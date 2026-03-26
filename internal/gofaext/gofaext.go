@@ -155,3 +155,9 @@ func Dat(iy, im, id int, fd float64) (d float64, status int) {
 	status = gofa.Dat(iy, im, id, fd, &d)
 	return d, status
 }
+
+// Gst06a returns the Greenwich Apparent Sidereal Time (GAST) for the given
+// UT1 and TT Julian dates. Result is in radians, [0, 2π).
+func Gst06a(uta, utb, tta, ttb float64) float64 {
+	return gofa.Gst06a(uta, utb, tta, ttb)
+}

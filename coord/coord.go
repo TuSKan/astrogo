@@ -77,11 +77,6 @@ func (c ICRS) ToUnitVector() vector.Vec3 {
 // ToUnitVector converts the direction to a unit Cartesian vector in the
 // frame's standard orientation (X=North, Y=East, Z=Up).
 func (c AltAz) ToUnitVector() vector.Vec3 {
-	// Az is North=0, East=90. Spherical Lon is usually East=0.
-	// To match Z=Up, X=North, Y=East:
-	// x = cos(alt) * cos(az)
-	// y = cos(alt) * sin(az)
-	// z = sin(alt)
 	alt := c.Alt.Radians()
 	az := c.Az.Radians()
 	cosAlt := math.Cos(alt)
@@ -98,6 +93,54 @@ func (c Galactic) ToUnitVector() vector.Vec3 {
 // frame's standard orientation.
 func (c Ecliptic) ToUnitVector() vector.Vec3 {
 	return vector.FromSpherical(c.Lon.Radians(), c.Lat.Radians())
+}
+
+// ── FromUnitVector ────────────────────────────────────────────────────────────
+
+// ICRSFromUnitVector converts a unit Cartesian vector back to an ICRS coordinate.
+func ICRSFromUnitVector(v vector.Vec3) ICRS {
+	lon, lat := v.ToSpherical()
+	return ICRS{RA: angle.Rad(lon), Dec: angle.Rad(lat)}
+}
+
+// GalacticFromUnitVector converts a unit Cartesian vector to a Galactic coordinate.
+func GalacticFromUnitVector(v vector.Vec3) Galactic {
+	lon, lat := v.ToSpherical()
+	return Galactic{L: angle.Rad(lon), B: angle.Rad(lat)}
+}
+
+// EclipticFromUnitVector converts a unit Cartesian vector to an Ecliptic coordinate.
+func EclipticFromUnitVector(v vector.Vec3) Ecliptic {
+	lon, lat := v.ToSpherical()
+	return Ecliptic{Lon: angle.Rad(lon), Lat: angle.Rad(lat)}
+}
+
+// ── Equality ──────────────────────────────────────────────────────────────────
+
+const coordTol = 1e-12 // radians (~0.2 microarcseconds)
+
+// Equal reports whether c and other point to within coordTol radians of each other.
+func (c ICRS) Equal(other ICRS) bool {
+	return math.Abs(c.RA.Radians()-other.RA.Radians()) < coordTol &&
+		math.Abs(c.Dec.Radians()-other.Dec.Radians()) < coordTol
+}
+
+// Equal reports whether c and other point to within coordTol radians of each other.
+func (c Galactic) Equal(other Galactic) bool {
+	return math.Abs(c.L.Radians()-other.L.Radians()) < coordTol &&
+		math.Abs(c.B.Radians()-other.B.Radians()) < coordTol
+}
+
+// Equal reports whether c and other point to within coordTol radians of each other.
+func (c Ecliptic) Equal(other Ecliptic) bool {
+	return math.Abs(c.Lon.Radians()-other.Lon.Radians()) < coordTol &&
+		math.Abs(c.Lat.Radians()-other.Lat.Radians()) < coordTol
+}
+
+// Equal reports whether c and other point to within coordTol radians of each other.
+func (c AltAz) Equal(other AltAz) bool {
+	return math.Abs(c.Alt.Radians()-other.Alt.Radians()) < coordTol &&
+		math.Abs(c.Az.Radians()-other.Az.Radians()) < coordTol
 }
 
 // ── Formatting ────────────────────────────────────────────────────────────────

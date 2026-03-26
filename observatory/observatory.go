@@ -3,9 +3,11 @@ package observatory
 import (
 	"errors"
 	"fmt"
+	"math"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/earth"
+	"github.com/TuSKan/astrogo/internal/gofaext"
 	"github.com/TuSKan/astrogo/time"
 )
 
@@ -73,4 +75,45 @@ func (s Site) HeightMeters() float64 { return s.location.Height }
 // String returns a compact representation of the site.
 func (s Site) String() string {
 	return fmt.Sprintf("Site(%s: %s, Hor=%s)", s.name, s.location, s.horizon)
+}
+
+// Equal reports whether s and other represent the same observing site
+// (same name, location, horizon, and time zone).
+func (s Site) Equal(other Site) bool {
+	return s.name == other.name &&
+		s.location.Lon.Radians() == other.location.Lon.Radians() &&
+		s.location.Lat.Radians() == other.location.Lat.Radians() &&
+		s.location.Height == other.location.Height &&
+		s.horizon.Radians() == other.horizon.Radians()
+}
+
+// WithHorizon returns a copy of s with the given horizon limit.
+func (s Site) WithHorizon(h angle.Angle) (Site, error) {
+	return NewSite(s.name, s.location, h, s.timeZone)
+}
+
+// WithTimeZone returns a copy of s with the given time zone.
+func (s Site) WithTimeZone(tz *time.Location) Site {
+	s.timeZone = tz
+	return s
+}
+
+// LocalSiderealTime returns the Local Apparent Sidereal Time (LAST) at the
+// observer's location for the given time.
+//
+// LAST = GAST + east longitude
+//
+// It uses the IAU 2006 GAST model (Gst06a) with the approximation UT1 ≈ UTC.
+func (s Site) LocalSiderealTime(t time.Time) angle.Angle {
+	// For v1 we approximate UT1 = UTC (DUT1 = 0).
+	utc1, utc2 := t.JDParts()
+	tt1, tt2 := t.TT().JDParts()
+	gast := gofaext.Gst06a(utc1, utc2, tt1, tt2)
+	lst := gast + s.location.Lon.Radians()
+	// Normalise to [0, 2π)
+	lst = math.Mod(lst, 2*math.Pi)
+	if lst < 0 {
+		lst += 2 * math.Pi
+	}
+	return angle.Rad(lst)
 }

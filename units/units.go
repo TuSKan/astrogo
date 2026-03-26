@@ -70,13 +70,29 @@ func (u Unit) PowInt(p int) Unit {
 	}
 }
 
-// ── Built-in Units ────────────────────────────────────────────────────────────
+// String returns a human-readable description of the unit, e.g., "km".
+func (u Unit) String() string {
+	if u.Symbol != "" {
+		return u.Symbol
+	}
+	return u.Name
+}
+
+// ── Built-in Units ─────────────────────────────────────────────────────────────
 
 var (
-	// Length
+	// Length (SI)
 	Meter      = Unit{Dimension: Length, ScaleFactor: 1.0, Name: "meter", Symbol: "m"}
 	Kilometer  = Unit{Dimension: Length, ScaleFactor: 1000.0, Name: "kilometer", Symbol: "km"}
 	Millimeter = Unit{Dimension: Length, ScaleFactor: 1e-3, Name: "millimeter", Symbol: "mm"}
+
+	// Astronomical length
+	// 1 AU = 1.495978707e11 m (IAU 2012 nominal)
+	AstronomicalUnit = Unit{Dimension: Length, ScaleFactor: 1.495978707e11, Name: "astronomical unit", Symbol: "AU"}
+	// 1 pc = 648000/π AU
+	Parsec = Unit{Dimension: Length, ScaleFactor: 3.085677581491367e16, Name: "parsec", Symbol: "pc"}
+	// 1 ly = 9.4607304725808e15 m
+	LightYear = Unit{Dimension: Length, ScaleFactor: 9.4607304725808e15, Name: "light-year", Symbol: "ly"}
 
 	// Mass
 	Gram     = Unit{Dimension: Mass, ScaleFactor: 1e-3, Name: "gram", Symbol: "g"}
@@ -96,4 +112,9 @@ var (
 
 	// Temperature
 	Kelvin = Unit{Dimension: Temperature, ScaleFactor: 1.0, Name: "kelvin", Symbol: "K"}
+
+	// Flux density (spectral)
+	// 1 Jy = 1e-26 W / (m^2 Hz) = 1e-26 kg / s^2
+	// Dimension: M * T^-2 (Spectral Flux Density in SI base units)
+	Jansky = Unit{Dimension: SpectralFlux, ScaleFactor: 1e-26, Name: "jansky", Symbol: "Jy"}
 )

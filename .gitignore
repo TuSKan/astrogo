@@ -39,3 +39,7 @@ data/
 *.txt
 *.png
 *.log
+
+# Assets exception (ensure files in assets/ are tracked even if they match global patterns)
+!assets/
+!assets/**
