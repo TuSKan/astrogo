@@ -2,6 +2,7 @@ package visibility
 
 import (
 	"errors"
+	"math"
 	stdtime "time"
 
 	"github.com/TuSKan/astrogo/angle"
@@ -102,15 +103,21 @@ func VisibleIntervals(
 
 // TransitEstimate estimates the time and altitude of maximum culmination
 // (transit) for an object within a given search window.
-// It uses a simple sampled maximum search.
+//
+// It uses a two-stage approach:
+//  1. Coarse 10-min grid scan to bracket the maximum.
+//  2. Golden-section search within the bracket for sub-minute precision.
 func TransitEstimate(obj sky.Object, site observatory.Site, start, end time.Time) (time.Time, angle.Angle, error) {
-	// Use 1-minute steps for a reasonably good coarse estimate
-	step := 1 * stdtime.Minute
-	maxAlt := angle.Deg(-90)
-	var maxTime time.Time
+	const coarseStep = 10 * stdtime.Minute
+	const tol = 1 * stdtime.Second
 
-	t := start
-	for t.Before(end) || t.Equal(end) {
+	// Stage 1: coarse scan to locate the bracket [tLeft, tRight] around the peak.
+	type sample struct {
+		t   time.Time
+		alt float64
+	}
+	var samples []sample
+	for t := start; !t.After(end); t = t.Add(coarseStep) {
 		pos, err := obj.ICRS(t)
 		if err != nil {
 			return time.Time{}, angle.Deg(0), err
@@ -119,15 +126,87 @@ func TransitEstimate(obj sky.Object, site observatory.Site, start, end time.Time
 		if err != nil {
 			return time.Time{}, angle.Deg(0), err
 		}
-
-		if aa.Alt.Degrees() > maxAlt.Degrees() {
-			maxAlt = aa.Alt
-			maxTime = t
-		}
-		t = t.Add(step)
+		samples = append(samples, sample{t, aa.Alt.Degrees()})
+	}
+	if len(samples) == 0 {
+		return time.Time{}, angle.Deg(0), nil
 	}
 
-	return maxTime, maxAlt, nil
+	// Find index of maximum.
+	maxIdx := 0
+	for i, s := range samples {
+		if s.alt > samples[maxIdx].alt {
+			maxIdx = i
+		}
+	}
+
+	// Stage 2: golden-section search within the surrounding bracket.
+	lo := samples[max(0, maxIdx-1)].t
+	hi := samples[min(len(samples)-1, maxIdx+1)].t
+
+	R := (math.Sqrt(5) - 1) / 2
+	C := 1 - R
+
+	altAt := func(t time.Time) (float64, error) {
+		pos, err := obj.ICRS(t)
+		if err != nil {
+			return 0, err
+		}
+		aa, err := sky.AltAz(pos, t, site)
+		if err != nil {
+			return 0, err
+		}
+		return aa.Alt.Degrees(), nil
+	}
+
+	d := hi.Sub(lo)
+	ga := lo.Add(stdtime.Duration(float64(d) * C))
+	gb := lo.Add(stdtime.Duration(float64(d) * R))
+	fa, err := altAt(ga)
+	if err != nil {
+		return time.Time{}, angle.Deg(0), err
+	}
+	fb, err := altAt(gb)
+	if err != nil {
+		return time.Time{}, angle.Deg(0), err
+	}
+
+	for hi.Sub(lo) > tol {
+		if fa > fb {
+			hi = gb
+			gb, fb = ga, fa
+			d = hi.Sub(lo)
+			ga = lo.Add(stdtime.Duration(float64(d) * C))
+			if fa, err = altAt(ga); err != nil {
+				return time.Time{}, angle.Deg(0), err
+			}
+		} else {
+			lo = ga
+			ga, fa = gb, fb
+			d = hi.Sub(lo)
+			gb = lo.Add(stdtime.Duration(float64(d) * R))
+			if fb, err = altAt(gb); err != nil {
+				return time.Time{}, angle.Deg(0), err
+			}
+		}
+	}
+
+	var resTime time.Time
+	if fa > fb {
+		resTime = ga
+	} else {
+		resTime = gb
+	}
+
+	pos, err := obj.ICRS(resTime)
+	if err != nil {
+		return time.Time{}, angle.Deg(0), err
+	}
+	aa, err := sky.AltAz(pos, resTime, site)
+	if err != nil {
+		return time.Time{}, angle.Deg(0), err
+	}
+	return resTime, aa.Alt, nil
 }
 
 // MaxAltitudeInWindow returns the maximum altitude reached by an object
@@ -156,10 +235,10 @@ func Find(
 
 	t := start
 	for t.Before(end) || t.Equal(end) {
-		// Adapt sky.Object to target.Observable if needed, 
+		// Adapt sky.Object to target.Observable if needed,
 		// but since target.Observable is simpler, it should work if we cast or if we change the signature.
 		// For now, let's just use a local adapter if needed.
-		
+
 		obs, ok := obj.(target.Observable)
 		if !ok {
 			// If it's not a target.Observable, we can't check constraints that require it.

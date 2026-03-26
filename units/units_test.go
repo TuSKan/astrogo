@@ -77,12 +77,48 @@ func TestDerivedUnits(t *testing.T) {
 }
 
 func TestUnitAlgebra(t *testing.T) {
-	// m * m = m^2
 	m2 := units.Meter.Mul(units.Meter)
 	testutil.AssertEqual(t, "m*m dimension", m2.Dimension, units.Area)
 	testutil.AssertNear(t, "m*m scale", m2.ScaleFactor, 1.0, 1e-15)
 
-	// Newton = kg * m / s^2
 	newton := units.Kilogram.Mul(units.Meter).Div(units.Second.PowInt(2))
 	testutil.AssertEqual(t, "Newton dimension", newton.Dimension, units.Force)
+}
+
+func TestAstronomicalUnits(t *testing.T) {
+	// 1 AU in km
+	factor, err := units.AstronomicalUnit.ConversionFactor(units.Kilometer)
+	testutil.AssertNoError(t, err)
+	testutil.AssertNear(t, "1 AU in km", factor, 1.495978707e8, 1e3) // ~1.496e8 km
+
+	// 1 pc in AU
+	factorPcAU, err := units.Parsec.ConversionFactor(units.AstronomicalUnit)
+	testutil.AssertNoError(t, err)
+	testutil.AssertNear(t, "1 pc in AU", factorPcAU, 206264.8, 0.5) // IAU value
+
+	// 1 ly in pc
+	factorLyPc, err := units.LightYear.ConversionFactor(units.Parsec)
+	testutil.AssertNoError(t, err)
+	testutil.AssertNear(t, "1 ly in pc", factorLyPc, 0.30660, 1e-4)
+
+	// Incompatible: AU vs second
+	_, err = units.AstronomicalUnit.ConversionFactor(units.Second)
+	testutil.AssertError(t, err)
+}
+
+func TestJansky(t *testing.T) {
+	// Jansky should have SpectralFlux dimension
+	testutil.AssertEqual(t, "Jansky dimension", units.Jansky.Dimension, units.SpectralFlux)
+	testutil.AssertNear(t, "Jansky scale", units.Jansky.ScaleFactor, 1e-26, 1e-40)
+
+	// Jy is not compatible with length
+	if units.Jansky.Compatible(units.Meter) {
+		t.Error("Jansky should not be compatible with Meter")
+	}
+}
+
+func TestUnitString(t *testing.T) {
+	testutil.AssertEqual(t, "Meter symbol", units.Meter.String(), "m")
+	testutil.AssertEqual(t, "AU symbol", units.AstronomicalUnit.String(), "AU")
+	testutil.AssertEqual(t, "Jansky symbol", units.Jansky.String(), "Jy")
 }

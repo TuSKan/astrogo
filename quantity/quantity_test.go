@@ -1,6 +1,7 @@
 package quantity_test
 
 import (
+	"math"
 	"testing"
 
 	"github.com/TuSKan/astrogo/internal/testutil"
@@ -99,4 +100,68 @@ func TestMustInPanic(t *testing.T) {
 	}()
 	q := quantity.New(1, units.Meter)
 	_ = q.MustIn(units.Second)
+}
+
+func TestScale(t *testing.T) {
+	q := quantity.New(10, units.Meter)
+	s := q.Scale(3.5)
+	testutil.AssertNear(t, "Scale value", s.Value, 35, 1e-15)
+	testutil.AssertEqual(t, "Scale unit", s.Unit, units.Meter)
+}
+
+func TestAbs(t *testing.T) {
+	neg := quantity.New(-7.5, units.Kilometer)
+	pos := neg.Abs()
+	testutil.AssertNear(t, "Abs value", pos.Value, 7.5, 1e-15)
+
+	alreadyPos := quantity.New(3.0, units.Meter)
+	testutil.AssertNear(t, "Abs already positive", alreadyPos.Abs().Value, 3.0, 1e-15)
+}
+
+func TestIsZeroNaN(t *testing.T) {
+	zero := quantity.New(0, units.Meter)
+	nonZero := quantity.New(1, units.Meter)
+	nan := quantity.New(math.NaN(), units.Meter)
+
+	if !zero.IsZero() {
+		t.Error("IsZero: expected true for 0m")
+	}
+	if nonZero.IsZero() {
+		t.Error("IsZero: expected false for 1m")
+	}
+	if !nan.IsNaN() {
+		t.Error("IsNaN: expected true for NaN")
+	}
+	if zero.IsNaN() {
+		t.Error("IsNaN: expected false for 0")
+	}
+}
+
+func TestCompare(t *testing.T) {
+	a := quantity.New(500, units.Meter)
+	b := quantity.New(1, units.Kilometer)
+	c := quantity.New(2, units.Kilometer)
+
+	cmp, err := a.Compare(b) // 500m vs 1000m
+	testutil.AssertNoError(t, err)
+	if cmp != -1 {
+		t.Errorf("Compare: expected -1, got %d", cmp)
+	}
+
+	cmp2, err := b.Compare(a) // 1000m vs 500m
+	testutil.AssertNoError(t, err)
+	if cmp2 != 1 {
+		t.Errorf("Compare: expected +1, got %d", cmp2)
+	}
+
+	cmp3, err := b.Compare(b) // equal
+	testutil.AssertNoError(t, err)
+	if cmp3 != 0 {
+		t.Errorf("Compare: expected 0, got %d", cmp3)
+	}
+
+	// Incompatible units
+	_, err = a.Compare(quantity.New(1, units.Second))
+	testutil.AssertError(t, err)
+	_ = c // silence unused
 }

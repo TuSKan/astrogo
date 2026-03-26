@@ -95,9 +95,42 @@ func (q Quantity) Equals(other Quantity) bool {
 	if !q.Unit.Compatible(other.Unit) {
 		return false
 	}
-	// Convert both to SI base for exact comparison
 	v1 := q.Value * q.Unit.ScaleFactor
 	v2 := other.Value * other.Unit.ScaleFactor
-	// Tight tolerance for float comparison
 	return math.Abs(v1-v2) < 1e-15*math.Max(math.Abs(v1), math.Abs(v2))
+}
+
+// Scale returns a new Quantity with its value multiplied by factor, keeping the same unit.
+func (q Quantity) Scale(factor float64) Quantity {
+	return Quantity{Value: q.Value * factor, Unit: q.Unit}
+}
+
+// Abs returns a new Quantity with the absolute value, keeping the same unit.
+func (q Quantity) Abs() Quantity {
+	return Quantity{Value: math.Abs(q.Value), Unit: q.Unit}
+}
+
+// IsZero reports whether the quantity's value is exactly zero.
+func (q Quantity) IsZero() bool { return q.Value == 0 }
+
+// IsNaN reports whether the quantity's value is NaN.
+func (q Quantity) IsNaN() bool { return math.IsNaN(q.Value) }
+
+// Compare compares q and other by their SI-base values.
+// Returns -1, 0, or +1 if q is less than, equal to, or greater than other.
+// Returns an error if the units are incompatible.
+func (q Quantity) Compare(other Quantity) (int, error) {
+	if !q.Unit.Compatible(other.Unit) {
+		return 0, units.IncompatibleUnitError{From: q.Unit, To: other.Unit}
+	}
+	v1 := q.Value * q.Unit.ScaleFactor
+	v2 := other.Value * other.Unit.ScaleFactor
+	switch {
+	case v1 < v2:
+		return -1, nil
+	case v1 > v2:
+		return 1, nil
+	default:
+		return 0, nil
+	}
 }

@@ -13,6 +13,7 @@ type Duration = time.Duration
 type Location = time.Location
 
 const (
+	Second = time.Second
 	Minute = time.Minute
 	Hour   = time.Hour
 )
@@ -119,6 +120,16 @@ func (t Time) Scale() Scale {
 // String returns a simple string representation (JD + Scale).
 func (t Time) String() string {
 	return fmt.Sprintf("JD %.8f (%s)", t.JD(), t.scale)
+}
+
+// ToGo converts the Time to a standard library time.Time.
+// The result is in UTC.
+func (t Time) ToGo() time.Time {
+	// JD 2440587.5 is 1970-01-01 00:00:00 UTC
+	unix := (t.JD() - 2440587.5) * 86400.0
+	sec := int64(math.Floor(unix))
+	nsec := int64((unix - float64(sec)) * 1e9)
+	return time.Unix(sec, nsec).UTC()
 }
 
 // Add returns a new Time with the duration added.

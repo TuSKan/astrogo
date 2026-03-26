@@ -56,3 +56,44 @@ func TestString(t *testing.T) {
 		t.Error("String() returned empty")
 	}
 }
+
+func TestSiteEqual(t *testing.T) {
+	loc, _ := earth.NewGeodetic(angle.Deg(10), angle.Deg(45), 500)
+	a, _ := observatory.NewSite("Test", loc, angle.Deg(20), nil)
+	b, _ := observatory.NewSite("Test", loc, angle.Deg(20), nil)
+	c, _ := observatory.NewSite("Other", loc, angle.Deg(20), nil)
+
+	if !a.Equal(b) {
+		t.Error("identical sites should be equal")
+	}
+	if a.Equal(c) {
+		t.Error("sites with different names should not be equal")
+	}
+}
+
+func TestWithHorizon(t *testing.T) {
+	loc, _ := earth.NewGeodetic(angle.Deg(0), angle.Deg(0), 0)
+	site, _ := observatory.NewSite("Test", loc, angle.Zero(), nil)
+
+	s2, err := site.WithHorizon(angle.Deg(15))
+	testutil.AssertNoError(t, err)
+	testutil.AssertNear(t, "WithHorizon", s2.Horizon().Degrees(), 15.0, 1e-12)
+
+	// Invalid horizon should fail
+	_, err = site.WithHorizon(angle.Deg(100))
+	testutil.AssertError(t, err)
+}
+
+func TestLocalSiderealTime(t *testing.T) {
+	// Greenwich (lon=0) at J2000.0 (2000-01-01 12:00:00 UTC = JD 2451545.0)
+	// GAST at J2000.0 is approximately 18.697 hours = 280.46 degrees
+	loc, _ := earth.NewGeodetic(angle.Deg(0), angle.Deg(51.5), 0) // Greenwich
+	site, _ := observatory.NewSite("Greenwich", loc, angle.Zero(), nil)
+
+	tm := time.FromJD(2451545.0, time.UTC)
+	lst := site.LocalSiderealTime(tm)
+
+	// Known GAST at J2000.0 ~280.46° ± 0.5°
+	expectedDeg := 280.46
+	testutil.AssertNear(t, "LST at Greenwich J2000", lst.Degrees(), expectedDeg, 0.5)
+}
