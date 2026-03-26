@@ -4,7 +4,22 @@ import (
 	"fmt"
 	"math"
 	"time"
+
+	"github.com/TuSKan/astrogo/internal/gofaext"
 )
+
+type Duration = time.Duration
+
+type Location = time.Location
+
+const (
+	Minute = time.Minute
+	Hour   = time.Hour
+)
+
+var LoadLocation = time.LoadLocation
+
+var LocationUTC = time.UTC
 
 // Scale represents an astronomical time scale.
 type Scale uint8
@@ -117,6 +132,11 @@ func (t Time) AddDays(d float64) Time {
 	return FromJDParts(t.jd1, t.jd2+d, t.scale)
 }
 
+// Date returns a new Time from a Go standard library time.Time.
+func Date(year int, month time.Month, day int, hour int, min int, sec int, nsec int, loc *time.Location) Time {
+	return FromGo(time.Date(year, month, day, hour, min, sec, nsec, loc))
+}
+
 // Before returns true if t is chronologically before other.
 // WARNING: This assumes both times are in the same scale for a simple comparison.
 func (t Time) Before(other Time) bool {
@@ -168,6 +188,32 @@ func (t Time) SubDays(other Time) float64 {
 }
 
 // ── Internal Helpers ──────────────────────────────────────────────────────────
+
+// TT returns a new Time converted to the Terrestrial Time scale.
+func (t Time) TT() Time {
+	if t.scale == TT {
+		return t
+	}
+	if t.scale != UTC {
+		// Simplified conversion for other scales not implemented in v1
+		return t
+	}
+	// UTC -> TT: TT = UTC + ΔAT + 32.184s
+	y, m, d, fd, _ := gofaext.JdToDate(t.jd1, t.jd2)
+	dat, _ := gofaext.Dat(y, m, d, fd)
+	deltaTT := (dat + 32.184) / 86400.0
+	return FromJDParts(t.jd1, t.jd2+deltaTT, TT)
+}
+
+// TDB returns a new Time converted to the Barycentric Dynamical Time scale.
+// In this implementation, TDB is approximated as being equal to TT.
+func (t Time) TDB() Time {
+	if t.scale == TDB {
+		return t
+	}
+	tt := t.TT()
+	return Time{jd1: tt.jd1, jd2: tt.jd2, scale: TDB}
+}
 
 // normalize ensures that |jd2| < 1.0, and both components are properly balanced.
 func (t *Time) normalize() {

@@ -150,3 +150,8 @@ func Moon98(date1, date2 float64) (pv [2][3]float64) {
 	gofa.Moon98(date1, date2, &pv)
 	return pv
 }
+// Dat returns the number of leap seconds for a given UTC date.
+func Dat(iy, im, id int, fd float64) (d float64, status int) {
+	status = gofa.Dat(iy, im, id, fd, &d)
+	return d, status
+}

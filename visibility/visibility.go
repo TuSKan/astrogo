@@ -1,12 +1,14 @@
 package visibility
 
 import (
+	"errors"
 	stdtime "time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/constraint"
 	"github.com/TuSKan/astrogo/observatory"
 	"github.com/TuSKan/astrogo/sky"
+	"github.com/TuSKan/astrogo/target"
 	"github.com/TuSKan/astrogo/time"
 )
 
@@ -154,14 +156,23 @@ func Find(
 
 	t := start
 	for t.Before(end) || t.Equal(end) {
-		ctx := constraint.NewContext(obj, t, site, nil)
+		// Adapt sky.Object to target.Observable if needed, 
+		// but since target.Observable is simpler, it should work if we cast or if we change the signature.
+		// For now, let's just use a local adapter if needed.
+		
+		obs, ok := obj.(target.Observable)
+		if !ok {
+			// If it's not a target.Observable, we can't check constraints that require it.
+			return nil, errors.New("object does not implement target.Observable")
+		}
+
 		allOK := true
 		for _, c := range constraints {
-			ok, err := c.Evaluate(ctx)
+			res, err := c.Check(obs, t, site)
 			if err != nil {
 				return nil, err
 			}
-			if !ok {
+			if !res.Pass {
 				allOK = false
 				break
 			}

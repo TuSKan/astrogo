@@ -22,29 +22,6 @@ type Object interface {
 	ICRS(t time.Time) (coord.ICRS, error)
 }
 
-// Target represents a fixed celestial object with an optional priority.
-type Target struct {
-	Name     string
-	Coord    coord.ICRS
-	Priority float64
-}
-
-// ICRS implements Object for a fixed Target.
-func (t *Target) ICRS(_ time.Time) (coord.ICRS, error) {
-	return t.Coord, nil
-}
-
-// NewTarget creates a named celestial target at the given RA/Dec (degrees).
-func NewTarget(name string, raDeg, decDeg float64) *Target {
-	return &Target{
-		Name: name,
-		Coord: coord.ICRS{
-			RA:  angle.Deg(raDeg),
-			Dec: angle.Deg(decDeg),
-		},
-	}
-}
-
 func Separation(a, b coord.ICRS) angle.Angle {
 	va := a.ToUnitVector()
 	vb := b.ToUnitVector()
@@ -73,6 +50,11 @@ func PositionAngle(from, to coord.ICRS) angle.Angle {
 // It is a convenience wrapper around transform.ICRSToAltAz.
 func AltAz(target coord.ICRS, t time.Time, site observatory.Site) (coord.AltAz, error) {
 	return transform.ICRSToAltAz(target, t, site.Location())
+}
+
+// HourAngle returns the local Hour Angle for a target.
+func HourAngle(target coord.ICRS, t time.Time, site observatory.Site) (angle.Angle, error) {
+	return transform.ICRSToHourAngle(target, t, site.Location())
 }
 
 // ZenithDistance returns the zenith distance (90 - Alt) for a given altitude.

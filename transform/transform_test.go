@@ -82,3 +82,74 @@ func TestAltAzEdgeCases(t *testing.T) {
 		t.Errorf("Invalid Alt: %v", aa.Alt)
 	}
 }
+
+func TestGalacticExtremes(t *testing.T) {
+	const tol = 1e-7
+	tests := []struct {
+		name string
+		icrs coord.ICRS
+		l, b float64
+	}{
+		{
+			name: "North Galactic Pole",
+			icrs: coord.ICRS{RA: angle.Deg(192.85948), Dec: angle.Deg(27.12825)},
+			b:    90,
+		},
+		{
+			name: "South Galactic Pole",
+			icrs: coord.ICRS{RA: angle.Deg(12.85948), Dec: angle.Deg(-27.12825)},
+			b:    -90,
+		},
+		{
+			name: "Galactic Center",
+			icrs: coord.ICRS{RA: angle.Deg(266.405), Dec: angle.Deg(-28.936)},
+			l:    0, b: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gal := transform.ICRSToGalactic(tt.icrs)
+			if tt.b == 90 || tt.b == -90 {
+				testutil.AssertNear(t, tt.name+" B", gal.B.Degrees(), tt.b, tol)
+			} else {
+				testutil.AssertNear(t, tt.name+" L", gal.L.Degrees(), tt.l, 0.1) // GC RA/Dec are approx
+				testutil.AssertNear(t, tt.name+" B", gal.B.Degrees(), tt.b, 0.1)
+			}
+		})
+	}
+}
+
+func TestEclipticExtremes(t *testing.T) {
+	const tol = 2e-5
+	tm := time.FromJD(2451545.0, time.UTC) // J2000
+
+	tests := []struct {
+		name string
+		icrs coord.ICRS
+		lat  float64
+	}{
+		{
+			name: "North Ecliptic Pole",
+			icrs: coord.ICRS{RA: angle.Deg(270), Dec: angle.Deg(66.5607083)},
+			lat:  90,
+		},
+		{
+			name: "South Ecliptic Pole",
+			icrs: coord.ICRS{RA: angle.Deg(90), Dec: angle.Deg(-66.5607083)},
+			lat:  -90,
+		},
+		{
+			name: "Aries",
+			icrs: coord.ICRS{RA: angle.Deg(0), Dec: angle.Deg(0)},
+			lat:  0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ecl := transform.ICRSToEcliptic(tt.icrs, tm)
+			testutil.AssertNear(t, tt.name+" Lat", ecl.Lat.Degrees(), tt.lat, tol)
+		})
+	}
+}

@@ -91,7 +91,9 @@ package main
 import (
 	"fmt"
 	"github.com/TuSKan/astrogo/angle"
+	"github.com/TuSKan/astrogo/catalog"
 	"github.com/TuSKan/astrogo/constraint"
+	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/earth"
 	"github.com/TuSKan/astrogo/observatory"
 	"github.com/TuSKan/astrogo/plan"
@@ -107,31 +109,30 @@ func main() {
 	// 2. Define Observation Constraints
 	// We want targets at least 30 degrees above the horizon.
 	constraints := []constraint.Constraint{
-		constraint.MinAltitudeConstraint{MinAlt: angle.Deg(30)},
+		constraint.Altitude{Threshold: angle.Deg(30)},
 	}
 
-	// 3. Create a Planner
-	p, _ := plan.NewPlanner(site, constraints)
-
-	// 4. Define a Target: Orion Nebula (M42)
-	// (RA 05h 35m 17s, Dec -05d 23m 28s)
+	// 3. Define Targets
+	// Orion Nebula (fixed)
 	ra, _  := angle.ParseHMS("05h 35m 17.3s")
 	dec, _ := angle.ParseDMS("-05° 23' 28\"")
-	target := sky.NewTarget("M42", ra.Degrees(), dec.Degrees())
-
-	// 5. Check Observability
-	now := time.NowUTC()
-	ok, _ := p.Observable(target, now)
-
-	// 6. Output Result
-	altaz, _ := sky.AltAz(target.Coord, now, site)
+	m42 := target.NewFixed(catalog.Target{
+		Name: "M42",
+		Coord: coord.ICRS{RA: ra, Dec: dec},
+	})
 	
-	fmt.Printf("Target:   %s\n", target.Name)
-	fmt.Printf("Altitude: %s\n", altaz.Alt.DMSString(1))
-	if ok {
-		fmt.Println("Status:   Visible (Satisfies Constraints)")
-	} else {
-		fmt.Println("Status:   Not Observable")
+	// Mars (moving)
+	mars := target.NewDefaultBody(body.Mars)
+
+	// 4. Check Observability and Score
+	now := time.NowUTC()
+	
+	for _, obj := range []target.Observable{m42, mars} {
+		eval, _  := plan.IsObservable(obj, now, site, constraints...)
+		score, _ := plan.ScoreObservable(obj, now, site, constraints...)
+		
+		fmt.Printf("Target: %-10s  Observable: %-5v  Score: %5.1f\n", 
+			obj.Name(), eval.Observable, score)
 	}
 }
 ```
@@ -159,25 +160,31 @@ flowchart TD
 
 ---
 
-## Package Overview
+## Implementation Status
 
-| Package | Purpose |
-| :--- | :--- |
-| `angle` | Angular types and operations |
-| `time` | Astronomical time scales (JD-based) |
-| `units` | Physical unit system |
-| `quantity` | Value + unit representation |
-| `vector` | 3D geometry primitives |
-| `earth` | Geodesy and Earth models |
-| `coord` | Celestial coordinate types |
-| `transform` | Frame transformations |
-| `observatory` | Observer/site modeling |
-| `sky` | Sky calculations (Alt/Az, airmass, separation) |
-| `visibility` | Target visibility windows |
-| `constraint` | Planning constraints |
-| `plan` | Observation planning |
-| `ephemeris` | Solar system and moving objects |
-| `fits` / `io` | Data formats and interoperability |
+| Package | Purpose | Status |
+| :--- | :--- | :--- |
+| `constants` | Universal and astronomical constants | ✅ implemented |
+| `angle` | Angular types and operations | ✅ implemented |
+| `vector` | 3D geometry primitives | ✅ implemented |
+| `units` | Physical unit system | ⏳ partial |
+| `quantity` | Value + unit representation | ⏳ partial |
+| `time` | Astronomical time scales (JD-based) | ⏳ partial |
+| `earth` | Geodesy and Earth models | ⏳ partial |
+| `coord` | Celestial coordinate types | ⏳ partial |
+| `frame` | Coordinate frames and reference systems | ⏳ partial |
+| `transform` | Frame transformations | ⏳ partial |
+| `target` | Unified observation targets (fixed/moving) | ✅ implemented |
+| `observatory` | Observer/site modeling | ⏳ partial |
+| `sky` | Sky calculations (Alt/Az, airmass, separation) | ⏳ partial |
+| `visibility` | Target visibility windows | ⏳ partial |
+| `constraint` | Planning constraints | ✅ implemented |
+| `plan` | Observation planning and scoring | ✅ implemented |
+| `ephemeris` | Solar system and moving objects | ✅ implemented |
+| `fits` / `io` | Data formats and interoperability | 🚧 scaffold |
+
+See [`VALIDATION.md`](./VALIDATION.md) for scientific validation status and accuracy notes.
+
 
 ---
 

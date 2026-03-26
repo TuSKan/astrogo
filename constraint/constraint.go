@@ -1,67 +1,191 @@
+// Package constraint provides a system for evaluating astronomical observing constraints.
+//
+// It allows checking whether an observable target is suitable for observation
+// at a given time and site based on criteria such as minimum altitude,
+// maximum airmass, and solar/lunar positions.
 package constraint
 
 import (
+	"fmt"
+
 	"github.com/TuSKan/astrogo/angle"
+	"github.com/TuSKan/astrogo/body"
+	"github.com/TuSKan/astrogo/coord"
+	"github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/observatory"
 	"github.com/TuSKan/astrogo/sky"
+	"github.com/TuSKan/astrogo/target"
 	"github.com/TuSKan/astrogo/time"
 )
 
+// Result represents the outcome of a constraint check.
+type Result struct {
+	// Pass is true if the constraint was satisfied.
+	Pass bool
+	// Value is the numerical value evaluated (e.g., actual altitude).
+	Value float64
+	// Reason is an optional human-readable explanation of the result.
+	Reason string
+}
 
-// Constraint defines a requirement for an observation to be considered valid.
+func (r Result) String() string {
+	status := "FAIL"
+	if r.Pass {
+		status = "PASS"
+	}
+	if r.Reason != "" {
+		return fmt.Sprintf("%s: %s (value=%.2f)", status, r.Reason, r.Value)
+	}
+	return fmt.Sprintf("%s (value=%.2f)", status, r.Value)
+}
+
+// Constraint defines the interface for an observing requirement.
 type Constraint interface {
-	// Evaluate returns true if the constraint is satisfied for the target
-	// at the given time and site. It uses the provided Context for
-	// access to memoized coordinates.
-	Evaluate(ctx *Context) (bool, error)
+	// Check evaluates the constraint for a given target, time, and site.
+	Check(obj target.Observable, t time.Time, site observatory.Site) (Result, error)
 }
 
-// MinAltitudeConstraint ensures an object is above a minimum altitude.
-type MinAltitudeConstraint struct {
-	MinAlt angle.Angle
+// Altitude passes if the target's altitude is >= a threshold.
+type Altitude struct {
+	Threshold angle.Angle
 }
 
-func (c MinAltitudeConstraint) Evaluate(ctx *Context) (bool, error) {
-	aa, err := ctx.AltAz()
+func (c Altitude) Check(obj target.Observable, t time.Time, site observatory.Site) (Result, error) {
+	aa, err := skyAltAzOf(obj, t, site)
 	if err != nil {
-		return false, err
+		return Result{}, err
 	}
-	return aa.Alt.Degrees() >= c.MinAlt.Degrees(), nil
-}
 
-// MaxAirmassConstraint ensures an object's airmass is below a maximum limit.
-type MaxAirmassConstraint struct {
-	MaxAirmass float64
-}
+	val := aa.Alt.Degrees()
+	thresh := c.Threshold.Degrees()
+	pass := val >= thresh
 
-func (c MaxAirmassConstraint) Evaluate(ctx *Context) (bool, error) {
-	aa, err := ctx.AltAz()
-	if err != nil {
-		return false, err
+	reason := ""
+	if !pass {
+		reason = fmt.Sprintf("altitude %.2f is below threshold %.2f", val, thresh)
 	}
-	am, err := sky.Airmass(aa.Alt)
+
+	return Result{
+		Pass:   pass,
+		Value:  val,
+		Reason: reason,
+	}, nil
+}
+
+// Airmass passes if the target's airmass is <= a threshold.
+type Airmass struct {
+	Threshold float64
+}
+
+func (c Airmass) Check(obj target.Observable, t time.Time, site observatory.Site) (Result, error) {
+	am, err := skyAirmassOf(obj, t, site)
 	if err != nil {
-		// If object is below horizon, airmass returns error, which correctly
-		// means constraint is not satisfied.
 		if err == sky.ErrBelowHorizon {
-			return false, nil
+			return Result{
+				Pass:   false,
+				Reason: "target is below the horizon",
+			}, nil
 		}
-		return false, err
+		return Result{}, err
 	}
-	return am <= c.MaxAirmass, nil
+
+	pass := am <= c.Threshold
+	reason := ""
+	if !pass {
+		reason = fmt.Sprintf("airmass %.2f exceeds threshold %.2f", am, c.Threshold)
+	}
+
+	return Result{
+		Pass:   pass,
+		Value:  am,
+		Reason: reason,
+	}, nil
 }
 
-// EvaluateAll checks if an object satisfies all provided constraints.
-func EvaluateAll(obj sky.Object, t time.Time, site observatory.Site, constraints []Constraint) (bool, error) {
-	ctx := NewContext(obj, t, site, nil)
-	for _, c := range constraints {
-		ok, err := c.Evaluate(ctx)
-		if err != nil {
-			return false, err
-		}
-		if !ok {
-			return false, nil
-		}
+// Sun passes if the Sun's altitude is <= a threshold (e.g., twilight).
+type Sun struct {
+	Threshold angle.Angle
+}
+
+func (c Sun) Check(_ target.Observable, t time.Time, site observatory.Site) (Result, error) {
+	sun := target.Body{
+		ID:       body.Sun,
+		Provider: ephemeris.Default(),
 	}
-	return true, nil
+
+	aa, err := skyAltAzOf(sun, t, site)
+	if err != nil {
+		return Result{}, err
+	}
+
+	val := aa.Alt.Degrees()
+	thresh := c.Threshold.Degrees()
+	pass := val <= thresh
+
+	reason := ""
+	if !pass {
+		reason = fmt.Sprintf("sun altitude %.2f is above threshold %.2f", val, thresh)
+	}
+
+	return Result{
+		Pass:   pass,
+		Value:  val,
+		Reason: reason,
+	}, nil
+}
+
+// MoonSep passes if the angular separation between the target and
+// the Moon is >= a threshold.
+type MoonSep struct {
+	Threshold angle.Angle
+}
+
+func (c MoonSep) Check(obj target.Observable, t time.Time, _ observatory.Site) (Result, error) {
+	pos, err := obj.Position(t)
+	if err != nil {
+		return Result{}, err
+	}
+
+	moon := target.Body{
+		ID:       body.Moon,
+		Provider: ephemeris.Default(),
+	}
+	moonPos, err := moon.Position(t)
+	if err != nil {
+		return Result{}, err
+	}
+
+	sep := sky.Separation(pos, moonPos)
+	val := sep.Degrees()
+	thresh := c.Threshold.Degrees()
+	pass := val >= thresh
+
+	reason := ""
+	if !pass {
+		reason = fmt.Sprintf("moon separation %.2f is below threshold %.2f", val, thresh)
+	}
+
+	return Result{
+		Pass:   pass,
+		Value:  val,
+		Reason: reason,
+	}, nil
+}
+
+// ── Private Sky Helpers ──────────────────────────────────────────────────────
+
+func skyAltAzOf(obj target.Observable, t time.Time, site observatory.Site) (coord.AltAz, error) {
+	pos, err := obj.Position(t)
+	if err != nil {
+		return coord.AltAz{}, err
+	}
+	return sky.AltAz(pos, t, site)
+}
+
+func skyAirmassOf(obj target.Observable, t time.Time, site observatory.Site) (float64, error) {
+	aa, err := skyAltAzOf(obj, t, site)
+	if err != nil {
+		return 0, err
+	}
+	return sky.Airmass(aa.Alt)
 }
