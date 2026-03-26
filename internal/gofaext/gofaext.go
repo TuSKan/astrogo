@@ -1,0 +1,152 @@
+package gofaext
+
+import "github.com/hebl/gofa"
+
+// Dtf2d converts a calendar date and time expressed in the given scale
+// ("UTC", "TAI", "TT", etc.) into a two-part Julian date (d1, d2).
+// It returns an error code matching the gofa convention:
+//
+//	0  = OK
+//	+1 = dubious year (ERFA warning)
+//	-1 = bad year
+//	-2 = bad month
+//	-3 = bad day
+//	-4 = bad hour, minute or second
+func Dtf2d(scale string, year, month, day, hour, min int, sec float64) (d1, d2 float64, status int) {
+	status = gofa.Dtf2d(scale, year, month, day, hour, min, sec, &d1, &d2)
+	return d1, d2, status
+}
+
+// JdToDate converts a Julian date (supplied as two-part jd1+jd2) to a
+// Gregorian calendar date. Returns year, month, day (integer) and the
+// fractional day.
+func JdToDate(jd1, jd2 float64) (year, month, day int, frac float64, status int) {
+	status = gofa.Jd2cal(jd1, jd2, &year, &month, &day, &frac)
+	return year, month, day, frac, status
+}
+
+// Seps returns the angular separation (in radians) between two directions
+// given as (ra1,dec1) and (ra2,dec2), both in radians.
+func Seps(ra1, dec1, ra2, dec2 float64) float64 {
+	return gofa.Seps(ra1, dec1, ra2, dec2)
+}
+
+// Atco13 performs the full ICRS → observed (az, zd, ha, dec, ra)
+// transformation including precession-nutation, Earth rotation, polar motion,
+// diurnal aberration, and refraction.
+//
+// All angular inputs and outputs are in radians.
+// Pressure phpa in hPa, temperature tc in °C, humidity rh in [0,1],
+// wavelength wl in micrometres.
+//
+// Returns: azimuth aob, zenith distance zob, hour angle hob,
+// declination dob, right ascension rob, equation of origins eo, and
+// a gofa status code (0 = OK, 1 = dubious year).
+func Atco13(
+	raRad, decRad float64,
+	pmra, pmdec, parallax, rv float64,
+	utc1, utc2, dut1 float64,
+	elong, phi, hm float64,
+	xp, yp float64,
+	phpa, tc, rh, wl float64,
+) (aob, zob, hob, dob, rob, eo float64, status int) {
+	status = gofa.Atco13(
+		raRad, decRad,
+		pmra, pmdec, parallax, rv,
+		utc1, utc2, dut1,
+		elong, phi, hm,
+		xp, yp,
+		phpa, tc, rh, wl,
+		&aob, &zob, &hob, &dob, &rob, &eo,
+	)
+	return aob, zob, hob, dob, rob, eo, status
+}
+// Atio13 performs the full observed → ICRS transformation including
+// refraction, diurnal aberration, and Earth rotation.
+// Atio13 performs the CIRS → observed transformation.
+func Atio13(
+	ri, di float64, // CIRS RA, Dec (radians)
+	utc1, utc2, dut1 float64,
+	elong, phi, hm float64,
+	xp, yp float64,
+	phpa, tc, rh, wl float64,
+) (aob, zob, hob, dob, rob float64) {
+	gofa.Atio13(
+		ri, di,
+		utc1, utc2, dut1,
+		elong, phi, hm,
+		xp, yp,
+		phpa, tc, rh, wl,
+		&aob, &zob, &hob, &dob, &rob,
+	)
+	return aob, zob, hob, dob, rob
+}
+
+// Atoc13 performs the observed → ICRS transformation for a given coordinate type
+// ("A" for Az/ZD, "H" for HA/Dec, "R" for RA/Dec).
+func Atoc13(
+	typ string,
+	ob1, ob2 float64,
+	utc1, utc2, dut1 float64,
+	elong, phi, hm float64,
+	xp, yp float64,
+	phpa, tc, rh, wl float64,
+) (rc, dc float64) {
+	gofa.Atoc13(
+		typ, ob1, ob2,
+		utc1, utc2, dut1,
+		elong, phi, hm,
+		xp, yp,
+		phpa, tc, rh, wl,
+		&rc, &dc,
+	)
+	return rc, dc
+}
+
+// Icrs2g converts ICRS to Galactic coordinates.
+func Icrs2g(ra, dec float64) (gl, gb float64) {
+	gofa.Icrs2g(ra, dec, &gl, &gb)
+	return gl, gb
+}
+
+// G2icrs converts Galactic to ICRS coordinates.
+func G2icrs(gl, gb float64) (ra, dec float64) {
+	gofa.G2icrs(gl, gb, &ra, &dec)
+	return ra, dec
+}
+
+// Eceq06 converts ICRS to Ecliptic coordinates (IAU 2006).
+func Eceq06(date1, date2 float64, ra, dec float64) (elon, elat float64) {
+	gofa.Eceq06(date1, date2, ra, dec, &elon, &elat)
+	return elon, elat
+}
+
+// Eqec06 converts Ecliptic to ICRS coordinates (IAU 2006).
+func Eqec06(date1, date2 float64, elon, elat float64) (ra, dec float64) {
+	gofa.Eqec06(date1, date2, elon, elat, &ra, &dec)
+	return ra, dec
+}
+
+// Atic13 converts CIRS to ICRS coordinates.
+func Atic13(ri, di, date1, date2 float64) (rc, dc float64) {
+	var eo float64
+	gofa.Atic13(ri, di, date1, date2, &rc, &dc, &eo)
+	return rc, dc
+}
+
+// Epv00 returns Earth heliocentric and barycentric position/velocity.
+// pvh[0], pvh[1] are heliocentric position and velocity [3]float64 in AU, AU/day.
+// pvb[0], pvb[1] are barycentric position and velocity [3]float64 in AU, AU/day.
+// status: 0=OK.
+func Epv00(date1, date2 float64) (pvh, pvb [2][3]float64, status int) {
+	status = gofa.Epv00(date1, date2, &pvh, &pvb)
+	return pvh, pvb, status
+}
+
+// Moon98 returns the geocentric position/velocity of the Moon.
+// pv[0] is position [3]float64 in AU.
+// pv[1] is velocity [3]float64 in AU/day.
+func Moon98(date1, date2 float64) (pv [2][3]float64) {
+	gofa.Moon98(date1, date2, &pv)
+	return pv
+}
