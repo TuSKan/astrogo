@@ -2,12 +2,12 @@ package observatory_test
 
 import (
 	"testing"
-	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/earth"
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/observatory"
+	"github.com/TuSKan/astrogo/time"
 )
 
 func TestNewSite(t *testing.T) {

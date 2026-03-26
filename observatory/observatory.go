@@ -3,10 +3,10 @@ package observatory
 import (
 	"errors"
 	"fmt"
-	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/earth"
+	"github.com/TuSKan/astrogo/time"
 )
 
 var (
@@ -56,7 +56,7 @@ func (s Site) Horizon() angle.Angle { return s.horizon }
 // TimeZone returns the site's local time zone, or UTC if nil.
 func (s Site) TimeZone() *time.Location {
 	if s.timeZone == nil {
-		return time.UTC
+		return time.LocationUTC
 	}
 	return s.timeZone
 }

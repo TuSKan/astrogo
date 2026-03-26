@@ -3,14 +3,15 @@ package sky_test
 import (
 	"fmt"
 	"github.com/TuSKan/astrogo/angle"
+	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/sky"
 )
 
 func ExampleSeparation() {
-	p1 := sky.NewTarget("Star A", 0, 0)
-	p2 := sky.NewTarget("Star B", 0.1, 0) // 6 arcminutes away
-	
-	sep := sky.Separation(p1.Coord, p2.Coord)
+	p1 := coord.ICRS{RA: angle.Deg(0), Dec: angle.Deg(0)}
+	p2 := coord.ICRS{RA: angle.Deg(0.1), Dec: angle.Deg(0)} // 6 arcminutes away
+
+	sep := sky.Separation(p1, p2)
 	fmt.Printf("%.0f arcmin\n", sep.Arcminutes())
 	// Output: 6 arcmin
 }

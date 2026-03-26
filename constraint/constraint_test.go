@@ -1,72 +1,85 @@
-package constraint_test
+package constraint
 
 import (
 	"testing"
 
 	"github.com/TuSKan/astrogo/angle"
-	"github.com/TuSKan/astrogo/constraint"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/earth"
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/observatory"
-	"github.com/TuSKan/astrogo/sky"
+	"github.com/TuSKan/astrogo/target"
 	"github.com/TuSKan/astrogo/time"
 )
 
-func TestAltAzConstraint(t *testing.T) {
-	// North Pole makes tests deterministic (Alt independent of LST for fixed Dec)
-	loc, _ := earth.NewGeodetic(angle.Deg(0), angle.Deg(90), 0)
-	site, _ := observatory.NewSite("NorthPole", loc, angle.Deg(0), nil)
-	tm := time.NowUTC()
+func TestConstraints(t *testing.T) {
+	loc, _ := earth.NewGeodetic(angle.Zero(), angle.Zero(), 0)
+	site, _ := observatory.NewSite("Test", loc, angle.Zero(), nil)
+	// Equinox 2000
+	tm := time.FromJD(2451545.0, time.UTC)
 
-	minAlt := constraint.MinAltitudeConstraint{MinAlt: angle.Deg(30)}
-	maxAm := constraint.MaxAirmassConstraint{MaxAirmass: 2.0}
+	t.Run("Altitude", func(t *testing.T) {
+		c := Altitude{Threshold: angle.Deg(20)}
+		// Target near zenith at Greenwich
+		obj := target.Custom{Coord: coord.ICRS{RA: angle.Hour(18.69), Dec: angle.Deg(0)}}
+		res, err := c.Check(obj, tm, site)
+		testutil.AssertNoError(t, err)
+		if !res.Pass {
+			t.Errorf("Expected PASS for high altitude, got %v", res)
+		}
 
-	// 1. High Object (near Zenith at North Pole)
-	objHigh := &sky.Target{Coord: coord.ICRS{RA: angle.Deg(0), Dec: angle.Deg(89)}}
-	ctxHigh := constraint.NewContext(objHigh, tm, site, nil)
+		c2 := Altitude{Threshold: angle.Deg(95)}
+		res2, _ := c2.Check(obj, tm, site)
+		if res2.Pass {
+			t.Errorf("Expected FAIL for extreme threshold, got %v", res2)
+		}
+	})
 
-	ok, err := minAlt.Evaluate(ctxHigh)
-	testutil.AssertNoError(t, err)
-	if !ok {
-		t.Error("MinAltitude failed for high object")
-	}
+	t.Run("Airmass", func(t *testing.T) {
+		c := Airmass{Threshold: 2.0}
+		obj := target.Custom{Coord: coord.ICRS{RA: angle.Hour(18.69), Dec: angle.Deg(0)}}
+		res, err := c.Check(obj, tm, site)
+		testutil.AssertNoError(t, err)
+		if !res.Pass {
+			t.Errorf("Expected PASS for low airmass, got %v", res)
+		}
 
-	ok, err = maxAm.Evaluate(ctxHigh)
-	testutil.AssertNoError(t, err)
-	if !ok {
-		t.Error("MaxAirmass failed for high object")
-	}
-
-	// 2. Low Object (far below horizon from North Pole)
-	objLow := &sky.Target{Coord: coord.ICRS{RA: angle.Deg(0), Dec: angle.Deg(-45)}}
-	ctxLow := constraint.NewContext(objLow, tm, site, nil)
-
-	ok, err = minAlt.Evaluate(ctxLow)
-	testutil.AssertNoError(t, err)
-	if ok {
-		t.Error("MinAltitude passed for low object")
-	}
-
-	ok, err = maxAm.Evaluate(ctxLow)
-	testutil.AssertNoError(t, err)
-	if ok {
-		t.Error("MaxAirmass passed for low object")
-	}
+		// Below horizon target
+		obj2 := target.Custom{Coord: coord.ICRS{RA: angle.Hour(6.69), Dec: angle.Deg(0)}}
+		res2, err := c.Check(obj2, tm, site)
+		testutil.AssertNoError(t, err)
+		if res2.Pass {
+			t.Error("Expected FAIL for target below horizon")
+		}
+	})
 }
 
-func TestEvaluateAll(t *testing.T) {
-	loc, _ := earth.NewGeodetic(angle.Deg(0), angle.Deg(90), 0)
-	site, _ := observatory.NewSite("NorthPole", loc, angle.Deg(0), nil)
-	tm := time.NowUTC()
-	constraints := []constraint.Constraint{
-		constraint.MinAltitudeConstraint{MinAlt: angle.Deg(30)},
-	}
+func TestSunMoonConstraints(t *testing.T) {
+	loc, _ := earth.NewGeodetic(angle.Zero(), angle.Zero(), 0)
+	site, _ := observatory.NewSite("Test", loc, angle.Zero(), nil)
+	
+	// Night time (Sun below horizon)
+	tmNight := time.FromJD(2451545.5, time.UTC) 
+	
+	t.Run("Sun", func(t *testing.T) {
+		c := Sun{Threshold: angle.Deg(-12)}
+		res, err := c.Check(nil, tmNight, site)
+		testutil.AssertNoError(t, err)
+		if !res.Pass {
+			t.Errorf("Expected PASS during night, got %v", res)
+		}
+	})
 
-	obj := &sky.Target{Coord: coord.ICRS{RA: angle.Deg(0), Dec: angle.Deg(89)}}
-	ok, err := constraint.EvaluateAll(obj, tm, site, constraints)
-	testutil.AssertNoError(t, err)
-	if !ok {
-		t.Error("EvaluateAll failed for visible object")
-	}
+	t.Run("MoonSep", func(t *testing.T) {
+		c := MoonSep{Threshold: angle.Deg(30)}
+		// Target at (0,0)
+		obj := target.Custom{Coord: coord.ICRS{RA: angle.Deg(0), Dec: angle.Deg(0)}}
+		res, err := c.Check(obj, tmNight, site)
+		testutil.AssertNoError(t, err)
+		// Moon position at tmNight is roughly RA=19h, Dec=-16deg.
+		// Separation should be > 30 deg from (0,0).
+		if !res.Pass {
+			t.Errorf("Expected PASS for far moon, got %v", res)
+		}
+	})
 }

@@ -43,6 +43,30 @@ func ICRSToAltAz(c coord.ICRS, t time.Time, site earth.Geodetic) (coord.AltAz, e
 	}, nil
 }
 
+// ICRSToHourAngle converts ICRS coordinates to local observed Hour Angle at the
+// given time and observer location.
+func ICRSToHourAngle(c coord.ICRS, t time.Time, site earth.Geodetic) (angle.Angle, error) {
+	jd1, jd2 := t.JDParts()
+
+	const (
+		pressure    = 1013.25
+		temperature = 15.0
+		humidity    = 0.5
+		wavelength  = 0.55
+	)
+
+	_, _, ha, _, _, _, _ := gofaext.Atco13(
+		c.RA.Radians(), c.Dec.Radians(),
+		0, 0, 0, 0,
+		jd1, jd2, 0,
+		site.Lon.Radians(), site.Lat.Radians(), site.Height,
+		0, 0,
+		pressure, temperature, humidity, wavelength,
+	)
+
+	return angle.Rad(ha).Wrap180(), nil
+}
+
 // AltAzToICRS converts local observed AltAz to ICRS coordinates at the given
 // time and observer location.
 func AltAzToICRS(c coord.AltAz, t time.Time, site earth.Geodetic) (coord.ICRS, error) {
@@ -101,7 +125,7 @@ func GalacticToICRS(c coord.Galactic) coord.ICRS {
 // of the given date.
 func ICRSToEcliptic(c coord.ICRS, t time.Time) coord.Ecliptic {
 	jd1, jd2 := t.JDParts()
-	lon, lat := gofaext.Eceq06(jd1, jd2, c.RA.Radians(), c.Dec.Radians())
+	lon, lat := gofaext.Eqec06(jd1, jd2, c.RA.Radians(), c.Dec.Radians())
 	return coord.Ecliptic{
 		Lon:  angle.Rad(lon).Wrap360(),
 		Lat:  angle.Rad(lat),
@@ -113,7 +137,7 @@ func ICRSToEcliptic(c coord.ICRS, t time.Time) coord.Ecliptic {
 // to ICRS coordinates.
 func EclipticToICRS(c coord.Ecliptic, t time.Time) coord.ICRS {
 	jd1, jd2 := t.JDParts()
-	ra, dec := gofaext.Eqec06(jd1, jd2, c.Lon.Radians(), c.Lat.Radians())
+	ra, dec := gofaext.Eceq06(jd1, jd2, c.Lon.Radians(), c.Lat.Radians())
 	return coord.ICRS{
 		RA:   angle.Rad(ra).Wrap360(),
 		Dec:  angle.Rad(dec),

@@ -78,3 +78,21 @@ func TestString(t *testing.T) {
 		t.Errorf("Time.String() returned %q", s)
 	}
 }
+
+func TestScaleConversions(t *testing.T) {
+	// J2000.0 UTC -> JD 2451545.0
+	tm := atime.FromJD(2451545.0, atime.UTC)
+
+	// In 2000, ΔAT = 32s
+	// TT = UTC + 32s + 32.184s = UTC + 64.184s
+	// TT_JD = 2451545.0 + 64.184 / 86400 = 2451545.0007428704
+	
+	tt := tm.TT()
+	testutil.AssertEqual(t, "TT scale", tt.Scale(), atime.TT)
+	testutil.AssertNear(t, "TT JD", tt.JD(), 2451545.0007428704, 1e-12)
+
+	// TDB is approximated as TT in v1
+	tdb := tm.TDB()
+	testutil.AssertEqual(t, "TDB scale", tdb.Scale(), atime.TDB)
+	testutil.AssertNear(t, "TDB JD", tdb.JD(), tt.JD(), 1e-15)
+}
