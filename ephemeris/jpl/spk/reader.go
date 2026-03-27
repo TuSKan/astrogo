@@ -1,43 +1,18 @@
-package jpl
+package spk
 
 import (
 	"encoding/binary"
 	"fmt"
 	"io"
 	"math"
-	"net/http"
 	"os"
 	"path/filepath"
 
+	"github.com/TuSKan/astrogo/internal/tools"
 	"github.com/TuSKan/astrogo/vector"
 )
 
-// Download fetches a file from a URL and saves it to the target path.
-func Download(url, path string) error {
-	// Ensure directory exists
-	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
-		return err
-	}
-
-	resp, err := http.Get(url)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("jpl: download failed with status %d", resp.StatusCode)
-	}
-
-	out, err := os.Create(path)
-	if err != nil {
-		return err
-	}
-	defer out.Close()
-
-	_, err = io.Copy(out, resp.Body)
-	return err
-}
+const JPL_SPK_KERNEL_URI = "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/"
 
 // RecordSize is the standard DAF record size in bytes.
 const RecordSize = 1024
@@ -56,22 +31,39 @@ type Summary struct {
 	Integers []int32
 }
 
+type ReadAtCloser interface {
+	io.ReaderAt
+	io.Closer
+}
+
 // Reader provides tools to read DAF/SPK files.
 type Reader struct {
-	F       *os.File
+	F       ReadAtCloser
 	FileRec FileRecord
 }
 
-// Open opens a DAF/SPK file and reads its metadata.
-func Open(path string) (*Reader, error) {
-	f, err := os.Open(path)
-	if err != nil {
-		return nil, err
+func CacheDownload(kernel, path string) (*Reader, error) {
+	spkPath := filepath.Join(path, kernel)
+	if _, err := os.Stat(spkPath); os.IsNotExist(err) {
+		spkURI := JPL_SPK_KERNEL_URI + kernel
+		fmt.Printf("jpl: downloading %s...\n", spkURI)
+		if err := tools.Download(spkURI, spkPath); err != nil {
+			return nil, fmt.Errorf("jpl: failed to download SPK: %w", err)
+		}
 	}
 
+	file, err := os.Open(spkPath)
+	if err != nil {
+		return nil, fmt.Errorf("jpl: failed to open SPK: %w", err)
+	}
+
+	return NewReader(file)
+}
+
+// New opens a DAF/SPK file and reads its metadata.
+func NewReader(f ReadAtCloser) (*Reader, error) {
 	buf := make([]byte, RecordSize)
 	if _, err := f.ReadAt(buf, 0); err != nil {
-		f.Close()
 		return nil, err
 	}
 
@@ -184,9 +176,92 @@ func EvaluateSegment(s *Segment, r *Reader, et float64) (pos, vel vector.Vec3, e
 		return evaluateType2(s, r, et)
 	case 3:
 		return evaluateType3(s, r, et)
+	case 21:
+		return evaluateType21(s, r, et)
 	default:
 		return vector.Vec3{}, vector.Vec3{}, fmt.Errorf("jpl: unsupported SPK segment type %d", s.Type)
 	}
+}
+
+func evaluateType21(s *Segment, r *Reader, et float64) (pos, vel vector.Vec3, err error) {
+	// Type 21 segments have N records, then N epochs, then N.
+	meta, err := r.ReadDoubles(s.EndAddr, s.EndAddr)
+	if err != nil {
+		return vector.Vec3{}, vector.Vec3{}, err
+	}
+	nRecs := int32(meta[0])
+
+	epochs, err := r.ReadDoubles(s.EndAddr-nRecs, s.EndAddr-1)
+	if err != nil {
+		return vector.Vec3{}, vector.Vec3{}, err
+	}
+
+	idx := int32(0)
+	for i := int32(0); i < nRecs-1; i++ {
+		if et < epochs[i+1] {
+			idx = i
+			break
+		}
+		idx = nRecs - 1
+	}
+
+	// Calculate record length
+	recordAreaLen := s.EndAddr - nRecs - s.StartAddr
+	L := recordAreaLen / nRecs
+
+	recStart := s.StartAddr + idx*L
+	rec, err := r.ReadDoubles(recStart, recStart+L-1)
+	if err != nil {
+		return vector.Vec3{}, vector.Vec3{}, err
+	}
+
+	// Extended Modified Difference Array Algorithm
+	t0 := rec[0]
+	dt := rec[1:16]
+	p0 := rec[16:19]
+	v0 := rec[19:22]
+	mda := rec[22 : 22+45]
+	maxOrd := int(rec[67])
+	// rec[68:71] are additional weights W if needed, but we calculate them
+
+	delta := et - t0
+	if delta == 0 {
+		return vector.Vec3{X: p0[0], Y: p0[1], Z: p0[2]}, vector.Vec3{X: v0[0], Y: v0[1], Z: v0[2]}, nil
+	}
+
+	// Precompute recursive weights
+	// We need 15 orders max
+	var g [15]float64
+	var gd [15]float64
+	var w [15]float64
+
+	tp := delta
+	g[0] = 1.0
+	gd[0] = 0.0
+	w[0] = 1.0
+
+	for i := 1; i <= maxOrd; i++ {
+		w[i-1] = tp / dt[i-1]
+		tp = delta + dt[i-1]
+		g[i] = w[i-1] * g[i-1]
+		gd[i] = w[i-1]*gd[i-1] + g[i-1]/dt[i-1]
+	}
+
+	// Interpolate each component
+	posArr := [3]float64{p0[0], p0[1], p0[2]}
+	velArr := [3]float64{v0[0], v0[1], v0[2]}
+
+	for i := 1; i <= maxOrd; i++ {
+		for j := 0; j < 3; j++ {
+			// MDA is 3x15, stored as [order1_x, order1_y, order1_z, order2_x, ...]
+			val := mda[(i-1)*3+j]
+			posArr[j] += g[i] * val
+			velArr[j] += gd[i] * val
+		}
+	}
+
+	return vector.Vec3{X: posArr[0], Y: posArr[1], Z: posArr[2]},
+		vector.Vec3{X: velArr[0], Y: velArr[1], Z: velArr[2]}, nil
 }
 
 func evaluateType2(s *Segment, r *Reader, et float64) (pos, vel vector.Vec3, err error) {

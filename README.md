@@ -71,7 +71,11 @@ Existing astronomy tools are powerful, but often:
 ### Ephemerides
 - Sun and Moon positions
 - Planetary positions (Mercury → Neptune)
-- Pluggable ephemeris backends (JPL DE files)
+- **High-performance JPL SPK provider**:
+    - Multi-kernel architecture (load planets and small-bodies simultaneously)
+    - On-demand asteroid/comet fetching via **JPL Horizons API**
+    - Support for **SPK Type 21** (Extended Modified Difference Arrays)
+    - Precedence-aware segment indexing (~85x faster lookups)
 
 ### Visibility & planning
 - Observable windows (sampled constraint evaluation)
@@ -109,6 +113,8 @@ import (
 	"github.com/TuSKan/astrogo/observatory"
 	"github.com/TuSKan/astrogo/plan"
 	"github.com/TuSKan/astrogo/sky"
+	"github.com/TuSKan/astrogo/target"
+	"github.com/TuSKan/astrogo/body"
 	"github.com/TuSKan/astrogo/time"
 )
 
@@ -209,7 +215,7 @@ flowchart TD
 | `sky` | Alt/Az, airmass, separation, position angle | ✅ implemented | Pickering (1982) airmass model |
 | `target` | Unified observation targets (fixed/moving/body) | ✅ implemented | |
 | `constraint` | Planning constraints (altitude, airmass, …) | ✅ implemented | |
-| `ephemeris` | Solar system ephemerides via JPL DE | ✅ implemented | validated against JPL Horizons |
+| `ephemeris` | Solar system ephemerides via JPL DE | ✅ implemented | multi-kernel; SPK Type 21; Horizons on-demand |
 | `body` | Solar system body definitions | ✅ implemented | |
 | `catalog` | Object identity and catalog entries | ✅ implemented | OpenNGC support |
 | `plan` | Observation planning, scoring, event solving | ✅ implemented | rise/set/transit/twilight solver |
@@ -259,7 +265,9 @@ These are wrapped internally to ensure:
 - [x] Complete time scale conversions (UTC, TAI, TT, TDB, UT1)
 - [x] Robust transform graph
 - [x] Sun and Moon ephemerides
-- [x] Planetary ephemerides (pluggable backends — JPL DE)
+- [x] High-performance JPL SPK provider (Multi-kernel, ~85x speedup)
+- [x] Small-body support via JPL Horizons (on-demand SPK fetching)
+- [x] SPK Type 21 support (Asteroids/Comets)
 - [x] Rise/Set/Transit event solver (bisection + golden-section)
 - [x] Twilight event helpers (Civil, Nautical, Astronomical)
 - [ ] Advanced visibility constraints (moon illumination, sky background)

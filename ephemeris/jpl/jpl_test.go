@@ -6,6 +6,8 @@ import (
 
 	"github.com/TuSKan/astrogo/body"
 	"github.com/TuSKan/astrogo/ephemeris/jpl"
+	"github.com/TuSKan/astrogo/ephemeris/jpl/lsk"
+	"github.com/TuSKan/astrogo/ephemeris/jpl/spk"
 	"github.com/TuSKan/astrogo/time"
 )
 
@@ -38,8 +40,8 @@ func TestBodyMapping(t *testing.T) {
 }
 
 func TestTimeConv(t *testing.T) {
-	l := &jpl.LSK{
-		DeltaAt: []jpl.LeapData{
+	l := &lsk.Reader{
+		DeltaAt: []lsk.LeapData{
 			{JD: 2441317.5, N: 10}, // 1972-JAN-1
 			{JD: 2441499.5, N: 11}, // 1972-JUL-1
 		},
@@ -47,7 +49,7 @@ func TestTimeConv(t *testing.T) {
 
 	// 2023-JAN-1
 	tm := time.FromJD(2459945.5, time.UTC)
-	tdb := jpl.UTCToTDB(tm, l)
+	tdb := lsk.UTCToTDB(tm, l)
 
 	// Pre-calculated approx: UTC + 11s + 32.184s = UTC + 43.184s
 	// 2459945.5 + 43.184/86400 = 2459945.5005
@@ -55,7 +57,7 @@ func TestTimeConv(t *testing.T) {
 		t.Errorf("TDB %f should be > UTC %f", tdb, 2459945.5)
 	}
 
-	et := jpl.TDBToET(tdb)
+	et := lsk.TDBToET(tdb)
 	if et < 0 {
 		t.Errorf("ET %f for 2023 should be > 0", et)
 	}
@@ -64,21 +66,22 @@ func TestTimeConv(t *testing.T) {
 func TestCheby(t *testing.T) {
 	// Simple constant polynomial
 	coeffs := []float64{10.0}
-	p, v := jpl.EvalChebyshev(coeffs, 0.5, 100.0, true)
+	p, v := spk.EvalChebyshev(coeffs, 0.5, 100.0, true)
 	if p != 10.0 || v != 0.0 {
 		t.Errorf("Constant Cheby: p=%f v=%f, want 10.0, 0.0", p, v)
 	}
 
 	// Line p = tau
 	coeffs = []float64{0.0, 1.0}
-	p, v = jpl.EvalChebyshev(coeffs, 0.5, 100.0, true)
+	p, v = spk.EvalChebyshev(coeffs, 0.5, 100.0, true)
 	if math.Abs(p-0.5) > 1e-12 || math.Abs(v-0.01) > 1e-12 {
 		t.Errorf("Linear Cheby: p=%f v=%f, want 0.5, 0.01", p, v)
 	}
 }
 
 func TestJPLUnitsAreAUAndAUPerDay(t *testing.T) {
-	p, _ := jpl.New("de440s", "data")
+	p, _ := jpl.NewProvider(jpl.WithSource(jpl.Planets), jpl.WithKernel("de440s"), jpl.WithDataDir("data"))
+
 	defer p.Close()
 
 	state, _ := p.State(body.Sun, time.Now())
@@ -89,7 +92,8 @@ func TestJPLUnitsAreAUAndAUPerDay(t *testing.T) {
 }
 
 func TestJPLUnsupportedBody(t *testing.T) {
-	p, _ := jpl.New("de440s", "data")
+	p, _ := jpl.NewProvider(jpl.WithSource(jpl.Planets), jpl.WithKernel("de440s"), jpl.WithDataDir("data"))
+
 	defer p.Close()
 
 	_, err := p.State(body.ID(255), time.Now())
@@ -99,7 +103,8 @@ func TestJPLUnsupportedBody(t *testing.T) {
 }
 
 func TestJPLOutOfCoverageEpoch(t *testing.T) {
-	p, _ := jpl.New("de440s", "data")
+	p, _ := jpl.NewProvider(jpl.WithSource(jpl.Planets), jpl.WithKernel("de440s"), jpl.WithDataDir("data"))
+
 	defer p.Close()
 
 	// Year 5000
@@ -111,7 +116,8 @@ func TestJPLOutOfCoverageEpoch(t *testing.T) {
 }
 
 func TestJPLDeterministicRepeatedCalls(t *testing.T) {
-	p, _ := jpl.New("de440s", "data")
+	p, _ := jpl.NewProvider(jpl.WithSource(jpl.Planets), jpl.WithKernel("de440s"), jpl.WithDataDir("data"))
+
 	defer p.Close()
 
 	tm := time.Now()
@@ -121,4 +127,110 @@ func TestJPLDeterministicRepeatedCalls(t *testing.T) {
 	if s1.Pos.X != s2.Pos.X || s1.Pos.Y != s2.Pos.Y || s1.Pos.Z != s2.Pos.Z {
 		t.Error("Re-evaluating at same epoch produced different results")
 	}
+}
+
+func TestSourceSelection(t *testing.T) {
+	t.Run("Planets", func(t *testing.T) {
+		p, err := jpl.NewProvider(jpl.WithSource(jpl.Planets), jpl.WithKernel("de440s"), jpl.WithDataDir("data"))
+		if err != nil {
+			t.Fatalf("Planets source failed: %v", err)
+		}
+		if p == nil {
+			t.Fatal("Planets source returned nil provider")
+		}
+		p.Close()
+	})
+
+	t.Run("Unsupported", func(t *testing.T) {
+		unsupported := []jpl.Source{jpl.Satellites, jpl.Stations}
+		for _, s := range unsupported {
+			_, err := jpl.NewProvider(jpl.WithSource(s))
+			if err == nil {
+				t.Errorf("Expected error for unsupported source %v", s)
+			}
+		}
+	})
+
+	t.Run("Unknown", func(t *testing.T) {
+		_, err := jpl.NewProvider(jpl.WithSource(jpl.Source("unknown")))
+		if err == nil {
+			t.Error("Expected error for unknown source")
+		}
+	})
+}
+
+func TestSmallBodyEros(t *testing.T) {
+	// Eros (433)
+	// We use a specific time where it has coverage
+	start := time.FromJD(2460000.5, time.UTC) // 2023-FEB-25
+	end := time.FromJD(2460001.5, time.UTC)   // 2023-FEB-26
+
+	p, err := jpl.NewProvider(
+		jpl.WithSource(jpl.SmallBody),
+		jpl.WithKernel("433"),
+		jpl.WithTimeInterval(start, end),
+		jpl.WithDataDir("data"),
+	)
+	if err != nil {
+		t.Fatalf("Failed to create smallbody provider: %v", err)
+	}
+	defer p.Close()
+
+	t.Logf("Loaded %d kernels", len(p.SupportedBodies()))
+
+	// Check if Eros is in supported bodies
+	bodies := p.SupportedBodies()
+	found := false
+	for _, b := range bodies {
+		if b == body.ID(433) {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("Eros (433) not found in supported bodies: %v", bodies)
+	}
+
+	// Get state
+	state, err := p.State(body.ID(433), start)
+	if err != nil {
+		t.Fatalf("Failed to get state for Eros: %v", err)
+	}
+
+	t.Logf("Eros State: Pos=%v, Vel=%v", state.Pos, state.Vel)
+
+	// Verify position is reasonable (range for Eros is ~1.1 to 1.8 AU from Sun)
+	// Geocentric distance for Eros varies.
+	dist := state.Pos.Norm()
+	if dist < 0.1 || dist > 5.0 {
+		t.Errorf("Suspicious geocentric distance for Eros: %f AU", dist)
+	}
+	t.Logf("Eros State at %v: Pos=%v Dist=%v AU", start, state.Pos, dist)
+}
+
+func TestSmallBodyMultiMatch(t *testing.T) {
+	// Querying "Apophis" matches multiple entries in SBDB,
+	// but here we are passing a "kernel" command to Horizons.
+	// Horizons might return a list if the command is ambiguous.
+
+	start := time.FromJD(2460000.5, time.UTC)
+	end := time.FromJD(2460001.5, time.UTC)
+
+	p, err := jpl.NewProvider(
+		jpl.WithSource(jpl.SmallBody),
+		jpl.WithKernel("Apophis"), // "Apophis" is ambiguous in Horizons web, but let's see API
+		jpl.WithTimeInterval(start, end),
+		jpl.WithDataDir("data"),
+	)
+	if err != nil {
+		// If it's ambiguous, spk.CacheAPI should have handled it or returned error
+		t.Fatalf("Failed to create provider for Apophis: %v", err)
+	}
+	defer p.Close()
+
+	bodies := p.SupportedBodies()
+	if len(bodies) == 0 {
+		t.Error("Expected at least one body loaded for Apophis")
+	}
+	t.Logf("Loaded bodies for 'Apophis': %v", bodies)
 }
