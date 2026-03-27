@@ -3,7 +3,7 @@ package body
 import "fmt"
 
 // ID identifies a major Solar System body or a generic celestial object.
-type ID uint8
+type ID uint32
 
 const (
 	Mercury ID = iota + 1

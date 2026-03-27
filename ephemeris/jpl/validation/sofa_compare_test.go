@@ -10,7 +10,7 @@ import (
 )
 
 func runSOFATest(t *testing.T, bid body.ID) {
-	p, err := jpl.New("de440s", "../data")
+	p, err := jpl.NewProvider(jpl.WithSource(jpl.Planets), jpl.WithKernel("de440"), jpl.WithDataDir("../data"))
 	if err != nil {
 		t.Skipf("skipping SOFA comparison: JPL provider failed: %v", err)
 	}

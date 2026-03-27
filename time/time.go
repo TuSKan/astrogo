@@ -22,6 +22,8 @@ var LoadLocation = time.LoadLocation
 
 var LocationUTC = time.UTC
 
+var RFC3339 = time.RFC3339
+
 // Scale represents an astronomical time scale.
 type Scale uint8
 
@@ -146,6 +148,11 @@ func (t Time) AddDays(d float64) Time {
 // Date returns a new Time from a Go standard library time.Time.
 func Date(year int, month time.Month, day int, hour int, min int, sec int, nsec int, loc *time.Location) Time {
 	return FromGo(time.Date(year, month, day, hour, min, sec, nsec, loc))
+}
+
+// Format returns a string representation of the time in the given format.
+func (t *Time) Format(format string) string {
+	return t.ToGo().Format(format)
 }
 
 // Before returns true if t is chronologically before other.

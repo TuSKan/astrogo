@@ -1,9 +1,6 @@
 package jpl_test
 
 import (
-	"encoding/json"
-	"os"
-	"path/filepath"
 	"testing"
 
 	"github.com/TuSKan/astrogo/body"
@@ -12,32 +9,24 @@ import (
 	"github.com/TuSKan/astrogo/vector"
 )
 
-type ValidationCase struct {
-	Body    string     `json:"body"`
-	NAIF    int        `json:"naif_id"`
-	Epoch   string     `json:"epoch"`
-	ET      float64    `json:"et"`
-	Pos     [3]float64 `json:"pos"`
-	Vel     [3]float64 `json:"vel"`
-	UnitPos string     `json:"unit_pos"`
-	UnitVel string     `json:"unit_vel"`
-}
-
-func loadCases(t *testing.T) []ValidationCase {
-	path := filepath.Join("..", "validation", "horizons_reference.json")
-	data, err := os.ReadFile(path)
+func loadCases(t *testing.T) []*StateVector {
+	sun, err := fetchVector(10, "Sun")
 	if err != nil {
-		t.Fatalf("failed to read reference data: %v", err)
+		t.Fatalf("failed to fetch sun vector: %v", err)
 	}
-	var cases []ValidationCase
-	if err := json.Unmarshal(data, &cases); err != nil {
-		t.Fatalf("failed to unmarshal reference data: %v", err)
+	moon, err := fetchVector(301, "Moon")
+	if err != nil {
+		t.Fatalf("failed to fetch moon vector: %v", err)
 	}
-	return cases
+	mars, err := fetchVector(4, "Mars")
+	if err != nil {
+		t.Fatalf("failed to fetch mars vector: %v", err)
+	}
+	return []*StateVector{sun, moon, mars}
 }
 
 func runHorizonsTest(t *testing.T, bodyName string) {
-	p, err := jpl.New("de440s", "../data")
+	p, err := jpl.NewProvider(jpl.WithSource(jpl.Planets), jpl.WithKernel("de440"), jpl.WithDataDir("../data"))
 	if err != nil {
 		t.Fatalf("failed to create provider: %v", err)
 	}
