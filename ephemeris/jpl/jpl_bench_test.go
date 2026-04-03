@@ -30,7 +30,7 @@ func BenchmarkEvalChebyshev(b *testing.B) {
 
 func BenchmarkFindSegment(b *testing.B) {
 	p, _ := jpl.NewProvider(jpl.WithDataDir("data"))
-	
+
 	// Mock 100 kernels, each with 10 targets, each target has 1 segment.
 	// Total 1,000 segments in Index.
 	for k := 0; k < 100; k++ {
@@ -50,7 +50,7 @@ func BenchmarkFindSegment(b *testing.B) {
 				p.ByTarget[targetID] = make([]jpl.SegmentRef, 0)
 			}
 			p.ByTarget[targetID] = append(p.ByTarget[targetID], ref)
-			
+
 			// Update coverage
 			p.ByTargetCoverage[targetID] = jpl.TargetCoverage{
 				StartET: -1e15,

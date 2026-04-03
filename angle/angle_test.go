@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	tol    = 1e-12 // tight tolerance for unit conversions (round-trip safe)
+	tol     = 1e-12 // tight tolerance for unit conversions (round-trip safe)
 	trigTol = 1e-14 // tolerance for stdlib trig cross-checks
 )
 

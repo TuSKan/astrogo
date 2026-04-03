@@ -7,9 +7,11 @@ import (
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/earth"
+	"github.com/TuSKan/astrogo/frame"
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/transform"
+	"github.com/TuSKan/astrogo/vector"
 )
 
 func TestGalacticRoundTrip(t *testing.T) {
@@ -151,5 +153,30 @@ func TestEclipticExtremes(t *testing.T) {
 			ecl := transform.ICRSToEcliptic(tt.icrs, tm)
 			testutil.AssertNear(t, tt.name+" Lat", ecl.Lat.Degrees(), tt.lat, tol)
 		})
+	}
+}
+
+func TestICRSToHourAngle(t *testing.T) {
+	site, _ := earth.NewGeodetic(angle.Deg(0), angle.Deg(0), 0)
+	tm := time.FromJD(2451545.0, time.UTC)
+	icrs := coord.ICRS{RA: angle.Deg(0), Dec: angle.Deg(0)}
+	ha, err := transform.ICRSToHourAngle(icrs, tm, site)
+	testutil.AssertNoError(t, err)
+
+	if math.IsNaN(ha.Radians()) {
+		t.Errorf("Hour angle returning NaN")
+	}
+}
+
+func TestTransformer(t *testing.T) {
+	tr := transform.IdentityTransformer{}
+	v := vector.V3(1, 2, 3)
+	tm := time.FromJD(2451545.0, time.UTC)
+
+	out, err := tr.Transform(frame.ICRS{}, frame.Galactic{}, v, tm)
+	testutil.AssertNoError(t, err)
+
+	if out.X != v.X || out.Y != v.Y || out.Z != v.Z {
+		t.Errorf("IdentityTransformer changed vector, got %v", out)
 	}
 }

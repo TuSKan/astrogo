@@ -49,13 +49,13 @@ type AltAz struct {
 
 func (f AltAz) Name() string { return "AltAz" }
 func (f AltAz) String() string {
-	return fmt.Sprintf("AltAz(Time=%s, Lat=%s, Lon=%s)", 
+	return fmt.Sprintf("AltAz(Time=%s, Lat=%s, Lon=%s)",
 		f.Time, f.Location.Lat.DMSString(0), f.Location.Lon.DMSString(0))
 }
 
 // ── Metadata Structures ───────────────────────────────────────────────────────
 
-// ObserversLocation carries the minimal terrestrial metadata needed for 
+// ObserversLocation carries the minimal terrestrial metadata needed for
 // topocentric frames without depending on the full `earth` package.
 type ObserversLocation struct {
 	Lon    angle.Angle

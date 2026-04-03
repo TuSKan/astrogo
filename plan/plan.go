@@ -145,7 +145,6 @@ func IsObservable(
 	return eval, nil
 }
 
-
 // ScoredTarget pairs an Observable with its calculated desirability score.
 type ScoredTarget struct {
 	Object target.Observable
@@ -230,7 +229,6 @@ func RankObservables(
 
 	return scored, nil
 }
-
 
 // Window represents a contiguous time interval.
 type Window struct {

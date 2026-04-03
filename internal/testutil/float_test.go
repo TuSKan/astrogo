@@ -18,7 +18,7 @@ func TestInAbsTol(t *testing.T) {
 		ok   bool
 	}{
 		{"equal", 1.0, 1.0, 0.0, true},
-		{"within tol", 1.125, 1.0, 0.25, true},  // 0.125 < 0.25, exact in binary
+		{"within tol", 1.125, 1.0, 0.25, true},    // 0.125 < 0.25, exact in binary
 		{"exact boundary", 1.25, 1.0, 0.25, true}, // 0.25 exact in binary, diff == tol
 		{"just outside", 1.5, 1.0, 0.25, false},   // 0.5 > 0.25
 		{"negative diff", 0.75, 1.0, 0.25, true},

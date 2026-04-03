@@ -35,7 +35,7 @@ func TestFixed(t *testing.T) {
 
 func TestCustom(t *testing.T) {
 	c1 := coord.ICRS{RA: angle.Deg(10), Dec: angle.Deg(20)}
-	
+
 	// Named custom
 	target1 := Custom{Label: "My Point", Coord: c1}
 	if target1.Name() != "My Point" {

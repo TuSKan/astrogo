@@ -18,7 +18,7 @@ func BenchmarkVisibleIntervals(b *testing.B) {
 	obj := benchMock{c: coord.ICRS{RA: angle.Deg(0), Dec: angle.Deg(45)}}
 	start := atime.FromJD(2460000.0, atime.UTC)
 	end := start.AddDays(1.0)
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_, _ = visibility.VisibleIntervals(obj, site, start, end, 10*time.Minute, angle.Deg(20))
