@@ -300,7 +300,8 @@ flowchart TD
 | `visibility` | Visibility windows, transit estimate | ✅ implemented | golden-section transit; VisibleIntervals |
 | `units` | Physical unit system | ✅ implemented | AU, Parsec, LightYear, Jansky |
 | `quantity` | Value + unit representation | ✅ implemented | Scale, Abs, Compare, IsZero/IsNaN |
-| `fits` / `io` | Data formats and interoperability | 🚧 stubbed | **TODO**: Unimplemented (planned for v1) |
+| `fits` / `io` | Data formats and interoperability | ✅ implemented | `OpenMmap`, `.gz` streams, Apache Arrow tables & images |
+| `wcs` | World Coordinate Systems | ✅ implemented | Spherical Gnomonic paths (`TAN`), `fits.ExtractWCS` |
 
 See [`VALIDATION.md`](./VALIDATION.md) for scientific validation status and accuracy notes.
 
@@ -323,15 +324,17 @@ These are wrapped internally to ensure:
 
 ### Current Focus
 - Core primitives (angle, time, vector)
-- Coordinate systems and transforms
+- Coordinate systems, Transforms, and WCS
 - Observer and sky calculations
 - Event solving for rise/set/transit/twilight
+- FITS, Interoperability and Memory Execution (`mmap`, Arrow)
 
-### Not Yet Stable or Unimplemented
-- Advanced planning / scheduling
-- Full time scale conversions
-- FITS format encoding/decoding (**TODO**: Unimplemented)
-- High-volume catalog dataset ingestion (**TODO**: Unimplemented)
+### Not Yet Stable or Unimplemented (See Roadmap)
+- Vectorized Batch APIs & Hardware Optimizations
+- Unified Ephemeris Abstractions (Local/Remote)
+- Remote Ecosystem Integrations (Simbad, VizieR, Horizons)
+- Advanced Observation Schedule Optimization
+- Image-Domain & Photometric Output Pipelines
 
 > [!IMPORTANT]
 > Expect API changes until v1.0.
