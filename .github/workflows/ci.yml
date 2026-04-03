@@ -1,4 +1,4 @@
-name: CI
+name: Run tests and upload coverage
 
 on:
   push:
@@ -22,6 +22,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
 
       - name: Setup Go
         uses: actions/setup-go@v5
@@ -46,5 +48,6 @@ jobs:
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v5
         with:
+          token: ${{ secrets.CODECOV_TOKEN }}
           files: ./coverage.out
           fail_ci_if_error: false
