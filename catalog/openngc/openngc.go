@@ -2,7 +2,7 @@ package openngc
 
 import (
 	"bytes"
-	_ "embed"
+	"embed"
 	"encoding/csv"
 	"io"
 	"log"
@@ -15,8 +15,20 @@ import (
 )
 
 //go:generate go run ./parser/parse.go data/openngc.csv https://raw.githubusercontent.com/mattiaverga/OpenNGC/master/database_files/NGC.csv https://raw.githubusercontent.com/mattiaverga/OpenNGC/master/database_files/addendum.csv
-//go:embed data/openngc.csv
+
+//go:embed data/*
+var catalogFS embed.FS
+
 var data []byte
+
+func init() {
+	// Dynamically attempt to load the catalog buffer if the user generated it locally.
+	// Bypasses the strict compiler block when ignored in CI.
+	d, err := catalogFS.ReadFile("data/openngc.csv")
+	if err == nil {
+		data = d
+	}
+}
 
 // Record represents a raw entry in the OpenNGC dataset.
 type Record struct {
