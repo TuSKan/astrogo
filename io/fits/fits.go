@@ -136,16 +136,22 @@ func payloadSize(h *Header) int64 {
 	return bytes
 }
 
-// ReadHeader reads cards from the BlockReader until it encounters the END card.
 func ReadHeader(br *BlockReader) (*Header, error) {
 	h := NewHeader()
 	buf := make([]byte, BlockSize)
+	maxBlocks := 10000 // 28MB max header size failsafe
+	blocksRead := 0
 
 	for {
+		if blocksRead > maxBlocks {
+			return nil, fmt.Errorf("fits: header exceeded %d blocks without END card (corrupt or compressed file?)", maxBlocks)
+		}
+		
 		err := br.ReadBlock(buf)
 		if err != nil {
 			return nil, err
 		}
+		blocksRead++
 
 		for i := 0; i < BlockSize; i += CardSize {
 			rawCard := buf[i : i+CardSize]

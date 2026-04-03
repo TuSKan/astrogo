@@ -36,8 +36,7 @@ coverage*
 
 # Data files and scientific corpus formats
 data/
-io/fits/corpus/
-corpus/
+
 *.data
 *.csv
 *.bsp
