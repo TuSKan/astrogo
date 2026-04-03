@@ -2,6 +2,7 @@ package angle_test
 
 import (
 	"fmt"
+
 	"github.com/TuSKan/astrogo/angle"
 )
 

@@ -86,7 +86,7 @@ func TestScaleConversions(t *testing.T) {
 	// In 2000, ΔAT = 32s
 	// TT = UTC + 32s + 32.184s = UTC + 64.184s
 	// TT_JD = 2451545.0 + 64.184 / 86400 = 2451545.0007428704
-	
+
 	tt := tm.TT()
 	testutil.AssertEqual(t, "TT scale", tt.Scale(), atime.TT)
 	testutil.AssertNear(t, "TT JD", tt.JD(), 2451545.0007428704, 1e-12)
@@ -95,4 +95,57 @@ func TestScaleConversions(t *testing.T) {
 	tdb := tm.TDB()
 	testutil.AssertEqual(t, "TDB scale", tdb.Scale(), atime.TDB)
 	testutil.AssertNear(t, "TDB JD", tdb.JD(), tt.JD(), 1e-15)
+}
+
+func TestTimeComparisons(t *testing.T) {
+	t1 := atime.FromJD(2450000.0, atime.UTC)
+	t2 := atime.FromJD(2450001.0, atime.UTC)
+	t3 := atime.FromJD(2450000.0, atime.UTC)
+
+	if !t1.Before(t2) {
+		t.Errorf("Expected t1 before t2")
+	}
+	if !t2.After(t1) {
+		t.Errorf("Expected t2 after t1")
+	}
+	if !t1.Equal(t3) {
+		t.Errorf("Expected t1 equal to t3")
+	}
+	if t1.Equal(t2) {
+		t.Errorf("Expected t1 not equal to t2")
+	}
+
+	zero := atime.Time{}
+	if !zero.IsZero() {
+		t.Errorf("Expected zero time to be zero")
+	}
+	if t1.IsZero() {
+		t.Errorf("Expected t1 to not be zero")
+	}
+}
+
+func TestTimeStdInterop(t *testing.T) {
+	t1 := atime.FromJD(2451545.0, atime.UTC) // J2000
+	gt := t1.ToGo()
+	if gt.Year() != 2000 || gt.Month() != 1 || gt.Day() != 1 || gt.Hour() != 12 {
+		t.Errorf("ToGo conversion failed, got %v", gt)
+	}
+
+	t2 := atime.Date(2000, 1, 1, 12, 0, 0, 0, time.UTC)
+	if !t1.Equal(t2) {
+		t.Errorf("Date constructor failed, expected %v got %v", t1.JD(), t2.JD())
+	}
+
+	fstr := t1.Format(time.RFC3339)
+	if fstr != "2000-01-01T12:00:00Z" {
+		t.Errorf("Format failed, got %q", fstr)
+	}
+
+	t3 := t1.Add(24 * time.Hour)
+	testutil.AssertNear(t, "Add 24h", t3.JD(), 2451546.0, 1e-10)
+
+	dur := t3.Sub(t1)
+	if dur != 24*time.Hour {
+		t.Errorf("Sub duration failed, expected 24h got %v", dur)
+	}
 }

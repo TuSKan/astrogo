@@ -1,5 +1,11 @@
-
 # astrogo
+
+[![Go Reference](https://pkg.go.dev/badge/github.com/TuSKan/astrogo.svg)](https://pkg.go.dev/github.com/TuSKan/astrogo)
+[![Go Report Card](https://goreportcard.com/badge/github.com/TuSKan/astrogo)](https://goreportcard.com/report/github.com/TuSKan/astrogo)
+[![CI](https://github.com/TuSKan/astrogo/actions/workflows/ci.yml/badge.svg)](https://github.com/TuSKan/astrogo/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/TuSKan/astrogo/branch/main/graph/badge.svg)](https://codecov.io/gh/TuSKan/astrogo)
+[![GitHub release (latest by date)](https://img.shields.io/github/v/release/TuSKan/astrogo)](https://github.com/TuSKan/astrogo/releases)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
 ![AstroGo Mascot](assets/image.png)
 
@@ -105,6 +111,8 @@ package main
 
 import (
 	"fmt"
+	"log"
+	
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/catalog"
 	"github.com/TuSKan/astrogo/constraint"
@@ -120,8 +128,14 @@ import (
 
 func main() {
 	// 1. Setup the Observer at Mauna Kea
-	loc, _ := earth.NewGeodetic(angle.Deg(-155.46), angle.Deg(19.82), 4205)
-	site, _ := observatory.NewSite("Mauna Kea", loc, angle.Deg(20), nil)
+	loc, err := earth.NewGeodetic(angle.Deg(-155.46), angle.Deg(19.82), 4205)
+	if err != nil {
+		log.Fatalf("invalid coordinates: %v", err)
+	}
+	site, err := observatory.NewSite("Mauna Kea", loc, angle.Deg(20), nil)
+	if err != nil {
+		log.Fatalf("failed to setup site: %v", err)
+	}
 
 	// 2. Define Observation Constraints
 	// We want targets at least 30 degrees above the horizon.
@@ -131,8 +145,14 @@ func main() {
 
 	// 3. Define Targets
 	// Orion Nebula (fixed)
-	ra, _  := angle.ParseHMS("05h 35m 17.3s")
-	dec, _ := angle.ParseDMS("-05° 23' 28\"")
+	ra, err := angle.ParseHMS("05h 35m 17.3s")
+	if err != nil {
+		log.Fatalf("failed to parse RA: %v", err)
+	}
+	dec, err := angle.ParseDMS("-05° 23' 28\"")
+	if err != nil {
+		log.Fatalf("failed to parse Dec: %v", err)
+	}
 	m42 := target.NewFixed(catalog.Target{
 		Name: "M42",
 		Coord: coord.ICRS{RA: ra, Dec: dec},
@@ -145,8 +165,17 @@ func main() {
 	now := time.NowUTC()
 	
 	for _, obj := range []target.Observable{m42, mars} {
-		eval, _  := plan.IsObservable(obj, now, site, constraints...)
-		score, _ := plan.ScoreObservable(obj, now, site, constraints...)
+		eval, err := plan.IsObservable(obj, now, site, constraints...)
+		if err != nil {
+			log.Printf("skipping observability check for %s: %v", obj.Name(), err)
+			continue
+		}
+		
+		score, err := plan.ScoreObservable(obj, now, site, constraints...)
+		if err != nil {
+			log.Printf("skipping scoring for %s: %v", obj.Name(), err)
+			continue
+		}
 		
 		fmt.Printf("Target: %-10s  Observable: %-5v  Score: %5.1f\n", 
 			obj.Name(), eval.Observable, score)
@@ -160,22 +189,69 @@ func main() {
 // Find sunrise and sunset for tonight at Mauna Kea
 eph := ephemeris.DefaultProvider()
 rise, set, err := plan.SunriseSunset(tonight, tomorrow, site, eph)
-if err == nil {
-    fmt.Println("Sunrise:", rise)
-    fmt.Println("Sunset:", set)
+if err != nil {
+    log.Fatalf("failed to find sunrise/sunset: %v", err)
 }
+fmt.Println("Sunrise:", rise)
+fmt.Println("Sunset:", set)
 
 // Find astronomical twilight (Sun at -18°)
-dawn, dusk, _ := plan.AstronomicalDawnDusk(tonight, tomorrow, site, eph)
+dawn, dusk, err := plan.AstronomicalDawnDusk(tonight, tomorrow, site, eph)
+if err != nil {
+    log.Fatalf("failed to find dawn/dusk: %v", err)
+}
 fmt.Println("Astro Dawn:", dawn)
 fmt.Println("Astro Dusk:", dusk)
 
 // Generic event finder for any target with custom threshold
 finder := plan.NewEventFinder(15*time.Minute, 1*time.Second)
-events, _ := finder.FindEvents(m42, start, end, site, angle.Deg(30))
+events, err := finder.FindEvents(m42, start, end, site, angle.Deg(30))
+if err != nil {
+    log.Fatalf("failed to find events: %v", err)
+}
 for _, e := range events {
     fmt.Println(e) // Rise/Set/Transit at sub-second precision
 }
+```
+
+### Coordinate Transformations and Time Scales
+
+```go
+// Convert between coordinate frames and time scales
+now := time.NowUTC()
+tt := now.TT()
+
+// Define coordinates in ICRS (e.g., Andromeda Galaxy)
+src := coord.ICRS{
+    RA:  angle.Deg(10.684),
+    Dec: angle.Deg(41.269),
+}
+
+// Transform directly to Galactic coordinates
+gal := transform.ICRSToGalactic(src)
+fmt.Printf("Galactic L: %v, B: %v\n", gal.L, gal.B)
+
+// Transform to Ecliptic coordinates using Terrestrial Time
+ecl := transform.ICRSToEcliptic(src, tt)
+fmt.Printf("Ecliptic Lon: %v, Lat: %v\n", ecl.Lon, ecl.Lat)
+```
+
+### Solar System Ephemerides
+
+```go
+// Fetch high precision planet positions using JPL Ephemerides (DE440 by default)
+eph := ephemeris.DefaultProvider()
+
+// Compute Barycentric Dynamical Time (TDB) for highest accuracy
+t := time.Date(2025, 1, 1, 12, 0, 0, 0, time.UTCScale).TDB()
+
+// Get position of Mars relative to the Earth (Geocentric)
+pos, err := eph.Position(body.Mars, body.Earth, t)
+if err != nil {
+    log.Fatalf("failed to compute ephemeris: %v", err)
+}
+
+fmt.Printf("Distance from Earth to Mars: %.6f AU\n", pos.Length())
 ```
 
 ## Architecture
@@ -224,7 +300,7 @@ flowchart TD
 | `visibility` | Visibility windows, transit estimate | ✅ implemented | golden-section transit; VisibleIntervals |
 | `units` | Physical unit system | ✅ implemented | AU, Parsec, LightYear, Jansky |
 | `quantity` | Value + unit representation | ✅ implemented | Scale, Abs, Compare, IsZero/IsNaN |
-| `fits` / `io` | Data formats and interoperability | 🚧 scaffold | |
+| `fits` / `io` | Data formats and interoperability | 🚧 stubbed | **TODO**: Unimplemented (planned for v1) |
 
 See [`VALIDATION.md`](./VALIDATION.md) for scientific validation status and accuracy notes.
 
@@ -251,30 +327,22 @@ These are wrapped internally to ensure:
 - Observer and sky calculations
 - Event solving for rise/set/transit/twilight
 
-### Not Yet Stable
+### Not Yet Stable or Unimplemented
 - Advanced planning / scheduling
 - Full time scale conversions
-- FITS and catalog support
+- FITS format encoding/decoding (**TODO**: Unimplemented)
+- High-volume catalog dataset ingestion (**TODO**: Unimplemented)
 
 > [!IMPORTANT]
 > Expect API changes until v1.0.
 
 ---
 
-## Roadmap
-- [x] Complete time scale conversions (UTC, TAI, TT, TDB, UT1)
-- [x] Robust transform graph
-- [x] Sun and Moon ephemerides
-- [x] High-performance JPL SPK provider (Multi-kernel, ~85x speedup)
-- [x] Small-body support via JPL Horizons (on-demand SPK fetching)
-- [x] SPK Type 21 support (Asteroids/Comets)
-- [x] Rise/Set/Transit event solver (bisection + golden-section)
-- [x] Twilight event helpers (Civil, Nautical, Astronomical)
-- [ ] Advanced visibility constraints (moon illumination, sky background)
-- [ ] Observation scheduling engine
-- [ ] FITS support
-- [ ] Catalog handling (columnar, large datasets)
-- [ ] Batch/vectorized APIs
+## Project Roadmap
+
+We actively track our development pipeline across multiple capability tiers focusing on High-Performance Vectorization, Scheduling Engines, and external Data Ecosystem integration.
+
+Please see our full [**Project Roadmap**](ROADMAP.md) to understand current milestones, tracking priorities, and architectural expansion goals.
 
 ---
 
@@ -292,17 +360,9 @@ These are wrapped internally to ensure:
 
 ## Contributing
 
-Contributions are welcome, especially in:
-- Numerical validation
-- Reference comparisons (e.g., against Astropy)
-- Performance improvements
-- Documentation and examples
+We strongly welcome contributions! Please refer to our [Contributing Guide](CONTRIBUTING.md) for instructions on how to set up your development environment, run numerical tests, and submit pull requests.
 
-### Before Contributing
-- Follow package boundaries
-- Avoid introducing hidden state
-- Add tests with numerical tolerances
-- Keep APIs explicit and minimal
+By participating in this project, you agree to abide by our [Code of Conduct](CODE_OF_CONDUCT.md).
 
 ---
 

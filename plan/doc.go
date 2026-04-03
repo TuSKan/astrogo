@@ -4,7 +4,7 @@
 // event-based solver for identifying rise, set, and transit times for
 // both fixed and moving celestial targets.
 //
-// Refinement
+// # Refinement
 //
 // The event finder uses a two-stage approach: a coarse sampling pass followed
 // by numerical refinement using bisection (for roots) and golden-section search

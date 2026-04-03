@@ -72,12 +72,12 @@ var (
 	Luminosity    = Dimension{J: 1}
 
 	Area         = Dimension{L: 2}
-	Volume        = Dimension{L: 3}
-	Velocity      = Dimension{L: 1, T: -1}
-	Accel         = Dimension{L: 1, T: -2}
-	Force         = Dimension{L: 1, M: 1, T: -2}
-	Pressure      = Dimension{L: -1, M: 1, T: -2}
-	Energy        = Dimension{L: 2, M: 1, T: -2}
-	Power         = Dimension{L: 2, M: 1, T: -3}
-	SpectralFlux  = Dimension{M: 1, T: -2} // W/(m²·Hz) base: kg·s⁻²
+	Volume       = Dimension{L: 3}
+	Velocity     = Dimension{L: 1, T: -1}
+	Accel        = Dimension{L: 1, T: -2}
+	Force        = Dimension{L: 1, M: 1, T: -2}
+	Pressure     = Dimension{L: -1, M: 1, T: -2}
+	Energy       = Dimension{L: 2, M: 1, T: -2}
+	Power        = Dimension{L: 2, M: 1, T: -3}
+	SpectralFlux = Dimension{M: 1, T: -2} // W/(m²·Hz) base: kg·s⁻²
 )

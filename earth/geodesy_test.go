@@ -50,7 +50,7 @@ func TestECEFRoundTrip(t *testing.T) {
 	wgs84 := earth.WGS84()
 	cases := []struct {
 		lon, lat angle.Angle
-		h       float64
+		h        float64
 	}{
 		{angle.Deg(0), angle.Deg(0), 0},
 		{angle.Deg(45), angle.Deg(45), 1000},

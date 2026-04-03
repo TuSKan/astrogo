@@ -4,9 +4,9 @@
 //
 // This package builds on top of `sky`, `observatory`, and `time` to answer
 // practical observing questions:
-//  - "Is this object above my horizon right now?"
-//  - "When is this object observable tonight?"
-//  - "When does this object reach its maximum altitude?"
+//   - "Is this object above my horizon right now?"
+//   - "When is this object observable tonight?"
+//   - "When does this object reach its maximum altitude?"
 //
 // # Accuracy and Performance
 //

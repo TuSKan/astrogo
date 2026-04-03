@@ -115,6 +115,6 @@ func BenchmarkResolve(b *testing.B) {
 	}
 	r := NewResolver(p)
 	for i := 0; i < b.N; i++ {
-		r.Resolve("M42")
+		_, _ = r.Resolve("M42")
 	}
 }

@@ -14,7 +14,7 @@ import (
 // DOC: https://ssd-api.jpl.nasa.gov/doc/sbdb_query.html
 // API: https://ssd-api.jpl.nasa.gov/sbdb_query.api
 
-const JPL_SBDB_QUERY_API = "https://ssd-api.jpl.nasa.gov/sbdb_query.api"
+var sbdbQueryAPI = "https://ssd-api.jpl.nasa.gov/sbdb_query.api"
 
 // Orbit Class Codes
 // Code	Name	Kind	Description
@@ -69,7 +69,7 @@ type SmallBodyProvider struct {
 // NewSmallBodyProvider creates a provider from a JPL SBDB Query API CSV reader.
 // Expected columns (minimal): full_name, pdes, name, spkid, kind
 func NewSmallBodyProvider(query SBDBQuery) (*SmallBodyProvider, error) {
-	api, err := url.Parse(JPL_SBDB_QUERY_API)
+	api, err := url.Parse(sbdbQueryAPI)
 	if err != nil {
 		return nil, fmt.Errorf("catalog: failed to parse SBDB URL: %w", err)
 	}

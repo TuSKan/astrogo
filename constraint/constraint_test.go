@@ -57,10 +57,10 @@ func TestConstraints(t *testing.T) {
 func TestSunMoonConstraints(t *testing.T) {
 	loc, _ := earth.NewGeodetic(angle.Zero(), angle.Zero(), 0)
 	site, _ := observatory.NewSite("Test", loc, angle.Zero(), nil)
-	
+
 	// Night time (Sun below horizon)
-	tmNight := time.FromJD(2451545.5, time.UTC) 
-	
+	tmNight := time.FromJD(2451545.5, time.UTC)
+
 	t.Run("Sun", func(t *testing.T) {
 		c := Sun{Threshold: angle.Deg(-12)}
 		res, err := c.Check(nil, tmNight, site)

@@ -1,4 +1,4 @@
-package openngc
+package main
 
 import (
 	"encoding/csv"
@@ -256,17 +256,21 @@ func writeRuntimeCSV(path string, records []targetRecord) error {
 
 	w := csv.NewWriter(f)
 	// Output format: id,name,kind,ra_deg,dec_deg,aliases(semicolon separated)
-	w.Write([]string{"id", "name", "kind", "ra", "dec", "aliases"})
+	if err := w.Write([]string{"id", "name", "kind", "ra", "dec", "aliases"}); err != nil {
+		return err
+	}
 
 	for _, rec := range records {
-		w.Write([]string{
+		if err := w.Write([]string{
 			rec.ID,
 			rec.Name,
 			rec.Kind,
 			fmt.Sprintf("%.6f", rec.RA),
 			fmt.Sprintf("%.6f", rec.Dec),
 			strings.Join(rec.Aliases, ";"),
-		})
+		}); err != nil {
+			return err
+		}
 	}
 	w.Flush()
 	return w.Error()

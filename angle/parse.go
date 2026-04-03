@@ -20,15 +20,7 @@ import (
 // The sign applies to the whole angle; individual fields must be non-negative.
 // Arcminutes must be in [0, 60) and arcseconds must be in [0, 60).
 func ParseDMS(s string) (Angle, error) {
-	sign, fields, err := parseSexagesimal(s)
-	if err != nil {
-		return 0, fmt.Errorf("ParseDMS %q: %w", s, err)
-	}
-	if err := validateMinSec(fields[1], fields[2]); err != nil {
-		return 0, fmt.Errorf("ParseDMS %q: %w", s, err)
-	}
-	deg := fields[0] + fields[1]/60 + fields[2]/3600
-	return Deg(sign * deg), nil
+	return parseBaseSexagesimal(s, "ParseDMS", Deg)
 }
 
 // ParseHMS parses a sexagesimal angle string in hours-minutes-seconds format
@@ -43,15 +35,21 @@ func ParseDMS(s string) (Angle, error) {
 // A leading '-' sign is allowed for hour angles. Minutes must be in [0, 60)
 // and seconds in [0, 60).
 func ParseHMS(s string) (Angle, error) {
+	return parseBaseSexagesimal(s, "ParseHMS", Hour)
+}
+
+// parseBaseSexagesimal handles the shared logic of extracting the sign and components,
+// validating bounds, and creating the final angle.
+func parseBaseSexagesimal(s string, funcName string, unit func(float64) Angle) (Angle, error) {
 	sign, fields, err := parseSexagesimal(s)
 	if err != nil {
-		return 0, fmt.Errorf("ParseHMS %q: %w", s, err)
+		return 0, fmt.Errorf("%s %q: %w", funcName, s, err)
 	}
 	if err := validateMinSec(fields[1], fields[2]); err != nil {
-		return 0, fmt.Errorf("ParseHMS %q: %w", s, err)
+		return 0, fmt.Errorf("%s %q: %w", funcName, s, err)
 	}
-	hours := fields[0] + fields[1]/60 + fields[2]/3600
-	return Hour(sign * hours), nil
+	val := fields[0] + fields[1]/60 + fields[2]/3600
+	return unit(sign * val), nil
 }
 
 // ── Internal helpers ──────────────────────────────────────────────────────────
@@ -94,21 +92,15 @@ func parseSexagesimal(s string) (sign float64, fields [3]float64, err error) {
 // extractNumericFields scans s and returns up to max non-negative float64
 // values separated by any run of non-digit, non-dot bytes.
 func extractNumericFields(s string, max int) ([]float64, error) {
-	result := make([]float64, 0, max)
-	i := 0
-	for i < len(s) && len(result) < max {
-		// Skip non-numeric characters
-		for i < len(s) && !isDigitByte(s[i]) {
-			i++
-		}
-		if i >= len(s) {
+	parts := strings.FieldsFunc(s, func(r rune) bool {
+		return !(r >= '0' && r <= '9' || r == '.')
+	})
+
+	var result []float64
+	for _, token := range parts {
+		if len(result) >= max {
 			break
 		}
-		start := i
-		for i < len(s) && (isDigitByte(s[i]) || s[i] == '.') {
-			i++
-		}
-		token := s[start:i]
 		v, err := strconv.ParseFloat(token, 64)
 		if err != nil {
 			return nil, fmt.Errorf("cannot parse %q as number", token)
@@ -128,6 +120,3 @@ func validateMinSec(minutes, secs float64) error {
 	}
 	return nil
 }
-
-// isDigitByte reports whether b is an ASCII decimal digit.
-func isDigitByte(b byte) bool { return b >= '0' && b <= '9' }

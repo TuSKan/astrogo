@@ -7,7 +7,7 @@ import (
 	"github.com/TuSKan/astrogo/vector"
 )
 
-var sink float64    // prevents dead-code elimination
+var sink float64 // prevents dead-code elimination
 var vecSink vector.Vec3
 
 func BenchmarkDot(b *testing.B) {
