@@ -41,6 +41,11 @@ func CacheAPI(kernel string, startTime, endTime time.Time, path string) ([]*Read
 	var readers []*Reader
 	spkFile := kernel + ".bsp"
 	spkPath := filepath.Join(path, spkFile)
+
+	if err := os.MkdirAll(path, 0755); err != nil {
+		return nil, fmt.Errorf("jpl: failed to create directory %s: %w", path, err)
+	}
+
 	if _, err := os.Stat(spkPath); err == nil {
 		// Already exists, just return reader
 		f, err := os.Open(spkPath)
