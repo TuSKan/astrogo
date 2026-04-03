@@ -55,7 +55,7 @@ type SBDBQuery struct {
 	Kind      string // Limit results to either asteroids-only (a) or comets-only (c)
 	Group     string // Limit results to NEOs-only (neo) or PHAs-only (pha)
 	Class     string // Limit results to small-bodies with orbits of the specified class (or classes). Allowable values are valid 3-character orbit-class codes. If specifying more than one class, separate entities with a comma (e.g., TJN,CEN). Codes are case-sensitive.
-	Satellite  string // Limit results to small-bodies with at least one known satellite. true or 1, false or 0
+	Satellite string // Limit results to small-bodies with at least one known satellite. true or 1, false or 0
 	Fragments string // Exclude all comet fragments (if any) from results. true or 1, false or 0
 	Custom    string // Custom field constraints. Maximum length is 2048 characters.
 }
