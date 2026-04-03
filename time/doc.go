@@ -4,7 +4,7 @@
 //
 // Go's standard `time.Time` is designed for civil time and recent history/future.
 // In contrast, `atime` is designed for:
-//   - Precision across millenia: Uses a two-part Julian Date representation
+//   - Precision across millennia: Uses a two-part Julian Date representation
 //     to maintain sub-millisecond precision over long time scales.
 //   - Multiple Time Scales: Supports UTC, TAI, TT, UT1, and TDB.
 //   - Numerical correctness: Facilitates precise propagation of planet
