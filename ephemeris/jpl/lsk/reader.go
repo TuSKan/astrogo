@@ -23,7 +23,7 @@ type Reader struct {
 
 func Cache(kernel, path string) (*Reader, error) {
 	lskPath := filepath.Join(path, kernel)
-	
+
 	if err := os.MkdirAll(filepath.Dir(lskPath), 0755); err != nil {
 		return nil, fmt.Errorf("jpl: failed to create parent dir for LSK %s: %w", lskPath, err)
 	}

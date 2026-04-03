@@ -44,7 +44,7 @@ type Reader struct {
 
 func CacheDownload(kernel, path string) (*Reader, error) {
 	spkPath := filepath.Join(path, kernel)
-	
+
 	if err := os.MkdirAll(filepath.Dir(spkPath), 0755); err != nil {
 		return nil, fmt.Errorf("jpl: failed to create parent dir for SPK %s: %w", spkPath, err)
 	}

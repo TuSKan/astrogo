@@ -1,3 +1,7 @@
+run:
+  # Bypass golangci-lint version panic on new Go versions natively
+  go: "1.24"
+
 linters:
   # Enable specific linters
   enable:
