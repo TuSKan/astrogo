@@ -146,7 +146,7 @@ func ReadHeader(br *BlockReader) (*Header, error) {
 		if blocksRead > maxBlocks {
 			return nil, fmt.Errorf("fits: header exceeded %d blocks without END card (corrupt or compressed file?)", maxBlocks)
 		}
-		
+
 		err := br.ReadBlock(buf)
 		if err != nil {
 			return nil, err
