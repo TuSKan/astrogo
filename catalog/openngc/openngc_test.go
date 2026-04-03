@@ -8,6 +8,9 @@ import (
 
 func TestProvider(t *testing.T) {
 	p := New()
+	if len(p.targets) == 0 {
+		t.Skip("skipping OpenNGC standard tests: openngc.csv dataset is not present")
+	}
 
 	tests := []struct {
 		query  string
@@ -38,6 +41,9 @@ func TestProvider(t *testing.T) {
 
 func TestSearch(t *testing.T) {
 	p := New()
+	if len(p.targets) == 0 {
+		t.Skip("skipping OpenNGC standard search tests: openngc.csv dataset is not present")
+	}
 	results := p.Search("orion")
 	if len(results) == 0 {
 		t.Errorf("Search(%q) returned no results", "orion")
@@ -57,6 +63,9 @@ func TestSearch(t *testing.T) {
 
 func BenchmarkSearch(b *testing.B) {
 	p := New()
+	if len(p.targets) == 0 {
+		b.Skip("skipping OpenNGC standard benchmark: openngc.csv dataset is not present")
+	}
 	for i := 0; i < b.N; i++ {
 		p.Search("nebula")
 	}
