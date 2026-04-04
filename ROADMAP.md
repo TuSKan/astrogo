@@ -1,87 +1,257 @@
-# AstroGo Project Roadmap
+# AstroGo Roadmap
 
-AstroGo aims to become the definitive astronomy and astrophysics standard library for the Go ecosystem. While Python's `astropy` leads the industry in available algorithms, Go offers unparalleled potential for high-throughput concurrency, massive batch processing, and pipeline integrations that Python execution traditionally struggles with.
+AstroGo aims to become a **pure-Go high-performance, scientifically reliable astronomy library**, focused on precision computation, observatory planning, and scalable data workflows.
 
-The roadmap is categorized by priority tiers. Completed objectives reflect milestones that have successfully been integrated into the active `main` branch.
-
----
-
-## ✅ Completed Milestones
-
-### 1. High-Performance FITS I/O Engine
-- **Status:** Complete (Phase 0-2)
-- **Impact:** Astronomical image workflows are now completely unblocked.
-- **Deliverables:**
-  - Full Multi-Extension FITS support (`Primary`, `Image`, `ASCII`, `BINTABLE`).
-  - Zero-copy mapping via `golang.org/x/exp/mmap` natively bridging FITS blocks via pure memory references.
-  - Apache Arrow (`apache/arrow-go/v18`) structures storing multi-dimensional image arrays and binary table dataframes dynamically without reflection. 
-  - Transparent `.gz` pipeline decompression accelerating via multithreaded `pgzip`.
-
-### 2. World Coordinate Systems (WCS)
-- **Status:** Complete (Phase 3)
-- **Impact:** Allows physical coordinates to geometrically tie against absolute sky maps.
-- **Deliverables:**
-  - Automated `fits.ExtractWCS` mechanisms cleanly lifting coordinate boundaries from generic headers.
-  - Pixel-to-World coordinate paths utilizing exact mathematical Gnomonic (`TAN`) spherical tracking natively bypassing flat-Earth GIS algorithm distortions.
+The project has already achieved strong coverage of core astronomy primitives (time, coordinates, ephemerides, planning, FITS, WCS, catalogs, and validation). The roadmap now focuses on **scientific completeness, operational planning, and workflow ergonomics**.
 
 ---
 
-## 🚀 Tier 1 — Core Execution & Baseline Parity
-*These priorities close fundamental usability gaps and establish AstroGo's core performance advantages.*
+# ✅ Current Status (Summary)
 
-### 1. Vectorized Batch APIs & Hardware Optimizations
-Astropy currently dictates the industry, however AstroGo will dominate server-side astronomy by leaning heavily into Go's concurrency structures.
-- **Why it matters:** Can a user efficiently process 100,000 target alt/az checks, or structurally score an entire sky catalog dynamically across multi-core pipeline workers? 
-- **Deliverables:**
-  - Concurrent batch evaluation handlers for ephemerides and horizon visibility grids.
-  - Thread-safe coordinate transformations routing pipeline arrays.
+AstroGo already provides:
 
-### 2. Scientific Validation & Authority Layer 
-- **Why it matters:** Serious users need verified mathematical boundaries and quantifiable precision error thresholds out-of-the-box. 
-- **Deliverables:**
-  - Comprehensive interoperability corpus verified dynamically against Astropy/SPICE/SOFA standard dataset outputs.
-  - Documented programmatic error budgets for numerical drift.
+- Astronomical time scales (UTC, TAI, TT, **UT1**, TDB)
+- Coordinate frames and transformations (ICRS, Galactic, Ecliptic, AltAz)
+- Observatory modeling and sidereal time
+- Sky calculations (alt/az, airmass, separation, position angle)
+- Event solving (rise, set, transit, twilight)
+- Constraint system and visibility evaluation
+- JPL DE ephemerides with:
+  - multi-kernel support
+  - Horizons on-demand querying
+  - cache + provider abstraction
+- Catalog identity:
+  - OpenNGC embedded
+  - SBDB (NASA) query integration
+- FITS I/O (multi-extension, tables, images)
+- WCS support
+- Units and quantities system
+- Validation framework against SOFA / Horizons / analytical invariants
+- CI with automated testing
 
-### 3. Unified Ephemeris Abstractions
-- **Why it matters:** Modern observers use a broad mosaic of SPK binaries and internet APIs. Users should not need to rewrite call sites when pivoting between a local DE planetary kernel cache network versus a remote JPL Horizons dynamic orbital query.
-- **Deliverables:**
-  - Unified Go interfaces safely bridging local `SPK` planetary caches, remote orbital queries, and offline graceful fallbacks transparently.
-
----
-
-## 🔭 Tier 2 — Data Ecosystem & Astro Tables 
-*These milestones bring AstroGo fully out of raw physical mathematics and directly into structural catalog pipelining.*
-
-### 1. Catalog & Arrow Table Infrastructure
-By leveraging `apache/arrow-go/v18` already configured within our FITS Binary Tables module, we structurally establish rigorous execution systems for resolving source lists and instrument catalogs completely sidestepping Python's severe Pandas/NumPy memory bloat configurations.
-- **Why it matters:** Modern Astronomy pipelines live and die by sorting billion-row star catalogs or massive reduced photometry tabular dataframes.
-- **Deliverables:**
-  - Unit-aware dataframe logic bridging explicit columnar tables.
-  - High-volume catalog intersections interoperating natively with interoperable files formats (`CSV`, `Parquet`, explicit FITS binary tables).
-
-### 2. Remote Astroquery-style Ecosystem Integrations
-- **Why it matters:** Connecting real-time remote scientific data retrieval pipelines directly into Go expands backend microservice usability dramatically.
-- **Deliverables:**
-  - Native integrated HTTP ingestion APIs targeting massive datasets like Simbad, VizieR, and explicit Gaia spherical cone searches.
-  - MPC (Minor Planet Center) / Small body tracking integration workflows.
+The project is **past the foundational stage**.
 
 ---
 
-## 📅 Tier 3 — Complex Operations & Deep Scheduling
-*Achieving parity with platforms like `astroplan` by tracking physical mechanical overhead limitations against the cosmos.*
+# 🚀 Phase 1 — Precision Astronomy Completion
 
-### 1. Observatory Schedule Optimization Engines
-- **Why it matters:** Driving complex robotic observatories requires ranking thousands of dynamic active targets simultaneously while tracking altitude transitions against active filter delays or camera configuration limits.
-- **Deliverables:**
-  - Observation block handlers generating priority-based and observability-score-maximizing operational schedules natively mapping observability windows over nights and celestial seasons.
-  - Physical transition models structurally measuring observatory configuration slew-time penalties.
+**Goal:** achieve observatory-grade correctness for real-world usage.
 
-### 2. Deep Time Infrastructure (`EOP` / `UT1`)
-While `UTC`, `TAI`, and `TT` are sufficient for 95% of tasks, ultra-precision observatory pointing demands integrating strict Earth Orientation Parameters dynamically.
-- **Deliverables:** 
-  - Resolving pure physical `UT1` scales evaluating dynamic external IERS tables.
-  - Polishing precision stale-data system behavior executing against stale or disconnected cache behavior logic.
+## 1. Earth Orientation Parameters (EOP)
 
-### 3. Image-Domain & Photometric Output Pipelines
-If AstroGo expands to handle complete physical image extraction, building out pixel-level analytical instruments rounds out the final roadmap barriers targeting "Complete Platform Dominance".
-- **Deliverables:** Advanced Spectral handlers, explicit Point Spread Function (PSF) source measuring, explicit aperture tooling, and image calibration tracking utilities generating propagated photometric datasets dynamically!
+### Status
+UT1 exists, but full Earth orientation modeling is incomplete.
+
+### Deliverables
+- UT1–UTC correction ingestion
+- EOP data loader and cache
+- polar motion support
+- deterministic fallback for stale/missing data
+- validation against reference datasets
+
+### Outcome
+Accurate sidereal time and topocentric positioning under real Earth rotation conditions.
+
+---
+
+## 2. Apparent / Observed Coordinate Pipeline
+
+### Status
+Geometric transformations are complete; apparent corrections are not.
+
+### Deliverables
+- aberration corrections
+- proper motion propagation
+- parallax handling
+- topocentric apparent coordinates
+- explicit API separation:
+  - geometric
+  - astrometric
+  - apparent
+  - observed
+
+### Outcome
+Coordinates suitable for real telescope pointing and observation comparison.
+
+---
+
+## 3. Atmospheric Refraction Model
+
+### Status
+Basic approximation exists.
+
+### Deliverables
+- refraction model abstraction
+- standard atmosphere correction
+- optional pressure / temperature input
+- selectable modes:
+  - none
+  - approximate
+  - improved model
+
+### Outcome
+More realistic horizon and low-altitude behavior.
+
+---
+
+# 📅 Phase 2 — Scheduling Engine
+
+**Goal:** evolve from planning primitives to full observatory scheduling.
+
+## 4. Advanced Scheduling Optimization
+
+### Deliverables
+- observing block abstraction
+- target prioritization
+- multi-target optimization
+- cadence-aware scheduling
+- pluggable strategies:
+  - greedy
+  - score-maximizing
+  - priority-based
+  - window-aware
+
+### Outcome
+Automated generation of optimized observing plans.
+
+---
+
+## 5. Transition & Operational Overhead Modeling
+
+### Deliverables
+- slew-time estimation
+- configuration / filter change costs
+- setup overhead modeling
+- penalty-aware scheduling integration
+
+### Outcome
+Schedules that reflect real observatory constraints.
+
+---
+
+## 6. Explainable Scheduling Output
+
+### Deliverables
+- structured schedule object
+- score breakdown per decision
+- rejection explanations
+- reproducible scheduling traces
+
+### Outcome
+Transparent and debuggable planning decisions.
+
+---
+
+# 📊 Phase 3 — Data Workflow Layer
+
+**Goal:** enable real catalog and pipeline workflows.
+
+## 7. Catalog Table Infrastructure
+
+### Status
+Catalog identity exists; table workflows are limited.
+
+### Deliverables
+- structured catalog table abstraction
+- typed fields and schemas
+- unit-aware columns
+- filtering and sorting
+- cross-match primitives
+- integration with FITS tables and Arrow
+
+### Outcome
+Catalogs become first-class, manipulable datasets.
+
+---
+
+## 8. Batch / High-Throughput APIs
+
+### Deliverables
+- batch coordinate transforms
+- batch ephemeris evaluation
+- batch visibility computation
+- batch event solving
+- concurrency-safe kernel/cache usage
+
+### Outcome
+Efficient large-scale processing (surveys, pipelines, services).
+
+---
+
+# 🧪 Phase 4 — Validation & Scientific Trust
+
+**Goal:** maintain and strengthen scientific reliability.
+
+## 9. Validation Expansion
+
+### Deliverables
+- extended comparison against Astropy / SOFA / Horizons
+- additional edge-case datasets:
+  - high latitude
+  - circumpolar
+  - horizon edge
+- small-body validation coverage
+- apparent-coordinate validation
+
+### Outcome
+Higher confidence across all domains.
+
+---
+
+## 10. Scientific CI Gating
+
+### Deliverables
+- validation suite separated from unit tests
+- tolerance drift detection
+- corpus-based regression runs
+- CI failure on scientific regressions
+
+### Outcome
+Prevents silent numerical degradation over time.
+
+---
+
+# 🎯 Strategic Direction
+
+AstroGo should position itself as:
+
+> **A high-performance Go-native astronomy engine focused on precision, ephemerides, and observatory planning — with strong support for large-scale and backend workflows.**
+
+Not as a full clone of other ecosystems, but as:
+
+- **more performant for pipelines**
+- **more structured for backend services**
+- **scientifically reliable for planning and ephemerides**
+
+---
+
+# ⚠️ Non-Goals (for now)
+
+To maintain focus, the following are intentionally not prioritized:
+
+- full photometry / image processing ecosystem
+- full spectral analysis stack
+- complete reproduction of all Astropy submodules
+
+These can be explored later if aligned with project direction.
+
+---
+
+# 🧭 Summary
+
+AstroGo is no longer missing core astronomy capabilities.
+
+The remaining work is concentrated in:
+
+- precision corrections (EOP, apparent place, refraction)
+- scheduling depth
+- data workflow ergonomics
+- validation hardening
+
+Completing these will elevate AstroGo from:
+
+> **a powerful astronomy library**
+
+to:
+
+> **a production-grade astronomy platform for Go**
