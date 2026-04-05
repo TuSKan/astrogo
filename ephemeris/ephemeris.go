@@ -50,6 +50,29 @@ func Velocity(p Provider, id body.ID, t time.Time) (vector.Vec3, error) {
 	return st.Vel, nil
 }
 
+// ApparentState calculates the rigorously light-time delayed (retarded) geometric state
+// of a target by repeatedly polling the ephemeris Provider at (t - tau).
+// To satisfy classical planetary aberration, it strictly couples the true orbital curve 
+// via the provider rather than relying on linear vector shortcuts.
+func ApparentState(p Provider, target body.ID, obsTime time.Time) (State, error) {
+	st, err := p.State(target, obsTime)
+	if err != nil {
+		return State{}, err
+	}
+
+	tauDays := st.Pos.Norm() / 173.144632674
+	for j := 0; j < 5; j++ {
+		retardedTime := obsTime.AddDays(-tauDays)
+		st, err = p.State(target, retardedTime)
+		if err != nil {
+			return State{}, err
+		}
+		tauDays = st.Pos.Norm() / 173.144632674
+	}
+
+	return st, nil
+}
+
 // ToICRS converts a geocentric Cartesian vector (in AU) to spherical ICRS coordinates.
 // It assumes the input vector is already in an ICRS-compatible inertial frame.
 func ToICRS(pos vector.Vec3) (coord.ICRS, error) {

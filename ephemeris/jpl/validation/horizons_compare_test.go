@@ -1,3 +1,5 @@
+//go:build network
+
 package jpl_test
 
 import (
@@ -10,15 +12,15 @@ import (
 )
 
 func loadCases(t *testing.T) []*StateVector {
-	sun, err := fetchVector(10, "Sun")
+	sun, err := fetchVector(10, "Sun", "2000-01-01 12:00 TDB", "2000-01-01 12:01")
 	if err != nil {
 		t.Fatalf("failed to fetch sun vector: %v", err)
 	}
-	moon, err := fetchVector(301, "Moon")
+	moon, err := fetchVector(301, "Moon", "2000-01-01 12:00 TDB", "2000-01-01 12:01")
 	if err != nil {
 		t.Fatalf("failed to fetch moon vector: %v", err)
 	}
-	mars, err := fetchVector(4, "Mars")
+	mars, err := fetchVector(4, "Mars", "2000-01-01 12:00 TDB", "2000-01-01 12:01")
 	if err != nil {
 		t.Fatalf("failed to fetch mars vector: %v", err)
 	}

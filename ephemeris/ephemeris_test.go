@@ -1,16 +1,19 @@
 package ephemeris_test
 
 import (
+	"math"
 	"testing"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/body"
+	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/earth"
 	"github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/observatory"
 	"github.com/TuSKan/astrogo/sky"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/transform"
 	"github.com/TuSKan/astrogo/vector"
 )
 
@@ -100,5 +103,194 @@ func TestUnsupportedBody(t *testing.T) {
 	_, err := p.State(body.Mars, tm)
 	if err == nil {
 		t.Error("Expected error for unsupported body (Mars) in sofa provider")
+	}
+}
+
+
+
+
+
+const (
+	lightAUPerDay = 173.144632674
+	arcsecPerRad  = 206264.80624709636
+)
+
+type mockLinearProvider struct {
+	baseTime time.Time
+	pos      vector.Vec3
+	vel      vector.Vec3
+}
+
+func (m *mockLinearProvider) State(id body.ID, t time.Time) (ephemeris.State, error) {
+	jd1_req, jd2_req := t.JDParts()
+	jd1_base, jd2_base := m.baseTime.JDParts()
+	dtDays := (jd1_req - jd1_base) + (jd2_req - jd2_base)
+	
+	p := m.pos.Add(m.vel.MulScalar(dtDays))
+	return ephemeris.State{Pos: p, Vel: m.vel}, nil
+}
+
+func angularSepArcsec(a, b coord.AltAz) float64 {
+	az1 := a.Az.Radians()
+	alt1 := a.Alt.Radians()
+	az2 := b.Az.Radians()
+	alt2 := b.Alt.Radians()
+
+	s1 := math.Sin(alt1)
+	c1 := math.Cos(alt1)
+	s2 := math.Sin(alt2)
+	c2 := math.Cos(alt2)
+
+	cosd := s1*s2 + c1*c2*math.Cos(az1-az2)
+	if cosd > 1 {
+		cosd = 1
+	}
+	if cosd < -1 {
+		cosd = -1
+	}
+	return math.Acos(cosd) * arcsecPerRad
+}
+
+func iteratedApparentVector(st ephemeris.State) vector.Vec3 {
+	v := st.Pos
+	tauDays := v.Norm() / lightAUPerDay
+	for j := 0; j < 5; j++ {
+		iterPos := v.Sub(st.Vel.MulScalar(tauDays))
+		tauDays = iterPos.Norm() / lightAUPerDay
+	}
+	return v.Sub(st.Vel.MulScalar(tauDays))
+}
+
+func TestApparentState_ZeroVelocityReducesToGeometric(t *testing.T) {
+	tm := time.Date(2026, 4, 5, 0, 0, 0, 0, time.LocationUTC)
+
+	site := earth.Geodetic{
+		Lat: angle.Deg(-23.5505),
+		Lon: angle.Deg(-46.6333),
+		Height:   760,
+	}
+
+	atm := earth.Atmosphere{} 
+	atm.Model = earth.RefractionNone{}
+
+	mock := &mockLinearProvider{
+		baseTime: tm,
+		pos:      vector.V3(1.2, 0.4, 0.3),
+		vel:      vector.Zero(),
+	}
+
+	appState, err := ephemeris.ApparentState(mock, body.Sun, tm)
+	if err != nil {
+		t.Fatalf("ApparentState failed: %v", err)
+	}
+
+	got := transform.GeocentricToObserved(appState.Pos, tm, site, atm)
+	want := transform.GeocentricToObserved(mock.pos, tm, site, atm)
+
+	sep := angularSepArcsec(got, want)
+	if sep > 1e-6 {
+		t.Fatalf("zero-velocity case should reduce to geometric path; sep = %.12f arcsec", sep)
+	}
+}
+
+func TestApparentState_MatchesManualLightTimeIteration(t *testing.T) {
+	tm := time.Date(2026, 4, 5, 0, 0, 0, 0, time.LocationUTC)
+
+	site := earth.Geodetic{
+		Lat: angle.Deg(-23.5505),
+		Lon: angle.Deg(-46.6333),
+		Height:   760,
+	}
+
+	atm := earth.Atmosphere{}
+	atm.Model = earth.RefractionNone{}
+
+	st := ephemeris.State{
+		Pos: vector.V3(1.0, 0.8, 0.2),
+		Vel: vector.V3(-0.012, 0.009, 0.0015), 
+	}
+
+	mock := &mockLinearProvider{
+		baseTime: tm,
+		pos:      st.Pos,
+		vel:      st.Vel,
+	}
+
+	appState, _ := ephemeris.ApparentState(mock, body.Mars, tm)
+	got := transform.GeocentricToObserved(appState.Pos, tm, site, atm)
+
+	app := iteratedApparentVector(st)
+	want := transform.GeocentricToObserved(app, tm, site, atm)
+
+	sep := angularSepArcsec(got, want)
+	if sep > 1e-6 {
+		t.Fatalf("ApparentState does not match explicit light-time reduction; sep = %.12f arcsec", sep)
+	}
+}
+
+func TestApparentState_LightTimeActuallyChangesResult(t *testing.T) {
+	tm := time.Date(2026, 4, 5, 0, 0, 0, 0, time.LocationUTC)
+
+	site := earth.Geodetic{
+		Lat: angle.Deg(19.8261),
+		Lon: angle.Deg(-155.4700),
+		Height:   4205,
+	}
+
+	atm := earth.Atmosphere{}
+	atm.Model = earth.RefractionNone{}
+
+	mock := &mockLinearProvider{
+		baseTime: tm,
+		pos: vector.V3(4.0, 1.5, 0.2),
+		vel: vector.V3(-0.006, 0.010, 0.0008),
+	}
+
+	appState, _ := ephemeris.ApparentState(mock, body.Jupiter, tm)
+	
+	got := transform.GeocentricToObserved(appState.Pos, tm, site, atm)
+	geom := transform.GeocentricToObserved(mock.pos, tm, site, atm)
+
+	sep := angularSepArcsec(got, geom)
+	if sep <= 0 {
+		t.Fatalf("expected light-time correction to produce a non-zero angular shift")
+	}
+
+	if sep < 0.001 {
+		t.Fatalf("expected measurable apparent shift, got only %.9f arcsec", sep)
+	}
+}
+
+func TestApparentState_DistantObjectHasTinyCorrection(t *testing.T) {
+	tm := time.Date(2026, 4, 5, 0, 0, 0, 0, time.LocationUTC)
+
+	site := earth.Geodetic{
+		Lat: angle.Deg(28.7606),
+		Lon: angle.Deg(-17.8890),
+		Height:   2390,
+	}
+
+	atm := earth.Atmosphere{}
+	atm.Model = earth.RefractionNone{}
+
+	mock := &mockLinearProvider{
+		baseTime: tm,
+		pos: vector.V3(40.0, 10.0, 2.0),
+		vel: vector.V3(-0.001, 0.0008, 0.0001),
+	}
+
+	appState, _ := ephemeris.ApparentState(mock, body.Jupiter, tm)
+
+	got := transform.GeocentricToObserved(appState.Pos, tm, site, atm)
+	geom := transform.GeocentricToObserved(mock.pos, tm, site, atm)
+
+	sep := angularSepArcsec(got, geom)
+
+	if sep < 0 {
+		t.Fatalf("invalid negative separation")
+	}
+
+	if sep > 30 {
+		t.Fatalf("distant slow object should not shift absurdly; got %.6f arcsec", sep)
 	}
 }
