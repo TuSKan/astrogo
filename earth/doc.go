@@ -13,6 +13,15 @@
 //   - ECEF (Earth-Centered, Earth-Fixed): Cartesian (X, Y, Z) vectors in
 //     the Earth's rotating frame.
 //
+// # Atmospheric Refraction & EOP Modeling
+//
+// This package also holds dynamic planetary-scale states:
+//   - [Atmosphere]: Site conditions (temperature, pressure) driving modular
+//     [RefractionModel] interfaces (SOFA exact vs Saemundsson analytical).
+//   - Earth Orientation Parameters (EOP): Automatically parses IERS 
+//     `finals2000A.all` datasets to provide live DUT1 offsets and Polar Motion
+//     `(XP, YP)` tracking for Observatory-grade terrestrial alignment.
+//
 // # Scope
 //
 // This package owns physical Earth modeling. It does NOT own:

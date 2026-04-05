@@ -44,6 +44,7 @@ Validation should be:
 | Astronomical time scales | ✅ validated | gofa / SOFA | 1e-12 d | UTC ↔ TAI ↔ TT ↔ TDB verified |
 | Local Sidereal Time | ✅ validated | gofa Gst06a (IAU 2006) | 0.5 deg | GAST at Greenwich J2000.0 |
 | Ephemerides (JPL DE) | ✅ validated | JPL Horizons | 1e-7 AU / 1e-8 AU·d⁻¹ | Sun, Moon, Planets (pos + vel) |
+| Apparent / Observed Coordinates | ✅ validated | JPL Horizons (OBSERVER) | 1 arcsecond | Full Astrometric -> Local Topocentric Pipeline (EOP mapped) |
 | Units algebra | ✅ validated | analytical | exact | AU, Parsec, LightYear, Jansky verified |
 | Quantity arithmetic | ✅ validated | analytical | 1e-15 | Scale, Abs, Compare, conversion |
 | Planning / visibility | ✅ validated | geometric sanity | logical | constraint system + scoring verified |
@@ -58,11 +59,8 @@ Validation should be:
 
 The following areas are not yet considered scientifically complete:
 
-- Earth orientation parameters (EOP): polar wander, UT1-UTC corrections
-- High-precision apparent place calculations (aberration, proper motion, parallax)
-- Atmospheric refraction models (beyond plane-parallel approximation)
 - Advanced observation scheduling optimization
-- FITS and catalog I/O
+- FITS and catalog I/O (in hardening process)
 
 ---
 

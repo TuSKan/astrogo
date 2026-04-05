@@ -62,6 +62,16 @@ func Atco13(
 	return aob, zob, hob, dob, rob, eo, status
 }
 
+// Atci13 transforms ICRS astrometric coordinates to CIRS (apparent) coordinates.
+func Atci13(
+	rc, dc float64,
+	pr, pd, px, rv float64,
+	date1, date2 float64,
+) (ri, di, eo float64) {
+	gofa.Atci13(rc, dc, pr, pd, px, rv, date1, date2, &ri, &di, &eo)
+	return ri, di, eo
+}
+
 // Atio13 performs the full observed → ICRS transformation including
 // refraction, diurnal aberration, and Earth rotation.
 // Atio13 performs the CIRS → observed transformation.

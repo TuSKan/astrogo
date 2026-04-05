@@ -12,82 +12,136 @@ import (
 	"github.com/TuSKan/astrogo/vector"
 )
 
-// ── Equatorial <-> Horizontal ───────────────────────────────────────────────
+// ── Pipeline Transformations (Astrometric -> Apparent -> Observed) ────────────
 
-// ICRSToAltAz converts ICRS coordinates to local observed AltAz at the given
-// time and observer location.
-func ICRSToAltAz(c coord.ICRS, t time.Time, site earth.Geodetic) (coord.AltAz, error) {
+// AstrometricToApparent computes the Celestial Intermediate Reference System (CIRS) apparent 
+// position of an object from its Astrometric (catalog ICRS) coordinates at a specific time.
+// It applies proper motion, parallax, radial velocity, light deflection, and aberration.
+func AstrometricToApparent(c coord.Astrometric, t time.Time) coord.Apparent {
 	jd1, jd2 := t.JDParts()
 
-	// Default conditions for refraction (standard atmosphere)
-	const (
-		pressure    = 1013.25 // hPa
-		temperature = 15.0    // °C
-		humidity    = 0.5     // 0-1
-		wavelength  = 0.55    // μm
+	ri, di, _ := gofaext.Atci13(
+		c.RA.Radians(), c.Dec.Radians(),
+		c.PmRA.Radians(), c.PmDec.Radians(), c.Parallax.Radians(), c.RV,
+		jd1, jd2,
 	)
+
+	return coord.Apparent{
+		RA:  angle.Rad(ri).Wrap360(),
+		Dec: angle.Rad(di),
+	}
+}
+
+// ApparentToObserved converts geocentric CIRS Apparent coordinates to local Observed AltAz
+// taking into account Earth rotation, polar motion, and atmospheric refraction.
+func ApparentToObserved(c coord.Apparent, t time.Time, site earth.Geodetic, atm earth.Atmosphere) coord.AltAz {
+	jd1, jd2 := t.JDParts()
+	mjd := (jd1 - 2400000.5) + jd2
+	eop, _ := earth.GetModel().EOP(mjd)
+
+	p := atm.Pressure
+	_, isSOFA := atm.Model.(earth.RefractionSOFA)
+	if atm.Model != nil && !isSOFA {
+		p = 0.0 // Bypass internal SOFA refraction
+	}
+
+	az, zd, _, _, _ := gofaext.Atio13(
+		c.RA.Radians(), c.Dec.Radians(),
+		jd1, jd2, eop.DUT1,
+		site.Lon.Radians(), site.Lat.Radians(), site.Height,
+		eop.XP, eop.YP,
+		p, atm.Temperature, atm.Humidity, atm.Wavelength,
+	)
+
+	alt := angle.Rad(math.Pi/2 - zd)
+	if atm.Model != nil && !isSOFA {
+		alt += atm.Model.Refract(alt, atm, site)
+	}
+
+	return coord.AltAz{
+		Alt: alt,
+		Az:  angle.Rad(az).Wrap360(),
+	}
+}
+
+// AstrometricToObserved collapses the entire apparent pipeline from an Astrometric catalog
+// point explicitly to a refracted local AltAz position.
+func AstrometricToObserved(c coord.Astrometric, t time.Time, site earth.Geodetic, atm earth.Atmosphere) coord.AltAz {
+	jd1, jd2 := t.JDParts()
+	mjd := (jd1 - 2400000.5) + jd2
+	eop, _ := earth.GetModel().EOP(mjd)
+
+	p := atm.Pressure
+	_, isSOFA := atm.Model.(earth.RefractionSOFA)
+	if atm.Model != nil && !isSOFA {
+		p = 0.0
+	}
 
 	az, zd, _, _, _, _, _ := gofaext.Atco13(
 		c.RA.Radians(), c.Dec.Radians(),
-		0, 0, 0, 0, // No proper motion/parallax
-		jd1, jd2, 0, // Assuming DUT1=0 for v1
+		c.PmRA.Radians(), c.PmDec.Radians(), c.Parallax.Radians(), c.RV,
+		jd1, jd2, eop.DUT1,
 		site.Lon.Radians(), site.Lat.Radians(), site.Height,
-		0, 0, // No polar motion for v1
-		pressure, temperature, humidity, wavelength,
+		eop.XP, eop.YP,
+		p, atm.Temperature, atm.Humidity, atm.Wavelength,
 	)
+
+	alt := angle.Rad(math.Pi/2 - zd)
+	if atm.Model != nil && !isSOFA {
+		alt += atm.Model.Refract(alt, atm, site)
+	}
 
 	return coord.AltAz{
-		Alt:  angle.Rad(math.Pi/2 - zd),
-		Az:   angle.Rad(az).Wrap360(),
-		Dist: c.Dist,
-	}, nil
+		Alt: alt,
+		Az:  angle.Rad(az).Wrap360(),
+	}
 }
 
-// ICRSToHourAngle converts ICRS coordinates to local observed Hour Angle at the
-// given time and observer location.
+// ── Equatorial <-> Horizontal (Legacy Implementations) ──────────────────────
+
+// ICRSToAltAz converts purely geometric ICRS coordinates to local observed AltAz 
+// relying on standard atmospheric conditions. Parallax and proper motion are 0.
+func ICRSToAltAz(c coord.ICRS, t time.Time, site earth.Geodetic) (coord.AltAz, error) {
+	astro := coord.Astrometric{RA: c.RA, Dec: c.Dec}
+	altaz := AstrometricToObserved(astro, t, site, earth.StandardAtmosphere)
+	altaz.Dist = c.Dist // Preserve geometric distance
+	return altaz, nil
+}
+
+// ICRSToHourAngle converts purely geometric ICRS coordinates to local observed Hour Angle.
 func ICRSToHourAngle(c coord.ICRS, t time.Time, site earth.Geodetic) (angle.Angle, error) {
 	jd1, jd2 := t.JDParts()
-
-	const (
-		pressure    = 1013.25
-		temperature = 15.0
-		humidity    = 0.5
-		wavelength  = 0.55
-	)
+	mjd := (jd1 - 2400000.5) + jd2
+	eop, _ := earth.GetModel().EOP(mjd)
+	atm := earth.StandardAtmosphere
 
 	_, _, ha, _, _, _, _ := gofaext.Atco13(
 		c.RA.Radians(), c.Dec.Radians(),
 		0, 0, 0, 0,
-		jd1, jd2, 0,
+		jd1, jd2, eop.DUT1,
 		site.Lon.Radians(), site.Lat.Radians(), site.Height,
-		0, 0,
-		pressure, temperature, humidity, wavelength,
+		eop.XP, eop.YP,
+		atm.Pressure, atm.Temperature, atm.Humidity, atm.Wavelength,
 	)
 
 	return angle.Rad(ha).Wrap180(), nil
 }
 
-// AltAzToICRS converts local observed AltAz to ICRS coordinates at the given
-// time and observer location.
+// AltAzToICRS converts local observed AltAz back into geometric ICRS assuming
+// standard atmospheric refraction.
 func AltAzToICRS(c coord.AltAz, t time.Time, site earth.Geodetic) (coord.ICRS, error) {
 	jd1, jd2 := t.JDParts()
+	mjd := (jd1 - 2400000.5) + jd2
+	eop, _ := earth.GetModel().EOP(mjd)
+	atm := earth.StandardAtmosphere
 
-	const (
-		pressure    = 1013.25
-		temperature = 15.0
-		humidity    = 0.5
-		wavelength  = 0.55
-	)
-
-	// Use Atoc13 ("A" = Az/ZD type) for the Observed-to-ICRS transformation.
-	// This handles the internal Observed -> CIRS -> ICRS chain correctly.
 	ra, dec := gofaext.Atoc13(
 		"A",
 		c.Az.Radians(), math.Pi/2-c.Alt.Radians(),
-		jd1, jd2, 0,
+		jd1, jd2, eop.DUT1,
 		site.Lon.Radians(), site.Lat.Radians(), site.Height,
-		0, 0,
-		pressure, temperature, humidity, wavelength,
+		eop.XP, eop.YP,
+		atm.Pressure, atm.Temperature, atm.Humidity, atm.Wavelength,
 	)
 
 	return coord.ICRS{

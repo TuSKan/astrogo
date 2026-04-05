@@ -5,6 +5,7 @@ import (
 	"math"
 	"time"
 
+	"github.com/TuSKan/astrogo/earth"
 	"github.com/TuSKan/astrogo/internal/gofaext"
 )
 
@@ -206,6 +207,27 @@ func (t Time) SubDays(other Time) float64 {
 }
 
 // ── Internal Helpers ──────────────────────────────────────────────────────────
+
+// UT1 returns a new Time converted to the Universal Time scale.
+func (t Time) UT1() Time {
+	if t.scale == UT1 {
+		return t
+	}
+	
+	// Simplify by treating base scale as UTC for the UT1 offset application
+	utc := t
+
+	// MJD is JD - 2400000.5
+	mjd := (utc.jd1 - 2400000.5) + utc.jd2
+	eop, err := earth.GetModel().EOP(mjd)
+	
+	dut1 := 0.0
+	if err == nil {
+		dut1 = eop.DUT1
+	}
+
+	return FromJDParts(utc.jd1, utc.jd2+(dut1/86400.0), UT1)
+}
 
 // TT returns a new Time converted to the Terrestrial Time scale.
 func (t Time) TT() Time {
