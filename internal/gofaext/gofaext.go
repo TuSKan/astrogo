@@ -173,3 +173,12 @@ func Dat(iy, im, id int, fd float64) (d float64, status int) {
 func Gst06a(uta, utb, tta, ttb float64) float64 {
 	return gofa.Gst06a(uta, utb, tta, ttb)
 }
+
+// C2t06a returns the Earth rotation matrix mapping ICRS to the Terrestrial 
+// Intermediate Reference System (TIRS). The transpose of this matrix maps TIRS backwards into ICRS natively.
+func C2t06a(tta, ttb, uta, utb, xp, yp float64) [3][3]float64 {
+	var rc2t [3][3]float64
+	gofa.C2t06a(tta, ttb, uta, utb, xp, yp, &rc2t)
+	return rc2t
+}
+

@@ -1,6 +1,7 @@
 package transform
 
 import (
+	"fmt"
 	"math"
 
 	"github.com/TuSKan/astrogo/angle"
@@ -94,6 +95,80 @@ func AstrometricToObserved(c coord.Astrometric, t time.Time, site earth.Geodetic
 	return coord.AltAz{
 		Alt: alt,
 		Az:  angle.Rad(az).Wrap360(),
+	}
+}
+
+// GeocentricToObserved natively tracks Solar System planets mathematically
+// by bypassing SOFA's BARYCENTRIC stellar parallax limitations.
+// It algebraically displaces the true local Observer using rigorous Earth matrices natively.
+func GeocentricToObserved(v vector.Vec3, t time.Time, site earth.Geodetic, atm earth.Atmosphere) coord.AltAz {
+	jd1, jd2 := t.JDParts()
+	ut1, ut2 := t.UT1().JDParts()
+	tt1, tt2 := t.TT().JDParts()
+
+	mjd := (jd1 - 2400000.5) + jd2
+	eop, _ := earth.GetModel().EOP(mjd)
+
+	// 1. Get SOFA ICRS-to-TIRS matrix
+	mat := gofaext.C2t06a(tt1, tt2, ut1, ut2, eop.XP, eop.YP)
+
+	// 2. WGS84 simplistic radius displacement in strictly Terrestrial Frame (TIRS)
+	const au = 149597870.7
+	const rEq = 6378.137
+	const f = 1.0 / 298.257223563
+
+	sinLat := math.Sin(site.Lat.Radians())
+	cosLat := math.Cos(site.Lat.Radians())
+
+	c_earth := 1.0 / math.Sqrt(cosLat*cosLat+(1.0-f)*(1.0-f)*sinLat*sinLat)
+	s_earth := (1.0 - f) * (1.0 - f) * c_earth
+
+	xTIRS := (rEq*c_earth + site.Height/1000.0) * cosLat * math.Cos(site.Lon.Radians()) / au
+	yTIRS := (rEq*c_earth + site.Height/1000.0) * cosLat * math.Sin(site.Lon.Radians()) / au
+	zTIRS := (rEq*s_earth + site.Height/1000.0) * sinLat / au
+
+	// 3. Multiply TIRS Vector by TRANSPOSE of ICRS->TIRS Matrix to produce Observer ICRS Vector
+	obsX := mat[0][0]*xTIRS + mat[1][0]*yTIRS + mat[2][0]*zTIRS
+	obsY := mat[0][1]*xTIRS + mat[1][1]*yTIRS + mat[2][1]*zTIRS
+	obsZ := mat[0][2]*xTIRS + mat[1][2]*yTIRS + mat[2][2]*zTIRS
+
+	obsVec := vector.Vec3{X: obsX, Y: obsY, Z: obsZ}
+	fmt.Printf("Engine obsVec: %v\n", obsVec)
+
+	// 4. Absolute Cartesian Shift
+	topoVec := v.Sub(obsVec)
+
+	// 5. Transform Topocentric ICRS vector directly back into the body-fixed ITRS (Terrestrial) frame.
+	// Since `mat` rotates ICRS to ITRS, we multiply the ICRS Topocentric vector by `mat`.
+	tx := mat[0][0]*topoVec.X + mat[0][1]*topoVec.Y + mat[0][2]*topoVec.Z
+	ty := mat[1][0]*topoVec.X + mat[1][1]*topoVec.Y + mat[1][2]*topoVec.Z
+	tz := mat[2][0]*topoVec.X + mat[2][1]*topoVec.Y + mat[2][2]*topoVec.Z
+
+	// 6. Convert ITRS to Local Horizon ENU (East, North, Up)
+	lonRad := site.Lon.Radians()
+	sinLon, cosLon := math.Sincos(lonRad)
+
+	E := -sinLon*tx + cosLon*ty
+	N := -sinLat*cosLon*tx - sinLat*sinLon*ty + cosLat*tz
+	U := cosLat*cosLon*tx + cosLat*sinLon*ty + sinLat*tz
+
+	// 7. Calculate Geometric Altitude and Azimuth!
+	// Azimuth is angle from North (N) towards East (E)
+	azimuth := math.Atan2(E, N)
+	if azimuth < 0 {
+		azimuth += 2 * math.Pi
+	}
+	altitude := math.Asin(U / topoVec.Norm())
+
+	// 8. Apply Atmospheric Refraction (if specified in the model)
+	observedAlt := angle.Rad(altitude)
+	if atm.Model != nil {
+		observedAlt += atm.Model.Refract(angle.Rad(altitude), atm, site)
+	}
+
+	return coord.AltAz{
+		Alt: observedAlt,
+		Az:  angle.Rad(azimuth),
 	}
 }
 

@@ -22,7 +22,7 @@ type StateVector struct {
 	UnitVel string    `json:"unit_vel"`
 }
 
-func fetchVector(naifID int, bodyName string) (*StateVector, error) {
+func fetchVector(naifID int, bodyName string, startStr, stopStr string) (*StateVector, error) {
 	// 1. Define the base URL
 	baseURL := "https://ssd.jpl.nasa.gov/api/horizons.api"
 
@@ -33,14 +33,15 @@ func fetchVector(naifID int, bodyName string) (*StateVector, error) {
 	params.Add("CENTER", "'@399'")
 	params.Add("MAKE_EPHEM", "'YES'")
 	params.Add("EPHEM_TYPE", "'VECTORS'")
-	params.Add("START_TIME", "'2000-01-01 12:00 TDB'")
-	params.Add("STOP_TIME", "'2000-01-01 12:01'")
+	params.Add("START_TIME", fmt.Sprintf("'%s'", startStr))
+	params.Add("STOP_TIME", fmt.Sprintf("'%s'", stopStr))
 	params.Add("STEP_SIZE", "'1d'")
 	params.Add("OUT_UNITS", "'AU-D'")
 	params.Add("REF_PLANE", "'FRAME'")
 	params.Add("VEC_TABLE", "'2'")
 	params.Add("CSV_FORMAT", "'YES'")
 	params.Add("OBJ_DATA", "'NO'")
+	params.Add("TIME_TYPE", "'UT'")
 
 	// 3. Encode and fix spaces. (url.Values uses '+' for spaces, Horizons prefers '%20')
 	encodedQuery := strings.ReplaceAll(params.Encode(), "+", "%20")
@@ -59,7 +60,7 @@ func fetchVector(naifID int, bodyName string) (*StateVector, error) {
 	soeIdx := strings.Index(responseStr, "$$SOE")
 	eoeIdx := strings.Index(responseStr, "$$EOE")
 	if soeIdx == -1 || eoeIdx == -1 {
-		return nil, fmt.Errorf("ephemeris data not found in response")
+		return nil, fmt.Errorf("ephemeris data not found in response: %s", responseStr[:int(math.Min(float64(len(responseStr)), 500))])
 	}
 
 	csvBlock := responseStr[soeIdx+6 : eoeIdx]
@@ -129,6 +130,7 @@ type ObserverPoint struct {
 	AppDec    float64 // Apparent Dec in degrees
 	Azimuth   float64 // Refracted Azimuth in degrees
 	Elevation float64 // Refracted Elevation in degrees
+	Range     float64 // Observer to Target Range in AU
 }
 
 // fetchObserverTable queries the Horizons API for a ground-based observer
@@ -147,8 +149,8 @@ func fetchObserverTable(naifID int, bodyName string, lon, lat, height float64, s
 	params.Add("STOP_TIME", fmt.Sprintf("'%s'", stopStr)) 
     params.Add("STEP_SIZE", "'1m'") // 1 minute step size
 
-	// Important quantities: 1 (Astrometric RA/Dec), 2 (Apparent RA/Dec), 4 (Azi/Elev)
-	params.Add("QUANTITIES", "'1,2,4'")
+	// Important quantities: 1 (Astrometric RA/Dec), 2 (Apparent RA/Dec), 4 (Azi/Elev), 20 (Observer Range)
+	params.Add("QUANTITIES", "'1,2,4,20'")
 	params.Add("CAL_FORMAT", "'JD'")
 	params.Add("CSV_FORMAT", "'YES'")
 	params.Add("OBJ_DATA", "'NO'")
@@ -222,12 +224,13 @@ func fetchObserverTable(naifID int, bodyName string, lon, lat, height float64, s
 
 	target := &ObserverPoint{
 		Body:      bodyName,
-		AstroRA:   parseAngleStr(cLen - 7, true),
-		AstroDec:  parseAngleStr(cLen - 6, false),
-		AppRA:     parseAngleStr(cLen - 5, true),
-		AppDec:    parseAngleStr(cLen - 4, false),
-		Azimuth:   parseFloat(cLen - 3),
-		Elevation: parseFloat(cLen - 2),
+		AstroRA:   parseAngleStr(cLen - 9, true),
+		AstroDec:  parseAngleStr(cLen - 8, false),
+		AppRA:     parseAngleStr(cLen - 7, true),
+		AppDec:    parseAngleStr(cLen - 6, false),
+		Azimuth:   parseFloat(cLen - 5),
+		Elevation: parseFloat(cLen - 4),
+		Range:     parseFloat(cLen - 3), // Quantity 20 adds Range and Range Rate, trailing comma creates empty elem
 	}
 
 	return target, nil
