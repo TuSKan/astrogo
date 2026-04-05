@@ -9,6 +9,26 @@ import (
 	"github.com/TuSKan/astrogo/vector"
 )
 
+// Astrometric represents a stellar position with kinematics in the ICRS frame.
+// It bundles pure geometry with motion parameters critical for accurate 
+// apparent positioning over long timescales.
+type Astrometric struct {
+	RA       angle.Angle // Right Ascension
+	Dec      angle.Angle // Declination
+	PmRA     angle.Angle // Proper motion in RA per Julian year
+	PmDec    angle.Angle // Proper motion in Dec per Julian year
+	Parallax angle.Angle // Parallax
+	RV       float64     // Radial velocity in km/s
+}
+
+// Apparent represents the true geocentric position of an object, referred to the 
+// Celestial Intermediate Reference System (CIRS) at a specific time.
+// It accounts for proper motion, parallax, light deflection, aberration, and precession.
+type Apparent struct {
+	RA  angle.Angle // Right Ascension (CIRS)
+	Dec angle.Angle // Declination (CIRS)
+}
+
 // ICRS represents a direction and optional distance in the International
 // Celestial Reference System (J2000). RA is Right Ascension; Dec is Declination.
 type ICRS struct {
@@ -42,6 +62,11 @@ type Ecliptic struct {
 }
 
 // ── Validation ────────────────────────────────────────────────────────────────
+
+func (c Astrometric) Validate() error { return validateLat(c.Dec) }
+
+// Validate checks if the coordinate components are finite and within range.
+func (c Apparent) Validate() error { return validateLat(c.Dec) }
 
 // Validate checks if the coordinate components are finite and within range.
 func (c ICRS) Validate() error { return validateLat(c.Dec) }
@@ -144,6 +169,26 @@ func (c AltAz) Equal(other AltAz) bool {
 }
 
 // ── Formatting ────────────────────────────────────────────────────────────────
+
+// Equal reports whether c and other point to within coordTol radians of each other.
+func (c Astrometric) Equal(other Astrometric) bool {
+	return math.Abs(c.RA.Radians()-other.RA.Radians()) < coordTol &&
+		math.Abs(c.Dec.Radians()-other.Dec.Radians()) < coordTol
+}
+
+// Equal reports whether c and other point to within coordTol radians of each other.
+func (c Apparent) Equal(other Apparent) bool {
+	return math.Abs(c.RA.Radians()-other.RA.Radians()) < coordTol &&
+		math.Abs(c.Dec.Radians()-other.Dec.Radians()) < coordTol
+}
+
+func (c Astrometric) String() string {
+	return fmt.Sprintf("Astrometric RA=%s Dec=%s", c.RA.Wrap360().HMSString(2), c.Dec.DMSString(2))
+}
+
+func (c Apparent) String() string {
+	return fmt.Sprintf("Apparent RA=%s Dec=%s", c.RA.Wrap360().HMSString(2), c.Dec.DMSString(2))
+}
 
 func (c ICRS) String() string {
 	return fmt.Sprintf("ICRS RA=%s Dec=%s", c.RA.Wrap360().HMSString(2), c.Dec.DMSString(2))

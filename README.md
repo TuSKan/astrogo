@@ -65,9 +65,11 @@ Existing astronomy tools are powerful, but often:
 - Horizontal (Alt/Az)
 
 ### Transformations
-- Frame-to-frame transformations
-- Observer-dependent transforms
-- SOFA-compliant algorithms via internal wrappers
+- Full mapping: Geometric <-> Astrometric <-> Apparent <-> Observed 
+- Frame-to-frame (Galactic, Ecliptic, ICRS, CIRS)
+- Dynamic DUT1 tracking and Polar Motion (XP/YP) caching via IERS EOP rapid data
+- Modular Atmospheric Refraction system (SOFA analytical vs approximation plugins)
+- Aberration, light deflection, proper motion, parallax handled natively
 
 ### Observer modeling
 - Geodetic locations (WGS84)
@@ -285,9 +287,9 @@ flowchart TD
 | `angle` | Angular types, HMS/DMS parsing | ✅ implemented | boundary wrapping validated |
 | `vector` | 3D geometry primitives | ✅ implemented | pole cases validated |
 | `earth` | Geodesy and Earth models (WGS84) | ✅ implemented | geodetic ↔ ECEF validated |
-| `time` | Astronomical time scales (JD-based) | ✅ implemented | UTC ↔ TAI ↔ TT ↔ TDB validated |
-| `frame` | Coordinate frame types and equality | ✅ implemented | ICRS, Galactic, Ecliptic, AltAz |
-| `transform` | Frame-to-frame transformations | ✅ implemented | Galactic, Ecliptic, AltAz validated |
+| `time` | Astronomical time scales (JD-based) | ✅ implemented | UTC ↔ TAI ↔ TT ↔ TDB ↔ UT1 verified natively |
+| `frame` | Coordinate frame types and equality | ✅ implemented | ICRS/CIRS, Galactic, Ecliptic, AltAz |
+| `transform` | Frame-to-frame transformations | ✅ implemented | Grand Validation against JPL Horizons Passed |
 | `sky` | Alt/Az, airmass, separation, position angle | ✅ implemented | Pickering (1982) airmass model |
 | `target` | Unified observation targets (fixed/moving/body) | ✅ implemented | |
 | `constraint` | Planning constraints (altitude, airmass, …) | ✅ implemented | |

@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/TuSKan/astrogo/earth"
 	"github.com/TuSKan/astrogo/internal/testutil"
 	atime "github.com/TuSKan/astrogo/time"
 )
@@ -148,4 +149,28 @@ func TestTimeStdInterop(t *testing.T) {
 	if dur != 24*time.Hour {
 		t.Errorf("Sub duration failed, expected 24h got %v", dur)
 	}
+}
+
+type mockEOP struct{}
+
+func (mockEOP) EOP(_ float64) (earth.EOP, error) {
+	return earth.EOP{DUT1: 1.5}, nil
+}
+
+func TestTime_UT1(t *testing.T) {
+	// Register the mock model
+	earth.RegisterModel(mockEOP{})
+	
+	utc := atime.FromJD(2451545.0, atime.UTC) // J2000 UTC
+	ut1 := utc.UT1()
+
+	testutil.AssertEqual(t, "UT1 scale", ut1.Scale(), atime.UT1)
+	
+	expectedJD := 2451545.0 + (1.5 / 86400.0)
+	testutil.AssertNear(t, "UT1 JD offset", ut1.JD(), expectedJD, 1e-12)
+	
+	// Calling UT1 on an existing UT1 struct should just return it unchanged
+	ut1b := ut1.UT1()
+	testutil.AssertEqual(t, "Idempotent UT1 scale", ut1b.Scale(), atime.UT1)
+	testutil.AssertNear(t, "Idempotent UT1 JD", ut1b.JD(), ut1.JD(), 1e-15)
 }

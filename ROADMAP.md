@@ -40,12 +40,12 @@ The project is **past the foundational stage**.
 ## 1. Earth Orientation Parameters (EOP)
 
 ### Status
-UT1 exists, but full Earth orientation modeling is incomplete.
+✅ Fully Operational
 
 ### Deliverables
-- UT1–UTC correction ingestion
-- EOP data loader and cache
-- polar motion support
+- [x] UT1–UTC correction ingestion
+- [x] EOP data loader and cache
+- [x] polar motion support
 - deterministic fallback for stale/missing data
 - validation against reference datasets
 
@@ -57,12 +57,12 @@ Accurate sidereal time and topocentric positioning under real Earth rotation con
 ## 2. Apparent / Observed Coordinate Pipeline
 
 ### Status
-Geometric transformations are complete; apparent corrections are not.
+✅ Fully Operational
 
 ### Deliverables
-- aberration corrections
-- proper motion propagation
-- parallax handling
+- [x] aberration corrections
+- [x] proper motion propagation
+- [x] parallax handling
 - topocentric apparent coordinates
 - explicit API separation:
   - geometric
@@ -78,16 +78,16 @@ Coordinates suitable for real telescope pointing and observation comparison.
 ## 3. Atmospheric Refraction Model
 
 ### Status
-Basic approximation exists.
+✅ Fully Operational
 
 ### Deliverables
-- refraction model abstraction
-- standard atmosphere correction
-- optional pressure / temperature input
-- selectable modes:
-  - none
-  - approximate
-  - improved model
+- [x] refraction model abstraction
+- [x] standard atmosphere correction
+- [x] optional pressure / temperature input
+- [x] selectable modes:
+  - [x] none
+  - [x] approximate
+  - [x] improved model (SOFA)
 
 ### Outcome
 More realistic horizon and low-altitude behavior.

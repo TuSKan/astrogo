@@ -11,18 +11,18 @@
 //
 // # Supported Transformations
 //
-// Version 1 supports:
-//   - ICRS <-> AltAz (Observed): Includes Earth rotation and refraction.
+// Version 1 supports a comprehensive mapping graph covering:
+//   - Astrometric <-> Apparent <-> Observed (AltAz): The complete observatory
+//     pipeline including proper motion, light deflection, aberration, dynamical 
+//     EOP integration (DUT1, polar motion), and atmospheric refraction.
 //   - ICRS <-> Galactic: Using the IAU 1958 definition.
 //   - ICRS <-> Ecliptic: Using coordinates of the date (IAU 2006).
 //
-// # Assumptions
+// # Extensibility
 //
-//   - The current implementation assumes DUT1=0 and no polar motion (XP=0, YP=0).
-//   - AltAz transforms assume a standard atmosphere (1013.25 hPa, 15°C)
-//     for refraction unless otherwise noted in future versions.
-//
-// # Future Extensibility
+// Refraction within `transform` is decoupled through `earth.Atmosphere.Model`, 
+// enabling standard SOFA integration or explicit bypass configurations without 
+// disrupting celestial mechanics.
 //
 // While v1 uses explicit functions (e.g., [ICRSToAltAz]), the package is
 // designed to eventually support a dynamic transformation graph, where

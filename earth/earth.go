@@ -1,5 +1,6 @@
 package earth
 
+import "sync"
 // EOP holds Earth Orientation Parameters for a single epoch.
 // All fields follow IERS conventions.
 type EOP struct {
@@ -26,4 +27,24 @@ type ZeroModel struct{}
 // EOP returns an all-zero EOP record.
 func (ZeroModel) EOP(_ float64) (EOP, error) {
 	return EOP{}, nil
+}
+
+var (
+	modelMu     sync.RWMutex
+	globalModel Model = ZeroModel{}
+)
+
+// RegisterModel sets the globally used Earth orientation parameter model.
+// This is typically called automatically by packages like `earth/iers` via init().
+func RegisterModel(m Model) {
+	modelMu.Lock()
+	defer modelMu.Unlock()
+	globalModel = m
+}
+
+// GetModel retrieves the globally used Earth orientation parameter model.
+func GetModel() Model {
+	modelMu.RLock()
+	defer modelMu.RUnlock()
+	return globalModel
 }
