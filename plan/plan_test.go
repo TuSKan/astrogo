@@ -110,7 +110,7 @@ func TestObservableWindows_Grouping(t *testing.T) {
 	site, _ := NewSite("Test", loc, angle.Zero(), nil)
 	obj := Custom{Coord: coord.NewICRS(angle.Zero(), angle.Zero())}
 
-	start := time.Now()
+	start := time.NowUTC()
 	step := 1 * stdtime.Minute
 	end := start.Add(5 * stdtime.Minute) // 6 samples: 0, 1, 2, 3, 4, 5
 

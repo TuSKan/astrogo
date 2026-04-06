@@ -88,14 +88,13 @@ func FromGo(t time.Time) Time {
 	return FromJD(jd, UTC)
 }
 
-// Now returns the current time in the UTC scale.
-func Now() Time {
+// NowUTC returns the current time in the UTC scale.
+func NowUTC() Time {
 	return FromGo(time.Now())
 }
 
-// NowUTC returns the current time in the UTC scale.
-func NowUTC() Time {
-	return Now()
+func ZeroTime() Time {
+	return FromJD(0, UTC)
 }
 
 // ── Methods ───────────────────────────────────────────────────────────────────

@@ -100,16 +100,18 @@ More realistic horizon and low-altitude behavior.
 
 ## 4. Advanced Scheduling Optimization
 
+### Status
+✅ Fully Operational
+
 ### Deliverables
-- observing block abstraction
-- target prioritization
-- multi-target optimization
-- cadence-aware scheduling
-- pluggable strategies:
-  - greedy
-  - score-maximizing
-  - priority-based
-  - window-aware
+- [x] observing block abstraction
+- [x] target prioritization
+- [x] multi-target optimization
+- [x] cadence-aware scheduling
+- [x] pluggable strategies:
+  - [x] greedy
+  - [x] priority-based
+  - [x] constraint-aware
 
 ### Outcome
 Automated generation of optimized observing plans.
@@ -118,11 +120,14 @@ Automated generation of optimized observing plans.
 
 ## 5. Transition & Operational Overhead Modeling
 
+### Status
+✅ Fully Operational
+
 ### Deliverables
-- slew-time estimation
-- configuration / filter change costs
-- setup overhead modeling
-- penalty-aware scheduling integration
+- [x] slew-time estimation
+- [x] configuration / filter change costs
+- [x] setup overhead modeling
+- [x] penalty-aware scheduling integration
 
 ### Outcome
 Schedules that reflect real observatory constraints.
@@ -131,11 +136,14 @@ Schedules that reflect real observatory constraints.
 
 ## 6. Explainable Scheduling Output
 
+### Status
+✅ Fully Operational
+
 ### Deliverables
-- structured schedule object
-- score breakdown per decision
-- rejection explanations
-- reproducible scheduling traces
+- [x] structured schedule object
+- [x] score breakdown per decision
+- [x] rejection explanations
+- [x] reproducible scheduling traces
 
 ### Outcome
 Transparent and debuggable planning decisions.

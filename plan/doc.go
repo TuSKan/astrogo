@@ -1,8 +1,10 @@
-// Package plan provides high-level tools for astronomical observation planning.
+// Package plan provides high-level tools for astronomical observation planning
+// and robust scheduling.
 //
-// It includes the core observability evaluation API and a high-precision
-// event-based solver for identifying rise, set, and transit times for
-// both fixed and moving celestial targets.
+// It includes the core observability evaluation API, a high-precision
+// event-based solver for identifying rise, set, and transit times, and a
+// full scheduling engine for generating observation timelines subject to
+// constraints, slew transitions, and dynamical block prioritizations.
 //
 // # Refinement
 //

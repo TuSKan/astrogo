@@ -102,6 +102,11 @@ Existing astronomy tools are powerful, but often:
 - Observable windows (sampled constraint evaluation)
 - Altitude/airmass/separation constraints
 - Target scoring and ranking
+- **Advanced Scheduling Engine**:
+  - `Block` and `Configuration` abstractions for observing requests
+  - Detailed `Schedule` traces (`ScheduledBlock`, `UnscheduledBlock`)
+  - `TransitionModel` for modeling slew and instrument setup time
+  - Pluggable `Strategy` allocators (`GreedyStrategy`, `PriorityStrategy`)
 
 ### Event Solver *(new)*
 - **`EventFinder`** — two-stage numerical solver (coarse bracketing → bisection / golden-section)
@@ -358,17 +363,15 @@ These are wrapped internally to ensure:
 
 🚀 **Active Development (Stable Core)**
 
-### Completed & Stable Foundations (Phase 1 & 4)
+### Completed & Stable Foundations (Phase 1, 2, 3 & 4)
 - **Precision Core:** Core primitives (angle, time, vector) and coordinate transforms
 - **Ephemeris Engine:** Unified Ephemeris (JPL SPK) with rigorous local/remote abstractions
-- **Observation Planning:** Unified `plan` constraints, observability scoring, and event solving
+- **Observation Planning & Scheduling:** Unified `plan` constraints, event solving, and full **engine** (blocks, transition modeling, priorities)
 - **Scientific Validation:** Mathematically hardened and tested against NASA JPL Horizons (<1.0" tolerance)
-- **I/O & Data:** FITS Interoperability and Memory Execution (`mmap`, Arrow tables)
+- **I/O & Data:** FITS Interoperability, Memory Execution (`mmap`, Arrow tables), and catalog TAP integrations
 
 ### Current Focus & Unimplemented (See Roadmap)
 - Vectorized Batch APIs & Hardware Optimizations
-- Remote Ecosystem Integrations (Simbad, VizieR)
-- Advanced Observation Schedule Optimization
 - Image-Domain & Photometric Output Pipelines
 
 > [!IMPORTANT]
