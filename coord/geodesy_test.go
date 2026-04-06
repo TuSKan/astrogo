@@ -78,3 +78,33 @@ func TestECEF_ZeroVector(t *testing.T) {
 	// FromECEF with Bowring should still return something, but we just check lack of panic.
 	testutil.AssertNoError(t, err)
 }
+
+func TestGeodetic_Interface(t *testing.T) {
+	g, _ := coord.NewGeodetic(angle.Deg(10), angle.Deg(20), 30)
+
+	testutil.AssertEqual(t, "Name", g.Name(), "Geodetic")
+	testutil.AssertNoError(t, g.Validate())
+
+	s := g.String()
+	testutil.AssertEqual(t, "String", s, "Lon=+10°00'00\", Lat=+20°00'00\", H=30.0m")
+
+	// Equal
+	g2, _ := coord.NewGeodetic(angle.Deg(10), angle.Deg(20), 30)
+	g3, _ := coord.NewGeodetic(angle.Deg(10), angle.Deg(20), 40)
+	if !g.Equal(g2) {
+		t.Error("expected equal")
+	}
+	if g.Equal(g3) {
+		t.Error("expected not equal")
+	}
+	if g.Equal(coord.NewICRS(angle.Deg(0), angle.Deg(0))) {
+		t.Error("expected not equal for different types")
+	}
+
+	// UnitVectors
+	v := g.ToUnitVector()
+	g4, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(0), 0)
+	g4.FromUnitVector(v)
+	testutil.AssertNear(t, "FromUnitVector Lon", g4.Lon().Degrees(), 10.0, 1e-10)
+	testutil.AssertNear(t, "FromUnitVector Lat", g4.Lat().Degrees(), 20.0, 1e-10)
+}

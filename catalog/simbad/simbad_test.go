@@ -163,3 +163,18 @@ func TestParseMalformedCSV(t *testing.T) {
 		t.Fatalf("Expected ParseCSV to fail on malformed data")
 	}
 }
+
+func TestProviderInterface(t *testing.T) {
+	p := New()
+	if p.Name() != "simbad" {
+		t.Errorf("expected simbad, got %s", p.Name())
+	}
+	caps := p.Capabilities()
+	if len(caps) != 1 || caps[0] != catalog.CapObjectResolution {
+		t.Errorf("expected CapObjectResolution, got %v", caps)
+	}
+
+	// Triggers internal error paths since we didn't mock
+	_, _ = p.Resolve("non_existent_body")
+	_ = p.Search("non_existent_body")
+}
