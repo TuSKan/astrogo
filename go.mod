@@ -3,6 +3,7 @@ module github.com/TuSKan/astrogo
 go 1.25.0
 
 require (
+	github.com/cenkalti/backoff/v5 v5.0.3
 	github.com/hebl/gofa v1.19.1
 	github.com/klauspost/pgzip v1.2.6
 )
