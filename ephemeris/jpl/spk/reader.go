@@ -143,9 +143,17 @@ func (r *Reader) ReadSummaries() ([]Summary, error) {
 // ReadDoubles reads a range of float64 from the data area.
 func (r *Reader) ReadDoubles(startWord, endWord int32) ([]float64, error) {
 	count := endWord - startWord + 1
+	if count <= 0 {
+		return nil, fmt.Errorf("jpl/spk: invalid double precision word bounds (%d to %d)", startWord, endWord)
+	}
+	
 	buf := make([]byte, count*8)
-	if _, err := r.F.ReadAt(buf, int64(startWord-1)*8); err != nil && err != io.EOF {
+	n, err := r.F.ReadAt(buf, int64(startWord-1)*8)
+	if err != nil && err != io.EOF {
 		return nil, err
+	}
+	if n < len(buf) && (err == io.EOF || err == nil) {
+		return nil, fmt.Errorf("jpl/spk: corrupt file (unexpected EOF reading word %d)", startWord)
 	}
 
 	res := make([]float64, count)
