@@ -69,7 +69,7 @@ func TestScientificStability(t *testing.T) {
 
 	for i, c := range cases {
 		t.Run(c.TargetName, func(t *testing.T) {
-			site, err := coord.NewGeodetic(angle.Deg(c.ObserverLat), angle.Deg(c.ObserverLon), c.ObserverEle)
+			site, err := coord.NewGeodetic(angle.Deg(c.ObserverLon), angle.Deg(c.ObserverLat), c.ObserverEle)
 			if err != nil {
 				t.Fatalf("Failed to create site: %v", err)
 			}
@@ -135,15 +135,6 @@ func TestScientificStability(t *testing.T) {
 
 			// 3. Body-Specific Scientific Tolerances
 			limit := 1.0 // Strict generic constraint
-			switch c.TargetName {
-			case "Jupiter":
-				limit = 2.0 // Relaxed explicitly for unmodeled Relativistic Deflection
-			case "Moon":
-				limit = 1.6 // Relaxed slightly for Lunar Topocentric Parallax limits
-			default:
-				limit = 1.0 // Strict generic constraint
-			}
-
 			// Validate RA/Dec separately (Astrometric geometry phase). We log structural shifts
 			// reflecting raw Topocentric Parallax unmodeled before Earth flattening.
 			if dRA > limit*4000.0 || dDec > limit*4000.0 {

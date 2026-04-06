@@ -63,6 +63,7 @@ Existing astronomy tools are powerful, but often:
 - Galactic
 - Ecliptic
 - Horizontal (Alt/Az)
+- Geodesic
 
 ### Transformations
 - Full mapping: Geometric <-> Astrometric <-> Apparent <-> Observed 
@@ -284,7 +285,7 @@ flowchart TD
 | `ephemeris` | Solar system ephemerides via JPL DE | ✅ implemented | multi-kernel; SPK Type 21; Horizons on-demand |
 | `catalog` | Object identity and catalog entries | ✅ implemented | OpenNGC support |
 | `plan` | Target abstraction, Observatory, Constraints, Planning | ✅ implemented | visibility, rise/set/transit solver |
-| `units` | Physical unit system | ✅ implemented | AU, Parsec, LightYear, Jansky |
+| `unit` | Physical unit and quantity system | ✅ implemented | AU, Parsec, LightYear, Jansky |
 | `fits` | Data formats and interoperability | ✅ implemented | `OpenMmap`, `.gz` streams, Apache Arrow tables & images |
 | `wcs` | World Coordinate Systems | ✅ implemented | Spherical Gnomonic paths (`TAN`), `fits.ExtractWCS` |
 
@@ -305,19 +306,18 @@ These are wrapped internally to ensure:
 
 ## Project Status
 
-🚧 **Early development**
+🚀 **Active Development (Stable Core)**
 
-### Current Focus
-- Core primitives (angle, time, vector)
-- Coordinate systems, Transforms, and WCS
-- Observer and sky calculations
-- Event solving for rise/set/transit/twilight
-- FITS, Interoperability and Memory Execution (`mmap`, Arrow)
+### Completed & Stable Foundations (Phase 1 & 4)
+- **Precision Core:** Core primitives (angle, time, vector) and coordinate transforms
+- **Ephemeris Engine:** Unified Ephemeris (JPL SPK) with rigorous local/remote abstractions
+- **Observation Planning:** Unified `plan` constraints, observability scoring, and event solving
+- **Scientific Validation:** Mathematically hardened and tested against NASA JPL Horizons (<1.0" tolerance)
+- **I/O & Data:** FITS Interoperability and Memory Execution (`mmap`, Arrow tables)
 
-### Not Yet Stable or Unimplemented (See Roadmap)
+### Current Focus & Unimplemented (See Roadmap)
 - Vectorized Batch APIs & Hardware Optimizations
-- Unified Ephemeris Abstractions (Local/Remote)
-- Remote Ecosystem Integrations (Simbad, VizieR, Horizons)
+- Remote Ecosystem Integrations (Simbad, VizieR)
 - Advanced Observation Schedule Optimization
 - Image-Domain & Photometric Output Pipelines
 
