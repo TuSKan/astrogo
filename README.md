@@ -267,13 +267,51 @@ fmt.Printf("Distance from Earth to Mars: %.6f AU\n", pos.Length())
 
 ```mermaid
 flowchart TD
-    C[constants] --> V[math/vector] --> U[units] --> A[angle] --> T[time]
-    C --> Co[coord]
-    Co --> P[plan]
-    P --> Ep[ephemeris]
-    P --> Cat[catalog]
-	I[iers] --> Co
-    P --> IO[io / fits]
+    %% High-level Orchestration
+    plan[plan]
+    fits[fits]
+    catalog[catalog]
+
+    %% Scientific Engines
+    ephemeris[ephemeris]
+    coord[coord]
+    
+    %% Data Providers
+    iers[iers]
+
+    %% Primitive Foundation
+    subgraph Primitives
+        direction LR
+        time[time]
+        angle[angle]
+        vector[vector]
+        unit[unit]
+        constants[constants]
+    end
+
+    %% Dependency mappings (Top-Down: A imports B)
+    plan --> coord
+    plan --> ephemeris
+    plan --> catalog
+    
+    fits --> catalog
+    
+    catalog --> coord
+    catalog --> time
+    catalog --> angle
+    
+    ephemeris --> time
+    ephemeris --> vector
+    ephemeris --> coord
+    
+    coord --> iers
+    coord --> time
+    coord --> vector
+    coord --> angle
+    
+    iers --> time
+
+    style Primitives fill:transparent,stroke:#888,stroke-dasharray: 5 5
 ```
 
 ### Key Principles

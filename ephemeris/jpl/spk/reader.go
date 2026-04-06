@@ -69,6 +69,18 @@ func CacheDownload(kernel, path string) (*Reader, error) {
 		return nil, err
 	}
 
+	// Validate physical file size against DAF logical file length
+	// FREE is the 1-based index of the first free double precision word.
+	// Therefore, (FREE - 1) words * 8 bytes is the absolute minimum byte length.
+	if stat, err := file.Stat(); err == nil {
+		expectedMinSize := int64(r.FileRec.FREE-1) * 8
+		if stat.Size() < expectedMinSize {
+			r.Close()
+			os.Remove(spkPath)
+			return nil, fmt.Errorf("jpl: corrupt SPK file gracefully deleted (truncated: %d bytes, expected min %d bytes)", stat.Size(), expectedMinSize)
+		}
+	}
+
 	// Verify file integrity immediately to auto-heal CI pipelines
 	if _, err := r.ReadSummaries(); err != nil {
 		r.Close()
