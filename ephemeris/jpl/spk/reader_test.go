@@ -13,7 +13,9 @@ import (
 func TestSPKReader(t *testing.T) {
 	// Bootstrap the download process robustly via the provider logic
 	prov, err := jpl.NewProvider(jpl.WithSource(jpl.Planets), jpl.WithKernel("de440s"))
-	testutil.AssertNoError(t, err)
+	if err != nil {
+		t.Fatalf("setup failed: %v", err)
+	}
 	defer prov.Close()
 
 	spkPath := filepath.Join(prov.DataDir, "planets", "de440s.bsp")

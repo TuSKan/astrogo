@@ -62,7 +62,21 @@ func CacheDownload(kernel, path string) (*Reader, error) {
 		return nil, fmt.Errorf("jpl: failed to open SPK: %w", err)
 	}
 
-	return NewReader(file)
+	r, err := NewReader(file)
+	if err != nil {
+		file.Close()
+		os.Remove(spkPath)
+		return nil, err
+	}
+
+	// Verify file integrity immediately to auto-heal CI pipelines
+	if _, err := r.ReadSummaries(); err != nil {
+		r.Close()
+		os.Remove(spkPath)
+		return nil, fmt.Errorf("jpl: corrupt SPK file gracefully deleted: %w", err)
+	}
+
+	return r, nil
 }
 
 // New opens a DAF/SPK file and reads its metadata.
