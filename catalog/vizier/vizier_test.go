@@ -42,7 +42,7 @@ func TestVizierOfflineConeSearch(t *testing.T) {
 		return true
 	})
 
-	// Our visualization scaffold returns empty on parseCSV for vizier, but 
+	// Our visualization scaffold returns empty on parseCSV for vizier, but
 	// ensures network paths and iter blocks behave functionally.
 	if len(targets) != 0 {
 		t.Fatalf("Expected scaffold parser to return empty arrays, got %d", len(targets))

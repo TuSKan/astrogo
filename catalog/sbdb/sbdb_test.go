@@ -44,10 +44,10 @@ func TestSBDBResolver(t *testing.T) {
 	// Test cache bypassing HTTP mock and testing async SeqIterator
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
-	
+
 	req := catalog.ObjectRequest{Query: "aten"}
 	iter := prov.ResolveObject(ctx, req)
-	
+
 	var targets []catalog.Target
 	iter(func(tar catalog.Target, err error) bool {
 		if err == nil {

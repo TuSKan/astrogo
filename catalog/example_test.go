@@ -27,7 +27,7 @@ func Example_integration() {
 
 	req := catalog.ObjectRequest{Query: "M31", Limit: 1}
 	iterator := provider.ResolveObject(ctx, req)
-	
+
 	var andromeda catalog.Target
 	iterator(func(t catalog.Target, err error) bool {
 		if err == nil {
@@ -62,7 +62,7 @@ func Example_integration() {
 		fmt.Println("Transform error:", err)
 		return
 	}
-	
+
 	fmt.Printf("At %v (UTC), from %s:\n", obsTime, obs.Name())
 	fmt.Printf("M31 Altitude: %.4f°\n", altaz.Alt().Degrees())
 	fmt.Printf("M31 Azimuth:  %.4f°\n", altaz.Az().Degrees())

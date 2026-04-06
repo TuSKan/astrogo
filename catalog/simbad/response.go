@@ -16,7 +16,7 @@ import (
 // oid, main_id, ra, dec, otype, id (matched alias)
 func ParseCSV(r io.Reader) ([]catalog.Target, error) {
 	reader := csv.NewReader(r)
-	
+
 	// Read header and build column index map
 	header, err := reader.Read()
 	if err != nil {
@@ -89,7 +89,7 @@ func ParseCSV(r io.Reader) ([]catalog.Target, error) {
 			Coord:   c,
 			Catalog: "SIMBAD",
 		}
-		
+
 		if aliasIdx, exists := colIdx["id"]; exists {
 			alias := row[aliasIdx]
 			if alias != "" {

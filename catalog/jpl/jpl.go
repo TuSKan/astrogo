@@ -42,7 +42,7 @@ func (p *Provider) Resolve(query string) (catalog.Target, bool) {
 func (p *Provider) Search(query string) []catalog.Target {
 	ctx := context.TODO()
 	req := catalog.ObjectRequest{Query: query, Limit: 10}
-	
+
 	iter := p.ResolveObject(ctx, req)
 	var targets []catalog.Target
 	iter(func(t catalog.Target, err error) bool {
@@ -95,7 +95,7 @@ func (p *Provider) ResolveObject(ctx context.Context, req catalog.ObjectRequest)
 			return
 		}
 
-		// A real implementation requires parsing the 'Result' text block 
+		// A real implementation requires parsing the 'Result' text block
 		// to extract 'Number', 'Name', and 'Designation' lines reliably.
 		// For now we map a heuristic fallback returning the query string itself.
 		t := catalog.Target{
@@ -105,7 +105,10 @@ func (p *Provider) ResolveObject(ctx context.Context, req catalog.ObjectRequest)
 			Catalog: "jpl_horizons",
 		}
 
-		p.cache.Set(cacheKey, []catalog.Target{t})
+		if err := p.cache.Set(cacheKey, []catalog.Target{t}); err != nil {
+			yield(catalog.Target{}, err)
+			return
+		}
 
 		if !yield(t, nil) {
 			return

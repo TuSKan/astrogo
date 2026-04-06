@@ -60,12 +60,15 @@ func TestResolveMock(t *testing.T) {
 			return
 		}
 		w.Header().Set("Content-Type", "text/csv")
-		w.Write(data)
+		if _, err := w.Write(data); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}))
 	defer server.Close()
 
 	// temporarily override the global endpoint for testing
-	// In a complete implementation we might want to dependency-inject `tapSyncURL`, 
+	// In a complete implementation we might want to dependency-inject `tapSyncURL`,
 	// but for testing we can define a client specifically talking to it.
 	// Since we defined tapSyncURL as const, we just test the public method? Actually,
 	// test ParseCSV is the real test. We can just test Provider behavior if we can mock Client Transport.
@@ -110,7 +113,7 @@ func TestRetryTimeout(t *testing.T) {
 	provider := New()
 	provider.client.HTTPClient.Timeout = 100 * time.Millisecond
 	provider.client.UserAgent = "TestUserAgent"
-	
+
 	// Create mock transport directly to our server
 	provider.client.HTTPClient.Transport = &mockTransport{
 		Handler: server.Config.Handler,
@@ -119,7 +122,7 @@ func TestRetryTimeout(t *testing.T) {
 	ctx := context.Background()
 	req := catalog.ObjectRequest{Query: "test"}
 	iter := provider.ResolveObject(ctx, req)
-	
+
 	iter(func(tgt catalog.Target, err error) bool {
 		if err == nil {
 			t.Errorf("expected error, got nil")
@@ -160,4 +163,3 @@ func TestParseMalformedCSV(t *testing.T) {
 		t.Fatalf("Expected ParseCSV to fail on malformed data")
 	}
 }
-

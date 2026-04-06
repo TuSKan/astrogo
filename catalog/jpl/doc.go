@@ -2,8 +2,8 @@
 // through the NASA JPL Horizons system.
 //
 // Horizons maintains ephemerides and physical metadata for planets, natural satellites,
-// major barycenters, and artificial spacecraft. The jpl catalog searches the horizons.api 
-// endpoint strictly to fetch base identifiers and body names, allowing deep cross-matching 
+// major barycenters, and artificial spacecraft. The jpl catalog searches the horizons.api
+// endpoint strictly to fetch base identifiers and body names, allowing deep cross-matching
 // of objects against active spacecraft ID numbers.
 //
 // This package is exclusively for resolving static object identities. For resolving

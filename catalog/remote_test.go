@@ -20,7 +20,10 @@ func TestClientRetries(t *testing.T) {
 			return
 		}
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK"))
+		if _, err := w.Write([]byte("OK")); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}))
 	defer server.Close()
 
@@ -31,7 +34,7 @@ func TestClientRetries(t *testing.T) {
 	// We'll just run it as it's not strictly 500ms but we'll accept the brief pause for robust testing.
 
 	req, _ := http.NewRequestWithContext(context.Background(), "GET", server.URL, nil)
-	
+
 	resp, err := client.Do(req)
 	testutil.AssertNoError(t, err)
 	defer resp.Body.Close()
@@ -50,7 +53,7 @@ func TestClientPermanentFailure(t *testing.T) {
 
 	client := NewClient()
 	req, _ := http.NewRequestWithContext(context.Background(), "GET", server.URL, nil)
-	
+
 	_, err := client.Do(req)
 	if err == nil {
 		t.Fatalf("Expected permanent failure HTTP error")
@@ -73,13 +76,13 @@ func TestClientContextCancellation(t *testing.T) {
 	defer server.Close()
 
 	client := NewClient()
-	
+
 	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 	defer cancel()
 
 	req, _ := http.NewRequestWithContext(ctx, "GET", server.URL, nil)
 	_, err := client.Do(req)
-	
+
 	if err == nil || (!errors.Is(err, context.DeadlineExceeded) && !errors.Is(err, context.Canceled)) {
 		t.Fatalf("Expected DeadlineExceeded or Canceled, got: %v", err)
 	}
@@ -93,7 +96,7 @@ func TestSliceSeqIteration(t *testing.T) {
 	}
 
 	iter := SliceSeq(targets)
-	
+
 	count := 0
 	iter(func(tar Target, err error) bool {
 		testutil.AssertNoError(t, err)

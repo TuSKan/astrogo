@@ -46,7 +46,7 @@ func (p *Provider) Resolve(query string) (catalog.Target, bool) {
 func (p *Provider) Search(query string) []catalog.Target {
 	ctx := context.TODO()
 	req := catalog.ObjectRequest{Query: query, Limit: 10}
-	
+
 	iter := p.ResolveObject(ctx, req)
 	var targets []catalog.Target
 	iter(func(t catalog.Target, err error) bool {
@@ -133,7 +133,10 @@ func (p *Provider) ResolveObject(ctx context.Context, req catalog.ObjectRequest)
 			})
 		}
 
-		p.cache.Set(cacheKey, targets)
+		if err := p.cache.Set(cacheKey, targets); err != nil {
+			yield(catalog.Target{}, err)
+			return
+		}
 
 		for _, t := range targets {
 			if !yield(t, nil) {

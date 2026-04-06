@@ -36,13 +36,13 @@ var TargetSchema = arrow.NewSchema(
 // ArrowCache implements an in-memory cache using Apache Arrow records to minimize GC overhead.
 type ArrowCache struct {
 	mu      sync.RWMutex
-	records map[string]arrow.Record
+	records map[string]arrow.RecordBatch
 	mem     memory.Allocator
 }
 
 func NewArrowCache() *ArrowCache {
 	return &ArrowCache{
-		records: make(map[string]arrow.Record),
+		records: make(map[string]arrow.RecordBatch),
 		mem:     memory.NewGoAllocator(),
 	}
 }
@@ -55,13 +55,13 @@ func (c *ArrowCache) Get(key string) (SeqIterator[Target], bool) {
 	if !ok {
 		return nil, false
 	}
-	
+
 	// Retain the record so it doesn't get released while iterating
 	rec.Retain()
-	
+
 	return func(yield func(Target, error) bool) {
 		defer rec.Release()
-		
+
 		idArr := rec.Column(0).(*array.String)
 		nameArr := rec.Column(1).(*array.String)
 		desigArr := rec.Column(2).(*array.String)
@@ -141,16 +141,16 @@ func (c *ArrowCache) Set(key string, items []Target) error {
 		}
 	}
 
-	rec := b.NewRecord()
-	
+	rec := b.NewRecordBatch()
+
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	
+
 	// Release old record if it exists
 	if old, exists := c.records[key]; exists {
 		old.Release()
 	}
-	
+
 	c.records[key] = rec
 	return nil
 }
@@ -161,6 +161,6 @@ func (c *ArrowCache) Close() error {
 	for _, r := range c.records {
 		r.Release()
 	}
-	c.records = make(map[string]arrow.Record)
+	c.records = make(map[string]arrow.RecordBatch)
 	return nil
 }

@@ -15,7 +15,7 @@ func TestArrowCacheWriteRead(t *testing.T) {
 	defer cache.Close()
 
 	key := "test:query:1"
-	
+
 	_, ok := cache.Get(key)
 	testutil.AssertEqual(t, "Initial Miss", ok, false)
 
@@ -81,7 +81,7 @@ func TestArrowCacheWriteRead(t *testing.T) {
 	// Overwrite validation
 	err = cache.Set(key, []Target{{ID: "OVERWRITTEN"}})
 	testutil.AssertNoError(t, err)
-	
+
 	seq2, _ := cache.Get(key)
 	var o []Target
 	seq2(func(tar Target, err error) bool {
@@ -96,11 +96,11 @@ func TestArrowCacheRelease(t *testing.T) {
 	cache := NewArrowCache()
 	err := cache.Set("key1", []Target{{ID: "A"}})
 	testutil.AssertNoError(t, err)
-	
+
 	// Ensure Close clears maps safely unlocking Arrow memory boundaries
 	err = cache.Close()
 	testutil.AssertNoError(t, err)
-	
+
 	_, ok := cache.Get("key1")
 	testutil.AssertEqual(t, "Cache Hit After Close", ok, false)
 }

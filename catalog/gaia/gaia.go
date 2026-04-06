@@ -17,7 +17,7 @@ import (
 
 const tapSyncURL = "https://gea.esac.esa.int/tap-server/tap/sync"
 
-// Provider implements catalog.Provider and catalog.ConeSearcher 
+// Provider implements catalog.Provider and catalog.ConeSearcher
 // explicitly pointing at Gaia DR3 to extract astrometric parameters.
 type Provider struct {
 	client *catalog.Client
@@ -42,7 +42,7 @@ func (p *Provider) Resolve(query string) (catalog.Target, bool) {
 }
 
 func (p *Provider) Search(query string) []catalog.Target {
-	return nil 
+	return nil
 }
 
 func (p *Provider) ConeSearch(ctx context.Context, req catalog.ConeRequest) catalog.SeqIterator[catalog.Target] {
@@ -92,7 +92,10 @@ func (p *Provider) ConeSearch(ctx context.Context, req catalog.ConeRequest) cata
 			return
 		}
 
-		p.cache.Set(cacheKey, targets)
+		if err := p.cache.Set(cacheKey, targets); err != nil {
+			yield(catalog.Target{}, err)
+			return
+		}
 
 		for _, t := range targets {
 			if !yield(t, nil) {
@@ -132,13 +135,13 @@ func parseCSV(body io.Reader) ([]catalog.Target, error) {
 		raDeg, _ := strconv.ParseFloat(row[col["ra"]], 64)
 		decDeg, _ := strconv.ParseFloat(row[col["dec"]], 64)
 		// PMs and parallax omitted from target struct mapping currently, standard ICRS is used
-		
+
 		t := catalog.Target{
-			ID:          id,
-			Name:        "Gaia DR3 " + id,
-			Kind:        catalog.KindStar,
-			Coord:       coord.NewICRS(angle.Deg(raDeg), angle.Deg(decDeg)),
-			Catalog:     "Gaia DR3",
+			ID:      id,
+			Name:    "Gaia DR3 " + id,
+			Kind:    catalog.KindStar,
+			Coord:   coord.NewICRS(angle.Deg(raDeg), angle.Deg(decDeg)),
+			Catalog: "Gaia DR3",
 		}
 		targets = append(targets, t)
 	}
