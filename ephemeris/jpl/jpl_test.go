@@ -80,11 +80,16 @@ func TestCheby(t *testing.T) {
 }
 
 func TestJPLUnitsAreAUAndAUPerDay(t *testing.T) {
-	p, _ := jpl.NewProvider(jpl.WithSource(jpl.Planets), jpl.WithKernel("de440s"), jpl.WithDataDir("data"))
-
+	p, err := jpl.NewProvider(jpl.WithSource(jpl.Planets), jpl.WithKernel("de440s"), jpl.WithDataDir("data"))
+	if err != nil {
+		t.Fatalf("failed to initialize provider: %v", err)
+	}
 	defer p.Close()
 
-	state, _ := p.State(ephemeris.Sun, time.Now())
+	state, err := p.State(ephemeris.Sun, time.Now())
+	if err != nil {
+		t.Fatalf("failed to evaluate Sun state: %v", err)
+	}
 	dist := state.Pos.Norm()
 	if dist < 0.9 || dist > 1.1 {
 		t.Errorf("Sun distance %f AU seems wrong for AU units", dist)
@@ -116,13 +121,21 @@ func TestJPLOutOfCoverageEpoch(t *testing.T) {
 }
 
 func TestJPLDeterministicRepeatedCalls(t *testing.T) {
-	p, _ := jpl.NewProvider(jpl.WithSource(jpl.Planets), jpl.WithKernel("de440s"), jpl.WithDataDir("data"))
-
+	p, err := jpl.NewProvider(jpl.WithSource(jpl.Planets), jpl.WithKernel("de440s"), jpl.WithDataDir("data"))
+	if err != nil {
+		t.Fatalf("setup failed: %v", err)
+	}
 	defer p.Close()
 
 	tm := time.Now()
-	s1, _ := p.State(ephemeris.Sun, tm)
-	s2, _ := p.State(ephemeris.Sun, tm)
+	s1, err := p.State(ephemeris.Sun, tm)
+	if err != nil {
+		t.Fatalf("s1 failed: %v", err)
+	}
+	s2, err := p.State(ephemeris.Sun, tm)
+	if err != nil {
+		t.Fatalf("s2 failed: %v", err)
+	}
 
 	if s1.Pos.X != s2.Pos.X || s1.Pos.Y != s2.Pos.Y || s1.Pos.Z != s2.Pos.Z {
 		t.Error("Re-evaluating at same epoch produced different results")

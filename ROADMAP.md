@@ -149,15 +149,16 @@ Transparent and debuggable planning decisions.
 ## 7. Catalog Table Infrastructure
 
 ### Status
-Catalog identity exists; table workflows are limited.
+✅ Fully Operational (Remote Data Layer)
 
 ### Deliverables
-- structured catalog table abstraction
-- typed fields and schemas
-- unit-aware columns
-- filtering and sorting
-- cross-match primitives
-- integration with FITS tables and Arrow
+- [x] structured catalog table abstraction
+- [x] remote provider bindings (SIMBAD, MAST, SBDB, VizieR, Gaia)
+- [x] explicit offline regression caches (JSON/XML/CSV structural decoding)
+- [x] memory-mapped hardware vectors via Arrow `RecordBatch`
+- [x] resilient API rate-limit resilience backoffs component
+- [x] integration with FITS tables and arrays
+- cross-match logic algorithms
 
 ### Outcome
 Catalogs become first-class, manipulable datasets.

@@ -47,6 +47,7 @@ Validation should be:
 | Apparent / Observed Coordinates | ✅ validated | JPL Horizons (OBSERVER) | 1 arcsecond | Full Astrometric -> Local Topocentric Pipeline (EOP mapped) |
 | Units algebra | ✅ validated | analytical | exact | AU, Parsec, LightYear, Jansky verified |
 | Quantity arithmetic | ✅ validated | analytical | 1e-15 | Scale, Abs, Compare, conversion |
+| Catalog Providers | ✅ validated | API References/Offline Caches | exact schemas | Dual JSON/XML parsing (STScI), Strict ADQL parsing (CDS TAP) |
 | Planning / visibility | ✅ validated | geometric sanity | logical | constraint system + scoring verified |
 | Transit estimate | ✅ validated | geometric sanity | < 1 min | golden-section search, 10-min coarse bracket |
 | Rise / Set / Transit events | ✅ validated | geometric sanity | < 1 s | bisection + golden-section solver |
