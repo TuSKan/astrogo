@@ -61,3 +61,16 @@ func (m *mockTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	resp.Request = req
 	return resp, nil
 }
+
+func TestProviderInterface(t *testing.T) {
+	p := New()
+	if p.Name() != "mast" {
+		t.Errorf("expected mast, got %s", p.Name())
+	}
+	caps := p.Capabilities()
+	if len(caps) != 2 || caps[0] != catalog.CapObjectResolution || caps[1] != catalog.CapConeSearch {
+		t.Errorf("expected CapObjectResolution and CapConeSearch, got %v", caps)
+	}
+	_, _ = p.Resolve("non_existent_body")
+	_ = p.Search("non_existent_body")
+}

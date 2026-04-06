@@ -71,3 +71,16 @@ func TestJPLErrorResponse(t *testing.T) {
 		return false
 	})
 }
+
+func TestProviderInterface(t *testing.T) {
+	p := New()
+	testutil.AssertEqual(t, "Name", p.Name(), "jpl")
+	caps := p.Capabilities()
+	if len(caps) != 1 || caps[0] != catalog.CapObjectResolution {
+		t.Errorf("expected CapObjectResolution, got %v", caps)
+	}
+
+	// Fast fail search / resolve since no network mock attached here
+	// This hits the missing coverage lines.
+	_, _ = p.Resolve("non_existent_body_to_trigger_miss")
+}

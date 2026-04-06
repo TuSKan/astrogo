@@ -61,3 +61,19 @@ func (m *mockTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	resp.Request = req
 	return resp, nil
 }
+
+func TestProviderInterface(t *testing.T) {
+	p := New()
+	testutil.AssertEqual(t, "Name", p.Name(), "gaia")
+	caps := p.Capabilities()
+	if len(caps) != 1 || caps[0] != catalog.CapConeSearch {
+		t.Errorf("expected CapConeSearch, got %v", caps)
+	}
+	_, ok := p.Resolve("foo")
+	if ok {
+		t.Error("expected Resolve to return false")
+	}
+	if p.Search("foo") != nil {
+		t.Error("expected Search to return nil")
+	}
+}

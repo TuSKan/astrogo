@@ -70,3 +70,10 @@ func BenchmarkSearch(b *testing.B) {
 		p.Search("nebula")
 	}
 }
+
+func TestProviderInterface(t *testing.T) {
+	p := New()
+	if p.Name() != "openngc" {
+		t.Errorf("expected openngc, got %s", p.Name())
+	}
+}

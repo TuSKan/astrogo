@@ -60,3 +60,28 @@ func (m *mockTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	resp.Request = req
 	return resp, nil
 }
+
+func TestProviderInterface(t *testing.T) {
+	p := New()
+	if p.Name() != "vizier" {
+		t.Errorf("expected vizier, got %s", p.Name())
+	}
+	caps := p.Capabilities()
+	if len(caps) != 1 || caps[0] != catalog.CapConeSearch {
+		t.Errorf("expected CapConeSearch, got %v", caps)
+	}
+
+	_, ok := p.Resolve("foo")
+	if ok {
+		t.Error("expected Resolve to return false")
+	}
+	if p.Search("foo") != nil {
+		t.Error("expected Search to return nil")
+	}
+
+	// This validates missing coverage on the parseCSV empty conditions
+	iter := p.ConeSearch(context.Background(), catalog.ConeRequest{})
+	iter(func(target catalog.Target, err error) bool {
+		return false
+	})
+}

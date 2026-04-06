@@ -60,3 +60,17 @@ func TestSBDBResolver(t *testing.T) {
 		t.Fatalf("Expected 1 targets from stream, got %d", len(targets))
 	}
 }
+
+func TestProviderInterface(t *testing.T) {
+	p := New()
+	if p.Name() != "sbdb" {
+		t.Errorf("expected sbdb, got %s", p.Name())
+	}
+	caps := p.Capabilities()
+	if len(caps) != 1 || caps[0] != catalog.CapObjectResolution {
+		t.Errorf("expected CapObjectResolution, got %v", caps)
+	}
+
+	_, _ = p.Resolve("non_existent_body")
+	_ = p.Search("non_existent_body")
+}
