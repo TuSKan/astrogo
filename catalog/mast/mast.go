@@ -96,41 +96,62 @@ func (p *Provider) ResolveObject(ctx context.Context, req catalog.ObjectRequest)
 			return
 		}
 
+		var targets []catalog.Target
+
 		if len(b) > 0 && b[0] == '{' {
-			// MAST returns JSON for errors
-			var errPayload struct {
-				Status string `json:"status"`
-				Msg    string `json:"msg"`
+			// Try parsing as JSON first
+			var jsonPayload struct {
+				Status             string `json:"status"`
+				Msg                string `json:"msg"`
+				ResolvedCoordinate []struct {
+					CanonicalName string  `json:"canonicalName"`
+					RA            float64 `json:"ra"`
+					Decl          float64 `json:"decl"`
+					Resolver      string  `json:"resolver"`
+				} `json:"resolvedCoordinate"`
 			}
-			if err := json.Unmarshal(b, &errPayload); err == nil && errPayload.Status == "ERROR" {
-				yield(catalog.Target{}, fmt.Errorf("mast: %s", errPayload.Msg))
+
+			if err := json.Unmarshal(b, &jsonPayload); err == nil {
+				if jsonPayload.Status == "ERROR" {
+					yield(catalog.Target{}, fmt.Errorf("mast: %s", jsonPayload.Msg))
+					return
+				}
+				for _, match := range jsonPayload.ResolvedCoordinate {
+					targets = append(targets, catalog.Target{
+						ID:      match.CanonicalName,
+						Name:    match.CanonicalName,
+						Coord:   coord.NewICRS(angle.Deg(match.RA), angle.Deg(match.Decl)),
+						Catalog: match.Resolver,
+					})
+				}
+			}
+		}
+
+		if len(targets) == 0 {
+			// Fallback to XML
+			var xmlPayload struct {
+				XMLName            xml.Name `xml:"resolvedItems"`
+				ResolvedCoordinate []struct {
+					CanonicalName string  `xml:"canonicalName"`
+					RA            float64 `xml:"ra"`
+					Decl          float64 `xml:"dec"` // XML uses 'dec', JSON uses 'decl'
+					Resolver      string  `xml:"resolver"`
+				} `xml:"resolvedCoordinate"`
+			}
+			
+			if err := xml.Unmarshal(b, &xmlPayload); err != nil {
+				yield(catalog.Target{}, err)
 				return
 			}
-		}
-
-		var payload struct {
-			XMLName            xml.Name `xml:"resolvedItems"`
-			ResolvedCoordinate []struct {
-				CanonicalName string  `xml:"canonicalName"`
-				RA            float64 `xml:"ra"`
-				Decl          float64 `xml:"dec"`
-				Resolver      string  `xml:"resolver"`
-			} `xml:"resolvedCoordinate"`
-		}
-
-		if err := xml.Unmarshal(b, &payload); err != nil {
-			yield(catalog.Target{}, err)
-			return
-		}
-
-		var targets []catalog.Target
-		for _, match := range payload.ResolvedCoordinate {
-			targets = append(targets, catalog.Target{
-				ID:      match.CanonicalName,
-				Name:    match.CanonicalName,
-				Coord:   coord.NewICRS(angle.Deg(match.RA), angle.Deg(match.Decl)),
-				Catalog: match.Resolver,
-			})
+			
+			for _, match := range xmlPayload.ResolvedCoordinate {
+				targets = append(targets, catalog.Target{
+					ID:      match.CanonicalName,
+					Name:    match.CanonicalName,
+					Coord:   coord.NewICRS(angle.Deg(match.RA), angle.Deg(match.Decl)),
+					Catalog: match.Resolver,
+				})
+			}
 		}
 
 		if err := p.cache.Set(cacheKey, targets); err != nil {
