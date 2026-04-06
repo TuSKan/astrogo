@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"runtime"
 
-	"github.com/TuSKan/astrogo/body"
 	"github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/ephemeris/jpl/lsk"
 	"github.com/TuSKan/astrogo/ephemeris/jpl/spk"
@@ -31,10 +30,10 @@ const (
 const JPL_KERNEL_URI = "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/"
 const KM_PER_AU = 149597870.7
 
-var BodyIDToNAIF = map[body.ID]int{
-	body.Sun: 10, body.Moon: 301, body.Mercury: 199, body.Venus: 299,
-	body.Earth: 399, body.Mars: 4, body.Jupiter: 5, body.Saturn: 6,
-	body.Uranus: 7, body.Neptune: 8,
+var BodyIDToNAIF = map[ephemeris.ID]int{
+	ephemeris.Sun: 10, ephemeris.Moon: 301, ephemeris.Mercury: 199, ephemeris.Venus: 299,
+	ephemeris.Earth: 399, ephemeris.Mars: 4, ephemeris.Jupiter: 5, ephemeris.Saturn: 6,
+	ephemeris.Uranus: 7, ephemeris.Neptune: 8,
 }
 
 var ErrNoSegment = fmt.Errorf("jpl: no coverage for target at requested epoch")
@@ -51,7 +50,7 @@ type SegmentRef struct {
 	SegmentIndex int
 }
 
-// TargetCoverage stores summary coverage info per target.
+// TargetCoverage stores summary coverage info per plan.
 type TargetCoverage struct {
 	StartET float64
 	EndET   float64
@@ -179,7 +178,7 @@ func (p *Provider) Close() error {
 
 // State returns the geocentric state (position and velocity) of the given
 // body at time t.
-func (p *Provider) State(id body.ID, t time.Time) (ephemeris.State, error) {
+func (p *Provider) State(id ephemeris.ID, t time.Time) (ephemeris.State, error) {
 	naif, ok := BodyIDToNAIF[id]
 	if !ok {
 		naif = int(id)
@@ -339,14 +338,14 @@ func (p *Provider) segment(ref SegmentRef) *spk.Segment {
 }
 
 // SupportedBodies returns a list of body IDs available in the loaded kernels.
-func (p *Provider) SupportedBodies() []body.ID {
-	seen := make(map[body.ID]bool)
-	var res []body.ID
+func (p *Provider) SupportedBodies() []ephemeris.ID {
+	seen := make(map[ephemeris.ID]bool)
+	var res []ephemeris.ID
 	for targetID := range p.ByTarget {
-		bid := body.ID(targetID)
+		bid := ephemeris.ID(targetID)
 		// Map back from asteroid ID if needed
 		if targetID > 20000000 && targetID < 21000000 {
-			bid = body.ID(targetID - 20000000)
+			bid = ephemeris.ID(targetID - 20000000)
 		}
 
 		// Check if it's a known body

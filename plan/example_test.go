@@ -1,41 +1,35 @@
-package plan_test
+package plan
 
 import (
 	"fmt"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/catalog"
-	"github.com/TuSKan/astrogo/constraint"
+
 	"github.com/TuSKan/astrogo/coord"
-	"github.com/TuSKan/astrogo/earth"
-	"github.com/TuSKan/astrogo/observatory"
-	"github.com/TuSKan/astrogo/plan"
-	"github.com/TuSKan/astrogo/target"
+
 	"github.com/TuSKan/astrogo/time"
 )
 
 func ExamplePlanner_Observable() {
 	// Setup observatory
-	loc, _ := earth.NewGeodetic(angle.Deg(-70), angle.Deg(-30), 2400) // Chile
-	site, _ := observatory.NewSite("Paranal", loc, angle.Zero(), nil)
+	loc, _ := coord.NewGeodetic(angle.Deg(-70), angle.Deg(-30), 2400) // Chile
+	site, _ := NewSite("Paranal", loc, angle.Zero(), nil)
 
 	// Constraints
-	constraints := []constraint.Constraint{
-		constraint.Altitude{Threshold: angle.Deg(30)},
+	constraints := []Constraint{
+		Altitude{Threshold: angle.Deg(30)},
 	}
 
-	planner, err := plan.NewPlanner(site, constraints)
+	planner, err := NewPlanner(site, constraints)
 	if err != nil {
 		panic(err)
 	}
 
 	// Target
-	obj := target.NewFixed(catalog.Target{
-		Name: "Arp 220",
-		Coord: coord.ICRS{
-			RA:  angle.Deg(233.738),
-			Dec: angle.Deg(23.503),
-		},
+	obj := NewFixed(catalog.Target{
+		Name:  "Arp 220",
+		Coord: coord.NewICRS(angle.Deg(233.738), angle.Deg(23.503)),
 	})
 
 	// Fixed time: Equinox 2000 midnight (T=0.5).
@@ -51,13 +45,13 @@ func ExamplePlanner_Observable() {
 }
 
 func ExampleObservableWindows() {
-	loc, _ := earth.NewGeodetic(angle.Zero(), angle.Zero(), 0)
-	site, _ := observatory.NewSite("Greenwich", loc, angle.Zero(), nil)
+	loc, _ := coord.NewGeodetic(angle.Zero(), angle.Zero(), 0)
+	site, _ := NewSite("Greenwich", loc, angle.Zero(), nil)
 
 	// Target at Zenith initially (J2000 Noon LST ~18.69h)
-	obj := target.NewFixed(catalog.Target{
+	obj := NewFixed(catalog.Target{
 		Name:  "ZenithTarget",
-		Coord: coord.ICRS{RA: angle.Hour(18.69), Dec: angle.Zero()},
+		Coord: coord.NewICRS(angle.Hour(18.69), angle.Zero()),
 	})
 
 	start := time.FromJD(2451545.0, time.UTC) // J2000 Noon
@@ -65,11 +59,11 @@ func ExampleObservableWindows() {
 	step := 1 * time.Hour
 
 	// Constraint: Altitude > 30 degrees
-	constraints := []constraint.Constraint{
-		constraint.Altitude{Threshold: angle.Deg(30)},
+	constraints := []Constraint{
+		Altitude{Threshold: angle.Deg(30)},
 	}
 
-	windows, _ := plan.ObservableWindows(obj, start, end, step, site, constraints...)
+	windows, _ := ObservableWindows(obj, start, end, step, site, constraints...)
 
 	for _, w := range windows {
 		fmt.Printf("Window: %s to %s\n", w.Start, w.End)
@@ -78,16 +72,16 @@ func ExampleObservableWindows() {
 }
 
 func ExampleRankObservables() {
-	loc, _ := earth.NewGeodetic(angle.Zero(), angle.Zero(), 0)
-	site, _ := observatory.NewSite("Test", loc, angle.Zero(), nil)
+	loc, _ := coord.NewGeodetic(angle.Zero(), angle.Zero(), 0)
+	site, _ := NewSite("Test", loc, angle.Zero(), nil)
 	tm := time.FromJD(2451545.0, time.UTC) // J2000 Noon
 
-	objs := []target.Observable{
-		target.NewFixed(catalog.Target{Name: "NearZenith", Coord: coord.ICRS{RA: angle.Hour(18.69), Dec: angle.Deg(0)}}),
-		target.NewFixed(catalog.Target{Name: "Lower", Coord: coord.ICRS{RA: angle.Hour(18.69), Dec: angle.Deg(45)}}),
+	objs := []Observable{
+		NewFixed(catalog.Target{Name: "NearZenith", Coord: coord.NewICRS(angle.Hour(18.69), angle.Deg(0))}),
+		NewFixed(catalog.Target{Name: "Lower", Coord: coord.NewICRS(angle.Hour(18.69), angle.Deg(45))}),
 	}
 
-	ranked, _ := plan.RankObservables(objs, tm, site)
+	ranked, _ := RankObservables(objs, tm, site)
 
 	for i, rt := range ranked {
 		fmt.Printf("%d. %-10s (Score: %5.1f)\n", i+1, rt.Object.Name(), rt.Score)

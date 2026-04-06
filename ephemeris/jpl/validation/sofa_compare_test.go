@@ -1,15 +1,16 @@
+//go:build validation
+
 package jpl_test
 
 import (
 	"testing"
 
-	"github.com/TuSKan/astrogo/body"
 	"github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/ephemeris/jpl"
 	"github.com/TuSKan/astrogo/time"
 )
 
-func runSOFATest(t *testing.T, bid body.ID) {
+func runSOFATest(t *testing.T, bid ephemeris.ID) {
 	p, err := jpl.NewProvider(jpl.WithSource(jpl.Planets), jpl.WithKernel("de440"), jpl.WithDataDir("../data"))
 	if err != nil {
 		t.Skipf("skipping SOFA comparison: JPL provider failed: %v", err)
@@ -41,7 +42,7 @@ func runSOFATest(t *testing.T, bid body.ID) {
 
 			posDiff := jplState.Pos.Sub(sofaState.Pos).Norm()
 			tol := sunPosTol
-			if bid == body.Moon {
+			if bid == ephemeris.Moon {
 				tol = moonPosTol
 			}
 
@@ -53,9 +54,9 @@ func runSOFATest(t *testing.T, bid body.ID) {
 }
 
 func TestJPLStateAgainstSOFASun(t *testing.T) {
-	runSOFATest(t, body.Sun)
+	runSOFATest(t, ephemeris.Sun)
 }
 
 func TestJPLStateAgainstSOFAMoon(t *testing.T) {
-	runSOFATest(t, body.Moon)
+	runSOFATest(t, ephemeris.Moon)
 }

@@ -1,3 +1,5 @@
+//go:build validation
+
 package jpl_test
 
 import (
@@ -141,13 +143,13 @@ func fetchObserverTable(naifID int, bodyName string, lon, lat, height float64, s
 	params := url.Values{}
 	params.Add("format", "text")
 	params.Add("COMMAND", fmt.Sprintf("'%d'", naifID))
-	params.Add("CENTER", "'coord@399'") // Earth Observer
+	params.Add("CENTER", "'coord@399'")                                          // Earth Observer
 	params.Add("SITE_COORD", fmt.Sprintf("'%f,%f,%f'", lon, lat, height/1000.0)) // Longitude, Latitude, Elevation in km
 	params.Add("MAKE_EPHEM", "'YES'")
 	params.Add("EPHEM_TYPE", "'OBSERVER'")
 	params.Add("START_TIME", fmt.Sprintf("'%s'", startStr))
-	params.Add("STOP_TIME", fmt.Sprintf("'%s'", stopStr)) 
-    params.Add("STEP_SIZE", "'1m'") // 1 minute step size
+	params.Add("STOP_TIME", fmt.Sprintf("'%s'", stopStr))
+	params.Add("STEP_SIZE", "'1m'") // 1 minute step size
 
 	// Important quantities: 1 (Astrometric RA/Dec), 2 (Apparent RA/Dec), 4 (Azi/Elev), 20 (Observer Range)
 	params.Add("QUANTITIES", "'1,2,4,20'")
@@ -184,10 +186,10 @@ func fetchObserverTable(naifID int, bodyName string, lon, lat, height float64, s
 	// Horizons usually renders: JDTDB, Calendar, ... flags
 	// For standard CSV output without datetime string:
 	// JD, AstRA, AstDec, AppRA, AppDec, Az, El
-	
+
 	// Because of flags, sometimes it's larger. Let's just parse backwards or specifically:
 	// Format is typically: JD, target_presence_flags, RA(ICRF), DEC(ICRF), RA(a-app), DEC(a-app), Azi(a-app), Elev(a-app)
-	
+
 	if len(cols) < 8 {
 		return nil, fmt.Errorf("unexpected column count in observer output: %d", len(cols))
 	}
@@ -208,7 +210,7 @@ func fetchObserverTable(naifID int, bodyName string, lon, lat, height float64, s
 		d, _ := strconv.ParseFloat(parts[0], 64)
 		m, _ := strconv.ParseFloat(parts[1], 64)
 		sec, _ := strconv.ParseFloat(parts[2], 64)
-		
+
 		sign := 1.0
 		if strings.HasPrefix(s, "-") {
 			sign = -1.0
@@ -224,10 +226,10 @@ func fetchObserverTable(naifID int, bodyName string, lon, lat, height float64, s
 
 	target := &ObserverPoint{
 		Body:      bodyName,
-		AstroRA:   parseAngleStr(cLen - 9, true),
-		AstroDec:  parseAngleStr(cLen - 8, false),
-		AppRA:     parseAngleStr(cLen - 7, true),
-		AppDec:    parseAngleStr(cLen - 6, false),
+		AstroRA:   parseAngleStr(cLen-9, true),
+		AstroDec:  parseAngleStr(cLen-8, false),
+		AppRA:     parseAngleStr(cLen-7, true),
+		AppDec:    parseAngleStr(cLen-6, false),
 		Azimuth:   parseFloat(cLen - 5),
 		Elevation: parseFloat(cLen - 4),
 		Range:     parseFloat(cLen - 3), // Quantity 20 adds Range and Range Rate, trailing comma creates empty elem

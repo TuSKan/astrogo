@@ -11,12 +11,9 @@ import (
 	"time"
 
 	"github.com/TuSKan/astrogo/angle"
-
-	"github.com/TuSKan/astrogo/body"
-	"github.com/TuSKan/astrogo/earth"
+	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/ephemeris"
 	atime "github.com/TuSKan/astrogo/time"
-	"github.com/TuSKan/astrogo/transform"
 	"github.com/TuSKan/astrogo/vector"
 )
 
@@ -26,11 +23,11 @@ type mockLinearProvider struct {
 	vel      vector.Vec3
 }
 
-func (m *mockLinearProvider) State(id body.ID, t atime.Time) (ephemeris.State, error) {
+func (m *mockLinearProvider) State(id ephemeris.ID, t atime.Time) (ephemeris.State, error) {
 	jd1_req, jd2_req := t.JDParts()
 	jd1_base, jd2_base := m.baseTime.JDParts()
 	dtDays := (jd1_req - jd1_base) + (jd2_req - jd2_base)
-	
+
 	p := m.pos.Add(m.vel.MulScalar(dtDays))
 	return ephemeris.State{Pos: p, Vel: m.vel}, nil
 }
@@ -72,10 +69,9 @@ func TestScientificStability(t *testing.T) {
 
 	for i, c := range cases {
 		t.Run(c.TargetName, func(t *testing.T) {
-			site := earth.Geodetic{
-				Lat:    angle.Deg(c.ObserverLat),
-				Lon:    angle.Deg(c.ObserverLon),
-				Height: c.ObserverEle,
+			site, err := coord.NewGeodetic(angle.Deg(c.ObserverLat), angle.Deg(c.ObserverLon), c.ObserverEle)
+			if err != nil {
+				t.Fatalf("Failed to create site: %v", err)
 			}
 
 			// Horizons time format parsing (e.g. 2024-11-01 12:00)
@@ -106,33 +102,35 @@ func TestScientificStability(t *testing.T) {
 			}
 
 			// Natively extract the rigorous retarded-time Geocentric state directly from the library
-			appState, _ := ephemeris.ApparentState(mock, body.ID(c.TargetID), obsTime)
+			appState, _ := ephemeris.ApparentState(mock, ephemeris.ID(c.TargetID), obsTime)
 
 			// Get standard Earth model matrices to extract Topocentric offset
-			atm := earth.StandardAtmosphere
-			atm.Model = earth.RefractionNone{} // We bypass explicit analytical limits here to verify absolute pure geometry.
+			atm := coord.StandardAtmosphere
+			atm.Model = coord.RefractionNone{} // We bypass explicit analytical limits here to verify absolute pure geometry.
 
 			// Route flawlessly through native Topocentric offset builder!
 			// We track exactly how the true geographic shift affects alt/az
-			observed := transform.GeocentricToObserved(appState.Pos, obsTime, site, atm)
-			
+			observed := coord.GeocentricToObserved(appState.Pos, obsTime, site, atm)
+
 			appICRS, _ := ephemeris.ToICRS(appState.Pos)
-			dRA_raw := math.Abs(appICRS.RA.Degrees() - c.Data.AstroRA)
-			if dRA_raw > 180.0 { dRA_raw = 360.0 - dRA_raw }
-			dRA := dRA_raw * math.Cos(appICRS.Dec.Radians()) * 3600.0
-			dDec := math.Abs(appICRS.Dec.Degrees() - c.Data.AstroDec) * 3600.0
+			dRA_raw := math.Abs(appICRS.RA().Degrees() - c.Data.AstroRA)
+			if dRA_raw > 180.0 {
+				dRA_raw = 360.0 - dRA_raw
+			}
+			dRA := dRA_raw * math.Cos(appICRS.Dec().Radians()) * 3600.0
+			dDec := math.Abs(appICRS.Dec().Degrees()-c.Data.AstroDec) * 3600.0
 
 			// 2. Decoupled Alt/Az Deltas
-			dAlt := math.Abs(observed.Alt.Degrees() - c.Data.Elevation) * 3600.0
+			dAlt := math.Abs(observed.Alt().Degrees()-c.Data.Elevation) * 3600.0
 
 			// Azimuth requires safe cyclic difference mapping + Great Circle compression for Polar/Zenith edge cases
-			dAzDeg := math.Abs(observed.Az.Degrees() - c.Data.Azimuth)
-			if dAzDeg > 180 { 
-				dAzDeg = 360.0 - dAzDeg 
+			dAzDeg := math.Abs(observed.Az().Degrees() - c.Data.Azimuth)
+			if dAzDeg > 180 {
+				dAzDeg = 360.0 - dAzDeg
 			}
-			dAz := dAzDeg * math.Cos(observed.Alt.Radians()) * 3600.0
+			dAz := dAzDeg * math.Cos(observed.Alt().Radians()) * 3600.0
 
-			t.Logf("DEBUG [%s]: AstroRA: %.5f, AppICRS.RA: %.5f | AstroDec: %.5f, AppICRS.Dec: %.5f", c.TargetName, c.Data.AstroRA, appICRS.RA.Degrees(), c.Data.AstroDec, appICRS.Dec.Degrees())
+			t.Logf("DEBUG [%s]: AstroRA: %.5f, AppICRS.RA: %.5f | AstroDec: %.5f, AppICRS.Dec: %.5f", c.TargetName, c.Data.AstroRA, appICRS.RA().Degrees(), c.Data.AstroDec, appICRS.Dec().Degrees())
 			t.Logf("Baseline %d [%s] Deltas -> dRA: %.3f\", dDec: %.3f\", dAlt: %.3f\", dAz: %.3f\"", i, c.TargetName, dRA, dDec, dAlt, dAz)
 
 			// 3. Body-Specific Scientific Tolerances
@@ -146,7 +144,7 @@ func TestScientificStability(t *testing.T) {
 				limit = 1.0 // Strict generic constraint
 			}
 
-			// Validate RA/Dec separately (Astrometric geometry phase). We log structural shifts 
+			// Validate RA/Dec separately (Astrometric geometry phase). We log structural shifts
 			// reflecting raw Topocentric Parallax unmodeled before Earth flattening.
 			if dRA > limit*4000.0 || dDec > limit*4000.0 {
 				t.Logf("DEBUG: Geocentric-Topocentric Parallax shifts measured. (dRA: %.3f\", dDec: %.3f\")", dRA, dDec)

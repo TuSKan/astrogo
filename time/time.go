@@ -5,7 +5,7 @@ import (
 	"math"
 	"time"
 
-	"github.com/TuSKan/astrogo/earth"
+	"github.com/TuSKan/astrogo/iers"
 	"github.com/TuSKan/astrogo/internal/gofaext"
 )
 
@@ -213,14 +213,14 @@ func (t Time) UT1() Time {
 	if t.scale == UT1 {
 		return t
 	}
-	
+
 	// Simplify by treating base scale as UTC for the UT1 offset application
 	utc := t
 
 	// MJD is JD - 2400000.5
 	mjd := (utc.jd1 - 2400000.5) + utc.jd2
-	eop, err := earth.GetModel().EOP(mjd)
-	
+	eop, err := iers.GetModel().EOP(mjd)
+
 	dut1 := 0.0
 	if err == nil {
 		dut1 = eop.DUT1

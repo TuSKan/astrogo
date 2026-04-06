@@ -7,8 +7,6 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
-
-	"github.com/TuSKan/astrogo/coord"
 )
 
 // DOC: https://ssd-api.jpl.nasa.gov/doc/sbdb_query.html
@@ -158,7 +156,7 @@ func NewSmallBodyProvider(query SBDBQuery) (*SmallBodyProvider, error) {
 			SPKID:       spkid,
 			Kind:        Kind(kindStr),
 			Catalog:     "sbdb",
-			Coord:       coord.ICRS{}, // Small bodies are dynamic, no fixed ICRS
+			Coord:       nil, // Small bodies are dynamic, no fixed ICRS
 		}
 
 		idx := len(p.targets)

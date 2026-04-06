@@ -60,7 +60,6 @@ Validation should be:
 The following areas are not yet considered scientifically complete:
 
 - Advanced observation scheduling optimization
-- FITS and catalog I/O (in hardening process)
 
 ---
 

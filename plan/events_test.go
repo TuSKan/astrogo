@@ -1,30 +1,27 @@
-package plan_test
+package plan
 
 import (
 	"testing"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
-	"github.com/TuSKan/astrogo/earth"
 	"github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/internal/testutil"
-	"github.com/TuSKan/astrogo/observatory"
-	"github.com/TuSKan/astrogo/plan"
-	"github.com/TuSKan/astrogo/target"
+
 	"github.com/TuSKan/astrogo/time"
 )
 
 // ── Generic Event Finder Tests ──────────────────────────────────────────────
 
 func TestEventFinder_Fixed(t *testing.T) {
-	loc, _ := earth.NewGeodetic(angle.Deg(0), angle.Deg(45), 0)
-	site, _ := observatory.NewSite("Test", loc, angle.Zero(), nil)
-	obj := target.Custom{Coord: coord.ICRS{RA: angle.Deg(0), Dec: angle.Deg(0)}}
+	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(45), 0)
+	site, _ := NewSite("Test", loc, angle.Zero(), nil)
+	obj := Custom{Coord: coord.NewICRS(angle.Deg(0), angle.Deg(0))}
 
 	start := time.FromJD(2451545.0, time.UTC)
 	end := start.Add(24 * time.Hour)
 
-	finder := plan.NewEventFinder(30*time.Minute, 1*time.Second)
+	finder := NewEventFinder(30*time.Minute, 1*time.Second)
 	events, err := finder.FindEvents(obj, start, end, site, angle.Deg(20))
 	testutil.AssertNoError(t, err)
 
@@ -40,45 +37,45 @@ func TestEventFinder_Fixed(t *testing.T) {
 			}
 		}
 
-		if e.Kind == plan.EventRise || e.Kind == plan.EventSet {
+		if e.Kind == EventRise || e.Kind == EventSet {
 			testutil.AssertNear(t, "altitude", e.Altitude.Degrees(), 20.0, 0.01)
 		}
 	}
 }
 
 func TestEventFinder_Circumpolar(t *testing.T) {
-	loc, _ := earth.NewGeodetic(angle.Deg(0), angle.Deg(45), 0)
-	site, _ := observatory.NewSite("Test", loc, angle.Zero(), nil)
-	obj := target.Custom{Coord: coord.ICRS{RA: angle.Deg(0), Dec: angle.Deg(80)}}
+	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(45), 0)
+	site, _ := NewSite("Test", loc, angle.Zero(), nil)
+	obj := Custom{Coord: coord.NewICRS(angle.Deg(0), angle.Deg(80))}
 
 	start := time.FromJD(2451545.0, time.UTC)
 	end := start.Add(24 * time.Hour)
 
-	finder := plan.NewEventFinder(30*time.Minute, 10*time.Second)
+	finder := NewEventFinder(30*time.Minute, 10*time.Second)
 	events, err := finder.FindEvents(obj, start, end, site, angle.Deg(10))
 	testutil.AssertNoError(t, err)
 
 	for _, e := range events {
-		if e.Kind == plan.EventRise || e.Kind == plan.EventSet {
+		if e.Kind == EventRise || e.Kind == EventSet {
 			t.Errorf("unexpected rise/set for circumpolar target: %v", e)
 		}
 	}
 }
 
 func TestEventFinder_NeverVisible(t *testing.T) {
-	loc, _ := earth.NewGeodetic(angle.Deg(0), angle.Deg(45), 0)
-	site, _ := observatory.NewSite("Test", loc, angle.Zero(), nil)
-	obj := target.Custom{Coord: coord.ICRS{RA: angle.Deg(0), Dec: angle.Deg(-80)}}
+	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(45), 0)
+	site, _ := NewSite("Test", loc, angle.Zero(), nil)
+	obj := Custom{Coord: coord.NewICRS(angle.Deg(0), angle.Deg(-80))}
 
 	start := time.FromJD(2451545.0, time.UTC)
 	end := start.Add(24 * time.Hour)
 
-	finder := plan.NewEventFinder(30*time.Minute, 10*time.Second)
+	finder := NewEventFinder(30*time.Minute, 10*time.Second)
 	events, err := finder.FindEvents(obj, start, end, site, angle.Deg(0))
 	testutil.AssertNoError(t, err)
 
 	for _, e := range events {
-		if e.Kind == plan.EventRise || e.Kind == plan.EventSet {
+		if e.Kind == EventRise || e.Kind == EventSet {
 			t.Errorf("unexpected rise/set for never-visible target: %v", e)
 		}
 	}
@@ -87,26 +84,26 @@ func TestEventFinder_NeverVisible(t *testing.T) {
 // ── Sun and Moon Helper Tests ──────────────────────────────────────────────
 
 func TestSunEvents(t *testing.T) {
-	loc, _ := earth.NewGeodetic(angle.Deg(0), angle.Deg(40), 0)
-	site, _ := observatory.NewSite("Test", loc, angle.Zero(), nil)
+	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(40), 0)
+	site, _ := NewSite("Test", loc, angle.Zero(), nil)
 	eph := ephemeris.Default()
 
 	start := time.FromJD(2451544.5, time.UTC)
 	end := start.Add(24 * time.Hour)
 
-	events, err := plan.SunEvents(start, end, site, eph)
+	events, err := SunEvents(start, end, site, eph)
 	testutil.AssertNoError(t, err)
 
 	hasRise, hasSet, hasTransit := false, false, false
 	for _, e := range events {
 		switch e.Kind {
-		case plan.EventRise:
+		case EventRise:
 			hasRise = true
-			testutil.AssertNear(t, "sunrise altitude", e.Altitude.Degrees(), plan.SunHorizonAltitude, 0.01)
-		case plan.EventSet:
+			testutil.AssertNear(t, "sunrise altitude", e.Altitude.Degrees(), SunHorizonAltitude, 0.01)
+		case EventSet:
 			hasSet = true
-			testutil.AssertNear(t, "sunset altitude", e.Altitude.Degrees(), plan.SunHorizonAltitude, 0.01)
-		case plan.EventTransit:
+			testutil.AssertNear(t, "sunset altitude", e.Altitude.Degrees(), SunHorizonAltitude, 0.01)
+		case EventTransit:
 			hasTransit = true
 		}
 	}
@@ -117,50 +114,50 @@ func TestSunEvents(t *testing.T) {
 }
 
 func TestSunEvents_Polar(t *testing.T) {
-	loc, _ := earth.NewGeodetic(angle.Deg(0), angle.Deg(80), 0)
-	site, _ := observatory.NewSite("Arctic", loc, angle.Zero(), nil)
+	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(80), 0)
+	site, _ := NewSite("Arctic", loc, angle.Zero(), nil)
 	eph := ephemeris.Default()
 
 	start := time.FromJD(2451727.5, time.UTC)
 	end := start.Add(24 * time.Hour)
 
-	events, err := plan.SunEvents(start, end, site, eph)
+	events, err := SunEvents(start, end, site, eph)
 	testutil.AssertNoError(t, err)
 
 	for _, e := range events {
-		if e.Kind == plan.EventRise || e.Kind == plan.EventSet {
+		if e.Kind == EventRise || e.Kind == EventSet {
 			t.Errorf("unexpected rise/set during Midnight Sun: %v", e)
 		}
 	}
 }
 
 func TestMoonEvents(t *testing.T) {
-	loc, _ := earth.NewGeodetic(angle.Deg(0), angle.Deg(40), 0)
-	site, _ := observatory.NewSite("Test", loc, angle.Zero(), nil)
+	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(40), 0)
+	site, _ := NewSite("Test", loc, angle.Zero(), nil)
 	eph := ephemeris.Default()
 
 	start := time.FromJD(2451545.0, time.UTC)
 	end := start.Add(24 * time.Hour)
 
-	events, err := plan.MoonEvents(start, end, site, eph)
+	events, err := MoonEvents(start, end, site, eph)
 	testutil.AssertNoError(t, err)
 
 	for _, e := range events {
-		if e.Kind == plan.EventRise || e.Kind == plan.EventSet {
-			testutil.AssertNear(t, "moonrise/set altitude", e.Altitude.Degrees(), plan.MoonHorizonAltitude, 0.01)
+		if e.Kind == EventRise || e.Kind == EventSet {
+			testutil.AssertNear(t, "moonrise/set altitude", e.Altitude.Degrees(), MoonHorizonAltitude, 0.01)
 		}
 	}
 }
 
 func TestSunriseSunset(t *testing.T) {
-	loc, _ := earth.NewGeodetic(angle.Deg(0), angle.Deg(40), 0)
-	site, _ := observatory.NewSite("Test", loc, angle.Zero(), nil)
+	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(40), 0)
+	site, _ := NewSite("Test", loc, angle.Zero(), nil)
 	eph := ephemeris.Default()
 
 	start := time.FromJD(2451544.5, time.UTC)
 	end := start.Add(24 * time.Hour)
 
-	rise, set, err := plan.SunriseSunset(start, end, site, eph)
+	rise, set, err := SunriseSunset(start, end, site, eph)
 	testutil.AssertNoError(t, err)
 
 	if rise == nil || set == nil {
@@ -171,22 +168,22 @@ func TestSunriseSunset(t *testing.T) {
 // ── Twilight Tests ──────────────────────────────────────────────────────────
 
 func TestTwilightEvents(t *testing.T) {
-	loc, _ := earth.NewGeodetic(angle.Deg(0), angle.Deg(40), 0)
-	site, _ := observatory.NewSite("Test", loc, angle.Zero(), nil)
+	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(40), 0)
+	site, _ := NewSite("Test", loc, angle.Zero(), nil)
 	eph := ephemeris.Default()
 
 	start := time.FromJD(2451544.5, time.UTC)
 	end := start.Add(24 * time.Hour)
 
-	kinds := []plan.TwilightKind{
-		plan.CivilTwilight,
-		plan.NauticalTwilight,
-		plan.AstronomicalTwilight,
+	kinds := []TwilightKind{
+		CivilTwilight,
+		NauticalTwilight,
+		AstronomicalTwilight,
 	}
 
 	for _, kind := range kinds {
 		t.Run(kind.String(), func(t *testing.T) {
-			events, err := plan.TwilightEvents(start, end, site, eph, kind)
+			events, err := TwilightEvents(start, end, site, eph, kind)
 			testutil.AssertNoError(t, err)
 
 			if len(events) == 0 {
@@ -195,10 +192,10 @@ func TestTwilightEvents(t *testing.T) {
 
 			for _, e := range events {
 				if e.Dawn != nil {
-					testutil.AssertNear(t, "dawn altitude", e.Dawn.Altitude.Degrees(), plan.TwilightThresholds[kind], 0.01)
+					testutil.AssertNear(t, "dawn altitude", e.Dawn.Altitude.Degrees(), TwilightThresholds[kind], 0.01)
 				}
 				if e.Dusk != nil {
-					testutil.AssertNear(t, "dusk altitude", e.Dusk.Altitude.Degrees(), plan.TwilightThresholds[kind], 0.01)
+					testutil.AssertNear(t, "dusk altitude", e.Dusk.Altitude.Degrees(), TwilightThresholds[kind], 0.01)
 				}
 			}
 		})
@@ -206,17 +203,17 @@ func TestTwilightEvents(t *testing.T) {
 }
 
 func TestTwilight_Sequence(t *testing.T) {
-	loc, _ := earth.NewGeodetic(angle.Deg(0), angle.Deg(40), 0)
-	site, _ := observatory.NewSite("Test", loc, angle.Zero(), nil)
+	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(40), 0)
+	site, _ := NewSite("Test", loc, angle.Zero(), nil)
 	eph := ephemeris.Default()
 
 	start := time.FromJD(2451544.5, time.UTC)
 	end := start.Add(24 * time.Hour)
 
-	aDawn, aDusk, _ := plan.AstronomicalDawnDusk(start, end, site, eph)
-	nDawn, nDusk, _ := plan.NauticalDawnDusk(start, end, site, eph)
-	cDawn, cDusk, _ := plan.CivilDawnDusk(start, end, site, eph)
-	rise, set, _ := plan.SunriseSunset(start, end, site, eph)
+	aDawn, aDusk, _ := AstronomicalDawnDusk(start, end, site, eph)
+	nDawn, nDusk, _ := NauticalDawnDusk(start, end, site, eph)
+	cDawn, cDusk, _ := CivilDawnDusk(start, end, site, eph)
+	rise, set, _ := SunriseSunset(start, end, site, eph)
 
 	if !aDawn.Time.Before(nDawn.Time) {
 		t.Errorf("Astro dawn should be before Nautical dawn: %v vs %v", aDawn.Time, nDawn.Time)
@@ -240,14 +237,14 @@ func TestTwilight_Sequence(t *testing.T) {
 }
 
 func TestTwilight_HighLat(t *testing.T) {
-	loc, _ := earth.NewGeodetic(angle.Deg(0), angle.Deg(51.5), 0)
-	site, _ := observatory.NewSite("London", loc, angle.Zero(), nil)
+	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(51.5), 0)
+	site, _ := NewSite("London", loc, angle.Zero(), nil)
 	eph := ephemeris.Default()
 
 	start := time.FromJD(2451727.5, time.UTC)
 	end := start.Add(24 * time.Hour)
 
-	aDawn, aDusk, err := plan.AstronomicalDawnDusk(start, end, site, eph)
+	aDawn, aDusk, err := AstronomicalDawnDusk(start, end, site, eph)
 	testutil.AssertNoError(t, err)
 
 	if aDawn != nil || aDusk != nil {
@@ -258,12 +255,12 @@ func TestTwilight_HighLat(t *testing.T) {
 // ── Benchmarks ─────────────────────────────────────────────────────────────
 
 func BenchmarkEventFinder(b *testing.B) {
-	loc, _ := earth.NewGeodetic(angle.Deg(0), angle.Deg(45), 0)
-	site, _ := observatory.NewSite("Test", loc, angle.Zero(), nil)
-	obj := target.Custom{Coord: coord.ICRS{RA: angle.Deg(0), Dec: angle.Deg(0)}}
+	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(45), 0)
+	site, _ := NewSite("Test", loc, angle.Zero(), nil)
+	obj := Custom{Coord: coord.NewICRS(angle.Deg(0), angle.Deg(0))}
 	start := time.FromJD(2451545.0, time.UTC)
 	end := start.Add(24 * time.Hour)
-	finder := plan.NewEventFinder(30*time.Minute, 1*time.Second)
+	finder := NewEventFinder(30*time.Minute, 1*time.Second)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {

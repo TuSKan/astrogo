@@ -6,11 +6,9 @@ import (
 	"sort"
 
 	"github.com/TuSKan/astrogo/angle"
-	"github.com/TuSKan/astrogo/body"
+	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/ephemeris"
-	"github.com/TuSKan/astrogo/observatory"
-	"github.com/TuSKan/astrogo/sky"
-	"github.com/TuSKan/astrogo/target"
+
 	"github.com/TuSKan/astrogo/time"
 )
 
@@ -39,7 +37,7 @@ func (k EventKind) String() string {
 	}
 }
 
-// Event represents a specific occurrence of a celestial target in the sky.
+// Event represents a specific occurrence of a celestial target in the coord.
 type Event struct {
 	Kind       EventKind
 	Time       time.Time
@@ -120,9 +118,9 @@ func NewEventFinder(step, tol time.Duration) EventFinder {
 // FindEvents locates all rise, set, and transit events for the given object
 // within the [start, end] interval relative to the observer's site and threshold altitude.
 func (f EventFinder) FindEvents(
-	obj target.Observable,
+	obj Observable,
 	start, end time.Time,
-	site observatory.Site,
+	site *Site,
 	threshold angle.Angle,
 ) ([]Event, error) {
 	if f.Step <= 0 {
@@ -219,15 +217,15 @@ const (
 
 // SunEvents returns all rise, set, and transit events for the Sun in the given interval.
 // It uses a threshold of -0.833° to account for atmospheric refraction and semi-diameter.
-func SunEvents(start, end time.Time, site observatory.Site, eph ephemeris.Provider) ([]Event, error) {
-	sun := target.NewBody(body.Sun, eph)
+func SunEvents(start, end time.Time, site *Site, eph ephemeris.Provider) ([]Event, error) {
+	sun := NewBody(ephemeris.Sun, eph)
 	finder := NewEventFinder(15*time.Minute, 1*time.Second)
 	return finder.FindEvents(sun, start, end, site, angle.Deg(SunHorizonAltitude))
 }
 
 // SunriseSunset returns the first sunrise and first sunset found in the given interval.
 // If an event is not found, the corresponding pointer will be nil.
-func SunriseSunset(start, end time.Time, site observatory.Site, eph ephemeris.Provider) (rise *Event, set *Event, err error) {
+func SunriseSunset(start, end time.Time, site *Site, eph ephemeris.Provider) (rise *Event, set *Event, err error) {
 	events, err := SunEvents(start, end, site, eph)
 	if err != nil {
 		return nil, nil, err
@@ -248,15 +246,15 @@ func SunriseSunset(start, end time.Time, site observatory.Site, eph ephemeris.Pr
 
 // MoonEvents returns all rise, set, and transit events for the Moon in the given interval.
 // It uses a threshold of 0° (center of the disk).
-func MoonEvents(start, end time.Time, site observatory.Site, eph ephemeris.Provider) ([]Event, error) {
-	moon := target.NewBody(body.Moon, eph)
+func MoonEvents(start, end time.Time, site *Site, eph ephemeris.Provider) ([]Event, error) {
+	moon := NewBody(ephemeris.Moon, eph)
 	finder := NewEventFinder(15*time.Minute, 1*time.Second)
 	return finder.FindEvents(moon, start, end, site, angle.Deg(MoonHorizonAltitude))
 }
 
 // MoonriseMoonset returns the first moonrise and first moonset found in the given interval.
 // If an event is not found, the corresponding pointer will be nil.
-func MoonriseMoonset(start, end time.Time, site observatory.Site, eph ephemeris.Provider) (rise *Event, set *Event, err error) {
+func MoonriseMoonset(start, end time.Time, site *Site, eph ephemeris.Provider) (rise *Event, set *Event, err error) {
 	events, err := MoonEvents(start, end, site, eph)
 	if err != nil {
 		return nil, nil, err
@@ -276,13 +274,13 @@ func MoonriseMoonset(start, end time.Time, site observatory.Site, eph ephemeris.
 }
 
 // TwilightEvents returns grouped dawn/dusk pairs for the given twilight kind and interval.
-func TwilightEvents(start, end time.Time, site observatory.Site, eph ephemeris.Provider, kind TwilightKind) ([]TwilightEvent, error) {
+func TwilightEvents(start, end time.Time, site *Site, eph ephemeris.Provider, kind TwilightKind) ([]TwilightEvent, error) {
 	threshold, ok := TwilightThresholds[kind]
 	if !ok {
 		return nil, nil
 	}
 
-	sun := target.NewBody(body.Sun, eph)
+	sun := NewBody(ephemeris.Sun, eph)
 	finder := NewEventFinder(15*time.Minute, 1*time.Second)
 	events, err := finder.FindEvents(sun, start, end, site, angle.Deg(threshold))
 	if err != nil {
@@ -305,23 +303,23 @@ func TwilightEvents(start, end time.Time, site observatory.Site, eph ephemeris.P
 }
 
 // CivilDawnDusk returns the first civil dawn and first civil dusk found in the interval.
-func CivilDawnDusk(start, end time.Time, site observatory.Site, eph ephemeris.Provider) (dawn *Event, dusk *Event, err error) {
+func CivilDawnDusk(start, end time.Time, site *Site, eph ephemeris.Provider) (dawn *Event, dusk *Event, err error) {
 	return getTwilightPair(start, end, site, eph, CivilTwilight)
 }
 
 // NauticalDawnDusk returns the first nautical dawn and first nautical dusk found in the interval.
-func NauticalDawnDusk(start, end time.Time, site observatory.Site, eph ephemeris.Provider) (dawn *Event, dusk *Event, err error) {
+func NauticalDawnDusk(start, end time.Time, site *Site, eph ephemeris.Provider) (dawn *Event, dusk *Event, err error) {
 	return getTwilightPair(start, end, site, eph, NauticalTwilight)
 }
 
 // AstronomicalDawnDusk returns the first astronomical dawn and first astronomical dusk found in the interval.
-func AstronomicalDawnDusk(start, end time.Time, site observatory.Site, eph ephemeris.Provider) (dawn *Event, dusk *Event, err error) {
+func AstronomicalDawnDusk(start, end time.Time, site *Site, eph ephemeris.Provider) (dawn *Event, dusk *Event, err error) {
 	return getTwilightPair(start, end, site, eph, AstronomicalTwilight)
 }
 
-func getTwilightPair(start, end time.Time, site observatory.Site, eph ephemeris.Provider, kind TwilightKind) (dawn *Event, dusk *Event, err error) {
+func getTwilightPair(start, end time.Time, site *Site, eph ephemeris.Provider, kind TwilightKind) (dawn *Event, dusk *Event, err error) {
 	threshold := TwilightThresholds[kind]
-	sun := target.NewBody(body.Sun, eph)
+	sun := NewBody(ephemeris.Sun, eph)
 	finder := NewEventFinder(15*time.Minute, 1*time.Second)
 	events, err := finder.FindEvents(sun, start, end, site, angle.Deg(threshold))
 	if err != nil {
@@ -343,20 +341,20 @@ func getTwilightPair(start, end time.Time, site observatory.Site, eph ephemeris.
 
 // altitudeDiff returns alt(t) - threshold in degrees.
 func (f EventFinder) altitudeDiff(
-	obj target.Observable,
+	obj Observable,
 	t time.Time,
-	site observatory.Site,
+	site *Site,
 	threshold angle.Angle,
 ) (float64, error) {
 	pos, err := obj.Position(t)
 	if err != nil {
 		return 0, err
 	}
-	aa, err := sky.AltAz(pos, t, site)
+	aa, err := coord.ICRSToAltAz(pos, t, site.Location())
 	if err != nil {
 		return 0, err
 	}
-	return aa.Alt.Degrees() - threshold.Degrees(), nil
+	return aa.Alt().Degrees() - threshold.Degrees(), nil
 }
 
 // ── Numerical Solver ──────────────────────────────────────────────────────────
@@ -364,10 +362,10 @@ func (f EventFinder) altitudeDiff(
 // refineRoot uses bisection to find the exact time when altitudeDiff == 0.
 // This is used for finding precise rise and set times.
 func (f EventFinder) refineRoot(
-	obj target.Observable,
+	obj Observable,
 	t1, t2 time.Time,
 	h1, h2 float64,
-	site observatory.Site,
+	site *Site,
 	threshold angle.Angle,
 	kind EventKind,
 ) (Event, error) {
@@ -398,7 +396,7 @@ func (f EventFinder) refineRoot(
 	if err != nil {
 		return Event{}, err
 	}
-	aa, err := sky.AltAz(pos, resTime, site)
+	aa, err := coord.ICRSToAltAz(pos, resTime, site.Location())
 	if err != nil {
 		return Event{}, err
 	}
@@ -406,17 +404,17 @@ func (f EventFinder) refineRoot(
 	return Event{
 		Kind:     kind,
 		Time:     resTime,
-		Altitude: aa.Alt,
-		Azimuth:  aa.Az,
-		Value:    aa.Alt.Degrees() - threshold.Degrees(),
+		Altitude: aa.Alt(),
+		Azimuth:  aa.Az(),
+		Value:    aa.Alt().Degrees() - threshold.Degrees(),
 	}, nil
 }
 
 // refineMax uses golden section search to find the time of maximum altitude.
 func (f EventFinder) refineMax(
-	obj target.Observable,
+	obj Observable,
 	t1, t3 time.Time,
-	site observatory.Site,
+	site *Site,
 	threshold angle.Angle,
 ) (Event, error) {
 	// Golden section search for maximum in [t1, t3]
@@ -478,7 +476,7 @@ func (f EventFinder) refineMax(
 	if err != nil {
 		return Event{}, err
 	}
-	aa, err := sky.AltAz(pos, resTime, site)
+	aa, err := coord.ICRSToAltAz(pos, resTime, site.Location())
 	if err != nil {
 		return Event{}, err
 	}
@@ -486,8 +484,8 @@ func (f EventFinder) refineMax(
 	return Event{
 		Kind:     EventTransit,
 		Time:     resTime,
-		Altitude: aa.Alt,
-		Azimuth:  aa.Az,
-		Value:    aa.Alt.Degrees(),
+		Altitude: aa.Alt(),
+		Azimuth:  aa.Az(),
+		Value:    aa.Alt().Degrees(),
 	}, nil
 }

@@ -147,7 +147,7 @@ func parseCSV(data []byte) ([]catalog.Target, error) {
 			ID:      id,
 			Name:    name,
 			Kind:    kind,
-			Coord:   coord.ICRS{RA: angle.Deg(raDeg), Dec: angle.Deg(decDeg)},
+			Coord:   coord.NewICRS(angle.Deg(raDeg), angle.Deg(decDeg)),
 			Catalog: "openngc",
 			Aliases: aliases,
 		})
