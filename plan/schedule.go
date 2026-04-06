@@ -295,7 +295,7 @@ func (s *GreedyStrategy) Schedule(planner *Planner, window Window, blocks []*Blo
 
 				currentTime = endTime
 				lastBlock = b
-				
+
 				if item.rem > 0 {
 					item.rem--
 					// Next observation can start after MinInterval passes
@@ -310,7 +310,7 @@ func (s *GreedyStrategy) Schedule(planner *Planner, window Window, blocks []*Blo
 
 		if !placed {
 			// Time gap: no block could be scheduled, advance time
-			
+
 			// Optimization: if all remaining items are waiting for cadence, fast-forward time
 			allWaiting := true
 			earliestAvailable := window.End
@@ -323,7 +323,7 @@ func (s *GreedyStrategy) Schedule(planner *Planner, window Window, blocks []*Blo
 					earliestAvailable = item.available
 				}
 			}
-			
+
 			if allWaiting && earliestAvailable.After(currentTime) {
 				currentTime = earliestAvailable
 			} else {
