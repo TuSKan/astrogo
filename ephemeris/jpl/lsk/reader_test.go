@@ -14,7 +14,9 @@ import (
 
 func TestLSKReader(t *testing.T) {
 	prov, err := jpl.NewProvider(jpl.WithSource(jpl.Planets), jpl.WithKernel("de440s"))
-	testutil.AssertNoError(t, err)
+	if err != nil {
+		t.Fatalf("setup failed: %v", err)
+	}
 	defer prov.Close()
 
 	lskPath := filepath.Join(prov.DataDir, "lsk", "naif0012.tls")

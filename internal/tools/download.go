@@ -25,12 +25,31 @@ func Download(url, path string) error {
 		return fmt.Errorf("jpl: download failed with status %d", resp.StatusCode)
 	}
 
-	out, err := os.Create(path)
+	tmpFile, err := os.CreateTemp(filepath.Dir(path), "download-*.tmp")
 	if err != nil {
 		return err
 	}
-	defer out.Close()
+	tmpName := tmpFile.Name()
+	
+	// Ensure we don't leak the tmp file if something panics or fails early
+	defer func() {
+		tmpFile.Close()
+		os.Remove(tmpName)
+	}()
 
-	_, err = io.Copy(out, resp.Body)
-	return err
+	if _, err = io.Copy(tmpFile, resp.Body); err != nil {
+		return err
+	}
+	
+	// Close explicitly before rename (critical for Windows)
+	if err := tmpFile.Close(); err != nil {
+		return err
+	}
+
+	// Atomically move the fully downloaded file into place
+	if err := os.Rename(tmpName, path); err != nil {
+		return fmt.Errorf("jpl: failed to finalize download atomic rename: %w", err)
+	}
+
+	return nil
 }

@@ -97,24 +97,28 @@ func TestJPLUnitsAreAUAndAUPerDay(t *testing.T) {
 }
 
 func TestJPLUnsupportedBody(t *testing.T) {
-	p, _ := jpl.NewProvider(jpl.WithSource(jpl.Planets), jpl.WithKernel("de440s"), jpl.WithDataDir("data"))
-
+	p, err := jpl.NewProvider(jpl.WithSource(jpl.Planets), jpl.WithKernel("de440s"), jpl.WithDataDir("data"))
+	if err != nil {
+		t.Fatalf("setup failed: %v", err)
+	}
 	defer p.Close()
 
-	_, err := p.State(ephemeris.ID(255), time.Now())
+	_, err = p.State(ephemeris.ID(255), time.Now())
 	if err == nil {
 		t.Error("Expected error for unsupported body")
 	}
 }
 
 func TestJPLOutOfCoverageEpoch(t *testing.T) {
-	p, _ := jpl.NewProvider(jpl.WithSource(jpl.Planets), jpl.WithKernel("de440s"), jpl.WithDataDir("data"))
-
+	p, err := jpl.NewProvider(jpl.WithSource(jpl.Planets), jpl.WithKernel("de440s"), jpl.WithDataDir("data"))
+	if err != nil {
+		t.Fatalf("setup failed: %v", err)
+	}
 	defer p.Close()
 
 	// Year 5000
 	tm := time.FromJD(3545000.0, time.UTC)
-	_, err := p.State(ephemeris.Sun, tm)
+	_, err = p.State(ephemeris.Sun, tm)
 	if err == nil {
 		t.Error("Expected error for out-of-coverage epoch")
 	}
