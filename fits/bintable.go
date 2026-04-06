@@ -3,6 +3,7 @@ package fits
 import (
 	"fmt"
 	"io"
+	"strconv"
 	"strings"
 
 	"github.com/apache/arrow-go/v18/arrow"
@@ -100,4 +101,88 @@ func ReadBintable(h *Header, r io.Reader) (*BintableHDU, error) {
 	}
 
 	return hdu, nil
+}
+
+// GetStringColumn extracts a FITS binary table column and safely converts it to a standard Go string slice.
+func (hdu *BintableHDU) GetStringColumn(colName string) ([]string, error) {
+	if hdu.Batch == nil {
+		return nil, fmt.Errorf("fits: uninitialized bintable batch")
+	}
+	schema := hdu.Batch.Schema()
+	idx := -1
+	for i, f := range schema.Fields() {
+		if f.Name == colName {
+			idx = i
+			break
+		}
+	}
+	if idx < 0 {
+		return nil, fmt.Errorf("fits: column %s not found", colName)
+	}
+
+	arr := hdu.Batch.Column(idx)
+	rows := int(hdu.Batch.NumRows())
+	res := make([]string, rows)
+
+	for i := 0; i < rows; i++ {
+		if arr.IsNull(i) {
+			continue
+		}
+		switch a := arr.(type) {
+		case *array.String:
+			res[i] = a.Value(i)
+		case *array.Int32:
+			res[i] = strconv.FormatInt(int64(a.Value(i)), 10)
+		case *array.Int64:
+			res[i] = strconv.FormatInt(a.Value(i), 10)
+		case *array.Float32:
+			res[i] = strconv.FormatFloat(float64(a.Value(i)), 'f', -1, 32)
+		case *array.Float64:
+			res[i] = strconv.FormatFloat(a.Value(i), 'f', -1, 64)
+		}
+	}
+	return res, nil
+}
+
+// GetFloatColumn extracts a FITS binary table column safely into a standard Go float64 slice.
+func (hdu *BintableHDU) GetFloatColumn(colName string) ([]float64, error) {
+	if hdu.Batch == nil {
+		return nil, fmt.Errorf("fits: uninitialized bintable batch")
+	}
+	schema := hdu.Batch.Schema()
+	idx := -1
+	for i, f := range schema.Fields() {
+		if f.Name == colName {
+			idx = i
+			break
+		}
+	}
+	if idx < 0 {
+		return nil, fmt.Errorf("fits: column %s not found", colName)
+	}
+
+	arr := hdu.Batch.Column(idx)
+	rows := int(hdu.Batch.NumRows())
+	res := make([]float64, rows)
+
+	for i := 0; i < rows; i++ {
+		if arr.IsNull(i) {
+			continue
+		}
+		switch a := arr.(type) {
+		case *array.Float64:
+			res[i] = a.Value(i)
+		case *array.Float32:
+			res[i] = float64(a.Value(i))
+		case *array.Int32:
+			res[i] = float64(a.Value(i))
+		case *array.Int64:
+			res[i] = float64(a.Value(i))
+		case *array.String:
+			if val, err := strconv.ParseFloat(a.Value(i), 64); err == nil {
+				res[i] = val
+			}
+		}
+	}
+	return res, nil
 }

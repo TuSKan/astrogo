@@ -1,4 +1,4 @@
-//go:build validation
+//go:build network
 
 package jpl_test
 
