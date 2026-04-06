@@ -76,7 +76,7 @@ func ExampleScheduler_BuildSchedule() {
 			fmt.Printf("- %s: %s\n", b.Block.ID, b.Reason)
 		}
 	}
-	
+
 	// Output:
 	// Generated Schedule for Greenwich:
 	// 1. BlockA [TargetA] -> Start: JD 2451545.00069444 (UTC) | Setup: 60s
