@@ -13,7 +13,7 @@ const tapSyncURL = "http://simbad.cds.unistra.fr/simbad/sim-tap/sync"
 // BuildResolveQuery constructs an ADQL query to resolve an object by name
 // from SIMBAD's TAP service. It joins the `basic` and `ident` tables.
 func BuildResolveQuery(req catalog.ObjectRequest) string {
-	// A naive query that looks up the object in the ident table 
+	// A naive query that looks up the object in the ident table
 	// and fetches core properties from the basic table.
 	limit := req.Limit
 	if limit <= 0 {
@@ -24,7 +24,7 @@ func BuildResolveQuery(req catalog.ObjectRequest) string {
 	// SIMBAD requires precise spaces for some ID types but we do a fuzzy LIKE for now
 	// To be perfectly robust, one would use lowercase match or regex, but standard ADQL
 	// supports LIKE or basic LIKE. SIMBAD's ADQL implementation supports lower() string functions.
-	
+
 	// Ensure we handle single quotes safely
 	safeQ := strings.ReplaceAll(q, "'", "''")
 

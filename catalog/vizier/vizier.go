@@ -14,7 +14,7 @@ import (
 
 const tapSyncURL = "http://tapvizier.u-strasbg.fr/TAPVizieR/tap/sync"
 
-// Provider implements catalog.Provider and catalog.ConeSearcher 
+// Provider implements catalog.Provider and catalog.ConeSearcher
 // for querying tables hosted on VizieR via TAP ADQL.
 type Provider struct {
 	client *catalog.Client
@@ -39,17 +39,17 @@ func (p *Provider) Resolve(query string) (catalog.Target, bool) {
 }
 
 func (p *Provider) Search(query string) []catalog.Target {
-	return nil 
+	return nil
 }
 
 func (p *Provider) ConeSearch(ctx context.Context, req catalog.ConeRequest) catalog.SeqIterator[catalog.Target] {
 	// VizieR requires specifying a catalog index/table if we do ADQL.
-	// Since ConeRequest doesn't specify 'table', we might need to rely purely on VizieR's standard catalogs 
-	// OR require the user to encode it somehow. 
+	// Since ConeRequest doesn't specify 'table', we might need to rely purely on VizieR's standard catalogs
+	// OR require the user to encode it somehow.
 	// Wait, the easiest way to do a vizier cone search across standard catalogues is using their REST/ConeSearch API, not TAP.
 	// But let's assume they want the standard II/246 (2MASS) for generic lookups if none specified.
 	// We will create a flexible TAP generator.
-	
+
 	table := "II/246/out" // 2MASS point source catalog as a generic fallback baseline
 	limit := req.Limit
 	if limit <= 0 {
@@ -97,7 +97,10 @@ func (p *Provider) ConeSearch(ctx context.Context, req catalog.ConeRequest) cata
 			return
 		}
 
-		p.cache.Set(cacheKey, targets)
+		if err := p.cache.Set(cacheKey, targets); err != nil {
+			yield(catalog.Target{}, err)
+			return
+		}
 
 		for _, t := range targets {
 			if !yield(t, nil) {

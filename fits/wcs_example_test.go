@@ -37,10 +37,10 @@ func ExampleExtractWCS() {
 
 		// Use the coordinates safely.
 		fmt.Println("WCS Extracted Successfully")
-		
+
 		// Typically, one would use w.PixelToWorld() to transform a sensor pixel into spherical coords:
 		// worldPos, _ := w.PixelToWorld([]float64{100.0, 100.0})
-		_ = w 
+		_ = w
 	} else {
 		fmt.Println("WCS Extracted Successfully")
 	}

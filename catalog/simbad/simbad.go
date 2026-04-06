@@ -30,14 +30,13 @@ func (p *Provider) Name() string {
 	return "simbad"
 }
 
-
 // Capabilities lists the supported remote query capacities.
 func (p *Provider) Capabilities() []catalog.Capability {
 	return []catalog.Capability{catalog.CapObjectResolution}
 }
 
 // Resolve matches a single object by returning the most relevant hit.
-// Adheres strictly to catalog.Provider. 
+// Adheres strictly to catalog.Provider.
 func (p *Provider) Resolve(query string) (catalog.Target, bool) {
 	targets := p.Search(query)
 	if len(targets) > 0 {
@@ -50,7 +49,7 @@ func (p *Provider) Resolve(query string) (catalog.Target, bool) {
 func (p *Provider) Search(query string) []catalog.Target {
 	ctx := context.TODO()
 	req := catalog.ObjectRequest{Query: query, Limit: 10}
-	
+
 	iter := p.ResolveObject(ctx, req)
 	var targets []catalog.Target
 	iter(func(t catalog.Target, err error) bool {
@@ -72,7 +71,7 @@ func (p *Provider) ResolveObject(ctx context.Context, req catalog.ObjectRequest)
 	if req.Limit <= 0 {
 		cacheKey = "resolve:" + catalog.Normalize(req.Query) + ":10"
 	}
-	
+
 	if seq, ok := p.cache.Get(cacheKey); ok {
 		return seq
 	}
@@ -107,7 +106,10 @@ func (p *Provider) ResolveObject(ctx context.Context, req catalog.ObjectRequest)
 		}
 
 		// 2. Cache Results on successful fetch
-		p.cache.Set(cacheKey, targets)
+		if err := p.cache.Set(cacheKey, targets); err != nil {
+			yield(catalog.Target{}, err)
+			return
+		}
 
 		for _, t := range targets {
 			if !yield(t, nil) {

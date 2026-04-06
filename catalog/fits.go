@@ -94,5 +94,3 @@ func (p *FITSProvider) Search(query string) []Target {
 	}
 	return matches
 }
-
-
