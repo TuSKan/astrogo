@@ -51,9 +51,8 @@ data/
 !assets/
 !assets/**
 
-!testdata/
-!testdata/**
-
+!**/testdata/
+!**/testdata/**
 # Embedded go assets placeholders
 !catalog/openngc/data/
 !catalog/openngc/data/.keep
