@@ -59,7 +59,9 @@ func TestSPKReader(t *testing.T) {
 	testutil.AssertNoError(t, err)
 
 	pos, vel, err := spk.EvaluateSegment(seg, r, et)
-	testutil.AssertNoError(t, err)
+	if err != nil {
+		t.Fatalf("EvaluateSegment failed: %v", err)
+	}
 
 	if pos.Norm() == 0 || vel.Norm() == 0 {
 		t.Error("evaluated position/velocity is exactly zero, expected realistic barycenter values")
