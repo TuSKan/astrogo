@@ -138,12 +138,12 @@ func (p *Provider) ResolveObject(ctx context.Context, req catalog.ObjectRequest)
 					Resolver      string  `xml:"resolver"`
 				} `xml:"resolvedCoordinate"`
 			}
-			
+
 			if err := xml.Unmarshal(b, &xmlPayload); err != nil {
 				yield(catalog.Target{}, err)
 				return
 			}
-			
+
 			for _, match := range xmlPayload.ResolvedCoordinate {
 				targets = append(targets, catalog.Target{
 					ID:      match.CanonicalName,

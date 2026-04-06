@@ -146,7 +146,7 @@ func (r *Reader) ReadDoubles(startWord, endWord int32) ([]float64, error) {
 	if count <= 0 {
 		return nil, fmt.Errorf("jpl/spk: invalid double precision word bounds (%d to %d)", startWord, endWord)
 	}
-	
+
 	buf := make([]byte, count*8)
 	n, err := r.F.ReadAt(buf, int64(startWord-1)*8)
 	if err != nil && err != io.EOF {
