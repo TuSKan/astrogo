@@ -5,7 +5,7 @@ package jpl_test
 import (
 	"testing"
 
-	"github.com/TuSKan/astrogo/body"
+	"github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/ephemeris/jpl"
 	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/vector"
@@ -51,12 +51,12 @@ func runHorizonsTest(t *testing.T, bodyName string) {
 		t.Run(c.Body, func(t *testing.T) {
 			tm := time.FromJD(2451545.0+c.ET/86400.0, time.TDB)
 
-			bid := body.Sun
+			bid := ephemeris.Sun
 			if c.Body == "Moon" {
-				bid = body.Moon
+				bid = ephemeris.Moon
 			}
 			if c.Body == "Mars" {
-				bid = body.Mars
+				bid = ephemeris.Mars
 			}
 
 			state, err := p.State(bid, tm)

@@ -5,14 +5,13 @@ import (
 	"math"
 
 	"github.com/TuSKan/astrogo/angle"
-	"github.com/TuSKan/astrogo/body"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/internal/gofaext"
 	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/vector"
 )
 
-// State represents the kinematic state of a celestial body.
+// State represents the kinematic state of a celestial
 type State struct {
 	Pos vector.Vec3 // Geocentric position in AU (ICRS-like)
 	Vel vector.Vec3 // Geocentric velocity in AU/day (ICRS-like)
@@ -22,7 +21,7 @@ type State struct {
 type Provider interface {
 	// State returns the geocentric state (position and velocity) of the given
 	// body at time t. The vectors are typically in an inertial frame like ICRS.
-	State(id body.ID, t time.Time) (State, error)
+	State(id ID, t time.Time) (State, error)
 }
 
 // Default returns a SOFA-based ephemeris provider for the Sun and Moon.
@@ -32,7 +31,7 @@ func Default() Provider {
 
 // Position is a convenience helper that returns the geocentric position
 // of a body at time t.
-func Position(p Provider, id body.ID, t time.Time) (vector.Vec3, error) {
+func Position(p Provider, id ID, t time.Time) (vector.Vec3, error) {
 	st, err := p.State(id, t)
 	if err != nil {
 		return vector.Vec3{}, err
@@ -42,7 +41,7 @@ func Position(p Provider, id body.ID, t time.Time) (vector.Vec3, error) {
 
 // Velocity is a convenience helper that returns the geocentric velocity
 // of a body at time t.
-func Velocity(p Provider, id body.ID, t time.Time) (vector.Vec3, error) {
+func Velocity(p Provider, id ID, t time.Time) (vector.Vec3, error) {
 	st, err := p.State(id, t)
 	if err != nil {
 		return vector.Vec3{}, err
@@ -52,9 +51,9 @@ func Velocity(p Provider, id body.ID, t time.Time) (vector.Vec3, error) {
 
 // ApparentState calculates the rigorously light-time delayed (retarded) geometric state
 // of a target by repeatedly polling the ephemeris Provider at (t - tau).
-// To satisfy classical planetary aberration, it strictly couples the true orbital curve 
+// To satisfy classical planetary aberration, it strictly couples the true orbital curve
 // via the provider rather than relying on linear vector shortcuts.
-func ApparentState(p Provider, target body.ID, obsTime time.Time) (State, error) {
+func ApparentState(p Provider, target ID, obsTime time.Time) (State, error) {
 	st, err := p.State(target, obsTime)
 	if err != nil {
 		return State{}, err
@@ -75,28 +74,25 @@ func ApparentState(p Provider, target body.ID, obsTime time.Time) (State, error)
 
 // ToICRS converts a geocentric Cartesian vector (in AU) to spherical ICRS coordinates.
 // It assumes the input vector is already in an ICRS-compatible inertial frame.
-func ToICRS(pos vector.Vec3) (coord.ICRS, error) {
+func ToICRS(pos vector.Vec3) (*coord.ICRS, error) {
 	r := math.Sqrt(pos.X*pos.X + pos.Y*pos.Y + pos.Z*pos.Z)
 	if r < 1e-12 { // Avoid division by zero for very small or zero vectors
-		return coord.ICRS{}, errors.New("ephemeris: cannot convert near-zero vector to ICRS")
+		return nil, errors.New("ephemeris: cannot convert near-zero vector to ICRS")
 	}
 
 	ra := math.Atan2(pos.Y, pos.X)
 	dec := math.Asin(pos.Z / r)
 
-	return coord.ICRS{
-		RA:  angle.Rad(ra).Wrap2Pi(),
-		Dec: angle.Rad(dec),
-	}, nil
+	return coord.NewICRS(angle.Rad(ra).Wrap2Pi(), angle.Rad(dec)), nil
 }
 
 type sofaProvider struct{}
 
-func (s *sofaProvider) State(id body.ID, t time.Time) (State, error) {
+func (s *sofaProvider) State(id ID, t time.Time) (State, error) {
 	tdb := t.TDB()
 	d1, d2 := tdb.JDParts()
 	switch id {
-	case body.Sun:
+	case Sun:
 		// Epv00 returns Earth heliocentric position/velocity.
 		// Sun geocentric = -Earth heliocentric.
 		pvh, _, status := gofaext.Epv00(d1, d2)
@@ -110,7 +106,7 @@ func (s *sofaProvider) State(id body.ID, t time.Time) (State, error) {
 			Vel: vector.Vec3{X: -vh[0], Y: -vh[1], Z: -vh[2]},
 		}, nil
 
-	case body.Moon:
+	case Moon:
 		// Moon98 returns Moon geocentric position/velocity relative to GCRS (ICRS-like).
 		pv := gofaext.Moon98(d1, d2)
 		return State{

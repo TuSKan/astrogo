@@ -117,32 +117,27 @@ import (
 	
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/catalog"
-	"github.com/TuSKan/astrogo/constraint"
 	"github.com/TuSKan/astrogo/coord"
-	"github.com/TuSKan/astrogo/earth"
-	"github.com/TuSKan/astrogo/observatory"
+	"github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/plan"
-	"github.com/TuSKan/astrogo/sky"
-	"github.com/TuSKan/astrogo/target"
-	"github.com/TuSKan/astrogo/body"
 	"github.com/TuSKan/astrogo/time"
 )
 
 func main() {
 	// 1. Setup the Observer at Mauna Kea
-	loc, err := earth.NewGeodetic(angle.Deg(-155.46), angle.Deg(19.82), 4205)
+	loc, err := coord.NewGeodetic(angle.Deg(-155.46), angle.Deg(19.82), 4205)
 	if err != nil {
 		log.Fatalf("invalid coordinates: %v", err)
 	}
-	site, err := observatory.NewSite("Mauna Kea", loc, angle.Deg(20), nil)
+	site, err := plan.NewSite("Mauna Kea", loc, angle.Deg(20), nil)
 	if err != nil {
 		log.Fatalf("failed to setup site: %v", err)
 	}
 
 	// 2. Define Observation Constraints
 	// We want targets at least 30 degrees above the horizon.
-	constraints := []constraint.Constraint{
-		constraint.Altitude{Threshold: angle.Deg(30)},
+	constraints := []plan.Constraint{
+		plan.Altitude{Threshold: angle.Deg(30)},
 	}
 
 	// 3. Define Targets
@@ -155,18 +150,18 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to parse Dec: %v", err)
 	}
-	m42 := target.NewFixed(catalog.Target{
-		Name: "M42",
-		Coord: coord.ICRS{RA: ra, Dec: dec},
+	m42 := plan.NewFixed(catalog.Target{
+		Name:  "M42",
+		Coord: coord.NewICRS(ra, dec),
 	})
 	
 	// Mars (moving)
-	mars := target.NewDefaultBody(body.Mars)
+	mars := plan.NewDefaultBody(ephemeris.Mars)
 
 	// 4. Check Observability and Score
 	now := time.NowUTC()
 	
-	for _, obj := range []target.Observable{m42, mars} {
+	for _, obj := range []plan.Observable{m42, mars} {
 		eval, err := plan.IsObservable(obj, now, site, constraints...)
 		if err != nil {
 			log.Printf("skipping observability check for %s: %v", obj.Name(), err)
@@ -224,18 +219,15 @@ now := time.NowUTC()
 tt := now.TT()
 
 // Define coordinates in ICRS (e.g., Andromeda Galaxy)
-src := coord.ICRS{
-    RA:  angle.Deg(10.684),
-    Dec: angle.Deg(41.269),
-}
+src := coord.NewICRS(angle.Deg(10.684), angle.Deg(41.269))
 
 // Transform directly to Galactic coordinates
-gal := transform.ICRSToGalactic(src)
-fmt.Printf("Galactic L: %v, B: %v\n", gal.L, gal.B)
+gal := coord.ICRSToGalactic(src)
+fmt.Printf("Galactic L: %v, B: %v\n", gal.L(), gal.B())
 
 // Transform to Ecliptic coordinates using Terrestrial Time
-ecl := transform.ICRSToEcliptic(src, tt)
-fmt.Printf("Ecliptic Lon: %v, Lat: %v\n", ecl.Lon, ecl.Lat)
+ecl := coord.ICRSToEcliptic(src, tt)
+fmt.Printf("Ecliptic Lon: %v, Lat: %v\n", ecl.Lon(), ecl.Lat())
 ```
 
 ### Solar System Ephemerides
@@ -248,7 +240,7 @@ eph := ephemeris.DefaultProvider()
 t := time.Date(2025, 1, 1, 12, 0, 0, 0, time.UTCScale).TDB()
 
 // Get position of Mars relative to the Earth (Geocentric)
-pos, err := eph.Position(body.Mars, body.Earth, t)
+pos, err := eph.Position(ephemeris.Mars, ephemeris.Earth, t)
 if err != nil {
     log.Fatalf("failed to compute ephemeris: %v", err)
 }
@@ -262,13 +254,13 @@ fmt.Printf("Distance from Earth to Mars: %.6f AU\n", pos.Length())
 
 ```mermaid
 flowchart TD
-    C[constants] --> V[math/vector] --> U[units] --> Q[quantity] --> A[angle] --> T[time]
-    C --> E[earth] --> Co[coord] --> F[frame] --> Tr[transform]
-    E --> Ob[observatory] --> S[sky] --> Vi[visibility]
-    Vi --> Cs[constraint] --> P[plan]
+    C[constants] --> V[math/vector] --> U[units] --> A[angle] --> T[time]
+    C --> Co[coord]
+    Co --> P[plan]
     P --> Ep[ephemeris]
     P --> Cat[catalog]
-    P --> IO[io]
+	I[iers] --> Co
+    P --> IO[io / fits]
 ```
 
 ### Key Principles
@@ -286,23 +278,14 @@ flowchart TD
 | `constants` | Universal and astronomical constants | ✅ implemented | |
 | `angle` | Angular types, HMS/DMS parsing | ✅ implemented | boundary wrapping validated |
 | `vector` | 3D geometry primitives | ✅ implemented | pole cases validated |
-| `earth` | Geodesy and Earth models (WGS84) | ✅ implemented | geodetic ↔ ECEF validated |
 | `time` | Astronomical time scales (JD-based) | ✅ implemented | UTC ↔ TAI ↔ TT ↔ TDB ↔ UT1 verified natively |
-| `frame` | Coordinate frame types and equality | ✅ implemented | ICRS/CIRS, Galactic, Ecliptic, AltAz |
-| `transform` | Frame-to-frame transformations | ✅ implemented | Grand Validation against JPL Horizons Passed |
-| `sky` | Alt/Az, airmass, separation, position angle | ✅ implemented | Pickering (1982) airmass model |
-| `target` | Unified observation targets (fixed/moving/body) | ✅ implemented | |
-| `constraint` | Planning constraints (altitude, airmass, …) | ✅ implemented | |
+| `coord` | Celestial coordinate types, Geodesy, Transformations | ✅ implemented | Geometric ↔ Apparent ↔ Observed verified |
+| `iers` | Earth Orientation Parameters (EOP) and polar motion | ✅ implemented | Dynamic DUT1/XP/YP caching |
 | `ephemeris` | Solar system ephemerides via JPL DE | ✅ implemented | multi-kernel; SPK Type 21; Horizons on-demand |
-| `body` | Solar system body definitions | ✅ implemented | |
 | `catalog` | Object identity and catalog entries | ✅ implemented | OpenNGC support |
-| `plan` | Observation planning, scoring, event solving | ✅ implemented | rise/set/transit/twilight solver |
-| `coord` | Celestial coordinate types | ✅ implemented | FromUnitVector, Equal; round-trips validated |
-| `observatory` | Observer/site modeling | ✅ implemented | LocalSiderealTime (IAU 2006 GAST) |
-| `visibility` | Visibility windows, transit estimate | ✅ implemented | golden-section transit; VisibleIntervals |
+| `plan` | Target abstraction, Observatory, Constraints, Planning | ✅ implemented | visibility, rise/set/transit solver |
 | `units` | Physical unit system | ✅ implemented | AU, Parsec, LightYear, Jansky |
-| `quantity` | Value + unit representation | ✅ implemented | Scale, Abs, Compare, IsZero/IsNaN |
-| `fits` / `io` | Data formats and interoperability | ✅ implemented | `OpenMmap`, `.gz` streams, Apache Arrow tables & images |
+| `fits` | Data formats and interoperability | ✅ implemented | `OpenMmap`, `.gz` streams, Apache Arrow tables & images |
 | `wcs` | World Coordinate Systems | ✅ implemented | Spherical Gnomonic paths (`TAN`), `fits.ExtractWCS` |
 
 See [`VALIDATION.md`](./VALIDATION.md) for scientific validation status and accuracy notes.

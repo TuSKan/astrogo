@@ -3,7 +3,6 @@ package ephemeris_test
 import (
 	"testing"
 
-	"github.com/TuSKan/astrogo/body"
 	"github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/vector"
@@ -14,7 +13,7 @@ func BenchmarkStateSun(b *testing.B) {
 	tm := time.NowUTC()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, _ = p.State(body.Sun, tm)
+		_, _ = p.State(ephemeris.Sun, tm)
 	}
 }
 
@@ -23,7 +22,7 @@ func BenchmarkStateMoon(b *testing.B) {
 	tm := time.NowUTC()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, _ = p.State(body.Moon, tm)
+		_, _ = p.State(ephemeris.Moon, tm)
 	}
 }
 

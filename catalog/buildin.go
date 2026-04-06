@@ -3,8 +3,7 @@ package catalog
 import (
 	"strings"
 
-	"github.com/TuSKan/astrogo/body"
-	"github.com/TuSKan/astrogo/coord"
+	"github.com/TuSKan/astrogo/ephemeris"
 )
 
 // BuiltinProvider provides Solar System bodies.
@@ -19,14 +18,14 @@ func NewBuiltinProvider() *BuiltinProvider {
 		byKey: make(map[string]int),
 	}
 
-	for _, b := range body.Bodies {
+	for _, b := range ephemeris.Bodies {
 		kind := KindOther
 		switch b.Kind {
-		case body.KindStar:
+		case ephemeris.KindStar:
 			kind = KindStar
-		case body.KindPlanet:
+		case ephemeris.KindPlanet:
 			kind = KindPlanet
-		case body.KindMoon:
+		case ephemeris.KindMoon:
 			kind = KindMoon
 		}
 
@@ -35,7 +34,7 @@ func NewBuiltinProvider() *BuiltinProvider {
 			Name:    b.Name,
 			Kind:    kind,
 			Catalog: "builtin",
-			Coord:   coord.ICRS{},
+			Coord:   nil,
 		}
 
 		idx := len(bp.targets)

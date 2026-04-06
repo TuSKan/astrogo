@@ -4,7 +4,7 @@ import (
 	"math"
 	"testing"
 
-	"github.com/TuSKan/astrogo/body"
+	"github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/ephemeris/jpl"
 	"github.com/TuSKan/astrogo/ephemeris/jpl/lsk"
 	"github.com/TuSKan/astrogo/ephemeris/jpl/spk"
@@ -13,13 +13,13 @@ import (
 
 func TestBodyMapping(t *testing.T) {
 	tests := []struct {
-		id   body.ID
+		id   ephemeris.ID
 		want int
 	}{
-		{body.Sun, 10},
-		{body.Moon, 301},
-		{body.Earth, 399},
-		{body.Mars, 4},
+		{ephemeris.Sun, 10},
+		{ephemeris.Moon, 301},
+		{ephemeris.Earth, 399},
+		{ephemeris.Mars, 4},
 	}
 
 	for _, tt := range tests {
@@ -33,7 +33,7 @@ func TestBodyMapping(t *testing.T) {
 		}
 	}
 
-	_, ok := jpl.BodyIDToNAIF[body.ID(255)]
+	_, ok := jpl.BodyIDToNAIF[ephemeris.ID(255)]
 	if ok {
 		t.Error("Expected error for unknown body ID")
 	}
@@ -84,7 +84,7 @@ func TestJPLUnitsAreAUAndAUPerDay(t *testing.T) {
 
 	defer p.Close()
 
-	state, _ := p.State(body.Sun, time.Now())
+	state, _ := p.State(ephemeris.Sun, time.Now())
 	dist := state.Pos.Norm()
 	if dist < 0.9 || dist > 1.1 {
 		t.Errorf("Sun distance %f AU seems wrong for AU units", dist)
@@ -96,7 +96,7 @@ func TestJPLUnsupportedBody(t *testing.T) {
 
 	defer p.Close()
 
-	_, err := p.State(body.ID(255), time.Now())
+	_, err := p.State(ephemeris.ID(255), time.Now())
 	if err == nil {
 		t.Error("Expected error for unsupported body")
 	}
@@ -109,7 +109,7 @@ func TestJPLOutOfCoverageEpoch(t *testing.T) {
 
 	// Year 5000
 	tm := time.FromJD(3545000.0, time.UTC)
-	_, err := p.State(body.Sun, tm)
+	_, err := p.State(ephemeris.Sun, tm)
 	if err == nil {
 		t.Error("Expected error for out-of-coverage epoch")
 	}
@@ -121,8 +121,8 @@ func TestJPLDeterministicRepeatedCalls(t *testing.T) {
 	defer p.Close()
 
 	tm := time.Now()
-	s1, _ := p.State(body.Sun, tm)
-	s2, _ := p.State(body.Sun, tm)
+	s1, _ := p.State(ephemeris.Sun, tm)
+	s2, _ := p.State(ephemeris.Sun, tm)
 
 	if s1.Pos.X != s2.Pos.X || s1.Pos.Y != s2.Pos.Y || s1.Pos.Z != s2.Pos.Z {
 		t.Error("Re-evaluating at same epoch produced different results")
@@ -182,7 +182,7 @@ func TestSmallBodyEros(t *testing.T) {
 	bodies := p.SupportedBodies()
 	found := false
 	for _, b := range bodies {
-		if b == body.ID(433) {
+		if b == ephemeris.ID(433) {
 			found = true
 			break
 		}
@@ -192,7 +192,7 @@ func TestSmallBodyEros(t *testing.T) {
 	}
 
 	// Get state
-	state, err := p.State(body.ID(433), start)
+	state, err := p.State(ephemeris.ID(433), start)
 	if err != nil {
 		t.Fatalf("Failed to get state for Eros: %v", err)
 	}

@@ -9,7 +9,7 @@ import (
 
 func ExampleICRS_ToUnitVector() {
 	// Object at RA=0, Dec=0
-	c := coord.ICRS{RA: angle.Deg(0), Dec: angle.Deg(0)}
+	c := coord.NewICRS(angle.Deg(0), angle.Deg(0))
 	v := c.ToUnitVector()
 
 	fmt.Printf("X: %.1f, Y: %.1f, Z: %.1f\n", v.X, v.Y, v.Z)
@@ -18,7 +18,7 @@ func ExampleICRS_ToUnitVector() {
 
 func ExampleAltAz() {
 	// Altitude 45, Azimuth 180 (South)
-	aa := coord.AltAz{Alt: angle.Deg(45), Az: angle.Deg(180)}
-	fmt.Println(aa.Alt.DMSString(0))
+	aa := coord.NewAltAz(angle.Deg(45), angle.Deg(180))
+	fmt.Println(aa.Alt().DMSString(0))
 	// Output: +45°00'00"
 }

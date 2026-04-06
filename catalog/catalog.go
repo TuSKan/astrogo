@@ -35,13 +35,13 @@ type Target struct {
 	Designation string
 	SPKID       string
 	Kind        Kind
-	Coord       coord.ICRS
+	Coord       *coord.ICRS
 	Catalog     string
 	Aliases     []string
 }
 
-// ICRS implements sky.Object for a static catalog Target.
-func (t Target) ICRS(_ time.Time) (coord.ICRS, error) {
+// ICRS implements coord.Object for a static catalog Target.
+func (t Target) ICRS(_ time.Time) (*coord.ICRS, error) {
 	return t.Coord, nil
 }
 

@@ -3,34 +3,31 @@ package plan
 import (
 	"sort"
 
-	"github.com/TuSKan/astrogo/constraint"
-	"github.com/TuSKan/astrogo/observatory"
-	"github.com/TuSKan/astrogo/sky"
-	"github.com/TuSKan/astrogo/target"
+	"github.com/TuSKan/astrogo/coord"
+
 	"github.com/TuSKan/astrogo/time"
-	"github.com/TuSKan/astrogo/visibility"
 )
 
 // Observation pairs a Target with a specific observing time requirement.
 type Observation struct {
-	Target   target.Observable
+	Target   Observable
 	Duration time.Duration
 }
 
-// Slot pairs a sky.Object with an observing Window.
+// Slot pairs a coord.Object with an observing Window.
 type Slot struct {
-	Object target.Observable
-	Window visibility.Window
+	Object Observable
+	Window Window
 }
 
-// Planner evaluates sky.Objects against a set of Constraints at a given Site.
+// Planner evaluates coord.Objects against a set of Constraints at a given Site.
 type Planner struct {
-	Site        observatory.Site
-	Constraints []constraint.Constraint
+	Site        *Site
+	Constraints []Constraint
 }
 
 // NewPlanner creates a new Planner for the given site and constraints.
-func NewPlanner(site observatory.Site, constraints []constraint.Constraint) (*Planner, error) {
+func NewPlanner(site *Site, constraints []Constraint) (*Planner, error) {
 	return &Planner{
 		Site:        site,
 		Constraints: constraints,
@@ -38,7 +35,7 @@ func NewPlanner(site observatory.Site, constraints []constraint.Constraint) (*Pl
 }
 
 // Observable returns true if all constraints are satisfied for obj at time t.
-func (p *Planner) Observable(obj target.Observable, t time.Time) (bool, error) {
+func (p *Planner) Observable(obj Observable, t time.Time) (bool, error) {
 	eval, err := IsObservable(obj, t, p.Site, p.Constraints...)
 	if err != nil {
 		return false, err
@@ -48,8 +45,8 @@ func (p *Planner) Observable(obj target.Observable, t time.Time) (bool, error) {
 
 // FilterObservable returns the subset of objects that satisfy all constraints
 // at the given time.
-func (p *Planner) FilterObservable(objects []target.Observable, t time.Time) ([]target.Observable, error) {
-	var filtered []target.Observable
+func (p *Planner) FilterObservable(objects []Observable, t time.Time) ([]Observable, error) {
+	var filtered []Observable
 	for _, obj := range objects {
 		ok, err := p.Observable(obj, t)
 		if err != nil {
@@ -64,23 +61,23 @@ func (p *Planner) FilterObservable(objects []target.Observable, t time.Time) ([]
 
 // RankedObject pairs an object with its observability score.
 type RankedObject struct {
-	Object target.Observable
+	Object Observable
 	Score  float64 // e.g., peak altitude in degrees
 }
 
 // RankObservable ranks objects by their maximum altitude within the given
 // time window. Only objects that satisfy constraints at least once in the
 // window are included.
-func (p *Planner) RankObservable(objects []target.Observable, start, end time.Time) ([]RankedObject, error) {
+func (p *Planner) RankObservable(objects []Observable, start, end time.Time) ([]RankedObject, error) {
 	var ranked []RankedObject
 	for _, obj := range objects {
-		// TransitEstimate expects sky.Object for now.
-		skyObj, ok := obj.(sky.Object)
+		// TransitEstimate expects coord.Object for now.
+		skyObj, ok := obj.(coord.Object)
 		if !ok {
-			continue // Skip objects that don't satisfy sky.Object
+			continue // Skip objects that don't satisfy coord.Object
 		}
 
-		transitTime, peakAlt, err := visibility.TransitEstimate(skyObj, p.Site, start, end)
+		transitTime, peakAlt, err := TransitEstimate(skyObj, p.Site, start, end)
 		if err != nil {
 			return nil, err
 		}
@@ -110,8 +107,8 @@ func (p *Planner) RankObservable(objects []target.Observable, start, end time.Ti
 type Evaluation struct {
 	// Observable is true if all evaluated constraints passed.
 	Observable bool
-	// Results contains the individual results for each constraint.
-	Results []constraint.Result
+	// Results contains the individual results for each
+	Results []Result
 }
 
 // IsObservable evaluates all provided constraints against a target at a specific
@@ -121,14 +118,14 @@ type Evaluation struct {
 // It only returns an error if a constraint check fails due to a technical error
 // (e.g., ephemeris lookup failure), not if a constraint is simply not satisfied.
 func IsObservable(
-	obj target.Observable,
+	obj Observable,
 	t time.Time,
-	site observatory.Site,
-	constraints ...constraint.Constraint,
+	site *Site,
+	constraints ...Constraint,
 ) (Evaluation, error) {
 	eval := Evaluation{
 		Observable: true,
-		Results:    make([]constraint.Result, 0, len(constraints)),
+		Results:    make([]Result, 0, len(constraints)),
 	}
 
 	for _, c := range constraints {
@@ -147,7 +144,7 @@ func IsObservable(
 
 // ScoredTarget pairs an Observable with its calculated desirability score.
 type ScoredTarget struct {
-	Object target.Observable
+	Object Observable
 	Score  float64
 }
 
@@ -167,10 +164,10 @@ type Prioritized interface {
 //
 // This provides a transparent, altitude-first ranking that respects user-defined priorities.
 func ScoreObservable(
-	obj target.Observable,
+	obj Observable,
 	t time.Time,
-	site observatory.Site,
-	constraints ...constraint.Constraint,
+	site *Site,
+	constraints ...Constraint,
 ) (float64, error) {
 	eval, err := IsObservable(obj, t, site, constraints...)
 	if err != nil {
@@ -186,11 +183,11 @@ func ScoreObservable(
 	if err != nil {
 		return 0, err
 	}
-	altAz, err := sky.AltAz(pos, t, site)
+	altAz, err := coord.ICRSToAltAz(pos, t, site.Location())
 	if err != nil {
 		return 0, err
 	}
-	score := altAz.Alt.Degrees()
+	score := altAz.Alt().Degrees()
 
 	// Apply priority if available
 	if p, ok := obj.(Prioritized); ok {
@@ -203,10 +200,10 @@ func ScoreObservable(
 // RankObservables evaluates and ranks a list of targets based on their observability
 // score at a specific time and site.
 func RankObservables(
-	objs []target.Observable,
+	objs []Observable,
 	t time.Time,
-	site observatory.Site,
-	constraints ...constraint.Constraint,
+	site *Site,
+	constraints ...Constraint,
 ) ([]ScoredTarget, error) {
 	var scored []ScoredTarget
 	for _, obj := range objs {
@@ -236,17 +233,22 @@ type Window struct {
 	End   time.Time
 }
 
+// Duration returns the duration of the window as a standard time.Duration.
+func (w Window) Duration() time.Duration {
+	return w.End.Sub(w.Start)
+}
+
 // ObservableWindows computes the time intervals where the target satisfies all
 // provided constraints by sampling the range [start, end] at the given cadence.
 //
 // grouping logic groups contiguous observable intervals into windows.
 // For v1, this is a simple sampled search engine, not an exact event solver.
 func ObservableWindows(
-	obj target.Observable,
+	obj Observable,
 	start, end time.Time,
 	step time.Duration,
-	site observatory.Site,
-	constraints ...constraint.Constraint,
+	site *Site,
+	constraints ...Constraint,
 ) ([]Window, error) {
 	if step <= 0 {
 		return nil, nil // Or return an error if preferred, but let's be safe.

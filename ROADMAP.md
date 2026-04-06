@@ -184,14 +184,17 @@ Efficient large-scale processing (surveys, pipelines, services).
 
 ## 9. Validation Expansion
 
+### Status
+✅ Fully Operational
+
 ### Deliverables
-- extended comparison against Astropy / SOFA / Horizons
-- additional edge-case datasets:
-  - high latitude
-  - circumpolar
-  - horizon edge
-- small-body validation coverage
-- apparent-coordinate validation
+- [x] extended comparison against Astropy / SOFA / Horizons
+- [x] additional edge-case datasets:
+  - [x] high latitude
+  - [x] circumpolar
+  - [x] horizon edge
+- [x] small-body validation coverage
+- [x] apparent-coordinate validation
 
 ### Outcome
 Higher confidence across all domains.
@@ -200,11 +203,14 @@ Higher confidence across all domains.
 
 ## 10. Scientific CI Gating
 
+### Status
+✅ Fully Operational
+
 ### Deliverables
-- validation suite separated from unit tests
-- tolerance drift detection
-- corpus-based regression runs
-- CI failure on scientific regressions
+- [x] validation suite separated from unit tests
+- [x] tolerance drift detection
+- [x] corpus-based regression runs
+- [x] CI failure on scientific regressions
 
 ### Outcome
 Prevents silent numerical degradation over time.
