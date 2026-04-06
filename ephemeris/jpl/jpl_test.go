@@ -86,7 +86,7 @@ func TestJPLUnitsAreAUAndAUPerDay(t *testing.T) {
 	}
 	defer p.Close()
 
-	state, err := p.State(ephemeris.Sun, time.Now())
+	state, err := p.State(ephemeris.Sun, time.NowUTC())
 	if err != nil {
 		t.Fatalf("failed to evaluate Sun state: %v", err)
 	}
@@ -103,7 +103,7 @@ func TestJPLUnsupportedBody(t *testing.T) {
 	}
 	defer p.Close()
 
-	_, err = p.State(ephemeris.ID(255), time.Now())
+	_, err = p.State(ephemeris.ID(255), time.NowUTC())
 	if err == nil {
 		t.Error("Expected error for unsupported body")
 	}
@@ -131,7 +131,7 @@ func TestJPLDeterministicRepeatedCalls(t *testing.T) {
 	}
 	defer p.Close()
 
-	tm := time.Now()
+	tm := time.NowUTC()
 	s1, err := p.State(ephemeris.Sun, tm)
 	if err != nil {
 		t.Fatalf("s1 failed: %v", err)

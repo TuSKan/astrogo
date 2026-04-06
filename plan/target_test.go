@@ -24,7 +24,7 @@ func TestFixed(t *testing.T) {
 		t.Errorf("expected name Orion Nebula, got %s", f.Name())
 	}
 
-	pos, err := f.Position(time.Now())
+	pos, err := f.Position(time.NowUTC())
 	testutil.AssertNoError(t, err)
 
 	if pos.RA().Radians() != obj.Coord.RA().Radians() || pos.Dec().Radians() != obj.Coord.Dec().Radians() {
@@ -40,7 +40,7 @@ func TestCustom(t *testing.T) {
 	if target1.Name() != "My Point" {
 		t.Errorf("expected name My Point, got %s", target1.Name())
 	}
-	pos1, err := target1.Position(time.Now())
+	pos1, err := target1.Position(time.NowUTC())
 	testutil.AssertNoError(t, err)
 	if pos1.RA().Radians() != c1.RA().Radians() {
 		t.Errorf("expected position %+v, got %+v", c1, pos1)
@@ -64,7 +64,7 @@ func TestZeroValueSafety(t *testing.T) {
 	if f.Name() != "" {
 		t.Errorf("expected empty name for zero-value Fixed")
 	}
-	pos, err := f.Position(time.Now())
+	pos, err := f.Position(time.NowUTC())
 	testutil.AssertNoError(t, err)
 	if pos.RA().Radians() != 0 || pos.Dec().Radians() != 0 {
 		t.Errorf("expected zero position for zero-value Fixed")
@@ -75,7 +75,7 @@ func TestZeroValueSafety(t *testing.T) {
 	if c.Name() != "Custom" {
 		t.Errorf("expected name Custom for zero-value Custom")
 	}
-	pos2, err := c.Position(time.Now())
+	pos2, err := c.Position(time.NowUTC())
 	testutil.AssertNoError(t, err)
 	if pos2.RA().Radians() != 0 || pos2.Dec().Radians() != 0 {
 		t.Errorf("expected zero position for zero-value Custom")
@@ -84,7 +84,7 @@ func TestZeroValueSafety(t *testing.T) {
 
 func TestBody(t *testing.T) {
 	p := ephemeris.Default()
-	now := time.Now()
+	now := time.NowUTC()
 
 	// Sun
 	sun := Body{ID: ephemeris.Sun, Provider: p}
@@ -126,7 +126,7 @@ func (m mockMarsProvider) State(id ephemeris.ID, _ time.Time) (ephemeris.State, 
 
 func TestBodyMars(t *testing.T) {
 	mars := Body{ID: ephemeris.Mars, Provider: mockMarsProvider{}}
-	pos, err := mars.Position(time.Now())
+	pos, err := mars.Position(time.NowUTC())
 	testutil.AssertNoError(t, err)
 
 	// X=1.5, Y=0, Z=0 in AU -> RA=0, Dec=0
@@ -138,11 +138,11 @@ func TestBodyMars(t *testing.T) {
 func TestBodyErrors(t *testing.T) {
 	// Nil provider
 	b1 := Body{ID: ephemeris.Sun}
-	_, err := b1.Position(time.Now())
+	_, err := b1.Position(time.NowUTC())
 	testutil.AssertError(t, err)
 
 	// Unsupported body (using sofaProvider for Mars)
 	b2 := Body{ID: ephemeris.Mars, Provider: ephemeris.Default()}
-	_, err = b2.Position(time.Now())
+	_, err = b2.Position(time.NowUTC())
 	testutil.AssertError(t, err)
 }

@@ -21,7 +21,7 @@ func runSOFATest(t *testing.T, bid ephemeris.ID) {
 
 	epochs := []time.Time{
 		time.FromJD(2451545.0, time.TDB),
-		time.Now(),
+		time.NowUTC(),
 		time.Date(2010, 6, 21, 0, 0, 0, 0, time.LocationUTC),
 	}
 
