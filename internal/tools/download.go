@@ -30,7 +30,7 @@ func Download(url, path string) error {
 		return err
 	}
 	tmpName := tmpFile.Name()
-	
+
 	// Ensure we don't leak the tmp file if something panics or fails early
 	defer func() {
 		tmpFile.Close()
@@ -40,7 +40,7 @@ func Download(url, path string) error {
 	if _, err = io.Copy(tmpFile, resp.Body); err != nil {
 		return err
 	}
-	
+
 	// Close explicitly before rename (critical for Windows)
 	if err := tmpFile.Close(); err != nil {
 		return err
