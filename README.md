@@ -86,6 +86,18 @@ Existing astronomy tools are powerful, but often:
     - Support for **SPK Type 21** (Extended Modified Difference Arrays)
     - Precedence-aware segment indexing (~85x faster lookups)
 
+### Catalogs & Data Services
+- Unified `catalog.Provider` interfaces (`ObjectResolver`, `ConeSearcher`)
+- Hardware-optimized native caching via **Apache Arrow** columnar batches
+- Modern Go 1.23 streaming `iter.Seq2` iteration for memory-safe big data fetching
+- Resilient network layers with exponent backoff testing
+- Production-grade bindings:
+    - **SIMBAD** (ADQL TAP)
+    - **MAST** (STScI CAOM Dual-Encoding support)
+    - **JPL SBDB** (Small-Body Database Search)
+    - **Gaia** & **VizieR** (Data TAP)
+    - **OpenNGC** (Zero-io `//go:embed` binaries)
+
 ### Visibility & planning
 - Observable windows (sampled constraint evaluation)
 - Altitude/airmass/separation constraints
@@ -283,7 +295,7 @@ flowchart TD
 | `coord` | Celestial coordinate types, Geodesy, Transformations | ✅ implemented | Geometric ↔ Apparent ↔ Observed verified |
 | `iers` | Earth Orientation Parameters (EOP) and polar motion | ✅ implemented | Dynamic DUT1/XP/YP caching |
 | `ephemeris` | Solar system ephemerides via JPL DE | ✅ implemented | multi-kernel; SPK Type 21; Horizons on-demand |
-| `catalog` | Object identity and catalog entries | ✅ implemented | OpenNGC support |
+| `catalog` | Remote object resolution and cone searches | ✅ implemented | SIMBAD, MAST, Gaia, VizieR, JPL SBDB, OpenNGC |
 | `plan` | Target abstraction, Observatory, Constraints, Planning | ✅ implemented | visibility, rise/set/transit solver |
 | `unit` | Physical unit and quantity system | ✅ implemented | AU, Parsec, LightYear, Jansky |
 | `fits` | Data formats and interoperability | ✅ implemented | `OpenMmap`, `.gz` streams, Apache Arrow tables & images |
