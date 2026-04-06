@@ -6,7 +6,7 @@ import (
 	"log"
 )
 
-//go:generate go run ../internal/tools/download.go https://datacenter.iers.org/data/9/finals2000A.all data/finals2000A.all
+//go:generate go run ../internal/tools/cmd/download/main.go https://datacenter.iers.org/data/9/finals2000A.all data/finals2000A.all
 
 //go:embed data/*
 var eopFS embed.FS
