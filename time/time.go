@@ -82,10 +82,14 @@ func FromJDParts(jd1, jd2 float64, s Scale) Time {
 // The input is interpreted as being in the UTC scale.
 func FromGo(t time.Time) Time {
 	utc := t.UTC()
-	unix := float64(utc.Unix()) + float64(utc.Nanosecond())/1e9
+	unixSec := float64(utc.Unix())
+	unixNsec := float64(utc.Nanosecond()) / 1e9
+
 	// Unix epoch 1970-01-01 is JD 2440587.5
-	jd := 2440587.5 + unix/86400.0
-	return FromJD(jd, UTC)
+	days := math.Floor(unixSec / 86400.0)
+	frac := (unixSec-days*86400.0)/86400.0 + unixNsec/86400.0
+
+	return FromJDParts(2440587.5+days, frac, UTC)
 }
 
 // NowUTC returns the current time in the UTC scale.
@@ -128,9 +132,19 @@ func (t Time) String() string {
 // The result is in UTC.
 func (t Time) ToGo() time.Time {
 	// JD 2440587.5 is 1970-01-01 00:00:00 UTC
-	unix := (t.JD() - 2440587.5) * 86400.0
-	sec := int64(math.Floor(unix))
-	nsec := int64((unix - float64(sec)) * 1e9)
+	days1 := t.jd1 - 2440587.5
+	days2 := t.jd2
+
+	totalSec := days1*86400.0 + days2*86400.0
+
+	// Round to the nearest nanosecond to avoid floating-point drift
+	nsecTotal := int64(math.Round(totalSec * 1e9))
+	sec := nsecTotal / 1e9
+	nsec := nsecTotal % 1e9
+	if nsec < 0 {
+		sec -= 1
+		nsec += 1e9
+	}
 	return time.Unix(sec, nsec).UTC()
 }
 
@@ -269,10 +283,8 @@ func (t *Time) normalize() {
 	t.jd1 = jd1Int
 	t.jd2 += jd1Frac
 
-	// Final pass: ensure -0.5 <= jd2 < 0.5 for stability?
-	// standard astro libraries often use:
-	//   jd1 = integer + 0.5 (JD starts at noon)
-	//   jd2 = fraction of day
-	// But simple "integer + remainder" is often more robust for general diffs.
-	// We'll stick to simple "floor" normalization for now.
+	// Re-normalize in case jd2 overflowed past 1.0 (e.g. 0.5 + 0.5)
+	extraDays = math.Floor(t.jd2)
+	t.jd1 += extraDays
+	t.jd2 -= extraDays
 }

@@ -10,7 +10,7 @@ import (
 	"strings"
 
 	"github.com/TuSKan/astrogo/angle"
-	"github.com/TuSKan/astrogo/catalog"
+	"github.com/TuSKan/astrogo/catalog/provider"
 	"github.com/TuSKan/astrogo/coord"
 )
 
@@ -34,15 +34,15 @@ func init() {
 type Record struct {
 	ID      string
 	Name    string
-	Kind    catalog.Kind
+	Kind    provider.Kind
 	RA      string
 	Dec     string
 	Aliases []string
 }
 
-// Provider implements the catalog.Provider interface for OpenNGC.
+// Provider implements the provider.Provider interface for OpenNGC.
 type Provider struct {
-	targets []catalog.Target
+	targets []provider.Target
 	byKey   map[string]int
 }
 
@@ -57,12 +57,12 @@ func New() *Provider {
 		byKey:   make(map[string]int),
 	}
 	for i, t := range targets {
-		p.byKey[catalog.Normalize(t.ID)] = i
+		p.byKey[provider.Normalize(t.ID)] = i
 		if t.Name != "" {
-			p.byKey[catalog.Normalize(t.Name)] = i
+			p.byKey[provider.Normalize(t.Name)] = i
 		}
 		for _, a := range t.Aliases {
-			p.byKey[catalog.Normalize(a)] = i
+			p.byKey[provider.Normalize(a)] = i
 		}
 	}
 	return p
@@ -70,28 +70,28 @@ func New() *Provider {
 
 func (p *Provider) Name() string { return "openngc" }
 
-func (p *Provider) Resolve(query string) (catalog.Target, bool) {
-	q := catalog.Normalize(query)
+func (p *Provider) Resolve(query string) (provider.Target, bool) {
+	q := provider.Normalize(query)
 	if idx, ok := p.byKey[q]; ok {
 		return p.targets[idx], true
 	}
-	return catalog.Target{}, false
+	return provider.Target{}, false
 }
 
-func (p *Provider) Search(query string) []catalog.Target {
-	q := catalog.Normalize(query)
+func (p *Provider) Search(query string) []provider.Target {
+	q := provider.Normalize(query)
 	if q == "" {
 		return nil
 	}
-	var results []catalog.Target
+	var results []provider.Target
 	for _, t := range p.targets {
-		if strings.Contains(catalog.Normalize(t.Name), q) ||
-			strings.Contains(catalog.Normalize(t.ID), q) {
+		if strings.Contains(provider.Normalize(t.Name), q) ||
+			strings.Contains(provider.Normalize(t.ID), q) {
 			results = append(results, t)
 			continue
 		}
 		for _, a := range t.Aliases {
-			if strings.Contains(catalog.Normalize(a), q) {
+			if strings.Contains(provider.Normalize(a), q) {
 				results = append(results, t)
 				break
 			}
@@ -100,12 +100,12 @@ func (p *Provider) Search(query string) []catalog.Target {
 	return results
 }
 
-func parseCSV(data []byte) ([]catalog.Target, error) {
+func parseCSV(data []byte) ([]provider.Target, error) {
 	r := csv.NewReader(bytes.NewReader(data))
 	if _, err := r.Read(); err != nil {
 		return nil, err
 	}
-	var targets []catalog.Target
+	var targets []provider.Target
 	for {
 		row, err := r.Read()
 		if err == io.EOF {
@@ -122,28 +122,28 @@ func parseCSV(data []byte) ([]catalog.Target, error) {
 		raDeg, _ := strconv.ParseFloat(raStr, 64)
 		decDeg, _ := strconv.ParseFloat(decStr, 64)
 
-		var kind catalog.Kind
+		var kind provider.Kind
 		switch kindStr {
 		case "Galaxy":
-			kind = catalog.KindGalaxy
+			kind = provider.KindGalaxy
 		case "Nebula":
-			kind = catalog.KindNebula
+			kind = provider.KindNebula
 		case "OpenCluster":
-			kind = catalog.KindOpenCluster
+			kind = provider.KindOpenCluster
 		case "GlobularCluster":
-			kind = catalog.KindGlobularCluster
+			kind = provider.KindGlobularCluster
 		case "Star":
-			kind = catalog.KindStar
+			kind = provider.KindStar
 		case "Asterism":
-			kind = catalog.KindAsterism
+			kind = provider.KindAsterism
 		default:
-			kind = catalog.KindOther
+			kind = provider.KindOther
 		}
 		var aliases []string
 		if aliasesStr != "" {
 			aliases = strings.Split(aliasesStr, ";")
 		}
-		targets = append(targets, catalog.Target{
+		targets = append(targets, provider.Target{
 			ID:      id,
 			Name:    name,
 			Kind:    kind,

@@ -2,6 +2,8 @@ package catalog
 
 import (
 	"testing"
+
+	"github.com/TuSKan/astrogo/catalog/provider"
 )
 
 type mockProvider struct {
@@ -11,14 +13,14 @@ type mockProvider struct {
 
 func (p *mockProvider) Name() string { return p.name }
 func (p *mockProvider) Resolve(query string) (Target, bool) {
-	t, ok := p.targets[Normalize(query)]
+	t, ok := p.targets[provider.Normalize(query)]
 	return t, ok
 }
 func (p *mockProvider) Search(query string) []Target {
 	var res []Target
-	q := Normalize(query)
+	q := provider.Normalize(query)
 	for _, t := range p.targets {
-		if Normalize(t.Name) == q || Normalize(t.ID) == q {
+		if provider.Normalize(t.Name) == q || provider.Normalize(t.ID) == q {
 			res = append(res, t)
 		}
 	}
@@ -39,7 +41,7 @@ func TestResolver_Resolve(t *testing.T) {
 		},
 	}
 
-	r := NewResolver(p1, p2)
+	r := &Resolver{providers: []provider.Provider{p1, p2}}
 
 	tests := []struct {
 		query   string
@@ -81,7 +83,7 @@ func TestResolver_Ambiguity(t *testing.T) {
 		},
 	}
 
-	r := NewResolver(p1, p2)
+	r := &Resolver{providers: []provider.Provider{p1, p2}}
 	_, err := r.Resolve("target")
 	if err != ErrAmbiguous {
 		t.Errorf("expected ErrAmbiguous, got %v", err)
@@ -100,8 +102,8 @@ func TestNormalize(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		if got := Normalize(tt.input); got != tt.want {
-			t.Errorf("Normalize(%q) = %q, want %q", tt.input, got, tt.want)
+		if got := provider.Normalize(tt.input); got != tt.want {
+			t.Errorf("provider.Normalize(%q) = %q, want %q", tt.input, got, tt.want)
 		}
 	}
 }
@@ -113,7 +115,7 @@ func BenchmarkResolve(b *testing.B) {
 			"m42": {ID: "m42", Name: "Orion Nebula", Catalog: "p"},
 		},
 	}
-	r := NewResolver(p)
+	r := &Resolver{providers: []provider.Provider{p}}
 	for i := 0; i < b.N; i++ {
 		_, _ = r.Resolve("M42")
 	}

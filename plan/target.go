@@ -6,6 +6,7 @@ import (
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/catalog"
+	"github.com/TuSKan/astrogo/catalog/openngc"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/time"
@@ -25,6 +26,17 @@ type Observable interface {
 // NewFixed creates a new Observable for a fixed catalog
 func NewFixed(obj catalog.Target) Fixed {
 	return Fixed{Object: obj}
+}
+
+// NewDefaultFixed creates a new Observable for a fixed catalog using
+// the default OpenNGC provider.
+func NewDefaultFixed(name string) (Fixed, error) {
+	provider := openngc.New()
+	obj, ok := provider.Resolve(name)
+	if !ok {
+		return Fixed{}, fmt.Errorf("target: %s not found in default catalog (OpenNGC)", name)
+	}
+	return NewFixed(obj), nil
 }
 
 // Fixed is an Observable wrapper around a catalog.Target.

@@ -4,80 +4,73 @@ package catalog
 import (
 	"errors"
 	"sort"
-	"strings"
 
-	"github.com/TuSKan/astrogo/coord"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/catalog/gaia"
+	"github.com/TuSKan/astrogo/catalog/jpl"
+	"github.com/TuSKan/astrogo/catalog/mast"
+	"github.com/TuSKan/astrogo/catalog/openngc"
+	"github.com/TuSKan/astrogo/catalog/provider"
+	"github.com/TuSKan/astrogo/catalog/sbdb"
+	"github.com/TuSKan/astrogo/catalog/simbad"
+	"github.com/TuSKan/astrogo/catalog/vizier"
 )
 
-// Kind represents the type of an astronomical object.
-type Kind string
+// Source represents an astronomical data provider type.
+type Source int
 
 const (
-	KindStar             Kind = "Star"
-	KindPlanet           Kind = "Planet"
-	KindMoon             Kind = "Moon"
-	KindGalaxy           Kind = "Galaxy"
-	KindNebula           Kind = "Nebula"
-	KindStarCluster      Kind = "StarCluster"
-	KindOpenCluster      Kind = "OpenCluster"
-	KindGlobularCluster  Kind = "GlobularCluster"
-	KindSupernovaRemnant Kind = "SupernovaRemnant"
-	KindAsterism         Kind = "Asterism"
-	KindDoubleStar       Kind = "DoubleStar"
-	KindOther            Kind = "Other"
+	OpenNGC Source = iota
+	SIMBAD
+	MAST
+	JPL
+	SBDB
+	Gaia
+	VizieR
 )
-
-// Target represents an astronomical object in a catalog.
-type Target struct {
-	ID          string
-	Name        string
-	Designation string
-	SPKID       string
-	Kind        Kind
-	Coord       *coord.ICRS
-	Catalog     string
-	Aliases     []string
-}
-
-// ICRS implements coord.Object for a static catalog Target.
-func (t Target) ICRS(_ time.Time) (*coord.ICRS, error) {
-	return t.Coord, nil
-}
-
-// Provider defines the interface for astronomical catalogs.
-type Provider interface {
-	Name() string
-	Resolve(query string) (Target, bool)
-	Search(query string) []Target
-}
 
 var (
 	ErrNotFound  = errors.New("target not found")
 	ErrAmbiguous = errors.New("ambiguous target name")
 )
 
-// Normalize converts a query to a canonical form for matching.
-func Normalize(query string) string {
-	q := strings.ToLower(strings.TrimSpace(query))
-	q = strings.ReplaceAll(q, " ", "")
-	if strings.HasPrefix(q, "messier") {
-		q = "m" + q[7:]
-	}
-	return q
-}
+// Export core types directly via Type Aliasing to break cyclic dependencies natively.
+type Target = provider.Target
+type Provider = provider.Provider
+type Kind = provider.Kind
+type ObjectRequest = provider.ObjectRequest
+type SeqIterator[T any] = provider.SeqIterator[T]
 
 // Resolver orchestrates multiple providers to find astronomical targets.
 type Resolver struct {
 	providers []Provider
 }
 
-func NewResolver(providers ...Provider) *Resolver {
+// NewResolver instantiates remote and local catalog implementations securely.
+func NewResolver(sources ...Source) *Resolver {
+	var providers []Provider
+	for _, src := range sources {
+		switch src {
+		case OpenNGC:
+			providers = append(providers, openngc.New())
+		case SIMBAD:
+			providers = append(providers, simbad.New())
+		case MAST:
+			providers = append(providers, mast.New())
+		case JPL:
+			providers = append(providers, jpl.New())
+		case SBDB:
+			providers = append(providers, sbdb.New())
+		case Gaia:
+			providers = append(providers, gaia.New())
+		case VizieR:
+			providers = append(providers, vizier.New())
+		}
+	}
 	return &Resolver{providers: providers}
 }
 
 func (r *Resolver) Resolve(query string) (Target, error) {
-	q := Normalize(query)
+	q := provider.Normalize(query)
 	if q == "" {
 		return Target{}, ErrNotFound
 	}
@@ -105,7 +98,7 @@ func (r *Resolver) Resolve(query string) (Target, error) {
 }
 
 func (r *Resolver) Search(query string) []Target {
-	q := Normalize(query)
+	q := provider.Normalize(query)
 	if q == "" {
 		return nil
 	}
@@ -131,13 +124,13 @@ func (r *Resolver) Search(query string) []Target {
 	}
 	scored := make([]scoredTarget, len(unique))
 	for i, t := range unique {
-		bestScore := score(q, t.Name)
+		bestScore := provider.Score(q, t.Name)
 		for _, alias := range t.Aliases {
-			if s := score(q, alias); s > bestScore {
+			if s := provider.Score(q, alias); s > bestScore {
 				bestScore = s
 			}
 		}
-		if s := score(q, t.ID); s > bestScore {
+		if s := provider.Score(q, t.ID); s > bestScore {
 			bestScore = s
 		}
 		scored[i] = scoredTarget{t, bestScore}
@@ -158,51 +151,4 @@ func (r *Resolver) Search(query string) []Target {
 	}
 
 	return final
-}
-
-func score(query, candidate string) float64 {
-	if query == "" || candidate == "" {
-		return 0
-	}
-	c := Normalize(candidate)
-	if query == c {
-		return 1.0
-	}
-	if strings.HasPrefix(c, query) {
-		return 0.8
-	}
-	if strings.Contains(c, query) {
-		return 0.5
-	}
-	dist := levenshtein(query, c)
-	maxLen := len(query)
-	if len(c) > maxLen {
-		maxLen = len(c)
-	}
-	lScore := 1.0 - float64(dist)/float64(maxLen)
-	if lScore < 0 {
-		lScore = 0
-	}
-	return lScore * 0.3
-}
-
-func levenshtein(s, t string) int {
-	d := make([][]int, len(s)+1)
-	for i := range d {
-		d[i] = make([]int, len(t)+1)
-		d[i][0] = i
-	}
-	for j := range d[0] {
-		d[0][j] = j
-	}
-	for j := 1; j <= len(t); j++ {
-		for i := 1; i <= len(s); i++ {
-			cost := 1
-			if s[i-1] == t[j-1] {
-				cost = 0
-			}
-			d[i][j] = min(d[i-1][j]+1, min(d[i][j-1]+1, d[i-1][j-1]+cost))
-		}
-	}
-	return d[len(s)][len(t)]
 }

@@ -11,41 +11,41 @@ import (
 	"strings"
 
 	"github.com/TuSKan/astrogo/angle"
-	"github.com/TuSKan/astrogo/catalog"
+	"github.com/TuSKan/astrogo/catalog/provider"
 	"github.com/TuSKan/astrogo/coord"
 )
 
 const tapSyncURL = "https://gea.esac.esa.int/tap-server/tap/sync"
 
-// Provider implements catalog.Provider and catalog.ConeSearcher
+// Provider implements provider.Provider and provider.ConeSearcher
 // explicitly pointing at Gaia DR3 to extract astrometric parameters.
 type Provider struct {
-	client *catalog.Client
-	cache  catalog.Cache
+	client *provider.Client
+	cache  provider.Cache
 }
 
 func New() *Provider {
 	return &Provider{
-		client: catalog.NewClient(),
-		cache:  catalog.NewArrowCache(),
+		client: provider.NewClient(),
+		cache:  provider.NewArrowCache(),
 	}
 }
 
 func (p *Provider) Name() string { return "gaia" }
 
-func (p *Provider) Capabilities() []catalog.Capability {
-	return []catalog.Capability{catalog.CapConeSearch}
+func (p *Provider) Capabilities() []provider.Capability {
+	return []provider.Capability{provider.CapConeSearch}
 }
 
-func (p *Provider) Resolve(query string) (catalog.Target, bool) {
-	return catalog.Target{}, false
+func (p *Provider) Resolve(query string) (provider.Target, bool) {
+	return provider.Target{}, false
 }
 
-func (p *Provider) Search(query string) []catalog.Target {
+func (p *Provider) Search(query string) []provider.Target {
 	return nil
 }
 
-func (p *Provider) ConeSearch(ctx context.Context, req catalog.ConeRequest) catalog.SeqIterator[catalog.Target] {
+func (p *Provider) ConeSearch(ctx context.Context, req provider.ConeRequest) provider.SeqIterator[provider.Target] {
 	limit := req.Limit
 	if limit <= 0 {
 		limit = 100
@@ -56,10 +56,7 @@ func (p *Provider) ConeSearch(ctx context.Context, req catalog.ConeRequest) cata
 	rad := req.Radius.Degrees()
 
 	// Query gaia source for ra, dec, pmra, pmdec, parallax
-	adql := fmt.Sprintf(`SELECT TOP %d 
-	source_id, ra, dec, pmra, pmdec, parallax
-	FROM gaiadr3.gaia_source
-	WHERE 1=CONTAINS(POINT('ICRS', ra, dec), CIRCLE('ICRS', %f, %f, %f))`, limit, ra, dec, rad)
+	adql := fmt.Sprintf(`SELECT TOP %d source_id, ra, dec, pmra, pmdec, parallax FROM gaiadr3.gaia_source WHERE 1=CONTAINS(POINT('ICRS', ra, dec), CIRCLE('ICRS', %f, %f, %f))`, limit, ra, dec, rad)
 
 	cacheKey := fmt.Sprintf("gaia:cone:%f:%f:%f:%d", ra, dec, rad, limit)
 	if seq, ok := p.cache.Get(cacheKey); ok {
@@ -74,26 +71,26 @@ func (p *Provider) ConeSearch(ctx context.Context, req catalog.ConeRequest) cata
 
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, tapSyncURL, strings.NewReader(v.Encode()))
 	if err != nil {
-		return catalog.SliceSeq([]catalog.Target{})
+		return provider.SliceSeq([]provider.Target{})
 	}
 	httpReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-	return func(yield func(catalog.Target, error) bool) {
+	return func(yield func(provider.Target, error) bool) {
 		resp, err := p.client.Do(httpReq)
 		if err != nil {
-			yield(catalog.Target{}, err)
+			yield(provider.Target{}, err)
 			return
 		}
 		defer resp.Body.Close()
 
 		targets, err := parseCSV(resp.Body)
 		if err != nil {
-			yield(catalog.Target{}, err)
+			yield(provider.Target{}, err)
 			return
 		}
 
 		if err := p.cache.Set(cacheKey, targets); err != nil {
-			yield(catalog.Target{}, err)
+			yield(provider.Target{}, err)
 			return
 		}
 
@@ -105,7 +102,7 @@ func (p *Provider) ConeSearch(ctx context.Context, req catalog.ConeRequest) cata
 	}
 }
 
-func parseCSV(body io.Reader) ([]catalog.Target, error) {
+func parseCSV(body io.Reader) ([]provider.Target, error) {
 	reader := csv.NewReader(body)
 	header, err := reader.Read()
 	if err != nil {
@@ -120,7 +117,7 @@ func parseCSV(body io.Reader) ([]catalog.Target, error) {
 		col[h] = i
 	}
 
-	var targets []catalog.Target
+	var targets []provider.Target
 
 	for {
 		row, err := reader.Read()
@@ -136,10 +133,10 @@ func parseCSV(body io.Reader) ([]catalog.Target, error) {
 		decDeg, _ := strconv.ParseFloat(row[col["dec"]], 64)
 		// PMs and parallax omitted from target struct mapping currently, standard ICRS is used
 
-		t := catalog.Target{
+		t := provider.Target{
 			ID:      id,
 			Name:    "Gaia DR3 " + id,
-			Kind:    catalog.KindStar,
+			Kind:    provider.KindStar,
 			Coord:   coord.NewICRS(angle.Deg(raDeg), angle.Deg(decDeg)),
 			Catalog: "Gaia DR3",
 		}

@@ -1,9 +1,10 @@
-package catalog
+package provider
 
 import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"iter"
 	"net/http"
 	"time"
@@ -133,9 +134,9 @@ func (c *Client) Do(req *http.Request) (*http.Response, error) {
 				return nil, backoff.Permanent(err)
 			}
 			if resp.StatusCode >= 400 {
-				bd := req.URL.String()
 				defer resp.Body.Close()
-				return nil, backoff.Permanent(&HTTPError{StatusCode: resp.StatusCode, Body: bd})
+				bdBytes, _ := io.ReadAll(resp.Body)
+				return nil, backoff.Permanent(&HTTPError{StatusCode: resp.StatusCode, Body: string(bdBytes)})
 			}
 			return resp, nil
 		}

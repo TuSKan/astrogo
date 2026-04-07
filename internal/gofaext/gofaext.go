@@ -162,6 +162,13 @@ func Moon98(date1, date2 float64) (pv [2][3]float64) {
 	return pv
 }
 
+// Plan94 returns the heliocentric position and velocity of a major planet.
+// np: 1=Mercury, 2=Venus, 3=EMB, 4=Mars, 5=Jupiter, 6=Saturn, 7=Uranus, 8=Neptune.
+func Plan94(date1, date2 float64, np int) (pv [2][3]float64, status int) {
+	status = gofa.Plan94(date1, date2, np, &pv)
+	return pv, status
+}
+
 // Dat returns the number of leap seconds for a given UTC date.
 func Dat(iy, im, id int, fd float64) (d float64, status int) {
 	status = gofa.Dat(iy, im, id, fd, &d)

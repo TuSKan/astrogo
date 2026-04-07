@@ -1,13 +1,11 @@
 package catalog_test
 
 import (
-	"context"
 	"fmt"
 	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/catalog"
-	"github.com/TuSKan/astrogo/catalog/simbad"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/plan"
 	astrot "github.com/TuSKan/astrogo/time"
@@ -17,26 +15,12 @@ import (
 // to resolve a celestial target from a remote provider and seamlessly
 // pass its coordinates into observing planner capabilities.
 func Example_integration() {
-	// 1. Initialize a catalog provider (e.g., SIMBAD)
-	provider := simbad.New()
-
 	// 2. Perform a live query to resolve the target mathematically
 	// We'll search for the Andromeda Galaxy (M31)
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
+	resolver := catalog.NewResolver(catalog.SIMBAD)
+	andromeda, err := resolver.Resolve("M31")
 
-	req := catalog.ObjectRequest{Query: "M31", Limit: 1}
-	iterator := provider.ResolveObject(ctx, req)
-
-	var andromeda catalog.Target
-	iterator(func(t catalog.Target, err error) bool {
-		if err == nil {
-			andromeda = t
-		}
-		return false // get only the first match
-	})
-
-	if andromeda.ID == "" {
+	if err != nil {
 		fmt.Println("Failed to resolve target.")
 		return
 	}

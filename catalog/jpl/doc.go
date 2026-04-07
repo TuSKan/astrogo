@@ -1,4 +1,4 @@
-// Package jpl provides a catalog.Provider implementation handling metadata resolution
+// Package jpl provides a provider.Provider implementation handling metadata resolution
 // through the NASA JPL Horizons system.
 //
 // Horizons maintains ephemerides and physical metadata for planets, natural satellites,

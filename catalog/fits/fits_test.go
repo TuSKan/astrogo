@@ -1,26 +1,27 @@
-package catalog
+package fits
 
 import (
 	"testing"
 
 	"github.com/TuSKan/astrogo/angle"
+	"github.com/TuSKan/astrogo/catalog/provider"
 	"github.com/TuSKan/astrogo/coord"
 )
 
-func TestNewFITSProvider_FileNotFound(t *testing.T) {
+func TestNew_FileNotFound(t *testing.T) {
 	// Provide a non-existent path to verify error bubbling from fits.Open
-	_, err := NewFITSProvider("non_existent_fake_file.fits")
+	_, err := New("non_existent_fake_file.fits")
 	if err == nil {
 		t.Fatal("expected error on non-existent file, got nil")
 	}
 }
 
-func TestFITSProvider_ResolveAndSearch(t *testing.T) {
+func TestProvider_ResolveAndSearch(t *testing.T) {
 	// Mock a provider directly to test the interface logic,
 	// bypassing the physical file extraction which relies on actual FITS file schemas.
-	provider := &FITSProvider{
+	provider := &Provider{
 		name: "MockCatalog",
-		targets: []Target{
+		targets: []provider.Target{
 			{ID: "ID-1", Name: "Sirius", Coord: coord.NewICRS(angle.Deg(101.287), angle.Deg(-16.716))},
 			{ID: "ID-2", Name: "Vega", Coord: coord.NewICRS(angle.Deg(279.234), angle.Deg(38.783))},
 		},
@@ -42,7 +43,7 @@ func TestFITSProvider_ResolveAndSearch(t *testing.T) {
 
 	tgt, found = provider.Resolve("unknown")
 	if found {
-		t.Errorf("expected not to find unknown target, got %s", tgt.Name)
+		t.Errorf("expected not to find unknown provider.Target, got %s", tgt.Name)
 	}
 
 	// Test Search (partial match mapping for substring discovery)

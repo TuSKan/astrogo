@@ -96,9 +96,9 @@ func TestUnsupportedBody(t *testing.T) {
 	p := ephemeris.Default()
 	tm := time.NowUTC()
 
-	_, err := p.State(ephemeris.Mars, tm)
+	_, err := p.State(ephemeris.ID(999999), tm)
 	if err == nil {
-		t.Error("Expected error for unsupported body (Mars) in sofa provider")
+		t.Error("Expected error for unsupported body")
 	}
 }
 

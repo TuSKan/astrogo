@@ -8,20 +8,20 @@ import (
 	"testing"
 	"time"
 
-	"github.com/TuSKan/astrogo/catalog"
+	"github.com/TuSKan/astrogo/catalog/provider"
 )
 
 func TestSimbadNetworkResolve(t *testing.T) {
 	prov := New()
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	// Live network test requesting M31 over real internet TAP
-	req := catalog.ObjectRequest{Query: "m31", Limit: 1}
+	req := provider.ObjectRequest{Query: "m31", Limit: 1}
 	iter := prov.ResolveObject(ctx, req)
 
-	var targets []catalog.Target
-	iter(func(tar catalog.Target, err error) bool {
+	var targets []provider.Target
+	iter(func(tar provider.Target, err error) bool {
 		if err != nil {
 			t.Fatalf("Live network failed: %v", err)
 		}

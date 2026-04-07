@@ -7,7 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/TuSKan/astrogo/catalog"
+	"github.com/TuSKan/astrogo/catalog/provider"
 	"github.com/TuSKan/astrogo/internal/testutil"
 )
 
@@ -30,7 +30,7 @@ func TestJPLResolveMock(t *testing.T) {
 	tar, ok := prov.Resolve("Mars")
 	testutil.AssertEqual(t, "Resolve Ok", ok, true)
 	testutil.AssertEqual(t, "Resolve ID", tar.ID, "Mars")
-	testutil.AssertEqual(t, "Resolve Kind", string(tar.Kind), string(catalog.KindPlanet))
+	testutil.AssertEqual(t, "Resolve Kind", string(tar.Kind), string(provider.KindPlanet))
 }
 
 type mockTransport struct {
@@ -59,9 +59,9 @@ func TestJPLErrorResponse(t *testing.T) {
 	prov := New()
 	prov.client.HTTPClient.Transport = &mockTransport{Handler: server.Config.Handler}
 
-	req := catalog.ObjectRequest{Query: "!!!ERROR!!!"}
+	req := provider.ObjectRequest{Query: "!!!ERROR!!!"}
 	iter := prov.ResolveObject(context.Background(), req)
-	iter(func(tar catalog.Target, err error) bool {
+	iter(func(tar provider.Target, err error) bool {
 		if err == nil {
 			t.Fatalf("Expected explicit json payload error")
 		}
@@ -76,7 +76,7 @@ func TestProviderInterface(t *testing.T) {
 	p := New()
 	testutil.AssertEqual(t, "Name", p.Name(), "jpl")
 	caps := p.Capabilities()
-	if len(caps) != 1 || caps[0] != catalog.CapObjectResolution {
+	if len(caps) != 1 || caps[0] != provider.CapObjectResolution {
 		t.Errorf("expected CapObjectResolution, got %v", caps)
 	}
 

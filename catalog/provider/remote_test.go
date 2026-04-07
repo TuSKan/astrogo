@@ -1,4 +1,4 @@
-package catalog
+package provider_test
 
 import (
 	"context"
@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/TuSKan/astrogo/catalog/provider"
 	"github.com/TuSKan/astrogo/internal/testutil"
 )
 
@@ -27,7 +28,7 @@ func TestClientRetries(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := NewClient()
+	client := provider.NewClient()
 	client.MaxRetries = 5 // Ensures it has enough headroom
 	// Use small timeouts to prevent long test runs if using arbitrary backoff
 	// The cenkalti backoff implicitly uses default Backoff which starts at 500ms
@@ -51,7 +52,7 @@ func TestClientPermanentFailure(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := NewClient()
+	client := provider.NewClient()
 	req, _ := http.NewRequestWithContext(context.Background(), "GET", server.URL, nil)
 
 	_, err := client.Do(req)
@@ -59,9 +60,9 @@ func TestClientPermanentFailure(t *testing.T) {
 		t.Fatalf("Expected permanent failure HTTP error")
 	}
 
-	var httpErr *HTTPError
+	var httpErr *provider.HTTPError
 	if !errors.As(err, &httpErr) {
-		t.Fatalf("Expected HTTPError type, got: %T", err)
+		t.Fatalf("Expected provider.HTTPError type, got: %T", err)
 	}
 
 	testutil.AssertEqual(t, "Status Code", httpErr.StatusCode, http.StatusNotFound)
@@ -75,7 +76,7 @@ func TestClientContextCancellation(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := NewClient()
+	client := provider.NewClient()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 	defer cancel()
@@ -89,16 +90,16 @@ func TestClientContextCancellation(t *testing.T) {
 }
 
 func TestSliceSeqIteration(t *testing.T) {
-	targets := []Target{
+	targets := []provider.Target{
 		{ID: "1"},
 		{ID: "2"},
 		{ID: "3"},
 	}
 
-	iter := SliceSeq(targets)
+	iter := provider.SliceSeq(targets)
 
 	count := 0
-	iter(func(tar Target, err error) bool {
+	iter(func(tar provider.Target, err error) bool {
 		testutil.AssertNoError(t, err)
 		count++
 		return true // Continue iteration
@@ -107,7 +108,7 @@ func TestSliceSeqIteration(t *testing.T) {
 
 	// Early Abort
 	abortCount := 0
-	iter(func(tar Target, err error) bool {
+	iter(func(tar provider.Target, err error) bool {
 		abortCount++
 		return false // Abort iteration
 	})
