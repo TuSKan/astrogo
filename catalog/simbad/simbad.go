@@ -85,10 +85,10 @@ func (p *Provider) Search(query string) []provider.Target {
 
 // ResolveObject provides an async streaming mechanism using ADQL.
 func (p *Provider) ResolveObject(ctx context.Context, req provider.ObjectRequest) provider.SeqIterator[provider.Target] {
-	// 1. Check Cache First
-	cacheKey := "resolve:" + provider.Normalize(req.Query) + ":" + string(rune(req.Limit))
+	// 1. Check Cache First (Maintain case to prevent ADQL case-sensitive collisions)
+	cacheKey := fmt.Sprintf("resolve:%s:%d", req.Query, req.Limit)
 	if req.Limit <= 0 {
-		cacheKey = "resolve:" + provider.Normalize(req.Query) + ":10"
+		cacheKey = fmt.Sprintf("resolve:%s:10", req.Query)
 	}
 
 	if seq, ok := p.cache.Get(cacheKey); ok {

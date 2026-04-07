@@ -12,16 +12,86 @@ import (
 	"github.com/TuSKan/astrogo/time"
 )
 
-// EventKind defines the type of astronomical event.
+// EventFamily classifies the broad category of an astronomical event.
+type EventFamily int
+
+const (
+	// EventFamilyVisibility encompasses events related to an observer's local horizon (e.g. rise, set, transit).
+	EventFamilyVisibility EventFamily = iota
+	// EventFamilyRelativeGeometry encompasses events dependent on the angular relationship
+	// between bodies (e.g. conjunction, opposition, greatest elongation).
+	EventFamilyRelativeGeometry
+	// EventFamilyOverlap encompasses events where physical bodies obscure one another (e.g. eclipses, occultations).
+	EventFamilyOverlap
+	// EventFamilyIllumination encompasses events related to phase and illumination (e.g. moon phases).
+	EventFamilyIllumination
+)
+
+func (f EventFamily) String() string {
+	switch f {
+	case EventFamilyVisibility:
+		return "Visibility"
+	case EventFamilyRelativeGeometry:
+		return "Relative Geometry"
+	case EventFamilyOverlap:
+		return "Overlap"
+	case EventFamilyIllumination:
+		return "Illumination"
+	default:
+		return "Unknown"
+	}
+}
+
+// EventKind identifies the specific astronomical event within a family.
 type EventKind int
 
 const (
-	// EventRise represents the target crossing upward through the threshold.
+	// -- FamilyVisibility --
+
+	// EventRise represents the target crossing upward through the threshold altitude.
 	EventRise EventKind = iota
-	// EventSet represents the target crossing downward through the threshold.
+	// EventSet represents the target crossing downward through the threshold altitude.
 	EventSet
 	// EventTransit represents the target reaching its local maximum altitude.
 	EventTransit
+
+	// -- FamilyRelativeGeometry --
+
+	// EventConjunction represents two targets having the same apparent longitude or right ascension.
+	EventConjunction
+	// EventOpposition represents two targets having apparent longitudes or right ascensions 180 degrees apart.
+	EventOpposition
+	// EventGreatestElongationEast represents the maximum angular separation of an inner planet east of the Sun.
+	EventGreatestElongationEast
+	// EventGreatestElongationWest represents the maximum angular separation of an inner planet west of the Sun.
+	EventGreatestElongationWest
+	// EventQuadratureEast represents a target being 90 degrees east of the Sun.
+	EventQuadratureEast
+	// EventQuadratureWest represents a target being 90 degrees west of the Sun.
+	EventQuadratureWest
+
+	// -- FamilyOverlap (Phase 2/3) --
+
+	EventOccultationStart
+	EventOccultationEnd
+	EventEclipseStart
+	EventEclipseEnd
+	EventIngress
+	EventEgress
+
+	// -- FamilyIllumination (Phase 3) --
+
+	EventNewMoon
+	EventFirstQuarter
+	EventFullMoon
+	EventLastQuarter
+	EventMaxIllumination
+	EventMinIllumination
+)
+
+const (
+	// EventAnyVisibility is a wildcard to find Rise, Set, and Transit in a single pass.
+	EventAnyVisibility EventKind = -1
 )
 
 func (k EventKind) String() string {
@@ -32,9 +102,465 @@ func (k EventKind) String() string {
 		return "Set"
 	case EventTransit:
 		return "Transit"
+	case EventConjunction:
+		return "Conjunction"
+	case EventOpposition:
+		return "Opposition"
+	case EventGreatestElongationEast:
+		return "Greatest Elongation East"
+	case EventGreatestElongationWest:
+		return "Greatest Elongation West"
+	case EventQuadratureEast:
+		return "Quadrature East"
+	case EventQuadratureWest:
+		return "Quadrature West"
+	case EventOccultationStart:
+		return "Occultation Start"
+	case EventOccultationEnd:
+		return "Occultation End"
+	case EventEclipseStart:
+		return "Eclipse Start"
+	case EventEclipseEnd:
+		return "Eclipse End"
+	case EventIngress:
+		return "Ingress"
+	case EventEgress:
+		return "Egress"
+	case EventNewMoon:
+		return "New Moon"
+	case EventFirstQuarter:
+		return "First Quarter"
+	case EventFullMoon:
+		return "Full Moon"
+	case EventLastQuarter:
+		return "Last Quarter"
+	case EventMaxIllumination:
+		return "Max Illumination"
+	case EventMinIllumination:
+		return "Min Illumination"
 	default:
 		return "Unknown"
 	}
+}
+
+// EventSpec formally defines what type of astronomical event is being solved for.
+type EventSpec struct {
+	// Family defines the broad category of the event solver.
+	Family EventFamily
+
+	// Kind identifies the specific event type being solved.
+	Kind EventKind
+
+	// Target is the primary object for the event (e.g., the Sun, the Moon, a Star).
+	Target Observable
+
+	// Other is an optional secondary target used for relative events (e.g. Conjunctions, Eclipses).
+	Other Observable
+
+	// Observer is required for topocentric (site-dependent) events like Rise and Set.
+	// Relative geometry events (Conjunction) might omit this to solve geocentrically.
+	Observer *Site
+
+	// Threshold defines the angular condition for the event.
+	// For rise/set, this is the horizon altitude.
+	// For geometry, it might represent a specific separation angle.
+	Threshold angle.Angle
+}
+
+// Validate checks if the Spec configuration is fully provided for its type.
+func (s EventSpec) Validate() error {
+	if s.Target == nil {
+		return fmt.Errorf("event spec must contain a primary target")
+	}
+
+	switch s.Family {
+	case EventFamilyVisibility:
+		if s.Observer == nil {
+			return fmt.Errorf("visibility events require an observer geodetic location")
+		}
+	case EventFamilyRelativeGeometry, EventFamilyOverlap:
+		if s.Other == nil && !isPhaseEvent(s.Kind) {
+			return fmt.Errorf("%v geometry requires a secondary target", s.Kind)
+		}
+	}
+	return nil
+}
+
+func isPhaseEvent(k EventKind) bool {
+	return false
+}
+
+// evaluator is a function that returns the metric to be solved (e.g. altitude diff, separation angle).
+type evaluator func(t time.Time) (float64, error)
+
+// EventSolver searches for astronomical events based on an EventSpec over a time interval.
+type EventSolver struct {
+	Step      time.Duration
+	Tolerance time.Duration
+	MaxIter   int
+}
+
+// NewEventSolver creates a numerical solver for finding events.
+func NewEventSolver(step, tol time.Duration) EventSolver {
+	if step <= 0 {
+		step = 15 * time.Minute
+	}
+	if tol <= 0 {
+		tol = 1 * time.Second
+	}
+	return EventSolver{
+		Step:      step,
+		Tolerance: tol,
+		MaxIter:   50,
+	}
+}
+
+// Find searches for events matching the given specification within the interval.
+func (s EventSolver) Find(spec EventSpec, start, end time.Time) ([]Event, error) {
+	if err := spec.Validate(); err != nil {
+		return nil, err
+	}
+
+	var events []Event
+	var err error
+
+	switch spec.Family {
+	case EventFamilyVisibility:
+		events, err = s.solveVisibility(spec, start, end)
+	case EventFamilyRelativeGeometry:
+		events, err = s.solveGeometry(spec, start, end)
+	default:
+		return nil, fmt.Errorf("event solver for family %v is not implemented", spec.Family)
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	// Sort events by time
+	sort.Slice(events, func(i, j int) bool {
+		return events[i].Time.Before(events[j].Time)
+	})
+
+	return events, nil
+}
+
+// refineRoot uses bisection to find the exact time when eval(t) == 0.
+func (s EventSolver) refineRoot(eval evaluator, t1, t2 time.Time, v1 float64) (time.Time, float64, error) {
+	low, high := t1, t2
+
+	for i := 0; i < s.MaxIter; i++ {
+		if high.Sub(low) < s.Tolerance {
+			break
+		}
+
+		mid := low.Add(high.Sub(low) / 2)
+		vm, err := eval(mid)
+		if err != nil {
+			return time.Time{}, 0, err
+		}
+
+		if (v1 > 0) == (vm > 0) {
+			low = mid
+			v1 = vm
+		} else {
+			high = mid
+		}
+	}
+
+	resTime := low.Add(high.Sub(low) / 2)
+	val, err := eval(resTime)
+	return resTime, val, err
+}
+
+// refineExtremum uses golden section search to find the time of local maximum or minimum eval(t).
+func (s EventSolver) refineExtremum(eval evaluator, t1, t3 time.Time, isMax bool) (time.Time, float64, error) {
+	R := (math.Sqrt(5) - 1) / 2
+	C := 1 - R
+
+	low, high := t1, t3
+	d := high.Sub(low)
+
+	ga := low.Add(time.Duration(float64(d) * C))
+	gb := low.Add(time.Duration(float64(d) * R))
+
+	fa, err := eval(ga)
+	if err != nil {
+		return time.Time{}, 0, err
+	}
+	fb, err := eval(gb)
+	if err != nil {
+		return time.Time{}, 0, err
+	}
+
+	for i := 0; i < s.MaxIter; i++ {
+		if high.Sub(low) < s.Tolerance {
+			break
+		}
+
+		replaceA := fa > fb
+		if !isMax {
+			replaceA = fa < fb
+		}
+
+		if replaceA {
+			high = gb
+			gb = ga
+			fb = fa
+			d = high.Sub(low)
+			ga = low.Add(time.Duration(float64(d) * C))
+			fa, err = eval(ga)
+			if err != nil {
+				return time.Time{}, 0, err
+			}
+		} else {
+			low = ga
+			ga = gb
+			fa = fb
+			d = high.Sub(low)
+			gb = low.Add(time.Duration(float64(d) * R))
+			fb, err = eval(gb)
+			if err != nil {
+				return time.Time{}, 0, err
+			}
+		}
+	}
+
+	var resTime time.Time
+
+	chooseA := fa > fb
+	if !isMax {
+		chooseA = fa < fb
+	}
+
+	if chooseA {
+		resTime = ga
+	} else {
+		resTime = gb
+	}
+
+	val, err := eval(resTime)
+	return resTime, val, err
+}
+
+func (s EventSolver) solveVisibility(spec EventSpec, start, end time.Time) ([]Event, error) {
+	var events []Event
+
+	evalVal := func(t time.Time) (float64, error) {
+		pos, err := spec.Target.Position(t)
+		if err != nil {
+			return 0, err
+		}
+
+		astro := coord.NewAstrometric(pos.RA(), pos.Dec())
+		geom := coord.AstrometricToObserved(astro, t, spec.Observer.Location(), coord.Atmosphere{Pressure: 0})
+
+		return geom.Alt().Degrees() - spec.Threshold.Degrees(), nil
+	}
+
+	n := int(end.Sub(start)/s.Step) + 2
+	times := make([]time.Time, 0, n)
+	alts := make([]float64, 0, n)
+
+	for t := start; !t.After(end); t = t.Add(s.Step) {
+		times = append(times, t)
+		h, err := evalVal(t)
+		if err != nil {
+			return nil, err
+		}
+		alts = append(alts, h)
+	}
+	if last := times[len(times)-1]; last.Before(end) {
+		times = append(times, end)
+		h, err := evalVal(end)
+		if err != nil {
+			return nil, err
+		}
+		alts = append(alts, h)
+	}
+
+	for i := 0; i < len(times)-1; i++ {
+		t1, t2 := times[i], times[i+1]
+		h1, h2 := alts[i], alts[i+1]
+
+		// Crossings (Rise/Set)
+		if (h1 <= 0 && h2 > 0) || (h1 > 0 && h2 <= 0) {
+			kind := EventRise
+			if h1 > 0 {
+				kind = EventSet
+			}
+
+			if spec.Kind == kind || spec.Kind == EventAnyVisibility {
+				resTime, _, err := s.refineRoot(evalVal, t1, t2, h1)
+				if err != nil {
+					return nil, err
+				}
+
+				// Calculate geometric outputs
+				pos, _ := spec.Target.Position(resTime)
+				astro := coord.NewAstrometric(pos.RA(), pos.Dec())
+				geom := coord.AstrometricToObserved(astro, resTime, spec.Observer.Location(), coord.Atmosphere{Pressure: 0})
+				aa, _ := coord.ICRSToAltAz(pos, resTime, spec.Observer.Location())
+
+				events = append(events, Event{
+					Kind:              kind,
+					Time:              resTime,
+					Altitude:          aa.Alt(),
+					GeometricAltitude: geom.Alt(),
+					Azimuth:           aa.Az(),
+					Value:             geom.Alt().Degrees() - spec.Threshold.Degrees(),
+				})
+			}
+		}
+
+		// Local Maximum (Transit)
+		if i > 0 {
+			h0 := alts[i-1]
+			if h1 > h0 && h1 >= h2 && (spec.Kind == EventTransit || spec.Kind == EventAnyVisibility) {
+				resTime, _, err := s.refineExtremum(evalVal, times[i-1], times[i+1], true)
+				if err != nil {
+					return nil, err
+				}
+
+				pos, _ := spec.Target.Position(resTime)
+				astro := coord.NewAstrometric(pos.RA(), pos.Dec())
+				geom := coord.AstrometricToObserved(astro, resTime, spec.Observer.Location(), coord.Atmosphere{Pressure: 0})
+				aa, _ := coord.ICRSToAltAz(pos, resTime, spec.Observer.Location())
+
+				events = append(events, Event{
+					Kind:              EventTransit,
+					Time:              resTime,
+					Altitude:          aa.Alt(),
+					GeometricAltitude: geom.Alt(),
+					Azimuth:           aa.Az(),
+					Value:             aa.Alt().Degrees(),
+				})
+			}
+		}
+	}
+
+	return events, nil
+}
+
+func (s EventSolver) solveGeometry(spec EventSpec, start, end time.Time) ([]Event, error) {
+	var events []Event
+
+	// Geometry solver handles Conjunction, Opposition, and Greatest Elongation.
+	evalVal := func(t time.Time) (float64, error) {
+		pos1, err := spec.Target.Position(t)
+		if err != nil {
+			return 0, err
+		}
+		pos2, err := spec.Other.Position(t)
+		if err != nil {
+			return 0, err
+		}
+
+		switch spec.Kind {
+		case EventConjunction, EventOpposition:
+			// Difference in Right Ascension
+			diff := pos1.RA().Degrees() - pos2.RA().Degrees()
+			// Normalize to [-180, 180]
+			for diff > 180 {
+				diff -= 360
+			}
+			for diff <= -180 {
+				diff += 360
+			}
+
+			if spec.Kind == EventOpposition {
+				if diff > 0 {
+					diff -= 180
+				} else {
+					diff += 180
+				}
+			}
+			return diff, nil
+		case EventGreatestElongationEast, EventGreatestElongationWest:
+			sep := coord.Separation(pos1, pos2).Degrees()
+			return sep, nil
+		default:
+			return 0, fmt.Errorf("unsupported geometry kind: %v", spec.Kind)
+		}
+	}
+
+	n := int(end.Sub(start)/s.Step) + 2
+	times := make([]time.Time, 0, n)
+	vals := make([]float64, 0, n)
+
+	for t := start; !t.After(end); t = t.Add(s.Step) {
+		times = append(times, t)
+		v, err := evalVal(t)
+		if err != nil {
+			return nil, err
+		}
+		vals = append(vals, v)
+	}
+	if last := times[len(times)-1]; last.Before(end) {
+		times = append(times, end)
+		v, err := evalVal(end)
+		if err != nil {
+			return nil, err
+		}
+		vals = append(vals, v)
+	}
+
+	for i := 0; i < len(times)-1; i++ {
+		t1, t2 := times[i], times[i+1]
+		v1, v2 := vals[i], vals[i+1]
+
+		if spec.Kind == EventConjunction || spec.Kind == EventOpposition {
+			// Find root (crosses 0)
+			if (v1 <= 0 && v2 > 0) || (v1 > 0 && v2 <= 0) {
+				// Handle 180/-180 wrap-around false crossings if they jump significantly > 180
+				if math.Abs(v1-v2) < 180 {
+					resTime, val, err := s.refineRoot(evalVal, t1, t2, v1)
+					if err != nil {
+						return nil, err
+					}
+					events = append(events, Event{
+						Kind:  spec.Kind,
+						Time:  resTime,
+						Value: val,
+					})
+				}
+			}
+		}
+
+		if (spec.Kind == EventGreatestElongationEast || spec.Kind == EventGreatestElongationWest) && i > 0 {
+			// Find local maximum
+			v0 := vals[i-1]
+			if v1 > v0 && v1 >= v2 {
+				resTime, val, err := s.refineExtremum(evalVal, times[i-1], times[i+1], true)
+				if err != nil {
+					return nil, err
+				}
+
+				// Validate if it is East or West based on RA difference.
+				pos1, _ := spec.Target.Position(resTime)
+				pos2, _ := spec.Other.Position(resTime)
+				raDiff := pos1.RA().Degrees() - pos2.RA().Degrees()
+				for raDiff > 180 {
+					raDiff -= 360
+				}
+				for raDiff <= -180 {
+					raDiff += 360
+				}
+
+				isEast := raDiff > 0
+
+				if (spec.Kind == EventGreatestElongationEast && isEast) || (spec.Kind == EventGreatestElongationWest && !isEast) {
+					events = append(events, Event{
+						Kind:  spec.Kind,
+						Time:  resTime,
+						Value: val, // peak separation in degrees
+					})
+				}
+			}
+		}
+	}
+
+	return events, nil
 }
 
 // Event represents a specific occurrence of a celestial target in the coord.
@@ -96,113 +622,6 @@ type TwilightEvent struct {
 
 // ── Event Finder API ──────────────────────────────────────────────────────────
 
-// EventFinder searches for rise, set, and transit events over a time interval.
-type EventFinder struct {
-	// Step is the coarse sampling interval for bracketing events.
-	Step time.Duration
-	// Tolerance is the desired precision for the event time.
-	Tolerance time.Duration
-	// MaxIter is the maximum number of iterations for the numerical solver.
-	MaxIter int
-}
-
-// NewEventFinder creates a new EventFinder with the given step and tolerance.
-// A step of 15-30 minutes and tolerance of 1 second is typically sufficient for most uses.
-func NewEventFinder(step, tol time.Duration) EventFinder {
-	return EventFinder{
-		Step:      step,
-		Tolerance: tol,
-		MaxIter:   50, // Generally enough for bisection/golden-section to converge
-	}
-}
-
-// FindEvents locates all rise, set, and transit events for the given object
-// within the [start, end] interval relative to the observer's site and threshold altitude.
-func (f EventFinder) FindEvents(
-	obj Observable,
-	start, end time.Time,
-	site *Site,
-	threshold angle.Angle,
-) ([]Event, error) {
-	if f.Step <= 0 {
-		f.Step = 15 * time.Minute
-	}
-	if f.Tolerance <= 0 {
-		f.Tolerance = 1 * time.Second
-	}
-	if f.MaxIter <= 0 {
-		f.MaxIter = 50
-	}
-
-	var events []Event
-
-	// Pre-sample the interval to find brackets
-	// We want to ensure we don't miss narrow peaks, so we use a reasonable step.
-	// 15-30 mins is usually fine for celestial motion.
-	n := int(end.Sub(start)/f.Step) + 2
-	times := make([]time.Time, 0, n)
-	alts := make([]float64, 0, n)
-
-	for t := start; !t.After(end); t = t.Add(f.Step) {
-		times = append(times, t)
-		h, err := f.altitudeDiff(obj, t, site, threshold)
-		if err != nil {
-			return nil, err
-		}
-		alts = append(alts, h)
-	}
-	// Ensure the end point is included
-	if last := times[len(times)-1]; last.Before(end) {
-		times = append(times, end)
-		h, err := f.altitudeDiff(obj, end, site, threshold)
-		if err != nil {
-			return nil, err
-		}
-		alts = append(alts, h)
-	}
-
-	for i := 0; i < len(times)-1; i++ {
-		t1, t2 := times[i], times[i+1]
-		h1, h2 := alts[i], alts[i+1]
-
-		// 1. Crossing (Rise/Set)
-		// We look for sign changes in altitude - threshold.
-		if (h1 <= 0 && h2 > 0) || (h1 > 0 && h2 <= 0) {
-			kind := EventRise
-			if h1 > 0 {
-				kind = EventSet
-			}
-			event, err := f.refineRoot(obj, t1, t2, h1, h2, site, threshold, kind)
-			if err != nil {
-				return nil, err
-			}
-			events = append(events, event)
-		}
-
-		// 2. Local Maximum (Transit)
-		// We need three points to bracket a maximum: i-1, i, i+1.
-		// If alts[i] is greater than both neighbors, there's a peak.
-		if i > 0 {
-			h0 := alts[i-1]
-			if h1 > h0 && h1 >= h2 {
-				// Peak is bracketed by [times[i-1], times[i+1]]
-				event, err := f.refineMax(obj, times[i-1], times[i+1], site, threshold)
-				if err != nil {
-					return nil, err
-				}
-				events = append(events, event)
-			}
-		}
-	}
-
-	// Sort events by time
-	sort.Slice(events, func(i, j int) bool {
-		return events[i].Time.Before(events[j].Time)
-	})
-
-	return events, nil
-}
-
 // ── Sun/Moon/Twilight Helpers ──────────────────────────────────────────────────
 
 const (
@@ -220,8 +639,15 @@ const (
 // It uses a threshold of -0.833° to account for atmospheric refraction and semi-diameter.
 func SunEvents(start, end time.Time, site *Site, eph ephemeris.Provider) ([]Event, error) {
 	sun := NewBody(ephemeris.Sun, eph)
-	finder := NewEventFinder(15*time.Minute, 1*time.Second)
-	return finder.FindEvents(sun, start, end, site, angle.Deg(SunHorizonAltitude))
+	solver := NewEventSolver(15*time.Minute, 1*time.Second)
+	spec := EventSpec{
+		Family:    EventFamilyVisibility,
+		Kind:      EventAnyVisibility,
+		Target:    sun,
+		Observer:  site,
+		Threshold: angle.Deg(SunHorizonAltitude),
+	}
+	return solver.Find(spec, start, end)
 }
 
 // SunriseSunset returns the first sunrise and first sunset found in the given interval.
@@ -249,8 +675,15 @@ func SunriseSunset(start, end time.Time, site *Site, eph ephemeris.Provider) (ri
 // It uses a threshold of 0° (center of the disk).
 func MoonEvents(start, end time.Time, site *Site, eph ephemeris.Provider) ([]Event, error) {
 	moon := NewBody(ephemeris.Moon, eph)
-	finder := NewEventFinder(15*time.Minute, 1*time.Second)
-	return finder.FindEvents(moon, start, end, site, angle.Deg(MoonHorizonAltitude))
+	solver := NewEventSolver(15*time.Minute, 1*time.Second)
+	spec := EventSpec{
+		Family:    EventFamilyVisibility,
+		Kind:      EventAnyVisibility,
+		Target:    moon,
+		Observer:  site,
+		Threshold: angle.Deg(MoonHorizonAltitude),
+	}
+	return solver.Find(spec, start, end)
 }
 
 // MoonriseMoonset returns the first moonrise and first moonset found in the given interval.
@@ -282,8 +715,15 @@ func TwilightEvents(start, end time.Time, site *Site, eph ephemeris.Provider, ki
 	}
 
 	sun := NewBody(ephemeris.Sun, eph)
-	finder := NewEventFinder(15*time.Minute, 1*time.Second)
-	events, err := finder.FindEvents(sun, start, end, site, angle.Deg(threshold))
+	solver := NewEventSolver(15*time.Minute, 1*time.Second)
+	spec := EventSpec{
+		Family:    EventFamilyVisibility,
+		Kind:      EventAnyVisibility,
+		Target:    sun,
+		Observer:  site,
+		Threshold: angle.Deg(threshold),
+	}
+	events, err := solver.Find(spec, start, end)
 	if err != nil {
 		return nil, err
 	}
@@ -321,8 +761,15 @@ func AstronomicalDawnDusk(start, end time.Time, site *Site, eph ephemeris.Provid
 func getTwilightPair(start, end time.Time, site *Site, eph ephemeris.Provider, kind TwilightKind) (dawn *Event, dusk *Event, err error) {
 	threshold := TwilightThresholds[kind]
 	sun := NewBody(ephemeris.Sun, eph)
-	finder := NewEventFinder(15*time.Minute, 1*time.Second)
-	events, err := finder.FindEvents(sun, start, end, site, angle.Deg(threshold))
+	solver := NewEventSolver(15*time.Minute, 1*time.Second)
+	spec := EventSpec{
+		Family:    EventFamilyVisibility,
+		Kind:      EventAnyVisibility,
+		Target:    sun,
+		Observer:  site,
+		Threshold: angle.Deg(threshold),
+	}
+	events, err := solver.Find(spec, start, end)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -340,163 +787,97 @@ func getTwilightPair(start, end time.Time, site *Site, eph ephemeris.Provider, k
 	return dawn, dusk, nil
 }
 
-// altitudeDiff returns alt(t) - threshold in degrees.
-func (f EventFinder) altitudeDiff(
-	obj Observable,
-	t time.Time,
-	site *Site,
-	threshold angle.Angle,
-) (float64, error) {
-	pos, err := obj.Position(t)
-	if err != nil {
-		return 0, err
+// ── Geometry Helpers ──────────────────────────────────────────────────────────
+
+// Conjunctions returns all conjunction events between target and other in the given interval.
+func Conjunctions(start, end time.Time, target, other Observable) ([]Event, error) {
+	solver := NewEventSolver(6*time.Hour, 1*time.Second)
+	spec := EventSpec{
+		Family: EventFamilyRelativeGeometry,
+		Kind:   EventConjunction,
+		Target: target,
+		Other:  other,
 	}
-	// EventFinder natively operates on the strictly computed Topocentric OBSERVED Altitude.
-	// This naturally accounts for refraction directly, allowing users to specify visual barriers (e.g. 10 deg dome).
-	// Calculate strictly geometric altitude to compare against standard thresholds (e.g. -0.5667 deg)
-	// We bypass atmosphere here so that numerical roots correctly hit the geometric horizon
-	astro := coord.NewAstrometric(pos.RA(), pos.Dec())
-	geom := coord.AstrometricToObserved(astro, t, site.Location(), coord.Atmosphere{Pressure: 0})
-	return geom.Alt().Degrees() - threshold.Degrees(), nil
+	return solver.Find(spec, start, end)
 }
 
-// ── Numerical Solver ──────────────────────────────────────────────────────────
-
-// refineRoot uses bisection to find the exact time when altitudeDiff == 0.
-// This is used for finding precise rise and set times.
-func (f EventFinder) refineRoot(
-	obj Observable,
-	t1, t2 time.Time,
-	h1, h2 float64,
-	site *Site,
-	threshold angle.Angle,
-	kind EventKind,
-) (Event, error) {
-	low, high := t1, t2
-	f1 := h1
-
-	for i := 0; i < f.MaxIter; i++ {
-		if high.Sub(low) < f.Tolerance {
-			break
-		}
-
-		mid := low.Add(high.Sub(low) / 2)
-		fm, err := f.altitudeDiff(obj, mid, site, threshold)
-		if err != nil {
-			return Event{}, err
-		}
-
-		if (f1 > 0) == (fm > 0) {
-			low = mid
-			f1 = fm
-		} else {
-			high = mid
-		}
+// Oppositions returns all opposition events between target and other in the given interval.
+func Oppositions(start, end time.Time, target, other Observable) ([]Event, error) {
+	solver := NewEventSolver(6*time.Hour, 1*time.Second)
+	spec := EventSpec{
+		Family: EventFamilyRelativeGeometry,
+		Kind:   EventOpposition,
+		Target: target,
+		Other:  other,
 	}
-
-	resTime := low.Add(high.Sub(low) / 2)
-	pos, err := obj.Position(resTime)
-	if err != nil {
-		return Event{}, err
-	}
-
-	astro := coord.NewAstrometric(pos.RA(), pos.Dec())
-	geom := coord.AstrometricToObserved(astro, resTime, site.Location(), coord.Atmosphere{Pressure: 0})
-	aa, err := coord.ICRSToAltAz(pos, resTime, site.Location())
-	if err != nil {
-		return Event{}, err
-	}
-
-	return Event{
-		Kind:              kind,
-		Time:              resTime,
-		Altitude:          aa.Alt(),
-		GeometricAltitude: geom.Alt(),
-		Azimuth:           aa.Az(),
-		Value:             geom.Alt().Degrees() - threshold.Degrees(),
-	}, nil
+	return solver.Find(spec, start, end)
 }
 
-// refineMax uses golden section search to find the time of maximum altitude.
-func (f EventFinder) refineMax(
-	obj Observable,
-	t1, t3 time.Time,
-	site *Site,
-	threshold angle.Angle,
-) (Event, error) {
-	// Golden section search for maximum in [t1, t3]
-	// Using R = (sqrt(5)-1)/2
-	R := (math.Sqrt(5) - 1) / 2
-	C := 1 - R
+// GreatestElongations returns all Greatest Elongation events (both East and West) for a planet relative to the Sun.
+func GreatestElongations(start, end time.Time, target, sun Observable) ([]Event, error) {
+	solver := NewEventSolver(6*time.Hour, 1*time.Second)
 
-	low, high := t1, t3
-	d := high.Sub(low)
+	specEast := EventSpec{
+		Family: EventFamilyRelativeGeometry,
+		Kind:   EventGreatestElongationEast,
+		Target: target,
+		Other:  sun,
+	}
 
-	ga := low.Add(time.Duration(float64(d) * C))
-	gb := low.Add(time.Duration(float64(d) * R))
+	specWest := EventSpec{
+		Family: EventFamilyRelativeGeometry,
+		Kind:   EventGreatestElongationWest,
+		Target: target,
+		Other:  sun,
+	}
 
-	fa, err := f.altitudeDiff(obj, ga, site, threshold)
+	var allEvents []Event
+
+	eastEvents, err := solver.Find(specEast, start, end)
 	if err != nil {
-		return Event{}, err
+		return nil, err
 	}
-	fb, err := f.altitudeDiff(obj, gb, site, threshold)
+	allEvents = append(allEvents, eastEvents...)
+
+	westEvents, err := solver.Find(specWest, start, end)
 	if err != nil {
-		return Event{}, err
+		return nil, err
 	}
+	allEvents = append(allEvents, westEvents...)
 
-	for i := 0; i < f.MaxIter; i++ {
-		if high.Sub(low) < f.Tolerance {
-			break
-		}
+	sort.Slice(allEvents, func(i, j int) bool {
+		return allEvents[i].Time.Before(allEvents[j].Time)
+	})
 
-		if fa > fb {
-			high = gb
-			gb = ga
-			fb = fa
-			d = high.Sub(low)
-			ga = low.Add(time.Duration(float64(d) * C))
-			fa, err = f.altitudeDiff(obj, ga, site, threshold)
-			if err != nil {
-				return Event{}, err
-			}
-		} else {
-			low = ga
-			ga = gb
-			fa = fb
-			d = high.Sub(low)
-			gb = low.Add(time.Duration(float64(d) * R))
-			fb, err = f.altitudeDiff(obj, gb, site, threshold)
-			if err != nil {
-				return Event{}, err
-			}
-		}
+	return allEvents, nil
+}
+
+// LunarEclipses returns the full moons (Sun-Moon Oppositions) in the given interval
+// which represent the syzygy alignment necessary for lunar eclipses.
+func LunarEclipses(start, end time.Time, eph ephemeris.Provider) ([]Event, error) {
+	sun := NewBody(ephemeris.Sun, eph)
+	moon := NewBody(ephemeris.Moon, eph)
+
+	// Moon moves very fast, so we use a higher resolution solver
+	solver := NewEventSolver(6*time.Hour, 1*time.Second)
+	spec := EventSpec{
+		Family: EventFamilyRelativeGeometry,
+		Kind:   EventOpposition,
+		Target: moon,
+		Other:  sun,
 	}
+	return solver.Find(spec, start, end)
+}
 
-	var resTime time.Time
-	if fa > fb {
-		resTime = ga
-	} else {
-		resTime = gb
+// VisibilityEvents returns all rise, transit, and set events for a target crossing the given threshold altitude within the interval.
+func VisibilityEvents(start, end time.Time, target Observable, site *Site, threshold angle.Angle) ([]Event, error) {
+	solver := NewEventSolver(15*time.Minute, 1*time.Second)
+	spec := EventSpec{
+		Family:    EventFamilyVisibility,
+		Kind:      EventAnyVisibility,
+		Target:    target,
+		Observer:  site,
+		Threshold: threshold,
 	}
-
-	pos, err := obj.Position(resTime)
-	if err != nil {
-		return Event{}, err
-	}
-	aa, err := coord.ICRSToAltAz(pos, resTime, site.Location())
-	if err != nil {
-		return Event{}, err
-	}
-
-	astro := coord.NewAstrometric(pos.RA(), pos.Dec())
-	geom := coord.AstrometricToObserved(astro, resTime, site.Location(), coord.Atmosphere{Pressure: 0})
-
-	return Event{
-		Kind:              EventTransit,
-		Time:              resTime,
-		Altitude:          aa.Alt(),
-		GeometricAltitude: geom.Alt(),
-		Azimuth:           aa.Az(),
-		Value:             aa.Alt().Degrees(),
-	}, nil
+	return solver.Find(spec, start, end)
 }

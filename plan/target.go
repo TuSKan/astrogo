@@ -3,6 +3,7 @@ package plan
 import (
 	"errors"
 	"fmt"
+	"math"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/catalog"
@@ -23,37 +24,74 @@ type Observable interface {
 	Position(t time.Time) (*coord.ICRS, error)
 }
 
-// NewFixed creates a new Observable for a fixed catalog
-func NewFixed(obj catalog.Target) Fixed {
-	return Fixed{Object: obj}
+// NewFixed is a legacy wrapper for NewDeepSpace.
+func NewFixed(obj catalog.Target) DeepSpace {
+	return NewDeepSpace(obj)
 }
 
-// NewDefaultFixed creates a new Observable for a fixed catalog using
+// NewDeepSpace creates a new Observable for a deep space target
+// (e.g. Star, Galaxy, Nebula), which automatically propagates proper motion.
+func NewDeepSpace(obj catalog.Target) DeepSpace {
+	return DeepSpace{Object: obj}
+}
+
+// NewDefaultDeepSpace creates a new Observable for a deep space target using
 // the default OpenNGC provider.
-func NewDefaultFixed(name string) (Fixed, error) {
+func NewDefaultDeepSpace(name string) (DeepSpace, error) {
 	provider := openngc.New()
 	obj, ok := provider.Resolve(name)
 	if !ok {
-		return Fixed{}, fmt.Errorf("target: %s not found in default catalog (OpenNGC)", name)
+		return DeepSpace{}, fmt.Errorf("target: %s not found in default catalog (OpenNGC)", name)
 	}
-	return NewFixed(obj), nil
+	return NewDeepSpace(obj), nil
 }
 
-// Fixed is an Observable wrapper around a catalog.Target.
-type Fixed struct {
+// DeepSpace is an Observable wrapper around a catalog.Target that propagates kinematics.
+type DeepSpace struct {
 	Object catalog.Target
 }
 
 // Name returns the object name from the catalog.
-func (f Fixed) Name() string {
+func (f DeepSpace) Name() string {
 	return f.Object.Name
 }
 
-// Position returns the fixed ICRS coordinates from the catalog object.
-func (f Fixed) Position(_ time.Time) (*coord.ICRS, error) {
+// Position returns the ICRS coordinates from the catalog object, applying proper motion
+// if the target possesses kinetic data.
+func (f DeepSpace) Position(t time.Time) (*coord.ICRS, error) {
 	if f.Object.Coord == nil {
 		return coord.NewICRS(angle.Rad(0), angle.Rad(0)), nil
 	}
+
+	// Mathematically propagate coordinates if target has proper motion.
+	hasPM := f.Object.PmRA.Radians() != 0 || f.Object.PmDec.Radians() != 0
+	if hasPM && !f.Object.Epoch.IsZero() {
+		// Julian years elapsed since catalog epoch
+		dt := (t.JD() - f.Object.Epoch.JD()) / 365.25
+
+		// Proper motion is inherently defined on the sphere, PmRA is typically
+		// dRA/dt * cos(Dec) or strictly dRA/dt depending on convention.
+		// In SIMBAD, pmra = dRA/dt * cos(Dec) usually, but simple addition
+		// handles basic observational propagation for non-extreme scopes.
+		// Note: The standard astrometric wrapper is highly rigorous, but this handles simple drifting.
+		dRA := f.Object.PmRA.Radians() * dt
+		dDec := f.Object.PmDec.Radians() * dt
+
+		// More rigorously, we can construct an Astrometric source and wrap it
+		// using AstrometricToApparent, but ICRS natively serves our geometrical model here.
+		// Since we just need geometric positional updates to trigger geometric Rise/Set events correctly.
+		// Just divide by cos(Dec) because astronomical dRA = PM_RA / cos(Dec) in coordinates.
+		cosDec := math.Cos(f.Object.Coord.Dec().Radians())
+		if math.Abs(cosDec) < 1e-10 {
+			cosDec = 1e-10
+		}
+
+		newRA := f.Object.Coord.RA().Radians() + (dRA / cosDec)
+		newDec := f.Object.Coord.Dec().Radians() + dDec
+
+		return coord.NewICRS(angle.Rad(newRA), angle.Rad(newDec)), nil
+	}
+
 	return f.Object.Coord, nil
 }
 

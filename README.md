@@ -109,12 +109,10 @@ Existing astronomy tools are powerful, but often:
   - Pluggable `Strategy` allocators (`GreedyStrategy`, `PriorityStrategy`)
 
 ### Event Solver *(new)*
-- **`EventFinder`** — two-stage numerical solver (coarse bracketing → bisection / golden-section)
-- Rise, Set, and Transit events for any target (fixed or moving)
-- **Sun events**: `SunEvents`, `SunriseSunset`
-- **Moon events**: `MoonEvents`, `MoonriseMoonset`
-- **Twilight events**: `CivilDawnDusk`, `NauticalDawnDusk`, `AstronomicalDawnDusk`
-- Sub-second precision; handles circumpolar and never-rise edge cases
+- **Unified `EventSolver`** — generic numerical root-finder (bisection / golden-section)
+- **Visibility Events**: Rise, Set, and Transit at sub-second precision.
+- **Relational Geometry Options**: Conjunction, Opposition, and Greatest Elongation.
+- **Convenience Helpers**: SunriseSunset`, `CivilDawnDusk`, `VisibilityEvents`, `Conjunctions`, `Oppositions`, `LunarEclipses`, `GreatestElongations`.
 
 ---
 
@@ -218,14 +216,19 @@ if err != nil {
 fmt.Println("Astro Dawn:", dawn)
 fmt.Println("Astro Dusk:", dusk)
 
-// Generic event finder for any target with custom threshold
-finder := plan.NewEventFinder(15*time.Minute, 1*time.Second)
-events, err := finder.FindEvents(m42, start, end, site, angle.Deg(30))
+// Find Visibility Events (Rise, Transit, Set) for a target over a 30-degree horizon
+events, err := plan.VisibilityEvents(start, end, m42, site, angle.Deg(30))
 if err != nil {
     log.Fatalf("failed to find events: %v", err)
 }
 for _, e := range events {
     fmt.Println(e) // Rise/Set/Transit at sub-second precision
+}
+
+// Find Conjunction between the Moon and Mars
+geomEvents, _ := plan.Conjunctions(start, end, moon, mars)
+for _, ge := range geomEvents {
+    fmt.Printf("Conjunction at: %s\n", ge.Time)
 }
 ```
 

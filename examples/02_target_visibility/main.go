@@ -27,7 +27,7 @@ func main() {
 	planner, _ := plan.NewPlanner(site, constraints)
 
 	// 3. Set Target using Default Local Catalog (OpenNGC)
-	target, err := plan.NewDefaultFixed("Orion Nebula")
+	target, err := plan.NewDefaultDeepSpace("Orion Nebula")
 	if err != nil {
 		log.Fatalf("Failed to resolve target: %v", err)
 	}

@@ -33,6 +33,10 @@ func BuildResolveQuery(req provider.ObjectRequest) string {
 		basic.ra,
 		basic.dec,
 		basic.otype,
+		basic.pmra,
+		basic.pmdec,
+		basic.plx_value,
+		basic.rvz_radvel,
 		ident.id
 	FROM basic 
 	JOIN ident ON basic.oid = ident.oidref 

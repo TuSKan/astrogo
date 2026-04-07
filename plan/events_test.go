@@ -1,6 +1,7 @@
 package plan
 
 import (
+	"math"
 	"testing"
 
 	"github.com/TuSKan/astrogo/angle"
@@ -13,7 +14,7 @@ import (
 
 // ── Generic Event Finder Tests ──────────────────────────────────────────────
 
-func TestEventFinder_Fixed(t *testing.T) {
+func TestEventSolver_Visibility_Fixed(t *testing.T) {
 	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(45), 0)
 	site, _ := NewSite("Test", loc, angle.Zero(), nil)
 	obj := Custom{Coord: coord.NewICRS(angle.Deg(0), angle.Deg(0))}
@@ -21,8 +22,14 @@ func TestEventFinder_Fixed(t *testing.T) {
 	start := time.FromJD(2451545.0, time.UTC)
 	end := start.Add(24 * time.Hour)
 
-	finder := NewEventFinder(30*time.Minute, 1*time.Second)
-	events, err := finder.FindEvents(obj, start, end, site, angle.Deg(20))
+	solver := NewEventSolver(30*time.Minute, 1*time.Second)
+	events, err := solver.Find(EventSpec{
+		Family:    EventFamilyVisibility,
+		Kind:      EventAnyVisibility,
+		Target:    obj,
+		Observer:  site,
+		Threshold: angle.Deg(20),
+	}, start, end)
 	testutil.AssertNoError(t, err)
 
 	if len(events) == 0 {
@@ -43,7 +50,7 @@ func TestEventFinder_Fixed(t *testing.T) {
 	}
 }
 
-func TestEventFinder_Circumpolar(t *testing.T) {
+func TestEventSolver_Visibility_Circumpolar(t *testing.T) {
 	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(45), 0)
 	site, _ := NewSite("Test", loc, angle.Zero(), nil)
 	obj := Custom{Coord: coord.NewICRS(angle.Deg(0), angle.Deg(80))}
@@ -51,8 +58,14 @@ func TestEventFinder_Circumpolar(t *testing.T) {
 	start := time.FromJD(2451545.0, time.UTC)
 	end := start.Add(24 * time.Hour)
 
-	finder := NewEventFinder(30*time.Minute, 10*time.Second)
-	events, err := finder.FindEvents(obj, start, end, site, angle.Deg(10))
+	solver := NewEventSolver(30*time.Minute, 10*time.Second)
+	events, err := solver.Find(EventSpec{
+		Family:    EventFamilyVisibility,
+		Kind:      EventAnyVisibility,
+		Target:    obj,
+		Observer:  site,
+		Threshold: angle.Deg(10),
+	}, start, end)
 	testutil.AssertNoError(t, err)
 
 	for _, e := range events {
@@ -62,7 +75,7 @@ func TestEventFinder_Circumpolar(t *testing.T) {
 	}
 }
 
-func TestEventFinder_NeverVisible(t *testing.T) {
+func TestEventSolver_Visibility_NeverVisible(t *testing.T) {
 	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(45), 0)
 	site, _ := NewSite("Test", loc, angle.Zero(), nil)
 	obj := Custom{Coord: coord.NewICRS(angle.Deg(0), angle.Deg(-80))}
@@ -70,8 +83,14 @@ func TestEventFinder_NeverVisible(t *testing.T) {
 	start := time.FromJD(2451545.0, time.UTC)
 	end := start.Add(24 * time.Hour)
 
-	finder := NewEventFinder(30*time.Minute, 10*time.Second)
-	events, err := finder.FindEvents(obj, start, end, site, angle.Deg(0))
+	solver := NewEventSolver(30*time.Minute, 10*time.Second)
+	events, err := solver.Find(EventSpec{
+		Family:    EventFamilyVisibility,
+		Kind:      EventAnyVisibility,
+		Target:    obj,
+		Observer:  site,
+		Threshold: angle.Deg(0),
+	}, start, end)
 	testutil.AssertNoError(t, err)
 
 	for _, e := range events {
@@ -254,16 +273,177 @@ func TestTwilight_HighLat(t *testing.T) {
 
 // ── Benchmarks ─────────────────────────────────────────────────────────────
 
-func BenchmarkEventFinder(b *testing.B) {
+func BenchmarkEventSolver(b *testing.B) {
 	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(45), 0)
 	site, _ := NewSite("Test", loc, angle.Zero(), nil)
 	obj := Custom{Coord: coord.NewICRS(angle.Deg(0), angle.Deg(0))}
 	start := time.FromJD(2451545.0, time.UTC)
 	end := start.Add(24 * time.Hour)
-	finder := NewEventFinder(30*time.Minute, 1*time.Second)
+	solver := NewEventSolver(30*time.Minute, 1*time.Second)
+	spec := EventSpec{
+		Family:    EventFamilyVisibility,
+		Kind:      EventAnyVisibility,
+		Target:    obj,
+		Observer:  site,
+		Threshold: angle.Deg(20),
+	}
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, _ = finder.FindEvents(obj, start, end, site, angle.Deg(20))
+		_, _ = solver.Find(spec, start, end)
 	}
 }
+
+// ── Geometry Tests ─────────────────────────────────────────────────────────
+
+// mockLinearTarget sweeps across Right Ascension linearly.
+type mockLinearTarget struct {
+	raRate  float64 // deg per hour
+	startRA float64
+	dec     float64
+}
+
+func (m *mockLinearTarget) Position(t time.Time) (*coord.ICRS, error) {
+	hours := float64(t.Sub(time.FromJD(2451545.0, time.UTC)).Hours())
+	ra := m.startRA + m.raRate*hours
+	// Normalize RA
+	for ra >= 360 {
+		ra -= 360
+	}
+	for ra < 0 {
+		ra += 360
+	}
+	return coord.NewICRS(angle.Deg(ra), angle.Deg(m.dec)), nil
+}
+
+func (m *mockLinearTarget) Constraints() []Constraint { return nil }
+func (m *mockLinearTarget) Catalog() string           { return "MOCK" }
+func (m *mockLinearTarget) ID() string                { return "Linear" }
+func (m *mockLinearTarget) Name() string              { return "LinearName" }
+
+func TestSolveGeometry_Conjunction(t *testing.T) {
+	t1 := &mockLinearTarget{raRate: 1.0, startRA: 10, dec: 0.0}
+	t2 := &mockLinearTarget{raRate: 0.5, startRA: 15, dec: 0.0}
+
+	start := time.FromJD(2451545.0, time.UTC)
+	end := start.Add(24 * time.Hour)
+
+	solver := NewEventSolver(1*time.Hour, 1*time.Second)
+
+	spec := EventSpec{
+		Family: EventFamilyRelativeGeometry,
+		Kind:   EventConjunction,
+		Target: t1,
+		Other:  t2,
+	}
+
+	events, err := solver.Find(spec, start, end)
+	testutil.AssertNoError(t, err)
+
+	if len(events) != 1 {
+		t.Fatalf("expected 1 conjunction event, got %d", len(events))
+	}
+
+	event := events[0]
+	if event.Kind != EventConjunction {
+		t.Errorf("expected EventConjunction, got %v", event.Kind)
+	}
+
+	gotHours := float64(event.Time.Sub(start).Hours())
+	testutil.AssertNear(t, "conjunction time", gotHours, 10.0, 0.01)
+}
+
+func TestSolveGeometry_Opposition(t *testing.T) {
+	t1 := &mockLinearTarget{raRate: 1.0, startRA: 175, dec: 0.0}
+	t2 := &mockLinearTarget{raRate: 0.0, startRA: 0, dec: 0.0}
+
+	start := time.FromJD(2451545.0, time.UTC)
+	end := start.Add(10 * time.Hour)
+
+	solver := NewEventSolver(1*time.Hour, 1*time.Second)
+
+	spec := EventSpec{
+		Family: EventFamilyRelativeGeometry,
+		Kind:   EventOpposition,
+		Target: t1,
+		Other:  t2,
+	}
+
+	events, err := solver.Find(spec, start, end)
+	testutil.AssertNoError(t, err)
+
+	if len(events) != 1 {
+		t.Fatalf("expected 1 opposition event, got %d", len(events))
+	}
+
+	gotHours := float64(events[0].Time.Sub(start).Hours())
+	testutil.AssertNear(t, "opposition time", gotHours, 5.0, 0.01)
+}
+
+// target with parabolic separation distance to test Greatest Elongation.
+type mockParabolicTarget struct {
+	a float64
+	h float64
+	k float64
+}
+
+func (m *mockParabolicTarget) Position(t time.Time) (*coord.ICRS, error) {
+	hours := float64(t.Sub(time.FromJD(2451545.0, time.UTC)).Hours())
+	dec := m.a*math.Pow(hours-m.h, 2) + m.k
+	return coord.NewICRS(angle.Deg(0), angle.Deg(dec)), nil
+}
+
+func (m *mockParabolicTarget) Constraints() []Constraint { return nil }
+func (m *mockParabolicTarget) Catalog() string           { return "MOCK" }
+func (m *mockParabolicTarget) ID() string                { return "Para" }
+func (m *mockParabolicTarget) Name() string              { return "ParaName" }
+
+func TestSolveGeometry_GreatestElongation(t *testing.T) {
+	t2 := &mockLinearTarget{raRate: 0, startRA: 10, dec: 0}
+
+	t1 := &mockParabolicTarget{
+		a: -1.0,
+		h: 6.0,
+		k: 15.0,
+	}
+
+	t1_pos := func(t time.Time) (*coord.ICRS, error) {
+		hours := float64(t.Sub(time.FromJD(2451545.0, time.UTC)).Hours())
+		dec := t1.a*math.Pow(hours-t1.h, 2) + t1.k
+		return coord.NewICRS(angle.Deg(20), angle.Deg(dec)), nil
+	}
+
+	wrapper := &mockDynamicTarget{f: t1_pos}
+
+	start := time.FromJD(2451545.0, time.UTC)
+	end := start.Add(12 * time.Hour)
+
+	solver := NewEventSolver(1*time.Hour, 1*time.Second)
+
+	spec := EventSpec{
+		Family: EventFamilyRelativeGeometry,
+		Kind:   EventGreatestElongationEast,
+		Target: wrapper,
+		Other:  t2,
+	}
+
+	events, err := solver.Find(spec, start, end)
+	testutil.AssertNoError(t, err)
+
+	if len(events) != 1 {
+		t.Fatalf("expected 1 greatest elongation event, got %d", len(events))
+	}
+
+	gotHours := float64(events[0].Time.Sub(start).Hours())
+	testutil.AssertNear(t, "elongation time", gotHours, 6.0, 0.1)
+}
+
+type mockDynamicTarget struct {
+	f func(t time.Time) (*coord.ICRS, error)
+}
+
+func (m *mockDynamicTarget) Position(t time.Time) (*coord.ICRS, error) { return m.f(t) }
+func (m *mockDynamicTarget) Constraints() []Constraint                 { return nil }
+func (m *mockDynamicTarget) Catalog() string                           { return "DYN" }
+func (m *mockDynamicTarget) ID() string                                { return "Dyn" }
+func (m *mockDynamicTarget) Name() string                              { return "DynName" }

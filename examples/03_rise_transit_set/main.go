@@ -5,7 +5,7 @@ import (
 	"log"
 
 	"github.com/TuSKan/astrogo/angle"
-	"github.com/TuSKan/astrogo/catalog/simbad"
+	"github.com/TuSKan/astrogo/catalog"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/plan"
 	"github.com/TuSKan/astrogo/time"
@@ -19,24 +19,21 @@ func main() {
 	loc, _ := coord.NewGeodetic(angle.Deg(-46.6525), angle.Deg(-23.600833), 786)
 	site, _ := plan.NewSite("São Paulo", loc, angle.Zero(), nil)
 
-	// 2. Set a Fixed Target
-	sirius, ok := simbad.New().Resolve("Sirius")
-	if !ok {
+	// 2. Set a Deep Space Target
+	sirius, err := catalog.NewResolver(catalog.SIMBAD).Resolve("Sirius")
+	if err != nil {
 		log.Fatalf("Failed to resolve target: %s", "Sirius")
 	}
-	target := plan.NewFixed(sirius)
+	target := plan.NewDeepSpace(sirius)
 
 	// 3. Define the Time interval (next 24 hours starting from 7 PM tonight)
 	tz, _ := time.LoadLocation("America/Sao_Paulo")
 	start := time.Date(2026, 4, 6, 19, 0, 0, 0, tz)
 	end := start.Add(24 * time.Hour)
 
-	// 4. Set up an Event Finder (searching every 15 minutes, with 1s tolerance)
-	finder := plan.NewEventFinder(15*time.Minute, 1*time.Second)
-
-	// 5. Find Events (crossing over -0.56 degree standard geometric horizon threshold)
+	// 4. Find Events (crossing over -0.56 degree standard geometric horizon threshold)
 	// Real-world astronomical tools use -0.56° (or -34 arcminutes) to approximate standard visual rising/setting.
-	events, err := finder.FindEvents(target, start, end, site, angle.Deg(-0.5667))
+	events, err := plan.VisibilityEvents(start, end, target, site, angle.Deg(-0.5667))
 	if err != nil {
 		fmt.Printf("Error finding events: %v\n", err)
 		return

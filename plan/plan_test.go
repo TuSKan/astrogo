@@ -26,8 +26,8 @@ func TestPlanner(t *testing.T) {
 	tm := time.NowUTC()
 
 	objs := []Observable{
-		Fixed{Object: catalog.Target{Name: "High", Coord: coord.NewICRS(angle.Deg(0), angle.Deg(45))}},
-		Fixed{Object: catalog.Target{Name: "Low", Coord: coord.NewICRS(angle.Deg(180), angle.Deg(-45))}},
+		DeepSpace{Object: catalog.Target{Name: "High", Coord: coord.NewICRS(angle.Deg(0), angle.Deg(45))}},
+		DeepSpace{Object: catalog.Target{Name: "Low", Coord: coord.NewICRS(angle.Deg(180), angle.Deg(-45))}},
 	}
 
 	filtered, err := planner.FilterObservable(objs, tm)

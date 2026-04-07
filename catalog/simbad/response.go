@@ -9,6 +9,7 @@ import (
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/catalog/provider"
 	"github.com/TuSKan/astrogo/coord"
+	"github.com/TuSKan/astrogo/time"
 )
 
 // ParseCSV parses SIMBAD's TAP output in CSV format into provider.Targets.
@@ -88,6 +89,31 @@ func ParseCSV(r io.Reader) ([]provider.Target, error) {
 			Kind:    otype,
 			Coord:   c,
 			Catalog: "SIMBAD",
+		}
+
+		if c != nil {
+			t.Epoch = time.FromJD(2451545.0, time.UTC) // Default SIMBAD Epoch (J2000)
+
+			if pmRAStr, ok := colIdx["pmra"]; ok && row[pmRAStr] != "" {
+				if v, err := strconv.ParseFloat(row[pmRAStr], 64); err == nil {
+					t.PmRA = angle.Arcsec(v / 1000.0)
+				}
+			}
+			if pmDecStr, ok := colIdx["pmdec"]; ok && row[pmDecStr] != "" {
+				if v, err := strconv.ParseFloat(row[pmDecStr], 64); err == nil {
+					t.PmDec = angle.Arcsec(v / 1000.0)
+				}
+			}
+			if plxStr, ok := colIdx["plx_value"]; ok && row[plxStr] != "" {
+				if v, err := strconv.ParseFloat(row[plxStr], 64); err == nil {
+					t.Parallax = angle.Arcsec(v / 1000.0)
+				}
+			}
+			if rvStr, ok := colIdx["rvz_radvel"]; ok && row[rvStr] != "" {
+				if v, err := strconv.ParseFloat(row[rvStr], 64); err == nil {
+					t.RadialVelocity = v
+				}
+			}
 		}
 
 		if aliasIdx, exists := colIdx["id"]; exists {
