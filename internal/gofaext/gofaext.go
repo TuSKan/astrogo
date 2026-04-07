@@ -188,3 +188,11 @@ func C2t06a(tta, ttb, uta, utb, xp, yp float64) [3][3]float64 {
 	gofa.C2t06a(tta, ttb, uta, utb, xp, yp, &rc2t)
 	return rc2t
 }
+
+// Refco determining the constants A and B in the atmospheric refraction model
+// dz = A tan z + B tan^3 z.
+// phpa is pressure in hPa, tc is temp in C, rh is relative humidity, wl is wavelength in um.
+func Refco(phpa, tc, rh, wl float64) (refa, refb float64) {
+	gofa.Refco(phpa, tc, rh, wl, &refa, &refb)
+	return refa, refb
+}

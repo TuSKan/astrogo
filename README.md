@@ -69,13 +69,13 @@ Existing astronomy tools are powerful, but often:
 - Full mapping: Geometric <-> Astrometric <-> Apparent <-> Observed 
 - Frame-to-frame (Galactic, Ecliptic, ICRS, CIRS)
 - Dynamic DUT1 tracking and Polar Motion (XP/YP) caching via IERS EOP rapid data
-- Modular Atmospheric Refraction system (SOFA analytical vs approximation plugins)
+- Modular Atmospheric Refraction system (Bidirectional Bennett/Saemundsson mappings)
 - Aberration, light deflection, proper motion, parallax handled natively
 
 ### Observer modeling
 - Geodetic locations (WGS84)
 - Local sky computations
-- Airmass and zenith distance
+- Pickering (2002) Airmass interpolation and Zenith distance metrics
 
 ### Ephemerides
 - Sun and Moon positions
