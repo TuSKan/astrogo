@@ -114,6 +114,53 @@ func (s *sofaProvider) State(id ID, t time.Time) (State, error) {
 			Vel: vector.Vec3{X: pv[1][0], Y: pv[1][1], Z: pv[1][2]},
 		}, nil
 
+	case Mercury, Venus, Earth, Mars, Jupiter, Saturn, Uranus, Neptune:
+		// Get Earth heliocentric state
+		pvh, _, status := gofaext.Epv00(d1, d2)
+		if status < 0 {
+			return State{}, errors.New("ephemeris: sofa epv00 failed")
+		}
+
+		var np int
+		switch id {
+		case Mercury:
+			np = 1
+		case Venus:
+			np = 2
+		case Earth:
+			np = 3
+		case Mars:
+			np = 4
+		case Jupiter:
+			np = 5
+		case Saturn:
+			np = 6
+		case Uranus:
+			np = 7
+		case Neptune:
+			np = 8
+		}
+
+		// Get Planet heliocentric state
+		pv, status := gofaext.Plan94(d1, d2, np)
+		if status < 0 {
+			return State{}, errors.New("ephemeris: sofa plan94 failed")
+		}
+
+		// Planet Geocentric = Planet Heliocentric - Earth Heliocentric
+		return State{
+			Pos: vector.Vec3{
+				X: pv[0][0] - pvh[0][0],
+				Y: pv[0][1] - pvh[0][1],
+				Z: pv[0][2] - pvh[0][2],
+			},
+			Vel: vector.Vec3{
+				X: pv[1][0] - pvh[1][0],
+				Y: pv[1][1] - pvh[1][1],
+				Z: pv[1][2] - pvh[1][2],
+			},
+		}, nil
+
 	default:
 		return State{}, errors.New("ephemeris: unsupported body for sofa provider")
 	}

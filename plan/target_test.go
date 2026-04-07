@@ -141,8 +141,8 @@ func TestBodyErrors(t *testing.T) {
 	_, err := b1.Position(time.NowUTC())
 	testutil.AssertError(t, err)
 
-	// Unsupported body (using sofaProvider for Mars)
-	b2 := Body{ID: ephemeris.Mars, Provider: ephemeris.Default()}
+	// Unsupported body
+	b2 := Body{ID: ephemeris.ID(999999), Provider: ephemeris.Default()}
 	_, err = b2.Position(time.NowUTC())
 	testutil.AssertError(t, err)
 }

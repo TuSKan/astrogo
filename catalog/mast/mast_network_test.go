@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/TuSKan/astrogo/catalog"
+	"github.com/TuSKan/astrogo/catalog/provider"
 )
 
 func TestMastNetworkResolve(t *testing.T) {
@@ -17,11 +17,11 @@ func TestMastNetworkResolve(t *testing.T) {
 	defer cancel()
 
 	// STScI MAST Name Lookup for Vega
-	req := catalog.ObjectRequest{Query: "Vega", Limit: 1}
+	req := provider.ObjectRequest{Query: "Vega", Limit: 1}
 
 	iter := prov.ResolveObject(ctx, req)
-	var targets []catalog.Target
-	iter(func(tar catalog.Target, err error) bool {
+	var targets []provider.Target
+	iter(func(tar provider.Target, err error) bool {
 		if err != nil {
 			t.Fatalf("Live network failed: %v", err)
 		}

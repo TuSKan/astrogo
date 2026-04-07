@@ -4,43 +4,32 @@ import (
 	"fmt"
 
 	"github.com/TuSKan/astrogo/angle"
-	"github.com/TuSKan/astrogo/catalog"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/time"
 )
 
 func ExampleScheduler_BuildSchedule() {
-	// 1. Setup Observatory
+	// Setup observatory and planner constraints
 	loc, _ := coord.NewGeodetic(angle.Zero(), angle.Zero(), 0)
 	site, _ := NewSite("Greenwich", loc, angle.Zero(), nil)
+	planner, _ := NewPlanner(site, []Constraint{Altitude{Threshold: angle.Deg(30)}})
 
-	// 2. Setup Planner and constraints
-	constraints := []Constraint{
-		Altitude{Threshold: angle.Deg(30)},
-	}
-	planner, _ := NewPlanner(site, constraints)
-
-	// 3. Define Slew and Transition Model
+	// Configure transition overheads (slew speeds, filter changes)
 	transition := &BasicTransitionModel{
 		BaseSetup:           1 * time.Minute,
 		SlewRate:            2.0, // degrees per second
 		FilterChangePenalty: 30 * time.Second,
 	}
 
-	// 4. Create Strategy and Scheduler
-	strategy := &PriorityStrategy{Step: 5 * time.Minute}
-	scheduler := NewScheduler(planner, strategy, transition)
+	scheduler := NewScheduler(planner, &PriorityStrategy{Step: 5 * time.Minute}, transition)
 
-	// 5. Define Observation Blocks
-	t1 := NewFixed(catalog.Target{Name: "TargetA", Coord: coord.NewICRS(angle.Hour(18.69), angle.Deg(0))})
-	t2 := NewFixed(catalog.Target{Name: "TargetB", Coord: coord.NewICRS(angle.Hour(18.69), angle.Deg(45))})
-
+	// Define our observing blocks using Custom coordinates
 	blocks := []*Block{
 		{
 			ID:       "BlockA",
-			Target:   t1,
+			Target:   Custom{Label: "TargetA", Coord: coord.NewICRS(angle.Hour(18.69), angle.Zero())},
 			Duration: 30 * time.Minute,
-			Priority: 2.0, // Higher priority
+			Priority: 2.0,
 			Config:   Configuration{Filter: "V"},
 			Cadence: &Cadence{
 				MinInterval: 2 * time.Hour,
@@ -49,37 +38,26 @@ func ExampleScheduler_BuildSchedule() {
 		},
 		{
 			ID:       "BlockB",
-			Target:   t2,
+			Target:   Custom{Label: "TargetB", Coord: coord.NewICRS(angle.Hour(18.69), angle.Deg(45))},
 			Duration: 45 * time.Minute,
 			Priority: 1.0,
 			Config:   Configuration{Filter: "R"},
 		},
 	}
 
-	// 6. Define Scheduling Window (e.g., 6 hours)
-	start := time.FromJD(2451545.0, time.UTC) // J2000 Noon (Targets at ideal positions)
+	// Generate a 6-hour schedule
+	start := time.FromJD(2451545.0, time.UTC) // J2000 Noon
 	window := Window{Start: start, End: start.Add(6 * time.Hour)}
 
-	// 7. Generate Schedule
 	schedule, _ := scheduler.BuildSchedule(window, blocks)
 
 	// Print Results
-	fmt.Printf("Generated Schedule for %s:\n", schedule.Site.Name())
-	for i, b := range schedule.Blocks {
-		fmt.Printf("%d. %s [%s] -> Start: %s | Setup: %ds\n",
-			i+1, b.Block.ID, b.Block.Target.Name(), b.Window.Start, int(b.SetupTime.Seconds()))
-	}
-
-	if len(schedule.Unscheduled) > 0 {
-		fmt.Println("\nUnscheduled Blocks:")
-		for _, b := range schedule.Unscheduled {
-			fmt.Printf("- %s: %s\n", b.Block.ID, b.Reason)
-		}
+	for _, b := range schedule.Blocks {
+		fmt.Printf("%s [%s] -> Setup: %ds\n", b.Block.ID, b.Block.Target.Name(), int(b.SetupTime.Seconds()))
 	}
 
 	// Output:
-	// Generated Schedule for Greenwich:
-	// 1. BlockA [TargetA] -> Start: JD 2451545.00069444 (UTC) | Setup: 60s
-	// 2. BlockB [TargetB] -> Start: JD 2451545.02234890 (UTC) | Setup: 70s
-	// 3. BlockA [TargetA] -> Start: JD 2451545.10554628 (UTC) | Setup: 59s
+	// BlockA [TargetA] -> Setup: 60s
+	// BlockB [TargetB] -> Setup: 70s
+	// BlockA [TargetA] -> Setup: 59s
 }

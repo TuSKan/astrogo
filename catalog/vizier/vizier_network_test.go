@@ -9,17 +9,17 @@ import (
 	"time"
 
 	"github.com/TuSKan/astrogo/angle"
-	"github.com/TuSKan/astrogo/catalog"
+	"github.com/TuSKan/astrogo/catalog/provider"
 	"github.com/TuSKan/astrogo/coord"
 )
 
 func TestVizierNetworkConeSearch(t *testing.T) {
 	prov := New()
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	// Generic ConeSearch around M31 core
-	req := catalog.ConeRequest{
+	req := provider.ConeRequest{
 		Center: coord.NewICRS(angle.Deg(10.684), angle.Deg(41.269)),
 		Radius: angle.Deg(0.01), // Very tight 36 arcseconds
 		Limit:  10,
@@ -27,7 +27,7 @@ func TestVizierNetworkConeSearch(t *testing.T) {
 
 	iter := prov.ConeSearch(ctx, req)
 	var count int
-	iter(func(tar catalog.Target, err error) bool {
+	iter(func(tar provider.Target, err error) bool {
 		if err != nil {
 			t.Fatalf("Live network failed: %v", err)
 		}

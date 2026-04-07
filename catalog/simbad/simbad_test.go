@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/TuSKan/astrogo/catalog"
+	"github.com/TuSKan/astrogo/catalog/provider"
 )
 
 func TestParseCSV(t *testing.T) {
@@ -32,7 +32,7 @@ func TestParseCSV(t *testing.T) {
 	if tgt.ID != "NAME M  31" {
 		t.Errorf("unexpected ID: %s", tgt.ID)
 	}
-	if tgt.Kind != catalog.KindGalaxy {
+	if tgt.Kind != provider.KindGalaxy {
 		t.Errorf("unexpected Kind: %s", tgt.Kind)
 	}
 
@@ -73,12 +73,12 @@ func TestResolveMock(t *testing.T) {
 	// Since we defined tapSyncURL as const, we just test the public method? Actually,
 	// test ParseCSV is the real test. We can just test Provider behavior if we can mock Client Transport.
 
-	provider := New()
-	provider.client.HTTPClient.Transport = &mockTransport{
+	p := New()
+	p.client.HTTPClient.Transport = &mockTransport{
 		Handler: server.Config.Handler,
 	}
 
-	tgt, ok := provider.Resolve("m31")
+	tgt, ok := p.Resolve("m31")
 	if !ok {
 		t.Fatalf("failed to resolve target")
 	}
@@ -110,20 +110,20 @@ func TestRetryTimeout(t *testing.T) {
 	}))
 	defer server.Close()
 
-	provider := New()
-	provider.client.HTTPClient.Timeout = 100 * time.Millisecond
-	provider.client.UserAgent = "TestUserAgent"
+	p := New()
+	p.client.HTTPClient.Timeout = 100 * time.Millisecond
+	p.client.UserAgent = "TestUserAgent"
 
 	// Create mock transport directly to our server
-	provider.client.HTTPClient.Transport = &mockTransport{
+	p.client.HTTPClient.Transport = &mockTransport{
 		Handler: server.Config.Handler,
 	}
 
 	ctx := context.Background()
-	req := catalog.ObjectRequest{Query: "test"}
-	iter := provider.ResolveObject(ctx, req)
+	req := provider.ObjectRequest{Query: "test"}
+	iter := p.ResolveObject(ctx, req)
 
-	iter(func(tgt catalog.Target, err error) bool {
+	iter(func(tgt provider.Target, err error) bool {
 		if err == nil {
 			t.Errorf("expected error, got nil")
 		}
@@ -170,7 +170,7 @@ func TestProviderInterface(t *testing.T) {
 		t.Errorf("expected simbad, got %s", p.Name())
 	}
 	caps := p.Capabilities()
-	if len(caps) != 1 || caps[0] != catalog.CapObjectResolution {
+	if len(caps) != 1 || caps[0] != provider.CapObjectResolution {
 		t.Errorf("expected CapObjectResolution, got %v", caps)
 	}
 

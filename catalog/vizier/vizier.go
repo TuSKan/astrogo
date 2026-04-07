@@ -9,40 +9,40 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/TuSKan/astrogo/catalog"
+	"github.com/TuSKan/astrogo/catalog/provider"
 )
 
 const tapSyncURL = "http://tapvizier.u-strasbg.fr/TAPVizieR/tap/sync"
 
-// Provider implements catalog.Provider and catalog.ConeSearcher
+// Provider implements provider.Provider and provider.ConeSearcher
 // for querying tables hosted on VizieR via TAP ADQL.
 type Provider struct {
-	client *catalog.Client
-	cache  catalog.Cache
+	client *provider.Client
+	cache  provider.Cache
 }
 
 func New() *Provider {
 	return &Provider{
-		client: catalog.NewClient(),
-		cache:  catalog.NewArrowCache(),
+		client: provider.NewClient(),
+		cache:  provider.NewArrowCache(),
 	}
 }
 
 func (p *Provider) Name() string { return "vizier" }
 
-func (p *Provider) Capabilities() []catalog.Capability {
-	return []catalog.Capability{catalog.CapConeSearch}
+func (p *Provider) Capabilities() []provider.Capability {
+	return []provider.Capability{provider.CapConeSearch}
 }
 
-func (p *Provider) Resolve(query string) (catalog.Target, bool) {
-	return catalog.Target{}, false // Not supported directly, use ConeSearch
+func (p *Provider) Resolve(query string) (provider.Target, bool) {
+	return provider.Target{}, false // Not supported directly, use ConeSearch
 }
 
-func (p *Provider) Search(query string) []catalog.Target {
+func (p *Provider) Search(query string) []provider.Target {
 	return nil
 }
 
-func (p *Provider) ConeSearch(ctx context.Context, req catalog.ConeRequest) catalog.SeqIterator[catalog.Target] {
+func (p *Provider) ConeSearch(ctx context.Context, req provider.ConeRequest) provider.SeqIterator[provider.Target] {
 	// VizieR requires specifying a catalog index/table if we do ADQL.
 	// Since ConeRequest doesn't specify 'table', we might need to rely purely on VizieR's standard catalogs
 	// OR require the user to encode it somehow.
@@ -57,8 +57,11 @@ func (p *Provider) ConeSearch(ctx context.Context, req catalog.ConeRequest) cata
 	}
 
 	// CIRCLE receives coordinates in DEGREES for ADQL natively.
-	ra := req.Center.RA().Degrees()
-	dec := req.Center.Dec().Degrees()
+	var ra, dec float64
+	if req.Center != nil {
+		ra = req.Center.RA().Degrees()
+		dec = req.Center.Dec().Degrees()
+	}
 	rad := req.Radius.Degrees()
 
 	adql := fmt.Sprintf(`SELECT TOP %d 
@@ -79,26 +82,26 @@ func (p *Provider) ConeSearch(ctx context.Context, req catalog.ConeRequest) cata
 
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, tapSyncURL, strings.NewReader(v.Encode()))
 	if err != nil {
-		return catalog.SliceSeq([]catalog.Target{})
+		return provider.SliceSeq([]provider.Target{})
 	}
 	httpReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-	return func(yield func(catalog.Target, error) bool) {
+	return func(yield func(provider.Target, error) bool) {
 		resp, err := p.client.Do(httpReq)
 		if err != nil {
-			yield(catalog.Target{}, err)
+			yield(provider.Target{}, err)
 			return
 		}
 		defer resp.Body.Close()
 
 		targets, err := parseCSV(resp.Body)
 		if err != nil {
-			yield(catalog.Target{}, err)
+			yield(provider.Target{}, err)
 			return
 		}
 
 		if err := p.cache.Set(cacheKey, targets); err != nil {
-			yield(catalog.Target{}, err)
+			yield(provider.Target{}, err)
 			return
 		}
 
@@ -110,11 +113,11 @@ func (p *Provider) ConeSearch(ctx context.Context, req catalog.ConeRequest) cata
 	}
 }
 
-func parseCSV(body io.Reader) ([]catalog.Target, error) {
+func parseCSV(body io.Reader) ([]provider.Target, error) {
 	reader := csv.NewReader(body)
 	if _, err := reader.Read(); err != nil { // discard header for now and assume exact select order
 		return nil, err
 	}
 	// TODO: implement standard schema extraction or hardcode based on SELECT order.
-	return []catalog.Target{}, nil // Scaffolded
+	return []provider.Target{}, nil // Scaffolded
 }

@@ -1,4 +1,4 @@
-// Package vizier provides a catalog.ConeSearcher implementation targeting the
+// Package vizier provides a provider.ConeSearcher implementation targeting the
 // CDS VizieR catalog service.
 //
 // VizieR is an astronomical catalog registry hosting thousands of datasets.

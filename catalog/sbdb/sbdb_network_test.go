@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/TuSKan/astrogo/catalog"
+	"github.com/TuSKan/astrogo/catalog/provider"
 )
 
 func TestSBDBNetworkResolve(t *testing.T) {
@@ -16,11 +16,11 @@ func TestSBDBNetworkResolve(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	req := catalog.ObjectRequest{Query: "Aten", Limit: 1}
+	req := provider.ObjectRequest{Query: "Aten", Limit: 1}
 	iter := prov.ResolveObject(ctx, req)
 
-	var targets []catalog.Target
-	iter(func(tar catalog.Target, err error) bool {
+	var targets []provider.Target
+	iter(func(tar provider.Target, err error) bool {
 		if err != nil {
 			t.Fatalf("Live network failed: %v", err)
 		}

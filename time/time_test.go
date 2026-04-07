@@ -151,6 +151,37 @@ func TestTimeStdInterop(t *testing.T) {
 	}
 }
 
+func TestTimeFloatPrecisionRoundTrip(t *testing.T) {
+	// Let's test a broad spectrum of "dirty" hours and dates
+	// to ensure floating-point precision truncation never regresses again.
+
+	datesToTest := []time.Time{
+		time.Date(2026, 4, 6, 22, 0, 0, 0, time.UTC),                       // JD = 2461137.41666667 (The original issue)
+		time.Date(2026, 4, 6, 19, 0, 0, 0, time.FixedZone("BRT", -3*3600)), // São Paulo Timezone directly
+		time.Date(1999, 12, 31, 23, 59, 59, 0, time.UTC),                   // One second before Y2K
+		time.Date(2038, 1, 19, 3, 14, 7, 0, time.UTC),                      // Year 2038 problem epoch
+		time.Date(2000, 1, 1, 12, 0, 0, 0, time.UTC),                       // Exact .5 JD boundary
+		time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC),                        // Unix Epoch Origin
+		time.Date(2050, 7, 4, 18, 30, 45, 123456000, time.UTC),             // Mixed sub-seconds
+	}
+
+	for _, dt := range datesToTest {
+		// Go -> AstroGo Time
+		astroTime := atime.FromGo(dt)
+
+		// AstroGo Time -> Go
+		roundTripped := astroTime.ToGo()
+
+		// Verify exactly equal down to the second level at minimum
+		if dt.Unix() != roundTripped.Unix() {
+			t.Errorf("Round-trip failed for %v!\nExpected: %v\nGot:      %v",
+				dt.Format(time.RFC3339Nano),
+				dt.Format(time.RFC3339Nano),
+				roundTripped.Format(time.RFC3339Nano))
+		}
+	}
+}
+
 type mockEOP struct{}
 
 func (mockEOP) EOP(_ float64) (iers.EOP, error) {

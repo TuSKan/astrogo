@@ -1,4 +1,4 @@
-package catalog
+package fits
 
 import (
 	"fmt"
@@ -8,17 +8,19 @@ import (
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/fits"
+
+	"github.com/TuSKan/astrogo/catalog/provider"
 )
 
-type FITSProvider struct {
+type Provider struct {
 	name    string
-	targets []Target
+	targets []provider.Target
 }
 
-// NewFITSProvider encapsulates the entire process of opening a FITS file off disk,
+// New encapsulates the entire process of opening a FITS file off disk,
 // auto-detecting the first Binary Table HDU, and building a fully loaded Provider.
 // It assumes the table uses standard simplistic column names ("ID", "NAME", "RA", "DEC").
-func NewFITSProvider(filePath string) (*FITSProvider, error) {
+func New(filePath string) (*Provider, error) {
 	f, err := fits.Open(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("catalog/fits: failed to open file: %w", err)
@@ -45,50 +47,50 @@ func NewFITSProvider(filePath string) (*FITSProvider, error) {
 	}
 
 	rows := len(ids)
-	targets := make([]Target, 0, rows)
+	targets := make([]provider.Target, 0, rows)
 
 	for i := 0; i < rows; i++ {
-		targets = append(targets, Target{
+		targets = append(targets, provider.Target{
 			ID:      ids[i],
 			Name:    names[i],
-			Kind:    KindOther,
+			Kind:    provider.KindOther,
 			Coord:   coord.NewICRS(angle.Deg(ras[i]), angle.Deg(decs[i])),
 			Catalog: "FITS",
 		})
 	}
 
 	catalogName := filepath.Base(filePath)
-	return &FITSProvider{
+	return &Provider{
 		name:    catalogName,
 		targets: targets,
 	}, nil
 }
 
 // Name returns the provider's literal identifier.
-func (p *FITSProvider) Name() string {
+func (p *Provider) Name() string {
 	return p.name
 }
 
 // Resolve attempts a precise match of a FITS target natively scanning ID or Name.
-func (p *FITSProvider) Resolve(query string) (Target, bool) {
-	q := Normalize(query)
+func (p *Provider) Resolve(query string) (provider.Target, bool) {
+	q := provider.Normalize(query)
 	for _, t := range p.targets {
-		if Normalize(t.ID) == q || Normalize(t.Name) == q {
+		if provider.Normalize(t.ID) == q || provider.Normalize(t.Name) == q {
 			return t, true
 		}
 	}
-	return Target{}, false
+	return provider.Target{}, false
 }
 
 // Search attempts substring matching, returning all intersecting records.
-func (p *FITSProvider) Search(query string) []Target {
-	q := Normalize(query)
-	var matches []Target
+func (p *Provider) Search(query string) []provider.Target {
+	q := provider.Normalize(query)
+	var matches []provider.Target
 	if q == "" {
 		return matches
 	}
 	for _, t := range p.targets {
-		if strings.Contains(Normalize(t.ID), q) || strings.Contains(Normalize(t.Name), q) {
+		if strings.Contains(provider.Normalize(t.ID), q) || strings.Contains(provider.Normalize(t.Name), q) {
 			matches = append(matches, t)
 		}
 	}
