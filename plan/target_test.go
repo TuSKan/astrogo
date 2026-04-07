@@ -13,12 +13,12 @@ import (
 	"github.com/TuSKan/astrogo/vector"
 )
 
-func TestFixed(t *testing.T) {
+func TestDeepSpace(t *testing.T) {
 	obj := catalog.Target{
 		Name:  "Orion Nebula",
 		Coord: coord.NewICRS(angle.Hour(5.5), angle.Deg(-5.5)),
 	}
-	f := Fixed{Object: obj}
+	f := DeepSpace{Object: obj}
 
 	if f.Name() != "Orion Nebula" {
 		t.Errorf("expected name Orion Nebula, got %s", f.Name())
@@ -54,20 +54,20 @@ func TestCustom(t *testing.T) {
 }
 
 func TestInterface(t *testing.T) {
-	var _ Observable = Fixed{}
+	var _ Observable = DeepSpace{}
 	var _ Observable = Custom{}
 }
 
 func TestZeroValueSafety(t *testing.T) {
-	// Fixed with zero-value catalog.Target
-	f := Fixed{}
+	// DeepSpace with zero-value catalog.Target
+	f := DeepSpace{}
 	if f.Name() != "" {
-		t.Errorf("expected empty name for zero-value Fixed")
+		t.Errorf("expected empty name for zero-value DeepSpace")
 	}
 	pos, err := f.Position(time.NowUTC())
 	testutil.AssertNoError(t, err)
 	if pos.RA().Radians() != 0 || pos.Dec().Radians() != 0 {
-		t.Errorf("expected zero position for zero-value Fixed")
+		t.Errorf("expected zero position for zero-value DeepSpace")
 	}
 
 	// Custom with zero-value

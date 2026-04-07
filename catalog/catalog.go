@@ -77,7 +77,7 @@ func (r *Resolver) Resolve(query string) (Target, error) {
 
 	var matches []Target
 	for _, p := range r.providers {
-		if t, ok := p.Resolve(q); ok {
+		if t, ok := p.Resolve(query); ok {
 			matches = append(matches, t)
 		}
 	}

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"strings"
 
+	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/time"
 )
@@ -28,14 +29,19 @@ const (
 
 // Target represents an astronomical object in a provider.
 type Target struct {
-	ID          string
-	Name        string
-	Designation string
-	SPKID       string
-	Kind        Kind
-	Coord       *coord.ICRS
-	Catalog     string
-	Aliases     []string
+	ID             string
+	Name           string
+	Designation    string
+	SPKID          string
+	Kind           Kind
+	Coord          *coord.ICRS
+	Epoch          time.Time
+	PmRA           angle.Angle // Proper motion in RA
+	PmDec          angle.Angle // Proper motion in Declination
+	Parallax       angle.Angle
+	RadialVelocity float64 // km/s
+	Catalog        string
+	Aliases        []string
 }
 
 // ICRS implements coord.Object for a static catalog Target.

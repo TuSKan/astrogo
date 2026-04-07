@@ -13,6 +13,7 @@ import (
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/catalog/provider"
 	"github.com/TuSKan/astrogo/coord"
+	"github.com/TuSKan/astrogo/time"
 )
 
 const tapSyncURL = "https://gea.esac.esa.int/tap-server/tap/sync"
@@ -131,14 +132,30 @@ func parseCSV(body io.Reader) ([]provider.Target, error) {
 		id := row[col["source_id"]]
 		raDeg, _ := strconv.ParseFloat(row[col["ra"]], 64)
 		decDeg, _ := strconv.ParseFloat(row[col["dec"]], 64)
-		// PMs and parallax omitted from target struct mapping currently, standard ICRS is used
 
 		t := provider.Target{
 			ID:      id,
 			Name:    "Gaia DR3 " + id,
 			Kind:    provider.KindStar,
 			Coord:   coord.NewICRS(angle.Deg(raDeg), angle.Deg(decDeg)),
+			Epoch:   time.FromJD(2457388.5, time.UTC), // Gaia DR3 epoch is J2016.0
 			Catalog: "Gaia DR3",
+		}
+
+		if pmRAStr, ok := col["pmra"]; ok && row[pmRAStr] != "" {
+			if v, err := strconv.ParseFloat(row[pmRAStr], 64); err == nil {
+				t.PmRA = angle.Arcsec(v / 1000.0)
+			}
+		}
+		if pmDecStr, ok := col["pmdec"]; ok && row[pmDecStr] != "" {
+			if v, err := strconv.ParseFloat(row[pmDecStr], 64); err == nil {
+				t.PmDec = angle.Arcsec(v / 1000.0)
+			}
+		}
+		if plxStr, ok := col["parallax"]; ok && row[plxStr] != "" {
+			if v, err := strconv.ParseFloat(row[plxStr], 64); err == nil {
+				t.Parallax = angle.Arcsec(v / 1000.0)
+			}
 		}
 		targets = append(targets, t)
 	}
