@@ -34,8 +34,8 @@ func main() {
 	// 4. Set up an Event Finder (searching every 15 minutes, with 1s tolerance)
 	finder := plan.NewEventFinder(15*time.Minute, 1*time.Second)
 
-	// 5. Find Events (crossing over -0.56 degree standard refracted horizon threshold)
-	// Real-world astronomical tools use -0.56° (or -34 arcminutes) for stellar rise/set
+	// 5. Find Events (crossing over -0.56 degree standard geometric horizon threshold)
+	// Real-world astronomical tools use -0.56° (or -34 arcminutes) to approximate standard visual rising/setting.
 	events, err := finder.FindEvents(target, start, end, site, angle.Deg(-0.5667))
 	if err != nil {
 		fmt.Printf("Error finding events: %v\n", err)

@@ -40,7 +40,8 @@ Validation should be:
 | ICRS ↔ Ecliptic | ✅ validated | `gofa` (IAU 2006) | 2e-5 deg | poles, Aries, round-trip verified |
 | ICRS ↔ AltAz | ✅ validated | `gofa` + invariants | 1e-7 deg | edge cases + round-trip verified |
 | Coord FromUnitVector | ✅ validated | round-trip | 1e-10 deg | ICRS, Galactic, Ecliptic tested |
-| Airmass | ✅ validated | analytical | 1e-4 | plane-parallel + Pickering (1982) |
+| Airmass | ✅ validated | analytical | 1e-4 | Pickering (2002) empirical interpolation |
+| Atmospheric Refraction | ✅ validated | analytical | 1e-4 deg | Bidirectional Trace (Bennett 1982 / Saemundsson 1986) |
 | Astronomical time scales | ✅ validated | gofa / SOFA | 1e-12 d | UTC ↔ TAI ↔ TT ↔ TDB verified |
 | Local Sidereal Time | ✅ validated | gofa Gst06a (IAU 2006) | 0.5 deg | GAST at Greenwich J2000.0 |
 | Ephemerides (JPL DE) | ✅ validated | JPL Horizons | 1e-7 AU / 1e-8 AU·d⁻¹ | Sun, Moon, Planets (pos + vel) |

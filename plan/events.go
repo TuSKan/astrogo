@@ -39,12 +39,13 @@ func (k EventKind) String() string {
 
 // Event represents a specific occurrence of a celestial target in the coord.
 type Event struct {
-	Kind       EventKind
-	Time       time.Time
-	Altitude   angle.Angle
-	Azimuth    angle.Angle
-	Observable bool    // True if the event satisfies observation conditions (not used directly here)
-	Value      float64 // Internal numeric value used by the solver (e.g. altitude difference)
+	Kind              EventKind
+	Time              time.Time
+	Altitude          angle.Angle // Observed refracted altitude
+	GeometricAltitude angle.Angle // True geometric altitude
+	Azimuth           angle.Angle
+	Observable        bool    // True if the event satisfies observation conditions (not used directly here)
+	Value             float64 // Internal numeric value used by the solver (e.g. altitude difference)
 }
 
 func (e Event) String() string {
@@ -350,11 +351,13 @@ func (f EventFinder) altitudeDiff(
 	if err != nil {
 		return 0, err
 	}
-	aa, err := coord.ICRSToAltAz(pos, t, site.Location())
-	if err != nil {
-		return 0, err
-	}
-	return aa.Alt().Degrees() - threshold.Degrees(), nil
+	// EventFinder natively operates on the strictly computed Topocentric OBSERVED Altitude.
+	// This naturally accounts for refraction directly, allowing users to specify visual barriers (e.g. 10 deg dome).
+	// Calculate strictly geometric altitude to compare against standard thresholds (e.g. -0.5667 deg)
+	// We bypass atmosphere here so that numerical roots correctly hit the geometric horizon
+	astro := coord.NewAstrometric(pos.RA(), pos.Dec())
+	geom := coord.AstrometricToObserved(astro, t, site.Location(), coord.Atmosphere{Pressure: 0})
+	return geom.Alt().Degrees() - threshold.Degrees(), nil
 }
 
 // ── Numerical Solver ──────────────────────────────────────────────────────────
@@ -396,17 +399,21 @@ func (f EventFinder) refineRoot(
 	if err != nil {
 		return Event{}, err
 	}
+
+	astro := coord.NewAstrometric(pos.RA(), pos.Dec())
+	geom := coord.AstrometricToObserved(astro, resTime, site.Location(), coord.Atmosphere{Pressure: 0})
 	aa, err := coord.ICRSToAltAz(pos, resTime, site.Location())
 	if err != nil {
 		return Event{}, err
 	}
 
 	return Event{
-		Kind:     kind,
-		Time:     resTime,
-		Altitude: aa.Alt(),
-		Azimuth:  aa.Az(),
-		Value:    aa.Alt().Degrees() - threshold.Degrees(),
+		Kind:              kind,
+		Time:              resTime,
+		Altitude:          aa.Alt(),
+		GeometricAltitude: geom.Alt(),
+		Azimuth:           aa.Az(),
+		Value:             geom.Alt().Degrees() - threshold.Degrees(),
 	}, nil
 }
 
@@ -481,11 +488,15 @@ func (f EventFinder) refineMax(
 		return Event{}, err
 	}
 
+	astro := coord.NewAstrometric(pos.RA(), pos.Dec())
+	geom := coord.AstrometricToObserved(astro, resTime, site.Location(), coord.Atmosphere{Pressure: 0})
+
 	return Event{
-		Kind:     EventTransit,
-		Time:     resTime,
-		Altitude: aa.Alt(),
-		Azimuth:  aa.Az(),
-		Value:    aa.Alt().Degrees(),
+		Kind:              EventTransit,
+		Time:              resTime,
+		Altitude:          aa.Alt(),
+		GeometricAltitude: geom.Alt(),
+		Azimuth:           aa.Az(),
+		Value:             aa.Alt().Degrees(),
 	}, nil
 }
