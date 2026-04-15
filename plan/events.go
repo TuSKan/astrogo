@@ -6,6 +6,7 @@ import (
 	"sort"
 
 	"github.com/TuSKan/astrogo/angle"
+	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/ephemeris"
 
@@ -479,7 +480,7 @@ func (s EventSolver) solveVisibility(spec EventSpec, start, end time.Time) ([]Ev
 			return 0, err
 		}
 
-		ctx := coord.NewContext(t, spec.Observer.Location(), coord.StandardAtmosphere)
+		ctx := coord.NewContext(t, spec.Observer.Location(), atmosphere.StandardAtmosphere)
 		astro := coord.NewAstrometric(pos.RA(), pos.Dec())
 		geom := ctx.AstrometricToObserved(astro)
 
@@ -525,7 +526,7 @@ func (s EventSolver) solveVisibility(spec EventSpec, start, end time.Time) ([]Ev
 				}
 
 				// Calculate geometric outputs
-				resCtx := coord.NewContext(resTime, spec.Observer.Location(), coord.StandardAtmosphere)
+				resCtx := coord.NewContext(resTime, spec.Observer.Location(), atmosphere.StandardAtmosphere)
 				pos, _ := spec.Target.Position(resTime)
 				astro := coord.NewAstrometric(pos.RA(), pos.Dec())
 				geom := resCtx.AstrometricToObserved(astro)
@@ -551,7 +552,7 @@ func (s EventSolver) solveVisibility(spec EventSpec, start, end time.Time) ([]Ev
 					return nil, err
 				}
 
-				resCtx := coord.NewContext(resTime, spec.Observer.Location(), coord.StandardAtmosphere)
+				resCtx := coord.NewContext(resTime, spec.Observer.Location(), atmosphere.StandardAtmosphere)
 				pos, _ := spec.Target.Position(resTime)
 				astro := coord.NewAstrometric(pos.RA(), pos.Dec())
 				geom := resCtx.AstrometricToObserved(astro)

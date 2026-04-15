@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/TuSKan/astrogo/catalog/provider"
+	"github.com/TuSKan/astrogo/catalog/resolve"
 )
 
 func TestSimbadNetworkResolve(t *testing.T) {
@@ -17,11 +17,11 @@ func TestSimbadNetworkResolve(t *testing.T) {
 	defer cancel()
 
 	// Live network test requesting M31 over real internet TAP
-	req := provider.ObjectRequest{Query: "m31", Limit: 1}
+	req := resolve.ObjectRequest{Query: "m31", Limit: 1}
 	iter := prov.ResolveObject(ctx, req)
 
-	var targets []provider.Target
-	iter(func(tar provider.Target, err error) bool {
+	var targets []resolve.Target
+	iter(func(tar resolve.Target, err error) bool {
 		if err != nil {
 			t.Fatalf("Live network failed: %v", err)
 		}

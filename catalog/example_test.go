@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/TuSKan/astrogo/angle"
+	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/catalog"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/plan"
@@ -41,7 +42,7 @@ func Example_integration() {
 	obsTime := astrot.Date(2026, 4, 6, 0, 0, 0, 0, time.UTC)
 
 	// Compute target's altitude and azimuth properties from the Observatory at that time
-	ctx := coord.NewContext(obsTime, obs.Location(), coord.StandardAtmosphere)
+	ctx := coord.NewContext(obsTime, obs.Location(), atmosphere.StandardAtmosphere)
 	altaz, err := ctx.ICRSToAltAz(andromeda.Coord)
 	if err != nil {
 		fmt.Println("Transform error:", err)

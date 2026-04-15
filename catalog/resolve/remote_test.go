@@ -1,4 +1,4 @@
-package provider_test
+package resolve_test
 
 import (
 	"context"
@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/TuSKan/astrogo/catalog/provider"
+	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/internal/testutil"
 )
 
@@ -28,7 +28,7 @@ func TestClientRetries(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := provider.NewClient()
+	client := resolve.NewClient()
 	client.MaxRetries = 5 // Ensures it has enough headroom
 	// Use small timeouts to prevent long test runs if using arbitrary backoff
 	// The cenkalti backoff implicitly uses default Backoff which starts at 500ms
@@ -52,7 +52,7 @@ func TestClientPermanentFailure(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := provider.NewClient()
+	client := resolve.NewClient()
 	req, _ := http.NewRequestWithContext(context.Background(), "GET", server.URL, nil)
 
 	_, err := client.Do(req)
@@ -60,9 +60,9 @@ func TestClientPermanentFailure(t *testing.T) {
 		t.Fatalf("Expected permanent failure HTTP error")
 	}
 
-	var httpErr *provider.HTTPError
+	var httpErr *resolve.HTTPError
 	if !errors.As(err, &httpErr) {
-		t.Fatalf("Expected provider.HTTPError type, got: %T", err)
+		t.Fatalf("Expected resolve.HTTPError type, got: %T", err)
 	}
 
 	testutil.AssertEqual(t, "Status Code", httpErr.StatusCode, http.StatusNotFound)
@@ -76,7 +76,7 @@ func TestClientContextCancellation(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := provider.NewClient()
+	client := resolve.NewClient()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 	defer cancel()
@@ -90,16 +90,16 @@ func TestClientContextCancellation(t *testing.T) {
 }
 
 func TestSliceSeqIteration(t *testing.T) {
-	targets := []provider.Target{
+	targets := []resolve.Target{
 		{ID: "1"},
 		{ID: "2"},
 		{ID: "3"},
 	}
 
-	iter := provider.SliceSeq(targets)
+	iter := resolve.SliceSeq(targets)
 
 	count := 0
-	iter(func(tar provider.Target, err error) bool {
+	iter(func(tar resolve.Target, err error) bool {
 		testutil.AssertNoError(t, err)
 		count++
 		return true // Continue iteration
@@ -108,7 +108,7 @@ func TestSliceSeqIteration(t *testing.T) {
 
 	// Early Abort
 	abortCount := 0
-	iter(func(tar provider.Target, err error) bool {
+	iter(func(tar resolve.Target, err error) bool {
 		abortCount++
 		return false // Abort iteration
 	})

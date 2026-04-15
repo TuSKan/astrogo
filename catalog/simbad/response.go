@@ -7,15 +7,15 @@ import (
 	"strconv"
 
 	"github.com/TuSKan/astrogo/angle"
-	"github.com/TuSKan/astrogo/catalog/provider"
+	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/time"
 )
 
-// ParseCSV parses SIMBAD's TAP output in CSV format into provider.Targets.
+// ParseCSV parses SIMBAD's TAP output in CSV format into resolve.Targets.
 // The expected order from BuildResolveQuery is:
 // oid, main_id, ra, dec, otype, id (matched alias)
-func ParseCSV(r io.Reader) ([]provider.Target, error) {
+func ParseCSV(r io.Reader) ([]resolve.Target, error) {
 	reader := csv.NewReader(r)
 
 	// Read header and build column index map
@@ -42,7 +42,7 @@ func ParseCSV(r io.Reader) ([]provider.Target, error) {
 
 	// Map to hold unique targets because joining with ident table can return
 	// multiple rows for the same basic.oid (one row per alias match).
-	targetMap := make(map[string]*provider.Target)
+	targetMap := make(map[string]*resolve.Target)
 
 	for {
 		row, err := reader.Read()
@@ -78,12 +78,12 @@ func ParseCSV(r io.Reader) ([]provider.Target, error) {
 			}
 		}
 
-		otype := provider.KindOther
+		otype := resolve.KindOther
 		if tIdx, ok := colIdx["otype"]; ok {
 			otype = mapSimbadKind(row[tIdx])
 		}
 
-		t := provider.Target{
+		t := resolve.Target{
 			ID:      mainID,
 			Name:    mainID,
 			Kind:    otype,
@@ -126,7 +126,7 @@ func ParseCSV(r io.Reader) ([]provider.Target, error) {
 		targetMap[mainID] = &t
 	}
 
-	var results []provider.Target
+	var results []resolve.Target
 	for _, t := range targetMap {
 		results = append(results, *t)
 	}
@@ -135,19 +135,19 @@ func ParseCSV(r io.Reader) ([]provider.Target, error) {
 }
 
 // mapSimbadKind maps common SIMBAD Object Types (OTypes) to astrogo internal kinds.
-func mapSimbadKind(o string) provider.Kind {
+func mapSimbadKind(o string) resolve.Kind {
 	switch o {
 	case "Star", "V*", "Em*":
-		return provider.KindStar
+		return resolve.KindStar
 	case "GlC", "OpC", "Cl*":
-		return provider.KindStarCluster // or Globular/Open specifically inside logic
+		return resolve.KindStarCluster // or Globular/Open specifically inside logic
 	case "PN", "HII", "Neb":
-		return provider.KindNebula
+		return resolve.KindNebula
 	case "G", "Gal", "AGN":
-		return provider.KindGalaxy
+		return resolve.KindGalaxy
 	case "SNR":
-		return provider.KindSupernovaRemnant
+		return resolve.KindSupernovaRemnant
 	default:
-		return provider.KindOther
+		return resolve.KindOther
 	}
 }

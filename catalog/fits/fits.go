@@ -9,16 +9,16 @@ import (
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/fits"
 
-	"github.com/TuSKan/astrogo/catalog/provider"
+	"github.com/TuSKan/astrogo/catalog/resolve"
 )
 
 type Provider struct {
 	name    string
-	targets []provider.Target
+	targets []resolve.Target
 }
 
 // New encapsulates the entire process of opening a FITS file off disk,
-// auto-detecting the first Binary Table HDU, and building a fully loaded Provider.
+// auto-detecting the first Binary Table HDU, and building a fully loaded resolve.
 // It assumes the table uses standard simplistic column names ("ID", "NAME", "RA", "DEC").
 func New(filePath string) (*Provider, error) {
 	f, err := fits.Open(filePath)
@@ -47,13 +47,13 @@ func New(filePath string) (*Provider, error) {
 	}
 
 	rows := len(ids)
-	targets := make([]provider.Target, 0, rows)
+	targets := make([]resolve.Target, 0, rows)
 
 	for i := 0; i < rows; i++ {
-		targets = append(targets, provider.Target{
+		targets = append(targets, resolve.Target{
 			ID:      ids[i],
 			Name:    names[i],
-			Kind:    provider.KindOther,
+			Kind:    resolve.KindOther,
 			Coord:   coord.NewICRS(angle.Deg(ras[i]), angle.Deg(decs[i])),
 			Catalog: "FITS",
 		})
@@ -72,25 +72,25 @@ func (p *Provider) Name() string {
 }
 
 // Resolve attempts a precise match of a FITS target natively scanning ID or Name.
-func (p *Provider) Resolve(query string) (provider.Target, bool) {
-	q := provider.Normalize(query)
+func (p *Provider) Resolve(query string) (resolve.Target, bool) {
+	q := resolve.Normalize(query)
 	for _, t := range p.targets {
-		if provider.Normalize(t.ID) == q || provider.Normalize(t.Name) == q {
+		if resolve.Normalize(t.ID) == q || resolve.Normalize(t.Name) == q {
 			return t, true
 		}
 	}
-	return provider.Target{}, false
+	return resolve.Target{}, false
 }
 
 // Search attempts substring matching, returning all intersecting records.
-func (p *Provider) Search(query string) []provider.Target {
-	q := provider.Normalize(query)
-	var matches []provider.Target
+func (p *Provider) Search(query string) []resolve.Target {
+	q := resolve.Normalize(query)
+	var matches []resolve.Target
 	if q == "" {
 		return matches
 	}
 	for _, t := range p.targets {
-		if strings.Contains(provider.Normalize(t.ID), q) || strings.Contains(provider.Normalize(t.Name), q) {
+		if strings.Contains(resolve.Normalize(t.ID), q) || strings.Contains(resolve.Normalize(t.Name), q) {
 			matches = append(matches, t)
 		}
 	}

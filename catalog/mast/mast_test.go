@@ -7,7 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/TuSKan/astrogo/catalog/provider"
+	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/internal/testutil"
 )
 
@@ -31,11 +31,11 @@ func TestMastOfflineResolve(t *testing.T) {
 	prov := New()
 	prov.client.HTTPClient.Transport = &mockTransport{Handler: server.Config.Handler}
 
-	req := provider.ObjectRequest{Query: "M31"}
+	req := resolve.ObjectRequest{Query: "M31"}
 	iter := prov.ResolveObject(context.Background(), req)
 
-	var targets []provider.Target
-	iter(func(tar provider.Target, err error) bool {
+	var targets []resolve.Target
+	iter(func(tar resolve.Target, err error) bool {
 		testutil.AssertNoError(t, err)
 		targets = append(targets, tar)
 		return true
@@ -68,7 +68,7 @@ func TestProviderInterface(t *testing.T) {
 		t.Errorf("expected mast, got %s", p.Name())
 	}
 	caps := p.Capabilities()
-	if len(caps) != 2 || caps[0] != provider.CapObjectResolution || caps[1] != provider.CapConeSearch {
+	if len(caps) != 2 || caps[0] != resolve.CapObjectResolution || caps[1] != resolve.CapConeSearch {
 		t.Errorf("expected CapObjectResolution and CapConeSearch, got %v", caps)
 	}
 	_, _ = p.Resolve("non_existent_body")

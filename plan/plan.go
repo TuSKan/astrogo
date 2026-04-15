@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"sort"
 
+	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
 
 	"github.com/TuSKan/astrogo/time"
@@ -132,7 +133,7 @@ func IsObservable(
 	if err != nil {
 		return Evaluation{}, err
 	}
-	ctx := coord.NewContext(t, site.Location(), coord.StandardAtmosphere)
+	ctx := coord.NewContext(t, site.Location(), atmosphere.StandardAtmosphere)
 	altAz, err := ctx.ICRSToAltAz(pos)
 	if err != nil {
 		return Evaluation{}, err

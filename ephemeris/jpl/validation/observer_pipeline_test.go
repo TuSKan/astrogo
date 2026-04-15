@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/TuSKan/astrogo/angle"
+	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
 	atime "github.com/TuSKan/astrogo/time"
 )
@@ -52,7 +53,7 @@ func TestPhase1ObserverPipelineAgainstHorizons(t *testing.T) {
 	// Actually, Astrometric is defined wrt ICRS cleanly.
 
 	// 2. Map through to Apparent!
-	ctx := coord.NewContext(obsTime, site, coord.StandardAtmosphere)
+	ctx := coord.NewContext(obsTime, site, atmosphere.StandardAtmosphere)
 	apparent := ctx.AstrometricToApparent(coord.NewAstrometric(astro.RA(), astro.Dec()))
 
 	// AstroGo uses CIRS (Celestial Intermediate Reference System) for Apparent coords.
@@ -82,8 +83,8 @@ func TestPhase1ObserverPipelineAgainstHorizons(t *testing.T) {
 	// 3. Map to Observed Topocentric (Alt/Az)
 	// Horizons outputs AIRLESS coordinates unless told otherwise (we specifically stripped REFRACTION flag logic since it breaks output bounds unless specific atmospheric limits are present, which we can't reliably inject).
 	// Therefore, we MUST use our RefractionNone model to properly evaluate that Earth Orientation Parameters apply perfectly natively.
-	atmNoRef := coord.StandardAtmosphere
-	atmNoRef.Model = coord.RefractionNone{}
+	atmNoRef := atmosphere.StandardAtmosphere
+	atmNoRef.Model = atmosphere.RefractionNone{}
 
 	ctxNoRef := coord.NewContext(obsTime, site, atmNoRef)
 	observed := ctxNoRef.ApparentToObserved(apparent)

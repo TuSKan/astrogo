@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/TuSKan/astrogo/catalog/provider"
+	"github.com/TuSKan/astrogo/catalog/resolve"
 )
 
 func TestParseCSV(t *testing.T) {
@@ -32,7 +32,7 @@ func TestParseCSV(t *testing.T) {
 	if tgt.ID != "NAME M  31" {
 		t.Errorf("unexpected ID: %s", tgt.ID)
 	}
-	if tgt.Kind != provider.KindGalaxy {
+	if tgt.Kind != resolve.KindGalaxy {
 		t.Errorf("unexpected Kind: %s", tgt.Kind)
 	}
 
@@ -120,10 +120,10 @@ func TestRetryTimeout(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	req := provider.ObjectRequest{Query: "test"}
+	req := resolve.ObjectRequest{Query: "test"}
 	iter := p.ResolveObject(ctx, req)
 
-	iter(func(tgt provider.Target, err error) bool {
+	iter(func(tgt resolve.Target, err error) bool {
 		if err == nil {
 			t.Errorf("expected error, got nil")
 		}
@@ -170,7 +170,7 @@ func TestProviderInterface(t *testing.T) {
 		t.Errorf("expected simbad, got %s", p.Name())
 	}
 	caps := p.Capabilities()
-	if len(caps) != 1 || caps[0] != provider.CapObjectResolution {
+	if len(caps) != 1 || caps[0] != resolve.CapObjectResolution {
 		t.Errorf("expected CapObjectResolution, got %v", caps)
 	}
 

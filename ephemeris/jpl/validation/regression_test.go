@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/TuSKan/astrogo/angle"
+	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/ephemeris"
 	atime "github.com/TuSKan/astrogo/time"
@@ -105,8 +106,8 @@ func TestScientificStability(t *testing.T) {
 			appState, _ := ephemeris.ApparentState(mock, ephemeris.ID(c.TargetID), obsTime)
 
 			// Get standard Earth model matrices to extract Topocentric offset
-			atm := coord.StandardAtmosphere
-			atm.Model = coord.RefractionNone{} // We bypass explicit analytical limits here to verify absolute pure geometry.
+			atm := atmosphere.StandardAtmosphere
+			atm.Model = atmosphere.RefractionNone{} // We bypass explicit analytical limits here to verify absolute pure geometry.
 
 			// Route flawlessly through native Topocentric offset builder!
 			// We track exactly how the true geographic shift affects alt/az

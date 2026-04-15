@@ -9,6 +9,7 @@ import (
 	"fmt"
 
 	"github.com/TuSKan/astrogo/angle"
+	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/ephemeris"
 
@@ -77,7 +78,7 @@ type Airmass struct {
 func (c Airmass) Check(obj Observable, t time.Time, site *Site) (Result, error) {
 	am, err := skyAirmassOf(obj, t, site)
 	if err != nil {
-		if err == coord.ErrBelowHorizon {
+		if err == atmosphere.ErrBelowHorizon {
 			return Result{
 				Pass:   false,
 				Reason: "target is below the horizon",
@@ -176,15 +177,7 @@ func skyAltAzOf(obj Observable, t time.Time, site *Site) (*coord.AltAz, error) {
 	if err != nil {
 		return nil, err
 	}
-	ctx := coord.NewContext(t, site.Location(), coord.StandardAtmosphere)
-	return ctx.ICRSToAltAz(pos)
-}
-
-func skyAltAzOfCtx(obj Observable, t time.Time, ctx *coord.Context) (*coord.AltAz, error) {
-	pos, err := obj.Position(t)
-	if err != nil {
-		return nil, err
-	}
+	ctx := coord.NewContext(t, site.Location(), atmosphere.StandardAtmosphere)
 	return ctx.ICRSToAltAz(pos)
 }
 
@@ -193,5 +186,5 @@ func skyAirmassOf(obj Observable, t time.Time, site *Site) (float64, error) {
 	if err != nil {
 		return 0, err
 	}
-	return coord.Airmass(aa.Alt())
+	return atmosphere.Airmass(aa.Alt())
 }

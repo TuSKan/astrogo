@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/TuSKan/astrogo/angle"
-	"github.com/TuSKan/astrogo/catalog/provider"
+	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/coord"
 )
 
@@ -21,7 +21,7 @@ func TestProvider_ResolveAndSearch(t *testing.T) {
 	// bypassing the physical file extraction which relies on actual FITS file schemas.
 	provider := &Provider{
 		name: "MockCatalog",
-		targets: []provider.Target{
+		targets: []resolve.Target{
 			{ID: "ID-1", Name: "Sirius", Coord: coord.NewICRS(angle.Deg(101.287), angle.Deg(-16.716))},
 			{ID: "ID-2", Name: "Vega", Coord: coord.NewICRS(angle.Deg(279.234), angle.Deg(38.783))},
 		},
@@ -43,7 +43,7 @@ func TestProvider_ResolveAndSearch(t *testing.T) {
 
 	tgt, found = provider.Resolve("unknown")
 	if found {
-		t.Errorf("expected not to find unknown provider.Target, got %s", tgt.Name)
+		t.Errorf("expected not to find unknown resolve.Target, got %s", tgt.Name)
 	}
 
 	// Test Search (partial match mapping for substring discovery)

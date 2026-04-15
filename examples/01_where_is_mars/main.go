@@ -5,6 +5,7 @@ import (
 	"log"
 
 	"github.com/TuSKan/astrogo/angle"
+	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/plan"
@@ -32,7 +33,7 @@ func main() {
 	}
 
 	// 5. Convert ICRS sky coordinates to local Altitude and Azimuth
-	ctx := coord.NewContext(tm, loc, coord.StandardAtmosphere)
+	ctx := coord.NewContext(tm, loc, atmosphere.StandardAtmosphere)
 	skyPos, err := ctx.ICRSToAltAz(icrs)
 	if err != nil {
 		log.Fatalf("Error converting to Alt/Az: %v", err)

@@ -9,7 +9,7 @@ import (
 	"github.com/TuSKan/astrogo/catalog/jpl"
 	"github.com/TuSKan/astrogo/catalog/mast"
 	"github.com/TuSKan/astrogo/catalog/openngc"
-	"github.com/TuSKan/astrogo/catalog/provider"
+	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/catalog/sbdb"
 	"github.com/TuSKan/astrogo/catalog/simbad"
 	"github.com/TuSKan/astrogo/catalog/vizier"
@@ -34,11 +34,11 @@ var (
 )
 
 // Export core types directly via Type Aliasing to break cyclic dependencies natively.
-type Target = provider.Target
-type Provider = provider.Provider
-type Kind = provider.Kind
-type ObjectRequest = provider.ObjectRequest
-type SeqIterator[T any] = provider.SeqIterator[T]
+type Target = resolve.Target
+type Provider = resolve.Provider
+type Kind = resolve.Kind
+type ObjectRequest = resolve.ObjectRequest
+type SeqIterator[T any] = resolve.SeqIterator[T]
 
 // Resolver orchestrates multiple providers to find astronomical targets.
 type Resolver struct {
@@ -70,7 +70,7 @@ func NewResolver(sources ...Source) *Resolver {
 }
 
 func (r *Resolver) Resolve(query string) (Target, error) {
-	q := provider.Normalize(query)
+	q := resolve.Normalize(query)
 	if q == "" {
 		return Target{}, ErrNotFound
 	}
@@ -98,7 +98,7 @@ func (r *Resolver) Resolve(query string) (Target, error) {
 }
 
 func (r *Resolver) Search(query string) []Target {
-	q := provider.Normalize(query)
+	q := resolve.Normalize(query)
 	if q == "" {
 		return nil
 	}
@@ -124,13 +124,13 @@ func (r *Resolver) Search(query string) []Target {
 	}
 	scored := make([]scoredTarget, len(unique))
 	for i, t := range unique {
-		bestScore := provider.Score(q, t.Name)
+		bestScore := resolve.Score(q, t.Name)
 		for _, alias := range t.Aliases {
-			if s := provider.Score(q, alias); s > bestScore {
+			if s := resolve.Score(q, alias); s > bestScore {
 				bestScore = s
 			}
 		}
-		if s := provider.Score(q, t.ID); s > bestScore {
+		if s := resolve.Score(q, t.ID); s > bestScore {
 			bestScore = s
 		}
 		scored[i] = scoredTarget{t, bestScore}

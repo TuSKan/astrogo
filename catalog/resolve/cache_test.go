@@ -1,4 +1,4 @@
-package provider_test
+package resolve_test
 
 import (
 	"math"
@@ -9,11 +9,11 @@ import (
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/internal/testutil"
 
-	"github.com/TuSKan/astrogo/catalog/provider"
+	"github.com/TuSKan/astrogo/catalog/resolve"
 )
 
 func TestArrowCacheWriteRead(t *testing.T) {
-	cache := provider.NewArrowCache()
+	cache := resolve.NewArrowCache()
 	defer cache.Close()
 
 	key := "test:query:1"
@@ -21,19 +21,19 @@ func TestArrowCacheWriteRead(t *testing.T) {
 	_, ok := cache.Get(key)
 	testutil.AssertEqual(t, "Initial Miss", ok, false)
 
-	targets := []provider.Target{
+	targets := []resolve.Target{
 		{
 			ID:          "OBJ1",
 			Name:        "Test Object",
 			Designation: "Desig1",
 			SPKID:       "999",
-			Kind:        provider.KindStar,
+			Kind:        resolve.KindStar,
 			Catalog:     "test",
 			Coord:       coord.NewICRS(angle.Deg(45.0), angle.Deg(-15.0)),
 			Aliases:     []string{"A", "B"},
 		},
 		{
-			ID:      "OBJ2", // Minimal provider.Target checking nil coordinates
+			ID:      "OBJ2", // Minimal resolve.Target checking nil coordinates
 			Catalog: "test",
 		},
 	}
@@ -44,15 +44,15 @@ func TestArrowCacheWriteRead(t *testing.T) {
 	seq, ok := cache.Get(key)
 	testutil.AssertEqual(t, "Cache Hit", ok, true)
 
-	var retrieved []provider.Target
-	seq(func(tar provider.Target, err error) bool {
+	var retrieved []resolve.Target
+	seq(func(tar resolve.Target, err error) bool {
 		testutil.AssertNoError(t, err)
 		retrieved = append(retrieved, tar)
 		return true
 	})
 
 	if len(retrieved) != 2 {
-		t.Fatalf("Expected 2 provider.Targets, got %d", len(retrieved))
+		t.Fatalf("Expected 2 resolve.Targets, got %d", len(retrieved))
 	}
 
 	// Validate full decode matches full encode
@@ -61,7 +61,7 @@ func TestArrowCacheWriteRead(t *testing.T) {
 	testutil.AssertEqual(t, "Name", t1.Name, "Test Object")
 	testutil.AssertEqual(t, "Designation", t1.Designation, "Desig1")
 	testutil.AssertEqual(t, "SPKID", t1.SPKID, "999")
-	testutil.AssertEqual(t, "Kind", string(t1.Kind), string(provider.KindStar))
+	testutil.AssertEqual(t, "Kind", string(t1.Kind), string(resolve.KindStar))
 	if t1.Coord == nil {
 		t.Fatalf("Expected coordinate, got nil")
 	}
@@ -81,12 +81,12 @@ func TestArrowCacheWriteRead(t *testing.T) {
 	}
 
 	// Overwrite validation
-	err = cache.Set(key, []provider.Target{{ID: "OVERWRITTEN"}})
+	err = cache.Set(key, []resolve.Target{{ID: "OVERWRITTEN"}})
 	testutil.AssertNoError(t, err)
 
 	seq2, _ := cache.Get(key)
-	var o []provider.Target
-	seq2(func(tar provider.Target, err error) bool {
+	var o []resolve.Target
+	seq2(func(tar resolve.Target, err error) bool {
 		o = append(o, tar)
 		return true
 	})
@@ -95,8 +95,8 @@ func TestArrowCacheWriteRead(t *testing.T) {
 }
 
 func TestArrowCacheRelease(t *testing.T) {
-	cache := provider.NewArrowCache()
-	err := cache.Set("key1", []provider.Target{{ID: "A"}})
+	cache := resolve.NewArrowCache()
+	err := cache.Set("key1", []resolve.Target{{ID: "A"}})
 	testutil.AssertNoError(t, err)
 
 	// Ensure Close clears maps safely unlocking Arrow memory boundaries

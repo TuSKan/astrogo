@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/TuSKan/astrogo/angle"
+	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/internal/testutil"
@@ -28,7 +29,7 @@ func TestSunAltitudeMovement(t *testing.T) {
 	posStart, err := ephemeris.ToICRS(vecStart)
 	testutil.AssertNoError(t, err)
 
-	ctxStart := coord.NewContext(tm, site.Location(), coord.StandardAtmosphere)
+	ctxStart := coord.NewContext(tm, site.Location(), atmosphere.StandardAtmosphere)
 	aaStart, _ := ctxStart.ICRSToAltAz(posStart)
 
 	tmLate := tm.AddDays(0.25) // +6 hours
@@ -38,7 +39,7 @@ func TestSunAltitudeMovement(t *testing.T) {
 	posLate, err := ephemeris.ToICRS(vecLate)
 	testutil.AssertNoError(t, err)
 
-	ctxLate := coord.NewContext(tmLate, site.Location(), coord.StandardAtmosphere)
+	ctxLate := coord.NewContext(tmLate, site.Location(), atmosphere.StandardAtmosphere)
 	aaLate, _ := ctxLate.ICRSToAltAz(posLate)
 
 	t.Logf("Sun Alt @ Noon: %.2f", aaStart.Alt().Degrees())
@@ -161,8 +162,8 @@ func TestApparentState_ZeroVelocityReducesToGeometric(t *testing.T) {
 	site, err := coord.NewGeodetic(angle.Deg(-46.6333), angle.Deg(-23.5505), 760)
 	testutil.AssertNoError(t, err)
 
-	atm := coord.Atmosphere{}
-	atm.Model = coord.RefractionNone{}
+	atm := atmosphere.Atmosphere{}
+	atm.Model = atmosphere.RefractionNone{}
 
 	mock := &mockLinearProvider{
 		baseTime: tm,
@@ -191,8 +192,8 @@ func TestApparentState_MatchesManualLightTimeIteration(t *testing.T) {
 	site, err := coord.NewGeodetic(angle.Deg(-46.6333), angle.Deg(-23.5505), 760)
 	testutil.AssertNoError(t, err)
 
-	atm := coord.Atmosphere{}
-	atm.Model = coord.RefractionNone{}
+	atm := atmosphere.Atmosphere{}
+	atm.Model = atmosphere.RefractionNone{}
 
 	st := ephemeris.State{
 		Pos: vector.V3(1.0, 0.8, 0.2),
@@ -224,8 +225,8 @@ func TestApparentState_LightTimeActuallyChangesResult(t *testing.T) {
 	site, err := coord.NewGeodetic(angle.Deg(-155.4700), angle.Deg(19.8261), 4205)
 	testutil.AssertNoError(t, err)
 
-	atm := coord.Atmosphere{}
-	atm.Model = coord.RefractionNone{}
+	atm := atmosphere.Atmosphere{}
+	atm.Model = atmosphere.RefractionNone{}
 
 	mock := &mockLinearProvider{
 		baseTime: tm,
@@ -255,8 +256,8 @@ func TestApparentState_DistantObjectHasTinyCorrection(t *testing.T) {
 	site, err := coord.NewGeodetic(angle.Deg(-17.8890), angle.Deg(28.7606), 2390)
 	testutil.AssertNoError(t, err)
 
-	atm := coord.Atmosphere{}
-	atm.Model = coord.RefractionNone{}
+	atm := atmosphere.Atmosphere{}
+	atm.Model = atmosphere.RefractionNone{}
 
 	mock := &mockLinearProvider{
 		baseTime: tm,

@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/TuSKan/astrogo/angle"
-	"github.com/TuSKan/astrogo/catalog/provider"
+	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/coord"
 )
 
@@ -19,15 +19,15 @@ func TestGaiaNetworkConeSearch(t *testing.T) {
 	defer cancel()
 
 	// Tap the Pleiades core
-	req := provider.ConeRequest{
+	req := resolve.ConeRequest{
 		Center: coord.NewICRS(angle.Deg(56.75), angle.Deg(24.116)),
 		Radius: angle.Deg(0.05),
 		Limit:  5,
 	}
 
 	iter := prov.ConeSearch(ctx, req)
-	var targets []provider.Target
-	iter(func(tar provider.Target, err error) bool {
+	var targets []resolve.Target
+	iter(func(tar resolve.Target, err error) bool {
 		if err != nil {
 			t.Fatalf("Live network failed: %v", err)
 		}
