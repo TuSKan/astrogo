@@ -20,6 +20,7 @@
 - Precise celestial coordinate transformations
 - Astronomical time handling and time scales
 - Observer-based sky calculations (Alt/Az, airmass, visibility)
+- Atmospheric refraction modeling (pluggable models)
 - Solar system ephemerides (Sun, Moon, Planets via JPL DE)
 - Observation planning, constraints, and event solving
 
@@ -66,16 +67,24 @@ Existing astronomy tools are powerful, but often:
 - Geodesic
 
 ### Transformations
-- Full mapping: Geometric <-> Astrometric <-> Apparent <-> Observed 
+- Full mapping: Geometric ↔ Astrometric ↔ Apparent ↔ Observed 
 - Frame-to-frame (Galactic, Ecliptic, ICRS, CIRS)
 - Dynamic DUT1 tracking and Polar Motion (XP/YP) caching via IERS EOP rapid data
-- Modular Atmospheric Refraction system (Bidirectional Bennett/Saemundsson mappings)
+- One-time log warning when IERS data is unavailable (UT1 ≈ UTC fallback)
 - Aberration, light deflection, proper motion, parallax handled natively
+
+### Atmospheric modeling (`atmosphere`)
+- Pluggable `RefractionModel` interface with bidirectional refraction
+- `RefractionNone` — bypass refraction
+- `RefractionApproximate` — Saemundsson/Bennett tangent formula
+- `RefractionRigorous` — full correction with pressure, temperature, humidity, wavelength
+- Pickering (2002) airmass interpolation and zenith distance metrics
+- Chromatic atmospheric dispersion via `Reducer.Disperse()`
 
 ### Observer modeling
 - Geodetic locations (WGS84)
 - Local sky computations
-- Pickering (2002) Airmass interpolation and Zenith distance metrics
+- Stateful `Context` caching for batch transformations
 
 ### Ephemerides
 - Sun and Moon positions
@@ -84,19 +93,25 @@ Existing astronomy tools are powerful, but often:
     - Multi-kernel architecture (load planets and small-bodies simultaneously)
     - On-demand asteroid/comet fetching via **JPL Horizons API**
     - Support for **SPK Type 21** (Extended Modified Difference Arrays)
-    - Precedence-aware segment indexing (~85x faster lookups)
+    - Precedence-aware segment indexing (~85× faster lookups)
 
-### Catalogs & Data Services
-- Unified `catalog.Provider` interfaces (`ObjectResolver`, `ConeSearcher`)
+### Catalogs & Data Services (`catalog/resolve`)
+- Unified `resolve.Provider` interfaces (`ObjectResolver`, `ConeSearcher`)
 - Hardware-optimized native caching via **Apache Arrow** columnar batches
 - Modern Go 1.23 streaming `iter.Seq2` iteration for memory-safe big data fetching
-- Resilient network layers with exponent backoff testing
+- Resilient network layers with exponential backoff retry
 - Production-grade bindings:
     - **SIMBAD** (ADQL TAP)
     - **MAST** (STScI CAOM Dual-Encoding support)
     - **JPL SBDB** (Small-Body Database Search)
     - **Gaia** & **VizieR** (Data TAP)
-    - **OpenNGC** (Zero-io `//go:embed` binaries)
+    - **OpenNGC** (Zero-I/O `//go:embed` binaries)
+
+### FITS & World Coordinate System (`fits`)
+- Read standard FITS files (Image, BinTable, ASCII Table HDUs)
+- Gzip-compressed streams (`.fits.gz`), memory-mapped access (`OpenMmap`)
+- Apache Arrow columnar export for catalog-scale table HDUs
+- **WCS** — pixel-to-sky mapping with TAN (Gnomonic) projection and `ExtractWCS` header parser
 
 ### Visibility & planning
 - Observable windows (sampled constraint evaluation)
@@ -108,11 +123,11 @@ Existing astronomy tools are powerful, but often:
   - `TransitionModel` for modeling slew and instrument setup time
   - Pluggable `Strategy` allocators (`GreedyStrategy`, `PriorityStrategy`)
 
-### Event Solver *(new)*
-- **Unified `EventSolver`** — generic numerical root-finder (bisection / golden-section)
+### Event Solver
+- **Unified `EventSolver`** — numerical root-finder (Brent's method / golden-section)
 - **Visibility Events**: Rise, Set, and Transit at sub-second precision.
-- **Relational Geometry Options**: Conjunction, Opposition, and Greatest Elongation.
-- **Convenience Helpers**: SunriseSunset`, `CivilDawnDusk`, `VisibilityEvents`, `Conjunctions`, `Oppositions`, `LunarEclipses`, `GreatestElongations`.
+- **Relational Geometry**: Conjunction, Opposition, and Greatest Elongation.
+- **Convenience Helpers**: `SunriseSunset`, `CivilDawnDusk`, `VisibilityEvents`, `Conjunctions`, `Oppositions`, `LunarEclipses`, `GreatestElongations`.
 
 ---
 
@@ -132,6 +147,7 @@ import (
 	"log"
 	
 	"github.com/TuSKan/astrogo/angle"
+	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/catalog"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/ephemeris"
@@ -196,77 +212,63 @@ func main() {
 }
 ```
 
-### Event Solving Example
+### Coordinate Transformations
+
+```go
+// Define an observer context (caches SOFA matrices for the epoch)
+loc, _ := coord.NewGeodetic(angle.Deg(-155.46), angle.Deg(19.82), 4205)
+now := time.NowUTC()
+ctx := coord.NewContext(now, loc, atmosphere.StandardAtmosphere)
+
+// ICRS → Alt/Az with atmospheric refraction
+src := coord.NewICRS(angle.Deg(10.684), angle.Deg(41.269))
+altaz, _ := ctx.ICRSToAltAz(src)
+fmt.Printf("Alt: %.2f°, Az: %.2f°\n", altaz.Alt().Degrees(), altaz.Az().Degrees())
+
+// Pure frame rotations (no observer needed)
+gal := coord.ICRSToGalactic(src)
+fmt.Printf("Galactic L: %.4f°, B: %.4f°\n", gal.L().Degrees(), gal.B().Degrees())
+
+tt := now.TT()
+ecl := coord.ICRSToEcliptic(src, tt)
+fmt.Printf("Ecliptic Lon: %.4f°, Lat: %.4f°\n", ecl.Lon().Degrees(), ecl.Lat().Degrees())
+```
+
+### Event Solving
 
 ```go
 // Find sunrise and sunset for tonight at Mauna Kea
-eph := ephemeris.DefaultProvider()
 rise, set, err := plan.SunriseSunset(tonight, tomorrow, site, eph)
-if err != nil {
-    log.Fatalf("failed to find sunrise/sunset: %v", err)
-}
 fmt.Println("Sunrise:", rise)
 fmt.Println("Sunset:", set)
 
-// Find astronomical twilight (Sun at -18°)
-dawn, dusk, err := plan.AstronomicalDawnDusk(tonight, tomorrow, site, eph)
-if err != nil {
-    log.Fatalf("failed to find dawn/dusk: %v", err)
-}
-fmt.Println("Astro Dawn:", dawn)
-fmt.Println("Astro Dusk:", dusk)
-
-// Find Visibility Events (Rise, Transit, Set) for a target over a 30-degree horizon
-events, err := plan.VisibilityEvents(start, end, m42, site, angle.Deg(30))
-if err != nil {
-    log.Fatalf("failed to find events: %v", err)
-}
+// Find Visibility Events (Rise, Transit, Set) for a target
+events, _ := plan.VisibilityEvents(start, end, m42, site, angle.Deg(30))
 for _, e := range events {
     fmt.Println(e) // Rise/Set/Transit at sub-second precision
 }
 
-// Find Conjunction between the Moon and Mars
-geomEvents, _ := plan.Conjunctions(start, end, moon, mars)
-for _, ge := range geomEvents {
-    fmt.Printf("Conjunction at: %s\n", ge.Time)
+// Planetary geometry: Conjunction between the Moon and Mars
+conjunctions, _ := plan.Conjunctions(start, end, moon, mars)
+for _, c := range conjunctions {
+    fmt.Printf("Conjunction at: %s\n", c.Time)
 }
-```
-
-### Coordinate Transformations and Time Scales
-
-```go
-// Convert between coordinate frames and time scales
-now := time.NowUTC()
-tt := now.TT()
-
-// Define coordinates in ICRS (e.g., Andromeda Galaxy)
-src := coord.NewICRS(angle.Deg(10.684), angle.Deg(41.269))
-
-// Transform directly to Galactic coordinates
-gal := coord.ICRSToGalactic(src)
-fmt.Printf("Galactic L: %v, B: %v\n", gal.L(), gal.B())
-
-// Transform to Ecliptic coordinates using Terrestrial Time
-ecl := coord.ICRSToEcliptic(src, tt)
-fmt.Printf("Ecliptic Lon: %v, Lat: %v\n", ecl.Lon(), ecl.Lat())
 ```
 
 ### Solar System Ephemerides
 
 ```go
-// Fetch high precision planet positions using JPL Ephemerides (DE440 by default)
-eph := ephemeris.DefaultProvider()
+// Fetch planet positions using default JPL ephemerides
+eph := ephemeris.Default()
+t := time.NowUTC()
 
-// Compute Barycentric Dynamical Time (TDB) for highest accuracy
-t := time.Date(2025, 1, 1, 12, 0, 0, 0, time.UTCScale).TDB()
+// Get geocentric state of Mars
+state, err := eph.State(ephemeris.Mars, t)
+pos, vel := state.Pos, state.Vel
 
-// Get position of Mars relative to the Earth (Geocentric)
-pos, err := eph.Position(ephemeris.Mars, ephemeris.Earth, t)
-if err != nil {
-    log.Fatalf("failed to compute ephemeris: %v", err)
-}
-
-fmt.Printf("Distance from Earth to Mars: %.6f AU\n", pos.Length())
+// Convert to sky coordinates
+icrs, _ := ephemeris.ToICRS(pos)
+fmt.Printf("Mars RA: %.4f°, Dec: %.4f°\n", icrs.RA().Degrees(), icrs.Dec().Degrees())
 ```
 
 ## Architecture
@@ -277,12 +279,13 @@ fmt.Printf("Distance from Earth to Mars: %.6f AU\n", pos.Length())
 flowchart TD
     %% High-level Orchestration
     plan[plan]
-    fits[fits]
     catalog[catalog]
 
     %% Scientific Engines
     ephemeris[ephemeris]
     coord[coord]
+    atmosphere[atmosphere]
+    fits[fits]
     
     %% Data Providers
     iers[iers]
@@ -301,22 +304,26 @@ flowchart TD
     plan --> coord
     plan --> ephemeris
     plan --> catalog
-    
-    fits --> catalog
+    plan --> atmosphere
     
     catalog --> coord
     catalog --> time
     catalog --> angle
+    
+    fits --> coord
     
     ephemeris --> time
     ephemeris --> vector
     ephemeris --> coord
     
     coord --> iers
+    coord --> atmosphere
     coord --> time
     coord --> vector
     coord --> angle
     
+    atmosphere --> angle
+
     iers --> time
 
     style Primitives fill:transparent,stroke:#888,stroke-dasharray: 5 5
@@ -325,27 +332,28 @@ flowchart TD
 ### Key Principles
 - **No cyclic dependencies**: Clean unidirectional imports.
 - **Explicit data models**: Structures over magic mappings.
-- **Separation of concerns**: Primitives isolated from domain logic.
-- **Batch-friendly computation paths**: Designed for high-throughput.
+- **Separation of concerns**: Domain physics (`atmosphere`) decoupled from coordinate geometry (`coord`).
+- **Batch-friendly computation paths**: `Context` caches expensive SOFA matrices once per epoch.
 
 ---
 
 ## Implementation Status
 
-| Package | Purpose | Status | Notes |
-| :--- | :--- | :--- | :--- |
-| `constants` | Universal and astronomical constants | ✅ implemented | |
-| `angle` | Angular types, HMS/DMS parsing | ✅ implemented | boundary wrapping validated |
-| `vector` | 3D geometry primitives | ✅ implemented | pole cases validated |
-| `time` | Astronomical time scales (JD-based) | ✅ implemented | UTC ↔ TAI ↔ TT ↔ TDB ↔ UT1 verified natively |
-| `coord` | Celestial coordinate types, Geodesy, Transformations | ✅ implemented | Geometric ↔ Apparent ↔ Observed verified |
-| `iers` | Earth Orientation Parameters (EOP) and polar motion | ✅ implemented | Dynamic DUT1/XP/YP caching |
-| `ephemeris` | Solar system ephemerides via JPL DE | ✅ implemented | multi-kernel; SPK Type 21; Horizons on-demand |
-| `catalog` | Remote object resolution and cone searches | ✅ implemented | SIMBAD, MAST, Gaia, VizieR, JPL SBDB, OpenNGC |
-| `plan` | Target abstraction, Observatory, Constraints, Planning | ✅ implemented | visibility, rise/set/transit solver |
-| `unit` | Physical unit and quantity system | ✅ implemented | AU, Parsec, LightYear, Jansky |
-| `fits` | Data formats and interoperability | ✅ implemented | `OpenMmap`, `.gz` streams, Apache Arrow tables & images |
-| `wcs` | World Coordinate Systems | ✅ implemented | Spherical Gnomonic paths (`TAN`), `fits.ExtractWCS` |
+| Package | Purpose | Status |
+| :--- | :--- | :--- |
+| `constants` | Universal and astronomical constants | ✅ Stable |
+| `angle` | Angular types, HMS/DMS parsing | ✅ Stable |
+| `vector` | 3D geometry primitives | ✅ Stable |
+| `time` | Astronomical time scales (JD-based, UTC/TAI/TT/TDB/UT1) | ✅ Stable |
+| `atmosphere` | Refraction models, airmass, dispersion | ✅ Stable |
+| `coord` | Coordinate types, transforms, topocentric reduction | ✅ Stable |
+| `iers` | Earth Orientation Parameters (DUT1, polar motion) | ✅ Stable |
+| `ephemeris` | Solar system ephemerides (SOFA + JPL SPK) | ✅ Stable |
+| `catalog/resolve` | Provider interface, HTTP client, Arrow cache | ✅ Stable |
+| `catalog/*` | SIMBAD, MAST, Gaia, VizieR, JPL, SBDB, OpenNGC | ✅ Stable |
+| `fits` | FITS I/O, WCS (TAN projection), mmap, Arrow export | ✅ Stable |
+| `plan` | Observability, constraints, events, scheduling engine | ✅ Stable |
+| `unit` | Physical unit and quantity system | ✅ Stable |
 
 See [`VALIDATION.md`](./VALIDATION.md) for scientific validation status and accuracy notes.
 
@@ -366,12 +374,13 @@ These are wrapped internally to ensure:
 
 🚀 **Active Development (Stable Core)**
 
-### Completed & Stable Foundations (Phase 1, 2, 3 & 4)
+### Completed & Stable Foundations
 - **Precision Core:** Core primitives (angle, time, vector) and coordinate transforms
+- **Atmospheric Modeling:** Standalone `atmosphere` package with pluggable refraction and dispersion
 - **Ephemeris Engine:** Unified Ephemeris (JPL SPK) with rigorous local/remote abstractions
-- **Observation Planning & Scheduling:** Unified `plan` constraints, event solving, and full **engine** (blocks, transition modeling, priorities)
-- **Scientific Validation:** Mathematically hardened and tested against NASA JPL Horizons (<1.0" tolerance)
-- **I/O & Data:** FITS Interoperability, Memory Execution (`mmap`, Arrow tables), and catalog TAP integrations
+- **Observation Planning & Scheduling:** Unified `plan` constraints, event solving, and full scheduling engine
+- **Scientific Validation:** Mathematically hardened and tested against NASA JPL Horizons (<1.0″ tolerance)
+- **I/O & Data:** FITS interoperability (mmap, Arrow tables, WCS), catalog TAP integrations
 
 ### Current Focus & Unimplemented (See Roadmap)
 - Vectorized Batch APIs & Hardware Optimizations
