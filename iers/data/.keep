@@ -1,0 +1,1 @@
+This file ensures the 'data' directory exists so that the //go:embed directive in iers.go doesn't break CI tools or compilation prior to running 'go generate'.

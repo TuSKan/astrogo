@@ -56,3 +56,5 @@ data/
 # Embedded go assets placeholders
 !catalog/openngc/data/
 !catalog/openngc/data/.keep
+!iers/data/
+!iers/data/**
