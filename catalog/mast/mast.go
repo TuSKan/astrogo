@@ -11,45 +11,45 @@ import (
 	"strings"
 
 	"github.com/TuSKan/astrogo/angle"
-	"github.com/TuSKan/astrogo/catalog/provider"
+	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/coord"
 )
 
 const mastAPI = "https://mast.stsci.edu/api/v0/invoke"
 
 type Provider struct {
-	client *provider.Client
-	cache  provider.Cache
+	client *resolve.Client
+	cache  resolve.Cache
 }
 
 func New() *Provider {
 	return &Provider{
-		client: provider.NewClient(),
-		cache:  provider.NewArrowCache(),
+		client: resolve.NewClient(),
+		cache:  resolve.NewArrowCache(),
 	}
 }
 
 func (p *Provider) Name() string { return "mast" }
 
-func (p *Provider) Capabilities() []provider.Capability {
-	return []provider.Capability{provider.CapObjectResolution, provider.CapConeSearch}
+func (p *Provider) Capabilities() []resolve.Capability {
+	return []resolve.Capability{resolve.CapObjectResolution, resolve.CapConeSearch}
 }
 
-func (p *Provider) Resolve(query string) (provider.Target, bool) {
+func (p *Provider) Resolve(query string) (resolve.Target, bool) {
 	targets := p.Search(query)
 	if len(targets) > 0 {
 		return targets[0], true
 	}
-	return provider.Target{}, false
+	return resolve.Target{}, false
 }
 
-func (p *Provider) Search(query string) []provider.Target {
+func (p *Provider) Search(query string) []resolve.Target {
 	ctx := context.TODO()
-	req := provider.ObjectRequest{Query: query, Limit: 10}
+	req := resolve.ObjectRequest{Query: query, Limit: 10}
 
 	iter := p.ResolveObject(ctx, req)
-	var targets []provider.Target
-	iter(func(t provider.Target, err error) bool {
+	var targets []resolve.Target
+	iter(func(t resolve.Target, err error) bool {
 		if err == nil {
 			targets = append(targets, t)
 		}
@@ -58,8 +58,8 @@ func (p *Provider) Search(query string) []provider.Target {
 	return targets
 }
 
-func (p *Provider) ResolveObject(ctx context.Context, req provider.ObjectRequest) provider.SeqIterator[provider.Target] {
-	cacheKey := "resolve:mast:" + provider.Normalize(req.Query)
+func (p *Provider) ResolveObject(ctx context.Context, req resolve.ObjectRequest) resolve.SeqIterator[resolve.Target] {
+	cacheKey := "resolve:mast:" + resolve.Normalize(req.Query)
 	if seq, ok := p.cache.Get(cacheKey); ok {
 		return seq
 	}
@@ -78,25 +78,25 @@ func (p *Provider) ResolveObject(ctx context.Context, req provider.ObjectRequest
 
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, mastAPI, strings.NewReader(v.Encode()))
 	if err != nil {
-		return provider.SliceSeq([]provider.Target{})
+		return resolve.SliceSeq([]resolve.Target{})
 	}
 	httpReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-	return func(yield func(provider.Target, error) bool) {
+	return func(yield func(resolve.Target, error) bool) {
 		resp, err := p.client.Do(httpReq)
 		if err != nil {
-			yield(provider.Target{}, err)
+			yield(resolve.Target{}, err)
 			return
 		}
 		defer resp.Body.Close()
 
 		b, err := io.ReadAll(resp.Body)
 		if err != nil {
-			yield(provider.Target{}, err)
+			yield(resolve.Target{}, err)
 			return
 		}
 
-		var targets []provider.Target
+		var targets []resolve.Target
 
 		if len(b) > 0 && b[0] == '{' {
 			// Try parsing as JSON first
@@ -113,11 +113,11 @@ func (p *Provider) ResolveObject(ctx context.Context, req provider.ObjectRequest
 
 			if err := json.Unmarshal(b, &jsonPayload); err == nil {
 				if jsonPayload.Status == "ERROR" {
-					yield(provider.Target{}, fmt.Errorf("mast: %s", jsonPayload.Msg))
+					yield(resolve.Target{}, fmt.Errorf("mast: %s", jsonPayload.Msg))
 					return
 				}
 				for _, match := range jsonPayload.ResolvedCoordinate {
-					targets = append(targets, provider.Target{
+					targets = append(targets, resolve.Target{
 						ID:      match.CanonicalName,
 						Name:    match.CanonicalName,
 						Coord:   coord.NewICRS(angle.Deg(match.RA), angle.Deg(match.Decl)),
@@ -140,12 +140,12 @@ func (p *Provider) ResolveObject(ctx context.Context, req provider.ObjectRequest
 			}
 
 			if err := xml.Unmarshal(b, &xmlPayload); err != nil {
-				yield(provider.Target{}, err)
+				yield(resolve.Target{}, err)
 				return
 			}
 
 			for _, match := range xmlPayload.ResolvedCoordinate {
-				targets = append(targets, provider.Target{
+				targets = append(targets, resolve.Target{
 					ID:      match.CanonicalName,
 					Name:    match.CanonicalName,
 					Coord:   coord.NewICRS(angle.Deg(match.RA), angle.Deg(match.Decl)),
@@ -155,7 +155,7 @@ func (p *Provider) ResolveObject(ctx context.Context, req provider.ObjectRequest
 		}
 
 		if err := p.cache.Set(cacheKey, targets); err != nil {
-			yield(provider.Target{}, err)
+			yield(resolve.Target{}, err)
 			return
 		}
 
@@ -167,7 +167,7 @@ func (p *Provider) ResolveObject(ctx context.Context, req provider.ObjectRequest
 	}
 }
 
-func (p *Provider) ConeSearch(ctx context.Context, req provider.ConeRequest) provider.SeqIterator[provider.Target] {
+func (p *Provider) ConeSearch(ctx context.Context, req resolve.ConeRequest) resolve.SeqIterator[resolve.Target] {
 	// Minimal stub for CAOM spatial search
-	return provider.SliceSeq([]provider.Target{})
+	return resolve.SliceSeq([]resolve.Target{})
 }

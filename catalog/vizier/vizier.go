@@ -9,40 +9,40 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/TuSKan/astrogo/catalog/provider"
+	"github.com/TuSKan/astrogo/catalog/resolve"
 )
 
 const tapSyncURL = "http://tapvizier.u-strasbg.fr/TAPVizieR/tap/sync"
 
-// Provider implements provider.Provider and provider.ConeSearcher
+// Provider implements resolve.Provider and resolve.ConeSearcher
 // for querying tables hosted on VizieR via TAP ADQL.
 type Provider struct {
-	client *provider.Client
-	cache  provider.Cache
+	client *resolve.Client
+	cache  resolve.Cache
 }
 
 func New() *Provider {
 	return &Provider{
-		client: provider.NewClient(),
-		cache:  provider.NewArrowCache(),
+		client: resolve.NewClient(),
+		cache:  resolve.NewArrowCache(),
 	}
 }
 
 func (p *Provider) Name() string { return "vizier" }
 
-func (p *Provider) Capabilities() []provider.Capability {
-	return []provider.Capability{provider.CapConeSearch}
+func (p *Provider) Capabilities() []resolve.Capability {
+	return []resolve.Capability{resolve.CapConeSearch}
 }
 
-func (p *Provider) Resolve(query string) (provider.Target, bool) {
-	return provider.Target{}, false // Not supported directly, use ConeSearch
+func (p *Provider) Resolve(query string) (resolve.Target, bool) {
+	return resolve.Target{}, false // Not supported directly, use ConeSearch
 }
 
-func (p *Provider) Search(query string) []provider.Target {
+func (p *Provider) Search(query string) []resolve.Target {
 	return nil
 }
 
-func (p *Provider) ConeSearch(ctx context.Context, req provider.ConeRequest) provider.SeqIterator[provider.Target] {
+func (p *Provider) ConeSearch(ctx context.Context, req resolve.ConeRequest) resolve.SeqIterator[resolve.Target] {
 	// VizieR requires specifying a catalog index/table if we do ADQL.
 	// Since ConeRequest doesn't specify 'table', we might need to rely purely on VizieR's standard catalogs
 	// OR require the user to encode it somehow.
@@ -82,26 +82,26 @@ func (p *Provider) ConeSearch(ctx context.Context, req provider.ConeRequest) pro
 
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, tapSyncURL, strings.NewReader(v.Encode()))
 	if err != nil {
-		return provider.SliceSeq([]provider.Target{})
+		return resolve.SliceSeq([]resolve.Target{})
 	}
 	httpReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-	return func(yield func(provider.Target, error) bool) {
+	return func(yield func(resolve.Target, error) bool) {
 		resp, err := p.client.Do(httpReq)
 		if err != nil {
-			yield(provider.Target{}, err)
+			yield(resolve.Target{}, err)
 			return
 		}
 		defer resp.Body.Close()
 
 		targets, err := parseCSV(resp.Body)
 		if err != nil {
-			yield(provider.Target{}, err)
+			yield(resolve.Target{}, err)
 			return
 		}
 
 		if err := p.cache.Set(cacheKey, targets); err != nil {
-			yield(provider.Target{}, err)
+			yield(resolve.Target{}, err)
 			return
 		}
 
@@ -113,11 +113,11 @@ func (p *Provider) ConeSearch(ctx context.Context, req provider.ConeRequest) pro
 	}
 }
 
-func parseCSV(body io.Reader) ([]provider.Target, error) {
+func parseCSV(body io.Reader) ([]resolve.Target, error) {
 	reader := csv.NewReader(body)
 	if _, err := reader.Read(); err != nil { // discard header for now and assume exact select order
 		return nil, err
 	}
 	// TODO: implement standard schema extraction or hardcode based on SELECT order.
-	return []provider.Target{}, nil // Scaffolded
+	return []resolve.Target{}, nil // Scaffolded
 }

@@ -1,9 +1,11 @@
 package coord
 
 import (
+	"log"
 	"math"
 
 	"github.com/TuSKan/astrogo/angle"
+	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/iers"
 	"github.com/TuSKan/astrogo/internal/gofaext"
 	"github.com/TuSKan/astrogo/time"
@@ -31,11 +33,11 @@ type Reduction struct {
 type Reducer struct {
 	site  *Geodetic
 	time  time.Time
-	atmos Atmosphere
+	atmos atmosphere.Atmosphere
 }
 
 // NewReducer creates a new apparent-place reduction pipeline.
-func NewReducer(site *Geodetic, t time.Time, atmos Atmosphere) *Reducer {
+func NewReducer(site *Geodetic, t time.Time, atmos atmosphere.Atmosphere) *Reducer {
 	return &Reducer{
 		site:  site,
 		time:  t,
@@ -56,7 +58,12 @@ func (r *Reducer) Reduce(v vector.Vec3) *Reduction {
 	tt1, tt2 := r.time.TT().JDParts()
 
 	mjd := (jd1 - 2400000.5) + jd2
-	eop, _ := iers.GetModel().EOP(mjd)
+	eop, err := iers.GetModel().EOP(mjd)
+	if err != nil {
+		warnEOPOnce.Do(func() {
+			log.Printf("astrogo/coord: IERS EOP data unavailable (MJD %.1f): using zero DUT1/polar motion. Topocentric accuracy degraded to ~1 arcsec.", mjd)
+		})
+	}
 
 	// 1. Get SOFA ICRS-to-TIRS matrix
 	mat := gofaext.C2t06a(tt1, tt2, ut1, ut2, eop.XP, eop.YP)
@@ -113,7 +120,7 @@ func (r *Reducer) Reduce(v vector.Vec3) *Reduction {
 	// 8. Apply Atmospheric Refraction for primary wavelength
 	obsAltAz := NewAltAz(geomAltAz.Alt(), geomAltAz.Az())
 	if r.atmos.Model != nil {
-		shift := r.atmos.Model.RefractFromTrue(geomAltAz.Alt(), r.atmos, r.site)
+		shift := r.atmos.Model.RefractFromTrue(geomAltAz.Alt(), r.atmos)
 		obsAltAz.SetAlt(geomAltAz.Alt().Add(shift))
 	}
 	res.Observed = obsAltAz
@@ -140,7 +147,7 @@ func (r *Reducer) Disperse(v vector.Vec3, wavelengths []float64) *Reduction {
 		wlAtmos := r.atmos
 		wlAtmos.Wavelength = wl
 
-		shift := wlAtmos.Model.RefractFromTrue(res.Geometric.Alt(), wlAtmos, r.site)
+		shift := wlAtmos.Model.RefractFromTrue(res.Geometric.Alt(), wlAtmos)
 		dispersedAltAz := NewAltAz(res.Geometric.Alt().Add(shift), res.Geometric.Az())
 		res.Dispersion[wl] = dispersedAltAz
 	}

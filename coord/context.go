@@ -1,14 +1,20 @@
 package coord
 
 import (
+	"log"
 	"math"
+	"sync"
 
 	"github.com/TuSKan/astrogo/angle"
+	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/iers"
 	"github.com/TuSKan/astrogo/internal/gofaext"
 	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/vector"
 )
+
+// warnEOPOnce guards the one-time warning emitted when IERS EOP data is unavailable.
+var warnEOPOnce sync.Once
 
 // Context encapsulates the observation environment (time and location) and precomputes
 // the computationally expensive SOFA intermediate astrometry parameters (ASTROM).
@@ -17,16 +23,21 @@ import (
 type Context struct {
 	t      time.Time
 	site   *Geodetic
-	atm    Atmosphere
+	atm    atmosphere.Atmosphere
 	astrom gofaext.ASTROM
 	eo     float64
 }
 
 // NewContext prepares the astrometry parameters for a specific observer time and site.
-func NewContext(t time.Time, site *Geodetic, atm Atmosphere) *Context {
+func NewContext(t time.Time, site *Geodetic, atm atmosphere.Atmosphere) *Context {
 	jd1, jd2 := t.JDParts()
 	mjd := (jd1 - 2400000.5) + jd2
-	eop, _ := iers.GetModel().EOP(mjd)
+	eop, err := iers.GetModel().EOP(mjd)
+	if err != nil {
+		warnEOPOnce.Do(func() {
+			log.Printf("astrogo/coord: IERS EOP data unavailable (MJD %.1f): using zero DUT1/polar motion. Topocentric accuracy degraded to ~1 arcsec.", mjd)
+		})
+	}
 
 	p := atm.Pressure
 	if atm.Model != nil {
@@ -56,7 +67,7 @@ func (ctx *Context) Time() time.Time { return ctx.t }
 func (ctx *Context) Site() *Geodetic { return ctx.site }
 
 // Atmosphere returns the encapsulated atmosphere configuration.
-func (ctx *Context) Atmosphere() Atmosphere { return ctx.atm }
+func (ctx *Context) Atmosphere() atmosphere.Atmosphere { return ctx.atm }
 
 // AstrometricToApparent computes the Celestial Intermediate Reference System (CIRS) apparent
 // position of an object from its Astrometric (catalog ICRS) coordinates.
@@ -79,7 +90,7 @@ func (ctx *Context) ApparentToObserved(c *Apparent) *AltAz {
 
 	alt := angle.Rad(math.Pi/2 - zd)
 	if ctx.atm.Model != nil {
-		alt += ctx.atm.Model.RefractFromTrue(alt, ctx.atm, ctx.site)
+		alt += ctx.atm.Model.RefractFromTrue(alt, ctx.atm)
 	}
 
 	return NewAltAz(alt, angle.Rad(az).Wrap360())
@@ -96,7 +107,7 @@ func (ctx *Context) AstrometricToObserved(c *Astrometric) *AltAz {
 
 	alt := angle.Rad(math.Pi/2 - zd)
 	if ctx.atm.Model != nil {
-		alt += ctx.atm.Model.RefractFromTrue(alt, ctx.atm, ctx.site)
+		alt += ctx.atm.Model.RefractFromTrue(alt, ctx.atm)
 	}
 
 	return NewAltAz(alt, angle.Rad(az).Wrap360())
@@ -134,14 +145,19 @@ func (ctx *Context) ICRSToHourAngle(c *ICRS) (angle.Angle, error) {
 func (ctx *Context) AltAzToICRS(c *AltAz) (*ICRS, error) {
 	jd1, jd2 := ctx.t.JDParts()
 	mjd := (jd1 - 2400000.5) + jd2
-	eop, _ := iers.GetModel().EOP(mjd)
+	eop, err := iers.GetModel().EOP(mjd)
+	if err != nil {
+		warnEOPOnce.Do(func() {
+			log.Printf("astrogo/coord: IERS EOP data unavailable (MJD %.1f): using zero DUT1/polar motion. Topocentric accuracy degraded to ~1 arcsec.", mjd)
+		})
+	}
 
 	p := ctx.atm.Pressure
 	geomAlt := c.Alt()
 
 	if ctx.atm.Model != nil {
 		p = 0.0
-		R := ctx.atm.Model.RefractFromApparent(c.Alt(), ctx.atm, ctx.site)
+		R := ctx.atm.Model.RefractFromApparent(c.Alt(), ctx.atm)
 		geomAlt = angle.Rad(c.Alt().Radians() - R.Radians())
 	}
 

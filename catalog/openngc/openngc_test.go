@@ -3,7 +3,7 @@ package openngc
 import (
 	"testing"
 
-	"github.com/TuSKan/astrogo/catalog/provider"
+	"github.com/TuSKan/astrogo/catalog/resolve"
 )
 
 func TestProvider(t *testing.T) {
@@ -50,7 +50,7 @@ func TestSearch(t *testing.T) {
 	}
 	found := false
 	for _, r := range results {
-		norm := provider.Normalize(r.Name)
+		norm := resolve.Normalize(r.Name)
 		if norm == "orionnebula" || norm == "greatorionnebula" || norm == "ngc1976" {
 			found = true
 			break

@@ -1,4 +1,4 @@
-package coord
+package atmosphere
 
 import (
 	"errors"
@@ -12,11 +12,11 @@ import (
 type RefractionModel interface {
 	// RefractFromTrue computes the atmospheric refraction correction by propagating a True geometric altitude
 	// forward linearly into refracted Observed appearance (Saemundsson 1986).
-	RefractFromTrue(trueAlt angle.Angle, env Atmosphere, site *Geodetic) angle.Angle
+	RefractFromTrue(trueAlt angle.Angle, env Atmosphere) angle.Angle
 
 	// RefractFromApparent computes the atmospheric refraction correction necessary to un-refract an
 	// Observed visual altitude backwards into pure geometric Truth (Bennett 1982).
-	RefractFromApparent(obsAlt angle.Angle, env Atmosphere, site *Geodetic) angle.Angle
+	RefractFromApparent(obsAlt angle.Angle, env Atmosphere) angle.Angle
 }
 
 // Atmosphere represents meteorological parameters used for calculating atmospheric
@@ -38,12 +38,12 @@ type Atmosphere struct {
 type RefractionNone struct{}
 
 // RefractFromTrue returns precisely 0 shifting.
-func (RefractionNone) RefractFromTrue(_ angle.Angle, _ Atmosphere, _ *Geodetic) angle.Angle {
+func (RefractionNone) RefractFromTrue(_ angle.Angle, _ Atmosphere) angle.Angle {
 	return 0
 }
 
 // RefractFromApparent returns precisely 0 shifting.
-func (RefractionNone) RefractFromApparent(_ angle.Angle, _ Atmosphere, _ *Geodetic) angle.Angle {
+func (RefractionNone) RefractFromApparent(_ angle.Angle, _ Atmosphere) angle.Angle {
 	return 0
 }
 
@@ -52,7 +52,7 @@ func (RefractionNone) RefractFromApparent(_ angle.Angle, _ Atmosphere, _ *Geodet
 type RefractionApproximate struct{}
 
 // RefractFromTrue applies Saemundsson's refraction formula (S&T 1986).
-func (RefractionApproximate) RefractFromTrue(trueAlt angle.Angle, env Atmosphere, _ *Geodetic) angle.Angle {
+func (RefractionApproximate) RefractFromTrue(trueAlt angle.Angle, env Atmosphere) angle.Angle {
 	h := trueAlt.Degrees()
 	if h < -5.0 {
 		return 0 // Avoid absurd refraction below horizon
@@ -66,7 +66,7 @@ func (RefractionApproximate) RefractFromTrue(trueAlt angle.Angle, env Atmosphere
 }
 
 // RefractFromApparent applies Bennett's empirical fraction.
-func (RefractionApproximate) RefractFromApparent(obsAlt angle.Angle, env Atmosphere, _ *Geodetic) angle.Angle {
+func (RefractionApproximate) RefractFromApparent(obsAlt angle.Angle, env Atmosphere) angle.Angle {
 	h := obsAlt.Degrees()
 	if h < -5.0 {
 		return 0
@@ -81,7 +81,7 @@ type RefractionRigorous struct{}
 
 // RefractFromTrue calculates the atmospheric refraction based on the rigorous Saemundsson (1986)
 // model which remains stable and valid down to the true horizon.
-func (RefractionRigorous) RefractFromTrue(trueAlt angle.Angle, env Atmosphere, _ *Geodetic) angle.Angle {
+func (RefractionRigorous) RefractFromTrue(trueAlt angle.Angle, env Atmosphere) angle.Angle {
 	h := trueAlt.Degrees()
 	if h < -5.0 {
 		return 0
@@ -107,7 +107,7 @@ func (RefractionRigorous) RefractFromTrue(trueAlt angle.Angle, env Atmosphere, _
 
 // RefractFromApparent derives atmospheric refraction analytically based on the observed visual altitude.
 // Standardized on the robust Bennett (1982) formula which handles zero-altitude gracefully.
-func (RefractionRigorous) RefractFromApparent(obsAlt angle.Angle, env Atmosphere, _ *Geodetic) angle.Angle {
+func (RefractionRigorous) RefractFromApparent(obsAlt angle.Angle, env Atmosphere) angle.Angle {
 	h := obsAlt.Degrees()
 	if h < -5.0 {
 		return 0

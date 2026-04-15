@@ -1,4 +1,4 @@
-package provider
+package resolve
 
 import (
 	"context"

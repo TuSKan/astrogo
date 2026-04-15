@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/TuSKan/astrogo/angle"
+	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/vector"
@@ -12,7 +13,7 @@ import (
 
 // Helper to provide a target at a specific geometric altitude
 func getTargetAtAltitude(site *coord.Geodetic, obsTime time.Time, minAlt, maxAlt float64) vector.Vec3 {
-	reducer := coord.NewReducer(site, obsTime, coord.Atmosphere{Pressure: 0})
+	reducer := coord.NewReducer(site, obsTime, atmosphere.Atmosphere{Pressure: 0})
 	for i := 0; i < 360; i += 5 {
 		for j := -90; j <= 90; j += 5 {
 			ra := angle.Deg(float64(i)).Radians()
@@ -47,7 +48,7 @@ func assertFinite(t *testing.T, val float64, name string) {
 func TestReducer_Group1_GeometricConsistency(t *testing.T) {
 	site, _ := coord.NewGeodetic(angle.Deg(-70), angle.Deg(40), 100)
 	obsTime := time.NowUTC()
-	atmZero := coord.Atmosphere{Pressure: 0}
+	atmZero := atmosphere.Atmosphere{Pressure: 0}
 
 	vec := getTargetAtAltitude(site, obsTime, 40, 80)
 
@@ -69,9 +70,9 @@ func TestReducer_Group1_SiteDependence(t *testing.T) {
 	obsTime := time.NowUTC()
 	vec := getTargetAtAltitude(site1, obsTime, 40, 80)
 
-	r1 := coord.NewReducer(site1, obsTime, coord.Atmosphere{Pressure: 0}).Reduce(vec)
-	r2 := coord.NewReducer(site2, obsTime, coord.Atmosphere{Pressure: 0}).Reduce(vec)
-	r3 := coord.NewReducer(site3, obsTime, coord.Atmosphere{Pressure: 0}).Reduce(vec)
+	r1 := coord.NewReducer(site1, obsTime, atmosphere.Atmosphere{Pressure: 0}).Reduce(vec)
+	r2 := coord.NewReducer(site2, obsTime, atmosphere.Atmosphere{Pressure: 0}).Reduce(vec)
+	r3 := coord.NewReducer(site3, obsTime, atmosphere.Atmosphere{Pressure: 0}).Reduce(vec)
 
 	// Expected: Same target should yield different AltAz coordinates for different locations
 	if r1.Geometric.Equal(r2.Geometric) || r1.Geometric.Equal(r3.Geometric) || r2.Geometric.Equal(r3.Geometric) {
@@ -86,8 +87,8 @@ func TestReducer_Group1_TimeDependence(t *testing.T) {
 
 	vec := getTargetAtAltitude(site, obsTime1, 40, 80)
 
-	r1 := coord.NewReducer(site, obsTime1, coord.Atmosphere{Pressure: 0}).Reduce(vec)
-	r2 := coord.NewReducer(site, obsTime2, coord.Atmosphere{Pressure: 0}).Reduce(vec)
+	r1 := coord.NewReducer(site, obsTime1, atmosphere.Atmosphere{Pressure: 0}).Reduce(vec)
+	r2 := coord.NewReducer(site, obsTime2, atmosphere.Atmosphere{Pressure: 0}).Reduce(vec)
 
 	if r1.Geometric.Equal(r2.Geometric) {
 		t.Errorf("Time dependence failed: different times returned identical geometric coordinates.")
@@ -102,8 +103,8 @@ func TestReducer_Group2_ZeroPressure(t *testing.T) {
 	site, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(45), 0)
 	obsTime := time.NowUTC()
 
-	atmStandard := coord.StandardAtmosphere
-	atmZero := coord.StandardAtmosphere
+	atmStandard := atmosphere.StandardAtmosphere
+	atmZero := atmosphere.StandardAtmosphere
 	atmZero.Pressure = 0
 
 	vec := getTargetAtAltitude(site, obsTime, 2, 10)
@@ -125,7 +126,7 @@ func TestReducer_Group2_ZeroPressure(t *testing.T) {
 func TestReducer_Group2_RefractionRaisesAltitude(t *testing.T) {
 	site, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(45), 0)
 	obsTime := time.NowUTC()
-	atm := coord.StandardAtmosphere
+	atm := atmosphere.StandardAtmosphere
 
 	vec := getTargetAtAltitude(site, obsTime, 2, 10)
 	res := coord.NewReducer(site, obsTime, atm).Reduce(vec)
@@ -139,7 +140,7 @@ func TestReducer_Group2_RefractionRaisesAltitude(t *testing.T) {
 func TestReducer_Group2_RefractionWeakensAtZenith(t *testing.T) {
 	site, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(45), 0)
 	obsTime := time.NowUTC()
-	atm := coord.StandardAtmosphere
+	atm := atmosphere.StandardAtmosphere
 
 	reducer := coord.NewReducer(site, obsTime, atm)
 
@@ -158,17 +159,16 @@ func TestReducer_Group2_RefractionWeakensAtZenith(t *testing.T) {
 }
 
 func TestReducer_Group2_LowAltitudeGuard(t *testing.T) {
-	site, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(0), 0)
-	atm := coord.StandardAtmosphere
+	atm := atmosphere.StandardAtmosphere
 
 	// Geometric altitude heavily below the horizon (-6 degrees)
-	shiftDeep := atm.Model.RefractFromTrue(angle.Deg(-6.0), atm, site)
+	shiftDeep := atm.Model.RefractFromTrue(angle.Deg(-6.0), atm)
 	if shiftDeep != 0 {
 		t.Errorf("Expected Refraction model to guard deeply depressed altitudes correctly (return 0), got %v", shiftDeep.Degrees())
 	}
 
 	// Geometric altitude right on the horizon
-	shiftHz := atm.Model.RefractFromTrue(angle.Deg(0), atm, site)
+	shiftHz := atm.Model.RefractFromTrue(angle.Deg(0), atm)
 	assertFinite(t, float64(shiftHz), "Horizon Refraction")
 
 	// Rigorous Saemundsson expectation near 0 is roughly ~34 arcminutes (+0.5667 ish)
@@ -184,7 +184,7 @@ func TestReducer_Group2_LowAltitudeGuard(t *testing.T) {
 func TestReducer_Group3_Dispersion(t *testing.T) {
 	site, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(45), 0)
 	obsTime := time.NowUTC()
-	atm := coord.StandardAtmosphere
+	atm := atmosphere.StandardAtmosphere
 
 	reducer := coord.NewReducer(site, obsTime, atm)
 	vecLow := getTargetAtAltitude(site, obsTime, 2, 10)
@@ -212,7 +212,7 @@ func TestReducer_Group3_Dispersion(t *testing.T) {
 	}
 
 	// Group 3.4: No atm means no dispersion
-	reducerZero := coord.NewReducer(site, obsTime, coord.Atmosphere{Pressure: 0})
+	reducerZero := coord.NewReducer(site, obsTime, atmosphere.Atmosphere{Pressure: 0})
 	resZero := reducerZero.Disperse(vecLow, wls)
 
 	if resZero.Dispersion[0.35].Alt() != resZero.Dispersion[2.0].Alt() {
@@ -226,7 +226,7 @@ func TestReducer_Group3_Dispersion(t *testing.T) {
 
 func TestReducer_Group4_Semantics(t *testing.T) {
 	site, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(45), 0)
-	atm := coord.StandardAtmosphere
+	atm := atmosphere.StandardAtmosphere
 	obsTime := time.NowUTC()
 
 	vec := getTargetAtAltitude(site, obsTime, 2, 10)
@@ -281,7 +281,7 @@ func TestReducer_Group5_FixturesAndSafety(t *testing.T) {
 			site, _ := coord.NewGeodetic(angle.Deg(tt.lon), angle.Deg(tt.lat), 0)
 
 			// Test standard refraction
-			reducer := coord.NewReducer(site, obsTime, coord.StandardAtmosphere)
+			reducer := coord.NewReducer(site, obsTime, atmosphere.StandardAtmosphere)
 			res := reducer.Reduce(tt.vec)
 
 			// Numerical safety checks

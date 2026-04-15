@@ -1,4 +1,4 @@
-package provider
+package resolve
 
 import (
 	"errors"
@@ -27,7 +27,7 @@ const (
 	KindOther            Kind = "Other"
 )
 
-// Target represents an astronomical object in a provider.
+// Target represents an astronomical object in a resolve.
 type Target struct {
 	ID             string
 	Name           string

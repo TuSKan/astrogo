@@ -7,21 +7,21 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/TuSKan/astrogo/catalog/provider"
+	"github.com/TuSKan/astrogo/catalog/resolve"
 )
 
 var sbdbQueryAPI = "https://ssd-api.jpl.nasa.gov/sbdb.api"
 
-// Provider implements provider.Provider and provider.ObjectResolver for SBDB.
+// Provider implements resolve.Provider and resolve.ObjectResolver for SBDB.
 type Provider struct {
-	client *provider.Client
-	cache  provider.Cache
+	client *resolve.Client
+	cache  resolve.Cache
 }
 
 func New() *Provider {
 	return &Provider{
-		client: provider.NewClient(),
-		cache:  provider.NewArrowCache(),
+		client: resolve.NewClient(),
+		cache:  resolve.NewArrowCache(),
 	}
 }
 
@@ -29,25 +29,25 @@ func (p *Provider) Name() string {
 	return "sbdb"
 }
 
-func (p *Provider) Capabilities() []provider.Capability {
-	return []provider.Capability{provider.CapObjectResolution}
+func (p *Provider) Capabilities() []resolve.Capability {
+	return []resolve.Capability{resolve.CapObjectResolution}
 }
 
-func (p *Provider) Resolve(query string) (provider.Target, bool) {
+func (p *Provider) Resolve(query string) (resolve.Target, bool) {
 	targets := p.Search(query)
 	if len(targets) > 0 {
 		return targets[0], true
 	}
-	return provider.Target{}, false
+	return resolve.Target{}, false
 }
 
-func (p *Provider) Search(query string) []provider.Target {
+func (p *Provider) Search(query string) []resolve.Target {
 	ctx := context.TODO()
-	req := provider.ObjectRequest{Query: query, Limit: 1}
+	req := resolve.ObjectRequest{Query: query, Limit: 1}
 
 	iter := p.ResolveObject(ctx, req)
-	var targets []provider.Target
-	iter(func(t provider.Target, err error) bool {
+	var targets []resolve.Target
+	iter(func(t resolve.Target, err error) bool {
 		if err == nil {
 			targets = append(targets, t)
 		}
@@ -56,8 +56,8 @@ func (p *Provider) Search(query string) []provider.Target {
 	return targets
 }
 
-func (p *Provider) ResolveObject(ctx context.Context, req provider.ObjectRequest) provider.SeqIterator[provider.Target] {
-	queryKey := provider.Normalize(req.Query)
+func (p *Provider) ResolveObject(ctx context.Context, req resolve.ObjectRequest) resolve.SeqIterator[resolve.Target] {
+	queryKey := resolve.Normalize(req.Query)
 	cacheKey := "resolve:sbdb:" + queryKey
 
 	if seq, ok := p.cache.Get(cacheKey); ok {
@@ -74,13 +74,13 @@ func (p *Provider) ResolveObject(ctx context.Context, req provider.ObjectRequest
 
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, api.String(), nil)
 	if err != nil {
-		return provider.SliceSeq([]provider.Target{})
+		return resolve.SliceSeq([]resolve.Target{})
 	}
 
-	return func(yield func(provider.Target, error) bool) {
+	return func(yield func(resolve.Target, error) bool) {
 		resp, err := p.client.Do(httpReq)
 		if err != nil {
-			yield(provider.Target{}, err)
+			yield(resolve.Target{}, err)
 			return
 		}
 		defer resp.Body.Close()
@@ -96,7 +96,7 @@ func (p *Provider) ResolveObject(ctx context.Context, req provider.ObjectRequest
 		}
 
 		if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
-			yield(provider.Target{}, err)
+			yield(resolve.Target{}, err)
 			return
 		}
 
@@ -104,12 +104,12 @@ func (p *Provider) ResolveObject(ctx context.Context, req provider.ObjectRequest
 			// This means either multiple matches or error
 			// The JSON payload includes generic text if multiple
 			// We skip multiple matching to keep it exact resolution for lookup API
-			yield(provider.Target{}, fmt.Errorf("sbdb: %s", payload.Message))
+			yield(resolve.Target{}, fmt.Errorf("sbdb: %s", payload.Message))
 			return
 		}
 
 		if payload.Object == nil {
-			yield(provider.Target{}, nil) // empty
+			yield(resolve.Target{}, nil) // empty
 			return
 		}
 
@@ -118,17 +118,17 @@ func (p *Provider) ResolveObject(ctx context.Context, req provider.ObjectRequest
 			kindStr = "Comet"
 		}
 
-		t := provider.Target{
+		t := resolve.Target{
 			ID:          payload.Object.SpkId,
 			Name:        payload.Object.FullName,
 			Designation: payload.Object.Des,
 			SPKID:       payload.Object.SpkId,
-			Kind:        provider.Kind(kindStr),
+			Kind:        resolve.Kind(kindStr),
 			Catalog:     "sbdb",
 		}
 
-		if err := p.cache.Set(cacheKey, []provider.Target{t}); err != nil {
-			yield(provider.Target{}, err)
+		if err := p.cache.Set(cacheKey, []resolve.Target{t}); err != nil {
+			yield(resolve.Target{}, err)
 			return
 		}
 

@@ -7,45 +7,45 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/TuSKan/astrogo/catalog/provider"
+	"github.com/TuSKan/astrogo/catalog/resolve"
 )
 
 const horizonsAPI = "https://ssd.jpl.nasa.gov/api/horizons.api"
 
-// Provider implements provider.Provider for major bodies via JPL Horizons.
+// Provider implements resolve.Provider for major bodies via JPL Horizons.
 type Provider struct {
-	client *provider.Client
-	cache  provider.Cache
+	client *resolve.Client
+	cache  resolve.Cache
 }
 
 func New() *Provider {
 	return &Provider{
-		client: provider.NewClient(),
-		cache:  provider.NewArrowCache(),
+		client: resolve.NewClient(),
+		cache:  resolve.NewArrowCache(),
 	}
 }
 
 func (p *Provider) Name() string { return "jpl" }
 
-func (p *Provider) Capabilities() []provider.Capability {
-	return []provider.Capability{provider.CapObjectResolution}
+func (p *Provider) Capabilities() []resolve.Capability {
+	return []resolve.Capability{resolve.CapObjectResolution}
 }
 
-func (p *Provider) Resolve(query string) (provider.Target, bool) {
+func (p *Provider) Resolve(query string) (resolve.Target, bool) {
 	targets := p.Search(query)
 	if len(targets) > 0 {
 		return targets[0], true
 	}
-	return provider.Target{}, false
+	return resolve.Target{}, false
 }
 
-func (p *Provider) Search(query string) []provider.Target {
+func (p *Provider) Search(query string) []resolve.Target {
 	ctx := context.TODO()
-	req := provider.ObjectRequest{Query: query, Limit: 10}
+	req := resolve.ObjectRequest{Query: query, Limit: 10}
 
 	iter := p.ResolveObject(ctx, req)
-	var targets []provider.Target
-	iter(func(t provider.Target, err error) bool {
+	var targets []resolve.Target
+	iter(func(t resolve.Target, err error) bool {
 		if err == nil {
 			targets = append(targets, t)
 		}
@@ -54,8 +54,8 @@ func (p *Provider) Search(query string) []provider.Target {
 	return targets
 }
 
-func (p *Provider) ResolveObject(ctx context.Context, req provider.ObjectRequest) provider.SeqIterator[provider.Target] {
-	queryKey := provider.Normalize(req.Query)
+func (p *Provider) ResolveObject(ctx context.Context, req resolve.ObjectRequest) resolve.SeqIterator[resolve.Target] {
+	queryKey := resolve.Normalize(req.Query)
 	cacheKey := "resolve:jpl:" + queryKey
 
 	if seq, ok := p.cache.Get(cacheKey); ok {
@@ -70,13 +70,13 @@ func (p *Provider) ResolveObject(ctx context.Context, req provider.ObjectRequest
 
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, api.String(), nil)
 	if err != nil {
-		return provider.SliceSeq([]provider.Target{})
+		return resolve.SliceSeq([]resolve.Target{})
 	}
 
-	return func(yield func(provider.Target, error) bool) {
+	return func(yield func(resolve.Target, error) bool) {
 		resp, err := p.client.Do(httpReq)
 		if err != nil {
-			yield(provider.Target{}, err)
+			yield(resolve.Target{}, err)
 			return
 		}
 		defer resp.Body.Close()
@@ -86,27 +86,27 @@ func (p *Provider) ResolveObject(ctx context.Context, req provider.ObjectRequest
 			Error  string `json:"error"`
 		}
 		if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
-			yield(provider.Target{}, err)
+			yield(resolve.Target{}, err)
 			return
 		}
 
 		if payload.Error != "" {
-			yield(provider.Target{}, fmt.Errorf("jpl: %s", payload.Error))
+			yield(resolve.Target{}, fmt.Errorf("jpl: %s", payload.Error))
 			return
 		}
 
 		// A real implementation requires parsing the 'Result' text block
 		// to extract 'Number', 'Name', and 'Designation' lines reliably.
 		// For now we map a heuristic fallback returning the query string itself.
-		t := provider.Target{
+		t := resolve.Target{
 			ID:      req.Query,
 			Name:    req.Query + " (Horizons metadata parsing stub)",
-			Kind:    provider.KindPlanet,
+			Kind:    resolve.KindPlanet,
 			Catalog: "jpl_horizons",
 		}
 
-		if err := p.cache.Set(cacheKey, []provider.Target{t}); err != nil {
-			yield(provider.Target{}, err)
+		if err := p.cache.Set(cacheKey, []resolve.Target{t}); err != nil {
+			yield(resolve.Target{}, err)
 			return
 		}
 

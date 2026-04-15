@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/TuSKan/astrogo/catalog/provider"
+	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/internal/testutil"
 )
 
@@ -45,11 +45,11 @@ func TestSBDBResolver(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
-	req := provider.ObjectRequest{Query: "aten"}
+	req := resolve.ObjectRequest{Query: "aten"}
 	iter := prov.ResolveObject(ctx, req)
 
-	var targets []provider.Target
-	iter(func(tar provider.Target, err error) bool {
+	var targets []resolve.Target
+	iter(func(tar resolve.Target, err error) bool {
 		if err == nil {
 			targets = append(targets, tar)
 		}
@@ -67,7 +67,7 @@ func TestProviderInterface(t *testing.T) {
 		t.Errorf("expected sbdb, got %s", p.Name())
 	}
 	caps := p.Capabilities()
-	if len(caps) != 1 || caps[0] != provider.CapObjectResolution {
+	if len(caps) != 1 || caps[0] != resolve.CapObjectResolution {
 		t.Errorf("expected CapObjectResolution, got %v", caps)
 	}
 

@@ -6,7 +6,7 @@ import (
 	stdtime "time"
 
 	"github.com/TuSKan/astrogo/angle"
-
+	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
 
 	"github.com/TuSKan/astrogo/time"
@@ -25,7 +25,7 @@ func IsVisible(obj coord.Object, t time.Time, site *Site, minAlt angle.Angle) (b
 	if err != nil {
 		return false, err
 	}
-	ctx := coord.NewContext(t, site.Location(), coord.StandardAtmosphere)
+	ctx := coord.NewContext(t, site.Location(), atmosphere.StandardAtmosphere)
 	aa, err := ctx.ICRSToAltAz(pos)
 	if err != nil {
 		return false, err
@@ -58,7 +58,7 @@ func VisibleIntervals(
 			return nil, err
 		}
 
-		ctx := coord.NewContext(t, site.Location(), coord.StandardAtmosphere)
+		ctx := coord.NewContext(t, site.Location(), atmosphere.StandardAtmosphere)
 		aa, err := ctx.ICRSToAltAz(pos)
 		if err != nil {
 			return nil, err
@@ -113,7 +113,7 @@ func TransitEstimate(obj coord.Object, site *Site, start, end time.Time) (time.T
 		if err != nil {
 			return time.Time{}, angle.Deg(0), err
 		}
-		ctx := coord.NewContext(t, site.Location(), coord.StandardAtmosphere)
+		ctx := coord.NewContext(t, site.Location(), atmosphere.StandardAtmosphere)
 		aa, err := ctx.ICRSToAltAz(pos)
 		if err != nil {
 			return time.Time{}, angle.Deg(0), err
@@ -141,7 +141,7 @@ func TransitEstimate(obj coord.Object, site *Site, start, end time.Time) (time.T
 		if err != nil {
 			return 0, err
 		}
-		ctx := coord.NewContext(t, site.Location(), coord.StandardAtmosphere)
+		ctx := coord.NewContext(t, site.Location(), atmosphere.StandardAtmosphere)
 		aa, err := ctx.ICRSToAltAz(pos)
 		if err != nil {
 			return 0, err
@@ -243,7 +243,7 @@ func TransitEstimate(obj coord.Object, site *Site, start, end time.Time) (time.T
 	if err != nil {
 		return time.Time{}, angle.Deg(0), err
 	}
-	resCtx := coord.NewContext(resTime, site.Location(), coord.StandardAtmosphere)
+	resCtx := coord.NewContext(resTime, site.Location(), atmosphere.StandardAtmosphere)
 	aa, err := resCtx.ICRSToAltAz(pos)
 	if err != nil {
 		return time.Time{}, angle.Deg(0), err

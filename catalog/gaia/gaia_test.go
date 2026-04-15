@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/TuSKan/astrogo/angle"
-	"github.com/TuSKan/astrogo/catalog/provider"
+	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/internal/testutil"
 )
@@ -27,15 +27,15 @@ func TestGaiaOfflineConeSearch(t *testing.T) {
 	prov := New()
 	prov.client.HTTPClient.Transport = &mockTransport{Handler: server.Config.Handler}
 
-	req := provider.ConeRequest{
+	req := resolve.ConeRequest{
 		Center: coord.NewICRS(angle.Deg(10), angle.Deg(40)),
 		Radius: angle.Deg(5),
 	}
 
 	iter := prov.ConeSearch(context.Background(), req)
 
-	var targets []provider.Target
-	iter(func(tar provider.Target, err error) bool {
+	var targets []resolve.Target
+	iter(func(tar resolve.Target, err error) bool {
 		testutil.AssertNoError(t, err)
 		targets = append(targets, tar)
 		return true
@@ -46,7 +46,7 @@ func TestGaiaOfflineConeSearch(t *testing.T) {
 	}
 
 	testutil.AssertEqual(t, "ID", targets[0].ID, "123456789")
-	testutil.AssertEqual(t, "Kind", string(targets[0].Kind), string(provider.KindStar))
+	testutil.AssertEqual(t, "Kind", string(targets[0].Kind), string(resolve.KindStar))
 	testutil.AssertEqual(t, "Catalog", targets[0].Catalog, "Gaia DR3")
 }
 
@@ -66,7 +66,7 @@ func TestProviderInterface(t *testing.T) {
 	p := New()
 	testutil.AssertEqual(t, "Name", p.Name(), "gaia")
 	caps := p.Capabilities()
-	if len(caps) != 1 || caps[0] != provider.CapConeSearch {
+	if len(caps) != 1 || caps[0] != resolve.CapConeSearch {
 		t.Errorf("expected CapConeSearch, got %v", caps)
 	}
 	_, ok := p.Resolve("foo")

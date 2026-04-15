@@ -2,12 +2,16 @@ package time
 
 import (
 	"fmt"
+	"log"
 	"math"
+	"sync"
 	"time"
 
 	"github.com/TuSKan/astrogo/iers"
 	"github.com/TuSKan/astrogo/internal/gofaext"
 )
+
+var warnUT1Once sync.Once
 
 type Duration = time.Duration
 
@@ -237,6 +241,10 @@ func (t Time) UT1() Time {
 	dut1 := 0.0
 	if err == nil {
 		dut1 = eop.DUT1
+	} else {
+		warnUT1Once.Do(func() {
+			log.Printf("astrogo/time: IERS EOP data unavailable (MJD %.1f): UT1 ≈ UTC (DUT1=0). Max error ≈ 0.9s. Load finals2000A for sub-second precision.", mjd)
+		})
 	}
 
 	return FromJDParts(utc.jd1, utc.jd2+(dut1/86400.0), UT1)

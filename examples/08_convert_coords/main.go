@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/TuSKan/astrogo/angle"
+	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/time"
 )
@@ -23,7 +24,7 @@ func main() {
 	loc, _ := coord.NewGeodetic(angle.Deg(-46.6525), angle.Deg(-23.600833), 786)
 	now := time.NowUTC()
 
-	ctx := coord.NewContext(now, loc, coord.StandardAtmosphere)
+	ctx := coord.NewContext(now, loc, atmosphere.StandardAtmosphere)
 	altaz, err := ctx.ICRSToAltAz(icrs)
 	if err != nil {
 		fmt.Printf("Error converting to AltAz: %v\n", err)

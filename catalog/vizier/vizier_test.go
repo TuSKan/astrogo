@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/TuSKan/astrogo/angle"
-	"github.com/TuSKan/astrogo/catalog/provider"
+	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/coord"
 )
 
@@ -26,15 +26,15 @@ func TestVizierOfflineConeSearch(t *testing.T) {
 	prov := New()
 	prov.client.HTTPClient.Transport = &mockTransport{Handler: server.Config.Handler}
 
-	req := provider.ConeRequest{
+	req := resolve.ConeRequest{
 		Center: coord.NewICRS(angle.Deg(10), angle.Deg(40)),
 		Radius: angle.Deg(5),
 	}
 
 	iter := prov.ConeSearch(context.Background(), req)
 
-	var targets []provider.Target
-	iter(func(tar provider.Target, err error) bool {
+	var targets []resolve.Target
+	iter(func(tar resolve.Target, err error) bool {
 		if err != nil {
 			t.Fatalf("Unexpected err: %v", err)
 		}
@@ -67,7 +67,7 @@ func TestProviderInterface(t *testing.T) {
 		t.Errorf("expected vizier, got %s", p.Name())
 	}
 	caps := p.Capabilities()
-	if len(caps) != 1 || caps[0] != provider.CapConeSearch {
+	if len(caps) != 1 || caps[0] != resolve.CapConeSearch {
 		t.Errorf("expected CapConeSearch, got %v", caps)
 	}
 
@@ -80,8 +80,8 @@ func TestProviderInterface(t *testing.T) {
 	}
 
 	// This validates missing coverage on the parseCSV empty conditions
-	iter := p.ConeSearch(context.Background(), provider.ConeRequest{})
-	iter(func(target provider.Target, err error) bool {
+	iter := p.ConeSearch(context.Background(), resolve.ConeRequest{})
+	iter(func(target resolve.Target, err error) bool {
 		return false
 	})
 }

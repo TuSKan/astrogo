@@ -11,42 +11,42 @@ import (
 	"strings"
 
 	"github.com/TuSKan/astrogo/angle"
-	"github.com/TuSKan/astrogo/catalog/provider"
+	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/time"
 )
 
 const tapSyncURL = "https://gea.esac.esa.int/tap-server/tap/sync"
 
-// Provider implements provider.Provider and provider.ConeSearcher
+// Provider implements resolve.Provider and resolve.ConeSearcher
 // explicitly pointing at Gaia DR3 to extract astrometric parameters.
 type Provider struct {
-	client *provider.Client
-	cache  provider.Cache
+	client *resolve.Client
+	cache  resolve.Cache
 }
 
 func New() *Provider {
 	return &Provider{
-		client: provider.NewClient(),
-		cache:  provider.NewArrowCache(),
+		client: resolve.NewClient(),
+		cache:  resolve.NewArrowCache(),
 	}
 }
 
 func (p *Provider) Name() string { return "gaia" }
 
-func (p *Provider) Capabilities() []provider.Capability {
-	return []provider.Capability{provider.CapConeSearch}
+func (p *Provider) Capabilities() []resolve.Capability {
+	return []resolve.Capability{resolve.CapConeSearch}
 }
 
-func (p *Provider) Resolve(query string) (provider.Target, bool) {
-	return provider.Target{}, false
+func (p *Provider) Resolve(query string) (resolve.Target, bool) {
+	return resolve.Target{}, false
 }
 
-func (p *Provider) Search(query string) []provider.Target {
+func (p *Provider) Search(query string) []resolve.Target {
 	return nil
 }
 
-func (p *Provider) ConeSearch(ctx context.Context, req provider.ConeRequest) provider.SeqIterator[provider.Target] {
+func (p *Provider) ConeSearch(ctx context.Context, req resolve.ConeRequest) resolve.SeqIterator[resolve.Target] {
 	limit := req.Limit
 	if limit <= 0 {
 		limit = 100
@@ -72,26 +72,26 @@ func (p *Provider) ConeSearch(ctx context.Context, req provider.ConeRequest) pro
 
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, tapSyncURL, strings.NewReader(v.Encode()))
 	if err != nil {
-		return provider.SliceSeq([]provider.Target{})
+		return resolve.SliceSeq([]resolve.Target{})
 	}
 	httpReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-	return func(yield func(provider.Target, error) bool) {
+	return func(yield func(resolve.Target, error) bool) {
 		resp, err := p.client.Do(httpReq)
 		if err != nil {
-			yield(provider.Target{}, err)
+			yield(resolve.Target{}, err)
 			return
 		}
 		defer resp.Body.Close()
 
 		targets, err := parseCSV(resp.Body)
 		if err != nil {
-			yield(provider.Target{}, err)
+			yield(resolve.Target{}, err)
 			return
 		}
 
 		if err := p.cache.Set(cacheKey, targets); err != nil {
-			yield(provider.Target{}, err)
+			yield(resolve.Target{}, err)
 			return
 		}
 
@@ -103,7 +103,7 @@ func (p *Provider) ConeSearch(ctx context.Context, req provider.ConeRequest) pro
 	}
 }
 
-func parseCSV(body io.Reader) ([]provider.Target, error) {
+func parseCSV(body io.Reader) ([]resolve.Target, error) {
 	reader := csv.NewReader(body)
 	header, err := reader.Read()
 	if err != nil {
@@ -118,7 +118,7 @@ func parseCSV(body io.Reader) ([]provider.Target, error) {
 		col[h] = i
 	}
 
-	var targets []provider.Target
+	var targets []resolve.Target
 
 	for {
 		row, err := reader.Read()
@@ -133,10 +133,10 @@ func parseCSV(body io.Reader) ([]provider.Target, error) {
 		raDeg, _ := strconv.ParseFloat(row[col["ra"]], 64)
 		decDeg, _ := strconv.ParseFloat(row[col["dec"]], 64)
 
-		t := provider.Target{
+		t := resolve.Target{
 			ID:      id,
 			Name:    "Gaia DR3 " + id,
-			Kind:    provider.KindStar,
+			Kind:    resolve.KindStar,
 			Coord:   coord.NewICRS(angle.Deg(raDeg), angle.Deg(decDeg)),
 			Epoch:   time.FromJD(2457388.5, time.UTC), // Gaia DR3 epoch is J2016.0
 			Catalog: "Gaia DR3",

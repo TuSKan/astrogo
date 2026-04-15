@@ -44,7 +44,7 @@ func EclipticToICRS(c *Ecliptic, t time.Time) *ICRS {
 // Transformer converts a Cartesian vector from one reference frame to another
 // at a given time.
 type Transformer interface {
-// Transform converts v from src to dst within the given observation context.
+	// Transform converts v from src to dst within the given observation context.
 	Transform(ctx *Context, src, dst CoordinateSystem, v vector.Vec3) (vector.Vec3, error)
 }
 

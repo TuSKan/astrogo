@@ -7,21 +7,21 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/TuSKan/astrogo/catalog/provider"
+	"github.com/TuSKan/astrogo/catalog/resolve"
 )
 
-// Provider implements the provider.Provider and provider.ObjectResolver
+// Provider implements the resolve.Provider and resolve.ObjectResolver
 // interfaces interacting with SIMBAD's Table Access Protocol endpoint.
 type Provider struct {
-	client *provider.Client
-	cache  provider.Cache
+	client *resolve.Client
+	cache  resolve.Cache
 }
 
 // New creates a new SIMBAD ObjectResolver.
 func New() *Provider {
 	return &Provider{
-		client: provider.NewClient(),
-		cache:  provider.NewArrowCache(),
+		client: resolve.NewClient(),
+		cache:  resolve.NewArrowCache(),
 	}
 }
 
@@ -31,27 +31,27 @@ func (p *Provider) Name() string {
 }
 
 // Capabilities lists the supported remote query capacities.
-func (p *Provider) Capabilities() []provider.Capability {
-	return []provider.Capability{provider.CapObjectResolution}
+func (p *Provider) Capabilities() []resolve.Capability {
+	return []resolve.Capability{resolve.CapObjectResolution}
 }
 
 // Resolve matches a single object by returning the most relevant hit.
-// Adheres strictly to provider.Provider and utilizes AstroGo scoring for precision.
-func (p *Provider) Resolve(query string) (provider.Target, bool) {
+// Adheres strictly to resolve.Provider and utilizes AstroGo scoring for precision.
+func (p *Provider) Resolve(query string) (resolve.Target, bool) {
 	targets := p.Search(query)
 	if len(targets) == 0 {
-		return provider.Target{}, false
+		return resolve.Target{}, false
 	}
 
 	bestIdx := 0
 	bestScore := -1.0
 	for i, t := range targets {
-		s := provider.Score(query, t.Name)
-		if idScore := provider.Score(query, t.ID); idScore > s {
+		s := resolve.Score(query, t.Name)
+		if idScore := resolve.Score(query, t.ID); idScore > s {
 			s = idScore
 		}
 		for _, a := range t.Aliases {
-			if aScore := provider.Score(query, a); aScore > s {
+			if aScore := resolve.Score(query, a); aScore > s {
 				s = aScore
 			}
 		}
@@ -65,13 +65,13 @@ func (p *Provider) Resolve(query string) (provider.Target, bool) {
 }
 
 // Search matches all objects closely matching a freeform query.
-func (p *Provider) Search(query string) []provider.Target {
+func (p *Provider) Search(query string) []resolve.Target {
 	ctx := context.TODO()
-	req := provider.ObjectRequest{Query: query, Limit: 10}
+	req := resolve.ObjectRequest{Query: query, Limit: 10}
 
 	iter := p.ResolveObject(ctx, req)
-	var targets []provider.Target
-	iter(func(t provider.Target, err error) bool {
+	var targets []resolve.Target
+	iter(func(t resolve.Target, err error) bool {
 		if err != nil {
 			fmt.Printf("SIMBAD ERR: %v\n", err)
 			return false
@@ -84,7 +84,7 @@ func (p *Provider) Search(query string) []provider.Target {
 }
 
 // ResolveObject provides an async streaming mechanism using ADQL.
-func (p *Provider) ResolveObject(ctx context.Context, req provider.ObjectRequest) provider.SeqIterator[provider.Target] {
+func (p *Provider) ResolveObject(ctx context.Context, req resolve.ObjectRequest) resolve.SeqIterator[resolve.Target] {
 	// 1. Check Cache First (Maintain case to prevent ADQL case-sensitive collisions)
 	cacheKey := fmt.Sprintf("resolve:%s:%d", req.Query, req.Limit)
 	if req.Limit <= 0 {
@@ -100,39 +100,39 @@ func (p *Provider) ResolveObject(ctx context.Context, req provider.ObjectRequest
 
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, tapSyncURL, strings.NewReader(body))
 	if err != nil {
-		return provider.SliceSeq([]provider.Target{})
+		return resolve.SliceSeq([]resolve.Target{})
 	}
 	httpReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-	return func(yield func(provider.Target, error) bool) {
+	return func(yield func(resolve.Target, error) bool) {
 		resp, err := p.client.Do(httpReq)
 		if err != nil {
-			yield(provider.Target{}, err)
+			yield(resolve.Target{}, err)
 			return
 		}
 		if resp.StatusCode >= 400 {
 			b, _ := io.ReadAll(resp.Body)
 			resp.Body.Close()
-			yield(provider.Target{}, fmt.Errorf("http error %d: %s", resp.StatusCode, string(b)))
+			yield(resolve.Target{}, fmt.Errorf("http error %d: %s", resp.StatusCode, string(b)))
 			return
 		}
 		defer resp.Body.Close()
 
 		data, err := io.ReadAll(resp.Body)
 		if err != nil {
-			yield(provider.Target{}, err)
+			yield(resolve.Target{}, err)
 			return
 		}
 
 		targets, err := ParseCSV(strings.NewReader(string(data)))
 		if err != nil {
-			yield(provider.Target{}, err)
+			yield(resolve.Target{}, err)
 			return
 		}
 
 		// 2. Cache Results on successful fetch
 		if err := p.cache.Set(cacheKey, targets); err != nil {
-			yield(provider.Target{}, err)
+			yield(resolve.Target{}, err)
 			return
 		}
 
