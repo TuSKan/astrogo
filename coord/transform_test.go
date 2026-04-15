@@ -48,10 +48,11 @@ func TestAltAzRoundTrip(t *testing.T) {
 	tm := time.FromJD(2460000.5, time.UTC)
 	icrs := coord.NewICRS(angle.Deg(100), angle.Deg(20))
 
-	aa, err := coord.ICRSToAltAz(icrs, tm, site)
+	ctx := coord.NewContext(tm, site, coord.StandardAtmosphere)
+	aa, err := ctx.ICRSToAltAz(icrs)
 	testutil.AssertNoError(t, err)
 
-	back, err := coord.AltAzToICRS(aa, tm, site)
+	back, err := ctx.AltAzToICRS(aa)
 	testutil.AssertNoError(t, err)
 
 	// Round-trip through refraction and Earth rotation should be very close,
@@ -74,7 +75,8 @@ func TestAltAzEdgeCases(t *testing.T) {
 
 	// Zenith test
 	icrsAtZenith := coord.NewICRS(angle.Deg(280.4606), angle.Deg(0)) // Simplified
-	aa, _ := coord.ICRSToAltAz(icrsAtZenith, tm, site)
+	ctx := coord.NewContext(tm, site, coord.StandardAtmosphere)
+	aa, _ := ctx.ICRSToAltAz(icrsAtZenith)
 	// Just check it doesn't crash and returns reasonable values.
 	if aa.Alt().Degrees() > 90 || aa.Alt().Degrees() < -90 {
 		t.Errorf("Invalid Alt: %v", aa.Alt())
@@ -156,7 +158,8 @@ func TestICRSToHourAngle(t *testing.T) {
 	site, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(0), 0)
 	tm := time.FromJD(2451545.0, time.UTC)
 	icrs := coord.NewICRS(angle.Deg(0), angle.Deg(0))
-	ha, err := coord.ICRSToHourAngle(icrs, tm, site)
+	ctx := coord.NewContext(tm, site, coord.StandardAtmosphere)
+	ha, err := ctx.ICRSToHourAngle(icrs)
 	testutil.AssertNoError(t, err)
 
 	if math.IsNaN(ha.Radians()) {
@@ -167,9 +170,8 @@ func TestICRSToHourAngle(t *testing.T) {
 func TestTransformer(t *testing.T) {
 	tr := coord.IdentityTransformer{}
 	v := vector.V3(1, 2, 3)
-	tm := time.FromJD(2451545.0, time.UTC)
 
-	out, err := tr.Transform(nil, nil, v, tm)
+	out, err := tr.Transform(nil, nil, nil, v)
 	testutil.AssertNoError(t, err)
 
 	if out.X != v.X || out.Y != v.Y || out.Z != v.Z {
@@ -188,17 +190,20 @@ func TestRefractionModes(t *testing.T) {
 	// 1. No Refraction Model
 	atmNone := coord.StandardAtmosphere
 	atmNone.Model = coord.RefractionNone{}
-	obsNone := coord.AstrometricToObserved(astro, obsTime, site, atmNone)
+	ctxNone := coord.NewContext(obsTime, site, atmNone)
+	obsNone := ctxNone.AstrometricToObserved(astro)
 
 	// 2. SOFA (Native) Refraction Model
 	atmSOFA := coord.StandardAtmosphere
 	atmSOFA.Model = coord.RefractionRigorous{}
-	obsSOFA := coord.AstrometricToObserved(astro, obsTime, site, atmSOFA)
+	ctxSOFA := coord.NewContext(obsTime, site, atmSOFA)
+	obsSOFA := ctxSOFA.AstrometricToObserved(astro)
 
 	// 3. Approximate Refraction Model
 	atmApprox := coord.StandardAtmosphere
 	atmApprox.Model = coord.RefractionApproximate{}
-	obsApprox := coord.AstrometricToObserved(astro, obsTime, site, atmApprox)
+	ctxApprox := coord.NewContext(obsTime, site, atmApprox)
+	obsApprox := ctxApprox.AstrometricToObserved(astro)
 
 	// Assertions
 	altNone := obsNone.Alt().Degrees()
@@ -237,13 +242,9 @@ func TestAstrometricToApparent(t *testing.T) {
 	// Calculate apparent position 10 years later (2010.0)
 	obsTime := time.Date(2010, 1, 1, 12, 0, 0, 0, time.LocationUTC)
 
-	// Since proper motion is applied for exactly 10 Julian years
-	// Expected roughly:
-	// RA += 10 * 1.5 arcsec = 15 arcsec
-	// Dec += 10 * -0.5 arcsec = -5 arcsec
-	// Plus light deflection and aberration corrections (~20 arcsec max)
-
-	apparent := coord.AstrometricToApparent(astro, obsTime)
+	site, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(0), 0)
+	ctx := coord.NewContext(obsTime, site, coord.StandardAtmosphere)
+	apparent := ctx.AstrometricToApparent(astro)
 
 	// Basic sanity bounds checking — it should be a completely valid number
 	// and visibly shifted from its geometric ICRS start.
@@ -271,9 +272,6 @@ func TestApparentToObserved(t *testing.T) {
 		t.Fatalf("Failed to create geodetic site: %v", err)
 	}
 
-	// We pick an arbitrary time. We won't perfectly match LST without extracting GST,
-	// but we can just test if the transform correctly pushes the values to AltAz.
-
 	obsTime := time.Date(2023, 5, 1, 6, 0, 0, 0, time.LocationUTC)
 
 	apparent := coord.NewApparent(angle.Deg(10.0), angle.Deg(45.0))
@@ -281,7 +279,8 @@ func TestApparentToObserved(t *testing.T) {
 	// Standard atmosphere
 	atm := coord.StandardAtmosphere
 
-	observed := coord.ApparentToObserved(apparent, obsTime, site, atm)
+	ctx := coord.NewContext(obsTime, site, atm)
+	observed := ctx.ApparentToObserved(apparent)
 
 	// Result should be valid coordinates
 	if observed.Alt().Degrees() < -90 || observed.Alt().Degrees() > 90 {
@@ -301,12 +300,14 @@ func TestLegacyEquatorialHorizontalConsistency(t *testing.T) {
 
 	geom := coord.NewICRS(angle.Deg(150), angle.Deg(30))
 
-	// Compute using legacy ICRSToAltAz
-	altaz1, _ := coord.ICRSToAltAz(geom, obsTime, site)
+	ctx := coord.NewContext(obsTime, site, coord.StandardAtmosphere)
+
+	// Compute using ICRSToAltAz
+	altaz1, _ := ctx.ICRSToAltAz(geom)
 
 	// Compute using explicit pipeline
 	astro := coord.NewAstrometric(geom.RA(), geom.Dec())
-	altaz2 := coord.AstrometricToObserved(astro, obsTime, site, coord.StandardAtmosphere)
+	altaz2 := ctx.AstrometricToObserved(astro)
 
 	testutil.AssertNear(t, "Legacy vs Pipeline Altitude", altaz1.Alt().Degrees(), altaz2.Alt().Degrees(), 1e-12)
 	testutil.AssertNear(t, "Legacy vs Pipeline Azimuth", altaz1.Az().Degrees(), altaz2.Az().Degrees(), 1e-12)
@@ -322,7 +323,8 @@ func TestTransformNearPole(t *testing.T) {
 		t.Fatalf("Failed to create geodetic site: %v", err)
 	}
 	starNorth := coord.NewICRS(angle.Deg(0), angle.Deg(89.9))
-	aaN, err := coord.ICRSToAltAz(starNorth, tm, locN)
+	ctxN := coord.NewContext(tm, locN, coord.StandardAtmosphere)
+	aaN, err := ctxN.ICRSToAltAz(starNorth)
 	testutil.AssertNoError(t, err)
 	if aaN.Alt().Degrees() < 89.0 {
 		t.Fatalf("expected near-zenith altitude at North Pole, got %.6f deg", aaN.Alt().Degrees())
@@ -334,7 +336,8 @@ func TestTransformNearPole(t *testing.T) {
 		t.Fatalf("Failed to create geodetic site: %v", err)
 	}
 	starEq := coord.NewICRS(angle.Deg(0), angle.Deg(0))
-	aaS, err := coord.ICRSToAltAz(starEq, tm, locS)
+	ctxS := coord.NewContext(tm, locS, coord.StandardAtmosphere)
+	aaS, err := ctxS.ICRSToAltAz(starEq)
 	testutil.AssertNoError(t, err)
 	testutil.AssertNear(t, "Altitude at S.Pole Horizon", aaS.Alt().Degrees(), 0, 0.5)
 }
@@ -345,13 +348,14 @@ func TestTransformBoundaryRA(t *testing.T) {
 		t.Fatalf("Failed to create geodetic site: %v", err)
 	}
 	tm := time.NowUTC()
+	ctx := coord.NewContext(tm, loc, coord.StandardAtmosphere)
 
 	// Test RA 359.999 vs 0.001 should yield very similar results
 	s1 := coord.NewICRS(angle.Deg(359.999), angle.Deg(45))
 	s2 := coord.NewICRS(angle.Deg(0.001), angle.Deg(45))
 
-	aa1, _ := coord.ICRSToAltAz(s1, tm, loc)
-	aa2, _ := coord.ICRSToAltAz(s2, tm, loc)
+	aa1, _ := ctx.ICRSToAltAz(s1)
+	aa2, _ := ctx.ICRSToAltAz(s2)
 
 	diff := aa1.Az().Sub(aa2.Az()).WrapPi().Degrees()
 	if diff > 0.1 {
@@ -372,8 +376,10 @@ func TestNegativeLongitude(t *testing.T) {
 	tm := time.NowUTC()
 	star := coord.NewICRS(angle.Deg(0), angle.Deg(0))
 
-	aa1, _ := coord.ICRSToAltAz(star, tm, loc1)
-	aa2, _ := coord.ICRSToAltAz(star, tm, loc2)
+	ctx1 := coord.NewContext(tm, loc1, coord.StandardAtmosphere)
+	ctx2 := coord.NewContext(tm, loc2, coord.StandardAtmosphere)
+	aa1, _ := ctx1.ICRSToAltAz(star)
+	aa2, _ := ctx2.ICRSToAltAz(star)
 
 	testutil.AssertNear(t, "Alt same for -45/315 lon", aa1.Alt().Degrees(), aa2.Alt().Degrees(), 1e-10)
 	diffAz := aa1.Az().Sub(aa2.Az()).WrapPi().Degrees()

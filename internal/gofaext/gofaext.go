@@ -196,3 +196,33 @@ func Refco(phpa, tc, rh, wl float64) (refa, refb float64) {
 	gofa.Refco(phpa, tc, rh, wl, &refa, &refb)
 	return refa, refb
 }
+
+// ASTROM aliases the GOFA ASTROM structure for caching star-independent
+// astrometry parameters.
+type ASTROM = gofa.ASTROM
+
+// Apco13 prepares the ASTROM parameters for ICRS <-> observed transformations.
+func Apco13(utc1, utc2, dut1 float64, elong, phi, hm, xp, yp float64, phpa, tc, rh, wl float64) (ASTROM, float64) {
+	var astrom ASTROM
+	var eo float64
+	gofa.Apco13(utc1, utc2, dut1, elong, phi, hm, xp, yp, phpa, tc, rh, wl, &astrom, &eo)
+	return astrom, eo
+}
+
+// Atciq provides quick ICRS to CIRS transformation given precomputed ASTROM parameters.
+func Atciq(rc, dc float64, pr, pd, px, rv float64, astrom *ASTROM) (ri, di float64) {
+	gofa.Atciq(rc, dc, pr, pd, px, rv, astrom, &ri, &di)
+	return ri, di
+}
+
+// Atioq provides quick CIRS to observed place transformation utilizing precomputed configurations.
+func Atioq(ri, di float64, astrom *ASTROM) (aob, zob, hob, dob, rob float64) {
+	gofa.Atioq(ri, di, astrom, &aob, &zob, &hob, &dob, &rob)
+	return aob, zob, hob, dob, rob
+}
+
+// Atcoq collapses Atciq and Atioq: quick ICRS to observed.
+func Atcoq(rc, dc float64, pr, pd, px, rv float64, astrom *ASTROM) (aob, zob, hob, dob, rob float64) {
+	ri, di := Atciq(rc, dc, pr, pd, px, rv, astrom)
+	return Atioq(ri, di, astrom)
+}

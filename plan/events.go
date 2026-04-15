@@ -245,102 +245,229 @@ func (s EventSolver) Find(spec EventSpec, start, end time.Time) ([]Event, error)
 	return events, nil
 }
 
-// refineRoot uses bisection to find the exact time when eval(t) == 0.
+// refineRoot uses Brent's method to find the exact time when eval(t) == 0.
+// Brent's method combines inverse quadratic interpolation, secant, and bisection
+// for superlinear convergence while maintaining the robustness of bracketing.
+// Requires: v1 and eval(t2) have opposite signs (bracketing condition).
 func (s EventSolver) refineRoot(eval evaluator, t1, t2 time.Time, v1 float64) (time.Time, float64, error) {
-	low, high := t1, t2
+	// Work in float64 seconds offset from t1 to avoid time.Duration precision issues.
+	origin := t1
+	tolSec := float64(s.Tolerance) / float64(time.Second)
+
+	timeAt := func(sec float64) time.Time {
+		return origin.Add(time.Duration(sec * float64(time.Second)))
+	}
+
+	a := 0.0
+	b := float64(t2.Sub(t1)) / float64(time.Second)
+	fa := v1
+	fb, err := eval(timeAt(b))
+	if err != nil {
+		return time.Time{}, 0, err
+	}
+
+	c, fc := a, fa
+	d := b - a
+	e := d
 
 	for i := 0; i < s.MaxIter; i++ {
-		if high.Sub(low) < s.Tolerance {
+		if math.Abs(b-a) < tolSec || fb == 0 {
 			break
 		}
 
-		mid := low.Add(high.Sub(low) / 2)
-		vm, err := eval(mid)
+		// Ensure |f(b)| <= |f(c)| for interpolation quality
+		if (fb > 0 && fc > 0) || (fb < 0 && fc < 0) {
+			c, fc = a, fa
+			d = b - a
+			e = d
+		}
+
+		if math.Abs(fc) < math.Abs(fb) {
+			a, b, c = b, c, b
+			fa, fb, fc = fb, fc, fb
+		}
+
+		tol1 := 2.0*1e-15*math.Abs(b) + 0.5*tolSec
+		m := 0.5 * (c - b)
+
+		if math.Abs(m) <= tol1 || fb == 0 {
+			break
+		}
+
+		if math.Abs(e) >= tol1 && math.Abs(fa) > math.Abs(fb) {
+			// Try interpolation
+			sv := fb / fa
+			var p, q float64
+
+			if a == c {
+				// Secant (linear)
+				p = 2.0 * m * sv
+				q = 1.0 - sv
+			} else {
+				// Inverse quadratic interpolation
+				qv := fa / fc
+				r := fb / fc
+				p = sv * (2.0*m*qv*(qv-r) - (b-a)*(r-1.0))
+				q = (qv - 1.0) * (r - 1.0) * (sv - 1.0)
+			}
+
+			if p > 0 {
+				q = -q
+			} else {
+				p = -p
+			}
+
+			if 2.0*p < math.Min(3.0*m*q-math.Abs(tol1*q), math.Abs(e*q)) {
+				e = d
+				d = p / q
+			} else {
+				d = m
+				e = d
+			}
+		} else {
+			// Bisection
+			d = m
+			e = d
+		}
+
+		a = b
+		fa = fb
+
+		if math.Abs(d) > tol1 {
+			b += d
+		} else if m > 0 {
+			b += tol1
+		} else {
+			b -= tol1
+		}
+
+		fb, err = eval(timeAt(b))
 		if err != nil {
 			return time.Time{}, 0, err
 		}
-
-		if (v1 > 0) == (vm > 0) {
-			low = mid
-			v1 = vm
-		} else {
-			high = mid
-		}
 	}
 
-	resTime := low.Add(high.Sub(low) / 2)
-	val, err := eval(resTime)
-	return resTime, val, err
+	resTime := timeAt(b)
+	return resTime, fb, nil
 }
 
-// refineExtremum uses golden section search to find the time of local maximum or minimum eval(t).
+// refineExtremum uses Brent's minimization to find the time of local maximum or minimum.
+// Brent's minimization combines parabolic interpolation with golden section fallback
+// for superlinear convergence on smooth functions.
 func (s EventSolver) refineExtremum(eval evaluator, t1, t3 time.Time, isMax bool) (time.Time, float64, error) {
-	R := (math.Sqrt(5) - 1) / 2
-	C := 1 - R
+	const goldenRatio = 0.3819660112501051 // (3 - sqrt(5)) / 2
 
-	low, high := t1, t3
-	d := high.Sub(low)
+	a, b := t1, t3
+	x := a.Add(time.Duration(float64(b.Sub(a)) * 0.5))
 
-	ga := low.Add(time.Duration(float64(d) * C))
-	gb := low.Add(time.Duration(float64(d) * R))
-
-	fa, err := eval(ga)
+	fx, err := eval(x)
 	if err != nil {
 		return time.Time{}, 0, err
 	}
-	fb, err := eval(gb)
-	if err != nil {
-		return time.Time{}, 0, err
+	if isMax {
+		fx = -fx
 	}
+
+	w, v := x, x
+	fw, fv := fx, fx
+	e := time.Duration(0) // Distance moved on the step before last
+	d := time.Duration(0) // Distance moved on the last step
 
 	for i := 0; i < s.MaxIter; i++ {
-		if high.Sub(low) < s.Tolerance {
+		midpoint := a.Add(time.Duration(float64(b.Sub(a)) * 0.5))
+		tol1 := float64(s.Tolerance)
+		tol2 := 2.0 * tol1
+
+		if math.Abs(float64(x.Sub(midpoint)))+float64(b.Sub(a))/2.0 <= tol2 {
 			break
 		}
 
-		replaceA := fa > fb
-		if !isMax {
-			replaceA = fa < fb
+		useParabolic := false
+
+		if math.Abs(float64(e)) > tol1 {
+			// Fit parabola through x, v, w
+			xw := float64(x.Sub(w))
+			xv := float64(x.Sub(v))
+			r := xw * (fx - fv)
+			q := xv * (fx - fw)
+			p := xv*q - xw*r
+			q = 2.0 * (q - r)
+
+			if q > 0 {
+				p = -p
+			} else {
+				q = -q
+			}
+
+			// Accept parabolic step if it falls within the bracket and is a reduction
+			if math.Abs(p) < math.Abs(0.5*q*float64(e)) &&
+				p > q*float64(a.Sub(x)) &&
+				p < q*float64(b.Sub(x)) {
+
+				e = d
+				d = time.Duration(p / q)
+				useParabolic = true
+			}
 		}
 
-		if replaceA {
-			high = gb
-			gb = ga
-			fb = fa
-			d = high.Sub(low)
-			ga = low.Add(time.Duration(float64(d) * C))
-			fa, err = eval(ga)
-			if err != nil {
-				return time.Time{}, 0, err
+		if !useParabolic {
+			// Golden section step
+			if x.After(midpoint) || x.Equal(midpoint) {
+				e = a.Sub(x)
+			} else {
+				e = b.Sub(x)
 			}
+			d = time.Duration(float64(e) * goldenRatio)
+		}
+
+		// Evaluate at the new trial point
+		var u time.Time
+		if math.Abs(float64(d)) >= tol1 {
+			u = x.Add(d)
+		} else if float64(d) > 0 {
+			u = x.Add(time.Duration(tol1))
 		} else {
-			low = ga
-			ga = gb
-			fa = fb
-			d = high.Sub(low)
-			gb = low.Add(time.Duration(float64(d) * R))
-			fb, err = eval(gb)
-			if err != nil {
-				return time.Time{}, 0, err
+			u = x.Add(time.Duration(-tol1))
+		}
+
+		fu, err := eval(u)
+		if err != nil {
+			return time.Time{}, 0, err
+		}
+		if isMax {
+			fu = -fu
+		}
+
+		// Update bracket
+		if fu <= fx {
+			if u.Before(x) {
+				b = x
+			} else {
+				a = x
+			}
+			v, w, x = w, x, u
+			fv, fw, fx = fw, fx, fu
+		} else {
+			if u.Before(x) {
+				a = u
+			} else {
+				b = u
+			}
+			if fu <= fw || w.Equal(x) {
+				v, w = w, u
+				fv, fw = fw, fu
+			} else if fu <= fv || v.Equal(x) || v.Equal(w) {
+				v = u
+				fv = fu
 			}
 		}
 	}
 
-	var resTime time.Time
-
-	chooseA := fa > fb
-	if !isMax {
-		chooseA = fa < fb
+	finalVal, err := eval(x)
+	if err != nil {
+		return time.Time{}, 0, err
 	}
-
-	if chooseA {
-		resTime = ga
-	} else {
-		resTime = gb
-	}
-
-	val, err := eval(resTime)
-	return resTime, val, err
+	return x, finalVal, err
 }
 
 func (s EventSolver) solveVisibility(spec EventSpec, start, end time.Time) ([]Event, error) {
@@ -352,8 +479,9 @@ func (s EventSolver) solveVisibility(spec EventSpec, start, end time.Time) ([]Ev
 			return 0, err
 		}
 
+		ctx := coord.NewContext(t, spec.Observer.Location(), coord.StandardAtmosphere)
 		astro := coord.NewAstrometric(pos.RA(), pos.Dec())
-		geom := coord.AstrometricToObserved(astro, t, spec.Observer.Location(), coord.Atmosphere{Pressure: 0})
+		geom := ctx.AstrometricToObserved(astro)
 
 		return geom.Alt().Degrees() - spec.Threshold.Degrees(), nil
 	}
@@ -397,10 +525,11 @@ func (s EventSolver) solveVisibility(spec EventSpec, start, end time.Time) ([]Ev
 				}
 
 				// Calculate geometric outputs
+				resCtx := coord.NewContext(resTime, spec.Observer.Location(), coord.StandardAtmosphere)
 				pos, _ := spec.Target.Position(resTime)
 				astro := coord.NewAstrometric(pos.RA(), pos.Dec())
-				geom := coord.AstrometricToObserved(astro, resTime, spec.Observer.Location(), coord.Atmosphere{Pressure: 0})
-				aa, _ := coord.ICRSToAltAz(pos, resTime, spec.Observer.Location())
+				geom := resCtx.AstrometricToObserved(astro)
+				aa, _ := resCtx.ICRSToAltAz(pos)
 
 				events = append(events, Event{
 					Kind:              kind,
@@ -422,10 +551,11 @@ func (s EventSolver) solveVisibility(spec EventSpec, start, end time.Time) ([]Ev
 					return nil, err
 				}
 
+				resCtx := coord.NewContext(resTime, spec.Observer.Location(), coord.StandardAtmosphere)
 				pos, _ := spec.Target.Position(resTime)
 				astro := coord.NewAstrometric(pos.RA(), pos.Dec())
-				geom := coord.AstrometricToObserved(astro, resTime, spec.Observer.Location(), coord.Atmosphere{Pressure: 0})
-				aa, _ := coord.ICRSToAltAz(pos, resTime, spec.Observer.Location())
+				geom := resCtx.AstrometricToObserved(astro)
+				aa, _ := resCtx.ICRSToAltAz(pos)
 
 				events = append(events, Event{
 					Kind:              EventTransit,

@@ -32,7 +32,8 @@ func main() {
 	}
 
 	// 5. Convert ICRS sky coordinates to local Altitude and Azimuth
-	skyPos, err := coord.ICRSToAltAz(icrs, tm, loc)
+	ctx := coord.NewContext(tm, loc, coord.StandardAtmosphere)
+	skyPos, err := ctx.ICRSToAltAz(icrs)
 	if err != nil {
 		log.Fatalf("Error converting to Alt/Az: %v", err)
 	}

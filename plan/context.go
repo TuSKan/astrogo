@@ -13,13 +13,15 @@ type Environment struct {
 	// Future: Sun  coord.ICRS
 }
 
-// Context carries memoized data across multiple constraint evaluations
-// for the same (object, time, site) triplet.
-type Context struct {
+// EvalContext carries memoized data across multiple constraint evaluations
+// for the same (object, time, site) triplet. It wraps a coord.Context
+// to reuse the precomputed ASTROM parameters.
+type EvalContext struct {
 	Object coord.Object
 	Time   time.Time
-	Site   Site
+	Site   *Site
 	Env    *Environment
+	Ctx    *coord.Context
 
 	// Memoized values
 	icrs  *coord.ICRS
@@ -27,18 +29,30 @@ type Context struct {
 	err   error
 }
 
-// NewContext creates a bare context for evaluation.
-func NewContext(obj coord.Object, t time.Time, site Site, env *Environment) *Context {
-	return &Context{
+// NewEvalContext creates a bare context for evaluation.
+func NewEvalContext(obj coord.Object, t time.Time, site *Site, env *Environment) *EvalContext {
+	return &EvalContext{
 		Object: obj,
 		Time:   t,
 		Site:   site,
 		Env:    env,
+		Ctx:    coord.NewContext(t, site.Location(), coord.StandardAtmosphere),
+	}
+}
+
+// NewEvalContextWith creates a context that reuses an existing coord.Context.
+func NewEvalContextWith(obj coord.Object, t time.Time, site *Site, env *Environment, ctx *coord.Context) *EvalContext {
+	return &EvalContext{
+		Object: obj,
+		Time:   t,
+		Site:   site,
+		Env:    env,
+		Ctx:    ctx,
 	}
 }
 
 // ICRS returns the (memoized) ICRS coordinates.
-func (c *Context) ICRS() (*coord.ICRS, error) {
+func (c *EvalContext) ICRS() (*coord.ICRS, error) {
 	if c.icrs != nil {
 		return c.icrs, c.err
 	}
@@ -49,7 +63,7 @@ func (c *Context) ICRS() (*coord.ICRS, error) {
 }
 
 // AltAz returns the (memoized) AltAz coordinates.
-func (c *Context) AltAz() (*coord.AltAz, error) {
+func (c *EvalContext) AltAz() (*coord.AltAz, error) {
 	if c.altAz != nil {
 		return c.altAz, c.err
 	}
@@ -57,7 +71,7 @@ func (c *Context) AltAz() (*coord.AltAz, error) {
 	if err != nil {
 		return nil, err
 	}
-	aa, err := coord.ICRSToAltAz(icrs, c.Time, c.Site.Location())
+	aa, err := c.Ctx.ICRSToAltAz(icrs)
 	c.altAz = aa
 	c.err = err
 	return aa, err

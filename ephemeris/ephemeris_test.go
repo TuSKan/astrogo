@@ -28,7 +28,8 @@ func TestSunAltitudeMovement(t *testing.T) {
 	posStart, err := ephemeris.ToICRS(vecStart)
 	testutil.AssertNoError(t, err)
 
-	aaStart, _ := coord.ICRSToAltAz(posStart, tm, site.Location())
+	ctxStart := coord.NewContext(tm, site.Location(), coord.StandardAtmosphere)
+	aaStart, _ := ctxStart.ICRSToAltAz(posStart)
 
 	tmLate := tm.AddDays(0.25) // +6 hours
 	vecLate, err := ephemeris.Position(p, ephemeris.Sun, tmLate)
@@ -37,7 +38,8 @@ func TestSunAltitudeMovement(t *testing.T) {
 	posLate, err := ephemeris.ToICRS(vecLate)
 	testutil.AssertNoError(t, err)
 
-	aaLate, _ := coord.ICRSToAltAz(posLate, tmLate, site.Location())
+	ctxLate := coord.NewContext(tmLate, site.Location(), coord.StandardAtmosphere)
+	aaLate, _ := ctxLate.ICRSToAltAz(posLate)
 
 	t.Logf("Sun Alt @ Noon: %.2f", aaStart.Alt().Degrees())
 	t.Logf("Sun Alt @ Eve:  %.2f", aaLate.Alt().Degrees())
@@ -173,8 +175,9 @@ func TestApparentState_ZeroVelocityReducesToGeometric(t *testing.T) {
 		t.Fatalf("ApparentState failed: %v", err)
 	}
 
-	got := coord.GeocentricToObserved(appState.Pos, tm, site, atm)
-	want := coord.GeocentricToObserved(mock.pos, tm, site, atm)
+	ctx := coord.NewContext(tm, site, atm)
+	got := ctx.GeocentricToObserved(appState.Pos)
+	want := ctx.GeocentricToObserved(mock.pos)
 
 	sep := angularSepArcsec(got, want)
 	if sep > 1e-6 {
@@ -202,11 +205,12 @@ func TestApparentState_MatchesManualLightTimeIteration(t *testing.T) {
 		vel:      st.Vel,
 	}
 
+	ctx := coord.NewContext(tm, site, atm)
 	appState, _ := ephemeris.ApparentState(mock, ephemeris.Mars, tm)
-	got := coord.GeocentricToObserved(appState.Pos, tm, site, atm)
+	got := ctx.GeocentricToObserved(appState.Pos)
 
 	app := iteratedApparentVector(st)
-	want := coord.GeocentricToObserved(app, tm, site, atm)
+	want := ctx.GeocentricToObserved(app)
 
 	sep := angularSepArcsec(got, want)
 	if sep > 1e-6 {
@@ -229,10 +233,11 @@ func TestApparentState_LightTimeActuallyChangesResult(t *testing.T) {
 		vel:      vector.V3(-0.006, 0.010, 0.0008),
 	}
 
+	ctx := coord.NewContext(tm, site, atm)
 	appState, _ := ephemeris.ApparentState(mock, ephemeris.Jupiter, tm)
 
-	got := coord.GeocentricToObserved(appState.Pos, tm, site, atm)
-	geom := coord.GeocentricToObserved(mock.pos, tm, site, atm)
+	got := ctx.GeocentricToObserved(appState.Pos)
+	geom := ctx.GeocentricToObserved(mock.pos)
 
 	sep := angularSepArcsec(got, geom)
 	if sep <= 0 {
@@ -259,10 +264,11 @@ func TestApparentState_DistantObjectHasTinyCorrection(t *testing.T) {
 		vel:      vector.V3(-0.001, 0.0008, 0.0001),
 	}
 
+	ctx := coord.NewContext(tm, site, atm)
 	appState, _ := ephemeris.ApparentState(mock, ephemeris.Jupiter, tm)
 
-	got := coord.GeocentricToObserved(appState.Pos, tm, site, atm)
-	geom := coord.GeocentricToObserved(mock.pos, tm, site, atm)
+	got := ctx.GeocentricToObserved(appState.Pos)
+	geom := ctx.GeocentricToObserved(mock.pos)
 
 	sep := angularSepArcsec(got, geom)
 

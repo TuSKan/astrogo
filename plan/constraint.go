@@ -176,7 +176,16 @@ func skyAltAzOf(obj Observable, t time.Time, site *Site) (*coord.AltAz, error) {
 	if err != nil {
 		return nil, err
 	}
-	return coord.ICRSToAltAz(pos, t, site.Location())
+	ctx := coord.NewContext(t, site.Location(), coord.StandardAtmosphere)
+	return ctx.ICRSToAltAz(pos)
+}
+
+func skyAltAzOfCtx(obj Observable, t time.Time, ctx *coord.Context) (*coord.AltAz, error) {
+	pos, err := obj.Position(t)
+	if err != nil {
+		return nil, err
+	}
+	return ctx.ICRSToAltAz(pos)
 }
 
 func skyAirmassOf(obj Observable, t time.Time, site *Site) (float64, error) {

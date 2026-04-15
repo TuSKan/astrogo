@@ -25,7 +25,8 @@ func IsVisible(obj coord.Object, t time.Time, site *Site, minAlt angle.Angle) (b
 	if err != nil {
 		return false, err
 	}
-	aa, err := coord.ICRSToAltAz(pos, t, site.Location())
+	ctx := coord.NewContext(t, site.Location(), coord.StandardAtmosphere)
+	aa, err := ctx.ICRSToAltAz(pos)
 	if err != nil {
 		return false, err
 	}
@@ -52,14 +53,13 @@ func VisibleIntervals(
 
 	t := start
 	for t.Before(end) || t.Equal(end) {
-		// For efficiency in v1 we re-calculate position at each step.
-		// For fixed stars (ICRS) this is redundant, for planets it is required.
 		pos, err := obj.ICRS(t)
 		if err != nil {
 			return nil, err
 		}
 
-		aa, err := coord.ICRSToAltAz(pos, t, site.Location())
+		ctx := coord.NewContext(t, site.Location(), coord.StandardAtmosphere)
+		aa, err := ctx.ICRSToAltAz(pos)
 		if err != nil {
 			return nil, err
 		}
@@ -94,10 +94,13 @@ func VisibleIntervals(
 //
 // It uses a two-stage approach:
 //  1. Coarse 10-min grid scan to bracket the maximum.
-//  2. Golden-section search within the bracket for sub-minute precision.
+//  2. Brent's minimization (parabolic interpolation + golden section fallback)
+//     within the bracket for sub-second precision.
 func TransitEstimate(obj coord.Object, site *Site, start, end time.Time) (time.Time, angle.Angle, error) {
 	const coarseStep = 10 * stdtime.Minute
 	const tol = 1 * stdtime.Second
+	const golden = 0.3819660112501051 // (3 - sqrt(5)) / 2
+	const maxIter = 50
 
 	// Stage 1: coarse scan to locate the bracket [tLeft, tRight] around the peak.
 	type sample struct {
@@ -110,7 +113,8 @@ func TransitEstimate(obj coord.Object, site *Site, start, end time.Time) (time.T
 		if err != nil {
 			return time.Time{}, angle.Deg(0), err
 		}
-		aa, err := coord.ICRSToAltAz(pos, t, site.Location())
+		ctx := coord.NewContext(t, site.Location(), coord.StandardAtmosphere)
+		aa, err := ctx.ICRSToAltAz(pos)
 		if err != nil {
 			return time.Time{}, angle.Deg(0), err
 		}
@@ -128,69 +132,119 @@ func TransitEstimate(obj coord.Object, site *Site, start, end time.Time) (time.T
 		}
 	}
 
-	// Stage 2: golden-section search within the surrounding bracket.
-	lo := samples[max(0, maxIdx-1)].t
-	hi := samples[min(len(samples)-1, maxIdx+1)].t
+	// Stage 2: Brent's minimization on -altitude within the surrounding bracket.
+	a := samples[max(0, maxIdx-1)].t
+	b := samples[min(len(samples)-1, maxIdx+1)].t
 
-	R := (math.Sqrt(5) - 1) / 2
-	C := 1 - R
-
-	altAt := func(t time.Time) (float64, error) {
+	negAltAt := func(t time.Time) (float64, error) {
 		pos, err := obj.ICRS(t)
 		if err != nil {
 			return 0, err
 		}
-		aa, err := coord.ICRSToAltAz(pos, t, site.Location())
+		ctx := coord.NewContext(t, site.Location(), coord.StandardAtmosphere)
+		aa, err := ctx.ICRSToAltAz(pos)
 		if err != nil {
 			return 0, err
 		}
-		return aa.Alt().Degrees(), nil
+		return -aa.Alt().Degrees(), nil // negate for minimization
 	}
 
-	d := hi.Sub(lo)
-	ga := lo.Add(stdtime.Duration(float64(d) * C))
-	gb := lo.Add(stdtime.Duration(float64(d) * R))
-	fa, err := altAt(ga)
-	if err != nil {
-		return time.Time{}, angle.Deg(0), err
-	}
-	fb, err := altAt(gb)
+	x := a.Add(stdtime.Duration(float64(b.Sub(a)) * 0.5))
+	fx, err := negAltAt(x)
 	if err != nil {
 		return time.Time{}, angle.Deg(0), err
 	}
 
-	for hi.Sub(lo) > tol {
-		if fa > fb {
-			hi = gb
-			gb, fb = ga, fa
-			d = hi.Sub(lo)
-			ga = lo.Add(stdtime.Duration(float64(d) * C))
-			if fa, err = altAt(ga); err != nil {
-				return time.Time{}, angle.Deg(0), err
+	w, v := x, x
+	fw, fv := fx, fx
+	e := stdtime.Duration(0)
+	d := stdtime.Duration(0)
+
+	for i := 0; i < maxIter; i++ {
+		mid := a.Add(stdtime.Duration(float64(b.Sub(a)) * 0.5))
+		tol1 := float64(tol)
+		tol2 := 2.0 * tol1
+
+		if math.Abs(float64(x.Sub(mid)))+float64(b.Sub(a))/2.0 <= tol2 {
+			break
+		}
+
+		useParabolic := false
+		if math.Abs(float64(e)) > tol1 {
+			xw := float64(x.Sub(w))
+			xv := float64(x.Sub(v))
+			r := xw * (fx - fv)
+			q := xv * (fx - fw)
+			p := xv*q - xw*r
+			q = 2.0 * (q - r)
+			if q > 0 {
+				p = -p
+			} else {
+				q = -q
 			}
+			if math.Abs(p) < math.Abs(0.5*q*float64(e)) &&
+				p > q*float64(a.Sub(x)) && p < q*float64(b.Sub(x)) {
+				e = d
+				d = stdtime.Duration(p / q)
+				useParabolic = true
+			}
+		}
+
+		if !useParabolic {
+			if x.After(mid) || x.Equal(mid) {
+				e = a.Sub(x)
+			} else {
+				e = b.Sub(x)
+			}
+			d = stdtime.Duration(float64(e) * golden)
+		}
+
+		var u time.Time
+		if math.Abs(float64(d)) >= tol1 {
+			u = x.Add(d)
+		} else if float64(d) > 0 {
+			u = x.Add(stdtime.Duration(tol1))
 		} else {
-			lo = ga
-			ga, fa = gb, fb
-			d = hi.Sub(lo)
-			gb = lo.Add(stdtime.Duration(float64(d) * R))
-			if fb, err = altAt(gb); err != nil {
-				return time.Time{}, angle.Deg(0), err
+			u = x.Add(stdtime.Duration(-tol1))
+		}
+
+		fu, err := negAltAt(u)
+		if err != nil {
+			return time.Time{}, angle.Deg(0), err
+		}
+
+		if fu <= fx {
+			if u.Before(x) {
+				b = x
+			} else {
+				a = x
+			}
+			v, w, x = w, x, u
+			fv, fw, fx = fw, fx, fu
+		} else {
+			if u.Before(x) {
+				a = u
+			} else {
+				b = u
+			}
+			if fu <= fw || w.Equal(x) {
+				v, w = w, u
+				fv, fw = fw, fu
+			} else if fu <= fv || v.Equal(x) || v.Equal(w) {
+				v = u
+				fv = fu
 			}
 		}
 	}
 
-	var resTime time.Time
-	if fa > fb {
-		resTime = ga
-	} else {
-		resTime = gb
-	}
+	resTime := x
 
 	pos, err := obj.ICRS(resTime)
 	if err != nil {
 		return time.Time{}, angle.Deg(0), err
 	}
-	aa, err := coord.ICRSToAltAz(pos, resTime, site.Location())
+	resCtx := coord.NewContext(resTime, site.Location(), coord.StandardAtmosphere)
+	aa, err := resCtx.ICRSToAltAz(pos)
 	if err != nil {
 		return time.Time{}, angle.Deg(0), err
 	}

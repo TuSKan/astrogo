@@ -1,6 +1,7 @@
 package plan
 
 import (
+	"fmt"
 	"sort"
 
 	"github.com/TuSKan/astrogo/coord"
@@ -74,7 +75,7 @@ func (p *Planner) RankObservable(objects []Observable, start, end time.Time) ([]
 		// TransitEstimate expects coord.Object for now.
 		skyObj, ok := obj.(coord.Object)
 		if !ok {
-			continue // Skip objects that don't satisfy coord.Object
+			return nil, fmt.Errorf("object %T does not implement coord.Object required for ranking", obj)
 		}
 
 		transitTime, peakAlt, err := TransitEstimate(skyObj, p.Site, start, end)
@@ -109,6 +110,10 @@ type Evaluation struct {
 	Observable bool
 	// Results contains the individual results for each
 	Results []Result
+	// Position is the ICRS position of the object at evaluation time.
+	Position *coord.ICRS
+	// AltAz is the locally observed horizontal coordinates at evaluation time.
+	AltAz *coord.AltAz
 }
 
 // IsObservable evaluates all provided constraints against a target at a specific
@@ -123,9 +128,21 @@ func IsObservable(
 	site *Site,
 	constraints ...Constraint,
 ) (Evaluation, error) {
+	pos, err := obj.Position(t)
+	if err != nil {
+		return Evaluation{}, err
+	}
+	ctx := coord.NewContext(t, site.Location(), coord.StandardAtmosphere)
+	altAz, err := ctx.ICRSToAltAz(pos)
+	if err != nil {
+		return Evaluation{}, err
+	}
+
 	eval := Evaluation{
 		Observable: true,
 		Results:    make([]Result, 0, len(constraints)),
+		Position:   pos,
+		AltAz:      altAz,
 	}
 
 	for _, c := range constraints {
@@ -178,16 +195,7 @@ func ScoreObservable(
 		return 0, nil
 	}
 
-	// Calculate altitude
-	pos, err := obj.Position(t)
-	if err != nil {
-		return 0, err
-	}
-	altAz, err := coord.ICRSToAltAz(pos, t, site.Location())
-	if err != nil {
-		return 0, err
-	}
-	score := altAz.Alt().Degrees()
+	score := eval.AltAz.Alt().Degrees()
 
 	// Apply priority if available
 	if p, ok := obj.(Prioritized); ok {
@@ -251,7 +259,7 @@ func ObservableWindows(
 	constraints ...Constraint,
 ) ([]Window, error) {
 	if step <= 0 {
-		return nil, nil // Or return an error if preferred, but let's be safe.
+		return nil, fmt.Errorf("step could not be negative")
 	}
 
 	var windows []Window
