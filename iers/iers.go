@@ -8,7 +8,7 @@ import (
 
 //go:generate go run ../internal/tools/cmd/download/main.go https://datacenter.iers.org/data/9/finals2000A.all data/finals2000A.all
 
-//go:embed data/*
+//go:embed all:data/*
 var eopFS embed.FS
 
 var FinalsData []byte
