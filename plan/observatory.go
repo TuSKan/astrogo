@@ -88,31 +88,30 @@ func (s *Site) HorizonDip() angle.Angle {
 }
 
 // RiseSetThreshold returns the standard rise/set altitude threshold for a
-// point source (star) at this site.
+// point source (star) at this site, including the geometric horizon dip
+// from the site's elevation.
 //
-// Since SOFA computes rigorous atmospheric refraction internally, the returned
-// altitude is the observed (refracted) altitude. Stars rise/set when their
-// observed center crosses the geometric horizon (0°).
+// At sea level: 0°. At 786m: −0.82° (the depressed horizon).
 func (s *Site) RiseSetThreshold() angle.Angle {
-	return angle.Deg(0)
+	return angle.Deg(-s.HorizonDip().Degrees())
 }
 
 // SunRiseSetThreshold returns the sunrise/sunset altitude threshold.
-// Since SOFA handles refraction rigorously, we only need the solar
-// semi-diameter: the Sun rises when its observed upper limb touches
-// the geometric horizon, i.e., observed center = −16' = −0.2667°.
+// The Sun rises when its observed upper limb touches the visible horizon,
+// accounting for the solar semi-diameter (16') and geometric horizon dip
+// from the observer's elevation.
 func (s *Site) SunRiseSetThreshold() angle.Angle {
 	const sunSemiDiameter = 0.2667 // degrees, ~16 arcmin
-	return angle.Deg(-sunSemiDiameter)
+	return angle.Deg(-sunSemiDiameter - s.HorizonDip().Degrees())
 }
 
 // MoonRiseSetThreshold returns the rise/set altitude threshold for the Moon.
-// Since SOFA handles refraction, we only account for the Moon's geometry:
-// semi-diameter (15.5') minus horizontal parallax (57').
-// Net: observed center at +(57' - 15.5')/60° = +0.692° ≈ +0.125°.
+// With topocentric parallax handled by the Reducer pipeline (via
+// GeocentricToObserved), the threshold accounts for the Moon's mean angular
+// semidiameter (~15.5') and the geometric horizon dip from elevation.
 func (s *Site) MoonRiseSetThreshold() angle.Angle {
-	const moonThreshold = 0.125 // degrees: (57-15.5)/60 = +0.692 → simplified to +0.125
-	return angle.Deg(moonThreshold)
+	const moonSemiDiameter = 0.2583 // degrees, ~15.5 arcmin (mean)
+	return angle.Deg(-moonSemiDiameter - s.HorizonDip().Degrees())
 }
 
 // String returns a compact representation of the site.

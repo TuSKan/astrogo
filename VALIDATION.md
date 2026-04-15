@@ -54,8 +54,8 @@ Validation should be:
 | Rise / Set / Transit events | ✅ validated | USNO API | < 2 min | Chandrupatla root-finding solver |
 | Twilight events | ✅ validated | geometric sanity | < 1 s | Civil (−6°), Nautical (−12°), Astronomical (−18°); sequence ordering verified |
 | Event solver edge cases | ✅ validated | analytical | logical | circumpolar, never-rise, polar midnight sun, high-lat no astronomical twilight |
-| Sun Rise/Set/Transit | ✅ validated | USNO API | < 2.4 min | 3 locations × 3 dates, SOFA-native refraction |
-| Moon Rise/Set/Transit | ✅ validated | USNO API | < 5.1 min | 3 locations × 3 dates, parallax-corrected |
+| Sun Rise/Set/Transit | ✅ validated | USNO API | < 1.3 min | 3 locations × 3 dates, topocentric + horizon dip |
+| Moon Rise/Set/Transit | ✅ validated | USNO API | < 1.6 min | 3 locations × 3 dates, topocentric parallax via Reducer |
 | Moon Phases | ✅ validated | USNO API | ≤ 1 min | 12 consecutive phases (Jan–Mar 2026) |
 | Earth's Seasons | ✅ validated | USNO API | 2–4 min | 4 events (2026), aberration-corrected ecliptic longitude |
 | Celestial Navigation (AltAz) | ✅ validated | USNO API | 0.002° | Sub-arcsecond stellar altitude accuracy |

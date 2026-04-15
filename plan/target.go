@@ -10,6 +10,7 @@ import (
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/vector"
 )
 
 // Observable represents anything that can appear on the sky at a given time.
@@ -143,4 +144,15 @@ func (b Body) Position(t time.Time) (*coord.ICRS, error) {
 	}
 
 	return icrs, nil
+}
+
+// GeocentricVec returns the raw geocentric position vector (in AU) for the body.
+// This is used by the event solver to route through the topocentric reduction
+// pipeline (coord.Reducer), which applies proper parallax correction — critical
+// for the Moon (~1° topocentric parallax).
+func (b Body) GeocentricVec(t time.Time) (vector.Vec3, error) {
+	if b.Provider == nil {
+		return vector.Vec3{}, errors.New("target: nil ephemeris provider")
+	}
+	return ephemeris.Position(b.Provider, b.ID, t)
 }

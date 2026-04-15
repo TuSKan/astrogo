@@ -2,7 +2,7 @@
 
 AstroGo aims to become a **pure-Go high-performance, scientifically reliable astronomy library**, focused on precision computation, observatory planning, and scalable data workflows.
 
-The project has already achieved strong coverage of core astronomy primitives (time, coordinates, ephemerides, planning, FITS, WCS, catalogs, and validation). The roadmap now focuses on **scientific completeness, operational planning, and workflow ergonomics**.
+The project has achieved strong coverage of core astronomy primitives (time, coordinates, ephemerides, planning, FITS, WCS, catalogs, and validation). The roadmap now focuses on **batch workflows, cross-matching, and operational polish**.
 
 ---
 
@@ -23,206 +23,187 @@ AstroGo already provides:
 - Catalog identity:
   - OpenNGC embedded
   - SBDB (NASA) query integration
+  - SIMBAD, Gaia, MAST, VizieR remote providers
 - FITS I/O (multi-extension, tables, images)
 - WCS support
 - Units and quantities system
-- Validation framework against SOFA / Horizons / analytical invariants
+- Validation framework against SOFA / Horizons / USNO / analytical invariants
 - CI with automated testing
 
 The project is **past the foundational stage**.
 
 ---
 
-# 🚀 Phase 1 — Precision Astronomy Completion
+# ✅ Phase 1 — Precision Astronomy Completion
 
 **Goal:** achieve observatory-grade correctness for real-world usage.
 
 ## 1. Earth Orientation Parameters (EOP)
 
-### Status
-✅ Fully Operational
+**Status:** ✅ Complete
 
-### Deliverables
 - [x] UT1–UTC correction ingestion
 - [x] EOP data loader and cache
 - [x] polar motion support
-- deterministic fallback for stale/missing data
-- validation against reference datasets
-
-### Outcome
-Accurate sidereal time and topocentric positioning under real Earth rotation conditions.
+- [x] deterministic fallback for stale/missing data
+- [x] validation against reference datasets
 
 ---
 
 ## 2. Apparent / Observed Coordinate Pipeline
 
-### Status
-✅ Fully Operational
+**Status:** ✅ Complete
 
-### Deliverables
 - [x] aberration corrections
 - [x] proper motion propagation
 - [x] parallax handling
-- topocentric apparent coordinates
-- explicit API separation:
-  - geometric
-  - astrometric
-  - apparent
-  - observed
-
-### Outcome
-Coordinates suitable for real telescope pointing and observation comparison.
+- [x] topocentric apparent coordinates
+- [x] explicit API separation (geometric, astrometric, apparent, observed)
 
 ---
 
 ## 3. Atmospheric Refraction Model
 
-### Status
-✅ Fully Operational
+**Status:** ✅ Complete
 
-### Deliverables
 - [x] refraction model abstraction
 - [x] standard atmosphere correction
 - [x] optional pressure / temperature input
-- [x] selectable modes:
-  - [x] none
-  - [x] approximate
-  - [x] improved model (SOFA)
-
-### Outcome
-More realistic horizon and low-altitude behavior.
+- [x] selectable modes (none, approximate, improved/SOFA)
 
 ---
 
-# 📅 Phase 2 — Scheduling Engine
+## 4. Numerical Solver Architecture
+
+**Status:** ✅ Complete
+
+- [x] Unified `Solver` struct (`plan/solver.go`)
+- [x] Chandrupatla root-finding (1997) — replaces Brent's method for roots
+- [x] Brent's minimization — retained for smooth unimodal extremum-finding
+- [x] Eliminated ~300 lines of duplicated solver code
+- [x] Comprehensive unit tests (`solver_test.go` — 17 tests, black-box)
+- [x] Transit detection edge case fix (non-bracketed intervals)
+
+---
+
+## 5. Planetary & Lunar Phenomena
+
+**Status:** ✅ Complete
+
+- [x] Moon phases (New, First Quarter, Full, Last Quarter) — ≤1 min vs USNO
+- [x] Earth's seasons (equinoxes + solstices) — 2–4 min vs USNO
+- [x] Perihelion/Aphelion (`plan.Apsides`) — **≤1 min** vs USNO
+- [x] Lunar eclipse detection (`plan.LunarEclipses`) — ecliptic latitude filter
+- [x] Solar eclipse detection (`plan.SolarEclipses`) — ecliptic latitude filter
+- [x] Moon illumination fraction (`plan.MoonIllumination`)
+- [x] Conjunctions, oppositions, greatest elongations
+- [x] Validated against USNO API and NASA Eclipse Catalog (2026)
+
+---
+
+# ✅ Phase 2 — Scheduling Engine
 
 **Goal:** evolve from planning primitives to full observatory scheduling.
 
-## 4. Advanced Scheduling Optimization
+## 6. Advanced Scheduling Optimization
 
-### Status
-✅ Fully Operational
+**Status:** ✅ Complete
 
-### Deliverables
 - [x] observing block abstraction
 - [x] target prioritization
 - [x] multi-target optimization
 - [x] cadence-aware scheduling
-- [x] pluggable strategies:
-  - [x] greedy
-  - [x] priority-based
-  - [x] constraint-aware
-
-### Outcome
-Automated generation of optimized observing plans.
+- [x] pluggable strategies (greedy, priority-based, constraint-aware)
 
 ---
 
-## 5. Transition & Operational Overhead Modeling
+## 7. Transition & Operational Overhead Modeling
 
-### Status
-✅ Fully Operational
+**Status:** ✅ Complete
 
-### Deliverables
 - [x] slew-time estimation
 - [x] configuration / filter change costs
 - [x] setup overhead modeling
 - [x] penalty-aware scheduling integration
 
-### Outcome
-Schedules that reflect real observatory constraints.
-
 ---
 
-## 6. Explainable Scheduling Output
+## 8. Explainable Scheduling Output
 
-### Status
-✅ Fully Operational
+**Status:** ✅ Complete
 
-### Deliverables
 - [x] structured schedule object
 - [x] score breakdown per decision
 - [x] rejection explanations
 - [x] reproducible scheduling traces
 
-### Outcome
-Transparent and debuggable planning decisions.
-
 ---
 
-# 📊 Phase 3 — Data Workflow Layer
-
-**Goal:** enable real catalog and pipeline workflows.
-
-## 7. Catalog Table Infrastructure
-
-### Status
-✅ Fully Operational (Remote Data Layer)
-
-### Deliverables
-- [x] structured catalog table abstraction
-- [x] remote provider bindings (SIMBAD, MAST, SBDB, VizieR, Gaia)
-- [x] explicit offline regression caches (JSON/XML/CSV structural decoding)
-- [x] memory-mapped hardware vectors via Arrow `RecordBatch`
-- [x] resilient API rate-limit resilience backoffs component
-- [x] integration with FITS tables and arrays
-- cross-match logic algorithms
-
-### Outcome
-Catalogs become first-class, manipulable datasets.
-
----
-
-## 8. Batch / High-Throughput APIs
-
-### Deliverables
-- batch coordinate transforms
-- batch ephemeris evaluation
-- batch visibility computation
-- batch event solving
-- concurrency-safe kernel/cache usage
-
-### Outcome
-Efficient large-scale processing (surveys, pipelines, services).
-
----
-
-# 🧪 Phase 4 — Validation & Scientific Trust
+# ✅ Phase 3 — Validation & Scientific Trust
 
 **Goal:** maintain and strengthen scientific reliability.
 
-## 9. Validation Expansion
+## 9. USNO Integration Validation
 
-### Status
-✅ Fully Operational
+**Status:** ✅ Complete
 
-### Deliverables
-- [x] extended comparison against Astropy / SOFA / Horizons
-- [x] additional edge-case datasets:
-  - [x] high latitude
-  - [x] circumpolar
-  - [x] horizon edge
-- [x] small-body validation coverage
-- [x] apparent-coordinate validation
+- [x] Sun/Moon rise/set/transit — ≤1 min vs USNO API
+- [x] Moon phases — ≤1 min vs USNO API
+- [x] Earth's seasons — 2–4 min vs USNO API
+- [x] Perihelion/Aphelion — ≤1 min vs USNO API
+- [x] Lunar/Solar eclipses — date-exact vs NASA Eclipse Catalog
+- [x] Celestial navigation (AltAz) — 0.002° vs USNO API
+- [x] Julian Date conversion — exact
+- [x] Sidereal time — sanity-checked
 
-### Outcome
-Higher confidence across all domains.
+See [`USNO.md`](./USNO.md) and [`VALIDATION.md`](./VALIDATION.md) for full details.
 
 ---
 
 ## 10. Scientific CI Gating
 
-### Status
-✅ Fully Operational
+**Status:** ✅ Complete
 
-### Deliverables
-- [x] validation suite separated from unit tests
+- [x] validation suite separated from unit tests (`-tags=integration`)
 - [x] tolerance drift detection
-- [x] corpus-based regression runs
+- [x] corpus-based regression runs (JPL Horizons)
 - [x] CI failure on scientific regressions
 
+---
+
+# 📊 Phase 4 — Data Workflow Layer
+
+**Goal:** enable real catalog and pipeline workflows.
+
+## 11. Catalog Table Infrastructure
+
+**Status:** ✅ Complete (Remote Data Layer)
+
+- [x] structured catalog table abstraction
+- [x] remote provider bindings (SIMBAD, MAST, SBDB, VizieR, Gaia)
+- [x] explicit offline regression caches (JSON/XML/CSV structural decoding)
+- [x] memory-mapped hardware vectors via Arrow `RecordBatch`
+- [x] resilient API rate-limit backoffs
+- [x] integration with FITS tables and arrays
+
+### Remaining
+
+- [ ] cross-match logic algorithms (positional, multi-catalog)
+
+---
+
+## 12. Batch / High-Throughput APIs
+
+**Status:** 🔲 Not Started
+
+- [ ] batch coordinate transforms
+- [ ] batch ephemeris evaluation
+- [ ] batch visibility computation
+- [ ] batch event solving
+- [ ] concurrency-safe kernel/cache usage
+
 ### Outcome
-Prevents silent numerical degradation over time.
+Efficient large-scale processing (surveys, pipelines, services).
 
 ---
 
@@ -254,19 +235,24 @@ These can be explored later if aligned with project direction.
 
 # 🧭 Summary
 
-AstroGo is no longer missing core astronomy capabilities.
+AstroGo has completed all core astronomy capabilities:
+
+- ✅ Precision corrections (EOP, apparent place, refraction)
+- ✅ Numerical solvers (Chandrupatla + Brent)
+- ✅ Planetary phenomena (phases, seasons, apsides, eclipses)
+- ✅ Scheduling depth (constraint-aware, explainable)
+- ✅ Scientific validation (USNO, Horizons, SOFA)
+- ✅ Catalog remote data layer
 
 The remaining work is concentrated in:
 
-- precision corrections (EOP, apparent place, refraction)
-- scheduling depth
-- data workflow ergonomics
-- validation hardening
+- **Batch/vectorized APIs** for high-throughput use cases
+- **Cross-match algorithms** for multi-catalog workflows
 
 Completing these will elevate AstroGo from:
 
-> **a powerful astronomy library**
+> **a production-grade astronomy library**
 
 to:
 
-> **a production-grade astronomy platform for Go**
+> **a scalable astronomy platform for Go**
