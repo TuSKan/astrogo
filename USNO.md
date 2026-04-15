@@ -9,6 +9,8 @@ for astronomical calculations.
 go test -tags integration -run TestUSNO -v -timeout 300s ./plan/
 ```
 
+**Ephemeris:** JPL DE442 (with SOFA analytical fallback).
+
 ---
 
 ## Test Coverage
@@ -19,6 +21,8 @@ go test -tags integration -run TestUSNO -v -timeout 300s ./plan/
 | Celestial Navigation | `TestUSNO_CelNav` | ✅ PASS | 0.002° (sub-arcsecond) |
 | Moon Phases | `TestUSNO_MoonPhases` | ✅ PASS | **≤1 minute** |
 | Earth's Seasons | `TestUSNO_Seasons` | ✅ PASS | **2–4 minutes** |
+| Perihelion/Aphelion | `TestUSNO_Apsides` | ✅ PASS | **≤1 minute** |
+| Lunar/Solar Eclipses | `TestUSNO_Eclipses` | ✅ PASS | date-exact vs NASA |
 | Julian Date Converter | `TestUSNO_JulianDate` | ✅ PASS | exact |
 | Sidereal Time | `TestUSNO_SiderealTime` | ✅ PASS | sanity validated |
 
@@ -30,43 +34,59 @@ go test -tags integration -run TestUSNO -v -timeout 300s ./plan/
 
 | Event Type | Mean Δ | Max Δ | Tolerance |
 |---|---|---|---|
-| **Sun Transit** | 0.3 min | 0.5 min | 2 min |
-| **Sun Rise/Set** | 0.8 min | 2.4 min | 7 min |
-| **Moon Transit** | 0.2 min | 0.5 min | 2 min |
-| **Moon Rise/Set** | 2.8 min | 5.1 min | 8 min |
+| **Sun Transit** | 0.3 min | 0.5 min | 1 min |
+| **Sun Rise/Set** | 0.5 min | 1.3 min | 2 min |
+| **Moon Transit** | 0.2 min | 0.5 min | 1 min |
+| **Moon Rise/Set** | 0.6 min | 1.6 min | 3 min |
+
+Coordinate pipeline: solar system bodies use `GeocentricToObserved` (full
+topocentric parallax correction). Thresholds include body semidiameter
+and geometric horizon dip from observer elevation.
 
 ### São Paulo (S23°36', W46°39', 786m)
 
 | Date | Event | USNO | astrogo | Δ |
 |---|---|---|---|---|
-| 2026-04-06 | Sun Rise | 06:17 | 06:18:33 | 1.6 min |
-| 2026-04-06 | Sun Transit | 12:09 | 12:08:57 | 0.0 min |
-| 2026-04-06 | Sun Set | 18:01 | 17:59:01 | 2.0 min |
+| 2026-04-06 | Sun Rise | 06:17 | 06:15:42 | 1.3 min |
+| 2026-04-06 | Sun Transit | 12:09 | 12:08:56 | 0.1 min |
+| 2026-04-06 | Sun Set | 18:01 | 18:01:54 | 0.9 min |
 | 2026-04-06 | Moon Transit | 03:09 | 03:09:07 | 0.1 min |
-| 2026-04-06 | Moon Set | 10:13 | 10:13:54 | 0.9 min |
-| 2026-04-06 | Moon Rise | 20:53 | 20:52:23 | 0.6 min |
+| 2026-04-06 | Moon Set | 10:13 | 10:14:35 | 1.6 min |
+| 2026-04-06 | Moon Rise | 20:53 | 20:51:40 | 1.3 min |
 
 ### Washington DC (N38°54', W77°02', 0m)
 
 | Date | Event | USNO | astrogo | Δ |
 |---|---|---|---|---|
-| 2026-04-06 | Sun Rise | 06:45 | 06:44:41 | **0.3 min** |
-| 2026-04-06 | Sun Transit | 13:10 | 13:10:28 | 0.5 min |
-| 2026-04-06 | Sun Set | 19:37 | 19:36:53 | **0.1 min** |
-| 2026-12-21 | Sun Rise | 07:23 | 07:22:49 | 0.2 min |
-| 2026-12-21 | Sun Transit | 12:06 | 12:06:19 | 0.3 min |
+| 2026-04-06 | Sun Rise | 06:45 | 06:44:43 | **0.3 min** |
+| 2026-04-06 | Sun Transit | 13:10 | 13:10:27 | 0.5 min |
+| 2026-04-06 | Sun Set | 19:37 | 19:36:54 | **0.1 min** |
+| 2026-04-06 | Moon Transit | 04:15 | 04:14:50 | 0.2 min |
+| 2026-04-06 | Moon Set | 08:49 | 08:48:57 | **0.0 min** |
+| 2026-12-21 | Sun Rise | 07:23 | 07:22:52 | 0.1 min |
+| 2026-12-21 | Sun Transit | 12:06 | 12:06:18 | 0.3 min |
 | 2026-12-21 | Sun Set | 16:50 | 16:49:48 | 0.2 min |
+| 2026-12-21 | Moon Set | 04:42 | 04:41:46 | 0.2 min |
+| 2026-12-21 | Moon Rise | 14:19 | 14:18:38 | **0.4 min** |
+| 2026-12-21 | Moon Transit | 22:04 | 22:04:21 | 0.3 min |
 
 ### London (N51°30', W0°08', 0m)
 
 | Date | Event | USNO | astrogo | Δ |
 |---|---|---|---|---|
-| 2026-06-21 | Sun Rise | 04:43 | 04:42:38 | 0.4 min |
-| 2026-06-21 | Sun Transit | 13:02 | 13:02:20 | 0.3 min |
+| 2026-04-06 | Moon Rise | 00:15 | 00:13:57 | 1.1 min |
+| 2026-04-06 | Moon Transit | 03:57 | 03:56:39 | 0.3 min |
+| 2026-04-06 | Moon Set | 07:32 | 07:33:01 | 1.0 min |
+| 2026-06-21 | Sun Rise | 04:43 | 04:42:41 | 0.3 min |
+| 2026-06-21 | Sun Transit | 13:02 | 13:02:19 | 0.3 min |
 | 2026-06-21 | Sun Set | 21:22 | 21:22:00 | **0.0 min** |
-| 2026-12-21 | Sun Rise | 08:04 | 08:03:18 | 0.7 min |
+| 2026-06-21 | Moon Set | 00:35 | 00:34:47 | 0.2 min |
+| 2026-06-21 | Moon Rise | 12:41 | 12:40:09 | 0.9 min |
+| 2026-12-21 | Sun Rise | 08:04 | 08:03:21 | 0.6 min |
 | 2026-12-21 | Sun Transit | 11:59 | 11:58:34 | 0.4 min |
 | 2026-12-21 | Sun Set | 15:53 | 15:53:50 | 0.8 min |
+| 2026-12-21 | Moon Set | 05:07 | 05:07:23 | 0.4 min |
+| 2026-12-21 | Moon Rise | 13:09 | 13:08:35 | **0.4 min** |
 
 ---
 

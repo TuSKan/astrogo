@@ -21,6 +21,7 @@ import (
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/ephemeris"
+	"github.com/TuSKan/astrogo/ephemeris/jpl"
 	"github.com/TuSKan/astrogo/plan"
 	"github.com/TuSKan/astrogo/time"
 )
@@ -183,10 +184,16 @@ func deltaMinutes(usnoMin, astroMin float64) float64 {
 
 func newEph(t *testing.T) ephemeris.Provider {
 	t.Helper()
-	eph := ephemeris.Default()
-	if eph == nil {
-		t.Fatal("Failed to create ephemeris: nil provider")
+	eph, err := jpl.NewProvider(jpl.WithSource(jpl.Planets), jpl.WithKernel("de442"))
+	if err != nil {
+		t.Logf("DE442 unavailable (%v), falling back to default", err)
+		def := ephemeris.Default()
+		if def == nil {
+			t.Fatal("Failed to create ephemeris: nil provider")
+		}
+		return def
 	}
+	t.Cleanup(func() { eph.Close() })
 	return eph
 }
 
@@ -272,11 +279,11 @@ func TestUSNO_SunMoonOneDay(t *testing.T) {
 						t.Logf("Sun %-12s  USNO=%02d:%02d  astrogo=%s  Δ=%.1f min",
 							sp.Phen, h, m, ev.Time.In(tz).Format("15:04:05"), delta)
 
-						// Rise/Set: 7 min tolerance (refraction model differences at horizon)
-						// Transit: 2 min tolerance (no refraction dependence)
-						tol := 7.0
+						// Rise/Set: 2 min tolerance (topocentric + horizon dip)
+						// Transit: 1 min tolerance (no refraction dependence)
+						tol := 2.0
 						if matchKind == plan.EventTransit {
-							tol = 2.0
+							tol = 1.0
 						}
 						if delta > tol {
 							t.Errorf("Sun %s: Δ=%.1f min exceeds %.0f min tolerance", sp.Phen, delta, tol)
@@ -324,11 +331,11 @@ func TestUSNO_SunMoonOneDay(t *testing.T) {
 						t.Logf("Moon %-12s  USNO=%02d:%02d  astrogo=%s  Δ=%.1f min",
 							mp.Phen, h, m, ev.Time.In(tz).Format("15:04:05"), delta)
 
-						// Moon: 8 min rise/set tolerance (refraction + parallax differences)
-						// Transit: 2 min tolerance
-						tol := 8.0
+						// Moon: 3 min rise/set tolerance (topocentric parallax + refraction)
+						// Transit: 1 min tolerance
+						tol := 3.0
 						if matchKind == plan.EventTransit {
-							tol = 2.0
+							tol = 1.0
 						}
 						if delta > tol {
 							t.Errorf("Moon %s: Δ=%.1f min exceeds %.0f min tolerance", mp.Phen, delta, tol)
@@ -365,7 +372,14 @@ func TestUSNO_CelNav(t *testing.T) {
 	ctx := coord.NewContext(tm, site.Location(), site.Atmosphere())
 
 	// Validate Sun position
-	eph := ephemeris.Default()
+	var eph ephemeris.Provider
+	jplEph, err := jpl.NewProvider(jpl.WithSource(jpl.Planets), jpl.WithKernel("de442"))
+	if err != nil {
+		t.Logf("failed to load jpl de442: %v", err)
+		eph = ephemeris.Default()
+	} else {
+		eph = jplEph
+	}
 
 	for _, entry := range resp.Properties.Data {
 		if entry.Object == "ARIES" {

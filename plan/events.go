@@ -260,17 +260,28 @@ func (s EventSolver) solveVisibility(spec EventSpec, start, end time.Time) ([]Ev
 	var events []Event
 
 	evalVal := func(t time.Time) (float64, error) {
+		ctx := coord.NewContext(t, spec.Observer.Location(), spec.Observer.Atmosphere())
+
+		// For solar system bodies, use the vector-based topocentric pipeline
+		// which properly corrects for diurnal parallax (critical for the Moon: ~1°).
+		if body, ok := spec.Target.(Body); ok {
+			vec, err := body.GeocentricVec(t)
+			if err != nil {
+				return 0, err
+			}
+			aa := ctx.GeocentricToObserved(vec)
+			return aa.Alt().Degrees() - spec.Threshold.Degrees(), nil
+		}
+
+		// For deep-space / stellar targets, use the astrometric pipeline.
 		pos, err := spec.Target.Position(t)
 		if err != nil {
 			return 0, err
 		}
-
-		ctx := coord.NewContext(t, spec.Observer.Location(), spec.Observer.Atmosphere())
 		aa, err := ctx.ICRSToAltAz(pos)
 		if err != nil {
 			return 0, err
 		}
-
 		return aa.Alt().Degrees() - spec.Threshold.Degrees(), nil
 	}
 
@@ -312,10 +323,16 @@ func (s EventSolver) solveVisibility(spec EventSpec, start, end time.Time) ([]Ev
 					return nil, err
 				}
 
-				// Calculate geometric outputs
+				// Calculate geometric outputs using the appropriate pipeline
 				resCtx := coord.NewContext(resTime, spec.Observer.Location(), spec.Observer.Atmosphere())
-				pos, _ := spec.Target.Position(resTime)
-				aa, _ := resCtx.ICRSToAltAz(pos)
+				var aa *coord.AltAz
+				if body, ok := spec.Target.(Body); ok {
+					vec, _ := body.GeocentricVec(resTime)
+					aa = resCtx.GeocentricToObserved(vec)
+				} else {
+					pos, _ := spec.Target.Position(resTime)
+					aa, _ = resCtx.ICRSToAltAz(pos)
+				}
 
 				events = append(events, Event{
 					Kind:              kind,
