@@ -48,42 +48,52 @@ func NewWCS(naxis int) *WCS {
 	}
 }
 
+// SetCRPIX sets the reference pixel coordinate array (1-based FITS indexing).
 func (w *WCS) SetCRPIX(crpix []float64) {
 	w.crpix = crpix
 }
 
+// SetCRVAL sets the world coordinate values at the reference pixel.
 func (w *WCS) SetCRVAL(crval []float64) {
 	w.crval = crval
 }
 
+// SetCDELT sets the pixel scale (degrees per pixel) along each axis.
 func (w *WCS) SetCDELT(cdelt []float64) {
 	w.cdelt = cdelt
 }
 
+// SetCTYPE sets the coordinate axis type identifiers (e.g., "RA---TAN", "DEC--TAN").
 func (w *WCS) SetCTYPE(ctype []string) {
 	w.ctype = ctype
 }
 
+// SetPC sets the linear transformation (rotation/skew) matrix.
 func (w *WCS) SetPC(pc [][]float64) {
 	w.pc = pc
 }
 
+// GetCRPIX returns the reference pixel coordinate array.
 func (w *WCS) GetCRPIX() []float64 {
 	return w.crpix
 }
 
+// GetCRVAL returns the world coordinate values at the reference pixel.
 func (w *WCS) GetCRVAL() []float64 {
 	return w.crval
 }
 
+// GetCDELT returns the pixel scale along each axis.
 func (w *WCS) GetCDELT() []float64 {
 	return w.cdelt
 }
 
+// GetCTYPE returns the coordinate axis type identifiers.
 func (w *WCS) GetCTYPE() []string {
 	return w.ctype
 }
 
+// GetPC returns the linear transformation matrix.
 func (w *WCS) GetPC() [][]float64 {
 	return w.pc
 }

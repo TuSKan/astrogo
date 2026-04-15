@@ -29,6 +29,7 @@ type HTTPError struct {
 	Body       string
 }
 
+// Error returns a human-readable string describing the HTTP error.
 func (e *HTTPError) Error() string {
 	return fmt.Sprintf("catalog: http %d - %s", e.StatusCode, e.Body)
 }
@@ -87,6 +88,8 @@ func SliceSeq[T any](items []T) SeqIterator[T] {
 // RetryPolicy defines whether a request should be retried based on err or response.
 type RetryPolicy func(resp *http.Response, err error) bool
 
+// DefaultRetryPolicy retries on transient network errors, 429 (rate-limited),
+// and 5xx server errors. Context cancellations are never retried.
 func DefaultRetryPolicy(resp *http.Response, err error) bool {
 	if err != nil {
 		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
@@ -110,6 +113,8 @@ type Client struct {
 	UserAgent   string
 }
 
+// NewClient returns a Client with sensible defaults (30s timeout, 3 retries,
+// exponential backoff, AstroGo user-agent).
 func NewClient() *Client {
 	return &Client{
 		HTTPClient: &http.Client{
@@ -121,6 +126,7 @@ func NewClient() *Client {
 	}
 }
 
+// Do executes the HTTP request with automatic retry and backoff.
 func (c *Client) Do(req *http.Request) (*http.Response, error) {
 	if c.UserAgent != "" && req.Header.Get("User-Agent") == "" {
 		req.Header.Set("User-Agent", c.UserAgent)

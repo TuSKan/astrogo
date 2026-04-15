@@ -18,6 +18,7 @@ type Cache interface {
 	Close() error
 }
 
+// TargetSchema defines the Apache Arrow schema used for serializing Target records.
 var TargetSchema = arrow.NewSchema(
 	[]arrow.Field{
 		{Name: "ID", Type: arrow.BinaryTypes.String},
@@ -40,6 +41,7 @@ type ArrowCache struct {
 	mem     memory.Allocator
 }
 
+// NewArrowCache returns a ready-to-use in-memory ArrowCache.
 func NewArrowCache() *ArrowCache {
 	return &ArrowCache{
 		records: make(map[string]arrow.RecordBatch),
@@ -47,6 +49,9 @@ func NewArrowCache() *ArrowCache {
 	}
 }
 
+// Get retrieves cached targets for the given query key, returning a streaming
+// iterator and true if the key was found. The underlying Arrow record is
+// retained for the lifetime of the iterator.
 func (c *ArrowCache) Get(key string) (SeqIterator[Target], bool) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
@@ -104,6 +109,8 @@ func (c *ArrowCache) Get(key string) (SeqIterator[Target], bool) {
 	}, true
 }
 
+// Set stores a slice of targets under the given query key as an Arrow record
+// batch. Any previously cached record for that key is released.
 func (c *ArrowCache) Set(key string, items []Target) error {
 	b := array.NewRecordBuilder(c.mem, TargetSchema)
 	defer b.Release()
@@ -155,6 +162,7 @@ func (c *ArrowCache) Set(key string, items []Target) error {
 	return nil
 }
 
+// Close releases all cached Arrow records and resets the cache.
 func (c *ArrowCache) Close() error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
