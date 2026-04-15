@@ -6,6 +6,7 @@ import (
 	"math"
 
 	"github.com/TuSKan/astrogo/angle"
+	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/internal/gofaext"
 	"github.com/TuSKan/astrogo/time"
@@ -71,6 +72,48 @@ func (s *Site) Latitude() angle.Angle { return s.location.Lat() }
 
 // HeightMeters returns the site's height above the reference ellipsoid in meters.
 func (s *Site) HeightMeters() float64 { return s.location.Height() }
+
+// Atmosphere returns an atmospheric profile adjusted for the site's elevation
+// using the ICAO International Standard Atmosphere barometric formula.
+// Pressure and temperature are reduced for altitude; humidity, wavelength,
+// and the refraction model are inherited from the sea-level standard.
+func (s *Site) Atmosphere() atmosphere.Atmosphere {
+	return atmosphere.AtAltitude(s.location.Height())
+}
+
+// HorizonDip returns the geometric dip angle of the visible horizon at this
+// site's elevation. At sea level the dip is zero; at 786 m it is ≈ 0.90°.
+func (s *Site) HorizonDip() angle.Angle {
+	return atmosphere.HorizonDip(s.location.Height())
+}
+
+// RiseSetThreshold returns the standard rise/set altitude threshold for a
+// point source (star) at this site.
+//
+// Since SOFA computes rigorous atmospheric refraction internally, the returned
+// altitude is the observed (refracted) altitude. Stars rise/set when their
+// observed center crosses the geometric horizon (0°).
+func (s *Site) RiseSetThreshold() angle.Angle {
+	return angle.Deg(0)
+}
+
+// SunRiseSetThreshold returns the sunrise/sunset altitude threshold.
+// Since SOFA handles refraction rigorously, we only need the solar
+// semi-diameter: the Sun rises when its observed upper limb touches
+// the geometric horizon, i.e., observed center = −16' = −0.2667°.
+func (s *Site) SunRiseSetThreshold() angle.Angle {
+	const sunSemiDiameter = 0.2667 // degrees, ~16 arcmin
+	return angle.Deg(-sunSemiDiameter)
+}
+
+// MoonRiseSetThreshold returns the rise/set altitude threshold for the Moon.
+// Since SOFA handles refraction, we only account for the Moon's geometry:
+// semi-diameter (15.5') minus horizontal parallax (57').
+// Net: observed center at +(57' - 15.5')/60° = +0.692° ≈ +0.125°.
+func (s *Site) MoonRiseSetThreshold() angle.Angle {
+	const moonThreshold = 0.125 // degrees: (57-15.5)/60 = +0.692 → simplified to +0.125
+	return angle.Deg(moonThreshold)
+}
 
 // String returns a compact representation of the site.
 func (s *Site) String() string {

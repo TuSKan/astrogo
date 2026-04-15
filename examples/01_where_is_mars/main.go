@@ -39,7 +39,7 @@ func main() {
 		log.Fatalf("Error converting to Alt/Az: %v", err)
 	}
 
-	fmt.Printf("Time: %s (%s)\n", tm, tm.ToGo().In(tz).Format("2006-01-02 15:04:05 -0700"))
+	fmt.Printf("Time: %s (%s)\n", tm, tm.Format("2006-01-02 15:04:05 -0700"))
 	fmt.Printf("Observer: São Paulo, Brazil\n")
 	fmt.Printf("Mars Altitude: %.2f°\n", skyPos.Alt().Degrees())
 	fmt.Printf("Mars Azimuth:  %.2f°\n", skyPos.Az().Degrees())

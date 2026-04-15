@@ -4,7 +4,6 @@ import (
 	"math"
 	"sort"
 
-	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/time"
 )
@@ -113,12 +112,12 @@ func (m *BasicTransitionModel) Overhead(ctx TransitionContext) (time.Duration, e
 			return 0, err
 		}
 
-		altAzFrom, err := coord.NewContext(ctx.FromTime, ctx.Site.Location(), atmosphere.StandardAtmosphere).ICRSToAltAz(posFrom)
+		altAzFrom, err := coord.NewContext(ctx.FromTime, ctx.Site.Location(), ctx.Site.Atmosphere()).ICRSToAltAz(posFrom)
 		if err != nil {
 			return 0, err
 		}
 
-		altAzTo, err := coord.NewContext(ctx.ToTime, ctx.Site.Location(), atmosphere.StandardAtmosphere).ICRSToAltAz(posTo)
+		altAzTo, err := coord.NewContext(ctx.ToTime, ctx.Site.Location(), ctx.Site.Atmosphere()).ICRSToAltAz(posTo)
 		if err != nil {
 			return 0, err
 		}

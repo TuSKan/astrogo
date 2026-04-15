@@ -67,7 +67,7 @@ func main() {
 		fmt.Printf("%d. %-15s | Start: %s | Setup: %ds\n",
 			i+1,
 			b.Block.ID,
-			b.Window.Start.ToGo().In(tz).Format("15:04"),
+			b.Window.Start.Format("15:04"),
 			int(b.SetupTime.Seconds()))
 	}
 }

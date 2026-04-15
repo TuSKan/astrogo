@@ -51,11 +51,17 @@ type Apparent struct {
 	dec angle.Angle
 }
 
-// ICRS represents a direction and optional distance in the International Celestial Reference System
+// ICRS represents a direction and optional distance in the International Celestial Reference System.
+// It can optionally carry stellar kinematics (proper motion, parallax, radial velocity)
+// which, when present, are forwarded to SOFA for rigorous space-motion propagation.
 type ICRS struct {
-	ra   angle.Angle
-	dec  angle.Angle
-	dist float64
+	ra       angle.Angle
+	dec      angle.Angle
+	dist     float64
+	pmRA     angle.Angle // Proper motion in RA (dRA/dt × cos δ), per Julian year
+	pmDec    angle.Angle // Proper motion in Dec, per Julian year
+	parallax angle.Angle // Stellar parallax
+	rv       float64     // Radial velocity (km/s)
 }
 
 // AltAz represents a direction and optional distance in the local horizontal frame.
@@ -81,7 +87,14 @@ type Ecliptic struct {
 
 // ── Constructors ──────────────────────────────────────────────────────────────
 
-func NewICRS(ra, dec angle.Angle) *ICRS               { return &ICRS{ra: ra, dec: dec} }
+func NewICRS(ra, dec angle.Angle) *ICRS { return &ICRS{ra: ra, dec: dec} }
+
+// NewICRSWithKinematics creates an ICRS direction with stellar kinematics attached.
+// SOFA uses these to compute rigorous space-motion propagation, annual parallax,
+// and aberration coupling internally via Atcoq/Atciq.
+func NewICRSWithKinematics(ra, dec, pmRA, pmDec, parallax angle.Angle, rv float64) *ICRS {
+	return &ICRS{ra: ra, dec: dec, pmRA: pmRA, pmDec: pmDec, parallax: parallax, rv: rv}
+}
 func NewAltAz(alt, az angle.Angle) *AltAz             { return &AltAz{alt: alt, az: az} }
 func NewGalactic(l, b angle.Angle) *Galactic          { return &Galactic{l: l, b: b} }
 func NewEcliptic(lon, lat angle.Angle) *Ecliptic      { return &Ecliptic{lon: lon, lat: lat} }
@@ -93,12 +106,26 @@ func NewObserversLocation(lon, lat angle.Angle, height float64) *ObserversLocati
 
 // ── Accessors ─────────────────────────────────────────────────────────────────
 
-func (c *ICRS) RA() angle.Angle      { return c.ra }
-func (c *ICRS) Dec() angle.Angle     { return c.dec }
-func (c *ICRS) Dist() float64        { return c.dist }
-func (c *ICRS) SetRA(a angle.Angle)  { c.ra = a }
-func (c *ICRS) SetDec(a angle.Angle) { c.dec = a }
-func (c *ICRS) SetDist(d float64)    { c.dist = d }
+func (c *ICRS) RA() angle.Angle       { return c.ra }
+func (c *ICRS) Dec() angle.Angle      { return c.dec }
+func (c *ICRS) Dist() float64         { return c.dist }
+func (c *ICRS) PmRA() angle.Angle     { return c.pmRA }
+func (c *ICRS) PmDec() angle.Angle    { return c.pmDec }
+func (c *ICRS) Parallax() angle.Angle { return c.parallax }
+func (c *ICRS) RV() float64           { return c.rv }
+func (c *ICRS) SetRA(a angle.Angle)   { c.ra = a }
+func (c *ICRS) SetDec(a angle.Angle)  { c.dec = a }
+func (c *ICRS) SetDist(d float64)     { c.dist = d }
+
+// Astrometric returns a copy of this ICRS position as an Astrometric catalog entry,
+// carrying any attached kinematics (proper motion, parallax, radial velocity).
+func (c *ICRS) Astrometric() *Astrometric {
+	return &Astrometric{
+		ra: c.ra, dec: c.dec,
+		pmRA: c.pmRA, pmDec: c.pmDec,
+		parallax: c.parallax, rv: c.rv,
+	}
+}
 
 func (c *AltAz) Alt() angle.Angle     { return c.alt }
 func (c *AltAz) Az() angle.Angle      { return c.az }

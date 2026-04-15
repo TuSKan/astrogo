@@ -1,7 +1,6 @@
 package plan
 
 import (
-	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
 
 	"github.com/TuSKan/astrogo/time"
@@ -37,7 +36,7 @@ func NewEvalContext(obj coord.Object, t time.Time, site *Site, env *Environment)
 		Time:   t,
 		Site:   site,
 		Env:    env,
-		Ctx:    coord.NewContext(t, site.Location(), atmosphere.StandardAtmosphere),
+		Ctx:    coord.NewContext(t, site.Location(), site.Atmosphere()),
 	}
 }
 

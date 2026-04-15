@@ -1,7 +1,7 @@
 {
 	"gopls": {
 		"buildFlags": [
-			"-tags=network,validation"
+			"-tags=network,validation,integration"
 		]
 	}
 }

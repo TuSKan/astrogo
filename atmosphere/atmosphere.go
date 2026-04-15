@@ -167,3 +167,71 @@ func Airmass(alt angle.Angle) (float64, error) {
 
 	return am, nil
 }
+
+// ── Elevation-Aware Corrections ──────────────────────────────────────────────
+
+// const (
+// 	meanEarthRadius = 6371000.0 // Mean Earth radius in meters (IAU nominal)
+// )
+
+// HorizonDip returns the apparent dip angle of the horizon for an observer at
+// height h meters above the reference ellipsoid. The dip is the angular depression
+// of the visible horizon below the mathematical (level) horizon, corrected for
+// standard atmospheric refraction.
+//
+// Formula: dip ≈ 1.76' × √h (arcminutes), where h is in meters.
+//
+// This is the standard navigational/astronomical formula that accounts for the
+// atmospheric refraction coefficient k ≈ 0.13 (light bending reduces the geometric
+// dip by roughly 1/7). At sea level (h=0), dip = 0. At 786m, dip ≈ 0.82°.
+func HorizonDip(h float64) angle.Angle {
+	if h <= 0 {
+		return angle.Zero()
+	}
+	// 1.76 arcminutes per sqrt(meter), converted to degrees
+	dipArcmin := 1.76 * math.Sqrt(h)
+	return angle.Deg(dipArcmin / 60.0)
+}
+
+// AtAltitude returns an Atmosphere with pressure and temperature adjusted for the
+// given altitude h (meters) using the ICAO International Standard Atmosphere model.
+//
+// Barometric formula (troposphere, h < 11000 m):
+//
+//	P(h) = P₀ × (1 − L·h / T₀)^(g·M / (R*·L))
+//	T(h) = T₀ − L·h   (in °C)
+//
+// Constants:
+//   - L  = 0.0065 K/m (temperature lapse rate)
+//   - T₀ = 288.15 K (sea-level standard temperature)
+//   - g  = 9.80665 m/s²
+//   - M  = 0.0289644 kg/mol (molar mass of dry air)
+//   - R* = 8.31447 J/(mol·K) (universal gas constant)
+//
+// The refraction model and wavelength are inherited from [StandardAtmosphere].
+func AtAltitude(h float64) Atmosphere {
+	if h <= 0 {
+		return StandardAtmosphere
+	}
+
+	const (
+		P0       = 1013.25             // Sea-level pressure (hPa)
+		T0       = 288.15              // Sea-level temperature (K)
+		L        = 0.0065              // Temperature lapse rate (K/m)
+		g        = 9.80665             // Gravitational acceleration (m/s²)
+		M        = 0.0289644           // Molar mass of dry air (kg/mol)
+		Rstar    = 8.31447             // Universal gas constant (J/(mol·K))
+		exponent = g * M / (Rstar * L) // ≈ 5.25588
+	)
+
+	pressure := P0 * math.Pow(1.0-L*h/T0, exponent)
+	temperature := (T0 - L*h) - 273.15 // Convert to Celsius
+
+	return Atmosphere{
+		Pressure:    pressure,
+		Temperature: temperature,
+		Humidity:    StandardAtmosphere.Humidity,
+		Wavelength:  StandardAtmosphere.Wavelength,
+		Model:       nil, // Let SOFA compute refraction rigorously via Atcoq
+	}
+}

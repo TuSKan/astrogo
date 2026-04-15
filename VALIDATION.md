@@ -50,10 +50,18 @@ Validation should be:
 | Quantity arithmetic | ✅ validated | analytical | 1e-15 | Scale, Abs, Compare, conversion |
 | Catalog Providers | ✅ validated | API References/Offline Caches | exact schemas | Dual JSON/XML parsing (STScI), Strict ADQL parsing (CDS TAP) |
 | Planning / visibility | ✅ validated | geometric sanity | logical | constraint system + scoring verified |
-| Transit estimate | ✅ validated | geometric sanity | < 1 min | golden-section search, 10-min coarse bracket |
-| Rise / Set / Transit events | ✅ validated | geometric sanity | < 1 s | bisection + golden-section solver |
+| Transit estimate | ✅ validated | geometric sanity | < 1 min | Brent's minimization, 10-min coarse bracket |
+| Rise / Set / Transit events | ✅ validated | USNO API | < 2 min | Chandrupatla root-finding solver |
 | Twilight events | ✅ validated | geometric sanity | < 1 s | Civil (−6°), Nautical (−12°), Astronomical (−18°); sequence ordering verified |
 | Event solver edge cases | ✅ validated | analytical | logical | circumpolar, never-rise, polar midnight sun, high-lat no astronomical twilight |
+| Sun Rise/Set/Transit | ✅ validated | USNO API | < 2.4 min | 3 locations × 3 dates, SOFA-native refraction |
+| Moon Rise/Set/Transit | ✅ validated | USNO API | < 5.1 min | 3 locations × 3 dates, parallax-corrected |
+| Moon Phases | ✅ validated | USNO API | ≤ 1 min | 12 consecutive phases (Jan–Mar 2026) |
+| Earth's Seasons | ✅ validated | USNO API | 2–4 min | 4 events (2026), aberration-corrected ecliptic longitude |
+| Celestial Navigation (AltAz) | ✅ validated | USNO API | 0.002° | Sub-arcsecond stellar altitude accuracy |
+| Perihelion/Aphelion | ✅ validated | USNO API | ≤ 1 min | Brent's minimization on Earth-Sun distance |
+| Lunar Eclipse Detection | ✅ validated | NASA Eclipse Catalog | date-exact | 2/2 eclipses detected for 2026 (Danjon limit filter) |
+| Solar Eclipse Detection | ✅ validated | NASA Eclipse Catalog | date-exact | 2/2 eclipses detected for 2026 (ecliptic latitude filter) |
 
 ---
 
@@ -83,8 +91,11 @@ Used when a trusted scientific implementation exists.
 Primary references:
 - `gofa` (SOFA-derived)
 - JPL Horizons
+- **U.S. Naval Observatory API** — gold standard for rise/set/transit, moon phases, seasons, celestial navigation
 - Astropy
 - Published standards / tables
+
+See [`USNO.md`](./USNO.md) for the full USNO validation report with per-event residual analysis.
 
 ### 3. Round-trip consistency
 Used where inverse transforms should approximately recover original values.

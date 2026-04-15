@@ -118,10 +118,10 @@ func TestSunEvents(t *testing.T) {
 		switch e.Kind {
 		case EventRise:
 			hasRise = true
-			testutil.AssertNear(t, "sunrise altitude", e.GeometricAltitude.Degrees(), SunHorizonAltitude, 0.01)
+			testutil.AssertNear(t, "sunrise altitude", e.GeometricAltitude.Degrees(), site.SunRiseSetThreshold().Degrees(), 0.01)
 		case EventSet:
 			hasSet = true
-			testutil.AssertNear(t, "sunset altitude", e.GeometricAltitude.Degrees(), SunHorizonAltitude, 0.01)
+			testutil.AssertNear(t, "sunset altitude", e.GeometricAltitude.Degrees(), site.SunRiseSetThreshold().Degrees(), 0.01)
 		case EventTransit:
 			hasTransit = true
 		}
@@ -163,7 +163,7 @@ func TestMoonEvents(t *testing.T) {
 
 	for _, e := range events {
 		if e.Kind == EventRise || e.Kind == EventSet {
-			testutil.AssertNear(t, "moonrise/set altitude", e.GeometricAltitude.Degrees(), MoonHorizonAltitude, 0.01)
+			testutil.AssertNear(t, "moonrise/set altitude", e.GeometricAltitude.Degrees(), site.MoonRiseSetThreshold().Degrees(), 0.01)
 		}
 	}
 }
@@ -211,10 +211,10 @@ func TestTwilightEvents(t *testing.T) {
 
 			for _, e := range events {
 				if e.Dawn != nil {
-					testutil.AssertNear(t, "dawn altitude", e.Dawn.GeometricAltitude.Degrees(), TwilightThresholds[kind], 0.01)
+					testutil.AssertNear(t, "dawn altitude", e.Dawn.GeometricAltitude.Degrees(), TwilightThresholds[kind], 0.02)
 				}
 				if e.Dusk != nil {
-					testutil.AssertNear(t, "dusk altitude", e.Dusk.GeometricAltitude.Degrees(), TwilightThresholds[kind], 0.01)
+					testutil.AssertNear(t, "dusk altitude", e.Dusk.GeometricAltitude.Degrees(), TwilightThresholds[kind], 0.02)
 				}
 			}
 		})

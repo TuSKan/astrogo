@@ -17,10 +17,28 @@ type Duration = time.Duration
 
 type Location = time.Location
 
+type Month = time.Month
+
 const (
 	Second = time.Second
 	Minute = time.Minute
 	Hour   = time.Hour
+)
+
+// Month constants re-exported from the standard library.
+const (
+	January   = time.January
+	February  = time.February
+	March     = time.March
+	April     = time.April
+	May       = time.May
+	June      = time.June
+	July      = time.July
+	August    = time.August
+	September = time.September
+	October   = time.October
+	November  = time.November
+	December  = time.December
 )
 
 var LoadLocation = time.LoadLocation
@@ -61,10 +79,15 @@ func (s Scale) String() string {
 //
 // Internal representation uses a two-part Julian Date (jd1 + jd2) to maintain
 // precision. The split is typically at the nearest day.
+//
+// An optional display location (loc) is carried for presentation purposes.
+// It affects only [Time.ToGo], [Time.Format], and [Time.String] and never
+// influences scientific computation or scale conversions.
 type Time struct {
 	jd1   float64
 	jd2   float64
 	scale Scale
+	loc   *time.Location // display-only; nil defaults to UTC
 }
 
 // ── Constructors ──────────────────────────────────────────────────────────────
@@ -84,7 +107,9 @@ func FromJDParts(jd1, jd2 float64, s Scale) Time {
 
 // FromGo creates a Time from a Go standard library time.Time.
 // The input is interpreted as being in the UTC scale.
+// The original time.Location is preserved for display purposes.
 func FromGo(t time.Time) Time {
+	loc := t.Location()
 	utc := t.UTC()
 	unixSec := float64(utc.Unix())
 	unixNsec := float64(utc.Nanosecond()) / 1e9
@@ -93,7 +118,9 @@ func FromGo(t time.Time) Time {
 	days := math.Floor(unixSec / 86400.0)
 	frac := (unixSec-days*86400.0)/86400.0 + unixNsec/86400.0
 
-	return FromJDParts(2440587.5+days, frac, UTC)
+	result := FromJDParts(2440587.5+days, frac, UTC)
+	result.loc = loc
+	return result
 }
 
 // NowUTC returns the current time in the UTC scale.
@@ -127,13 +154,19 @@ func (t Time) Scale() Scale {
 	return t.scale
 }
 
-// String returns a simple string representation (JD + Scale).
+// String returns a human-readable representation.
+// If a display location is set, the civil time in that timezone is shown;
+// otherwise the raw JD and scale are returned.
 func (t Time) String() string {
+	if t.loc != nil && t.loc != time.UTC {
+		return t.ToGo().Format("2006-01-02 15:04:05 MST")
+	}
 	return fmt.Sprintf("JD %.8f (%s)", t.JD(), t.scale)
 }
 
 // ToGo converts the Time to a standard library time.Time.
-// The result is in UTC.
+// If a display location was set (via [FromGo], [Date], or [Time.In]),
+// the result is expressed in that timezone; otherwise it defaults to UTC.
 func (t Time) ToGo() time.Time {
 	// JD 2440587.5 is 1970-01-01 00:00:00 UTC
 	days1 := t.jd1 - 2440587.5
@@ -149,27 +182,60 @@ func (t Time) ToGo() time.Time {
 		sec -= 1
 		nsec += 1e9
 	}
-	return time.Unix(sec, nsec).UTC()
+	gt := time.Unix(sec, nsec).UTC()
+	if t.loc != nil {
+		return gt.In(t.loc)
+	}
+	return gt
 }
+
+// GoTime is an alias for [ToGo].
+func (t Time) GoTime() time.Time { return t.ToGo() }
+
+// Year returns the Gregorian calendar year of t.
+func (t Time) Year() int { return t.ToGo().Year() }
 
 // Add returns a new Time with the duration added.
 // It uses a simple conversion: 1 day = 86400.0 seconds.
+// The display location is preserved.
 func (t Time) Add(d time.Duration) Time {
 	return t.AddDays(d.Seconds() / 86400.0)
 }
 
 // AddDays returns a new Time with d days added.
+// The display location is preserved.
 func (t Time) AddDays(d float64) Time {
-	return FromJDParts(t.jd1, t.jd2+d, t.scale)
+	result := FromJDParts(t.jd1, t.jd2+d, t.scale)
+	result.loc = t.loc
+	return result
 }
 
-// Date returns a new Time from a Go standard library time.Time.
+// Date creates a Time from calendar components and a timezone.
+// The timezone location is preserved for display purposes.
 func Date(year int, month time.Month, day int, hour int, min int, sec int, nsec int, loc *time.Location) Time {
 	return FromGo(time.Date(year, month, day, hour, min, sec, nsec, loc))
 }
 
-// Format returns a string representation of the time in the given format.
-func (t *Time) Format(format string) string {
+// Location returns the display timezone associated with this Time.
+// Returns time.UTC if none was set.
+func (t Time) Location() *time.Location {
+	if t.loc != nil {
+		return t.loc
+	}
+	return time.UTC
+}
+
+// In returns a copy of t with the display location set to loc.
+// This does not change the underlying instant; only how it is displayed
+// by [Time.ToGo], [Time.Format], and [Time.String].
+func (t Time) In(loc *time.Location) Time {
+	t.loc = loc
+	return t
+}
+
+// Format returns a string representation of the time in the given layout.
+// The display location is applied before formatting.
+func (t Time) Format(format string) string {
 	return t.ToGo().Format(format)
 }
 
@@ -247,7 +313,9 @@ func (t Time) UT1() Time {
 		})
 	}
 
-	return FromJDParts(utc.jd1, utc.jd2+(dut1/86400.0), UT1)
+	result := FromJDParts(utc.jd1, utc.jd2+(dut1/86400.0), UT1)
+	result.loc = t.loc
+	return result
 }
 
 // TT returns a new Time converted to the Terrestrial Time scale.
@@ -263,7 +331,9 @@ func (t Time) TT() Time {
 	y, m, d, fd, _ := gofaext.JdToDate(t.jd1, t.jd2)
 	dat, _ := gofaext.Dat(y, m, d, fd)
 	deltaTT := (dat + 32.184) / 86400.0
-	return FromJDParts(t.jd1, t.jd2+deltaTT, TT)
+	result := FromJDParts(t.jd1, t.jd2+deltaTT, TT)
+	result.loc = t.loc
+	return result
 }
 
 // TDB returns a new Time converted to the Barycentric Dynamical Time scale.
@@ -273,7 +343,7 @@ func (t Time) TDB() Time {
 		return t
 	}
 	tt := t.TT()
-	return Time{jd1: tt.jd1, jd2: tt.jd2, scale: TDB}
+	return Time{jd1: tt.jd1, jd2: tt.jd2, scale: TDB, loc: t.loc}
 }
 
 // normalize ensures that |jd2| < 1.0, and both components are properly balanced.

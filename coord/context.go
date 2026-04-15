@@ -120,20 +120,23 @@ func (ctx *Context) GeocentricToObserved(v vector.Vec3) *AltAz {
 	return res.Observed
 }
 
-// ICRSToAltAz converts purely geometric ICRS coordinates to local observed AltAz
-// utilizing the precomputed epoch pipeline matrices.
+// ICRSToAltAz converts ICRS coordinates to local observed AltAz utilizing the
+// precomputed epoch pipeline matrices. If the ICRS carries stellar kinematics
+// (proper motion, parallax, radial velocity), they are forwarded to SOFA for
+// rigorous space-motion propagation.
 func (ctx *Context) ICRSToAltAz(c *ICRS) (*AltAz, error) {
-	astro := NewAstrometric(c.RA(), c.Dec())
-	altaz := ctx.AstrometricToObserved(astro)
+	altaz := ctx.AstrometricToObserved(c.Astrometric())
 	altaz.SetDist(c.Dist())
 	return altaz, nil
 }
 
-// ICRSToHourAngle converts purely geometric ICRS coordinates to local observed Hour Angle.
+// ICRSToHourAngle converts ICRS coordinates to local observed Hour Angle.
+// If the ICRS carries kinematics, they are forwarded to SOFA for rigorous
+// space-motion propagation.
 func (ctx *Context) ICRSToHourAngle(c *ICRS) (angle.Angle, error) {
 	_, _, ha, _, _ := gofaext.Atcoq(
 		c.RA().Radians(), c.Dec().Radians(),
-		0, 0, 0, 0,
+		c.PmRA().Radians(), c.PmDec().Radians(), c.Parallax().Radians(), c.RV(),
 		&ctx.astrom,
 	)
 	return angle.Rad(ha).Wrap180(), nil
