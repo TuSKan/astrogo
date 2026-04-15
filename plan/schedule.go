@@ -112,12 +112,12 @@ func (m *BasicTransitionModel) Overhead(ctx TransitionContext) (time.Duration, e
 			return 0, err
 		}
 
-		altAzFrom, err := coord.ICRSToAltAz(posFrom, ctx.FromTime, ctx.Site.Location())
+		altAzFrom, err := coord.NewContext(ctx.FromTime, ctx.Site.Location(), coord.StandardAtmosphere).ICRSToAltAz(posFrom)
 		if err != nil {
 			return 0, err
 		}
 
-		altAzTo, err := coord.ICRSToAltAz(posTo, ctx.ToTime, ctx.Site.Location())
+		altAzTo, err := coord.NewContext(ctx.ToTime, ctx.Site.Location(), coord.StandardAtmosphere).ICRSToAltAz(posTo)
 		if err != nil {
 			return 0, err
 		}

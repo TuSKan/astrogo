@@ -110,7 +110,8 @@ func TestScientificStability(t *testing.T) {
 
 			// Route flawlessly through native Topocentric offset builder!
 			// We track exactly how the true geographic shift affects alt/az
-			observed := coord.GeocentricToObserved(appState.Pos, obsTime, site, atm)
+			obsCtx := coord.NewContext(obsTime, site, atm)
+			observed := obsCtx.GeocentricToObserved(appState.Pos)
 
 			appICRS, _ := ephemeris.ToICRS(appState.Pos)
 			dRA_raw := math.Abs(appICRS.RA().Degrees() - c.Data.AstroRA)

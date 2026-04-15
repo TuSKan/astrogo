@@ -80,11 +80,23 @@ func (s *Site) String() string {
 // Equal reports whether s and other represent the same observing site
 // (same name, location, horizon, and time zone).
 func (s *Site) Equal(other *Site) bool {
+	if s == nil || other == nil {
+		return s == other
+	}
+
+	tzEqual := false
+	if s.timeZone == nil && other.timeZone == nil {
+		tzEqual = true
+	} else if s.timeZone != nil && other.timeZone != nil {
+		tzEqual = s.timeZone.String() == other.timeZone.String()
+	}
+
 	return s.name == other.name &&
 		s.location.Lon().Radians() == other.location.Lon().Radians() &&
 		s.location.Lat().Radians() == other.location.Lat().Radians() &&
 		s.location.Height() == other.location.Height() &&
-		s.horizon.Radians() == other.horizon.Radians()
+		s.horizon.Radians() == other.horizon.Radians() &&
+		tzEqual
 }
 
 // WithHorizon returns a copy of s with the given horizon limit.
@@ -94,8 +106,12 @@ func (s *Site) WithHorizon(h angle.Angle) (*Site, error) {
 
 // WithTimeZone returns a copy of s with the given time zone.
 func (s *Site) WithTimeZone(tz *time.Location) *Site {
-	s.timeZone = tz
-	return s
+	return &Site{
+		name:     s.name,
+		location: s.location,
+		horizon:  s.horizon,
+		timeZone: tz,
+	}
 }
 
 // LocalSiderealTime returns the Local Apparent Sidereal Time (LAST) at the
@@ -103,12 +119,12 @@ func (s *Site) WithTimeZone(tz *time.Location) *Site {
 //
 // LAST = GAST + east longitude
 //
-// It uses the IAU 2006 GAST model (Gst06a) with the approximation UT1 ≈ UTC.
+// It uses the IAU 2006 GAST model (Gst06a).
 func (s *Site) LocalSiderealTime(t time.Time) angle.Angle {
-	// For v1 we approximate UT1 = UTC (DUT1 = 0).
-	utc1, utc2 := t.JDParts()
+	ut1 := t.UT1()
+	u1, u2 := ut1.JDParts()
 	tt1, tt2 := t.TT().JDParts()
-	gast := gofaext.Gst06a(utc1, utc2, tt1, tt2)
+	gast := gofaext.Gst06a(u1, u2, tt1, tt2)
 	lst := gast + s.location.Lon().Radians()
 	// Normalise to [0, 2π)
 	lst = math.Mod(lst, 2*math.Pi)

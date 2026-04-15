@@ -52,7 +52,8 @@ func TestPhase1ObserverPipelineAgainstHorizons(t *testing.T) {
 	// Actually, Astrometric is defined wrt ICRS cleanly.
 
 	// 2. Map through to Apparent!
-	apparent := coord.AstrometricToApparent(coord.NewAstrometric(astro.RA(), astro.Dec()), obsTime)
+	ctx := coord.NewContext(obsTime, site, coord.StandardAtmosphere)
+	apparent := ctx.AstrometricToApparent(coord.NewAstrometric(astro.RA(), astro.Dec()))
 
 	// AstroGo uses CIRS (Celestial Intermediate Reference System) for Apparent coords.
 	// Horizons uses classical True Equator and Equinox of Date.
@@ -81,10 +82,11 @@ func TestPhase1ObserverPipelineAgainstHorizons(t *testing.T) {
 	// 3. Map to Observed Topocentric (Alt/Az)
 	// Horizons outputs AIRLESS coordinates unless told otherwise (we specifically stripped REFRACTION flag logic since it breaks output bounds unless specific atmospheric limits are present, which we can't reliably inject).
 	// Therefore, we MUST use our RefractionNone model to properly evaluate that Earth Orientation Parameters apply perfectly natively.
-	atm := coord.StandardAtmosphere
-	atm.Model = coord.RefractionNone{}
+	atmNoRef := coord.StandardAtmosphere
+	atmNoRef.Model = coord.RefractionNone{}
 
-	observed := coord.ApparentToObserved(apparent, obsTime, site, atm)
+	ctxNoRef := coord.NewContext(obsTime, site, atmNoRef)
+	observed := ctxNoRef.ApparentToObserved(apparent)
 
 	t.Logf("AstroGo  Geometric Observer  : Azimuth=%v, Elevation=%v", observed.Az().Degrees(), observed.Alt().Degrees())
 

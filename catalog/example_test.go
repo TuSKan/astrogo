@@ -41,7 +41,8 @@ func Example_integration() {
 	obsTime := astrot.Date(2026, 4, 6, 0, 0, 0, 0, time.UTC)
 
 	// Compute target's altitude and azimuth properties from the Observatory at that time
-	altaz, err := coord.ICRSToAltAz(andromeda.Coord, obsTime, obs.Location())
+	ctx := coord.NewContext(obsTime, obs.Location(), coord.StandardAtmosphere)
+	altaz, err := ctx.ICRSToAltAz(andromeda.Coord)
 	if err != nil {
 		fmt.Println("Transform error:", err)
 		return

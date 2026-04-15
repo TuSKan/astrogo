@@ -23,7 +23,8 @@ func main() {
 	loc, _ := coord.NewGeodetic(angle.Deg(-46.6525), angle.Deg(-23.600833), 786)
 	now := time.NowUTC()
 
-	altaz, err := coord.ICRSToAltAz(icrs, now, loc)
+	ctx := coord.NewContext(now, loc, coord.StandardAtmosphere)
+	altaz, err := ctx.ICRSToAltAz(icrs)
 	if err != nil {
 		fmt.Printf("Error converting to AltAz: %v\n", err)
 	}

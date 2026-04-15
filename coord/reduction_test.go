@@ -244,7 +244,8 @@ func TestReducer_Group4_Semantics(t *testing.T) {
 
 	// 4.2 Apparent vector should roughly mirror typical vector norms
 	astrometric := coord.NewAstrometric(angle.Zero(), angle.Zero()) // Placeholder Astrometric
-	app := coord.AstrometricToApparent(astrometric, obsTime)
+	ctxTest := coord.NewContext(obsTime, site, atm)
+	app := ctxTest.AstrometricToApparent(astrometric)
 	if app.RA().Radians() == 0 && app.Dec().Radians() == 0 {
 		t.Error("AstrometricToApparent returned uninitialized zero coordinates")
 	}
