@@ -90,36 +90,67 @@ func main() {
 	}
 
 	// ----------------------------------------------------
-	// Lunar Eclipse / Full Moon
-	// A Lunar Eclipse strictly occurs at the exact moment of Opposition between the Sun and the Moon.
-	// This event demonstrates how to trace Syzygy alignments using the convenient wrapper.
-	fmt.Println("\nLooking for Full Moons (Sun-Moon Oppositions) leading to possible Lunar Eclipses (Next 365 Days):")
+	// Lunar Eclipse Detection
+	// Uses MoonPhases + ecliptic latitude filter to find actual eclipse candidates.
+	fmt.Println("\nLooking for Lunar Eclipses (Next 365 Days):")
 
-	lunarEvents, err := plan.LunarEclipses(start, end, eph)
+	lunarEclipses, err := plan.LunarEclipses(start, end, eph)
 	if err != nil {
-		log.Fatalf("failed to find Lunar Oppositions: %v", err)
+		log.Fatalf("failed to find lunar eclipses: %v", err)
 	}
 
-	if len(lunarEvents) == 0 {
-		fmt.Println("No Lunar Oppositions found in this time period.")
+	if len(lunarEclipses) == 0 {
+		fmt.Println("No lunar eclipses found in this time period.")
 	}
-	// Let's just print the first 5 events so we don't flood the output (there are ~12 full moons a year)
-	for i, e := range lunarEvents {
-		if i >= 5 {
-			fmt.Printf("... plus %d more full moons throughout the year.\n", len(lunarEvents)-5)
-			break
-		}
-
-		// Evaluate if the Moon is actually visible from São Paulo at the exact moment of Syzygy!
+	for i, ecl := range lunarEclipses {
+		// Evaluate if the Moon is actually visible from São Paulo at eclipse time
 		altCheck := plan.Altitude{Threshold: angle.Zero()}
-		res, _ := altCheck.Check(moon, e.Time, site)
+		res, _ := altCheck.Check(moon, ecl.Time, site)
 
 		visibilityStr := "Invisible (below horizon)"
 		if res.Pass {
 			visibilityStr = "Visible!"
 		}
 
-		fmt.Printf("[%d] Lunar Opposition (Full Moon) at %s  -  Altitude from SP: %5.2f° (%s)\n",
-			i+1, e.Time.Format(time.RFC3339), res.Value, visibilityStr)
+		fmt.Printf("[%d] %s at %s  β=%.3f°  γ=%.2f  (%s)\n",
+			i+1, ecl.Type, ecl.Time.Format(time.RFC3339),
+			ecl.EclipticLatitude.Degrees(), ecl.Gamma, visibilityStr)
+	}
+
+	// ----------------------------------------------------
+	// Solar Eclipse Detection
+	fmt.Println("\nLooking for Solar Eclipses (Next 365 Days):")
+
+	solarEclipses, err := plan.SolarEclipses(start, end, eph)
+	if err != nil {
+		log.Fatalf("failed to find solar eclipses: %v", err)
+	}
+
+	if len(solarEclipses) == 0 {
+		fmt.Println("No solar eclipses found in this time period.")
+	}
+	for i, ecl := range solarEclipses {
+		altCheck := plan.Altitude{Threshold: angle.Zero()}
+		res, _ := altCheck.Check(moon, ecl.Time, site)
+
+		visibilityStr := "Invisible (below horizon)"
+		if res.Pass {
+			visibilityStr = "Visible!"
+		}
+		fmt.Printf("[%d] %s at %s  β=%.3f°  γ=%.2f  (%s)\n",
+			i+1, ecl.Type, ecl.Time.Format(time.RFC3339),
+			ecl.EclipticLatitude.Degrees(), ecl.Gamma, visibilityStr)
+	}
+
+	// ----------------------------------------------------
+	// Earth's Apsides (Perihelion & Aphelion)
+	fmt.Println("\nEarth's Apsides for current year:")
+
+	apsides, err := plan.Apsides(start.Year(), eph)
+	if err != nil {
+		log.Fatalf("failed to compute apsides: %v", err)
+	}
+	for _, a := range apsides {
+		fmt.Printf("  %s: %s  (%.6f AU)\n", a.Apsis, a.Time.Format(time.RFC3339), a.Distance)
 	}
 }

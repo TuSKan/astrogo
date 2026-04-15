@@ -205,3 +205,94 @@ func TestTime_UT1(t *testing.T) {
 	testutil.AssertEqual(t, "Idempotent UT1 scale", ut1b.Scale(), atime.UT1)
 	testutil.AssertNear(t, "Idempotent UT1 JD", ut1b.JD(), ut1.JD(), 1e-15)
 }
+
+func TestTime_LocationPreservation(t *testing.T) {
+	brt := time.FixedZone("BRT", -3*3600)
+
+	// FromGo preserves the original location
+	goTime := time.Date(2026, 4, 14, 22, 0, 0, 0, brt)
+	tm := atime.FromGo(goTime)
+
+	if tm.Location().String() != "BRT" {
+		t.Errorf("expected BRT location, got %s", tm.Location())
+	}
+
+	// ToGo returns in the original timezone
+	gt := tm.ToGo()
+	if gt.Location().String() != "BRT" {
+		t.Errorf("expected BRT in ToGo, got %s", gt.Location())
+	}
+	if gt.Hour() != 22 {
+		t.Errorf("expected hour 22 in BRT, got %d", gt.Hour())
+	}
+
+	// Date preserves the location
+	tm2 := atime.Date(2026, 4, 14, 22, 0, 0, 0, brt)
+	if tm2.Location().String() != "BRT" {
+		t.Errorf("expected BRT from Date, got %s", tm2.Location())
+	}
+
+	// Format uses the stored location
+	fstr := tm2.Format("15:04")
+	if fstr != "22:00" {
+		t.Errorf("expected 22:00 in BRT format, got %s", fstr)
+	}
+}
+
+func TestTime_In(t *testing.T) {
+	tm := atime.FromJD(2451545.0, atime.UTC) // J2000 at UTC
+
+	// Default location is UTC
+	if tm.Location() != time.UTC {
+		t.Errorf("expected UTC default, got %s", tm.Location())
+	}
+
+	// In() changes the display location without modifying the instant
+	brt := time.FixedZone("BRT", -3*3600)
+	tm2 := tm.In(brt)
+
+	testutil.AssertNear(t, "JD unchanged by In()", tm2.JD(), tm.JD(), 1e-15)
+	if tm2.Location().String() != "BRT" {
+		t.Errorf("expected BRT after In(), got %s", tm2.Location())
+	}
+
+	// ToGo should now return in BRT
+	gt := tm2.ToGo()
+	if gt.Location().String() != "BRT" {
+		t.Errorf("expected BRT in ToGo after In(), got %s", gt.Location())
+	}
+}
+
+func TestTime_LocationPropagation(t *testing.T) {
+	brt := time.FixedZone("BRT", -3*3600)
+	tm := atime.Date(2026, 4, 14, 22, 0, 0, 0, brt)
+
+	// AddDays preserves location
+	tm2 := tm.AddDays(1)
+	if tm2.Location().String() != "BRT" {
+		t.Errorf("AddDays lost location: %s", tm2.Location())
+	}
+
+	// Add preserves location
+	tm3 := tm.Add(24 * time.Hour)
+	if tm3.Location().String() != "BRT" {
+		t.Errorf("Add lost location: %s", tm3.Location())
+	}
+
+	// Scale conversions preserve location
+	tt := tm.TT()
+	if tt.Location().String() != "BRT" {
+		t.Errorf("TT() lost location: %s", tt.Location())
+	}
+
+	tdb := tm.TDB()
+	if tdb.Location().String() != "BRT" {
+		t.Errorf("TDB() lost location: %s", tdb.Location())
+	}
+
+	iers.RegisterModel(mockEOP{})
+	ut1 := tm.UT1()
+	if ut1.Location().String() != "BRT" {
+		t.Errorf("UT1() lost location: %s", ut1.Location())
+	}
+}

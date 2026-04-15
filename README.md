@@ -124,7 +124,9 @@ Existing astronomy tools are powerful, but often:
   - Pluggable `Strategy` allocators (`GreedyStrategy`, `PriorityStrategy`)
 
 ### Event Solver
-- **Unified `EventSolver`** — numerical root-finder (Brent's method / golden-section)
+- **Unified `Solver`** — Chandrupatla root-finding (1997) + Brent's minimization
+- **Moon Phases**: New, First Quarter, Full, Last Quarter — ≤1 min vs USNO
+- **Earth's Seasons**: Equinoxes and Solstices — 2–4 min vs USNO
 - **Visibility Events**: Rise, Set, and Transit at sub-second precision.
 - **Relational Geometry**: Conjunction, Opposition, and Greatest Elongation.
 - **Convenience Helpers**: `SunriseSunset`, `CivilDawnDusk`, `VisibilityEvents`, `Conjunctions`, `Oppositions`, `LunarEclipses`, `GreatestElongations`.
@@ -355,7 +357,7 @@ flowchart TD
 | `plan` | Observability, constraints, events, scheduling engine | ✅ Stable |
 | `unit` | Physical unit and quantity system | ✅ Stable |
 
-See [`VALIDATION.md`](./VALIDATION.md) for scientific validation status and accuracy notes.
+See [`VALIDATION.md`](./VALIDATION.md) for scientific validation status and [`USNO.md`](./USNO.md) for the U.S. Naval Observatory accuracy report.
 
 ---
 
@@ -379,7 +381,7 @@ These are wrapped internally to ensure:
 - **Atmospheric Modeling:** Standalone `atmosphere` package with pluggable refraction and dispersion
 - **Ephemeris Engine:** Unified Ephemeris (JPL SPK) with rigorous local/remote abstractions
 - **Observation Planning & Scheduling:** Unified `plan` constraints, event solving, and full scheduling engine
-- **Scientific Validation:** Mathematically hardened and tested against NASA JPL Horizons (<1.0″ tolerance)
+- **Scientific Validation:** Mathematically hardened and tested against NASA JPL Horizons (<1.0″ tolerance) and the [U.S. Naval Observatory API](./USNO.md) (≤1 min moon phases, <2.4 min rise/set)
 - **I/O & Data:** FITS interoperability (mmap, Arrow tables, WCS), catalog TAP integrations
 
 ### Current Focus & Unimplemented (See Roadmap)

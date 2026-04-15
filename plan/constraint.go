@@ -177,7 +177,7 @@ func skyAltAzOf(obj Observable, t time.Time, site *Site) (*coord.AltAz, error) {
 	if err != nil {
 		return nil, err
 	}
-	ctx := coord.NewContext(t, site.Location(), atmosphere.StandardAtmosphere)
+	ctx := coord.NewContext(t, site.Location(), site.Atmosphere())
 	return ctx.ICRSToAltAz(pos)
 }
 

@@ -226,3 +226,16 @@ func Atcoq(rc, dc float64, pr, pd, px, rv float64, astrom *ASTROM) (aob, zob, ho
 	ri, di := Atciq(rc, dc, pr, pd, px, rv, astrom)
 	return Atioq(ri, di, astrom)
 }
+
+// Nut06a returns the IAU 2006/2000A nutation components:
+//   - dpsi: nutation in longitude (radians)
+//   - deps: nutation in obliquity (radians)
+func Nut06a(date1, date2 float64) (dpsi, deps float64) {
+	gofa.Nut06a(date1, date2, &dpsi, &deps)
+	return dpsi, deps
+}
+
+// Obl06 returns the mean obliquity of the ecliptic (IAU 2006) in radians.
+func Obl06(date1, date2 float64) float64 {
+	return gofa.Obl06(date1, date2)
+}

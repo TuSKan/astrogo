@@ -3,7 +3,6 @@ package plan
 import (
 	"errors"
 	"fmt"
-	"math"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/catalog"
@@ -56,40 +55,26 @@ func (f DeepSpace) Name() string {
 	return f.Object.Name
 }
 
-// Position returns the ICRS coordinates from the catalog object, applying proper motion
-// if the target possesses kinetic data.
+// Position returns the ICRS coordinates from the catalog object, including
+// any stellar kinematics (proper motion, parallax, radial velocity).
+// The coordinates are returned at the J2000 catalog epoch; SOFA handles
+// rigorous space-motion propagation to the observation epoch internally.
 func (f DeepSpace) Position(t time.Time) (*coord.ICRS, error) {
 	if f.Object.Coord == nil {
 		return coord.NewICRS(angle.Rad(0), angle.Rad(0)), nil
 	}
 
-	// Mathematically propagate coordinates if target has proper motion.
+	// If the target has kinematics, attach them to the ICRS so SOFA
+	// can apply rigorous space-motion propagation via Atcoq/Atciq.
 	hasPM := f.Object.PmRA.Radians() != 0 || f.Object.PmDec.Radians() != 0
-	if hasPM && !f.Object.Epoch.IsZero() {
-		// Julian years elapsed since catalog epoch
-		dt := (t.JD() - f.Object.Epoch.JD()) / 365.25
-
-		// Proper motion is inherently defined on the sphere, PmRA is typically
-		// dRA/dt * cos(Dec) or strictly dRA/dt depending on convention.
-		// In SIMBAD, pmra = dRA/dt * cos(Dec) usually, but simple addition
-		// handles basic observational propagation for non-extreme scopes.
-		// Note: The standard astrometric wrapper is highly rigorous, but this handles simple drifting.
-		dRA := f.Object.PmRA.Radians() * dt
-		dDec := f.Object.PmDec.Radians() * dt
-
-		// More rigorously, we can construct an Astrometric source and wrap it
-		// using AstrometricToApparent, but ICRS natively serves our geometrical model here.
-		// Since we just need geometric positional updates to trigger geometric Rise/Set events correctly.
-		// Just divide by cos(Dec) because astronomical dRA = PM_RA / cos(Dec) in coordinates.
-		cosDec := math.Cos(f.Object.Coord.Dec().Radians())
-		if math.Abs(cosDec) < 1e-10 {
-			cosDec = 1e-10
-		}
-
-		newRA := f.Object.Coord.RA().Radians() + (dRA / cosDec)
-		newDec := f.Object.Coord.Dec().Radians() + dDec
-
-		return coord.NewICRS(angle.Rad(newRA), angle.Rad(newDec)), nil
+	hasParallax := f.Object.Parallax.Radians() != 0
+	if hasPM || hasParallax {
+		return coord.NewICRSWithKinematics(
+			f.Object.Coord.RA(), f.Object.Coord.Dec(),
+			f.Object.PmRA, f.Object.PmDec,
+			f.Object.Parallax,
+			f.Object.RadialVelocity,
+		), nil
 	}
 
 	return f.Object.Coord, nil

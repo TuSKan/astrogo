@@ -38,7 +38,7 @@ func main() {
 
 	// 5. Check Visibility!
 	visible, reasons := planner.Observable(target, tm)
-	fmt.Printf("Checking visibility of %s at %v from %s...\n\n", target.Name(), tm.ToGo().In(tz).Format("15:04 -0700"), site.Name())
+	fmt.Printf("Checking visibility of %s at %v from %s...\n\n", target.Name(), tm.Format("15:04 -0700"), site.Name())
 
 	if visible {
 		fmt.Printf("Result: Yes! %s is visible right now and satisfies all constraints.\n", target.Name())
