@@ -470,6 +470,7 @@ func (t Time) Format(format string) string {
 	)
 	return r.Replace(format)
 }
+
 // Before reports whether t is chronologically before other.
 // If t and other are in different time scales, both are automatically
 // converted to TT for comparison. Same-scale comparisons have zero overhead.
