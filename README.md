@@ -133,9 +133,9 @@ Existing astronomy tools are powerful, but often:
 - **Moon Phase Events**: `NextNewMoon`, `NextFullMoon`, `MoonPhases` via `EventFamilyIllumination`
 - **Earth's Seasons**: Equinoxes and Solstices — 2–4 min vs USNO
 - **Visibility Events**: Rise, Set, and Transit at sub-second precision
-- **Relational Geometry**: Conjunction, Opposition, Greatest Elongation, Quadrature
+- **Relational Geometry**: Conjunction (RA), Conjunction (Ecliptic Longitude), Appulse, Opposition, Greatest Elongation, Quadrature
 - **Eclipse Detection**: `LunarEclipses`, `SolarEclipses` via ecliptic latitude filter (Danjon limit)
-- **Convenience**: `SunriseSunset`, `CivilDawnDusk`, `VisibilityEvents`, `Conjunctions`, `Oppositions`, `GreatestElongations`
+- **Convenience**: `SunriseSunset`, `CivilDawnDusk`, `VisibilityEvents`, `Conjunctions`, `ConjunctionsEcliptic`, `Appulses`, `Oppositions`, `GreatestElongations`
 
 ---
 
@@ -306,6 +306,18 @@ conj, _ := plan.Conjunctions(start, end, mars, jupiter)
 for _, c := range conj {
     fmt.Printf("Mars-Jupiter conjunction: %s\n", c.Time)
 }
+
+// Ecliptic longitude conjunctions (classical definition)
+eclConj, _ := plan.ConjunctionsEcliptic(start, end, mars, jupiter)
+for _, c := range eclConj {
+    fmt.Printf("Ecl. lon. conjunction: %s\n", c.Time)
+}
+
+// Appulses (closest visual approach)
+appulses, _ := plan.Appulses(start, end, mars, jupiter)
+for _, a := range appulses {
+    fmt.Printf("Appulse: %s (min sep: %.2f°)\n", a.Time, a.Value)
+}
 ```
 
 ## Architecture
@@ -392,7 +404,7 @@ flowchart TD
 | `plan` | Observability, constraints, events, scheduling engine | ✅ Stable |
 | `unit` | Physical unit and quantity system | ✅ Stable |
 
-See [`VALIDATION.md`](./VALIDATION.md) for scientific validation status and [`USNO.md`](./USNO.md) for the U.S. Naval Observatory accuracy report.
+See [`VALIDATION.md`](docs/VALIDATION.md) for scientific validation status and [`USNO.md`](docs/USNO.md) for the U.S. Naval Observatory accuracy report.
 
 ---
 
@@ -434,7 +446,7 @@ These are wrapped internally to ensure:
 | Refraction (rigorous) | 14 ns | 0 |
 | Scheduler (100 blocks) | 123 ms | linear |
 
-### Remaining (See [Roadmap](ROADMAP.md))
+### Remaining (See [Roadmap](docs/ROADMAP.md))
 - Batch/vectorized APIs for high-throughput pipelines
 - Cross-match algorithms for multi-catalog workflows
 
@@ -496,7 +508,32 @@ Full ephemeris-based TDB would add ~500× overhead per call. This trade-off is d
 
 We actively track our development pipeline across multiple capability tiers focusing on High-Performance Vectorization, Scheduling Engines, and external Data Ecosystem integration.
 
-Please see our full [**Project Roadmap**](ROADMAP.md) to understand current milestones, tracking priorities, and architectural expansion goals.
+Please see our full [**Project Roadmap**](docs/ROADMAP.md) to understand current milestones, tracking priorities, and architectural expansion goals.
+
+---
+
+## Case Study: Dating the Crucifixion Astronomically
+
+`astrogo` was used to produce a rigorous astronomical analysis of the birth and crucifixion
+of Jesus of Nazareth — demonstrating the library's deep-historical epoch capabilities.
+
+📄 **[When Did Jesus Die? An Astronomer's Cold Case](docs/JESUS.md)**
+
+The article uses `astrogo` + JPL DE441 ephemerides to:
+- Identify **5 lunar eclipse candidates** for Herod's death (5 BC – 1 BC)
+- Compute the **Jupiter-Saturn triple conjunction** of 7 BC (three definitions: RA, ecliptic longitude, appulse)
+- Verify the **Jupiter-Venus appulse** of June 17, 2 BC (0.009° — below naked-eye resolution)
+- Search all **Friday Nisan 14** dates in the Pilate window (AD 26–36)
+- Simulate the **April 3, AD 33 lunar eclipse** from Jerusalem
+
+Full runnable examples: [`examples/10_jesus_christ/`](examples/10_jesus_christ/)
+
+| Example | Description |
+| :--- | :--- |
+| [`born/`](examples/10_jesus_christ/born/) | Star of Bethlehem: Jupiter-Saturn and Jupiter-Venus conjunctions |
+| [`herod/`](examples/10_jesus_christ/herod/) | Herod's Eclipse: lunar eclipse catalog 5 BC – AD 1 |
+| [`crux/`](examples/10_jesus_christ/crux/) | Passover Moon: Friday Nisan 14 search (AD 26–36) |
+| [`eclipse/`](examples/10_jesus_christ/eclipse/) | Blood Moon: April 3, AD 33 eclipse simulation |
 
 ---
 
