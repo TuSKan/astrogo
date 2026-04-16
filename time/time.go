@@ -239,9 +239,13 @@ func (t Time) Format(format string) string {
 	return t.ToGo().Format(format)
 }
 
-// Before returns true if t is chronologically before other.
-// WARNING: This assumes both times are in the same scale for a simple comparison.
+// Before reports whether t is chronologically before other.
+// If t and other are in different time scales, both are automatically
+// converted to TT for comparison. Same-scale comparisons have zero overhead.
 func (t Time) Before(other Time) bool {
+	if t.scale != other.scale {
+		t, other = t.TT(), other.TT()
+	}
 	if t.jd1 < other.jd1 {
 		return true
 	}
@@ -251,9 +255,12 @@ func (t Time) Before(other Time) bool {
 	return t.jd2 < other.jd2
 }
 
-// After returns true if t is chronologically after other.
-// WARNING: This assumes both times are in the same scale for a simple comparison.
+// After reports whether t is chronologically after other.
+// Cross-scale times are automatically unified via TT.
 func (t Time) After(other Time) bool {
+	if t.scale != other.scale {
+		t, other = t.TT(), other.TT()
+	}
 	if t.jd1 > other.jd1 {
 		return true
 	}
@@ -263,9 +270,13 @@ func (t Time) After(other Time) bool {
 	return t.jd2 > other.jd2
 }
 
-// Equal reports whether t and other represent the same Julian Date in the same scale.
+// Equal reports whether t and other represent the same physical instant.
+// Cross-scale times are automatically unified via TT.
 func (t Time) Equal(other Time) bool {
-	return t.scale == other.scale && t.jd1 == other.jd1 && t.jd2 == other.jd2
+	if t.scale != other.scale {
+		t, other = t.TT(), other.TT()
+	}
+	return t.jd1 == other.jd1 && t.jd2 == other.jd2
 }
 
 // IsZero reports whether t represents the zero-value Julian Date.
@@ -274,76 +285,202 @@ func (t Time) IsZero() bool {
 }
 
 // Sub returns the duration t - other.
-// It uses a simple conversion: 1 day = 86400.0 seconds.
+// Cross-scale times are automatically unified via TT.
 func (t Time) Sub(other Time) time.Duration {
 	days := t.SubDays(other)
 	return time.Duration(days * 86400.0 * float64(time.Second))
 }
 
 // SubDays returns the difference t - other in days.
-//
-// WARNING: This assumes both times are in the same scale. If they differ, the
-// result is currently a simple numerical difference and may be scientifically
-// incorrect if scale conversions are ignored.
+// Cross-scale times are automatically unified via TT.
 func (t Time) SubDays(other Time) float64 {
+	if t.scale != other.scale {
+		t, other = t.TT(), other.TT()
+	}
 	return (t.jd1 - other.jd1) + (t.jd2 - other.jd2)
 }
 
-// ── Internal Helpers ──────────────────────────────────────────────────────────
+// ── Scale Conversion Helpers ─────────────────────────────────────────────────
 
-// UT1 returns a new Time converted to the Universal Time scale.
-func (t Time) UT1() Time {
-	if t.scale == UT1 {
-		return t
-	}
-
-	// Simplify by treating base scale as UTC for the UT1 offset application
-	utc := t
-
-	// MJD is JD - 2400000.5
-	mjd := (utc.jd1 - 2400000.5) + utc.jd2
-	eop, err := iers.GetModel().EOP(mjd)
-
-	dut1 := 0.0
-	if err == nil {
-		dut1 = eop.DUT1
-	} else {
-		warnUT1Once.Do(func() {
-			log.Printf("astrogo/time: IERS EOP data unavailable (MJD %.1f): UT1 ≈ UTC (DUT1=0). Max error ≈ 0.9s. Load finals2000A for sub-second precision.", mjd)
-		})
-	}
-
-	result := FromJDParts(utc.jd1, utc.jd2+(dut1/86400.0), UT1)
-	result.loc = t.loc
+// fromPartsPreserveLoc creates a Time in the given scale from a two-part JD,
+// preserving the display location of the source time.
+func fromPartsPreserveLoc(src Time, jd1, jd2 float64, s Scale) Time {
+	result := FromJDParts(jd1, jd2, s)
+	result.loc = src.loc
 	return result
 }
 
+// tdbMinusTT returns the TDB−TT difference in seconds for a given epoch,
+// using the single-term Fairhead & Bretagnon (1990) approximation.
+//
+// The dominant sinusoidal term has amplitude 1.657 ms and period ≈1 year.
+// This covers >99.5% of the total TDB−TT variation; higher-order terms
+// contribute <3 μs and are negligible for all astrogo use cases.
+//
+// Reference: Fairhead L., Bretagnon P., A&A 229, 240 (1990).
+func tdbMinusTT(jdTT1, jdTT2 float64) float64 {
+	// T = Julian centuries from J2000.0 TT
+	T := ((jdTT1 - 2451545.0) + jdTT2) / 36525.0
+	// Mean anomaly of Earth (degrees → radians)
+	g := (357.5277233 + 35999.0503400*T) * (math.Pi / 180.0)
+	return 0.001657 * math.Sin(g)
+}
+
+// dut1ForUTC retrieves DUT1 for the given UTC two-part JD.
+// Returns (dut1, nil) on success, or (0, err) if IERS data is unavailable.
+func dut1ForUTC(jd1, jd2 float64) (float64, error) {
+	mjd := (jd1 - 2400000.5) + jd2
+	eop, err := iers.GetModel().EOP(mjd)
+	if err != nil {
+		return 0, err
+	}
+	return eop.DUT1, nil
+}
+
+// dut1OrFallback retrieves DUT1 with a fallback to 0.0 on error.
+// Logs a one-time warning when falling back.
+func dut1OrFallback(jd1, jd2 float64) float64 {
+	dut1, err := dut1ForUTC(jd1, jd2)
+	if err != nil {
+		warnUT1Once.Do(func() {
+			mjd := (jd1 - 2400000.5) + jd2
+			log.Printf("astrogo/time: IERS EOP data unavailable (MJD %.1f): UT1 ≈ UTC (DUT1=0). Max error ≈ 0.9s. Load finals2000A for sub-second precision.", mjd)
+		})
+		return 0
+	}
+	return dut1
+}
+
+// ── Scale Conversions ────────────────────────────────────────────────────────
+//
+// Conversion graph:
+//
+//	UTC ←→ TAI ←→ TT ←→ TDB
+//	 ↕
+//	UT1
+//
+// All conversions except those involving UT1 are deterministic.
+// UT1 depends on IERS Earth Orientation Parameters (DUT1).
+
+// UTC returns a new Time converted to the Coordinated Universal Time scale.
+//
+// For UT1 input, the conversion uses IERS DUT1 data when available,
+// falling back to DUT1=0 (max error 0.9s) with a one-time log warning.
+func (t Time) UTC() Time {
+	if t.scale == UTC {
+		return t
+	}
+	switch t.scale {
+	case TAI:
+		// UTC = TAI − ΔAT.
+		// Use TAI JD as initial UTC guess for the leap-second lookup,
+		// then iterate once to handle the leap-second boundary.
+		y, m, d, fd, _ := gofaext.JdToDate(t.jd1, t.jd2)
+		dat, _ := gofaext.Dat(y, m, d, fd)
+		utcJD2 := t.jd2 - dat/86400.0
+		// Re-check: ΔAT may differ at the true UTC epoch (leap-second edge).
+		y2, m2, d2, fd2, _ := gofaext.JdToDate(t.jd1, utcJD2)
+		dat2, _ := gofaext.Dat(y2, m2, d2, fd2)
+		if dat2 != dat {
+			utcJD2 = t.jd2 - dat2/86400.0
+		}
+		return fromPartsPreserveLoc(t, t.jd1, utcJD2, UTC)
+	case TT:
+		// TT → TAI → UTC: TAI = TT − 32.184s
+		tai := fromPartsPreserveLoc(t, t.jd1, t.jd2-32.184/86400.0, TAI)
+		return tai.UTC()
+	case TDB:
+		// TDB → TT → TAI → UTC
+		tt := fromPartsPreserveLoc(t, t.jd1, t.jd2-tdbMinusTT(t.jd1, t.jd2)/86400.0, TT)
+		return tt.UTC()
+	case UT1:
+		// UTC = UT1 − DUT1. Since |DUT1| < 0.9s, UT1 ≈ UTC for lookup.
+		dut1 := dut1OrFallback(t.jd1, t.jd2)
+		return fromPartsPreserveLoc(t, t.jd1, t.jd2-dut1/86400.0, UTC)
+	}
+	return t // unreachable with current scales
+}
+
+// TAI returns a new Time converted to the International Atomic Time scale.
+func (t Time) TAI() Time {
+	if t.scale == TAI {
+		return t
+	}
+	switch t.scale {
+	case UTC:
+		// TAI = UTC + ΔAT
+		y, m, d, fd, _ := gofaext.JdToDate(t.jd1, t.jd2)
+		dat, _ := gofaext.Dat(y, m, d, fd)
+		return fromPartsPreserveLoc(t, t.jd1, t.jd2+dat/86400.0, TAI)
+	case TT:
+		// TAI = TT − 32.184s
+		return fromPartsPreserveLoc(t, t.jd1, t.jd2-32.184/86400.0, TAI)
+	default:
+		// TDB, UT1 → UTC → TAI
+		return t.UTC().TAI()
+	}
+}
+
 // TT returns a new Time converted to the Terrestrial Time scale.
+//
+// All conversion paths are deterministic. For UT1 input, the internal
+// UTC conversion may use a DUT1 fallback (DUT1=0, max error 0.9s)
+// if IERS data is unavailable.
 func (t Time) TT() Time {
 	if t.scale == TT {
 		return t
 	}
-	if t.scale != UTC {
-		// Simplified conversion for other scales not implemented in v1
-		return t
+	switch t.scale {
+	case UTC:
+		// TT = UTC + ΔAT + 32.184s
+		y, m, d, fd, _ := gofaext.JdToDate(t.jd1, t.jd2)
+		dat, _ := gofaext.Dat(y, m, d, fd)
+		return fromPartsPreserveLoc(t, t.jd1, t.jd2+(dat+32.184)/86400.0, TT)
+	case TAI:
+		// TT = TAI + 32.184s
+		return fromPartsPreserveLoc(t, t.jd1, t.jd2+32.184/86400.0, TT)
+	case TDB:
+		// TT = TDB − (TDB−TT). Use TDB JD as TT approximation for the
+		// correction term (residual error ≈ 4 ns, negligible).
+		return fromPartsPreserveLoc(t, t.jd1, t.jd2-tdbMinusTT(t.jd1, t.jd2)/86400.0, TT)
+	case UT1:
+		// UT1 → UTC (with fallback) → TT
+		return t.UTC().TT()
 	}
-	// UTC -> TT: TT = UTC + ΔAT + 32.184s
-	y, m, d, fd, _ := gofaext.JdToDate(t.jd1, t.jd2)
-	dat, _ := gofaext.Dat(y, m, d, fd)
-	deltaTT := (dat + 32.184) / 86400.0
-	result := FromJDParts(t.jd1, t.jd2+deltaTT, TT)
-	result.loc = t.loc
-	return result
+	return t // unreachable
 }
 
 // TDB returns a new Time converted to the Barycentric Dynamical Time scale.
-// In this implementation, TDB is approximated as being equal to TT.
+//
+// Uses the single-term Fairhead & Bretagnon (1990) approximation for the
+// TDB−TT correction (amplitude 1.657 ms, period ≈1 year, >99.5% of signal).
 func (t Time) TDB() Time {
 	if t.scale == TDB {
 		return t
 	}
 	tt := t.TT()
-	return Time{jd1: tt.jd1, jd2: tt.jd2, scale: TDB, loc: t.loc}
+	correction := tdbMinusTT(tt.jd1, tt.jd2) / 86400.0
+	return fromPartsPreserveLoc(t, tt.jd1, tt.jd2+correction, TDB)
+}
+
+// UT1 returns a new Time converted to the Universal Time (UT1) scale.
+//
+// This conversion requires IERS Earth Orientation Parameters for DUT1.
+// Returns an error if IERS data is unavailable for the given epoch.
+// The embedded finals2000A data is auto-loaded when the iers package is
+// imported; for dates beyond its prediction window, load updated data
+// via [iers.RegisterModel].
+func (t Time) UT1() (Time, error) {
+	if t.scale == UT1 {
+		return t, nil
+	}
+	utc := t.UTC() // deterministic route to UTC
+	dut1, err := dut1ForUTC(utc.jd1, utc.jd2)
+	if err != nil {
+		return Time{}, fmt.Errorf("astrogo/time: UT1 conversion failed (MJD %.1f): %w",
+			(utc.jd1-2400000.5)+utc.jd2, err)
+	}
+	return fromPartsPreserveLoc(t, utc.jd1, utc.jd2+dut1/86400.0, UT1), nil
 }
 
 // normalize ensures that |jd2| < 1.0, and both components are properly balanced.

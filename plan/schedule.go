@@ -286,11 +286,12 @@ func (s *GreedyStrategy) Schedule(planner *Planner, window Window, blocks []*Blo
 
 			// Check observability over the full duration
 			if checkConstraintsInterval(b.Target, startTime, endTime, step, planner.Site, allConstraints...) {
+				score := scoreBlockPlacement(b, startTime, endTime, planner)
 				sched.Blocks = append(sched.Blocks, ScheduledBlock{
 					Block:     b,
 					Window:    Window{Start: startTime, End: endTime},
 					SetupTime: overhead,
-					Score:     b.Priority, // Simple score default
+					Score:     score,
 				})
 
 				currentTime = endTime

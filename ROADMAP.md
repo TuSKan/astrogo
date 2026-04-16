@@ -114,6 +114,9 @@ The project is **past the foundational stage**.
 - [x] multi-target optimization
 - [x] cadence-aware scheduling
 - [x] pluggable strategies (greedy, priority-based, constraint-aware)
+- [x] **`SwapOptimizedStrategy`** — monotonic local search with adjacent swaps + gap insertion
+- [x] `ScoreObservable` at block midpoint for cross-strategy comparability
+- [x] Linear scaling benchmarked to 100 blocks
 
 ---
 
@@ -171,11 +174,75 @@ See [`USNO.md`](./USNO.md) and [`VALIDATION.md`](./VALIDATION.md) for full detai
 
 ---
 
+# ✅ Phase 3.5 — Observatory-Grade Hardening (v0.1.0)
+
+**Goal:** eliminate scientific liabilities and establish production-grade correctness.
+
+## 11. Scale-Aware Time System
+
+**Status:** ✅ Complete
+
+- [x] Full bidirectional conversion graph: `UTC↔TAI↔TT↔TDB`, `UTC↔UT1`
+- [x] Fairhead & Bretagnon (1990) TDB−TT correction (±3 µs residual)
+- [x] `UT1()` returns `(Time, error)` — explicit IERS data unavailability
+- [x] Cross-scale `Before`, `After`, `Equal`, `Sub`, `SubDays` auto-unify via TT
+- [x] Zero-overhead same-scale fast path (~2 ns)
+
+## 12. Visibility Boundary Refinement
+
+**Status:** ✅ Complete
+
+- [x] Chandrupatla root-finding for continuous altitude crossings
+- [x] Binary search for discrete constraint state transitions
+- [x] `VisibleIntervals`, `Find`, `ObservableWindows` refined to sub-second precision
+
+## 13. API Hygiene & Defensive Patterns
+
+**Status:** ✅ Complete
+
+- [x] `NewSite` nil-location guard (`ErrNilLocation`)
+- [x] `Site.Equal` epsilon-tolerant comparison (1e-12 rad)
+- [x] `DeepSpace.Position` and `Custom.Position` return defensive copies
+- [x] Consistent SOFA refraction at all altitudes (fixed `AtAltitude(0)` path)
+
+## 14. Illumination Event Family
+
+**Status:** ✅ Complete
+
+- [x] `EventFamilyIllumination` in EventSolver dispatch
+- [x] `solveIllumination` via ecliptic longitude (delegates to `moonElongation`)
+- [x] `isPhaseEvent` guard for validation exemption
+- [x] `NextNewMoon`, `NextFullMoon` convenience helpers
+- [x] `EventAnyPhase` wildcard
+
+## 15. Benchmark Suite
+
+**Status:** ✅ Complete (40+ benchmarks across 5 packages)
+
+- [x] `coord/`: NewContext, ICRSToAltAz (cached vs uncached), 100-star batch, Reducer
+- [x] `time/`: All scale conversions, round-trip, same-scale vs cross-scale comparison
+- [x] `atmosphere/`: Rigorous, Approximate, horizon, Airmass, AtAltitude
+- [x] `plan/`: VisibleIntervals (10 min / 1 min), ObservableWindows, EventSolver, scheduler scaling (10/50/100 blocks × 3 strategies), TransitEstimate
+
+## 16. Atmosphere Correctness Tests
+
+**Status:** ✅ Complete (19 tests)
+
+- [x] Refraction at known altitudes (zenith, 45°, 20°, 10°, horizon, below)
+- [x] Wavelength dispersion (blue > red)
+- [x] Zero-pressure guard, RefractionNone contract
+- [x] Airmass known values, monotonicity, below-horizon error
+- [x] AtAltitude pressure/temperature validation (sea level through Everest)
+- [x] Model nil consistency at all altitudes
+- [x] HorizonDip, ZenithDistance
+
+---
+
 # 📊 Phase 4 — Data Workflow Layer
 
 **Goal:** enable real catalog and pipeline workflows.
 
-## 11. Catalog Table Infrastructure
+## 17. Catalog Table Infrastructure
 
 **Status:** ✅ Complete (Remote Data Layer)
 
@@ -192,7 +259,7 @@ See [`USNO.md`](./USNO.md) and [`VALIDATION.md`](./VALIDATION.md) for full detai
 
 ---
 
-## 12. Batch / High-Throughput APIs
+## 18. Batch / High-Throughput APIs
 
 **Status:** 🔲 Not Started
 
@@ -235,13 +302,16 @@ These can be explored later if aligned with project direction.
 
 # 🧭 Summary
 
-AstroGo has completed all core astronomy capabilities:
+AstroGo has completed all core astronomy capabilities and v0.1.0 hardening:
 
-- ✅ Precision corrections (EOP, apparent place, refraction)
-- ✅ Numerical solvers (Chandrupatla + Brent)
-- ✅ Planetary phenomena (phases, seasons, apsides, eclipses)
-- ✅ Scheduling depth (constraint-aware, explainable)
-- ✅ Scientific validation (USNO, Horizons, SOFA)
+- ✅ Scale-aware time system (full conversion graph, Fairhead TDB, explicit UT1 errors)
+- ✅ SOFA-rigorous refraction at all altitudes
+- ✅ Sub-second visibility boundary refinement
+- ✅ Production scheduler (SwapOptimized, linear scaling)
+- ✅ Complete event solver (visibility, geometry, illumination, eclipses)
+- ✅ API hygiene (nil guards, epsilon equality, defensive copies)
+- ✅ 40+ benchmarks validating performance claims
+- ✅ Scientific validation (USNO, JPL Horizons, NASA Eclipse Catalog)
 - ✅ Catalog remote data layer
 
 The remaining work is concentrated in:
@@ -251,7 +321,7 @@ The remaining work is concentrated in:
 
 Completing these will elevate AstroGo from:
 
-> **a production-grade astronomy library**
+> **an observatory-grade astronomy library**
 
 to:
 

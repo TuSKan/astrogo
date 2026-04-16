@@ -47,6 +47,13 @@ func TestInvalidHorizon(t *testing.T) {
 	}
 }
 
+func TestNilLocation(t *testing.T) {
+	_, err := NewSite("No Location", nil, angle.Zero(), nil)
+	if err != ErrNilLocation {
+		t.Errorf("Expected ErrNilLocation, got %v", err)
+	}
+}
+
 func TestString(t *testing.T) {
 	loc, _ := coord.NewGeodetic(angle.Deg(10), angle.Deg(45), 500)
 	site, _ := NewSite("Test", loc, angle.Deg(20), nil)
@@ -91,7 +98,10 @@ func TestLocalSiderealTime(t *testing.T) {
 	site, _ := NewSite("Greenwich", loc, angle.Zero(), nil)
 
 	tm := time.FromJD(2451545.0, time.UTC)
-	lst := site.LocalSiderealTime(tm)
+	lst, err := site.LocalSiderealTime(tm)
+	if err != nil {
+		t.Fatalf("LocalSiderealTime failed: %v", err)
+	}
 
 	// Known GAST at J2000.0 ~280.46° ± 0.5°
 	expectedDeg := 280.46

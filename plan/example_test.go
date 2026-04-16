@@ -68,7 +68,7 @@ func ExampleObservableWindows() {
 	for _, w := range windows {
 		fmt.Printf("Window: %s to %s\n", w.Start, w.End)
 	}
-	// Output: Window: JD 2451545.00000000 (UTC) to JD 2451545.16666667 (UTC)
+	// Output: Window: JD 2451545.00000000 (UTC) to JD 2451545.16596113 (UTC)
 }
 
 func ExampleRankObservables() {

@@ -211,7 +211,15 @@ func HorizonDip(h float64) angle.Angle {
 // The refraction model and wavelength are inherited from [StandardAtmosphere].
 func AtAltitude(h float64) Atmosphere {
 	if h <= 0 {
-		return StandardAtmosphere
+		// Sea level: use standard ISA values but let SOFA handle refraction
+		// (Model: nil) for consistency with all other altitudes.
+		return Atmosphere{
+			Pressure:    StandardAtmosphere.Pressure,
+			Temperature: StandardAtmosphere.Temperature,
+			Humidity:    StandardAtmosphere.Humidity,
+			Wavelength:  StandardAtmosphere.Wavelength,
+			Model:       nil,
+		}
 	}
 
 	const (

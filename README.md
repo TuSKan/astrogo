@@ -9,30 +9,25 @@
 
 ![AstroGo Mascot](assets/image.png)
 
-**High-performance astronomy and observation-planning toolkit for Go, inspired by Astropy and Astroplan.**
+**Observatory-grade astronomy and observation-planning engine for Go.**
+
+Scale-aware time arithmetic · SOFA-rigorous coordinate transforms · sub-second visibility boundaries · production scheduling · validated against USNO, JPL Horizons, and NASA Eclipse Catalogs.
 
 ---
 
 ## Overview
 
-`astrogo` is a Go-native scientific library for astronomy, designed to provide:
+`astrogo` is a Go-native scientific library for professional-grade astronomy, providing:
 
-- Precise celestial coordinate transformations
-- Astronomical time handling and time scales
-- Observer-based sky calculations (Alt/Az, airmass, visibility)
-- Atmospheric refraction modeling (pluggable models)
-- Solar system ephemerides (Sun, Moon, Planets via JPL DE)
-- Observation planning, constraints, and event solving
+- **Scale-aware time system** — Full `UTC↔TAI↔TT↔TDB` conversion graph with Fairhead & Bretagnon TDB corrections and explicit IERS UT1 error propagation
+- **SOFA-rigorous coordinate transforms** — Cached `Context` amortizes expensive matrix computations (91 µs once → 325 ns per transform)
+- **Sub-second visibility detection** — Chandrupatla root-finding refines grid-sampled boundaries to <1s precision
+- **Production scheduling engine** — Greedy, Priority, and `SwapOptimized` strategies with monotonic improvement guarantees
+- **Complete event solver** — Rise/Set/Transit, Moon Phases, Seasons, Apsides, Eclipses, Conjunctions, Elongations
+- **JPL DE ephemerides** — Multi-kernel SPK with on-demand Horizons fetching
+- **Observatory-grade refraction** — SOFA's rigorous model at all altitudes, with pluggable override interface
 
-It is built with a strong emphasis on:
-
-- **Performance** (low allocations, batch-friendly APIs)
-- **Numerical correctness** (SOFA-compliant algorithms)
-- **Explicit, composable APIs**
-- **Clean package boundaries**
-
-Unlike Python ecosystems, `astrogo` is designed from the ground up for Go:
-no dynamic magic, no hidden global state, and no implicit unit conversions.
+Designed from the ground up for Go: no dynamic magic, no hidden global state, zero-allocation hot paths.
 
 ---
 
@@ -54,10 +49,13 @@ Existing astronomy tools are powerful, but often:
 
 ## Features
 
-### Core scientific primitives
+### Core Scientific Primitives
 - Angles (radians, degrees, sexagesimal — HMS/DMS parsing)
 - Units and quantities
-- High-precision time representation (JD-based, UTC/TAI/TT/TDB/UT1)
+- **Scale-aware time system** (JD-based, full `UTC↔TAI↔TT↔TDB↔UT1` conversion graph)
+  - Fairhead & Bretagnon (1990) TDB correction (±3 µs residual)
+  - Cross-scale comparisons auto-unify via TT (2 ns same-scale fast path)
+  - `UT1()` returns `(Time, error)` — explicit IERS data unavailability
 
 ### Coordinate systems
 - ICRS
@@ -73,18 +71,20 @@ Existing astronomy tools are powerful, but often:
 - One-time log warning when IERS data is unavailable (UT1 ≈ UTC fallback)
 - Aberration, light deflection, proper motion, parallax handled natively
 
-### Atmospheric modeling (`atmosphere`)
+### Atmospheric Modeling (`atmosphere`)
+- **SOFA-rigorous refraction by default** at all altitudes (ICAO standard atmosphere)
 - Pluggable `RefractionModel` interface with bidirectional refraction
 - `RefractionNone` — bypass refraction
-- `RefractionApproximate` — Saemundsson/Bennett tangent formula
-- `RefractionRigorous` — full correction with pressure, temperature, humidity, wavelength
-- Pickering (2002) airmass interpolation and zenith distance metrics
+- `RefractionApproximate` — Saemundsson/Bennett tangent formula (~12 ns/call)
+- `RefractionRigorous` — full pressure/temperature/humidity/wavelength correction (~14 ns/call)
+- Pickering (2002) airmass — stable down to 0° altitude (overcomes Kasten & Young limitations)
 - Chromatic atmospheric dispersion via `Reducer.Disperse()`
 
-### Observer modeling
-- Geodetic locations (WGS84)
-- Local sky computations
-- Stateful `Context` caching for batch transformations
+### Observer Modeling
+- Geodetic locations (WGS84) with nil-location guards
+- Epsilon-tolerant site equality (1e-12 rad)
+- Defensive catalog pointer copying
+- **Stateful `Context`** caching for batch transforms (73× speedup for 100-star batches)
 
 ### Ephemerides
 - Sun and Moon positions
@@ -113,23 +113,29 @@ Existing astronomy tools are powerful, but often:
 - Apache Arrow columnar export for catalog-scale table HDUs
 - **WCS** — pixel-to-sky mapping with TAN (Gnomonic) projection and `ExtractWCS` header parser
 
-### Visibility & planning
-- Observable windows (sampled constraint evaluation)
+### Visibility & Planning
+- **Sub-second boundary refinement** — Chandrupatla (continuous altitude) + bisection (discrete constraints)
+- Observable windows with constraint evaluation
 - Altitude/airmass/separation constraints
-- Target scoring and ranking
-- **Advanced Scheduling Engine**:
+- Target scoring and ranking (`ScoreObservable` at midpoint altitude × priority)
+- **Production Scheduling Engine**:
   - `Block` and `Configuration` abstractions for observing requests
-  - Detailed `Schedule` traces (`ScheduledBlock`, `UnscheduledBlock`)
-  - `TransitionModel` for modeling slew and instrument setup time
-  - Pluggable `Strategy` allocators (`GreedyStrategy`, `PriorityStrategy`)
+  - `TransitionModel` for slew and instrument setup time
+  - Pluggable `Strategy` allocators:
+    - `GreedyStrategy` — fast, linear scaling
+    - `PriorityStrategy` — priority-sorted greedy
+    - **`SwapOptimizedStrategy`** — local search with adjacent swaps + gap insertion (monotonic improvement)
+  - Linear scaling benchmarked to 100 blocks
 
 ### Event Solver
 - **Unified `Solver`** — Chandrupatla root-finding (1997) + Brent's minimization
 - **Moon Phases**: New, First Quarter, Full, Last Quarter — ≤1 min vs USNO
+- **Moon Phase Events**: `NextNewMoon`, `NextFullMoon`, `MoonPhases` via `EventFamilyIllumination`
 - **Earth's Seasons**: Equinoxes and Solstices — 2–4 min vs USNO
-- **Visibility Events**: Rise, Set, and Transit at sub-second precision.
-- **Relational Geometry**: Conjunction, Opposition, and Greatest Elongation.
-- **Convenience Helpers**: `SunriseSunset`, `CivilDawnDusk`, `VisibilityEvents`, `Conjunctions`, `Oppositions`, `LunarEclipses`, `GreatestElongations`.
+- **Visibility Events**: Rise, Set, and Transit at sub-second precision
+- **Relational Geometry**: Conjunction, Opposition, Greatest Elongation, Quadrature
+- **Eclipse Detection**: `LunarEclipses`, `SolarEclipses` via ecliptic latitude filter (Danjon limit)
+- **Convenience**: `SunriseSunset`, `CivilDawnDusk`, `VisibilityEvents`, `Conjunctions`, `Oppositions`, `GreatestElongations`
 
 ---
 
@@ -139,7 +145,7 @@ Existing astronomy tools are powerful, but often:
 go get github.com/TuSKan/astrogo
 ```
 
-## Quick Example
+## Quick Start — Tonight's Observing Plan
 
 ```go
 package main
@@ -147,9 +153,8 @@ package main
 import (
 	"fmt"
 	"log"
-	
+
 	"github.com/TuSKan/astrogo/angle"
-	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/catalog"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/ephemeris"
@@ -158,119 +163,149 @@ import (
 )
 
 func main() {
-	// 1. Setup the Observer at Mauna Kea
-	loc, err := coord.NewGeodetic(angle.Deg(-155.46), angle.Deg(19.82), 4205)
-	if err != nil {
-		log.Fatalf("invalid coordinates: %v", err)
-	}
-	site, err := plan.NewSite("Mauna Kea", loc, angle.Deg(20), nil)
-	if err != nil {
-		log.Fatalf("failed to setup site: %v", err)
-	}
+	// ── Observatory Setup: ESO Paranal (VLT) ──
+	loc, _ := coord.NewGeodetic(angle.Deg(-70.4046), angle.Deg(-24.6272), 2635)
+	site, _ := plan.NewSite("Paranal", loc, angle.Deg(20), nil)
 
-	// 2. Define Observation Constraints
-	// We want targets at least 30 degrees above the horizon.
-	constraints := []plan.Constraint{
-		plan.Altitude{Threshold: angle.Deg(30)},
-	}
+	// ── Night boundaries ──
+	eph := ephemeris.Default()
+	tonight := time.Date(2026, 4, 15, 22, 0, 0, 0, time.LocationUTC)
+	tomorrow := tonight.AddDays(1)
 
-	// 3. Define Targets
-	// Orion Nebula (fixed)
-	ra, err := angle.ParseHMS("05h 35m 17.3s")
-	if err != nil {
-		log.Fatalf("failed to parse RA: %v", err)
-	}
-	dec, err := angle.ParseDMS("-05° 23' 28\"")
-	if err != nil {
-		log.Fatalf("failed to parse Dec: %v", err)
-	}
-	m42 := plan.NewFixed(catalog.Target{
-		Name:  "M42",
-		Coord: coord.NewICRS(ra, dec),
+	sunrise, sunset, _ := plan.SunriseSunset(tonight, tomorrow, site, eph)
+	fmt.Printf("Sunset:  %s\n", sunset.Time)
+	fmt.Printf("Sunrise: %s\n", sunrise.Time)
+
+	dawn, dusk, _ := plan.AstronomicalDawnDusk(tonight, tomorrow, site, eph)
+	fmt.Printf("Astro dusk: %s → Astro dawn: %s\n", dusk.Time, dawn.Time)
+
+	// ── Moon phase check ──
+	nextFull, _ := plan.NextFullMoon(tonight, eph)
+	fmt.Printf("Next Full Moon: %s\n", nextFull.Time)
+
+	frac, _, _ := plan.MoonIllumination(tonight, eph)
+	fmt.Printf("Moon illumination: %.0f%%\n", frac*100)
+
+	// ── Targets ──
+	ra, _ := angle.ParseHMS("13h 29m 52.7s")
+	dec, _ := angle.ParseDMS("-47° 12' 18\"")
+	omegaCen := plan.NewFixed(catalog.Target{
+		Name: "Omega Centauri", Coord: coord.NewICRS(ra, dec),
 	})
-	
-	// Mars (moving)
+
+	ra2, _ := angle.ParseHMS("17h 45m 40.0s")
+	dec2, _ := angle.ParseDMS("-29° 00' 28\"")
+	sgrA := plan.NewFixed(catalog.Target{
+		Name: "Sgr A*", Coord: coord.NewICRS(ra2, dec2),
+	})
+
 	mars := plan.NewDefaultBody(ephemeris.Mars)
 
-	// 4. Check Observability and Score
-	now := time.NowUTC()
-	
-	for _, obj := range []plan.Observable{m42, mars} {
-		eval, err := plan.IsObservable(obj, now, site, constraints...)
-		if err != nil {
-			log.Printf("skipping observability check for %s: %v", obj.Name(), err)
-			continue
-		}
-		
-		score, err := plan.ScoreObservable(obj, now, site, constraints...)
-		if err != nil {
-			log.Printf("skipping scoring for %s: %v", obj.Name(), err)
-			continue
-		}
-		
-		fmt.Printf("Target: %-10s  Observable: %-5v  Score: %5.1f\n", 
+	// ── Observability + Scoring ──
+	constraints := []plan.Constraint{
+		plan.Altitude{Threshold: angle.Deg(30)},
+		plan.AirmassConstraint{MaxAirmass: 2.0},
+	}
+
+	fmt.Println("\n── Observability ──────────────────────")
+	for _, obj := range []plan.Observable{omegaCen, sgrA, mars} {
+		eval, _ := plan.IsObservable(obj, tonight, site, constraints...)
+		score, _ := plan.ScoreObservable(obj, tonight, site, constraints...)
+		fmt.Printf("  %-18s  Observable: %-5v  Score: %5.1f\n",
 			obj.Name(), eval.Observable, score)
+	}
+
+	// ── Schedule the night ──
+	planner, _ := plan.NewPlanner(site, nil)
+	blocks := []*plan.Block{
+		{ID: "OmCen", Target: omegaCen, Duration: 45 * time.Minute, Priority: 3},
+		{ID: "SgrA",  Target: sgrA,     Duration: 60 * time.Minute, Priority: 5},
+		{ID: "Mars",  Target: mars,     Duration: 20 * time.Minute, Priority: 2},
+	}
+
+	strategy := &plan.SwapOptimizedStrategy{
+		Base:      &plan.PriorityStrategy{},
+		MaxPasses: 5,
+	}
+	window := plan.Window{Start: dusk.Time, End: dawn.Time}
+	tm := &plan.BasicTransitionModel{BaseSetup: 5 * time.Minute}
+
+	schedule, _ := strategy.Schedule(planner, window, blocks, tm)
+
+	fmt.Println("\n── Schedule ──────────────────────────")
+	for _, sb := range schedule.Blocks {
+		fmt.Printf("  %s: %s → %s  (score: %.1f)\n",
+			sb.Block.ID, sb.Start, sb.End, sb.Score)
+	}
+	for _, ub := range schedule.Unscheduled {
+		fmt.Printf("  [skip] %s: %s\n", ub.Block.ID, ub.Reason)
 	}
 }
 ```
 
-### Coordinate Transformations
+### Batch Coordinate Transforms (73× Speedup)
 
 ```go
-// Define an observer context (caches SOFA matrices for the epoch)
-loc, _ := coord.NewGeodetic(angle.Deg(-155.46), angle.Deg(19.82), 4205)
-now := time.NowUTC()
-ctx := coord.NewContext(now, loc, atmosphere.StandardAtmosphere)
+// Create one Context per epoch — amortizes the 91 µs SOFA Apco13 cost.
+loc, _ := coord.NewGeodetic(angle.Deg(-70.4), angle.Deg(-24.6), 2635)
+atm := atmosphere.AtAltitude(2635)  // SOFA refraction at all altitudes
+ctx := coord.NewContext(time.NowUTC(), loc, atm)
 
-// ICRS → Alt/Az with atmospheric refraction
-src := coord.NewICRS(angle.Deg(10.684), angle.Deg(41.269))
-altaz, _ := ctx.ICRSToAltAz(src)
-fmt.Printf("Alt: %.2f°, Az: %.2f°\n", altaz.Alt().Degrees(), altaz.Az().Degrees())
-
-// Pure frame rotations (no observer needed)
-gal := coord.ICRSToGalactic(src)
-fmt.Printf("Galactic L: %.4f°, B: %.4f°\n", gal.L().Degrees(), gal.B().Degrees())
-
-tt := now.TT()
-ecl := coord.ICRSToEcliptic(src, tt)
-fmt.Printf("Ecliptic Lon: %.4f°, Lat: %.4f°\n", ecl.Lon().Degrees(), ecl.Lat().Degrees())
-```
-
-### Event Solving
-
-```go
-// Find sunrise and sunset for tonight at Mauna Kea
-rise, set, err := plan.SunriseSunset(tonight, tomorrow, site, eph)
-fmt.Println("Sunrise:", rise)
-fmt.Println("Sunset:", set)
-
-// Find Visibility Events (Rise, Transit, Set) for a target
-events, _ := plan.VisibilityEvents(start, end, m42, site, angle.Deg(30))
-for _, e := range events {
-    fmt.Println(e) // Rise/Set/Transit at sub-second precision
-}
-
-// Planetary geometry: Conjunction between the Moon and Mars
-conjunctions, _ := plan.Conjunctions(start, end, moon, mars)
-for _, c := range conjunctions {
-    fmt.Printf("Conjunction at: %s\n", c.Time)
+// Transform 100 catalog stars for ~325 ns each (instead of ~91 µs each).
+for _, star := range catalogStars {
+    altaz, _ := ctx.ICRSToAltAz(star.ICRS)
+    if altaz.Alt().Degrees() > 30 {
+        observable = append(observable, star)
+    }
 }
 ```
 
-### Solar System Ephemerides
+### Moon Phases & Eclipse Detection
 
 ```go
-// Fetch planet positions using default JPL ephemerides
 eph := ephemeris.Default()
-t := time.NowUTC()
+start := time.Date(2026, 1, 1, 0, 0, 0, 0, time.LocationUTC)
+end := start.AddDays(365)
 
-// Get geocentric state of Mars
-state, err := eph.State(ephemeris.Mars, t)
-pos, vel := state.Pos, state.Vel
+// All lunar phases for 2026
+phases, _ := plan.MoonPhases(start, end, eph)
+for _, p := range phases {
+    fmt.Printf("%s: %s\n", p.Phase, p.Time)
+}
 
-// Convert to sky coordinates
-icrs, _ := ephemeris.ToICRS(pos)
-fmt.Printf("Mars RA: %.4f°, Dec: %.4f°\n", icrs.RA().Degrees(), icrs.Dec().Degrees())
+// Lunar eclipses — filtered by Danjon ecliptic latitude limit
+eclipses, _ := plan.LunarEclipses(start, end, eph)
+for _, e := range eclipses {
+    fmt.Printf("Lunar Eclipse: %s (γ=%.2f, lat=%.2f°)\n",
+        e.Time, e.Gamma, e.EclipticLatitude.Degrees())
+}
+
+// Next Full Moon from tonight
+nextFull, _ := plan.NextFullMoon(time.NowUTC(), eph)
+fmt.Printf("Next Full Moon: %s (illumination: %.0f%%)\n",
+    nextFull.Time, nextFull.Value*100)
+```
+
+### Planetary Geometry
+
+```go
+eph := ephemeris.Default()
+venus := plan.NewBody(ephemeris.Venus, eph)
+sun := plan.NewBody(ephemeris.Sun, eph)
+
+// Greatest elongations of Venus in 2026
+elongations, _ := plan.GreatestElongations(start, end, venus, sun)
+for _, e := range elongations {
+    fmt.Printf("%s: %.1f° at %s\n", e.Kind, e.Value, e.Time)
+}
+
+// Mars-Jupiter conjunctions
+mars := plan.NewBody(ephemeris.Mars, eph)
+jupiter := plan.NewBody(ephemeris.Jupiter, eph)
+conj, _ := plan.Conjunctions(start, end, mars, jupiter)
+for _, c := range conj {
+    fmt.Printf("Mars-Jupiter conjunction: %s\n", c.Time)
+}
 ```
 
 ## Architecture
@@ -374,19 +409,34 @@ These are wrapped internally to ensure:
 
 ## Project Status
 
-🚀 **Active Development (Stable Core)**
+🚀 **v0.1.0 — Observatory-Grade Release**
 
-### Completed & Stable Foundations
-- **Precision Core:** Core primitives (angle, time, vector) and coordinate transforms
-- **Atmospheric Modeling:** Standalone `atmosphere` package with pluggable refraction and dispersion
-- **Ephemeris Engine:** Unified Ephemeris (JPL SPK) with rigorous local/remote abstractions
-- **Observation Planning & Scheduling:** Unified `plan` constraints, event solving, and full scheduling engine
-- **Scientific Validation:** Mathematically hardened and tested against NASA JPL Horizons (<1.0″ tolerance) and the [U.S. Naval Observatory API](./USNO.md) (≤1 min moon phases, <2.4 min rise/set)
-- **I/O & Data:** FITS interoperability (mmap, Arrow tables, WCS), catalog TAP integrations
+### Hardened Core
+- **Scale-aware time system:** Full `UTC↔TAI↔TT↔TDB↔UT1` conversion graph, Fairhead & Bretagnon TDB correction, explicit IERS error propagation
+- **SOFA-rigorous refraction:** Consistent across all altitudes (sea level through 8849m)
+- **Sub-second visibility boundaries:** Chandrupatla + bisection refinement on all grid transitions
+- **Production scheduler:** `SwapOptimizedStrategy` with monotonic local search, benchmarked linear scaling to 100 blocks
+- **Illumination events:** `EventFamilyIllumination` with `NextNewMoon`, `NextFullMoon`, `MoonPhases` via ecliptic longitude
+- **API hygiene:** Nil-location guards, epsilon-tolerant equality, defensive catalog copies
 
-### Current Focus & Unimplemented (See Roadmap)
-- Vectorized Batch APIs & Hardware Optimizations
-- Image-Domain & Photometric Output Pipelines
+### Scientific Validation
+- **JPL Horizons:** <1.0″ coordinate tolerance
+- **U.S. Naval Observatory:** ≤1 min moon phases, <2.4 min rise/set
+- **NASA Eclipse Catalog:** Date-exact eclipse detection (2026)
+
+### Performance (benchmarked on i9-11980HK)
+| Operation | Cost | Allocs |
+|-----------|------|--------|
+| `coord.NewContext` (SOFA Apco13) | 91 µs | 1 |
+| `ICRSToAltAz` (cached Context) | 325 ns | 1 |
+| 100-star batch (cached vs scalar) | 73× speedup | — |
+| Time scale conversion | 18–90 ns | 0 |
+| Refraction (rigorous) | 14 ns | 0 |
+| Scheduler (100 blocks) | 123 ms | linear |
+
+### Remaining (See [Roadmap](ROADMAP.md))
+- Batch/vectorized APIs for high-throughput pipelines
+- Cross-match algorithms for multi-catalog workflows
 
 > [!IMPORTANT]
 > Expect API changes until v1.0.

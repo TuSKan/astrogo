@@ -92,10 +92,24 @@ func TestScaleConversions(t *testing.T) {
 	testutil.AssertEqual(t, "TT scale", tt.Scale(), atime.TT)
 	testutil.AssertNear(t, "TT JD", tt.JD(), 2451545.0007428704, 1e-12)
 
-	// TDB is approximated as TT in v1
+	// TDB uses Fairhead & Bretagnon correction.
+	// At J2000 (T=0): g = 357.5277233°, TDB−TT ≈ −71.5 μs
 	tdb := tm.TDB()
 	testutil.AssertEqual(t, "TDB scale", tdb.Scale(), atime.TDB)
-	testutil.AssertNear(t, "TDB JD", tdb.JD(), tt.JD(), 1e-15)
+
+	// Compute expected FB correction using two-part JD for precision
+	tt1, tt2 := tt.JDParts()
+	tdb1, tdb2 := tdb.JDParts()
+	tdbMinusTTsec := ((tdb1 - tt1) + (tdb2 - tt2)) * 86400.0
+	T := ((tt1 - 2451545.0) + tt2) / 36525.0
+	g := (357.5277233 + 35999.0503400*T) * math.Pi / 180.0
+	expectedCorrSec := 0.001657 * math.Sin(g)
+	testutil.AssertNear(t, "TDB−TT correction (sec)", tdbMinusTTsec, expectedCorrSec, 1e-12)
+
+	// TDB must differ from TT (not just relabeled)
+	if math.Abs(tdbMinusTTsec) < 1e-6 {
+		t.Errorf("TDB and TT should differ by FB correction, but Δ = %e s", tdbMinusTTsec)
+	}
 }
 
 func TestTimeComparisons(t *testing.T) {
@@ -193,7 +207,10 @@ func TestTime_UT1(t *testing.T) {
 	iers.RegisterModel(mockEOP{})
 
 	utc := atime.FromJD(2451545.0, atime.UTC) // J2000 UTC
-	ut1 := utc.UT1()
+	ut1, err := utc.UT1()
+	if err != nil {
+		t.Fatalf("UT1() returned error: %v", err)
+	}
 
 	testutil.AssertEqual(t, "UT1 scale", ut1.Scale(), atime.UT1)
 
@@ -201,7 +218,10 @@ func TestTime_UT1(t *testing.T) {
 	testutil.AssertNear(t, "UT1 JD offset", ut1.JD(), expectedJD, 1e-12)
 
 	// Calling UT1 on an existing UT1 struct should just return it unchanged
-	ut1b := ut1.UT1()
+	ut1b, err := ut1.UT1()
+	if err != nil {
+		t.Fatalf("UT1() on UT1 time returned error: %v", err)
+	}
 	testutil.AssertEqual(t, "Idempotent UT1 scale", ut1b.Scale(), atime.UT1)
 	testutil.AssertNear(t, "Idempotent UT1 JD", ut1b.JD(), ut1.JD(), 1e-15)
 }
@@ -291,8 +311,254 @@ func TestTime_LocationPropagation(t *testing.T) {
 	}
 
 	iers.RegisterModel(mockEOP{})
-	ut1 := tm.UT1()
+	ut1, err := tm.UT1()
+	if err != nil {
+		t.Fatal(err)
+	}
 	if ut1.Location().String() != "BRT" {
 		t.Errorf("UT1() lost location: %s", ut1.Location())
 	}
+
+	// TAI and UTC conversions also preserve location
+	tai := tm.TAI()
+	if tai.Location().String() != "BRT" {
+		t.Errorf("TAI() lost location: %s", tai.Location())
+	}
+
+	utcBack := tt.UTC()
+	if utcBack.Location().String() != "BRT" {
+		t.Errorf("TT().UTC() lost location: %s", utcBack.Location())
+	}
+}
+
+// ── New Scale Conversion Tests ───────────────────────────────────────────────
+
+func TestTAI_Conversion(t *testing.T) {
+	// J2000.0 UTC: ΔAT = 32 leap seconds
+	utc := atime.FromJD(2451545.0, atime.UTC)
+
+	tai := utc.TAI()
+	testutil.AssertEqual(t, "TAI scale", tai.Scale(), atime.TAI)
+	// TAI = UTC + 32s
+	expectedTAI := 2451545.0 + 32.0/86400.0
+	testutil.AssertNear(t, "TAI JD", tai.JD(), expectedTAI, 1e-12)
+
+	// TAI → TT should add 32.184s
+	tt := tai.TT()
+	testutil.AssertEqual(t, "TT from TAI scale", tt.Scale(), atime.TT)
+	expectedTT := expectedTAI + 32.184/86400.0
+	testutil.AssertNear(t, "TT from TAI JD", tt.JD(), expectedTT, 1e-12)
+
+	// Idempotent
+	tai2 := tai.TAI()
+	testutil.AssertNear(t, "TAI idempotent", tai2.JD(), tai.JD(), 1e-15)
+}
+
+func TestUTC_Inverse(t *testing.T) {
+	utc := atime.FromJD(2451545.0, atime.UTC)
+
+	// UTC → TT → UTC round-trip
+	tt := utc.TT()
+	utcBack := tt.UTC()
+	testutil.AssertEqual(t, "UTC round-trip scale", utcBack.Scale(), atime.UTC)
+	testutil.AssertNear(t, "UTC→TT→UTC", utcBack.JD(), utc.JD(), 1e-12)
+
+	// UTC → TAI → UTC round-trip
+	tai := utc.TAI()
+	utcBack2 := tai.UTC()
+	testutil.AssertEqual(t, "UTC→TAI→UTC scale", utcBack2.Scale(), atime.UTC)
+	testutil.AssertNear(t, "UTC→TAI→UTC", utcBack2.JD(), utc.JD(), 1e-12)
+
+	// UTC → TDB → UTC round-trip
+	tdb := utc.TDB()
+	utcBack3 := tdb.UTC()
+	testutil.AssertEqual(t, "UTC→TDB→UTC scale", utcBack3.Scale(), atime.UTC)
+	testutil.AssertNear(t, "UTC→TDB→UTC", utcBack3.JD(), utc.JD(), 1e-10)
+
+	// Idempotent
+	utc2 := utc.UTC()
+	testutil.AssertNear(t, "UTC idempotent", utc2.JD(), utc.JD(), 1e-15)
+}
+
+func TestConversionRoundTrips(t *testing.T) {
+	// Full chain: UTC → TAI → TT → TDB → TT → TAI → UTC
+	utc := atime.FromJD(2460000.5, atime.UTC)
+
+	tai := utc.TAI()
+	tt := tai.TT()
+	tdb := tt.TDB()
+	ttBack := tdb.TT()
+	taiBack := ttBack.TAI()
+	utcBack := taiBack.UTC()
+
+	testutil.AssertEqual(t, "Full round-trip scale", utcBack.Scale(), atime.UTC)
+	// Allow 1e-10 JD tolerance for TDB→TT round-trip (FB is not exactly invertible)
+	testutil.AssertNear(t, "Full round-trip JD", utcBack.JD(), utc.JD(), 1e-10)
+
+	// With UT1
+	iers.RegisterModel(mockEOP{})
+	ut1, err := utc.UT1()
+	if err != nil {
+		t.Fatal(err)
+	}
+	utcFromUT1 := ut1.UTC()
+	testutil.AssertEqual(t, "UT1→UTC scale", utcFromUT1.Scale(), atime.UTC)
+	// DUT1=1.5s: UTC→UT1→UTC should recover within ~1e-12 JD
+	testutil.AssertNear(t, "UTC→UT1→UTC", utcFromUT1.JD(), utc.JD(), 1e-12)
+}
+
+func TestTDB_FairheadBretagnon(t *testing.T) {
+	// Test at several epochs to verify the sinusoidal correction.
+	// We compare using JDParts() instead of JD() to avoid float64
+	// cancellation (the correction ~1.7ms is near the noise floor of
+	// the combined JD's 16 significant digits).
+	epochs := []struct {
+		name string
+		jd   float64
+	}{
+		{"J2000", 2451545.0},
+		{"2010-01-01", 2455197.5},
+		{"2020-07-01", 2459031.5},
+		{"2026-04-06", 2461136.5},
+		{"1990-01-01", 2447892.5},
+	}
+
+	for _, ep := range epochs {
+		t.Run(ep.name, func(t *testing.T) {
+			utc := atime.FromJD(ep.jd, atime.UTC)
+			tt := utc.TT()
+			tdb := utc.TDB()
+
+			// Use two-part JD for precise differencing
+			tdb1, tdb2 := tdb.JDParts()
+			tt1, tt2 := tt.JDParts()
+			tdbMinusTTsec := ((tdb1 - tt1) + (tdb2 - tt2)) * 86400.0
+
+			// FB amplitude is 1.657 ms; the correction must be within bounds
+			if math.Abs(tdbMinusTTsec) > 0.002 {
+				t.Errorf("TDB−TT = %.6f s exceeds 2 ms bound", tdbMinusTTsec)
+			}
+
+			// Verify against direct FB formula using two-part T
+			T := ((tt1 - 2451545.0) + tt2) / 36525.0
+			g := (357.5277233 + 35999.0503400*T) * math.Pi / 180.0
+			expectedSec := 0.001657 * math.Sin(g)
+			testutil.AssertNear(t, "TDB−TT vs FB", tdbMinusTTsec, expectedSec, 1e-11)
+
+			t.Logf("T=%.6f  TDB−TT = %.6f ms", T, tdbMinusTTsec*1000)
+		})
+	}
+}
+
+func TestCrossScaleComparison(t *testing.T) {
+	// Create the same instant in different scales
+	utc := atime.FromJD(2451545.0, atime.UTC)
+	tt := utc.TT()
+	tai := utc.TAI()
+	tdb := utc.TDB()
+
+	// Same instant, different scales: Before/After should be false
+	if utc.Before(tt) {
+		t.Error("UTC should not be Before TT (same instant)")
+	}
+	if utc.After(tt) {
+		t.Error("UTC should not be After TT (same instant)")
+	}
+	if !utc.Equal(tt) {
+		t.Error("UTC and TT representing same instant should be Equal")
+	}
+
+	// Cross-scale Sub should be ~0
+	delta := utc.Sub(tt)
+	if math.Abs(delta.Seconds()) > 1e-6 {
+		t.Errorf("UTC.Sub(TT) for same instant: got %v, expected ~0", delta)
+	}
+
+	// TAI vs TDB (same instant — may have ~1ns FB round-trip residual)
+	taiTdbDelta := tai.Sub(tdb)
+	if math.Abs(taiTdbDelta.Seconds()) > 1e-6 {
+		t.Errorf("TAI.Sub(TDB) for same instant: got %v, expected ~0", taiTdbDelta)
+	}
+
+	// Different instants across scales
+	utc2 := utc.AddDays(1) // 1 day later, still UTC
+	if !utc.Before(utc2.TT()) {
+		t.Error("Earlier UTC should be Before later TT")
+	}
+	if !utc2.TDB().After(utc) {
+		t.Error("Later TDB should be After earlier UTC")
+	}
+
+	// SubDays cross-scale
+	daysDiff := utc2.TDB().SubDays(utc)
+	testutil.AssertNear(t, "Cross-scale SubDays", daysDiff, 1.0, 1e-8)
+}
+
+func TestCrossScaleSub(t *testing.T) {
+	// Verify Sub handles same-scale fast path correctly
+	a := atime.FromJD(2451545.0, atime.TT)
+	b := atime.FromJD(2451546.0, atime.TT)
+
+	dur := b.Sub(a)
+	if dur != 24*time.Hour {
+		t.Errorf("Same-scale Sub: got %v, want 24h", dur)
+	}
+
+	// Cross-scale Sub
+	utc := atime.FromJD(2451545.0, atime.UTC)
+	tt := utc.TT()
+	dur2 := utc.Sub(tt)
+	if math.Abs(dur2.Seconds()) > 1e-6 {
+		t.Errorf("Cross-scale Sub for same instant: got %v", dur2)
+	}
+}
+
+type errorEOP struct{}
+
+func (errorEOP) EOP(_ float64) (iers.EOP, error) {
+	return iers.EOP{}, &eopUnavailableError{}
+}
+
+type eopUnavailableError struct{}
+
+func (e *eopUnavailableError) Error() string { return "EOP data unavailable" }
+
+func TestUT1_Error(t *testing.T) {
+	// Register a model that always fails
+	iers.RegisterModel(errorEOP{})
+	defer iers.RegisterModel(iers.ZeroModel{}) // restore
+
+	utc := atime.FromJD(2451545.0, atime.UTC)
+	_, err := utc.UT1()
+	if err == nil {
+		t.Fatal("Expected error from UT1() with unavailable EOP, got nil")
+	}
+	t.Logf("UT1 error (expected): %v", err)
+}
+
+func TestTT_FromAllScales(t *testing.T) {
+	iers.RegisterModel(mockEOP{})
+	defer iers.RegisterModel(iers.ZeroModel{})
+
+	utc := atime.FromJD(2451545.0, atime.UTC)
+	expectedTT := utc.TT()
+
+	// TAI → TT
+	tai := utc.TAI()
+	ttFromTAI := tai.TT()
+	testutil.AssertNear(t, "TAI→TT", ttFromTAI.JD(), expectedTT.JD(), 1e-14)
+
+	// TDB → TT
+	tdb := utc.TDB()
+	ttFromTDB := tdb.TT()
+	// TDB→TT→TDB→TT may have ~1e-10 JD residual from FB non-invertibility
+	testutil.AssertNear(t, "TDB→TT", ttFromTDB.JD(), expectedTT.JD(), 1e-10)
+
+	// UT1 → TT (goes UT1→UTC→TT)
+	ut1, err := utc.UT1()
+	if err != nil {
+		t.Fatal(err)
+	}
+	ttFromUT1 := ut1.TT()
+	testutil.AssertNear(t, "UT1→TT", ttFromUT1.JD(), expectedTT.JD(), 1e-12)
 }
