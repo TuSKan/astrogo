@@ -16,8 +16,13 @@ import (
 // Each pass is O(n²) where n is the number of scheduled blocks.
 // Optimization is monotonic: the total schedule score never decreases.
 //
-// This is the same local search approach used by production observatory
-// schedulers (ESO/VLT, SCHED, STARS).
+// IMPORTANT: This is a local search heuristic, not a global optimizer.
+// It does not guarantee the globally optimal schedule. This is the same
+// trade-off made by production observatory schedulers (ESO/VLT, SCHED, STARS)
+// where tractability and monotonic improvement are preferred over the
+// NP-hard combinatorial global optimum. Users requiring global optimization
+// (e.g., integer programming, branch-and-bound) should implement the
+// Strategy interface directly.
 type SwapOptimizedStrategy struct {
 	// Base is the seed strategy that produces the initial schedule.
 	// Defaults to PriorityStrategy if nil.
