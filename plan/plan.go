@@ -249,8 +249,8 @@ func (w Window) Duration() time.Duration {
 // ObservableWindows computes the time intervals where the target satisfies all
 // provided constraints by sampling the range [start, end] at the given cadence.
 //
-// grouping logic groups contiguous observable intervals into windows.
-// For v1, this is a simple sampled search engine, not an exact event solver.
+// Transition boundaries are refined using binary search (sub-second precision),
+// eliminating the ±step quantization error of pure grid search.
 func ObservableWindows(
 	obj Observable,
 	start, end time.Time,
@@ -262,9 +262,21 @@ func ObservableWindows(
 		return nil, fmt.Errorf("step could not be negative")
 	}
 
+	// Observability check function for bisection refinement.
+	checkObs := func(t time.Time) bool {
+		eval, err := IsObservable(obj, t, site, constraints...)
+		if err != nil {
+			return false
+		}
+		return eval.Observable
+	}
+
 	var windows []Window
 	inWindow := false
 	var windowStart time.Time
+	var prevT time.Time
+	hasPrev := false
+	prevOK := false
 
 	t := start
 	for t.Before(end) || t.Equal(end) {
@@ -274,16 +286,24 @@ func ObservableWindows(
 		}
 
 		if eval.Observable && !inWindow {
-			windowStart = t
+			if hasPrev {
+				windowStart = refineBisect(prevT, t, prevOK, checkObs)
+			} else {
+				windowStart = t
+			}
 			inWindow = true
 		} else if !eval.Observable && inWindow {
+			windowEnd := refineBisect(prevT, t, prevOK, checkObs)
 			windows = append(windows, Window{
 				Start: windowStart,
-				End:   t,
+				End:   windowEnd,
 			})
 			inWindow = false
 		}
 
+		prevT = t
+		prevOK = eval.Observable
+		hasPrev = true
 		t = t.Add(step)
 	}
 

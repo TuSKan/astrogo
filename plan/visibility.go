@@ -31,9 +31,68 @@ func IsVisible(obj coord.Object, t time.Time, site *Site, minAlt angle.Angle) (b
 	return aa.Alt().Degrees() >= minAlt.Degrees(), nil
 }
 
+// ── Boundary Refinement Helpers ──────────────────────────────────────────────
+
+// refineVisibility uses Chandrupatla root-finding to locate the precise time
+// when a body's altitude crosses the threshold within [a, b].
+//
+// The altitude at a and b must bracket the threshold (one above, one below).
+// Falls back to the grid point b if refinement fails.
+func refineVisibility(
+	obj coord.Object,
+	site *Site,
+	a, b time.Time,
+	threshold angle.Angle,
+) time.Time {
+	altEval := func(t time.Time) (float64, error) {
+		pos, err := obj.ICRS(t)
+		if err != nil {
+			return 0, err
+		}
+		ctx := coord.NewContext(t, site.Location(), site.Atmosphere())
+		aa, err := ctx.ICRSToAltAz(pos)
+		if err != nil {
+			return 0, err
+		}
+		return aa.Alt().Degrees() - threshold.Degrees(), nil
+	}
+	solver := DefaultSolver()
+	refined, _, err := solver.FindRoot(Evaluator(altEval), a, b)
+	if err != nil {
+		return b // fallback: use latest grid point
+	}
+	return refined
+}
+
+// refineBisect uses binary search to locate the precise time when a boolean
+// state transition occurs within [a, b].
+//
+// check(a) must return aState, and check(b) must return !aState.
+// After 20 bisections on a typical 5-minute bracket, precision is ~0.3 ms.
+//
+// This is used for constraint-based observability where the underlying
+// function may be discontinuous (unlike altitude, which is continuous
+// and uses Chandrupatla root-finding via refineVisibility).
+func refineBisect(a, b time.Time, aState bool, check func(time.Time) bool) time.Time {
+	const maxBisect = 20
+	for i := 0; i < maxBisect; i++ {
+		mid := a.Add(b.Sub(a) / 2)
+		if check(mid) == aState {
+			a = mid
+		} else {
+			b = mid
+		}
+	}
+	return a.Add(b.Sub(a) / 2)
+}
+
+// ── Visibility Finders ───────────────────────────────────────────────────────
+
 // VisibleIntervals finds contiguous time windows during which an object is
 // above the specified altitude threshold.
-// It uses a sampled grid search with the provided step size.
+//
+// It uses a sampled grid search with the provided step size, then refines
+// each boundary using Chandrupatla root-finding (sub-second precision).
 func VisibleIntervals(
 	obj coord.Object,
 	site *Site,
@@ -48,6 +107,8 @@ func VisibleIntervals(
 	intervals := make([]Interval, 0, 4)
 	inWindow := false
 	var winStart time.Time
+	var prevT time.Time
+	hasPrev := false
 
 	t := start
 	for t.Before(end) || t.Equal(end) {
@@ -65,15 +126,25 @@ func VisibleIntervals(
 		visible := aa.Alt().Degrees() >= minAlt.Degrees()
 
 		if visible && !inWindow {
-			winStart = t
+			// Transition: invisible → visible. Refine the exact crossing.
+			if hasPrev {
+				winStart = refineVisibility(obj, site, prevT, t, minAlt)
+			} else {
+				winStart = t
+			}
 			inWindow = true
 		} else if !visible && inWindow {
+			// Transition: visible → invisible. Refine the exact crossing.
+			winEnd := refineVisibility(obj, site, prevT, t, minAlt)
 			intervals = append(intervals, Interval{
 				Object: obj,
-				Window: Window{Start: winStart, End: t},
+				Window: Window{Start: winStart, End: winEnd},
 			})
 			inWindow = false
 		}
+
+		prevT = t
+		hasPrev = true
 		t = t.Add(step)
 	}
 
@@ -170,6 +241,8 @@ func MaxAltitudeInWindow(obj coord.Object, site *Site, start, end time.Time) (an
 
 // Find scans [start, end] in steps of step, returning all intervals during
 // which obj satisfies all constraints from site.
+//
+// Transition boundaries are refined using binary search (sub-second precision).
 func Find(
 	obj coord.Object,
 	site *Site,
@@ -181,44 +254,52 @@ func Find(
 		step = 5 * stdtime.Minute
 	}
 
+	obs, ok := obj.(Observable)
+	if !ok {
+		return nil, errors.New("object does not implement Observable")
+	}
+
+	// Constraint check function for bisection refinement.
+	checkObs := func(t time.Time) bool {
+		for _, c := range constraints {
+			res, err := c.Check(obs, t, site)
+			if err != nil || !res.Pass {
+				return false
+			}
+		}
+		return true
+	}
+
 	intervals := make([]Interval, 0, 4)
 	inWindow := false
 	var winStart time.Time
+	var prevT time.Time
+	hasPrev := false
+	prevOK := false
 
 	t := start
 	for t.Before(end) || t.Equal(end) {
-		// Adapt coord.Object to Observable if needed,
-		// but since Observable is simpler, it should work if we cast or if we change the signature.
-		// For now, let's just use a local adapter if needed.
-
-		obs, ok := obj.(Observable)
-		if !ok {
-			// If it's not a Observable, we can't check constraints that require it.
-			return nil, errors.New("object does not implement Observable")
-		}
-
-		allOK := true
-		for _, c := range constraints {
-			res, err := c.Check(obs, t, site)
-			if err != nil {
-				return nil, err
-			}
-			if !res.Pass {
-				allOK = false
-				break
-			}
-		}
+		allOK := checkObs(t)
 
 		if allOK && !inWindow {
-			winStart = t
+			if hasPrev {
+				winStart = refineBisect(prevT, t, prevOK, checkObs)
+			} else {
+				winStart = t
+			}
 			inWindow = true
 		} else if !allOK && inWindow {
+			winEnd := refineBisect(prevT, t, prevOK, checkObs)
 			intervals = append(intervals, Interval{
 				Object: obj,
-				Window: Window{Start: winStart, End: t},
+				Window: Window{Start: winStart, End: winEnd},
 			})
 			inWindow = false
 		}
+
+		prevT = t
+		prevOK = allOK
+		hasPrev = true
 		t = t.Add(step)
 	}
 

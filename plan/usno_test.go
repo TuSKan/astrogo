@@ -628,7 +628,10 @@ func TestUSNO_SiderealTime(t *testing.T) {
 
 	for _, tc := range testTimes {
 		t.Run(tc.name, func(t *testing.T) {
-			lst := site.LocalSiderealTime(tc.tm)
+			lst, err := site.LocalSiderealTime(tc.tm)
+			if err != nil {
+				t.Fatalf("LocalSiderealTime failed: %v", err)
+			}
 			t.Logf("LST at %s: %s (%.6f°)", tc.name, lst.HMSString(3), lst.Degrees())
 			// Sanity: LST must be in [0, 360)
 			if lst.Degrees() < 0 || lst.Degrees() >= 360 {

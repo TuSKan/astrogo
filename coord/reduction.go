@@ -54,9 +54,9 @@ func (r *Reducer) Reduce(v vector.Vec3) *Reduction {
 	}
 
 	jd1, jd2 := r.time.JDParts()
-	ut1, ut2 := r.time.UT1().JDParts()
-	tt1, tt2 := r.time.TT().JDParts()
 
+	// Fetch EOP once for both UT1 derivation and polar motion,
+	// avoiding the redundant IERS lookup that UT1()/TT() would each make.
 	mjd := (jd1 - 2400000.5) + jd2
 	eop, err := iers.GetModel().EOP(mjd)
 	if err != nil {
@@ -64,6 +64,10 @@ func (r *Reducer) Reduce(v vector.Vec3) *Reduction {
 			log.Printf("astrogo/coord: IERS EOP data unavailable (MJD %.1f): using zero DUT1/polar motion. Topocentric accuracy degraded to ~1 arcsec.", mjd)
 		})
 	}
+
+	// Derive UT1 and TT from the UTC input using the already-fetched EOP.
+	ut1, ut2 := jd1, jd2+eop.DUT1/86400.0
+	tt1, tt2 := r.time.TT().JDParts()
 
 	// 1. Get SOFA ICRS-to-TIRS matrix
 	mat := gofaext.C2t06a(tt1, tt2, ut1, ut2, eop.XP, eop.YP)

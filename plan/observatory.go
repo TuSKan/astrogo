@@ -14,6 +14,7 @@ import (
 
 var (
 	ErrInvalidHorizon = errors.New("horizon must be between -90 and 90 degrees")
+	ErrNilLocation    = errors.New("geodetic location must not be nil")
 )
 
 // Site represents a physical observing location.
@@ -31,13 +32,12 @@ type Site struct {
 // horizon: The local horizon limit (e.g., 0 deg for ideal, 20 deg for trees/hills).
 // tz: The local time zone (optional, can be nil).
 func NewSite(name string, loc *coord.Geodetic, horizon angle.Angle, tz *time.Location) (*Site, error) {
+	if loc == nil {
+		return nil, ErrNilLocation
+	}
 	if horizon.Degrees() < -90 || horizon.Degrees() > 90 {
 		return nil, ErrInvalidHorizon
 	}
-
-	// Validate geodetic location (latitude bounds check)
-	// NewGeodetic already does this, but we ensure the input is valid here.
-	// Actually, we trust coord.Geodetic if it was constructed via NewGeodetic.
 
 	return &Site{
 		name:     name,
@@ -121,6 +121,9 @@ func (s *Site) String() string {
 
 // Equal reports whether s and other represent the same observing site
 // (same name, location, horizon, and time zone).
+//
+// Coordinates and horizon are compared with a tolerance of 1e-12 radians
+// (~0.2 μas) to avoid false negatives from float64 round-trip drift.
 func (s *Site) Equal(other *Site) bool {
 	if s == nil || other == nil {
 		return s == other
@@ -133,11 +136,12 @@ func (s *Site) Equal(other *Site) bool {
 		tzEqual = s.timeZone.String() == other.timeZone.String()
 	}
 
+	const eps = 1e-12 // radians, ~0.2 μas
 	return s.name == other.name &&
-		s.location.Lon().Radians() == other.location.Lon().Radians() &&
-		s.location.Lat().Radians() == other.location.Lat().Radians() &&
-		s.location.Height() == other.location.Height() &&
-		s.horizon.Radians() == other.horizon.Radians() &&
+		math.Abs(s.location.Lon().Radians()-other.location.Lon().Radians()) < eps &&
+		math.Abs(s.location.Lat().Radians()-other.location.Lat().Radians()) < eps &&
+		math.Abs(s.location.Height()-other.location.Height()) < eps &&
+		math.Abs(s.horizon.Radians()-other.horizon.Radians()) < eps &&
 		tzEqual
 }
 
@@ -162,8 +166,12 @@ func (s *Site) WithTimeZone(tz *time.Location) *Site {
 // LAST = GAST + east longitude
 //
 // It uses the IAU 2006 GAST model (Gst06a).
-func (s *Site) LocalSiderealTime(t time.Time) angle.Angle {
-	ut1 := t.UT1()
+// Returns an error if IERS EOP data is unavailable for the UT1 conversion.
+func (s *Site) LocalSiderealTime(t time.Time) (angle.Angle, error) {
+	ut1, err := t.UT1()
+	if err != nil {
+		return angle.Zero(), fmt.Errorf("LocalSiderealTime: %w", err)
+	}
 	u1, u2 := ut1.JDParts()
 	tt1, tt2 := t.TT().JDParts()
 	gast := gofaext.Gst06a(u1, u2, tt1, tt2)
@@ -173,5 +181,5 @@ func (s *Site) LocalSiderealTime(t time.Time) angle.Angle {
 	if lst < 0 {
 		lst += 2 * math.Pi
 	}
-	return angle.Rad(lst)
+	return angle.Rad(lst), nil
 }

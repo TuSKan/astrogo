@@ -78,7 +78,9 @@ func (f DeepSpace) Position(t time.Time) (*coord.ICRS, error) {
 		), nil
 	}
 
-	return f.Object.Coord, nil
+	// No kinematics — return a defensive copy so callers cannot mutate
+	// the underlying catalog entry.
+	return coord.NewICRS(f.Object.Coord.RA(), f.Object.Coord.Dec()), nil
 }
 
 // Custom is an Observable that represents an arbitrary fixed coordinate.
@@ -96,11 +98,12 @@ func (c Custom) Name() string {
 }
 
 // Position returns the stored fixed coordinate.
+// Returns a defensive copy so callers cannot mutate the original.
 func (c Custom) Position(_ time.Time) (*coord.ICRS, error) {
 	if c.Coord == nil {
 		return coord.NewICRS(angle.Rad(0), angle.Rad(0)), nil
 	}
-	return c.Coord, nil
+	return coord.NewICRS(c.Coord.RA(), c.Coord.Dec()), nil
 }
 
 // NewBody creates a new moving target using the provided ephemeris provider.

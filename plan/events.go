@@ -182,11 +182,19 @@ func (s EventSpec) Validate() error {
 		if s.Other == nil && !isPhaseEvent(s.Kind) {
 			return fmt.Errorf("%v geometry requires a secondary target", s.Kind)
 		}
+	case EventFamilyIllumination:
+		// Illumination events need only a Target; the Sun is implicit.
 	}
 	return nil
 }
 
+// isPhaseEvent returns true for EventKinds in the Illumination family.
 func isPhaseEvent(k EventKind) bool {
+	switch k {
+	case EventNewMoon, EventFirstQuarter, EventFullMoon, EventLastQuarter,
+		EventMaxIllumination, EventMinIllumination:
+		return true
+	}
 	return false
 }
 
@@ -230,6 +238,8 @@ func (s EventSolver) Find(spec EventSpec, start, end time.Time) ([]Event, error)
 		events, err = s.solveVisibility(spec, start, end)
 	case EventFamilyRelativeGeometry:
 		events, err = s.solveGeometry(spec, start, end)
+	case EventFamilyIllumination:
+		events, err = s.solveIllumination(spec, start, end)
 	default:
 		return nil, fmt.Errorf("event solver for family %v is not implemented", spec.Family)
 	}
@@ -840,4 +850,159 @@ func VisibilityEvents(start, end time.Time, target Observable, site *Site) ([]Ev
 		Threshold: site.RiseSetThreshold(),
 	}
 	return solver.Find(spec, start, end)
+}
+
+// ── Illumination Solver ──────────────────────────────────────────────────────
+
+// EventAnyPhase is a wildcard to find all four lunar phases in a single pass.
+const EventAnyPhase EventKind = -2
+
+// solveIllumination finds lunar phase events (New Moon, First Quarter, Full Moon,
+// Last Quarter) by tracking the geocentric elongation angle between the target
+// (Moon) and the Sun using proper ecliptic longitude differences.
+//
+// This method delegates to moonElongation (phases.go) for rigorous ecliptic
+// coordinate computation and wraps the results as Event types for the
+// unified EventSolver framework.
+func (s EventSolver) solveIllumination(spec EventSpec, start, end time.Time) ([]Event, error) {
+	eph := ephemeris.Default()
+
+	type phaseTarget struct {
+		kind     EventKind
+		elongDeg float64
+	}
+
+	var targets []phaseTarget
+	switch spec.Kind {
+	case EventNewMoon:
+		targets = []phaseTarget{{EventNewMoon, 0}}
+	case EventFirstQuarter:
+		targets = []phaseTarget{{EventFirstQuarter, 90}}
+	case EventFullMoon:
+		targets = []phaseTarget{{EventFullMoon, 180}}
+	case EventLastQuarter:
+		targets = []phaseTarget{{EventLastQuarter, 270}}
+	default:
+		targets = []phaseTarget{
+			{EventNewMoon, 0},
+			{EventFirstQuarter, 90},
+			{EventFullMoon, 180},
+			{EventLastQuarter, 270},
+		}
+	}
+
+	n := int(end.Sub(start)/s.Step) + 2
+	times := make([]time.Time, 0, n)
+	elongs := make([]float64, 0, n)
+
+	for t := start; !t.After(end); t = t.Add(s.Step) {
+		times = append(times, t)
+		e, err := moonElongation(t, eph)
+		if err != nil {
+			return nil, err
+		}
+		elongs = append(elongs, e)
+	}
+	if last := times[len(times)-1]; last.Before(end) {
+		times = append(times, end)
+		e, err := moonElongation(end, eph)
+		if err != nil {
+			return nil, err
+		}
+		elongs = append(elongs, e)
+	}
+
+	var events []Event
+
+	for _, pt := range targets {
+		targetDeg := pt.elongDeg
+
+		signedDist := func(elong float64) float64 {
+			d := elong - targetDeg
+			for d > 180 {
+				d -= 360
+			}
+			for d <= -180 {
+				d += 360
+			}
+			return d
+		}
+
+		evalDist := func(t time.Time) (float64, error) {
+			e, err := moonElongation(t, eph)
+			if err != nil {
+				return 0, err
+			}
+			return signedDist(e), nil
+		}
+
+		for i := 0; i < len(times)-1; i++ {
+			d1 := signedDist(elongs[i])
+			d2 := signedDist(elongs[i+1])
+
+			if (d1 <= 0 && d2 > 0) || (d1 > 0 && d2 <= 0) {
+				if math.Abs(d1-d2) > 180 {
+					continue
+				}
+
+				resTime, _, err := s.refineRoot(evalDist, times[i], times[i+1], d1)
+				if err != nil {
+					continue
+				}
+
+				e, _ := moonElongation(resTime, eph)
+				illumination := (1.0 - math.Cos(e*math.Pi/180.0)) / 2.0
+
+				events = append(events, Event{
+					Kind:  pt.kind,
+					Time:  resTime,
+					Value: illumination,
+				})
+			}
+		}
+	}
+
+	return events, nil
+}
+
+// NextNewMoon returns the first New Moon event after the given start time.
+// Searches up to 35 days ahead (slightly more than one synodic month).
+func NextNewMoon(start time.Time, eph ephemeris.Provider) (*Event, error) {
+	end := start.AddDays(35)
+	moon := NewBody(ephemeris.Moon, eph)
+	solver := NewEventSolver(6*time.Hour, 1*time.Second)
+	spec := EventSpec{
+		Family: EventFamilyIllumination,
+		Kind:   EventNewMoon,
+		Target: moon,
+	}
+	events, err := solver.Find(spec, start, end)
+	if err != nil {
+		return nil, err
+	}
+	if len(events) == 0 {
+		return nil, nil
+	}
+	return &events[0], nil
+}
+
+// NextFullMoon returns the first Full Moon event after the given start time.
+// Searches up to 35 days ahead (slightly more than one synodic month).
+func NextFullMoon(start time.Time, eph ephemeris.Provider) (*Event, error) {
+	end := start.AddDays(35)
+	moon := NewBody(ephemeris.Moon, eph)
+	solver := NewEventSolver(6*time.Hour, 1*time.Second)
+	spec := EventSpec{
+		Family: EventFamilyIllumination,
+		Kind:   EventFullMoon,
+		Target: moon,
+	}
+	events, err := solver.Find(spec, start, end)
+	if err != nil {
+		return nil, err
+	}
+	if len(events) == 0 {
+		return nil, nil
+	}
+	return &events[0], nil
 }
