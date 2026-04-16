@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"math"
+	"strings"
 	"sync"
 	"time"
 
@@ -18,6 +19,41 @@ type Duration = time.Duration
 type Location = time.Location
 
 type Month = time.Month
+
+// Weekday represents a day of the week (0=Sunday, 6=Saturday).
+type Weekday int
+
+const (
+	Sunday    Weekday = 0
+	Monday    Weekday = 1
+	Tuesday   Weekday = 2
+	Wednesday Weekday = 3
+	Thursday  Weekday = 4
+	Friday    Weekday = 5
+	Saturday  Weekday = 6
+)
+
+// String returns the English name of the day ("Sunday", "Monday", ...).
+func (w Weekday) String() string {
+	switch w {
+	case Sunday:
+		return "Sunday"
+	case Monday:
+		return "Monday"
+	case Tuesday:
+		return "Tuesday"
+	case Wednesday:
+		return "Wednesday"
+	case Thursday:
+		return "Thursday"
+	case Friday:
+		return "Friday"
+	case Saturday:
+		return "Saturday"
+	default:
+		return fmt.Sprintf("Weekday(%d)", w)
+	}
+}
 
 const (
 	Second = time.Second
@@ -45,7 +81,10 @@ var LoadLocation = time.LoadLocation
 
 var LocationUTC = time.UTC
 
-var RFC3339 = time.RFC3339
+var (
+	RFC1123 = time.RFC1123
+	RFC3339 = time.RFC3339
+)
 
 // Scale represents an astronomical time scale.
 type Scale uint8
@@ -174,14 +213,21 @@ func (t Time) ToGo() time.Time {
 
 	totalSec := days1*86400.0 + days2*86400.0
 
-	// Round to the nearest nanosecond to avoid floating-point drift
-	nsecTotal := int64(math.Round(totalSec * 1e9))
-	sec := nsecTotal / 1e9
-	nsec := nsecTotal % 1e9
-	if nsec < 0 {
-		sec -= 1
+	// Split into integer seconds and fractional nanoseconds to avoid
+	// int64 overflow when converting very large negative totalSec to
+	// nanoseconds (e.g., year 33 AD → totalSec ≈ -6.1e10, which would
+	// overflow int64 if multiplied by 1e9).
+	sec := int64(math.Floor(totalSec))
+	frac := totalSec - float64(sec)
+	nsec := int64(math.Round(frac * 1e9))
+	if nsec >= 1e9 {
+		sec++
+		nsec -= 1e9
+	} else if nsec < 0 {
+		sec--
 		nsec += 1e9
 	}
+
 	gt := time.Unix(sec, nsec).UTC()
 	if t.loc != nil {
 		return gt.In(t.loc)
@@ -193,7 +239,150 @@ func (t Time) ToGo() time.Time {
 func (t Time) GoTime() time.Time { return t.ToGo() }
 
 // Year returns the Gregorian calendar year of t.
-func (t Time) Year() int { return t.ToGo().Year() }
+// Uses SOFA's JD→calendar conversion for proper proleptic calendar support.
+func (t Time) Year() int {
+	y, _, _, _, _ := gofaext.JdToDate(t.jd1, t.jd2)
+	return y
+}
+
+// Month returns the month of t (1=January, ..., 12=December).
+func (t Time) Month() Month {
+	_, m, _, _, _ := gofaext.JdToDate(t.jd1, t.jd2)
+	return Month(m)
+}
+
+// Day returns the day of the month of t.
+func (t Time) Day() int {
+	_, _, d, _, _ := gofaext.JdToDate(t.jd1, t.jd2)
+	return d
+}
+
+// Calendar returns the full calendar decomposition of t:
+// year, month, day, and the fractional part of the day [0, 1).
+// This uses SOFA's JD→calendar conversion and correctly handles
+// the proleptic Gregorian calendar (negative/zero years).
+func (t Time) Calendar() (year, month, day int, dayFrac float64) {
+	y, m, d, f, _ := gofaext.JdToDate(t.jd1, t.jd2)
+	return y, m, d, f
+}
+
+// JulianCalendar returns the Julian calendar decomposition of t:
+// year, month, day, and the fractional part of the day [0, 1).
+// This is the correct calendar system for all dates before October 15, 1582.
+// Historical and biblical references (Josephus, Passover dates, etc.)
+// use the Julian calendar exclusively.
+func (t Time) JulianCalendar() (year, month, day int, dayFrac float64) {
+	jd := t.jd1 + t.jd2
+
+	// Integer JD at noon
+	z := int(math.Floor(jd + 0.5))
+	// Fractional day from noon
+	f := (jd + 0.5) - float64(z)
+
+	// Julian calendar: no Gregorian correction (b=0)
+	c := z + 32082
+	d := (4*c + 3) / 1461
+	e := c - (1461*d)/4
+	m := (5*e + 2) / 153
+
+	day = e - (153*m+2)/5 + 1
+	month = m + 3 - 12*(m/10)
+	year = d - 4800 + m/10
+
+	return year, month, day, f
+}
+
+// FormatJulian returns a string representation of the time in the given
+// layout using the Julian calendar. This should be used for all dates
+// before October 15, 1582 (e.g., biblical and ancient historical dates).
+func (t Time) FormatJulian(format string) string {
+	y, m, d, frac := t.JulianCalendar()
+
+	totalSec := frac * 86400.0
+	hour := int(totalSec / 3600)
+	totalSec -= float64(hour) * 3600
+	min := int(totalSec / 60)
+	sec := int(totalSec - float64(min)*60)
+
+	yearStr := fmt.Sprintf("%04d", y)
+	if y < 0 {
+		yearStr = fmt.Sprintf("%+05d", y)
+	}
+
+	r := strings.NewReplacer(
+		"2006", yearStr,
+		"Jan", time.Month(m).String()[:3],
+		"01", fmt.Sprintf("%02d", m),
+		"02", fmt.Sprintf("%02d", d),
+		"15", fmt.Sprintf("%02d", hour),
+		"04", fmt.Sprintf("%02d", min),
+		"05", fmt.Sprintf("%02d", sec),
+		"MST", t.scale.String(),
+	)
+	return r.Replace(format)
+}
+
+// Weekday returns the day of the week for time t.
+// 0=Sunday, 1=Monday, ..., 6=Saturday.
+// This is computed directly from the Julian Date and works for all epochs.
+func (t Time) Weekday() Weekday {
+	// The Julian Date at noon on Monday 1 Jan 4713 BC is 0.0.
+	// JD 0.0 was a Monday. So JD mod 7 gives:
+	//   0 = Monday, 1 = Tuesday, ..., 6 = Sunday
+	// We want 0=Sunday, so we shift by +1.
+	jd := t.JD()
+	// Floor to get the nearest noon JD (integer), then shift
+	// The day of the week = (floor(JD + 0.5) + 1) mod 7
+	d := int(math.Floor(jd+0.5)) + 1
+	d = d % 7
+	if d < 0 {
+		d += 7
+	}
+	return Weekday(d)
+}
+
+// AddDate returns the time corresponding to adding the given number of
+// years, months, and days to t. It operates on the calendar date directly
+// using SOFA conversions, supporting the full proleptic Gregorian calendar.
+func (t Time) AddDate(years, months, days int) Time {
+	if years == 0 && months == 0 {
+		// Pure day offset — just add via JD arithmetic (most efficient,
+		// and avoids Dtf2d day-overflow issues).
+		return t.AddDays(float64(days))
+	}
+
+	y, m, _, frac, _ := gofaext.JdToDate(t.jd1, t.jd2)
+	y += years
+	m += months
+
+	// Normalize month overflow
+	for m > 12 {
+		y++
+		m -= 12
+	}
+	for m < 1 {
+		y--
+		m += 12
+	}
+
+	// Keep original day-of-month from the source date.
+	_, _, origDay, _, _ := gofaext.JdToDate(t.jd1, t.jd2)
+
+	// Convert hours from fractional day
+	totalSec := frac * 86400.0
+	hour := int(totalSec / 3600)
+	totalSec -= float64(hour) * 3600
+	min := int(totalSec / 60)
+	sec := totalSec - float64(min)*60
+
+	// Use day 1 of the target month to get a base JD, then add
+	// the original day-of-month - 1 + extra days via JD arithmetic.
+	jd1, jd2, _ := gofaext.Dtf2d(t.scale.String(), y, m, 1, hour, min, sec)
+	result := FromJDParts(jd1, jd2, t.scale)
+	result = result.AddDays(float64(origDay - 1 + days))
+	result.loc = t.loc
+	return result
+}
 
 // Add returns a new Time with the duration added.
 // It uses a simple conversion: 1 day = 86400.0 seconds.
@@ -211,9 +400,25 @@ func (t Time) AddDays(d float64) Time {
 }
 
 // Date creates a Time from calendar components and a timezone.
+// Unlike Go's time.Date, this function correctly handles the full
+// proleptic Gregorian calendar including negative (astronomical) years.
+// Year 0 = 1 BC, year -1 = 2 BC, etc.
 // The timezone location is preserved for display purposes.
 func Date(year int, month time.Month, day int, hour int, min int, sec int, nsec int, loc *time.Location) Time {
-	return FromGo(time.Date(year, month, day, hour, min, sec, nsec, loc))
+	// For years within Go's time.Time range, delegate to FromGo which
+	// handles timezone offsets exactly.
+	if year >= 1 && year <= 9999 {
+		return FromGo(time.Date(year, month, day, hour, min, sec, nsec, loc))
+	}
+
+	// For deep historical years (negative/zero), use SOFA's Dtf2d.
+	// Timezone offsets are irrelevant for ancient astronomical dates
+	// (they're always specified in UTC or local solar time).
+	fracSec := float64(sec) + float64(nsec)/1e9
+	jd1, jd2, _ := gofaext.Dtf2d("UTC", year, int(month), day, hour, min, fracSec)
+	result := FromJDParts(jd1, jd2, UTC)
+	result.loc = loc
+	return result
 }
 
 // Location returns the display timezone associated with this Time.
@@ -234,11 +439,37 @@ func (t Time) In(loc *time.Location) Time {
 }
 
 // Format returns a string representation of the time in the given layout.
-// The display location is applied before formatting.
+// For dates within Go's time.Time range (~year 0 to 9999), this delegates
+// to the standard library. For dates outside that range (e.g., negative years),
+// it formats manually using the SOFA-derived calendar components.
 func (t Time) Format(format string) string {
-	return t.ToGo().Format(format)
-}
+	y, m, d, frac, _ := gofaext.JdToDate(t.jd1, t.jd2)
+	// If year is within Go's time.Time range, delegate to standard formatting
+	if y >= 0 && y <= 9999 {
+		return t.ToGo().Format(format)
+	}
+	// Manual formatting for out-of-range dates.
+	// Uses strings.NewReplacer for single-pass replacement to avoid
+	// infinite loops when replaced values contain other format tokens
+	// (e.g., year "-0018" contains "01" which would match month token).
+	totalSec := frac * 86400.0
+	hour := int(totalSec / 3600)
+	totalSec -= float64(hour) * 3600
+	min := int(totalSec / 60)
+	sec := int(totalSec - float64(min)*60)
 
+	r := strings.NewReplacer(
+		"2006", fmt.Sprintf("%+05d", y),
+		"Jan", time.Month(m).String()[:3],
+		"01", fmt.Sprintf("%02d", m),
+		"02", fmt.Sprintf("%02d", d),
+		"15", fmt.Sprintf("%02d", hour),
+		"04", fmt.Sprintf("%02d", min),
+		"05", fmt.Sprintf("%02d", sec),
+		"MST", t.scale.String(),
+	)
+	return r.Replace(format)
+}
 // Before reports whether t is chronologically before other.
 // If t and other are in different time scales, both are automatically
 // converted to TT for comparison. Same-scale comparisons have zero overhead.

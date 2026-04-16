@@ -57,8 +57,12 @@ const (
 
 	// -- FamilyRelativeGeometry --
 
-	// EventConjunction represents two targets having the same apparent longitude or right ascension.
+	// EventConjunction represents two targets having the same right ascension (ΔRA = 0).
 	EventConjunction
+	// EventConjunctionEcliptic represents two targets having the same ecliptic longitude (Δλ = 0).
+	EventConjunctionEcliptic
+	// EventAppulse represents the moment of minimum angular separation between two targets.
+	EventAppulse
 	// EventOpposition represents two targets having apparent longitudes or right ascensions 180 degrees apart.
 	EventOpposition
 	// EventGreatestElongationEast represents the maximum angular separation of an inner planet east of the Sun.
@@ -104,6 +108,10 @@ func (k EventKind) String() string {
 		return "Transit"
 	case EventConjunction:
 		return "Conjunction"
+	case EventConjunctionEcliptic:
+		return "Conjunction (Ecl. Lon.)"
+	case EventAppulse:
+		return "Appulse"
 	case EventOpposition:
 		return "Opposition"
 	case EventGreatestElongationEast:
@@ -448,6 +456,22 @@ func (s EventSolver) solveGeometry(spec EventSpec, start, end time.Time) ([]Even
 				}
 			}
 			return diff, nil
+		case EventConjunctionEcliptic:
+			// Difference in Ecliptic Longitude
+			ecl1 := coord.ICRSToEcliptic(pos1, t)
+			ecl2 := coord.ICRSToEcliptic(pos2, t)
+			diff := ecl1.Lon().Degrees() - ecl2.Lon().Degrees()
+			for diff > 180 {
+				diff -= 360
+			}
+			for diff <= -180 {
+				diff += 360
+			}
+			return diff, nil
+		case EventAppulse:
+			// Angular separation (for minimum-finding)
+			sep := coord.Separation(pos1, pos2).Degrees()
+			return sep, nil
 		case EventGreatestElongationEast, EventGreatestElongationWest:
 			sep := coord.Separation(pos1, pos2).Degrees()
 			return sep, nil
@@ -481,7 +505,7 @@ func (s EventSolver) solveGeometry(spec EventSpec, start, end time.Time) ([]Even
 		t1, t2 := times[i], times[i+1]
 		v1, v2 := vals[i], vals[i+1]
 
-		if spec.Kind == EventConjunction || spec.Kind == EventOpposition {
+		if spec.Kind == EventConjunction || spec.Kind == EventConjunctionEcliptic || spec.Kind == EventOpposition {
 			// Find root (crosses 0)
 			if (v1 <= 0 && v2 > 0) || (v1 > 0 && v2 <= 0) {
 				// Handle 180/-180 wrap-around false crossings if they jump significantly > 180
@@ -528,6 +552,22 @@ func (s EventSolver) solveGeometry(spec EventSpec, start, end time.Time) ([]Even
 						Value: val, // peak separation in degrees
 					})
 				}
+			}
+		}
+
+		if spec.Kind == EventAppulse && i > 0 {
+			// Find local minimum of angular separation
+			v0 := vals[i-1]
+			if v1 < v0 && v1 <= v2 {
+				resTime, val, err := s.refineExtremum(evalVal, times[i-1], times[i+1], false)
+				if err != nil {
+					return nil, err
+				}
+				events = append(events, Event{
+					Kind:  EventAppulse,
+					Time:  resTime,
+					Value: val, // minimum separation in degrees
+				})
 			}
 		}
 	}
@@ -757,12 +797,38 @@ func getTwilightPair(start, end time.Time, site *Site, eph ephemeris.Provider, k
 
 // ── Geometry Helpers ──────────────────────────────────────────────────────────
 
-// Conjunctions returns all conjunction events between target and other in the given interval.
+// Conjunctions returns all conjunction events (same RA, ΔRA = 0) between target and other.
 func Conjunctions(start, end time.Time, target, other Observable) ([]Event, error) {
 	solver := NewEventSolver(6*time.Hour, 1*time.Second)
 	spec := EventSpec{
 		Family: EventFamilyRelativeGeometry,
 		Kind:   EventConjunction,
+		Target: target,
+		Other:  other,
+	}
+	return solver.Find(spec, start, end)
+}
+
+// ConjunctionsEcliptic returns all ecliptic longitude conjunction events (Δλ = 0).
+// This is the classical definition used in most historical astronomical literature.
+func ConjunctionsEcliptic(start, end time.Time, target, other Observable) ([]Event, error) {
+	solver := NewEventSolver(6*time.Hour, 1*time.Second)
+	spec := EventSpec{
+		Family: EventFamilyRelativeGeometry,
+		Kind:   EventConjunctionEcliptic,
+		Target: target,
+		Other:  other,
+	}
+	return solver.Find(spec, start, end)
+}
+
+// Appulses returns all moments of minimum angular separation between target and other.
+// The returned Event.Value contains the minimum separation in degrees.
+func Appulses(start, end time.Time, target, other Observable) ([]Event, error) {
+	solver := NewEventSolver(6*time.Hour, 1*time.Second)
+	spec := EventSpec{
+		Family: EventFamilyRelativeGeometry,
+		Kind:   EventAppulse,
 		Target: target,
 		Other:  other,
 	}
