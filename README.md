@@ -204,7 +204,7 @@ func main() {
 	// ── Observability + Scoring ──
 	constraints := []plan.Constraint{
 		plan.Altitude{Threshold: angle.Deg(30)},
-		plan.AirmassConstraint{MaxAirmass: 2.0},
+		plan.Airmass{Threshold: 2.0},
 	}
 
 	fmt.Println("\n── Observability ──────────────────────")
@@ -440,6 +440,55 @@ These are wrapped internally to ensure:
 
 > [!IMPORTANT]
 > Expect API changes until v1.0.
+
+---
+
+## Known Limitations & Scope
+
+> [!WARNING]
+> These are documented trade-offs, not bugs. They represent deliberate scope boundaries for v0.1.0.
+
+### Context Caching (Performance)
+
+The SOFA Apco13 matrix computation in `coord.NewContext` costs ~91 µs. In v0.1.0, the scheduling hot path creates **one Context per time step** (shared across all constraints via the `ConstraintCtx` interface), rather than one per constraint per step.
+
+Built-in constraints (`Altitude`, `Airmass`) implement `ConstraintCtx` automatically. Custom constraints that implement this interface will also benefit from the cached Context in the scheduler.
+
+**For batch transforms outside the scheduler**, create one `Context` per epoch and reuse it:
+```go
+ctx := coord.NewContext(epoch, site.Location(), site.Atmosphere())
+for _, star := range targets {
+    altaz, _ := ctx.ICRSToAltAz(star.ICRS) // ~325 ns, not ~91 µs
+}
+```
+
+### Scheduler Optimality
+
+`SwapOptimizedStrategy` is a **local search heuristic**, not a global optimizer. It improves on greedy/priority strategies via adjacent swaps and gap insertion, with monotonic score guarantees — but it does not find the globally optimal schedule.
+
+This is the same trade-off made by production observatory schedulers (ESO/VLT SCHED, STARS, Gemini) where tractability and predictability are preferred over the NP-hard combinatorial optimum.
+
+Users from operations research backgrounds who need provable global optimality (integer linear programming, branch-and-bound, etc.) should implement the `Strategy` interface directly.
+
+### IERS Earth Orientation Parameters
+
+Sub-arcsecond topocentric accuracy and sub-second UT1 timing require IERS EOP data ([finals2000A](https://datacenter.iers.org/data/latestVersion/finals2000A.data.csv)). Without it:
+
+| Metric | With EOP | Without EOP |
+|--------|----------|-------------|
+| UT1 accuracy | <50 ms | ~0.9 s (UT1 ≈ UTC fallback) |
+| Topocentric alt/az | <0.01″ | ~1″ |
+| Rise/set timing | <1 s | <2 s |
+
+The library logs a one-time warning when EOP data is unavailable. **Users who redirect or suppress logs will not see this warning.** The IERS data is bundled via `go:generate`:
+
+### TDB Precision
+
+The Fairhead & Bretagnon (1990) single-term TDB−TT correction has a ±3 µs residual. This is sufficient for observatory planning and even millisecond-precision pulsar timing. It is **not** sufficient for:
+- Deep-space probe telemetry (needs full JPL DE-based TDB)
+- Sub-microsecond timing array work
+
+Full ephemeris-based TDB would add ~500× overhead per call. This trade-off is documented in `time/time.go`.
 
 ---
 

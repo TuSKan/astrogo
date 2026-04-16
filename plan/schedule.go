@@ -145,6 +145,16 @@ func (m *BasicTransitionModel) Overhead(ctx TransitionContext) (time.Duration, e
 }
 
 // Strategy provides an algorithm to map a list of Blocks to a Schedule.
+//
+// This is the primary extension point for custom scheduling algorithms.
+// The built-in strategies (GreedyStrategy, PriorityStrategy, SwapOptimizedStrategy)
+// use local heuristics. Users requiring global optimization (e.g., integer
+// linear programming, simulated annealing, genetic algorithms) should implement
+// this interface directly.
+//
+// Performance note: each constraint evaluation creates a new coord.Context
+// (~91 µs). For programs processing >1000 targets, consider pre-caching
+// Context objects and passing them through a custom Strategy implementation.
 type Strategy interface {
 	// Schedule produces a Schedule from the provided Blocks within the given Window.
 	// The implementation should use Planner for constraint evaluation and TransitionModel
@@ -183,11 +193,31 @@ func (s *Scheduler) BuildSchedule(window Window, blocks []*Block) (*Schedule, er
 const defaultStep = 1 * time.Minute
 
 // checkConstraintsInterval verifies that all constraints pass continuously over a time range.
+//
+// Performance: creates a single coord.Context per time step and shares it
+// across all constraints that implement ConstraintCtx, avoiding redundant
+// SOFA matrix computations (~91 µs each).
 func checkConstraintsInterval(target Observable, start, end time.Time, step time.Duration, site *Site, constraints ...Constraint) bool {
+	check := func(t time.Time) bool {
+		ctx := coord.NewContext(t, site.Location(), site.Atmosphere())
+		for _, c := range constraints {
+			var res Result
+			var err error
+			if cc, ok := c.(ConstraintCtx); ok {
+				res, err = cc.CheckCtx(target, t, site, ctx)
+			} else {
+				res, err = c.Check(target, t, site)
+			}
+			if err != nil || !res.Pass {
+				return false
+			}
+		}
+		return true
+	}
+
 	t := start
 	for t.Before(end) || t.Equal(end) {
-		eval, err := IsObservable(target, t, site, constraints...)
-		if err != nil || !eval.Observable {
+		if !check(t) {
 			return false
 		}
 		t = t.Add(step)
@@ -195,8 +225,7 @@ func checkConstraintsInterval(target Observable, start, end time.Time, step time
 
 	// Always check the exact end time as well.
 	if !start.Equal(end) {
-		eval, err := IsObservable(target, end, site, constraints...)
-		if err != nil || !eval.Observable {
+		if !check(end) {
 			return false
 		}
 	}

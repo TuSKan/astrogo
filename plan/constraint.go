@@ -43,13 +43,32 @@ type Constraint interface {
 	Check(obj Observable, t time.Time, site *Site) (Result, error)
 }
 
+// ConstraintCtx is an optional extension of Constraint that accepts a
+// pre-built coord.Context. When evaluating multiple constraints at the
+// same (time, site), sharing a single Context avoids redundant SOFA
+// matrix computations (~91 µs per NewContext call).
+//
+// Constraints that implement this interface will receive cached Contexts
+// in the scheduling hot path. Those that don't will fall back to Constraint.Check.
+type ConstraintCtx interface {
+	Constraint
+	// CheckCtx is like Check but uses a pre-built coord.Context.
+	CheckCtx(obj Observable, t time.Time, site *Site, ctx *coord.Context) (Result, error)
+}
+
 // Altitude passes if the target's altitude is >= a threshold.
 type Altitude struct {
 	Threshold angle.Angle
 }
 
 func (c Altitude) Check(obj Observable, t time.Time, site *Site) (Result, error) {
-	aa, err := skyAltAzOf(obj, t, site)
+	ctx := coord.NewContext(t, site.Location(), site.Atmosphere())
+	return c.CheckCtx(obj, t, site, ctx)
+}
+
+// CheckCtx evaluates altitude using a pre-built coord.Context.
+func (c Altitude) CheckCtx(obj Observable, t time.Time, site *Site, ctx *coord.Context) (Result, error) {
+	aa, err := skyAltAzCtx(obj, t, ctx)
 	if err != nil {
 		return Result{}, err
 	}
@@ -76,7 +95,13 @@ type Airmass struct {
 }
 
 func (c Airmass) Check(obj Observable, t time.Time, site *Site) (Result, error) {
-	am, err := skyAirmassOf(obj, t, site)
+	ctx := coord.NewContext(t, site.Location(), site.Atmosphere())
+	return c.CheckCtx(obj, t, site, ctx)
+}
+
+// CheckCtx evaluates airmass using a pre-built coord.Context.
+func (c Airmass) CheckCtx(obj Observable, t time.Time, site *Site, ctx *coord.Context) (Result, error) {
+	am, err := skyAirmassCtx(obj, t, ctx)
 	if err != nil {
 		if err == atmosphere.ErrBelowHorizon {
 			return Result{
@@ -106,12 +131,19 @@ type Sun struct {
 }
 
 func (c Sun) Check(_ Observable, t time.Time, site *Site) (Result, error) {
+	ctx := coord.NewContext(t, site.Location(), site.Atmosphere())
+	return c.CheckCtx(nil, t, site, ctx)
+}
+
+// CheckCtx evaluates Sun altitude using a pre-built coord.Context.
+// The obj parameter is ignored — the Sun position is always computed internally.
+func (c Sun) CheckCtx(_ Observable, t time.Time, _ *Site, ctx *coord.Context) (Result, error) {
 	sun := Body{
 		ID:       ephemeris.Sun,
 		Provider: ephemeris.Default(),
 	}
 
-	aa, err := skyAltAzOf(sun, t, site)
+	aa, err := skyAltAzCtx(sun, t, ctx)
 	if err != nil {
 		return Result{}, err
 	}
@@ -172,17 +204,18 @@ func (c MoonSep) Check(obj Observable, t time.Time, _ *Site) (Result, error) {
 
 // ── Private Sky Helpers ──────────────────────────────────────────────────────
 
-func skyAltAzOf(obj Observable, t time.Time, site *Site) (*coord.AltAz, error) {
+// skyAltAzCtx computes alt/az using a pre-built coord.Context.
+func skyAltAzCtx(obj Observable, t time.Time, ctx *coord.Context) (*coord.AltAz, error) {
 	pos, err := obj.Position(t)
 	if err != nil {
 		return nil, err
 	}
-	ctx := coord.NewContext(t, site.Location(), site.Atmosphere())
 	return ctx.ICRSToAltAz(pos)
 }
 
-func skyAirmassOf(obj Observable, t time.Time, site *Site) (float64, error) {
-	aa, err := skyAltAzOf(obj, t, site)
+// skyAirmassCtx computes airmass using a pre-built coord.Context.
+func skyAirmassCtx(obj Observable, t time.Time, ctx *coord.Context) (float64, error) {
+	aa, err := skyAltAzCtx(obj, t, ctx)
 	if err != nil {
 		return 0, err
 	}
