@@ -25,6 +25,13 @@ go test -tags integration -run TestUSNO -v -timeout 300s ./plan/
 | Lunar/Solar Eclipses | `TestUSNO_Eclipses` | ✅ PASS | date-exact vs NASA |
 | Julian Date Converter | `TestUSNO_JulianDate` | ✅ PASS | exact |
 | Sidereal Time | `TestUSNO_SiderealTime` | ✅ PASS | sanity validated |
+| **Edge Cases** | | | |
+| Polar Sun (Midnight Sun / Polar Night) | `TestUSNO_PolarSun` | ✅ PASS | circumpolar agreement |
+| High Altitude (Everest 8849m) | `TestUSNO_HighAltitude` | ✅ PASS | Sun <5 min, Moon <5 min |
+| Equator (0°, 0°) | `TestUSNO_Equator` | ✅ PASS | Sun <2 min, ~12h day |
+| Polar Moon | `TestUSNO_PolarMoon` | ✅ PASS | circumpolar agreement |
+| CelNav at Extreme Locations | `TestUSNO_CelNav_EdgeCases` | ✅ PASS | Alt <1.5° |
+| Altitude Shift (Sea Level vs Summit) | `TestUSNO_AltitudeShift` | ✅ PASS | monotonic shift verified |
 
 ---
 
@@ -198,6 +205,110 @@ Implemented in `plan.LunarEclipses()` and `plan.SolarEclipses()`.
 
 ---
 
+## Edge Case Validation — Extreme Locations
+
+These tests stress the solver at geographic and atmospheric extremes where
+standard mid-latitude assumptions break down.
+
+### Test Locations
+
+| Location | Latitude | Longitude | Height | Edge Case |
+|---|---|---|---|---|
+| **North Pole** | 89.99°N | 0° | 0 m | Midnight sun / polar night |
+| **South Pole** | 89.99°S | 0° | 0 m | Reverse polar phenomena |
+| **Mount Everest** | 27.99°N | 86.93°E | 8849 m | Extreme horizon dip (~3.3°) |
+| **Equator** | 0° | 0° | 0 m | Fast-setting bodies, ~12h day |
+| **Tromsø** | 69.65°N | 18.96°E | 0 m | Near-polar boundary |
+
+### Polar Sun — Midnight Sun / Polar Night
+
+At latitudes above the Arctic/Antarctic circle, the Sun can remain continuously
+above or below the horizon for 24+ hours. USNO returns `null` for rise/set times
+when a body is circumpolar or never rises.
+
+| Date | Location | Phenomenon | USNO | astrogo | Agreement |
+|---|---|---|---|---|---|
+| 2026-06-21 | North Pole | Midnight Sun | No rise/set (null) | 0 rise, 0 set | ✅ |
+| 2026-12-21 | North Pole | Polar Night | No rise/set (null) | 0 rise, 0 set | ✅ |
+| 2026-06-21 | South Pole | Polar Night | No rise/set (null) | 0 rise, 0 set | ✅ |
+| 2026-12-21 | South Pole | Midnight Sun | No rise/set (null) | 0 rise, 0 set | ✅ |
+| 2026-06-21 | Tromsø | Midnight Sun | No rise/set (null) | 0 rise, 0 set | ✅ |
+| 2026-03-20 | Tromsø | Normal | Rise + Set | Rise + Set | ✅ <5 min |
+
+Algorithm: The visibility solver naturally handles circumpolar geometry — when
+the altitude curve never crosses the threshold, no zero-crossings are found,
+correctly yielding zero rise/set events.
+
+### High Altitude — Mount Everest (8849m)
+
+At extreme elevation the geometric horizon dip is ~3.3°, which shifts
+rise/set times significantly (sunrise earlier, sunset later).
+
+| Property | Sea Level | Everest (8849m) |
+|---|---|---|
+| Horizon Dip | 0° | ~3.3° |
+| Sun Threshold | −0.267° | ~−3.6° |
+| Moon Threshold | −0.258° | ~−3.6° |
+
+Tolerance: **5 min** for rise/set (atmospheric refraction models diverge at extreme
+elevations), **2 min** for transit.
+
+**Altitude Shift Invariant:**
+
+| Event | Sea Level | Summit (8849m) | Shift | Expected |
+|---|---|---|---|---|
+| Sunrise | later | **earlier** | ↑ | ✅ |
+| Sunset | earlier | **later** | ↑ | ✅ |
+
+The altitude shift test (`TestUSNO_AltitudeShift`) verifies the physical invariant
+that higher altitude always yields earlier sunrise and later sunset at the same
+geodetic position.
+
+### Equator (0°, 0°) — Fast-Setting Bodies
+
+At the equator, celestial bodies set perpendicular to the horizon (fastest
+possible setting speed). Day length is nearly constant year-round.
+
+| Date | Day Length | Expected | Δ from 12h |
+|---|---|---|---|
+| 2026-03-20 (Equinox) | ~12h 0min | ~12h | <15 min |
+| 2026-06-21 (Solstice) | ~12h 7min | ~12h | <15 min |
+| 2026-12-21 (Solstice) | ~12h 7min | ~12h | <15 min |
+
+Tolerance: **2 min** rise/set, **1 min** transit (standard mid-latitude values).
+
+### Polar Moon — Circumpolar Detection
+
+The Moon's declination varies ±28.5° over ~18.6 years, making circumpolar
+Moon events common at polar latitudes. Tests validate that astrogo agrees
+with USNO on whether the Moon rises/sets on a given day.
+
+| Date | Location | USNO Moon | astrogo Moon | Agreement |
+|---|---|---|---|---|
+| 2026-06-21 | North Pole | varies | matches USNO | ✅ |
+| 2026-12-21 | North Pole | varies | matches USNO | ✅ |
+| 2026-06-21 | South Pole | varies | matches USNO | ✅ |
+| 2026-12-21 | South Pole | varies | matches USNO | ✅ |
+| 2026-06-21 | Tromsø | varies | matches USNO | ✅ |
+| 2026-12-21 | Tromsø | varies | matches USNO | ✅ |
+
+When USNO reports `null` (circumpolar/below horizon), astrogo correctly
+produces zero rise/set events. When timed events exist, Δ < 5 min.
+
+### Celestial Navigation — Extreme Locations
+
+| Location | Date | Time (UTC) | Object | Property | Tolerance | Note |
+|---|---|---|---|---|---|---|
+| North Pole | 2026-06-21 | 12:00 | Sun | Altitude | 0.2° | ~23.4° above horizon |
+| South Pole | 2026-12-21 | 00:00 | Sun | Altitude | 0.2° | ~23.4° above horizon |
+| Equator | 2026-03-20 | 12:00 | Sun | Altitude | 0.2° | Near zenith (~90°) |
+| Everest | 2026-06-21 | 06:00 | Sun | Altitude | 1.5° | Altitude refraction correction |
+
+> **Note:** At latitudes >85°, azimuth is degenerate (all directions converge to
+> "south") and is excluded from tolerance checks.
+
+---
+
 ## Implementation Status
 
 | Feature | Status |
@@ -206,6 +317,7 @@ Implemented in `plan.LunarEclipses()` and `plan.SolarEclipses()`.
 | Lunar Eclipse Detection | ✅ Implemented (`plan.LunarEclipses`) |
 | Perihelion/Aphelion | ✅ Implemented (`plan.Apsides`) — **≤1 min vs USNO** |
 | Moon Illumination | ✅ Implemented (`plan.MoonIllumination`) |
+| Polar / High-Altitude / Equator | ✅ Validated — circumpolar, 8849m, fast-set |
 
 ---
 
