@@ -28,9 +28,9 @@ var ErrPropagation = errors.New("satellite: sgp4 propagation failed")
 
 // Satellite wraps a NORAD GP element set with SGP4 propagation state.
 type Satellite struct {
-	GP   norad.GP               // Source orbital elements
-	Name string                 // Satellite name
-	sat  gosatellite.Satellite  // Initialized SGP4 state
+	GP   norad.GP              // Source orbital elements
+	Name string                // Satellite name
+	sat  gosatellite.Satellite // Initialized SGP4 state
 }
 
 // NewFromGP creates a Satellite from a parsed GP element set.
@@ -252,7 +252,6 @@ func computeGMST(t time.Time) float64 {
 
 // timeToComponents extracts calendar components from an astrogo time for SGP4.
 func timeToComponents(t time.Time) (year, month, day, hour, min, sec int) {
-	year = t.Year()
 	// Extract month/day from the Julian Date.
 	jd1, jd2 := t.JDParts()
 	y, m, d, frac, _ := gofaext.JdToDate(jd1, jd2)
