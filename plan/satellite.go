@@ -9,10 +9,10 @@ import (
 
 // SatellitePass represents a single pass of a satellite over an observer.
 type SatellitePass struct {
-	Name        string       // Satellite name
-	Rise        PassEvent    // AOS (Acquisition of Signal)
-	Culmination PassEvent    // TCA (Time of Closest Approach / max elevation)
-	Set         PassEvent    // LOS (Loss of Signal)
+	Name        string        // Satellite name
+	Rise        PassEvent     // AOS (Acquisition of Signal)
+	Culmination PassEvent     // TCA (Time of Closest Approach / max elevation)
+	Set         PassEvent     // LOS (Loss of Signal)
 	Duration    time.Duration // Total pass duration
 }
 

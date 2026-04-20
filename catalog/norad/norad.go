@@ -32,8 +32,8 @@ type GP struct {
 	NoradCatID      int     `json:"NORAD_CAT_ID"`        // Up to 9 digits
 	ElementSetNo    int     `json:"ELEMENT_SET_NO"`
 	RevAtEpoch      int     `json:"REV_AT_EPOCH"`
-	BStar           float64 `json:"BSTAR"`           // Drag coefficient (1/earth radii)
-	MeanMotionDot   float64 `json:"MEAN_MOTION_DOT"` // First derivative (rev/day²)
+	BStar           float64 `json:"BSTAR"`            // Drag coefficient (1/earth radii)
+	MeanMotionDot   float64 `json:"MEAN_MOTION_DOT"`  // First derivative (rev/day²)
 	MeanMotionDDot  float64 `json:"MEAN_MOTION_DDOT"` // Second derivative (rev/day³)
 }
 
@@ -217,15 +217,15 @@ const (
 
 // Well-known CelestTrak GROUP values.
 const (
-	GroupStations  = "STATIONS"    // Space stations
-	GroupStarlink  = "STARLINK"    // SpaceX Starlink
-	GroupActive    = "ACTIVE"      // All active satellites
-	GroupWeather   = "WEATHER"     // Weather satellites
-	GroupGPSOps    = "GPS-OPS"     // GPS operational
-	GroupGalileOps = "GALILEO"     // Galileo navigation
-	GroupAmateur   = "AMATEUR"     // Amateur radio
-	GroupVisible   = "VISUAL"      // Brightest / visually interesting
-	GroupAnalyst   = "ANALYST"     // Analyst objects (incl. 6-digit catalog numbers)
+	GroupStations  = "STATIONS" // Space stations
+	GroupStarlink  = "STARLINK" // SpaceX Starlink
+	GroupActive    = "ACTIVE"   // All active satellites
+	GroupWeather   = "WEATHER"  // Weather satellites
+	GroupGPSOps    = "GPS-OPS"  // GPS operational
+	GroupGalileOps = "GALILEO"  // Galileo navigation
+	GroupAmateur   = "AMATEUR"  // Amateur radio
+	GroupVisible   = "VISUAL"   // Brightest / visually interesting
+	GroupAnalyst   = "ANALYST"  // Analyst objects (incl. 6-digit catalog numbers)
 )
 
 // Provider implements resolve.Provider for NORAD satellite catalog lookups.
@@ -281,19 +281,8 @@ func (p *Provider) Search(query string) []resolve.Target {
 func (p *Provider) Fetch(ctx context.Context, query QueryType, value string) ([]GP, error) {
 	cacheKey := fmt.Sprintf("norad:%s:%s", query, value)
 
-	if cached, ok := p.cache.Get(cacheKey); ok {
-		var gps []GP
-		cached(func(t resolve.Target, err error) bool {
-			if err == nil && t.Designation != "" {
-				// Cache stores targets; we need GP data
-				// For simplicity, return from cache only at target level.
-			}
-			return true
-		})
-		if len(gps) > 0 {
-			return gps, nil
-		}
-	}
+	// NOTE: cache stores resolve.Target values, not GP structs.
+	// GP data is always fetched fresh from the API.
 
 	api, err := url.Parse(gpAPIBase)
 	if err != nil {

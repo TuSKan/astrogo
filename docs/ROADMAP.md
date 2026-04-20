@@ -163,6 +163,7 @@ The project is **past the foundational stage**.
 - [x] Celestial navigation (AltAz) — 0.002° vs USNO API
 - [x] Julian Date conversion — exact
 - [x] Sidereal time — sanity-checked
+- [ ] Moon phases vs [AstroPixels historical catalog](http://astropixels.com/ephemeris/phasescat/phases0001.html) (1–100 CE)
 
 See [`USNO.md`](./USNO.md) and [`VALIDATION.md`](./VALIDATION.md) for full details.
 

@@ -57,6 +57,7 @@ Validation should be:
 | Sun Rise/Set/Transit | ✅ validated | USNO API | < 1.3 min | 3 locations × 3 dates, topocentric + horizon dip |
 | Moon Rise/Set/Transit | ✅ validated | USNO API | < 1.6 min | 3 locations × 3 dates, topocentric parallax via Reducer |
 | Moon Phases | ✅ validated | USNO API | ≤ 1 min | 12 consecutive phases (Jan–Mar 2026) |
+| Moon Phases (historical) | 🔲 pending | [AstroPixels](http://astropixels.com/ephemeris/phasescat/phases0001.html) | TBD | Deep-historical validation (1–100 CE) |
 | Earth's Seasons | ✅ validated | USNO API | 2–4 min | 4 events (2026), aberration-corrected ecliptic longitude |
 | Celestial Navigation (AltAz) | ✅ validated | USNO API | 0.002° | Sub-arcsecond stellar altitude accuracy |
 | Perihelion/Aphelion | ✅ validated | USNO API | ≤ 1 min | Brent's minimization on Earth-Sun distance |
@@ -69,6 +70,7 @@ Validation should be:
 
 The following areas are not yet considered scientifically complete:
 
+- Moon phases validation against [AstroPixels historical catalog](http://astropixels.com/ephemeris/phasescat/phases0001.html) (1–100 CE) for deep-epoch accuracy
 - Advanced observation scheduling optimization
 
 ---

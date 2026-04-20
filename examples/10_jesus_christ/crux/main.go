@@ -105,11 +105,11 @@ func main() {
 				// Moon must be at least 20 hours old for likely naked-eye visibility
 				if ageHours >= 20.0 && ageHours < 72.0 {
 					// This sunset marks the evening that begins Nisan 1.
-				// In the Jewish calendar, a "day" runs sunset-to-sunset.
-				// The DAYTIME of Nisan 14 (Passover sacrifice / crucifixion)
-				// is 14 civil (midnight-to-midnight) days after the sighting
-				// sunset: 13 sunsets to reach the evening of Nisan 14, then
-				// the next morning is its daytime portion.
+					// In the Jewish calendar, a "day" runs sunset-to-sunset.
+					// The DAYTIME of Nisan 14 (Passover sacrifice / crucifixion)
+					// is 14 civil (midnight-to-midnight) days after the sighting
+					// sunset: 13 sunsets to reach the evening of Nisan 14, then
+					// the next morning is its daytime portion.
 					nisan14 := sunsetUTC.AddDate(0, 0, 14)
 					weekday := nisan14.Weekday()
 

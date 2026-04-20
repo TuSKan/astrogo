@@ -92,6 +92,9 @@ func moonElongation(t time.Time, eph ephemeris.Provider) (float64, error) {
 // The algorithm samples the Moon-Sun ecliptic elongation at regular intervals
 // and uses Brent's method (via Solver) to refine the instant when the elongation
 // crosses 0°, 90°, 180°, or 270°.
+//
+// TODO: validate deep-historical accuracy against AstroPixels moon phase catalog
+// (http://astropixels.com/ephemeris/phasescat/phases0001.html) for 1–100 CE.
 func MoonPhases(start, end time.Time, eph ephemeris.Provider) ([]MoonPhaseEvent, error) {
 	const step = 6 * time.Hour // ~4 samples per day → won't miss any phase
 	solver := DefaultSolver()
