@@ -8,6 +8,7 @@ import (
 	"github.com/TuSKan/astrogo/catalog/gaia"
 	"github.com/TuSKan/astrogo/catalog/jpl"
 	"github.com/TuSKan/astrogo/catalog/mast"
+	"github.com/TuSKan/astrogo/catalog/norad"
 	"github.com/TuSKan/astrogo/catalog/openngc"
 	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/catalog/sbdb"
@@ -26,6 +27,7 @@ const (
 	SBDB
 	Gaia
 	VizieR
+	NORAD
 )
 
 var (
@@ -64,6 +66,8 @@ func NewResolver(sources ...Source) *Resolver {
 			providers = append(providers, gaia.New())
 		case VizieR:
 			providers = append(providers, vizier.New())
+		case NORAD:
+			providers = append(providers, norad.New())
 		}
 	}
 	return &Resolver{providers: providers}

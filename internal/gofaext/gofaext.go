@@ -239,3 +239,13 @@ func Nut06a(date1, date2 float64) (dpsi, deps float64) {
 func Obl06(date1, date2 float64) float64 {
 	return gofa.Obl06(date1, date2)
 }
+
+// Pnm06a returns the bias-precession-nutation matrix (IAU 2006/2000A).
+// The matrix operates as V(date) = BPN * V(GCRS), where V(date) is
+// with respect to the true equatorial triad of date.
+// The transpose maps from the true equatorial frame back to GCRS.
+func Pnm06a(date1, date2 float64) [3][3]float64 {
+	var rbpn [3][3]float64
+	gofa.Pnm06a(date1, date2, &rbpn)
+	return rbpn
+}

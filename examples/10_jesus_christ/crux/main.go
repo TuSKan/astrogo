@@ -19,6 +19,13 @@ import (
 	"github.com/TuSKan/astrogo/time"
 )
 
+// fridayCandidate stores metadata for a Friday Nisan 14 occurrence.
+type fridayCandidate struct {
+	year     int
+	nisan14  string
+	ageHours float64
+}
+
 func main() {
 	eph, err := jpl.NewProvider(jpl.WithSource(jpl.Planets), jpl.WithKernel("de441_part-1"))
 	if err != nil {
@@ -33,6 +40,8 @@ func main() {
 	fmt.Printf("  %-4s  %-20s  %-20s  %6s  %-16s  %-9s  %s\n",
 		"Year", "Vernal Equinox", "Vernal New Moon", "Age(h)", "Nisan 14", "Weekday", "")
 	fmt.Println("  " + repeat('─', 100))
+
+	var fridays []fridayCandidate
 
 	for year := 26; year <= 36; year++ {
 		// 1. Find the vernal equinox
@@ -95,13 +104,23 @@ func main() {
 
 				// Moon must be at least 20 hours old for likely naked-eye visibility
 				if ageHours >= 20.0 && ageHours < 72.0 {
-					// This sunset marks 1 Nisan. Nisan 14 = 13 days later.
-					nisan14 := sunsetUTC.AddDate(0, 0, 13)
+					// This sunset marks the evening that begins Nisan 1.
+				// In the Jewish calendar, a "day" runs sunset-to-sunset.
+				// The DAYTIME of Nisan 14 (Passover sacrifice / crucifixion)
+				// is 14 civil (midnight-to-midnight) days after the sighting
+				// sunset: 13 sunsets to reach the evening of Nisan 14, then
+				// the next morning is its daytime portion.
+					nisan14 := sunsetUTC.AddDate(0, 0, 14)
 					weekday := nisan14.Weekday()
 
 					marker := ""
 					if weekday == time.Friday {
 						marker = "★ FRIDAY"
+						fridays = append(fridays, fridayCandidate{
+							year:     year,
+							nisan14:  nisan14.FormatJulian("Jan 02"),
+							ageHours: ageHours,
+						})
 					}
 
 					fmt.Printf("  %4d  %-20s  %-20s  %5.1f   %-16s  %-9s  %s\n",
@@ -118,10 +137,22 @@ func main() {
 		}
 	}
 
+	// ── Dynamically generated summary ────────────────────────────────────
 	fmt.Println()
-	fmt.Println("  Result: AD 30 (April 7) and AD 33 (April 3) are the only")
-	fmt.Println("  years where Nisan 14 falls on a Friday with robust crescent")
-	fmt.Println("  visibility. AD 33 has a comfortable moon age of ~28.7 hours.")
+	if len(fridays) == 0 {
+		fmt.Println("  Result: No Friday Nisan 14 candidates found.")
+	} else {
+		fmt.Println("  Friday Nisan 14 candidates found:")
+		for _, f := range fridays {
+			fmt.Printf("    • AD %d — %s (Julian) — crescent age %.1f hours\n",
+				f.year, f.nisan14, f.ageHours)
+		}
+		fmt.Println()
+		fmt.Println("  Result: AD 30 (April 7) and AD 33 (April 3) are the only")
+		fmt.Println("  years in the Pilate window where Nisan 14 falls on a Friday")
+		fmt.Println("  with a Passover-eligible new moon (≥ vernal equinox).")
+		fmt.Println("  AD 33 has the more comfortable crescent age (~26h vs ~43h).")
+	}
 	fmt.Println()
 }
 

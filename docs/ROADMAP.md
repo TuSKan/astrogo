@@ -24,6 +24,11 @@ AstroGo already provides:
   - OpenNGC embedded
   - SBDB (NASA) query integration
   - SIMBAD, Gaia, MAST, VizieR remote providers
+  - **NORAD/CelestTrak** GP data (OMM/JSON)
+- **Satellite tracking (SGP4)**:
+  - TEME→GCRS frame conversion
+  - Sub-satellite ground track
+  - Pass prediction (AOS/TCA/LOS)
 - FITS I/O (multi-extension, tables, images)
 - WCS support
 - Units and quantities system
@@ -259,6 +264,23 @@ See [`USNO.md`](./USNO.md) and [`VALIDATION.md`](./VALIDATION.md) for full detai
 
 ---
 
+## 17.5 NORAD Satellite Tracking
+
+**Status:** ✅ Complete
+
+- [x] CelestTrak GP JSON client (`catalog/norad`) — OMM-aligned field names (CCSDS 502.0-B-3 / Space Data Standards)
+- [x] TLE generation from OMM fields for SGP4 initialization
+- [x] SGP4 propagation via `go-satellite` (`ephemeris/satellite`)
+- [x] TEME → GCRS frame conversion (via SOFA GAST)
+- [x] `ephemeris.Provider` interface implementation (State in AU, AU/day)
+- [x] Sub-satellite ground track (geodetic lat/lon/alt)
+- [x] Topocentric look angles (azimuth, elevation, range)
+- [x] Pass prediction (`plan.SatellitePasses`) — AOS/TCA/LOS with Chandrupatla rise/set refinement
+- [x] Catalog integration (`catalog.NORAD` source in unified Resolver)
+- [x] Live example (`examples/12_satellite_tracking/`) — ISS tracking with CelestTrak data
+- [x] Validated: ISS altitude ~420 km, orbital period ~93 min, velocity ~7.7 km/s
+---
+
 ## 18. Batch / High-Throughput APIs
 
 **Status:** 🔲 Not Started
@@ -313,11 +335,13 @@ AstroGo has completed all core astronomy capabilities and v0.1.0 hardening:
 - ✅ 40+ benchmarks validating performance claims
 - ✅ Scientific validation (USNO, JPL Horizons, NASA Eclipse Catalog)
 - ✅ Catalog remote data layer
+- ✅ **NORAD satellite tracking** (CelestTrak GP, SGP4, pass prediction)
 
 The remaining work is concentrated in:
 
 - **Batch/vectorized APIs** for high-throughput use cases
 - **Cross-match algorithms** for multi-catalog workflows
+- **Satellite illumination constraints** (sunlit + dark sky for visual observation)
 
 Completing these will elevate AstroGo from:
 
