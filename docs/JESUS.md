@@ -43,6 +43,7 @@ very different conclusions — because, as we'll show, everything hinges on gett
 birth year right.
 
 ---
+<div style="page-break-after: always"></div>
 
 ## Table of Contents
 
@@ -59,6 +60,7 @@ birth year right.
 - [References](#references)
 
 ---
+<div style="page-break-after: always"></div>
 
 ## Part I: The Problem with Calendars
 
@@ -136,6 +138,7 @@ fmt.Printf("JD(TT) = %.6f\n", tt.JD())
 ```
 
 ---
+<div style="page-break-after: always"></div>
 
 ## Part II: When Did Herod Die?
 
@@ -270,6 +273,7 @@ for _, e := range eclipses {
 This single re-dating changes everything downstream.
 
 ---
+<div style="page-break-after: always"></div>
 
 ## Part III: The Star of Bethlehem
 
@@ -368,6 +372,7 @@ The 3–2 BC chronology is the stronger candidate, both for its visual drama and
 consistency with the revised Herodian chronology.
 
 ---
+<div style="page-break-after: always"></div>
 
 ## Part IV: Anchoring the Ministry
 
@@ -420,6 +425,7 @@ If you adopt a shorter ministry (~one year), you get AD 29 — but this creates 
 problems with the lunar calendar, as we'll see below.
 
 ---
+<div style="page-break-after: always"></div>
 
 ## Part V: Finding the Friday
 
@@ -517,6 +523,7 @@ which evening the crescent was spotted. Nisan 14 lands squarely on Friday.
 And AD 33 brings something that AD 30 doesn't: a lunar eclipse.
 
 ---
+<div style="page-break-after: always"></div>
 
 ## Part VI: The Blood Moon
 
@@ -612,6 +619,7 @@ In the entire Pilate window (AD 26–36), **no other Passover features a lunar e
 from Jerusalem**. AD 33 is unique.
 
 ---
+<div style="page-break-after: always"></div>
 
 ## Part VII: The Darkness Problem
 
@@ -655,6 +663,7 @@ aerosol signatures is striking — but it's a geophysical observation, not an as
 one. The darkness remains outside the scope of orbital mechanics.
 
 ---
+<div style="page-break-after: always"></div>
 
 ## Part VIII: The Traditional Chronology Problem
 
@@ -729,6 +738,7 @@ archaeological record — all independently.
 This is the cost of starting with a wrong birth year.
 
 ---
+<div style="page-break-after: always"></div>
 
 ## Part IX: Conclusion
 
@@ -769,7 +779,7 @@ happened when it happened.
 The sky keeps receipts. And on this question, the sky's answer is April 3, AD 33.
 
 ---
-
+<div style="page-break-after: always"></div>
 ## Appendix A: Runnable `astrogo` Examples
 
 All claims in this article can be independently verified using the runnable example
@@ -832,6 +842,7 @@ go run ./examples/10_jesus_christ/eclipse/
 ```
 
 ---
+<div style="page-break-after: always"></div>
 
 ## References
 

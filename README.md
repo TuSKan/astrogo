@@ -89,6 +89,7 @@ Existing astronomy tools are powerful, but often:
 ### Ephemerides
 - Sun and Moon positions
 - Planetary positions (Mercury → Neptune)
+- **SGP4 satellite propagation** — TEME→GCRS conversion, sub-satellite ground track, topocentric look angles
 - **High-performance JPL SPK provider**:
     - Multi-kernel architecture (load planets and small-bodies simultaneously)
     - On-demand asteroid/comet fetching via **JPL Horizons API**
@@ -106,6 +107,7 @@ Existing astronomy tools are powerful, but often:
     - **JPL SBDB** (Small-Body Database Search)
     - **Gaia** & **VizieR** (Data TAP)
     - **OpenNGC** (Zero-I/O `//go:embed` binaries)
+    - **NORAD/CelestTrak** (GP data — OMM/JSON format aligned with [Space Data Standards](https://spacedatastandards.org))
 
 ### FITS & World Coordinate System (`fits`)
 - Read standard FITS files (Image, BinTable, ASCII Table HDUs)
@@ -133,6 +135,7 @@ Existing astronomy tools are powerful, but often:
 - **Moon Phase Events**: `NextNewMoon`, `NextFullMoon`, `MoonPhases` via `EventFamilyIllumination`
 - **Earth's Seasons**: Equinoxes and Solstices — 2–4 min vs USNO
 - **Visibility Events**: Rise, Set, and Transit at sub-second precision
+- **Satellite Passes**: AOS/TCA/LOS prediction with Chandrupatla-refined rise/set boundaries (`SatellitePasses`)
 - **Relational Geometry**: Conjunction (RA), Conjunction (Ecliptic Longitude), Appulse, Opposition, Greatest Elongation, Quadrature
 - **Eclipse Detection**: `LunarEclipses`, `SolarEclipses` via ecliptic latitude filter (Danjon limit)
 - **Convenience**: `SunriseSunset`, `CivilDawnDusk`, `VisibilityEvents`, `Conjunctions`, `ConjunctionsEcliptic`, `Appulses`, `Oppositions`, `GreatestElongations`
@@ -320,6 +323,36 @@ for _, a := range appulses {
 }
 ```
 
+### Satellite Tracking (NORAD/SGP4)
+
+```go
+// Fetch ISS orbital data from CelestTrak (JSON/OMM format)
+provider := norad.New()
+gp, _ := provider.FetchByID(ctx, 25544)  // ISS catalog number
+
+// Initialize SGP4 propagator
+sat, _ := satellite.NewFromGP(gp)
+fmt.Printf("Orbital period: %.1f min\n", sat.OrbitalPeriod())
+
+// Propagate to current epoch — position in TEME frame (km)
+pos, vel, _ := sat.PropagateECI(now)
+fmt.Printf("Position: %.0f km, Velocity: %.2f km/s\n", pos.Norm(), vel.Norm())
+
+// Sub-satellite point (ground track)
+geo, _ := sat.SubSatellitePoint(now)
+fmt.Printf("Lat: %.2f°  Lon: %.2f°  Alt: %.0f km\n",
+    geo.Lat().Degrees(), geo.Lon().Degrees(), geo.Height()/1e3)
+
+// Predict passes over an observer (next 24 hours, min 10° elevation)
+observer, _ := coord.NewGeodetic(angle.Deg(-46.63), angle.Deg(-23.55), 760)
+passes, _ := plan.SatellitePasses(sat, start, end, observer, angle.Deg(10))
+for _, pass := range passes {
+    fmt.Printf("AOS: %s  Max El: %.1f°  LOS: %s  Duration: %s\n",
+        pass.Rise.Time, pass.Culmination.Elevation.Degrees(),
+        pass.Set.Time, pass.Duration)
+}
+```
+
 ## Architecture
 
 `astrogo` follows a layered design:
@@ -364,6 +397,10 @@ flowchart TD
     ephemeris --> time
     ephemeris --> vector
     ephemeris --> coord
+    satellite["ephemeris/satellite"] --> ephemeris
+    satellite --> norad
+    norad["catalog/norad"] --> catalog
+    plan --> satellite
     
     coord --> iers
     coord --> atmosphere
@@ -398,10 +435,11 @@ flowchart TD
 | `coord` | Coordinate types, transforms, topocentric reduction | ✅ Stable |
 | `iers` | Earth Orientation Parameters (DUT1, polar motion) | ✅ Stable |
 | `ephemeris` | Solar system ephemerides (SOFA + JPL SPK) | ✅ Stable |
+| `ephemeris/satellite` | SGP4 propagation, TEME→GCRS, look angles, ground track | ✅ Stable |
 | `catalog/resolve` | Provider interface, HTTP client, Arrow cache | ✅ Stable |
-| `catalog/*` | SIMBAD, MAST, Gaia, VizieR, JPL, SBDB, OpenNGC | ✅ Stable |
+| `catalog/*` | SIMBAD, MAST, Gaia, VizieR, JPL, SBDB, OpenNGC, NORAD | ✅ Stable |
 | `fits` | FITS I/O, WCS (TAN projection), mmap, Arrow export | ✅ Stable |
-| `plan` | Observability, constraints, events, scheduling engine | ✅ Stable |
+| `plan` | Observability, constraints, events, scheduling, satellite passes | ✅ Stable |
 | `unit` | Physical unit and quantity system | ✅ Stable |
 
 See [`VALIDATION.md`](docs/VALIDATION.md) for scientific validation status and [`USNO.md`](docs/USNO.md) for the U.S. Naval Observatory accuracy report.
@@ -448,6 +486,7 @@ These are wrapped internally to ensure:
 
 ### Remaining (See [Roadmap](docs/ROADMAP.md))
 - Batch/vectorized APIs for high-throughput pipelines
+- Satellite visibility/illumination constraints (sunlit + above horizon)
 - Cross-match algorithms for multi-catalog workflows
 
 > [!IMPORTANT]
@@ -534,6 +573,16 @@ Full runnable examples: [`examples/10_jesus_christ/`](examples/10_jesus_christ/)
 | [`herod/`](examples/10_jesus_christ/herod/) | Herod's Eclipse: lunar eclipse catalog 5 BC – AD 1 |
 | [`crux/`](examples/10_jesus_christ/crux/) | Passover Moon: Friday Nisan 14 search (AD 26–36) |
 | [`eclipse/`](examples/10_jesus_christ/eclipse/) | Blood Moon: April 3, AD 33 eclipse simulation |
+
+## Satellite Tracking Example
+
+See [`examples/12_satellite_tracking/`](examples/12_satellite_tracking/) for a complete end-to-end demonstration:
+
+1. **Fetch** live ISS GP data from CelestTrak (JSON/OMM format)
+2. **Propagate** orbit via SGP4 to compute ECI position/velocity
+3. **Ground track** — sub-satellite lat/lon/altitude
+4. **Pass prediction** — find all passes above 10° over São Paulo
+5. **Look angle** — current azimuth/elevation/range
 
 ---
 

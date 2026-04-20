@@ -1,0 +1,180 @@
+package plan
+
+import (
+	"github.com/TuSKan/astrogo/angle"
+	"github.com/TuSKan/astrogo/coord"
+	"github.com/TuSKan/astrogo/ephemeris/satellite"
+	"github.com/TuSKan/astrogo/time"
+)
+
+// SatellitePass represents a single pass of a satellite over an observer.
+type SatellitePass struct {
+	Name        string       // Satellite name
+	Rise        PassEvent    // AOS (Acquisition of Signal)
+	Culmination PassEvent    // TCA (Time of Closest Approach / max elevation)
+	Set         PassEvent    // LOS (Loss of Signal)
+	Duration    time.Duration // Total pass duration
+}
+
+// PassEvent captures a time + topocentric coordinates for pass events.
+type PassEvent struct {
+	Time      time.Time
+	Azimuth   angle.Angle
+	Elevation angle.Angle
+	Range     float64 // km
+}
+
+// SatellitePasses computes all passes of a satellite over an observer site
+// within the given time window, filtered by minimum elevation.
+//
+// The function uses a grid-sampling approach with 30-second steps (appropriate
+// for LEO satellites with ~90 minute periods) and Chandrupatla root-finding
+// for sub-second rise/set boundary refinement.
+func SatellitePasses(sat *satellite.Satellite, start, end time.Time,
+	observer *coord.Geodetic, minElevation angle.Angle) ([]SatellitePass, error) {
+
+	step := 30 * time.Second // 30s steps for LEO
+	refineTol := 1 * time.Second
+
+	// Elevation evaluation function.
+	evalEl := func(t time.Time) (float64, error) {
+		_, el, _, err := sat.LookAngle(t, observer)
+		if err != nil {
+			return 0, err
+		}
+		return el.Degrees() - minElevation.Degrees(), nil
+	}
+
+	// Sample elevation over the window.
+	n := int(end.Sub(start)/step) + 2
+	times := make([]time.Time, 0, n)
+	vals := make([]float64, 0, n)
+
+	for t := start; !t.After(end); t = t.Add(step) {
+		times = append(times, t)
+		v, err := evalEl(t)
+		if err != nil {
+			return nil, err
+		}
+		vals = append(vals, v)
+	}
+	if last := times[len(times)-1]; last.Before(end) {
+		times = append(times, end)
+		v, err := evalEl(end)
+		if err != nil {
+			return nil, err
+		}
+		vals = append(vals, v)
+	}
+
+	// Find rise/set crossings and build passes.
+	solver := NewEventSolver(step, refineTol)
+	var passes []SatellitePass
+	var currentPass *SatellitePass
+
+	for i := 0; i < len(times)-1; i++ {
+		v1, v2 := vals[i], vals[i+1]
+
+		// Rise crossing: elevation goes above minimum.
+		if v1 <= 0 && v2 > 0 {
+			riseTime, _, err := solver.refineRoot(evalEl, times[i], times[i+1], v1)
+			if err != nil {
+				continue
+			}
+
+			az, el, rng, _ := sat.LookAngle(riseTime, observer)
+			currentPass = &SatellitePass{
+				Name: sat.Name,
+				Rise: PassEvent{
+					Time:      riseTime,
+					Azimuth:   az,
+					Elevation: el,
+					Range:     rng,
+				},
+			}
+		}
+
+		// Set crossing: elevation drops below minimum.
+		if v1 > 0 && v2 <= 0 && currentPass != nil {
+			setTime, _, err := solver.refineRoot(evalEl, times[i], times[i+1], v1)
+			if err != nil {
+				currentPass = nil
+				continue
+			}
+
+			az, el, rng, _ := sat.LookAngle(setTime, observer)
+			currentPass.Set = PassEvent{
+				Time:      setTime,
+				Azimuth:   az,
+				Elevation: el,
+				Range:     rng,
+			}
+			currentPass.Duration = setTime.Sub(currentPass.Rise.Time)
+
+			// Find culmination (max elevation) between rise and set.
+			culm, err := findCulmination(sat, observer, currentPass.Rise.Time, setTime)
+			if err == nil {
+				currentPass.Culmination = culm
+			}
+
+			passes = append(passes, *currentPass)
+			currentPass = nil
+		}
+	}
+
+	return passes, nil
+}
+
+// findCulmination finds the point of maximum elevation during a pass
+// by sampling at 5-second intervals and refining the peak.
+func findCulmination(sat *satellite.Satellite, observer *coord.Geodetic,
+	start, end time.Time) (PassEvent, error) {
+
+	step := 5 * time.Second
+	bestTime := start
+	bestEl := -90.0
+
+	for t := start; !t.After(end); t = t.Add(step) {
+		_, el, _, err := sat.LookAngle(t, observer)
+		if err != nil {
+			continue
+		}
+		if el.Degrees() > bestEl {
+			bestEl = el.Degrees()
+			bestTime = t
+		}
+	}
+
+	// Refine around the peak with 1-second steps.
+	refineStart := bestTime.Add(-step)
+	if refineStart.Before(start) {
+		refineStart = start
+	}
+	refineEnd := bestTime.Add(step)
+	if refineEnd.After(end) {
+		refineEnd = end
+	}
+
+	for t := refineStart; !t.After(refineEnd); t = t.Add(1 * time.Second) {
+		_, el, _, err := sat.LookAngle(t, observer)
+		if err != nil {
+			continue
+		}
+		if el.Degrees() > bestEl {
+			bestEl = el.Degrees()
+			bestTime = t
+		}
+	}
+
+	az, el, rng, err := sat.LookAngle(bestTime, observer)
+	if err != nil {
+		return PassEvent{}, err
+	}
+
+	return PassEvent{
+		Time:      bestTime,
+		Azimuth:   az,
+		Elevation: el,
+		Range:     rng,
+	}, nil
+}
