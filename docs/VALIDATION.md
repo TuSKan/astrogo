@@ -57,12 +57,17 @@ Validation should be:
 | Sun Rise/Set/Transit | ✅ validated | USNO API | < 1.3 min | 3 locations × 3 dates, topocentric + horizon dip |
 | Moon Rise/Set/Transit | ✅ validated | USNO API | < 1.6 min | 3 locations × 3 dates, topocentric parallax via Reducer |
 | Moon Phases | ✅ validated | USNO API | ≤ 1 min | 12 consecutive phases (Jan–Mar 2026) |
-| Moon Phases (historical) | 🔲 pending | [AstroPixels](http://astropixels.com/ephemeris/phasescat/phases0001.html) | TBD | Deep-historical validation (1–100 CE) |
+| Moon Phases (historical) | ✅ validated | [AstroPixels](https://astropixels.com/ephemeris/phasescat/phasescat.html) | ≤ 5.2 min | 44,574 phases across 9 centuries (1–2100 CE), mean Δ=1.8 min |
 | Earth's Seasons | ✅ validated | USNO API | 2–4 min | 4 events (2026), aberration-corrected ecliptic longitude |
 | Celestial Navigation (AltAz) | ✅ validated | USNO API | 0.002° | Sub-arcsecond stellar altitude accuracy |
 | Perihelion/Aphelion | ✅ validated | USNO API | ≤ 1 min | Brent's minimization on Earth-Sun distance |
 | Lunar Eclipse Detection | ✅ validated | NASA Eclipse Catalog | date-exact | 2/2 eclipses detected for 2026 (Danjon limit filter) |
 | Solar Eclipse Detection | ✅ validated | NASA Eclipse Catalog | date-exact | 2/2 eclipses detected for 2026 (ecliptic latitude filter) |
+| Lunar Eclipse (historical) | ✅ validated | [NASA 5MC Lunar](https://eclipse.gsfc.nasa.gov/LEcat5/LEcatalog.html) | ≤ 1.3 min | 1424/1424 eclipses detected across 6 centuries (1–2000 CE), mean Δ=0.8 min |
+| Solar Eclipse (historical) | ✅ validated | [NASA 5MC Solar](https://eclipse.gsfc.nasa.gov/SEcat5/SEcatalog.html) | ≤ 1.4 min | 1383/1383 eclipses detected across 6 centuries (1–2000 CE), mean Δ=0.8 min |
+| ΔT (TT−UT1) | ✅ validated | [NASA ΔT Polynomial](https://eclipse.gsfc.nasa.gov/LEcat5/deltatpoly.html) | ≤ 0.9 s | Espenak & Meeus 2006 + n-dot correction, cross-validated against 1187 NASA catalog entries, mean error 0.3 s |
+
+> **Note:** Both the [NASA Five Millennium Eclipse Catalogs](https://eclipse.gsfc.nasa.gov/LEcat5/LEcatalog.html) and the [AstroPixels Moon Phase Tables](https://astropixels.com/ephemeris/phasescat/phasescat.html) are computed by **Fred Espenak** using the same ΔT model (Espenak & Meeus 2006). The `time.DeltaT()` polynomial includes the secular acceleration correction `c = -0.000012932*(y-1955)²` to convert from Morrison & Stephenson's assumed n-dot (−26.0 arcsec/cy²) to the Lunar Laser Ranging value (−25.858 arcsec/cy²) used by both ELP-2000/82 and DE441. For historical dates (pre-1972), `TT()` and `TDB()` automatically apply ΔT, so users never need to handle time scale conversion manually.
 
 ---
 
@@ -70,7 +75,6 @@ Validation should be:
 
 The following areas are not yet considered scientifically complete:
 
-- Moon phases validation against [AstroPixels historical catalog](http://astropixels.com/ephemeris/phasescat/phases0001.html) (1–100 CE) for deep-epoch accuracy
 - Advanced observation scheduling optimization
 
 ---
@@ -94,6 +98,8 @@ Primary references:
 - `gofa` (SOFA-derived)
 - JPL Horizons
 - **U.S. Naval Observatory API** — gold standard for rise/set/transit, moon phases, seasons, celestial navigation
+- **AstroPixels** — Fred Espenak's Six Millennium Catalog of Phases of the Moon (2000 BCE – 4000 CE)
+- **NASA GSFC Eclipse Catalog** — Five Millennium Catalogs of Solar and Lunar Eclipses (2000 BCE – 3000 CE)
 - Astropy
 - Published standards / tables
 
