@@ -421,6 +421,50 @@ func Date(year int, month time.Month, day int, hour int, min int, sec int, nsec 
 	return result
 }
 
+// DateJulianCal creates a Time from Julian calendar components.
+// This is the correct constructor for all dates before October 15, 1582
+// (the start of the Gregorian calendar). Historical sources, ancient records,
+// and biblical references use the Julian calendar exclusively.
+//
+// The time is created in the UTC scale. For astronomical computation on
+// historical dates, chain with ApplyDeltaT() to convert to TT:
+//
+//	t := time.DateJulianCal(33, 4, 3, 15, 0, 0).ApplyDeltaT()
+func DateJulianCal(year, month, day, hour, min, sec int) Time {
+	// Julian calendar to JD conversion (Meeus, Astronomical Algorithms)
+	a := (14 - month) / 12
+	y := year + 4800 - a
+	m := month + 12*a - 3
+	jdn := day + (153*m+2)/5 + 365*y + y/4 - 32083
+	jd := float64(jdn) - 0.5 + float64(hour)/24.0 + float64(min)/1440.0 + float64(sec)/86400.0
+	return FromJD(jd, UTC)
+}
+
+// DecimalYear returns the decimal year representation of the time.
+// This is commonly used for ΔT computation and slow-varying astronomical
+// parameters. The formula is: year + (month − 0.5) / 12, which gives
+// the middle of the month — accurate enough for ΔT purposes.
+func (t Time) DecimalYear() float64 {
+	y, m, _, f := t.Calendar()
+	// Day fraction → fractional month contribution
+	return float64(y) + (float64(m)-0.5+f)/12.0
+}
+
+// ApplyDeltaT converts a UTC/UT time to TT by applying the ΔT polynomial
+// (Espenak & Meeus 2006). This is the correct conversion for historical
+// dates where IERS leap-second data (LSK) is not available.
+//
+// For modern dates (post-1972), the standard TT() method using the LSK
+// is preferred. For historical dates (especially pre-1600), this method
+// provides the only reliable UT → TT bridge.
+//
+// The relationship is: TT = UT + ΔT, where ΔT = TT − UT1 encodes the
+// accumulated drift in Earth's rotation rate due to tidal friction.
+func (t Time) ApplyDeltaT() Time {
+	dt := DeltaT(t.DecimalYear())
+	return fromPartsPreserveLoc(t, t.jd1, t.jd2+dt/86400.0, TDB)
+}
+
 // Location returns the display timezone associated with this Time.
 // Returns time.UTC if none was set.
 func (t Time) Location() *time.Location {
@@ -655,18 +699,28 @@ func (t Time) TAI() Time {
 
 // TT returns a new Time converted to the Terrestrial Time scale.
 //
-// All conversion paths are deterministic. For UT1 input, the internal
-// UTC conversion may use a DUT1 fallback (DUT1=0, max error 0.9s)
-// if IERS data is unavailable.
+// For modern dates (post-1972), the conversion uses leap seconds from the
+// NAIF LSK: TT = UTC + ΔAT + 32.184s. For historical dates (pre-1972),
+// where no leap-second data exists, the Espenak & Meeus (2006) ΔT polynomial
+// is used automatically: TT = UT + ΔT. This means .TT() and .TDB() produce
+// correct results for any epoch from -1999 to +3000 without requiring the
+// user to call ApplyDeltaT() explicitly.
 func (t Time) TT() Time {
 	if t.scale == TT {
 		return t
 	}
 	switch t.scale {
 	case UTC:
-		// TT = UTC + ΔAT + 32.184s
+		// Check if the LSK has valid leap-second data for this epoch.
+		// Before 1972, ΔAT = 0 (no leap seconds), so we use ΔT instead.
 		y, m, d, fd, _ := gofaext.JdToDate(t.jd1, t.jd2)
 		dat, _ := gofaext.Dat(y, m, d, fd)
+		if dat == 0 && y < 1972 {
+			// Historical date: use ΔT polynomial (TT = UT + ΔT)
+			dt := DeltaT(t.DecimalYear())
+			return fromPartsPreserveLoc(t, t.jd1, t.jd2+dt/86400.0, TT)
+		}
+		// Modern date: TT = UTC + ΔAT + 32.184s
 		return fromPartsPreserveLoc(t, t.jd1, t.jd2+(dat+32.184)/86400.0, TT)
 	case TAI:
 		// TT = TAI + 32.184s
