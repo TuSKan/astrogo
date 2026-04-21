@@ -22,8 +22,7 @@ import (
 	"testing"
 	gotime "time"
 
-	"github.com/TuSKan/astrogo/ephemeris/jpl"
-	"github.com/TuSKan/astrogo/ephemeris/jpl/spk"
+	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/plan"
 	"github.com/TuSKan/astrogo/time"
 )
@@ -39,28 +38,6 @@ type nasaEclipseRef struct {
 }
 
 // ── NASA Eclipse Catalog Parser ──────────────────────────────────────────────
-
-// nasaLERegex parses NASA lunar eclipse catalog lines.
-// Example: "04824  0001 Jun 24  12:08:47  10519 -24719   78   P   t-   0.9653  ..."
-var nasaLERegex = regexp.MustCompile(
-	`(\d{5})\s+` + // Cat Num
-		`(-?\d{4})\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d{1,2})\s+` + // Date
-		`(\d{2}):(\d{2}):(\d{2})\s+` + // Time (TD)
-		`(-?\d+)\s+` + // ΔT
-		`(-?\d+)\s+` + // Luna Num
-		`(\d+)\s+` + // Saros Num
-		`([TPN][-+]?)\s+`, // Eclipse Type
-)
-
-// nasaSERegex parses NASA solar eclipse catalog lines.
-// Example: "00001  -1999 Jun 12  04:20:42  ..."
-var nasaSERegex = regexp.MustCompile(
-	`(\d{5})\s+` + // Cat Num
-		`(-?\d{4})\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d{1,2})\s+` + // Date
-		`(\d{2}):(\d{2}):(\d{2})\s+` + // Time (TD)
-		`(-?\d+)\s+` + // ΔT
-		`.*?([TAHP][a-z]?)\s+`, // Eclipse Type
-)
 
 // parseNASALunarEclipses parses a NASA lunar eclipse catalog page.
 func parseNASALunarEclipses(html string) []nasaEclipseRef {
@@ -286,15 +263,11 @@ func fetchNASAPage(t *testing.T, url string) string {
 // ── Test: Lunar Eclipses vs NASA ─────────────────────────────────────────────
 
 func TestNASA_LunarEclipses_Historical(t *testing.T) {
-	eph, err := jpl.NewProvider(jpl.WithSource(jpl.Planets), jpl.WithKernel("de441_part-1"))
+	prov, err := eph.NewProvider(eph.Planets, "de441_part-1", eph.WithKernel("de441_part-2"))
 	if err != nil {
-		t.Fatalf("Failed to create DE441 part-1 provider: %v", err)
+		t.Fatalf("Failed to create DE441 provider: %v", err)
 	}
-	defer eph.Close()
-
-	if k2, err := spk.CacheDownload("planets/de441_part-2.bsp", eph.DataDir); err == nil {
-		_ = eph.AddKernel(k2)
-	}
+	defer prov.Close()
 
 	// Century ranges matching NASA catalog URLs
 	centuries := []struct {
@@ -335,7 +308,7 @@ func TestNASA_LunarEclipses_Historical(t *testing.T) {
 				searchStart := refTime.Add(-30 * 24 * time.Hour)
 				searchEnd := refTime.Add(30 * 24 * time.Hour)
 
-				eclipses, err := plan.LunarEclipses(searchStart, searchEnd, eph)
+				eclipses, err := plan.LunarEclipses(searchStart, searchEnd, prov)
 				if err != nil {
 					t.Logf("  SKIP %04d-%02d-%02d: LunarEclipses error: %v",
 						ref.Year, ref.Month, ref.Day, err)
@@ -404,15 +377,11 @@ func TestNASA_LunarEclipses_Historical(t *testing.T) {
 // ── Test: Solar Eclipses vs NASA ─────────────────────────────────────────────
 
 func TestNASA_SolarEclipses_Historical(t *testing.T) {
-	eph, err := jpl.NewProvider(jpl.WithSource(jpl.Planets), jpl.WithKernel("de441_part-1"))
+	prov, err := eph.NewProvider(eph.Planets, "de441_part-1", eph.WithKernel("de441_part-2"))
 	if err != nil {
-		t.Fatalf("Failed to create DE441 part-1 provider: %v", err)
+		t.Fatalf("Failed to create DE441 provider: %v", err)
 	}
-	defer eph.Close()
-
-	if k2, err := spk.CacheDownload("planets/de441_part-2.bsp", eph.DataDir); err == nil {
-		_ = eph.AddKernel(k2)
-	}
+	defer prov.Close()
 
 	centuries := []struct {
 		start, end int
@@ -451,7 +420,7 @@ func TestNASA_SolarEclipses_Historical(t *testing.T) {
 				searchStart := refTime.Add(-30 * 24 * time.Hour)
 				searchEnd := refTime.Add(30 * 24 * time.Hour)
 
-				eclipses, err := plan.SolarEclipses(searchStart, searchEnd, eph)
+				eclipses, err := plan.SolarEclipses(searchStart, searchEnd, prov)
 				if err != nil {
 					t.Logf("  SKIP %04d-%02d-%02d: SolarEclipses error: %v",
 						ref.Year, ref.Month, ref.Day, err)

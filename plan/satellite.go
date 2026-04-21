@@ -2,10 +2,41 @@ package plan
 
 import (
 	"github.com/TuSKan/astrogo/angle"
+	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
-	"github.com/TuSKan/astrogo/ephemeris/satellite"
+	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/time"
 )
+
+// defaultAtm is used for satellite pass prediction when no atmosphere is specified.
+var defaultAtm = atmosphere.Atmosphere{}
+
+// LookAngle computes the topocentric look angle (altitude, azimuth, distance)
+// from an observer to any celestial body at time t.
+//
+// This works for both satellite and planetary providers — any Provider that
+// returns a valid State. Uses the coord.Reducer pipeline which correctly
+// handles both nearby objects (LEO satellites) and distant bodies (planets)
+// by computing the full topocentric vector (geocentric - observer).
+func LookAngle(prov eph.Provider, id eph.ID, ctx *coord.Context) (*coord.AltAz, error) {
+
+	st, err := prov.State(id, ctx.Time())
+	if err != nil {
+		return nil, err
+	}
+
+	// Use the Reducer pipeline: computes observer GCRS position, subtracts it
+	// from the geocentric state, converts to ENU, then az/el. This gives the
+	// correct topocentric range for nearby objects (satellites).
+	reducer := coord.NewReducer(ctx.Site(), ctx.Time(), ctx.Atmosphere())
+	reduction := reducer.Reduce(st.Pos)
+
+	// The Reducer works in AU — convert topocentric distance to km.
+	const kmPerAU = 149597870.7
+	reduction.Observed.SetDist(reduction.Topocentric.Norm() * kmPerAU)
+
+	return reduction.Observed, nil
+}
 
 // SatellitePass represents a single pass of a satellite over an observer.
 type SatellitePass struct {
@@ -30,19 +61,36 @@ type PassEvent struct {
 // The function uses a grid-sampling approach with 30-second steps (appropriate
 // for LEO satellites with ~90 minute periods) and Chandrupatla root-finding
 // for sub-second rise/set boundary refinement.
-func SatellitePasses(sat *satellite.Satellite, start, end time.Time,
+func SatellitePasses(prov eph.Provider, name string, start, end time.Time,
 	observer *coord.Geodetic, minElevation angle.Angle) ([]SatellitePass, error) {
 
 	step := 30 * time.Second // 30s steps for LEO
 	refineTol := 1 * time.Second
 
+	// lookAt creates a context and computes look angle at time t.
+	lookAt := func(t time.Time) (*coord.AltAz, error) {
+		ctx := coord.NewContext(t, observer, defaultAtm)
+		return LookAngle(prov, 0, ctx)
+	}
+
 	// Elevation evaluation function.
 	evalEl := func(t time.Time) (float64, error) {
-		_, el, _, err := sat.LookAngle(t, observer)
+		altaz, err := lookAt(t)
 		if err != nil {
 			return 0, err
 		}
-		return el.Degrees() - minElevation.Degrees(), nil
+		return altaz.Alt().Degrees() - minElevation.Degrees(), nil
+	}
+
+	// passEvent builds a PassEvent from a LookAngle call.
+	passEvent := func(t time.Time) PassEvent {
+		altaz, _ := lookAt(t)
+		return PassEvent{
+			Time:      t,
+			Azimuth:   altaz.Az(),
+			Elevation: altaz.Alt(),
+			Range:     altaz.Dist(),
+		}
 	}
 
 	// Sample elevation over the window.
@@ -81,16 +129,9 @@ func SatellitePasses(sat *satellite.Satellite, start, end time.Time,
 			if err != nil {
 				continue
 			}
-
-			az, el, rng, _ := sat.LookAngle(riseTime, observer)
 			currentPass = &SatellitePass{
-				Name: sat.Name,
-				Rise: PassEvent{
-					Time:      riseTime,
-					Azimuth:   az,
-					Elevation: el,
-					Range:     rng,
-				},
+				Name: name,
+				Rise: passEvent(riseTime),
 			}
 		}
 
@@ -102,17 +143,11 @@ func SatellitePasses(sat *satellite.Satellite, start, end time.Time,
 				continue
 			}
 
-			az, el, rng, _ := sat.LookAngle(setTime, observer)
-			currentPass.Set = PassEvent{
-				Time:      setTime,
-				Azimuth:   az,
-				Elevation: el,
-				Range:     rng,
-			}
+			currentPass.Set = passEvent(setTime)
 			currentPass.Duration = setTime.Sub(currentPass.Rise.Time)
 
 			// Find culmination (max elevation) between rise and set.
-			culm, err := findCulmination(sat, observer, currentPass.Rise.Time, setTime)
+			culm, err := findCulmination(prov, observer, currentPass.Rise.Time, setTime)
 			if err == nil {
 				currentPass.Culmination = culm
 			}
@@ -127,7 +162,7 @@ func SatellitePasses(sat *satellite.Satellite, start, end time.Time,
 
 // findCulmination finds the point of maximum elevation during a pass
 // by sampling at 5-second intervals and refining the peak.
-func findCulmination(sat *satellite.Satellite, observer *coord.Geodetic,
+func findCulmination(prov eph.Provider, observer *coord.Geodetic,
 	start, end time.Time) (PassEvent, error) {
 
 	step := 5 * time.Second
@@ -135,12 +170,13 @@ func findCulmination(sat *satellite.Satellite, observer *coord.Geodetic,
 	bestEl := -90.0
 
 	for t := start; !t.After(end); t = t.Add(step) {
-		_, el, _, err := sat.LookAngle(t, observer)
+		ctx := coord.NewContext(t, observer, defaultAtm)
+		altaz, err := LookAngle(prov, 0, ctx)
 		if err != nil {
 			continue
 		}
-		if el.Degrees() > bestEl {
-			bestEl = el.Degrees()
+		if altaz.Alt().Degrees() > bestEl {
+			bestEl = altaz.Alt().Degrees()
 			bestTime = t
 		}
 	}
@@ -156,25 +192,27 @@ func findCulmination(sat *satellite.Satellite, observer *coord.Geodetic,
 	}
 
 	for t := refineStart; !t.After(refineEnd); t = t.Add(1 * time.Second) {
-		_, el, _, err := sat.LookAngle(t, observer)
+		ctx := coord.NewContext(t, observer, defaultAtm)
+		altaz, err := LookAngle(prov, 0, ctx)
 		if err != nil {
 			continue
 		}
-		if el.Degrees() > bestEl {
-			bestEl = el.Degrees()
+		if altaz.Alt().Degrees() > bestEl {
+			bestEl = altaz.Alt().Degrees()
 			bestTime = t
 		}
 	}
 
-	az, el, rng, err := sat.LookAngle(bestTime, observer)
+	ctx := coord.NewContext(bestTime, observer, defaultAtm)
+	altaz, err := LookAngle(prov, 0, ctx)
 	if err != nil {
 		return PassEvent{}, err
 	}
 
 	return PassEvent{
 		Time:      bestTime,
-		Azimuth:   az,
-		Elevation: el,
-		Range:     rng,
+		Azimuth:   altaz.Az(),
+		Elevation: altaz.Alt(),
+		Range:     altaz.Dist(),
 	}, nil
 }

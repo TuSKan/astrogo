@@ -4,6 +4,72 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## [0.1.1] — 2026-04-21
+
+Ephemeris provider unification, unified Target architecture, lunar crescent visibility module, and plan package hardening.
+
+### Added
+
+#### Ephemeris
+- `ephemeris/core.Provider` — provider-agnostic interface unifying planetary and satellite ephemerides
+- `ephemeris.Default()` — single-call factory returning the built-in SOFA provider
+- Satellite observer logic moved from `ephemeris/satellite` to `plan` (topocentric concerns belong in the planning layer)
+
+#### Unified Target
+- `plan.NewTarget(catalog.Target, ephemeris.Provider)` — universal factory for fixed and moving targets
+- Convenience wrappers: `NewSun`, `NewMoon`, `NewMars`, `NewBody`, `NewDefaultBody`, `NewFixed`
+- `plan.Target` implements `Observable` and `coord.Object` — single type replaces fragmented legacy types
+- `plan.TargetDetails` with `GetDetails()` for on-demand property retrieval
+
+#### Crescent Visibility
+- `plan/crescent.go` — 20 historical lunar crescent visibility criteria (1910–2021)
+  - Category 1: Altitude & Azimuth — Fotheringham, Maunder, Ilyas 1988, Fatoohi, Krauss-Athenian
+  - Category 2: Calendrical — MABIMS 1995, Istanbul 2016, MABIMS 2021
+  - Category 3: Elongation — Danjon, Schaefer, Ilyas 1984
+  - Category 4: ArcV vs Width — Bruin, Alrefay, Yallop (6 zones), Odeh (4 zones), Qureshi (5 zones)
+  - Category 5: Lag Time — Caldwell Naked-Eye, Caldwell Optical, Gautschy
+- `CrescentParams` input struct, `CrescentResult` with `EvaluateAll()` and `String()`
+- `plan/crescent_test.go` — boundary and smoke tests for all 20 criteria
+- `examples/13_crescent_visibility/` — runnable example
+
+#### Scoring
+- `ScoreConfig` struct with configurable weights and `DefaultScoreConfig()`
+- Moon position cache (`moonSepCache`) for efficient batch scoring
+- `estimateHoursUntilSet` — lightweight forward-scan urgency estimator
+
+### Changed
+
+#### Scoring
+- **Composite merit function** replaces naive altitude-based scoring in `ScoreObservable`
+  - Altitude merit: `alt/90°` (0–1), rewarding lower airmass
+  - Urgency merit: `1/max(hours_until_set, 0.5)`, prioritizes targets about to set
+  - Moon separation: `min(separation/30°, 1.0)`, penalizes lunar proximity
+  - Default weights: altitude 0.5, urgency 0.3, moon 0.2
+- `IsObservable` shares `coord.Context` across constraints via `ConstraintCtx` (O(1) vs O(N) matrix allocations)
+- `MoonSep` constraint implements `ConstraintCtx` interface
+
+#### Concurrency
+- `FilterObservable`, `RankObservable`, `RankObservables` execute concurrently via `errgroup`
+
+#### Ephemeris Architecture
+- `ephemeris/body.go` deleted — functionality merged into `ephemeris/ephemeris.go`
+- `ephemeris/satellite` simplified — observer-dependent logic moved to `plan/satellite.go`
+- All examples and tests updated to unified `NewTarget` / `ephemeris.Default()` API
+
+### Removed
+- `Environment` struct — empty v1 placeholder removed from `EvalContext`
+- `ephemeris/body.go` — consolidated into main ephemeris package
+
+### Fixed
+- `VisibleIntervals`, `Find`, `ObservableWindows` return error for step sizes > 15 min
+- `catalog/norad` — removed empty `if` branch (staticcheck)
+- `ephemeris/satellite` — removed ineffectual `year` assignment (staticcheck)
+
+### API Changes
+- `ScoreObservable` signature: added `cfg *ScoreConfig` parameter (pass `nil` for defaults)
+- `NewEvalContext` / `NewEvalContextWith`: removed `env *Environment` parameter
+- `plan.NewTarget` replaces fragmented `plan.NewDeepSpace`, `plan.NewMoving`, etc.
+
 
 ## [0.1.0] — 2026-04-16
 

@@ -7,7 +7,7 @@ import (
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
-	"github.com/TuSKan/astrogo/ephemeris"
+	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/plan"
 	"github.com/TuSKan/astrogo/time"
 )
@@ -24,7 +24,7 @@ func main() {
 	tm := time.Date(2026, 4, 6, 19, 0, 0, 0, tz)
 
 	// 3. Create a moving target for Mars using the built-in default ephemeris
-	mars := plan.NewDefaultBody(ephemeris.Mars)
+	mars := plan.NewMars(eph.Default())
 
 	// 4. Get the geocentric ICRS coordinates of Mars at this exact time
 	icrs, err := mars.Position(tm)

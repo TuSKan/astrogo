@@ -1,95 +1,86 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"log"
 	"strings"
-	gotime "time"
 
 	"github.com/TuSKan/astrogo/angle"
-	"github.com/TuSKan/astrogo/catalog/norad"
+	"github.com/TuSKan/astrogo/atmosphere"
+	"github.com/TuSKan/astrogo/catalog"
 	"github.com/TuSKan/astrogo/coord"
-	"github.com/TuSKan/astrogo/ephemeris/satellite"
+	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/plan"
 	"github.com/TuSKan/astrogo/time"
 )
 
-// This example demonstrates astrogo's NORAD satellite tracking capabilities:
+// This example demonstrates astrogo's unified Provider API for satellite tracking:
 //
-//  1. Fetch live GP data from CelestTrak (ISS / NORAD Cat# 25544)
-//  2. SGP4 orbit propagation to compute current position
-//  3. Sub-satellite point (ground track)
-//  4. Pass prediction over an observer location
+//  1. Resolve satellite from catalog (NORAD → CelestTrak)
+//  2. SGP4 orbit propagation via Provider.State() — same as JPL planets
+//  3. Provider-agnostic altitude
+//  4. Topocentric look angle via coord.Context (same API for ISS (Zarya) and Mars)
+//  5. Pass prediction
 //
 // CelestTrak API: https://celestrak.org/NORAD/elements/gp.php
-// Space Data Standards: https://spacedatastandards.org
 
 func main() {
 	// ═══════════════════════════════════════════════════════════════════════
-	// 1. Fetch ISS GP Data from CelestTrak
+	// 1. Resolve ISS (Zarya) from NORAD Catalog
 	// ═══════════════════════════════════════════════════════════════════════
-	header("Fetching ISS GP Data")
+	header("Resolving ISS (Zarya) from NORAD Catalog")
 
-	ctx, cancel := context.WithTimeout(context.Background(), 30*gotime.Second)
-	defer cancel()
-
-	provider := norad.New()
-	gp, err := provider.FetchByID(ctx, 25544) // ISS NORAD catalog number
+	resolver := catalog.NewResolver(catalog.NORAD)
+	target, err := resolver.Resolve("ISS (Zarya)")
 	if err != nil {
-		log.Fatalf("Failed to fetch ISS data: %v", err)
+		log.Fatalf("Failed to resolve ISS (Zarya): %v", err)
 	}
 
-	epoch, _ := gp.EpochTime()
-	fmt.Printf("  Name:          %s\n", gp.ObjectName)
-	fmt.Printf("  NORAD Cat#:    %d\n", gp.NoradCatID)
-	fmt.Printf("  Intl Des:      %s\n", gp.ObjectID)
-	fmt.Printf("  Epoch:         %s\n", gp.Epoch)
-	fmt.Printf("  Inclination:   %.4f°\n", gp.Inclination)
-	fmt.Printf("  Eccentricity:  %.7f\n", gp.Eccentricity)
-	fmt.Printf("  Mean Motion:   %.8f rev/day\n", gp.MeanMotion)
-	fmt.Printf("  BSTAR:         %.10f\n", gp.BStar)
+	fmt.Printf("  Name:     %s\n", target.Name)
+	fmt.Printf("  NORAD ID: %s\n", target.ID)
+	fmt.Printf("  Intl Des: %s\n", target.Designation)
+	fmt.Printf("  Epoch:    %s\n", target.Epoch)
 
 	// ═══════════════════════════════════════════════════════════════════════
-	// 2. Initialize SGP4 Propagator
+	// 2. Create Provider from Target TLE
 	// ═══════════════════════════════════════════════════════════════════════
-	header("SGP4 Propagation")
+	header("SGP4 Propagation (via Provider.State)")
 
-	sat, err := satellite.NewFromGP(gp)
+	prov, err := eph.NewProvider(eph.Satellites, target.Name,
+		eph.WithTLE(target.TLELine1, target.TLELine2))
 	if err != nil {
-		log.Fatalf("Failed to create satellite: %v", err)
+		log.Fatalf("Failed to create satellite provider: %v", err)
+	}
+	defer prov.Close()
+
+	// Use the unified State API — same as for JPL planets.
+	epoch := target.Epoch
+	state, err := prov.State(0, epoch)
+	if err != nil {
+		log.Fatalf("State failed: %v", err)
 	}
 
-	fmt.Printf("  Orbital period: %.2f min\n", sat.OrbitalPeriod())
+	// Derive RA/Dec from GCRS position.
+	icrs, _ := eph.ToICRS(state.Pos)
+	fmt.Printf("  RA:       %s\n", icrs.RA())
+	fmt.Printf("  Dec:      %s\n", icrs.Dec())
+	fmt.Printf("  Distance: %.1f km\n", state.DistanceKm())
 
-	// Propagate at TLE epoch.
-	pos, vel, err := sat.PropagateECI(epoch)
+	// ═══════════════════════════════════════════════════════════════════════
+	// 3. Provider-Agnostic Altitude
+	// ═══════════════════════════════════════════════════════════════════════
+	header("Orbital Altitude")
+
+	alt, err := eph.Altitude(prov, 0, epoch)
 	if err != nil {
-		log.Fatalf("Propagation failed: %v", err)
+		log.Fatalf("Altitude failed: %v", err)
 	}
-	fmt.Printf("  ECI Position:  (%.2f, %.2f, %.2f) km\n", pos.X, pos.Y, pos.Z)
-	fmt.Printf("  ECI Velocity:  (%.4f, %.4f, %.4f) km/s\n", vel.X, vel.Y, vel.Z)
-	fmt.Printf("  |r| = %.2f km  |v| = %.4f km/s\n", pos.Norm(), vel.Norm())
+	fmt.Printf("  Altitude: %.1f km above Earth surface\n", alt)
 
 	// ═══════════════════════════════════════════════════════════════════════
-	// 3. Sub-Satellite Point (Ground Track)
+	// 4. Look Angle via coord.Context (same API for ISS (Zarya) and Mars)
 	// ═══════════════════════════════════════════════════════════════════════
-	header("Ground Track at Epoch")
-
-	geo, err := sat.SubSatellitePoint(epoch)
-	if err != nil {
-		log.Fatalf("SubSatellitePoint failed: %v", err)
-	}
-
-	alt := geo.Height() / 1e3
-	fmt.Printf("  Latitude:   %s (%.4f°)\n", geo.Lat(), geo.Lat().Degrees())
-	fmt.Printf("  Longitude:  %s (%.4f°)\n", geo.Lon(), geo.Lon().Degrees())
-	fmt.Printf("  Altitude:   %.1f km\n", alt)
-
-	// ═══════════════════════════════════════════════════════════════════════
-	// 4. Pass Prediction
-	// ═══════════════════════════════════════════════════════════════════════
-	header("Pass Prediction — São Paulo, Brazil")
+	header("Look Angle — São Paulo, Brazil")
 
 	// Observer: São Paulo (-23.5505°, -46.6333°, 760m)
 	observer, err := coord.NewGeodetic(angle.Deg(-46.6333), angle.Deg(-23.5505), 760)
@@ -97,26 +88,49 @@ func main() {
 		log.Fatalf("NewGeodetic failed: %v", err)
 	}
 
-	// Search for passes in the next 24 hours, minimum 10° elevation.
+	// Build the observation context (caches SOFA matrices for this time+site).
+	ctx := coord.NewContext(epoch, observer, atmosphere.Atmosphere{})
+
+	altaz, err := plan.LookAngle(prov, 0, ctx)
+	if err != nil {
+		log.Fatalf("LookAngle failed: %v", err)
+	}
+
+	fmt.Printf("  Azimuth:    %s (%.2f°)\n", altaz.Az(), altaz.Az().Degrees())
+	fmt.Printf("  Elevation:  %s (%.2f°)\n", altaz.Alt(), altaz.Alt().Degrees())
+	fmt.Printf("  Range:      %.1f km\n", altaz.Dist())
+
+	if altaz.Alt().Degrees() > 0 {
+		fmt.Printf("  Status:     ☀ ABOVE HORIZON\n")
+	} else {
+		fmt.Printf("  Status:     ● Below horizon\n")
+	}
+
+	// ═══════════════════════════════════════════════════════════════════════
+	// 5. Pass Prediction
+	// ═══════════════════════════════════════════════════════════════════════
 	start := epoch
 	end := epoch.AddDays(1.0)
-	minEl := angle.Deg(10.0)
+	minEl := angle.Deg(20.0)
+	loc, _ := time.LoadLocation("America/Sao_Paulo")
 
-	passes, err := plan.SatellitePasses(sat, start, end, observer, minEl)
+	header("Pass Prediction (next 24h, min %1.f° elevation)", minEl.Degrees())
+
+	passes, err := plan.SatellitePasses(prov, target.Name, start, end, observer, minEl)
 	if err != nil {
 		log.Fatalf("SatellitePasses failed: %v", err)
 	}
 
 	if len(passes) == 0 {
-		fmt.Println("  No passes above 10° found in the next 24 hours.")
+		fmt.Printf("  No passes above %.1f° found in the next 24 hours.\n", minEl.Degrees())
 	} else {
-		fmt.Printf("  Found %d pass(es) above 10° in 24 hours:\n\n", len(passes))
+		fmt.Printf("  Found %d pass(es) above %.1f° in 24 hours:\n\n", len(passes), minEl.Degrees())
 
 		for i, pass := range passes {
 			fmt.Printf("  ┌─── Pass %d ──────────────────────────────────────────────┐\n", i+1)
-			printPassEvent("AOS (Rise)", pass.Rise)
-			printPassEvent("TCA (Max) ", pass.Culmination)
-			printPassEvent("LOS (Set) ", pass.Set)
+			printPassEvent("AOS (Rise)", pass.Rise, loc)
+			printPassEvent("TCA (Max) ", pass.Culmination, loc)
+			printPassEvent("LOS (Set) ", pass.Set, loc)
 			fmt.Printf("  │  Duration:    %s\n", fmtDuration(pass.Duration))
 			fmt.Println("  └──────────────────────────────────────────────────────────┘")
 			if i < len(passes)-1 {
@@ -124,51 +138,29 @@ func main() {
 			}
 		}
 	}
-
-	// ═══════════════════════════════════════════════════════════════════════
-	// 5. Current Look Angle
-	// ═══════════════════════════════════════════════════════════════════════
-	header("Look Angle at Epoch")
-
-	az, el, rng, err := sat.LookAngle(epoch, observer)
-	if err != nil {
-		log.Fatalf("LookAngle failed: %v", err)
-	}
-
-	fmt.Printf("  Azimuth:     %s (%.2f°)\n", az, az.Degrees())
-	fmt.Printf("  Elevation:   %s (%.2f°)\n", el, el.Degrees())
-	fmt.Printf("  Range:       %.1f km\n", rng)
-
-	if el.Degrees() > 0 {
-		fmt.Printf("  Status:      ☀ ABOVE HORIZON\n")
-	} else {
-		fmt.Printf("  Status:      ● Below horizon\n")
-	}
 }
 
 // ── Formatting helpers ────────────────────────────────────────────────────────
 
-func header(title string) {
+func header(titleFormat string, a ...any) {
+	title := fmt.Sprintf(titleFormat, a...)
 	width := 62
-	pad := width - len(title) - 4
-	if pad < 0 {
-		pad = 0
-	}
+	pad := max(width-len(title)-4, 0)
 	fmt.Printf("\n  ══ %s %s\n\n", title, strings.Repeat("═", pad))
 }
 
-func printPassEvent(label string, ev plan.PassEvent) {
+func printPassEvent(label string, ev plan.PassEvent, loc *time.Location) {
 	fmt.Printf("  │  %-10s  %s  Az: %6.1f°  El: %5.1f°  Rng: %6.0f km\n",
 		label,
-		fmtTime(ev.Time),
+		fmtTime(ev.Time, loc),
 		ev.Azimuth.Degrees(),
 		ev.Elevation.Degrees(),
 		ev.Range,
 	)
 }
 
-func fmtTime(t time.Time) string {
-	return t.ToGo().Format("15:04:05")
+func fmtTime(t time.Time, loc *time.Location) string {
+	return t.ToGo().In(loc).Format("2006-01-02 15:04:05 MST")
 }
 
 func fmtDuration(d time.Duration) string {

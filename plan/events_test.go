@@ -5,8 +5,9 @@ import (
 	"testing"
 
 	"github.com/TuSKan/astrogo/angle"
+	"github.com/TuSKan/astrogo/catalog"
 	"github.com/TuSKan/astrogo/coord"
-	"github.com/TuSKan/astrogo/ephemeris"
+	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/internal/testutil"
 
 	"github.com/TuSKan/astrogo/time"
@@ -17,7 +18,7 @@ import (
 func TestEventSolver_Visibility_Fixed(t *testing.T) {
 	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(45), 0)
 	site, _ := NewSite("Test", loc, angle.Zero(), nil)
-	obj := Custom{Coord: coord.NewICRS(angle.Deg(0), angle.Deg(0))}
+	obj := NewTarget(catalog.Target{Coord: coord.NewICRS(angle.Deg(0), angle.Deg(0))}, nil)
 
 	start := time.FromJD(2451545.0, time.UTC)
 	end := start.Add(24 * time.Hour)
@@ -53,7 +54,7 @@ func TestEventSolver_Visibility_Fixed(t *testing.T) {
 func TestEventSolver_Visibility_Circumpolar(t *testing.T) {
 	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(45), 0)
 	site, _ := NewSite("Test", loc, angle.Zero(), nil)
-	obj := Custom{Coord: coord.NewICRS(angle.Deg(0), angle.Deg(80))}
+	obj := NewTarget(catalog.Target{Coord: coord.NewICRS(angle.Deg(0), angle.Deg(80))}, nil)
 
 	start := time.FromJD(2451545.0, time.UTC)
 	end := start.Add(24 * time.Hour)
@@ -78,7 +79,7 @@ func TestEventSolver_Visibility_Circumpolar(t *testing.T) {
 func TestEventSolver_Visibility_NeverVisible(t *testing.T) {
 	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(45), 0)
 	site, _ := NewSite("Test", loc, angle.Zero(), nil)
-	obj := Custom{Coord: coord.NewICRS(angle.Deg(0), angle.Deg(-80))}
+	obj := NewTarget(catalog.Target{Coord: coord.NewICRS(angle.Deg(0), angle.Deg(-80))}, nil)
 
 	start := time.FromJD(2451545.0, time.UTC)
 	end := start.Add(24 * time.Hour)
@@ -105,7 +106,7 @@ func TestEventSolver_Visibility_NeverVisible(t *testing.T) {
 func TestSunEvents(t *testing.T) {
 	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(40), 0)
 	site, _ := NewSite("Test", loc, angle.Zero(), nil)
-	eph := ephemeris.Default()
+	eph := eph.Default()
 
 	start := time.FromJD(2451544.5, time.UTC)
 	end := start.Add(24 * time.Hour)
@@ -135,7 +136,7 @@ func TestSunEvents(t *testing.T) {
 func TestSunEvents_Polar(t *testing.T) {
 	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(80), 0)
 	site, _ := NewSite("Arctic", loc, angle.Zero(), nil)
-	eph := ephemeris.Default()
+	eph := eph.Default()
 
 	start := time.FromJD(2451727.5, time.UTC)
 	end := start.Add(24 * time.Hour)
@@ -153,7 +154,7 @@ func TestSunEvents_Polar(t *testing.T) {
 func TestMoonEvents(t *testing.T) {
 	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(40), 0)
 	site, _ := NewSite("Test", loc, angle.Zero(), nil)
-	eph := ephemeris.Default()
+	eph := eph.Default()
 
 	start := time.FromJD(2451545.0, time.UTC)
 	end := start.Add(24 * time.Hour)
@@ -171,7 +172,7 @@ func TestMoonEvents(t *testing.T) {
 func TestSunriseSunset(t *testing.T) {
 	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(40), 0)
 	site, _ := NewSite("Test", loc, angle.Zero(), nil)
-	eph := ephemeris.Default()
+	eph := eph.Default()
 
 	start := time.FromJD(2451544.5, time.UTC)
 	end := start.Add(24 * time.Hour)
@@ -189,7 +190,7 @@ func TestSunriseSunset(t *testing.T) {
 func TestTwilightEvents(t *testing.T) {
 	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(40), 0)
 	site, _ := NewSite("Test", loc, angle.Zero(), nil)
-	eph := ephemeris.Default()
+	eph := eph.Default()
 
 	start := time.FromJD(2451544.5, time.UTC)
 	end := start.Add(24 * time.Hour)
@@ -224,7 +225,7 @@ func TestTwilightEvents(t *testing.T) {
 func TestTwilight_Sequence(t *testing.T) {
 	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(40), 0)
 	site, _ := NewSite("Test", loc, angle.Zero(), nil)
-	eph := ephemeris.Default()
+	eph := eph.Default()
 
 	start := time.FromJD(2451544.5, time.UTC)
 	end := start.Add(24 * time.Hour)
@@ -258,7 +259,7 @@ func TestTwilight_Sequence(t *testing.T) {
 func TestTwilight_HighLat(t *testing.T) {
 	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(51.5), 0)
 	site, _ := NewSite("London", loc, angle.Zero(), nil)
-	eph := ephemeris.Default()
+	eph := eph.Default()
 
 	start := time.FromJD(2451727.5, time.UTC)
 	end := start.Add(24 * time.Hour)
@@ -276,7 +277,7 @@ func TestTwilight_HighLat(t *testing.T) {
 func BenchmarkEventSolver(b *testing.B) {
 	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(45), 0)
 	site, _ := NewSite("Test", loc, angle.Zero(), nil)
-	obj := Custom{Coord: coord.NewICRS(angle.Deg(0), angle.Deg(0))}
+	obj := NewTarget(catalog.Target{Coord: coord.NewICRS(angle.Deg(0), angle.Deg(0))}, nil)
 	start := time.FromJD(2451545.0, time.UTC)
 	end := start.Add(24 * time.Hour)
 	solver := NewEventSolver(30*time.Minute, 1*time.Second)
@@ -320,6 +321,9 @@ func (m *mockLinearTarget) Constraints() []Constraint { return nil }
 func (m *mockLinearTarget) Catalog() string           { return "MOCK" }
 func (m *mockLinearTarget) ID() string                { return "Linear" }
 func (m *mockLinearTarget) Name() string              { return "LinearName" }
+func (m *mockLinearTarget) GetDetails(ctx *coord.Context, props ...string) (*TargetDetails, error) {
+	return nil, nil
+}
 
 func TestSolveGeometry_Conjunction(t *testing.T) {
 	t1 := &mockLinearTarget{raRate: 1.0, startRA: 10, dec: 0.0}
@@ -397,6 +401,9 @@ func (m *mockParabolicTarget) Constraints() []Constraint { return nil }
 func (m *mockParabolicTarget) Catalog() string           { return "MOCK" }
 func (m *mockParabolicTarget) ID() string                { return "Para" }
 func (m *mockParabolicTarget) Name() string              { return "ParaName" }
+func (m *mockParabolicTarget) GetDetails(ctx *coord.Context, props ...string) (*TargetDetails, error) {
+	return nil, nil
+}
 
 func TestSolveGeometry_GreatestElongation(t *testing.T) {
 	t2 := &mockLinearTarget{raRate: 0, startRA: 10, dec: 0}
@@ -447,3 +454,6 @@ func (m *mockDynamicTarget) Constraints() []Constraint                 { return 
 func (m *mockDynamicTarget) Catalog() string                           { return "DYN" }
 func (m *mockDynamicTarget) ID() string                                { return "Dyn" }
 func (m *mockDynamicTarget) Name() string                              { return "DynName" }
+func (m *mockDynamicTarget) GetDetails(ctx *coord.Context, props ...string) (*TargetDetails, error) {
+	return nil, nil
+}

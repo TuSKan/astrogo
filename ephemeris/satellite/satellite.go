@@ -4,12 +4,12 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"strconv"
+	"strings"
 
-	"github.com/TuSKan/astrogo/angle"
-	"github.com/TuSKan/astrogo/catalog/norad"
 	"github.com/TuSKan/astrogo/constants"
 	"github.com/TuSKan/astrogo/coord"
-	"github.com/TuSKan/astrogo/ephemeris"
+	"github.com/TuSKan/astrogo/ephemeris/core"
 	"github.com/TuSKan/astrogo/internal/gofaext"
 	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/vector"
@@ -26,25 +26,11 @@ const secPerDay = constants.JulianDaySeconds // 86400
 // ErrPropagation indicates an SGP4 propagation failure.
 var ErrPropagation = errors.New("satellite: sgp4 propagation failed")
 
-// Satellite wraps a NORAD GP element set with SGP4 propagation state.
+// Satellite wraps a NORAD TLE element set with SGP4 propagation state.
 type Satellite struct {
-	GP   norad.GP              // Source orbital elements
-	Name string                // Satellite name
-	sat  gosatellite.Satellite // Initialized SGP4 state
-}
-
-// NewFromGP creates a Satellite from a parsed GP element set.
-func NewFromGP(gp norad.GP) (*Satellite, error) {
-	line1, line2 := gp.ToTLE()
-	sat := gosatellite.TLEToSat(line1, line2, gosatellite.GravityWGS84)
-	if sat.Error != 0 {
-		return nil, fmt.Errorf("%w: sgp4 init error %d: %s", ErrPropagation, sat.Error, sat.ErrorStr)
-	}
-	return &Satellite{
-		GP:   gp,
-		Name: gp.ObjectName,
-		sat:  sat,
-	}, nil
+	Name       string                // Satellite name
+	MeanMotion float64               // Mean motion (rev/day), parsed from TLE line 2
+	sat        gosatellite.Satellite // Initialized SGP4 state
 }
 
 // NewFromTLE creates a Satellite from raw TLE lines.
@@ -53,14 +39,32 @@ func NewFromTLE(name, line1, line2 string) (*Satellite, error) {
 	if sat.Error != 0 {
 		return nil, fmt.Errorf("%w: sgp4 init error %d: %s", ErrPropagation, sat.Error, sat.ErrorStr)
 	}
+
+	mm := parseMeanMotion(line2)
+
 	return &Satellite{
-		Name: name,
-		sat:  sat,
+		Name:       name,
+		MeanMotion: mm,
+		sat:        sat,
 	}, nil
 }
 
-// PropagateECI returns the TEME position and velocity (km, km/s) at time t.
-func (s *Satellite) PropagateECI(t time.Time) (pos, vel vector.Vec3, err error) {
+// parseMeanMotion extracts mean motion (rev/day) from TLE line 2,
+// columns 53–63 (0-indexed).
+func parseMeanMotion(line2 string) float64 {
+	if len(line2) < 63 {
+		return 0
+	}
+	s := strings.TrimSpace(line2[52:63])
+	mm, err := strconv.ParseFloat(s, 64)
+	if err != nil {
+		return 0
+	}
+	return mm
+}
+
+// propagateECI returns the TEME position and velocity (km, km/s) at time t.
+func (s *Satellite) propagateECI(t time.Time) (pos, vel vector.Vec3, err error) {
 	year, month, day, hour, min, sec := timeToComponents(t)
 	eciPos, eciVel := gosatellite.Propagate(s.sat, year, month, day, hour, min, sec)
 
@@ -76,30 +80,33 @@ func (s *Satellite) PropagateECI(t time.Time) (pos, vel vector.Vec3, err error) 
 }
 
 // State returns the geocentric position/velocity in GCRS (AU, AU/day),
-// implementing the [ephemeris.Provider] interface contract.
+// implementing the [core.Provider] interface contract.
 //
 // The conversion pipeline: TEME (km) → GCRS (AU) via the IAU 2006
 // Earth rotation matrix (C2T06A).
-func (s *Satellite) State(_ ephemeris.ID, t time.Time) (ephemeris.State, error) {
-	eciPos, eciVel, err := s.PropagateECI(t)
+func (s *Satellite) State(_ core.ID, t time.Time) (core.State, error) {
+	eciPos, eciVel, err := s.propagateECI(t)
 	if err != nil {
-		return ephemeris.State{}, err
+		return core.State{}, err
 	}
 
 	// Convert TEME → GCRS using the Earth rotation matrix.
 	gcrsPos, gcrsVel := temeToGCRS(eciPos, eciVel, t)
 
 	// Convert km → AU, km/s → AU/day.
-	return ephemeris.State{
+	return core.State{
 		Pos: gcrsPos.MulScalar(1.0 / kmPerAU),
 		Vel: gcrsVel.MulScalar(secPerDay / kmPerAU),
 	}, nil
 }
 
-// SubSatellitePoint returns the geodetic coordinates (lat, lon, altitude)
+// Close is a no-op for satellite providers (no file handles).
+func (s *Satellite) Close() error { return nil }
+
+// subSatellitePoint returns the geodetic coordinates (lat, lon, altitude)
 // of the sub-satellite point at time t.
-func (s *Satellite) SubSatellitePoint(t time.Time) (*coord.Geodetic, error) {
-	eciPos, _, err := s.PropagateECI(t)
+func (s *Satellite) subSatellitePoint(t time.Time) (*coord.Geodetic, error) {
+	eciPos, _, err := s.propagateECI(t)
 	if err != nil {
 		return nil, err
 	}
@@ -126,72 +133,20 @@ func (s *Satellite) SubSatellitePoint(t time.Time) (*coord.Geodetic, error) {
 
 // OrbitalPeriod returns the orbital period in minutes, derived from mean motion.
 func (s *Satellite) OrbitalPeriod() float64 {
-	if s.GP.MeanMotion <= 0 {
+	if s.MeanMotion <= 0 {
 		return 0
 	}
-	return 1440.0 / s.GP.MeanMotion // minutes
+	return 1440.0 / s.MeanMotion // minutes
 }
 
-// Altitude returns the approximate altitude above the WGS84 ellipsoid at time t, in kilometres.
+// Altitude returns the precise altitude above the WGS84 ellipsoid at time t, in kilometres.
+// This uses the sub-satellite geodetic computation for WGS84-precise values.
 func (s *Satellite) Altitude(t time.Time) (float64, error) {
-	geo, err := s.SubSatellitePoint(t)
+	geo, err := s.subSatellitePoint(t)
 	if err != nil {
 		return 0, err
 	}
 	return geo.Height() / 1e3, nil // metres → km
-}
-
-// LookAngle computes the topocentric look angle (azimuth, elevation, range)
-// from an observer to the satellite at time t.
-func (s *Satellite) LookAngle(t time.Time, observer *coord.Geodetic) (az, el angle.Angle, rng float64, err error) {
-	eciPos, _, err := s.PropagateECI(t)
-	if err != nil {
-		return angle.Zero(), angle.Zero(), 0, err
-	}
-
-	// Convert observer to ECI.
-	obsLat := observer.Lat().Radians()
-	obsLon := observer.Lon().Radians()
-	obsAlt := observer.Height() / 1e3 // metres → km
-
-	gmst := computeGMST(t)
-
-	// Observer ECI position.
-	obsLL := gosatellite.LatLong{Latitude: obsLat, Longitude: obsLon}
-	jday := t.JD()
-	obsECI := gosatellite.LLAToECI(obsLL, obsAlt, jday)
-
-	// Range vector in ECI.
-	rangeECI := gosatellite.Vector3{
-		X: eciPos.X - obsECI.X,
-		Y: eciPos.Y - obsECI.Y,
-		Z: eciPos.Z - obsECI.Z,
-	}
-
-	// Rotate range vector to topocentric SEZ (South-East-Zenith).
-	sinLat := math.Sin(obsLat)
-	cosLat := math.Cos(obsLat)
-	sinLST := math.Sin(gmst + obsLon)
-	cosLST := math.Cos(gmst + obsLon)
-
-	// Topocentric SEZ coordinates.
-	south := sinLat*cosLST*rangeECI.X + sinLat*sinLST*rangeECI.Y - cosLat*rangeECI.Z
-	east := -sinLST*rangeECI.X + cosLST*rangeECI.Y
-	zenith := cosLat*cosLST*rangeECI.X + cosLat*sinLST*rangeECI.Y + sinLat*rangeECI.Z
-
-	// Range magnitude.
-	rng = math.Sqrt(south*south + east*east + zenith*zenith)
-
-	// Elevation.
-	elRad := math.Asin(zenith / rng)
-
-	// Azimuth (measured clockwise from north).
-	azRad := math.Atan2(east, -south)
-	if azRad < 0 {
-		azRad += 2 * math.Pi
-	}
-
-	return angle.Rad(azRad), angle.Rad(elRad), rng, nil
 }
 
 // temeToGCRS converts TEME position/velocity (km, km/s) to GCRS using

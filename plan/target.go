@@ -3,159 +3,154 @@ package plan
 import (
 	"errors"
 	"fmt"
+	"strconv"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/catalog"
-	"github.com/TuSKan/astrogo/catalog/openngc"
+	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/coord"
-	"github.com/TuSKan/astrogo/ephemeris"
+	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/vector"
 )
 
 // Observable represents anything that can appear on the sky at a given time.
-// It provides a unified abstraction for fixed celestial objects, moving solar system
-// bodies, and custom user-defined coordinates.
+// It provides a unified abstraction for celestial objects.
 type Observable interface {
-	// Name returns the display name of the
+	// Name returns the display name
 	Name() string
 	// Position returns the ICRS coordinates of the target at the given time.
 	// For fixed targets, time may be ignored. For moving targets, time is required.
 	Position(t time.Time) (*coord.ICRS, error)
+	// GetDetails retrieves comprehensive properties about the observable at the given context.
+	GetDetails(ctx *coord.Context, props ...string) (*TargetDetails, error)
 }
 
-// NewFixed is a legacy wrapper for NewDeepSpace.
-func NewFixed(obj catalog.Target) DeepSpace {
-	return NewDeepSpace(obj)
+// Target unifies all celestial objects (Deep Space, Planets, Satellites) into one struct.
+type Target struct {
+	Catalog  catalog.Target
+	Provider eph.Provider
 }
 
-// NewDeepSpace creates a new Observable for a deep space target
-// (e.g. Star, Galaxy, Nebula), which automatically propagates proper motion.
-func NewDeepSpace(obj catalog.Target) DeepSpace {
-	return DeepSpace{Object: obj}
+// NewTarget creates a new Observable Target.
+// For fixed targets, prov can be nil.
+// For moving targets (planets, satellites), prov is required.
+func NewTarget(c catalog.Target, p eph.Provider) Target {
+	return Target{Catalog: c, Provider: p}
 }
 
-// NewDefaultDeepSpace creates a new Observable for a deep space target using
-// the default OpenNGC provider.
-func NewDefaultDeepSpace(name string) (DeepSpace, error) {
-	provider := openngc.New()
-	obj, ok := provider.Resolve(name)
-	if !ok {
-		return DeepSpace{}, fmt.Errorf("target: %s not found in default catalog (OpenNGC)", name)
+// Name returns the target's name.
+func (t Target) Name() string {
+	return t.Catalog.Name
+}
+
+// Position returns the ICRS coordinates of the target.
+func (t Target) Position(time time.Time) (*coord.ICRS, error) {
+	if t.Provider != nil {
+		// Moving object
+		idStr := t.Catalog.ID
+		if idStr == "" {
+			return nil, errors.New("moving target requires a valid Catalog.ID")
+		}
+		idUint, err := strconv.ParseUint(idStr, 10, 32)
+		if err != nil {
+			return nil, fmt.Errorf("invalid ID for moving target: %w", err)
+		}
+		ephID := eph.ID(idUint)
+
+		pos, err := eph.Position(t.Provider, ephID, time)
+		if err != nil {
+			return nil, fmt.Errorf("target: ephemeris error for %s: %w", t.Name(), err)
+		}
+		icrs, err := eph.ToICRS(pos)
+		if err != nil {
+			return nil, fmt.Errorf("target: coordinate conversion error for %s: %w", t.Name(), err)
+		}
+		return icrs, nil
 	}
-	return NewDeepSpace(obj), nil
-}
 
-// DeepSpace is an Observable wrapper around a catalog.Target that propagates kinematics.
-type DeepSpace struct {
-	Object catalog.Target
-}
-
-// Name returns the object name from the catalog.
-func (f DeepSpace) Name() string {
-	return f.Object.Name
-}
-
-// Position returns the ICRS coordinates from the catalog object, including
-// any stellar kinematics (proper motion, parallax, radial velocity).
-// The coordinates are returned at the J2000 catalog epoch; SOFA handles
-// rigorous space-motion propagation to the observation epoch internally.
-func (f DeepSpace) Position(t time.Time) (*coord.ICRS, error) {
-	if f.Object.Coord == nil {
+	// Fixed object
+	if t.Catalog.Coord == nil {
 		return coord.NewICRS(angle.Rad(0), angle.Rad(0)), nil
 	}
 
-	// If the target has kinematics, attach them to the ICRS so SOFA
-	// can apply rigorous space-motion propagation via Atcoq/Atciq.
-	hasPM := f.Object.PmRA.Radians() != 0 || f.Object.PmDec.Radians() != 0
-	hasParallax := f.Object.Parallax.Radians() != 0
+	hasPM := t.Catalog.PmRA.Radians() != 0 || t.Catalog.PmDec.Radians() != 0
+	hasParallax := t.Catalog.Parallax.Radians() != 0
 	if hasPM || hasParallax {
 		return coord.NewICRSWithKinematics(
-			f.Object.Coord.RA(), f.Object.Coord.Dec(),
-			f.Object.PmRA, f.Object.PmDec,
-			f.Object.Parallax,
-			f.Object.RadialVelocity,
+			t.Catalog.Coord.RA(), t.Catalog.Coord.Dec(),
+			t.Catalog.PmRA, t.Catalog.PmDec,
+			t.Catalog.Parallax,
+			t.Catalog.RadialVelocity,
 		), nil
 	}
 
-	// No kinematics — return a defensive copy so callers cannot mutate
-	// the underlying catalog entry.
-	return coord.NewICRS(f.Object.Coord.RA(), f.Object.Coord.Dec()), nil
+	return coord.NewICRS(t.Catalog.Coord.RA(), t.Catalog.Coord.Dec()), nil
 }
 
-// Custom is an Observable that represents an arbitrary fixed coordinate.
-type Custom struct {
-	Label string
-	Coord *coord.ICRS
-}
-
-// Name returns the label, or "Custom" if empty.
-func (c Custom) Name() string {
-	if c.Label == "" {
-		return "Custom"
-	}
-	return c.Label
-}
-
-// Position returns the stored fixed coordinate.
-// Returns a defensive copy so callers cannot mutate the original.
-func (c Custom) Position(_ time.Time) (*coord.ICRS, error) {
-	if c.Coord == nil {
-		return coord.NewICRS(angle.Rad(0), angle.Rad(0)), nil
-	}
-	return coord.NewICRS(c.Coord.RA(), c.Coord.Dec()), nil
-}
-
-// NewBody creates a new moving target using the provided ephemeris provider.
-func NewBody(id ephemeris.ID, p ephemeris.Provider) Body {
-	return Body{ID: id, Provider: p}
-}
-
-// NewDefaultBody creates a new moving target using the default ephemeris provider.
-func NewDefaultBody(id ephemeris.ID) Body {
-	return Body{ID: id, Provider: ephemeris.Default()}
-}
-
-// Body is an Observable that represents a moving solar-system ephemeris.
-// It uses an ephemeris.Provider to compute coordinates at a given time.
-type Body struct {
-	ID       ephemeris.ID
-	Provider ephemeris.Provider
-}
-
-// Name returns the conventional name of the solar-system ephemeris.
-func (b Body) Name() string {
-	return b.ID.String()
-}
-
-// Position returns the geocentric ICRS coordinates of the body at time t.
-func (b Body) Position(t time.Time) (*coord.ICRS, error) {
-	if b.Provider == nil {
-		return nil, errors.New("target: nil ephemeris provider")
-	}
-
-	// Obtain the geocentric position vector (in AU).
-	pos, err := ephemeris.Position(b.Provider, b.ID, t)
-	if err != nil {
-		return nil, fmt.Errorf("target: ephemeris error for %s: %w", b.Name(), err)
-	}
-
-	// Convert the position vector into coord.ICRS.
-	icrs, err := ephemeris.ToICRS(pos)
-	if err != nil {
-		return nil, fmt.Errorf("target: coordinate conversion error for %s: %w", b.Name(), err)
-	}
-
-	return icrs, nil
-}
-
-// GeocentricVec returns the raw geocentric position vector (in AU) for the body.
+// GeocentricVec returns the raw geocentric position vector (in AU).
 // This is used by the event solver to route through the topocentric reduction
-// pipeline (coord.Reducer), which applies proper parallax correction — critical
-// for the Moon (~1° topocentric parallax).
-func (b Body) GeocentricVec(t time.Time) (vector.Vec3, error) {
-	if b.Provider == nil {
-		return vector.Vec3{}, errors.New("target: nil ephemeris provider")
+// pipeline (coord.Reducer), which applies proper parallax correction.
+func (t Target) GeocentricVec(time time.Time) (vector.Vec3, error) {
+	if t.Provider == nil {
+		return vector.Vec3{}, errors.New("target: not a moving body")
 	}
-	return ephemeris.Position(b.Provider, b.ID, t)
+	idStr := t.Catalog.ID
+	if idStr == "" {
+		return vector.Vec3{}, errors.New("moving target requires a valid Catalog.ID")
+	}
+	idUint, err := strconv.ParseUint(idStr, 10, 32)
+	if err != nil {
+		return vector.Vec3{}, err
+	}
+	return eph.Position(t.Provider, eph.ID(idUint), time)
+}
+
+// GetDetails computes properties for the Target.
+func (t Target) GetDetails(ctx *coord.Context, props ...string) (*TargetDetails, error) {
+	return computeDetails(t, ctx, props...)
+}
+
+func NewSun(provider eph.Provider) Target {
+	return NewTarget(catalog.Target{ID: "11", Name: "Sun", Kind: resolve.KindStar}, provider)
+}
+
+func NewMoon(provider eph.Provider) Target {
+	return NewTarget(catalog.Target{ID: "10", Name: "Moon", Kind: resolve.KindMoon}, provider)
+}
+
+func NewMercury(provider eph.Provider) Target {
+	return NewTarget(catalog.Target{ID: "1", Name: "Mercury", Kind: resolve.KindPlanet}, provider)
+}
+
+func NewVenus(provider eph.Provider) Target {
+	return NewTarget(catalog.Target{ID: "2", Name: "Venus", Kind: resolve.KindPlanet}, provider)
+}
+
+func NewEarth(provider eph.Provider) Target {
+	return NewTarget(catalog.Target{ID: "3", Name: "Earth", Kind: resolve.KindPlanet}, provider)
+}
+
+func NewMars(provider eph.Provider) Target {
+	return NewTarget(catalog.Target{ID: "4", Name: "Mars", Kind: resolve.KindPlanet}, provider)
+}
+
+func NewJupiter(provider eph.Provider) Target {
+	return NewTarget(catalog.Target{ID: "5", Name: "Jupiter", Kind: resolve.KindPlanet}, provider)
+}
+
+func NewSaturn(provider eph.Provider) Target {
+	return NewTarget(catalog.Target{ID: "6", Name: "Saturn", Kind: resolve.KindPlanet}, provider)
+}
+
+func NewUranus(provider eph.Provider) Target {
+	return NewTarget(catalog.Target{ID: "7", Name: "Uranus", Kind: resolve.KindPlanet}, provider)
+}
+
+func NewNeptune(provider eph.Provider) Target {
+	return NewTarget(catalog.Target{ID: "8", Name: "Neptune", Kind: resolve.KindPlanet}, provider)
+}
+
+func NewPluto(provider eph.Provider) Target {
+	return NewTarget(catalog.Target{ID: "9", Name: "Pluto", Kind: resolve.KindPlanet}, provider)
 }

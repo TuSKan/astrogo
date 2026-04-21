@@ -16,17 +16,17 @@ import (
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
-	"github.com/TuSKan/astrogo/ephemeris/jpl"
+	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/plan"
 	"github.com/TuSKan/astrogo/time"
 )
 
 func main() {
-	eph, err := jpl.NewProvider(jpl.WithSource(jpl.Planets), jpl.WithKernel("de441_part-1"))
+	prov, err := eph.NewProvider(eph.Planets, "de441_part-1")
 	if err != nil {
 		panic(err)
 	}
-	defer eph.Close()
+	defer prov.Close()
 
 	// Jerusalem: 31°46'N, 35°14'E, altitude ~780m (Temple Mount)
 	loc, err := coord.NewGeodetic(angle.Deg(31.7683), angle.Deg(35.2137), 780.0)
@@ -50,7 +50,7 @@ func main() {
 	tEnd := time.Date(33, time.April, 4, 0, 0, 0, 0, time.LocationUTC)
 
 	// ── Sunset ──
-	_, sunSet, err := plan.SunriseSunset(tStart, tEnd, site, eph)
+	_, sunSet, err := plan.SunriseSunset(tStart, tEnd, site, prov)
 	if err != nil {
 		fmt.Printf("  Sunset error: %v\n", err)
 	} else if sunSet != nil {
@@ -61,7 +61,7 @@ func main() {
 	}
 
 	// ── Moonrise ──
-	moonRise, _, err := plan.MoonriseMoonset(tStart, tEnd, site, eph)
+	moonRise, _, err := plan.MoonriseMoonset(tStart, tEnd, site, prov)
 	if err != nil {
 		fmt.Printf("  Moonrise error: %v\n", err)
 	} else if moonRise != nil {
@@ -75,7 +75,7 @@ func main() {
 	eStart := time.Date(33, time.March, 1, 0, 0, 0, 0, time.LocationUTC)
 	eEnd := time.Date(33, time.May, 1, 0, 0, 0, 0, time.LocationUTC)
 
-	eclipses, err := plan.LunarEclipses(eStart, eEnd, eph)
+	eclipses, err := plan.LunarEclipses(eStart, eEnd, prov)
 	if err != nil {
 		fmt.Printf("  Eclipse error: %v\n", err)
 	}
@@ -99,7 +99,7 @@ func main() {
 
 	// ── Moon Illumination at moonrise ──
 	if moonRise != nil {
-		frac, phaseAngle, err := plan.MoonIllumination(moonRise.Time, eph)
+		frac, phaseAngle, err := plan.MoonIllumination(moonRise.Time, prov)
 		if err != nil {
 			fmt.Printf("  Illumination error: %v\n", err)
 		} else {
@@ -136,7 +136,7 @@ func main() {
 	pilateStart := time.Date(26, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
 	pilateEnd := time.Date(37, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
 
-	allEclipses, err := plan.LunarEclipses(pilateStart, pilateEnd, eph)
+	allEclipses, err := plan.LunarEclipses(pilateStart, pilateEnd, prov)
 	if err != nil {
 		panic(err)
 	}

@@ -3,6 +3,7 @@ package jpl_test
 import (
 	"testing"
 
+	"github.com/TuSKan/astrogo/ephemeris/core"
 	"github.com/TuSKan/astrogo/ephemeris/jpl"
 	"github.com/TuSKan/astrogo/ephemeris/jpl/spk"
 )
@@ -29,7 +30,7 @@ func BenchmarkEvalChebyshev(b *testing.B) {
 }
 
 func BenchmarkFindSegment(b *testing.B) {
-	p, _ := jpl.NewProvider(jpl.WithDataDir("data"))
+	p, _ := jpl.NewProvider(core.Planets, "de440s", jpl.WithDataDir("data"))
 
 	// Mock 100 kernels, each with 10 targets, each target has 1 segment.
 	// Total 1,000 segments in Index.

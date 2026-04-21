@@ -42,6 +42,10 @@ type Target struct {
 	RadialVelocity float64 // km/s
 	Catalog        string
 	Aliases        []string
+
+	// TLE data for satellite targets (populated by NORAD provider).
+	TLELine1 string
+	TLELine2 string
 }
 
 // ICRS implements coord.Object for a static catalog Target.

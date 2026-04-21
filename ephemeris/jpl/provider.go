@@ -8,32 +8,20 @@ import (
 	"path/filepath"
 	"runtime"
 
-	"github.com/TuSKan/astrogo/ephemeris"
+	"github.com/TuSKan/astrogo/ephemeris/core"
 	"github.com/TuSKan/astrogo/ephemeris/jpl/lsk"
 	"github.com/TuSKan/astrogo/ephemeris/jpl/spk"
 	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/vector"
 )
 
-// Source defines the type of ephemeris data source.
-type Source string
-
-const (
-	Planets    Source = "planets"
-	SmallBody  Source = "smallbody"
-	Asteroids  Source = "asteroids"
-	Comets     Source = "comets"
-	Satellites Source = "satellites"
-	Stations   Source = "stations"
-)
-
 const JPL_KERNEL_URI = "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/"
 const KM_PER_AU = 149597870.7
 
-var BodyIDToNAIF = map[ephemeris.ID]int{
-	ephemeris.Sun: 10, ephemeris.Moon: 301, ephemeris.Mercury: 199, ephemeris.Venus: 299,
-	ephemeris.Earth: 399, ephemeris.Mars: 4, ephemeris.Jupiter: 5, ephemeris.Saturn: 6,
-	ephemeris.Uranus: 7, ephemeris.Neptune: 8,
+var BodyIDToNAIF = map[core.ID]int{
+	core.Sun: 10, core.Moon: 301, core.Mercury: 199, core.Venus: 299,
+	core.Earth: 399, core.Mars: 4, core.Jupiter: 5, core.Saturn: 6,
+	core.Uranus: 7, core.Neptune: 8,
 }
 
 var ErrNoSegment = fmt.Errorf("jpl: no coverage for target at requested epoch")
@@ -57,7 +45,7 @@ type TargetCoverage struct {
 	Count   int
 }
 
-// Provider implements ephemeris.Provider using JPL SPK/LSK kernels.
+// Provider implements core.Provider using JPL SPK/LSK kernels.
 type Provider struct {
 	LSK              *lsk.Reader
 	Kernels          []*Kernel
@@ -67,10 +55,10 @@ type Provider struct {
 	DataDir          string
 
 	// Configuration fields for initialization
-	Source    Source
-	Kernel    string
-	StartTime time.Time
-	EndTime   time.Time
+	source    core.Source
+	kernel    string
+	startTime time.Time
+	endTime   time.Time
 }
 
 type Option func(*Provider)
@@ -79,30 +67,25 @@ func WithDataDir(dataDir string) Option {
 	return func(p *Provider) { p.DataDir = dataDir }
 }
 
-func WithKernel(version string) Option {
-	return func(p *Provider) { p.Kernel = version }
-}
-
 func WithTimeInterval(start, end time.Time) Option {
 	return func(p *Provider) {
-		p.StartTime = start
-		p.EndTime = end
-	}
-}
-
-func WithSource(src Source) Option {
-	return func(p *Provider) {
-		p.Source = src
+		p.startTime = start
+		p.endTime = end
 	}
 }
 
 // NewProvider creates a new JPL ephemeris provider.
-func NewProvider(opts ...Option) (*Provider, error) {
+//
+// The source selects the kind of JPL data (Planets, SmallBody, Asteroids,
+// Comets). The kernel identifies the specific dataset (e.g. "de442", "433").
+func NewProvider(source core.Source, kernel string, opts ...Option) (*Provider, error) {
 	_, filename, _, _ := runtime.Caller(0)
 	p := &Provider{
 		DataDir:          filepath.Join(filepath.Dir(filename), "data"),
 		ByTarget:         make(map[int32][]SegmentRef),
 		ByTargetCoverage: make(map[int32]TargetCoverage),
+		source:           source,
+		kernel:           kernel,
 	}
 	for _, opt := range opts {
 		opt(p)
@@ -112,19 +95,19 @@ func NewProvider(opts ...Option) (*Provider, error) {
 		return nil, fmt.Errorf("jpl: failed to create directory: %w", err)
 	}
 
-	switch p.Source {
-	case Planets:
-		if p.Kernel == "" {
-			p.Kernel = "de440"
+	switch p.source {
+	case core.Planets:
+		if p.kernel == "" {
+			p.kernel = "de440"
 		}
-		k, err := spk.CacheDownload("planets/"+p.Kernel+".bsp", p.DataDir)
+		k, err := spk.CacheDownload("planets/"+p.kernel+".bsp", p.DataDir)
 		if err != nil {
 			return nil, fmt.Errorf("jpl: failed to load planetary kernel: %w", err)
 		}
 		if err := p.AddKernel(k); err != nil {
 			return nil, fmt.Errorf("jpl: failed to load planetary kernel: %w", err)
 		}
-	case Asteroids, Comets, SmallBody:
+	case core.Asteroids, core.Comets, core.SmallBody:
 		// Always load a minimal planetary kernel for recursion (center resolution)
 		pk, err := spk.CacheDownload("planets/de440s.bsp", p.DataDir)
 		if err != nil {
@@ -134,7 +117,7 @@ func NewProvider(opts ...Option) (*Provider, error) {
 			return nil, fmt.Errorf("jpl: failed to add planetary base kernel: %w", err)
 		}
 
-		spkReaders, err := spk.CacheAPI(p.Kernel, p.StartTime, p.EndTime, filepath.Join(p.DataDir, string(p.Source)))
+		spkReaders, err := spk.CacheAPI(p.kernel, p.startTime, p.endTime, filepath.Join(p.DataDir, string(p.source)))
 		if err != nil {
 			return nil, fmt.Errorf("jpl: failed to get SPK files: %w", err)
 		}
@@ -143,12 +126,12 @@ func NewProvider(opts ...Option) (*Provider, error) {
 				return nil, fmt.Errorf("jpl: failed to load small-body kernel: %w", err)
 			}
 		}
-	case Satellites:
+	case core.Satellites:
 		return nil, fmt.Errorf("jpl: satellites source not implemented")
-	case Stations:
+	case core.Stations:
 		return nil, fmt.Errorf("jpl: stations source not implemented")
 	default:
-		return nil, fmt.Errorf("jpl: unknown source %q", p.Source)
+		return nil, fmt.Errorf("jpl: unknown source %q", p.source)
 	}
 
 	var err error
@@ -178,7 +161,7 @@ func (p *Provider) Close() error {
 
 // State returns the geocentric state (position and velocity) of the given
 // body at time t.
-func (p *Provider) State(id ephemeris.ID, t time.Time) (ephemeris.State, error) {
+func (p *Provider) State(id core.ID, t time.Time) (core.State, error) {
 	naif, ok := BodyIDToNAIF[id]
 	if !ok {
 		naif = int(id)
@@ -190,13 +173,13 @@ func (p *Provider) State(id ephemeris.ID, t time.Time) (ephemeris.State, error) 
 	// Get target relative to SSB (0)
 	targetSSB, err := p.evaluateRecursive(int32(naif), et, 0)
 	if err != nil {
-		return ephemeris.State{}, err
+		return core.State{}, err
 	}
 
 	// Get Earth relative to SSB (0)
 	earthSSB, err := p.evaluateRecursive(399, et, 0)
 	if err != nil {
-		return ephemeris.State{}, fmt.Errorf("jpl: failed to get Earth state: %w", err)
+		return core.State{}, fmt.Errorf("jpl: failed to get Earth state: %w", err)
 	}
 
 	// Geocentric = Target(SSB) - Earth(SSB)
@@ -204,7 +187,7 @@ func (p *Provider) State(id ephemeris.ID, t time.Time) (ephemeris.State, error) 
 	relVel := targetSSB.Vel.Sub(earthSSB.Vel)
 
 	// Convert to AU and AU/day
-	return ephemeris.State{
+	return core.State{
 		Pos: vector.Vec3{
 			X: relPos.X / KM_PER_AU,
 			Y: relPos.Y / KM_PER_AU,
@@ -218,26 +201,26 @@ func (p *Provider) State(id ephemeris.ID, t time.Time) (ephemeris.State, error) 
 	}, nil
 }
 
-func (p *Provider) evaluateRecursive(targetID int32, et float64, baseID int32) (ephemeris.State, error) {
+func (p *Provider) evaluateRecursive(targetID int32, et float64, baseID int32) (core.State, error) {
 	currentID := targetID
 	var totalPos, totalVel vector.Vec3
 
 	// Limit depth to prevent infinite loops (though SPK trees should be shallow)
 	for depth := 0; depth < 10; depth++ {
 		if currentID == baseID {
-			return ephemeris.State{Pos: totalPos, Vel: totalVel}, nil
+			return core.State{Pos: totalPos, Vel: totalVel}, nil
 		}
 
 		ref, err := p.FindSegment(currentID, et)
 		if err != nil {
-			return ephemeris.State{}, err
+			return core.State{}, err
 		}
 
 		k := p.Kernels[ref.KernelIndex]
 		s := &k.Segments[ref.SegmentIndex]
 		pos, vel, err := spk.EvaluateSegment(s, k.Reader, et)
 		if err != nil {
-			return ephemeris.State{}, err
+			return core.State{}, err
 		}
 
 		totalPos = totalPos.Add(pos)
@@ -245,7 +228,7 @@ func (p *Provider) evaluateRecursive(targetID int32, et float64, baseID int32) (
 		currentID = s.Center
 	}
 
-	return ephemeris.State{}, fmt.Errorf("jpl: recursion depth exceeded for target %d", targetID)
+	return core.State{}, fmt.Errorf("jpl: recursion depth exceeded for target %d", targetID)
 }
 
 // AddKernel opens an SPK file and adds its segments to the provider index.
@@ -338,14 +321,14 @@ func (p *Provider) segment(ref SegmentRef) *spk.Segment {
 }
 
 // SupportedBodies returns a list of body IDs available in the loaded kernels.
-func (p *Provider) SupportedBodies() []ephemeris.ID {
-	seen := make(map[ephemeris.ID]bool)
-	var res []ephemeris.ID
+func (p *Provider) SupportedBodies() []core.ID {
+	seen := make(map[core.ID]bool)
+	var res []core.ID
 	for targetID := range p.ByTarget {
-		bid := ephemeris.ID(targetID)
+		bid := core.ID(targetID)
 		// Map back from asteroid ID if needed
 		if targetID > 20000000 && targetID < 21000000 {
-			bid = ephemeris.ID(targetID - 20000000)
+			bid = core.ID(targetID - 20000000)
 		}
 
 		// Check if it's a known body

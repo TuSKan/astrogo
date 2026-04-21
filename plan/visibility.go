@@ -2,6 +2,7 @@ package plan
 
 import (
 	"errors"
+	"fmt"
 	stdtime "time"
 
 	"github.com/TuSKan/astrogo/angle"
@@ -93,6 +94,9 @@ func refineBisect(a, b time.Time, aState bool, check func(time.Time) bool) time.
 //
 // It uses a sampled grid search with the provided step size, then refines
 // each boundary using Chandrupatla root-finding (sub-second precision).
+//
+// The step must be positive and at most 15 minutes. Larger steps risk missing
+// short visibility windows entirely and will return an error.
 func VisibleIntervals(
 	obj coord.Object,
 	site *Site,
@@ -102,6 +106,9 @@ func VisibleIntervals(
 ) ([]Interval, error) {
 	if step <= 0 {
 		step = 5 * stdtime.Minute
+	}
+	if step > 15*stdtime.Minute {
+		return nil, fmt.Errorf("step %v exceeds maximum 15m: large steps risk missing short visibility windows", step)
 	}
 
 	intervals := make([]Interval, 0, 4)
@@ -243,6 +250,9 @@ func MaxAltitudeInWindow(obj coord.Object, site *Site, start, end time.Time) (an
 // which obj satisfies all constraints from site.
 //
 // Transition boundaries are refined using binary search (sub-second precision).
+//
+// The step must be positive and at most 15 minutes. Larger steps risk missing
+// short visibility windows entirely and will return an error.
 func Find(
 	obj coord.Object,
 	site *Site,
@@ -252,6 +262,9 @@ func Find(
 ) ([]Interval, error) {
 	if step <= 0 {
 		step = 5 * stdtime.Minute
+	}
+	if step > 15*stdtime.Minute {
+		return nil, fmt.Errorf("step %v exceeds maximum 15m: large steps risk missing short visibility windows", step)
 	}
 
 	obs, ok := obj.(Observable)

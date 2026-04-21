@@ -24,7 +24,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to resolve target: %s", "Sirius")
 	}
-	target := plan.NewDeepSpace(sirius)
+	target := plan.NewTarget(sirius, nil)
 
 	// 3. Define the Time interval (next 24 hours starting from 6 PM tonight)
 	tz, _ := time.LoadLocation("America/Sao_Paulo")

@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/TuSKan/astrogo/angle"
+	"github.com/TuSKan/astrogo/catalog"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/time"
 )
@@ -27,7 +28,7 @@ func ExampleScheduler_BuildSchedule() {
 	blocks := []*Block{
 		{
 			ID:       "BlockA",
-			Target:   Custom{Label: "TargetA", Coord: coord.NewICRS(angle.Hour(18.69), angle.Zero())},
+			Target:   NewTarget(catalog.Target{Name: "TargetA", Coord: coord.NewICRS(angle.Hour(18.69), angle.Zero())}, nil),
 			Duration: 30 * time.Minute,
 			Priority: 2.0,
 			Config:   Configuration{Filter: "V"},
@@ -38,7 +39,7 @@ func ExampleScheduler_BuildSchedule() {
 		},
 		{
 			ID:       "BlockB",
-			Target:   Custom{Label: "TargetB", Coord: coord.NewICRS(angle.Hour(18.69), angle.Deg(45))},
+			Target:   NewTarget(catalog.Target{Name: "TargetB", Coord: coord.NewICRS(angle.Hour(18.69), angle.Deg(45))}, nil),
 			Duration: 45 * time.Minute,
 			Priority: 1.0,
 			Config:   Configuration{Filter: "R"},

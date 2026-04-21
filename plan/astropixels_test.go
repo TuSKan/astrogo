@@ -22,8 +22,7 @@ import (
 	"testing"
 	gotime "time"
 
-	"github.com/TuSKan/astrogo/ephemeris/jpl"
-	"github.com/TuSKan/astrogo/ephemeris/jpl/spk"
+	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/plan"
 	"github.com/TuSKan/astrogo/time"
 )
@@ -192,21 +191,11 @@ func fetchAstroPixelsPage(t *testing.T, startYear int) string {
 
 func TestAstroPixels_MoonPhases(t *testing.T) {
 	// Load both DE441 parts for full coverage: part-1 (deep historical) + part-2 (modern/future)
-	eph, err := jpl.NewProvider(jpl.WithSource(jpl.Planets), jpl.WithKernel("de441_part-1"))
+	prov, err := eph.NewProvider(eph.Planets, "de441_part-1", eph.WithKernel("de441_part-2"))
 	if err != nil {
-		t.Fatalf("Failed to create DE441 part-1 provider: %v", err)
+		t.Fatalf("Failed to create DE441 provider: %v", err)
 	}
-	defer eph.Close()
-
-	// Add part-2 for modern/future coverage (~1969 CE to +17191 CE)
-	k2, err := spk.CacheDownload("planets/de441_part-2.bsp", eph.DataDir)
-	if err != nil {
-		t.Logf("WARNING: DE441 part-2 unavailable (%v) — post-1969 dates may be skipped", err)
-	} else {
-		if err := eph.AddKernel(k2); err != nil {
-			t.Logf("WARNING: failed to add DE441 part-2: %v", err)
-		}
-	}
+	defer prov.Close()
 
 	// Century start years to test — spans the full catalog
 	// AstroPixels covers 0001-4000 CE (common era pages)
@@ -251,7 +240,7 @@ func TestAstroPixels_MoonPhases(t *testing.T) {
 				searchStart := refTime.Add(-2 * 24 * time.Hour)
 				searchEnd := refTime.Add(2 * 24 * time.Hour)
 
-				phases, err := plan.MoonPhases(searchStart, searchEnd, eph)
+				phases, err := plan.MoonPhases(searchStart, searchEnd, prov)
 				if err != nil {
 					t.Logf("  SKIP %04d-%02d-%02d %02d:%02d %s: MoonPhases error: %v",
 						ref.Year, ref.Month, ref.Day, ref.Hour, ref.Min, ref.Phase, err)

@@ -4,9 +4,9 @@
 // Methodology:
 //  1. Compute the vernal equinox for each year
 //  2. Find new moons near the equinox
-//  3. Estimate crescent visibility (moon age at Jerusalem sunset)
-//  4. Count to Nisan 14
-//  5. Check if it's a Friday
+//  3. Compute topocentric crescent parameters at Jerusalem sunset
+//  4. Evaluate all 20 modern visibility criteria
+//  5. Count to Nisan 14 and check if it's a Friday
 //
 // Requires DE441 for epoch coverage.
 package main
@@ -14,7 +14,9 @@ package main
 import (
 	"fmt"
 
-	"github.com/TuSKan/astrogo/ephemeris/jpl"
+	"github.com/TuSKan/astrogo/angle"
+	"github.com/TuSKan/astrogo/coord"
+	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/plan"
 	"github.com/TuSKan/astrogo/time"
 )
@@ -24,17 +26,22 @@ type fridayCandidate struct {
 	year     int
 	nisan14  string
 	ageHours float64
+	crescent plan.CrescentResult
 }
 
 func main() {
-	eph, err := jpl.NewProvider(jpl.WithSource(jpl.Planets), jpl.WithKernel("de441_part-1"))
+	prov, err := eph.NewProvider(eph.Planets, "de441_part-1")
 	if err != nil {
 		panic(err)
 	}
-	defer eph.Close()
+	defer prov.Close()
+
+	// Jerusalem: 31.7683°N, 35.2137°E, 754m
+	jerusalem, _ := coord.NewGeodetic(angle.Deg(35.2137), angle.Deg(31.7683), 754)
 
 	fmt.Println("══════════════════════════════════════════════════════════════")
-	fmt.Println("  Passover Moon — Friday Nisan 14 Candidates (AD 26–36)")
+	fmt.Println("  Passover Moon — Friday Nisan 14 Candidates (AD 26-36)")
+	fmt.Println("  with Lunar Crescent Visibility Analysis")
 	fmt.Println("══════════════════════════════════════════════════════════════")
 	fmt.Println()
 	fmt.Printf("  %-4s  %-20s  %-20s  %6s  %-16s  %-9s  %s\n",
@@ -45,7 +52,7 @@ func main() {
 
 	for year := 26; year <= 36; year++ {
 		// 1. Find the vernal equinox
-		seasons, err := plan.Seasons(year, eph)
+		seasons, err := plan.Seasons(year, prov)
 		if err != nil {
 			fmt.Printf("  AD %d: seasons error: %v\n", year, err)
 			continue
@@ -66,7 +73,7 @@ func main() {
 		// 2. Find new moons within a window around the equinox
 		searchStart := equinox.Add(-45 * 24 * time.Hour)
 		searchEnd := equinox.Add(45 * 24 * time.Hour)
-		phases, err := plan.MoonPhases(searchStart, searchEnd, eph)
+		phases, err := plan.MoonPhases(searchStart, searchEnd, prov)
 		if err != nil {
 			fmt.Printf("  AD %d: moon phases error: %v\n", year, err)
 			continue
@@ -102,8 +109,23 @@ func main() {
 
 				ageHours := sunsetUTC.Sub(nm.Time).Hours()
 
-				// Moon must be at least 20 hours old for likely naked-eye visibility
-				if ageHours >= 20.0 && ageHours < 72.0 {
+				// Moon must be at least 15 hours old for any plausible visibility
+				if ageHours >= 15.0 && ageHours < 72.0 {
+					// Compute topocentric crescent parameters at this sunset
+					params, err := plan.NewCrescentParams(sunsetUTC, jerusalem, prov)
+					if err != nil {
+						continue
+					}
+					result := params.EvaluateAll()
+
+					// Check if at least the Danjon elongation criterion is met
+					if !result.Danjon {
+						continue
+					}
+
+					// Count positive criteria as a visibility confidence score
+					nVisible := countVisible(result)
+
 					// This sunset marks the evening that begins Nisan 1.
 					// In the Jewish calendar, a "day" runs sunset-to-sunset.
 					// The DAYTIME of Nisan 14 (Passover sacrifice / crucifixion)
@@ -120,17 +142,19 @@ func main() {
 							year:     year,
 							nisan14:  nisan14.FormatJulian("Jan 02"),
 							ageHours: ageHours,
+							crescent: result,
 						})
 					}
 
-					fmt.Printf("  %4d  %-20s  %-20s  %5.1f   %-16s  %-9s  %s\n",
+					fmt.Printf("  %4d  %-20s  %-20s  %5.1f   %-16s  %-9s  %s  [%d/20 criteria]\n",
 						year,
 						equinox.FormatJulian("Jan 02 15:04 MST"),
 						nm.Time.FormatJulian("Jan 02 15:04 MST"),
 						ageHours,
 						nisan14.FormatJulian("Jan 02 2006"),
 						weekday,
-						marker)
+						marker,
+						nVisible)
 					break // Take the first visible sunset
 				}
 			}
@@ -144,16 +168,54 @@ func main() {
 	} else {
 		fmt.Println("  Friday Nisan 14 candidates found:")
 		for _, f := range fridays {
-			fmt.Printf("    • AD %d — %s (Julian) — crescent age %.1f hours\n",
-				f.year, f.nisan14, f.ageHours)
+			nVisible := countVisible(f.crescent)
+			fmt.Printf("    • AD %d — %s (Julian) — crescent age %.1f hours — %d/20 criteria met\n",
+				f.year, f.nisan14, f.ageHours, nVisible)
 		}
+
+		// Show detailed crescent evaluation for each Friday candidate
+		for _, f := range fridays {
+			fmt.Println()
+			fmt.Printf("  ── Crescent Visibility: AD %d (%s) ─────────────────────\n",
+				f.year, f.nisan14)
+			fmt.Println(indent(f.crescent.String(), "    "))
+		}
+
 		fmt.Println()
-		fmt.Println("  Result: AD 30 (April 7) and AD 33 (April 3) are the only")
-		fmt.Println("  years in the Pilate window where Nisan 14 falls on a Friday")
-		fmt.Println("  with a Passover-eligible new moon (≥ vernal equinox).")
-		fmt.Println("  AD 33 has the more comfortable crescent age (~26h vs ~43h).")
+		fmt.Println("  Conclusion: AD 30 and AD 33 are the only years in the Pilate")
+		fmt.Println("  window where Nisan 14 falls on a Friday with a Passover-eligible")
+		fmt.Println("  new moon (≥ vernal equinox).")
 	}
 	fmt.Println()
+}
+
+// countVisible counts how many of the 20 criteria report visibility.
+func countVisible(r plan.CrescentResult) int {
+	n := 0
+	bools := []bool{
+		r.Fotheringham, r.Maunder, r.Ilyas1988, r.Fatoohi, r.KraussAthenian,
+		r.MABIMS1995, r.Istanbul2016, r.MABIMS2021,
+		r.Danjon, r.Schaefer, r.Ilyas1984,
+		r.Bruin, r.AlrefayNakedEye,
+		r.CaldwellNakedEye, r.CaldwellOptical, r.Gautschy,
+	}
+	for _, b := range bools {
+		if b {
+			n++
+		}
+	}
+	// Zone-based criteria: count if in a "visible" zone
+	if r.Yallop.Code == "A" || r.Yallop.Code == "B" {
+		n++
+	}
+	if r.Odeh.Code == "Naked Eye" || r.Odeh.Code == "Optical/Naked" {
+		n++
+	}
+	if r.Qureshi.Code == "A" || r.Qureshi.Code == "B" {
+		n++
+	}
+	// Alrefay is already counted above as AlrefayNakedEye
+	return n
 }
 
 func repeat(ch rune, n int) string {
@@ -162,4 +224,32 @@ func repeat(ch rune, n int) string {
 		s[i] = ch
 	}
 	return string(s)
+}
+
+func indent(s, prefix string) string {
+	out := ""
+	for i, line := range splitLines(s) {
+		if i > 0 {
+			out += "\n"
+		}
+		if line != "" {
+			out += prefix + line
+		}
+	}
+	return out
+}
+
+func splitLines(s string) []string {
+	var lines []string
+	start := 0
+	for i := 0; i < len(s); i++ {
+		if s[i] == '\n' {
+			lines = append(lines, s[start:i])
+			start = i + 1
+		}
+	}
+	if start < len(s) {
+		lines = append(lines, s[start:])
+	}
+	return lines
 }

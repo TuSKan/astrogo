@@ -22,6 +22,9 @@ func (m mockObject) ICRS(t time.Time) (*coord.ICRS, error) {
 
 func (m mockObject) Name() string                              { return "mock" }
 func (m mockObject) Position(t time.Time) (*coord.ICRS, error) { return m.pos, nil }
+func (m mockObject) GetDetails(ctx *coord.Context, props ...string) (*TargetDetails, error) {
+	return nil, nil
+}
 
 func TestIsVisible(t *testing.T) {
 	// Site at lat 45
@@ -57,7 +60,7 @@ func TestVisibleIntervals(t *testing.T) {
 	// Circumpolar-like object (very high dec)
 	obj := mockObject{pos: coord.NewICRS(angle.Deg(0), angle.Deg(89))}
 
-	intervals, err := VisibleIntervals(obj, site, start, end, 1*stdtime.Hour, angle.Deg(10))
+	intervals, err := VisibleIntervals(obj, site, start, end, 15*stdtime.Minute, angle.Deg(10))
 	testutil.AssertNoError(t, err)
 
 	if len(intervals) == 0 {
@@ -75,7 +78,7 @@ func TestNeverVisible(t *testing.T) {
 	// Object far below horizon (antipode)
 	obj := mockObject{pos: coord.NewICRS(angle.Deg(0), angle.Deg(-89))}
 
-	intervals, err := VisibleIntervals(obj, site, start, end, 1*stdtime.Hour, angle.Deg(0))
+	intervals, err := VisibleIntervals(obj, site, start, end, 15*stdtime.Minute, angle.Deg(0))
 	testutil.AssertNoError(t, err)
 
 	if len(intervals) > 0 {
@@ -114,7 +117,7 @@ func TestFind(t *testing.T) {
 	end := start.AddDays(1)
 	obj := mockObject{pos: coord.NewICRS(angle.Deg(100), angle.Deg(20))}
 
-	intervals, err := Find(obj, site, nil, start, end, 1*stdtime.Hour)
+	intervals, err := Find(obj, site, nil, start, end, 15*stdtime.Minute)
 	testutil.AssertNoError(t, err)
 	if len(intervals) == 0 {
 		t.Fatalf("Expected observable intervals")

@@ -13,7 +13,7 @@ import (
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
-	"github.com/TuSKan/astrogo/ephemeris"
+	eph "github.com/TuSKan/astrogo/ephemeris"
 	atime "github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/vector"
 )
@@ -24,14 +24,16 @@ type mockLinearProvider struct {
 	vel      vector.Vec3
 }
 
-func (m *mockLinearProvider) State(id ephemeris.ID, t atime.Time) (ephemeris.State, error) {
+func (m *mockLinearProvider) State(id eph.ID, t atime.Time) (eph.State, error) {
 	jd1_req, jd2_req := t.JDParts()
 	jd1_base, jd2_base := m.baseTime.JDParts()
 	dtDays := (jd1_req - jd1_base) + (jd2_req - jd2_base)
 
 	p := m.pos.Add(m.vel.MulScalar(dtDays))
-	return ephemeris.State{Pos: p, Vel: m.vel}, nil
+	return eph.State{Pos: p, Vel: m.vel}, nil
 }
+
+func (m *mockLinearProvider) Close() error { return nil }
 
 // ObserverPoint JSON map matching the horizons_api struct
 type BaselinePoint struct {
@@ -95,7 +97,7 @@ func TestScientificStability(t *testing.T) {
 			}
 
 			// Construct an isolated MockProvider for dynamic library ingestion testing offline.
-			// This tests ephemeris.ApparentState's exact iteration logic safely without networking.
+			// This tests eph.ApparentState's exact iteration logic safely without networking.
 			mock := &mockLinearProvider{
 				baseTime: obsTime,
 				pos:      targetGeoVec,
@@ -103,7 +105,7 @@ func TestScientificStability(t *testing.T) {
 			}
 
 			// Natively extract the rigorous retarded-time Geocentric state directly from the library
-			appState, _ := ephemeris.ApparentState(mock, ephemeris.ID(c.TargetID), obsTime)
+			appState, _ := eph.ApparentState(mock, eph.ID(c.TargetID), obsTime)
 
 			// Get standard Earth model matrices to extract Topocentric offset
 			atm := atmosphere.StandardAtmosphere
@@ -114,7 +116,7 @@ func TestScientificStability(t *testing.T) {
 			obsCtx := coord.NewContext(obsTime, site, atm)
 			observed := obsCtx.GeocentricToObserved(appState.Pos)
 
-			appICRS, _ := ephemeris.ToICRS(appState.Pos)
+			appICRS, _ := eph.ToICRS(appState.Pos)
 			dRA_raw := math.Abs(appICRS.RA().Degrees() - c.Data.AstroRA)
 			if dRA_raw > 180.0 {
 				dRA_raw = 360.0 - dRA_raw

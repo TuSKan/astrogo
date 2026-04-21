@@ -20,8 +20,7 @@ import (
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
-	"github.com/TuSKan/astrogo/ephemeris"
-	"github.com/TuSKan/astrogo/ephemeris/jpl"
+	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/plan"
 	"github.com/TuSKan/astrogo/time"
 )
@@ -102,19 +101,6 @@ type usnoCelNavEntry struct {
 	} `json:"altitude_corrections"`
 }
 
-type usnoDSTResponse struct {
-	APIVersion string         `json:"apiversion"`
-	Data       []usnoDSTEntry `json:"data"`
-	Year       int            `json:"year"`
-}
-
-type usnoDSTEntry struct {
-	Month  int    `json:"month"`
-	Day    int    `json:"day"`
-	Phenom string `json:"phenom"`
-	Time   string `json:"time"`
-}
-
 // ── Test Location ────────────────────────────────────────────────────────────
 
 type testLocation struct {
@@ -182,25 +168,25 @@ func deltaMinutes(usnoMin, astroMin float64) float64 {
 	return d
 }
 
-func newEph(t *testing.T) ephemeris.Provider {
+func newEph(t *testing.T) eph.Provider {
 	t.Helper()
-	eph, err := jpl.NewProvider(jpl.WithSource(jpl.Planets), jpl.WithKernel("de442"))
+	p, err := eph.NewProvider(eph.Planets, "de442")
 	if err != nil {
 		t.Logf("DE442 unavailable (%v), falling back to default", err)
-		def := ephemeris.Default()
+		def := eph.Default()
 		if def == nil {
 			t.Fatal("Failed to create ephemeris: nil provider")
 		}
 		return def
 	}
-	t.Cleanup(func() { eph.Close() })
-	return eph
+	t.Cleanup(func() { p.Close() })
+	return p
 }
 
 // ── Test: Complete Sun and Moon Data for One Day ──────────────────────────────
 
 func TestUSNO_SunMoonOneDay(t *testing.T) {
-	eph := newEph(t)
+	prov := newEph(t)
 	dates := []string{"2026-04-06", "2026-06-21", "2026-12-21"}
 
 	for _, loc := range testLocations {
@@ -245,7 +231,7 @@ func TestUSNO_SunMoonOneDay(t *testing.T) {
 				end := start.Add(24 * time.Hour)
 
 				// Compare Sun events
-				sunEvents, err := plan.SunEvents(start, end, site, eph)
+				sunEvents, err := plan.SunEvents(start, end, site, prov)
 				if err != nil {
 					t.Fatalf("SunEvents failed: %v", err)
 				}
@@ -297,7 +283,7 @@ func TestUSNO_SunMoonOneDay(t *testing.T) {
 				}
 
 				// Compare Moon events
-				moonEvents, err := plan.MoonEvents(start, end, site, eph)
+				moonEvents, err := plan.MoonEvents(start, end, site, prov)
 				if err != nil {
 					t.Fatalf("MoonEvents failed: %v", err)
 				}
@@ -372,13 +358,13 @@ func TestUSNO_CelNav(t *testing.T) {
 	ctx := coord.NewContext(tm, site.Location(), site.Atmosphere())
 
 	// Validate Sun position
-	var eph ephemeris.Provider
-	jplEph, err := jpl.NewProvider(jpl.WithSource(jpl.Planets), jpl.WithKernel("de442"))
+	var prov eph.Provider
+	jplProv, err := eph.NewProvider(eph.Planets, "de442")
 	if err != nil {
 		t.Logf("failed to load jpl de442: %v", err)
-		eph = ephemeris.Default()
+		prov = eph.Default()
 	} else {
-		eph = jplEph
+		prov = jplProv
 	}
 
 	for _, entry := range resp.Properties.Data {
@@ -391,7 +377,7 @@ func TestUSNO_CelNav(t *testing.T) {
 
 		// We can validate Sun position via ephemeris
 		if entry.Object == "Sun" {
-			sunTarget := plan.NewBody(ephemeris.Sun, eph)
+			sunTarget := plan.NewSun(prov)
 			pos, err := sunTarget.Position(tm)
 			if err != nil {
 				t.Logf("Sun position error: %v", err)
@@ -1444,7 +1430,7 @@ func TestUSNO_CelNav_EdgeCases(t *testing.T) {
 			site, _ := plan.NewSite("test", geodetic, angle.Zero(), time.LocationUTC)
 			ctx := coord.NewContext(tm, site.Location(), site.Atmosphere())
 
-			eph := newEph(t)
+			prov := newEph(t)
 
 			for _, entry := range resp.Properties.Data {
 				if entry.Object == "ARIES" {
@@ -1455,7 +1441,7 @@ func TestUSNO_CelNav_EdgeCases(t *testing.T) {
 				}
 
 				if entry.Object == "Sun" {
-					sunTarget := plan.NewBody(ephemeris.Sun, eph)
+					sunTarget := plan.NewSun(prov)
 					pos, err := sunTarget.Position(tm)
 					if err != nil {
 						t.Logf("Sun position error: %v", err)
@@ -1487,7 +1473,7 @@ func TestUSNO_CelNav_EdgeCases(t *testing.T) {
 				}
 
 				if entry.Object == "Moon" {
-					moonTarget := plan.NewBody(ephemeris.Moon, eph)
+					moonTarget := plan.NewMoon(prov)
 					pos, err := moonTarget.Position(tm)
 					if err != nil {
 						t.Logf("Moon position error: %v", err)

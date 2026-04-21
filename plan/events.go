@@ -1,13 +1,15 @@
 package plan
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"sort"
+	"strconv"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
-	"github.com/TuSKan/astrogo/ephemeris"
+	eph "github.com/TuSKan/astrogo/ephemeris"
 
 	"github.com/TuSKan/astrogo/time"
 )
@@ -282,8 +284,8 @@ func (s EventSolver) solveVisibility(spec EventSpec, start, end time.Time) ([]Ev
 
 		// For solar system bodies, use the vector-based topocentric pipeline
 		// which properly corrects for diurnal parallax (critical for the Moon: ~1°).
-		if body, ok := spec.Target.(Body); ok {
-			vec, err := body.GeocentricVec(t)
+		if tTarget, ok := spec.Target.(Target); ok && tTarget.Provider != nil {
+			vec, err := tTarget.GeocentricVec(t)
 			if err != nil {
 				return 0, err
 			}
@@ -344,8 +346,8 @@ func (s EventSolver) solveVisibility(spec EventSpec, start, end time.Time) ([]Ev
 				// Calculate geometric outputs using the appropriate pipeline
 				resCtx := coord.NewContext(resTime, spec.Observer.Location(), spec.Observer.Atmosphere())
 				var aa *coord.AltAz
-				if body, ok := spec.Target.(Body); ok {
-					vec, _ := body.GeocentricVec(resTime)
+				if tTarget, ok := spec.Target.(Target); ok && tTarget.Provider != nil {
+					vec, _ := tTarget.GeocentricVec(resTime)
 					aa = resCtx.GeocentricToObserved(vec)
 				} else {
 					pos, _ := spec.Target.Position(resTime)
@@ -644,8 +646,8 @@ type TwilightEvent struct {
 // SunEvents returns all rise, set, and transit events for the Sun in the given interval.
 // The threshold accounts for atmospheric refraction (34'), solar semi-diameter (16'),
 // and geometric horizon dip from the site's elevation.
-func SunEvents(start, end time.Time, site *Site, eph ephemeris.Provider) ([]Event, error) {
-	sun := NewBody(ephemeris.Sun, eph)
+func SunEvents(start, end time.Time, site *Site, provider eph.Provider) ([]Event, error) {
+	sun := NewSun(provider)
 	solver := NewEventSolver(15*time.Minute, 1*time.Second)
 	spec := EventSpec{
 		Family:    EventFamilyVisibility,
@@ -659,8 +661,8 @@ func SunEvents(start, end time.Time, site *Site, eph ephemeris.Provider) ([]Even
 
 // SunriseSunset returns the first sunrise and first sunset found in the given interval.
 // If an event is not found, the corresponding pointer will be nil.
-func SunriseSunset(start, end time.Time, site *Site, eph ephemeris.Provider) (rise *Event, set *Event, err error) {
-	events, err := SunEvents(start, end, site, eph)
+func SunriseSunset(start, end time.Time, site *Site, prov eph.Provider) (rise *Event, set *Event, err error) {
+	events, err := SunEvents(start, end, site, prov)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -681,8 +683,8 @@ func SunriseSunset(start, end time.Time, site *Site, eph ephemeris.Provider) (ri
 // MoonEvents returns all rise, set, and transit events for the Moon in the given interval.
 // The threshold accounts for atmospheric refraction, mean lunar semi-diameter,
 // horizontal parallax, and geometric horizon dip from the site's elevation.
-func MoonEvents(start, end time.Time, site *Site, eph ephemeris.Provider) ([]Event, error) {
-	moon := NewBody(ephemeris.Moon, eph)
+func MoonEvents(start, end time.Time, site *Site, provider eph.Provider) ([]Event, error) {
+	moon := NewMoon(provider)
 	solver := NewEventSolver(15*time.Minute, 1*time.Second)
 	spec := EventSpec{
 		Family:    EventFamilyVisibility,
@@ -696,8 +698,8 @@ func MoonEvents(start, end time.Time, site *Site, eph ephemeris.Provider) ([]Eve
 
 // MoonriseMoonset returns the first moonrise and first moonset found in the given interval.
 // If an event is not found, the corresponding pointer will be nil.
-func MoonriseMoonset(start, end time.Time, site *Site, eph ephemeris.Provider) (rise *Event, set *Event, err error) {
-	events, err := MoonEvents(start, end, site, eph)
+func MoonriseMoonset(start, end time.Time, site *Site, prov eph.Provider) (rise *Event, set *Event, err error) {
+	events, err := MoonEvents(start, end, site, prov)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -716,13 +718,13 @@ func MoonriseMoonset(start, end time.Time, site *Site, eph ephemeris.Provider) (
 }
 
 // TwilightEvents returns grouped dawn/dusk pairs for the given twilight kind and interval.
-func TwilightEvents(start, end time.Time, site *Site, eph ephemeris.Provider, kind TwilightKind) ([]TwilightEvent, error) {
+func TwilightEvents(start, end time.Time, site *Site, prov eph.Provider, kind TwilightKind) ([]TwilightEvent, error) {
 	threshold, ok := TwilightThresholds[kind]
 	if !ok {
 		return nil, nil
 	}
 
-	sun := NewBody(ephemeris.Sun, eph)
+	sun := NewSun(prov)
 	solver := NewEventSolver(15*time.Minute, 1*time.Second)
 	spec := EventSpec{
 		Family:    EventFamilyVisibility,
@@ -752,23 +754,23 @@ func TwilightEvents(start, end time.Time, site *Site, eph ephemeris.Provider, ki
 }
 
 // CivilDawnDusk returns the first civil dawn and first civil dusk found in the interval.
-func CivilDawnDusk(start, end time.Time, site *Site, eph ephemeris.Provider) (dawn *Event, dusk *Event, err error) {
-	return getTwilightPair(start, end, site, eph, CivilTwilight)
+func CivilDawnDusk(start, end time.Time, site *Site, prov eph.Provider) (dawn *Event, dusk *Event, err error) {
+	return getTwilightPair(start, end, site, prov, CivilTwilight)
 }
 
 // NauticalDawnDusk returns the first nautical dawn and first nautical dusk found in the interval.
-func NauticalDawnDusk(start, end time.Time, site *Site, eph ephemeris.Provider) (dawn *Event, dusk *Event, err error) {
-	return getTwilightPair(start, end, site, eph, NauticalTwilight)
+func NauticalDawnDusk(start, end time.Time, site *Site, prov eph.Provider) (dawn *Event, dusk *Event, err error) {
+	return getTwilightPair(start, end, site, prov, NauticalTwilight)
 }
 
 // AstronomicalDawnDusk returns the first astronomical dawn and first astronomical dusk found in the interval.
-func AstronomicalDawnDusk(start, end time.Time, site *Site, eph ephemeris.Provider) (dawn *Event, dusk *Event, err error) {
-	return getTwilightPair(start, end, site, eph, AstronomicalTwilight)
+func AstronomicalDawnDusk(start, end time.Time, site *Site, prov eph.Provider) (dawn *Event, dusk *Event, err error) {
+	return getTwilightPair(start, end, site, prov, AstronomicalTwilight)
 }
 
-func getTwilightPair(start, end time.Time, site *Site, eph ephemeris.Provider, kind TwilightKind) (dawn *Event, dusk *Event, err error) {
+func getTwilightPair(start, end time.Time, site *Site, prov eph.Provider, kind TwilightKind) (dawn *Event, dusk *Event, err error) {
 	threshold := TwilightThresholds[kind]
-	sun := NewBody(ephemeris.Sun, eph)
+	sun := NewSun(prov)
 	solver := NewEventSolver(15*time.Minute, 1*time.Second)
 	spec := EventSpec{
 		Family:    EventFamilyVisibility,
@@ -888,9 +890,9 @@ func GreatestElongations(start, end time.Time, target, sun Observable) ([]Event,
 
 // FullMoonOppositions returns the full moons (Sun-Moon Oppositions) in the given interval.
 // For eclipse detection, use LunarEclipses() which filters by ecliptic latitude.
-func FullMoonOppositions(start, end time.Time, eph ephemeris.Provider) ([]Event, error) {
-	sun := NewBody(ephemeris.Sun, eph)
-	moon := NewBody(ephemeris.Moon, eph)
+func FullMoonOppositions(start, end time.Time, provider eph.Provider) ([]Event, error) {
+	sun := NewSun(provider)
+	moon := NewMoon(provider)
 
 	// Moon moves very fast, so we use a higher resolution solver
 	solver := NewEventSolver(6*time.Hour, 1*time.Second)
@@ -931,7 +933,16 @@ const EventAnyPhase EventKind = -2
 // coordinate computation and wraps the results as Event types for the
 // unified EventSolver framework.
 func (s EventSolver) solveIllumination(spec EventSpec, start, end time.Time) ([]Event, error) {
-	eph := ephemeris.Default()
+	var prov eph.Provider
+	if tTarget, ok := spec.Target.(Target); ok && tTarget.Provider != nil {
+		idUint, _ := strconv.ParseUint(tTarget.Catalog.ID, 10, 32)
+		if eph.ID(idUint) != eph.Moon {
+			return nil, errors.New("illumination solver requires a Moon target")
+		}
+		prov = tTarget.Provider
+	} else {
+		return nil, errors.New("illumination solver requires a Target with Provider")
+	}
 
 	type phaseTarget struct {
 		kind     EventKind
@@ -963,7 +974,7 @@ func (s EventSolver) solveIllumination(spec EventSpec, start, end time.Time) ([]
 
 	for t := start; !t.After(end); t = t.Add(s.Step) {
 		times = append(times, t)
-		e, err := moonElongation(t, eph)
+		e, err := moonElongation(t, prov)
 		if err != nil {
 			return nil, err
 		}
@@ -971,7 +982,7 @@ func (s EventSolver) solveIllumination(spec EventSpec, start, end time.Time) ([]
 	}
 	if last := times[len(times)-1]; last.Before(end) {
 		times = append(times, end)
-		e, err := moonElongation(end, eph)
+		e, err := moonElongation(end, prov)
 		if err != nil {
 			return nil, err
 		}
@@ -995,7 +1006,7 @@ func (s EventSolver) solveIllumination(spec EventSpec, start, end time.Time) ([]
 		}
 
 		evalDist := func(t time.Time) (float64, error) {
-			e, err := moonElongation(t, eph)
+			e, err := moonElongation(t, prov)
 			if err != nil {
 				return 0, err
 			}
@@ -1016,7 +1027,7 @@ func (s EventSolver) solveIllumination(spec EventSpec, start, end time.Time) ([]
 					continue
 				}
 
-				e, _ := moonElongation(resTime, eph)
+				e, _ := moonElongation(resTime, prov)
 				illumination := (1.0 - math.Cos(e*math.Pi/180.0)) / 2.0
 
 				events = append(events, Event{
@@ -1033,9 +1044,9 @@ func (s EventSolver) solveIllumination(spec EventSpec, start, end time.Time) ([]
 
 // NextNewMoon returns the first New Moon event after the given start time.
 // Searches up to 35 days ahead (slightly more than one synodic month).
-func NextNewMoon(start time.Time, eph ephemeris.Provider) (*Event, error) {
+func NextNewMoon(start time.Time, provider eph.Provider) (*Event, error) {
 	end := start.AddDays(35)
-	moon := NewBody(ephemeris.Moon, eph)
+	moon := NewMoon(provider)
 	solver := NewEventSolver(6*time.Hour, 1*time.Second)
 	spec := EventSpec{
 		Family: EventFamilyIllumination,
@@ -1054,9 +1065,9 @@ func NextNewMoon(start time.Time, eph ephemeris.Provider) (*Event, error) {
 
 // NextFullMoon returns the first Full Moon event after the given start time.
 // Searches up to 35 days ahead (slightly more than one synodic month).
-func NextFullMoon(start time.Time, eph ephemeris.Provider) (*Event, error) {
+func NextFullMoon(start time.Time, provider eph.Provider) (*Event, error) {
 	end := start.AddDays(35)
-	moon := NewBody(ephemeris.Moon, eph)
+	moon := NewMoon(provider)
 	solver := NewEventSolver(6*time.Hour, 1*time.Second)
 	spec := EventSpec{
 		Family: EventFamilyIllumination,

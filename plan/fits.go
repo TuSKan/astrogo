@@ -4,6 +4,8 @@ import (
 	"fmt"
 
 	"github.com/TuSKan/astrogo/angle"
+	"github.com/TuSKan/astrogo/catalog"
+	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/fits"
 )
@@ -40,7 +42,7 @@ func SiteFromFITS(h *fits.Header) (*Site, error) {
 // TargetFromFITS extracts observation pointing coordinates constructing a Custom plan target.
 // It prioritizes standard numeric World Coordinate System reference pixels (CRVAL1, CRVAL2)
 // representing the geometric center of the sensor frame.
-func TargetFromFITS(h *fits.Header) (Custom, error) {
+func TargetFromFITS(h *fits.Header) (Observable, error) {
 	name, errName := h.GetString("OBJECT")
 	if errName != nil {
 		name, _ = h.GetString("OBJNAME")
@@ -55,7 +57,7 @@ func TargetFromFITS(h *fits.Header) (Custom, error) {
 		if explicit, errExp := h.GetFloat("RA_DEG"); errExp == nil {
 			ra = explicit
 		} else {
-			return Custom{}, fmt.Errorf("plan/fits: missing CRVAL1 or RA_DEG mapping for RA coordinate")
+			return nil, fmt.Errorf("plan/fits: missing CRVAL1 or RA_DEG mapping for RA coordinate")
 		}
 	}
 
@@ -64,12 +66,13 @@ func TargetFromFITS(h *fits.Header) (Custom, error) {
 		if explicit, errExp := h.GetFloat("DEC_DEG"); errExp == nil {
 			dec = explicit
 		} else {
-			return Custom{}, fmt.Errorf("plan/fits: missing CRVAL2 or DEC_DEG mapping for DEC coordinate")
+			return nil, fmt.Errorf("plan/fits: missing CRVAL2 or DEC_DEG mapping for DEC coordinate")
 		}
 	}
 
-	return Custom{
-		Label: name,
+	return NewTarget(catalog.Target{
+		Name:  name,
 		Coord: coord.NewICRS(angle.Deg(ra), angle.Deg(dec)),
-	}, nil
+		Kind:  resolve.KindOther,
+	}, nil), nil
 }

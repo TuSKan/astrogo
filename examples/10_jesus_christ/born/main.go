@@ -9,23 +9,22 @@ import (
 	"fmt"
 
 	"github.com/TuSKan/astrogo/coord"
-	"github.com/TuSKan/astrogo/ephemeris"
-	"github.com/TuSKan/astrogo/ephemeris/jpl"
+	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/plan"
 	"github.com/TuSKan/astrogo/time"
 )
 
 func main() {
-	eph, err := jpl.NewProvider(jpl.WithSource(jpl.Planets), jpl.WithKernel("de441_part-1"))
+	prov, err := eph.NewProvider(eph.Planets, "de441_part-1")
 	if err != nil {
 		panic(err)
 	}
-	defer eph.Close()
+	defer prov.Close()
 
-	jupiter := plan.NewBody(ephemeris.Jupiter, eph)
-	saturn := plan.NewBody(ephemeris.Saturn, eph)
-	venus := plan.NewBody(ephemeris.Venus, eph)
-	sun := plan.NewBody(ephemeris.Sun, eph)
+	jupiter := plan.NewJupiter(prov)
+	saturn := plan.NewSaturn(prov)
+	venus := plan.NewVenus(prov)
+	sun := plan.NewSun(prov)
 
 	fmt.Println("══════════════════════════════════════════════════════════")
 	fmt.Println("  Star of Bethlehem Candidates — astrogo + JPL DE441")

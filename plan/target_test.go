@@ -6,19 +6,20 @@ import (
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/catalog"
+	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/coord"
-	"github.com/TuSKan/astrogo/ephemeris"
+	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/vector"
 )
 
-func TestDeepSpace(t *testing.T) {
+func TestTargetFixed(t *testing.T) {
 	obj := catalog.Target{
 		Name:  "Orion Nebula",
 		Coord: coord.NewICRS(angle.Hour(5.5), angle.Deg(-5.5)),
 	}
-	f := DeepSpace{Object: obj}
+	f := NewTarget(obj, nil)
 
 	if f.Name() != "Orion Nebula" {
 		t.Errorf("expected name Orion Nebula, got %s", f.Name())
@@ -32,62 +33,25 @@ func TestDeepSpace(t *testing.T) {
 	}
 }
 
-func TestCustom(t *testing.T) {
-	c1 := coord.NewICRS(angle.Deg(10), angle.Deg(20))
-
-	// Named custom
-	target1 := Custom{Label: "My Point", Coord: c1}
-	if target1.Name() != "My Point" {
-		t.Errorf("expected name My Point, got %s", target1.Name())
-	}
-	pos1, err := target1.Position(time.NowUTC())
-	testutil.AssertNoError(t, err)
-	if pos1.RA().Radians() != c1.RA().Radians() {
-		t.Errorf("expected position %+v, got %+v", c1, pos1)
-	}
-
-	// Default custom
-	target2 := Custom{Coord: c1}
-	if target2.Name() != "Custom" {
-		t.Errorf("expected name Custom, got %s", target2.Name())
-	}
-}
-
-func TestInterface(t *testing.T) {
-	var _ Observable = DeepSpace{}
-	var _ Observable = Custom{}
-}
-
-func TestZeroValueSafety(t *testing.T) {
-	// DeepSpace with zero-value catalog.Target
-	f := DeepSpace{}
+func TestTargetZeroValueSafety(t *testing.T) {
+	// Target with zero-value catalog.Target
+	f := NewTarget(catalog.Target{}, nil)
 	if f.Name() != "" {
-		t.Errorf("expected empty name for zero-value DeepSpace")
+		t.Errorf("expected empty name for zero-value Target")
 	}
 	pos, err := f.Position(time.NowUTC())
 	testutil.AssertNoError(t, err)
 	if pos.RA().Radians() != 0 || pos.Dec().Radians() != 0 {
-		t.Errorf("expected zero position for zero-value DeepSpace")
-	}
-
-	// Custom with zero-value
-	c := Custom{}
-	if c.Name() != "Custom" {
-		t.Errorf("expected name Custom for zero-value Custom")
-	}
-	pos2, err := c.Position(time.NowUTC())
-	testutil.AssertNoError(t, err)
-	if pos2.RA().Radians() != 0 || pos2.Dec().Radians() != 0 {
-		t.Errorf("expected zero position for zero-value Custom")
+		t.Errorf("expected zero position for zero-value Target")
 	}
 }
 
-func TestBody(t *testing.T) {
-	p := ephemeris.Default()
+func TestTargetBody(t *testing.T) {
+	p := eph.Default()
 	now := time.NowUTC()
 
 	// Sun
-	sun := Body{ID: ephemeris.Sun, Provider: p}
+	sun := NewTarget(catalog.Target{ID: "11", Name: "Sun", Kind: resolve.KindStar}, p)
 	if sun.Name() != "Sun" {
 		t.Errorf("expected name Sun, got %s", sun.Name())
 	}
@@ -98,7 +62,7 @@ func TestBody(t *testing.T) {
 	}
 
 	// Moon
-	moon := Body{ID: ephemeris.Moon, Provider: p}
+	moon := NewTarget(catalog.Target{ID: "10", Name: "Moon", Kind: resolve.KindMoon}, p)
 	if moon.Name() != "Moon" {
 		t.Errorf("expected name Moon, got %s", moon.Name())
 	}
@@ -117,15 +81,17 @@ func TestBody(t *testing.T) {
 
 type mockMarsProvider struct{}
 
-func (m mockMarsProvider) State(id ephemeris.ID, _ time.Time) (ephemeris.State, error) {
-	if id == ephemeris.Mars {
-		return ephemeris.State{Pos: vector.V3(1.5, 0, 0)}, nil
+func (m mockMarsProvider) State(id eph.ID, _ time.Time) (eph.State, error) {
+	if id == eph.Mars {
+		return eph.State{Pos: vector.V3(1.5, 0, 0)}, nil
 	}
-	return ephemeris.State{}, errors.New("unsupported body")
+	return eph.State{}, errors.New("unsupported body")
 }
 
-func TestBodyMars(t *testing.T) {
-	mars := Body{ID: ephemeris.Mars, Provider: mockMarsProvider{}}
+func (m mockMarsProvider) Close() error { return nil }
+
+func TestTargetMars(t *testing.T) {
+	mars := NewTarget(catalog.Target{ID: "4", Name: "Mars", Kind: resolve.KindPlanet}, mockMarsProvider{})
 	pos, err := mars.Position(time.NowUTC())
 	testutil.AssertNoError(t, err)
 
@@ -135,14 +101,14 @@ func TestBodyMars(t *testing.T) {
 	}
 }
 
-func TestBodyErrors(t *testing.T) {
-	// Nil provider
-	b1 := Body{ID: ephemeris.Sun}
-	_, err := b1.Position(time.NowUTC())
+func TestTargetErrors(t *testing.T) {
+	// Moving object but nil provider
+	b1 := Target{Catalog: catalog.Target{ID: "11", Kind: resolve.KindStar}, Provider: nil}
+	_, err := b1.GeocentricVec(time.NowUTC())
 	testutil.AssertError(t, err)
 
 	// Unsupported body
-	b2 := Body{ID: ephemeris.ID(999999), Provider: ephemeris.Default()}
+	b2 := NewTarget(catalog.Target{ID: "999999", Kind: resolve.KindOther}, eph.Default())
 	_, err = b2.Position(time.NowUTC())
 	testutil.AssertError(t, err)
 }

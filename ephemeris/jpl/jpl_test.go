@@ -4,7 +4,7 @@ import (
 	"math"
 	"testing"
 
-	"github.com/TuSKan/astrogo/ephemeris"
+	"github.com/TuSKan/astrogo/ephemeris/core"
 	"github.com/TuSKan/astrogo/ephemeris/jpl"
 	"github.com/TuSKan/astrogo/ephemeris/jpl/lsk"
 	"github.com/TuSKan/astrogo/ephemeris/jpl/spk"
@@ -13,13 +13,13 @@ import (
 
 func TestBodyMapping(t *testing.T) {
 	tests := []struct {
-		id   ephemeris.ID
+		id   core.ID
 		want int
 	}{
-		{ephemeris.Sun, 10},
-		{ephemeris.Moon, 301},
-		{ephemeris.Earth, 399},
-		{ephemeris.Mars, 4},
+		{core.Sun, 10},
+		{core.Moon, 301},
+		{core.Earth, 399},
+		{core.Mars, 4},
 	}
 
 	for _, tt := range tests {
@@ -33,7 +33,7 @@ func TestBodyMapping(t *testing.T) {
 		}
 	}
 
-	_, ok := jpl.BodyIDToNAIF[ephemeris.ID(255)]
+	_, ok := jpl.BodyIDToNAIF[core.ID(255)]
 	if ok {
 		t.Error("Expected error for unknown body ID")
 	}
@@ -80,13 +80,13 @@ func TestCheby(t *testing.T) {
 }
 
 func TestJPLUnitsAreAUAndAUPerDay(t *testing.T) {
-	p, err := jpl.NewProvider(jpl.WithSource(jpl.Planets), jpl.WithKernel("de440s"), jpl.WithDataDir("data"))
+	p, err := jpl.NewProvider(core.Planets, "de440s", jpl.WithDataDir("data"))
 	if err != nil {
 		t.Fatalf("failed to initialize provider: %v", err)
 	}
 	defer p.Close()
 
-	state, err := p.State(ephemeris.Sun, time.NowUTC())
+	state, err := p.State(core.Sun, time.NowUTC())
 	if err != nil {
 		t.Fatalf("failed to evaluate Sun state: %v", err)
 	}
@@ -97,20 +97,20 @@ func TestJPLUnitsAreAUAndAUPerDay(t *testing.T) {
 }
 
 func TestJPLUnsupportedBody(t *testing.T) {
-	p, err := jpl.NewProvider(jpl.WithSource(jpl.Planets), jpl.WithKernel("de440s"), jpl.WithDataDir("data"))
+	p, err := jpl.NewProvider(core.Planets, "de440s", jpl.WithDataDir("data"))
 	if err != nil {
 		t.Fatalf("setup failed: %v", err)
 	}
 	defer p.Close()
 
-	_, err = p.State(ephemeris.ID(255), time.NowUTC())
+	_, err = p.State(core.ID(255), time.NowUTC())
 	if err == nil {
 		t.Error("Expected error for unsupported body")
 	}
 }
 
 func TestJPLOutOfCoverageEpoch(t *testing.T) {
-	p, err := jpl.NewProvider(jpl.WithSource(jpl.Planets), jpl.WithKernel("de440s"), jpl.WithDataDir("data"))
+	p, err := jpl.NewProvider(core.Planets, "de440s", jpl.WithDataDir("data"))
 	if err != nil {
 		t.Fatalf("setup failed: %v", err)
 	}
@@ -118,25 +118,25 @@ func TestJPLOutOfCoverageEpoch(t *testing.T) {
 
 	// Year 5000
 	tm := time.FromJD(3545000.0, time.UTC)
-	_, err = p.State(ephemeris.Sun, tm)
+	_, err = p.State(core.Sun, tm)
 	if err == nil {
 		t.Error("Expected error for out-of-coverage epoch")
 	}
 }
 
 func TestJPLDeterministicRepeatedCalls(t *testing.T) {
-	p, err := jpl.NewProvider(jpl.WithSource(jpl.Planets), jpl.WithKernel("de440s"), jpl.WithDataDir("data"))
+	p, err := jpl.NewProvider(core.Planets, "de440s", jpl.WithDataDir("data"))
 	if err != nil {
 		t.Fatalf("setup failed: %v", err)
 	}
 	defer p.Close()
 
 	tm := time.NowUTC()
-	s1, err := p.State(ephemeris.Sun, tm)
+	s1, err := p.State(core.Sun, tm)
 	if err != nil {
 		t.Fatalf("s1 failed: %v", err)
 	}
-	s2, err := p.State(ephemeris.Sun, tm)
+	s2, err := p.State(core.Sun, tm)
 	if err != nil {
 		t.Fatalf("s2 failed: %v", err)
 	}
@@ -148,7 +148,7 @@ func TestJPLDeterministicRepeatedCalls(t *testing.T) {
 
 func TestSourceSelection(t *testing.T) {
 	t.Run("Planets", func(t *testing.T) {
-		p, err := jpl.NewProvider(jpl.WithSource(jpl.Planets), jpl.WithKernel("de440s"), jpl.WithDataDir("data"))
+		p, err := jpl.NewProvider(core.Planets, "de440s", jpl.WithDataDir("data"))
 		if err != nil {
 			t.Fatalf("Planets source failed: %v", err)
 		}
@@ -159,9 +159,9 @@ func TestSourceSelection(t *testing.T) {
 	})
 
 	t.Run("Unsupported", func(t *testing.T) {
-		unsupported := []jpl.Source{jpl.Satellites, jpl.Stations}
+		unsupported := []core.Source{core.Satellites, core.Stations}
 		for _, s := range unsupported {
-			_, err := jpl.NewProvider(jpl.WithSource(s))
+			_, err := jpl.NewProvider(s, "")
 			if err == nil {
 				t.Errorf("Expected error for unsupported source %v", s)
 			}
@@ -169,7 +169,7 @@ func TestSourceSelection(t *testing.T) {
 	})
 
 	t.Run("Unknown", func(t *testing.T) {
-		_, err := jpl.NewProvider(jpl.WithSource(jpl.Source("unknown")))
+		_, err := jpl.NewProvider(core.Source("unknown"), "")
 		if err == nil {
 			t.Error("Expected error for unknown source")
 		}
@@ -183,8 +183,8 @@ func TestSmallBodyEros(t *testing.T) {
 	end := time.FromJD(2460001.5, time.UTC)   // 2023-FEB-26
 
 	p, err := jpl.NewProvider(
-		jpl.WithSource(jpl.SmallBody),
-		jpl.WithKernel("433"),
+		core.SmallBody,
+		"433",
 		jpl.WithTimeInterval(start, end),
 		jpl.WithDataDir("data"),
 	)
@@ -199,7 +199,7 @@ func TestSmallBodyEros(t *testing.T) {
 	bodies := p.SupportedBodies()
 	found := false
 	for _, b := range bodies {
-		if b == ephemeris.ID(433) {
+		if b == core.ID(433) {
 			found = true
 			break
 		}
@@ -209,7 +209,7 @@ func TestSmallBodyEros(t *testing.T) {
 	}
 
 	// Get state
-	state, err := p.State(ephemeris.ID(433), start)
+	state, err := p.State(core.ID(433), start)
 	if err != nil {
 		t.Fatalf("Failed to get state for Eros: %v", err)
 	}
@@ -234,8 +234,8 @@ func TestSmallBodyMultiMatch(t *testing.T) {
 	end := time.FromJD(2460001.5, time.UTC)
 
 	p, err := jpl.NewProvider(
-		jpl.WithSource(jpl.SmallBody),
-		jpl.WithKernel("Apophis"), // "Apophis" is ambiguous in Horizons web, but let's see API
+		core.SmallBody,
+		"Apophis", // "Apophis" is ambiguous in Horizons web, but let's see API
 		jpl.WithTimeInterval(start, end),
 		jpl.WithDataDir("data"),
 	)

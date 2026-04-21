@@ -457,38 +457,6 @@ These are wrapped internally to ensure:
 
 ---
 
-## Project Status
-
-🚀 **v0.1.0 — Observatory-Grade Release**
-
-### Hardened Core
-- **Scale-aware time system:** Full `UTC↔TAI↔TT↔TDB↔UT1` conversion graph, Fairhead & Bretagnon TDB correction, explicit IERS error propagation
-- **SOFA-rigorous refraction:** Consistent across all altitudes (sea level through 8849m)
-- **Sub-second visibility boundaries:** Chandrupatla + bisection refinement on all grid transitions
-- **Production scheduler:** `SwapOptimizedStrategy` with monotonic local search, benchmarked linear scaling to 100 blocks
-- **Illumination events:** `EventFamilyIllumination` with `NextNewMoon`, `NextFullMoon`, `MoonPhases` via ecliptic longitude
-- **API hygiene:** Nil-location guards, epsilon-tolerant equality, defensive catalog copies
-
-### Scientific Validation
-- **JPL Horizons:** <1.0″ coordinate tolerance
-- **U.S. Naval Observatory:** ≤1 min moon phases, <2.4 min rise/set
-- **NASA Eclipse Catalog:** Date-exact eclipse detection (2026)
-
-### Performance (benchmarked on i9-11980HK)
-| Operation | Cost | Allocs |
-|-----------|------|--------|
-| `coord.NewContext` (SOFA Apco13) | 91 µs | 1 |
-| `ICRSToAltAz` (cached Context) | 325 ns | 1 |
-| 100-star batch (cached vs scalar) | 73× speedup | — |
-| Time scale conversion | 18–90 ns | 0 |
-| Refraction (rigorous) | 14 ns | 0 |
-| Scheduler (100 blocks) | 123 ms | linear |
-
-### Remaining (See [Roadmap](docs/ROADMAP.md))
-- Batch/vectorized APIs for high-throughput pipelines
-- Satellite visibility/illumination constraints (sunlit + above horizon)
-- Cross-match algorithms for multi-catalog workflows
-
 > [!IMPORTANT]
 > Expect API changes until v1.0.
 
@@ -551,29 +519,6 @@ Please see our full [**Project Roadmap**](docs/ROADMAP.md) to understand current
 
 ---
 
-## Case Study: Dating the Crucifixion Astronomically
-
-`astrogo` was used to produce a rigorous astronomical analysis of the birth and crucifixion
-of Jesus of Nazareth — demonstrating the library's deep-historical epoch capabilities.
-
-📄 **[When Did Jesus Die? An Astronomer's Cold Case](docs/JESUS.md)**
-
-The article uses `astrogo` + JPL DE441 ephemerides to:
-- Identify **5 lunar eclipse candidates** for Herod's death (5 BC – 1 BC)
-- Compute the **Jupiter-Saturn triple conjunction** of 7 BC (three definitions: RA, ecliptic longitude, appulse)
-- Verify the **Jupiter-Venus appulse** of June 17, 2 BC (0.009° — below naked-eye resolution)
-- Search all **Friday Nisan 14** dates in the Pilate window (AD 26–36)
-- Simulate the **April 3, AD 33 lunar eclipse** from Jerusalem
-
-Full runnable examples: [`examples/10_jesus_christ/`](examples/10_jesus_christ/)
-
-| Example | Description |
-| :--- | :--- |
-| [`born/`](examples/10_jesus_christ/born/) | Star of Bethlehem: Jupiter-Saturn and Jupiter-Venus conjunctions |
-| [`herod/`](examples/10_jesus_christ/herod/) | Herod's Eclipse: lunar eclipse catalog 5 BC – AD 1 |
-| [`crux/`](examples/10_jesus_christ/crux/) | Passover Moon: Friday Nisan 14 search (AD 26–36) |
-| [`eclipse/`](examples/10_jesus_christ/eclipse/) | Blood Moon: April 3, AD 33 eclipse simulation |
-
 ## Satellite Tracking Example
 
 See [`examples/12_satellite_tracking/`](examples/12_satellite_tracking/) for a complete end-to-end demonstration:
@@ -586,51 +531,12 @@ See [`examples/12_satellite_tracking/`](examples/12_satellite_tracking/) for a c
 
 ---
 
-## Design Goals
-- Deterministic, testable scientific results
-- Minimal allocations in hot paths
-- Explicit handling of units and frames
-- No hidden global state
-- Clear separation between:
-    - Scientific primitives
-    - Astronomy domain logic
-    - Planning layer
-
----
-
 ## Contributing
 
-We strongly welcome contributions! Please refer to our [Contributing Guide](CONTRIBUTING.md) for instructions on how to set up your development environment, run numerical tests, and submit pull requests.
-
-By participating in this project, you agree to abide by our [Code of Conduct](CODE_OF_CONDUCT.md).
-
----
-
-## Testing Philosophy
-- **No silent assumptions**: Fail early if ambiguity exists.
-- **Explicit tolerances**: Mandatory for floating-point comparisons.
-- **Edge cases**:
-    - Poles
-    - Horizon
-    - Angle wrapping
-    - Time boundaries
-    - Circumpolar and never-rise targets
+Contributions welcome! See [Contributing Guide](CONTRIBUTING.md) and [Code of Conduct](CODE_OF_CONDUCT.md).
 
 ---
 
 ## License
 
 MIT
-
----
-
-## Inspiration
-- [Astropy](https://www.astropy.org/)
-- [Astroplan](https://astroplan.readthedocs.io/)
-
----
-
-## Disclaimer
-
-**This is a scientific computing library under active development.**
-Results should be validated against trusted references for critical applications.

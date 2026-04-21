@@ -7,8 +7,7 @@ import (
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
-	"github.com/TuSKan/astrogo/ephemeris"
-	"github.com/TuSKan/astrogo/ephemeris/jpl"
+	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/time"
 )
 
@@ -66,8 +65,8 @@ func main() {
 	// Method 1: Built-in SOFA Provider (Plan94 analytical series)
 	// ═══════════════════════════════════════════════════════════════════════
 	fmt.Println("┌─ Method 1: Built-in SOFA Provider (Plan94) ─────────────────────┐")
-	sofaProv := ephemeris.Default()
-	computeAndPrint(sofaProv, ephemeris.Mars, t, horizonsRA, horizonsDec, horizonsDist)
+	sofaProv := eph.Default()
+	computeAndPrint(sofaProv, eph.Mars, t, horizonsRA, horizonsDec, horizonsDist)
 	fmt.Println("└──────────────────────────────────────────────────────────────────┘")
 	fmt.Println()
 
@@ -75,13 +74,13 @@ func main() {
 	// Method 2: JPL DE440 Provider (numerical integration)
 	// ═══════════════════════════════════════════════════════════════════════
 	fmt.Println("┌─ Method 2: JPL DE440 Provider ──────────────────────────────────┐")
-	jplProv, err := jpl.NewProvider(jpl.WithSource(jpl.Planets))
+	jplProv, err := eph.NewProvider(eph.Planets, "de440")
 	if err != nil {
 		log.Printf("│  ⚠ JPL provider unavailable: %v\n", err)
 		fmt.Println("│  Skipping JPL comparison.")
 	} else {
 		defer jplProv.Close()
-		computeAndPrint(jplProv, ephemeris.Mars, t, horizonsRA, horizonsDec, horizonsDist)
+		computeAndPrint(jplProv, eph.Mars, t, horizonsRA, horizonsDec, horizonsDist)
 	}
 	fmt.Println("└──────────────────────────────────────────────────────────────────┘")
 	fmt.Println()
@@ -98,19 +97,19 @@ func main() {
 
 // computeAndPrint computes Mars position using the given provider and prints
 // the results alongside the Horizons reference.
-func computeAndPrint(prov ephemeris.Provider, body ephemeris.ID, t time.Time,
+func computeAndPrint(prov eph.Provider, body eph.ID, t time.Time,
 	refRA, refDec angle.Angle, refDist float64) {
 
 	// Use ApparentState to apply light-time correction (iterative retardation),
 	// matching Skyfield's observe() and Horizons' astrometric coordinates.
-	st, err := ephemeris.ApparentState(prov, body, t)
+	st, err := eph.ApparentState(prov, body, t)
 	if err != nil {
 		log.Printf("│  ✗ Error: %v\n", err)
 		return
 	}
 
 	// Convert Cartesian (AU) → spherical ICRS
-	icrs, err := ephemeris.ToICRS(st.Pos)
+	icrs, err := eph.ToICRS(st.Pos)
 	if err != nil {
 		log.Printf("│  ✗ Error: %v\n", err)
 		return
