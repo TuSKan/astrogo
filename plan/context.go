@@ -6,21 +6,17 @@ import (
 	"github.com/TuSKan/astrogo/time"
 )
 
-// Environment bundles physical parameters for constraint evaluation.
-// In v1 it's empty, but in v2 it will contain weather, moon position, etc.
-type Environment struct {
-	// Future: Moon coord.ICRS
-	// Future: Sun  coord.ICRS
-}
-
 // EvalContext carries memoized data across multiple constraint evaluations
 // for the same (object, time, site) triplet. It wraps a coord.Context
 // to reuse the precomputed ASTROM parameters.
+//
+// Future extensions (weather conditions, Moon/Sun pre-computed positions)
+// can be added as fields here without changing the public constructor
+// signature — use functional options or builder methods when that time comes.
 type EvalContext struct {
 	Object coord.Object
 	Time   time.Time
 	Site   *Site
-	Env    *Environment
 	Ctx    *coord.Context
 
 	// Memoized values
@@ -30,23 +26,21 @@ type EvalContext struct {
 }
 
 // NewEvalContext creates a bare context for evaluation.
-func NewEvalContext(obj coord.Object, t time.Time, site *Site, env *Environment) *EvalContext {
+func NewEvalContext(obj coord.Object, t time.Time, site *Site) *EvalContext {
 	return &EvalContext{
 		Object: obj,
 		Time:   t,
 		Site:   site,
-		Env:    env,
 		Ctx:    coord.NewContext(t, site.Location(), site.Atmosphere()),
 	}
 }
 
 // NewEvalContextWith creates a context that reuses an existing coord.Context.
-func NewEvalContextWith(obj coord.Object, t time.Time, site *Site, env *Environment, ctx *coord.Context) *EvalContext {
+func NewEvalContextWith(obj coord.Object, t time.Time, site *Site, ctx *coord.Context) *EvalContext {
 	return &EvalContext{
 		Object: obj,
 		Time:   t,
 		Site:   site,
-		Env:    env,
 		Ctx:    ctx,
 	}
 }

@@ -5,7 +5,8 @@ package jpl_test
 import (
 	"testing"
 
-	"github.com/TuSKan/astrogo/ephemeris"
+	eph "github.com/TuSKan/astrogo/ephemeris"
+	"github.com/TuSKan/astrogo/ephemeris/core"
 	"github.com/TuSKan/astrogo/ephemeris/jpl"
 	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/vector"
@@ -28,7 +29,7 @@ func loadCases(t *testing.T) []*StateVector {
 }
 
 func runHorizonsTest(t *testing.T, bodyName string) {
-	p, err := jpl.NewProvider(jpl.WithSource(jpl.Planets), jpl.WithKernel("de440"), jpl.WithDataDir("../data"))
+	p, err := jpl.NewProvider(core.Planets, "de440", jpl.WithDataDir("../data"))
 	if err != nil {
 		t.Fatalf("failed to create provider: %v", err)
 	}
@@ -51,12 +52,12 @@ func runHorizonsTest(t *testing.T, bodyName string) {
 		t.Run(c.Body, func(t *testing.T) {
 			tm := time.FromJD(2451545.0+c.ET/86400.0, time.TDB)
 
-			bid := ephemeris.Sun
+			bid := eph.Sun
 			if c.Body == "Moon" {
-				bid = ephemeris.Moon
+				bid = eph.Moon
 			}
 			if c.Body == "Mars" {
-				bid = ephemeris.Mars
+				bid = eph.Mars
 			}
 
 			state, err := p.State(bid, tm)

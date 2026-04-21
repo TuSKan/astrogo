@@ -72,10 +72,7 @@ func (gp GP) ToTLE() (line1, line2 string) {
 		class = "U"
 	}
 
-	catID := gp.NoradCatID
-	if catID > 99999 {
-		catID = 99999
-	}
+	catID := min(gp.NoradCatID, 99999)
 
 	// Convert international designator from yyyy-nnnp to TLE format (yynnnp, 8 chars).
 	intdes := formatIntDes(gp.ObjectID)
@@ -333,11 +330,16 @@ func (p *Provider) FetchByID(ctx context.Context, catNr int) (GP, error) {
 
 // gpToTarget converts a GP element set to a resolve.Target.
 func gpToTarget(gp GP) resolve.Target {
+	l1, l2 := gp.ToTLE()
+	epoch, _ := gp.EpochTime()
 	return resolve.Target{
 		ID:          fmt.Sprintf("%d", gp.NoradCatID),
 		Name:        gp.ObjectName,
 		Designation: gp.ObjectID,
 		Kind:        resolve.Kind("Satellite"),
 		Catalog:     "norad",
+		Epoch:       epoch,
+		TLELine1:    l1,
+		TLELine2:    l2,
 	}
 }

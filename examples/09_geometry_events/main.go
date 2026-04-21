@@ -6,8 +6,7 @@ import (
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
-	"github.com/TuSKan/astrogo/ephemeris"
-	"github.com/TuSKan/astrogo/ephemeris/jpl"
+	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/plan"
 	"github.com/TuSKan/astrogo/time"
 )
@@ -19,19 +18,18 @@ func main() {
 	end := start.AddDays(365) // Scan over an entire year
 
 	// 1. Setup high-precision JPL Ephemeris (DE442) as requested
-	eph, err := jpl.NewProvider(jpl.WithSource(jpl.Planets), jpl.WithKernel("de442"))
+	prov, err := eph.NewProvider(eph.Planets, "de442")
 	if err != nil {
 		log.Fatalf("failed to load jpl de442: %v", err)
 	}
-	defer eph.Close()
+	defer prov.Close()
 
-	// 2. Defining targets using our high precision provider
-	mars := plan.NewBody(ephemeris.Mars, eph)
-	venus := plan.NewBody(ephemeris.Venus, eph)
-	jupiter := plan.NewBody(ephemeris.Jupiter, eph)
-	saturn := plan.NewBody(ephemeris.Saturn, eph)
-	sun := plan.NewBody(ephemeris.Sun, eph)
-	moon := plan.NewBody(ephemeris.Moon, eph)
+	mars := plan.NewMars(prov)
+	venus := plan.NewVenus(prov)
+	jupiter := plan.NewJupiter(prov)
+	saturn := plan.NewSaturn(prov)
+	sun := plan.NewSun(prov)
+	moon := plan.NewMoon(prov)
 
 	// 3. Setup Observatory (São Paulo, Brazil with precise coordinates from user's app)
 	// Geocentric Events (like Full Moon syzygy) do not depend on the observer to occur,
@@ -94,7 +92,7 @@ func main() {
 	// Uses MoonPhases + ecliptic latitude filter to find actual eclipse candidates.
 	fmt.Println("\nLooking for Lunar Eclipses (Next 365 Days):")
 
-	lunarEclipses, err := plan.LunarEclipses(start, end, eph)
+	lunarEclipses, err := plan.LunarEclipses(start, end, prov)
 	if err != nil {
 		log.Fatalf("failed to find lunar eclipses: %v", err)
 	}
@@ -121,7 +119,7 @@ func main() {
 	// Solar Eclipse Detection
 	fmt.Println("\nLooking for Solar Eclipses (Next 365 Days):")
 
-	solarEclipses, err := plan.SolarEclipses(start, end, eph)
+	solarEclipses, err := plan.SolarEclipses(start, end, prov)
 	if err != nil {
 		log.Fatalf("failed to find solar eclipses: %v", err)
 	}
@@ -146,7 +144,7 @@ func main() {
 	// Earth's Apsides (Perihelion & Aphelion)
 	fmt.Println("\nEarth's Apsides for current year:")
 
-	apsides, err := plan.Apsides(start.Year(), eph)
+	apsides, err := plan.Apsides(start.Year(), prov)
 	if err != nil {
 		log.Fatalf("failed to compute apsides: %v", err)
 	}

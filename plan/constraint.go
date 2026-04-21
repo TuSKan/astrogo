@@ -10,8 +10,10 @@ import (
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
+	"github.com/TuSKan/astrogo/catalog"
+	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/coord"
-	"github.com/TuSKan/astrogo/ephemeris"
+	eph "github.com/TuSKan/astrogo/ephemeris"
 
 	"github.com/TuSKan/astrogo/time"
 )
@@ -137,10 +139,13 @@ func (c Sun) Check(_ Observable, t time.Time, site *Site) (Result, error) {
 
 // CheckCtx evaluates Sun altitude using a pre-built coord.Context.
 // The obj parameter is ignored — the Sun position is always computed internally.
-func (c Sun) CheckCtx(_ Observable, t time.Time, _ *Site, ctx *coord.Context) (Result, error) {
-	sun := Body{
-		ID:       ephemeris.Sun,
-		Provider: ephemeris.Default(),
+func (c Sun) CheckCtx(obj Observable, t time.Time, _ *Site, ctx *coord.Context) (Result, error) {
+	sun := NewTarget(catalog.Target{ID: "11", Name: "Sun", Kind: resolve.KindStar}, eph.Default())
+
+	// If we are checking the Sun itself against a Sun constraint, don't penalize
+	// (Though normally you wouldn't constrain the Sun against the Sun)
+	if b, ok := obj.(Target); ok && b.Catalog.ID == "11" {
+		return Result{Pass: true, Value: 0}, nil
 	}
 
 	aa, err := skyAltAzCtx(sun, t, ctx)
@@ -170,17 +175,24 @@ type MoonSep struct {
 	Threshold angle.Angle
 }
 
-func (c MoonSep) Check(obj Observable, t time.Time, _ *Site) (Result, error) {
-	pos, err := obj.Position(t)
+func (c MoonSep) Check(obj Observable, t time.Time, site *Site) (Result, error) {
+	ctx := coord.NewContext(t, site.Location(), site.Atmosphere())
+	return c.CheckCtx(obj, ctx)
+}
+
+// CheckCtx evaluates Moon separation using a pre-built coord.Context.
+func (c MoonSep) CheckCtx(obj Observable, ctx *coord.Context) (Result, error) {
+	if b, ok := obj.(Target); ok && b.Catalog.ID == "10" {
+		return Result{Pass: true, Value: 180}, nil
+	}
+
+	pos, err := obj.Position(ctx.Time())
 	if err != nil {
 		return Result{}, err
 	}
 
-	moon := Body{
-		ID:       ephemeris.Moon,
-		Provider: ephemeris.Default(),
-	}
-	moonPos, err := moon.Position(t)
+	moon := NewTarget(catalog.Target{ID: "10", Name: "Moon", Kind: resolve.KindMoon}, eph.Default())
+	moonPos, err := moon.Position(ctx.Time())
 	if err != nil {
 		return Result{}, err
 	}

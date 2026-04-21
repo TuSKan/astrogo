@@ -6,14 +6,14 @@
 // The package wraps the go-satellite SGP4 implementation (a Go port of David
 // Vallado's reference code from Spacetrack Report #3) to compute satellite
 // position and velocity in the TEME (True Equator Mean Equinox) frame, then
-// converts to GCRS for consistency with astrogo's [ephemeris.Provider] contract.
+// converts to GCRS for consistency with astrogo's [eph.Provider] contract.
 //
 // # Usage
 //
 // Construct a [Satellite] from a NORAD GP element set or raw TLE lines:
 //
 //	sat, err := satellite.NewFromTLE(line1, line2)
-//	state, err := sat.State(ephemeris.ID(0), t)
+//	state, err := sat.State(eph.ID(0), t)
 //
 // For sub-satellite ground track:
 //

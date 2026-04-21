@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/TuSKan/astrogo/angle"
+	"github.com/TuSKan/astrogo/catalog"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/time"
 )
@@ -23,9 +24,9 @@ func TestSwapOptimizedStrategy(t *testing.T) {
 	start := time.ZeroTime()
 	window := Window{Start: start, End: start.Add(1 * time.Hour)}
 
-	b1 := &Block{ID: "B1", Target: Custom{Label: "T1"}, Duration: 20 * time.Minute, Priority: 1.0}
-	b2 := &Block{ID: "B2", Target: Custom{Label: "T2"}, Duration: 20 * time.Minute, Priority: 5.0}
-	b3 := &Block{ID: "B3", Target: Custom{Label: "T3"}, Duration: 10 * time.Minute, Priority: 3.0}
+	b1 := &Block{ID: "B1", Target: NewTarget(catalog.Target{Name: "T1"}, nil), Duration: 20 * time.Minute, Priority: 1.0}
+	b2 := &Block{ID: "B2", Target: NewTarget(catalog.Target{Name: "T2"}, nil), Duration: 20 * time.Minute, Priority: 5.0}
+	b3 := &Block{ID: "B3", Target: NewTarget(catalog.Target{Name: "T3"}, nil), Duration: 10 * time.Minute, Priority: 3.0}
 
 	// SwapOptimized with PriorityStrategy base
 	strategy := &SwapOptimizedStrategy{
@@ -75,13 +76,13 @@ func TestSwapOptimizedGapInsertion(t *testing.T) {
 	// B1 always fails constraints → will be unscheduled by greedy
 	b1 := &Block{
 		ID:          "Failing",
-		Target:      Custom{Label: "T1"},
+		Target:      NewTarget(catalog.Target{Name: "T1"}, nil),
 		Duration:    10 * time.Minute,
 		Priority:    10.0,
 		Constraints: []Constraint{mockConstraint{pass: false}},
 	}
-	b2 := &Block{ID: "B2", Target: Custom{Label: "T2"}, Duration: 20 * time.Minute, Priority: 5.0}
-	b3 := &Block{ID: "B3", Target: Custom{Label: "T3"}, Duration: 10 * time.Minute, Priority: 1.0}
+	b2 := &Block{ID: "B2", Target: NewTarget(catalog.Target{Name: "T2"}, nil), Duration: 20 * time.Minute, Priority: 5.0}
+	b3 := &Block{ID: "B3", Target: NewTarget(catalog.Target{Name: "T3"}, nil), Duration: 10 * time.Minute, Priority: 1.0}
 
 	strategy := &SwapOptimizedStrategy{
 		Base:      &PriorityStrategy{},
@@ -174,7 +175,7 @@ func TestSwapOptimizedWithNilBase(t *testing.T) {
 	start := time.ZeroTime()
 	window := Window{Start: start, End: start.Add(1 * time.Hour)}
 
-	b1 := &Block{ID: "B1", Target: Custom{Label: "T1"}, Duration: 20 * time.Minute, Priority: 1.0}
+	b1 := &Block{ID: "B1", Target: NewTarget(catalog.Target{Name: "T1"}, nil), Duration: 20 * time.Minute, Priority: 1.0}
 
 	strategy := &SwapOptimizedStrategy{} // nil Base → defaults to PriorityStrategy
 	sched, err := strategy.Schedule(planner, window, []*Block{b1}, tm)
@@ -194,7 +195,7 @@ func TestScoreBlockPlacement(t *testing.T) {
 
 	b := &Block{
 		ID:       "B1",
-		Target:   Custom{Label: "T1"},
+		Target:   NewTarget(catalog.Target{Name: "T1"}, nil),
 		Duration: 20 * time.Minute,
 		Priority: 2.0,
 	}

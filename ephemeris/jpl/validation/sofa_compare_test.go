@@ -5,19 +5,20 @@ package jpl_test
 import (
 	"testing"
 
-	"github.com/TuSKan/astrogo/ephemeris"
+	eph "github.com/TuSKan/astrogo/ephemeris"
+	"github.com/TuSKan/astrogo/ephemeris/core"
 	"github.com/TuSKan/astrogo/ephemeris/jpl"
 	"github.com/TuSKan/astrogo/time"
 )
 
-func runSOFATest(t *testing.T, bid ephemeris.ID) {
-	p, err := jpl.NewProvider(jpl.WithSource(jpl.Planets), jpl.WithKernel("de440"), jpl.WithDataDir("../data"))
+func runSOFATest(t *testing.T, bid eph.ID) {
+	p, err := jpl.NewProvider(core.Planets, "de440", jpl.WithDataDir("../data"))
 	if err != nil {
 		t.Skipf("skipping SOFA comparison: JPL provider failed: %v", err)
 	}
 	defer p.Close()
 
-	sofa := ephemeris.Default()
+	sofa := eph.Default()
 
 	epochs := []time.Time{
 		time.FromJD(2451545.0, time.TDB),
@@ -42,7 +43,7 @@ func runSOFATest(t *testing.T, bid ephemeris.ID) {
 
 			posDiff := jplState.Pos.Sub(sofaState.Pos).Norm()
 			tol := sunPosTol
-			if bid == ephemeris.Moon {
+			if bid == eph.Moon {
 				tol = moonPosTol
 			}
 
@@ -54,9 +55,9 @@ func runSOFATest(t *testing.T, bid ephemeris.ID) {
 }
 
 func TestJPLStateAgainstSOFASun(t *testing.T) {
-	runSOFATest(t, ephemeris.Sun)
+	runSOFATest(t, eph.Sun)
 }
 
 func TestJPLStateAgainstSOFAMoon(t *testing.T) {
-	runSOFATest(t, ephemeris.Moon)
+	runSOFATest(t, eph.Moon)
 }

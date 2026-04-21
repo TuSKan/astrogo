@@ -6,7 +6,7 @@ import (
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
-	"github.com/TuSKan/astrogo/ephemeris"
+	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/time"
 )
 
@@ -51,21 +51,21 @@ type MoonPhaseEvent struct {
 // moonElongation returns the ecliptic longitude difference (Moon − Sun)
 // normalized to [0, 360). This is the standard definition of lunar elongation
 // used for phase computation.
-func moonElongation(t time.Time, eph ephemeris.Provider) (float64, error) {
-	sunPos, err := ephemeris.Position(eph, ephemeris.Sun, t)
+func moonElongation(t time.Time, prov eph.Provider) (float64, error) {
+	sunPos, err := eph.Position(prov, eph.Sun, t)
 	if err != nil {
 		return 0, fmt.Errorf("phases: sun position: %w", err)
 	}
-	moonPos, err := ephemeris.Position(eph, ephemeris.Moon, t)
+	moonPos, err := eph.Position(prov, eph.Moon, t)
 	if err != nil {
 		return 0, fmt.Errorf("phases: moon position: %w", err)
 	}
 
-	sunICRS, err := ephemeris.ToICRS(sunPos)
+	sunICRS, err := eph.ToICRS(sunPos)
 	if err != nil {
 		return 0, fmt.Errorf("phases: sun ICRS: %w", err)
 	}
-	moonICRS, err := ephemeris.ToICRS(moonPos)
+	moonICRS, err := eph.ToICRS(moonPos)
 	if err != nil {
 		return 0, fmt.Errorf("phases: moon ICRS: %w", err)
 	}
@@ -92,21 +92,21 @@ func moonElongation(t time.Time, eph ephemeris.Provider) (float64, error) {
 // The algorithm samples the Moon-Sun ecliptic elongation at regular intervals
 // and uses Brent's method (via Solver) to refine the instant when the elongation
 // crosses 0°, 90°, 180°, or 270°.
-func MoonPhases(start, end time.Time, eph ephemeris.Provider) ([]MoonPhaseEvent, error) {
+func MoonPhases(start, end time.Time, prov eph.Provider) ([]MoonPhaseEvent, error) {
 	const step = 6 * time.Hour // ~4 samples per day → won't miss any phase
 	solver := DefaultSolver()
 	var events []MoonPhaseEvent
 
 	phases := []MoonPhase{PhaseNewMoon, PhaseFirstQuarter, PhaseFullMoon, PhaseLastQuarter}
 
-	prevElong, err := moonElongation(start, eph)
+	prevElong, err := moonElongation(start, prov)
 	if err != nil {
 		return nil, err
 	}
 
 	prevT := start
 	for t := start.Add(step); !t.After(end); t = t.Add(step) {
-		curElong, err := moonElongation(t, eph)
+		curElong, err := moonElongation(t, prov)
 		if err != nil {
 			return nil, err
 		}
@@ -115,7 +115,7 @@ func MoonPhases(start, end time.Time, eph ephemeris.Provider) ([]MoonPhaseEvent,
 			target := phase.targetAngle()
 
 			if CrossesTarget(prevElong, curElong, target, 360) {
-				eval := phaseEvaluator(target, eph)
+				eval := phaseEvaluator(target, prov)
 				refined, _, err := solver.FindRoot(eval, prevT, t)
 				if err != nil {
 					continue
@@ -133,9 +133,9 @@ func MoonPhases(start, end time.Time, eph ephemeris.Provider) ([]MoonPhaseEvent,
 
 // phaseEvaluator returns an Evaluator that computes (elongation − target),
 // normalized to [-180, 180], suitable for root-finding.
-func phaseEvaluator(target float64, eph ephemeris.Provider) Evaluator {
+func phaseEvaluator(target float64, prov eph.Provider) Evaluator {
 	return func(t time.Time) (float64, error) {
-		elong, err := moonElongation(t, eph)
+		elong, err := moonElongation(t, prov)
 		if err != nil {
 			return 0, err
 		}
@@ -196,12 +196,12 @@ type SeasonEvent struct {
 // (annual aberration displaces the Sun westward). Light-time and aberration
 // largely cancel for the Sun, but the net effect shifts the apparent longitude
 // by −κ in ecliptic coordinates.
-func sunEclipticLongitude(t time.Time, eph ephemeris.Provider) (float64, error) {
-	sunPos, err := ephemeris.Position(eph, ephemeris.Sun, t)
+func sunEclipticLongitude(t time.Time, prov eph.Provider) (float64, error) {
+	sunPos, err := eph.Position(prov, eph.Sun, t)
 	if err != nil {
 		return 0, fmt.Errorf("seasons: sun position: %w", err)
 	}
-	sunICRS, err := ephemeris.ToICRS(sunPos)
+	sunICRS, err := eph.ToICRS(sunPos)
 	if err != nil {
 		return 0, fmt.Errorf("seasons: sun ICRS: %w", err)
 	}
@@ -229,7 +229,7 @@ func sunEclipticLongitude(t time.Time, eph ephemeris.Provider) (float64, error) 
 
 // Seasons computes all equinoxes and solstices for a given year.
 // Returns events in chronological order.
-func Seasons(year int, eph ephemeris.Provider) ([]SeasonEvent, error) {
+func Seasons(year int, prov eph.Provider) ([]SeasonEvent, error) {
 	start := time.Date(year, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
 	end := time.Date(year+1, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
 
@@ -239,14 +239,14 @@ func Seasons(year int, eph ephemeris.Provider) ([]SeasonEvent, error) {
 
 	seasons := []Season{SeasonVernalEquinox, SeasonSummerSolstice, SeasonAutumnalEquinox, SeasonWinterSolstice}
 
-	prevLon, err := sunEclipticLongitude(start, eph)
+	prevLon, err := sunEclipticLongitude(start, prov)
 	if err != nil {
 		return nil, err
 	}
 
 	prevT := start
 	for t := start.Add(step); !t.After(end); t = t.Add(step) {
-		curLon, err := sunEclipticLongitude(t, eph)
+		curLon, err := sunEclipticLongitude(t, prov)
 		if err != nil {
 			return nil, err
 		}
@@ -255,7 +255,7 @@ func Seasons(year int, eph ephemeris.Provider) ([]SeasonEvent, error) {
 			target := season.targetLongitude()
 
 			if CrossesIncreasing(prevLon, curLon, target, 360) {
-				eval := seasonEvaluator(target, eph)
+				eval := seasonEvaluator(target, prov)
 				refined, _, err := solver.FindRoot(eval, prevT, t)
 				if err != nil {
 					continue
@@ -273,9 +273,9 @@ func Seasons(year int, eph ephemeris.Provider) ([]SeasonEvent, error) {
 
 // seasonEvaluator returns an Evaluator that computes (ecliptic longitude − target),
 // normalized to [-180, 180], suitable for root-finding.
-func seasonEvaluator(target float64, eph ephemeris.Provider) Evaluator {
+func seasonEvaluator(target float64, prov eph.Provider) Evaluator {
 	return func(t time.Time) (float64, error) {
-		lon, err := sunEclipticLongitude(t, eph)
+		lon, err := sunEclipticLongitude(t, prov)
 		if err != nil {
 			return 0, err
 		}
@@ -294,21 +294,21 @@ func seasonEvaluator(target float64, eph ephemeris.Provider) Evaluator {
 
 // MoonIllumination returns the fraction of the Moon's disk illuminated [0, 1]
 // and the phase angle in degrees at time t.
-func MoonIllumination(t time.Time, eph ephemeris.Provider) (fraction float64, phaseAngle angle.Angle, err error) {
-	sunPos, err := ephemeris.Position(eph, ephemeris.Sun, t)
+func MoonIllumination(t time.Time, prov eph.Provider) (fraction float64, phaseAngle angle.Angle, err error) {
+	sunPos, err := eph.Position(prov, eph.Sun, t)
 	if err != nil {
 		return 0, 0, err
 	}
-	moonPos, err := ephemeris.Position(eph, ephemeris.Moon, t)
+	moonPos, err := eph.Position(prov, eph.Moon, t)
 	if err != nil {
 		return 0, 0, err
 	}
 
-	sunICRS, err := ephemeris.ToICRS(sunPos)
+	sunICRS, err := eph.ToICRS(sunPos)
 	if err != nil {
 		return 0, 0, err
 	}
-	moonICRS, err := ephemeris.ToICRS(moonPos)
+	moonICRS, err := eph.ToICRS(moonPos)
 	if err != nil {
 		return 0, 0, err
 	}
@@ -354,13 +354,13 @@ type ApsisEvent struct {
 //
 // Uses Brent's minimization (via Solver.FindExtremum) on the geocentric
 // Earth-Sun distance. Perihelion occurs around January 3, aphelion around July 4.
-func Apsides(year int, eph ephemeris.Provider) ([]ApsisEvent, error) {
+func Apsides(year int, prov eph.Provider) ([]ApsisEvent, error) {
 	solver := DefaultSolver()
 	var events []ApsisEvent
 
 	// Earth-Sun distance evaluator (returns distance in AU)
 	sunDistance := func(t time.Time) (float64, error) {
-		pos, err := ephemeris.Position(eph, ephemeris.Sun, t)
+		pos, err := eph.Position(prov, eph.Sun, t)
 		if err != nil {
 			return 0, fmt.Errorf("apsides: sun position: %w", err)
 		}
@@ -420,12 +420,12 @@ type EclipseEvent struct {
 }
 
 // moonEclipticLatitude returns the Moon's ecliptic latitude at time t.
-func moonEclipticLatitude(t time.Time, eph ephemeris.Provider) (angle.Angle, error) {
-	moonPos, err := ephemeris.Position(eph, ephemeris.Moon, t)
+func moonEclipticLatitude(t time.Time, prov eph.Provider) (angle.Angle, error) {
+	moonPos, err := eph.Position(prov, eph.Moon, t)
 	if err != nil {
 		return 0, fmt.Errorf("eclipse: moon position: %w", err)
 	}
-	moonICRS, err := ephemeris.ToICRS(moonPos)
+	moonICRS, err := eph.ToICRS(moonPos)
 	if err != nil {
 		return 0, fmt.Errorf("eclipse: moon ICRS: %w", err)
 	}
@@ -436,20 +436,20 @@ func moonEclipticLatitude(t time.Time, eph ephemeris.Provider) (angle.Angle, err
 // moonAntiSunSeparation returns the angular separation (degrees) between
 // the Moon and the anti-solar point (Earth's shadow center).
 // The "time of greatest lunar eclipse" is the minimum of this function.
-func moonAntiSunSeparation(t time.Time, eph ephemeris.Provider) (float64, error) {
-	sunPos, err := ephemeris.Position(eph, ephemeris.Sun, t)
+func moonAntiSunSeparation(t time.Time, prov eph.Provider) (float64, error) {
+	sunPos, err := eph.Position(prov, eph.Sun, t)
 	if err != nil {
 		return 0, err
 	}
-	moonPos, err := ephemeris.Position(eph, ephemeris.Moon, t)
+	moonPos, err := eph.Position(prov, eph.Moon, t)
 	if err != nil {
 		return 0, err
 	}
-	sunICRS, err := ephemeris.ToICRS(sunPos)
+	sunICRS, err := eph.ToICRS(sunPos)
 	if err != nil {
 		return 0, err
 	}
-	moonICRS, err := ephemeris.ToICRS(moonPos)
+	moonICRS, err := eph.ToICRS(moonPos)
 	if err != nil {
 		return 0, err
 	}
@@ -466,20 +466,20 @@ func moonAntiSunSeparation(t time.Time, eph ephemeris.Provider) (float64, error)
 // moonSunSeparation returns the angular separation (degrees) between
 // the Moon and the Sun as seen from Earth.
 // The "time of greatest solar eclipse" is the minimum of this function.
-func moonSunSeparation(t time.Time, eph ephemeris.Provider) (float64, error) {
-	sunPos, err := ephemeris.Position(eph, ephemeris.Sun, t)
+func moonSunSeparation(t time.Time, prov eph.Provider) (float64, error) {
+	sunPos, err := eph.Position(prov, eph.Sun, t)
 	if err != nil {
 		return 0, err
 	}
-	moonPos, err := ephemeris.Position(eph, ephemeris.Moon, t)
+	moonPos, err := eph.Position(prov, eph.Moon, t)
 	if err != nil {
 		return 0, err
 	}
-	sunICRS, err := ephemeris.ToICRS(sunPos)
+	sunICRS, err := eph.ToICRS(sunPos)
 	if err != nil {
 		return 0, err
 	}
-	moonICRS, err := ephemeris.ToICRS(moonPos)
+	moonICRS, err := eph.ToICRS(moonPos)
 	if err != nil {
 		return 0, err
 	}
@@ -493,10 +493,10 @@ func moonSunSeparation(t time.Time, eph ephemeris.Provider) (float64, error) {
 // The eclipse time is refined to the moment of minimum Moon–anti-Sun angular
 // separation (time of greatest eclipse). The Gamma field indicates how central
 // the eclipse is (0 = perfectly central, 1 = at the limit).
-func LunarEclipses(start, end time.Time, eph ephemeris.Provider) ([]EclipseEvent, error) {
+func LunarEclipses(start, end time.Time, prov eph.Provider) ([]EclipseEvent, error) {
 	const penumbralLimit = 1.58 // degrees
 
-	phases, err := MoonPhases(start, end, eph)
+	phases, err := MoonPhases(start, end, prov)
 	if err != nil {
 		return nil, fmt.Errorf("lunar eclipses: %w", err)
 	}
@@ -508,7 +508,7 @@ func LunarEclipses(start, end time.Time, eph ephemeris.Provider) ([]EclipseEvent
 			continue
 		}
 
-		lat, err := moonEclipticLatitude(phase.Time, eph)
+		lat, err := moonEclipticLatitude(phase.Time, prov)
 		if err != nil {
 			continue
 		}
@@ -520,13 +520,13 @@ func LunarEclipses(start, end time.Time, eph ephemeris.Provider) ([]EclipseEvent
 			tMin := phase.Time.Add(-30 * time.Minute)
 			tMax := phase.Time.Add(30 * time.Minute)
 			eclTime, _, err := solver.FindExtremum(func(t time.Time) (float64, error) {
-				return moonAntiSunSeparation(t, eph)
+				return moonAntiSunSeparation(t, prov)
 			}, tMin, tMax, false)
 			if err != nil {
 				eclTime = phase.Time
 			}
 
-			refinedLat, _ := moonEclipticLatitude(eclTime, eph)
+			refinedLat, _ := moonEclipticLatitude(eclTime, prov)
 			eclipses = append(eclipses, EclipseEvent{
 				Type:             EclipseLunar,
 				Time:             eclTime,
@@ -546,10 +546,10 @@ func LunarEclipses(start, end time.Time, eph ephemeris.Provider) ([]EclipseEvent
 // The eclipse time is refined to the moment of minimum Moon–Sun angular
 // separation (time of greatest eclipse). The Gamma field indicates how central
 // the eclipse is (0 = perfectly central, 1 = at the limit).
-func SolarEclipses(start, end time.Time, eph ephemeris.Provider) ([]EclipseEvent, error) {
+func SolarEclipses(start, end time.Time, prov eph.Provider) ([]EclipseEvent, error) {
 	const partialLimit = 1.58 // degrees
 
-	phases, err := MoonPhases(start, end, eph)
+	phases, err := MoonPhases(start, end, prov)
 	if err != nil {
 		return nil, fmt.Errorf("solar eclipses: %w", err)
 	}
@@ -561,7 +561,7 @@ func SolarEclipses(start, end time.Time, eph ephemeris.Provider) ([]EclipseEvent
 			continue
 		}
 
-		lat, err := moonEclipticLatitude(phase.Time, eph)
+		lat, err := moonEclipticLatitude(phase.Time, prov)
 		if err != nil {
 			continue
 		}
@@ -573,13 +573,13 @@ func SolarEclipses(start, end time.Time, eph ephemeris.Provider) ([]EclipseEvent
 			tMin := phase.Time.Add(-30 * time.Minute)
 			tMax := phase.Time.Add(30 * time.Minute)
 			eclTime, _, err := solver.FindExtremum(func(t time.Time) (float64, error) {
-				return moonSunSeparation(t, eph)
+				return moonSunSeparation(t, prov)
 			}, tMin, tMax, false)
 			if err != nil {
 				eclTime = phase.Time
 			}
 
-			refinedLat, _ := moonEclipticLatitude(eclTime, eph)
+			refinedLat, _ := moonEclipticLatitude(eclTime, prov)
 			eclipses = append(eclipses, EclipseEvent{
 				Type:             EclipseSolar,
 				Time:             eclTime,

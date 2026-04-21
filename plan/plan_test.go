@@ -8,7 +8,7 @@ import (
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/catalog"
 	"github.com/TuSKan/astrogo/coord"
-	"github.com/TuSKan/astrogo/ephemeris"
+	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/time"
 )
@@ -26,8 +26,8 @@ func TestPlanner(t *testing.T) {
 	tm := time.NowUTC()
 
 	objs := []Observable{
-		DeepSpace{Object: catalog.Target{Name: "High", Coord: coord.NewICRS(angle.Deg(0), angle.Deg(45))}},
-		DeepSpace{Object: catalog.Target{Name: "Low", Coord: coord.NewICRS(angle.Deg(180), angle.Deg(-45))}},
+		NewTarget(catalog.Target{Name: "High", Coord: coord.NewICRS(angle.Deg(0), angle.Deg(45))}, nil),
+		NewTarget(catalog.Target{Name: "Low", Coord: coord.NewICRS(angle.Deg(180), angle.Deg(-45))}, nil),
 	}
 
 	filtered, err := planner.FilterObservable(objs, tm)
@@ -43,7 +43,7 @@ func TestObservableWindows_Fixed(t *testing.T) {
 	site, _ := NewSite("Test", loc, angle.Zero(), nil)
 
 	// Target at zenith at Greenwich J2000 (LST ~18.69h)
-	obj := Custom{Coord: coord.NewICRS(angle.Hour(18.69), angle.Deg(0))}
+	obj := NewTarget(catalog.Target{Coord: coord.NewICRS(angle.Hour(18.69), angle.Deg(0))}, nil)
 
 	start := time.FromJD(2451545.0, time.UTC) // J2000 Noon (Observable)
 	end := start.Add(1 * stdtime.Hour)
@@ -73,13 +73,13 @@ func TestObservableWindows_Moving(t *testing.T) {
 	loc, _ := coord.NewGeodetic(angle.Zero(), angle.Zero(), 0)
 	site, _ := NewSite("Test", loc, angle.Zero(), nil)
 
-	sun := Body{ID: ephemeris.Sun, Provider: ephemeris.Default()}
+	sun := NewTarget(catalog.Target{ID: "11", Name: "Sun", Kind: "Star"}, eph.Default())
 
 	// Start at Noon J2000 (Sun high)
 	start := time.FromJD(2451545.0, time.UTC)
 	// End 24 hours later
 	end := start.Add(24 * time.Hour)
-	step := 30 * time.Minute
+	step := 15 * time.Minute // ≤ 15min max
 
 	t.Run("SunDaylight", func(t *testing.T) {
 		// Sun altitude > 0 (Daylight)
@@ -108,7 +108,7 @@ func (f *flipConstraint) Check(_ Observable, _ time.Time, _ *Site) (Result, erro
 func TestObservableWindows_Grouping(t *testing.T) {
 	loc, _ := coord.NewGeodetic(angle.Zero(), angle.Zero(), 0)
 	site, _ := NewSite("Test", loc, angle.Zero(), nil)
-	obj := Custom{Coord: coord.NewICRS(angle.Zero(), angle.Zero())}
+	obj := NewTarget(catalog.Target{Coord: coord.NewICRS(angle.Zero(), angle.Zero())}, nil)
 
 	start := time.NowUTC()
 	step := 1 * stdtime.Minute
@@ -141,7 +141,7 @@ func TestIsObservable(t *testing.T) {
 	tm := time.FromJD(2451545.0, time.UTC)
 
 	// Target at zenith
-	obj := Custom{Coord: coord.NewICRS(angle.Hour(18.69), angle.Deg(0))}
+	obj := NewTarget(catalog.Target{Coord: coord.NewICRS(angle.Hour(18.69), angle.Deg(0))}, nil)
 
 	t.Run("AllPass", func(t *testing.T) {
 		constraints := []Constraint{
@@ -186,7 +186,7 @@ func TestIsObservable(t *testing.T) {
 		// Site (0,0) at LST=18.7h means Sun is near meridian at Dec=-23.
 
 		// Wait, for this test let's just use a high threshold to force a fail.
-		sun := Body{ID: ephemeris.Sun, Provider: ephemeris.Default()}
+		sun := NewTarget(catalog.Target{ID: "11", Name: "Sun", Kind: "Star"}, eph.Default())
 		eval, err := IsObservable(sun, tm, site, Altitude{Threshold: angle.Deg(80)})
 		testutil.AssertNoError(t, err)
 		if eval.Observable {
@@ -202,12 +202,12 @@ func TestScoreObservable(t *testing.T) {
 
 	t.Run("AltitudeScoring", func(t *testing.T) {
 		// Target 1: Near zenith (Alt ~90)
-		obj1 := Custom{Coord: coord.NewICRS(angle.Hour(18.69), angle.Deg(0))}
+		obj1 := NewTarget(catalog.Target{Coord: coord.NewICRS(angle.Hour(18.69), angle.Deg(0))}, nil)
 		// Target 2: Lower (Alt ~45)
-		obj2 := Custom{Coord: coord.NewICRS(angle.Hour(18.69), angle.Deg(45))}
+		obj2 := NewTarget(catalog.Target{Coord: coord.NewICRS(angle.Hour(18.69), angle.Deg(45))}, nil)
 
-		s1, _ := ScoreObservable(obj1, tm, site)
-		s2, _ := ScoreObservable(obj2, tm, site)
+		s1, _ := ScoreObservable(obj1, tm, site, nil)
+		s2, _ := ScoreObservable(obj2, tm, site, nil)
 
 		if s1 <= s2 {
 			t.Errorf("Expected higher altitude to have higher score: %f <= %f", s1, s2)
@@ -215,14 +215,42 @@ func TestScoreObservable(t *testing.T) {
 	})
 
 	t.Run("FailingConstraint", func(t *testing.T) {
-		obj := Custom{Coord: coord.NewICRS(angle.Hour(18.69), angle.Deg(0))}
+		obj := NewTarget(catalog.Target{Coord: coord.NewICRS(angle.Hour(18.69), angle.Deg(0))}, nil)
 		// Force fail with extreme altitude threshold
 		c := Altitude{Threshold: angle.Deg(95)}
 
-		s, err := ScoreObservable(obj, tm, site, c)
+		s, err := ScoreObservable(obj, tm, site, nil, c)
 		testutil.AssertNoError(t, err)
 		if s != 0 {
 			t.Errorf("Expected score 0 for failing constraint, got %f", s)
+		}
+	})
+
+	t.Run("UrgencyBoost", func(t *testing.T) {
+		// Use altitude-only config to isolate urgency testing.
+		altOnly := &ScoreConfig{AltitudeWeight: 1, UrgencyWeight: 0, MoonWeight: 0}
+		urgOnly := &ScoreConfig{AltitudeWeight: 0, UrgencyWeight: 1, MoonWeight: 0}
+
+		obj := NewTarget(catalog.Target{Coord: coord.NewICRS(angle.Hour(18.69), angle.Deg(0))}, nil)
+
+		sAlt, _ := ScoreObservable(obj, tm, site, altOnly)
+		sUrg, _ := ScoreObservable(obj, tm, site, urgOnly)
+
+		// Both should be positive for a visible target
+		if sAlt <= 0 {
+			t.Errorf("Expected positive altitude score, got %f", sAlt)
+		}
+		if sUrg <= 0 {
+			t.Errorf("Expected positive urgency score, got %f", sUrg)
+		}
+	})
+
+	t.Run("CompositeHigherThanZero", func(t *testing.T) {
+		obj := NewTarget(catalog.Target{Coord: coord.NewICRS(angle.Hour(18.69), angle.Deg(0))}, nil)
+		s, err := ScoreObservable(obj, tm, site, nil) // Default config
+		testutil.AssertNoError(t, err)
+		if s <= 0 {
+			t.Errorf("Expected positive composite score for visible target, got %f", s)
 		}
 	})
 }
@@ -242,10 +270,10 @@ func TestRankObservables(t *testing.T) {
 	t.Run("RankingStability", func(t *testing.T) {
 		objs := []Observable{
 			prioritizedTarget{
-				Observable: Custom{Coord: coord.NewICRS(angle.Hour(18.69), angle.Deg(45))},
+				Observable: NewTarget(catalog.Target{Coord: coord.NewICRS(angle.Hour(18.69), angle.Deg(45))}, nil),
 				priority:   2.0, // High priority but lower altitude
 			},
-			Custom{Coord: coord.NewICRS(angle.Hour(18.69), angle.Deg(0))}, // Zenith but priority 1.0
+			NewTarget(catalog.Target{Coord: coord.NewICRS(angle.Hour(18.69), angle.Deg(0))}, nil), // Zenith but priority 1.0
 		}
 
 		// Score 1: ~45 * 2.0 = 90
@@ -253,7 +281,7 @@ func TestRankObservables(t *testing.T) {
 		// (Actually depends on exact math, let's adjust to be sure)
 
 		objs[0] = prioritizedTarget{
-			Observable: Custom{Coord: coord.NewICRS(angle.Hour(18.69), angle.Deg(45))},
+			Observable: NewTarget(catalog.Target{Coord: coord.NewICRS(angle.Hour(18.69), angle.Deg(45))}, nil),
 			priority:   3.0, // Score ~135
 		}
 
@@ -267,4 +295,33 @@ func TestRankObservables(t *testing.T) {
 			t.Error("Priority should have pushed lower altitude target to first place")
 		}
 	})
+}
+
+func TestObservableWindows_StepTooLarge(t *testing.T) {
+	loc, _ := coord.NewGeodetic(angle.Zero(), angle.Zero(), 0)
+	site, _ := NewSite("Test", loc, angle.Zero(), nil)
+	obj := NewTarget(catalog.Target{Coord: coord.NewICRS(angle.Zero(), angle.Zero())}, nil)
+
+	start := time.NowUTC()
+	end := start.Add(6 * stdtime.Hour)
+
+	// Step > 15min should return an error.
+	_, err := ObservableWindows(obj, start, end, 30*stdtime.Minute, site, Altitude{Threshold: angle.Deg(30)})
+	if err == nil {
+		t.Error("Expected error for step > 15 minutes")
+	}
+
+	// Step <= 15min should succeed.
+	_, err = ObservableWindows(obj, start, end, 15*stdtime.Minute, site, Altitude{Threshold: angle.Deg(30)})
+	testutil.AssertNoError(t, err)
+}
+
+func TestScoreConfig_Defaults(t *testing.T) {
+	cfg := DefaultScoreConfig()
+	wA, wU, wM := cfg.normalize()
+
+	total := wA + wU + wM
+	if total < 0.999 || total > 1.001 {
+		t.Errorf("Expected normalized weights to sum to 1.0, got %f", total)
+	}
 }

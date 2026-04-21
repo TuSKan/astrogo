@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/TuSKan/astrogo/fits"
+	"github.com/TuSKan/astrogo/time"
 )
 
 func TestSiteFromFITS(t *testing.T) {
@@ -48,10 +49,11 @@ func TestTargetFromFITS(t *testing.T) {
 	}
 
 	// test RA and Dec
-	if target.Coord.RA().Degrees() != 83.82208 {
-		t.Errorf("expected RA 83.82208, got: %v", target.Coord.RA().Degrees())
+	pos, _ := target.Position(time.Time{})
+	if pos.RA().Degrees() != 83.82208 {
+		t.Errorf("expected RA 83.82208, got: %v", pos.RA().Degrees())
 	}
-	if target.Coord.Dec().Degrees() != -5.39111 {
-		t.Errorf("expected Dec -5.39111, got: %v", target.Coord.Dec().Degrees())
+	if pos.Dec().Degrees() != -5.39111 {
+		t.Errorf("expected Dec -5.39111, got: %v", pos.Dec().Degrees())
 	}
 }

@@ -7,7 +7,7 @@ import (
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
-	"github.com/TuSKan/astrogo/ephemeris"
+	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/plan"
 	"github.com/TuSKan/astrogo/time"
@@ -17,26 +17,26 @@ import (
 func TestSunAltitudeMovement(t *testing.T) {
 	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(45), 0)
 	site, _ := plan.NewSite("Test", loc, angle.Zero(), nil)
-	p := ephemeris.Default()
+	p := eph.Default()
 
 	// Noon (roughly) at long 0
 	tm := time.FromJD(2460000.0, time.UTC)
 
 	// Get Sun position
-	vecStart, err := ephemeris.Position(p, ephemeris.Sun, tm)
+	vecStart, err := eph.Position(p, eph.Sun, tm)
 	testutil.AssertNoError(t, err)
 
-	posStart, err := ephemeris.ToICRS(vecStart)
+	posStart, err := eph.ToICRS(vecStart)
 	testutil.AssertNoError(t, err)
 
 	ctxStart := coord.NewContext(tm, site.Location(), atmosphere.StandardAtmosphere)
 	aaStart, _ := ctxStart.ICRSToAltAz(posStart)
 
 	tmLate := tm.AddDays(0.25) // +6 hours
-	vecLate, err := ephemeris.Position(p, ephemeris.Sun, tmLate)
+	vecLate, err := eph.Position(p, eph.Sun, tmLate)
 	testutil.AssertNoError(t, err)
 
-	posLate, err := ephemeris.ToICRS(vecLate)
+	posLate, err := eph.ToICRS(vecLate)
 	testutil.AssertNoError(t, err)
 
 	ctxLate := coord.NewContext(tmLate, site.Location(), atmosphere.StandardAtmosphere)
@@ -51,13 +51,13 @@ func TestSunAltitudeMovement(t *testing.T) {
 }
 
 func TestMoonPosition(t *testing.T) {
-	p := ephemeris.Default()
+	p := eph.Default()
 	tm := time.NowUTC()
 
-	vec, err := ephemeris.Position(p, ephemeris.Moon, tm)
+	vec, err := eph.Position(p, eph.Moon, tm)
 	testutil.AssertNoError(t, err)
 
-	pos, err := ephemeris.ToICRS(vec)
+	pos, err := eph.ToICRS(vec)
 	testutil.AssertNoError(t, err)
 
 	t.Logf("Moon ICRS: RA=%.2f Dec=%.2f", pos.RA().Degrees(), pos.Dec().Degrees())
@@ -68,16 +68,16 @@ func TestMoonPosition(t *testing.T) {
 }
 
 func TestStateAndHelpers(t *testing.T) {
-	p := ephemeris.Default()
+	p := eph.Default()
 	tm := time.NowUTC()
 
-	st, err := p.State(ephemeris.Sun, tm)
+	st, err := p.State(eph.Sun, tm)
 	testutil.AssertNoError(t, err)
 
-	pos, err := ephemeris.Position(p, ephemeris.Sun, tm)
+	pos, err := eph.Position(p, eph.Sun, tm)
 	testutil.AssertNoError(t, err)
 
-	vel, err := ephemeris.Velocity(p, ephemeris.Sun, tm)
+	vel, err := eph.Velocity(p, eph.Sun, tm)
 	testutil.AssertNoError(t, err)
 
 	if pos != st.Pos {
@@ -89,17 +89,17 @@ func TestStateAndHelpers(t *testing.T) {
 }
 
 func TestToICRSZeroVector(t *testing.T) {
-	_, err := ephemeris.ToICRS(vector.Vec3{})
+	_, err := eph.ToICRS(vector.Vec3{})
 	if err == nil {
 		t.Error("Expected error for zero vector conversion")
 	}
 }
 
 func TestUnsupportedBody(t *testing.T) {
-	p := ephemeris.Default()
+	p := eph.Default()
 	tm := time.NowUTC()
 
-	_, err := p.State(ephemeris.ID(999999), tm)
+	_, err := p.State(eph.ID(999999), tm)
 	if err == nil {
 		t.Error("Expected error for unsupported body")
 	}
@@ -116,14 +116,16 @@ type mockLinearProvider struct {
 	vel      vector.Vec3
 }
 
-func (m *mockLinearProvider) State(id ephemeris.ID, t time.Time) (ephemeris.State, error) {
+func (m *mockLinearProvider) State(id eph.ID, t time.Time) (eph.State, error) {
 	jd1_req, jd2_req := t.JDParts()
 	jd1_base, jd2_base := m.baseTime.JDParts()
 	dtDays := (jd1_req - jd1_base) + (jd2_req - jd2_base)
 
 	p := m.pos.Add(m.vel.MulScalar(dtDays))
-	return ephemeris.State{Pos: p, Vel: m.vel}, nil
+	return eph.State{Pos: p, Vel: m.vel}, nil
 }
+
+func (m *mockLinearProvider) Close() error { return nil }
 
 func angularSepArcsec(a, b *coord.AltAz) float64 {
 	az1 := a.Az().Radians()
@@ -146,7 +148,7 @@ func angularSepArcsec(a, b *coord.AltAz) float64 {
 	return math.Acos(cosd) * arcsecPerRad
 }
 
-func iteratedApparentVector(st ephemeris.State) vector.Vec3 {
+func iteratedApparentVector(st eph.State) vector.Vec3 {
 	v := st.Pos
 	tauDays := v.Norm() / lightAUPerDay
 	for j := 0; j < 5; j++ {
@@ -171,7 +173,7 @@ func TestApparentState_ZeroVelocityReducesToGeometric(t *testing.T) {
 		vel:      vector.Zero(),
 	}
 
-	appState, err := ephemeris.ApparentState(mock, ephemeris.Sun, tm)
+	appState, err := eph.ApparentState(mock, eph.Sun, tm)
 	if err != nil {
 		t.Fatalf("ApparentState failed: %v", err)
 	}
@@ -195,7 +197,7 @@ func TestApparentState_MatchesManualLightTimeIteration(t *testing.T) {
 	atm := atmosphere.Atmosphere{}
 	atm.Model = atmosphere.RefractionNone{}
 
-	st := ephemeris.State{
+	st := eph.State{
 		Pos: vector.V3(1.0, 0.8, 0.2),
 		Vel: vector.V3(-0.012, 0.009, 0.0015),
 	}
@@ -207,7 +209,7 @@ func TestApparentState_MatchesManualLightTimeIteration(t *testing.T) {
 	}
 
 	ctx := coord.NewContext(tm, site, atm)
-	appState, _ := ephemeris.ApparentState(mock, ephemeris.Mars, tm)
+	appState, _ := eph.ApparentState(mock, eph.Mars, tm)
 	got := ctx.GeocentricToObserved(appState.Pos)
 
 	app := iteratedApparentVector(st)
@@ -235,7 +237,7 @@ func TestApparentState_LightTimeActuallyChangesResult(t *testing.T) {
 	}
 
 	ctx := coord.NewContext(tm, site, atm)
-	appState, _ := ephemeris.ApparentState(mock, ephemeris.Jupiter, tm)
+	appState, _ := eph.ApparentState(mock, eph.Jupiter, tm)
 
 	got := ctx.GeocentricToObserved(appState.Pos)
 	geom := ctx.GeocentricToObserved(mock.pos)
@@ -266,7 +268,7 @@ func TestApparentState_DistantObjectHasTinyCorrection(t *testing.T) {
 	}
 
 	ctx := coord.NewContext(tm, site, atm)
-	appState, _ := ephemeris.ApparentState(mock, ephemeris.Jupiter, tm)
+	appState, _ := eph.ApparentState(mock, eph.Jupiter, tm)
 
 	got := ctx.GeocentricToObserved(appState.Pos)
 	geom := ctx.GeocentricToObserved(mock.pos)

@@ -7,13 +7,14 @@ import (
 
 	"github.com/TuSKan/astrogo/time"
 
+	"github.com/TuSKan/astrogo/ephemeris/core"
 	"github.com/TuSKan/astrogo/ephemeris/jpl"
 	"github.com/TuSKan/astrogo/ephemeris/jpl/lsk"
 	"github.com/TuSKan/astrogo/internal/testutil"
 )
 
 func TestLSKReader(t *testing.T) {
-	prov, err := jpl.NewProvider(jpl.WithSource(jpl.Planets), jpl.WithKernel("de440s"))
+	prov, err := jpl.NewProvider(core.Planets, "de440s")
 	if err != nil {
 		t.Fatalf("setup failed: %v", err)
 	}

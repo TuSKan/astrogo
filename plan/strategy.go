@@ -276,7 +276,7 @@ func mergeConstraints(a, b []Constraint) []Constraint {
 // computation when the caller already has one for the same epoch.
 func scoreBlockPlacement(block *Block, start, end time.Time, planner *Planner) float64 {
 	mid := start.Add(end.Sub(start) / 2)
-	score, err := ScoreObservable(block.Target, mid, planner.Site, planner.Constraints...)
+	score, err := ScoreObservable(block.Target, mid, planner.Site, nil, planner.Constraints...)
 	if err != nil {
 		return block.Priority
 	}

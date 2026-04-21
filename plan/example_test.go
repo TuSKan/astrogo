@@ -27,10 +27,10 @@ func ExamplePlanner_Observable() {
 	}
 
 	// Target
-	obj := NewFixed(catalog.Target{
+	obj := NewTarget(catalog.Target{
 		Name:  "Arp 220",
 		Coord: coord.NewICRS(angle.Deg(233.738), angle.Deg(23.503)),
-	})
+	}, nil)
 
 	// Fixed time: Equinox 2000 midnight (T=0.5).
 	t := time.FromJD(2451545.5, time.UTC)
@@ -49,14 +49,14 @@ func ExampleObservableWindows() {
 	site, _ := NewSite("Greenwich", loc, angle.Zero(), nil)
 
 	// Target at Zenith initially (J2000 Noon LST ~18.69h)
-	obj := NewFixed(catalog.Target{
+	obj := NewTarget(catalog.Target{
 		Name:  "ZenithTarget",
 		Coord: coord.NewICRS(angle.Hour(18.69), angle.Zero()),
-	})
+	}, nil)
 
 	start := time.FromJD(2451545.0, time.UTC) // J2000 Noon
 	end := start.Add(6 * time.Hour)
-	step := 1 * time.Hour
+	step := 10 * time.Minute // ≤ 15min
 
 	// Constraint: Altitude > 30 degrees
 	constraints := []Constraint{
@@ -68,7 +68,7 @@ func ExampleObservableWindows() {
 	for _, w := range windows {
 		fmt.Printf("Window: %s to %s\n", w.Start, w.End)
 	}
-	// Output: Window: JD 2451545.00000000 (UTC) to JD 2451545.16596113 (UTC)
+	// Output: Window: JD 2451545.00000000 (UTC) to JD 2451545.16596114 (UTC)
 }
 
 func ExampleRankObservables() {
@@ -76,10 +76,9 @@ func ExampleRankObservables() {
 	site, _ := NewSite("Test", loc, angle.Zero(), nil)
 	tm := time.FromJD(2451545.0, time.UTC) // J2000 Noon
 
-	objs := []Observable{
-		NewFixed(catalog.Target{Name: "NearZenith", Coord: coord.NewICRS(angle.Hour(18.69), angle.Deg(0))}),
-		NewFixed(catalog.Target{Name: "Lower", Coord: coord.NewICRS(angle.Hour(18.69), angle.Deg(45))}),
-	}
+	obj1 := NewTarget(catalog.Target{Name: "NearZenith", Coord: coord.NewICRS(angle.Hour(18.69), angle.Deg(0))}, nil)
+	obj2 := NewTarget(catalog.Target{Name: "Lower", Coord: coord.NewICRS(angle.Hour(18.69), angle.Deg(45))}, nil)
+	objs := []Observable{obj1, obj2}
 
 	ranked, _ := RankObservables(objs, tm, site)
 
@@ -87,6 +86,6 @@ func ExampleRankObservables() {
 		fmt.Printf("%d. %-10s (Score: %5.1f)\n", i+1, rt.Object.Name(), rt.Score)
 	}
 	// Output:
-	// 1. NearZenith (Score:  89.9)
-	// 2. Lower      (Score:  45.0)
+	// 1. NearZenith (Score:  67.5)
+	// 2. Lower      (Score:  45.4)
 }

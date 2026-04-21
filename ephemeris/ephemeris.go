@@ -6,28 +6,180 @@ import (
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
+	"github.com/TuSKan/astrogo/ephemeris/core"
+	"github.com/TuSKan/astrogo/ephemeris/jpl"
+	"github.com/TuSKan/astrogo/ephemeris/jpl/spk"
+	"github.com/TuSKan/astrogo/ephemeris/satellite"
 	"github.com/TuSKan/astrogo/internal/gofaext"
 	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/vector"
 )
 
-// State represents the kinematic state of a celestial
-type State struct {
-	Pos vector.Vec3 // Geocentric position in AU (ICRS-like)
-	Vel vector.Vec3 // Geocentric velocity in AU/day (ICRS-like)
+// ─── Re-exported core types (users import "ephemeris", not "ephemeris/core") ─
+
+type Provider = core.Provider
+type State = core.State
+type ID = core.ID
+type Source = core.Source
+type Kind = core.Kind
+type Body = core.Body
+
+const (
+	Mercury               = core.Mercury
+	Venus                 = core.Venus
+	Earth                 = core.Earth
+	Mars                  = core.Mars
+	Jupiter               = core.Jupiter
+	Saturn                = core.Saturn
+	Uranus                = core.Uranus
+	Neptune               = core.Neptune
+	Pluto                 = core.Pluto
+	Moon                  = core.Moon
+	Sun                   = core.Sun
+	SolarSystemBarycenter = core.SolarSystemBarycenter
+)
+
+const (
+	KindStar       = core.KindStar
+	KindPlanet     = core.KindPlanet
+	KindMoon       = core.KindMoon
+	KindMinorBody  = core.KindMinorBody
+	KindComet      = core.KindComet
+	KindBarycenter = core.KindBarycenter
+	KindSatellite  = core.KindSatellite
+)
+
+const (
+	Planets    = core.Planets
+	SmallBody  = core.SmallBody
+	Asteroids  = core.Asteroids
+	Comets     = core.Comets
+	Satellites = core.Satellites
+	Stations   = core.Stations
+)
+
+var (
+	SunBody     = core.SunBody
+	MoonBody    = core.MoonBody
+	MercuryBody = core.MercuryBody
+	VenusBody   = core.VenusBody
+	EarthBody   = core.EarthBody
+	MarsBody    = core.MarsBody
+	JupiterBody = core.JupiterBody
+	SaturnBody  = core.SaturnBody
+	UranusBody  = core.UranusBody
+	NeptuneBody = core.NeptuneBody
+	Bodies      = core.Bodies
+)
+
+// Satellite is the SGP4 orbit propagator for NORAD TLE data.
+type Satellite = satellite.Satellite
+
+// JPL is the JPL DE4xx numerical ephemeris provider.
+type JPL = jpl.Provider
+
+// ─── Options ─────────────────────────────────────────────────────────────────
+
+// Option configures provider construction.
+type Option func(*config)
+
+type config struct {
+	DataDir      string
+	Start        time.Time
+	End          time.Time
+	ExtraKernels []string // additional SPK kernels to load
+	TLEName      string
+	TLELine1     string
+	TLELine2     string
 }
 
-// Provider is the interface for celestial ephemeris sources.
-type Provider interface {
-	// State returns the geocentric state (position and velocity) of the given
-	// body at time t. The vectors are typically in an inertial frame like ICRS.
-	State(id ID, t time.Time) (State, error)
+// WithDataDir sets the local cache directory for downloaded kernels.
+func WithDataDir(dir string) Option {
+	return func(c *config) { c.DataDir = dir }
 }
+
+// WithTimeInterval restricts the ephemeris coverage window (for small-body SPK).
+func WithTimeInterval(start, end time.Time) Option {
+	return func(c *config) { c.Start = start; c.End = end }
+}
+
+// WithKernel adds an extra SPK kernel to load after the primary one.
+// Multiple WithKernel options can be chained.
+//
+//	p := eph.NewProvider(eph.Planets, "de441_part-1", eph.WithKernel("de441_part-2"))
+func WithKernel(name string) Option {
+	return func(c *config) { c.ExtraKernels = append(c.ExtraKernels, name) }
+}
+
+// WithTLE provides raw TLE lines for satellite construction.
+func WithTLE(line1, line2 string) Option {
+	return func(c *config) {
+		c.TLELine1 = line1
+		c.TLELine2 = line2
+	}
+}
+
+// ─── Factory ─────────────────────────────────────────────────────────────────
+
+// NewProvider creates an ephemeris provider for the given source and kernel.
+//
+//	p, err := eph.NewProvider(eph.Planets, "de442")
+//	p, err := eph.NewProvider(eph.Planets, "de441_part-1", eph.WithKernel("de441_part-2"))
+//	p, err := eph.NewProvider(eph.SmallBody, "433", eph.WithTimeInterval(start, end))
+//	p, err := eph.NewProvider(eph.Satellites, "ISS", eph.WithTLE(l1, l2))
+func NewProvider(source Source, kernel string, opts ...Option) (Provider, error) {
+	var cfg config
+	for _, opt := range opts {
+		opt(&cfg)
+	}
+
+	switch source {
+	case Planets, SmallBody, Asteroids, Comets:
+		var jplOpts []jpl.Option
+		if cfg.DataDir != "" {
+			jplOpts = append(jplOpts, jpl.WithDataDir(cfg.DataDir))
+		}
+		if !cfg.Start.IsZero() && !cfg.End.IsZero() {
+			jplOpts = append(jplOpts, jpl.WithTimeInterval(cfg.Start, cfg.End))
+		}
+		p, err := jpl.NewProvider(source, kernel, jplOpts...)
+		if err != nil {
+			return nil, err
+		}
+		for _, extra := range cfg.ExtraKernels {
+			k, err := spk.CacheDownload("planets/"+extra+".bsp", p.DataDir)
+			if err != nil {
+				return nil, err
+			}
+			if err = p.AddKernel(k); err != nil {
+				return nil, err
+			}
+		}
+		return p, nil
+
+	case Satellites:
+		if cfg.TLELine1 == "" || cfg.TLELine2 == "" {
+			return nil, errors.New("eph: Satellites source requires WithTLE option")
+		}
+		cfg.TLEName = kernel
+		return satellite.NewFromTLE(cfg.TLEName, cfg.TLELine1, cfg.TLELine2)
+
+	case Stations:
+		return nil, errors.New("eph: Stations source not yet implemented")
+
+	default:
+		return nil, errors.New("eph: unknown source " + string(source))
+	}
+}
+
+// ─── Default SOFA Provider ───────────────────────────────────────────────────
 
 // Default returns a SOFA-based ephemeris provider for the Sun and Moon.
 func Default() Provider {
 	return &sofaProvider{}
 }
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
 
 // Position is a convenience helper that returns the geocentric position
 // of a body at time t.
@@ -49,10 +201,21 @@ func Velocity(p Provider, id ID, t time.Time) (vector.Vec3, error) {
 	return st.Vel, nil
 }
 
+const earthMeanRadiusKm = 6371.0
+
+// Altitude returns the approximate altitude above the Earth's mean surface
+// in kilometres. For satellites this gives orbital altitude (~400 km for ISS);
+// for planets it gives geocentric distance minus Earth radius.
+func Altitude(p Provider, id ID, t time.Time) (float64, error) {
+	st, err := p.State(id, t)
+	if err != nil {
+		return 0, err
+	}
+	return st.DistanceKm() - earthMeanRadiusKm, nil
+}
+
 // ApparentState calculates the rigorously light-time delayed (retarded) geometric state
 // of a target by repeatedly polling the ephemeris Provider at (t - tau).
-// To satisfy classical planetary aberration, it strictly couples the true orbital curve
-// via the provider rather than relying on linear vector shortcuts.
 func ApparentState(p Provider, target ID, obsTime time.Time) (State, error) {
 	st, err := p.State(target, obsTime)
 	if err != nil {
@@ -73,11 +236,10 @@ func ApparentState(p Provider, target ID, obsTime time.Time) (State, error) {
 }
 
 // ToICRS converts a geocentric Cartesian vector (in AU) to spherical ICRS coordinates.
-// It assumes the input vector is already in an ICRS-compatible inertial frame.
 func ToICRS(pos vector.Vec3) (*coord.ICRS, error) {
 	r := math.Sqrt(pos.X*pos.X + pos.Y*pos.Y + pos.Z*pos.Z)
-	if r < 1e-12 { // Avoid division by zero for very small or zero vectors
-		return nil, errors.New("ephemeris: cannot convert near-zero vector to ICRS")
+	if r < 1e-12 {
+		return nil, errors.New("eph: cannot convert near-zero vector to ICRS")
 	}
 
 	ra := math.Atan2(pos.Y, pos.X)
@@ -86,6 +248,8 @@ func ToICRS(pos vector.Vec3) (*coord.ICRS, error) {
 	return coord.NewICRS(angle.Rad(ra).Wrap2Pi(), angle.Rad(dec)), nil
 }
 
+// ─── SOFA provider (analytical Sun/Moon) ─────────────────────────────────────
+
 type sofaProvider struct{}
 
 func (s *sofaProvider) State(id ID, t time.Time) (State, error) {
@@ -93,11 +257,9 @@ func (s *sofaProvider) State(id ID, t time.Time) (State, error) {
 	d1, d2 := tdb.JDParts()
 	switch id {
 	case Sun:
-		// Epv00 returns Earth heliocentric position/velocity.
-		// Sun geocentric = -Earth heliocentric.
 		pvh, _, status := gofaext.Epv00(d1, d2)
 		if status < 0 {
-			return State{}, errors.New("ephemeris: sofa epv00 failed")
+			return State{}, errors.New("eph: sofa epv00 failed")
 		}
 		ph := pvh[0]
 		vh := pvh[1]
@@ -107,7 +269,6 @@ func (s *sofaProvider) State(id ID, t time.Time) (State, error) {
 		}, nil
 
 	case Moon:
-		// Moon98 returns Moon geocentric position/velocity relative to GCRS (ICRS-like).
 		pv := gofaext.Moon98(d1, d2)
 		return State{
 			Pos: vector.Vec3{X: pv[0][0], Y: pv[0][1], Z: pv[0][2]},
@@ -115,12 +276,10 @@ func (s *sofaProvider) State(id ID, t time.Time) (State, error) {
 		}, nil
 
 	case Mercury, Venus, Earth, Mars, Jupiter, Saturn, Uranus, Neptune:
-		// Get Earth heliocentric state
 		pvh, _, status := gofaext.Epv00(d1, d2)
 		if status < 0 {
-			return State{}, errors.New("ephemeris: sofa epv00 failed")
+			return State{}, errors.New("eph: sofa epv00 failed")
 		}
-
 		var np int
 		switch id {
 		case Mercury:
@@ -140,14 +299,10 @@ func (s *sofaProvider) State(id ID, t time.Time) (State, error) {
 		case Neptune:
 			np = 8
 		}
-
-		// Get Planet heliocentric state
 		pv, status := gofaext.Plan94(d1, d2, np)
 		if status < 0 {
-			return State{}, errors.New("ephemeris: sofa plan94 failed")
+			return State{}, errors.New("eph: sofa plan94 failed")
 		}
-
-		// Planet Geocentric = Planet Heliocentric - Earth Heliocentric
 		return State{
 			Pos: vector.Vec3{
 				X: pv[0][0] - pvh[0][0],
@@ -162,6 +317,8 @@ func (s *sofaProvider) State(id ID, t time.Time) (State, error) {
 		}, nil
 
 	default:
-		return State{}, errors.New("ephemeris: unsupported body for sofa provider")
+		return State{}, errors.New("eph: unsupported body for sofa provider")
 	}
 }
+
+func (s *sofaProvider) Close() error { return nil }
