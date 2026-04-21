@@ -1,8 +1,8 @@
-// Example: Evaluate lunar crescent visibility using all 20 modern criteria.
+// Example: Evaluate lunar crescent visibility from computed ephemeris.
 //
-// This demonstrates the plan.CrescentParams evaluation pipeline against
-// a representative set of topocentric parameters for a typical
-// first-visibility observation scenario.
+// This finds the next New Moon, then evaluates crescent visibility on the
+// following evening from São Paulo using real Sun/Moon positions computed
+// via NewCrescentParams. All 20 modern criteria (1910–2021) are evaluated.
 //
 // Reference:
 //
@@ -12,33 +12,69 @@ package main
 
 import (
 	"fmt"
+	"log"
 
+	"github.com/TuSKan/astrogo/coord"
+	"github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/plan"
+	"github.com/TuSKan/astrogo/time"
 )
 
 func main() {
 	fmt.Println("══════════════════════════════════════════════════════════════")
-	fmt.Println("  Modern Lunar Crescent Visibility Criteria (1910–2021)")
+	fmt.Println("  Lunar Crescent Visibility — São Paulo")
 	fmt.Println("══════════════════════════════════════════════════════════════")
 	fmt.Println()
 
-	// Representative parameters for a marginal crescent sighting.
-	p := plan.CrescentParams{
-		ArcV: 10.5, // Arc of Vision (degrees)
-		ArcL: 12.0, // Elongation (degrees)
-		DAZ:  8.0,  // Azimuth difference (degrees)
-		MAlt: 5.5,  // Moon altitude (degrees)
-		W:    0.5,  // Crescent width (arc minutes)
-		LT:   35.0, // Lag time (minutes)
+	// ── Observer: São Paulo, Brazil ──────────────────────────────────────
+	loc, _ := coord.NewEarthLocation(-23.5505, -46.6333, 760)
+	site, _ := plan.NewSite("São Paulo", loc, 0, nil)
+
+	eph := ephemeris.Default()
+
+	// ── Find the next New Moon ──────────────────────────────────────────
+	now := time.NowUTC()
+	newMoon, err := plan.NextNewMoon(now, eph)
+	if err != nil {
+		log.Fatalf("NextNewMoon: %v", err)
+	}
+	fmt.Printf("  Next New Moon: %s\n\n", newMoon.Time)
+
+	// ── Find sunset on the evening after the New Moon ───────────────────
+	// The crescent is typically first visible on the evening following
+	// the astronomical New Moon (conjunction).
+	evening := newMoon.Time
+	nextDay := evening.AddDays(1)
+
+	_, sunset, err := plan.SunriseSunset(evening, nextDay, site, eph)
+	if err != nil {
+		log.Fatalf("SunriseSunset: %v", err)
+	}
+	fmt.Printf("  Sunset (São Paulo): %s\n\n", sunset.Time)
+
+	// ── Compute crescent parameters ~20 min after sunset ────────────────
+	// Best-practice observation window: 15–30 min after sunset, when the
+	// sky is dark enough to see a thin crescent but the Moon is still
+	// above the horizon.
+	obsTime := sunset.Time.Add(20 * time.Minute)
+	fmt.Printf("  Observation time:   %s (sunset + 20 min)\n\n", obsTime)
+
+	params, err := plan.NewCrescentParams(obsTime, loc, eph)
+	if err != nil {
+		log.Fatalf("NewCrescentParams: %v", err)
 	}
 
-	result := p.EvaluateAll()
+	// ── Evaluate all 20 criteria ────────────────────────────────────────
+	result := params.EvaluateAll()
 	fmt.Println(result.String())
 	fmt.Println()
 
-	// Demonstrate individual criterion calls
-	fmt.Println("─── Individual Criterion Examples ───")
-	fmt.Printf("  Yallop q-value: %.4f → Zone %s\n", result.Yallop.Value, result.Yallop.Code)
-	fmt.Printf("  Odeh V-value:   %.4f → %s\n", result.Odeh.Value, result.Odeh.Code)
-	fmt.Printf("  Qureshi S-value: %.4f → Zone %s\n", result.Qureshi.Value, result.Qureshi.Code)
+	// ── Summary ─────────────────────────────────────────────────────────
+	fmt.Println("─── Multi-Zone Classification ──────────────────────────────")
+	fmt.Printf("  Yallop (1998):  Zone %s — %s (q=%.4f)\n",
+		result.Yallop.Code, result.Yallop.Label, result.Yallop.Value)
+	fmt.Printf("  Odeh (2004):    %s — %s (V=%.4f)\n",
+		result.Odeh.Code, result.Odeh.Label, result.Odeh.Value)
+	fmt.Printf("  Qureshi (2010): Zone %s — %s (S=%.4f)\n",
+		result.Qureshi.Code, result.Qureshi.Label, result.Qureshi.Value)
 }
