@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
@@ -14,7 +13,7 @@ import (
 
 func main() {
 	// 1. Define the observer's location (São Paulo, Brazil)
-	loc, err := coord.NewGeodetic(angle.Deg(-46.6333), angle.Deg(-23.5505), 760)
+	loc, err := coord.NewEarthLocation(-23.5505, -46.6333, 760)
 	if err != nil {
 		log.Fatal(err)
 	}
