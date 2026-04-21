@@ -140,6 +140,11 @@ Existing astronomy tools are powerful, but often:
 - **Eclipse Detection**: `LunarEclipses`, `SolarEclipses` via ecliptic latitude filter (Danjon limit)
 - **Convenience**: `SunriseSunset`, `CivilDawnDusk`, `VisibilityEvents`, `Conjunctions`, `ConjunctionsEcliptic`, `Appulses`, `Oppositions`, `GreatestElongations`
 
+### Lunar Crescent Visibility
+- **20 Historical Criteria (1910–2021)** — Fotheringham, Danjon, Yallop, Odeh, Caldwell, MABIMS, and more
+- Evaluates topocentric parameters (Altitude/Azimuth, Elongation, ArcV/Width, Lag Time)
+- `EvaluateAll` for batch assessment across all 20 models simultaneously
+
 ---
 
 ## Installation
@@ -287,6 +292,24 @@ for _, e := range eclipses {
 nextFull, _ := plan.NextFullMoon(time.NowUTC(), eph)
 fmt.Printf("Next Full Moon: %s (illumination: %.0f%%)\n",
     nextFull.Time, nextFull.Value*100)
+```
+
+### Lunar Crescent Visibility
+
+```go
+// Compute topocentric parameters for the evening of sighting
+params, _ := plan.NewCrescentParams(sunsetTime, site.Location(), eph)
+
+// Evaluate all 20 historical criteria simultaneously
+result := params.EvaluateAll()
+
+// Multi-zone classifications (Yallop, Odeh, Qureshi)
+fmt.Printf("Yallop (1998): %s\n", result.Yallop.Label)
+fmt.Printf("Odeh (2004):   %s\n", result.Odeh.Label)
+
+// Singular physical limits
+fmt.Printf("Above Danjon limit: %v\n", result.Danjon)
+fmt.Printf("MABIMS (2021):      %v\n", result.MABIMS2021)
 ```
 
 ### Planetary Geometry
