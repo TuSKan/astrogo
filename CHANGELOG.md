@@ -141,4 +141,5 @@ First observatory-grade release. Validated against USNO, JPL Horizons, and NASA 
 - `VisibleIntervals` creates independent Contexts per grid step (correct; each step is a different epoch)
 - IERS EOP data fetched via `go:generate`, not at runtime
 
+[0.1.1]: https://github.com/TuSKan/astrogo/releases/tag/v0.1.1
 [0.1.0]: https://github.com/TuSKan/astrogo/releases/tag/v0.1.0
