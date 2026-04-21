@@ -17,11 +17,7 @@ func main() {
 	galactic := coord.ICRSToGalactic(icrs)
 
 	// 3. Convert ICRS -> AltAz (requires Site details and Time)
-	// 1. Setup Observatory (São Paulo, Brazil with precise coordinates from user's app)
-	// Lat: 23° 36' 03'' S = -23.600833°
-	// Lon: 46° 39' 09'' W = -46.6525°
-	// Elev: 786m
-	loc, _ := coord.NewGeodetic(angle.Deg(-46.6525), angle.Deg(-23.600833), 786)
+	loc, _ := coord.NewEarthLocation(-23.5505, -46.6333, 760) // São Paulo
 	now := time.NowUTC()
 
 	ctx := coord.NewContext(now, loc, atmosphere.StandardAtmosphere)

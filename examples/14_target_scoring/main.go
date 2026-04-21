@@ -22,8 +22,8 @@ import (
 
 func main() {
 	// ── Observatory: São Paulo (-23.5505°, -46.6333°, 760m) ─────────────
-	loc, _ := coord.NewGeodetic(angle.Deg(-46.6333), angle.Deg(-23.5505), 760)
-	site, _ := plan.NewSite("São Paulo", loc, angle.Zero(), nil)
+	loc, _ := coord.NewEarthLocation(-23.5505, -46.6333, 760)
+	site, _ := plan.NewSite("São Paulo", loc, 0, nil)
 
 	// ── Observation epoch: 2026-04-15 at local midnight ──────────────────
 	tz, _ := time.LoadLocation("America/Sao_Paulo")

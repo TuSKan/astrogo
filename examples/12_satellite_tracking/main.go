@@ -83,9 +83,9 @@ func main() {
 	header("Look Angle — São Paulo, Brazil")
 
 	// Observer: São Paulo (-23.5505°, -46.6333°, 760m)
-	observer, err := coord.NewGeodetic(angle.Deg(-46.6333), angle.Deg(-23.5505), 760)
+	observer, err := coord.NewEarthLocation(-23.5505, -46.6333, 760)
 	if err != nil {
-		log.Fatalf("NewGeodetic failed: %v", err)
+		log.Fatalf("NewEarthLocation failed: %v", err)
 	}
 
 	// Build the observation context (caches SOFA matrices for this time+site).

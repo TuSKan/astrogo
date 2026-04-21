@@ -47,6 +47,20 @@ func NewGeodetic(lon, lat angle.Angle, height float64) (*Geodetic, error) {
 	return &Geodetic{lon: lon, lat: lat, height: height}, nil
 }
 
+// NewEarthLocation creates a Geodetic coordinate from latitude, longitude
+// (in degrees) and height above the ellipsoid (in meters).
+//
+// This is a convenience wrapper around [NewGeodetic] that accepts plain
+// float64 values in the natural (lat, lon) order used by GPS receivers
+// and mapping services (Google Maps, OpenStreetMap, etc.).
+//
+// Example:
+//
+//	loc, _ := coord.NewEarthLocation(-23.5505, -46.6333, 760) // São Paulo
+func NewEarthLocation(latDeg, lonDeg, heightMeters float64) (*Geodetic, error) {
+	return NewGeodetic(angle.Deg(lonDeg), angle.Deg(latDeg), heightMeters)
+}
+
 func (g *Geodetic) Lon() angle.Angle {
 	return g.lon
 }

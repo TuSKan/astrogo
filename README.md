@@ -171,9 +171,9 @@ import (
 )
 
 func main() {
-	// ── Observatory Setup: ESO Paranal (VLT) ──
-	loc, _ := coord.NewGeodetic(angle.Deg(-70.4046), angle.Deg(-24.6272), 2635)
-	site, _ := plan.NewSite("Paranal", loc, angle.Deg(20), nil)
+	// ── Observer Setup: São Paulo ──
+	loc, _ := coord.NewEarthLocation(-23.5505, -46.6333, 760)
+	site, _ := plan.NewSite("São Paulo", loc, angle.Zero(), nil)
 
 	// ── Night boundaries ──
 	eph := ephemeris.Default()
@@ -255,8 +255,8 @@ func main() {
 
 ```go
 // Create one Context per epoch — amortizes the 91 µs SOFA Apco13 cost.
-loc, _ := coord.NewGeodetic(angle.Deg(-70.4), angle.Deg(-24.6), 2635)
-atm := atmosphere.AtAltitude(2635)  // SOFA refraction at all altitudes
+loc, _ := coord.NewEarthLocation(-23.55, -46.63, 760)  // São Paulo
+atm := atmosphere.AtAltitude(760)  // SOFA refraction at all altitudes
 ctx := coord.NewContext(time.NowUTC(), loc, atm)
 
 // Transform 100 catalog stars for ~325 ns each (instead of ~91 µs each).
@@ -367,7 +367,7 @@ fmt.Printf("Lat: %.2f°  Lon: %.2f°  Alt: %.0f km\n",
     geo.Lat().Degrees(), geo.Lon().Degrees(), geo.Height()/1e3)
 
 // Predict passes over an observer (next 24 hours, min 10° elevation)
-observer, _ := coord.NewGeodetic(angle.Deg(-46.63), angle.Deg(-23.55), 760)
+observer, _ := coord.NewEarthLocation(-23.55, -46.63, 760)  // São Paulo
 passes, _ := plan.SatellitePasses(sat, start, end, observer, angle.Deg(10))
 for _, pass := range passes {
     fmt.Printf("AOS: %s  Max El: %.1f°  LOS: %s  Duration: %s\n",
