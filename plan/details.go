@@ -59,15 +59,15 @@ func (d TargetDetails) String() string {
 	}
 
 	if d.RiseTime != nil {
-		b.WriteString(fmt.Sprintf("Rise time:\t%s\n", d.RiseTime.ToGo().Format("03:04 am")))
+		b.WriteString(fmt.Sprintf("Rise time:\t%s\n", d.RiseTime.ToGo().Format("03:04 pm")))
 		b.WriteString(fmt.Sprintf("Rise azimuth:\t%s\n", d.RiseAzimuth.DMSString(0)))
 	}
 	if d.TransitTime != nil {
-		b.WriteString(fmt.Sprintf("Time of maximum elevation:\t%s\n", d.TransitTime.ToGo().Format("03:04 am")))
+		b.WriteString(fmt.Sprintf("Time of maximum elevation:\t%s\n", d.TransitTime.ToGo().Format("03:04 pm")))
 		b.WriteString(fmt.Sprintf("Maximum elevation:\t%.1f°\n", d.MaxElevation.Degrees()))
 	}
 	if d.SetTime != nil {
-		b.WriteString(fmt.Sprintf("Set time:\t%s\n", d.SetTime.ToGo().Format("03:04 am")))
+		b.WriteString(fmt.Sprintf("Set time:\t%s\n", d.SetTime.ToGo().Format("03:04 pm")))
 		b.WriteString(fmt.Sprintf("Set azimuth:\t%s\n", d.SetAzimuth.DMSString(0)))
 	}
 	if d.Elongation.Radians() != 0 {
@@ -145,6 +145,12 @@ func computeDetails(obs Observable, ctx *coord.Context, props ...string) (*Targe
 	if tTarget, ok := obs.(Target); ok {
 		if tTarget.Catalog.Parallax.Radians() > 0 {
 			d.Distance = 1.0 / tTarget.Catalog.Parallax.Arcseconds() // pc
+		}
+		if tTarget.Catalog.PmRA.Radians() != 0 {
+			d.ExtraProps["Proper motion (RA)"] = fmt.Sprintf("%.2f mas/yr", tTarget.Catalog.PmRA.Arcseconds()*1000.0)
+		}
+		if tTarget.Catalog.PmDec.Radians() != 0 {
+			d.ExtraProps["Proper motion (Dec)"] = fmt.Sprintf("%.2f mas/yr", tTarget.Catalog.PmDec.Arcseconds()*1000.0)
 		}
 		for _, alias := range tTarget.Catalog.Aliases {
 			if strings.HasPrefix(alias, "M ") || strings.HasPrefix(alias, "M") {
