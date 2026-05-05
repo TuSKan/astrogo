@@ -28,8 +28,7 @@ func main() {
 	}
 	
 	sirius := plan.NewTarget(catTarget, nil)
-	details, err := sirius.GetDetails(ctx, 
-		"Magnitude", "-1.46 m",
+	details, err := sirius.GetDetails(ctx,
 		"Bayer letter", "α CMa",
 		"Flamsteed number", "9 CMa",
 		"FK5 number", "FK5 257",
