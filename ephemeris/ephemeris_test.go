@@ -161,12 +161,6 @@ func iteratedApparentVector(st eph.State) vector.Vec3 {
 func TestApparentState_ZeroVelocityReducesToGeometric(t *testing.T) {
 	tm := time.Date(2026, 4, 5, 0, 0, 0, 0, time.LocationUTC)
 
-	site, err := coord.NewGeodetic(angle.Deg(-46.6333), angle.Deg(-23.5505), 760)
-	testutil.AssertNoError(t, err)
-
-	atm := atmosphere.Atmosphere{}
-	atm.Model = atmosphere.RefractionNone{}
-
 	mock := &mockLinearProvider{
 		baseTime: tm,
 		pos:      vector.V3(1.2, 0.4, 0.3),
@@ -178,24 +172,16 @@ func TestApparentState_ZeroVelocityReducesToGeometric(t *testing.T) {
 		t.Fatalf("ApparentState failed: %v", err)
 	}
 
-	ctx := coord.NewContext(tm, site, atm)
-	got := ctx.GeocentricToObserved(appState.Pos)
-	want := ctx.GeocentricToObserved(mock.pos)
-
-	sep := angularSepArcsec(got, want)
-	if sep > 1e-6 {
-		t.Fatalf("zero-velocity case should reduce to geometric path; sep = %.12f arcsec", sep)
+	// With zero velocity, the retarded position must be exactly the geometric position.
+	diff := appState.Pos.Sub(mock.pos)
+	dist := diff.Norm()
+	if dist > 1e-15 {
+		t.Fatalf("zero-velocity case should return identical position; diff = %e AU", dist)
 	}
 }
 
 func TestApparentState_MatchesManualLightTimeIteration(t *testing.T) {
 	tm := time.Date(2026, 4, 5, 0, 0, 0, 0, time.LocationUTC)
-
-	site, err := coord.NewGeodetic(angle.Deg(-46.6333), angle.Deg(-23.5505), 760)
-	testutil.AssertNoError(t, err)
-
-	atm := atmosphere.Atmosphere{}
-	atm.Model = atmosphere.RefractionNone{}
 
 	st := eph.State{
 		Pos: vector.V3(1.0, 0.8, 0.2),
@@ -208,16 +194,14 @@ func TestApparentState_MatchesManualLightTimeIteration(t *testing.T) {
 		vel:      st.Vel,
 	}
 
-	ctx := coord.NewContext(tm, site, atm)
 	appState, _ := eph.ApparentState(mock, eph.Mars, tm)
-	got := ctx.GeocentricToObserved(appState.Pos)
+	expected := iteratedApparentVector(st)
 
-	app := iteratedApparentVector(st)
-	want := ctx.GeocentricToObserved(app)
-
-	sep := angularSepArcsec(got, want)
-	if sep > 1e-6 {
-		t.Fatalf("ApparentState does not match explicit light-time reduction; sep = %.12f arcsec", sep)
+	// Compare retarded position vectors directly.
+	diff := appState.Pos.Sub(expected)
+	dist := diff.Norm()
+	if dist > 1e-15 {
+		t.Fatalf("ApparentState does not match explicit light-time reduction; diff = %e AU", dist)
 	}
 }
 
