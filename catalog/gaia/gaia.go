@@ -134,12 +134,13 @@ func parseCSV(body io.Reader) ([]resolve.Target, error) {
 		decDeg, _ := strconv.ParseFloat(row[col["dec"]], 64)
 
 		t := resolve.Target{
-			ID:      id,
-			Name:    "Gaia DR3 " + id,
-			Kind:    resolve.KindStar,
-			Coord:   coord.NewICRS(angle.Deg(raDeg), angle.Deg(decDeg)),
-			Epoch:   time.FromJD(2457388.5, time.UTC), // Gaia DR3 epoch is J2016.0
-			Catalog: "Gaia DR3",
+			ID:       id,
+			Name:     "Gaia DR3 " + id,
+			Kind:     resolve.KindStar,
+			Coord:    coord.NewICRS(angle.Deg(raDeg), angle.Deg(decDeg)),
+			HasCoord: true,
+			Epoch:    time.FromJD(2457388.5, time.UTC), // Gaia DR3 epoch is J2016.0
+			Catalog:  "Gaia DR3",
 		}
 
 		if pmRAStr, ok := col["pmra"]; ok && row[pmRAStr] != "" {
