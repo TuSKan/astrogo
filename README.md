@@ -488,11 +488,11 @@ These are wrapped internally to ensure:
 ## Known Limitations & Scope
 
 > [!WARNING]
-> These are documented trade-offs, not bugs. They represent deliberate scope boundaries for v0.1.1.
+> These are documented trade-offs, not bugs. They represent deliberate scope boundaries for v0.1.2.
 
 ### Context Caching (Performance)
 
-The SOFA Apco13 matrix computation in `coord.NewContext` costs ~91 µs. In v0.1.1, the scheduling hot path creates **one Context per time step** (shared across all constraints via the `ConstraintCtx` interface), rather than one per constraint per step.
+The SOFA Apco13 matrix computation in `coord.NewContext` costs ~91 µs. In v0.1.2, the scheduling hot path creates **one Context per time step** (shared across all constraints via the `ConstraintCtx` interface), rather than one per constraint per step.
 
 Built-in constraints (`Altitude`, `Airmass`) implement `ConstraintCtx` automatically. Custom constraints that implement this interface will also benefit from the cached Context in the scheduler.
 

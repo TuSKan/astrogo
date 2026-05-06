@@ -875,6 +875,6 @@ go run ./examples/10_jesus_christ/eclipse/
 
 ---
 
-*Computations verified with `astrogo` v0.1.1 using JPL DE441 ephemerides (part-1, covering
+*Computations verified with `astrogo` v0.1.2 using JPL DE441 ephemerides (part-1, covering
 13200 BC – AD 17191). Eclipse parameters cross-validated against NASA/EclipseWise catalogs.
 All source code is open-source and independently auditable.*

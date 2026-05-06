@@ -4,6 +4,43 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## [0.1.2] — 2026-05-06
+
+Refraction hardening: USNO-standard rise/set pipeline, sub-minute accuracy, Planet Parade showcase.
+
+### Added
+
+#### Documentation
+- `docs/PLANET_PARADE.md` — showcase reconstructing the Feb 28, 2025 seven-planet evening alignment from São Paulo using DE442, with 1-minute altitude timeline, conjunction detection, ecliptic clustering analysis
+- `examples/16_planet_parade/` — runnable program reproducing all numbers in the showcase document
+
+### Changed
+
+#### Refraction Pipeline
+- `coord/context.go`: apply SOFA Refa/Refb refraction as fallback when `Atmosphere.Model` is nil, extended guard to −1° altitude
+- `coord/reduction.go`: same Refa/Refb fallback in `Reducer.Reduce` for consistency
+- `plan/observatory.go`: bake 34' standard atmospheric refraction into Sun/Moon rise/set thresholds (−0.8333° at sea level), matching USNO/Explanatory Supplement convention
+- `plan/events.go`: use geometric (zero-pressure) atmosphere in event solver root-finding, eliminating refraction discontinuity at horizon; `GeometricAltitude` is now truly geometric
+
+#### Documentation
+- `docs/USNO.md`: full rewrite with verified sub-minute numbers, USNO API height limitation documented, Everest 0m vs 8849m altitude-corrected tables, refraction model section
+- `docs/VALIDATION.md`: tightened tolerances (Sun ≤0.5 min, Moon ≤0.6 min), refreshed AstroPixels numbers (44,524 events), added altitude correction row
+- `README.md`: updated precision claims throughout (rise/set ≤0.6 min, 41/41 USNO tests)
+
+### Fixed
+- `plan/usno_test.go`: fix Tromsø DST mismatch (enforce UTC, not US DST rules for European locations), set height=0 for São Paulo (USNO API ignores height parameter), restructure Everest test for sea-level + altitude-shift validation
+
+### Validation
+
+| Metric | v0.1.1 | v0.1.2 |
+|--------|--------|--------|
+| Sun rise/set vs USNO | <1.3 min | **≤0.5 min** |
+| Moon rise/set vs USNO | <1.6 min | **≤0.6 min** |
+| USNO integration tests | 41/41 | 41/41 |
+| AstroPixels moon phases | 44,524 matched | 44,524 matched (mean Δ=1.87 min) |
+| NASA lunar eclipses | 1,424/1,424 | 1,424/1,424 (mean Δ=0.8 min) |
+| NASA solar eclipses | 1,383/1,383 | 1,383/1,383 (mean Δ=0.8 min) |
+
 ## [0.1.1] — 2026-04-21
 
 Ephemeris provider unification, unified Target architecture, lunar crescent visibility module, and plan package hardening.
@@ -141,5 +178,6 @@ First observatory-grade release. Validated against USNO, JPL Horizons, and NASA 
 - `VisibleIntervals` creates independent Contexts per grid step (correct; each step is a different epoch)
 - IERS EOP data fetched via `go:generate`, not at runtime
 
+[0.1.2]: https://github.com/TuSKan/astrogo/releases/tag/v0.1.2
 [0.1.1]: https://github.com/TuSKan/astrogo/releases/tag/v0.1.1
 [0.1.0]: https://github.com/TuSKan/astrogo/releases/tag/v0.1.0
