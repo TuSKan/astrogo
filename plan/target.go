@@ -35,7 +35,15 @@ type Target struct {
 // NewTarget creates a new Observable Target.
 // For fixed targets, prov can be nil.
 // For moving targets (planets, satellites), prov is required.
+//
+// If the catalog entry carries a non-zero Coord but HasCoord is false,
+// NewTarget sets HasCoord = true automatically so that callers who
+// construct a catalog.Target inline (e.g. in tests) don't need to
+// remember the flag.
 func NewTarget(c catalog.Target, p eph.Provider) Target {
+	if !c.HasCoord && (c.Coord.RA().Radians() != 0 || c.Coord.Dec().Radians() != 0) {
+		c.HasCoord = true
+	}
 	return Target{Catalog: c, Provider: p}
 }
 
