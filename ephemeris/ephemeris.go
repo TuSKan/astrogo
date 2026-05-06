@@ -236,10 +236,10 @@ func ApparentState(p Provider, target ID, obsTime time.Time) (State, error) {
 }
 
 // ToICRS converts a geocentric Cartesian vector (in AU) to spherical ICRS coordinates.
-func ToICRS(pos vector.Vec3) (*coord.ICRS, error) {
+func ToICRS(pos vector.Vec3) (coord.ICRS, error) {
 	r := math.Sqrt(pos.X*pos.X + pos.Y*pos.Y + pos.Z*pos.Z)
 	if r < 1e-12 {
-		return nil, errors.New("eph: cannot convert near-zero vector to ICRS")
+		return coord.ICRS{}, errors.New("eph: cannot convert near-zero vector to ICRS")
 	}
 
 	ra := math.Atan2(pos.Y, pos.X)

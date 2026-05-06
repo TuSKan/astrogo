@@ -8,6 +8,7 @@ import (
 	"strconv"
 
 	"github.com/TuSKan/astrogo/angle"
+	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
 
@@ -279,8 +280,16 @@ func (s EventSolver) refineExtremum(eval evaluator, t1, t3 time.Time, isMax bool
 func (s EventSolver) solveVisibility(spec EventSpec, start, end time.Time) ([]Event, error) {
 	var events []Event
 
+	// Build a no-refraction atmosphere for geometric altitude evaluation.
+	// Standard atmospheric refraction (34') is already baked into the rise/set
+	// threshold (e.g. SunRiseSetThreshold = −50' at sea level), following
+	// the USNO/Explanatory Supplement convention. Using geometric altitude
+	// avoids the discontinuity at alt=0° that SOFA's tan(z) refraction
+	// series would introduce in the root-finder.
+	geomAtm := atmosphere.Atmosphere{Pressure: 0} // zero pressure → no refraction
+
 	evalVal := func(t time.Time) (float64, error) {
-		ctx := coord.NewContext(t, spec.Observer.Location(), spec.Observer.Atmosphere())
+		ctx := coord.NewContext(t, spec.Observer.Location(), geomAtm)
 
 		// For solar system bodies, use the vector-based topocentric pipeline
 		// which properly corrects for diurnal parallax (critical for the Moon: ~1°).
@@ -343,9 +352,10 @@ func (s EventSolver) solveVisibility(spec EventSpec, start, end time.Time) ([]Ev
 					return nil, err
 				}
 
-				// Calculate geometric outputs using the appropriate pipeline
-				resCtx := coord.NewContext(resTime, spec.Observer.Location(), spec.Observer.Atmosphere())
-				var aa *coord.AltAz
+				// Calculate geometric altitude at the refined event time,
+				// using the same no-refraction atmosphere as the solver.
+				resCtx := coord.NewContext(resTime, spec.Observer.Location(), geomAtm)
+				var aa coord.AltAz
 				if tTarget, ok := spec.Target.(Target); ok && tTarget.Provider != nil {
 					vec, _ := tTarget.GeocentricVec(resTime)
 					aa = resCtx.GeocentricToObserved(vec)

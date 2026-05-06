@@ -7,6 +7,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"sort"
 
 	"github.com/TuSKan/astrogo/internal/tools"
 	"github.com/TuSKan/astrogo/vector"
@@ -229,18 +230,25 @@ func evaluateType21(s *Segment, r *Reader, et float64) (pos, vel vector.Vec3, er
 		return vector.Vec3{}, vector.Vec3{}, err
 	}
 	nRecs := int32(meta[0])
+	if nRecs <= 0 {
+		return vector.Vec3{}, vector.Vec3{}, fmt.Errorf("jpl: type 21 segment has invalid record count: %d", nRecs)
+	}
 
 	epochs, err := r.ReadDoubles(s.EndAddr-nRecs, s.EndAddr-1)
 	if err != nil {
 		return vector.Vec3{}, vector.Vec3{}, err
 	}
 
-	idx := int32(0)
-	for i := int32(0); i < nRecs-1; i++ {
-		if et < epochs[i+1] {
-			idx = i
-			break
-		}
+	// Binary search for the epoch interval containing et.
+	// sort.Search returns the smallest i such that epochs[i] > et,
+	// so the record index is (i - 1), clamped to valid bounds.
+	idx := int32(sort.Search(int(nRecs), func(i int) bool {
+		return epochs[i] > et
+	}))
+	if idx > 0 {
+		idx--
+	}
+	if idx >= nRecs {
 		idx = nRecs - 1
 	}
 
@@ -254,6 +262,11 @@ func evaluateType21(s *Segment, r *Reader, et float64) (pos, vel vector.Vec3, er
 		return vector.Vec3{}, vector.Vec3{}, err
 	}
 
+	// Validate record length: need at least 68 doubles (t0 + 15 dt + 3 p0 + 3 v0 + 45 MDA + maxOrd).
+	if len(rec) < 68 {
+		return vector.Vec3{}, vector.Vec3{}, fmt.Errorf("jpl: type 21 record too short: %d doubles (need >= 68)", len(rec))
+	}
+
 	// Extended Modified Difference Array Algorithm
 	t0 := rec[0]
 	dt := rec[1:16]
@@ -261,6 +274,13 @@ func evaluateType21(s *Segment, r *Reader, et float64) (pos, vel vector.Vec3, er
 	v0 := rec[19:22]
 	mda := rec[22 : 22+45]
 	maxOrd := int(rec[67])
+
+	// Bounds-check maxOrd against the fixed-size arrays.
+	const maxAllowedOrd = 15
+	if maxOrd < 0 || maxOrd > maxAllowedOrd {
+		return vector.Vec3{}, vector.Vec3{}, fmt.Errorf("jpl: type 21 maxOrd=%d out of valid range [0,%d]", maxOrd, maxAllowedOrd)
+	}
+
 	// rec[68:71] are additional weights W if needed, but we calculate them
 
 	delta := et - t0
@@ -269,15 +289,13 @@ func evaluateType21(s *Segment, r *Reader, et float64) (pos, vel vector.Vec3, er
 	}
 
 	// Precompute recursive weights
-	// We need 15 orders max
-	var g [15]float64
-	var gd [15]float64
-	var w [15]float64
+	var g [maxAllowedOrd + 1]float64
+	var gd [maxAllowedOrd + 1]float64
+	var w [maxAllowedOrd]float64
 
 	tp := delta
 	g[0] = 1.0
 	gd[0] = 0.0
-	w[0] = 1.0
 
 	for i := 1; i <= maxOrd; i++ {
 		w[i-1] = tp / dt[i-1]

@@ -217,10 +217,10 @@ func (c MoonSep) CheckCtx(obj Observable, ctx *coord.Context) (Result, error) {
 // ── Private Sky Helpers ──────────────────────────────────────────────────────
 
 // skyAltAzCtx computes alt/az using a pre-built coord.Context.
-func skyAltAzCtx(obj Observable, t time.Time, ctx *coord.Context) (*coord.AltAz, error) {
+func skyAltAzCtx(obj Observable, t time.Time, ctx *coord.Context) (coord.AltAz, error) {
 	pos, err := obj.Position(t)
 	if err != nil {
-		return nil, err
+		return coord.AltAz{}, err
 	}
 	return ctx.ICRSToAltAz(pos)
 }

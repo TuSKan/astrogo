@@ -249,3 +249,14 @@ func Pnm06a(date1, date2 float64) [3][3]float64 {
 	gofa.Pnm06a(date1, date2, &rbpn)
 	return rbpn
 }
+
+// Ee06a returns the equation of the equinoxes (IAU 2006/2000A) in radians
+// for the given TT Julian date. This is the difference between Greenwich
+// Apparent Sidereal Time and Greenwich Mean Sidereal Time:
+//
+//	GAST = GMST + Ee06a
+//
+// Used to rotate from the mean equinox (TEME) to the true equinox of date.
+func Ee06a(date1, date2 float64) float64 {
+	return gofa.Ee06a(date1, date2)
+}

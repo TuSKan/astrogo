@@ -162,9 +162,9 @@ type Evaluation struct {
 	// Results contains the individual results for each
 	Results []Result
 	// Position is the ICRS position of the object at evaluation time.
-	Position *coord.ICRS
+	Position coord.ICRS
 	// AltAz is the locally observed horizontal coordinates at evaluation time.
-	AltAz *coord.AltAz
+	AltAz coord.AltAz
 }
 
 // IsObservable evaluates all provided constraints against a target at a specific
@@ -291,25 +291,27 @@ func (sc ScoreConfig) normalize() (wAlt, wUrg, wMoon float64) {
 var moonSepCache struct {
 	mu   sync.Mutex
 	time time.Time
-	pos  *coord.ICRS
+	pos  coord.ICRS
+	ok   bool
 }
 
 // getMoonPosition returns the Moon's ICRS coordinates, caching per-epoch.
-func getMoonPosition(t time.Time) (*coord.ICRS, error) {
+func getMoonPosition(t time.Time) (coord.ICRS, error) {
 	moonSepCache.mu.Lock()
 	defer moonSepCache.mu.Unlock()
 
-	if moonSepCache.pos != nil && moonSepCache.time.Equal(t) {
+	if moonSepCache.ok && moonSepCache.time.Equal(t) {
 		return moonSepCache.pos, nil
 	}
 
 	moon := NewTarget(catalog.Target{ID: "10", Name: "Moon", Kind: resolve.KindMoon}, eph.Default())
 	pos, err := moon.Position(t)
 	if err != nil {
-		return nil, err
+		return coord.ICRS{}, err
 	}
 	moonSepCache.time = t
 	moonSepCache.pos = pos
+	moonSepCache.ok = true
 	return pos, nil
 }
 

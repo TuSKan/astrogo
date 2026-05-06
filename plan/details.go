@@ -108,7 +108,7 @@ func computeDetails(obs Observable, ctx *coord.Context, props ...string) (*Targe
 	d.Dec = pos.Dec()
 
 	// Compute Topocentric AltAz and Distance
-	var altaz *coord.AltAz
+	var altaz coord.AltAz
 	if tTarget, ok := obs.(Target); ok && tTarget.Provider != nil {
 		vec, err := tTarget.GeocentricVec(t)
 		if err != nil {

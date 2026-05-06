@@ -110,14 +110,13 @@ func (g *Geodetic) FromUnitVector(v vector.Vec3) {
 	g.height = 0
 }
 
-func (g *Geodetic) Equal(other CoordinateSystem) bool {
-	o, ok := other.(*Geodetic)
-	if !ok {
+func (g *Geodetic) Equal(other *Geodetic) bool {
+	if other == nil {
 		return false
 	}
-	return math.Abs(g.lon.Radians()-o.lon.Radians()) < 1e-12 &&
-		math.Abs(g.lat.Radians()-o.lat.Radians()) < 1e-12 &&
-		math.Abs(g.height-o.height) < 1e-6
+	return math.Abs(g.lon.Radians()-other.lon.Radians()) < 1e-12 &&
+		math.Abs(g.lat.Radians()-other.lat.Radians()) < 1e-12 &&
+		math.Abs(g.height-other.height) < 1e-6
 }
 
 // ── Transformations ──────────────────────────────────────────────────────────

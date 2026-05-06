@@ -2,6 +2,7 @@ package iers
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -9,6 +10,10 @@ import (
 	"strconv"
 	"strings"
 )
+
+// ErrOutOfRange indicates that the requested MJD falls outside
+// the coverage window of the loaded IERS EOP data.
+var ErrOutOfRange = errors.New("iers: MJD out of EOP data coverage")
 
 // Record is a single line of IERS EOP data.
 type Record struct {
@@ -79,10 +84,26 @@ func ParseFinals2000A(r io.Reader) (*Table, error) {
 	return &Table{records: records}, nil
 }
 
+// Coverage returns the MJD range [min, max] covered by the loaded EOP data.
+// Returns (0, 0) if no records are loaded.
+func (t *Table) Coverage() (mjdMin, mjdMax float64) {
+	if len(t.records) == 0 {
+		return 0, 0
+	}
+	return t.records[0].MJD, t.records[len(t.records)-1].MJD
+}
+
 // EOP returns interpolated parameters for the given Modified Julian Date.
+// Returns ErrOutOfRange if mjd falls outside the coverage of the loaded data.
 func (t *Table) EOP(mjd float64) (EOP, error) {
 	if len(t.records) == 0 {
 		return EOP{}, fmt.Errorf("no EOP records available")
+	}
+
+	// Reject queries outside the data coverage window.
+	if mjd < t.records[0].MJD || mjd > t.records[len(t.records)-1].MJD {
+		return EOP{}, fmt.Errorf("%w: MJD %.1f not in [%.1f, %.1f]",
+			ErrOutOfRange, mjd, t.records[0].MJD, t.records[len(t.records)-1].MJD)
 	}
 
 	// Binary search
@@ -90,12 +111,9 @@ func (t *Table) EOP(mjd float64) (EOP, error) {
 		return t.records[i].MJD >= mjd
 	})
 
+	// Exact match on first record
 	if i == 0 {
 		r := t.records[0]
-		return EOP{DUT1: r.DUT1, XP: r.XP, YP: r.YP, LOD: r.LOD}, nil
-	}
-	if i == len(t.records) {
-		r := t.records[len(t.records)-1]
 		return EOP{DUT1: r.DUT1, XP: r.XP, YP: r.YP, LOD: r.LOD}, nil
 	}
 

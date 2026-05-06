@@ -12,8 +12,8 @@ import (
 	"github.com/TuSKan/astrogo/catalog/resolve"
 )
 
-func TestArrowCacheWriteRead(t *testing.T) {
-	cache := resolve.NewArrowCache()
+func TestMapCacheWriteRead(t *testing.T) {
+	cache := resolve.NewMapCache()
 	defer cache.Close()
 
 	key := "test:query:1"
@@ -30,6 +30,7 @@ func TestArrowCacheWriteRead(t *testing.T) {
 			Kind:        resolve.KindStar,
 			Catalog:     "test",
 			Coord:       coord.NewICRS(angle.Deg(45.0), angle.Deg(-15.0)),
+			HasCoord:    true,
 			Aliases:     []string{"A", "B"},
 		},
 		{
@@ -62,8 +63,8 @@ func TestArrowCacheWriteRead(t *testing.T) {
 	testutil.AssertEqual(t, "Designation", t1.Designation, "Desig1")
 	testutil.AssertEqual(t, "SPKID", t1.SPKID, "999")
 	testutil.AssertEqual(t, "Kind", string(t1.Kind), string(resolve.KindStar))
-	if t1.Coord == nil {
-		t.Fatalf("Expected coordinate, got nil")
+	if !t1.HasCoord {
+		t.Fatalf("Expected coordinate, got no coord")
 	}
 	if math.Abs(t1.Coord.RA().Degrees()-45.0) > 1e-9 {
 		t.Errorf("RA mismatch: got %f", t1.Coord.RA().Degrees())
@@ -76,8 +77,8 @@ func TestArrowCacheWriteRead(t *testing.T) {
 	// Validate partial decode
 	t2 := retrieved[1]
 	testutil.AssertEqual(t, "ID 2", t2.ID, "OBJ2")
-	if t2.Coord != nil {
-		t.Fatalf("Expected nil coordinate for OBJ2, got %v", t2.Coord)
+	if t2.HasCoord {
+		t.Fatalf("Expected no coordinate for OBJ2, got %v", t2.Coord)
 	}
 
 	// Overwrite validation
@@ -94,8 +95,8 @@ func TestArrowCacheWriteRead(t *testing.T) {
 	testutil.AssertEqual(t, "Overwritten ID", o[0].ID, "OVERWRITTEN")
 }
 
-func TestArrowCacheRelease(t *testing.T) {
-	cache := resolve.NewArrowCache()
+func TestMapCacheRelease(t *testing.T) {
+	cache := resolve.NewMapCache()
 	err := cache.Set("key1", []resolve.Target{{ID: "A"}})
 	testutil.AssertNoError(t, err)
 

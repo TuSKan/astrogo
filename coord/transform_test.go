@@ -9,7 +9,6 @@ import (
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/time"
-	"github.com/TuSKan/astrogo/vector"
 )
 
 func TestGalacticRoundTrip(t *testing.T) {
@@ -88,7 +87,7 @@ func TestGalacticExtremes(t *testing.T) {
 	const tol = 1e-7
 	tests := []struct {
 		name string
-		icrs *coord.ICRS
+		icrs coord.ICRS
 		l, b float64
 	}{
 		{
@@ -127,7 +126,7 @@ func TestEclipticExtremes(t *testing.T) {
 
 	tests := []struct {
 		name string
-		icrs *coord.ICRS
+		icrs coord.ICRS
 		lat  float64
 	}{
 		{
@@ -165,18 +164,6 @@ func TestICRSToHourAngle(t *testing.T) {
 
 	if math.IsNaN(ha.Radians()) {
 		t.Errorf("Hour angle returning NaN")
-	}
-}
-
-func TestTransformer(t *testing.T) {
-	tr := coord.IdentityTransformer{}
-	v := vector.V3(1, 2, 3)
-
-	out, err := tr.Transform(nil, nil, nil, v)
-	testutil.AssertNoError(t, err)
-
-	if out.X != v.X || out.Y != v.Y || out.Z != v.Z {
-		t.Errorf("IdentityTransformer changed vector, got %v", out)
 	}
 }
 

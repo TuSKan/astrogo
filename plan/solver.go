@@ -326,13 +326,18 @@ func CrossesTarget(prev, cur, target, wrapAt float64) bool {
 
 // CrossesIncreasing checks whether a monotonically increasing (with wrap)
 // quantity crossed a target value. Used for Sun's ecliptic longitude (~1°/day).
+//
+// The wrap detection uses a half-wrap window: a wraparound is detected when
+// prev is in the upper half of the range and cur is in the lower half,
+// ensuring correctness regardless of step size.
 func CrossesIncreasing(prev, cur, target, wrapAt float64) bool {
 	// Normal monotonic crossing
 	if prev <= target && cur > target {
 		return true
 	}
 	// Handle wraparound (e.g., 359° → 1° crossing 0°)
-	if target == 0 && prev > wrapAt*0.97 && cur < wrapAt*0.03 {
+	halfWrap := wrapAt / 2.0
+	if target == 0 && prev > halfWrap && cur < halfWrap {
 		return true
 	}
 	return false

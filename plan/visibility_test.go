@@ -13,15 +13,15 @@ import (
 
 // mockObject implements coord.Object for testing.
 type mockObject struct {
-	pos *coord.ICRS
+	pos coord.ICRS
 }
 
-func (m mockObject) ICRS(t time.Time) (*coord.ICRS, error) {
+func (m mockObject) ICRS(t time.Time) (coord.ICRS, error) {
 	return m.pos, nil
 }
 
-func (m mockObject) Name() string                              { return "mock" }
-func (m mockObject) Position(t time.Time) (*coord.ICRS, error) { return m.pos, nil }
+func (m mockObject) Name() string                             { return "mock" }
+func (m mockObject) Position(t time.Time) (coord.ICRS, error) { return m.pos, nil }
 func (m mockObject) GetDetails(ctx *coord.Context, props ...string) (*TargetDetails, error) {
 	return nil, nil
 }

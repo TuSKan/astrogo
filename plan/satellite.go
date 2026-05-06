@@ -18,11 +18,11 @@ var defaultAtm = atmosphere.Atmosphere{}
 // returns a valid State. Uses the coord.Reducer pipeline which correctly
 // handles both nearby objects (LEO satellites) and distant bodies (planets)
 // by computing the full topocentric vector (geocentric - observer).
-func LookAngle(prov eph.Provider, id eph.ID, ctx *coord.Context) (*coord.AltAz, error) {
+func LookAngle(prov eph.Provider, id eph.ID, ctx *coord.Context) (coord.AltAz, error) {
 
 	st, err := prov.State(id, ctx.Time())
 	if err != nil {
-		return nil, err
+		return coord.AltAz{}, err
 	}
 
 	// Use the Reducer pipeline: computes observer GCRS position, subtracts it
@@ -68,7 +68,7 @@ func SatellitePasses(prov eph.Provider, name string, start, end time.Time,
 	refineTol := 1 * time.Second
 
 	// lookAt creates a context and computes look angle at time t.
-	lookAt := func(t time.Time) (*coord.AltAz, error) {
+	lookAt := func(t time.Time) (coord.AltAz, error) {
 		ctx := coord.NewContext(t, observer, defaultAtm)
 		return LookAngle(prov, 0, ctx)
 	}

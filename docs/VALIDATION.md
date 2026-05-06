@@ -41,7 +41,7 @@ Validation should be:
 | ICRS ↔ AltAz | ✅ validated | `gofa` + invariants | 1e-7 deg | edge cases + round-trip verified |
 | Coord FromUnitVector | ✅ validated | round-trip | 1e-10 deg | ICRS, Galactic, Ecliptic tested |
 | Airmass | ✅ validated | analytical | 1e-4 | Pickering (2002) empirical interpolation |
-| Atmospheric Refraction | ✅ validated | analytical | 1e-4 deg | Bidirectional Trace (Bennett 1982 / Saemundsson 1986) |
+| Atmospheric Refraction | ✅ validated | SOFA + analytical | 1e-4 deg | SOFA Refa/Refb (Refco via Apco13) + Saemundsson 1986 fallback |
 | Astronomical time scales | ✅ validated | gofa / SOFA | 1e-12 d | UTC ↔ TAI ↔ TT ↔ TDB verified |
 | Local Sidereal Time | ✅ validated | gofa Gst06a (IAU 2006) | 0.5 deg | GAST at Greenwich J2000.0 |
 | Ephemerides (JPL DE) | ✅ validated | JPL Horizons | 1e-7 AU / 1e-8 AU·d⁻¹ | Sun, Moon, Planets (pos + vel) |
@@ -51,13 +51,14 @@ Validation should be:
 | Catalog Providers | ✅ validated | API References/Offline Caches | exact schemas | Dual JSON/XML parsing (STScI), Strict ADQL parsing (CDS TAP) |
 | Planning / visibility | ✅ validated | geometric sanity | logical | constraint system + scoring verified |
 | Transit estimate | ✅ validated | geometric sanity | < 1 min | Brent's minimization, 10-min coarse bracket |
-| Rise / Set / Transit events | ✅ validated | USNO API | < 2 min | Chandrupatla root-finding solver |
+| Rise / Set / Transit events | ✅ validated | USNO API | ≤ 0.6 min | Chandrupatla root-finding + SOFA refraction model |
 | Twilight events | ✅ validated | geometric sanity | < 1 s | Civil (−6°), Nautical (−12°), Astronomical (−18°); sequence ordering verified |
 | Event solver edge cases | ✅ validated | analytical | logical | circumpolar, never-rise, polar midnight sun, high-lat no astronomical twilight |
-| Sun Rise/Set/Transit | ✅ validated | USNO API | < 1.3 min | 3 locations × 3 dates, topocentric + horizon dip |
-| Moon Rise/Set/Transit | ✅ validated | USNO API | < 1.6 min | 3 locations × 3 dates, topocentric parallax via Reducer |
+| Sun Rise/Set/Transit | ✅ validated | USNO API | ≤ 0.5 min | 3 locations × 3 dates × 9 events, USNO threshold convention |
+| Moon Rise/Set/Transit | ✅ validated | USNO API | ≤ 0.6 min | 3 locations × 3 dates, topocentric parallax via GeocentricToObserved |
+| Altitude correction (8849m) | ✅ validated | internal consistency | ±1 min | Horizon dip 2.76° produces ~13 min shift at Everest |
 | Moon Phases | ✅ validated | USNO API | ≤ 1 min | 12 consecutive phases (Jan–Mar 2026) |
-| Moon Phases (historical) | ✅ validated | [AstroPixels](https://astropixels.com/ephemeris/phasescat/phasescat.html) | ≤ 5.2 min | 44,574 phases across 9 centuries (1–2100 CE), mean Δ=1.8 min |
+| Moon Phases (historical) | ✅ validated | [AstroPixels](https://astropixels.com/ephemeris/phasescat/phasescat.html) | ≤ 6.0 min | 44,524 phases across 9 centuries (1–2100 CE), mean Δ=1.87 min |
 | Earth's Seasons | ✅ validated | USNO API | 2–4 min | 4 events (2026), aberration-corrected ecliptic longitude |
 | Celestial Navigation (AltAz) | ✅ validated | USNO API | 0.002° | Sub-arcsecond stellar altitude accuracy |
 | Perihelion/Aphelion | ✅ validated | USNO API | ≤ 1 min | Brent's minimization on Earth-Sun distance |

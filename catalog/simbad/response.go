@@ -69,12 +69,14 @@ func ParseCSV(r io.Reader) ([]resolve.Target, error) {
 		raStr := row[colIdx["ra"]]
 		decStr := row[colIdx["dec"]]
 
-		var c *coord.ICRS
+		var c coord.ICRS
+		hasCoord := false
 		if raStr != "" && decStr != "" {
 			raDeg, errRA := strconv.ParseFloat(raStr, 64)
 			decDeg, errDec := strconv.ParseFloat(decStr, 64)
 			if errRA == nil && errDec == nil {
 				c = coord.NewICRS(angle.Deg(raDeg), angle.Deg(decDeg))
+				hasCoord = true
 			}
 		}
 
@@ -84,14 +86,15 @@ func ParseCSV(r io.Reader) ([]resolve.Target, error) {
 		}
 
 		t := resolve.Target{
-			ID:      mainID,
-			Name:    mainID,
-			Kind:    otype,
-			Coord:   c,
-			Catalog: "SIMBAD",
+			ID:       mainID,
+			Name:     mainID,
+			Kind:     otype,
+			Coord:    c,
+			HasCoord: hasCoord,
+			Catalog:  "SIMBAD",
 		}
 
-		if c != nil {
+		if hasCoord {
 			t.Epoch = time.FromJD(2451545.0, time.UTC) // Default SIMBAD Epoch (J2000)
 
 			if pmRAStr, ok := colIdx["pmra"]; ok && row[pmRAStr] != "" {

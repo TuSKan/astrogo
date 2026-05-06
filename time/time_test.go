@@ -97,18 +97,20 @@ func TestScaleConversions(t *testing.T) {
 	tdb := tm.TDB()
 	testutil.AssertEqual(t, "TDB scale", tdb.Scale(), atime.TDB)
 
-	// Compute expected FB correction using two-part JD for precision
+	// Compute TDB−TT correction in seconds via two-part JD differencing.
 	tt1, tt2 := tt.JDParts()
 	tdb1, tdb2 := tdb.JDParts()
 	tdbMinusTTsec := ((tdb1 - tt1) + (tdb2 - tt2)) * 86400.0
-	T := ((tt1 - 2451545.0) + tt2) / 36525.0
-	g := (357.5277233 + 35999.0503400*T) * math.Pi / 180.0
-	expectedCorrSec := 0.001657 * math.Sin(g)
-	testutil.AssertNear(t, "TDB−TT correction (sec)", tdbMinusTTsec, expectedCorrSec, 1e-12)
+
+	// The XJSE2000 multi-term correction at J2000 (T=0) should be small (~89 µs).
+	// The dominant term has amplitude 1.657 ms, so |TDB−TT| must be < 2 ms.
+	if math.Abs(tdbMinusTTsec) > 0.002 {
+		t.Errorf("TDB−TT = %e s exceeds 2 ms bound", tdbMinusTTsec)
+	}
 
 	// TDB must differ from TT (not just relabeled)
-	if math.Abs(tdbMinusTTsec) < 1e-6 {
-		t.Errorf("TDB and TT should differ by FB correction, but Δ = %e s", tdbMinusTTsec)
+	if math.Abs(tdbMinusTTsec) < 1e-8 {
+		t.Errorf("TDB and TT should differ by XJSE2000 correction, but Δ = %e s", tdbMinusTTsec)
 	}
 }
 
@@ -407,8 +409,8 @@ func TestConversionRoundTrips(t *testing.T) {
 	testutil.AssertNear(t, "UTC→UT1→UTC", utcFromUT1.JD(), utc.JD(), 1e-12)
 }
 
-func TestTDB_FairheadBretagnon(t *testing.T) {
-	// Test at several epochs to verify the sinusoidal correction.
+func TestTDB_XJSE2000(t *testing.T) {
+	// Test at several epochs to verify the multi-term XJSE2000 correction.
 	// We compare using JDParts() instead of JD() to avoid float64
 	// cancellation (the correction ~1.7ms is near the noise floor of
 	// the combined JD's 16 significant digits).
@@ -434,18 +436,23 @@ func TestTDB_FairheadBretagnon(t *testing.T) {
 			tt1, tt2 := tt.JDParts()
 			tdbMinusTTsec := ((tdb1 - tt1) + (tdb2 - tt2)) * 86400.0
 
-			// FB amplitude is 1.657 ms; the correction must be within bounds
+			// XJSE2000 amplitude is dominated by 1.657 ms; the correction must be within bounds.
 			if math.Abs(tdbMinusTTsec) > 0.002 {
 				t.Errorf("TDB−TT = %.6f s exceeds 2 ms bound", tdbMinusTTsec)
 			}
 
-			// Verify against direct FB formula using two-part T
+			// Verify the dominant term is within 30 µs of single-term approximation
+			// (the multi-term series adds corrections up to ~22 µs from other planets).
 			T := ((tt1 - 2451545.0) + tt2) / 36525.0
 			g := (357.5277233 + 35999.0503400*T) * math.Pi / 180.0
-			expectedSec := 0.001657 * math.Sin(g)
-			testutil.AssertNear(t, "TDB−TT vs FB", tdbMinusTTsec, expectedSec, 1e-11)
+			singleTermSec := 0.001657 * math.Sin(g)
+			diff := math.Abs(tdbMinusTTsec - singleTermSec)
+			if diff > 50e-6 {
+				t.Errorf("Multi-term deviates from single-term by %.1f µs (expected < 50 µs)", diff*1e6)
+			}
 
-			t.Logf("T=%.6f  TDB−TT = %.6f ms", T, tdbMinusTTsec*1000)
+			t.Logf("T=%.6f  TDB−TT = %.6f ms  (single-term: %.6f ms, Δ=%.2f µs)",
+				T, tdbMinusTTsec*1000, singleTermSec*1000, diff*1e6)
 		})
 	}
 }

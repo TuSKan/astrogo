@@ -34,7 +34,8 @@ type Target struct {
 	Designation    string
 	SPKID          string
 	Kind           Kind
-	Coord          *coord.ICRS
+	Coord          coord.ICRS
+	HasCoord       bool // true if Coord contains valid coordinates
 	Epoch          time.Time
 	PmRA           angle.Angle // Proper motion in RA
 	PmDec          angle.Angle // Proper motion in Declination
@@ -49,7 +50,7 @@ type Target struct {
 }
 
 // ICRS implements coord.Object for a static catalog Target.
-func (t Target) ICRS(_ time.Time) (*coord.ICRS, error) {
+func (t Target) ICRS(_ time.Time) (coord.ICRS, error) {
 	return t.Coord, nil
 }
 

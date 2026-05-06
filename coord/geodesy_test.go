@@ -97,9 +97,6 @@ func TestGeodetic_Interface(t *testing.T) {
 	if g.Equal(g3) {
 		t.Error("expected not equal")
 	}
-	if g.Equal(coord.NewICRS(angle.Deg(0), angle.Deg(0))) {
-		t.Error("expected not equal for different types")
-	}
 
 	// UnitVectors
 	v := g.ToUnitVector()

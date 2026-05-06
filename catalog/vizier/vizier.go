@@ -24,7 +24,7 @@ type Provider struct {
 func New() *Provider {
 	return &Provider{
 		client: resolve.NewClient(),
-		cache:  resolve.NewArrowCache(),
+		cache:  resolve.NewMapCache(),
 	}
 }
 
@@ -57,11 +57,8 @@ func (p *Provider) ConeSearch(ctx context.Context, req resolve.ConeRequest) reso
 	}
 
 	// CIRCLE receives coordinates in DEGREES for ADQL natively.
-	var ra, dec float64
-	if req.Center != nil {
-		ra = req.Center.RA().Degrees()
-		dec = req.Center.Dec().Degrees()
-	}
+	ra := req.Center.RA().Degrees()
+	dec := req.Center.Dec().Degrees()
 	rad := req.Radius.Degrees()
 
 	adql := fmt.Sprintf(`SELECT TOP %d 
