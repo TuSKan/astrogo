@@ -144,12 +144,13 @@ func parseCSV(data []byte) ([]resolve.Target, error) {
 			aliases = strings.Split(aliasesStr, ";")
 		}
 		targets = append(targets, resolve.Target{
-			ID:      id,
-			Name:    name,
-			Kind:    kind,
-			Coord:   coord.NewICRS(angle.Deg(raDeg), angle.Deg(decDeg)),
-			Catalog: "openngc",
-			Aliases: aliases,
+			ID:       id,
+			Name:     name,
+			Kind:     kind,
+			Coord:    coord.NewICRS(angle.Deg(raDeg), angle.Deg(decDeg)),
+			HasCoord: true,
+			Catalog:  "openngc",
+			Aliases:  aliases,
 		})
 	}
 	return targets, nil

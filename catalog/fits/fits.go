@@ -51,11 +51,12 @@ func New(filePath string) (*Provider, error) {
 
 	for i := 0; i < rows; i++ {
 		targets = append(targets, resolve.Target{
-			ID:      ids[i],
-			Name:    names[i],
-			Kind:    resolve.KindOther,
-			Coord:   coord.NewICRS(angle.Deg(ras[i]), angle.Deg(decs[i])),
-			Catalog: "FITS",
+			ID:       ids[i],
+			Name:     names[i],
+			Kind:     resolve.KindOther,
+			Coord:    coord.NewICRS(angle.Deg(ras[i]), angle.Deg(decs[i])),
+			HasCoord: true,
+			Catalog:  "FITS",
 		})
 	}
 

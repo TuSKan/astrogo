@@ -118,10 +118,11 @@ func (p *Provider) ResolveObject(ctx context.Context, req resolve.ObjectRequest)
 				}
 				for _, match := range jsonPayload.ResolvedCoordinate {
 					targets = append(targets, resolve.Target{
-						ID:      match.CanonicalName,
-						Name:    match.CanonicalName,
-						Coord:   coord.NewICRS(angle.Deg(match.RA), angle.Deg(match.Decl)),
-						Catalog: match.Resolver,
+						ID:       match.CanonicalName,
+						Name:     match.CanonicalName,
+						Coord:    coord.NewICRS(angle.Deg(match.RA), angle.Deg(match.Decl)),
+						HasCoord: true,
+						Catalog:  match.Resolver,
 					})
 				}
 			}
@@ -146,10 +147,11 @@ func (p *Provider) ResolveObject(ctx context.Context, req resolve.ObjectRequest)
 
 			for _, match := range xmlPayload.ResolvedCoordinate {
 				targets = append(targets, resolve.Target{
-					ID:      match.CanonicalName,
-					Name:    match.CanonicalName,
-					Coord:   coord.NewICRS(angle.Deg(match.RA), angle.Deg(match.Decl)),
-					Catalog: match.Resolver,
+					ID:       match.CanonicalName,
+					Name:     match.CanonicalName,
+					Coord:    coord.NewICRS(angle.Deg(match.RA), angle.Deg(match.Decl)),
+					HasCoord: true,
+					Catalog:  match.Resolver,
 				})
 			}
 		}
