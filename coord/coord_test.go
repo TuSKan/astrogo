@@ -62,7 +62,7 @@ func TestAngleWrappingRequirement(t *testing.T) {
 // ── FromUnitVector round-trip tests ──────────────────────────────────────────
 
 func TestICRSRoundTrip(t *testing.T) {
-	cases := []*coord.ICRS{
+	cases := []coord.ICRS{
 		coord.NewICRS(angle.Deg(0), angle.Deg(0)),
 		coord.NewICRS(angle.Deg(90), angle.Deg(45)),
 		coord.NewICRS(angle.Deg(180), angle.Deg(-30)),
@@ -81,7 +81,7 @@ func TestICRSRoundTrip(t *testing.T) {
 }
 
 func TestGalacticRoundTrip_FromVec(t *testing.T) {
-	cases := []*coord.Galactic{
+	cases := []coord.Galactic{
 		coord.NewGalactic(angle.Deg(0), angle.Deg(0)),
 		coord.NewGalactic(angle.Deg(45), angle.Deg(20)),
 		coord.NewGalactic(angle.Deg(180), angle.Deg(-45)),
@@ -97,7 +97,7 @@ func TestGalacticRoundTrip_FromVec(t *testing.T) {
 }
 
 func TestEclipticRoundTrip_FromVec(t *testing.T) {
-	cases := []*coord.Ecliptic{
+	cases := []coord.Ecliptic{
 		coord.NewEcliptic(angle.Deg(0), angle.Deg(0)),
 		coord.NewEcliptic(angle.Deg(120), angle.Deg(-10)),
 		coord.NewEcliptic(angle.Deg(300), angle.Deg(15)),
@@ -263,17 +263,11 @@ func TestMoreEqual(t *testing.T) {
 	if astA.Equal(astC) {
 		t.Error("different Astrometric should not be equal")
 	}
-	if astA.Equal(coord.NewICRS(angle.Deg(0), angle.Deg(0))) {
-		t.Error("different type should not be equal")
-	}
 
 	appA := coord.NewApparent(angle.Deg(1), angle.Deg(2))
 	appB := coord.NewApparent(angle.Deg(1), angle.Deg(2))
 	if !appA.Equal(appB) {
 		t.Error("identical Apparent should be equal")
-	}
-	if appA.Equal(coord.NewAstrometric(angle.Deg(0), angle.Deg(0))) {
-		t.Error("different type should not be equal")
 	}
 
 	obsA := coord.NewObserversLocation(angle.Deg(1), angle.Deg(2), 10)

@@ -28,13 +28,17 @@ type SwapOptimizedStrategy struct {
 	// Defaults to PriorityStrategy if nil.
 	Base Strategy
 
-	// MaxPasses limits the number of optimization passes. Default: 3.
-	// Optimization stops early if a pass produces no improvement.
+	// MaxPasses limits the number of optimization passes. Default: 20.
+	// Optimization stops early if two consecutive passes produce no change.
 	MaxPasses int
 
 	// Step is the time increment for constraint validation during
 	// swap and insertion feasibility checks. Default: 1 minute.
 	Step time.Duration
+
+	// TabuTenure is the number of passes a swap pair stays tabu.
+	// Default: 3. Set to 0 to disable tabu search.
+	TabuTenure int
 }
 
 // Schedule produces an optimized schedule by seeding from the base strategy
@@ -57,18 +61,33 @@ func (s *SwapOptimizedStrategy) Schedule(
 
 	maxPasses := s.MaxPasses
 	if maxPasses <= 0 {
-		maxPasses = 3
+		maxPasses = 20
 	}
 	step := s.Step
 	if step <= 0 {
 		step = defaultStep
 	}
 
+	// Initialize tabu list for swap-cycle prevention.
+	tenure := s.TabuTenure
+	if tenure <= 0 {
+		tenure = 3
+	}
+	tabu := newTabuList(tenure)
+
+	// Iterate until convergence: two consecutive passes with no improvement,
+	// or maxPasses reached as a safety cap.
+	idlePasses := 0
 	for pass := 0; pass < maxPasses; pass++ {
-		swapped := s.swapPass(sched, planner, transition, step)
+		swapped := s.swapPass(sched, planner, transition, step, tabu, pass)
 		inserted := s.insertPass(sched, planner, window, transition, step)
-		if !swapped && !inserted {
-			break // converged
+		if swapped || inserted {
+			idlePasses = 0
+		} else {
+			idlePasses++
+			if idlePasses >= 2 {
+				break // converged: two passes with zero improvement
+			}
 		}
 	}
 
@@ -86,9 +105,19 @@ func (s *SwapOptimizedStrategy) swapPass(
 	planner *Planner,
 	transition TransitionModel,
 	step time.Duration,
+	tabu *tabuList,
+	passNum int,
 ) bool {
 	improved := false
 	n := len(sched.Blocks)
+
+	// Pre-compute merged constraints per block to avoid re-allocating on every candidate.
+	mergedC := make(map[string][]Constraint, n)
+	for _, sb := range sched.Blocks {
+		if _, ok := mergedC[sb.Block.ID]; !ok {
+			mergedC[sb.Block.ID] = mergeConstraints(planner.Constraints, sb.Block.Constraints)
+		}
+	}
 
 	for i := 0; i < n-1; i++ {
 		bi := sched.Blocks[i]
@@ -99,8 +128,7 @@ func (s *SwapOptimizedStrategy) swapPass(
 		newJEnd := newJStart.Add(bj.Block.Duration)
 
 		// Validate bj's constraints at the new time.
-		allCJ := mergeConstraints(planner.Constraints, bj.Block.Constraints)
-		if !checkConstraintsInterval(bj.Block.Target, newJStart, newJEnd, step, planner.Site, allCJ...) {
+		if !checkConstraintsInterval(bj.Block.Target, newJStart, newJEnd, step, planner.Site, mergedC[bj.Block.ID]...) {
 			continue
 		}
 
@@ -134,18 +162,24 @@ func (s *SwapOptimizedStrategy) swapPass(
 		}
 
 		// Validate bi's constraints at the new time.
-		allCI := mergeConstraints(planner.Constraints, bi.Block.Constraints)
-		if !checkConstraintsInterval(bi.Block.Target, newIStart, newIEnd, step, planner.Site, allCI...) {
+		if !checkConstraintsInterval(bi.Block.Target, newIStart, newIEnd, step, planner.Site, mergedC[bi.Block.ID]...) {
 			continue
 		}
 
-		// Score comparison: accept only if total score improves.
+		// Score comparison: accept if total score improves or equals (plateau move).
+		// Plateau moves (>=) allow escape from local maxima; oscillation is bounded
+		// by the convergence check in Schedule() which stops after two idle passes.
 		oldScore := bi.Score + bj.Score
 		newJScore := scoreBlockPlacement(bj.Block, newJStart, newJEnd, planner)
 		newIScore := scoreBlockPlacement(bi.Block, newIStart, newIEnd, planner)
 		newScore := newJScore + newIScore
 
-		if newScore > oldScore {
+		if newScore >= oldScore {
+			// Check tabu status: skip if this pair was recently swapped.
+			if tabu.isTabu(bi.Block.ID, bj.Block.ID, passNum) {
+				continue
+			}
+
 			sched.Blocks[i] = ScheduledBlock{
 				Block:     bj.Block,
 				Window:    Window{Start: newJStart, End: newJEnd},
@@ -159,6 +193,9 @@ func (s *SwapOptimizedStrategy) swapPass(
 				SetupTime: overhead,
 			}
 			improved = true
+
+			// Record the reverse swap as tabu.
+			tabu.add(bi.Block.ID, bj.Block.ID, passNum)
 		}
 	}
 
@@ -168,6 +205,8 @@ func (s *SwapOptimizedStrategy) swapPass(
 // insertPass tries to insert each unscheduled block into a gap in the schedule.
 // Blocks are tried in priority order. Each block is placed in the first gap
 // where it fits and satisfies constraints.
+// Gaps are computed once per pass (not per candidate) and the schedule is
+// re-sorted after all insertions.
 //
 // Returns true if any block was inserted.
 func (s *SwapOptimizedStrategy) insertPass(
@@ -191,10 +230,20 @@ func (s *SwapOptimizedStrategy) insertPass(
 		return sortedUnsched[i].Block.Priority > sortedUnsched[j].Block.Priority
 	})
 
+	// Pre-compute merged constraints per unscheduled block.
+	mergedC := make(map[string][]Constraint, len(sortedUnsched))
+	for _, ub := range sortedUnsched {
+		if _, ok := mergedC[ub.Block.ID]; !ok {
+			mergedC[ub.Block.ID] = mergeConstraints(planner.Constraints, ub.Block.Constraints)
+		}
+	}
+
+	// Compute gaps once before iterating over unscheduled blocks.
+	gaps := scheduleGaps(sched.Blocks, window)
+
 	for _, ub := range sortedUnsched {
 		inserted := false
 
-		gaps := scheduleGaps(sched.Blocks, window)
 		for _, gap := range gaps {
 			if gap.window.Duration() < ub.Block.Duration {
 				continue
@@ -224,8 +273,7 @@ func (s *SwapOptimizedStrategy) insertPass(
 				continue
 			}
 
-			allC := mergeConstraints(planner.Constraints, ub.Block.Constraints)
-			if checkConstraintsInterval(ub.Block.Target, startTime, endTime, step, planner.Site, allC...) {
+			if checkConstraintsInterval(ub.Block.Target, startTime, endTime, step, planner.Site, mergedC[ub.Block.ID]...) {
 				score := scoreBlockPlacement(ub.Block, startTime, endTime, planner)
 				sched.Blocks = append(sched.Blocks, ScheduledBlock{
 					Block:     ub.Block,
@@ -235,6 +283,12 @@ func (s *SwapOptimizedStrategy) insertPass(
 				})
 				inserted = true
 				improved = true
+
+				// Rebuild gaps to account for the insertion.
+				sort.Slice(sched.Blocks, func(i, j int) bool {
+					return sched.Blocks[i].Window.Start.Before(sched.Blocks[j].Window.Start)
+				})
+				gaps = scheduleGaps(sched.Blocks, window)
 				break
 			}
 		}
@@ -246,7 +300,7 @@ func (s *SwapOptimizedStrategy) insertPass(
 
 	sched.Unscheduled = remaining
 
-	// Re-sort blocks chronologically after insertions.
+	// Final chronological sort.
 	sort.Slice(sched.Blocks, func(i, j int) bool {
 		return sched.Blocks[i].Window.Start.Before(sched.Blocks[j].Window.Start)
 	})
@@ -328,4 +382,43 @@ func scheduleGaps(blocks []ScheduledBlock, window Window) []gapInfo {
 	}
 
 	return gaps
+}
+
+// ── Tabu Search ──────────────────────────────────────────────────────────────
+
+// tabuKey identifies a pair of blocks that were recently swapped.
+type tabuKey struct{ a, b string }
+
+// tabuList prevents swap oscillation by tracking recently swapped block pairs.
+// A swap pair remains tabu for `tenure` passes after being recorded.
+type tabuList struct {
+	set    map[tabuKey]int // value = pass number when added
+	tenure int
+}
+
+func newTabuList(tenure int) *tabuList {
+	return &tabuList{
+		set:    make(map[tabuKey]int),
+		tenure: tenure,
+	}
+}
+
+// isTabu returns true if swapping (a, b) is currently forbidden.
+func (t *tabuList) isTabu(a, b string, currentPass int) bool {
+	if t.tenure == 0 {
+		return false
+	}
+	// Check both orderings
+	if pass, ok := t.set[tabuKey{a, b}]; ok && currentPass-pass < t.tenure {
+		return true
+	}
+	if pass, ok := t.set[tabuKey{b, a}]; ok && currentPass-pass < t.tenure {
+		return true
+	}
+	return false
+}
+
+// add records that blocks (a, b) were swapped at passNum.
+func (t *tabuList) add(a, b string, passNum int) {
+	t.set[tabuKey{a, b}] = passNum
 }

@@ -37,7 +37,7 @@ func TestSimbadNetworkResolve(t *testing.T) {
 	if tgt.ID == "" {
 		t.Errorf("Expected ID populated from live server")
 	}
-	if tgt.Coord == nil {
+	if !tgt.HasCoord {
 		t.Fatalf("Expected live coordinates for M31")
 	}
 }

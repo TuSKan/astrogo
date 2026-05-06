@@ -79,7 +79,7 @@ func BenchmarkICRSToAltAz_100Stars_NewContext(b *testing.B) {
 	atm := atmosphere.AtAltitude(2635)
 	t := time.FromJD(2460000.5, time.UTC)
 
-	stars := make([]*coord.ICRS, 100)
+	stars := make([]coord.ICRS, 100)
 	for i := range stars {
 		ra := angle.Deg(float64(i) * 3.6) // spread across sky
 		dec := angle.Deg(float64(i)*1.8 - 90)
@@ -101,7 +101,7 @@ func BenchmarkICRSToAltAz_100Stars_CachedContext(b *testing.B) {
 	atm := atmosphere.AtAltitude(2635)
 	t := time.FromJD(2460000.5, time.UTC)
 
-	stars := make([]*coord.ICRS, 100)
+	stars := make([]coord.ICRS, 100)
 	for i := range stars {
 		ra := angle.Deg(float64(i) * 3.6)
 		dec := angle.Deg(float64(i)*1.8 - 90)

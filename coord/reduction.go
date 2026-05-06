@@ -21,11 +21,11 @@ type Reduction struct {
 	// measured in the inertial ICRS frame.
 	Topocentric vector.Vec3
 	// Geometric is the un-refracted local horizon coordinate (Altitude / Azimuth).
-	Geometric *AltAz
+	Geometric AltAz
 	// Observed is the refracted local horizon coordinate for the primary wavelength.
-	Observed *AltAz
+	Observed AltAz
 	// Dispersion maps specific wavelengths to their refracted local horizon coordinates.
-	Dispersion map[float64]*AltAz
+	Dispersion map[float64]AltAz
 }
 
 // Reducer defines the explicit apparent-place reduction pipeline, converting
@@ -53,7 +53,9 @@ func (r *Reducer) Reduce(v vector.Vec3) *Reduction {
 		Geocentric: v,
 	}
 
-	jd1, jd2 := r.time.JDParts()
+	// Ensure UTC for EOP lookup and UT1 derivation, regardless of input scale.
+	utcTime := r.time.UTC()
+	jd1, jd2 := utcTime.JDParts()
 
 	// Fetch EOP once for both UT1 derivation and polar motion,
 	// avoiding the redundant IERS lookup that UT1()/TT() would each make.
@@ -65,7 +67,7 @@ func (r *Reducer) Reduce(v vector.Vec3) *Reduction {
 		})
 	}
 
-	// Derive UT1 and TT from the UTC input using the already-fetched EOP.
+	// Derive UT1 from UTC + DUT1, and TT via the scale-aware conversion.
 	ut1, ut2 := jd1, jd2+eop.DUT1/86400.0
 	tt1, tt2 := r.time.TT().JDParts()
 
@@ -123,9 +125,25 @@ func (r *Reducer) Reduce(v vector.Vec3) *Reduction {
 
 	// 8. Apply Atmospheric Refraction for primary wavelength
 	obsAltAz := NewAltAz(geomAltAz.Alt(), geomAltAz.Az())
-	if r.atmos.Model != nil {
+	switch {
+	case r.atmos.Model != nil:
 		shift := r.atmos.Model.RefractFromTrue(geomAltAz.Alt(), r.atmos)
 		obsAltAz.SetAlt(geomAltAz.Alt().Add(shift))
+	case r.atmos.Pressure > 0:
+		// Use SOFA's refraction model (Refco + tan(z) series) for consistency
+		// with the stellar path (Atioq). Refco computes the same coefficients
+		// that Apco13 stores in ASTROM.Refa/Refb.
+		refa, refb := gofaext.Refco(r.atmos.Pressure, r.atmos.Temperature,
+			r.atmos.Humidity, r.atmos.Wavelength)
+		z := math.Pi/2 - geomAltAz.Alt().Radians()
+		const zMax = 91.0 * math.Pi / 180.0 // alt ≈ −1°
+		if z > 0 && z < zMax {
+			tz := math.Tan(z)
+			dR := refa*tz + refb*tz*tz*tz
+			if dR > 0 {
+				obsAltAz.SetAlt(angle.Rad(geomAltAz.Alt().Radians() + dR))
+			}
+		}
 	}
 	res.Observed = obsAltAz
 
@@ -136,7 +154,7 @@ func (r *Reducer) Reduce(v vector.Vec3) *Reduction {
 // returning the reduction evaluated differentially for each wavelength.
 func (r *Reducer) Disperse(v vector.Vec3, wavelengths []float64) *Reduction {
 	res := r.Reduce(v)
-	res.Dispersion = make(map[float64]*AltAz)
+	res.Dispersion = make(map[float64]AltAz)
 
 	if r.atmos.Model == nil {
 		// No refraction model; dispersion is identical across all wavelengths

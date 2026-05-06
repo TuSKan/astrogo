@@ -10,19 +10,21 @@ import (
 // for the same (object, time, site) triplet. It wraps a coord.Context
 // to reuse the precomputed ASTROM parameters.
 //
-// Future extensions (weather conditions, Moon/Sun pre-computed positions)
-// can be added as fields here without changing the public constructor
-// signature — use functional options or builder methods when that time comes.
+// Each memoized result (ICRS, AltAz) stores its own error to prevent
+// one path's failure from contaminating another's return value.
 type EvalContext struct {
 	Object coord.Object
 	Time   time.Time
 	Site   *Site
 	Ctx    *coord.Context
 
-	// Memoized values
-	icrs  *coord.ICRS
-	altAz *coord.AltAz
-	err   error
+	// Memoized values — each stores its own (value, error) tuple.
+	icrs    coord.ICRS
+	icrsOk  bool
+	icrsErr error
+	altAz   coord.AltAz
+	altOk   bool
+	altErr  error
 }
 
 // NewEvalContext creates a bare context for evaluation.
@@ -46,27 +48,30 @@ func NewEvalContextWith(obj coord.Object, t time.Time, site *Site, ctx *coord.Co
 }
 
 // ICRS returns the (memoized) ICRS coordinates.
-func (c *EvalContext) ICRS() (*coord.ICRS, error) {
-	if c.icrs != nil {
-		return c.icrs, c.err
+func (c *EvalContext) ICRS() (coord.ICRS, error) {
+	if c.icrsOk || c.icrsErr != nil {
+		return c.icrs, c.icrsErr
 	}
 	icrs, err := c.Object.ICRS(c.Time)
 	c.icrs = icrs
-	c.err = err
+	c.icrsOk = err == nil
+	c.icrsErr = err
 	return icrs, err
 }
 
 // AltAz returns the (memoized) AltAz coordinates.
-func (c *EvalContext) AltAz() (*coord.AltAz, error) {
-	if c.altAz != nil {
-		return c.altAz, c.err
+func (c *EvalContext) AltAz() (coord.AltAz, error) {
+	if c.altOk || c.altErr != nil {
+		return c.altAz, c.altErr
 	}
 	icrs, err := c.ICRS()
 	if err != nil {
-		return nil, err
+		c.altErr = err
+		return coord.AltAz{}, err
 	}
 	aa, err := c.Ctx.ICRSToAltAz(icrs)
 	c.altAz = aa
-	c.err = err
+	c.altOk = err == nil
+	c.altErr = err
 	return aa, err
 }

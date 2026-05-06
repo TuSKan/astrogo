@@ -11,7 +11,7 @@
 
 **Observatory-grade astronomy and observation-planning engine for Go.**
 
-Scale-aware time arithmetic · SOFA-rigorous coordinate transforms · sub-second visibility boundaries · production scheduling · validated against USNO, JPL Horizons, and NASA Eclipse Catalogs.
+Scale-aware time arithmetic · SOFA-rigorous coordinate transforms · sub-minute rise/set accuracy · production scheduling · validated against USNO, JPL Horizons, and NASA Eclipse Catalogs.
 
 ---
 
@@ -25,7 +25,7 @@ Scale-aware time arithmetic · SOFA-rigorous coordinate transforms · sub-second
 - **Production scheduling engine** — Greedy, Priority, and `SwapOptimized` strategies with monotonic improvement guarantees
 - **Complete event solver** — Rise/Set/Transit, Moon Phases, Seasons, Apsides, Eclipses, Conjunctions, Elongations
 - **JPL DE ephemerides** — Multi-kernel SPK with on-demand Horizons fetching
-- **Observatory-grade refraction** — SOFA's rigorous model at all altitudes, with pluggable override interface
+- **Observatory-grade refraction** — SOFA Refa/Refb coefficients at all altitudes, USNO-standard 34' threshold convention, ≤0.6 min rise/set accuracy
 
 Designed from the ground up for Go: no dynamic magic, no hidden global state, zero-allocation hot paths.
 
@@ -134,7 +134,7 @@ Existing astronomy tools are powerful, but often:
 - **Moon Phases**: New, First Quarter, Full, Last Quarter — ≤1 min vs USNO
 - **Moon Phase Events**: `NextNewMoon`, `NextFullMoon`, `MoonPhases` via `EventFamilyIllumination`
 - **Earth's Seasons**: Equinoxes and Solstices — 2–4 min vs USNO
-- **Visibility Events**: Rise, Set, and Transit at sub-second precision
+- **Visibility Events**: Rise/Set ≤0.6 min vs USNO, Transit ≤0.5 min — 41/41 edge cases passing (polar, equatorial, 8849m altitude)
 - **Satellite Passes**: AOS/TCA/LOS prediction with Chandrupatla-refined rise/set boundaries (`SatellitePasses`)
 - **Relational Geometry**: Conjunction (RA), Conjunction (Ecliptic Longitude), Appulse, Opposition, Greatest Elongation, Quadrature
 - **Eclipse Detection**: `LunarEclipses`, `SolarEclipses` via ecliptic latitude filter (Danjon limit)
@@ -465,7 +465,7 @@ flowchart TD
 | `plan` | Observability, constraints, events, scheduling, satellite passes | ✅ Stable |
 | `unit` | Physical unit and quantity system | ✅ Stable |
 
-See [`VALIDATION.md`](docs/VALIDATION.md) for scientific validation status and [`USNO.md`](docs/USNO.md) for the U.S. Naval Observatory accuracy report.
+See [`VALIDATION.md`](docs/VALIDATION.md) for scientific validation status and [`USNO.md`](docs/USNO.md) for the U.S. Naval Observatory accuracy report (41/41 tests passing, ≤0.6 min rise/set accuracy across 3 continents + polar/equatorial/8849m edge cases).
 
 ---
 
@@ -520,7 +520,7 @@ Sub-arcsecond topocentric accuracy and sub-second UT1 timing require IERS EOP da
 |--------|----------|-------------|
 | UT1 accuracy | <50 ms | ~0.9 s (UT1 ≈ UTC fallback) |
 | Topocentric alt/az | <0.01″ | ~1″ |
-| Rise/set timing | <1 s | <2 s |
+| Rise/set timing | ≤0.6 min vs USNO | ≤0.7 min vs USNO |
 
 The library logs a one-time warning when EOP data is unavailable. **Users who redirect or suppress logs will not see this warning.** The IERS data is bundled via `go:generate`:
 

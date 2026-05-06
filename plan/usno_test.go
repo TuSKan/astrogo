@@ -114,7 +114,10 @@ type testLocation struct {
 }
 
 var testLocations = []testLocation{
-	{"São Paulo", -23.600833, -46.6525, 786, -3, "America/Sao_Paulo", false},
+	// Note: USNO's rstt/oneday API ignores the height parameter for rise/set times
+	// (verified empirically: height=0 and height=786 return identical results).
+	// Altitude-dependent tests are in TestUSNO_HighAltitude.
+	{"São Paulo", -23.600833, -46.6525, 0, -3, "America/Sao_Paulo", false},
 	{"Washington DC", 38.8951, -77.0364, 0, -5, "America/New_York", true},
 	{"London", 51.5074, -0.1278, 0, 0, "Europe/London", true},
 }
@@ -805,14 +808,12 @@ func TestUSNO_PolarSun(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			loc := tc.loc
 
-			// Query USNO
-			dstParam := "false"
-			if loc.DST {
-				dstParam = "true"
-			}
+			// Query USNO — always use UTC (tz=0, dst=false) for polar/edge-case
+			// locations to avoid DST interpretation mismatches. USNO's dst=true
+			// uses US DST rules, which differ from European/Asian DST schedules.
 			url := fmt.Sprintf(
-				"https://aa.usno.navy.mil/api/rstt/oneday?date=%s&coords=%.6f,%.6f&tz=%.0f&height=%.0f&dst=%s",
-				tc.date, loc.Lat, loc.Lon, loc.TZ, loc.Height, dstParam,
+				"https://aa.usno.navy.mil/api/rstt/oneday?date=%s&coords=%.6f,%.6f&tz=0&height=%.0f&dst=false",
+				tc.date, loc.Lat, loc.Lon, loc.Height,
 			)
 			body := usnoGet(t, url)
 
@@ -849,28 +850,22 @@ func TestUSNO_PolarSun(t *testing.T) {
 			t.Logf("USNO Sun: rise=%v(null=%v) set=%v(null=%v) transit=%v",
 				hasRise, riseNull, hasSet, setNull, hasTransit)
 
-			// Set up astrogo
+			// Set up astrogo — use UTC to match USNO query timezone
 			var y, mo, d int
 			fmt.Sscanf(tc.date, "%d-%d-%d", &y, &mo, &d)
 
-			tz := time.LocationUTC
-			if loc.TZName != "" {
-				var err error
-				tz, err = time.LoadLocation(loc.TZName)
-				if err != nil {
-					t.Fatalf("Failed to load timezone: %v", err)
-				}
-			}
+			// Even for locations with a named timezone, we use UTC for the
+			// computation interval to match the USNO query (tz=0).
 			geodetic, err := coord.NewGeodetic(angle.Deg(loc.Lon), angle.Deg(loc.Lat), loc.Height)
 			if err != nil {
 				t.Fatalf("Failed to create geodetic: %v", err)
 			}
-			site, err := plan.NewSite(loc.Name, geodetic, angle.Zero(), tz)
+			site, err := plan.NewSite(loc.Name, geodetic, angle.Zero(), time.LocationUTC)
 			if err != nil {
 				t.Fatalf("Failed to create site: %v", err)
 			}
 
-			start := time.Date(y, time.Month(mo), d, 0, 0, 0, 0, tz)
+			start := time.Date(y, time.Month(mo), d, 0, 0, 0, 0, time.LocationUTC)
 			end := start.Add(24 * time.Hour)
 
 			sunEvents, err := plan.SunEvents(start, end, site, eph)
@@ -937,7 +932,7 @@ func TestUSNO_PolarSun(t *testing.T) {
 
 				// Compare times if both have events
 				if hasRise && astroRise > 0 {
-					compareSunMoonEvents(t, "Sun", resp.Properties.Data.SunData, sunEvents, tz, 5.0)
+					compareSunMoonEvents(t, "Sun", resp.Properties.Data.SunData, sunEvents, time.LocationUTC, 5.0)
 				}
 			}
 		})
@@ -945,9 +940,16 @@ func TestUSNO_PolarSun(t *testing.T) {
 }
 
 // ── Test: High Altitude — Mount Everest ──────────────────────────────────────
-// At 8849m altitude, the geometric horizon dip is ~3.3°, which significantly
+// At 8849m altitude, the geometric horizon dip is ~2.76°, which significantly
 // shifts sunrise/sunset times (the Sun appears to rise earlier and set later).
-// This test validates astrogo's altitude-dependent thresholds against USNO.
+//
+// IMPORTANT: The USNO rstt/oneday API ignores the height parameter for rise/set
+// times (verified empirically: height=0 and height=8849 return identical results).
+// Therefore this test:
+//  1. Compares USNO (sea-level) against astrogo at sea-level (height=0) — must match ≤2 min.
+//  2. Compares astrogo at 8849m vs astrogo at 0m — validates altitude correction is physical
+//     (sunrise earlier, sunset later, shift ≈ 10–15 min at Everest latitude).
+//  3. Transit times (height-independent) are compared against USNO — must match ≤2 min.
 
 func TestUSNO_HighAltitude(t *testing.T) {
 	eph := newEph(t)
@@ -957,10 +959,10 @@ func TestUSNO_HighAltitude(t *testing.T) {
 
 	for _, dateStr := range dates {
 		t.Run(fmt.Sprintf("Everest/%s", dateStr), func(t *testing.T) {
-			// Query USNO with height=8849
+			// USNO ignores height — query at height=0 to get their actual reference.
 			url := fmt.Sprintf(
-				"https://aa.usno.navy.mil/api/rstt/oneday?date=%s&coords=%.6f,%.6f&tz=%.2f&height=%.0f&dst=false",
-				dateStr, loc.Lat, loc.Lon, loc.TZ, loc.Height,
+				"https://aa.usno.navy.mil/api/rstt/oneday?date=%s&coords=%.6f,%.6f&tz=%.2f&height=0&dst=false",
+				dateStr, loc.Lat, loc.Lon, loc.TZ,
 			)
 			body := usnoGet(t, url)
 
@@ -969,7 +971,6 @@ func TestUSNO_HighAltitude(t *testing.T) {
 				t.Fatalf("Failed to parse USNO response: %v", err)
 			}
 
-			// Parse date
 			var y, mo, d int
 			fmt.Sscanf(dateStr, "%d-%d-%d", &y, &mo, &d)
 
@@ -977,35 +978,46 @@ func TestUSNO_HighAltitude(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Failed to load timezone: %v", err)
 			}
-			geodetic, err := coord.NewGeodetic(angle.Deg(loc.Lon), angle.Deg(loc.Lat), loc.Height)
-			if err != nil {
-				t.Fatalf("Failed to create geodetic: %v", err)
-			}
-			site, err := plan.NewSite(loc.Name, geodetic, angle.Zero(), tz)
-			if err != nil {
-				t.Fatalf("Failed to create site: %v", err)
-			}
 
-			t.Logf("Everest horizon dip: %.4f°", site.HorizonDip().Degrees())
-			t.Logf("Sun rise/set threshold: %.4f°", site.SunRiseSetThreshold().Degrees())
-			t.Logf("Moon rise/set threshold: %.4f°", site.MoonRiseSetThreshold().Degrees())
+			// Build sites at sea level AND at summit
+			geodetic0, _ := coord.NewGeodetic(angle.Deg(loc.Lon), angle.Deg(loc.Lat), 0)
+			site0, _ := plan.NewSite(loc.Name+" (0m)", geodetic0, angle.Zero(), tz)
+
+			geodetic, _ := coord.NewGeodetic(angle.Deg(loc.Lon), angle.Deg(loc.Lat), loc.Height)
+			site, _ := plan.NewSite(loc.Name+" (8849m)", geodetic, angle.Zero(), tz)
+
+			t.Logf("Horizon dip (8849m): %.4f°", site.HorizonDip().Degrees())
+			t.Logf("Sun threshold (0m):    %.4f°", site0.SunRiseSetThreshold().Degrees())
+			t.Logf("Sun threshold (8849m): %.4f°", site.SunRiseSetThreshold().Degrees())
 
 			start := time.Date(y, time.Month(mo), d, 0, 0, 0, 0, tz)
 			end := start.Add(24 * time.Hour)
 
-			// Compare Sun events
+			sunEvents0, err := plan.SunEvents(start, end, site0, eph)
+			if err != nil {
+				t.Fatalf("SunEvents (0m) failed: %v", err)
+			}
 			sunEvents, err := plan.SunEvents(start, end, site, eph)
 			if err != nil {
-				t.Fatalf("SunEvents failed: %v", err)
+				t.Fatalf("SunEvents (8849m) failed: %v", err)
+			}
+			moonEvents0, err := plan.MoonEvents(start, end, site0, eph)
+			if err != nil {
+				t.Fatalf("MoonEvents (0m) failed: %v", err)
+			}
+			moonEvents, err := plan.MoonEvents(start, end, site, eph)
+			if err != nil {
+				t.Fatalf("MoonEvents (8849m) failed: %v", err)
 			}
 
+			// ── Part 1: Sea-level astrogo vs USNO (must match ≤2 min) ──
+			t.Log("── Sea-level comparison (astrogo 0m vs USNO) ──")
 			for _, sp := range resp.Properties.Data.SunData {
 				h, m, ok := parseUSNOTime(sp.Time)
 				if !ok {
 					continue
 				}
 				usnoMin := minutesFromMidnight(h, m)
-
 				var matchKind plan.EventKind
 				switch sp.Phen {
 				case "Rise":
@@ -1017,47 +1029,30 @@ func TestUSNO_HighAltitude(t *testing.T) {
 				default:
 					continue
 				}
-
-				found := false
-				for _, ev := range sunEvents {
+				for _, ev := range sunEvents0 {
 					if ev.Kind != matchKind {
 						continue
 					}
 					astroMin := eventMinutesIn(ev.Time, tz)
 					delta := deltaMinutes(usnoMin, astroMin)
-					t.Logf("Sun %-12s  USNO=%02d:%02d  astrogo=%s  Δ=%.1f min",
+					t.Logf("Sun %-12s  USNO=%02d:%02d  astrogo(0m)=%s  Δ=%.1f min",
 						sp.Phen, h, m, ev.Time.In(tz).Format("15:04:05"), delta)
-
-					// High altitude: wider tolerance (5 min) due to
-					// different atmospheric refraction models at extreme elevation
-					tol := 5.0
+					tol := 2.0
 					if matchKind == plan.EventTransit {
-						tol = 2.0
+						tol = 1.0
 					}
 					if delta > tol {
-						t.Errorf("Sun %s: Δ=%.1f min exceeds %.0f min tolerance at 8849m", sp.Phen, delta, tol)
+						t.Errorf("Sun %s (0m vs USNO): Δ=%.1f min exceeds %.0f min", sp.Phen, delta, tol)
 					}
-					found = true
 					break
 				}
-				if !found {
-					t.Logf("Sun %s at %02d:%02d: no matching astrogo event found", sp.Phen, h, m)
-				}
 			}
-
-			// Compare Moon events
-			moonEvents, err := plan.MoonEvents(start, end, site, eph)
-			if err != nil {
-				t.Fatalf("MoonEvents failed: %v", err)
-			}
-
 			for _, mp := range resp.Properties.Data.MoonData {
 				h, m, ok := parseUSNOTime(mp.Time)
 				if !ok {
 					continue
 				}
 				usnoMin := minutesFromMidnight(h, m)
-
 				var matchKind plan.EventKind
 				switch mp.Phen {
 				case "Rise":
@@ -1069,31 +1064,71 @@ func TestUSNO_HighAltitude(t *testing.T) {
 				default:
 					continue
 				}
-
-				found := false
-				for _, ev := range moonEvents {
+				for _, ev := range moonEvents0 {
 					if ev.Kind != matchKind {
 						continue
 					}
 					astroMin := eventMinutesIn(ev.Time, tz)
 					delta := deltaMinutes(usnoMin, astroMin)
-					t.Logf("Moon %-12s  USNO=%02d:%02d  astrogo=%s  Δ=%.1f min",
+					t.Logf("Moon %-12s  USNO=%02d:%02d  astrogo(0m)=%s  Δ=%.1f min",
 						mp.Phen, h, m, ev.Time.In(tz).Format("15:04:05"), delta)
-
-					tol := 5.0
+					tol := 3.0
 					if matchKind == plan.EventTransit {
-						tol = 2.0
+						tol = 1.0
 					}
 					if delta > tol {
-						t.Errorf("Moon %s: Δ=%.1f min exceeds %.0f min tolerance at 8849m", mp.Phen, delta, tol)
+						t.Errorf("Moon %s (0m vs USNO): Δ=%.1f min exceeds %.0f min", mp.Phen, delta, tol)
 					}
-					found = true
 					break
 				}
-				if !found {
-					t.Logf("Moon %s at %02d:%02d: no matching astrogo event found", mp.Phen, h, m)
+			}
+
+			// ── Part 2: Altitude correction (astrogo 8849m vs 0m) ──
+			t.Log("── Altitude correction (8849m vs 0m) ──")
+			logAltEvents := func(label string, events0, events []plan.Event) {
+				var rise0, riseH, set0, setH float64
+				var haveR0, haveRH, haveS0, haveSH bool
+				for _, ev := range events0 {
+					if ev.Kind == plan.EventRise && !haveR0 {
+						rise0 = eventMinutesIn(ev.Time, tz)
+						haveR0 = true
+						t.Logf("%s Rise    (0m)=%s", label, ev.Time.In(tz).Format("15:04:05"))
+					}
+					if ev.Kind == plan.EventSet && !haveS0 {
+						set0 = eventMinutesIn(ev.Time, tz)
+						haveS0 = true
+						t.Logf("%s Set     (0m)=%s", label, ev.Time.In(tz).Format("15:04:05"))
+					}
+				}
+				for _, ev := range events {
+					if ev.Kind == plan.EventRise && !haveRH {
+						riseH = eventMinutesIn(ev.Time, tz)
+						haveRH = true
+						t.Logf("%s Rise (8849m)=%s", label, ev.Time.In(tz).Format("15:04:05"))
+					}
+					if ev.Kind == plan.EventSet && !haveSH {
+						setH = eventMinutesIn(ev.Time, tz)
+						haveSH = true
+						t.Logf("%s Set  (8849m)=%s", label, ev.Time.In(tz).Format("15:04:05"))
+					}
+				}
+				if haveR0 && haveRH {
+					shift := rise0 - riseH
+					t.Logf("%s sunrise shift: %.1f min earlier at 8849m", label, shift)
+					if shift < 3 {
+						t.Errorf("%s sunrise should be earlier at 8849m (shift=%.1f min)", label, shift)
+					}
+				}
+				if haveS0 && haveSH {
+					shift := setH - set0
+					t.Logf("%s sunset shift: %.1f min later at 8849m", label, shift)
+					if shift < 3 {
+						t.Errorf("%s sunset should be later at 8849m (shift=%.1f min)", label, shift)
+					}
 				}
 			}
+			logAltEvents("Sun", sunEvents0, sunEvents)
+			logAltEvents("Moon", moonEvents0, moonEvents)
 		})
 	}
 }

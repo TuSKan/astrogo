@@ -15,15 +15,15 @@ import (
 // ── Visibility Detection ─────────────────────────────────────────────────────
 
 type benchMock struct {
-	c *coord.ICRS
+	c coord.ICRS
 }
 
-func (m benchMock) ICRS(_ atime.Time) (*coord.ICRS, error) {
+func (m benchMock) ICRS(_ atime.Time) (coord.ICRS, error) {
 	return m.c, nil
 }
 
-func (m benchMock) Name() string                               { return "mock" }
-func (m benchMock) Position(t atime.Time) (*coord.ICRS, error) { return m.c, nil }
+func (m benchMock) Name() string                              { return "mock" }
+func (m benchMock) Position(t atime.Time) (coord.ICRS, error) { return m.c, nil }
 func (m benchMock) GetDetails(ctx *coord.Context, props ...string) (*TargetDetails, error) {
 	return nil, nil
 }

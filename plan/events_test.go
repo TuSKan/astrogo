@@ -304,7 +304,7 @@ type mockLinearTarget struct {
 	dec     float64
 }
 
-func (m *mockLinearTarget) Position(t time.Time) (*coord.ICRS, error) {
+func (m *mockLinearTarget) Position(t time.Time) (coord.ICRS, error) {
 	hours := float64(t.Sub(time.FromJD(2451545.0, time.UTC)).Hours())
 	ra := m.startRA + m.raRate*hours
 	// Normalize RA
@@ -391,7 +391,7 @@ type mockParabolicTarget struct {
 	k float64
 }
 
-func (m *mockParabolicTarget) Position(t time.Time) (*coord.ICRS, error) {
+func (m *mockParabolicTarget) Position(t time.Time) (coord.ICRS, error) {
 	hours := float64(t.Sub(time.FromJD(2451545.0, time.UTC)).Hours())
 	dec := m.a*math.Pow(hours-m.h, 2) + m.k
 	return coord.NewICRS(angle.Deg(0), angle.Deg(dec)), nil
@@ -414,7 +414,7 @@ func TestSolveGeometry_GreatestElongation(t *testing.T) {
 		k: 15.0,
 	}
 
-	t1_pos := func(t time.Time) (*coord.ICRS, error) {
+	t1_pos := func(t time.Time) (coord.ICRS, error) {
 		hours := float64(t.Sub(time.FromJD(2451545.0, time.UTC)).Hours())
 		dec := t1.a*math.Pow(hours-t1.h, 2) + t1.k
 		return coord.NewICRS(angle.Deg(20), angle.Deg(dec)), nil
@@ -446,14 +446,14 @@ func TestSolveGeometry_GreatestElongation(t *testing.T) {
 }
 
 type mockDynamicTarget struct {
-	f func(t time.Time) (*coord.ICRS, error)
+	f func(t time.Time) (coord.ICRS, error)
 }
 
-func (m *mockDynamicTarget) Position(t time.Time) (*coord.ICRS, error) { return m.f(t) }
-func (m *mockDynamicTarget) Constraints() []Constraint                 { return nil }
-func (m *mockDynamicTarget) Catalog() string                           { return "DYN" }
-func (m *mockDynamicTarget) ID() string                                { return "Dyn" }
-func (m *mockDynamicTarget) Name() string                              { return "DynName" }
+func (m *mockDynamicTarget) Position(t time.Time) (coord.ICRS, error) { return m.f(t) }
+func (m *mockDynamicTarget) Constraints() []Constraint                { return nil }
+func (m *mockDynamicTarget) Catalog() string                          { return "DYN" }
+func (m *mockDynamicTarget) ID() string                               { return "Dyn" }
+func (m *mockDynamicTarget) Name() string                             { return "DynName" }
 func (m *mockDynamicTarget) GetDetails(ctx *coord.Context, props ...string) (*TargetDetails, error) {
 	return nil, nil
 }

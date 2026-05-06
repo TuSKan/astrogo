@@ -17,7 +17,7 @@ go test -tags integration -run TestUSNO -v -timeout 300s ./plan/
 
 | USNO Service | Test | Status | Accuracy |
 |---|---|---|---|
-| Complete Sun and Moon Data for One Day | `TestUSNO_SunMoonOneDay` | ✅ PASS | Sun <2 min, Moon <5 min |
+| Complete Sun and Moon Data for One Day | `TestUSNO_SunMoonOneDay` | ✅ PASS | Sun ≤0.5 min, Moon ≤0.6 min |
 | Celestial Navigation | `TestUSNO_CelNav` | ✅ PASS | 0.002° (sub-arcsecond) |
 | Moon Phases | `TestUSNO_MoonPhases` | ✅ PASS | **≤1 minute** |
 | Earth's Seasons | `TestUSNO_Seasons` | ✅ PASS | **2–4 minutes** |
@@ -27,11 +27,13 @@ go test -tags integration -run TestUSNO -v -timeout 300s ./plan/
 | Sidereal Time | `TestUSNO_SiderealTime` | ✅ PASS | sanity validated |
 | **Edge Cases** | | | |
 | Polar Sun (Midnight Sun / Polar Night) | `TestUSNO_PolarSun` | ✅ PASS | circumpolar agreement |
-| High Altitude (Everest 8849m) | `TestUSNO_HighAltitude` | ✅ PASS | Sun <5 min, Moon <5 min |
-| Equator (0°, 0°) | `TestUSNO_Equator` | ✅ PASS | Sun <2 min, ~12h day |
+| High Altitude (Everest 8849m) | `TestUSNO_HighAltitude` | ✅ PASS | 0m vs USNO ≤0.5 min |
+| Equator (0°, 0°) | `TestUSNO_Equator` | ✅ PASS | Sun ≤1 min, ~12h day |
 | Polar Moon | `TestUSNO_PolarMoon` | ✅ PASS | circumpolar agreement |
 | CelNav at Extreme Locations | `TestUSNO_CelNav_EdgeCases` | ✅ PASS | Alt <1.5° |
 | Altitude Shift (Sea Level vs Summit) | `TestUSNO_AltitudeShift` | ✅ PASS | monotonic shift verified |
+
+**41/41 tests passing.**
 
 ---
 
@@ -41,59 +43,91 @@ go test -tags integration -run TestUSNO -v -timeout 300s ./plan/
 
 | Event Type | Mean Δ | Max Δ | Tolerance |
 |---|---|---|---|
-| **Sun Transit** | 0.3 min | 0.5 min | 1 min |
-| **Sun Rise/Set** | 0.5 min | 1.3 min | 2 min |
+| **Sun Transit** | 0.2 min | 0.5 min | 1 min |
+| **Sun Rise/Set** | 0.2 min | 0.5 min | 2 min |
 | **Moon Transit** | 0.2 min | 0.5 min | 1 min |
-| **Moon Rise/Set** | 0.6 min | 1.6 min | 3 min |
+| **Moon Rise/Set** | 0.3 min | 0.6 min | 3 min |
 
 Coordinate pipeline: solar system bodies use `GeocentricToObserved` (full
-topocentric parallax correction). Thresholds include body semidiameter
-and geometric horizon dip from observer elevation.
+topocentric parallax correction). Thresholds follow the USNO/Explanatory
+Supplement convention:
 
-### São Paulo (S23°36', W46°39', 786m)
+| Component | Value |
+|---|---|
+| Solar semi-diameter | 16' (0.2667°) |
+| Standard atmospheric refraction | 34' (0.5667°) |
+| Total at sea level | **−50' (−0.8333°)** |
+| Horizon dip from elevation _h_ | 1.76'√_h_ |
+
+> **Note:** The USNO `rstt/oneday` API ignores the `height` parameter for
+> rise/set times (verified empirically: `height=0` and `height=786` return
+> identical results for São Paulo). All comparisons below use `height=0`.
+> Altitude-dependent behaviour is validated separately in the
+> [High Altitude](#high-altitude--mount-everest-8849m) section.
+
+### São Paulo (S23°36', W46°39', height=0)
 
 | Date | Event | USNO | astrogo | Δ |
 |---|---|---|---|---|
-| 2026-04-06 | Sun Rise | 06:17 | 06:15:42 | 1.3 min |
+| 2026-04-06 | Sun Rise | 06:17 | 06:16:50 | **0.2 min** |
 | 2026-04-06 | Sun Transit | 12:09 | 12:08:56 | 0.1 min |
-| 2026-04-06 | Sun Set | 18:01 | 18:01:54 | 0.9 min |
+| 2026-04-06 | Sun Set | 18:01 | 18:00:46 | **0.2 min** |
 | 2026-04-06 | Moon Transit | 03:09 | 03:09:07 | 0.1 min |
-| 2026-04-06 | Moon Set | 10:13 | 10:14:35 | 1.6 min |
-| 2026-04-06 | Moon Rise | 20:53 | 20:51:40 | 1.3 min |
+| 2026-04-06 | Moon Set | 10:13 | 10:13:16 | 0.3 min |
+| 2026-04-06 | Moon Rise | 20:53 | 20:53:00 | **0.0 min** |
+| 2026-06-21 | Sun Rise | 06:48 | 06:48:05 | **0.1 min** |
+| 2026-06-21 | Sun Transit | 12:08 | 12:08:27 | 0.5 min |
+| 2026-06-21 | Sun Set | 17:29 | 17:28:52 | **0.1 min** |
+| 2026-06-21 | Moon Rise | 11:51 | 11:51:21 | 0.4 min |
+| 2026-06-21 | Moon Transit | 18:03 | 18:02:44 | 0.3 min |
+| 2026-12-21 | Sun Rise | 05:17 | 05:16:55 | **0.1 min** |
+| 2026-12-21 | Sun Transit | 12:05 | 12:04:44 | 0.3 min |
+| 2026-12-21 | Sun Set | 18:53 | 18:52:36 | 0.4 min |
+| 2026-12-21 | Moon Set | 02:27 | 02:27:16 | 0.3 min |
+| 2026-12-21 | Moon Rise | 16:31 | 16:31:05 | **0.1 min** |
+| 2026-12-21 | Moon Transit | 21:57 | 21:57:27 | 0.5 min |
 
 ### Washington DC (N38°54', W77°02', 0m)
 
 | Date | Event | USNO | astrogo | Δ |
 |---|---|---|---|---|
-| 2026-04-06 | Sun Rise | 06:45 | 06:44:43 | **0.3 min** |
+| 2026-04-06 | Sun Rise | 06:45 | 06:45:00 | **0.0 min** |
 | 2026-04-06 | Sun Transit | 13:10 | 13:10:27 | 0.5 min |
-| 2026-04-06 | Sun Set | 19:37 | 19:36:54 | **0.1 min** |
+| 2026-04-06 | Sun Set | 19:37 | 19:36:37 | 0.4 min |
 | 2026-04-06 | Moon Transit | 04:15 | 04:14:50 | 0.2 min |
-| 2026-04-06 | Moon Set | 08:49 | 08:48:57 | **0.0 min** |
-| 2026-12-21 | Sun Rise | 07:23 | 07:22:52 | 0.1 min |
+| 2026-04-06 | Moon Set | 08:49 | 08:48:38 | 0.4 min |
+| 2026-06-21 | Sun Rise | 05:43 | 05:43:05 | **0.1 min** |
+| 2026-06-21 | Sun Transit | 13:10 | 13:10:00 | **0.0 min** |
+| 2026-06-21 | Sun Set | 20:37 | 20:36:58 | **0.0 min** |
+| 2026-06-21 | Moon Set | 00:41 | 00:41:17 | 0.3 min |
+| 2026-06-21 | Moon Rise | 13:02 | 13:01:53 | **0.1 min** |
+| 2026-06-21 | Moon Transit | 19:08 | 19:07:52 | 0.1 min |
+| 2026-12-21 | Sun Rise | 07:23 | 07:23:10 | 0.2 min |
 | 2026-12-21 | Sun Transit | 12:06 | 12:06:18 | 0.3 min |
-| 2026-12-21 | Sun Set | 16:50 | 16:49:48 | 0.2 min |
-| 2026-12-21 | Moon Set | 04:42 | 04:41:46 | 0.2 min |
-| 2026-12-21 | Moon Rise | 14:19 | 14:18:38 | **0.4 min** |
+| 2026-12-21 | Sun Set | 16:50 | 16:49:29 | 0.5 min |
+| 2026-12-21 | Moon Set | 04:42 | 04:41:28 | 0.5 min |
+| 2026-12-21 | Moon Rise | 14:19 | 14:18:57 | **0.0 min** |
 | 2026-12-21 | Moon Transit | 22:04 | 22:04:21 | 0.3 min |
 
 ### London (N51°30', W0°08', 0m)
 
 | Date | Event | USNO | astrogo | Δ |
 |---|---|---|---|---|
-| 2026-04-06 | Moon Rise | 00:15 | 00:13:57 | 1.1 min |
+| 2026-04-06 | Moon Rise | 00:15 | 00:14:25 | 0.6 min |
 | 2026-04-06 | Moon Transit | 03:57 | 03:56:39 | 0.3 min |
-| 2026-04-06 | Moon Set | 07:32 | 07:33:01 | 1.0 min |
-| 2026-06-21 | Sun Rise | 04:43 | 04:42:41 | 0.3 min |
+| 2026-04-06 | Moon Set | 07:32 | 07:32:34 | 0.6 min |
+| 2026-06-21 | Sun Rise | 04:43 | 04:43:07 | **0.1 min** |
 | 2026-06-21 | Sun Transit | 13:02 | 13:02:19 | 0.3 min |
-| 2026-06-21 | Sun Set | 21:22 | 21:22:00 | **0.0 min** |
-| 2026-06-21 | Moon Set | 00:35 | 00:34:47 | 0.2 min |
-| 2026-06-21 | Moon Rise | 12:41 | 12:40:09 | 0.9 min |
-| 2026-12-21 | Sun Rise | 08:04 | 08:03:21 | 0.6 min |
+| 2026-06-21 | Sun Set | 21:22 | 21:21:34 | 0.4 min |
+| 2026-06-21 | Moon Set | 00:35 | 00:34:28 | 0.5 min |
+| 2026-06-21 | Moon Rise | 12:41 | 12:40:29 | 0.5 min |
+| 2026-06-21 | Moon Transit | 18:51 | 18:51:07 | 0.1 min |
+| 2026-12-21 | Sun Rise | 08:04 | 08:03:46 | 0.2 min |
 | 2026-12-21 | Sun Transit | 11:59 | 11:58:34 | 0.4 min |
-| 2026-12-21 | Sun Set | 15:53 | 15:53:50 | 0.8 min |
-| 2026-12-21 | Moon Set | 05:07 | 05:07:23 | 0.4 min |
-| 2026-12-21 | Moon Rise | 13:09 | 13:08:35 | **0.4 min** |
+| 2026-12-21 | Sun Set | 15:53 | 15:53:25 | 0.4 min |
+| 2026-12-21 | Moon Set | 05:07 | 05:06:58 | **0.0 min** |
+| 2026-12-21 | Moon Rise | 13:09 | 13:09:01 | **0.0 min** |
+| 2026-12-21 | Moon Transit | 21:43 | 21:43:14 | 0.2 min |
 
 ---
 
@@ -169,6 +203,15 @@ All tests use the USNO API v4.0.1:
 | `/api/moon/phases/date` | `date`, `nump` |
 | `/api/seasons` | `year` |
 
+> **USNO API Limitation — `height` parameter:**
+> The `rstt/oneday` endpoint accepts a `height` parameter but returns
+> **identical** rise/set times regardless of the value (verified empirically
+> for São Paulo at 786m and Everest at 8849m). USNO's internal computation
+> uses a fixed sea-level model for rise/set timing. The `height` parameter
+> may affect other endpoints or future API versions. This limitation is
+> documented so that callers do not mistakenly assume USNO accounts for
+> observer elevation in rise/set calculations.
+
 ---
 
 ## Perihelion/Aphelion — 2026
@@ -216,7 +259,7 @@ standard mid-latitude assumptions break down.
 |---|---|---|---|---|
 | **North Pole** | 89.99°N | 0° | 0 m | Midnight sun / polar night |
 | **South Pole** | 89.99°S | 0° | 0 m | Reverse polar phenomena |
-| **Mount Everest** | 27.99°N | 86.93°E | 8849 m | Extreme horizon dip (~3.3°) |
+| **Mount Everest** | 27.99°N | 86.93°E | 8849 m | Extreme horizon dip (~2.76°) |
 | **Equator** | 0° | 0° | 0 m | Fast-setting bodies, ~12h day |
 | **Tromsø** | 69.65°N | 18.96°E | 0 m | Near-polar boundary |
 
@@ -235,34 +278,70 @@ when a body is circumpolar or never rises.
 | 2026-06-21 | Tromsø | Midnight Sun | No rise/set (null) | 0 rise, 0 set | ✅ |
 | 2026-03-20 | Tromsø | Normal | Rise + Set | Rise + Set | ✅ <5 min |
 
+> **Note on DST:** USNO's `dst=true` parameter applies **US DST rules**, which
+> differ from European/Asian schedules. For polar/edge-case locations all queries
+> use `tz=0, dst=false` (UTC) to avoid cross-jurisdiction DST interpretation
+> mismatches (e.g., Norway switches to CEST on March 29, but US DST starts
+> March 8 — a 21-day gap that causes 60-minute offsets at equinox dates).
+
 Algorithm: The visibility solver naturally handles circumpolar geometry — when
 the altitude curve never crosses the threshold, no zero-crossings are found,
 correctly yielding zero rise/set events.
 
 ### High Altitude — Mount Everest (8849m)
 
-At extreme elevation the geometric horizon dip is ~3.3°, which shifts
+At extreme elevation the geometric horizon dip is ~2.76°, which shifts
 rise/set times significantly (sunrise earlier, sunset later).
 
-| Property | Sea Level | Everest (8849m) |
+> **USNO API Limitation:** The `height` parameter has no effect on the
+> `rstt/oneday` endpoint's rise/set output (verified: `height=0` and
+> `height=8849` return identical times). Therefore the high-altitude test
+> validates: (1) sea-level astrogo vs USNO (must match ≤2 min), and
+> (2) astrogo altitude correction (8849m vs 0m) internally.
+
+#### Threshold Comparison
+
+| Property | Sea Level (0m) | Everest (8849m) |
 |---|---|---|
-| Horizon Dip | 0° | ~3.3° |
-| Sun Threshold | −0.267° | ~−3.6° |
-| Moon Threshold | −0.258° | ~−3.6° |
+| Horizon Dip | 0° | 2.7594° |
+| Sun Threshold | −0.8334° | −3.5928° |
+| Moon Threshold | −0.8250° | −3.5844° |
 
-Tolerance: **5 min** for rise/set (atmospheric refraction models diverge at extreme
-elevations), **2 min** for transit.
+#### Part 1: Sea-Level astrogo vs USNO (height=0)
 
-**Altitude Shift Invariant:**
-
-| Event | Sea Level | Summit (8849m) | Shift | Expected |
+| Date | Event | USNO | astrogo (0m) | Δ |
 |---|---|---|---|---|
-| Sunrise | later | **earlier** | ↑ | ✅ |
-| Sunset | earlier | **later** | ↑ | ✅ |
+| 2026-03-20 | Sun Rise | 06:02 | 06:01:38 | **0.4 min** |
+| 2026-03-20 | Sun Transit | 12:05 | 12:04:48 | 0.2 min |
+| 2026-03-20 | Sun Set | 18:08 | 18:08:26 | 0.4 min |
+| 2026-03-20 | Moon Rise | 06:32 | 06:32:04 | **0.1 min** |
+| 2026-03-20 | Moon Set | 19:36 | 19:36:15 | 0.2 min |
+| 2026-06-21 | Sun Rise | 05:02 | 05:01:31 | 0.5 min |
+| 2026-06-21 | Sun Transit | 11:59 | 11:59:03 | **0.0 min** |
+| 2026-06-21 | Sun Set | 18:57 | 18:56:39 | 0.3 min |
+| 2026-12-21 | Sun Rise | 06:44 | 06:44:13 | 0.2 min |
+| 2026-12-21 | Sun Set | 17:06 | 17:06:18 | 0.3 min |
 
-The altitude shift test (`TestUSNO_AltitudeShift`) verifies the physical invariant
-that higher altitude always yields earlier sunrise and later sunset at the same
-geodetic position.
+#### Part 2: Altitude Correction (astrogo 8849m vs 0m)
+
+| Date | Event | astrogo (0m) | astrogo (8849m) | Shift |
+|---|---|---|---|---|
+| 2026-03-20 | Sun Rise | 06:01:38 | 05:49:08 | **12.5 min earlier** |
+| 2026-03-20 | Sun Set | 18:08:26 | 18:20:56 | **12.5 min later** |
+| 2026-03-20 | Moon Rise | 06:32:04 | 06:19:07 | **12.9 min earlier** |
+| 2026-03-20 | Moon Set | 19:36:15 | 19:49:40 | **13.4 min later** |
+| 2026-06-21 | Sun Rise | 05:01:31 | 04:47:20 | **14.2 min earlier** |
+| 2026-06-21 | Sun Set | 18:56:39 | 19:10:49 | **14.2 min later** |
+| 2026-06-21 | Moon Rise | 11:23:36 | 11:10:35 | **13.0 min earlier** |
+| 2026-06-21 | Moon Set | 23:44:30 | 23:57:15 | **12.8 min later** |
+| 2026-12-21 | Sun Rise | 06:44:13 | 06:30:22 | **13.8 min earlier** |
+| 2026-12-21 | Sun Set | 17:06:18 | 17:20:09 | **13.9 min later** |
+| 2026-12-21 | Moon Rise | 14:16:26 | 14:01:56 | **14.5 min earlier** |
+| 2026-12-21 | Moon Set | 03:29:20 | 03:43:47 | **14.4 min later** |
+
+The altitude shift is consistent across all dates (~13 min), which is physically
+correct: at latitude 28°N, the Sun crosses the horizon at ~0.22°/min, and the
+2.76° horizon dip at 8849m produces a ~12.5 min shift (2.76° / 0.22°/min).
 
 ### Equator (0°, 0°) — Fast-Setting Bodies
 
@@ -272,10 +351,10 @@ possible setting speed). Day length is nearly constant year-round.
 | Date | Day Length | Expected | Δ from 12h |
 |---|---|---|---|
 | 2026-03-20 (Equinox) | ~12h 0min | ~12h | <15 min |
-| 2026-06-21 (Solstice) | ~12h 7min | ~12h | <15 min |
-| 2026-12-21 (Solstice) | ~12h 7min | ~12h | <15 min |
+| 2026-06-21 (Solstice) | ~12h 0min | ~12h | <15 min |
+| 2026-12-21 (Solstice) | ~12h 0min | ~12h | <15 min |
 
-Tolerance: **2 min** rise/set, **1 min** transit (standard mid-latitude values).
+Tolerance: **1 min** rise/set and transit (tightened from 2 min after refraction fix).
 
 ### Polar Moon — Circumpolar Detection
 
@@ -306,6 +385,25 @@ produces zero rise/set events. When timed events exist, Δ < 5 min.
 
 > **Note:** At latitudes >85°, azimuth is degenerate (all directions converge to
 > "south") and is excluded from tolerance checks.
+
+---
+
+## Refraction Model
+
+The rise/set pipeline uses **geometric altitude** compared against a threshold
+that includes standard atmospheric refraction (34'), following the convention
+of the USNO Explanatory Supplement to the Astronomical Almanac (§9.311).
+
+The `GeocentricToObserved` function applies SOFA's refraction model
+(Refa/Refb coefficients from `Apco13`) for general-purpose altitude queries,
+but the event solver bypasses refraction (zero-pressure atmosphere) to avoid
+a discontinuity at alt=0° in the tan(z) refraction series.
+
+This approach ensures:
+1. Rise/set times match USNO's sea-level reference to ≤0.6 minutes.
+2. The refraction model is physically correct for altitude queries above the
+   horizon (e.g., celestial navigation, constraint evaluation).
+3. Altitude corrections at elevated sites produce physically correct shifts.
 
 ---
 

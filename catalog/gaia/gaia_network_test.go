@@ -39,7 +39,7 @@ func TestGaiaNetworkConeSearch(t *testing.T) {
 		t.Fatalf("Expected stars from Gaia DR3 at Pleiades")
 	}
 
-	if targets[0].Coord == nil {
+	if !targets[0].HasCoord {
 		t.Fatalf("Expected astremetry mapped to coordinates from Gaia")
 	}
 }

@@ -2,6 +2,7 @@ package iers
 
 import (
 	"bytes"
+	"errors"
 	"math"
 	"testing"
 
@@ -52,10 +53,23 @@ func TestParseFinals2000A(t *testing.T) {
 	expectedXP := (0.120733 + 0.118980) / 2.0 * arcsec2rad
 	testutil.AssertNear(t, "EOP Midpoint XP", eopMid.XP, expectedXP, 1e-12)
 
-	// Test extrapolation/clamping bounding box values
-	eopUnder, _ := table.EOP(40000.0)
-	testutil.AssertEqual(t, "Clamped Under", eopUnder.DUT1, 0.8084178)
+	// Test out-of-range queries return ErrOutOfRange
+	_, err = table.EOP(40000.0)
+	if err == nil {
+		t.Error("expected ErrOutOfRange for MJD below coverage, got nil")
+	} else if !errors.Is(err, ErrOutOfRange) {
+		t.Errorf("expected ErrOutOfRange, got: %v", err)
+	}
 
-	eopOver, _ := table.EOP(50000.0)
-	testutil.AssertEqual(t, "Clamped Over", eopOver.DUT1, 0.8056163)
+	_, err = table.EOP(50000.0)
+	if err == nil {
+		t.Error("expected ErrOutOfRange for MJD above coverage, got nil")
+	} else if !errors.Is(err, ErrOutOfRange) {
+		t.Errorf("expected ErrOutOfRange, got: %v", err)
+	}
+
+	// Test Coverage()
+	minMJD, maxMJD := table.Coverage()
+	testutil.AssertEqual(t, "Coverage min", minMJD, 41684.0)
+	testutil.AssertEqual(t, "Coverage max", maxMJD, 41685.0)
 }

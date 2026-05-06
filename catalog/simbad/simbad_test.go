@@ -40,8 +40,8 @@ func TestParseCSV(t *testing.T) {
 		t.Errorf("expected 3 aliases, got %v", tgt.Aliases)
 	}
 
-	if tgt.Coord == nil {
-		t.Fatalf("Coord is nil")
+	if !tgt.HasCoord {
+		t.Fatalf("Coord is missing")
 	}
 
 	if math.Abs(tgt.Coord.RA().Degrees()-10.68470833) > 1e-6 {

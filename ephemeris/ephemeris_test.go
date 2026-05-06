@@ -127,7 +127,7 @@ func (m *mockLinearProvider) State(id eph.ID, t time.Time) (eph.State, error) {
 
 func (m *mockLinearProvider) Close() error { return nil }
 
-func angularSepArcsec(a, b *coord.AltAz) float64 {
+func angularSepArcsec(a, b coord.AltAz) float64 {
 	az1 := a.Az().Radians()
 	alt1 := a.Alt().Radians()
 	az2 := b.Az().Radians()

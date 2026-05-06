@@ -51,7 +51,7 @@ type ObjectRequest struct {
 
 // ConeRequest represents a spatial query around a specific coordinate.
 type ConeRequest struct {
-	Center *coord.ICRS
+	Center coord.ICRS
 	Radius angle.Angle
 	Limit  int
 }

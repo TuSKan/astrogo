@@ -1,8 +1,10 @@
 package fits
 
 import (
+	"encoding/binary"
 	"fmt"
 	"io"
+	"math"
 
 	"github.com/apache/arrow-go/v18/arrow"
 	"github.com/apache/arrow-go/v18/arrow/array"
@@ -27,7 +29,21 @@ type ImageHDU struct {
 	Axes   []int64
 
 	// Tensor holds the multi-dimensional array data using Apache Arrow.
+	// Pixel values are stored in native byte order after endian conversion.
 	Tensor tensor.Interface
+
+	// BScale is the linear scaling factor from the FITS header (default 1.0).
+	// Physical value = BZero + BScale * stored_value.
+	BScale float64
+
+	// BZero is the zero-point offset from the FITS header (default 0.0).
+	// Physical value = BZero + BScale * stored_value.
+	BZero float64
+
+	// Blank is the integer sentinel value indicating undefined pixels (from BLANK keyword).
+	// Only meaningful for integer BITPIX (8, 16, 32, 64). HasBlank reports whether it was set.
+	Blank    int64
+	HasBlank bool
 }
 
 // ReadImage reads an N-dimensional FITS image payload mapped directly into an Arrow Tensor representation.
@@ -60,10 +76,30 @@ func ReadImage(h *Header, r io.Reader) (*ImageHDU, error) {
 		totalPixels = 0
 	}
 
+	// Parse BSCALE / BZERO / BLANK from header.
+	bscale := 1.0
+	if v, err := h.GetFloat("BSCALE"); err == nil {
+		bscale = v
+	}
+	bzero := 0.0
+	if v, err := h.GetFloat("BZERO"); err == nil {
+		bzero = v
+	}
+	var blank int64
+	var hasBlank bool
+	if v, err := h.GetInt("BLANK"); err == nil {
+		blank = int64(v)
+		hasBlank = true
+	}
+
 	hdu := &ImageHDU{
 		basicHDU: basicHDU{header: h, hType: HDUTypeImage},
 		Bitpix:   bitpix,
 		Axes:     axes,
+		BScale:   bscale,
+		BZero:    bzero,
+		Blank:    blank,
+		HasBlank: hasBlank,
 	}
 
 	if totalPixels == 0 {
@@ -103,14 +139,16 @@ func ReadImage(h *Header, r io.Reader) (*ImageHDU, error) {
 	buf := memory.NewResizableBuffer(mem)
 	buf.Resize(int(totalPayloadBytes))
 
-	// In FITS, all data is strictly Big-Endian.
-	// Since go-arrow uses native Endianness (little-endian typically),
-	// a completely robust implementation would byte-swap the buffer mid-flight.
-	// For this P0 prototype, we will just read the raw byte stream into the arrow buffer directly.
-	_, err = io.ReadFull(r, buf.Bytes())
+	// FITS mandates big-endian byte order for all data.
+	// Arrow tensors expect native byte order. Read the raw stream, then
+	// convert big-endian → native for multi-byte pixel types.
+	rawBytes := buf.Bytes()
+	_, err = io.ReadFull(r, rawBytes)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read image payload: %w", err)
 	}
+
+	swapBigEndianToNative(rawBytes, int(pixelBytes))
 
 	// After reading the payload, discard the padding to reach 2880 byte bounds
 	paddingBytes := int(totalPayloadBytes) % BlockSize
@@ -131,4 +169,41 @@ func ReadImage(h *Header, r io.Reader) (*ImageHDU, error) {
 	hdu.Tensor = tensor.New(data, axes, nil, nil)
 
 	return hdu, nil
+}
+
+// swapBigEndianToNative converts a byte buffer from big-endian to native byte order in-place.
+// bytesPerPixel must be 1, 2, 4, or 8. For bytesPerPixel==1, this is a no-op.
+func swapBigEndianToNative(buf []byte, bytesPerPixel int) {
+	switch bytesPerPixel {
+	case 1:
+		// No swap needed for single-byte data.
+	case 2:
+		for i := 0; i < len(buf); i += 2 {
+			v := binary.BigEndian.Uint16(buf[i:])
+			binary.NativeEndian.PutUint16(buf[i:], v)
+		}
+	case 4:
+		for i := 0; i < len(buf); i += 4 {
+			v := binary.BigEndian.Uint32(buf[i:])
+			binary.NativeEndian.PutUint32(buf[i:], v)
+		}
+	case 8:
+		for i := 0; i < len(buf); i += 8 {
+			v := binary.BigEndian.Uint64(buf[i:])
+			binary.NativeEndian.PutUint64(buf[i:], v)
+		}
+	}
+}
+
+// PhysicalValue applies the BSCALE/BZERO linear calibration transform to a stored pixel value:
+//
+//	physical = BZero + BScale * stored
+//
+// If the stored value matches the BLANK sentinel (integer BITPIX only, when HasBlank is true),
+// NaN is returned to indicate an undefined pixel.
+func (img *ImageHDU) PhysicalValue(stored float64) float64 {
+	if img.HasBlank && int64(stored) == img.Blank {
+		return math.NaN()
+	}
+	return img.BZero + img.BScale*stored
 }

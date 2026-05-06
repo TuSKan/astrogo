@@ -28,7 +28,7 @@ type Provider struct {
 func New() *Provider {
 	return &Provider{
 		client: resolve.NewClient(),
-		cache:  resolve.NewArrowCache(),
+		cache:  resolve.NewMapCache(),
 	}
 }
 

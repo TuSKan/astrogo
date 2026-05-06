@@ -21,7 +21,7 @@ type Observable interface {
 	Name() string
 	// Position returns the ICRS coordinates of the target at the given time.
 	// For fixed targets, time may be ignored. For moving targets, time is required.
-	Position(t time.Time) (*coord.ICRS, error)
+	Position(t time.Time) (coord.ICRS, error)
 	// GetDetails retrieves comprehensive properties about the observable at the given context.
 	GetDetails(ctx *coord.Context, props ...string) (*TargetDetails, error)
 }
@@ -45,32 +45,32 @@ func (t Target) Name() string {
 }
 
 // Position returns the ICRS coordinates of the target.
-func (t Target) Position(time time.Time) (*coord.ICRS, error) {
+func (t Target) Position(time time.Time) (coord.ICRS, error) {
 	if t.Provider != nil {
 		// Moving object
 		idStr := t.Catalog.ID
 		if idStr == "" {
-			return nil, errors.New("moving target requires a valid Catalog.ID")
+			return coord.ICRS{}, errors.New("moving target requires a valid Catalog.ID")
 		}
 		idUint, err := strconv.ParseUint(idStr, 10, 32)
 		if err != nil {
-			return nil, fmt.Errorf("invalid ID for moving target: %w", err)
+			return coord.ICRS{}, fmt.Errorf("invalid ID for moving target: %w", err)
 		}
 		ephID := eph.ID(idUint)
 
 		pos, err := eph.Position(t.Provider, ephID, time)
 		if err != nil {
-			return nil, fmt.Errorf("target: ephemeris error for %s: %w", t.Name(), err)
+			return coord.ICRS{}, fmt.Errorf("target: ephemeris error for %s: %w", t.Name(), err)
 		}
 		icrs, err := eph.ToICRS(pos)
 		if err != nil {
-			return nil, fmt.Errorf("target: coordinate conversion error for %s: %w", t.Name(), err)
+			return coord.ICRS{}, fmt.Errorf("target: coordinate conversion error for %s: %w", t.Name(), err)
 		}
 		return icrs, nil
 	}
 
 	// Fixed object
-	if t.Catalog.Coord == nil {
+	if !t.Catalog.HasCoord {
 		return coord.NewICRS(angle.Rad(0), angle.Rad(0)), nil
 	}
 

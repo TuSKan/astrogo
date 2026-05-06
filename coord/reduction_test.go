@@ -233,8 +233,10 @@ func TestReducer_Group4_Semantics(t *testing.T) {
 	pipeline := coord.NewReducer(site, obsTime, atm)
 	res := pipeline.Reduce(vec)
 
-	if res.Geometric == nil || res.Observed == nil {
-		t.Fatalf("API violated: returned nil state points")
+	// With value types, we verify the Reduction fields are populated (non-zero-value).
+	if res.Geometric.Alt().Radians() == 0 && res.Geometric.Az().Radians() == 0 &&
+		res.Observed.Alt().Radians() == 0 && res.Observed.Az().Radians() == 0 {
+		t.Fatalf("API violated: returned zero-value state points")
 	}
 
 	// 4.1 distinction

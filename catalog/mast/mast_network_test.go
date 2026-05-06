@@ -33,7 +33,7 @@ func TestMastNetworkResolve(t *testing.T) {
 		t.Fatalf("Expected resolving Vega through MAST CAOM")
 	}
 
-	if targets[0].Coord == nil {
+	if !targets[0].HasCoord {
 		t.Fatalf("Expected ICRS coordinates mapped properly")
 	}
 }
