@@ -27,9 +27,6 @@ go.work.sum
 # env file
 .env
 
-# Coverage
-coverage*
-
 # Editor/IDE
 # .idea/
 # .vscode/
