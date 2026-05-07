@@ -28,8 +28,9 @@ func ExamplePlanner_Observable() {
 
 	// Target
 	obj := NewTarget(catalog.Target{
-		Name:  "Arp 220",
-		Coord: coord.NewICRS(angle.Deg(233.738), angle.Deg(23.503)),
+		Name:     "Arp 220",
+		Coord:    coord.NewICRS(angle.Deg(233.738), angle.Deg(23.503)),
+		HasCoord: true,
 	}, nil)
 
 	// Fixed time: Equinox 2000 midnight (T=0.5).
@@ -50,8 +51,9 @@ func ExampleObservableWindows() {
 
 	// Target at Zenith initially (J2000 Noon LST ~18.69h)
 	obj := NewTarget(catalog.Target{
-		Name:  "ZenithTarget",
-		Coord: coord.NewICRS(angle.Hour(18.69), angle.Zero()),
+		Name:     "ZenithTarget",
+		Coord:    coord.NewICRS(angle.Hour(18.69), angle.Zero()),
+		HasCoord: true,
 	}, nil)
 
 	start := time.FromJD(2451545.0, time.UTC) // J2000 Noon
@@ -76,8 +78,8 @@ func ExampleRankObservables() {
 	site, _ := NewSite("Test", loc, angle.Zero(), nil)
 	tm := time.FromJD(2451545.0, time.UTC) // J2000 Noon
 
-	obj1 := NewTarget(catalog.Target{Name: "NearZenith", Coord: coord.NewICRS(angle.Hour(18.69), angle.Deg(0))}, nil)
-	obj2 := NewTarget(catalog.Target{Name: "Lower", Coord: coord.NewICRS(angle.Hour(18.69), angle.Deg(45))}, nil)
+	obj1 := NewTarget(catalog.Target{Name: "NearZenith", Coord: coord.NewICRS(angle.Hour(18.69), angle.Deg(0)), HasCoord: true}, nil)
+	obj2 := NewTarget(catalog.Target{Name: "Lower", Coord: coord.NewICRS(angle.Hour(18.69), angle.Deg(45)), HasCoord: true}, nil)
 	objs := []Observable{obj1, obj2}
 
 	ranked, _ := RankObservables(objs, tm, site)

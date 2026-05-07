@@ -102,9 +102,17 @@ func (p *Provider) Search(query string) []resolve.Target {
 
 func parseCSV(data []byte) ([]resolve.Target, error) {
 	r := csv.NewReader(bytes.NewReader(data))
-	if _, err := r.Read(); err != nil {
+	header, err := r.Read()
+	if err != nil {
 		return nil, err
 	}
+
+	// Build column index map for forward-compatible parsing.
+	col := make(map[string]int)
+	for i, h := range header {
+		col[h] = i
+	}
+
 	var targets []resolve.Target
 	for {
 		row, err := r.Read()
@@ -143,7 +151,7 @@ func parseCSV(data []byte) ([]resolve.Target, error) {
 		if aliasesStr != "" {
 			aliases = strings.Split(aliasesStr, ";")
 		}
-		targets = append(targets, resolve.Target{
+		t := resolve.Target{
 			ID:       id,
 			Name:     name,
 			Kind:     kind,
@@ -151,7 +159,17 @@ func parseCSV(data []byte) ([]resolve.Target, error) {
 			HasCoord: true,
 			Catalog:  "openngc",
 			Aliases:  aliases,
-		})
+		}
+
+		// V-band magnitude (column present in generated CSV from parser v2+).
+		if idx, ok := col["vmag"]; ok && idx < len(row) && row[idx] != "" {
+			if v, err := strconv.ParseFloat(row[idx], 64); err == nil {
+				t.VMag = v
+				t.HasVMag = true
+			}
+		}
+
+		targets = append(targets, t)
 	}
 	return targets, nil
 }

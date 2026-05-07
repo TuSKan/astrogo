@@ -59,7 +59,7 @@ func BenchmarkVisibleIntervals_1MinStep(b *testing.B) {
 func BenchmarkEventSolver_Visibility(b *testing.B) {
 	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(45), 0)
 	site, _ := NewSite("Test", loc, angle.Zero(), nil)
-	obj := NewTarget(catalog.Target{Coord: coord.NewICRS(angle.Deg(0), angle.Deg(0))}, nil)
+	obj := NewTarget(catalog.Target{Coord: coord.NewICRS(angle.Deg(0), angle.Deg(0)), HasCoord: true}, nil)
 	start := atime.FromJD(2451545.0, atime.UTC)
 	end := start.Add(24 * atime.Hour)
 	solver := NewEventSolver(30*atime.Minute, 1*atime.Second)
@@ -82,7 +82,7 @@ func BenchmarkEventSolver_Visibility(b *testing.B) {
 func BenchmarkObservableWindows(b *testing.B) {
 	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(45), 0)
 	site, _ := NewSite("Test", loc, angle.Zero(), nil)
-	obj := NewTarget(catalog.Target{Coord: coord.NewICRS(angle.Hour(18.69), angle.Deg(0))}, nil)
+	obj := NewTarget(catalog.Target{Coord: coord.NewICRS(angle.Hour(18.69), angle.Deg(0)), HasCoord: true}, nil)
 	start := atime.FromJD(2451545.0, atime.UTC)
 	end := start.Add(12 * atime.Hour)
 	constraints := []Constraint{Altitude{Threshold: angle.Deg(30)}}
@@ -101,7 +101,7 @@ func makeBlocks(n int) []*Block {
 	for i := 0; i < n; i++ {
 		blocks[i] = &Block{
 			ID:       fmt.Sprintf("B%d", i),
-			Target:   NewTarget(catalog.Target{Name: fmt.Sprintf("T%d", i), Coord: coord.NewICRS(angle.Deg(0), angle.Deg(0))}, nil),
+			Target:   NewTarget(catalog.Target{Name: fmt.Sprintf("T%d", i), Coord: coord.NewICRS(angle.Deg(0), angle.Deg(0)), HasCoord: true}, nil),
 			Duration: 10 * atime.Minute,
 			Priority: float64(n - i), // descending priority
 		}

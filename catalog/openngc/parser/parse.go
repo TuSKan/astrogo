@@ -71,6 +71,8 @@ type targetRecord struct {
 	RA      float64
 	Dec     float64
 	Aliases []string
+	VMag    string // V-band apparent magnitude (empty if unavailable)
+	BMag    string // B-band apparent magnitude (empty if unavailable)
 }
 
 func downloadAndParse(url string) ([]targetRecord, error) {
@@ -158,10 +160,30 @@ func parseOpenNGC(input io.Reader) ([]targetRecord, error) {
 			RA:      ra,
 			Dec:     dec,
 			Aliases: aliases,
+			VMag:    extractMag(row, col, "V-Mag"),
+			BMag:    extractMag(row, col, "B-Mag"),
 		})
 	}
 
 	return records, nil
+}
+
+// extractMag safely extracts a magnitude value from a row by column name.
+// Returns empty string if column doesn't exist or value is empty.
+func extractMag(row []string, col map[string]int, colName string) string {
+	idx, ok := col[colName]
+	if !ok || idx >= len(row) {
+		return ""
+	}
+	v := strings.TrimSpace(row[idx])
+	if v == "" {
+		return ""
+	}
+	// Validate it's a parseable number.
+	if _, err := strconv.ParseFloat(v, 64); err != nil {
+		return ""
+	}
+	return v
 }
 
 func normalizeID(s string) string {
@@ -255,8 +277,8 @@ func writeRuntimeCSV(path string, records []targetRecord) error {
 	defer f.Close()
 
 	w := csv.NewWriter(f)
-	// Output format: id,name,kind,ra_deg,dec_deg,aliases(semicolon separated)
-	if err := w.Write([]string{"id", "name", "kind", "ra", "dec", "aliases"}); err != nil {
+	// Output format: id,name,kind,ra_deg,dec_deg,aliases(semicolon separated),vmag,bmag
+	if err := w.Write([]string{"id", "name", "kind", "ra", "dec", "aliases", "vmag", "bmag"}); err != nil {
 		return err
 	}
 
@@ -268,6 +290,8 @@ func writeRuntimeCSV(path string, records []targetRecord) error {
 			fmt.Sprintf("%.6f", rec.RA),
 			fmt.Sprintf("%.6f", rec.Dec),
 			strings.Join(rec.Aliases, ";"),
+			rec.VMag,
+			rec.BMag,
 		}); err != nil {
 			return err
 		}

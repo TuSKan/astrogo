@@ -26,8 +26,8 @@ func TestPlanner(t *testing.T) {
 	tm := time.NowUTC()
 
 	objs := []Observable{
-		NewTarget(catalog.Target{Name: "High", Coord: coord.NewICRS(angle.Deg(0), angle.Deg(45))}, nil),
-		NewTarget(catalog.Target{Name: "Low", Coord: coord.NewICRS(angle.Deg(180), angle.Deg(-45))}, nil),
+		NewTarget(catalog.Target{Name: "High", Coord: coord.NewICRS(angle.Deg(0), angle.Deg(45)), HasCoord: true}, nil),
+		NewTarget(catalog.Target{Name: "Low", Coord: coord.NewICRS(angle.Deg(180), angle.Deg(-45)), HasCoord: true}, nil),
 	}
 
 	filtered, err := planner.FilterObservable(objs, tm)
@@ -43,7 +43,7 @@ func TestObservableWindows_Fixed(t *testing.T) {
 	site, _ := NewSite("Test", loc, angle.Zero(), nil)
 
 	// Target at zenith at Greenwich J2000 (LST ~18.69h)
-	obj := NewTarget(catalog.Target{Coord: coord.NewICRS(angle.Hour(18.69), angle.Deg(0))}, nil)
+	obj := NewTarget(catalog.Target{Coord: coord.NewICRS(angle.Hour(18.69), angle.Deg(0)), HasCoord: true}, nil)
 
 	start := time.FromJD(2451545.0, time.UTC) // J2000 Noon (Observable)
 	end := start.Add(1 * stdtime.Hour)
@@ -108,7 +108,7 @@ func (f *flipConstraint) Check(_ Observable, _ time.Time, _ *Site) (Result, erro
 func TestObservableWindows_Grouping(t *testing.T) {
 	loc, _ := coord.NewGeodetic(angle.Zero(), angle.Zero(), 0)
 	site, _ := NewSite("Test", loc, angle.Zero(), nil)
-	obj := NewTarget(catalog.Target{Coord: coord.NewICRS(angle.Zero(), angle.Zero())}, nil)
+	obj := NewTarget(catalog.Target{Coord: coord.NewICRS(angle.Zero(), angle.Zero()), HasCoord: true}, nil)
 
 	start := time.NowUTC()
 	step := 1 * stdtime.Minute
@@ -141,7 +141,7 @@ func TestIsObservable(t *testing.T) {
 	tm := time.FromJD(2451545.0, time.UTC)
 
 	// Target at zenith
-	obj := NewTarget(catalog.Target{Coord: coord.NewICRS(angle.Hour(18.69), angle.Deg(0))}, nil)
+	obj := NewTarget(catalog.Target{Coord: coord.NewICRS(angle.Hour(18.69), angle.Deg(0)), HasCoord: true}, nil)
 
 	t.Run("AllPass", func(t *testing.T) {
 		constraints := []Constraint{
@@ -202,9 +202,9 @@ func TestScoreObservable(t *testing.T) {
 
 	t.Run("AltitudeScoring", func(t *testing.T) {
 		// Target 1: Near zenith (Alt ~90)
-		obj1 := NewTarget(catalog.Target{Coord: coord.NewICRS(angle.Hour(18.69), angle.Deg(0))}, nil)
+		obj1 := NewTarget(catalog.Target{Coord: coord.NewICRS(angle.Hour(18.69), angle.Deg(0)), HasCoord: true}, nil)
 		// Target 2: Lower (Alt ~45)
-		obj2 := NewTarget(catalog.Target{Coord: coord.NewICRS(angle.Hour(18.69), angle.Deg(45))}, nil)
+		obj2 := NewTarget(catalog.Target{Coord: coord.NewICRS(angle.Hour(18.69), angle.Deg(45)), HasCoord: true}, nil)
 
 		s1, _ := ScoreObservable(obj1, tm, site, nil)
 		s2, _ := ScoreObservable(obj2, tm, site, nil)
@@ -215,7 +215,7 @@ func TestScoreObservable(t *testing.T) {
 	})
 
 	t.Run("FailingConstraint", func(t *testing.T) {
-		obj := NewTarget(catalog.Target{Coord: coord.NewICRS(angle.Hour(18.69), angle.Deg(0))}, nil)
+		obj := NewTarget(catalog.Target{Coord: coord.NewICRS(angle.Hour(18.69), angle.Deg(0)), HasCoord: true}, nil)
 		// Force fail with extreme altitude threshold
 		c := Altitude{Threshold: angle.Deg(95)}
 
@@ -231,7 +231,7 @@ func TestScoreObservable(t *testing.T) {
 		altOnly := &ScoreConfig{AltitudeWeight: 1, UrgencyWeight: 0, MoonWeight: 0}
 		urgOnly := &ScoreConfig{AltitudeWeight: 0, UrgencyWeight: 1, MoonWeight: 0}
 
-		obj := NewTarget(catalog.Target{Coord: coord.NewICRS(angle.Hour(18.69), angle.Deg(0))}, nil)
+		obj := NewTarget(catalog.Target{Coord: coord.NewICRS(angle.Hour(18.69), angle.Deg(0)), HasCoord: true}, nil)
 
 		sAlt, _ := ScoreObservable(obj, tm, site, altOnly)
 		sUrg, _ := ScoreObservable(obj, tm, site, urgOnly)
@@ -246,7 +246,7 @@ func TestScoreObservable(t *testing.T) {
 	})
 
 	t.Run("CompositeHigherThanZero", func(t *testing.T) {
-		obj := NewTarget(catalog.Target{Coord: coord.NewICRS(angle.Hour(18.69), angle.Deg(0))}, nil)
+		obj := NewTarget(catalog.Target{Coord: coord.NewICRS(angle.Hour(18.69), angle.Deg(0)), HasCoord: true}, nil)
 		s, err := ScoreObservable(obj, tm, site, nil) // Default config
 		testutil.AssertNoError(t, err)
 		if s <= 0 {
@@ -270,10 +270,10 @@ func TestRankObservables(t *testing.T) {
 	t.Run("RankingStability", func(t *testing.T) {
 		objs := []Observable{
 			prioritizedTarget{
-				Observable: NewTarget(catalog.Target{Coord: coord.NewICRS(angle.Hour(18.69), angle.Deg(45))}, nil),
+				Observable: NewTarget(catalog.Target{Coord: coord.NewICRS(angle.Hour(18.69), angle.Deg(45)), HasCoord: true}, nil),
 				priority:   2.0, // High priority but lower altitude
 			},
-			NewTarget(catalog.Target{Coord: coord.NewICRS(angle.Hour(18.69), angle.Deg(0))}, nil), // Zenith but priority 1.0
+			NewTarget(catalog.Target{Coord: coord.NewICRS(angle.Hour(18.69), angle.Deg(0)), HasCoord: true}, nil), // Zenith but priority 1.0
 		}
 
 		// Score 1: ~45 * 2.0 = 90
@@ -281,7 +281,7 @@ func TestRankObservables(t *testing.T) {
 		// (Actually depends on exact math, let's adjust to be sure)
 
 		objs[0] = prioritizedTarget{
-			Observable: NewTarget(catalog.Target{Coord: coord.NewICRS(angle.Hour(18.69), angle.Deg(45))}, nil),
+			Observable: NewTarget(catalog.Target{Coord: coord.NewICRS(angle.Hour(18.69), angle.Deg(45)), HasCoord: true}, nil),
 			priority:   3.0, // Score ~135
 		}
 
@@ -300,7 +300,7 @@ func TestRankObservables(t *testing.T) {
 func TestObservableWindows_StepTooLarge(t *testing.T) {
 	loc, _ := coord.NewGeodetic(angle.Zero(), angle.Zero(), 0)
 	site, _ := NewSite("Test", loc, angle.Zero(), nil)
-	obj := NewTarget(catalog.Target{Coord: coord.NewICRS(angle.Zero(), angle.Zero())}, nil)
+	obj := NewTarget(catalog.Target{Coord: coord.NewICRS(angle.Zero(), angle.Zero()), HasCoord: true}, nil)
 
 	start := time.NowUTC()
 	end := start.Add(6 * stdtime.Hour)

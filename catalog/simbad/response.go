@@ -117,6 +117,13 @@ func ParseCSV(r io.Reader) ([]resolve.Target, error) {
 					t.RadialVelocity = v
 				}
 			}
+			// V-band magnitude from allfluxes table.
+			if vmagIdx, ok := colIdx["v"]; ok && row[vmagIdx] != "" {
+				if v, err := strconv.ParseFloat(row[vmagIdx], 64); err == nil {
+					t.VMag = v
+					t.HasVMag = true
+				}
+			}
 		}
 
 		if aliasIdx, exists := colIdx["id"]; exists {

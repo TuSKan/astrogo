@@ -28,7 +28,7 @@ func ExampleScheduler_BuildSchedule() {
 	blocks := []*Block{
 		{
 			ID:       "BlockA",
-			Target:   NewTarget(catalog.Target{Name: "TargetA", Coord: coord.NewICRS(angle.Hour(18.69), angle.Zero())}, nil),
+			Target:   NewTarget(catalog.Target{Name: "TargetA", Coord: coord.NewICRS(angle.Hour(18.69), angle.Zero()), HasCoord: true}, nil),
 			Duration: 30 * time.Minute,
 			Priority: 2.0,
 			Config:   Configuration{Filter: "V"},
@@ -39,7 +39,7 @@ func ExampleScheduler_BuildSchedule() {
 		},
 		{
 			ID:       "BlockB",
-			Target:   NewTarget(catalog.Target{Name: "TargetB", Coord: coord.NewICRS(angle.Hour(18.69), angle.Deg(45))}, nil),
+			Target:   NewTarget(catalog.Target{Name: "TargetB", Coord: coord.NewICRS(angle.Hour(18.69), angle.Deg(45)), HasCoord: true}, nil),
 			Duration: 45 * time.Minute,
 			Priority: 1.0,
 			Config:   Configuration{Filter: "R"},

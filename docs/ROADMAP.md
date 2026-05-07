@@ -32,8 +32,10 @@ AstroGo already provides:
 - FITS I/O (multi-extension, tables, images)
 - WCS support
 - Units and quantities system
-- Validation framework against SOFA / Horizons / USNO / analytical invariants
+- Validation framework against SOFA / Horizons / USNO / FINK / analytical invariants
 - CI with automated testing
+- **Apparent magnitude** for all body types (planets, asteroids, comets, satellites, stars)
+- **FINK/ZTF SSOFT** provider for sHG1G2 phase-curve parameters
 
 The project is **past the foundational stage**.
 
@@ -265,6 +267,22 @@ See [`USNO.md`](./USNO.md) and [`VALIDATION.md`](./VALIDATION.md) for full detai
 
 ---
 
+## 17.6 Apparent Magnitude & FINK Photometry
+
+**Status:** ✅ Complete
+
+- [x] `magnitude/` package — Mallama & Hilton (2018) planets, Saturn rings, Neptune secular brightening
+- [x] Asteroid phase curves: H,G (Bowell 1989), H,G₁,G₂ (Muinonen 2010), H,G₁₂* (Penttilä 2016)
+- [x] **sHG1G2** (Carry et al. 2024) — 7-parameter spin-geometry model with `CosAspectAngle()`, `SpinCorrection()`
+- [x] Comet, satellite, star, Sun, Moon magnitude functions
+- [x] `catalog/fink` provider — FINK/ZTF SSOFT (single-object JSON + bulk parquet)
+- [x] `resolve.Target` extended with G1, G2, SpinRA, SpinDec, Oblateness fields
+- [x] `plan/details.go` upgraded: sHG1G2 → HG1G2 → HG priority chain
+- [x] **E2E validation**: 186 r-band observations of 8467 Benoitcarry — 100% match at 0.025 mag vs FINK phunk pipeline
+- [x] 36 magnitude tests + 5 FINK network validation tests
+
+---
+
 ## 17.5 NORAD Satellite Tracking
 
 **Status:** ✅ Complete
@@ -315,7 +333,6 @@ Not as a full clone of other ecosystems, but as:
 
 To maintain focus, the following are intentionally not prioritized:
 
-- full photometry / image processing ecosystem
 - full spectral analysis stack
 - complete reproduction of all Astropy submodules
 
@@ -337,12 +354,16 @@ AstroGo has completed all core astronomy capabilities and v0.1.0 hardening:
 - ✅ Scientific validation (USNO, JPL Horizons, NASA Eclipse Catalog)
 - ✅ Catalog remote data layer
 - ✅ **NORAD satellite tracking** (CelestTrak GP, SGP4, pass prediction)
+- ✅ **Apparent magnitude** (planets, asteroids, comets, satellites, stars — 36 tests)
+- ✅ **FINK/ZTF SSOFT** (sHG1G2 spin-geometry photometry — validated against phunk pipeline)
 
 The remaining work is concentrated in:
 
+- **Polymorphic Observable architecture** — replace `Target` god-struct with typed `Star`, `Planet`, `Asteroid`, `Comet`, `Satellite`, `DeepSkyObject` — each with embedded `eph.Provider` and own `ApparentMagnitude()` method
 - **Batch/vectorized APIs** for high-throughput use cases
 - **Cross-match algorithms** for multi-catalog workflows
 - **Satellite illumination constraints** (sunlit + dark sky for visual observation)
+- **Topocentric planet corrections** (currently geocentric projected to local horizon)
 
 Completing these will elevate AstroGo from:
 

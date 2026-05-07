@@ -325,9 +325,6 @@ func mergeConstraints(a, b []Constraint) []Constraint {
 // The score combines altitude (0–90°) weighted by priority, reflecting
 // both scientific quality (lower airmass) and user preference.
 // Falls back to static block priority if scoring fails.
-//
-// TODO: Accept a pre-built coord.Context to avoid redundant SOFA matrix
-// computation when the caller already has one for the same epoch.
 func scoreBlockPlacement(block *Block, start, end time.Time, planner *Planner) float64 {
 	mid := start.Add(end.Sub(start) / 2)
 	score, err := ScoreObservable(block.Target, mid, planner.Site, nil, planner.Constraints...)

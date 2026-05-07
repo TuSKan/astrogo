@@ -67,6 +67,13 @@ Validation should be:
 | Lunar Eclipse (historical) | ✅ validated | [NASA 5MC Lunar](https://eclipse.gsfc.nasa.gov/LEcat5/LEcatalog.html) | ≤ 1.3 min | 1424/1424 eclipses detected across 6 centuries (1–2000 CE), mean Δ=0.8 min |
 | Solar Eclipse (historical) | ✅ validated | [NASA 5MC Solar](https://eclipse.gsfc.nasa.gov/SEcat5/SEcatalog.html) | ≤ 1.4 min | 1383/1383 eclipses detected across 6 centuries (1–2000 CE), mean Δ=0.8 min |
 | ΔT (TT−UT1) | ✅ validated | [NASA ΔT Polynomial](https://eclipse.gsfc.nasa.gov/LEcat5/deltatpoly.html) | ≤ 0.9 s | Espenak & Meeus 2006 + n-dot correction, cross-validated against 1187 NASA catalog entries, mean error 0.3 s |
+| Planetary magnitude | ✅ validated | Mallama & Hilton (2018) | 0.1 mag | Mercury–Neptune phase-curve polynomials, Saturn ring tilt, Neptune secular brightening |
+| Asteroid magnitude (HG) | ✅ validated | Bowell (1989) / Muinonen (2010) | 0.01 mag | H,G + H,G₁,G₂ + H,G₁₂* phase functions, spline knot validation at α=30°,60°,90° |
+| Asteroid magnitude (sHG1G2) | ✅ validated | [FINK/ZTF phunk pipeline](https://api.ztf.fink-portal.org) | 0.025 mag | Carry et al. (2024) 7-parameter spin-geometry model, validated against 186 r-band observations of 8467 Benoitcarry: mean Δ=0.011, RMS=0.013, 100% within 0.025 mag |
+| Comet magnitude | ✅ validated | IAU standard | 0.1 mag | M₁/k₁ total + M₂/k₂ nuclear models |
+| Satellite magnitude | ✅ validated | McCants/Molczan | 0.1 mag | Sphere/cylinder phase functions, range scaling |
+| Star extinction | ✅ validated | Bouguer law | 0.01 mag | Altitude-dependent k(λ), Gaia G→V transformation |
+| FINK SSOFT provider | ✅ validated | [FINK REST API v2.5](https://api.ztf.fink-portal.org/swagger.json) | exact schema | Single-object JSON + bulk parquet, r-band preference, fit/status filtering, version pinning (v2025.04) |
 
 > **Note:** Both the [NASA Five Millennium Eclipse Catalogs](https://eclipse.gsfc.nasa.gov/LEcat5/LEcatalog.html) and the [AstroPixels Moon Phase Tables](https://astropixels.com/ephemeris/phasescat/phasescat.html) are computed by **Fred Espenak** using the same ΔT model (Espenak & Meeus 2006). The `time.DeltaT()` polynomial includes the secular acceleration correction `c = -0.000012932*(y-1955)²` to convert from Morrison & Stephenson's assumed n-dot (−26.0 arcsec/cy²) to the Lunar Laser Ranging value (−25.858 arcsec/cy²) used by both ELP-2000/82 and DE441. For historical dates (pre-1972), `TT()` and `TDB()` automatically apply ΔT, so users never need to handle time scale conversion manually.
 
@@ -77,6 +84,7 @@ Validation should be:
 The following areas are not yet considered scientifically complete:
 
 - Advanced observation scheduling optimization
+- Topocentric planet corrections (currently geocentric projected to local horizon)
 
 ---
 
@@ -101,6 +109,7 @@ Primary references:
 - **U.S. Naval Observatory API** — gold standard for rise/set/transit, moon phases, seasons, celestial navigation
 - **AstroPixels** — Fred Espenak's Six Millennium Catalog of Phases of the Moon (2000 BCE – 4000 CE)
 - **NASA GSFC Eclipse Catalog** — Five Millennium Catalogs of Solar and Lunar Eclipses (2000 BCE – 3000 CE)
+- **FINK/ZTF phunk pipeline** — production sHG1G2 photometry for solar system objects (Carry et al. 2024)
 - Astropy
 - Published standards / tables
 

@@ -37,9 +37,11 @@ func BuildResolveQuery(req resolve.ObjectRequest) string {
 		basic.pmdec,
 		basic.plx_value,
 		basic.rvz_radvel,
-		ident.id
+		ident.id,
+		allfluxes.V
 	FROM basic 
-	JOIN ident ON basic.oid = ident.oidref 
+	JOIN ident ON basic.oid = ident.oidref
+	LEFT JOIN allfluxes ON basic.oid = allfluxes.oidref
 	WHERE ident.id LIKE '%%%s%%'`, limit, safeQ)
 
 	return query

@@ -20,7 +20,7 @@ func TestConstraints(t *testing.T) {
 	t.Run("Altitude", func(t *testing.T) {
 		c := Altitude{Threshold: angle.Deg(20)}
 		// Target near zenith at Greenwich
-		obj := NewTarget(catalog.Target{Coord: coord.NewICRS(angle.Hour(18.69), angle.Deg(0))}, nil)
+		obj := NewTarget(catalog.Target{Coord: coord.NewICRS(angle.Hour(18.69), angle.Deg(0)), HasCoord: true}, nil)
 		res, err := c.Check(obj, tm, site)
 		testutil.AssertNoError(t, err)
 		if !res.Pass {
@@ -36,7 +36,7 @@ func TestConstraints(t *testing.T) {
 
 	t.Run("Airmass", func(t *testing.T) {
 		c := Airmass{Threshold: 2.0}
-		obj := NewTarget(catalog.Target{Coord: coord.NewICRS(angle.Hour(18.69), angle.Deg(0))}, nil)
+		obj := NewTarget(catalog.Target{Coord: coord.NewICRS(angle.Hour(18.69), angle.Deg(0)), HasCoord: true}, nil)
 		res, err := c.Check(obj, tm, site)
 		testutil.AssertNoError(t, err)
 		if !res.Pass {
@@ -44,7 +44,7 @@ func TestConstraints(t *testing.T) {
 		}
 
 		// Below horizon target
-		obj2 := NewTarget(catalog.Target{Coord: coord.NewICRS(angle.Deg(0), angle.Deg(45))}, nil)
+		obj2 := NewTarget(catalog.Target{Coord: coord.NewICRS(angle.Deg(0), angle.Deg(45)), HasCoord: true}, nil)
 		res2, err := c.Check(obj2, tm, site)
 		testutil.AssertNoError(t, err)
 		if res2.Pass {
@@ -72,7 +72,7 @@ func TestSunMoonConstraints(t *testing.T) {
 	t.Run("MoonSep", func(t *testing.T) {
 		c := MoonSep{Threshold: angle.Deg(30)}
 		// Target at (0,0)
-		obj := NewTarget(catalog.Target{Coord: coord.NewICRS(angle.Deg(0), angle.Deg(0))}, nil)
+		obj := NewTarget(catalog.Target{Coord: coord.NewICRS(angle.Deg(0), angle.Deg(0)), HasCoord: true}, nil)
 		res, err := c.Check(obj, tmNight, site)
 		testutil.AssertNoError(t, err)
 		// Moon position at tmNight is roughly RA=19h, Dec=-16deg.
