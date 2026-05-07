@@ -28,6 +28,22 @@ type WCS struct {
 	// pc Matrix: Linear Transformation (rotation and skew) coefficients mapping
 	// intermediate coordinates relative to the base increments.
 	pc [][]float64
+
+	// lonAxis and latAxis record which physical axis (0 or 1) carries celestial
+	// longitude (RA) and latitude (Dec). Normally lonAxis=0, latAxis=1, but
+	// FITS allows CTYPE1="DEC--xxx" / CTYPE2="RA---xxx" which reverses them.
+	// Set by extractProjection; -1 means no celestial axis detected.
+	lonAxis, latAxis int
+
+	// SIP (Simple Imaging Polynomial) distortion coefficients.
+	// Forward: pixel offset (u,v) → corrected (u + f(u,v), v + g(u,v))
+	//   f(u,v) = Σ sipA[(p,q)] · u^p · v^q   for p+q ≤ A_ORDER
+	//   g(u,v) = Σ sipB[(p,q)] · u^p · v^q   for p+q ≤ B_ORDER
+	// Inverse: intermediate (u',v') → pixel offset (u,v)
+	//   Δu = Σ sipAP[(p,q)] · u'^p · v'^q
+	//   Δv = Σ sipBP[(p,q)] · u'^p · v'^q
+	sipA, sipB   map[[2]int]float64
+	sipAP, sipBP map[[2]int]float64
 }
 
 // NewWCS constructs an empty identity-mapped N-dimensional Coordinate System.
@@ -73,6 +89,21 @@ func (w *WCS) SetPC(pc [][]float64) {
 	w.pc = pc
 }
 
+// SetSIP sets the forward SIP distortion polynomial coefficients.
+// Each map key [2]int{p, q} represents the exponent pair for u^p * v^q.
+// The maps may be nil to disable SIP distortion.
+func (w *WCS) SetSIP(a, b map[[2]int]float64) {
+	w.sipA = a
+	w.sipB = b
+}
+
+// SetSIPInverse sets the inverse SIP polynomial coefficients (AP, BP).
+// These are used in WorldToPixel to compute a direct inverse without iteration.
+func (w *WCS) SetSIPInverse(ap, bp map[[2]int]float64) {
+	w.sipAP = ap
+	w.sipBP = bp
+}
+
 // GetCRPIX returns the reference pixel coordinate array.
 func (w *WCS) GetCRPIX() []float64 {
 	return w.crpix
@@ -101,23 +132,52 @@ func (w *WCS) GetPC() [][]float64 {
 const deg2rad = math.Pi / 180.0
 const rad2deg = 180.0 / math.Pi
 
+// sipEval evaluates a SIP polynomial: Σ coeffs[(p,q)] · u^p · v^q.
+func sipEval(coeffs map[[2]int]float64, u, v float64) float64 {
+	if len(coeffs) == 0 {
+		return 0
+	}
+	var sum float64
+	for pq, c := range coeffs {
+		if c == 0 {
+			continue
+		}
+		sum += c * math.Pow(u, float64(pq[0])) * math.Pow(v, float64(pq[1]))
+	}
+	return sum
+}
+
 // PixelToWorld transforms a continuous FITS 1-indexed pixel coordinate
 // slice mapping it against spherical Sky metrics.
 //
 // Supported projections: TAN (Gnomonic), SIN (Orthographic),
 // ARC (Zenithal equidistant), STG (Stereographic), AIT (Hammer-Aitoff).
+// SIP distortion is applied when CTYPE contains the "-SIP" suffix.
 func (w *WCS) PixelToWorld(pixels []float64) ([]float64, error) {
 	if len(pixels) != w.nAxis {
 		return nil, fmt.Errorf("wcs: expected %d dimensional pixel input", w.nAxis)
 	}
 
-	// Step 1: Linear Transformation mapping offsets onto standard linear plane.
-	inter := make([]float64, w.nAxis)
+	// Detect projection type and set lonAxis/latAxis (needed by SIP and deprojection).
+	proj := w.extractProjection()
+
+	// Step 1: Compute pixel offsets from reference pixel.
 	offset := make([]float64, w.nAxis)
 	for i := 0; i < w.nAxis; i++ {
 		offset[i] = pixels[i] - w.crpix[i]
 	}
 
+	// Step 1b: Apply SIP forward distortion to the celestial pixel offsets.
+	// SIP corrects (u,v) → (u + f(u,v), v + g(u,v)) before the CD matrix.
+	if w.nAxis >= 2 && len(w.sipA) > 0 && w.lonAxis >= 0 {
+		u := offset[w.lonAxis]
+		v := offset[w.latAxis]
+		offset[w.lonAxis] = u + sipEval(w.sipA, u, v)
+		offset[w.latAxis] = v + sipEval(w.sipB, u, v)
+	}
+
+	// Step 2: Linear Transformation mapping offsets onto standard linear plane.
+	inter := make([]float64, w.nAxis)
 	for i := 0; i < w.nAxis; i++ {
 		var sum float64
 		for j := 0; j < w.nAxis; j++ {
@@ -126,14 +186,14 @@ func (w *WCS) PixelToWorld(pixels []float64) ([]float64, error) {
 		inter[i] = sum * w.cdelt[i]
 	}
 
-	// Step 2: Spherical de-projection if celestial axes are present.
-	proj := w.extractProjection()
+	// Step 3: Spherical de-projection if celestial axes are present.
 	if w.nAxis >= 2 && proj != "" {
-		xRad := inter[0] * deg2rad
-		yRad := inter[1] * deg2rad
+		// Map intermediate coords using axis order detected from CTYPE.
+		xRad := inter[w.lonAxis] * deg2rad
+		yRad := inter[w.latAxis] * deg2rad
 
-		alpha0 := w.crval[0] * deg2rad
-		delta0 := w.crval[1] * deg2rad
+		alpha0 := w.crval[w.lonAxis] * deg2rad
+		delta0 := w.crval[w.latAxis] * deg2rad
 
 		ra, dec, err := deproject(proj, xRad, yRad, alpha0, delta0)
 		if err != nil {
@@ -147,10 +207,12 @@ func (w *WCS) PixelToWorld(pixels []float64) ([]float64, error) {
 		ra = math.Mod(ra, 2*math.Pi)
 
 		res := make([]float64, w.nAxis)
-		res[0] = ra * rad2deg
-		res[1] = dec * rad2deg
-		for i := 2; i < w.nAxis; i++ {
-			res[i] = w.crval[i] + inter[i]
+		res[w.lonAxis] = ra * rad2deg
+		res[w.latAxis] = dec * rad2deg
+		for i := 0; i < w.nAxis; i++ {
+			if i != w.lonAxis && i != w.latAxis {
+				res[i] = w.crval[i] + inter[i]
+			}
 		}
 		return res, nil
 	}
@@ -163,10 +225,12 @@ func (w *WCS) PixelToWorld(pixels []float64) ([]float64, error) {
 	return res, nil
 }
 
-// WorldToPixel converts world coordinates back to FITS 1-indexed pixel coordinates
-// using Newton-Raphson iteration on PixelToWorld.
+// WorldToPixel converts world coordinates back to FITS 1-indexed pixel coordinates.
 //
-// Convergence is typically 3–5 iterations for well-conditioned projections.
+// For recognized spherical projections (TAN, SIN, ARC, STG, AIT), the initial
+// guess is computed analytically via the forward projection, then refined with
+// Newton-Raphson iteration. This ensures convergence even at large field offsets.
+//
 // Returns an error if the solver does not converge within 20 iterations
 // or if the Jacobian becomes singular.
 func (w *WCS) WorldToPixel(world []float64) ([]float64, error) {
@@ -174,10 +238,64 @@ func (w *WCS) WorldToPixel(world []float64) ([]float64, error) {
 		return nil, fmt.Errorf("wcs: expected %d dimensional world input", w.nAxis)
 	}
 
-	// Initial guess: linear inverse.
 	pix := make([]float64, w.nAxis)
-	for i := 0; i < w.nAxis; i++ {
-		pix[i] = w.crpix[i] + (world[i]-w.crval[i])/w.cdelt[i]
+	proj := w.extractProjection()
+
+	if w.nAxis >= 2 && proj != "" {
+		// Analytical initial guess via forward spherical projection.
+		la, lo := w.lonAxis, w.latAxis
+		raRad := world[lo] * deg2rad
+		decRad := world[la] * deg2rad
+		alpha0 := w.crval[lo] * deg2rad
+		delta0 := w.crval[la] * deg2rad
+
+		xRad, yRad, err := project(proj, raRad, decRad, alpha0, delta0)
+		if err != nil {
+			// Fall back to linear guess if projection fails.
+			for i := 0; i < w.nAxis; i++ {
+				pix[i] = w.crpix[i] + (world[i]-w.crval[i])/w.cdelt[i]
+			}
+		} else {
+			// Convert intermediate coords (radians) to degrees.
+			xDeg := xRad * rad2deg
+			yDeg := yRad * rad2deg
+
+			// Invert the linear transform: inter = PC * (pix - crpix) * cdelt
+			// First divide by cdelt to get u = PC * dp:
+			u := [2]float64{xDeg / w.cdelt[lo], yDeg / w.cdelt[la]}
+
+			// Invert 2x2 PC sub-matrix for the celestial axes:
+			det := w.pc[lo][lo]*w.pc[la][la] - w.pc[lo][la]*w.pc[la][lo]
+			if math.Abs(det) < 1e-30 {
+				return nil, fmt.Errorf("wcs: WorldToPixel PC matrix is singular")
+			}
+			dp := [2]float64{
+				(w.pc[la][la]*u[0] - w.pc[lo][la]*u[1]) / det,
+				(w.pc[lo][lo]*u[1] - w.pc[la][lo]*u[0]) / det,
+			}
+
+			// Apply SIP inverse correction if available.
+			// dp gives undistorted pixel offsets; AP/BP map back to distorted.
+			if len(w.sipAP) > 0 {
+				dp[0] += sipEval(w.sipAP, dp[0], dp[1])
+				dp[1] += sipEval(w.sipBP, dp[0], dp[1])
+			}
+
+			pix[lo] = w.crpix[lo] + dp[0]
+			pix[la] = w.crpix[la] + dp[1]
+
+			// Higher axes: linear inverse.
+			for i := 0; i < w.nAxis; i++ {
+				if i != lo && i != la {
+					pix[i] = w.crpix[i] + (world[i]-w.crval[i])/w.cdelt[i]
+				}
+			}
+		}
+	} else {
+		// No projection: linear inverse.
+		for i := 0; i < w.nAxis; i++ {
+			pix[i] = w.crpix[i] + (world[i]-w.crval[i])/w.cdelt[i]
+		}
 	}
 
 	const maxIter = 20
@@ -189,9 +307,10 @@ func (w *WCS) WorldToPixel(world []float64) ([]float64, error) {
 			return nil, fmt.Errorf("wcs: WorldToPixel forward evaluation failed: %w", err)
 		}
 
-		// Residual = fwd - world
-		dx := fwd[0] - world[0]
-		dy := fwd[1] - world[1]
+		// Residual in (lon, lat) world coordinates.
+		lo, la := w.lonAxis, w.latAxis
+		dx := fwd[lo] - world[lo]
+		dy := fwd[la] - world[la]
 
 		// Handle RA wrap-around: pick shortest arc
 		if dx > 180 {
@@ -204,11 +323,11 @@ func (w *WCS) WorldToPixel(world []float64) ([]float64, error) {
 			return pix, nil
 		}
 
-		// Numerical Jacobian via finite differences
+		// Numerical Jacobian via finite differences along pixel axes.
 		const h = 1e-6
 		pix1 := make([]float64, w.nAxis)
 		copy(pix1, pix)
-		pix1[0] += h
+		pix1[lo] += h
 		f1, err := w.PixelToWorld(pix1)
 		if err != nil {
 			return nil, err
@@ -216,17 +335,29 @@ func (w *WCS) WorldToPixel(world []float64) ([]float64, error) {
 
 		pix2 := make([]float64, w.nAxis)
 		copy(pix2, pix)
-		pix2[1] += h
+		pix2[la] += h
 		f2, err := w.PixelToWorld(pix2)
 		if err != nil {
 			return nil, err
 		}
 
-		// J = [[df0/dp0, df0/dp1], [df1/dp0, df1/dp1]]
-		j00 := (f1[0] - fwd[0]) / h
-		j01 := (f2[0] - fwd[0]) / h
-		j10 := (f1[1] - fwd[1]) / h
-		j11 := (f2[1] - fwd[1]) / h
+		// J = [[d(lon)/dp_lo, d(lon)/dp_la], [d(lat)/dp_lo, d(lat)/dp_la]]
+		j00 := (f1[lo] - fwd[lo]) / h
+		j01 := (f2[lo] - fwd[lo]) / h
+		j10 := (f1[la] - fwd[la]) / h
+		j11 := (f2[la] - fwd[la]) / h
+
+		// Handle RA wrap in Jacobian columns
+		if j00 > 180 {
+			j00 -= 360
+		} else if j00 < -180 {
+			j00 += 360
+		}
+		if j01 > 180 {
+			j01 -= 360
+		} else if j01 < -180 {
+			j01 += 360
+		}
 
 		det := j00*j11 - j01*j10
 		if math.Abs(det) < 1e-30 {
@@ -234,8 +365,8 @@ func (w *WCS) WorldToPixel(world []float64) ([]float64, error) {
 		}
 
 		// Newton update: pix -= J^{-1} * residual
-		pix[0] -= (j11*dx - j01*dy) / det
-		pix[1] -= (-j10*dx + j00*dy) / det
+		pix[lo] -= (j11*dx - j01*dy) / det
+		pix[la] -= (-j10*dx + j00*dy) / det
 	}
 
 	return nil, fmt.Errorf("wcs: WorldToPixel did not converge after %d iterations", maxIter)
@@ -243,25 +374,153 @@ func (w *WCS) WorldToPixel(world []float64) ([]float64, error) {
 
 // ── Projection Helpers ───────────────────────────────────────────────────────
 
-// extractProjection returns the 3-letter projection code from CTYPE (e.g., "TAN").
+// extractProjection returns the 3-letter projection code from CTYPE (e.g., "TAN")
+// and populates lonAxis/latAxis to record the axis mapping.
+//
+// Standard layout: CTYPE1="RA---TAN", CTYPE2="DEC--TAN" → lonAxis=0, latAxis=1.
+// Swapped layout:  CTYPE1="DEC--TAN", CTYPE2="RA---TAN" → lonAxis=1, latAxis=0.
+// SIP distortion:  CTYPE1="RA---TAN-SIP" → the "-SIP" suffix is stripped.
+//
 // Returns "" if no recognized celestial projection is found.
 func (w *WCS) extractProjection() string {
 	if w.nAxis < 2 {
+		w.lonAxis, w.latAxis = -1, -1
 		return ""
 	}
-	ct0 := w.ctype[0]
-	if len(ct0) >= 8 {
-		proj := ct0[5:8]
-		switch proj {
-		case "TAN", "SIN", "ARC", "STG", "AIT":
-			return proj
+
+	known := map[string]bool{"TAN": true, "SIN": true, "ARC": true, "STG": true, "AIT": true}
+
+	// Identify which axis is longitude (RA) and which is latitude (DEC).
+	var proj string
+	w.lonAxis, w.latAxis = -1, -1
+
+	for i := 0; i < 2; i++ {
+		ct := w.ctype[i]
+		// Strip the "-SIP" distortion suffix if present.
+		ct = strings.TrimSuffix(ct, "-SIP")
+		if len(ct) < 8 {
+			continue
+		}
+		prefix := ct[:4]
+		code := ct[5:8]
+		if !known[code] {
+			continue
+		}
+		switch {
+		case strings.HasPrefix(prefix, "RA"):
+			w.lonAxis = i
+			proj = code
+		case strings.HasPrefix(prefix, "DEC"):
+			w.latAxis = i
+			proj = code
+		case strings.HasPrefix(prefix, "GLON") || strings.HasPrefix(prefix, "ELON"):
+			w.lonAxis = i
+			proj = code
+		case strings.HasPrefix(prefix, "GLAT") || strings.HasPrefix(prefix, "ELAT"):
+			w.latAxis = i
+			proj = code
 		}
 	}
-	return ""
+
+	// Both axes must be identified for a valid celestial WCS.
+	if w.lonAxis < 0 || w.latAxis < 0 {
+		w.lonAxis, w.latAxis = -1, -1
+		return ""
+	}
+
+	return proj
+}
+
+// project applies the forward spherical projection to compute intermediate
+// coordinates (x, y) in radians from (ra, dec) in radians relative to the
+// reference point (alpha0, delta0). This is the analytical inverse of [deproject].
+func project(proj string, ra, dec, alpha0, delta0 float64) (x, y float64, err error) {
+	dra := ra - alpha0
+	sinDRA, cosDRA := math.Sincos(dra)
+	sinDec, cosDec := math.Sincos(dec)
+	sinD0, cosD0 := math.Sincos(delta0)
+
+	switch proj {
+	case "TAN":
+		denom := sinDec*sinD0 + cosDec*cosD0*cosDRA
+		if denom <= 0 {
+			return 0, 0, fmt.Errorf("wcs: TAN projection: point behind tangent plane")
+		}
+		x = cosDec * sinDRA / denom
+		y = (sinDec*cosD0 - cosDec*sinD0*cosDRA) / denom
+
+	case "SIN":
+		x = cosDec * sinDRA
+		y = sinDec*cosD0 - cosDec*sinD0*cosDRA
+
+	case "ARC":
+		sinTheta := sinDec*sinD0 + cosDec*cosD0*cosDRA
+		sinTheta = math.Max(-1, math.Min(1, sinTheta))
+		theta := math.Asin(sinTheta)
+		r := math.Pi/2 - theta
+		if r < 1e-15 {
+			x, y = 0, 0
+		} else {
+			phi := math.Atan2(cosDec*sinDRA, sinDec*cosD0-cosDec*sinD0*cosDRA)
+			x = r * math.Sin(phi)
+			y = r * math.Cos(phi)
+		}
+
+	case "STG":
+		sinTheta := sinDec*sinD0 + cosDec*cosD0*cosDRA
+		sinTheta = math.Max(-1, math.Min(1, sinTheta))
+		theta := math.Asin(sinTheta)
+		r := 2 * math.Tan((math.Pi/2-theta)/2)
+		if r < 1e-15 {
+			x, y = 0, 0
+		} else {
+			phi := math.Atan2(cosDec*sinDRA, sinDec*cosD0-cosDec*sinD0*cosDRA)
+			x = r * math.Sin(phi)
+			y = r * math.Cos(phi)
+		}
+
+	case "AIT":
+		// Hammer-Aitoff equal-area (pseudo-cylindrical, theta_0 = 0).
+		//
+		// Per Calabretta & Greisen (2002) §7.1, the native pole for AIT sits at
+		// delta_p = delta0 + 90°, alpha_p = alpha0, phi_p = π.
+		//
+		// Step 1: Celestial → native spherical coordinates.
+		//   sin(θ) = sin(dec)·cos(δ₀) − cos(dec)·sin(δ₀)·cos(Δα)
+		//   φ = π + atan2(−cos(dec)·sin(Δα),
+		//                  −sin(dec)·sin(δ₀) − cos(dec)·cos(δ₀)·cos(Δα))
+		nativeTheta := math.Asin(sinDec*cosD0 - cosDec*sinD0*cosDRA)
+		nativePhi := math.Pi + math.Atan2(-cosDec*sinDRA,
+			-sinDec*sinD0-cosDec*cosD0*cosDRA)
+		// Normalize to [-π, π] to prevent wrapping in the Hammer formula.
+		nativePhi = math.Remainder(nativePhi, 2*math.Pi)
+
+		// Step 2: Hammer projection of native coordinates.
+		sinNT, cosNT := math.Sincos(nativeTheta)
+		halfPhi := nativePhi / 2
+		cosNTcosHalf := cosNT * math.Cos(halfPhi)
+		denom := math.Sqrt(1 + cosNTcosHalf)
+		if denom < 1e-15 {
+			return 0, 0, fmt.Errorf("wcs: AIT projection: antipodal point")
+		}
+		s2 := math.Sqrt(2)
+		x = 2 * s2 * cosNT * math.Sin(halfPhi) / denom
+		y = s2 * sinNT / denom
+
+	default:
+		return 0, 0, fmt.Errorf("wcs: unsupported projection %q", proj)
+	}
+	return x, y, nil
 }
 
 // deproject applies the inverse spherical projection to recover (ra, dec) in radians
 // from intermediate coordinates (x, y) in radians relative to the reference point.
+//
+// Uses the Calabretta & Greisen (2002) conventions where for zenithal projections:
+//
+//	x = R(θ)·sin(φ),  y = −R(θ)·cos(φ)
+//
+// so sin(φ) = x/R and cos(φ) = −y/R.
 func deproject(proj string, x, y, alpha0, delta0 float64) (ra, dec float64, err error) {
 	sinD0, cosD0 := math.Sincos(delta0)
 
@@ -271,52 +530,69 @@ func deproject(proj string, x, y, alpha0, delta0 float64) (ra, dec float64, err 
 		if r == 0 {
 			return alpha0, delta0, nil
 		}
+		// θ = atan(1/r) for gnomonic (TAN)
 		theta := math.Atan(1.0 / r)
 		sinT, cosT := math.Sincos(theta)
-		dec = math.Asin(cosT*sinD0 + (y/r)*sinT*cosD0)
-		ra = alpha0 + math.Atan2(x*sinT, r*cosD0*cosT-y*sinD0*sinT)
+		// cos(φ) = −y/r, sin(φ) = x/r
+		dec = math.Asin(sinT*sinD0 - (y/r)*cosT*cosD0)
+		ra = alpha0 + math.Atan2(-x*cosT, r*sinT*cosD0+y*cosT*sinD0)
 
 	case "SIN":
 		// Orthographic (slant-projection variant with xi=0, eta=0)
+		// For SIN, R(θ) = cos(θ), so x = cos(θ)sin(φ), y = −cos(θ)cos(φ)
+		// sinT = sqrt(1 − r²), cosT = r = sqrt(x²+y²)
 		r2 := x*x + y*y
 		if r2 > 1.0 {
 			return 0, 0, fmt.Errorf("wcs: SIN projection: point outside unit sphere (r²=%.6f)", r2)
 		}
-		cosT := math.Sqrt(1 - r2)
-		dec = math.Asin(cosT*sinD0 + y*cosD0)
-		ra = alpha0 + math.Atan2(x, cosD0*cosT-y*sinD0)
+		sinT := math.Sqrt(1 - r2)
+		dec = math.Asin(sinT*sinD0 + y*cosD0)
+		ra = alpha0 + math.Atan2(x, sinT*cosD0-y*sinD0)
 
 	case "ARC":
-		// Zenithal equidistant
+		// Zenithal equidistant: R(θ) = π/2 − θ
 		r := math.Hypot(x, y)
 		if r == 0 {
 			return alpha0, delta0, nil
 		}
 		theta := math.Pi/2 - r
 		sinT, cosT := math.Sincos(theta)
-		dec = math.Asin(cosT*sinD0 + (y/r)*sinT*cosD0)
-		ra = alpha0 + math.Atan2(x*sinT, r*cosD0*cosT-y*sinD0*sinT)
+		dec = math.Asin(sinT*sinD0 - (y/r)*cosT*cosD0)
+		ra = alpha0 + math.Atan2(-x*cosT, r*sinT*cosD0+y*cosT*sinD0)
 
 	case "STG":
-		// Stereographic
+		// Stereographic: R(θ) = 2·tan((π/2−θ)/2)
 		r := math.Hypot(x, y)
 		if r == 0 {
 			return alpha0, delta0, nil
 		}
 		theta := math.Pi/2 - 2*math.Atan(r/2)
 		sinT, cosT := math.Sincos(theta)
-		dec = math.Asin(cosT*sinD0 + (y/r)*sinT*cosD0)
-		ra = alpha0 + math.Atan2(x*sinT, r*cosD0*cosT-y*sinD0*sinT)
+		dec = math.Asin(sinT*sinD0 - (y/r)*cosT*cosD0)
+		ra = alpha0 + math.Atan2(-x*cosT, r*sinT*cosD0+y*cosT*sinD0)
 
 	case "AIT":
-		// Hammer-Aitoff (full-sky equal-area)
+		// Hammer-Aitoff (full-sky equal-area, pseudo-cylindrical, theta_0 = 0).
+		//
+		// Step 1: Inverse Hammer → native (φ, θ).
 		z2 := 1.0 - (x/4)*(x/4) - (y/2)*(y/2)
 		if z2 < 0 {
 			return 0, 0, fmt.Errorf("wcs: AIT projection: point outside valid region")
 		}
 		z := math.Sqrt(z2)
-		dec = math.Asin(y * z)
-		ra = alpha0 + 2*math.Atan2(x*z, 2*(2*z2-1))
+		nativeTheta := math.Asin(y * z)
+		nativePhi := 2 * math.Atan2(x*z, 2*(2*z2-1))
+
+		// Step 2: Native → celestial rotation.
+		// For AIT with delta_p = delta0+90°, alpha_p = alpha0, phi_p = π:
+		//   sin(dec) = sin(θ)·cos(δ₀) + cos(θ)·sin(δ₀)·cos(φ)
+		//   ra = α₀ + atan2(cos(θ)·sin(φ),
+		//                    −sin(θ)·sin(δ₀) + cos(θ)·cos(δ₀)·cos(φ))
+		sinNT, cosNT := math.Sincos(nativeTheta)
+		sinNP, cosNP := math.Sincos(nativePhi)
+		dec = math.Asin(sinNT*cosD0 + cosNT*sinD0*cosNP)
+		ra = alpha0 + math.Atan2(cosNT*sinNP,
+			-sinNT*sinD0+cosNT*cosD0*cosNP)
 
 	default:
 		return 0, 0, fmt.Errorf("wcs: unsupported projection %q", proj)
@@ -427,5 +703,38 @@ func ExtractWCS(h *Header) (*WCS, error) {
 	w.SetCDELT(cdelt)
 	w.SetPC(pc)
 
+	// Extract SIP distortion coefficients if present.
+	sipA := parseSIPPoly(h, "A")
+	sipB := parseSIPPoly(h, "B")
+	if len(sipA) > 0 || len(sipB) > 0 {
+		w.SetSIP(sipA, sipB)
+	}
+	sipAP := parseSIPPoly(h, "AP")
+	sipBP := parseSIPPoly(h, "BP")
+	if len(sipAP) > 0 || len(sipBP) > 0 {
+		w.SetSIPInverse(sipAP, sipBP)
+	}
+
 	return w, nil
+}
+
+// parseSIPPoly reads a SIP polynomial from a FITS header.
+// prefix is one of "A", "B", "AP", "BP".
+// Returns nil if the ORDER keyword is not found.
+func parseSIPPoly(h *Header, prefix string) map[[2]int]float64 {
+	order, err := h.GetInt(prefix + "_ORDER")
+	if err != nil || order < 0 {
+		return nil
+	}
+
+	coeffs := make(map[[2]int]float64)
+	for p := 0; p <= order; p++ {
+		for q := 0; q <= order-p; q++ {
+			key := fmt.Sprintf("%s_%d_%d", prefix, p, q)
+			if v, err := h.GetFloat(key); err == nil && v != 0 {
+				coeffs[[2]int{p, q}] = v
+			}
+		}
+	}
+	return coeffs
 }

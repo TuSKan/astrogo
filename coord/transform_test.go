@@ -9,6 +9,7 @@ import (
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/vector"
 )
 
 func TestGalacticRoundTrip(t *testing.T) {
@@ -372,4 +373,68 @@ func TestNegativeLongitude(t *testing.T) {
 	testutil.AssertNear(t, "Alt same for -45/315 lon", aa1.Alt().Degrees(), aa2.Alt().Degrees(), 1e-10)
 	diffAz := aa1.Az().Sub(aa2.Az()).WrapPi().Degrees()
 	testutil.AssertNear(t, "Az same for -45/315 lon", diffAz, 0, 1e-10)
+}
+
+func TestICRSBatchToAltAzParallel_Correctness(t *testing.T) {
+	loc, _ := coord.NewGeodetic(angle.Deg(-70.4), angle.Deg(-24.6), 2635)
+	atm := atmosphere.AtAltitude(2635)
+	tm := time.FromJD(2460000.5, time.UTC)
+	ctx := coord.NewContext(tm, loc, atm)
+
+	const n = 500
+	stars := make([]coord.ICRS, n)
+	for i := range stars {
+		ra := angle.Deg(float64(i) * 360.0 / float64(n))
+		dec := angle.Deg(float64(i)*180.0/float64(n) - 90)
+		stars[i] = coord.NewICRS(ra, dec)
+	}
+
+	serial := make([]coord.AltAz, n)
+	parallel := make([]coord.AltAz, n)
+
+	ctx.ICRSBatchToAltAz(stars, serial)
+	ctx.ICRSBatchToAltAzParallel(stars, parallel)
+
+	for i := 0; i < n; i++ {
+		if math.Abs(serial[i].Alt().Degrees()-parallel[i].Alt().Degrees()) > 1e-14 ||
+			math.Abs(serial[i].Az().Degrees()-parallel[i].Az().Degrees()) > 1e-14 {
+			t.Fatalf("mismatch at index %d: serial=(%.10f, %.10f) parallel=(%.10f, %.10f)",
+				i,
+				serial[i].Alt().Degrees(), serial[i].Az().Degrees(),
+				parallel[i].Alt().Degrees(), parallel[i].Az().Degrees())
+		}
+	}
+}
+
+func TestReduceBatchParallel_Correctness(t *testing.T) {
+	loc, _ := coord.NewGeodetic(angle.Deg(-70.4), angle.Deg(-24.6), 2635)
+	atm := atmosphere.AtAltitude(2635)
+	tm := time.FromJD(2460000.5, time.UTC)
+	ctx := coord.NewContext(tm, loc, atm)
+
+	const n = 500
+	vecs := make([]vector.Vec3, n)
+	for i := range vecs {
+		vecs[i] = vector.Vec3{
+			X: 0.00257 + float64(i)*1e-8,
+			Y: 0.00010 + float64(i)*1e-9,
+			Z: 0.00005,
+		}
+	}
+
+	serial := make([]coord.AltAz, n)
+	parallel := make([]coord.AltAz, n)
+
+	ctx.ReduceBatch(vecs, serial)
+	ctx.ReduceBatchParallel(vecs, parallel)
+
+	for i := 0; i < n; i++ {
+		if math.Abs(serial[i].Alt().Degrees()-parallel[i].Alt().Degrees()) > 1e-14 ||
+			math.Abs(serial[i].Az().Degrees()-parallel[i].Az().Degrees()) > 1e-14 {
+			t.Fatalf("mismatch at index %d: serial=(%.10f, %.10f) parallel=(%.10f, %.10f)",
+				i,
+				serial[i].Alt().Degrees(), serial[i].Az().Degrees(),
+				parallel[i].Alt().Degrees(), parallel[i].Az().Degrees())
+		}
+	}
 }

@@ -22,13 +22,13 @@ func TestBasicTransitionModel(t *testing.T) {
 	}
 
 	block1 := &Block{
-		Target: NewTarget(catalog.Target{Name: "Target 1", Coord: coord.NewICRS(0, 0)}, nil),
+		Target: NewTarget(catalog.Target{Name: "Target 1", Coord: coord.NewICRS(0, 0), HasCoord: true}, nil),
 		Config: Configuration{Filter: "V"},
 	}
 
 	block2 := &Block{
 		// 90 degrees away in Azimuth (approximate test) -> At Zenith, Alt is high, let's just make it a known offset
-		Target: NewTarget(catalog.Target{Name: "Target 2", Coord: coord.NewICRS(1.57079632679, 0)}, nil), // ~90 RA offset
+		Target: NewTarget(catalog.Target{Name: "Target 2", Coord: coord.NewICRS(1.57079632679, 0), HasCoord: true}, nil), // ~90 RA offset
 		Config: Configuration{Filter: "R"},
 	}
 

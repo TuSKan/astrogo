@@ -4,6 +4,63 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [0.1.3] — 2026-05-07
+
+FINK/ZTF SSOFT photometry provider, sHG1G2 spin-geometry model, and `computeDetails` refactor.
+
+### Added
+
+#### Photometry — sHG1G2 Model (Carry et al. 2024)
+- `magnitude/asteroid.go`: `AsteroidSHG1G2()` — 7-parameter spin-geometry apparent magnitude
+- `magnitude/asteroid.go`: `CosAspectAngle()` — aspect angle between geocentric position and spin pole
+- `magnitude/asteroid.go`: `SpinCorrection()` — oblateness-dependent magnitude correction
+- `magnitude/asteroid.go`: `Oblateness()` — triaxial ellipsoid → R parameter conversion
+
+#### FINK SSOFT Catalog Provider
+- `catalog/fink/` — new package implementing `resolve.Provider` for the FINK/ZTF Solar System Object Fink Table
+- **Dual-mode access**: fast single-object JSON queries + bulk parquet table download (~60 MB)
+- **Version pinning**: defaults to `2025.04` (API defaults to current month which may not exist)
+- **r-band preference**: uses ZTF filter 2 (closer to Johnson V than g-band)
+- `NewWithVersion()` — query a specific SSOFT release
+- 4 offline tests + 1 network test + 5 FINK E2E validation tests
+
+#### Target Extensions
+- `catalog/resolve/target.go`: added `G1`, `G2`, `HasG1G2`, `SpinRA`, `SpinDec`, `HasSpin`, `Oblateness`, `HasOblateness` fields
+
+### Changed
+
+#### Magnitude Priority Chain
+- `plan/details.go`: asteroid magnitude now uses **sHG1G2 → HG1G2 → HG** priority (was HG only)
+
+#### `computeDetails` Refactor
+- `plan/details.go`: extracted 8 focused helpers from 240-line monolith
+  - `fillMovingBody()` — topocentric AltAz + elongation
+  - `computeMagnitude()` — priority-dispatched magnitude computation
+  - `cometMagnitude()`, `asteroidMagnitude()` — per-type magnitude methods
+  - `helioGeometry()` — shared heliocentric distance/phase angle computation
+  - `fillCatalogProps()` — parallax, proper motion, aliases
+  - `applyProps()` — custom property overrides
+  - `fillRiseSetTransit()` — event solver block
+- `plan/target.go`: added `ephID()` helper, refactored `GeocentricVec` to use it
+- Eliminated: 3 repeated type assertions, 3 duplicate `strconv.ParseUint` blocks, 2 duplicate heliocentric distance computations, 1 dead-code planet magnitude branch
+
+### Documentation
+- `README.md`: added `magnitude` package features section, FINK to catalog providers, implementation status table
+- `docs/VALIDATION.md`: added 7 validation rows (planetary, asteroid HG, asteroid sHG1G2, comet, satellite, star, FINK provider)
+- `docs/TODO.md`: added sHG1G2 + FINK sections, added polymorphic Observable architecture (v0.2)
+- `docs/ROADMAP.md`: added Phase 17.6 (Magnitude & FINK), updated summary and remaining work
+- `catalog/fink/doc.go`: documented dual-mode architecture and version pinning
+
+### Validation
+
+| Metric | Result |
+|--------|--------|
+| sHG1G2 vs FINK phunk (8467 Benoitcarry, r-band) | mean Δ=0.011 mag, 100% within 0.025 mag |
+| FINK residual RMS | 0.064 mag (n=327 observations) |
+| Spin correction coverage | 55.5° aspect angle range |
+| Offline + network tests | 54 plan + 36 magnitude + 9 fink = 99 tests |
+
 ## [0.1.2] — 2026-05-06
 
 Refraction hardening: USNO-standard rise/set pipeline, sub-minute accuracy, Planet Parade showcase.
@@ -178,6 +235,7 @@ First observatory-grade release. Validated against USNO, JPL Horizons, and NASA 
 - `VisibleIntervals` creates independent Contexts per grid step (correct; each step is a different epoch)
 - IERS EOP data fetched via `go:generate`, not at runtime
 
+[0.1.3]: https://github.com/TuSKan/astrogo/releases/tag/v0.1.3
 [0.1.2]: https://github.com/TuSKan/astrogo/releases/tag/v0.1.2
 [0.1.1]: https://github.com/TuSKan/astrogo/releases/tag/v0.1.1
 [0.1.0]: https://github.com/TuSKan/astrogo/releases/tag/v0.1.0

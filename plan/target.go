@@ -103,15 +103,20 @@ func (t Target) GeocentricVec(time time.Time) (vector.Vec3, error) {
 	if t.Provider == nil {
 		return vector.Vec3{}, errors.New("target: not a moving body")
 	}
-	idStr := t.Catalog.ID
-	if idStr == "" {
-		return vector.Vec3{}, errors.New("moving target requires a valid Catalog.ID")
+	id, ok := t.ephID()
+	if !ok {
+		return vector.Vec3{}, errors.New("moving target requires a valid numeric Catalog.ID")
 	}
-	idUint, err := strconv.ParseUint(idStr, 10, 32)
+	return eph.Position(t.Provider, id, time)
+}
+
+// ephID parses the catalog ID into an ephemeris body identifier.
+func (t Target) ephID() (eph.ID, bool) {
+	n, err := strconv.ParseUint(t.Catalog.ID, 10, 32)
 	if err != nil {
-		return vector.Vec3{}, err
+		return 0, false
 	}
-	return eph.Position(t.Provider, eph.ID(idUint), time)
+	return eph.ID(n), true
 }
 
 // GetDetails computes properties for the Target.

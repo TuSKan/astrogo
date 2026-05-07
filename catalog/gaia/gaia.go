@@ -57,7 +57,7 @@ func (p *Provider) ConeSearch(ctx context.Context, req resolve.ConeRequest) reso
 	rad := req.Radius.Degrees()
 
 	// Query gaia source for ra, dec, pmra, pmdec, parallax
-	adql := fmt.Sprintf(`SELECT TOP %d source_id, ra, dec, pmra, pmdec, parallax FROM gaiadr3.gaia_source WHERE 1=CONTAINS(POINT('ICRS', ra, dec), CIRCLE('ICRS', %f, %f, %f))`, limit, ra, dec, rad)
+	adql := fmt.Sprintf(`SELECT TOP %d source_id, ra, dec, pmra, pmdec, parallax, phot_g_mean_mag, bp_rp FROM gaiadr3.gaia_source WHERE 1=CONTAINS(POINT('ICRS', ra, dec), CIRCLE('ICRS', %f, %f, %f))`, limit, ra, dec, rad)
 
 	cacheKey := fmt.Sprintf("gaia:cone:%f:%f:%f:%d", ra, dec, rad, limit)
 	if seq, ok := p.cache.Get(cacheKey); ok {
@@ -156,6 +156,23 @@ func parseCSV(body io.Reader) ([]resolve.Target, error) {
 		if plxStr, ok := col["parallax"]; ok && row[plxStr] != "" {
 			if v, err := strconv.ParseFloat(row[plxStr], 64); err == nil {
 				t.Parallax = angle.Arcsec(v / 1000.0)
+			}
+		}
+		// Compute Johnson V from Gaia G + BP-RP colour.
+		if gIdx, ok := col["phot_g_mean_mag"]; ok && row[gIdx] != "" {
+			if gMag, err := strconv.ParseFloat(row[gIdx], 64); err == nil {
+				if bpRpIdx, ok2 := col["bp_rp"]; ok2 && row[bpRpIdx] != "" {
+					if bpRp, err2 := strconv.ParseFloat(row[bpRpIdx], 64); err2 == nil {
+						// Gaia DR3 polynomial: V − G = −0.02704 + 0.01424·c − 0.2156·c² + 0.01426·c³
+						dV := -0.02704 + 0.01424*bpRp - 0.2156*bpRp*bpRp + 0.01426*bpRp*bpRp*bpRp
+						t.VMag = gMag + dV
+						t.HasVMag = true
+					}
+				} else {
+					// No colour — use G as approximate V (±0.3 mag for most stars).
+					t.VMag = gMag
+					t.HasVMag = true
+				}
 			}
 		}
 		targets = append(targets, t)

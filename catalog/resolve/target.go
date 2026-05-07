@@ -47,6 +47,32 @@ type Target struct {
 	// TLE data for satellite targets (populated by NORAD provider).
 	TLELine1 string
 	TLELine2 string
+
+	// Physical magnitude parameters (populated by SBDB or catalog providers).
+	// For asteroids: H (absolute mag) and G (slope parameter, default 0.15).
+	// For comets: M1/k1 (total magnitude), M2/k2 (nuclear magnitude).
+	// For stars: VMag (catalog V-band magnitude).
+	VMag    float64 // Catalog V-band magnitude (0 = not set)
+	HasVMag bool    // true if VMag is populated
+	H       float64 // Asteroid absolute magnitude
+	G       float64 // Asteroid slope parameter (0 = not set, use 0.15 default)
+	HasH    bool    // true if H is populated
+	M1      float64 // Comet total absolute magnitude
+	K1      float64 // Comet total activity parameter
+	M2      float64 // Comet nuclear absolute magnitude
+	K2      float64 // Comet nuclear activity parameter
+	HasM1   bool    // true if M1/K1 are populated
+
+	// HG1G2 / sHG1G2 phase-curve parameters (Carry et al. 2024).
+	// Populated by: FINK SSOFT provider.
+	G1            float64 // Phase function G₁ parameter
+	G2            float64 // Phase function G₂ parameter
+	HasG1G2       bool    // true if G1/G2 are populated
+	SpinRA        float64 // Spin axis RA (degrees, J2000)
+	SpinDec       float64 // Spin axis Dec (degrees, J2000)
+	HasSpin       bool    // true if spin axis is populated
+	Oblateness    float64 // Polar oblateness R ∈ (0,1], 1 = sphere
+	HasOblateness bool    // true if R is populated
 }
 
 // ICRS implements coord.Object for a static catalog Target.

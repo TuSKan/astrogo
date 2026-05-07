@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strconv"
+	"strings"
 
 	"github.com/TuSKan/astrogo/catalog/resolve"
 )
@@ -69,6 +71,8 @@ func (p *Provider) ResolveObject(ctx context.Context, req resolve.ObjectRequest)
 
 	// Switch to using Lookup API explicitly targeted via sstr
 	params.Set("sstr", req.Query)
+	// Request physical parameters to get H, G, M1, k1 for magnitude computation.
+	params.Set("phys-par", "true")
 
 	api.RawQuery = params.Encode()
 
@@ -92,6 +96,10 @@ func (p *Provider) ResolveObject(ctx context.Context, req resolve.ObjectRequest)
 				Des      string `json:"des"`
 				Kind     string `json:"kind"`
 			} `json:"object"`
+			PhysPar []struct {
+				Name  string `json:"name"`
+				Value string `json:"value"`
+			} `json:"phys_par"`
 			Message string `json:"message"`
 		}
 
@@ -127,6 +135,38 @@ func (p *Provider) ResolveObject(ctx context.Context, req resolve.ObjectRequest)
 			Catalog:     "sbdb",
 		}
 
+		// Parse physical parameters for magnitude computation.
+		for _, pp := range payload.PhysPar {
+			switch pp.Name {
+			case "H":
+				if v, err := parseFloat(pp.Value); err == nil {
+					t.H = v
+					t.HasH = true
+				}
+			case "G":
+				if v, err := parseFloat(pp.Value); err == nil {
+					t.G = v
+				}
+			case "M1":
+				if v, err := parseFloat(pp.Value); err == nil {
+					t.M1 = v
+					t.HasM1 = true
+				}
+			case "K1":
+				if v, err := parseFloat(pp.Value); err == nil {
+					t.K1 = v
+				}
+			case "M2":
+				if v, err := parseFloat(pp.Value); err == nil {
+					t.M2 = v
+				}
+			case "K2":
+				if v, err := parseFloat(pp.Value); err == nil {
+					t.K2 = v
+				}
+			}
+		}
+
 		if err := p.cache.Set(cacheKey, []resolve.Target{t}); err != nil {
 			yield(resolve.Target{}, err)
 			return
@@ -136,4 +176,18 @@ func (p *Provider) ResolveObject(ctx context.Context, req resolve.ObjectRequest)
 			return
 		}
 	}
+}
+
+// parseFloat extracts a float64 from a string, ignoring trailing units/notes.
+func parseFloat(s string) (float64, error) {
+	s = strings.TrimSpace(s)
+	// SBDB sometimes returns values like "3.53" or "3.53 (assumed)"
+	// Take only the numeric prefix.
+	for i, c := range s {
+		if c != '-' && c != '+' && c != '.' && (c < '0' || c > '9') {
+			s = s[:i]
+			break
+		}
+	}
+	return strconv.ParseFloat(strings.TrimSpace(s), 64)
 }

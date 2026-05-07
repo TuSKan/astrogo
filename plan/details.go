@@ -8,6 +8,7 @@ import (
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
+	mag "github.com/TuSKan/astrogo/magnitude"
 	"github.com/TuSKan/astrogo/time"
 )
 
@@ -92,12 +93,13 @@ func (d TargetDetails) String() string {
 	return b.String()
 }
 
+// ── computeDetails ──────────────────────────────────────────────────────────
+
 func computeDetails(obs Observable, ctx *coord.Context, props ...string) (*TargetDetails, error) {
 	d := &TargetDetails{
 		Name:       obs.Name(),
 		ExtraProps: make(map[string]string),
 	}
-
 	t := ctx.Time()
 
 	pos, err := obs.Position(t)
@@ -107,65 +109,228 @@ func computeDetails(obs Observable, ctx *coord.Context, props ...string) (*Targe
 	d.RA = pos.RA()
 	d.Dec = pos.Dec()
 
-	// Compute Topocentric AltAz and Distance
-	var altaz coord.AltAz
-	if tTarget, ok := obs.(Target); ok && tTarget.Provider != nil {
-		vec, err := tTarget.GeocentricVec(t)
-		if err != nil {
-			return nil, err
-		}
-		altaz = ctx.GeocentricToObserved(vec)
-		d.Distance = vec.Norm() // AU for planets, or maybe km for satellites
-		d.DistanceUnit = "a.u."
-
-		// If it's a satellite check
-		if tTarget.Catalog.Kind == "Satellite" {
-			d.Distance = altaz.Dist() // km
-			d.DistanceUnit = "km"
-		} else {
-			// Elongation for planets
-			sunVec, err := eph.Position(tTarget.Provider, eph.Sun, t)
-			if err == nil {
-				sunPos := coord.NewICRS(angle.Rad(math.Atan2(sunVec.Y, sunVec.X)), angle.Rad(math.Asin(sunVec.Z/sunVec.Norm())))
-				sep := coord.Separation(pos, sunPos)
-				d.Elongation = sep
-			}
-		}
-
+	// ── Topocentric position + distance ──
+	tgt, isTarget := obs.(Target)
+	if isTarget && tgt.Provider != nil {
+		fillMovingBody(d, tgt, t, ctx)
 	} else {
-		altaz, _ = ctx.ICRSToAltAz(pos)
+		altaz, _ := ctx.ICRSToAltAz(pos)
+		d.Altitude = altaz.Alt()
+		d.Azimuth = altaz.Az()
 		d.DistanceUnit = "pc"
-		d.Distance = 0
 	}
 
+	// ── Catalog properties + magnitude ──
+	if isTarget {
+		fillCatalogProps(d, tgt)
+		if m := tgt.computeMagnitude(t); m != "" {
+			d.Magnitude = m
+		}
+	}
+
+	// ── Custom props (override anything above) ──
+	applyProps(d, props)
+
+	// ── Rise/Set/Transit events ──
+	fillRiseSetTransit(d, obs, ctx)
+
+	return d, nil
+}
+
+// ── Moving-body helpers ─────────────────────────────────────────────────────
+
+// fillMovingBody computes topocentric AltAz, distance, and elongation
+// for a target with an ephemeris provider.
+func fillMovingBody(d *TargetDetails, tgt Target, t time.Time, ctx *coord.Context) {
+	vec, err := tgt.GeocentricVec(t)
+	if err != nil {
+		return
+	}
+	altaz := ctx.GeocentricToObserved(vec)
 	d.Altitude = altaz.Alt()
 	d.Azimuth = altaz.Az()
+	d.Distance = vec.Norm()
+	d.DistanceUnit = "a.u."
 
-	// Fill catalog properties
-	if tTarget, ok := obs.(Target); ok {
-		if tTarget.Catalog.Parallax.Radians() > 0 {
-			d.Distance = 1.0 / tTarget.Catalog.Parallax.Arcseconds() // pc
-		}
-		if tTarget.Catalog.PmRA.Radians() != 0 {
-			d.ExtraProps["Proper motion (RA)"] = fmt.Sprintf("%.2f mas/yr", tTarget.Catalog.PmRA.Arcseconds()*1000.0)
-		}
-		if tTarget.Catalog.PmDec.Radians() != 0 {
-			d.ExtraProps["Proper motion (Dec)"] = fmt.Sprintf("%.2f mas/yr", tTarget.Catalog.PmDec.Arcseconds()*1000.0)
-		}
-		for _, alias := range tTarget.Catalog.Aliases {
-			if strings.HasPrefix(alias, "M ") || strings.HasPrefix(alias, "M") {
-				// Avoid "Mars" or other M words, check if next char is digit
-				if len(alias) > 1 && alias[1] >= '0' && alias[1] <= '9' || (len(alias) > 2 && alias[0:2] == "M ") {
-					d.ExtraProps["Messier number"] = strings.Replace(alias, " ", "", -1)
-				}
-			}
-			if strings.HasPrefix(alias, "NGC") || strings.HasPrefix(alias, "IC") {
-				d.ExtraProps["NGC/IC number"] = alias
+	if tgt.Catalog.Kind == "Satellite" {
+		d.Distance = altaz.Dist()
+		d.DistanceUnit = "km"
+		return
+	}
+
+	// Elongation from the Sun.
+	sunVec, err := eph.Position(tgt.Provider, eph.Sun, t)
+	if err == nil {
+		sunPos := coord.NewICRS(
+			angle.Rad(math.Atan2(sunVec.Y, sunVec.X)),
+			angle.Rad(math.Asin(sunVec.Z/sunVec.Norm())),
+		)
+		pos := coord.NewICRS(
+			angle.Rad(math.Atan2(vec.Y, vec.X)),
+			angle.Rad(math.Asin(vec.Z/vec.Norm())),
+		)
+		d.Elongation = coord.Separation(pos, sunPos)
+	}
+}
+
+// ── Magnitude computation ───────────────────────────────────────────────────
+
+// computeMagnitude returns the formatted apparent magnitude string using the
+// highest-priority model available for the target.
+//
+// Priority: Planet > Comet (M1) > Asteroid (sHG1G2 > HG1G2 > HG) > Catalog VMag.
+func (tgt Target) computeMagnitude(t time.Time) string {
+	cat := tgt.Catalog
+
+	// Planet / Moon / Sun — ephemeris-based Mallama & Hilton (2018).
+	if tgt.Provider != nil && cat.Kind != "Satellite" {
+		if id, ok := tgt.ephID(); ok {
+			if v, err := mag.PlanetApparent(tgt.Provider, id, t); err == nil {
+				return fmt.Sprintf("%.1f mag", v)
 			}
 		}
 	}
 
-	// Process custom flexible props
+	// Comet — M1/k1 total magnitude.
+	if cat.HasM1 {
+		return tgt.cometMagnitude(t)
+	}
+
+	// Asteroid — sHG1G2 / HG1G2 / HG phase-curve.
+	if cat.HasH {
+		return tgt.asteroidMagnitude(t)
+	}
+
+	// Star / DSO — catalog V-band magnitude.
+	if cat.HasVMag {
+		return fmt.Sprintf("%.1f mag", cat.VMag)
+	}
+
+	return ""
+}
+
+// cometMagnitude computes the apparent magnitude for a comet using M1/k1.
+func (tgt Target) cometMagnitude(t time.Time) string {
+	r, delta, _, _, ok := tgt.helioGeometry(t)
+	if ok {
+		return fmt.Sprintf("%.1f mag", mag.CometApparent(tgt.Catalog.M1, tgt.Catalog.K1, r, delta))
+	}
+	// No ephemeris — return raw parameters.
+	return fmt.Sprintf("M1=%.1f, k1=%.1f", tgt.Catalog.M1, tgt.Catalog.K1)
+}
+
+// asteroidMagnitude computes the apparent magnitude for an asteroid using the
+// best available model: sHG1G2 (Carry 2024) → HG1G2 → HG.
+func (tgt Target) asteroidMagnitude(t time.Time) string {
+	cat := tgt.Catalog
+	r, delta, alpha, st, ok := tgt.helioGeometry(t)
+	if !ok {
+		G := cat.G
+		if G == 0 {
+			G = 0.15
+		}
+		return fmt.Sprintf("H=%.1f, G=%.2f", cat.H, G)
+	}
+
+	switch {
+	case cat.HasG1G2 && cat.HasSpin && cat.HasOblateness:
+		// Full sHG1G2 (Carry et al. 2024) with spin correction.
+		ra := angle.Rad(math.Atan2(st.Pos.Y, st.Pos.X))
+		dec := angle.Rad(math.Asin(st.Pos.Z / delta))
+		cosL := mag.CosAspectAngle(ra, dec, angle.Deg(cat.SpinRA), angle.Deg(cat.SpinDec))
+		v := mag.AsteroidSHG1G2(cat.H, cat.G1, cat.G2, r, delta, alpha, cat.Oblateness, cosL)
+		return fmt.Sprintf("%.1f mag", v)
+
+	case cat.HasG1G2:
+		// HG1G2 without spin correction.
+		v := mag.AsteroidHG1G2(cat.H, cat.G1, cat.G2, r, delta, alpha)
+		return fmt.Sprintf("%.1f mag", v)
+
+	default:
+		// Classic HG model.
+		G := cat.G
+		if G == 0 {
+			G = 0.15
+		}
+		v := mag.AsteroidHG(cat.H, G, r, delta, alpha)
+		return fmt.Sprintf("%.1f mag", v)
+	}
+}
+
+// helioGeometry computes heliocentric distance r, geocentric distance Δ,
+// and phase angle α for a small body at time t.
+func (tgt Target) helioGeometry(t time.Time) (r, delta float64, alpha angle.Angle, st eph.State, ok bool) {
+	id, valid := tgt.ephID()
+	if !valid || tgt.Provider == nil {
+		return
+	}
+	var err error
+	st, err = tgt.Provider.State(id, t)
+	if err != nil {
+		return
+	}
+	sunSt, err := tgt.Provider.State(eph.Sun, t)
+	if err != nil {
+		return
+	}
+
+	delta = st.Distance()
+	hx := st.Pos.X - sunSt.Pos.X
+	hy := st.Pos.Y - sunSt.Pos.Y
+	hz := st.Pos.Z - sunSt.Pos.Z
+	r = math.Sqrt(hx*hx + hy*hy + hz*hz)
+	R := sunSt.Distance()
+
+	cosA := (r*r + delta*delta - R*R) / (2 * r * delta)
+	cosA = clamp(cosA, -1, 1)
+	alpha = angle.Rad(math.Acos(cosA))
+	ok = true
+	return
+}
+
+// clamp restricts v to the range [lo, hi].
+func clamp(v, lo, hi float64) float64 {
+	if v < lo {
+		return lo
+	}
+	if v > hi {
+		return hi
+	}
+	return v
+}
+
+// ── Catalog property extraction ─────────────────────────────────────────────
+
+// fillCatalogProps populates parallax-derived distance, proper motion,
+// and catalog alias identifiers (Messier, NGC/IC).
+func fillCatalogProps(d *TargetDetails, tgt Target) {
+	cat := tgt.Catalog
+	if cat.Parallax.Radians() > 0 {
+		d.Distance = 1.0 / cat.Parallax.Arcseconds() // pc
+	}
+	if cat.PmRA.Radians() != 0 {
+		d.ExtraProps["Proper motion (RA)"] = fmt.Sprintf("%.2f mas/yr", cat.PmRA.Arcseconds()*1000.0)
+	}
+	if cat.PmDec.Radians() != 0 {
+		d.ExtraProps["Proper motion (Dec)"] = fmt.Sprintf("%.2f mas/yr", cat.PmDec.Arcseconds()*1000.0)
+	}
+	for _, alias := range cat.Aliases {
+		if strings.HasPrefix(alias, "M ") || strings.HasPrefix(alias, "M") {
+			// Avoid "Mars" or other M words, check if next char is digit
+			if len(alias) > 1 && alias[1] >= '0' && alias[1] <= '9' || (len(alias) > 2 && alias[0:2] == "M ") {
+				d.ExtraProps["Messier number"] = strings.Replace(alias, " ", "", -1)
+			}
+		}
+		if strings.HasPrefix(alias, "NGC") || strings.HasPrefix(alias, "IC") {
+			d.ExtraProps["NGC/IC number"] = alias
+		}
+	}
+}
+
+// ── Custom property overrides ───────────────────────────────────────────────
+
+// applyProps processes key/value pairs that override auto-computed fields.
+func applyProps(d *TargetDetails, props []string) {
 	for i := 0; i < len(props)-1; i += 2 {
 		key := props[i]
 		val := props[i+1]
@@ -182,10 +347,16 @@ func computeDetails(obs Observable, ctx *coord.Context, props ...string) (*Targe
 			d.ExtraProps[key] = val
 		}
 	}
+}
 
+// ── Rise/Set/Transit events ─────────────────────────────────────────────────
+
+// fillRiseSetTransit finds the next rise, set, and transit events within
+// ±12/+24 hours of the context time.
+func fillRiseSetTransit(d *TargetDetails, obs Observable, ctx *coord.Context) {
 	site, _ := NewSite("Observer", ctx.Site(), angle.Deg(0), nil)
+	t := ctx.Time()
 
-	// Start looking for events from slightly before now to capture today's rise/set
 	start := t.Add(-12 * time.Hour)
 	end := t.Add(24 * time.Hour)
 
@@ -199,23 +370,32 @@ func computeDetails(obs Observable, ctx *coord.Context, props ...string) (*Targe
 		Threshold: angle.Deg(0),
 	}
 	events, err := solver.Find(spec, start, end)
-	if err == nil {
-		for _, ev := range events {
-			if ev.Kind == EventRise && ev.Time.After(start) && d.RiseTime == nil {
+	if err != nil {
+		return
+	}
+	for _, ev := range events {
+		if !ev.Time.After(start) {
+			continue
+		}
+		switch ev.Kind {
+		case EventRise:
+			if d.RiseTime == nil {
 				tt := ev.Time
 				d.RiseTime = &tt
 				d.RiseAzimuth = ev.Azimuth
-			} else if ev.Kind == EventSet && ev.Time.After(start) && d.SetTime == nil {
+			}
+		case EventSet:
+			if d.SetTime == nil {
 				tt := ev.Time
 				d.SetTime = &tt
 				d.SetAzimuth = ev.Azimuth
-			} else if ev.Kind == EventTransit && ev.Time.After(start) && d.TransitTime == nil {
+			}
+		case EventTransit:
+			if d.TransitTime == nil {
 				tt := ev.Time
 				d.TransitTime = &tt
 				d.MaxElevation = ev.Altitude
 			}
 		}
 	}
-
-	return d, nil
 }

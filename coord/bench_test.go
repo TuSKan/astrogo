@@ -134,3 +134,78 @@ func BenchmarkReducer(b *testing.B) {
 		_ = r.Reduce(v)
 	}
 }
+
+// BenchmarkReducer_Cached measures Reduce() with a reused Reducer,
+// demonstrating the lazy Context caching introduced to fix the cache asymmetry.
+func BenchmarkReducer_Cached(b *testing.B) {
+	loc, _ := coord.NewGeodetic(angle.Deg(-70.4), angle.Deg(-24.6), 2635)
+	atm := atmosphere.AtAltitude(2635)
+	t := time.FromJD(2460000.5, time.UTC)
+	v := vector.Vec3{X: 0.00257, Y: 0.00010, Z: 0.00005}
+
+	r := coord.NewReducer(loc, t, atm)
+	_ = r.Reduce(v) // warm up the cache
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = r.Reduce(v)
+	}
+}
+
+// ── Parallel Batch ───────────────────────────────────────────────────────────
+
+func BenchmarkICRSBatchToAltAz_10k(b *testing.B) {
+	loc, _ := coord.NewGeodetic(angle.Deg(-70.4), angle.Deg(-24.6), 2635)
+	atm := atmosphere.AtAltitude(2635)
+	t := time.FromJD(2460000.5, time.UTC)
+	ctx := coord.NewContext(t, loc, atm)
+
+	const n = 10000
+	stars := make([]coord.ICRS, n)
+	for i := range stars {
+		ra := angle.Deg(float64(i) * 360.0 / float64(n))
+		dec := angle.Deg(float64(i)*180.0/float64(n) - 90)
+		stars[i] = coord.NewICRS(ra, dec)
+	}
+	out := make([]coord.AltAz, n)
+
+	b.Run("Serial", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			ctx.ICRSBatchToAltAz(stars, out)
+		}
+	})
+	b.Run("Parallel", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			ctx.ICRSBatchToAltAzParallel(stars, out)
+		}
+	})
+}
+
+func BenchmarkReduceBatch_10k(b *testing.B) {
+	loc, _ := coord.NewGeodetic(angle.Deg(-70.4), angle.Deg(-24.6), 2635)
+	atm := atmosphere.AtAltitude(2635)
+	t := time.FromJD(2460000.5, time.UTC)
+	ctx := coord.NewContext(t, loc, atm)
+
+	const n = 10000
+	vecs := make([]vector.Vec3, n)
+	for i := range vecs {
+		vecs[i] = vector.Vec3{
+			X: 0.00257 + float64(i)*1e-8,
+			Y: 0.00010 + float64(i)*1e-9,
+			Z: 0.00005,
+		}
+	}
+	out := make([]coord.AltAz, n)
+
+	b.Run("Serial", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			ctx.ReduceBatch(vecs, out)
+		}
+	})
+	b.Run("Parallel", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			ctx.ReduceBatchParallel(vecs, out)
+		}
+	})
+}

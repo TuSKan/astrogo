@@ -16,8 +16,9 @@ import (
 
 func TestTargetFixed(t *testing.T) {
 	obj := catalog.Target{
-		Name:  "Orion Nebula",
-		Coord: coord.NewICRS(angle.Hour(5.5), angle.Deg(-5.5)),
+		Name:     "Orion Nebula",
+		Coord:    coord.NewICRS(angle.Hour(5.5), angle.Deg(-5.5)),
+		HasCoord: true,
 	}
 	f := NewTarget(obj, nil)
 

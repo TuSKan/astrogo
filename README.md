@@ -96,6 +96,15 @@ Existing astronomy tools are powerful, but often:
     - Support for **SPK Type 21** (Extended Modified Difference Arrays)
     - Precedence-aware segment indexing (~85× faster lookups)
 
+### Apparent Magnitude (`magnitude`)
+- **Planets**: Mallama & Hilton (2018) — Mercury through Neptune, Saturn ring correction, Neptune secular brightening
+- **Asteroids**: H,G · H,G₁,G₂ · H,G₁₂* · **sHG1G2** (Carry et al. 2024) — 7-parameter spin-geometry model
+- **Comets**: IAU standard M₁/k₁ (total) + M₂/k₂ (nuclear)
+- **Satellites**: McCants/Molczan sphere/cylinder phase functions
+- **Stars**: Bouguer atmospheric extinction with altitude scaling, Gaia G→V/B transformations
+- **Sun/Moon**: Distance modulus + Allen (2000) phase polynomial
+- **Validated against FINK/ZTF phunk pipeline** — 100% match at 0.025 mag (186 r-band observations)
+
 ### Catalogs & Data Services (`catalog/resolve`)
 - Unified `resolve.Provider` interfaces (`ObjectResolver`, `ConeSearcher`)
 - Hardware-optimized native caching via **Apache Arrow** columnar batches
@@ -108,6 +117,7 @@ Existing astronomy tools are powerful, but often:
     - **Gaia** & **VizieR** (Data TAP)
     - **OpenNGC** (Zero-I/O `//go:embed` binaries)
     - **NORAD/CelestTrak** (GP data — OMM/JSON format aligned with [Space Data Standards](https://spacedatastandards.org))
+    - **FINK/ZTF SSOFT** (sHG1G2 phase-curve parameters for ~95k asteroids — single-object JSON + bulk parquet)
 
 ### FITS & World Coordinate System (`fits`)
 - Read standard FITS files (Image, BinTable, ASCII Table HDUs)
@@ -460,12 +470,13 @@ flowchart TD
 | `ephemeris` | Solar system ephemerides (SOFA + JPL SPK) | ✅ Stable |
 | `ephemeris/satellite` | SGP4 propagation, TEME→GCRS, look angles, ground track | ✅ Stable |
 | `catalog/resolve` | Provider interface, HTTP client, Arrow cache | ✅ Stable |
-| `catalog/*` | SIMBAD, MAST, Gaia, VizieR, JPL, SBDB, OpenNGC, NORAD | ✅ Stable |
+| `catalog/*` | SIMBAD, MAST, Gaia, VizieR, JPL, SBDB, OpenNGC, NORAD, FINK | ✅ Stable |
+| `magnitude` | Apparent magnitude (planets, asteroids, comets, satellites, stars) | ✅ Stable |
 | `fits` | FITS I/O, WCS (TAN projection), mmap, Arrow export | ✅ Stable |
 | `plan` | Observability, constraints, events, scheduling, satellite passes | ✅ Stable |
 | `unit` | Physical unit and quantity system | ✅ Stable |
 
-See [`VALIDATION.md`](docs/VALIDATION.md) for scientific validation status and [`USNO.md`](docs/USNO.md) for the U.S. Naval Observatory accuracy report (41/41 tests passing, ≤0.6 min rise/set accuracy across 3 continents + polar/equatorial/8849m edge cases).
+See [`VALIDATION.md`](docs/VALIDATION.md) for scientific validation status, [`USNO.md`](docs/USNO.md) for the U.S. Naval Observatory accuracy report (41/41 tests passing, ≤0.6 min rise/set accuracy across 3 continents + polar/equatorial/8849m edge cases), and the FINK/ZTF sHG1G2 validation (100% match at 0.025 mag against the phunk production pipeline).
 
 ---
 
