@@ -363,7 +363,6 @@ The remaining work is concentrated in:
 - **Batch/vectorized APIs** for high-throughput use cases
 - **Cross-match algorithms** for multi-catalog workflows
 - **Satellite illumination constraints** (sunlit + dark sky for visual observation)
-- **Topocentric planet corrections** (currently geocentric projected to local horizon)
 
 Completing these will elevate AstroGo from:
 

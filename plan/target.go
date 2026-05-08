@@ -56,17 +56,12 @@ func (t Target) Name() string {
 func (t Target) Position(time time.Time) (coord.ICRS, error) {
 	if t.Provider != nil {
 		// Moving object
-		idStr := t.Catalog.ID
-		if idStr == "" {
-			return coord.ICRS{}, errors.New("moving target requires a valid Catalog.ID")
+		id, ok := t.ephID()
+		if !ok {
+			return coord.ICRS{}, errors.New("moving target requires a valid numeric Catalog.ID")
 		}
-		idUint, err := strconv.ParseUint(idStr, 10, 32)
-		if err != nil {
-			return coord.ICRS{}, fmt.Errorf("invalid ID for moving target: %w", err)
-		}
-		ephID := eph.ID(idUint)
 
-		pos, err := eph.Position(t.Provider, ephID, time)
+		pos, err := eph.Position(t.Provider, id, time)
 		if err != nil {
 			return coord.ICRS{}, fmt.Errorf("target: ephemeris error for %s: %w", t.Name(), err)
 		}

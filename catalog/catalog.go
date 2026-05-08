@@ -79,20 +79,15 @@ func (r *Resolver) Resolve(query string) (Target, error) {
 		return Target{}, ErrNotFound
 	}
 
-	var matches []Target
+	// First-match-wins: providers are tried in priority order.
+	// If a provider resolves the query, return immediately.
 	for _, p := range r.providers {
 		if t, ok := p.Resolve(query); ok {
-			matches = append(matches, t)
+			return t, nil
 		}
 	}
 
-	if len(matches) > 1 {
-		return Target{}, ErrAmbiguous
-	}
-	if len(matches) == 1 {
-		return matches[0], nil
-	}
-
+	// Fall back to fuzzy search across all providers.
 	results := r.Search(query)
 	if len(results) > 0 {
 		return results[0], nil
