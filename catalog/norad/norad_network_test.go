@@ -1,14 +1,37 @@
 //go:build integration
 
+// Package norad contains integration tests that validate live queries
+// against the CelestTrak GP API (celestrak.org).
+//
+// Run with: go test -tags integration -v ./catalog/norad/
+//
+// These tests require an active internet connection to reach
+// https://celestrak.org/NORAD/elements/gp.php endpoints.
+// If the endpoint is unreachable, tests are skipped automatically.
 package norad
 
 import (
 	"context"
+	"net"
 	"testing"
 	"time"
 )
 
+// requireCelestrak skips the test when the CelestTrak API endpoint is
+// unreachable (DNS failure, firewall, etc.).  This avoids false-negative
+// CI failures for transient network issues.
+func requireCelestrak(t *testing.T) {
+	t.Helper()
+	conn, err := net.DialTimeout("tcp", "celestrak.org:443", 5*time.Second)
+	if err != nil {
+		t.Skipf("CelestTrak unreachable, skipping live test: %v", err)
+	}
+	conn.Close()
+}
+
 func TestFetchISS_Live(t *testing.T) {
+	requireCelestrak(t)
+
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
@@ -52,6 +75,8 @@ func TestFetchISS_Live(t *testing.T) {
 }
 
 func TestFetchGroup_Live(t *testing.T) {
+	requireCelestrak(t)
+
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
@@ -76,6 +101,8 @@ func TestFetchGroup_Live(t *testing.T) {
 }
 
 func TestResolve_Live(t *testing.T) {
+	requireCelestrak(t)
+
 	p := New()
 	target, ok := p.Resolve("ISS")
 	if !ok {

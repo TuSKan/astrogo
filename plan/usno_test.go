@@ -129,11 +129,11 @@ func usnoGet(t *testing.T, url string) []byte {
 	client := &http.Client{Timeout: 30 * time.Second}
 	resp, err := client.Get(url)
 	if err != nil {
-		t.Fatalf("USNO API request failed: %v", err)
+		t.Skipf("USNO API unreachable, skipping: %v", err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != 200 {
-		t.Fatalf("USNO API returned status %d for %s", resp.StatusCode, url)
+		t.Skipf("USNO API returned status %d for %s", resp.StatusCode, url)
 	}
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
