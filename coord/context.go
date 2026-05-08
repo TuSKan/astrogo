@@ -117,6 +117,12 @@ func (ctx *Context) Site() *Geodetic { return ctx.site }
 // Atmosphere returns the encapsulated atmosphere configuration.
 func (ctx *Context) Atmosphere() atmosphere.Atmosphere { return ctx.atm }
 
+// ObsVec returns the observer's geocentric position in the ICRS frame (AU).
+// This can be subtracted from a body's geocentric vector to obtain the
+// topocentric position, correcting for diurnal parallax (~1° for the Moon,
+// ~23″ for Mars at opposition).
+func (ctx *Context) ObsVec() vector.Vec3 { return ctx.obsVec }
+
 // AstrometricToApparent computes the Celestial Intermediate Reference System (CIRS) apparent
 // position of an object from its Astrometric (catalog ICRS) coordinates.
 func (ctx *Context) AstrometricToApparent(c Astrometric) Apparent {

@@ -7,7 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.1.3] — 2026-05-07
 
-FINK/ZTF SSOFT photometry provider, sHG1G2 spin-geometry model, and `computeDetails` refactor.
+FINK/ZTF SSOFT photometry provider, sHG1G2 spin-geometry model, `computeDetails` refactor,
+topocentric planet corrections, CI hardening, IERS auto-update, and Equinox showcase.
 
 ### Added
 
@@ -28,6 +29,29 @@ FINK/ZTF SSOFT photometry provider, sHG1G2 spin-geometry model, and `computeDeta
 #### Target Extensions
 - `catalog/resolve/target.go`: added `G1`, `G2`, `HasG1G2`, `SpinRA`, `SpinDec`, `HasSpin`, `Oblateness`, `HasOblateness` fields
 
+#### Topocentric Planets
+- `coord/context.go`: added `ObsVec()` — exports observer's geocentric ICRS position vector (AU)
+- `plan/details.go`: `fillMovingBody()` now computes topocentric RA/Dec and distance by subtracting the observer vector
+- Diurnal parallax correction: ~1° for the Moon, ~23″ for Mars at opposition
+- Elongation also computed topocentrically
+
+#### IERS EOP Auto-Update
+- `iers/fetch.go`: `FetchIfStale(mjd)` — opt-in runtime download of fresh EOP data
+- Cache at `iers/data/finals2000A.data` with 7-day staleness check
+- Safe for concurrent use via `sync.Once`
+
+#### CI Hardening
+- `.github/workflows/ci.yml`: 5 jobs (was 1):
+  - `lint-and-test` — existing job
+  - `race-detection` — `go test -race -short`
+  - `benchmarks` — artifact upload with 90-day retention
+  - `integration` — tagged `integration` tests (USNO, NASA, NORAD, IMCCE) with `continue-on-error`
+  - `validation` — tagged `validation` tests (JPL Horizons, SOFA)
+
+#### Showcase
+- `examples/17_equinox_prediction/` — 10-year equinox/solstice almanac + season durations + apsides + eclipses + topocentric Moon
+- `docs/EQUINOX.md` — narrative showcase document with verified tables (all BRT)
+
 ### Changed
 
 #### Magnitude Priority Chain
@@ -35,31 +59,31 @@ FINK/ZTF SSOFT photometry provider, sHG1G2 spin-geometry model, and `computeDeta
 
 #### `computeDetails` Refactor
 - `plan/details.go`: extracted 8 focused helpers from 240-line monolith
-  - `fillMovingBody()` — topocentric AltAz + elongation
+  - `fillMovingBody()` — topocentric AltAz + RA/Dec + elongation (rewritten for v0.1.3)
   - `computeMagnitude()` — priority-dispatched magnitude computation
   - `cometMagnitude()`, `asteroidMagnitude()` — per-type magnitude methods
   - `helioGeometry()` — shared heliocentric distance/phase angle computation
   - `fillCatalogProps()` — parallax, proper motion, aliases
   - `applyProps()` — custom property overrides
   - `fillRiseSetTransit()` — event solver block
-- `plan/target.go`: added `ephID()` helper, refactored `GeocentricVec` to use it
-- Eliminated: 3 repeated type assertions, 3 duplicate `strconv.ParseUint` blocks, 2 duplicate heliocentric distance computations, 1 dead-code planet magnitude branch
+- `plan/target.go`: `ephID()` helper, `Position()` and `GeocentricVec()` refactored to use it
 
 ### Documentation
-- `README.md`: added `magnitude` package features section, FINK to catalog providers, implementation status table
-- `docs/VALIDATION.md`: added 7 validation rows (planetary, asteroid HG, asteroid sHG1G2, comet, satellite, star, FINK provider)
-- `docs/TODO.md`: added sHG1G2 + FINK sections, added polymorphic Observable architecture (v0.2)
-- `docs/ROADMAP.md`: added Phase 17.6 (Magnitude & FINK), updated summary and remaining work
-- `catalog/fink/doc.go`: documented dual-mode architecture and version pinning
+- `README.md`: added **Showcases** section linking Equinox, Planet Parade, Jesus, and Satellite Tracking
+- `docs/EQUINOX.md`: verified almanac with BRT times for São Paulo
+- `docs/VALIDATION.md`: removed topocentric from incomplete areas (now implemented)
+- `docs/TODO.md`: marked CI Coverage, IERS Auto-Update, Topocentric Planets, Equinox showcase as ✅
+- `docs/ROADMAP.md`: removed topocentric from remaining work
 
 ### Validation
 
 | Metric | Result |
 |--------|--------|
 | sHG1G2 vs FINK phunk (8467 Benoitcarry, r-band) | mean Δ=0.011 mag, 100% within 0.025 mag |
-| FINK residual RMS | 0.064 mag (n=327 observations) |
-| Spin correction coverage | 55.5° aspect angle range |
-| Offline + network tests | 54 plan + 36 magnitude + 9 fink = 99 tests |
+| 2026 Eclipses vs NASA | all 4 within ≤1 min |
+| 2024–2033 Seasons vs USNO | all within ≤1 min (41/41 tests) |
+| Orbital eccentricity | e=0.016671 (matches IAU) |
+| Topocentric Moon parallax | ~1° correction applied |
 
 ## [0.1.2] — 2026-05-06
 

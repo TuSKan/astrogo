@@ -553,15 +553,16 @@ Please see our full [**Project Roadmap**](docs/ROADMAP.md) to understand current
 
 ---
 
-## Satellite Tracking Example
+## Showcases
 
-See [`examples/12_satellite_tracking/`](examples/12_satellite_tracking/) for a complete end-to-end demonstration:
+Science-as-showcase documents — narrative analysis backed by runnable code and verifiable tables:
 
-1. **Fetch** live ISS GP data from CelestTrak (JSON/OMM format)
-2. **Propagate** orbit via SGP4 to compute ECI position/velocity
-3. **Ground track** — sub-satellite lat/lon/altitude
-4. **Pass prediction** — find all passes above 10° over São Paulo
-5. **Look angle** — current azimuth/elevation/range
+| Showcase | Topic | Example |
+|----------|-------|---------|
+| [**Equinox & Solstice Almanac**](docs/EQUINOX.md) | Decade of seasons, eclipses, apsides, topocentric Moon | [`examples/17_equinox_prediction/`](examples/17_equinox_prediction/) |
+| [**The Great Planet Parade**](docs/PLANET_PARADE.md) | Feb 28 2025 — seven planets in the evening sky from São Paulo | [`examples/16_planet_parade/`](examples/16_planet_parade/) |
+| [**When Did Jesus Die?**](docs/JESUS.md) | Dating the Crucifixion via lunar eclipses, conjunctions, and crescent visibility | [`examples/10_jesus_christ/`](examples/10_jesus_christ/) |
+| **Satellite Tracking** | ISS pass prediction — SGP4, ground track, look angles | [`examples/12_satellite_tracking/`](examples/12_satellite_tracking/) |
 
 ---
 

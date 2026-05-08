@@ -139,17 +139,28 @@ func computeDetails(obs Observable, ctx *coord.Context, props ...string) (*Targe
 
 // ── Moving-body helpers ─────────────────────────────────────────────────────
 
-// fillMovingBody computes topocentric AltAz, distance, and elongation
-// for a target with an ephemeris provider.
+// fillMovingBody computes topocentric AltAz, RA/Dec, distance, and elongation
+// for a target with an ephemeris provider. The observer's ICRS position is
+// subtracted to correct for diurnal parallax (~1° for the Moon, ~23″ for Mars).
 func fillMovingBody(d *TargetDetails, tgt Target, t time.Time, ctx *coord.Context) {
 	vec, err := tgt.GeocentricVec(t)
 	if err != nil {
 		return
 	}
+
+	// Topocentric vector: geocentric body position minus observer ICRS position.
+	topoVec := vec.Sub(ctx.ObsVec())
+	topoDist := topoVec.Norm()
+
+	// Topocentric RA/Dec (corrected for diurnal parallax).
+	d.RA = angle.Rad(math.Atan2(topoVec.Y, topoVec.X)).Wrap360()
+	d.Dec = angle.Rad(math.Asin(topoVec.Z / topoDist))
+
+	// AltAz via the full Context pipeline (includes refraction).
 	altaz := ctx.GeocentricToObserved(vec)
 	d.Altitude = altaz.Alt()
 	d.Azimuth = altaz.Az()
-	d.Distance = vec.Norm()
+	d.Distance = topoDist
 	d.DistanceUnit = "a.u."
 
 	if tgt.Catalog.Kind == "Satellite" {
@@ -158,18 +169,16 @@ func fillMovingBody(d *TargetDetails, tgt Target, t time.Time, ctx *coord.Contex
 		return
 	}
 
-	// Elongation from the Sun.
+	// Elongation from the Sun (topocentric).
 	sunVec, err := eph.Position(tgt.Provider, eph.Sun, t)
 	if err == nil {
+		sunTopo := sunVec.Sub(ctx.ObsVec())
 		sunPos := coord.NewICRS(
-			angle.Rad(math.Atan2(sunVec.Y, sunVec.X)),
-			angle.Rad(math.Asin(sunVec.Z/sunVec.Norm())),
+			angle.Rad(math.Atan2(sunTopo.Y, sunTopo.X)),
+			angle.Rad(math.Asin(sunTopo.Z/sunTopo.Norm())),
 		)
-		pos := coord.NewICRS(
-			angle.Rad(math.Atan2(vec.Y, vec.X)),
-			angle.Rad(math.Asin(vec.Z/vec.Norm())),
-		)
-		d.Elongation = coord.Separation(pos, sunPos)
+		bodyPos := coord.NewICRS(d.RA, d.Dec)
+		d.Elongation = coord.Separation(bodyPos, sunPos)
 	}
 }
 

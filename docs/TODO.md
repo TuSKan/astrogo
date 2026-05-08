@@ -62,7 +62,7 @@ New `catalog/fink` package — FINK/ZTF Solar System Object Fink Table:
 
 Science-as-showcase template (narrative + runnable code + verifiable tables):
 
-- **Newtonian Equinox Prediction** — compute equinox/solstice dates from first principles
+- ~~**Equinox & Solstice Almanac**~~ ✅ — `examples/17_equinox_prediction/`, `docs/EQUINOX.md`
 - **SOHO LASCO 2027 Planet Alignment** — predict the next major conjunction visible from SOHO
 - **Historical Eclipse Reconstruction** — reconstruct a well-documented ancient eclipse
 
@@ -146,10 +146,13 @@ constructor, ICRS ↔ Galactic rotation matrix, and `TestGalacticRoundTrip` /
 
 **Files:** `coord/coord.go`, `coord/transform.go`
 
-### Topocentric Planets
+### ~~Topocentric Planets~~ ✅
 
-Full topocentric correction for planets (stellar aberration + diurnal parallax).
-Currently planets use geocentric positions projected to the local horizon.
+Topocentric RA/Dec and distance for all moving bodies via `ctx.ObsVec()` subtraction.
+Corrects diurnal parallax (~1° for Moon, ~23″ for Mars at opposition).
+Elongation also computed topocentrically.
+
+**Files:** `coord/context.go` (added `ObsVec()`), `plan/details.go` (`fillMovingBody` rewritten)
 
 ---
 
@@ -189,16 +192,22 @@ Completed. Tests found and fixed **3 bugs**:
 
 ## Infrastructure
 
-### CI Coverage
+### ~~CI Coverage~~ ✅
 
-- Add tagged test runs (`integration`, `validation`) as a separate CI job
-- Add benchmark regression tracking (`go test -bench . -count=5`)
-- Consider `go test -race` for concurrency safety
+- [x] Race detection job (`go test -race -short`) — catches data races in concurrent code
+- [x] Benchmark regression tracking (`go test -bench . -benchmem -count=3`) with artifact upload
+- [x] Tagged test runs: `integration` (USNO, NASA eclipses, AstroPixels, NORAD, IMCCE) and `validation` (JPL Horizons, SOFA) as separate CI jobs
 
-### IERS EOP Auto-Update
+**Files:** `.github/workflows/ci.yml`
 
-Currently EOP data is fetched via `go:generate`. Consider a runtime fallback
-that downloads finals2000A.data on first use (with caching).
+### ~~IERS EOP Auto-Update~~ ✅
+
+Opt-in `iers.FetchIfStale(mjd)` downloads fresh finals2000A.all from IERS data
+center if the embedded table doesn't cover the requested epoch. Cached to
+`iers/data/finals2000A.data` with 7-day staleness check. Safe for concurrent
+use via `sync.Once`.
+
+**Files:** `iers/fetch.go`
 
 ### ~~README Allocation Claims~~ ✅
 

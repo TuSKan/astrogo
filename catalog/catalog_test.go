@@ -69,7 +69,9 @@ func TestResolver_Resolve(t *testing.T) {
 	}
 }
 
-func TestResolver_Ambiguity(t *testing.T) {
+func TestResolver_ProviderPriority(t *testing.T) {
+	// When multiple providers resolve the same query,
+	// the first provider in priority order wins.
 	p1 := &mockProvider{
 		name: "p1",
 		targets: map[string]Target{
@@ -84,9 +86,15 @@ func TestResolver_Ambiguity(t *testing.T) {
 	}
 
 	r := &Resolver{providers: []resolve.Provider{p1, p2}}
-	_, err := r.Resolve("target")
-	if err != ErrAmbiguous {
-		t.Errorf("expected ErrAmbiguous, got %v", err)
+	got, err := r.Resolve("target")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.Catalog != "p1" {
+		t.Errorf("expected p1 (first provider), got catalog=%s", got.Catalog)
+	}
+	if got.Name != "Target 1" {
+		t.Errorf("expected 'Target 1', got %q", got.Name)
 	}
 }
 

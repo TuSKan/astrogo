@@ -84,7 +84,6 @@ Validation should be:
 The following areas are not yet considered scientifically complete:
 
 - Advanced observation scheduling optimization
-- Topocentric planet corrections (currently geocentric projected to local horizon)
 
 ---
 
