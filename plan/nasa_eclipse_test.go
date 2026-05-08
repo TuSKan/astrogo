@@ -247,11 +247,11 @@ func fetchNASAPage(t *testing.T, url string) string {
 	req.Header.Set("User-Agent", "Mozilla/5.0 (compatible; astrogo-test/1.0)")
 	resp, err := client.Do(req)
 	if err != nil {
-		t.Fatalf("Failed to fetch NASA page %s: %v", url, err)
+		t.Skipf("NASA endpoint unreachable, skipping: %v", err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != 200 {
-		t.Fatalf("NASA returned status %d for %s", resp.StatusCode, url)
+		t.Skipf("NASA returned status %d for %s", resp.StatusCode, url)
 	}
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {

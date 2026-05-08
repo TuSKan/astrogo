@@ -174,11 +174,11 @@ func fetchAstroPixelsPage(t *testing.T, startYear int) string {
 	req.Header.Set("User-Agent", "Mozilla/5.0 (compatible; astrogo-test/1.0)")
 	resp, err := client.Do(req)
 	if err != nil {
-		t.Fatalf("Failed to fetch AstroPixels page %s: %v", url, err)
+		t.Skipf("AstroPixels unreachable, skipping: %v", err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != 200 {
-		t.Fatalf("AstroPixels returned status %d for %s", resp.StatusCode, url)
+		t.Skipf("AstroPixels returned status %d for %s", resp.StatusCode, url)
 	}
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
