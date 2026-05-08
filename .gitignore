@@ -43,6 +43,7 @@ data/
 *.fits
 *.fits.gz
 *.fit
+*.parquet
 
 # Assets exception (ensure files in assets/ are tracked even if they match global patterns)
 !assets/
