@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 	"sync"
 	"time"
+
+	"github.com/TuSKan/astrogo/internal/cache"
 )
 
 const (
@@ -23,38 +25,80 @@ const (
 	fetchTimeout = 30 * time.Second
 )
 
-var fetchOnce sync.Once
+var (
+	fetchMu      sync.Mutex
+	lastAttempt  time.Time     // wall-clock of last fetch attempt (success or failure)
+	lastFetchErr error         // non-nil if the most recent attempt failed
+	retryCooldown = 5 * time.Minute // minimum interval between fetch attempts
+)
 
-// FetchIfStale downloads fresh IERS EOP data if the embedded table
-// doesn't cover the requested MJD. The downloaded file is cached to
-// iers/data/finals2000A.data relative to the module root (or the
-// working directory if the module root is not available).
+// FetchIfStale downloads fresh IERS EOP data if the current model
+// doesn't cover the requested MJD. The downloaded file is cached under
+// the user's OS cache directory (e.g. ~/.cache/astrogo/iers/ on Linux,
+// %LocalAppData%/astrogo/iers/ on Windows).
 //
-// This function is safe for concurrent use: only one download will
-// be attempted regardless of how many goroutines call it.
+// This function is safe for concurrent use: a mutex serialises
+// download attempts, and the coverage check is repeated inside the
+// lock so a successful concurrent fetch is respected immediately.
+//
+// After a failed attempt, retries are throttled to once per 5 minutes
+// to avoid hammering the IERS server on transient errors.
 //
 // The downloaded data is parsed and registered globally via RegisterModel,
 // replacing the previous (potentially stale) embedded data.
 func FetchIfStale(mjd float64) error {
-	model := GetModel()
+	// Fast path (no lock): current model already covers this epoch.
+	if covered(mjd) {
+		return nil
+	}
 
-	// Check if current model covers the requested epoch.
-	if table, ok := model.(*Table); ok {
-		if _, err := table.EOP(mjd); err == nil {
-			return nil // embedded data is fresh enough
+	fetchMu.Lock()
+	defer fetchMu.Unlock()
+
+	// Re-check after acquiring the lock — another goroutine may have
+	// fetched successfully while we were waiting.
+	if covered(mjd) {
+		return nil
+	}
+
+	// Seed the cooldown timer from the on-disk cache if we haven't
+	// attempted a fetch yet in this process.
+	if lastAttempt.IsZero() {
+		if info, err := os.Stat(CachePath()); err == nil {
+			lastAttempt = info.ModTime()
 		}
 	}
 
-	var fetchErr error
-	fetchOnce.Do(func() {
-		fetchErr = doFetch()
-	})
-	return fetchErr
+	// Throttle retries so transient errors don't cause a request storm.
+	if !lastAttempt.IsZero() && time.Since(lastAttempt) < retryCooldown {
+		return lastFetchErr // may be nil (successful) or the prior error
+	}
+
+	lastAttempt = time.Now()
+	lastFetchErr = doFetch()
+	return lastFetchErr
 }
 
-// CachePath returns the path where downloaded EOP data is cached.
+// covered reports whether the current global model covers the given MJD.
+func covered(mjd float64) bool {
+	model := GetModel()
+	if table, ok := model.(*Table); ok {
+		_, err := table.EOP(mjd)
+		return err == nil
+	}
+	return false
+}
+
+// CachePath returns the absolute path where downloaded EOP data is cached.
+// It uses the OS-standard user cache directory via [cache.Path].
 func CachePath() string {
-	return filepath.Join("iers", "data", "finals2000A.data")
+	p, err := cache.Path("iers", "finals2000A.data")
+	if err != nil {
+		// Fallback: temp directory (cache.Path already handles UserCacheDir
+		// failures, so this is truly exceptional).
+		return filepath.Join(os.TempDir(), "astrogo", "iers", "finals2000A.data")
+	}
+	return p
 }
 
 func doFetch() error {

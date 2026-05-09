@@ -133,16 +133,40 @@ const deg2rad = math.Pi / 180.0
 const rad2deg = 180.0 / math.Pi
 
 // sipEval evaluates a SIP polynomial: Σ coeffs[(p,q)] · u^p · v^q.
+//
+// Uses precomputed power tables instead of math.Pow for performance:
+// SIP is evaluated per-pixel, so on a 4096×4096 image this runs ~16M times.
 func sipEval(coeffs map[[2]int]float64, u, v float64) float64 {
 	if len(coeffs) == 0 {
 		return 0
 	}
+
+	// Determine maximum exponents to size the power tables.
+	var maxP, maxQ int
+	for pq := range coeffs {
+		if pq[0] > maxP {
+			maxP = pq[0]
+		}
+		if pq[1] > maxQ {
+			maxQ = pq[1]
+		}
+	}
+
+	// Precompute u^0..u^maxP and v^0..v^maxQ.
+	upow := make([]float64, maxP+1)
+	vpow := make([]float64, maxQ+1)
+	upow[0] = 1
+	vpow[0] = 1
+	for i := 1; i <= maxP; i++ {
+		upow[i] = upow[i-1] * u
+	}
+	for i := 1; i <= maxQ; i++ {
+		vpow[i] = vpow[i-1] * v
+	}
+
 	var sum float64
 	for pq, c := range coeffs {
-		if c == 0 {
-			continue
-		}
-		sum += c * math.Pow(u, float64(pq[0])) * math.Pow(v, float64(pq[1]))
+		sum += c * upow[pq[0]] * vpow[pq[1]]
 	}
 	return sum
 }

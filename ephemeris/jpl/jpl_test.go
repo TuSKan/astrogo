@@ -80,7 +80,7 @@ func TestCheby(t *testing.T) {
 }
 
 func TestJPLUnitsAreAUAndAUPerDay(t *testing.T) {
-	p, err := jpl.NewProvider(core.Planets, "de440s", jpl.WithDataDir("data"))
+	p, err := jpl.NewProvider(core.Planets, "de440s")
 	if err != nil {
 		t.Fatalf("failed to initialize provider: %v", err)
 	}
@@ -97,7 +97,7 @@ func TestJPLUnitsAreAUAndAUPerDay(t *testing.T) {
 }
 
 func TestJPLUnsupportedBody(t *testing.T) {
-	p, err := jpl.NewProvider(core.Planets, "de440s", jpl.WithDataDir("data"))
+	p, err := jpl.NewProvider(core.Planets, "de440s")
 	if err != nil {
 		t.Fatalf("setup failed: %v", err)
 	}
@@ -110,7 +110,7 @@ func TestJPLUnsupportedBody(t *testing.T) {
 }
 
 func TestJPLOutOfCoverageEpoch(t *testing.T) {
-	p, err := jpl.NewProvider(core.Planets, "de440s", jpl.WithDataDir("data"))
+	p, err := jpl.NewProvider(core.Planets, "de440s")
 	if err != nil {
 		t.Fatalf("setup failed: %v", err)
 	}
@@ -125,7 +125,7 @@ func TestJPLOutOfCoverageEpoch(t *testing.T) {
 }
 
 func TestJPLDeterministicRepeatedCalls(t *testing.T) {
-	p, err := jpl.NewProvider(core.Planets, "de440s", jpl.WithDataDir("data"))
+	p, err := jpl.NewProvider(core.Planets, "de440s")
 	if err != nil {
 		t.Fatalf("setup failed: %v", err)
 	}
@@ -148,7 +148,7 @@ func TestJPLDeterministicRepeatedCalls(t *testing.T) {
 
 func TestSourceSelection(t *testing.T) {
 	t.Run("Planets", func(t *testing.T) {
-		p, err := jpl.NewProvider(core.Planets, "de440s", jpl.WithDataDir("data"))
+		p, err := jpl.NewProvider(core.Planets, "de440s")
 		if err != nil {
 			t.Fatalf("Planets source failed: %v", err)
 		}
@@ -186,7 +186,6 @@ func TestSmallBodyEros(t *testing.T) {
 		core.SmallBody,
 		"433",
 		jpl.WithTimeInterval(start, end),
-		jpl.WithDataDir("data"),
 	)
 	if err != nil {
 		t.Fatalf("Failed to create smallbody provider: %v", err)
@@ -237,7 +236,6 @@ func TestSmallBodyMultiMatch(t *testing.T) {
 		core.SmallBody,
 		"Apophis", // "Apophis" is ambiguous in Horizons web, but let's see API
 		jpl.WithTimeInterval(start, end),
-		jpl.WithDataDir("data"),
 	)
 	if err != nil {
 		// If it's ambiguous, spk.CacheAPI should have handled it or returned error

@@ -18,8 +18,8 @@ type TargetDetails struct {
 	Description  string
 	Source       string
 	Magnitude    string
-	RA           angle.Angle
-	Dec          angle.Angle
+	RA           angle.Angle // ICRS J2000 (astrometric; topocentric for moving bodies)
+	Dec          angle.Angle // ICRS J2000 (astrometric; topocentric for moving bodies)
 	Altitude     angle.Angle
 	Azimuth      angle.Angle
 	Distance     float64 // in AU or pc depending on object
@@ -50,8 +50,8 @@ func (d TargetDetails) String() string {
 	if d.Magnitude != "" {
 		b.WriteString(fmt.Sprintf("Magnitude:\t%s\n", d.Magnitude))
 	}
-	b.WriteString(fmt.Sprintf("RA:\t%s\n", d.RA.HMSString(1)))
-	b.WriteString(fmt.Sprintf("Dec:\t%s\n", d.Dec.DMSString(0)))
+	b.WriteString(fmt.Sprintf("RA (ICRS):\t%s\n", d.RA.HMSString(1)))
+	b.WriteString(fmt.Sprintf("Dec (ICRS):\t%s\n", d.Dec.DMSString(0)))
 	b.WriteString(fmt.Sprintf("Altitude:\t%s\n", d.Altitude.DMSString(0)))
 	b.WriteString(fmt.Sprintf("Azimuth:\t%s\n", d.Azimuth.DMSString(0)))
 	b.WriteString(fmt.Sprintf("Distance:\t%.4f %s\n", d.Distance, d.DistanceUnit))
@@ -152,7 +152,9 @@ func fillMovingBody(d *TargetDetails, tgt Target, t time.Time, ctx *coord.Contex
 	topoVec := vec.Sub(ctx.ObsVec())
 	topoDist := topoVec.Norm()
 
-	// Topocentric RA/Dec (corrected for diurnal parallax).
+	// Topocentric ICRS RA/Dec (astrometric, corrected for diurnal parallax
+	// but not for precession-nutation or aberration — matches J2000 star
+	// charts, Stellarium default, and GoTo mount coordinate systems).
 	d.RA = angle.Rad(math.Atan2(topoVec.Y, topoVec.X)).Wrap360()
 	d.Dec = angle.Rad(math.Asin(topoVec.Z / topoDist))
 
