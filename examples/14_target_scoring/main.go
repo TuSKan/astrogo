@@ -51,7 +51,7 @@ func main() {
 			fmt.Printf("  ⚠ Could not resolve %q: %v\n", l.name, err)
 			continue
 		}
-		targets = append(targets, plan.NewTarget(t, nil))
+		targets = append(targets, plan.FromCatalog(t, nil))
 	}
 
 	// ── Constraints ──────────────────────────────────────────────────────

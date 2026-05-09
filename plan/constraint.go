@@ -10,8 +10,6 @@ import (
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
-	"github.com/TuSKan/astrogo/catalog"
-	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
 
@@ -140,11 +138,10 @@ func (c Sun) Check(_ Observable, t time.Time, site *Site) (Result, error) {
 // CheckCtx evaluates Sun altitude using a pre-built coord.Context.
 // The obj parameter is ignored — the Sun position is always computed internally.
 func (c Sun) CheckCtx(obj Observable, t time.Time, _ *Site, ctx *coord.Context) (Result, error) {
-	sun := NewTarget(catalog.Target{ID: "11", Name: "Sun", Kind: resolve.KindStar}, eph.Default())
+	sun := NewSun(eph.Default())
 
-	// If we are checking the Sun itself against a Sun constraint, don't penalize
-	// (Though normally you wouldn't constrain the Sun against the Sun)
-	if b, ok := obj.(Target); ok && b.Catalog.ID == "11" {
+	// If we are checking the Sun itself against a Sun constraint, don't penalize.
+	if p, ok := obj.(*Planet); ok && p.IsSun() {
 		return Result{Pass: true, Value: 0}, nil
 	}
 
@@ -182,7 +179,7 @@ func (c MoonSep) Check(obj Observable, t time.Time, site *Site) (Result, error) 
 
 // CheckCtx evaluates Moon separation using a pre-built coord.Context.
 func (c MoonSep) CheckCtx(obj Observable, ctx *coord.Context) (Result, error) {
-	if b, ok := obj.(Target); ok && b.Catalog.ID == "10" {
+	if p, ok := obj.(*Planet); ok && p.IsMoon() {
 		return Result{Pass: true, Value: 180}, nil
 	}
 
@@ -191,7 +188,7 @@ func (c MoonSep) CheckCtx(obj Observable, ctx *coord.Context) (Result, error) {
 		return Result{}, err
 	}
 
-	moon := NewTarget(catalog.Target{ID: "10", Name: "Moon", Kind: resolve.KindMoon}, eph.Default())
+	moon := NewMoon(eph.Default())
 	moonPos, err := moon.Position(ctx.Time())
 	if err != nil {
 		return Result{}, err

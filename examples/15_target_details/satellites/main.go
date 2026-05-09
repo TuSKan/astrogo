@@ -31,7 +31,7 @@ func main() {
 	}
 	defer prov.Close()
 
-	iss := plan.NewTarget(catTarget, prov)
+	iss := plan.FromCatalog(catTarget, prov)
 
 	// Use satellite epoch for calculation (you can use time.Date/Now() as well)
 	t := catTarget.Epoch

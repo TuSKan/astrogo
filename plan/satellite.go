@@ -1,12 +1,51 @@
 package plan
 
 import (
+	"fmt"
+
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/vector"
 )
+
+// Satellite represents an artificial satellite with an SGP4/TLE-based provider.
+type Satellite struct {
+	name     string
+	id       eph.ID
+	provider eph.Provider
+}
+
+// NewSatellite creates a satellite target.
+func NewSatellite(name string, id eph.ID, provider eph.Provider) *Satellite {
+	return &Satellite{name: name, id: id, provider: provider}
+}
+
+func (s *Satellite) Name() string           { return s.name }
+func (s *Satellite) Provider() eph.Provider { return s.provider }
+func (s *Satellite) EphID() eph.ID          { return s.id }
+
+func (s *Satellite) Position(t time.Time) (coord.ICRS, error) {
+	pos, err := eph.Position(s.provider, s.id, t)
+	if err != nil {
+		return coord.ICRS{}, fmt.Errorf("satellite: ephemeris error for %s: %w", s.name, err)
+	}
+	icrs, err := eph.ToICRS(pos)
+	if err != nil {
+		return coord.ICRS{}, fmt.Errorf("satellite: coordinate conversion error for %s: %w", s.name, err)
+	}
+	return icrs, nil
+}
+
+func (s *Satellite) GeocentricVec(t time.Time) (vector.Vec3, error) {
+	return eph.Position(s.provider, s.id, t)
+}
+
+func (s *Satellite) GetDetails(ctx *coord.Context, props ...string) (*TargetDetails, error) {
+	return computeDetails(s, ctx, props...)
+}
 
 // defaultAtm is used for satellite pass prediction when no atmosphere is specified.
 var defaultAtm = atmosphere.Atmosphere{}

@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/TuSKan/astrogo/angle"
-	"github.com/TuSKan/astrogo/catalog"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/internal/testutil"
@@ -18,7 +17,7 @@ import (
 func TestEventSolver_Visibility_Fixed(t *testing.T) {
 	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(45), 0)
 	site, _ := NewSite("Test", loc, angle.Zero(), nil)
-	obj := NewTarget(catalog.Target{Coord: coord.NewICRS(angle.Deg(0), angle.Deg(0)), HasCoord: true}, nil)
+	obj := NewStar("T", angle.Deg(0), angle.Deg(0))
 
 	start := time.FromJD(2451545.0, time.UTC)
 	end := start.Add(24 * time.Hour)
@@ -54,7 +53,7 @@ func TestEventSolver_Visibility_Fixed(t *testing.T) {
 func TestEventSolver_Visibility_Circumpolar(t *testing.T) {
 	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(45), 0)
 	site, _ := NewSite("Test", loc, angle.Zero(), nil)
-	obj := NewTarget(catalog.Target{Coord: coord.NewICRS(angle.Deg(0), angle.Deg(80)), HasCoord: true}, nil)
+	obj := NewStar("T", angle.Deg(0), angle.Deg(80))
 
 	start := time.FromJD(2451545.0, time.UTC)
 	end := start.Add(24 * time.Hour)
@@ -79,7 +78,7 @@ func TestEventSolver_Visibility_Circumpolar(t *testing.T) {
 func TestEventSolver_Visibility_NeverVisible(t *testing.T) {
 	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(45), 0)
 	site, _ := NewSite("Test", loc, angle.Zero(), nil)
-	obj := NewTarget(catalog.Target{Coord: coord.NewICRS(angle.Deg(0), angle.Deg(-80)), HasCoord: true}, nil)
+	obj := NewStar("T", angle.Deg(0), angle.Deg(-80))
 
 	start := time.FromJD(2451545.0, time.UTC)
 	end := start.Add(24 * time.Hour)
@@ -277,7 +276,7 @@ func TestTwilight_HighLat(t *testing.T) {
 func BenchmarkEventSolver(b *testing.B) {
 	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(45), 0)
 	site, _ := NewSite("Test", loc, angle.Zero(), nil)
-	obj := NewTarget(catalog.Target{Coord: coord.NewICRS(angle.Deg(0), angle.Deg(0)), HasCoord: true}, nil)
+	obj := NewStar("T", angle.Deg(0), angle.Deg(0))
 	start := time.FromJD(2451545.0, time.UTC)
 	end := start.Add(24 * time.Hour)
 	solver := NewEventSolver(30*time.Minute, 1*time.Second)

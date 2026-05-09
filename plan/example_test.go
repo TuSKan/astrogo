@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/TuSKan/astrogo/angle"
-	"github.com/TuSKan/astrogo/catalog"
 
 	"github.com/TuSKan/astrogo/coord"
 
@@ -27,11 +26,7 @@ func ExamplePlanner_Observable() {
 	}
 
 	// Target
-	obj := NewTarget(catalog.Target{
-		Name:     "Arp 220",
-		Coord:    coord.NewICRS(angle.Deg(233.738), angle.Deg(23.503)),
-		HasCoord: true,
-	}, nil)
+	obj := NewStar("Arp 220", angle.Deg(233.738), angle.Deg(23.503))
 
 	// Fixed time: Equinox 2000 midnight (T=0.5).
 	t := time.FromJD(2451545.5, time.UTC)
@@ -50,11 +45,7 @@ func ExampleObservableWindows() {
 	site, _ := NewSite("Greenwich", loc, angle.Zero(), nil)
 
 	// Target at Zenith initially (J2000 Noon LST ~18.69h)
-	obj := NewTarget(catalog.Target{
-		Name:     "ZenithTarget",
-		Coord:    coord.NewICRS(angle.Hour(18.69), angle.Zero()),
-		HasCoord: true,
-	}, nil)
+	obj := NewStar("ZenithTarget", angle.Hour(18.69), angle.Zero())
 
 	start := time.FromJD(2451545.0, time.UTC) // J2000 Noon
 	end := start.Add(6 * time.Hour)
@@ -78,8 +69,8 @@ func ExampleRankObservables() {
 	site, _ := NewSite("Test", loc, angle.Zero(), nil)
 	tm := time.FromJD(2451545.0, time.UTC) // J2000 Noon
 
-	obj1 := NewTarget(catalog.Target{Name: "NearZenith", Coord: coord.NewICRS(angle.Hour(18.69), angle.Deg(0)), HasCoord: true}, nil)
-	obj2 := NewTarget(catalog.Target{Name: "Lower", Coord: coord.NewICRS(angle.Hour(18.69), angle.Deg(45)), HasCoord: true}, nil)
+	obj1 := NewStar("NearZenith", angle.Hour(18.69), angle.Deg(0))
+	obj2 := NewStar("Lower", angle.Hour(18.69), angle.Deg(45))
 	objs := []Observable{obj1, obj2}
 
 	ranked, _ := RankObservables(objs, tm, site)

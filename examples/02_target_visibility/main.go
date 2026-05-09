@@ -29,7 +29,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to resolve target: %v", err)
 	}
-	target := plan.NewTarget(targetData, nil)
+	target := plan.FromCatalog(targetData, nil)
 
 	// 4. Set Time to 'tonight at 7 PM' (UTC-3)
 	tz, _ := time.LoadLocation("America/Sao_Paulo")

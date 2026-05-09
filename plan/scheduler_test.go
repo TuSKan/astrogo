@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/TuSKan/astrogo/angle"
-	"github.com/TuSKan/astrogo/catalog"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/time"
 )
@@ -31,8 +30,8 @@ func TestSchedulerAndStrategies(t *testing.T) {
 	start := time.ZeroTime()
 	window := Window{Start: start, End: start.Add(1 * time.Hour)}
 
-	b1 := &Block{ID: "B1", Target: NewTarget(catalog.Target{Coord: coord.NewICRS(angle.Zero(), angle.Zero()), HasCoord: true}, nil), Duration: 10 * time.Minute}
-	b2 := &Block{ID: "B2", Target: NewTarget(catalog.Target{Coord: coord.NewICRS(angle.Zero(), angle.Zero()), HasCoord: true}, nil), Duration: 20 * time.Minute, Priority: 5.0}
+	b1 := &Block{ID: "B1", Target: NewStar("T", angle.Zero(), angle.Zero()), Duration: 10 * time.Minute}
+	b2 := &Block{ID: "B2", Target: NewStar("T", angle.Zero(), angle.Zero()), Duration: 20 * time.Minute, Priority: 5.0}
 
 	// 1. Greedy Strategy
 	scheduler := NewScheduler(planner, &GreedyStrategy{}, tm)
@@ -65,7 +64,7 @@ func TestSchedulerAndStrategies(t *testing.T) {
 	// 3. Constraints logic
 	b3 := &Block{
 		ID:          "B3",
-		Target:      NewTarget(catalog.Target{Name: "T3"}, nil),
+		Target:      NewStar("T3", angle.Zero(), angle.Zero()),
 		Duration:    20 * time.Minute,
 		Constraints: []Constraint{mockConstraint{pass: false}},
 	}

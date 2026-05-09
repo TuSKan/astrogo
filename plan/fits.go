@@ -4,8 +4,6 @@ import (
 	"fmt"
 
 	"github.com/TuSKan/astrogo/angle"
-	"github.com/TuSKan/astrogo/catalog"
-	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/fits"
 )
@@ -70,9 +68,5 @@ func TargetFromFITS(h *fits.Header) (Observable, error) {
 		}
 	}
 
-	return NewTarget(catalog.Target{
-		Name:  name,
-		Coord: coord.NewICRS(angle.Deg(ra), angle.Deg(dec)),
-		Kind:  resolve.KindOther,
-	}, nil), nil
+	return NewDeepSkyObject(name, angle.Deg(ra), angle.Deg(dec)), nil
 }

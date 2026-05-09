@@ -9,8 +9,6 @@ import (
 
 	"golang.org/x/sync/errgroup"
 
-	"github.com/TuSKan/astrogo/catalog"
-	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
 
@@ -317,7 +315,7 @@ func getMoonPosition(t time.Time) (coord.ICRS, error) {
 		return moonSepCache.pos, nil
 	}
 
-	moon := NewTarget(catalog.Target{ID: "10", Name: "Moon", Kind: resolve.KindMoon}, eph.Default())
+	moon := NewMoon(eph.Default())
 	pos, err := moon.Position(t)
 	if err != nil {
 		return coord.ICRS{}, err

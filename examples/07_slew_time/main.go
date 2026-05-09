@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/TuSKan/astrogo/angle"
-	"github.com/TuSKan/astrogo/catalog"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/plan"
 	"github.com/TuSKan/astrogo/time"
@@ -25,13 +24,13 @@ func main() {
 	// 3. Define two Observing Blocks
 	// Block A (Looking North)
 	blockA := plan.Block{
-		Target: plan.NewTarget(catalog.Target{Name: "TargetA", Coord: coord.NewICRS(angle.Hour(10.0), angle.Deg(20.0))}, nil),
+		Target: plan.NewStar("TargetA", angle.Hour(10.0), angle.Deg(20.0)),
 		Config: plan.Configuration{Filter: "V"},
 	}
 
 	// Block B (Looking South, changing filter)
 	blockB := plan.Block{
-		Target: plan.NewTarget(catalog.Target{Name: "TargetB", Coord: coord.NewICRS(angle.Hour(12.0), angle.Deg(-40.0))}, nil),
+		Target: plan.NewStar("TargetB", angle.Hour(12.0), angle.Deg(-40.0)),
 		Config: plan.Configuration{Filter: "R"},
 	}
 

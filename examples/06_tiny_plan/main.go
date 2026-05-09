@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/TuSKan/astrogo/angle"
-	"github.com/TuSKan/astrogo/catalog"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/plan"
 	"github.com/TuSKan/astrogo/time"
@@ -32,14 +31,14 @@ func main() {
 	blocks := []*plan.Block{
 		{
 			ID:       "Alpha Centauri",
-			Target:   plan.NewTarget(catalog.Target{Name: "Alpha Cen", Coord: coord.NewICRS(angle.Hour(14.66), angle.Deg(-60.83))}, nil),
+			Target:   plan.NewStar("Alpha Cen", angle.Hour(14.66), angle.Deg(-60.83)),
 			Duration: 30 * time.Minute,
 			Priority: 2.0, // High priority
 			Config:   plan.Configuration{Filter: "V"},
 		},
 		{
 			ID:       "Omega Centauri",
-			Target:   plan.NewTarget(catalog.Target{Name: "Omega Cen", Coord: coord.NewICRS(angle.Hour(13.44), angle.Deg(-47.47))}, nil),
+			Target:   plan.NewStar("Omega Cen", angle.Hour(13.44), angle.Deg(-47.47)),
 			Duration: 45 * time.Minute,
 			Priority: 1.0, // Lower priority
 			Config:   plan.Configuration{Filter: "R"},
