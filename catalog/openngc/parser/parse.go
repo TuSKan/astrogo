@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/csv"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -107,7 +108,7 @@ func parseOpenNGC(input io.Reader) ([]targetRecord, error) {
 	var records []targetRecord
 	for {
 		row, err := r.Read()
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			break
 		}
 		if err != nil {

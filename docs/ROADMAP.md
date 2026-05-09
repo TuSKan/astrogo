@@ -1,323 +1,230 @@
 # AstroGo Roadmap
 
-AstroGo aims to become a **pure-Go high-performance, scientifically reliable astronomy library**, focused on precision computation, observatory planning, and scalable data workflows.
-
-The project has achieved strong coverage of core astronomy primitives (time, coordinates, ephemerides, planning, FITS, WCS, catalogs, and validation). The roadmap now focuses on **batch workflows, cross-matching, and operational polish**.
-
----
-
-# ✅ Current Status (Summary)
-
-AstroGo already provides:
-
-- Astronomical time scales (UTC, TAI, TT, **UT1**, TDB)
-- Coordinate frames and transformations (ICRS, Galactic, Ecliptic, AltAz)
-- Observatory modeling and sidereal time
-- Sky calculations (alt/az, airmass, separation, position angle)
-- Event solving (rise, set, transit, twilight)
-- Constraint system and visibility evaluation
-- JPL DE ephemerides with:
-  - multi-kernel support
-  - Horizons on-demand querying
-  - cache + provider abstraction
-- Catalog identity:
-  - OpenNGC embedded
-  - SBDB (NASA) query integration
-  - SIMBAD, Gaia, MAST, VizieR remote providers
-  - **NORAD/CelestTrak** GP data (OMM/JSON)
-- **Satellite tracking (SGP4)**:
-  - TEME→GCRS frame conversion
-  - Sub-satellite ground track
-  - Pass prediction (AOS/TCA/LOS)
-- FITS I/O (multi-extension, tables, images)
-- WCS support
-- Units and quantities system
-- Validation framework against SOFA / Horizons / USNO / FINK / analytical invariants
-- CI with automated testing
-- **Apparent magnitude** for all body types (planets, asteroids, comets, satellites, stars)
-- **FINK/ZTF SSOFT** provider for sHG1G2 phase-curve parameters
-
-The project is **past the foundational stage**.
+**Pure-Go high-performance, scientifically reliable astronomy library** —
+precision computation, observatory planning, and scalable data workflows.
 
 ---
 
-# ✅ Phase 1 — Precision Astronomy Completion
+# ✅ Completed
 
-**Goal:** achieve observatory-grade correctness for real-world usage.
+## Phase 1 — Precision Astronomy
 
-## 1. Earth Orientation Parameters (EOP)
+| # | Capability | Status |
+|---|---|---|
+| 1 | **Earth Orientation Parameters** — UT1−UTC, polar motion, deterministic fallback | ✅ v0.1.0 |
+| 2 | **Coordinate Pipeline** — aberration, proper motion, parallax, topocentric apparent | ✅ v0.1.0 |
+| 3 | **Atmospheric Refraction** — SOFA Refa/Refb at all altitudes, pluggable models | ✅ v0.1.0 |
+| 4 | **Numerical Solver** — Chandrupatla root-finding (1997), Brent's minimization | ✅ v0.1.0 |
+| 5 | **Planetary & Lunar Phenomena** — phases, seasons, apsides, eclipses, geometry events | ✅ v0.1.0 |
+| 6 | **Scale-Aware Time** — full UTC↔TAI↔TT↔TDB↔UT1 graph, Fairhead TDB, explicit UT1 errors | ✅ v0.1.0 |
+| 7 | **Visibility Boundary Refinement** — sub-second Chandrupatla + bisection | ✅ v0.1.0 |
+| 8 | **API Hygiene** — nil guards, epsilon equality, defensive copies | ✅ v0.1.0 |
 
-**Status:** ✅ Complete
+## Phase 2 — Scheduling Engine
 
-- [x] UT1–UTC correction ingestion
-- [x] EOP data loader and cache
-- [x] polar motion support
-- [x] deterministic fallback for stale/missing data
-- [x] validation against reference datasets
+| # | Capability | Status |
+|---|---|---|
+| 9 | **Scheduling Strategies** — Greedy, Priority, SwapOptimized (monotonic local search) | ✅ v0.1.0 |
+| 10 | **Transition Modeling** — slew-time, filter change costs, setup overhead | ✅ v0.1.0 |
+| 11 | **Explainable Output** — structured schedule, score breakdown, rejection reasons | ✅ v0.1.0 |
 
----
+## Phase 3 — Validation & Scientific Trust
 
-## 2. Apparent / Observed Coordinate Pipeline
+| # | Capability | Status |
+|---|---|---|
+| 12 | **USNO Validation** — rise/set ≤0.6 min, phases ≤1 min, eclipses date-exact | ✅ v0.1.0 |
+| 13 | **Scientific CI** — integration/validation tags, tolerance drift detection, FINK match | ✅ v0.1.0 |
+| 14 | **Benchmark Suite** — 40+ benchmarks across coord, time, atmosphere, plan | ✅ v0.1.0 |
 
-**Status:** ✅ Complete
+## Phase 4 — Data & Photometry
 
-- [x] aberration corrections
-- [x] proper motion propagation
-- [x] parallax handling
-- [x] topocentric apparent coordinates
-- [x] explicit API separation (geometric, astrometric, apparent, observed)
+| # | Capability | Status |
+|---|---|---|
+| 15 | **Catalog Data Layer** — SIMBAD, MAST, SBDB, VizieR, Gaia, OpenNGC, NORAD, FINK | ✅ v0.1.2 |
+| 16 | **NORAD Satellite Tracking** — CelestTrak GP, SGP4, TEME→GCRS, pass prediction | ✅ v0.1.2 |
+| 17 | **Apparent Magnitude** — planets, asteroids (sHG1G2), comets, satellites, stars | ✅ v0.1.3 |
+| 18 | **WCS** — TAN/ARC/STG/SIN/AIT, SIP distortion, TPV distortion, axis-order detection | ✅ v0.1.3 |
+| 19 | **Parallel Batch Reduction** — `ReduceBatchParallel`, 4.3× on 16 threads | ✅ v0.1.3 |
 
----
+## Phase 5 — Polymorphic Architecture
 
-## 3. Atmospheric Refraction Model
-
-**Status:** ✅ Complete
-
-- [x] refraction model abstraction
-- [x] standard atmosphere correction
-- [x] optional pressure / temperature input
-- [x] selectable modes (none, approximate, improved/SOFA)
-
----
-
-## 4. Numerical Solver Architecture
-
-**Status:** ✅ Complete
-
-- [x] Unified `Solver` struct (`plan/solver.go`)
-- [x] Chandrupatla root-finding (1997) — replaces Brent's method for roots
-- [x] Brent's minimization — retained for smooth unimodal extremum-finding
-- [x] Eliminated ~300 lines of duplicated solver code
-- [x] Comprehensive unit tests (`solver_test.go` — 17 tests, black-box)
-- [x] Transit detection edge case fix (non-bracketed intervals)
-
----
-
-## 5. Planetary & Lunar Phenomena
-
-**Status:** ✅ Complete
-
-- [x] Moon phases (New, First Quarter, Full, Last Quarter) — ≤1 min vs USNO
-- [x] Earth's seasons (equinoxes + solstices) — 2–4 min vs USNO
-- [x] Perihelion/Aphelion (`plan.Apsides`) — **≤1 min** vs USNO
-- [x] Lunar eclipse detection (`plan.LunarEclipses`) — ecliptic latitude filter
-- [x] Solar eclipse detection (`plan.SolarEclipses`) — ecliptic latitude filter
-- [x] Moon illumination fraction (`plan.MoonIllumination`)
-- [x] Conjunctions, oppositions, greatest elongations
-- [x] Validated against USNO API and NASA Eclipse Catalog (2026)
+| # | Capability | Status |
+|---|---|---|
+| 20 | **Observable type hierarchy** — `Star`, `Planet`, `Asteroid`, `Comet`, `Satellite`, `DeepSkyObject` | ✅ v0.1.4 |
+| 21 | **Interface dispatch** — `Observable`, `MovingBody`, `MagnitudeComputer` replace flag checks | ✅ v0.1.4 |
+| 22 | **`FromCatalog` factory** — `catalog.Target` wire format → concrete typed Observable | ✅ v0.1.4 |
+| 23 | **Legacy cleanup** — `Target` god-struct, `NewTarget`, boolean-flag dispatch deleted | ✅ v0.1.4 |
 
 ---
 
-# ✅ Phase 2 — Scheduling Engine
+# 🔨 Phase 6 — Advanced Constraints & Realism
 
-**Goal:** evolve from planning primitives to full observatory scheduling.
+**Goal:** model the constraints that real observers face beyond altitude and airmass.
 
-## 6. Advanced Scheduling Optimization
-
-**Status:** ✅ Complete
-
-- [x] observing block abstraction
-- [x] target prioritization
-- [x] multi-target optimization
-- [x] cadence-aware scheduling
-- [x] pluggable strategies (greedy, priority-based, constraint-aware)
-- [x] **`SwapOptimizedStrategy`** — monotonic local search with adjacent swaps + gap insertion
-- [x] `ScoreObservable` at block midpoint for cross-strategy comparability
-- [x] Linear scaling benchmarked to 100 blocks
-
----
-
-## 7. Transition & Operational Overhead Modeling
-
-**Status:** ✅ Complete
-
-- [x] slew-time estimation
-- [x] configuration / filter change costs
-- [x] setup overhead modeling
-- [x] penalty-aware scheduling integration
-
----
-
-## 8. Explainable Scheduling Output
-
-**Status:** ✅ Complete
-
-- [x] structured schedule object
-- [x] score breakdown per decision
-- [x] rejection explanations
-- [x] reproducible scheduling traces
-
----
-
-# ✅ Phase 3 — Validation & Scientific Trust
-
-**Goal:** maintain and strengthen scientific reliability.
-
-## 9. USNO Integration Validation
-
-**Status:** ✅ Complete
-
-- [x] Sun/Moon rise/set/transit — ≤1 min vs USNO API
-- [x] Moon phases — ≤1 min vs USNO API
-- [x] Earth's seasons — 2–4 min vs USNO API
-- [x] Perihelion/Aphelion — ≤1 min vs USNO API
-- [x] Lunar/Solar eclipses — date-exact vs NASA Eclipse Catalog
-- [x] Celestial navigation (AltAz) — 0.002° vs USNO API
-- [x] Julian Date conversion — exact
-- [x] Sidereal time — sanity-checked
-- [ ] Moon phases vs [AstroPixels historical catalog](http://astropixels.com/ephemeris/phasescat/phases0001.html) (1–100 CE)
-
-See [`USNO.md`](./USNO.md) and [`VALIDATION.md`](./VALIDATION.md) for full details.
-
----
-
-## 10. Scientific CI Gating
-
-**Status:** ✅ Complete
-
-- [x] validation suite separated from unit tests (`-tags=integration`)
-- [x] tolerance drift detection
-- [x] corpus-based regression runs (JPL Horizons)
-- [x] CI failure on scientific regressions
-
----
-
-# ✅ Phase 3.5 — Observatory-Grade Hardening (v0.1.0)
-
-**Goal:** eliminate scientific liabilities and establish production-grade correctness.
-
-## 11. Scale-Aware Time System
-
-**Status:** ✅ Complete
-
-- [x] Full bidirectional conversion graph: `UTC↔TAI↔TT↔TDB`, `UTC↔UT1`
-- [x] Fairhead & Bretagnon (1990) TDB−TT correction (±3 µs residual)
-- [x] `UT1()` returns `(Time, error)` — explicit IERS data unavailability
-- [x] Cross-scale `Before`, `After`, `Equal`, `Sub`, `SubDays` auto-unify via TT
-- [x] Zero-overhead same-scale fast path (~2 ns)
-
-## 12. Visibility Boundary Refinement
-
-**Status:** ✅ Complete
-
-- [x] Chandrupatla root-finding for continuous altitude crossings
-- [x] Binary search for discrete constraint state transitions
-- [x] `VisibleIntervals`, `Find`, `ObservableWindows` refined to sub-second precision
-
-## 13. API Hygiene & Defensive Patterns
-
-**Status:** ✅ Complete
-
-- [x] `NewSite` nil-location guard (`ErrNilLocation`)
-- [x] `Site.Equal` epsilon-tolerant comparison (1e-12 rad)
-- [x] `DeepSpace.Position` and `Custom.Position` return defensive copies
-- [x] Consistent SOFA refraction at all altitudes (fixed `AtAltitude(0)` path)
-
-## 14. Illumination Event Family
-
-**Status:** ✅ Complete
-
-- [x] `EventFamilyIllumination` in EventSolver dispatch
-- [x] `solveIllumination` via ecliptic longitude (delegates to `moonElongation`)
-- [x] `isPhaseEvent` guard for validation exemption
-- [x] `NextNewMoon`, `NextFullMoon` convenience helpers
-- [x] `EventAnyPhase` wildcard
-
-## 15. Benchmark Suite
-
-**Status:** ✅ Complete (40+ benchmarks across 5 packages)
-
-- [x] `coord/`: NewContext, ICRSToAltAz (cached vs uncached), 100-star batch, Reducer
-- [x] `time/`: All scale conversions, round-trip, same-scale vs cross-scale comparison
-- [x] `atmosphere/`: Rigorous, Approximate, horizon, Airmass, AtAltitude
-- [x] `plan/`: VisibleIntervals (10 min / 1 min), ObservableWindows, EventSolver, scheduler scaling (10/50/100 blocks × 3 strategies), TransitEstimate
-
-## 16. Atmosphere Correctness Tests
-
-**Status:** ✅ Complete (19 tests)
-
-- [x] Refraction at known altitudes (zenith, 45°, 20°, 10°, horizon, below)
-- [x] Wavelength dispersion (blue > red)
-- [x] Zero-pressure guard, RefractionNone contract
-- [x] Airmass known values, monotonicity, below-horizon error
-- [x] AtAltitude pressure/temperature validation (sea level through Everest)
-- [x] Model nil consistency at all altitudes
-- [x] HorizonDip, ZenithDistance
-
----
-
-# 📊 Phase 4 — Data Workflow Layer
-
-**Goal:** enable real catalog and pipeline workflows.
-
-## 17. Catalog Table Infrastructure
-
-**Status:** ✅ Complete (Remote Data Layer)
-
-- [x] structured catalog table abstraction
-- [x] remote provider bindings (SIMBAD, MAST, SBDB, VizieR, Gaia)
-- [x] explicit offline regression caches (JSON/XML/CSV structural decoding)
-- [x] memory-mapped hardware vectors via Arrow `RecordBatch`
-- [x] resilient API rate-limit backoffs
-- [x] integration with FITS tables and arrays
-
-### Remaining
-
-- [ ] cross-match logic algorithms (positional, multi-catalog)
-
----
-
-## 17.6 Apparent Magnitude & FINK Photometry
-
-**Status:** ✅ Complete
-
-- [x] `magnitude/` package — Mallama & Hilton (2018) planets, Saturn rings, Neptune secular brightening
-- [x] Asteroid phase curves: H,G (Bowell 1989), H,G₁,G₂ (Muinonen 2010), H,G₁₂* (Penttilä 2016)
-- [x] **sHG1G2** (Carry et al. 2024) — 7-parameter spin-geometry model with `CosAspectAngle()`, `SpinCorrection()`
-- [x] Comet, satellite, star, Sun, Moon magnitude functions
-- [x] `catalog/fink` provider — FINK/ZTF SSOFT (single-object JSON + bulk parquet)
-- [x] `resolve.Target` extended with G1, G2, SpinRA, SpinDec, Oblateness fields
-- [x] `plan/details.go` upgraded: sHG1G2 → HG1G2 → HG priority chain
-- [x] **E2E validation**: 186 r-band observations of 8467 Benoitcarry — 100% match at 0.025 mag vs FINK phunk pipeline
-- [x] 36 magnitude tests + 5 FINK network validation tests
-
----
-
-## 17.5 NORAD Satellite Tracking
-
-**Status:** ✅ Complete
-
-- [x] CelestTrak GP JSON client (`catalog/norad`) — OMM-aligned field names (CCSDS 502.0-B-3 / Space Data Standards)
-- [x] TLE generation from OMM fields for SGP4 initialization
-- [x] SGP4 propagation via `go-satellite` (`ephemeris/satellite`)
-- [x] TEME → GCRS frame conversion (via SOFA GAST)
-- [x] `ephemeris.Provider` interface implementation (State in AU, AU/day)
-- [x] Sub-satellite ground track (geodetic lat/lon/alt)
-- [x] Topocentric look angles (azimuth, elevation, range)
-- [x] Pass prediction (`plan.SatellitePasses`) — AOS/TCA/LOS with Chandrupatla rise/set refinement
-- [x] Catalog integration (`catalog.NORAD` source in unified Resolver)
-- [x] Live example (`examples/12_satellite_tracking/`) — ISS tracking with CelestTrak data
-- [x] Validated: ISS altitude ~420 km, orbital period ~93 min, velocity ~7.7 km/s
----
-
-## 18. Batch / High-Throughput APIs
+## 24. Light Pollution Constraint
 
 **Status:** 🔲 Not Started
 
-- [ ] batch coordinate transforms
-- [ ] batch ephemeris evaluation
-- [ ] batch visibility computation
-- [ ] batch event solving
-- [ ] concurrency-safe kernel/cache usage
+Bortle/SQM-based sky brightness thresholds that penalize or reject targets in zones
+where limiting magnitude is too shallow.
 
-### Outcome
-Efficient large-scale processing (surveys, pipelines, services).
+- [ ] `SkyBrightness` constraint — accepts Bortle class (1–9) or SQM (mag/arcsec²)
+- [ ] Per-target minimum limiting magnitude threshold
+- [ ] Optional sky-brightness grid (spatial SQM map) for directional evaluation
+- [ ] Integration with `ScoreObservable` — brightness-limited targets get lower merit
+
+**Inspiration:** Light pollution atlases (Falchi et al. 2016), ClearDarkSky SQM data.
+
+---
+
+## 25. Horizon Profile Constraint
+
+**Status:** 🔲 Not Started
+
+Per-azimuth altitude minimums from terrain data, replacing the flat-horizon assumption.
+
+- [ ] `HorizonProfile` type — azimuth → minimum altitude lookup (interpolated)
+- [ ] Load from CSV/JSON (azimuth, altitude pairs)
+- [ ] Load from terrain raycasting (DEM/SRTM input)
+- [ ] `Horizon` constraint — rejects targets below the local terrain horizon at their azimuth
+- [ ] Integration with `NewSite` — optional profile per observatory
+
+**Inspiration:** astroplan's `AltitudeConstraint` with custom horizon, KStars terrain profiles.
+
+---
+
+## 26. Weather Constraint
+
+**Status:** 🔲 Not Started
+
+Real-time or forecast-based weather gating for scheduling decisions.
+
+- [ ] `Weather` constraint interface — cloud cover, wind, humidity, dew point
+- [ ] Provider abstraction for weather data sources (OpenMeteo, Visual Crossing, local station)
+- [ ] Cloud cover threshold (reject if > N% overcast)
+- [ ] Wind speed limit (telescope safety)
+- [ ] Dew point proximity alert (condensation risk)
+- [ ] Precipitation rejection
+- [ ] Historical weather-weighted scoring for long-term planning
+
+**Note:** Weather is inherently probabilistic. The constraint should support both
+"hard reject" (active rain) and "soft penalty" (marginal clouds) modes.
+
+---
+
+## 27. Satellite Illumination Constraint
+
+**Status:** 🔲 Not Started
+
+Visual satellite observation requires three simultaneous conditions: the satellite is
+above the observer's horizon, the observer is in darkness, and the satellite is in sunlight.
+
+- [ ] `SatelliteIllumination` constraint — Earth shadow geometry
+- [ ] Cylindrical shadow model (sufficient for LEO/MEO)
+- [ ] Integration with `SatellitePasses` — filter passes by illumination status
+- [ ] Iridium flare prediction (specular reflection geometry)
+
+---
+
+# 📊 Phase 7 — Visualization
+
+**Goal:** publication-ready sky charts and planning diagrams, in the spirit of
+[starplot.dev](https://starplot.dev) and astroplan's `plot_airmass` / `plot_sky` / `plot_parallactic`.
+
+## 28. Airmass Diagram
+
+**Status:** 🔲 Not Started
+
+Classic observing-night airmass plot: time on x-axis, airmass (inverted) on y-axis,
+one curve per target, twilight bands shaded.
+
+- [ ] `plot.Airmass(targets, site, night)` → SVG/PNG
+- [ ] Twilight shading (civil, nautical, astronomical)
+- [ ] Moon altitude/illumination annotation
+- [ ] Multi-target overlay with legend
+- [ ] Interactive HTML variant (hover for exact values)
+
+**Inspiration:** astroplan `plot_airmass`, Stellarium altitude graph.
+
+---
+
+## 29. Sky Chart
+
+**Status:** 🔲 Not Started
+
+Polar projection sky map showing target positions, horizon profile, and cardinal directions.
+
+- [ ] `plot.SkyChart(targets, site, time)` → SVG/PNG
+- [ ] Stereographic or orthographic polar projection
+- [ ] Horizon profile overlay (if available)
+- [ ] Target markers with labels
+- [ ] Moon/Sun positions annotated
+- [ ] Constellation grid (optional)
+
+**Inspiration:** starplot.dev, Cartes du Ciel, astroplan `plot_sky`.
+
+---
+
+## 30. Observability Table
+
+**Status:** 🔲 Not Started
+
+Tabular summary of target visibility across a night or multi-night window.
+
+- [ ] `plot.ObservabilityTable(targets, site, nights)` → SVG/PNG/HTML
+- [ ] Color-coded cells (green = observable, red = below constraints, yellow = marginal)
+- [ ] Time resolution (15 min default)
+- [ ] Multi-night calendar view
+- [ ] Constraint breakdown tooltip (which constraint failed)
+
+**Inspiration:** astroplan `plot_schedule`, ESO Phase 2 visibility tables.
+
+---
+
+## 31. Parallactic Angle Diagram
+
+**Status:** 🔲 Not Started
+
+Parallactic angle vs. time for targets — critical for slit-spectroscopy and
+atmospheric dispersion compensator planning.
+
+- [ ] `plot.ParallacticAngle(targets, site, night)` → SVG/PNG
+- [ ] Parallactic angle calculation (already available via coord pipeline)
+- [ ] Optimal slit rotation overlay
+
+**Inspiration:** astroplan `plot_parallactic`.
+
+---
+
+# 📊 Phase 8 — Batch & Pipeline
+
+**Goal:** enable high-throughput catalog and pipeline workflows.
+
+## 32. Batch / High-Throughput APIs
+
+**Status:** 🔲 Not Started
+
+- [ ] Batch coordinate transforms (vectorized)
+- [ ] Batch ephemeris evaluation
+- [ ] Batch visibility computation
+- [ ] Batch event solving
+- [ ] Concurrency-safe kernel/cache usage
+
+---
+
+## 33. Cross-Match Algorithms
+
+**Status:** 🔲 Not Started
+
+- [ ] Positional cross-match (nearest neighbor, cone radius)
+- [ ] Multi-catalog cross-match (SIMBAD × Gaia × OpenNGC)
+- [ ] Probabilistic matching (Bayesian, with proper motion correction)
 
 ---
 
 # 🎯 Strategic Direction
 
-AstroGo should position itself as:
+AstroGo positions itself as:
 
 > **A high-performance Go-native astronomy engine focused on precision, ephemerides, and observatory planning — with strong support for large-scale and backend workflows.**
 
@@ -331,43 +238,6 @@ Not as a full clone of other ecosystems, but as:
 
 # ⚠️ Non-Goals (for now)
 
-To maintain focus, the following are intentionally not prioritized:
-
-- full spectral analysis stack
-- complete reproduction of all Astropy submodules
-
-These can be explored later if aligned with project direction.
-
----
-
-# 🧭 Summary
-
-AstroGo has completed all core astronomy capabilities and v0.1.0 hardening:
-
-- ✅ Scale-aware time system (full conversion graph, Fairhead TDB, explicit UT1 errors)
-- ✅ SOFA-rigorous refraction at all altitudes
-- ✅ Sub-second visibility boundary refinement
-- ✅ Production scheduler (SwapOptimized, linear scaling)
-- ✅ Complete event solver (visibility, geometry, illumination, eclipses)
-- ✅ API hygiene (nil guards, epsilon equality, defensive copies)
-- ✅ 40+ benchmarks validating performance claims
-- ✅ Scientific validation (USNO, JPL Horizons, NASA Eclipse Catalog)
-- ✅ Catalog remote data layer
-- ✅ **NORAD satellite tracking** (CelestTrak GP, SGP4, pass prediction)
-- ✅ **Apparent magnitude** (planets, asteroids, comets, satellites, stars — 36 tests)
-- ✅ **FINK/ZTF SSOFT** (sHG1G2 spin-geometry photometry — validated against phunk pipeline)
-
-The remaining work is concentrated in:
-
-- **Polymorphic Observable architecture** — replace `Target` god-struct with typed `Star`, `Planet`, `Asteroid`, `Comet`, `Satellite`, `DeepSkyObject` — each with embedded `eph.Provider` and own `ApparentMagnitude()` method
-- **Batch/vectorized APIs** for high-throughput use cases
-- **Cross-match algorithms** for multi-catalog workflows
-- **Satellite illumination constraints** (sunlit + dark sky for visual observation)
-
-Completing these will elevate AstroGo from:
-
-> **an observatory-grade astronomy library**
-
-to:
-
-> **a scalable astronomy platform for Go**
+- Full spectral analysis stack
+- Complete reproduction of all Astropy submodules
+- GUI application (the visualization phase targets programmatic output: SVG/PNG/HTML)

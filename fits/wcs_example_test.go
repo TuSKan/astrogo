@@ -502,3 +502,106 @@ func TestSIPDistortion(t *testing.T) {
 		}
 	}
 }
+
+// TestTPVDistortion verifies that TPV polynomial distortion produces correct
+// pixel↔world round-trips and measurable shifts vs undistorted TAN.
+func TestTPVDistortion(t *testing.T) {
+	// Set up a TAN-TPV WCS for a 4096×4096 detector.
+	// 0.25 arcsec/pixel scale — typical ground-based wide-field imager.
+	w := fits.NewWCS(2)
+	w.SetCTYPE([]string{"RA---TAN-TPV", "DEC--TAN-TPV"})
+	w.SetCRPIX([]float64{2048.5, 2048.5})
+	w.SetCRVAL([]float64{150.0, 45.0})
+
+	scale := 0.25 / 3600.0 // 0.25 arcsec in degrees
+	w.SetCDELT([]float64{-scale, scale})
+
+	// TPV distortion coefficients (representative of SCAMP astrometric solution).
+	// PV1 affects the longitude axis, PV2 affects the latitude axis.
+	pv1 := map[int]float64{
+		1:  1.0,   // linear term (identity)
+		4:  0.02,  // x² radial
+		6:  0.015, // y² radial
+		7:  0.5,   // x³
+		9:  0.3,   // xy²
+		11: -0.1,  // r³
+	}
+	pv2 := map[int]float64{
+		2:  1.0,   // linear term (identity)
+		4:  0.01,  // x²
+		6:  0.025, // y²
+		8:  0.4,   // x²y
+		10: 0.6,   // y³
+		11: -0.1,  // r³
+	}
+	w.SetTPV(pv1, pv2)
+
+	// Pure TAN for comparison.
+	wNoTPV := fits.NewWCS(2)
+	wNoTPV.SetCTYPE([]string{"RA---TAN", "DEC--TAN"})
+	wNoTPV.SetCRPIX([]float64{2048.5, 2048.5})
+	wNoTPV.SetCRVAL([]float64{150.0, 45.0})
+	wNoTPV.SetCDELT([]float64{-scale, scale})
+
+	// Test 1: At reference pixel, TPV should produce zero distortion.
+	refWorld, err := w.PixelToWorld([]float64{2048.5, 2048.5})
+	if err != nil {
+		t.Fatalf("TPV PixelToWorld at CRPIX: %v", err)
+	}
+	if math.Abs(refWorld[0]-150.0) > 1e-10 || math.Abs(refWorld[1]-45.0) > 1e-10 {
+		t.Errorf("TPV at CRPIX: expected (150, 45), got (%.10f, %.10f)", refWorld[0], refWorld[1])
+	}
+
+	// Test 2: At field edge, TPV should produce a measurable shift vs pure TAN.
+	edgePx := []float64{200.0, 200.0} // ~1848 pixels from center
+
+	tpvWorld, err := w.PixelToWorld(edgePx)
+	if err != nil {
+		t.Fatalf("TPV PixelToWorld at edge: %v", err)
+	}
+
+	tanWorld, err := wNoTPV.PixelToWorld(edgePx)
+	if err != nil {
+		t.Fatalf("TAN PixelToWorld at edge: %v", err)
+	}
+
+	dRA := (tpvWorld[0] - tanWorld[0]) * 3600.0  // arcsec
+	dDec := (tpvWorld[1] - tanWorld[1]) * 3600.0 // arcsec
+	shift := math.Sqrt(dRA*dRA + dDec*dDec)
+
+	t.Logf("TPV shift at edge: dRA=%.4f\" dDec=%.4f\" total=%.4f\"", dRA, dDec, shift)
+
+	if shift < 0.001 {
+		t.Errorf("TPV distortion too small at field edge: %.6f arcsec", shift)
+	}
+	if shift > 100.0 {
+		t.Errorf("TPV distortion unreasonably large: %.4f arcsec", shift)
+	}
+
+	// Test 3: Forward/inverse round-trip with TPV.
+	testPixels := [][]float64{
+		{2048.5, 2048.5}, // center
+		{200.0, 200.0},   // corner
+		{3900.0, 3900.0}, // opposite corner
+		{1000.0, 3000.0}, // off-axis
+		{2048.5, 200.0},  // edge
+	}
+
+	for _, px := range testPixels {
+		world, err := w.PixelToWorld(px)
+		if err != nil {
+			t.Fatalf("TPV PixelToWorld(%.1f, %.1f): %v", px[0], px[1], err)
+		}
+
+		rtPx, err := w.WorldToPixel(world)
+		if err != nil {
+			t.Fatalf("TPV WorldToPixel(%.6f, %.6f): %v", world[0], world[1], err)
+		}
+
+		dPx := math.Sqrt((rtPx[0]-px[0])*(rtPx[0]-px[0]) + (rtPx[1]-px[1])*(rtPx[1]-px[1]))
+		if dPx > 0.01 { // 0.01 pixel tolerance (Newton-Raphson should be very accurate)
+			t.Errorf("TPV round-trip (%.1f, %.1f) → (%.6f, %.6f) → (%.4f, %.4f): residual %.6f px",
+				px[0], px[1], world[0], world[1], rtPx[0], rtPx[1], dPx)
+		}
+	}
+}

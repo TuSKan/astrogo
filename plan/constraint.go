@@ -6,6 +6,7 @@
 package plan
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/TuSKan/astrogo/angle"
@@ -103,7 +104,7 @@ func (c Airmass) Check(obj Observable, t time.Time, site *Site) (Result, error) 
 func (c Airmass) CheckCtx(obj Observable, t time.Time, site *Site, ctx *coord.Context) (Result, error) {
 	am, err := skyAirmassCtx(obj, t, ctx)
 	if err != nil {
-		if err == atmosphere.ErrBelowHorizon {
+		if errors.Is(err, atmosphere.ErrBelowHorizon) {
 			return Result{
 				Pass:   false,
 				Reason: "target is below the horizon",

@@ -34,16 +34,16 @@ type Asteroid struct {
 type AsteroidOption func(*Asteroid)
 
 // WithHG sets the classic H,G parameters.
-func WithHG(H, G float64) AsteroidOption {
-	return func(a *Asteroid) { a.H = H; a.G = G }
+func WithHG(absH, slopeG float64) AsteroidOption {
+	return func(a *Asteroid) { a.H = absH; a.G = slopeG }
 }
 
 // WithHG1G2 sets the three-parameter HG1G2 phase curve.
-func WithHG1G2(H, G1, G2 float64) AsteroidOption {
+func WithHG1G2(absH, g1, g2 float64) AsteroidOption {
 	return func(a *Asteroid) {
-		a.H = H
-		a.G1 = G1
-		a.G2 = G2
+		a.H = absH
+		a.G1 = g1
+		a.G2 = g2
 		a.hasG1G2 = true
 	}
 }
@@ -136,9 +136,9 @@ func (a *Asteroid) helioGeometry(t time.Time) (r, delta float64, alpha angle.Ang
 	hy := st.Pos.Y - sunSt.Pos.Y
 	hz := st.Pos.Z - sunSt.Pos.Z
 	r = math.Sqrt(hx*hx + hy*hy + hz*hz)
-	R := sunSt.Distance()
+	sunDist := sunSt.Distance()
 
-	cosA := (r*r + delta*delta - R*R) / (2 * r * delta)
+	cosA := (r*r + delta*delta - sunDist*sunDist) / (2 * r * delta)
 	cosA = clamp(cosA, -1, 1)
 	alpha = angle.Rad(math.Acos(cosA))
 	return

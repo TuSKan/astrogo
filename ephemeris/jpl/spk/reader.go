@@ -2,6 +2,7 @@ package spk
 
 import (
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -176,10 +177,10 @@ func (r *Reader) ReadDoubles(startWord, endWord int32) ([]float64, error) {
 
 	buf := make([]byte, count*8)
 	n, err := r.F.ReadAt(buf, int64(startWord-1)*8)
-	if err != nil && err != io.EOF {
+	if err != nil && !errors.Is(err, io.EOF) {
 		return nil, err
 	}
-	if n < len(buf) && (err == io.EOF || err == nil) {
+	if n < len(buf) && (errors.Is(err, io.EOF) || err == nil) {
 		return nil, fmt.Errorf("jpl/spk: corrupt file (unexpected EOF reading word %d)", startWord)
 	}
 
