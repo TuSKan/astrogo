@@ -192,14 +192,25 @@ func (s *Scheduler) BuildSchedule(window Window, blocks []*Block) (*Schedule, er
 
 const defaultStep = 1 * time.Minute
 
-// checkConstraintsInterval verifies that all constraints pass continuously over a time range.
+// checkConstraintsIntervalCtx verifies that all constraints pass continuously
+// over a time range, and returns the coord.Context closest to the interval
+// midpoint. Callers that need to score the same block immediately after
+// constraint checking can reuse this Context instead of creating a redundant
+// one (~91 µs saved per call).
 //
 // Performance: creates a single coord.Context per time step and shares it
 // across all constraints that implement ConstraintCtx, avoiding redundant
-// SOFA matrix computations (~91 µs each).
-func checkConstraintsInterval(target Observable, start, end time.Time, step time.Duration, site *Site, constraints ...Constraint) bool {
+// SOFA matrix computations.
+func checkConstraintsIntervalCtx(target Observable, start, end time.Time, step time.Duration, site *Site, constraints ...Constraint) (*coord.Context, bool) {
+	mid := start.Add(end.Sub(start) / 2)
+	var midCtx *coord.Context
+
 	check := func(t time.Time) bool {
 		ctx := coord.NewContext(t, site.Location(), site.Atmosphere())
+		// Capture the context closest to the midpoint for reuse by scoring.
+		if midCtx == nil || absDur(t.Sub(mid)) <= absDur(midCtx.Time().Sub(mid)) {
+			midCtx = ctx
+		}
 		for _, c := range constraints {
 			var res Result
 			var err error
@@ -218,7 +229,7 @@ func checkConstraintsInterval(target Observable, start, end time.Time, step time
 	t := start
 	for t.Before(end) || t.Equal(end) {
 		if !check(t) {
-			return false
+			return nil, false
 		}
 		t = t.Add(step)
 	}
@@ -226,11 +237,19 @@ func checkConstraintsInterval(target Observable, start, end time.Time, step time
 	// Always check the exact end time as well.
 	if !start.Equal(end) {
 		if !check(end) {
-			return false
+			return nil, false
 		}
 	}
 
-	return true
+	return midCtx, true
+}
+
+// absDur returns the absolute value of a time.Duration.
+func absDur(d time.Duration) time.Duration {
+	if d < 0 {
+		return -d
+	}
+	return d
 }
 
 // GreedyStrategy traverses time forward and schedules the first block in the list
@@ -314,8 +333,8 @@ func (s *GreedyStrategy) Schedule(planner *Planner, window Window, blocks []*Blo
 			allConstraints = append(allConstraints, b.Constraints...)
 
 			// Check observability over the full duration
-			if checkConstraintsInterval(b.Target, startTime, endTime, step, planner.Site, allConstraints...) {
-				score := scoreBlockPlacement(b, startTime, endTime, planner)
+			if midCtx, ok := checkConstraintsIntervalCtx(b.Target, startTime, endTime, step, planner.Site, allConstraints...); ok {
+				score := scoreBlockPlacement(b, startTime, endTime, planner, midCtx)
 				sched.Blocks = append(sched.Blocks, ScheduledBlock{
 					Block:     b,
 					Window:    Window{Start: startTime, End: endTime},

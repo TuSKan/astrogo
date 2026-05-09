@@ -24,18 +24,18 @@ type Comet struct {
 type CometOption func(*Comet)
 
 // WithNuclearMagnitude sets the nuclear magnitude parameters.
-func WithNuclearMagnitude(M2, K2 float64) CometOption {
-	return func(c *Comet) { c.M2 = M2; c.K2 = K2 }
+func WithNuclearMagnitude(m2, k2 float64) CometOption {
+	return func(c *Comet) { c.M2 = m2; c.K2 = k2 }
 }
 
 // NewCometWithOptions creates a comet target with optional parameters.
-func NewComet(name string, id eph.ID, provider eph.Provider, M1, K1 float64, opts ...CometOption) *Comet {
+func NewComet(name string, id eph.ID, provider eph.Provider, m1, k1 float64, opts ...CometOption) *Comet {
 	c := &Comet{
 		name:     name,
 		id:       id,
 		provider: provider,
-		M1:       M1,
-		K1:       K1,
+		M1:       m1,
+		K1:       k1,
 	}
 	for _, opt := range opts {
 		opt(c)

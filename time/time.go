@@ -334,7 +334,7 @@ func (t Time) Weekday() Weekday {
 	// Floor to get the nearest noon JD (integer), then shift
 	// The day of the week = (floor(JD + 0.5) + 1) mod 7
 	d := int(math.Floor(jd+0.5)) + 1
-	d = d % 7
+	d %= 7
 	if d < 0 {
 		d += 7
 	}

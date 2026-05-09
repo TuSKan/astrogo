@@ -97,7 +97,7 @@ func main() {
 		var results []result
 
 		for _, obj := range targets {
-			score, err := plan.ScoreObservable(obj, tm, site, profile.cfg, constraints...)
+			score, err := plan.ScoreObservable(obj, tm, site, profile.cfg, nil, constraints...)
 			if err != nil {
 				fmt.Printf("  %-14s  error: %v\n", obj.Name(), err)
 				continue

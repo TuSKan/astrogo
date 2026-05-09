@@ -60,11 +60,14 @@ func (ctx *Context) ReduceBatchParallel(in []vector.Vec3, out []AltAz) {
 		if end > n {
 			end = n
 		}
+		// Each worker gets its own Context copy to avoid shared mutable
+		// ASTROM state (SOFA's iauAtioq may cache refraction coefficients).
+		local := ctx.Clone()
 		wg.Add(1)
 		go func(lo, hi int) {
 			defer wg.Done()
 			for i := lo; i < hi; i++ {
-				out[i] = ctx.GeocentricToObserved(in[i])
+				out[i] = local.GeocentricToObserved(in[i])
 			}
 		}(start, end)
 	}
@@ -119,11 +122,14 @@ func (ctx *Context) ICRSBatchToAltAzParallel(in []ICRS, out []AltAz) {
 		if end > n {
 			end = n
 		}
+		// Each worker gets its own Context copy to avoid shared mutable
+		// ASTROM state (SOFA's iauAtioq may cache refraction coefficients).
+		local := ctx.Clone()
 		wg.Add(1)
 		go func(lo, hi int) {
 			defer wg.Done()
 			for i := lo; i < hi; i++ {
-				altaz := ctx.AstrometricToObserved(in[i].Astrometric())
+				altaz := local.AstrometricToObserved(in[i].Astrometric())
 				altaz.SetDist(in[i].Dist())
 				out[i] = altaz
 			}

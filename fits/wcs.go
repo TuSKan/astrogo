@@ -44,6 +44,13 @@ type WCS struct {
 	//   Δv = Σ sipBP[(p,q)] · u'^p · v'^q
 	sipA, sipB   map[[2]int]float64
 	sipAP, sipBP map[[2]int]float64
+
+	// TPV (Tangent Plane Polynomial) distortion coefficients.
+	// Applied in intermediate (tangent plane) coordinates AFTER the CD/PC matrix,
+	// unlike SIP which operates in pixel space.
+	// PV1 coefficients correct the longitude axis; PV2 correct the latitude axis.
+	// Key is the term index (0–39); value is the coefficient.
+	tpv1, tpv2 map[int]float64
 }
 
 // NewWCS constructs an empty identity-mapped N-dimensional Coordinate System.
@@ -102,6 +109,15 @@ func (w *WCS) SetSIP(a, b map[[2]int]float64) {
 func (w *WCS) SetSIPInverse(ap, bp map[[2]int]float64) {
 	w.sipAP = ap
 	w.sipBP = bp
+}
+
+// SetTPV sets the TPV distortion polynomial coefficients.
+// pv1 and pv2 map term index (0–39) to coefficient value.
+// pv1 corrects the longitude intermediate coordinate;
+// pv2 corrects the latitude intermediate coordinate.
+func (w *WCS) SetTPV(pv1, pv2 map[int]float64) {
+	w.tpv1 = pv1
+	w.tpv2 = pv2
 }
 
 // GetCRPIX returns the reference pixel coordinate array.
@@ -208,6 +224,15 @@ func (w *WCS) PixelToWorld(pixels []float64) ([]float64, error) {
 			sum += w.pc[i][j] * offset[j]
 		}
 		inter[i] = sum * w.cdelt[i]
+	}
+
+	// Step 2b: Apply TPV distortion in intermediate coordinate space.
+	// TPV replaces (x, y) with polynomial functions of (x, y).
+	if w.nAxis >= 2 && len(w.tpv1) > 0 && w.lonAxis >= 0 {
+		x := inter[w.lonAxis]
+		y := inter[w.latAxis]
+		inter[w.lonAxis] = tpvEval(w.tpv1, x, y)
+		inter[w.latAxis] = tpvEval(w.tpv2, x, y)
 	}
 
 	// Step 3: Spherical de-projection if celestial axes are present.
@@ -422,6 +447,7 @@ func (w *WCS) extractProjection() string {
 		ct := w.ctype[i]
 		// Strip the "-SIP" distortion suffix if present.
 		ct = strings.TrimSuffix(ct, "-SIP")
+		ct = strings.TrimSuffix(ct, "-TPV")
 		if len(ct) < 8 {
 			continue
 		}
@@ -739,6 +765,22 @@ func ExtractWCS(h *Header) (*WCS, error) {
 		w.SetSIPInverse(sipAP, sipBP)
 	}
 
+	// Extract TPV distortion coefficients if CTYPE contains "-TPV" suffix.
+	hasTPV := false
+	for _, ct := range ctype {
+		if strings.HasSuffix(ct, "-TPV") {
+			hasTPV = true
+			break
+		}
+	}
+	if hasTPV {
+		pv1 := parseTPVCoeffs(h, 1)
+		pv2 := parseTPVCoeffs(h, 2)
+		if len(pv1) > 0 || len(pv2) > 0 {
+			w.SetTPV(pv1, pv2)
+		}
+	}
+
 	return w, nil
 }
 
@@ -759,6 +801,101 @@ func parseSIPPoly(h *Header, prefix string) map[[2]int]float64 {
 				coeffs[[2]int{p, q}] = v
 			}
 		}
+	}
+	return coeffs
+}
+
+// tpvEval evaluates a TPV distortion polynomial at intermediate coordinates (x, y).
+// The TPV convention defines up to 40 terms (indices 0–39) using the standard
+// SCAMP/SExtractor polynomial ordering. Term index maps to:
+//
+//	 0: 1            1: x            2: y            3: r
+//	 4: x²           5: xy           6: y²           7: x³
+//	 8: x²y          9: xy²         10: y³          11: r³
+//	12: x⁴          13: x³y         14: x²y²        15: xy³
+//	16: y⁴          17: x⁵          18: x⁴y         19: x³y²
+//	20: x²y³        21: xy⁴         22: y⁵          23: r⁵
+//	24: x⁶          25: x⁵y         26: x⁴y²        27: x³y³
+//	28: x²y⁴        29: xy⁵         30: y⁶          31: x⁷
+//	32: x⁶y         33: x⁵y²        34: x⁴y³        35: x³y⁴
+//	36: x²y⁵        37: xy⁶         38: y⁷          39: r⁷
+func tpvEval(coeffs map[int]float64, x, y float64) float64 {
+	if len(coeffs) == 0 {
+		return 0 // empty polynomial — caller should guard with len() > 0
+	}
+
+	x2 := x * x
+	y2 := y * y
+	xy := x * y
+	r2 := x2 + y2
+	r := math.Sqrt(r2)
+
+	// Build the term table. Only compute terms that have nonzero coefficients.
+	terms := [40]float64{
+		0:  1,
+		1:  x,
+		2:  y,
+		3:  r,
+		4:  x2,
+		5:  xy,
+		6:  y2,
+		7:  x2 * x,
+		8:  x2 * y,
+		9:  x * y2,
+		10: y2 * y,
+		11: r2 * r,
+		12: x2 * x2,
+		13: x2 * xy,
+		14: x2 * y2,
+		15: xy * y2,
+		16: y2 * y2,
+		17: x2 * x2 * x,
+		18: x2 * x2 * y,
+		19: x2 * x * y2,
+		20: x2 * y2 * y,
+		21: x * y2 * y2,
+		22: y2 * y2 * y,
+		23: r2 * r2 * r,
+		24: x2 * x2 * x2,
+		25: x2 * x2 * xy,
+		26: x2 * x2 * y2,
+		27: x2 * x * y2 * y,
+		28: x2 * y2 * y2,
+		29: x * y2 * y2 * y,
+		30: y2 * y2 * y2,
+		31: x2 * x2 * x2 * x,
+		32: x2 * x2 * x2 * y,
+		33: x2 * x2 * x * y2,
+		34: x2 * x2 * y2 * y,
+		35: x2 * x * y2 * y2,
+		36: x2 * y2 * y2 * y,
+		37: x * y2 * y2 * y2,
+		38: y2 * y2 * y2 * y,
+		39: r2 * r2 * r2 * r,
+	}
+
+	var sum float64
+	for idx, c := range coeffs {
+		if idx >= 0 && idx < 40 {
+			sum += c * terms[idx]
+		}
+	}
+	return sum
+}
+
+// parseTPVCoeffs reads TPV polynomial coefficients from a FITS header.
+// axis is 1 or 2 (for PV1_j or PV2_j keywords).
+// Returns nil if no PV keywords are found.
+func parseTPVCoeffs(h *Header, axis int) map[int]float64 {
+	coeffs := make(map[int]float64)
+	for j := 0; j < 40; j++ {
+		key := fmt.Sprintf("PV%d_%d", axis, j)
+		if v, err := h.GetFloat(key); err == nil {
+			coeffs[j] = v
+		}
+	}
+	if len(coeffs) == 0 {
+		return nil
 	}
 	return coeffs
 }

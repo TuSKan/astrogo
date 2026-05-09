@@ -230,7 +230,7 @@ func fillAliasProps(d *TargetDetails, aliases []string) {
 	for _, alias := range aliases {
 		if strings.HasPrefix(alias, "M ") || strings.HasPrefix(alias, "M") {
 			if len(alias) > 1 && alias[1] >= '0' && alias[1] <= '9' || (len(alias) > 2 && alias[0:2] == "M ") {
-				d.ExtraProps["Messier number"] = strings.Replace(alias, " ", "", -1)
+				d.ExtraProps["Messier number"] = strings.ReplaceAll(alias, " ", "")
 			}
 		}
 		if strings.HasPrefix(alias, "NGC") || strings.HasPrefix(alias, "IC") {

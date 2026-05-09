@@ -1,16 +1,18 @@
+version: "2"
+
 linters:
-  # Enable specific linters
   enable:
-    - gofmt
-    - goimports
     - govet
     - errcheck
     - staticcheck
     - gosimple
     - ineffassign
-    - typecheck
 
-linters-settings:
-  gofmt:
-    # Simplify code: gofmt with `-s` option
-    simplify: true
+formatters:
+  enable:
+    - gofmt
+    - goimports
+
+  settings:
+    gofmt:
+      simplify: true
