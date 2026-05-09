@@ -13,13 +13,11 @@ import (
 
 // BintableHDU represents a FITS Binary Table extension.
 type BintableHDU struct {
-	basicHDU
-	Rows    int // NAXIS2
-	Cols    int // TFIELDS
-	RowSize int // NAXIS1
-
-	// Batch represents the fully converted columnar Dataframe natively inside Apache Arrow.
 	Batch arrow.RecordBatch
+	basicHDU
+	Rows    int
+	Cols    int
+	RowSize int
 }
 
 // ReadBintable scaffolds the ingestion of BINTABLE payloads structurally translating them into Arrow schemas.
@@ -51,17 +49,18 @@ func ReadBintable(h *Header, r io.Reader) (*BintableHDU, error) {
 		// Basic mapper matching FITS Data types to Arrow standard datatypes
 		tform = strings.TrimSpace(tform)
 		var dt arrow.DataType
-		if strings.HasSuffix(tform, "J") { // 32-bit int
+		switch {
+		case strings.HasSuffix(tform, "J"): // 32-bit int
 			dt = arrow.PrimitiveTypes.Int32
-		} else if strings.HasSuffix(tform, "K") { // 64-bit int
+		case strings.HasSuffix(tform, "K"): // 64-bit int
 			dt = arrow.PrimitiveTypes.Int64
-		} else if strings.HasSuffix(tform, "E") { // float32
+		case strings.HasSuffix(tform, "E"): // float32
 			dt = arrow.PrimitiveTypes.Float32
-		} else if strings.HasSuffix(tform, "D") { // float64
+		case strings.HasSuffix(tform, "D"): // float64
 			dt = arrow.PrimitiveTypes.Float64
-		} else if strings.Contains(tform, "A") { // Characters
+		case strings.Contains(tform, "A"): // Characters
 			dt = arrow.BinaryTypes.String
-		} else {
+		default:
 			dt = arrow.PrimitiveTypes.Float64 // Fallback
 		}
 

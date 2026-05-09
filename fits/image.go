@@ -24,24 +24,12 @@ const (
 
 // ImageHDU represents a FITS image matrix (N-dimensional).
 type ImageHDU struct {
-	basicHDU
-	Bitpix int
-	Axes   []int64
-
-	// Tensor holds the multi-dimensional array data using Apache Arrow.
-	// Pixel values are stored in native byte order after endian conversion.
 	Tensor tensor.Interface
-
-	// BScale is the linear scaling factor from the FITS header (default 1.0).
-	// Physical value = BZero + BScale * stored_value.
-	BScale float64
-
-	// BZero is the zero-point offset from the FITS header (default 0.0).
-	// Physical value = BZero + BScale * stored_value.
-	BZero float64
-
-	// Blank is the integer sentinel value indicating undefined pixels (from BLANK keyword).
-	// Only meaningful for integer BITPIX (8, 16, 32, 64). HasBlank reports whether it was set.
+	Axes   []int64
+	basicHDU
+	Bitpix   int
+	BScale   float64
+	BZero    float64
 	Blank    int64
 	HasBlank bool
 }

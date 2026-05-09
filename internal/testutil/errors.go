@@ -86,7 +86,6 @@ func RunCases[C interface {
 }](t *testing.T, cases []C) {
 	t.Helper()
 	for _, c := range cases {
-		c := c
 		t.Run(c.Name(), c.Run)
 	}
 }

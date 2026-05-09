@@ -9,21 +9,21 @@ func TestDeltaT_KnownValues(t *testing.T) {
 	// Known ΔT values from NASA tables and IERS observations.
 	// With n-dot correction applied, these should match NASA exactly.
 	tests := []struct {
-		year    float64
-		wantMin float64 // lower bound (seconds)
-		wantMax float64 // upper bound (seconds)
 		desc    string
+		year    float64
+		wantMin float64
+		wantMax float64
 	}{
-		{-500, 17100, 17200, "500 BCE: deep historical"},
-		{0, 10500, 10600, "0 CE: Roman era"},
-		{500, 5600, 5700, "500 CE: early medieval"},
-		{1000, 1500, 1600, "1000 CE: medieval"},
-		{1600, 118, 121, "1600 CE: start of telescopic era"},
-		{1700, 7.5, 9.5, "1700 CE"},
-		{1800, 13.0, 14.5, "1800 CE"},
-		{1900, -3.1, -2.5, "1900 CE: beginning of precise measurements"},
-		{1950, 29.0, 29.1, "1950 CE"},
-		{2000, 63.8, 63.9, "2000 CE: modern"},
+		{"500 BCE: deep historical", -500, 17100, 17200},
+		{"0 CE: Roman era", 0, 10500, 10600},
+		{"500 CE: early medieval", 500, 5600, 5700},
+		{"1000 CE: medieval", 1000, 1500, 1600},
+		{"1600 CE: start of telescopic era", 1600, 118, 121},
+		{"1700 CE", 1700, 7.5, 9.5},
+		{"1800 CE", 1800, 13.0, 14.5},
+		{"1900 CE: beginning of precise measurements", 1900, -3.1, -2.5},
+		{"1950 CE", 1950, 29.0, 29.1},
+		{"2000 CE: modern", 2000, 63.8, 63.9},
 	}
 
 	for _, tt := range tests {
@@ -74,17 +74,17 @@ func TestDeltaT_MonotonicModern(t *testing.T) {
 
 func TestDeltaTUncertainty_KnownValues(t *testing.T) {
 	tests := []struct {
+		desc    string
 		year    float64
 		wantMin float64
 		wantMax float64
-		desc    string
 	}{
-		{-1000, 600, 1200, "-1000 CE: very high uncertainty"},
-		{0, 200, 300, "0 CE: historical"},
-		{1000, 50, 60, "1000 CE: medieval"},
-		{1500, 15, 25, "1500 CE: pre-telescopic"},
-		{1700, 1.5, 5.5, "1700 CE: early telescopic"},
-		{2000, 0, 0.1, "2000 CE: modern observations"},
+		{"-1000 CE: very high uncertainty", -1000, 600, 1200},
+		{"0 CE: historical", 0, 200, 300},
+		{"1000 CE: medieval", 1000, 50, 60},
+		{"1500 CE: pre-telescopic", 1500, 15, 25},
+		{"1700 CE: early telescopic", 1700, 1.5, 5.5},
+		{"2000 CE: modern observations", 2000, 0, 0.1},
 	}
 
 	for _, tt := range tests {

@@ -105,9 +105,9 @@ func (p *Provider) ResolveObject(ctx context.Context, req resolve.ObjectRequest)
 				Msg                string `json:"msg"`
 				ResolvedCoordinate []struct {
 					CanonicalName string  `json:"canonicalName"`
+					Resolver      string  `json:"resolver"`
 					RA            float64 `json:"ra"`
 					Decl          float64 `json:"decl"`
-					Resolver      string  `json:"resolver"`
 				} `json:"resolvedCoordinate"`
 			}
 
@@ -134,9 +134,9 @@ func (p *Provider) ResolveObject(ctx context.Context, req resolve.ObjectRequest)
 				XMLName            xml.Name `xml:"resolvedItems"`
 				ResolvedCoordinate []struct {
 					CanonicalName string  `xml:"canonicalName"`
-					RA            float64 `xml:"ra"`
-					Decl          float64 `xml:"dec"` // XML uses 'dec', JSON uses 'decl'
 					Resolver      string  `xml:"resolver"`
+					RA            float64 `xml:"ra"`
+					Decl          float64 `xml:"dec"`
 				} `xml:"resolvedCoordinate"`
 			}
 

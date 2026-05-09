@@ -1,6 +1,7 @@
 package atmosphere
 
 import (
+	"errors"
 	"math"
 	"testing"
 
@@ -121,7 +122,7 @@ func TestAirmass_KnownValues(t *testing.T) {
 
 func TestAirmass_BelowHorizon(t *testing.T) {
 	_, err := Airmass(angle.Deg(-5))
-	if err != ErrBelowHorizon {
+	if !errors.Is(err, ErrBelowHorizon) {
 		t.Errorf("expected ErrBelowHorizon for alt=-5°, got %v", err)
 	}
 }

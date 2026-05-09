@@ -360,34 +360,23 @@ func (p *CrescentParams) Gautschy() bool {
 // CrescentResult holds the evaluation of all 20 visibility criteria
 // against a single set of crescent parameters.
 type CrescentResult struct {
-	// Params is the input parameter set that was evaluated.
-	Params CrescentParams
-
-	// Category 1: Altitude & Azimuth (ArcV vs DAZ)
-	Fotheringham   bool
-	Maunder        bool
-	Ilyas1988      bool
-	Fatoohi        bool
-	KraussAthenian bool
-
-	// Category 2: Calendrical (ArcL + MAlt)
-	MABIMS1995   bool
-	Istanbul2016 bool
-	MABIMS2021   bool
-
-	// Category 3: Singular Elongation
-	Danjon    bool
-	Schaefer  bool
-	Ilyas1984 bool
-
-	// Category 4: ArcV vs Crescent Width
-	Bruin           bool
-	AlrefayNakedEye bool
-	Yallop          CrescentZone
-	Odeh            CrescentZone
-	Qureshi         CrescentZone
-
-	// Category 5: Lag Time
+	Qureshi          CrescentZone
+	Odeh             CrescentZone
+	Yallop           CrescentZone
+	Params           CrescentParams
+	KraussAthenian   bool
+	Ilyas1984        bool
+	MABIMS1995       bool
+	Istanbul2016     bool
+	MABIMS2021       bool
+	Danjon           bool
+	Schaefer         bool
+	Fatoohi          bool
+	Bruin            bool
+	AlrefayNakedEye  bool
+	Ilyas1988        bool
+	Maunder          bool
+	Fotheringham     bool
 	CaldwellNakedEye bool
 	CaldwellOptical  bool
 	Gautschy         bool

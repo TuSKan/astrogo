@@ -13,79 +13,78 @@ import (
 
 // TargetDetails holds descriptive and ephemeris properties of an Observable.
 type TargetDetails struct {
-	Name         string
+	ExtraProps   map[string]string
+	SetTime      *time.Time
+	TransitTime  *time.Time
+	RiseTime     *time.Time
+	AngularSize  string
 	Description  string
 	Source       string
 	Magnitude    string
-	RA           angle.Angle // ICRS J2000 (astrometric; topocentric for moving bodies)
-	Dec          angle.Angle // ICRS J2000 (astrometric; topocentric for moving bodies)
-	Altitude     angle.Angle
-	Azimuth      angle.Angle
-	Distance     float64 // in AU or pc depending on object
+	Name         string
 	DistanceUnit string
-	AngularSize  string
-	RiseTime     *time.Time
+	Distance     float64
+	Azimuth      angle.Angle
 	RiseAzimuth  angle.Angle
-	TransitTime  *time.Time
+	Altitude     angle.Angle
 	MaxElevation angle.Angle
-	SetTime      *time.Time
+	Dec          angle.Angle
 	SetAzimuth   angle.Angle
 	Elongation   angle.Angle
-
-	ExtraProps map[string]string
+	RA           angle.Angle
 }
 
 // String formats the details as a textual summary.
 func (d TargetDetails) String() string {
 	var b strings.Builder
-	b.WriteString(fmt.Sprintf("%s\n", strings.ToUpper(d.Name)))
+	fmt.Fprintf(&b, "%s\n", strings.ToUpper(d.Name))
 	if d.Description != "" {
-		b.WriteString(fmt.Sprintf("%s\n\n", d.Description))
+		fmt.Fprintf(&b, "%s\n\n", d.Description)
 	}
 	if d.Source != "" {
-		b.WriteString(fmt.Sprintf("%s\n\n", d.Source))
+		fmt.Fprintf(&b, "%s\n\n", d.Source)
 	}
 
 	if d.Magnitude != "" {
-		b.WriteString(fmt.Sprintf("Magnitude:\t%s\n", d.Magnitude))
+		fmt.Fprintf(&b, "Magnitude:\t%s\n", d.Magnitude)
 	}
-	b.WriteString(fmt.Sprintf("RA (ICRS):\t%s\n", d.RA.HMSString(1)))
-	b.WriteString(fmt.Sprintf("Dec (ICRS):\t%s\n", d.Dec.DMSString(0)))
-	b.WriteString(fmt.Sprintf("Altitude:\t%s\n", d.Altitude.DMSString(0)))
-	b.WriteString(fmt.Sprintf("Azimuth:\t%s\n", d.Azimuth.DMSString(0)))
-	b.WriteString(fmt.Sprintf("Distance:\t%.4f %s\n", d.Distance, d.DistanceUnit))
+	fmt.Fprintf(&b, "RA (ICRS):\t%s\n", d.RA.HMSString(1))
+	fmt.Fprintf(&b, "Dec (ICRS):\t%s\n", d.Dec.DMSString(0))
+	fmt.Fprintf(&b, "Altitude:\t%s\n", d.Altitude.DMSString(0))
+	fmt.Fprintf(&b, "Azimuth:\t%s\n", d.Azimuth.DMSString(0))
+	fmt.Fprintf(&b, "Distance:\t%.4f %s\n", d.Distance, d.DistanceUnit)
 	if d.AngularSize != "" {
-		b.WriteString(fmt.Sprintf("Angular size(s):\t%s\n", d.AngularSize))
+		fmt.Fprintf(&b, "Angular size(s):\t%s\n", d.AngularSize)
 	}
 
 	if d.RiseTime != nil {
-		b.WriteString(fmt.Sprintf("Rise time:\t%s\n", d.RiseTime.ToGo().Format("03:04 pm")))
-		b.WriteString(fmt.Sprintf("Rise azimuth:\t%s\n", d.RiseAzimuth.DMSString(0)))
+		fmt.Fprintf(&b, "Rise time:\t%s\n", d.RiseTime.ToGo().Format("03:04 pm"))
+		fmt.Fprintf(&b, "Rise azimuth:\t%s\n", d.RiseAzimuth.DMSString(0))
 	}
 	if d.TransitTime != nil {
-		b.WriteString(fmt.Sprintf("Time of maximum elevation:\t%s\n", d.TransitTime.ToGo().Format("03:04 pm")))
-		b.WriteString(fmt.Sprintf("Maximum elevation:\t%.1f°\n", d.MaxElevation.Degrees()))
+		fmt.Fprintf(&b, "Time of maximum elevation:\t%s\n", d.TransitTime.ToGo().Format("03:04 pm"))
+		fmt.Fprintf(&b, "Maximum elevation:\t%.1f°\n", d.MaxElevation.Degrees())
 	}
 	if d.SetTime != nil {
-		b.WriteString(fmt.Sprintf("Set time:\t%s\n", d.SetTime.ToGo().Format("03:04 pm")))
-		b.WriteString(fmt.Sprintf("Set azimuth:\t%s\n", d.SetAzimuth.DMSString(0)))
+		fmt.Fprintf(&b, "Set time:\t%s\n", d.SetTime.ToGo().Format("03:04 pm"))
+		fmt.Fprintf(&b, "Set azimuth:\t%s\n", d.SetAzimuth.DMSString(0))
 	}
 	if d.Elongation.Radians() != 0 {
-		b.WriteString(fmt.Sprintf("Elongation:\t%.1f°\n", d.Elongation.Degrees()))
+		fmt.Fprintf(&b, "Elongation:\t%.1f°\n", d.Elongation.Degrees())
 	}
 
 	if len(d.ExtraProps) > 0 {
 		b.WriteString("\n")
 		// Output known props first if they exist
 		if v, ok := d.ExtraProps["Messier number"]; ok {
-			b.WriteString(fmt.Sprintf("Messier number:\t%s\n", v))
+			fmt.Fprintf(&b, "Messier number:\t%s\n", v)
 		}
 		if v, ok := d.ExtraProps["NGC/IC number"]; ok {
-			b.WriteString(fmt.Sprintf("NGC/IC number:\t%s\n", v))
+			fmt.Fprintf(&b, "NGC/IC number:\t%s\n", v)
 		}
 		for k, v := range d.ExtraProps {
 			if k != "Messier number" && k != "NGC/IC number" {
-				b.WriteString(fmt.Sprintf("%s:\t%s\n", k, v))
+				fmt.Fprintf(&b, "%s:\t%s\n", k, v)
 			}
 		}
 	}
@@ -230,7 +229,7 @@ func fillAliasProps(d *TargetDetails, aliases []string) {
 	for _, alias := range aliases {
 		if strings.HasPrefix(alias, "M ") || strings.HasPrefix(alias, "M") {
 			if len(alias) > 1 && alias[1] >= '0' && alias[1] <= '9' || (len(alias) > 2 && alias[0:2] == "M ") {
-				d.ExtraProps["Messier number"] = strings.Replace(alias, " ", "", -1)
+				d.ExtraProps["Messier number"] = strings.ReplaceAll(alias, " ", "")
 			}
 		}
 		if strings.HasPrefix(alias, "NGC") || strings.HasPrefix(alias, "IC") {

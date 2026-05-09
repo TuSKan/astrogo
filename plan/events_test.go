@@ -1,7 +1,6 @@
 package plan
 
 import (
-	"math"
 	"testing"
 
 	"github.com/TuSKan/astrogo/angle"
@@ -392,7 +391,7 @@ type mockParabolicTarget struct {
 
 func (m *mockParabolicTarget) Position(t time.Time) (coord.ICRS, error) {
 	hours := float64(t.Sub(time.FromJD(2451545.0, time.UTC)).Hours())
-	dec := m.a*math.Pow(hours-m.h, 2) + m.k
+	dec := m.a*(hours-m.h)*(hours-m.h) + m.k
 	return coord.NewICRS(angle.Deg(0), angle.Deg(dec)), nil
 }
 
@@ -415,7 +414,7 @@ func TestSolveGeometry_GreatestElongation(t *testing.T) {
 
 	t1_pos := func(t time.Time) (coord.ICRS, error) {
 		hours := float64(t.Sub(time.FromJD(2451545.0, time.UTC)).Hours())
-		dec := t1.a*math.Pow(hours-t1.h, 2) + t1.k
+		dec := t1.a*(hours-t1.h)*(hours-t1.h) + t1.k
 		return coord.NewICRS(angle.Deg(20), angle.Deg(dec)), nil
 	}
 

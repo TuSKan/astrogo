@@ -155,14 +155,10 @@ func (p *Planner) RankObservable(objects []Observable, start, end time.Time) ([]
 
 // Evaluation represents the aggregated result of multiple constraint checks.
 type Evaluation struct {
-	// Observable is true if all evaluated constraints passed.
+	Results    []Result
+	Position   coord.ICRS
+	AltAz      coord.AltAz
 	Observable bool
-	// Results contains the individual results for each
-	Results []Result
-	// Position is the ICRS position of the object at evaluation time.
-	Position coord.ICRS
-	// AltAz is the locally observed horizontal coordinates at evaluation time.
-	AltAz coord.AltAz
 }
 
 // IsObservable evaluates all provided constraints against a target at a specific
@@ -181,24 +177,29 @@ func IsObservable(
 	site *Site,
 	constraints ...Constraint,
 ) (Evaluation, error) {
-	eval, _, err := isObservableCtx(obj, t, site, constraints...)
+	eval, _, err := isObservableCtx(obj, t, site, nil, constraints...)
 	return eval, err
 }
 
 // isObservableCtx is the internal implementation of IsObservable that also
-// returns the coord.Context it creates, allowing callers to reuse it for
-// subsequent coordinate work at the same epoch.
+// returns the coord.Context, allowing callers to reuse it for subsequent
+// coordinate work at the same epoch.
+//
+// If ctx is non-nil it is reused; otherwise a new Context is created.
 func isObservableCtx(
 	obj Observable,
 	t time.Time,
 	site *Site,
+	ctx *coord.Context,
 	constraints ...Constraint,
 ) (Evaluation, *coord.Context, error) {
 	pos, err := obj.Position(t)
 	if err != nil {
 		return Evaluation{}, nil, err
 	}
-	ctx := coord.NewContext(t, site.Location(), site.Atmosphere())
+	if ctx == nil {
+		ctx = coord.NewContext(t, site.Location(), site.Atmosphere())
+	}
 	altAz, err := ctx.ICRSToAltAz(pos)
 	if err != nil {
 		return Evaluation{}, nil, err
@@ -300,9 +301,9 @@ func (sc ScoreConfig) normalize() (wAlt, wUrg, wMoon float64) {
 // moonSepCache stores the Moon's ICRS position for a given epoch to avoid
 // redundant ephemeris lookups when scoring many targets at the same time.
 var moonSepCache struct {
-	mu   sync.Mutex
 	time time.Time
 	pos  coord.ICRS
+	mu   sync.Mutex
 	ok   bool
 }
 
@@ -332,13 +333,14 @@ func getMoonPosition(t time.Time) (coord.ICRS, error) {
 //
 // Returns math.Inf(1) if the target is still above threshold at all probe
 // points (circumpolar or very long visibility window).
-func estimateHoursUntilSet(obj Observable, t time.Time, site *Site, ctx *coord.Context, currentAlt float64) float64 {
+func estimateHoursUntilSet(obj Observable, t time.Time, site *Site, currentAlt float64) float64 {
 	// If already below horizon, urgency is maximum.
 	if currentAlt <= 0 {
 		return 0
 	}
 
 	// Probe at +30m, +1h, +2h, +4h, +8h — 5 evaluations total.
+	// Each probe requires a fresh Context (different epoch than the caller's ctx).
 	probeOffsets := [5]time.Duration{
 		30 * time.Minute,
 		1 * time.Hour,
@@ -346,8 +348,6 @@ func estimateHoursUntilSet(obj Observable, t time.Time, site *Site, ctx *coord.C
 		4 * time.Hour,
 		8 * time.Hour,
 	}
-
-	_ = ctx // Not reused — each probe is a different epoch.
 
 	for _, offset := range probeOffsets {
 		ft := t.Add(offset)
@@ -392,9 +392,10 @@ func ScoreObservable(
 	t time.Time,
 	site *Site,
 	cfg *ScoreConfig,
+	ctx *coord.Context,
 	constraints ...Constraint,
 ) (float64, error) {
-	eval, ctx, err := isObservableCtx(obj, t, site, constraints...)
+	eval, _, err := isObservableCtx(obj, t, site, ctx, constraints...)
 	if err != nil {
 		return 0, err
 	}
@@ -414,16 +415,14 @@ func ScoreObservable(
 	altMerit := math.Max(altDeg/90.0, 0)
 
 	// ── Urgency merit (0–1) ─────────────────────────────────────────────
-	// Reuses the coord.Context from isObservableCtx to avoid a redundant
-	// NewContext call (~91 µs saved per ScoreObservable invocation).
 	var urgMerit float64
 	if wUrg > 0 {
-		hoursLeft := estimateHoursUntilSet(obj, t, site, ctx, altDeg)
+		hoursLeft := estimateHoursUntilSet(obj, t, site, altDeg)
 		urgMerit = math.Min(1.0/(math.Max(hoursLeft, 0.5)), 1.0)
 	}
 
 	// ── Moon separation merit (0–1) ──────────────────────────────────────
-	var moonMerit float64 = 1.0 // default: no penalty if Moon lookup fails
+	moonMerit := 1.0 // default: no penalty if Moon lookup fails
 	if wMoon > 0 {
 		moonPos, err := getMoonPosition(t)
 		if err == nil {
@@ -471,7 +470,7 @@ func RankObservables(
 
 	for i, obj := range objs {
 		g.Go(func() error {
-			s, err := ScoreObservable(obj, t, site, nil, constraints...)
+			s, err := ScoreObservable(obj, t, site, nil, nil, constraints...)
 			if err != nil {
 				return err
 			}

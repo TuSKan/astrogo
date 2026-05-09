@@ -61,14 +61,13 @@ type ssoRecord struct {
 //   - Per-object JSON queries via /api/v1/ssoft?sso_number=N (fast, no cache needed)
 //   - Full-table parquet download for bulk indexing (lazy, cached in memory)
 type Provider struct {
-	client  *http.Client
-	version string // SSOFT version (YYYY.MM)
-
+	loadErr  error
+	client   *http.Client
+	byNumber map[int64]*ssoRecord
+	byName   map[string]*ssoRecord
+	version  string
 	mu       sync.RWMutex
 	loaded   bool
-	loadErr  error
-	byNumber map[int64]*ssoRecord  // sso_number → record
-	byName   map[string]*ssoRecord // lowercase(sso_name) → record
 }
 
 // New returns a Provider with the default SSOFT version.
@@ -170,7 +169,12 @@ func (p *Provider) querySingle(number int64, name string) (*ssoRecord, error) {
 	}
 
 	raw, _ := json.Marshal(payload)
-	resp, err := p.client.Post(ssoftURL, "application/json", bytes.NewReader(raw))
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, ssoftURL, bytes.NewReader(raw))
+	if err != nil {
+		return nil, fmt.Errorf("fink: ssoft request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := p.client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("fink: ssoft request: %w", err)
 	}
@@ -398,7 +402,12 @@ func (p *Provider) downloadSSOFT() ([]ssoRecord, error) {
 		"flavor":        "SHG1G2",
 	})
 
-	resp, err := p.client.Post(ssoftURL, "application/json", bytes.NewReader(payload))
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, ssoftURL, bytes.NewReader(payload))
+	if err != nil {
+		return nil, fmt.Errorf("SSOFT request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := p.client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("SSOFT request: %w", err)
 	}
@@ -425,13 +434,14 @@ func (p *Provider) downloadSSOFT() ([]ssoRecord, error) {
 		return nil, fmt.Errorf("creating temp file: %w", err)
 	}
 	tmpName := tmp.Name()
-	defer os.Remove(tmpName)
+	defer func() {
+		_ = tmp.Close()
+		_ = os.Remove(tmpName)
+	}()
 
 	if _, err := tmp.Write(data); err != nil {
-		tmp.Close()
 		return nil, fmt.Errorf("writing temp parquet: %w", err)
 	}
-	tmp.Close()
 
 	return p.readParquet(tmpName)
 }

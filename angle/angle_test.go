@@ -259,12 +259,12 @@ func TestDivScalar_zero_isInf(t *testing.T) {
 
 func TestString(t *testing.T) {
 	cases := []struct {
-		deg  float64
 		want string
+		deg  float64
 	}{
-		{0, "0.0000°"},
-		{90, "90.0000°"},
-		{-45.5, "-45.5000°"},
+		{"0.0000°", 0},
+		{"90.0000°", 90},
+		{"-45.5000°", -45.5},
 	}
 	for i, c := range cases {
 		got := angle.Deg(c.deg).String()
@@ -277,18 +277,18 @@ func TestString(t *testing.T) {
 func TestDMSString(t *testing.T) {
 	cases := []struct {
 		name      string
+		want      string
 		deg       float64
 		precision int
-		want      string
 	}{
-		{"zero p0", 0, 0, `+00°00'00"`},
-		{"90 p0", 90, 0, `+90°00'00"`},
-		{"negative p0", -45, 0, `-45°00'00"`},
-		{"30'30\" p2", 0.5 + 30.0/3600, 2, `+00°30'30.00"`},
+		{"zero p0", `+00°00'00"`, 0, 0},
+		{"90 p0", `+90°00'00"`, 90, 0},
+		{"negative p0", `-45°00'00"`, -45, 0},
+		{"30'30\" p2", `+00°30'30.00"`, 0.5 + 30.0/3600, 2},
 		// Carry: 59.995 s → rounds to 00.0 with carry to minutes
-		{"carry p1", 0 + 59.995/3600, 1, `+00°01'00.0"`},
+		{"carry p1", `+00°01'00.0"`, 0 + 59.995/3600, 1},
 		// Known angle: Orion belt roughly at −1°12′6.9″
-		{"known angle p1", -(1 + 12.0/60 + 6.9/3600), 1, `-01°12'06.9"`},
+		{"known angle p1", `-01°12'06.9"`, -(1 + 12.0/60 + 6.9/3600), 1},
 	}
 	for i, c := range cases {
 		got := angle.Deg(c.deg).DMSString(c.precision)
@@ -301,17 +301,17 @@ func TestDMSString(t *testing.T) {
 func TestHMSString(t *testing.T) {
 	cases := []struct {
 		name      string
+		want      string
 		hours     float64
 		precision int
-		want      string
 	}{
-		{"0h p0", 0, 0, "00h00m00s"},
-		{"6h p0", 6, 0, "06h00m00s"},
-		{"23h59m p1", 23 + 59.0/60, 1, "23h59m00.0s"},
+		{"0h p0", "00h00m00s", 0, 0},
+		{"6h p0", "06h00m00s", 6, 0},
+		{"23h59m p1", "23h59m00.0s", 23 + 59.0/60, 1},
 		// Values > 24h are normalised
-		{"25h=1h p0", 25, 0, "01h00m00s"},
+		{"25h=1h p0", "01h00m00s", 25, 0},
 		// Fractional seconds
-		{"2h30m15.5s p1", 2 + 30.0/60 + 15.5/3600, 1, "02h30m15.5s"},
+		{"2h30m15.5s p1", "02h30m15.5s", 2 + 30.0/60 + 15.5/3600, 1},
 	}
 	for i, c := range cases {
 		got := angle.Hour(c.hours).HMSString(c.precision)

@@ -42,8 +42,8 @@ type Record struct {
 
 // Provider implements the resolve.Provider interface for OpenNGC.
 type Provider struct {
-	targets []resolve.Target
 	byKey   map[string]int
+	targets []resolve.Target
 }
 
 func New() *Provider {

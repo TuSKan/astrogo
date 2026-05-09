@@ -25,8 +25,8 @@ import (
 )
 
 type planetDef struct {
-	Name   string
 	Target plan.Observable
+	Name   string
 }
 
 func main() {
@@ -52,13 +52,13 @@ func main() {
 	atm := atmosphere.AtAltitude(760)
 
 	planets := []planetDef{
-		{"Mercury", plan.NewMercury(prov)},
-		{"Venus", plan.NewVenus(prov)},
-		{"Mars", plan.NewMars(prov)},
-		{"Jupiter", plan.NewJupiter(prov)},
-		{"Saturn", plan.NewSaturn(prov)},
-		{"Uranus", plan.NewUranus(prov)},
-		{"Neptune", plan.NewNeptune(prov)},
+		{plan.NewMercury(prov), "Mercury"},
+		{plan.NewVenus(prov), "Venus"},
+		{plan.NewMars(prov), "Mars"},
+		{plan.NewJupiter(prov), "Jupiter"},
+		{plan.NewSaturn(prov), "Saturn"},
+		{plan.NewUranus(prov), "Uranus"},
+		{plan.NewNeptune(prov), "Neptune"},
 	}
 
 	// ── Part 1: Solar Events ──────────────────────────────────────────

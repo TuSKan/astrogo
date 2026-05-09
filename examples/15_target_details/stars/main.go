@@ -26,7 +26,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to resolve Sirius: %v", err)
 	}
-	
+
 	sirius := plan.FromCatalog(catTarget, nil)
 	details, err := sirius.GetDetails(ctx,
 		"Bayer letter", "α CMa",
@@ -44,6 +44,6 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	
+
 	fmt.Println(details)
 }

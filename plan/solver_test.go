@@ -43,7 +43,6 @@ func TestFindRoot_LinearFunction(t *testing.T) {
 	root, fval, err := s.FindRoot(timeFunc(func(x float64) float64 {
 		return x - 5
 	}), after(0), after(10))
-
 	if err != nil {
 		t.Fatalf("FindRoot failed: %v", err)
 	}
@@ -61,7 +60,6 @@ func TestFindRoot_QuadraticFunction(t *testing.T) {
 	root, fval, err := s.FindRoot(timeFunc(func(x float64) float64 {
 		return x*x - 4
 	}), after(0), after(10))
-
 	if err != nil {
 		t.Fatalf("FindRoot failed: %v", err)
 	}
@@ -79,7 +77,6 @@ func TestFindRoot_SineFunction(t *testing.T) {
 	root, fval, err := s.FindRoot(timeFunc(func(x float64) float64 {
 		return math.Sin(x)
 	}), after(2), after(4))
-
 	if err != nil {
 		t.Fatalf("FindRoot failed: %v", err)
 	}
@@ -99,7 +96,6 @@ func TestFindRoot_FlatFunction(t *testing.T) {
 		d := x - 3
 		return d * d * d
 	}), after(0), after(6))
-
 	if err != nil {
 		t.Fatalf("FindRoot failed: %v", err)
 	}
@@ -118,7 +114,6 @@ func TestFindRoot_ExponentialDecay(t *testing.T) {
 	root, fval, err := s.FindRoot(timeFunc(func(x float64) float64 {
 		return math.Exp(-x) - 0.01
 	}), after(0), after(10))
-
 	if err != nil {
 		t.Fatalf("FindRoot failed: %v", err)
 	}
@@ -139,7 +134,6 @@ func TestFindRoot_AstronomicalScale(t *testing.T) {
 	root, fval, err := s.FindRoot(timeFunc(func(x float64) float64 {
 		return math.Sin(2*math.Pi*x/period - math.Pi/3)
 	}), after(10000), after(20000))
-
 	if err != nil {
 		t.Fatalf("FindRoot failed: %v", err)
 	}
@@ -171,7 +165,6 @@ func TestFindRoot_ExactRootAtEndpoint(t *testing.T) {
 	root, fval, err := s.FindRoot(timeFunc(func(x float64) float64 {
 		return x
 	}), after(0), after(10))
-
 	if err != nil {
 		t.Fatalf("FindRoot failed: %v", err)
 	}
@@ -193,7 +186,6 @@ func TestFindExtremum_QuadraticMinimum(t *testing.T) {
 		d := x - 7
 		return d * d
 	}), after(0), after(14), false)
-
 	if err != nil {
 		t.Fatalf("FindExtremum failed: %v", err)
 	}
@@ -215,7 +207,6 @@ func TestFindExtremum_QuadraticMaximum(t *testing.T) {
 		d := x - 5
 		return -d*d + 100
 	}), after(0), after(10), true)
-
 	if err != nil {
 		t.Fatalf("FindExtremum failed: %v", err)
 	}
@@ -236,7 +227,6 @@ func TestFindExtremum_CosineMinimum(t *testing.T) {
 	minT, minVal, err := s.FindExtremum(timeFunc(func(x float64) float64 {
 		return math.Cos(x)
 	}), after(2), after(4), false)
-
 	if err != nil {
 		t.Fatalf("FindExtremum failed: %v", err)
 	}
@@ -259,7 +249,6 @@ func TestFindExtremum_TransitSimulation(t *testing.T) {
 	maxT, _, err := s.FindExtremum(timeFunc(func(x float64) float64 {
 		return -math.Cos(2 * math.Pi * x / period)
 	}), after(0), after(period), true)
-
 	if err != nil {
 		t.Fatalf("FindExtremum failed: %v", err)
 	}
@@ -343,7 +332,6 @@ func TestFindRoot_ConvergenceCount(t *testing.T) {
 		count++
 		return x*x - 2, nil
 	}, after(0.1), after(10))
-
 	if err != nil {
 		t.Fatalf("FindRoot failed: %v", err)
 	}

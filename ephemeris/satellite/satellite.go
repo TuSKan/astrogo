@@ -28,9 +28,9 @@ var ErrPropagation = errors.New("satellite: sgp4 propagation failed")
 
 // Satellite wraps a NORAD TLE element set with SGP4 propagation state.
 type Satellite struct {
-	Name       string                // Satellite name
-	MeanMotion float64               // Mean motion (rev/day), parsed from TLE line 2
-	sat        gosatellite.Satellite // Initialized SGP4 state
+	Name       string
+	sat        gosatellite.Satellite
+	MeanMotion float64
 }
 
 // NewFromTLE creates a Satellite from raw TLE lines.

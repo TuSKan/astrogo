@@ -9,11 +9,11 @@ import (
 // DeepSkyObject represents a fixed deep-sky target (galaxy, nebula, cluster, etc.).
 type DeepSkyObject struct {
 	name    string
+	kind    string
+	aliases []string
 	coord   coord.ICRS
 	vMag    float64
 	hasVMag bool
-	kind    string // display only: "Galaxy", "Nebula", etc.
-	aliases []string
 }
 
 // DSOOption configures optional DeepSkyObject fields.

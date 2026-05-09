@@ -6,6 +6,7 @@
 package plan
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/TuSKan/astrogo/angle"
@@ -18,12 +19,9 @@ import (
 
 // Result represents the outcome of a constraint check.
 type Result struct {
-	// Pass is true if the constraint was satisfied.
-	Pass bool
-	// Value is the numerical value evaluated (e.g., actual altitude).
-	Value float64
-	// Reason is an optional human-readable explanation of the result.
 	Reason string
+	Value  float64
+	Pass   bool
 }
 
 func (r Result) String() string {
@@ -103,7 +101,7 @@ func (c Airmass) Check(obj Observable, t time.Time, site *Site) (Result, error) 
 func (c Airmass) CheckCtx(obj Observable, t time.Time, site *Site, ctx *coord.Context) (Result, error) {
 	am, err := skyAirmassCtx(obj, t, ctx)
 	if err != nil {
-		if err == atmosphere.ErrBelowHorizon {
+		if errors.Is(err, atmosphere.ErrBelowHorizon) {
 			return Result{
 				Pass:   false,
 				Reason: "target is below the horizon",

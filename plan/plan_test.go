@@ -205,8 +205,8 @@ func TestScoreObservable(t *testing.T) {
 		// Target 2: Lower (Alt ~45)
 		obj2 := NewStar("T", angle.Hour(18.69), angle.Deg(45))
 
-		s1, _ := ScoreObservable(obj1, tm, site, nil)
-		s2, _ := ScoreObservable(obj2, tm, site, nil)
+		s1, _ := ScoreObservable(obj1, tm, site, nil, nil)
+		s2, _ := ScoreObservable(obj2, tm, site, nil, nil)
 
 		if s1 <= s2 {
 			t.Errorf("Expected higher altitude to have higher score: %f <= %f", s1, s2)
@@ -218,7 +218,7 @@ func TestScoreObservable(t *testing.T) {
 		// Force fail with extreme altitude threshold
 		c := Altitude{Threshold: angle.Deg(95)}
 
-		s, err := ScoreObservable(obj, tm, site, nil, c)
+		s, err := ScoreObservable(obj, tm, site, nil, nil, c)
 		testutil.AssertNoError(t, err)
 		if s != 0 {
 			t.Errorf("Expected score 0 for failing constraint, got %f", s)
@@ -232,8 +232,8 @@ func TestScoreObservable(t *testing.T) {
 
 		obj := NewStar("T", angle.Hour(18.69), angle.Deg(0))
 
-		sAlt, _ := ScoreObservable(obj, tm, site, altOnly)
-		sUrg, _ := ScoreObservable(obj, tm, site, urgOnly)
+		sAlt, _ := ScoreObservable(obj, tm, site, altOnly, nil)
+		sUrg, _ := ScoreObservable(obj, tm, site, urgOnly, nil)
 
 		// Both should be positive for a visible target
 		if sAlt <= 0 {
@@ -246,7 +246,7 @@ func TestScoreObservable(t *testing.T) {
 
 	t.Run("CompositeHigherThanZero", func(t *testing.T) {
 		obj := NewStar("T", angle.Hour(18.69), angle.Deg(0))
-		s, err := ScoreObservable(obj, tm, site, nil) // Default config
+		s, err := ScoreObservable(obj, tm, site, nil, nil) // Default config
 		testutil.AssertNoError(t, err)
 		if s <= 0 {
 			t.Errorf("Expected positive composite score for visible target, got %f", s)

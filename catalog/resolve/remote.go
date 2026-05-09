@@ -9,9 +9,10 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/cenkalti/backoff/v5"
+
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
-	"github.com/cenkalti/backoff/v5"
 )
 
 // List of standard catalog/remote interactions errors.
@@ -25,8 +26,8 @@ var (
 
 // HTTPError represents an error returned by an external API endpoint.
 type HTTPError struct {
-	StatusCode int
 	Body       string
+	StatusCode int
 }
 
 // Error returns a human-readable string describing the HTTP error.
@@ -108,9 +109,9 @@ func DefaultRetryPolicy(resp *http.Response, err error) bool {
 // Client executes HTTP requests with retries, context handling, and rate-limiting support.
 type Client struct {
 	HTTPClient  *http.Client
-	MaxRetries  uint
 	RetryPolicy RetryPolicy
 	UserAgent   string
+	MaxRetries  uint
 }
 
 // NewClient returns a Client with sensible defaults (30s timeout, 3 retries,
@@ -148,7 +149,7 @@ func (c *Client) Do(req *http.Request) (*http.Response, error) {
 		}
 
 		if resp != nil && err == nil {
-			resp.Body.Close()
+			_ = resp.Body.Close()
 			return nil, fmt.Errorf("retriable status code %d", resp.StatusCode)
 		}
 		return nil, err

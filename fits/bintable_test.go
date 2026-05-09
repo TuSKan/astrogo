@@ -5,9 +5,10 @@ import (
 	"math"
 	"testing"
 
-	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/apache/arrow-go/v18/arrow/array"
 	"github.com/apache/arrow-go/v18/arrow/memory"
+
+	"github.com/TuSKan/astrogo/internal/testutil"
 )
 
 func TestReadBintable(t *testing.T) {

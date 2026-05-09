@@ -10,13 +10,14 @@ import (
 // parallax, and catalog V-band magnitude.
 type Star struct {
 	name           string
+	aliases        []string
 	coord          coord.ICRS
-	pmRA, pmDec    angle.Angle
+	pmRA           angle.Angle
+	pmDec          angle.Angle
 	parallax       angle.Angle
 	radialVelocity float64
 	vMag           float64
 	hasVMag        bool
-	aliases        []string
 }
 
 // StarOption configures optional Star fields.

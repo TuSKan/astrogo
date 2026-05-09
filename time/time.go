@@ -123,10 +123,10 @@ func (s Scale) String() string {
 // It affects only [Time.ToGo], [Time.Format], and [Time.String] and never
 // influences scientific computation or scale conversions.
 type Time struct {
+	loc   *time.Location
 	jd1   float64
 	jd2   float64
 	scale Scale
-	loc   *time.Location // display-only; nil defaults to UTC
 }
 
 // ── Constructors ──────────────────────────────────────────────────────────────
@@ -334,7 +334,7 @@ func (t Time) Weekday() Weekday {
 	// Floor to get the nearest noon JD (integer), then shift
 	// The day of the week = (floor(JD + 0.5) + 1) mod 7
 	d := int(math.Floor(jd+0.5)) + 1
-	d = d % 7
+	d %= 7
 	if d < 0 {
 		d += 7
 	}
@@ -404,7 +404,7 @@ func (t Time) AddDays(d float64) Time {
 // proleptic Gregorian calendar including negative (astronomical) years.
 // Year 0 = 1 BC, year -1 = 2 BC, etc.
 // The timezone location is preserved for display purposes.
-func Date(year int, month time.Month, day int, hour int, min int, sec int, nsec int, loc *time.Location) Time {
+func Date(year int, month time.Month, day, hour, min, sec, nsec int, loc *time.Location) Time {
 	// For years within Go's time.Time range, delegate to FromGo which
 	// handles timezone offsets exactly.
 	if year >= 1 && year <= 9999 {

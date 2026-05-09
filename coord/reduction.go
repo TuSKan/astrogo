@@ -13,17 +13,11 @@ import (
 // Reduction represents the calculated outcomes of an apparent-place reduction sequence.
 // It exposes the intermediate geometries from the transformation pipeline.
 type Reduction struct {
-	// Geocentric is the input inertial state vector (e.g., True or Apparent state).
-	Geocentric vector.Vec3
-	// Topocentric is the Cartesian state vector relative to the observer (Geocentric - Observer)
-	// measured in the inertial ICRS frame.
+	Dispersion  map[float64]AltAz
+	Geocentric  vector.Vec3
 	Topocentric vector.Vec3
-	// Geometric is the un-refracted local horizon coordinate (Altitude / Azimuth).
-	Geometric AltAz
-	// Observed is the refracted local horizon coordinate for the primary wavelength.
-	Observed AltAz
-	// Dispersion maps specific wavelengths to their refracted local horizon coordinates.
-	Dispersion map[float64]AltAz
+	Geometric   AltAz
+	Observed    AltAz
 }
 
 // Reducer defines the explicit apparent-place reduction pipeline, converting
@@ -34,12 +28,11 @@ type Reduction struct {
 // matrix and IERS EOP lookup (~91 µs each). This makes Reducer suitable for
 // batch reduction of many targets at the same epoch.
 type Reducer struct {
-	site  *Geodetic
-	time  time.Time
 	atmos atmosphere.Atmosphere
-
-	once sync.Once
-	ctx  *Context // lazily initialized on first Reduce()
+	time  time.Time
+	site  *Geodetic
+	ctx   *Context
+	once  sync.Once
 }
 
 // NewReducer creates a new apparent-place reduction pipeline.

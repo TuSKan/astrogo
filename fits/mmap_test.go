@@ -1,6 +1,7 @@
 package fits
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -59,7 +60,7 @@ func TestMMapSeeker(t *testing.T) {
 	// Read EOF bypassed
 	seeker.off = 10
 	n, err := seeker.Read(p)
-	if n != 0 || err != io.EOF {
+	if n != 0 || !errors.Is(err, io.EOF) {
 		t.Errorf("expected EOF, got n=%d, err=%v", n, err)
 	}
 

@@ -290,15 +290,15 @@ func TestYallop(t *testing.T) {
 	// Zone F: q <= -0.293  → ArcV <= 8.9071
 	tests := []struct {
 		name     string
-		p        CrescentParams
 		wantCode string
+		p        CrescentParams
 	}{
-		{"zone A easily visible", CrescentParams{ArcV: 15, W: 0}, "A"},
-		{"zone B", CrescentParams{ArcV: 13.0, W: 0}, "B"},
-		{"zone C", CrescentParams{ArcV: 11.0, W: 0}, "C"},
-		{"zone D", CrescentParams{ArcV: 10.0, W: 0}, "D"},
-		{"zone E", CrescentParams{ArcV: 9.2, W: 0}, "E"},
-		{"zone F below Danjon", CrescentParams{ArcV: 2, W: 0}, "F"},
+		{"zone A easily visible", "A", CrescentParams{ArcV: 15, W: 0}},
+		{"zone B", "B", CrescentParams{ArcV: 13.0, W: 0}},
+		{"zone C", "C", CrescentParams{ArcV: 11.0, W: 0}},
+		{"zone D", "D", CrescentParams{ArcV: 10.0, W: 0}},
+		{"zone E", "E", CrescentParams{ArcV: 9.2, W: 0}},
+		{"zone F below Danjon", "F", CrescentParams{ArcV: 2, W: 0}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -351,13 +351,13 @@ func TestOdeh(t *testing.T) {
 	// Not Visible:    V < -0.96  → ArcV < 6.2051
 	tests := []struct {
 		name     string
-		p        CrescentParams
 		wantCode string
+		p        CrescentParams
 	}{
-		{"naked eye", CrescentParams{ArcV: 15, W: 0}, "Naked Eye"},
-		{"optical/naked", CrescentParams{ArcV: 10, W: 0}, "Optical/Naked"},
-		{"optical only", CrescentParams{ArcV: 7, W: 0}, "Optical Only"},
-		{"not visible", CrescentParams{ArcV: 2, W: 0}, "Not Visible"},
+		{"naked eye", "Naked Eye", CrescentParams{ArcV: 15, W: 0}},
+		{"optical/naked", "Optical/Naked", CrescentParams{ArcV: 10, W: 0}},
+		{"optical only", "Optical Only", CrescentParams{ArcV: 7, W: 0}},
+		{"not visible", "Not Visible", CrescentParams{ArcV: 2, W: 0}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -417,14 +417,14 @@ func TestQureshi(t *testing.T) {
 	// E: S <= -0.16 → ArcV <= 3.52266
 	tests := []struct {
 		name     string
-		p        CrescentParams
 		wantCode string
+		p        CrescentParams
 	}{
-		{"easily visible", CrescentParams{ArcV: 8.0, W: 5.0}, "A"},
-		{"perfect conditions", CrescentParams{ArcV: 6.0, W: 5.0}, "B"},
-		{"may require optical", CrescentParams{ArcV: 5.0, W: 5.0}, "C"},
-		{"require optical", CrescentParams{ArcV: 4.0, W: 5.0}, "D"},
-		{"not visible", CrescentParams{ArcV: 3.0, W: 5.0}, "E"},
+		{"easily visible", "A", CrescentParams{ArcV: 8.0, W: 5.0}},
+		{"perfect conditions", "B", CrescentParams{ArcV: 6.0, W: 5.0}},
+		{"may require optical", "C", CrescentParams{ArcV: 5.0, W: 5.0}},
+		{"require optical", "D", CrescentParams{ArcV: 4.0, W: 5.0}},
+		{"not visible", "E", CrescentParams{ArcV: 3.0, W: 5.0}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

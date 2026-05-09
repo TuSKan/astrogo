@@ -155,25 +155,11 @@ func (k EventKind) String() string {
 
 // EventSpec formally defines what type of astronomical event is being solved for.
 type EventSpec struct {
-	// Family defines the broad category of the event solver.
-	Family EventFamily
-
-	// Kind identifies the specific event type being solved.
-	Kind EventKind
-
-	// Target is the primary object for the event (e.g., the Sun, the Moon, a Star).
-	Target Observable
-
-	// Other is an optional secondary target used for relative events (e.g. Conjunctions, Eclipses).
-	Other Observable
-
-	// Observer is required for topocentric (site-dependent) events like Rise and Set.
-	// Relative geometry events (Conjunction) might omit this to solve geocentrically.
-	Observer *Site
-
-	// Threshold defines the angular condition for the event.
-	// For rise/set, this is the horizon altitude.
-	// For geometry, it might represent a specific separation angle.
+	Target    Observable
+	Other     Observable
+	Observer  *Site
+	Family    EventFamily
+	Kind      EventKind
 	Threshold angle.Angle
 }
 
@@ -588,13 +574,13 @@ func (s EventSolver) solveGeometry(spec EventSpec, start, end time.Time) ([]Even
 
 // Event represents a specific occurrence of a celestial target in the coord.
 type Event struct {
-	Kind              EventKind
 	Time              time.Time
-	Altitude          angle.Angle // Observed refracted altitude
-	GeometricAltitude angle.Angle // True geometric altitude
+	Kind              EventKind
+	Altitude          angle.Angle
+	GeometricAltitude angle.Angle
 	Azimuth           angle.Angle
-	Observable        bool    // True if the event satisfies observation conditions (not used directly here)
-	Value             float64 // Internal numeric value used by the solver (e.g. altitude difference)
+	Value             float64
+	Observable        bool
 }
 
 func (e Event) String() string {
@@ -638,9 +624,9 @@ var TwilightThresholds = map[TwilightKind]float64{
 // TwilightEvent groups a dawn and dusk occurrence for a specific twilight level.
 // If an event did not occur within the search interval, the pointer will be nil.
 type TwilightEvent struct {
-	Kind TwilightKind
 	Dawn *Event
 	Dusk *Event
+	Kind TwilightKind
 }
 
 // ── Event Finder API ──────────────────────────────────────────────────────────
@@ -670,7 +656,7 @@ func SunEvents(start, end time.Time, site *Site, provider eph.Provider) ([]Event
 
 // SunriseSunset returns the first sunrise and first sunset found in the given interval.
 // If an event is not found, the corresponding pointer will be nil.
-func SunriseSunset(start, end time.Time, site *Site, prov eph.Provider) (rise *Event, set *Event, err error) {
+func SunriseSunset(start, end time.Time, site *Site, prov eph.Provider) (rise, set *Event, err error) {
 	events, err := SunEvents(start, end, site, prov)
 	if err != nil {
 		return nil, nil, err
@@ -707,7 +693,7 @@ func MoonEvents(start, end time.Time, site *Site, provider eph.Provider) ([]Even
 
 // MoonriseMoonset returns the first moonrise and first moonset found in the given interval.
 // If an event is not found, the corresponding pointer will be nil.
-func MoonriseMoonset(start, end time.Time, site *Site, prov eph.Provider) (rise *Event, set *Event, err error) {
+func MoonriseMoonset(start, end time.Time, site *Site, prov eph.Provider) (rise, set *Event, err error) {
 	events, err := MoonEvents(start, end, site, prov)
 	if err != nil {
 		return nil, nil, err
@@ -763,21 +749,21 @@ func TwilightEvents(start, end time.Time, site *Site, prov eph.Provider, kind Tw
 }
 
 // CivilDawnDusk returns the first civil dawn and first civil dusk found in the interval.
-func CivilDawnDusk(start, end time.Time, site *Site, prov eph.Provider) (dawn *Event, dusk *Event, err error) {
+func CivilDawnDusk(start, end time.Time, site *Site, prov eph.Provider) (dawn, dusk *Event, err error) {
 	return getTwilightPair(start, end, site, prov, CivilTwilight)
 }
 
 // NauticalDawnDusk returns the first nautical dawn and first nautical dusk found in the interval.
-func NauticalDawnDusk(start, end time.Time, site *Site, prov eph.Provider) (dawn *Event, dusk *Event, err error) {
+func NauticalDawnDusk(start, end time.Time, site *Site, prov eph.Provider) (dawn, dusk *Event, err error) {
 	return getTwilightPair(start, end, site, prov, NauticalTwilight)
 }
 
 // AstronomicalDawnDusk returns the first astronomical dawn and first astronomical dusk found in the interval.
-func AstronomicalDawnDusk(start, end time.Time, site *Site, prov eph.Provider) (dawn *Event, dusk *Event, err error) {
+func AstronomicalDawnDusk(start, end time.Time, site *Site, prov eph.Provider) (dawn, dusk *Event, err error) {
 	return getTwilightPair(start, end, site, prov, AstronomicalTwilight)
 }
 
-func getTwilightPair(start, end time.Time, site *Site, prov eph.Provider, kind TwilightKind) (dawn *Event, dusk *Event, err error) {
+func getTwilightPair(start, end time.Time, site *Site, prov eph.Provider, kind TwilightKind) (dawn, dusk *Event, err error) {
 	threshold := TwilightThresholds[kind]
 	sun := NewSun(prov)
 	solver := NewEventSolver(15*time.Minute, 1*time.Second)

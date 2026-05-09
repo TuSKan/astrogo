@@ -1,14 +1,15 @@
 package catalog
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/TuSKan/astrogo/catalog/resolve"
 )
 
 type mockProvider struct {
-	name    string
 	targets map[string]Target
+	name    string
 }
 
 func (p *mockProvider) Name() string { return p.name }
@@ -16,6 +17,7 @@ func (p *mockProvider) Resolve(query string) (Target, bool) {
 	t, ok := p.targets[resolve.Normalize(query)]
 	return t, ok
 }
+
 func (p *mockProvider) Search(query string) []Target {
 	var res []Target
 	q := resolve.Normalize(query)
@@ -44,21 +46,21 @@ func TestResolver_Resolve(t *testing.T) {
 	r := &Resolver{providers: []resolve.Provider{p1, p2}}
 
 	tests := []struct {
+		wantErr error
 		query   string
 		wantID  string
-		wantErr error
 	}{
-		{"M42", "m42", nil},
-		{"m 42", "m42", nil},
-		{"Messier 42", "m42", nil},
-		{"M31", "m31", nil},
-		{"M43", "", ErrNotFound},
+		{nil, "M42", "m42"},
+		{nil, "m 42", "m42"},
+		{nil, "Messier 42", "m42"},
+		{nil, "M31", "m31"},
+		{ErrNotFound, "M43", ""},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.query, func(t *testing.T) {
 			got, err := r.Resolve(tt.query)
-			if err != tt.wantErr {
+			if !errors.Is(err, tt.wantErr) {
 				t.Errorf("Resolve() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}

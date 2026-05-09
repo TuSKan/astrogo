@@ -96,11 +96,11 @@ func (p *Provider) ResolveObject(ctx context.Context, req resolve.ObjectRequest)
 				Des      string `json:"des"`
 				Kind     string `json:"kind"`
 			} `json:"object"`
+			Message string `json:"message"`
 			PhysPar []struct {
 				Name  string `json:"name"`
 				Value string `json:"value"`
 			} `json:"phys_par"`
-			Message string `json:"message"`
 		}
 
 		if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {

@@ -35,13 +35,13 @@ func TestParseHorizonsSummary(t *testing.T) {
 	}
 
 	tests := []struct {
-		idx  int
 		id   string
 		name string
+		idx  int
 	}{
-		{0, "0", "Solar System Barycenter"},
-		{14, "301", "Moon"},
-		{15, "399", "Earth"},
+		{"0", "Solar System Barycenter", 0},
+		{"301", "Moon", 14},
+		{"399", "Earth", 15},
 	}
 
 	for _, tt := range tests {

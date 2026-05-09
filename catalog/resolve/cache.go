@@ -4,11 +4,12 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/TuSKan/astrogo/angle"
-	"github.com/TuSKan/astrogo/coord"
 	"github.com/apache/arrow-go/v18/arrow"
 	"github.com/apache/arrow-go/v18/arrow/array"
 	"github.com/apache/arrow-go/v18/arrow/memory"
+
+	"github.com/TuSKan/astrogo/angle"
+	"github.com/TuSKan/astrogo/coord"
 )
 
 // Cache provides a thread-safe caching system for query results.
@@ -44,8 +45,8 @@ var TargetSchema = arrow.NewSchema(
 // API compatibility. The ToRecordBatch helper is available for callers that
 // need columnar representation for downstream Arrow-native operations.
 type MapCache struct {
-	mu    sync.RWMutex
 	items map[string][]Target
+	mu    sync.RWMutex
 }
 
 // NewMapCache returns a ready-to-use in-memory MapCache.

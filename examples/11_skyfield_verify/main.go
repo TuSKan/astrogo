@@ -98,8 +98,8 @@ func main() {
 // computeAndPrint computes Mars position using the given provider and prints
 // the results alongside the Horizons reference.
 func computeAndPrint(prov eph.Provider, body eph.ID, t time.Time,
-	refRA, refDec angle.Angle, refDist float64) {
-
+	refRA, refDec angle.Angle, refDist float64,
+) {
 	// Use ApparentState to apply light-time correction (iterative retardation),
 	// matching Skyfield's observe() and Horizons' astrometric coordinates.
 	st, err := eph.ApparentState(prov, body, t)

@@ -17,12 +17,14 @@ import (
 
 // ─── Re-exported core types (users import "ephemeris", not "ephemeris/core") ─
 
-type Provider = core.Provider
-type State = core.State
-type ID = core.ID
-type Source = core.Source
-type Kind = core.Kind
-type Body = core.Body
+type (
+	Provider = core.Provider
+	State    = core.State
+	ID       = core.ID
+	Source   = core.Source
+	Kind     = core.Kind
+	Body     = core.Body
+)
 
 const (
 	Mercury               = core.Mercury
@@ -84,13 +86,13 @@ type JPL = jpl.Provider
 type Option func(*config)
 
 type config struct {
-	DataDir      string
 	Start        time.Time
 	End          time.Time
-	ExtraKernels []string // additional SPK kernels to load
+	DataDir      string
 	TLEName      string
 	TLELine1     string
 	TLELine2     string
+	ExtraKernels []string
 }
 
 // WithDataDir sets the local cache directory for downloaded kernels.

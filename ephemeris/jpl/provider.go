@@ -15,8 +15,10 @@ import (
 	"github.com/TuSKan/astrogo/vector"
 )
 
-const JPL_KERNEL_URI = "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/"
-const KM_PER_AU = 149597870.7
+const (
+	JPL_KERNEL_URI = "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/"
+	KM_PER_AU      = 149597870.7
+)
 
 var BodyIDToNAIF = map[core.ID]int{
 	core.Sun: 10, core.Moon: 301, core.Mercury: 199, core.Venus: 299,
@@ -47,18 +49,16 @@ type TargetCoverage struct {
 
 // Provider implements core.Provider using JPL SPK/LSK kernels.
 type Provider struct {
+	startTime        time.Time
+	endTime          time.Time
 	LSK              *lsk.Reader
-	Kernels          []*Kernel
-	Index            []SegmentRef             // Global flat index
-	ByTarget         map[int32][]SegmentRef   // Grouped by target
-	ByTargetCoverage map[int32]TargetCoverage // Precomputed metadata
+	ByTarget         map[int32][]SegmentRef
+	ByTargetCoverage map[int32]TargetCoverage
 	DataDir          string
-
-	// Configuration fields for initialization
-	source    core.Source
-	kernel    string
-	startTime time.Time
-	endTime   time.Time
+	source           core.Source
+	kernel           string
+	Kernels          []*Kernel
+	Index            []SegmentRef
 }
 
 type Option func(*Provider)
@@ -95,7 +95,7 @@ func NewProvider(source core.Source, kernel string, opts ...Option) (*Provider, 
 		opt(p)
 	}
 
-	if err := os.MkdirAll(p.DataDir, 0755); err != nil {
+	if err := os.MkdirAll(p.DataDir, 0o755); err != nil {
 		return nil, fmt.Errorf("jpl: failed to create directory: %w", err)
 	}
 

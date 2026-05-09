@@ -20,7 +20,6 @@ func Example_integration() {
 	// We'll search for the Andromeda Galaxy (M31)
 	resolver := catalog.NewResolver(catalog.SIMBAD)
 	andromeda, err := resolver.Resolve("M31")
-
 	if err != nil {
 		fmt.Println("Failed to resolve target.")
 		return
@@ -52,5 +51,4 @@ func Example_integration() {
 	fmt.Printf("At %v (UTC), from %s:\n", obsTime, obs.Name())
 	fmt.Printf("M31 Altitude: %.4f°\n", altaz.Alt().Degrees())
 	fmt.Printf("M31 Azimuth:  %.4f°\n", altaz.Az().Degrees())
-
 }

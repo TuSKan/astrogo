@@ -23,10 +23,10 @@ import (
 
 // fridayCandidate stores metadata for a Friday Nisan 14 occurrence.
 type fridayCandidate struct {
-	year     int
 	nisan14  string
-	ageHours float64
 	crescent plan.CrescentResult
+	year     int
+	ageHours float64
 }
 
 func main() {

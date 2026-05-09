@@ -18,23 +18,23 @@ var gpAPIBase = "https://celestrak.org/NORAD/elements/gp.php"
 // GP represents a NORAD General Perturbations element set (OMM-compatible).
 // Field names align with CCSDS 502.0-B-3 / Space Data Standards OMM schema.
 type GP struct {
-	ObjectName      string  `json:"OBJECT_NAME"`       // Satellite name
-	ObjectID        string  `json:"OBJECT_ID"`         // International designator (yyyy-nnnp)
-	Epoch           string  `json:"EPOCH"`             // Element set epoch (ISO 8601)
-	MeanMotion      float64 `json:"MEAN_MOTION"`       // Revolutions per day
-	Eccentricity    float64 `json:"ECCENTRICITY"`      // Dimensionless
-	Inclination     float64 `json:"INCLINATION"`       // Degrees
-	RAOfAscNode     float64 `json:"RA_OF_ASC_NODE"`    // Degrees
-	ArgOfPericenter float64 `json:"ARG_OF_PERICENTER"` // Degrees
-	MeanAnomaly     float64 `json:"MEAN_ANOMALY"`      // Degrees
+	ObjectName      string  `json:"OBJECT_NAME"`
+	ObjectID        string  `json:"OBJECT_ID"`
+	Epoch           string  `json:"EPOCH"`
+	Classification  string  `json:"CLASSIFICATION_TYPE"`
+	MeanAnomaly     float64 `json:"MEAN_ANOMALY"`
+	Inclination     float64 `json:"INCLINATION"`
+	RAOfAscNode     float64 `json:"RA_OF_ASC_NODE"`
+	ArgOfPericenter float64 `json:"ARG_OF_PERICENTER"`
+	Eccentricity    float64 `json:"ECCENTRICITY"`
 	EphemerisType   int     `json:"EPHEMERIS_TYPE"`
-	Classification  string  `json:"CLASSIFICATION_TYPE"` // U/C/S
-	NoradCatID      int     `json:"NORAD_CAT_ID"`        // Up to 9 digits
+	MeanMotion      float64 `json:"MEAN_MOTION"`
+	NoradCatID      int     `json:"NORAD_CAT_ID"`
 	ElementSetNo    int     `json:"ELEMENT_SET_NO"`
 	RevAtEpoch      int     `json:"REV_AT_EPOCH"`
-	BStar           float64 `json:"BSTAR"`            // Drag coefficient (1/earth radii)
-	MeanMotionDot   float64 `json:"MEAN_MOTION_DOT"`  // First derivative (rev/day²)
-	MeanMotionDDot  float64 `json:"MEAN_MOTION_DDOT"` // Second derivative (rev/day³)
+	BStar           float64 `json:"BSTAR"`
+	MeanMotionDot   float64 `json:"MEAN_MOTION_DOT"`
+	MeanMotionDDot  float64 `json:"MEAN_MOTION_DDOT"`
 }
 
 // EpochTime parses the GP epoch string into an astrogo Time (UTC).

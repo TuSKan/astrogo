@@ -127,8 +127,8 @@ func TestAssertExact_passes(t *testing.T) {
 
 type tbSpy struct {
 	testing.TB
-	failed bool
 	msg    string
+	failed bool
 }
 
 func (s *tbSpy) Helper() {}
