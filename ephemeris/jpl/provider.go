@@ -6,11 +6,11 @@ import (
 	"math"
 	"os"
 	"path/filepath"
-	"runtime"
 
 	"github.com/TuSKan/astrogo/ephemeris/core"
 	"github.com/TuSKan/astrogo/ephemeris/jpl/lsk"
 	"github.com/TuSKan/astrogo/ephemeris/jpl/spk"
+	"github.com/TuSKan/astrogo/internal/cache"
 	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/vector"
 )
@@ -79,9 +79,13 @@ func WithTimeInterval(start, end time.Time) Option {
 // The source selects the kind of JPL data (Planets, SmallBody, Asteroids,
 // Comets). The kernel identifies the specific dataset (e.g. "de442", "433").
 func NewProvider(source core.Source, kernel string, opts ...Option) (*Provider, error) {
-	_, filename, _, _ := runtime.Caller(0)
+	// Default DataDir: OS user cache directory (e.g. ~/.cache/astrogo/jpl)
+	defaultDir, err := cache.Dir("jpl")
+	if err != nil {
+		return nil, fmt.Errorf("jpl: failed to resolve cache directory: %w", err)
+	}
 	p := &Provider{
-		DataDir:          filepath.Join(filepath.Dir(filename), "data"),
+		DataDir:          defaultDir,
 		ByTarget:         make(map[int32][]SegmentRef),
 		ByTargetCoverage: make(map[int32]TargetCoverage),
 		source:           source,
@@ -134,7 +138,6 @@ func NewProvider(source core.Source, kernel string, opts ...Option) (*Provider, 
 		return nil, fmt.Errorf("jpl: unknown source %q", p.source)
 	}
 
-	var err error
 	p.LSK, err = lsk.Cache("lsk/naif0012.tls", p.DataDir)
 	if err != nil {
 		return nil, fmt.Errorf("jpl: failed to locate/cache LSK: %w", err)

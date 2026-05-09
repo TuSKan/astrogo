@@ -29,7 +29,7 @@ func loadCases(t *testing.T) []*StateVector {
 }
 
 func runHorizonsTest(t *testing.T, bodyName string) {
-	p, err := jpl.NewProvider(core.Planets, "de440", jpl.WithDataDir("../data"))
+	p, err := jpl.NewProvider(core.Planets, "de440")
 	if err != nil {
 		t.Fatalf("failed to create provider: %v", err)
 	}

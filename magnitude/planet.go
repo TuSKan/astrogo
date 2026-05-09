@@ -102,12 +102,17 @@ func subLatitude(pole, direction [3]float64) float64 {
 
 func mercuryMag(r, delta, phAng float64) float64 {
 	distMod := 5 * math.Log10(r*delta)
+	p2 := phAng * phAng
+	p3 := p2 * phAng
+	p4 := p2 * p2
+	p5 := p4 * phAng
+	p6 := p4 * p2
 	phAngFactor := 6.3280e-02*phAng -
-		1.6336e-03*phAng*phAng +
-		3.3644e-05*math.Pow(phAng, 3) -
-		3.4265e-07*math.Pow(phAng, 4) +
-		1.6893e-09*math.Pow(phAng, 5) -
-		3.0334e-12*math.Pow(phAng, 6)
+		1.6336e-03*p2 +
+		3.3644e-05*p3 -
+		3.4265e-07*p4 +
+		1.6893e-09*p5 -
+		3.0334e-12*p6
 	return -0.613 + distMod + phAngFactor
 }
 
@@ -220,8 +225,10 @@ func saturnMag(sunToPlanet, observerToPlanet [3]float64, r, delta, phAng float64
 
 	// Beyond geocentric limits: globe-only (Eq. 11/12).
 	// Eq. 12: globe-alone beyond geocentric phase angle limit.
+	p3 := phAng * phAng * phAng
+	p4 := p3 * phAng
 	return -8.94 + 2.446e-4*phAng + 2.672e-4*phAng*phAng -
-		1.506e-6*math.Pow(phAng, 3) + 4.767e-9*math.Pow(phAng, 4) + distMod
+		1.506e-6*p3 + 4.767e-9*p4 + distMod
 }
 
 // ── Uranus — Mallama & Hilton 2018, Table 8 ─────────────────────────────────

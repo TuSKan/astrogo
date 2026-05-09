@@ -48,6 +48,7 @@ func MoonApparent(p eph.Provider, t time.Time) (float64, error) {
 	alphaDeg := math.Acos(cosAlpha) * 180 / math.Pi
 
 	// Allen (2000) polynomial.
-	v := -12.74 + 0.026*math.Abs(alphaDeg) + 4e-9*math.Pow(alphaDeg, 4)
+	a2 := alphaDeg * alphaDeg
+	v := -12.74 + 0.026*math.Abs(alphaDeg) + 4e-9*a2*a2
 	return v, nil
 }
