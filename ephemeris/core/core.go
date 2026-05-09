@@ -130,8 +130,8 @@ const (
 
 // Body represents a named celestial body and its category.
 type Body struct {
-	ID   ID
 	Name string
+	ID   ID
 	Kind Kind
 }
 

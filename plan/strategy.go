@@ -3,6 +3,7 @@ package plan
 import (
 	"sort"
 
+	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/time"
 )
 
@@ -128,7 +129,8 @@ func (s *SwapOptimizedStrategy) swapPass(
 		newJEnd := newJStart.Add(bj.Block.Duration)
 
 		// Validate bj's constraints at the new time.
-		if !checkConstraintsInterval(bj.Block.Target, newJStart, newJEnd, step, planner.Site, mergedC[bj.Block.ID]...) {
+		midCtxJ, okJ := checkConstraintsIntervalCtx(bj.Block.Target, newJStart, newJEnd, step, planner.Site, mergedC[bj.Block.ID]...)
+		if !okJ {
 			continue
 		}
 
@@ -162,7 +164,8 @@ func (s *SwapOptimizedStrategy) swapPass(
 		}
 
 		// Validate bi's constraints at the new time.
-		if !checkConstraintsInterval(bi.Block.Target, newIStart, newIEnd, step, planner.Site, mergedC[bi.Block.ID]...) {
+		midCtxI, okI := checkConstraintsIntervalCtx(bi.Block.Target, newIStart, newIEnd, step, planner.Site, mergedC[bi.Block.ID]...)
+		if !okI {
 			continue
 		}
 
@@ -170,8 +173,8 @@ func (s *SwapOptimizedStrategy) swapPass(
 		// Plateau moves (>=) allow escape from local maxima; oscillation is bounded
 		// by the convergence check in Schedule() which stops after two idle passes.
 		oldScore := bi.Score + bj.Score
-		newJScore := scoreBlockPlacement(bj.Block, newJStart, newJEnd, planner)
-		newIScore := scoreBlockPlacement(bi.Block, newIStart, newIEnd, planner)
+		newJScore := scoreBlockPlacement(bj.Block, newJStart, newJEnd, planner, midCtxJ)
+		newIScore := scoreBlockPlacement(bi.Block, newIStart, newIEnd, planner, midCtxI)
 		newScore := newJScore + newIScore
 
 		if newScore >= oldScore {
@@ -273,8 +276,8 @@ func (s *SwapOptimizedStrategy) insertPass(
 				continue
 			}
 
-			if checkConstraintsInterval(ub.Block.Target, startTime, endTime, step, planner.Site, mergedC[ub.Block.ID]...) {
-				score := scoreBlockPlacement(ub.Block, startTime, endTime, planner)
+			if midCtx, ok := checkConstraintsIntervalCtx(ub.Block.Target, startTime, endTime, step, planner.Site, mergedC[ub.Block.ID]...); ok {
+				score := scoreBlockPlacement(ub.Block, startTime, endTime, planner, midCtx)
 				sched.Blocks = append(sched.Blocks, ScheduledBlock{
 					Block:     ub.Block,
 					Window:    Window{Start: startTime, End: endTime},
@@ -322,12 +325,11 @@ func mergeConstraints(a, b []Constraint) []Constraint {
 // scoreBlockPlacement evaluates how desirable a block placement is by
 // scoring the target at the observation midpoint using ScoreObservable.
 //
-// The score combines altitude (0–90°) weighted by priority, reflecting
-// both scientific quality (lower airmass) and user preference.
+// If ctx is non-nil it is reused; otherwise ScoreObservable creates one.
 // Falls back to static block priority if scoring fails.
-func scoreBlockPlacement(block *Block, start, end time.Time, planner *Planner) float64 {
+func scoreBlockPlacement(block *Block, start, end time.Time, planner *Planner, ctx *coord.Context) float64 {
 	mid := start.Add(end.Sub(start) / 2)
-	score, err := ScoreObservable(block.Target, mid, planner.Site, nil, planner.Constraints...)
+	score, err := ScoreObservable(block.Target, mid, planner.Site, nil, ctx, planner.Constraints...)
 	if err != nil {
 		return block.Priority
 	}

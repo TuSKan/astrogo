@@ -20,10 +20,10 @@ var (
 // Site represents a physical observing location.
 // Sites are immutable by convention.
 type Site struct {
-	name     string
 	location *coord.Geodetic
-	horizon  angle.Angle
 	timeZone *time.Location
+	name     string
+	horizon  angle.Angle
 }
 
 // NewSite creates a new observing site with validation.

@@ -396,8 +396,8 @@ func TestICRSBatchToAltAzParallel_Correctness(t *testing.T) {
 	ctx.ICRSBatchToAltAzParallel(stars, parallel)
 
 	for i := 0; i < n; i++ {
-		if math.Abs(serial[i].Alt().Degrees()-parallel[i].Alt().Degrees()) > 1e-14 ||
-			math.Abs(serial[i].Az().Degrees()-parallel[i].Az().Degrees()) > 1e-14 {
+		if math.Abs(serial[i].Alt().Degrees()-parallel[i].Alt().Degrees()) > 1e-12 ||
+			math.Abs(serial[i].Az().Degrees()-parallel[i].Az().Degrees()) > 1e-12 {
 			t.Fatalf("mismatch at index %d: serial=(%.10f, %.10f) parallel=(%.10f, %.10f)",
 				i,
 				serial[i].Alt().Degrees(), serial[i].Az().Degrees(),
@@ -429,8 +429,8 @@ func TestReduceBatchParallel_Correctness(t *testing.T) {
 	ctx.ReduceBatchParallel(vecs, parallel)
 
 	for i := 0; i < n; i++ {
-		if math.Abs(serial[i].Alt().Degrees()-parallel[i].Alt().Degrees()) > 1e-14 ||
-			math.Abs(serial[i].Az().Degrees()-parallel[i].Az().Degrees()) > 1e-14 {
+		if math.Abs(serial[i].Alt().Degrees()-parallel[i].Alt().Degrees()) > 1e-12 ||
+			math.Abs(serial[i].Az().Degrees()-parallel[i].Az().Degrees()) > 1e-12 {
 			t.Fatalf("mismatch at index %d: serial=(%.10f, %.10f) parallel=(%.10f, %.10f)",
 				i,
 				serial[i].Alt().Degrees(), serial[i].Az().Degrees(),

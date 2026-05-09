@@ -34,14 +34,14 @@ func main() {
 	simbad := catalog.NewResolver(catalog.SIMBAD)
 
 	type lookup struct {
-		name     string
 		resolver *catalog.Resolver
+		name     string
 	}
 	lookups := []lookup{
-		{"NGC 5139", ngc},   // Omega Centauri
-		{"NGC 3372", ngc},   // Carina Nebula
-		{"Sgr A*", simbad},  // Galactic center
-		{"Canopus", simbad}, // Alpha Carinae
+		{ngc, "NGC 5139"},   // Omega Centauri
+		{ngc, "NGC 3372"},   // Carina Nebula
+		{simbad, "Sgr A*"},  // Galactic center
+		{simbad, "Canopus"}, // Alpha Carinae
 	}
 
 	targets := make([]plan.Observable, 0, len(lookups))
@@ -62,21 +62,21 @@ func main() {
 
 	// ── Scoring profiles ─────────────────────────────────────────────────
 	profiles := []struct {
-		name string
 		cfg  *plan.ScoreConfig
+		name string
 	}{
-		{"Default (balanced)", nil}, // uses DefaultScoreConfig()
-		{"Altitude-only", &plan.ScoreConfig{
+		{nil, "Default (balanced)"}, // uses DefaultScoreConfig()
+		{&plan.ScoreConfig{
 			AltitudeWeight: 1.0,
 			UrgencyWeight:  0.0,
 			MoonWeight:     0.0,
-		}},
-		{"Urgency-heavy", &plan.ScoreConfig{
+		}, "Altitude-only"},
+		{&plan.ScoreConfig{
 			AltitudeWeight:     0.2,
 			UrgencyWeight:      0.7,
 			MoonWeight:         0.1,
 			MoonFullPenaltyDeg: 30.0,
-		}},
+		}, "Urgency-heavy"},
 	}
 
 	// ── Header ───────────────────────────────────────────────────────────
@@ -97,7 +97,7 @@ func main() {
 		var results []result
 
 		for _, obj := range targets {
-			score, err := plan.ScoreObservable(obj, tm, site, profile.cfg, constraints...)
+			score, err := plan.ScoreObservable(obj, tm, site, profile.cfg, nil, constraints...)
 			if err != nil {
 				fmt.Printf("  %-14s  error: %v\n", obj.Name(), err)
 				continue

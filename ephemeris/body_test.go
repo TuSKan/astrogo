@@ -12,7 +12,7 @@ func TestIDString(t *testing.T) {
 	testutil.AssertEqual(t, "Mars name", eph.Mars.String(), "Mars")
 
 	// Check the alias
-	var p eph.ID = eph.Jupiter
+	p := eph.Jupiter
 	testutil.AssertEqual(t, "Planet alias", p.String(), "Jupiter")
 }
 

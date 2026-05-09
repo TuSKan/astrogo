@@ -80,7 +80,7 @@ func main() {
 		dayStart := e.Time.Add(-window)
 		dayEnd := e.Time.Add(window)
 
-		visibility := "?"
+		var visibility string
 
 		// Check if Sun is set (= night) at eclipse time
 		_, sunSet, sunErr := plan.SunriseSunset(dayStart, dayEnd, site, prov)

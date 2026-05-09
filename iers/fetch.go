@@ -2,6 +2,7 @@ package iers
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"log"
@@ -116,7 +117,11 @@ func doFetch() error {
 	log.Printf("astrogo/iers: downloading fresh EOP data from %s", finalsURL)
 
 	client := &http.Client{Timeout: fetchTimeout}
-	resp, err := client.Get(finalsURL)
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, finalsURL, nil)
+	if err != nil {
+		return fmt.Errorf("iers: failed to create EOP request: %w", err)
+	}
+	resp, err := client.Do(req)
 	if err != nil {
 		return fmt.Errorf("iers: failed to download EOP data: %w", err)
 	}

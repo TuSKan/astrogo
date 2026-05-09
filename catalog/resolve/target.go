@@ -29,50 +29,40 @@ const (
 
 // Target represents an astronomical object in a resolve.
 type Target struct {
-	ID             string
+	Epoch          time.Time
+	Catalog        string
 	Name           string
 	Designation    string
 	SPKID          string
 	Kind           Kind
-	Coord          coord.ICRS
-	HasCoord       bool // true if Coord contains valid coordinates
-	Epoch          time.Time
-	PmRA           angle.Angle // Proper motion in RA
-	PmDec          angle.Angle // Proper motion in Declination
-	Parallax       angle.Angle
-	RadialVelocity float64 // km/s
-	Catalog        string
+	ID             string
+	TLELine2       string
+	TLELine1       string
 	Aliases        []string
-
-	// TLE data for satellite targets (populated by NORAD provider).
-	TLELine1 string
-	TLELine2 string
-
-	// Physical magnitude parameters (populated by SBDB or catalog providers).
-	// For asteroids: H (absolute mag) and G (slope parameter, default 0.15).
-	// For comets: M1/k1 (total magnitude), M2/k2 (nuclear magnitude).
-	// For stars: VMag (catalog V-band magnitude).
-	VMag    float64 // Catalog V-band magnitude (0 = not set)
-	HasVMag bool    // true if VMag is populated
-	H       float64 // Asteroid absolute magnitude
-	G       float64 // Asteroid slope parameter (0 = not set, use 0.15 default)
-	HasH    bool    // true if H is populated
-	M1      float64 // Comet total absolute magnitude
-	K1      float64 // Comet total activity parameter
-	M2      float64 // Comet nuclear absolute magnitude
-	K2      float64 // Comet nuclear activity parameter
-	HasM1   bool    // true if M1/K1 are populated
-
-	// HG1G2 / sHG1G2 phase-curve parameters (Carry et al. 2024).
-	// Populated by: FINK SSOFT provider.
-	G1            float64 // Phase function G₁ parameter
-	G2            float64 // Phase function G₂ parameter
-	HasG1G2       bool    // true if G1/G2 are populated
-	SpinRA        float64 // Spin axis RA (degrees, J2000)
-	SpinDec       float64 // Spin axis Dec (degrees, J2000)
-	HasSpin       bool    // true if spin axis is populated
-	Oblateness    float64 // Polar oblateness R ∈ (0,1], 1 = sphere
-	HasOblateness bool    // true if R is populated
+	Coord          coord.ICRS
+	VMag           float64
+	G2             float64
+	Parallax       angle.Angle
+	PmDec          angle.Angle
+	PmRA           angle.Angle
+	Oblateness     float64
+	SpinDec        float64
+	H              float64
+	G              float64
+	SpinRA         float64
+	M1             float64
+	K1             float64
+	M2             float64
+	K2             float64
+	RadialVelocity float64
+	G1             float64
+	HasM1          bool
+	HasG1G2        bool
+	HasH           bool
+	HasVMag        bool
+	HasSpin        bool
+	HasCoord       bool
+	HasOblateness  bool
 }
 
 // ICRS implements coord.Object for a static catalog Target.

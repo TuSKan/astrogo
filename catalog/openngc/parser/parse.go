@@ -1,7 +1,9 @@
 package main
 
 import (
+	"context"
 	"encoding/csv"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -68,15 +70,19 @@ type targetRecord struct {
 	ID      string
 	Name    string
 	Kind    string
+	VMag    string
+	BMag    string
+	Aliases []string
 	RA      float64
 	Dec     float64
-	Aliases []string
-	VMag    string // V-band apparent magnitude (empty if unavailable)
-	BMag    string // B-band apparent magnitude (empty if unavailable)
 }
 
 func downloadAndParse(url string) ([]targetRecord, error) {
-	resp, err := http.Get(url)
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -107,7 +113,7 @@ func parseOpenNGC(input io.Reader) ([]targetRecord, error) {
 	var records []targetRecord
 	for {
 		row, err := r.Read()
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			break
 		}
 		if err != nil {

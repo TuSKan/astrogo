@@ -2,6 +2,7 @@ package spk
 
 import (
 	"bufio"
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -42,7 +43,7 @@ func CacheAPI(kernel string, startTime, endTime time.Time, path string) ([]*Read
 	spkFile := kernel + ".bsp"
 	spkPath := filepath.Join(path, spkFile)
 
-	if err := os.MkdirAll(path, 0755); err != nil {
+	if err := os.MkdirAll(path, 0o755); err != nil {
 		return nil, fmt.Errorf("jpl: failed to create directory %s: %w", path, err)
 	}
 
@@ -79,7 +80,7 @@ func CacheAPI(kernel string, startTime, endTime time.Time, path string) ([]*Read
 			return nil, fmt.Errorf("jpl: failed to decode SPK data: %w", err)
 		}
 
-		if err := os.WriteFile(spkPath, spkData, 0644); err != nil {
+		if err := os.WriteFile(spkPath, spkData, 0o644); err != nil {
 			return nil, fmt.Errorf("jpl: failed to save SPK %s: %w", spkPath, err)
 		}
 		f, err := os.Open(spkPath)
@@ -123,7 +124,11 @@ func apiHorizonsRequest(command string, startTime, endTime time.Time) (*Horizons
 
 	api.RawQuery = params.Encode()
 
-	r, err := http.Get(api.String())
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, api.String(), nil)
+	if err != nil {
+		return nil, fmt.Errorf("HorizonsRequest: failed to create request: %w", err)
+	}
+	r, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("HorizonsRequest: failed to get: %w", err)
 	}

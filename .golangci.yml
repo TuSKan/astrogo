@@ -1,16 +1,58 @@
+version: "2"
+
 linters:
-  # Enable specific linters
+  default: none
   enable:
-    - gofmt
-    - goimports
     - govet
     - errcheck
     - staticcheck
-    - gosimple
     - ineffassign
-    - typecheck
+    - noctx
+    - nilnil
+    - errorlint
+    - bodyclose
 
-linters-settings:
-  gofmt:
-    # Simplify code: gofmt with `-s` option
-    simplify: true
+  settings:
+    errcheck:
+      check-type-assertions: false
+      check-blank: false
+
+  exclusions:
+    rules:
+      # Deferred Close/Remove — errors are not actionable in cleanup paths
+      - text: "Error return value of .* is not checked"
+        source: "defer .*\\.Close\\(\\)"
+        linters:
+          - errcheck
+      # Non-deferred Close in error recovery paths (SPK reader cleanup)
+      - text: "Error return value of .* is not checked"
+        source: "(r|file)\\.Close\\(\\)|os\\.Remove"
+        path: "ephemeris/jpl/spk/reader\\.go"
+        linters:
+          - errcheck
+      # nil,nil returns are valid API for optional event finders
+      - path: "plan/events\\.go"
+        linters:
+          - nilnil
+      # Examples are not production code
+      - path: "examples/"
+        linters:
+          - errcheck
+          - noctx
+          - ineffassign
+      # Test files — bodyclose, errcheck, nilnil, noctx
+      - path: "_test\\.go"
+        linters:
+          - errcheck
+          - bodyclose
+          - nilnil
+          - noctx
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+
+  settings:
+    gofmt:
+      simplify: true

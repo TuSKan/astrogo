@@ -1,6 +1,7 @@
 package tools
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -11,11 +12,15 @@ import (
 // Download fetches a file from a URL and saves it to the target path.
 func Download(url, path string) error {
 	// Ensure directory exists
-	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return err
 	}
 
-	resp, err := http.Get(url)
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, url, nil)
+	if err != nil {
+		return err
+	}
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return err
 	}
@@ -33,8 +38,8 @@ func Download(url, path string) error {
 
 	// Ensure we don't leak the tmp file if something panics or fails early
 	defer func() {
-		tmpFile.Close()
-		os.Remove(tmpName)
+		_ = tmpFile.Close()
+		_ = os.Remove(tmpName)
 	}()
 
 	if _, err = io.Copy(tmpFile, resp.Body); err != nil {

@@ -44,8 +44,8 @@ func (p MoonPhase) targetAngle() float64 {
 
 // MoonPhaseEvent records the precise instant of a primary lunar phase.
 type MoonPhaseEvent struct {
-	Phase MoonPhase
 	Time  time.Time
+	Phase MoonPhase
 }
 
 // moonElongation returns the ecliptic longitude difference (Moon − Sun)
@@ -184,8 +184,8 @@ func (s Season) targetLongitude() float64 {
 
 // SeasonEvent records the precise instant of a seasonal event.
 type SeasonEvent struct {
-	Season Season
 	Time   time.Time
+	Season Season
 }
 
 // sunEclipticLongitude returns the Sun's apparent ecliptic longitude at time t.
@@ -345,9 +345,9 @@ func (a Apsis) String() string {
 
 // ApsisEvent records the precise instant and distance of an orbital apsis.
 type ApsisEvent struct {
-	Apsis    Apsis
 	Time     time.Time
-	Distance float64 // AU
+	Apsis    Apsis
+	Distance float64
 }
 
 // Apsides computes the perihelion and aphelion of the Earth for a given year.
@@ -413,10 +413,10 @@ func (e EclipseType) String() string {
 
 // EclipseEvent records an eclipse with its time and ecliptic latitude.
 type EclipseEvent struct {
-	Type             EclipseType
 	Time             time.Time
-	EclipticLatitude angle.Angle // Moon's ecliptic latitude at syzygy
-	Gamma            float64     // |ecliptic latitude| / eclipse limit — lower = more central
+	Type             EclipseType
+	EclipticLatitude angle.Angle
+	Gamma            float64
 }
 
 // moonEclipticLatitude returns the Moon's ecliptic latitude at time t.

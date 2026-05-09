@@ -127,13 +127,13 @@ func G2icrs(gl, gb float64) (ra, dec float64) {
 }
 
 // Eceq06 converts ICRS to Ecliptic coordinates (IAU 2006).
-func Eceq06(date1, date2 float64, ra, dec float64) (elon, elat float64) {
+func Eceq06(date1, date2, ra, dec float64) (elon, elat float64) {
 	gofa.Eceq06(date1, date2, ra, dec, &elon, &elat)
 	return elon, elat
 }
 
 // Eqec06 converts Ecliptic to ICRS coordinates (IAU 2006).
-func Eqec06(date1, date2 float64, elon, elat float64) (ra, dec float64) {
+func Eqec06(date1, date2, elon, elat float64) (ra, dec float64) {
 	gofa.Eqec06(date1, date2, elon, elat, &ra, &dec)
 	return ra, dec
 }
@@ -202,7 +202,7 @@ func Refco(phpa, tc, rh, wl float64) (refa, refb float64) {
 type ASTROM = gofa.ASTROM
 
 // Apco13 prepares the ASTROM parameters for ICRS <-> observed transformations.
-func Apco13(utc1, utc2, dut1 float64, elong, phi, hm, xp, yp float64, phpa, tc, rh, wl float64) (ASTROM, float64) {
+func Apco13(utc1, utc2, dut1, elong, phi, hm, xp, yp, phpa, tc, rh, wl float64) (ASTROM, float64) {
 	var astrom ASTROM
 	var eo float64
 	gofa.Apco13(utc1, utc2, dut1, elong, phi, hm, xp, yp, phpa, tc, rh, wl, &astrom, &eo)
@@ -210,7 +210,7 @@ func Apco13(utc1, utc2, dut1 float64, elong, phi, hm, xp, yp float64, phpa, tc, 
 }
 
 // Atciq provides quick ICRS to CIRS transformation given precomputed ASTROM parameters.
-func Atciq(rc, dc float64, pr, pd, px, rv float64, astrom *ASTROM) (ri, di float64) {
+func Atciq(rc, dc, pr, pd, px, rv float64, astrom *ASTROM) (ri, di float64) {
 	gofa.Atciq(rc, dc, pr, pd, px, rv, astrom, &ri, &di)
 	return ri, di
 }
@@ -222,7 +222,7 @@ func Atioq(ri, di float64, astrom *ASTROM) (aob, zob, hob, dob, rob float64) {
 }
 
 // Atcoq collapses Atciq and Atioq: quick ICRS to observed.
-func Atcoq(rc, dc float64, pr, pd, px, rv float64, astrom *ASTROM) (aob, zob, hob, dob, rob float64) {
+func Atcoq(rc, dc, pr, pd, px, rv float64, astrom *ASTROM) (aob, zob, hob, dob, rob float64) {
 	ri, di := Atciq(rc, dc, pr, pd, px, rv, astrom)
 	return Atioq(ri, di, astrom)
 }

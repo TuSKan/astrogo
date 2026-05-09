@@ -13,9 +13,9 @@ import (
 // Planet represents a solar system body with an ephemeris provider
 // (Sun, Moon, Mercury–Pluto).
 type Planet struct {
+	provider eph.Provider
 	name     string
 	id       eph.ID
-	provider eph.Provider
 }
 
 // NewPlanet creates a planet target.

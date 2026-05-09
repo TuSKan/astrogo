@@ -146,11 +146,11 @@ func TestGPToTarget(t *testing.T) {
 
 func TestFormatTLEExp(t *testing.T) {
 	tests := []struct {
-		input float64
 		want  string
+		input float64
 	}{
-		{0, " 00000-0"},
-		{0.00019193879, " 19194-3"},
+		{" 00000-0", 0},
+		{" 19194-3", 0.00019193879},
 	}
 
 	for _, tt := range tests {

@@ -34,21 +34,19 @@ func Open(path string) (*File, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer f.Close()
 
 	if strings.HasSuffix(strings.ToLower(path), ".gz") {
 		gzReader, err := pgzip.NewReader(f)
 		if err != nil {
-			f.Close()
 			return nil, err
 		}
 		// Notice: pgzip.Reader does not support io.Seeker.
 		// The underlying fits.Read loop will gracefully fallback to streaming.
 		defer gzReader.Close()
-		defer f.Close()
 		return Read(gzReader)
 	}
 
-	defer f.Close()
 	return Read(f)
 }
 

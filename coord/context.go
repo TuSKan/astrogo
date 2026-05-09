@@ -108,6 +108,14 @@ func NewContext(t time.Time, site *Geodetic, atm atmosphere.Atmosphere) *Context
 	}
 }
 
+// Clone returns an independent copy of the Context, safe for concurrent use.
+// Each copy has its own ASTROM struct, avoiding data races from SOFA's
+// internal refraction coefficient caching in iauAtioq.
+func (ctx *Context) Clone() *Context {
+	c := *ctx // shallow copy — all fields are value types or immutable pointers
+	return &c
+}
+
 // Time returns the encapsulated observation time.
 func (ctx *Context) Time() time.Time { return ctx.t }
 

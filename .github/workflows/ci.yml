@@ -44,12 +44,17 @@ jobs:
         run: go vet ./...
 
       - name: Run tests with coverage
+        if: matrix.os == 'ubuntu-latest'
         run: go test -v -coverprofile=coverage.out -covermode=atomic ./...
+
+      - name: Run tests
+        if: matrix.os != 'ubuntu-latest'
+        run: go test -v ./...
 
       - name: Run golangci-lint
         if: matrix.os == 'ubuntu-latest'
         run: |
-          go install github.com/golangci/golangci-lint/cmd/golangci-lint@v2.12.2
+          curl -sSfL https://golangci-lint.run/install.sh | sh -s -- -b $(go env GOPATH)/bin v2.12.2
           $(go env GOPATH)/bin/golangci-lint run --timeout=5m
 
       - name: Upload coverage to Codecov

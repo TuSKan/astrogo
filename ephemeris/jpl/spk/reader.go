@@ -2,6 +2,7 @@ package spk
 
 import (
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -20,10 +21,13 @@ const RecordSize = 1024
 
 // FileRecord represents the DAF file record.
 type FileRecord struct {
-	IDWord         uint64
-	ND, NI         int32
-	FWD, BWD, FREE int32
-	Order          binary.ByteOrder
+	Order  binary.ByteOrder
+	IDWord uint64
+	ND     int32
+	NI     int32
+	FWD    int32
+	BWD    int32
+	FREE   int32
 }
 
 // Summary represents a DAF segment summary.
@@ -46,7 +50,7 @@ type Reader struct {
 func CacheDownload(kernel, path string) (*Reader, error) {
 	spkPath := filepath.Join(path, kernel)
 
-	if err := os.MkdirAll(filepath.Dir(spkPath), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(spkPath), 0o755); err != nil {
 		return nil, fmt.Errorf("jpl: failed to create parent dir for SPK %s: %w", spkPath, err)
 	}
 
@@ -176,10 +180,10 @@ func (r *Reader) ReadDoubles(startWord, endWord int32) ([]float64, error) {
 
 	buf := make([]byte, count*8)
 	n, err := r.F.ReadAt(buf, int64(startWord-1)*8)
-	if err != nil && err != io.EOF {
+	if err != nil && !errors.Is(err, io.EOF) {
 		return nil, err
 	}
-	if n < len(buf) && (err == io.EOF || err == nil) {
+	if n < len(buf) && (errors.Is(err, io.EOF) || err == nil) {
 		return nil, fmt.Errorf("jpl/spk: corrupt file (unexpected EOF reading word %d)", startWord)
 	}
 

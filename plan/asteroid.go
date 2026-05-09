@@ -20,30 +20,32 @@ type SpinAxis struct {
 
 // Asteroid represents a minor planet with phase-curve photometry parameters.
 type Asteroid struct {
-	name     string
-	id       eph.ID
 	provider eph.Provider
-	H, G     float64 // classic HG (G default 0.15)
-	G1, G2   float64 // HG1G2 (zero if unknown)
+	spin     *SpinAxis
+	name     string
+	H        float64
+	G        float64
+	G1       float64
+	G2       float64
+	oblat    float64
+	id       eph.ID
 	hasG1G2  bool
-	spin     *SpinAxis // nil if unknown
-	oblat    float64   // polar oblateness R ∈ (0,1], 1 = sphere; 0 if unknown
 }
 
 // AsteroidOption configures optional Asteroid fields.
 type AsteroidOption func(*Asteroid)
 
 // WithHG sets the classic H,G parameters.
-func WithHG(H, G float64) AsteroidOption {
-	return func(a *Asteroid) { a.H = H; a.G = G }
+func WithHG(absH, slopeG float64) AsteroidOption {
+	return func(a *Asteroid) { a.H = absH; a.G = slopeG }
 }
 
 // WithHG1G2 sets the three-parameter HG1G2 phase curve.
-func WithHG1G2(H, G1, G2 float64) AsteroidOption {
+func WithHG1G2(absH, g1, g2 float64) AsteroidOption {
 	return func(a *Asteroid) {
-		a.H = H
-		a.G1 = G1
-		a.G2 = G2
+		a.H = absH
+		a.G1 = g1
+		a.G2 = g2
 		a.hasG1G2 = true
 	}
 }
@@ -124,11 +126,11 @@ func (a *Asteroid) ApparentMagnitudeCtx(t time.Time, _ *coord.Context) (float64,
 func (a *Asteroid) helioGeometry(t time.Time) (r, delta float64, alpha angle.Angle, st eph.State, err error) {
 	st, err = a.provider.State(a.id, t)
 	if err != nil {
-		return
+		return r, delta, alpha, st, err
 	}
 	sunSt, err := a.provider.State(eph.Sun, t)
 	if err != nil {
-		return
+		return r, delta, alpha, st, err
 	}
 
 	delta = st.Distance()
@@ -136,10 +138,10 @@ func (a *Asteroid) helioGeometry(t time.Time) (r, delta float64, alpha angle.Ang
 	hy := st.Pos.Y - sunSt.Pos.Y
 	hz := st.Pos.Z - sunSt.Pos.Z
 	r = math.Sqrt(hx*hx + hy*hy + hz*hz)
-	R := sunSt.Distance()
+	sunDist := sunSt.Distance()
 
-	cosA := (r*r + delta*delta - R*R) / (2 * r * delta)
+	cosA := (r*r + delta*delta - sunDist*sunDist) / (2 * r * delta)
 	cosA = clamp(cosA, -1, 1)
 	alpha = angle.Rad(math.Acos(cosA))
-	return
+	return r, delta, alpha, st, err
 }

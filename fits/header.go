@@ -18,8 +18,8 @@ type Card struct {
 
 // Header is a collection of FITS records, providing ordered storage and type-safe access.
 type Header struct {
+	keys  map[string]int
 	Cards []Card
-	keys  map[string]int // maps keyword to index in Cards
 }
 
 // NewHeader initializes an empty FITS Header.

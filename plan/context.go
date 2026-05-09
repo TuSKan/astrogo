@@ -13,18 +13,16 @@ import (
 // Each memoized result (ICRS, AltAz) stores its own error to prevent
 // one path's failure from contaminating another's return value.
 type EvalContext struct {
-	Object coord.Object
-	Time   time.Time
-	Site   *Site
-	Ctx    *coord.Context
-
-	// Memoized values — each stores its own (value, error) tuple.
-	icrs    coord.ICRS
-	icrsOk  bool
+	Time    time.Time
+	Object  coord.Object
 	icrsErr error
-	altAz   coord.AltAz
-	altOk   bool
 	altErr  error
+	Site    *Site
+	Ctx     *coord.Context
+	icrs    coord.ICRS
+	altAz   coord.AltAz
+	icrsOk  bool
+	altOk   bool
 }
 
 // NewEvalContext creates a bare context for evaluation.

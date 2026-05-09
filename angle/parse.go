@@ -40,7 +40,7 @@ func ParseHMS(s string) (Angle, error) {
 
 // parseBaseSexagesimal handles the shared logic of extracting the sign and components,
 // validating bounds, and creating the final angle.
-func parseBaseSexagesimal(s string, funcName string, unit func(float64) Angle) (Angle, error) {
+func parseBaseSexagesimal(s, funcName string, unit func(float64) Angle) (Angle, error) {
 	sign, fields, err := parseSexagesimal(s)
 	if err != nil {
 		return 0, fmt.Errorf("%s %q: %w", funcName, s, err)
@@ -93,7 +93,7 @@ func parseSexagesimal(s string) (sign float64, fields [3]float64, err error) {
 // values separated by any run of non-digit, non-dot bytes.
 func extractNumericFields(s string, max int) ([]float64, error) {
 	parts := strings.FieldsFunc(s, func(r rune) bool {
-		return !(r >= '0' && r <= '9' || r == '.')
+		return (r < '0' || r > '9') && r != '.'
 	})
 
 	var result []float64

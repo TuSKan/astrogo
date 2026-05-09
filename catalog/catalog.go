@@ -36,11 +36,13 @@ var (
 )
 
 // Export core types directly via Type Aliasing to break cyclic dependencies natively.
-type Target = resolve.Target
-type Provider = resolve.Provider
-type Kind = resolve.Kind
-type ObjectRequest = resolve.ObjectRequest
-type SeqIterator[T any] = resolve.SeqIterator[T]
+type (
+	Target             = resolve.Target
+	Provider           = resolve.Provider
+	Kind               = resolve.Kind
+	ObjectRequest      = resolve.ObjectRequest
+	SeqIterator[T any] = resolve.SeqIterator[T]
+)
 
 // Resolver orchestrates multiple providers to find astronomical targets.
 type Resolver struct {

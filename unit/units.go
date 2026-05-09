@@ -7,10 +7,10 @@ import (
 
 // Unit represents a specific measurement scale within a physical dimension.
 type Unit struct {
-	Dimension   Dimension // The physical dimensions of this unit.
-	ScaleFactor float64   // Conversion factor to the canonical SI base unit.
-	Name        string    // Full name (e.g., "meter")
-	Symbol      string    // Unit symbol (e.g., "m")
+	Name        string
+	Symbol      string
+	ScaleFactor float64
+	Dimension   Dimension
 }
 
 // ── Unit Algebra ──────────────────────────────────────────────────────────────

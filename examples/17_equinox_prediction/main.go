@@ -70,14 +70,14 @@ func main() {
 	events27, _ := plan.Seasons(2027, prov)
 
 	durations := []struct {
-		name  string
 		start time.Time
 		end   time.Time
+		name  string
 	}{
-		{"Spring", events26[0].Time, events26[1].Time},
-		{"Summer", events26[1].Time, events26[2].Time},
-		{"Autumn", events26[2].Time, events26[3].Time},
-		{"Winter", events26[3].Time, events27[0].Time},
+		{events26[0].Time, events26[1].Time, "Spring"},
+		{events26[1].Time, events26[2].Time, "Summer"},
+		{events26[2].Time, events26[3].Time, "Autumn"},
+		{events26[3].Time, events27[0].Time, "Winter"},
 	}
 
 	totalDays := 0.0

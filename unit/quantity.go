@@ -7,8 +7,8 @@ import (
 
 // Quantity represents a scalar physical value with an associated unit.
 type Quantity struct {
-	Value float64
 	Unit  Unit
+	Value float64
 }
 
 // New creates a new Quantity with the given value and unit.

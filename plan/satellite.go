@@ -13,9 +13,9 @@ import (
 
 // Satellite represents an artificial satellite with an SGP4/TLE-based provider.
 type Satellite struct {
+	provider eph.Provider
 	name     string
 	id       eph.ID
-	provider eph.Provider
 }
 
 // NewSatellite creates a satellite target.
@@ -58,7 +58,6 @@ var defaultAtm = atmosphere.Atmosphere{}
 // handles both nearby objects (LEO satellites) and distant bodies (planets)
 // by computing the full topocentric vector (geocentric - observer).
 func LookAngle(prov eph.Provider, id eph.ID, ctx *coord.Context) (coord.AltAz, error) {
-
 	st, err := prov.State(id, ctx.Time())
 	if err != nil {
 		return coord.AltAz{}, err
@@ -101,8 +100,8 @@ type PassEvent struct {
 // for LEO satellites with ~90 minute periods) and Chandrupatla root-finding
 // for sub-second rise/set boundary refinement.
 func SatellitePasses(prov eph.Provider, name string, start, end time.Time,
-	observer *coord.Geodetic, minElevation angle.Angle) ([]SatellitePass, error) {
-
+	observer *coord.Geodetic, minElevation angle.Angle,
+) ([]SatellitePass, error) {
 	step := 30 * time.Second // 30s steps for LEO
 	refineTol := 1 * time.Second
 
@@ -202,8 +201,8 @@ func SatellitePasses(prov eph.Provider, name string, start, end time.Time,
 // findCulmination finds the point of maximum elevation during a pass
 // by sampling at 5-second intervals and refining the peak.
 func findCulmination(prov eph.Provider, observer *coord.Geodetic,
-	start, end time.Time) (PassEvent, error) {
-
+	start, end time.Time,
+) (PassEvent, error) {
 	step := 5 * time.Second
 	bestTime := start
 	bestEl := -90.0

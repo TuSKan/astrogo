@@ -110,13 +110,12 @@ func (p *Provider) ResolveObject(ctx context.Context, req resolve.ObjectRequest)
 			yield(resolve.Target{}, err)
 			return
 		}
+		defer resp.Body.Close()
 		if resp.StatusCode >= 400 {
 			b, _ := io.ReadAll(resp.Body)
-			resp.Body.Close()
 			yield(resolve.Target{}, fmt.Errorf("http error %d: %s", resp.StatusCode, string(b)))
 			return
 		}
-		defer resp.Body.Close()
 
 		data, err := io.ReadAll(resp.Body)
 		if err != nil {

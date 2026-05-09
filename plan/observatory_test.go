@@ -1,6 +1,7 @@
 package plan
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/TuSKan/astrogo/angle"
@@ -37,19 +38,19 @@ func TestInvalidHorizon(t *testing.T) {
 	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(0), 0)
 
 	_, err := NewSite("Bad Horizon", loc, angle.Deg(100), nil)
-	if err != ErrInvalidHorizon {
+	if !errors.Is(err, ErrInvalidHorizon) {
 		t.Errorf("Expected ErrInvalidHorizon, got %v", err)
 	}
 
 	_, err = NewSite("Bad Horizon Low", loc, angle.Deg(-95), nil)
-	if err != ErrInvalidHorizon {
+	if !errors.Is(err, ErrInvalidHorizon) {
 		t.Errorf("Expected ErrInvalidHorizon, got %v", err)
 	}
 }
 
 func TestNilLocation(t *testing.T) {
 	_, err := NewSite("No Location", nil, angle.Zero(), nil)
-	if err != ErrNilLocation {
+	if !errors.Is(err, ErrNilLocation) {
 		t.Errorf("Expected ErrNilLocation, got %v", err)
 	}
 }

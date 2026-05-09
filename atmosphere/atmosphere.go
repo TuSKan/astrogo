@@ -22,14 +22,11 @@ type RefractionModel interface {
 // Atmosphere represents meteorological parameters used for calculating atmospheric
 // refraction during astronomical observations.
 type Atmosphere struct {
-	Pressure    float64 // Ambient pressure in hPa (millibars). Default ~1013.25
-	Temperature float64 // Ambient temperature in degrees Celsius. Default ~15.0
-	Humidity    float64 // Relative humidity [0.0 - 1.0]. Default ~0.5
-	Wavelength  float64 // Observation wavelength in micrometers. Default ~0.55
-
-	// Model dictates how the environmental parameters are structurally applied.
-	// If nil, it defaults to RefractionRigorous internally.
-	Model RefractionModel
+	Model       RefractionModel
+	Pressure    float64
+	Temperature float64
+	Humidity    float64
+	Wavelength  float64
 }
 
 // ── Models ────────────────────────────────────────────────────────────────────
@@ -142,9 +139,7 @@ var StandardAtmosphere = Atmosphere{
 
 // ── Observational Metrics ─────────────────────────────────────────────────────
 
-var (
-	ErrBelowHorizon = errors.New("object is below the horizon")
-)
+var ErrBelowHorizon = errors.New("object is below the horizon")
 
 // ZenithDistance returns the zenith distance (90 - Alt) for a given altitude.
 func ZenithDistance(alt angle.Angle) angle.Angle {
