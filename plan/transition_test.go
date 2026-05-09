@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/TuSKan/astrogo/angle"
-	"github.com/TuSKan/astrogo/catalog"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/time"
 )
@@ -22,13 +21,13 @@ func TestBasicTransitionModel(t *testing.T) {
 	}
 
 	block1 := &Block{
-		Target: NewTarget(catalog.Target{Name: "Target 1", Coord: coord.NewICRS(0, 0), HasCoord: true}, nil),
+		Target: NewStar("Target 1", 0, 0),
 		Config: Configuration{Filter: "V"},
 	}
 
 	block2 := &Block{
 		// 90 degrees away in Azimuth (approximate test) -> At Zenith, Alt is high, let's just make it a known offset
-		Target: NewTarget(catalog.Target{Name: "Target 2", Coord: coord.NewICRS(1.57079632679, 0), HasCoord: true}, nil), // ~90 RA offset
+		Target: NewStar("Target 2", 1.57079632679, 0), // ~90 RA offset
 		Config: Configuration{Filter: "R"},
 	}
 

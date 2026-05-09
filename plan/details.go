@@ -8,7 +8,6 @@ import (
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
-	mag "github.com/TuSKan/astrogo/magnitude"
 	"github.com/TuSKan/astrogo/time"
 )
 
@@ -110,9 +109,8 @@ func computeDetails(obs Observable, ctx *coord.Context, props ...string) (*Targe
 	d.Dec = pos.Dec()
 
 	// ── Topocentric position + distance ──
-	tgt, isTarget := obs.(Target)
-	if isTarget && tgt.Provider != nil {
-		fillMovingBody(d, tgt, t, ctx)
+	if mb, ok := obs.(MovingBody); ok {
+		fillMovingBody(d, mb, t, ctx)
 	} else {
 		altaz, _ := ctx.ICRSToAltAz(pos)
 		d.Altitude = altaz.Alt()
@@ -120,13 +118,18 @@ func computeDetails(obs Observable, ctx *coord.Context, props ...string) (*Targe
 		d.DistanceUnit = "pc"
 	}
 
-	// ── Catalog properties + magnitude ──
-	if isTarget {
-		fillCatalogProps(d, tgt)
-		if m := tgt.computeMagnitude(t); m != "" {
-			d.Magnitude = m
+	// ── Magnitude via interface dispatch ──
+	if mc, ok := obs.(MagnitudeComputer); ok {
+		if v, err := mc.ApparentMagnitudeCtx(t, ctx); err == nil {
+			d.Magnitude = fmt.Sprintf("%.1f mag", v)
 		}
+	} else {
+		// Static magnitude for non-MagnitudeComputer types.
+		fillStaticMagnitude(d, obs)
 	}
+
+	// ── Type-specific catalog properties ──
+	fillTypedProps(d, obs)
 
 	// ── Custom props (override anything above) ──
 	applyProps(d, props)
@@ -142,8 +145,8 @@ func computeDetails(obs Observable, ctx *coord.Context, props ...string) (*Targe
 // fillMovingBody computes topocentric AltAz, RA/Dec, distance, and elongation
 // for a target with an ephemeris provider. The observer's ICRS position is
 // subtracted to correct for diurnal parallax (~1° for the Moon, ~23″ for Mars).
-func fillMovingBody(d *TargetDetails, tgt Target, t time.Time, ctx *coord.Context) {
-	vec, err := tgt.GeocentricVec(t)
+func fillMovingBody(d *TargetDetails, mb MovingBody, t time.Time, ctx *coord.Context) {
+	vec, err := mb.GeocentricVec(t)
 	if err != nil {
 		return
 	}
@@ -165,14 +168,15 @@ func fillMovingBody(d *TargetDetails, tgt Target, t time.Time, ctx *coord.Contex
 	d.Distance = topoDist
 	d.DistanceUnit = "a.u."
 
-	if tgt.Catalog.Kind == "Satellite" {
+	// Satellite distances are in km from the Reducer pipeline.
+	if _, isSat := mb.(*Satellite); isSat {
 		d.Distance = altaz.Dist()
 		d.DistanceUnit = "km"
 		return
 	}
 
 	// Elongation from the Sun (topocentric).
-	sunVec, err := eph.Position(tgt.Provider, eph.Sun, t)
+	sunVec, err := eph.Position(mb.Provider(), eph.Sun, t)
 	if err == nil {
 		sunTopo := sunVec.Sub(ctx.ObsVec())
 		sunPos := coord.NewICRS(
@@ -184,150 +188,47 @@ func fillMovingBody(d *TargetDetails, tgt Target, t time.Time, ctx *coord.Contex
 	}
 }
 
-// ── Magnitude computation ───────────────────────────────────────────────────
+// ── Static magnitude ────────────────────────────────────────────────────────
 
-// computeMagnitude returns the formatted apparent magnitude string using the
-// highest-priority model available for the target.
-//
-// Priority: Planet > Comet (M1) > Asteroid (sHG1G2 > HG1G2 > HG) > Catalog VMag.
-func (tgt Target) computeMagnitude(t time.Time) string {
-	cat := tgt.Catalog
-
-	// Planet / Moon / Sun — ephemeris-based Mallama & Hilton (2018).
-	if tgt.Provider != nil && cat.Kind != "Satellite" {
-		if id, ok := tgt.ephID(); ok {
-			if v, err := mag.PlanetApparent(tgt.Provider, id, t); err == nil {
-				return fmt.Sprintf("%.1f mag", v)
-			}
+// fillStaticMagnitude handles non-MagnitudeComputer types with catalog magnitudes.
+func fillStaticMagnitude(d *TargetDetails, obs Observable) {
+	switch v := obs.(type) {
+	case *Star:
+		if v.hasVMag {
+			d.Magnitude = fmt.Sprintf("%.1f mag", v.vMag)
+		}
+	case *DeepSkyObject:
+		if v.hasVMag {
+			d.Magnitude = fmt.Sprintf("%.1f mag", v.vMag)
 		}
 	}
-
-	// Comet — M1/k1 total magnitude.
-	if cat.HasM1 {
-		return tgt.cometMagnitude(t)
-	}
-
-	// Asteroid — sHG1G2 / HG1G2 / HG phase-curve.
-	if cat.HasH {
-		return tgt.asteroidMagnitude(t)
-	}
-
-	// Star / DSO — catalog V-band magnitude.
-	if cat.HasVMag {
-		return fmt.Sprintf("%.1f mag", cat.VMag)
-	}
-
-	return ""
 }
 
-// cometMagnitude computes the apparent magnitude for a comet using M1/k1.
-func (tgt Target) cometMagnitude(t time.Time) string {
-	r, delta, _, _, ok := tgt.helioGeometry(t)
-	if ok {
-		return fmt.Sprintf("%.1f mag", mag.CometApparent(tgt.Catalog.M1, tgt.Catalog.K1, r, delta))
-	}
-	// No ephemeris — return raw parameters.
-	return fmt.Sprintf("M1=%.1f, k1=%.1f", tgt.Catalog.M1, tgt.Catalog.K1)
-}
+// ── Type-specific property extraction ───────────────────────────────────────
 
-// asteroidMagnitude computes the apparent magnitude for an asteroid using the
-// best available model: sHG1G2 (Carry 2024) → HG1G2 → HG.
-func (tgt Target) asteroidMagnitude(t time.Time) string {
-	cat := tgt.Catalog
-	r, delta, alpha, st, ok := tgt.helioGeometry(t)
-	if !ok {
-		G := cat.G
-		if G == 0 {
-			G = 0.15
+// fillTypedProps extracts type-specific properties into ExtraProps.
+func fillTypedProps(d *TargetDetails, obs Observable) {
+	switch v := obs.(type) {
+	case *Star:
+		if v.parallax.Radians() > 0 {
+			d.Distance = 1.0 / v.parallax.Arcseconds()
 		}
-		return fmt.Sprintf("H=%.1f, G=%.2f", cat.H, G)
-	}
-
-	switch {
-	case cat.HasG1G2 && cat.HasSpin && cat.HasOblateness:
-		// Full sHG1G2 (Carry et al. 2024) with spin correction.
-		ra := angle.Rad(math.Atan2(st.Pos.Y, st.Pos.X))
-		dec := angle.Rad(math.Asin(st.Pos.Z / delta))
-		cosL := mag.CosAspectAngle(ra, dec, angle.Deg(cat.SpinRA), angle.Deg(cat.SpinDec))
-		v := mag.AsteroidSHG1G2(cat.H, cat.G1, cat.G2, r, delta, alpha, cat.Oblateness, cosL)
-		return fmt.Sprintf("%.1f mag", v)
-
-	case cat.HasG1G2:
-		// HG1G2 without spin correction.
-		v := mag.AsteroidHG1G2(cat.H, cat.G1, cat.G2, r, delta, alpha)
-		return fmt.Sprintf("%.1f mag", v)
-
-	default:
-		// Classic HG model.
-		G := cat.G
-		if G == 0 {
-			G = 0.15
+		if v.pmRA.Radians() != 0 {
+			d.ExtraProps["Proper motion (RA)"] = fmt.Sprintf("%.2f mas/yr", v.pmRA.Arcseconds()*1000.0)
 		}
-		v := mag.AsteroidHG(cat.H, G, r, delta, alpha)
-		return fmt.Sprintf("%.1f mag", v)
+		if v.pmDec.Radians() != 0 {
+			d.ExtraProps["Proper motion (Dec)"] = fmt.Sprintf("%.2f mas/yr", v.pmDec.Arcseconds()*1000.0)
+		}
+		fillAliasProps(d, v.aliases)
+	case *DeepSkyObject:
+		fillAliasProps(d, v.aliases)
 	}
 }
 
-// helioGeometry computes heliocentric distance r, geocentric distance Δ,
-// and phase angle α for a small body at time t.
-func (tgt Target) helioGeometry(t time.Time) (r, delta float64, alpha angle.Angle, st eph.State, ok bool) {
-	id, valid := tgt.ephID()
-	if !valid || tgt.Provider == nil {
-		return
-	}
-	var err error
-	st, err = tgt.Provider.State(id, t)
-	if err != nil {
-		return
-	}
-	sunSt, err := tgt.Provider.State(eph.Sun, t)
-	if err != nil {
-		return
-	}
-
-	delta = st.Distance()
-	hx := st.Pos.X - sunSt.Pos.X
-	hy := st.Pos.Y - sunSt.Pos.Y
-	hz := st.Pos.Z - sunSt.Pos.Z
-	r = math.Sqrt(hx*hx + hy*hy + hz*hz)
-	R := sunSt.Distance()
-
-	cosA := (r*r + delta*delta - R*R) / (2 * r * delta)
-	cosA = clamp(cosA, -1, 1)
-	alpha = angle.Rad(math.Acos(cosA))
-	ok = true
-	return
-}
-
-// clamp restricts v to the range [lo, hi].
-func clamp(v, lo, hi float64) float64 {
-	if v < lo {
-		return lo
-	}
-	if v > hi {
-		return hi
-	}
-	return v
-}
-
-// ── Catalog property extraction ─────────────────────────────────────────────
-
-// fillCatalogProps populates parallax-derived distance, proper motion,
-// and catalog alias identifiers (Messier, NGC/IC).
-func fillCatalogProps(d *TargetDetails, tgt Target) {
-	cat := tgt.Catalog
-	if cat.Parallax.Radians() > 0 {
-		d.Distance = 1.0 / cat.Parallax.Arcseconds() // pc
-	}
-	if cat.PmRA.Radians() != 0 {
-		d.ExtraProps["Proper motion (RA)"] = fmt.Sprintf("%.2f mas/yr", cat.PmRA.Arcseconds()*1000.0)
-	}
-	if cat.PmDec.Radians() != 0 {
-		d.ExtraProps["Proper motion (Dec)"] = fmt.Sprintf("%.2f mas/yr", cat.PmDec.Arcseconds()*1000.0)
-	}
-	for _, alias := range cat.Aliases {
+// fillAliasProps extracts Messier and NGC/IC identifiers from alias lists.
+func fillAliasProps(d *TargetDetails, aliases []string) {
+	for _, alias := range aliases {
 		if strings.HasPrefix(alias, "M ") || strings.HasPrefix(alias, "M") {
-			// Avoid "Mars" or other M words, check if next char is digit
 			if len(alias) > 1 && alias[1] >= '0' && alias[1] <= '9' || (len(alias) > 2 && alias[0:2] == "M ") {
 				d.ExtraProps["Messier number"] = strings.Replace(alias, " ", "", -1)
 			}
@@ -409,4 +310,15 @@ func fillRiseSetTransit(d *TargetDetails, obs Observable, ctx *coord.Context) {
 			}
 		}
 	}
+}
+
+// clamp restricts v to the range [lo, hi].
+func clamp(v, lo, hi float64) float64 {
+	if v < lo {
+		return lo
+	}
+	if v > hi {
+		return hi
+	}
+	return v
 }

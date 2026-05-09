@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"math"
 	"sort"
-	"strconv"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
@@ -293,8 +292,8 @@ func (s EventSolver) solveVisibility(spec EventSpec, start, end time.Time) ([]Ev
 
 		// For solar system bodies, use the vector-based topocentric pipeline
 		// which properly corrects for diurnal parallax (critical for the Moon: ~1°).
-		if tTarget, ok := spec.Target.(Target); ok && tTarget.Provider != nil {
-			vec, err := tTarget.GeocentricVec(t)
+		if mb, ok := spec.Target.(MovingBody); ok {
+			vec, err := mb.GeocentricVec(t)
 			if err != nil {
 				return 0, err
 			}
@@ -356,8 +355,8 @@ func (s EventSolver) solveVisibility(spec EventSpec, start, end time.Time) ([]Ev
 				// using the same no-refraction atmosphere as the solver.
 				resCtx := coord.NewContext(resTime, spec.Observer.Location(), geomAtm)
 				var aa coord.AltAz
-				if tTarget, ok := spec.Target.(Target); ok && tTarget.Provider != nil {
-					vec, _ := tTarget.GeocentricVec(resTime)
+				if mb, ok := spec.Target.(MovingBody); ok {
+					vec, _ := mb.GeocentricVec(resTime)
 					aa = resCtx.GeocentricToObserved(vec)
 				} else {
 					pos, _ := spec.Target.Position(resTime)
@@ -944,14 +943,10 @@ const EventAnyPhase EventKind = -2
 // unified EventSolver framework.
 func (s EventSolver) solveIllumination(spec EventSpec, start, end time.Time) ([]Event, error) {
 	var prov eph.Provider
-	if tTarget, ok := spec.Target.(Target); ok && tTarget.Provider != nil {
-		idUint, _ := strconv.ParseUint(tTarget.Catalog.ID, 10, 32)
-		if eph.ID(idUint) != eph.Moon {
-			return nil, errors.New("illumination solver requires a Moon target")
-		}
-		prov = tTarget.Provider
+	if p, ok := spec.Target.(*Planet); ok && p.IsMoon() {
+		prov = p.Provider()
 	} else {
-		return nil, errors.New("illumination solver requires a Target with Provider")
+		return nil, errors.New("illumination solver requires a Moon target (*Planet with IsMoon)")
 	}
 
 	type phaseTarget struct {

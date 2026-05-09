@@ -1640,3 +1640,4 @@ func compareSunMoonEvents(t *testing.T, body string, usnoPhenomena []usnoPhenome
 		}
 	}
 }
+

@@ -26,9 +26,9 @@ const (
 )
 
 var (
-	fetchMu      sync.Mutex
-	lastAttempt  time.Time     // wall-clock of last fetch attempt (success or failure)
-	lastFetchErr error         // non-nil if the most recent attempt failed
+	fetchMu       sync.Mutex
+	lastAttempt   time.Time         // wall-clock of last fetch attempt (success or failure)
+	lastFetchErr  error             // non-nil if the most recent attempt failed
 	retryCooldown = 5 * time.Minute // minimum interval between fetch attempts
 )
 

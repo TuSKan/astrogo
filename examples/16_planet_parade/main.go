@@ -26,7 +26,7 @@ import (
 
 type planetDef struct {
 	Name   string
-	Target plan.Target
+	Target plan.Observable
 }
 
 func main() {

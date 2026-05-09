@@ -205,19 +205,23 @@ func main() {
 	fmt.Printf("Moon illumination: %.0f%%\n", frac*100)
 
 	// ── Targets ──
-	ra, _ := angle.ParseHMS("13h 29m 52.7s")
-	dec, _ := angle.ParseDMS("-47° 12' 18\"")
-	omegaCen := plan.NewFixed(catalog.Target{
-		Name: "Omega Centauri", Coord: coord.NewICRS(ra, dec),
-	})
+	// Resolve by name — coordinates come from SIMBAD/OpenNGC automatically.
+	resolver := catalog.NewResolver(catalog.SIMBAD, catalog.OpenNGC)
 
-	ra2, _ := angle.ParseHMS("17h 45m 40.0s")
-	dec2, _ := angle.ParseDMS("-29° 00' 28\"")
-	sgrA := plan.NewFixed(catalog.Target{
-		Name: "Sgr A*", Coord: coord.NewICRS(ra2, dec2),
-	})
+	omegaCenCat, err := resolver.Resolve("NGC 5139") // Omega Centauri
+	if err != nil {
+		log.Fatal(err)
+	}
+	omegaCen := plan.FromCatalog(omegaCenCat, nil)
 
-	mars := plan.NewDefaultBody(ephemeris.Mars)
+	sgrACat, err := resolver.Resolve("Sgr A*")
+	if err != nil {
+		log.Fatal(err)
+	}
+	sgrA := plan.FromCatalog(sgrACat, nil)
+
+	// Planets use ephemeris-backed constructors directly.
+	mars := plan.NewMars(eph)
 
 	// ── Observability + Scoring ──
 	constraints := []plan.Constraint{
@@ -227,10 +231,10 @@ func main() {
 
 	fmt.Println("\n── Observability ──────────────────────")
 	for _, obj := range []plan.Observable{omegaCen, sgrA, mars} {
-		eval, _ := plan.IsObservable(obj, tonight, site, constraints...)
-		score, _ := plan.ScoreObservable(obj, tonight, site, constraints...)
+		visible, _ := plan.IsObservable(obj, tonight, site, constraints...)
+		score, _ := plan.ScoreObservable(obj, tonight, site, nil, constraints...)
 		fmt.Printf("  %-18s  Observable: %-5v  Score: %5.1f\n",
-			obj.Name(), eval.Observable, score)
+			obj.Name(), visible, score)
 	}
 
 	// ── Schedule the night ──
@@ -326,8 +330,8 @@ fmt.Printf("MABIMS (2021):      %v\n", result.MABIMS2021)
 
 ```go
 eph := ephemeris.Default()
-venus := plan.NewBody(ephemeris.Venus, eph)
-sun := plan.NewBody(ephemeris.Sun, eph)
+venus := plan.NewVenus(eph)
+sun := plan.NewSun(eph)
 
 // Greatest elongations of Venus in 2026
 elongations, _ := plan.GreatestElongations(start, end, venus, sun)
@@ -336,8 +340,8 @@ for _, e := range elongations {
 }
 
 // Mars-Jupiter conjunctions
-mars := plan.NewBody(ephemeris.Mars, eph)
-jupiter := plan.NewBody(ephemeris.Jupiter, eph)
+mars := plan.NewMars(eph)
+jupiter := plan.NewJupiter(eph)
 conj, _ := plan.Conjunctions(start, end, mars, jupiter)
 for _, c := range conj {
     fmt.Printf("Mars-Jupiter conjunction: %s\n", c.Time)
