@@ -2,6 +2,7 @@ package ephemeris
 
 import (
 	"errors"
+	"fmt"
 	"math"
 
 	"github.com/TuSKan/astrogo/angle"
@@ -72,6 +73,18 @@ var (
 	UranusBody  = core.UranusBody
 	NeptuneBody = core.NeptuneBody
 	Bodies      = core.Bodies
+)
+
+// ── Sentinel errors ──────────────────────────────────────────────────────────
+
+var (
+	ErrTLERequired    = errors.New("eph: Satellites source requires WithTLE option")
+	ErrNotImplemented = errors.New("eph: source not yet implemented")
+	ErrUnknownSource  = errors.New("eph: unknown source")
+	ErrZeroVector     = errors.New("eph: cannot convert near-zero vector to ICRS")
+	ErrSofaEpv00      = errors.New("eph: sofa epv00 failed")
+	ErrSofaPlan94     = errors.New("eph: sofa plan94 failed")
+	ErrUnsupportedBody = errors.New("eph: unsupported body for sofa provider")
 )
 
 // Satellite is the SGP4 orbit propagator for NORAD TLE data.
@@ -166,7 +179,7 @@ func NewProvider(source Source, kernel string, opts ...Option) (Provider, error)
 
 	case Satellites:
 		if cfg.TLELine1 == "" || cfg.TLELine2 == "" {
-			return nil, errors.New("eph: Satellites source requires WithTLE option")
+			return nil, ErrTLERequired
 		}
 
 		cfg.TLEName = kernel
@@ -174,10 +187,10 @@ func NewProvider(source Source, kernel string, opts ...Option) (Provider, error)
 		return satellite.NewFromTLE(cfg.TLEName, cfg.TLELine1, cfg.TLELine2)
 
 	case Stations:
-		return nil, errors.New("eph: Stations source not yet implemented")
+		return nil, fmt.Errorf("%w: Stations", ErrNotImplemented)
 
 	default:
-		return nil, errors.New("eph: unknown source " + string(source))
+		return nil, fmt.Errorf("%w: %s", ErrUnknownSource, source)
 	}
 }
 
@@ -253,7 +266,7 @@ func ApparentState(p Provider, target ID, obsTime time.Time) (State, error) {
 func ToICRS(pos vector.Vec3) (coord.ICRS, error) {
 	r := math.Sqrt(pos.X*pos.X + pos.Y*pos.Y + pos.Z*pos.Z)
 	if r < 1e-12 {
-		return coord.ICRS{}, errors.New("eph: cannot convert near-zero vector to ICRS")
+		return coord.ICRS{}, ErrZeroVector
 	}
 
 	ra := math.Atan2(pos.Y, pos.X)
@@ -274,7 +287,7 @@ func (s *sofaProvider) State(id ID, t time.Time) (State, error) {
 	case Sun:
 		pvh, _, status := gofaext.Epv00(d1, d2)
 		if status < 0 {
-			return State{}, errors.New("eph: sofa epv00 failed")
+			return State{}, ErrSofaEpv00
 		}
 
 		ph := pvh[0]
@@ -296,7 +309,7 @@ func (s *sofaProvider) State(id ID, t time.Time) (State, error) {
 	case Mercury, Venus, Earth, Mars, Jupiter, Saturn, Uranus, Neptune:
 		pvh, _, status := gofaext.Epv00(d1, d2)
 		if status < 0 {
-			return State{}, errors.New("eph: sofa epv00 failed")
+			return State{}, ErrSofaEpv00
 		}
 
 		var np int
@@ -322,7 +335,7 @@ func (s *sofaProvider) State(id ID, t time.Time) (State, error) {
 
 		pv, status := gofaext.Plan94(d1, d2, np)
 		if status < 0 {
-			return State{}, errors.New("eph: sofa plan94 failed")
+			return State{}, ErrSofaPlan94
 		}
 
 		return State{
@@ -339,7 +352,7 @@ func (s *sofaProvider) State(id ID, t time.Time) (State, error) {
 		}, nil
 
 	default:
-		return State{}, errors.New("eph: unsupported body for sofa provider")
+		return State{}, ErrUnsupportedBody
 	}
 }
 
