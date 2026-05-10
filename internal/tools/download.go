@@ -10,6 +10,9 @@ import (
 	"path/filepath"
 )
 
+// ErrDownloadFailed indicates a download returned an unexpected HTTP status.
+var ErrDownloadFailed = errors.New("download failed")
+
 // Download fetches a file from a URL and saves it to the target path.
 func Download(url, path string) (err error) {
 	// Ensure directory exists
@@ -34,7 +37,7 @@ func Download(url, path string) (err error) {
 	}()
 
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("jpl: download failed with status %d", resp.StatusCode)
+		return fmt.Errorf("%w: status %d", ErrDownloadFailed, resp.StatusCode)
 	}
 
 	tmpFile, err := os.CreateTemp(filepath.Dir(path), "download-*.tmp")

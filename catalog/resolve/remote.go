@@ -22,6 +22,7 @@ var (
 	ErrInvalidInput = errors.New("catalog: invalid input")
 	ErrParseFailure = errors.New("catalog: parse failure")
 	ErrServiceError = errors.New("catalog: service error")
+	ErrRetriable    = errors.New("retriable status code")
 )
 
 // HTTPError represents an error returned by an external API endpoint.
@@ -159,7 +160,7 @@ func (c *Client) Do(req *http.Request) (*http.Response, error) {
 
 		if resp != nil && err == nil {
 			_ = resp.Body.Close()
-			return nil, fmt.Errorf("retriable status code %d", resp.StatusCode)
+			return nil, fmt.Errorf("%w: %d", ErrRetriable, resp.StatusCode)
 		}
 
 		return nil, err

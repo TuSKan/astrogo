@@ -30,13 +30,6 @@ func TestSPKReader(t *testing.T) {
 	f, err := os.Open(spkPath)
 	testutil.AssertNoError(t, err)
 
-	t.Cleanup(func() {
-		err := f.Close()
-		if err != nil {
-			t.Errorf("failed to close file: %v", err)
-		}
-	})
-
 	r, err := spk.NewReader(f)
 	testutil.AssertNoError(t, err)
 

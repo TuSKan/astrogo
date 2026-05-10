@@ -1,7 +1,6 @@
 package fits
 
 import (
-	"errors"
 	"fmt"
 	"io"
 	"strconv"
@@ -111,7 +110,7 @@ func ReadBintable(h *Header, r io.Reader) (*BintableHDU, error) {
 // GetStringColumn extracts a FITS binary table column and safely converts it to a standard Go string slice.
 func (hdu *BintableHDU) GetStringColumn(colName string) ([]string, error) {
 	if hdu.Batch == nil {
-		return nil, errors.New("fits: uninitialized bintable batch")
+		return nil, ErrUninitBatch
 	}
 
 	schema := hdu.Batch.Schema()
@@ -125,7 +124,7 @@ func (hdu *BintableHDU) GetStringColumn(colName string) ([]string, error) {
 	}
 
 	if idx < 0 {
-		return nil, fmt.Errorf("fits: column %s not found", colName)
+		return nil, fmt.Errorf("%w: %s", ErrColumnNotFound, colName)
 	}
 
 	arr := hdu.Batch.Column(idx)
@@ -157,7 +156,7 @@ func (hdu *BintableHDU) GetStringColumn(colName string) ([]string, error) {
 // GetFloatColumn extracts a FITS binary table column safely into a standard Go float64 slice.
 func (hdu *BintableHDU) GetFloatColumn(colName string) ([]float64, error) {
 	if hdu.Batch == nil {
-		return nil, errors.New("fits: uninitialized bintable batch")
+		return nil, ErrUninitBatch
 	}
 
 	schema := hdu.Batch.Schema()
@@ -171,7 +170,7 @@ func (hdu *BintableHDU) GetFloatColumn(colName string) ([]float64, error) {
 	}
 
 	if idx < 0 {
-		return nil, fmt.Errorf("fits: column %s not found", colName)
+		return nil, fmt.Errorf("%w: %s", ErrColumnNotFound, colName)
 	}
 
 	arr := hdu.Batch.Column(idx)

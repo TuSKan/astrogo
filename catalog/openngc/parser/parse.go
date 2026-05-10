@@ -14,6 +14,13 @@ import (
 	"strings"
 )
 
+// Sentinel errors for OpenNGC parsing.
+var (
+	errBadHTTPStatus = errors.New("bad status")
+	errInvalidRA     = errors.New("invalid RA format")
+	errInvalidDec    = errors.New("invalid Dec format")
+)
+
 // Mapping from OpenNGC types to astrogo Kind
 func mapType(t string) string { // Changed return type to string to match targetRecord.Kind
 	switch t {
@@ -97,7 +104,7 @@ func downloadAndParse(url string) (_ []targetRecord, err error) {
 	}()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("bad status: %s", resp.Status)
+		return nil, fmt.Errorf("%w: %s", errBadHTTPStatus, resp.Status)
 	}
 
 	return parseOpenNGC(resp.Body)
@@ -269,7 +276,7 @@ func parseRA(s string) (float64, error) {
 	// HH:MM:SS.SS
 	parts := strings.Split(s, ":")
 	if len(parts) != 3 {
-		return 0, errors.New("invalid RA format")
+		return 0, errInvalidRA
 	}
 
 	h, _ := strconv.ParseFloat(parts[0], 64)
@@ -291,7 +298,7 @@ func parseDec(s string) (float64, error) {
 
 	parts := strings.Split(s, ":")
 	if len(parts) != 3 {
-		return 0, errors.New("invalid Dec format")
+		return 0, errInvalidDec
 	}
 
 	d, _ := strconv.ParseFloat(parts[0], 64)

@@ -126,7 +126,7 @@ func ReadImage(h *Header, r io.Reader) (*ImageHDU, error) {
 		pixelBytes = 8
 		dt = arrow.PrimitiveTypes.Float64
 	default:
-		return nil, fmt.Errorf("invalid BITPIX value: %d", bitpix)
+		return nil, fmt.Errorf("%w: %d", ErrInvalidBitpix, bitpix)
 	}
 
 	totalPayloadBytes := totalPixels * pixelBytes

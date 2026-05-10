@@ -17,6 +17,14 @@ import (
 	"github.com/TuSKan/astrogo/vector"
 )
 
+// Sentinel errors for JPL provider.
+var (
+	ErrNotImplemented   = errors.New("jpl: source not implemented")
+	ErrUnknownSource    = errors.New("jpl: unknown source")
+	ErrRecursionDepth   = errors.New("jpl: recursion depth exceeded")
+	ErrNilKernel        = errors.New("jpl: kernel is nil")
+)
+
 const (
 	JPL_KERNEL_URI = "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/"
 	KM_PER_AU      = 149597870.7
@@ -139,11 +147,11 @@ func NewProvider(source core.Source, kernel string, opts ...Option) (*Provider, 
 			}
 		}
 	case core.Satellites:
-		return nil, errors.New("jpl: satellites source not implemented")
+		return nil, fmt.Errorf("%w: satellites", ErrNotImplemented)
 	case core.Stations:
-		return nil, errors.New("jpl: stations source not implemented")
+		return nil, fmt.Errorf("%w: stations", ErrNotImplemented)
 	default:
-		return nil, fmt.Errorf("jpl: unknown source %q", p.source)
+		return nil, fmt.Errorf("%w: %s", ErrUnknownSource, p.source)
 	}
 
 	p.LSK, err = lsk.Cache("lsk/naif0012.tls", p.DataDir)
@@ -246,13 +254,13 @@ func (p *Provider) evaluateRecursive(targetID int32, et float64, baseID int32) (
 		currentID = s.Center
 	}
 
-	return core.State{}, fmt.Errorf("jpl: recursion depth exceeded for target %d", targetID)
+	return core.State{}, fmt.Errorf("%w: target %d", ErrRecursionDepth, targetID)
 }
 
 // AddKernel opens an SPK file and adds its segments to the provider index.
 func (p *Provider) AddKernel(k *spk.Reader) error {
 	if k == nil {
-		return errors.New("jpl: kernel is nil")
+		return ErrNilKernel
 	}
 
 	summaries, err := k.ReadSummaries()

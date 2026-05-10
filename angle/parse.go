@@ -7,6 +7,15 @@ import (
 	"strings"
 )
 
+// Sentinel errors for angle parsing.
+var (
+	ErrEmptyString  = errors.New("empty string")
+	ErrNoFields     = errors.New("no numeric fields found")
+	ErrParseNumber  = errors.New("cannot parse as number")
+	ErrMinuteRange  = errors.New("minutes out of range [0, 60)")
+	ErrSecondRange  = errors.New("seconds out of range [0, 60)")
+)
+
 // ParseDMS parses a sexagesimal angle string in degrees-arcminutes-arcseconds
 // format and returns the corresponding Angle.
 //
@@ -67,7 +76,7 @@ func parseBaseSexagesimal(s, funcName string, unit func(float64) Angle) (Angle, 
 func parseSexagesimal(s string) (sign float64, fields [3]float64, err error) {
 	s = strings.TrimSpace(s)
 	if s == "" {
-		return 0, [3]float64{}, errors.New("empty string")
+		return 0, [3]float64{}, ErrEmptyString
 	}
 
 	sign = 1
@@ -88,7 +97,7 @@ func parseSexagesimal(s string) (sign float64, fields [3]float64, err error) {
 	}
 
 	if len(nums) == 0 {
-		return 0, [3]float64{}, errors.New("no numeric fields found")
+		return 0, [3]float64{}, ErrNoFields
 	}
 
 	var f [3]float64
@@ -112,7 +121,7 @@ func extractNumericFields(s string, max int) ([]float64, error) {
 
 		v, err := strconv.ParseFloat(token, 64)
 		if err != nil {
-			return nil, fmt.Errorf("cannot parse %q as number", token)
+			return nil, fmt.Errorf("%w: %q", ErrParseNumber, token)
 		}
 
 		result = append(result, v)
@@ -124,11 +133,11 @@ func extractNumericFields(s string, max int) ([]float64, error) {
 // validateMinSec checks that minutes and seconds are in [0, 60).
 func validateMinSec(minutes, secs float64) error {
 	if minutes < 0 || minutes >= 60 {
-		return fmt.Errorf("minutes %.4g out of range [0, 60)", minutes)
+		return fmt.Errorf("%w: %.4g", ErrMinuteRange, minutes)
 	}
 
 	if secs < 0 || secs >= 60 {
-		return fmt.Errorf("seconds %.4g out of range [0, 60)", secs)
+		return fmt.Errorf("%w: %.4g", ErrSecondRange, secs)
 	}
 
 	return nil

@@ -3,6 +3,7 @@ package sbdb
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -13,6 +14,9 @@ import (
 )
 
 var sbdbQueryAPI = "https://ssd-api.jpl.nasa.gov/sbdb.api"
+
+// ErrAPIError indicates a SBDB API error response.
+var ErrAPIError = errors.New("sbdb: API error")
 
 // Provider implements resolve.Provider and resolve.ObjectResolver for SBDB.
 type Provider struct {
@@ -121,7 +125,7 @@ func (p *Provider) ResolveObject(ctx context.Context, req resolve.ObjectRequest)
 			// This means either multiple matches or error
 			// The JSON payload includes generic text if multiple
 			// We skip multiple matching to keep it exact resolution for lookup API
-			yield(resolve.Target{}, fmt.Errorf("sbdb: %s", payload.Message))
+			yield(resolve.Target{}, fmt.Errorf("%w: %s", ErrAPIError, payload.Message))
 			return
 		}
 

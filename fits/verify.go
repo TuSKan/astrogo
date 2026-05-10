@@ -1,7 +1,5 @@
 package fits
 
-import "errors"
-
 // VerifyError classifies FITS standard violations.
 type VerifyError struct {
 	Keyword string
@@ -16,7 +14,7 @@ func (e VerifyError) Error() string {
 // At minimum, it must contain SIMPLE=T, BITPIX, NAXIS in that exact sequence.
 func VerifyPrimaryHeader(h *Header) error {
 	if len(h.Cards) == 0 {
-		return errors.New("fits verify: empty header")
+		return ErrEmptyHeader
 	}
 
 	// 1. First keyword must be SIMPLE.

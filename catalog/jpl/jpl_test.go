@@ -2,9 +2,11 @@ package jpl
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/TuSKan/astrogo/catalog/resolve"
@@ -75,7 +77,11 @@ func TestJPLErrorResponse(t *testing.T) {
 			t.Fatalf("Expected explicit json payload error")
 		}
 
-		if err.Error() != "jpl: unrecognized command" {
+		if !errors.Is(err, ErrAPIError) {
+			t.Fatalf("Expected ErrAPIError, got: %v", err)
+		}
+
+		if !strings.Contains(err.Error(), "unrecognized command") {
 			t.Fatalf("Unexpected error mapping: %v", err)
 		}
 

@@ -1,7 +1,6 @@
 package fits
 
 import (
-	"errors"
 	"fmt"
 	"io"
 
@@ -79,11 +78,11 @@ func (m *mmapSeeker) Seek(offset int64, whence int) (int64, error) {
 	case io.SeekEnd:
 		target = m.len + offset
 	default:
-		return 0, fmt.Errorf("mmapSeeker: invalid whence %d", whence)
+		return 0, fmt.Errorf("%w: %d", ErrInvalidWhence, whence)
 	}
 
 	if target < 0 {
-		return 0, errors.New("mmapSeeker: negative offset")
+		return 0, ErrNegativeOffset
 	}
 
 	m.off = target

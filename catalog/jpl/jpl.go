@@ -3,12 +3,16 @@ package jpl
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
 
 	"github.com/TuSKan/astrogo/catalog/resolve"
 )
+
+// ErrAPIError indicates a JPL Horizons API error response.
+var ErrAPIError = errors.New("jpl: API error")
 
 const horizonsAPI = "https://ssd.jpl.nasa.gov/api/horizons.api"
 
@@ -101,7 +105,7 @@ func (p *Provider) ResolveObject(ctx context.Context, req resolve.ObjectRequest)
 		}
 
 		if payload.Error != "" {
-			yield(resolve.Target{}, fmt.Errorf("jpl: %s", payload.Error))
+			yield(resolve.Target{}, fmt.Errorf("%w: %s", ErrAPIError, payload.Error))
 			return
 		}
 

@@ -119,7 +119,7 @@ func (p *Planner) RankObservable(objects []Observable, start, end time.Time) ([]
 			// TransitEstimate expects coord.Object for now.
 			skyObj, ok := obj.(coord.Object)
 			if !ok {
-				return fmt.Errorf("object %T does not implement coord.Object required for ranking", obj)
+				return fmt.Errorf("%w: %T", ErrNotCoordObject, obj)
 			}
 
 			transitTime, peakAlt, err := TransitEstimate(skyObj, p.Site, start, end)
@@ -565,11 +565,11 @@ func ObservableWindows(
 	constraints ...Constraint,
 ) ([]Window, error) {
 	if step <= 0 {
-		return nil, fmt.Errorf("step must be positive, got %v", step)
+		return nil, fmt.Errorf("%w: %v", ErrStepNotPositive, step)
 	}
 
 	if step > maxObservableStep {
-		return nil, fmt.Errorf("step %v exceeds maximum %v: large steps risk missing short visibility windows", step, maxObservableStep)
+		return nil, fmt.Errorf("%w: %v exceeds maximum %v", ErrStepTooLarge, step, maxObservableStep)
 	}
 
 	// Observability check function for bisection refinement.

@@ -1,7 +1,6 @@
 package plan
 
 import (
-	"errors"
 	"fmt"
 	"math"
 	"sort"
@@ -166,17 +165,17 @@ type EventSpec struct {
 // Validate checks if the Spec configuration is fully provided for its type.
 func (s EventSpec) Validate() error {
 	if s.Target == nil {
-		return errors.New("event spec must contain a primary target")
+		return ErrNoPrimaryTarget
 	}
 
 	switch s.Family {
 	case EventFamilyVisibility:
 		if s.Observer == nil {
-			return errors.New("visibility events require an observer geodetic location")
+			return ErrNoObserverLocation
 		}
 	case EventFamilyRelativeGeometry, EventFamilyOverlap:
 		if s.Other == nil && !isPhaseEvent(s.Kind) {
-			return fmt.Errorf("%v geometry requires a secondary target", s.Kind)
+			return fmt.Errorf("%w: %v", ErrNoSecondaryTarget, s.Kind)
 		}
 	case EventFamilyIllumination:
 		// Illumination events need only a Target; the Sun is implicit.
@@ -243,7 +242,7 @@ func (s EventSolver) Find(spec EventSpec, start, end time.Time) ([]Event, error)
 	case EventFamilyIllumination:
 		events, err = s.solveIllumination(spec, start, end)
 	default:
-		return nil, fmt.Errorf("event solver for family %v is not implemented", spec.Family)
+		return nil, fmt.Errorf("%w: %v", ErrFamilyNotImpl, spec.Family)
 	}
 
 	if err != nil {
@@ -499,7 +498,7 @@ func (s EventSolver) solveGeometry(spec EventSpec, start, end time.Time) ([]Even
 			sep := coord.Separation(pos1, pos2).Degrees()
 			return sep, nil
 		default:
-			return 0, fmt.Errorf("unsupported geometry kind: %v", spec.Kind)
+			return 0, fmt.Errorf("%w: %v", ErrUnsupportedGeom, spec.Kind)
 		}
 	}
 
@@ -987,7 +986,7 @@ func (s EventSolver) solveIllumination(spec EventSpec, start, end time.Time) ([]
 	if p, ok := spec.Target.(*Planet); ok && p.IsMoon() {
 		prov = p.Provider()
 	} else {
-		return nil, errors.New("illumination solver requires a Moon target (*Planet with IsMoon)")
+		return nil, ErrMoonRequired
 	}
 
 	type phaseTarget struct {
