@@ -34,11 +34,13 @@ func TestGofaExtWrappers(t *testing.T) {
 	// Icrs2g / G2icrs
 	gl, gb := gofaext.Icrs2g(0, 0)
 	ra, _ := gofaext.G2icrs(gl, gb)
+
 	if ra > 3.14 {
 		ra -= 2 * 3.14159265358979323846
 	} else if ra < -3.14 {
 		ra += 2 * 3.14159265358979323846
 	}
+
 	testutil.AssertNear(t, "G2icrs RA", ra, 0.0, 1e-9)
 
 	// Eceq06 / Eqec06
