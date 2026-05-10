@@ -32,7 +32,7 @@ type File struct {
 func Open(path string) (_ *File, err error) {
 	f, err := os.Open(path)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("fits: open: %w", err)
 	}
 	defer func() {
 		if cerr := f.Close(); cerr != nil {
@@ -43,7 +43,7 @@ func Open(path string) (_ *File, err error) {
 	if strings.HasSuffix(strings.ToLower(path), ".gz") {
 		gzReader, err := pgzip.NewReader(f)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("fits: gzip reader: %w", err)
 		}
 		// Notice: pgzip.Reader does not support io.Seeker.
 		// The underlying fits.Read loop will gracefully fallback to streaming.
@@ -90,12 +90,12 @@ func Read(r io.Reader) (*File, error) {
 			if canSeek {
 				_, err = seeker.Seek(size, io.SeekCurrent)
 				if err != nil {
-					return nil, err
+					return nil, fmt.Errorf("fits: seek payload: %w", err)
 				}
 			} else {
 				_, err = io.CopyN(io.Discard, r, size)
 				if err != nil {
-					return nil, err
+					return nil, fmt.Errorf("fits: skip payload: %w", err)
 				}
 			}
 		}
@@ -200,12 +200,20 @@ func (b *BlockReader) ReadBlock(buf []byte) error {
 
 	_, err := io.ReadFull(b.r, buf)
 
-	return err
+	if err != nil {
+		return fmt.Errorf("fits: read block: %w", err)
+	}
+
+	return nil
 }
 
 // ReadBigEndian is a zero-reflection utility to read binary values from FITS arrays
 func ReadBigEndian(r io.Reader, data any) error {
-	return binary.Read(r, binary.BigEndian, data)
+	if err := binary.Read(r, binary.BigEndian, data); err != nil {
+		return fmt.Errorf("fits: read big-endian: %w", err)
+	}
+
+	return nil
 }
 
 // Write scaffolds writing a basic HDU to a FITS file.

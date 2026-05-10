@@ -319,22 +319,22 @@ func seasonEvaluator(target float64, prov eph.Provider) Evaluator {
 func MoonIllumination(t time.Time, prov eph.Provider) (fraction float64, phaseAngle angle.Angle, err error) {
 	sunPos, err := eph.Position(prov, eph.Sun, t)
 	if err != nil {
-		return 0, 0, err
+		return 0, 0, fmt.Errorf("illumination: sun position: %w", err)
 	}
 
 	moonPos, err := eph.Position(prov, eph.Moon, t)
 	if err != nil {
-		return 0, 0, err
+		return 0, 0, fmt.Errorf("illumination: moon position: %w", err)
 	}
 
 	sunICRS, err := eph.ToICRS(sunPos)
 	if err != nil {
-		return 0, 0, err
+		return 0, 0, fmt.Errorf("illumination: sun ICRS: %w", err)
 	}
 
 	moonICRS, err := eph.ToICRS(moonPos)
 	if err != nil {
-		return 0, 0, err
+		return 0, 0, fmt.Errorf("illumination: moon ICRS: %w", err)
 	}
 
 	// Phase angle = angular separation between Sun and Moon as seen from Earth
@@ -472,22 +472,22 @@ func moonEclipticLatitude(t time.Time, prov eph.Provider) (angle.Angle, error) {
 func moonAntiSunSeparation(t time.Time, prov eph.Provider) (float64, error) {
 	sunPos, err := eph.Position(prov, eph.Sun, t)
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("eclipse: sun position: %w", err)
 	}
 
 	moonPos, err := eph.Position(prov, eph.Moon, t)
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("eclipse: moon position: %w", err)
 	}
 
 	sunICRS, err := eph.ToICRS(sunPos)
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("eclipse: sun ICRS: %w", err)
 	}
 
 	moonICRS, err := eph.ToICRS(moonPos)
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("eclipse: moon ICRS: %w", err)
 	}
 
 	// Anti-solar point: flip the Sun's unit vector
@@ -506,22 +506,22 @@ func moonAntiSunSeparation(t time.Time, prov eph.Provider) (float64, error) {
 func moonSunSeparation(t time.Time, prov eph.Provider) (float64, error) {
 	sunPos, err := eph.Position(prov, eph.Sun, t)
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("eclipse: sun position: %w", err)
 	}
 
 	moonPos, err := eph.Position(prov, eph.Moon, t)
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("eclipse: moon position: %w", err)
 	}
 
 	sunICRS, err := eph.ToICRS(sunPos)
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("eclipse: sun ICRS: %w", err)
 	}
 
 	moonICRS, err := eph.ToICRS(moonPos)
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("eclipse: moon ICRS: %w", err)
 	}
 
 	return coord.Separation(moonICRS, sunICRS).Degrees(), nil

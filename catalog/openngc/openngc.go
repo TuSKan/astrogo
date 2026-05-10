@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"embed"
 	"encoding/csv"
+	"fmt"
 	"io"
 	"log"
 	"strconv"
@@ -113,7 +114,7 @@ func parseCSV(data []byte) ([]resolve.Target, error) {
 
 	header, err := r.Read()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("openngc: read header: %w", err)
 	}
 
 	// Build column index map for forward-compatible parsing.
@@ -131,7 +132,7 @@ func parseCSV(data []byte) ([]resolve.Target, error) {
 		}
 
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("openngc: read row: %w", err)
 		}
 
 		if len(row) < 6 {

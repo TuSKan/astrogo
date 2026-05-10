@@ -100,7 +100,11 @@ func NewReader(r io.ReadCloser) (*Reader, error) {
 }
 
 func (r *Reader) Close() error {
-	return r.F.Close()
+	if err := r.F.Close(); err != nil {
+		return fmt.Errorf("lsk: close: %w", err)
+	}
+
+	return nil
 }
 
 type LeapData struct {

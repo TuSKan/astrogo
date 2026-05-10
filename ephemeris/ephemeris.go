@@ -161,17 +161,17 @@ func NewProvider(source Source, kernel string, opts ...Option) (Provider, error)
 
 		p, err := jpl.NewProvider(source, kernel, jplOpts...)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("ephemeris: new provider: %w", err)
 		}
 
 		for _, extra := range cfg.ExtraKernels {
 			k, err := spk.CacheDownload("planets/"+extra+".bsp", p.DataDir)
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("ephemeris: cache kernel %s: %w", extra, err)
 			}
 
 			if err = p.AddKernel(k); err != nil {
-				return nil, err
+				return nil, fmt.Errorf("ephemeris: add kernel: %w", err)
 			}
 		}
 
@@ -184,7 +184,12 @@ func NewProvider(source Source, kernel string, opts ...Option) (Provider, error)
 
 		cfg.TLEName = kernel
 
-		return satellite.NewFromTLE(cfg.TLEName, cfg.TLELine1, cfg.TLELine2)
+		sat, err := satellite.NewFromTLE(cfg.TLEName, cfg.TLELine1, cfg.TLELine2)
+		if err != nil {
+			return nil, fmt.Errorf("ephemeris: new TLE: %w", err)
+		}
+
+		return sat, nil
 
 	case Stations:
 		return nil, fmt.Errorf("%w: Stations", ErrNotImplemented)
@@ -208,7 +213,7 @@ func Default() Provider {
 func Position(p Provider, id ID, t time.Time) (vector.Vec3, error) {
 	st, err := p.State(id, t)
 	if err != nil {
-		return vector.Vec3{}, err
+		return vector.Vec3{}, fmt.Errorf("ephemeris: position: %w", err)
 	}
 
 	return st.Pos, nil
@@ -219,7 +224,7 @@ func Position(p Provider, id ID, t time.Time) (vector.Vec3, error) {
 func Velocity(p Provider, id ID, t time.Time) (vector.Vec3, error) {
 	st, err := p.State(id, t)
 	if err != nil {
-		return vector.Vec3{}, err
+		return vector.Vec3{}, fmt.Errorf("ephemeris: velocity: %w", err)
 	}
 
 	return st.Vel, nil
@@ -233,7 +238,7 @@ const earthMeanRadiusKm = 6371.0
 func Altitude(p Provider, id ID, t time.Time) (float64, error) {
 	st, err := p.State(id, t)
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("ephemeris: altitude: %w", err)
 	}
 
 	return st.DistanceKm() - earthMeanRadiusKm, nil
@@ -244,7 +249,7 @@ func Altitude(p Provider, id ID, t time.Time) (float64, error) {
 func ApparentState(p Provider, target ID, obsTime time.Time) (State, error) {
 	st, err := p.State(target, obsTime)
 	if err != nil {
-		return State{}, err
+		return State{}, fmt.Errorf("ephemeris: apparent state: %w", err)
 	}
 
 	tauDays := st.Pos.Norm() / 173.144632674
@@ -253,7 +258,7 @@ func ApparentState(p Provider, target ID, obsTime time.Time) (State, error) {
 
 		st, err = p.State(target, retardedTime)
 		if err != nil {
-			return State{}, err
+			return State{}, fmt.Errorf("ephemeris: apparent state retarded: %w", err)
 		}
 
 		tauDays = st.Pos.Norm() / 173.144632674

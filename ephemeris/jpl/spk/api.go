@@ -230,7 +230,7 @@ func parseHorizonsResult(data string) ([]HorizonsResult, error) {
 
 	err := scanner.Err()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("horizons: scan response: %w", err)
 	}
 
 	return result, nil

@@ -56,7 +56,12 @@ func (p *Planet) Position(t time.Time) (coord.ICRS, error) {
 }
 
 func (p *Planet) GeocentricVec(t time.Time) (vector.Vec3, error) {
-	return eph.Position(p.provider, p.id, t)
+	v, err := eph.Position(p.provider, p.id, t)
+	if err != nil {
+		return vector.Vec3{}, fmt.Errorf("planet: geocentric: %w", err)
+	}
+
+	return v, nil
 }
 
 func (p *Planet) GetDetails(ctx *coord.Context, props ...string) (*TargetDetails, error) {
@@ -65,7 +70,12 @@ func (p *Planet) GetDetails(ctx *coord.Context, props ...string) (*TargetDetails
 
 // ApparentMagnitude returns the Mallama & Hilton (2018) apparent magnitude.
 func (p *Planet) ApparentMagnitude(t time.Time) (float64, error) {
-	return mag.PlanetApparent(p.provider, p.id, t)
+	m, err := mag.PlanetApparent(p.provider, p.id, t)
+	if err != nil {
+		return 0, fmt.Errorf("planet: apparent magnitude: %w", err)
+	}
+
+	return m, nil
 }
 
 // ApparentMagnitudeCtx returns apparent magnitude (planets don't need atmospheric context).

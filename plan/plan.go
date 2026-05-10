@@ -79,7 +79,7 @@ func (p *Planner) FilterObservable(objects []Observable, t time.Time) ([]Observa
 
 	err := g.Wait()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("plan: filter visibility: %w", err)
 	}
 
 	var filtered []Observable
@@ -142,7 +142,7 @@ func (p *Planner) RankObservable(objects []Observable, start, end time.Time) ([]
 
 	err := g.Wait()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("plan: rank: %w", err)
 	}
 
 	var ranked []RankedObject
@@ -206,7 +206,7 @@ func isObservableCtx(
 ) (Evaluation, *coord.Context, error) {
 	pos, err := obj.Position(t)
 	if err != nil {
-		return Evaluation{}, nil, err
+		return Evaluation{}, nil, fmt.Errorf("plan: evaluate position: %w", err)
 	}
 
 	if ctx == nil {
@@ -215,7 +215,7 @@ func isObservableCtx(
 
 	altAz, err := ctx.ICRSToAltAz(pos)
 	if err != nil {
-		return Evaluation{}, nil, err
+		return Evaluation{}, nil, fmt.Errorf("plan: evaluate AltAz: %w", err)
 	}
 
 	eval := Evaluation{
@@ -234,7 +234,7 @@ func isObservableCtx(
 		}
 
 		if err != nil {
-			return Evaluation{}, nil, err
+			return Evaluation{}, nil, fmt.Errorf("plan: constraint check: %w", err)
 		}
 
 		eval.Results = append(eval.Results, res)
@@ -511,7 +511,7 @@ func RankObservables(
 
 	err := g.Wait()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("plan: score: %w", err)
 	}
 
 	var scored []ScoredTarget

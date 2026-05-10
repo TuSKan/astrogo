@@ -109,7 +109,7 @@ func CacheDownload(kernel, path string) (*Reader, error) {
 func NewReader(f ReadAtCloser) (*Reader, error) {
 	buf := make([]byte, RecordSize)
 	if _, err := f.ReadAt(buf, 0); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("spk: read file record: %w", err)
 	}
 
 	format := string(buf[88:96])
@@ -135,7 +135,11 @@ func NewReader(f ReadAtCloser) (*Reader, error) {
 
 // Close closes the file.
 func (r *Reader) Close() error {
-	return r.F.Close()
+	if err := r.F.Close(); err != nil {
+		return fmt.Errorf("spk: close: %w", err)
+	}
+
+	return nil
 }
 
 // ReadSummaries reads all segments summaries.
@@ -147,7 +151,7 @@ func (r *Reader) ReadSummaries() ([]Summary, error) {
 	for next != 0 {
 		buf := make([]byte, RecordSize)
 		if _, err := r.F.ReadAt(buf, int64(next-1)*RecordSize); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("spk: read summary record: %w", err)
 		}
 
 		fwdFloat := math.Float64frombits(r.FileRec.Order.Uint64(buf[0:8]))
@@ -194,7 +198,7 @@ func (r *Reader) ReadDoubles(startWord, endWord int32) ([]float64, error) {
 
 	n, err := r.F.ReadAt(buf, int64(startWord-1)*8)
 	if err != nil && !errors.Is(err, io.EOF) {
-		return nil, err
+		return nil, fmt.Errorf("spk: read doubles: %w", err)
 	}
 
 	if n < len(buf) && (errors.Is(err, io.EOF) || err == nil) {

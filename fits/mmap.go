@@ -43,7 +43,11 @@ func OpenMmap(path string) (*MMapFile, error) {
 // Close gracefully releases the memory mapped handle mapping.
 func (m *MMapFile) Close() error {
 	if m.mapped != nil {
-		return m.mapped.Close()
+		if err := m.mapped.Close(); err != nil {
+			return fmt.Errorf("fits: close mmap: %w", err)
+		}
+
+		return nil
 	}
 
 	return nil
@@ -64,7 +68,11 @@ func (m *mmapSeeker) Read(p []byte) (int, error) {
 	n, err := m.at.ReadAt(p, m.off)
 	m.off += int64(n)
 
-	return n, err
+	if err != nil {
+		return n, fmt.Errorf("fits: mmap read: %w", err)
+	}
+
+	return n, nil
 }
 
 func (m *mmapSeeker) Seek(offset int64, whence int) (int64, error) {

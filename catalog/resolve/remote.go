@@ -163,9 +163,14 @@ func (c *Client) Do(req *http.Request) (*http.Response, error) {
 			return nil, fmt.Errorf("%w: %d", ErrRetriable, resp.StatusCode)
 		}
 
-		return nil, err
+		return nil, fmt.Errorf("resolve: HTTP do: %w", err)
 	}
 
 	// Use backoff/v5 to handle retries and contexts
-	return backoff.Retry(req.Context(), operation, backoff.WithMaxTries(c.MaxRetries))
+	result, err := backoff.Retry(req.Context(), operation, backoff.WithMaxTries(c.MaxRetries))
+	if err != nil {
+		return nil, fmt.Errorf("resolve: retry: %w", err)
+	}
+
+	return result, nil
 }

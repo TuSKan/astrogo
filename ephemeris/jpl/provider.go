@@ -246,7 +246,7 @@ func (p *Provider) evaluateRecursive(targetID int32, et float64, baseID int32) (
 
 		pos, vel, err := spk.EvaluateSegment(s, k.Reader, et)
 		if err != nil {
-			return core.State{}, err
+			return core.State{}, fmt.Errorf("jpl: evaluate segment: %w", err)
 		}
 
 		totalPos = totalPos.Add(pos)

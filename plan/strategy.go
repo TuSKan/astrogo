@@ -1,6 +1,7 @@
 package plan
 
 import (
+	"fmt"
 	"sort"
 
 	"github.com/TuSKan/astrogo/coord"
@@ -57,7 +58,7 @@ func (s *SwapOptimizedStrategy) Schedule(
 
 	sched, err := base.Schedule(planner, window, blocks, transition)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("strategy: schedule: %w", err)
 	}
 
 	maxPasses := s.MaxPasses

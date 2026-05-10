@@ -2,6 +2,7 @@ package fits
 
 import (
 	"errors"
+	"fmt"
 	"strconv"
 	"strings"
 )
@@ -77,7 +78,12 @@ func (h *Header) GetInt(keyword string) (int, error) {
 
 	val := strings.TrimSpace(card.Value)
 
-	return strconv.Atoi(val)
+	v, err := strconv.Atoi(val)
+	if err != nil {
+		return 0, fmt.Errorf("fits: parse int %q: %w", keyword, err)
+	}
+
+	return v, nil
 }
 
 // GetFloat returns the value of a keyword as a float64.
@@ -89,7 +95,12 @@ func (h *Header) GetFloat(keyword string) (float64, error) {
 
 	val := strings.TrimSpace(card.Value)
 
-	return strconv.ParseFloat(val, 64)
+	v, err := strconv.ParseFloat(val, 64)
+	if err != nil {
+		return 0, fmt.Errorf("fits: parse float %q: %w", keyword, err)
+	}
+
+	return v, nil
 }
 
 // ParseCard extracts the value and comment string from a raw 80-byte FITS card.

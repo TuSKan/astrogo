@@ -89,12 +89,12 @@ type targetRecord struct {
 func downloadAndParse(url string) (_ []targetRecord, err error) {
 	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, url, nil)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("openngc: new request: %w", err)
 	}
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("openngc: HTTP do: %w", err)
 	}
 	defer func() {
 		cerr := resp.Body.Close()
@@ -117,7 +117,7 @@ func parseOpenNGC(input io.Reader) ([]targetRecord, error) {
 
 	header, err := r.Read()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("openngc: read header: %w", err)
 	}
 
 	col := make(map[string]int)
@@ -134,7 +134,7 @@ func parseOpenNGC(input io.Reader) ([]targetRecord, error) {
 		}
 
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("openngc: read row: %w", err)
 		}
 
 		kindStr := row[col["Type"]]
@@ -311,7 +311,7 @@ func parseDec(s string) (float64, error) {
 func writeRuntimeCSV(path string, records []targetRecord) (err error) {
 	f, err := os.Create(path)
 	if err != nil {
-		return err
+		return fmt.Errorf("openngc: create file: %w", err)
 	}
 	defer func() {
 		cerr := f.Close()
@@ -323,7 +323,7 @@ func writeRuntimeCSV(path string, records []targetRecord) (err error) {
 	w := csv.NewWriter(f)
 	// Output format: id,name,kind,ra_deg,dec_deg,aliases(semicolon separated),vmag,bmag
 	if err := w.Write([]string{"id", "name", "kind", "ra", "dec", "aliases", "vmag", "bmag"}); err != nil {
-		return err
+		return fmt.Errorf("openngc: write header: %w", err)
 	}
 
 	for _, rec := range records {
@@ -338,11 +338,15 @@ func writeRuntimeCSV(path string, records []targetRecord) (err error) {
 			rec.BMag,
 		})
 		if err != nil {
-			return err
+			return fmt.Errorf("openngc: write row: %w", err)
 		}
 	}
 
 	w.Flush()
 
-	return w.Error()
+	if err := w.Error(); err != nil {
+		return fmt.Errorf("openngc: flush: %w", err)
+	}
+
+	return nil
 }

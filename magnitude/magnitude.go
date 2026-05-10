@@ -2,6 +2,7 @@ package magnitude
 
 import (
 	"errors"
+	"fmt"
 	"math"
 
 	"github.com/TuSKan/astrogo/angle"
@@ -60,12 +61,12 @@ type bodyGeometry struct {
 func geometryVectors(p eph.Provider, target eph.ID, t time.Time) (bodyGeometry, [3]float64, error) {
 	planetSt, err := p.State(target, t)
 	if err != nil {
-		return bodyGeometry{}, [3]float64{}, err
+		return bodyGeometry{}, [3]float64{}, fmt.Errorf("magnitude: target state: %w", err)
 	}
 
 	sunSt, err := p.State(eph.Sun, t)
 	if err != nil {
-		return bodyGeometry{}, [3]float64{}, err
+		return bodyGeometry{}, [3]float64{}, fmt.Errorf("magnitude: sun state: %w", err)
 	}
 
 	// Earth→Planet (geocentric)

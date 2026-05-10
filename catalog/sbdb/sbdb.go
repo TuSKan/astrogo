@@ -203,5 +203,10 @@ func parseFloat(s string) (float64, error) {
 		}
 	}
 
-	return strconv.ParseFloat(strings.TrimSpace(s), 64)
+	v, err := strconv.ParseFloat(strings.TrimSpace(s), 64)
+	if err != nil {
+		return 0, fmt.Errorf("sbdb: parse float: %w", err)
+	}
+
+	return v, nil
 }

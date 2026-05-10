@@ -30,7 +30,7 @@ func WithNuclearMagnitude(m2, k2 float64) CometOption {
 	return func(c *Comet) { c.M2 = m2; c.K2 = k2 }
 }
 
-// NewCometWithOptions creates a comet target with optional parameters.
+// NewComet creates a comet target with optional parameters.
 func NewComet(name string, id eph.ID, provider eph.Provider, m1, k1 float64, opts ...CometOption) *Comet {
 	c := &Comet{
 		name:     name,
@@ -65,7 +65,12 @@ func (c *Comet) Position(t time.Time) (coord.ICRS, error) {
 }
 
 func (c *Comet) GeocentricVec(t time.Time) (vector.Vec3, error) {
-	return eph.Position(c.provider, c.id, t)
+	v, err := eph.Position(c.provider, c.id, t)
+	if err != nil {
+		return vector.Vec3{}, fmt.Errorf("comet: geocentric: %w", err)
+	}
+
+	return v, nil
 }
 
 func (c *Comet) GetDetails(ctx *coord.Context, props ...string) (*TargetDetails, error) {
@@ -90,12 +95,12 @@ func (c *Comet) ApparentMagnitudeCtx(t time.Time, _ *coord.Context) (float64, er
 func (c *Comet) distances(t time.Time) (r, delta float64, err error) {
 	st, err := c.provider.State(c.id, t)
 	if err != nil {
-		return 0, 0, err
+		return 0, 0, fmt.Errorf("comet: state: %w", err)
 	}
 
 	sunSt, err := c.provider.State(eph.Sun, t)
 	if err != nil {
-		return 0, 0, err
+		return 0, 0, fmt.Errorf("comet: sun state: %w", err)
 	}
 
 	delta = st.Distance()
