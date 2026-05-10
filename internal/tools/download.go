@@ -64,6 +64,13 @@ func Download(url, path string) (err error) {
 
 	// Atomically move the fully downloaded file into place
 	if err := os.Rename(tmpName, path); err != nil {
+		// On Windows, if multiple test suites run concurrently, another test
+		// might have already downloaded and opened (locked) the file. If the file
+		// exists and has a positive size, we can safely ignore the rename error.
+		if stat, statErr := os.Stat(path); statErr == nil && stat.Size() > 0 {
+			return nil
+		}
+
 		return fmt.Errorf("jpl: failed to finalize download atomic rename: %w", err)
 	}
 

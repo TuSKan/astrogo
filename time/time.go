@@ -67,11 +67,11 @@ func (w Weekday) String() string {
 
 const (
 	// Second is one second.
-	Second time.Duration = time.Second //nolint:revive // Public time unit constant; unit name is intentional.
+	Second time.Duration = time.Second //nolint:revive,nolintlint // Public time unit constant; unit name is intentional.
 	// Minute is one minute.
-	Minute time.Duration = time.Minute //nolint:revive // Public time unit constant; unit name is intentional.
+	Minute time.Duration = time.Minute //nolint:revive,nolintlint // Public time unit constant; unit name is intentional.
 	// Hour is one hour.
-	Hour time.Duration = time.Hour //nolint:revive // Public time unit constant; unit name is intentional.
+	Hour time.Duration = time.Hour //nolint:revive,nolintlint // Public time unit constant; unit name is intentional.
 )
 
 // Month constants re-exported from the standard library.
