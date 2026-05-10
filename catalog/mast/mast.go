@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"encoding/xml"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -16,6 +17,9 @@ import (
 )
 
 const mastAPI = "https://mast.stsci.edu/api/v0/invoke"
+
+// ErrAPIError indicates a MAST API error response.
+var ErrAPIError = errors.New("mast: API error")
 
 type Provider struct {
 	client *resolve.Client
@@ -125,7 +129,7 @@ func (p *Provider) ResolveObject(ctx context.Context, req resolve.ObjectRequest)
 			err := json.Unmarshal(b, &jsonPayload)
 			if err == nil {
 				if jsonPayload.Status == "ERROR" {
-					yield(resolve.Target{}, fmt.Errorf("mast: %s", jsonPayload.Msg))
+					yield(resolve.Target{}, fmt.Errorf("%w: %s", ErrAPIError, jsonPayload.Msg))
 					return
 				}
 

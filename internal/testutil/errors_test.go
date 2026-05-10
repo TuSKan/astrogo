@@ -7,6 +7,16 @@ import (
 	"github.com/TuSKan/astrogo/internal/testutil"
 )
 
+// Test fixture errors.
+var (
+	errOops             = errors.New("oops")
+	errExpected          = errors.New("expected")
+	errConnectionRefused = errors.New("connection refused")
+	errTimeout           = errors.New("timeout")
+	errContext           = errors.New("context: ")
+	errUnrelated         = errors.New("unrelated")
+)
+
 // ── AssertNoError ─────────────────────────────────────────────────────────────
 
 func TestAssertNoError_nil(t *testing.T) {
@@ -15,7 +25,7 @@ func TestAssertNoError_nil(t *testing.T) {
 
 func TestAssertNoError_nonNil(t *testing.T) {
 	spy := &tbSpy{TB: t}
-	testutil.AssertNoError(spy, errors.New("oops"))
+	testutil.AssertNoError(spy, errOops)
 
 	if !spy.failed {
 		t.Errorf("AssertNoError did not fail for non-nil error")
@@ -25,7 +35,7 @@ func TestAssertNoError_nonNil(t *testing.T) {
 // ── AssertError ───────────────────────────────────────────────────────────────
 
 func TestAssertError_nonNil(t *testing.T) {
-	testutil.AssertError(t, errors.New("expected")) // must not fail
+	testutil.AssertError(t, errExpected) // must not fail
 }
 
 func TestAssertError_nil(t *testing.T) {
@@ -40,12 +50,12 @@ func TestAssertError_nil(t *testing.T) {
 // ── AssertErrorContains ───────────────────────────────────────────────────────
 
 func TestAssertErrorContains_match(t *testing.T) {
-	testutil.AssertErrorContains(t, errors.New("connection refused"), "refused")
+	testutil.AssertErrorContains(t, errConnectionRefused, "refused")
 }
 
 func TestAssertErrorContains_substring_not_found(t *testing.T) {
 	spy := &tbSpy{TB: t}
-	testutil.AssertErrorContains(spy, errors.New("timeout"), "refused")
+	testutil.AssertErrorContains(spy, errTimeout, "refused")
 
 	if !spy.failed {
 		t.Errorf("AssertErrorContains did not fail when substring absent")
@@ -66,13 +76,13 @@ func TestAssertErrorContains_nil_error(t *testing.T) {
 var errSentinel = errors.New("sentinel")
 
 func TestAssertErrorIs_match(t *testing.T) {
-	wrapped := errors.Join(errors.New("context: "), errSentinel)
+	wrapped := errors.Join(errContext, errSentinel)
 	testutil.AssertErrorIs(t, wrapped, errSentinel)
 }
 
 func TestAssertErrorIs_no_match(t *testing.T) {
 	spy := &tbSpy{TB: t}
-	testutil.AssertErrorIs(spy, errors.New("unrelated"), errSentinel)
+	testutil.AssertErrorIs(spy, errUnrelated, errSentinel)
 
 	if !spy.failed {
 		t.Errorf("AssertErrorIs did not fail for non-matching error")

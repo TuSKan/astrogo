@@ -1,7 +1,6 @@
 package coord
 
 import (
-	"errors"
 	"fmt"
 	"math"
 
@@ -39,11 +38,11 @@ func NewGeodetic(lon, lat angle.Angle, height float64) (*Geodetic, error) {
 	if math.IsNaN(lon.Radians()) || math.IsInf(lon.Radians(), 0) ||
 		math.IsNaN(lat.Radians()) || math.IsInf(lat.Radians(), 0) ||
 		math.IsNaN(height) || math.IsInf(height, 0) {
-		return nil, errors.New("geodetic coordinates must be finite")
+		return nil, fmt.Errorf("geodetic: %w", ErrNotFinite)
 	}
 
 	if lat.Degrees() < -90 || lat.Degrees() > 90 {
-		return nil, errors.New("latitude must be between -90 and 90 degrees")
+		return nil, fmt.Errorf("geodetic: %w", ErrLatitudeRange)
 	}
 
 	return &Geodetic{lon: lon, lat: lat, height: height}, nil
@@ -83,7 +82,7 @@ func (g *Geodetic) Name() string {
 
 func (g *Geodetic) Validate() error {
 	if g.lat.Degrees() < -90 || g.lat.Degrees() > 90 {
-		return errors.New("latitude must be between -90 and 90 degrees")
+		return fmt.Errorf("geodetic: %w", ErrLatitudeRange)
 	}
 
 	return nil
@@ -157,7 +156,7 @@ func FromECEF(v vector.Vec3, e Ellipsoid) (*Geodetic, error) {
 	if math.IsNaN(x) || math.IsInf(x, 0) ||
 		math.IsNaN(y) || math.IsInf(y, 0) ||
 		math.IsNaN(z) || math.IsInf(z, 0) {
-		return nil, errors.New("ECEF coordinates must be finite")
+		return nil, fmt.Errorf("ECEF: %w", ErrNotFinite)
 	}
 
 	a := e.A

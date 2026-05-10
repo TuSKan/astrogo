@@ -46,7 +46,7 @@ func ValidateDatasum(headerSum string, computed uint32) error {
 	}
 
 	if uint32(expected) != computed {
-		return fmt.Errorf("DATASUM mismatch: expected %d, got %d", expected, computed)
+		return fmt.Errorf("%w: expected %d, got %d", ErrDatasumMismatch, expected, computed)
 	}
 
 	return nil

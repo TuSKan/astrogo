@@ -1,7 +1,6 @@
 package plan
 
 import (
-	"errors"
 	"fmt"
 	stdtime "time"
 
@@ -118,7 +117,7 @@ func VisibleIntervals(
 	}
 
 	if step > 15*stdtime.Minute {
-		return nil, fmt.Errorf("step %v exceeds maximum 15m: large steps risk missing short visibility windows", step)
+		return nil, fmt.Errorf("%w: %v", ErrStepTooLarge, step)
 	}
 
 	intervals := make([]Interval, 0, 4)
@@ -294,12 +293,12 @@ func Find(
 	}
 
 	if step > 15*stdtime.Minute {
-		return nil, fmt.Errorf("step %v exceeds maximum 15m: large steps risk missing short visibility windows", step)
+		return nil, fmt.Errorf("%w: %v", ErrStepTooLarge, step)
 	}
 
 	obs, ok := obj.(Observable)
 	if !ok {
-		return nil, errors.New("object does not implement Observable")
+		return nil, ErrNotObservable
 	}
 
 	// Constraint check function for bisection refinement.

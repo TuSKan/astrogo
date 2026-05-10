@@ -18,6 +18,9 @@ import (
 // CelestTrak GP API base URL.
 var gpAPIBase = "https://celestrak.org/NORAD/elements/gp.php"
 
+// ErrNoData is returned when no GP records exist for a catalog number.
+var ErrNoData = errors.New("norad: no data for catalog number")
+
 // GP represents a NORAD General Perturbations element set (OMM-compatible).
 // Field names align with CCSDS 502.0-B-3 / Space Data Standards OMM schema.
 type GP struct {
@@ -353,7 +356,7 @@ func (p *Provider) FetchByID(ctx context.Context, catNr int) (GP, error) {
 	}
 
 	if len(gps) == 0 {
-		return GP{}, fmt.Errorf("norad: no data for catalog number %d", catNr)
+		return GP{}, fmt.Errorf("%w: %d", ErrNoData, catNr)
 	}
 
 	return gps[0], nil

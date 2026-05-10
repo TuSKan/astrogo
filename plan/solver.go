@@ -89,7 +89,7 @@ func (s Solver) FindRoot(eval Evaluator, t1, t2 time.Time) (time.Time, float64, 
 	// Verify bracketing condition
 	if fa*fb > 0 {
 		return time.Time{}, 0, fmt.Errorf(
-			"solver: bracketing condition violated: f(a)=%g and f(b)=%g have the same sign", fa, fb)
+			"%w: f(a)=%g, f(b)=%g", ErrBracketingViolated, fa, fb)
 	}
 
 	// Third point: initialize to a (will be replaced after first iteration)

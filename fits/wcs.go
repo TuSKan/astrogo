@@ -1,7 +1,6 @@
 package fits
 
 import (
-	"errors"
 	"fmt"
 	"math"
 	"strings"
@@ -174,7 +173,7 @@ func sipEval(coeffs map[[2]int]float64, u, v float64) float64 {
 // SIP distortion is applied when CTYPE contains the "-SIP" suffix.
 func (w *WCS) PixelToWorld(pixels []float64) ([]float64, error) {
 	if len(pixels) != w.nAxis {
-		return nil, fmt.Errorf("wcs: expected %d dimensional pixel input", w.nAxis)
+		return nil, fmt.Errorf("%w: expected %d", ErrWCSDimension, w.nAxis)
 	}
 
 	// Detect projection type and set lonAxis/latAxis (needed by SIP and deprojection).
@@ -268,7 +267,7 @@ func (w *WCS) PixelToWorld(pixels []float64) ([]float64, error) {
 // or if the Jacobian becomes singular.
 func (w *WCS) WorldToPixel(world []float64) ([]float64, error) {
 	if len(world) != w.nAxis {
-		return nil, fmt.Errorf("wcs: expected %d dimensional world input", w.nAxis)
+		return nil, fmt.Errorf("%w: expected %d", ErrWCSDimension, w.nAxis)
 	}
 
 	pix := make([]float64, w.nAxis)
@@ -300,7 +299,7 @@ func (w *WCS) WorldToPixel(world []float64) ([]float64, error) {
 			// Invert 2x2 PC sub-matrix for the celestial axes:
 			det := w.pc[lo][lo]*w.pc[la][la] - w.pc[lo][la]*w.pc[la][lo]
 			if math.Abs(det) < 1e-30 {
-				return nil, errors.New("wcs: WorldToPixel PC matrix is singular")
+				return nil, ErrWCSSingular
 			}
 
 			dp := [2]float64{
@@ -400,7 +399,7 @@ func (w *WCS) WorldToPixel(world []float64) ([]float64, error) {
 
 		det := j00*j11 - j01*j10
 		if math.Abs(det) < 1e-30 {
-			return nil, errors.New("wcs: WorldToPixel Jacobian is singular")
+			return nil, ErrWCSSingular
 		}
 
 		// Newton update: pix -= J^{-1} * residual
@@ -408,7 +407,7 @@ func (w *WCS) WorldToPixel(world []float64) ([]float64, error) {
 		pix[la] -= (-j10*dx + j00*dy) / det
 	}
 
-	return nil, fmt.Errorf("wcs: WorldToPixel did not converge after %d iterations", maxIter)
+	return nil, fmt.Errorf("%w: after %d iterations", ErrWCSNotConverged, maxIter)
 }
 
 // ── Projection Helpers ───────────────────────────────────────────────────────
@@ -489,7 +488,7 @@ func project(proj string, ra, dec, alpha0, delta0 float64) (x, y float64, err er
 	case "TAN":
 		denom := sinDec*sinD0 + cosDec*cosD0*cosDRA
 		if denom <= 0 {
-			return 0, 0, errors.New("wcs: TAN projection: point behind tangent plane")
+			return 0, 0, ErrWCSBehindPlane
 		}
 
 		x = cosDec * sinDRA / denom
@@ -550,7 +549,7 @@ func project(proj string, ra, dec, alpha0, delta0 float64) (x, y float64, err er
 
 		denom := math.Sqrt(1 + cosNTcosHalf)
 		if denom < 1e-15 {
-			return 0, 0, errors.New("wcs: AIT projection: antipodal point")
+			return 0, 0, ErrWCSAntipodal
 		}
 
 		s2 := math.Sqrt(2)
@@ -558,7 +557,7 @@ func project(proj string, ra, dec, alpha0, delta0 float64) (x, y float64, err er
 		y = s2 * sinNT / denom
 
 	default:
-		return 0, 0, fmt.Errorf("wcs: unsupported projection %q", proj)
+		return 0, 0, fmt.Errorf("%w: %q", ErrWCSUnsupported, proj)
 	}
 
 	return x, y, nil
@@ -594,7 +593,7 @@ func deproject(proj string, x, y, alpha0, delta0 float64) (ra, dec float64, err 
 		// sinT = sqrt(1 − r²), cosT = r = sqrt(x²+y²)
 		r2 := x*x + y*y
 		if r2 > 1.0 {
-			return 0, 0, fmt.Errorf("wcs: SIN projection: point outside unit sphere (r²=%.6f)", r2)
+			return 0, 0, fmt.Errorf("%w: r²=%.6f", ErrWCSOutsideSphere, r2)
 		}
 
 		sinT := math.Sqrt(1 - r2)
@@ -631,7 +630,7 @@ func deproject(proj string, x, y, alpha0, delta0 float64) (ra, dec float64, err 
 		// Step 1: Inverse Hammer → native (φ, θ).
 		z2 := 1.0 - (x/4)*(x/4) - (y/2)*(y/2)
 		if z2 < 0 {
-			return 0, 0, errors.New("wcs: AIT projection: point outside valid region")
+			return 0, 0, ErrWCSOutsideRegion
 		}
 
 		z := math.Sqrt(z2)
@@ -650,7 +649,7 @@ func deproject(proj string, x, y, alpha0, delta0 float64) (ra, dec float64, err 
 			-sinNT*sinD0+cosNT*cosD0*cosNP)
 
 	default:
-		return 0, 0, fmt.Errorf("wcs: unsupported projection %q", proj)
+		return 0, 0, fmt.Errorf("%w: %q", ErrWCSUnsupported, proj)
 	}
 
 	return ra, dec, nil
@@ -663,11 +662,11 @@ func deproject(proj string, x, y, alpha0, delta0 float64) (ra, dec float64, err 
 func ExtractWCS(h *Header) (*WCS, error) {
 	naxis, err := h.GetInt("NAXIS")
 	if err != nil {
-		return nil, errors.New("fits/wcs: header missing mandatory NAXIS keyword")
+		return nil, ErrWCSMissingNAXIS
 	}
 
 	if naxis <= 0 {
-		return nil, errors.New("fits/wcs: header defines mathematically 0-dimensional plane")
+		return nil, ErrWCSZeroDim
 	}
 
 	crpix := make([]float64, naxis)

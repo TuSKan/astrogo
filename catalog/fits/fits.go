@@ -13,6 +13,12 @@ import (
 	"github.com/TuSKan/astrogo/catalog/resolve"
 )
 
+// Sentinel errors for catalog/fits.
+var (
+	ErrNoBintable     = errors.New("catalog/fits: no binary table found")
+	ErrMissingColumns = errors.New("catalog/fits: missing required mapping columns in bintable")
+)
+
 type Provider struct {
 	name    string
 	targets []resolve.Target
@@ -37,7 +43,7 @@ func New(filePath string) (*Provider, error) {
 	}
 
 	if bintable == nil {
-		return nil, fmt.Errorf("catalog/fits: no binary table found in %s", filePath)
+		return nil, fmt.Errorf("%w: %s", ErrNoBintable, filePath)
 	}
 
 	ids, errId := bintable.GetStringColumn("ID")
@@ -46,7 +52,7 @@ func New(filePath string) (*Provider, error) {
 	decs, errDec := bintable.GetFloatColumn("DEC")
 
 	if errId != nil || errName != nil || errRa != nil || errDec != nil {
-		return nil, errors.New("catalog/fits: missing required mapping columns in bintable")
+		return nil, ErrMissingColumns
 	}
 
 	rows := len(ids)

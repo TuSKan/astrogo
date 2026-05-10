@@ -88,7 +88,7 @@ func CacheDownload(kernel, path string) (*Reader, error) {
 			removeErr := os.Remove(spkPath)
 
 			return nil, errors.Join(
-				fmt.Errorf("jpl: corrupt SPK file gracefully deleted (truncated: %d bytes, expected min %d bytes)", stat.Size(), expectedMinSize),
+				fmt.Errorf("%w: truncated %d bytes, expected min %d bytes", ErrCorruptSPK, stat.Size(), expectedMinSize),
 				closeErr, removeErr,
 			)
 		}
@@ -187,7 +187,7 @@ func (r *Reader) ReadSummaries() ([]Summary, error) {
 func (r *Reader) ReadDoubles(startWord, endWord int32) ([]float64, error) {
 	count := endWord - startWord + 1
 	if count <= 0 {
-		return nil, fmt.Errorf("jpl/spk: invalid double precision word bounds (%d to %d)", startWord, endWord)
+		return nil, fmt.Errorf("%w: %d to %d", ErrInvalidWordBounds, startWord, endWord)
 	}
 
 	buf := make([]byte, count*8)
@@ -198,7 +198,7 @@ func (r *Reader) ReadDoubles(startWord, endWord int32) ([]float64, error) {
 	}
 
 	if n < len(buf) && (errors.Is(err, io.EOF) || err == nil) {
-		return nil, fmt.Errorf("jpl/spk: corrupt file (unexpected EOF reading word %d)", startWord)
+		return nil, fmt.Errorf("%w: unexpected EOF reading word %d", ErrCorruptSPK, startWord)
 	}
 
 	res := make([]float64, count)
@@ -226,7 +226,7 @@ func SelectSegment(segments []Segment, targetID int32, et float64) (*Segment, er
 		}
 	}
 
-	return nil, fmt.Errorf("jpl: no coverage for target %d at ET %f", targetID, et)
+	return nil, fmt.Errorf("%w: %d at ET %f", ErrNoCoverage, targetID, et)
 }
 
 // EvaluateSegment computes state from an SPK segment.
@@ -239,7 +239,7 @@ func EvaluateSegment(s *Segment, r *Reader, et float64) (pos, vel vector.Vec3, e
 	case 21:
 		return evaluateType21(s, r, et)
 	default:
-		return vector.Vec3{}, vector.Vec3{}, fmt.Errorf("jpl: unsupported SPK segment type %d", s.Type)
+		return vector.Vec3{}, vector.Vec3{}, fmt.Errorf("%w: %d", ErrUnsupportedSegment, s.Type)
 	}
 }
 
@@ -252,7 +252,7 @@ func evaluateType21(s *Segment, r *Reader, et float64) (pos, vel vector.Vec3, er
 
 	nRecs := int32(meta[0])
 	if nRecs <= 0 {
-		return vector.Vec3{}, vector.Vec3{}, fmt.Errorf("jpl: type 21 segment has invalid record count: %d", nRecs)
+		return vector.Vec3{}, vector.Vec3{}, fmt.Errorf("%w: %d", ErrInvalidRecordCount, nRecs)
 	}
 
 	epochs, err := r.ReadDoubles(s.EndAddr-nRecs, s.EndAddr-1)
@@ -287,7 +287,7 @@ func evaluateType21(s *Segment, r *Reader, et float64) (pos, vel vector.Vec3, er
 
 	// Validate record length: need at least 68 doubles (t0 + 15 dt + 3 p0 + 3 v0 + 45 MDA + maxOrd).
 	if len(rec) < 68 {
-		return vector.Vec3{}, vector.Vec3{}, fmt.Errorf("jpl: type 21 record too short: %d doubles (need >= 68)", len(rec))
+		return vector.Vec3{}, vector.Vec3{}, fmt.Errorf("%w: %d doubles (need >= 68)", ErrRecordTooShort, len(rec))
 	}
 
 	// Extended Modified Difference Array Algorithm
@@ -301,7 +301,7 @@ func evaluateType21(s *Segment, r *Reader, et float64) (pos, vel vector.Vec3, er
 	// Bounds-check maxOrd against the fixed-size arrays.
 	const maxAllowedOrd = 15
 	if maxOrd < 0 || maxOrd > maxAllowedOrd {
-		return vector.Vec3{}, vector.Vec3{}, fmt.Errorf("jpl: type 21 maxOrd=%d out of valid range [0,%d]", maxOrd, maxAllowedOrd)
+		return vector.Vec3{}, vector.Vec3{}, fmt.Errorf("%w: maxOrd=%d, allowed [0,%d]", ErrInvalidOrder, maxOrd, maxAllowedOrd)
 	}
 
 	// rec[68:71] are additional weights W if needed, but we calculate them

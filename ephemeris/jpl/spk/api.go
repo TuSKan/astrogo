@@ -156,15 +156,15 @@ func apiHorizonsRequest(command string, startTime, endTime time.Time) (_ *Horizo
 	case http.StatusOK:
 		// Proceed
 	case http.StatusBadRequest:
-		return nil, errors.New("jpl: horizons bad request (400): check keywords/content")
+		return nil, ErrHorizonsBadRequest
 	case http.StatusMethodNotAllowed:
-		return nil, errors.New("jpl: horizons method not allowed (405)")
+		return nil, ErrHorizonsMethodNA
 	case http.StatusInternalServerError:
-		return nil, errors.New("jpl: horizons internal server error (500): database unavailable")
+		return nil, ErrHorizonsServerError
 	case http.StatusServiceUnavailable:
-		return nil, errors.New("jpl: horizons service unavailable (503): temporary overload/maintenance")
+		return nil, ErrHorizonsUnavailable
 	default:
-		return nil, fmt.Errorf("jpl: horizons unexpected status: %s", r.Status)
+		return nil, fmt.Errorf("%w: %s", ErrHorizonsUnexpected, r.Status)
 	}
 
 	var resp HorizonsResponse

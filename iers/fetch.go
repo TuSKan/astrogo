@@ -27,6 +27,9 @@ const (
 	fetchTimeout = 30 * time.Second
 )
 
+// ErrEOPHTTPStatus indicates an unexpected HTTP status from the IERS EOP download.
+var ErrEOPHTTPStatus = errors.New("iers: EOP download returned unexpected status")
+
 //nolint:gochecknoglobals // fetch rate-limiter state — guarded by sync.Mutex
 var (
 	fetchMu       sync.Mutex
@@ -140,7 +143,7 @@ func doFetch() (err error) {
 	}()
 
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("iers: EOP download returned status %d", resp.StatusCode)
+		return fmt.Errorf("%w: %d", ErrEOPHTTPStatus, resp.StatusCode)
 	}
 
 	data, err := io.ReadAll(resp.Body)

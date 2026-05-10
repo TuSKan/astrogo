@@ -15,6 +15,13 @@ import (
 	"github.com/TuSKan/astrogo/time"
 )
 
+// Sentinel errors for LSK parsing.
+var (
+	ErrNoLeapseconds = errors.New("jpl: no leapseconds found in LSK")
+	ErrInvalidDate   = errors.New("invalid spice date")
+	ErrInvalidMonth  = errors.New("invalid month")
+)
+
 const JPL_LSK_KERNEL_URI = "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/"
 
 type Reader struct {
@@ -84,7 +91,7 @@ func NewReader(r io.ReadCloser) (*Reader, error) {
 	}
 
 	if len(l.DeltaAt) == 0 {
-		return nil, errors.New("jpl: no leapseconds found in LSK")
+		return nil, ErrNoLeapseconds
 	}
 
 	l.F = r
@@ -105,7 +112,7 @@ func parseSpiceDate(s string) (float64, error) {
 
 	parts := strings.Split(s, "-")
 	if len(parts) < 2 {
-		return 0, fmt.Errorf("invalid spice date %s", s)
+		return 0, fmt.Errorf("%w: %s", ErrInvalidDate, s)
 	}
 
 	year, _ := strconv.Atoi(parts[0])
@@ -123,7 +130,7 @@ func parseSpiceDate(s string) (float64, error) {
 
 	month := months[monthStr]
 	if month == 0 {
-		return 0, fmt.Errorf("invalid month %s", monthStr)
+		return 0, fmt.Errorf("%w: %s", ErrInvalidMonth, monthStr)
 	}
 
 	// Simple JD calculation for 12:00:00 (standard for leapsecond dates in LSK)

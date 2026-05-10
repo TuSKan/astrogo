@@ -2,6 +2,7 @@ package simbad
 
 import (
 	"encoding/csv"
+	"errors"
 	"fmt"
 	"io"
 	"strconv"
@@ -11,6 +12,9 @@ import (
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/time"
 )
+
+// ErrMissingColumn indicates a required column is missing from the SIMBAD response.
+var ErrMissingColumn = errors.New("simbad: missing expected column")
 
 // ParseCSV parses SIMBAD's TAP output in CSV format into resolve.Targets.
 // The expected order from BuildResolveQuery is:
@@ -37,7 +41,7 @@ func ParseCSV(r io.Reader) ([]resolve.Target, error) {
 	required := []string{"main_id", "ra", "dec"}
 	for _, req := range required {
 		if _, ok := colIdx[req]; !ok {
-			return nil, fmt.Errorf("simbad: internal error, missing expected column %q", req)
+			return nil, fmt.Errorf("%w: %q", ErrMissingColumn, req)
 		}
 	}
 

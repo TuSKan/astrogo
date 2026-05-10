@@ -2,6 +2,7 @@ package simbad
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -9,6 +10,9 @@ import (
 
 	"github.com/TuSKan/astrogo/catalog/resolve"
 )
+
+// ErrHTTPError indicates an HTTP error from SIMBAD TAP.
+var ErrHTTPError = errors.New("simbad: HTTP error")
 
 // Provider implements the resolve.Provider and resolve.ObjectResolver
 // interfaces interacting with SIMBAD's Table Access Protocol endpoint.
@@ -126,7 +130,7 @@ func (p *Provider) ResolveObject(ctx context.Context, req resolve.ObjectRequest)
 
 		if resp.StatusCode >= 400 {
 			b, _ := io.ReadAll(resp.Body)
-			yield(resolve.Target{}, fmt.Errorf("http error %d: %s", resp.StatusCode, string(b)))
+			yield(resolve.Target{}, fmt.Errorf("%w: %d: %s", ErrHTTPError, resp.StatusCode, string(b)))
 
 			return
 		}

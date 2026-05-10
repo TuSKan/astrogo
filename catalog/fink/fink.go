@@ -28,6 +28,16 @@ var ssoftURL = "https://api.ztf.fink-portal.org/api/v1/ssoft"
 // current month, which may not exist yet; pin to a known-good release.
 var defaultVersion = "2025.04"
 
+// Sentinel errors for FINK/SSOFT operations.
+var (
+	ErrNoIdentifier    = errors.New("fink: need number or name")
+	ErrHTTPStatus      = errors.New("fink: unexpected HTTP status")
+	ErrResponseFormat  = errors.New("fink: unexpected response format")
+	ErrRemoteException = errors.New("fink: remote exception in response")
+	ErrSSOFTError      = errors.New("fink: SSOFT error response")
+	ErrInvalidParquet  = errors.New("fink: not a valid parquet file")
+)
+
 // ssoRecord stores the fitted sHG1G2 parameters extracted from SSOFT.
 type ssoRecord struct {
 	Name   string
@@ -172,7 +182,7 @@ func (p *Provider) querySingle(number int64, name string) (_ *ssoRecord, err err
 	} else if name != "" {
 		payload["sso_name"] = name
 	} else {
-		return nil, errors.New("fink: need number or name")
+		return nil, ErrNoIdentifier
 	}
 
 	raw, _ := json.Marshal(payload)
@@ -200,7 +210,7 @@ func (p *Provider) querySingle(number int64, name string) (_ *ssoRecord, err err
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("fink: ssoft HTTP %d: %s", resp.StatusCode, string(data[:min(200, len(data))]))
+		return nil, fmt.Errorf("%w: %d: %s", ErrHTTPStatus, resp.StatusCode, string(data[:min(200, len(data))]))
 	}
 
 	// Single-object returns a JSON object; full table returns an array.
@@ -212,7 +222,7 @@ func (p *Provider) querySingle(number int64, name string) (_ *ssoRecord, err err
 
 		err2 := json.Unmarshal(data, &arr)
 		if err2 != nil || len(arr) == 0 {
-			return nil, errors.New("fink: unexpected response format")
+			return nil, ErrResponseFormat
 		}
 
 		obj = arr[0]
@@ -220,7 +230,7 @@ func (p *Provider) querySingle(number int64, name string) (_ *ssoRecord, err err
 
 	// Check for error responses.
 	if _, hasErr := obj["RemoteException"]; hasErr {
-		return nil, errors.New("fink: remote exception in response")
+		return nil, ErrRemoteException
 	}
 
 	rec := &ssoRecord{
@@ -460,12 +470,12 @@ func (p *Provider) downloadSSOFT() (_ []ssoRecord, err error) {
 
 	// Check for JSON error responses (the API returns 200 even on errors).
 	if len(data) < 1000 && len(data) > 0 && data[0] == '{' {
-		return nil, fmt.Errorf("SSOFT error: %s", string(data[:min(200, len(data))]))
+		return nil, fmt.Errorf("%w: %s", ErrSSOFTError, string(data[:min(200, len(data))]))
 	}
 
 	// Validate parquet magic bytes (PAR1).
 	if len(data) < 4 || data[0] != 0x50 || data[1] != 0x41 || data[2] != 0x52 || data[3] != 0x31 {
-		return nil, fmt.Errorf("SSOFT: not a valid parquet file (size=%d)", len(data))
+		return nil, fmt.Errorf("%w: size=%d", ErrInvalidParquet, len(data))
 	}
 
 	// Write to temp file (parquet reader requires seekable input).

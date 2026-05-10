@@ -20,7 +20,7 @@ func TestNewGeodetic(t *testing.T) {
 	// Invalid latitude
 	_, err = coord.NewGeodetic(angle.Deg(0), angle.Deg(91), 0)
 	testutil.AssertError(t, err)
-	testutil.AssertErrorContains(t, err, "latitude must be between -90 and 90 degrees")
+	testutil.AssertErrorIs(t, err, coord.ErrLatitudeRange)
 
 	// Non-finite
 	_, err = coord.NewGeodetic(angle.Rad(math.NaN()), angle.Deg(0), 0)

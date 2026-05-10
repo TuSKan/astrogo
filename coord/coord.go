@@ -10,6 +10,12 @@ import (
 	"github.com/TuSKan/astrogo/vector"
 )
 
+// Sentinel errors for coordinate validation.
+var (
+	ErrNotFinite    = errors.New("coordinate component must be finite")
+	ErrLatitudeRange = errors.New("latitude/altitude out of range")
+)
+
 // Object represents any celestial entity that has a predictable position
 // on the sky.
 type Object interface {
@@ -188,11 +194,11 @@ func (c ObserversLocation) Validate() error { return validateLat(c.lat) }
 func validateLat(lat angle.Angle) error {
 	d := lat.Degrees()
 	if math.IsNaN(d) || math.IsInf(d, 0) {
-		return errors.New("coordinate component must be finite")
+		return ErrNotFinite
 	}
 
 	if d < -90 || d > 90 {
-		return fmt.Errorf("latitude/altitude out of range: %g deg", d)
+		return fmt.Errorf("%w: %g deg", ErrLatitudeRange, d)
 	}
 
 	return nil

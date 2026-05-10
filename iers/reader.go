@@ -15,6 +15,9 @@ import (
 // the coverage window of the loaded IERS EOP data.
 var ErrOutOfRange = errors.New("iers: MJD out of EOP data coverage")
 
+// ErrNoRecords indicates the EOP table has no records loaded.
+var ErrNoRecords = errors.New("iers: no EOP records available")
+
 // Record is a single line of IERS EOP data.
 type Record struct {
 	MJD  float64
@@ -101,7 +104,7 @@ func (t *Table) Coverage() (mjdMin, mjdMax float64) {
 // Returns ErrOutOfRange if mjd falls outside the coverage of the loaded data.
 func (t *Table) EOP(mjd float64) (EOP, error) {
 	if len(t.records) == 0 {
-		return EOP{}, errors.New("no EOP records available")
+		return EOP{}, ErrNoRecords
 	}
 
 	// Reject queries outside the data coverage window.
