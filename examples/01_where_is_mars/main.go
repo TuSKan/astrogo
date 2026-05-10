@@ -1,3 +1,4 @@
+// Package main demonstrates locating Mars in the sky.
 package main
 
 import (

@@ -188,7 +188,7 @@ func IsObservable(
 	site *Site,
 	constraints ...Constraint,
 ) (Evaluation, error) {
-	eval, _, err := isObservableCtx(obj, t, site, nil, constraints...)
+	eval, err := isObservableCtx(obj, t, site, nil, constraints...)
 	return eval, err
 }
 
@@ -203,10 +203,10 @@ func isObservableCtx(
 	site *Site,
 	ctx *coord.Context,
 	constraints ...Constraint,
-) (Evaluation, *coord.Context, error) {
+) (Evaluation, error) {
 	pos, err := obj.Position(t)
 	if err != nil {
-		return Evaluation{}, nil, fmt.Errorf("plan: evaluate position: %w", err)
+		return Evaluation{}, fmt.Errorf("plan: evaluate position: %w", err)
 	}
 
 	if ctx == nil {
@@ -215,7 +215,7 @@ func isObservableCtx(
 
 	altAz, err := ctx.ICRSToAltAz(pos)
 	if err != nil {
-		return Evaluation{}, nil, fmt.Errorf("plan: evaluate AltAz: %w", err)
+		return Evaluation{}, fmt.Errorf("plan: evaluate AltAz: %w", err)
 	}
 
 	eval := Evaluation{
@@ -234,7 +234,7 @@ func isObservableCtx(
 		}
 
 		if err != nil {
-			return Evaluation{}, nil, fmt.Errorf("plan: constraint check: %w", err)
+			return Evaluation{}, fmt.Errorf("plan: constraint check: %w", err)
 		}
 
 		eval.Results = append(eval.Results, res)
@@ -243,7 +243,7 @@ func isObservableCtx(
 		}
 	}
 
-	return eval, ctx, nil
+	return eval, nil
 }
 
 // ── Scoring ──────────────────────────────────────────────────────────────────
@@ -418,7 +418,7 @@ func ScoreObservable(
 	ctx *coord.Context,
 	constraints ...Constraint,
 ) (float64, error) {
-	eval, _, err := isObservableCtx(obj, t, site, ctx, constraints...)
+	eval, err := isObservableCtx(obj, t, site, ctx, constraints...)
 	if err != nil {
 		return 0, err
 	}

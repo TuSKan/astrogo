@@ -23,10 +23,16 @@ func NewSatellite(name string, id eph.ID, provider eph.Provider) *Satellite {
 	return &Satellite{name: name, id: id, provider: provider}
 }
 
-func (s *Satellite) Name() string           { return s.name }
-func (s *Satellite) Provider() eph.Provider { return s.provider }
-func (s *Satellite) EphID() eph.ID          { return s.id }
+// Name returns the satellite's display name.
+func (s *Satellite) Name() string { return s.name }
 
+// Provider returns the ephemeris provider for this satellite.
+func (s *Satellite) Provider() eph.Provider { return s.provider }
+
+// EphID returns the NAIF/NORAD ID for ephemeris lookups.
+func (s *Satellite) EphID() eph.ID { return s.id }
+
+// Position computes the ICRS position of the satellite at time t.
 func (s *Satellite) Position(t time.Time) (coord.ICRS, error) {
 	pos, err := eph.Position(s.provider, s.id, t)
 	if err != nil {
@@ -41,6 +47,7 @@ func (s *Satellite) Position(t time.Time) (coord.ICRS, error) {
 	return icrs, nil
 }
 
+// GeocentricVec returns the geocentric position vector of the satellite.
 func (s *Satellite) GeocentricVec(t time.Time) (vector.Vec3, error) {
 	v, err := eph.Position(s.provider, s.id, t)
 	if err != nil {
@@ -50,6 +57,7 @@ func (s *Satellite) GeocentricVec(t time.Time) (vector.Vec3, error) {
 	return v, nil
 }
 
+// GetDetails computes the position and visual magnitude of the satellite.
 func (s *Satellite) GetDetails(ctx *coord.Context, props ...string) (*TargetDetails, error) {
 	return computeDetails(s, ctx, props...)
 }

@@ -61,19 +61,19 @@ func InAngleTol(got, want, tol float64) bool {
 
 // AssertNear fails t if |got - want| > tol.
 // label is included verbatim in the failure message.
-func AssertNear(t testing.TB, label string, got, want, tol float64) {
-	t.Helper()
+func AssertNear(tb testing.TB, label string, got, want, tol float64) {
+	tb.Helper()
 
 	if !InAbsTol(got, want, tol) {
-		t.Errorf("%s: got %.15g, want %.15g (abs tol %.3g, diff %.3g)",
+		tb.Errorf("%s: got %.15g, want %.15g (abs tol %.3g, diff %.3g)",
 			label, got, want, tol, math.Abs(got-want))
 	}
 }
 
 // AssertRelNear fails t if |got - want| / |want| > relTol.
 // When want == 0 the comparison is |got| <= relTol (see InRelTol).
-func AssertRelNear(t testing.TB, label string, got, want, relTol float64) {
-	t.Helper()
+func AssertRelNear(tb testing.TB, label string, got, want, relTol float64) {
+	tb.Helper()
 
 	if !InRelTol(got, want, relTol) {
 		var rel float64
@@ -83,15 +83,15 @@ func AssertRelNear(t testing.TB, label string, got, want, relTol float64) {
 			rel = math.Abs(got)
 		}
 
-		t.Errorf("%s: got %.15g, want %.15g (rel tol %.3g, rel err %.3g)",
+		tb.Errorf("%s: got %.15g, want %.15g (rel tol %.3g, rel err %.3g)",
 			label, got, want, relTol, rel)
 	}
 }
 
 // AssertAngleNear fails t if the shortest angular distance between got and
 // want (both in radians) is > tol (in radians).
-func AssertAngleNear(t testing.TB, label string, got, want, tol float64) {
-	t.Helper()
+func AssertAngleNear(tb testing.TB, label string, got, want, tol float64) {
+	tb.Helper()
 
 	if !InAngleTol(got, want, tol) {
 		diff := math.Abs(got - want)
@@ -101,7 +101,7 @@ func AssertAngleNear(t testing.TB, label string, got, want, tol float64) {
 			diff = 2*math.Pi - diff
 		}
 
-		t.Errorf("%s: got %.15g rad, want %.15g rad (angle tol %.3g rad, shortest diff %.3g rad)",
+		tb.Errorf("%s: got %.15g rad, want %.15g rad (angle tol %.3g rad, shortest diff %.3g rad)",
 			label, got, want, tol, diff)
 	}
 }
@@ -109,11 +109,11 @@ func AssertAngleNear(t testing.TB, label string, got, want, tol float64) {
 // AssertExact fails t if got != want.
 // Use only when exact bit-level equality is mathematically guaranteed
 // (e.g. integer Julian day round-trips).
-func AssertExact(t testing.TB, label string, got, want float64) {
-	t.Helper()
+func AssertExact(tb testing.TB, label string, got, want float64) {
+	tb.Helper()
 
 	if got != want {
-		t.Errorf("%s: got %.15g, want %.15g (expected exact equality)", label, got, want)
+		tb.Errorf("%s: got %.15g, want %.15g (expected exact equality)", label, got, want)
 	}
 }
 

@@ -1,3 +1,4 @@
+// Package main implements the download tool.
 package main
 
 import (

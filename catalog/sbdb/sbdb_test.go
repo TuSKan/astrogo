@@ -22,8 +22,9 @@ func TestSBDBResolver(t *testing.T) {
 		}
 	}`
 
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
+
 		if _, err := fmt.Fprint(w, jsonData); err != nil {
 			t.Errorf("failed to write response: %v", err)
 		}

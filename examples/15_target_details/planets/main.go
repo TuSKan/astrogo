@@ -1,3 +1,4 @@
+// Package main demonstrates planet target details.
 package main
 
 import (

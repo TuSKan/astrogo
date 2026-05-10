@@ -1,3 +1,4 @@
+// Package main demonstrates geometry event detection.
 package main
 
 import (
@@ -23,7 +24,8 @@ func main() {
 		log.Fatalf("failed to load jpl de442: %v", err)
 	}
 	defer func() {
-		if err := prov.Close(); err != nil {
+		err := prov.Close()
+		if err != nil {
 			log.Printf("failed to close provider: %v", err)
 		}
 	}()

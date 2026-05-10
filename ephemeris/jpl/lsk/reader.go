@@ -22,22 +22,35 @@ var (
 	ErrInvalidMonth  = errors.New("invalid month")
 )
 
-const JPL_LSK_KERNEL_URI = "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/"
+// JPLLSKKernelURI is the base URL for the JPL LSK kernel.
+const JPLLSKKernelURI = "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/"
 
+// Reader is a reader for the JPL LSK kernel.
 type Reader struct {
 	F       io.ReadCloser
 	DeltaAt []LeapData
 }
 
+// Cache downloads an LSK file if it doesn't exist and opens it.
+//
+// It provides an auto-healing mechanism for CI environments by automatically
+// removing corrupt or truncated files.
+//
+// If the file is incomplete or its metadata is invalid, the function:
+//  1. Closes the file handle.
+//  2. Removes the corrupt file from the filesystem.
+//  3. Returns the error wrapped with a descriptive message.
 func Cache(kernel, path string) (*Reader, error) {
 	lskPath := filepath.Join(path, kernel)
 
-	if err := os.MkdirAll(filepath.Dir(lskPath), 0o755); err != nil {
+	err := os.MkdirAll(filepath.Dir(lskPath), 0o755)
+	if err != nil {
 		return nil, fmt.Errorf("jpl: failed to create parent dir for LSK %s: %w", lskPath, err)
 	}
 
-	if _, err := os.Stat(lskPath); os.IsNotExist(err) {
-		lskURI := JPL_LSK_KERNEL_URI + kernel
+	_, err = os.Stat(lskPath)
+	if os.IsNotExist(err) {
+		lskURI := JPLLSKKernelURI + kernel
 
 		err := tools.Download(lskURI, lskPath)
 		if err != nil {
@@ -53,6 +66,7 @@ func Cache(kernel, path string) (*Reader, error) {
 	return NewReader(ls)
 }
 
+// NewReader parses an LSK kernel from the given reader.
 func NewReader(r io.ReadCloser) (*Reader, error) {
 	l := &Reader{}
 	scanner := bufio.NewScanner(r)
@@ -68,9 +82,11 @@ func NewReader(r io.ReadCloser) (*Reader, error) {
 			}
 		}
 
-		if inDeltaAt && strings.Contains(line, ")") {
-			inDeltaAt = false
-			line = line[:strings.Index(line, ")")]
+		if inDeltaAt {
+			if idx := strings.Index(line, ")"); idx >= 0 {
+				inDeltaAt = false
+				line = line[:idx]
+			}
 		}
 
 		if inDeltaAt || (line != "" && !inDeltaAt && strings.HasPrefix(line, "@")) {
@@ -99,18 +115,25 @@ func NewReader(r io.ReadCloser) (*Reader, error) {
 	return l, nil
 }
 
+// Close closes the underlying file reader.
 func (r *Reader) Close() error {
-	if err := r.F.Close(); err != nil {
+	err := r.F.Close()
+	if err != nil {
 		return fmt.Errorf("lsk: close: %w", err)
 	}
 
 	return nil
 }
 
+// LeapData represents a leapsecond correction entry.
 type LeapData struct {
 	JD, N float64
 }
 
+// parseSpiceDate parses a SPICE date string into a Julian Date.
+//
+// The format is "@YYYY-MMM-DD" or "@YYYY-MMM".
+// Example: "@2016-JAN-01"
 func parseSpiceDate(s string) (float64, error) {
 	s = strings.TrimPrefix(s, "@")
 
@@ -148,10 +171,10 @@ func parseSpiceDate(s string) (float64, error) {
 	return jd, nil
 }
 
-func (l *Reader) leapSecondsAt(jdTDB float64) float64 {
+func (r *Reader) leapSecondsAt(jdTDB float64) float64 {
 	lastN := 0.0
 
-	for _, d := range l.DeltaAt {
+	for _, d := range r.DeltaAt {
 		if jdTDB < d.JD {
 			break
 		}
@@ -162,6 +185,12 @@ func (l *Reader) leapSecondsAt(jdTDB float64) float64 {
 	return lastN
 }
 
+// UTCToTDB converts a time.Time to a Julian Date in the Barycentric Dynamical
+// Time (TDB) scale.
+//
+// The conversion formula used is:
+// TDB = UTC + (LS + 32.184) / 86400.0
+// where LS is the number of leap seconds at the given time.
 func UTCToTDB(t time.Time, l *Reader) float64 {
 	d1, d2 := t.JDParts()
 	if t.Scale() == time.TDB {
@@ -174,6 +203,7 @@ func UTCToTDB(t time.Time, l *Reader) float64 {
 	return jdUTC + (ls+32.184)/86400.0
 }
 
+// TDBToET converts a Julian Date in TDB to elapsed seconds past J2000.
 func TDBToET(jdTDB float64) float64 {
 	return (jdTDB - 2451545.0) * 86400.0
 }

@@ -79,9 +79,7 @@ func TestFindRoot_SineFunction(t *testing.T) {
 	// f(x) = sin(x) → root at x = π ≈ 3.14159..., bracket [2, 4]
 	s := tightSolver()
 
-	root, fval, err := s.FindRoot(timeFunc(func(x float64) float64 {
-		return math.Sin(x)
-	}), after(2), after(4))
+	root, fval, err := s.FindRoot(timeFunc(math.Sin), after(2), after(4))
 	if err != nil {
 		t.Fatalf("FindRoot failed: %v", err)
 	}
@@ -246,9 +244,7 @@ func TestFindExtremum_CosineMinimum(t *testing.T) {
 	// f(x) = cos(x) → minimum at x = π ≈ 3.14159...
 	s := tightSolver()
 
-	minT, minVal, err := s.FindExtremum(timeFunc(func(x float64) float64 {
-		return math.Cos(x)
-	}), after(2), after(4), false)
+	minT, minVal, err := s.FindExtremum(timeFunc(math.Cos), after(2), after(4), false)
 	if err != nil {
 		t.Fatalf("FindExtremum failed: %v", err)
 	}

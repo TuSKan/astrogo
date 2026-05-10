@@ -507,7 +507,7 @@ Category 5: Lag Time
 //	if err != nil { ... }
 //	result := p.EvaluateAll()
 //	fmt.Println(result.String())
-func NewCrescentParams(t time.Time, loc *coord.Geodetic, prov eph.Provider) (CrescentParams, error) {
+func NewCrescentParams(t time.Time, loc *coord.Geodetic, prov eph.Provider) (CrescentParams, error) { //nolint:funcorder // constructor after criteria methods for readability
 	// Get geocentric ICRS positions for Sun and Moon
 	sunPos, err := eph.Position(prov, eph.Sun, t)
 	if err != nil {

@@ -117,10 +117,10 @@ type mockLinearProvider struct {
 	vel      vector.Vec3
 }
 
-func (m *mockLinearProvider) State(id eph.ID, t time.Time) (eph.State, error) {
-	jd1_req, jd2_req := t.JDParts()
-	jd1_base, jd2_base := m.baseTime.JDParts()
-	dtDays := (jd1_req - jd1_base) + (jd2_req - jd2_base)
+func (m *mockLinearProvider) State(_ eph.ID, t time.Time) (eph.State, error) {
+	jd1Req, jd2Req := t.JDParts()
+	jd1Base, jd2Base := m.baseTime.JDParts()
+	dtDays := (jd1Req - jd1Base) + (jd2Req - jd2Base)
 
 	p := m.pos.Add(m.vel.MulScalar(dtDays))
 
@@ -213,6 +213,7 @@ func TestApparentState_MatchesManualLightTimeIteration(t *testing.T) {
 	}
 }
 
+//nolint:dupl // shares structure with DistantObject test but uses different mock parameters.
 func TestApparentState_LightTimeActuallyChangesResult(t *testing.T) {
 	tm := time.Date(2026, 4, 5, 0, 0, 0, 0, time.LocationUTC)
 
@@ -244,6 +245,7 @@ func TestApparentState_LightTimeActuallyChangesResult(t *testing.T) {
 	}
 }
 
+//nolint:dupl // shares structure with LightTime test but uses different mock parameters.
 func TestApparentState_DistantObjectHasTinyCorrection(t *testing.T) {
 	tm := time.Date(2026, 4, 5, 0, 0, 0, 0, time.LocationUTC)
 

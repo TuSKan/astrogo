@@ -86,40 +86,46 @@ func (u Unit) String() string {
 //
 //nolint:gochecknoglobals // SI/IAU units are inherently package-level constants
 var (
-	// Length (SI)
-	Meter      = Unit{Dimension: Length, ScaleFactor: 1.0, Name: "meter", Symbol: "m"}
-	Kilometer  = Unit{Dimension: Length, ScaleFactor: 1000.0, Name: "kilometer", Symbol: "km"}
+	// Meter is the SI base unit of length.
+	Meter = Unit{Dimension: Length, ScaleFactor: 1.0, Name: "meter", Symbol: "m"}
+	// Kilometer is 1000 metres.
+	Kilometer = Unit{Dimension: Length, ScaleFactor: 1000.0, Name: "kilometer", Symbol: "km"}
+	// Millimeter is 0.001 metres.
 	Millimeter = Unit{Dimension: Length, ScaleFactor: 1e-3, Name: "millimeter", Symbol: "mm"}
 
-	// Astronomical length
-	// 1 AU = 1.495978707e11 m (IAU 2012 nominal)
+	// AstronomicalUnit is 1 AU = 1.495978707e11 m (IAU 2012 nominal).
 	AstronomicalUnit = Unit{Dimension: Length, ScaleFactor: 1.495978707e11, Name: "astronomical unit", Symbol: "AU"}
-	// 1 pc = 648000/π AU
+	// Parsec is 1 pc = 648000/π AU.
 	Parsec = Unit{Dimension: Length, ScaleFactor: 3.085677581491367e16, Name: "parsec", Symbol: "pc"}
-	// 1 ly = 9.4607304725808e15 m
+	// LightYear is 1 ly = 9.4607304725808e15 m.
 	LightYear = Unit{Dimension: Length, ScaleFactor: 9.4607304725808e15, Name: "light-year", Symbol: "ly"}
 
-	// Mass
-	Gram     = Unit{Dimension: Mass, ScaleFactor: 1e-3, Name: "gram", Symbol: "g"}
+	// Gram is 0.001 kilograms.
+	Gram = Unit{Dimension: Mass, ScaleFactor: 1e-3, Name: "gram", Symbol: "g"}
+	// Kilogram is the SI base unit of mass.
 	Kilogram = Unit{Dimension: Mass, ScaleFactor: 1.0, Name: "kilogram", Symbol: "kg"}
 
-	// Time
+	// Second is the SI base unit of time.
 	Second = Unit{Dimension: Time, ScaleFactor: 1.0, Name: "second", Symbol: "s"}
+	// Minute is 60 seconds.
 	Minute = Unit{Dimension: Time, ScaleFactor: 60.0, Name: "minute", Symbol: "min"}
-	Hour   = Unit{Dimension: Time, ScaleFactor: 3600.0, Name: "hour", Symbol: "h"}
-	Day    = Unit{Dimension: Time, ScaleFactor: 86400.0, Name: "day", Symbol: "d"}
+	// Hour is 3600 seconds.
+	Hour = Unit{Dimension: Time, ScaleFactor: 3600.0, Name: "hour", Symbol: "h"}
+	// Day is 86400 seconds.
+	Day = Unit{Dimension: Time, ScaleFactor: 86400.0, Name: "day", Symbol: "d"}
 
-	// Angle (Dimensionless)
-	Radian    = Unit{Dimension: Dimensionless, ScaleFactor: 1.0, Name: "radian", Symbol: "rad"}
-	Degree    = Unit{Dimension: Dimensionless, ScaleFactor: math.Pi / 180.0, Name: "degree", Symbol: "deg"}
+	// Radian is the SI unit of angle (dimensionless).
+	Radian = Unit{Dimension: Dimensionless, ScaleFactor: 1.0, Name: "radian", Symbol: "rad"}
+	// Degree is π/180 radians.
+	Degree = Unit{Dimension: Dimensionless, ScaleFactor: math.Pi / 180.0, Name: "degree", Symbol: "deg"}
+	// Arcminute is 1/60 of a degree.
 	Arcminute = Unit{Dimension: Dimensionless, ScaleFactor: math.Pi / (180.0 * 60.0), Name: "arcminute", Symbol: "arcmin"}
+	// Arcsecond is 1/3600 of a degree.
 	Arcsecond = Unit{Dimension: Dimensionless, ScaleFactor: math.Pi / (180.0 * 3600.0), Name: "arcsecond", Symbol: "arcsec"}
 
-	// Temperature
+	// Kelvin is the SI base unit of thermodynamic temperature.
 	Kelvin = Unit{Dimension: Temperature, ScaleFactor: 1.0, Name: "kelvin", Symbol: "K"}
 
-	// Flux density (spectral)
-	// 1 Jy = 1e-26 W / (m^2 Hz) = 1e-26 kg / s^2
-	// Dimension: M * T^-2 (Spectral Flux Density in SI base units)
+	// Jansky is 1e-26 W/(m²·Hz), the standard unit of spectral flux density.
 	Jansky = Unit{Dimension: SpectralFlux, ScaleFactor: 1e-26, Name: "jansky", Symbol: "Jy"}
 )

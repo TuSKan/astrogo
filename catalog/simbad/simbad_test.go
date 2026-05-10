@@ -17,8 +17,10 @@ func TestParseCSV(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to open test fixture: %v", err)
 	}
+
 	t.Cleanup(func() {
-		if err := f.Close(); err != nil {
+		err := f.Close()
+		if err != nil {
 			t.Errorf("failed to close file: %v", err)
 		}
 	})
@@ -114,7 +116,7 @@ func (m *mockTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 func TestRetryTimeout(t *testing.T) {
 	attempts := 0
 
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		attempts++
 
 		w.WriteHeader(http.StatusTooManyRequests)
@@ -134,7 +136,7 @@ func TestRetryTimeout(t *testing.T) {
 	req := resolve.ObjectRequest{Query: "test"}
 	iter := p.ResolveObject(ctx, req)
 
-	iter(func(tgt resolve.Target, err error) bool {
+	iter(func(_ resolve.Target, err error) bool {
 		if err == nil {
 			t.Errorf("expected error, got nil")
 		}
@@ -152,8 +154,10 @@ func TestParseEmptyCSV(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to open test fixture: %v", err)
 	}
+
 	t.Cleanup(func() {
-		if err := f.Close(); err != nil {
+		err := f.Close()
+		if err != nil {
 			t.Errorf("failed to close file: %v", err)
 		}
 	})
@@ -173,8 +177,10 @@ func TestParseMalformedCSV(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to open test fixture: %v", err)
 	}
+
 	t.Cleanup(func() {
-		if err := f.Close(); err != nil {
+		err := f.Close()
+		if err != nil {
 			t.Errorf("failed to close file: %v", err)
 		}
 	})

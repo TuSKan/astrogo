@@ -1,4 +1,3 @@
-// Package jpl provides an ephemeris provider using JPL SPK/LSK kernels.
 package jpl
 
 import (
@@ -19,23 +18,27 @@ import (
 
 // Sentinel errors for JPL provider.
 var (
-	ErrNotImplemented   = errors.New("jpl: source not implemented")
-	ErrUnknownSource    = errors.New("jpl: unknown source")
-	ErrRecursionDepth   = errors.New("jpl: recursion depth exceeded")
-	ErrNilKernel        = errors.New("jpl: kernel is nil")
+	ErrNotImplemented = errors.New("jpl: source not implemented")
+	ErrUnknownSource  = errors.New("jpl: unknown source")
+	ErrRecursionDepth = errors.New("jpl: recursion depth exceeded")
+	ErrNilKernel      = errors.New("jpl: kernel is nil")
 )
 
 const (
-	JPL_KERNEL_URI = "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/"
-	KM_PER_AU      = 149597870.7
+	// JPLKernelURI is the base URI for JPL kernels.
+	JPLKernelURI = "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/"
+	// KMPerAU is the number of kilometers per astronomical unit.
+	KMPerAU = 149597870.7
 )
 
+// BodyIDToNAIF maps core.ID to NAIF integer IDs.
 var BodyIDToNAIF = map[core.ID]int{
 	core.Sun: 10, core.Moon: 301, core.Mercury: 199, core.Venus: 299,
 	core.Earth: 399, core.Mars: 4, core.Jupiter: 5, core.Saturn: 6,
 	core.Uranus: 7, core.Neptune: 8,
 }
 
+// ErrNoSegment is returned when no segment is found for the target at the requested epoch.
 var ErrNoSegment = errors.New("jpl: no coverage for target at requested epoch")
 
 // Kernel represents a single SPK file and its metadata.
@@ -71,12 +74,15 @@ type Provider struct {
 	Index            []SegmentRef
 }
 
+// Option configures a Provider.
 type Option func(*Provider)
 
+// WithDataDir sets the directory where kernels are stored.
 func WithDataDir(dataDir string) Option {
 	return func(p *Provider) { p.DataDir = dataDir }
 }
 
+// WithTimeInterval sets the time interval for which the provider is valid.
 func WithTimeInterval(start, end time.Time) Option {
 	return func(p *Provider) {
 		p.startTime = start
@@ -213,48 +219,16 @@ func (p *Provider) State(id core.ID, t time.Time) (core.State, error) {
 	// Convert to AU and AU/day
 	return core.State{
 		Pos: vector.Vec3{
-			X: relPos.X / KM_PER_AU,
-			Y: relPos.Y / KM_PER_AU,
-			Z: relPos.Z / KM_PER_AU,
+			X: relPos.X / KMPerAU,
+			Y: relPos.Y / KMPerAU,
+			Z: relPos.Z / KMPerAU,
 		},
 		Vel: vector.Vec3{
-			X: relVel.X * 86400 / KM_PER_AU,
-			Y: relVel.Y * 86400 / KM_PER_AU,
-			Z: relVel.Z * 86400 / KM_PER_AU,
+			X: relVel.X * 86400 / KMPerAU,
+			Y: relVel.Y * 86400 / KMPerAU,
+			Z: relVel.Z * 86400 / KMPerAU,
 		},
 	}, nil
-}
-
-func (p *Provider) evaluateRecursive(targetID int32, et float64, baseID int32) (core.State, error) {
-	currentID := targetID
-
-	var totalPos, totalVel vector.Vec3
-
-	// Limit depth to prevent infinite loops (though SPK trees should be shallow)
-	for range 10 {
-		if currentID == baseID {
-			return core.State{Pos: totalPos, Vel: totalVel}, nil
-		}
-
-		ref, err := p.FindSegment(currentID, et)
-		if err != nil {
-			return core.State{}, err
-		}
-
-		k := p.Kernels[ref.KernelIndex]
-		s := &k.Segments[ref.SegmentIndex]
-
-		pos, vel, err := spk.EvaluateSegment(s, k.Reader, et)
-		if err != nil {
-			return core.State{}, fmt.Errorf("jpl: evaluate segment: %w", err)
-		}
-
-		totalPos = totalPos.Add(pos)
-		totalVel = totalVel.Add(vel)
-		currentID = s.Center
-	}
-
-	return core.State{}, fmt.Errorf("%w: target %d", ErrRecursionDepth, targetID)
 }
 
 // AddKernel opens an SPK file and adds its segments to the provider index.
@@ -313,6 +287,7 @@ func (p *Provider) AddKernel(k *spk.Reader) error {
 	return nil
 }
 
+// FindSegment finds the appropriate segment for a target at a given time.
 func (p *Provider) FindSegment(target int32, et float64) (*SegmentRef, error) {
 	// Fast failure path 1: target not loaded
 	refs, ok := p.ByTarget[target]
@@ -347,11 +322,6 @@ func (p *Provider) FindSegment(target int32, et float64) (*SegmentRef, error) {
 	return nil, ErrNoSegment
 }
 
-// segment dereferences a SegmentRef to the actual spk.Segment.
-func (p *Provider) segment(ref SegmentRef) *spk.Segment {
-	return &p.Kernels[ref.KernelIndex].Segments[ref.SegmentIndex]
-}
-
 // SupportedBodies returns a list of body IDs available in the loaded kernels.
 func (p *Provider) SupportedBodies() []core.ID {
 	seen := make(map[core.ID]bool)
@@ -380,4 +350,43 @@ func (p *Provider) SupportedBodies() []core.ID {
 	}
 
 	return res
+}
+
+// evaluateRecursive evaluates the state of a target body at a given time.
+// It recursively evaluates the state of the target body at a given time.
+func (p *Provider) evaluateRecursive(targetID int32, et float64, baseID int32) (core.State, error) {
+	currentID := targetID
+
+	var totalPos, totalVel vector.Vec3
+
+	// Limit depth to prevent infinite loops (though SPK trees should be shallow)
+	for range 10 {
+		if currentID == baseID {
+			return core.State{Pos: totalPos, Vel: totalVel}, nil
+		}
+
+		ref, err := p.FindSegment(currentID, et)
+		if err != nil {
+			return core.State{}, err
+		}
+
+		k := p.Kernels[ref.KernelIndex]
+		s := &k.Segments[ref.SegmentIndex]
+
+		pos, vel, err := spk.EvaluateSegment(s, k.Reader, et)
+		if err != nil {
+			return core.State{}, fmt.Errorf("jpl: evaluate segment: %w", err)
+		}
+
+		totalPos = totalPos.Add(pos)
+		totalVel = totalVel.Add(vel)
+		currentID = s.Center
+	}
+
+	return core.State{}, fmt.Errorf("%w: target %d", ErrRecursionDepth, targetID)
+}
+
+// segment dereferences a SegmentRef to the actual spk.Segment.
+func (p *Provider) segment(ref SegmentRef) *spk.Segment {
+	return &p.Kernels[ref.KernelIndex].Segments[ref.SegmentIndex]
 }

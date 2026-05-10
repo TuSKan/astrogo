@@ -229,11 +229,16 @@ func checksumTLE(line string) int {
 type QueryType string
 
 const (
-	QueryCatNr   QueryType = "CATNR"   // Catalog Number (1–9 digits)
-	QueryIntDes  QueryType = "INTDES"  // International Designator (yyyy-nnn)
-	QueryGroup   QueryType = "GROUP"   // CelestTrak satellite group
-	QueryName    QueryType = "NAME"    // Satellite name search
-	QuerySpecial QueryType = "SPECIAL" // Special datasets (GPZ, DECAYING)
+	// QueryCatNr queries by NORAD catalog number (1–9 digits).
+	QueryCatNr QueryType = "CATNR"
+	// QueryIntDes queries by international designator (yyyy-nnn).
+	QueryIntDes QueryType = "INTDES"
+	// QueryGroup queries by CelestTrak satellite group.
+	QueryGroup QueryType = "GROUP"
+	// QueryName queries by satellite name.
+	QueryName QueryType = "NAME"
+	// QuerySpecial queries special datasets (GPZ, DECAYING).
+	QuerySpecial QueryType = "SPECIAL"
 )
 
 // Well-known CelestTrak GROUP values.
@@ -327,7 +332,8 @@ func (p *Provider) Fetch(ctx context.Context, query QueryType, value string) (_ 
 		return nil, fmt.Errorf("norad: fetch failed: %w", err)
 	}
 	defer func() {
-		if cerr := resp.Body.Close(); cerr != nil {
+		cerr := resp.Body.Close()
+		if cerr != nil {
 			err = errors.Join(err, cerr)
 		}
 	}()

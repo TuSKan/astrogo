@@ -1,3 +1,4 @@
+// Package main demonstrates coordinate system conversions.
 package main
 
 import (

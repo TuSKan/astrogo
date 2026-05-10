@@ -17,7 +17,7 @@ func TestVizierOfflineConeSearch(t *testing.T) {
 10.684,41.269,OBJ1
 `
 
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "text/csv")
 
 		if _, err := fmt.Fprint(w, csvData); err != nil {
@@ -90,7 +90,7 @@ func TestProviderInterface(t *testing.T) {
 
 	// This validates missing coverage on the parseCSV empty conditions
 	iter := p.ConeSearch(context.Background(), resolve.ConeRequest{})
-	iter(func(target resolve.Target, err error) bool {
+	iter(func(_ resolve.Target, _ error) bool {
 		return false
 	})
 }

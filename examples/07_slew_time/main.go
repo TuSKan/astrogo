@@ -1,3 +1,4 @@
+// Package main demonstrates telescope slew time calculation.
 package main
 
 import (

@@ -16,14 +16,14 @@ type mockObject struct {
 	pos coord.ICRS
 }
 
-func (m mockObject) ICRS(t time.Time) (coord.ICRS, error) {
+func (m mockObject) ICRS(_ time.Time) (coord.ICRS, error) {
 	return m.pos, nil
 }
 
 func (m mockObject) Name() string                             { return "mock" }
-func (m mockObject) Position(t time.Time) (coord.ICRS, error) { return m.pos, nil }
-func (m mockObject) GetDetails(ctx *coord.Context, props ...string) (*TargetDetails, error) {
-	return nil, nil
+func (m mockObject) Position(_ time.Time) (coord.ICRS, error) { return m.pos, nil }
+func (m mockObject) GetDetails(_ *coord.Context, _ ...string) (*TargetDetails, error) {
+	return &TargetDetails{}, nil
 }
 
 func TestIsVisible(t *testing.T) {

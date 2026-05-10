@@ -16,10 +16,14 @@ import (
 type MoonPhase int
 
 const (
-	PhaseNewMoon      MoonPhase = iota // Sun-Moon elongation = 0°
-	PhaseFirstQuarter                  // Sun-Moon elongation = 90°
-	PhaseFullMoon                      // Sun-Moon elongation = 180°
-	PhaseLastQuarter                   // Sun-Moon elongation = 270°
+	// PhaseNewMoon is Sun-Moon elongation = 0°.
+	PhaseNewMoon MoonPhase = iota
+	// PhaseFirstQuarter is Sun-Moon elongation = 90°.
+	PhaseFirstQuarter
+	// PhaseFullMoon is Sun-Moon elongation = 180°.
+	PhaseFullMoon
+	// PhaseLastQuarter is Sun-Moon elongation = 270°.
+	PhaseLastQuarter
 )
 
 func (p MoonPhase) String() string {
@@ -167,10 +171,14 @@ func phaseEvaluator(target float64, prov eph.Provider) Evaluator {
 type Season int
 
 const (
-	SeasonVernalEquinox   Season = iota // Sun ecliptic longitude = 0°
-	SeasonSummerSolstice                // Sun ecliptic longitude = 90°
-	SeasonAutumnalEquinox               // Sun ecliptic longitude = 180°
-	SeasonWinterSolstice                // Sun ecliptic longitude = 270°
+	// SeasonVernalEquinox is when Sun ecliptic longitude = 0°.
+	SeasonVernalEquinox Season = iota
+	// SeasonSummerSolstice is when Sun ecliptic longitude = 90°.
+	SeasonSummerSolstice
+	// SeasonAutumnalEquinox is when Sun ecliptic longitude = 180°.
+	SeasonAutumnalEquinox
+	// SeasonWinterSolstice is when Sun ecliptic longitude = 270°.
+	SeasonWinterSolstice
 )
 
 func (s Season) String() string {
@@ -352,8 +360,10 @@ func MoonIllumination(t time.Time, prov eph.Provider) (fraction float64, phaseAn
 type Apsis int
 
 const (
-	ApsisPerihelion Apsis = iota // Closest approach to the Sun
-	ApsisAphelion                // Farthest point from the Sun
+	// ApsisPerihelion is the closest approach to the Sun.
+	ApsisPerihelion Apsis = iota
+	// ApsisAphelion is the farthest point from the Sun.
+	ApsisAphelion
 )
 
 func (a Apsis) String() string {
@@ -426,7 +436,9 @@ func Apsides(year int, prov eph.Provider) ([]ApsisEvent, error) {
 type EclipseType int
 
 const (
+	// EclipseLunar is when the Moon passes through Earth's shadow.
 	EclipseLunar EclipseType = iota
+	// EclipseSolar is when the Moon passes between Earth and Sun.
 	EclipseSolar
 )
 
@@ -534,6 +546,8 @@ func moonSunSeparation(t time.Time, prov eph.Provider) (float64, error) {
 // The eclipse time is refined to the moment of minimum Moon–anti-Sun angular
 // separation (time of greatest eclipse). The Gamma field indicates how central
 // the eclipse is (0 = perfectly central, 1 = at the limit).
+//
+//nolint:dupl // shares structure with SolarEclipses but differs in phase filter and separation function.
 func LunarEclipses(start, end time.Time, prov eph.Provider) ([]EclipseEvent, error) {
 	const penumbralLimit = 1.58 // degrees
 
@@ -590,6 +604,8 @@ func LunarEclipses(start, end time.Time, prov eph.Provider) ([]EclipseEvent, err
 // The eclipse time is refined to the moment of minimum Moon–Sun angular
 // separation (time of greatest eclipse). The Gamma field indicates how central
 // the eclipse is (0 = perfectly central, 1 = at the limit).
+//
+//nolint:dupl // shares structure with LunarEclipses but differs in phase filter and separation function.
 func SolarEclipses(start, end time.Time, prov eph.Provider) ([]EclipseEvent, error) {
 	const partialLimit = 1.58 // degrees
 

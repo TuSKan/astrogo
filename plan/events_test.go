@@ -116,7 +116,7 @@ func TestSunEvents(t *testing.T) {
 	hasRise, hasSet, hasTransit := false, false, false
 
 	for _, e := range events {
-		switch e.Kind {
+		switch e.Kind { //nolint:exhaustive // only rise/set/transit tested
 		case EventRise:
 			hasRise = true
 
@@ -331,8 +331,8 @@ func (m *mockLinearTarget) Constraints() []Constraint { return nil }
 func (m *mockLinearTarget) Catalog() string           { return "MOCK" }
 func (m *mockLinearTarget) ID() string                { return "Linear" }
 func (m *mockLinearTarget) Name() string              { return "LinearName" }
-func (m *mockLinearTarget) GetDetails(ctx *coord.Context, props ...string) (*TargetDetails, error) {
-	return nil, nil
+func (m *mockLinearTarget) GetDetails(_ *coord.Context, _ ...string) (*TargetDetails, error) {
+	return &TargetDetails{}, nil
 }
 
 func TestSolveGeometry_Conjunction(t *testing.T) {
@@ -412,8 +412,8 @@ func (m *mockParabolicTarget) Constraints() []Constraint { return nil }
 func (m *mockParabolicTarget) Catalog() string           { return "MOCK" }
 func (m *mockParabolicTarget) ID() string                { return "Para" }
 func (m *mockParabolicTarget) Name() string              { return "ParaName" }
-func (m *mockParabolicTarget) GetDetails(ctx *coord.Context, props ...string) (*TargetDetails, error) {
-	return nil, nil
+func (m *mockParabolicTarget) GetDetails(_ *coord.Context, _ ...string) (*TargetDetails, error) {
+	return &TargetDetails{}, nil
 }
 
 func TestSolveGeometry_GreatestElongation(t *testing.T) {
@@ -425,14 +425,14 @@ func TestSolveGeometry_GreatestElongation(t *testing.T) {
 		k: 15.0,
 	}
 
-	t1_pos := func(t time.Time) (coord.ICRS, error) {
+	t1Pos := func(t time.Time) (coord.ICRS, error) {
 		hours := float64(t.Sub(time.FromJD(2451545.0, time.UTC)).Hours())
 		dec := t1.a*(hours-t1.h)*(hours-t1.h) + t1.k
 
 		return coord.NewICRS(angle.Deg(20), angle.Deg(dec)), nil
 	}
 
-	wrapper := &mockDynamicTarget{f: t1_pos}
+	wrapper := &mockDynamicTarget{f: t1Pos}
 
 	start := time.FromJD(2451545.0, time.UTC)
 	end := start.Add(12 * time.Hour)
@@ -466,6 +466,6 @@ func (m *mockDynamicTarget) Constraints() []Constraint                { return n
 func (m *mockDynamicTarget) Catalog() string                          { return "DYN" }
 func (m *mockDynamicTarget) ID() string                               { return "Dyn" }
 func (m *mockDynamicTarget) Name() string                             { return "DynName" }
-func (m *mockDynamicTarget) GetDetails(ctx *coord.Context, props ...string) (*TargetDetails, error) {
-	return nil, nil
+func (m *mockDynamicTarget) GetDetails(_ *coord.Context, _ ...string) (*TargetDetails, error) {
+	return &TargetDetails{}, nil
 }

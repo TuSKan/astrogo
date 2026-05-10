@@ -20,8 +20,10 @@ import (
 // API: https://ssd-api.jpl.nasa.gov/horizons.api
 // SELECT: https://ssd.jpl.nasa.gov/horizons/manual.html#select
 
-const JPL_HORIZONS_API = "https://ssd.jpl.nasa.gov/api/horizons.api"
+// JPLHorizonsAPI is the base URL for the JPL Horizons API.
+const JPLHorizonsAPI = "https://ssd.jpl.nasa.gov/api/horizons.api"
 
+// HorizonsResult is a single result from the Horizons API.
 type HorizonsResult struct {
 	ID          string   `json:"id"`
 	Name        string   `json:"name"`
@@ -29,6 +31,7 @@ type HorizonsResult struct {
 	Aliases     []string `json:"aliases"`
 }
 
+// HorizonsResponse is the response from the Horizons API.
 type HorizonsResponse struct {
 	Result    string `json:"result"`
 	Signature struct {
@@ -39,6 +42,15 @@ type HorizonsResponse struct {
 	SpkFileID string `json:"spk_file_id"`
 }
 
+// CacheAPI caches an SPK file from JPL Horizons if it doesn't exist.
+//
+// It automatically handles:
+// - Directory creation
+// - File existence check
+// - Base64 decoding
+// - File writing
+// - Reader creation
+// - Error handling
 func CacheAPI(kernel string, startTime, endTime time.Time, path string) ([]*Reader, error) {
 	var readers []*Reader
 
@@ -120,7 +132,7 @@ func CacheAPI(kernel string, startTime, endTime time.Time, path string) ([]*Read
 }
 
 func apiHorizonsRequest(command string, startTime, endTime time.Time) (_ *HorizonsResponse, err error) {
-	api, err := url.Parse(JPL_HORIZONS_API)
+	api, err := url.Parse(JPLHorizonsAPI)
 	if err != nil {
 		return nil, fmt.Errorf("jpl: failed to parse API URL: %w", err)
 	}

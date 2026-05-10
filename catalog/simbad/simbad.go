@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"strings"
 
@@ -82,7 +83,7 @@ func (p *Provider) Search(query string) []resolve.Target {
 
 	iter(func(t resolve.Target, err error) bool {
 		if err != nil {
-			fmt.Printf("SIMBAD ERR: %v\n", err)
+			log.Printf("SIMBAD ERR: %v", err)
 			return false
 		}
 
@@ -123,7 +124,8 @@ func (p *Provider) ResolveObject(ctx context.Context, req resolve.ObjectRequest)
 			return
 		}
 		defer func() {
-			if cerr := resp.Body.Close(); cerr != nil {
+			cerr := resp.Body.Close()
+			if cerr != nil {
 				yield(resolve.Target{}, cerr)
 			}
 		}()

@@ -1,3 +1,4 @@
+// Package main demonstrates target visibility analysis.
 package main
 
 import (

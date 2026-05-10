@@ -22,7 +22,7 @@ var catalogFS embed.FS
 
 var data []byte
 
-func init() {
+func init() { //nolint:gochecknoinits // loads embedded catalog data
 	// Dynamically attempt to load the catalog buffer if the user generated it locally.
 	// Bypasses the strict compiler block when ignored in CI.
 	d, err := catalogFS.ReadFile("data/openngc.csv")
@@ -47,6 +47,7 @@ type Provider struct {
 	targets []resolve.Target
 }
 
+// New creates a new OpenNGC catalog provider from embedded data.
 func New() *Provider {
 	targets, err := parseCSV(data)
 	if err != nil {
@@ -72,8 +73,10 @@ func New() *Provider {
 	return p
 }
 
+// Name returns the provider identifier.
 func (p *Provider) Name() string { return "openngc" }
 
+// Resolve performs exact-match resolution for a query.
 func (p *Provider) Resolve(query string) (resolve.Target, bool) {
 	q := resolve.Normalize(query)
 	if idx, ok := p.byKey[q]; ok {
@@ -83,6 +86,7 @@ func (p *Provider) Resolve(query string) (resolve.Target, bool) {
 	return resolve.Target{}, false
 }
 
+// Search performs fuzzy search across all NGC/IC objects.
 func (p *Provider) Search(query string) []resolve.Target {
 	q := resolve.Normalize(query)
 	if q == "" {

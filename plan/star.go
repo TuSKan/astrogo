@@ -61,8 +61,12 @@ func NewStar(name string, ra, dec angle.Angle, opts ...StarOption) *Star {
 	return s
 }
 
-func (s *Star) Name() string { return s.name }
+// Name returns the star name.
+func (s *Star) Name() string {
+	return s.name
+}
 
+// Position returns the star position.
 func (s *Star) Position(_ time.Time) (coord.ICRS, error) {
 	hasPM := s.pmRA.Radians() != 0 || s.pmDec.Radians() != 0
 
@@ -78,6 +82,7 @@ func (s *Star) Position(_ time.Time) (coord.ICRS, error) {
 	return s.coord, nil
 }
 
+// GetDetails returns the target details.
 func (s *Star) GetDetails(ctx *coord.Context, props ...string) (*TargetDetails, error) {
 	return computeDetails(s, ctx, props...)
 }

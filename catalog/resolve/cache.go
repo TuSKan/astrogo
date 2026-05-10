@@ -113,15 +113,15 @@ func ToRecordBatch(items []Target) arrow.RecordBatch {
 	b := array.NewRecordBuilder(mem, TargetSchema)
 	defer b.Release()
 
-	idB := b.Field(0).(*array.StringBuilder)
-	nameB := b.Field(1).(*array.StringBuilder)
-	desigB := b.Field(2).(*array.StringBuilder)
-	spkB := b.Field(3).(*array.StringBuilder)
-	kindB := b.Field(4).(*array.StringBuilder)
-	catB := b.Field(5).(*array.StringBuilder)
-	raB := b.Field(6).(*array.Float64Builder)
-	decB := b.Field(7).(*array.Float64Builder)
-	aliasesB := b.Field(8).(*array.StringBuilder)
+	idB, _ := b.Field(0).(*array.StringBuilder)
+	nameB, _ := b.Field(1).(*array.StringBuilder)
+	desigB, _ := b.Field(2).(*array.StringBuilder)
+	spkB, _ := b.Field(3).(*array.StringBuilder)
+	kindB, _ := b.Field(4).(*array.StringBuilder)
+	catB, _ := b.Field(5).(*array.StringBuilder)
+	raB, _ := b.Field(6).(*array.Float64Builder)
+	decB, _ := b.Field(7).(*array.Float64Builder)
+	aliasesB, _ := b.Field(8).(*array.StringBuilder)
 
 	for _, t := range items {
 		idB.Append(t.ID)
@@ -153,15 +153,15 @@ func ToRecordBatch(items []Target) arrow.RecordBatch {
 // This is the inverse of ToRecordBatch for callers that receive Arrow data
 // from external sources.
 func FromRecordBatch(rec arrow.RecordBatch) []Target {
-	idArr := rec.Column(0).(*array.String)
-	nameArr := rec.Column(1).(*array.String)
-	desigArr := rec.Column(2).(*array.String)
-	spkArr := rec.Column(3).(*array.String)
-	kindArr := rec.Column(4).(*array.String)
-	catArr := rec.Column(5).(*array.String)
-	raArr := rec.Column(6).(*array.Float64)
-	decArr := rec.Column(7).(*array.Float64)
-	aliasesArr := rec.Column(8).(*array.String)
+	idArr, _ := rec.Column(0).(*array.String)
+	nameArr, _ := rec.Column(1).(*array.String)
+	desigArr, _ := rec.Column(2).(*array.String)
+	spkArr, _ := rec.Column(3).(*array.String)
+	kindArr, _ := rec.Column(4).(*array.String)
+	catArr, _ := rec.Column(5).(*array.String)
+	raArr, _ := rec.Column(6).(*array.Float64)
+	decArr, _ := rec.Column(7).(*array.Float64)
+	aliasesArr, _ := rec.Column(8).(*array.String)
 
 	targets := make([]Target, int(rec.NumRows()))
 	for i := range targets {

@@ -9,7 +9,7 @@ import (
 
 // Test fixture errors.
 var (
-	errOops             = errors.New("oops")
+	errOops              = errors.New("oops")
 	errExpected          = errors.New("expected")
 	errConnectionRefused = errors.New("connection refused")
 	errTimeout           = errors.New("timeout")
@@ -131,6 +131,8 @@ type mathCase struct {
 
 func (c mathCase) Name() string { return c.name }
 func (c mathCase) Run(t *testing.T) {
+	t.Helper()
+
 	got := c.a + c.b
 	testutil.AssertNear(t, "sum", got, c.want, 1e-14)
 }

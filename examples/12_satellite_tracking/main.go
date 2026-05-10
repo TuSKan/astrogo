@@ -1,3 +1,4 @@
+// Package main demonstrates real-time satellite tracking.
 package main
 
 import (
@@ -53,7 +54,8 @@ func main() {
 		log.Fatalf("Failed to create satellite provider: %v", err)
 	}
 	defer func() {
-		if err := prov.Close(); err != nil {
+		err := prov.Close()
+		if err != nil {
 			log.Printf("failed to close provider: %v", err)
 		}
 	}()
@@ -173,8 +175,8 @@ func fmtTime(t time.Time, loc *time.Location) string {
 
 func fmtDuration(d time.Duration) string {
 	total := int(d.Seconds())
-	min := total / 60
+	mins := total / 60
 	sec := total % 60
 
-	return fmt.Sprintf("%dm %02ds", min, sec)
+	return fmt.Sprintf("%dm %02ds", mins, sec)
 }

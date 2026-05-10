@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"math"
 	"os"
 	"path/filepath"
@@ -15,7 +16,8 @@ import (
 	"github.com/TuSKan/astrogo/vector"
 )
 
-const JPL_SPK_KERNEL_URI = "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/"
+// JPLSPKKernelURI is the base URL for JPL SPK binary kernel downloads.
+const JPLSPKKernelURI = "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/"
 
 // RecordSize is the standard DAF record size in bytes.
 const RecordSize = 1024
@@ -37,6 +39,7 @@ type Summary struct {
 	Integers []int32
 }
 
+// ReadAtCloser is an interface that combines io.ReaderAt and io.Closer.
 type ReadAtCloser interface {
 	io.ReaderAt
 	io.Closer
@@ -48,6 +51,15 @@ type Reader struct {
 	FileRec FileRecord
 }
 
+// CacheDownload downloads an SPK file if it doesn't exist and opens it.
+//
+// It provides an auto-healing mechanism for CI environments by automatically
+// removing corrupt or truncated files.
+//
+// If the file is incomplete or its metadata is invalid, the function:
+//  1. Closes the file handle.
+//  2. Removes the corrupt file from the filesystem.
+//  3. Returns the error wrapped with a descriptive message.
 func CacheDownload(kernel, path string) (*Reader, error) {
 	spkPath := filepath.Join(path, kernel)
 
@@ -56,8 +68,8 @@ func CacheDownload(kernel, path string) (*Reader, error) {
 	}
 
 	if _, err := os.Stat(spkPath); os.IsNotExist(err) {
-		spkURI := JPL_SPK_KERNEL_URI + kernel
-		fmt.Printf("jpl: downloading %s...\n", spkURI)
+		spkURI := JPLSPKKernelURI + kernel
+		log.Printf("jpl: downloading %s...", spkURI)
 
 		err := tools.Download(spkURI, spkPath)
 		if err != nil {
@@ -105,7 +117,7 @@ func CacheDownload(kernel, path string) (*Reader, error) {
 	return r, nil
 }
 
-// New opens a DAF/SPK file and reads its metadata.
+// NewReader opens a DAF/SPK file and reads its metadata.
 func NewReader(f ReadAtCloser) (*Reader, error) {
 	buf := make([]byte, RecordSize)
 	if _, err := f.ReadAt(buf, 0); err != nil {
@@ -135,7 +147,8 @@ func NewReader(f ReadAtCloser) (*Reader, error) {
 
 // Close closes the file.
 func (r *Reader) Close() error {
-	if err := r.F.Close(); err != nil {
+	err := r.F.Close()
+	if err != nil {
 		return fmt.Errorf("spk: close: %w", err)
 	}
 

@@ -54,6 +54,7 @@ func (c *EvalContext) ICRS() (coord.ICRS, error) {
 	}
 
 	icrs, err := c.Object.ICRS(c.Time)
+
 	c.icrs = icrs
 	if err != nil {
 		c.icrsErr = fmt.Errorf("evalctx: ICRS: %w", err)

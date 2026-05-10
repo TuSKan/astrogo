@@ -1,7 +1,7 @@
 package catalog_test
 
 import (
-	"fmt"
+	"testing"
 	"time"
 
 	"github.com/TuSKan/astrogo/angle"
@@ -12,22 +12,21 @@ import (
 	astrot "github.com/TuSKan/astrogo/time"
 )
 
-// Example_integration demonstrates how to use the catalog system
+// TestIntegration demonstrates how to use the catalog system
 // to resolve a celestial target from a remote provider and seamlessly
 // pass its coordinates into observing planner capabilities.
-func Example_integration() {
+func TestIntegration(t *testing.T) {
 	// 2. Perform a live query to resolve the target mathematically
 	// We'll search for the Andromeda Galaxy (M31)
 	resolver := catalog.NewResolver(catalog.SIMBAD)
 
 	andromeda, err := resolver.Resolve("M31")
 	if err != nil {
-		fmt.Println("Failed to resolve target.")
-		return
+		t.Skipf("Skipping integration test — cannot reach SIMBAD: %v", err)
 	}
 
-	fmt.Printf("Resolved Target: %s via %s\n", andromeda.Name, andromeda.Catalog)
-	fmt.Printf("Coordinates (ICRS): %s\n\n", andromeda.Coord)
+	t.Logf("Resolved Target: %s via %s", andromeda.Name, andromeda.Catalog)
+	t.Logf("Coordinates (ICRS): %s\n", andromeda.Coord)
 
 	// 3. Integrate resolved catalog data into observational computations
 	// Let's create an Observatory on Earth (e.g. at Mauna Kea)
@@ -35,8 +34,7 @@ func Example_integration() {
 
 	obs, err := plan.NewSite("Mauna Kea", loc, angle.Deg(0), nil)
 	if err != nil {
-		fmt.Println("Failed to create site:", err)
-		return
+		t.Fatalf("Failed to create site: %v", err)
 	}
 
 	// We calculate at a specific time (e.g. 2026-04-06 00:00:00 UTC)
@@ -47,11 +45,10 @@ func Example_integration() {
 
 	altaz, err := ctx.ICRSToAltAz(andromeda.Coord)
 	if err != nil {
-		fmt.Println("Transform error:", err)
-		return
+		t.Fatalf("Transform error: %v", err)
 	}
 
-	fmt.Printf("At %v (UTC), from %s:\n", obsTime, obs.Name())
-	fmt.Printf("M31 Altitude: %.4f°\n", altaz.Alt().Degrees())
-	fmt.Printf("M31 Azimuth:  %.4f°\n", altaz.Az().Degrees())
+	t.Logf("At %v (UTC), from %s:", obsTime, obs.Name())
+	t.Logf("M31 Altitude: %.4f°", altaz.Alt().Degrees())
+	t.Logf("M31 Azimuth:  %.4f°", altaz.Az().Degrees())
 }

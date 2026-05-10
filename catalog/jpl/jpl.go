@@ -22,6 +22,7 @@ type Provider struct {
 	cache  resolve.Cache
 }
 
+// New creates a new JPL Horizons catalog provider.
 func New() *Provider {
 	return &Provider{
 		client: resolve.NewClient(),
@@ -29,12 +30,15 @@ func New() *Provider {
 	}
 }
 
+// Name returns the provider identifier.
 func (p *Provider) Name() string { return "jpl" }
 
+// Capabilities returns the set of supported resolution operations.
 func (p *Provider) Capabilities() []resolve.Capability {
 	return []resolve.Capability{resolve.CapObjectResolution}
 }
 
+// Resolve performs exact-match resolution for a query.
 func (p *Provider) Resolve(query string) (resolve.Target, bool) {
 	targets := p.Search(query)
 	if len(targets) > 0 {
@@ -44,6 +48,7 @@ func (p *Provider) Resolve(query string) (resolve.Target, bool) {
 	return resolve.Target{}, false
 }
 
+// Search performs a fuzzy search for the query.
 func (p *Provider) Search(query string) []resolve.Target {
 	ctx := context.TODO()
 	req := resolve.ObjectRequest{Query: query, Limit: 10}
@@ -63,6 +68,7 @@ func (p *Provider) Search(query string) []resolve.Target {
 	return targets
 }
 
+// ResolveObject performs streaming resolution via the JPL Horizons API.
 func (p *Provider) ResolveObject(ctx context.Context, req resolve.ObjectRequest) resolve.SeqIterator[resolve.Target] {
 	queryKey := resolve.Normalize(req.Query)
 	cacheKey := "resolve:jpl:" + queryKey

@@ -22,9 +22,9 @@ func (m benchMock) ICRS(_ atime.Time) (coord.ICRS, error) {
 }
 
 func (m benchMock) Name() string                              { return "mock" }
-func (m benchMock) Position(t atime.Time) (coord.ICRS, error) { return m.c, nil }
-func (m benchMock) GetDetails(ctx *coord.Context, props ...string) (*TargetDetails, error) {
-	return nil, nil
+func (m benchMock) Position(_ atime.Time) (coord.ICRS, error) { return m.c, nil }
+func (m benchMock) GetDetails(_ *coord.Context, _ ...string) (*TargetDetails, error) {
+	return &TargetDetails{}, nil
 }
 
 func BenchmarkVisibleIntervals(b *testing.B) {
@@ -114,6 +114,8 @@ func makeBlocks(n int) []*Block {
 }
 
 func benchScheduler(b *testing.B, n int, strategy Strategy) {
+	b.Helper()
+
 	loc, _ := coord.NewGeodetic(angle.Zero(), angle.Zero(), 0)
 	site, _ := NewSite("Bench", loc, angle.Zero(), nil)
 	planner, _ := NewPlanner(site, nil)

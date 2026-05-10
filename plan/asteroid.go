@@ -73,10 +73,16 @@ func NewAsteroid(name string, id eph.ID, provider eph.Provider, opts ...Asteroid
 	return a
 }
 
-func (a *Asteroid) Name() string           { return a.name }
-func (a *Asteroid) Provider() eph.Provider { return a.provider }
-func (a *Asteroid) EphID() eph.ID          { return a.id }
+// Name returns the asteroid's display name.
+func (a *Asteroid) Name() string { return a.name }
 
+// Provider returns the ephemeris provider for this asteroid.
+func (a *Asteroid) Provider() eph.Provider { return a.provider }
+
+// EphID returns the NAIF ID for ephemeris lookups.
+func (a *Asteroid) EphID() eph.ID { return a.id }
+
+// Position returns the ICRS sky position at time t.
 func (a *Asteroid) Position(t time.Time) (coord.ICRS, error) {
 	pos, err := eph.Position(a.provider, a.id, t)
 	if err != nil {
@@ -91,6 +97,7 @@ func (a *Asteroid) Position(t time.Time) (coord.ICRS, error) {
 	return icrs, nil
 }
 
+// GeocentricVec returns the geocentric position vector at time t.
 func (a *Asteroid) GeocentricVec(t time.Time) (vector.Vec3, error) {
 	v, err := eph.Position(a.provider, a.id, t)
 	if err != nil {
@@ -100,6 +107,7 @@ func (a *Asteroid) GeocentricVec(t time.Time) (vector.Vec3, error) {
 	return v, nil
 }
 
+// GetDetails computes observational details using the given coordinate context.
 func (a *Asteroid) GetDetails(ctx *coord.Context, props ...string) (*TargetDetails, error) {
 	return computeDetails(a, ctx, props...)
 }
@@ -126,6 +134,7 @@ func (a *Asteroid) ApparentMagnitude(t time.Time) (float64, error) {
 	}
 }
 
+// ApparentMagnitudeCtx computes apparent magnitude (context variant).
 func (a *Asteroid) ApparentMagnitudeCtx(t time.Time, _ *coord.Context) (float64, error) {
 	return a.ApparentMagnitude(t)
 }

@@ -1,3 +1,4 @@
+// Package main demonstrates astronomical name resolution.
 package main
 
 import (
@@ -43,7 +44,8 @@ func main() {
 	// 5. Demonstrate the strict Resolve() guarantee
 	fmt.Printf("\nExecuting strict Resolve() on %q...\n", "M31")
 
-	if exact, err := resolver.Resolve("M31"); err == nil {
+	exact, err := resolver.Resolve("M31")
+	if err == nil {
 		fmt.Printf("Strictly matched: %s (%s) perfectly.\n", exact.Name, exact.ID)
 	}
 }

@@ -253,11 +253,13 @@ func (s Solver) FindExtremum(eval Evaluator, t1, t3 time.Time, isMax bool) (time
 
 		// Evaluate at the new trial point
 		var u time.Time
-		if math.Abs(float64(d)) >= tol1 {
+
+		switch {
+		case math.Abs(float64(d)) >= tol1:
 			u = x.Add(d)
-		} else if float64(d) > 0 {
+		case float64(d) > 0:
 			u = x.Add(time.Duration(tol1))
-		} else {
+		default:
 			u = x.Add(time.Duration(-tol1))
 		}
 

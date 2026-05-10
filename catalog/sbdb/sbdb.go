@@ -24,6 +24,7 @@ type Provider struct {
 	cache  resolve.Cache
 }
 
+// New creates a new SBDB catalog provider.
 func New() *Provider {
 	return &Provider{
 		client: resolve.NewClient(),
@@ -31,14 +32,17 @@ func New() *Provider {
 	}
 }
 
+// Name returns the provider identifier.
 func (p *Provider) Name() string {
 	return "sbdb"
 }
 
+// Capabilities returns the set of supported resolution operations.
 func (p *Provider) Capabilities() []resolve.Capability {
 	return []resolve.Capability{resolve.CapObjectResolution}
 }
 
+// Resolve performs exact-match resolution for a query.
 func (p *Provider) Resolve(query string) (resolve.Target, bool) {
 	targets := p.Search(query)
 	if len(targets) > 0 {
@@ -48,6 +52,7 @@ func (p *Provider) Resolve(query string) (resolve.Target, bool) {
 	return resolve.Target{}, false
 }
 
+// Search performs fuzzy search across all MPC-registered small bodies.
 func (p *Provider) Search(query string) []resolve.Target {
 	ctx := context.TODO()
 	req := resolve.ObjectRequest{Query: query, Limit: 1}
@@ -67,6 +72,7 @@ func (p *Provider) Search(query string) []resolve.Target {
 	return targets
 }
 
+// ResolveObject performs streaming resolution via the JPL Small-Body Database API.
 func (p *Provider) ResolveObject(ctx context.Context, req resolve.ObjectRequest) resolve.SeqIterator[resolve.Target] {
 	queryKey := resolve.Normalize(req.Query)
 	cacheKey := "resolve:sbdb:" + queryKey
@@ -104,7 +110,7 @@ func (p *Provider) ResolveObject(ctx context.Context, req resolve.ObjectRequest)
 
 		var payload struct {
 			Object *struct {
-				SpkId    string `json:"spkid"`
+				SpkID    string `json:"spkid"`
 				FullName string `json:"fullname"`
 				Des      string `json:"des"`
 				Kind     string `json:"kind"`
@@ -140,10 +146,10 @@ func (p *Provider) ResolveObject(ctx context.Context, req resolve.ObjectRequest)
 		}
 
 		t := resolve.Target{
-			ID:          payload.Object.SpkId,
+			ID:          payload.Object.SpkID,
 			Name:        payload.Object.FullName,
 			Designation: payload.Object.Des,
-			SPKID:       payload.Object.SpkId,
+			SPKID:       payload.Object.SpkID,
 			Kind:        resolve.Kind(kindStr),
 			Catalog:     "sbdb",
 		}

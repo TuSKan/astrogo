@@ -9,11 +9,11 @@ import (
 
 // Sentinel errors for angle parsing.
 var (
-	ErrEmptyString  = errors.New("empty string")
-	ErrNoFields     = errors.New("no numeric fields found")
-	ErrParseNumber  = errors.New("cannot parse as number")
-	ErrMinuteRange  = errors.New("minutes out of range [0, 60)")
-	ErrSecondRange  = errors.New("seconds out of range [0, 60)")
+	ErrEmptyString = errors.New("empty string")
+	ErrNoFields    = errors.New("no numeric fields found")
+	ErrParseNumber = errors.New("cannot parse as number")
+	ErrMinuteRange = errors.New("minutes out of range [0, 60)")
+	ErrSecondRange = errors.New("seconds out of range [0, 60)")
 )
 
 // ParseDMS parses a sexagesimal angle string in degrees-arcminutes-arcseconds
@@ -56,7 +56,8 @@ func parseBaseSexagesimal(s, funcName string, unit func(float64) Angle) (Angle, 
 		return 0, fmt.Errorf("%s %q: %w", funcName, s, err)
 	}
 
-	if err := validateMinSec(fields[1], fields[2]); err != nil {
+	err = validateMinSec(fields[1], fields[2])
+	if err != nil {
 		return 0, fmt.Errorf("%s %q: %w", funcName, s, err)
 	}
 
@@ -106,16 +107,16 @@ func parseSexagesimal(s string) (sign float64, fields [3]float64, err error) {
 	return sign, f, nil
 }
 
-// extractNumericFields scans s and returns up to max non-negative float64
+// extractNumericFields scans s and returns up to limit non-negative float64
 // values separated by any run of non-digit, non-dot bytes.
-func extractNumericFields(s string, max int) ([]float64, error) {
+func extractNumericFields(s string, limit int) ([]float64, error) {
 	parts := strings.FieldsFunc(s, func(r rune) bool {
 		return (r < '0' || r > '9') && r != '.'
 	})
 
 	var result []float64
 	for _, token := range parts {
-		if len(result) >= max {
+		if len(result) >= limit {
 			break
 		}
 

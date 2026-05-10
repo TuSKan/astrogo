@@ -18,7 +18,7 @@ func TestGaiaOfflineConeSearch(t *testing.T) {
 123456789,10.684,41.269,1.1,-2.2,5.5
 `
 
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "text/csv")
 
 		if _, err := fmt.Fprint(w, csvData); err != nil {

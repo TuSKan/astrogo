@@ -29,7 +29,7 @@ func FromCatalog(c catalog.Target, p eph.Provider) Observable {
 
 	// ── Moving body with provider ──
 	if p != nil {
-		switch c.Kind {
+		switch c.Kind { //nolint:exhaustive // only planet/moon/star routed here
 		case resolve.KindPlanet, resolve.KindMoon, resolve.KindStar:
 			// Sun/Moon/planets — the resolver uses KindStar for Sun
 			if isPlanetID(id) {

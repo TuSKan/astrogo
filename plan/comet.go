@@ -46,10 +46,16 @@ func NewComet(name string, id eph.ID, provider eph.Provider, m1, k1 float64, opt
 	return c
 }
 
-func (c *Comet) Name() string           { return c.name }
-func (c *Comet) Provider() eph.Provider { return c.provider }
-func (c *Comet) EphID() eph.ID          { return c.id }
+// Name returns the name of the comet.
+func (c *Comet) Name() string { return c.name }
 
+// Provider returns the ephemeris provider.
+func (c *Comet) Provider() eph.Provider { return c.provider }
+
+// EphID returns the ephemeris ID.
+func (c *Comet) EphID() eph.ID { return c.id }
+
+// Position returns the ICRS position of the comet.
 func (c *Comet) Position(t time.Time) (coord.ICRS, error) {
 	pos, err := eph.Position(c.provider, c.id, t)
 	if err != nil {
@@ -64,6 +70,7 @@ func (c *Comet) Position(t time.Time) (coord.ICRS, error) {
 	return icrs, nil
 }
 
+// GeocentricVec returns the geocentric vector of the comet.
 func (c *Comet) GeocentricVec(t time.Time) (vector.Vec3, error) {
 	v, err := eph.Position(c.provider, c.id, t)
 	if err != nil {
@@ -73,6 +80,7 @@ func (c *Comet) GeocentricVec(t time.Time) (vector.Vec3, error) {
 	return v, nil
 }
 
+// GetDetails returns the target details for the comet.
 func (c *Comet) GetDetails(ctx *coord.Context, props ...string) (*TargetDetails, error) {
 	return computeDetails(c, ctx, props...)
 }
@@ -87,6 +95,7 @@ func (c *Comet) ApparentMagnitude(t time.Time) (float64, error) {
 	return mag.CometApparent(c.M1, c.K1, r, delta), nil
 }
 
+// ApparentMagnitudeCtx provides cached magnitude computation.
 func (c *Comet) ApparentMagnitudeCtx(t time.Time, _ *coord.Context) (float64, error) {
 	return c.ApparentMagnitude(t)
 }
