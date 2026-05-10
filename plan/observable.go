@@ -36,3 +36,9 @@ type MagnitudeComputer interface {
 	// ApparentMagnitudeCtx returns the apparent magnitude with atmospheric corrections.
 	ApparentMagnitudeCtx(t time.Time, ctx *coord.Context) (float64, error)
 }
+
+// StaticMagnitude is implemented by targets with a catalog magnitude
+// that does not vary with time or observer geometry.
+type StaticMagnitude interface {
+	StaticMagnitude() (float64, bool)
+}

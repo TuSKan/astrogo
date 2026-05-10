@@ -1,0 +1,36 @@
+name: Validation
+
+on:
+  workflow_dispatch: # Manual trigger only — run before releases
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  validation:
+    name: Validation Tests (JPL Horizons + SOFA)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.26'
+
+      - name: Generate files
+        run: go generate ./...
+
+      - name: Run integration tests
+        run: go test -tags=integration -v -count=1 -timeout=15m ./...
+
+      - name: Run validation tests
+        run: go test -tags=validation -v -count=1 -timeout=15m ./...
+
+      - name: Run network-dependent validation
+        run: go test -tags=network -v -count=1 -timeout=15m ./...

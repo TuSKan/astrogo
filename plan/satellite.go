@@ -1,26 +1,55 @@
 package plan
 
 import (
+	"errors"
 	"fmt"
+	"math"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
+	mag "github.com/TuSKan/astrogo/magnitude"
 	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/vector"
 )
 
 // Satellite represents an artificial satellite with an SGP4/TLE-based provider.
 type Satellite struct {
-	provider eph.Provider
-	name     string
-	id       eph.ID
+	provider   eph.Provider
+	name       string
+	id         eph.ID
+	stdMag     float64
+	convention mag.StdMagConvention
+	phaseModel mag.SatPhaseModel
+	hasStdMag  bool
+}
+
+// SatelliteOption configures optional Satellite fields.
+type SatelliteOption func(*Satellite)
+
+// WithStdMag sets the satellite's standard magnitude and convention.
+func WithStdMag(stdMag float64, conv mag.StdMagConvention) SatelliteOption {
+	return func(s *Satellite) {
+		s.stdMag = stdMag
+		s.convention = conv
+		s.hasStdMag = true
+	}
+}
+
+// WithPhaseModel sets the satellite's phase function model (sphere or cylinder).
+func WithPhaseModel(model mag.SatPhaseModel) SatelliteOption {
+	return func(s *Satellite) { s.phaseModel = model }
 }
 
 // NewSatellite creates a satellite target.
-func NewSatellite(name string, id eph.ID, provider eph.Provider) *Satellite {
-	return &Satellite{name: name, id: id, provider: provider}
+func NewSatellite(name string, id eph.ID, provider eph.Provider, opts ...SatelliteOption) *Satellite {
+	s := &Satellite{name: name, id: id, provider: provider}
+	for _, opt := range opts {
+		opt(s)
+	}
+
+	return s
 }
 
 // Name returns the satellite's display name.
@@ -60,6 +89,73 @@ func (s *Satellite) GeocentricVec(t time.Time) (vector.Vec3, error) {
 // GetDetails computes the position and visual magnitude of the satellite.
 func (s *Satellite) GetDetails(ctx *coord.Context, props ...string) (*TargetDetails, error) {
 	return computeDetails(s, ctx, props...)
+}
+
+// errNoObserverCtx is returned when satellite magnitude is called without a context.
+var errNoObserverCtx = errors.New("satellite: apparent magnitude requires observer context (use ApparentMagnitudeCtx)")
+
+// ApparentMagnitude cannot be computed for a satellite without observer context.
+// Use [Satellite.ApparentMagnitudeCtx] instead.
+func (s *Satellite) ApparentMagnitude(_ time.Time) (float64, error) {
+	return 0, errNoObserverCtx
+}
+
+// ApparentMagnitudeCtx computes the satellite's apparent visual magnitude
+// using the topocentric range from [LookAngle] and the Sun–Satellite–Observer
+// phase angle. Requires that [WithStdMag] was set at construction.
+func (s *Satellite) ApparentMagnitudeCtx(t time.Time, ctx *coord.Context) (float64, error) {
+	if !s.hasStdMag {
+		return 0, fmt.Errorf("satellite %s: no standard magnitude set", s.name)
+	}
+
+	if ctx == nil {
+		return 0, errNoObserverCtx
+	}
+
+	// Get topocentric range via LookAngle.
+	altaz, err := LookAngle(s.provider, s.id, ctx)
+	if err != nil {
+		return 0, fmt.Errorf("satellite magnitude: look angle: %w", err)
+	}
+
+	rangeKm := altaz.Dist()
+
+	// Compute phase angle: Sun–Satellite–Observer.
+	// We need the Sun's position and the satellite's geocentric position.
+	sunSt, err := s.provider.State(eph.Sun, t)
+	if err != nil {
+		return 0, fmt.Errorf("satellite magnitude: sun state: %w", err)
+	}
+
+	satSt, err := s.provider.State(s.id, t)
+	if err != nil {
+		return 0, fmt.Errorf("satellite magnitude: sat state: %w", err)
+	}
+
+	// Sun→Satellite vector (heliocentric satellite position).
+	sunToSat := satSt.Pos.Sub(sunSt.Pos)
+	// Observer→Satellite vector (topocentric, already in the reducer).
+	obsToSat := satSt.Pos.Sub(ctx.ObsVec())
+
+	// Phase angle = angle between Sun→Sat and Obs→Sat vectors.
+	// cos(α) = dot(sunToSat, obsToSat) / (|sunToSat| · |obsToSat|)
+	dot := sunToSat.X*obsToSat.X + sunToSat.Y*obsToSat.Y + sunToSat.Z*obsToSat.Z
+	norm1 := sunToSat.Norm()
+	norm2 := obsToSat.Norm()
+
+	if norm1 == 0 || norm2 == 0 {
+		return 0, fmt.Errorf("satellite magnitude: degenerate geometry")
+	}
+
+	cosAlpha := math.Max(-1, math.Min(1, dot/(norm1*norm2)))
+	alpha := angle.Rad(math.Acos(cosAlpha))
+
+	return mag.SatelliteApparent(s.stdMag, s.convention, rangeKm, alpha, s.phaseModel), nil
+}
+
+// StaticMagnitude returns the catalog standard magnitude if set.
+func (s *Satellite) StaticMagnitude() (float64, bool) {
+	return s.stdMag, s.hasStdMag
 }
 
 // defaultAtm is used for satellite pass prediction when no atmosphere is specified.

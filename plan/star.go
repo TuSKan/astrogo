@@ -86,3 +86,6 @@ func (s *Star) Position(_ time.Time) (coord.ICRS, error) {
 func (s *Star) GetDetails(ctx *coord.Context, props ...string) (*TargetDetails, error) {
 	return computeDetails(s, ctx, props...)
 }
+
+// StaticMagnitude returns the catalog V-band magnitude if set.
+func (s *Star) StaticMagnitude() (float64, bool) { return s.vMag, s.hasVMag }

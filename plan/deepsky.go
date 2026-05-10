@@ -59,3 +59,6 @@ func (d *DeepSkyObject) Position(_ time.Time) (coord.ICRS, error) {
 func (d *DeepSkyObject) GetDetails(ctx *coord.Context, props ...string) (*TargetDetails, error) {
 	return computeDetails(d, ctx, props...)
 }
+
+// StaticMagnitude returns the catalog V-band magnitude if set.
+func (d *DeepSkyObject) StaticMagnitude() (float64, bool) { return d.vMag, d.hasVMag }
