@@ -36,6 +36,7 @@ Lint-zero release: full `golangci-lint` compliance with zero violations across a
 - Each disabled linter has documented rationale in config comments
 
 ### Fixed
+- `internal/tools/download.go`: fixed double-close error during `go generate` temp file cleanup
 - `ephemeris/doc.go`: package comment `Package eph` → `Package ephemeris`
 - `angle/parse.go`: `max` variable renamed to `limit` (builtin shadowing)
 - `iers/fetch.go`: `min`/`max` variables renamed to `lo`/`hi` (builtin shadowing)
@@ -75,7 +76,7 @@ Observable polymorphism, scheduler context sharing, TPV distortion, NORAD test h
 - Fixed `tpvEval` empty-map semantics (return 0, not x)
 
 #### Integration Tests
-- NORAD, USNO, NASA, AstroPixels tests use graceful `t.Skipf()` when endpoints are unreachable
+- FINK, NORAD, USNO, NASA, AstroPixels tests use graceful `t.Skipf()` when endpoints are unreachable
 
 ### Removed
 - `plan/target.go` — monolithic Target type replaced by polymorphic Observable implementations

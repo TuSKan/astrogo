@@ -59,9 +59,9 @@ func ExampleObservableWindows() {
 	windows, _ := ObservableWindows(obj, start, end, step, site, constraints...)
 
 	for _, w := range windows {
-		fmt.Printf("Window: %s to %s\n", w.Start, w.End)
+		fmt.Printf("Window: %s to %s\n", w.Start.Format("2006-01-02 15:04:05"), w.End.Format("2006-01-02 15:04:05"))
 	}
-	// Output: Window: JD 2451545.00000000 (UTC) to JD 2451545.16596114 (UTC)
+	// Output: Window: 2000-01-01 12:00:00 to 2000-01-01 15:58:59
 }
 
 func ExampleRankObservables() {
