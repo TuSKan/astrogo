@@ -12,8 +12,8 @@
 package main
 
 import (
-	"log"
 	"fmt"
+	"log"
 	"strings"
 
 	"github.com/TuSKan/astrogo/angle"

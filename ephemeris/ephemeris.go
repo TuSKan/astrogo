@@ -78,12 +78,12 @@ var (
 // ── Sentinel errors ──────────────────────────────────────────────────────────
 
 var (
-	ErrTLERequired    = errors.New("eph: Satellites source requires WithTLE option")
-	ErrNotImplemented = errors.New("eph: source not yet implemented")
-	ErrUnknownSource  = errors.New("eph: unknown source")
-	ErrZeroVector     = errors.New("eph: cannot convert near-zero vector to ICRS")
-	ErrSofaEpv00      = errors.New("eph: sofa epv00 failed")
-	ErrSofaPlan94     = errors.New("eph: sofa plan94 failed")
+	ErrTLERequired     = errors.New("eph: Satellites source requires WithTLE option")
+	ErrNotImplemented  = errors.New("eph: source not yet implemented")
+	ErrUnknownSource   = errors.New("eph: unknown source")
+	ErrZeroVector      = errors.New("eph: cannot convert near-zero vector to ICRS")
+	ErrSofaEpv00       = errors.New("eph: sofa epv00 failed")
+	ErrSofaPlan94      = errors.New("eph: sofa plan94 failed")
 	ErrUnsupportedBody = errors.New("eph: unsupported body for sofa provider")
 )
 
