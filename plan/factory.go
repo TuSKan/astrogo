@@ -68,8 +68,8 @@ func FromCatalog(c catalog.Target, p eph.Provider) Observable {
 			return NewAsteroid(c.Name, id, p, opts...)
 		}
 
-		// Generic moving body (unknown sub-type) → Planet as fallback
-		return NewPlanet(c.Name, id, p)
+		// Generic moving body (unknown sub-type) — no photometric model.
+		return NewGenericBody(c.Name, id, p)
 	}
 
 	// ── Fixed targets ──

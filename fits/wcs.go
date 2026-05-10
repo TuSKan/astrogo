@@ -333,7 +333,7 @@ func (w *WCS) WorldToPixel(world []float64) ([]float64, error) {
 
 	const maxIter = 20
 
-	const tol = 1e-12 // degrees (~0.036 mas)
+	const tol = 1e-9 // degrees (~3.6 mas — well below pixel scale, matches SCAMP fit precision)
 
 	for range maxIter {
 		fwd, err := w.PixelToWorld(pix)

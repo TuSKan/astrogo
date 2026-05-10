@@ -28,10 +28,18 @@ type TargetDetails struct {
 	RiseAzimuth  angle.Angle
 	Altitude     angle.Angle
 	MaxElevation angle.Angle
-	Dec          angle.Angle
 	SetAzimuth   angle.Angle
 	Elongation   angle.Angle
-	RA           angle.Angle
+
+	// RA is the astrometric topocentric right ascension in the ICRS frame (J2000).
+	// For moving bodies this includes diurnal parallax correction but does NOT
+	// include precession-nutation or stellar aberration. Matches J2000 star
+	// charts, Stellarium default, and GoTo mount coordinate systems.
+	RA angle.Angle
+
+	// Dec is the astrometric topocentric declination in the ICRS frame (J2000).
+	// Same reference frame caveats as RA — astrometric, not apparent of-date.
+	Dec angle.Angle
 }
 
 // String formats the details as a textual summary.
@@ -203,14 +211,9 @@ func fillMovingBody(d *TargetDetails, mb MovingBody, t time.Time, ctx *coord.Con
 
 // fillStaticMagnitude handles non-MagnitudeComputer types with catalog magnitudes.
 func fillStaticMagnitude(d *TargetDetails, obs Observable) {
-	switch v := obs.(type) {
-	case *Star:
-		if v.hasVMag {
-			d.Magnitude = fmt.Sprintf("%.1f mag", v.vMag)
-		}
-	case *DeepSkyObject:
-		if v.hasVMag {
-			d.Magnitude = fmt.Sprintf("%.1f mag", v.vMag)
+	if sm, ok := obs.(StaticMagnitude); ok {
+		if v, has := sm.StaticMagnitude(); has {
+			d.Magnitude = fmt.Sprintf("%.1f mag", v)
 		}
 	}
 }

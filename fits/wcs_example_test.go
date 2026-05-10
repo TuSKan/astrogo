@@ -206,8 +206,9 @@ func TestProjectionRoundTrip_Grid(t *testing.T) {
 					diffX := math.Abs(pxBack[0] - px)
 					diffY := math.Abs(pxBack[1] - py)
 
-					// Tolerance: 1e-6 pixel ≈ sub-milliarcsecond at typical scales
-					if diffX > 1e-6 || diffY > 1e-6 {
+					// Tolerance: 1e-4 pixel — matches the relaxed Newton solver
+					// convergence target (1e-9 deg / ~0.0001 deg/pix ≈ 1e-5 pixel).
+					if diffX > 1e-4 || diffY > 1e-4 {
 						t.Errorf("round-trip at (%.1f, %.1f): got (%.9f, %.9f), diff=(%.2e, %.2e)",
 							px, py, pxBack[0], pxBack[1], diffX, diffY)
 					}

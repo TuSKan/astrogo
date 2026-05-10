@@ -446,6 +446,24 @@ func TestSatelliteApparent_CylinderVsSphere(t *testing.T) {
 	t.Logf("Sphere=%.3f, Cylinder=%.3f", mSphere, mCyl)
 }
 
+func TestSatelliteApparent_MolczanConvention(t *testing.T) {
+	stdMag := 3.0
+	rangeKm := 1000.0
+	alpha := angle.Deg(90)
+
+	mMcCants := magnitude.SatelliteApparent(stdMag, magnitude.ConventionMcCants, rangeKm, alpha, magnitude.PhaseSphere)
+	mMolczan := magnitude.SatelliteApparent(stdMag, magnitude.ConventionMolczan, rangeKm, alpha, magnitude.PhaseSphere)
+
+	// Molczan convention assumes mean brightness (50% illumination), so
+	// the same stdMag value represents an intrinsically brighter satellite.
+	// The result should be brighter (lower mag) by 2.5·log₁₀(2) ≈ 0.7526.
+	expectedOffset := 2.5 * math.Log10(2)
+	actualOffset := mMcCants - mMolczan
+
+	assertNear(t, "Molczan offset", actualOffset, expectedOffset, 0.001)
+	t.Logf("McCants=%.3f, Molczan=%.3f, Δ=%.4f (expected %.4f)", mMcCants, mMolczan, actualOffset, expectedOffset)
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
 // Star — Extinction
 // ══════════════════════════════════════════════════════════════════════════════

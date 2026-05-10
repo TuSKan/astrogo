@@ -31,9 +31,13 @@ const (
 
 	// ConventionMolczan uses the Molczan convention:
 	// same range/phase reference but mean brightness, 50% illumination.
-	// Intrinsically ~1.4 mag fainter than McCants for the same satellite.
+	// Intrinsically ~0.75 mag fainter than McCants for the same satellite.
 	ConventionMolczan
 )
+
+// molczanOffset is the magnitude difference between Molczan (mean, 50%)
+// and McCants (max, 100%) conventions: 2.5·log₁₀(2) ≈ 0.7526 mag.
+const molczanOffset = 0.7526
 
 // SatelliteApparent computes the apparent visual magnitude of an artificial satellite.
 //
@@ -49,9 +53,18 @@ const (
 //   - rangeKm: observer–satellite range in kilometres
 //   - alpha: phase angle (Sun–satellite–observer)
 //   - shape: phase function model (sphere or cylinder)
-func SatelliteApparent(stdMag float64, _ StdMagConvention, rangeKm float64, alpha angle.Angle, shape SatPhaseModel) float64 {
+func SatelliteApparent(stdMag float64, conv StdMagConvention, rangeKm float64, alpha angle.Angle, shape SatPhaseModel) float64 {
 	if rangeKm <= 0 {
 		return stdMag
+	}
+
+	// Normalize to McCants convention (maximum brightness, 100% illumination).
+	// Molczan convention uses mean brightness (50% illumination), which is
+	// intrinsically fainter by 2.5·log₁₀(2) ≈ 0.75 mag for the same object.
+	// Subtract the offset to convert Molczan → McCants reference frame.
+	m := stdMag
+	if conv == ConventionMolczan {
+		m -= molczanOffset
 	}
 
 	// Distance modulus relative to 1000 km reference.
@@ -65,13 +78,11 @@ func SatelliteApparent(stdMag float64, _ StdMagConvention, rangeKm float64, alph
 
 	phaseMag := -2.5 * math.Log10(psi)
 
-	// McCants convention already includes the phase at 90° in the reference.
-	// Molczan is similar but with different assumptions.
 	// The phase correction is relative to the reference geometry (α=90°).
 	refPsi := satPhaseFunction(math.Pi/2, shape) // Ψ at 90°
 	refMag := -2.5 * math.Log10(refPsi)
 
-	return stdMag + distMod + phaseMag - refMag
+	return m + distMod + phaseMag - refMag
 }
 
 // satPhaseFunction evaluates the phase function for the given shape model.
