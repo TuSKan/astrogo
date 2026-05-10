@@ -21,11 +21,13 @@ const mastAPI = "https://mast.stsci.edu/api/v0/invoke"
 // ErrAPIError indicates a MAST API error response.
 var ErrAPIError = errors.New("mast: API error")
 
+// Provider implements the resolve.Provider interface for the MAST catalog.
 type Provider struct {
 	client *resolve.Client
 	cache  resolve.Cache
 }
 
+// New creates a new MAST provider.
 func New() *Provider {
 	return &Provider{
 		client: resolve.NewClient(),
@@ -33,12 +35,15 @@ func New() *Provider {
 	}
 }
 
+// Name returns the name of the provider.
 func (p *Provider) Name() string { return "mast" }
 
+// Capabilities returns the capabilities of the provider.
 func (p *Provider) Capabilities() []resolve.Capability {
 	return []resolve.Capability{resolve.CapObjectResolution, resolve.CapConeSearch}
 }
 
+// Resolve resolves a query to a target.
 func (p *Provider) Resolve(query string) (resolve.Target, bool) {
 	targets := p.Search(query)
 	if len(targets) > 0 {
@@ -48,6 +53,7 @@ func (p *Provider) Resolve(query string) (resolve.Target, bool) {
 	return resolve.Target{}, false
 }
 
+// Search searches for targets matching the query.
 func (p *Provider) Search(query string) []resolve.Target {
 	ctx := context.TODO()
 	req := resolve.ObjectRequest{Query: query, Limit: 10}
@@ -67,6 +73,7 @@ func (p *Provider) Search(query string) []resolve.Target {
 	return targets
 }
 
+// ResolveObject resolves a query to a target.
 func (p *Provider) ResolveObject(ctx context.Context, req resolve.ObjectRequest) resolve.SeqIterator[resolve.Target] {
 	cacheKey := "resolve:mast:" + resolve.Normalize(req.Query)
 	if seq, ok := p.cache.Get(cacheKey); ok {
@@ -81,7 +88,11 @@ func (p *Provider) ResolveObject(ctx context.Context, req resolve.ObjectRequest)
 		},
 	}
 
-	b, _ := json.Marshal(payload)
+	b, err := json.Marshal(payload)
+	if err != nil {
+		return resolve.SliceSeq([]resolve.Target{})
+	}
+
 	v := url.Values{}
 	v.Set("request", string(b))
 
@@ -187,7 +198,8 @@ func (p *Provider) ResolveObject(ctx context.Context, req resolve.ObjectRequest)
 	}
 }
 
-func (p *Provider) ConeSearch(ctx context.Context, req resolve.ConeRequest) resolve.SeqIterator[resolve.Target] {
+// ConeSearch implements cone search using CAOM.
+func (p *Provider) ConeSearch(_ context.Context, _ resolve.ConeRequest) resolve.SeqIterator[resolve.Target] {
 	// Minimal stub for CAOM spatial search
 	return resolve.SliceSeq([]resolve.Target{})
 }

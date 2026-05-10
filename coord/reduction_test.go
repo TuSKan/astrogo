@@ -37,6 +37,8 @@ func getTargetAtAltitude(site *coord.Geodetic, obsTime time.Time, minAlt, maxAlt
 
 // Helper to check numerical safety
 func assertFinite(t *testing.T, val float64, name string) {
+	t.Helper()
+
 	if math.IsNaN(val) || math.IsInf(val, 0) {
 		t.Errorf("Numerical safety failed: %s is NaN or Inf (%v)", name, val)
 	}

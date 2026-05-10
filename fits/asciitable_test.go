@@ -7,7 +7,7 @@ import (
 	"github.com/TuSKan/astrogo/internal/testutil"
 )
 
-func TestReadAsciiTable(t *testing.T) {
+func TestReadASCIITable(t *testing.T) {
 	h := NewHeader()
 	h.Append(Card{Keyword: "TFIELDS", Value: "1"})
 	h.Append(Card{Keyword: "NAXIS2", Value: "1"})
@@ -18,7 +18,7 @@ func TestReadAsciiTable(t *testing.T) {
 	copy(padded, payload)
 
 	r := bytes.NewReader(padded)
-	hdu, err := ReadAsciiTable(h, r)
+	hdu, err := ReadASCIITable(h, r)
 	testutil.AssertNoError(t, err)
 
 	if hdu.Cols != 1 || hdu.Rows != 1 || hdu.RowSize != 10 {
@@ -28,7 +28,7 @@ func TestReadAsciiTable(t *testing.T) {
 	// Error missing TFIELDS
 	h2 := NewHeader()
 
-	_, err = ReadAsciiTable(h2, bytes.NewReader(nil))
+	_, err = ReadASCIITable(h2, bytes.NewReader(nil))
 	if err == nil {
 		t.Errorf("expected error missing TFIELDS")
 	}

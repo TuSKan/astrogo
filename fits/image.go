@@ -24,9 +24,10 @@ const (
 
 // ImageHDU represents a FITS image matrix (N-dimensional).
 type ImageHDU struct {
-	Tensor tensor.Interface
-	Axes   []int64
 	basicHDU
+
+	Tensor   tensor.Interface
+	Axes     []int64
 	Bitpix   int
 	BScale   float64
 	BZero    float64

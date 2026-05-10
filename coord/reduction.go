@@ -44,15 +44,6 @@ func NewReducer(site *Geodetic, t time.Time, atmos atmosphere.Atmosphere) *Reduc
 	}
 }
 
-// context returns the lazily-initialized Context, building it on first access.
-func (r *Reducer) context() *Context {
-	r.once.Do(func() {
-		r.ctx = NewContext(r.time, r.site, r.atmos)
-	})
-
-	return r.ctx
-}
-
 // Reduce translates a geocentric inertial vector into topocentric coordinates,
 // explicitly modeling Earth orientation, topological observer displacement,
 // and applying the environmental refraction model.
@@ -120,4 +111,13 @@ func (r *Reducer) Disperse(v vector.Vec3, wavelengths []float64) *Reduction {
 	}
 
 	return res
+}
+
+// context returns the lazily-initialized Context, building it on first access.
+func (r *Reducer) context() *Context {
+	r.once.Do(func() {
+		r.ctx = NewContext(r.time, r.site, r.atmos)
+	})
+
+	return r.ctx
 }

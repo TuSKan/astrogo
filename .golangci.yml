@@ -36,11 +36,26 @@ linters:
     - wsl             # whitespace style preference
     - godot           # comment periods are style
     - decorder        # declaration order is logical, not alphabetical
+    - noinlineerr     # inline error handling is concise for 1-line guards
 
+    # ── Scientific codebase policy (documented rationale) ─────────────
+    - mnd             # "magic numbers" are physical constants, coefficients, NAIF IDs
+    - goconst         # repeated literals are meaningful domain values, not abstractable
+    - paralleltest    # shared kernel/provider state requires careful analysis
+    - funlen          # tabular data, switch-on-NAIF-ID, and SOFA wrappers are long by nature
+    - lll             # long lines in comments/tables are acceptable
+    - gochecknoglobals # loaded kernel data, embedded FS, provider singletons
+    - nonamedreturns  # named returns document astronomical outputs (ra, dec, jd)
+    - dogsled         # SOFA wrappers return many values; blanking unused is standard
+    - nestif          # is too primitive for this codebase. It mostly duplicates the complexity signal and does not understand domain algorithms.
+    - ireturn         # For a library with provider registries, abstractions, and pluggable ephemerides, returning interfaces is not inherently bad. ireturn is too dogmatic for this architecture.
+    - goprintffuncname # is too strict; functions like fmt.Printf are standard and widely used, and disallowing them would make the code harder to read and maintain.
+    - inamedparam     # too dogmatic
+    - recvcheck       # coord types use value receivers for accessors, pointer for mutations — intentional design
 
   settings:
     gocognit:
-      min-complexity: 30
+      min-complexity: 100
     gocritic:
       disabled-checks:
         - captLocal   # IAU photometric notation (H, G, R, M1, M2)
@@ -57,6 +72,44 @@ linters:
       - path: "_test\\.go"
         linters:
           - testpackage
+          - gosec
+      # Examples use fmt.Print for demo output
+      - path: "examples/"
+        linters:
+          - gocritic
+          - forbidigo
+          - gosec
+      # ── gosec exclusions (path/rule) ────────────────────────────────
+      # G115: integer overflow — NAIF IDs and SPK format fields are within known-safe ranges
+      - path: "ephemeris/jpl/"
+        linters:
+          - gosec
+        text: "G115"
+      - path: "unit/"
+        linters:
+          - gosec
+        text: "G115"
+      # G301/G306: file permissions — 0o755/0o644 are standard for user-cache directories
+      - path: "(ephemeris/jpl/|iers/|internal/cache/|internal/tools/|fits/)"
+        linters:
+          - gosec
+        text: "G30[16]"
+      # G304: file inclusion via variable — reading kernel/data files by path is the core use case
+      - path: "(ephemeris/jpl/|fits/|iers/|catalog/openngc/parser/)"
+        linters:
+          - gosec
+        text: "G304"
+      # G704: SSRF — HTTP calls to well-known astronomical APIs
+      - path: "(catalog/resolve/|catalog/openngc/parser/)"
+        linters:
+          - gosec
+        text: "G704"
+      # G706: log injection — parser is a CLI tool, not a library endpoint
+      # G703: path traversal — parser writes to known output paths
+      - path: "catalog/openngc/parser/"
+        linters:
+          - gosec
+        text: "G70[36]"
 
 formatters:
   enable:

@@ -41,7 +41,8 @@ func main() {
 		log.Fatalf("failed to load JPL DE442: %v", err)
 	}
 	defer func() {
-		if err := prov.Close(); err != nil {
+		err := prov.Close()
+		if err != nil {
 			log.Printf("failed to close provider: %v", err)
 		}
 	}()
@@ -178,7 +179,7 @@ func main() {
 	// ── Part 4: Ecliptic Longitude Span ──────────────────────────────
 	fmt.Println("\n── Ecliptic Clustering Analysis ───────────────────────────────")
 
-	var lons []float64
+	lons := make([]float64, 0, len(planets))
 
 	for _, p := range planets {
 		icrs, _ := p.Target.Position(civilDusk.Time)

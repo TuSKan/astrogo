@@ -51,7 +51,7 @@ func TestSPKReader(t *testing.T) {
 		t.Fatal("expected more than 0 summaries")
 	}
 
-	var segments []spk.Segment
+	segments := make([]spk.Segment, 0, len(summaries))
 	for _, sum := range summaries {
 		segments = append(segments, spk.Segment{
 			Target:    sum.Integers[0],

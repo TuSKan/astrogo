@@ -1,4 +1,4 @@
-// Package eph provides celestial body positions and velocities for astronomical computing.
+// Package ephemeris provides celestial body positions and velocities for astronomical computing.
 //
 // # Architecture
 //

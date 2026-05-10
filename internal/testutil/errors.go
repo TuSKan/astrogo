@@ -11,46 +11,46 @@ import (
 
 // AssertNoError fails t if err != nil.
 // Use this when an operation must succeed.
-func AssertNoError(t testing.TB, err error) {
-	t.Helper()
+func AssertNoError(tb testing.TB, err error) {
+	tb.Helper()
 
 	if err != nil {
-		t.Errorf("unexpected error: %v", err)
+		tb.Errorf("unexpected error: %v", err)
 	}
 }
 
 // AssertError fails t if err == nil.
 // Use this when an operation must fail (any error is acceptable).
-func AssertError(t testing.TB, err error) {
-	t.Helper()
+func AssertError(tb testing.TB, err error) {
+	tb.Helper()
 
 	if err == nil {
-		t.Errorf("expected an error but got nil")
+		tb.Errorf("expected an error but got nil")
 	}
 }
 
 // AssertErrorContains fails t if err is nil or if err.Error() does not
 // contain substr.
-func AssertErrorContains(t testing.TB, err error, substr string) {
-	t.Helper()
+func AssertErrorContains(tb testing.TB, err error, substr string) {
+	tb.Helper()
 
 	if err == nil {
-		t.Errorf("expected error containing %q but got nil", substr)
+		tb.Errorf("expected error containing %q but got nil", substr)
 		return
 	}
 
 	if !strings.Contains(err.Error(), substr) {
-		t.Errorf("error %q does not contain %q", err.Error(), substr)
+		tb.Errorf("error %q does not contain %q", err.Error(), substr)
 	}
 }
 
 // AssertErrorIs fails t if !errors.Is(err, target).
 // Use this when the exact sentinel error matters.
-func AssertErrorIs(t testing.TB, err, target error) {
-	t.Helper()
+func AssertErrorIs(tb testing.TB, err, target error) {
+	tb.Helper()
 
 	if !errors.Is(err, target) {
-		t.Errorf("got error %v; want errors.Is match for %v", err, target)
+		tb.Errorf("got error %v; want errors.Is match for %v", err, target)
 	}
 }
 
@@ -71,12 +71,12 @@ func CaseLabel(i int, name string) string {
 // FailCase marks t as failed with a diagnostic that identifies the table row.
 // It uses t.Errorf so the test continues running remaining cases.
 // i is the zero-based row index; name is optional.
-func FailCase(t testing.TB, i int, name, format string, args ...any) {
-	t.Helper()
+func FailCase(tb testing.TB, i int, name, format string, args ...any) {
+	tb.Helper()
 
 	label := CaseLabel(i, name)
 	msg := fmt.Sprintf(format, args...)
-	t.Errorf("%s: %s", label, msg)
+	tb.Errorf("%s: %s", label, msg)
 }
 
 // RunCases iterates over a slice of test cases using t.Run subtests.

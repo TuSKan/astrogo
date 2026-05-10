@@ -6,10 +6,14 @@ import "io"
 type HDUType int
 
 const (
-	HDUTypeImage   HDUType = iota // Primary or Image Extension
-	HDUTypeASCII                  // TABLE
-	HDUTypeBinary                 // BINTABLE
-	HDUTypeUnknown                // Unknown extension type
+	// HDUTypeImage is a primary or image extension HDU.
+	HDUTypeImage HDUType = iota // Primary or Image Extension
+	// HDUTypeASCII is an ASCII table HDU.
+	HDUTypeASCII // TABLE
+	// HDUTypeBinary is a binary table HDU.
+	HDUTypeBinary // BINTABLE
+	// HDUTypeUnknown is an unknown extension type.
+	HDUTypeUnknown // Unknown extension type
 )
 
 // HDU (Header Data Unit) is the foundational FITS structure.
@@ -34,4 +38,4 @@ type basicHDU struct {
 
 func (h *basicHDU) Header() *Header          { return h.header }
 func (h *basicHDU) Type() HDUType            { return h.hType }
-func (h *basicHDU) Load(r io.ReaderAt) error { return nil } // Stub
+func (h *basicHDU) Load(_ io.ReaderAt) error { return nil } // Stub

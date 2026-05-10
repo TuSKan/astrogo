@@ -49,51 +49,6 @@ func NewFromTLE(name, line1, line2 string) (*Satellite, error) {
 	}, nil
 }
 
-// parseMeanMotion extracts mean motion (rev/day) from TLE line 2,
-// columns 53–63 (0-indexed).
-func parseMeanMotion(line2 string) float64 {
-	if len(line2) < 63 {
-		return 0
-	}
-
-	s := strings.TrimSpace(line2[52:63])
-
-	mm, err := strconv.ParseFloat(s, 64)
-	if err != nil {
-		return 0
-	}
-
-	return mm
-}
-
-// propagateECI returns the TEME position and velocity (km, km/s) at time t.
-// The go-satellite Propagate API accepts integer seconds, so we propagate
-// to the truncated second and linearly interpolate position for the
-// sub-second remainder using the velocity vector. This reduces the
-// position error from up to ~7.7 km (at LEO velocity) to < 1 m.
-func (s *Satellite) propagateECI(t time.Time) (pos, vel vector.Vec3, err error) {
-	year, month, day, hour, min, sec, fracSec := timeToComponents(t)
-	eciPos, eciVel := gosatellite.Propagate(s.sat, year, month, day, hour, min, sec)
-
-	// Check for propagation failure (NaN or zero position).
-	if math.IsNaN(eciPos.X) || math.IsNaN(eciPos.Y) || math.IsNaN(eciPos.Z) {
-		return vector.Vec3{}, vector.Vec3{}, fmt.Errorf(
-			"%w: NaN position at %s", ErrPropagation, t)
-	}
-
-	vel = vector.V3(eciVel.X, eciVel.Y, eciVel.Z)
-
-	// Linear interpolation for sub-second fraction:
-	// pos_corrected = pos_truncated + vel * fracSec
-	pos = vector.V3(
-		eciPos.X+eciVel.X*fracSec,
-		eciPos.Y+eciVel.Y*fracSec,
-		eciPos.Z+eciVel.Z*fracSec,
-	)
-
-	return pos, vel, nil
-}
-
 // State returns the geocentric position/velocity in GCRS (AU, AU/day),
 // implementing the [core.Provider] interface contract.
 //
@@ -117,6 +72,71 @@ func (s *Satellite) State(_ core.ID, t time.Time) (core.State, error) {
 
 // Close is a no-op for satellite providers (no file handles).
 func (s *Satellite) Close() error { return nil }
+
+// OrbitalPeriod returns the orbital period in minutes, derived from mean motion.
+func (s *Satellite) OrbitalPeriod() float64 {
+	if s.MeanMotion <= 0 {
+		return 0
+	}
+
+	return 1440.0 / s.MeanMotion // minutes
+}
+
+// Altitude returns the precise altitude above the WGS84 ellipsoid at time t, in kilometres.
+// This uses the sub-satellite geodetic computation for WGS84-precise values.
+func (s *Satellite) Altitude(t time.Time) (float64, error) {
+	geo, err := s.subSatellitePoint(t)
+	if err != nil {
+		return 0, err
+	}
+
+	return geo.Height() / 1e3, nil // metres → km
+}
+
+// parseMeanMotion extracts mean motion (rev/day) from TLE line 2,
+// columns 53–63 (0-indexed).
+func parseMeanMotion(line2 string) float64 {
+	if len(line2) < 63 {
+		return 0
+	}
+
+	s := strings.TrimSpace(line2[52:63])
+
+	mm, err := strconv.ParseFloat(s, 64)
+	if err != nil {
+		return 0
+	}
+
+	return mm
+}
+
+// propagateECI returns the TEME position and velocity (km, km/s) at time t.
+// The go-satellite Propagate API accepts integer seconds, so we propagate
+// to the truncated second and linearly interpolate position for the
+// sub-second remainder using the velocity vector. This reduces the
+// position error from up to ~7.7 km (at LEO velocity) to < 1 m.
+func (s *Satellite) propagateECI(t time.Time) (pos, vel vector.Vec3, err error) {
+	year, month, day, hour, minute, second, fracSec := timeToComponents(t)
+	eciPos, eciVel := gosatellite.Propagate(s.sat, year, month, day, hour, minute, second)
+
+	// Check for propagation failure (NaN or zero position).
+	if math.IsNaN(eciPos.X) || math.IsNaN(eciPos.Y) || math.IsNaN(eciPos.Z) {
+		return vector.Vec3{}, vector.Vec3{}, fmt.Errorf(
+			"%w: NaN position at %s", ErrPropagation, t)
+	}
+
+	vel = vector.V3(eciVel.X, eciVel.Y, eciVel.Z)
+
+	// Linear interpolation for sub-second fraction:
+	// pos_corrected = pos_truncated + vel * fracSec
+	pos = vector.V3(
+		eciPos.X+eciVel.X*fracSec,
+		eciPos.Y+eciVel.Y*fracSec,
+		eciPos.Z+eciVel.Z*fracSec,
+	)
+
+	return pos, vel, nil
+}
 
 // subSatellitePoint returns the geodetic coordinates (lat, lon, altitude)
 // of the sub-satellite point at time t.
@@ -145,26 +165,6 @@ func (s *Satellite) subSatellitePoint(t time.Time) (*coord.Geodetic, error) {
 	}
 
 	return geo, nil
-}
-
-// OrbitalPeriod returns the orbital period in minutes, derived from mean motion.
-func (s *Satellite) OrbitalPeriod() float64 {
-	if s.MeanMotion <= 0 {
-		return 0
-	}
-
-	return 1440.0 / s.MeanMotion // minutes
-}
-
-// Altitude returns the precise altitude above the WGS84 ellipsoid at time t, in kilometres.
-// This uses the sub-satellite geodetic computation for WGS84-precise values.
-func (s *Satellite) Altitude(t time.Time) (float64, error) {
-	geo, err := s.subSatellitePoint(t)
-	if err != nil {
-		return 0, err
-	}
-
-	return geo.Height() / 1e3, nil // metres → km
 }
 
 // temeToGCRS converts TEME position/velocity (km, km/s) to GCRS using
@@ -244,7 +244,7 @@ func computeGMST(t time.Time) float64 {
 // timeToComponents extracts calendar components from an astrogo time for SGP4.
 // Returns integer year/month/day/hour/min/sec and the fractional second
 // remainder for sub-second velocity interpolation.
-func timeToComponents(t time.Time) (year, month, day, hour, min, sec int, fracSec float64) {
+func timeToComponents(t time.Time) (year, month, day, hour, minute, second int, fracSec float64) {
 	// Extract month/day from the Julian Date.
 	jd1, jd2 := t.JDParts()
 	y, m, d, frac, _ := gofaext.JdToDate(jd1, jd2)
@@ -256,10 +256,10 @@ func timeToComponents(t time.Time) (year, month, day, hour, min, sec int, fracSe
 	totalSec := frac * secPerDay
 	hour = int(totalSec / 3600)
 	totalSec -= float64(hour) * 3600
-	min = int(totalSec / 60)
-	totalSec -= float64(min) * 60
-	sec = int(totalSec)
-	fracSec = totalSec - float64(sec)
+	minute = int(totalSec / 60)
+	totalSec -= float64(minute) * 60
+	second = int(totalSec)
+	fracSec = totalSec - float64(second)
 
-	return year, month, day, hour, min, sec, fracSec
+	return year, month, day, hour, minute, second, fracSec
 }

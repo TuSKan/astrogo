@@ -12,13 +12,18 @@ import (
 )
 
 const (
+	// BlockSize is the size of a FITS block.
 	BlockSize = 2880
-	CardSize  = 80
+	// CardSize is the size of a FITS card.
+	CardSize = 80
 )
 
 var (
-	ErrInvalidBlock  = errors.New("fits: block size is not 2880 bytes")
-	ErrNoPrimaryHDU  = errors.New("fits: missing primary HDU")
+	// ErrInvalidBlock is returned when a block size is not 2880 bytes.
+	ErrInvalidBlock = errors.New("fits: block size is not 2880 bytes")
+	// ErrNoPrimaryHDU is returned when a primary HDU is not found.
+	ErrNoPrimaryHDU = errors.New("fits: missing primary HDU")
+	// ErrUnimplemented is returned when a feature is not yet implemented.
 	ErrUnimplemented = errors.New("fits: feature not yet implemented")
 )
 
@@ -35,7 +40,8 @@ func Open(path string) (_ *File, err error) {
 		return nil, fmt.Errorf("fits: open: %w", err)
 	}
 	defer func() {
-		if cerr := f.Close(); cerr != nil {
+		cerr := f.Close()
+		if cerr != nil {
 			err = errors.Join(err, cerr)
 		}
 	}()
@@ -48,7 +54,8 @@ func Open(path string) (_ *File, err error) {
 		// Notice: pgzip.Reader does not support io.Seeker.
 		// The underlying fits.Read loop will gracefully fallback to streaming.
 		defer func() {
-			if cerr := gzReader.Close(); cerr != nil {
+			cerr := gzReader.Close()
+			if cerr != nil {
 				err = errors.Join(err, cerr)
 			}
 		}()
@@ -147,6 +154,9 @@ func payloadSize(h *Header) int64 {
 	return bytes
 }
 
+// ReadHeader reads a FITS header from a block reader.
+// It reads up to 10000 blocks (28MB) to find the END card.
+// This is a safety measure to prevent infinite loops in case of corrupted files.
 func ReadHeader(br *BlockReader) (*Header, error) {
 	h := NewHeader()
 	buf := make([]byte, BlockSize)
@@ -199,7 +209,6 @@ func (b *BlockReader) ReadBlock(buf []byte) error {
 	}
 
 	_, err := io.ReadFull(b.r, buf)
-
 	if err != nil {
 		return fmt.Errorf("fits: read block: %w", err)
 	}
@@ -209,7 +218,8 @@ func (b *BlockReader) ReadBlock(buf []byte) error {
 
 // ReadBigEndian is a zero-reflection utility to read binary values from FITS arrays
 func ReadBigEndian(r io.Reader, data any) error {
-	if err := binary.Read(r, binary.BigEndian, data); err != nil {
+	err := binary.Read(r, binary.BigEndian, data)
+	if err != nil {
 		return fmt.Errorf("fits: read big-endian: %w", err)
 	}
 
@@ -217,6 +227,6 @@ func ReadBigEndian(r io.Reader, data any) error {
 }
 
 // Write scaffolds writing a basic HDU to a FITS file.
-func Write(path string, data []float64) error {
+func Write(_ string, _ []float64) error {
 	return ErrUnimplemented
 }

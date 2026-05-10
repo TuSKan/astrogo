@@ -1,4 +1,3 @@
-// Package catalog provides a lightweight astronomical object catalog system.
 package catalog
 
 import (
@@ -20,27 +19,42 @@ import (
 type Source int
 
 const (
+	// OpenNGC is the embedded OpenNGC deep-sky catalog.
 	OpenNGC Source = iota
+	// SIMBAD is the CDS SIMBAD astronomical database.
 	SIMBAD
+	// MAST is the Mikulski Archive for Space Telescopes.
 	MAST
+	// JPL is the NASA JPL Horizons ephemeris service.
 	JPL
+	// SBDB is the NASA JPL Small-Body Database.
 	SBDB
+	// Gaia is the ESA Gaia DR3 catalog via TAP.
 	Gaia
+	// VizieR is the CDS VizieR catalog service.
 	VizieR
+	// NORAD is the NORAD space-track satellite catalog.
 	NORAD
 )
 
 var (
-	ErrNotFound  = errors.New("target not found")
+	// ErrNotFound is returned when no catalog provider can resolve a query.
+	ErrNotFound = errors.New("target not found")
+	// ErrAmbiguous is returned when a query matches multiple targets.
 	ErrAmbiguous = errors.New("ambiguous target name")
 )
 
-// Export core types directly via Type Aliasing to break cyclic dependencies natively.
+// Target and related types are re-exported from the resolve package.
 type (
-	Target             = resolve.Target
-	Provider           = resolve.Provider
-	Kind               = resolve.Kind
-	ObjectRequest      = resolve.ObjectRequest
+	// Target is a resolved astronomical target.
+	Target = resolve.Target
+	// Provider is a catalog data source.
+	Provider = resolve.Provider
+	// Kind is the classification of an astronomical object.
+	Kind = resolve.Kind
+	// ObjectRequest is a query for resolving objects.
+	ObjectRequest = resolve.ObjectRequest
+	// SeqIterator is a streaming result iterator.
 	SeqIterator[T any] = resolve.SeqIterator[T]
 )
 
@@ -77,6 +91,7 @@ func NewResolver(sources ...Source) *Resolver {
 	return &Resolver{providers: providers}
 }
 
+// Resolve finds a single target matching the query across all providers.
 func (r *Resolver) Resolve(query string) (Target, error) {
 	q := resolve.Normalize(query)
 	if q == "" {
@@ -100,6 +115,7 @@ func (r *Resolver) Resolve(query string) (Target, error) {
 	return Target{}, ErrNotFound
 }
 
+// Search returns all matching targets from all providers.
 func (r *Resolver) Search(query string) []Target {
 	q := resolve.Normalize(query)
 	if q == "" {

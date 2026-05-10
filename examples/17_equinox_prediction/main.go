@@ -31,7 +31,8 @@ func main() {
 		log.Fatalf("ephemeris: %v", err)
 	}
 	defer func() {
-		if err := prov.Close(); err != nil {
+		err := prov.Close()
+		if err != nil {
 			log.Printf("failed to close provider: %v", err)
 		}
 	}()

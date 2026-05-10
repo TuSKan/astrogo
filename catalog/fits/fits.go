@@ -19,6 +19,7 @@ var (
 	ErrMissingColumns = errors.New("catalog/fits: missing required mapping columns in bintable")
 )
 
+// Provider loads targets from a FITS binary table file.
 type Provider struct {
 	name    string
 	targets []resolve.Target
@@ -46,12 +47,12 @@ func New(filePath string) (*Provider, error) {
 		return nil, fmt.Errorf("%w: %s", ErrNoBintable, filePath)
 	}
 
-	ids, errId := bintable.GetStringColumn("ID")
+	ids, errID := bintable.GetStringColumn("ID")
 	names, errName := bintable.GetStringColumn("NAME")
 	ras, errRa := bintable.GetFloatColumn("RA")
 	decs, errDec := bintable.GetFloatColumn("DEC")
 
-	if errId != nil || errName != nil || errRa != nil || errDec != nil {
+	if errID != nil || errName != nil || errRa != nil || errDec != nil {
 		return nil, ErrMissingColumns
 	}
 

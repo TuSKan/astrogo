@@ -5,9 +5,9 @@ import (
 	"io"
 )
 
-// AsciiTableHDU represents a FITS ASCII Table extension (TABLE).
+// ASCIITableHDU represents a FITS ASCII Table extension (TABLE).
 // ASCII Tables use string formatting natively.
-type AsciiTableHDU struct {
+type ASCIITableHDU struct {
 	basicHDU
 
 	Rows    int // NAXIS2
@@ -15,9 +15,9 @@ type AsciiTableHDU struct {
 	RowSize int // NAXIS1
 }
 
-// ReadAsciiTable scaffolds the ingestion of ASCII TABLE payloads.
+// ReadASCIITable scaffolds the ingestion of ASCII TABLE payloads.
 // Because it is lower priority than BINTABLE, it currently returns standard unloaded frames.
-func ReadAsciiTable(h *Header, r io.Reader) (*AsciiTableHDU, error) {
+func ReadASCIITable(h *Header, r io.Reader) (*ASCIITableHDU, error) {
 	tfields, err := h.GetInt("TFIELDS")
 	if err != nil {
 		return nil, fmt.Errorf("missing TFIELDS: %w", err)
@@ -26,7 +26,7 @@ func ReadAsciiTable(h *Header, r io.Reader) (*AsciiTableHDU, error) {
 	rows, _ := h.GetInt("NAXIS2")
 	rowSize, _ := h.GetInt("NAXIS1")
 
-	hdu := &AsciiTableHDU{
+	hdu := &ASCIITableHDU{
 		basicHDU: basicHDU{header: h, hType: HDUTypeASCII},
 		Rows:     rows,
 		Cols:     tfields,

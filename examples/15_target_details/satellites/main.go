@@ -1,3 +1,4 @@
+// Package main demonstrates satellite target details.
 package main
 
 import (
@@ -31,7 +32,8 @@ func main() {
 		log.Fatalf("failed to create satellite provider: %v", err)
 	}
 	defer func() {
-		if err := prov.Close(); err != nil {
+		err := prov.Close()
+		if err != nil {
 			log.Printf("failed to close provider: %v", err)
 		}
 	}()

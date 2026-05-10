@@ -103,7 +103,7 @@ func TestMapCacheWriteRead(t *testing.T) {
 
 	var o []resolve.Target
 
-	seq2(func(tar resolve.Target, err error) bool {
+	seq2(func(tar resolve.Target, _ error) bool {
 		o = append(o, tar)
 		return true
 	})

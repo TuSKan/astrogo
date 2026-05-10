@@ -2,6 +2,7 @@ package magnitude_test
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -36,7 +37,7 @@ import (
 const finkBaseURL = "https://api.ztf.fink-portal.org"
 
 // finkSSOQuery queries the /api/v1/sso endpoint for a named SSO.
-func finkSSOQuery(t *testing.T, numberOrDesig string, withResiduals, withEphem bool) []map[string]any {
+func finkSSOQuery(t *testing.T, numberOrDesig string, withResiduals, withEphem bool) []map[string]any { //nolint:unparam // designed for reuse
 	t.Helper()
 
 	body := map[string]any{
@@ -45,14 +46,27 @@ func finkSSOQuery(t *testing.T, numberOrDesig string, withResiduals, withEphem b
 		"withEphem":     withEphem,
 		"output-format": "json",
 	}
-	raw, _ := json.Marshal(body)
 
-	resp, err := http.Post(finkBaseURL+"/api/v1/sso", "application/json", bytes.NewReader(raw))
+	raw, err := json.Marshal(body)
+	if err != nil {
+		t.Fatalf("FINK SSO JSON marshal failed: %v", err)
+	}
+
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, finkBaseURL+"/api/v1/sso", bytes.NewReader(raw))
+	if err != nil {
+		t.Fatalf("FINK SSO request build failed: %v", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatalf("FINK SSO query failed: %v", err)
 	}
+
 	t.Cleanup(func() {
-		if err := resp.Body.Close(); err != nil {
+		err := resp.Body.Close()
+		if err != nil {
 			t.Errorf("failed to close response body: %v", err)
 		}
 	})

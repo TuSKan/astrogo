@@ -13,56 +13,102 @@ import (
 type Kind string
 
 const (
-	KindStar             Kind = "Star"
-	KindPlanet           Kind = "Planet"
-	KindMoon             Kind = "Moon"
-	KindGalaxy           Kind = "Galaxy"
-	KindNebula           Kind = "Nebula"
-	KindStarCluster      Kind = "StarCluster"
-	KindOpenCluster      Kind = "OpenCluster"
-	KindGlobularCluster  Kind = "GlobularCluster"
+	// KindStar represents a star.
+	KindStar Kind = "Star"
+	// KindPlanet represents a planet.
+	KindPlanet Kind = "Planet"
+	// KindMoon represents a moon.
+	KindMoon Kind = "Moon"
+	// KindGalaxy represents a galaxy.
+	KindGalaxy Kind = "Galaxy"
+	// KindNebula represents a nebula.
+	KindNebula Kind = "Nebula"
+	// KindStarCluster represents a star cluster.
+	KindStarCluster Kind = "StarCluster"
+	// KindOpenCluster represents an open cluster.
+	KindOpenCluster Kind = "OpenCluster"
+	// KindGlobularCluster represents a globular cluster.
+	KindGlobularCluster Kind = "GlobularCluster"
+	// KindSupernovaRemnant represents a supernova remnant.
 	KindSupernovaRemnant Kind = "SupernovaRemnant"
-	KindAsterism         Kind = "Asterism"
-	KindDoubleStar       Kind = "DoubleStar"
-	KindOther            Kind = "Other"
+	// KindAsterism represents an asterism.
+	KindAsterism Kind = "Asterism"
+	// KindDoubleStar represents a double star.
+	KindDoubleStar Kind = "DoubleStar"
+	// KindOther represents other celestial objects.
+	KindOther Kind = "Other"
 )
 
 // Target represents an astronomical object in a resolve.
 type Target struct {
-	Epoch          time.Time
-	Catalog        string
-	Name           string
-	Designation    string
-	SPKID          string
-	Kind           Kind
-	ID             string
-	TLELine2       string
-	TLELine1       string
-	Aliases        []string
-	Coord          coord.ICRS
-	VMag           float64
-	G2             float64
-	Parallax       angle.Angle
-	PmDec          angle.Angle
-	PmRA           angle.Angle
-	Oblateness     float64
-	SpinDec        float64
-	H              float64
-	G              float64
-	SpinRA         float64
-	M1             float64
-	K1             float64
-	M2             float64
-	K2             float64
+	// Epoch is the epoch of the target.
+	Epoch time.Time
+	// Catalog is the catalog of the target.
+	Catalog string
+	// Name is the name of the target.
+	Name string
+	// Designation is the designation of the target.
+	Designation string
+	// SPKID is the SPKID of the target.
+	SPKID string
+	// Kind is the kind of the target.
+	Kind Kind
+	// ID is the ID of the target.
+	ID string
+	// TLELine2 is the TLE line 2 of the target.
+	TLELine2 string
+	// TLELine1 is the TLE line 1 of the target.
+	TLELine1 string
+	// Aliases are the aliases of the target.
+	Aliases []string
+	// Coord is the coordinate of the target.
+	Coord coord.ICRS
+	// VMag is the V magnitude of the target.
+	VMag float64
+	// G2 is the G2 of the target.
+	G2 float64
+	// Parallax is the parallax of the target.
+	Parallax angle.Angle
+	// PmDec is the proper motion in declination of the target.
+	PmDec angle.Angle
+	// PmRA is the proper motion in right ascension of the target.
+	PmRA angle.Angle
+	// Oblateness is the oblateness of the target.
+	Oblateness float64
+	// SpinDec is the spin declination of the target.
+	SpinDec float64
+	// H is the absolute magnitude of the target.
+	H float64
+	// G is the phase coefficient of the target.
+	G float64
+	// SpinRA is the spin right ascension of the target.
+	SpinRA float64
+	// M1 is the total magnitude of the target.
+	M1 float64
+	// K1 is the phase coefficient of the target.
+	K1 float64
+	// M2 is the nuclear magnitude of the target.
+	M2 float64
+	// K2 is the phase coefficient of the target.
+	K2 float64
+	// RadialVelocity is the radial velocity of the target.
 	RadialVelocity float64
-	G1             float64
-	HasM1          bool
-	HasG1G2        bool
-	HasH           bool
-	HasVMag        bool
-	HasSpin        bool
-	HasCoord       bool
-	HasOblateness  bool
+	// G1 is the phase coefficient of the target.
+	G1 float64
+	// HasM1 is true if the target has M1.
+	HasM1 bool
+	// HasG1G2 is true if the target has G1 and G2.
+	HasG1G2 bool
+	// HasH is true if the target has H.
+	HasH bool
+	// HasVMag is true if the target has VMag.
+	HasVMag bool
+	// HasSpin is true if the target has spin information.
+	HasSpin bool
+	// HasCoord is true if the target has coordinate information.
+	HasCoord bool
+	// HasOblateness is true if the target has oblateness information.
+	HasOblateness bool
 }
 
 // ICRS implements coord.Object for a static catalog Target.
@@ -78,7 +124,9 @@ type Provider interface {
 }
 
 var (
-	ErrNotFound  = errors.New("target not found")
+	// ErrNotFound is returned when no provider can resolve the query.
+	ErrNotFound = errors.New("target not found")
+	// ErrAmbiguous is returned when a query matches multiple targets.
 	ErrAmbiguous = errors.New("ambiguous target name")
 )
 

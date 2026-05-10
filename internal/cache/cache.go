@@ -27,7 +27,8 @@ func Dir(subsystem string) (string, error) {
 
 	dir := filepath.Join(base, appName, subsystem)
 
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	err = os.MkdirAll(dir, 0o755)
+	if err != nil {
 		return dir, fmt.Errorf("cache: mkdir %s: %w", dir, err)
 	}
 
@@ -44,7 +45,9 @@ func Path(subsystem, name string) (string, error) {
 	}
 
 	p := filepath.Join(base, appName, subsystem, filepath.FromSlash(name))
-	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+
+	err = os.MkdirAll(filepath.Dir(p), 0o755)
+	if err != nil {
 		return "", fmt.Errorf("cache: mkdir: %w", err)
 	}
 

@@ -25,6 +25,7 @@ type Provider struct {
 	cache  resolve.Cache
 }
 
+// New creates a new Gaia DR3 catalog provider.
 func New() *Provider {
 	return &Provider{
 		client: resolve.NewClient(),
@@ -32,20 +33,25 @@ func New() *Provider {
 	}
 }
 
+// Name returns the provider identifier.
 func (p *Provider) Name() string { return "gaia" }
 
+// Capabilities returns the set of supported resolution operations.
 func (p *Provider) Capabilities() []resolve.Capability {
 	return []resolve.Capability{resolve.CapConeSearch}
 }
 
-func (p *Provider) Resolve(query string) (resolve.Target, bool) {
+// Resolve always returns false for Gaia (no name resolution).
+func (p *Provider) Resolve(_ string) (resolve.Target, bool) {
 	return resolve.Target{}, false
 }
 
-func (p *Provider) Search(query string) []resolve.Target {
+// Search always returns nil for Gaia (no name search).
+func (p *Provider) Search(_ string) []resolve.Target {
 	return nil
 }
 
+// ConeSearch performs a spatial cone search via the Gaia DR3 TAP service.
 func (p *Provider) ConeSearch(ctx context.Context, req resolve.ConeRequest) resolve.SeqIterator[resolve.Target] {
 	limit := req.Limit
 	if limit <= 0 {
@@ -96,7 +102,8 @@ func (p *Provider) ConeSearch(ctx context.Context, req resolve.ConeRequest) reso
 			return
 		}
 
-		if err := p.cache.Set(cacheKey, targets); err != nil {
+		err = p.cache.Set(cacheKey, targets)
+		if err != nil {
 			yield(resolve.Target{}, err)
 			return
 		}

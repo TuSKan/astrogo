@@ -62,24 +62,29 @@ func NewEarthLocation(latDeg, lonDeg, heightMeters float64) (*Geodetic, error) {
 	return NewGeodetic(angle.Deg(lonDeg), angle.Deg(latDeg), heightMeters)
 }
 
+// Lon returns the longitude of the geodetic coordinate.
 func (g *Geodetic) Lon() angle.Angle {
 	return g.lon
 }
 
+// Lat returns the latitude of the geodetic coordinate.
 func (g *Geodetic) Lat() angle.Angle {
 	return g.lat
 }
 
+// Height returns the height above the ellipsoid.
 func (g *Geodetic) Height() float64 {
 	return g.height
 }
 
 // ── CoordinateSystem Implementation ──────────────────────────────────────────
 
+// Name returns the name of the coordinate system.
 func (g *Geodetic) Name() string {
 	return "Geodetic"
 }
 
+// Validate checks if the geodetic coordinate is valid.
 func (g *Geodetic) Validate() error {
 	if g.lat.Degrees() < -90 || g.lat.Degrees() > 90 {
 		return fmt.Errorf("geodetic: %w", ErrLatitudeRange)
@@ -88,8 +93,8 @@ func (g *Geodetic) Validate() error {
 	return nil
 }
 
+// ToUnitVector represents the unit direction outward from the center of the Earth.
 func (g *Geodetic) ToUnitVector() vector.Vec3 {
-	// Represents the unit direction outward from the center of the Earth.
 	// We extract it normalized effectively discarding height for the pure unit spherical representation.
 	phi := g.lat.Radians()
 	lam := g.lon.Radians()
@@ -103,8 +108,8 @@ func (g *Geodetic) ToUnitVector() vector.Vec3 {
 	)
 }
 
+// FromUnitVector restores the Lon/Lat from a unit direction. Height is zeroed.
 func (g *Geodetic) FromUnitVector(v vector.Vec3) {
-	// Restores the Lon/Lat from a unit direction. Height is zeroed.
 	p := math.Hypot(v.X, v.Y)
 	lat := math.Atan2(v.Z, p)
 	lon := math.Atan2(v.Y, v.X)
@@ -113,6 +118,7 @@ func (g *Geodetic) FromUnitVector(v vector.Vec3) {
 	g.height = 0
 }
 
+// Equal reports whether g and other represent the same geodetic coordinate.
 func (g *Geodetic) Equal(other *Geodetic) bool {
 	if other == nil {
 		return false

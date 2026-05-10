@@ -34,7 +34,7 @@ var ErrEOPHTTPStatus = errors.New("iers: EOP download returned unexpected status
 var (
 	fetchMu       sync.Mutex
 	lastAttempt   time.Time         // wall-clock of last fetch attempt (success or failure)
-	lastFetchErr  error             // non-nil if the most recent attempt failed
+	errLastFetch  error             // non-nil if the most recent attempt failed
 	retryCooldown = 5 * time.Minute // minimum interval between fetch attempts
 )
 
@@ -77,13 +77,13 @@ func FetchIfStale(mjd float64) error {
 
 	// Throttle retries so transient errors don't cause a request storm.
 	if !lastAttempt.IsZero() && time.Since(lastAttempt) < retryCooldown {
-		return lastFetchErr // may be nil (successful) or the prior error
+		return errLastFetch // may be nil (successful) or the prior error
 	}
 
 	lastAttempt = time.Now()
-	lastFetchErr = doFetch()
+	errLastFetch = doFetch()
 
-	return lastFetchErr
+	return errLastFetch
 }
 
 // covered reports whether the current global model covers the given MJD.
@@ -166,9 +166,9 @@ func doFetch() (err error) {
 	}
 
 	RegisterModel(table)
-	min, max := table.Coverage()
+	lo, hi := table.Coverage()
 	log.Printf("astrogo/iers: loaded fresh EOP data: MJD %.0f–%.0f (%d records)",
-		min, max, len(table.records))
+		lo, hi, len(table.records))
 
 	return nil
 }
@@ -185,9 +185,9 @@ func loadFromDisk(path string) error {
 	}
 
 	RegisterModel(table)
-	min, max := table.Coverage()
+	lo, hi := table.Coverage()
 	log.Printf("astrogo/iers: loaded cached EOP data: MJD %.0f–%.0f (%d records)",
-		min, max, len(table.records))
+		lo, hi, len(table.records))
 
 	return nil
 }

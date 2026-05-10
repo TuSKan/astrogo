@@ -1,3 +1,4 @@
+// Package main cross-validates astrogo ephemeris output against Skyfield.
 package main
 
 import (

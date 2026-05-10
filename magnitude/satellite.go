@@ -49,7 +49,7 @@ const (
 //   - rangeKm: observer–satellite range in kilometres
 //   - alpha: phase angle (Sun–satellite–observer)
 //   - shape: phase function model (sphere or cylinder)
-func SatelliteApparent(stdMag float64, conv StdMagConvention, rangeKm float64, alpha angle.Angle, shape SatPhaseModel) float64 {
+func SatelliteApparent(stdMag float64, _ StdMagConvention, rangeKm float64, alpha angle.Angle, shape SatPhaseModel) float64 {
 	if rangeKm <= 0 {
 		return stdMag
 	}
@@ -76,7 +76,7 @@ func SatelliteApparent(stdMag float64, conv StdMagConvention, rangeKm float64, a
 
 // satPhaseFunction evaluates the phase function for the given shape model.
 func satPhaseFunction(alphaRad float64, shape SatPhaseModel) float64 {
-	switch shape {
+	switch shape { //nolint:exhaustive // PhaseSphere handled by default
 	case PhaseCylinder:
 		sinA := math.Sin(alphaRad)
 		cosA := math.Cos(alphaRad)

@@ -13,8 +13,9 @@ import (
 
 // BintableHDU represents a FITS Binary Table extension.
 type BintableHDU struct {
-	Batch arrow.RecordBatch
 	basicHDU
+
+	Batch   arrow.RecordBatch
 	Rows    int
 	Cols    int
 	RowSize int

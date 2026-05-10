@@ -43,7 +43,8 @@ func OpenMmap(path string) (*MMapFile, error) {
 // Close gracefully releases the memory mapped handle mapping.
 func (m *MMapFile) Close() error {
 	if m.mapped != nil {
-		if err := m.mapped.Close(); err != nil {
+		err := m.mapped.Close()
+		if err != nil {
 			return fmt.Errorf("fits: close mmap: %w", err)
 		}
 

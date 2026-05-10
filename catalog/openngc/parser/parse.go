@@ -72,7 +72,7 @@ func main() {
 		log.Fatalf("error writing output: %v", err)
 	}
 
-	fmt.Printf("Successfully generated %d records to %s\n", len(records), outputPath)
+	log.Printf("Successfully generated %d records to %s\n", len(records), outputPath)
 }
 
 type targetRecord struct {
@@ -207,7 +207,8 @@ func extractMag(row []string, col map[string]int, colName string) string {
 		return ""
 	}
 	// Validate it's a parseable number.
-	if _, err := strconv.ParseFloat(v, 64); err != nil {
+	_, err := strconv.ParseFloat(v, 64)
+	if err != nil {
 		return ""
 	}
 
@@ -322,7 +323,8 @@ func writeRuntimeCSV(path string, records []targetRecord) (err error) {
 
 	w := csv.NewWriter(f)
 	// Output format: id,name,kind,ra_deg,dec_deg,aliases(semicolon separated),vmag,bmag
-	if err := w.Write([]string{"id", "name", "kind", "ra", "dec", "aliases", "vmag", "bmag"}); err != nil {
+	err = w.Write([]string{"id", "name", "kind", "ra", "dec", "aliases", "vmag", "bmag"})
+	if err != nil {
 		return fmt.Errorf("openngc: write header: %w", err)
 	}
 
@@ -344,7 +346,8 @@ func writeRuntimeCSV(path string, records []targetRecord) (err error) {
 
 	w.Flush()
 
-	if err := w.Error(); err != nil {
+	err = w.Error()
+	if err != nil {
 		return fmt.Errorf("openngc: flush: %w", err)
 	}
 

@@ -77,20 +77,32 @@ const (
 
 	// -- FamilyOverlap (Phase 2/3) --
 
+	// EventOccultationStart represents the start of an occultation.
 	EventOccultationStart
+	// EventOccultationEnd represents the end of an occultation.
 	EventOccultationEnd
+	// EventEclipseStart represents the start of an eclipse.
 	EventEclipseStart
+	// EventEclipseEnd represents the end of an eclipse.
 	EventEclipseEnd
+	// EventIngress represents the ingress of a transit or eclipse.
 	EventIngress
+	// EventEgress represents the egress of a transit or eclipse.
 	EventEgress
 
 	// -- FamilyIllumination (Phase 3) --
 
+	// EventNewMoon is when the Sun-Moon elongation is 0°.
 	EventNewMoon
+	// EventFirstQuarter is when the Sun-Moon elongation is 90°.
 	EventFirstQuarter
+	// EventFullMoon is when the Sun-Moon elongation is 180°.
 	EventFullMoon
+	// EventLastQuarter is when the Sun-Moon elongation is 270°.
 	EventLastQuarter
+	// EventMaxIllumination is when the illumination is maximal.
 	EventMaxIllumination
+	// EventMinIllumination is when the illumination is minimal.
 	EventMinIllumination
 )
 
@@ -100,7 +112,7 @@ const (
 )
 
 func (k EventKind) String() string {
-	switch k {
+	switch k { //nolint:exhaustive // only named kinds have string representation
 	case EventRise:
 		return "Rise"
 	case EventSet:
@@ -186,7 +198,7 @@ func (s EventSpec) Validate() error {
 
 // isPhaseEvent returns true for EventKinds in the Illumination family.
 func isPhaseEvent(k EventKind) bool {
-	switch k {
+	switch k { //nolint:exhaustive // only phase events checked
 	case EventNewMoon, EventFirstQuarter, EventFullMoon, EventLastQuarter,
 		EventMaxIllumination, EventMinIllumination:
 		return true
@@ -234,7 +246,7 @@ func (s EventSolver) Find(spec EventSpec, start, end time.Time) ([]Event, error)
 		err    error
 	)
 
-	switch spec.Family {
+	switch spec.Family { //nolint:exhaustive // families handled; default returns error
 	case EventFamilyVisibility:
 		events, err = s.solveVisibility(spec, start, end)
 	case EventFamilyRelativeGeometry:
@@ -405,11 +417,13 @@ func (s EventSolver) solveVisibility(spec EventSpec, start, end time.Time) ([]Ev
 				haRight, _ := evalHA(times[i+1])
 
 				var bracketA, bracketB time.Time
-				if haLeft*haMid <= 0 {
+
+				switch {
+				case haLeft*haMid <= 0:
 					bracketA, bracketB = times[i-1], times[i]
-				} else if haMid*haRight <= 0 {
+				case haMid*haRight <= 0:
 					bracketA, bracketB = times[i], times[i+1]
-				} else {
+				default:
 					// HA doesn't cross zero — no transit in this bracket
 					continue
 				}
@@ -453,7 +467,7 @@ func (s EventSolver) solveGeometry(spec EventSpec, start, end time.Time) ([]Even
 			return 0, fmt.Errorf("events: other position: %w", err)
 		}
 
-		switch spec.Kind {
+		switch spec.Kind { //nolint:exhaustive // only geometry kinds relevant
 		case EventConjunction, EventOpposition:
 			// Difference in Right Ascension
 			diff := pos1.RA().Degrees() - pos2.RA().Degrees()
@@ -627,11 +641,11 @@ func (e Event) String() string {
 type TwilightKind int
 
 const (
-	// CivilTwilight: Sun at -6° altitude.
+	// CivilTwilight is Sun at -6° altitude.
 	CivilTwilight TwilightKind = iota
-	// NauticalTwilight: Sun at -12° altitude.
+	// NauticalTwilight is Sun at -12° altitude.
 	NauticalTwilight
-	// AstronomicalTwilight: Sun at -18° altitude.
+	// AstronomicalTwilight is Sun at -18° altitude.
 	AstronomicalTwilight
 )
 
@@ -778,7 +792,7 @@ func TwilightEvents(start, end time.Time, site *Site, prov eph.Provider, kind Tw
 
 	for i := range events {
 		e := events[i]
-		switch e.Kind {
+		switch e.Kind { //nolint:exhaustive // only rise/set create twilight pairs
 		case EventRise:
 			ec := e
 			twilightEvents = append(twilightEvents, TwilightEvent{Kind: kind, Dawn: &ec})
@@ -996,7 +1010,7 @@ func (s EventSolver) solveIllumination(spec EventSpec, start, end time.Time) ([]
 
 	var targets []phaseTarget
 
-	switch spec.Kind {
+	switch spec.Kind { //nolint:exhaustive // only phase event kinds dispatched
 	case EventNewMoon:
 		targets = []phaseTarget{{EventNewMoon, 0}}
 	case EventFirstQuarter:
@@ -1114,7 +1128,7 @@ func NextNewMoon(start time.Time, provider eph.Provider) (*Event, error) {
 	}
 
 	if len(events) == 0 {
-		return nil, nil
+		return nil, ErrEventNotFound
 	}
 
 	return &events[0], nil
@@ -1138,7 +1152,7 @@ func NextFullMoon(start time.Time, provider eph.Provider) (*Event, error) {
 	}
 
 	if len(events) == 0 {
-		return nil, nil
+		return nil, ErrEventNotFound
 	}
 
 	return &events[0], nil

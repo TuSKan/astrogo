@@ -29,8 +29,10 @@ func assertNear(t *testing.T, label string, got, want, tol float64) {
 
 func TestPlanetApparent_AllPlanets(t *testing.T) {
 	p := defaultProvider()
+
 	t.Cleanup(func() {
-		if err := p.Close(); err != nil {
+		err := p.Close()
+		if err != nil {
 			t.Errorf("failed to close provider: %v", err)
 		}
 	})
@@ -70,8 +72,10 @@ func TestPlanetApparent_AllPlanets(t *testing.T) {
 
 func TestSunApparent(t *testing.T) {
 	p := defaultProvider()
+
 	t.Cleanup(func() {
-		if err := p.Close(); err != nil {
+		err := p.Close()
+		if err != nil {
 			t.Errorf("failed to close provider: %v", err)
 		}
 	})
@@ -89,8 +93,10 @@ func TestSunApparent(t *testing.T) {
 
 func TestMoonApparent(t *testing.T) {
 	p := defaultProvider()
+
 	t.Cleanup(func() {
-		if err := p.Close(); err != nil {
+		err := p.Close()
+		if err != nil {
 			t.Errorf("failed to close provider: %v", err)
 		}
 	})
@@ -111,8 +117,10 @@ func TestMoonApparent(t *testing.T) {
 
 func TestPlanetApparent_Sun(t *testing.T) {
 	p := defaultProvider()
+
 	t.Cleanup(func() {
-		if err := p.Close(); err != nil {
+		err := p.Close()
+		if err != nil {
 			t.Errorf("failed to close provider: %v", err)
 		}
 	})
@@ -129,8 +137,10 @@ func TestPlanetApparent_Sun(t *testing.T) {
 
 func TestPlanetApparent_Earth_ReturnsError(t *testing.T) {
 	p := defaultProvider()
+
 	t.Cleanup(func() {
-		if err := p.Close(); err != nil {
+		err := p.Close()
+		if err != nil {
 			t.Errorf("failed to close provider: %v", err)
 		}
 	})
@@ -145,8 +155,10 @@ func TestPlanetApparent_Earth_ReturnsError(t *testing.T) {
 
 func TestPhaseAngle_Venus(t *testing.T) {
 	p := defaultProvider()
+
 	t.Cleanup(func() {
-		if err := p.Close(); err != nil {
+		err := p.Close()
+		if err != nil {
 			t.Errorf("failed to close provider: %v", err)
 		}
 	})
@@ -168,8 +180,10 @@ func TestPhaseAngle_Venus(t *testing.T) {
 
 func TestPhaseAngle_Jupiter_Small(t *testing.T) {
 	p := defaultProvider()
+
 	t.Cleanup(func() {
-		if err := p.Close(); err != nil {
+		err := p.Close()
+		if err != nil {
 			t.Errorf("failed to close provider: %v", err)
 		}
 	})
@@ -191,8 +205,10 @@ func TestPhaseAngle_Jupiter_Small(t *testing.T) {
 
 func TestIlluminatedFraction_Moon(t *testing.T) {
 	p := defaultProvider()
+
 	t.Cleanup(func() {
-		if err := p.Close(); err != nil {
+		err := p.Close()
+		if err != nil {
 			t.Errorf("failed to close provider: %v", err)
 		}
 	})
@@ -213,8 +229,10 @@ func TestIlluminatedFraction_Moon(t *testing.T) {
 
 func TestNeptune_SecularBrightening(t *testing.T) {
 	p := defaultProvider()
+
 	t.Cleanup(func() {
-		if err := p.Close(); err != nil {
+		err := p.Close()
+		if err != nil {
 			t.Errorf("failed to close provider: %v", err)
 		}
 	})

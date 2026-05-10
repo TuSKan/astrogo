@@ -15,7 +15,7 @@ import (
 func TestClientRetries(t *testing.T) {
 	attempts := 0
 
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		attempts++
 		if attempts < 3 {
 			w.WriteHeader(http.StatusTooManyRequests)
@@ -24,7 +24,8 @@ func TestClientRetries(t *testing.T) {
 
 		w.WriteHeader(http.StatusOK)
 
-		if _, err := w.Write([]byte("OK")); err != nil {
+		_, err := w.Write([]byte("OK"))
+		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -56,7 +57,7 @@ func TestClientRetries(t *testing.T) {
 func TestClientPermanentFailure(t *testing.T) {
 	attempts := 0
 
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		attempts++
 
 		w.WriteHeader(http.StatusNotFound) // 404 is NOT transient by DefaultRetryPolicy
@@ -66,7 +67,14 @@ func TestClientPermanentFailure(t *testing.T) {
 	client := resolve.NewClient()
 	req, _ := http.NewRequestWithContext(context.Background(), http.MethodGet, server.URL, nil)
 
-	_, err := client.Do(req)
+	resp, err := client.Do(req)
+	if resp != nil {
+		err := resp.Body.Close()
+		if err != nil {
+			t.Errorf("failed to close response body: %v", err)
+		}
+	}
+
 	if err == nil {
 		t.Fatalf("Expected permanent failure HTTP error")
 	}
@@ -81,7 +89,7 @@ func TestClientPermanentFailure(t *testing.T) {
 }
 
 func TestClientContextCancellation(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		time.Sleep(500 * time.Millisecond) // artificially hold response
 		w.WriteHeader(http.StatusOK)
 	}))
@@ -93,7 +101,15 @@ func TestClientContextCancellation(t *testing.T) {
 	defer cancel()
 
 	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, server.URL, nil)
-	_, err := client.Do(req)
+
+	resp, err := client.Do(req)
+	if resp != nil {
+		defer func() {
+			if cerr := resp.Body.Close(); cerr != nil {
+				t.Logf("failed to close response body: %v", cerr)
+			}
+		}()
+	}
 
 	if err == nil || (!errors.Is(err, context.DeadlineExceeded) && !errors.Is(err, context.Canceled)) {
 		t.Fatalf("Expected DeadlineExceeded or Canceled, got: %v", err)
@@ -111,7 +127,7 @@ func TestSliceSeqIteration(t *testing.T) {
 
 	count := 0
 
-	iter(func(tar resolve.Target, err error) bool {
+	iter(func(_ resolve.Target, err error) bool {
 		testutil.AssertNoError(t, err)
 
 		count++
@@ -123,7 +139,7 @@ func TestSliceSeqIteration(t *testing.T) {
 	// Early Abort
 	abortCount := 0
 
-	iter(func(tar resolve.Target, err error) bool {
+	iter(func(_ resolve.Target, _ error) bool {
 		abortCount++
 		return false // Abort iteration
 	})

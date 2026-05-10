@@ -348,13 +348,15 @@ func (s *cubicSpline) eval(xv float64) float64 {
 	}
 
 	var result float64
-	if xv < s.x[0] {
+
+	switch {
+	case xv < s.x[0]:
 		// Linear extrapolation using left endpoint derivative.
 		result = s.y[0] + s.dyL*(xv-s.x[0])
-	} else if xv >= s.x[n-1] {
+	case xv >= s.x[n-1]:
 		// Linear extrapolation using right endpoint derivative.
 		result = s.y[n-1] + s.dyR*(xv-s.x[n-1])
-	} else {
+	default:
 		// Find interval via binary search.
 		idx := max(sort.SearchFloat64s(s.x, xv)-1, 0)
 

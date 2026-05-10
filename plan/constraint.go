@@ -56,13 +56,14 @@ type Altitude struct {
 	Threshold angle.Angle
 }
 
+// Check evaluates whether the target's altitude meets the threshold.
 func (c Altitude) Check(obj Observable, t time.Time, site *Site) (Result, error) {
 	ctx := coord.NewContext(t, site.Location(), site.Atmosphere())
 	return c.CheckCtx(obj, t, site, ctx)
 }
 
 // CheckCtx evaluates altitude using a pre-built coord.Context.
-func (c Altitude) CheckCtx(obj Observable, t time.Time, site *Site, ctx *coord.Context) (Result, error) {
+func (c Altitude) CheckCtx(obj Observable, t time.Time, _ *Site, ctx *coord.Context) (Result, error) {
 	aa, err := skyAltAzCtx(obj, t, ctx)
 	if err != nil {
 		return Result{}, err
@@ -89,13 +90,14 @@ type Airmass struct {
 	Threshold float64
 }
 
+// Check evaluates whether the target's airmass is within the threshold.
 func (c Airmass) Check(obj Observable, t time.Time, site *Site) (Result, error) {
 	ctx := coord.NewContext(t, site.Location(), site.Atmosphere())
 	return c.CheckCtx(obj, t, site, ctx)
 }
 
 // CheckCtx evaluates airmass using a pre-built coord.Context.
-func (c Airmass) CheckCtx(obj Observable, t time.Time, site *Site, ctx *coord.Context) (Result, error) {
+func (c Airmass) CheckCtx(obj Observable, t time.Time, _ *Site, ctx *coord.Context) (Result, error) {
 	am, err := skyAirmassCtx(obj, t, ctx)
 	if err != nil {
 		if errors.Is(err, atmosphere.ErrBelowHorizon) {
@@ -127,6 +129,7 @@ type Sun struct {
 	Threshold angle.Angle
 }
 
+// Check evaluates whether the Sun's altitude meets the threshold.
 func (c Sun) Check(_ Observable, t time.Time, site *Site) (Result, error) {
 	ctx := coord.NewContext(t, site.Location(), site.Atmosphere())
 	return c.CheckCtx(nil, t, site, ctx)
@@ -169,6 +172,7 @@ type MoonSep struct {
 	Threshold angle.Angle
 }
 
+// Check evaluates Moon separation for a given target and time.
 func (c MoonSep) Check(obj Observable, t time.Time, site *Site) (Result, error) {
 	ctx := coord.NewContext(t, site.Location(), site.Atmosphere())
 	return c.CheckCtx(obj, ctx)

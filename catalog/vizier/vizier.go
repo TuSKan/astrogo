@@ -21,6 +21,7 @@ type Provider struct {
 	cache  resolve.Cache
 }
 
+// New creates a new VizieR catalog provider.
 func New() *Provider {
 	return &Provider{
 		client: resolve.NewClient(),
@@ -28,20 +29,25 @@ func New() *Provider {
 	}
 }
 
+// Name returns the provider identifier.
 func (p *Provider) Name() string { return "vizier" }
 
+// Capabilities returns the set of supported resolution operations.
 func (p *Provider) Capabilities() []resolve.Capability {
 	return []resolve.Capability{resolve.CapConeSearch}
 }
 
-func (p *Provider) Resolve(query string) (resolve.Target, bool) {
+// Resolve always returns false for VizieR (use ConeSearch instead).
+func (p *Provider) Resolve(_ string) (resolve.Target, bool) {
 	return resolve.Target{}, false // Not supported directly, use ConeSearch
 }
 
-func (p *Provider) Search(query string) []resolve.Target {
+// Search always returns nil for VizieR (use ConeSearch instead).
+func (p *Provider) Search(_ string) []resolve.Target {
 	return nil
 }
 
+// ConeSearch performs a spatial cone search via the VizieR service.
 func (p *Provider) ConeSearch(ctx context.Context, req resolve.ConeRequest) resolve.SeqIterator[resolve.Target] {
 	// VizieR requires specifying a catalog index/table if we do ADQL.
 	// Since ConeRequest doesn't specify 'table', we might need to rely purely on VizieR's standard catalogs

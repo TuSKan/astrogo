@@ -25,22 +25,77 @@ func NewPlanet(name string, id eph.ID, provider eph.Provider) *Planet {
 
 // Convenience constructors for the major bodies.
 
-func NewSun(provider eph.Provider) *Planet     { return NewPlanet("Sun", eph.Sun, provider) }
-func NewMoon(provider eph.Provider) *Planet    { return NewPlanet("Moon", eph.Moon, provider) }
-func NewMercury(provider eph.Provider) *Planet { return NewPlanet("Mercury", eph.Mercury, provider) }
-func NewVenus(provider eph.Provider) *Planet   { return NewPlanet("Venus", eph.Venus, provider) }
-func NewEarth(provider eph.Provider) *Planet   { return NewPlanet("Earth", eph.Earth, provider) }
-func NewMars(provider eph.Provider) *Planet    { return NewPlanet("Mars", eph.Mars, provider) }
-func NewJupiter(provider eph.Provider) *Planet { return NewPlanet("Jupiter", eph.Jupiter, provider) }
-func NewSaturn(provider eph.Provider) *Planet  { return NewPlanet("Saturn", eph.Saturn, provider) }
-func NewUranus(provider eph.Provider) *Planet  { return NewPlanet("Uranus", eph.Uranus, provider) }
-func NewNeptune(provider eph.Provider) *Planet { return NewPlanet("Neptune", eph.Neptune, provider) }
-func NewPluto(provider eph.Provider) *Planet   { return NewPlanet("Pluto", eph.Pluto, provider) }
+// NewSun creates a Sun target.
+func NewSun(provider eph.Provider) *Planet {
+	return NewPlanet("Sun", eph.Sun, provider)
+}
 
-func (p *Planet) Name() string           { return p.name }
-func (p *Planet) Provider() eph.Provider { return p.provider }
-func (p *Planet) EphID() eph.ID          { return p.id }
+// NewMoon creates a Moon target.
+func NewMoon(provider eph.Provider) *Planet {
+	return NewPlanet("Moon", eph.Moon, provider)
+}
 
+// NewMercury creates a Mercury target.
+func NewMercury(provider eph.Provider) *Planet {
+	return NewPlanet("Mercury", eph.Mercury, provider)
+}
+
+// NewVenus creates a Venus target.
+func NewVenus(provider eph.Provider) *Planet {
+	return NewPlanet("Venus", eph.Venus, provider)
+}
+
+// NewEarth creates an Earth target.
+func NewEarth(provider eph.Provider) *Planet {
+	return NewPlanet("Earth", eph.Earth, provider)
+}
+
+// NewMars creates a Mars target.
+func NewMars(provider eph.Provider) *Planet {
+	return NewPlanet("Mars", eph.Mars, provider)
+}
+
+// NewJupiter creates a Jupiter target.
+func NewJupiter(provider eph.Provider) *Planet {
+	return NewPlanet("Jupiter", eph.Jupiter, provider)
+}
+
+// NewSaturn creates a Saturn target.
+func NewSaturn(provider eph.Provider) *Planet {
+	return NewPlanet("Saturn", eph.Saturn, provider)
+}
+
+// NewUranus creates an Uranus target.
+func NewUranus(provider eph.Provider) *Planet {
+	return NewPlanet("Uranus", eph.Uranus, provider)
+}
+
+// NewNeptune creates a Neptune target.
+func NewNeptune(provider eph.Provider) *Planet {
+	return NewPlanet("Neptune", eph.Neptune, provider)
+}
+
+// NewPluto creates a Pluto target.
+func NewPluto(provider eph.Provider) *Planet {
+	return NewPlanet("Pluto", eph.Pluto, provider)
+}
+
+// Name returns the planet's name.
+func (p *Planet) Name() string {
+	return p.name
+}
+
+// Provider returns the planet's ephemeris provider.
+func (p *Planet) Provider() eph.Provider {
+	return p.provider
+}
+
+// EphID returns the planet's ephemeris ID.
+func (p *Planet) EphID() eph.ID {
+	return p.id
+}
+
+// Position returns the planet's position.
 func (p *Planet) Position(t time.Time) (coord.ICRS, error) {
 	pos, err := eph.Position(p.provider, p.id, t)
 	if err != nil {
@@ -55,6 +110,7 @@ func (p *Planet) Position(t time.Time) (coord.ICRS, error) {
 	return icrs, nil
 }
 
+// GeocentricVec returns the planet's geocentric position.
 func (p *Planet) GeocentricVec(t time.Time) (vector.Vec3, error) {
 	v, err := eph.Position(p.provider, p.id, t)
 	if err != nil {
@@ -64,6 +120,7 @@ func (p *Planet) GeocentricVec(t time.Time) (vector.Vec3, error) {
 	return v, nil
 }
 
+// GetDetails returns the target details.
 func (p *Planet) GetDetails(ctx *coord.Context, props ...string) (*TargetDetails, error) {
 	return computeDetails(p, ctx, props...)
 }

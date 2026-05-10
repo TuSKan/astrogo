@@ -48,8 +48,13 @@ func TestReadBintable(t *testing.T) {
 	bldr := array.NewRecordBuilder(mem, schema)
 	defer bldr.Release()
 
-	bldr.Field(0).(*array.Int32Builder).Append(42)
-	bldr.Field(1).(*array.Float32Builder).Append(3.14)
+	if f, ok := bldr.Field(0).(*array.Int32Builder); ok {
+		f.Append(42)
+	}
+
+	if f, ok := bldr.Field(1).(*array.Float32Builder); ok {
+		f.Append(3.14)
+	}
 
 	bt.Batch = bldr.NewRecordBatch()
 

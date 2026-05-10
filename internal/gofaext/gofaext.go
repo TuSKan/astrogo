@@ -12,8 +12,8 @@ import "github.com/hebl/gofa"
 //	-2 = bad month
 //	-3 = bad day
 //	-4 = bad hour, minute or second
-func Dtf2d(scale string, year, month, day, hour, min int, sec float64) (d1, d2 float64, status int) {
-	status = gofa.Dtf2d(scale, year, month, day, hour, min, sec, &d1, &d2)
+func Dtf2d(scale string, year, month, day, hour, minute int, second float64) (d1, d2 float64, status int) {
+	status = gofa.Dtf2d(scale, year, month, day, hour, minute, second, &d1, &d2)
 	return d1, d2, status
 }
 

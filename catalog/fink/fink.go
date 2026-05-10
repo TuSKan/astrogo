@@ -94,8 +94,10 @@ func NewWithVersion(version string) *Provider {
 	}
 }
 
+// Name returns the provider identifier.
 func (p *Provider) Name() string { return "fink" }
 
+// Capabilities returns the set of supported resolution operations.
 func (p *Provider) Capabilities() []resolve.Capability {
 	return []resolve.Capability{resolve.CapObjectResolution, resolve.CapFullCatalog}
 }
@@ -107,14 +109,14 @@ func (p *Provider) Resolve(query string) (resolve.Target, bool) {
 
 	// Fast path: numeric lookup via single-object JSON endpoint.
 	if n, err := strconv.ParseInt(q, 10, 64); err == nil {
-		rec, err := p.querySingle(n, "")
+		rec, err := p.querySingle(context.Background(), n, "")
 		if err == nil && rec != nil {
 			return p.recordToTarget(rec), true
 		}
 	}
 
 	// Try name-based lookup via single-object JSON.
-	rec, err := p.querySingle(0, q)
+	rec, err := p.querySingle(context.Background(), 0, q)
 	if err == nil && rec != nil {
 		return p.recordToTarget(rec), true
 	}
@@ -142,8 +144,8 @@ func (p *Provider) Search(query string) []resolve.Target {
 }
 
 // ResolveObject implements resolve.ObjectResolver.
-func (p *Provider) ResolveObject(ctx context.Context, req resolve.ObjectRequest) resolve.SeqIterator[resolve.Target] {
-	tgt, ok := p.Resolve(req.Query)
+func (p *Provider) ResolveObject(_ context.Context, req resolve.ObjectRequest) resolve.SeqIterator[resolve.Target] {
+	tgt, ok := p.Resolve(req.Query) //nolint:contextcheck // Resolve is interface-bound; bulk download path uses Background
 	if !ok {
 		return resolve.SliceSeq([]resolve.Target{})
 	}
@@ -171,23 +173,28 @@ func (p *Provider) Count() int {
 
 // querySingle queries the SSOFT endpoint for a single object via JSON.
 // Pass number > 0 for numeric lookup, or name != "" for name lookup.
-func (p *Provider) querySingle(number int64, name string) (_ *ssoRecord, err error) {
+func (p *Provider) querySingle(ctx context.Context, number int64, name string) (_ *ssoRecord, err error) {
 	payload := map[string]any{
 		"output-format": "json",
 		"version":       p.version,
 		"flavor":        "SHG1G2",
 	}
-	if number > 0 {
+
+	switch {
+	case number > 0:
 		payload["sso_number"] = number
-	} else if name != "" {
+	case name != "":
 		payload["sso_name"] = name
-	} else {
+	default:
 		return nil, ErrNoIdentifier
 	}
 
-	raw, _ := json.Marshal(payload)
+	raw, err := json.Marshal(payload)
+	if err != nil {
+		return nil, fmt.Errorf("fink: marshal request: %w", err)
+	}
 
-	req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, ssoftURL, bytes.NewReader(raw))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, ssoftURL, bytes.NewReader(raw))
 	if err != nil {
 		return nil, fmt.Errorf("fink: ssoft request: %w", err)
 	}
@@ -199,7 +206,8 @@ func (p *Provider) querySingle(number int64, name string) (_ *ssoRecord, err err
 		return nil, fmt.Errorf("fink: ssoft request: %w", err)
 	}
 	defer func() {
-		if cerr := resp.Body.Close(); cerr != nil {
+		cerr := resp.Body.Close()
+		if cerr != nil {
 			err = errors.Join(err, cerr)
 		}
 	}()
@@ -440,11 +448,14 @@ func (p *Provider) ensureLoaded() error {
 
 // downloadSSOFT fetches the full SSOFT parquet table from the FINK API.
 func (p *Provider) downloadSSOFT() (_ []ssoRecord, err error) {
-	payload, _ := json.Marshal(map[string]any{
+	payload, err := json.Marshal(map[string]any{
 		"output-format": "parquet",
 		"version":       p.version,
 		"flavor":        "SHG1G2",
 	})
+	if err != nil {
+		return nil, fmt.Errorf("fink: marshal SSOFT request: %w", err)
+	}
 
 	req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, ssoftURL, bytes.NewReader(payload))
 	if err != nil {
@@ -458,7 +469,8 @@ func (p *Provider) downloadSSOFT() (_ []ssoRecord, err error) {
 		return nil, fmt.Errorf("SSOFT request: %w", err)
 	}
 	defer func() {
-		if cerr := resp.Body.Close(); cerr != nil {
+		cerr := resp.Body.Close()
+		if cerr != nil {
 			err = errors.Join(err, cerr)
 		}
 	}()
@@ -505,7 +517,8 @@ func (p *Provider) readParquet(path string) (_ []ssoRecord, err error) {
 	}
 
 	defer func() {
-		if cerr := rdr.Close(); cerr != nil {
+		cerr := rdr.Close()
+		if cerr != nil {
 			err = errors.Join(err, cerr)
 		}
 	}()

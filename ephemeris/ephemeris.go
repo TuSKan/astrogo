@@ -19,71 +19,120 @@ import (
 // ─── Re-exported core types (users import "ephemeris", not "ephemeris/core") ─
 
 type (
+	// Provider is an ephemeris provider.
 	Provider = core.Provider
-	State    = core.State
-	ID       = core.ID
-	Source   = core.Source
-	Kind     = core.Kind
-	Body     = core.Body
+	// State is an ephemeris state.
+	State = core.State
+	// ID is an ephemeris ID.
+	ID = core.ID
+	// Source is an ephemeris source.
+	Source = core.Source
+	// Kind is an ephemeris kind.
+	Kind = core.Kind
+	// Body is an ephemeris body.
+	Body = core.Body
 )
 
 const (
-	Mercury               = core.Mercury
-	Venus                 = core.Venus
-	Earth                 = core.Earth
-	Mars                  = core.Mars
-	Jupiter               = core.Jupiter
-	Saturn                = core.Saturn
-	Uranus                = core.Uranus
-	Neptune               = core.Neptune
-	Pluto                 = core.Pluto
-	Moon                  = core.Moon
-	Sun                   = core.Sun
+	// Mercury is the identifier for Mercury.
+	Mercury = core.Mercury
+	// Venus is the identifier for Venus.
+	Venus = core.Venus
+	// Earth is the identifier for Earth.
+	Earth = core.Earth
+	// Mars is the identifier for Mars.
+	Mars = core.Mars
+	// Jupiter is the identifier for Jupiter.
+	Jupiter = core.Jupiter
+	// Saturn is the identifier for Saturn.
+	Saturn = core.Saturn
+	// Uranus is the identifier for Uranus.
+	Uranus = core.Uranus
+	// Neptune is the identifier for Neptune.
+	Neptune = core.Neptune
+	// Pluto is the identifier for Pluto.
+	Pluto = core.Pluto
+	// Moon is the identifier for the Moon.
+	Moon = core.Moon
+	// Sun is the identifier for the Sun.
+	Sun = core.Sun
+	// SolarSystemBarycenter is the identifier for the Solar System Barycenter.
 	SolarSystemBarycenter = core.SolarSystemBarycenter
 )
 
 const (
-	KindStar       = core.KindStar
-	KindPlanet     = core.KindPlanet
-	KindMoon       = core.KindMoon
-	KindMinorBody  = core.KindMinorBody
-	KindComet      = core.KindComet
+	// KindStar is the kind for stars.
+	KindStar = core.KindStar
+	// KindPlanet is the kind for planets.
+	KindPlanet = core.KindPlanet
+	// KindMoon is the kind for moons.
+	KindMoon = core.KindMoon
+	// KindMinorBody is the kind for minor bodies.
+	KindMinorBody = core.KindMinorBody
+	// KindComet is the kind for comets.
+	KindComet = core.KindComet
+	// KindBarycenter is the kind for barycenters.
 	KindBarycenter = core.KindBarycenter
-	KindSatellite  = core.KindSatellite
+	// KindSatellite is the kind for satellites.
+	KindSatellite = core.KindSatellite
 )
 
 const (
-	Planets    = core.Planets
-	SmallBody  = core.SmallBody
-	Asteroids  = core.Asteroids
-	Comets     = core.Comets
+	// Planets is the source for planets.
+	Planets = core.Planets
+	// SmallBody is the source for small bodies.
+	SmallBody = core.SmallBody
+	// Asteroids is the source for asteroids.
+	Asteroids = core.Asteroids
+	// Comets is the source for comets.
+	Comets = core.Comets
+	// Satellites is the source for satellites.
 	Satellites = core.Satellites
-	Stations   = core.Stations
+	// Stations is the source for stations.
+	Stations = core.Stations
 )
 
 var (
-	SunBody     = core.SunBody
-	MoonBody    = core.MoonBody
+	// SunBody is the body for the Sun.
+	SunBody = core.SunBody
+	// MoonBody is the body for the Moon.
+	MoonBody = core.MoonBody
+	// MercuryBody is the body for Mercury.
 	MercuryBody = core.MercuryBody
-	VenusBody   = core.VenusBody
-	EarthBody   = core.EarthBody
-	MarsBody    = core.MarsBody
+	// VenusBody is the body for Venus.
+	VenusBody = core.VenusBody
+	// EarthBody is the body for Earth.
+	EarthBody = core.EarthBody
+	// MarsBody is the body for Mars.
+	MarsBody = core.MarsBody
+	// JupiterBody is the body for Jupiter.
 	JupiterBody = core.JupiterBody
-	SaturnBody  = core.SaturnBody
-	UranusBody  = core.UranusBody
+	// SaturnBody is the body for Saturn.
+	SaturnBody = core.SaturnBody
+	// UranusBody is the body for Uranus.
+	UranusBody = core.UranusBody
+	// NeptuneBody is the body for Neptune.
 	NeptuneBody = core.NeptuneBody
-	Bodies      = core.Bodies
+	// Bodies is the array of all bodies.
+	Bodies = core.Bodies
 )
 
 // ── Sentinel errors ──────────────────────────────────────────────────────────
 
 var (
-	ErrTLERequired     = errors.New("eph: Satellites source requires WithTLE option")
-	ErrNotImplemented  = errors.New("eph: source not yet implemented")
-	ErrUnknownSource   = errors.New("eph: unknown source")
-	ErrZeroVector      = errors.New("eph: cannot convert near-zero vector to ICRS")
-	ErrSofaEpv00       = errors.New("eph: sofa epv00 failed")
-	ErrSofaPlan94      = errors.New("eph: sofa plan94 failed")
+	// ErrTLERequired is the error for when TLE data is required.
+	ErrTLERequired = errors.New("eph: Satellites source requires WithTLE option")
+	// ErrNotImplemented is the error for when a source is not yet implemented.
+	ErrNotImplemented = errors.New("eph: source not yet implemented")
+	// ErrUnknownSource is the error for when an unknown source is provided.
+	ErrUnknownSource = errors.New("eph: unknown source")
+	// ErrZeroVector is the error for when a near-zero vector is provided.
+	ErrZeroVector = errors.New("eph: cannot convert near-zero vector to ICRS")
+	// ErrSofaEpv00 is the error for when the sofa epv00 function fails.
+	ErrSofaEpv00 = errors.New("eph: sofa epv00 failed")
+	// ErrSofaPlan94 is the error for when the sofa plan94 function fails.
+	ErrSofaPlan94 = errors.New("eph: sofa plan94 failed")
+	// ErrUnsupportedBody is the error for when an unsupported body is provided.
 	ErrUnsupportedBody = errors.New("eph: unsupported body for sofa provider")
 )
 
@@ -170,7 +219,8 @@ func NewProvider(source Source, kernel string, opts ...Option) (Provider, error)
 				return nil, fmt.Errorf("ephemeris: cache kernel %s: %w", extra, err)
 			}
 
-			if err = p.AddKernel(k); err != nil {
+			err = p.AddKernel(k)
+			if err != nil {
 				return nil, fmt.Errorf("ephemeris: add kernel: %w", err)
 			}
 		}

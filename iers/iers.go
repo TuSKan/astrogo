@@ -11,9 +11,13 @@ import (
 //go:embed all:data/*
 var eopFS embed.FS
 
-//nolint:gochecknoglobals // embedded IERS EOP reference data
-var FinalsData []byte
+var (
+	// FinalsData holds the IERS EOP reference data.
+	//nolint:gochecknoglobals // embedded IERS EOP reference data
+	FinalsData []byte
+)
 
+//nolint:gochecknoinits // init is used to load the embedded IERS EOP reference data
 func init() {
 	d, err := eopFS.ReadFile("data/finals2000A.all")
 	if err == nil {

@@ -1,4 +1,4 @@
-// Package quantity provides a representation of scalar physical quantities
+// Package unit provides a representation of scalar physical quantities
 // with explicit units.
 //
 // # Design

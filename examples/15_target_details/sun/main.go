@@ -1,3 +1,4 @@
+// Package main demonstrates Sun target details.
 package main
 
 import (

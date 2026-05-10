@@ -1,3 +1,4 @@
+// Package main demonstrates deep-sky object target details.
 package main
 
 import (

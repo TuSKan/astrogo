@@ -1,3 +1,4 @@
+// Package main demonstrates star target details.
 package main
 
 import (

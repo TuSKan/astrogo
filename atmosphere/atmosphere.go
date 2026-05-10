@@ -146,6 +146,7 @@ var StandardAtmosphere = Atmosphere{
 
 // ── Observational Metrics ─────────────────────────────────────────────────────
 
+// ErrBelowHorizon is returned when the target altitude is below the horizon.
 var ErrBelowHorizon = errors.New("object is below the horizon")
 
 // ZenithDistance returns the zenith distance (90 - Alt) for a given altitude.

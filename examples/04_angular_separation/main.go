@@ -1,3 +1,4 @@
+// Package main demonstrates angular separation calculation.
 package main
 
 import (

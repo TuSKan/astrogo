@@ -161,7 +161,7 @@ func TestCompare(t *testing.T) {
 		t.Errorf("Compare: expected +1, got %d", cmp2)
 	}
 
-	cmp3, err := b.Compare(b) // equal
+	cmp3, err := b.Compare(b) //nolint:gocritic // intentional self-comparison test
 	testutil.AssertNoError(t, err)
 
 	if cmp3 != 0 {

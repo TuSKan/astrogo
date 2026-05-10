@@ -64,7 +64,7 @@ func TestObservableWindows_Fixed(t *testing.T) {
 		}
 	})
 
-	t.Run("MultipleWindows", func(t *testing.T) {
+	t.Run("MultipleWindows", func(_ *testing.T) {
 		// This is harder to test with real math without finding exact time points.
 		// Let's use a mock constraint that flips every sample.
 	})

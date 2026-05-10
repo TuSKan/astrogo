@@ -5,6 +5,82 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.5] — 2026-05-10
+
+Lint-zero release: full `golangci-lint` compliance with zero violations across all enabled linters.
+
+### Changed
+
+#### Static Analysis — Zero-Violation State
+- **revive**: resolved all 50+ violations
+  - Added doc comments to all exported symbols across 30+ source files
+  - Added package comments to all `examples/` packages
+  - Fixed comment format (`Name:` → `Name is`) for const blocks
+  - Blanked unused parameters in test callbacks and stub methods
+  - Fixed `errId` → `errID`, `SpkId` → `SpkID` naming conventions
+  - Renamed `JPL_KERNEL_URI` → `JPLKernelURI`, `KM_PER_AU` → `KMPerAU`
+  - Fixed `min` builtin redefinition in satellite example
+- **forbidigo**: replaced `fmt.Printf` with `log.Printf` in parser CLI tool
+- **gosec**: added targeted path/rule exclusions in `.golangci.yml`
+  - G115 (integer overflow): excluded for `ephemeris/jpl/`, `unit/` (NAIF IDs, SPK format fields)
+  - G301/G306 (file permissions): excluded for cache directories
+  - G304 (file inclusion): excluded for kernel/data file readers
+  - G704/G703/G706 (SSRF/path/log): excluded for known-API HTTP clients and CLI tools
+- **dupl**: added `//nolint:dupl` to 4 intentionally-similar functions (eclipse pairs, test pairs)
+- **wrapcheck**: contextual error wrapping across all packages
+- **err113**: sentinel errors for all error paths
+
+#### Linter Configuration (`.golangci.yml`)
+- `gocognit`: threshold raised to 100
+- Disabled globally: `nestif`, `ireturn`, `recvcheck`, `goprintffuncname`, `inamedparam`, `noinlineerr`
+- Each disabled linter has documented rationale in config comments
+
+### Fixed
+- `ephemeris/doc.go`: package comment `Package eph` → `Package ephemeris`
+- `angle/parse.go`: `max` variable renamed to `limit` (builtin shadowing)
+- `iers/fetch.go`: `min`/`max` variables renamed to `lo`/`hi` (builtin shadowing)
+
+## [0.1.4] — 2026-05-08
+
+Observable polymorphism, scheduler context sharing, TPV distortion, NORAD test hardening, and production lint audit.
+
+### Added
+
+#### Observable Polymorphism
+- `plan/planet.go`, `plan/star.go`, `plan/deepsky.go`, `plan/asteroid.go`, `plan/comet.go`, `plan/satellite.go` — concrete `Observable` implementations replacing the monolithic `Target` type
+- `plan/factory.go` — `NewTarget()` factory dispatching to typed constructors based on catalog kind and ephemeris source
+- `plan/observable.go` — shared `Observable` interface and helpers
+
+#### WCS/FITS — TPV Distortion
+- `fits/wcs.go`: TPV (Tangent Plane Polynomial) distortion projection support
+- 40-term standard SCAMP/SExtractor polynomial evaluation via `PV1_j`/`PV2_j` FITS headers
+- Round-trip pixel↔sky accuracy <0.01 pixel validated
+- `fits/wcs_example_test.go`: example test suite
+
+#### CI
+- `.github/workflows/nightly.yml`: nightly integration test workflow
+
+### Changed
+
+#### Scheduler Performance
+- Unified `coord.Context` sharing through single code path (`ScoreObservable`, `isObservableCtx`, `checkConstraintsIntervalCtx`)
+- `GreedyStrategy`, `swapPass`, `insertPass` all reuse midpoint Context
+- Eliminated ~6 redundant Context allocations per scheduler iteration
+- Deleted dead `checkConstraintsInterval` wrapper, `scoreObservableWithCtx`, `scoreBlockPlacementCtx` (~94 lines removed)
+
+#### Production Hardening
+- `errors.Is` for all sentinel comparisons (constraint, SPK, OpenNGC parser)
+- `strings.ReplaceAll`, compound assignment operators, if-else → switch
+- Lowercase local variables for IAU params (captLocal compliance)
+- Fixed `tpvEval` empty-map semantics (return 0, not x)
+
+#### Integration Tests
+- NORAD, USNO, NASA, AstroPixels tests use graceful `t.Skipf()` when endpoints are unreachable
+
+### Removed
+- `plan/target.go` — monolithic Target type replaced by polymorphic Observable implementations
+- `docs/TODO.md` — consolidated into `docs/ROADMAP.md`
+
 ## [0.1.3] — 2026-05-07
 
 FINK/ZTF SSOFT photometry provider, sHG1G2 spin-geometry model, `computeDetails` refactor,
@@ -259,6 +335,8 @@ First observatory-grade release. Validated against USNO, JPL Horizons, and NASA 
 - `VisibleIntervals` creates independent Contexts per grid step (correct; each step is a different epoch)
 - IERS EOP data fetched via `go:generate`, not at runtime
 
+[0.1.5]: https://github.com/TuSKan/astrogo/releases/tag/v0.1.5
+[0.1.4]: https://github.com/TuSKan/astrogo/releases/tag/v0.1.4
 [0.1.3]: https://github.com/TuSKan/astrogo/releases/tag/v0.1.3
 [0.1.2]: https://github.com/TuSKan/astrogo/releases/tag/v0.1.2
 [0.1.1]: https://github.com/TuSKan/astrogo/releases/tag/v0.1.1

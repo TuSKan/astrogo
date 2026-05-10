@@ -47,12 +47,15 @@ func NewDeepSkyObject(name string, ra, dec angle.Angle, opts ...DSOOption) *Deep
 	return d
 }
 
+// Name returns the object's display name.
 func (d *DeepSkyObject) Name() string { return d.name }
 
+// Position returns the fixed ICRS position (time-independent).
 func (d *DeepSkyObject) Position(_ time.Time) (coord.ICRS, error) {
 	return d.coord, nil
 }
 
+// GetDetails computes observational details using the given coordinate context.
 func (d *DeepSkyObject) GetDetails(ctx *coord.Context, props ...string) (*TargetDetails, error) {
 	return computeDetails(d, ctx, props...)
 }

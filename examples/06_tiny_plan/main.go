@@ -1,3 +1,4 @@
+// Package main demonstrates a minimal observation planning workflow.
 package main
 
 import (

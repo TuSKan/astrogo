@@ -308,7 +308,7 @@ func fillRiseSetTransit(d *TargetDetails, obs Observable, ctx *coord.Context) {
 			continue
 		}
 
-		switch ev.Kind {
+		switch ev.Kind { //nolint:exhaustive // only rise/set/transit relevant
 		case EventRise:
 			if d.RiseTime == nil {
 				tt := ev.Time

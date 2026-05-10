@@ -1,3 +1,4 @@
+// Package main demonstrates moon target details.
 package main
 
 import (

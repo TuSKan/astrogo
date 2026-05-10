@@ -53,12 +53,18 @@ type Provider interface {
 type Source string
 
 const (
-	Planets    Source = "planets"    // JPL DE planetary ephemeris
-	SmallBody  Source = "smallbody"  // JPL small-body SPK (generic query)
-	Asteroids  Source = "asteroids"  // JPL asteroid SPK
-	Comets     Source = "comets"     // JPL comet SPK
+	// Planets is the source type for planetary ephemeris.
+	Planets Source = "planets" // JPL DE planetary ephemeris
+	// SmallBody is the source type for small-body ephemeris.
+	SmallBody Source = "smallbody" // JPL small-body SPK (generic query)
+	// Asteroids is the source type for asteroid ephemeris.
+	Asteroids Source = "asteroids" // JPL asteroid SPK
+	// Comets is the source type for comet ephemeris.
+	Comets Source = "comets" // JPL comet SPK
+	// Satellites is the source type for satellite ephemeris.
 	Satellites Source = "satellites" // Artificial satellites (NORAD TLE/GP → SGP4)
-	Stations   Source = "stations"   // Ground stations (reserved)
+	// Stations is the source type for ground station ephemeris.
+	Stations Source = "stations" // Ground stations (reserved)
 )
 
 // ─── Body ID ─────────────────────────────────────────────────────────────────
@@ -67,17 +73,29 @@ const (
 type ID uint32
 
 const (
+	// Mercury is the identifier for Mercury.
 	Mercury ID = iota + 1
+	// Venus is the identifier for Venus.
 	Venus
+	// Earth is the identifier for Earth.
 	Earth
+	// Mars is the identifier for Mars.
 	Mars
+	// Jupiter is the identifier for Jupiter.
 	Jupiter
+	// Saturn is the identifier for Saturn.
 	Saturn
+	// Uranus is the identifier for Uranus.
 	Uranus
+	// Neptune is the identifier for Neptune.
 	Neptune
+	// Pluto is the identifier for Pluto.
 	Pluto
+	// Moon is the identifier for the Moon.
 	Moon
+	// Sun is the identifier for the Sun.
 	Sun
+	// SolarSystemBarycenter is the identifier for the solar system barycenter.
 	SolarSystemBarycenter
 )
 
@@ -119,19 +137,29 @@ func (id ID) String() string {
 type Kind uint8
 
 const (
+	// KindStar is the kind of a star.
 	KindStar Kind = iota + 1
+	// KindPlanet is the kind of a planet.
 	KindPlanet
+	// KindMoon is the kind of a moon.
 	KindMoon
+	// KindMinorBody is the kind of a minor body.
 	KindMinorBody
+	// KindComet is the kind of a comet.
 	KindComet
+	// KindBarycenter is the kind of a barycenter.
 	KindBarycenter
+	// KindSatellite is the kind of a satellite.
 	KindSatellite
 )
 
 // Body represents a named celestial body and its category.
 type Body struct {
+	// Name is the name of the body.
 	Name string
-	ID   ID
+	// ID is the identifier of the body.
+	ID ID
+	// Kind is the kind of the body.
 	Kind Kind
 }
 
@@ -139,15 +167,25 @@ type Body struct {
 //
 //nolint:gochecknoglobals // IAU body registry — immutable catalog data
 var (
-	SunBody     = Body{ID: Sun, Name: "Sun", Kind: KindStar}
-	MoonBody    = Body{ID: Moon, Name: "Moon", Kind: KindMoon}
+	// SunBody is the Sun body.
+	SunBody = Body{ID: Sun, Name: "Sun", Kind: KindStar}
+	// MoonBody is the Moon body.
+	MoonBody = Body{ID: Moon, Name: "Moon", Kind: KindMoon}
+	// MercuryBody is the Mercury body.
 	MercuryBody = Body{ID: Mercury, Name: "Mercury", Kind: KindPlanet}
-	VenusBody   = Body{ID: Venus, Name: "Venus", Kind: KindPlanet}
-	EarthBody   = Body{ID: Earth, Name: "Earth", Kind: KindPlanet}
-	MarsBody    = Body{ID: Mars, Name: "Mars", Kind: KindPlanet}
+	// VenusBody is the Venus body.
+	VenusBody = Body{ID: Venus, Name: "Venus", Kind: KindPlanet}
+	// EarthBody is the Earth body.
+	EarthBody = Body{ID: Earth, Name: "Earth", Kind: KindPlanet}
+	// MarsBody is the Mars body.
+	MarsBody = Body{ID: Mars, Name: "Mars", Kind: KindPlanet}
+	// JupiterBody is the Jupiter body.
 	JupiterBody = Body{ID: Jupiter, Name: "Jupiter", Kind: KindPlanet}
-	SaturnBody  = Body{ID: Saturn, Name: "Saturn", Kind: KindPlanet}
-	UranusBody  = Body{ID: Uranus, Name: "Uranus", Kind: KindPlanet}
+	// SaturnBody is the Saturn body.
+	SaturnBody = Body{ID: Saturn, Name: "Saturn", Kind: KindPlanet}
+	// UranusBody is the Uranus body.
+	UranusBody = Body{ID: Uranus, Name: "Uranus", Kind: KindPlanet}
+	// NeptuneBody is the Neptune body.
 	NeptuneBody = Body{ID: Neptune, Name: "Neptune", Kind: KindPlanet}
 )
 

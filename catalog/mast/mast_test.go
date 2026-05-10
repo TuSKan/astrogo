@@ -22,7 +22,7 @@ func TestMastOfflineResolve(t *testing.T) {
 	"status": "COMPLETE"
 }`
 
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 
 		if _, err := fmt.Fprint(w, jsonPayload); err != nil {

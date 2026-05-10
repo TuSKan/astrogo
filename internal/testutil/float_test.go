@@ -136,7 +136,7 @@ type tbSpy struct {
 }
 
 func (s *tbSpy) Helper() {}
-func (s *tbSpy) Errorf(format string, args ...any) {
+func (s *tbSpy) Errorf(format string, _ ...any) {
 	s.failed = true
 	s.msg = format // enough to verify the code path was taken
 }

@@ -19,7 +19,7 @@ func TestJPLResolveMock(t *testing.T) {
   "result": "Multiple major-bodies match string \"Mars*\"\n\n  Number  Name                           Designation  IAU/aliases/other   \n  ------  -----------------------------  -----------  ------------------- \n     401  Mars Barycenter                                                 \n     499  Mars                                                            \n"
 }`
 
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 
 		if _, err := fmt.Fprint(w, jsonPayload); err != nil {
@@ -58,7 +58,7 @@ func TestJPLErrorResponse(t *testing.T) {
   "error": "unrecognized command"
 }`
 
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 
 		if _, err := fmt.Fprint(w, jsonPayload); err != nil {
@@ -72,7 +72,7 @@ func TestJPLErrorResponse(t *testing.T) {
 
 	req := resolve.ObjectRequest{Query: "!!!ERROR!!!"}
 	iter := prov.ResolveObject(context.Background(), req)
-	iter(func(tar resolve.Target, err error) bool {
+	iter(func(_ resolve.Target, err error) bool {
 		if err == nil {
 			t.Fatalf("Expected explicit json payload error")
 		}

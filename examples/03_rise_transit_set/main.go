@@ -1,3 +1,4 @@
+// Package main demonstrates rise, transit, and set computation.
 package main
 
 import (

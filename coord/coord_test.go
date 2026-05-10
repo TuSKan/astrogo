@@ -54,7 +54,7 @@ func TestString(t *testing.T) {
 	testutil.AssertEqual(t, "ICRS string", s, "ICRS RA=12h30m00.00s Dec=-45°15'00.00\"")
 }
 
-func TestAngleWrappingRequirement(t *testing.T) {
+func TestAngleWrappingRequirement(_ *testing.T) {
 	c := coord.NewICRS(angle.Deg(370), angle.Deg(0))
 	_ = c.String()
 }

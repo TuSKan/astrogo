@@ -14,23 +14,33 @@ import (
 
 var warnUT1Once sync.Once
 
+// Duration is the interface that represents a duration.
 type Duration = time.Duration
 
+// Location is the interface that represents a time zone.
 type Location = time.Location
 
+// Month is the interface that represents a month.
 type Month = time.Month
 
 // Weekday represents a day of the week (0=Sunday, 6=Saturday).
 type Weekday int
 
 const (
-	Sunday    Weekday = 0
-	Monday    Weekday = 1
-	Tuesday   Weekday = 2
+	// Sunday is the first day of the week.
+	Sunday Weekday = 0
+	// Monday is the second day of the week.
+	Monday Weekday = 1
+	// Tuesday is the third day of the week.
+	Tuesday Weekday = 2
+	// Wednesday is the fourth day of the week.
 	Wednesday Weekday = 3
-	Thursday  Weekday = 4
-	Friday    Weekday = 5
-	Saturday  Weekday = 6
+	// Thursday is the fifth day of the week.
+	Thursday Weekday = 4
+	// Friday is the sixth day of the week.
+	Friday Weekday = 5
+	// Saturday is the seventh day of the week.
+	Saturday Weekday = 6
 )
 
 // String returns the English name of the day ("Sunday", "Monday", ...).
@@ -56,33 +66,52 @@ func (w Weekday) String() string {
 }
 
 const (
-	Second = time.Second
-	Minute = time.Minute
-	Hour   = time.Hour
+	// Second is one second.
+	Second time.Duration = time.Second //nolint:revive // Public time unit constant; unit name is intentional.
+	// Minute is one minute.
+	Minute time.Duration = time.Minute //nolint:revive // Public time unit constant; unit name is intentional.
+	// Hour is one hour.
+	Hour time.Duration = time.Hour //nolint:revive // Public time unit constant; unit name is intentional.
 )
 
 // Month constants re-exported from the standard library.
 const (
-	January   = time.January
-	February  = time.February
-	March     = time.March
-	April     = time.April
-	May       = time.May
-	June      = time.June
-	July      = time.July
-	August    = time.August
+	// January is the first month of the year.
+	January = time.January
+	// February is the second month of the year.
+	February = time.February
+	// March is the third month of the year.
+	March = time.March
+	// April is the fourth month of the year.
+	April = time.April
+	// May is the fifth month of the year.
+	May = time.May
+	// June is the sixth month of the year.
+	June = time.June
+	// July is the seventh month of the year.
+	July = time.July
+	// August is the eighth month of the year.
+	August = time.August
+	// September is the ninth month of the year.
 	September = time.September
-	October   = time.October
-	November  = time.November
-	December  = time.December
+	// October is the tenth month of the year.
+	October = time.October
+	// November is the eleventh month of the year.
+	November = time.November
+	// December is the twelfth month of the year.
+	December = time.December
 )
 
+// LoadLocation loads a location from the standard library.
 var LoadLocation = time.LoadLocation
 
+// LocationUTC is the UTC location.
 var LocationUTC = time.UTC
 
 var (
+	// RFC1123 is a time format that conforms to RFC 1123.
 	RFC1123 = time.RFC1123
+	// RFC3339 is a time format that conforms to RFC 3339.
 	RFC3339 = time.RFC3339
 )
 
@@ -90,11 +119,16 @@ var (
 type Scale uint8
 
 const (
-	UTC Scale = iota // Coordinated Universal Time
-	TAI              // International Atomic Time
-	TT               // Terrestrial Time
-	UT1              // Universal Time
-	TDB              // Barycentric Dynamical Time
+	// UTC is Coordinated Universal Time.
+	UTC Scale = iota
+	// TAI is International Atomic Time.
+	TAI
+	// TT is Terrestrial Time.
+	TT
+	// UT1 is Universal Time.
+	UT1
+	// TDB is Barycentric Dynamical Time.
+	TDB
 )
 
 func (s Scale) String() string {
@@ -169,6 +203,7 @@ func NowUTC() Time {
 	return FromGo(time.Now())
 }
 
+// ZeroTime returns the zero time, defined as JD 0 in the UTC scale.
 func ZeroTime() Time {
 	return FromJD(0, UTC)
 }
@@ -303,11 +338,11 @@ func (t Time) JulianCalendar() (year, month, day int, dayFrac float64) {
 func (t Time) FormatJulian(format string) string {
 	y, m, d, frac := t.JulianCalendar()
 
-	totalSec := frac * 86400.0
-	hour := int(totalSec / 3600)
-	totalSec -= float64(hour) * 3600
-	min := int(totalSec / 60)
-	sec := int(totalSec - float64(min)*60)
+	secondOfDay := frac * 86400.0
+	hour := int(secondOfDay / 3600)
+	secondOfDay -= float64(hour) * 3600
+	minute := int(secondOfDay / 60)
+	second := int(secondOfDay - float64(minute)*60)
 
 	yearStr := fmt.Sprintf("%04d", y)
 	if y < 0 {
@@ -320,8 +355,8 @@ func (t Time) FormatJulian(format string) string {
 		"01", fmt.Sprintf("%02d", m),
 		"02", fmt.Sprintf("%02d", d),
 		"15", fmt.Sprintf("%02d", hour),
-		"04", fmt.Sprintf("%02d", min),
-		"05", fmt.Sprintf("%02d", sec),
+		"04", fmt.Sprintf("%02d", minute),
+		"05", fmt.Sprintf("%02d", second),
 		"MST", t.scale.String(),
 	)
 
@@ -381,12 +416,12 @@ func (t Time) AddDate(years, months, days int) Time {
 	totalSec := frac * 86400.0
 	hour := int(totalSec / 3600)
 	totalSec -= float64(hour) * 3600
-	min := int(totalSec / 60)
-	sec := totalSec - float64(min)*60
+	minute := int(totalSec / 60)
+	second := totalSec - float64(minute)*60
 
 	// Use day 1 of the target month to get a base JD, then add
 	// the original day-of-month - 1 + extra days via JD arithmetic.
-	jd1, jd2, _ := gofaext.Dtf2d(t.scale.String(), y, m, 1, hour, min, sec)
+	jd1, jd2, _ := gofaext.Dtf2d(t.scale.String(), y, m, 1, hour, minute, second)
 	result := FromJDParts(jd1, jd2, t.scale)
 	result = result.AddDays(float64(origDay - 1 + days))
 	result.loc = t.loc
@@ -415,18 +450,18 @@ func (t Time) AddDays(d float64) Time {
 // proleptic Gregorian calendar including negative (astronomical) years.
 // Year 0 = 1 BC, year -1 = 2 BC, etc.
 // The timezone location is preserved for display purposes.
-func Date(year int, month time.Month, day, hour, min, sec, nsec int, loc *time.Location) Time {
+func Date(year int, month time.Month, day, hour, minute, second, nanosecond int, loc *time.Location) Time {
 	// For years within Go's time.Time range, delegate to FromGo which
 	// handles timezone offsets exactly.
 	if year >= 1 && year <= 9999 {
-		return FromGo(time.Date(year, month, day, hour, min, sec, nsec, loc))
+		return FromGo(time.Date(year, month, day, hour, minute, second, nanosecond, loc))
 	}
 
 	// For deep historical years (negative/zero), use SOFA's Dtf2d.
 	// Timezone offsets are irrelevant for ancient astronomical dates
 	// (they're always specified in UTC or local solar time).
-	fracSec := float64(sec) + float64(nsec)/1e9
-	jd1, jd2, _ := gofaext.Dtf2d("UTC", year, int(month), day, hour, min, fracSec)
+	fracSec := float64(second) + float64(nanosecond)/1e9
+	jd1, jd2, _ := gofaext.Dtf2d("UTC", year, int(month), day, hour, minute, fracSec)
 	result := FromJDParts(jd1, jd2, UTC)
 	result.loc = loc
 
@@ -442,13 +477,13 @@ func Date(year int, month time.Month, day, hour, min, sec, nsec int, loc *time.L
 // historical dates, chain with ApplyDeltaT() to convert to TT:
 //
 //	t := time.DateJulianCal(33, 4, 3, 15, 0, 0).ApplyDeltaT()
-func DateJulianCal(year, month, day, hour, min, sec int) Time {
+func DateJulianCal(year, month, day, hour, minute, second int) Time {
 	// Julian calendar to JD conversion (Meeus, Astronomical Algorithms)
 	a := (14 - month) / 12
 	y := year + 4800 - a
 	m := month + 12*a - 3
 	jdn := day + (153*m+2)/5 + 365*y + y/4 - 32083
-	jd := float64(jdn) - 0.5 + float64(hour)/24.0 + float64(min)/1440.0 + float64(sec)/86400.0
+	jd := float64(jdn) - 0.5 + float64(hour)/24.0 + float64(minute)/1440.0 + float64(second)/86400.0
 
 	return FromJD(jd, UTC)
 }
@@ -513,8 +548,8 @@ func (t Time) Format(format string) string {
 	totalSec := frac * 86400.0
 	hour := int(totalSec / 3600)
 	totalSec -= float64(hour) * 3600
-	min := int(totalSec / 60)
-	sec := int(totalSec - float64(min)*60)
+	minute := int(totalSec / 60)
+	second := int(totalSec - float64(minute)*60)
 
 	r := strings.NewReplacer(
 		"2006", fmt.Sprintf("%+05d", y),
@@ -522,8 +557,8 @@ func (t Time) Format(format string) string {
 		"01", fmt.Sprintf("%02d", m),
 		"02", fmt.Sprintf("%02d", d),
 		"15", fmt.Sprintf("%02d", hour),
-		"04", fmt.Sprintf("%02d", min),
-		"05", fmt.Sprintf("%02d", sec),
+		"04", fmt.Sprintf("%02d", minute),
+		"05", fmt.Sprintf("%02d", second),
 		"MST", t.scale.String(),
 	)
 
@@ -704,7 +739,7 @@ func (t Time) UTC() Time {
 		return t
 	}
 
-	switch t.scale {
+	switch t.scale { //nolint:exhaustive // UTC is identity; only TAI/TT/TDB/UT1 convert
 	case TAI:
 		// UTC = TAI − ΔAT.
 		// Use TAI JD as initial UTC guess for the leap-second lookup,
@@ -744,7 +779,7 @@ func (t Time) TAI() Time {
 		return t
 	}
 
-	switch t.scale {
+	switch t.scale { //nolint:exhaustive // only UTC/TT/TDB convert to TAI
 	case UTC:
 		// TAI = UTC + ΔAT
 		y, m, d, fd, _ := gofaext.JdToDate(t.jd1, t.jd2)
@@ -773,7 +808,7 @@ func (t Time) TT() Time {
 		return t
 	}
 
-	switch t.scale {
+	switch t.scale { //nolint:exhaustive // only UTC/TAI/TDB convert to TT
 	case UTC:
 		// Check if the LSK has valid leap-second data for this epoch.
 		// Before 1972, ΔAT = 0 (no leap seconds), so we use ΔT instead.

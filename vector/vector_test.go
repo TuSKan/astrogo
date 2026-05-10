@@ -244,9 +244,9 @@ func TestRotateZ_composition(t *testing.T) {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 // assertVecNear fails t if any component of got differs from want by more than tol.
-func assertVecNear(t testing.TB, label string, got, want vector.Vec3, tolerance float64) {
-	t.Helper()
-	testutil.AssertNear(t, label+".X", got.X, want.X, tolerance)
-	testutil.AssertNear(t, label+".Y", got.Y, want.Y, tolerance)
-	testutil.AssertNear(t, label+".Z", got.Z, want.Z, tolerance)
+func assertVecNear(tb testing.TB, label string, got, want vector.Vec3, tolerance float64) { //nolint:unparam // tolerance parameterized for readability
+	tb.Helper()
+	testutil.AssertNear(tb, label+".X", got.X, want.X, tolerance)
+	testutil.AssertNear(tb, label+".Y", got.Y, want.Y, tolerance)
+	testutil.AssertNear(tb, label+".Z", got.Z, want.Z, tolerance)
 }
