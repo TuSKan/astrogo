@@ -8,8 +8,8 @@
 package main
 
 import (
-	"log"
 	"fmt"
+	"log"
 	"math"
 
 	"github.com/TuSKan/astrogo/angle"

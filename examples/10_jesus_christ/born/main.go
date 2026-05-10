@@ -6,8 +6,8 @@
 package main
 
 import (
-	"log"
 	"fmt"
+	"log"
 
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
