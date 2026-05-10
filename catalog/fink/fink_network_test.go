@@ -1,5 +1,6 @@
 //go:build network
-// +build network
+
+//go test -tags network ./catalog/fink
 
 package fink
 
