@@ -65,6 +65,7 @@ func main() {
 	// Method 1: Built-in SOFA Provider (Plan94 analytical series)
 	// ═══════════════════════════════════════════════════════════════════════
 	fmt.Println("┌─ Method 1: Built-in SOFA Provider (Plan94) ─────────────────────┐")
+
 	sofaProv := eph.Default()
 	computeAndPrint(sofaProv, eph.Mars, t, horizonsRA, horizonsDec, horizonsDist)
 	fmt.Println("└──────────────────────────────────────────────────────────────────┘")
@@ -74,14 +75,22 @@ func main() {
 	// Method 2: JPL DE440 Provider (numerical integration)
 	// ═══════════════════════════════════════════════════════════════════════
 	fmt.Println("┌─ Method 2: JPL DE440 Provider ──────────────────────────────────┐")
+
 	jplProv, err := eph.NewProvider(eph.Planets, "de440")
 	if err != nil {
 		log.Printf("│  ⚠ JPL provider unavailable: %v\n", err)
 		fmt.Println("│  Skipping JPL comparison.")
 	} else {
-		defer jplProv.Close()
+		defer func() {
+			err := jplProv.Close()
+			if err != nil {
+				log.Printf("failed to close JPL provider: %v", err)
+			}
+		}()
+
 		computeAndPrint(jplProv, eph.Mars, t, horizonsRA, horizonsDec, horizonsDist)
 	}
+
 	fmt.Println("└──────────────────────────────────────────────────────────────────┘")
 	fmt.Println()
 

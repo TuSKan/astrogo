@@ -37,6 +37,7 @@ func TestProvider_ResolveAndSearch(t *testing.T) {
 	if !found {
 		t.Fatal("expected to find Sirius")
 	}
+
 	if tgt.ID != "ID-1" {
 		t.Errorf("expected ID-1, got %s", tgt.ID)
 	}
@@ -51,6 +52,7 @@ func TestProvider_ResolveAndSearch(t *testing.T) {
 	if len(results) != 1 {
 		t.Fatalf("expected 1 search result, got %d", len(results))
 	}
+
 	if results[0].Name != "Sirius" {
 		t.Errorf("expected Sirius, got %s", results[0].Name)
 	}

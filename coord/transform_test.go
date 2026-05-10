@@ -86,6 +86,7 @@ func TestAltAzEdgeCases(t *testing.T) {
 
 func TestGalacticExtremes(t *testing.T) {
 	const tol = 1e-7
+
 	tests := []struct {
 		name string
 		icrs coord.ICRS
@@ -123,6 +124,7 @@ func TestGalacticExtremes(t *testing.T) {
 
 func TestEclipticExtremes(t *testing.T) {
 	const tol = 2e-5
+
 	tm := time.FromJD(2451545.0, time.UTC) // J2000
 
 	tests := []struct {
@@ -203,6 +205,7 @@ func TestRefractionModes(t *testing.T) {
 	if altSOFA <= altNone {
 		t.Errorf("SOFA Refraction failed to lift altitude: Geometric=%v, Refracted=%v", altNone, altSOFA)
 	}
+
 	if altApprox <= altNone {
 		t.Errorf("Approx Refraction failed to lift altitude: Geometric=%v, Refracted=%v", altNone, altApprox)
 	}
@@ -255,7 +258,6 @@ func TestAstrometricToApparent(t *testing.T) {
 func TestApparentToObserved(t *testing.T) {
 	// Zenith star in CIRS right on local meridian (Hour Angle = 0)
 	// At observer's latitude, if Declination == Latitude and LST == RA, star is exactly at Zenith.
-
 	site, err := coord.NewGeodetic(angle.Deg(45.0), angle.Deg(-90.0), 100.0)
 	if err != nil {
 		t.Fatalf("Failed to create geodetic site: %v", err)
@@ -275,6 +277,7 @@ func TestApparentToObserved(t *testing.T) {
 	if observed.Alt().Degrees() < -90 || observed.Alt().Degrees() > 90 {
 		t.Errorf("Invalid Altitude: %v", observed.Alt().Degrees())
 	}
+
 	if observed.Az().Degrees() < 0 || observed.Az().Degrees() > 360 {
 		t.Errorf("Invalid Azimuth: %v", observed.Az().Degrees())
 	}
@@ -285,6 +288,7 @@ func TestLegacyEquatorialHorizontalConsistency(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create geodetic site: %v", err)
 	}
+
 	obsTime := time.Date(2023, 5, 1, 6, 0, 0, 0, time.LocationUTC)
 
 	geom := coord.NewICRS(angle.Deg(150), angle.Deg(30))
@@ -311,10 +315,12 @@ func TestTransformNearPole(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create geodetic site: %v", err)
 	}
+
 	starNorth := coord.NewICRS(angle.Deg(0), angle.Deg(89.9))
 	ctxN := coord.NewContext(tm, locN, atmosphere.StandardAtmosphere)
 	aaN, err := ctxN.ICRSToAltAz(starNorth)
 	testutil.AssertNoError(t, err)
+
 	if aaN.Alt().Degrees() < 89.0 {
 		t.Fatalf("expected near-zenith altitude at North Pole, got %.6f deg", aaN.Alt().Degrees())
 	}
@@ -324,6 +330,7 @@ func TestTransformNearPole(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create geodetic site: %v", err)
 	}
+
 	starEq := coord.NewICRS(angle.Deg(0), angle.Deg(0))
 	ctxS := coord.NewContext(tm, locS, atmosphere.StandardAtmosphere)
 	aaS, err := ctxS.ICRSToAltAz(starEq)
@@ -336,6 +343,7 @@ func TestTransformBoundaryRA(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create geodetic site: %v", err)
 	}
+
 	tm := time.NowUTC()
 	ctx := coord.NewContext(tm, loc, atmosphere.StandardAtmosphere)
 
@@ -358,10 +366,12 @@ func TestNegativeLongitude(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create geodetic site: %v", err)
 	}
+
 	loc2, err := coord.NewGeodetic(angle.Deg(315), angle.Deg(0), 0)
 	if err != nil {
 		t.Fatalf("Failed to create geodetic site: %v", err)
 	}
+
 	tm := time.NowUTC()
 	star := coord.NewICRS(angle.Deg(0), angle.Deg(0))
 
@@ -382,6 +392,7 @@ func TestICRSBatchToAltAzParallel_Correctness(t *testing.T) {
 	ctx := coord.NewContext(tm, loc, atm)
 
 	const n = 500
+
 	stars := make([]coord.ICRS, n)
 	for i := range stars {
 		ra := angle.Deg(float64(i) * 360.0 / float64(n))
@@ -395,7 +406,7 @@ func TestICRSBatchToAltAzParallel_Correctness(t *testing.T) {
 	ctx.ICRSBatchToAltAz(stars, serial)
 	ctx.ICRSBatchToAltAzParallel(stars, parallel)
 
-	for i := 0; i < n; i++ {
+	for i := range n {
 		if math.Abs(serial[i].Alt().Degrees()-parallel[i].Alt().Degrees()) > 1e-12 ||
 			math.Abs(serial[i].Az().Degrees()-parallel[i].Az().Degrees()) > 1e-12 {
 			t.Fatalf("mismatch at index %d: serial=(%.10f, %.10f) parallel=(%.10f, %.10f)",
@@ -413,6 +424,7 @@ func TestReduceBatchParallel_Correctness(t *testing.T) {
 	ctx := coord.NewContext(tm, loc, atm)
 
 	const n = 500
+
 	vecs := make([]vector.Vec3, n)
 	for i := range vecs {
 		vecs[i] = vector.Vec3{
@@ -428,7 +440,7 @@ func TestReduceBatchParallel_Correctness(t *testing.T) {
 	ctx.ReduceBatch(vecs, serial)
 	ctx.ReduceBatchParallel(vecs, parallel)
 
-	for i := 0; i < n; i++ {
+	for i := range n {
 		if math.Abs(serial[i].Alt().Degrees()-parallel[i].Alt().Degrees()) > 1e-12 ||
 			math.Abs(serial[i].Az().Degrees()-parallel[i].Az().Degrees()) > 1e-12 {
 			t.Fatalf("mismatch at index %d: serial=(%.10f, %.10f) parallel=(%.10f, %.10f)",

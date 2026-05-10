@@ -12,7 +12,9 @@
 package main
 
 import (
+	"log"
 	"fmt"
+	"strings"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
@@ -34,7 +36,11 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	defer prov.Close()
+	defer func() {
+		if err := prov.Close(); err != nil {
+			log.Printf("failed to close provider: %v", err)
+		}
+	}()
 
 	// Jerusalem: 31.7683°N, 35.2137°E, 754m
 	jerusalem, _ := coord.NewGeodetic(angle.Deg(35.2137), angle.Deg(31.7683), 754)
@@ -59,12 +65,14 @@ func main() {
 		}
 
 		var equinox time.Time
+
 		for _, s := range seasons {
 			if s.Season == plan.SeasonVernalEquinox {
 				equinox = s.Time
 				break
 			}
 		}
+
 		if equinox.IsZero() {
 			fmt.Printf("  AD %d: no vernal equinox found\n", year)
 			continue
@@ -73,6 +81,7 @@ func main() {
 		// 2. Find new moons within a window around the equinox
 		searchStart := equinox.Add(-45 * 24 * time.Hour)
 		searchEnd := equinox.Add(45 * 24 * time.Hour)
+
 		phases, err := plan.MoonPhases(searchStart, searchEnd, prov)
 		if err != nil {
 			fmt.Printf("  AD %d: moon phases error: %v\n", year, err)
@@ -81,6 +90,7 @@ func main() {
 
 		// Collect all new moons
 		var newMoons []plan.MoonPhaseEvent
+
 		for _, p := range phases {
 			if p.Phase == plan.PhaseNewMoon {
 				newMoons = append(newMoons, p)
@@ -93,11 +103,10 @@ func main() {
 			// Jerusalem sunset ≈ 18:00 local solar time
 			// Jerusalem is at longitude 35.21°E → UTC offset ≈ +2h21m
 			// So sunset ≈ 15:39 UTC (approximate, varies by season)
-
 			conjYear, conjMonth, conjDay, _ := nm.Time.Calendar()
 
 			// Check this and next 2 days for first visible crescent
-			for dayOff := 0; dayOff < 3; dayOff++ {
+			for dayOff := range 3 {
 				sunsetUTC := time.Date(
 					conjYear, time.Month(conjMonth), conjDay+dayOff,
 					15, 39, 0, 0, time.LocationUTC)
@@ -116,6 +125,7 @@ func main() {
 					if err != nil {
 						continue
 					}
+
 					result := params.EvaluateAll()
 
 					// Check if at least the Danjon elongation criterion is met
@@ -138,6 +148,7 @@ func main() {
 					marker := ""
 					if weekday == time.Friday {
 						marker = "★ FRIDAY"
+
 						fridays = append(fridays, fridayCandidate{
 							year:     year,
 							nisan14:  nisan14.FormatJulian("Jan 02"),
@@ -155,6 +166,7 @@ func main() {
 						weekday,
 						marker,
 						nVisible)
+
 					break // Take the first visible sunset
 				}
 			}
@@ -163,10 +175,12 @@ func main() {
 
 	// ── Dynamically generated summary ────────────────────────────────────
 	fmt.Println()
+
 	if len(fridays) == 0 {
 		fmt.Println("  Result: No Friday Nisan 14 candidates found.")
 	} else {
 		fmt.Println("  Friday Nisan 14 candidates found:")
+
 		for _, f := range fridays {
 			nVisible := countVisible(f.crescent)
 			fmt.Printf("    • AD %d — %s (Julian) — crescent age %.1f hours — %d/20 criteria met\n",
@@ -186,12 +200,14 @@ func main() {
 		fmt.Println("  window where Nisan 14 falls on a Friday with a Passover-eligible")
 		fmt.Println("  new moon (≥ vernal equinox).")
 	}
+
 	fmt.Println()
 }
 
 // countVisible counts how many of the 20 criteria report visibility.
 func countVisible(r plan.CrescentResult) int {
 	n := 0
+
 	bools := []bool{
 		r.Fotheringham, r.Maunder, r.Ilyas1988, r.Fatoohi, r.KraussAthenian,
 		r.MABIMS1995, r.Istanbul2016, r.MABIMS2021,
@@ -208,9 +224,11 @@ func countVisible(r plan.CrescentResult) int {
 	if r.Yallop.Code == "A" || r.Yallop.Code == "B" {
 		n++
 	}
+
 	if r.Odeh.Code == "Naked Eye" || r.Odeh.Code == "Optical/Naked" {
 		n++
 	}
+
 	if r.Qureshi.Code == "A" || r.Qureshi.Code == "B" {
 		n++
 	}
@@ -223,33 +241,45 @@ func repeat(ch rune, n int) string {
 	for i := range s {
 		s[i] = ch
 	}
+
 	return string(s)
 }
 
 func indent(s, prefix string) string {
 	out := ""
+
+	var outSb231 strings.Builder
+
 	for i, line := range splitLines(s) {
 		if i > 0 {
-			out += "\n"
+			outSb231.WriteString("\n")
 		}
+
 		if line != "" {
-			out += prefix + line
+			outSb231.WriteString(prefix + line)
 		}
 	}
+
+	out += outSb231.String()
+
 	return out
 }
 
 func splitLines(s string) []string {
 	var lines []string
+
 	start := 0
-	for i := 0; i < len(s); i++ {
+
+	for i := range len(s) {
 		if s[i] == '\n' {
 			lines = append(lines, s[start:i])
 			start = i + 1
 		}
 	}
+
 	if start < len(s) {
 		lines = append(lines, s[start:])
 	}
+
 	return lines
 }

@@ -46,6 +46,7 @@ func TestGofaExtWrappers(t *testing.T) {
 	// Epv00
 	pvh, pvb, st := gofaext.Epv00(d1, d2)
 	testutil.AssertEqual(t, "Status", st, 0)
+
 	if pvh[0][0] == 0 && pvb[0][0] == 0 {
 		t.Errorf("Epv00 failed, got zero")
 	}
@@ -59,6 +60,7 @@ func TestGofaExtWrappers(t *testing.T) {
 	// Dat
 	dat, st := gofaext.Dat(2000, 1, 1, 0.5)
 	testutil.AssertEqual(t, "Status", st, 0)
+
 	if dat == 0 {
 		t.Errorf("Dat failed, got zero")
 	}

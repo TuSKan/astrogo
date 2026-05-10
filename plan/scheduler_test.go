@@ -19,10 +19,12 @@ func (m mockConstraint) Check(target Observable, t time.Time, site *Site) (Resul
 
 func TestSchedulerAndStrategies(t *testing.T) {
 	loc, _ := coord.NewGeodetic(angle.Zero(), angle.Zero(), 0)
+
 	site, err := NewSite("TestSite", loc, angle.Zero(), nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+
 	planner, _ := NewPlanner(site, nil)
 
 	tm := &BasicTransitionModel{BaseSetup: 0} // Simplify time math by zeroing base setup
@@ -35,6 +37,7 @@ func TestSchedulerAndStrategies(t *testing.T) {
 
 	// 1. Greedy Strategy
 	scheduler := NewScheduler(planner, &GreedyStrategy{}, tm)
+
 	sched, err := scheduler.BuildSchedule(window, []*Block{b1, b2})
 	if err != nil {
 		t.Fatalf("Greedy scheduling failed: %v", err)
@@ -51,6 +54,7 @@ func TestSchedulerAndStrategies(t *testing.T) {
 
 	// 2. Priority Strategy
 	scheduler = NewScheduler(planner, &PriorityStrategy{}, tm)
+
 	sched, err = scheduler.BuildSchedule(window, []*Block{b1, b2})
 	if err != nil {
 		t.Fatalf("Priority scheduling failed: %v", err)
@@ -68,10 +72,12 @@ func TestSchedulerAndStrategies(t *testing.T) {
 		Duration:    20 * time.Minute,
 		Constraints: []Constraint{mockConstraint{pass: false}},
 	}
+
 	sched, err = scheduler.BuildSchedule(window, []*Block{b3})
 	if err != nil {
 		t.Fatalf("Constraint scheduling failed: %v", err)
 	}
+
 	if len(sched.Blocks) != 0 || len(sched.Unscheduled) != 1 {
 		t.Errorf("expected B3 to fail constraint check")
 	}

@@ -96,13 +96,16 @@ func DefaultRetryPolicy(resp *http.Response, err error) bool {
 		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 			return false
 		}
+
 		return true
 	}
+
 	if resp != nil {
 		if resp.StatusCode == http.StatusTooManyRequests || resp.StatusCode >= 500 {
 			return true
 		}
 	}
+
 	return false
 }
 
@@ -140,11 +143,17 @@ func (c *Client) Do(req *http.Request) (*http.Response, error) {
 			if err != nil {
 				return nil, backoff.Permanent(err)
 			}
+
 			if resp.StatusCode >= 400 {
-				defer resp.Body.Close()
 				bdBytes, _ := io.ReadAll(resp.Body)
-				return nil, backoff.Permanent(&HTTPError{StatusCode: resp.StatusCode, Body: string(bdBytes)})
+				closeErr := resp.Body.Close()
+
+				return nil, backoff.Permanent(errors.Join(
+					&HTTPError{StatusCode: resp.StatusCode, Body: string(bdBytes)},
+					closeErr,
+				))
 			}
+
 			return resp, nil
 		}
 
@@ -152,6 +161,7 @@ func (c *Client) Do(req *http.Request) (*http.Response, error) {
 			_ = resp.Body.Close()
 			return nil, fmt.Errorf("retriable status code %d", resp.StatusCode)
 		}
+
 		return nil, err
 	}
 

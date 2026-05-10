@@ -60,6 +60,7 @@ func main() {
 	// 5. Print out the generated timeline
 	fmt.Println("Observing Schedule:")
 	fmt.Println("===================")
+
 	for i, b := range schedule.Blocks {
 		fmt.Printf("%d. %-15s | Start: %s | Setup: %ds\n",
 			i+1,

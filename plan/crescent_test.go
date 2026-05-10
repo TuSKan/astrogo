@@ -330,6 +330,7 @@ func TestYallopBoundaries(t *testing.T) {
 
 	// Clearly above → must be A
 	p.ArcV = 14.1
+
 	got = p.Yallop()
 	if got.Code != "A" {
 		t.Errorf("q clearly above 0.216 should be zone A, got %q (q=%.6f)", got.Code, got.Value)
@@ -337,6 +338,7 @@ func TestYallopBoundaries(t *testing.T) {
 
 	// Clearly below → must be B
 	p.ArcV = 13.5
+
 	got = p.Yallop()
 	if got.Code != "B" {
 		t.Errorf("q clearly below 0.216 should be zone B, got %q (q=%.6f)", got.Code, got.Value)
@@ -374,6 +376,7 @@ func TestOdehBoundaries(t *testing.T) {
 	// V >= 5.65 → Naked Eye
 	// Clearly above: ArcV = 13.0 → V = 5.8349
 	p := CrescentParams{ArcV: 13.0, W: 0}
+
 	got := p.Odeh()
 	if got.Code != "Naked Eye" {
 		t.Errorf("V=5.83 should be Naked Eye, got %q (V=%.6f)", got.Code, got.Value)
@@ -381,6 +384,7 @@ func TestOdehBoundaries(t *testing.T) {
 
 	// V just below 5.65 → Optical/Naked (ArcV = 12.81 → V = 5.6449)
 	p.ArcV = 12.81
+
 	got = p.Odeh()
 	if got.Code != "Optical/Naked" {
 		t.Errorf("V=5.6449 should be Optical/Naked, got %q (V=%.6f)", got.Code, got.Value)
@@ -520,48 +524,63 @@ func TestEvaluateAll(t *testing.T) {
 	if r.Fotheringham != p.Fotheringham() {
 		t.Error("Fotheringham mismatch")
 	}
+
 	if r.Maunder != p.Maunder() {
 		t.Error("Maunder mismatch")
 	}
+
 	if r.Ilyas1988 != p.Ilyas1988() {
 		t.Error("Ilyas1988 mismatch")
 	}
+
 	if r.Fatoohi != p.Fatoohi() {
 		t.Error("Fatoohi mismatch")
 	}
+
 	if r.KraussAthenian != p.KraussAthenian() {
 		t.Error("KraussAthenian mismatch")
 	}
+
 	if r.MABIMS1995 != p.MABIMS1995() {
 		t.Error("MABIMS1995 mismatch")
 	}
+
 	if r.Istanbul2016 != p.Istanbul2016() {
 		t.Error("Istanbul2016 mismatch")
 	}
+
 	if r.MABIMS2021 != p.MABIMS2021() {
 		t.Error("MABIMS2021 mismatch")
 	}
+
 	if r.Danjon != p.Danjon() {
 		t.Error("Danjon mismatch")
 	}
+
 	if r.Schaefer != p.Schaefer() {
 		t.Error("Schaefer mismatch")
 	}
+
 	if r.Ilyas1984 != p.Ilyas1984() {
 		t.Error("Ilyas1984 mismatch")
 	}
+
 	if r.Bruin != p.Bruin() {
 		t.Error("Bruin mismatch")
 	}
+
 	if r.AlrefayNakedEye != p.AlrefayNakedEye() {
 		t.Error("AlrefayNakedEye mismatch")
 	}
+
 	if r.CaldwellNakedEye != p.CaldwellNakedEye() {
 		t.Error("CaldwellNakedEye mismatch")
 	}
+
 	if r.CaldwellOptical != p.CaldwellOptical() {
 		t.Error("CaldwellOptical mismatch")
 	}
+
 	if r.Gautschy != p.Gautschy() {
 		t.Error("Gautschy mismatch")
 	}
@@ -571,10 +590,12 @@ func TestEvaluateAll(t *testing.T) {
 	if math.Abs(r.Yallop.Value-yDirect.Value) > 1e-10 || r.Yallop.Code != yDirect.Code {
 		t.Errorf("Yallop mismatch: got %v, want %v", r.Yallop, yDirect)
 	}
+
 	oDirect := p.Odeh()
 	if math.Abs(r.Odeh.Value-oDirect.Value) > 1e-10 || r.Odeh.Code != oDirect.Code {
 		t.Errorf("Odeh mismatch: got %v, want %v", r.Odeh, oDirect)
 	}
+
 	qDirect := p.Qureshi()
 	if math.Abs(r.Qureshi.Value-qDirect.Value) > 1e-10 || r.Qureshi.Code != qDirect.Code {
 		t.Errorf("Qureshi mismatch: got %v, want %v", r.Qureshi, qDirect)
@@ -584,6 +605,7 @@ func TestEvaluateAll(t *testing.T) {
 func TestEvaluateAllString(t *testing.T) {
 	p := CrescentParams{ArcV: 10.5, ArcL: 12.0, DAZ: 8.0, MAlt: 5.5, W: 0.5, LT: 35.0}
 	r := p.EvaluateAll()
+
 	s := r.String()
 	if len(s) == 0 {
 		t.Error("String() returned empty")
@@ -598,6 +620,7 @@ func TestEvaluateAllString(t *testing.T) {
 
 func TestCrescentZoneString(t *testing.T) {
 	z := CrescentZone{Code: "A", Label: "Easily visible", Value: 0.3456}
+
 	s := z.String()
 	if s != "A: Easily visible (value=0.3456)" {
 		t.Errorf("CrescentZone.String() = %q", s)
@@ -615,5 +638,6 @@ func searchStr(s, substr string) bool {
 			return true
 		}
 	}
+
 	return false
 }

@@ -12,10 +12,12 @@ import (
 // can improve upon a naive greedy schedule.
 func TestSwapOptimizedStrategy(t *testing.T) {
 	loc, _ := coord.NewGeodetic(angle.Zero(), angle.Zero(), 0)
+
 	site, err := NewSite("TestSite", loc, angle.Zero(), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	planner, _ := NewPlanner(site, nil)
 
 	tm := &BasicTransitionModel{BaseSetup: 0}
@@ -33,6 +35,7 @@ func TestSwapOptimizedStrategy(t *testing.T) {
 		MaxPasses: 3,
 	}
 	scheduler := NewScheduler(planner, strategy, tm)
+
 	sched, err := scheduler.BuildSchedule(window, []*Block{b1, b2, b3})
 	if err != nil {
 		t.Fatalf("SwapOptimized scheduling failed: %v", err)
@@ -45,14 +48,19 @@ func TestSwapOptimizedStrategy(t *testing.T) {
 	if len(sched.Blocks) < 3 {
 		t.Fatalf("expected 3 scheduled blocks, got %d", len(sched.Blocks))
 	}
-	var maxScore float64
-	var maxID string
+
+	var (
+		maxScore float64
+		maxID    string
+	)
+
 	for _, sb := range sched.Blocks {
 		if sb.Score > maxScore {
 			maxScore = sb.Score
 			maxID = sb.Block.ID
 		}
 	}
+
 	if maxID != "B3" && maxID != "B2" {
 		t.Errorf("expected B2 or B3 to have highest composite score, got %s (%.2f)", maxID, maxScore)
 	}
@@ -63,6 +71,7 @@ func TestSwapOptimizedStrategy(t *testing.T) {
 	}
 
 	t.Logf("Scheduled %d blocks, %d unscheduled", len(sched.Blocks), len(sched.Unscheduled))
+
 	for i, sb := range sched.Blocks {
 		t.Logf("  [%d] %s: %s → %s (score=%.2f)", i, sb.Block.ID, sb.Window.Start, sb.Window.End, sb.Score)
 	}
@@ -72,10 +81,12 @@ func TestSwapOptimizedStrategy(t *testing.T) {
 // recovers blocks that the greedy scheduler couldn't place.
 func TestSwapOptimizedGapInsertion(t *testing.T) {
 	loc, _ := coord.NewGeodetic(angle.Zero(), angle.Zero(), 0)
+
 	site, err := NewSite("TestSite", loc, angle.Zero(), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	planner, _ := NewPlanner(site, nil)
 
 	tm := &BasicTransitionModel{BaseSetup: 0}
@@ -144,6 +155,7 @@ func TestScheduleGaps(t *testing.T) {
 	if gaps[0].prevBlock != nil {
 		t.Error("first gap should have nil prevBlock")
 	}
+
 	expectedDur := 10 * time.Minute
 	if gaps[0].window.Duration() != expectedDur {
 		t.Errorf("first gap duration: got %v, want %v", gaps[0].window.Duration(), expectedDur)
@@ -169,6 +181,7 @@ func TestEmptyScheduleGaps(t *testing.T) {
 	if len(gaps) != 1 {
 		t.Fatalf("expected 1 gap for empty schedule, got %d", len(gaps))
 	}
+
 	if gaps[0].window.Duration() != 1*time.Hour {
 		t.Errorf("gap duration: got %v, want 1h", gaps[0].window.Duration())
 	}
@@ -188,10 +201,12 @@ func TestSwapOptimizedWithNilBase(t *testing.T) {
 	b1 := &Block{ID: "B1", Target: NewStar("T1", angle.Zero(), angle.Zero()), Duration: 20 * time.Minute, Priority: 1.0}
 
 	strategy := &SwapOptimizedStrategy{} // nil Base → defaults to PriorityStrategy
+
 	sched, err := strategy.Schedule(planner, window, []*Block{b1}, tm)
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	if len(sched.Blocks) != 1 {
 		t.Errorf("expected 1 scheduled block, got %d", len(sched.Blocks))
 	}

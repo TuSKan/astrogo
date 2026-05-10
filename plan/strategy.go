@@ -64,6 +64,7 @@ func (s *SwapOptimizedStrategy) Schedule(
 	if maxPasses <= 0 {
 		maxPasses = 20
 	}
+
 	step := s.Step
 	if step <= 0 {
 		step = defaultStep
@@ -74,13 +75,16 @@ func (s *SwapOptimizedStrategy) Schedule(
 	if tenure <= 0 {
 		tenure = 3
 	}
+
 	tabu := newTabuList(tenure)
 
 	// Iterate until convergence: two consecutive passes with no improvement,
 	// or maxPasses reached as a safety cap.
 	idlePasses := 0
-	for pass := 0; pass < maxPasses; pass++ {
+
+	for pass := range maxPasses {
 		swapped := s.swapPass(sched, planner, transition, step, tabu, pass)
+
 		inserted := s.insertPass(sched, planner, window, transition, step)
 		if swapped || inserted {
 			idlePasses = 0
@@ -120,7 +124,7 @@ func (s *SwapOptimizedStrategy) swapPass(
 		}
 	}
 
-	for i := 0; i < n-1; i++ {
+	for i := range n - 1 {
 		bi := sched.Blocks[i]
 		bj := sched.Blocks[i+1]
 
@@ -136,6 +140,7 @@ func (s *SwapOptimizedStrategy) swapPass(
 
 		// Compute transition overhead from bj to bi.
 		overhead := time.Duration(0)
+
 		if transition != nil {
 			ctx := TransitionContext{
 				FromBlock: bj.Block,
@@ -144,10 +149,12 @@ func (s *SwapOptimizedStrategy) swapPass(
 				ToTime:    newJEnd,
 				Site:      planner.Site,
 			}
+
 			oh, err := transition.Overhead(ctx)
 			if err != nil {
 				continue
 			}
+
 			overhead = oh
 		}
 
@@ -254,6 +261,7 @@ func (s *SwapOptimizedStrategy) insertPass(
 
 			// Compute transition overhead from the preceding block.
 			overhead := time.Duration(0)
+
 			if transition != nil {
 				ctx := TransitionContext{
 					FromBlock: gap.prevBlock,
@@ -262,10 +270,12 @@ func (s *SwapOptimizedStrategy) insertPass(
 					ToTime:    gap.window.Start,
 					Site:      planner.Site,
 				}
+
 				oh, err := transition.Overhead(ctx)
 				if err != nil {
 					continue
 				}
+
 				overhead = oh
 			}
 
@@ -292,6 +302,7 @@ func (s *SwapOptimizedStrategy) insertPass(
 					return sched.Blocks[i].Window.Start.Before(sched.Blocks[j].Window.Start)
 				})
 				gaps = scheduleGaps(sched.Blocks, window)
+
 				break
 			}
 		}
@@ -319,6 +330,7 @@ func mergeConstraints(a, b []Constraint) []Constraint {
 	merged := make([]Constraint, 0, len(a)+len(b))
 	merged = append(merged, a...)
 	merged = append(merged, b...)
+
 	return merged
 }
 
@@ -329,10 +341,12 @@ func mergeConstraints(a, b []Constraint) []Constraint {
 // Falls back to static block priority if scoring fails.
 func scoreBlockPlacement(block *Block, start, end time.Time, planner *Planner, ctx *coord.Context) float64 {
 	mid := start.Add(end.Sub(start) / 2)
+
 	score, err := ScoreObservable(block.Target, mid, planner.Site, nil, ctx, planner.Constraints...)
 	if err != nil {
 		return block.Priority
 	}
+
 	return score
 }
 
@@ -360,8 +374,9 @@ func scheduleGaps(blocks []ScheduledBlock, window Window) []gapInfo {
 	}
 
 	// Gaps between blocks.
-	for i := 0; i < len(blocks)-1; i++ {
+	for i := range len(blocks) - 1 {
 		gapStart := blocks[i].Window.End
+
 		gapEnd := blocks[i+1].Window.Start
 		if gapStart.Before(gapEnd) {
 			gaps = append(gaps, gapInfo{
@@ -411,9 +426,11 @@ func (t *tabuList) isTabu(a, b string, currentPass int) bool {
 	if pass, ok := t.set[tabuKey{a, b}]; ok && currentPass-pass < t.tenure {
 		return true
 	}
+
 	if pass, ok := t.set[tabuKey{b, a}]; ok && currentPass-pass < t.tenure {
 		return true
 	}
+
 	return false
 }
 

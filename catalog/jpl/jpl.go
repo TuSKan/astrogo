@@ -36,6 +36,7 @@ func (p *Provider) Resolve(query string) (resolve.Target, bool) {
 	if len(targets) > 0 {
 		return targets[0], true
 	}
+
 	return resolve.Target{}, false
 }
 
@@ -44,13 +45,17 @@ func (p *Provider) Search(query string) []resolve.Target {
 	req := resolve.ObjectRequest{Query: query, Limit: 10}
 
 	iter := p.ResolveObject(ctx, req)
+
 	var targets []resolve.Target
+
 	iter(func(t resolve.Target, err error) bool {
 		if err == nil {
 			targets = append(targets, t)
 		}
+
 		return len(targets) < 10
 	})
+
 	return targets
 }
 
@@ -79,7 +84,12 @@ func (p *Provider) ResolveObject(ctx context.Context, req resolve.ObjectRequest)
 			yield(resolve.Target{}, err)
 			return
 		}
-		defer resp.Body.Close()
+		defer func() {
+			cerr := resp.Body.Close()
+			if cerr != nil {
+				yield(resolve.Target{}, cerr)
+			}
+		}()
 
 		var payload struct {
 			Result string `json:"result"`

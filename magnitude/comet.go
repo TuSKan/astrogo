@@ -20,6 +20,7 @@ func CometApparent(M1, k1, r, delta float64) float64 {
 	if r <= 0 || delta <= 0 {
 		return M1
 	}
+
 	return M1 + 5*math.Log10(delta) + k1*math.Log10(r)
 }
 
@@ -36,5 +37,6 @@ func CometNuclearApparent(M2, k2, r, delta float64) float64 {
 	if r <= 0 || delta <= 0 {
 		return M2
 	}
+
 	return M2 + 5*math.Log10(delta) + k2*math.Log10(r)
 }

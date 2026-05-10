@@ -83,9 +83,11 @@ func TestEquals(t *testing.T) {
 	if !q1.Equals(q2) {
 		t.Error("1000m should equal 1km")
 	}
+
 	if q1.Equals(q3) {
 		t.Error("1000m should not equal 1.1km")
 	}
+
 	if q1.Equals(q4) {
 		t.Error("1000m should not equal 1000s")
 	}
@@ -97,6 +99,7 @@ func TestMustInPanic(t *testing.T) {
 			t.Errorf("MustIn did not panic on incompatible units")
 		}
 	}()
+
 	q := unit.New(1, unit.Meter)
 	_ = q.MustIn(unit.Second)
 }
@@ -125,12 +128,15 @@ func TestIsZeroNaN(t *testing.T) {
 	if !zero.IsZero() {
 		t.Error("IsZero: expected true for 0m")
 	}
+
 	if nonZero.IsZero() {
 		t.Error("IsZero: expected false for 1m")
 	}
+
 	if !nan.IsNaN() {
 		t.Error("IsNaN: expected true for NaN")
 	}
+
 	if zero.IsNaN() {
 		t.Error("IsNaN: expected false for 0")
 	}
@@ -143,18 +149,21 @@ func TestCompare(t *testing.T) {
 
 	cmp, err := a.Compare(b) // 500m vs 1000m
 	testutil.AssertNoError(t, err)
+
 	if cmp != -1 {
 		t.Errorf("Compare: expected -1, got %d", cmp)
 	}
 
 	cmp2, err := b.Compare(a) // 1000m vs 500m
 	testutil.AssertNoError(t, err)
+
 	if cmp2 != 1 {
 		t.Errorf("Compare: expected +1, got %d", cmp2)
 	}
 
 	cmp3, err := b.Compare(b) // equal
 	testutil.AssertNoError(t, err)
+
 	if cmp3 != 0 {
 		t.Errorf("Compare: expected 0, got %d", cmp3)
 	}
@@ -162,5 +171,6 @@ func TestCompare(t *testing.T) {
 	// Incompatible units
 	_, err = a.Compare(unit.New(1, unit.Second))
 	testutil.AssertError(t, err)
+
 	_ = c // silence unused
 }

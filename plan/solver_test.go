@@ -40,12 +40,14 @@ func tightSolver() plan.Solver {
 func TestFindRoot_LinearFunction(t *testing.T) {
 	// f(x) = x - 5 → root at x = 5
 	s := tightSolver()
+
 	root, fval, err := s.FindRoot(timeFunc(func(x float64) float64 {
 		return x - 5
 	}), after(0), after(10))
 	if err != nil {
 		t.Fatalf("FindRoot failed: %v", err)
 	}
+
 	rootSec := root.Sub(epoch).Seconds()
 	t.Logf("root=%.9f s  f(root)=%e", rootSec, fval)
 
@@ -57,12 +59,14 @@ func TestFindRoot_LinearFunction(t *testing.T) {
 func TestFindRoot_QuadraticFunction(t *testing.T) {
 	// f(x) = x² - 4 → roots at x = ±2; bracket [0, 10] finds x = 2
 	s := tightSolver()
+
 	root, fval, err := s.FindRoot(timeFunc(func(x float64) float64 {
 		return x*x - 4
 	}), after(0), after(10))
 	if err != nil {
 		t.Fatalf("FindRoot failed: %v", err)
 	}
+
 	rootSec := root.Sub(epoch).Seconds()
 	t.Logf("root=%.9f s  f(root)=%e", rootSec, fval)
 
@@ -74,12 +78,14 @@ func TestFindRoot_QuadraticFunction(t *testing.T) {
 func TestFindRoot_SineFunction(t *testing.T) {
 	// f(x) = sin(x) → root at x = π ≈ 3.14159..., bracket [2, 4]
 	s := tightSolver()
+
 	root, fval, err := s.FindRoot(timeFunc(func(x float64) float64 {
 		return math.Sin(x)
 	}), after(2), after(4))
 	if err != nil {
 		t.Fatalf("FindRoot failed: %v", err)
 	}
+
 	rootSec := root.Sub(epoch).Seconds()
 	t.Logf("root=%.12f s  f(root)=%e  (π=%.12f)", rootSec, fval, math.Pi)
 
@@ -92,6 +98,7 @@ func TestFindRoot_FlatFunction(t *testing.T) {
 	// f(x) = (x - 3)³ — has a triple root at x = 3, very flat there.
 	// This is where Chandrupatla excels over Brent's method.
 	s := tightSolver()
+
 	root, fval, err := s.FindRoot(timeFunc(func(x float64) float64 {
 		d := x - 3
 		return d * d * d
@@ -99,6 +106,7 @@ func TestFindRoot_FlatFunction(t *testing.T) {
 	if err != nil {
 		t.Fatalf("FindRoot failed: %v", err)
 	}
+
 	rootSec := root.Sub(epoch).Seconds()
 	t.Logf("root=%.9f s  f(root)=%e (flat triple root)", rootSec, fval)
 
@@ -111,12 +119,14 @@ func TestFindRoot_ExponentialDecay(t *testing.T) {
 	// f(x) = exp(-x) - 0.01 → root at x = ln(100) ≈ 4.60517...
 	s := tightSolver()
 	expected := math.Log(100)
+
 	root, fval, err := s.FindRoot(timeFunc(func(x float64) float64 {
 		return math.Exp(-x) - 0.01
 	}), after(0), after(10))
 	if err != nil {
 		t.Fatalf("FindRoot failed: %v", err)
 	}
+
 	rootSec := root.Sub(epoch).Seconds()
 	t.Logf("root=%.9f s  f(root)=%e  (expected=%.9f)", rootSec, fval, expected)
 
@@ -131,12 +141,14 @@ func TestFindRoot_AstronomicalScale(t *testing.T) {
 	// and at t = 86400/2 + 14400 = 57600 s
 	s := plan.DefaultSolver() // 1-second tolerance
 	period := 86400.0
+
 	root, fval, err := s.FindRoot(timeFunc(func(x float64) float64 {
 		return math.Sin(2*math.Pi*x/period - math.Pi/3)
 	}), after(10000), after(20000))
 	if err != nil {
 		t.Fatalf("FindRoot failed: %v", err)
 	}
+
 	rootSec := root.Sub(epoch).Seconds()
 	expected := period / 6 // = 14400
 	t.Logf("root=%.3f s  f(root)=%e  (expected=%.1f s)", rootSec, fval, expected)
@@ -149,25 +161,28 @@ func TestFindRoot_AstronomicalScale(t *testing.T) {
 func TestFindRoot_BracketingViolation(t *testing.T) {
 	// f(x) = x² + 1 is always positive → no root → bracketing error
 	s := tightSolver()
+
 	_, _, err := s.FindRoot(timeFunc(func(x float64) float64 {
 		return x*x + 1
 	}), after(1), after(10))
-
 	if err == nil {
 		t.Fatal("expected bracketing violation error, got nil")
 	}
+
 	t.Logf("correctly returned error: %v", err)
 }
 
 func TestFindRoot_ExactRootAtEndpoint(t *testing.T) {
 	// f(x) = x → root at x = 0, which is the left endpoint
 	s := tightSolver()
+
 	root, fval, err := s.FindRoot(timeFunc(func(x float64) float64 {
 		return x
 	}), after(0), after(10))
 	if err != nil {
 		t.Fatalf("FindRoot failed: %v", err)
 	}
+
 	rootSec := root.Sub(epoch).Seconds()
 	t.Logf("root=%.9f s  f(root)=%e", rootSec, fval)
 
@@ -182,6 +197,7 @@ func TestFindRoot_ExactRootAtEndpoint(t *testing.T) {
 func TestFindExtremum_QuadraticMinimum(t *testing.T) {
 	// f(x) = (x - 7)² → minimum at x = 7
 	s := tightSolver()
+
 	minT, minVal, err := s.FindExtremum(timeFunc(func(x float64) float64 {
 		d := x - 7
 		return d * d
@@ -189,12 +205,14 @@ func TestFindExtremum_QuadraticMinimum(t *testing.T) {
 	if err != nil {
 		t.Fatalf("FindExtremum failed: %v", err)
 	}
+
 	minSec := minT.Sub(epoch).Seconds()
 	t.Logf("min=%.9f s  f(min)=%e", minSec, minVal)
 
 	if math.Abs(minSec-7) > 1e-3 {
 		t.Errorf("min=%.9f, want 7.0 (Δ=%e)", minSec, minSec-7)
 	}
+
 	if minVal > 1e-6 {
 		t.Errorf("f(min)=%e, want ≈0", minVal)
 	}
@@ -203,6 +221,7 @@ func TestFindExtremum_QuadraticMinimum(t *testing.T) {
 func TestFindExtremum_QuadraticMaximum(t *testing.T) {
 	// f(x) = -(x - 5)² + 100 → maximum at x = 5, f(5) = 100
 	s := tightSolver()
+
 	maxT, maxVal, err := s.FindExtremum(timeFunc(func(x float64) float64 {
 		d := x - 5
 		return -d*d + 100
@@ -210,12 +229,14 @@ func TestFindExtremum_QuadraticMaximum(t *testing.T) {
 	if err != nil {
 		t.Fatalf("FindExtremum failed: %v", err)
 	}
+
 	maxSec := maxT.Sub(epoch).Seconds()
 	t.Logf("max=%.9f s  f(max)=%.6f", maxSec, maxVal)
 
 	if math.Abs(maxSec-5) > 1e-3 {
 		t.Errorf("max=%.9f, want 5.0 (Δ=%e)", maxSec, maxSec-5)
 	}
+
 	if math.Abs(maxVal-100) > 0.01 {
 		t.Errorf("f(max)=%.6f, want 100.0", maxVal)
 	}
@@ -224,18 +245,21 @@ func TestFindExtremum_QuadraticMaximum(t *testing.T) {
 func TestFindExtremum_CosineMinimum(t *testing.T) {
 	// f(x) = cos(x) → minimum at x = π ≈ 3.14159...
 	s := tightSolver()
+
 	minT, minVal, err := s.FindExtremum(timeFunc(func(x float64) float64 {
 		return math.Cos(x)
 	}), after(2), after(4), false)
 	if err != nil {
 		t.Fatalf("FindExtremum failed: %v", err)
 	}
+
 	minSec := minT.Sub(epoch).Seconds()
 	t.Logf("min=%.12f s  f(min)=%.12f  (π=%.12f)", minSec, minVal, math.Pi)
 
 	if math.Abs(minSec-math.Pi) > 1e-3 {
 		t.Errorf("min=%.12f, want π=%.12f (Δ=%e)", minSec, math.Pi, minSec-math.Pi)
 	}
+
 	if math.Abs(minVal-(-1)) > 0.001 {
 		t.Errorf("f(min)=%.12f, want -1.0", minVal)
 	}
@@ -246,12 +270,14 @@ func TestFindExtremum_TransitSimulation(t *testing.T) {
 	// f(t) = -cos(2π·t / 43200) → peaks at t = 21600 s (6 hours)
 	s := plan.DefaultSolver()
 	period := 43200.0
+
 	maxT, _, err := s.FindExtremum(timeFunc(func(x float64) float64 {
 		return -math.Cos(2 * math.Pi * x / period)
 	}), after(0), after(period), true)
 	if err != nil {
 		t.Fatalf("FindExtremum failed: %v", err)
 	}
+
 	maxSec := maxT.Sub(epoch).Seconds()
 	expected := period / 2.0 // 21600 s
 	t.Logf("transit=%.3f s (%.1f h)  expected=%.1f s (%.1f h)", maxSec, maxSec/3600, expected, expected/3600)
@@ -327,20 +353,24 @@ func TestFindRoot_ConvergenceCount(t *testing.T) {
 	// for microsecond tolerance from a [0, 10] bracket.
 	count := 0
 	s := plan.Solver{Tolerance: time.Second / 1e6, MaxIter: 100} // 1 µs
+
 	root, _, err := s.FindRoot(func(t time.Time) (float64, error) {
 		x := t.Sub(epoch).Seconds()
 		count++
+
 		return x*x - 2, nil
 	}, after(0.1), after(10))
 	if err != nil {
 		t.Fatalf("FindRoot failed: %v", err)
 	}
+
 	rootSec := root.Sub(epoch).Seconds()
 	t.Logf("root=%.12f (√2=%.12f)  evaluations=%d", rootSec, math.Sqrt(2), count)
 
 	if count > 30 {
 		t.Errorf("too many evaluations: %d (expected <30 for Chandrupatla on smooth quadratic)", count)
 	}
+
 	if math.Abs(rootSec-math.Sqrt(2)) > 1e-6 {
 		t.Errorf("root=%.12f, want √2=%.12f", rootSec, math.Sqrt(2))
 	}
@@ -353,6 +383,7 @@ func TestDefaultSolver(t *testing.T) {
 	if s.Tolerance != time.Second {
 		t.Errorf("Tolerance=%v, want 1s", s.Tolerance)
 	}
+
 	if s.MaxIter != 64 {
 		t.Errorf("MaxIter=%d, want 64", s.MaxIter)
 	}

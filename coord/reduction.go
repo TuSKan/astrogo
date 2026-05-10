@@ -49,6 +49,7 @@ func (r *Reducer) context() *Context {
 	r.once.Do(func() {
 		r.ctx = NewContext(r.time, r.site, r.atmos)
 	})
+
 	return r.ctx
 }
 
@@ -78,6 +79,7 @@ func (r *Reducer) Reduce(v vector.Vec3) *Reduction {
 	if azimuth < 0 {
 		azimuth += 2 * math.Pi
 	}
+
 	altitude := math.Asin(U / topoVec.Norm())
 	geomAltAz := NewAltAz(angle.Rad(altitude), angle.Rad(azimuth))
 
@@ -103,6 +105,7 @@ func (r *Reducer) Disperse(v vector.Vec3, wavelengths []float64) *Reduction {
 		for _, wl := range wavelengths {
 			res.Dispersion[wl] = res.Observed
 		}
+
 		return res
 	}
 

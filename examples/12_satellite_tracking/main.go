@@ -31,6 +31,7 @@ func main() {
 	header("Resolving ISS (Zarya) from NORAD Catalog")
 
 	resolver := catalog.NewResolver(catalog.NORAD)
+
 	target, err := resolver.Resolve("ISS (Zarya)")
 	if err != nil {
 		log.Fatalf("Failed to resolve ISS (Zarya): %v", err)
@@ -51,10 +52,15 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to create satellite provider: %v", err)
 	}
-	defer prov.Close()
+	defer func() {
+		if err := prov.Close(); err != nil {
+			log.Printf("failed to close provider: %v", err)
+		}
+	}()
 
 	// Use the unified State API — same as for JPL planets.
 	epoch := target.Epoch
+
 	state, err := prov.State(0, epoch)
 	if err != nil {
 		log.Fatalf("State failed: %v", err)
@@ -75,6 +81,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Altitude failed: %v", err)
 	}
+
 	fmt.Printf("  Altitude: %.1f km above Earth surface\n", alt)
 
 	// ═══════════════════════════════════════════════════════════════════════
@@ -133,6 +140,7 @@ func main() {
 			printPassEvent("LOS (Set) ", pass.Set, loc)
 			fmt.Printf("  │  Duration:    %s\n", fmtDuration(pass.Duration))
 			fmt.Println("  └──────────────────────────────────────────────────────────┘")
+
 			if i < len(passes)-1 {
 				fmt.Println()
 			}
@@ -167,5 +175,6 @@ func fmtDuration(d time.Duration) string {
 	total := int(d.Seconds())
 	min := total / 60
 	sec := total % 60
+
 	return fmt.Sprintf("%dm %02ds", min, sec)
 }

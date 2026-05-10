@@ -11,8 +11,10 @@ import (
 // Expected: ~5 ns/op (one math.Mod + one branch + no allocation).
 func BenchmarkWrap2Pi(b *testing.B) {
 	a := angle.Deg(540.123)
+
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+
+	for range b.N {
 		_ = a.Wrap2Pi()
 	}
 }
@@ -20,8 +22,10 @@ func BenchmarkWrap2Pi(b *testing.B) {
 // BenchmarkWrapPi measures the cost of normalizing to (-π, π].
 func BenchmarkWrapPi(b *testing.B) {
 	a := angle.Deg(270.456)
+
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+
+	for range b.N {
 		_ = a.WrapPi()
 	}
 }
@@ -30,8 +34,10 @@ func BenchmarkWrapPi(b *testing.B) {
 // Both should be within ~10% of each other since the wrapper is inlineable.
 func BenchmarkSin(b *testing.B) {
 	a := angle.Deg(37.5)
+
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+
+	for range b.N {
 		_ = a.Sin()
 	}
 }
@@ -39,8 +45,10 @@ func BenchmarkSin(b *testing.B) {
 // BenchmarkCos measures the cost of a.Cos().
 func BenchmarkCos(b *testing.B) {
 	a := angle.Deg(37.5)
+
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+
+	for range b.N {
 		_ = a.Cos()
 	}
 }
@@ -48,8 +56,10 @@ func BenchmarkCos(b *testing.B) {
 // BenchmarkDMSString measures formatting overhead.
 func BenchmarkDMSString(b *testing.B) {
 	a := angle.Deg(123.456789)
+
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+
+	for range b.N {
 		_ = a.DMSString(3)
 	}
 }
@@ -57,8 +67,10 @@ func BenchmarkDMSString(b *testing.B) {
 // BenchmarkHMSString measures HMS formatting overhead.
 func BenchmarkHMSString(b *testing.B) {
 	a := angle.Hour(12.3456789)
+
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+
+	for range b.N {
 		_ = a.HMSString(3)
 	}
 }
@@ -66,8 +78,10 @@ func BenchmarkHMSString(b *testing.B) {
 // BenchmarkParseDMS measures parsing overhead.
 func BenchmarkParseDMS(b *testing.B) {
 	s := `+12°34'56.789"`
+
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+
+	for range b.N {
 		_, _ = angle.ParseDMS(s)
 	}
 }
@@ -75,8 +89,10 @@ func BenchmarkParseDMS(b *testing.B) {
 // BenchmarkDegConvert measures Deg constructor + Degrees accessor round-trip.
 func BenchmarkDegConvert(b *testing.B) {
 	v := math.Pi / 4
+
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+
+	for range b.N {
 		_ = angle.Rad(v).Degrees()
 	}
 }

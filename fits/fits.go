@@ -29,12 +29,16 @@ type File struct {
 
 // Open reads a FITS file from a disk path.
 // Transparently handles `.gz` and `.fits.gz` extension streams.
-func Open(path string) (*File, error) {
+func Open(path string) (_ *File, err error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, err
 	}
-	defer f.Close()
+	defer func() {
+		if cerr := f.Close(); cerr != nil {
+			err = errors.Join(err, cerr)
+		}
+	}()
 
 	if strings.HasSuffix(strings.ToLower(path), ".gz") {
 		gzReader, err := pgzip.NewReader(f)
@@ -43,7 +47,12 @@ func Open(path string) (*File, error) {
 		}
 		// Notice: pgzip.Reader does not support io.Seeker.
 		// The underlying fits.Read loop will gracefully fallback to streaming.
-		defer gzReader.Close()
+		defer func() {
+			if cerr := gzReader.Close(); cerr != nil {
+				err = errors.Join(err, cerr)
+			}
+		}()
+
 		return Read(gzReader)
 	}
 
@@ -69,6 +78,7 @@ func Read(r io.Reader) (*File, error) {
 					break // Successfully finished reading file
 				}
 			}
+
 			return nil, err
 		}
 
@@ -107,6 +117,7 @@ func payloadSize(h *Header) int64 {
 	}
 
 	var total int64 = 1
+
 	for i := 1; i <= naxis; i++ {
 		dim, _ := h.GetInt(fmt.Sprintf("NAXIS%d", i))
 		total *= int64(dim)
@@ -120,6 +131,7 @@ func payloadSize(h *Header) int64 {
 	if err != nil {
 		gcount = 1
 	}
+
 	pcount, err := h.GetInt("PCOUNT")
 	if err != nil {
 		pcount = 0
@@ -131,6 +143,7 @@ func payloadSize(h *Header) int64 {
 	if remainder != 0 {
 		bytes += int64(BlockSize) - remainder
 	}
+
 	return bytes
 }
 
@@ -149,6 +162,7 @@ func ReadHeader(br *BlockReader) (*Header, error) {
 		if err != nil {
 			return nil, err
 		}
+
 		blocksRead++
 
 		for i := 0; i < BlockSize; i += CardSize {
@@ -183,7 +197,9 @@ func (b *BlockReader) ReadBlock(buf []byte) error {
 	if len(buf) != BlockSize {
 		return ErrInvalidBlock
 	}
+
 	_, err := io.ReadFull(b.r, buf)
+
 	return err
 }
 

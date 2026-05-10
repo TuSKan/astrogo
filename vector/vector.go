@@ -78,6 +78,7 @@ func (v Vec3) Unit() Vec3 {
 	if n == 0 {
 		return Zero()
 	}
+
 	return v.DivScalar(n)
 }
 
@@ -90,6 +91,7 @@ func (v Vec3) Unit() Vec3 {
 // The resulting vector has unit norm for finite, non-NaN inputs.
 func FromSpherical(lon, lat float64) Vec3 {
 	cosLat := math.Cos(lat)
+
 	return Vec3{
 		X: cosLat * math.Cos(lon),
 		Y: cosLat * math.Sin(lon),
@@ -109,11 +111,14 @@ func (v Vec3) ToSpherical() (lon, lat float64) {
 	if n == 0 {
 		return 0, 0
 	}
+
 	lat = math.Asin(v.Z / n)
+
 	lon = math.Atan2(v.Y, v.X)
 	if lon < 0 {
 		lon += 2 * math.Pi
 	}
+
 	return lon, lat
 }
 
@@ -128,6 +133,7 @@ func (v Vec3) ToSpherical() (lon, lat float64) {
 //	Z' = sin·Y + cos·Z
 func (v Vec3) RotateX(rad float64) Vec3 {
 	c, s := math.Cos(rad), math.Sin(rad)
+
 	return Vec3{
 		X: v.X,
 		Y: c*v.Y - s*v.Z,
@@ -142,6 +148,7 @@ func (v Vec3) RotateX(rad float64) Vec3 {
 //	Z' = −sin·X + cos·Z
 func (v Vec3) RotateY(rad float64) Vec3 {
 	c, s := math.Cos(rad), math.Sin(rad)
+
 	return Vec3{
 		X: c*v.X + s*v.Z,
 		Y: v.Y,
@@ -156,6 +163,7 @@ func (v Vec3) RotateY(rad float64) Vec3 {
 //	Z' = Z
 func (v Vec3) RotateZ(rad float64) Vec3 {
 	c, s := math.Cos(rad), math.Sin(rad)
+
 	return Vec3{
 		X: c*v.X - s*v.Y,
 		Y: s*v.X + c*v.Y,

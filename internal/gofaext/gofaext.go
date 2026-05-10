@@ -59,6 +59,7 @@ func Atco13(
 		phpa, tc, rh, wl,
 		&aob, &zob, &hob, &dob, &rob, &eo,
 	)
+
 	return aob, zob, hob, dob, rob, eo, status
 }
 
@@ -90,6 +91,7 @@ func Atio13(
 		phpa, tc, rh, wl,
 		&aob, &zob, &hob, &dob, &rob,
 	)
+
 	return aob, zob, hob, dob, rob
 }
 
@@ -111,6 +113,7 @@ func Atoc13(
 		phpa, tc, rh, wl,
 		&rc, &dc,
 	)
+
 	return rc, dc
 }
 
@@ -142,6 +145,7 @@ func Eqec06(date1, date2, elon, elat float64) (ra, dec float64) {
 func Atic13(ri, di, date1, date2 float64) (rc, dc float64) {
 	var eo float64
 	gofa.Atic13(ri, di, date1, date2, &rc, &dc, &eo)
+
 	return rc, dc
 }
 
@@ -186,6 +190,7 @@ func Gst06a(uta, utb, tta, ttb float64) float64 {
 func C2t06a(tta, ttb, uta, utb, xp, yp float64) [3][3]float64 {
 	var rc2t [3][3]float64
 	gofa.C2t06a(tta, ttb, uta, utb, xp, yp, &rc2t)
+
 	return rc2t
 }
 
@@ -203,9 +208,12 @@ type ASTROM = gofa.ASTROM
 
 // Apco13 prepares the ASTROM parameters for ICRS <-> observed transformations.
 func Apco13(utc1, utc2, dut1, elong, phi, hm, xp, yp, phpa, tc, rh, wl float64) (ASTROM, float64) {
-	var astrom ASTROM
-	var eo float64
+	var (
+		astrom ASTROM
+		eo     float64
+	)
 	gofa.Apco13(utc1, utc2, dut1, elong, phi, hm, xp, yp, phpa, tc, rh, wl, &astrom, &eo)
+
 	return astrom, eo
 }
 
@@ -247,6 +255,7 @@ func Obl06(date1, date2 float64) float64 {
 func Pnm06a(date1, date2 float64) [3][3]float64 {
 	var rbpn [3][3]float64
 	gofa.Pnm06a(date1, date2, &rbpn)
+
 	return rbpn
 }
 

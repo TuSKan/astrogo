@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -112,9 +113,11 @@ func (p *Provider) Resolve(query string) (resolve.Target, bool) {
 	if err := p.ensureLoaded(); err != nil {
 		return resolve.Target{}, false
 	}
+
 	if rec := p.lookupCached(q); rec != nil {
 		return p.recordToTarget(rec), true
 	}
+
 	return resolve.Target{}, false
 }
 
@@ -124,6 +127,7 @@ func (p *Provider) Search(query string) []resolve.Target {
 	if !ok {
 		return nil
 	}
+
 	return []resolve.Target{tgt}
 }
 
@@ -133,6 +137,7 @@ func (p *Provider) ResolveObject(ctx context.Context, req resolve.ObjectRequest)
 	if !ok {
 		return resolve.SliceSeq([]resolve.Target{})
 	}
+
 	return resolve.SliceSeq([]resolve.Target{tgt})
 }
 
@@ -140,6 +145,7 @@ func (p *Provider) ResolveObject(ctx context.Context, req resolve.ObjectRequest)
 func (p *Provider) Loaded() bool {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
+
 	return p.loaded
 }
 
@@ -147,6 +153,7 @@ func (p *Provider) Loaded() bool {
 func (p *Provider) Count() int {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
+
 	return len(p.byNumber)
 }
 
@@ -154,8 +161,8 @@ func (p *Provider) Count() int {
 
 // querySingle queries the SSOFT endpoint for a single object via JSON.
 // Pass number > 0 for numeric lookup, or name != "" for name lookup.
-func (p *Provider) querySingle(number int64, name string) (*ssoRecord, error) {
-	payload := map[string]interface{}{
+func (p *Provider) querySingle(number int64, name string) (_ *ssoRecord, err error) {
+	payload := map[string]any{
 		"output-format": "json",
 		"version":       p.version,
 		"flavor":        "SHG1G2",
@@ -165,44 +172,55 @@ func (p *Provider) querySingle(number int64, name string) (*ssoRecord, error) {
 	} else if name != "" {
 		payload["sso_name"] = name
 	} else {
-		return nil, fmt.Errorf("fink: need number or name")
+		return nil, errors.New("fink: need number or name")
 	}
 
 	raw, _ := json.Marshal(payload)
+
 	req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, ssoftURL, bytes.NewReader(raw))
 	if err != nil {
 		return nil, fmt.Errorf("fink: ssoft request: %w", err)
 	}
+
 	req.Header.Set("Content-Type", "application/json")
+
 	resp, err := p.client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("fink: ssoft request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if cerr := resp.Body.Close(); cerr != nil {
+			err = errors.Join(err, cerr)
+		}
+	}()
 
 	data, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("fink: reading response: %w", err)
 	}
+
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("fink: ssoft HTTP %d: %s", resp.StatusCode, string(data[:min(200, len(data))]))
 	}
 
 	// Single-object returns a JSON object; full table returns an array.
 	// Try object first.
-	var obj map[string]interface{}
+	var obj map[string]any
 	if err := json.Unmarshal(data, &obj); err != nil {
 		// Try array of objects.
-		var arr []map[string]interface{}
-		if err2 := json.Unmarshal(data, &arr); err2 != nil || len(arr) == 0 {
-			return nil, fmt.Errorf("fink: unexpected response format")
+		var arr []map[string]any
+
+		err2 := json.Unmarshal(data, &arr)
+		if err2 != nil || len(arr) == 0 {
+			return nil, errors.New("fink: unexpected response format")
 		}
+
 		obj = arr[0]
 	}
 
 	// Check for error responses.
 	if _, hasErr := obj["RemoteException"]; hasErr {
-		return nil, fmt.Errorf("fink: remote exception in response")
+		return nil, errors.New("fink: remote exception in response")
 	}
 
 	rec := &ssoRecord{
@@ -231,11 +249,12 @@ func (p *Provider) querySingle(number int64, name string) (*ssoRecord, error) {
 }
 
 // JSON helpers for parsing SSOFT response fields.
-func jsonF64(m map[string]interface{}, key string) float64 {
+func jsonF64(m map[string]any, key string) float64 {
 	v, ok := m[key]
 	if !ok || v == nil {
 		return math.NaN()
 	}
+
 	switch val := v.(type) {
 	case float64:
 		return val
@@ -247,16 +266,19 @@ func jsonF64(m map[string]interface{}, key string) float64 {
 		if err != nil {
 			return math.NaN()
 		}
+
 		return f
 	}
+
 	return math.NaN()
 }
 
-func jsonInt(m map[string]interface{}, key string) int64 {
+func jsonInt(m map[string]any, key string) int64 {
 	v, ok := m[key]
 	if !ok || v == nil {
 		return 0
 	}
+
 	switch val := v.(type) {
 	case float64:
 		return int64(val)
@@ -267,17 +289,20 @@ func jsonInt(m map[string]interface{}, key string) int64 {
 		i, _ := strconv.ParseInt(val, 10, 64)
 		return i
 	}
+
 	return 0
 }
 
-func jsonStr(m map[string]interface{}, key string) string {
+func jsonStr(m map[string]any, key string) string {
 	v, ok := m[key]
 	if !ok || v == nil {
 		return ""
 	}
+
 	if s, ok := v.(string); ok {
 		return s
 	}
+
 	return fmt.Sprintf("%v", v)
 }
 
@@ -287,9 +312,9 @@ func jsonStr(m map[string]interface{}, key string) string {
 // Uses r-band (filter 2) for H, G1, G2 as it is closer to Johnson V.
 func (p *Provider) recordToTarget(rec *ssoRecord) resolve.Target {
 	t := resolve.Target{
-		ID:          fmt.Sprintf("%d", rec.Number),
+		ID:          strconv.FormatInt(rec.Number, 10),
 		Name:        rec.Name,
-		Designation: fmt.Sprintf("%d", rec.Number),
+		Designation: strconv.FormatInt(rec.Number, 10),
 		Kind:        "Asteroid",
 		Catalog:     "fink",
 	}
@@ -343,29 +368,36 @@ func (p *Provider) lookupCached(query string) *ssoRecord {
 			return rec
 		}
 	}
+
 	key := strings.ToLower(q)
 	if rec, ok := p.byName[key]; ok {
 		return rec
 	}
+
 	return nil
 }
 
 // ensureLoaded downloads and indexes the SSOFT parquet table on first call.
 func (p *Provider) ensureLoaded() error {
 	p.mu.RLock()
+
 	if p.loaded {
 		p.mu.RUnlock()
 		return nil
 	}
+
 	if p.loadErr != nil {
 		err := p.loadErr
 		p.mu.RUnlock()
+
 		return err
 	}
+
 	p.mu.RUnlock()
 
 	p.mu.Lock()
 	defer p.mu.Unlock()
+
 	if p.loaded {
 		return nil
 	}
@@ -384,6 +416,7 @@ func (p *Provider) ensureLoaded() error {
 		if rec.Fit != 0 || rec.Status < 1 {
 			continue
 		}
+
 		p.byNumber[rec.Number] = rec
 		if rec.Name != "" {
 			p.byName[strings.ToLower(rec.Name)] = rec
@@ -391,12 +424,13 @@ func (p *Provider) ensureLoaded() error {
 	}
 
 	p.loaded = true
+
 	return nil
 }
 
 // downloadSSOFT fetches the full SSOFT parquet table from the FINK API.
-func (p *Provider) downloadSSOFT() ([]ssoRecord, error) {
-	payload, _ := json.Marshal(map[string]interface{}{
+func (p *Provider) downloadSSOFT() (_ []ssoRecord, err error) {
+	payload, _ := json.Marshal(map[string]any{
 		"output-format": "parquet",
 		"version":       p.version,
 		"flavor":        "SHG1G2",
@@ -406,12 +440,18 @@ func (p *Provider) downloadSSOFT() ([]ssoRecord, error) {
 	if err != nil {
 		return nil, fmt.Errorf("SSOFT request: %w", err)
 	}
+
 	req.Header.Set("Content-Type", "application/json")
+
 	resp, err := p.client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("SSOFT request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if cerr := resp.Body.Close(); cerr != nil {
+			err = errors.Join(err, cerr)
+		}
+	}()
 
 	data, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -433,6 +473,7 @@ func (p *Provider) downloadSSOFT() ([]ssoRecord, error) {
 	if err != nil {
 		return nil, fmt.Errorf("creating temp file: %w", err)
 	}
+
 	tmpName := tmp.Name()
 	defer func() {
 		_ = tmp.Close()
@@ -447,12 +488,17 @@ func (p *Provider) downloadSSOFT() ([]ssoRecord, error) {
 }
 
 // readParquet extracts ssoRecords from a SSOFT parquet file.
-func (p *Provider) readParquet(path string) ([]ssoRecord, error) {
+func (p *Provider) readParquet(path string) (_ []ssoRecord, err error) {
 	rdr, err := file.OpenParquetFile(path, false)
 	if err != nil {
 		return nil, fmt.Errorf("opening parquet: %w", err)
 	}
-	defer rdr.Close()
+
+	defer func() {
+		if cerr := rdr.Close(); cerr != nil {
+			err = errors.Join(err, cerr)
+		}
+	}()
 
 	arrowRdr, err := pqarrow.NewFileReader(rdr, pqarrow.ArrowReadProperties{}, nil)
 	if err != nil {
@@ -480,12 +526,14 @@ func (p *Provider) readParquet(path string) ([]ssoRecord, error) {
 		if !ok {
 			return math.NaN()
 		}
+
 		col := tbl.Column(idx)
 		for _, chunk := range col.Data().Chunks() {
 			if row < chunk.Len() {
 				if chunk.IsNull(row) {
 					return math.NaN()
 				}
+
 				v := chunk.GetOneForMarshal(row)
 				switch fv := v.(type) {
 				case float64:
@@ -496,10 +544,13 @@ func (p *Provider) readParquet(path string) ([]ssoRecord, error) {
 					f, _ := fv.Float64()
 					return f
 				}
+
 				return math.NaN()
 			}
+
 			row -= chunk.Len()
 		}
+
 		return math.NaN()
 	}
 
@@ -508,12 +559,14 @@ func (p *Provider) readParquet(path string) ([]ssoRecord, error) {
 		if !ok {
 			return 0
 		}
+
 		col := tbl.Column(idx)
 		for _, chunk := range col.Data().Chunks() {
 			if row < chunk.Len() {
 				if chunk.IsNull(row) {
 					return 0
 				}
+
 				v := chunk.GetOneForMarshal(row)
 				switch iv := v.(type) {
 				case int32:
@@ -523,10 +576,13 @@ func (p *Provider) readParquet(path string) ([]ssoRecord, error) {
 				case float64:
 					return int64(iv)
 				}
+
 				return 0
 			}
+
 			row -= chunk.Len()
 		}
+
 		return 0
 	}
 
@@ -535,20 +591,25 @@ func (p *Provider) readParquet(path string) ([]ssoRecord, error) {
 		if !ok {
 			return ""
 		}
+
 		col := tbl.Column(idx)
 		for _, chunk := range col.Data().Chunks() {
 			if row < chunk.Len() {
 				if chunk.IsNull(row) {
 					return ""
 				}
+
 				v := chunk.GetOneForMarshal(row)
 				if s, ok := v.(string); ok {
 					return s
 				}
+
 				return fmt.Sprintf("%v", v)
 			}
+
 			row -= chunk.Len()
 		}
+
 		return ""
 	}
 

@@ -25,6 +25,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to create provider: %v", err)
 	}
+
 	sun := plan.NewSun(prov)
 
 	details, err := sun.GetDetails(ctx, "Description", "Our local star", "Source", "JPL DE442")

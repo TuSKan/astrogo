@@ -32,10 +32,12 @@ func TestIsVisible(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create geodetic site: %v", err)
 	}
+
 	site, err := NewSite("Test", loc, angle.Zero(), nil)
 	if err != nil {
 		t.Fatalf("Failed to create observatory: %v", err)
 	}
+
 	tm := time.NowUTC()
 
 	// Object at zenith (same Dec as Lat, Hour Angle 0)
@@ -52,6 +54,7 @@ func TestVisibleIntervals(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create geodetic site: %v", err)
 	}
+
 	site, _ := NewSite("Test", loc, angle.Zero(), nil)
 
 	start := time.FromJD(2460000.5, time.UTC)
@@ -101,6 +104,7 @@ func TestTransitEstimate(t *testing.T) {
 	if tm.IsZero() {
 		t.Error("Transit time is zero")
 	}
+
 	if alt.Degrees() < -90 {
 		t.Error("Invalid transit altitude")
 	}
@@ -119,9 +123,11 @@ func TestFind(t *testing.T) {
 
 	intervals, err := Find(obj, site, nil, start, end, 15*stdtime.Minute)
 	testutil.AssertNoError(t, err)
+
 	if len(intervals) == 0 {
 		t.Fatalf("Expected observable intervals")
 	}
+
 	dur := intervals[0].Window.Duration()
 	if dur <= 0 {
 		t.Errorf("Duration() should be positive, got %v", dur)
@@ -132,6 +138,7 @@ func TestDuration(t *testing.T) {
 	start := time.FromJD(2460000.0, time.UTC)
 	end := start.AddDays(1)
 	win := Window{Start: start, End: end}
+
 	dur := win.Duration()
 	if dur != 24*stdtime.Hour {
 		t.Errorf("expected 24h, got %v", dur)

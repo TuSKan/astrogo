@@ -166,13 +166,13 @@ type EventSpec struct {
 // Validate checks if the Spec configuration is fully provided for its type.
 func (s EventSpec) Validate() error {
 	if s.Target == nil {
-		return fmt.Errorf("event spec must contain a primary target")
+		return errors.New("event spec must contain a primary target")
 	}
 
 	switch s.Family {
 	case EventFamilyVisibility:
 		if s.Observer == nil {
-			return fmt.Errorf("visibility events require an observer geodetic location")
+			return errors.New("visibility events require an observer geodetic location")
 		}
 	case EventFamilyRelativeGeometry, EventFamilyOverlap:
 		if s.Other == nil && !isPhaseEvent(s.Kind) {
@@ -181,6 +181,7 @@ func (s EventSpec) Validate() error {
 	case EventFamilyIllumination:
 		// Illumination events need only a Target; the Sun is implicit.
 	}
+
 	return nil
 }
 
@@ -191,6 +192,7 @@ func isPhaseEvent(k EventKind) bool {
 		EventMaxIllumination, EventMinIllumination:
 		return true
 	}
+
 	return false
 }
 
@@ -208,9 +210,11 @@ func NewEventSolver(step, tol time.Duration) EventSolver {
 	if step <= 0 {
 		step = 15 * time.Minute
 	}
+
 	if tol <= 0 {
 		tol = 1 * time.Second
 	}
+
 	return EventSolver{
 		Step: step,
 		Solver: Solver{
@@ -226,8 +230,10 @@ func (s EventSolver) Find(spec EventSpec, start, end time.Time) ([]Event, error)
 		return nil, err
 	}
 
-	var events []Event
-	var err error
+	var (
+		events []Event
+		err    error
+	)
 
 	switch spec.Family {
 	case EventFamilyVisibility:
@@ -283,7 +289,9 @@ func (s EventSolver) solveVisibility(spec EventSpec, start, end time.Time) ([]Ev
 			if err != nil {
 				return 0, err
 			}
+
 			aa := ctx.GeocentricToObserved(vec)
+
 			return aa.Alt().Degrees() - spec.Threshold.Degrees(), nil
 		}
 
@@ -292,10 +300,12 @@ func (s EventSolver) solveVisibility(spec EventSpec, start, end time.Time) ([]Ev
 		if err != nil {
 			return 0, err
 		}
+
 		aa, err := ctx.ICRSToAltAz(pos)
 		if err != nil {
 			return 0, err
 		}
+
 		return aa.Alt().Degrees() - spec.Threshold.Degrees(), nil
 	}
 
@@ -305,22 +315,27 @@ func (s EventSolver) solveVisibility(spec EventSpec, start, end time.Time) ([]Ev
 
 	for t := start; !t.After(end); t = t.Add(s.Step) {
 		times = append(times, t)
+
 		h, err := evalVal(t)
 		if err != nil {
 			return nil, err
 		}
+
 		alts = append(alts, h)
 	}
+
 	if last := times[len(times)-1]; last.Before(end) {
 		times = append(times, end)
+
 		h, err := evalVal(end)
 		if err != nil {
 			return nil, err
 		}
+
 		alts = append(alts, h)
 	}
 
-	for i := 0; i < len(times)-1; i++ {
+	for i := range len(times) - 1 {
 		t1, t2 := times[i], times[i+1]
 		h1, h2 := alts[i], alts[i+1]
 
@@ -340,7 +355,9 @@ func (s EventSolver) solveVisibility(spec EventSpec, start, end time.Time) ([]Ev
 				// Calculate geometric altitude at the refined event time,
 				// using the same no-refraction atmosphere as the solver.
 				resCtx := coord.NewContext(resTime, spec.Observer.Location(), geomAtm)
+
 				var aa coord.AltAz
+
 				if mb, ok := spec.Target.(MovingBody); ok {
 					vec, _ := mb.GeocentricVec(resTime)
 					aa = resCtx.GeocentricToObserved(vec)
@@ -372,11 +389,14 @@ func (s EventSolver) solveVisibility(spec EventSpec, start, end time.Time) ([]Ev
 					if err != nil {
 						return 0, err
 					}
+
 					ctx := coord.NewContext(t, spec.Observer.Location(), spec.Observer.Atmosphere())
+
 					ha, err := ctx.ICRSToHourAngle(pos)
 					if err != nil {
 						return 0, err
 					}
+
 					return ha.Degrees(), nil
 				}
 
@@ -428,6 +448,7 @@ func (s EventSolver) solveGeometry(spec EventSpec, start, end time.Time) ([]Even
 		if err != nil {
 			return 0, err
 		}
+
 		pos2, err := spec.Other.Position(t)
 		if err != nil {
 			return 0, err
@@ -441,6 +462,7 @@ func (s EventSolver) solveGeometry(spec EventSpec, start, end time.Time) ([]Even
 			for diff > 180 {
 				diff -= 360
 			}
+
 			for diff <= -180 {
 				diff += 360
 			}
@@ -452,18 +474,22 @@ func (s EventSolver) solveGeometry(spec EventSpec, start, end time.Time) ([]Even
 					diff += 180
 				}
 			}
+
 			return diff, nil
 		case EventConjunctionEcliptic:
 			// Difference in Ecliptic Longitude
 			ecl1 := coord.ICRSToEcliptic(pos1, t)
 			ecl2 := coord.ICRSToEcliptic(pos2, t)
+
 			diff := ecl1.Lon().Degrees() - ecl2.Lon().Degrees()
 			for diff > 180 {
 				diff -= 360
 			}
+
 			for diff <= -180 {
 				diff += 360
 			}
+
 			return diff, nil
 		case EventAppulse:
 			// Angular separation (for minimum-finding)
@@ -483,22 +509,27 @@ func (s EventSolver) solveGeometry(spec EventSpec, start, end time.Time) ([]Even
 
 	for t := start; !t.After(end); t = t.Add(s.Step) {
 		times = append(times, t)
+
 		v, err := evalVal(t)
 		if err != nil {
 			return nil, err
 		}
+
 		vals = append(vals, v)
 	}
+
 	if last := times[len(times)-1]; last.Before(end) {
 		times = append(times, end)
+
 		v, err := evalVal(end)
 		if err != nil {
 			return nil, err
 		}
+
 		vals = append(vals, v)
 	}
 
-	for i := 0; i < len(times)-1; i++ {
+	for i := range len(times) - 1 {
 		t1, t2 := times[i], times[i+1]
 		v1, v2 := vals[i], vals[i+1]
 
@@ -511,6 +542,7 @@ func (s EventSolver) solveGeometry(spec EventSpec, start, end time.Time) ([]Even
 					if err != nil {
 						return nil, err
 					}
+
 					events = append(events, Event{
 						Kind:  spec.Kind,
 						Time:  resTime,
@@ -532,10 +564,12 @@ func (s EventSolver) solveGeometry(spec EventSpec, start, end time.Time) ([]Even
 				// Validate if it is East or West based on RA difference.
 				pos1, _ := spec.Target.Position(resTime)
 				pos2, _ := spec.Other.Position(resTime)
+
 				raDiff := pos1.RA().Degrees() - pos2.RA().Degrees()
 				for raDiff > 180 {
 					raDiff -= 360
 				}
+
 				for raDiff <= -180 {
 					raDiff += 360
 				}
@@ -560,6 +594,7 @@ func (s EventSolver) solveGeometry(spec EventSpec, start, end time.Time) ([]Even
 				if err != nil {
 					return nil, err
 				}
+
 				events = append(events, Event{
 					Kind:  EventAppulse,
 					Time:  resTime,
@@ -651,6 +686,7 @@ func SunEvents(start, end time.Time, site *Site, provider eph.Provider) ([]Event
 		Observer:  site,
 		Threshold: site.SunRiseSetThreshold(),
 	}
+
 	return solver.Find(spec, start, end)
 }
 
@@ -667,11 +703,13 @@ func SunriseSunset(start, end time.Time, site *Site, prov eph.Provider) (rise, s
 			ec := e
 			rise = &ec
 		}
+
 		if e.Kind == EventSet && set == nil {
 			ec := e
 			set = &ec
 		}
 	}
+
 	return rise, set, nil
 }
 
@@ -688,6 +726,7 @@ func MoonEvents(start, end time.Time, site *Site, provider eph.Provider) ([]Even
 		Observer:  site,
 		Threshold: site.MoonRiseSetThreshold(),
 	}
+
 	return solver.Find(spec, start, end)
 }
 
@@ -704,11 +743,13 @@ func MoonriseMoonset(start, end time.Time, site *Site, prov eph.Provider) (rise,
 			ec := e
 			rise = &ec
 		}
+
 		if e.Kind == EventSet && set == nil {
 			ec := e
 			set = &ec
 		}
 	}
+
 	return rise, set, nil
 }
 
@@ -728,13 +769,15 @@ func TwilightEvents(start, end time.Time, site *Site, prov eph.Provider, kind Tw
 		Observer:  site,
 		Threshold: angle.Deg(threshold),
 	}
+
 	events, err := solver.Find(spec, start, end)
 	if err != nil {
 		return nil, err
 	}
 
 	var twilightEvents []TwilightEvent
-	for i := 0; i < len(events); i++ {
+
+	for i := range events {
 		e := events[i]
 		switch e.Kind {
 		case EventRise:
@@ -745,6 +788,7 @@ func TwilightEvents(start, end time.Time, site *Site, prov eph.Provider, kind Tw
 			twilightEvents = append(twilightEvents, TwilightEvent{Kind: kind, Dusk: &ec})
 		}
 	}
+
 	return twilightEvents, nil
 }
 
@@ -774,6 +818,7 @@ func getTwilightPair(start, end time.Time, site *Site, prov eph.Provider, kind T
 		Observer:  site,
 		Threshold: angle.Deg(threshold),
 	}
+
 	events, err := solver.Find(spec, start, end)
 	if err != nil {
 		return nil, nil, err
@@ -784,11 +829,13 @@ func getTwilightPair(start, end time.Time, site *Site, prov eph.Provider, kind T
 			ec := e
 			dawn = &ec
 		}
+
 		if e.Kind == EventSet && dusk == nil {
 			ec := e
 			dusk = &ec
 		}
 	}
+
 	return dawn, dusk, nil
 }
 
@@ -803,6 +850,7 @@ func Conjunctions(start, end time.Time, target, other Observable) ([]Event, erro
 		Target: target,
 		Other:  other,
 	}
+
 	return solver.Find(spec, start, end)
 }
 
@@ -816,6 +864,7 @@ func ConjunctionsEcliptic(start, end time.Time, target, other Observable) ([]Eve
 		Target: target,
 		Other:  other,
 	}
+
 	return solver.Find(spec, start, end)
 }
 
@@ -829,6 +878,7 @@ func Appulses(start, end time.Time, target, other Observable) ([]Event, error) {
 		Target: target,
 		Other:  other,
 	}
+
 	return solver.Find(spec, start, end)
 }
 
@@ -841,6 +891,7 @@ func Oppositions(start, end time.Time, target, other Observable) ([]Event, error
 		Target: target,
 		Other:  other,
 	}
+
 	return solver.Find(spec, start, end)
 }
 
@@ -868,12 +919,14 @@ func GreatestElongations(start, end time.Time, target, sun Observable) ([]Event,
 	if err != nil {
 		return nil, err
 	}
+
 	allEvents = append(allEvents, eastEvents...)
 
 	westEvents, err := solver.Find(specWest, start, end)
 	if err != nil {
 		return nil, err
 	}
+
 	allEvents = append(allEvents, westEvents...)
 
 	sort.Slice(allEvents, func(i, j int) bool {
@@ -897,6 +950,7 @@ func FullMoonOppositions(start, end time.Time, provider eph.Provider) ([]Event, 
 		Target: moon,
 		Other:  sun,
 	}
+
 	return solver.Find(spec, start, end)
 }
 
@@ -912,6 +966,7 @@ func VisibilityEvents(start, end time.Time, target Observable, site *Site) ([]Ev
 		Observer:  site,
 		Threshold: site.RiseSetThreshold(),
 	}
+
 	return solver.Find(spec, start, end)
 }
 
@@ -941,6 +996,7 @@ func (s EventSolver) solveIllumination(spec EventSpec, start, end time.Time) ([]
 	}
 
 	var targets []phaseTarget
+
 	switch spec.Kind {
 	case EventNewMoon:
 		targets = []phaseTarget{{EventNewMoon, 0}}
@@ -965,18 +1021,23 @@ func (s EventSolver) solveIllumination(spec EventSpec, start, end time.Time) ([]
 
 	for t := start; !t.After(end); t = t.Add(s.Step) {
 		times = append(times, t)
+
 		e, err := moonElongation(t, prov)
 		if err != nil {
 			return nil, err
 		}
+
 		elongs = append(elongs, e)
 	}
+
 	if last := times[len(times)-1]; last.Before(end) {
 		times = append(times, end)
+
 		e, err := moonElongation(end, prov)
 		if err != nil {
 			return nil, err
 		}
+
 		elongs = append(elongs, e)
 	}
 
@@ -990,9 +1051,11 @@ func (s EventSolver) solveIllumination(spec EventSpec, start, end time.Time) ([]
 			for d > 180 {
 				d -= 360
 			}
+
 			for d <= -180 {
 				d += 360
 			}
+
 			return d
 		}
 
@@ -1001,10 +1064,11 @@ func (s EventSolver) solveIllumination(spec EventSpec, start, end time.Time) ([]
 			if err != nil {
 				return 0, err
 			}
+
 			return signedDist(e), nil
 		}
 
-		for i := 0; i < len(times)-1; i++ {
+		for i := range len(times) - 1 {
 			d1 := signedDist(elongs[i])
 			d2 := signedDist(elongs[i+1])
 
@@ -1044,13 +1108,16 @@ func NextNewMoon(start time.Time, provider eph.Provider) (*Event, error) {
 		Kind:   EventNewMoon,
 		Target: moon,
 	}
+
 	events, err := solver.Find(spec, start, end)
 	if err != nil {
 		return nil, err
 	}
+
 	if len(events) == 0 {
 		return nil, nil
 	}
+
 	return &events[0], nil
 }
 
@@ -1065,12 +1132,15 @@ func NextFullMoon(start time.Time, provider eph.Provider) (*Event, error) {
 		Kind:   EventFullMoon,
 		Target: moon,
 	}
+
 	events, err := solver.Find(spec, start, end)
 	if err != nil {
 		return nil, err
 	}
+
 	if len(events) == 0 {
 		return nil, nil
 	}
+
 	return &events[0], nil
 }

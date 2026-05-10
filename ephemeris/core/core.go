@@ -136,6 +136,8 @@ type Body struct {
 }
 
 // Built-in major bodies.
+//
+//nolint:gochecknoglobals // IAU body registry — immutable catalog data
 var (
 	SunBody     = Body{ID: Sun, Name: "Sun", Kind: KindStar}
 	MoonBody    = Body{ID: Moon, Name: "Moon", Kind: KindMoon}
@@ -150,6 +152,8 @@ var (
 )
 
 // Bodies is a utility list of all major Solar System bodies as concrete structs.
+//
+//nolint:gochecknoglobals // IAU body registry — immutable catalog data
 var Bodies = []Body{
 	SunBody, MoonBody, MercuryBody, VenusBody, EarthBody,
 	MarsBody, JupiterBody, SaturnBody, UranusBody, NeptuneBody,

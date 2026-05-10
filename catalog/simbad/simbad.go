@@ -45,16 +45,19 @@ func (p *Provider) Resolve(query string) (resolve.Target, bool) {
 
 	bestIdx := 0
 	bestScore := -1.0
+
 	for i, t := range targets {
 		s := resolve.Score(query, t.Name)
 		if idScore := resolve.Score(query, t.ID); idScore > s {
 			s = idScore
 		}
+
 		for _, a := range t.Aliases {
 			if aScore := resolve.Score(query, a); aScore > s {
 				s = aScore
 			}
 		}
+
 		if s > bestScore {
 			bestScore = s
 			bestIdx = i
@@ -70,16 +73,20 @@ func (p *Provider) Search(query string) []resolve.Target {
 	req := resolve.ObjectRequest{Query: query, Limit: 10}
 
 	iter := p.ResolveObject(ctx, req)
+
 	var targets []resolve.Target
+
 	iter(func(t resolve.Target, err error) bool {
 		if err != nil {
 			fmt.Printf("SIMBAD ERR: %v\n", err)
 			return false
 		}
+
 		targets = append(targets, t)
 		// Try to read up to 10
 		return len(targets) < 10
 	})
+
 	return targets
 }
 
@@ -102,6 +109,7 @@ func (p *Provider) ResolveObject(ctx context.Context, req resolve.ObjectRequest)
 	if err != nil {
 		return resolve.SliceSeq([]resolve.Target{})
 	}
+
 	httpReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 	return func(yield func(resolve.Target, error) bool) {
@@ -110,10 +118,16 @@ func (p *Provider) ResolveObject(ctx context.Context, req resolve.ObjectRequest)
 			yield(resolve.Target{}, err)
 			return
 		}
-		defer resp.Body.Close()
+		defer func() {
+			if cerr := resp.Body.Close(); cerr != nil {
+				yield(resolve.Target{}, cerr)
+			}
+		}()
+
 		if resp.StatusCode >= 400 {
 			b, _ := io.ReadAll(resp.Body)
 			yield(resolve.Target{}, fmt.Errorf("http error %d: %s", resp.StatusCode, string(b)))
+
 			return
 		}
 

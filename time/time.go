@@ -141,6 +141,7 @@ func FromJD(jd float64, s Scale) Time {
 func FromJDParts(jd1, jd2 float64, s Scale) Time {
 	t := Time{jd1: jd1, jd2: jd2, scale: s}
 	t.normalize()
+
 	return t
 }
 
@@ -159,6 +160,7 @@ func FromGo(t time.Time) Time {
 
 	result := FromJDParts(2440587.5+days, frac, UTC)
 	result.loc = loc
+
 	return result
 }
 
@@ -200,6 +202,7 @@ func (t Time) String() string {
 	if t.loc != nil && t.loc != time.UTC {
 		return t.ToGo().Format("2006-01-02 15:04:05 MST")
 	}
+
 	return fmt.Sprintf("JD %.8f (%s)", t.JD(), t.scale)
 }
 
@@ -219,6 +222,7 @@ func (t Time) ToGo() time.Time {
 	// overflow int64 if multiplied by 1e9).
 	sec := int64(math.Floor(totalSec))
 	frac := totalSec - float64(sec)
+
 	nsec := int64(math.Round(frac * 1e9))
 	if nsec >= 1e9 {
 		sec++
@@ -232,6 +236,7 @@ func (t Time) ToGo() time.Time {
 	if t.loc != nil {
 		return gt.In(t.loc)
 	}
+
 	return gt
 }
 
@@ -319,6 +324,7 @@ func (t Time) FormatJulian(format string) string {
 		"05", fmt.Sprintf("%02d", sec),
 		"MST", t.scale.String(),
 	)
+
 	return r.Replace(format)
 }
 
@@ -334,10 +340,12 @@ func (t Time) Weekday() Weekday {
 	// Floor to get the nearest noon JD (integer), then shift
 	// The day of the week = (floor(JD + 0.5) + 1) mod 7
 	d := int(math.Floor(jd+0.5)) + 1
+
 	d %= 7
 	if d < 0 {
 		d += 7
 	}
+
 	return Weekday(d)
 }
 
@@ -360,6 +368,7 @@ func (t Time) AddDate(years, months, days int) Time {
 		y++
 		m -= 12
 	}
+
 	for m < 1 {
 		y--
 		m += 12
@@ -381,6 +390,7 @@ func (t Time) AddDate(years, months, days int) Time {
 	result := FromJDParts(jd1, jd2, t.scale)
 	result = result.AddDays(float64(origDay - 1 + days))
 	result.loc = t.loc
+
 	return result
 }
 
@@ -396,6 +406,7 @@ func (t Time) Add(d time.Duration) Time {
 func (t Time) AddDays(d float64) Time {
 	result := FromJDParts(t.jd1, t.jd2+d, t.scale)
 	result.loc = t.loc
+
 	return result
 }
 
@@ -418,6 +429,7 @@ func Date(year int, month time.Month, day, hour, min, sec, nsec int, loc *time.L
 	jd1, jd2, _ := gofaext.Dtf2d("UTC", year, int(month), day, hour, min, fracSec)
 	result := FromJDParts(jd1, jd2, UTC)
 	result.loc = loc
+
 	return result
 }
 
@@ -437,6 +449,7 @@ func DateJulianCal(year, month, day, hour, min, sec int) Time {
 	m := month + 12*a - 3
 	jdn := day + (153*m+2)/5 + 365*y + y/4 - 32083
 	jd := float64(jdn) - 0.5 + float64(hour)/24.0 + float64(min)/1440.0 + float64(sec)/86400.0
+
 	return FromJD(jd, UTC)
 }
 
@@ -471,6 +484,7 @@ func (t Time) Location() *time.Location {
 	if t.loc != nil {
 		return t.loc
 	}
+
 	return time.UTC
 }
 
@@ -512,6 +526,7 @@ func (t Time) Format(format string) string {
 		"05", fmt.Sprintf("%02d", sec),
 		"MST", t.scale.String(),
 	)
+
 	return r.Replace(format)
 }
 
@@ -522,12 +537,15 @@ func (t Time) Before(other Time) bool {
 	if t.scale != other.scale {
 		t, other = t.TT(), other.TT()
 	}
+
 	if t.jd1 < other.jd1 {
 		return true
 	}
+
 	if t.jd1 > other.jd1 {
 		return false
 	}
+
 	return t.jd2 < other.jd2
 }
 
@@ -537,12 +555,15 @@ func (t Time) After(other Time) bool {
 	if t.scale != other.scale {
 		t, other = t.TT(), other.TT()
 	}
+
 	if t.jd1 > other.jd1 {
 		return true
 	}
+
 	if t.jd1 < other.jd1 {
 		return false
 	}
+
 	return t.jd2 > other.jd2
 }
 
@@ -559,10 +580,12 @@ func (t Time) Equal(other Time) bool {
 	}
 	// 1 nanosecond in Julian days: 1e-9 / 86400 ≈ 1.157e-14
 	const nsInJD = 1e-9 / 86400.0
+
 	diff := (t.jd1 - other.jd1) + (t.jd2 - other.jd2)
 	if diff < 0 {
 		diff = -diff
 	}
+
 	return diff < nsInJD
 }
 
@@ -584,6 +607,7 @@ func (t Time) SubDays(other Time) float64 {
 	if t.scale != other.scale {
 		t, other = t.TT(), other.TT()
 	}
+
 	return (t.jd1 - other.jd1) + (t.jd2 - other.jd2)
 }
 
@@ -594,6 +618,7 @@ func (t Time) SubDays(other Time) float64 {
 func fromPartsPreserveLoc(src Time, jd1, jd2 float64, s Scale) Time {
 	result := FromJDParts(jd1, jd2, s)
 	result.loc = src.loc
+
 	return result
 }
 
@@ -626,6 +651,7 @@ func tdbMinusTT(jdTT1, jdTT2 float64) float64 {
 	sum += 0.000014 * math.Sin(2*M)                   // 2nd harmonic
 	sum += 0.000005 * math.Sin(3*M)                   // 3rd harmonic
 	sum += 0.000005 * math.Sin(M+77.71*math.Pi/180.0) // Jupiter indirect
+
 	return sum
 }
 
@@ -633,10 +659,12 @@ func tdbMinusTT(jdTT1, jdTT2 float64) float64 {
 // Returns (dut1, nil) on success, or (0, err) if IERS data is unavailable.
 func dut1ForUTC(jd1, jd2 float64) (float64, error) {
 	mjd := (jd1 - 2400000.5) + jd2
+
 	eop, err := iers.GetModel().EOP(mjd)
 	if err != nil {
 		return 0, err
 	}
+
 	return eop.DUT1, nil
 }
 
@@ -649,8 +677,10 @@ func dut1OrFallback(jd1, jd2 float64) float64 {
 			mjd := (jd1 - 2400000.5) + jd2
 			log.Printf("astrogo/time: IERS EOP data unavailable (MJD %.1f): UT1 ≈ UTC (DUT1=0). Max error ≈ 0.9s. Load finals2000A for sub-second precision.", mjd)
 		})
+
 		return 0
 	}
+
 	return dut1
 }
 
@@ -673,6 +703,7 @@ func (t Time) UTC() Time {
 	if t.scale == UTC {
 		return t
 	}
+
 	switch t.scale {
 	case TAI:
 		// UTC = TAI − ΔAT.
@@ -683,10 +714,12 @@ func (t Time) UTC() Time {
 		utcJD2 := t.jd2 - dat/86400.0
 		// Re-check: ΔAT may differ at the true UTC epoch (leap-second edge).
 		y2, m2, d2, fd2, _ := gofaext.JdToDate(t.jd1, utcJD2)
+
 		dat2, _ := gofaext.Dat(y2, m2, d2, fd2)
 		if dat2 != dat {
 			utcJD2 = t.jd2 - dat2/86400.0
 		}
+
 		return fromPartsPreserveLoc(t, t.jd1, utcJD2, UTC)
 	case TT:
 		// TT → TAI → UTC: TAI = TT − 32.184s
@@ -701,6 +734,7 @@ func (t Time) UTC() Time {
 		dut1 := dut1OrFallback(t.jd1, t.jd2)
 		return fromPartsPreserveLoc(t, t.jd1, t.jd2-dut1/86400.0, UTC)
 	}
+
 	return t // unreachable with current scales
 }
 
@@ -709,11 +743,13 @@ func (t Time) TAI() Time {
 	if t.scale == TAI {
 		return t
 	}
+
 	switch t.scale {
 	case UTC:
 		// TAI = UTC + ΔAT
 		y, m, d, fd, _ := gofaext.JdToDate(t.jd1, t.jd2)
 		dat, _ := gofaext.Dat(y, m, d, fd)
+
 		return fromPartsPreserveLoc(t, t.jd1, t.jd2+dat/86400.0, TAI)
 	case TT:
 		// TAI = TT − 32.184s
@@ -736,11 +772,13 @@ func (t Time) TT() Time {
 	if t.scale == TT {
 		return t
 	}
+
 	switch t.scale {
 	case UTC:
 		// Check if the LSK has valid leap-second data for this epoch.
 		// Before 1972, ΔAT = 0 (no leap seconds), so we use ΔT instead.
 		y, m, d, fd, _ := gofaext.JdToDate(t.jd1, t.jd2)
+
 		dat, _ := gofaext.Dat(y, m, d, fd)
 		if dat == 0 && y < 1972 {
 			// Historical date: use ΔT polynomial (TT = UT + ΔT)
@@ -760,6 +798,7 @@ func (t Time) TT() Time {
 		// UT1 → UTC (with fallback) → TT
 		return t.UTC().TT()
 	}
+
 	return t // unreachable
 }
 
@@ -771,8 +810,10 @@ func (t Time) TDB() Time {
 	if t.scale == TDB {
 		return t
 	}
+
 	tt := t.TT()
 	correction := tdbMinusTT(tt.jd1, tt.jd2) / 86400.0
+
 	return fromPartsPreserveLoc(t, tt.jd1, tt.jd2+correction, TDB)
 }
 
@@ -787,12 +828,15 @@ func (t Time) UT1() (Time, error) {
 	if t.scale == UT1 {
 		return t, nil
 	}
+
 	utc := t.UTC() // deterministic route to UTC
+
 	dut1, err := dut1ForUTC(utc.jd1, utc.jd2)
 	if err != nil {
 		return Time{}, fmt.Errorf("astrogo/time: UT1 conversion failed (MJD %.1f): %w",
 			(utc.jd1-2400000.5)+utc.jd2, err)
 	}
+
 	return fromPartsPreserveLoc(t, utc.jd1, utc.jd2+dut1/86400.0, UT1), nil
 }
 

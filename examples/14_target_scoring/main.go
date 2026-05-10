@@ -37,6 +37,7 @@ func main() {
 		resolver *catalog.Resolver
 		name     string
 	}
+
 	lookups := []lookup{
 		{ngc, "NGC 5139"},   // Omega Centauri
 		{ngc, "NGC 3372"},   // Carina Nebula
@@ -51,6 +52,7 @@ func main() {
 			fmt.Printf("  ⚠ Could not resolve %q: %v\n", l.name, err)
 			continue
 		}
+
 		targets = append(targets, plan.FromCatalog(t, nil))
 	}
 
@@ -94,6 +96,7 @@ func main() {
 			name  string
 			score float64
 		}
+
 		var results []result
 
 		for _, obj := range targets {
@@ -102,23 +105,27 @@ func main() {
 				fmt.Printf("  %-14s  error: %v\n", obj.Name(), err)
 				continue
 			}
+
 			results = append(results, result{obj.Name(), score})
 		}
 
 		// Print ranked
 		fmt.Printf("  %-14s  %8s\n", "Target", "Score")
 		fmt.Printf("  %-14s  %8s\n", "──────────────", "────────")
+
 		for _, r := range results {
 			marker := " "
 			if r.score == 0 {
 				marker = "✗"
 			}
+
 			fmt.Printf("  %-14s  %8.1f  %s\n", r.name, r.score, marker)
 		}
 	}
 
 	// ── Explain the default weights ──────────────────────────────────────
 	fmt.Println("\n── Weight Breakdown ──────────────────────────────────────────")
+
 	cfg := plan.DefaultScoreConfig()
 	fmt.Printf("  Altitude:  %.0f%%  (alt/90°, lower airmass = better)\n", cfg.AltitudeWeight*100)
 	fmt.Printf("  Urgency:   %.0f%%  (1/hours_until_set, about-to-set = urgent)\n", cfg.UrgencyWeight*100)

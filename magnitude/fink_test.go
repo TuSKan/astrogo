@@ -36,42 +36,53 @@ import (
 const finkBaseURL = "https://api.ztf.fink-portal.org"
 
 // finkSSOQuery queries the /api/v1/sso endpoint for a named SSO.
-func finkSSOQuery(t *testing.T, numberOrDesig string, withResiduals, withEphem bool) []map[string]interface{} {
+func finkSSOQuery(t *testing.T, numberOrDesig string, withResiduals, withEphem bool) []map[string]any {
 	t.Helper()
-	body := map[string]interface{}{
+
+	body := map[string]any{
 		"n_or_d":        numberOrDesig,
 		"withResiduals": withResiduals,
 		"withEphem":     withEphem,
 		"output-format": "json",
 	}
 	raw, _ := json.Marshal(body)
+
 	resp, err := http.Post(finkBaseURL+"/api/v1/sso", "application/json", bytes.NewReader(raw))
 	if err != nil {
 		t.Fatalf("FINK SSO query failed: %v", err)
 	}
-	defer resp.Body.Close()
+	t.Cleanup(func() {
+		if err := resp.Body.Close(); err != nil {
+			t.Errorf("failed to close response body: %v", err)
+		}
+	})
+
 	data, _ := io.ReadAll(resp.Body)
-	if resp.StatusCode != 200 {
+	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("FINK SSO HTTP %d: %s", resp.StatusCode, string(data[:min(200, len(data))]))
 	}
-	var records []map[string]interface{}
+
+	var records []map[string]any
 	if err := json.Unmarshal(data, &records); err != nil {
 		t.Fatalf("FINK SSO JSON parse: %v", err)
 	}
+
 	return records
 }
 
 // getFloat extracts a float64 from a JSON record, skipping nil/nan.
-func getFloat(r map[string]interface{}, key string) (float64, bool) {
+func getFloat(r map[string]any, key string) (float64, bool) {
 	v, ok := r[key]
 	if !ok || v == nil {
 		return 0, false
 	}
+
 	switch val := v.(type) {
 	case float64:
 		if math.IsNaN(val) || math.IsInf(val, 0) {
 			return 0, false
 		}
+
 		return val, true
 	case json.Number:
 		f, err := val.Float64()
@@ -92,6 +103,7 @@ func TestFINK_SSOEndpoint(t *testing.T) {
 	if len(records) < 10 {
 		t.Fatalf("expected ≥10 observations for 8467 (Benoitcarry), got %d", len(records))
 	}
+
 	t.Logf("8467 Benoitcarry: %d observations", len(records))
 
 	// Validate first record has required ephemeris fields.
@@ -115,6 +127,7 @@ func TestFINK_EndToEndSHG1G2(t *testing.T) {
 
 	// Step 1: Get fitted parameters from SSOFT via the provider.
 	prov := fink.New()
+
 	tgt, ok := prov.Resolve("8467")
 	if !ok {
 		t.Fatal("FINK provider: Resolve(8467) failed — SSOFT download or parsing error")
@@ -170,6 +183,7 @@ func TestFINK_EndToEndSHG1G2(t *testing.T) {
 		if int(fid) != 2 {
 			continue
 		}
+
 		nR2++
 
 		alpha := angle.Deg(phase)
@@ -180,6 +194,7 @@ func TestFINK_EndToEndSHG1G2(t *testing.T) {
 		// reduced_mag = H - 2.5·log₁₀(G₁Φ₁+G₂Φ₂+G₃Φ₃) + SpinCorrection
 		// We use AsteroidSHG1G2 with r=1, Δ=1 to get the reduced magnitude.
 		var ourModel float64
+
 		if tgt.HasSpin && tgt.HasOblateness {
 			cosL := magnitude.CosAspectAngle(ra, dec, spinRA, spinDec)
 			ourModel = magnitude.AsteroidSHG1G2(tgt.H, tgt.G1, tgt.G2, 1, 1, alpha, tgt.Oblateness, cosL)
@@ -194,13 +209,16 @@ func TestFINK_EndToEndSHG1G2(t *testing.T) {
 		// If our model == FINK model, then ourRes ≈ finkRes.
 		diff := math.Abs(ourRes - finkRes)
 		sumDiff += diff
+
 		sumDiffSq += diff * diff
 		if diff > maxDiff {
 			maxDiff = diff
 		}
+
 		if diff < 0.025 {
 			nMatch++
 		}
+
 		nValid++
 
 		_ = dhelio
@@ -227,6 +245,7 @@ func TestFINK_EndToEndSHG1G2(t *testing.T) {
 	if matchPct < 85 {
 		t.Errorf("model match = %.1f%%, expected ≥85%% within 0.025 mag", matchPct)
 	}
+
 	if meanDiff > 0.03 {
 		t.Errorf("mean |diff| = %.4f, expected < 0.02 mag", meanDiff)
 	}
@@ -245,6 +264,7 @@ func TestFINK_ReducedMagnitudeConsistency(t *testing.T) {
 	}
 
 	var nChecked int
+
 	for _, r := range records {
 		magpsf, okMag := getFloat(r, "i:magpsf")
 		redMag, okRed := getFloat(r, "i:magpsf_red")
@@ -262,6 +282,7 @@ func TestFINK_ReducedMagnitudeConsistency(t *testing.T) {
 			t.Errorf("obs %d: magpsf_red=%.4f, expected=%.4f (diff=%.4f)",
 				nChecked, redMag, expected, diff)
 		}
+
 		nChecked++
 		if nChecked >= 20 {
 			break
@@ -271,6 +292,7 @@ func TestFINK_ReducedMagnitudeConsistency(t *testing.T) {
 	if nChecked == 0 {
 		t.Fatal("no valid observations for reduced magnitude check")
 	}
+
 	t.Logf("Checked %d observations: reduced magnitude formula consistent", nChecked)
 }
 
@@ -284,10 +306,12 @@ func TestFINK_SpinCorrectionPhysics(t *testing.T) {
 
 	// Get spin parameters from the provider.
 	prov := fink.New()
+
 	tgt, ok := prov.Resolve("8467")
 	if !ok {
 		t.Fatal("FINK provider: Resolve(8467) failed")
 	}
+
 	if !tgt.HasSpin || !tgt.HasOblateness {
 		t.Skip("no spin/R parameters available for 8467")
 	}
@@ -305,6 +329,7 @@ func TestFINK_SpinCorrectionPhysics(t *testing.T) {
 
 	for _, r := range records {
 		raVal, okRA := getFloat(r, "RA")
+
 		decVal, okDec := getFloat(r, "DEC")
 		if !okRA || !okDec {
 			continue
@@ -322,6 +347,7 @@ func TestFINK_SpinCorrectionPhysics(t *testing.T) {
 	}
 
 	var minCos, maxCos, minSpin, maxSpin float64
+
 	minCos, maxCos = cosLambdas[0], cosLambdas[0]
 	minSpin, maxSpin = spinCorrs[0], spinCorrs[0]
 
@@ -329,19 +355,24 @@ func TestFINK_SpinCorrectionPhysics(t *testing.T) {
 		if c < -1.001 || c > 1.001 {
 			t.Errorf("cos Λ = %.6f out of [-1,1] bounds", c)
 		}
+
 		if c < minCos {
 			minCos = c
 		}
+
 		if c > maxCos {
 			maxCos = c
 		}
+
 		s := spinCorrs[i]
 		if s > 0.001 {
 			t.Errorf("SpinCorrection = %.6f should be ≤ 0", s)
 		}
+
 		if s < minSpin {
 			minSpin = s
 		}
+
 		if s > maxSpin {
 			maxSpin = s
 		}
@@ -366,22 +397,27 @@ func TestFINK_ResidualStatistics(t *testing.T) {
 		t.Fatalf("expected ≥10 observations, got %d", len(records))
 	}
 
-	var nValid int
-	var sumRes, sumResSq, sumAbsRes float64
-	var maxAbsRes float64
+	var (
+		nValid                      int
+		sumRes, sumResSq, sumAbsRes float64
+		maxAbsRes                   float64
+	)
 
 	for _, r := range records {
 		res, ok := getFloat(r, "residuals_shg1g2")
 		if !ok {
 			continue
 		}
+
 		sumRes += res
 		sumResSq += res * res
 		abs := math.Abs(res)
+
 		sumAbsRes += abs
 		if abs > maxAbsRes {
 			maxAbsRes = abs
 		}
+
 		nValid++
 	}
 
@@ -402,6 +438,7 @@ func TestFINK_ResidualStatistics(t *testing.T) {
 	if math.Abs(meanRes) > 0.15 {
 		t.Errorf("mean residual = %+.4f, expected near zero", meanRes)
 	}
+
 	if rmsRes > 0.5 {
 		t.Errorf("RMS residual = %.4f, expected < 0.5", rmsRes)
 	}

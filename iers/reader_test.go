@@ -40,6 +40,7 @@ func TestParseFinals2000A(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	testutil.AssertEqual(t, "EOP Exact Bound DUT1", eopZero.DUT1, 0.8084178)
 
 	// Test linear interpolation (midpoint)
@@ -47,6 +48,7 @@ func TestParseFinals2000A(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	expectedDUT1 := (0.8084178 + 0.8056163) / 2.0
 	testutil.AssertNear(t, "EOP Midpoint DUT1", eopMid.DUT1, expectedDUT1, 1e-12)
 

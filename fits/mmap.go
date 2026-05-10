@@ -1,6 +1,7 @@
 package fits
 
 import (
+	"errors"
 	"fmt"
 	"io"
 
@@ -10,6 +11,7 @@ import (
 // MMapFile represents a memory-mapped FITS dataset.
 type MMapFile struct {
 	*File
+
 	mapped *mmap.ReaderAt
 }
 
@@ -44,6 +46,7 @@ func (m *MMapFile) Close() error {
 	if m.mapped != nil {
 		return m.mapped.Close()
 	}
+
 	return nil
 }
 
@@ -58,13 +61,16 @@ func (m *mmapSeeker) Read(p []byte) (int, error) {
 	if m.off >= m.len {
 		return 0, io.EOF
 	}
+
 	n, err := m.at.ReadAt(p, m.off)
 	m.off += int64(n)
+
 	return n, err
 }
 
 func (m *mmapSeeker) Seek(offset int64, whence int) (int64, error) {
 	var target int64
+
 	switch whence {
 	case io.SeekStart:
 		target = offset
@@ -77,8 +83,10 @@ func (m *mmapSeeker) Seek(offset int64, whence int) (int64, error) {
 	}
 
 	if target < 0 {
-		return 0, fmt.Errorf("mmapSeeker: negative offset")
+		return 0, errors.New("mmapSeeker: negative offset")
 	}
+
 	m.off = target
+
 	return target, nil
 }

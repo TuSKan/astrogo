@@ -27,6 +27,7 @@ func GalacticToICRS(c Galactic) ICRS {
 func ICRSToEcliptic(c ICRS, t time.Time) Ecliptic {
 	jd1, jd2 := t.JDParts()
 	lon, lat := gofaext.Eqec06(jd1, jd2, c.RA().Radians(), c.Dec().Radians())
+
 	return NewEcliptic(angle.Rad(lon).Wrap360(), angle.Rad(lat))
 }
 
@@ -35,5 +36,6 @@ func ICRSToEcliptic(c ICRS, t time.Time) Ecliptic {
 func EclipticToICRS(c Ecliptic, t time.Time) ICRS {
 	jd1, jd2 := t.JDParts()
 	ra, dec := gofaext.Eceq06(jd1, jd2, c.Lon().Radians(), c.Lat().Radians())
+
 	return NewICRS(angle.Rad(ra).Wrap360(), angle.Rad(dec))
 }

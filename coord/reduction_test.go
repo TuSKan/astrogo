@@ -14,6 +14,7 @@ import (
 // Helper to provide a target at a specific geometric altitude
 func getTargetAtAltitude(site *coord.Geodetic, obsTime time.Time, minAlt, maxAlt float64) vector.Vec3 {
 	reducer := coord.NewReducer(site, obsTime, atmosphere.Atmosphere{Pressure: 0})
+
 	for i := 0; i < 360; i += 5 {
 		for j := -90; j <= 90; j += 5 {
 			ra := angle.Deg(float64(i)).Radians()
@@ -247,6 +248,7 @@ func TestReducer_Group4_Semantics(t *testing.T) {
 	// 4.2 Apparent vector should roughly mirror typical vector norms
 	astrometric := coord.NewAstrometric(angle.Zero(), angle.Zero()) // Placeholder Astrometric
 	ctxTest := coord.NewContext(obsTime, site, atm)
+
 	app := ctxTest.AstrometricToApparent(astrometric)
 	if app.RA().Radians() == 0 && app.Dec().Radians() == 0 {
 		t.Error("AstrometricToApparent returned uninitialized zero coordinates")
@@ -260,7 +262,6 @@ func TestReducer_Group4_Semantics(t *testing.T) {
 func TestReducer_Group5_FixturesAndSafety(t *testing.T) {
 	// Table driven fixture simulation
 	// Evaluating typical constraints without infinite / NaN leaks
-
 	type fixture struct {
 		name       string
 		lat, lon   float64
@@ -302,6 +303,7 @@ func TestReducer_Group5_FixturesAndSafety(t *testing.T) {
 			diff := math.Abs(disp.Dispersion[0.4].Alt().Degrees() - disp.Dispersion[0.7].Alt().Degrees())
 
 			assertFinite(t, diff, tt.name+"_DispersionDiff")
+
 			if diff > 1.0 {
 				t.Errorf("Unrealistic massive dispersion recorded: %v degrees", diff)
 			}

@@ -72,8 +72,10 @@ func TestICRSRoundTrip(t *testing.T) {
 	}
 	for i, c := range cases {
 		v := c.ToUnitVector()
+
 		var back coord.ICRS
 		back.FromUnitVector(v)
+
 		label := testutil.CaseLabel(i, "ICRS round-trip")
 		testutil.AssertNear(t, label+" RA", back.RA().Degrees(), c.RA().Wrap360().Degrees(), 1e-10)
 		testutil.AssertNear(t, label+" Dec", back.Dec().Degrees(), c.Dec().Degrees(), 1e-10)
@@ -88,8 +90,10 @@ func TestGalacticRoundTrip_FromVec(t *testing.T) {
 	}
 	for i, c := range cases {
 		v := c.ToUnitVector()
+
 		var back coord.Galactic
 		back.FromUnitVector(v)
+
 		label := testutil.CaseLabel(i, "Galactic round-trip")
 		testutil.AssertNear(t, label+" L", back.L().Degrees(), c.L().Wrap360().Degrees(), 1e-10)
 		testutil.AssertNear(t, label+" B", back.B().Degrees(), c.B().Degrees(), 1e-10)
@@ -104,8 +108,10 @@ func TestEclipticRoundTrip_FromVec(t *testing.T) {
 	}
 	for i, c := range cases {
 		v := c.ToUnitVector()
+
 		var back coord.Ecliptic
 		back.FromUnitVector(v)
+
 		label := testutil.CaseLabel(i, "Ecliptic round-trip")
 		testutil.AssertNear(t, label+" Lon", back.Lon().Degrees(), c.Lon().Wrap360().Degrees(), 1e-10)
 		testutil.AssertNear(t, label+" Lat", back.Lat().Degrees(), c.Lat().Degrees(), 1e-10)
@@ -122,6 +128,7 @@ func TestICRSEqual(t *testing.T) {
 	if !a.Equal(b) {
 		t.Error("identical ICRS should be equal")
 	}
+
 	if a.Equal(c) {
 		t.Error("different ICRS should not be equal")
 	}
@@ -131,9 +138,11 @@ func TestGalacticEqual(t *testing.T) {
 	a := coord.NewGalactic(angle.Deg(120), angle.Deg(30))
 	b := coord.NewGalactic(angle.Deg(120), angle.Deg(30))
 	c := coord.NewGalactic(angle.Deg(121), angle.Deg(30))
+
 	if !a.Equal(b) {
 		t.Error("identical Galactic should be equal")
 	}
+
 	if a.Equal(c) {
 		t.Error("different Galactic should not be equal")
 	}
@@ -141,6 +150,7 @@ func TestGalacticEqual(t *testing.T) {
 
 func TestEclipticEqual(t *testing.T) {
 	a := coord.NewEcliptic(angle.Deg(60), angle.Deg(5))
+
 	b := coord.NewEcliptic(angle.Deg(60), angle.Deg(5))
 	if !a.Equal(b) {
 		t.Error("identical Ecliptic should be equal")
@@ -149,6 +159,7 @@ func TestEclipticEqual(t *testing.T) {
 
 func TestAltAzEqual(t *testing.T) {
 	a := coord.NewAltAz(angle.Deg(45), angle.Deg(180))
+
 	b := coord.NewAltAz(angle.Deg(45), angle.Deg(180))
 	if !a.Equal(b) {
 		t.Error("identical AltAz should be equal")
@@ -257,14 +268,17 @@ func TestMoreEqual(t *testing.T) {
 	astA := coord.NewAstrometric(angle.Deg(1), angle.Deg(2))
 	astB := coord.NewAstrometric(angle.Deg(1), angle.Deg(2))
 	astC := coord.NewAstrometric(angle.Deg(2), angle.Deg(2))
+
 	if !astA.Equal(astB) {
 		t.Error("identical Astrometric should be equal")
 	}
+
 	if astA.Equal(astC) {
 		t.Error("different Astrometric should not be equal")
 	}
 
 	appA := coord.NewApparent(angle.Deg(1), angle.Deg(2))
+
 	appB := coord.NewApparent(angle.Deg(1), angle.Deg(2))
 	if !appA.Equal(appB) {
 		t.Error("identical Apparent should be equal")
@@ -273,9 +287,11 @@ func TestMoreEqual(t *testing.T) {
 	obsA := coord.NewObserversLocation(angle.Deg(1), angle.Deg(2), 10)
 	obsB := coord.NewObserversLocation(angle.Deg(1), angle.Deg(2), 10)
 	obsC := coord.NewObserversLocation(angle.Deg(1), angle.Deg(2), 20)
+
 	if !obsA.Equal(obsB) {
 		t.Error("identical ObserversLocation should be equal")
 	}
+
 	if obsA.Equal(obsC) {
 		t.Error("different ObserversLocation should not be equal")
 	}

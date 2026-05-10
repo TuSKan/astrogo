@@ -22,12 +22,14 @@ func main() {
 	ctx := coord.NewContext(t, loc, atmosphere.StandardAtmosphere)
 
 	resolver := catalog.NewResolver(catalog.OpenNGC, catalog.SIMBAD)
+
 	catTarget, err := resolver.Resolve("Sirius")
 	if err != nil {
 		log.Fatalf("failed to resolve Sirius: %v", err)
 	}
 
 	sirius := plan.FromCatalog(catTarget, nil)
+
 	details, err := sirius.GetDetails(ctx,
 		"Bayer letter", "α CMa",
 		"Flamsteed number", "9 CMa",

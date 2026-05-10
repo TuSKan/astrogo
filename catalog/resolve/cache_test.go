@@ -14,7 +14,13 @@ import (
 
 func TestMapCacheWriteRead(t *testing.T) {
 	cache := resolve.NewMapCache()
-	defer cache.Close()
+
+	t.Cleanup(func() {
+		err := cache.Close()
+		if err != nil {
+			t.Errorf("failed to close cache: %v", err)
+		}
+	})
 
 	key := "test:query:1"
 
@@ -46,9 +52,12 @@ func TestMapCacheWriteRead(t *testing.T) {
 	testutil.AssertEqual(t, "Cache Hit", ok, true)
 
 	var retrieved []resolve.Target
+
 	seq(func(tar resolve.Target, err error) bool {
 		testutil.AssertNoError(t, err)
+
 		retrieved = append(retrieved, tar)
+
 		return true
 	})
 
@@ -63,20 +72,25 @@ func TestMapCacheWriteRead(t *testing.T) {
 	testutil.AssertEqual(t, "Designation", t1.Designation, "Desig1")
 	testutil.AssertEqual(t, "SPKID", t1.SPKID, "999")
 	testutil.AssertEqual(t, "Kind", string(t1.Kind), string(resolve.KindStar))
+
 	if !t1.HasCoord {
 		t.Fatalf("Expected coordinate, got no coord")
 	}
+
 	if math.Abs(t1.Coord.RA().Degrees()-45.0) > 1e-9 {
 		t.Errorf("RA mismatch: got %f", t1.Coord.RA().Degrees())
 	}
+
 	if math.Abs(t1.Coord.Dec().Degrees() - -15.0) > 1e-9 {
 		t.Errorf("Dec mismatch: got %f", t1.Coord.Dec().Degrees())
 	}
+
 	testutil.AssertEqual(t, "Aliases", strings.Join(t1.Aliases, ","), "A,B")
 
 	// Validate partial decode
 	t2 := retrieved[1]
 	testutil.AssertEqual(t, "ID 2", t2.ID, "OBJ2")
+
 	if t2.HasCoord {
 		t.Fatalf("Expected no coordinate for OBJ2, got %v", t2.Coord)
 	}
@@ -86,7 +100,9 @@ func TestMapCacheWriteRead(t *testing.T) {
 	testutil.AssertNoError(t, err)
 
 	seq2, _ := cache.Get(key)
+
 	var o []resolve.Target
+
 	seq2(func(tar resolve.Target, err error) bool {
 		o = append(o, tar)
 		return true

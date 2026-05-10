@@ -59,6 +59,7 @@ func (RefractionApproximate) RefractFromTrue(trueAlt angle.Angle, env Atmosphere
 	R := 1.02 / math.Tan((h+10.3/(h+5.11))*math.Pi/180.0)
 
 	factor := (env.Pressure / 1010.0) * (283.0 / (273.15 + env.Temperature))
+
 	return angle.Deg((R * factor) / 60.0)
 }
 
@@ -68,8 +69,10 @@ func (RefractionApproximate) RefractFromApparent(obsAlt angle.Angle, env Atmosph
 	if h < -5.0 {
 		return 0
 	}
+
 	R := 1.0 / math.Tan((h+7.31/(h+4.4))*math.Pi/180.0)
 	factor := (env.Pressure / 1010.0) * (283.0 / (273.15 + env.Temperature))
+
 	return angle.Deg((R * factor) / 60.0)
 }
 
@@ -94,6 +97,7 @@ func (RefractionRigorous) RefractFromTrue(trueAlt angle.Angle, env Atmosphere) a
 	r0 := 1.02 / math.Tan(inner*math.Pi/180.0)
 
 	correction := (env.Pressure / 1010.0) * (283.0 / (273.15 + env.Temperature))
+
 	wlFactor := 1.0
 	if env.Wavelength > 0 {
 		wlFactor = 1.0 + 0.005*(0.55-env.Wavelength)
@@ -120,6 +124,7 @@ func (RefractionRigorous) RefractFromApparent(obsAlt angle.Angle, env Atmosphere
 	r0 := 1.0 / math.Tan(inner*math.Pi/180.0)
 
 	correction := (env.Pressure / 1010.0) * (283.0 / (273.15 + env.Temperature))
+
 	wlFactor := 1.0
 	if env.Wavelength > 0 {
 		wlFactor = 1.0 + 0.005*(0.55-env.Wavelength)
@@ -129,6 +134,8 @@ func (RefractionRigorous) RefractFromApparent(obsAlt angle.Angle, env Atmosphere
 }
 
 // StandardAtmosphere returns a typical sea-level atmospheric profile using the rigorous backend.
+//
+//nolint:gochecknoglobals // ICAO ISA reference profile — immutable physical constant
 var StandardAtmosphere = Atmosphere{
 	Pressure:    1013.25,
 	Temperature: 15.0,
@@ -185,6 +192,7 @@ func HorizonDip(h float64) angle.Angle {
 	}
 	// 1.76 arcminutes per sqrt(meter), converted to degrees
 	dipArcmin := 1.76 * math.Sqrt(h)
+
 	return angle.Deg(dipArcmin / 60.0)
 }
 

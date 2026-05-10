@@ -19,6 +19,7 @@ func main() {
 
 	// We'll use the satellite epoch for context later or current time
 	resolver := catalog.NewResolver(catalog.NORAD)
+
 	catTarget, err := resolver.Resolve("ISS (Zarya)")
 	if err != nil {
 		log.Fatalf("failed to resolve ISS: %v", err)
@@ -29,7 +30,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to create satellite provider: %v", err)
 	}
-	defer prov.Close()
+	defer func() {
+		if err := prov.Close(); err != nil {
+			log.Printf("failed to close provider: %v", err)
+		}
+	}()
 
 	iss := plan.FromCatalog(catTarget, prov)
 

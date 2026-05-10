@@ -11,6 +11,7 @@ import (
 //go:embed all:data/*
 var eopFS embed.FS
 
+//nolint:gochecknoglobals // embedded IERS EOP reference data
 var FinalsData []byte
 
 func init() {
@@ -22,10 +23,12 @@ func init() {
 	if len(FinalsData) == 0 {
 		return // in case go generate hasn't been run or file was empty
 	}
+
 	model, err := ParseFinals2000A(bytes.NewReader(FinalsData))
 	if err != nil {
 		log.Printf("astrogo/earth/iers: failed to parse embedded EOP data: %v", err)
 		return
 	}
+
 	RegisterModel(model)
 }

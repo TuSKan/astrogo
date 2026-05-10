@@ -14,7 +14,6 @@ import (
 func ExampleExtractWCS() {
 	// Let's assume we have a FITS file with a standard image HDU containing WCS info.
 	// We'll mimic the FITS ingestion process.
-
 	path := "hubble.fits"
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		path = filepath.Join("corpus", "hubble.fits") // fallback path used in testing
@@ -119,6 +118,7 @@ func makeWCS(proj string, ra0, dec0, scale float64) *fits.WCS {
 	w.SetCRPIX([]float64{512.0, 512.0})
 	w.SetCRVAL([]float64{ra0, dec0})
 	w.SetCDELT([]float64{-scale, scale})
+
 	return w
 }
 
@@ -129,13 +129,16 @@ func TestProjectionRoundTrip_ReferencePixel(t *testing.T) {
 	for _, proj := range projs {
 		t.Run(proj, func(t *testing.T) {
 			w := makeWCS(proj, 83.633, 22.0145, 0.001) // near Orion Nebula
+
 			res, err := w.PixelToWorld([]float64{512.0, 512.0})
 			if err != nil {
 				t.Fatalf("PixelToWorld at CRPIX failed: %v", err)
 			}
+
 			if math.Abs(res[0]-83.633) > 1e-10 {
 				t.Errorf("RA: expected 83.633, got %.10f", res[0])
 			}
+
 			if math.Abs(res[1]-22.0145) > 1e-10 {
 				t.Errorf("Dec: expected 22.0145, got %.10f", res[1])
 			}
@@ -173,10 +176,12 @@ func TestProjectionRoundTrip_Grid(t *testing.T) {
 			w := makeWCS(tc.proj, tc.ra0, tc.dec0, tc.scale)
 
 			crpix := w.GetCRPIX()
+
 			step := tc.fieldPix / 4
 			if step < 1 {
 				step = 1
 			}
+
 			var tested, skipped int
 
 			for dx := -tc.fieldPix; dx <= tc.fieldPix; dx += step {
@@ -206,12 +211,15 @@ func TestProjectionRoundTrip_Grid(t *testing.T) {
 						t.Errorf("round-trip at (%.1f, %.1f): got (%.9f, %.9f), diff=(%.2e, %.2e)",
 							px, py, pxBack[0], pxBack[1], diffX, diffY)
 					}
+
 					tested++
 				}
 			}
+
 			if tested == 0 {
 				t.Error("no points were testable — check field size vs projection limits")
 			}
+
 			t.Logf("tested %d points, skipped %d", tested, skipped)
 		})
 	}
@@ -278,6 +286,7 @@ func TestProjectionRoundTrip_RAWrap(t *testing.T) {
 // TestProjection_SIN_OutOfBounds verifies the SIN projection rejects r²>1.
 func TestProjection_SIN_OutOfBounds(t *testing.T) {
 	w := makeWCS("SIN", 180.0, 45.0, 1.0) // 1 deg/pixel → huge field
+
 	_, err := w.PixelToWorld([]float64{512.0 + 100, 512.0})
 	if err == nil {
 		t.Error("expected SIN projection to reject out-of-bounds point")
@@ -287,6 +296,7 @@ func TestProjection_SIN_OutOfBounds(t *testing.T) {
 // TestProjection_AIT_OutOfBounds verifies the AIT projection rejects invalid regions.
 func TestProjection_AIT_OutOfBounds(t *testing.T) {
 	w := makeWCS("AIT", 0.0, 0.0, 1.0)
+
 	_, err := w.PixelToWorld([]float64{512.0 + 500, 512.0})
 	if err == nil {
 		t.Error("expected AIT projection to reject out-of-bounds point")
@@ -312,9 +322,11 @@ func TestProjection_UnknownFallsBackToLinear(t *testing.T) {
 	// Linear: CRVAL + offset * CDELT
 	expectedRA := 10.0 + (55.0-50.0)*(-0.01)
 	expectedDec := 20.0 + (55.0-50.0)*0.01
+
 	if math.Abs(res[0]-expectedRA) > 1e-10 {
 		t.Errorf("RA: expected %.4f, got %.4f", expectedRA, res[0])
 	}
+
 	if math.Abs(res[1]-expectedDec) > 1e-10 {
 		t.Errorf("Dec: expected %.4f, got %.4f", expectedDec, res[1])
 	}
@@ -363,6 +375,7 @@ func TestProjection_SwappedAxes(t *testing.T) {
 	if math.Abs(stdRA-swpRA) > 1e-10 {
 		t.Errorf("RA mismatch: standard=%.6f, swapped=%.6f", stdRA, swpRA)
 	}
+
 	if math.Abs(stdDec-swpDec) > 1e-10 {
 		t.Errorf("Dec mismatch: standard=%.6f, swapped=%.6f", stdDec, swpDec)
 	}
@@ -444,6 +457,7 @@ func TestSIPDistortion(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SIP PixelToWorld at CRPIX: %v", err)
 	}
+
 	if math.Abs(refWorld[0]-150.0) > 1e-10 || math.Abs(refWorld[1]-45.0) > 1e-10 {
 		t.Errorf("SIP at CRPIX: expected (150, 45), got (%.10f, %.10f)", refWorld[0], refWorld[1])
 	}
@@ -471,6 +485,7 @@ func TestSIPDistortion(t *testing.T) {
 	if shift < 0.01 {
 		t.Errorf("SIP distortion too small at field edge: %.4f arcsec", shift)
 	}
+
 	if shift > 10.0 {
 		t.Errorf("SIP distortion unreasonably large: %.4f arcsec", shift)
 	}
@@ -548,6 +563,7 @@ func TestTPVDistortion(t *testing.T) {
 	if err != nil {
 		t.Fatalf("TPV PixelToWorld at CRPIX: %v", err)
 	}
+
 	if math.Abs(refWorld[0]-150.0) > 1e-10 || math.Abs(refWorld[1]-45.0) > 1e-10 {
 		t.Errorf("TPV at CRPIX: expected (150, 45), got (%.10f, %.10f)", refWorld[0], refWorld[1])
 	}
@@ -574,6 +590,7 @@ func TestTPVDistortion(t *testing.T) {
 	if shift < 0.001 {
 		t.Errorf("TPV distortion too small at field edge: %.6f arcsec", shift)
 	}
+
 	if shift > 100.0 {
 		t.Errorf("TPV distortion unreasonably large: %.4f arcsec", shift)
 	}

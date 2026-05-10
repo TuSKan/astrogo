@@ -40,7 +40,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to load JPL DE442: %v", err)
 	}
-	defer prov.Close()
+	defer func() {
+		if err := prov.Close(); err != nil {
+			log.Printf("failed to close provider: %v", err)
+		}
+	}()
 
 	brtz, err := time.LoadLocation("America/Sao_Paulo")
 	if err != nil {
@@ -71,14 +75,17 @@ func main() {
 	if err != nil {
 		log.Fatalf("SunriseSunset: %v", err)
 	}
+
 	_, civilDusk, err := plan.CivilDawnDusk(day, next, site, prov)
 	if err != nil {
 		log.Fatalf("CivilDawnDusk: %v", err)
 	}
+
 	_, nautDusk, err := plan.NauticalDawnDusk(day, next, site, prov)
 	if err != nil {
 		log.Fatalf("NauticalDawnDusk: %v", err)
 	}
+
 	_, astroDusk, err := plan.AstronomicalDawnDusk(day, next, site, prov)
 	if err != nil {
 		log.Fatalf("AstronomicalDawnDusk: %v", err)
@@ -109,6 +116,7 @@ func main() {
 
 		alt := altaz.Alt().Degrees()
 		amStr := "below"
+
 		if alt > 0 {
 			am, _ := atmosphere.Airmass(altaz.Alt())
 			amStr = fmt.Sprintf("%.1f", am)
@@ -121,33 +129,41 @@ func main() {
 	// ── Part 3: Altitude Timeline ────────────────────────────────────
 	fmt.Println("\n── Altitude Timeline (sunset → +75 min, every 5 min) ─────────")
 	fmt.Print("  Time (BRT) │")
+
 	for _, p := range planets {
 		name := p.Name
 		if len(name) > 5 {
 			name = name[:5]
 		}
+
 		fmt.Printf(" %-5s │", name)
 	}
+
 	fmt.Println()
 	fmt.Print("  ───────────┼")
+
 	for range planets {
 		fmt.Print("───────┼")
 	}
+
 	fmt.Println()
 
 	tStart := sunset.Time
-	for i := 0; i <= 75; i++ {
+	for i := range 76 {
 		t := tStart.Add(time.Duration(int64(i) * 1 * int64(time.Minute)))
 		c := coord.NewContext(t, loc, atm)
 
 		fmt.Printf("  %s │", t.In(brtz).Format("15:04"))
+
 		for _, p := range planets {
 			icrs, err := p.Target.Position(t)
 			if err != nil {
 				fmt.Print("  err  │")
 				continue
 			}
+
 			altaz, _ := c.ICRSToAltAz(icrs)
+
 			alt := altaz.Alt().Degrees()
 			if alt < 0 {
 				fmt.Print("  ───  │")
@@ -155,6 +171,7 @@ func main() {
 				fmt.Printf(" %+4.0f° │", alt)
 			}
 		}
+
 		fmt.Println()
 	}
 
@@ -162,6 +179,7 @@ func main() {
 	fmt.Println("\n── Ecliptic Clustering Analysis ───────────────────────────────")
 
 	var lons []float64
+
 	for _, p := range planets {
 		icrs, _ := p.Target.Position(civilDusk.Time)
 		ecl := coord.ICRSToEcliptic(icrs, civilDusk.Time)
@@ -170,22 +188,28 @@ func main() {
 
 	// Find minimum arc span containing all planets
 	minSpan := 360.0
+
 	for i := range lons {
 		maxArc := 0.0
+
 		for j := range lons {
 			arc := lons[j] - lons[i]
 			for arc < 0 {
 				arc += 360
 			}
+
 			if arc > maxArc {
 				maxArc = arc
 			}
 		}
+
 		if maxArc < minSpan {
 			minSpan = maxArc
 		}
 	}
+
 	fmt.Printf("  Ecliptic longitude span: %.0f°\n", minSpan)
+
 	if minSpan < 180 {
 		fmt.Println("  All planets are in the same half of the sky ✓")
 	}
@@ -210,6 +234,7 @@ func main() {
 		if err != nil || len(appulses) == 0 {
 			continue
 		}
+
 		for _, app := range appulses {
 			fmt.Printf("  %s – %s: closest %.2f° on %s\n",
 				planets[pair[0]].Name, planets[pair[1]].Name,
@@ -221,6 +246,7 @@ func main() {
 	fmt.Println("\n── Visibility Summary ─────────────────────────────────────────")
 	fmt.Println("  Planet    │ Naked Eye │ Notes")
 	fmt.Println("  ──────────┼───────────┼──────────────────────────────────")
+
 	visibility := []struct {
 		name, eye, notes string
 	}{

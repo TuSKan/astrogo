@@ -6,6 +6,7 @@
 package main
 
 import (
+	"log"
 	"fmt"
 
 	"github.com/TuSKan/astrogo/coord"
@@ -19,7 +20,11 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	defer prov.Close()
+	defer func() {
+		if err := prov.Close(); err != nil {
+			log.Printf("failed to close provider: %v", err)
+		}
+	}()
 
 	jupiter := plan.NewJupiter(prov)
 	saturn := plan.NewSaturn(prov)
@@ -34,6 +39,7 @@ func main() {
 	// Candidate 1: Jupiter–Saturn triple conjunction, 7 BC
 	// ──────────────────────────────────────────────────────────────────
 	fmt.Println("\n▸ Jupiter–Saturn Conjunctions, 7 BC (astronomical year −6):")
+
 	s1 := time.Date(-6, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
 	e1 := time.Date(-5, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
 
@@ -62,6 +68,7 @@ func main() {
 
 	// ── Ecliptic longitude conjunctions (classical definition) ──
 	fmt.Println("\n  Ecliptic longitude conjunctions (classical definition, Δλ=0):")
+
 	eclConjs, err := plan.ConjunctionsEcliptic(s1, e1, jupiter, saturn)
 	if err != nil {
 		fmt.Printf("  Error: %v\n", err)
@@ -74,6 +81,7 @@ func main() {
 
 	// ── Appulses (minimum angular separation) ──
 	fmt.Println("\n  Appulses (closest visual approach):")
+
 	appulses, err := plan.Appulses(s1, e1, jupiter, saturn)
 	if err != nil {
 		fmt.Printf("  Error: %v\n", err)
@@ -114,6 +122,7 @@ func main() {
 	// Extra: Jupiter–Saturn conjunctions in 3–2 BC for comparison
 	// ──────────────────────────────────────────────────────────────────
 	fmt.Println("\n▸ Jupiter–Saturn geometry, 3–2 BC (for comparison):")
+
 	s3 := time.Date(-2, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
 	e3 := time.Date(0, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
 
@@ -144,11 +153,14 @@ func skyPosition(elongDeg float64) string {
 	if elongDeg > 120 {
 		return "All night (near opposition)"
 	}
+
 	if elongDeg > 90 {
 		return "Most of night"
 	}
+
 	if elongDeg > 45 {
 		return "Evening or morning sky"
 	}
+
 	return "Near Sun (difficult)"
 }

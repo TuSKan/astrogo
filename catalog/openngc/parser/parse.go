@@ -51,6 +51,7 @@ func main() {
 		if err != nil {
 			log.Fatalf("error processing %s: %v", url, err)
 		}
+
 		records = append(records, fileRecords...)
 	}
 
@@ -59,7 +60,8 @@ func main() {
 		return records[i].ID < records[j].ID
 	})
 
-	if err := writeRuntimeCSV(outputPath, records); err != nil {
+	err := writeRuntimeCSV(outputPath, records)
+	if err != nil {
 		log.Fatalf("error writing output: %v", err)
 	}
 
@@ -77,16 +79,22 @@ type targetRecord struct {
 	Dec     float64
 }
 
-func downloadAndParse(url string) ([]targetRecord, error) {
+func downloadAndParse(url string) (_ []targetRecord, err error) {
 	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
 	}
+
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		cerr := resp.Body.Close()
+		if cerr != nil {
+			err = errors.Join(err, cerr)
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("bad status: %s", resp.Status)
@@ -111,16 +119,19 @@ func parseOpenNGC(input io.Reader) ([]targetRecord, error) {
 	}
 
 	var records []targetRecord
+
 	for {
 		row, err := r.Read()
 		if errors.Is(err, io.EOF) {
 			break
 		}
+
 		if err != nil {
 			return nil, err
 		}
 
 		kindStr := row[col["Type"]]
+
 		mappedKind := mapType(kindStr)
 		if mappedKind == "Other" {
 			continue
@@ -142,6 +153,7 @@ func parseOpenNGC(input io.Reader) ([]targetRecord, error) {
 		if err != nil {
 			continue
 		}
+
 		dec, err := parseDec(decStr)
 		if err != nil {
 			continue
@@ -152,6 +164,7 @@ func parseOpenNGC(input io.Reader) ([]targetRecord, error) {
 
 		// Pick first common name as Name for better UI
 		displayName := name
+
 		if commonNames != "" {
 			first := strings.TrimSpace(strings.Split(commonNames, ",")[0])
 			if first != "" {
@@ -181,6 +194,7 @@ func extractMag(row []string, col map[string]int, colName string) string {
 	if !ok || idx >= len(row) {
 		return ""
 	}
+
 	v := strings.TrimSpace(row[idx])
 	if v == "" {
 		return ""
@@ -189,18 +203,22 @@ func extractMag(row []string, col map[string]int, colName string) string {
 	if _, err := strconv.ParseFloat(v, 64); err != nil {
 		return ""
 	}
+
 	return v
 }
 
 func normalizeID(s string) string {
 	s = strings.ReplaceAll(s, " ", "")
+
 	s = strings.ToUpper(s)
 	if strings.HasPrefix(s, "NGC") {
 		return "NGC" + strings.TrimLeft(s[3:], "0")
 	}
+
 	if strings.HasPrefix(s, "IC") {
 		return "IC" + strings.TrimLeft(s[2:], "0")
 	}
+
 	return s
 }
 
@@ -215,9 +233,11 @@ func gatherAliases(id, mID, commonNames, identifiers string) []string {
 		if a == "" {
 			return
 		}
+
 		norm := strings.ToLower(strings.ReplaceAll(a, " ", ""))
 		if !seen[norm] {
 			seen[norm] = true
+
 			aliases = append(aliases, a)
 		}
 	}
@@ -225,6 +245,7 @@ func gatherAliases(id, mID, commonNames, identifiers string) []string {
 	if mID != "" {
 		// OpenNGC M field is just the number sometimes, or "Mxx"
 		mNum := strings.TrimPrefix(mID, "M")
+
 		mNum = strings.TrimLeft(mNum, "0")
 		if mNum != "" {
 			add("M " + mNum)
@@ -233,10 +254,11 @@ func gatherAliases(id, mID, commonNames, identifiers string) []string {
 		}
 	}
 
-	for _, a := range strings.Split(commonNames, ",") {
+	for a := range strings.SplitSeq(commonNames, ",") {
 		add(a)
 	}
-	for _, a := range strings.Split(identifiers, ",") {
+
+	for a := range strings.SplitSeq(identifiers, ",") {
 		add(a)
 	}
 
@@ -247,11 +269,13 @@ func parseRA(s string) (float64, error) {
 	// HH:MM:SS.SS
 	parts := strings.Split(s, ":")
 	if len(parts) != 3 {
-		return 0, fmt.Errorf("invalid RA format")
+		return 0, errors.New("invalid RA format")
 	}
+
 	h, _ := strconv.ParseFloat(parts[0], 64)
 	m, _ := strconv.ParseFloat(parts[1], 64)
 	sVal, _ := strconv.ParseFloat(parts[2], 64)
+
 	return h*15 + m/4 + sVal/240, nil
 }
 
@@ -267,20 +291,27 @@ func parseDec(s string) (float64, error) {
 
 	parts := strings.Split(s, ":")
 	if len(parts) != 3 {
-		return 0, fmt.Errorf("invalid Dec format")
+		return 0, errors.New("invalid Dec format")
 	}
+
 	d, _ := strconv.ParseFloat(parts[0], 64)
 	m, _ := strconv.ParseFloat(parts[1], 64)
 	sVal, _ := strconv.ParseFloat(parts[2], 64)
+
 	return sign * (d + m/60 + sVal/3600), nil
 }
 
-func writeRuntimeCSV(path string, records []targetRecord) error {
+func writeRuntimeCSV(path string, records []targetRecord) (err error) {
 	f, err := os.Create(path)
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer func() {
+		cerr := f.Close()
+		if cerr != nil {
+			err = errors.Join(err, cerr)
+		}
+	}()
 
 	w := csv.NewWriter(f)
 	// Output format: id,name,kind,ra_deg,dec_deg,aliases(semicolon separated),vmag,bmag
@@ -289,7 +320,7 @@ func writeRuntimeCSV(path string, records []targetRecord) error {
 	}
 
 	for _, rec := range records {
-		if err := w.Write([]string{
+		err := w.Write([]string{
 			rec.ID,
 			rec.Name,
 			rec.Kind,
@@ -298,10 +329,13 @@ func writeRuntimeCSV(path string, records []targetRecord) error {
 			strings.Join(rec.Aliases, ";"),
 			rec.VMag,
 			rec.BMag,
-		}); err != nil {
+		})
+		if err != nil {
 			return err
 		}
 	}
+
 	w.Flush()
+
 	return w.Error()
 }

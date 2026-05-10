@@ -24,6 +24,7 @@ func ParseCSV(r io.Reader) ([]resolve.Target, error) {
 		if err == io.EOF {
 			return nil, nil
 		}
+
 		return nil, fmt.Errorf("simbad: failed to read CSV header: %w", err)
 	}
 
@@ -49,6 +50,7 @@ func ParseCSV(r io.Reader) ([]resolve.Target, error) {
 		if err == io.EOF {
 			break
 		}
+
 		if err != nil {
 			return nil, fmt.Errorf("simbad: failed to read CSV row: %w", err)
 		}
@@ -63,6 +65,7 @@ func ParseCSV(r io.Reader) ([]resolve.Target, error) {
 					existing.Aliases = append(existing.Aliases, alias)
 				}
 			}
+
 			continue
 		}
 
@@ -70,9 +73,12 @@ func ParseCSV(r io.Reader) ([]resolve.Target, error) {
 		decStr := row[colIdx["dec"]]
 
 		var c coord.ICRS
+
 		hasCoord := false
+
 		if raStr != "" && decStr != "" {
 			raDeg, errRA := strconv.ParseFloat(raStr, 64)
+
 			decDeg, errDec := strconv.ParseFloat(decStr, 64)
 			if errRA == nil && errDec == nil {
 				c = coord.NewICRS(angle.Deg(raDeg), angle.Deg(decDeg))
@@ -102,16 +108,19 @@ func ParseCSV(r io.Reader) ([]resolve.Target, error) {
 					t.PmRA = angle.Arcsec(v / 1000.0)
 				}
 			}
+
 			if pmDecStr, ok := colIdx["pmdec"]; ok && row[pmDecStr] != "" {
 				if v, err := strconv.ParseFloat(row[pmDecStr], 64); err == nil {
 					t.PmDec = angle.Arcsec(v / 1000.0)
 				}
 			}
+
 			if plxStr, ok := colIdx["plx_value"]; ok && row[plxStr] != "" {
 				if v, err := strconv.ParseFloat(row[plxStr], 64); err == nil {
 					t.Parallax = angle.Arcsec(v / 1000.0)
 				}
 			}
+
 			if rvStr, ok := colIdx["rvz_radvel"]; ok && row[rvStr] != "" {
 				if v, err := strconv.ParseFloat(row[rvStr], 64); err == nil {
 					t.RadialVelocity = v

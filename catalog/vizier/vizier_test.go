@@ -19,7 +19,10 @@ func TestVizierOfflineConeSearch(t *testing.T) {
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/csv")
-		fmt.Fprint(w, csvData)
+
+		if _, err := fmt.Fprint(w, csvData); err != nil {
+			t.Errorf("failed to write response: %v", err)
+		}
 	}))
 	defer server.Close()
 
@@ -34,11 +37,14 @@ func TestVizierOfflineConeSearch(t *testing.T) {
 	iter := prov.ConeSearch(context.Background(), req)
 
 	var targets []resolve.Target
+
 	iter(func(tar resolve.Target, err error) bool {
 		if err != nil {
 			t.Fatalf("Unexpected err: %v", err)
 		}
+
 		targets = append(targets, tar)
+
 		return true
 	})
 
@@ -58,6 +64,7 @@ func (m *mockTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	m.Handler.ServeHTTP(rec, req)
 	resp := rec.Result()
 	resp.Request = req
+
 	return resp, nil
 }
 
@@ -66,6 +73,7 @@ func TestProviderInterface(t *testing.T) {
 	if p.Name() != "vizier" {
 		t.Errorf("expected vizier, got %s", p.Name())
 	}
+
 	caps := p.Capabilities()
 	if len(caps) != 1 || caps[0] != resolve.CapConeSearch {
 		t.Errorf("expected CapConeSearch, got %v", caps)
@@ -75,6 +83,7 @@ func TestProviderInterface(t *testing.T) {
 	if ok {
 		t.Error("expected Resolve to return false")
 	}
+
 	if p.Search("foo") != nil {
 		t.Error("expected Search to return nil")
 	}

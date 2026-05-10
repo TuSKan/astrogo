@@ -1,6 +1,7 @@
 package jpl_test
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/TuSKan/astrogo/ephemeris/core"
@@ -13,17 +14,18 @@ func BenchmarkEvalChebyshev(b *testing.B) {
 	for i := range coeffs {
 		coeffs[i] = 0.1 * float64(i)
 	}
+
 	tau := 0.5
 	radius := 100.0
 
 	b.Run("PositionOnly", func(b *testing.B) {
-		for i := 0; i < b.N; i++ {
+		for range b.N {
 			spk.EvalChebyshev(coeffs, tau, radius, false)
 		}
 	})
 
 	b.Run("WithDerivative", func(b *testing.B) {
-		for i := 0; i < b.N; i++ {
+		for range b.N {
 			spk.EvalChebyshev(coeffs, tau, radius, true)
 		}
 	})
@@ -34,11 +36,12 @@ func BenchmarkFindSegment(b *testing.B) {
 
 	// Mock 100 kernels, each with 10 targets, each target has 1 segment.
 	// Total 1,000 segments in Index.
-	for k := 0; k < 100; k++ {
+	for k := range 100 {
 		kernel := &jpl.Kernel{
 			Segments: make([]spk.Segment, 10),
 		}
-		for s := 0; s < 10; s++ {
+
+		for s := range 10 {
 			targetID := int32(k*10 + s)
 			kernel.Segments[s] = spk.Segment{
 				Target:  targetID,
@@ -46,10 +49,12 @@ func BenchmarkFindSegment(b *testing.B) {
 				EndET:   1e15,
 			}
 			ref := jpl.SegmentRef{KernelIndex: k, SegmentIndex: s}
+
 			p.Index = append(p.Index, ref)
 			if p.ByTarget[targetID] == nil {
 				p.ByTarget[targetID] = make([]jpl.SegmentRef, 0)
 			}
+
 			p.ByTarget[targetID] = append(p.ByTarget[targetID], ref)
 
 			// Update coverage
@@ -59,6 +64,7 @@ func BenchmarkFindSegment(b *testing.B) {
 				Count:   1,
 			}
 		}
+
 		p.Kernels = append(p.Kernels, kernel)
 	}
 
@@ -68,17 +74,20 @@ func BenchmarkFindSegment(b *testing.B) {
 	const searchTarget = int32(5)
 
 	b.Run("GlobalScan", func(b *testing.B) {
-		for i := 0; i < b.N; i++ {
+		for range b.N {
 			et := 0.0
 			found := false
-			for j := len(p.Index) - 1; j >= 0; j-- {
-				ref := p.Index[j]
+
+			for _, v := range slices.Backward(p.Index) {
+				ref := v
+
 				seg := &p.Kernels[ref.KernelIndex].Segments[ref.SegmentIndex]
 				if seg.Target == searchTarget && et >= seg.StartET && et <= seg.EndET {
 					found = true
 					break
 				}
 			}
+
 			if !found {
 				b.Fatal("not found")
 			}
@@ -86,7 +95,7 @@ func BenchmarkFindSegment(b *testing.B) {
 	})
 
 	b.Run("TargetScan", func(b *testing.B) {
-		for i := 0; i < b.N; i++ {
+		for range b.N {
 			_, err := p.FindSegment(searchTarget, 0.0)
 			if err != nil {
 				b.Fatalf("failed: %v", err)

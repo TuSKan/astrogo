@@ -52,6 +52,7 @@ type Resolver struct {
 // NewResolver instantiates remote and local catalog implementations securely.
 func NewResolver(sources ...Source) *Resolver {
 	var providers []Provider
+
 	for _, src := range sources {
 		switch src {
 		case OpenNGC:
@@ -72,6 +73,7 @@ func NewResolver(sources ...Source) *Resolver {
 			providers = append(providers, norad.New())
 		}
 	}
+
 	return &Resolver{providers: providers}
 }
 
@@ -111,10 +113,12 @@ func (r *Resolver) Search(query string) []Target {
 
 	unique := make([]Target, 0, len(all))
 	seen := make(map[string]bool)
+
 	for _, t := range all {
 		key := t.Catalog + ":" + t.ID
 		if !seen[key] {
 			seen[key] = true
+
 			unique = append(unique, t)
 		}
 	}
@@ -123,6 +127,7 @@ func (r *Resolver) Search(query string) []Target {
 		t     Target
 		score float64
 	}
+
 	scored := make([]scoredTarget, len(unique))
 	for i, t := range unique {
 		bestScore := resolve.Score(q, t.Name)
@@ -131,9 +136,11 @@ func (r *Resolver) Search(query string) []Target {
 				bestScore = s
 			}
 		}
+
 		if s := resolve.Score(q, t.ID); s > bestScore {
 			bestScore = s
 		}
+
 		scored[i] = scoredTarget{t, bestScore}
 	}
 
@@ -141,13 +148,10 @@ func (r *Resolver) Search(query string) []Target {
 		return scored[i].score > scored[j].score
 	})
 
-	limit := 10
-	if len(scored) < limit {
-		limit = len(scored)
-	}
+	limit := min(len(scored), 10)
 
 	final := make([]Target, limit)
-	for i := 0; i < limit; i++ {
+	for i := range limit {
 		final[i] = scored[i].t
 	}
 

@@ -30,6 +30,7 @@ func (ZeroModel) EOP(_ float64) (EOP, error) {
 	return EOP{}, nil
 }
 
+//nolint:gochecknoglobals // singleton EOP model with RWMutex guard
 var (
 	modelMu     sync.RWMutex
 	globalModel Model = ZeroModel{}
@@ -40,6 +41,7 @@ var (
 func RegisterModel(m Model) {
 	modelMu.Lock()
 	defer modelMu.Unlock()
+
 	globalModel = m
 }
 
@@ -47,5 +49,6 @@ func RegisterModel(m Model) {
 func GetModel() Model {
 	modelMu.RLock()
 	defer modelMu.RUnlock()
+
 	return globalModel
 }

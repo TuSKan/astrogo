@@ -16,6 +16,7 @@ func TestAssertNoError_nil(t *testing.T) {
 func TestAssertNoError_nonNil(t *testing.T) {
 	spy := &tbSpy{TB: t}
 	testutil.AssertNoError(spy, errors.New("oops"))
+
 	if !spy.failed {
 		t.Errorf("AssertNoError did not fail for non-nil error")
 	}
@@ -30,6 +31,7 @@ func TestAssertError_nonNil(t *testing.T) {
 func TestAssertError_nil(t *testing.T) {
 	spy := &tbSpy{TB: t}
 	testutil.AssertError(spy, nil)
+
 	if !spy.failed {
 		t.Errorf("AssertError did not fail for nil error")
 	}
@@ -44,6 +46,7 @@ func TestAssertErrorContains_match(t *testing.T) {
 func TestAssertErrorContains_substring_not_found(t *testing.T) {
 	spy := &tbSpy{TB: t}
 	testutil.AssertErrorContains(spy, errors.New("timeout"), "refused")
+
 	if !spy.failed {
 		t.Errorf("AssertErrorContains did not fail when substring absent")
 	}
@@ -52,6 +55,7 @@ func TestAssertErrorContains_substring_not_found(t *testing.T) {
 func TestAssertErrorContains_nil_error(t *testing.T) {
 	spy := &tbSpy{TB: t}
 	testutil.AssertErrorContains(spy, nil, "anything")
+
 	if !spy.failed {
 		t.Errorf("AssertErrorContains did not fail for nil error")
 	}
@@ -69,6 +73,7 @@ func TestAssertErrorIs_match(t *testing.T) {
 func TestAssertErrorIs_no_match(t *testing.T) {
 	spy := &tbSpy{TB: t}
 	testutil.AssertErrorIs(spy, errors.New("unrelated"), errSentinel)
+
 	if !spy.failed {
 		t.Errorf("AssertErrorIs did not fail for non-matching error")
 	}
@@ -77,6 +82,7 @@ func TestAssertErrorIs_no_match(t *testing.T) {
 func TestAssertErrorIs_nil_error(t *testing.T) {
 	spy := &tbSpy{TB: t}
 	testutil.AssertErrorIs(spy, nil, errSentinel)
+
 	if !spy.failed {
 		t.Errorf("AssertErrorIs did not fail for nil error")
 	}
@@ -88,6 +94,7 @@ func TestCaseLabel(t *testing.T) {
 	if got := testutil.CaseLabel(0, ""); got != "case[0]" {
 		t.Errorf("CaseLabel(0, \"\") = %q, want \"case[0]\"", got)
 	}
+
 	if got := testutil.CaseLabel(3, "wraparound"); got != "case[3] (wraparound)" {
 		t.Errorf("CaseLabel(3, \"wraparound\") = %q", got)
 	}
@@ -98,6 +105,7 @@ func TestCaseLabel(t *testing.T) {
 func TestFailCase_records_failure(t *testing.T) {
 	spy := &tbSpy{TB: t}
 	testutil.FailCase(spy, 2, "my case", "got %d, want %d", 1, 2)
+
 	if !spy.failed {
 		t.Errorf("FailCase did not mark test as failed")
 	}

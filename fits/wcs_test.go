@@ -20,17 +20,20 @@ func TestExtractWCS(t *testing.T) {
 
 	wcs, err := ExtractWCS(h)
 	testutil.AssertNoError(t, err)
+
 	if wcs.GetCRVAL()[0] != 10.0 || wcs.GetCRVAL()[1] != 20.0 {
 		t.Errorf("expected CRVAL 10.0, 20.0, got %v", wcs.GetCRVAL())
 	}
 
 	h2 := NewHeader()
+
 	_, err = ExtractWCS(h2)
 	if err == nil {
 		t.Errorf("expected error missing NAXIS")
 	}
 
 	h2.Append(Card{Keyword: "NAXIS", Value: "0"})
+
 	_, err = ExtractWCS(h2)
 	if err == nil {
 		t.Errorf("expected error for NAXIS <= 0")

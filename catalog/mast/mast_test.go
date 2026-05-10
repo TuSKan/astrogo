@@ -24,7 +24,10 @@ func TestMastOfflineResolve(t *testing.T) {
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		fmt.Fprint(w, jsonPayload)
+
+		if _, err := fmt.Fprint(w, jsonPayload); err != nil {
+			t.Errorf("failed to write response: %v", err)
+		}
 	}))
 	defer server.Close()
 
@@ -35,9 +38,12 @@ func TestMastOfflineResolve(t *testing.T) {
 	iter := prov.ResolveObject(context.Background(), req)
 
 	var targets []resolve.Target
+
 	iter(func(tar resolve.Target, err error) bool {
 		testutil.AssertNoError(t, err)
+
 		targets = append(targets, tar)
+
 		return true
 	})
 
@@ -59,6 +65,7 @@ func (m *mockTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	m.Handler.ServeHTTP(rec, req)
 	resp := rec.Result()
 	resp.Request = req
+
 	return resp, nil
 }
 
@@ -67,10 +74,12 @@ func TestProviderInterface(t *testing.T) {
 	if p.Name() != "mast" {
 		t.Errorf("expected mast, got %s", p.Name())
 	}
+
 	caps := p.Capabilities()
 	if len(caps) != 2 || caps[0] != resolve.CapObjectResolution || caps[1] != resolve.CapConeSearch {
 		t.Errorf("expected CapObjectResolution and CapConeSearch, got %v", caps)
 	}
+
 	_, _ = p.Resolve("non_existent_body")
 	_ = p.Search("non_existent_body")
 }

@@ -42,6 +42,7 @@ func NewComet(name string, id eph.ID, provider eph.Provider, m1, k1 float64, opt
 	for _, opt := range opts {
 		opt(c)
 	}
+
 	return c
 }
 
@@ -54,10 +55,12 @@ func (c *Comet) Position(t time.Time) (coord.ICRS, error) {
 	if err != nil {
 		return coord.ICRS{}, fmt.Errorf("comet: ephemeris error for %s: %w", c.name, err)
 	}
+
 	icrs, err := eph.ToICRS(pos)
 	if err != nil {
 		return coord.ICRS{}, fmt.Errorf("comet: coordinate conversion error for %s: %w", c.name, err)
 	}
+
 	return icrs, nil
 }
 
@@ -75,6 +78,7 @@ func (c *Comet) ApparentMagnitude(t time.Time) (float64, error) {
 	if err != nil {
 		return 0, err
 	}
+
 	return mag.CometApparent(c.M1, c.K1, r, delta), nil
 }
 
@@ -88,14 +92,17 @@ func (c *Comet) distances(t time.Time) (r, delta float64, err error) {
 	if err != nil {
 		return 0, 0, err
 	}
+
 	sunSt, err := c.provider.State(eph.Sun, t)
 	if err != nil {
 		return 0, 0, err
 	}
+
 	delta = st.Distance()
 	hx := st.Pos.X - sunSt.Pos.X
 	hy := st.Pos.Y - sunSt.Pos.Y
 	hz := st.Pos.Z - sunSt.Pos.Z
 	r = math.Sqrt(hx*hx + hy*hy + hz*hz)
+
 	return r, delta, nil
 }

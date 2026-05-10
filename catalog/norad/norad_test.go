@@ -28,7 +28,9 @@ const issFixture = `[{
 
 func TestParseGPJSON(t *testing.T) {
 	var gps []GP
-	if err := json.Unmarshal([]byte(issFixture), &gps); err != nil {
+
+	err := json.Unmarshal([]byte(issFixture), &gps)
+	if err != nil {
 		t.Fatalf("Failed to parse ISS fixture: %v", err)
 	}
 
@@ -41,24 +43,31 @@ func TestParseGPJSON(t *testing.T) {
 	if gp.ObjectName != "ISS (ZARYA)" {
 		t.Errorf("ObjectName = %q, want %q", gp.ObjectName, "ISS (ZARYA)")
 	}
+
 	if gp.ObjectID != "1998-067A" {
 		t.Errorf("ObjectID = %q, want %q", gp.ObjectID, "1998-067A")
 	}
+
 	if gp.NoradCatID != 25544 {
 		t.Errorf("NoradCatID = %d, want 25544", gp.NoradCatID)
 	}
+
 	if gp.Inclination < 51.0 || gp.Inclination > 52.0 {
 		t.Errorf("Inclination = %f, expected ~51.6", gp.Inclination)
 	}
+
 	if gp.Eccentricity < 0 || gp.Eccentricity > 0.01 {
 		t.Errorf("Eccentricity = %f, expected near-circular", gp.Eccentricity)
 	}
+
 	if gp.MeanMotion < 15 || gp.MeanMotion > 16 {
 		t.Errorf("MeanMotion = %f, expected ~15.5 rev/day for ISS", gp.MeanMotion)
 	}
+
 	if gp.BStar <= 0 {
 		t.Errorf("BStar = %f, expected positive for LEO", gp.BStar)
 	}
+
 	if gp.Classification != "U" {
 		t.Errorf("Classification = %q, want U", gp.Classification)
 	}
@@ -88,7 +97,9 @@ func TestEpochTime(t *testing.T) {
 
 func TestToTLE(t *testing.T) {
 	var gps []GP
-	if err := json.Unmarshal([]byte(issFixture), &gps); err != nil {
+
+	err := json.Unmarshal([]byte(issFixture), &gps)
+	if err != nil {
 		t.Fatalf("Failed to parse: %v", err)
 	}
 
@@ -98,12 +109,15 @@ func TestToTLE(t *testing.T) {
 	if len(line1) != 69 {
 		t.Errorf("TLE line 1 length = %d, want 69", len(line1))
 	}
+
 	if len(line2) != 69 {
 		t.Errorf("TLE line 2 length = %d, want 69", len(line2))
 	}
+
 	if line1[0] != '1' {
 		t.Errorf("TLE line 1 should start with '1', got %c", line1[0])
 	}
+
 	if line2[0] != '2' {
 		t.Errorf("TLE line 2 should start with '2', got %c", line2[0])
 	}
@@ -133,12 +147,15 @@ func TestGPToTarget(t *testing.T) {
 	if target.ID != "25544" {
 		t.Errorf("Target.ID = %q, want %q", target.ID, "25544")
 	}
+
 	if target.Name != "ISS (ZARYA)" {
 		t.Errorf("Target.Name = %q, want %q", target.Name, "ISS (ZARYA)")
 	}
+
 	if target.Catalog != "norad" {
 		t.Errorf("Target.Catalog = %q, want %q", target.Catalog, "norad")
 	}
+
 	if target.Kind != "Satellite" {
 		t.Errorf("Target.Kind = %q, want %q", target.Kind, "Satellite")
 	}
@@ -159,6 +176,7 @@ func TestFormatTLEExp(t *testing.T) {
 		if len(got) == 0 {
 			t.Errorf("formatTLEExp(%f) returned empty string", tt.input)
 		}
+
 		t.Logf("formatTLEExp(%e) = %q", tt.input, got)
 	}
 }
@@ -171,7 +189,9 @@ const multiFixture = `[
 
 func TestParseMultiGP(t *testing.T) {
 	var gps []GP
-	if err := json.Unmarshal([]byte(multiFixture), &gps); err != nil {
+
+	err := json.Unmarshal([]byte(multiFixture), &gps)
+	if err != nil {
 		t.Fatalf("Failed to parse multi fixture: %v", err)
 	}
 
@@ -182,6 +202,7 @@ func TestParseMultiGP(t *testing.T) {
 	if gps[0].ObjectName != "ISS (ZARYA)" {
 		t.Errorf("First object = %q, want ISS", gps[0].ObjectName)
 	}
+
 	if gps[1].ObjectName != "CSS (TIANHE)" {
 		t.Errorf("Second object = %q, want CSS", gps[1].ObjectName)
 	}

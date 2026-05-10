@@ -20,12 +20,14 @@ func (p *mockProvider) Resolve(query string) (Target, bool) {
 
 func (p *mockProvider) Search(query string) []Target {
 	var res []Target
+
 	q := resolve.Normalize(query)
 	for _, t := range p.targets {
 		if resolve.Normalize(t.Name) == q || resolve.Normalize(t.ID) == q {
 			res = append(res, t)
 		}
 	}
+
 	return res
 }
 
@@ -64,6 +66,7 @@ func TestResolver_Resolve(t *testing.T) {
 				t.Errorf("Resolve() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
+
 			if err == nil && got.ID != tt.wantID {
 				t.Errorf("Resolve() got ID = %v, want %v", got.ID, tt.wantID)
 			}
@@ -88,13 +91,16 @@ func TestResolver_ProviderPriority(t *testing.T) {
 	}
 
 	r := &Resolver{providers: []resolve.Provider{p1, p2}}
+
 	got, err := r.Resolve("target")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+
 	if got.Catalog != "p1" {
 		t.Errorf("expected p1 (first provider), got catalog=%s", got.Catalog)
 	}
+
 	if got.Name != "Target 1" {
 		t.Errorf("expected 'Target 1', got %q", got.Name)
 	}
@@ -125,8 +131,9 @@ func BenchmarkResolve(b *testing.B) {
 			"m42": {ID: "m42", Name: "Orion Nebula", Catalog: "p"},
 		},
 	}
+
 	r := &Resolver{providers: []resolve.Provider{p}}
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		_, _ = r.Resolve("M42")
 	}
 }

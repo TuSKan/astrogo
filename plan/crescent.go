@@ -104,6 +104,7 @@ func (p *CrescentParams) Maunder() bool {
 func (p *CrescentParams) Ilyas1988() bool {
 	d := p.DAZ
 	limit := -0.0027356815*d - 0.0136648716*d*d + 0.0002119205*d*d*d + 10.2832719598
+
 	return p.ArcV >= limit
 }
 
@@ -115,6 +116,7 @@ func (p *CrescentParams) Ilyas1988() bool {
 func (p *CrescentParams) Fatoohi() bool {
 	d := p.DAZ
 	limit := 10.7638 + 0.0356*d - 0.0164*d*d + 0.0004*d*d*d
+
 	return p.ArcV >= limit
 }
 
@@ -126,6 +128,7 @@ func (p *CrescentParams) Fatoohi() bool {
 func (p *CrescentParams) KraussAthenian() bool {
 	d := p.DAZ
 	limit := 0.0291254840*d - 0.0098347831*d*d + 0.0000475196*d*d*d + 10.5981838905
+
 	return p.ArcV >= limit
 }
 
@@ -202,6 +205,7 @@ func (p *CrescentParams) Ilyas1984() bool {
 func (p *CrescentParams) Bruin() bool {
 	w := p.W
 	limit := 11.5621745317 - 7.944238328*w + 3.2608487770*w*w - 0.4559413249*w*w*w
+
 	return p.ArcV >= limit
 }
 
@@ -214,6 +218,7 @@ func (p *CrescentParams) Bruin() bool {
 func (p *CrescentParams) AlrefayNakedEye() bool {
 	w := p.W
 	limit := 9.34 - 4.51*w + 3.3*w*w - 1.01*w*w*w
+
 	return p.ArcV > limit
 }
 
@@ -352,6 +357,7 @@ func (p *CrescentParams) CaldwellOptical() bool {
 func (p *CrescentParams) Gautschy() bool {
 	d := p.DAZ
 	limit := 0.3342328913*d - 0.0715608980*d*d + 0.0009924422*d*d*d + 33.8890455442
+
 	return p.LT >= limit
 }
 
@@ -430,6 +436,7 @@ func (r CrescentResult) String() string {
 		if b {
 			return "Visible"
 		}
+
 		return "Not visible"
 	}
 
@@ -506,14 +513,17 @@ func NewCrescentParams(t time.Time, loc *coord.Geodetic, prov eph.Provider) (Cre
 	if err != nil {
 		return CrescentParams{}, fmt.Errorf("crescent: sun position: %w", err)
 	}
+
 	moonPos, err := eph.Position(prov, eph.Moon, t)
 	if err != nil {
 		return CrescentParams{}, fmt.Errorf("crescent: moon position: %w", err)
 	}
+
 	sunICRS, err := eph.ToICRS(sunPos)
 	if err != nil {
 		return CrescentParams{}, fmt.Errorf("crescent: sun ICRS: %w", err)
 	}
+
 	moonICRS, err := eph.ToICRS(moonPos)
 	if err != nil {
 		return CrescentParams{}, fmt.Errorf("crescent: moon ICRS: %w", err)
@@ -521,10 +531,12 @@ func NewCrescentParams(t time.Time, loc *coord.Geodetic, prov eph.Provider) (Cre
 
 	// Topocentric AltAz for both bodies
 	ctx := coord.NewContext(t, loc, atmosphere.Atmosphere{})
+
 	sunAltAz, err := ctx.ICRSToAltAz(sunICRS)
 	if err != nil {
 		return CrescentParams{}, fmt.Errorf("crescent: sun altaz: %w", err)
 	}
+
 	moonAltAz, err := ctx.ICRSToAltAz(moonICRS)
 	if err != nil {
 		return CrescentParams{}, fmt.Errorf("crescent: moon altaz: %w", err)
@@ -550,6 +562,7 @@ func NewCrescentParams(t time.Time, loc *coord.Geodetic, prov eph.Provider) (Cre
 	// W: topocentric crescent width (arc minutes)
 	// W ≈ SD × (1 − cos(elongation)), where SD ≈ 15.5' (mean lunar semi-diameter)
 	const moonSD = 15.5 // arc minutes
+
 	w := moonSD * (1.0 - math.Cos(arcL*math.Pi/180.0))
 
 	// LT: lag time estimate (minutes)

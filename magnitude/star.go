@@ -31,6 +31,7 @@ func StarApparent(catMag, airmass float64, extinctionCoeff ...float64) float64 {
 	if len(extinctionCoeff) > 0 {
 		k = extinctionCoeff[0]
 	}
+
 	return catMag + k*airmass
 }
 
@@ -67,6 +68,7 @@ func ExtinctionAtAltitude(k0, altitudeM float64) float64 {
 func GaiaGToJohnsonV(G, bpMinusRp float64) float64 {
 	c := bpMinusRp
 	dV := -0.02704 + 0.01424*c - 0.2156*c*c + 0.01426*c*c*c
+
 	return G + dV
 }
 
@@ -79,5 +81,6 @@ func GaiaGToJohnsonV(G, bpMinusRp float64) float64 {
 func GaiaGToJohnsonB(G, bpMinusRp float64) float64 {
 	c := bpMinusRp
 	dB := -0.02907 + 0.6399*c - 0.09631*c*c + 0.01023*c*c*c
+
 	return G + dB
 }

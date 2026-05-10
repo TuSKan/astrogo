@@ -9,16 +9,16 @@ import (
 )
 
 func TestMMapOpenClose(t *testing.T) {
-	tmp, err := os.CreateTemp("", "test_mmap_*.fits")
+	tmp, err := os.CreateTemp(t.TempDir(), "test_mmap_*.fits")
 	if err != nil {
 		t.Fatalf("failed to create temp file: %v", err)
 	}
-	defer os.Remove(tmp.Name())
 
 	headerData := make([]byte, 2880)
-	for i := 0; i < 2880; i++ {
+	for i := range 2880 {
 		headerData[i] = ' '
 	}
+
 	copy(headerData, []byte(fmt.Sprintf("%-80s", "SIMPLE  =                    T / ")))
 	copy(headerData[80:], []byte(fmt.Sprintf("%-80s", "BITPIX  =                    8 / ")))
 	copy(headerData[160:], []byte(fmt.Sprintf("%-80s", "NAXIS   =                    0 / ")))
@@ -27,6 +27,7 @@ func TestMMapOpenClose(t *testing.T) {
 	if _, err := tmp.Write(headerData); err != nil {
 		t.Fatalf("failed to write header: %v", err)
 	}
+
 	if err := tmp.Close(); err != nil {
 		t.Fatalf("failed to close temp file: %v", err)
 	}
@@ -35,9 +36,11 @@ func TestMMapOpenClose(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to open mmap: %v", err)
 	}
+
 	if len(mapped.HDUs) != 1 {
 		t.Errorf("expected 1 hdu, got %d", len(mapped.HDUs))
 	}
+
 	err = mapped.Close()
 	if err != nil {
 		t.Errorf("failed to close mmap: %v", err)
@@ -59,6 +62,7 @@ func TestMMapSeeker(t *testing.T) {
 
 	// Read EOF bypassed
 	seeker.off = 10
+
 	n, err := seeker.Read(p)
 	if n != 0 || !errors.Is(err, io.EOF) {
 		t.Errorf("expected EOF, got n=%d, err=%v", n, err)

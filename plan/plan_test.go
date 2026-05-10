@@ -22,6 +22,7 @@ func TestPlanner(t *testing.T) {
 
 	planner, err := NewPlanner(site, constraints)
 	testutil.AssertNoError(t, err)
+
 	tm := time.NowUTC()
 
 	objs := []Observable{
@@ -57,6 +58,7 @@ func TestObservableWindows_Fixed(t *testing.T) {
 		if len(windows) != 1 {
 			t.Errorf("expected 1 window, got %d", len(windows))
 		}
+
 		if !windows[0].Start.Equal(start) || !windows[0].End.Equal(end) {
 			t.Errorf("window range mismatch: %v - %v", windows[0].Start, windows[0].End)
 		}
@@ -101,6 +103,7 @@ type flipConstraint struct {
 func (f *flipConstraint) Check(_ Observable, _ time.Time, _ *Site) (Result, error) {
 	f.count++
 	pass := f.count%2 == 0
+
 	return Result{Pass: pass}, nil
 }
 
@@ -149,9 +152,11 @@ func TestIsObservable(t *testing.T) {
 		}
 		eval, err := IsObservable(obj, tm, site, constraints...)
 		testutil.AssertNoError(t, err)
+
 		if !eval.Observable {
 			t.Errorf("Expected observable, got evaluation: %+v", eval)
 		}
+
 		if len(eval.Results) != 2 {
 			t.Errorf("Expected 2 results, got %d", len(eval.Results))
 		}
@@ -164,15 +169,19 @@ func TestIsObservable(t *testing.T) {
 		}
 		eval, err := IsObservable(obj, tm, site, constraints...)
 		testutil.AssertNoError(t, err)
+
 		if eval.Observable {
 			t.Error("Expected NOT observable")
 		}
+
 		if len(eval.Results) != 2 {
 			t.Errorf("Expected 2 results, got %d", len(eval.Results))
 		}
+
 		if eval.Results[0].Pass {
 			t.Error("Expected first constraint to fail")
 		}
+
 		if !eval.Results[1].Pass {
 			t.Error("Expected second constraint to pass")
 		}
@@ -188,6 +197,7 @@ func TestIsObservable(t *testing.T) {
 		sun := NewSun(eph.Default())
 		eval, err := IsObservable(sun, tm, site, Altitude{Threshold: angle.Deg(80)})
 		testutil.AssertNoError(t, err)
+
 		if eval.Observable {
 			t.Error("Expected Sun to be below 80 deg threshold (it's at ~67 deg)")
 		}
@@ -220,6 +230,7 @@ func TestScoreObservable(t *testing.T) {
 
 		s, err := ScoreObservable(obj, tm, site, nil, nil, c)
 		testutil.AssertNoError(t, err)
+
 		if s != 0 {
 			t.Errorf("Expected score 0 for failing constraint, got %f", s)
 		}
@@ -239,6 +250,7 @@ func TestScoreObservable(t *testing.T) {
 		if sAlt <= 0 {
 			t.Errorf("Expected positive altitude score, got %f", sAlt)
 		}
+
 		if sUrg <= 0 {
 			t.Errorf("Expected positive urgency score, got %f", sUrg)
 		}
@@ -248,6 +260,7 @@ func TestScoreObservable(t *testing.T) {
 		obj := NewStar("T", angle.Hour(18.69), angle.Deg(0))
 		s, err := ScoreObservable(obj, tm, site, nil, nil) // Default config
 		testutil.AssertNoError(t, err)
+
 		if s <= 0 {
 			t.Errorf("Expected positive composite score for visible target, got %f", s)
 		}
@@ -256,6 +269,7 @@ func TestScoreObservable(t *testing.T) {
 
 type prioritizedTarget struct {
 	Observable
+
 	priority float64
 }
 
@@ -290,6 +304,7 @@ func TestRankObservables(t *testing.T) {
 		if len(ranked) != 2 {
 			t.Errorf("Expected 2 ranked targets, got %d", len(ranked))
 		}
+
 		if ranked[0].Object.Name() != objs[0].Name() {
 			t.Error("Priority should have pushed lower altitude target to first place")
 		}

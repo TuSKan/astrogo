@@ -9,6 +9,7 @@ import (
 // ASCII Tables use string formatting natively.
 type AsciiTableHDU struct {
 	basicHDU
+
 	Rows    int // NAXIS2
 	Cols    int // TFIELDS
 	RowSize int // NAXIS1
@@ -50,6 +51,7 @@ func ReadAsciiTable(h *Header, r io.Reader) (*AsciiTableHDU, error) {
 	paddingBytes := int(totalPayloadBytes) % BlockSize
 	if paddingBytes != 0 {
 		padLen := BlockSize - paddingBytes
+
 		padBuf := make([]byte, padLen)
 		if _, err := io.ReadFull(r, padBuf); err != nil {
 			return nil, fmt.Errorf("fits: failed reading asciitable padding: %w", err)

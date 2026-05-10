@@ -31,6 +31,7 @@ func TestUnitCompatibility(t *testing.T) {
 	if !unit.Meter.Compatible(unit.Kilometer) {
 		t.Error("Meter should be compatible with Kilometer")
 	}
+
 	if unit.Meter.Compatible(unit.Second) {
 		t.Error("Meter should not be compatible with Second")
 	}

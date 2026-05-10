@@ -49,6 +49,7 @@ func NewContext(t time.Time, site *Geodetic, atm atmosphere.Atmosphere) *Context
 	t = t.UTC()
 	jd1, jd2 := t.JDParts()
 	mjd := (jd1 - 2400000.5) + jd2
+
 	eop, err := iers.GetModel().EOP(mjd)
 	if err != nil {
 		warnEOPOnce.Do(func() {
@@ -76,9 +77,11 @@ func NewContext(t time.Time, site *Geodetic, atm atmosphere.Atmosphere) *Context
 	sinLat, cosLat := math.Sincos(site.Lat().Radians())
 	sinLon, cosLon := math.Sincos(site.Lon().Radians())
 
-	const au = 149597870.7
-	const rEq = 6378.137
-	const f = 1.0 / 298.257223563
+	const (
+		au  = 149597870.7
+		rEq = 6378.137
+		f   = 1.0 / 298.257223563
+	)
 
 	cEarth := 1.0 / math.Sqrt(cosLat*cosLat+(1.0-f)*(1.0-f)*sinLat*sinLat)
 	sEarth := (1.0 - f) * (1.0 - f) * cEarth
@@ -139,6 +142,7 @@ func (ctx *Context) AstrometricToApparent(c Astrometric) Apparent {
 		c.PmRA().Radians(), c.PmDec().Radians(), c.Parallax().Radians(), c.RV(),
 		&ctx.astrom,
 	)
+
 	return NewApparent(angle.Rad(ri).Wrap360(), angle.Rad(di))
 }
 
@@ -202,9 +206,11 @@ func (ctx *Context) GeocentricToObserved(v vector.Vec3) AltAz {
 	if azimuth < 0 {
 		azimuth += 2 * math.Pi
 	}
+
 	altitude := math.Asin(U / topoVec.Norm())
 
 	alt := angle.Rad(altitude)
+
 	switch {
 	case ctx.atm.Model != nil:
 		alt += ctx.atm.Model.RefractFromTrue(alt, ctx.atm)
@@ -220,9 +226,11 @@ func (ctx *Context) GeocentricToObserved(v vector.Vec3) AltAz {
 		// horizon. Below −1° the tan(z) series diverges and refraction is
 		// negligible for practical purposes.
 		z := math.Pi/2 - altitude
+
 		const zMax = 91.0 * math.Pi / 180.0 // alt ≈ −1°
 		if z > 0 && z < zMax {
 			tz := math.Tan(z)
+
 			dR := ctx.astrom.Refa*tz + ctx.astrom.Refb*tz*tz*tz
 			if dR > 0 {
 				alt = angle.Rad(altitude + dR)
@@ -240,6 +248,7 @@ func (ctx *Context) GeocentricToObserved(v vector.Vec3) AltAz {
 func (ctx *Context) ICRSToAltAz(c ICRS) (AltAz, error) {
 	altaz := ctx.AstrometricToObserved(c.Astrometric())
 	altaz.SetDist(c.Dist())
+
 	return altaz, nil
 }
 
@@ -252,6 +261,7 @@ func (ctx *Context) ICRSToHourAngle(c ICRS) (angle.Angle, error) {
 		c.PmRA().Radians(), c.PmDec().Radians(), c.Parallax().Radians(), c.RV(),
 		&ctx.astrom,
 	)
+
 	return angle.Rad(ha).Wrap180(), nil
 }
 

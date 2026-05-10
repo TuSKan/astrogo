@@ -23,7 +23,9 @@ func Dir(subsystem string) (string, error) {
 	if err != nil {
 		base = os.TempDir()
 	}
+
 	dir := filepath.Join(base, appName, subsystem)
+
 	return dir, os.MkdirAll(dir, 0o755)
 }
 
@@ -35,9 +37,11 @@ func Path(subsystem, name string) (string, error) {
 	if err != nil {
 		base = os.TempDir()
 	}
+
 	p := filepath.Join(base, appName, subsystem, filepath.FromSlash(name))
 	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
 		return "", err
 	}
+
 	return p, nil
 }

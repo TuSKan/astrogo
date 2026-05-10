@@ -38,9 +38,11 @@ type TargetDetails struct {
 func (d TargetDetails) String() string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "%s\n", strings.ToUpper(d.Name))
+
 	if d.Description != "" {
 		fmt.Fprintf(&b, "%s\n\n", d.Description)
 	}
+
 	if d.Source != "" {
 		fmt.Fprintf(&b, "%s\n\n", d.Source)
 	}
@@ -48,11 +50,13 @@ func (d TargetDetails) String() string {
 	if d.Magnitude != "" {
 		fmt.Fprintf(&b, "Magnitude:\t%s\n", d.Magnitude)
 	}
+
 	fmt.Fprintf(&b, "RA (ICRS):\t%s\n", d.RA.HMSString(1))
 	fmt.Fprintf(&b, "Dec (ICRS):\t%s\n", d.Dec.DMSString(0))
 	fmt.Fprintf(&b, "Altitude:\t%s\n", d.Altitude.DMSString(0))
 	fmt.Fprintf(&b, "Azimuth:\t%s\n", d.Azimuth.DMSString(0))
 	fmt.Fprintf(&b, "Distance:\t%.4f %s\n", d.Distance, d.DistanceUnit)
+
 	if d.AngularSize != "" {
 		fmt.Fprintf(&b, "Angular size(s):\t%s\n", d.AngularSize)
 	}
@@ -61,14 +65,17 @@ func (d TargetDetails) String() string {
 		fmt.Fprintf(&b, "Rise time:\t%s\n", d.RiseTime.ToGo().Format("03:04 pm"))
 		fmt.Fprintf(&b, "Rise azimuth:\t%s\n", d.RiseAzimuth.DMSString(0))
 	}
+
 	if d.TransitTime != nil {
 		fmt.Fprintf(&b, "Time of maximum elevation:\t%s\n", d.TransitTime.ToGo().Format("03:04 pm"))
 		fmt.Fprintf(&b, "Maximum elevation:\t%.1f°\n", d.MaxElevation.Degrees())
 	}
+
 	if d.SetTime != nil {
 		fmt.Fprintf(&b, "Set time:\t%s\n", d.SetTime.ToGo().Format("03:04 pm"))
 		fmt.Fprintf(&b, "Set azimuth:\t%s\n", d.SetAzimuth.DMSString(0))
 	}
+
 	if d.Elongation.Radians() != 0 {
 		fmt.Fprintf(&b, "Elongation:\t%.1f°\n", d.Elongation.Degrees())
 	}
@@ -79,15 +86,18 @@ func (d TargetDetails) String() string {
 		if v, ok := d.ExtraProps["Messier number"]; ok {
 			fmt.Fprintf(&b, "Messier number:\t%s\n", v)
 		}
+
 		if v, ok := d.ExtraProps["NGC/IC number"]; ok {
 			fmt.Fprintf(&b, "NGC/IC number:\t%s\n", v)
 		}
+
 		for k, v := range d.ExtraProps {
 			if k != "Messier number" && k != "NGC/IC number" {
 				fmt.Fprintf(&b, "%s:\t%s\n", k, v)
 			}
 		}
 	}
+
 	return b.String()
 }
 
@@ -104,6 +114,7 @@ func computeDetails(obs Observable, ctx *coord.Context, props ...string) (*Targe
 	if err != nil {
 		return nil, err
 	}
+
 	d.RA = pos.RA()
 	d.Dec = pos.Dec()
 
@@ -171,6 +182,7 @@ func fillMovingBody(d *TargetDetails, mb MovingBody, t time.Time, ctx *coord.Con
 	if _, isSat := mb.(*Satellite); isSat {
 		d.Distance = altaz.Dist()
 		d.DistanceUnit = "km"
+
 		return
 	}
 
@@ -212,12 +224,15 @@ func fillTypedProps(d *TargetDetails, obs Observable) {
 		if v.parallax.Radians() > 0 {
 			d.Distance = 1.0 / v.parallax.Arcseconds()
 		}
+
 		if v.pmRA.Radians() != 0 {
 			d.ExtraProps["Proper motion (RA)"] = fmt.Sprintf("%.2f mas/yr", v.pmRA.Arcseconds()*1000.0)
 		}
+
 		if v.pmDec.Radians() != 0 {
 			d.ExtraProps["Proper motion (Dec)"] = fmt.Sprintf("%.2f mas/yr", v.pmDec.Arcseconds()*1000.0)
 		}
+
 		fillAliasProps(d, v.aliases)
 	case *DeepSkyObject:
 		fillAliasProps(d, v.aliases)
@@ -232,6 +247,7 @@ func fillAliasProps(d *TargetDetails, aliases []string) {
 				d.ExtraProps["Messier number"] = strings.ReplaceAll(alias, " ", "")
 			}
 		}
+
 		if strings.HasPrefix(alias, "NGC") || strings.HasPrefix(alias, "IC") {
 			d.ExtraProps["NGC/IC number"] = alias
 		}
@@ -245,6 +261,7 @@ func applyProps(d *TargetDetails, props []string) {
 	for i := 0; i < len(props)-1; i += 2 {
 		key := props[i]
 		val := props[i+1]
+
 		switch key {
 		case "Description":
 			d.Description = val
@@ -280,14 +297,17 @@ func fillRiseSetTransit(d *TargetDetails, obs Observable, ctx *coord.Context) {
 		Observer:  site,
 		Threshold: angle.Deg(0),
 	}
+
 	events, err := solver.Find(spec, start, end)
 	if err != nil {
 		return
 	}
+
 	for _, ev := range events {
 		if !ev.Time.After(start) {
 			continue
 		}
+
 		switch ev.Kind {
 		case EventRise:
 			if d.RiseTime == nil {
@@ -316,8 +336,10 @@ func clamp(v, lo, hi float64) float64 {
 	if v < lo {
 		return lo
 	}
+
 	if v > hi {
 		return hi
 	}
+
 	return v
 }

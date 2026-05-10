@@ -16,9 +16,13 @@ func TestJPLResolveMock(t *testing.T) {
   "signature": {"version": "1.2", "source": "NASA/JPL Horizons API"},
   "result": "Multiple major-bodies match string \"Mars*\"\n\n  Number  Name                           Designation  IAU/aliases/other   \n  ------  -----------------------------  -----------  ------------------- \n     401  Mars Barycenter                                                 \n     499  Mars                                                            \n"
 }`
+
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		fmt.Fprint(w, jsonPayload)
+
+		if _, err := fmt.Fprint(w, jsonPayload); err != nil {
+			t.Errorf("failed to write response: %v", err)
+		}
 	}))
 	defer server.Close()
 
@@ -42,6 +46,7 @@ func (m *mockTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	m.Handler.ServeHTTP(rec, req)
 	resp := rec.Result()
 	resp.Request = req
+
 	return resp, nil
 }
 
@@ -50,9 +55,13 @@ func TestJPLErrorResponse(t *testing.T) {
   "signature": {"version": "1.2", "source": "NASA/JPL Horizons API"},
   "error": "unrecognized command"
 }`
+
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		fmt.Fprint(w, jsonPayload)
+
+		if _, err := fmt.Fprint(w, jsonPayload); err != nil {
+			t.Errorf("failed to write response: %v", err)
+		}
 	}))
 	defer server.Close()
 
@@ -65,9 +74,11 @@ func TestJPLErrorResponse(t *testing.T) {
 		if err == nil {
 			t.Fatalf("Expected explicit json payload error")
 		}
+
 		if err.Error() != "jpl: unrecognized command" {
 			t.Fatalf("Unexpected error mapping: %v", err)
 		}
+
 		return false
 	})
 }
@@ -75,6 +86,7 @@ func TestJPLErrorResponse(t *testing.T) {
 func TestProviderInterface(t *testing.T) {
 	p := New()
 	testutil.AssertEqual(t, "Name", p.Name(), "jpl")
+
 	caps := p.Capabilities()
 	if len(caps) != 1 || caps[0] != resolve.CapObjectResolution {
 		t.Errorf("expected CapObjectResolution, got %v", caps)

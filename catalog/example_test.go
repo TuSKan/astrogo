@@ -19,6 +19,7 @@ func Example_integration() {
 	// 2. Perform a live query to resolve the target mathematically
 	// We'll search for the Andromeda Galaxy (M31)
 	resolver := catalog.NewResolver(catalog.SIMBAD)
+
 	andromeda, err := resolver.Resolve("M31")
 	if err != nil {
 		fmt.Println("Failed to resolve target.")
@@ -31,6 +32,7 @@ func Example_integration() {
 	// 3. Integrate resolved catalog data into observational computations
 	// Let's create an Observatory on Earth (e.g. at Mauna Kea)
 	loc, _ := coord.NewGeodetic(angle.Deg(-155.4681), angle.Deg(19.8206), 4205.0)
+
 	obs, err := plan.NewSite("Mauna Kea", loc, angle.Deg(0), nil)
 	if err != nil {
 		fmt.Println("Failed to create site:", err)
@@ -42,6 +44,7 @@ func Example_integration() {
 
 	// Compute target's altitude and azimuth properties from the Observatory at that time
 	ctx := coord.NewContext(obsTime, obs.Location(), atmosphere.StandardAtmosphere)
+
 	altaz, err := ctx.ICRSToAltAz(andromeda.Coord)
 	if err != nil {
 		fmt.Println("Transform error:", err)

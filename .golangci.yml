@@ -1,52 +1,62 @@
 version: "2"
 
 linters:
-  default: none
+  default: all
   enable:
-    - govet
-    - errcheck
-    - staticcheck
-    - ineffassign
-    - noctx
-    - nilnil
-    - errorlint
-    - bodyclose
+    - gomodguard_v2
+  disable:
+    # ── Complexity: keep only one signal ───────────────────────────────
+    - cyclop          # redundant with gocognit for our purposes
+    - gocyclo         # redundant with gocognit for our purposes
+    - maintidx        # maintainability index too noisy for numerical/scientific code
+
+    # ── Not applicable to this project ────────────────────────────────
+    - depguard        # no dependency allowlist
+    - protogetter     # no protobuf
+    - testifylint     # no testify
+    - zerologlint     # no zerolog
+    - rowserrcheck    # no SQL
+    - sqlclosecheck   # no SQL
+
+    - spancheck       # no tracing
+    - canonicalheader # no canonical headers
+    - gosmopolitan    # no i18n
+    - musttag         # no struct tag enforcement
+    - tagliatelle     # no JSON naming convention
+
+    - gomodguard # deprecated since golangci-lint v2.12.0; replaced by gomodguard_v2
+
+
+    # ── Style choices (documented rationale) ──────────────────────────
+    - exhaustruct     # partial struct init is idiomatic Go
+    - varnamelen      # short vars (r, t, jd) standard in astronomy
+    - godox           # TODO/FIXME tracked in roadmap
+    - goheader        # no license header requirement
+    - nlreturn        # blank line before return is style
+    - wsl             # whitespace style preference
+    - godot           # comment periods are style
+    - decorder        # declaration order is logical, not alphabetical
+
 
   settings:
-    errcheck:
-      check-type-assertions: false
-      check-blank: false
+    gocognit:
+      min-complexity: 30
+    gocritic:
+      disabled-checks:
+        - captLocal   # IAU photometric notation (H, G, R, M1, M2)
+    gomodguard_v2:
+      local-replace-directives: true
 
   exclusions:
     rules:
-      # Deferred Close/Remove — errors are not actionable in cleanup paths
-      - text: "Error return value of .* is not checked"
-        source: "defer .*\\.Close\\(\\)"
+      # SOFA wrappers use named returns to document astronomical outputs (ra, dec, aob, zob, etc.)
+      - path: "internal/gofaext/"
         linters:
-          - errcheck
-      # Non-deferred Close in error recovery paths (SPK reader cleanup)
-      - text: "Error return value of .* is not checked"
-        source: "(r|file)\\.Close\\(\\)|os\\.Remove"
-        path: "ephemeris/jpl/spk/reader\\.go"
-        linters:
-          - errcheck
-      # nil,nil returns are valid API for optional event finders
-      - path: "plan/events\\.go"
-        linters:
-          - nilnil
-      # Examples are not production code
-      - path: "examples/"
-        linters:
-          - errcheck
-          - noctx
-          - ineffassign
-      # Test files — bodyclose, errcheck, nilnil, noctx
+          - nonamedreturns
+      # White-box tests — user will review what to export/refactor
       - path: "_test\\.go"
         linters:
-          - errcheck
-          - bodyclose
-          - nilnil
-          - noctx
+          - testpackage
 
 formatters:
   enable:
@@ -56,3 +66,6 @@ formatters:
   settings:
     gofmt:
       simplify: true
+    goimports:
+      local-prefixes:
+        - github.com/TuSKan/astrogo

@@ -8,6 +8,7 @@
 package main
 
 import (
+	"log"
 	"fmt"
 	"math"
 
@@ -23,13 +24,18 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	defer prov.Close()
+	defer func() {
+		if err := prov.Close(); err != nil {
+			log.Printf("failed to close provider: %v", err)
+		}
+	}()
 
 	// Jerusalem: 31°46'N, 35°14'E, altitude ~780m (Temple Mount)
 	loc, err := coord.NewGeodetic(angle.Deg(31.7683), angle.Deg(35.2137), 780.0)
 	if err != nil {
 		panic(err)
 	}
+
 	site, err := plan.NewSite("Jerusalem", loc, angle.Deg(0), time.LocationUTC)
 	if err != nil {
 		panic(err)
@@ -69,6 +75,7 @@ func main() {
 
 		// Year in historical notation
 		year, _, _, _ := e.Time.JulianCalendar()
+
 		yearStr := fmt.Sprintf("AD %d", year)
 		if year <= 0 {
 			yearStr = fmt.Sprintf("%d BC", 1-year)
@@ -88,11 +95,13 @@ func main() {
 		_ = sunErrR
 
 		isNight := false
+
 		if sunErr == nil && sunSet != nil {
 			// Night = after sunset and before next sunrise
 			if e.Time.After(sunSet.Time) {
 				isNight = true
 			}
+
 			if sunRise != nil && e.Time.Before(sunRise.Time) {
 				isNight = true
 			}
@@ -100,6 +109,7 @@ func main() {
 
 		// Check if Moon is above horizon at eclipse time
 		moonUp := false
+
 		moonRise, moonSet, moonErr := plan.MoonriseMoonset(dayStart, dayEnd, site, prov)
 		if moonErr == nil {
 			if moonRise != nil && moonSet != nil {
@@ -155,5 +165,6 @@ func repeat(ch rune, n int) string {
 	for i := range s {
 		s[i] = ch
 	}
+
 	return string(s)
 }

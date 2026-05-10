@@ -49,8 +49,8 @@ func (p *Provider) ConeSearch(ctx context.Context, req resolve.ConeRequest) reso
 	// Wait, the easiest way to do a vizier cone search across standard catalogues is using their REST/ConeSearch API, not TAP.
 	// But let's assume they want the standard II/246 (2MASS) for generic lookups if none specified.
 	// We will create a flexible TAP generator.
-
 	table := "II/246/out" // 2MASS point source catalog as a generic fallback baseline
+
 	limit := req.Limit
 	if limit <= 0 {
 		limit = 100
@@ -81,6 +81,7 @@ func (p *Provider) ConeSearch(ctx context.Context, req resolve.ConeRequest) reso
 	if err != nil {
 		return resolve.SliceSeq([]resolve.Target{})
 	}
+
 	httpReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 	return func(yield func(resolve.Target, error) bool) {
@@ -89,7 +90,12 @@ func (p *Provider) ConeSearch(ctx context.Context, req resolve.ConeRequest) reso
 			yield(resolve.Target{}, err)
 			return
 		}
-		defer resp.Body.Close()
+		defer func() {
+			cerr := resp.Body.Close()
+			if cerr != nil {
+				yield(resolve.Target{}, cerr)
+			}
+		}()
 
 		targets, err := parseCSV(resp.Body)
 		if err != nil {

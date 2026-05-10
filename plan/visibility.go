@@ -24,11 +24,14 @@ func IsVisible(obj coord.Object, t time.Time, site *Site, minAlt angle.Angle) (b
 	if err != nil {
 		return false, err
 	}
+
 	ctx := coord.NewContext(t, site.Location(), site.Atmosphere())
+
 	aa, err := ctx.ICRSToAltAz(pos)
 	if err != nil {
 		return false, err
 	}
+
 	return aa.Alt().Degrees() >= minAlt.Degrees(), nil
 }
 
@@ -50,18 +53,23 @@ func refineVisibility(
 		if err != nil {
 			return 0, err
 		}
+
 		ctx := coord.NewContext(t, site.Location(), site.Atmosphere())
+
 		aa, err := ctx.ICRSToAltAz(pos)
 		if err != nil {
 			return 0, err
 		}
+
 		return aa.Alt().Degrees() - threshold.Degrees(), nil
 	}
 	solver := DefaultSolver()
+
 	refined, _, err := solver.FindRoot(Evaluator(altEval), a, b)
 	if err != nil {
 		return b // fallback: use latest grid point
 	}
+
 	return refined
 }
 
@@ -76,7 +84,7 @@ func refineVisibility(
 // and uses Chandrupatla root-finding via refineVisibility).
 func refineBisect(a, b time.Time, aState bool, check func(time.Time) bool) time.Time {
 	const maxBisect = 20
-	for i := 0; i < maxBisect; i++ {
+	for range maxBisect {
 		mid := a.Add(b.Sub(a) / 2)
 		if check(mid) == aState {
 			a = mid
@@ -84,6 +92,7 @@ func refineBisect(a, b time.Time, aState bool, check func(time.Time) bool) time.
 			b = mid
 		}
 	}
+
 	return a.Add(b.Sub(a) / 2)
 }
 
@@ -107,14 +116,19 @@ func VisibleIntervals(
 	if step <= 0 {
 		step = 5 * stdtime.Minute
 	}
+
 	if step > 15*stdtime.Minute {
 		return nil, fmt.Errorf("step %v exceeds maximum 15m: large steps risk missing short visibility windows", step)
 	}
 
 	intervals := make([]Interval, 0, 4)
 	inWindow := false
-	var winStart time.Time
-	var prevT time.Time
+
+	var (
+		winStart time.Time
+		prevT    time.Time
+	)
+
 	hasPrev := false
 
 	t := start
@@ -125,6 +139,7 @@ func VisibleIntervals(
 		}
 
 		ctx := coord.NewContext(t, site.Location(), site.Atmosphere())
+
 		aa, err := ctx.ICRSToAltAz(pos)
 		if err != nil {
 			return nil, err
@@ -139,6 +154,7 @@ func VisibleIntervals(
 			} else {
 				winStart = t
 			}
+
 			inWindow = true
 		} else if !visible && inWindow {
 			// Transition: visible → invisible. Refine the exact crossing.
@@ -179,19 +195,25 @@ func TransitEstimate(obj coord.Object, site *Site, start, end time.Time) (time.T
 		t   time.Time
 		alt float64
 	}
+
 	var samples []sample
+
 	for t := start; !t.After(end); t = t.Add(coarseStep) {
 		pos, err := obj.ICRS(t)
 		if err != nil {
 			return time.Time{}, angle.Deg(0), err
 		}
+
 		ctx := coord.NewContext(t, site.Location(), site.Atmosphere())
+
 		aa, err := ctx.ICRSToAltAz(pos)
 		if err != nil {
 			return time.Time{}, angle.Deg(0), err
 		}
+
 		samples = append(samples, sample{t, aa.Alt().Degrees()})
 	}
+
 	if len(samples) == 0 {
 		return time.Time{}, angle.Deg(0), nil
 	}
@@ -213,15 +235,19 @@ func TransitEstimate(obj coord.Object, site *Site, start, end time.Time) (time.T
 		if err != nil {
 			return 0, err
 		}
+
 		ctx := coord.NewContext(t, site.Location(), site.Atmosphere())
+
 		aa, err := ctx.ICRSToAltAz(pos)
 		if err != nil {
 			return 0, err
 		}
+
 		return aa.Alt().Degrees(), nil
 	}
 
 	solver := DefaultSolver()
+
 	resTime, _, err := solver.FindExtremum(Evaluator(altAt), a, b, true)
 	if err != nil {
 		return time.Time{}, angle.Deg(0), err
@@ -231,11 +257,14 @@ func TransitEstimate(obj coord.Object, site *Site, start, end time.Time) (time.T
 	if err != nil {
 		return time.Time{}, angle.Deg(0), err
 	}
+
 	resCtx := coord.NewContext(resTime, site.Location(), site.Atmosphere())
+
 	aa, err := resCtx.ICRSToAltAz(pos)
 	if err != nil {
 		return time.Time{}, angle.Deg(0), err
 	}
+
 	return resTime, aa.Alt(), nil
 }
 
@@ -263,6 +292,7 @@ func Find(
 	if step <= 0 {
 		step = 5 * stdtime.Minute
 	}
+
 	if step > 15*stdtime.Minute {
 		return nil, fmt.Errorf("step %v exceeds maximum 15m: large steps risk missing short visibility windows", step)
 	}
@@ -280,13 +310,18 @@ func Find(
 				return false
 			}
 		}
+
 		return true
 	}
 
 	intervals := make([]Interval, 0, 4)
 	inWindow := false
-	var winStart time.Time
-	var prevT time.Time
+
+	var (
+		winStart time.Time
+		prevT    time.Time
+	)
+
 	hasPrev := false
 	prevOK := false
 
@@ -300,6 +335,7 @@ func Find(
 			} else {
 				winStart = t
 			}
+
 			inWindow = true
 		} else if !allOK && inWindow {
 			winEnd := refineBisect(prevT, t, prevOK, checkObs)

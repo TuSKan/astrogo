@@ -80,6 +80,7 @@ func (s Solver) FindRoot(eval Evaluator, t1, t2 time.Time) (time.Time, float64, 
 	if err != nil {
 		return time.Time{}, 0, fmt.Errorf("solver: eval at a: %w", err)
 	}
+
 	fb, err := eval(timeAt(xb))
 	if err != nil {
 		return time.Time{}, 0, fmt.Errorf("solver: eval at b: %w", err)
@@ -100,7 +101,7 @@ func (s Solver) FindRoot(eval Evaluator, t1, t2 time.Time) (time.Time, float64, 
 		fa, fb = fb, fa
 	}
 
-	for i := 0; i < s.MaxIter; i++ {
+	for i := range s.MaxIter {
 		// Convergence: bracket width or exact root
 		if math.Abs(xb-xa) <= tolSec || fb == 0 {
 			break
@@ -138,12 +139,14 @@ func (s Solver) FindRoot(eval Evaluator, t1, t2 time.Time) (time.Time, float64, 
 				if tlim < 1e-12 {
 					tlim = 1e-12
 				}
+
 				t = math.Max(tlim, math.Min(1-tlim, t))
 			}
 		}
 
 		// ── Evaluate at new trial point ────────────────────────────────
 		xt := xa + t*(xb-xa)
+
 		ft, err := eval(timeAt(xt))
 		if err != nil {
 			return time.Time{}, 0, fmt.Errorf("solver: eval at iter %d: %w", i, err)
@@ -190,6 +193,7 @@ func (s Solver) FindExtremum(eval Evaluator, t1, t3 time.Time, isMax bool) (time
 	if err != nil {
 		return time.Time{}, 0, fmt.Errorf("solver: extremum eval at x: %w", err)
 	}
+
 	if isMax {
 		fx = -fx
 	}
@@ -199,7 +203,7 @@ func (s Solver) FindExtremum(eval Evaluator, t1, t3 time.Time, isMax bool) (time
 	e := time.Duration(0) // Distance moved on the step before last
 	d := time.Duration(0) // Distance moved on the last step
 
-	for i := 0; i < s.MaxIter; i++ {
+	for i := range s.MaxIter {
 		midpoint := a.Add(time.Duration(float64(b.Sub(a)) * 0.5))
 		tol1 := float64(s.Tolerance)
 		tol2 := 2.0 * tol1
@@ -230,7 +234,6 @@ func (s Solver) FindExtremum(eval Evaluator, t1, t3 time.Time, isMax bool) (time
 			if math.Abs(p) < math.Abs(0.5*q*float64(e)) &&
 				p > q*float64(a.Sub(x)) &&
 				p < q*float64(b.Sub(x)) {
-
 				e = d
 				d = time.Duration(p / q)
 				useParabolic = true
@@ -244,6 +247,7 @@ func (s Solver) FindExtremum(eval Evaluator, t1, t3 time.Time, isMax bool) (time
 			} else {
 				e = b.Sub(x)
 			}
+
 			d = time.Duration(float64(e) * goldenRatio)
 		}
 
@@ -261,6 +265,7 @@ func (s Solver) FindExtremum(eval Evaluator, t1, t3 time.Time, isMax bool) (time
 		if err != nil {
 			return time.Time{}, 0, fmt.Errorf("solver: extremum eval at iter %d: %w", i, err)
 		}
+
 		if isMax {
 			fu = -fu
 		}
@@ -272,6 +277,7 @@ func (s Solver) FindExtremum(eval Evaluator, t1, t3 time.Time, isMax bool) (time
 			} else {
 				a = x
 			}
+
 			v, w, x = w, x, u
 			fv, fw, fx = fw, fx, fu
 		} else {
@@ -280,6 +286,7 @@ func (s Solver) FindExtremum(eval Evaluator, t1, t3 time.Time, isMax bool) (time
 			} else {
 				b = u
 			}
+
 			if fu <= fw || w.Equal(x) {
 				v, w = w, u
 				fv, fw = fw, fu
@@ -295,6 +302,7 @@ func (s Solver) FindExtremum(eval Evaluator, t1, t3 time.Time, isMax bool) (time
 	if err != nil {
 		return time.Time{}, 0, fmt.Errorf("solver: final eval: %w", err)
 	}
+
 	return x, finalVal, err
 }
 
@@ -340,5 +348,6 @@ func CrossesIncreasing(prev, cur, target, wrapAt float64) bool {
 	if target == 0 && prev > halfWrap && cur < halfWrap {
 		return true
 	}
+
 	return false
 }

@@ -41,6 +41,7 @@ func TestECEF_EquatorAndPoles(t *testing.T) {
 	g2, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(90), 0)
 	v2 := g2.ToECEF(wgs84)
 	b := wgs84.A * (1 - wgs84.F)
+
 	testutil.AssertNear(t, "Pole X", v2.X, 0, 1e-1)
 	testutil.AssertNear(t, "Pole Y", v2.Y, 0, 1e-1)
 	testutil.AssertNear(t, "Pole Z", v2.Z, b, 1e-1)
@@ -65,6 +66,7 @@ func TestECEFRoundTrip(t *testing.T) {
 		g2, err := coord.FromECEF(v, wgs84)
 
 		label := testutil.CaseLabel(i, "RoundTrip")
+
 		testutil.AssertNoError(t, err)
 		testutil.AssertNear(t, label+" Lon", g2.Lon().Degrees(), g.Lon().Degrees(), 1e-9)
 		testutil.AssertNear(t, label+" Lat", g2.Lat().Degrees(), g.Lat().Degrees(), 1e-9)
@@ -91,9 +93,11 @@ func TestGeodetic_Interface(t *testing.T) {
 	// Equal
 	g2, _ := coord.NewGeodetic(angle.Deg(10), angle.Deg(20), 30)
 	g3, _ := coord.NewGeodetic(angle.Deg(10), angle.Deg(20), 40)
+
 	if !g.Equal(g2) {
 		t.Error("expected equal")
 	}
+
 	if g.Equal(g3) {
 		t.Error("expected not equal")
 	}

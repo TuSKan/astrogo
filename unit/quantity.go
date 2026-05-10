@@ -25,6 +25,7 @@ func (q Quantity) In(to Unit) (Quantity, error) {
 	if err != nil {
 		return Quantity{}, err
 	}
+
 	return Quantity{Value: q.Value * factor, Unit: to}, nil
 }
 
@@ -35,6 +36,7 @@ func (q Quantity) MustIn(to Unit) Quantity {
 	if err != nil {
 		panic(err)
 	}
+
 	return res
 }
 
@@ -48,6 +50,7 @@ func (q Quantity) Add(other Quantity) (Quantity, error) {
 	if err != nil {
 		return Quantity{}, err
 	}
+
 	return Quantity{Value: q.Value + converted.Value, Unit: q.Unit}, nil
 }
 
@@ -59,6 +62,7 @@ func (q Quantity) Sub(other Quantity) (Quantity, error) {
 	if err != nil {
 		return Quantity{}, err
 	}
+
 	return Quantity{Value: q.Value - converted.Value, Unit: q.Unit}, nil
 }
 
@@ -93,8 +97,10 @@ func (q Quantity) Equals(other Quantity) bool {
 	if !q.Unit.Compatible(other.Unit) {
 		return false
 	}
+
 	v1 := q.Value * q.Unit.ScaleFactor
 	v2 := other.Value * other.Unit.ScaleFactor
+
 	return math.Abs(v1-v2) < 1e-15*math.Max(math.Abs(v1), math.Abs(v2))
 }
 
@@ -121,7 +127,9 @@ func (q Quantity) Compare(other Quantity) (int, error) {
 	if !q.Unit.Compatible(other.Unit) {
 		return 0, IncompatibleUnitError{From: q.Unit, To: other.Unit}
 	}
+
 	v1 := q.Value * q.Unit.ScaleFactor
+
 	v2 := other.Value * other.Unit.ScaleFactor
 	switch {
 	case v1 < v2:

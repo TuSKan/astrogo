@@ -35,6 +35,7 @@ func TestReadBintable(t *testing.T) {
 
 	// Read errors
 	h2 := NewHeader() // missing TFIELDS
+
 	_, err = ReadBintable(h2, bytes.NewReader(nil))
 	if err == nil {
 		t.Errorf("expected error for missing TFIELDS")
@@ -55,12 +56,14 @@ func TestReadBintable(t *testing.T) {
 	// Test Extractor
 	strCol, err := bt.GetStringColumn("id")
 	testutil.AssertNoError(t, err)
+
 	if len(strCol) != 1 || strCol[0] != "42" {
 		t.Errorf("expected string '42', got %v", strCol)
 	}
 
 	fltCol, err := bt.GetFloatColumn("flux")
 	testutil.AssertNoError(t, err)
+
 	if len(fltCol) != 1 || math.Abs(fltCol[0]-float64(float32(3.14))) > 1e-4 {
 		t.Errorf("expected float 3.14, got %v", fltCol)
 	}
@@ -69,6 +72,7 @@ func TestReadBintable(t *testing.T) {
 	if err == nil {
 		t.Errorf("expected error on invalid column")
 	}
+
 	_, err = bt.GetFloatColumn("invalid")
 	if err == nil {
 		t.Errorf("expected error on invalid column")

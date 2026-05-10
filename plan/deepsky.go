@@ -43,6 +43,7 @@ func NewDeepSkyObject(name string, ra, dec angle.Angle, opts ...DSOOption) *Deep
 	for _, opt := range opts {
 		opt(d)
 	}
+
 	return d
 }
 

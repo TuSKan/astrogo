@@ -17,6 +17,7 @@ func defaultProvider() eph.Provider {
 // assertNear is a helper for comparing floats with tolerance.
 func assertNear(t *testing.T, label string, got, want, tol float64) {
 	t.Helper()
+
 	if math.Abs(got-want) > tol {
 		t.Errorf("%s: got %.6f, want %.6f ±%.6f (diff=%.6f)", label, got, want, tol, got-want)
 	}
@@ -28,7 +29,11 @@ func assertNear(t *testing.T, label string, got, want, tol float64) {
 
 func TestPlanetApparent_AllPlanets(t *testing.T) {
 	p := defaultProvider()
-	defer p.Close()
+	t.Cleanup(func() {
+		if err := p.Close(); err != nil {
+			t.Errorf("failed to close provider: %v", err)
+		}
+	})
 
 	tm := time.Date(2026, 1, 1, 0, 0, 0, 0, time.LocationUTC)
 
@@ -54,6 +59,7 @@ func TestPlanetApparent_AllPlanets(t *testing.T) {
 			t.Errorf("%s: %v", tc.name, err)
 			continue
 		}
+
 		if mag < tc.minMag || mag > tc.maxMag {
 			t.Errorf("%s: mag=%.2f, expected [%.1f, %.1f]", tc.name, mag, tc.minMag, tc.maxMag)
 		} else {
@@ -64,49 +70,73 @@ func TestPlanetApparent_AllPlanets(t *testing.T) {
 
 func TestSunApparent(t *testing.T) {
 	p := defaultProvider()
-	defer p.Close()
+	t.Cleanup(func() {
+		if err := p.Close(); err != nil {
+			t.Errorf("failed to close provider: %v", err)
+		}
+	})
 
 	tm := time.Date(2026, 1, 1, 0, 0, 0, 0, time.LocationUTC)
+
 	mag, err := magnitude.SunApparent(p, tm)
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	assertNear(t, "Sun V", mag, -26.74, 0.05)
 	t.Logf("Sun V = %.3f mag", mag)
 }
 
 func TestMoonApparent(t *testing.T) {
 	p := defaultProvider()
-	defer p.Close()
+	t.Cleanup(func() {
+		if err := p.Close(); err != nil {
+			t.Errorf("failed to close provider: %v", err)
+		}
+	})
 
 	tm := time.Date(2026, 1, 1, 0, 0, 0, 0, time.LocationUTC)
+
 	mag, err := magnitude.MoonApparent(p, tm)
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	if mag < -13 || mag > 3 {
 		t.Errorf("Moon V = %.2f, out of physical range", mag)
 	}
+
 	t.Logf("Moon V = %.2f mag", mag)
 }
 
 func TestPlanetApparent_Sun(t *testing.T) {
 	p := defaultProvider()
-	defer p.Close()
+	t.Cleanup(func() {
+		if err := p.Close(); err != nil {
+			t.Errorf("failed to close provider: %v", err)
+		}
+	})
 
 	tm := time.Date(2026, 6, 15, 0, 0, 0, 0, time.LocationUTC)
+
 	mag, err := magnitude.PlanetApparent(p, eph.Sun, tm)
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	assertNear(t, "PlanetApparent(Sun)", mag, -26.74, 0.05)
 }
 
 func TestPlanetApparent_Earth_ReturnsError(t *testing.T) {
 	p := defaultProvider()
-	defer p.Close()
+	t.Cleanup(func() {
+		if err := p.Close(); err != nil {
+			t.Errorf("failed to close provider: %v", err)
+		}
+	})
 
 	tm := time.Date(2026, 1, 1, 0, 0, 0, 0, time.LocationUTC)
+
 	_, err := magnitude.PlanetApparent(p, eph.Earth, tm)
 	if err == nil {
 		t.Error("expected error for Earth, got nil")
@@ -115,54 +145,79 @@ func TestPlanetApparent_Earth_ReturnsError(t *testing.T) {
 
 func TestPhaseAngle_Venus(t *testing.T) {
 	p := defaultProvider()
-	defer p.Close()
+	t.Cleanup(func() {
+		if err := p.Close(); err != nil {
+			t.Errorf("failed to close provider: %v", err)
+		}
+	})
 
 	tm := time.Date(2026, 1, 1, 0, 0, 0, 0, time.LocationUTC)
+
 	alpha, err := magnitude.PhaseAngle(p, eph.Venus, tm)
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	deg := alpha.Degrees()
 	if deg < 0 || deg > 180 {
 		t.Errorf("Venus phase = %.1f°, out of range", deg)
 	}
+
 	t.Logf("Venus phase = %.1f°", deg)
 }
 
 func TestPhaseAngle_Jupiter_Small(t *testing.T) {
 	p := defaultProvider()
-	defer p.Close()
+	t.Cleanup(func() {
+		if err := p.Close(); err != nil {
+			t.Errorf("failed to close provider: %v", err)
+		}
+	})
 
 	tm := time.Date(2026, 1, 1, 0, 0, 0, 0, time.LocationUTC)
+
 	alpha, err := magnitude.PhaseAngle(p, eph.Jupiter, tm)
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	deg := alpha.Degrees()
 	if deg > 12 {
 		t.Errorf("Jupiter phase = %.1f°, expected ≤ 12°", deg)
 	}
+
 	t.Logf("Jupiter phase = %.1f°", deg)
 }
 
 func TestIlluminatedFraction_Moon(t *testing.T) {
 	p := defaultProvider()
-	defer p.Close()
+	t.Cleanup(func() {
+		if err := p.Close(); err != nil {
+			t.Errorf("failed to close provider: %v", err)
+		}
+	})
 
 	tm := time.Date(2026, 1, 1, 0, 0, 0, 0, time.LocationUTC)
+
 	frac, err := magnitude.IlluminatedFraction(p, eph.Moon, tm)
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	if frac < 0 || frac > 1 {
 		t.Errorf("Moon illuminated fraction = %.3f, out of [0,1]", frac)
 	}
+
 	t.Logf("Moon illuminated fraction = %.1f%%", frac*100)
 }
 
 func TestNeptune_SecularBrightening(t *testing.T) {
 	p := defaultProvider()
-	defer p.Close()
+	t.Cleanup(func() {
+		if err := p.Close(); err != nil {
+			t.Errorf("failed to close provider: %v", err)
+		}
+	})
 
 	t1980 := time.Date(1980, 1, 1, 0, 0, 0, 0, time.LocationUTC)
 	t2026 := time.Date(2026, 1, 1, 0, 0, 0, 0, time.LocationUTC)
@@ -171,10 +226,12 @@ func TestNeptune_SecularBrightening(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	m2026, err := magnitude.PlanetApparent(p, eph.Neptune, t2026)
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	t.Logf("Neptune 1980: V=%.2f, 2026: V=%.2f, diff=%.3f", m1980, m2026, m2026-m1980)
 }
 
@@ -210,6 +267,7 @@ func TestAsteroidHG_PhaseMonotonicity(t *testing.T) {
 	if m30 <= m0 || m60 <= m30 || m90 <= m60 {
 		t.Errorf("HG not monotonic: α=0°:%.2f, 30°:%.2f, 60°:%.2f, 90°:%.2f", m0, m30, m60, m90)
 	}
+
 	t.Logf("HG: α=0°:%.2f, 30°:%.2f, 60°:%.2f, 90°:%.2f", m0, m30, m60, m90)
 }
 
@@ -225,6 +283,7 @@ func TestAsteroidHG_BowellSinCorrection(t *testing.T) {
 	if mag <= baseline {
 		t.Errorf("HG at α=45° (%.3f) should be > baseline (%.3f)", mag, baseline)
 	}
+
 	t.Logf("HG α=45°: %.3f (baseline %.3f, diff %.4f)", mag, baseline, mag-baseline)
 }
 
@@ -239,6 +298,7 @@ func TestAsteroidHG1G2_Themis(t *testing.T) {
 	if math.Abs(m0-H) > 1.0 {
 		t.Errorf("HG1G2 Themis at α=0°: %.3f, expected ~%.3f", m0, H)
 	}
+
 	t.Logf("HG1G2 Themis α=0° r=Δ=1: V = %.3f", m0)
 }
 
@@ -252,6 +312,7 @@ func TestAsteroidHG1G2_PhaseMonotonicity(t *testing.T) {
 	if m30 <= m0 || m60 <= m30 {
 		t.Errorf("HG1G2 not monotonic: α=0°:%.2f, 30°:%.2f, 60°:%.2f", m0, m30, m60)
 	}
+
 	t.Logf("HG1G2: α=0°:%.2f, 30°:%.2f, 60°:%.2f", m0, m30, m60)
 }
 
@@ -294,6 +355,7 @@ func TestAsteroidHG12Star_Monotonic(t *testing.T) {
 	if m30 <= m0 {
 		t.Errorf("HG12* not monotonic: m0=%.2f m30=%.2f", m0, m30)
 	}
+
 	t.Logf("HG12*: m0=%.2f m30=%.2f", m0, m30)
 }
 
@@ -348,6 +410,7 @@ func TestSatelliteApparent_PhaseMonotonicity(t *testing.T) {
 	if m90 <= m0 || m150 <= m90 {
 		t.Errorf("sat phase not monotonic: α=0°:%.2f, 90°:%.2f, 150°:%.2f", m0, m90, m150)
 	}
+
 	t.Logf("Satellite: α=0°:%.2f, 90°:%.2f, 150°:%.2f", m0, m90, m150)
 }
 
@@ -361,6 +424,7 @@ func TestSatelliteApparent_CylinderVsSphere(t *testing.T) {
 	if mSphere == mCyl {
 		t.Error("sphere and cylinder should give different results")
 	}
+
 	t.Logf("Sphere=%.3f, Cylinder=%.3f", mSphere, mCyl)
 }
 
@@ -394,6 +458,7 @@ func TestExtinctionAtAltitude(t *testing.T) {
 	if k2500 >= 0.20 || k2500 < 0.10 {
 		t.Errorf("2500m: k=%.3f, expected ~0.15", k2500)
 	}
+
 	t.Logf("k(V) at 2500m = %.4f", k2500)
 }
 
@@ -407,6 +472,7 @@ func TestGaiaGToJohnsonV(t *testing.T) {
 	if math.Abs(diff) > 0.5 {
 		t.Errorf("G→V diff = %.3f, expected < 0.5", diff)
 	}
+
 	t.Logf("G=%.1f BP-RP=%.2f → V=%.3f (ΔV=%.3f)", G, bpRp, V, diff)
 
 	// Red dwarf (BP-RP ≈ 3.0): should give larger negative correction.
@@ -422,7 +488,6 @@ func TestAsteroidHG1G2_SplineKnots(t *testing.T) {
 	// At spline knot positions, HG1G2 should reproduce the knot values.
 	// For G1=1, G2=0: V = H − 2.5·log₁₀(Φ₁(α)) + 5·log₁₀(r·Δ)
 	// With r=Δ=1, H=0: V = −2.5·log₁₀(Φ₁(α))
-
 	H := 0.0
 	G1, G2 := 1.0, 0.0
 
@@ -517,6 +582,7 @@ func TestSHG1G2_PoleOnBrighter(t *testing.T) {
 	if mPole >= mEquator {
 		t.Errorf("pole-on (%.3f) should be brighter (smaller) than equator-on (%.3f)", mPole, mEquator)
 	}
+
 	t.Logf("R=%.1f: equator=%.3f, pole=%.3f (Δm=%.3f)", R, mEquator, mPole, mEquator-mPole)
 
 	// The brightness difference should be exactly 2.5·log₁₀(R) ≈ 0.387 mag.
@@ -539,6 +605,7 @@ func TestSHG1G2_Monotonic_Phase(t *testing.T) {
 	if m30 <= m0 || m60 <= m30 {
 		t.Errorf("sHG1G2 not monotonic: α=0°:%.2f, 30°:%.2f, 60°:%.2f", m0, m30, m60)
 	}
+
 	t.Logf("sHG1G2: α=0°:%.2f, 30°:%.2f, 60°:%.2f", m0, m30, m60)
 }
 

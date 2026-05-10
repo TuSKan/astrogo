@@ -26,6 +26,7 @@ func (ctx *Context) ReduceBatch(in []vector.Vec3, out []AltAz) {
 	if len(out) != len(in) {
 		panic("coord: ReduceBatch: len(out) must equal len(in)")
 	}
+
 	for i, v := range in {
 		out[i] = ctx.GeocentricToObserved(v)
 	}
@@ -46,6 +47,7 @@ func (ctx *Context) ReduceBatchParallel(in []vector.Vec3, out []AltAz) {
 	}
 
 	n := len(in)
+
 	workers := runtime.GOMAXPROCS(0)
 	if n < workers*2 {
 		ctx.ReduceBatch(in, out)
@@ -53,24 +55,25 @@ func (ctx *Context) ReduceBatchParallel(in []vector.Vec3, out []AltAz) {
 	}
 
 	var wg sync.WaitGroup
+
 	chunkSize := (n + workers - 1) / workers
 
 	for start := 0; start < n; start += chunkSize {
-		end := start + chunkSize
-		if end > n {
-			end = n
-		}
+		end := min(start+chunkSize, n)
 		// Each worker gets its own Context copy to avoid shared mutable
 		// ASTROM state (SOFA's iauAtioq may cache refraction coefficients).
 		local := ctx.Clone()
+
 		wg.Add(1)
 		go func(lo, hi int) {
 			defer wg.Done()
+
 			for i := lo; i < hi; i++ {
 				out[i] = local.GeocentricToObserved(in[i])
 			}
 		}(start, end)
 	}
+
 	wg.Wait()
 }
 
@@ -89,6 +92,7 @@ func (ctx *Context) ICRSBatchToAltAz(in []ICRS, out []AltAz) {
 	if len(out) != len(in) {
 		panic("coord: ICRSBatchToAltAz: len(out) must equal len(in)")
 	}
+
 	for i, c := range in {
 		// Use the full astrometric pipeline (Atcoq) via the cached ASTROM.
 		altaz := ctx.AstrometricToObserved(c.Astrometric())
@@ -108,6 +112,7 @@ func (ctx *Context) ICRSBatchToAltAzParallel(in []ICRS, out []AltAz) {
 	}
 
 	n := len(in)
+
 	workers := runtime.GOMAXPROCS(0)
 	if n < workers*2 {
 		ctx.ICRSBatchToAltAz(in, out)
@@ -115,19 +120,19 @@ func (ctx *Context) ICRSBatchToAltAzParallel(in []ICRS, out []AltAz) {
 	}
 
 	var wg sync.WaitGroup
+
 	chunkSize := (n + workers - 1) / workers
 
 	for start := 0; start < n; start += chunkSize {
-		end := start + chunkSize
-		if end > n {
-			end = n
-		}
+		end := min(start+chunkSize, n)
 		// Each worker gets its own Context copy to avoid shared mutable
 		// ASTROM state (SOFA's iauAtioq may cache refraction coefficients).
 		local := ctx.Clone()
+
 		wg.Add(1)
 		go func(lo, hi int) {
 			defer wg.Done()
+
 			for i := lo; i < hi; i++ {
 				altaz := local.AstrometricToObserved(in[i].Astrometric())
 				altaz.SetDist(in[i].Dist())
@@ -135,5 +140,6 @@ func (ctx *Context) ICRSBatchToAltAzParallel(in []ICRS, out []AltAz) {
 			}
 		}(start, end)
 	}
+
 	wg.Wait()
 }

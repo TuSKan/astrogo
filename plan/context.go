@@ -50,10 +50,12 @@ func (c *EvalContext) ICRS() (coord.ICRS, error) {
 	if c.icrsOk || c.icrsErr != nil {
 		return c.icrs, c.icrsErr
 	}
+
 	icrs, err := c.Object.ICRS(c.Time)
 	c.icrs = icrs
 	c.icrsOk = err == nil
 	c.icrsErr = err
+
 	return icrs, err
 }
 
@@ -62,14 +64,17 @@ func (c *EvalContext) AltAz() (coord.AltAz, error) {
 	if c.altOk || c.altErr != nil {
 		return c.altAz, c.altErr
 	}
+
 	icrs, err := c.ICRS()
 	if err != nil {
 		c.altErr = err
 		return coord.AltAz{}, err
 	}
+
 	aa, err := c.Ctx.ICRSToAltAz(icrs)
 	c.altAz = aa
 	c.altOk = err == nil
 	c.altErr = err
+
 	return aa, err
 }

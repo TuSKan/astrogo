@@ -44,6 +44,7 @@ func TestState(t *testing.T) {
 	}
 
 	epoch := time.Date(2026, 4, 19, 12, 0, 0, 0, time.LocationUTC)
+
 	state, err := sat.State(eph.ID(0), epoch)
 	if err != nil {
 		t.Fatalf("State failed: %v", err)
@@ -68,6 +69,7 @@ func TestState(t *testing.T) {
 	if speed == 0 {
 		t.Error("Speed is zero, expected non-zero for orbiting satellite")
 	}
+
 	t.Logf("GCRS velocity: %.8f AU/day", speed)
 }
 
@@ -85,6 +87,7 @@ func TestStateForwardOrbit(t *testing.T) {
 	if err != nil {
 		t.Fatalf("State at epoch failed: %v", err)
 	}
+
 	s1, err := sat.State(0, t1)
 	if err != nil {
 		t.Fatalf("State at epoch+90m failed: %v", err)
@@ -109,6 +112,7 @@ func TestAltitude(t *testing.T) {
 	}
 
 	epoch := time.Date(2026, 4, 19, 12, 0, 0, 0, time.LocationUTC)
+
 	alt, err := sat.Altitude(epoch)
 	if err != nil {
 		t.Fatalf("Altitude failed: %v", err)

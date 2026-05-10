@@ -51,6 +51,7 @@ func TestNowUTC(t *testing.T) {
 	if tm.JD() < 2460000 {
 		t.Errorf("NowUTC JD seems too small: %v", tm.JD())
 	}
+
 	testutil.AssertEqual(t, "Scale", tm.Scale(), atime.UTC)
 }
 
@@ -74,6 +75,7 @@ func TestScaleString(t *testing.T) {
 
 func TestString(t *testing.T) {
 	tm := atime.FromJD(2451545.0, atime.UTC)
+
 	s := tm.String()
 	if !math.IsNaN(tm.JD()) && (s == "" || s == "UNKNOWN") {
 		t.Errorf("Time.String() returned %q", s)
@@ -122,12 +124,15 @@ func TestTimeComparisons(t *testing.T) {
 	if !t1.Before(t2) {
 		t.Errorf("Expected t1 before t2")
 	}
+
 	if !t2.After(t1) {
 		t.Errorf("Expected t2 after t1")
 	}
+
 	if !t1.Equal(t3) {
 		t.Errorf("Expected t1 equal to t3")
 	}
+
 	if t1.Equal(t2) {
 		t.Errorf("Expected t1 not equal to t2")
 	}
@@ -136,6 +141,7 @@ func TestTimeComparisons(t *testing.T) {
 	if !zero.IsZero() {
 		t.Errorf("Expected zero time to be zero")
 	}
+
 	if t1.IsZero() {
 		t.Errorf("Expected t1 to not be zero")
 	}
@@ -143,6 +149,7 @@ func TestTimeComparisons(t *testing.T) {
 
 func TestTimeStdInterop(t *testing.T) {
 	t1 := atime.FromJD(2451545.0, atime.UTC) // J2000
+
 	gt := t1.ToGo()
 	if gt.Year() != 2000 || gt.Month() != 1 || gt.Day() != 1 || gt.Hour() != 12 {
 		t.Errorf("ToGo conversion failed, got %v", gt)
@@ -170,7 +177,6 @@ func TestTimeStdInterop(t *testing.T) {
 func TestTimeFloatPrecisionRoundTrip(t *testing.T) {
 	// Let's test a broad spectrum of "dirty" hours and dates
 	// to ensure floating-point precision truncation never regresses again.
-
 	datesToTest := []time.Time{
 		time.Date(2026, 4, 6, 22, 0, 0, 0, time.UTC),                       // JD = 2461137.41666667 (The original issue)
 		time.Date(2026, 4, 6, 19, 0, 0, 0, time.FixedZone("BRT", -3*3600)), // São Paulo Timezone directly
@@ -209,6 +215,7 @@ func TestTime_UT1(t *testing.T) {
 	iers.RegisterModel(mockEOP{})
 
 	utc := atime.FromJD(2451545.0, atime.UTC) // J2000 UTC
+
 	ut1, err := utc.UT1()
 	if err != nil {
 		t.Fatalf("UT1() returned error: %v", err)
@@ -224,6 +231,7 @@ func TestTime_UT1(t *testing.T) {
 	if err != nil {
 		t.Fatalf("UT1() on UT1 time returned error: %v", err)
 	}
+
 	testutil.AssertEqual(t, "Idempotent UT1 scale", ut1b.Scale(), atime.UT1)
 	testutil.AssertNear(t, "Idempotent UT1 JD", ut1b.JD(), ut1.JD(), 1e-15)
 }
@@ -244,6 +252,7 @@ func TestTime_LocationPreservation(t *testing.T) {
 	if gt.Location().String() != "BRT" {
 		t.Errorf("expected BRT in ToGo, got %s", gt.Location())
 	}
+
 	if gt.Hour() != 22 {
 		t.Errorf("expected hour 22 in BRT, got %d", gt.Hour())
 	}
@@ -274,6 +283,7 @@ func TestTime_In(t *testing.T) {
 	tm2 := tm.In(brt)
 
 	testutil.AssertNear(t, "JD unchanged by In()", tm2.JD(), tm.JD(), 1e-15)
+
 	if tm2.Location().String() != "BRT" {
 		t.Errorf("expected BRT after In(), got %s", tm2.Location())
 	}
@@ -313,10 +323,12 @@ func TestTime_LocationPropagation(t *testing.T) {
 	}
 
 	iers.RegisterModel(mockEOP{})
+
 	ut1, err := tm.UT1()
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	if ut1.Location().String() != "BRT" {
 		t.Errorf("UT1() lost location: %s", ut1.Location())
 	}
@@ -348,6 +360,7 @@ func TestTAI_Conversion(t *testing.T) {
 	// TAI → TT should add 32.184s
 	tt := tai.TT()
 	testutil.AssertEqual(t, "TT from TAI scale", tt.Scale(), atime.TT)
+
 	expectedTT := expectedTAI + 32.184/86400.0
 	testutil.AssertNear(t, "TT from TAI JD", tt.JD(), expectedTT, 1e-12)
 
@@ -399,10 +412,12 @@ func TestConversionRoundTrips(t *testing.T) {
 
 	// With UT1
 	iers.RegisterModel(mockEOP{})
+
 	ut1, err := utc.UT1()
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	utcFromUT1 := ut1.UTC()
 	testutil.AssertEqual(t, "UT1→UTC scale", utcFromUT1.Scale(), atime.UTC)
 	// DUT1=1.5s: UTC→UT1→UTC should recover within ~1e-12 JD
@@ -446,6 +461,7 @@ func TestTDB_XJSE2000(t *testing.T) {
 			T := ((tt1 - 2451545.0) + tt2) / 36525.0
 			g := (357.5277233 + 35999.0503400*T) * math.Pi / 180.0
 			singleTermSec := 0.001657 * math.Sin(g)
+
 			diff := math.Abs(tdbMinusTTsec - singleTermSec)
 			if diff > 50e-6 {
 				t.Errorf("Multi-term deviates from single-term by %.1f µs (expected < 50 µs)", diff*1e6)
@@ -468,9 +484,11 @@ func TestCrossScaleComparison(t *testing.T) {
 	if utc.Before(tt) {
 		t.Error("UTC should not be Before TT (same instant)")
 	}
+
 	if utc.After(tt) {
 		t.Error("UTC should not be After TT (same instant)")
 	}
+
 	if !utc.Equal(tt) {
 		t.Error("UTC and TT representing same instant should be Equal")
 	}
@@ -492,6 +510,7 @@ func TestCrossScaleComparison(t *testing.T) {
 	if !utc.Before(utc2.TT()) {
 		t.Error("Earlier UTC should be Before later TT")
 	}
+
 	if !utc2.TDB().After(utc) {
 		t.Error("Later TDB should be After earlier UTC")
 	}
@@ -514,6 +533,7 @@ func TestCrossScaleSub(t *testing.T) {
 	// Cross-scale Sub
 	utc := atime.FromJD(2451545.0, atime.UTC)
 	tt := utc.TT()
+
 	dur2 := utc.Sub(tt)
 	if math.Abs(dur2.Seconds()) > 1e-6 {
 		t.Errorf("Cross-scale Sub for same instant: got %v", dur2)
@@ -536,10 +556,12 @@ func TestUT1_Error(t *testing.T) {
 	defer iers.RegisterModel(iers.ZeroModel{}) // restore
 
 	utc := atime.FromJD(2451545.0, atime.UTC)
+
 	_, err := utc.UT1()
 	if err == nil {
 		t.Fatal("Expected error from UT1() with unavailable EOP, got nil")
 	}
+
 	t.Logf("UT1 error (expected): %v", err)
 }
 
@@ -566,6 +588,7 @@ func TestTT_FromAllScales(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	ttFromUT1 := ut1.TT()
 	testutil.AssertNear(t, "UT1→TT", ttFromUT1.JD(), expectedTT.JD(), 1e-12)
 }
