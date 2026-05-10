@@ -109,6 +109,7 @@ func (a Angle) Wrap2Pi() Angle {
 	if v < 0 {
 		v += twoPi
 	}
+
 	return Angle(v)
 }
 
@@ -120,6 +121,7 @@ func (a Angle) WrapPi() Angle {
 	} else if v <= -pi {
 		v += twoPi
 	}
+
 	return Angle(v)
 }
 
@@ -161,9 +163,11 @@ func (a Angle) String() string {
 // DMSString returns a formatted string in ±DD°MM'SS.S" format.
 func (a Angle) DMSString(precision int) string {
 	var b strings.Builder
+
 	degVal := a.Degrees()
 	if degVal < 0 {
 		b.WriteByte('-')
+
 		degVal = -degVal
 	} else {
 		b.WriteByte('+')
@@ -179,6 +183,7 @@ func (a Angle) DMSString(precision int) string {
 		pow := math.Pow10(precision)
 		if math.Round(s*pow)/pow >= 60 {
 			s = 0
+
 			m++
 			if m >= 60 {
 				m = 0
@@ -191,23 +196,27 @@ func (a Angle) DMSString(precision int) string {
 	if d < 10 {
 		b.WriteByte('0')
 	}
+
 	b.WriteString(strconv.FormatInt(d, 10))
 	b.WriteString("°")
 	// Minute
 	if m < 10 {
 		b.WriteByte('0')
 	}
+
 	b.WriteString(strconv.FormatInt(m, 10))
 	b.WriteString("'")
 	// Second
 	if s < 10 {
 		b.WriteByte('0')
 	}
+
 	if precision <= 0 {
 		b.WriteString(strconv.FormatInt(int64(math.Round(s)), 10))
 	} else {
 		b.WriteString(strconv.FormatFloat(s, 'f', precision, 64))
 	}
+
 	b.WriteByte('"')
 
 	return b.String()
@@ -216,6 +225,7 @@ func (a Angle) DMSString(precision int) string {
 // HMSString returns a formatted string in HHhMMmSS.Ss format.
 func (a Angle) HMSString(precision int) string {
 	var b strings.Builder
+
 	hVal := a.Wrap2Pi().Hours()
 
 	h := int64(hVal)
@@ -228,9 +238,11 @@ func (a Angle) HMSString(precision int) string {
 		pow := math.Pow10(precision)
 		if math.Round(s*pow)/pow >= 60 {
 			s = 0
+
 			m++
 			if m >= 60 {
 				m = 0
+
 				h++
 				if h >= 24 {
 					h = 0
@@ -243,23 +255,27 @@ func (a Angle) HMSString(precision int) string {
 	if h < 10 {
 		b.WriteByte('0')
 	}
+
 	b.WriteString(strconv.FormatInt(h, 10))
 	b.WriteString("h")
 	// Minute
 	if m < 10 {
 		b.WriteByte('0')
 	}
+
 	b.WriteString(strconv.FormatInt(m, 10))
 	b.WriteString("m")
 	// Second
 	if s < 10 {
 		b.WriteByte('0')
 	}
+
 	if precision <= 0 {
 		b.WriteString(strconv.FormatInt(int64(math.Round(s)), 10))
 	} else {
 		b.WriteString(strconv.FormatFloat(s, 'f', precision, 64))
 	}
+
 	b.WriteString("s")
 
 	return b.String()

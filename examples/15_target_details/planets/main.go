@@ -25,6 +25,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to create provider: %v", err)
 	}
+
 	mars := plan.NewMars(prov)
 
 	details, err := mars.GetDetails(ctx, "Description", "The Red Planet", "Source", "JPL DE442")

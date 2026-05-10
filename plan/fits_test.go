@@ -22,12 +22,15 @@ func TestSiteFromFITS(t *testing.T) {
 	if site.Name() != "AAO" {
 		t.Errorf("expected site name AAO, got: %s", site.Name())
 	}
+
 	if site.Longitude().Degrees() != 149.0661 {
 		t.Errorf("expected longitude 149.0661, got: %v", site.Longitude().Degrees())
 	}
+
 	if site.Latitude().Degrees() != -31.2770 {
 		t.Errorf("expected latitude -31.2770, got: %v", site.Latitude().Degrees())
 	}
+
 	if site.HeightMeters() != 1165.0 {
 		t.Errorf("expected elevation 1165.0, got: %v", site.HeightMeters())
 	}
@@ -53,6 +56,7 @@ func TestTargetFromFITS(t *testing.T) {
 	if pos.RA().Degrees() != 83.82208 {
 		t.Errorf("expected RA 83.82208, got: %v", pos.RA().Degrees())
 	}
+
 	if pos.Dec().Degrees() != -5.39111 {
 		t.Errorf("expected Dec -5.39111, got: %v", pos.Dec().Degrees())
 	}

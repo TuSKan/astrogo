@@ -69,6 +69,7 @@ func NewAsteroid(name string, id eph.ID, provider eph.Provider, opts ...Asteroid
 	for _, opt := range opts {
 		opt(a)
 	}
+
 	return a
 }
 
@@ -81,10 +82,12 @@ func (a *Asteroid) Position(t time.Time) (coord.ICRS, error) {
 	if err != nil {
 		return coord.ICRS{}, fmt.Errorf("asteroid: ephemeris error for %s: %w", a.name, err)
 	}
+
 	icrs, err := eph.ToICRS(pos)
 	if err != nil {
 		return coord.ICRS{}, fmt.Errorf("asteroid: coordinate conversion error for %s: %w", a.name, err)
 	}
+
 	return icrs, nil
 }
 
@@ -109,6 +112,7 @@ func (a *Asteroid) ApparentMagnitude(t time.Time) (float64, error) {
 		ra := angle.Rad(math.Atan2(st.Pos.Y, st.Pos.X))
 		dec := angle.Rad(math.Asin(st.Pos.Z / delta))
 		cosL := mag.CosAspectAngle(ra, dec, angle.Deg(a.spin.RA), angle.Deg(a.spin.Dec))
+
 		return mag.AsteroidSHG1G2(a.H, a.G1, a.G2, r, delta, alpha, a.oblat, cosL), nil
 	case a.hasG1G2:
 		return mag.AsteroidHG1G2(a.H, a.G1, a.G2, r, delta, alpha), nil
@@ -128,6 +132,7 @@ func (a *Asteroid) helioGeometry(t time.Time) (r, delta float64, alpha angle.Ang
 	if err != nil {
 		return r, delta, alpha, st, err
 	}
+
 	sunSt, err := a.provider.State(eph.Sun, t)
 	if err != nil {
 		return r, delta, alpha, st, err
@@ -143,5 +148,6 @@ func (a *Asteroid) helioGeometry(t time.Time) (r, delta float64, alpha angle.Ang
 	cosA := (r*r + delta*delta - sunDist*sunDist) / (2 * r * delta)
 	cosA = clamp(cosA, -1, 1)
 	alpha = angle.Rad(math.Acos(cosA))
+
 	return r, delta, alpha, st, err
 }

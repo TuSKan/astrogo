@@ -32,6 +32,7 @@ func TestRefractionRigorous_KnownValues(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ref := model.RefractFromTrue(angle.Deg(tt.alt), env)
+
 			refArcmin := math.Abs(ref.Degrees() * 60.0)
 			if refArcmin < tt.minRef || refArcmin > tt.maxRef {
 				t.Errorf("altitude=%g°: refraction=%.3f arcmin, want [%.1f, %.1f]",
@@ -88,6 +89,7 @@ func TestRefractionNone(t *testing.T) {
 	if ref != 0 {
 		t.Errorf("RefractionNone should return 0, got %v", ref)
 	}
+
 	ref = model.RefractFromApparent(angle.Deg(10), env)
 	if ref != 0 {
 		t.Errorf("RefractionNone should return 0, got %v", ref)
@@ -113,6 +115,7 @@ func TestAirmass_KnownValues(t *testing.T) {
 			t.Errorf("altitude=%g°: unexpected error: %v", tt.alt, err)
 			continue
 		}
+
 		if am < tt.wantMin || am > tt.wantMax {
 			t.Errorf("altitude=%g°: airmass=%.2f, want [%.1f, %.1f]",
 				tt.alt, am, tt.wantMin, tt.wantMax)
@@ -130,15 +133,18 @@ func TestAirmass_BelowHorizon(t *testing.T) {
 func TestAirmass_Monotonic(t *testing.T) {
 	// Airmass should increase monotonically as altitude decreases.
 	prev := 0.0
+
 	for alt := 89.0; alt >= 1.0; alt -= 1.0 {
 		am, err := Airmass(angle.Deg(alt))
 		if err != nil {
 			t.Fatalf("altitude=%g°: %v", alt, err)
 		}
+
 		if am <= prev {
 			t.Errorf("airmass not monotonic: X(%.0f°)=%.3f <= X(%.0f°)=%.3f",
 				alt, am, alt+1, prev)
 		}
+
 		prev = am
 	}
 }
@@ -150,6 +156,7 @@ func TestAtAltitude_SeaLevel(t *testing.T) {
 	if math.Abs(atm.Pressure-1013.25) > 0.01 {
 		t.Errorf("sea level pressure: got %.2f, want 1013.25", atm.Pressure)
 	}
+
 	if math.Abs(atm.Temperature-15.0) > 0.01 {
 		t.Errorf("sea level temperature: got %.2f, want 15.0", atm.Temperature)
 	}
@@ -166,6 +173,7 @@ func TestAtAltitude_Pressure_Decreases(t *testing.T) {
 		if atm.Pressure >= prev {
 			t.Errorf("pressure not decreasing: P(%.0fm)=%.2f >= P(prev)=%.2f", h, atm.Pressure, prev)
 		}
+
 		prev = atm.Pressure
 	}
 }
@@ -176,6 +184,7 @@ func TestAtAltitude_Everest(t *testing.T) {
 	if atm.Pressure < 300 || atm.Pressure > 340 {
 		t.Errorf("Everest pressure: got %.1f hPa, want ~315 hPa", atm.Pressure)
 	}
+
 	if atm.Temperature < -48 || atm.Temperature > -38 {
 		t.Errorf("Everest temperature: got %.1f°C, want ~-42.5°C", atm.Temperature)
 	}
@@ -207,11 +216,13 @@ func TestHorizonDip(t *testing.T) {
 
 	// Monotonically increasing.
 	prev := 0.0
+
 	for _, h := range []float64{10, 50, 100, 500, 1000, 5000} {
 		d := HorizonDip(h).Degrees()
 		if d <= prev {
 			t.Errorf("dip not increasing: HorizonDip(%.0fm)=%.4f° <= prev=%.4f°", h, d, prev)
 		}
+
 		prev = d
 	}
 }
@@ -223,6 +234,7 @@ func TestZenithDistance(t *testing.T) {
 	if math.Abs(zd.Degrees()-60.0) > 0.001 {
 		t.Errorf("ZenithDistance(30°) = %v, want 60°", zd)
 	}
+
 	zd90 := ZenithDistance(angle.Deg(90))
 	if math.Abs(zd90.Degrees()) > 0.001 {
 		t.Errorf("ZenithDistance(90°) = %v, want 0°", zd90)

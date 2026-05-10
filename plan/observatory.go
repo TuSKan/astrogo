@@ -35,6 +35,7 @@ func NewSite(name string, loc *coord.Geodetic, horizon angle.Angle, tz *time.Loc
 	if loc == nil {
 		return nil, ErrNilLocation
 	}
+
 	if horizon.Degrees() < -90 || horizon.Degrees() > 90 {
 		return nil, ErrInvalidHorizon
 	}
@@ -61,6 +62,7 @@ func (s *Site) TimeZone() *time.Location {
 	if s.timeZone == nil {
 		return time.LocationUTC
 	}
+
 	return s.timeZone
 }
 
@@ -109,8 +111,10 @@ func (s *Site) RiseSetThreshold() angle.Angle {
 //
 // Total at sea level: −(16' + 34') = −50' = −0.8333°.
 func (s *Site) SunRiseSetThreshold() angle.Angle {
-	const sunSemiDiameter = 0.2667    // degrees, ~16 arcmin
+	const sunSemiDiameter = 0.2667 // degrees, ~16 arcmin
+
 	const standardRefraction = 0.5667 // degrees, ~34 arcmin
+
 	return angle.Deg(-sunSemiDiameter - standardRefraction - s.HorizonDip().Degrees())
 }
 
@@ -123,8 +127,10 @@ func (s *Site) SunRiseSetThreshold() angle.Angle {
 // The Moon's mean semi-diameter is ~15.5' (varies with parallax, handled
 // by the topocentric correction in GeocentricToObserved).
 func (s *Site) MoonRiseSetThreshold() angle.Angle {
-	const moonSemiDiameter = 0.2583   // degrees, ~15.5 arcmin (mean)
+	const moonSemiDiameter = 0.2583 // degrees, ~15.5 arcmin (mean)
+
 	const standardRefraction = 0.5667 // degrees, ~34 arcmin
+
 	return angle.Deg(-moonSemiDiameter - standardRefraction - s.HorizonDip().Degrees())
 }
 
@@ -151,6 +157,7 @@ func (s *Site) Equal(other *Site) bool {
 	}
 
 	const eps = 1e-12 // radians, ~0.2 μas
+
 	return s.name == other.name &&
 		math.Abs(s.location.Lon().Radians()-other.location.Lon().Radians()) < eps &&
 		math.Abs(s.location.Lat().Radians()-other.location.Lat().Radians()) < eps &&
@@ -186,6 +193,7 @@ func (s *Site) LocalSiderealTime(t time.Time) (angle.Angle, error) {
 	if err != nil {
 		return angle.Zero(), fmt.Errorf("LocalSiderealTime: %w", err)
 	}
+
 	u1, u2 := ut1.JDParts()
 	tt1, tt2 := t.TT().JDParts()
 	gast := gofaext.Gst06a(u1, u2, tt1, tt2)
@@ -195,5 +203,6 @@ func (s *Site) LocalSiderealTime(t time.Time) (angle.Angle, error) {
 	if lst < 0 {
 		lst += 2 * math.Pi
 	}
+
 	return angle.Rad(lst), nil
 }

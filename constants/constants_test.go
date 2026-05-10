@@ -16,6 +16,7 @@ func near(a, b float64) bool {
 	if b == 0 {
 		return math.Abs(a) <= tol
 	}
+
 	return math.Abs(a-b)/math.Abs(b) <= tol
 }
 
@@ -80,6 +81,7 @@ func TestWGS84Flattening_range(t *testing.T) {
 func TestWGS84Flattening_inverse(t *testing.T) {
 	// WGS84Flattening == 1 / WGS84InverseFlattening
 	got := constants.WGS84Flattening
+
 	want := 1.0 / constants.WGS84InverseFlattening
 	if got != want {
 		t.Errorf("WGS84Flattening = %v, want 1/WGS84InverseFlattening = %v", got, want)
@@ -90,6 +92,7 @@ func TestWGS84Flattening_inverse(t *testing.T) {
 func TestWGS84_PolarRadius_SmallerThan_SemiMajor(t *testing.T) {
 	a := constants.WGS84SemiMajorAxis
 	f := constants.WGS84Flattening
+
 	b := a * (1 - f)
 	if b >= a {
 		t.Errorf("WGS84 polar radius b = %v must be < a = %v", b, a)
@@ -137,6 +140,7 @@ func TestArcSecondsPerRadian_is_3600xDegreesPerRadian(t *testing.T) {
 func TestArcSecondsPerRadian_knownValue(t *testing.T) {
 	// 1 radian ≈ 206 264.806 arcsec (standard reference value).
 	const knownLo, knownHi = 206264.0, 206265.5
+
 	v := constants.ArcSecondsPerRadian
 	if v < knownLo || v > knownHi {
 		t.Errorf("ArcSecondsPerRadian = %v, expected in [%v, %v]", v, knownLo, knownHi)
@@ -146,6 +150,7 @@ func TestArcSecondsPerRadian_knownValue(t *testing.T) {
 func TestFullCircle_radians(t *testing.T) {
 	// 360 degrees must equal 2π radians under the conversion factor.
 	got := 360 * constants.RadiansPerDegree
+
 	want := 2 * math.Pi
 	if !near(got, want) {
 		t.Errorf("360 × RadiansPerDegree = %.16g, want 2π = %.16g", got, want)
@@ -155,6 +160,7 @@ func TestFullCircle_radians(t *testing.T) {
 func TestRightAngle_radians(t *testing.T) {
 	// 90 degrees must equal π/2 radians.
 	got := 90 * constants.RadiansPerDegree
+
 	want := math.Pi / 2
 	if !near(got, want) {
 		t.Errorf("90 × RadiansPerDegree = %.16g, want π/2 = %.16g", got, want)

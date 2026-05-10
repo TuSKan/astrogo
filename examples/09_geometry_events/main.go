@@ -22,7 +22,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to load jpl de442: %v", err)
 	}
-	defer prov.Close()
+	defer func() {
+		if err := prov.Close(); err != nil {
+			log.Printf("failed to close provider: %v", err)
+		}
+	}()
 
 	mars := plan.NewMars(prov)
 	venus := plan.NewVenus(prov)
@@ -49,6 +53,7 @@ func main() {
 	if len(events) == 0 {
 		fmt.Println("No conjunctions found in this time period.")
 	}
+
 	for i, e := range events {
 		fmt.Printf("[%d] %s at %s\n", i+1, e.Kind, e.Time.Format(time.RFC3339))
 	}
@@ -73,6 +78,7 @@ func main() {
 	// Jupiter and Saturn Conjunction (The Great Conjunction)
 	// We might need to scan further into the future to find one, but let's check!
 	jupSatEnd := start.AddDays(365 * 20)
+
 	fmt.Println("\nLooking for Conjunctions between Jupiter and Saturn (Next 20 Years):")
 
 	jupSatEvents, err := plan.Conjunctions(start, jupSatEnd, jupiter, saturn)
@@ -83,6 +89,7 @@ func main() {
 	if len(jupSatEvents) == 0 {
 		fmt.Println("No Jupiter-Saturn conjunctions found in this time period.")
 	}
+
 	for i, e := range jupSatEvents {
 		fmt.Printf("[%d] %s at %s\n", i+1, e.Kind, e.Time.Format(time.RFC3339))
 	}
@@ -100,6 +107,7 @@ func main() {
 	if len(lunarEclipses) == 0 {
 		fmt.Println("No lunar eclipses found in this time period.")
 	}
+
 	for i, ecl := range lunarEclipses {
 		// Evaluate if the Moon is actually visible from São Paulo at eclipse time
 		altCheck := plan.Altitude{Threshold: angle.Zero()}
@@ -127,6 +135,7 @@ func main() {
 	if len(solarEclipses) == 0 {
 		fmt.Println("No solar eclipses found in this time period.")
 	}
+
 	for i, ecl := range solarEclipses {
 		altCheck := plan.Altitude{Threshold: angle.Zero()}
 		res, _ := altCheck.Check(moon, ecl.Time, site)
@@ -135,6 +144,7 @@ func main() {
 		if res.Pass {
 			visibilityStr = "Visible!"
 		}
+
 		fmt.Printf("[%d] %s at %s  β=%.3f°  γ=%.2f  (%s)\n",
 			i+1, ecl.Type, ecl.Time.Format(time.RFC3339),
 			ecl.EclipticLatitude.Degrees(), ecl.Gamma, visibilityStr)
@@ -148,6 +158,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to compute apsides: %v", err)
 	}
+
 	for _, a := range apsides {
 		fmt.Printf("  %s: %s  (%.6f AU)\n", a.Apsis, a.Time.Format(time.RFC3339), a.Distance)
 	}

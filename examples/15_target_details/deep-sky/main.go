@@ -22,12 +22,14 @@ func main() {
 	ctx := coord.NewContext(t, loc, atmosphere.StandardAtmosphere)
 
 	resolver := catalog.NewResolver(catalog.OpenNGC, catalog.SIMBAD)
+
 	catTarget, err := resolver.Resolve("M31")
 	if err != nil {
 		log.Fatalf("failed to resolve M31: %v", err)
 	}
 
 	m31 := plan.FromCatalog(catTarget, nil)
+
 	details, err := m31.GetDetails(ctx, "Description", "Andromeda Galaxy", "Source", "OpenNGC")
 	if err != nil {
 		log.Fatal(err)

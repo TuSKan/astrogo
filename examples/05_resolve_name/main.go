@@ -26,19 +26,23 @@ func main() {
 	for i, t := range results {
 		fmt.Printf("[%d] %-30s | Kind: %-15s | DB: %s\n", i+1, t.Name, t.Kind, t.Catalog)
 		fmt.Printf("    ID: %-26s | ICRS: %s\n", t.ID, t.Coord)
+
 		if len(t.Aliases) > 0 {
 			// Show up to 3 aliases to demonstrate why it matched
 			alts := t.Aliases
 			if len(alts) > 3 {
 				alts = alts[:3]
 			}
+
 			fmt.Printf("    Aliases: %v\n", alts)
 		}
+
 		fmt.Println("    -------------------------------------------------------------------")
 	}
 
 	// 5. Demonstrate the strict Resolve() guarantee
 	fmt.Printf("\nExecuting strict Resolve() on %q...\n", "M31")
+
 	if exact, err := resolver.Resolve("M31"); err == nil {
 		fmt.Printf("Strictly matched: %s (%s) perfectly.\n", exact.Name, exact.ID)
 	}

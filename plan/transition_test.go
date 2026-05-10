@@ -10,10 +10,12 @@ import (
 
 func TestBasicTransitionModel(t *testing.T) {
 	loc, _ := coord.NewGeodetic(angle.Zero(), angle.Zero(), 0)
+
 	site, err := NewSite("TestSite", loc, angle.Zero(), nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+
 	tm := &BasicTransitionModel{
 		BaseSetup:           1 * time.Minute,
 		SlewRate:            2.0, // degrees per second
@@ -44,6 +46,7 @@ func TestBasicTransitionModel(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+
 	if overhead != 1*time.Minute {
 		t.Errorf("expected 1m setup overhead, got %v", overhead)
 	}

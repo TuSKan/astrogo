@@ -52,6 +52,7 @@ func New() *Provider {
 		log.Printf("openngc: failed to parse embedded data: %v", err)
 		return &Provider{byKey: make(map[string]int)}
 	}
+
 	p := &Provider{
 		targets: targets,
 		byKey:   make(map[string]int),
@@ -61,10 +62,12 @@ func New() *Provider {
 		if t.Name != "" {
 			p.byKey[resolve.Normalize(t.Name)] = i
 		}
+
 		for _, a := range t.Aliases {
 			p.byKey[resolve.Normalize(a)] = i
 		}
 	}
+
 	return p
 }
 
@@ -75,6 +78,7 @@ func (p *Provider) Resolve(query string) (resolve.Target, bool) {
 	if idx, ok := p.byKey[q]; ok {
 		return p.targets[idx], true
 	}
+
 	return resolve.Target{}, false
 }
 
@@ -83,13 +87,16 @@ func (p *Provider) Search(query string) []resolve.Target {
 	if q == "" {
 		return nil
 	}
+
 	var results []resolve.Target
+
 	for _, t := range p.targets {
 		if strings.Contains(resolve.Normalize(t.Name), q) ||
 			strings.Contains(resolve.Normalize(t.ID), q) {
 			results = append(results, t)
 			continue
 		}
+
 		for _, a := range t.Aliases {
 			if strings.Contains(resolve.Normalize(a), q) {
 				results = append(results, t)
@@ -97,11 +104,13 @@ func (p *Provider) Search(query string) []resolve.Target {
 			}
 		}
 	}
+
 	return results
 }
 
 func parseCSV(data []byte) ([]resolve.Target, error) {
 	r := csv.NewReader(bytes.NewReader(data))
+
 	header, err := r.Read()
 	if err != nil {
 		return nil, err
@@ -114,23 +123,28 @@ func parseCSV(data []byte) ([]resolve.Target, error) {
 	}
 
 	var targets []resolve.Target
+
 	for {
 		row, err := r.Read()
 		if err == io.EOF {
 			break
 		}
+
 		if err != nil {
 			return nil, err
 		}
+
 		if len(row) < 6 {
 			continue
 		}
+
 		id, name, kindStr, raStr, decStr, aliasesStr := row[0], row[1], row[2], row[3], row[4], row[5]
 
 		raDeg, _ := strconv.ParseFloat(raStr, 64)
 		decDeg, _ := strconv.ParseFloat(decStr, 64)
 
 		var kind resolve.Kind
+
 		switch kindStr {
 		case "Galaxy":
 			kind = resolve.KindGalaxy
@@ -147,10 +161,12 @@ func parseCSV(data []byte) ([]resolve.Target, error) {
 		default:
 			kind = resolve.KindOther
 		}
+
 		var aliases []string
 		if aliasesStr != "" {
 			aliases = strings.Split(aliasesStr, ";")
 		}
+
 		t := resolve.Target{
 			ID:       id,
 			Name:     name,
@@ -171,5 +187,6 @@ func parseCSV(data []byte) ([]resolve.Target, error) {
 
 		targets = append(targets, t)
 	}
+
 	return targets, nil
 }

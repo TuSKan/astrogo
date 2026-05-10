@@ -1,6 +1,7 @@
 package fits
 
 import (
+	"errors"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -27,12 +28,14 @@ func New(filePath string) (*Provider, error) {
 	}
 
 	var bintable *fits.BintableHDU
+
 	for _, hdu := range f.HDUs {
 		if bt, ok := hdu.(*fits.BintableHDU); ok {
 			bintable = bt
 			break
 		}
 	}
+
 	if bintable == nil {
 		return nil, fmt.Errorf("catalog/fits: no binary table found in %s", filePath)
 	}
@@ -43,13 +46,13 @@ func New(filePath string) (*Provider, error) {
 	decs, errDec := bintable.GetFloatColumn("DEC")
 
 	if errId != nil || errName != nil || errRa != nil || errDec != nil {
-		return nil, fmt.Errorf("catalog/fits: missing required mapping columns in bintable")
+		return nil, errors.New("catalog/fits: missing required mapping columns in bintable")
 	}
 
 	rows := len(ids)
 	targets := make([]resolve.Target, 0, rows)
 
-	for i := 0; i < rows; i++ {
+	for i := range rows {
 		targets = append(targets, resolve.Target{
 			ID:       ids[i],
 			Name:     names[i],
@@ -61,6 +64,7 @@ func New(filePath string) (*Provider, error) {
 	}
 
 	catalogName := filepath.Base(filePath)
+
 	return &Provider{
 		name:    catalogName,
 		targets: targets,
@@ -80,20 +84,24 @@ func (p *Provider) Resolve(query string) (resolve.Target, bool) {
 			return t, true
 		}
 	}
+
 	return resolve.Target{}, false
 }
 
 // Search attempts substring matching, returning all intersecting records.
 func (p *Provider) Search(query string) []resolve.Target {
 	q := resolve.Normalize(query)
+
 	var matches []resolve.Target
 	if q == "" {
 		return matches
 	}
+
 	for _, t := range p.targets {
 		if strings.Contains(resolve.Normalize(t.ID), q) || strings.Contains(resolve.Normalize(t.Name), q) {
 			matches = append(matches, t)
 		}
 	}
+
 	return matches
 }

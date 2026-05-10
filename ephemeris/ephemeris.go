@@ -141,29 +141,36 @@ func NewProvider(source Source, kernel string, opts ...Option) (Provider, error)
 		if cfg.DataDir != "" {
 			jplOpts = append(jplOpts, jpl.WithDataDir(cfg.DataDir))
 		}
+
 		if !cfg.Start.IsZero() && !cfg.End.IsZero() {
 			jplOpts = append(jplOpts, jpl.WithTimeInterval(cfg.Start, cfg.End))
 		}
+
 		p, err := jpl.NewProvider(source, kernel, jplOpts...)
 		if err != nil {
 			return nil, err
 		}
+
 		for _, extra := range cfg.ExtraKernels {
 			k, err := spk.CacheDownload("planets/"+extra+".bsp", p.DataDir)
 			if err != nil {
 				return nil, err
 			}
+
 			if err = p.AddKernel(k); err != nil {
 				return nil, err
 			}
 		}
+
 		return p, nil
 
 	case Satellites:
 		if cfg.TLELine1 == "" || cfg.TLELine2 == "" {
 			return nil, errors.New("eph: Satellites source requires WithTLE option")
 		}
+
 		cfg.TLEName = kernel
+
 		return satellite.NewFromTLE(cfg.TLEName, cfg.TLELine1, cfg.TLELine2)
 
 	case Stations:
@@ -190,6 +197,7 @@ func Position(p Provider, id ID, t time.Time) (vector.Vec3, error) {
 	if err != nil {
 		return vector.Vec3{}, err
 	}
+
 	return st.Pos, nil
 }
 
@@ -200,6 +208,7 @@ func Velocity(p Provider, id ID, t time.Time) (vector.Vec3, error) {
 	if err != nil {
 		return vector.Vec3{}, err
 	}
+
 	return st.Vel, nil
 }
 
@@ -213,6 +222,7 @@ func Altitude(p Provider, id ID, t time.Time) (float64, error) {
 	if err != nil {
 		return 0, err
 	}
+
 	return st.DistanceKm() - earthMeanRadiusKm, nil
 }
 
@@ -225,12 +235,14 @@ func ApparentState(p Provider, target ID, obsTime time.Time) (State, error) {
 	}
 
 	tauDays := st.Pos.Norm() / 173.144632674
-	for j := 0; j < 5; j++ {
+	for range 5 {
 		retardedTime := obsTime.AddDays(-tauDays)
+
 		st, err = p.State(target, retardedTime)
 		if err != nil {
 			return State{}, err
 		}
+
 		tauDays = st.Pos.Norm() / 173.144632674
 	}
 
@@ -257,14 +269,17 @@ type sofaProvider struct{}
 func (s *sofaProvider) State(id ID, t time.Time) (State, error) {
 	tdb := t.TDB()
 	d1, d2 := tdb.JDParts()
+
 	switch id {
 	case Sun:
 		pvh, _, status := gofaext.Epv00(d1, d2)
 		if status < 0 {
 			return State{}, errors.New("eph: sofa epv00 failed")
 		}
+
 		ph := pvh[0]
 		vh := pvh[1]
+
 		return State{
 			Pos: vector.Vec3{X: -ph[0], Y: -ph[1], Z: -ph[2]},
 			Vel: vector.Vec3{X: -vh[0], Y: -vh[1], Z: -vh[2]},
@@ -272,6 +287,7 @@ func (s *sofaProvider) State(id ID, t time.Time) (State, error) {
 
 	case Moon:
 		pv := gofaext.Moon98(d1, d2)
+
 		return State{
 			Pos: vector.Vec3{X: pv[0][0], Y: pv[0][1], Z: pv[0][2]},
 			Vel: vector.Vec3{X: pv[1][0], Y: pv[1][1], Z: pv[1][2]},
@@ -282,7 +298,9 @@ func (s *sofaProvider) State(id ID, t time.Time) (State, error) {
 		if status < 0 {
 			return State{}, errors.New("eph: sofa epv00 failed")
 		}
+
 		var np int
+
 		switch id {
 		case Mercury:
 			np = 1
@@ -301,10 +319,12 @@ func (s *sofaProvider) State(id ID, t time.Time) (State, error) {
 		case Neptune:
 			np = 8
 		}
+
 		pv, status := gofaext.Plan94(d1, d2, np)
 		if status < 0 {
 			return State{}, errors.New("eph: sofa plan94 failed")
 		}
+
 		return State{
 			Pos: vector.Vec3{
 				X: pv[0][0] - pvh[0][0],

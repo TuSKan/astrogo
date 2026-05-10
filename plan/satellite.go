@@ -32,10 +32,12 @@ func (s *Satellite) Position(t time.Time) (coord.ICRS, error) {
 	if err != nil {
 		return coord.ICRS{}, fmt.Errorf("satellite: ephemeris error for %s: %w", s.name, err)
 	}
+
 	icrs, err := eph.ToICRS(pos)
 	if err != nil {
 		return coord.ICRS{}, fmt.Errorf("satellite: coordinate conversion error for %s: %w", s.name, err)
 	}
+
 	return icrs, nil
 }
 
@@ -117,12 +119,14 @@ func SatellitePasses(prov eph.Provider, name string, start, end time.Time,
 		if err != nil {
 			return 0, err
 		}
+
 		return altaz.Alt().Degrees() - minElevation.Degrees(), nil
 	}
 
 	// passEvent builds a PassEvent from a LookAngle call.
 	passEvent := func(t time.Time) PassEvent {
 		altaz, _ := lookAt(t)
+
 		return PassEvent{
 			Time:      t,
 			Azimuth:   altaz.Az(),
@@ -138,27 +142,35 @@ func SatellitePasses(prov eph.Provider, name string, start, end time.Time,
 
 	for t := start; !t.After(end); t = t.Add(step) {
 		times = append(times, t)
+
 		v, err := evalEl(t)
 		if err != nil {
 			return nil, err
 		}
+
 		vals = append(vals, v)
 	}
+
 	if last := times[len(times)-1]; last.Before(end) {
 		times = append(times, end)
+
 		v, err := evalEl(end)
 		if err != nil {
 			return nil, err
 		}
+
 		vals = append(vals, v)
 	}
 
 	// Find rise/set crossings and build passes.
 	solver := NewEventSolver(step, refineTol)
-	var passes []SatellitePass
-	var currentPass *SatellitePass
 
-	for i := 0; i < len(times)-1; i++ {
+	var (
+		passes      []SatellitePass
+		currentPass *SatellitePass
+	)
+
+	for i := range len(times) - 1 {
 		v1, v2 := vals[i], vals[i+1]
 
 		// Rise crossing: elevation goes above minimum.
@@ -167,6 +179,7 @@ func SatellitePasses(prov eph.Provider, name string, start, end time.Time,
 			if err != nil {
 				continue
 			}
+
 			currentPass = &SatellitePass{
 				Name: name,
 				Rise: passEvent(riseTime),
@@ -209,10 +222,12 @@ func findCulmination(prov eph.Provider, observer *coord.Geodetic,
 
 	for t := start; !t.After(end); t = t.Add(step) {
 		ctx := coord.NewContext(t, observer, defaultAtm)
+
 		altaz, err := LookAngle(prov, 0, ctx)
 		if err != nil {
 			continue
 		}
+
 		if altaz.Alt().Degrees() > bestEl {
 			bestEl = altaz.Alt().Degrees()
 			bestTime = t
@@ -224,6 +239,7 @@ func findCulmination(prov eph.Provider, observer *coord.Geodetic,
 	if refineStart.Before(start) {
 		refineStart = start
 	}
+
 	refineEnd := bestTime.Add(step)
 	if refineEnd.After(end) {
 		refineEnd = end
@@ -231,10 +247,12 @@ func findCulmination(prov eph.Provider, observer *coord.Geodetic,
 
 	for t := refineStart; !t.After(refineEnd); t = t.Add(1 * time.Second) {
 		ctx := coord.NewContext(t, observer, defaultAtm)
+
 		altaz, err := LookAngle(prov, 0, ctx)
 		if err != nil {
 			continue
 		}
+
 		if altaz.Alt().Degrees() > bestEl {
 			bestEl = altaz.Alt().Degrees()
 			bestTime = t
@@ -242,6 +260,7 @@ func findCulmination(prov eph.Provider, observer *coord.Geodetic,
 	}
 
 	ctx := coord.NewContext(bestTime, observer, defaultAtm)
+
 	altaz, err := LookAngle(prov, 0, ctx)
 	if err != nil {
 		return PassEvent{}, err

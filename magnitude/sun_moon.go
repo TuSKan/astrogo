@@ -18,10 +18,12 @@ func SunApparent(p eph.Provider, t time.Time) (float64, error) {
 	if err != nil {
 		return 0, err
 	}
+
 	R := st.Distance()
 	if R < 1e-12 {
 		return -26.74, nil
 	}
+
 	return -26.74 + 5*math.Log10(R), nil
 }
 
@@ -50,5 +52,6 @@ func MoonApparent(p eph.Provider, t time.Time) (float64, error) {
 	// Allen (2000) polynomial.
 	a2 := alphaDeg * alphaDeg
 	v := -12.74 + 0.026*math.Abs(alphaDeg) + 4e-9*a2*a2
+
 	return v, nil
 }

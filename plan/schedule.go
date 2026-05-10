@@ -90,6 +90,7 @@ func (m *BasicTransitionModel) Overhead(ctx TransitionContext) (time.Duration, e
 		if setup <= 0 {
 			setup = 1 * time.Minute
 		}
+
 		return setup, nil
 	}
 
@@ -129,6 +130,7 @@ func (m *BasicTransitionModel) Overhead(ctx TransitionContext) (time.Duration, e
 
 		azFrom := altAzFrom.Az().Degrees()
 		azTo := altAzTo.Az().Degrees()
+
 		dAz := math.Abs(azFrom - azTo)
 		if dAz > 180.0 {
 			dAz = 360.0 - dAz
@@ -203,6 +205,7 @@ const defaultStep = 1 * time.Minute
 // SOFA matrix computations.
 func checkConstraintsIntervalCtx(target Observable, start, end time.Time, step time.Duration, site *Site, constraints ...Constraint) (*coord.Context, bool) {
 	mid := start.Add(end.Sub(start) / 2)
+
 	var midCtx *coord.Context
 
 	check := func(t time.Time) bool {
@@ -211,18 +214,23 @@ func checkConstraintsIntervalCtx(target Observable, start, end time.Time, step t
 		if midCtx == nil || absDur(t.Sub(mid)) <= absDur(midCtx.Time().Sub(mid)) {
 			midCtx = ctx
 		}
+
 		for _, c := range constraints {
-			var res Result
-			var err error
+			var (
+				res Result
+				err error
+			)
 			if cc, ok := c.(ConstraintCtx); ok {
 				res, err = cc.CheckCtx(target, t, site, ctx)
 			} else {
 				res, err = c.Check(target, t, site)
 			}
+
 			if err != nil || !res.Pass {
 				return false
 			}
 		}
+
 		return true
 	}
 
@@ -231,6 +239,7 @@ func checkConstraintsIntervalCtx(target Observable, start, end time.Time, step t
 		if !check(t) {
 			return nil, false
 		}
+
 		t = t.Add(step)
 	}
 
@@ -249,6 +258,7 @@ func absDur(d time.Duration) time.Duration {
 	if d < 0 {
 		return -d
 	}
+
 	return d
 }
 
@@ -272,6 +282,7 @@ func (s *GreedyStrategy) Schedule(planner *Planner, window Window, blocks []*Blo
 	}
 
 	currentTime := window.Start
+
 	var lastBlock *Block
 
 	type activeItem struct {
@@ -281,11 +292,13 @@ func (s *GreedyStrategy) Schedule(planner *Planner, window Window, blocks []*Blo
 	}
 
 	var unassigned []*activeItem
+
 	for _, b := range blocks {
 		repeats := 0
 		if b.Cadence != nil {
 			repeats = b.Cadence.Repeats
 		}
+
 		unassigned = append(unassigned, &activeItem{
 			b:         b,
 			available: window.Start,
@@ -312,6 +325,7 @@ func (s *GreedyStrategy) Schedule(planner *Planner, window Window, blocks []*Blo
 				ToTime:    currentTime, // Initial approximation
 				Site:      planner.Site,
 			}
+
 			overhead, err := transition.Overhead(ctx)
 			if err != nil {
 				continue
@@ -352,7 +366,9 @@ func (s *GreedyStrategy) Schedule(planner *Planner, window Window, blocks []*Blo
 				} else {
 					unassigned = append(unassigned[:i], unassigned[i+1:]...)
 				}
+
 				placed = true
+
 				break
 			}
 		}
@@ -363,11 +379,13 @@ func (s *GreedyStrategy) Schedule(planner *Planner, window Window, blocks []*Blo
 			// Optimization: if all remaining items are waiting for cadence, fast-forward time
 			allWaiting := true
 			earliestAvailable := window.End
+
 			for _, item := range unassigned {
 				if !currentTime.Before(item.available) {
 					allWaiting = false
 					break
 				}
+
 				if item.available.Before(earliestAvailable) {
 					earliestAvailable = item.available
 				}
@@ -408,5 +426,6 @@ func (s *PriorityStrategy) Schedule(planner *Planner, window Window, blocks []*B
 	})
 
 	greedy := GreedyStrategy{Step: s.Step}
+
 	return greedy.Schedule(planner, window, sorted, transition)
 }

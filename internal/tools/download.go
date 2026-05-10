@@ -2,6 +2,7 @@ package tools
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -10,7 +11,7 @@ import (
 )
 
 // Download fetches a file from a URL and saves it to the target path.
-func Download(url, path string) error {
+func Download(url, path string) (err error) {
 	// Ensure directory exists
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return err
@@ -20,11 +21,17 @@ func Download(url, path string) error {
 	if err != nil {
 		return err
 	}
+
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		cerr := resp.Body.Close()
+		if cerr != nil {
+			err = errors.Join(err, cerr)
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("jpl: download failed with status %d", resp.StatusCode)
@@ -34,12 +41,20 @@ func Download(url, path string) error {
 	if err != nil {
 		return err
 	}
+
 	tmpName := tmpFile.Name()
 
 	// Ensure we don't leak the tmp file if something panics or fails early
 	defer func() {
-		_ = tmpFile.Close()
-		_ = os.Remove(tmpName)
+		cerr := tmpFile.Close()
+		if cerr != nil {
+			err = errors.Join(err, cerr)
+		}
+
+		rerr := os.Remove(tmpName)
+		if rerr != nil && err != nil {
+			err = errors.Join(err, rerr)
+		}
 	}()
 
 	if _, err = io.Copy(tmpFile, resp.Body); err != nil {

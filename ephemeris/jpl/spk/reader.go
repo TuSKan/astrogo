@@ -8,6 +8,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 
 	"github.com/TuSKan/astrogo/internal/tools"
@@ -57,7 +58,9 @@ func CacheDownload(kernel, path string) (*Reader, error) {
 	if _, err := os.Stat(spkPath); os.IsNotExist(err) {
 		spkURI := JPL_SPK_KERNEL_URI + kernel
 		fmt.Printf("jpl: downloading %s...\n", spkURI)
-		if err := tools.Download(spkURI, spkPath); err != nil {
+
+		err := tools.Download(spkURI, spkPath)
+		if err != nil {
 			return nil, fmt.Errorf("jpl: failed to download SPK: %w", err)
 		}
 	}
@@ -69,9 +72,10 @@ func CacheDownload(kernel, path string) (*Reader, error) {
 
 	r, err := NewReader(file)
 	if err != nil {
-		file.Close()
-		os.Remove(spkPath)
-		return nil, err
+		closeErr := file.Close()
+		removeErr := os.Remove(spkPath)
+
+		return nil, errors.Join(err, closeErr, removeErr)
 	}
 
 	// Validate physical file size against DAF logical file length
@@ -80,17 +84,22 @@ func CacheDownload(kernel, path string) (*Reader, error) {
 	if stat, err := file.Stat(); err == nil {
 		expectedMinSize := int64(r.FileRec.FREE-1) * 8
 		if stat.Size() < expectedMinSize {
-			r.Close()
-			os.Remove(spkPath)
-			return nil, fmt.Errorf("jpl: corrupt SPK file gracefully deleted (truncated: %d bytes, expected min %d bytes)", stat.Size(), expectedMinSize)
+			closeErr := r.Close()
+			removeErr := os.Remove(spkPath)
+
+			return nil, errors.Join(
+				fmt.Errorf("jpl: corrupt SPK file gracefully deleted (truncated: %d bytes, expected min %d bytes)", stat.Size(), expectedMinSize),
+				closeErr, removeErr,
+			)
 		}
 	}
 
 	// Verify file integrity immediately to auto-heal CI pipelines
 	if _, err := r.ReadSummaries(); err != nil {
-		r.Close()
-		os.Remove(spkPath)
-		return nil, fmt.Errorf("jpl: corrupt SPK file gracefully deleted: %w", err)
+		closeErr := r.Close()
+		removeErr := os.Remove(spkPath)
+
+		return nil, errors.Join(fmt.Errorf("jpl: corrupt SPK file gracefully deleted: %w", err), closeErr, removeErr)
 	}
 
 	return r, nil
@@ -104,6 +113,7 @@ func NewReader(f ReadAtCloser) (*Reader, error) {
 	}
 
 	format := string(buf[88:96])
+
 	var order binary.ByteOrder = binary.LittleEndian
 	if format == "BIG-IEEE" {
 		order = binary.BigEndian
@@ -131,6 +141,7 @@ func (r *Reader) Close() error {
 // ReadSummaries reads all segments summaries.
 func (r *Reader) ReadSummaries() ([]Summary, error) {
 	var summaries []Summary
+
 	next := r.FileRec.FWD
 
 	for next != 0 {
@@ -144,8 +155,8 @@ func (r *Reader) ReadSummaries() ([]Summary, error) {
 		nSum := int32(math.Float64frombits(r.FileRec.Order.Uint64(buf[16:24])))
 		sumLen := int(r.FileRec.ND+(r.FileRec.NI+1)/2) * 8
 
-		for i := 0; i < int(nSum); i++ {
-			offset := 24 + i*sumLen
+		for i := range nSum {
+			offset := 24 + int(i)*sumLen
 			sumBuf := buf[offset : offset+sumLen]
 
 			s := Summary{
@@ -153,18 +164,19 @@ func (r *Reader) ReadSummaries() ([]Summary, error) {
 				Integers: make([]int32, r.FileRec.NI),
 			}
 
-			for d := 0; d < int(r.FileRec.ND); d++ {
+			for d := range r.FileRec.ND {
 				bits := r.FileRec.Order.Uint64(sumBuf[d*8 : (d+1)*8])
 				s.Doubles[d] = math.Float64frombits(bits)
 			}
 
 			intStart := int(r.FileRec.ND) * 8
-			for j := 0; j < int(r.FileRec.NI); j++ {
-				s.Integers[j] = int32(r.FileRec.Order.Uint32(sumBuf[intStart+j*4 : intStart+(j+1)*4]))
+			for j := range r.FileRec.NI {
+				s.Integers[j] = int32(r.FileRec.Order.Uint32(sumBuf[intStart+int(j)*4 : intStart+int(j+1)*4]))
 			}
 
 			summaries = append(summaries, s)
 		}
+
 		next = fwd
 	}
 
@@ -179,19 +191,22 @@ func (r *Reader) ReadDoubles(startWord, endWord int32) ([]float64, error) {
 	}
 
 	buf := make([]byte, count*8)
+
 	n, err := r.F.ReadAt(buf, int64(startWord-1)*8)
 	if err != nil && !errors.Is(err, io.EOF) {
 		return nil, err
 	}
+
 	if n < len(buf) && (errors.Is(err, io.EOF) || err == nil) {
 		return nil, fmt.Errorf("jpl/spk: corrupt file (unexpected EOF reading word %d)", startWord)
 	}
 
 	res := make([]float64, count)
-	for i := 0; i < int(count); i++ {
+	for i := range count {
 		bits := r.FileRec.Order.Uint64(buf[i*8 : (i+1)*8])
 		res[i] = math.Float64frombits(bits)
 	}
+
 	return res, nil
 }
 
@@ -204,12 +219,13 @@ type Segment struct {
 
 // SelectSegment finds the highest priority segment for target and ET.
 func SelectSegment(segments []Segment, targetID int32, et float64) (*Segment, error) {
-	for i := len(segments) - 1; i >= 0; i-- {
-		s := &segments[i]
+	for _, v := range slices.Backward(segments) {
+		s := &v
 		if s.Target == targetID && et >= s.StartET && et <= s.EndET {
 			return s, nil
 		}
 	}
+
 	return nil, fmt.Errorf("jpl: no coverage for target %d at ET %f", targetID, et)
 }
 
@@ -233,6 +249,7 @@ func evaluateType21(s *Segment, r *Reader, et float64) (pos, vel vector.Vec3, er
 	if err != nil {
 		return vector.Vec3{}, vector.Vec3{}, err
 	}
+
 	nRecs := int32(meta[0])
 	if nRecs <= 0 {
 		return vector.Vec3{}, vector.Vec3{}, fmt.Errorf("jpl: type 21 segment has invalid record count: %d", nRecs)
@@ -252,6 +269,7 @@ func evaluateType21(s *Segment, r *Reader, et float64) (pos, vel vector.Vec3, er
 	if idx > 0 {
 		idx--
 	}
+
 	if idx >= nRecs {
 		idx = nRecs - 1
 	}
@@ -261,6 +279,7 @@ func evaluateType21(s *Segment, r *Reader, et float64) (pos, vel vector.Vec3, er
 	L := recordAreaLen / nRecs
 
 	recStart := s.StartAddr + idx*L
+
 	rec, err := r.ReadDoubles(recStart, recStart+L-1)
 	if err != nil {
 		return vector.Vec3{}, vector.Vec3{}, err
@@ -293,9 +312,11 @@ func evaluateType21(s *Segment, r *Reader, et float64) (pos, vel vector.Vec3, er
 	}
 
 	// Precompute recursive weights
-	var g [maxAllowedOrd + 1]float64
-	var gd [maxAllowedOrd + 1]float64
-	var w [maxAllowedOrd]float64
+	var (
+		g  [maxAllowedOrd + 1]float64
+		gd [maxAllowedOrd + 1]float64
+		w  [maxAllowedOrd]float64
+	)
 
 	tp := delta
 	g[0] = 1.0
@@ -313,7 +334,7 @@ func evaluateType21(s *Segment, r *Reader, et float64) (pos, vel vector.Vec3, er
 	velArr := [3]float64{v0[0], v0[1], v0[2]}
 
 	for i := 1; i <= maxOrd; i++ {
-		for j := 0; j < 3; j++ {
+		for j := range 3 {
 			// MDA is 3x15, stored as [order1_x, order1_y, order1_z, order2_x, ...]
 			val := mda[(i-1)*3+j]
 			posArr[j] += g[i] * val
@@ -330,22 +351,25 @@ func evaluateType2(s *Segment, r *Reader, et float64) (pos, vel vector.Vec3, err
 	if err != nil {
 		return vector.Vec3{}, vector.Vec3{}, err
 	}
+
 	tInit, tLen, rSize := meta[0], meta[1], int32(meta[2])
 	nCoeffs := (rSize - 2) / 3
-	idx := int32((et - tInit) / tLen)
-	if idx < 0 {
-		idx = 0
-	}
+
+	idx := max(int32((et-tInit)/tLen), 0)
+
 	recStart := s.StartAddr + idx*rSize
+
 	rec, err := r.ReadDoubles(recStart, recStart+rSize-1)
 	if err != nil {
 		return vector.Vec3{}, vector.Vec3{}, err
 	}
+
 	mid, radius := rec[0], rec[1]
 	tau := (et - mid) / radius
 	pos.X, vel.X = EvalChebyshev(rec[2:2+nCoeffs], tau, radius, true)
 	pos.Y, vel.Y = EvalChebyshev(rec[2+nCoeffs:2+2*nCoeffs], tau, radius, true)
 	pos.Z, vel.Z = EvalChebyshev(rec[2+2*nCoeffs:2+3*nCoeffs], tau, radius, true)
+
 	return pos, vel, nil
 }
 
@@ -354,17 +378,19 @@ func evaluateType3(s *Segment, r *Reader, et float64) (pos, vel vector.Vec3, err
 	if err != nil {
 		return vector.Vec3{}, vector.Vec3{}, err
 	}
+
 	tInit, tLen, rSize := meta[0], meta[1], int32(meta[2])
 	nCoeffs := (rSize - 2) / 6
-	idx := int32((et - tInit) / tLen)
-	if idx < 0 {
-		idx = 0
-	}
+
+	idx := max(int32((et-tInit)/tLen), 0)
+
 	recStart := s.StartAddr + idx*rSize
+
 	rec, err := r.ReadDoubles(recStart, recStart+rSize-1)
 	if err != nil {
 		return vector.Vec3{}, vector.Vec3{}, err
 	}
+
 	mid, radius := rec[0], rec[1]
 	tau := (et - mid) / radius
 	pos.X, _ = EvalChebyshev(rec[2:2+nCoeffs], tau, radius, false)
@@ -374,6 +400,7 @@ func evaluateType3(s *Segment, r *Reader, et float64) (pos, vel vector.Vec3, err
 	vel.X, _ = EvalChebyshev(rec[vStart:vStart+nCoeffs], tau, radius, false)
 	vel.Y, _ = EvalChebyshev(rec[vStart+nCoeffs:vStart+2*nCoeffs], tau, radius, false)
 	vel.Z, _ = EvalChebyshev(rec[vStart+2*nCoeffs:vStart+3*nCoeffs], tau, radius, false)
+
 	return pos, vel, nil
 }
 
@@ -383,16 +410,20 @@ func EvalChebyshev(coeffs []float64, tau, radius float64, calcDeriv bool) (p, v 
 	if n == 0 {
 		return 0, 0
 	}
+
 	if n == 1 {
 		return coeffs[0], 0
 	}
+
 	t0, t1 := 1.0, tau
 	p = coeffs[0]*t0 + coeffs[1]*t1
+
 	var u0, u1 float64
 	if calcDeriv {
 		u0, u1 = 0.0, 1.0
 		v = coeffs[1] * u1
 	}
+
 	for i := 2; i < n; i++ {
 		tn := 2.0*tau*t1 - t0
 		if calcDeriv {
@@ -400,11 +431,14 @@ func EvalChebyshev(coeffs []float64, tau, radius float64, calcDeriv bool) (p, v 
 			v += coeffs[i] * un
 			u0, u1 = u1, un
 		}
+
 		p += coeffs[i] * tn
 		t0, t1 = t1, tn
 	}
+
 	if calcDeriv {
 		v /= radius
 	}
+
 	return p, v
 }

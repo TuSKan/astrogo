@@ -37,6 +37,7 @@ func TestEventSolver_Visibility_Fixed(t *testing.T) {
 
 	for i, e := range events {
 		t.Log(e.String())
+
 		if i > 0 {
 			if e.Time.Before(events[i-1].Time) {
 				t.Errorf("events not sorted: %v before %v", e.Time, events[i-1].Time)
@@ -113,13 +114,16 @@ func TestSunEvents(t *testing.T) {
 	testutil.AssertNoError(t, err)
 
 	hasRise, hasSet, hasTransit := false, false, false
+
 	for _, e := range events {
 		switch e.Kind {
 		case EventRise:
 			hasRise = true
+
 			testutil.AssertNear(t, "sunrise altitude", e.GeometricAltitude.Degrees(), site.SunRiseSetThreshold().Degrees(), 0.01)
 		case EventSet:
 			hasSet = true
+
 			testutil.AssertNear(t, "sunset altitude", e.GeometricAltitude.Degrees(), site.SunRiseSetThreshold().Degrees(), 0.01)
 		case EventTransit:
 			hasTransit = true
@@ -212,6 +216,7 @@ func TestTwilightEvents(t *testing.T) {
 				if e.Dawn != nil {
 					testutil.AssertNear(t, "dawn altitude", e.Dawn.GeometricAltitude.Degrees(), TwilightThresholds[kind], 0.02)
 				}
+
 				if e.Dusk != nil {
 					testutil.AssertNear(t, "dusk altitude", e.Dusk.GeometricAltitude.Degrees(), TwilightThresholds[kind], 0.02)
 				}
@@ -236,9 +241,11 @@ func TestTwilight_Sequence(t *testing.T) {
 	if !aDawn.Time.Before(nDawn.Time) {
 		t.Errorf("Astro dawn should be before Nautical dawn: %v vs %v", aDawn.Time, nDawn.Time)
 	}
+
 	if !nDawn.Time.Before(cDawn.Time) {
 		t.Errorf("Nautical dawn should be before Civil dawn: %v vs %v", nDawn.Time, cDawn.Time)
 	}
+
 	if !cDawn.Time.Before(rise.Time) {
 		t.Errorf("Civil dawn should be before Sunrise: %v vs %v", cDawn.Time, rise.Time)
 	}
@@ -246,9 +253,11 @@ func TestTwilight_Sequence(t *testing.T) {
 	if !set.Time.Before(cDusk.Time) {
 		t.Errorf("Sunset should be before Civil dusk: %v vs %v", set.Time, cDusk.Time)
 	}
+
 	if !cDusk.Time.Before(nDusk.Time) {
 		t.Errorf("Civil dusk should be before Nautical dusk: %v vs %v", cDusk.Time, nDusk.Time)
 	}
+
 	if !nDusk.Time.Before(aDusk.Time) {
 		t.Errorf("Nautical dusk should be before Astro dusk: %v vs %v", nDusk.Time, aDusk.Time)
 	}
@@ -288,7 +297,8 @@ func BenchmarkEventSolver(b *testing.B) {
 	}
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+
+	for range b.N {
 		_, _ = solver.Find(spec, start, end)
 	}
 }
@@ -309,9 +319,11 @@ func (m *mockLinearTarget) Position(t time.Time) (coord.ICRS, error) {
 	for ra >= 360 {
 		ra -= 360
 	}
+
 	for ra < 0 {
 		ra += 360
 	}
+
 	return coord.NewICRS(angle.Deg(ra), angle.Deg(m.dec)), nil
 }
 
@@ -392,6 +404,7 @@ type mockParabolicTarget struct {
 func (m *mockParabolicTarget) Position(t time.Time) (coord.ICRS, error) {
 	hours := float64(t.Sub(time.FromJD(2451545.0, time.UTC)).Hours())
 	dec := m.a*(hours-m.h)*(hours-m.h) + m.k
+
 	return coord.NewICRS(angle.Deg(0), angle.Deg(dec)), nil
 }
 
@@ -415,6 +428,7 @@ func TestSolveGeometry_GreatestElongation(t *testing.T) {
 	t1_pos := func(t time.Time) (coord.ICRS, error) {
 		hours := float64(t.Sub(time.FromJD(2451545.0, time.UTC)).Hours())
 		dec := t1.a*(hours-t1.h)*(hours-t1.h) + t1.k
+
 		return coord.NewICRS(angle.Deg(20), angle.Deg(dec)), nil
 	}
 

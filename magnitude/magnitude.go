@@ -43,6 +43,7 @@ func IlluminatedFraction(p eph.Provider, target eph.ID, t time.Time) (float64, e
 	if err != nil {
 		return 0, err
 	}
+
 	return (1 + math.Cos(alpha.Radians())) / 2, nil
 }
 

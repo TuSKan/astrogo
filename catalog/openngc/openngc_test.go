@@ -32,6 +32,7 @@ func TestProvider(t *testing.T) {
 				t.Errorf("Resolve(%q) ok = %v, want %v", tt.query, ok, tt.found)
 				return
 			}
+
 			if ok && got.ID != tt.wantID {
 				t.Errorf("Resolve(%q) got ID = %v, want %v", tt.query, got.ID, tt.wantID)
 			}
@@ -44,11 +45,14 @@ func TestSearch(t *testing.T) {
 	if len(p.targets) == 0 {
 		t.Skip("skipping OpenNGC standard search tests: openngc.csv dataset is not present")
 	}
+
 	results := p.Search("orion")
 	if len(results) == 0 {
 		t.Errorf("Search(%q) returned no results", "orion")
 	}
+
 	found := false
+
 	for _, r := range results {
 		norm := resolve.Normalize(r.Name)
 		if norm == "orionnebula" || norm == "greatorionnebula" || norm == "ngc1976" {
@@ -56,6 +60,7 @@ func TestSearch(t *testing.T) {
 			break
 		}
 	}
+
 	if !found {
 		t.Errorf("Search(%q) did not find Orion Nebula", "orion")
 	}
@@ -66,7 +71,8 @@ func BenchmarkSearch(b *testing.B) {
 	if len(p.targets) == 0 {
 		b.Skip("skipping OpenNGC standard benchmark: openngc.csv dataset is not present")
 	}
-	for i := 0; i < b.N; i++ {
+
+	for range b.N {
 		p.Search("nebula")
 	}
 }

@@ -1,6 +1,7 @@
 package plan
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/TuSKan/astrogo/angle"
@@ -15,7 +16,7 @@ func SiteFromFITS(h *fits.Header) (*Site, error) {
 	lat, errLat := h.GetFloat("SITELAT")
 
 	if errLon != nil || errLat != nil {
-		return nil, fmt.Errorf("plan/fits: missing mandatory SITELONG or SITELAT keywords")
+		return nil, errors.New("plan/fits: missing mandatory SITELONG or SITELAT keywords")
 	}
 
 	elev, errElev := h.GetFloat("SITEELEV")
@@ -45,6 +46,7 @@ func TargetFromFITS(h *fits.Header) (Observable, error) {
 	if errName != nil {
 		name, _ = h.GetString("OBJNAME")
 	}
+
 	if name == "" {
 		name = "FITS Target"
 	}
@@ -55,7 +57,7 @@ func TargetFromFITS(h *fits.Header) (Observable, error) {
 		if explicit, errExp := h.GetFloat("RA_DEG"); errExp == nil {
 			ra = explicit
 		} else {
-			return nil, fmt.Errorf("plan/fits: missing CRVAL1 or RA_DEG mapping for RA coordinate")
+			return nil, errors.New("plan/fits: missing CRVAL1 or RA_DEG mapping for RA coordinate")
 		}
 	}
 
@@ -64,7 +66,7 @@ func TargetFromFITS(h *fits.Header) (Observable, error) {
 		if explicit, errExp := h.GetFloat("DEC_DEG"); errExp == nil {
 			dec = explicit
 		} else {
-			return nil, fmt.Errorf("plan/fits: missing CRVAL2 or DEC_DEG mapping for DEC coordinate")
+			return nil, errors.New("plan/fits: missing CRVAL2 or DEC_DEG mapping for DEC coordinate")
 		}
 	}
 

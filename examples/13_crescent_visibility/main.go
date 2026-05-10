@@ -34,10 +34,12 @@ func main() {
 
 	// ── Find the next New Moon ──────────────────────────────────────────
 	now := time.NowUTC()
+
 	newMoon, err := plan.NextNewMoon(now, eph)
 	if err != nil {
 		log.Fatalf("NextNewMoon: %v", err)
 	}
+
 	fmt.Printf("  Next New Moon: %s\n\n", newMoon.Time)
 
 	// ── Find sunset on the evening after the New Moon ───────────────────
@@ -50,6 +52,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("SunriseSunset: %v", err)
 	}
+
 	fmt.Printf("  Sunset (São Paulo): %s\n\n", sunset.Time)
 
 	// ── Compute crescent parameters ~20 min after sunset ────────────────

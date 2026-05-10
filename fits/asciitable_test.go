@@ -27,6 +27,7 @@ func TestReadAsciiTable(t *testing.T) {
 
 	// Error missing TFIELDS
 	h2 := NewHeader()
+
 	_, err = ReadAsciiTable(h2, bytes.NewReader(nil))
 	if err == nil {
 		t.Errorf("expected error missing TFIELDS")

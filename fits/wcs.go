@@ -1,6 +1,7 @@
 package fits
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"strings"
@@ -137,6 +138,7 @@ func sipEval(coeffs map[[2]int]float64, u, v float64) float64 {
 		if pq[0] > maxP {
 			maxP = pq[0]
 		}
+
 		if pq[1] > maxQ {
 			maxQ = pq[1]
 		}
@@ -147,9 +149,11 @@ func sipEval(coeffs map[[2]int]float64, u, v float64) float64 {
 	vpow := make([]float64, maxQ+1)
 	upow[0] = 1
 	vpow[0] = 1
+
 	for i := 1; i <= maxP; i++ {
 		upow[i] = upow[i-1] * u
 	}
+
 	for i := 1; i <= maxQ; i++ {
 		vpow[i] = vpow[i-1] * v
 	}
@@ -158,6 +162,7 @@ func sipEval(coeffs map[[2]int]float64, u, v float64) float64 {
 	for pq, c := range coeffs {
 		sum += c * upow[pq[0]] * vpow[pq[1]]
 	}
+
 	return sum
 }
 
@@ -177,7 +182,7 @@ func (w *WCS) PixelToWorld(pixels []float64) ([]float64, error) {
 
 	// Step 1: Compute pixel offsets from reference pixel.
 	offset := make([]float64, w.nAxis)
-	for i := 0; i < w.nAxis; i++ {
+	for i := range w.nAxis {
 		offset[i] = pixels[i] - w.crpix[i]
 	}
 
@@ -192,11 +197,12 @@ func (w *WCS) PixelToWorld(pixels []float64) ([]float64, error) {
 
 	// Step 2: Linear Transformation mapping offsets onto standard linear plane.
 	inter := make([]float64, w.nAxis)
-	for i := 0; i < w.nAxis; i++ {
+	for i := range w.nAxis {
 		var sum float64
-		for j := 0; j < w.nAxis; j++ {
+		for j := range w.nAxis {
 			sum += w.pc[i][j] * offset[j]
 		}
+
 		inter[i] = sum * w.cdelt[i]
 	}
 
@@ -227,24 +233,28 @@ func (w *WCS) PixelToWorld(pixels []float64) ([]float64, error) {
 		if ra < 0 {
 			ra += 2 * math.Pi
 		}
+
 		ra = math.Mod(ra, 2*math.Pi)
 
 		res := make([]float64, w.nAxis)
 		res[w.lonAxis] = ra * rad2deg
+
 		res[w.latAxis] = dec * rad2deg
-		for i := 0; i < w.nAxis; i++ {
+		for i := range w.nAxis {
 			if i != w.lonAxis && i != w.latAxis {
 				res[i] = w.crval[i] + inter[i]
 			}
 		}
+
 		return res, nil
 	}
 
 	// Fallback: linear mapping.
 	res := make([]float64, w.nAxis)
-	for i := 0; i < w.nAxis; i++ {
+	for i := range w.nAxis {
 		res[i] = w.crval[i] + inter[i]
 	}
+
 	return res, nil
 }
 
@@ -275,7 +285,7 @@ func (w *WCS) WorldToPixel(world []float64) ([]float64, error) {
 		xRad, yRad, err := project(proj, raRad, decRad, alpha0, delta0)
 		if err != nil {
 			// Fall back to linear guess if projection fails.
-			for i := 0; i < w.nAxis; i++ {
+			for i := range w.nAxis {
 				pix[i] = w.crpix[i] + (world[i]-w.crval[i])/w.cdelt[i]
 			}
 		} else {
@@ -290,8 +300,9 @@ func (w *WCS) WorldToPixel(world []float64) ([]float64, error) {
 			// Invert 2x2 PC sub-matrix for the celestial axes:
 			det := w.pc[lo][lo]*w.pc[la][la] - w.pc[lo][la]*w.pc[la][lo]
 			if math.Abs(det) < 1e-30 {
-				return nil, fmt.Errorf("wcs: WorldToPixel PC matrix is singular")
+				return nil, errors.New("wcs: WorldToPixel PC matrix is singular")
 			}
+
 			dp := [2]float64{
 				(w.pc[la][la]*u[0] - w.pc[lo][la]*u[1]) / det,
 				(w.pc[lo][lo]*u[1] - w.pc[la][lo]*u[0]) / det,
@@ -308,7 +319,7 @@ func (w *WCS) WorldToPixel(world []float64) ([]float64, error) {
 			pix[la] = w.crpix[la] + dp[1]
 
 			// Higher axes: linear inverse.
-			for i := 0; i < w.nAxis; i++ {
+			for i := range w.nAxis {
 				if i != lo && i != la {
 					pix[i] = w.crpix[i] + (world[i]-w.crval[i])/w.cdelt[i]
 				}
@@ -316,15 +327,16 @@ func (w *WCS) WorldToPixel(world []float64) ([]float64, error) {
 		}
 	} else {
 		// No projection: linear inverse.
-		for i := 0; i < w.nAxis; i++ {
+		for i := range w.nAxis {
 			pix[i] = w.crpix[i] + (world[i]-w.crval[i])/w.cdelt[i]
 		}
 	}
 
 	const maxIter = 20
+
 	const tol = 1e-12 // degrees (~0.036 mas)
 
-	for iter := 0; iter < maxIter; iter++ {
+	for range maxIter {
 		fwd, err := w.PixelToWorld(pix)
 		if err != nil {
 			return nil, fmt.Errorf("wcs: WorldToPixel forward evaluation failed: %w", err)
@@ -348,9 +360,11 @@ func (w *WCS) WorldToPixel(world []float64) ([]float64, error) {
 
 		// Numerical Jacobian via finite differences along pixel axes.
 		const h = 1e-6
+
 		pix1 := make([]float64, w.nAxis)
 		copy(pix1, pix)
 		pix1[lo] += h
+
 		f1, err := w.PixelToWorld(pix1)
 		if err != nil {
 			return nil, err
@@ -359,6 +373,7 @@ func (w *WCS) WorldToPixel(world []float64) ([]float64, error) {
 		pix2 := make([]float64, w.nAxis)
 		copy(pix2, pix)
 		pix2[la] += h
+
 		f2, err := w.PixelToWorld(pix2)
 		if err != nil {
 			return nil, err
@@ -376,6 +391,7 @@ func (w *WCS) WorldToPixel(world []float64) ([]float64, error) {
 		} else if j00 < -180 {
 			j00 += 360
 		}
+
 		if j01 > 180 {
 			j01 -= 360
 		} else if j01 < -180 {
@@ -384,7 +400,7 @@ func (w *WCS) WorldToPixel(world []float64) ([]float64, error) {
 
 		det := j00*j11 - j01*j10
 		if math.Abs(det) < 1e-30 {
-			return nil, fmt.Errorf("wcs: WorldToPixel Jacobian is singular")
+			return nil, errors.New("wcs: WorldToPixel Jacobian is singular")
 		}
 
 		// Newton update: pix -= J^{-1} * residual
@@ -415,21 +431,26 @@ func (w *WCS) extractProjection() string {
 
 	// Identify which axis is longitude (RA) and which is latitude (DEC).
 	var proj string
+
 	w.lonAxis, w.latAxis = -1, -1
 
-	for i := 0; i < 2; i++ {
+	for i := range 2 {
 		ct := w.ctype[i]
 		// Strip the "-SIP" distortion suffix if present.
 		ct = strings.TrimSuffix(ct, "-SIP")
+
 		ct = strings.TrimSuffix(ct, "-TPV")
 		if len(ct) < 8 {
 			continue
 		}
+
 		prefix := ct[:4]
+
 		code := ct[5:8]
 		if !known[code] {
 			continue
 		}
+
 		switch {
 		case strings.HasPrefix(prefix, "RA"):
 			w.lonAxis = i
@@ -468,8 +489,9 @@ func project(proj string, ra, dec, alpha0, delta0 float64) (x, y float64, err er
 	case "TAN":
 		denom := sinDec*sinD0 + cosDec*cosD0*cosDRA
 		if denom <= 0 {
-			return 0, 0, fmt.Errorf("wcs: TAN projection: point behind tangent plane")
+			return 0, 0, errors.New("wcs: TAN projection: point behind tangent plane")
 		}
+
 		x = cosDec * sinDRA / denom
 		y = (sinDec*cosD0 - cosDec*sinD0*cosDRA) / denom
 
@@ -481,6 +503,7 @@ func project(proj string, ra, dec, alpha0, delta0 float64) (x, y float64, err er
 		sinTheta := sinDec*sinD0 + cosDec*cosD0*cosDRA
 		sinTheta = math.Max(-1, math.Min(1, sinTheta))
 		theta := math.Asin(sinTheta)
+
 		r := math.Pi/2 - theta
 		if r < 1e-15 {
 			x, y = 0, 0
@@ -494,6 +517,7 @@ func project(proj string, ra, dec, alpha0, delta0 float64) (x, y float64, err er
 		sinTheta := sinDec*sinD0 + cosDec*cosD0*cosDRA
 		sinTheta = math.Max(-1, math.Min(1, sinTheta))
 		theta := math.Asin(sinTheta)
+
 		r := 2 * math.Tan((math.Pi/2-theta)/2)
 		if r < 1e-15 {
 			x, y = 0, 0
@@ -523,10 +547,12 @@ func project(proj string, ra, dec, alpha0, delta0 float64) (x, y float64, err er
 		sinNT, cosNT := math.Sincos(nativeTheta)
 		halfPhi := nativePhi / 2
 		cosNTcosHalf := cosNT * math.Cos(halfPhi)
+
 		denom := math.Sqrt(1 + cosNTcosHalf)
 		if denom < 1e-15 {
-			return 0, 0, fmt.Errorf("wcs: AIT projection: antipodal point")
+			return 0, 0, errors.New("wcs: AIT projection: antipodal point")
 		}
+
 		s2 := math.Sqrt(2)
 		x = 2 * s2 * cosNT * math.Sin(halfPhi) / denom
 		y = s2 * sinNT / denom
@@ -534,6 +560,7 @@ func project(proj string, ra, dec, alpha0, delta0 float64) (x, y float64, err er
 	default:
 		return 0, 0, fmt.Errorf("wcs: unsupported projection %q", proj)
 	}
+
 	return x, y, nil
 }
 
@@ -569,6 +596,7 @@ func deproject(proj string, x, y, alpha0, delta0 float64) (ra, dec float64, err 
 		if r2 > 1.0 {
 			return 0, 0, fmt.Errorf("wcs: SIN projection: point outside unit sphere (r²=%.6f)", r2)
 		}
+
 		sinT := math.Sqrt(1 - r2)
 		dec = math.Asin(sinT*sinD0 + y*cosD0)
 		ra = alpha0 + math.Atan2(x, sinT*cosD0-y*sinD0)
@@ -579,6 +607,7 @@ func deproject(proj string, x, y, alpha0, delta0 float64) (ra, dec float64, err 
 		if r == 0 {
 			return alpha0, delta0, nil
 		}
+
 		theta := math.Pi/2 - r
 		sinT, cosT := math.Sincos(theta)
 		dec = math.Asin(sinT*sinD0 - (y/r)*cosT*cosD0)
@@ -590,6 +619,7 @@ func deproject(proj string, x, y, alpha0, delta0 float64) (ra, dec float64, err 
 		if r == 0 {
 			return alpha0, delta0, nil
 		}
+
 		theta := math.Pi/2 - 2*math.Atan(r/2)
 		sinT, cosT := math.Sincos(theta)
 		dec = math.Asin(sinT*sinD0 - (y/r)*cosT*cosD0)
@@ -601,8 +631,9 @@ func deproject(proj string, x, y, alpha0, delta0 float64) (ra, dec float64, err 
 		// Step 1: Inverse Hammer → native (φ, θ).
 		z2 := 1.0 - (x/4)*(x/4) - (y/2)*(y/2)
 		if z2 < 0 {
-			return 0, 0, fmt.Errorf("wcs: AIT projection: point outside valid region")
+			return 0, 0, errors.New("wcs: AIT projection: point outside valid region")
 		}
+
 		z := math.Sqrt(z2)
 		nativeTheta := math.Asin(y * z)
 		nativePhi := 2 * math.Atan2(x*z, 2*(2*z2-1))
@@ -632,10 +663,11 @@ func deproject(proj string, x, y, alpha0, delta0 float64) (ra, dec float64, err 
 func ExtractWCS(h *Header) (*WCS, error) {
 	naxis, err := h.GetInt("NAXIS")
 	if err != nil {
-		return nil, fmt.Errorf("fits/wcs: header missing mandatory NAXIS keyword")
+		return nil, errors.New("fits/wcs: header missing mandatory NAXIS keyword")
 	}
+
 	if naxis <= 0 {
-		return nil, fmt.Errorf("fits/wcs: header defines mathematically 0-dimensional plane")
+		return nil, errors.New("fits/wcs: header defines mathematically 0-dimensional plane")
 	}
 
 	crpix := make([]float64, naxis)
@@ -662,6 +694,7 @@ func ExtractWCS(h *Header) (*WCS, error) {
 		if err != nil {
 			d = 1.0
 		}
+
 		cdelt[idx] = d
 
 		pc[idx] = make([]float64, naxis)
@@ -670,6 +703,7 @@ func ExtractWCS(h *Header) (*WCS, error) {
 	// Try CDi_j first (used by HST, JWST, DES, LSST, and most survey pipelines).
 	// If any CDi_j keyword is found, use the CD matrix convention exclusively.
 	hasCDMatrix := false
+
 	cd := make([][]float64, naxis)
 	for i := 1; i <= naxis; i++ {
 		cd[i-1] = make([]float64, naxis)
@@ -685,11 +719,12 @@ func ExtractWCS(h *Header) (*WCS, error) {
 	if hasCDMatrix {
 		// Decompose CD matrix: CDi_j = CDELTi * PCi_j
 		// Extract CDELT as column norms and PC as the normalized rotation.
-		for i := 0; i < naxis; i++ {
+		for i := range naxis {
 			var colNorm float64
-			for j := 0; j < naxis; j++ {
+			for j := range naxis {
 				colNorm += cd[j][i] * cd[j][i]
 			}
+
 			colNorm = math.Sqrt(colNorm)
 			if colNorm == 0 {
 				colNorm = 1.0 // Avoid division by zero for degenerate axes
@@ -702,7 +737,7 @@ func ExtractWCS(h *Header) (*WCS, error) {
 				cdelt[i] = colNorm
 			}
 
-			for j := 0; j < naxis; j++ {
+			for j := range naxis {
 				pc[j][i] = cd[j][i] / cdelt[i]
 			}
 		}
@@ -729,11 +764,14 @@ func ExtractWCS(h *Header) (*WCS, error) {
 
 	// Extract SIP distortion coefficients if present.
 	sipA := parseSIPPoly(h, "A")
+
 	sipB := parseSIPPoly(h, "B")
 	if len(sipA) > 0 || len(sipB) > 0 {
 		w.SetSIP(sipA, sipB)
 	}
+
 	sipAP := parseSIPPoly(h, "AP")
+
 	sipBP := parseSIPPoly(h, "BP")
 	if len(sipAP) > 0 || len(sipBP) > 0 {
 		w.SetSIPInverse(sipAP, sipBP)
@@ -741,14 +779,17 @@ func ExtractWCS(h *Header) (*WCS, error) {
 
 	// Extract TPV distortion coefficients if CTYPE contains "-TPV" suffix.
 	hasTPV := false
+
 	for _, ct := range ctype {
 		if strings.HasSuffix(ct, "-TPV") {
 			hasTPV = true
 			break
 		}
 	}
+
 	if hasTPV {
 		pv1 := parseTPVCoeffs(h, 1)
+
 		pv2 := parseTPVCoeffs(h, 2)
 		if len(pv1) > 0 || len(pv2) > 0 {
 			w.SetTPV(pv1, pv2)
@@ -768,6 +809,7 @@ func parseSIPPoly(h *Header, prefix string) map[[2]int]float64 {
 	}
 
 	coeffs := make(map[[2]int]float64)
+
 	for p := 0; p <= order; p++ {
 		for q := 0; q <= order-p; q++ {
 			key := fmt.Sprintf("%s_%d_%d", prefix, p, q)
@@ -776,6 +818,7 @@ func parseSIPPoly(h *Header, prefix string) map[[2]int]float64 {
 			}
 		}
 	}
+
 	return coeffs
 }
 
@@ -849,11 +892,13 @@ func tpvEval(coeffs map[int]float64, x, y float64) float64 {
 	}
 
 	var sum float64
+
 	for idx, c := range coeffs {
 		if idx >= 0 && idx < 40 {
 			sum += c * terms[idx]
 		}
 	}
+
 	return sum
 }
 
@@ -862,14 +907,17 @@ func tpvEval(coeffs map[int]float64, x, y float64) float64 {
 // Returns nil if no PV keywords are found.
 func parseTPVCoeffs(h *Header, axis int) map[int]float64 {
 	coeffs := make(map[int]float64)
-	for j := 0; j < 40; j++ {
+
+	for j := range 40 {
 		key := fmt.Sprintf("PV%d_%d", axis, j)
 		if v, err := h.GetFloat(key); err == nil {
 			coeffs[j] = v
 		}
 	}
+
 	if len(coeffs) == 0 {
 		return nil
 	}
+
 	return coeffs
 }

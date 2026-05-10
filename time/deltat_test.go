@@ -50,7 +50,7 @@ func TestDeltaT_SegmentContinuity(t *testing.T) {
 
 		maxJump := 1.0 // 1 second max discontinuity
 		if jump > maxJump {
-			t.Errorf("Discontinuity at year %.0f: DeltaT(%.3f)=%.2f, DeltaT(%.3f)=%.2f, jump=%.2f s",
+			t.Errorf("Discontinuity at year %.0f: DeltaT(%.3f)=%.2f, DeltaT(%.3f)=%.2f, jump=%.2f",
 				b, b-eps, left, b+eps, right, jump)
 		} else {
 			t.Logf("Boundary %.0f: jump = %.4f s (left=%.2f, right=%.2f)", b, jump, left, right)
@@ -68,6 +68,7 @@ func TestDeltaT_MonotonicModern(t *testing.T) {
 			t.Errorf("DeltaT decreased unexpectedly: DeltaT(%.0f)=%.1f > DeltaT(%.0f)=%.1f",
 				y-5, prev, y, cur)
 		}
+
 		prev = cur
 	}
 }

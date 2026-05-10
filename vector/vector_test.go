@@ -129,6 +129,7 @@ func TestUnit(t *testing.T) {
 
 func TestFromSpherical_unitNorm(t *testing.T) {
 	lons := []float64{0, math.Pi / 4, math.Pi / 2, math.Pi, 3 * math.Pi / 2}
+
 	lats := []float64{0, math.Pi / 6, math.Pi / 3, -math.Pi / 4, -math.Pi / 3}
 	for _, lon := range lons {
 		for _, lat := range lats {

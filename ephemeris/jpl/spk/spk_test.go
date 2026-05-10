@@ -25,6 +25,7 @@ func TestParseHorizonsSummary(t *testing.T) {
       301  Moon                                            Luna                 
       399  Earth                                           Geocenter    
 `
+
 	targets, err := parseHorizonsResult(input)
 	if err != nil {
 		t.Fatalf("ParseHorizonsSummary failed: %v", err)
@@ -48,6 +49,7 @@ func TestParseHorizonsSummary(t *testing.T) {
 		if targets[tt.idx].ID != tt.id {
 			t.Errorf("target[%d] ID = %s, want %s", tt.idx, targets[tt.idx].ID, tt.id)
 		}
+
 		if targets[tt.idx].Name != tt.name {
 			t.Errorf("target[%d] Name = %s, want %s", tt.idx, targets[tt.idx].Name, tt.name)
 		}

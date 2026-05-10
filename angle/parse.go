@@ -1,6 +1,7 @@
 package angle
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -45,10 +46,13 @@ func parseBaseSexagesimal(s, funcName string, unit func(float64) Angle) (Angle, 
 	if err != nil {
 		return 0, fmt.Errorf("%s %q: %w", funcName, s, err)
 	}
+
 	if err := validateMinSec(fields[1], fields[2]); err != nil {
 		return 0, fmt.Errorf("%s %q: %w", funcName, s, err)
 	}
+
 	val := fields[0] + fields[1]/60 + fields[2]/3600
+
 	return unit(sign * val), nil
 }
 
@@ -63,10 +67,11 @@ func parseBaseSexagesimal(s, funcName string, unit func(float64) Angle) (Angle, 
 func parseSexagesimal(s string) (sign float64, fields [3]float64, err error) {
 	s = strings.TrimSpace(s)
 	if s == "" {
-		return 0, [3]float64{}, fmt.Errorf("empty string")
+		return 0, [3]float64{}, errors.New("empty string")
 	}
 
 	sign = 1
+
 	switch s[0] {
 	case '+':
 		s = s[1:]
@@ -74,18 +79,21 @@ func parseSexagesimal(s string) (sign float64, fields [3]float64, err error) {
 		sign = -1
 		s = s[1:]
 	}
+
 	s = strings.TrimSpace(s)
 
 	nums, err := extractNumericFields(s, 3)
 	if err != nil {
 		return 0, [3]float64{}, err
 	}
+
 	if len(nums) == 0 {
-		return 0, [3]float64{}, fmt.Errorf("no numeric fields found")
+		return 0, [3]float64{}, errors.New("no numeric fields found")
 	}
 
 	var f [3]float64
 	copy(f[:], nums)
+
 	return sign, f, nil
 }
 
@@ -101,12 +109,15 @@ func extractNumericFields(s string, max int) ([]float64, error) {
 		if len(result) >= max {
 			break
 		}
+
 		v, err := strconv.ParseFloat(token, 64)
 		if err != nil {
 			return nil, fmt.Errorf("cannot parse %q as number", token)
 		}
+
 		result = append(result, v)
 	}
+
 	return result, nil
 }
 
@@ -115,8 +126,10 @@ func validateMinSec(minutes, secs float64) error {
 	if minutes < 0 || minutes >= 60 {
 		return fmt.Errorf("minutes %.4g out of range [0, 60)", minutes)
 	}
+
 	if secs < 0 || secs >= 60 {
 		return fmt.Errorf("seconds %.4g out of range [0, 60)", secs)
 	}
+
 	return nil
 }

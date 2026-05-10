@@ -25,6 +25,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to create provider: %v", err)
 	}
+
 	moon := plan.NewMoon(prov)
 
 	details, err := moon.GetDetails(ctx, "Description", "Earth's natural satellite", "Source", "JPL DE442")

@@ -9,48 +9,60 @@ import (
 
 func BenchmarkUTCToTAI(b *testing.B) {
 	t := FromJD(2460000.5, UTC)
+
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+
+	for range b.N {
 		_ = t.TAI()
 	}
 }
 
 func BenchmarkUTCToTT(b *testing.B) {
 	t := FromJD(2460000.5, UTC)
+
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+
+	for range b.N {
 		_ = t.TT()
 	}
 }
 
 func BenchmarkUTCToTDB(b *testing.B) {
 	t := FromJD(2460000.5, UTC)
+
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+
+	for range b.N {
 		_ = t.TDB()
 	}
 }
 
 func BenchmarkUTCToUT1(b *testing.B) {
 	t := FromJD(2460000.5, UTC)
+
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+
+	for range b.N {
 		_, _ = t.UT1()
 	}
 }
 
 func BenchmarkTTToUTC(b *testing.B) {
 	t := FromJD(2460000.5, UTC).TT()
+
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+
+	for range b.N {
 		_ = t.UTC()
 	}
 }
 
 func BenchmarkTDBToTT(b *testing.B) {
 	t := FromJD(2460000.5, UTC).TDB()
+
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+
+	for range b.N {
 		_ = t.TT()
 	}
 }
@@ -60,8 +72,10 @@ func BenchmarkTDBToTT(b *testing.B) {
 
 func BenchmarkFullRoundTrip(b *testing.B) {
 	t := FromJD(2460000.5, UTC)
+
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+
+	for range b.N {
 		_ = t.TAI().TT().TDB().TT().TAI().UTC()
 	}
 }
@@ -72,8 +86,10 @@ func BenchmarkFullRoundTrip(b *testing.B) {
 func BenchmarkEqual_SameScale(b *testing.B) {
 	t1 := FromJD(2460000.5, UTC)
 	t2 := FromJD(2460000.5, UTC)
+
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+
+	for range b.N {
 		_ = t1.Equal(t2)
 	}
 }
@@ -81,8 +97,10 @@ func BenchmarkEqual_SameScale(b *testing.B) {
 func BenchmarkEqual_CrossScale(b *testing.B) {
 	t1 := FromJD(2460000.5, UTC)
 	t2 := t1.TT()
+
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+
+	for range b.N {
 		_ = t1.Equal(t2)
 	}
 }
@@ -90,8 +108,10 @@ func BenchmarkEqual_CrossScale(b *testing.B) {
 func BenchmarkSub_SameScale(b *testing.B) {
 	t1 := FromJD(2460001.0, UTC)
 	t2 := FromJD(2460000.5, UTC)
+
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+
+	for range b.N {
 		_ = t1.Sub(t2)
 	}
 }
@@ -99,8 +119,10 @@ func BenchmarkSub_SameScale(b *testing.B) {
 func BenchmarkSub_CrossScale(b *testing.B) {
 	t1 := FromJD(2460001.0, UTC)
 	t2 := FromJD(2460000.5, UTC).TDB()
+
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+
+	for range b.N {
 		_ = t1.Sub(t2)
 	}
 }

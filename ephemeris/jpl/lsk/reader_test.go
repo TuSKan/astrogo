@@ -18,17 +18,35 @@ func TestLSKReader(t *testing.T) {
 	if err != nil {
 		t.Fatalf("setup failed: %v", err)
 	}
-	defer prov.Close()
+
+	t.Cleanup(func() {
+		err := prov.Close()
+		if err != nil {
+			t.Errorf("failed to close provider: %v", err)
+		}
+	})
 
 	lskPath := filepath.Join(prov.DataDir, "lsk", "naif0012.tls")
 
 	f, err := os.Open(lskPath)
 	testutil.AssertNoError(t, err)
-	defer f.Close()
+
+	t.Cleanup(func() {
+		err := f.Close()
+		if err != nil {
+			t.Errorf("failed to close file: %v", err)
+		}
+	})
 
 	r, err := lsk.NewReader(f)
 	testutil.AssertNoError(t, err)
-	defer r.Close()
+
+	t.Cleanup(func() {
+		err := r.Close()
+		if err != nil {
+			t.Errorf("failed to close reader: %v", err)
+		}
+	})
 
 	// Test UTC to TDB conversion
 	// Difference between UTC and TDB is roughly 64 seconds + periodic terms at J2000

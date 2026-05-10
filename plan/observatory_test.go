@@ -74,6 +74,7 @@ func TestSiteEqual(t *testing.T) {
 	if !a.Equal(b) {
 		t.Error("identical sites should be equal")
 	}
+
 	if a.Equal(c) {
 		t.Error("sites with different names should not be equal")
 	}
@@ -99,6 +100,7 @@ func TestLocalSiderealTime(t *testing.T) {
 	site, _ := NewSite("Greenwich", loc, angle.Zero(), nil)
 
 	tm := time.FromJD(2451545.0, time.UTC)
+
 	lst, err := site.LocalSiderealTime(tm)
 	if err != nil {
 		t.Fatalf("LocalSiderealTime failed: %v", err)

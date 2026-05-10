@@ -90,6 +90,7 @@ func (c *MapCache) Set(key string, items []Target) error {
 	defer c.mu.Unlock()
 
 	c.items[key] = stored
+
 	return nil
 }
 
@@ -97,7 +98,9 @@ func (c *MapCache) Set(key string, items []Target) error {
 func (c *MapCache) Close() error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+
 	c.items = make(map[string][]Target)
+
 	return nil
 }
 
@@ -106,6 +109,7 @@ func (c *MapCache) Close() error {
 // The caller is responsible for calling Release() on the returned record.
 func ToRecordBatch(items []Target) arrow.RecordBatch {
 	mem := memory.NewGoAllocator()
+
 	b := array.NewRecordBuilder(mem, TargetSchema)
 	defer b.Release()
 
@@ -162,6 +166,7 @@ func FromRecordBatch(rec arrow.RecordBatch) []Target {
 	targets := make([]Target, int(rec.NumRows()))
 	for i := range targets {
 		var aliases []string
+
 		if !aliasesArr.IsNull(i) {
 			s := aliasesArr.Value(i)
 			if s != "" {
@@ -170,7 +175,9 @@ func FromRecordBatch(rec arrow.RecordBatch) []Target {
 		}
 
 		var icrs coord.ICRS
+
 		hasCoord := false
+
 		if !raArr.IsNull(i) && !decArr.IsNull(i) {
 			icrs = coord.NewICRS(angle.Rad(raArr.Value(i)), angle.Rad(decArr.Value(i)))
 			hasCoord = true

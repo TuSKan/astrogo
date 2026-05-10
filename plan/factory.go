@@ -44,6 +44,7 @@ func FromCatalog(c catalog.Target, p eph.Provider) Observable {
 				comet.M2 = c.M2
 				comet.K2 = c.K2
 			}
+
 			return comet
 		}
 
@@ -60,8 +61,10 @@ func FromCatalog(c catalog.Target, p eph.Provider) Observable {
 				if g == 0 {
 					g = 0.15
 				}
+
 				opts = append(opts, WithHG(c.H, g))
 			}
+
 			return NewAsteroid(c.Name, id, p, opts...)
 		}
 
@@ -77,44 +80,56 @@ func FromCatalog(c catalog.Target, p eph.Provider) Observable {
 		if c.PmRA.Radians() != 0 || c.PmDec.Radians() != 0 {
 			opts = append(opts, WithProperMotion(c.PmRA, c.PmDec))
 		}
+
 		if c.Parallax.Radians() != 0 {
 			opts = append(opts, WithParallax(c.Parallax))
 		}
+
 		if c.RadialVelocity != 0 {
 			opts = append(opts, WithRadialVelocity(c.RadialVelocity))
 		}
+
 		if c.HasVMag {
 			opts = append(opts, WithStarMagnitude(c.VMag))
 		}
+
 		if len(c.Aliases) > 0 {
 			opts = append(opts, WithAliases(c.Aliases...))
 		}
+
 		ra := angle.Rad(0)
 		dec := angle.Rad(0)
+
 		if c.HasCoord {
 			ra = c.Coord.RA()
 			dec = c.Coord.Dec()
 		}
+
 		return NewStar(c.Name, ra, dec, opts...)
 	}
 
 	// Deep-sky object (galaxy, nebula, cluster, etc.)
 	ra := angle.Rad(0)
 	dec := angle.Rad(0)
+
 	if c.HasCoord {
 		ra = c.Coord.RA()
 		dec = c.Coord.Dec()
 	}
+
 	var opts []DSOOption
 	if c.HasVMag {
 		opts = append(opts, WithDSOMagnitude(c.VMag))
 	}
+
 	if string(c.Kind) != "" {
 		opts = append(opts, WithDSOKind(string(c.Kind)))
 	}
+
 	if len(c.Aliases) > 0 {
 		opts = append(opts, WithDSOAliases(c.Aliases...))
 	}
+
 	return NewDeepSkyObject(c.Name, ra, dec, opts...)
 }
 
@@ -124,6 +139,7 @@ func parseEphID(id string) eph.ID {
 	if err != nil {
 		return 0
 	}
+
 	return eph.ID(n)
 }
 

@@ -83,6 +83,7 @@ func TestStateAndHelpers(t *testing.T) {
 	if pos != st.Pos {
 		t.Error("Position helper result mismatch with State")
 	}
+
 	if vel != st.Vel {
 		t.Error("Velocity helper result mismatch with State")
 	}
@@ -122,6 +123,7 @@ func (m *mockLinearProvider) State(id eph.ID, t time.Time) (eph.State, error) {
 	dtDays := (jd1_req - jd1_base) + (jd2_req - jd2_base)
 
 	p := m.pos.Add(m.vel.MulScalar(dtDays))
+
 	return eph.State{Pos: p, Vel: m.vel}, nil
 }
 
@@ -142,19 +144,23 @@ func angularSepArcsec(a, b coord.AltAz) float64 {
 	if cosd > 1 {
 		cosd = 1
 	}
+
 	if cosd < -1 {
 		cosd = -1
 	}
+
 	return math.Acos(cosd) * arcsecPerRad
 }
 
 func iteratedApparentVector(st eph.State) vector.Vec3 {
 	v := st.Pos
+
 	tauDays := v.Norm() / lightAUPerDay
-	for j := 0; j < 5; j++ {
+	for range 5 {
 		iterPos := v.Sub(st.Vel.MulScalar(tauDays))
 		tauDays = iterPos.Norm() / lightAUPerDay
 	}
+
 	return v.Sub(st.Vel.MulScalar(tauDays))
 }
 
@@ -174,6 +180,7 @@ func TestApparentState_ZeroVelocityReducesToGeometric(t *testing.T) {
 
 	// With zero velocity, the retarded position must be exactly the geometric position.
 	diff := appState.Pos.Sub(mock.pos)
+
 	dist := diff.Norm()
 	if dist > 1e-15 {
 		t.Fatalf("zero-velocity case should return identical position; diff = %e AU", dist)
@@ -199,6 +206,7 @@ func TestApparentState_MatchesManualLightTimeIteration(t *testing.T) {
 
 	// Compare retarded position vectors directly.
 	diff := appState.Pos.Sub(expected)
+
 	dist := diff.Norm()
 	if dist > 1e-15 {
 		t.Fatalf("ApparentState does not match explicit light-time reduction; diff = %e AU", dist)

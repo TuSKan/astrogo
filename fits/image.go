@@ -47,6 +47,7 @@ func ReadImage(h *Header, r io.Reader) (*ImageHDU, error) {
 	}
 
 	axes := make([]int64, naxis)
+
 	var totalPixels int64 = 1
 
 	for i := 1; i <= naxis; i++ {
@@ -69,12 +70,17 @@ func ReadImage(h *Header, r io.Reader) (*ImageHDU, error) {
 	if v, err := h.GetFloat("BSCALE"); err == nil {
 		bscale = v
 	}
+
 	bzero := 0.0
 	if v, err := h.GetFloat("BZERO"); err == nil {
 		bzero = v
 	}
-	var blank int64
-	var hasBlank bool
+
+	var (
+		blank    int64
+		hasBlank bool
+	)
+
 	if v, err := h.GetInt("BLANK"); err == nil {
 		blank = int64(v)
 		hasBlank = true
@@ -95,8 +101,11 @@ func ReadImage(h *Header, r io.Reader) (*ImageHDU, error) {
 	}
 
 	// Calculate total bytes
-	var pixelBytes int64
-	var dt arrow.DataType
+	var (
+		pixelBytes int64
+		dt         arrow.DataType
+	)
+
 	switch bitpix {
 	case BitpixUint8:
 		pixelBytes = 1
@@ -131,6 +140,7 @@ func ReadImage(h *Header, r io.Reader) (*ImageHDU, error) {
 	// Arrow tensors expect native byte order. Read the raw stream, then
 	// convert big-endian → native for multi-byte pixel types.
 	rawBytes := buf.Bytes()
+
 	_, err = io.ReadFull(r, rawBytes)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read image payload: %w", err)
@@ -142,6 +152,7 @@ func ReadImage(h *Header, r io.Reader) (*ImageHDU, error) {
 	paddingBytes := int(totalPayloadBytes) % BlockSize
 	if paddingBytes != 0 {
 		padLen := BlockSize - paddingBytes
+
 		padBuf := make([]byte, padLen)
 		if _, err := io.ReadFull(r, padBuf); err != nil {
 			return nil, fmt.Errorf("failed to read padding block: %w", err)
@@ -193,5 +204,6 @@ func (img *ImageHDU) PhysicalValue(stored float64) float64 {
 	if img.HasBlank && int64(stored) == img.Blank {
 		return math.NaN()
 	}
+
 	return img.BZero + img.BScale*stored
 }

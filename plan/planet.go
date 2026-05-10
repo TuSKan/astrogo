@@ -46,10 +46,12 @@ func (p *Planet) Position(t time.Time) (coord.ICRS, error) {
 	if err != nil {
 		return coord.ICRS{}, fmt.Errorf("planet: ephemeris error for %s: %w", p.name, err)
 	}
+
 	icrs, err := eph.ToICRS(pos)
 	if err != nil {
 		return coord.ICRS{}, fmt.Errorf("planet: coordinate conversion error for %s: %w", p.name, err)
 	}
+
 	return icrs, nil
 }
 

@@ -21,7 +21,8 @@ func BenchmarkNewContext(b *testing.B) {
 	t := time.FromJD(2460000.5, time.UTC)
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+
+	for range b.N {
 		_ = coord.NewContext(t, loc, atm)
 	}
 }
@@ -32,7 +33,8 @@ func BenchmarkNewContext_SeaLevel(b *testing.B) {
 	t := time.FromJD(2460000.5, time.UTC)
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+
+	for range b.N {
 		_ = coord.NewContext(t, loc, atm)
 	}
 }
@@ -48,7 +50,8 @@ func BenchmarkICRSToAltAz(b *testing.B) {
 	pos := coord.NewICRS(angle.Hour(5.5), angle.Deg(-5.4)) // Orion
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+
+	for range b.N {
 		ctx := coord.NewContext(t, loc, atm)
 		_, _ = ctx.ICRSToAltAz(pos)
 	}
@@ -65,7 +68,8 @@ func BenchmarkICRSToAltAz_CachedContext(b *testing.B) {
 	pos := coord.NewICRS(angle.Hour(5.5), angle.Deg(-5.4))
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+
+	for range b.N {
 		_, _ = ctx.ICRSToAltAz(pos)
 	}
 }
@@ -87,7 +91,8 @@ func BenchmarkICRSToAltAz_100Stars_NewContext(b *testing.B) {
 	}
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+
+	for range b.N {
 		// One context per star (scalar pattern — what the current code does)
 		for _, s := range stars {
 			ctx := coord.NewContext(t, loc, atm)
@@ -109,7 +114,8 @@ func BenchmarkICRSToAltAz_100Stars_CachedContext(b *testing.B) {
 	}
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+
+	for range b.N {
 		// One context for all stars (batched pattern)
 		ctx := coord.NewContext(t, loc, atm)
 		for _, s := range stars {
@@ -129,7 +135,8 @@ func BenchmarkReducer(b *testing.B) {
 	v := vector.Vec3{X: 0.00257, Y: 0.00010, Z: 0.00005}
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+
+	for range b.N {
 		r := coord.NewReducer(loc, t, atm)
 		_ = r.Reduce(v)
 	}
@@ -147,7 +154,8 @@ func BenchmarkReducer_Cached(b *testing.B) {
 	_ = r.Reduce(v) // warm up the cache
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+
+	for range b.N {
 		_ = r.Reduce(v)
 	}
 }
@@ -161,21 +169,23 @@ func BenchmarkICRSBatchToAltAz_10k(b *testing.B) {
 	ctx := coord.NewContext(t, loc, atm)
 
 	const n = 10000
+
 	stars := make([]coord.ICRS, n)
 	for i := range stars {
 		ra := angle.Deg(float64(i) * 360.0 / float64(n))
 		dec := angle.Deg(float64(i)*180.0/float64(n) - 90)
 		stars[i] = coord.NewICRS(ra, dec)
 	}
+
 	out := make([]coord.AltAz, n)
 
 	b.Run("Serial", func(b *testing.B) {
-		for i := 0; i < b.N; i++ {
+		for range b.N {
 			ctx.ICRSBatchToAltAz(stars, out)
 		}
 	})
 	b.Run("Parallel", func(b *testing.B) {
-		for i := 0; i < b.N; i++ {
+		for range b.N {
 			ctx.ICRSBatchToAltAzParallel(stars, out)
 		}
 	})
@@ -188,6 +198,7 @@ func BenchmarkReduceBatch_10k(b *testing.B) {
 	ctx := coord.NewContext(t, loc, atm)
 
 	const n = 10000
+
 	vecs := make([]vector.Vec3, n)
 	for i := range vecs {
 		vecs[i] = vector.Vec3{
@@ -196,15 +207,16 @@ func BenchmarkReduceBatch_10k(b *testing.B) {
 			Z: 0.00005,
 		}
 	}
+
 	out := make([]coord.AltAz, n)
 
 	b.Run("Serial", func(b *testing.B) {
-		for i := 0; i < b.N; i++ {
+		for range b.N {
 			ctx.ReduceBatch(vecs, out)
 		}
 	})
 	b.Run("Parallel", func(b *testing.B) {
-		for i := 0; i < b.N; i++ {
+		for range b.N {
 			ctx.ReduceBatchParallel(vecs, out)
 		}
 	})

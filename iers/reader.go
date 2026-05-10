@@ -35,6 +35,7 @@ var _ Model = (*Table)(nil)
 // It converts arcseconds to radians for XP and YP.
 func ParseFinals2000A(r io.Reader) (*Table, error) {
 	scanner := bufio.NewScanner(r)
+
 	var records []Record
 
 	arcsec2rad := math.Pi / (180.0 * 3600.0)
@@ -73,7 +74,9 @@ func ParseFinals2000A(r io.Reader) (*Table, error) {
 			LOD:  lod,
 		})
 	}
-	if err := scanner.Err(); err != nil {
+
+	err := scanner.Err()
+	if err != nil {
 		return nil, err
 	}
 
@@ -90,6 +93,7 @@ func (t *Table) Coverage() (mjdMin, mjdMax float64) {
 	if len(t.records) == 0 {
 		return 0, 0
 	}
+
 	return t.records[0].MJD, t.records[len(t.records)-1].MJD
 }
 
@@ -97,7 +101,7 @@ func (t *Table) Coverage() (mjdMin, mjdMax float64) {
 // Returns ErrOutOfRange if mjd falls outside the coverage of the loaded data.
 func (t *Table) EOP(mjd float64) (EOP, error) {
 	if len(t.records) == 0 {
-		return EOP{}, fmt.Errorf("no EOP records available")
+		return EOP{}, errors.New("no EOP records available")
 	}
 
 	// Reject queries outside the data coverage window.
@@ -124,6 +128,7 @@ func (t *Table) EOP(mjd float64) (EOP, error) {
 	if f < 0 {
 		f = 0
 	}
+
 	if f > 1 {
 		f = 1
 	}

@@ -30,7 +30,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("ephemeris: %v", err)
 	}
-	defer prov.Close()
+	defer func() {
+		if err := prov.Close(); err != nil {
+			log.Printf("failed to close provider: %v", err)
+		}
+	}()
 
 	brtz, err := time.LoadLocation("America/Sao_Paulo")
 	if err != nil {
@@ -54,10 +58,13 @@ func main() {
 		if err != nil {
 			log.Fatalf("seasons %d: %v", year, err)
 		}
+
 		fmt.Printf("  %d │", year)
+
 		for _, e := range events {
 			fmt.Printf(" %s │", e.Time.In(brtz).Format("Jan 02 15:04:05"))
 		}
+
 		fmt.Println()
 	}
 
@@ -81,12 +88,14 @@ func main() {
 	}
 
 	totalDays := 0.0
+
 	for _, d := range durations {
 		days := d.end.SubDays(d.start)
 		totalDays += days
 		hours := (days - float64(int(days))) * 24
 		fmt.Printf("  %-8s %6.2f days  (%dd %02dh)\n", d.name, days, int(days), int(hours))
 	}
+
 	fmt.Printf("  %-8s %6.2f days  (tropical year)\n", "Total", totalDays)
 	fmt.Println()
 	fmt.Println("  Note: Northern summer (93.6d) > winter (89.0d) because Earth is")
@@ -101,10 +110,12 @@ func main() {
 	if err != nil {
 		log.Fatalf("apsides: %v", err)
 	}
+
 	for _, a := range apsides {
 		fmt.Printf("  %-12s %s  (%.6f AU)\n",
 			a.Apsis, a.Time.In(brtz).Format("Jan 02 15:04:05 MST"), a.Distance)
 	}
+
 	eccentricity := (apsides[1].Distance - apsides[0].Distance) / (apsides[1].Distance + apsides[0].Distance)
 	fmt.Printf("\n  Orbital eccentricity: e = %.6f\n", eccentricity)
 
@@ -115,12 +126,15 @@ func main() {
 
 	phStart := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
 	phEnd := time.Date(2026, time.April, 1, 0, 0, 0, 0, time.LocationUTC)
+
 	phases, err := plan.MoonPhases(phStart, phEnd, prov)
 	if err != nil {
 		log.Fatalf("moon phases: %v", err)
 	}
+
 	for _, p := range phases {
 		icon := ""
+
 		switch p.Phase {
 		case plan.PhaseNewMoon:
 			icon = "🌑"
@@ -131,6 +145,7 @@ func main() {
 		case plan.PhaseLastQuarter:
 			icon = "🌗"
 		}
+
 		fmt.Printf("  %s %-15s %s\n", icon, p.Phase, p.Time.In(brtz).Format("Jan 02 15:04 MST"))
 	}
 
@@ -147,27 +162,34 @@ func main() {
 
 	for _, e := range lunarEcl {
 		classification := "Penumbral"
+
 		absLat := e.EclipticLatitude.Degrees()
 		if absLat < 0 {
 			absLat = -absLat
 		}
+
 		if absLat < 0.55 {
 			classification = "Total"
 		} else if absLat < 1.05 {
 			classification = "Partial"
 		}
+
 		fmt.Printf("  🌑 Lunar Eclipse (%s)  %s  |β|=%.3f°  γ=%.3f\n",
 			classification, e.Time.In(brtz).Format("Jan 02 15:04 MST"), absLat, e.Gamma)
 	}
+
 	for _, e := range solarEcl {
 		classification := "Partial"
+
 		absLat := e.EclipticLatitude.Degrees()
 		if absLat < 0 {
 			absLat = -absLat
 		}
+
 		if absLat < 0.99 {
 			classification = "Total/Annular"
 		}
+
 		fmt.Printf("  🌕 Solar Eclipse (%s)  %s  |β|=%.3f°  γ=%.3f\n",
 			classification, e.Time.In(brtz).Format("Jan 02 15:04 MST"), absLat, e.Gamma)
 	}
@@ -188,6 +210,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("moon details: %v", err)
 	}
+
 	fmt.Println(details)
 
 	// Show moon illumination at equinox
@@ -197,10 +220,12 @@ func main() {
 	// Moon rise/set on equinox day
 	eqDay := time.Date(2026, time.March, 20, 0, 0, 0, 0, time.LocationUTC)
 	eqNext := eqDay.Add(24 * time.Hour)
+
 	moonrise, moonset, _ := plan.MoonriseMoonset(eqDay, eqNext, site, prov)
 	if moonrise != nil {
 		fmt.Printf("  Moonrise:  %s  Az: %s\n", moonrise.Time.In(brtz).Format("15:04:05 MST"), moonrise.Azimuth.DMSString(0))
 	}
+
 	if moonset != nil {
 		fmt.Printf("  Moonset:   %s  Az: %s\n", moonset.Time.In(brtz).Format("15:04:05 MST"), moonset.Azimuth.DMSString(0))
 	}

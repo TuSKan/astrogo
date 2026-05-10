@@ -22,11 +22,13 @@ func TestConstraints(t *testing.T) {
 		obj := NewStar("T", angle.Hour(18.69), angle.Deg(0))
 		res, err := c.Check(obj, tm, site)
 		testutil.AssertNoError(t, err)
+
 		if !res.Pass {
 			t.Errorf("Expected PASS for high altitude, got %v", res)
 		}
 
 		c2 := Altitude{Threshold: angle.Deg(95)}
+
 		res2, _ := c2.Check(obj, tm, site)
 		if res2.Pass {
 			t.Errorf("Expected FAIL for extreme threshold, got %v", res2)
@@ -38,6 +40,7 @@ func TestConstraints(t *testing.T) {
 		obj := NewStar("T", angle.Hour(18.69), angle.Deg(0))
 		res, err := c.Check(obj, tm, site)
 		testutil.AssertNoError(t, err)
+
 		if !res.Pass {
 			t.Errorf("Expected PASS for low airmass, got %v", res)
 		}
@@ -46,6 +49,7 @@ func TestConstraints(t *testing.T) {
 		obj2 := NewStar("T", angle.Deg(0), angle.Deg(45))
 		res2, err := c.Check(obj2, tm, site)
 		testutil.AssertNoError(t, err)
+
 		if res2.Pass {
 			t.Error("Expected FAIL for target below horizon")
 		}
@@ -63,6 +67,7 @@ func TestSunMoonConstraints(t *testing.T) {
 		c := Sun{Threshold: angle.Deg(-12)}
 		res, err := c.Check(nil, tmNight, site)
 		testutil.AssertNoError(t, err)
+
 		if !res.Pass {
 			t.Errorf("Expected PASS during night, got %v", res)
 		}

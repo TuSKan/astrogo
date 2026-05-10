@@ -37,6 +37,7 @@ func (u Unit) ConversionFactor(to Unit) (float64, error) {
 	if !u.Compatible(to) {
 		return 0, IncompatibleUnitError{From: u, To: to}
 	}
+
 	return u.ScaleFactor / to.ScaleFactor, nil
 }
 
@@ -75,11 +76,15 @@ func (u Unit) String() string {
 	if u.Symbol != "" {
 		return u.Symbol
 	}
+
 	return u.Name
 }
 
 // ── Built-in Units ─────────────────────────────────────────────────────────────
 
+// SI and astronomical measurement units — immutable physical constants.
+//
+//nolint:gochecknoglobals // SI/IAU units are inherently package-level constants
 var (
 	// Length (SI)
 	Meter      = Unit{Dimension: Length, ScaleFactor: 1.0, Name: "meter", Symbol: "m"}

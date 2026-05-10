@@ -17,17 +17,35 @@ func TestSPKReader(t *testing.T) {
 	if err != nil {
 		t.Fatalf("setup failed: %v", err)
 	}
-	defer prov.Close()
+
+	t.Cleanup(func() {
+		err := prov.Close()
+		if err != nil {
+			t.Errorf("failed to close provider: %v", err)
+		}
+	})
 
 	spkPath := filepath.Join(prov.DataDir, "planets", "de440s.bsp")
 
 	f, err := os.Open(spkPath)
 	testutil.AssertNoError(t, err)
-	defer f.Close()
+
+	t.Cleanup(func() {
+		err := f.Close()
+		if err != nil {
+			t.Errorf("failed to close file: %v", err)
+		}
+	})
 
 	r, err := spk.NewReader(f)
 	testutil.AssertNoError(t, err)
-	defer r.Close()
+
+	t.Cleanup(func() {
+		err := r.Close()
+		if err != nil {
+			t.Errorf("failed to close reader: %v", err)
+		}
+	})
 
 	if r.FileRec.ND != 2 || r.FileRec.NI != 6 {
 		t.Errorf("expected ND=2, NI=6 for SPK, got ND=%d, NI=%d", r.FileRec.ND, r.FileRec.NI)

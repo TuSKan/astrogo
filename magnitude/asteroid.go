@@ -33,6 +33,7 @@ func AsteroidHG(H, G, r, delta float64, alpha angle.Angle) float64 {
 	if phaseFn <= 0 {
 		phaseFn = 1e-30 // prevent log(0)
 	}
+
 	return H + 5*math.Log10(r*delta) - 2.5*math.Log10(phaseFn)
 }
 
@@ -49,12 +50,14 @@ func bowellPhi(alphaRad float64, i int) float64 {
 	if alphaRad < 0 {
 		alphaRad = 0
 	}
+
 	halfA := alphaRad / 2
 	if halfA >= math.Pi/2 {
 		return 0
 	}
 
 	var A, B, C float64
+
 	switch i {
 	case 1:
 		A, B, C = 3.332, 0.631, 0.986
@@ -72,6 +75,7 @@ func bowellPhi(alphaRad float64, i int) float64 {
 
 	// Small-angle (smooth) component.
 	denom := 0.119 + 1.341*sinA - 0.754*sinA*sinA
+
 	phiS := 1.0
 	if math.Abs(denom) > 1e-30 {
 		phiS = 1 - C*sinA/denom
@@ -107,6 +111,7 @@ func AsteroidHG1G2(H, G1, G2, r, delta float64, alpha angle.Angle) float64 {
 	if phaseFn <= 0 {
 		phaseFn = 1e-30
 	}
+
 	return H - 2.5*math.Log10(phaseFn) + 5*math.Log10(r*delta)
 }
 
@@ -122,6 +127,7 @@ func AsteroidHG1G2(H, G1, G2, r, delta float64, alpha angle.Angle) float64 {
 func AsteroidHG12Star(H, G12star, r, delta float64, alpha angle.Angle) float64 {
 	G1 := 0.84293649 * G12star
 	G2 := 0.53513350 * (1 - G12star)
+
 	return AsteroidHG1G2(H, G1, G2, r, delta, alpha)
 }
 
@@ -141,6 +147,7 @@ func AsteroidHG12(H, G12, r, delta float64, alpha angle.Angle) float64 {
 		G1 = 0.9529*G12 + 0.02162
 		G2 = -0.6125*G12 + 0.5572
 	}
+
 	return AsteroidHG1G2(H, G1, G2, r, delta, alpha)
 }
 
@@ -199,6 +206,7 @@ func SpinCorrection(R, cosLambda float64) float64 {
 	if arg <= 0 {
 		arg = 1e-30
 	}
+
 	return 2.5 * math.Log10(arg)
 }
 
@@ -216,6 +224,7 @@ func CosAspectAngle(ra, dec, ra0, dec0 angle.Angle) float64 {
 	d := dec.Radians()
 	d0 := dec0.Radians()
 	dra := ra.Radians() - ra0.Radians()
+
 	return math.Sin(d)*math.Sin(d0) + math.Cos(d)*math.Cos(d0)*math.Cos(dra)
 }
 
@@ -229,6 +238,7 @@ func Oblateness(a, b, c float64) float64 {
 	if a*b == 0 {
 		return 1
 	}
+
 	return c * (a + b) / (2 * a * b)
 }
 
@@ -252,8 +262,9 @@ func newCubicSpline(x, y []float64, dyL, dyR float64) *cubicSpline {
 
 	// Compute intervals and slopes.
 	h := make([]float64, n-1)
+
 	r := make([]float64, n-1)
-	for i := 0; i < n-1; i++ {
+	for i := range n - 1 {
 		h[i] = x[i+1] - x[i]
 		r[i] = (y[i+1] - y[i]) / h[i]
 	}
@@ -267,6 +278,7 @@ func newCubicSpline(x, y []float64, dyL, dyR float64) *cubicSpline {
 		a1 := dyL
 		a2 := (3*r[0] - 2*dyL - dyR) / h[0]
 		a3 := (-2*r[0] + dyL + dyR) / (h[0] * h[0])
+
 		return &cubicSpline{
 			x:    x,
 			y:    y,
@@ -283,18 +295,20 @@ func newCubicSpline(x, y []float64, dyL, dyR float64) *cubicSpline {
 
 	// Right-hand side.
 	C := make([]float64, nInt)
-	for i := 0; i < nInt; i++ {
+	for i := range nInt {
 		k := i + 1
 		C[i] = 3 * (r[k-1]*h[k] + r[k]*h[k-1])
 	}
+
 	C[0] -= dyL * h[1]
 	C[nInt-1] -= dyR * h[nInt-1]
 
 	// Tridiagonal matrix coefficients.
 	lower := make([]float64, nInt)
 	diag := make([]float64, nInt)
+
 	upper := make([]float64, nInt)
-	for i := 0; i < nInt; i++ {
+	for i := range nInt {
 		k := i + 1
 		lower[i] = h[k]
 		diag[i] = 2 * (h[k-1] + h[k])
@@ -303,13 +317,14 @@ func newCubicSpline(x, y []float64, dyL, dyR float64) *cubicSpline {
 
 	// Thomas algorithm for tridiagonal solve.
 	solveTridiagonal(lower, diag, upper, C)
-	for i := 0; i < nInt; i++ {
+
+	for i := range nInt {
 		dys[i+1] = C[i]
 	}
 
 	// Build polynomial coefficients per interval.
 	coef := make([][4]float64, n-1)
-	for i := 0; i < n-1; i++ {
+	for i := range n - 1 {
 		a0 := y[i]
 		a1 := dys[i]
 		a2 := (3*r[i] - 2*dys[i] - dys[i+1]) / h[i]
@@ -328,6 +343,7 @@ func (s *cubicSpline) eval(xv float64) float64 {
 		if n == 1 {
 			return math.Max(0, s.y[0])
 		}
+
 		return 0
 	}
 
@@ -340,13 +356,12 @@ func (s *cubicSpline) eval(xv float64) float64 {
 		result = s.y[n-1] + s.dyR*(xv-s.x[n-1])
 	} else {
 		// Find interval via binary search.
-		idx := sort.SearchFloat64s(s.x, xv) - 1
-		if idx < 0 {
-			idx = 0
-		}
+		idx := max(sort.SearchFloat64s(s.x, xv)-1, 0)
+
 		if idx >= len(s.coef) {
 			idx = len(s.coef) - 1
 		}
+
 		dx := xv - s.x[idx]
 		c := s.coef[idx]
 		result = c[0] + c[1]*dx + c[2]*dx*dx + c[3]*dx*dx*dx
@@ -356,6 +371,7 @@ func (s *cubicSpline) eval(xv float64) float64 {
 	if result < 0 {
 		return 0
 	}
+
 	return result
 }
 
@@ -387,6 +403,7 @@ func deg2rad(degrees ...float64) []float64 {
 	for i, d := range degrees {
 		r[i] = d * math.Pi / 180
 	}
+
 	return r
 }
 

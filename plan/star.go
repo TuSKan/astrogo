@@ -57,6 +57,7 @@ func NewStar(name string, ra, dec angle.Angle, opts ...StarOption) *Star {
 	for _, opt := range opts {
 		opt(s)
 	}
+
 	return s
 }
 
@@ -64,6 +65,7 @@ func (s *Star) Name() string { return s.name }
 
 func (s *Star) Position(_ time.Time) (coord.ICRS, error) {
 	hasPM := s.pmRA.Radians() != 0 || s.pmDec.Radians() != 0
+
 	hasParallax := s.parallax.Radians() != 0
 	if hasPM || hasParallax {
 		return coord.NewICRSWithKinematics(
@@ -72,6 +74,7 @@ func (s *Star) Position(_ time.Time) (coord.ICRS, error) {
 			s.parallax, s.radialVelocity,
 		), nil
 	}
+
 	return s.coord, nil
 }
 

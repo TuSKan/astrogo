@@ -35,6 +35,7 @@ func TestDeg(t *testing.T) {
 func TestHMSStringEdge(t *testing.T) {
 	// 23h 59m 59.999s with precision 2 should round properly or stay < 24h
 	a := angle.Hour(23.99999)
+
 	s := a.HMSString(2)
 	if s >= "24h" {
 		t.Errorf("HMSString(23.99999) returned %q, expected < 24h", s)
@@ -86,12 +87,15 @@ func TestAccessorRoundTrips(t *testing.T) {
 	for _, v := range vals {
 		testutil.AssertNear(t, "Deg round-trip", angle.Deg(v).Degrees(), v, tol)
 	}
+
 	for _, v := range []float64{0, 1, -1, 6, 12, 24} {
 		testutil.AssertNear(t, "Hour round-trip", angle.Hour(v).Hours(), v, tol)
 	}
+
 	for _, v := range []float64{0, 1, 60, -1, 3600} {
 		testutil.AssertNear(t, "Arcmin round-trip", angle.Arcmin(v).Arcminutes(), v, tol)
 	}
+
 	for _, v := range []float64{0, 1, 3600, -1} {
 		testutil.AssertNear(t, "Arcsec round-trip", angle.Arcsec(v).Arcseconds(), v, tol)
 	}
@@ -140,6 +144,7 @@ func TestTan(t *testing.T) {
 
 func TestWrap2Pi(t *testing.T) {
 	const twoPi = 2 * math.Pi
+
 	cases := []struct {
 		name string
 		in   float64 // radians
@@ -175,6 +180,7 @@ func TestWrap2Pi(t *testing.T) {
 		if got < -tol || got >= twoPi+tol {
 			t.Errorf("%s: Wrap2Pi(%v) = %v, outside [0,2π)", testutil.CaseLabel(i, c.name), c.in, got)
 		}
+
 		testutil.AssertNear(t, testutil.CaseLabel(i, c.name), got, c.want, tol)
 	}
 }
@@ -208,6 +214,7 @@ func TestWrapPi(t *testing.T) {
 		if got <= -math.Pi || got > math.Pi {
 			t.Errorf("%s: WrapPi(%v) = %v, outside (-π,π]", testutil.CaseLabel(i, c.name), c.in, got)
 		}
+
 		testutil.AssertNear(t, testutil.CaseLabel(i, c.name), got, c.want, tol)
 	}
 }
@@ -349,13 +356,16 @@ func TestParseDMS(t *testing.T) {
 	}
 	for i, c := range cases {
 		got, err := angle.ParseDMS(c.input)
+
 		lbl := testutil.CaseLabel(i, c.name)
 		if c.wantErr {
 			if err == nil {
 				t.Errorf("%s: expected error for %q, got none", lbl, c.input)
 			}
+
 			continue
 		}
+
 		testutil.AssertNoError(t, err)
 		testutil.AssertNear(t, lbl, got.Degrees(), c.wantDeg, tol)
 	}
@@ -380,13 +390,16 @@ func TestParseHMS(t *testing.T) {
 	}
 	for i, c := range cases {
 		got, err := angle.ParseHMS(c.input)
+
 		lbl := testutil.CaseLabel(i, c.name)
 		if c.wantErr {
 			if err == nil {
 				t.Errorf("%s: expected error for %q, got none", lbl, c.input)
 			}
+
 			continue
 		}
+
 		testutil.AssertNoError(t, err)
 		testutil.AssertNear(t, lbl, got.Hours(), c.wantHours, tol)
 	}

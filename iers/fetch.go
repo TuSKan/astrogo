@@ -3,6 +3,7 @@ package iers
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -26,6 +27,7 @@ const (
 	fetchTimeout = 30 * time.Second
 )
 
+//nolint:gochecknoglobals // fetch rate-limiter state — guarded by sync.Mutex
 var (
 	fetchMu       sync.Mutex
 	lastAttempt   time.Time         // wall-clock of last fetch attempt (success or failure)
@@ -77,6 +79,7 @@ func FetchIfStale(mjd float64) error {
 
 	lastAttempt = time.Now()
 	lastFetchErr = doFetch()
+
 	return lastFetchErr
 }
 
@@ -87,6 +90,7 @@ func covered(mjd float64) bool {
 		_, err := table.EOP(mjd)
 		return err == nil
 	}
+
 	return false
 }
 
@@ -99,10 +103,11 @@ func CachePath() string {
 		// failures, so this is truly exceptional).
 		return filepath.Join(os.TempDir(), "astrogo", "iers", "finals2000A.data")
 	}
+
 	return p
 }
 
-func doFetch() error {
+func doFetch() (err error) {
 	cachePath := CachePath()
 
 	// Check if a sufficiently fresh cache file exists.
@@ -117,15 +122,22 @@ func doFetch() error {
 	log.Printf("astrogo/iers: downloading fresh EOP data from %s", finalsURL)
 
 	client := &http.Client{Timeout: fetchTimeout}
+
 	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, finalsURL, nil)
 	if err != nil {
 		return fmt.Errorf("iers: failed to create EOP request: %w", err)
 	}
+
 	resp, err := client.Do(req)
 	if err != nil {
 		return fmt.Errorf("iers: failed to download EOP data: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		cerr := resp.Body.Close()
+		if cerr != nil {
+			err = errors.Join(err, cerr)
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("iers: EOP download returned status %d", resp.StatusCode)
@@ -154,6 +166,7 @@ func doFetch() error {
 	min, max := table.Coverage()
 	log.Printf("astrogo/iers: loaded fresh EOP data: MJD %.0f–%.0f (%d records)",
 		min, max, len(table.records))
+
 	return nil
 }
 
@@ -162,13 +175,16 @@ func loadFromDisk(path string) error {
 	if err != nil {
 		return fmt.Errorf("iers: failed to read cached EOP file: %w", err)
 	}
+
 	table, err := ParseFinals2000A(bytes.NewReader(data))
 	if err != nil {
 		return fmt.Errorf("iers: failed to parse cached EOP data: %w", err)
 	}
+
 	RegisterModel(table)
 	min, max := table.Coverage()
 	log.Printf("astrogo/iers: loaded cached EOP data: MJD %.0f–%.0f (%d records)",
 		min, max, len(table.records))
+
 	return nil
 }

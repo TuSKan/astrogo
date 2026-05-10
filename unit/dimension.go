@@ -48,6 +48,7 @@ func (d Dimension) Div(other Dimension) Dimension {
 // PowInt returns d raised to the power p (multiplies exponents).
 func (d Dimension) PowInt(p int) Dimension {
 	p8 := int8(p)
+
 	return Dimension{
 		L:     d.L * p8,
 		M:     d.M * p8,
@@ -61,6 +62,9 @@ func (d Dimension) PowInt(p int) Dimension {
 
 // ── Common Dimensions ────────────────────────────────────────────────────────
 
+// SI base and derived dimensions — immutable physical constants.
+//
+//nolint:gochecknoglobals // SI dimensions are inherently package-level constants
 var (
 	Dimensionless = Dimension{}
 	Length        = Dimension{L: 1}

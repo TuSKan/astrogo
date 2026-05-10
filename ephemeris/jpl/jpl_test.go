@@ -2,6 +2,7 @@ package jpl_test
 
 import (
 	"math"
+	"slices"
 	"testing"
 
 	"github.com/TuSKan/astrogo/ephemeris/core"
@@ -28,6 +29,7 @@ func TestBodyMapping(t *testing.T) {
 			t.Errorf("BodyIDToNAIF[%v] not found", tt.id)
 			continue
 		}
+
 		if got != tt.want {
 			t.Errorf("BodyIDToNAIF[%v] = %v, want %v", tt.id, got, tt.want)
 		}
@@ -66,6 +68,7 @@ func TestTimeConv(t *testing.T) {
 func TestCheby(t *testing.T) {
 	// Simple constant polynomial
 	coeffs := []float64{10.0}
+
 	p, v := spk.EvalChebyshev(coeffs, 0.5, 100.0, true)
 	if p != 10.0 || v != 0.0 {
 		t.Errorf("Constant Cheby: p=%f v=%f, want 10.0, 0.0", p, v)
@@ -73,6 +76,7 @@ func TestCheby(t *testing.T) {
 
 	// Line p = tau
 	coeffs = []float64{0.0, 1.0}
+
 	p, v = spk.EvalChebyshev(coeffs, 0.5, 100.0, true)
 	if math.Abs(p-0.5) > 1e-12 || math.Abs(v-0.01) > 1e-12 {
 		t.Errorf("Linear Cheby: p=%f v=%f, want 0.5, 0.01", p, v)
@@ -84,12 +88,19 @@ func TestJPLUnitsAreAUAndAUPerDay(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to initialize provider: %v", err)
 	}
-	defer p.Close()
+
+	t.Cleanup(func() {
+		err := p.Close()
+		if err != nil {
+			t.Errorf("failed to close provider: %v", err)
+		}
+	})
 
 	state, err := p.State(core.Sun, time.NowUTC())
 	if err != nil {
 		t.Fatalf("failed to evaluate Sun state: %v", err)
 	}
+
 	dist := state.Pos.Norm()
 	if dist < 0.9 || dist > 1.1 {
 		t.Errorf("Sun distance %f AU seems wrong for AU units", dist)
@@ -101,7 +112,13 @@ func TestJPLUnsupportedBody(t *testing.T) {
 	if err != nil {
 		t.Fatalf("setup failed: %v", err)
 	}
-	defer p.Close()
+
+	t.Cleanup(func() {
+		err := p.Close()
+		if err != nil {
+			t.Errorf("failed to close provider: %v", err)
+		}
+	})
 
 	_, err = p.State(core.ID(255), time.NowUTC())
 	if err == nil {
@@ -114,10 +131,17 @@ func TestJPLOutOfCoverageEpoch(t *testing.T) {
 	if err != nil {
 		t.Fatalf("setup failed: %v", err)
 	}
-	defer p.Close()
+
+	t.Cleanup(func() {
+		err := p.Close()
+		if err != nil {
+			t.Errorf("failed to close provider: %v", err)
+		}
+	})
 
 	// Year 5000
 	tm := time.FromJD(3545000.0, time.UTC)
+
 	_, err = p.State(core.Sun, tm)
 	if err == nil {
 		t.Error("Expected error for out-of-coverage epoch")
@@ -129,13 +153,21 @@ func TestJPLDeterministicRepeatedCalls(t *testing.T) {
 	if err != nil {
 		t.Fatalf("setup failed: %v", err)
 	}
-	defer p.Close()
+
+	t.Cleanup(func() {
+		err := p.Close()
+		if err != nil {
+			t.Errorf("failed to close provider: %v", err)
+		}
+	})
 
 	tm := time.NowUTC()
+
 	s1, err := p.State(core.Sun, tm)
 	if err != nil {
 		t.Fatalf("s1 failed: %v", err)
 	}
+
 	s2, err := p.State(core.Sun, tm)
 	if err != nil {
 		t.Fatalf("s2 failed: %v", err)
@@ -152,10 +184,14 @@ func TestSourceSelection(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Planets source failed: %v", err)
 		}
+
 		if p == nil {
 			t.Fatal("Planets source returned nil provider")
 		}
-		p.Close()
+
+		if err := p.Close(); err != nil {
+			t.Errorf("failed to close provider: %v", err)
+		}
 	})
 
 	t.Run("Unsupported", func(t *testing.T) {
@@ -190,19 +226,20 @@ func TestSmallBodyEros(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create smallbody provider: %v", err)
 	}
-	defer p.Close()
+
+	t.Cleanup(func() {
+		err := p.Close()
+		if err != nil {
+			t.Errorf("failed to close provider: %v", err)
+		}
+	})
 
 	t.Logf("Loaded %d kernels", len(p.SupportedBodies()))
 
 	// Check if Eros is in supported bodies
 	bodies := p.SupportedBodies()
-	found := false
-	for _, b := range bodies {
-		if b == core.ID(433) {
-			found = true
-			break
-		}
-	}
+	found := slices.Contains(bodies, core.ID(433))
+
 	if !found {
 		t.Errorf("Eros (433) not found in supported bodies: %v", bodies)
 	}
@@ -221,6 +258,7 @@ func TestSmallBodyEros(t *testing.T) {
 	if dist < 0.1 || dist > 5.0 {
 		t.Errorf("Suspicious geocentric distance for Eros: %f AU", dist)
 	}
+
 	t.Logf("Eros State at %v: Pos=%v Dist=%v AU", start, state.Pos, dist)
 }
 
@@ -228,7 +266,6 @@ func TestSmallBodyMultiMatch(t *testing.T) {
 	// Querying "Apophis" matches multiple entries in SBDB,
 	// but here we are passing a "kernel" command to Horizons.
 	// Horizons might return a list if the command is ambiguous.
-
 	start := time.FromJD(2460000.5, time.UTC)
 	end := time.FromJD(2460001.5, time.UTC)
 
@@ -241,11 +278,18 @@ func TestSmallBodyMultiMatch(t *testing.T) {
 		// If it's ambiguous, spk.CacheAPI should have handled it or returned error
 		t.Fatalf("Failed to create provider for Apophis: %v", err)
 	}
-	defer p.Close()
+
+	t.Cleanup(func() {
+		err := p.Close()
+		if err != nil {
+			t.Errorf("failed to close provider: %v", err)
+		}
+	})
 
 	bodies := p.SupportedBodies()
 	if len(bodies) == 0 {
 		t.Error("Expected at least one body loaded for Apophis")
 	}
+
 	t.Logf("Loaded bodies for 'Apophis': %v", bodies)
 }

@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -40,6 +41,7 @@ type HorizonsResponse struct {
 
 func CacheAPI(kernel string, startTime, endTime time.Time, path string) ([]*Reader, error) {
 	var readers []*Reader
+
 	spkFile := kernel + ".bsp"
 	spkPath := filepath.Join(path, spkFile)
 
@@ -53,10 +55,12 @@ func CacheAPI(kernel string, startTime, endTime time.Time, path string) ([]*Read
 		if err != nil {
 			return nil, fmt.Errorf("jpl: failed to open cached SPK %s: %w", spkPath, err)
 		}
+
 		reader, err := NewReader(f)
 		if err != nil {
 			return nil, fmt.Errorf("jpl: failed to create reader for %s: %w", spkPath, err)
 		}
+
 		return []*Reader{reader}, nil
 	}
 
@@ -74,6 +78,7 @@ func CacheAPI(kernel string, startTime, endTime time.Time, path string) ([]*Read
 			if r == '\n' || r == '\r' || r == ' ' || r == '\t' {
 				return -1
 			}
+
 			return r
 		}, resp.Spk))
 		if err != nil {
@@ -83,36 +88,43 @@ func CacheAPI(kernel string, startTime, endTime time.Time, path string) ([]*Read
 		if err := os.WriteFile(spkPath, spkData, 0o644); err != nil {
 			return nil, fmt.Errorf("jpl: failed to save SPK %s: %w", spkPath, err)
 		}
+
 		f, err := os.Open(spkPath)
 		if err != nil {
 			return nil, fmt.Errorf("jpl: failed to open SPK %s: %w", spkPath, err)
 		}
+
 		reader, err := NewReader(f)
 		if err != nil {
 			return nil, fmt.Errorf("jpl: failed to create reader for %s: %w", spkPath, err)
 		}
+
 		readers = append(readers, reader)
 	} else {
 		hRes, err := parseHorizonsResult(resp.Result)
 		if err != nil {
 			return nil, fmt.Errorf("jpl: failed to parse Horizons result: %w", err)
 		}
+
 		for _, r := range hRes {
 			sub, err := CacheAPI(r.ID, startTime, endTime, path)
 			if err != nil {
 				return nil, fmt.Errorf("jpl: failed to get SPK %s: %w", spkPath, err)
 			}
+
 			readers = append(readers, sub...)
 		}
 	}
+
 	return readers, nil
 }
 
-func apiHorizonsRequest(command string, startTime, endTime time.Time) (*HorizonsResponse, error) {
+func apiHorizonsRequest(command string, startTime, endTime time.Time) (_ *HorizonsResponse, err error) {
 	api, err := url.Parse(JPL_HORIZONS_API)
 	if err != nil {
 		return nil, fmt.Errorf("jpl: failed to parse API URL: %w", err)
 	}
+
 	params := url.Values{}
 	params.Set("format", "json")
 	params.Set("COMMAND", "'"+command+"'")
@@ -128,23 +140,29 @@ func apiHorizonsRequest(command string, startTime, endTime time.Time) (*Horizons
 	if err != nil {
 		return nil, fmt.Errorf("HorizonsRequest: failed to create request: %w", err)
 	}
+
 	r, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("HorizonsRequest: failed to get: %w", err)
 	}
-	defer r.Body.Close()
+	defer func() {
+		cerr := r.Body.Close()
+		if cerr != nil {
+			err = errors.Join(err, cerr)
+		}
+	}()
 
 	switch r.StatusCode {
 	case http.StatusOK:
 		// Proceed
 	case http.StatusBadRequest:
-		return nil, fmt.Errorf("jpl: horizons bad request (400): check keywords/content")
+		return nil, errors.New("jpl: horizons bad request (400): check keywords/content")
 	case http.StatusMethodNotAllowed:
-		return nil, fmt.Errorf("jpl: horizons method not allowed (405)")
+		return nil, errors.New("jpl: horizons method not allowed (405)")
 	case http.StatusInternalServerError:
-		return nil, fmt.Errorf("jpl: horizons internal server error (500): database unavailable")
+		return nil, errors.New("jpl: horizons internal server error (500): database unavailable")
 	case http.StatusServiceUnavailable:
-		return nil, fmt.Errorf("jpl: horizons service unavailable (503): temporary overload/maintenance")
+		return nil, errors.New("jpl: horizons service unavailable (503): temporary overload/maintenance")
 	default:
 		return nil, fmt.Errorf("jpl: horizons unexpected status: %s", r.Status)
 	}
@@ -163,6 +181,7 @@ func parseHorizonsResult(data string) ([]HorizonsResult, error) {
 	scanner := bufio.NewScanner(strings.NewReader(data))
 
 	inTable := false
+
 	for scanner.Scan() {
 		line := scanner.Text()
 
@@ -182,6 +201,7 @@ func parseHorizonsResult(data string) ([]HorizonsResult, error) {
 			if len(result) > 0 {
 				break // End of results
 			}
+
 			continue // Skip leading empty lines in table area
 		}
 
@@ -208,7 +228,8 @@ func parseHorizonsResult(data string) ([]HorizonsResult, error) {
 		})
 	}
 
-	if err := scanner.Err(); err != nil {
+	err := scanner.Err()
+	if err != nil {
 		return nil, err
 	}
 
@@ -219,8 +240,10 @@ func safeSubstr(s string, start, length int) string {
 	if start >= len(s) {
 		return ""
 	}
+
 	if length == -1 || start+length > len(s) {
 		return s[start:]
 	}
+
 	return s[start : start+length]
 }

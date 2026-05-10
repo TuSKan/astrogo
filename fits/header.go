@@ -44,10 +44,12 @@ func (h *Header) Append(c Card) {
 // Get finds a card by keyword.
 func (h *Header) Get(keyword string) (Card, error) {
 	kw := strings.ToUpper(strings.TrimSpace(keyword))
+
 	idx, exists := h.keys[kw]
 	if !exists {
 		return Card{}, ErrKeyNotFound
 	}
+
 	return h.Cards[idx], nil
 }
 
@@ -57,6 +59,7 @@ func (h *Header) GetString(keyword string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+
 	val := strings.TrimSpace(card.Value)
 	if len(val) >= 2 && val[0] == '\'' && val[len(val)-1] == '\'' {
 		val = val[1 : len(val)-1]
@@ -71,7 +74,9 @@ func (h *Header) GetInt(keyword string) (int, error) {
 	if err != nil {
 		return 0, err
 	}
+
 	val := strings.TrimSpace(card.Value)
+
 	return strconv.Atoi(val)
 }
 
@@ -81,7 +86,9 @@ func (h *Header) GetFloat(keyword string) (float64, error) {
 	if err != nil {
 		return 0.0, err
 	}
+
 	val := strings.TrimSpace(card.Value)
+
 	return strconv.ParseFloat(val, 64)
 }
 
@@ -113,7 +120,7 @@ func ParseCard(raw []byte) Card {
 		inQuote := false
 		valEnd := len(rest)
 
-		for i := 0; i < len(rest); i++ {
+		for i := range len(rest) {
 			if rest[i] == '\'' {
 				inQuote = !inQuote
 			} else if rest[i] == '/' && !inQuote {

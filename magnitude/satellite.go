@@ -62,6 +62,7 @@ func SatelliteApparent(stdMag float64, conv StdMagConvention, rangeKm float64, a
 	if psi <= 0 {
 		psi = 1e-30
 	}
+
 	phaseMag := -2.5 * math.Log10(psi)
 
 	// McCants convention already includes the phase at 90° in the reference.
@@ -79,6 +80,7 @@ func satPhaseFunction(alphaRad float64, shape SatPhaseModel) float64 {
 	case PhaseCylinder:
 		sinA := math.Sin(alphaRad)
 		cosA := math.Cos(alphaRad)
+
 		return (sinA + (math.Pi-alphaRad)*cosA) / math.Pi
 	default: // PhaseSphere
 		return (1 + math.Cos(alphaRad)) / 2

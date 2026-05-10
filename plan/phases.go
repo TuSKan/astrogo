@@ -56,6 +56,7 @@ func moonElongation(t time.Time, prov eph.Provider) (float64, error) {
 	if err != nil {
 		return 0, fmt.Errorf("phases: sun position: %w", err)
 	}
+
 	moonPos, err := eph.Position(prov, eph.Moon, t)
 	if err != nil {
 		return 0, fmt.Errorf("phases: moon position: %w", err)
@@ -65,6 +66,7 @@ func moonElongation(t time.Time, prov eph.Provider) (float64, error) {
 	if err != nil {
 		return 0, fmt.Errorf("phases: sun ICRS: %w", err)
 	}
+
 	moonICRS, err := eph.ToICRS(moonPos)
 	if err != nil {
 		return 0, fmt.Errorf("phases: moon ICRS: %w", err)
@@ -80,9 +82,11 @@ func moonElongation(t time.Time, prov eph.Provider) (float64, error) {
 	for elong < 0 {
 		elong += 360
 	}
+
 	for elong >= 360 {
 		elong -= 360
 	}
+
 	return elong, nil
 }
 
@@ -94,7 +98,9 @@ func moonElongation(t time.Time, prov eph.Provider) (float64, error) {
 // crosses 0°, 90°, 180°, or 270°.
 func MoonPhases(start, end time.Time, prov eph.Provider) ([]MoonPhaseEvent, error) {
 	const step = 6 * time.Hour // ~4 samples per day → won't miss any phase
+
 	solver := DefaultSolver()
+
 	var events []MoonPhaseEvent
 
 	phases := []MoonPhase{PhaseNewMoon, PhaseFirstQuarter, PhaseFullMoon, PhaseLastQuarter}
@@ -116,10 +122,12 @@ func MoonPhases(start, end time.Time, prov eph.Provider) ([]MoonPhaseEvent, erro
 
 			if CrossesTarget(prevElong, curElong, target, 360) {
 				eval := phaseEvaluator(target, prov)
+
 				refined, _, err := solver.FindRoot(eval, prevT, t)
 				if err != nil {
 					continue
 				}
+
 				events = append(events, MoonPhaseEvent{Phase: phase, Time: refined})
 			}
 		}
@@ -139,13 +147,16 @@ func phaseEvaluator(target float64, prov eph.Provider) Evaluator {
 		if err != nil {
 			return 0, err
 		}
+
 		diff := elong - target
 		for diff > 180 {
 			diff -= 360
 		}
+
 		for diff < -180 {
 			diff += 360
 		}
+
 		return diff, nil
 	}
 }
@@ -201,6 +212,7 @@ func sunEclipticLongitude(t time.Time, prov eph.Provider) (float64, error) {
 	if err != nil {
 		return 0, fmt.Errorf("seasons: sun position: %w", err)
 	}
+
 	sunICRS, err := eph.ToICRS(sunPos)
 	if err != nil {
 		return 0, fmt.Errorf("seasons: sun ICRS: %w", err)
@@ -215,15 +227,18 @@ func sunEclipticLongitude(t time.Time, prov eph.Provider) (float64, error) {
 	// Subtract aberration constant: apparent Sun longitude is ~20.5" west
 	// of geometric due to Earth's orbital motion.
 	const aberration = 20.496 / 3600.0 // degrees
+
 	lon -= aberration
 
 	// Normalize to [0, 360)
 	for lon < 0 {
 		lon += 360
 	}
+
 	for lon >= 360 {
 		lon -= 360
 	}
+
 	return lon, nil
 }
 
@@ -234,7 +249,9 @@ func Seasons(year int, prov eph.Provider) ([]SeasonEvent, error) {
 	end := time.Date(year+1, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
 
 	const step = 24 * time.Hour // Daily sampling for ~1°/day Sun
+
 	solver := DefaultSolver()
+
 	var events []SeasonEvent
 
 	seasons := []Season{SeasonVernalEquinox, SeasonSummerSolstice, SeasonAutumnalEquinox, SeasonWinterSolstice}
@@ -256,10 +273,12 @@ func Seasons(year int, prov eph.Provider) ([]SeasonEvent, error) {
 
 			if CrossesIncreasing(prevLon, curLon, target, 360) {
 				eval := seasonEvaluator(target, prov)
+
 				refined, _, err := solver.FindRoot(eval, prevT, t)
 				if err != nil {
 					continue
 				}
+
 				events = append(events, SeasonEvent{Season: season, Time: refined})
 			}
 		}
@@ -279,13 +298,16 @@ func seasonEvaluator(target float64, prov eph.Provider) Evaluator {
 		if err != nil {
 			return 0, err
 		}
+
 		diff := lon - target
 		for diff > 180 {
 			diff -= 360
 		}
+
 		for diff < -180 {
 			diff += 360
 		}
+
 		return diff, nil
 	}
 }
@@ -299,6 +321,7 @@ func MoonIllumination(t time.Time, prov eph.Provider) (fraction float64, phaseAn
 	if err != nil {
 		return 0, 0, err
 	}
+
 	moonPos, err := eph.Position(prov, eph.Moon, t)
 	if err != nil {
 		return 0, 0, err
@@ -308,6 +331,7 @@ func MoonIllumination(t time.Time, prov eph.Provider) (fraction float64, phaseAn
 	if err != nil {
 		return 0, 0, err
 	}
+
 	moonICRS, err := eph.ToICRS(moonPos)
 	if err != nil {
 		return 0, 0, err
@@ -356,6 +380,7 @@ type ApsisEvent struct {
 // Earth-Sun distance. Perihelion occurs around January 3, aphelion around July 4.
 func Apsides(year int, prov eph.Provider) ([]ApsisEvent, error) {
 	solver := DefaultSolver()
+
 	var events []ApsisEvent
 
 	// Earth-Sun distance evaluator (returns distance in AU)
@@ -364,6 +389,7 @@ func Apsides(year int, prov eph.Provider) ([]ApsisEvent, error) {
 		if err != nil {
 			return 0, fmt.Errorf("apsides: sun position: %w", err)
 		}
+
 		return pos.Norm(), nil
 	}
 
@@ -371,20 +397,24 @@ func Apsides(year int, prov eph.Provider) ([]ApsisEvent, error) {
 	// Search window: Dec 15 of previous year → Feb 15
 	periStart := time.Date(year-1, time.December, 15, 0, 0, 0, 0, time.LocationUTC)
 	periEnd := time.Date(year, time.February, 15, 0, 0, 0, 0, time.LocationUTC)
+
 	periTime, periDist, err := solver.FindExtremum(Evaluator(sunDistance), periStart, periEnd, false)
 	if err != nil {
 		return nil, fmt.Errorf("apsides: perihelion: %w", err)
 	}
+
 	events = append(events, ApsisEvent{Apsis: ApsisPerihelion, Time: periTime, Distance: periDist})
 
 	// Aphelion: maximum distance, typically early July
 	// Search window: May 15 → Aug 15
 	apStart := time.Date(year, time.May, 15, 0, 0, 0, 0, time.LocationUTC)
 	apEnd := time.Date(year, time.August, 15, 0, 0, 0, 0, time.LocationUTC)
+
 	apTime, apDist, err := solver.FindExtremum(Evaluator(sunDistance), apStart, apEnd, true)
 	if err != nil {
 		return nil, fmt.Errorf("apsides: aphelion: %w", err)
 	}
+
 	events = append(events, ApsisEvent{Apsis: ApsisAphelion, Time: apTime, Distance: apDist})
 
 	return events, nil
@@ -425,11 +455,14 @@ func moonEclipticLatitude(t time.Time, prov eph.Provider) (angle.Angle, error) {
 	if err != nil {
 		return 0, fmt.Errorf("eclipse: moon position: %w", err)
 	}
+
 	moonICRS, err := eph.ToICRS(moonPos)
 	if err != nil {
 		return 0, fmt.Errorf("eclipse: moon ICRS: %w", err)
 	}
+
 	ecl := coord.ICRSToEcliptic(moonICRS, t.TDB())
+
 	return ecl.Lat(), nil
 }
 
@@ -441,14 +474,17 @@ func moonAntiSunSeparation(t time.Time, prov eph.Provider) (float64, error) {
 	if err != nil {
 		return 0, err
 	}
+
 	moonPos, err := eph.Position(prov, eph.Moon, t)
 	if err != nil {
 		return 0, err
 	}
+
 	sunICRS, err := eph.ToICRS(sunPos)
 	if err != nil {
 		return 0, err
 	}
+
 	moonICRS, err := eph.ToICRS(moonPos)
 	if err != nil {
 		return 0, err
@@ -460,6 +496,7 @@ func moonAntiSunSeparation(t time.Time, prov eph.Provider) (float64, error) {
 		-sunICRS.Dec(),
 	)
 	sep := coord.Separation(moonICRS, antiSun)
+
 	return sep.Degrees(), nil
 }
 
@@ -471,18 +508,22 @@ func moonSunSeparation(t time.Time, prov eph.Provider) (float64, error) {
 	if err != nil {
 		return 0, err
 	}
+
 	moonPos, err := eph.Position(prov, eph.Moon, t)
 	if err != nil {
 		return 0, err
 	}
+
 	sunICRS, err := eph.ToICRS(sunPos)
 	if err != nil {
 		return 0, err
 	}
+
 	moonICRS, err := eph.ToICRS(moonPos)
 	if err != nil {
 		return 0, err
 	}
+
 	return coord.Separation(moonICRS, sunICRS).Degrees(), nil
 }
 
@@ -502,7 +543,9 @@ func LunarEclipses(start, end time.Time, prov eph.Provider) ([]EclipseEvent, err
 	}
 
 	solver := DefaultSolver()
+
 	var eclipses []EclipseEvent
+
 	for _, phase := range phases {
 		if phase.Phase != PhaseFullMoon {
 			continue
@@ -519,6 +562,7 @@ func LunarEclipses(start, end time.Time, prov eph.Provider) ([]EclipseEvent, err
 			// window around the syzygy. This finds the "time of greatest eclipse".
 			tMin := phase.Time.Add(-30 * time.Minute)
 			tMax := phase.Time.Add(30 * time.Minute)
+
 			eclTime, _, err := solver.FindExtremum(func(t time.Time) (float64, error) {
 				return moonAntiSunSeparation(t, prov)
 			}, tMin, tMax, false)
@@ -555,7 +599,9 @@ func SolarEclipses(start, end time.Time, prov eph.Provider) ([]EclipseEvent, err
 	}
 
 	solver := DefaultSolver()
+
 	var eclipses []EclipseEvent
+
 	for _, phase := range phases {
 		if phase.Phase != PhaseNewMoon {
 			continue
@@ -572,6 +618,7 @@ func SolarEclipses(start, end time.Time, prov eph.Provider) ([]EclipseEvent, err
 			// window around the syzygy. This finds the "time of greatest eclipse".
 			tMin := phase.Time.Add(-30 * time.Minute)
 			tMax := phase.Time.Add(30 * time.Minute)
+
 			eclTime, _, err := solver.FindExtremum(func(t time.Time) (float64, error) {
 				return moonSunSeparation(t, prov)
 			}, tMin, tMax, false)

@@ -21,10 +21,12 @@ func CalcChecksum(data []byte) uint32 {
 	remainder := len(data) % 4
 	if remainder > 0 {
 		var last uint32
+
 		offset := len(data) - remainder
-		for i := 0; i < remainder; i++ {
+		for i := range remainder {
 			last |= uint32(data[offset+i]) << (24 - 8*i)
 		}
+
 		sum += uint64(last)
 	}
 
@@ -46,6 +48,7 @@ func ValidateDatasum(headerSum string, computed uint32) error {
 	if uint32(expected) != computed {
 		return fmt.Errorf("DATASUM mismatch: expected %d, got %d", expected, computed)
 	}
+
 	return nil
 }
 

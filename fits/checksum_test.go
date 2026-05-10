@@ -37,9 +37,11 @@ func TestVerifyChecksum(t *testing.T) {
 	if !VerifyChecksum(0xFFFFFFFF) {
 		t.Errorf("expected true for 0xFFFFFFFF")
 	}
+
 	if !VerifyChecksum(0x00000000) {
 		t.Errorf("expected true for 0")
 	}
+
 	if VerifyChecksum(0x12345678) {
 		t.Errorf("expected false for random val")
 	}

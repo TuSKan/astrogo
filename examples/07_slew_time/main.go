@@ -45,6 +45,7 @@ func main() {
 		ToTime:    t,
 		Site:      site,
 	}
+
 	transitionTime, err := model.Overhead(ctx)
 	if err != nil {
 		fmt.Printf("Calculation error: %v\n", err)

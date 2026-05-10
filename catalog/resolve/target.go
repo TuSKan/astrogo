@@ -85,10 +85,12 @@ var (
 // Normalize converts a query to a canonical form for matching.
 func Normalize(query string) string {
 	q := strings.ToLower(strings.TrimSpace(query))
+
 	q = strings.ReplaceAll(q, " ", "")
 	if strings.HasPrefix(q, "messier") {
 		q = "m" + q[7:]
 	}
+
 	return q
 }
 
@@ -97,25 +99,29 @@ func Score(query, candidate string) float64 {
 	if query == "" || candidate == "" {
 		return 0
 	}
+
 	c := Normalize(candidate)
 	if query == c {
 		return 1.0
 	}
+
 	if strings.HasPrefix(c, query) {
 		return 0.8
 	}
+
 	if strings.Contains(c, query) {
 		return 0.5
 	}
+
 	dist := levenshtein(query, c)
-	maxLen := len(query)
-	if len(c) > maxLen {
-		maxLen = len(c)
-	}
+
+	maxLen := max(len(c), len(query))
+
 	lScore := 1.0 - float64(dist)/float64(maxLen)
 	if lScore < 0 {
 		lScore = 0
 	}
+
 	return lScore * 0.3
 }
 
@@ -125,17 +131,21 @@ func levenshtein(s, t string) int {
 		d[i] = make([]int, len(t)+1)
 		d[i][0] = i
 	}
+
 	for j := range d[0] {
 		d[0][j] = j
 	}
+
 	for j := 1; j <= len(t); j++ {
 		for i := 1; i <= len(s); i++ {
 			cost := 1
 			if s[i-1] == t[j-1] {
 				cost = 0
 			}
+
 			d[i][j] = min(d[i-1][j]+1, min(d[i][j-1]+1, d[i-1][j-1]+cost))
 		}
 	}
+
 	return d[len(s)][len(t)]
 }

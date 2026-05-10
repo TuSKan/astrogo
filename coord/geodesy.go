@@ -41,9 +41,11 @@ func NewGeodetic(lon, lat angle.Angle, height float64) (*Geodetic, error) {
 		math.IsNaN(height) || math.IsInf(height, 0) {
 		return nil, errors.New("geodetic coordinates must be finite")
 	}
+
 	if lat.Degrees() < -90 || lat.Degrees() > 90 {
 		return nil, errors.New("latitude must be between -90 and 90 degrees")
 	}
+
 	return &Geodetic{lon: lon, lat: lat, height: height}, nil
 }
 
@@ -83,6 +85,7 @@ func (g *Geodetic) Validate() error {
 	if g.lat.Degrees() < -90 || g.lat.Degrees() > 90 {
 		return errors.New("latitude must be between -90 and 90 degrees")
 	}
+
 	return nil
 }
 
@@ -93,6 +96,7 @@ func (g *Geodetic) ToUnitVector() vector.Vec3 {
 	lam := g.lon.Radians()
 
 	cosPhi := math.Cos(phi)
+
 	return vector.V3(
 		cosPhi*math.Cos(lam),
 		cosPhi*math.Sin(lam),
@@ -114,6 +118,7 @@ func (g *Geodetic) Equal(other *Geodetic) bool {
 	if other == nil {
 		return false
 	}
+
 	return math.Abs(g.lon.Radians()-other.lon.Radians()) < 1e-12 &&
 		math.Abs(g.lat.Radians()-other.lat.Radians()) < 1e-12 &&
 		math.Abs(g.height-other.height) < 1e-6
@@ -166,10 +171,12 @@ func FromECEF(v vector.Vec3, e Ellipsoid) (*Geodetic, error) {
 		if z == 0 {
 			return NewGeodetic(angle.Rad(0), angle.Rad(0), -a)
 		}
+
 		lat := math.Pi / 2
 		if z < 0 {
 			lat = -math.Pi / 2
 		}
+
 		return NewGeodetic(angle.Rad(0), angle.Rad(lat), math.Abs(z)-b)
 	}
 

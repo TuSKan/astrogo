@@ -29,9 +29,11 @@ func (r Result) String() string {
 	if r.Pass {
 		status = "PASS"
 	}
+
 	if r.Reason != "" {
 		return fmt.Sprintf("%s: %s (value=%.2f)", status, r.Reason, r.Value)
 	}
+
 	return fmt.Sprintf("%s (value=%.2f)", status, r.Value)
 }
 
@@ -107,10 +109,12 @@ func (c Airmass) CheckCtx(obj Observable, t time.Time, site *Site, ctx *coord.Co
 				Reason: "target is below the horizon",
 			}, nil
 		}
+
 		return Result{}, err
 	}
 
 	pass := am <= c.Threshold
+
 	reason := ""
 	if !pass {
 		reason = fmt.Sprintf("airmass %.2f exceeds threshold %.2f", am, c.Threshold)
@@ -187,6 +191,7 @@ func (c MoonSep) CheckCtx(obj Observable, ctx *coord.Context) (Result, error) {
 	}
 
 	moon := NewMoon(eph.Default())
+
 	moonPos, err := moon.Position(ctx.Time())
 	if err != nil {
 		return Result{}, err
@@ -217,6 +222,7 @@ func skyAltAzCtx(obj Observable, t time.Time, ctx *coord.Context) (coord.AltAz, 
 	if err != nil {
 		return coord.AltAz{}, err
 	}
+
 	return ctx.ICRSToAltAz(pos)
 }
 
@@ -226,5 +232,6 @@ func skyAirmassCtx(obj Observable, t time.Time, ctx *coord.Context) (float64, er
 	if err != nil {
 		return 0, err
 	}
+
 	return atmosphere.Airmass(aa.Alt())
 }

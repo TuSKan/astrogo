@@ -11,8 +11,10 @@ import (
 func BenchmarkStateSun(b *testing.B) {
 	p := eph.Default()
 	tm := time.NowUTC()
+
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+
+	for range b.N {
 		_, _ = p.State(eph.Sun, tm)
 	}
 }
@@ -20,16 +22,20 @@ func BenchmarkStateSun(b *testing.B) {
 func BenchmarkStateMoon(b *testing.B) {
 	p := eph.Default()
 	tm := time.NowUTC()
+
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+
+	for range b.N {
 		_, _ = p.State(eph.Moon, tm)
 	}
 }
 
 func BenchmarkToICRS(b *testing.B) {
 	pos := vector.Vec3{X: 1.0, Y: 0.5, Z: 0.2}
+
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+
+	for range b.N {
 		_, _ = eph.ToICRS(pos)
 	}
 }

@@ -7,6 +7,7 @@ import (
 	"github.com/TuSKan/astrogo/vector"
 )
 
+//nolint:gochecknoglobals // benchmark sinks prevent dead-code elimination
 var (
 	sink    float64 // prevents dead-code elimination
 	vecSink vector.Vec3
@@ -15,8 +16,10 @@ var (
 func BenchmarkDot(b *testing.B) {
 	a := vector.V3(1, 2, 3)
 	c := vector.V3(4, 5, 6)
+
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+
+	for range b.N {
 		sink = a.Dot(c)
 	}
 }
@@ -24,40 +27,50 @@ func BenchmarkDot(b *testing.B) {
 func BenchmarkCross(b *testing.B) {
 	a := vector.V3(1, 2, 3)
 	c := vector.V3(4, 5, 6)
+
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+
+	for range b.N {
 		vecSink = a.Cross(c)
 	}
 }
 
 func BenchmarkNorm(b *testing.B) {
 	v := vector.V3(1, 2, 3)
+
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+
+	for range b.N {
 		sink = v.Norm()
 	}
 }
 
 func BenchmarkUnit(b *testing.B) {
 	v := vector.V3(1, 2, 3)
+
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+
+	for range b.N {
 		vecSink = v.Unit()
 	}
 }
 
 func BenchmarkFromSpherical(b *testing.B) {
 	lon, lat := 1.234, 0.567
+
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+
+	for range b.N {
 		vecSink = vector.FromSpherical(lon, lat)
 	}
 }
 
 func BenchmarkToSpherical(b *testing.B) {
 	v := vector.FromSpherical(1.234, 0.567)
+
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+
+	for range b.N {
 		sink, sink = v.ToSpherical()
 	}
 }
@@ -65,8 +78,10 @@ func BenchmarkToSpherical(b *testing.B) {
 func BenchmarkRotateZ(b *testing.B) {
 	v := vector.V3(1, 0, 0)
 	rad := math.Pi / 4
+
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+
+	for range b.N {
 		vecSink = v.RotateZ(rad)
 	}
 }
@@ -74,8 +89,10 @@ func BenchmarkRotateZ(b *testing.B) {
 func BenchmarkAdd(b *testing.B) {
 	a := vector.V3(1, 2, 3)
 	c := vector.V3(4, 5, 6)
+
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+
+	for range b.N {
 		vecSink = a.Add(c)
 	}
 }

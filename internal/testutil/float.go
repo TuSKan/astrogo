@@ -15,6 +15,7 @@ func InAbsTol(got, want, tol float64) bool {
 	if tol < 0 {
 		return false
 	}
+
 	return math.Abs(got-want) <= tol
 }
 
@@ -26,9 +27,11 @@ func InRelTol(got, want, relTol float64) bool {
 	if relTol < 0 {
 		return false
 	}
+
 	if want == 0 {
 		return math.Abs(got) <= relTol
 	}
+
 	return math.Abs(got-want)/math.Abs(want) <= relTol
 }
 
@@ -40,12 +43,14 @@ func InAngleTol(got, want, tol float64) bool {
 	if tol < 0 {
 		return false
 	}
+
 	diff := math.Abs(got - want)
 	// Reduce to [0, π] by folding over 2π and then π.
 	diff = math.Mod(diff, 2*math.Pi)
 	if diff > math.Pi {
 		diff = 2*math.Pi - diff
 	}
+
 	return diff <= tol
 }
 
@@ -58,6 +63,7 @@ func InAngleTol(got, want, tol float64) bool {
 // label is included verbatim in the failure message.
 func AssertNear(t testing.TB, label string, got, want, tol float64) {
 	t.Helper()
+
 	if !InAbsTol(got, want, tol) {
 		t.Errorf("%s: got %.15g, want %.15g (abs tol %.3g, diff %.3g)",
 			label, got, want, tol, math.Abs(got-want))
@@ -68,6 +74,7 @@ func AssertNear(t testing.TB, label string, got, want, tol float64) {
 // When want == 0 the comparison is |got| <= relTol (see InRelTol).
 func AssertRelNear(t testing.TB, label string, got, want, relTol float64) {
 	t.Helper()
+
 	if !InRelTol(got, want, relTol) {
 		var rel float64
 		if want != 0 {
@@ -75,6 +82,7 @@ func AssertRelNear(t testing.TB, label string, got, want, relTol float64) {
 		} else {
 			rel = math.Abs(got)
 		}
+
 		t.Errorf("%s: got %.15g, want %.15g (rel tol %.3g, rel err %.3g)",
 			label, got, want, relTol, rel)
 	}
@@ -84,12 +92,15 @@ func AssertRelNear(t testing.TB, label string, got, want, relTol float64) {
 // want (both in radians) is > tol (in radians).
 func AssertAngleNear(t testing.TB, label string, got, want, tol float64) {
 	t.Helper()
+
 	if !InAngleTol(got, want, tol) {
 		diff := math.Abs(got - want)
+
 		diff = math.Mod(diff, 2*math.Pi)
 		if diff > math.Pi {
 			diff = 2*math.Pi - diff
 		}
+
 		t.Errorf("%s: got %.15g rad, want %.15g rad (angle tol %.3g rad, shortest diff %.3g rad)",
 			label, got, want, tol, diff)
 	}
@@ -100,6 +111,7 @@ func AssertAngleNear(t testing.TB, label string, got, want, tol float64) {
 // (e.g. integer Julian day round-trips).
 func AssertExact(t testing.TB, label string, got, want float64) {
 	t.Helper()
+
 	if got != want {
 		t.Errorf("%s: got %.15g, want %.15g (expected exact equality)", label, got, want)
 	}

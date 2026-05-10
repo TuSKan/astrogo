@@ -29,9 +29,11 @@ func TestReadImage(t *testing.T) {
 	if img.Bitpix != 8 {
 		t.Errorf("expected 8 bitpix, got %d", img.Bitpix)
 	}
+
 	if len(img.Axes) != 2 {
 		t.Errorf("expected 2 axes, got %d", len(img.Axes))
 	}
+
 	if img.Tensor == nil {
 		t.Errorf("expected Tensor, got nil")
 	}
@@ -52,6 +54,7 @@ func TestReadImage(t *testing.T) {
 	h2.Append(Card{Keyword: "BITPIX", Value: "99"})
 	h2.Append(Card{Keyword: "NAXIS", Value: "1"})
 	h2.Append(Card{Keyword: "NAXIS1", Value: "1"})
+
 	_, err = ReadImage(h2, bytes.NewReader(nil))
 	if err == nil {
 		t.Errorf("expected error for invalid BITPIX value")
@@ -76,6 +79,7 @@ func TestReadImage_Int16_Endian(t *testing.T) {
 	buf := img.Tensor.Data().Buffers()[1].Bytes()
 	v0 := int16(binary.NativeEndian.Uint16(buf[0:]))
 	v1 := int16(binary.NativeEndian.Uint16(buf[2:]))
+
 	testutil.AssertEqual(t, "Int16 pixel 0", v0, int16(256))
 	testutil.AssertEqual(t, "Int16 pixel 1", v1, int16(-1))
 }

@@ -13,6 +13,7 @@ import (
 // Use this when an operation must succeed.
 func AssertNoError(t testing.TB, err error) {
 	t.Helper()
+
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -22,6 +23,7 @@ func AssertNoError(t testing.TB, err error) {
 // Use this when an operation must fail (any error is acceptable).
 func AssertError(t testing.TB, err error) {
 	t.Helper()
+
 	if err == nil {
 		t.Errorf("expected an error but got nil")
 	}
@@ -31,10 +33,12 @@ func AssertError(t testing.TB, err error) {
 // contain substr.
 func AssertErrorContains(t testing.TB, err error, substr string) {
 	t.Helper()
+
 	if err == nil {
 		t.Errorf("expected error containing %q but got nil", substr)
 		return
 	}
+
 	if !strings.Contains(err.Error(), substr) {
 		t.Errorf("error %q does not contain %q", err.Error(), substr)
 	}
@@ -44,6 +48,7 @@ func AssertErrorContains(t testing.TB, err error, substr string) {
 // Use this when the exact sentinel error matters.
 func AssertErrorIs(t testing.TB, err, target error) {
 	t.Helper()
+
 	if !errors.Is(err, target) {
 		t.Errorf("got error %v; want errors.Is match for %v", err, target)
 	}
@@ -59,6 +64,7 @@ func CaseLabel(i int, name string) string {
 	if name != "" {
 		return fmt.Sprintf("case[%d] (%s)", i, name)
 	}
+
 	return fmt.Sprintf("case[%d]", i)
 }
 
@@ -67,6 +73,7 @@ func CaseLabel(i int, name string) string {
 // i is the zero-based row index; name is optional.
 func FailCase(t testing.TB, i int, name, format string, args ...any) {
 	t.Helper()
+
 	label := CaseLabel(i, name)
 	msg := fmt.Sprintf(format, args...)
 	t.Errorf("%s: %s", label, msg)
@@ -85,6 +92,7 @@ func RunCases[C interface {
 	Run(*testing.T)
 }](t *testing.T, cases []C) {
 	t.Helper()
+
 	for _, c := range cases {
 		t.Run(c.Name(), c.Run)
 	}

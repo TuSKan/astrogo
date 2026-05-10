@@ -1,6 +1,7 @@
 package coord
 
 import (
+	"errors"
 	"fmt"
 	"math"
 
@@ -187,11 +188,13 @@ func (c ObserversLocation) Validate() error { return validateLat(c.lat) }
 func validateLat(lat angle.Angle) error {
 	d := lat.Degrees()
 	if math.IsNaN(d) || math.IsInf(d, 0) {
-		return fmt.Errorf("coordinate component must be finite")
+		return errors.New("coordinate component must be finite")
 	}
+
 	if d < -90 || d > 90 {
 		return fmt.Errorf("latitude/altitude out of range: %g deg", d)
 	}
+
 	return nil
 }
 
@@ -205,6 +208,7 @@ func (c AltAz) ToUnitVector() vector.Vec3 {
 	alt := c.alt.Radians()
 	az := c.az.Radians()
 	cosAlt := math.Cos(alt)
+
 	return vector.V3(cosAlt*math.Cos(az), cosAlt*math.Sin(az), math.Sin(alt))
 }
 
@@ -351,6 +355,7 @@ func Separation(a, b ICRS) angle.Angle {
 	vb := b.ToUnitVector()
 	cross := va.Cross(vb)
 	dot := va.Dot(vb)
+
 	return angle.Atan2(cross.Norm(), dot)
 }
 

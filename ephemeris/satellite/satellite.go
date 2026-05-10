@@ -55,11 +55,14 @@ func parseMeanMotion(line2 string) float64 {
 	if len(line2) < 63 {
 		return 0
 	}
+
 	s := strings.TrimSpace(line2[52:63])
+
 	mm, err := strconv.ParseFloat(s, 64)
 	if err != nil {
 		return 0
 	}
+
 	return mm
 }
 
@@ -135,6 +138,7 @@ func (s *Satellite) subSatellitePoint(t time.Time) (*coord.Geodetic, error) {
 
 	// Convert ECEF (km) to geodetic via coord.FromECEF (expects metres).
 	ecefVec := vector.V3(ecefX*1e3, ecefY*1e3, ecefZ*1e3)
+
 	geo, err := coord.FromECEF(ecefVec, coord.WGS84())
 	if err != nil {
 		return nil, fmt.Errorf("satellite: ecef→geodetic: %w", err)
@@ -148,6 +152,7 @@ func (s *Satellite) OrbitalPeriod() float64 {
 	if s.MeanMotion <= 0 {
 		return 0
 	}
+
 	return 1440.0 / s.MeanMotion // minutes
 }
 
@@ -158,6 +163,7 @@ func (s *Satellite) Altitude(t time.Time) (float64, error) {
 	if err != nil {
 		return 0, err
 	}
+
 	return geo.Height() / 1e3, nil // metres → km
 }
 
@@ -226,6 +232,7 @@ func computeGMST(t time.Time) float64 {
 	if err != nil {
 		ut1 = t.UTC()
 	}
+
 	tt := t.TT()
 
 	ut1a, ut1b := ut1.JDParts()

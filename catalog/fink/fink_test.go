@@ -32,9 +32,11 @@ func TestRecordToTarget_RBand(t *testing.T) {
 	if tgt.Name != "Benoitcarry" {
 		t.Errorf("Name = %q, want Benoitcarry", tgt.Name)
 	}
+
 	if tgt.ID != "8467" {
 		t.Errorf("ID = %q, want 8467", tgt.ID)
 	}
+
 	if tgt.Catalog != "fink" {
 		t.Errorf("Catalog = %q, want fink", tgt.Catalog)
 	}
@@ -43,12 +45,15 @@ func TestRecordToTarget_RBand(t *testing.T) {
 	if !tgt.HasH || tgt.H != 14.5 {
 		t.Errorf("H = %.1f (HasH=%v), want 14.5", tgt.H, tgt.HasH)
 	}
+
 	if !tgt.HasG1G2 || tgt.G1 != 0.25 || tgt.G2 != 0.35 {
 		t.Errorf("G1=%.2f G2=%.2f (HasG1G2=%v), want 0.25/0.35", tgt.G1, tgt.G2, tgt.HasG1G2)
 	}
+
 	if !tgt.HasSpin || tgt.SpinRA != 30.0 || tgt.SpinDec != 45.0 {
 		t.Errorf("SpinRA=%.1f SpinDec=%.1f (HasSpin=%v), want 30/45", tgt.SpinRA, tgt.SpinDec, tgt.HasSpin)
 	}
+
 	if !tgt.HasOblateness || tgt.Oblateness != 0.75 {
 		t.Errorf("Oblateness=%.2f (Has=%v), want 0.75", tgt.Oblateness, tgt.HasOblateness)
 	}
@@ -75,12 +80,15 @@ func TestRecordToTarget_GBandFallback(t *testing.T) {
 	if !tgt.HasH || tgt.H != 16.0 {
 		t.Errorf("H = %.1f, want 16.0 (g-band fallback)", tgt.H)
 	}
+
 	if !tgt.HasG1G2 || tgt.G1 != 0.30 {
 		t.Errorf("G1 = %.2f, want 0.30 (g-band fallback)", tgt.G1)
 	}
+
 	if tgt.HasSpin {
 		t.Error("HasSpin should be false for NaN spin values")
 	}
+
 	if tgt.HasOblateness {
 		t.Error("HasOblateness should be false for NaN R")
 	}
@@ -124,6 +132,7 @@ func TestProvider_Interface(t *testing.T) {
 	if p.Name() != "fink" {
 		t.Errorf("Name = %q, want fink", p.Name())
 	}
+
 	caps := p.Capabilities()
 	if len(caps) != 2 {
 		t.Errorf("Capabilities count = %d, want 2", len(caps))

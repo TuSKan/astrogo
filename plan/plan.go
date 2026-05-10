@@ -47,6 +47,7 @@ func (p *Planner) Observable(obj Observable, t time.Time) (bool, error) {
 	if err != nil {
 		return false, err
 	}
+
 	return eval.Observable, nil
 }
 
@@ -69,20 +70,26 @@ func (p *Planner) FilterObservable(objects []Observable, t time.Time) ([]Observa
 			if err != nil {
 				return err
 			}
+
 			results[i] = indexedResult{idx: i, ok: ok}
+
 			return nil
 		})
 	}
-	if err := g.Wait(); err != nil {
+
+	err := g.Wait()
+	if err != nil {
 		return nil, err
 	}
 
 	var filtered []Observable
+
 	for i, r := range results {
 		if r.ok {
 			filtered = append(filtered, objects[i])
 		}
 	}
+
 	return filtered, nil
 }
 
@@ -128,14 +135,18 @@ func (p *Planner) RankObservable(objects []Observable, start, end time.Time) ([]
 			if observable {
 				results[i] = indexedResult{obj: obj, score: peakAlt.Degrees(), ok: true}
 			}
+
 			return nil
 		})
 	}
-	if err := g.Wait(); err != nil {
+
+	err := g.Wait()
+	if err != nil {
 		return nil, err
 	}
 
 	var ranked []RankedObject
+
 	for _, r := range results {
 		if r.ok {
 			ranked = append(ranked, RankedObject{
@@ -197,9 +208,11 @@ func isObservableCtx(
 	if err != nil {
 		return Evaluation{}, nil, err
 	}
+
 	if ctx == nil {
 		ctx = coord.NewContext(t, site.Location(), site.Atmosphere())
 	}
+
 	altAz, err := ctx.ICRSToAltAz(pos)
 	if err != nil {
 		return Evaluation{}, nil, err
@@ -219,9 +232,11 @@ func isObservableCtx(
 		} else {
 			res, err = c.Check(obj, t, site)
 		}
+
 		if err != nil {
 			return Evaluation{}, nil, err
 		}
+
 		eval.Results = append(eval.Results, res)
 		if !res.Pass {
 			eval.Observable = false
@@ -295,6 +310,7 @@ func (sc ScoreConfig) normalize() (wAlt, wUrg, wMoon float64) {
 		// All zero — fall back to altitude-only
 		return 1, 0, 0
 	}
+
 	return a / total, u / total, m / total
 }
 
@@ -317,13 +333,16 @@ func getMoonPosition(t time.Time) (coord.ICRS, error) {
 	}
 
 	moon := NewMoon(eph.Default())
+
 	pos, err := moon.Position(t)
 	if err != nil {
 		return coord.ICRS{}, err
 	}
+
 	moonSepCache.time = t
 	moonSepCache.pos = pos
 	moonSepCache.ok = true
+
 	return pos, nil
 }
 
@@ -351,15 +370,19 @@ func estimateHoursUntilSet(obj Observable, t time.Time, site *Site, currentAlt f
 
 	for _, offset := range probeOffsets {
 		ft := t.Add(offset)
+
 		pos, err := obj.Position(ft)
 		if err != nil {
 			continue
 		}
+
 		fctx := coord.NewContext(ft, site.Location(), site.Atmosphere())
+
 		aa, err := fctx.ICRSToAltAz(pos)
 		if err != nil {
 			continue
 		}
+
 		if aa.Alt().Degrees() <= 0 {
 			// Target sets between previous probe and this one.
 			// Linear interpolation for a rough estimate.
@@ -408,6 +431,7 @@ func ScoreObservable(
 	if cfg != nil {
 		sc = *cfg
 	}
+
 	wAlt, wUrg, wMoon := sc.normalize()
 
 	// ── Altitude merit (0–1) ────────────────────────────────────────────
@@ -416,6 +440,7 @@ func ScoreObservable(
 
 	// ── Urgency merit (0–1) ─────────────────────────────────────────────
 	var urgMerit float64
+
 	if wUrg > 0 {
 		hoursLeft := estimateHoursUntilSet(obj, t, site, altDeg)
 		urgMerit = math.Min(1.0/(math.Max(hoursLeft, 0.5)), 1.0)
@@ -423,14 +448,17 @@ func ScoreObservable(
 
 	// ── Moon separation merit (0–1) ──────────────────────────────────────
 	moonMerit := 1.0 // default: no penalty if Moon lookup fails
+
 	if wMoon > 0 {
 		moonPos, err := getMoonPosition(t)
 		if err == nil {
 			sep := coord.Separation(eval.Position, moonPos).Degrees()
+
 			threshold := sc.MoonFullPenaltyDeg
 			if threshold <= 0 {
 				threshold = 30.0
 			}
+
 			moonMerit = math.Min(sep/threshold, 1.0)
 		}
 	}
@@ -474,15 +502,20 @@ func RankObservables(
 			if err != nil {
 				return err
 			}
+
 			scores[i] = indexedScore{score: s}
+
 			return nil
 		})
 	}
-	if err := g.Wait(); err != nil {
+
+	err := g.Wait()
+	if err != nil {
 		return nil, err
 	}
 
 	var scored []ScoredTarget
+
 	for i, s := range scores {
 		if s.score > 0 {
 			scored = append(scored, ScoredTarget{
@@ -534,6 +567,7 @@ func ObservableWindows(
 	if step <= 0 {
 		return nil, fmt.Errorf("step must be positive, got %v", step)
 	}
+
 	if step > maxObservableStep {
 		return nil, fmt.Errorf("step %v exceeds maximum %v: large steps risk missing short visibility windows", step, maxObservableStep)
 	}
@@ -544,13 +578,19 @@ func ObservableWindows(
 		if err != nil {
 			return false
 		}
+
 		return eval.Observable
 	}
 
 	var windows []Window
+
 	inWindow := false
-	var windowStart time.Time
-	var prevT time.Time
+
+	var (
+		windowStart time.Time
+		prevT       time.Time
+	)
+
 	hasPrev := false
 	prevOK := false
 
@@ -567,6 +607,7 @@ func ObservableWindows(
 			} else {
 				windowStart = t
 			}
+
 			inWindow = true
 		} else if !eval.Observable && inWindow {
 			windowEnd := refineBisect(prevT, t, prevOK, checkObs)

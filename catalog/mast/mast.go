@@ -40,6 +40,7 @@ func (p *Provider) Resolve(query string) (resolve.Target, bool) {
 	if len(targets) > 0 {
 		return targets[0], true
 	}
+
 	return resolve.Target{}, false
 }
 
@@ -48,13 +49,17 @@ func (p *Provider) Search(query string) []resolve.Target {
 	req := resolve.ObjectRequest{Query: query, Limit: 10}
 
 	iter := p.ResolveObject(ctx, req)
+
 	var targets []resolve.Target
+
 	iter(func(t resolve.Target, err error) bool {
 		if err == nil {
 			targets = append(targets, t)
 		}
+
 		return len(targets) < 10
 	})
+
 	return targets
 }
 
@@ -64,7 +69,7 @@ func (p *Provider) ResolveObject(ctx context.Context, req resolve.ObjectRequest)
 		return seq
 	}
 
-	payload := map[string]interface{}{
+	payload := map[string]any{
 		"service": "Mast.Name.Lookup",
 		"format":  "json",
 		"params": map[string]string{
@@ -80,6 +85,7 @@ func (p *Provider) ResolveObject(ctx context.Context, req resolve.ObjectRequest)
 	if err != nil {
 		return resolve.SliceSeq([]resolve.Target{})
 	}
+
 	httpReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 	return func(yield func(resolve.Target, error) bool) {
@@ -88,7 +94,12 @@ func (p *Provider) ResolveObject(ctx context.Context, req resolve.ObjectRequest)
 			yield(resolve.Target{}, err)
 			return
 		}
-		defer resp.Body.Close()
+		defer func() {
+			cerr := resp.Body.Close()
+			if cerr != nil {
+				yield(resolve.Target{}, cerr)
+			}
+		}()
 
 		b, err := io.ReadAll(resp.Body)
 		if err != nil {
@@ -111,11 +122,13 @@ func (p *Provider) ResolveObject(ctx context.Context, req resolve.ObjectRequest)
 				} `json:"resolvedCoordinate"`
 			}
 
-			if err := json.Unmarshal(b, &jsonPayload); err == nil {
+			err := json.Unmarshal(b, &jsonPayload)
+			if err == nil {
 				if jsonPayload.Status == "ERROR" {
 					yield(resolve.Target{}, fmt.Errorf("mast: %s", jsonPayload.Msg))
 					return
 				}
+
 				for _, match := range jsonPayload.ResolvedCoordinate {
 					targets = append(targets, resolve.Target{
 						ID:       match.CanonicalName,
@@ -140,7 +153,8 @@ func (p *Provider) ResolveObject(ctx context.Context, req resolve.ObjectRequest)
 				} `xml:"resolvedCoordinate"`
 			}
 
-			if err := xml.Unmarshal(b, &xmlPayload); err != nil {
+			err := xml.Unmarshal(b, &xmlPayload)
+			if err != nil {
 				yield(resolve.Target{}, err)
 				return
 			}

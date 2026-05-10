@@ -35,7 +35,8 @@ func BenchmarkVisibleIntervals(b *testing.B) {
 	end := start.AddDays(1.0)
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+
+	for range b.N {
 		_, _ = VisibleIntervals(obj, site, start, end, 10*time.Minute, angle.Deg(20))
 	}
 }
@@ -48,7 +49,8 @@ func BenchmarkVisibleIntervals_1MinStep(b *testing.B) {
 	end := start.AddDays(1.0)
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+
+	for range b.N {
 		_, _ = VisibleIntervals(obj, site, start, end, 1*time.Minute, angle.Deg(20))
 	}
 }
@@ -71,7 +73,8 @@ func BenchmarkEventSolver_Visibility(b *testing.B) {
 	}
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+
+	for range b.N {
 		_, _ = solver.Find(spec, start, end)
 	}
 }
@@ -87,7 +90,8 @@ func BenchmarkObservableWindows(b *testing.B) {
 	constraints := []Constraint{Altitude{Threshold: angle.Deg(30)}}
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+
+	for range b.N {
 		_, _ = ObservableWindows(obj, start, end, 5*atime.Minute, site, constraints...)
 	}
 }
@@ -97,7 +101,7 @@ func BenchmarkObservableWindows(b *testing.B) {
 
 func makeBlocks(n int) []*Block {
 	blocks := make([]*Block, n)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		blocks[i] = &Block{
 			ID:       fmt.Sprintf("B%d", i),
 			Target:   NewStar(fmt.Sprintf("T%d", i), angle.Deg(0), angle.Deg(0)),
@@ -105,6 +109,7 @@ func makeBlocks(n int) []*Block {
 			Priority: float64(n - i), // descending priority
 		}
 	}
+
 	return blocks
 }
 
@@ -119,7 +124,8 @@ func benchScheduler(b *testing.B, n int, strategy Strategy) {
 	window := Window{Start: start, End: start.Add(atime.Duration(n*15) * atime.Minute)}
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+
+	for range b.N {
 		_, _ = strategy.Schedule(planner, window, blocks, tm)
 	}
 }
@@ -170,7 +176,8 @@ func BenchmarkTransitEstimate(b *testing.B) {
 	end := start.AddDays(0.5)
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+
+	for range b.N {
 		_, _, _ = TransitEstimate(obj, site, start, end)
 	}
 }

@@ -74,6 +74,7 @@ func (p *Provider) ConeSearch(ctx context.Context, req resolve.ConeRequest) reso
 	if err != nil {
 		return resolve.SliceSeq([]resolve.Target{})
 	}
+
 	httpReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 	return func(yield func(resolve.Target, error) bool) {
@@ -82,7 +83,12 @@ func (p *Provider) ConeSearch(ctx context.Context, req resolve.ConeRequest) reso
 			yield(resolve.Target{}, err)
 			return
 		}
-		defer resp.Body.Close()
+		defer func() {
+			cerr := resp.Body.Close()
+			if cerr != nil {
+				yield(resolve.Target{}, cerr)
+			}
+		}()
 
 		targets, err := parseCSV(resp.Body)
 		if err != nil {
@@ -105,11 +111,13 @@ func (p *Provider) ConeSearch(ctx context.Context, req resolve.ConeRequest) reso
 
 func parseCSV(body io.Reader) ([]resolve.Target, error) {
 	reader := csv.NewReader(body)
+
 	header, err := reader.Read()
 	if err != nil {
 		if err == io.EOF {
 			return nil, nil
 		}
+
 		return nil, fmt.Errorf("gaia: failed to read CSV header: %w", err)
 	}
 
@@ -125,6 +133,7 @@ func parseCSV(body io.Reader) ([]resolve.Target, error) {
 		if err == io.EOF {
 			break
 		}
+
 		if err != nil {
 			return nil, err
 		}
@@ -148,11 +157,13 @@ func parseCSV(body io.Reader) ([]resolve.Target, error) {
 				t.PmRA = angle.Arcsec(v / 1000.0)
 			}
 		}
+
 		if pmDecStr, ok := col["pmdec"]; ok && row[pmDecStr] != "" {
 			if v, err := strconv.ParseFloat(row[pmDecStr], 64); err == nil {
 				t.PmDec = angle.Arcsec(v / 1000.0)
 			}
 		}
+
 		if plxStr, ok := col["parallax"]; ok && row[plxStr] != "" {
 			if v, err := strconv.ParseFloat(row[plxStr], 64); err == nil {
 				t.Parallax = angle.Arcsec(v / 1000.0)
@@ -175,7 +186,9 @@ func parseCSV(body io.Reader) ([]resolve.Target, error) {
 				}
 			}
 		}
+
 		targets = append(targets, t)
 	}
+
 	return targets, nil
 }

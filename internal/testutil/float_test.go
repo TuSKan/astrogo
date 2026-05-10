@@ -67,8 +67,11 @@ func TestInRelTol(t *testing.T) {
 // ── InAngleTol ───────────────────────────────────────────────────────────────
 
 func TestInAngleTol(t *testing.T) {
-	const arcsec = math.Pi / (180 * 3600)
-	const deg = math.Pi / 180
+	const (
+		arcsec = math.Pi / (180 * 3600)
+		deg    = math.Pi / 180
+	)
+
 	cases := []struct {
 		name string
 		got  float64
@@ -127,6 +130,7 @@ func TestAssertExact_passes(t *testing.T) {
 
 type tbSpy struct {
 	testing.TB
+
 	msg    string
 	failed bool
 }
@@ -141,6 +145,7 @@ func (s *tbSpy) Logf(string, ...any) {}
 func TestAssertNear_fails(t *testing.T) {
 	spy := &tbSpy{TB: t}
 	testutil.AssertNear(spy, "x", 2.0, 1.0, 0.001)
+
 	if !spy.failed {
 		t.Errorf("AssertNear did not fail for clearly different values")
 	}
@@ -149,6 +154,7 @@ func TestAssertNear_fails(t *testing.T) {
 func TestAssertRelNear_fails(t *testing.T) {
 	spy := &tbSpy{TB: t}
 	testutil.AssertRelNear(spy, "x", 2.0, 1.0, 0.01)
+
 	if !spy.failed {
 		t.Errorf("AssertRelNear did not fail for 100%% relative error")
 	}
@@ -157,6 +163,7 @@ func TestAssertRelNear_fails(t *testing.T) {
 func TestAssertAngleNear_fails(t *testing.T) {
 	spy := &tbSpy{TB: t}
 	testutil.AssertAngleNear(spy, "x", 0.0, math.Pi, 0.001)
+
 	if !spy.failed {
 		t.Errorf("AssertAngleNear did not fail for π-apart angles")
 	}
@@ -165,6 +172,7 @@ func TestAssertAngleNear_fails(t *testing.T) {
 func TestAssertExact_fails(t *testing.T) {
 	spy := &tbSpy{TB: t}
 	testutil.AssertExact(spy, "x", 1.0, 1.0+1e-15)
+
 	if !spy.failed {
 		t.Errorf("AssertExact did not fail for differing values")
 	}

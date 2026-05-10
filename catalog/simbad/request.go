@@ -55,5 +55,6 @@ func TAPRequest(adql string) string {
 	// CSV is straightforward to parse without a full VOTable XML parser.
 	v.Set("FORMAT", "csv")
 	v.Set("QUERY", adql)
+
 	return v.Encode()
 }

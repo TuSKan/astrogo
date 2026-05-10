@@ -24,11 +24,14 @@ func TestSBDBResolver(t *testing.T) {
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		fmt.Fprint(w, jsonData)
+		if _, err := fmt.Fprint(w, jsonData); err != nil {
+			t.Errorf("failed to write response: %v", err)
+		}
 	}))
 	defer server.Close()
 
 	originalURL := sbdbQueryAPI
+
 	sbdbQueryAPI = server.URL
 	defer func() { sbdbQueryAPI = originalURL }()
 
@@ -38,6 +41,7 @@ func TestSBDBResolver(t *testing.T) {
 	if !ok {
 		t.Fatalf("Failed to resolve Aten")
 	}
+
 	testutil.AssertEqual(t, "Resolve ID name", tar.Name, "2062 Aten (1976 AA)")
 	testutil.AssertEqual(t, "Resolve SPKID", tar.SPKID, "20002062")
 
@@ -49,10 +53,12 @@ func TestSBDBResolver(t *testing.T) {
 	iter := prov.ResolveObject(ctx, req)
 
 	var targets []resolve.Target
+
 	iter(func(tar resolve.Target, err error) bool {
 		if err == nil {
 			targets = append(targets, tar)
 		}
+
 		return true
 	})
 
@@ -66,6 +72,7 @@ func TestProviderInterface(t *testing.T) {
 	if p.Name() != "sbdb" {
 		t.Errorf("expected sbdb, got %s", p.Name())
 	}
+
 	caps := p.Capabilities()
 	if len(caps) != 1 || caps[0] != resolve.CapObjectResolution {
 		t.Errorf("expected CapObjectResolution, got %v", caps)

@@ -3,9 +3,12 @@ package norad
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
+	"strconv"
+	"strings"
 	gotime "time"
 
 	"github.com/TuSKan/astrogo/catalog/resolve"
@@ -47,6 +50,7 @@ func (gp GP) EpochTime() (time.Time, error) {
 			return time.Time{}, fmt.Errorf("norad: cannot parse epoch %q: %w", gp.Epoch, err)
 		}
 	}
+
 	return time.Date(t.Year(), t.Month(), t.Day(),
 		t.Hour(), t.Minute(), t.Second(), t.Nanosecond(), time.LocationUTC), nil
 }
@@ -58,6 +62,7 @@ func (gp GP) ToTLE() (line1, line2 string) {
 	// Compute epoch in TLE format: 2-digit year + day-of-year with fraction.
 	epochYr := 0
 	epochDay := 0.0
+
 	if t, err := gp.EpochTime(); err == nil {
 		jd1, jd2 := t.JDParts()
 		year := t.Year()
@@ -92,7 +97,7 @@ func (gp GP) ToTLE() (line1, line2 string) {
 		ndotStr, nddotStr, bstarStr,
 		gp.EphemerisType, gp.ElementSetNo)
 	line1 = padToLength(line1, 68)
-	line1 += fmt.Sprintf("%d", checksumTLE(line1))
+	line1 += strconv.Itoa(checksumTLE(line1))
 
 	// Line 2
 	line2 = fmt.Sprintf("2 %05d %8.4f %8.4f %07d %8.4f %8.4f %11.8f%5d",
@@ -100,7 +105,7 @@ func (gp GP) ToTLE() (line1, line2 string) {
 		int(gp.Eccentricity*1e7), gp.ArgOfPericenter,
 		gp.MeanAnomaly, gp.MeanMotion, gp.RevAtEpoch)
 	line2 = padToLength(line2, 68)
-	line2 += fmt.Sprintf("%d", checksumTLE(line2))
+	line2 += strconv.Itoa(checksumTLE(line2))
 
 	return line1, line2
 }
@@ -113,18 +118,24 @@ func formatIntDes(id string) string {
 	}
 	// Remove hyphen: "1998-067A" → "98067A"
 	result := ""
+
+	var resultSb116 strings.Builder
+
 	for i, part := range splitIntDes(id) {
 		if i == 0 {
 			// Take last 2 digits of year.
 			if len(part) >= 4 {
-				result += part[2:]
+				resultSb116.WriteString(part[2:])
 			} else {
-				result += part
+				resultSb116.WriteString(part)
 			}
 		} else {
-			result += part
+			resultSb116.WriteString(part)
 		}
 	}
+
+	result += resultSb116.String()
+
 	return fmt.Sprintf("%-8s", result)
 }
 
@@ -135,6 +146,7 @@ func splitIntDes(id string) []string {
 			return []string{id[:i], id[i+1:]}
 		}
 	}
+
 	return []string{id}
 }
 
@@ -144,6 +156,7 @@ func formatNdot(val float64) string {
 	if val >= 0 {
 		return fmt.Sprintf(" .%08d", int(val*1e8+0.5))
 	}
+
 	return fmt.Sprintf("-.%08d", int(-val*1e8+0.5))
 }
 
@@ -157,6 +170,7 @@ func formatTLEExp(val float64) string {
 	if val == 0 {
 		return " 00000-0"
 	}
+
 	sign := " "
 	if val < 0 {
 		sign = "-"
@@ -164,16 +178,19 @@ func formatTLEExp(val float64) string {
 	}
 
 	exp := 0
+
 	for val >= 1.0 {
 		val /= 10.0
 		exp++
 	}
+
 	for val < 0.1 && val > 0 {
 		val *= 10.0
 		exp--
 	}
 
 	mantissa := int(val*100000 + 0.5)
+
 	return fmt.Sprintf("%s%05d%+d", sign, mantissa, exp)
 }
 
@@ -182,15 +199,18 @@ func padToLength(s string, length int) string {
 	for len(s) < length {
 		s += " "
 	}
+
 	if len(s) > length {
 		s = s[:length]
 	}
+
 	return s
 }
 
 // checksumTLE computes the TLE modulo-10 checksum.
 func checksumTLE(line string) int {
 	sum := 0
+
 	for _, c := range line {
 		if c >= '0' && c <= '9' {
 			sum += int(c - '0')
@@ -198,6 +218,7 @@ func checksumTLE(line string) int {
 			sum++
 		}
 	}
+
 	return sum % 10
 }
 
@@ -253,6 +274,7 @@ func (p *Provider) Resolve(query string) (resolve.Target, bool) {
 	if len(targets) > 0 {
 		return targets[0], true
 	}
+
 	return resolve.Target{}, false
 }
 
@@ -270,12 +292,13 @@ func (p *Provider) Search(query string) []resolve.Target {
 	for _, gp := range gps {
 		targets = append(targets, gpToTarget(gp))
 	}
+
 	return targets
 }
 
 // Fetch queries the CelestTrak GP API and returns parsed element sets.
 // It uses the JSON format for compact, natively-typed responses.
-func (p *Provider) Fetch(ctx context.Context, query QueryType, value string) ([]GP, error) {
+func (p *Provider) Fetch(ctx context.Context, query QueryType, value string) (_ []GP, err error) {
 	cacheKey := fmt.Sprintf("norad:%s:%s", query, value)
 
 	// NOTE: cache stores resolve.Target values, not GP structs.
@@ -285,6 +308,7 @@ func (p *Provider) Fetch(ctx context.Context, query QueryType, value string) ([]
 	if err != nil {
 		return nil, fmt.Errorf("norad: %w", err)
 	}
+
 	params := api.Query()
 	params.Set(string(query), value)
 	params.Set("FORMAT", "JSON")
@@ -299,7 +323,11 @@ func (p *Provider) Fetch(ctx context.Context, query QueryType, value string) ([]
 	if err != nil {
 		return nil, fmt.Errorf("norad: fetch failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if cerr := resp.Body.Close(); cerr != nil {
+			err = errors.Join(err, cerr)
+		}
+	}()
 
 	var gps []GP
 	if err := json.NewDecoder(resp.Body).Decode(&gps); err != nil {
@@ -311,6 +339,7 @@ func (p *Provider) Fetch(ctx context.Context, query QueryType, value string) ([]
 	for i, gp := range gps {
 		targets[i] = gpToTarget(gp)
 	}
+
 	_ = p.cache.Set(cacheKey, targets)
 
 	return gps, nil
@@ -318,13 +347,15 @@ func (p *Provider) Fetch(ctx context.Context, query QueryType, value string) ([]
 
 // FetchByID fetches GP data for a single NORAD catalog number.
 func (p *Provider) FetchByID(ctx context.Context, catNr int) (GP, error) {
-	gps, err := p.Fetch(ctx, QueryCatNr, fmt.Sprintf("%d", catNr))
+	gps, err := p.Fetch(ctx, QueryCatNr, strconv.Itoa(catNr))
 	if err != nil {
 		return GP{}, err
 	}
+
 	if len(gps) == 0 {
 		return GP{}, fmt.Errorf("norad: no data for catalog number %d", catNr)
 	}
+
 	return gps[0], nil
 }
 
@@ -332,8 +363,9 @@ func (p *Provider) FetchByID(ctx context.Context, catNr int) (GP, error) {
 func gpToTarget(gp GP) resolve.Target {
 	l1, l2 := gp.ToTLE()
 	epoch, _ := gp.EpochTime()
+
 	return resolve.Target{
-		ID:          fmt.Sprintf("%d", gp.NoradCatID),
+		ID:          strconv.Itoa(gp.NoradCatID),
 		Name:        gp.ObjectName,
 		Designation: gp.ObjectID,
 		Kind:        resolve.Kind("Satellite"),

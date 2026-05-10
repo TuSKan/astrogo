@@ -21,6 +21,7 @@ func main() {
 	now := time.NowUTC()
 
 	ctx := coord.NewContext(now, loc, atmosphere.StandardAtmosphere)
+
 	altaz, err := ctx.ICRSToAltAz(icrs)
 	if err != nil {
 		fmt.Printf("Error converting to AltAz: %v\n", err)

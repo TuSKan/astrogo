@@ -26,10 +26,12 @@ func TestStarPosition(t *testing.T) {
 
 func TestStarNoCoordinate(t *testing.T) {
 	s := NewStar("Empty", angle.Zero(), angle.Zero())
+
 	pos, err := s.Position(time.FromJD(2451545.0, time.UTC))
 	if err != nil {
 		t.Fatalf("Position() error: %v", err)
 	}
+
 	if pos.RA().Degrees() != 0 || pos.Dec().Degrees() != 0 {
 		t.Error("expected zero coords")
 	}
@@ -87,9 +89,11 @@ func TestPlanetIdentity(t *testing.T) {
 	if !sun.IsSun() {
 		t.Error("Sun.IsSun() should be true")
 	}
+
 	if sun.IsMoon() {
 		t.Error("Sun.IsMoon() should be false")
 	}
+
 	if !moon.IsMoon() {
 		t.Error("Moon.IsMoon() should be true")
 	}
@@ -110,6 +114,7 @@ func TestDeepSkyObject(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Position() error: %v", err)
 	}
+
 	if pos.RA().Degrees() == 0 {
 		t.Error("M31 RA should be non-zero")
 	}

@@ -19,6 +19,7 @@ func PlanetApparent(p eph.Provider, target eph.ID, t time.Time) (float64, error)
 	if target == eph.Sun {
 		return SunApparent(p, t)
 	}
+
 	if target == eph.Moon {
 		return MoonApparent(p, t)
 	}
@@ -27,6 +28,7 @@ func PlanetApparent(p eph.Provider, target eph.ID, t time.Time) (float64, error)
 	if err != nil {
 		return 0, err
 	}
+
 	sunSt, err := p.State(eph.Sun, t)
 	if err != nil {
 		return 0, err
@@ -81,12 +83,15 @@ func vecLen(v [3]float64) float64 {
 func angleBetween(a, b [3]float64) float64 {
 	dot := a[0]*b[0] + a[1]*b[1] + a[2]*b[2]
 	la := vecLen(a)
+
 	lb := vecLen(b)
 	if la < 1e-30 || lb < 1e-30 {
 		return 0
 	}
+
 	cos := dot / (la * lb)
 	cos = math.Max(-1, math.Min(1, cos))
+
 	return math.Acos(cos)
 }
 
@@ -113,6 +118,7 @@ func mercuryMag(r, delta, phAng float64) float64 {
 		3.4265e-07*p4 +
 		1.6893e-09*p5 -
 		3.0334e-12*p6
+
 	return -0.613 + distMod + phAngFactor
 }
 
@@ -121,6 +127,7 @@ func mercuryMag(r, delta, phAng float64) float64 {
 
 func venusMag(r, delta, phAng float64) float64 {
 	distMod := 5 * math.Log10(r*delta)
+
 	var phAngFactor float64
 	if phAng < 163.7 {
 		// Polynomial in ascending order for Horner evaluation:
@@ -130,6 +137,7 @@ func venusMag(r, delta, phAng float64) float64 {
 		// a0 = 236.05828 + 4.384, a1 = -2.81914, a2 = 8.39034e-3
 		phAngFactor = ((8.39034e-03*phAng - 2.81914e+00) * phAng) + 236.05828 + 4.384
 	}
+
 	return -4.384 + distMod + phAngFactor
 }
 
@@ -143,8 +151,10 @@ func marsMag(r, delta, phAng float64) float64 {
 
 	const geocentricLimit = 50.0
 
-	var phAngFactor float64
-	var v10 float64
+	var (
+		phAngFactor float64
+		v10         float64
+	)
 	if phAng <= geocentricLimit {
 		v10 = -1.601
 		phAngFactor = 2.267e-02*phAng - 1.302e-04*phAng*phAng
@@ -161,10 +171,13 @@ func marsMag(r, delta, phAng float64) float64 {
 
 func jupiterMag(r, delta, phAng float64) float64 {
 	distMod := 5 * math.Log10(r*delta)
+
 	const geocentricLimit = 12.0
 
-	var phAngFactor float64
-	var v10 float64
+	var (
+		phAngFactor float64
+		v10         float64
+	)
 	if phAng <= geocentricLimit {
 		v10 = -9.395
 		phAngFactor = (6.16e-04*phAng - 3.7e-04) * phAng
@@ -176,8 +189,10 @@ func jupiterMag(r, delta, phAng float64) float64 {
 		if inner <= 0 {
 			inner = 1e-30
 		}
+
 		phAngFactor = -2.5 * math.Log10(inner)
 	}
+
 	return v10 + distMod + phAngFactor
 }
 
@@ -200,6 +215,7 @@ func saturnMag(sunToPlanet, observerToPlanet [3]float64, r, delta, phAng float64
 
 	// Geometric mean sub-latitude: sqrt(β_sun · β_earth) when same sign, else 0.
 	product := sunSubLat * earthSubLat
+
 	var subLatGeoc float64
 	if product >= 0 {
 		subLatGeoc = math.Sqrt(math.Abs(product))
@@ -219,6 +235,7 @@ func saturnMag(sunToPlanet, observerToPlanet [3]float64, r, delta, phAng float64
 	if phAng <= geocentricPhaseLimit && absSubLatGeoc <= geocentricInclinationLimit {
 		// Eq. 10: globe + rings, geocentric circumstances.
 		sinBeta := math.Sin(subLatGeoc * math.Pi / 180)
+
 		return -8.914 - 1.825*sinBeta + 0.026*phAng -
 			0.378*sinBeta*math.Exp(-2.25*phAng) + distMod
 	}
@@ -227,6 +244,7 @@ func saturnMag(sunToPlanet, observerToPlanet [3]float64, r, delta, phAng float64
 	// Eq. 12: globe-alone beyond geocentric phase angle limit.
 	p3 := phAng * phAng * phAng
 	p4 := p3 * phAng
+
 	return -8.94 + 2.446e-4*phAng + 2.672e-4*phAng*phAng -
 		1.506e-6*p3 + 4.767e-9*p4 + distMod
 }
@@ -254,6 +272,7 @@ func uranusMag(sunToPlanet, observerToPlanet [3]float64, r, delta, phAng float64
 	if phAng > geocentricLimit {
 		apMag += (1.045e-4*phAng + 6.587e-3) * phAng
 	}
+
 	return apMag
 }
 
@@ -282,5 +301,6 @@ func neptuneMag(r, delta, phAng float64, t time.Time) float64 {
 			return math.NaN() // Unknown before 2000 at large phase angles.
 		}
 	}
+
 	return apMag
 }
