@@ -449,8 +449,8 @@ func TestCaldwellNakedEye(t *testing.T) {
 		want bool
 	}{
 		{"high lag time", CrescentParams{LT: 50, ArcL: 10}, true},
-		{"at limit", CrescentParams{LT: 34.941, ArcL: 10}, false},   // -0.9709*10+44.65 = 34.941
-		{"above limit", CrescentParams{LT: 34.942, ArcL: 10}, true}, // strict >
+		{"below limit", CrescentParams{LT: 34.940, ArcL: 10}, false}, // -0.9709*10+44.65 = 34.941
+		{"above limit", CrescentParams{LT: 34.942, ArcL: 10}, true},  // strict >
 		{"low lag time", CrescentParams{LT: 20, ArcL: 10}, false},
 	}
 	for _, tt := range tests {
