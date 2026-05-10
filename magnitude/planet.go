@@ -1,6 +1,7 @@
 package magnitude
 
 import (
+	"fmt"
 	"math"
 
 	eph "github.com/TuSKan/astrogo/ephemeris"
@@ -26,12 +27,12 @@ func PlanetApparent(p eph.Provider, target eph.ID, t time.Time) (float64, error)
 
 	planetSt, err := p.State(target, t)
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("magnitude: planet state: %w", err)
 	}
 
 	sunSt, err := p.State(eph.Sun, t)
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("magnitude: sun state: %w", err)
 	}
 
 	// Sun→Planet (heliocentric) = Earth→Planet − Earth→Sun.

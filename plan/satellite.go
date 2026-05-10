@@ -42,7 +42,12 @@ func (s *Satellite) Position(t time.Time) (coord.ICRS, error) {
 }
 
 func (s *Satellite) GeocentricVec(t time.Time) (vector.Vec3, error) {
-	return eph.Position(s.provider, s.id, t)
+	v, err := eph.Position(s.provider, s.id, t)
+	if err != nil {
+		return vector.Vec3{}, fmt.Errorf("satellite: geocentric: %w", err)
+	}
+
+	return v, nil
 }
 
 func (s *Satellite) GetDetails(ctx *coord.Context, props ...string) (*TargetDetails, error) {
@@ -62,7 +67,7 @@ var defaultAtm = atmosphere.Atmosphere{}
 func LookAngle(prov eph.Provider, id eph.ID, ctx *coord.Context) (coord.AltAz, error) {
 	st, err := prov.State(id, ctx.Time())
 	if err != nil {
-		return coord.AltAz{}, err
+		return coord.AltAz{}, fmt.Errorf("satellite: look angle state: %w", err)
 	}
 
 	// Use the Reducer pipeline: computes observer GCRS position, subtracts it

@@ -662,7 +662,7 @@ func dut1ForUTC(jd1, jd2 float64) (float64, error) {
 
 	eop, err := iers.GetModel().EOP(mjd)
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("time: EOP lookup: %w", err)
 	}
 
 	return eop.DUT1, nil

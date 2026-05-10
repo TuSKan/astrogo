@@ -92,7 +92,12 @@ func (a *Asteroid) Position(t time.Time) (coord.ICRS, error) {
 }
 
 func (a *Asteroid) GeocentricVec(t time.Time) (vector.Vec3, error) {
-	return eph.Position(a.provider, a.id, t)
+	v, err := eph.Position(a.provider, a.id, t)
+	if err != nil {
+		return vector.Vec3{}, fmt.Errorf("asteroid: geocentric: %w", err)
+	}
+
+	return v, nil
 }
 
 func (a *Asteroid) GetDetails(ctx *coord.Context, props ...string) (*TargetDetails, error) {
@@ -130,12 +135,12 @@ func (a *Asteroid) ApparentMagnitudeCtx(t time.Time, _ *coord.Context) (float64,
 func (a *Asteroid) helioGeometry(t time.Time) (r, delta float64, alpha angle.Angle, st eph.State, err error) {
 	st, err = a.provider.State(a.id, t)
 	if err != nil {
-		return r, delta, alpha, st, err
+		return r, delta, alpha, st, fmt.Errorf("asteroid: state: %w", err)
 	}
 
 	sunSt, err := a.provider.State(eph.Sun, t)
 	if err != nil {
-		return r, delta, alpha, st, err
+		return r, delta, alpha, st, fmt.Errorf("asteroid: sun state: %w", err)
 	}
 
 	delta = st.Distance()
@@ -149,5 +154,5 @@ func (a *Asteroid) helioGeometry(t time.Time) (r, delta float64, alpha angle.Ang
 	cosA = clamp(cosA, -1, 1)
 	alpha = angle.Rad(math.Acos(cosA))
 
-	return r, delta, alpha, st, err
+	return r, delta, alpha, st, nil
 }

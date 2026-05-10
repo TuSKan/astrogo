@@ -21,14 +21,14 @@ type Interval struct {
 func IsVisible(obj coord.Object, t time.Time, site *Site, minAlt angle.Angle) (bool, error) {
 	pos, err := obj.ICRS(t)
 	if err != nil {
-		return false, err
+		return false, fmt.Errorf("visibility: ICRS: %w", err)
 	}
 
 	ctx := coord.NewContext(t, site.Location(), site.Atmosphere())
 
 	aa, err := ctx.ICRSToAltAz(pos)
 	if err != nil {
-		return false, err
+		return false, fmt.Errorf("visibility: AltAz: %w", err)
 	}
 
 	return aa.Alt().Degrees() >= minAlt.Degrees(), nil
@@ -50,14 +50,14 @@ func refineVisibility(
 	altEval := func(t time.Time) (float64, error) {
 		pos, err := obj.ICRS(t)
 		if err != nil {
-			return 0, err
+			return 0, fmt.Errorf("visibility: ICRS: %w", err)
 		}
 
 		ctx := coord.NewContext(t, site.Location(), site.Atmosphere())
 
 		aa, err := ctx.ICRSToAltAz(pos)
 		if err != nil {
-			return 0, err
+			return 0, fmt.Errorf("visibility: AltAz: %w", err)
 		}
 
 		return aa.Alt().Degrees() - threshold.Degrees(), nil
@@ -134,14 +134,14 @@ func VisibleIntervals(
 	for t.Before(end) || t.Equal(end) {
 		pos, err := obj.ICRS(t)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("visibility: ICRS: %w", err)
 		}
 
 		ctx := coord.NewContext(t, site.Location(), site.Atmosphere())
 
 		aa, err := ctx.ICRSToAltAz(pos)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("visibility: AltAz: %w", err)
 		}
 
 		visible := aa.Alt().Degrees() >= minAlt.Degrees()
@@ -232,14 +232,14 @@ func TransitEstimate(obj coord.Object, site *Site, start, end time.Time) (time.T
 	altAt := func(t time.Time) (float64, error) {
 		pos, err := obj.ICRS(t)
 		if err != nil {
-			return 0, err
+			return 0, fmt.Errorf("visibility: transit ICRS: %w", err)
 		}
 
 		ctx := coord.NewContext(t, site.Location(), site.Atmosphere())
 
 		aa, err := ctx.ICRSToAltAz(pos)
 		if err != nil {
-			return 0, err
+			return 0, fmt.Errorf("visibility: transit AltAz: %w", err)
 		}
 
 		return aa.Alt().Degrees(), nil

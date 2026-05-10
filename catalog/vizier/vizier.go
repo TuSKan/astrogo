@@ -119,7 +119,7 @@ func (p *Provider) ConeSearch(ctx context.Context, req resolve.ConeRequest) reso
 func parseCSV(body io.Reader) ([]resolve.Target, error) {
 	reader := csv.NewReader(body)
 	if _, err := reader.Read(); err != nil { // discard header for now and assume exact select order
-		return nil, err
+		return nil, fmt.Errorf("vizier: read header: %w", err)
 	}
 	// TODO: implement standard schema extraction or hardcode based on SELECT order.
 	return []resolve.Target{}, nil // Scaffolded

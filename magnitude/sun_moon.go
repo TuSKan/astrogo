@@ -1,6 +1,7 @@
 package magnitude
 
 import (
+	"fmt"
 	"math"
 
 	eph "github.com/TuSKan/astrogo/ephemeris"
@@ -16,7 +17,7 @@ import (
 func SunApparent(p eph.Provider, t time.Time) (float64, error) {
 	st, err := p.State(eph.Sun, t)
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("magnitude: sun state: %w", err)
 	}
 
 	R := st.Distance()

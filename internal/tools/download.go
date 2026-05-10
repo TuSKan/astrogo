@@ -17,17 +17,17 @@ var ErrDownloadFailed = errors.New("download failed")
 func Download(url, path string) (err error) {
 	// Ensure directory exists
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return err
+		return fmt.Errorf("download: mkdir: %w", err)
 	}
 
 	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, url, nil)
 	if err != nil {
-		return err
+		return fmt.Errorf("download: new request: %w", err)
 	}
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return err
+		return fmt.Errorf("download: HTTP do: %w", err)
 	}
 	defer func() {
 		cerr := resp.Body.Close()
@@ -42,7 +42,7 @@ func Download(url, path string) (err error) {
 
 	tmpFile, err := os.CreateTemp(filepath.Dir(path), "download-*.tmp")
 	if err != nil {
-		return err
+		return fmt.Errorf("download: create temp: %w", err)
 	}
 
 	tmpName := tmpFile.Name()
@@ -61,12 +61,12 @@ func Download(url, path string) (err error) {
 	}()
 
 	if _, err = io.Copy(tmpFile, resp.Body); err != nil {
-		return err
+		return fmt.Errorf("download: copy: %w", err)
 	}
 
 	// Close explicitly before rename (critical for Windows)
 	if err := tmpFile.Close(); err != nil {
-		return err
+		return fmt.Errorf("download: close temp: %w", err)
 	}
 
 	// Atomically move the fully downloaded file into place

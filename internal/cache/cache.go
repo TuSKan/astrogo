@@ -9,6 +9,7 @@
 package cache
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 )
@@ -26,7 +27,11 @@ func Dir(subsystem string) (string, error) {
 
 	dir := filepath.Join(base, appName, subsystem)
 
-	return dir, os.MkdirAll(dir, 0o755)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return dir, fmt.Errorf("cache: mkdir %s: %w", dir, err)
+	}
+
+	return dir, nil
 }
 
 // Path returns the absolute path for a cached file identified by
@@ -40,7 +45,7 @@ func Path(subsystem, name string) (string, error) {
 
 	p := filepath.Join(base, appName, subsystem, filepath.FromSlash(name))
 	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
-		return "", err
+		return "", fmt.Errorf("cache: mkdir: %w", err)
 	}
 
 	return p, nil

@@ -1,6 +1,8 @@
 package plan
 
 import (
+	"fmt"
+
 	"github.com/TuSKan/astrogo/coord"
 
 	"github.com/TuSKan/astrogo/time"
@@ -53,10 +55,14 @@ func (c *EvalContext) ICRS() (coord.ICRS, error) {
 
 	icrs, err := c.Object.ICRS(c.Time)
 	c.icrs = icrs
-	c.icrsOk = err == nil
-	c.icrsErr = err
+	if err != nil {
+		c.icrsErr = fmt.Errorf("evalctx: ICRS: %w", err)
+		return icrs, c.icrsErr
+	}
 
-	return icrs, err
+	c.icrsOk = true
+
+	return icrs, nil
 }
 
 // AltAz returns the (memoized) AltAz coordinates.
@@ -72,9 +78,13 @@ func (c *EvalContext) AltAz() (coord.AltAz, error) {
 	}
 
 	aa, err := c.Ctx.ICRSToAltAz(icrs)
-	c.altAz = aa
-	c.altOk = err == nil
-	c.altErr = err
+	if err != nil {
+		c.altErr = fmt.Errorf("evalctx: AltAz: %w", err)
+		return aa, c.altErr
+	}
 
-	return aa, err
+	c.altAz = aa
+	c.altOk = true
+
+	return aa, nil
 }

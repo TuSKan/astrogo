@@ -80,7 +80,7 @@ func ParseFinals2000A(r io.Reader) (*Table, error) {
 
 	err := scanner.Err()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("iers: scan EOP: %w", err)
 	}
 
 	sort.Slice(records, func(i, j int) bool {

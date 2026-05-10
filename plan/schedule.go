@@ -1,6 +1,7 @@
 package plan
 
 import (
+	"fmt"
 	"math"
 	"sort"
 
@@ -105,22 +106,22 @@ func (m *BasicTransitionModel) Overhead(ctx TransitionContext) (time.Duration, e
 	if m.SlewRate > 0 {
 		posFrom, err := ctx.FromBlock.Target.Position(ctx.FromTime)
 		if err != nil {
-			return 0, err
+			return 0, fmt.Errorf("schedule: from position: %w", err)
 		}
 
 		posTo, err := ctx.ToBlock.Target.Position(ctx.ToTime)
 		if err != nil {
-			return 0, err
+			return 0, fmt.Errorf("schedule: to position: %w", err)
 		}
 
 		altAzFrom, err := coord.NewContext(ctx.FromTime, ctx.Site.Location(), ctx.Site.Atmosphere()).ICRSToAltAz(posFrom)
 		if err != nil {
-			return 0, err
+			return 0, fmt.Errorf("schedule: from AltAz: %w", err)
 		}
 
 		altAzTo, err := coord.NewContext(ctx.ToTime, ctx.Site.Location(), ctx.Site.Atmosphere()).ICRSToAltAz(posTo)
 		if err != nil {
-			return 0, err
+			return 0, fmt.Errorf("schedule: to AltAz: %w", err)
 		}
 
 		// Calculate separation on Alt and Az independently.
@@ -189,7 +190,12 @@ func (s *Scheduler) BuildSchedule(window Window, blocks []*Block) (*Schedule, er
 		}, nil
 	}
 
-	return s.Strategy.Schedule(s.Planner, window, blocks, s.TransitionModel)
+	sched, err := s.Strategy.Schedule(s.Planner, window, blocks, s.TransitionModel)
+	if err != nil {
+		return nil, fmt.Errorf("scheduler: strategy: %w", err)
+	}
+
+	return sched, nil
 }
 
 const defaultStep = 1 * time.Minute

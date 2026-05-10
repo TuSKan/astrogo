@@ -135,7 +135,7 @@ func parseCSV(body io.Reader) ([]resolve.Target, error) {
 		}
 
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("gaia: read CSV: %w", err)
 		}
 
 		id := row[col["source_id"]]

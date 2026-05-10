@@ -1,8 +1,3 @@
-// Package constraint provides a system for evaluating astronomical observing constraints.
-//
-// It allows checking whether an observable target is suitable for observation
-// at a given time and site based on criteria such as minimum altitude,
-// maximum airmass, and solar/lunar positions.
 package plan
 
 import (
@@ -187,7 +182,7 @@ func (c MoonSep) CheckCtx(obj Observable, ctx *coord.Context) (Result, error) {
 
 	pos, err := obj.Position(ctx.Time())
 	if err != nil {
-		return Result{}, err
+		return Result{}, fmt.Errorf("constraint: moon separation position: %w", err)
 	}
 
 	moon := NewMoon(eph.Default())
@@ -220,10 +215,15 @@ func (c MoonSep) CheckCtx(obj Observable, ctx *coord.Context) (Result, error) {
 func skyAltAzCtx(obj Observable, t time.Time, ctx *coord.Context) (coord.AltAz, error) {
 	pos, err := obj.Position(t)
 	if err != nil {
-		return coord.AltAz{}, err
+		return coord.AltAz{}, fmt.Errorf("constraint: position: %w", err)
 	}
 
-	return ctx.ICRSToAltAz(pos)
+	aa, err := ctx.ICRSToAltAz(pos)
+	if err != nil {
+		return coord.AltAz{}, fmt.Errorf("constraint: ICRS to AltAz: %w", err)
+	}
+
+	return aa, nil
 }
 
 // skyAirmassCtx computes airmass using a pre-built coord.Context.
@@ -233,5 +233,10 @@ func skyAirmassCtx(obj Observable, t time.Time, ctx *coord.Context) (float64, er
 		return 0, err
 	}
 
-	return atmosphere.Airmass(aa.Alt())
+	am, err := atmosphere.Airmass(aa.Alt())
+	if err != nil {
+		return 0, fmt.Errorf("constraint: airmass: %w", err)
+	}
+
+	return am, nil
 }

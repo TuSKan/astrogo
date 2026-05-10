@@ -112,7 +112,7 @@ func computeDetails(obs Observable, ctx *coord.Context, props ...string) (*Targe
 
 	pos, err := obs.Position(t)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("details: position: %w", err)
 	}
 
 	d.RA = pos.RA()

@@ -286,7 +286,7 @@ func (s EventSolver) solveVisibility(spec EventSpec, start, end time.Time) ([]Ev
 		if mb, ok := spec.Target.(MovingBody); ok {
 			vec, err := mb.GeocentricVec(t)
 			if err != nil {
-				return 0, err
+				return 0, fmt.Errorf("events: geocentric vec: %w", err)
 			}
 
 			aa := ctx.GeocentricToObserved(vec)
@@ -297,12 +297,12 @@ func (s EventSolver) solveVisibility(spec EventSpec, start, end time.Time) ([]Ev
 		// For deep-space / stellar targets, use the astrometric pipeline.
 		pos, err := spec.Target.Position(t)
 		if err != nil {
-			return 0, err
+			return 0, fmt.Errorf("events: target position: %w", err)
 		}
 
 		aa, err := ctx.ICRSToAltAz(pos)
 		if err != nil {
-			return 0, err
+			return 0, fmt.Errorf("events: ICRS to AltAz: %w", err)
 		}
 
 		return aa.Alt().Degrees() - spec.Threshold.Degrees(), nil
@@ -386,14 +386,14 @@ func (s EventSolver) solveVisibility(spec EventSpec, start, end time.Time) ([]Ev
 				evalHA := func(t time.Time) (float64, error) {
 					pos, err := spec.Target.Position(t)
 					if err != nil {
-						return 0, err
+						return 0, fmt.Errorf("events: target position: %w", err)
 					}
 
 					ctx := coord.NewContext(t, spec.Observer.Location(), spec.Observer.Atmosphere())
 
 					ha, err := ctx.ICRSToHourAngle(pos)
 					if err != nil {
-						return 0, err
+						return 0, fmt.Errorf("events: hour angle: %w", err)
 					}
 
 					return ha.Degrees(), nil
@@ -445,12 +445,12 @@ func (s EventSolver) solveGeometry(spec EventSpec, start, end time.Time) ([]Even
 	evalVal := func(t time.Time) (float64, error) {
 		pos1, err := spec.Target.Position(t)
 		if err != nil {
-			return 0, err
+			return 0, fmt.Errorf("events: target position: %w", err)
 		}
 
 		pos2, err := spec.Other.Position(t)
 		if err != nil {
-			return 0, err
+			return 0, fmt.Errorf("events: other position: %w", err)
 		}
 
 		switch spec.Kind {
