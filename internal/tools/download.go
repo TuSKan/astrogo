@@ -49,15 +49,8 @@ func Download(url, path string) (err error) {
 
 	// Ensure we don't leak the tmp file if something panics or fails early
 	defer func() {
-		cerr := tmpFile.Close()
-		if cerr != nil {
-			err = errors.Join(err, cerr)
-		}
-
-		rerr := os.Remove(tmpName)
-		if rerr != nil && err != nil {
-			err = errors.Join(err, rerr)
-		}
+		_ = tmpFile.Close()
+		_ = os.Remove(tmpName)
 	}()
 
 	if _, err = io.Copy(tmpFile, resp.Body); err != nil {
