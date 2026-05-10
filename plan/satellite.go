@@ -94,6 +94,12 @@ func (s *Satellite) GetDetails(ctx *coord.Context, props ...string) (*TargetDeta
 // errNoObserverCtx is returned when satellite magnitude is called without a context.
 var errNoObserverCtx = errors.New("satellite: apparent magnitude requires observer context (use ApparentMagnitudeCtx)")
 
+// errNoStdMag is returned when satellite magnitude is requested without a standard magnitude.
+var errNoStdMag = errors.New("satellite: no standard magnitude set")
+
+// errDegenerateGeometry is returned when satellite magnitude geometry is degenerate.
+var errDegenerateGeometry = errors.New("satellite magnitude: degenerate geometry")
+
 // ApparentMagnitude cannot be computed for a satellite without observer context.
 // Use [Satellite.ApparentMagnitudeCtx] instead.
 func (s *Satellite) ApparentMagnitude(_ time.Time) (float64, error) {
@@ -105,7 +111,7 @@ func (s *Satellite) ApparentMagnitude(_ time.Time) (float64, error) {
 // phase angle. Requires that [WithStdMag] was set at construction.
 func (s *Satellite) ApparentMagnitudeCtx(t time.Time, ctx *coord.Context) (float64, error) {
 	if !s.hasStdMag {
-		return 0, fmt.Errorf("satellite %s: no standard magnitude set", s.name)
+		return 0, fmt.Errorf("%w: %s", errNoStdMag, s.name)
 	}
 
 	if ctx == nil {
@@ -144,7 +150,7 @@ func (s *Satellite) ApparentMagnitudeCtx(t time.Time, ctx *coord.Context) (float
 	norm2 := obsToSat.Norm()
 
 	if norm1 == 0 || norm2 == 0 {
-		return 0, fmt.Errorf("satellite magnitude: degenerate geometry")
+		return 0, errDegenerateGeometry
 	}
 
 	cosAlpha := math.Max(-1, math.Min(1, dot/(norm1*norm2)))
