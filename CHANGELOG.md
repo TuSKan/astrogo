@@ -5,6 +5,35 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+#### Satellite Photometry
+- `plan/satellite.go`: `Satellite.ApparentMagnitudeCtx` — apparent visual magnitude from topocentric range (via `LookAngle`) and the Sun–Satellite–Observer phase angle
+- `WithStdMag(stdMag, convention)` and `WithPhaseModel(model)` functional options on `NewSatellite`
+- `Satellite` now implements `MagnitudeComputer`; `ApparentMagnitude` (no context) returns a sentinel error directing callers to `ApparentMagnitudeCtx`
+- Sentinel errors `errNoObserverCtx`, `errNoStdMag`, `errDegenerateGeometry`
+
+#### Generic Moving Body
+- `plan/generic.go`: `GenericBody` — fallback `Observable` for ephemeris-backed targets with no photometric model. Deliberately does **not** implement `MagnitudeComputer`, so `GetDetails` no longer reports a spurious magnitude for unrecognized bodies
+
+#### Static Magnitude
+- `plan/observable.go`: `StaticMagnitude` interface for catalog magnitudes that do not vary with time or observer geometry, implemented by `Star`, `DeepSkyObject`, and `Satellite`
+
+#### CI / Tooling
+- `.github/workflows/pre-release.yml` (replaces `nightly.yml`)
+- `.agents/rules/rules.md` — agent contribution rules
+- `catalog/fink`: network test support
+
+### Changed
+- `magnitude/satellite.go`: `SatelliteApparent` now honors the `StdMagConvention` argument, normalizing Molczan (mean, 50%) to the McCants (max, 100%) reference via `molczanOffset = 2.5·log₁₀(2) ≈ 0.7526 mag`. Corrected the documented Molczan offset from ~1.4 mag to ~0.75 mag
+- `plan/factory.go`: `FromCatalog` returns `GenericBody` (not `Planet`) for unrecognized moving-body sub-types
+- `plan/details.go`: `fillStaticMagnitude` dispatches through the `StaticMagnitude` interface instead of a per-type switch; documented `TargetDetails.RA`/`Dec` as astrometric topocentric ICRS (J2000) — includes diurnal parallax, excludes precession-nutation and stellar aberration
+
+### Fixed
+- `magnitude/satellite.go`: `SatelliteApparent` previously ignored its convention parameter, yielding magnitudes ~0.75 mag too faint for Molczan-referenced standard magnitudes; the correction is now applied
+
 ## [0.1.5] — 2026-05-10
 
 Lint-zero release: full `golangci-lint` compliance with zero violations across all enabled linters.
@@ -336,6 +365,7 @@ First observatory-grade release. Validated against USNO, JPL Horizons, and NASA 
 - `VisibleIntervals` creates independent Contexts per grid step (correct; each step is a different epoch)
 - IERS EOP data fetched via `go:generate`, not at runtime
 
+[Unreleased]: https://github.com/TuSKan/astrogo/compare/v0.1.5...HEAD
 [0.1.5]: https://github.com/TuSKan/astrogo/releases/tag/v0.1.5
 [0.1.4]: https://github.com/TuSKan/astrogo/releases/tag/v0.1.4
 [0.1.3]: https://github.com/TuSKan/astrogo/releases/tag/v0.1.3
