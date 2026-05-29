@@ -55,13 +55,22 @@ precision computation, observatory planning, and scalable data workflows.
 | 22 | **`FromCatalog` factory** — `catalog.Target` wire format → concrete typed Observable | ✅ v0.1.4 |
 | 23 | **Legacy cleanup** — `Target` god-struct, `NewTarget`, boolean-flag dispatch deleted | ✅ v0.1.4 |
 
+## Phase 5.5 — Constraints, Photometry Depth & Quality
+
+| # | Capability | Status |
+|---|---|---|
+| 24 | **Constraint Framework** — `Altitude`, `Airmass`, `Sun` (twilight), `MoonSep` (lunar separation), all with shared `coord.Context` via `CheckCtx` | ✅ v0.1.4 |
+| 25 | **Generic Moving Body** — `GenericBody` fallback for ephemeris targets without a photometric model (no spurious magnitude in `GetDetails`) | ✅ unreleased |
+| 26 | **Satellite Magnitude Models** — Lambertian-sphere / diffuse-cylinder phase functions, McCants standard-magnitude convention | ✅ unreleased |
+| 27 | **Lint-Zero Quality Gate** — full `golangci-lint` v2 compliance, zero violations, exported-symbol docs across all packages | ✅ v0.1.5 |
+
 ---
 
 # 🔨 Phase 6 — Advanced Constraints & Realism
 
 **Goal:** model the constraints that real observers face beyond altitude and airmass.
 
-## 24. Light Pollution Constraint
+## 28. Light Pollution Constraint
 
 **Status:** 🔲 Not Started
 
@@ -77,7 +86,7 @@ where limiting magnitude is too shallow.
 
 ---
 
-## 25. Horizon Profile Constraint
+## 29. Horizon Profile Constraint
 
 **Status:** 🔲 Not Started
 
@@ -93,7 +102,7 @@ Per-azimuth altitude minimums from terrain data, replacing the flat-horizon assu
 
 ---
 
-## 26. Weather Constraint
+## 30. Weather Constraint
 
 **Status:** 🔲 Not Started
 
@@ -112,7 +121,7 @@ Real-time or forecast-based weather gating for scheduling decisions.
 
 ---
 
-## 27. Satellite Illumination Constraint
+## 31. Satellite Illumination Constraint
 
 **Status:** 🔲 Not Started
 
@@ -126,12 +135,27 @@ above the observer's horizon, the observer is in darkness, and the satellite is 
 
 ---
 
+## 32. Moon Illumination Constraint
+
+**Status:** 🔲 Not Started
+
+Companion to the existing `MoonSep` constraint: gate or penalize faint targets
+when lunar phase / sky brightness from moonlight is too high.
+
+- [ ] `MoonIllumination` constraint — reject/penalize above an illumination fraction
+- [ ] Optional coupling with `MoonSep` (separation × illumination scoring)
+- [ ] Integration with `ScoreObservable`
+
+**Inspiration:** astroplan `MoonIlluminationConstraint`.
+
+---
+
 # 📊 Phase 7 — Visualization
 
 **Goal:** publication-ready sky charts and planning diagrams, in the spirit of
 [starplot.dev](https://starplot.dev) and astroplan's `plot_airmass` / `plot_sky` / `plot_parallactic`.
 
-## 28. Airmass Diagram
+## 33. Airmass Diagram
 
 **Status:** 🔲 Not Started
 
@@ -148,7 +172,7 @@ one curve per target, twilight bands shaded.
 
 ---
 
-## 29. Sky Chart
+## 34. Sky Chart
 
 **Status:** 🔲 Not Started
 
@@ -165,7 +189,7 @@ Polar projection sky map showing target positions, horizon profile, and cardinal
 
 ---
 
-## 30. Observability Table
+## 35. Observability Table
 
 **Status:** 🔲 Not Started
 
@@ -181,7 +205,7 @@ Tabular summary of target visibility across a night or multi-night window.
 
 ---
 
-## 31. Parallactic Angle Diagram
+## 36. Parallactic Angle Diagram
 
 **Status:** 🔲 Not Started
 
@@ -200,7 +224,7 @@ atmospheric dispersion compensator planning.
 
 **Goal:** enable high-throughput catalog and pipeline workflows.
 
-## 32. Batch / High-Throughput APIs
+## 37. Batch / High-Throughput APIs
 
 **Status:** 🔲 Not Started
 
@@ -212,7 +236,7 @@ atmospheric dispersion compensator planning.
 
 ---
 
-## 33. Cross-Match Algorithms
+## 38. Cross-Match Algorithms
 
 **Status:** 🔲 Not Started
 
