@@ -1,0 +1,181 @@
+package lightpollution
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"io"
+	"math"
+	"net/http"
+	"net/url"
+	"os"
+	"slices"
+	"strconv"
+	"strings"
+	"time"
+
+	"github.com/TuSKan/astrogo/skybrightness"
+)
+
+// queryAPI is the lightpollutionmap.info point-query endpoint.
+const queryAPI = "https://www.lightpollutionmap.info/QueryRaster/"
+
+// defaultLayer is the World Atlas 2015 (Falchi et al. 2016) artificial-brightness layer.
+const defaultLayer = "wa_2015"
+
+// apiKeyEnv is the environment variable consulted for the API key by default.
+const apiKeyEnv = "LIGHTPOLLUTIONMAP_KEY"
+
+// Photometric constants for the brightness → magnitude conversion:
+//
+//	L[cd/m²] = magLuminanceZeroPoint · 10^(−0.4·m)
+//
+// anchored to the natural zenith background naturalLuminanceCdM2 ≡ 22.0 V
+// mag/arcsec² (Falchi et al. 2016).
+const (
+	// naturalLuminanceCdM2 is the natural zenith background, 0.171168465 mcd/m²
+	// ≡ 22.00 V mag/arcsec² (lightpollutionmap.info/help.html).
+	naturalLuminanceCdM2 = 1.71168465e-4
+	// magLuminanceZeroPoint is the SQM zero-point, 1.08e8 mcd/m².
+	magLuminanceZeroPoint = 1.08e5
+)
+
+// Sentinel errors.
+var (
+	// ErrNoAPIKey is returned when no API key is configured.
+	ErrNoAPIKey = errors.New("lightpollution: no API key (use WithAPIKey or set LIGHTPOLLUTIONMAP_KEY)")
+	// ErrBadResponse is returned when the API response cannot be parsed.
+	ErrBadResponse = errors.New("lightpollution: unexpected API response")
+)
+
+// Client queries the lightpollutionmap.info QueryRaster service.
+type Client struct {
+	apiKey  string
+	layer   string
+	baseURL string
+	http    *http.Client
+}
+
+// Option configures a Client.
+type Option func(*Client)
+
+// WithAPIKey sets the QueryRaster API key, overriding LIGHTPOLLUTIONMAP_KEY.
+func WithAPIKey(key string) Option { return func(c *Client) { c.apiKey = key } }
+
+// WithLayer overrides the raster layer (default "wa_2015").
+func WithLayer(layer string) Option { return func(c *Client) { c.layer = layer } }
+
+// WithHTTPClient sets a custom HTTP client.
+func WithHTTPClient(h *http.Client) Option { return func(c *Client) { c.http = h } }
+
+// New creates a Client. The API key defaults to the LIGHTPOLLUTIONMAP_KEY
+// environment variable unless overridden with WithAPIKey.
+func New(opts ...Option) *Client {
+	c := &Client{
+		apiKey:  os.Getenv(apiKeyEnv),
+		layer:   defaultLayer,
+		baseURL: queryAPI,
+		http:    &http.Client{Timeout: 30 * time.Second},
+	}
+
+	for _, opt := range opts {
+		opt(c)
+	}
+
+	return c
+}
+
+// SQM returns the total zenith sky surface brightness (V mag/arcsec²) at the
+// given geodetic latitude and longitude (degrees), combining the World Atlas
+// artificial brightness with the natural background.
+func (c *Client) SQM(ctx context.Context, latDeg, lonDeg float64) (skybrightness.SurfaceBrightnessV, error) {
+	art, err := c.artificialBrightness(ctx, latDeg, lonDeg)
+	if err != nil {
+		return 0, err
+	}
+
+	return artificialToSQM(art), nil
+}
+
+// Floor returns a skybrightness.Floor built from the site's resolved SQM.
+func (c *Client) Floor(ctx context.Context, latDeg, lonDeg float64) (skybrightness.Floor, error) {
+	sqm, err := c.SQM(ctx, latDeg, lonDeg)
+	if err != nil {
+		return skybrightness.Floor{}, err
+	}
+
+	return skybrightness.NewFloorSQM(sqm), nil
+}
+
+// artificialBrightness fetches the World Atlas artificial sky brightness
+// (mcd/m²) at the site.
+func (c *Client) artificialBrightness(ctx context.Context, latDeg, lonDeg float64) (float64, error) {
+	if c.apiKey == "" {
+		return 0, ErrNoAPIKey
+	}
+
+	u, err := url.Parse(c.baseURL)
+	if err != nil {
+		return 0, fmt.Errorf("lightpollution: parse url: %w", err)
+	}
+
+	q := u.Query()
+	q.Set("ql", c.layer)
+	q.Set("qt", "point")
+	q.Set("qd", fmt.Sprintf("%.6f,%.6f", lonDeg, latDeg)) // API order is lon,lat
+	q.Set("key", c.apiKey)
+	u.RawQuery = q.Encode()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
+	if err != nil {
+		return 0, fmt.Errorf("lightpollution: request: %w", err)
+	}
+
+	req.Header.Set("User-Agent", "AstroGo/1.0")
+
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return 0, fmt.Errorf("lightpollution: http: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 1<<16))
+	if err != nil {
+		return 0, fmt.Errorf("lightpollution: read body: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return 0, fmt.Errorf("%w: status %d: %s", ErrBadResponse, resp.StatusCode, strings.TrimSpace(string(body)))
+	}
+
+	return parseBrightness(string(body))
+}
+
+// parseBrightness extracts the brightness value from the CSV point-query
+// response, taking the last numeric token (point responses are short CSV).
+func parseBrightness(body string) (float64, error) {
+	fields := strings.FieldsFunc(body, func(r rune) bool {
+		return r == ',' || r == '\n' || r == '\r' || r == ' ' || r == '\t' || r == ';'
+	})
+
+	for _, f := range slices.Backward(fields) {
+		if v, err := strconv.ParseFloat(strings.TrimSpace(f), 64); err == nil {
+			return v, nil
+		}
+	}
+
+	return 0, fmt.Errorf("%w: no numeric value in %q", ErrBadResponse, strings.TrimSpace(body))
+}
+
+// artificialToSQM converts a World Atlas artificial brightness (mcd/m²) to a
+// total zenith V-band surface brightness (mag/arcsec²) by adding the natural
+// background in linear luminance.
+func artificialToSQM(artificialMcdM2 float64) skybrightness.SurfaceBrightnessV {
+	if artificialMcdM2 < 0 {
+		artificialMcdM2 = 0
+	}
+
+	lTot := naturalLuminanceCdM2 + artificialMcdM2*1e-3 // mcd/m² → cd/m²
+
+	return skybrightness.SurfaceBrightnessV(-2.5 * math.Log10(lTot/magLuminanceZeroPoint))
+}

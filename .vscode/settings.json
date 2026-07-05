@@ -3,5 +3,15 @@
 		"buildFlags": [
 			"-tags=network,validation,integration"
 		]
-	}
+	},
+	"cSpell.words": [
+		"Airmass",
+		"arcsec",
+		"astrogo",
+		"bortle",
+		"icrs",
+		"lightpollution",
+		"skybrightness",
+		"VIIRS"
+	]
 }

@@ -454,10 +454,12 @@ func TestSatelliteApparent_MolczanConvention(t *testing.T) {
 	mMcCants := magnitude.SatelliteApparent(stdMag, magnitude.ConventionMcCants, rangeKm, alpha, magnitude.PhaseSphere)
 	mMolczan := magnitude.SatelliteApparent(stdMag, magnitude.ConventionMolczan, rangeKm, alpha, magnitude.PhaseSphere)
 
-	// Molczan convention assumes mean brightness (50% illumination), so
-	// the same stdMag value represents an intrinsically brighter satellite.
-	// The result should be brighter (lower mag) by 2.5·log₁₀(2) ≈ 0.7526.
-	expectedOffset := 2.5 * math.Log10(2)
+	// The Molczan and McCants standard-magnitude conventions differ by ~1.4 mag
+	// in total (mmccants.org/tles/intrmagdef.html): ~0.75 mag from the
+	// illumination/phase convention (50% vs full phase) plus ~0.7 mag from the
+	// mean vs. maximum brightness definition. For the same stdMag input, the
+	// Molczan result is therefore brighter (lower mag) by that full offset.
+	expectedOffset := 1.45 // 2.5·log₁₀(2) + 0.7, matches molczanOffset
 	actualOffset := mMcCants - mMolczan
 
 	assertNear(t, "Molczan offset", actualOffset, expectedOffset, 0.001)

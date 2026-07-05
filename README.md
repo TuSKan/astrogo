@@ -563,6 +563,7 @@ Science-as-showcase documents — narrative analysis backed by runnable code and
 
 | Showcase | Topic | Example |
 |----------|-------|---------|
+| **Moonlit Sky Brightness** | Sky brightness & limiting magnitude from scattered moonlight, zodiacal light & airglow | [`examples/18_sky_brightness/`](examples/18_sky_brightness/) |
 | [**Equinox & Solstice Almanac**](docs/EQUINOX.md) | Decade of seasons, eclipses, apsides, topocentric Moon | [`examples/17_equinox_prediction/`](examples/17_equinox_prediction/) |
 | [**The Great Planet Parade**](docs/PLANET_PARADE.md) | Feb 28 2025 — seven planets in the evening sky from São Paulo | [`examples/16_planet_parade/`](examples/16_planet_parade/) |
 | [**When Did Jesus Die?**](docs/JESUS.md) | Dating the Crucifixion via lunar eclipses, conjunctions, and crescent visibility | [`examples/10_jesus_christ/`](examples/10_jesus_christ/) |

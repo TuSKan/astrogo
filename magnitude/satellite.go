@@ -25,19 +25,26 @@ type StdMagConvention int
 
 const (
 	// ConventionMcCants uses the McCants/Quicksat convention:
-	// standard magnitude at 1000 km range, 90° phase, maximum brightness,
-	// 100% illumination assumption.
+	// standard magnitude at 1000 km range, full phase (100% illumination),
+	// representing the brightest-likely ("maximum") brightness.
 	ConventionMcCants StdMagConvention = iota
 
 	// ConventionMolczan uses the Molczan convention:
-	// same range/phase reference but mean brightness, 50% illumination.
-	// Intrinsically ~0.75 mag fainter than McCants for the same satellite.
+	// standard magnitude at 1000 km range, 90° phase (50% illumination),
+	// representing mean brightness. Intrinsically ~1.4 mag fainter than
+	// McCants for the same satellite (see molczanOffset).
 	ConventionMolczan
 )
 
-// molczanOffset is the magnitude difference between Molczan (mean, 50%)
-// and McCants (max, 100%) conventions: 2.5·log₁₀(2) ≈ 0.7526 mag.
-const molczanOffset = 0.7526
+// molczanOffset is the total magnitude difference between the Molczan
+// (mcnames) and McCants (quicksat) standard-magnitude conventions, ~1.4 mag,
+// per https://www.mmccants.org/tles/intrmagdef.html. It is the sum of two
+// independent ~0.7 mag effects:
+//   - illumination/phase convention (Molczan 50% vs McCants full phase):
+//     2.5·log₁₀(2) ≈ 0.75 mag
+//   - mean vs. maximum ("brightest likely") brightness: ≈0.7 mag, a
+//     definitional (non-geometric) difference
+const molczanOffset = 1.45 // 2.5·log₁₀(2) + 0.7
 
 // SatelliteApparent computes the apparent visual magnitude of an artificial satellite.
 //
@@ -58,10 +65,9 @@ func SatelliteApparent(stdMag float64, conv StdMagConvention, rangeKm float64, a
 		return stdMag
 	}
 
-	// Normalize to McCants convention (maximum brightness, 100% illumination).
-	// Molczan convention uses mean brightness (50% illumination), which is
-	// intrinsically fainter by 2.5·log₁₀(2) ≈ 0.75 mag for the same object.
-	// Subtract the offset to convert Molczan → McCants reference frame.
+	// Normalize Molczan standard magnitudes to the McCants reference frame.
+	// A Molczan value is ~1.4 mag fainter than the McCants value for the same
+	// object (see molczanOffset), so subtract the offset to convert.
 	m := stdMag
 	if conv == ConventionMolczan {
 		m -= molczanOffset
