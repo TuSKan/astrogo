@@ -70,19 +70,27 @@ precision computation, observatory planning, and scalable data workflows.
 
 **Goal:** model the constraints that real observers face beyond altitude and airmass.
 
-## 28. Light Pollution Constraint
+## 28. Sky Brightness & Limiting Magnitude Constraint
 
-**Status:** 🔲 Not Started
+**Status:** ✅ unreleased
 
-Bortle/SQM-based sky brightness thresholds that penalize or reject targets in zones
-where limiting magnitude is too shallow.
+Delivered as the `skybrightness` package (physics engine) plus a
+`LimitingMagnitudeConstraint` in `plan`. Sky surface brightness is decomposed into
+additive components summed in linear flux space, from which a derived limiting
+magnitude scores or gates targets — going well beyond a static light-pollution floor.
 
-- [ ] `SkyBrightness` constraint — accepts Bortle class (1–9) or SQM (mag/arcsec²)
-- [ ] Per-target minimum limiting magnitude threshold
-- [ ] Optional sky-brightness grid (spatial SQM map) for directional evaluation
-- [ ] Integration with `ScoreObservable` — brightness-limited targets get lower merit
+- [x] `Floor` component — scalar SQM, directional `SQMGrid`, lossy `FloorFromBortle` (SQM canonical)
+- [x] `Moonlight` component — Krisciunas & Schaefer (1991) scattered moonlight (~8–23% accuracy)
+- [x] `ZodiacalLight` component — Leinert (1998) Table 17, bilinear interpolation
+- [x] `Airglow` component — dark-sky floor (Noll 2012 / Patat 2008)
+- [x] `CompositeModel` — linear-flux-space summation, allocation-free hot path
+- [x] `VisualLimitingMag` — Schaefer (1990) / Unihedron SQM→NELM conversion
+- [x] Per-target minimum limiting magnitude threshold (`Required`)
+- [x] Soft monotonic ramp scoring + `Boolean` hard-cutoff mode
+- [x] Integration with `ScoreObservable` via `ScoreObservableSky`
 
-**Inspiration:** Light pollution atlases (Falchi et al. 2016), ClearDarkSky SQM data.
+**Inspiration:** ESO Cerro Paranal sky model (Noll et al. 2012), Falchi et al. 2016,
+Krisciunas & Schaefer 1991, Leinert et al. 1998.
 
 ---
 

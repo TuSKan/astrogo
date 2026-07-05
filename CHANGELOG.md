@@ -21,18 +21,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 #### Static Magnitude
 - `plan/observable.go`: `StaticMagnitude` interface for catalog magnitudes that do not vary with time or observer geometry, implemented by `Star`, `DeepSkyObject`, and `Satellite`
 
+#### Sky Brightness & Observability (Phase 6, roadmap #28)
+- New `skybrightness` package — night-sky surface-brightness model decomposed into additive components summed in linear flux space (`Nanolambert`) and converted to V `mag/arcsec²` only at the boundary:
+  - `Floor` — light-pollution baseline from scalar SQM, directional `SQMGrid`, or lossy `FloorFromBortle` (SQM is the canonical input)
+  - `Moonlight` — scattered moonlight, Krisciunas & Schaefer (1991) closed form (~8–23% accuracy); zero when the Moon is below the horizon
+  - `ZodiacalLight` — Leinert et al. (1998) Table 17 (500 nm SI radiance) with bilinear interpolation; cross-validated against the Table 16 S10(V)⊙ values via the 1.28×10⁻⁸ W conversion
+  - `Airglow` — constant dark-sky floor (Noll et al. 2012 / Patat 2008)
+  - `CompositeModel` / `Model` / `Component` — allocation-free linear-flux summation
+  - `VisualLimitingMag` (`LimitingMagModel`) — Schaefer (1990) / Unihedron SQM→NELM conversion with airmass extinction
+- `plan/skybrightness.go`: `LimitingMagnitudeConstraint` — soft monotonic (logistic) observability merit by default, optional `Boolean` hard cutoff; `ScoreObservableSky` folds the sky merit into `ScoreObservable`
+- `examples/18_sky_brightness` — scattered-moonlight sky brightness and limiting magnitude vs. Moon separation, with constraint-based scoring
+
 #### CI / Tooling
 - `.github/workflows/pre-release.yml` (replaces `nightly.yml`)
 - `.agents/rules/rules.md` — agent contribution rules
 - `catalog/fink`: network test support
 
 ### Changed
-- `magnitude/satellite.go`: `SatelliteApparent` now honors the `StdMagConvention` argument, normalizing Molczan (mean, 50%) to the McCants (max, 100%) reference via `molczanOffset = 2.5·log₁₀(2) ≈ 0.7526 mag`. Corrected the documented Molczan offset from ~1.4 mag to ~0.75 mag
+- `magnitude/satellite.go`: `SatelliteApparent` now honors the `StdMagConvention` argument, normalizing Molczan standard magnitudes to the McCants reference frame via `molczanOffset = 1.45 mag` — the full ~1.4 mag Molczan↔McCants difference per [McCants](https://www.mmccants.org/tles/intrmagdef.html), combining the ~0.75 mag illumination/phase convention (`2.5·log₁₀(2)`) and the ~0.7 mag mean-vs-maximum brightness definition
 - `plan/factory.go`: `FromCatalog` returns `GenericBody` (not `Planet`) for unrecognized moving-body sub-types
 - `plan/details.go`: `fillStaticMagnitude` dispatches through the `StaticMagnitude` interface instead of a per-type switch; documented `TargetDetails.RA`/`Dec` as astrometric topocentric ICRS (J2000) — includes diurnal parallax, excludes precession-nutation and stellar aberration
 
 ### Fixed
-- `magnitude/satellite.go`: `SatelliteApparent` previously ignored its convention parameter, yielding magnitudes ~0.75 mag too faint for Molczan-referenced standard magnitudes; the correction is now applied
+- `magnitude/satellite.go`: `SatelliteApparent` previously ignored its `StdMagConvention` parameter, so Molczan-referenced standard magnitudes were not converted to the McCants frame; the full ~1.4 mag offset is now applied
 
 ## [0.1.5] — 2026-05-10
 
