@@ -15,18 +15,6 @@ import (
 	"github.com/TuSKan/astrogo/time"
 )
 
-// Observation pairs a Target with a specific observing time requirement.
-type Observation struct {
-	Target   Observable
-	Duration time.Duration
-}
-
-// Slot pairs a coord.Object with an observing Window.
-type Slot struct {
-	Object Observable
-	Window Window
-}
-
 // Planner evaluates coord.Objects against a set of Constraints at a given Site.
 type Planner struct {
 	Site        *Site

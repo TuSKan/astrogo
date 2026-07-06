@@ -85,4 +85,25 @@ func TestSunMoonConstraints(t *testing.T) {
 			t.Errorf("Expected PASS for far moon, got %v", res)
 		}
 	})
+
+	// Regression: MoonSep.CheckCtx previously had a signature
+	// (obj, ctx) that didn't match the ConstraintCtx interface
+	// (obj, t, site, ctx), so it silently never satisfied ConstraintCtx
+	// and never got the hot-path Context-reuse benefit.
+	t.Run("MoonSep satisfies ConstraintCtx", func(t *testing.T) {
+		var c ConstraintCtx = MoonSep{Threshold: angle.Deg(30)}
+
+		obj := NewStar("T", angle.Deg(0), angle.Deg(0))
+		ctx := coord.NewContext(tmNight, site.Location(), site.Atmosphere())
+
+		want, err := MoonSep{Threshold: angle.Deg(30)}.Check(obj, tmNight, site)
+		testutil.AssertNoError(t, err)
+
+		got, err := c.CheckCtx(obj, tmNight, site, ctx)
+		testutil.AssertNoError(t, err)
+
+		if got.Pass != want.Pass || got.Value != want.Value {
+			t.Errorf("CheckCtx result %+v does not match Check result %+v", got, want)
+		}
+	})
 }

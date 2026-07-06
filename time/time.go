@@ -810,17 +810,21 @@ func (t Time) TT() Time {
 
 	switch t.scale { //nolint:exhaustive // only UTC/TAI/TDB convert to TT
 	case UTC:
-		// Check if the LSK has valid leap-second data for this epoch.
-		// Before 1972, ΔAT = 0 (no leap seconds), so we use ΔT instead.
+		// Leap seconds were only introduced 1972-01-01; before that, TAI-UTC
+		// followed pre-1972 rational drift-rate corrections (still nonzero
+		// per SOFA's Dat back to 1960, and zero only before 1960) rather
+		// than integer leap seconds, so ΔAT is not a usable basis for TT
+		// here regardless of what Dat returns. Gate purely on the epoch.
 		y, m, d, fd, _ := gofaext.JdToDate(t.jd1, t.jd2)
 
-		dat, _ := gofaext.Dat(y, m, d, fd)
-		if dat == 0 && y < 1972 {
+		if y < 1972 {
 			// Historical date: use ΔT polynomial (TT = UT + ΔT)
 			dt := DeltaT(t.DecimalYear())
 			return fromPartsPreserveLoc(t, t.jd1, t.jd2+dt/86400.0, TT)
 		}
 		// Modern date: TT = UTC + ΔAT + 32.184s
+		dat, _ := gofaext.Dat(y, m, d, fd)
+
 		return fromPartsPreserveLoc(t, t.jd1, t.jd2+(dat+32.184)/86400.0, TT)
 	case TAI:
 		// TT = TAI + 32.184s

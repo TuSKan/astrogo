@@ -130,7 +130,11 @@ func computeDetails(obs Observable, ctx *coord.Context, props ...string) (*Targe
 	if mb, ok := obs.(MovingBody); ok {
 		fillMovingBody(d, mb, t, ctx)
 	} else {
-		altaz, _ := ctx.ICRSToAltAz(pos)
+		altaz, err := ctx.ICRSToAltAz(pos)
+		if err != nil {
+			return nil, fmt.Errorf("details: alt/az: %w", err)
+		}
+
 		d.Altitude = altaz.Alt()
 		d.Azimuth = altaz.Az()
 		d.DistanceUnit = "pc"
@@ -285,7 +289,13 @@ func applyProps(d *TargetDetails, props []string) {
 // fillRiseSetTransit finds the next rise, set, and transit events within
 // ±12/+24 hours of the context time.
 func fillRiseSetTransit(d *TargetDetails, obs Observable, ctx *coord.Context) {
-	site, _ := NewSite("Observer", ctx.Site(), angle.Deg(0), nil)
+	site, err := NewSite("Observer", ctx.Site(), angle.Deg(0), nil)
+	if err != nil {
+		// No valid location to compute rise/set/transit against; leave
+		// those fields unset rather than proceed with a broken Observer.
+		return
+	}
+
 	t := ctx.Time()
 
 	start := t.Add(-12 * time.Hour)

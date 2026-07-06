@@ -592,3 +592,32 @@ func TestTT_FromAllScales(t *testing.T) {
 	ttFromUT1 := ut1.TT()
 	testutil.AssertNear(t, "UT1→TT", ttFromUT1.JD(), expectedTT.JD(), 1e-12)
 }
+
+// TestTT_Pre1972UsesDeltaTNotLeapSeconds is a regression test: 1960-1971 dates
+// were previously misclassified as "modern" (leap-second era) because SOFA's
+// Dat returns nonzero rational drift-rate values from 1960 onward, not 0 until
+// 1972 as the old gate assumed, so this window silently used ΔAT+32.184s (the
+// drift-rate table) instead of the intended ΔT polynomial. Note: across this
+// whole window the two formulas happen to agree to within ~0.01-0.13s (both
+// track the same era's Earth-rotation/atomic-time divergence), so the
+// practical numerical impact is small — this test exists to confirm the
+// *formula* matches the code's documented design intent, not to demonstrate a
+// large numerical discrepancy.
+func TestTT_Pre1972UsesDeltaTNotLeapSeconds(t *testing.T) {
+	utc := atime.FromGo(time.Date(1965, 6, 15, 0, 0, 0, 0, time.UTC))
+	tt := utc.TT()
+
+	offsetSeconds := (tt.JD() - utc.JD()) * 86400.0
+	expectedDT := atime.DeltaT(utc.DecimalYear())
+
+	// 1e-4s tolerance absorbs float64 noise from JD() collapsing the
+	// two-part representation, while still being tighter than the ~0.09s
+	// gap between ΔT and the old (buggy) drift-table value at this date.
+	testutil.AssertNear(t, "TT-UTC offset (ΔT-based)", offsetSeconds, expectedDT, 1e-4)
+
+	// The true 1972-01-01 boundary itself must still use the leap-second path.
+	boundary := atime.FromGo(time.Date(1972, 1, 1, 0, 0, 0, 0, time.UTC))
+	ttBoundary := boundary.TT()
+	boundaryOffset := (ttBoundary.JD() - boundary.JD()) * 86400.0
+	testutil.AssertNear(t, "TT-UTC offset at 1972-01-01 (leap-second based)", boundaryOffset, 10+32.184, 1e-4)
+}

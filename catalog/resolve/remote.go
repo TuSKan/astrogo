@@ -152,6 +152,20 @@ func (c *Client) Do(req *http.Request) (*http.Response, error) {
 	}
 
 	operation := func() (*http.Response, error) {
+		// Rewind the request body before every attempt (including the
+		// first, a harmless no-op there): net/http drains and closes
+		// req.Body on each Do call, so without this, a retry after a
+		// transient failure would resend an empty/already-consumed body
+		// instead of replaying the original request.
+		if req.GetBody != nil {
+			body, gbErr := req.GetBody()
+			if gbErr != nil {
+				return nil, backoff.Permanent(fmt.Errorf("resolve: rewind request body: %w", gbErr))
+			}
+
+			req.Body = body
+		}
+
 		resp, err := c.HTTPClient.Do(req)
 
 		if !c.RetryPolicy(resp, err) {
