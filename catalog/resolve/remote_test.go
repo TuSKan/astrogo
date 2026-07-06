@@ -3,8 +3,10 @@ package resolve_test
 import (
 	"context"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -47,6 +49,58 @@ func TestClientRetries(t *testing.T) {
 		err := resp.Body.Close()
 		if err != nil {
 			t.Errorf("failed to close response body: %v", err)
+		}
+	})
+
+	testutil.AssertEqual(t, "Status Code", resp.StatusCode, http.StatusOK)
+	testutil.AssertEqual(t, "Attempts", attempts, 3)
+}
+
+// TestClientRetriesWithBody is a regression test: Do used to reuse the same
+// *http.Request across retry attempts without rewinding req.Body via
+// req.GetBody(), so a POST request that survived a transient failure and got
+// retried would resend an empty (already-drained) body instead of replaying
+// the original request — exactly the pattern SIMBAD/Gaia/VizieR/MAST use for
+// their ADQL query bodies.
+func TestClientRetriesWithBody(t *testing.T) {
+	attempts := 0
+
+	const wantBody = "query=select+*+from+targets"
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		attempts++
+
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		if attempts < 3 {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			return
+		}
+
+		if string(body) != wantBody {
+			t.Errorf("attempt %d: got body %q, want %q", attempts, body, wantBody)
+		}
+
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	client := resolve.NewClient()
+	client.MaxRetries = 5
+
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, server.URL, strings.NewReader(wantBody))
+	testutil.AssertNoError(t, err)
+
+	resp, err := client.Do(req)
+	testutil.AssertNoError(t, err)
+
+	t.Cleanup(func() {
+		if cerr := resp.Body.Close(); cerr != nil {
+			t.Errorf("failed to close response body: %v", cerr)
 		}
 	})
 

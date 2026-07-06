@@ -1,15 +1,7 @@
 package resolve
 
 import (
-	"strings"
 	"sync"
-
-	"github.com/apache/arrow-go/v18/arrow"
-	"github.com/apache/arrow-go/v18/arrow/array"
-	"github.com/apache/arrow-go/v18/arrow/memory"
-
-	"github.com/TuSKan/astrogo/angle"
-	"github.com/TuSKan/astrogo/coord"
 )
 
 // Cache provides a thread-safe caching system for query results.
@@ -19,31 +11,13 @@ type Cache interface {
 	Close() error
 }
 
-// TargetSchema defines the Apache Arrow schema used for serializing Target records.
-// Retained for API compatibility with downstream consumers that may inspect it.
-var TargetSchema = arrow.NewSchema(
-	[]arrow.Field{
-		{Name: "ID", Type: arrow.BinaryTypes.String},
-		{Name: "Name", Type: arrow.BinaryTypes.String},
-		{Name: "Designation", Type: arrow.BinaryTypes.String},
-		{Name: "SPKID", Type: arrow.BinaryTypes.String},
-		{Name: "Kind", Type: arrow.BinaryTypes.String},
-		{Name: "Catalog", Type: arrow.BinaryTypes.String},
-		{Name: "RA", Type: arrow.PrimitiveTypes.Float64, Nullable: true},
-		{Name: "Dec", Type: arrow.PrimitiveTypes.Float64, Nullable: true},
-		{Name: "Aliases", Type: arrow.BinaryTypes.String, Nullable: true}, // ';' separated to keep schema simple
-	},
-	nil,
-)
-
 // MapCache implements an in-memory cache that stores Target slices directly.
 //
 // The previous implementation serialized targets to/from Arrow RecordBatches on
 // every Set/Get, adding marshal/unmarshal overhead and per-row allocations
 // (ICRS, aliases) without exposing a columnar query path. This version stores
 // the slices directly, retaining the MapCache name and Cache interface for
-// API compatibility. The ToRecordBatch helper is available for callers that
-// need columnar representation for downstream Arrow-native operations.
+// API compatibility.
 type MapCache struct {
 	items map[string][]Target
 	mu    sync.RWMutex
@@ -102,99 +76,4 @@ func (c *MapCache) Close() error {
 	c.items = make(map[string][]Target)
 
 	return nil
-}
-
-// ToRecordBatch converts a slice of Targets to an Arrow RecordBatch for callers
-// that need columnar representation for downstream Arrow-native operations.
-// The caller is responsible for calling Release() on the returned record.
-func ToRecordBatch(items []Target) arrow.RecordBatch {
-	mem := memory.NewGoAllocator()
-
-	b := array.NewRecordBuilder(mem, TargetSchema)
-	defer b.Release()
-
-	idB, _ := b.Field(0).(*array.StringBuilder)
-	nameB, _ := b.Field(1).(*array.StringBuilder)
-	desigB, _ := b.Field(2).(*array.StringBuilder)
-	spkB, _ := b.Field(3).(*array.StringBuilder)
-	kindB, _ := b.Field(4).(*array.StringBuilder)
-	catB, _ := b.Field(5).(*array.StringBuilder)
-	raB, _ := b.Field(6).(*array.Float64Builder)
-	decB, _ := b.Field(7).(*array.Float64Builder)
-	aliasesB, _ := b.Field(8).(*array.StringBuilder)
-
-	for _, t := range items {
-		idB.Append(t.ID)
-		nameB.Append(t.Name)
-		desigB.Append(t.Designation)
-		spkB.Append(t.SPKID)
-		kindB.Append(string(t.Kind))
-		catB.Append(t.Catalog)
-
-		if t.HasCoord {
-			raB.Append(t.Coord.RA().Radians())
-			decB.Append(t.Coord.Dec().Radians())
-		} else {
-			raB.AppendNull()
-			decB.AppendNull()
-		}
-
-		if len(t.Aliases) > 0 {
-			aliasesB.Append(strings.Join(t.Aliases, ";"))
-		} else {
-			aliasesB.AppendNull()
-		}
-	}
-
-	return b.NewRecordBatch()
-}
-
-// FromRecordBatch converts an Arrow RecordBatch back to a slice of Targets.
-// This is the inverse of ToRecordBatch for callers that receive Arrow data
-// from external sources.
-func FromRecordBatch(rec arrow.RecordBatch) []Target {
-	idArr, _ := rec.Column(0).(*array.String)
-	nameArr, _ := rec.Column(1).(*array.String)
-	desigArr, _ := rec.Column(2).(*array.String)
-	spkArr, _ := rec.Column(3).(*array.String)
-	kindArr, _ := rec.Column(4).(*array.String)
-	catArr, _ := rec.Column(5).(*array.String)
-	raArr, _ := rec.Column(6).(*array.Float64)
-	decArr, _ := rec.Column(7).(*array.Float64)
-	aliasesArr, _ := rec.Column(8).(*array.String)
-
-	targets := make([]Target, int(rec.NumRows()))
-	for i := range targets {
-		var aliases []string
-
-		if !aliasesArr.IsNull(i) {
-			s := aliasesArr.Value(i)
-			if s != "" {
-				aliases = strings.Split(s, ";")
-			}
-		}
-
-		var icrs coord.ICRS
-
-		hasCoord := false
-
-		if !raArr.IsNull(i) && !decArr.IsNull(i) {
-			icrs = coord.NewICRS(angle.Rad(raArr.Value(i)), angle.Rad(decArr.Value(i)))
-			hasCoord = true
-		}
-
-		targets[i] = Target{
-			ID:          idArr.Value(i),
-			Name:        nameArr.Value(i),
-			Designation: desigArr.Value(i),
-			SPKID:       spkArr.Value(i),
-			Kind:        Kind(kindArr.Value(i)),
-			Catalog:     catArr.Value(i),
-			Coord:       icrs,
-			HasCoord:    hasCoord,
-			Aliases:     aliases,
-		}
-	}
-
-	return targets
 }

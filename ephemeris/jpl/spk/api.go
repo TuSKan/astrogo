@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	stdtime "time"
 
 	"github.com/TuSKan/astrogo/time"
 )
@@ -22,6 +23,10 @@ import (
 
 // JPLHorizonsAPI is the base URL for the JPL Horizons API.
 const JPLHorizonsAPI = "https://ssd.jpl.nasa.gov/api/horizons.api"
+
+// horizonsRequestTimeout bounds the whole Horizons API request (connect +
+// transfer), preventing an indefinite hang on a stalled connection.
+const horizonsRequestTimeout = 2 * stdtime.Minute
 
 // HorizonsResult is a single result from the Horizons API.
 type HorizonsResult struct {
@@ -148,7 +153,10 @@ func apiHorizonsRequest(command string, startTime, endTime time.Time) (_ *Horizo
 
 	api.RawQuery = params.Encode()
 
-	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, api.String(), nil)
+	ctx, cancel := context.WithTimeout(context.Background(), horizonsRequestTimeout)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, api.String(), nil)
 	if err != nil {
 		return nil, fmt.Errorf("HorizonsRequest: failed to create request: %w", err)
 	}

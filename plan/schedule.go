@@ -114,14 +114,33 @@ func (m *BasicTransitionModel) Overhead(ctx TransitionContext) (time.Duration, e
 			return 0, fmt.Errorf("schedule: to position: %w", err)
 		}
 
-		altAzFrom, err := coord.NewContext(ctx.FromTime, ctx.Site.Location(), ctx.Site.Atmosphere()).ICRSToAltAz(posFrom)
-		if err != nil {
-			return 0, fmt.Errorf("schedule: from AltAz: %w", err)
-		}
+		var altAzFrom, altAzTo coord.AltAz
 
-		altAzTo, err := coord.NewContext(ctx.ToTime, ctx.Site.Location(), ctx.Site.Atmosphere()).ICRSToAltAz(posTo)
-		if err != nil {
-			return 0, fmt.Errorf("schedule: to AltAz: %w", err)
+		if ctx.FromTime.Equal(ctx.ToTime) {
+			// Same epoch (the common case — ToTime is documented as
+			// "approximate, often FromTime"): share one Context instead of
+			// building two identical ~91µs SOFA transforms for one instant.
+			epochCtx := coord.NewContext(ctx.FromTime, ctx.Site.Location(), ctx.Site.Atmosphere())
+
+			altAzFrom, err = epochCtx.ICRSToAltAz(posFrom)
+			if err != nil {
+				return 0, fmt.Errorf("schedule: from AltAz: %w", err)
+			}
+
+			altAzTo, err = epochCtx.ICRSToAltAz(posTo)
+			if err != nil {
+				return 0, fmt.Errorf("schedule: to AltAz: %w", err)
+			}
+		} else {
+			altAzFrom, err = coord.NewContext(ctx.FromTime, ctx.Site.Location(), ctx.Site.Atmosphere()).ICRSToAltAz(posFrom)
+			if err != nil {
+				return 0, fmt.Errorf("schedule: from AltAz: %w", err)
+			}
+
+			altAzTo, err = coord.NewContext(ctx.ToTime, ctx.Site.Location(), ctx.Site.Atmosphere()).ICRSToAltAz(posTo)
+			if err != nil {
+				return 0, fmt.Errorf("schedule: to AltAz: %w", err)
+			}
 		}
 
 		// Calculate separation on Alt and Az independently.

@@ -370,11 +370,22 @@ func (s EventSolver) solveVisibility(spec EventSpec, start, end time.Time) ([]Ev
 				var aa coord.AltAz
 
 				if mb, ok := spec.Target.(MovingBody); ok {
-					vec, _ := mb.GeocentricVec(resTime)
+					vec, err := mb.GeocentricVec(resTime)
+					if err != nil {
+						continue // Can't populate display fields reliably; skip this event
+					}
+
 					aa = resCtx.GeocentricToObserved(vec)
 				} else {
-					pos, _ := spec.Target.Position(resTime)
-					aa, _ = resCtx.ICRSToAltAz(pos)
+					pos, err := spec.Target.Position(resTime)
+					if err != nil {
+						continue
+					}
+
+					aa, err = resCtx.ICRSToAltAz(pos)
+					if err != nil {
+						continue
+					}
 				}
 
 				events = append(events, Event{
@@ -412,9 +423,16 @@ func (s EventSolver) solveVisibility(spec EventSpec, start, end time.Time) ([]Ev
 				}
 
 				// Compute HA at bracket endpoints to find the sub-bracket containing HA=0
-				haLeft, _ := evalHA(times[i-1])
-				haMid, _ := evalHA(times[i])
-				haRight, _ := evalHA(times[i+1])
+				haLeft, errLeft := evalHA(times[i-1])
+				haMid, errMid := evalHA(times[i])
+				haRight, errRight := evalHA(times[i+1])
+
+				if errLeft != nil || errMid != nil || errRight != nil {
+					// Can't reliably bracket a sign-crossing without all
+					// three evaluations — a silently-zeroed HA here could
+					// fabricate or mask a transit. Skip this window.
+					continue
+				}
 
 				var bracketA, bracketB time.Time
 
@@ -434,8 +452,16 @@ func (s EventSolver) solveVisibility(spec EventSpec, start, end time.Time) ([]Ev
 				}
 
 				resCtx := coord.NewContext(resTime, spec.Observer.Location(), spec.Observer.Atmosphere())
-				pos, _ := spec.Target.Position(resTime)
-				aa, _ := resCtx.ICRSToAltAz(pos)
+
+				pos, err := spec.Target.Position(resTime)
+				if err != nil {
+					continue // Can't populate display fields reliably; skip this event
+				}
+
+				aa, err := resCtx.ICRSToAltAz(pos)
+				if err != nil {
+					continue
+				}
 
 				events = append(events, Event{
 					Kind:              EventTransit,
