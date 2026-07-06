@@ -3,9 +3,14 @@ package lightpollution
 import (
 	"context"
 	"errors"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
+	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/internal/testutil"
+	"github.com/TuSKan/astrogo/skybrightness"
 )
 
 // TestArtificialToSQM verifies the artificial-brightness → total SQM conversion
@@ -101,4 +106,43 @@ func TestSQMNoAPIKey(t *testing.T) {
 	if _, err := c.Floor(context.Background(), -23.5505, -46.6333); !errors.Is(err, ErrNoAPIKey) {
 		t.Errorf("Floor without key: expected ErrNoAPIKey, got %v", err)
 	}
+}
+
+// TestFloorIsArtificialOnly is a regression test: Floor used to build its
+// skybrightness.Floor from SQM's TOTAL (artificial+natural) brightness,
+// which silently double-counts the natural background when composed with
+// Airglow/Zodiacal/Moonlight in a skybrightness.CompositeModel — the exact
+// idiomatic composition pattern skybrightness/model_test.go demonstrates.
+// Floor must instead match skybrightness/atlas's artificial-only contract.
+func TestFloorIsArtificialOnly(t *testing.T) {
+	t.Parallel()
+
+	const artMcdM2 = 6.64
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		if _, err := fmt.Fprintf(w, "-46.6333,-23.5505,%v", artMcdM2); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}))
+	defer server.Close()
+
+	c := New(WithAPIKey("test-key"), WithHTTPClient(server.Client()))
+	c.baseURL = server.URL
+
+	floor, err := c.Floor(context.Background(), -23.5505, -46.6333)
+	testutil.AssertNoError(t, err)
+
+	radiance, err := floor.Radiance(coord.AltAz{}, nil)
+	testutil.AssertNoError(t, err)
+
+	gotSB := float64(radiance.SurfaceBrightnessV())
+	wantArtificialOnly := float64(skybrightness.SurfaceBrightnessFromMcdM2(artMcdM2))
+
+	// Note: at this brightness level the artificial-only and total (SQM)
+	// values happen to be numerically close (~0.03 mag apart) even though
+	// they're conceptually different quantities — so this test checks an
+	// exact match against the correct (artificial-only) formula rather than
+	// asserting a "must differ from total" bound, which would be fragile.
+	testutil.AssertNear(t, "Floor SB (artificial-only)", gotSB, wantArtificialOnly, 1e-9)
 }

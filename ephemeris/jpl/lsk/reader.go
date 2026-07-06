@@ -142,12 +142,19 @@ func parseSpiceDate(s string) (float64, error) {
 		return 0, fmt.Errorf("%w: %s", ErrInvalidDate, s)
 	}
 
-	year, _ := strconv.Atoi(parts[0])
+	year, err := strconv.Atoi(parts[0])
+	if err != nil {
+		return 0, fmt.Errorf("%w: %s", ErrInvalidDate, s)
+	}
+
 	monthStr := strings.ToUpper(parts[1])
 
 	day := 1
 	if len(parts) > 2 {
-		day, _ = strconv.Atoi(parts[2])
+		day, err = strconv.Atoi(parts[2])
+		if err != nil {
+			return 0, fmt.Errorf("%w: %s", ErrInvalidDate, s)
+		}
 	}
 
 	months := map[string]int{

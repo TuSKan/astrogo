@@ -85,9 +85,13 @@ func New(opts ...Option) *Client {
 	return c
 }
 
-// SQM returns the total zenith sky surface brightness (V mag/arcsec²) at the
+// SQM returns the TOTAL zenith sky surface brightness (V mag/arcsec²) at the
 // given geodetic latitude and longitude (degrees), combining the World Atlas
-// artificial brightness with the natural background.
+// artificial brightness with the natural background. This is a self-contained
+// answer to "how bright is the sky here" — do not feed it into a
+// skybrightness.CompositeModel alongside Airglow/Zodiacal/Moonlight, since
+// those already add their own natural-background components and would
+// double-count it. Use Floor for the composable, artificial-only value.
 func (c *Client) SQM(ctx context.Context, latDeg, lonDeg float64) (skybrightness.SurfaceBrightnessV, error) {
 	art, err := c.artificialBrightness(ctx, latDeg, lonDeg)
 	if err != nil {
@@ -97,14 +101,20 @@ func (c *Client) SQM(ctx context.Context, latDeg, lonDeg float64) (skybrightness
 	return artificialToSQM(art), nil
 }
 
-// Floor returns a skybrightness.Floor built from the site's resolved SQM.
+// Floor returns a skybrightness.Floor built from the site's resolved
+// ARTIFICIAL-ONLY sky brightness (World Atlas 2015 layer) — consistent with
+// the artificial-only contract skybrightness/atlas's Falchi/VIIRS providers
+// use (see skybrightness/atlas/doc.go), so it composes safely with
+// Airglow/Zodiacal/Moonlight in a skybrightness.CompositeModel without
+// double-counting the natural background. Use SQM instead for a
+// self-contained total (artificial+natural) brightness value.
 func (c *Client) Floor(ctx context.Context, latDeg, lonDeg float64) (skybrightness.Floor, error) {
-	sqm, err := c.SQM(ctx, latDeg, lonDeg)
+	art, err := c.artificialBrightness(ctx, latDeg, lonDeg)
 	if err != nil {
 		return skybrightness.Floor{}, err
 	}
 
-	return skybrightness.NewFloorSQM(sqm), nil
+	return skybrightness.NewFloorSQM(skybrightness.SurfaceBrightnessFromMcdM2(art)), nil
 }
 
 // artificialBrightness fetches the World Atlas artificial sky brightness

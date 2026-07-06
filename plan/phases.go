@@ -584,7 +584,13 @@ func LunarEclipses(start, end time.Time, prov eph.Provider) ([]EclipseEvent, err
 				eclTime = phase.Time
 			}
 
-			refinedLat, _ := moonEclipticLatitude(eclTime, prov)
+			refinedLat, err := moonEclipticLatitude(eclTime, prov)
+			if err != nil {
+				// Fall back to the already-validated latitude at the syzygy
+				// rather than silently reporting a zero-valued refinement.
+				refinedLat = lat
+			}
+
 			eclipses = append(eclipses, EclipseEvent{
 				Type:             EclipseLunar,
 				Time:             eclTime,
@@ -642,7 +648,13 @@ func SolarEclipses(start, end time.Time, prov eph.Provider) ([]EclipseEvent, err
 				eclTime = phase.Time
 			}
 
-			refinedLat, _ := moonEclipticLatitude(eclTime, prov)
+			refinedLat, err := moonEclipticLatitude(eclTime, prov)
+			if err != nil {
+				// Fall back to the already-validated latitude at the syzygy
+				// rather than silently reporting a zero-valued refinement.
+				refinedLat = lat
+			}
+
 			eclipses = append(eclipses, EclipseEvent{
 				Type:             EclipseSolar,
 				Time:             eclTime,
