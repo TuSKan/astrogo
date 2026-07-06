@@ -6,6 +6,7 @@ import (
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
+	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/skybrightness"
 )
 
@@ -30,9 +31,12 @@ func TestFloorScalarConstant(t *testing.T) {
 			t.Fatalf("Radiance: %v", err)
 		}
 
-		if got != want {
-			t.Errorf("scalar floor varied with direction: got %g, want %g", got, want)
-		}
+		// Tolerance-based, not exact equality: math.Exp inside Nanolamberts()
+		// can be FMA-contracted differently depending on the calling
+		// context (direct call here vs. through the GridFunc closure in
+		// Radiance), producing a few ULPs of difference — most visible on
+		// architectures with native FMA (e.g. arm64/macOS runners).
+		testutil.AssertNear(t, "scalar floor radiance", float64(got), float64(want), 1e-9)
 	}
 }
 
