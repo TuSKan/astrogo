@@ -1,0 +1,39 @@
+astrogo
+Copyright (c) 2026 Rener Castro
+
+This software is licensed under the MIT License (see LICENSE).
+
+================================================================================
+SOFA Attribution
+================================================================================
+
+astrogo's internal/gofaext package uses routines and computations derived
+from the github.com/hebl/gofa module (https://github.com/hebl/gofa), which is
+itself a Go port of routines from the International Astronomical Union's
+"Standards Of Fundamental Astronomy" (SOFA) software (http://www.iausofa.org),
+based on SOFA version 19 (2023-10-11 release).
+
+Per the terms of the SOFA Software License:
+
+  (a) This derived work (astrogo) uses routines and computations derived by
+      its authors from software provided by SOFA under license, and does not
+      itself constitute software provided by and/or endorsed by SOFA.
+
+  (b) astrogo's internal/gofaext package (internal/gofaext/gofaext.go) wraps
+      gofa's SOFA-derived routines (e.g. Apco13, Atciq, Atioq, Gst06a, C2t06a,
+      Nut06a, Obl06, Pnm06a, Ee06a, Epv00, Moon98, Plan94, Dat, Refco) with
+      thin adapters that translate astrogo's own value types (angles in
+      radians, two-part Julian dates, etc.) into the argument shapes those
+      routines expect. See internal/gofaext/doc.go for details of the
+      relationship between astrogo and the underlying gofa/SOFA algorithms.
+
+  (c) No routine name in astrogo or gofaext carries the "iau" or "sofa"
+      prefix (or a trivial modification thereof).
+
+  (d) The origin of the SOFA-derived components is cited above and in
+      internal/gofaext/doc.go; the original SOFA copyright and license text
+      is reproduced in full at:
+      https://github.com/hebl/gofa/blob/master/sofa_copyr.txt
+
+  Copyright (C) of the original SOFA software is held by the Standards Of
+  Fundamental Astronomy Board of the International Astronomical Union.

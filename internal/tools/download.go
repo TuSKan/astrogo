@@ -8,10 +8,17 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"time"
 )
 
 // ErrDownloadFailed indicates a download returned an unexpected HTTP status.
 var ErrDownloadFailed = errors.New("download failed")
+
+// downloadTimeout bounds the whole download (connect + transfer). Kernel
+// files can be large (hundreds of MB), so this is generous compared to a
+// typical API-call timeout — its purpose is only to prevent an indefinite
+// hang on a stalled connection, not to cap legitimately slow transfers.
+const downloadTimeout = 10 * time.Minute
 
 // Download fetches a file from a URL and saves it to the target path.
 func Download(url, path string) (err error) {
@@ -20,7 +27,10 @@ func Download(url, path string) (err error) {
 		return fmt.Errorf("download: mkdir: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, url, nil)
+	ctx, cancel := context.WithTimeout(context.Background(), downloadTimeout)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return fmt.Errorf("download: new request: %w", err)
 	}

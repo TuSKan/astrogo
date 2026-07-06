@@ -52,3 +52,31 @@ func GetModel() Model {
 
 	return globalModel
 }
+
+// coverer is implemented by Model values that know their own valid MJD
+// range (currently only *Table, built from a parsed finals2000A.all file).
+type coverer interface {
+	Coverage() (mjdMin, mjdMax float64)
+}
+
+// Coverage reports the currently-registered global Model's valid MJD range.
+// ok is false if the registered model doesn't expose a coverage range (e.g.
+// ZeroModel, or a custom Model that hasn't opted in) — such a model can be
+// queried for any epoch without ErrOutOfRange, but its accuracy is not
+// epoch-dependent either, so there is nothing to report.
+//
+// Use this to proactively check whether the currently-registered EOP data
+// still covers the epoch you are about to compute with — e.g. at service
+// startup, or on a periodic health check — rather than relying on the
+// one-time degradation warning coord.NewContext and time.Time log
+// internally the first time a query falls outside the model's range.
+func Coverage() (mjdMin, mjdMax float64, ok bool) {
+	c, ok := GetModel().(coverer)
+	if !ok {
+		return 0, 0, false
+	}
+
+	mjdMin, mjdMax = c.Coverage()
+
+	return mjdMin, mjdMax, true
+}

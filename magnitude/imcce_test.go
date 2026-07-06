@@ -25,16 +25,24 @@ import (
 // our HG model against them. They require network access.
 // ══════════════════════════════════════════════════════════════════════════════
 
+// imcceCard mirrors the actual SSOCard schema (see
+// https://ssp.imcce.fr/webservices/ssodnet/api/ssocard/<name>): H and G are
+// each their own nested {value, error} object *inside* absolute_magnitude,
+// not directly on it — e.g. parameters.physical.absolute_magnitude.H.value,
+// not parameters.physical.absolute_magnitude.value. There is no separate
+// top-level "phase_slope" field; G lives alongside H under the same object.
 type imcceCard struct {
 	Title  string `json:"title"`
 	Params struct {
 		Physical struct {
 			AbsMag *struct {
-				Value float64 `json:"value"`
+				H struct {
+					Value float64 `json:"value"`
+				} `json:"H"`
+				G struct {
+					Value float64 `json:"value"`
+				} `json:"G"`
 			} `json:"absolute_magnitude"`
-			SlopeParam *struct {
-				Value float64 `json:"value"`
-			} `json:"phase_slope"`
 		} `json:"physical"`
 	} `json:"parameters"`
 }
@@ -56,10 +64,16 @@ func fetchIMCCE(t *testing.T, name string) (H, G float64) {
 		t.Skipf("IMCCE: no H value for %s", name)
 	}
 
-	H = card.Params.Physical.AbsMag.Value
-	G = 0.15 // default
-	if card.Params.Physical.SlopeParam != nil {
-		G = card.Params.Physical.SlopeParam.Value
+	H = card.Params.Physical.AbsMag.H.Value
+	G = card.Params.Physical.AbsMag.G.Value
+
+	// No known minor planet has H <= 0 (that would be brighter than Venus
+	// at 1 AU). This endpoint is reachable and its JSON decodes cleanly by
+	// this point, so per this project's network-test convention, an
+	// implausible value here is our own logic error against valid data —
+	// fail loudly, don't skip it.
+	if H <= 0 {
+		t.Fatalf("IMCCE: implausible H=%.3f for %s from a reachable, decodable response — check imcceCard's field mapping against the live schema", H, name)
 	}
 
 	t.Logf("IMCCE %s: H=%.3f G=%.3f", card.Title, H, G)

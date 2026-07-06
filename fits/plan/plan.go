@@ -6,11 +6,12 @@ import (
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/fits"
+	"github.com/TuSKan/astrogo/plan"
 )
 
 // SiteFromFITS extracts observatory location metadata from standard FITS keywords
 // (SITELONG, SITELAT, SITEELEV) and returns a plan.Site matching the observation origin.
-func SiteFromFITS(h *fits.Header) (*Site, error) {
+func SiteFromFITS(h *fits.Header) (*plan.Site, error) {
 	lon, errLon := h.GetFloat("SITELONG")
 	lat, errLat := h.GetFloat("SITELAT")
 
@@ -34,13 +35,18 @@ func SiteFromFITS(h *fits.Header) (*Site, error) {
 	}
 
 	// Assuming 0 horizon limitation as standard ingestion
-	return NewSite(obsName, geodetic, angle.Deg(0), nil)
+	site, err := plan.NewSite(obsName, geodetic, angle.Deg(0), nil)
+	if err != nil {
+		return nil, fmt.Errorf("fits/plan: new site: %w", err)
+	}
+
+	return site, nil
 }
 
 // TargetFromFITS extracts observation pointing coordinates constructing a Custom plan target.
 // It prioritizes standard numeric World Coordinate System reference pixels (CRVAL1, CRVAL2)
 // representing the geometric center of the sensor frame.
-func TargetFromFITS(h *fits.Header) (Observable, error) {
+func TargetFromFITS(h *fits.Header) (plan.Observable, error) {
 	name, errName := h.GetString("OBJECT")
 	if errName != nil {
 		name, _ = h.GetString("OBJNAME")
@@ -69,5 +75,5 @@ func TargetFromFITS(h *fits.Header) (Observable, error) {
 		}
 	}
 
-	return NewDeepSkyObject(name, angle.Deg(ra), angle.Deg(dec)), nil
+	return plan.NewDeepSkyObject(name, angle.Deg(ra), angle.Deg(dec)), nil
 }

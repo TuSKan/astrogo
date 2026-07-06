@@ -175,11 +175,11 @@ type MoonSep struct {
 // Check evaluates Moon separation for a given target and time.
 func (c MoonSep) Check(obj Observable, t time.Time, site *Site) (Result, error) {
 	ctx := coord.NewContext(t, site.Location(), site.Atmosphere())
-	return c.CheckCtx(obj, ctx)
+	return c.CheckCtx(obj, t, site, ctx)
 }
 
 // CheckCtx evaluates Moon separation using a pre-built coord.Context.
-func (c MoonSep) CheckCtx(obj Observable, ctx *coord.Context) (Result, error) {
+func (c MoonSep) CheckCtx(obj Observable, _ time.Time, _ *Site, ctx *coord.Context) (Result, error) {
 	if p, ok := obj.(*Planet); ok && p.IsMoon() {
 		return Result{Pass: true, Value: 180}, nil
 	}

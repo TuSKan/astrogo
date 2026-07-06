@@ -75,3 +75,35 @@ func TestParseFinals2000A(t *testing.T) {
 	testutil.AssertEqual(t, "Coverage min", minMJD, 41684.0)
 	testutil.AssertEqual(t, "Coverage max", maxMJD, 41685.0)
 }
+
+// TestPackageCoverage exercises the package-level Coverage function against
+// both a real *Table (ok=true, matching the table's own Coverage()) and
+// ZeroModel (ok=false, since it has no epoch-dependent range to report).
+func TestPackageCoverage(t *testing.T) {
+	orig := GetModel()
+	defer RegisterModel(orig)
+
+	data := []byte(`73 1 2 41684.00 I  0.120733 0.009786  0.136966 0.015902  I 0.8084178 0.0002710  0.0000 0.1916  P    -0.766    0.199    -0.720    0.300   .143000   .137000   .8075000   -18.637    -3.667
+73 1 3 41685.00 I  0.118980 0.011039  0.135656 0.013616  I 0.8056163 0.0002710  3.5563 0.1916  P    -0.751    0.199    -0.701    0.300   .141000   .134000   .8044000   -18.636    -3.571  `)
+
+	table, err := ParseFinals2000A(bytes.NewReader(data))
+	if err != nil {
+		t.Fatalf("unexpected error parsing dataset: %v", err)
+	}
+
+	RegisterModel(table)
+
+	minMJD, maxMJD, ok := Coverage()
+	if !ok {
+		t.Fatal("Coverage(): expected ok=true for a registered *Table")
+	}
+
+	testutil.AssertEqual(t, "package Coverage min", minMJD, 41684.0)
+	testutil.AssertEqual(t, "package Coverage max", maxMJD, 41685.0)
+
+	RegisterModel(ZeroModel{})
+
+	if _, _, ok := Coverage(); ok {
+		t.Error("Coverage(): expected ok=false for ZeroModel")
+	}
+}
