@@ -62,6 +62,16 @@ func fetchIMCCE(t *testing.T, name string) (H, G float64) {
 		G = card.Params.Physical.SlopeParam.Value
 	}
 
+	// No known minor planet has H <= 0 (that would be brighter than Venus
+	// at 1 AU) — a value in that range means the API returned a malformed
+	// or placeholder record, not real data. Skip rather than fail on data
+	// we know is bad, per this project's network-test convention (t.Skipf
+	// for unreachable/bad-data endpoints, t.Fatal only for our own logic
+	// errors against a reachable, valid response).
+	if H <= 0 {
+		t.Skipf("IMCCE: implausible H=%.3f for %s (API likely returned a placeholder/malformed record)", H, name)
+	}
+
 	t.Logf("IMCCE %s: H=%.3f G=%.3f", card.Title, H, G)
 	return H, G
 }
