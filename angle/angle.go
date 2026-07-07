@@ -178,17 +178,29 @@ func (a Angle) DMSString(precision int) string {
 	m := int64(rem)
 	s := (rem - float64(m)) * 60
 
-	// Handle rounding up to 60s
-	if precision >= 0 {
-		pow := math.Pow10(precision)
-		if math.Round(s*pow)/pow >= 60 {
-			s = 0
+	// Handle rounding up to 60s. precision <= 0 and precision > 0 must use
+	// the exact same rounding rule the final digit-writing branch below
+	// applies (math.Round(s) vs pow-scaled rounding) — otherwise a value
+	// that carries only under one rule but not the other renders an
+	// invalid sexagesimal string like `00'60"` instead of carrying to the
+	// next unit. This previously only guarded precision >= 0, silently
+	// skipping the carry for any negative precision.
+	var carries bool
 
-			m++
-			if m >= 60 {
-				m = 0
-				d++
-			}
+	if precision > 0 {
+		pow := math.Pow10(precision)
+		carries = math.Round(s*pow)/pow >= 60
+	} else {
+		carries = math.Round(s) >= 60
+	}
+
+	if carries {
+		s = 0
+
+		m++
+		if m >= 60 {
+			m = 0
+			d++
 		}
 	}
 
@@ -233,20 +245,28 @@ func (a Angle) HMSString(precision int) string {
 	m := int64(rem)
 	s := (rem - float64(m)) * 60
 
-	// Handle rounding up to 60s
-	if precision >= 0 {
+	// Handle rounding up to 60s — see the identical comment in DMSString for
+	// why this must apply the same rule for negative precision, not just
+	// precision >= 0.
+	var carries bool
+
+	if precision > 0 {
 		pow := math.Pow10(precision)
-		if math.Round(s*pow)/pow >= 60 {
-			s = 0
+		carries = math.Round(s*pow)/pow >= 60
+	} else {
+		carries = math.Round(s) >= 60
+	}
 
-			m++
-			if m >= 60 {
-				m = 0
+	if carries {
+		s = 0
 
-				h++
-				if h >= 24 {
-					h = 0
-				}
+		m++
+		if m >= 60 {
+			m = 0
+
+			h++
+			if h >= 24 {
+				h = 0
 			}
 		}
 	}

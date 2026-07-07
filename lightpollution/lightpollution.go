@@ -14,6 +14,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cenkalti/backoff/v5"
+
 	"github.com/TuSKan/astrogo/skybrightness"
 )
 
@@ -47,6 +49,14 @@ var (
 	// ErrBadResponse is returned when the API response cannot be parsed.
 	ErrBadResponse = errors.New("lightpollution: unexpected API response")
 )
+
+// maxRetries bounds retry attempts on transient failures and 429/5xx
+// responses (exponential backoff via cenkalti/backoff/v5, mirroring
+// catalog/resolve.Client's policy). The daily request quota (see doc.go)
+// is a usage-pattern limit, not a burst rate — there is no per-second cap
+// documented for QueryRaster, so nothing here throttles request timing;
+// retrying an occasional transient failure is the actionable part.
+const maxRetries = 3
 
 // Client queries the lightpollutionmap.info QueryRaster service.
 type Client struct {
@@ -136,26 +146,39 @@ func (c *Client) artificialBrightness(ctx context.Context, latDeg, lonDeg float6
 	q.Set("key", c.apiKey)
 	u.RawQuery = q.Encode()
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
-	if err != nil {
-		return 0, fmt.Errorf("lightpollution: request: %w", err)
+	operation := func() ([]byte, error) {
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
+		if err != nil {
+			return nil, backoff.Permanent(fmt.Errorf("lightpollution: request: %w", err))
+		}
+
+		req.Header.Set("User-Agent", "AstroGo/1.0")
+
+		resp, err := c.http.Do(req)
+		if err != nil {
+			return nil, fmt.Errorf("lightpollution: http: %w", err)
+		}
+		defer func() { _ = resp.Body.Close() }()
+
+		body, err := io.ReadAll(io.LimitReader(resp.Body, 1<<16))
+		if err != nil {
+			return nil, fmt.Errorf("lightpollution: read body: %w", err)
+		}
+
+		if resp.StatusCode == http.StatusTooManyRequests || resp.StatusCode >= 500 {
+			return nil, fmt.Errorf("%w: status %d: %s", ErrBadResponse, resp.StatusCode, strings.TrimSpace(string(body)))
+		}
+
+		if resp.StatusCode != http.StatusOK {
+			return nil, backoff.Permanent(fmt.Errorf("%w: status %d: %s", ErrBadResponse, resp.StatusCode, strings.TrimSpace(string(body))))
+		}
+
+		return body, nil
 	}
 
-	req.Header.Set("User-Agent", "AstroGo/1.0")
-
-	resp, err := c.http.Do(req)
+	body, err := backoff.Retry(ctx, operation, backoff.WithMaxTries(maxRetries))
 	if err != nil {
-		return 0, fmt.Errorf("lightpollution: http: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	body, err := io.ReadAll(io.LimitReader(resp.Body, 1<<16))
-	if err != nil {
-		return 0, fmt.Errorf("lightpollution: read body: %w", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return 0, fmt.Errorf("%w: status %d: %s", ErrBadResponse, resp.StatusCode, strings.TrimSpace(string(body)))
+		return 0, fmt.Errorf("lightpollution: retry: %w", err)
 	}
 
 	return parseBrightness(string(body))

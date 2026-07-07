@@ -3,6 +3,7 @@ package jpl_test
 import (
 	"math"
 	"slices"
+	"sync"
 	"testing"
 
 	"github.com/TuSKan/astrogo/ephemeris/core"
@@ -292,4 +293,59 @@ func TestSmallBodyMultiMatch(t *testing.T) {
 	}
 
 	t.Logf("Loaded bodies for 'Apophis': %v", bodies)
+}
+
+// TestProvider_ConcurrentAddKernelAndState is a regression test for R26:
+// AddKernel mutated Kernels/Index/ByTarget/ByTargetCoverage with no locking,
+// so a caller adding a kernel after construction while other goroutines were
+// concurrently reading (State/FindSegment/SupportedBodies) would race. This
+// can't detect the race directly without cgo's -race detector (unavailable
+// in this sandbox), but it does exercise the exact interleaving under real
+// CI, and confirms nothing panics or deadlocks under contention.
+func TestProvider_ConcurrentAddKernelAndState(t *testing.T) {
+	p, err := jpl.NewProvider(core.Planets, "de440s")
+	if err != nil {
+		t.Fatalf("setup failed: %v", err)
+	}
+
+	t.Cleanup(func() {
+		if err := p.Close(); err != nil {
+			t.Errorf("failed to close provider: %v", err)
+		}
+	})
+
+	tm := time.NowUTC()
+
+	var wg sync.WaitGroup
+
+	// Readers: hammer State/FindSegment/SupportedBodies concurrently.
+	for range 8 {
+		wg.Go(func() {
+			for range 50 {
+				if _, err := p.State(core.Sun, tm); err != nil {
+					t.Errorf("State: %v", err)
+				}
+
+				p.SupportedBodies()
+			}
+		})
+	}
+
+	// Writer: re-open the already-cached planetary kernel and add it again,
+	// concurrently with the readers above.
+	wg.Go(func() {
+		for range 4 {
+			reader, err := spk.CacheDownload("planets/de440s.bsp", p.DataDir)
+			if err != nil {
+				t.Errorf("CacheDownload: %v", err)
+				return
+			}
+
+			if err := p.AddKernel(reader); err != nil {
+				t.Errorf("AddKernel: %v", err)
+			}
+		}
+	})
+
+	wg.Wait()
 }

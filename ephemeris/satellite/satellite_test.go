@@ -1,6 +1,7 @@
 package satellite_test
 
 import (
+	"errors"
 	"math"
 	"testing"
 
@@ -71,6 +72,30 @@ func TestState(t *testing.T) {
 	}
 
 	t.Logf("GCRS velocity: %.8f AU/day", speed)
+}
+
+// TestState_RejectsUnexpectedID is a regression test: State used to ignore
+// its id argument entirely, silently answering for the satellite regardless
+// of what body was requested. That made it possible for a caller to ask
+// this single-body provider for, say, the Sun's position and silently get
+// the satellite's position back instead — which is exactly what caused
+// plan.Satellite.ApparentMagnitudeCtx's Sun-geometry bug (see CHANGELOG).
+// State must now reject any id other than the zero value.
+func TestState_RejectsUnexpectedID(t *testing.T) {
+	sat, err := satellite.NewFromTLE("ISS", issLine1, issLine2)
+	if err != nil {
+		t.Fatalf("NewFromTLE failed: %v", err)
+	}
+
+	epoch := time.Date(2026, 4, 19, 12, 0, 0, 0, time.LocationUTC)
+
+	if _, err := sat.State(eph.Sun, epoch); !errors.Is(err, satellite.ErrUnexpectedID) {
+		t.Errorf("State(eph.Sun, ...) = %v, want ErrUnexpectedID", err)
+	}
+
+	if _, err := sat.State(eph.ID(0), epoch); err != nil {
+		t.Errorf("State(0, ...) should still succeed, got %v", err)
+	}
 }
 
 func TestStateForwardOrbit(t *testing.T) {

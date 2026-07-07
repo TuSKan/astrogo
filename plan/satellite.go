@@ -127,8 +127,13 @@ func (s *Satellite) ApparentMagnitudeCtx(t time.Time, ctx *coord.Context) (float
 	rangeKm := altaz.Dist()
 
 	// Compute phase angle: Sun–Satellite–Observer.
-	// We need the Sun's position and the satellite's geocentric position.
-	sunSt, err := s.provider.State(eph.Sun, t)
+	// The Sun's position always comes from the analytic SOFA provider, not
+	// s.provider: a bare SGP4/TLE provider (the documented construction via
+	// eph.NewProvider(eph.Satellites, ...)) tracks exactly one body and
+	// ignores the requested ID, so querying it for eph.Sun would silently
+	// return the satellite's own state again — making sunToSat the zero
+	// vector below and this always fail with errDegenerateGeometry.
+	sunSt, err := eph.Default().State(eph.Sun, t)
 	if err != nil {
 		return 0, fmt.Errorf("satellite magnitude: sun state: %w", err)
 	}

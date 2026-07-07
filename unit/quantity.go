@@ -101,6 +101,15 @@ func (q Quantity) Equals(other Quantity) bool {
 	v1 := q.Value * q.Unit.ScaleFactor
 	v2 := other.Value * other.Unit.ScaleFactor
 
+	// Exact match (notably v1 == v2 == 0, e.g. comparing a zero length in
+	// meters against a zero length in kilometers) short-circuits before the
+	// relative-tolerance check below, whose scale is 1e-15*max(|v1|,|v2|) —
+	// exactly 0 at v1=v2=0, making the strict "<" comparison fail at the
+	// one boundary it should trivially pass.
+	if v1 == v2 {
+		return true
+	}
+
 	return math.Abs(v1-v2) < 1e-15*math.Max(math.Abs(v1), math.Abs(v2))
 }
 

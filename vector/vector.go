@@ -35,8 +35,10 @@ func (v Vec3) MulScalar(s float64) Vec3 {
 	return Vec3{v.X * s, v.Y * s, v.Z * s}
 }
 
-// DivScalar returns v / s.
-// Returns a NaN vector if s == 0 (consistent with float64 arithmetic).
+// DivScalar returns v / s, following standard float64 division semantics:
+// a component divides to ±Inf if it is nonzero and s == 0, or to NaN if
+// both it and s are 0. It does not itself produce a uniformly NaN vector
+// for s == 0 unless v is also the zero vector.
 func (v Vec3) DivScalar(s float64) Vec3 {
 	return Vec3{v.X / s, v.Y / s, v.Z / s}
 }

@@ -8,7 +8,7 @@
 //   - Season duration asymmetry from Earth's orbital eccentricity
 //   - Moon phase detection via elongation crossing
 //   - Lunar/solar eclipse detection via ecliptic latitude filtering
-//   - Topocentric Moon position (v0.1.3 diurnal parallax correction)
+//   - Topocentric Moon position (diurnal parallax correction)
 //
 // Run: go run ./examples/17_equinox_prediction/
 package main
@@ -44,7 +44,7 @@ func main() {
 
 	fmt.Println("═══════════════════════════════════════════════════════════════════")
 	fmt.Println("  EQUINOX & SOLSTICE PREDICTION — 2024–2033")
-	fmt.Println("  AstroGo v0.1.3 | JPL DE442 | São Paulo (23°33'S, 46°38'W)")
+	fmt.Println("  AstroGo | JPL DE442 | São Paulo (23°33'S, 46°38'W)")
 	fmt.Println("═══════════════════════════════════════════════════════════════════")
 
 	// ── Part 1: Seasons for a decade ────────────────────────────────────────
@@ -195,7 +195,7 @@ func main() {
 			classification, e.Time.In(brtz).Format("Jan 02 15:04 MST"), absLat, e.Gamma)
 	}
 
-	// ── Part 6: Topocentric Moon (v0.1.3 diurnal parallax) ──────────────────
+	// ── Part 6: Topocentric Moon (diurnal parallax) ──────────────────────────
 	fmt.Println()
 	fmt.Println("── Topocentric Moon (São Paulo, Vernal Equinox 2026) ──────────────")
 	fmt.Println()
@@ -235,6 +235,6 @@ func main() {
 	fmt.Println("═══════════════════════════════════════════════════════════════════")
 	fmt.Println("  Computed with AstroGo + JPL DE442 ephemerides")
 	fmt.Println("  Seasons validated to <1 min vs USNO (41/41 tests)")
-	fmt.Println("  Moon diurnal parallax: ~1° correction applied (v0.1.3)")
+	fmt.Println("  Moon diurnal parallax: ~1° correction applied")
 	fmt.Println("═══════════════════════════════════════════════════════════════════")
 }

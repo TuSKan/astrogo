@@ -296,6 +296,11 @@ func TestDMSString(t *testing.T) {
 		{"carry p1", `+00°01'00.0"`, 0 + 59.995/3600, 1},
 		// Known angle: Orion belt roughly at −1°12′6.9″
 		{"known angle p1", `-01°12'06.9"`, -(1 + 12.0/60 + 6.9/3600), 1},
+		// Regression: negative precision must still carry like p0 — this
+		// previously skipped the carry check entirely (guarded on
+		// precision >= 0) and rendered the invalid `20'60"`.
+		{"carry negative precision", `+10°21'00"`, 10 + 20.0/60 + 59.6/3600, -1},
+		{"carry p0 (same value)", `+10°21'00"`, 10 + 20.0/60 + 59.6/3600, 0},
 	}
 	for i, c := range cases {
 		got := angle.Deg(c.deg).DMSString(c.precision)
@@ -319,6 +324,9 @@ func TestHMSString(t *testing.T) {
 		{"25h=1h p0", "01h00m00s", 25, 0},
 		// Fractional seconds
 		{"2h30m15.5s p1", "02h30m15.5s", 2 + 30.0/60 + 15.5/3600, 1},
+		// Regression: negative precision must still carry, matching p0 —
+		// see the identical DMSString regression case above.
+		{"carry negative precision", "10h21m00s", 10 + 20.0/60 + 59.6/3600, -1},
 	}
 	for i, c := range cases {
 		got := angle.Hour(c.hours).HMSString(c.precision)

@@ -195,7 +195,7 @@ func TransitEstimate(obj coord.Object, site *Site, start, end time.Time) (time.T
 		alt float64
 	}
 
-	var samples []sample
+	samples := make([]sample, 0, int(end.Sub(start)/coarseStep)+1)
 
 	for t := start; !t.After(end); t = t.Add(coarseStep) {
 		pos, err := obj.ICRS(t)
