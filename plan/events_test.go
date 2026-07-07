@@ -1,6 +1,7 @@
 package plan
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/TuSKan/astrogo/angle"
@@ -333,6 +334,33 @@ func (m *mockLinearTarget) ID() string                { return "Linear" }
 func (m *mockLinearTarget) Name() string              { return "LinearName" }
 func (m *mockLinearTarget) GetDetails(_ *coord.Context, _ ...string) (*TargetDetails, error) {
 	return &TargetDetails{}, nil
+}
+
+// TestEventSolver_Find_UnimplementedFamily is a regression test for R21:
+// EventFamilyOverlap passes EventSpec.Validate (it shares the
+// RelativeGeometry validation branch) but Find's dispatch switch has no case
+// for it — eclipses/occultations are solved via dedicated functions in
+// phases.go, not this generic solver. A caller must be able to distinguish
+// "not implemented" from other failures via errors.Is against the documented
+// public sentinel.
+func TestEventSolver_Find_UnimplementedFamily(t *testing.T) {
+	t1 := &mockLinearTarget{raRate: 1.0, startRA: 10, dec: 0.0}
+	t2 := &mockLinearTarget{raRate: 0.5, startRA: 15, dec: 0.0}
+
+	start := time.FromJD(2451545.0, time.UTC)
+	end := start.Add(24 * time.Hour)
+
+	solver := NewEventSolver(1*time.Hour, 1*time.Second)
+
+	_, err := solver.Find(EventSpec{
+		Family: EventFamilyOverlap,
+		Kind:   EventConjunction,
+		Target: t1,
+		Other:  t2,
+	}, start, end)
+	if !errors.Is(err, ErrFamilyNotImpl) {
+		t.Errorf("expected ErrFamilyNotImpl for EventFamilyOverlap, got %v", err)
+	}
 }
 
 func TestSolveGeometry_Conjunction(t *testing.T) {

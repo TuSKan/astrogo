@@ -22,6 +22,8 @@ type CorpusEntry struct {
 }
 
 func TestGenerateCorpus(t *testing.T) {
+	requireHorizons(t)
+
 	cases := []CorpusEntry{
 		{
 			TargetID:    499,

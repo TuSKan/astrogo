@@ -48,15 +48,16 @@ If you run `go generate ./...` and files change, explain what regenerated them a
 Strictly layered, unidirectional imports (no cycles). Lower layers never import higher ones:
 
 ```
-plan, catalog                      ← orchestration (observability, scheduling, events, resolvers)
-ephemeris, coord, atmosphere, fits ← scientific engines
-iers                               ← data provider (Earth orientation params)
-time, angle, vector, unit, constants ← primitives
+plan, catalog, fits/plan                         ← orchestration (observability, scheduling, events, resolvers, FITS↔plan bridge)
+ephemeris, coord, atmosphere, fits, skybrightness ← scientific engines
+iers, lightpollution                             ← data providers (Earth orientation params, live light-pollution API)
+time, angle, vector, unit, constants              ← primitives
 ```
 
 - **`coord`** is the transform core. `coord.Context` (in [coord/context.go](coord/context.go)) caches the expensive SOFA `Apco13` matrix computation (~91 µs) once per epoch so each subsequent transform is ~325 ns. **Hot paths must create one `Context` per epoch and reuse it** — never one per transform. The scheduler shares a single `Context` per time step across constraints via the `ConstraintCtx` interface; built-in `Altitude`/`Airmass` implement it.
-- **`ephemeris`** provides Sun/Moon/planet positions (SOFA + JPL SPK). `ephemeris/jpl` is the multi-kernel SPK provider with on-demand Horizons fetching; `ephemeris/satellite` is SGP4 (TEME→GCRS, ground track, look angles).
-- **`plan`** is the planning/event engine: `Observable` targets, `Constraint`s, the Chandrupatla/Brent `Solver` (rise/set/transit, phases, seasons, eclipses, conjunctions), and the `Strategy`-based scheduler (`Greedy`/`Priority`/`SwapOptimized`).
+- **`ephemeris`** provides Sun/Moon/planet positions (SOFA + JPL SPK). `ephemeris/jpl` is the multi-kernel SPK provider with on-demand Horizons fetching (`Provider.AddKernel`/`State`/`FindSegment`/`SupportedBodies` are guarded by an internal `sync.RWMutex` — safe to call concurrently); `ephemeris/satellite` is SGP4 (TEME→GCRS, ground track, look angles).
+- **`plan`** is the planning/event engine: `Observable` targets, `Constraint`s, the Chandrupatla/Brent `Solver` (rise/set/transit, phases, seasons, eclipses, conjunctions), and the `Strategy`-based scheduler (`Greedy`/`Priority`/`SwapOptimized`). `plan` has no dependency on `fits` or Apache Arrow — the FITS↔plan bridge (`SiteFromFITS`/`TargetFromFITS`) lives in the separate `fits/plan` package.
+- **`skybrightness`** (+ `skybrightness/atlas`) models night-sky surface brightness (moonlight, zodiacal light, airglow, light-pollution floor) as additive linear-flux components; `lightpollution` is a live client for the lightpollutionmap.info API feeding `skybrightness.Floor`. `plan.LimitingMagnitudeConstraint`/`ScoreObservableSky` wire this into observability scoring.
 - **`catalog`** + `catalog/resolve` expose unified `resolve.Provider` interfaces over SIMBAD/MAST/Gaia/VizieR/JPL/SBDB/OpenNGC/NORAD/FINK, with Apache Arrow columnar caching.
 - **`internal/gofaext`** wraps [github.com/hebl/gofa](https://github.com/hebl/gofa) (SOFA-derived algorithms). All low-level SOFA calls go through here to keep public APIs clean and the backend swappable.
 - **`internal/testutil`** holds float/error test helpers used across packages.

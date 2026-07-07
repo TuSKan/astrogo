@@ -42,3 +42,36 @@ type MagnitudeComputer interface {
 type StaticMagnitude interface {
 	StaticMagnitude() (float64, bool)
 }
+
+// Compile-time assertions that every concrete target type implements the
+// interfaces it's documented (README/CHANGELOG) to implement. Interface
+// satisfaction in Go is structural and silent — a method signature drift
+// drops a type out of an interface with no compiler error, only a missing
+// code path discovered at runtime (this already happened once: MoonSep's
+// CheckCtx had the wrong parameter list and silently fell out of
+// ConstraintCtx — see the assertions in constraint.go). These turn that
+// class of regression into a build failure instead.
+var (
+	_ Observable = (*Star)(nil)
+	_ Observable = (*DeepSkyObject)(nil)
+	_ Observable = (*Planet)(nil)
+	_ Observable = (*Asteroid)(nil)
+	_ Observable = (*Comet)(nil)
+	_ Observable = (*Satellite)(nil)
+	_ Observable = (*GenericBody)(nil)
+
+	_ MovingBody = (*Planet)(nil)
+	_ MovingBody = (*Asteroid)(nil)
+	_ MovingBody = (*Comet)(nil)
+	_ MovingBody = (*Satellite)(nil)
+	_ MovingBody = (*GenericBody)(nil)
+
+	_ MagnitudeComputer = (*Planet)(nil)
+	_ MagnitudeComputer = (*Asteroid)(nil)
+	_ MagnitudeComputer = (*Comet)(nil)
+	_ MagnitudeComputer = (*Satellite)(nil)
+
+	_ StaticMagnitude = (*Star)(nil)
+	_ StaticMagnitude = (*DeepSkyObject)(nil)
+	_ StaticMagnitude = (*Satellite)(nil)
+)

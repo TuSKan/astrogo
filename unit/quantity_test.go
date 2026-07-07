@@ -93,6 +93,24 @@ func TestEquals(t *testing.T) {
 	}
 }
 
+// TestEquals_Zero is a regression test: the relative-tolerance check
+// (|v1-v2| < 1e-15*max(|v1|,|v2|)) has a tolerance of exactly 0 when both
+// values are 0, so a strict "<" against a zero-width tolerance failed for
+// two physically-equal zero quantities in different (but compatible) units.
+func TestEquals_Zero(t *testing.T) {
+	z1 := unit.New(0, unit.Meter)
+	z2 := unit.New(0, unit.Kilometer)
+	z3 := unit.New(0, unit.Meter)
+
+	if !z1.Equals(z2) {
+		t.Error("0m should equal 0km")
+	}
+
+	if !z1.Equals(z3) {
+		t.Error("two independently constructed zero quantities in the same unit should be equal")
+	}
+}
+
 func TestMustInPanic(t *testing.T) {
 	defer func() {
 		if r := recover(); r == nil {

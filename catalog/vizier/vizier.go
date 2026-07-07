@@ -3,16 +3,25 @@ package vizier
 import (
 	"context"
 	"encoding/csv"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 
+	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/catalog/resolve"
+	"github.com/TuSKan/astrogo/coord"
 )
 
 const tapSyncURL = "http://tapvizier.u-strasbg.fr/TAPVizieR/tap/sync"
+
+// ErrUnexpectedSchema indicates the CSV response is missing a column the
+// parser depends on, e.g. because VizieR's TAP schema for the queried table
+// changed underneath ConeSearch's hardcoded ADQL SELECT clause.
+var ErrUnexpectedSchema = errors.New("vizier: unexpected response schema")
 
 // Provider implements resolve.Provider and resolve.ConeSearcher
 // for querying tables hosted on VizieR via TAP ADQL.
@@ -67,9 +76,9 @@ func (p *Provider) ConeSearch(ctx context.Context, req resolve.ConeRequest) reso
 	dec := req.Center.Dec().Degrees()
 	rad := req.Radius.Degrees()
 
-	adql := fmt.Sprintf(`SELECT TOP %d 
-	raj2000 as ra, dej2000 as dec
-	FROM "%s" 
+	adql := fmt.Sprintf(`SELECT TOP %d
+	"2MASS" as designation, raj2000 as ra, dej2000 as dec
+	FROM "%s"
 	WHERE 1=CONTAINS(POINT('ICRS', raj2000, dej2000), CIRCLE('ICRS', %f, %f, %f))`, limit, table, ra, dec, rad)
 
 	cacheKey := fmt.Sprintf("vizier:cone:%f:%f:%f:%d", ra, dec, rad, limit)
@@ -85,7 +94,9 @@ func (p *Provider) ConeSearch(ctx context.Context, req resolve.ConeRequest) reso
 
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, tapSyncURL, strings.NewReader(v.Encode()))
 	if err != nil {
-		return resolve.SliceSeq([]resolve.Target{})
+		return func(yield func(resolve.Target, error) bool) {
+			yield(resolve.Target{}, fmt.Errorf("vizier: new request: %w", err))
+		}
 	}
 
 	httpReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
@@ -122,11 +133,67 @@ func (p *Provider) ConeSearch(ctx context.Context, req resolve.ConeRequest) reso
 	}
 }
 
+// parseCSV extracts designation/ra/dec rows from the ADQL query's CSV
+// response. Columns are located by header name rather than assumed position,
+// so the parser stays correct if the SELECT clause in ConeSearch is reordered.
 func parseCSV(body io.Reader) ([]resolve.Target, error) {
 	reader := csv.NewReader(body)
-	if _, err := reader.Read(); err != nil { // discard header for now and assume exact select order
+
+	header, err := reader.Read()
+	if err != nil {
 		return nil, fmt.Errorf("vizier: read header: %w", err)
 	}
-	// TODO: implement standard schema extraction or hardcode based on SELECT order.
-	return []resolve.Target{}, nil // Scaffolded
+
+	col := make(map[string]int, len(header))
+	for i, name := range header {
+		col[strings.ToLower(strings.TrimSpace(name))] = i
+	}
+
+	desigIdx, raIdx, decIdx := col["designation"], col["ra"], col["dec"]
+	if _, ok := col["designation"]; !ok {
+		return nil, fmt.Errorf("%w: missing %q column", ErrUnexpectedSchema, "designation")
+	}
+
+	if _, ok := col["ra"]; !ok {
+		return nil, fmt.Errorf("%w: missing %q column", ErrUnexpectedSchema, "ra")
+	}
+
+	if _, ok := col["dec"]; !ok {
+		return nil, fmt.Errorf("%w: missing %q column", ErrUnexpectedSchema, "dec")
+	}
+
+	var targets []resolve.Target
+
+	for {
+		record, err := reader.Read()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+
+			return nil, fmt.Errorf("vizier: read row: %w", err)
+		}
+
+		designation := strings.TrimSpace(record[desigIdx])
+
+		raDeg, err := strconv.ParseFloat(strings.TrimSpace(record[raIdx]), 64)
+		if err != nil {
+			return nil, fmt.Errorf("vizier: parse ra %q: %w", record[raIdx], err)
+		}
+
+		decDeg, err := strconv.ParseFloat(strings.TrimSpace(record[decIdx]), 64)
+		if err != nil {
+			return nil, fmt.Errorf("vizier: parse dec %q: %w", record[decIdx], err)
+		}
+
+		targets = append(targets, resolve.Target{
+			Catalog:     "vizier",
+			Name:        designation,
+			Designation: designation,
+			Kind:        resolve.KindStar,
+			Coord:       coord.NewICRS(angle.Deg(raDeg), angle.Deg(decDeg)),
+		})
+	}
+
+	return targets, nil
 }

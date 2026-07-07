@@ -56,6 +56,53 @@ func TestRefractionApproximate_KnownValues(t *testing.T) {
 	}
 }
 
+// TestRefraction_LowAltitudeCutoffClearsSingularities is a regression test
+// for R13: the cutoff used to be -5.0°, which is past Bennett's (1982)
+// 7.31/(h+4.4) singularity at h=-4.4° — for h in [-5.0, -4.4), the formula
+// still evaluated and could spike arbitrarily (a huge tan() argument reduced
+// mod 360° lands unpredictably). lowAltitudeCutoffDeg (-4.0°) must clear
+// both RefractFromTrue's (-5.11°) and RefractFromApparent's (-4.4°)
+// singularities with margin, so no altitude in the evaluated range should
+// ever produce a wildly large correction.
+func TestRefraction_LowAltitudeCutoffClearsSingularities(t *testing.T) {
+	env := StandardAtmosphere
+
+	for _, model := range []RefractionModel{RefractionApproximate{}, RefractionRigorous{}} {
+		for h := lowAltitudeCutoffDeg; h <= 10; h += 0.05 {
+			refTrue := model.RefractFromTrue(angle.Deg(h), env)
+			refApp := model.RefractFromApparent(angle.Deg(h), env)
+
+			// A legitimate refraction correction near the horizon is at most
+			// a few tens of arcminutes (~35' at h=0); anything above 1°
+			// indicates the formula has hit the near-singularity blow-up
+			// this test guards against.
+			const maxSaneArcmin = 60.0
+
+			if math.Abs(refTrue.Degrees())*60 > maxSaneArcmin {
+				t.Errorf("%T.RefractFromTrue(%.2f) = %v arcmin, want <%v (near-singularity blow-up)",
+					model, h, refTrue.Degrees()*60, maxSaneArcmin)
+			}
+
+			if math.Abs(refApp.Degrees())*60 > maxSaneArcmin {
+				t.Errorf("%T.RefractFromApparent(%.2f) = %v arcmin, want <%v (near-singularity blow-up)",
+					model, h, refApp.Degrees()*60, maxSaneArcmin)
+			}
+		}
+	}
+
+	// Below the cutoff, both models must return exactly zero.
+	below := angle.Deg(lowAltitudeCutoffDeg - 0.01)
+	for _, model := range []RefractionModel{RefractionApproximate{}, RefractionRigorous{}} {
+		if r := model.RefractFromTrue(below, env); r != 0 {
+			t.Errorf("%T.RefractFromTrue below cutoff = %v, want 0", model, r)
+		}
+
+		if r := model.RefractFromApparent(below, env); r != 0 {
+			t.Errorf("%T.RefractFromApparent below cutoff = %v, want 0", model, r)
+		}
+	}
+}
+
 func TestRefraction_ZeroPressure(t *testing.T) {
 	model := RefractionRigorous{}
 	env := Atmosphere{Pressure: 0, Temperature: 15, Humidity: 0.5, Wavelength: 0.55}

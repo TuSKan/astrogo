@@ -19,6 +19,8 @@ func init() {
 }
 
 func TestPhase1ObserverPipelineAgainstHorizons(t *testing.T) {
+	requireHorizons(t)
+
 	// The Earth Observer setup
 	site, err := coord.NewGeodetic(angle.Deg(51.477), angle.Deg(0.0), 0.0)
 	if err != nil {

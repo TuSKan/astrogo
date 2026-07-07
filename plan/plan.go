@@ -1,6 +1,7 @@
 package plan
 
 import (
+	"container/list"
 	"fmt"
 	"math"
 	"runtime"
@@ -133,7 +134,7 @@ func (p *Planner) RankObservable(objects []Observable, start, end time.Time) ([]
 		return nil, fmt.Errorf("plan: rank: %w", err)
 	}
 
-	var ranked []RankedObject
+	ranked := make([]RankedObject, 0, len(results))
 
 	for _, r := range results {
 		if r.ok {
@@ -302,23 +303,48 @@ func (sc ScoreConfig) normalize() (wAlt, wUrg, wMoon float64) {
 	return a / total, u / total, m / total
 }
 
-// moonSepCache stores the Moon's ICRS position for a given epoch to avoid
-// redundant ephemeris lookups when scoring many targets at the same time.
-var moonSepCache struct {
-	time time.Time
-	pos  coord.ICRS
-	mu   sync.Mutex
-	ok   bool
+// moonPosCacheSize bounds the number of distinct epochs moonSepCache holds
+// at once. Rank and ScoreObservable evaluate many targets concurrently
+// (errgroup), each potentially at its own epoch (e.g. a per-object peak-time
+// search) — a single-entry cache thrashes to a ~0% hit rate under that
+// access pattern, since every concurrent lookup at a different epoch evicts
+// the last one before it can be reused. A small bounded LRU lets the common
+// case (several targets, or several constraint checks for one target,
+// sharing the same epoch) actually hit.
+const moonPosCacheSize = 32
+
+// moonPosEntry is the cached Moon position for one epoch.
+type moonPosEntry struct {
+	t   time.Time
+	pos coord.ICRS
+}
+
+// moonSepCache caches the Moon's ICRS position per epoch to avoid redundant
+// ephemeris lookups when scoring many targets at or near the same time.
+var moonSepCache = struct {
+	mu      sync.Mutex
+	entries map[time.Time]*list.Element // time.Time is a comparable value type
+	order   *list.List                  // front = most recently used
+}{
+	entries: make(map[time.Time]*list.Element, moonPosCacheSize),
+	order:   list.New(),
 }
 
 // getMoonPosition returns the Moon's ICRS coordinates, caching per-epoch.
 func getMoonPosition(t time.Time) (coord.ICRS, error) {
 	moonSepCache.mu.Lock()
-	defer moonSepCache.mu.Unlock()
 
-	if moonSepCache.ok && moonSepCache.time.Equal(t) {
-		return moonSepCache.pos, nil
+	if el, ok := moonSepCache.entries[t]; ok {
+		moonSepCache.order.MoveToFront(el)
+
+		pos := el.Value.(moonPosEntry).pos //nolint:forcetypeassert // only this cache ever inserts list elements
+
+		moonSepCache.mu.Unlock()
+
+		return pos, nil
 	}
+
+	moonSepCache.mu.Unlock()
 
 	moon := NewMoon(eph.Default())
 
@@ -327,9 +353,27 @@ func getMoonPosition(t time.Time) (coord.ICRS, error) {
 		return coord.ICRS{}, err
 	}
 
-	moonSepCache.time = t
-	moonSepCache.pos = pos
-	moonSepCache.ok = true
+	moonSepCache.mu.Lock()
+	defer moonSepCache.mu.Unlock()
+
+	// Another goroutine may have populated this epoch while we computed it;
+	// re-check to avoid a duplicate list entry.
+	if el, ok := moonSepCache.entries[t]; ok {
+		moonSepCache.order.MoveToFront(el)
+
+		return el.Value.(moonPosEntry).pos, nil //nolint:forcetypeassert // only this cache ever inserts list elements
+	}
+
+	el := moonSepCache.order.PushFront(moonPosEntry{t: t, pos: pos})
+	moonSepCache.entries[t] = el
+
+	if moonSepCache.order.Len() > moonPosCacheSize {
+		oldest := moonSepCache.order.Back()
+		if oldest != nil {
+			moonSepCache.order.Remove(oldest)
+			delete(moonSepCache.entries, oldest.Value.(moonPosEntry).t) //nolint:forcetypeassert // only this cache ever inserts list elements
+		}
+	}
 
 	return pos, nil
 }
