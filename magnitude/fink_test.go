@@ -1,3 +1,17 @@
+//go:build integration
+
+// FINK integration tests validate astrogo's sHG1G2 model against the live
+// FINK/ZTF phunk production pipeline.
+//
+// Run with: go test -tags integration -run TestFINK -v ./magnitude/
+//
+// These tests require an active internet connection to reach
+// https://api.ztf.fink-portal.org. This file previously had no build tag at
+// all, so it ran under the default `go test ./...` — making the default,
+// offline-only test suite (and CI's blocking lint-and-test / race-detection
+// jobs) fail whenever FINK's API had a bad day, unrelated to any code
+// change. See CHANGELOG for the fix.
+
 package magnitude_test
 
 import (
@@ -72,6 +86,15 @@ func finkSSOQuery(t *testing.T, numberOrDesig string, withResiduals, withEphem b
 	})
 
 	data, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode >= http.StatusInternalServerError {
+		// 5xx means the service itself is degraded (observed live: FINK's
+		// gateway returning 504), not that our request is wrong — treat it
+		// the same as the connection-level failure above rather than
+		// failing the run for external downtime.
+		t.Skipf("FINK SSO service unavailable, skipping live test: HTTP %d: %s",
+			resp.StatusCode, string(data[:min(200, len(data))]))
+	}
+
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("FINK SSO HTTP %d: %s", resp.StatusCode, string(data[:min(200, len(data))]))
 	}

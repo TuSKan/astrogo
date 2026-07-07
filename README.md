@@ -15,23 +15,51 @@ Scale-aware time arithmetic · SOFA-rigorous coordinate transforms · sub-minute
 
 ---
 
-## Overview
+## See it work
 
-`astrogo` is a Go-native scientific library for professional-grade astronomy, providing:
+Fifteen lines: where's a star right now, and when does it rise, transit, and set from your backyard?
 
-- **Scale-aware time system** — Full `UTC↔TAI↔TT↔TDB` conversion graph with Fairhead & Bretagnon TDB corrections and explicit IERS UT1 error propagation
-- **SOFA-rigorous coordinate transforms** — Cached `Context` amortizes expensive matrix computations (91 µs once → 325 ns per transform)
-- **Sub-second visibility detection** — Chandrupatla root-finding refines grid-sampled boundaries to <1s precision
-- **Production scheduling engine** — Greedy, Priority, and `SwapOptimized` strategies with monotonic improvement guarantees
-- **Complete event solver** — Rise/Set/Transit, Moon Phases, Seasons, Apsides, Eclipses, Conjunctions, Elongations
-- **JPL DE ephemerides** — Multi-kernel SPK with on-demand Horizons fetching
-- **Observatory-grade refraction** — SOFA Refa/Refb coefficients at all altitudes, USNO-standard 34' threshold convention, ≤0.6 min rise/set accuracy
+```go
+package main
 
-Designed from the ground up for Go: no dynamic magic, no hidden global state, zero-allocation hot paths.
+import (
+	"fmt"
+
+	"github.com/TuSKan/astrogo/angle"
+	"github.com/TuSKan/astrogo/coord"
+	"github.com/TuSKan/astrogo/plan"
+	"github.com/TuSKan/astrogo/time"
+)
+
+func main() {
+	loc, _ := coord.NewEarthLocation(-23.5505, -46.6333, 760) // São Paulo
+	site, _ := plan.NewSite("Backyard", loc, angle.Zero(), nil)
+	sirius := plan.NewStar("Sirius", angle.Hour(6.7525), angle.Deg(-16.7161))
+
+	tonight := time.Date(2026, 4, 15, 22, 0, 0, 0, time.LocationUTC)
+	eval, _ := plan.IsObservable(sirius, tonight, site, plan.Altitude{Threshold: angle.Deg(30)})
+	events, _ := plan.VisibilityEvents(tonight, tonight.AddDays(1), sirius, site)
+
+	fmt.Printf("Sirius right now: altitude %.1f°, observable above 30°: %v\n",
+		eval.AltAz.Alt().Degrees(), eval.Observable)
+	for _, e := range events {
+		fmt.Printf("  %-8s %s\n", e.Kind, e.Time.Format("2006-01-02 15:04 MST"))
+	}
+}
+```
+
+```
+Sirius right now: altitude 64.8°, observable above 30°: true
+  Set      2026-04-16 02:49 UTC
+  Rise     2026-04-16 13:40 UTC
+  Transit  2026-04-16 20:12 UTC
+```
+
+No API keys, no downloads, no Python underneath — every number above came from SOFA-derived algorithms running in pure Go. Every code sample in this README is copy-pasted from a program that was actually compiled and run; none of it is aspirational.
 
 ---
 
-## Why astrogo?
+## Why astrogo
 
 Existing astronomy tools are powerful, but often:
 
@@ -45,9 +73,330 @@ Existing astronomy tools are powerful, but often:
 - **Astroplan-style observation workflows**
 - **Go-level performance and control**
 
+Designed from the ground up for Go: no dynamic magic, no hidden global state, zero-allocation hot paths.
+
 ---
 
-## Features
+## Showcases
+
+The best way to see whether a library's numbers are trustworthy is to point it at a question with a real, checkable answer. These are full write-ups — narrative analysis backed by runnable code and tables you can verify against published references.
+
+| Showcase | The question | Code |
+|----------|---------------|------|
+| [**When Did Jesus Die?**](docs/JESUS.md) | *"The sky keeps receipts."* Three historical dating puzzles — the Star of Bethlehem, the ministry's start, the Crucifixion — resolved with eclipses, conjunctions, and lunar crescent visibility instead of manuscripts. | [`examples/10_jesus_christ/`](examples/10_jesus_christ/) |
+| [**The Great Planet Parade**](docs/PLANET_PARADE.md) | On Feb 28 2025, all seven planets were above the horizon at once from São Paulo. Was that actually visible, and how rare is it? | [`examples/16_planet_parade/`](examples/16_planet_parade/) |
+| [**Equinox & Solstice Almanac**](docs/EQUINOX.md) | A decade of seasons, eclipses, and apsides computed from first principles — no lookup tables, no curve fits, just JPL DE442 and root-finding. | [`examples/17_equinox_prediction/`](examples/17_equinox_prediction/) |
+| **Moonlit Sky Brightness** | How much does a full moon actually degrade your limiting magnitude, and by how many degrees of separation does that recover? | [`examples/18_sky_brightness/`](examples/18_sky_brightness/) |
+| **Satellite Tracking** | Predict ISS passes over your location from live NORAD/CelestTrak data — AOS, max elevation, LOS, ground track. | [`examples/12_satellite_tracking/`](examples/12_satellite_tracking/) |
+
+---
+
+## Installation
+
+```bash
+go get github.com/TuSKan/astrogo
+```
+
+## Quick Start — Tonight's Observing Plan
+
+Resolve real catalog targets, check tonight's twilight and Moon, score observability, and produce an optimized schedule for the whole night.
+
+```go
+package main
+
+import (
+	"fmt"
+	"log"
+
+	"github.com/TuSKan/astrogo/angle"
+	"github.com/TuSKan/astrogo/catalog"
+	"github.com/TuSKan/astrogo/coord"
+	"github.com/TuSKan/astrogo/ephemeris"
+	"github.com/TuSKan/astrogo/plan"
+	"github.com/TuSKan/astrogo/time"
+)
+
+const layout = "2006-01-02 15:04 MST"
+
+func main() {
+	// ── Observer Setup: São Paulo ──
+	loc, _ := coord.NewEarthLocation(-23.5505, -46.6333, 760)
+	site, _ := plan.NewSite("São Paulo", loc, angle.Zero(), nil)
+
+	// ── Night boundaries ──
+	eph := ephemeris.Default()
+	tonight := time.Date(2026, 4, 15, 22, 0, 0, 0, time.LocationUTC)
+	tomorrow := tonight.AddDays(1)
+
+	sunrise, sunset, _ := plan.SunriseSunset(tonight, tomorrow, site, eph)
+	fmt.Printf("Sunset:  %s\n", sunset.Time.Format(layout))
+	fmt.Printf("Sunrise: %s\n", sunrise.Time.Format(layout))
+
+	dawn, dusk, _ := plan.AstronomicalDawnDusk(tonight, tomorrow, site, eph)
+	fmt.Printf("Astro dusk: %s → Astro dawn: %s\n", dusk.Time.Format(layout), dawn.Time.Format(layout))
+
+	// ── Moon phase check ──
+	nextFull, _ := plan.NextFullMoon(tonight, eph)
+	fmt.Printf("Next Full Moon: %s\n", nextFull.Time.Format(layout))
+
+	frac, _, _ := plan.MoonIllumination(tonight, eph)
+	fmt.Printf("Moon illumination: %.0f%%\n", frac*100)
+
+	// ── Targets ──
+	// Resolve by name — coordinates come from SIMBAD/OpenNGC automatically.
+	resolver := catalog.NewResolver(catalog.SIMBAD, catalog.OpenNGC)
+
+	omegaCenCat, err := resolver.Resolve("NGC 5139") // Omega Centauri
+	if err != nil {
+		log.Fatal(err)
+	}
+	omegaCen := plan.FromCatalog(omegaCenCat, nil)
+
+	sgrACat, err := resolver.Resolve("Sgr A*")
+	if err != nil {
+		log.Fatal(err)
+	}
+	sgrA := plan.FromCatalog(sgrACat, nil)
+
+	// Planets use ephemeris-backed constructors directly.
+	mars := plan.NewMars(eph)
+
+	// ── Observability + Scoring ──
+	constraints := []plan.Constraint{
+		plan.Altitude{Threshold: angle.Deg(30)},
+		plan.Airmass{Threshold: 2.0},
+	}
+
+	fmt.Println("\n── Observability ──────────────────────")
+	for _, obj := range []plan.Observable{omegaCen, sgrA, mars} {
+		eval, _ := plan.IsObservable(obj, tonight, site, constraints...)
+		score, _ := plan.ScoreObservable(obj, tonight, site, nil, nil, constraints...)
+		fmt.Printf("  %-18s  Observable: %-5v  Score: %5.1f\n",
+			obj.Name(), eval.Observable, score)
+	}
+
+	// ── Schedule the night ──
+	planner, _ := plan.NewPlanner(site, nil)
+	blocks := []*plan.Block{
+		{ID: "OmCen", Target: omegaCen, Duration: 45 * time.Minute, Priority: 3},
+		{ID: "SgrA",  Target: sgrA,     Duration: 60 * time.Minute, Priority: 5},
+		{ID: "Mars",  Target: mars,     Duration: 20 * time.Minute, Priority: 2},
+	}
+
+	strategy := &plan.SwapOptimizedStrategy{
+		Base:      &plan.PriorityStrategy{},
+		MaxPasses: 5,
+	}
+	window := plan.Window{Start: dusk.Time, End: dawn.Time}
+	tm := &plan.BasicTransitionModel{BaseSetup: 5 * time.Minute}
+
+	schedule, _ := strategy.Schedule(planner, window, blocks, tm)
+
+	fmt.Println("\n── Schedule ──────────────────────────")
+	for _, sb := range schedule.Blocks {
+		fmt.Printf("  %s: %s → %s  (score: %.1f)\n",
+			sb.Block.ID, sb.Window.Start.Format(layout), sb.Window.End.Format(layout), sb.Score)
+	}
+	for _, ub := range schedule.Unscheduled {
+		fmt.Printf("  [skip] %s: %s\n", ub.Block.ID, ub.Reason)
+	}
+}
+```
+
+```
+Sunset:  2026-04-16 20:55 UTC
+Sunrise: 2026-04-16 09:17 UTC
+Astro dusk: 2026-04-15 22:07 UTC → Astro dawn: 2026-04-16 08:05 UTC
+Next Full Moon: 2026-05-01 17:23 UTC
+Moon illumination: 3%
+
+── Observability ──────────────────────
+  HD 116586            Observable: false  Score:   0.0
+  Sgr A*                Observable: false  Score:   0.0
+  Mars                  Observable: false  Score:   0.0
+
+── Schedule ──────────────────────────
+  SgrA: 2026-04-15 22:12 UTC → 2026-04-15 23:12 UTC  (score: 45.0)
+  Mars: 2026-04-15 23:12 UTC → 2026-04-15 23:32 UTC  (score: 29.0)
+  OmCen: 2026-04-15 23:32 UTC → 2026-04-16 00:17 UTC  (score: 41.4)
+```
+
+Two notes on that output: the individual `Observable` checks are evaluated at exactly `tonight` (22:00 UTC), which is still twilight in São Paulo — that's expected, not a bug. The scheduler's own window search (`dusk` → `dawn`) is what actually finds when each target clears the constraints, which is why it successfully places all three blocks with real scores. And since `resolver.Resolve` hits live SIMBAD, the exact target name it returns for NGC 5139 (here `HD 116586`, one of its many catalog aliases) and the last decimal of the score can vary slightly between runs — everything else is deterministic.
+
+<details>
+<summary><strong>More examples</strong> — batch transforms, moon phases &amp; eclipses, lunar crescent, planetary geometry, satellite tracking</summary>
+
+### Batch Coordinate Transforms (73× Speedup)
+
+```go
+// Create one Context per epoch — amortizes the 91 µs SOFA Apco13 cost.
+loc, _ := coord.NewEarthLocation(-23.55, -46.63, 760)  // São Paulo
+atm := atmosphere.AtAltitude(760)  // SOFA refraction at all altitudes
+ctx := coord.NewContext(time.NowUTC(), loc, atm)
+
+// Transform 100 catalog stars for ~325 ns each (instead of ~91 µs each).
+for _, star := range catalogStars {
+    altaz, _ := ctx.ICRSToAltAz(star.ICRS)
+    if altaz.Alt().Degrees() > 30 {
+        observable = append(observable, star)
+    }
+}
+```
+
+### Moon Phases & Eclipse Detection
+
+```go
+eph := ephemeris.Default()
+start := time.Date(2026, 1, 1, 0, 0, 0, 0, time.LocationUTC)
+end := start.AddDays(365)
+
+// All lunar phases for 2026
+phases, _ := plan.MoonPhases(start, end, eph)
+for _, p := range phases {
+    fmt.Printf("%s: %s\n", p.Phase, p.Time.Format(layout))
+}
+
+// Lunar eclipses — filtered by Danjon ecliptic latitude limit
+eclipses, _ := plan.LunarEclipses(start, end, eph)
+for _, e := range eclipses {
+    fmt.Printf("Lunar Eclipse: %s (γ=%.2f, lat=%.2f°)\n",
+        e.Time.Format(layout), e.Gamma, e.EclipticLatitude.Degrees())
+}
+
+// Next Full Moon from a reference date
+nextFull, _ := plan.NextFullMoon(start, eph)
+fmt.Printf("Next Full Moon: %s (illumination: %.0f%%)\n",
+    nextFull.Time.Format(layout), nextFull.Value*100)
+```
+```
+Full Moon: 2026-01-03 10:03 UTC
+Last Quarter: 2026-01-10 15:49 UTC
+New Moon: 2026-01-18 19:52 UTC
+First Quarter: 2026-01-26 04:47 UTC
+Lunar Eclipse: 2026-03-03 11:34 UTC (γ=0.23, lat=-0.36°)
+Lunar Eclipse: 2026-08-28 04:13 UTC (γ=0.29, lat=0.46°)
+Next Full Moon: 2026-01-03 10:03 UTC (illumination: 100%)
+```
+
+### Lunar Crescent Visibility
+
+```go
+// Compute topocentric parameters for the evening of sighting
+params, _ := plan.NewCrescentParams(sunsetTime, site.Location(), eph)
+
+// Evaluate all 20 historical criteria simultaneously
+result := params.EvaluateAll()
+
+// Multi-zone classifications (Yallop, Odeh, Qureshi)
+fmt.Printf("Yallop (1998): %s\n", result.Yallop.Label)
+fmt.Printf("Odeh (2004):   %s\n", result.Odeh.Label)
+
+// Singular physical limits
+fmt.Printf("Above Danjon limit: %v\n", result.Danjon)
+fmt.Printf("MABIMS (2021):      %v\n", result.MABIMS2021)
+```
+```
+Yallop (1998): Visible under perfect conditions
+Odeh (2004):   Visible to naked eye
+Above Danjon limit: true
+MABIMS (2021):      true
+```
+
+### Planetary Geometry
+
+```go
+eph := ephemeris.Default()
+venus := plan.NewVenus(eph)
+sun := plan.NewSun(eph)
+
+// Greatest elongations of Venus over a full synodic period
+elongations, _ := plan.GreatestElongations(start, end, venus, sun)
+for _, e := range elongations {
+    fmt.Printf("%s: %.1f° at %s\n", e.Kind, e.Value, e.Time.Format(layout))
+}
+
+// Mars-Jupiter conjunctions
+mars := plan.NewMars(eph)
+jupiter := plan.NewJupiter(eph)
+conj, _ := plan.Conjunctions(start, end, mars, jupiter)
+for _, c := range conj {
+    fmt.Printf("Mars-Jupiter conjunction: %s\n", c.Time.Format(layout))
+}
+
+// Appulses (closest visual approach)
+appulses, _ := plan.Appulses(start, end, mars, jupiter)
+for _, a := range appulses {
+    fmt.Printf("Appulse: %s (min sep: %.2f°)\n", a.Time.Format(layout), a.Value)
+}
+```
+```
+Greatest Elongation East: 45.9° at 2026-08-15 06:14 UTC
+Greatest Elongation West: 47.0° at 2027-01-03 17:43 UTC
+Mars-Jupiter conjunction: 2026-11-15 02:16 UTC
+Appulse: 2026-11-16 01:38 UTC (min sep: 1.19°)
+```
+
+### Satellite Tracking (NORAD/SGP4)
+
+```go
+// Resolve ISS from the live NORAD/CelestTrak catalog.
+resolver := catalog.NewResolver(catalog.NORAD)
+target, _ := resolver.Resolve("ISS (Zarya)")
+
+// SGP4 provider — implements the same Provider interface as JPL planets.
+prov, _ := ephemeris.NewProvider(ephemeris.Satellites, target.Name,
+    ephemeris.WithTLE(target.TLELine1, target.TLELine2))
+defer prov.Close()
+
+epoch := target.Epoch
+alt, _ := ephemeris.Altitude(prov, 0, epoch)
+fmt.Printf("Orbital altitude: %.0f km\n", alt)
+
+// Topocentric look angle — same coord.Context API used for planets and stars.
+observer, _ := coord.NewEarthLocation(-23.5505, -46.6333, 760)
+ctx := coord.NewContext(epoch, observer, atmosphere.Atmosphere{})
+altaz, _ := plan.LookAngle(prov, 0, ctx)
+fmt.Printf("Az: %.1f°  El: %.1f°  Range: %.0f km\n",
+    altaz.Az().Degrees(), altaz.Alt().Degrees(), altaz.Dist())
+
+// Predict passes over the observer (next 24 hours, min 10° elevation).
+passes, _ := plan.SatellitePasses(prov, target.Name, epoch, epoch.AddDays(1), observer, angle.Deg(10))
+for _, pass := range passes {
+    fmt.Printf("AOS: %s  Max El: %.1f°  LOS: %s  Duration: %s\n",
+        pass.Rise.Time.Format("15:04:05 MST"), pass.Culmination.Elevation.Degrees(),
+        pass.Set.Time.Format("15:04:05 MST"), pass.Duration.Round(time.Second))
+}
+```
+```
+Orbital altitude: 428 km
+Az: 264.1°  El: -50.1°  Range: 10320 km
+AOS: 09:56:17 UTC  Max El: 20.3°  LOS: 10:01:25 UTC  Duration: 5m8s
+AOS: 11:33:00 UTC  Max El: 19.6°  LOS: 11:38:05 UTC  Duration: 5m6s
+AOS: 19:45:03 UTC  Max El: 73.1°  LOS: 19:51:47 UTC  Duration: 6m44s
+```
+(Live output — ISS orbital elements and pass geometry change day to day.)
+
+</details>
+
+---
+
+## Feature Highlights
+
+| | |
+|---|---|
+| **Time** | Full `UTC↔TAI↔TT↔TDB↔UT1` graph, Fairhead & Bretagnon TDB (±3 µs), explicit IERS UT1 error propagation |
+| **Coordinates** | ICRS/Galactic/Ecliptic/AltAz/Geodetic, full Geometric→Astrometric→Apparent→Observed pipeline, `Context` caching (91 µs → 325 ns/transform) |
+| **Atmosphere** | SOFA-rigorous refraction by default at all altitudes, Pickering (2002) airmass down to 0°, pluggable `RefractionModel` |
+| **Ephemerides** | Sun/Moon/planets (SOFA), multi-kernel JPL SPK with on-demand Horizons fetching, SGP4 satellite propagation |
+| **Magnitude** | Planets (Mallama & Hilton 2018), asteroids (HG/HG1G2/**sHG1G2**), comets, satellites, stars — validated 100% within 0.025 mag against the FINK/ZTF production pipeline |
+| **Catalogs** | Unified `resolve.Provider` over SIMBAD, MAST, Gaia, VizieR, JPL SBDB, OpenNGC, NORAD, FINK — streaming `iter.Seq2`, Arrow caching, retry/backoff |
+| **FITS & WCS** | Image/BinTable/ASCII HDUs, gzip streams, mmap, TAN projection, Arrow export |
+| **Sky Brightness** | Moonlight (Krisciunas & Schaefer 1991), zodiacal light (Leinert 1998), airglow, light-pollution floor — folds into observability scoring |
+| **Planning** | Sub-second Chandrupatla/Brent boundary refinement, constraint-based scoring, `Greedy`/`Priority`/`SwapOptimized` scheduling strategies |
+| **Events** | Rise/Set/Transit, Moon Phases, Seasons, Apsides, Eclipses, Conjunctions, Elongations, Satellite Passes, 20 historical lunar-crescent criteria |
+
+<details>
+<summary><strong>Full feature list</strong> (by package)</summary>
 
 ### Core Scientific Primitives
 - Angles (radians, degrees, sexagesimal — HMS/DMS parsing)
@@ -65,7 +414,7 @@ Existing astronomy tools are powerful, but often:
 - Geodesic
 
 ### Transformations
-- Full mapping: Geometric ↔ Astrometric ↔ Apparent ↔ Observed 
+- Full mapping: Geometric ↔ Astrometric ↔ Apparent ↔ Observed
 - Frame-to-frame (Galactic, Ecliptic, ICRS, CIRS)
 - Dynamic DUT1 tracking and Polar Motion (XP/YP) caching via IERS EOP rapid data
 - One-time log warning when IERS data is unavailable (UT1 ≈ UTC fallback)
@@ -139,6 +488,16 @@ Existing astronomy tools are powerful, but often:
     - **`SwapOptimizedStrategy`** — local search with adjacent swaps + gap insertion (monotonic improvement)
   - Linear scaling benchmarked to 100 blocks
 
+### Sky Brightness & Light Pollution (`skybrightness`, `lightpollution`)
+- Night-sky surface brightness decomposed into additive components, summed in linear flux space and converted to V mag/arcsec² only at the boundary:
+  - `Moonlight` — scattered moonlight, Krisciunas & Schaefer (1991) closed form
+  - `ZodiacalLight` — Leinert et al. (1998) Table 17, bilinear interpolation
+  - `Airglow` — dark-sky floor (Noll et al. 2012 / Patat 2008)
+  - `Floor` — light-pollution baseline from scalar SQM, directional `SQMGrid`, or `FloorFromBortle`
+- `skybrightness/atlas` — offline, pure-Go artificial-brightness atlas providers (Falchi et al. 2016 World Atlas GeoTIFF, VIIRS-DNB)
+- `lightpollution` — live client for the lightpollutionmap.info QueryRaster API, with retry/backoff on transient failures
+- `plan.LimitingMagnitudeConstraint` / `ScoreObservableSky` — folds sky-brightness-derived limiting magnitude into observability constraints and scoring
+
 ### Event Solver
 - **Unified `Solver`** — Chandrupatla root-finding (1997) + Brent's minimization
 - **Moon Phases**: New, First Quarter, Full, Last Quarter — ≤1 min vs USNO
@@ -155,240 +514,9 @@ Existing astronomy tools are powerful, but often:
 - Evaluates topocentric parameters (Altitude/Azimuth, Elongation, ArcV/Width, Lag Time)
 - `EvaluateAll` for batch assessment across all 20 models simultaneously
 
+</details>
+
 ---
-
-## Installation
-
-```bash
-go get github.com/TuSKan/astrogo
-```
-
-## Quick Start — Tonight's Observing Plan
-
-```go
-package main
-
-import (
-	"fmt"
-	"log"
-
-	"github.com/TuSKan/astrogo/angle"
-	"github.com/TuSKan/astrogo/catalog"
-	"github.com/TuSKan/astrogo/coord"
-	"github.com/TuSKan/astrogo/ephemeris"
-	"github.com/TuSKan/astrogo/plan"
-	"github.com/TuSKan/astrogo/time"
-)
-
-func main() {
-	// ── Observer Setup: São Paulo ──
-	loc, _ := coord.NewEarthLocation(-23.5505, -46.6333, 760)
-	site, _ := plan.NewSite("São Paulo", loc, angle.Zero(), nil)
-
-	// ── Night boundaries ──
-	eph := ephemeris.Default()
-	tonight := time.Date(2026, 4, 15, 22, 0, 0, 0, time.LocationUTC)
-	tomorrow := tonight.AddDays(1)
-
-	sunrise, sunset, _ := plan.SunriseSunset(tonight, tomorrow, site, eph)
-	fmt.Printf("Sunset:  %s\n", sunset.Time)
-	fmt.Printf("Sunrise: %s\n", sunrise.Time)
-
-	dawn, dusk, _ := plan.AstronomicalDawnDusk(tonight, tomorrow, site, eph)
-	fmt.Printf("Astro dusk: %s → Astro dawn: %s\n", dusk.Time, dawn.Time)
-
-	// ── Moon phase check ──
-	nextFull, _ := plan.NextFullMoon(tonight, eph)
-	fmt.Printf("Next Full Moon: %s\n", nextFull.Time)
-
-	frac, _, _ := plan.MoonIllumination(tonight, eph)
-	fmt.Printf("Moon illumination: %.0f%%\n", frac*100)
-
-	// ── Targets ──
-	// Resolve by name — coordinates come from SIMBAD/OpenNGC automatically.
-	resolver := catalog.NewResolver(catalog.SIMBAD, catalog.OpenNGC)
-
-	omegaCenCat, err := resolver.Resolve("NGC 5139") // Omega Centauri
-	if err != nil {
-		log.Fatal(err)
-	}
-	omegaCen := plan.FromCatalog(omegaCenCat, nil)
-
-	sgrACat, err := resolver.Resolve("Sgr A*")
-	if err != nil {
-		log.Fatal(err)
-	}
-	sgrA := plan.FromCatalog(sgrACat, nil)
-
-	// Planets use ephemeris-backed constructors directly.
-	mars := plan.NewMars(eph)
-
-	// ── Observability + Scoring ──
-	constraints := []plan.Constraint{
-		plan.Altitude{Threshold: angle.Deg(30)},
-		plan.Airmass{Threshold: 2.0},
-	}
-
-	fmt.Println("\n── Observability ──────────────────────")
-	for _, obj := range []plan.Observable{omegaCen, sgrA, mars} {
-		visible, _ := plan.IsObservable(obj, tonight, site, constraints...)
-		score, _ := plan.ScoreObservable(obj, tonight, site, nil, constraints...)
-		fmt.Printf("  %-18s  Observable: %-5v  Score: %5.1f\n",
-			obj.Name(), visible, score)
-	}
-
-	// ── Schedule the night ──
-	planner, _ := plan.NewPlanner(site, nil)
-	blocks := []*plan.Block{
-		{ID: "OmCen", Target: omegaCen, Duration: 45 * time.Minute, Priority: 3},
-		{ID: "SgrA",  Target: sgrA,     Duration: 60 * time.Minute, Priority: 5},
-		{ID: "Mars",  Target: mars,     Duration: 20 * time.Minute, Priority: 2},
-	}
-
-	strategy := &plan.SwapOptimizedStrategy{
-		Base:      &plan.PriorityStrategy{},
-		MaxPasses: 5,
-	}
-	window := plan.Window{Start: dusk.Time, End: dawn.Time}
-	tm := &plan.BasicTransitionModel{BaseSetup: 5 * time.Minute}
-
-	schedule, _ := strategy.Schedule(planner, window, blocks, tm)
-
-	fmt.Println("\n── Schedule ──────────────────────────")
-	for _, sb := range schedule.Blocks {
-		fmt.Printf("  %s: %s → %s  (score: %.1f)\n",
-			sb.Block.ID, sb.Start, sb.End, sb.Score)
-	}
-	for _, ub := range schedule.Unscheduled {
-		fmt.Printf("  [skip] %s: %s\n", ub.Block.ID, ub.Reason)
-	}
-}
-```
-
-### Batch Coordinate Transforms (73× Speedup)
-
-```go
-// Create one Context per epoch — amortizes the 91 µs SOFA Apco13 cost.
-loc, _ := coord.NewEarthLocation(-23.55, -46.63, 760)  // São Paulo
-atm := atmosphere.AtAltitude(760)  // SOFA refraction at all altitudes
-ctx := coord.NewContext(time.NowUTC(), loc, atm)
-
-// Transform 100 catalog stars for ~325 ns each (instead of ~91 µs each).
-for _, star := range catalogStars {
-    altaz, _ := ctx.ICRSToAltAz(star.ICRS)
-    if altaz.Alt().Degrees() > 30 {
-        observable = append(observable, star)
-    }
-}
-```
-
-### Moon Phases & Eclipse Detection
-
-```go
-eph := ephemeris.Default()
-start := time.Date(2026, 1, 1, 0, 0, 0, 0, time.LocationUTC)
-end := start.AddDays(365)
-
-// All lunar phases for 2026
-phases, _ := plan.MoonPhases(start, end, eph)
-for _, p := range phases {
-    fmt.Printf("%s: %s\n", p.Phase, p.Time)
-}
-
-// Lunar eclipses — filtered by Danjon ecliptic latitude limit
-eclipses, _ := plan.LunarEclipses(start, end, eph)
-for _, e := range eclipses {
-    fmt.Printf("Lunar Eclipse: %s (γ=%.2f, lat=%.2f°)\n",
-        e.Time, e.Gamma, e.EclipticLatitude.Degrees())
-}
-
-// Next Full Moon from tonight
-nextFull, _ := plan.NextFullMoon(time.NowUTC(), eph)
-fmt.Printf("Next Full Moon: %s (illumination: %.0f%%)\n",
-    nextFull.Time, nextFull.Value*100)
-```
-
-### Lunar Crescent Visibility
-
-```go
-// Compute topocentric parameters for the evening of sighting
-params, _ := plan.NewCrescentParams(sunsetTime, site.Location(), eph)
-
-// Evaluate all 20 historical criteria simultaneously
-result := params.EvaluateAll()
-
-// Multi-zone classifications (Yallop, Odeh, Qureshi)
-fmt.Printf("Yallop (1998): %s\n", result.Yallop.Label)
-fmt.Printf("Odeh (2004):   %s\n", result.Odeh.Label)
-
-// Singular physical limits
-fmt.Printf("Above Danjon limit: %v\n", result.Danjon)
-fmt.Printf("MABIMS (2021):      %v\n", result.MABIMS2021)
-```
-
-### Planetary Geometry
-
-```go
-eph := ephemeris.Default()
-venus := plan.NewVenus(eph)
-sun := plan.NewSun(eph)
-
-// Greatest elongations of Venus in 2026
-elongations, _ := plan.GreatestElongations(start, end, venus, sun)
-for _, e := range elongations {
-    fmt.Printf("%s: %.1f° at %s\n", e.Kind, e.Value, e.Time)
-}
-
-// Mars-Jupiter conjunctions
-mars := plan.NewMars(eph)
-jupiter := plan.NewJupiter(eph)
-conj, _ := plan.Conjunctions(start, end, mars, jupiter)
-for _, c := range conj {
-    fmt.Printf("Mars-Jupiter conjunction: %s\n", c.Time)
-}
-
-// Ecliptic longitude conjunctions (classical definition)
-eclConj, _ := plan.ConjunctionsEcliptic(start, end, mars, jupiter)
-for _, c := range eclConj {
-    fmt.Printf("Ecl. lon. conjunction: %s\n", c.Time)
-}
-
-// Appulses (closest visual approach)
-appulses, _ := plan.Appulses(start, end, mars, jupiter)
-for _, a := range appulses {
-    fmt.Printf("Appulse: %s (min sep: %.2f°)\n", a.Time, a.Value)
-}
-```
-
-### Satellite Tracking (NORAD/SGP4)
-
-```go
-// Fetch ISS orbital data from CelestTrak (JSON/OMM format)
-provider := norad.New()
-gp, _ := provider.FetchByID(ctx, 25544)  // ISS catalog number
-
-// Initialize SGP4 propagator
-sat, _ := satellite.NewFromGP(gp)
-fmt.Printf("Orbital period: %.1f min\n", sat.OrbitalPeriod())
-
-// Propagate to current epoch — position in TEME frame (km)
-pos, vel, _ := sat.PropagateECI(now)
-fmt.Printf("Position: %.0f km, Velocity: %.2f km/s\n", pos.Norm(), vel.Norm())
-
-// Sub-satellite point (ground track)
-geo, _ := sat.SubSatellitePoint(now)
-fmt.Printf("Lat: %.2f°  Lon: %.2f°  Alt: %.0f km\n",
-    geo.Lat().Degrees(), geo.Lon().Degrees(), geo.Height()/1e3)
-
-// Predict passes over an observer (next 24 hours, min 10° elevation)
-observer, _ := coord.NewEarthLocation(-23.55, -46.63, 760)  // São Paulo
-passes, _ := plan.SatellitePasses(sat, start, end, observer, angle.Deg(10))
-for _, pass := range passes {
-    fmt.Printf("AOS: %s  Max El: %.1f°  LOS: %s  Duration: %s\n",
-        pass.Rise.Time, pass.Culmination.Elevation.Degrees(),
-        pass.Set.Time, pass.Duration)
-}
-```
 
 ## Architecture
 
@@ -399,15 +527,18 @@ flowchart TD
     %% High-level Orchestration
     plan[plan]
     catalog[catalog]
+    fitsplan["fits/plan"]
 
     %% Scientific Engines
     ephemeris[ephemeris]
     coord[coord]
     atmosphere[atmosphere]
     fits[fits]
-    
+    skybrightness[skybrightness]
+
     %% Data Providers
     iers[iers]
+    lightpollution[lightpollution]
 
     %% Primitive Foundation
     subgraph Primitives
@@ -424,13 +555,17 @@ flowchart TD
     plan --> ephemeris
     plan --> catalog
     plan --> atmosphere
-    
+    plan --> skybrightness
+
+    fitsplan --> fits
+    fitsplan --> plan
+
     catalog --> coord
     catalog --> time
     catalog --> angle
-    
+
     fits --> coord
-    
+
     ephemeris --> time
     ephemeris --> vector
     ephemeris --> coord
@@ -438,13 +573,16 @@ flowchart TD
     satellite --> norad
     norad["catalog/norad"] --> catalog
     plan --> satellite
-    
+
+    skybrightness --> angle
+    lightpollution --> skybrightness
+
     coord --> iers
     coord --> atmosphere
     coord --> time
     coord --> vector
     coord --> angle
-    
+
     atmosphere --> angle
 
     iers --> time
@@ -474,10 +612,15 @@ flowchart TD
 | `ephemeris` | Solar system ephemerides (SOFA + JPL SPK) | ✅ Stable |
 | `ephemeris/satellite` | SGP4 propagation, TEME→GCRS, look angles, ground track | ✅ Stable |
 | `catalog/resolve` | Provider interface, HTTP client, Arrow cache | ✅ Stable |
-| `catalog/*` | SIMBAD, MAST, Gaia, VizieR, JPL, SBDB, OpenNGC, NORAD, FINK | ✅ Stable |
+| `catalog/{simbad,mast,gaia,sbdb,openngc,norad,fink}` | Fully-implemented catalog providers | ✅ Stable |
+| `catalog/vizier` | ConeSearch works against a single hardcoded 2MASS table (see `doc.go`) | 🟡 Partial |
+| `catalog/jpl` | Name lookup only — result-text parsing not yet implemented (see `doc.go`) | 🟡 Partial |
 | `magnitude` | Apparent magnitude (planets, asteroids, comets, satellites, stars) | ✅ Stable |
 | `fits` | FITS I/O, WCS (TAN projection), mmap, Arrow export | ✅ Stable |
+| `fits/plan` | FITS↔plan bridge (`SiteFromFITS`, `TargetFromFITS`) | ✅ Stable |
 | `plan` | Observability, constraints, events, scheduling, satellite passes | ✅ Stable |
+| `skybrightness`, `skybrightness/atlas` | Sky brightness model (moonlight, zodiacal light, airglow, light-pollution floor) | ✅ Stable |
+| `lightpollution` | Live lightpollutionmap.info client | ✅ Stable |
 | `unit` | Physical unit and quantity system | ✅ Stable |
 
 See [`VALIDATION.md`](docs/VALIDATION.md) for scientific validation status, [`USNO.md`](docs/USNO.md) for the U.S. Naval Observatory accuracy report (41/41 tests passing, ≤0.6 min rise/set accuracy across 3 continents + polar/equatorial/8849m edge cases), and the FINK/ZTF sHG1G2 validation (100% match at 0.025 mag against the phunk production pipeline).
@@ -496,18 +639,18 @@ These are wrapped internally to ensure:
 ---
 
 > [!IMPORTANT]
-> Expect API changes until v1.0.
+> astrogo is pre-1.0 (currently **v0.2.0**) — the public API may still change. This release includes an extensive correctness/robustness/release-readiness audit (see [CHANGELOG.md](CHANGELOG.md)); a v1.0.0 API-stability commitment is planned once `catalog/jpl` and `catalog/vizier` (currently 🟡 partial, see Implementation Status below) are fully implemented.
 
 ---
 
 ## Known Limitations & Scope
 
 > [!WARNING]
-> These are documented trade-offs, not bugs. They represent deliberate scope boundaries for v0.1.2.
+> These are documented trade-offs, not bugs. They represent deliberate scope boundaries as of v0.2.0.
 
 ### Context Caching (Performance)
 
-The SOFA Apco13 matrix computation in `coord.NewContext` costs ~91 µs. In v0.1.2, the scheduling hot path creates **one Context per time step** (shared across all constraints via the `ConstraintCtx` interface), rather than one per constraint per step.
+The SOFA Apco13 matrix computation in `coord.NewContext` costs ~91 µs. The scheduling hot path creates **one Context per time step** (shared across all constraints via the `ConstraintCtx` interface), rather than one per constraint per step.
 
 Built-in constraints (`Altitude`, `Airmass`) implement `ConstraintCtx` automatically. Custom constraints that implement this interface will also benefit from the cached Context in the scheduler.
 
@@ -523,9 +666,7 @@ for _, star := range targets {
 
 `SwapOptimizedStrategy` is a **local search heuristic**, not a global optimizer. It improves on greedy/priority strategies via adjacent swaps and gap insertion, with monotonic score guarantees — but it does not find the globally optimal schedule.
 
-This is the same trade-off made by production observatory schedulers (ESO/VLT SCHED, STARS, Gemini) where tractability and predictability are preferred over the NP-hard combinatorial optimum.
-
-Users from operations research backgrounds who need provable global optimality (integer linear programming, branch-and-bound, etc.) should implement the `Strategy` interface directly.
+This is the same trade-off made by production observatory schedulers (ESO/VLT SCHED, STARS, Gemini) where tractability and predictability are preferred over the NP-hard combinatorial optimum. Users who need provable global optimality (integer linear programming, branch-and-bound, etc.) can implement the `Strategy` interface directly — it's a small, focused contract.
 
 ### IERS Earth Orientation Parameters
 
@@ -537,7 +678,11 @@ Sub-arcsecond topocentric accuracy and sub-second UT1 timing require IERS EOP da
 | Topocentric alt/az | <0.01″ | ~1″ |
 | Rise/set timing | ≤0.6 min vs USNO | ≤0.7 min vs USNO |
 
-The library logs a one-time warning when EOP data is unavailable. **Users who redirect or suppress logs will not see this warning.** The IERS data is bundled via `go:generate`:
+The library logs a one-time warning when EOP data is unavailable (users who redirect or suppress logs won't see it — call `iers.Coverage()` to check proactively). The IERS data is bundled via `go:generate`.
+
+### Catalog Provider Coverage
+
+`catalog/vizier` and `catalog/jpl` are the two providers still marked 🟡 in the table above — see their package docs for exactly what's implemented today. Every other catalog provider is fully functional.
 
 ### TDB Precision
 
@@ -554,20 +699,6 @@ Full ephemeris-based TDB would add ~500× overhead per call. This trade-off is d
 We actively track our development pipeline across multiple capability tiers focusing on High-Performance Vectorization, Scheduling Engines, and external Data Ecosystem integration.
 
 Please see our full [**Project Roadmap**](docs/ROADMAP.md) to understand current milestones, tracking priorities, and architectural expansion goals.
-
----
-
-## Showcases
-
-Science-as-showcase documents — narrative analysis backed by runnable code and verifiable tables:
-
-| Showcase | Topic | Example |
-|----------|-------|---------|
-| **Moonlit Sky Brightness** | Sky brightness & limiting magnitude from scattered moonlight, zodiacal light & airglow | [`examples/18_sky_brightness/`](examples/18_sky_brightness/) |
-| [**Equinox & Solstice Almanac**](docs/EQUINOX.md) | Decade of seasons, eclipses, apsides, topocentric Moon | [`examples/17_equinox_prediction/`](examples/17_equinox_prediction/) |
-| [**The Great Planet Parade**](docs/PLANET_PARADE.md) | Feb 28 2025 — seven planets in the evening sky from São Paulo | [`examples/16_planet_parade/`](examples/16_planet_parade/) |
-| [**When Did Jesus Die?**](docs/JESUS.md) | Dating the Crucifixion via lunar eclipses, conjunctions, and crescent visibility | [`examples/10_jesus_christ/`](examples/10_jesus_christ/) |
-| **Satellite Tracking** | ISS pass prediction — SGP4, ground track, look angles | [`examples/12_satellite_tracking/`](examples/12_satellite_tracking/) |
 
 ---
 

@@ -45,7 +45,11 @@ func (d Dimension) Div(other Dimension) Dimension {
 	}
 }
 
-// PowInt returns d raised to the power p (multiplies exponents).
+// PowInt returns d raised to the power p (multiplies exponents). p is
+// silently truncated to int8 range ([-128,127]) to match Dimension's own
+// exponent fields — physical dimension exponents in practice are always
+// single digits (e.g. -2 for area⁻¹), so this is not expected to matter,
+// but PowInt is not meant for arbitrarily large p.
 func (d Dimension) PowInt(p int) Dimension {
 	p8 := int8(p)
 

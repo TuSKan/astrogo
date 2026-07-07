@@ -5,6 +5,7 @@ package gaia
 
 import (
 	"context"
+	"net"
 	"testing"
 	"time"
 
@@ -13,7 +14,23 @@ import (
 	"github.com/TuSKan/astrogo/coord"
 )
 
+// requireGaia skips the test when the Gaia TAP endpoint is unreachable —
+// per this project's network test policy, a reachability failure must
+// never fail CI outright.
+func requireGaia(t *testing.T) {
+	t.Helper()
+
+	conn, err := net.DialTimeout("tcp", "gea.esac.esa.int:443", 5*time.Second)
+	if err != nil {
+		t.Skipf("Gaia TAP unreachable, skipping live test: %v", err)
+	}
+
+	_ = conn.Close()
+}
+
 func TestGaiaNetworkConeSearch(t *testing.T) {
+	requireGaia(t)
+
 	prov := New()
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second) // ESA TAP can be slower
 	defer cancel()

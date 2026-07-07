@@ -14,6 +14,16 @@ import (
 // ErrAPIError indicates a JPL Horizons API error response.
 var ErrAPIError = errors.New("jpl: API error")
 
+// ErrNotImplemented indicates a successful Horizons response whose free-text
+// "result" block this provider does not yet parse. Horizons has no stable
+// schema for this field — it ranges from a major-body match table to a full
+// small-body orbital-elements printout, and the exact table header wording
+// has been observed to differ across API responses — so a best-effort
+// heuristic parse here risks silently returning wrong data. Until a
+// dedicated parser is verified against live responses for every shape,
+// callers get this explicit error instead of a fabricated placeholder Target.
+var ErrNotImplemented = errors.New("jpl: Horizons result parsing not implemented for this response")
+
 const horizonsAPI = "https://ssd.jpl.nasa.gov/api/horizons.api"
 
 // Provider implements resolve.Provider for major bodies via JPL Horizons.
@@ -85,7 +95,9 @@ func (p *Provider) ResolveObject(ctx context.Context, req resolve.ObjectRequest)
 
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, api.String(), nil)
 	if err != nil {
-		return resolve.SliceSeq([]resolve.Target{})
+		return func(yield func(resolve.Target, error) bool) {
+			yield(resolve.Target{}, fmt.Errorf("jpl: new request: %w", err))
+		}
 	}
 
 	return func(yield func(resolve.Target, error) bool) {
@@ -115,23 +127,6 @@ func (p *Provider) ResolveObject(ctx context.Context, req resolve.ObjectRequest)
 			return
 		}
 
-		// A real implementation requires parsing the 'Result' text block
-		// to extract 'Number', 'Name', and 'Designation' lines reliably.
-		// For now we map a heuristic fallback returning the query string itself.
-		t := resolve.Target{
-			ID:      req.Query,
-			Name:    req.Query + " (Horizons metadata parsing stub)",
-			Kind:    resolve.KindPlanet,
-			Catalog: "jpl_horizons",
-		}
-
-		if err := p.cache.Set(cacheKey, []resolve.Target{t}); err != nil {
-			yield(resolve.Target{}, err)
-			return
-		}
-
-		if !yield(t, nil) {
-			return
-		}
+		yield(resolve.Target{}, fmt.Errorf("%w: query %q", ErrNotImplemented, req.Query))
 	}
 }

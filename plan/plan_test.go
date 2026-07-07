@@ -1,6 +1,8 @@
 package plan
 
 import (
+	"errors"
+	"sync"
 	"testing"
 
 	stdtime "time"
@@ -319,15 +321,77 @@ func TestObservableWindows_StepTooLarge(t *testing.T) {
 	start := time.NowUTC()
 	end := start.Add(6 * stdtime.Hour)
 
-	// Step > 15min should return an error.
+	// Step > 15min should return an error a caller can match via errors.Is
+	// against the documented public sentinel (R21 regression: these
+	// sentinels were declared and wrapped but never verified reachable).
 	_, err := ObservableWindows(obj, start, end, 30*stdtime.Minute, site, Altitude{Threshold: angle.Deg(30)})
-	if err == nil {
-		t.Error("Expected error for step > 15 minutes")
+	if !errors.Is(err, ErrStepTooLarge) {
+		t.Errorf("expected ErrStepTooLarge for step > 15 minutes, got %v", err)
 	}
 
 	// Step <= 15min should succeed.
 	_, err = ObservableWindows(obj, start, end, 15*stdtime.Minute, site, Altitude{Threshold: angle.Deg(30)})
 	testutil.AssertNoError(t, err)
+}
+
+func TestObservableWindows_StepNotPositive(t *testing.T) {
+	loc, _ := coord.NewGeodetic(angle.Zero(), angle.Zero(), 0)
+	site, _ := NewSite("Test", loc, angle.Zero(), nil)
+	obj := NewStar("T", angle.Zero(), angle.Zero())
+
+	start := time.NowUTC()
+	end := start.Add(6 * stdtime.Hour)
+
+	_, err := ObservableWindows(obj, start, end, 0, site, Altitude{Threshold: angle.Deg(30)})
+	if !errors.Is(err, ErrStepNotPositive) {
+		t.Errorf("expected ErrStepNotPositive for a zero step, got %v", err)
+	}
+
+	_, err = ObservableWindows(obj, start, end, -stdtime.Minute, site, Altitude{Threshold: angle.Deg(30)})
+	if !errors.Is(err, ErrStepNotPositive) {
+		t.Errorf("expected ErrStepNotPositive for a negative step, got %v", err)
+	}
+}
+
+// TestGetMoonPosition_MultiEpochCacheHits is a regression test for R25: the
+// old single-entry moonSepCache thrashed to a ~0% hit rate under concurrent
+// multi-epoch access, since every lookup at a new epoch evicted whatever was
+// cached before it could ever be reused. This exercises the realistic
+// pattern (many targets/goroutines revisiting a small set of shared epochs)
+// and asserts the ephemeris is only computed once per distinct epoch.
+func TestGetMoonPosition_MultiEpochCacheHits(t *testing.T) {
+	epochs := make([]time.Time, 5)
+	for i := range epochs {
+		epochs[i] = time.FromJD(2460000.5+float64(i), time.UTC)
+	}
+
+	var wg sync.WaitGroup
+
+	// Each of many goroutines revisits every epoch, simulating several
+	// targets/constraints sharing a handful of common evaluation times.
+	for range 20 {
+		wg.Go(func() {
+			for _, e := range epochs {
+				if _, err := getMoonPosition(e); err != nil {
+					t.Errorf("getMoonPosition(%v): %v", e, err)
+				}
+			}
+		})
+	}
+
+	wg.Wait()
+
+	// All 5 epochs must still be resident in the bounded cache — a
+	// single-entry design could only ever retain the last one.
+	moonSepCache.mu.Lock()
+	defer moonSepCache.mu.Unlock()
+
+	for _, e := range epochs {
+		if _, ok := moonSepCache.entries[e]; !ok {
+			t.Errorf("epoch %v evicted from cache; expected all %d epochs to fit within moonPosCacheSize=%d",
+				e, len(epochs), moonPosCacheSize)
+		}
+	}
 }
 
 func TestScoreConfig_Defaults(t *testing.T) {

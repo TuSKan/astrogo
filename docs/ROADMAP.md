@@ -5,6 +5,20 @@ precision computation, observatory planning, and scalable data workflows.
 
 ---
 
+# 🎯 Path to v1.0.0
+
+astrogo is pre-1.0 (currently **v0.2.0**). The deliberate decision was to ship v0.2.0
+first — the API is already in good shape after an extensive correctness/robustness/
+release-readiness audit (see [CHANGELOG.md](../CHANGELOG.md)) — rather than commit to
+the v1.0.0 API-stability promise while two catalog providers are still partial:
+
+- `catalog/jpl` — name resolution only; Horizons result-text parsing not yet implemented
+- `catalog/vizier` — `ConeSearch` only queries a single hardcoded 2MASS table
+
+Once both are fully implemented, v1.0.0 is back on the table.
+
+---
+
 # ✅ Completed
 
 ## Phase 1 — Precision Astronomy
@@ -60,8 +74,8 @@ precision computation, observatory planning, and scalable data workflows.
 | # | Capability | Status |
 |---|---|---|
 | 24 | **Constraint Framework** — `Altitude`, `Airmass`, `Sun` (twilight), `MoonSep` (lunar separation), all with shared `coord.Context` via `CheckCtx` | ✅ v0.1.4 |
-| 25 | **Generic Moving Body** — `GenericBody` fallback for ephemeris targets without a photometric model (no spurious magnitude in `GetDetails`) | ✅ unreleased |
-| 26 | **Satellite Magnitude Models** — Lambertian-sphere / diffuse-cylinder phase functions, McCants standard-magnitude convention | ✅ unreleased |
+| 25 | **Generic Moving Body** — `GenericBody` fallback for ephemeris targets without a photometric model (no spurious magnitude in `GetDetails`) | ✅ v0.2.0 |
+| 26 | **Satellite Magnitude Models** — Lambertian-sphere / diffuse-cylinder phase functions, McCants standard-magnitude convention | ✅ v0.2.0 |
 | 27 | **Lint-Zero Quality Gate** — full `golangci-lint` v2 compliance, zero violations, exported-symbol docs across all packages | ✅ v0.1.5 |
 
 ---
@@ -72,7 +86,7 @@ precision computation, observatory planning, and scalable data workflows.
 
 ## 28. Sky Brightness & Limiting Magnitude Constraint
 
-**Status:** ✅ unreleased
+**Status:** ✅ v0.2.0
 
 Delivered as the `skybrightness` package (physics engine) plus a
 `LimitingMagnitudeConstraint` in `plan`. Sky surface brightness is decomposed into

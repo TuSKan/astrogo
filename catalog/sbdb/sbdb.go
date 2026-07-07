@@ -93,7 +93,9 @@ func (p *Provider) ResolveObject(ctx context.Context, req resolve.ObjectRequest)
 
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, api.String(), nil)
 	if err != nil {
-		return resolve.SliceSeq([]resolve.Target{})
+		return func(yield func(resolve.Target, error) bool) {
+			yield(resolve.Target{}, fmt.Errorf("sbdb: new request: %w", err))
+		}
 	}
 
 	return func(yield func(resolve.Target, error) bool) {

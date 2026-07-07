@@ -51,6 +51,19 @@ type ConstraintCtx interface {
 	CheckCtx(obj Observable, t time.Time, site *Site, ctx *coord.Context) (Result, error)
 }
 
+// Compile-time assertions that every built-in constraint actually
+// implements ConstraintCtx. This is not automatic: CheckCtx's signature
+// must match exactly, and a drift (e.g. MoonSep.CheckCtx once had the wrong
+// parameter list) silently drops a type out of the interface with no
+// compiler error — only a missed scheduler fast path at runtime. These
+// turn that class of regression into a build failure instead.
+var (
+	_ ConstraintCtx = Altitude{}
+	_ ConstraintCtx = Airmass{}
+	_ ConstraintCtx = Sun{}
+	_ ConstraintCtx = MoonSep{}
+)
+
 // Altitude passes if the target's altitude is >= a threshold.
 type Altitude struct {
 	Threshold angle.Angle

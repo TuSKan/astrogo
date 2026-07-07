@@ -78,7 +78,9 @@ func (p *Provider) ConeSearch(ctx context.Context, req resolve.ConeRequest) reso
 
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, tapSyncURL, strings.NewReader(v.Encode()))
 	if err != nil {
-		return resolve.SliceSeq([]resolve.Target{})
+		return func(yield func(resolve.Target, error) bool) {
+			yield(resolve.Target{}, fmt.Errorf("gaia: new request: %w", err))
+		}
 	}
 
 	httpReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")

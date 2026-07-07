@@ -5,10 +5,28 @@
 package fink
 
 import (
+	"net"
 	"testing"
+	"time"
 )
 
+// requireFink skips the test when the FINK SSOFT API is unreachable — per
+// this project's network test policy, a reachability failure must never
+// fail CI outright.
+func requireFink(t *testing.T) {
+	t.Helper()
+
+	conn, err := net.DialTimeout("tcp", "api.ztf.fink-portal.org:443", 5*time.Second)
+	if err != nil {
+		t.Skipf("FINK unreachable, skipping live test: %v", err)
+	}
+
+	_ = conn.Close()
+}
+
 func TestFINKProvider_SingleObjectJSON(t *testing.T) {
+	requireFink(t)
+
 	p := New()
 
 	// Fast single-object JSON query.

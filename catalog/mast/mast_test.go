@@ -2,6 +2,7 @@ package mast
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -80,6 +81,35 @@ func TestProviderInterface(t *testing.T) {
 		t.Errorf("expected CapObjectResolution and CapConeSearch, got %v", caps)
 	}
 
+	// errTransport keeps this default (non-network-tagged) test fully
+	// offline — see CLAUDE.md's build-tag convention.
+	p.client.HTTPClient.Transport = errTransport{}
+
 	_, _ = p.Resolve("non_existent_body")
 	_ = p.Search("non_existent_body")
+}
+
+var errNoTransport = errors.New("errTransport: no network access in this test")
+
+type errTransport struct{}
+
+func (errTransport) RoundTrip(*http.Request) (*http.Response, error) {
+	return nil, errNoTransport
+}
+
+// TestConeSearchNotImplemented confirms ConeSearch surfaces ErrNotImplemented
+// explicitly rather than a fabricated empty-but-successful result — it
+// advertises resolve.CapConeSearch but CAOM spatial search isn't implemented
+// yet (see doc comment on ConeSearch).
+func TestConeSearchNotImplemented(t *testing.T) {
+	p := New()
+
+	iter := p.ConeSearch(context.Background(), resolve.ConeRequest{})
+	iter(func(_ resolve.Target, err error) bool {
+		if !errors.Is(err, ErrNotImplemented) {
+			t.Errorf("expected ErrNotImplemented, got %v", err)
+		}
+
+		return false
+	})
 }

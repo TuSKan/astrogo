@@ -2,9 +2,12 @@ package vizier
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"math"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/TuSKan/astrogo/angle"
@@ -13,9 +16,8 @@ import (
 )
 
 func TestVizierOfflineConeSearch(t *testing.T) {
-	csvData := `ra,dec,id
-10.684,41.269,OBJ1
-`
+	csvData := "designation,ra,dec\n" +
+		`"18375080-4835411 ",279.461678,-48.594772` + "\n"
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "text/csv")
@@ -48,10 +50,31 @@ func TestVizierOfflineConeSearch(t *testing.T) {
 		return true
 	})
 
-	// Our visualization scaffold returns empty on parseCSV for vizier, but
-	// ensures network paths and iter blocks behave functionally.
-	if len(targets) != 0 {
-		t.Fatalf("Expected scaffold parser to return empty arrays, got %d", len(targets))
+	if len(targets) != 1 {
+		t.Fatalf("expected 1 parsed target, got %d", len(targets))
+	}
+
+	got := targets[0]
+	if got.Designation != "18375080-4835411" {
+		t.Errorf("Designation = %q, want %q", got.Designation, "18375080-4835411")
+	}
+
+	if got.Catalog != "vizier" {
+		t.Errorf("Catalog = %q, want vizier", got.Catalog)
+	}
+
+	if math.Abs(got.Coord.RA().Degrees()-279.461678) > 1e-6 {
+		t.Errorf("RA = %v, want 279.461678", got.Coord.RA().Degrees())
+	}
+
+	if math.Abs(got.Coord.Dec().Degrees()-(-48.594772)) > 1e-6 {
+		t.Errorf("Dec = %v, want -48.594772", got.Coord.Dec().Degrees())
+	}
+}
+
+func TestParseCSVMissingColumn(t *testing.T) {
+	if _, err := parseCSV(strings.NewReader("ra,dec\n1,2\n")); !errors.Is(err, ErrUnexpectedSchema) {
+		t.Errorf("expected ErrUnexpectedSchema, got %v", err)
 	}
 }
 
@@ -88,9 +111,24 @@ func TestProviderInterface(t *testing.T) {
 		t.Error("expected Search to return nil")
 	}
 
-	// This validates missing coverage on the parseCSV empty conditions
+	// errTransport keeps this default (non-network-tagged) test fully
+	// offline — see CLAUDE.md's build-tag convention.
+	p.client.HTTPClient.Transport = errTransport{}
+
 	iter := p.ConeSearch(context.Background(), resolve.ConeRequest{})
-	iter(func(_ resolve.Target, _ error) bool {
+	iter(func(_ resolve.Target, err error) bool {
+		if err == nil {
+			t.Error("expected an error with no transport reachable")
+		}
+
 		return false
 	})
+}
+
+type errTransport struct{}
+
+var errNoTransport = errors.New("errTransport: no network access in this test")
+
+func (errTransport) RoundTrip(*http.Request) (*http.Response, error) {
+	return nil, errNoTransport
 }

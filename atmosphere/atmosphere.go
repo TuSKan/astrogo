@@ -7,6 +7,26 @@ import (
 	"github.com/TuSKan/astrogo/angle"
 )
 
+// lowAltitudeCutoffDeg is the true/apparent altitude below which
+// RefractionApproximate and RefractionRigorous return zero refraction
+// instead of evaluating Saemundsson (1986) or Bennett (1982).
+//
+// Both formulas divide by (h + a constant) — Saemundsson's tangent argument
+// has 10.3/(h+5.11), Bennett's has 7.31/(h+4.4) — so as h approaches -5.11°
+// or -4.4° respectively, that term diverges and, because it then feeds a
+// tan()/atan() a huge argument reduced mod 360°, the result stops being a
+// smooth extrapolation and becomes effectively arbitrary (it can spike or
+// flip sign depending on where the reduced angle lands). -4.0° clears both
+// singularities with margin (0.4° from Bennett's, 1.11° from Saemundsson's)
+// while still covering the entire physically relevant range: real
+// observations never need refraction correction this far below the horizon.
+//
+// This is a different, independently-justified cutoff from the one used in
+// coord/context.go's SOFA-Refa/Refb path (-1°, i.e. z < 91°) — that model's
+// tan(z) series is well-behaved much closer to the horizon, so it can safely
+// extend further down than the two empirical tangent formulas here.
+const lowAltitudeCutoffDeg = -4.0
+
 // RefractionModel defines an algorithm that computes the angular refraction shift.
 // It explicitly parses the distinction between forward and reverse tracing.
 type RefractionModel interface {
@@ -51,7 +71,7 @@ type RefractionApproximate struct{}
 // RefractFromTrue applies Saemundsson's refraction formula (S&T 1986).
 func (RefractionApproximate) RefractFromTrue(trueAlt angle.Angle, env Atmosphere) angle.Angle {
 	h := trueAlt.Degrees()
-	if h < -5.0 {
+	if h < lowAltitudeCutoffDeg {
 		return 0 // Avoid absurd refraction below horizon
 	}
 
@@ -66,7 +86,7 @@ func (RefractionApproximate) RefractFromTrue(trueAlt angle.Angle, env Atmosphere
 // RefractFromApparent applies Bennett's empirical fraction.
 func (RefractionApproximate) RefractFromApparent(obsAlt angle.Angle, env Atmosphere) angle.Angle {
 	h := obsAlt.Degrees()
-	if h < -5.0 {
+	if h < lowAltitudeCutoffDeg {
 		return 0
 	}
 
@@ -83,7 +103,7 @@ type RefractionRigorous struct{}
 // model which remains stable and valid down to the true horizon.
 func (RefractionRigorous) RefractFromTrue(trueAlt angle.Angle, env Atmosphere) angle.Angle {
 	h := trueAlt.Degrees()
-	if h < -5.0 {
+	if h < lowAltitudeCutoffDeg {
 		return 0
 	}
 
@@ -110,7 +130,7 @@ func (RefractionRigorous) RefractFromTrue(trueAlt angle.Angle, env Atmosphere) a
 // Standardized on the robust Bennett (1982) formula which handles zero-altitude gracefully.
 func (RefractionRigorous) RefractFromApparent(obsAlt angle.Angle, env Atmosphere) angle.Angle {
 	h := obsAlt.Degrees()
-	if h < -5.0 {
+	if h < lowAltitudeCutoffDeg {
 		return 0
 	}
 
