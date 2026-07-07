@@ -74,6 +74,10 @@ Validation should be:
 | Satellite magnitude | ✅ validated | McCants/Molczan | 0.1 mag | Sphere/cylinder phase functions, range scaling |
 | Star extinction | ✅ validated | Bouguer law | 0.01 mag | Altitude-dependent k(λ), Gaia G→V transformation |
 | FINK SSOFT provider | ✅ validated | [FINK REST API v2.5](https://api.ztf.fink-portal.org/swagger.json) | exact schema | Single-object JSON + bulk parquet, r-band preference, fit/status filtering, version pinning (v2025.04) |
+| Scattered moonlight | ⚠️ partially validated | Krisciunas & Schaefer (1991) | ~8–23% (paper's own stated accuracy) | Closed-form KS-1991 model; self-consistency and monotonicity tested, not yet cross-validated against an independent sky-brightness dataset |
+| Zodiacal light | ✅ validated | Leinert et al. (1998) Table 17 | analytical | Bilinear interpolation of the 500 nm SI radiance table; cross-validated against Table 16's S10(V)⊙ values via the 1.28×10⁻⁸ W conversion |
+| Airglow | ✅ validated | Noll et al. (2012) / Patat (2008) | analytical | Constant dark-sky floor, literature value |
+| Light-pollution floor / Bortle | ⚠️ partially validated | Falchi et al. (2016) | lossy (Bortle) / exact (SQM) | SQM↔radiance conversion exact; `FloorFromBortle`'s Bortle→SQM mapping is a documented lossy approximation, not a physical model |
 
 > **Note:** Both the [NASA Five Millennium Eclipse Catalogs](https://eclipse.gsfc.nasa.gov/LEcat5/LEcatalog.html) and the [AstroPixels Moon Phase Tables](https://astropixels.com/ephemeris/phasescat/phasescat.html) are computed by **Fred Espenak** using the same ΔT model (Espenak & Meeus 2006). The `time.DeltaT()` polynomial includes the secular acceleration correction `c = -0.000012932*(y-1955)²` to convert from Morrison & Stephenson's assumed n-dot (−26.0 arcsec/cy²) to the Lunar Laser Ranging value (−25.858 arcsec/cy²) used by both ELP-2000/82 and DE441. For historical dates (pre-1972), `TT()` and `TDB()` automatically apply ΔT, so users never need to handle time scale conversion manually.
 
@@ -84,6 +88,8 @@ Validation should be:
 The following areas are not yet considered scientifically complete:
 
 - Advanced observation scheduling optimization
+- Scattered-moonlight sky brightness (KS-1991) — not yet cross-validated against an independent sky-brightness dataset (e.g. a Cerro Paranal or ESO sky-model comparison); currently relies on the model's own published ~8–23% accuracy figure
+- `FloorFromBortle`'s Bortle-class → SQM mapping is a documented lossy approximation, not a physical model
 
 ---
 

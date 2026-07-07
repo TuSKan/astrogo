@@ -26,6 +26,15 @@ const secPerDay = constants.JulianDaySeconds // 86400
 // ErrPropagation indicates an SGP4 propagation failure.
 var ErrPropagation = errors.New("satellite: sgp4 propagation failed")
 
+// ErrUnexpectedID indicates State was queried for a body other than the
+// satellite this provider tracks. A *Satellite is single-purpose (one
+// instance = one object), so id must be the zero value (core.ID(0)); any
+// other id — including a real NAIF ID like a Sun/Moon lookup — used to be
+// silently ignored and answered with this satellite's own state instead of
+// an error, which is exactly what made plan.Satellite.ApparentMagnitudeCtx's
+// Sun-position bug possible (see CHANGELOG).
+var ErrUnexpectedID = errors.New("satellite: state queried for an id other than the tracked satellite (use core.ID(0))")
+
 // Satellite wraps a NORAD TLE element set with SGP4 propagation state.
 type Satellite struct {
 	Name       string
@@ -52,9 +61,17 @@ func NewFromTLE(name, line1, line2 string) (*Satellite, error) {
 // State returns the geocentric position/velocity in GCRS (AU, AU/day),
 // implementing the [core.Provider] interface contract.
 //
+// id must be core.ID(0) — this provider tracks exactly one body — any other
+// id returns [ErrUnexpectedID] rather than silently answering for the wrong
+// body.
+//
 // The conversion pipeline: TEME (km) → GCRS (AU) via the IAU 2006
 // Earth rotation matrix (C2T06A).
-func (s *Satellite) State(_ core.ID, t time.Time) (core.State, error) {
+func (s *Satellite) State(id core.ID, t time.Time) (core.State, error) {
+	if id != 0 {
+		return core.State{}, fmt.Errorf("%w: %d", ErrUnexpectedID, id)
+	}
+
 	eciPos, eciVel, err := s.propagateECI(t)
 	if err != nil {
 		return core.State{}, err

@@ -146,3 +146,69 @@ func TestFloorIsArtificialOnly(t *testing.T) {
 	// asserting a "must differ from total" bound, which would be fragile.
 	testutil.AssertNear(t, "Floor SB (artificial-only)", gotSB, wantArtificialOnly, 1e-9)
 }
+
+// TestArtificialBrightnessRetriesOnTransientFailure verifies a transient 503
+// is retried (per R20: the client previously made one unconditional request
+// with no retry/backoff, unlike catalog/resolve.Client) and a request that
+// eventually succeeds returns the correct value rather than surfacing the
+// earlier transient failure.
+func TestArtificialBrightnessRetriesOnTransientFailure(t *testing.T) {
+	t.Parallel()
+
+	const artMcdM2 = 3.14
+
+	var attempts int
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		attempts++
+		if attempts < 3 {
+			http.Error(w, "temporarily unavailable", http.StatusServiceUnavailable)
+			return
+		}
+
+		if _, err := fmt.Fprintf(w, "-46.6333,-23.5505,%v", artMcdM2); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}))
+	defer server.Close()
+
+	c := New(WithAPIKey("test-key"), WithHTTPClient(server.Client()))
+	c.baseURL = server.URL
+
+	got, err := c.artificialBrightness(context.Background(), -23.5505, -46.6333)
+	testutil.AssertNoError(t, err)
+	testutil.AssertNear(t, "artificial brightness after retry", got, artMcdM2, 1e-9)
+
+	if attempts != 3 {
+		t.Errorf("expected 3 attempts (2 failures + 1 success), got %d", attempts)
+	}
+}
+
+// TestArtificialBrightnessNonRetriableStatus verifies a permanent client
+// error (e.g. 400 bad request) is NOT retried — only transient failures and
+// 429/5xx are.
+func TestArtificialBrightnessNonRetriableStatus(t *testing.T) {
+	t.Parallel()
+
+	var attempts int
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		attempts++
+
+		http.Error(w, "bad request", http.StatusBadRequest)
+	}))
+	defer server.Close()
+
+	c := New(WithAPIKey("test-key"), WithHTTPClient(server.Client()))
+	c.baseURL = server.URL
+
+	_, err := c.artificialBrightness(context.Background(), -23.5505, -46.6333)
+	if !errors.Is(err, ErrBadResponse) {
+		t.Fatalf("expected ErrBadResponse, got %v", err)
+	}
+
+	if attempts != 1 {
+		t.Errorf("expected exactly 1 attempt for a non-retriable status, got %d", attempts)
+	}
+}

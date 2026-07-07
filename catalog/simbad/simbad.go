@@ -112,7 +112,9 @@ func (p *Provider) ResolveObject(ctx context.Context, req resolve.ObjectRequest)
 
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, tapSyncURL, strings.NewReader(body))
 	if err != nil {
-		return resolve.SliceSeq([]resolve.Target{})
+		return func(yield func(resolve.Target, error) bool) {
+			yield(resolve.Target{}, fmt.Errorf("simbad: new request: %w", err))
+		}
 	}
 
 	httpReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")

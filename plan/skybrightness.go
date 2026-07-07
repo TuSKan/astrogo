@@ -40,6 +40,12 @@ type LimitingMagnitudeConstraint struct {
 	Boolean bool
 }
 
+// Compile-time assertion that LimitingMagnitudeConstraint implements
+// ConstraintCtx (see the identical assertion block in constraint.go for why
+// this matters: a CheckCtx signature drift drops a type out of the
+// interface with no compiler error, only a missed scheduler fast path).
+var _ ConstraintCtx = LimitingMagnitudeConstraint{}
+
 // Check evaluates the constraint, building a coord.Context for (t, site).
 func (c LimitingMagnitudeConstraint) Check(obj Observable, t time.Time, site *Site) (Result, error) {
 	ctx := coord.NewContext(t, site.Location(), site.Atmosphere())

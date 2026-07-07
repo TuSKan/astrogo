@@ -21,6 +21,10 @@ const mastAPI = "https://mast.stsci.edu/api/v0/invoke"
 // ErrAPIError indicates a MAST API error response.
 var ErrAPIError = errors.New("mast: API error")
 
+// ErrNotImplemented indicates a capability this provider advertises
+// (resolve.CapConeSearch) but does not yet implement.
+var ErrNotImplemented = errors.New("mast: not implemented")
+
 // Provider implements the resolve.Provider interface for the MAST catalog.
 type Provider struct {
 	client *resolve.Client
@@ -98,7 +102,9 @@ func (p *Provider) ResolveObject(ctx context.Context, req resolve.ObjectRequest)
 
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, mastAPI, strings.NewReader(v.Encode()))
 	if err != nil {
-		return resolve.SliceSeq([]resolve.Target{})
+		return func(yield func(resolve.Target, error) bool) {
+			yield(resolve.Target{}, fmt.Errorf("mast: new request: %w", err))
+		}
 	}
 
 	httpReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
@@ -198,8 +204,13 @@ func (p *Provider) ResolveObject(ctx context.Context, req resolve.ObjectRequest)
 	}
 }
 
-// ConeSearch implements cone search using CAOM.
+// ConeSearch is not yet implemented for CAOM spatial search: STScI's
+// Mast.Caom.Cone service has a distinct request/response shape from the
+// name-resolution path ResolveObject already handles, unverified against a
+// live response so far. Callers get an explicit error rather than a
+// fabricated empty-but-successful result.
 func (p *Provider) ConeSearch(_ context.Context, _ resolve.ConeRequest) resolve.SeqIterator[resolve.Target] {
-	// Minimal stub for CAOM spatial search
-	return resolve.SliceSeq([]resolve.Target{})
+	return func(yield func(resolve.Target, error) bool) {
+		yield(resolve.Target{}, ErrNotImplemented)
+	}
 }

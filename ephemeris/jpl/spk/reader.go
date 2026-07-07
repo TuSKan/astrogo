@@ -1,7 +1,9 @@
 package spk
 
 import (
+	"crypto/sha256"
 	"encoding/binary"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -11,6 +13,7 @@ import (
 	"path/filepath"
 	"slices"
 	"sort"
+	"strings"
 
 	"github.com/TuSKan/astrogo/internal/tools"
 	"github.com/TuSKan/astrogo/vector"
@@ -46,6 +49,12 @@ type ReadAtCloser interface {
 }
 
 // Reader provides tools to read DAF/SPK files.
+//
+// A *Reader is safe for concurrent use by multiple goroutines once
+// constructed: FileRec is populated once in NewReader and never mutated
+// afterward, and every read method goes through F.ReadAt, whose io.ReaderAt
+// contract requires position-independent, concurrency-safe reads regardless
+// of the underlying implementation.
 type Reader struct {
 	F       ReadAtCloser
 	FileRec FileRecord
@@ -54,7 +63,12 @@ type Reader struct {
 // CacheDownload downloads an SPK file if it doesn't exist and opens it.
 //
 // It provides an auto-healing mechanism for CI environments by automatically
-// removing corrupt or truncated files.
+// removing corrupt or truncated files. Integrity is checked three ways: a
+// minimum-size floor derived from the DAF header, a structural parse of the
+// summary/directory records (ReadSummaries), and a SHA-256 checksum recorded
+// in a ".sha256" sidecar the first time the kernel is trusted and compared
+// against on every later open — this last check is the only one that covers
+// the bulk Chebyshev-coefficient data, which the first two never touch.
 //
 // If the file is incomplete or its metadata is invalid, the function:
 //  1. Closes the file handle.
@@ -114,7 +128,77 @@ func CacheDownload(kernel, path string) (*Reader, error) {
 		return nil, errors.Join(fmt.Errorf("jpl: corrupt SPK file gracefully deleted: %w", err), closeErr, removeErr)
 	}
 
+	// ReadSummaries only parses the DAF directory/summary records, a small
+	// fraction of the file — the bulk Chebyshev-coefficient data is never
+	// touched by the checks above, so a bit flip there would go undetected.
+	// NAIF does not publish per-kernel checksums to verify against, so we
+	// record our own SHA-256 the first time a kernel is trusted and compare
+	// against it on every later open of the same cached path.
+	if err := verifyOrBootstrapChecksum(spkPath); err != nil {
+		closeErr := r.Close()
+		removeErr := os.Remove(spkPath)
+		sumRemoveErr := removeChecksumSidecar(spkPath)
+
+		return nil, errors.Join(fmt.Errorf("jpl: corrupt SPK file gracefully deleted: %w", err), closeErr, removeErr, sumRemoveErr)
+	}
+
 	return r, nil
+}
+
+// checksumSidecarPath returns the path used to persist a kernel's recorded
+// SHA-256, alongside the kernel itself.
+func checksumSidecarPath(spkPath string) string {
+	return spkPath + ".sha256"
+}
+
+// removeChecksumSidecar deletes a kernel's checksum sidecar, ignoring a
+// missing file (nothing to clean up).
+func removeChecksumSidecar(spkPath string) error {
+	err := os.Remove(checksumSidecarPath(spkPath))
+	if err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("jpl: checksum: remove sidecar: %w", err)
+	}
+
+	return nil
+}
+
+// verifyOrBootstrapChecksum compares a cached kernel's current SHA-256
+// against the one recorded the last time it was trusted. If no sidecar
+// exists yet (a fresh download, or a cache pre-dating this feature), the
+// current hash is trusted and recorded for future opens instead of failing.
+func verifyOrBootstrapChecksum(spkPath string) error {
+	f, err := os.Open(spkPath)
+	if err != nil {
+		return fmt.Errorf("jpl: checksum: open: %w", err)
+	}
+	defer func() { _ = f.Close() }()
+
+	h := sha256.New()
+	if _, err := io.Copy(h, f); err != nil {
+		return fmt.Errorf("jpl: checksum: read: %w", err)
+	}
+
+	sum := hex.EncodeToString(h.Sum(nil))
+	sumPath := checksumSidecarPath(spkPath)
+
+	existing, err := os.ReadFile(sumPath)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			return fmt.Errorf("jpl: checksum: read sidecar: %w", err)
+		}
+
+		if err := os.WriteFile(sumPath, []byte(sum), 0o644); err != nil {
+			return fmt.Errorf("jpl: checksum: write sidecar: %w", err)
+		}
+
+		return nil
+	}
+
+	if strings.TrimSpace(string(existing)) != sum {
+		return fmt.Errorf("%w: sha256 mismatch (recorded %s, actual %s)", ErrCorruptSPK, strings.TrimSpace(string(existing)), sum)
+	}
+
+	return nil
 }
 
 // NewReader opens a DAF/SPK file and reads its metadata.

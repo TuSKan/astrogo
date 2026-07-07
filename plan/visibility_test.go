@@ -1,6 +1,7 @@
 package plan
 
 import (
+	"errors"
 	"testing"
 	stdtime "time"
 
@@ -68,6 +69,23 @@ func TestVisibleIntervals(t *testing.T) {
 
 	if len(intervals) == 0 {
 		t.Log("Warning: Circumpolar object not found visible in 24h window (might be refraction/ERA related)")
+	}
+}
+
+func TestVisibleIntervals_StepTooLarge(t *testing.T) {
+	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(45), 0)
+	site, _ := NewSite("Test", loc, angle.Zero(), nil)
+
+	start := time.FromJD(2460000.5, time.UTC)
+	end := start.AddDays(1)
+
+	obj := mockObject{pos: coord.NewICRS(angle.Deg(0), angle.Deg(45))}
+
+	// A caller must be able to match this via errors.Is against the
+	// documented public sentinel (R21 regression).
+	_, err := VisibleIntervals(obj, site, start, end, 20*stdtime.Minute, angle.Deg(10))
+	if !errors.Is(err, ErrStepTooLarge) {
+		t.Errorf("expected ErrStepTooLarge for step > 15 minutes, got %v", err)
 	}
 }
 

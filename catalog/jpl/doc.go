@@ -1,12 +1,20 @@
-// Package jpl provides a resolve.Provider implementation handling metadata resolution
-// through the NASA JPL Horizons system.
+// Package jpl provides a resolve.Provider implementation targeting the
+// NASA JPL Horizons system.
 //
-// Horizons maintains ephemerides and physical metadata for planets, natural satellites,
-// major barycenters, and artificial spacecraft. The jpl catalog searches the horizons.api
-// endpoint strictly to fetch base identifiers and body names, allowing deep cross-matching
-// of objects against active spacecraft ID numbers.
+// # Current status
 //
-// This package is exclusively for resolving static object identities. For resolving
-// actual time-dependent position states and astrometric geometries, utilize the
-// ephemeris/jpl library instead.
+// [Provider.ResolveObject] reaches the live horizons.api endpoint and
+// decodes its JSON envelope, but does not yet parse the "result" field —
+// Horizons has no stable schema for that field (it ranges from a
+// major-body match table to a full small-body orbital-elements printout,
+// and even the match-table header wording has been observed to differ
+// across responses). Rather than guess at a shape and risk silently
+// extracting the wrong identifier, every successful, decodable response
+// currently returns [ErrNotImplemented]. [Provider.Resolve] and
+// [Provider.Search] surface this as ok=false / an empty result.
+//
+// This package is exclusively for resolving static object identities. For
+// resolving actual time-dependent position states and astrometric
+// geometries, use the ephemeris/jpl package instead — that path is fully
+// implemented and does not depend on this one.
 package jpl

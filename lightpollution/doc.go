@@ -7,6 +7,13 @@
 // environment variable. No data is bundled and nothing is fetched unless you
 // call a client method.
 //
+// The 500/day figure is a usage-pattern quota, not a burst rate — the service
+// documents no per-second limit, so there is nothing meaningful for this
+// client to throttle at request time. It does retry transient failures and
+// 429/5xx responses with exponential backoff (bounded, see maxRetries); a
+// sustained 429 past that budget surfaces as [ErrBadResponse], and callers
+// approaching the daily quota are responsible for their own call cadence.
+//
 // # Brightness → magnitude
 //
 // Luminance and surface brightness are related by the standard photometric

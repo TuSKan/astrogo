@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"sync"
 
 	"github.com/TuSKan/astrogo/ephemeris/core"
 	"github.com/TuSKan/astrogo/ephemeris/jpl/lsk"
@@ -61,7 +62,13 @@ type TargetCoverage struct {
 }
 
 // Provider implements core.Provider using JPL SPK/LSK kernels.
+//
+// mu guards Kernels, Index, ByTarget, and ByTargetCoverage: AddKernel (and
+// Close) mutate them, and State/FindSegment/SupportedBodies read them, so a
+// Provider that has AddKernel called after construction — while other
+// goroutines are concurrently querying it — needs this to avoid a data race.
 type Provider struct {
+	mu               sync.RWMutex
 	startTime        time.Time
 	endTime          time.Time
 	LSK              *lsk.Reader
@@ -170,6 +177,9 @@ func NewProvider(source core.Source, kernel string, opts ...Option) (*Provider, 
 
 // Close releases all kernel resources.
 func (p *Provider) Close() error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
 	var lastErr error
 
 	for _, k := range p.Kernels {
@@ -192,6 +202,9 @@ func (p *Provider) Close() error {
 // State returns the geocentric state (position and velocity) of the given
 // body at time t.
 func (p *Provider) State(id core.ID, t time.Time) (core.State, error) {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+
 	naif, ok := BodyIDToNAIF[id]
 	if !ok {
 		naif = int(id)
@@ -236,6 +249,9 @@ func (p *Provider) AddKernel(k *spk.Reader) error {
 	if k == nil {
 		return ErrNilKernel
 	}
+
+	p.mu.Lock()
+	defer p.mu.Unlock()
 
 	summaries, err := k.ReadSummaries()
 	if err != nil {
@@ -289,41 +305,17 @@ func (p *Provider) AddKernel(k *spk.Reader) error {
 
 // FindSegment finds the appropriate segment for a target at a given time.
 func (p *Provider) FindSegment(target int32, et float64) (*SegmentRef, error) {
-	// Fast failure path 1: target not loaded
-	refs, ok := p.ByTarget[target]
-	if !ok {
-		// Try asteroid mapping (20,000,000 + ID)
-		if target > 0 && target < 1000000 {
-			target += 20000000
-			refs, ok = p.ByTarget[target]
-		}
+	p.mu.RLock()
+	defer p.mu.RUnlock()
 
-		if !ok {
-			return nil, ErrNoSegment
-		}
-	}
-
-	// Fast failure path 2: ET outside known target coverage
-	cov := p.ByTargetCoverage[target]
-	if et < cov.StartET || et > cov.EndET {
-		return nil, ErrNoSegment
-	}
-
-	// Scan target-local segments in reverse (last match wins = precedence)
-	for _, v := range slices.Backward(refs) {
-		ref := &v
-
-		seg := p.segment(*ref)
-		if et >= seg.StartET && et <= seg.EndET {
-			return ref, nil
-		}
-	}
-
-	return nil, ErrNoSegment
+	return p.findSegmentLocked(target, et)
 }
 
 // SupportedBodies returns a list of body IDs available in the loaded kernels.
 func (p *Provider) SupportedBodies() []core.ID {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+
 	seen := make(map[core.ID]bool)
 
 	var res []core.ID
@@ -354,6 +346,10 @@ func (p *Provider) SupportedBodies() []core.ID {
 
 // evaluateRecursive evaluates the state of a target body at a given time.
 // It recursively evaluates the state of the target body at a given time.
+//
+// Only called from State, which already holds p.mu for the duration — it
+// uses the *Locked helpers rather than FindSegment/segment to avoid
+// recursively re-acquiring the RWMutex from the same goroutine.
 func (p *Provider) evaluateRecursive(targetID int32, et float64, baseID int32) (core.State, error) {
 	currentID := targetID
 
@@ -365,7 +361,7 @@ func (p *Provider) evaluateRecursive(targetID int32, et float64, baseID int32) (
 			return core.State{Pos: totalPos, Vel: totalVel}, nil
 		}
 
-		ref, err := p.FindSegment(currentID, et)
+		ref, err := p.findSegmentLocked(currentID, et)
 		if err != nil {
 			return core.State{}, err
 		}
@@ -386,7 +382,46 @@ func (p *Provider) evaluateRecursive(targetID int32, et float64, baseID int32) (
 	return core.State{}, fmt.Errorf("%w: target %d", ErrRecursionDepth, targetID)
 }
 
-// segment dereferences a SegmentRef to the actual spk.Segment.
-func (p *Provider) segment(ref SegmentRef) *spk.Segment {
+// findSegmentLocked is FindSegment's body, callable by other methods that
+// already hold p.mu (evaluateRecursive) without recursively re-locking it —
+// sync.RWMutex's RLock is not safe to call recursively from one goroutine
+// (a writer queued in between would deadlock it).
+func (p *Provider) findSegmentLocked(target int32, et float64) (*SegmentRef, error) {
+	// Fast failure path 1: target not loaded
+	refs, ok := p.ByTarget[target]
+	if !ok {
+		// Try asteroid mapping (20,000,000 + ID)
+		if target > 0 && target < 1000000 {
+			target += 20000000
+			refs, ok = p.ByTarget[target]
+		}
+
+		if !ok {
+			return nil, ErrNoSegment
+		}
+	}
+
+	// Fast failure path 2: ET outside known target coverage
+	cov := p.ByTargetCoverage[target]
+	if et < cov.StartET || et > cov.EndET {
+		return nil, ErrNoSegment
+	}
+
+	// Scan target-local segments in reverse (last match wins = precedence)
+	for _, v := range slices.Backward(refs) {
+		ref := &v
+
+		seg := p.segmentLocked(*ref)
+		if et >= seg.StartET && et <= seg.EndET {
+			return ref, nil
+		}
+	}
+
+	return nil, ErrNoSegment
+}
+
+// segmentLocked dereferences a SegmentRef to the actual spk.Segment. Callers
+// must already hold p.mu (see findSegmentLocked's comment).
+func (p *Provider) segmentLocked(ref SegmentRef) *spk.Segment {
 	return &p.Kernels[ref.KernelIndex].Segments[ref.SegmentIndex]
 }
