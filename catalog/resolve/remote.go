@@ -62,6 +62,13 @@ type ObjectRequest struct {
 type ConeRequest struct {
 	// ID is the unique identifier of the target.
 	ID string
+	// Table selects which catalog table a ConeSearcher queries, for
+	// providers that support more than one (e.g. catalog/vizier). The
+	// empty string means "use the provider's default table" — existing
+	// callers that never set this field keep their current behavior
+	// unchanged. Providers that don't support table selection ignore this
+	// field entirely.
+	Table string
 	// Center is the coordinate to search around.
 	Center coord.ICRS
 	// Radius is the search radius.

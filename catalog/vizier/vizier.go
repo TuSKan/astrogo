@@ -20,8 +20,14 @@ const tapSyncURL = "http://tapvizier.u-strasbg.fr/TAPVizieR/tap/sync"
 
 // ErrUnexpectedSchema indicates the CSV response is missing a column the
 // parser depends on, e.g. because VizieR's TAP schema for the queried table
-// changed underneath ConeSearch's hardcoded ADQL SELECT clause.
+// changed underneath ConeSearch's ADQL SELECT clause.
 var ErrUnexpectedSchema = errors.New("vizier: unexpected response schema")
+
+// ErrUnknownTable indicates a ConeRequest named a VizieR table not present
+// in this package's schema registry (see tables.go). Rather than guess at
+// that table's RA/Dec/designation column names, ConeSearch requires the
+// table to be registered first.
+var ErrUnknownTable = errors.New("vizier: unknown table")
 
 // Provider implements resolve.Provider and resolve.ConeSearcher
 // for querying tables hosted on VizieR via TAP ADQL.
@@ -57,14 +63,24 @@ func (p *Provider) Search(_ string) []resolve.Target {
 }
 
 // ConeSearch performs a spatial cone search via the VizieR service.
+//
+// req.Table selects which VizieR table to query (e.g. "I/239/hip_main");
+// the empty string defaults to the 2MASS point-source catalog
+// (II/246/out), this package's original behavior. Querying a table not
+// present in this package's schema registry (tables.go) returns
+// ErrUnknownTable.
 func (p *Provider) ConeSearch(ctx context.Context, req resolve.ConeRequest) resolve.SeqIterator[resolve.Target] {
-	// VizieR requires specifying a catalog index/table if we do ADQL.
-	// Since ConeRequest doesn't specify 'table', we might need to rely purely on VizieR's standard catalogs
-	// OR require the user to encode it somehow.
-	// Wait, the easiest way to do a vizier cone search across standard catalogues is using their REST/ConeSearch API, not TAP.
-	// But let's assume they want the standard II/246 (2MASS) for generic lookups if none specified.
-	// We will create a flexible TAP generator.
-	table := "II/246/out" // 2MASS point source catalog as a generic fallback baseline
+	tableName := req.Table
+	if tableName == "" {
+		tableName = defaultTable
+	}
+
+	schema, ok := tableSchemas[tableName]
+	if !ok {
+		return func(yield func(resolve.Target, error) bool) {
+			yield(resolve.Target{}, fmt.Errorf("%w: %q", ErrUnknownTable, tableName))
+		}
+	}
 
 	limit := req.Limit
 	if limit <= 0 {
@@ -77,11 +93,14 @@ func (p *Provider) ConeSearch(ctx context.Context, req resolve.ConeRequest) reso
 	rad := req.Radius.Degrees()
 
 	adql := fmt.Sprintf(`SELECT TOP %d
-	"2MASS" as designation, raj2000 as ra, dej2000 as dec
+	%s as designation, %s as ra, %s as dec
 	FROM "%s"
-	WHERE 1=CONTAINS(POINT('ICRS', raj2000, dej2000), CIRCLE('ICRS', %f, %f, %f))`, limit, table, ra, dec, rad)
+	WHERE 1=CONTAINS(POINT('ICRS', %s, %s), CIRCLE('ICRS', %f, %f, %f))`,
+		limit, schema.DesigCol, schema.RACol, schema.DecCol, tableName, schema.RACol, schema.DecCol, ra, dec, rad)
 
-	cacheKey := fmt.Sprintf("vizier:cone:%f:%f:%f:%d", ra, dec, rad, limit)
+	// The table name is part of the cache key: two different tables queried
+	// with the same cone would otherwise collide on the same entry.
+	cacheKey := fmt.Sprintf("vizier:cone:%s:%f:%f:%f:%d", tableName, ra, dec, rad, limit)
 	if seq, ok := p.cache.Get(cacheKey); ok {
 		return seq
 	}
@@ -114,7 +133,7 @@ func (p *Provider) ConeSearch(ctx context.Context, req resolve.ConeRequest) reso
 			}
 		}()
 
-		targets, err := parseCSV(resp.Body)
+		targets, err := parseCSV(resp.Body, schema.Kind)
 		if err != nil {
 			yield(resolve.Target{}, err)
 			return
@@ -134,9 +153,10 @@ func (p *Provider) ConeSearch(ctx context.Context, req resolve.ConeRequest) reso
 }
 
 // parseCSV extracts designation/ra/dec rows from the ADQL query's CSV
-// response. Columns are located by header name rather than assumed position,
-// so the parser stays correct if the SELECT clause in ConeSearch is reordered.
-func parseCSV(body io.Reader) ([]resolve.Target, error) {
+// response, tagging every row with kind. Columns are located by header name
+// rather than assumed position, so the parser stays correct if the SELECT
+// clause in ConeSearch is reordered.
+func parseCSV(body io.Reader, kind resolve.Kind) ([]resolve.Target, error) {
 	reader := csv.NewReader(body)
 
 	header, err := reader.Read()
@@ -190,8 +210,9 @@ func parseCSV(body io.Reader) ([]resolve.Target, error) {
 			Catalog:     "vizier",
 			Name:        designation,
 			Designation: designation,
-			Kind:        resolve.KindStar,
+			Kind:        kind,
 			Coord:       coord.NewICRS(angle.Deg(raDeg), angle.Deg(decDeg)),
+			HasCoord:    true,
 		})
 	}
 

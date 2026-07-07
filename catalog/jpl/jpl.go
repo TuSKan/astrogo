@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strings"
 
 	"github.com/TuSKan/astrogo/catalog/resolve"
 )
@@ -15,13 +16,13 @@ import (
 var ErrAPIError = errors.New("jpl: API error")
 
 // ErrNotImplemented indicates a successful Horizons response whose free-text
-// "result" block this provider does not yet parse. Horizons has no stable
-// schema for this field — it ranges from a major-body match table to a full
-// small-body orbital-elements printout, and the exact table header wording
-// has been observed to differ across API responses — so a best-effort
-// heuristic parse here risks silently returning wrong data. Until a
-// dedicated parser is verified against live responses for every shape,
-// callers get this explicit error instead of a fabricated placeholder Target.
+// "result" block matches none of the recognized shapes: the major-body
+// ambiguous-match table, the small-body DASTCOM index table, or the
+// single-match "Target body name:" header line. This provider deliberately
+// does not attempt to parse a full orbital-elements printout body — that
+// portion of Horizons' output has no stable, verified schema — so a
+// genuinely novel response shape surfaces this explicit error instead of a
+// guessed/fabricated Target.
 var ErrNotImplemented = errors.New("jpl: Horizons result parsing not implemented for this response")
 
 const horizonsAPI = "https://ssd.jpl.nasa.gov/api/horizons.api"
@@ -127,6 +128,33 @@ func (p *Provider) ResolveObject(ctx context.Context, req resolve.ObjectRequest)
 			return
 		}
 
-		yield(resolve.Target{}, fmt.Errorf("%w: query %q", ErrNotImplemented, req.Query))
+		var (
+			targets []resolve.Target
+			matched bool
+		)
+
+		if ts, ok := parseSmallBodyIndexTable(payload.Result); ok {
+			targets, matched = ts, true
+		} else if ts, ok := parseMajorBodyMatchTable(payload.Result); ok {
+			targets, matched = ts, true
+		} else if t, ok := parseExactMatch(payload.Result); ok {
+			targets, matched = []resolve.Target{t}, true
+		}
+
+		if !matched && strings.TrimSpace(payload.Result) != "" {
+			yield(resolve.Target{}, fmt.Errorf("%w: query %q", ErrNotImplemented, req.Query))
+			return
+		}
+
+		if err := p.cache.Set(cacheKey, targets); err != nil {
+			yield(resolve.Target{}, err)
+			return
+		}
+
+		for _, t := range targets {
+			if !yield(t, nil) {
+				return
+			}
+		}
 	}
 }

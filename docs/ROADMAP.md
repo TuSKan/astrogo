@@ -10,12 +10,14 @@ precision computation, observatory planning, and scalable data workflows.
 astrogo is pre-1.0 (currently **v0.2.0**). The deliberate decision was to ship v0.2.0
 first — the API is already in good shape after an extensive correctness/robustness/
 release-readiness audit (see [CHANGELOG.md](../CHANGELOG.md)) — rather than commit to
-the v1.0.0 API-stability promise while two catalog providers are still partial:
+the v1.0.0 API-stability promise while two catalog providers were still partial:
 
-- `catalog/jpl` — name resolution only; Horizons result-text parsing not yet implemented
-- `catalog/vizier` — `ConeSearch` only queries a single hardcoded 2MASS table
+- `catalog/jpl` — ✅ now resolves both ambiguous (major/small-body match tables) and
+  unambiguous (single-match header line) Horizons queries into real `resolve.Target`s
+- `catalog/vizier` — ✅ `ConeSearch` now supports any VizieR table registered in
+  `tables.go` (2MASS, Hipparcos, Gaia DR3 today), selected via `ConeRequest.Table`
 
-Once both are fully implemented, v1.0.0 is back on the table.
+Both v1.0.0 blockers are closed — v1.0.0 is back on the table.
 
 ---
 

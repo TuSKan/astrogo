@@ -389,7 +389,7 @@ AOS: 19:45:03 UTC  Max El: 73.1°  LOS: 19:51:47 UTC  Duration: 6m44s
 | **Atmosphere** | SOFA-rigorous refraction by default at all altitudes, Pickering (2002) airmass down to 0°, pluggable `RefractionModel` |
 | **Ephemerides** | Sun/Moon/planets (SOFA), multi-kernel JPL SPK with on-demand Horizons fetching, SGP4 satellite propagation |
 | **Magnitude** | Planets (Mallama & Hilton 2018), asteroids (HG/HG1G2/**sHG1G2**), comets, satellites, stars — validated 100% within 0.025 mag against the FINK/ZTF production pipeline |
-| **Catalogs** | Unified `resolve.Provider` over SIMBAD, MAST, Gaia, VizieR, JPL SBDB, OpenNGC, NORAD, FINK — streaming `iter.Seq2`, Arrow caching, retry/backoff |
+| **Catalogs** | Unified `resolve.Provider` over SIMBAD, MAST, Gaia, VizieR, JPL Horizons & SBDB, OpenNGC, NORAD, FINK — streaming `iter.Seq2`, Arrow caching, retry/backoff |
 | **FITS & WCS** | Image/BinTable/ASCII HDUs, gzip streams, mmap, TAN projection, Arrow export |
 | **Sky Brightness** | Moonlight (Krisciunas & Schaefer 1991), zodiacal light (Leinert 1998), airglow, light-pollution floor — folds into observability scoring |
 | **Planning** | Sub-second Chandrupatla/Brent boundary refinement, constraint-based scoring, `Greedy`/`Priority`/`SwapOptimized` scheduling strategies |
@@ -613,8 +613,8 @@ flowchart TD
 | `ephemeris/satellite` | SGP4 propagation, TEME→GCRS, look angles, ground track | ✅ Stable |
 | `catalog/resolve` | Provider interface, HTTP client, Arrow cache | ✅ Stable |
 | `catalog/{simbad,mast,gaia,sbdb,openngc,norad,fink}` | Fully-implemented catalog providers | ✅ Stable |
-| `catalog/vizier` | ConeSearch works against a single hardcoded 2MASS table (see `doc.go`) | 🟡 Partial |
-| `catalog/jpl` | Name lookup only — result-text parsing not yet implemented (see `doc.go`) | 🟡 Partial |
+| `catalog/vizier` | ConeSearch against any registered VizieR table (2MASS, Hipparcos, Gaia DR3; extensible via `tables.go`) | ✅ Stable |
+| `catalog/jpl` | Horizons name resolution — ambiguous major/small-body match tables and unambiguous exact matches | ✅ Stable |
 | `magnitude` | Apparent magnitude (planets, asteroids, comets, satellites, stars) | ✅ Stable |
 | `fits` | FITS I/O, WCS (TAN projection), mmap, Arrow export | ✅ Stable |
 | `fits/plan` | FITS↔plan bridge (`SiteFromFITS`, `TargetFromFITS`) | ✅ Stable |
@@ -639,7 +639,7 @@ These are wrapped internally to ensure:
 ---
 
 > [!IMPORTANT]
-> astrogo is pre-1.0 (currently **v0.2.0**) — the public API may still change. This release includes an extensive correctness/robustness/release-readiness audit (see [CHANGELOG.md](CHANGELOG.md)); a v1.0.0 API-stability commitment is planned once `catalog/jpl` and `catalog/vizier` (currently 🟡 partial, see Implementation Status below) are fully implemented.
+> astrogo is pre-1.0 (currently **v0.2.0**) — the public API may still change. This release includes an extensive correctness/robustness/release-readiness audit (see [CHANGELOG.md](CHANGELOG.md)). `catalog/jpl` and `catalog/vizier` — the two providers that were gating a v1.0.0 API-stability commitment — are now fully implemented (see Implementation Status above); see [`docs/ROADMAP.md`](docs/ROADMAP.md) for what's left before v1.0.0.
 
 ---
 
@@ -679,10 +679,6 @@ Sub-arcsecond topocentric accuracy and sub-second UT1 timing require IERS EOP da
 | Rise/set timing | ≤0.6 min vs USNO | ≤0.7 min vs USNO |
 
 The library logs a one-time warning when EOP data is unavailable (users who redirect or suppress logs won't see it — call `iers.Coverage()` to check proactively). The IERS data is bundled via `go:generate`.
-
-### Catalog Provider Coverage
-
-`catalog/vizier` and `catalog/jpl` are the two providers still marked 🟡 in the table above — see their package docs for exactly what's implemented today. Every other catalog provider is fully functional.
 
 ### TDB Precision
 

@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+#### Catalog Providers: full `catalog/jpl` and `catalog/vizier` implementations
+- `catalog/jpl`: `ResolveObject` now parses Horizons' free-text `result` field for all three recognized response shapes (verified against live Horizons traffic) instead of always returning `ErrNotImplemented`:
+  - Ambiguous major-body matches (planets, satellites, spacecraft, barycenters) via a fixed-width table parser, ported from `ephemeris/jpl/spk`'s production-proven `parseHorizonsResult` and hardened with a COSPAR-designation regex (`cosparDesignationRe`) so a body name that overflows its nominal column width no longer corrupts the following Designation field
+  - Ambiguous small-body matches (comets/asteroids) via a new parser for Horizons' structurally different JPL/DASTCOM "Small-body Index Search Results" table
+  - Unambiguous single matches (major or small body) via Horizons' stable "Target body name: `<name>` (`<id-or-designation>`)" header line — deliberately not the orbital-elements printout body that follows, which has no stable, verified schema
+  - A genuinely novel/unrecognized non-blank response shape still returns `ErrNotImplemented`, preserving the honest-error-over-fabricated-Target policy from the prior audit
+  - Added the missing `cache.Set` call before yielding (every sibling provider does this; `catalog/jpl` previously never cached a result)
+- `catalog/vizier`: `resolve.ConeRequest` gains a `Table` field selecting which VizieR table to query, backed by a new schema registry (`tables.go`) mapping table name → RA/Dec/designation column names + `resolve.Kind`. An empty `Table` preserves the exact previous behavior (2MASS `II/246/out`). A table not in the registry returns the new `ErrUnknownTable` rather than guessing column names. Registered today: `II/246/out` (2MASS, default), `I/239/hip_main` (Hipparcos), `I/355/gaiadr3` (Gaia DR3)
+- `catalog/vizier`: the cache key now includes the table name (previously only ra/dec/radius/limit — two different tables queried over the same cone would have collided on one cache entry once table selection existed)
+- `catalog/vizier`: `parseCSV` now tags each row with the queried table's `resolve.Kind` instead of always `resolve.KindStar`, and sets `Target.HasCoord = true` (previously never set despite `Coord` always being populated)
+
+### Documentation
+- `catalog/jpl/doc.go`, `catalog/vizier/doc.go`: rewritten to describe the now-real capability
+- `README.md`, `docs/ROADMAP.md`: both v1.0.0-blocking catalog providers are now fully implemented; Implementation Status table updated, "Path to v1.0.0" section updated
+
 ## [0.2.0] — 2026-07-07
 
 ### Added
