@@ -62,3 +62,13 @@ Astronomical calculations require strict numerical tolerances:
 2. Clearly explain **why** the PR is needed.
 3. If applicable, provide numerical proofs or benchmarks demonstrating your changes.
 4. Ensure your PR passes all CI workflows (linting, tests, coverage).
+
+## For AI Assistant Users (Claude, GitHub Copilot, ChatGPT, etc.)
+
+If you're using AI tools to help with development:
+
+1. Always review generated commit messages to remove any attribution
+2. Ensure the message follows our commit style guide in CLAUDE.md
+3. Remove any co-author tags automatically added by tools
+
+Refer to [CLAUDE.md](CLAUDE.md) for complete style guidelines.
