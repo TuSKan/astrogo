@@ -62,3 +62,40 @@ func TestVizierNetworkConeSearch(t *testing.T) {
 		t.Fatalf("Expected limit to be respected")
 	}
 }
+
+// TestVizierNetworkConeSearch_RegisteredTable confirms ConeSearch works
+// live against a second registered table (Hipparcos), not just the default
+// 2MASS one.
+func TestVizierNetworkConeSearch_RegisteredTable(t *testing.T) {
+	requireVizier(t)
+
+	prov := New()
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	// A 2-degree cone around M31's core comfortably contains a Hipparcos star.
+	req := resolve.ConeRequest{
+		Table:  "I/239/hip_main",
+		Center: coord.NewICRS(angle.Deg(10.684), angle.Deg(41.269)),
+		Radius: angle.Deg(2),
+		Limit:  5,
+	}
+
+	iter := prov.ConeSearch(ctx, req)
+
+	var count int
+
+	iter(func(_ resolve.Target, err error) bool {
+		if err != nil {
+			t.Fatalf("live network failed: %v", err)
+		}
+
+		count++
+
+		return true
+	})
+
+	if count == 0 {
+		t.Error("expected at least one Hipparcos star within 2 degrees of Andromeda's core")
+	}
+}

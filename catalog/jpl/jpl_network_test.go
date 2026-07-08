@@ -5,7 +5,6 @@ package jpl
 
 import (
 	"context"
-	"errors"
 	"net"
 	"testing"
 	"time"
@@ -28,9 +27,8 @@ func requireHorizons(t *testing.T) {
 }
 
 // TestJPLNetworkResolve confirms the provider reaches the live Horizons API
-// and — since result-text parsing isn't implemented (see ErrNotImplemented)
-// — surfaces that explicitly rather than fabricating a Target. This is a
-// live-service reachability check, not a "resolution works" check.
+// and resolves an ambiguous major-body query ("Mars" matches the planet,
+// its barycenter, and several spacecraft) into real resolve.Targets.
 func TestJPLNetworkResolve(t *testing.T) {
 	requireHorizons(t)
 
@@ -38,16 +36,84 @@ func TestJPLNetworkResolve(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	req := resolve.ObjectRequest{Query: "Mars", Limit: 1}
+	req := resolve.ObjectRequest{Query: "Mars"}
 	iter := prov.ResolveObject(ctx, req)
 
-	var gotErr error
-	iter(func(_ resolve.Target, err error) bool {
-		gotErr = err
-		return false
+	var (
+		got    []resolve.Target
+		gotErr error
+	)
+
+	iter(func(t resolve.Target, err error) bool {
+		if err != nil {
+			gotErr = err
+			return false
+		}
+
+		got = append(got, t)
+
+		return true
 	})
 
-	if !errors.Is(gotErr, ErrNotImplemented) {
-		t.Fatalf("expected ErrNotImplemented from a reachable, decodable live response, got: %v", gotErr)
+	if gotErr != nil {
+		t.Fatalf("expected a resolved response, got error: %v", gotErr)
+	}
+
+	if len(got) == 0 {
+		t.Fatal("expected at least one match for ambiguous query \"Mars\"")
+	}
+
+	found := false
+
+	for _, tg := range got {
+		if tg.Name == "Mars" {
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		t.Errorf("expected a target named \"Mars\" among matches, got: %+v", got)
+	}
+}
+
+// TestJPLNetworkResolveExact confirms an unambiguous small-body query
+// resolves to exactly one Target via the "Target body name:" header parse.
+func TestJPLNetworkResolveExact(t *testing.T) {
+	requireHorizons(t)
+
+	prov := New()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	req := resolve.ObjectRequest{Query: "Ceres"}
+	iter := prov.ResolveObject(ctx, req)
+
+	var (
+		got    []resolve.Target
+		gotErr error
+	)
+
+	iter(func(t resolve.Target, err error) bool {
+		if err != nil {
+			gotErr = err
+			return false
+		}
+
+		got = append(got, t)
+
+		return true
+	})
+
+	if gotErr != nil {
+		t.Fatalf("expected a resolved response, got error: %v", gotErr)
+	}
+
+	if len(got) != 1 {
+		t.Fatalf("expected exactly 1 target for unambiguous query \"Ceres\", got %d: %+v", len(got), got)
+	}
+
+	if got[0].SPKID == "" {
+		t.Errorf("expected a non-empty SPKID, got: %+v", got[0])
 	}
 }

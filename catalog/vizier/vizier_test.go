@@ -13,6 +13,7 @@ import (
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/coord"
+	"github.com/TuSKan/astrogo/internal/testutil"
 )
 
 func TestVizierOfflineConeSearch(t *testing.T) {
@@ -73,8 +74,145 @@ func TestVizierOfflineConeSearch(t *testing.T) {
 }
 
 func TestParseCSVMissingColumn(t *testing.T) {
-	if _, err := parseCSV(strings.NewReader("ra,dec\n1,2\n")); !errors.Is(err, ErrUnexpectedSchema) {
+	if _, err := parseCSV(strings.NewReader("ra,dec\n1,2\n"), resolve.KindStar); !errors.Is(err, ErrUnexpectedSchema) {
 		t.Errorf("expected ErrUnexpectedSchema, got %v", err)
+	}
+}
+
+// TestVizierConeSearch_RegisteredTable confirms ConeSearch works against a
+// second registered table (Hipparcos), not just the default 2MASS one —
+// proving the table-parameterization mechanism generalizes, per the schema
+// registry in tables.go.
+func TestVizierConeSearch_RegisteredTable(t *testing.T) {
+	csvData := "designation,ra,dec\n" + "1,10.68470,41.26875\n"
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := r.ParseForm(); err != nil {
+			t.Fatalf("parse form: %v", err)
+		}
+
+		adql := r.PostFormValue("QUERY")
+		if !strings.Contains(adql, `FROM "I/239/hip_main"`) {
+			t.Errorf("expected query against I/239/hip_main, got: %s", adql)
+		}
+
+		if !strings.Contains(adql, "RAICRS") || !strings.Contains(adql, "DEICRS") {
+			t.Errorf("expected Hipparcos RA/Dec columns in query, got: %s", adql)
+		}
+
+		w.Header().Set("Content-Type", "text/csv")
+
+		if _, err := fmt.Fprint(w, csvData); err != nil {
+			t.Errorf("failed to write response: %v", err)
+		}
+	}))
+	defer server.Close()
+
+	prov := New()
+	prov.client.HTTPClient.Transport = &mockTransport{Handler: server.Config.Handler}
+
+	req := resolve.ConeRequest{
+		Table:  "I/239/hip_main",
+		Center: coord.NewICRS(angle.Deg(10.684), angle.Deg(41.269)),
+		Radius: angle.Deg(0.01),
+	}
+
+	var targets []resolve.Target
+
+	prov.ConeSearch(context.Background(), req)(func(tar resolve.Target, err error) bool {
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+
+		targets = append(targets, tar)
+
+		return true
+	})
+
+	if len(targets) != 1 {
+		t.Fatalf("expected 1 target, got %d", len(targets))
+	}
+
+	testutil.AssertEqual(t, "Kind", targets[0].Kind, resolve.KindStar)
+	testutil.AssertEqual(t, "HasCoord", targets[0].HasCoord, true)
+}
+
+// TestVizierConeSearch_UnknownTable confirms a table absent from the
+// schema registry returns ErrUnknownTable rather than guessing column names.
+func TestVizierConeSearch_UnknownTable(t *testing.T) {
+	prov := New()
+
+	req := resolve.ConeRequest{
+		Table:  "X/999/not_a_real_table",
+		Center: coord.NewICRS(angle.Deg(10), angle.Deg(40)),
+		Radius: angle.Deg(1),
+	}
+
+	iter := prov.ConeSearch(context.Background(), req)
+	iter(func(_ resolve.Target, err error) bool {
+		if !errors.Is(err, ErrUnknownTable) {
+			t.Fatalf("expected ErrUnknownTable, got %v", err)
+		}
+
+		return false
+	})
+}
+
+// TestVizierConeSearch_CacheKeyIncludesTable is a regression test: the same
+// cone queried against two different tables must not collide on one cache
+// entry (the cache key previously covered only ra/dec/rad/limit).
+func TestVizierConeSearch_CacheKeyIncludesTable(t *testing.T) {
+	var calls int
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls++
+
+		if err := r.ParseForm(); err != nil {
+			t.Fatalf("parse form: %v", err)
+		}
+
+		adql := r.PostFormValue("QUERY")
+
+		w.Header().Set("Content-Type", "text/csv")
+
+		if strings.Contains(adql, "I/239/hip_main") {
+			fmt.Fprint(w, "designation,ra,dec\n1,10.68470,41.26875\n") //nolint:errcheck // test server
+		} else {
+			fmt.Fprint(w, "designation,ra,dec\n2,10.68470,41.26875\n") //nolint:errcheck // test server
+		}
+	}))
+	defer server.Close()
+
+	prov := New()
+	prov.client.HTTPClient.Transport = &mockTransport{Handler: server.Config.Handler}
+
+	center := coord.NewICRS(angle.Deg(10.684), angle.Deg(41.269))
+	radius := angle.Deg(0.01)
+
+	var (
+		defaultTargets, hipTargets []resolve.Target
+	)
+
+	prov.ConeSearch(context.Background(), resolve.ConeRequest{Center: center, Radius: radius})(func(tar resolve.Target, _ error) bool {
+		defaultTargets = append(defaultTargets, tar)
+		return true
+	})
+
+	prov.ConeSearch(context.Background(), resolve.ConeRequest{Table: "I/239/hip_main", Center: center, Radius: radius})(func(tar resolve.Target, _ error) bool {
+		hipTargets = append(hipTargets, tar)
+		return true
+	})
+
+	if calls != 2 {
+		t.Fatalf("expected 2 live requests (no cache collision), got %d", calls)
+	}
+
+	if len(defaultTargets) != 1 || defaultTargets[0].Designation != "2" {
+		t.Fatalf("expected default-table target Designation=2, got %+v", defaultTargets)
+	}
+
+	if len(hipTargets) != 1 || hipTargets[0].Designation != "1" {
+		t.Fatalf("expected hip_main target Designation=1, got %+v", hipTargets)
 	}
 }
 

@@ -3,9 +3,21 @@
 //
 // # Current status
 //
-// [Provider.ConeSearch] currently queries a single hardcoded table — the
-// 2MASS point-source catalog (II/246/out) — as a generic fallback baseline.
-// It does not yet support selecting an arbitrary VizieR table/catalog per
-// request; ConeRequest has no field for one. Returned targets carry the
-// 2MASS designation, RA/Dec, and Kind [resolve.KindStar].
+// [Provider.ConeSearch] queries any VizieR table registered in this
+// package's schema registry (tables.go), selected via
+// [resolve.ConeRequest].Table. An empty Table defaults to the 2MASS
+// point-source catalog (II/246/out), this package's original behavior.
+// Querying a table not in the registry returns [ErrUnknownTable] rather
+// than guessing that table's RA/Dec/designation column names.
+//
+// Tables registered today:
+//
+//   - II/246/out — 2MASS Point Source Catalog (default)
+//   - I/239/hip_main — Hipparcos main catalog
+//   - I/355/gaiadr3 — Gaia DR3 (VizieR mirror)
+//
+// Adding a table is a data change (a new tables.go registry entry with
+// verified column names), not an API change — the registry can grow
+// without touching [resolve.ConeRequest] or [Provider.ConeSearch]'s
+// signature.
 package vizier
