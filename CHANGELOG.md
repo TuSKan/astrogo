@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] — 2026-07-08
+
 ### Added
 
 #### Catalog Providers: full `catalog/jpl` and `catalog/vizier` implementations
@@ -23,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Documentation
 - `catalog/jpl/doc.go`, `catalog/vizier/doc.go`: rewritten to describe the now-real capability
 - `README.md`, `docs/ROADMAP.md`: both v1.0.0-blocking catalog providers are now fully implemented; Implementation Status table updated, "Path to v1.0.0" section updated
+- `CONTRIBUTING.md`: added guidance for contributors using AI coding tools to strip generated commit-message attribution/co-author trailers before submitting a PR
 
 ## [0.2.0] — 2026-07-07
 
@@ -458,7 +461,8 @@ First observatory-grade release. Validated against USNO, JPL Horizons, and NASA 
 - `VisibleIntervals` creates independent Contexts per grid step (correct; each step is a different epoch)
 - IERS EOP data fetched via `go:generate`, not at runtime
 
-[Unreleased]: https://github.com/TuSKan/astrogo/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/TuSKan/astrogo/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/TuSKan/astrogo/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/TuSKan/astrogo/compare/v0.1.5...v0.2.0
 [0.1.5]: https://github.com/TuSKan/astrogo/releases/tag/v0.1.5
 [0.1.4]: https://github.com/TuSKan/astrogo/releases/tag/v0.1.4

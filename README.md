@@ -639,14 +639,14 @@ These are wrapped internally to ensure:
 ---
 
 > [!IMPORTANT]
-> astrogo is pre-1.0 (currently **v0.2.0**) — the public API may still change. This release includes an extensive correctness/robustness/release-readiness audit (see [CHANGELOG.md](CHANGELOG.md)). `catalog/jpl` and `catalog/vizier` — the two providers that were gating a v1.0.0 API-stability commitment — are now fully implemented (see Implementation Status above); see [`docs/ROADMAP.md`](docs/ROADMAP.md) for what's left before v1.0.0.
+> astrogo is pre-1.0 (currently **v0.3.0**) — the public API may still change. This release includes an extensive correctness/robustness/release-readiness audit (see [CHANGELOG.md](CHANGELOG.md)). `catalog/jpl` and `catalog/vizier` — the two providers that were gating a v1.0.0 API-stability commitment — are now fully implemented (see Implementation Status above); see [`docs/ROADMAP.md`](docs/ROADMAP.md) for what's left before v1.0.0.
 
 ---
 
 ## Known Limitations & Scope
 
 > [!WARNING]
-> These are documented trade-offs, not bugs. They represent deliberate scope boundaries as of v0.2.0.
+> These are documented trade-offs, not bugs. They represent deliberate scope boundaries as of v0.3.0.
 
 ### Context Caching (Performance)
 
