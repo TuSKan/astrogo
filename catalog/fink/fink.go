@@ -16,13 +16,11 @@ import (
 	"time"
 
 	"github.com/TuSKan/astrogo/catalog/resolve"
+	"github.com/TuSKan/astrogo/remote"
 
 	"github.com/apache/arrow-go/v18/parquet/file"
 	"github.com/apache/arrow-go/v18/parquet/pqarrow"
 )
-
-// SSOFT API endpoint.
-var ssoftURL = "https://api.ztf.fink-portal.org/api/v1/ssoft"
 
 // defaultVersion is the SSOFT release to query. The API defaults to the
 // current month, which may not exist yet; pin to a known-good release.
@@ -73,7 +71,7 @@ type ssoRecord struct {
 //   - Full-table parquet download for bulk indexing (lazy, cached in memory)
 type Provider struct {
 	loadErr  error
-	client   *http.Client
+	client   *remote.Client
 	byNumber map[int64]*ssoRecord
 	byName   map[string]*ssoRecord
 	version  string
@@ -89,7 +87,7 @@ func New() *Provider {
 // NewWithVersion returns a Provider targeting a specific SSOFT release (e.g. "2025.04").
 func NewWithVersion(version string) *Provider {
 	return &Provider{
-		client:  &http.Client{Timeout: 120 * time.Second},
+		client:  remote.NewClient(remote.WithTimeout(120 * time.Second)),
 		version: version,
 	}
 }
@@ -194,7 +192,12 @@ func (p *Provider) querySingle(ctx context.Context, number int64, name string) (
 		return nil, fmt.Errorf("fink: marshal request: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, ssoftURL, bytes.NewReader(raw))
+	base, err := remote.URL(remote.FINK)
+	if err != nil {
+		return nil, fmt.Errorf("fink: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, base, bytes.NewReader(raw))
 	if err != nil {
 		return nil, fmt.Errorf("fink: ssoft request: %w", err)
 	}
@@ -203,6 +206,11 @@ func (p *Provider) querySingle(ctx context.Context, number int64, name string) (
 
 	resp, err := p.client.Do(req)
 	if err != nil {
+		var httpErr *remote.HTTPError
+		if errors.As(err, &httpErr) {
+			return nil, fmt.Errorf("%w: %d: %s", ErrHTTPStatus, httpErr.StatusCode, httpErr.Body[:min(200, len(httpErr.Body))])
+		}
+
 		return nil, fmt.Errorf("fink: ssoft request: %w", err)
 	}
 	defer func() {
@@ -215,10 +223,6 @@ func (p *Provider) querySingle(ctx context.Context, number int64, name string) (
 	data, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("fink: reading response: %w", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("%w: %d: %s", ErrHTTPStatus, resp.StatusCode, string(data[:min(200, len(data))]))
 	}
 
 	// Single-object returns a JSON object; full table returns an array.
@@ -457,7 +461,12 @@ func (p *Provider) downloadSSOFT() (_ []ssoRecord, err error) {
 		return nil, fmt.Errorf("fink: marshal SSOFT request: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, ssoftURL, bytes.NewReader(payload))
+	base, err := remote.URL(remote.FINK)
+	if err != nil {
+		return nil, fmt.Errorf("fink: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, base, bytes.NewReader(payload))
 	if err != nil {
 		return nil, fmt.Errorf("SSOFT request: %w", err)
 	}
@@ -466,6 +475,11 @@ func (p *Provider) downloadSSOFT() (_ []ssoRecord, err error) {
 
 	resp, err := p.client.Do(req)
 	if err != nil {
+		var httpErr *remote.HTTPError
+		if errors.As(err, &httpErr) {
+			return nil, fmt.Errorf("%w: %d: %s", ErrHTTPStatus, httpErr.StatusCode, httpErr.Body[:min(200, len(httpErr.Body))])
+		}
+
 		return nil, fmt.Errorf("SSOFT request: %w", err)
 	}
 	defer func() {

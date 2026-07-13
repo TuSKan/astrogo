@@ -2,6 +2,7 @@ package lsk
 
 import (
 	"bufio"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -11,7 +12,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/TuSKan/astrogo/internal/tools"
+	gofs "github.com/ungerik/go-fs"
+
+	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/time"
 )
 
@@ -22,24 +25,19 @@ var (
 	ErrInvalidMonth  = errors.New("invalid month")
 )
 
-// JPLLSKKernelURI is the base URL for the JPL LSK kernel.
-const JPLLSKKernelURI = "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/"
-
 // Reader is a reader for the JPL LSK kernel.
 type Reader struct {
 	F       io.ReadCloser
 	DeltaAt []LeapData
 }
 
-// Cache downloads an LSK file if it doesn't exist and opens it.
+// Cache opens the LSK file at path/kernel, downloading it first when it is
+// absent. Downloads are gated by remote's consent configuration — enable
+// them with remote.EnableDownloads(remote.NAIFLSK, 0) (naif0012.tls is only
+// ~5 KB) or pre-seed the file to stay fully offline.
 //
 // It provides an auto-healing mechanism for CI environments by automatically
 // removing corrupt or truncated files.
-//
-// If the file is incomplete or its metadata is invalid, the function:
-//  1. Closes the file handle.
-//  2. Removes the corrupt file from the filesystem.
-//  3. Returns the error wrapped with a descriptive message.
 func Cache(kernel, path string) (*Reader, error) {
 	lskPath := filepath.Join(path, kernel)
 
@@ -50,11 +48,9 @@ func Cache(kernel, path string) (*Reader, error) {
 
 	_, err = os.Stat(lskPath)
 	if os.IsNotExist(err) {
-		lskURI := JPLLSKKernelURI + kernel
-
-		err := tools.Download(lskURI, lskPath)
+		err := remote.Download(context.Background(), remote.NAIFLSK, kernel, gofs.File(lskPath))
 		if err != nil {
-			return nil, fmt.Errorf("jpl: failed to download LSK for smallbody: %w", err)
+			return nil, fmt.Errorf("jpl: LSK %s: %w", kernel, err)
 		}
 	}
 

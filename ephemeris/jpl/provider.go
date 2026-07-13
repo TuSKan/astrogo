@@ -12,25 +12,23 @@ import (
 	"github.com/TuSKan/astrogo/ephemeris/core"
 	"github.com/TuSKan/astrogo/ephemeris/jpl/lsk"
 	"github.com/TuSKan/astrogo/ephemeris/jpl/spk"
-	"github.com/TuSKan/astrogo/internal/cache"
+	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/vector"
 )
 
 // Sentinel errors for JPL provider.
 var (
-	ErrNotImplemented = errors.New("jpl: source not implemented")
-	ErrUnknownSource  = errors.New("jpl: unknown source")
-	ErrRecursionDepth = errors.New("jpl: recursion depth exceeded")
-	ErrNilKernel      = errors.New("jpl: kernel is nil")
+	ErrNotImplemented        = errors.New("jpl: source not implemented")
+	ErrUnknownSource         = errors.New("jpl: unknown source")
+	ErrRecursionDepth        = errors.New("jpl: recursion depth exceeded")
+	ErrNilKernel             = errors.New("jpl: kernel is nil")
+	ErrNonLocalDataDir       = errors.New("jpl: DataDir is not on a local filesystem")
+	ErrKernelIndexOutOfRange = errors.New("jpl: kernel index out of range")
 )
 
-const (
-	// JPLKernelURI is the base URI for JPL kernels.
-	JPLKernelURI = "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/"
-	// KMPerAU is the number of kilometers per astronomical unit.
-	KMPerAU = 149597870.7
-)
+// KMPerAU is the number of kilometers per astronomical unit.
+const KMPerAU = 149597870.7
 
 // BodyIDToNAIF maps core.ID to NAIF integer IDs.
 var BodyIDToNAIF = map[core.ID]int{
@@ -46,6 +44,12 @@ var ErrNoSegment = errors.New("jpl: no coverage for target at requested epoch")
 type Kernel struct {
 	Reader   *spk.Reader
 	Segments []spk.Segment
+	// Path is the kernel file's location on disk — set by NewProvider,
+	// AddKernelFile, and Open. Empty only for a kernel added via the bare
+	// AddKernel(r *spk.Reader), since that call has no path to record
+	// (per-object small-body kernels obtained via NewProvider's
+	// spk.CacheAPI recursion currently fall into this case too).
+	Path string
 }
 
 // SegmentRef indexes a segment within a specific kernel.
@@ -102,14 +106,23 @@ func WithTimeInterval(start, end time.Time) Option {
 // The source selects the kind of JPL data (Planets, SmallBody, Asteroids,
 // Comets). The kernel identifies the specific dataset (e.g. "de442", "433").
 func NewProvider(source core.Source, kernel string, opts ...Option) (*Provider, error) {
-	// Default DataDir: OS user cache directory (e.g. ~/.cache/astrogo/jpl)
-	defaultDir, err := cache.Dir("jpl")
+	// Default DataDir: remote.DataDir()/jpl (OS user cache directory by
+	// default, e.g. ~/.cache/astrogo/jpl; configurable via remote.SetDataDir).
+	defaultDir, err := remote.SubsystemDir("jpl")
 	if err != nil {
-		return nil, fmt.Errorf("jpl: failed to resolve cache directory: %w", err)
+		return nil, fmt.Errorf("jpl: failed to resolve data directory: %w", err)
+	}
+
+	localDir := defaultDir.LocalPath()
+	if localDir == "" {
+		// spk.Reader needs io.ReaderAt random access, which non-local
+		// go-fs filesystems (future s3://, gs:// backends) can't provide
+		// directly; kernels currently require a local DataDir.
+		return nil, fmt.Errorf("%w: %s (JPL kernels require local random access; set remote.SetDataDirPath or jpl.WithDataDir to a local path)", ErrNonLocalDataDir, defaultDir)
 	}
 
 	p := &Provider{
-		DataDir:          defaultDir,
+		DataDir:          localDir,
 		ByTarget:         make(map[int32][]SegmentRef),
 		ByTargetCoverage: make(map[int32]TargetCoverage),
 		source:           source,
@@ -129,22 +142,26 @@ func NewProvider(source core.Source, kernel string, opts ...Option) (*Provider, 
 			p.kernel = "de440"
 		}
 
+		spkPath := filepath.Join(p.DataDir, "planets", p.kernel+".bsp")
+
 		k, err := spk.CacheDownload("planets/"+p.kernel+".bsp", p.DataDir)
 		if err != nil {
 			return nil, fmt.Errorf("jpl: failed to load planetary kernel: %w", err)
 		}
 
-		if err := p.AddKernel(k); err != nil {
+		if err := p.addKernelPath(k, spkPath); err != nil {
 			return nil, fmt.Errorf("jpl: failed to load planetary kernel: %w", err)
 		}
 	case core.Asteroids, core.Comets, core.SmallBody:
 		// Always load a minimal planetary kernel for recursion (center resolution)
+		basePath := filepath.Join(p.DataDir, "planets", "de440s.bsp")
+
 		pk, err := spk.CacheDownload("planets/de440s.bsp", p.DataDir)
 		if err != nil {
 			return nil, fmt.Errorf("jpl: failed to load planetary base kernel: %w", err)
 		}
 
-		if err := p.AddKernel(pk); err != nil {
+		if err := p.addKernelPath(pk, basePath); err != nil {
 			return nil, fmt.Errorf("jpl: failed to add planetary base kernel: %w", err)
 		}
 
@@ -253,54 +270,141 @@ func (p *Provider) AddKernel(k *spk.Reader) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	summaries, err := k.ReadSummaries()
+	return p.addKernelLocked(k, "")
+}
+
+// AddKernelFile opens the SPK file at path (a plain local filesystem path,
+// no network access) and adds it to the provider index, recording Path for
+// LoadedKernels/RemoveKernel. Use Open to construct a Provider entirely
+// from local files without ever going through NewProvider's
+// download-consent-gated construction.
+func (p *Provider) AddKernelFile(path string) error {
+	f, err := os.Open(path)
 	if err != nil {
-		return fmt.Errorf("jpl: failed to read summaries: %w", err)
+		return fmt.Errorf("jpl: open kernel %s: %w", path, err)
 	}
 
-	kIdx := len(p.Kernels)
-
-	var segments []spk.Segment
-
-	for i, s := range summaries {
-		seg := spk.Segment{
-			StartET:   s.Doubles[0],
-			EndET:     s.Doubles[1],
-			Target:    s.Integers[0],
-			Center:    s.Integers[1],
-			Frame:     s.Integers[2],
-			Type:      s.Integers[3],
-			StartAddr: s.Integers[4],
-			EndAddr:   s.Integers[5],
-		}
-		segments = append(segments, seg)
-		ref := SegmentRef{
-			KernelIndex:  kIdx,
-			SegmentIndex: i,
-		}
-		p.Index = append(p.Index, ref)
-		p.ByTarget[seg.Target] = append(p.ByTarget[seg.Target], ref)
-
-		// Update coverage metadata
-		cov := p.ByTargetCoverage[seg.Target]
-		if cov.Count == 0 {
-			cov.StartET = seg.StartET
-			cov.EndET = seg.EndET
-		} else {
-			cov.StartET = math.Min(cov.StartET, seg.StartET)
-			cov.EndET = math.Max(cov.EndET, seg.EndET)
-		}
-
-		cov.Count++
-		p.ByTargetCoverage[seg.Target] = cov
+	r, err := spk.NewReader(f)
+	if err != nil {
+		return errors.Join(fmt.Errorf("jpl: read kernel %s: %w", path, err), f.Close())
 	}
 
-	p.Kernels = append(p.Kernels, &Kernel{
-		Reader:   k,
-		Segments: segments,
-	})
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	return p.addKernelLocked(r, path)
+}
+
+// RemoveKernel closes and unloads the kernel at index i (as positioned in
+// p.Kernels — see LoadedKernels) and rebuilds the segment index. Removing
+// shifts the indices of every kernel after i down by one; re-fetch indices
+// via LoadedKernels before removing more than one kernel.
+func (p *Provider) RemoveKernel(i int) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	if i < 0 || i >= len(p.Kernels) {
+		return fmt.Errorf("%w: index %d, have %d kernels", ErrKernelIndexOutOfRange, i, len(p.Kernels))
+	}
+
+	if err := p.Kernels[i].Reader.Close(); err != nil {
+		return fmt.Errorf("jpl: close kernel: %w", err)
+	}
+
+	p.Kernels = append(p.Kernels[:i], p.Kernels[i+1:]...)
+	p.rebuildIndexLocked()
 
 	return nil
+}
+
+// UnloadAll closes every loaded kernel reader and clears the segment
+// index, leaving the Provider empty but reusable via
+// AddKernel/AddKernelFile. The LSK reader (if set) is left untouched —
+// pair with Close to also release it.
+func (p *Provider) UnloadAll() error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	var errs []error
+
+	for _, k := range p.Kernels {
+		if err := k.Reader.Close(); err != nil {
+			errs = append(errs, err)
+		}
+	}
+
+	p.Kernels = nil
+	p.rebuildIndexLocked()
+
+	return errors.Join(errs...)
+}
+
+// KernelInfo summarizes one loaded kernel for inspection — e.g. a setup
+// UI or diagnostic log listing what a Provider currently has loaded.
+type KernelInfo struct {
+	Path     string
+	Segments int
+	StartET  float64
+	EndET    float64
+}
+
+// LoadedKernels reports what is currently loaded, in p.Kernels order —
+// indices here match RemoveKernel's i parameter.
+func (p *Provider) LoadedKernels() []KernelInfo {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+
+	infos := make([]KernelInfo, len(p.Kernels))
+
+	for i, k := range p.Kernels {
+		info := KernelInfo{Path: k.Path, Segments: len(k.Segments)}
+
+		for j, seg := range k.Segments {
+			if j == 0 || seg.StartET < info.StartET {
+				info.StartET = seg.StartET
+			}
+
+			if j == 0 || seg.EndET > info.EndET {
+				info.EndET = seg.EndET
+			}
+		}
+
+		infos[i] = info
+	}
+
+	return infos
+}
+
+// Open constructs a Provider entirely from local kernel files — no network
+// access, no data directory resolution, no download consent required. This
+// is the production/offline path: pre-seed spkPaths and lskPath yourself
+// (e.g. files a prior EnableDownloads-backed run already cached, or copied
+// into a deployment image), then Open them directly.
+func Open(lskPath string, spkPaths ...string) (*Provider, error) {
+	p := &Provider{
+		ByTarget:         make(map[int32][]SegmentRef),
+		ByTargetCoverage: make(map[int32]TargetCoverage),
+	}
+
+	for _, path := range spkPaths {
+		if err := p.AddKernelFile(path); err != nil {
+			return nil, fmt.Errorf("jpl: open: %w", err)
+		}
+	}
+
+	f, err := os.Open(lskPath)
+	if err != nil {
+		return nil, fmt.Errorf("jpl: open LSK %s: %w", lskPath, err)
+	}
+
+	l, err := lsk.NewReader(f)
+	if err != nil {
+		return nil, fmt.Errorf("jpl: read LSK %s: %w", lskPath, err)
+	}
+
+	p.LSK = l
+
+	return p, nil
 }
 
 // FindSegment finds the appropriate segment for a target at a given time.
@@ -342,6 +446,76 @@ func (p *Provider) SupportedBodies() []core.ID {
 	}
 
 	return res
+}
+
+// addKernelPath is AddKernel with a known file path, used internally by
+// NewProvider so its kernels show up correctly in LoadedKernels.
+func (p *Provider) addKernelPath(k *spk.Reader, path string) error {
+	if k == nil {
+		return ErrNilKernel
+	}
+
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	return p.addKernelLocked(k, path)
+}
+
+// addKernelLocked is AddKernel/AddKernelFile/addKernelPath's shared body.
+// Callers must already hold p.mu.
+func (p *Provider) addKernelLocked(k *spk.Reader, path string) error {
+	summaries, err := k.ReadSummaries()
+	if err != nil {
+		return fmt.Errorf("jpl: failed to read summaries: %w", err)
+	}
+
+	segments := make([]spk.Segment, 0, len(summaries))
+	for _, s := range summaries {
+		segments = append(segments, spk.Segment{
+			StartET:   s.Doubles[0],
+			EndET:     s.Doubles[1],
+			Target:    s.Integers[0],
+			Center:    s.Integers[1],
+			Frame:     s.Integers[2],
+			Type:      s.Integers[3],
+			StartAddr: s.Integers[4],
+			EndAddr:   s.Integers[5],
+		})
+	}
+
+	p.Kernels = append(p.Kernels, &Kernel{Reader: k, Segments: segments, Path: path})
+	p.rebuildIndexLocked()
+
+	return nil
+}
+
+// rebuildIndexLocked recomputes Index, ByTarget, and ByTargetCoverage from
+// p.Kernels' already-parsed Segments (no re-reading from disk). Callers
+// must already hold p.mu.
+func (p *Provider) rebuildIndexLocked() {
+	p.Index = nil
+	p.ByTarget = make(map[int32][]SegmentRef)
+	p.ByTargetCoverage = make(map[int32]TargetCoverage)
+
+	for kIdx, k := range p.Kernels {
+		for i, seg := range k.Segments {
+			ref := SegmentRef{KernelIndex: kIdx, SegmentIndex: i}
+			p.Index = append(p.Index, ref)
+			p.ByTarget[seg.Target] = append(p.ByTarget[seg.Target], ref)
+
+			cov := p.ByTargetCoverage[seg.Target]
+			if cov.Count == 0 {
+				cov.StartET = seg.StartET
+				cov.EndET = seg.EndET
+			} else {
+				cov.StartET = math.Min(cov.StartET, seg.StartET)
+				cov.EndET = math.Max(cov.EndET, seg.EndET)
+			}
+
+			cov.Count++
+			p.ByTargetCoverage[seg.Target] = cov
+		}
+	}
 }
 
 // evaluateRecursive evaluates the state of a target body at a given time.

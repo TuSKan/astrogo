@@ -1,7 +1,9 @@
-// Package resolve provides the core types and HTTP infrastructure for
-// astronomical target resolution across catalog providers.
+// Package resolve provides the core domain types for astronomical target
+// resolution across catalog providers.
 //
 // It defines the [Target] aggregate, the pluggable [Provider] interface,
-// the [Client] HTTP transport with automatic retry and rate limiting,
-// and the [Cache] for persisting resolved results locally.
+// and the [Cache] for persisting resolved results locally. Providers reach
+// remote services through [github.com/TuSKan/astrogo/remote]'s [Client] and
+// endpoint registry — see that package for HTTP transport, retry, and
+// download-consent configuration.
 package resolve

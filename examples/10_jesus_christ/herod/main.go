@@ -16,10 +16,16 @@ import (
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/plan"
+	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/time"
 )
 
 func main() {
+	// de441 parts are multi-GB each; unlimited here since that's the whole
+	// point of this example. See README "Data downloads & offline usage".
+	remote.EnableDownloads(remote.NAIFSPK, 0)
+	remote.EnableDownloads(remote.NAIFLSK, 0)
+
 	prov, err := eph.NewProvider(eph.Planets, "de441_part-1")
 	if err != nil {
 		panic(err)

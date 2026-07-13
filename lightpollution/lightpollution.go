@@ -14,13 +14,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cenkalti/backoff/v5"
-
+	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/skybrightness"
 )
-
-// queryAPI is the lightpollutionmap.info point-query endpoint.
-const queryAPI = "https://www.lightpollutionmap.info/QueryRaster/"
 
 // defaultLayer is the World Atlas 2015 (Falchi et al. 2016) artificial-brightness layer.
 const defaultLayer = "wa_2015"
@@ -50,20 +46,11 @@ var (
 	ErrBadResponse = errors.New("lightpollution: unexpected API response")
 )
 
-// maxRetries bounds retry attempts on transient failures and 429/5xx
-// responses (exponential backoff via cenkalti/backoff/v5, mirroring
-// catalog/resolve.Client's policy). The daily request quota (see doc.go)
-// is a usage-pattern limit, not a burst rate — there is no per-second cap
-// documented for QueryRaster, so nothing here throttles request timing;
-// retrying an occasional transient failure is the actionable part.
-const maxRetries = 3
-
 // Client queries the lightpollutionmap.info QueryRaster service.
 type Client struct {
-	apiKey  string
-	layer   string
-	baseURL string
-	http    *http.Client
+	apiKey string
+	layer  string
+	client *remote.Client
 }
 
 // Option configures a Client.
@@ -75,17 +62,19 @@ func WithAPIKey(key string) Option { return func(c *Client) { c.apiKey = key } }
 // WithLayer overrides the raster layer (default "wa_2015").
 func WithLayer(layer string) Option { return func(c *Client) { c.layer = layer } }
 
-// WithHTTPClient sets a custom HTTP client.
-func WithHTTPClient(h *http.Client) Option { return func(c *Client) { c.http = h } }
+// WithHTTPClient sets a custom HTTP client (transport, proxy, TLS config).
+func WithHTTPClient(h *http.Client) Option { return func(c *Client) { c.client.HTTPClient = h } }
 
 // New creates a Client. The API key defaults to the LIGHTPOLLUTIONMAP_KEY
-// environment variable unless overridden with WithAPIKey.
+// environment variable unless overridden with WithAPIKey. Requests go
+// through remote.Client (retry/backoff on transient failures and 429/5xx
+// responses — the daily request quota, see doc.go, is a usage-pattern
+// limit, not a burst rate, so there is nothing to throttle beyond that).
 func New(opts ...Option) *Client {
 	c := &Client{
-		apiKey:  os.Getenv(apiKeyEnv),
-		layer:   defaultLayer,
-		baseURL: queryAPI,
-		http:    &http.Client{Timeout: 30 * time.Second},
+		apiKey: os.Getenv(apiKeyEnv),
+		layer:  defaultLayer,
+		client: remote.NewClient(remote.WithTimeout(30 * time.Second)),
 	}
 
 	for _, opt := range opts {
@@ -134,7 +123,12 @@ func (c *Client) artificialBrightness(ctx context.Context, latDeg, lonDeg float6
 		return 0, ErrNoAPIKey
 	}
 
-	u, err := url.Parse(c.baseURL)
+	base, err := remote.URL(remote.LightPollution)
+	if err != nil {
+		return 0, fmt.Errorf("lightpollution: %w", err)
+	}
+
+	u, err := url.Parse(base)
 	if err != nil {
 		return 0, fmt.Errorf("lightpollution: parse url: %w", err)
 	}
@@ -146,39 +140,25 @@ func (c *Client) artificialBrightness(ctx context.Context, latDeg, lonDeg float6
 	q.Set("key", c.apiKey)
 	u.RawQuery = q.Encode()
 
-	operation := func() ([]byte, error) {
-		req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
-		if err != nil {
-			return nil, backoff.Permanent(fmt.Errorf("lightpollution: request: %w", err))
-		}
-
-		req.Header.Set("User-Agent", "AstroGo/1.0")
-
-		resp, err := c.http.Do(req)
-		if err != nil {
-			return nil, fmt.Errorf("lightpollution: http: %w", err)
-		}
-		defer func() { _ = resp.Body.Close() }()
-
-		body, err := io.ReadAll(io.LimitReader(resp.Body, 1<<16))
-		if err != nil {
-			return nil, fmt.Errorf("lightpollution: read body: %w", err)
-		}
-
-		if resp.StatusCode == http.StatusTooManyRequests || resp.StatusCode >= 500 {
-			return nil, fmt.Errorf("%w: status %d: %s", ErrBadResponse, resp.StatusCode, strings.TrimSpace(string(body)))
-		}
-
-		if resp.StatusCode != http.StatusOK {
-			return nil, backoff.Permanent(fmt.Errorf("%w: status %d: %s", ErrBadResponse, resp.StatusCode, strings.TrimSpace(string(body))))
-		}
-
-		return body, nil
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
+	if err != nil {
+		return 0, fmt.Errorf("lightpollution: request: %w", err)
 	}
 
-	body, err := backoff.Retry(ctx, operation, backoff.WithMaxTries(maxRetries))
+	resp, err := c.client.Do(req)
 	if err != nil {
-		return 0, fmt.Errorf("lightpollution: retry: %w", err)
+		var httpErr *remote.HTTPError
+		if errors.As(err, &httpErr) {
+			return 0, fmt.Errorf("%w: status %d: %s", ErrBadResponse, httpErr.StatusCode, strings.TrimSpace(httpErr.Body))
+		}
+
+		return 0, fmt.Errorf("lightpollution: http: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 1<<16))
+	if err != nil {
+		return 0, fmt.Errorf("lightpollution: read body: %w", err)
 	}
 
 	return parseBrightness(string(body))

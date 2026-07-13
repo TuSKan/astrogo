@@ -55,7 +55,7 @@ Sirius right now: altitude 64.8°, observable above 30°: true
   Transit  2026-04-16 20:12 UTC
 ```
 
-No API keys, no downloads, no Python underneath — every number above came from SOFA-derived algorithms running in pure Go. Every code sample in this README is copy-pasted from a program that was actually compiled and run; none of it is aspirational.
+No API keys, no downloads, no Python underneath for this example — every number above came from SOFA-derived algorithms running in pure Go. (Higher-precision JPL ephemerides are available too, opt-in — see [Data downloads & offline usage](#data-downloads--offline-usage).) Every code sample in this README is copy-pasted from a program that was actually compiled and run; none of it is aspirational.
 
 ---
 
@@ -602,6 +602,7 @@ flowchart TD
 
 | Package | Purpose | Status |
 | :--- | :--- | :--- |
+| `remote` | Centralized endpoint registry, HTTP client (retry/backoff), consent-gated downloads, configurable data storage | ✅ Stable |
 | `constants` | Universal and astronomical constants | ✅ Stable |
 | `angle` | Angular types, HMS/DMS parsing | ✅ Stable |
 | `vector` | 3D geometry primitives | ✅ Stable |
@@ -624,6 +625,110 @@ flowchart TD
 | `unit` | Physical unit and quantity system | ✅ Stable |
 
 See [`VALIDATION.md`](docs/VALIDATION.md) for scientific validation status, [`USNO.md`](docs/USNO.md) for the U.S. Naval Observatory accuracy report (41/41 tests passing, ≤0.6 min rise/set accuracy across 3 continents + polar/equatorial/8849m edge cases), and the FINK/ZTF sHG1G2 validation (100% match at 0.025 mag against the phunk production pipeline).
+
+---
+
+## Data downloads & offline usage
+
+`astrogo` never downloads a file without your explicit consent — this is a deliberate,
+enforced default, not a suggestion. Every external connection the library can make is
+enumerated in the [`remote`](remote/doc.go) package's endpoint registry; nothing else
+happens.
+
+### What can be downloaded, and how big
+
+| Data | Endpoint | Typical size | When |
+| :--- | :--- | :--- | :--- |
+| JPL planetary kernel (de440s) | `remote.NAIFSPK` | ~32 MB | `eph.NewProvider(eph.Planets/SmallBody/..., "de440s")` |
+| JPL planetary kernel (de440, de442) | `remote.NAIFSPK` | ~115 MB | `eph.NewProvider(eph.Planets, "de440"/"de442")` |
+| JPL planetary kernel (de441 parts) | `remote.NAIFSPK` | multi-GB **each** | `eph.NewProvider(eph.Planets, "de441_part-1", eph.WithKernel("de441_part-2"))` |
+| Leap-second kernel (naif0012.tls) | `remote.NAIFLSK` | ~5 KB | always, alongside any JPL kernel |
+| Small-body SPK (Horizons-generated) | `remote.JPLHorizons` | KB–few MB | `eph.NewProvider(eph.SmallBody, "433", ...)` |
+| IERS Earth-orientation data | `remote.IERSFinals2000A` | ~3.7 MB | `iers.FetchNow`/`FetchIfStale`, or `go generate` for source builds |
+| OpenNGC catalog CSVs | `remote.OpenNGC` | ~1.5–2 MB | `go generate ./catalog/openngc/...` only — never at library runtime |
+
+Catalog resolvers (`catalog/simbad`, `catalog/gaia`, `catalog/vizier`, `catalog/mast`,
+`catalog/sbdb`, `catalog/norad`, `catalog/fink`) and `lightpollution` make small
+request/response API calls, not bulk downloads — those are gated by endpoint
+enable/disable and offline mode, not by download-size consent (the network call itself
+is the explicit purpose of the method you're calling).
+
+### Enabling a download
+
+Nothing above ever downloads silently. Construct a JPL ephemeris provider with a cold
+cache and no consent granted, and you get an explicit, actionable error instead of a
+multi-hundred-MB surprise:
+
+```go
+_, err := eph.NewProvider(eph.Planets, "de442")
+// err: jpl: SPK kernel planets/de442.bsp: remote: download denied: planets/de442.bsp
+// (size unknown from https://naif.jpl.nasa.gov/...); astrogo never downloads without
+// consent — call remote.EnableDownloads(remote.NAIFSPK, maxSize) or pre-seed the file
+```
+
+Grant consent per endpoint, with an optional size cap (`0` = unlimited):
+
+```go
+import "github.com/TuSKan/astrogo/remote"
+
+remote.EnableDownloads(remote.NAIFSPK, 200<<20) // allow up to 200 MB
+remote.EnableDownloads(remote.NAIFLSK, 0)       // the ~5 KB leap-second kernel, unlimited
+
+p, err := eph.NewProvider(eph.Planets, "de442") // now downloads (once) and caches
+```
+
+For total control, install a custom policy instead of per-endpoint limits:
+
+```go
+remote.SetPolicy(func(ep remote.Endpoint, size int64) error {
+    if size > 500<<20 {
+        return fmt.Errorf("refusing a %d-byte download of %s", size, ep.URL)
+    }
+    return nil // allow
+})
+```
+
+### Where data lives, and pointing it elsewhere
+
+All downloaded/cached data — JPL kernels, the IERS runtime cache — lives under one
+configurable base directory, default `os.UserCacheDir()/astrogo` (`~/.cache/astrogo` on
+Linux, `%LocalAppData%\astrogo` on Windows, `~/Library/Caches/astrogo` on macOS):
+
+```go
+remote.SetDataDirPath("/data/astrogo-cache") // or remote.SetDataDir for a github.com/ungerik/go-fs File
+```
+
+### Offline / air-gapped deployments
+
+Pre-seed the data directory with the files you need, then cut network access entirely:
+
+```go
+remote.SetOffline(true)
+
+p, err := jpl.Open("naif0012.tls", "de442.bsp") // pure local construction, zero network
+```
+
+Every downloader checks the filesystem before the network, so a pre-seeded deployment
+never dials out even without `SetOffline`. `iers.LoadFile`/`iers.LoadFS` load a local (or
+embedded) EOP snapshot the same way.
+
+### Endpoint control
+
+```go
+remote.Endpoints()                          // inspect every endpoint astrogo can reach
+remote.Disable(remote.SIMBAD)                // block one endpoint (ErrEndpointDisabled)
+remote.SetURL(remote.SIMBAD, "https://mirror.example/tap") // point at a mirror/proxy
+remote.SetOffline(true)                      // global kill switch, all network access
+```
+
+### Building from source
+
+`go generate ./...` refreshes the IERS EOP snapshot and the OpenNGC catalog CSV from
+their upstream sources — this is a development-time step, invoking it is itself the
+download consent (no `remote.EnableDownloads` call needed). Neither generated file is
+committed to the repository (see `.gitignore`), so a fresh `go get` gets working code with
+zero embedded data until you either run `go generate`, call `iers.FetchNow`/`LoadFile` at
+runtime, or pre-seed `remote.DataDir()` yourself.
 
 ---
 
@@ -678,7 +783,7 @@ Sub-arcsecond topocentric accuracy and sub-second UT1 timing require IERS EOP da
 | Topocentric alt/az | <0.01″ | ~1″ |
 | Rise/set timing | ≤0.6 min vs USNO | ≤0.7 min vs USNO |
 
-The library logs a one-time warning when EOP data is unavailable (users who redirect or suppress logs won't see it — call `iers.Coverage()` to check proactively). The IERS data is bundled via `go:generate`.
+The library logs a one-time warning when EOP data is unavailable (users who redirect or suppress logs won't see it — call `iers.Coverage()` to check proactively). The IERS data is refreshed via `go:generate`, `iers.FetchNow`/`FetchIfStale` at runtime, or `iers.LoadFile`/`LoadFS` from a pre-seeded snapshot — see [Data downloads & offline usage](#data-downloads--offline-usage).
 
 ### TDB Precision
 

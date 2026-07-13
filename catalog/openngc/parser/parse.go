@@ -12,14 +12,20 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
+
+	"github.com/TuSKan/astrogo/remote"
 )
 
 // Sentinel errors for OpenNGC parsing.
 var (
-	errBadHTTPStatus = errors.New("bad status")
-	errInvalidRA     = errors.New("invalid RA format")
-	errInvalidDec    = errors.New("invalid Dec format")
+	errInvalidRA  = errors.New("invalid RA format")
+	errInvalidDec = errors.New("invalid Dec format")
 )
+
+// fetchTimeout bounds each source-CSV download; go:generate invocation is
+// itself the download consent, so no remote registry gate applies here.
+const fetchTimeout = 2 * time.Minute
 
 // Mapping from OpenNGC types to astrogo Kind
 func mapType(t string) string { // Changed return type to string to match targetRecord.Kind
@@ -87,12 +93,17 @@ type targetRecord struct {
 }
 
 func downloadAndParse(url string) (_ []targetRecord, err error) {
-	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, url, nil)
+	ctx, cancel := context.WithTimeout(context.Background(), fetchTimeout)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("openngc: new request: %w", err)
 	}
 
-	resp, err := http.DefaultClient.Do(req)
+	client := remote.NewClient(remote.WithTimeout(fetchTimeout))
+
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("openngc: HTTP do: %w", err)
 	}
@@ -102,10 +113,6 @@ func downloadAndParse(url string) (_ []targetRecord, err error) {
 			err = errors.Join(err, cerr)
 		}
 	}()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("%w: %s", errBadHTTPStatus, resp.Status)
-	}
 
 	return parseOpenNGC(resp.Body)
 }

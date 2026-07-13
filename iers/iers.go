@@ -11,28 +11,37 @@ import (
 //go:embed all:data/*
 var eopFS embed.FS
 
-var (
-	// FinalsData holds the IERS EOP reference data.
-	//nolint:gochecknoglobals // embedded IERS EOP reference data
-	FinalsData []byte
-)
+// FinalsData holds the IERS EOP reference data embedded at build time
+// (empty if `go generate ./iers/...` hasn't been run — see README "Data
+// downloads & offline usage").
+//
+//nolint:gochecknoglobals // embedded IERS EOP reference data, populated lazily by loadEmbedded
+var FinalsData []byte
 
-//nolint:gochecknoinits // init is used to load the embedded IERS EOP reference data
-func init() {
+// loadEmbedded parses the embedded finals2000A.all snapshot and, if no
+// model has been explicitly registered yet, installs it as the default.
+// Called lazily and exactly once — the first time GetModel is queried, via
+// eop.go's loadOnce — rather than from init(), so merely importing iers
+// (transitively, via coord) doesn't pay the ~3.7 MB parse cost when EOP
+// data is never actually queried, and so a program that calls
+// RegisterModel/LoadFile before its first query never has that choice
+// silently overridden.
+func loadEmbedded() {
 	d, err := eopFS.ReadFile("data/finals2000A.all")
 	if err == nil {
 		FinalsData = d
 	}
 
 	if len(FinalsData) == 0 {
-		return // in case go generate hasn't been run or file was empty
+		log.Printf("astrogo/iers: no embedded EOP data — run `go generate ./iers/...`, call iers.FetchNow/LoadFile, or accept ZeroModel's reduced accuracy; see README \"Data downloads & offline usage\"")
+		return
 	}
 
 	model, err := ParseFinals2000A(bytes.NewReader(FinalsData))
 	if err != nil {
-		log.Printf("astrogo/earth/iers: failed to parse embedded EOP data: %v", err)
+		log.Printf("astrogo/iers: failed to parse embedded EOP data: %v", err)
 		return
 	}
 
-	RegisterModel(model)
+	registerIfDefault(model)
 }

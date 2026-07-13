@@ -13,22 +13,21 @@ import (
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/coord"
+	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/time"
 )
-
-const tapSyncURL = "https://gea.esac.esa.int/tap-server/tap/sync"
 
 // Provider implements resolve.Provider and resolve.ConeSearcher
 // explicitly pointing at Gaia DR3 to extract astrometric parameters.
 type Provider struct {
-	client *resolve.Client
+	client *remote.Client
 	cache  resolve.Cache
 }
 
 // New creates a new Gaia DR3 catalog provider.
 func New() *Provider {
 	return &Provider{
-		client: resolve.NewClient(),
+		client: remote.NewClient(),
 		cache:  resolve.NewMapCache(),
 	}
 }
@@ -70,13 +69,20 @@ func (p *Provider) ConeSearch(ctx context.Context, req resolve.ConeRequest) reso
 		return seq
 	}
 
+	base, err := remote.URL(remote.GaiaTAP)
+	if err != nil {
+		return func(yield func(resolve.Target, error) bool) {
+			yield(resolve.Target{}, err)
+		}
+	}
+
 	v := url.Values{}
 	v.Set("REQUEST", "doQuery")
 	v.Set("LANG", "ADQL")
 	v.Set("FORMAT", "csv")
 	v.Set("QUERY", adql)
 
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, tapSyncURL, strings.NewReader(v.Encode()))
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, base, strings.NewReader(v.Encode()))
 	if err != nil {
 		return func(yield func(resolve.Target, error) bool) {
 			yield(resolve.Target{}, fmt.Errorf("gaia: new request: %w", err))

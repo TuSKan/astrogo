@@ -14,9 +14,8 @@ import (
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/coord"
+	"github.com/TuSKan/astrogo/remote"
 )
-
-const mastAPI = "https://mast.stsci.edu/api/v0/invoke"
 
 // ErrAPIError indicates a MAST API error response.
 var ErrAPIError = errors.New("mast: API error")
@@ -27,14 +26,14 @@ var ErrNotImplemented = errors.New("mast: not implemented")
 
 // Provider implements the resolve.Provider interface for the MAST catalog.
 type Provider struct {
-	client *resolve.Client
+	client *remote.Client
 	cache  resolve.Cache
 }
 
 // New creates a new MAST provider.
 func New() *Provider {
 	return &Provider{
-		client: resolve.NewClient(),
+		client: remote.NewClient(),
 		cache:  resolve.NewMapCache(),
 	}
 }
@@ -97,10 +96,17 @@ func (p *Provider) ResolveObject(ctx context.Context, req resolve.ObjectRequest)
 		return resolve.SliceSeq([]resolve.Target{})
 	}
 
+	base, err := remote.URL(remote.MAST)
+	if err != nil {
+		return func(yield func(resolve.Target, error) bool) {
+			yield(resolve.Target{}, err)
+		}
+	}
+
 	v := url.Values{}
 	v.Set("request", string(b))
 
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, mastAPI, strings.NewReader(v.Encode()))
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, base, strings.NewReader(v.Encode()))
 	if err != nil {
 		return func(yield func(resolve.Target, error) bool) {
 			yield(resolve.Target{}, fmt.Errorf("mast: new request: %w", err))

@@ -10,6 +10,7 @@ import (
 
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/internal/testutil"
+	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/skybrightness"
 )
 
@@ -115,7 +116,10 @@ func TestSQMNoAPIKey(t *testing.T) {
 // idiomatic composition pattern skybrightness/model_test.go demonstrates.
 // Floor must instead match skybrightness/atlas's artificial-only contract.
 func TestFloorIsArtificialOnly(t *testing.T) {
-	t.Parallel()
+	// Not t.Parallel(): mutates the process-global remote registry via
+	// remote.SetURL, which would race against the other tests below that
+	// do the same.
+	t.Cleanup(remote.Reset)
 
 	const artMcdM2 = 6.64
 
@@ -127,8 +131,11 @@ func TestFloorIsArtificialOnly(t *testing.T) {
 	}))
 	defer server.Close()
 
+	if err := remote.SetURL(remote.LightPollution, server.URL); err != nil {
+		t.Fatal(err)
+	}
+
 	c := New(WithAPIKey("test-key"), WithHTTPClient(server.Client()))
-	c.baseURL = server.URL
 
 	floor, err := c.Floor(context.Background(), -23.5505, -46.6333)
 	testutil.AssertNoError(t, err)
@@ -153,7 +160,8 @@ func TestFloorIsArtificialOnly(t *testing.T) {
 // eventually succeeds returns the correct value rather than surfacing the
 // earlier transient failure.
 func TestArtificialBrightnessRetriesOnTransientFailure(t *testing.T) {
-	t.Parallel()
+	// Not t.Parallel(): mutates the process-global remote registry.
+	t.Cleanup(remote.Reset)
 
 	const artMcdM2 = 3.14
 
@@ -173,8 +181,11 @@ func TestArtificialBrightnessRetriesOnTransientFailure(t *testing.T) {
 	}))
 	defer server.Close()
 
+	if err := remote.SetURL(remote.LightPollution, server.URL); err != nil {
+		t.Fatal(err)
+	}
+
 	c := New(WithAPIKey("test-key"), WithHTTPClient(server.Client()))
-	c.baseURL = server.URL
 
 	got, err := c.artificialBrightness(context.Background(), -23.5505, -46.6333)
 	testutil.AssertNoError(t, err)
@@ -189,7 +200,8 @@ func TestArtificialBrightnessRetriesOnTransientFailure(t *testing.T) {
 // error (e.g. 400 bad request) is NOT retried — only transient failures and
 // 429/5xx are.
 func TestArtificialBrightnessNonRetriableStatus(t *testing.T) {
-	t.Parallel()
+	// Not t.Parallel(): mutates the process-global remote registry.
+	t.Cleanup(remote.Reset)
 
 	var attempts int
 
@@ -200,8 +212,11 @@ func TestArtificialBrightnessNonRetriableStatus(t *testing.T) {
 	}))
 	defer server.Close()
 
+	if err := remote.SetURL(remote.LightPollution, server.URL); err != nil {
+		t.Fatal(err)
+	}
+
 	c := New(WithAPIKey("test-key"), WithHTTPClient(server.Client()))
-	c.baseURL = server.URL
 
 	_, err := c.artificialBrightness(context.Background(), -23.5505, -46.6333)
 	if !errors.Is(err, ErrBadResponse) {

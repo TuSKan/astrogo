@@ -14,15 +14,12 @@ import (
 	"strings"
 	stdtime "time"
 
+	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/time"
 )
 
 // DOC: https://ssd-api.jpl.nasa.gov/doc/horizons.html
-// API: https://ssd-api.jpl.nasa.gov/horizons.api
 // SELECT: https://ssd.jpl.nasa.gov/horizons/manual.html#select
-
-// JPLHorizonsAPI is the base URL for the JPL Horizons API.
-const JPLHorizonsAPI = "https://ssd.jpl.nasa.gov/api/horizons.api"
 
 // horizonsRequestTimeout bounds the whole Horizons API request (connect +
 // transfer), preventing an indefinite hang on a stalled connection.
@@ -81,6 +78,14 @@ func CacheAPI(kernel string, startTime, endTime time.Time, path string) ([]*Read
 		return []*Reader{reader}, nil
 	}
 
+	// Generating and storing a small-body SPK kernel via Horizons is a file
+	// download in effect (KB–MB delivered base64-encoded inside the JSON
+	// response), so it requires the same explicit consent as any other
+	// kernel download: remote.EnableDownloads(remote.JPLHorizons, maxSize).
+	if err := remote.CheckDownload(remote.JPLHorizons, spkFile, -1); err != nil {
+		return nil, fmt.Errorf("jpl: SPK kernel %s: %w", kernel, err)
+	}
+
 	resp, err := apiHorizonsRequest(kernel, startTime, endTime)
 	if err != nil {
 		return nil, fmt.Errorf("jpl: failed to get SPK %s: %w", spkPath, err)
@@ -137,11 +142,6 @@ func CacheAPI(kernel string, startTime, endTime time.Time, path string) ([]*Read
 }
 
 func apiHorizonsRequest(command string, startTime, endTime time.Time) (_ *HorizonsResponse, err error) {
-	api, err := url.Parse(JPLHorizonsAPI)
-	if err != nil {
-		return nil, fmt.Errorf("jpl: failed to parse API URL: %w", err)
-	}
-
 	params := url.Values{}
 	params.Set("format", "json")
 	params.Set("COMMAND", "'"+command+"'")
@@ -151,20 +151,16 @@ func apiHorizonsRequest(command string, startTime, endTime time.Time) (_ *Horizo
 	params.Set("START_TIME", "'"+startTime.Format("2006-01-02 15:04:05.000")+"'")
 	params.Set("STOP_TIME", "'"+endTime.Format("2006-01-02 15:04:05.000")+"'")
 
-	api.RawQuery = params.Encode()
-
 	ctx, cancel := context.WithTimeout(context.Background(), horizonsRequestTimeout)
 	defer cancel()
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, api.String(), nil)
+	client := remote.NewClient(remote.WithTimeout(horizonsRequestTimeout))
+
+	r, err := client.Get(ctx, remote.JPLHorizons, "", params)
 	if err != nil {
-		return nil, fmt.Errorf("HorizonsRequest: failed to create request: %w", err)
+		return nil, mapHorizonsStatus(err)
 	}
 
-	r, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("HorizonsRequest: failed to get: %w", err)
-	}
 	defer func() {
 		cerr := r.Body.Close()
 		if cerr != nil {
@@ -172,27 +168,35 @@ func apiHorizonsRequest(command string, startTime, endTime time.Time) (_ *Horizo
 		}
 	}()
 
-	switch r.StatusCode {
-	case http.StatusOK:
-		// Proceed
-	case http.StatusBadRequest:
-		return nil, ErrHorizonsBadRequest
-	case http.StatusMethodNotAllowed:
-		return nil, ErrHorizonsMethodNA
-	case http.StatusInternalServerError:
-		return nil, ErrHorizonsServerError
-	case http.StatusServiceUnavailable:
-		return nil, ErrHorizonsUnavailable
-	default:
-		return nil, fmt.Errorf("%w: %s", ErrHorizonsUnexpected, r.Status)
-	}
-
 	var resp HorizonsResponse
 	if err := json.NewDecoder(r.Body).Decode(&resp); err != nil {
 		return nil, fmt.Errorf("jpl: failed to decode response: %w", err)
 	}
 
 	return &resp, nil
+}
+
+// mapHorizonsStatus translates remote's typed HTTP errors into this
+// package's documented Horizons sentinels. Non-HTTP errors (registry gate,
+// network failures) pass through wrapped.
+func mapHorizonsStatus(err error) error {
+	var httpErr *remote.HTTPError
+	if !errors.As(err, &httpErr) {
+		return fmt.Errorf("jpl: horizons request: %w", err)
+	}
+
+	switch httpErr.StatusCode {
+	case http.StatusBadRequest:
+		return ErrHorizonsBadRequest
+	case http.StatusMethodNotAllowed:
+		return ErrHorizonsMethodNA
+	case http.StatusInternalServerError:
+		return ErrHorizonsServerError
+	case http.StatusServiceUnavailable:
+		return ErrHorizonsUnavailable
+	default:
+		return fmt.Errorf("%w: %d", ErrHorizonsUnexpected, httpErr.StatusCode)
+	}
 }
 
 // ParseHorizonsSummary parses the tabular search results returned by Horizons when multiple bodies match a query.

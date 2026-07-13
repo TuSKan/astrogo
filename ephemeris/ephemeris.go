@@ -249,6 +249,23 @@ func NewProvider(source Source, kernel string, opts ...Option) (Provider, error)
 	}
 }
 
+// Open constructs a Provider entirely from local JPL kernel files — no
+// network access, no data-directory resolution, no download consent
+// required. This is the offline/production path: pre-seed spkPaths and
+// lskPath yourself (e.g. files a prior EnableDownloads-backed NewProvider
+// run already cached under remote.DataDir(), or copied into a deployment
+// image), then Open them directly.
+//
+//	p, err := eph.Open("naif0012.tls", "de442.bsp")
+func Open(lskPath string, spkPaths ...string) (Provider, error) {
+	p, err := jpl.Open(lskPath, spkPaths...)
+	if err != nil {
+		return nil, fmt.Errorf("ephemeris: open: %w", err)
+	}
+
+	return p, nil
+}
+
 // ─── Default SOFA Provider ───────────────────────────────────────────────────
 
 // Default returns a SOFA-based ephemeris provider for the Sun and Moon.

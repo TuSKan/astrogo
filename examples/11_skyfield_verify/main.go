@@ -9,6 +9,7 @@ import (
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
+	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/time"
 )
 
@@ -76,6 +77,11 @@ func main() {
 	// Method 2: JPL DE440 Provider (numerical integration)
 	// ═══════════════════════════════════════════════════════════════════════
 	fmt.Println("┌─ Method 2: JPL DE440 Provider ──────────────────────────────────┐")
+
+	// JPL kernel downloads are opt-in — see README "Data downloads &
+	// offline usage". de440 is ~114 MB; naif0012.tls (leap seconds) ~5 KB.
+	remote.EnableDownloads(remote.NAIFSPK, 200<<20)
+	remote.EnableDownloads(remote.NAIFLSK, 0)
 
 	jplProv, err := eph.NewProvider(eph.Planets, "de440")
 	if err != nil {

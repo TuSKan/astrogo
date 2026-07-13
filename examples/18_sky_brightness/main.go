@@ -21,6 +21,7 @@ import (
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/lightpollution"
 	"github.com/TuSKan/astrogo/plan"
+	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/skybrightness"
 	"github.com/TuSKan/astrogo/time"
 )
@@ -30,6 +31,11 @@ func main() {
 	tz, _ := time.LoadLocation("America/Sao_Paulo")
 	loc, _ := coord.NewEarthLocation(-23.5505, -46.6333, 760)
 	site, _ := plan.NewSite("São Paulo", loc, 0, tz)
+
+	// JPL kernel downloads are opt-in — see README "Data downloads &
+	// offline usage". de442 is ~115 MB; naif0012.tls (leap seconds) ~5 KB.
+	remote.EnableDownloads(remote.NAIFSPK, 200<<20)
+	remote.EnableDownloads(remote.NAIFLSK, 0)
 
 	provider, err := eph.NewProvider(eph.Planets, "de442")
 	if err != nil {

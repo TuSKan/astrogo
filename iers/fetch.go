@@ -7,19 +7,15 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"net/http"
 	"os"
 	"path/filepath"
 	"sync"
 	"time"
 
-	"github.com/TuSKan/astrogo/internal/cache"
+	"github.com/TuSKan/astrogo/remote"
 )
 
 const (
-	// finalsURL is the IERS data center URL for the current finals2000A.all file.
-	finalsURL = "https://datacenter.iers.org/data/9/finals2000A.all"
-
 	// staleDays is the maximum age of the cached file before re-downloading.
 	staleDays = 7
 
@@ -40,8 +36,8 @@ var (
 
 // FetchIfStale downloads fresh IERS EOP data if the current model
 // doesn't cover the requested MJD. The downloaded file is cached under
-// the user's OS cache directory (e.g. ~/.cache/astrogo/iers/ on Linux,
-// %LocalAppData%/astrogo/iers/ on Windows).
+// remote.DataDir()/iers (default: the user's OS cache directory, e.g.
+// ~/.cache/astrogo/iers/ on Linux, %LocalAppData%/astrogo/iers/ on Windows).
 //
 // This function is safe for concurrent use: a mutex serialises
 // download attempts, and the coverage check is repeated inside the
@@ -52,6 +48,10 @@ var (
 //
 // The downloaded data is parsed and registered globally via RegisterModel,
 // replacing the previous (potentially stale) embedded data.
+//
+// Calling this function is itself the download consent (the endpoint is
+// remote.IERSFinals2000A, ~3.7 MB); it still respects remote.SetOffline
+// and remote.Disable.
 func FetchIfStale(mjd float64) error {
 	// Fast path (no lock): current model already covers this epoch.
 	if covered(mjd) {
@@ -81,7 +81,24 @@ func FetchIfStale(mjd float64) error {
 	}
 
 	lastAttempt = time.Now()
-	errLastFetch = doFetch()
+	errLastFetch = doFetch(context.Background())
+
+	return errLastFetch
+}
+
+// FetchNow downloads and registers fresh IERS EOP data immediately,
+// bypassing the coverage, staleness, and cooldown checks that FetchIfStale
+// applies (a fresh on-disk cache file is still reused). Use it at service
+// startup or from a scheduled refresh job.
+//
+// Calling this function is itself the download consent; it still respects
+// remote.SetOffline and remote.Disable(remote.IERSFinals2000A).
+func FetchNow(ctx context.Context) error {
+	fetchMu.Lock()
+	defer fetchMu.Unlock()
+
+	lastAttempt = time.Now()
+	errLastFetch = doFetch(ctx)
 
 	return errLastFetch
 }
@@ -97,20 +114,20 @@ func covered(mjd float64) bool {
 	return false
 }
 
-// CachePath returns the absolute path where downloaded EOP data is cached.
-// It uses the OS-standard user cache directory via [cache.Path].
+// CachePath returns the absolute path where downloaded EOP data is cached,
+// under remote.DataDir()/iers.
 func CachePath() string {
-	p, err := cache.Path("iers", "finals2000A.data")
+	dir, err := remote.SubsystemDir("iers")
 	if err != nil {
-		// Fallback: temp directory (cache.Path already handles UserCacheDir
+		// Fallback: temp directory (DataDir already handles UserCacheDir
 		// failures, so this is truly exceptional).
 		return filepath.Join(os.TempDir(), "astrogo", "iers", "finals2000A.data")
 	}
 
-	return p
+	return dir.Join("finals2000A.data").LocalPath()
 }
 
-func doFetch() (err error) {
+func doFetch(ctx context.Context) (err error) {
 	cachePath := CachePath()
 
 	// Check if a sufficiently fresh cache file exists.
@@ -122,29 +139,24 @@ func doFetch() (err error) {
 		}
 	}
 
-	log.Printf("astrogo/iers: downloading fresh EOP data from %s", finalsURL)
+	client := remote.NewClient(remote.WithTimeout(fetchTimeout))
 
-	client := &http.Client{Timeout: fetchTimeout}
-
-	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, finalsURL, nil)
+	resp, err := client.Get(ctx, remote.IERSFinals2000A, "", nil)
 	if err != nil {
-		return fmt.Errorf("iers: failed to create EOP request: %w", err)
-	}
+		var httpErr *remote.HTTPError
+		if errors.As(err, &httpErr) {
+			return fmt.Errorf("%w: %d", ErrEOPHTTPStatus, httpErr.StatusCode)
+		}
 
-	resp, err := client.Do(req)
-	if err != nil {
 		return fmt.Errorf("iers: failed to download EOP data: %w", err)
 	}
+
 	defer func() {
 		cerr := resp.Body.Close()
 		if cerr != nil {
 			err = errors.Join(err, cerr)
 		}
 	}()
-
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("%w: %d", ErrEOPHTTPStatus, resp.StatusCode)
-	}
 
 	data, err := io.ReadAll(resp.Body)
 	if err != nil {

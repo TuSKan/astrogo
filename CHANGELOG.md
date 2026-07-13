@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed — BREAKING
+
+- **astrogo no longer auto-downloads anything.** Constructing a JPL ephemeris provider (`jpl.NewProvider`/`eph.NewProvider`) against a kernel that isn't already present locally now fails with an actionable `remote.ErrDownloadDenied` (naming the file, its size, and how to proceed) instead of silently downloading it. Grant consent per endpoint with `remote.EnableDownloads(remote.NAIFSPK, maxSize)` (and `remote.NAIFLSK` for the tiny leap-second kernel), or pre-seed the file, or use the new offline-only `jpl.Open`/`eph.Open`. See the README's "Data downloads & offline usage" section.
+- `catalog/resolve.Client`, `.HTTPError`, `.RetryPolicy`, `.DefaultRetryPolicy`, and `.NewClient` are removed; every catalog provider now uses `remote.Client`/`remote.NewClient` directly. `resolve.HTTPError.Error()`'s message prefix changes from `catalog:` to `remote:`.
+- All hardcoded endpoint URL constants (`spk.JPLSPKKernelURI`, `lsk.JPLLSKKernelURI`, `spk.JPLHorizonsAPI`, `jpl.JPLKernelURI`, and each catalog provider's private `tapSyncURL`/`mastAPI`/`gpAPIBase`/`sbdbQueryAPI`/`ssoftURL`/`queryAPI` constants) are removed — URLs now live in the `remote` package's endpoint registry, overridable via `remote.SetURL`.
+- `internal/tools.Download` and `internal/cache` are removed, absorbed into `remote.Download`/`remote.DataDir`.
+
+### Added
+
+#### Centralized network access: the `remote` package
+- New public `github.com/TuSKan/astrogo/remote` package: a registry of every external endpoint astrogo can reach (`remote.Endpoints()`, `remote.Disable`, `remote.SetURL`, `remote.SetOffline`), an HTTP client with retry/backoff shared by every provider (`remote.Client`/`remote.NewClient`), a consent-gated file downloader (`remote.Download`, `remote.EnableDownloads`/`DisableDownloads`, `remote.SetPolicy`), and a configurable storage location for all downloaded data (`remote.SetDataDir`/`SetDataDirPath`/`DataDir`/`SubsystemDir`, built on `github.com/ungerik/go-fs` so a future blob/bucket backend can be registered without call-site changes)
+- `ephemeris/jpl`: `Provider.AddKernelFile`, `RemoveKernel`, `UnloadAll`, `LoadedKernels` (kernel lifecycle management) and the package-level `Open(lskPath, spkPaths...)` for pure local, zero-network construction
+- `ephemeris`: `Open(lskPath, spkPaths...)` passthrough to `jpl.Open`
+- `iers`: `LoadFile`, `LoadFS`, `UseEmbedded`, `FetchNow` — the full local/explicit control set for Earth-orientation data, alongside the existing `FetchIfStale`/`RegisterModel`/`GetModel`/`Coverage`
+- `catalog/openngc`: the `go:generate` source URLs are now pinned to a specific upstream OpenNGC commit SHA, so regeneration is reproducible
+
+### Documentation
+- `README.md`: new "Data downloads & offline usage" section (endpoint/size table, consent examples, offline setup); fixed the "No API keys, no downloads" claim to scope it to the SOFA quickstart
+- `CLAUDE.md`: new "Network access & `remote`" section; `remote` added to the architecture diagram and layering rules
+- 9 `examples/` programs that construct a JPL provider now call `remote.EnableDownloads` first (with a size comment); new `examples/19_offline_setup/` demonstrates `remote.SetOffline`, `jpl.Open`, and `iers.LoadFile`
+- `iers/doc.go`, `catalog/openngc/doc.go`: updated for the lazy (non-`init()`) load and the pinned OpenNGC source SHA
+
+### Fixed
+- `iers`, `catalog/openngc`: embedded data is now parsed lazily (on first `GetModel()`/`New()` call) instead of in `init()`, removing a ~3.7 MB parse-on-import cost paid by every program that merely imports `iers` (transitively, via `coord`) whether or not EOP data is ever queried — also brings both packages into compliance with this project's own "no `init()` side effects" rule (see `CONTRIBUTING.md`/`CLAUDE.md`)
+
 ## [0.3.0] — 2026-07-08
 
 ### Added

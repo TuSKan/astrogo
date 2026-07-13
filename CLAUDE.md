@@ -36,12 +36,21 @@ Tests are partitioned by build tag — the default `go test ./...` runs only fas
 
 ## Generated / embedded data
 
-Two `go:generate` directives produce embedded data files. CI runs `go generate ./...` then `git diff --exit-code`, so regenerating must be reproducible:
+Two `go:generate` directives produce embedded data files, both gitignored (never committed — see [remote](#network-access--remote) below for why). CI's "Check generated files" step runs `go generate ./...` as a smoke test of the download tooling; the subsequent `git diff --exit-code` is a no-op for these two paths since nothing about them is tracked:
 
 - [iers/iers.go](iers/iers.go) — downloads IERS `finals2000A.all` EOP data into `iers/data/`.
-- [catalog/openngc/openngc.go](catalog/openngc/openngc.go) — builds the embedded OpenNGC catalog binaries.
+- [catalog/openngc/openngc.go](catalog/openngc/openngc.go) — builds the embedded OpenNGC catalog CSV.
 
 If you run `go generate ./...` and files change, explain what regenerated them and why before treating it as intended.
+
+## Network access & `remote`
+
+Every external endpoint astrogo can reach is registered in [remote](remote/doc.go) (primitives layer — stdlib + `cenkalti/backoff/v5` + `ungerik/go-fs` only). Two rules:
+
+- **Bulk file downloads (JPL SPK/LSK kernels, IERS EOP) never happen without explicit consent.** A missing kernel makes `jpl.NewProvider`/`eph.NewProvider` fail with an actionable `remote.ErrDownloadDenied` unless the caller granted `remote.EnableDownloads(id, maxSize)` first, or pre-seeded the file. Never add an implicit/automatic download anywhere in this codebase — route it through `remote.Download`/`remote.Client` and let the existing consent gate apply.
+- **All HTTP access goes through `remote.Client`** (`remote.NewClient()`), not a raw `http.Client` or `http.DefaultClient`. It provides retry/backoff, a `User-Agent`, and typed `*remote.HTTPError`s. `catalog/resolve` no longer has its own copy — every catalog provider imports `remote` directly.
+
+See the README's "Data downloads & offline usage" section for the user-facing picture (sizes, `remote.SetOffline`, `jpl.Open`, `iers.LoadFile`).
 
 ## Architecture
 
@@ -51,14 +60,14 @@ Strictly layered, unidirectional imports (no cycles). Lower layers never import 
 plan, catalog, fits/plan                         ← orchestration (observability, scheduling, events, resolvers, FITS↔plan bridge)
 ephemeris, coord, atmosphere, fits, skybrightness ← scientific engines
 iers, lightpollution                             ← data providers (Earth orientation params, live light-pollution API)
-time, angle, vector, unit, constants              ← primitives
+time, angle, vector, unit, constants, remote      ← primitives
 ```
 
 - **`coord`** is the transform core. `coord.Context` (in [coord/context.go](coord/context.go)) caches the expensive SOFA `Apco13` matrix computation (~91 µs) once per epoch so each subsequent transform is ~325 ns. **Hot paths must create one `Context` per epoch and reuse it** — never one per transform. The scheduler shares a single `Context` per time step across constraints via the `ConstraintCtx` interface; built-in `Altitude`/`Airmass` implement it.
 - **`ephemeris`** provides Sun/Moon/planet positions (SOFA + JPL SPK). `ephemeris/jpl` is the multi-kernel SPK provider with on-demand Horizons fetching (`Provider.AddKernel`/`State`/`FindSegment`/`SupportedBodies` are guarded by an internal `sync.RWMutex` — safe to call concurrently); `ephemeris/satellite` is SGP4 (TEME→GCRS, ground track, look angles).
 - **`plan`** is the planning/event engine: `Observable` targets, `Constraint`s, the Chandrupatla/Brent `Solver` (rise/set/transit, phases, seasons, eclipses, conjunctions), and the `Strategy`-based scheduler (`Greedy`/`Priority`/`SwapOptimized`). `plan` has no dependency on `fits` or Apache Arrow — the FITS↔plan bridge (`SiteFromFITS`/`TargetFromFITS`) lives in the separate `fits/plan` package.
 - **`skybrightness`** (+ `skybrightness/atlas`) models night-sky surface brightness (moonlight, zodiacal light, airglow, light-pollution floor) as additive linear-flux components; `lightpollution` is a live client for the lightpollutionmap.info API feeding `skybrightness.Floor`. `plan.LimitingMagnitudeConstraint`/`ScoreObservableSky` wire this into observability scoring.
-- **`catalog`** + `catalog/resolve` expose unified `resolve.Provider` interfaces over SIMBAD/MAST/Gaia/VizieR/JPL/SBDB/OpenNGC/NORAD/FINK, with Apache Arrow columnar caching.
+- **`catalog`** + `catalog/resolve` expose unified `resolve.Provider` interfaces over SIMBAD/MAST/Gaia/VizieR/JPL/SBDB/OpenNGC/NORAD/FINK, with Apache Arrow columnar caching. All network access goes through `remote.Client`.
 - **`internal/gofaext`** wraps [github.com/hebl/gofa](https://github.com/hebl/gofa) (SOFA-derived algorithms). All low-level SOFA calls go through here to keep public APIs clean and the backend swappable.
 - **`internal/testutil`** holds float/error test helpers used across packages.
 

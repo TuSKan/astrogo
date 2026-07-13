@@ -2,7 +2,8 @@
 // and the Jupiter-Venus conjunction of 2 BC.
 //
 // Requires DE441 for deep historical epoch coverage (13200 BC – AD 17191).
-// The kernel (~3 GB) is auto-downloaded on first run.
+// The kernel (~3 GB) downloads on first run, but only once you grant
+// consent — see README "Data downloads & offline usage".
 package main
 
 import (
@@ -12,10 +13,16 @@ import (
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/plan"
+	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/time"
 )
 
 func main() {
+	// de441 parts are multi-GB each; unlimited here since that's the whole
+	// point of this example. naif0012.tls (leap seconds) is ~5 KB.
+	remote.EnableDownloads(remote.NAIFSPK, 0)
+	remote.EnableDownloads(remote.NAIFLSK, 0)
+
 	prov, err := eph.NewProvider(eph.Planets, "de441_part-1")
 	if err != nil {
 		panic(err)

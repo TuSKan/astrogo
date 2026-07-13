@@ -9,22 +9,36 @@ import (
 	"log"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/coord"
 )
 
-//go:generate go run ./parser/parse.go data/openngc.csv https://raw.githubusercontent.com/mattiaverga/OpenNGC/master/database_files/NGC.csv https://raw.githubusercontent.com/mattiaverga/OpenNGC/master/database_files/addendum.csv
+// The OpenNGC source URLs are pinned to a specific upstream commit so that
+// `go generate` is reproducible — regenerating from the same commit must
+// always produce the same catalog/openngc/data/openngc.csv. Bump the SHA
+// (and re-run go generate) as a deliberate, reviewed data-update step; see
+// https://github.com/mattiaverga/OpenNGC/commits/master for the latest.
+//
+//go:generate go run ./parser/parse.go data/openngc.csv https://raw.githubusercontent.com/mattiaverga/OpenNGC/36cb178a0f69dba8bfc03a99c10512831edf1c6b/database_files/NGC.csv https://raw.githubusercontent.com/mattiaverga/OpenNGC/36cb178a0f69dba8bfc03a99c10512831edf1c6b/database_files/addendum.csv
 
 //go:embed data/*
 var catalogFS embed.FS
 
-var data []byte
+//nolint:gochecknoglobals // lazily-loaded embedded catalog buffer, guarded by loadOnce
+var (
+	data     []byte
+	loadOnce sync.Once
+)
 
-func init() { //nolint:gochecknoinits // loads embedded catalog data
-	// Dynamically attempt to load the catalog buffer if the user generated it locally.
-	// Bypasses the strict compiler block when ignored in CI.
+// loadEmbedded reads the embedded openngc.csv snapshot (empty if `go
+// generate ./catalog/openngc/...` hasn't been run — see README "Data
+// downloads & offline usage"). Called lazily from New via loadOnce rather
+// than init(), so merely importing this package doesn't pay the parse cost
+// when the provider is never constructed.
+func loadEmbedded() {
 	d, err := catalogFS.ReadFile("data/openngc.csv")
 	if err == nil {
 		data = d
@@ -49,6 +63,8 @@ type Provider struct {
 
 // New creates a new OpenNGC catalog provider from embedded data.
 func New() *Provider {
+	loadOnce.Do(loadEmbedded)
+
 	targets, err := parseCSV(data)
 	if err != nil {
 		log.Printf("openngc: failed to parse embedded data: %v", err)
