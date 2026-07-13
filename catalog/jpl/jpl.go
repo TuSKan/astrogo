@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/TuSKan/astrogo/catalog/resolve"
+	"github.com/TuSKan/astrogo/remote"
 )
 
 // ErrAPIError indicates a JPL Horizons API error response.
@@ -25,18 +26,16 @@ var ErrAPIError = errors.New("jpl: API error")
 // guessed/fabricated Target.
 var ErrNotImplemented = errors.New("jpl: Horizons result parsing not implemented for this response")
 
-const horizonsAPI = "https://ssd.jpl.nasa.gov/api/horizons.api"
-
 // Provider implements resolve.Provider for major bodies via JPL Horizons.
 type Provider struct {
-	client *resolve.Client
+	client *remote.Client
 	cache  resolve.Cache
 }
 
 // New creates a new JPL Horizons catalog provider.
 func New() *Provider {
 	return &Provider{
-		client: resolve.NewClient(),
+		client: remote.NewClient(),
 		cache:  resolve.NewMapCache(),
 	}
 }
@@ -88,7 +87,14 @@ func (p *Provider) ResolveObject(ctx context.Context, req resolve.ObjectRequest)
 		return seq
 	}
 
-	api, _ := url.Parse(horizonsAPI)
+	base, err := remote.URL(remote.JPLHorizons)
+	if err != nil {
+		return func(yield func(resolve.Target, error) bool) {
+			yield(resolve.Target{}, err)
+		}
+	}
+
+	api, _ := url.Parse(base)
 	params := api.Query()
 	params.Set("format", "json")
 	params.Set("COMMAND", fmt.Sprintf("'%s'", req.Query))

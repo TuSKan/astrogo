@@ -21,6 +21,7 @@ import (
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/plan"
+	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/time"
 )
 
@@ -36,6 +37,11 @@ func main() {
 	fmt.Println("═══════════════════════════════════════════════════════════════")
 
 	// ── Setup: JPL DE442 ──────────────────────────────────────────────
+	// Kernel downloads are opt-in — see README "Data downloads & offline
+	// usage". de442 is ~115 MB; naif0012.tls (leap seconds) ~5 KB.
+	remote.EnableDownloads(remote.NAIFSPK, 200<<20)
+	remote.EnableDownloads(remote.NAIFLSK, 0)
+
 	prov, err := eph.NewProvider(eph.Planets, "de442")
 	if err != nil {
 		log.Fatalf("failed to load JPL DE442: %v", err)

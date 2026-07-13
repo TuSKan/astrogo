@@ -14,9 +14,8 @@ import (
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/coord"
+	"github.com/TuSKan/astrogo/remote"
 )
-
-const tapSyncURL = "http://tapvizier.u-strasbg.fr/TAPVizieR/tap/sync"
 
 // ErrUnexpectedSchema indicates the CSV response is missing a column the
 // parser depends on, e.g. because VizieR's TAP schema for the queried table
@@ -32,14 +31,14 @@ var ErrUnknownTable = errors.New("vizier: unknown table")
 // Provider implements resolve.Provider and resolve.ConeSearcher
 // for querying tables hosted on VizieR via TAP ADQL.
 type Provider struct {
-	client *resolve.Client
+	client *remote.Client
 	cache  resolve.Cache
 }
 
 // New creates a new VizieR catalog provider.
 func New() *Provider {
 	return &Provider{
-		client: resolve.NewClient(),
+		client: remote.NewClient(),
 		cache:  resolve.NewMapCache(),
 	}
 }
@@ -105,13 +104,20 @@ func (p *Provider) ConeSearch(ctx context.Context, req resolve.ConeRequest) reso
 		return seq
 	}
 
+	base, err := remote.URL(remote.VizieR)
+	if err != nil {
+		return func(yield func(resolve.Target, error) bool) {
+			yield(resolve.Target{}, err)
+		}
+	}
+
 	v := url.Values{}
 	v.Set("REQUEST", "doQuery")
 	v.Set("LANG", "ADQL")
 	v.Set("FORMAT", "csv")
 	v.Set("QUERY", adql)
 
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, tapSyncURL, strings.NewReader(v.Encode()))
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, base, strings.NewReader(v.Encode()))
 	if err != nil {
 		return func(yield func(resolve.Target, error) bool) {
 			yield(resolve.Target{}, fmt.Errorf("vizier: new request: %w", err))

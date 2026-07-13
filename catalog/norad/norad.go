@@ -12,11 +12,9 @@ import (
 	gotime "time"
 
 	"github.com/TuSKan/astrogo/catalog/resolve"
+	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/time"
 )
-
-// CelestTrak GP API base URL.
-var gpAPIBase = "https://celestrak.org/NORAD/elements/gp.php"
 
 // ErrNoData is returned when no GP records exist for a catalog number.
 var ErrNoData = errors.New("norad: no data for catalog number")
@@ -256,14 +254,14 @@ const (
 
 // Provider implements resolve.Provider for NORAD satellite catalog lookups.
 type Provider struct {
-	client *resolve.Client
+	client *remote.Client
 	cache  resolve.Cache
 }
 
 // New returns a Provider configured with sensible defaults.
 func New() *Provider {
 	return &Provider{
-		client: resolve.NewClient(),
+		client: remote.NewClient(),
 		cache:  resolve.NewMapCache(),
 	}
 }
@@ -312,7 +310,12 @@ func (p *Provider) Fetch(ctx context.Context, query QueryType, value string) (_ 
 	// NOTE: cache stores resolve.Target values, not GP structs.
 	// GP data is always fetched fresh from the API.
 
-	api, err := url.Parse(gpAPIBase)
+	base, err := remote.URL(remote.CelesTrak)
+	if err != nil {
+		return nil, fmt.Errorf("norad: %w", err)
+	}
+
+	api, err := url.Parse(base)
 	if err != nil {
 		return nil, fmt.Errorf("norad: %w", err)
 	}

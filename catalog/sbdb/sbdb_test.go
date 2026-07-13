@@ -10,6 +10,7 @@ import (
 
 	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/internal/testutil"
+	"github.com/TuSKan/astrogo/remote"
 )
 
 func TestSBDBResolver(t *testing.T) {
@@ -31,10 +32,11 @@ func TestSBDBResolver(t *testing.T) {
 	}))
 	defer server.Close()
 
-	originalURL := sbdbQueryAPI
+	t.Cleanup(remote.Reset)
 
-	sbdbQueryAPI = server.URL
-	defer func() { sbdbQueryAPI = originalURL }()
+	if err := remote.SetURL(remote.JPLSBDB, server.URL); err != nil {
+		t.Fatal(err)
+	}
 
 	prov := New()
 

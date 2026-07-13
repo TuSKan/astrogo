@@ -6,12 +6,17 @@
 // # Data source and freshness
 //
 // This package's go:generate directive (iers.go) downloads the IERS
-// "finals2000A.all" bulletin into iers/data/ at build time, and an init()
-// parses it into a [*Table] and registers it as the global [Model] via
-// [RegisterModel]. That table has a hard, finite coverage window — it only
-// contains rows up to whatever finals2000A.all's tail extended to on the day
-// `go generate` last ran, and the trailing weeks of even that range are
-// typically "predicted" placeholders (blank measured DUT1/XP/YP fields).
+// "finals2000A.all" bulletin into iers/data/ at build time. The first call
+// to [GetModel] (directly, or transitively via [Coverage]/[FetchIfStale])
+// lazily parses that embedded snapshot into a [*Table] and registers it as
+// the global [Model] via [RegisterModel] — not an init(), so merely
+// importing this package (e.g. transitively through coord) never pays the
+// parse cost. Calling [RegisterModel]/[LoadFile]/[LoadFS] yourself before
+// that first query pre-empts the lazy load entirely. That table has a
+// hard, finite coverage window — it only contains rows up to whatever
+// finals2000A.all's tail extended to on the day `go generate` last ran,
+// and the trailing weeks of even that range are typically "predicted"
+// placeholders (blank measured DUT1/XP/YP fields).
 //
 // Because the embedded data file is not committed to the repository (it is
 // regenerated, not stored), the actual coverage window in any given build
@@ -42,4 +47,18 @@
 // model's actual range and decide when to call [FetchIfStale] (or simply
 // regenerate the embedded data at deploy time) rather than waiting for the
 // one-time degradation warning.
+//
+// # Full control set
+//
+// Calling [FetchIfStale]/[FetchNow] is itself the download consent for the
+// remote.IERSFinals2000A endpoint (~3.7 MB); it still respects
+// remote.SetOffline and remote.Disable. For offline/air-gapped
+// deployments, skip the network path entirely:
+//
+//   - [FetchNow] — explicit fetch now, bypassing staleness/cooldown checks
+//   - [LoadFile] / [LoadFS] — parse a local (or embedded, via a
+//     downstream embed.FS) finals2000A file and register it
+//   - [UseEmbedded] — re-register this package's own build-time embedded
+//     snapshot, undoing a prior LoadFile/LoadFS/FetchNow
+//   - [Coverage] — check the currently-registered model's valid MJD range
 package iers

@@ -8,8 +8,6 @@ import (
 	"github.com/TuSKan/astrogo/catalog/resolve"
 )
 
-const tapSyncURL = "http://simbad.cds.unistra.fr/simbad/sim-tap/sync"
-
 // BuildResolveQuery constructs an ADQL query to resolve an object by name
 // from SIMBAD's TAP service. It joins the `basic` and `ident` tables.
 func BuildResolveQuery(req resolve.ObjectRequest) string {

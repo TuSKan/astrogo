@@ -11,23 +11,22 @@ import (
 	"strings"
 
 	"github.com/TuSKan/astrogo/catalog/resolve"
+	"github.com/TuSKan/astrogo/remote"
 )
-
-var sbdbQueryAPI = "https://ssd-api.jpl.nasa.gov/sbdb.api"
 
 // ErrAPIError indicates a SBDB API error response.
 var ErrAPIError = errors.New("sbdb: API error")
 
 // Provider implements resolve.Provider and resolve.ObjectResolver for SBDB.
 type Provider struct {
-	client *resolve.Client
+	client *remote.Client
 	cache  resolve.Cache
 }
 
 // New creates a new SBDB catalog provider.
 func New() *Provider {
 	return &Provider{
-		client: resolve.NewClient(),
+		client: remote.NewClient(),
 		cache:  resolve.NewMapCache(),
 	}
 }
@@ -81,7 +80,14 @@ func (p *Provider) ResolveObject(ctx context.Context, req resolve.ObjectRequest)
 		return seq
 	}
 
-	api, _ := url.Parse(sbdbQueryAPI)
+	base, err := remote.URL(remote.JPLSBDB)
+	if err != nil {
+		return func(yield func(resolve.Target, error) bool) {
+			yield(resolve.Target{}, err)
+		}
+	}
+
+	api, _ := url.Parse(base)
 	params := api.Query()
 
 	// Switch to using Lookup API explicitly targeted via sstr

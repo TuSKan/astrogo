@@ -1,13 +1,13 @@
 package spk
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/binary"
 	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"math"
 	"os"
 	"path/filepath"
@@ -15,12 +15,11 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/TuSKan/astrogo/internal/tools"
+	gofs "github.com/ungerik/go-fs"
+
+	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/vector"
 )
-
-// JPLSPKKernelURI is the base URL for JPL SPK binary kernel downloads.
-const JPLSPKKernelURI = "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/"
 
 // RecordSize is the standard DAF record size in bytes.
 const RecordSize = 1024
@@ -60,7 +59,12 @@ type Reader struct {
 	FileRec FileRecord
 }
 
-// CacheDownload downloads an SPK file if it doesn't exist and opens it.
+// CacheDownload opens the SPK file at path/kernel, downloading it first
+// when it is absent. Downloads are gated by remote's consent configuration
+// — planetary kernels are large (de440s ≈ 32 MB, de440/de442 ≈ 115 MB,
+// de441 parts multi-GB), and astrogo never downloads them without an
+// explicit remote.EnableDownloads(remote.NAIFSPK, maxSize) call or a
+// pre-seeded file.
 //
 // It provides an auto-healing mechanism for CI environments by automatically
 // removing corrupt or truncated files. Integrity is checked three ways: a
@@ -82,12 +86,9 @@ func CacheDownload(kernel, path string) (*Reader, error) {
 	}
 
 	if _, err := os.Stat(spkPath); os.IsNotExist(err) {
-		spkURI := JPLSPKKernelURI + kernel
-		log.Printf("jpl: downloading %s...", spkURI)
-
-		err := tools.Download(spkURI, spkPath)
+		err := remote.Download(context.Background(), remote.NAIFSPK, kernel, gofs.File(spkPath))
 		if err != nil {
-			return nil, fmt.Errorf("jpl: failed to download SPK: %w", err)
+			return nil, fmt.Errorf("jpl: SPK kernel %s: %w", kernel, err)
 		}
 	}
 

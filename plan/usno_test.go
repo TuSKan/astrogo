@@ -10,6 +10,7 @@
 package plan_test
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -124,22 +125,75 @@ var testLocations = []testLocation{
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
+// usnoRequestTimeout bounds how long a single USNO request may run,
+// enforced independently of http.Client.Timeout (see usnoGet).
+const usnoRequestTimeout = 30 * time.Second
+
+// usnoResult carries a completed request's outcome across the goroutine
+// boundary in usnoGet.
+type usnoResult struct {
+	body       []byte
+	err        error
+	statusCode int
+}
+
+// usnoGet fetches url and returns its body, skipping the calling test on
+// any network/HTTP failure.
+//
+// The request runs in its own goroutine, raced against a context deadline
+// via select — not just http.Client.Timeout — because a stalled TCP
+// connect on a CI runner has been observed to outlast the client's own
+// Timeout (a stuck net.Dial doesn't always unblock promptly on context
+// cancellation in every environment), which previously hung this test
+// until the whole `go test` binary's global timeout fired 10 minutes
+// later and failed the entire package. If the goroutine never completes,
+// this function still returns (via t.Skipf) after usnoRequestTimeout; the
+// orphaned goroutine is harmless — it dies with the process when the test
+// binary exits.
 func usnoGet(t *testing.T, url string) []byte {
 	t.Helper()
-	client := &http.Client{Timeout: 30 * time.Second}
-	resp, err := client.Get(url)
-	if err != nil {
-		t.Skipf("USNO API unreachable, skipping: %v", err)
+
+	ctx, cancel := context.WithTimeout(context.Background(), usnoRequestTimeout)
+	defer cancel()
+
+	resultCh := make(chan usnoResult, 1)
+
+	go func() {
+		client := &http.Client{Timeout: usnoRequestTimeout}
+
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+		if err != nil {
+			resultCh <- usnoResult{err: err}
+			return
+		}
+
+		resp, err := client.Do(req)
+		if err != nil {
+			resultCh <- usnoResult{err: err}
+			return
+		}
+		defer resp.Body.Close() //nolint:errcheck // read-only response body, close error not actionable here
+
+		body, err := io.ReadAll(resp.Body)
+
+		resultCh <- usnoResult{body: body, err: err, statusCode: resp.StatusCode}
+	}()
+
+	select {
+	case res := <-resultCh:
+		if res.err != nil {
+			t.Skipf("USNO API unreachable, skipping: %v", res.err)
+		}
+
+		if res.statusCode != http.StatusOK {
+			t.Skipf("USNO API returned status %d for %s", res.statusCode, url)
+		}
+
+		return res.body
+	case <-ctx.Done():
+		t.Skipf("USNO API request exceeded %s, skipping: %s", usnoRequestTimeout, url)
+		return nil
 	}
-	defer resp.Body.Close()
-	if resp.StatusCode != 200 {
-		t.Skipf("USNO API returned status %d for %s", resp.StatusCode, url)
-	}
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		t.Fatalf("Failed to read USNO response: %v", err)
-	}
-	return body
 }
 
 // parseUSNOTime parses "HH:MM" into hours and minutes.
