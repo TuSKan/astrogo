@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] — 2026-07-13
+
 ### Changed — BREAKING
 
 - **astrogo no longer auto-downloads anything.** Constructing a JPL ephemeris provider (`jpl.NewProvider`/`eph.NewProvider`) against a kernel that isn't already present locally now fails with an actionable `remote.ErrDownloadDenied` (naming the file, its size, and how to proceed) instead of silently downloading it. Grant consent per endpoint with `remote.EnableDownloads(remote.NAIFSPK, maxSize)` (and `remote.NAIFLSK` for the tiny leap-second kernel), or pre-seed the file, or use the new offline-only `jpl.Open`/`eph.Open`. See the README's "Data downloads & offline usage" section.
@@ -31,6 +33,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - `iers`, `catalog/openngc`: embedded data is now parsed lazily (on first `GetModel()`/`New()` call) instead of in `init()`, removing a ~3.7 MB parse-on-import cost paid by every program that merely imports `iers` (transitively, via `coord`) whether or not EOP data is ever queried — also brings both packages into compliance with this project's own "no `init()` side effects" rule (see `CONTRIBUTING.md`/`CLAUDE.md`)
+- `remote`: fixed a data race in `TestClientContextCancelNotRetried` (plain `int` counter written by the test's HTTP handler goroutine, read by the main test goroutine after a context-deadline return with no synchronization between them)
+- `plan` (integration tests): `usnoGet` now bounds each USNO API request with an explicit `context.WithTimeout` raced via `select`, independent of `http.Client.Timeout` — a stalled TCP connect on a CI runner was observed to outlast the client's own 30s timeout, hanging the whole test binary until its 10-minute global alarm fired
 
 ## [0.3.0] — 2026-07-08
 
@@ -486,7 +490,8 @@ First observatory-grade release. Validated against USNO, JPL Horizons, and NASA 
 - `VisibleIntervals` creates independent Contexts per grid step (correct; each step is a different epoch)
 - IERS EOP data fetched via `go:generate`, not at runtime
 
-[Unreleased]: https://github.com/TuSKan/astrogo/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/TuSKan/astrogo/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/TuSKan/astrogo/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/TuSKan/astrogo/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/TuSKan/astrogo/compare/v0.1.5...v0.2.0
 [0.1.5]: https://github.com/TuSKan/astrogo/releases/tag/v0.1.5
