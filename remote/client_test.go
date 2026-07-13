@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -153,10 +154,10 @@ func TestClientUserAgent(t *testing.T) {
 func TestClientContextCancelNotRetried(t *testing.T) {
 	t.Cleanup(Reset)
 
-	var calls int
+	var calls atomic.Int32
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		calls++
+		calls.Add(1)
 
 		time.Sleep(200 * time.Millisecond)
 
@@ -177,8 +178,14 @@ func TestClientContextCancelNotRetried(t *testing.T) {
 		t.Fatal("expected context deadline error")
 	}
 
-	if calls > 1 {
-		t.Errorf("context cancellation must not retry; got %d attempts", calls)
+	// The handler goroutine may still be mid-sleep when Do returns (the
+	// context deadline fires client-side; it doesn't cancel the handler),
+	// so give it a moment to finish before reading the final count —
+	// otherwise this check itself races with the handler's write.
+	time.Sleep(250 * time.Millisecond)
+
+	if n := calls.Load(); n > 1 {
+		t.Errorf("context cancellation must not retry; got %d attempts", n)
 	}
 }
 
