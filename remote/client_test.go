@@ -293,6 +293,29 @@ func TestNewClientForExplicitOptionWins(t *testing.T) {
 	}
 }
 
+func TestClientOptions(t *testing.T) {
+	t.Cleanup(Reset)
+
+	customHTTP := &http.Client{Timeout: 42 * time.Second}
+
+	c := newTestClient(t, SIMBAD,
+		WithHTTPClient(customHTTP),
+		WithMaxRetries(7),
+		WithUserAgent("astrogo-test/1.0"))
+
+	if c.HTTPClient != customHTTP {
+		t.Error("WithHTTPClient did not replace the underlying *http.Client")
+	}
+
+	if c.MaxRetries != 7 {
+		t.Errorf("MaxRetries = %d, want 7", c.MaxRetries)
+	}
+
+	if c.UserAgent != "astrogo-test/1.0" {
+		t.Errorf("UserAgent = %q, want %q", c.UserAgent, "astrogo-test/1.0")
+	}
+}
+
 func TestClientGetReturnsBodyReader(t *testing.T) {
 	t.Cleanup(Reset)
 
