@@ -5,22 +5,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"log"
-	"os"
-	"path/filepath"
 	"sync"
 	"time"
 
+	gofs "github.com/ungerik/go-fs"
+
 	"github.com/TuSKan/astrogo/remote"
-)
-
-const (
-	// staleDays is the maximum age of the cached file before re-downloading.
-	staleDays = 7
-
-	// fetchTimeout is the HTTP timeout for downloading the file.
-	fetchTimeout = 30 * time.Second
 )
 
 // ErrEOPHTTPStatus indicates an unexpected HTTP status from the IERS EOP download.
@@ -70,8 +61,10 @@ func FetchIfStale(mjd float64) error {
 	// Seed the cooldown timer from the on-disk cache if we haven't
 	// attempted a fetch yet in this process.
 	if lastAttempt.IsZero() {
-		if info, err := os.Stat(CachePath()); err == nil {
-			lastAttempt = info.ModTime()
+		if cacheFile, err := CacheFile(); err == nil {
+			if info := cacheFile.Info(); info.Exists {
+				lastAttempt = info.Modified
+			}
 		}
 	}
 
@@ -114,92 +107,51 @@ func covered(mjd float64) bool {
 	return false
 }
 
-// CachePath returns the absolute path where downloaded EOP data is cached,
+// CacheFile returns the go-fs File where downloaded EOP data is cached,
 // under remote.DataDir()/iers.
-func CachePath() string {
-	dir, err := remote.SubsystemDir("iers")
+func CacheFile() (gofs.File, error) {
+	dir, err := remote.CacheDir(remote.IERSFinals2000A)
 	if err != nil {
-		// Fallback: temp directory (DataDir already handles UserCacheDir
-		// failures, so this is truly exceptional).
-		return filepath.Join(os.TempDir(), "astrogo", "iers", "finals2000A.data")
+		return "", fmt.Errorf("iers: %w", err)
 	}
 
-	return dir.Join("finals2000A.data").LocalPath()
+	return dir.Join("finals2000A.data"), nil
 }
 
-func doFetch(ctx context.Context) (err error) {
-	cachePath := CachePath()
-
-	// Check if a sufficiently fresh cache file exists.
-	if info, err := os.Stat(cachePath); err == nil {
-		age := time.Since(info.ModTime())
-		if age < staleDays*24*time.Hour {
-			// Cache is fresh — load from disk instead of downloading.
-			return loadFromDisk(cachePath)
-		}
-	}
-
-	client := remote.NewClient(remote.WithTimeout(fetchTimeout))
-
-	resp, err := client.Get(ctx, remote.IERSFinals2000A, "", nil)
+func doFetch(ctx context.Context) error {
+	// remote.GetFile reuses the cache untouched when a HEAD probe shows the
+	// IERS bulletin hasn't changed since we last downloaded it — a content
+	// check rather than a wall-clock expiration window, since finals2000A
+	// is updated on IERS's own schedule, not ours. WithValidate parses a
+	// fresh download before it's cached, so a corrupt response never gets
+	// trusted as the new cache.
+	f, err := remote.GetFile(ctx, remote.IERSFinals2000A, "", remote.WithCacheName("finals2000A.data"), remote.WithValidate(func(b []byte) error {
+		_, err := ParseFinals2000A(bytes.NewReader(b))
+		return err
+	}))
 	if err != nil {
 		var httpErr *remote.HTTPError
 		if errors.As(err, &httpErr) {
 			return fmt.Errorf("%w: %d", ErrEOPHTTPStatus, httpErr.StatusCode)
 		}
 
-		return fmt.Errorf("iers: failed to download EOP data: %w", err)
+		return fmt.Errorf("iers: fetch EOP data: %w", err)
 	}
 
-	defer func() {
-		cerr := resp.Body.Close()
-		if cerr != nil {
-			err = errors.Join(err, cerr)
-		}
-	}()
-
-	data, err := io.ReadAll(resp.Body)
+	data, err := f.ReadAll()
 	if err != nil {
-		return fmt.Errorf("iers: failed to read EOP response: %w", err)
-	}
-
-	// Parse before writing to disk, so we don't cache corrupt data.
-	table, err := ParseFinals2000A(bytes.NewReader(data))
-	if err != nil {
-		return fmt.Errorf("iers: failed to parse downloaded EOP data: %w", err)
-	}
-
-	// Ensure directory exists and write cache.
-	if err := os.MkdirAll(filepath.Dir(cachePath), 0o755); err != nil {
-		log.Printf("astrogo/iers: warning: could not create cache dir: %v", err)
-		// Still register the parsed data even if caching fails.
-	} else if err := os.WriteFile(cachePath, data, 0o644); err != nil {
-		log.Printf("astrogo/iers: warning: could not write cache file: %v", err)
-	}
-
-	RegisterModel(table)
-	lo, hi := table.Coverage()
-	log.Printf("astrogo/iers: loaded fresh EOP data: MJD %.0f–%.0f (%d records)",
-		lo, hi, len(table.records))
-
-	return nil
-}
-
-func loadFromDisk(path string) error {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return fmt.Errorf("iers: failed to read cached EOP file: %w", err)
+		return fmt.Errorf("iers: read EOP data: %w", err)
 	}
 
 	table, err := ParseFinals2000A(bytes.NewReader(data))
 	if err != nil {
-		return fmt.Errorf("iers: failed to parse cached EOP data: %w", err)
+		return fmt.Errorf("iers: parse EOP data: %w", err)
 	}
 
 	RegisterModel(table)
 	lo, hi := table.Coverage()
-	log.Printf("astrogo/iers: loaded cached EOP data: MJD %.0f–%.0f (%d records)",
-		lo, hi, len(table.records))
+
+	log.Printf("astrogo/iers: loaded EOP data: MJD %.0f–%.0f (%d records)", lo, hi, len(table.records))
 
 	return nil
 }

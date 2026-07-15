@@ -65,9 +65,9 @@ func DataDir() gofs.File {
 	return gofs.File(filepath.Join(base, appName))
 }
 
-// SubsystemDir returns DataDir()/<subsystem> (e.g. "jpl", "iers"), creating
+// subsystemDir returns DataDir()/<subsystem> (e.g. "jpl", "iers"), creating
 // it if it does not yet exist.
-func SubsystemDir(subsystem string) (gofs.File, error) {
+func subsystemDir(subsystem string) (gofs.File, error) {
 	dir := DataDir().Join(subsystem)
 
 	if err := dir.MakeAllDirs(); err != nil {
@@ -75,4 +75,20 @@ func SubsystemDir(subsystem string) (gofs.File, error) {
 	}
 
 	return dir, nil
+}
+
+// CacheDir returns the on-disk cache directory for a KindFile endpoint,
+// creating it if needed. Returns ErrUnknownEndpoint for an unregistered id
+// or an error if id is a KindAPI endpoint (which has no cache directory).
+func CacheDir(id EndpointID) (gofs.File, error) {
+	ep, ok := Lookup(id)
+	if !ok {
+		return "", fmt.Errorf("%w: %q", ErrUnknownEndpoint, id)
+	}
+
+	if ep.Kind != KindFile {
+		return "", fmt.Errorf("%w: %q has no cache directory", ErrNotFileEndpoint, id)
+	}
+
+	return subsystemDir(ep.Subsystem)
 }

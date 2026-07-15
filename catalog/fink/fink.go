@@ -1,19 +1,16 @@
 package fink
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"math"
-	"net/http"
 	"os"
 	"strconv"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/remote"
@@ -86,8 +83,13 @@ func New() *Provider {
 
 // NewWithVersion returns a Provider targeting a specific SSOFT release (e.g. "2025.04").
 func NewWithVersion(version string) *Provider {
+	client, err := remote.NewClientFor(remote.FINK)
+	if err != nil {
+		panic(err) // unregistered endpoint would be a programmer error
+	}
+
 	return &Provider{
-		client:  remote.NewClient(remote.WithTimeout(120 * time.Second)),
+		client:  client,
 		version: version,
 	}
 }
@@ -187,24 +189,7 @@ func (p *Provider) querySingle(ctx context.Context, number int64, name string) (
 		return nil, ErrNoIdentifier
 	}
 
-	raw, err := json.Marshal(payload)
-	if err != nil {
-		return nil, fmt.Errorf("fink: marshal request: %w", err)
-	}
-
-	base, err := remote.URL(remote.FINK)
-	if err != nil {
-		return nil, fmt.Errorf("fink: %w", err)
-	}
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, base, bytes.NewReader(raw))
-	if err != nil {
-		return nil, fmt.Errorf("fink: ssoft request: %w", err)
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := p.client.Do(req)
+	body, err := p.client.PostJSON(ctx, remote.FINK, "", payload)
 	if err != nil {
 		var httpErr *remote.HTTPError
 		if errors.As(err, &httpErr) {
@@ -214,13 +199,13 @@ func (p *Provider) querySingle(ctx context.Context, number int64, name string) (
 		return nil, fmt.Errorf("fink: ssoft request: %w", err)
 	}
 	defer func() {
-		cerr := resp.Body.Close()
+		cerr := body.Close()
 		if cerr != nil {
 			err = errors.Join(err, cerr)
 		}
 	}()
 
-	data, err := io.ReadAll(resp.Body)
+	data, err := io.ReadAll(body)
 	if err != nil {
 		return nil, fmt.Errorf("fink: reading response: %w", err)
 	}
@@ -452,28 +437,13 @@ func (p *Provider) ensureLoaded() error {
 
 // downloadSSOFT fetches the full SSOFT parquet table from the FINK API.
 func (p *Provider) downloadSSOFT() (_ []ssoRecord, err error) {
-	payload, err := json.Marshal(map[string]any{
+	payload := map[string]any{
 		"output-format": "parquet",
 		"version":       p.version,
 		"flavor":        "SHG1G2",
-	})
-	if err != nil {
-		return nil, fmt.Errorf("fink: marshal SSOFT request: %w", err)
 	}
 
-	base, err := remote.URL(remote.FINK)
-	if err != nil {
-		return nil, fmt.Errorf("fink: %w", err)
-	}
-
-	req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, base, bytes.NewReader(payload))
-	if err != nil {
-		return nil, fmt.Errorf("SSOFT request: %w", err)
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := p.client.Do(req)
+	body, err := p.client.PostJSON(context.Background(), remote.FINK, "", payload)
 	if err != nil {
 		var httpErr *remote.HTTPError
 		if errors.As(err, &httpErr) {
@@ -483,13 +453,13 @@ func (p *Provider) downloadSSOFT() (_ []ssoRecord, err error) {
 		return nil, fmt.Errorf("SSOFT request: %w", err)
 	}
 	defer func() {
-		cerr := resp.Body.Close()
+		cerr := body.Close()
 		if cerr != nil {
 			err = errors.Join(err, cerr)
 		}
 	}()
 
-	data, err := io.ReadAll(resp.Body)
+	data, err := io.ReadAll(body)
 	if err != nil {
 		return nil, fmt.Errorf("reading SSOFT response: %w", err)
 	}

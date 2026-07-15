@@ -15,7 +15,7 @@ import (
 	"log"
 
 	"github.com/TuSKan/astrogo/coord"
-	"github.com/TuSKan/astrogo/ephemeris"
+	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/plan"
 	"github.com/TuSKan/astrogo/time"
 )
@@ -30,12 +30,12 @@ func main() {
 	loc, _ := coord.NewEarthLocation(-23.5505, -46.6333, 760)
 	site, _ := plan.NewSite("São Paulo", loc, 0, nil)
 
-	eph := ephemeris.Default()
+	prov := eph.Default()
 
 	// ── Find the next New Moon ──────────────────────────────────────────
 	now := time.NowUTC()
 
-	newMoon, err := plan.NextNewMoon(now, eph)
+	newMoon, err := plan.NextNewMoon(now, prov)
 	if err != nil {
 		log.Fatalf("NextNewMoon: %v", err)
 	}
@@ -48,7 +48,7 @@ func main() {
 	evening := newMoon.Time
 	nextDay := evening.AddDays(1)
 
-	_, sunset, err := plan.SunriseSunset(evening, nextDay, site, eph)
+	_, sunset, err := plan.SunriseSunset(evening, nextDay, site, prov)
 	if err != nil {
 		log.Fatalf("SunriseSunset: %v", err)
 	}
@@ -62,7 +62,7 @@ func main() {
 	obsTime := sunset.Time.Add(20 * time.Minute)
 	fmt.Printf("  Observation time:   %s (sunset + 20 min)\n\n", obsTime)
 
-	params, err := plan.NewCrescentParams(obsTime, loc, eph)
+	params, err := plan.NewCrescentParams(obsTime, loc, prov)
 	if err != nil {
 		log.Fatalf("NewCrescentParams: %v", err)
 	}

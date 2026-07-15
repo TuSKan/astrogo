@@ -12,6 +12,7 @@
 package plan_test
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"math"
@@ -263,7 +264,7 @@ func fetchNASAPage(t *testing.T, url string) string {
 // ── Test: Lunar Eclipses vs NASA ─────────────────────────────────────────────
 
 func TestNASA_LunarEclipses_Historical(t *testing.T) {
-	prov, err := eph.NewProvider(eph.Planets, "de441_part-1", eph.WithKernel("de441_part-2"))
+	prov, err := eph.NewProvider(context.Background(), eph.Planets, "de441_part-1", eph.WithKernel("de441_part-2"))
 	if err != nil {
 		t.Fatalf("Failed to create DE441 provider: %v", err)
 	}
@@ -377,7 +378,7 @@ func TestNASA_LunarEclipses_Historical(t *testing.T) {
 // ── Test: Solar Eclipses vs NASA ─────────────────────────────────────────────
 
 func TestNASA_SolarEclipses_Historical(t *testing.T) {
-	prov, err := eph.NewProvider(eph.Planets, "de441_part-1", eph.WithKernel("de441_part-2"))
+	prov, err := eph.NewProvider(context.Background(), eph.Planets, "de441_part-1", eph.WithKernel("de441_part-2"))
 	if err != nil {
 		t.Fatalf("Failed to create DE441 provider: %v", err)
 	}

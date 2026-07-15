@@ -2,6 +2,7 @@ package remote
 
 import (
 	"fmt"
+	"slices"
 	"sort"
 	"sync"
 )
@@ -25,12 +26,22 @@ func Endpoints() []Endpoint {
 
 	out := make([]Endpoint, 0, len(endpoints))
 	for _, ep := range endpoints {
-		out = append(out, ep)
+		out = append(out, cloneEndpoint(ep))
 	}
 
 	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
 
 	return out
+}
+
+// cloneEndpoint copies ep's Files slice so a caller mutating a returned
+// Endpoint (or its Files) can never corrupt the registry's own copy —
+// every other Endpoint field is a value type and already snapshot-safe
+// via Go's plain struct copy.
+func cloneEndpoint(ep Endpoint) Endpoint {
+	ep.Files = slices.Clone(ep.Files)
+
+	return ep
 }
 
 // Lookup returns the endpoint registered under id.
@@ -40,7 +51,7 @@ func Lookup(id EndpointID) (Endpoint, bool) {
 
 	ep, ok := endpoints[id]
 
-	return ep, ok
+	return cloneEndpoint(ep), ok
 }
 
 // Enable re-enables access to the given endpoints (the default state).

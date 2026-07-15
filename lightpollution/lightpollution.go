@@ -12,7 +12,6 @@ import (
 	"slices"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/skybrightness"
@@ -71,10 +70,15 @@ func WithHTTPClient(h *http.Client) Option { return func(c *Client) { c.client.H
 // responses — the daily request quota, see doc.go, is a usage-pattern
 // limit, not a burst rate, so there is nothing to throttle beyond that).
 func New(opts ...Option) *Client {
+	client, err := remote.NewClientFor(remote.LightPollution)
+	if err != nil {
+		panic(err) // unregistered endpoint would be a programmer error
+	}
+
 	c := &Client{
 		apiKey: os.Getenv(apiKeyEnv),
 		layer:  defaultLayer,
-		client: remote.NewClient(remote.WithTimeout(30 * time.Second)),
+		client: client,
 	}
 
 	for _, opt := range opts {
@@ -123,29 +127,13 @@ func (c *Client) artificialBrightness(ctx context.Context, latDeg, lonDeg float6
 		return 0, ErrNoAPIKey
 	}
 
-	base, err := remote.URL(remote.LightPollution)
-	if err != nil {
-		return 0, fmt.Errorf("lightpollution: %w", err)
-	}
-
-	u, err := url.Parse(base)
-	if err != nil {
-		return 0, fmt.Errorf("lightpollution: parse url: %w", err)
-	}
-
-	q := u.Query()
+	q := url.Values{}
 	q.Set("ql", c.layer)
 	q.Set("qt", "point")
 	q.Set("qd", fmt.Sprintf("%.6f,%.6f", lonDeg, latDeg)) // API order is lon,lat
 	q.Set("key", c.apiKey)
-	u.RawQuery = q.Encode()
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
-	if err != nil {
-		return 0, fmt.Errorf("lightpollution: request: %w", err)
-	}
-
-	resp, err := c.client.Do(req)
+	resp, err := c.client.Get(ctx, remote.LightPollution, "", q)
 	if err != nil {
 		var httpErr *remote.HTTPError
 		if errors.As(err, &httpErr) {
@@ -154,9 +142,9 @@ func (c *Client) artificialBrightness(ctx context.Context, latDeg, lonDeg float6
 
 		return 0, fmt.Errorf("lightpollution: http: %w", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func() { _ = resp.Close() }()
 
-	body, err := io.ReadAll(io.LimitReader(resp.Body, 1<<16))
+	body, err := io.ReadAll(io.LimitReader(resp, 1<<16))
 	if err != nil {
 		return 0, fmt.Errorf("lightpollution: read body: %w", err)
 	}

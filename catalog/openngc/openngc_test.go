@@ -6,11 +6,33 @@ import (
 	"github.com/TuSKan/astrogo/catalog/resolve"
 )
 
-func TestProvider(t *testing.T) {
-	p := New()
-	if len(p.targets) == 0 {
-		t.Skip("skipping OpenNGC standard tests: openngc.csv dataset is not present")
+// newTestProvider builds a Provider directly from a fixed set of targets,
+// exercising Resolve/Search logic without any network access — New()'s
+// fetch pipeline is covered separately in fetch_test.go.
+func newTestProvider() *Provider {
+	targets := []resolve.Target{
+		{ID: "NGC1976", Name: "Orion Nebula", Kind: resolve.KindNebula, Catalog: "openngc", Aliases: []string{"M42", "M 42", "Messier 42"}},
+		{ID: "NGC224", Name: "Andromeda Galaxy", Kind: resolve.KindGalaxy, Catalog: "openngc", Aliases: []string{"M31", "M 31", "Messier 31"}},
 	}
+
+	p := &Provider{targets: targets, byKey: make(map[string]int)}
+
+	for i, t := range targets {
+		p.byKey[resolve.Normalize(t.ID)] = i
+		if t.Name != "" {
+			p.byKey[resolve.Normalize(t.Name)] = i
+		}
+
+		for _, a := range t.Aliases {
+			p.byKey[resolve.Normalize(a)] = i
+		}
+	}
+
+	return p
+}
+
+func TestProvider(t *testing.T) {
+	p := newTestProvider()
 
 	tests := []struct {
 		query  string
@@ -41,21 +63,17 @@ func TestProvider(t *testing.T) {
 }
 
 func TestSearch(t *testing.T) {
-	p := New()
-	if len(p.targets) == 0 {
-		t.Skip("skipping OpenNGC standard search tests: openngc.csv dataset is not present")
-	}
+	p := newTestProvider()
 
 	results := p.Search("orion")
 	if len(results) == 0 {
-		t.Errorf("Search(%q) returned no results", "orion")
+		t.Fatalf("Search(%q) returned no results", "orion")
 	}
 
 	found := false
 
 	for _, r := range results {
-		norm := resolve.Normalize(r.Name)
-		if norm == "orionnebula" || norm == "greatorionnebula" || norm == "ngc1976" {
+		if resolve.Normalize(r.Name) == "orionnebula" {
 			found = true
 			break
 		}
@@ -67,10 +85,7 @@ func TestSearch(t *testing.T) {
 }
 
 func BenchmarkSearch(b *testing.B) {
-	p := New()
-	if len(p.targets) == 0 {
-		b.Skip("skipping OpenNGC standard benchmark: openngc.csv dataset is not present")
-	}
+	p := newTestProvider()
 
 	for range b.N {
 		p.Search("nebula")

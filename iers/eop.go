@@ -50,7 +50,7 @@ func RegisterModel(m Model) {
 
 // registerIfDefault installs m only if no model has been explicitly
 // registered yet (globalModel is still the zero-value default). Used by
-// loadEmbedded so an explicit RegisterModel/LoadFile call always wins over
+// loadEmbedded so an explicit RegisterModel/LoadFS call always wins over
 // the lazily-loaded embedded snapshot, regardless of call order.
 func registerIfDefault(m Model) {
 	modelMu.Lock()

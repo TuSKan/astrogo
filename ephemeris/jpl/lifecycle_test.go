@@ -1,6 +1,7 @@
 package jpl_test
 
 import (
+	"context"
 	"errors"
 	"path/filepath"
 	"strings"
@@ -18,10 +19,19 @@ import (
 // must fail with an actionable ErrDownloadDenied, not a silent download.
 func TestNewProvider_ColdCacheDownloadsDisabled(t *testing.T) {
 	remote.DisableDownloads(remote.NAIFSPK)
+	// A fresh, empty data dir: NAIFSPK downloads are always resolved
+	// through remote's own cache directory (see remote.CacheDir), not
+	// jpl.WithDataDir, so isolating this test's "cold cache" scenario from
+	// the shared cache other tests in this package populate requires
+	// remote.SetDataDirPath rather than the jpl.Option.
+	remote.SetDataDirPath(t.TempDir())
 
-	t.Cleanup(func() { remote.EnableDownloads(remote.NAIFSPK, 0) })
+	t.Cleanup(func() {
+		remote.EnableDownloads(remote.NAIFSPK, 0)
+		remote.SetDataDir("")
+	})
 
-	_, err := jpl.NewProvider(core.Planets, "de440s", jpl.WithDataDir(t.TempDir()))
+	_, err := jpl.NewProvider(context.Background(), core.Planets, "de440s")
 	if !errors.Is(err, remote.ErrDownloadDenied) {
 		t.Fatalf("expected ErrDownloadDenied, got %v", err)
 	}
@@ -41,7 +51,7 @@ func TestNewProvider_ColdCacheDownloadsDisabled(t *testing.T) {
 // in this file) and then reopened purely from disk with zero network
 // involvement, proving the offline path works independently of NewProvider.
 func TestKernelLifecycle(t *testing.T) {
-	seed, err := jpl.NewProvider(core.Planets, "de440s")
+	seed, err := jpl.NewProvider(context.Background(), core.Planets, "de440s")
 	if err != nil {
 		t.Fatalf("seed provider: %v", err)
 	}

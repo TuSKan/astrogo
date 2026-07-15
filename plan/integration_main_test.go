@@ -10,7 +10,7 @@ import (
 )
 
 // TestMain grants download consent for this package's integration-tagged
-// suite, which constructs real eph.NewProvider(eph.Planets, ...) instances
+// suite, which constructs real eph.NewProvider(ctx, eph.Planets, ...) instances
 // against large JPL kernels (de442 ~115 MB, de441 parts multi-GB each) —
 // a network/cache dependency that predates remote's consent-gating (see
 // ephemeris/jpl's own TestMain for the same rationale). Since these tests

@@ -37,7 +37,7 @@ func main() {
 	remote.EnableDownloads(remote.NAIFSPK, 200<<20)
 	remote.EnableDownloads(remote.NAIFLSK, 0)
 
-	provider, err := eph.NewProvider(eph.Planets, "de442")
+	provider, err := eph.NewProvider(context.Background(), eph.Planets, "de442")
 	if err != nil {
 		panic(err)
 	}

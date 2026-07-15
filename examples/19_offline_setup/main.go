@@ -6,22 +6,24 @@
 //
 //  1. remote.SetOffline(true) — a global kill switch: every network call,
 //     API or download, fails immediately with remote.ErrOffline.
-//  2. jpl.Open — construct a JPL ephemeris provider purely from local
-//     kernel files, with zero network access at all (no registry gate to
-//     even trip).
-//  3. iers.LoadFile — load Earth-orientation data from a local file
-//     instead of the network or the build-time embedded snapshot.
+//  2. eph.NewProvider against a pre-seeded remote.DataDir() — remote is the
+//     only thing that ever resolves or opens these files, so a kernel
+//     placed at its expected path is found with zero network access, no
+//     separate local-only constructor required.
+//  3. iers.LoadFS — load Earth-orientation data from a local file (via
+//     os.DirFS) instead of the network or the build-time embedded snapshot.
 //
 // Run: go run ./examples/19_offline_setup/
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
 
-	"github.com/TuSKan/astrogo/ephemeris/core"
-	"github.com/TuSKan/astrogo/ephemeris/jpl"
+	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/iers"
 	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/time"
@@ -53,42 +55,45 @@ func main() {
 
 	remote.SetOffline(false) // restore for the rest of this example
 
-	// ── 2. jpl.Open — pure local construction ───────────────────────────
+	// ── 2. eph.NewProvider against a pre-seeded cache ───────────────────
 	// This is the production path: pre-seed the kernel files yourself
 	// (copy them into a deployment image, or let a build step run with
-	// EnableDownloads once and reuse remote.DataDir() afterward), then
-	// Open them directly. No registry gate is even consulted.
-	fmt.Println("\n[2] jpl.Open — pure local construction, zero network")
+	// EnableDownloads once) at remote.DataDir()'s expected layout, then
+	// call NewProvider exactly as usual. remote checks the filesystem
+	// before ever considering a download, so this hits zero network as
+	// long as the files are already there — no separate local-only
+	// constructor to bypass remote with.
+	fmt.Println("\n[2] eph.NewProvider against a pre-seeded cache, zero network")
 
 	jplDir := remote.DataDir().Join("jpl").LocalPath()
 	lskPath := filepath.Join(jplDir, "lsk", "naif0012.tls")
 	spkPath := filepath.Join(jplDir, "planets", "de440s.bsp")
 
-	p, err := jpl.Open(lskPath, spkPath)
+	p, err := eph.NewProvider(context.Background(), eph.Planets, "de440s")
 	if err != nil {
-		fmt.Printf("    no local kernels found at %s — run example 09 or 11 first\n", jplDir)
-		fmt.Println("    (with downloads enabled) to populate the cache, then re-run this example.")
+		fmt.Printf("    no local kernels found at %s (%v)\n", jplDir, err)
+		fmt.Println("    run example 09 or 11 first (with downloads enabled) to populate the")
+		fmt.Println("    cache, or copy pre-built de440s.bsp/naif0012.tls files there yourself.")
 	} else {
 		defer p.Close() //nolint:errcheck // best-effort cleanup in example code
 
-		state, err := p.State(core.Mars, time.NowUTC())
+		state, err := p.State(eph.Mars, time.NowUTC())
 		if err != nil {
 			fmt.Printf("    State: %v\n", err)
 		} else {
 			fmt.Printf("    Mars geocentric distance: %.4f AU (from %s, %s)\n",
 				state.Pos.Norm(), lskPath, spkPath)
 		}
-
-		for i, k := range p.LoadedKernels() {
-			fmt.Printf("    kernel[%d]: %s (%d segments)\n", i, k.Path, k.Segments)
-		}
 	}
 
-	// ── 3. iers.LoadFile — local EOP data ───────────────────────────────
-	fmt.Println("\n[3] iers.LoadFile — local Earth-orientation data")
+	// ── 3. iers.LoadFS — local EOP data ─────────────────────────────────
+	fmt.Println("\n[3] iers.LoadFS — local Earth-orientation data")
 
-	iersPath := remote.DataDir().Join("iers", "finals2000A.data").LocalPath()
-	if err := iers.LoadFile(iersPath); err != nil {
+	iersDir := remote.DataDir().Join("iers").LocalPath()
+	iersName := "finals2000A.data"
+	iersPath := filepath.Join(iersDir, iersName)
+
+	if err := iers.LoadFS(os.DirFS(iersDir), iersName); err != nil {
 		fmt.Printf("    no local EOP cache at %s — call iers.FetchNow once (with\n", iersPath)
 		fmt.Println("    network access) to populate it, or ship a finals2000A file with your deployment.")
 	} else {

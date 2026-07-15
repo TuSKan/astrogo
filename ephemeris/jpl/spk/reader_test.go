@@ -1,6 +1,7 @@
 package spk_test
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -13,7 +14,7 @@ import (
 
 func TestSPKReader(t *testing.T) {
 	// Bootstrap the download process robustly via the provider logic
-	prov, err := jpl.NewProvider(core.Planets, "de440s")
+	prov, err := jpl.NewProvider(context.Background(), core.Planets, "de440s")
 	if err != nil {
 		t.Fatalf("setup failed: %v", err)
 	}

@@ -1,1 +1,0 @@
-This file exists strictly to ensure `//go:embed data/*` in `openngc.go` succeeds during CI compilation where the un-tracked `openngc.csv` is physically missing.

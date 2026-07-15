@@ -5,9 +5,18 @@ import (
 	"fmt"
 
 	"github.com/TuSKan/astrogo/catalog"
+	"github.com/TuSKan/astrogo/remote"
 )
 
 func main() {
+	// OpenNGC fetches its catalog data over the network, like every other
+	// astrogo catalog provider (see README "Data downloads & offline
+	// usage"). Enabling downloads here is enough — catalog.NewResolver's
+	// first use of catalog.OpenNGC below fetches it automatically
+	// (content-checked, so a re-run only costs a HEAD probe once cached).
+	// No need to import catalog/openngc directly.
+	remote.EnableDownloads(remote.OpenNGC, 5<<20) // ~2 MB combined source CSVs
+
 	resolver := catalog.NewResolver(catalog.OpenNGC, catalog.SIMBAD, catalog.MAST)
 
 	query := "Andromeda"

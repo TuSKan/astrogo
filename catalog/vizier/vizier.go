@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
@@ -37,8 +36,13 @@ type Provider struct {
 
 // New creates a new VizieR catalog provider.
 func New() *Provider {
+	client, err := remote.NewClientFor(remote.VizieR)
+	if err != nil {
+		panic(err) // unregistered endpoint would be a programmer error
+	}
+
 	return &Provider{
-		client: remote.NewClient(),
+		client: client,
 		cache:  resolve.NewMapCache(),
 	}
 }
@@ -104,42 +108,21 @@ func (p *Provider) ConeSearch(ctx context.Context, req resolve.ConeRequest) reso
 		return seq
 	}
 
-	base, err := remote.URL(remote.VizieR)
-	if err != nil {
-		return func(yield func(resolve.Target, error) bool) {
-			yield(resolve.Target{}, err)
-		}
-	}
-
 	v := url.Values{}
 	v.Set("REQUEST", "doQuery")
 	v.Set("LANG", "ADQL")
 	v.Set("FORMAT", "csv")
 	v.Set("QUERY", adql)
 
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, base, strings.NewReader(v.Encode()))
-	if err != nil {
-		return func(yield func(resolve.Target, error) bool) {
-			yield(resolve.Target{}, fmt.Errorf("vizier: new request: %w", err))
-		}
-	}
-
-	httpReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-
 	return func(yield func(resolve.Target, error) bool) {
-		resp, err := p.client.Do(httpReq)
+		body, err := p.client.PostForm(ctx, remote.VizieR, "", v)
 		if err != nil {
 			yield(resolve.Target{}, err)
 			return
 		}
-		defer func() {
-			cerr := resp.Body.Close()
-			if cerr != nil {
-				yield(resolve.Target{}, cerr)
-			}
-		}()
+		defer func() { _ = body.Close() }()
 
-		targets, err := parseCSV(resp.Body, schema.Kind)
+		targets, err := parseCSV(body, schema.Kind)
 		if err != nil {
 			yield(resolve.Target{}, err)
 			return

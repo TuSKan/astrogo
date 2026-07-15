@@ -45,8 +45,8 @@ func BuildResolveQuery(req resolve.ObjectRequest) string {
 	return query
 }
 
-// TAPRequest generates the URL-encoded body for a POST TAP query.
-func TAPRequest(adql string) string {
+// TAPRequest builds the form values for a POST TAP query.
+func TAPRequest(adql string) url.Values {
 	v := url.Values{}
 	v.Set("REQUEST", "doQuery")
 	v.Set("LANG", "ADQL")
@@ -54,5 +54,5 @@ func TAPRequest(adql string) string {
 	v.Set("FORMAT", "csv")
 	v.Set("QUERY", adql)
 
-	return v.Encode()
+	return v
 }

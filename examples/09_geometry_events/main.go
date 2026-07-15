@@ -2,6 +2,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 
@@ -25,7 +26,7 @@ func main() {
 	remote.EnableDownloads(remote.NAIFLSK, 0)
 
 	// 1. Setup high-precision JPL Ephemeris (DE442) as requested
-	prov, err := eph.NewProvider(eph.Planets, "de442")
+	prov, err := eph.NewProvider(context.Background(), eph.Planets, "de442")
 	if err != nil {
 		log.Fatalf("failed to load jpl de442: %v", err)
 	}

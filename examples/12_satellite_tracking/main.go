@@ -2,6 +2,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"strings"
@@ -48,7 +49,7 @@ func main() {
 	// ═══════════════════════════════════════════════════════════════════════
 	header("SGP4 Propagation (via Provider.State)")
 
-	prov, err := eph.NewProvider(eph.Satellites, target.Name,
+	prov, err := eph.NewProvider(context.Background(), eph.Satellites, target.Name,
 		eph.WithTLE(target.TLELine1, target.TLELine2))
 	if err != nil {
 		log.Fatalf("Failed to create satellite provider: %v", err)

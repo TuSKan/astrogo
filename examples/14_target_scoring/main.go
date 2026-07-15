@@ -17,10 +17,18 @@ import (
 	"github.com/TuSKan/astrogo/catalog"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/plan"
+	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/time"
 )
 
 func main() {
+	// The NGC targets below resolve against OpenNGC alone (no SIMBAD
+	// fallback), so its catalog data needs to actually be populated.
+	// Enabling downloads here is enough — catalog.NewResolver's first use
+	// of catalog.OpenNGC below fetches it automatically (content-checked,
+	// so a re-run only costs a HEAD probe once cached).
+	remote.EnableDownloads(remote.OpenNGC, 5<<20) // ~2 MB combined source CSVs
+
 	// ── Observatory: São Paulo (-23.5505°, -46.6333°, 760m) ─────────────
 	loc, _ := coord.NewEarthLocation(-23.5505, -46.6333, 760)
 	site, _ := plan.NewSite("São Paulo", loc, 0, nil)

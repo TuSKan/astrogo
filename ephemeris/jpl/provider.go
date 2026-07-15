@@ -1,13 +1,15 @@
 package jpl
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"math"
-	"os"
 	"path/filepath"
 	"slices"
 	"sync"
+
+	gofs "github.com/ungerik/go-fs"
 
 	"github.com/TuSKan/astrogo/ephemeris/core"
 	"github.com/TuSKan/astrogo/ephemeris/jpl/lsk"
@@ -88,7 +90,12 @@ type Provider struct {
 // Option configures a Provider.
 type Option func(*Provider)
 
-// WithDataDir sets the directory where kernels are stored.
+// WithDataDir sets the local directory Path labels (LoadedKernels) and
+// small-body Horizons-generated kernels (spk.CacheAPI) are placed under.
+// It does not redirect where NAIFSPK/NAIFLSK registry downloads are
+// cached — those always live under remote's own cache directory for the
+// endpoint (see remote.CacheDir); use remote.SetDataDir/SetDataDirPath to
+// relocate that.
 func WithDataDir(dataDir string) Option {
 	return func(p *Provider) { p.DataDir = dataDir }
 }
@@ -105,10 +112,11 @@ func WithTimeInterval(start, end time.Time) Option {
 //
 // The source selects the kind of JPL data (Planets, SmallBody, Asteroids,
 // Comets). The kernel identifies the specific dataset (e.g. "de442", "433").
-func NewProvider(source core.Source, kernel string, opts ...Option) (*Provider, error) {
-	// Default DataDir: remote.DataDir()/jpl (OS user cache directory by
-	// default, e.g. ~/.cache/astrogo/jpl; configurable via remote.SetDataDir).
-	defaultDir, err := remote.SubsystemDir("jpl")
+func NewProvider(ctx context.Context, source core.Source, kernel string, opts ...Option) (*Provider, error) {
+	// Default DataDir: remote's cache directory for NAIFSPK, i.e.
+	// remote.DataDir()/jpl (OS user cache directory by default, e.g.
+	// ~/.cache/astrogo/jpl; configurable via remote.SetDataDir).
+	defaultDir, err := remote.CacheDir(remote.NAIFSPK)
 	if err != nil {
 		return nil, fmt.Errorf("jpl: failed to resolve data directory: %w", err)
 	}
@@ -132,7 +140,7 @@ func NewProvider(source core.Source, kernel string, opts ...Option) (*Provider, 
 		opt(p)
 	}
 
-	if err := os.MkdirAll(p.DataDir, 0o755); err != nil {
+	if err := gofs.File(p.DataDir).MakeAllDirs(); err != nil {
 		return nil, fmt.Errorf("jpl: failed to create directory: %w", err)
 	}
 
@@ -144,7 +152,7 @@ func NewProvider(source core.Source, kernel string, opts ...Option) (*Provider, 
 
 		spkPath := filepath.Join(p.DataDir, "planets", p.kernel+".bsp")
 
-		k, err := spk.CacheDownload("planets/"+p.kernel+".bsp", p.DataDir)
+		k, err := spk.CacheDownload(ctx, "planets/"+p.kernel+".bsp")
 		if err != nil {
 			return nil, fmt.Errorf("jpl: failed to load planetary kernel: %w", err)
 		}
@@ -156,7 +164,7 @@ func NewProvider(source core.Source, kernel string, opts ...Option) (*Provider, 
 		// Always load a minimal planetary kernel for recursion (center resolution)
 		basePath := filepath.Join(p.DataDir, "planets", "de440s.bsp")
 
-		pk, err := spk.CacheDownload("planets/de440s.bsp", p.DataDir)
+		pk, err := spk.CacheDownload(ctx, "planets/de440s.bsp")
 		if err != nil {
 			return nil, fmt.Errorf("jpl: failed to load planetary base kernel: %w", err)
 		}
@@ -165,7 +173,7 @@ func NewProvider(source core.Source, kernel string, opts ...Option) (*Provider, 
 			return nil, fmt.Errorf("jpl: failed to add planetary base kernel: %w", err)
 		}
 
-		spkReaders, err := spk.CacheAPI(p.kernel, p.startTime, p.endTime, filepath.Join(p.DataDir, string(p.source)))
+		spkReaders, err := spk.CacheAPI(ctx, p.kernel, p.startTime, p.endTime, filepath.Join(p.DataDir, string(p.source)))
 		if err != nil {
 			return nil, fmt.Errorf("jpl: failed to get SPK files: %w", err)
 		}
@@ -184,7 +192,7 @@ func NewProvider(source core.Source, kernel string, opts ...Option) (*Provider, 
 		return nil, fmt.Errorf("%w: %s", ErrUnknownSource, p.source)
 	}
 
-	p.LSK, err = lsk.Cache("lsk/naif0012.tls", p.DataDir)
+	p.LSK, err = lsk.Cache(ctx, "lsk/naif0012.tls")
 	if err != nil {
 		return nil, fmt.Errorf("jpl: failed to locate/cache LSK: %w", err)
 	}
@@ -279,14 +287,14 @@ func (p *Provider) AddKernel(k *spk.Reader) error {
 // from local files without ever going through NewProvider's
 // download-consent-gated construction.
 func (p *Provider) AddKernelFile(path string) error {
-	f, err := os.Open(path)
+	rsc, err := gofs.File(path).OpenReadSeeker()
 	if err != nil {
 		return fmt.Errorf("jpl: open kernel %s: %w", path, err)
 	}
 
-	r, err := spk.NewReader(f)
+	r, err := spk.NewReader(rsc)
 	if err != nil {
-		return errors.Join(fmt.Errorf("jpl: read kernel %s: %w", path, err), f.Close())
+		return errors.Join(fmt.Errorf("jpl: read kernel %s: %w", path, err), rsc.Close())
 	}
 
 	p.mu.Lock()
@@ -392,7 +400,7 @@ func Open(lskPath string, spkPaths ...string) (*Provider, error) {
 		}
 	}
 
-	f, err := os.Open(lskPath)
+	f, err := gofs.File(lskPath).OpenReader()
 	if err != nil {
 		return nil, fmt.Errorf("jpl: open LSK %s: %w", lskPath, err)
 	}

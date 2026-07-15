@@ -3,6 +3,7 @@
 package jpl_test
 
 import (
+	"context"
 	"testing"
 
 	eph "github.com/TuSKan/astrogo/ephemeris"
@@ -31,7 +32,7 @@ func loadCases(t *testing.T) []*StateVector {
 func runHorizonsTest(t *testing.T, bodyName string) {
 	requireHorizons(t)
 
-	p, err := jpl.NewProvider(core.Planets, "de440")
+	p, err := jpl.NewProvider(context.Background(), core.Planets, "de440")
 	if err != nil {
 		t.Fatalf("failed to create provider: %v", err)
 	}

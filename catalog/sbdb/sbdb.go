@@ -2,10 +2,8 @@ package sbdb
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
@@ -25,8 +23,13 @@ type Provider struct {
 
 // New creates a new SBDB catalog provider.
 func New() *Provider {
+	client, err := remote.NewClientFor(remote.JPLSBDB)
+	if err != nil {
+		panic(err) // unregistered endpoint would be a programmer error
+	}
+
 	return &Provider{
-		client: remote.NewClient(),
+		client: client,
 		cache:  resolve.NewMapCache(),
 	}
 }
@@ -80,42 +83,13 @@ func (p *Provider) ResolveObject(ctx context.Context, req resolve.ObjectRequest)
 		return seq
 	}
 
-	base, err := remote.URL(remote.JPLSBDB)
-	if err != nil {
-		return func(yield func(resolve.Target, error) bool) {
-			yield(resolve.Target{}, err)
-		}
-	}
-
-	api, _ := url.Parse(base)
-	params := api.Query()
-
+	params := url.Values{}
 	// Switch to using Lookup API explicitly targeted via sstr
 	params.Set("sstr", req.Query)
 	// Request physical parameters to get H, G, M1, k1 for magnitude computation.
 	params.Set("phys-par", "true")
 
-	api.RawQuery = params.Encode()
-
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, api.String(), nil)
-	if err != nil {
-		return func(yield func(resolve.Target, error) bool) {
-			yield(resolve.Target{}, fmt.Errorf("sbdb: new request: %w", err))
-		}
-	}
-
 	return func(yield func(resolve.Target, error) bool) {
-		resp, err := p.client.Do(httpReq)
-		if err != nil {
-			yield(resolve.Target{}, err)
-			return
-		}
-		defer func() {
-			if cerr := resp.Body.Close(); cerr != nil {
-				yield(resolve.Target{}, cerr)
-			}
-		}()
-
 		var payload struct {
 			Object *struct {
 				SpkID    string `json:"spkid"`
@@ -130,7 +104,7 @@ func (p *Provider) ResolveObject(ctx context.Context, req resolve.ObjectRequest)
 			} `json:"phys_par"`
 		}
 
-		if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+		if err := p.client.GetJSON(ctx, remote.JPLSBDB, "", params, &payload); err != nil {
 			yield(resolve.Target{}, err)
 			return
 		}

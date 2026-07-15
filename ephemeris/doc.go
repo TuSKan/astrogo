@@ -15,16 +15,16 @@
 // # Quick Start
 //
 //	// JPL planetary ephemeris (DE442)
-//	p, err := eph.NewProvider(eph.Planets, "de442")
+//	p, err := eph.NewProvider(ctx, eph.Planets, "de442")
 //	if err != nil { log.Fatal(err) }
 //	defer p.Close()
 //	state, _ := p.State(eph.Mars, t)
 //
 //	// Multi-kernel (deep historical + modern)
-//	p, err := eph.NewProvider(eph.Planets, "de441_part-1", eph.WithKernel("de441_part-2"))
+//	p, err := eph.NewProvider(ctx, eph.Planets, "de441_part-1", eph.WithKernel("de441_part-2"))
 //
 //	// NORAD satellite (ISS)
-//	sat, err := eph.NewProvider(eph.Satellites, "ISS",
+//	sat, err := eph.NewProvider(ctx, eph.Satellites, "ISS",
 //	    eph.WithTLE(line1, line2))
 //
 // # Default Provider

@@ -3,6 +3,7 @@
 package jpl_test
 
 import (
+	"context"
 	"testing"
 
 	eph "github.com/TuSKan/astrogo/ephemeris"
@@ -12,7 +13,7 @@ import (
 )
 
 func runSOFATest(t *testing.T, bid eph.ID) {
-	p, err := jpl.NewProvider(core.Planets, "de440")
+	p, err := jpl.NewProvider(context.Background(), core.Planets, "de440")
 	if err != nil {
 		t.Skipf("skipping SOFA comparison: JPL provider failed: %v", err)
 	}

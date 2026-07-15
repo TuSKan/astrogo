@@ -1,6 +1,7 @@
 package lsk_test
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -14,7 +15,7 @@ import (
 )
 
 func TestLSKReader(t *testing.T) {
-	prov, err := jpl.NewProvider(core.Planets, "de440s")
+	prov, err := jpl.NewProvider(context.Background(), core.Planets, "de440s")
 	if err != nil {
 		t.Fatalf("setup failed: %v", err)
 	}

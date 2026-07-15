@@ -5,24 +5,26 @@
 //
 // # Data source and freshness
 //
-// This package's go:generate directive (iers.go) downloads the IERS
-// "finals2000A.all" bulletin into iers/data/ at build time. The first call
-// to [GetModel] (directly, or transitively via [Coverage]/[FetchIfStale])
-// lazily parses that embedded snapshot into a [*Table] and registers it as
-// the global [Model] via [RegisterModel] — not an init(), so merely
-// importing this package (e.g. transitively through coord) never pays the
-// parse cost. Calling [RegisterModel]/[LoadFile]/[LoadFS] yourself before
-// that first query pre-empts the lazy load entirely. That table has a
-// hard, finite coverage window — it only contains rows up to whatever
-// finals2000A.all's tail extended to on the day `go generate` last ran,
-// and the trailing weeks of even that range are typically "predicted"
-// placeholders (blank measured DUT1/XP/YP fields).
+// iers.go embeds iers/data/finals2000A.all via go:embed if that file is
+// present at build time (it is gitignored, so a fresh checkout embeds
+// nothing until someone places a IERS "finals2000A.all" bulletin there
+// themselves). The first call to [GetModel] (directly, or transitively via
+// [Coverage]/[FetchIfStale]) lazily parses whatever was embedded into a
+// [*Table] and registers it as the global [Model] via [RegisterModel] — not
+// an init(), so merely importing this package (e.g. transitively through
+// coord) never pays the parse cost. Calling
+// [RegisterModel]/[LoadFS] yourself before that first query pre-empts the
+// lazy load entirely. That table has a hard, finite coverage
+// window — it only contains rows up to whatever finals2000A.all's tail
+// extended to when the embedded file was last refreshed, and the trailing
+// weeks of even that range are typically "predicted" placeholders (blank
+// measured DUT1/XP/YP fields).
 //
-// Because the embedded data file is not committed to the repository (it is
-// regenerated, not stored), the actual coverage window in any given build
-// depends entirely on how recently `go generate ./...` ran before that build
-// — check [GetModel]'s [Model.EOP] against [Coverage] at startup in any
-// long-running service, rather than assuming freshness.
+// Because the embedded data file is not committed to the repository, most
+// builds embed nothing at all and rely on [FetchNow]/[FetchIfStale] or a
+// manually pre-seeded [LoadFS] instead — check [GetModel]'s [Model.EOP]
+// against [Coverage] at startup in any long-running service, rather than
+// assuming freshness.
 //
 // # What happens when the data runs out
 //
@@ -44,9 +46,8 @@
 // runtime, but nothing in astrogo calls it automatically — it is only useful
 // if application code calls it itself, proactively, before the coverage
 // window is exhausted. Use [Coverage] to check the currently-registered
-// model's actual range and decide when to call [FetchIfStale] (or simply
-// regenerate the embedded data at deploy time) rather than waiting for the
-// one-time degradation warning.
+// model's actual range and decide when to call [FetchIfStale] rather than
+// waiting for the one-time degradation warning.
 //
 // # Full control set
 //
@@ -56,9 +57,8 @@
 // deployments, skip the network path entirely:
 //
 //   - [FetchNow] — explicit fetch now, bypassing staleness/cooldown checks
-//   - [LoadFile] / [LoadFS] — parse a local (or embedded, via a
-//     downstream embed.FS) finals2000A file and register it
-//   - [UseEmbedded] — re-register this package's own build-time embedded
-//     snapshot, undoing a prior LoadFile/LoadFS/FetchNow
+//   - [LoadFS] — parse a finals2000A file reached through any io/fs.FS
+//     (a local directory via os.DirFS, an embed.FS, or any other
+//     stdlib-compatible filesystem) and register it
 //   - [Coverage] — check the currently-registered model's valid MJD range
 package iers

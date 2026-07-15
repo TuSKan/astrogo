@@ -12,6 +12,7 @@
 package plan_test
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"math"
@@ -191,7 +192,7 @@ func fetchAstroPixelsPage(t *testing.T, startYear int) string {
 
 func TestAstroPixels_MoonPhases(t *testing.T) {
 	// Load both DE441 parts for full coverage: part-1 (deep historical) + part-2 (modern/future)
-	prov, err := eph.NewProvider(eph.Planets, "de441_part-1", eph.WithKernel("de441_part-2"))
+	prov, err := eph.NewProvider(context.Background(), eph.Planets, "de441_part-1", eph.WithKernel("de441_part-2"))
 	if err != nil {
 		t.Fatalf("Failed to create DE441 provider: %v", err)
 	}

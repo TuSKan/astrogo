@@ -464,7 +464,7 @@ AOS: 19:45:03 UTC  Max El: 73.1°  LOS: 19:51:47 UTC  Duration: 6m44s
     - **MAST** (STScI CAOM Dual-Encoding support)
     - **JPL SBDB** (Small-Body Database Search)
     - **Gaia** & **VizieR** (Data TAP)
-    - **OpenNGC** (Zero-I/O `//go:embed` binaries)
+    - **OpenNGC** (NGC/IC deep-sky catalog, fetched and cached on first use)
     - **NORAD/CelestTrak** (GP data — OMM/JSON format aligned with [Space Data Standards](https://spacedatastandards.org))
     - **FINK/ZTF SSOFT** (sHG1G2 phase-curve parameters for ~95k asteroids — single-object JSON + bulk parquet)
 
@@ -644,8 +644,13 @@ happens.
 | JPL planetary kernel (de441 parts) | `remote.NAIFSPK` | multi-GB **each** | `eph.NewProvider(eph.Planets, "de441_part-1", eph.WithKernel("de441_part-2"))` |
 | Leap-second kernel (naif0012.tls) | `remote.NAIFLSK` | ~5 KB | always, alongside any JPL kernel |
 | Small-body SPK (Horizons-generated) | `remote.JPLHorizons` | KB–few MB | `eph.NewProvider(eph.SmallBody, "433", ...)` |
-| IERS Earth-orientation data | `remote.IERSFinals2000A` | ~3.7 MB | `iers.FetchNow`/`FetchIfStale`, or `go generate` for source builds |
-| OpenNGC catalog CSVs | `remote.OpenNGC` | ~1.5–2 MB | `go generate ./catalog/openngc/...` only — never at library runtime |
+| IERS Earth-orientation data | `remote.IERSFinals2000A` | ~3.7 MB | `iers.FetchNow`/`FetchIfStale` |
+| OpenNGC catalog CSVs | `remote.OpenNGC` | ~2 MB combined | `catalog.NewResolver(catalog.OpenNGC, ...)` |
+
+Both IERS and OpenNGC skip the download entirely when the upstream content hasn't
+changed since the last fetch — a HEAD-request content check (ETag/Content-Length)
+against what was cached, not a wall-clock expiration window, since the two sources
+mutate on their own schedules rather than yours.
 
 Catalog resolvers (`catalog/simbad`, `catalog/gaia`, `catalog/vizier`, `catalog/mast`,
 `catalog/sbdb`, `catalog/norad`, `catalog/fink`) and `lightpollution` make small
@@ -677,6 +682,15 @@ remote.EnableDownloads(remote.NAIFLSK, 0)       // the ~5 KB leap-second kernel,
 p, err := eph.NewProvider(eph.Planets, "de442") // now downloads (once) and caches
 ```
 
+`catalog.OpenNGC` follows the same pattern — enabling the endpoint is the only step required;
+`catalog.NewResolver`'s first use of it fetches and caches the catalog automatically:
+
+```go
+remote.EnableDownloads(remote.OpenNGC, 5<<20) // ~2 MB combined source CSVs
+
+resolver := catalog.NewResolver(catalog.OpenNGC, catalog.SIMBAD) // fetches OpenNGC on first use
+```
+
 For total control, install a custom policy instead of per-endpoint limits:
 
 ```go
@@ -700,17 +714,19 @@ remote.SetDataDirPath("/data/astrogo-cache") // or remote.SetDataDir for a githu
 
 ### Offline / air-gapped deployments
 
-Pre-seed the data directory with the files you need, then cut network access entirely:
+Pre-seed `remote.DataDir()` with the files you need (e.g. copy a kernel to
+`remote.DataDir()/jpl/planets/de442.bsp`), then cut network access entirely:
 
 ```go
 remote.SetOffline(true)
 
-p, err := jpl.Open("naif0012.tls", "de442.bsp") // pure local construction, zero network
+p, err := eph.NewProvider(eph.Planets, "de442") // finds the pre-seeded kernel, zero network
 ```
 
 Every downloader checks the filesystem before the network, so a pre-seeded deployment
-never dials out even without `SetOffline`. `iers.LoadFile`/`iers.LoadFS` load a local (or
-embedded) EOP snapshot the same way.
+never dials out even without `SetOffline` — `remote` is the only thing that resolves or
+opens these files, there is no separate local-only constructor to bypass it with.
+`iers.LoadFS` loads a local (or embedded) EOP snapshot the same way.
 
 ### Endpoint control
 
@@ -723,12 +739,13 @@ remote.SetOffline(true)                      // global kill switch, all network 
 
 ### Building from source
 
-`go generate ./...` refreshes the IERS EOP snapshot and the OpenNGC catalog CSV from
-their upstream sources — this is a development-time step, invoking it is itself the
-download consent (no `remote.EnableDownloads` call needed). Neither generated file is
-committed to the repository (see `.gitignore`), so a fresh `go get` gets working code with
-zero embedded data until you either run `go generate`, call `iers.FetchNow`/`LoadFile` at
-runtime, or pre-seed `remote.DataDir()` yourself.
+The IERS EOP snapshot (`iers/data/finals2000A.all`) is `go:embed`-ed if present, but it
+isn't committed to the repository (see `.gitignore`), so a fresh `go get`/checkout builds
+with zero embedded data. Get working data by calling `iers.FetchNow`/`LoadFS` at runtime,
+or by placing your own copy of the file at its path above before running `go build`.
+OpenNGC has no embedded data at all — like every other catalog provider, it fetches over
+the network via `remote.EnableDownloads(remote.OpenNGC, ...)` (see "Enabling a download"
+above).
 
 ---
 
@@ -783,7 +800,7 @@ Sub-arcsecond topocentric accuracy and sub-second UT1 timing require IERS EOP da
 | Topocentric alt/az | <0.01″ | ~1″ |
 | Rise/set timing | ≤0.6 min vs USNO | ≤0.7 min vs USNO |
 
-The library logs a one-time warning when EOP data is unavailable (users who redirect or suppress logs won't see it — call `iers.Coverage()` to check proactively). The IERS data is refreshed via `go:generate`, `iers.FetchNow`/`FetchIfStale` at runtime, or `iers.LoadFile`/`LoadFS` from a pre-seeded snapshot — see [Data downloads & offline usage](#data-downloads--offline-usage).
+The library logs a one-time warning when EOP data is unavailable (users who redirect or suppress logs won't see it — call `iers.Coverage()` to check proactively). The IERS data is refreshed via `iers.FetchNow`/`FetchIfStale` at runtime, or `iers.LoadFS` from a pre-seeded snapshot — see [Data downloads & offline usage](#data-downloads--offline-usage).
 
 ### TDB Precision
 
