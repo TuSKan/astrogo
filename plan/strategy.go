@@ -1,8 +1,9 @@
 package plan
 
 import (
+	"cmp"
 	"fmt"
-	"sort"
+	"slices"
 
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/time"
@@ -237,8 +238,8 @@ func (s *SwapOptimizedStrategy) insertPass(
 	// Sort unscheduled by priority (highest first) for best gap allocation.
 	sortedUnsched := make([]UnscheduledBlock, len(sched.Unscheduled))
 	copy(sortedUnsched, sched.Unscheduled)
-	sort.SliceStable(sortedUnsched, func(i, j int) bool {
-		return sortedUnsched[i].Block.Priority > sortedUnsched[j].Block.Priority
+	slices.SortStableFunc(sortedUnsched, func(a, b UnscheduledBlock) int {
+		return cmp.Compare(b.Block.Priority, a.Block.Priority)
 	})
 
 	// Pre-compute merged constraints per unscheduled block.
@@ -299,8 +300,16 @@ func (s *SwapOptimizedStrategy) insertPass(
 				improved = true
 
 				// Rebuild gaps to account for the insertion.
-				sort.Slice(sched.Blocks, func(i, j int) bool {
-					return sched.Blocks[i].Window.Start.Before(sched.Blocks[j].Window.Start)
+				slices.SortFunc(sched.Blocks, func(a, b ScheduledBlock) int {
+					if a.Window.Start.Before(b.Window.Start) {
+						return -1
+					}
+
+					if b.Window.Start.Before(a.Window.Start) {
+						return 1
+					}
+
+					return 0
 				})
 				gaps = scheduleGaps(sched.Blocks, window)
 
@@ -316,8 +325,16 @@ func (s *SwapOptimizedStrategy) insertPass(
 	sched.Unscheduled = remaining
 
 	// Final chronological sort.
-	sort.Slice(sched.Blocks, func(i, j int) bool {
-		return sched.Blocks[i].Window.Start.Before(sched.Blocks[j].Window.Start)
+	slices.SortFunc(sched.Blocks, func(a, b ScheduledBlock) int {
+		if a.Window.Start.Before(b.Window.Start) {
+			return -1
+		}
+
+		if b.Window.Start.Before(a.Window.Start) {
+			return 1
+		}
+
+		return 0
 	})
 
 	return improved

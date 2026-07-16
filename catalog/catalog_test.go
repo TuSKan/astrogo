@@ -133,7 +133,7 @@ func BenchmarkResolve(b *testing.B) {
 	}
 
 	r := &Resolver{providers: []resolve.Provider{p}}
-	for range b.N {
+	for b.Loop() {
 		_, _ = r.Resolve("M42")
 	}
 }
