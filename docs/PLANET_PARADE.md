@@ -117,7 +117,7 @@ prov, _ := eph.NewProvider(eph.Planets, "de442")
 defer prov.Close()
 
 loc, _ := coord.NewEarthLocation(-23.5505, -46.6333, 760)
-site, _ := plan.NewSite("São Paulo", loc, angle.Zero(), brtz)
+site, _ := plan.NewSite("São Paulo", loc, brtz)
 
 day := time.Date(2025, 2, 28, 0, 0, 0, 0, brtz)
 next := day.Add(24 * time.Hour)

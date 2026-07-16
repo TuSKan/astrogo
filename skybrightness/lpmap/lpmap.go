@@ -1,4 +1,4 @@
-package lightpollution
+package lpmap
 
 import (
 	"context"
@@ -40,9 +40,9 @@ const (
 // Sentinel errors.
 var (
 	// ErrNoAPIKey is returned when no API key is configured.
-	ErrNoAPIKey = errors.New("lightpollution: no API key (use WithAPIKey or set LIGHTPOLLUTIONMAP_KEY)")
+	ErrNoAPIKey = errors.New("lpmap: no API key (use WithAPIKey or set LIGHTPOLLUTIONMAP_KEY)")
 	// ErrBadResponse is returned when the API response cannot be parsed.
-	ErrBadResponse = errors.New("lightpollution: unexpected API response")
+	ErrBadResponse = errors.New("lpmap: unexpected API response")
 )
 
 // Client queries the lightpollutionmap.info QueryRaster service.
@@ -140,13 +140,13 @@ func (c *Client) artificialBrightness(ctx context.Context, latDeg, lonDeg float6
 			return 0, fmt.Errorf("%w: status %d: %s", ErrBadResponse, httpErr.StatusCode, strings.TrimSpace(httpErr.Body))
 		}
 
-		return 0, fmt.Errorf("lightpollution: http: %w", err)
+		return 0, fmt.Errorf("lpmap: http: %w", err)
 	}
 	defer func() { _ = resp.Close() }()
 
 	body, err := io.ReadAll(io.LimitReader(resp, 1<<16))
 	if err != nil {
-		return 0, fmt.Errorf("lightpollution: read body: %w", err)
+		return 0, fmt.Errorf("lpmap: read body: %w", err)
 	}
 
 	return parseBrightness(string(body))

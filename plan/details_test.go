@@ -21,7 +21,7 @@ func TestGetDetails_Star(t *testing.T) {
 	loc, err := coord.NewGeodetic(angle.Zero(), angle.Zero(), 0)
 	testutil.AssertNoError(t, err)
 
-	site, err := NewSite("Test", loc, angle.Zero(), nil)
+	site, err := NewSite("Test", loc, nil)
 	testutil.AssertNoError(t, err)
 
 	tm := time.FromJD(2451545.0, time.UTC) // J2000
@@ -81,7 +81,7 @@ func TestGetDetails_DeepSkyObject(t *testing.T) {
 	loc, err := coord.NewGeodetic(angle.Zero(), angle.Zero(), 0)
 	testutil.AssertNoError(t, err)
 
-	site, err := NewSite("Test", loc, angle.Zero(), nil)
+	site, err := NewSite("Test", loc, nil)
 	testutil.AssertNoError(t, err)
 
 	tm := time.FromJD(2451545.0, time.UTC)
@@ -107,7 +107,7 @@ func TestGetDetails_MovingBody(t *testing.T) {
 	loc, err := coord.NewGeodetic(angle.Zero(), angle.Zero(), 0)
 	testutil.AssertNoError(t, err)
 
-	site, err := NewSite("Test", loc, angle.Zero(), nil)
+	site, err := NewSite("Test", loc, nil)
 	testutil.AssertNoError(t, err)
 
 	tm := time.FromJD(2451545.0, time.UTC)
@@ -145,7 +145,7 @@ func TestGetDetails_String(t *testing.T) {
 	loc, err := coord.NewGeodetic(angle.Zero(), angle.Zero(), 0)
 	testutil.AssertNoError(t, err)
 
-	site, err := NewSite("Test", loc, angle.Zero(), nil)
+	site, err := NewSite("Test", loc, nil)
 	testutil.AssertNoError(t, err)
 
 	tm := time.FromJD(2451545.0, time.UTC)

@@ -19,10 +19,10 @@ import (
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
-	"github.com/TuSKan/astrogo/lightpollution"
 	"github.com/TuSKan/astrogo/plan"
 	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/skybrightness"
+	"github.com/TuSKan/astrogo/skybrightness/lpmap"
 	"github.com/TuSKan/astrogo/time"
 )
 
@@ -30,7 +30,7 @@ func main() {
 	// ── Observatory: São Paulo ───────────────────────────────────────────
 	tz, _ := time.LoadLocation("America/Sao_Paulo")
 	loc, _ := coord.NewEarthLocation(-23.5505, -46.6333, 760)
-	site, _ := plan.NewSite("São Paulo", loc, 0, tz)
+	site, _ := plan.NewSite("São Paulo", loc, tz)
 
 	// JPL kernel downloads are opt-in — see README "Data downloads &
 	// offline usage". de442 is ~115 MB; naif0012.tls (leap seconds) ~5 KB.
@@ -83,7 +83,7 @@ func main() {
 		skybrightness.NewZodiacalLight(provider),
 	}
 
-	if floor, err := lightpollution.New().Floor(context.Background(), -23.5505, -46.6333); err == nil {
+	if floor, err := lpmap.New().Floor(context.Background(), -23.5505, -46.6333); err == nil {
 		sqm, _ := floor.Radiance(coord.NewAltAz(angle.Deg(90), angle.Deg(0)), nil)
 		fmt.Printf("\n  Discovered São Paulo light-pollution floor: %.2f V mag/arcsec² (Falchi 2015)\n",
 			float64(sqm.SurfaceBrightnessV()))

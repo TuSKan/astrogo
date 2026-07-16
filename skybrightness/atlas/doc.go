@@ -7,6 +7,10 @@
 // perform no runtime downloads: the caller supplies the data file as an
 // io.ReaderAt; this file lists the source URLs/DOIs.
 //
+// See also [github.com/TuSKan/astrogo/skybrightness/lpmap] for a live-API
+// alternative resolving the same World Atlas data with no downloaded file,
+// at the cost of requiring an API key and network access per query.
+//
 // # Quantity and conversion
 //
 // Atlases store the artificial-only zenith radiance in mcd/m². It is

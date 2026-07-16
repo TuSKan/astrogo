@@ -33,7 +33,7 @@ import (
 
 func main() {
 	loc, _ := coord.NewEarthLocation(-23.5505, -46.6333, 760) // São Paulo
-	site, _ := plan.NewSite("Backyard", loc, angle.Zero(), nil)
+	site, _ := plan.NewSite("Backyard", loc, nil)
 	sirius := plan.NewStar("Sirius", angle.Hour(6.7525), angle.Deg(-16.7161))
 
 	tonight := time.Date(2026, 4, 15, 22, 0, 0, 0, time.LocationUTC)
@@ -121,7 +121,7 @@ const layout = "2006-01-02 15:04 MST"
 func main() {
 	// ── Observer Setup: São Paulo ──
 	loc, _ := coord.NewEarthLocation(-23.5505, -46.6333, 760)
-	site, _ := plan.NewSite("São Paulo", loc, angle.Zero(), nil)
+	site, _ := plan.NewSite("São Paulo", loc, nil)
 
 	// ── Night boundaries ──
 	eph := ephemeris.Default()
@@ -488,14 +488,14 @@ AOS: 19:45:03 UTC  Max El: 73.1°  LOS: 19:51:47 UTC  Duration: 6m44s
     - **`SwapOptimizedStrategy`** — local search with adjacent swaps + gap insertion (monotonic improvement)
   - Linear scaling benchmarked to 100 blocks
 
-### Sky Brightness & Light Pollution (`skybrightness`, `lightpollution`)
+### Sky Brightness & Light Pollution (`skybrightness`, `skybrightness/lpmap`)
 - Night-sky surface brightness decomposed into additive components, summed in linear flux space and converted to V mag/arcsec² only at the boundary:
   - `Moonlight` — scattered moonlight, Krisciunas & Schaefer (1991) closed form
   - `ZodiacalLight` — Leinert et al. (1998) Table 17, bilinear interpolation
   - `Airglow` — dark-sky floor (Noll et al. 2012 / Patat 2008)
   - `Floor` — light-pollution baseline from scalar SQM, directional `SQMGrid`, or `FloorFromBortle`
 - `skybrightness/atlas` — offline, pure-Go artificial-brightness atlas providers (Falchi et al. 2016 World Atlas GeoTIFF, VIIRS-DNB)
-- `lightpollution` — live client for the lightpollutionmap.info QueryRaster API, with retry/backoff on transient failures
+- `skybrightness/lpmap` — live client for the lightpollutionmap.info QueryRaster API, with retry/backoff on transient failures
 - `plan.LimitingMagnitudeConstraint` / `ScoreObservableSky` — folds sky-brightness-derived limiting magnitude into observability constraints and scoring
 
 ### Event Solver
@@ -538,7 +538,7 @@ flowchart TD
 
     %% Data Providers
     iers[iers]
-    lightpollution[lightpollution]
+    lpmap["skybrightness/lpmap"]
 
     %% Primitive Foundation
     subgraph Primitives
@@ -575,7 +575,7 @@ flowchart TD
     plan --> satellite
 
     skybrightness --> angle
-    lightpollution --> skybrightness
+    lpmap --> skybrightness
 
     coord --> iers
     coord --> atmosphere
@@ -621,7 +621,7 @@ flowchart TD
 | `fits/plan` | FITS↔plan bridge (`SiteFromFITS`, `TargetFromFITS`) | ✅ Stable |
 | `plan` | Observability, constraints, events, scheduling, satellite passes | ✅ Stable |
 | `skybrightness`, `skybrightness/atlas` | Sky brightness model (moonlight, zodiacal light, airglow, light-pollution floor) | ✅ Stable |
-| `lightpollution` | Live lightpollutionmap.info client | ✅ Stable |
+| `skybrightness/lpmap` | Live lightpollutionmap.info client | ✅ Stable |
 | `unit` | Physical unit and quantity system | ✅ Stable |
 
 See [`VALIDATION.md`](docs/VALIDATION.md) for scientific validation status, [`USNO.md`](docs/USNO.md) for the U.S. Naval Observatory accuracy report (41/41 tests passing, ≤0.6 min rise/set accuracy across 3 continents + polar/equatorial/8849m edge cases), and the FINK/ZTF sHG1G2 validation (100% match at 0.025 mag against the phunk production pipeline).
@@ -647,13 +647,17 @@ happens.
 | IERS Earth-orientation data | `remote.IERSFinals2000A` | ~3.7 MB | `iers.FetchNow`/`FetchIfStale` |
 | OpenNGC catalog CSVs | `remote.OpenNGC` | ~2 MB combined | `catalog.NewResolver(catalog.OpenNGC, ...)` |
 
+For an accuracy/offline tradeoff comparison across `ephemeris.Default()` and the
+JPL kernels above, see the [`ephemeris` package doc](ephemeris/doc.go)'s
+"Choosing a Provider" section.
+
 Both IERS and OpenNGC skip the download entirely when the upstream content hasn't
 changed since the last fetch — a HEAD-request content check (ETag/Content-Length)
 against what was cached, not a wall-clock expiration window, since the two sources
 mutate on their own schedules rather than yours.
 
 Catalog resolvers (`catalog/simbad`, `catalog/gaia`, `catalog/vizier`, `catalog/mast`,
-`catalog/sbdb`, `catalog/norad`, `catalog/fink`) and `lightpollution` make small
+`catalog/sbdb`, `catalog/norad`, `catalog/fink`) and `skybrightness/lpmap` make small
 request/response API calls, not bulk downloads — those are gated by endpoint
 enable/disable and offline mode, not by download-size consent (the network call itself
 is the explicit purpose of the method you're calling).

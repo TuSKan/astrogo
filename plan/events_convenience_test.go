@@ -166,7 +166,7 @@ func TestVisibilityEvents_Star(t *testing.T) {
 		t.Fatalf("NewGeodetic: %v", err)
 	}
 
-	site, err := NewSite("São Paulo", loc, angle.Zero(), nil)
+	site, err := NewSite("São Paulo", loc, nil)
 	if err != nil {
 		t.Fatalf("NewSite: %v", err)
 	}

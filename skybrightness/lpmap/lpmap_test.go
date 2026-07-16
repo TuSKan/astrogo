@@ -1,4 +1,4 @@
-package lightpollution
+package lpmap
 
 import (
 	"context"

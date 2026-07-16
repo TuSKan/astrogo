@@ -28,26 +28,41 @@ type Site struct {
 	horizon  angle.Angle
 }
 
+// SiteOption configures optional NewSite parameters.
+type SiteOption func(*Site)
+
+// WithHorizon sets the site's local horizon limit (e.g., 0 deg for ideal,
+// 20 deg for trees/hills). Defaults to angle.Zero() if omitted.
+func WithHorizon(h angle.Angle) SiteOption {
+	return func(s *Site) { s.horizon = h }
+}
+
 // NewSite creates a new observing site with validation.
 // name: A human-readable name for the site.
 // loc: The geodetic location (longitude, latitude, height).
-// horizon: The local horizon limit (e.g., 0 deg for ideal, 20 deg for trees/hills).
 // tz: The local time zone (optional, can be nil).
-func NewSite(name string, loc *coord.Geodetic, horizon angle.Angle, tz *time.Location) (*Site, error) {
+// opts: optional parameters — see WithHorizon.
+func NewSite(name string, loc *coord.Geodetic, tz *time.Location, opts ...SiteOption) (*Site, error) {
 	if loc == nil {
 		return nil, ErrNilLocation
 	}
 
-	if horizon.Degrees() < -90 || horizon.Degrees() > 90 {
+	s := &Site{
+		name:     name,
+		location: loc,
+		horizon:  angle.Zero(),
+		timeZone: tz,
+	}
+
+	for _, opt := range opts {
+		opt(s)
+	}
+
+	if s.horizon.Degrees() < -90 || s.horizon.Degrees() > 90 {
 		return nil, ErrInvalidHorizon
 	}
 
-	return &Site{
-		name:     name,
-		location: loc,
-		horizon:  horizon,
-		timeZone: tz,
-	}, nil
+	return s, nil
 }
 
 // Name returns the site's human-readable name.
@@ -170,7 +185,7 @@ func (s *Site) Equal(other *Site) bool {
 
 // WithHorizon returns a copy of s with the given horizon limit.
 func (s *Site) WithHorizon(h angle.Angle) (*Site, error) {
-	return NewSite(s.name, s.location, h, s.timeZone)
+	return NewSite(s.name, s.location, s.timeZone, WithHorizon(h))
 }
 
 // WithTimeZone returns a copy of s with the given time zone.

@@ -29,7 +29,7 @@ func (m benchMock) GetDetails(_ *coord.Context, _ ...string) (*TargetDetails, er
 
 func BenchmarkVisibleIntervals(b *testing.B) {
 	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(45), 0)
-	site, _ := NewSite("Test", loc, angle.Zero(), nil)
+	site, _ := NewSite("Test", loc, nil)
 	obj := benchMock{c: coord.NewICRS(angle.Deg(0), angle.Deg(45))}
 	start := atime.FromJD(2460000.0, atime.UTC)
 	end := start.AddDays(1.0)
@@ -43,7 +43,7 @@ func BenchmarkVisibleIntervals(b *testing.B) {
 
 func BenchmarkVisibleIntervals_1MinStep(b *testing.B) {
 	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(45), 0)
-	site, _ := NewSite("Test", loc, angle.Zero(), nil)
+	site, _ := NewSite("Test", loc, nil)
 	obj := benchMock{c: coord.NewICRS(angle.Deg(0), angle.Deg(45))}
 	start := atime.FromJD(2460000.0, atime.UTC)
 	end := start.AddDays(1.0)
@@ -59,7 +59,7 @@ func BenchmarkVisibleIntervals_1MinStep(b *testing.B) {
 
 func BenchmarkEventSolver_Visibility(b *testing.B) {
 	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(45), 0)
-	site, _ := NewSite("Test", loc, angle.Zero(), nil)
+	site, _ := NewSite("Test", loc, nil)
 	obj := NewStar("T", angle.Deg(0), angle.Deg(0))
 	start := atime.FromJD(2451545.0, atime.UTC)
 	end := start.Add(24 * atime.Hour)
@@ -83,7 +83,7 @@ func BenchmarkEventSolver_Visibility(b *testing.B) {
 
 func BenchmarkObservableWindows(b *testing.B) {
 	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(45), 0)
-	site, _ := NewSite("Test", loc, angle.Zero(), nil)
+	site, _ := NewSite("Test", loc, nil)
 	obj := NewStar("T", angle.Hour(18.69), angle.Deg(0))
 	start := atime.FromJD(2451545.0, atime.UTC)
 	end := start.Add(12 * atime.Hour)
@@ -117,7 +117,7 @@ func benchScheduler(b *testing.B, n int, strategy Strategy) {
 	b.Helper()
 
 	loc, _ := coord.NewGeodetic(angle.Zero(), angle.Zero(), 0)
-	site, _ := NewSite("Bench", loc, angle.Zero(), nil)
+	site, _ := NewSite("Bench", loc, nil)
 	planner, _ := NewPlanner(site, nil)
 	tm := &BasicTransitionModel{BaseSetup: 0}
 	blocks := makeBlocks(n)
@@ -172,7 +172,7 @@ func BenchmarkSwapOptimized_100(b *testing.B) {
 
 func BenchmarkTransitEstimate(b *testing.B) {
 	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(45), 0)
-	site, _ := NewSite("Test", loc, angle.Zero(), nil)
+	site, _ := NewSite("Test", loc, nil)
 	obj := benchMock{c: coord.NewICRS(angle.Deg(100), angle.Deg(20))}
 	start := atime.FromJD(2460000.0, atime.UTC)
 	end := start.AddDays(0.5)

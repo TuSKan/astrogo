@@ -1,6 +1,14 @@
-// Package lightpollution resolves a site's artificial night-sky brightness from
-// the lightpollutionmap.info QueryRaster service (the World Atlas 2015 layer,
+// Package lpmap resolves a site's artificial night-sky brightness from the
+// lightpollutionmap.info QueryRaster service (the World Atlas 2015 layer,
 // i.e. the Falchi et al. 2016 atlas) and converts it to a skybrightness floor.
+//
+// lpmap is a live-API sibling of [github.com/TuSKan/astrogo/skybrightness/atlas]:
+// both resolve the same World Atlas artificial-brightness data for the same
+// purpose (a [skybrightness.Floor] input), but atlas decodes a
+// caller-supplied offline file (no API key, no network) while lpmap queries
+// the service live (requires an API key, needs network access). Pick atlas
+// for offline/bundled-data use, lpmap when a live per-request query is
+// preferred over managing a data file.
 //
 // The QueryRaster API requires a free API key (https://www.lightpollutionmap.info,
 // 500 requests/day). Supply it via [WithAPIKey] or the LIGHTPOLLUTIONMAP_KEY
@@ -34,4 +42,4 @@
 //   - Falchi et al. 2016, "The new world atlas of artificial night sky
 //     brightness", Sci. Adv. 2, e1600377.
 //   - lightpollutionmap.info QueryRaster service (Jurij Stare).
-package lightpollution
+package lpmap

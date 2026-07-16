@@ -11,7 +11,7 @@ import (
 func ExampleScheduler_BuildSchedule() {
 	// Setup observatory and planner constraints
 	loc, _ := coord.NewGeodetic(angle.Zero(), angle.Zero(), 0)
-	site, _ := NewSite("Greenwich", loc, angle.Zero(), nil)
+	site, _ := NewSite("Greenwich", loc, nil)
 	planner, _ := NewPlanner(site, []Constraint{Altitude{Threshold: angle.Deg(30)}})
 
 	// Configure transition overheads (slew speeds, filter changes)

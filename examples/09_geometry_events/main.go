@@ -48,7 +48,7 @@ func main() {
 	// Geocentric Events (like Full Moon syzygy) do not depend on the observer to occur,
 	// but we can map the generated event timestamp against an observer to see if the event is visible locally!
 	loc, _ := coord.NewEarthLocation(-23.5505, -46.6333, 760) // São Paulo
-	site, _ := plan.NewSite("São Paulo", loc, 0, nil)
+	site, _ := plan.NewSite("São Paulo", loc, nil)
 
 	// ----------------------------------------------------
 	// Conjunction: Mars and Venus having the same Right Ascension
