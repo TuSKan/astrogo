@@ -7,7 +7,7 @@ precision computation, observatory planning, and scalable data workflows.
 
 # 🎯 Path to v1.0.0
 
-astrogo is pre-1.0 (currently **v0.4.0**). The deliberate decision was to ship
+astrogo is pre-1.0 (currently **v0.5.0**). The deliberate decision was to ship
 minor versions first — the API is already in good shape after an extensive
 correctness/robustness/release-readiness audit (see [CHANGELOG.md](../CHANGELOG.md))
 — rather than commit to the v1.0.0 API-stability promise while two catalog

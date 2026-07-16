@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] — 2026-07-16
+
 ### Changed — BREAKING
 - **`go:generate` is gone.** `internal/tools/cmd/download` and `catalog/openngc/parser` are deleted; `iers/iers.go` and `catalog/openngc/openngc.go` no longer have `go:generate` directives.
 - **`catalog/openngc` no longer uses `go:embed` at all** — no `catalogFS`, no `catalog/openngc/data/`, no package-level cached CSV, no `loadOnce`. `openngc.New()` now fetches and merges the two upstream source CSVs on every call (content-checked against a local cache, so a re-run costs only a HEAD probe once cached), exactly like every other astrogo catalog provider does its own network access — nothing embedded, nothing to fall back to.
@@ -522,7 +524,8 @@ First observatory-grade release. Validated against USNO, JPL Horizons, and NASA 
 - `VisibleIntervals` creates independent Contexts per grid step (correct; each step is a different epoch)
 - IERS EOP data fetched via `go:generate`, not at runtime
 
-[Unreleased]: https://github.com/TuSKan/astrogo/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/TuSKan/astrogo/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/TuSKan/astrogo/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/TuSKan/astrogo/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/TuSKan/astrogo/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/TuSKan/astrogo/compare/v0.1.5...v0.2.0

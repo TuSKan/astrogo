@@ -761,14 +761,14 @@ These are wrapped internally to ensure:
 ---
 
 > [!IMPORTANT]
-> astrogo is pre-1.0 (currently **v0.4.0**) — the public API may still change. This release centralizes all network access behind the [`remote`](remote/doc.go) package and removes implicit downloads (see [CHANGELOG.md](CHANGELOG.md) for the full breaking-change list). `catalog/jpl` and `catalog/vizier` — the two providers that previously gated a v1.0.0 API-stability commitment — are fully implemented (see Implementation Status above); see [`docs/ROADMAP.md`](docs/ROADMAP.md) for what's left before v1.0.0.
+> astrogo is pre-1.0 (currently **v0.5.0**) — the public API may still change. This release rebuilds the [`remote`](remote/doc.go) package's public API around the `Endpoint` struct (`GetFile`/`CacheDir`/`NewClientFor` replace the previous primitives; see [CHANGELOG.md](CHANGELOG.md) for the full breaking-change list). `catalog/jpl` and `catalog/vizier` — the two providers that previously gated a v1.0.0 API-stability commitment — are fully implemented (see Implementation Status above); see [`docs/ROADMAP.md`](docs/ROADMAP.md) for what's left before v1.0.0.
 
 ---
 
 ## Known Limitations & Scope
 
 > [!WARNING]
-> These are documented trade-offs, not bugs. They represent deliberate scope boundaries as of v0.4.0.
+> These are documented trade-offs, not bugs. They represent deliberate scope boundaries as of v0.5.0.
 
 ### Context Caching (Performance)
 
