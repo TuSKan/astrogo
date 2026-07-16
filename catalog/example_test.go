@@ -32,7 +32,7 @@ func TestIntegration(t *testing.T) {
 	// Let's create an Observatory on Earth (e.g. at Mauna Kea)
 	loc, _ := coord.NewGeodetic(angle.Deg(-155.4681), angle.Deg(19.8206), 4205.0)
 
-	obs, err := plan.NewSite("Mauna Kea", loc, nil)
+	obs, err := plan.NewSite("Mauna Kea", loc)
 	if err != nil {
 		t.Fatalf("Failed to create site: %v", err)
 	}

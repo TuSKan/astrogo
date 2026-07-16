@@ -31,7 +31,7 @@ func main() {
 
 	// ── Observatory: São Paulo (-23.5505°, -46.6333°, 760m) ─────────────
 	loc, _ := coord.NewEarthLocation(-23.5505, -46.6333, 760)
-	site, _ := plan.NewSite("São Paulo", loc, nil)
+	site, _ := plan.NewSite("São Paulo", loc)
 
 	// ── Observation epoch: 2026-04-15 at local midnight ──────────────────
 	tz, _ := time.LoadLocation("America/Sao_Paulo")

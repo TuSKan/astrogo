@@ -20,7 +20,7 @@ func (m mockConstraint) Check(_ Observable, _ time.Time, _ *Site) (Result, error
 func TestSchedulerAndStrategies(t *testing.T) {
 	loc, _ := coord.NewGeodetic(angle.Zero(), angle.Zero(), 0)
 
-	site, err := NewSite("TestSite", loc, nil)
+	site, err := NewSite("TestSite", loc)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

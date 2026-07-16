@@ -59,7 +59,7 @@ func main() {
 	}
 
 	loc, _ := coord.NewEarthLocation(-23.5505, -46.6333, 760)
-	site, _ := plan.NewSite("São Paulo", loc, brtz)
+	site, _ := plan.NewSite("São Paulo", loc, plan.WithTimeZone(brtz))
 	atm := atmosphere.AtAltitude(760)
 
 	planets := []planetDef{

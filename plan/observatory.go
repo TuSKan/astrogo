@@ -37,12 +37,17 @@ func WithHorizon(h angle.Angle) SiteOption {
 	return func(s *Site) { s.horizon = h }
 }
 
+// WithTimeZone sets the site's local time zone. Defaults to UTC if omitted
+// (see Site.TimeZone).
+func WithTimeZone(tz *time.Location) SiteOption {
+	return func(s *Site) { s.timeZone = tz }
+}
+
 // NewSite creates a new observing site with validation.
 // name: A human-readable name for the site.
 // loc: The geodetic location (longitude, latitude, height).
-// tz: The local time zone (optional, can be nil).
-// opts: optional parameters — see WithHorizon.
-func NewSite(name string, loc *coord.Geodetic, tz *time.Location, opts ...SiteOption) (*Site, error) {
+// opts: optional parameters — see WithHorizon and WithTimeZone.
+func NewSite(name string, loc *coord.Geodetic, opts ...SiteOption) (*Site, error) {
 	if loc == nil {
 		return nil, ErrNilLocation
 	}
@@ -51,7 +56,6 @@ func NewSite(name string, loc *coord.Geodetic, tz *time.Location, opts ...SiteOp
 		name:     name,
 		location: loc,
 		horizon:  angle.Zero(),
-		timeZone: tz,
 	}
 
 	for _, opt := range opts {
@@ -185,7 +189,7 @@ func (s *Site) Equal(other *Site) bool {
 
 // WithHorizon returns a copy of s with the given horizon limit.
 func (s *Site) WithHorizon(h angle.Angle) (*Site, error) {
-	return NewSite(s.name, s.location, s.timeZone, WithHorizon(h))
+	return NewSite(s.name, s.location, WithHorizon(h), WithTimeZone(s.timeZone))
 }
 
 // WithTimeZone returns a copy of s with the given time zone.

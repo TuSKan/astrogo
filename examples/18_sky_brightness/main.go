@@ -30,7 +30,7 @@ func main() {
 	// ── Observatory: São Paulo ───────────────────────────────────────────
 	tz, _ := time.LoadLocation("America/Sao_Paulo")
 	loc, _ := coord.NewEarthLocation(-23.5505, -46.6333, 760)
-	site, _ := plan.NewSite("São Paulo", loc, tz)
+	site, _ := plan.NewSite("São Paulo", loc, plan.WithTimeZone(tz))
 
 	// JPL kernel downloads are opt-in — see README "Data downloads &
 	// offline usage". de442 is ~115 MB; naif0012.tls (leap seconds) ~5 KB.

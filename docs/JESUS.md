@@ -582,7 +582,7 @@ glowing with a dull reddish-copper hue.
 ```go
 // Compute moonrise over Jerusalem on April 3, AD 33
 loc, _ := coord.NewGeodetic(angle.Deg(31.7683), angle.Deg(35.2137), 780.0)
-site, _ := plan.NewSite("Jerusalem", loc, time.LocationUTC)
+site, _ := plan.NewSite("Jerusalem", loc, plan.WithTimeZone(time.LocationUTC))
 
 dayStart := time.Date(33, time.April, 3, 12, 0, 0, 0, time.LocationUTC)
 dayEnd   := time.Date(33, time.April, 3, 20, 0, 0, 0, time.LocationUTC)

@@ -28,7 +28,7 @@ func main() {
 
 	// ── Observer: São Paulo, Brazil ──────────────────────────────────────
 	loc, _ := coord.NewEarthLocation(-23.5505, -46.6333, 760)
-	site, _ := plan.NewSite("São Paulo", loc, nil)
+	site, _ := plan.NewSite("São Paulo", loc)
 
 	prov := eph.Default()
 

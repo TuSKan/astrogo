@@ -16,7 +16,7 @@ import (
 
 func TestSunAltitudeMovement(t *testing.T) {
 	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(45), 0)
-	site, _ := plan.NewSite("Test", loc, nil)
+	site, _ := plan.NewSite("Test", loc)
 	p := eph.Default()
 
 	// Noon (roughly) at long 0

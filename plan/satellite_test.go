@@ -77,7 +77,7 @@ func TestPlanSatellite_PositionAndDetails(t *testing.T) {
 		t.Fatalf("NewGeodetic: %v", err)
 	}
 
-	site, err := NewSite("São Paulo", loc, nil)
+	site, err := NewSite("São Paulo", loc)
 	if err != nil {
 		t.Fatalf("NewSite: %v", err)
 	}
@@ -111,7 +111,7 @@ func TestPlanSatellite_ApparentMagnitudeRequiresContext(t *testing.T) {
 		t.Fatalf("NewGeodetic: %v", err)
 	}
 
-	site, err := NewSite("São Paulo", loc, nil)
+	site, err := NewSite("São Paulo", loc)
 	if err != nil {
 		t.Fatalf("NewSite: %v", err)
 	}

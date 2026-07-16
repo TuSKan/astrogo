@@ -209,7 +209,7 @@ func main() {
 	moonTarget := plan.NewMoon(prov)
 	now := events26[0].Time // Use the actual vernal equinox moment
 	loc, _ := coord.NewEarthLocation(-23.5505, -46.6333, 760.0)
-	site, _ := plan.NewSite("São Paulo", loc, brtz)
+	site, _ := plan.NewSite("São Paulo", loc, plan.WithTimeZone(brtz))
 	atm := atmosphere.AtAltitude(760)
 	ctx := coord.NewContext(now, loc, atm)
 
