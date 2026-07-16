@@ -34,7 +34,7 @@ func TestIsVisible(t *testing.T) {
 		t.Fatalf("Failed to create geodetic site: %v", err)
 	}
 
-	site, err := NewSite("Test", loc, nil)
+	site, err := NewSite("Test", loc)
 	if err != nil {
 		t.Fatalf("Failed to create observatory: %v", err)
 	}
@@ -56,7 +56,7 @@ func TestVisibleIntervals(t *testing.T) {
 		t.Fatalf("Failed to create geodetic site: %v", err)
 	}
 
-	site, _ := NewSite("Test", loc, nil)
+	site, _ := NewSite("Test", loc)
 
 	start := time.FromJD(2460000.5, time.UTC)
 	end := start.AddDays(1)
@@ -74,7 +74,7 @@ func TestVisibleIntervals(t *testing.T) {
 
 func TestVisibleIntervals_StepTooLarge(t *testing.T) {
 	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(45), 0)
-	site, _ := NewSite("Test", loc, nil)
+	site, _ := NewSite("Test", loc)
 
 	start := time.FromJD(2460000.5, time.UTC)
 	end := start.AddDays(1)
@@ -91,7 +91,7 @@ func TestVisibleIntervals_StepTooLarge(t *testing.T) {
 
 func TestNeverVisible(t *testing.T) {
 	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(45), 0)
-	site, _ := NewSite("Test", loc, nil)
+	site, _ := NewSite("Test", loc)
 
 	start := time.FromJD(2460000.5, time.UTC)
 	end := start.AddDays(1)
@@ -109,7 +109,7 @@ func TestNeverVisible(t *testing.T) {
 
 func TestTransitEstimate(t *testing.T) {
 	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(45), 0)
-	site, _ := NewSite("Test", loc, nil)
+	site, _ := NewSite("Test", loc)
 
 	start := time.FromJD(2460000.0, time.UTC)
 	end := start.AddDays(0.5)
@@ -134,7 +134,7 @@ func TestTransitEstimate(t *testing.T) {
 
 func TestFind(t *testing.T) {
 	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(45), 0)
-	site, _ := NewSite("Test", loc, nil)
+	site, _ := NewSite("Test", loc)
 	start := time.FromJD(2460000.0, time.UTC)
 	end := start.AddDays(1)
 	obj := mockObject{pos: coord.NewICRS(angle.Deg(100), angle.Deg(20))}

@@ -16,7 +16,7 @@ func TestNewSite(t *testing.T) {
 	tz, _ := time.LoadLocation("Europe/Rome")
 	horizon := angle.Deg(20)
 
-	site, err := NewSite("My Observatory", loc, tz, WithHorizon(horizon))
+	site, err := NewSite("My Observatory", loc, WithHorizon(horizon), WithTimeZone(tz))
 	testutil.AssertNoError(t, err)
 
 	testutil.AssertEqual(t, "Name", site.Name(), "My Observatory")
@@ -29,7 +29,7 @@ func TestNewSite(t *testing.T) {
 
 func TestDefaultTimeZone(t *testing.T) {
 	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(0), 0)
-	site, _ := NewSite("UTC Site", loc, nil)
+	site, _ := NewSite("UTC Site", loc)
 
 	testutil.AssertEqual(t, "Default TZ", site.TimeZone().String(), "UTC")
 }
@@ -37,19 +37,19 @@ func TestDefaultTimeZone(t *testing.T) {
 func TestInvalidHorizon(t *testing.T) {
 	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(0), 0)
 
-	_, err := NewSite("Bad Horizon", loc, nil, WithHorizon(angle.Deg(100)))
+	_, err := NewSite("Bad Horizon", loc, WithHorizon(angle.Deg(100)))
 	if !errors.Is(err, ErrInvalidHorizon) {
 		t.Errorf("Expected ErrInvalidHorizon, got %v", err)
 	}
 
-	_, err = NewSite("Bad Horizon Low", loc, nil, WithHorizon(angle.Deg(-95)))
+	_, err = NewSite("Bad Horizon Low", loc, WithHorizon(angle.Deg(-95)))
 	if !errors.Is(err, ErrInvalidHorizon) {
 		t.Errorf("Expected ErrInvalidHorizon, got %v", err)
 	}
 }
 
 func TestNilLocation(t *testing.T) {
-	_, err := NewSite("No Location", nil, nil)
+	_, err := NewSite("No Location", nil)
 	if !errors.Is(err, ErrNilLocation) {
 		t.Errorf("Expected ErrNilLocation, got %v", err)
 	}
@@ -57,7 +57,7 @@ func TestNilLocation(t *testing.T) {
 
 func TestString(t *testing.T) {
 	loc, _ := coord.NewGeodetic(angle.Deg(10), angle.Deg(45), 500)
-	site, _ := NewSite("Test", loc, nil, WithHorizon(angle.Deg(20)))
+	site, _ := NewSite("Test", loc, WithHorizon(angle.Deg(20)))
 
 	s := site.String()
 	if s == "" {
@@ -67,9 +67,9 @@ func TestString(t *testing.T) {
 
 func TestSiteEqual(t *testing.T) {
 	loc, _ := coord.NewGeodetic(angle.Deg(10), angle.Deg(45), 500)
-	a, _ := NewSite("Test", loc, nil, WithHorizon(angle.Deg(20)))
-	b, _ := NewSite("Test", loc, nil, WithHorizon(angle.Deg(20)))
-	c, _ := NewSite("Other", loc, nil, WithHorizon(angle.Deg(20)))
+	a, _ := NewSite("Test", loc, WithHorizon(angle.Deg(20)))
+	b, _ := NewSite("Test", loc, WithHorizon(angle.Deg(20)))
+	c, _ := NewSite("Other", loc, WithHorizon(angle.Deg(20)))
 
 	if !a.Equal(b) {
 		t.Error("identical sites should be equal")
@@ -82,7 +82,7 @@ func TestSiteEqual(t *testing.T) {
 
 func TestWithHorizon(t *testing.T) {
 	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(0), 0)
-	site, _ := NewSite("Test", loc, nil)
+	site, _ := NewSite("Test", loc)
 
 	s2, err := site.WithHorizon(angle.Deg(15))
 	testutil.AssertNoError(t, err)
@@ -97,7 +97,7 @@ func TestLocalSiderealTime(t *testing.T) {
 	// Greenwich (lon=0) at J2000.0 (2000-01-01 12:00:00 UTC = JD 2451545.0)
 	// GAST at J2000.0 is approximately 18.697 hours = 280.46 degrees
 	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(51.5), 0) // Greenwich
-	site, _ := NewSite("Greenwich", loc, nil)
+	site, _ := NewSite("Greenwich", loc)
 
 	tm := time.FromJD(2451545.0, time.UTC)
 

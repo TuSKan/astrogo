@@ -33,7 +33,7 @@ import (
 
 func main() {
 	loc, _ := coord.NewEarthLocation(-23.5505, -46.6333, 760) // São Paulo
-	site, _ := plan.NewSite("Backyard", loc, nil)
+	site, _ := plan.NewSite("Backyard", loc)
 	sirius := plan.NewStar("Sirius", angle.Hour(6.7525), angle.Deg(-16.7161))
 
 	tonight := time.Date(2026, 4, 15, 22, 0, 0, 0, time.LocationUTC)
@@ -121,7 +121,7 @@ const layout = "2006-01-02 15:04 MST"
 func main() {
 	// ── Observer Setup: São Paulo ──
 	loc, _ := coord.NewEarthLocation(-23.5505, -46.6333, 760)
-	site, _ := plan.NewSite("São Paulo", loc, nil)
+	site, _ := plan.NewSite("São Paulo", loc)
 
 	// ── Night boundaries ──
 	eph := ephemeris.Default()

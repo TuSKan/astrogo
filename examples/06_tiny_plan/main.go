@@ -13,7 +13,7 @@ import (
 func main() {
 	// 1. Setup Observatory (São Paulo, Brazil)
 	loc, _ := coord.NewEarthLocation(-23.5505, -46.6333, 760)
-	site, _ := plan.NewSite("São Paulo", loc, nil)
+	site, _ := plan.NewSite("São Paulo", loc)
 
 	// Ensure targets are at least 20 degrees above the horizon
 	planner, _ := plan.NewPlanner(site, []plan.Constraint{plan.Altitude{Threshold: angle.Deg(20)}})

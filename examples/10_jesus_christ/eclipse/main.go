@@ -47,7 +47,7 @@ func main() {
 		panic(err)
 	}
 
-	site, err := plan.NewSite("Jerusalem", loc, time.LocationUTC)
+	site, err := plan.NewSite("Jerusalem", loc, plan.WithTimeZone(time.LocationUTC))
 	if err != nil {
 		panic(err)
 	}

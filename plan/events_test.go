@@ -16,7 +16,7 @@ import (
 
 func TestEventSolver_Visibility_Fixed(t *testing.T) {
 	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(45), 0)
-	site, _ := NewSite("Test", loc, nil)
+	site, _ := NewSite("Test", loc)
 	obj := NewStar("T", angle.Deg(0), angle.Deg(0))
 
 	start := time.FromJD(2451545.0, time.UTC)
@@ -53,7 +53,7 @@ func TestEventSolver_Visibility_Fixed(t *testing.T) {
 
 func TestEventSolver_Visibility_Circumpolar(t *testing.T) {
 	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(45), 0)
-	site, _ := NewSite("Test", loc, nil)
+	site, _ := NewSite("Test", loc)
 	obj := NewStar("T", angle.Deg(0), angle.Deg(80))
 
 	start := time.FromJD(2451545.0, time.UTC)
@@ -78,7 +78,7 @@ func TestEventSolver_Visibility_Circumpolar(t *testing.T) {
 
 func TestEventSolver_Visibility_NeverVisible(t *testing.T) {
 	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(45), 0)
-	site, _ := NewSite("Test", loc, nil)
+	site, _ := NewSite("Test", loc)
 	obj := NewStar("T", angle.Deg(0), angle.Deg(-80))
 
 	start := time.FromJD(2451545.0, time.UTC)
@@ -105,7 +105,7 @@ func TestEventSolver_Visibility_NeverVisible(t *testing.T) {
 
 func TestSunEvents(t *testing.T) {
 	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(40), 0)
-	site, _ := NewSite("Test", loc, nil)
+	site, _ := NewSite("Test", loc)
 	eph := eph.Default()
 
 	start := time.FromJD(2451544.5, time.UTC)
@@ -138,7 +138,7 @@ func TestSunEvents(t *testing.T) {
 
 func TestSunEvents_Polar(t *testing.T) {
 	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(80), 0)
-	site, _ := NewSite("Arctic", loc, nil)
+	site, _ := NewSite("Arctic", loc)
 	eph := eph.Default()
 
 	start := time.FromJD(2451727.5, time.UTC)
@@ -156,7 +156,7 @@ func TestSunEvents_Polar(t *testing.T) {
 
 func TestMoonEvents(t *testing.T) {
 	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(40), 0)
-	site, _ := NewSite("Test", loc, nil)
+	site, _ := NewSite("Test", loc)
 	eph := eph.Default()
 
 	start := time.FromJD(2451545.0, time.UTC)
@@ -174,7 +174,7 @@ func TestMoonEvents(t *testing.T) {
 
 func TestSunriseSunset(t *testing.T) {
 	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(40), 0)
-	site, _ := NewSite("Test", loc, nil)
+	site, _ := NewSite("Test", loc)
 	eph := eph.Default()
 
 	start := time.FromJD(2451544.5, time.UTC)
@@ -192,7 +192,7 @@ func TestSunriseSunset(t *testing.T) {
 
 func TestTwilightEvents(t *testing.T) {
 	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(40), 0)
-	site, _ := NewSite("Test", loc, nil)
+	site, _ := NewSite("Test", loc)
 	eph := eph.Default()
 
 	start := time.FromJD(2451544.5, time.UTC)
@@ -228,7 +228,7 @@ func TestTwilightEvents(t *testing.T) {
 
 func TestTwilight_Sequence(t *testing.T) {
 	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(40), 0)
-	site, _ := NewSite("Test", loc, nil)
+	site, _ := NewSite("Test", loc)
 	eph := eph.Default()
 
 	start := time.FromJD(2451544.5, time.UTC)
@@ -266,7 +266,7 @@ func TestTwilight_Sequence(t *testing.T) {
 
 func TestTwilight_HighLat(t *testing.T) {
 	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(51.5), 0)
-	site, _ := NewSite("London", loc, nil)
+	site, _ := NewSite("London", loc)
 	eph := eph.Default()
 
 	start := time.FromJD(2451727.5, time.UTC)
@@ -284,7 +284,7 @@ func TestTwilight_HighLat(t *testing.T) {
 
 func BenchmarkEventSolver(b *testing.B) {
 	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(45), 0)
-	site, _ := NewSite("Test", loc, nil)
+	site, _ := NewSite("Test", loc)
 	obj := NewStar("T", angle.Deg(0), angle.Deg(0))
 	start := time.FromJD(2451545.0, time.UTC)
 	end := start.Add(24 * time.Hour)

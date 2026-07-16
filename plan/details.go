@@ -289,7 +289,7 @@ func applyProps(d *TargetDetails, props []string) {
 // fillRiseSetTransit finds the next rise, set, and transit events within
 // ±12/+24 hours of the context time.
 func fillRiseSetTransit(d *TargetDetails, obs Observable, ctx *coord.Context) {
-	site, err := NewSite("Observer", ctx.Site(), nil)
+	site, err := NewSite("Observer", ctx.Site())
 	if err != nil {
 		// No valid location to compute rise/set/transit against; leave
 		// those fields unset rather than proceed with a broken Observer.

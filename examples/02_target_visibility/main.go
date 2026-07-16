@@ -15,7 +15,7 @@ import (
 func main() {
 	// 1. Setup Observatory (São Paulo, Brazil)
 	loc, _ := coord.NewEarthLocation(-23.5505, -46.6333, 760)
-	site, _ := plan.NewSite("São Paulo", loc, nil)
+	site, _ := plan.NewSite("São Paulo", loc)
 
 	// 2. Define Constraints: The target must be above 30 degrees altitude
 	constraints := []plan.Constraint{
