@@ -154,6 +154,35 @@ func TestFloorIsArtificialOnly(t *testing.T) {
 	testutil.AssertNear(t, "Floor SB (artificial-only)", gotSB, wantArtificialOnly, 1e-9)
 }
 
+func TestWithLayerOverridesDefault(t *testing.T) {
+	t.Cleanup(remote.Reset)
+
+	var gotLayer string
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotLayer = r.URL.Query().Get("ql")
+
+		if _, err := fmt.Fprint(w, "-46.6333,-23.5505,6.64"); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}))
+	defer server.Close()
+
+	if err := remote.SetURL(remote.LightPollution, server.URL); err != nil {
+		t.Fatal(err)
+	}
+
+	c := New(WithAPIKey("test-key"), WithHTTPClient(server.Client()), WithLayer("viirs_2023"))
+
+	_, err := c.Floor(context.Background(), -23.5505, -46.6333)
+	testutil.AssertNoError(t, err)
+
+	if gotLayer != "viirs_2023" {
+		t.Errorf("layer query param = %q, want %q", gotLayer, "viirs_2023")
+	}
+}
+
 // TestArtificialBrightnessRetriesOnTransientFailure verifies a transient 503
 // is retried (per R20: the client previously made one unconditional request
 // with no retry/backoff, unlike catalog/resolve.Client) and a request that
