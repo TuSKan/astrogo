@@ -225,6 +225,90 @@ func TestGetFileWithCacheNameDiffersFromPath(t *testing.T) {
 	}
 }
 
+func TestGetFileWithProgressReportsBytesDirectSavePath(t *testing.T) {
+	cleanRemoteState(t)
+
+	const payload = "kernel-progress-payload"
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(payload))
+	}))
+	defer srv.Close()
+
+	if err := SetURL(NAIFSPK, srv.URL); err != nil {
+		t.Fatal(err)
+	}
+
+	EnableDownloads(NAIFSPK, 0)
+
+	var mu sync.Mutex
+
+	var last int64
+
+	var calls int
+
+	_, err := GetFile(context.Background(), NAIFSPK, "planets/progress.bsp",
+		WithProgress(func(downloaded, _ int64) {
+			mu.Lock()
+			defer mu.Unlock()
+
+			calls++
+			last = downloaded
+		}))
+	if err != nil {
+		t.Fatalf("GetFile: %v", err)
+	}
+
+	if calls == 0 {
+		t.Fatal("WithProgress callback was never invoked")
+	}
+
+	if last != int64(len(payload)) {
+		t.Errorf("final downloaded = %d, want %d", last, len(payload))
+	}
+
+	calls = 0
+
+	if _, err := GetFile(context.Background(), NAIFSPK, "planets/progress.bsp",
+		WithProgress(func(int64, int64) { calls++ })); err != nil {
+		t.Fatalf("GetFile (cached): %v", err)
+	}
+
+	if calls != 0 {
+		t.Errorf("WithProgress must not fire on a cache hit; got %d calls", calls)
+	}
+}
+
+func TestGetFileWithProgressReportsBytesValidatedPath(t *testing.T) {
+	cleanRemoteState(t)
+
+	const payload = "leap-second-progress-payload"
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(payload))
+	}))
+	defer srv.Close()
+
+	if err := SetURL(NAIFLSK, srv.URL); err != nil {
+		t.Fatal(err)
+	}
+
+	EnableDownloads(NAIFLSK, 0)
+
+	var last int64
+
+	_, err := GetFile(context.Background(), NAIFLSK, "naif0012.tls",
+		WithValidate(func([]byte) error { return nil }),
+		WithProgress(func(downloaded, _ int64) { last = downloaded }))
+	if err != nil {
+		t.Fatalf("GetFile: %v", err)
+	}
+
+	if last != int64(len(payload)) {
+		t.Errorf("final downloaded = %d, want %d", last, len(payload))
+	}
+}
+
 func TestGetFileDownloadDeniedWithoutConsent(t *testing.T) {
 	cleanRemoteState(t)
 

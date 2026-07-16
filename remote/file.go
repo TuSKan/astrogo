@@ -42,6 +42,27 @@ func Save(r io.Reader, dest gofs.File) error {
 	return nil
 }
 
+// progressReader wraps r, invoking onProgress after every Read that returns
+// data with the running byte count and total (0 if the total is unknown,
+// e.g. no Content-Length header).
+type progressReader struct {
+	r          io.Reader
+	total      int64
+	read       int64
+	onProgress func(downloaded, total int64)
+}
+
+func (p *progressReader) Read(b []byte) (int, error) {
+	n, err := p.r.Read(b)
+	if n > 0 {
+		p.read += int64(n)
+		p.onProgress(p.read, p.total)
+	}
+
+	//nolint:wrapcheck // must forward the underlying error (incl. io.EOF) unwrapped: io.Copy/io.ReadAll identity-check it via errors.Is
+	return n, err
+}
+
 // writeAtomicReader streams body into a temp file next to path and
 // atomically renames it into place — never leaving a partial file at
 // path. Used by Save for the local-filesystem destination path (go-fs's

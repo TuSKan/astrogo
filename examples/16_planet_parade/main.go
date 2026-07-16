@@ -17,7 +17,6 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
@@ -60,7 +59,7 @@ func main() {
 	}
 
 	loc, _ := coord.NewEarthLocation(-23.5505, -46.6333, 760)
-	site, _ := plan.NewSite("São Paulo", loc, angle.Zero(), brtz)
+	site, _ := plan.NewSite("São Paulo", loc, brtz)
 	atm := atmosphere.AtAltitude(760)
 
 	planets := []planetDef{

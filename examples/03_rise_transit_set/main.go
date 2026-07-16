@@ -14,7 +14,7 @@ import (
 func main() {
 	// 1. Setup Observatory (São Paulo, Brazil)
 	loc, _ := coord.NewEarthLocation(-23.5505, -46.6333, 760)
-	site, _ := plan.NewSite("São Paulo", loc, 0, nil)
+	site, _ := plan.NewSite("São Paulo", loc, nil)
 
 	// 2. Set a Deep Space Target
 	sirius, err := catalog.NewResolver(catalog.SIMBAD).Resolve("Sirius")

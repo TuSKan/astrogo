@@ -17,7 +17,7 @@ func skyTestFixture(t *testing.T) (*Site, time.Time, *coord.Context) {
 		t.Fatalf("NewGeodetic: %v", err)
 	}
 
-	site, err := NewSite("Test", loc, angle.Zero(), nil)
+	site, err := NewSite("Test", loc, nil)
 	if err != nil {
 		t.Fatalf("NewSite: %v", err)
 	}

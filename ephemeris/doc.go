@@ -33,6 +33,28 @@
 //   - Sun: IAU 2000 Earth ephemeris (Epv00), providing ~0.1″ solar accuracy.
 //   - Moon: Meeus 1998 algorithm (Moon98), providing geocentric GCRS-like state.
 //
+// # Choosing a Provider
+//
+// [Default] needs no download and no [context.Context] consent step, at the
+// cost of accuracy. A JPL kernel via [NewProvider] is sub-arcsecond (validated
+// against JPL Horizons, see docs/VALIDATION.md) but requires a one-time,
+// consent-gated download (see the remote package doc for the consent gate).
+// de440s/de440/de442/de441 do not differ from each other in accuracy — only
+// in time-span coverage and file size; the real accuracy jump is
+// [Default] versus any JPL kernel:
+//
+//	Provider                    Accuracy                    Size         Download
+//	Default()                   ~0.1″ solar (Sun); Moon      built-in     not needed
+//	                             via Meeus 1998, not JPL-grade
+//	NewProvider(…, "de440s")     sub-arcsecond vs. Horizons   ~32 MB       one-time
+//	NewProvider(…, "de440")      same fidelity, wider span    ~115 MB      one-time
+//	NewProvider(…, "de442")      same fidelity, wider span    ~115 MB      one-time
+//	NewProvider(…, "de441_…")    same fidelity, millennia     multi-GB/part one-time
+//
+// Default to de440s once JPL-grade positions are needed; reach for de440/de442
+// only when a request spans centuries beyond de440s's coverage, and de441
+// only for millennia-scale work.
+//
 // # Coordinates and Frames
 //
 // Providers return [State] vectors (position and velocity) in astronomical units

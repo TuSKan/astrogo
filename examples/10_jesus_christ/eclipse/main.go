@@ -47,7 +47,7 @@ func main() {
 		panic(err)
 	}
 
-	site, err := plan.NewSite("Jerusalem", loc, angle.Deg(0), time.LocationUTC)
+	site, err := plan.NewSite("Jerusalem", loc, time.LocationUTC)
 	if err != nil {
 		panic(err)
 	}

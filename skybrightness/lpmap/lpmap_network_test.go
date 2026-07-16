@@ -1,12 +1,12 @@
 //go:build network
 
-//go test -tags network ./lightpollution
+//go test -tags network ./skybrightness/lpmap
 
 // These tests reach the live lightpollutionmap.info QueryRaster service and
 // require a free API key in the LIGHTPOLLUTIONMAP_KEY environment variable.
 // They skip automatically when the key is absent or the endpoint is unreachable
 // (DNS failure, firewall, transient outage) to avoid false-negative CI failures.
-package lightpollution
+package lpmap
 
 import (
 	"context"

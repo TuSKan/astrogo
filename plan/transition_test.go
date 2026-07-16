@@ -11,7 +11,7 @@ import (
 func TestBasicTransitionModel(t *testing.T) {
 	loc, _ := coord.NewGeodetic(angle.Zero(), angle.Zero(), 0)
 
-	site, err := NewSite("TestSite", loc, angle.Zero(), nil)
+	site, err := NewSite("TestSite", loc, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -84,7 +84,7 @@ func TestBasicTransitionModel_SameEpoch(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	site, err := NewSite("TestSite", loc, angle.Zero(), nil)
+	site, err := NewSite("TestSite", loc, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

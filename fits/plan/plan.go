@@ -35,7 +35,7 @@ func SiteFromFITS(h *fits.Header) (*plan.Site, error) {
 	}
 
 	// Assuming 0 horizon limitation as standard ingestion
-	site, err := plan.NewSite(obsName, geodetic, angle.Deg(0), nil)
+	site, err := plan.NewSite(obsName, geodetic, nil)
 	if err != nil {
 		return nil, fmt.Errorf("fits/plan: new site: %w", err)
 	}

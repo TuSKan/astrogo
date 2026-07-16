@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `remote.WithProgress(func(downloaded, total int64))` — a `ReadOption` reporting a `GetFile` download's progress as it streams, on both the buffered (`WithValidate`) and direct-to-disk paths. Independent of whether a caller supplies it, `GetFile` now logs one line (via the stdlib `log` package) at the start of an actual download showing the endpoint and its registered `ApproxSize` — never logged on a cache hit.
+- `ephemeris` package doc: a "Choosing a Provider" section comparing `Default()` against the JPL kernel family (de440s/de440/de442/de441) on accuracy, size, and offline-friendliness — previously only a size table existed, with no guidance on which provider to reach for.
+- `plan` package doc: a "Finding what you need" task-oriented symbol index (site setup, targets, rise/set/twilight, observability scoring, geometric events, phases/eclipses, crescent visibility, scheduling, satellite passes, low-level solving) — previously prose-only with no way to locate a symbol among the package's ~150 exported names short of scanning godoc alphabetically.
+
+### Changed — BREAKING
+- **`lightpollution` moved to `skybrightness/lpmap`** (package name `lightpollution` → `lpmap`). It's a live-API sibling of `skybrightness/atlas` — both resolve the same World Atlas artificial-brightness data for a `skybrightness.Floor`, just from a downloaded file (`atlas`) versus a live per-request query (`lpmap`) — and the old top-level package name didn't make that relationship, or the live-client-vs-physics-model distinction from core `skybrightness`, visible. Update `import "github.com/TuSKan/astrogo/lightpollution"` to `import "github.com/TuSKan/astrogo/skybrightness/lpmap"`; `lightpollution.New()` is now `lpmap.New()`. `remote.LightPollution` (the endpoint registry key) is unchanged.
+- **`plan.NewSite`'s `horizon angle.Angle` parameter is now the optional `WithHorizon(angle.Angle)` `SiteOption`, defaulting to `angle.Zero()`.** The signature changes from `NewSite(name, loc, horizon, tz)` to `NewSite(name, loc, tz, opts...)` — the overwhelming majority of call sites passed a zero horizon anyway, so most callers now drop the argument entirely (`NewSite("Site", loc, tz)`); a non-zero horizon becomes `NewSite("Site", loc, tz, plan.WithHorizon(angle.Deg(20)))`. Matches the `WithX`-functional-option convention already used by `Asteroid`/`Comet`/`DeepSkyObject`/`Satellite`/`Star` in this package. `Site.WithHorizon` (the copy-with-new-horizon method) is unchanged.
+
+### Changed
+- Every `plan.NewSite` call site across examples, docs, and tests now spells a zero horizon limit as `angle.Zero()` (or omits it entirely now that it's optional — see above) — previously a mix of `angle.Zero()`, a bare `0`, and `angle.Deg(0)` (all numerically identical, but inconsistent to read).
+
 ## [0.5.0] — 2026-07-16
 
 ### Changed — BREAKING

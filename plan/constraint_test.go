@@ -12,7 +12,7 @@ import (
 
 func TestConstraints(t *testing.T) {
 	loc, _ := coord.NewGeodetic(angle.Zero(), angle.Zero(), 0)
-	site, _ := NewSite("Test", loc, angle.Zero(), nil)
+	site, _ := NewSite("Test", loc, nil)
 	// Equinox 2000
 	tm := time.FromJD(2451545.0, time.UTC)
 
@@ -58,7 +58,7 @@ func TestConstraints(t *testing.T) {
 
 func TestSunMoonConstraints(t *testing.T) {
 	loc, _ := coord.NewGeodetic(angle.Zero(), angle.Zero(), 0)
-	site, _ := NewSite("Test", loc, angle.Zero(), nil)
+	site, _ := NewSite("Test", loc, nil)
 
 	// Night time (Sun below horizon)
 	tmNight := time.FromJD(2451545.5, time.UTC)

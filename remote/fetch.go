@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"time"
 
@@ -28,6 +29,7 @@ type readCfg struct {
 	cacheName string
 	validate  func([]byte) error
 	timeout   time.Duration
+	progress  func(downloaded, total int64)
 }
 
 // ReadOption customizes a single GetFile call.
@@ -51,6 +53,13 @@ func WithValidate(f func([]byte) error) ReadOption {
 // WithDownloadTimeout overrides Endpoint.DownloadTimeout for this one call.
 func WithDownloadTimeout(d time.Duration) ReadOption {
 	return func(c *readCfg) { c.timeout = d }
+}
+
+// WithProgress registers a callback invoked as a download progresses, with
+// the bytes transferred so far and the total (0 if unknown, e.g. no
+// Content-Length header). Never called for a cache hit.
+func WithProgress(f func(downloaded, total int64)) ReadOption {
+	return func(c *readCfg) { c.progress = f }
 }
 
 // GetFile ensures endpoint id's content at path is present and valid in
@@ -114,7 +123,13 @@ func GetFile(ctx context.Context, id EndpointID, name string, opts ...ReadOption
 		timeout = DefaultDownloadTimeout
 	}
 
-	if err := fetchInto(ctx, id, name, cacheFile, timeout, cfg.validate); err != nil {
+	if ep.ApproxSize == SizeVaries {
+		log.Printf("remote: downloading %s (endpoint %s, size varies)", cacheFile, id)
+	} else {
+		log.Printf("remote: downloading %s (endpoint %s, approx %d bytes)", cacheFile, id, ep.ApproxSize)
+	}
+
+	if err := fetchInto(ctx, id, name, cacheFile, timeout, cfg.validate, cfg.progress); err != nil {
 		return "", err
 	}
 
@@ -136,8 +151,9 @@ func GetFile(ctx context.Context, id EndpointID, name string, opts ...ReadOption
 // endpoint's ApproxSize, then again with the exact Content-Length once
 // response headers arrive. With validate non-nil, the full body is
 // buffered and validated before being written to dest; otherwise the
-// response streams straight through to Save.
-func fetchInto(ctx context.Context, id EndpointID, path string, dest gofs.File, timeout time.Duration, validate func([]byte) error) error {
+// response streams straight through to Save. With progress non-nil, it's
+// invoked as the body is read regardless of which of those two paths runs.
+func fetchInto(ctx context.Context, id EndpointID, path string, dest gofs.File, timeout time.Duration, validate func([]byte) error, progress func(downloaded, total int64)) error {
 	base, err := URL(id)
 	if err != nil {
 		return err
@@ -177,8 +193,18 @@ func fetchInto(ctx context.Context, id EndpointID, path string, dest gofs.File, 
 		return err
 	}
 
+	body := resp.Body
+
+	var bodyReader io.Reader = body
+
+	if progress != nil {
+		total := max(resp.ContentLength, 0)
+
+		bodyReader = &progressReader{r: body, total: total, onProgress: progress}
+	}
+
 	if validate != nil {
-		data, err := io.ReadAll(resp.Body)
+		data, err := io.ReadAll(bodyReader)
 		if err != nil {
 			return fmt.Errorf("%w: %s: %w", ErrDownloadFailed, name, err)
 		}
@@ -194,7 +220,7 @@ func fetchInto(ctx context.Context, id EndpointID, path string, dest gofs.File, 
 		return nil
 	}
 
-	if err := Save(resp.Body, dest); err != nil {
+	if err := Save(bodyReader, dest); err != nil {
 		return fmt.Errorf("%w: %w", ErrDownloadFailed, err)
 	}
 
