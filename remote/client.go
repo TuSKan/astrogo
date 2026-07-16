@@ -1,7 +1,9 @@
 package remote
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -16,6 +18,9 @@ import (
 // defaultUserAgent identifies astrogo to remote services on every request
 // that doesn't set its own User-Agent.
 const defaultUserAgent = "AstroGo/1.0"
+
+// DefaultAPITimeout is used for a KindAPI endpoint whose Timeout is zero.
+const DefaultAPITimeout = 30 * time.Second
 
 // RetryPolicy defines whether a request should be retried based on err or response.
 type RetryPolicy func(resp *http.Response, err error) bool
@@ -50,7 +55,7 @@ type Client struct {
 	MaxRetries  uint
 }
 
-// ClientOption customizes a Client built by NewClient.
+// ClientOption customizes a Client built by NewClientFor.
 type ClientOption func(*Client)
 
 // WithHTTPClient replaces the underlying *http.Client (custom transport,
@@ -59,7 +64,8 @@ func WithHTTPClient(h *http.Client) ClientOption {
 	return func(c *Client) { c.HTTPClient = h }
 }
 
-// WithTimeout sets the underlying client's total request timeout.
+// WithTimeout sets the underlying client's total request timeout, overriding
+// the endpoint's registered Timeout.
 func WithTimeout(d time.Duration) ClientOption {
 	return func(c *Client) { c.HTTPClient.Timeout = d }
 }
@@ -74,13 +80,25 @@ func WithUserAgent(ua string) ClientOption {
 	return func(c *Client) { c.UserAgent = ua }
 }
 
-// NewClient returns a Client with sensible defaults (30s timeout, 3 retries,
-// exponential backoff, AstroGo user-agent), customizable via options.
-func NewClient(opts ...ClientOption) *Client {
+// NewClientFor builds a Client for endpoint id, defaulting its timeout to
+// the endpoint's registered Timeout (DefaultAPITimeout if zero), with opts
+// applied on top. This is the sole Client constructor — every astrogo
+// package builds its HTTP client from the Endpoint that describes the
+// service it talks to, instead of configuring timeouts ad hoc at each call
+// site. Returns ErrUnknownEndpoint for an unregistered id.
+func NewClientFor(id EndpointID, opts ...ClientOption) (*Client, error) {
+	ep, ok := Lookup(id)
+	if !ok {
+		return nil, fmt.Errorf("%w: %q", ErrUnknownEndpoint, id)
+	}
+
+	timeout := ep.Timeout
+	if timeout == 0 {
+		timeout = DefaultAPITimeout
+	}
+
 	c := &Client{
-		HTTPClient: &http.Client{
-			Timeout: 30 * time.Second,
-		},
+		HTTPClient:  &http.Client{Timeout: timeout},
 		MaxRetries:  3,
 		RetryPolicy: DefaultRetryPolicy,
 		UserAgent:   defaultUserAgent,
@@ -90,7 +108,7 @@ func NewClient(opts ...ClientOption) *Client {
 		opt(c)
 	}
 
-	return c
+	return c, nil
 }
 
 // Do executes the HTTP request with automatic retry and backoff. Non-2xx
@@ -159,9 +177,11 @@ func (c *Client) Do(req *http.Request) (*http.Response, error) {
 }
 
 // Get resolves the endpoint's base URL through the registry gate (offline
-// mode, enable/disable, overrides), appends path and query, and executes
-// the request via Do. It is the standard one-liner for API endpoints.
-func (c *Client) Get(ctx context.Context, id EndpointID, path string, query url.Values) (*http.Response, error) {
+// mode, enable/disable, overrides), appends path and query, executes the
+// request via Do, and returns the response body directly — already
+// consent/status-checked, since Do converts any non-2xx response into a
+// returned error before a caller ever sees a body.
+func (c *Client) Get(ctx context.Context, id EndpointID, path string, query url.Values) (io.ReadCloser, error) {
 	base, err := URL(id)
 	if err != nil {
 		return nil, err
@@ -177,7 +197,82 @@ func (c *Client) Get(ctx context.Context, id EndpointID, path string, query url.
 		return nil, fmt.Errorf("remote: new request: %w", err)
 	}
 
-	return c.Do(req)
+	resp, err := c.Do(req)
+	if err != nil {
+		return nil, err
+	}
+
+	return resp.Body, nil
+}
+
+// GetJSON executes a GET and decodes the JSON response body into out,
+// closing the body when done. For endpoints that always return JSON with
+// no format sniffing needed.
+func (c *Client) GetJSON(ctx context.Context, id EndpointID, path string, query url.Values, out any) error {
+	body, err := c.Get(ctx, id, path, query)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = body.Close() }()
+
+	if err := json.NewDecoder(body).Decode(out); err != nil {
+		return fmt.Errorf("remote: decode JSON from %q: %w", id, err)
+	}
+
+	return nil
+}
+
+// PostForm executes a POST with an application/x-www-form-urlencoded body
+// and returns the raw response body — for TAP-ADQL consumers and any
+// endpoint whose response format must be sniffed rather than auto-decoded.
+func (c *Client) PostForm(ctx context.Context, id EndpointID, path string, v url.Values) (io.ReadCloser, error) {
+	base, err := URL(id)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, joinURL(base, path), strings.NewReader(v.Encode()))
+	if err != nil {
+		return nil, fmt.Errorf("remote: new request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	resp, err := c.Do(req)
+	if err != nil {
+		return nil, err
+	}
+
+	return resp.Body, nil
+}
+
+// PostJSON marshals body as the JSON request payload and returns the raw
+// response body — for endpoints whose response format must be sniffed
+// rather than auto-decoded.
+func (c *Client) PostJSON(ctx context.Context, id EndpointID, path string, body any) (io.ReadCloser, error) {
+	base, err := URL(id)
+	if err != nil {
+		return nil, err
+	}
+
+	b, err := json.Marshal(body)
+	if err != nil {
+		return nil, fmt.Errorf("remote: marshal JSON body: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, joinURL(base, path), bytes.NewReader(b))
+	if err != nil {
+		return nil, fmt.Errorf("remote: new request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.Do(req)
+	if err != nil {
+		return nil, err
+	}
+
+	return resp.Body, nil
 }
 
 // joinURL appends path to base with exactly one separating slash; an empty

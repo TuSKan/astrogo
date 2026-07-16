@@ -2,19 +2,14 @@ package simbad
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"log"
-	"net/http"
 	"strings"
 
 	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/remote"
 )
-
-// ErrHTTPError indicates an HTTP error from SIMBAD TAP.
-var ErrHTTPError = errors.New("simbad: HTTP error")
 
 // Provider implements the resolve.Provider and resolve.ObjectResolver
 // interfaces interacting with SIMBAD's Table Access Protocol endpoint.
@@ -25,8 +20,13 @@ type Provider struct {
 
 // New creates a new SIMBAD ObjectResolver.
 func New() *Provider {
+	client, err := remote.NewClientFor(remote.SIMBAD)
+	if err != nil {
+		panic(err) // unregistered endpoint would be a programmer error
+	}
+
 	return &Provider{
-		client: remote.NewClient(),
+		client: client,
 		cache:  resolve.NewMapCache(),
 	}
 }
@@ -108,46 +108,18 @@ func (p *Provider) ResolveObject(ctx context.Context, req resolve.ObjectRequest)
 		return seq
 	}
 
-	base, err := remote.URL(remote.SIMBAD)
-	if err != nil {
-		return func(yield func(resolve.Target, error) bool) {
-			yield(resolve.Target{}, err)
-		}
-	}
-
 	adql := BuildResolveQuery(req)
-	body := TAPRequest(adql)
-
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, base, strings.NewReader(body))
-	if err != nil {
-		return func(yield func(resolve.Target, error) bool) {
-			yield(resolve.Target{}, fmt.Errorf("simbad: new request: %w", err))
-		}
-	}
-
-	httpReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	v := TAPRequest(adql)
 
 	return func(yield func(resolve.Target, error) bool) {
-		resp, err := p.client.Do(httpReq)
+		body, err := p.client.PostForm(ctx, remote.SIMBAD, "", v)
 		if err != nil {
 			yield(resolve.Target{}, err)
 			return
 		}
-		defer func() {
-			cerr := resp.Body.Close()
-			if cerr != nil {
-				yield(resolve.Target{}, cerr)
-			}
-		}()
+		defer func() { _ = body.Close() }()
 
-		if resp.StatusCode >= 400 {
-			b, _ := io.ReadAll(resp.Body)
-			yield(resolve.Target{}, fmt.Errorf("%w: %d: %s", ErrHTTPError, resp.StatusCode, string(b)))
-
-			return
-		}
-
-		data, err := io.ReadAll(resp.Body)
+		data, err := io.ReadAll(body)
 		if err != nil {
 			yield(resolve.Target{}, err)
 			return

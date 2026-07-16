@@ -1,49 +1,12 @@
 package openngc
 
 import (
-	"bytes"
-	"embed"
-	"encoding/csv"
-	"fmt"
-	"io"
+	"context"
 	"log"
-	"strconv"
 	"strings"
-	"sync"
 
-	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/catalog/resolve"
-	"github.com/TuSKan/astrogo/coord"
 )
-
-// The OpenNGC source URLs are pinned to a specific upstream commit so that
-// `go generate` is reproducible — regenerating from the same commit must
-// always produce the same catalog/openngc/data/openngc.csv. Bump the SHA
-// (and re-run go generate) as a deliberate, reviewed data-update step; see
-// https://github.com/mattiaverga/OpenNGC/commits/master for the latest.
-//
-//go:generate go run ./parser/parse.go data/openngc.csv https://raw.githubusercontent.com/mattiaverga/OpenNGC/36cb178a0f69dba8bfc03a99c10512831edf1c6b/database_files/NGC.csv https://raw.githubusercontent.com/mattiaverga/OpenNGC/36cb178a0f69dba8bfc03a99c10512831edf1c6b/database_files/addendum.csv
-
-//go:embed data/*
-var catalogFS embed.FS
-
-//nolint:gochecknoglobals // lazily-loaded embedded catalog buffer, guarded by loadOnce
-var (
-	data     []byte
-	loadOnce sync.Once
-)
-
-// loadEmbedded reads the embedded openngc.csv snapshot (empty if `go
-// generate ./catalog/openngc/...` hasn't been run — see README "Data
-// downloads & offline usage"). Called lazily from New via loadOnce rather
-// than init(), so merely importing this package doesn't pay the parse cost
-// when the provider is never constructed.
-func loadEmbedded() {
-	d, err := catalogFS.ReadFile("data/openngc.csv")
-	if err == nil {
-		data = d
-	}
-}
 
 // Record represents a raw entry in the OpenNGC dataset.
 type Record struct {
@@ -61,13 +24,19 @@ type Provider struct {
 	targets []resolve.Target
 }
 
-// New creates a new OpenNGC catalog provider from embedded data.
+// New creates a new OpenNGC catalog provider — like every other astrogo
+// catalog provider, it does its own network access rather than reading
+// build-time embedded data. It fetches and merges the two upstream source
+// CSVs if remote.EnableDownloads(remote.OpenNGC, ...) has been called,
+// reusing a local cache untouched when a HEAD probe shows nothing changed
+// upstream. If downloads aren't enabled, or the fetch fails for any other
+// reason, New returns an empty, warning-logged provider — the same
+// degraded behavior as any other catalog provider whose backing source is
+// unreachable.
 func New() *Provider {
-	loadOnce.Do(loadEmbedded)
-
-	targets, err := parseCSV(data)
+	targets, err := fetch(context.Background())
 	if err != nil {
-		log.Printf("openngc: failed to parse embedded data: %v", err)
+		log.Printf("openngc: %v", err)
 		return &Provider{byKey: make(map[string]int)}
 	}
 
@@ -127,87 +96,4 @@ func (p *Provider) Search(query string) []resolve.Target {
 	}
 
 	return results
-}
-
-func parseCSV(data []byte) ([]resolve.Target, error) {
-	r := csv.NewReader(bytes.NewReader(data))
-
-	header, err := r.Read()
-	if err != nil {
-		return nil, fmt.Errorf("openngc: read header: %w", err)
-	}
-
-	// Build column index map for forward-compatible parsing.
-	col := make(map[string]int)
-	for i, h := range header {
-		col[h] = i
-	}
-
-	var targets []resolve.Target
-
-	for {
-		row, err := r.Read()
-		if err == io.EOF {
-			break
-		}
-
-		if err != nil {
-			return nil, fmt.Errorf("openngc: read row: %w", err)
-		}
-
-		if len(row) < 6 {
-			continue
-		}
-
-		id, name, kindStr, raStr, decStr, aliasesStr := row[0], row[1], row[2], row[3], row[4], row[5]
-
-		raDeg, _ := strconv.ParseFloat(raStr, 64)
-		decDeg, _ := strconv.ParseFloat(decStr, 64)
-
-		var kind resolve.Kind
-
-		switch kindStr {
-		case "Galaxy":
-			kind = resolve.KindGalaxy
-		case "Nebula":
-			kind = resolve.KindNebula
-		case "OpenCluster":
-			kind = resolve.KindOpenCluster
-		case "GlobularCluster":
-			kind = resolve.KindGlobularCluster
-		case "Star":
-			kind = resolve.KindStar
-		case "Asterism":
-			kind = resolve.KindAsterism
-		default:
-			kind = resolve.KindOther
-		}
-
-		var aliases []string
-		if aliasesStr != "" {
-			aliases = strings.Split(aliasesStr, ";")
-		}
-
-		t := resolve.Target{
-			ID:       id,
-			Name:     name,
-			Kind:     kind,
-			Coord:    coord.NewICRS(angle.Deg(raDeg), angle.Deg(decDeg)),
-			HasCoord: true,
-			Catalog:  "openngc",
-			Aliases:  aliases,
-		}
-
-		// V-band magnitude (column present in generated CSV from parser v2+).
-		if idx, ok := col["vmag"]; ok && idx < len(row) && row[idx] != "" {
-			if v, err := strconv.ParseFloat(row[idx], 64); err == nil {
-				t.VMag = v
-				t.HasVMag = true
-			}
-		}
-
-		targets = append(targets, t)
-	}
-
-	return targets, nil
 }

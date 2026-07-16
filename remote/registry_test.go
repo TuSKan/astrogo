@@ -210,6 +210,22 @@ func TestEndpointsSnapshot(t *testing.T) {
 	}
 }
 
+func TestLookupFilesSliceIsNotShared(t *testing.T) {
+	t.Cleanup(Reset)
+
+	ep, ok := Lookup(OpenNGC)
+	if !ok || len(ep.Files) == 0 {
+		t.Fatalf("Lookup(OpenNGC) = %+v, %v, want a populated Files manifest", ep, ok)
+	}
+
+	original := ep.Files[0]
+	ep.Files[0] = "mutated.csv"
+
+	if fresh, _ := Lookup(OpenNGC); fresh.Files[0] != original {
+		t.Error("mutating a Lookup result's Files slice leaked into the registry")
+	}
+}
+
 func TestRegistryConcurrency(t *testing.T) {
 	t.Cleanup(Reset)
 

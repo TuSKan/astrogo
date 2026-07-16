@@ -1,6 +1,7 @@
 package jpl_test
 
 import (
+	"context"
 	"math"
 	"slices"
 	"sync"
@@ -85,7 +86,7 @@ func TestCheby(t *testing.T) {
 }
 
 func TestJPLUnitsAreAUAndAUPerDay(t *testing.T) {
-	p, err := jpl.NewProvider(core.Planets, "de440s")
+	p, err := jpl.NewProvider(context.Background(), core.Planets, "de440s")
 	if err != nil {
 		t.Fatalf("failed to initialize provider: %v", err)
 	}
@@ -109,7 +110,7 @@ func TestJPLUnitsAreAUAndAUPerDay(t *testing.T) {
 }
 
 func TestJPLUnsupportedBody(t *testing.T) {
-	p, err := jpl.NewProvider(core.Planets, "de440s")
+	p, err := jpl.NewProvider(context.Background(), core.Planets, "de440s")
 	if err != nil {
 		t.Fatalf("setup failed: %v", err)
 	}
@@ -128,7 +129,7 @@ func TestJPLUnsupportedBody(t *testing.T) {
 }
 
 func TestJPLOutOfCoverageEpoch(t *testing.T) {
-	p, err := jpl.NewProvider(core.Planets, "de440s")
+	p, err := jpl.NewProvider(context.Background(), core.Planets, "de440s")
 	if err != nil {
 		t.Fatalf("setup failed: %v", err)
 	}
@@ -150,7 +151,7 @@ func TestJPLOutOfCoverageEpoch(t *testing.T) {
 }
 
 func TestJPLDeterministicRepeatedCalls(t *testing.T) {
-	p, err := jpl.NewProvider(core.Planets, "de440s")
+	p, err := jpl.NewProvider(context.Background(), core.Planets, "de440s")
 	if err != nil {
 		t.Fatalf("setup failed: %v", err)
 	}
@@ -181,7 +182,7 @@ func TestJPLDeterministicRepeatedCalls(t *testing.T) {
 
 func TestSourceSelection(t *testing.T) {
 	t.Run("Planets", func(t *testing.T) {
-		p, err := jpl.NewProvider(core.Planets, "de440s")
+		p, err := jpl.NewProvider(context.Background(), core.Planets, "de440s")
 		if err != nil {
 			t.Fatalf("Planets source failed: %v", err)
 		}
@@ -198,7 +199,7 @@ func TestSourceSelection(t *testing.T) {
 	t.Run("Unsupported", func(t *testing.T) {
 		unsupported := []core.Source{core.Satellites, core.Stations}
 		for _, s := range unsupported {
-			_, err := jpl.NewProvider(s, "")
+			_, err := jpl.NewProvider(context.Background(), s, "")
 			if err == nil {
 				t.Errorf("Expected error for unsupported source %v", s)
 			}
@@ -206,7 +207,7 @@ func TestSourceSelection(t *testing.T) {
 	})
 
 	t.Run("Unknown", func(t *testing.T) {
-		_, err := jpl.NewProvider(core.Source("unknown"), "")
+		_, err := jpl.NewProvider(context.Background(), core.Source("unknown"), "")
 		if err == nil {
 			t.Error("Expected error for unknown source")
 		}
@@ -220,6 +221,7 @@ func TestSmallBodyEros(t *testing.T) {
 	end := time.FromJD(2460001.5, time.UTC)   // 2023-FEB-26
 
 	p, err := jpl.NewProvider(
+		context.Background(),
 		core.SmallBody,
 		"433",
 		jpl.WithTimeInterval(start, end),
@@ -271,6 +273,7 @@ func TestSmallBodyMultiMatch(t *testing.T) {
 	end := time.FromJD(2460001.5, time.UTC)
 
 	p, err := jpl.NewProvider(
+		context.Background(),
 		core.SmallBody,
 		"Apophis", // "Apophis" is ambiguous in Horizons web, but let's see API
 		jpl.WithTimeInterval(start, end),
@@ -303,7 +306,7 @@ func TestSmallBodyMultiMatch(t *testing.T) {
 // in this sandbox), but it does exercise the exact interleaving under real
 // CI, and confirms nothing panics or deadlocks under contention.
 func TestProvider_ConcurrentAddKernelAndState(t *testing.T) {
-	p, err := jpl.NewProvider(core.Planets, "de440s")
+	p, err := jpl.NewProvider(context.Background(), core.Planets, "de440s")
 	if err != nil {
 		t.Fatalf("setup failed: %v", err)
 	}
@@ -335,7 +338,7 @@ func TestProvider_ConcurrentAddKernelAndState(t *testing.T) {
 	// concurrently with the readers above.
 	wg.Go(func() {
 		for range 4 {
-			reader, err := spk.CacheDownload("planets/de440s.bsp", p.DataDir)
+			reader, err := spk.CacheDownload(context.Background(), "planets/de440s.bsp")
 			if err != nil {
 				t.Errorf("CacheDownload: %v", err)
 				return

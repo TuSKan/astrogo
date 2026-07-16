@@ -2,6 +2,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 
@@ -28,7 +29,7 @@ func main() {
 	remote.EnableDownloads(remote.NAIFSPK, 200<<20)
 	remote.EnableDownloads(remote.NAIFLSK, 0)
 
-	prov, err := eph.NewProvider(eph.Planets, "de442")
+	prov, err := eph.NewProvider(context.Background(), eph.Planets, "de442")
 	if err != nil {
 		log.Fatalf("failed to create provider: %v", err)
 	}

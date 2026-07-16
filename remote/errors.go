@@ -35,6 +35,14 @@ var (
 	// It normally never escapes Client.Do; it is exported so custom
 	// RetryPolicy implementations can produce/detect it.
 	ErrRetriable = errors.New("remote: retriable status code")
+
+	// ErrNotFileEndpoint is returned by GetFile/CacheDir for an endpoint
+	// registered as KindAPI, which has no cache directory or download path.
+	ErrNotFileEndpoint = errors.New("remote: not a file endpoint")
+
+	// ErrCacheNameRequired is returned by GetFile when both name and
+	// WithCacheName are empty, leaving no cache filename to resolve.
+	ErrCacheNameRequired = errors.New("remote: name or WithCacheName required")
 )
 
 // HTTPError represents a non-2xx response from an external API endpoint

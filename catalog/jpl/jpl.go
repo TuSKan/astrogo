@@ -2,10 +2,8 @@ package jpl
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"net/http"
 	"net/url"
 	"strings"
 
@@ -34,8 +32,13 @@ type Provider struct {
 
 // New creates a new JPL Horizons catalog provider.
 func New() *Provider {
+	client, err := remote.NewClientFor(remote.JPLHorizons)
+	if err != nil {
+		panic(err) // unregistered endpoint would be a programmer error
+	}
+
 	return &Provider{
-		client: remote.NewClient(),
+		client: client,
 		cache:  resolve.NewMapCache(),
 	}
 }
@@ -87,44 +90,17 @@ func (p *Provider) ResolveObject(ctx context.Context, req resolve.ObjectRequest)
 		return seq
 	}
 
-	base, err := remote.URL(remote.JPLHorizons)
-	if err != nil {
-		return func(yield func(resolve.Target, error) bool) {
-			yield(resolve.Target{}, err)
-		}
-	}
-
-	api, _ := url.Parse(base)
-	params := api.Query()
+	params := url.Values{}
 	params.Set("format", "json")
 	params.Set("COMMAND", fmt.Sprintf("'%s'", req.Query))
-	api.RawQuery = params.Encode()
-
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, api.String(), nil)
-	if err != nil {
-		return func(yield func(resolve.Target, error) bool) {
-			yield(resolve.Target{}, fmt.Errorf("jpl: new request: %w", err))
-		}
-	}
 
 	return func(yield func(resolve.Target, error) bool) {
-		resp, err := p.client.Do(httpReq)
-		if err != nil {
-			yield(resolve.Target{}, err)
-			return
-		}
-		defer func() {
-			cerr := resp.Body.Close()
-			if cerr != nil {
-				yield(resolve.Target{}, cerr)
-			}
-		}()
-
 		var payload struct {
 			Result string `json:"result"`
 			Error  string `json:"error"`
 		}
-		if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+
+		if err := p.client.GetJSON(ctx, remote.JPLHorizons, "", params, &payload); err != nil {
 			yield(resolve.Target{}, err)
 			return
 		}

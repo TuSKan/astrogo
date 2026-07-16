@@ -90,26 +90,20 @@ linters:
           - gosec
         text: "G115"
       # G301/G306: file permissions — 0o755/0o644 are standard for user-cache directories
-      - path: "(ephemeris/jpl/|iers/|internal/cache/|internal/tools/|fits/)"
+      - path: "(ephemeris/jpl/|iers/|internal/cache/|fits/|remote/|catalog/openngc/)"
         linters:
           - gosec
         text: "G30[16]"
       # G304: file inclusion via variable — reading kernel/data files by path is the core use case
-      - path: "(ephemeris/jpl/|fits/|iers/|catalog/openngc/parser/)"
+      - path: "(ephemeris/jpl/|fits/|iers/|remote/|catalog/openngc/)"
         linters:
           - gosec
         text: "G304"
       # G704: SSRF — HTTP calls to well-known astronomical APIs
-      - path: "(catalog/resolve/|catalog/openngc/parser/)"
+      - path: "catalog/resolve/"
         linters:
           - gosec
         text: "G704"
-      # G706: log injection — parser is a CLI tool, not a library endpoint
-      # G703: path traversal — parser writes to known output paths
-      - path: "catalog/openngc/parser/"
-        linters:
-          - gosec
-        text: "G70[36]"
 
 formatters:
   enable:

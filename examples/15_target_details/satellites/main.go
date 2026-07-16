@@ -2,6 +2,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 
@@ -27,7 +28,7 @@ func main() {
 	}
 
 	// For satellites, we create an ephemeris provider using TLE strings
-	prov, err := eph.NewProvider(eph.Satellites, catTarget.Name, eph.WithTLE(catTarget.TLELine1, catTarget.TLELine2))
+	prov, err := eph.NewProvider(context.Background(), eph.Satellites, catTarget.Name, eph.WithTLE(catTarget.TLELine1, catTarget.TLELine2))
 	if err != nil {
 		log.Fatalf("failed to create satellite provider: %v", err)
 	}

@@ -1,6 +1,7 @@
 package jpl_test
 
 import (
+	"context"
 	"slices"
 	"testing"
 
@@ -32,7 +33,7 @@ func BenchmarkEvalChebyshev(b *testing.B) {
 }
 
 func BenchmarkFindSegment(b *testing.B) {
-	p, _ := jpl.NewProvider(core.Planets, "de440s")
+	p, _ := jpl.NewProvider(context.Background(), core.Planets, "de440s")
 
 	// Mock 100 kernels, each with 10 targets, each target has 1 segment.
 	// Total 1,000 segments in Index.

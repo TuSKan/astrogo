@@ -2,17 +2,17 @@ package spk
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"encoding/base64"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
-	"os"
 	"path/filepath"
 	"strings"
-	stdtime "time"
+
+	gofs "github.com/ungerik/go-fs"
 
 	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/time"
@@ -20,10 +20,6 @@ import (
 
 // DOC: https://ssd-api.jpl.nasa.gov/doc/horizons.html
 // SELECT: https://ssd.jpl.nasa.gov/horizons/manual.html#select
-
-// horizonsRequestTimeout bounds the whole Horizons API request (connect +
-// transfer), preventing an indefinite hang on a stalled connection.
-const horizonsRequestTimeout = 2 * stdtime.Minute
 
 // HorizonsResult is a single result from the Horizons API.
 type HorizonsResult struct {
@@ -53,24 +49,20 @@ type HorizonsResponse struct {
 // - File writing
 // - Reader creation
 // - Error handling
-func CacheAPI(kernel string, startTime, endTime time.Time, path string) ([]*Reader, error) {
+func CacheAPI(ctx context.Context, kernel string, startTime, endTime time.Time, path string) ([]*Reader, error) {
 	var readers []*Reader
 
 	spkFile := kernel + ".bsp"
 	spkPath := filepath.Join(path, spkFile)
 
-	if err := os.MkdirAll(path, 0o755); err != nil {
-		return nil, fmt.Errorf("jpl: failed to create directory %s: %w", path, err)
-	}
-
-	if _, err := os.Stat(spkPath); err == nil {
+	if gofs.File(spkPath).Exists() {
 		// Already exists, just return reader
-		f, err := os.Open(spkPath)
+		ra, err := openReaderAt(gofs.File(spkPath))
 		if err != nil {
 			return nil, fmt.Errorf("jpl: failed to open cached SPK %s: %w", spkPath, err)
 		}
 
-		reader, err := NewReader(f)
+		reader, err := NewReader(ra)
 		if err != nil {
 			return nil, fmt.Errorf("jpl: failed to create reader for %s: %w", spkPath, err)
 		}
@@ -86,7 +78,7 @@ func CacheAPI(kernel string, startTime, endTime time.Time, path string) ([]*Read
 		return nil, fmt.Errorf("jpl: SPK kernel %s: %w", kernel, err)
 	}
 
-	resp, err := apiHorizonsRequest(kernel, startTime, endTime)
+	resp, err := apiHorizonsRequest(ctx, kernel, startTime, endTime)
 	if err != nil {
 		return nil, fmt.Errorf("jpl: failed to get SPK %s: %w", spkPath, err)
 	}
@@ -107,16 +99,16 @@ func CacheAPI(kernel string, startTime, endTime time.Time, path string) ([]*Read
 			return nil, fmt.Errorf("jpl: failed to decode SPK data: %w", err)
 		}
 
-		if err := os.WriteFile(spkPath, spkData, 0o644); err != nil {
+		if err := remote.Save(bytes.NewReader(spkData), gofs.File(spkPath)); err != nil {
 			return nil, fmt.Errorf("jpl: failed to save SPK %s: %w", spkPath, err)
 		}
 
-		f, err := os.Open(spkPath)
+		ra, err := openReaderAt(gofs.File(spkPath))
 		if err != nil {
 			return nil, fmt.Errorf("jpl: failed to open SPK %s: %w", spkPath, err)
 		}
 
-		reader, err := NewReader(f)
+		reader, err := NewReader(ra)
 		if err != nil {
 			return nil, fmt.Errorf("jpl: failed to create reader for %s: %w", spkPath, err)
 		}
@@ -129,7 +121,7 @@ func CacheAPI(kernel string, startTime, endTime time.Time, path string) ([]*Read
 		}
 
 		for _, r := range hRes {
-			sub, err := CacheAPI(r.ID, startTime, endTime, path)
+			sub, err := CacheAPI(ctx, r.ID, startTime, endTime, path)
 			if err != nil {
 				return nil, fmt.Errorf("jpl: failed to get SPK %s: %w", spkPath, err)
 			}
@@ -141,7 +133,7 @@ func CacheAPI(kernel string, startTime, endTime time.Time, path string) ([]*Read
 	return readers, nil
 }
 
-func apiHorizonsRequest(command string, startTime, endTime time.Time) (_ *HorizonsResponse, err error) {
+func apiHorizonsRequest(ctx context.Context, command string, startTime, endTime time.Time) (*HorizonsResponse, error) {
 	params := url.Values{}
 	params.Set("format", "json")
 	params.Set("COMMAND", "'"+command+"'")
@@ -151,26 +143,14 @@ func apiHorizonsRequest(command string, startTime, endTime time.Time) (_ *Horizo
 	params.Set("START_TIME", "'"+startTime.Format("2006-01-02 15:04:05.000")+"'")
 	params.Set("STOP_TIME", "'"+endTime.Format("2006-01-02 15:04:05.000")+"'")
 
-	ctx, cancel := context.WithTimeout(context.Background(), horizonsRequestTimeout)
-	defer cancel()
-
-	client := remote.NewClient(remote.WithTimeout(horizonsRequestTimeout))
-
-	r, err := client.Get(ctx, remote.JPLHorizons, "", params)
+	client, err := remote.NewClientFor(remote.JPLHorizons)
 	if err != nil {
-		return nil, mapHorizonsStatus(err)
+		return nil, fmt.Errorf("jpl: horizons client: %w", err)
 	}
 
-	defer func() {
-		cerr := r.Body.Close()
-		if cerr != nil {
-			err = errors.Join(err, cerr)
-		}
-	}()
-
 	var resp HorizonsResponse
-	if err := json.NewDecoder(r.Body).Decode(&resp); err != nil {
-		return nil, fmt.Errorf("jpl: failed to decode response: %w", err)
+	if err := client.GetJSON(ctx, remote.JPLHorizons, "", params, &resp); err != nil {
+		return nil, mapHorizonsStatus(err)
 	}
 
 	return &resp, nil

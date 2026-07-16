@@ -6,14 +6,12 @@ import (
 	"log"
 )
 
-//go:generate go run ../internal/tools/cmd/download/main.go https://datacenter.iers.org/data/9/finals2000A.all data/finals2000A.all
-
 //go:embed all:data/*
 var eopFS embed.FS
 
 // FinalsData holds the IERS EOP reference data embedded at build time
-// (empty if `go generate ./iers/...` hasn't been run — see README "Data
-// downloads & offline usage").
+// (empty unless iers/data/finals2000A.all was manually populated before
+// building — see README "Data downloads & offline usage").
 //
 //nolint:gochecknoglobals // embedded IERS EOP reference data, populated lazily by loadEmbedded
 var FinalsData []byte
@@ -24,7 +22,7 @@ var FinalsData []byte
 // eop.go's loadOnce — rather than from init(), so merely importing iers
 // (transitively, via coord) doesn't pay the ~3.7 MB parse cost when EOP
 // data is never actually queried, and so a program that calls
-// RegisterModel/LoadFile before its first query never has that choice
+// RegisterModel/LoadFS before its first query never has that choice
 // silently overridden.
 func loadEmbedded() {
 	d, err := eopFS.ReadFile("data/finals2000A.all")
@@ -33,7 +31,7 @@ func loadEmbedded() {
 	}
 
 	if len(FinalsData) == 0 {
-		log.Printf("astrogo/iers: no embedded EOP data — run `go generate ./iers/...`, call iers.FetchNow/LoadFile, or accept ZeroModel's reduced accuracy; see README \"Data downloads & offline usage\"")
+		log.Printf("astrogo/iers: no embedded EOP data — call iers.FetchNow/LoadFS, or accept ZeroModel's reduced accuracy; see README \"Data downloads & offline usage\"")
 		return
 	}
 

@@ -2,6 +2,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"math"
@@ -83,7 +84,7 @@ func main() {
 	remote.EnableDownloads(remote.NAIFSPK, 200<<20)
 	remote.EnableDownloads(remote.NAIFLSK, 0)
 
-	jplProv, err := eph.NewProvider(eph.Planets, "de440")
+	jplProv, err := eph.NewProvider(context.Background(), eph.Planets, "de440")
 	if err != nil {
 		log.Printf("│  ⚠ JPL provider unavailable: %v\n", err)
 		fmt.Println("│  Skipping JPL comparison.")

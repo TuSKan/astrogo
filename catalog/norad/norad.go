@@ -2,10 +2,8 @@ package norad
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
@@ -260,8 +258,13 @@ type Provider struct {
 
 // New returns a Provider configured with sensible defaults.
 func New() *Provider {
+	client, err := remote.NewClientFor(remote.CelesTrak)
+	if err != nil {
+		panic(err) // unregistered endpoint would be a programmer error
+	}
+
 	return &Provider{
-		client: remote.NewClient(),
+		client: client,
 		cache:  resolve.NewMapCache(),
 	}
 }
@@ -286,10 +289,9 @@ func (p *Provider) Resolve(query string) (resolve.Target, bool) {
 
 // Search returns satellites matching the query string.
 func (p *Provider) Search(query string) []resolve.Target {
-	ctx, cancel := context.WithTimeout(context.Background(), 30*gotime.Second)
-	defer cancel()
-
-	gps, err := p.Fetch(ctx, QueryName, query)
+	// No local timeout wrapper needed: NewClientFor(remote.CelesTrak) already
+	// bounds the whole request at the endpoint's registered Timeout.
+	gps, err := p.Fetch(context.Background(), QueryName, query)
 	if err != nil || len(gps) == 0 {
 		return nil
 	}
@@ -304,46 +306,19 @@ func (p *Provider) Search(query string) []resolve.Target {
 
 // Fetch queries the CelestTrak GP API and returns parsed element sets.
 // It uses the JSON format for compact, natively-typed responses.
-func (p *Provider) Fetch(ctx context.Context, query QueryType, value string) (_ []GP, err error) {
+func (p *Provider) Fetch(ctx context.Context, query QueryType, value string) ([]GP, error) {
 	cacheKey := fmt.Sprintf("norad:%s:%s", query, value)
 
 	// NOTE: cache stores resolve.Target values, not GP structs.
 	// GP data is always fetched fresh from the API.
 
-	base, err := remote.URL(remote.CelesTrak)
-	if err != nil {
-		return nil, fmt.Errorf("norad: %w", err)
-	}
-
-	api, err := url.Parse(base)
-	if err != nil {
-		return nil, fmt.Errorf("norad: %w", err)
-	}
-
-	params := api.Query()
+	params := url.Values{}
 	params.Set(string(query), value)
 	params.Set("FORMAT", "JSON")
-	api.RawQuery = params.Encode()
-
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, api.String(), nil)
-	if err != nil {
-		return nil, fmt.Errorf("norad: %w", err)
-	}
-
-	resp, err := p.client.Do(httpReq)
-	if err != nil {
-		return nil, fmt.Errorf("norad: fetch failed: %w", err)
-	}
-	defer func() {
-		cerr := resp.Body.Close()
-		if cerr != nil {
-			err = errors.Join(err, cerr)
-		}
-	}()
 
 	var gps []GP
-	if err := json.NewDecoder(resp.Body).Decode(&gps); err != nil {
-		return nil, fmt.Errorf("norad: json decode: %w", err)
+	if err := p.client.GetJSON(ctx, remote.CelesTrak, "", params, &gps); err != nil {
+		return nil, fmt.Errorf("norad: fetch failed: %w", err)
 	}
 
 	// Cache as targets for the resolver layer.

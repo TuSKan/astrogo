@@ -154,19 +154,10 @@ Do not loosen tolerances without explaining why.
 
 ## Generated files
 
-If the agent runs:
-
-```bash
-go generate ./...
-```
-
-it must check whether generated files changed.
-
-If generated files changed, the agent must explain:
-
-- what generated them;
-- why they changed;
-- whether the changes should be committed.
+This codebase has no `go:generate` step — do not reintroduce one. `iers` and
+`catalog/openngc` embed gitignored data files via `go:embed` if present;
+populate them at runtime (`iers.FetchNow`/`FetchIfStale`) rather than adding
+a generation/download tool.
 
 ## Completion contract
 

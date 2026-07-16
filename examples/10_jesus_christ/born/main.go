@@ -7,6 +7,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 
@@ -23,7 +24,7 @@ func main() {
 	remote.EnableDownloads(remote.NAIFSPK, 0)
 	remote.EnableDownloads(remote.NAIFLSK, 0)
 
-	prov, err := eph.NewProvider(eph.Planets, "de441_part-1")
+	prov, err := eph.NewProvider(context.Background(), eph.Planets, "de441_part-1")
 	if err != nil {
 		panic(err)
 	}

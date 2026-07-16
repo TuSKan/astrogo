@@ -1,5 +1,7 @@
 package remote
 
+import "time"
+
 // EndpointID names a remote service astrogo can contact. The full set of
 // endpoints the library will ever reach is enumerated below — there are no
 // hidden hosts. Inspect them at runtime with Endpoints.
@@ -52,9 +54,10 @@ const (
 	// (lightpollution package; requires an API key).
 	LightPollution EndpointID = "lightpollutionmap"
 
-	// OpenNGC is the OpenNGC catalog source on GitHub, contacted only at
-	// development time by `go generate ./catalog/openngc/...` — never at
-	// library runtime.
+	// OpenNGC is the OpenNGC catalog source CSVs on GitHub, pinned to a
+	// specific commit so catalog/openngc.New's fetch is reproducible. Used
+	// only when the caller has called remote.EnableDownloads(OpenNGC, ...)
+	// — never implicitly.
 	OpenNGC EndpointID = "openngc.github"
 )
 
@@ -83,7 +86,9 @@ type Endpoint struct {
 	URL string
 	// Kind is KindAPI or KindFile.
 	Kind Kind
-	// Subsystem names the astrogo package family using this endpoint.
+	// Subsystem names the astrogo package family using this endpoint. For
+	// KindFile it is also the literal cache-dir token resolved by CacheDir;
+	// for KindAPI it is a free-form description, never used for a path.
 	Subsystem string
 	// Description says what the endpoint provides.
 	Description string
@@ -98,11 +103,32 @@ type Endpoint struct {
 	// MaxDownloadSize caps a single download's size in bytes once
 	// DownloadsOK is set; 0 means unlimited.
 	MaxDownloadSize int64
+	// Timeout is the API request timeout (KindAPI). Zero means
+	// DefaultAPITimeout.
+	Timeout time.Duration
+	// DownloadTimeout is the whole-transfer timeout (KindFile). Zero means
+	// DefaultDownloadTimeout.
+	DownloadTimeout time.Duration
+	// Mutable marks a KindFile endpoint whose upstream content can change
+	// (IERS, OpenNGC): a cached copy is re-validated with a HEAD probe
+	// before reuse. false means the content is immutable/versioned (JPL
+	// kernels): a cached copy is reused on existence alone.
+	Mutable bool
+	// Files lists the fixed set of file names a KindFile endpoint serves,
+	// for endpoints whose content is a small, known manifest rather than
+	// arbitrarily-named caller-supplied files (e.g. OpenNGC's two source
+	// CSVs). Empty for endpoints without a fixed manifest — JPL kernels are
+	// named by the caller, so NAIFSPK/NAIFLSK leave this nil.
+	Files []string
 }
 
 // SizeVaries marks an endpoint whose per-fetch size cannot be usefully
 // approximated.
 const SizeVaries int64 = -1
+
+// DefaultDownloadTimeout is used for a KindFile endpoint whose
+// DownloadTimeout is zero.
+const DefaultDownloadTimeout = 10 * time.Minute
 
 // defaultEndpoints is the built-in registry table. URLs here are the single
 // source of truth for where astrogo connects — packages resolve them via
@@ -110,31 +136,37 @@ const SizeVaries int64 = -1
 func defaultEndpoints() map[EndpointID]Endpoint {
 	return map[EndpointID]Endpoint{
 		IERSFinals2000A: {
-			ID:          IERSFinals2000A,
-			URL:         "https://datacenter.iers.org/data/9/finals2000A.all",
-			Kind:        KindFile,
-			Subsystem:   "iers",
-			Description: "IERS Earth-orientation parameters (finals2000A.all)",
-			ApproxSize:  3_800_000,
-			Enabled:     true,
+			ID:              IERSFinals2000A,
+			URL:             "https://datacenter.iers.org/data/9/finals2000A.all",
+			Kind:            KindFile,
+			Subsystem:       "iers",
+			Description:     "IERS Earth-orientation parameters (finals2000A.all)",
+			ApproxSize:      3_800_000,
+			Enabled:         true,
+			DownloadTimeout: 30 * time.Second,
+			Mutable:         true,
 		},
 		NAIFSPK: {
-			ID:          NAIFSPK,
-			URL:         "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/",
-			Kind:        KindFile,
-			Subsystem:   "ephemeris/jpl",
-			Description: "NASA NAIF planetary ephemeris SPK kernels (de440s ~32 MB, de440/de442 ~115 MB, de441 multi-GB)",
-			ApproxSize:  SizeVaries,
-			Enabled:     true,
+			ID:              NAIFSPK,
+			URL:             "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/",
+			Kind:            KindFile,
+			Subsystem:       "jpl",
+			Description:     "NASA NAIF planetary ephemeris SPK kernels (de440s ~32 MB, de440/de442 ~115 MB, de441 multi-GB)",
+			ApproxSize:      SizeVaries,
+			Enabled:         true,
+			DownloadTimeout: 30 * time.Minute,
+			Mutable:         false,
 		},
 		NAIFLSK: {
-			ID:          NAIFLSK,
-			URL:         "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/",
-			Kind:        KindFile,
-			Subsystem:   "ephemeris/jpl",
-			Description: "NASA NAIF leap-second kernel (naif0012.tls)",
-			ApproxSize:  6_000,
-			Enabled:     true,
+			ID:              NAIFLSK,
+			URL:             "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/",
+			Kind:            KindFile,
+			Subsystem:       "jpl",
+			Description:     "NASA NAIF leap-second kernel (naif0012.tls)",
+			ApproxSize:      6_000,
+			Enabled:         true,
+			DownloadTimeout: 1 * time.Minute,
+			Mutable:         false,
 		},
 		JPLHorizons: {
 			ID:          JPLHorizons,
@@ -144,6 +176,7 @@ func defaultEndpoints() map[EndpointID]Endpoint {
 			Description: "JPL Horizons API (name resolution and small-body SPK generation)",
 			ApproxSize:  SizeVaries,
 			Enabled:     true,
+			Timeout:     2 * time.Minute,
 		},
 		JPLSBDB: {
 			ID:          JPLSBDB,
@@ -153,6 +186,7 @@ func defaultEndpoints() map[EndpointID]Endpoint {
 			Description: "JPL Small-Body Database query API",
 			ApproxSize:  100_000,
 			Enabled:     true,
+			Timeout:     30 * time.Second,
 		},
 		SIMBAD: {
 			ID:          SIMBAD,
@@ -162,6 +196,7 @@ func defaultEndpoints() map[EndpointID]Endpoint {
 			Description: "CDS SIMBAD TAP service",
 			ApproxSize:  100_000,
 			Enabled:     true,
+			Timeout:     30 * time.Second,
 		},
 		VizieR: {
 			ID:          VizieR,
@@ -171,6 +206,7 @@ func defaultEndpoints() map[EndpointID]Endpoint {
 			Description: "CDS VizieR TAP service",
 			ApproxSize:  100_000,
 			Enabled:     true,
+			Timeout:     30 * time.Second,
 		},
 		GaiaTAP: {
 			ID:          GaiaTAP,
@@ -180,6 +216,7 @@ func defaultEndpoints() map[EndpointID]Endpoint {
 			Description: "ESA Gaia archive TAP service",
 			ApproxSize:  100_000,
 			Enabled:     true,
+			Timeout:     30 * time.Second,
 		},
 		MAST: {
 			ID:          MAST,
@@ -189,6 +226,7 @@ func defaultEndpoints() map[EndpointID]Endpoint {
 			Description: "STScI MAST invoke API",
 			ApproxSize:  100_000,
 			Enabled:     true,
+			Timeout:     30 * time.Second,
 		},
 		CelesTrak: {
 			ID:          CelesTrak,
@@ -198,6 +236,7 @@ func defaultEndpoints() map[EndpointID]Endpoint {
 			Description: "CelesTrak GP element sets (TLEs)",
 			ApproxSize:  100_000,
 			Enabled:     true,
+			Timeout:     30 * time.Second,
 		},
 		FINK: {
 			ID:          FINK,
@@ -207,6 +246,7 @@ func defaultEndpoints() map[EndpointID]Endpoint {
 			Description: "FINK broker ZTF solar-system object feature table",
 			ApproxSize:  SizeVaries,
 			Enabled:     true,
+			Timeout:     120 * time.Second,
 		},
 		LightPollution: {
 			ID:          LightPollution,
@@ -216,15 +256,19 @@ func defaultEndpoints() map[EndpointID]Endpoint {
 			Description: "lightpollutionmap.info raster query (World Atlas 2015)",
 			ApproxSize:  1_000,
 			Enabled:     true,
+			Timeout:     30 * time.Second,
 		},
 		OpenNGC: {
-			ID:          OpenNGC,
-			URL:         "https://raw.githubusercontent.com/mattiaverga/OpenNGC",
-			Kind:        KindFile,
-			Subsystem:   "catalog/openngc (go generate only)",
-			Description: "OpenNGC catalog source CSVs (development-time regeneration)",
-			ApproxSize:  2_000_000,
-			Enabled:     true,
+			ID:              OpenNGC,
+			URL:             "https://raw.githubusercontent.com/mattiaverga/OpenNGC/36cb178a0f69dba8bfc03a99c10512831edf1c6b/database_files",
+			Kind:            KindFile,
+			Subsystem:       "openngc",
+			Description:     "OpenNGC catalog source CSVs (NGC.csv, addendum.csv), pinned to a fixed commit",
+			ApproxSize:      2_000_000,
+			Enabled:         true,
+			DownloadTimeout: 2 * time.Minute,
+			Mutable:         true,
+			Files:           []string{"NGC.csv", "addendum.csv"},
 		},
 	}
 }

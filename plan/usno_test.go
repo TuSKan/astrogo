@@ -227,7 +227,7 @@ func deltaMinutes(usnoMin, astroMin float64) float64 {
 
 func newEph(t *testing.T) eph.Provider {
 	t.Helper()
-	p, err := eph.NewProvider(eph.Planets, "de442")
+	p, err := eph.NewProvider(context.Background(), eph.Planets, "de442")
 	if err != nil {
 		t.Logf("DE442 unavailable (%v), falling back to default", err)
 		def := eph.Default()
@@ -416,7 +416,7 @@ func TestUSNO_CelNav(t *testing.T) {
 
 	// Validate Sun position
 	var prov eph.Provider
-	jplProv, err := eph.NewProvider(eph.Planets, "de442")
+	jplProv, err := eph.NewProvider(context.Background(), eph.Planets, "de442")
 	if err != nil {
 		t.Logf("failed to load jpl de442: %v", err)
 		prov = eph.Default()

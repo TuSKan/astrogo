@@ -44,21 +44,6 @@ jobs:
           go mod tidy
           git diff --exit-code -- go.mod go.sum
 
-      # Runs the go:generate tooling (iers, catalog/openngc) end-to-end as a
-      # smoke test of the download pipeline (internal/tools/cmd/download →
-      # remote.DownloadURL). It does NOT verify data reproducibility: the
-      # generated files (iers/data/finals2000A.all, catalog/openngc/data/
-      # openngc.csv) are intentionally gitignored (see README "Data
-      # downloads & offline usage"), so `git diff` never has anything
-      # tracked to compare against. Invoking go:generate is itself the
-      # download consent for this step — no remote.EnableDownloads call
-      # is required.
-      - name: Check generated files
-        shell: bash
-        run: |
-          go generate ./...
-          git diff --exit-code
-
       - name: Run tests with coverage
         if: matrix.os == 'ubuntu-latest'
         run: go test -v -coverprofile=coverage.out -covermode=atomic ./...

@@ -1,6 +1,7 @@
 package ephemeris
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"math"
@@ -187,11 +188,11 @@ func WithTLE(line1, line2 string) Option {
 
 // NewProvider creates an ephemeris provider for the given source and kernel.
 //
-//	p, err := eph.NewProvider(eph.Planets, "de442")
-//	p, err := eph.NewProvider(eph.Planets, "de441_part-1", eph.WithKernel("de441_part-2"))
-//	p, err := eph.NewProvider(eph.SmallBody, "433", eph.WithTimeInterval(start, end))
-//	p, err := eph.NewProvider(eph.Satellites, "ISS", eph.WithTLE(l1, l2))
-func NewProvider(source Source, kernel string, opts ...Option) (Provider, error) {
+//	p, err := eph.NewProvider(ctx, eph.Planets, "de442")
+//	p, err := eph.NewProvider(ctx, eph.Planets, "de441_part-1", eph.WithKernel("de441_part-2"))
+//	p, err := eph.NewProvider(ctx, eph.SmallBody, "433", eph.WithTimeInterval(start, end))
+//	p, err := eph.NewProvider(ctx, eph.Satellites, "ISS", eph.WithTLE(l1, l2))
+func NewProvider(ctx context.Context, source Source, kernel string, opts ...Option) (Provider, error) {
 	var cfg config
 	for _, opt := range opts {
 		opt(&cfg)
@@ -208,13 +209,13 @@ func NewProvider(source Source, kernel string, opts ...Option) (Provider, error)
 			jplOpts = append(jplOpts, jpl.WithTimeInterval(cfg.Start, cfg.End))
 		}
 
-		p, err := jpl.NewProvider(source, kernel, jplOpts...)
+		p, err := jpl.NewProvider(ctx, source, kernel, jplOpts...)
 		if err != nil {
 			return nil, fmt.Errorf("ephemeris: new provider: %w", err)
 		}
 
 		for _, extra := range cfg.ExtraKernels {
-			k, err := spk.CacheDownload("planets/"+extra+".bsp", p.DataDir)
+			k, err := spk.CacheDownload(ctx, "planets/"+extra+".bsp")
 			if err != nil {
 				return nil, fmt.Errorf("ephemeris: cache kernel %s: %w", extra, err)
 			}
@@ -247,23 +248,6 @@ func NewProvider(source Source, kernel string, opts ...Option) (Provider, error)
 	default:
 		return nil, fmt.Errorf("%w: %s", ErrUnknownSource, source)
 	}
-}
-
-// Open constructs a Provider entirely from local JPL kernel files — no
-// network access, no data-directory resolution, no download consent
-// required. This is the offline/production path: pre-seed spkPaths and
-// lskPath yourself (e.g. files a prior EnableDownloads-backed NewProvider
-// run already cached under remote.DataDir(), or copied into a deployment
-// image), then Open them directly.
-//
-//	p, err := eph.Open("naif0012.tls", "de442.bsp")
-func Open(lskPath string, spkPaths ...string) (Provider, error) {
-	p, err := jpl.Open(lskPath, spkPaths...)
-	if err != nil {
-		return nil, fmt.Errorf("ephemeris: open: %w", err)
-	}
-
-	return p, nil
 }
 
 // ─── Default SOFA Provider ───────────────────────────────────────────────────
