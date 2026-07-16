@@ -34,7 +34,14 @@ func testDAFHeader() []byte {
 }
 
 func TestApiHorizonsRequest(t *testing.T) {
-	t.Cleanup(remote.Reset)
+	// This package's TestMain grants NAIFSPK/NAIFLSK download consent once
+	// for the whole test binary — remote.Reset() would revoke that for
+	// every test that runs afterward (e.g. reader_test.go's TestSPKReader),
+	// so restore only the specific override this test makes instead of
+	// resetting the whole registry.
+	origEndpoint, _ := remote.Lookup(remote.JPLHorizons)
+
+	t.Cleanup(func() { _ = remote.SetURL(remote.JPLHorizons, origEndpoint.URL) })
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if got := r.URL.Query().Get("COMMAND"); got != "'499'" {
@@ -92,8 +99,6 @@ func TestMapHorizonsStatus(t *testing.T) {
 }
 
 func TestCacheAPIReusesExistingFile(t *testing.T) {
-	t.Cleanup(remote.Reset)
-
 	dir := t.TempDir()
 
 	if err := os.WriteFile(filepath.Join(dir, "433.bsp"), testDAFHeader(), 0o600); err != nil {
@@ -118,7 +123,12 @@ func TestCacheAPIReusesExistingFile(t *testing.T) {
 }
 
 func TestCacheAPIGeneratesFromHorizons(t *testing.T) {
-	t.Cleanup(remote.Reset)
+	// See TestApiHorizonsRequest: restore only the URL override, never
+	// call remote.Reset() (it would revoke TestMain's download consent
+	// for the rest of this package's test binary).
+	origEndpoint, _ := remote.Lookup(remote.JPLHorizons)
+
+	t.Cleanup(func() { _ = remote.SetURL(remote.JPLHorizons, origEndpoint.URL) })
 
 	dir := t.TempDir()
 
