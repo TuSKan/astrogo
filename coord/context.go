@@ -1,20 +1,14 @@
 package coord
 
 import (
-	"log"
 	"math"
-	"sync"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
-	"github.com/TuSKan/astrogo/iers"
 	"github.com/TuSKan/astrogo/internal/gofaext"
 	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/vector"
 )
-
-// warnEOPOnce guards the one-time warning emitted when IERS EOP data is unavailable.
-var warnEOPOnce sync.Once
 
 // Context encapsulates the observation environment (time and location) and precomputes
 // the computationally expensive SOFA intermediate astrometry parameters (ASTROM),
@@ -28,7 +22,7 @@ type Context struct {
 	site   *Geodetic
 	atm    atmosphere.Atmosphere
 	astrom gofaext.ASTROM
-	eop    iers.EOP // cached for AltAzToICRS reuse
+	eop    time.EOP // cached for AltAzToICRS reuse
 
 	// Precomputed geocentric reduction fields (for GeocentricToObserved).
 	// These avoid rebuilding the C2t06a matrix + observer vector per call.
@@ -48,14 +42,7 @@ func NewContext(t time.Time, site *Geodetic, atm atmosphere.Atmosphere) *Context
 	// to prevent silent corruption of the ASTROM cache.
 	t = t.UTC()
 	jd1, jd2 := t.JDParts()
-	mjd := (jd1 - 2400000.5) + jd2
-
-	eop, err := iers.GetModel().EOP(mjd)
-	if err != nil {
-		warnEOPOnce.Do(func() {
-			log.Printf("astrogo/coord: IERS EOP data unavailable (MJD %.1f): using zero DUT1/polar motion. Topocentric accuracy degraded to ~1 arcsec.", mjd)
-		})
-	}
+	eop := t.EOP()
 
 	p := atm.Pressure
 	if atm.Model != nil {

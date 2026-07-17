@@ -63,12 +63,8 @@ func (gp GP) ToTLE() (line1, line2 string) {
 	epochDay := 0.0
 
 	if t, err := gp.EpochTime(); err == nil {
-		jd1, jd2 := t.JDParts()
-		year := t.Year()
-		epochYr = year % 100
-		jan1 := time.Date(year, 1, 1, 0, 0, 0, 0, time.LocationUTC)
-		jdJan1_1, jdJan1_2 := jan1.JDParts()
-		epochDay = (jd1 - jdJan1_1) + (jd2 - jdJan1_2) + 1.0
+		epochYr = t.Year() % 100
+		epochDay = t.DayOfYear()
 	}
 
 	class := gp.Classification

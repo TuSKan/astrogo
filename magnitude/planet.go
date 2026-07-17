@@ -287,7 +287,7 @@ func neptuneMag(r, delta, phAng float64, t time.Time) float64 {
 
 	// Eq. 16: magnitude at unit distance as function of time.
 	// Clamp to [-7.00, -6.89].
-	year := 2000.0 + (t.JD()-2451545.0)/365.25
+	year := t.JulianEpochYear()
 	v10 := -6.89 - 0.0054*(year-1980.0)
 	v10 = math.Max(-7.00, math.Min(-6.89, v10))
 

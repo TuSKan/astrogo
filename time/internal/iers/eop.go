@@ -34,13 +34,9 @@ func (ZeroModel) EOP(_ float64) (EOP, error) {
 var (
 	modelMu     sync.RWMutex
 	globalModel Model = ZeroModel{}
-	loadOnce    sync.Once
 )
 
 // RegisterModel sets the globally used Earth orientation parameter model.
-// Calling it before the first GetModel/FetchIfStale/FetchNow query
-// pre-empts iers's own lazy load of the embedded finals2000A snapshot —
-// see loadEmbedded.
 func RegisterModel(m Model) {
 	modelMu.Lock()
 	defer modelMu.Unlock()
@@ -48,26 +44,10 @@ func RegisterModel(m Model) {
 	globalModel = m
 }
 
-// registerIfDefault installs m only if no model has been explicitly
-// registered yet (globalModel is still the zero-value default). Used by
-// loadEmbedded so an explicit RegisterModel/LoadFS call always wins over
-// the lazily-loaded embedded snapshot, regardless of call order.
-func registerIfDefault(m Model) {
-	modelMu.Lock()
-	defer modelMu.Unlock()
-
-	if _, isDefault := globalModel.(ZeroModel); isDefault {
-		globalModel = m
-	}
-}
-
 // GetModel retrieves the globally used Earth orientation parameter model.
-// The first call triggers a one-time lazy load of the embedded
-// finals2000A snapshot (see loadEmbedded) unless a model was already
-// registered explicitly.
+// Defaults to ZeroModel until RegisterModel, Fetch, FetchIfStale, or
+// LoadFS populates real data.
 func GetModel() Model {
-	loadOnce.Do(loadEmbedded)
-
 	modelMu.RLock()
 	defer modelMu.RUnlock()
 

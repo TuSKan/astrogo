@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/TuSKan/astrogo/iers"
 	"github.com/TuSKan/astrogo/internal/testutil"
 	atime "github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/time/internal/iers"
 )
 
 func TestFromJD(t *testing.T) {

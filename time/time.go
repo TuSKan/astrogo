@@ -8,8 +8,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/TuSKan/astrogo/iers"
 	"github.com/TuSKan/astrogo/internal/gofaext"
+	"github.com/TuSKan/astrogo/time/internal/iers"
 )
 
 var warnUT1Once sync.Once
@@ -690,12 +690,18 @@ func tdbMinusTT(jdTT1, jdTT2 float64) float64 {
 	return sum
 }
 
+// mjdFromJDParts converts a two-part Julian Date to a Modified Julian
+// Date. The sole implementation of this formula — Time.MJD (epoch.go),
+// dut1ForUTC, dut1OrFallback, and UT1's error path all call it rather
+// than each recomputing (jd1-2400000.5)+jd2 independently.
+func mjdFromJDParts(jd1, jd2 float64) float64 {
+	return (jd1 - 2400000.5) + jd2
+}
+
 // dut1ForUTC retrieves DUT1 for the given UTC two-part JD.
 // Returns (dut1, nil) on success, or (0, err) if IERS data is unavailable.
 func dut1ForUTC(jd1, jd2 float64) (float64, error) {
-	mjd := (jd1 - 2400000.5) + jd2
-
-	eop, err := iers.GetModel().EOP(mjd)
+	eop, err := iers.GetModel().EOP(mjdFromJDParts(jd1, jd2))
 	if err != nil {
 		return 0, fmt.Errorf("time: EOP lookup: %w", err)
 	}
@@ -709,8 +715,7 @@ func dut1OrFallback(jd1, jd2 float64) float64 {
 	dut1, err := dut1ForUTC(jd1, jd2)
 	if err != nil {
 		warnUT1Once.Do(func() {
-			mjd := (jd1 - 2400000.5) + jd2
-			log.Printf("astrogo/time: IERS EOP data unavailable (MJD %.1f): UT1 ≈ UTC (DUT1=0). Max error ≈ 0.9s. Load finals2000A for sub-second precision.", mjd)
+			log.Printf("astrogo/time: IERS EOP data unavailable (MJD %.1f): UT1 ≈ UTC (DUT1=0). Max error ≈ 0.9s. Load finals2000A for sub-second precision.", mjdFromJDParts(jd1, jd2))
 		})
 
 		return 0
@@ -859,10 +864,9 @@ func (t Time) TDB() Time {
 // UT1 returns a new Time converted to the Universal Time (UT1) scale.
 //
 // This conversion requires IERS Earth Orientation Parameters for DUT1.
-// Returns an error if IERS data is unavailable for the given epoch.
-// The embedded finals2000A data is auto-loaded when the iers package is
-// imported; for dates beyond its prediction window, load updated data
-// via [iers.RegisterModel].
+// Returns an error if IERS data is unavailable for the given epoch — no
+// data is loaded automatically; populate it via [Fetch], [FetchIfStale],
+// or [LoadFS].
 func (t Time) UT1() (Time, error) {
 	if t.scale == UT1 {
 		return t, nil
@@ -873,7 +877,7 @@ func (t Time) UT1() (Time, error) {
 	dut1, err := dut1ForUTC(utc.jd1, utc.jd2)
 	if err != nil {
 		return Time{}, fmt.Errorf("astrogo/time: UT1 conversion failed (MJD %.1f): %w",
-			(utc.jd1-2400000.5)+utc.jd2, err)
+			mjdFromJDParts(utc.jd1, utc.jd2), err)
 	}
 
 	return fromPartsPreserveLoc(t, utc.jd1, utc.jd2+dut1/86400.0, UT1), nil
