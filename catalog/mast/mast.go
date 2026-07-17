@@ -86,9 +86,9 @@ func (p *Provider) ResolveObject(ctx context.Context, req resolve.ObjectRequest)
 
 	payload := map[string]any{
 		"service": "Mast.Name.Lookup",
+		"format":  "json",
 		"params": map[string]string{
-			"input":  req.Query,
-			"format": "json",
+			"input": req.Query,
 		},
 	}
 

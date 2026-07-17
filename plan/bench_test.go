@@ -34,7 +34,9 @@ func BenchmarkVisibleIntervals(b *testing.B) {
 	start := atime.FromJD(2460000.0, atime.UTC)
 	end := start.AddDays(1.0)
 
-	for b.Loop() {
+	b.ResetTimer()
+
+	for range b.N {
 		_, _ = VisibleIntervals(obj, site, start, end, 10*time.Minute, angle.Deg(20))
 	}
 }
@@ -46,7 +48,9 @@ func BenchmarkVisibleIntervals_1MinStep(b *testing.B) {
 	start := atime.FromJD(2460000.0, atime.UTC)
 	end := start.AddDays(1.0)
 
-	for b.Loop() {
+	b.ResetTimer()
+
+	for range b.N {
 		_, _ = VisibleIntervals(obj, site, start, end, 1*time.Minute, angle.Deg(20))
 	}
 }
@@ -68,7 +72,9 @@ func BenchmarkEventSolver_Visibility(b *testing.B) {
 		Threshold: angle.Deg(20),
 	}
 
-	for b.Loop() {
+	b.ResetTimer()
+
+	for range b.N {
 		_, _ = solver.Find(spec, start, end)
 	}
 }
@@ -83,7 +89,9 @@ func BenchmarkObservableWindows(b *testing.B) {
 	end := start.Add(12 * atime.Hour)
 	constraints := []Constraint{Altitude{Threshold: angle.Deg(30)}}
 
-	for b.Loop() {
+	b.ResetTimer()
+
+	for range b.N {
 		_, _ = ObservableWindows(obj, start, end, 5*atime.Minute, site, constraints...)
 	}
 }
@@ -117,7 +125,9 @@ func benchScheduler(b *testing.B, n int, strategy Strategy) {
 	start := atime.ZeroTime()
 	window := Window{Start: start, End: start.Add(atime.Duration(n*15) * atime.Minute)}
 
-	for b.Loop() {
+	b.ResetTimer()
+
+	for range b.N {
 		_, _ = strategy.Schedule(planner, window, blocks, tm)
 	}
 }
@@ -167,7 +177,9 @@ func BenchmarkTransitEstimate(b *testing.B) {
 	start := atime.FromJD(2460000.0, atime.UTC)
 	end := start.AddDays(0.5)
 
-	for b.Loop() {
+	b.ResetTimer()
+
+	for range b.N {
 		_, _, _ = TransitEstimate(obj, site, start, end)
 	}
 }
