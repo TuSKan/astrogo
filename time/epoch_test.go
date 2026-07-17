@@ -40,6 +40,22 @@ func TestTimeDayOfYear(t *testing.T) {
 	testutil.AssertNear(t, "DayOfYear on Dec 31 (non-leap year)", dec31.DayOfYear(), 365.0, 1e-9)
 }
 
+func TestTimeGASTFallsBackToUTCOnUT1Error(t *testing.T) {
+	atime.RegisterModel(errorEOP{})
+	defer atime.RegisterModel(atime.ZeroModel{})
+
+	tm := atime.FromJD(2451545.0, atime.UTC)
+
+	gast, err := tm.GAST()
+	if err == nil {
+		t.Fatal("expected an error when the registered model fails")
+	}
+
+	// Falling back to UTC in place of UT1 is at most a few hundred ms of
+	// error — the result should still be close to the known GAST value.
+	testutil.AssertNear(t, "GAST fallback at J2000", gast.Degrees(), 280.46, 0.5)
+}
+
 func TestTimeEOPDegradesToZeroWithWarning(t *testing.T) {
 	atime.RegisterModel(errorEOP{})
 	defer atime.RegisterModel(atime.ZeroModel{})
@@ -50,4 +66,17 @@ func TestTimeEOPDegradesToZeroWithWarning(t *testing.T) {
 	if eop != (atime.EOP{}) {
 		t.Errorf("expected zero EOP on lookup failure, got %+v", eop)
 	}
+}
+
+func TestTimeUTCFromUT1FallsBackOnEOPError(t *testing.T) {
+	atime.RegisterModel(errorEOP{})
+	defer atime.RegisterModel(atime.ZeroModel{})
+
+	// A UT1-scale Time converting to UTC hits dut1OrFallback, which
+	// substitutes DUT1=0 (UT1≈UTC) and logs a one-time warning on lookup
+	// failure, rather than propagating the error like Time.UT1() does.
+	ut1 := atime.FromJD(2451545.0, atime.UT1)
+
+	utc := ut1.UTC()
+	testutil.AssertNear(t, "UTC fallback (DUT1=0) at J2000", utc.JD(), 2451545.0, 1e-9)
 }
