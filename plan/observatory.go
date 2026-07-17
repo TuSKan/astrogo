@@ -8,7 +8,6 @@ import (
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
-	"github.com/TuSKan/astrogo/internal/gofaext"
 	"github.com/TuSKan/astrogo/time"
 )
 
@@ -210,15 +209,12 @@ func (s *Site) WithTimeZone(tz *time.Location) *Site {
 // It uses the IAU 2006 GAST model (Gst06a).
 // Returns an error if IERS EOP data is unavailable for the UT1 conversion.
 func (s *Site) LocalSiderealTime(t time.Time) (angle.Angle, error) {
-	ut1, err := t.UT1()
+	gast, err := t.GAST()
 	if err != nil {
 		return angle.Zero(), fmt.Errorf("LocalSiderealTime: %w", err)
 	}
 
-	u1, u2 := ut1.JDParts()
-	tt1, tt2 := t.TT().JDParts()
-	gast := gofaext.Gst06a(u1, u2, tt1, tt2)
-	lst := gast + s.location.Lon().Radians()
+	lst := gast.Radians() + s.location.Lon().Radians()
 	// Normalise to [0, 2π)
 	lst = math.Mod(lst, 2*math.Pi)
 	if lst < 0 {

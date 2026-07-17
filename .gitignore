@@ -51,7 +51,3 @@ data/
 
 !**/testdata/
 !**/testdata/**
-# Embedded go assets placeholders
-!iers/data/
-iers/data/*
-!iers/data/.keep

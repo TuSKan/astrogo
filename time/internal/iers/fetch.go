@@ -34,16 +34,17 @@ var (
 // download attempts, and the coverage check is repeated inside the
 // lock so a successful concurrent fetch is respected immediately.
 //
-// After a failed attempt, retries are throttled to once per 5 minutes
-// to avoid hammering the IERS server on transient errors.
+// After a failed attempt, retries are throttled by retryCooldown (see
+// SetRetryCooldown) to avoid hammering the IERS server on transient
+// errors.
 //
 // The downloaded data is parsed and registered globally via RegisterModel,
-// replacing the previous (potentially stale) embedded data.
+// replacing whatever model was previously registered.
 //
 // Calling this function is itself the download consent (the endpoint is
 // remote.IERSFinals2000A, ~3.7 MB); it still respects remote.SetOffline
 // and remote.Disable.
-func FetchIfStale(mjd float64) error {
+func FetchIfStale(ctx context.Context, mjd float64) error {
 	// Fast path (no lock): current model already covers this epoch.
 	if covered(mjd) {
 		return nil
@@ -74,26 +75,36 @@ func FetchIfStale(mjd float64) error {
 	}
 
 	lastAttempt = time.Now()
-	errLastFetch = doFetch(context.Background())
+	errLastFetch = fetch(ctx)
 
 	return errLastFetch
 }
 
-// FetchNow downloads and registers fresh IERS EOP data immediately,
+// Fetch downloads and registers fresh IERS EOP data immediately,
 // bypassing the coverage, staleness, and cooldown checks that FetchIfStale
 // applies (a fresh on-disk cache file is still reused). Use it at service
 // startup or from a scheduled refresh job.
 //
 // Calling this function is itself the download consent; it still respects
 // remote.SetOffline and remote.Disable(remote.IERSFinals2000A).
-func FetchNow(ctx context.Context) error {
+func Fetch(ctx context.Context) error {
 	fetchMu.Lock()
 	defer fetchMu.Unlock()
 
 	lastAttempt = time.Now()
-	errLastFetch = doFetch(ctx)
+	errLastFetch = fetch(ctx)
 
 	return errLastFetch
+}
+
+// SetRetryCooldown sets the minimum interval FetchIfStale waits between
+// fetch attempts after a failure (0 disables throttling). The default is
+// 5 minutes.
+func SetRetryCooldown(d time.Duration) {
+	fetchMu.Lock()
+	defer fetchMu.Unlock()
+
+	retryCooldown = d
 }
 
 // covered reports whether the current global model covers the given MJD.
@@ -118,7 +129,9 @@ func CacheFile() (gofs.File, error) {
 	return dir.Join("finals2000A.data"), nil
 }
 
-func doFetch(ctx context.Context) error {
+// fetch is the shared core both Fetch and FetchIfStale serialize on via
+// fetchMu; it holds no lock itself.
+func fetch(ctx context.Context) error {
 	// remote.GetFile reuses the cache untouched when a HEAD probe shows the
 	// IERS bulletin hasn't changed since we last downloaded it — a content
 	// check rather than a wall-clock expiration window, since finals2000A

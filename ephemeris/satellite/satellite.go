@@ -163,12 +163,15 @@ func (s *Satellite) subSatellitePoint(t time.Time) (*coord.Geodetic, error) {
 		return nil, err
 	}
 
-	// Compute GMST for ECI → ECEF conversion.
-	gmst := computeGMST(t)
+	// Compute GAST for ECI → ECEF conversion. Falls back to UTC-derived
+	// GAST (a few hundred ms of error at worst) rather than failing if
+	// IERS EOP data is unavailable, matching this function's existing
+	// no-error-return contract.
+	gast, _ := t.GAST()
 
 	// Rotate ECI → ECEF.
-	cosG := math.Cos(gmst)
-	sinG := math.Sin(gmst)
+	cosG := math.Cos(gast.Radians())
+	sinG := math.Sin(gast.Radians())
 	ecefX := eciPos.X*cosG + eciPos.Y*sinG
 	ecefY := -eciPos.X*sinG + eciPos.Y*cosG
 	ecefZ := eciPos.Z
@@ -241,21 +244,6 @@ func temeToGCRS(pos, vel vector.Vec3, t time.Time) (gcrsPos, gcrsVel vector.Vec3
 	)
 
 	return gcrsPos, gcrsVel
-}
-
-// computeGMST returns the Greenwich Mean Sidereal Time in radians for time t.
-func computeGMST(t time.Time) float64 {
-	ut1, err := t.UT1()
-	if err != nil {
-		ut1 = t.UTC()
-	}
-
-	tt := t.TT()
-
-	ut1a, ut1b := ut1.JDParts()
-	tta, ttb := tt.JDParts()
-
-	return gofaext.Gst06a(ut1a, ut1b, tta, ttb)
 }
 
 // timeToComponents extracts calendar components from an astrogo time for SGP4.

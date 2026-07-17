@@ -537,7 +537,6 @@ flowchart TD
     skybrightness[skybrightness]
 
     %% Data Providers
-    iers[iers]
     lpmap["skybrightness/lpmap"]
 
     %% Primitive Foundation
@@ -577,15 +576,12 @@ flowchart TD
     skybrightness --> angle
     lpmap --> skybrightness
 
-    coord --> iers
     coord --> atmosphere
     coord --> time
     coord --> vector
     coord --> angle
 
     atmosphere --> angle
-
-    iers --> time
 
     style Primitives fill:transparent,stroke:#888,stroke-dasharray: 5 5
 ```
@@ -606,10 +602,9 @@ flowchart TD
 | `constants` | Universal and astronomical constants | ✅ Stable |
 | `angle` | Angular types, HMS/DMS parsing | ✅ Stable |
 | `vector` | 3D geometry primitives | ✅ Stable |
-| `time` | Astronomical time scales (JD-based, UTC/TAI/TT/TDB/UT1) | ✅ Stable |
+| `time` | Astronomical time scales (JD-based, UTC/TAI/TT/TDB/UT1), Earth Orientation Parameters (DUT1, polar motion), epoch arithmetic (MJD, GAST, Julian epoch year, day-of-year) | ✅ Stable |
 | `atmosphere` | Refraction models, airmass, dispersion | ✅ Stable |
 | `coord` | Coordinate types, transforms, topocentric reduction | ✅ Stable |
-| `iers` | Earth Orientation Parameters (DUT1, polar motion) | ✅ Stable |
 | `ephemeris` | Solar system ephemerides (SOFA + JPL SPK) | ✅ Stable |
 | `ephemeris/satellite` | SGP4 propagation, TEME→GCRS, look angles, ground track | ✅ Stable |
 | `catalog/resolve` | Provider interface, HTTP client, Arrow cache | ✅ Stable |
@@ -644,7 +639,7 @@ happens.
 | JPL planetary kernel (de441 parts) | `remote.NAIFSPK` | multi-GB **each** | `eph.NewProvider(eph.Planets, "de441_part-1", eph.WithKernel("de441_part-2"))` |
 | Leap-second kernel (naif0012.tls) | `remote.NAIFLSK` | ~5 KB | always, alongside any JPL kernel |
 | Small-body SPK (Horizons-generated) | `remote.JPLHorizons` | KB–few MB | `eph.NewProvider(eph.SmallBody, "433", ...)` |
-| IERS Earth-orientation data | `remote.IERSFinals2000A` | ~3.7 MB | `iers.FetchNow`/`FetchIfStale` |
+| IERS Earth-orientation data | `remote.IERSFinals2000A` | ~3.7 MB | `time.Fetch`/`FetchIfStale` |
 | OpenNGC catalog CSVs | `remote.OpenNGC` | ~2 MB combined | `catalog.NewResolver(catalog.OpenNGC, ...)` |
 
 For an accuracy/offline tradeoff comparison across `ephemeris.Default()` and the
@@ -730,7 +725,7 @@ p, err := eph.NewProvider(eph.Planets, "de442") // finds the pre-seeded kernel, 
 Every downloader checks the filesystem before the network, so a pre-seeded deployment
 never dials out even without `SetOffline` — `remote` is the only thing that resolves or
 opens these files, there is no separate local-only constructor to bypass it with.
-`iers.LoadFS` loads a local (or embedded) EOP snapshot the same way.
+`time.LoadFS` loads a local EOP snapshot the same way.
 
 ### Endpoint control
 
@@ -743,13 +738,12 @@ remote.SetOffline(true)                      // global kill switch, all network 
 
 ### Building from source
 
-The IERS EOP snapshot (`iers/data/finals2000A.all`) is `go:embed`-ed if present, but it
-isn't committed to the repository (see `.gitignore`), so a fresh `go get`/checkout builds
-with zero embedded data. Get working data by calling `iers.FetchNow`/`LoadFS` at runtime,
-or by placing your own copy of the file at its path above before running `go build`.
-OpenNGC has no embedded data at all — like every other catalog provider, it fetches over
-the network via `remote.EnableDownloads(remote.OpenNGC, ...)` (see "Enabling a download"
-above).
+No package in astrogo embeds data at build time. IERS EOP data is obtained exclusively
+at runtime via `time.Fetch`/`FetchIfStale` (network, consent-gated) or `time.LoadFS`
+(a pre-seeded finals2000A file, or any other `io/fs.FS`) — there is no `iers/data/`
+directory or `go:embed` to populate before building. OpenNGC works the same way — like
+every other catalog provider, it fetches over the network via
+`remote.EnableDownloads(remote.OpenNGC, ...)` (see "Enabling a download" above).
 
 ---
 
@@ -804,7 +798,7 @@ Sub-arcsecond topocentric accuracy and sub-second UT1 timing require IERS EOP da
 | Topocentric alt/az | <0.01″ | ~1″ |
 | Rise/set timing | ≤0.6 min vs USNO | ≤0.7 min vs USNO |
 
-The library logs a one-time warning when EOP data is unavailable (users who redirect or suppress logs won't see it — call `iers.Coverage()` to check proactively). The IERS data is refreshed via `iers.FetchNow`/`FetchIfStale` at runtime, or `iers.LoadFS` from a pre-seeded snapshot — see [Data downloads & offline usage](#data-downloads--offline-usage).
+The library logs a one-time warning when EOP data is unavailable (users who redirect or suppress logs won't see it — call `time.Coverage()` to check proactively). The IERS data is refreshed via `time.Fetch`/`FetchIfStale` at runtime, or `time.LoadFS` from a pre-seeded snapshot — see [Data downloads & offline usage](#data-downloads--offline-usage).
 
 ### TDB Precision
 
