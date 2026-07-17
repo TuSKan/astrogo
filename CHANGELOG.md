@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] — 2026-07-17
+
 ### Added
 - `remote.WithProgress(func(downloaded, total int64))` — a `ReadOption` reporting a `GetFile` download's progress as it streams, on both the buffered (`WithValidate`) and direct-to-disk paths. Independent of whether a caller supplies it, `GetFile` now logs one line (via the stdlib `log` package) at the start of an actual download showing the endpoint and its registered `ApproxSize` — never logged on a cache hit.
 - `ephemeris` package doc: a "Choosing a Provider" section comparing `Default()` against the JPL kernel family (de440s/de440/de442/de441) on accuracy, size, and offline-friendliness — previously only a size table existed, with no guidance on which provider to reach for.
@@ -539,7 +541,8 @@ First observatory-grade release. Validated against USNO, JPL Horizons, and NASA 
 - `VisibleIntervals` creates independent Contexts per grid step (correct; each step is a different epoch)
 - IERS EOP data fetched via `go:generate`, not at runtime
 
-[Unreleased]: https://github.com/TuSKan/astrogo/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/TuSKan/astrogo/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/TuSKan/astrogo/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/TuSKan/astrogo/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/TuSKan/astrogo/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/TuSKan/astrogo/compare/v0.2.0...v0.3.0
