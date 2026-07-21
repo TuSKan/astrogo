@@ -1,10 +1,13 @@
 package mast
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"encoding/xml"
 	"errors"
 	"fmt"
+	"io"
 	"net/url"
 
 	"github.com/TuSKan/astrogo/angle"
@@ -108,39 +111,74 @@ func (p *Provider) ResolveObject(ctx context.Context, req resolve.ObjectRequest)
 		}
 		defer func() { _ = body.Close() }()
 
-		// The request above always sets "format": "json" (MAST defaults to
-		// XML otherwise), so a 2xx response body is always JSON — no
-		// format sniffing needed.
-		var jsonPayload struct {
-			Status             string `json:"status"`
-			Msg                string `json:"msg"`
-			ResolvedCoordinate []struct {
-				CanonicalName string  `json:"canonicalName"`
-				Resolver      string  `json:"resolver"`
-				RA            float64 `json:"ra"`
-				Decl          float64 `json:"decl"`
-			} `json:"resolvedCoordinate"`
-		}
-
-		if err := json.NewDecoder(body).Decode(&jsonPayload); err != nil {
-			yield(resolve.Target{}, fmt.Errorf("mast: decode response: %w", err))
+		data, err := io.ReadAll(body)
+		if err != nil {
+			yield(resolve.Target{}, fmt.Errorf("mast: read response: %w", err))
 			return
 		}
 
-		if jsonPayload.Status == "ERROR" {
-			yield(resolve.Target{}, fmt.Errorf("%w: %s", ErrAPIError, jsonPayload.Msg))
-			return
-		}
+		// The request above always sets "format": "json", but MAST has been
+		// observed to ignore it and return its default XML body anyway —
+		// sniff the actual content instead of trusting the requested format.
+		var targets []resolve.Target
 
-		targets := make([]resolve.Target, 0, len(jsonPayload.ResolvedCoordinate))
-		for _, match := range jsonPayload.ResolvedCoordinate {
-			targets = append(targets, resolve.Target{
-				ID:       match.CanonicalName,
-				Name:     match.CanonicalName,
-				Coord:    coord.NewICRS(angle.Deg(match.RA), angle.Deg(match.Decl)),
-				HasCoord: true,
-				Catalog:  match.Resolver,
-			})
+		if trimmed := bytes.TrimSpace(data); len(trimmed) > 0 && trimmed[0] == '<' {
+			var xmlPayload struct {
+				ResolvedCoordinate []struct {
+					CanonicalName string  `xml:"canonicalName"`
+					Resolver      string  `xml:"resolver"`
+					RA            float64 `xml:"ra"`
+					Dec           float64 `xml:"dec"`
+				} `xml:"resolvedCoordinate"`
+			}
+
+			if err := xml.Unmarshal(data, &xmlPayload); err != nil {
+				yield(resolve.Target{}, fmt.Errorf("mast: decode XML response: %w", err))
+				return
+			}
+
+			targets = make([]resolve.Target, 0, len(xmlPayload.ResolvedCoordinate))
+			for _, match := range xmlPayload.ResolvedCoordinate {
+				targets = append(targets, resolve.Target{
+					ID:       match.CanonicalName,
+					Name:     match.CanonicalName,
+					Coord:    coord.NewICRS(angle.Deg(match.RA), angle.Deg(match.Dec)),
+					HasCoord: true,
+					Catalog:  match.Resolver,
+				})
+			}
+		} else {
+			var jsonPayload struct {
+				Status             string `json:"status"`
+				Msg                string `json:"msg"`
+				ResolvedCoordinate []struct {
+					CanonicalName string  `json:"canonicalName"`
+					Resolver      string  `json:"resolver"`
+					RA            float64 `json:"ra"`
+					Decl          float64 `json:"decl"`
+				} `json:"resolvedCoordinate"`
+			}
+
+			if err := json.Unmarshal(data, &jsonPayload); err != nil {
+				yield(resolve.Target{}, fmt.Errorf("mast: decode response: %w", err))
+				return
+			}
+
+			if jsonPayload.Status == "ERROR" {
+				yield(resolve.Target{}, fmt.Errorf("%w: %s", ErrAPIError, jsonPayload.Msg))
+				return
+			}
+
+			targets = make([]resolve.Target, 0, len(jsonPayload.ResolvedCoordinate))
+			for _, match := range jsonPayload.ResolvedCoordinate {
+				targets = append(targets, resolve.Target{
+					ID:       match.CanonicalName,
+					Name:     match.CanonicalName,
+					Coord:    coord.NewICRS(angle.Deg(match.RA), angle.Deg(match.Decl)),
+					HasCoord: true,
+					Catalog:  match.Resolver,
+				})
+			}
 		}
 
 		if err := p.cache.Set(cacheKey, targets); err != nil {
