@@ -29,6 +29,12 @@ type Context struct {
 	mat    [3][3]float64 // ICRS → TIRS rotation matrix
 	obsVec vector.Vec3   // observer position in ICRS frame (AU)
 
+	// rc2i (precession-nutation) and rpom (polar motion) are the slow
+	// factors C2t06a composes internally (mat = C2tcio(rc2i, era, rpom)).
+	// Cached so AtTime can recompute mat from a fresh era alone.
+	rc2i [3][3]float64
+	rpom [3][3]float64
+
 	// Cached site trigonometry (computed once).
 	sinLat, cosLat float64
 	sinLon, cosLon float64
@@ -56,34 +62,24 @@ func NewContext(t time.Time, site *Geodetic, atm atmosphere.Atmosphere) *Context
 		p, atm.Temperature, atm.Humidity, atm.Wavelength,
 	)
 
-	// Precompute C2t06a matrix and observer ICRS vector once.
+	// Precompute the C2t06a matrix and observer ICRS vector once, via its
+	// decomposed factors (rc2i, rpom) rather than the monolithic call, so
+	// AtTime can later recompute mat from a fresh Earth Rotation Angle
+	// alone without rebuilding the slow precession-nutation/polar-motion
+	// factors. Bit-identical to a direct C2t06a call.
 	ut1, ut2 := jd1, jd2+eop.DUT1/86400.0
 	tt1, tt2 := t.TT().JDParts()
-	mat := gofaext.C2t06a(tt1, tt2, ut1, ut2, eop.XP, eop.YP)
+	rc2i := gofaext.C2i06a(tt1, tt2)
+	sp := gofaext.Sp00(tt1, tt2)
+	rpom := gofaext.Pom00(eop.XP, eop.YP, sp)
+	era0 := gofaext.Era00(ut1, ut2)
+	mat := gofaext.C2tcio(rc2i, era0, rpom)
 
 	sinLat, cosLat := math.Sincos(site.Lat().Radians())
 	sinLon, cosLon := math.Sincos(site.Lon().Radians())
 
-	const (
-		au  = 149597870.7
-		rEq = 6378.137
-		f   = 1.0 / 298.257223563
-	)
-
-	cEarth := 1.0 / math.Sqrt(cosLat*cosLat+(1.0-f)*(1.0-f)*sinLat*sinLat)
-	sEarth := (1.0 - f) * (1.0 - f) * cEarth
-	heightKm := site.Height() / 1000.0
-
-	xTIRS := (rEq*cEarth + heightKm) * cosLat * cosLon / au
-	yTIRS := (rEq*cEarth + heightKm) * cosLat * sinLon / au
-	zTIRS := (rEq*sEarth + heightKm) * sinLat / au
-
-	// Observer ICRS = transpose(mat) * TIRS
-	obsVec := vector.Vec3{
-		X: mat[0][0]*xTIRS + mat[1][0]*yTIRS + mat[2][0]*zTIRS,
-		Y: mat[0][1]*xTIRS + mat[1][1]*yTIRS + mat[2][1]*zTIRS,
-		Z: mat[0][2]*xTIRS + mat[1][2]*yTIRS + mat[2][2]*zTIRS,
-	}
+	tirs := tirsVec(sinLat, cosLat, sinLon, cosLon, site.Height())
+	obsVec := icrsFromTIRS(mat, tirs)
 
 	return &Context{
 		t:      t,
@@ -93,6 +89,8 @@ func NewContext(t time.Time, site *Geodetic, atm atmosphere.Atmosphere) *Context
 		eop:    eop,
 		mat:    mat,
 		obsVec: obsVec,
+		rc2i:   rc2i,
+		rpom:   rpom,
 		sinLat: sinLat, cosLat: cosLat,
 		sinLon: sinLon, cosLon: cosLon,
 	}
@@ -104,6 +102,67 @@ func NewContext(t time.Time, site *Geodetic, atm atmosphere.Atmosphere) *Context
 func (ctx *Context) Clone() *Context {
 	c := *ctx // shallow copy — all fields are value types or immutable pointers
 	return &c
+}
+
+// tirsVec returns the observer's geocentric position in the TIRS frame
+// (AU) from site trigonometry and height — pure site geometry, independent
+// of time, shared by NewContext and AtTime.
+func tirsVec(sinLat, cosLat, sinLon, cosLon, heightM float64) vector.Vec3 {
+	const (
+		au  = 149597870.7
+		rEq = 6378.137
+		f   = 1.0 / 298.257223563
+	)
+
+	cEarth := 1.0 / math.Sqrt(cosLat*cosLat+(1.0-f)*(1.0-f)*sinLat*sinLat)
+	sEarth := (1.0 - f) * (1.0 - f) * cEarth
+	heightKm := heightM / 1000.0
+
+	return vector.Vec3{
+		X: (rEq*cEarth + heightKm) * cosLat * cosLon / au,
+		Y: (rEq*cEarth + heightKm) * cosLat * sinLon / au,
+		Z: (rEq*sEarth + heightKm) * sinLat / au,
+	}
+}
+
+// icrsFromTIRS rotates a TIRS-frame vector into the ICRS frame:
+// v_ICRS = transpose(mat) * v_TIRS.
+func icrsFromTIRS(mat [3][3]float64, tirs vector.Vec3) vector.Vec3 {
+	return vector.Vec3{
+		X: mat[0][0]*tirs.X + mat[1][0]*tirs.Y + mat[2][0]*tirs.Z,
+		Y: mat[0][1]*tirs.X + mat[1][1]*tirs.Y + mat[2][1]*tirs.Z,
+		Z: mat[0][2]*tirs.X + mat[1][2]*tirs.Y + mat[2][2]*tirs.Z,
+	}
+}
+
+// AtTime derives a new Context at instant t from this one, cheaply updating
+// only Earth-rotation-dependent state (the ASTROM Earth Rotation Angle, the
+// celestial-to-terrestrial matrix, and the observer vector) while reusing
+// this Context's precession-nutation, Earth ephemeris, polar motion, cached
+// EOP, and site/atmosphere state. Cost is O(1) (a handful of trig calls and
+// matrix multiplies) versus NewContext's ~91 µs full SOFA rebuild.
+//
+// Accuracy: holding precession-nutation and aberration fixed costs ≲0.1″ per
+// hour of |t − ctx.Time()| — dominated by nutation's ~13.66-day term
+// (≈0.025″/h) and the annual-aberration direction's drift (≈0.015″/h);
+// precession (≈0.006″/h) and reusing this Context's DUT1/polar-motion
+// (<0.001″/h combined) are smaller still. At the horizon's steepest crossing
+// rate, 0.1″ of positional error is under 0.01 s of rise/set-time bias.
+// Callers sweeping longer spans should rebuild a fresh NewContext
+// periodically rather than calling AtTime indefinitely far from ctx.Time().
+func (ctx *Context) AtTime(t time.Time) *Context {
+	t = t.UTC()
+	jd1, jd2 := t.JDParts()
+	ut1, ut2 := jd1, jd2+ctx.eop.DUT1/86400.0
+	era := gofaext.Era00(ut1, ut2)
+
+	c := ctx.Clone()
+	c.t = t
+	gofaext.Aper(era, &c.astrom)
+	c.mat = gofaext.C2tcio(c.rc2i, era, c.rpom)
+	c.obsVec = icrsFromTIRS(c.mat, tirsVec(c.sinLat, c.cosLat, c.sinLon, c.cosLon, c.site.Height()))
+
+	return c
 }
 
 // Time returns the encapsulated observation time.

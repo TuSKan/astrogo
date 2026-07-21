@@ -78,3 +78,55 @@ func TestGofaExtWrappers(t *testing.T) {
 		t.Errorf("Gst06a failed, got zero")
 	}
 }
+
+// TestC2tcioDecompositionMatchesC2t06a proves that composing the
+// decomposed factors (C2i06a, Era00, Pom00/Sp00) via C2tcio reproduces the
+// monolithic C2t06a call exactly — the property coord.Context.AtTime relies
+// on to cheaply recompute only the Earth-rotation-dependent factor.
+func TestC2tcioDecompositionMatchesC2t06a(t *testing.T) {
+	const (
+		tt1, tt2 = 2451545.0, 0.25 // an arbitrary TT epoch
+		ut1, ut2 = 2451545.0, 0.24 // a nearby UT1 epoch (DUT1 offset)
+		xp, yp   = 1.5e-7, 2.3e-7  // arbitrary polar motion, radians
+	)
+
+	want := gofaext.C2t06a(tt1, tt2, ut1, ut2, xp, yp)
+
+	rc2i := gofaext.C2i06a(tt1, tt2)
+	sp := gofaext.Sp00(tt1, tt2)
+	rpom := gofaext.Pom00(xp, yp, sp)
+	era := gofaext.Era00(ut1, ut2)
+	got := gofaext.C2tcio(rc2i, era, rpom)
+
+	for i := range 3 {
+		for j := range 3 {
+			testutil.AssertNear(t, "C2tcio decomposition", got[i][j], want[i][j], 1e-15)
+		}
+	}
+}
+
+// TestAperUpdatesOnlyEral proves Aper touches only ASTROM.Eral, leaving
+// every other field (populated by a real Apco13 call) untouched — the
+// property that makes it a safe O(1) substitute for a full Apco13 rebuild
+// when only the Earth Rotation Angle has changed.
+func TestAperUpdatesOnlyEral(t *testing.T) {
+	astrom, _ := gofaext.Apco13(
+		2451545.0, 0.5, 0.1,
+		0.3, 0.7, 500.0,
+		1.5e-7, 2.3e-7,
+		1013.25, 15.0, 0.5, 0.55,
+	)
+
+	before := astrom
+	gofaext.Aper(1.2345, &astrom)
+
+	if astrom.Eral != 1.2345+before.Along {
+		t.Errorf("Aper: Eral = %v, want %v", astrom.Eral, 1.2345+before.Along)
+	}
+
+	astrom.Eral = before.Eral // neutralize the one expected change
+
+	if astrom != before {
+		t.Errorf("Aper mutated a field other than Eral:\nbefore=%+v\nafter=%+v", before, astrom)
+	}
+}

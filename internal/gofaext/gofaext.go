@@ -194,6 +194,60 @@ func C2t06a(tta, ttb, uta, utb, xp, yp float64) [3][3]float64 {
 	return rc2t
 }
 
+// Era00 returns the Earth Rotation Angle (IAU 2000) in radians for the given
+// UT1 two-part Julian date — the one orientation quantity that changes
+// materially between nearby instants (as opposed to precession, nutation,
+// and polar motion, which drift sub-arcsecond per day).
+func Era00(uta, utb float64) float64 {
+	return gofa.Era00(uta, utb)
+}
+
+// Aper updates only astrom.Eral (= theta + astrom.Along) in place, leaving
+// every other ASTROM field untouched — an O(1) alternative to rebuilding the
+// whole ASTROM via Apco13 when only the Earth Rotation Angle has changed.
+func Aper(theta float64, astrom *ASTROM) {
+	gofa.Aper(theta, astrom)
+}
+
+// C2i06a returns the celestial-to-intermediate (precession-nutation, IAU
+// 2006/2000A) matrix for the given TT two-part Julian date — the slow factor
+// of C2t06a, safe to cache across a short time window and reuse with a
+// freshly computed Era00/Pom00 via C2tcio.
+func C2i06a(tta, ttb float64) [3][3]float64 {
+	var rc2i [3][3]float64
+	gofa.C2i06a(tta, ttb, &rc2i)
+
+	return rc2i
+}
+
+// Sp00 returns the TIO locator s' (radians) for the given TT two-part
+// Julian date.
+func Sp00(tta, ttb float64) float64 {
+	return gofa.Sp00(tta, ttb)
+}
+
+// Pom00 returns the polar-motion matrix for polar coordinates xp, yp
+// (radians) and TIO locator sp (radians) — the other slow factor of C2t06a.
+func Pom00(xp, yp, sp float64) [3][3]float64 {
+	var rpom [3][3]float64
+	gofa.Pom00(xp, yp, sp, &rpom)
+
+	return rpom
+}
+
+// C2tcio assembles the celestial-to-terrestrial matrix from a cached
+// celestial-to-intermediate matrix, a fresh Earth Rotation Angle, and a
+// cached polar-motion matrix. Composing C2i06a + Era00 + Pom00 this way is
+// bit-identical to C2t06a at the same instant, but lets a caller hold rc2i
+// and rpom fixed across a series of nearby instants and recompute only era —
+// the fast path C2t06a's own SOFA documentation describes for exactly this.
+func C2tcio(rc2i [3][3]float64, era float64, rpom [3][3]float64) [3][3]float64 {
+	var rc2t [3][3]float64
+	gofa.C2tcio(rc2i, era, rpom, &rc2t)
+
+	return rc2t
+}
+
 // Refco determining the constants A and B in the atmospheric refraction model
 // dz = A tan z + B tan^3 z.
 // phpa is pressure in hPa, tc is temp in C, rh is relative humidity, wl is wavelength in um.

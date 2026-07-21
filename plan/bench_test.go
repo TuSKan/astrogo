@@ -7,6 +7,7 @@ import (
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
+	eph "github.com/TuSKan/astrogo/ephemeris"
 
 	atime "github.com/TuSKan/astrogo/time"
 )
@@ -181,5 +182,63 @@ func BenchmarkTransitEstimate(b *testing.B) {
 
 	for range b.N {
 		_, _, _ = TransitEstimate(obj, site, start, end)
+	}
+}
+
+// ── Fortnight Event Sweep (issue #10 repro) ─────────────────────────────────
+
+// BenchmarkFortnightEvents mirrors an observing-planner workload (the shape
+// reported in https://github.com/TuSKan/astrogo/issues/10): for each of 14
+// days, compute sun rise/set/transit, the three twilight bands, and moon
+// rise/set — the standard "14-night forecast" that made coord.NewContext
+// ~65% of total CPU before Context.AtTime (see coord/context.go) let
+// solveVisibility amortize one full NewContext per ~hour of solve window
+// instead of rebuilding one per sample and per bisection iteration.
+func BenchmarkFortnightEvents(b *testing.B) {
+	g, err := coord.NewGeodetic(angle.Deg(2.1686), angle.Deg(41.3874), 0) // Barcelona
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	tz, err := time.LoadLocation("Europe/Madrid")
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	site, err := NewSite("bcn", g, WithTimeZone(tz))
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	provider := eph.Default()
+	start := atime.Date(2026, 7, 20, 0, 0, 0, 0, tz)
+
+	b.ResetTimer()
+
+	for range b.N {
+		for d := range 14 {
+			day := start.AddDate(0, 0, d)
+			next := day.AddDate(0, 0, 1)
+
+			if _, err := SunEvents(day, next, site, provider); err != nil {
+				b.Fatal(err)
+			}
+
+			if _, _, err := CivilDawnDusk(day, next, site, provider); err != nil {
+				b.Fatal(err)
+			}
+
+			if _, _, err := NauticalDawnDusk(day, next, site, provider); err != nil {
+				b.Fatal(err)
+			}
+
+			if _, _, err := AstronomicalDawnDusk(day, next, site, provider); err != nil {
+				b.Fatal(err)
+			}
+
+			if _, err := MoonEvents(day, next, site, provider); err != nil {
+				b.Fatal(err)
+			}
+		}
 	}
 }

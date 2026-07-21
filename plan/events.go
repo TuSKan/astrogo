@@ -290,8 +290,44 @@ func (s EventSolver) solveVisibility(spec EventSpec, start, end time.Time) ([]Ev
 	// series would introduce in the root-finder.
 	geomAtm := atmosphere.Atmosphere{Pressure: 0} // zero pressure → no refraction
 
+	// eventCtxRefresh bounds how far a coord.Context.AtTime derivation may
+	// drift from its last full coord.NewContext rebuild. AtTime's documented
+	// accuracy is ≲0.1″/hour (holding precession-nutation and aberration
+	// fixed); at 1h that's <0.01s of rise/set-time bias — a >100x margin
+	// against the solver's ~1s Tolerance and this package's minute-level
+	// USNO/NASA reference tolerances, while still turning the large majority
+	// of per-sample and per-bisection-iteration NewContext calls (~91µs
+	// each) into O(1) AtTime derivations.
+	const eventCtxRefresh = 1 * time.Hour
+
+	// contextCache returns a closure that rebuilds a full coord.NewContext
+	// only when t has drifted more than eventCtxRefresh from the last
+	// rebuild, deriving every other call cheaply via AtTime. evalVal and
+	// evalHA use independent caches since they evaluate under different
+	// atmospheres (geomAtm vs. spec.Observer.Atmosphere()).
+	contextCache := func(atm atmosphere.Atmosphere) func(t time.Time) *coord.Context {
+		var base *coord.Context
+
+		return func(t time.Time) *coord.Context {
+			if base == nil || t.Sub(base.Time()).Abs() > eventCtxRefresh {
+				base = coord.NewContext(t, spec.Observer.Location(), atm)
+			}
+
+			return base.AtTime(t)
+		}
+	}
+
+	// evalCtx backs evalVal (rise/set/twilight, geometric no-refraction
+	// atmosphere); evalHACtx backs the transit search's evalHA closure
+	// (defined further below, inside the event loop, since it's only
+	// needed once a transit candidate is found) — both declared here so a
+	// single cache persists across every sample and bisection iteration,
+	// and across multiple transit candidates, within this solveVisibility call.
+	evalCtx := contextCache(geomAtm)
+	evalHACtx := contextCache(spec.Observer.Atmosphere())
+
 	evalVal := func(t time.Time) (float64, error) {
-		ctx := coord.NewContext(t, spec.Observer.Location(), geomAtm)
+		ctx := evalCtx(t)
 
 		// For solar system bodies, use the vector-based topocentric pipeline
 		// which properly corrects for diurnal parallax (critical for the Moon: ~1°).
@@ -412,7 +448,7 @@ func (s EventSolver) solveVisibility(spec EventSpec, start, end time.Time) ([]Ev
 						return 0, fmt.Errorf("events: target position: %w", err)
 					}
 
-					ctx := coord.NewContext(t, spec.Observer.Location(), spec.Observer.Atmosphere())
+					ctx := evalHACtx(t)
 
 					ha, err := ctx.ICRSToHourAngle(pos)
 					if err != nil {
