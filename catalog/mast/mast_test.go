@@ -57,6 +57,84 @@ func TestMastOfflineResolve(t *testing.T) {
 	testutil.AssertEqual(t, "RA", targets[0].Coord.RA().Degrees(), 10.684)
 }
 
+// TestMastOfflineResolveXML covers a live-observed MAST quirk: the invoke
+// API sometimes ignores the request's "format": "json" field and returns
+// its default XML body anyway. ResolveObject must sniff and decode this
+// correctly rather than failing to parse it as JSON.
+func TestMastOfflineResolveXML(t *testing.T) {
+	xmlPayload := `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><ns2:resolvedItems xmlns:ns2="santa.stsci.edu"><resolvedCoordinate><canonicalName>M  31</canonicalName><dec>41.26875</dec><objectType>AGN</objectType><ra>10.684708</ra><resolver>SIMBAD</resolver><resolverTime>513</resolverTime><searchString>m31</searchString></resolvedCoordinate><status></status></ns2:resolvedItems>`
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/xml;charset=UTF-8")
+
+		if _, err := fmt.Fprint(w, xmlPayload); err != nil {
+			t.Errorf("failed to write response: %v", err)
+		}
+	}))
+	defer server.Close()
+
+	prov := New()
+	prov.client.HTTPClient.Transport = &mockTransport{Handler: server.Config.Handler}
+
+	req := resolve.ObjectRequest{Query: "M31"}
+	iter := prov.ResolveObject(context.Background(), req)
+
+	var targets []resolve.Target
+
+	iter(func(tar resolve.Target, err error) bool {
+		testutil.AssertNoError(t, err)
+
+		targets = append(targets, tar)
+
+		return true
+	})
+
+	if len(targets) != 1 {
+		t.Fatalf("Expected 1 target, got %d", len(targets))
+	}
+
+	testutil.AssertEqual(t, "Name", targets[0].Name, "M  31")
+	testutil.AssertEqual(t, "Catalog", targets[0].Catalog, "SIMBAD")
+	testutil.AssertEqual(t, "RA", targets[0].Coord.RA().Degrees(), 10.684708)
+	testutil.AssertEqual(t, "Dec", targets[0].Coord.Dec().Degrees(), 41.26875)
+}
+
+// TestMastOfflineResolveXMLNoMatch covers the XML "not found" shape: no
+// resolvedCoordinate element and an empty status, as observed live for an
+// unresolvable name — this must yield zero targets, not an error.
+func TestMastOfflineResolveXMLNoMatch(t *testing.T) {
+	xmlPayload := `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><ns2:resolvedItems xmlns:ns2="santa.stsci.edu"><status></status></ns2:resolvedItems>`
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/xml;charset=UTF-8")
+
+		if _, err := fmt.Fprint(w, xmlPayload); err != nil {
+			t.Errorf("failed to write response: %v", err)
+		}
+	}))
+	defer server.Close()
+
+	prov := New()
+	prov.client.HTTPClient.Transport = &mockTransport{Handler: server.Config.Handler}
+
+	req := resolve.ObjectRequest{Query: "ThisIsNotARealObjectXYZ123"}
+	iter := prov.ResolveObject(context.Background(), req)
+
+	var targets []resolve.Target
+
+	iter(func(tar resolve.Target, err error) bool {
+		testutil.AssertNoError(t, err)
+
+		targets = append(targets, tar)
+
+		return true
+	})
+
+	if len(targets) != 0 {
+		t.Fatalf("Expected 0 targets, got %d", len(targets))
+	}
+}
+
 type mockTransport struct {
 	Handler http.Handler
 }
