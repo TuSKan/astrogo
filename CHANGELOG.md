@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.1] — 2026-07-21
+
+### Added
+- `coord.Context.AtTime(t time.Time) *Context` — cheaply derives a new `Context` at a nearby instant by updating only Earth-rotation-dependent state (Earth Rotation Angle, the celestial-to-terrestrial matrix, the observer vector) instead of rebuilding the full SOFA `Apco13`/IAU 2006/2000A precession-nutation computation from scratch. Documented accuracy bound: ≲0.1″/hour of drift from the source `Context`'s epoch.
+
+### Fixed
+- `plan.EventSolver`'s rise/set/twilight/transit sweeps (`solveVisibility`) rebuilt a full `coord.NewContext` for every sampled instant and every bisection-refinement step, measured at ~65% of total CPU in a 14-night forecast benchmark ([#10](https://github.com/TuSKan/astrogo/issues/10)). It now rebuilds a full `Context` only once per hour of solve window and derives every sample/bisection step from it via the new `Context.AtTime`, cutting `BenchmarkFortnightEvents` from ~1.6s/op to ~0.6s/op on the reporter's repro shape. Reported event values are unaffected — the post-refinement display rebuilds are untouched.
+- `catalog/mast`'s `ResolveObject` failed to decode MAST invoke-API responses when the server ignored the request's `"format": "json"` field and returned its default XML body instead (`invalid character '<' looking for beginning of value`). The response body is now sniffed and decoded as JSON or XML as appropriate, instead of assuming a 2xx response is always JSON.
+
 ## [0.6.0] — 2026-07-17
 
 ### Added
