@@ -2,6 +2,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 
@@ -17,7 +18,7 @@ func main() {
 	site, _ := plan.NewSite("São Paulo", loc)
 
 	// 2. Set a Deep Space Target
-	sirius, err := catalog.NewResolver(catalog.SIMBAD).Resolve("Sirius")
+	sirius, err := catalog.NewResolver(catalog.SIMBAD).Resolve(context.Background(), "Sirius")
 	if err != nil {
 		log.Fatalf("Failed to resolve target: %s", "Sirius")
 	}

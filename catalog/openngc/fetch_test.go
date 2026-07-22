@@ -1,6 +1,7 @@
 package openngc
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -9,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/TuSKan/astrogo/remote"
+	astrotime "github.com/TuSKan/astrogo/time"
 )
 
 const (
@@ -72,11 +74,18 @@ func TestNewFetchesFromNetworkWhenDownloadsEnabled(t *testing.T) {
 
 	p := New()
 
-	if got, ok := p.Resolve("M42"); !ok || got.ID != "NGC1976" {
+	got, ok := p.Resolve(context.Background(), "M42")
+	if !ok || got.ID != "NGC1976" {
 		t.Errorf("Resolve(M42) = %+v, %v, want NGC1976, true", got, ok)
 	}
 
-	if got, ok := p.Resolve("M31"); !ok || got.ID != "NGC224" {
+	// Regression: Epoch used to never be set despite OpenNGC's RA/Dec being
+	// implicitly J2000 by the catalog's own convention.
+	if !got.Epoch.Equal(astrotime.J2000) {
+		t.Errorf("Epoch = %v, want time.J2000", got.Epoch)
+	}
+
+	if got, ok := p.Resolve(context.Background(), "M31"); !ok || got.ID != "NGC224" {
 		t.Errorf("Resolve(M31) = %+v, %v, want NGC224, true", got, ok)
 	}
 }
@@ -140,7 +149,7 @@ func TestNewDefaultDenyIssuesNoRequest(t *testing.T) {
 		t.Errorf("New() must not touch the network when downloads aren't enabled; server saw %d hits", got)
 	}
 
-	if _, ok := p.Resolve("M42"); ok {
+	if _, ok := p.Resolve(context.Background(), "M42"); ok {
 		t.Error("expected an empty provider when downloads are disabled")
 	}
 }

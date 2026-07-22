@@ -43,8 +43,8 @@ func (p *Provider) Capabilities() []resolve.Capability {
 
 // Resolve matches a single object by returning the most relevant hit.
 // Adheres strictly to resolve.Provider and utilizes AstroGo scoring for precision.
-func (p *Provider) Resolve(query string) (resolve.Target, bool) {
-	targets := p.Search(query)
+func (p *Provider) Resolve(ctx context.Context, query string) (resolve.Target, bool) {
+	targets := p.Search(ctx, query)
 	if len(targets) == 0 {
 		return resolve.Target{}, false
 	}
@@ -74,8 +74,7 @@ func (p *Provider) Resolve(query string) (resolve.Target, bool) {
 }
 
 // Search matches all objects closely matching a freeform query.
-func (p *Provider) Search(query string) []resolve.Target {
-	ctx := context.TODO()
+func (p *Provider) Search(ctx context.Context, query string) []resolve.Target {
 	req := resolve.ObjectRequest{Query: query, Limit: 10}
 
 	iter := p.ResolveObject(ctx, req)

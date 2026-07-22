@@ -1,6 +1,7 @@
 package catalog_test
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -20,7 +21,7 @@ func TestIntegration(t *testing.T) {
 	// We'll search for the Andromeda Galaxy (M31)
 	resolver := catalog.NewResolver(catalog.SIMBAD)
 
-	andromeda, err := resolver.Resolve("M31")
+	andromeda, err := resolver.Resolve(context.Background(), "M31")
 	if err != nil {
 		t.Skipf("Skipping integration test — cannot reach SIMBAD: %v", err)
 	}

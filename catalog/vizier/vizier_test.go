@@ -74,8 +74,39 @@ func TestVizierOfflineConeSearch(t *testing.T) {
 }
 
 func TestParseCSVMissingColumn(t *testing.T) {
-	if _, err := parseCSV(strings.NewReader("ra,dec\n1,2\n"), resolve.KindStar); !errors.Is(err, ErrUnexpectedSchema) {
+	if _, err := parseCSV(strings.NewReader("ra,dec\n1,2\n"), tableSchemas[defaultTable]); !errors.Is(err, ErrUnexpectedSchema) {
 		t.Errorf("expected ErrUnexpectedSchema, got %v", err)
+	}
+}
+
+// TestParseCSV_PopulatesIDAndEpoch is a regression test: ID used to be left
+// empty (only Name/Designation were set from the same designation value),
+// and Epoch used to never be set despite each table having a genuinely
+// different native reference epoch.
+func TestParseCSV_PopulatesIDAndEpoch(t *testing.T) {
+	schema := tableSchemas["I/239/hip_main"]
+
+	targets, err := parseCSV(strings.NewReader("designation,ra,dec\n32349,101.28,-16.71\n"), schema)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(targets) != 1 {
+		t.Fatalf("expected 1 target, got %d", len(targets))
+	}
+
+	got := targets[0]
+
+	if got.ID != "32349" {
+		t.Errorf("ID = %q, want %q", got.ID, "32349")
+	}
+
+	if got.ID != got.Designation {
+		t.Errorf("expected ID to match Designation (%q), got %q", got.Designation, got.ID)
+	}
+
+	if !got.Epoch.Equal(epochHipparcos) {
+		t.Errorf("Epoch = %v, want the table's own Hipparcos epoch %v", got.Epoch, epochHipparcos)
 	}
 }
 
@@ -240,12 +271,12 @@ func TestProviderInterface(t *testing.T) {
 		t.Errorf("expected CapConeSearch, got %v", caps)
 	}
 
-	_, ok := p.Resolve("foo")
+	_, ok := p.Resolve(context.Background(), "foo")
 	if ok {
 		t.Error("expected Resolve to return false")
 	}
 
-	if p.Search("foo") != nil {
+	if p.Search(context.Background(), "foo") != nil {
 		t.Error("expected Search to return nil")
 	}
 

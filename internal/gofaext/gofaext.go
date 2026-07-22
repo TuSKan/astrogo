@@ -323,3 +323,24 @@ func Pnm06a(date1, date2 float64) [3][3]float64 {
 func Ee06a(date1, date2 float64) float64 {
 	return gofa.Ee06a(date1, date2)
 }
+
+// Pmsafe applies stellar space motion (proper motion, parallax, radial
+// velocity) to propagate a catalog position from one epoch to another,
+// guarding against the near-zero-parallax case that would otherwise make
+// the underlying relativistic iteration fail outright.
+//
+// ra1, dec1 are in radians; pmr1, pmd1 are coordinate proper motions in
+// radians/Julian-year (already ×cos(dec)); px1 is parallax in arcseconds;
+// rv1 is radial velocity in km/s (positive receding). ep1a/ep1b and
+// ep2a/ep2b are the "from" and "to" epochs as two-part TDB Julian dates.
+//
+// status: 0 = OK; 1 = parallax overridden (was zero/negative/too small);
+// 2 = proper motion implied >1% c, treated as zero; 4 = did not converge;
+// -1 = system error (bad parallax data, e.g. NaN). Bits combine (3 = both
+// 1 and 2); treat any status >= 0 as "propagated, inputs adjusted", only
+// -1 as a hard failure.
+func Pmsafe(ra1, dec1, pmr1, pmd1, px1, rv1, ep1a, ep1b, ep2a, ep2b float64) (ra2, dec2, pmr2, pmd2, px2, rv2 float64, status int) {
+	status = gofa.Pmsafe(ra1, dec1, pmr1, pmd1, px1, rv1, ep1a, ep1b, ep2a, ep2b, &ra2, &dec2, &pmr2, &pmd2, &px2, &rv2)
+
+	return ra2, dec2, pmr2, pmd2, px2, rv2, status
+}

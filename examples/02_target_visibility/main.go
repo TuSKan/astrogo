@@ -2,6 +2,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 
@@ -26,7 +27,7 @@ func main() {
 	planner, _ := plan.NewPlanner(site, constraints)
 
 	// 3. Set Target using SIMBAD
-	targetData, err := catalog.NewResolver(catalog.SIMBAD).Resolve("Orion Nebula")
+	targetData, err := catalog.NewResolver(catalog.SIMBAD).Resolve(context.Background(), "Orion Nebula")
 	if err != nil {
 		log.Fatalf("Failed to resolve target: %v", err)
 	}

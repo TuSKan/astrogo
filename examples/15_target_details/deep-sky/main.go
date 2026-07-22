@@ -2,6 +2,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 
@@ -31,7 +32,7 @@ func main() {
 
 	resolver := catalog.NewResolver(catalog.OpenNGC, catalog.SIMBAD)
 
-	catTarget, err := resolver.Resolve("M31")
+	catTarget, err := resolver.Resolve(context.Background(), "M31")
 	if err != nil {
 		log.Fatalf("failed to resolve M31: %v", err)
 	}

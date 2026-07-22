@@ -11,6 +11,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/TuSKan/astrogo/angle"
@@ -55,7 +56,7 @@ func main() {
 
 	targets := make([]plan.Observable, 0, len(lookups))
 	for _, l := range lookups {
-		t, err := l.resolver.Resolve(l.name)
+		t, err := l.resolver.Resolve(context.Background(), l.name)
 		if err != nil {
 			fmt.Printf("  ⚠ Could not resolve %q: %v\n", l.name, err)
 			continue

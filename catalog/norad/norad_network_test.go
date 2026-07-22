@@ -104,7 +104,7 @@ func TestResolve_Live(t *testing.T) {
 	requireCelestrak(t)
 
 	p := New()
-	target, ok := p.Resolve("ISS")
+	target, ok := p.Resolve(context.Background(), "ISS")
 	if !ok {
 		t.Fatal("Failed to resolve ISS")
 	}

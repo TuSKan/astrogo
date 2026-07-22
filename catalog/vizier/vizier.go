@@ -56,12 +56,12 @@ func (p *Provider) Capabilities() []resolve.Capability {
 }
 
 // Resolve always returns false for VizieR (use ConeSearch instead).
-func (p *Provider) Resolve(_ string) (resolve.Target, bool) {
+func (p *Provider) Resolve(_ context.Context, _ string) (resolve.Target, bool) {
 	return resolve.Target{}, false // Not supported directly, use ConeSearch
 }
 
 // Search always returns nil for VizieR (use ConeSearch instead).
-func (p *Provider) Search(_ string) []resolve.Target {
+func (p *Provider) Search(_ context.Context, _ string) []resolve.Target {
 	return nil
 }
 
@@ -122,7 +122,7 @@ func (p *Provider) ConeSearch(ctx context.Context, req resolve.ConeRequest) reso
 		}
 		defer func() { _ = body.Close() }()
 
-		targets, err := parseCSV(body, schema.Kind)
+		targets, err := parseCSV(body, schema)
 		if err != nil {
 			yield(resolve.Target{}, err)
 			return
@@ -142,10 +142,10 @@ func (p *Provider) ConeSearch(ctx context.Context, req resolve.ConeRequest) reso
 }
 
 // parseCSV extracts designation/ra/dec rows from the ADQL query's CSV
-// response, tagging every row with kind. Columns are located by header name
-// rather than assumed position, so the parser stays correct if the SELECT
-// clause in ConeSearch is reordered.
-func parseCSV(body io.Reader, kind resolve.Kind) ([]resolve.Target, error) {
+// response, tagging every row with schema's kind and native epoch. Columns
+// are located by header name rather than assumed position, so the parser
+// stays correct if the SELECT clause in ConeSearch is reordered.
+func parseCSV(body io.Reader, schema tableSchema) ([]resolve.Target, error) {
 	reader := csv.NewReader(body)
 
 	header, err := reader.Read()
@@ -197,11 +197,13 @@ func parseCSV(body io.Reader, kind resolve.Kind) ([]resolve.Target, error) {
 
 		targets = append(targets, resolve.Target{
 			Catalog:     "vizier",
+			ID:          designation,
 			Name:        designation,
 			Designation: designation,
-			Kind:        kind,
+			Kind:        schema.Kind,
 			Coord:       coord.NewICRS(angle.Deg(raDeg), angle.Deg(decDeg)),
 			HasCoord:    true,
+			Epoch:       schema.Epoch,
 		})
 	}
 
