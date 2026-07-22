@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `remote.EnableAllDownloads(maxSize int64)` / `remote.DisableAllDownloads()` — grant or revoke file-download consent for every registered `KindFile` endpoint (`IERSFinals2000A`, `NAIFSPK`, `NAIFLSK`, `OpenNGC`) at once, instead of calling `EnableDownloads`/`DisableDownloads` once per endpoint.
+
+### Changed — BREAKING
+- **`time.Fetch`, `time.FetchIfStale`, and `time.LoadFS` are removed.** Earth Orientation Parameters now load automatically and lazily the first time they're needed — any `Time.EOP()`, `Time.UTC()` (UT1 branch), or `Time.UT1()` call that finds the registered model doesn't cover the requested epoch now: (1) reads and parses whatever `finals2000A.data` file already exists at the standard cache path, no network access and no consent required (same rule every other pre-seeded astrogo data source already follows); (2) if that doesn't help, and `remote.EnableDownloads(remote.IERSFinals2000A, ...)` (or `EnableAllDownloads`) was called, fetches over the network; (3) otherwise degrades to the existing zero-EOP-plus-one-time-warning fallback, unchanged. `time.RegisterModel`/`GetModel`/`Coverage`/`ParseFinals2000A`/`SetRetryCooldown` are unaffected. Note: a process that never touched EOP data before now performs a disk read (and possibly a network fetch, if consent was already granted elsewhere) on its very first `Time.EOP()`/`Time.UTC()`/`Time.UT1()` call — previously this was a pure, instant no-op against the zero-value default model.
+
 ## [0.6.1] — 2026-07-21
 
 ### Added

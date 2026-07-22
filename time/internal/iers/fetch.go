@@ -25,27 +25,31 @@ var (
 	retryCooldown = 5 * time.Minute // minimum interval between fetch attempts
 )
 
-// FetchIfStale downloads fresh IERS EOP data if the current model
-// doesn't cover the requested MJD. The downloaded file is cached under
-// remote.DataDir()/iers (default: the user's OS cache directory, e.g.
-// ~/.cache/astrogo/iers/ on Linux, %LocalAppData%/astrogo/iers/ on Windows).
+// EnsureLoaded makes a best-effort, at-most-one-attempt-per-cooldown-window
+// attempt to populate the global EOP model before a lookup for mjd —
+// mirroring the openngc.New()/jpl.NewProvider lazy-load contract used
+// elsewhere in this codebase. It never logs; callers (time.lookupEOP)
+// decide whether to warn-and-degrade or propagate the returned error.
 //
-// This function is safe for concurrent use: a mutex serialises
-// download attempts, and the coverage check is repeated inside the
-// lock so a successful concurrent fetch is respected immediately.
+// Order of attempts:
+//  1. Fast path (no lock): the current model already covers mjd.
+//  2. Under fetchMu (re-checked immediately after acquiring it): read and
+//     parse whatever finals2000A file already exists on disk, with no
+//     network access and no consent check — the same thing this package's
+//     former LoadFS did, just from the standard cache path instead of an
+//     arbitrary io/fs.FS. This step is necessary because remote.GetFile's
+//     own cache-hit path requires a signature sidecar that a hand-pre-seeded
+//     file never has (see fetch's doc comment); the parsed table is
+//     registered even if it doesn't cover mjd — still the best available
+//     data — and the attempt falls through to step 3 if it doesn't help.
+//  3. If still uncovered and the retry cooldown has elapsed: the existing
+//     consent-gated fetch (remote.GetFile: HEAD-probe reuse, or a fresh,
+//     EnableDownloads-gated download).
 //
-// After a failed attempt, retries are throttled by retryCooldown (see
-// SetRetryCooldown) to avoid hammering the IERS server on transient
-// errors.
-//
-// The downloaded data is parsed and registered globally via RegisterModel,
-// replacing whatever model was previously registered.
-//
-// Calling this function is itself the download consent (the endpoint is
-// remote.IERSFinals2000A, ~3.7 MB); it still respects remote.SetOffline
-// and remote.Disable.
-func FetchIfStale(ctx context.Context, mjd float64) error {
-	// Fast path (no lock): current model already covers this epoch.
+// Safe for concurrent use: a mutex serialises attempts, and the coverage
+// check is repeated inside the lock so a successful concurrent load is
+// respected immediately.
+func EnsureLoaded(mjd float64) error {
 	if covered(mjd) {
 		return nil
 	}
@@ -54,17 +58,21 @@ func FetchIfStale(ctx context.Context, mjd float64) error {
 	defer fetchMu.Unlock()
 
 	// Re-check after acquiring the lock — another goroutine may have
-	// fetched successfully while we were waiting.
+	// loaded successfully while we were waiting.
 	if covered(mjd) {
 		return nil
 	}
 
-	// Seed the cooldown timer from the on-disk cache if we haven't
-	// attempted a fetch yet in this process.
-	if lastAttempt.IsZero() {
-		if cacheFile, err := CacheFile(); err == nil {
-			if info := cacheFile.Info(); info.Exists {
+	if cacheFile, err := CacheFile(); err == nil {
+		if info := cacheFile.Info(); info.Exists {
+			if lastAttempt.IsZero() {
 				lastAttempt = info.Modified
+			}
+
+			if data, rerr := cacheFile.ReadAll(); rerr == nil {
+				if _, perr := parseAndRegister(data); perr == nil && covered(mjd) {
+					return nil
+				}
 			}
 		}
 	}
@@ -75,29 +83,12 @@ func FetchIfStale(ctx context.Context, mjd float64) error {
 	}
 
 	lastAttempt = time.Now()
-	errLastFetch = fetch(ctx)
+	errLastFetch = fetch(context.Background())
 
 	return errLastFetch
 }
 
-// Fetch downloads and registers fresh IERS EOP data immediately,
-// bypassing the coverage, staleness, and cooldown checks that FetchIfStale
-// applies (a fresh on-disk cache file is still reused). Use it at service
-// startup or from a scheduled refresh job.
-//
-// Calling this function is itself the download consent; it still respects
-// remote.SetOffline and remote.Disable(remote.IERSFinals2000A).
-func Fetch(ctx context.Context) error {
-	fetchMu.Lock()
-	defer fetchMu.Unlock()
-
-	lastAttempt = time.Now()
-	errLastFetch = fetch(ctx)
-
-	return errLastFetch
-}
-
-// SetRetryCooldown sets the minimum interval FetchIfStale waits between
+// SetRetryCooldown sets the minimum interval EnsureLoaded waits between
 // fetch attempts after a failure (0 disables throttling). The default is
 // 5 minutes.
 func SetRetryCooldown(d time.Duration) {
@@ -129,8 +120,22 @@ func CacheFile() (gofs.File, error) {
 	return dir.Join("finals2000A.data"), nil
 }
 
-// fetch is the shared core both Fetch and FetchIfStale serialize on via
-// fetchMu; it holds no lock itself.
+// parseAndRegister parses raw finals2000A bytes and, on success, registers
+// the resulting Table as the global model — the shared core of both a
+// network fetch and a raw on-disk cache read.
+func parseAndRegister(data []byte) (*Table, error) {
+	table, err := ParseFinals2000A(bytes.NewReader(data))
+	if err != nil {
+		return nil, err
+	}
+
+	RegisterModel(table)
+
+	return table, nil
+}
+
+// fetch is the shared core EnsureLoaded serializes on via fetchMu; it
+// holds no lock itself.
 func fetch(ctx context.Context) error {
 	// remote.GetFile reuses the cache untouched when a HEAD probe shows the
 	// IERS bulletin hasn't changed since we last downloaded it — a content
@@ -156,12 +161,11 @@ func fetch(ctx context.Context) error {
 		return fmt.Errorf("iers: read EOP data: %w", err)
 	}
 
-	table, err := ParseFinals2000A(bytes.NewReader(data))
+	table, err := parseAndRegister(data)
 	if err != nil {
 		return fmt.Errorf("iers: parse EOP data: %w", err)
 	}
 
-	RegisterModel(table)
 	lo, hi := table.Coverage()
 
 	log.Printf("astrogo/iers: loaded EOP data: MJD %.0f–%.0f (%d records)", lo, hi, len(table.records))

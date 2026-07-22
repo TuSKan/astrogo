@@ -154,10 +154,14 @@ Do not loosen tolerances without explaining why.
 
 ## Generated files
 
-This codebase has no `go:generate` step — do not reintroduce one. `iers` and
-`catalog/openngc` embed gitignored data files via `go:embed` if present;
-populate them at runtime (`iers.FetchNow`/`FetchIfStale`) rather than adding
-a generation/download tool.
+This codebase has no `go:generate` step, and no package uses `go:embed` — do
+not reintroduce either. Every data source is obtained at runtime through
+`remote.GetFile`: `catalog/openngc` fetches explicitly on `New()`; `time`'s
+Earth Orientation Parameters load lazily and automatically on first
+`Time.EOP()`/`Time.UTC()`/`Time.UT1()` query (pre-seeded disk cache, then a
+`remote.EnableDownloads`-gated network fetch). Populate data by pre-seeding
+the file or granting `remote.EnableDownloads`/`EnableAllDownloads` — never
+by adding a generation/download tool.
 
 ## Completion contract
 

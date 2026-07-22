@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/TuSKan/astrogo/internal/testutil"
+	"github.com/TuSKan/astrogo/remote"
 	atime "github.com/TuSKan/astrogo/time"
 )
 
@@ -41,6 +42,11 @@ func TestTimeDayOfYear(t *testing.T) {
 }
 
 func TestTimeGASTFallsBackToUTCOnUT1Error(t *testing.T) {
+	// The automatic lazy load's disk-read step must not find a real cache
+	// file left by another test/run and silently overwrite errorEOP{}.
+	remote.SetDataDirPath(t.TempDir())
+	t.Cleanup(func() { remote.SetDataDir("") })
+
 	atime.RegisterModel(errorEOP{})
 	defer atime.RegisterModel(atime.ZeroModel{})
 
@@ -57,6 +63,11 @@ func TestTimeGASTFallsBackToUTCOnUT1Error(t *testing.T) {
 }
 
 func TestTimeEOPDegradesToZeroWithWarning(t *testing.T) {
+	// The automatic lazy load's disk-read step must not find a real cache
+	// file left by another test/run and silently overwrite errorEOP{}.
+	remote.SetDataDirPath(t.TempDir())
+	t.Cleanup(func() { remote.SetDataDir("") })
+
 	atime.RegisterModel(errorEOP{})
 	defer atime.RegisterModel(atime.ZeroModel{})
 
@@ -69,6 +80,11 @@ func TestTimeEOPDegradesToZeroWithWarning(t *testing.T) {
 }
 
 func TestTimeUTCFromUT1FallsBackOnEOPError(t *testing.T) {
+	// The automatic lazy load's disk-read step must not find a real cache
+	// file left by another test/run and silently overwrite errorEOP{}.
+	remote.SetDataDirPath(t.TempDir())
+	t.Cleanup(func() { remote.SetDataDir("") })
+
 	atime.RegisterModel(errorEOP{})
 	defer atime.RegisterModel(atime.ZeroModel{})
 

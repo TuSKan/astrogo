@@ -180,6 +180,43 @@ func DisableDownloads(id EndpointID) {
 	}
 }
 
+// EnableAllDownloads grants file-download consent for every registered
+// KindFile endpoint (today: IERSFinals2000A, NAIFSPK, NAIFLSK, OpenNGC),
+// applying the same maxSize cap to each. Equivalent to calling
+// EnableDownloads(id, maxSize) once per KindFile endpoint. KindAPI
+// endpoints are unaffected — they have no download-consent gate.
+func EnableAllDownloads(maxSize int64) {
+	regMu.Lock()
+	defer regMu.Unlock()
+
+	for id, ep := range endpoints {
+		if ep.Kind != KindFile {
+			continue
+		}
+
+		ep.DownloadsOK = true
+		ep.MaxDownloadSize = maxSize
+		endpoints[id] = ep
+	}
+}
+
+// DisableAllDownloads revokes file-download consent for every registered
+// KindFile endpoint (the default state for each).
+func DisableAllDownloads() {
+	regMu.Lock()
+	defer regMu.Unlock()
+
+	for id, ep := range endpoints {
+		if ep.Kind != KindFile {
+			continue
+		}
+
+		ep.DownloadsOK = false
+		ep.MaxDownloadSize = 0
+		endpoints[id] = ep
+	}
+}
+
 // DownloadsEnabled reports whether downloads are enabled for id and the
 // configured per-download size cap (0 = unlimited).
 func DownloadsEnabled(id EndpointID) (ok bool, maxSize int64) {

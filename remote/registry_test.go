@@ -158,6 +158,37 @@ func TestDownloadConsentEnableAndLimit(t *testing.T) {
 	}
 }
 
+func TestEnableAllDownloadsAndDisableAllDownloads(t *testing.T) {
+	t.Cleanup(Reset)
+
+	EnableAllDownloads(50 << 20)
+
+	for _, id := range []EndpointID{IERSFinals2000A, NAIFSPK, NAIFLSK, OpenNGC} {
+		ok, maxSize := DownloadsEnabled(id)
+		if !ok {
+			t.Errorf("EnableAllDownloads: %s: expected DownloadsOK=true", id)
+		}
+
+		if maxSize != 50<<20 {
+			t.Errorf("EnableAllDownloads: %s: MaxDownloadSize = %d, want %d", id, maxSize, 50<<20)
+		}
+	}
+
+	// A KindAPI endpoint has no download-consent gate — EnableAllDownloads
+	// must not touch it either way.
+	if ok, _ := DownloadsEnabled(SIMBAD); ok {
+		t.Error("EnableAllDownloads must not grant consent to a KindAPI endpoint")
+	}
+
+	DisableAllDownloads()
+
+	for _, id := range []EndpointID{IERSFinals2000A, NAIFSPK, NAIFLSK, OpenNGC} {
+		if ok, maxSize := DownloadsEnabled(id); ok || maxSize != 0 {
+			t.Errorf("DisableAllDownloads: %s: expected DownloadsOK=false, MaxDownloadSize=0, got ok=%v maxSize=%d", id, ok, maxSize)
+		}
+	}
+}
+
 var errKernelsForbidden = errors.New("kernels forbidden here")
 
 func TestCustomPolicy(t *testing.T) {

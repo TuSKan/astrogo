@@ -2,17 +2,12 @@ package time
 
 import (
 	"fmt"
-	"log"
 	"math"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/TuSKan/astrogo/internal/gofaext"
-	"github.com/TuSKan/astrogo/time/internal/iers"
 )
-
-var warnUT1Once sync.Once
 
 // Duration is the interface that represents a duration.
 type Duration = time.Duration
@@ -701,7 +696,7 @@ func mjdFromJDParts(jd1, jd2 float64) float64 {
 // dut1ForUTC retrieves DUT1 for the given UTC two-part JD.
 // Returns (dut1, nil) on success, or (0, err) if IERS data is unavailable.
 func dut1ForUTC(jd1, jd2 float64) (float64, error) {
-	eop, err := iers.GetModel().EOP(mjdFromJDParts(jd1, jd2))
+	eop, err := lookupEOP(mjdFromJDParts(jd1, jd2))
 	if err != nil {
 		return 0, fmt.Errorf("time: EOP lookup: %w", err)
 	}
@@ -710,13 +705,13 @@ func dut1ForUTC(jd1, jd2 float64) (float64, error) {
 }
 
 // dut1OrFallback retrieves DUT1 with a fallback to 0.0 on error.
-// Logs a one-time warning when falling back.
+// Logs a one-time warning (shared with Time.EOP()) when falling back.
 func dut1OrFallback(jd1, jd2 float64) float64 {
+	mjd := mjdFromJDParts(jd1, jd2)
+
 	dut1, err := dut1ForUTC(jd1, jd2)
 	if err != nil {
-		warnUT1Once.Do(func() {
-			log.Printf("astrogo/time: IERS EOP data unavailable (MJD %.1f): UT1 ≈ UTC (DUT1=0). Max error ≈ 0.9s. Load finals2000A for sub-second precision.", mjdFromJDParts(jd1, jd2))
-		})
+		warnEOPUnavailable(mjd)
 
 		return 0
 	}
@@ -863,10 +858,13 @@ func (t Time) TDB() Time {
 
 // UT1 returns a new Time converted to the Universal Time (UT1) scale.
 //
-// This conversion requires IERS Earth Orientation Parameters for DUT1.
-// Returns an error if IERS data is unavailable for the given epoch — no
-// data is loaded automatically; populate it via [Fetch], [FetchIfStale],
-// or [LoadFS].
+// This conversion requires IERS Earth Orientation Parameters for DUT1,
+// which are loaded automatically and lazily on first need: a pre-seeded
+// on-disk cache file, then (if [remote.EnableDownloads] was called for
+// [remote.IERSFinals2000A]) a network fetch. Returns an error if none of
+// that yields data for the given epoch — unlike [Time.EOP] and
+// [Time.UTC]'s UT1 branch, this method propagates the failure rather than
+// silently degrading to DUT1=0.
 func (t Time) UT1() (Time, error) {
 	if t.scale == UT1 {
 		return t, nil

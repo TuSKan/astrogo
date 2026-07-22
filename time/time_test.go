@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/TuSKan/astrogo/internal/testutil"
+	"github.com/TuSKan/astrogo/remote"
 	atime "github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/time/internal/iers"
 )
@@ -211,8 +212,14 @@ func (mockEOP) EOP(_ float64) (iers.EOP, error) {
 }
 
 func TestTime_UT1(t *testing.T) {
+	// The automatic lazy load's disk-read step must not find a real cache
+	// file left by another test/run and silently overwrite mockEOP{}.
+	remote.SetDataDirPath(t.TempDir())
+	t.Cleanup(func() { remote.SetDataDir("") })
+
 	// Register the mock model
 	iers.RegisterModel(mockEOP{})
+	t.Cleanup(func() { iers.RegisterModel(iers.ZeroModel{}) })
 
 	utc := atime.FromJD(2451545.0, atime.UTC) // J2000 UTC
 
@@ -296,6 +303,12 @@ func TestTime_In(t *testing.T) {
 }
 
 func TestTime_LocationPropagation(t *testing.T) {
+	// The automatic lazy load's disk-read step must not find a real cache
+	// file left by another test/run and silently swap out mockEOP{}.
+	remote.SetDataDirPath(t.TempDir())
+	t.Cleanup(func() { remote.SetDataDir("") })
+	t.Cleanup(func() { iers.RegisterModel(iers.ZeroModel{}) })
+
 	brt := time.FixedZone("BRT", -3*3600)
 	tm := atime.Date(2026, 4, 14, 22, 0, 0, 0, brt)
 
@@ -396,6 +409,12 @@ func TestUTC_Inverse(t *testing.T) {
 }
 
 func TestConversionRoundTrips(t *testing.T) {
+	// The automatic lazy load's disk-read step must not find a real cache
+	// file left by another test/run and silently swap out mockEOP{}.
+	remote.SetDataDirPath(t.TempDir())
+	t.Cleanup(func() { remote.SetDataDir("") })
+	t.Cleanup(func() { iers.RegisterModel(iers.ZeroModel{}) })
+
 	// Full chain: UTC → TAI → TT → TDB → TT → TAI → UTC
 	utc := atime.FromJD(2460000.5, atime.UTC)
 
@@ -551,6 +570,11 @@ type eopUnavailableError struct{}
 func (e *eopUnavailableError) Error() string { return "EOP data unavailable" }
 
 func TestUT1_Error(t *testing.T) {
+	// The automatic lazy load's disk-read step must not find a real cache
+	// file left by another test/run and silently overwrite errorEOP{}.
+	remote.SetDataDirPath(t.TempDir())
+	t.Cleanup(func() { remote.SetDataDir("") })
+
 	// Register a model that always fails
 	iers.RegisterModel(errorEOP{})
 	defer iers.RegisterModel(iers.ZeroModel{}) // restore
@@ -566,6 +590,11 @@ func TestUT1_Error(t *testing.T) {
 }
 
 func TestTT_FromAllScales(t *testing.T) {
+	// The automatic lazy load's disk-read step must not find a real cache
+	// file left by another test/run and silently swap out mockEOP{}.
+	remote.SetDataDirPath(t.TempDir())
+	t.Cleanup(func() { remote.SetDataDir("") })
+
 	iers.RegisterModel(mockEOP{})
 	defer iers.RegisterModel(iers.ZeroModel{})
 
