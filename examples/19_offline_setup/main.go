@@ -10,8 +10,9 @@
 //     only thing that ever resolves or opens these files, so a kernel
 //     placed at its expected path is found with zero network access, no
 //     separate local-only constructor required.
-//  3. time.LoadFS — load Earth-orientation data from a local file (via
-//     os.DirFS) instead of the network.
+//  3. Time.EOP() against a pre-seeded finals2000A.data — Earth-orientation
+//     data follows the exact same rule as the kernel above: no explicit
+//     loader call, the first query finds a pre-seeded file automatically.
 //
 // Run: go run ./examples/19_offline_setup/
 package main
@@ -20,7 +21,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 	"path/filepath"
 
 	eph "github.com/TuSKan/astrogo/ephemeris"
@@ -85,23 +85,23 @@ func main() {
 		}
 	}
 
-	// ── 3. time.LoadFS — local EOP data ──────────────────────────────────
-	fmt.Println("\n[3] time.LoadFS — local Earth-orientation data")
+	// ── 3. Time.EOP() — local Earth-orientation data, loaded automatically ──
+	fmt.Println("\n[3] Time.EOP() — local Earth-orientation data, loaded automatically")
 
-	iersDir := remote.DataDir().Join("iers").LocalPath()
-	iersName := "finals2000A.data"
-	iersPath := filepath.Join(iersDir, iersName)
+	iersPath := remote.DataDir().Join("iers").Join("finals2000A.data").LocalPath()
 
-	if err := time.LoadFS(os.DirFS(iersDir), iersName); err != nil {
-		fmt.Printf("    no local EOP cache at %s — call time.Fetch once (with\n", iersPath)
-		fmt.Println("    network access) to populate it, or ship a finals2000A file with your deployment.")
+	_ = time.NowUTC().EOP() // never errors; triggers the lazy load as a side effect
+
+	if lo, hi, ok := time.Coverage(); ok {
+		fmt.Printf("    loaded EOP data automatically: MJD %.0f–%.0f (from %s)\n", lo, hi, iersPath)
 	} else {
-		lo, hi, _ := time.Coverage()
-		fmt.Printf("    loaded EOP data: MJD %.0f–%.0f\n", lo, hi)
+		fmt.Printf("    no local EOP cache at %s — call remote.EnableDownloads(remote.IERSFinals2000A, 0)\n", iersPath)
+		fmt.Println("    once (with network access) to populate it, or ship a finals2000A.data file with your deployment.")
 	}
 
-	// time.Fetch (not called here) is the network-backed equivalent — see
-	// README "Data downloads & offline usage" for the full picture,
-	// including remote.EnableDownloads and remote.SetDataDir for
-	// redirecting all of this to a different location entirely.
+	// Earth-orientation data works exactly like the kernel above: pre-seed
+	// finals2000A.data at this path, or grant remote.EnableDownloads once
+	// with network access — see README "Data downloads & offline usage"
+	// for the full picture, including remote.SetDataDir for redirecting
+	// all of this to a different location entirely.
 }

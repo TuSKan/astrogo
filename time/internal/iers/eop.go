@@ -45,8 +45,8 @@ func RegisterModel(m Model) {
 }
 
 // GetModel retrieves the globally used Earth orientation parameter model.
-// Defaults to ZeroModel until RegisterModel, Fetch, FetchIfStale, or
-// LoadFS populates real data.
+// Defaults to ZeroModel until RegisterModel populates it directly, or a
+// lazy load triggered by EnsureLoaded succeeds.
 func GetModel() Model {
 	modelMu.RLock()
 	defer modelMu.RUnlock()

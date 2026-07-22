@@ -17,7 +17,13 @@ import (
 	"github.com/TuSKan/astrogo/remote"
 )
 
-func TestFetch(t *testing.T) {
+// sampleFinals2000A mimics finals2000A.all format for two consecutive days
+// (same fixture shape as reader_test.go's TestParseFinals2000A), covering
+// MJD 41684-41685.
+const sampleFinals2000A = `73 1 2 41684.00 I  0.120733 0.009786  0.136966 0.015902  I 0.8084178 0.0002710  0.0000 0.1916  P    -0.766    0.199    -0.720    0.300   .143000   .137000   .8075000   -18.637    -3.667
+73 1 3 41685.00 I  0.118980 0.011039  0.135656 0.013616  I 0.8056163 0.0002710  3.5563 0.1916  P    -0.751    0.199    -0.701    0.300   .141000   .134000   .8044000   -18.636    -3.571  `
+
+func TestEnsureLoadedFetchesWhenUncovered(t *testing.T) {
 	t.Cleanup(func() {
 		RegisterModel(ZeroModel{})
 		remote.Reset()
@@ -39,20 +45,26 @@ func TestFetch(t *testing.T) {
 	remote.SetDataDirPath(t.TempDir())
 	t.Cleanup(func() { remote.SetDataDir("") })
 
-	if err := Fetch(context.Background()); err != nil {
-		t.Fatalf("Fetch: %v", err)
+	if err := EnsureLoaded(41684); err != nil {
+		t.Fatalf("EnsureLoaded: %v", err)
 	}
 
 	if _, _, ok := Coverage(); !ok {
-		t.Error("expected a coverage-reporting model after Fetch")
+		t.Error("expected a coverage-reporting model after EnsureLoaded")
 	}
 }
 
-func TestFetchSkipsBodyWhenETagUnchanged(t *testing.T) {
+func TestEnsureLoadedSkipsBodyWhenETagUnchanged(t *testing.T) {
 	t.Cleanup(func() {
 		RegisterModel(ZeroModel{})
 		remote.Reset()
+		SetRetryCooldown(5 * time.Minute)
 	})
+
+	fetchMu.Lock()
+	lastAttempt = time.Time{}
+	errLastFetch = nil
+	fetchMu.Unlock()
 
 	var getCount atomic.Int32
 
@@ -73,25 +85,37 @@ func TestFetchSkipsBodyWhenETagUnchanged(t *testing.T) {
 	remote.EnableDownloads(remote.IERSFinals2000A, 0)
 	remote.SetDataDirPath(t.TempDir())
 	t.Cleanup(func() { remote.SetDataDir("") })
+	SetRetryCooldown(0)
 
-	if err := Fetch(context.Background()); err != nil {
-		t.Fatalf("first Fetch: %v", err)
+	// Query an MJD the fixture never covers (41684-41685) so covered()
+	// never short-circuits EnsureLoaded before reaching fetch() — what's
+	// under test here is remote.GetFile's own ETag-based body-skip, not
+	// EnsureLoaded's coverage fast path.
+	const uncoveredMJD = 99999
+
+	if err := EnsureLoaded(uncoveredMJD); err != nil {
+		t.Fatalf("first EnsureLoaded: %v", err)
 	}
 
 	if got := getCount.Load(); got != 1 {
-		t.Fatalf("expected 1 GET after first Fetch, got %d", got)
+		t.Fatalf("expected 1 GET after first EnsureLoaded, got %d", got)
 	}
 
-	if err := Fetch(context.Background()); err != nil {
-		t.Fatalf("second Fetch: %v", err)
+	if err := EnsureLoaded(uncoveredMJD); err != nil {
+		t.Fatalf("second EnsureLoaded: %v", err)
 	}
 
 	if got := getCount.Load(); got != 1 {
-		t.Errorf("expected still 1 GET after second Fetch (unchanged ETag should skip the download), got %d", got)
+		t.Errorf("expected still 1 GET after second EnsureLoaded (unchanged ETag should skip the download), got %d", got)
 	}
 }
 
-func TestFetchHTTPError(t *testing.T) {
+func TestEnsureLoadedHTTPError(t *testing.T) {
+	fetchMu.Lock()
+	lastAttempt = time.Time{}
+	errLastFetch = nil
+	fetchMu.Unlock()
+
 	t.Cleanup(func() {
 		RegisterModel(ZeroModel{})
 		remote.Reset()
@@ -110,7 +134,7 @@ func TestFetchHTTPError(t *testing.T) {
 	remote.SetDataDirPath(t.TempDir())
 	t.Cleanup(func() { remote.SetDataDir("") })
 
-	err := Fetch(context.Background())
+	err := EnsureLoaded(41684)
 	if !errors.Is(err, ErrEOPHTTPStatus) {
 		t.Fatalf("expected ErrEOPHTTPStatus, got %v", err)
 	}
@@ -129,11 +153,11 @@ func (nonTableModel) EOP(_ float64) (EOP, error) {
 	return EOP{}, nil
 }
 
-func TestFetchIfStale(t *testing.T) {
-	// Fetch-calling tests earlier in this package's run share the
-	// package-level cooldown state (lastAttempt/errLastFetch) with
-	// FetchIfStale — reset it so this test's "cold" scenario isn't
-	// silently short-circuited by another test's recent attempt.
+func TestEnsureLoadedRespectsCooldownAcrossMJDs(t *testing.T) {
+	// EnsureLoaded-calling tests earlier in this package's run share the
+	// package-level cooldown state (lastAttempt/errLastFetch) — reset it
+	// so this test's "cold" scenario isn't silently short-circuited by
+	// another test's recent attempt.
 	fetchMu.Lock()
 	lastAttempt = time.Time{}
 	errLastFetch = nil
@@ -167,23 +191,23 @@ func TestFetchIfStale(t *testing.T) {
 	// short-circuit the fetch regardless of the requested MJD.
 	RegisterModel(nonTableModel{})
 
-	if err := FetchIfStale(context.Background(), 41684); err != nil {
-		t.Fatalf("FetchIfStale (cold): %v", err)
+	if err := EnsureLoaded(41684); err != nil {
+		t.Fatalf("EnsureLoaded (cold): %v", err)
 	}
 
 	if got := getCount.Load(); got != 1 {
-		t.Fatalf("expected 1 GET after the first FetchIfStale, got %d", got)
+		t.Fatalf("expected 1 GET after the first EnsureLoaded, got %d", got)
 	}
 
 	if _, _, ok := Coverage(); !ok {
-		t.Error("expected a coverage-reporting model after FetchIfStale")
+		t.Error("expected a coverage-reporting model after EnsureLoaded")
 	}
 
 	// A second call for an MJD the freshly-registered Table does NOT cover
 	// must still skip the network: the retry cooldown holds regardless of
 	// coverage, since the last attempt (a moment ago) succeeded.
-	if err := FetchIfStale(context.Background(), 99999); err != nil {
-		t.Fatalf("FetchIfStale (cooldown): %v", err)
+	if err := EnsureLoaded(99999); err != nil {
+		t.Fatalf("EnsureLoaded (cooldown): %v", err)
 	}
 
 	if got := getCount.Load(); got != 1 {
@@ -207,7 +231,12 @@ func TestCacheFile(t *testing.T) {
 	}
 }
 
-func TestFetchDefaultDenyIssuesNoRequest(t *testing.T) {
+func TestEnsureLoadedDefaultDenyIssuesNoRequest(t *testing.T) {
+	fetchMu.Lock()
+	lastAttempt = time.Time{}
+	errLastFetch = nil
+	fetchMu.Unlock()
+
 	t.Cleanup(remote.Reset)
 
 	var hits atomic.Int32
@@ -226,9 +255,9 @@ func TestFetchDefaultDenyIssuesNoRequest(t *testing.T) {
 	remote.SetDataDirPath(t.TempDir())
 	t.Cleanup(func() { remote.SetDataDir("") })
 
-	err := Fetch(context.Background())
+	err := EnsureLoaded(41684)
 	if !errors.Is(err, remote.ErrDownloadDenied) {
-		t.Fatalf("Fetch without EnableDownloads: expected ErrDownloadDenied, got %v", err)
+		t.Fatalf("EnsureLoaded without EnableDownloads: expected ErrDownloadDenied, got %v", err)
 	}
 
 	if got := hits.Load(); got != 0 {
@@ -236,7 +265,12 @@ func TestFetchDefaultDenyIssuesNoRequest(t *testing.T) {
 	}
 }
 
-func TestFetchRejectsCorruptDownload(t *testing.T) {
+func TestEnsureLoadedRejectsCorruptDownload(t *testing.T) {
+	fetchMu.Lock()
+	lastAttempt = time.Time{}
+	errLastFetch = nil
+	fetchMu.Unlock()
+
 	t.Cleanup(func() {
 		RegisterModel(ZeroModel{})
 		remote.Reset()
@@ -260,8 +294,8 @@ func TestFetchRejectsCorruptDownload(t *testing.T) {
 	remote.SetDataDirPath(t.TempDir())
 	t.Cleanup(func() { remote.SetDataDir("") })
 
-	if err := Fetch(context.Background()); err == nil {
-		t.Fatal("expected Fetch to reject a corrupt download, got nil error")
+	if err := EnsureLoaded(41684); err == nil {
+		t.Fatal("expected EnsureLoaded to reject a corrupt download, got nil error")
 	}
 
 	if _, ok := GetModel().(ZeroModel); !ok {
@@ -288,7 +322,61 @@ func TestCoveredNonTableModel(t *testing.T) {
 	}
 }
 
-func TestFetchIfStaleSeedsCooldownFromCacheMtime(t *testing.T) {
+// TestEnsureLoadedReadsPreSeededCacheWithoutNetwork proves the core of the
+// lazy-load contract: a finals2000A file already sitting on disk (as if
+// hand-copied there, never fetched via remote.GetFile — so it has no
+// signature sidecar) is read and registered directly, with zero network
+// access and no download consent required.
+func TestEnsureLoadedReadsPreSeededCacheWithoutNetwork(t *testing.T) {
+	t.Cleanup(func() {
+		RegisterModel(ZeroModel{})
+		remote.Reset()
+	})
+
+	var hits atomic.Int32
+
+	srv := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
+		hits.Add(1)
+	}))
+	defer srv.Close()
+
+	if err := remote.SetURL(remote.IERSFinals2000A, srv.URL); err != nil {
+		t.Fatal(err)
+	}
+
+	remote.SetDataDirPath(t.TempDir())
+	t.Cleanup(func() { remote.SetDataDir("") })
+
+	// Pre-seed the cache file directly — bypassing remote.GetFile/consent
+	// entirely, exactly like a hand-copied deployment file.
+	cacheFile, err := CacheFile()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := cacheFile.WriteAll([]byte(sampleFinals2000A)); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := EnsureLoaded(41684); err != nil {
+		t.Fatalf("EnsureLoaded: %v", err)
+	}
+
+	if got := hits.Load(); got != 0 {
+		t.Errorf("expected zero network hits when a pre-seeded cache file already covers the query, got %d", got)
+	}
+
+	if _, _, ok := Coverage(); !ok {
+		t.Error("expected a coverage-reporting model after reading the pre-seeded cache")
+	}
+}
+
+// TestEnsureLoadedSeedsCooldownFromCacheMtime covers the case where a
+// pre-seeded cache file exists but doesn't cover the requested MJD: the
+// disk-read step still registers it (best available data) and seeds the
+// retry cooldown from the file's mtime, so a stale-but-present file
+// doesn't cause an immediate network fetch attempt.
+func TestEnsureLoadedSeedsCooldownFromCacheMtime(t *testing.T) {
 	t.Cleanup(func() {
 		RegisterModel(ZeroModel{})
 		remote.Reset()
@@ -317,9 +405,10 @@ func TestFetchIfStaleSeedsCooldownFromCacheMtime(t *testing.T) {
 	remote.SetDataDirPath(t.TempDir())
 	t.Cleanup(func() { remote.SetDataDir("") })
 
-	// Pre-seed a fresh cache file so FetchIfStale's cold-process cooldown
-	// seed (CacheFile().Info().Modified) throttles the very first call in
-	// this process, before any Fetch/FetchIfStale has run here.
+	// Pre-seed a fresh cache file that does NOT cover the queried MJD, so
+	// the disk-read step registers it but still falls through toward a
+	// network fetch — exercising the cooldown-seeded-from-mtime throttle
+	// rather than the "already covered" fast path.
 	cacheFile, err := CacheFile()
 	if err != nil {
 		t.Fatal(err)
@@ -329,10 +418,10 @@ func TestFetchIfStaleSeedsCooldownFromCacheMtime(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	RegisterModel(nonTableModel{}) // never covers, so the fast path can't skip the seed check
+	const uncoveredMJD = 99999
 
-	if err := FetchIfStale(context.Background(), 41684); err != nil {
-		t.Fatalf("FetchIfStale: %v", err)
+	if err := EnsureLoaded(uncoveredMJD); err != nil {
+		t.Fatalf("EnsureLoaded: %v", err)
 	}
 
 	if got := hits.Load(); got != 0 {
@@ -340,7 +429,7 @@ func TestFetchIfStaleSeedsCooldownFromCacheMtime(t *testing.T) {
 	}
 }
 
-func TestFetchIfStaleConcurrent(t *testing.T) {
+func TestEnsureLoadedConcurrent(t *testing.T) {
 	t.Cleanup(func() {
 		RegisterModel(ZeroModel{})
 		remote.Reset()
@@ -376,8 +465,8 @@ func TestFetchIfStaleConcurrent(t *testing.T) {
 
 	for range 10 {
 		wg.Go(func() {
-			if err := FetchIfStale(context.Background(), 41684); err != nil {
-				t.Errorf("FetchIfStale: %v", err)
+			if err := EnsureLoaded(41684); err != nil {
+				t.Errorf("EnsureLoaded: %v", err)
 			}
 		})
 	}
@@ -385,10 +474,15 @@ func TestFetchIfStaleConcurrent(t *testing.T) {
 	wg.Wait()
 
 	if got := getCount.Load(); got != 1 {
-		t.Errorf("expected exactly 1 GET across concurrent FetchIfStale calls (re-check-after-lock), got %d", got)
+		t.Errorf("expected exactly 1 GET across concurrent EnsureLoaded calls (re-check-after-lock), got %d", got)
 	}
 }
 
+// TestFetchContextCancellation exercises fetch (the unexported, ctx-taking
+// core EnsureLoaded serializes on) directly — EnsureLoaded itself has no
+// ctx parameter (it uses context.Background() internally, matching
+// openngc.New()'s lazy-load precedent), so context cancellation can only
+// be observed at this lower layer.
 func TestFetchContextCancellation(t *testing.T) {
 	t.Cleanup(func() {
 		RegisterModel(ZeroModel{})
@@ -411,7 +505,7 @@ func TestFetchContextCancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	if err := Fetch(ctx); !errors.Is(err, context.Canceled) {
+	if err := fetch(ctx); !errors.Is(err, context.Canceled) {
 		t.Fatalf("expected context.Canceled, got %v", err)
 	}
 
@@ -425,6 +519,10 @@ func TestFetchContextCancellation(t *testing.T) {
 	}
 }
 
+// TestFetchDoesNotAccumulateCacheFiles exercises fetch directly (see
+// TestFetchContextCancellation's doc comment) — calling it 3 times in a
+// row bypasses EnsureLoaded's coverage-based short-circuit, which would
+// otherwise make repeat calls no-ops after the first success.
 func TestFetchDoesNotAccumulateCacheFiles(t *testing.T) {
 	t.Cleanup(func() {
 		RegisterModel(ZeroModel{})
@@ -445,8 +543,8 @@ func TestFetchDoesNotAccumulateCacheFiles(t *testing.T) {
 	t.Cleanup(func() { remote.SetDataDir("") })
 
 	for range 3 {
-		if err := Fetch(context.Background()); err != nil {
-			t.Fatalf("Fetch: %v", err)
+		if err := fetch(context.Background()); err != nil {
+			t.Fatalf("fetch: %v", err)
 		}
 	}
 
@@ -491,7 +589,7 @@ func TestSetRetryCooldown(t *testing.T) {
 
 	// A unique ETag on every response (GET or HEAD) defeats remote.GetFile's
 	// own HEAD-probe cache reuse (the IERS endpoint is Mutable) — otherwise
-	// the second FetchIfStale's HEAD probe would see the same ETag the first
+	// the second EnsureLoaded's HEAD probe would see the same ETag the first
 	// GET's response carried and reuse the cache without a real GET,
 	// confounding what this test actually checks: SetRetryCooldown's
 	// throttle, not remote's separate content-unchanged reuse.
@@ -516,14 +614,14 @@ func TestSetRetryCooldown(t *testing.T) {
 	SetRetryCooldown(0)
 	RegisterModel(nonTableModel{})
 
-	if err := FetchIfStale(context.Background(), 41684); err != nil {
-		t.Fatalf("first FetchIfStale: %v", err)
+	if err := EnsureLoaded(41684); err != nil {
+		t.Fatalf("first EnsureLoaded: %v", err)
 	}
 
 	RegisterModel(nonTableModel{}) // force a second real attempt (never covers)
 
-	if err := FetchIfStale(context.Background(), 99999); err != nil {
-		t.Fatalf("second FetchIfStale: %v", err)
+	if err := EnsureLoaded(99999); err != nil {
+		t.Fatalf("second EnsureLoaded: %v", err)
 	}
 
 	if got := getCount.Load(); got != 2 {

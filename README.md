@@ -639,7 +639,7 @@ happens.
 | JPL planetary kernel (de441 parts) | `remote.NAIFSPK` | multi-GB **each** | `eph.NewProvider(eph.Planets, "de441_part-1", eph.WithKernel("de441_part-2"))` |
 | Leap-second kernel (naif0012.tls) | `remote.NAIFLSK` | ~5 KB | always, alongside any JPL kernel |
 | Small-body SPK (Horizons-generated) | `remote.JPLHorizons` | KB–few MB | `eph.NewProvider(eph.SmallBody, "433", ...)` |
-| IERS Earth-orientation data | `remote.IERSFinals2000A` | ~3.7 MB | `time.Fetch`/`FetchIfStale` |
+| IERS Earth-orientation data | `remote.IERSFinals2000A` | ~3.7 MB | automatic on first `Time.EOP()`/`.UTC()`/`.UT1()` query needing it |
 | OpenNGC catalog CSVs | `remote.OpenNGC` | ~2 MB combined | `catalog.NewResolver(catalog.OpenNGC, ...)` |
 
 For an accuracy/offline tradeoff comparison across `ephemeris.Default()` and the
@@ -690,6 +690,13 @@ remote.EnableDownloads(remote.OpenNGC, 5<<20) // ~2 MB combined source CSVs
 resolver := catalog.NewResolver(catalog.OpenNGC, catalog.SIMBAD) // fetches OpenNGC on first use
 ```
 
+To grant consent for every download-gated endpoint at once instead of enumerating them
+individually, use `remote.EnableAllDownloads` (and its counterpart `DisableAllDownloads`):
+
+```go
+remote.EnableAllDownloads(200 << 20) // NAIFSPK, NAIFLSK, IERSFinals2000A, OpenNGC — all at once
+```
+
 For total control, install a custom policy instead of per-endpoint limits:
 
 ```go
@@ -725,7 +732,9 @@ p, err := eph.NewProvider(eph.Planets, "de442") // finds the pre-seeded kernel, 
 Every downloader checks the filesystem before the network, so a pre-seeded deployment
 never dials out even without `SetOffline` — `remote` is the only thing that resolves or
 opens these files, there is no separate local-only constructor to bypass it with.
-`time.LoadFS` loads a local EOP snapshot the same way.
+IERS EOP data follows the same rule: drop `finals2000A.data` at
+`remote.DataDir()/iers/finals2000A.data` and the first `Time.EOP()`/`.UTC()`/`.UT1()`
+call finds it automatically — no explicit loader call needed.
 
 ### Endpoint control
 
@@ -739,10 +748,11 @@ remote.SetOffline(true)                      // global kill switch, all network 
 ### Building from source
 
 No package in astrogo embeds data at build time. IERS EOP data is obtained exclusively
-at runtime via `time.Fetch`/`FetchIfStale` (network, consent-gated) or `time.LoadFS`
-(a pre-seeded finals2000A file, or any other `io/fs.FS`) — there is no `iers/data/`
-directory or `go:embed` to populate before building. OpenNGC works the same way — like
-every other catalog provider, it fetches over the network via
+at runtime, automatically and lazily the first time it's needed: a pre-seeded
+finals2000A file on disk, then (consent-gated via `remote.EnableDownloads`) a network
+fetch — there is no `iers/data/` directory or `go:embed` to populate before building.
+OpenNGC works the same way — like every other catalog provider, it fetches over the
+network via
 `remote.EnableDownloads(remote.OpenNGC, ...)` (see "Enabling a download" above).
 
 ---
@@ -798,7 +808,7 @@ Sub-arcsecond topocentric accuracy and sub-second UT1 timing require IERS EOP da
 | Topocentric alt/az | <0.01″ | ~1″ |
 | Rise/set timing | ≤0.6 min vs USNO | ≤0.7 min vs USNO |
 
-The library logs a one-time warning when EOP data is unavailable (users who redirect or suppress logs won't see it — call `time.Coverage()` to check proactively). The IERS data is refreshed via `time.Fetch`/`FetchIfStale` at runtime, or `time.LoadFS` from a pre-seeded snapshot — see [Data downloads & offline usage](#data-downloads--offline-usage).
+The library logs a one-time warning when EOP data is unavailable (users who redirect or suppress logs won't see it — call `time.Coverage()` to check proactively). IERS data loads automatically and lazily the first time it's needed — a pre-seeded snapshot on disk, then a consent-gated network fetch — see [Data downloads & offline usage](#data-downloads--offline-usage).
 
 ### TDB Precision
 

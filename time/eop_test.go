@@ -1,12 +1,10 @@
 package time_test
 
 import (
-	"context"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
-	"testing/fstest"
 
 	"github.com/TuSKan/astrogo/remote"
 	atime "github.com/TuSKan/astrogo/time"
@@ -26,36 +24,78 @@ func TestParseFinals2000AGateway(t *testing.T) {
 	}
 }
 
-func TestLoadFSGateway(t *testing.T) {
-	t.Cleanup(func() { atime.RegisterModel(atime.ZeroModel{}) })
+// TestEOPLazyLoadFindsPreSeededCacheWithoutConsent proves the core of the
+// automatic lazy-load contract: a finals2000A file already sitting at the
+// standard cache path (as if hand-copied there for an offline deployment,
+// never fetched via remote.GetFile) is found and used by a bare EOP query
+// — no remote.EnableDownloads call, no explicit loader call, and (via the
+// httptest server below) zero network access.
+func TestEOPLazyLoadFindsPreSeededCacheWithoutConsent(t *testing.T) {
+	t.Cleanup(func() {
+		atime.RegisterModel(atime.ZeroModel{})
+		remote.Reset()
+	})
 
-	fsys := fstest.MapFS{
-		"finals2000A.all": {Data: []byte(sampleFinals2000AForGateway)},
+	var hits int32
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		hits++
+		_, _ = w.Write([]byte(sampleFinals2000AForGateway))
+	}))
+	defer srv.Close()
+
+	if err := remote.SetURL(remote.IERSFinals2000A, srv.URL); err != nil {
+		t.Fatal(err)
 	}
 
-	if err := atime.LoadFS(fsys, "finals2000A.all"); err != nil {
-		t.Fatalf("LoadFS: %v", err)
+	remote.SetDataDirPath(t.TempDir())
+	t.Cleanup(func() { remote.SetDataDir("") })
+
+	dir, err := remote.CacheDir(remote.IERSFinals2000A)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := dir.Join("finals2000A.data").WriteAll([]byte(sampleFinals2000AForGateway)); err != nil {
+		t.Fatal(err)
+	}
+
+	tm := atime.FromJD(2441684.5, atime.UTC) // MJD 41684
+
+	eop := tm.EOP()
+	if eop == (atime.EOP{}) {
+		t.Error("expected non-zero EOP from the pre-seeded cache file")
 	}
 
 	lo, hi, ok := atime.Coverage()
 	if !ok {
-		t.Fatal("expected a coverage-reporting model after LoadFS")
+		t.Fatal("expected a coverage-reporting model after the lazy load")
 	}
 
 	if lo != 41684 || hi != 41685 {
 		t.Errorf("Coverage = [%v, %v], want [41684, 41685]", lo, hi)
 	}
 
-	if _, ok := atime.GetModel().(*atime.Table); !ok {
-		t.Errorf("expected *Table after LoadFS, got %T", atime.GetModel())
+	if hits != 0 {
+		t.Errorf("expected zero network hits when a pre-seeded cache file covers the query, got %d", hits)
 	}
 }
 
-func TestFetchAndFetchIfStaleGateway(t *testing.T) {
+// TestEOPLazyLoadFetchesWithConsent proves the other half of the lazy-load
+// contract: with no pre-seeded cache but download consent granted, a bare
+// EOP query fetches over the network automatically — no explicit Fetch/
+// FetchIfStale call needed.
+func TestEOPLazyLoadFetchesWithConsent(t *testing.T) {
 	t.Cleanup(func() {
 		atime.RegisterModel(atime.ZeroModel{})
 		remote.Reset()
+		atime.SetRetryCooldown(5 * atime.Minute)
 	})
+
+	// Another test in this binary may have made a recent lazy-load attempt
+	// (success or failure); disable the cooldown so this test's own
+	// attempt isn't throttled by that unrelated prior attempt.
+	atime.SetRetryCooldown(0)
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = w.Write([]byte(sampleFinals2000AForGateway))
@@ -70,19 +110,35 @@ func TestFetchAndFetchIfStaleGateway(t *testing.T) {
 	remote.SetDataDirPath(t.TempDir())
 	t.Cleanup(func() { remote.SetDataDir("") })
 
-	if err := atime.Fetch(context.Background()); err != nil {
-		t.Fatalf("Fetch: %v", err)
+	tm := atime.FromJD(2441684.5, atime.UTC) // MJD 41684
+
+	eop := tm.EOP()
+	if eop == (atime.EOP{}) {
+		t.Error("expected non-zero EOP after the automatic network fetch")
 	}
 
 	if _, _, ok := atime.Coverage(); !ok {
-		t.Error("expected a coverage-reporting model after Fetch")
+		t.Error("expected a coverage-reporting model after the lazy fetch")
 	}
+}
 
-	// The registered Table already covers this epoch, so FetchIfStale
-	// must short-circuit without error.
+// TestEOPLazyLoadDegradesToZeroWithoutCacheOrConsent proves the final
+// fallback: no pre-seeded cache and no download consent still degrades
+// gracefully to a zero EOP, exactly like today, rather than blocking or
+// erroring.
+func TestEOPLazyLoadDegradesToZeroWithoutCacheOrConsent(t *testing.T) {
+	t.Cleanup(func() {
+		atime.RegisterModel(atime.ZeroModel{})
+		remote.Reset()
+	})
+
+	remote.SetDataDirPath(t.TempDir())
+	t.Cleanup(func() { remote.SetDataDir("") })
+
 	tm := atime.FromJD(2441684.5, atime.UTC) // MJD 41684
-	if err := atime.FetchIfStale(context.Background(), tm); err != nil {
-		t.Fatalf("FetchIfStale: %v", err)
+
+	if eop := tm.EOP(); eop != (atime.EOP{}) {
+		t.Errorf("expected zero EOP with no cache and no consent, got %+v", eop)
 	}
 }
 
