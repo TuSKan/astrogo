@@ -15,8 +15,10 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"net"
 	"net/http"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/TuSKan/astrogo/angle"
@@ -128,6 +130,44 @@ var testLocations = []testLocation{
 // usnoRequestTimeout bounds how long a single USNO request may run,
 // enforced independently of http.Client.Timeout (see usnoGet).
 const usnoRequestTimeout = 30 * time.Second
+
+//nolint:gochecknoglobals // once-per-process reachability cache, see requireUSNO
+var (
+	usnoReachableOnce sync.Once
+	usnoReachableOK   bool
+)
+
+// requireUSNO skips the calling test immediately if the USNO API is
+// unreachable, checked once per process via a cheap TCP dial (mirroring
+// this project's network-test convention of a fast reachability pre-check
+// rather than paying each call site's own timeout). Call it as the first
+// line of every top-level USNO test function — t.Skip halts that
+// function immediately, so no subtest beneath it runs either.
+//
+// Without this, a full USNO outage previously cost each of this file's
+// ~30 usnoGet call sites its own usnoRequestTimeout (30s) run
+// sequentially, summing past the CI job's own 10-minute test binary
+// timeout before the last few calls ever got a chance to skip
+// gracefully themselves — killing the whole package's test run instead
+// of skipping fast.
+func requireUSNO(t *testing.T) {
+	t.Helper()
+
+	usnoReachableOnce.Do(func() {
+		conn, err := net.DialTimeout("tcp", "aa.usno.navy.mil:443", 5*time.Second)
+		if err != nil {
+			return
+		}
+
+		usnoReachableOK = true
+
+		_ = conn.Close()
+	})
+
+	if !usnoReachableOK {
+		t.Skip("USNO API unreachable, skipping")
+	}
+}
 
 // usnoResult carries a completed request's outcome across the goroutine
 // boundary in usnoGet.
@@ -243,6 +283,8 @@ func newEph(t *testing.T) eph.Provider {
 // ── Test: Complete Sun and Moon Data for One Day ──────────────────────────────
 
 func TestUSNO_SunMoonOneDay(t *testing.T) {
+	requireUSNO(t)
+
 	prov := newEph(t)
 	dates := []string{"2026-04-06", "2026-06-21", "2026-12-21"}
 
@@ -398,6 +440,8 @@ func TestUSNO_SunMoonOneDay(t *testing.T) {
 // ── Test: Celestial Navigation (AltAz validation) ────────────────────────────
 
 func TestUSNO_CelNav(t *testing.T) {
+	requireUSNO(t)
+
 	// Test at São Paulo on 2026-04-06 at 21:00 UTC
 	url := "https://aa.usno.navy.mil/api/celnav?date=2026-04-06&time=21:00:00&coords=-23.600833,-46.6525"
 	body := usnoGet(t, url)
@@ -490,6 +534,8 @@ func TestUSNO_CelNav(t *testing.T) {
 // ── Test: Moon Phases ────────────────────────────────────────────────────────
 
 func TestUSNO_MoonPhases(t *testing.T) {
+	requireUSNO(t)
+
 	url := "https://aa.usno.navy.mil/api/moon/phases/date?date=2026-01-01&nump=12"
 	body := usnoGet(t, url)
 
@@ -560,6 +606,8 @@ func TestUSNO_MoonPhases(t *testing.T) {
 // ── Test: Earth's Seasons ────────────────────────────────────────────────────
 
 func TestUSNO_Seasons(t *testing.T) {
+	requireUSNO(t)
+
 	url := "https://aa.usno.navy.mil/api/seasons?year=2026"
 	body := usnoGet(t, url)
 
@@ -687,6 +735,8 @@ func TestUSNO_SiderealTime(t *testing.T) {
 // ── Test: Perihelion/Aphelion ────────────────────────────────────────────────
 
 func TestUSNO_Apsides(t *testing.T) {
+	requireUSNO(t)
+
 	url := "https://aa.usno.navy.mil/api/seasons?year=2026"
 	body := usnoGet(t, url)
 
@@ -836,6 +886,8 @@ var edgeCaseLocations = []testLocation{
 // 3. When events DO exist near the polar boundary, they agree within tolerance.
 
 func TestUSNO_PolarSun(t *testing.T) {
+	requireUSNO(t)
+
 	eph := newEph(t)
 
 	cases := []struct {
@@ -1006,6 +1058,8 @@ func TestUSNO_PolarSun(t *testing.T) {
 //  3. Transit times (height-independent) are compared against USNO — must match ≤2 min.
 
 func TestUSNO_HighAltitude(t *testing.T) {
+	requireUSNO(t)
+
 	eph := newEph(t)
 	loc := edgeCaseLocations[2] // Everest
 
@@ -1193,6 +1247,8 @@ func TestUSNO_HighAltitude(t *testing.T) {
 // This validates that the solver converges correctly with steep altitude curves.
 
 func TestUSNO_Equator(t *testing.T) {
+	requireUSNO(t)
+
 	eph := newEph(t)
 	loc := edgeCaseLocations[3] // Equator (0°, 0°)
 
@@ -1309,6 +1365,8 @@ func TestUSNO_Equator(t *testing.T) {
 // extended periods. This tests the Moon event solver at extreme latitudes.
 
 func TestUSNO_PolarMoon(t *testing.T) {
+	requireUSNO(t)
+
 	eph := newEph(t)
 
 	cases := []struct {
@@ -1477,6 +1535,8 @@ func TestUSNO_PolarMoon(t *testing.T) {
 // Validates AltAz computation at polar and high-altitude locations against USNO.
 
 func TestUSNO_CelNav_EdgeCases(t *testing.T) {
+	requireUSNO(t)
+
 	cases := []struct {
 		name    string
 		lat     float64
