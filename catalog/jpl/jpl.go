@@ -52,8 +52,8 @@ func (p *Provider) Capabilities() []resolve.Capability {
 }
 
 // Resolve performs exact-match resolution for a query.
-func (p *Provider) Resolve(query string) (resolve.Target, bool) {
-	targets := p.Search(query)
+func (p *Provider) Resolve(ctx context.Context, query string) (resolve.Target, bool) {
+	targets := p.Search(ctx, query)
 	if len(targets) > 0 {
 		return targets[0], true
 	}
@@ -62,8 +62,7 @@ func (p *Provider) Resolve(query string) (resolve.Target, bool) {
 }
 
 // Search performs a fuzzy search for the query.
-func (p *Provider) Search(query string) []resolve.Target {
-	ctx := context.TODO()
+func (p *Provider) Search(ctx context.Context, query string) []resolve.Target {
 	req := resolve.ObjectRequest{Query: query, Limit: 10}
 
 	iter := p.ResolveObject(ctx, req)

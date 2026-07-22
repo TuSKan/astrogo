@@ -44,12 +44,12 @@ func (p *Provider) Capabilities() []resolve.Capability {
 }
 
 // Resolve always returns false for Gaia (no name resolution).
-func (p *Provider) Resolve(_ string) (resolve.Target, bool) {
+func (p *Provider) Resolve(_ context.Context, _ string) (resolve.Target, bool) {
 	return resolve.Target{}, false
 }
 
 // Search always returns nil for Gaia (no name search).
-func (p *Provider) Search(_ string) []resolve.Target {
+func (p *Provider) Search(_ context.Context, _ string) []resolve.Target {
 	return nil
 }
 
@@ -136,8 +136,16 @@ func parseCSV(body io.Reader) ([]resolve.Target, error) {
 		}
 
 		id := row[col["source_id"]]
-		raDeg, _ := strconv.ParseFloat(row[col["ra"]], 64)
-		decDeg, _ := strconv.ParseFloat(row[col["dec"]], 64)
+
+		raDeg, raErr := strconv.ParseFloat(row[col["ra"]], 64)
+		decDeg, decErr := strconv.ParseFloat(row[col["dec"]], 64)
+
+		if raErr != nil || decErr != nil {
+			// A row with an unparseable/missing position is useless for
+			// astrometric cross-matching and worse than absent — skip it
+			// rather than reporting a fake (0,0) as if it were real.
+			continue
+		}
 
 		t := resolve.Target{
 			ID:       id,

@@ -40,13 +40,19 @@ func TestSBDBResolver(t *testing.T) {
 
 	prov := New()
 
-	tar, ok := prov.Resolve("aten")
+	tar, ok := prov.Resolve(context.Background(), "aten")
 	if !ok {
 		t.Fatalf("Failed to resolve Aten")
 	}
 
 	testutil.AssertEqual(t, "Resolve ID name", tar.Name, "2062 Aten (1976 AA)")
 	testutil.AssertEqual(t, "Resolve SPKID", tar.SPKID, "20002062")
+
+	// Regression: Kind must be the canonical resolve.KindAsteroid constant,
+	// not an ad hoc resolve.Kind("Asteroid") string built outside the enum.
+	if tar.Kind != resolve.KindAsteroid {
+		t.Errorf("Kind = %q, want %q", tar.Kind, resolve.KindAsteroid)
+	}
 
 	// Test cache bypassing HTTP mock and testing async SeqIterator
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
@@ -70,6 +76,43 @@ func TestSBDBResolver(t *testing.T) {
 	}
 }
 
+func TestSBDBResolver_CometKind(t *testing.T) {
+	jsonData := `{
+		"object": {
+			"spkid": "1000036",
+			"fullname": "1P/Halley",
+			"des": "1P",
+			"kind": "c"
+		}
+	}`
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+
+		if _, err := fmt.Fprint(w, jsonData); err != nil {
+			t.Errorf("failed to write response: %v", err)
+		}
+	}))
+	defer server.Close()
+
+	t.Cleanup(remote.Reset)
+
+	if err := remote.SetURL(remote.JPLSBDB, server.URL); err != nil {
+		t.Fatal(err)
+	}
+
+	prov := New()
+
+	tar, ok := prov.Resolve(context.Background(), "halley")
+	if !ok {
+		t.Fatalf("Failed to resolve Halley")
+	}
+
+	if tar.Kind != resolve.KindComet {
+		t.Errorf("Kind = %q, want %q", tar.Kind, resolve.KindComet)
+	}
+}
+
 func TestProviderInterface(t *testing.T) {
 	p := New()
 	if p.Name() != "sbdb" {
@@ -81,6 +124,6 @@ func TestProviderInterface(t *testing.T) {
 		t.Errorf("expected CapObjectResolution, got %v", caps)
 	}
 
-	_, _ = p.Resolve("non_existent_body")
-	_ = p.Search("non_existent_body")
+	_, _ = p.Resolve(context.Background(), "non_existent_body")
+	_ = p.Search(context.Background(), "non_existent_body")
 }

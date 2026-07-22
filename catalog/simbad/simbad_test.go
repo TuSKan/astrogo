@@ -88,7 +88,7 @@ func TestResolveMock(t *testing.T) {
 		Handler: server.Config.Handler,
 	}
 
-	tgt, ok := p.Resolve("m31")
+	tgt, ok := p.Resolve(context.Background(), "m31")
 	if !ok {
 		t.Fatalf("failed to resolve target")
 	}
@@ -203,6 +203,6 @@ func TestProviderInterface(t *testing.T) {
 	}
 
 	// Triggers internal error paths since we didn't mock
-	_, _ = p.Resolve("non_existent_body")
-	_ = p.Search("non_existent_body")
+	_, _ = p.Resolve(context.Background(), "non_existent_body")
+	_ = p.Search(context.Background(), "non_existent_body")
 }

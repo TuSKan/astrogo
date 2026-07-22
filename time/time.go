@@ -103,6 +103,11 @@ var LoadLocation = time.LoadLocation
 // LocationUTC is the UTC location.
 var LocationUTC = time.UTC
 
+// J2000 is the standard epoch J2000.0 (JD 2451545.0 TT) — the reference
+// epoch most star catalogs (Gaia excepted, at J2016.0) and orbital-element
+// sources assume when they don't report their own epoch explicitly.
+var J2000 = FromJD(2451545.0, TT)
+
 var (
 	// RFC1123 is a time format that conforms to RFC 1123.
 	RFC1123 = time.RFC1123

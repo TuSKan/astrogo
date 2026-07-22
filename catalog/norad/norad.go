@@ -274,8 +274,8 @@ func (p *Provider) Capabilities() []resolve.Capability {
 }
 
 // Resolve attempts to find a single satellite by name or catalog number.
-func (p *Provider) Resolve(query string) (resolve.Target, bool) {
-	targets := p.Search(query)
+func (p *Provider) Resolve(ctx context.Context, query string) (resolve.Target, bool) {
+	targets := p.Search(ctx, query)
 	if len(targets) > 0 {
 		return targets[0], true
 	}
@@ -284,10 +284,10 @@ func (p *Provider) Resolve(query string) (resolve.Target, bool) {
 }
 
 // Search returns satellites matching the query string.
-func (p *Provider) Search(query string) []resolve.Target {
+func (p *Provider) Search(ctx context.Context, query string) []resolve.Target {
 	// No local timeout wrapper needed: NewClientFor(remote.CelesTrak) already
 	// bounds the whole request at the endpoint's registered Timeout.
-	gps, err := p.Fetch(context.Background(), QueryName, query)
+	gps, err := p.Fetch(ctx, QueryName, query)
 	if err != nil || len(gps) == 0 {
 		return nil
 	}
@@ -351,7 +351,7 @@ func gpToTarget(gp GP) resolve.Target {
 		ID:          strconv.Itoa(gp.NoradCatID),
 		Name:        gp.ObjectName,
 		Designation: gp.ObjectID,
-		Kind:        resolve.Kind("Satellite"),
+		Kind:        resolve.KindSatellite,
 		Catalog:     "norad",
 		Epoch:       epoch,
 		TLELine1:    l1,

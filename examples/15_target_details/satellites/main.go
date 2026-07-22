@@ -22,7 +22,7 @@ func main() {
 	// We'll use the satellite epoch for context later or current time
 	resolver := catalog.NewResolver(catalog.NORAD)
 
-	catTarget, err := resolver.Resolve("ISS (Zarya)")
+	catTarget, err := resolver.Resolve(context.Background(), "ISS (Zarya)")
 	if err != nil {
 		log.Fatalf("failed to resolve ISS: %v", err)
 	}

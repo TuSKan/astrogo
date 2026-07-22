@@ -7,6 +7,7 @@ import (
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/internal/testutil"
+	"github.com/TuSKan/astrogo/time"
 )
 
 func TestValidation(t *testing.T) {
@@ -325,6 +326,54 @@ func TestSeparationAndPositionAngle(t *testing.T) {
 
 	pa := coord.PositionAngle(ic1, ic2)
 	testutil.AssertNear(t, "PositionAngle", pa.Degrees(), 90.0, 1e-10)
+}
+
+func TestPropagateEpoch_NoKinematicsIsNoOp(t *testing.T) {
+	c := coord.NewICRS(angle.Deg(10), angle.Deg(20))
+
+	later := time.J2000.Add((50 * 365.25 * 24) * time.Hour)
+
+	out, err := coord.PropagateEpoch(c, time.J2000, later)
+	testutil.AssertNoError(t, err)
+	testutil.AssertNear(t, "RA unchanged with no kinematics", out.RA().Degrees(), c.RA().Degrees(), 1e-12)
+	testutil.AssertNear(t, "Dec unchanged with no kinematics", out.Dec().Degrees(), c.Dec().Degrees(), 1e-12)
+}
+
+func TestPropagateEpoch_SameEpochIsNoOp(t *testing.T) {
+	c := coord.NewICRSWithKinematics(angle.Deg(10), angle.Deg(0), angle.Arcsec(1), angle.Arcsec(0), angle.Arcsec(0.1), 0)
+
+	out, err := coord.PropagateEpoch(c, time.J2000, time.J2000)
+	testutil.AssertNoError(t, err)
+	testutil.AssertNear(t, "RA unchanged at same epoch", out.RA().Degrees(), c.RA().Degrees(), 1e-15)
+}
+
+func TestPropagateEpoch_AppliesProperMotion(t *testing.T) {
+	// dec=0 so cos(dec)=1: coordinate-angle pmRA of 1 arcsec/yr over 10
+	// years should shift RA by ~10 arcsec, to within a small tolerance for
+	// the relativistic/parallax correction Pmsafe also applies.
+	c := coord.NewICRSWithKinematics(angle.Deg(10), angle.Deg(0), angle.Arcsec(1), angle.Arcsec(0), angle.Arcsec(0.1), 0)
+
+	later := time.J2000.Add((10 * 365.25 * 24) * time.Hour)
+
+	out, err := coord.PropagateEpoch(c, time.J2000, later)
+	testutil.AssertNoError(t, err)
+
+	shiftArcsec := (out.RA().Degrees() - c.RA().Degrees()) * 3600
+	testutil.AssertNear(t, "RA shift over 10yr at 1 arcsec/yr PM", shiftArcsec, 10.0, 0.1)
+}
+
+func TestPropagateEpoch_ZeroEpochDefaultsToJ2000(t *testing.T) {
+	c := coord.NewICRSWithKinematics(angle.Deg(10), angle.Deg(0), angle.Arcsec(1), angle.Arcsec(0), angle.Arcsec(0.1), 0)
+
+	later := time.J2000.Add((10 * 365.25 * 24) * time.Hour)
+
+	explicit, err := coord.PropagateEpoch(c, time.J2000, later)
+	testutil.AssertNoError(t, err)
+
+	implicit, err := coord.PropagateEpoch(c, time.Time{}, later)
+	testutil.AssertNoError(t, err)
+
+	testutil.AssertNear(t, "zero fromEpoch matches explicit J2000", implicit.RA().Degrees(), explicit.RA().Degrees(), 1e-15)
 }
 
 func TestMoreRoundTrips(t *testing.T) {

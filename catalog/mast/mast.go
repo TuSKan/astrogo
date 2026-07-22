@@ -14,6 +14,7 @@ import (
 	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/remote"
+	"github.com/TuSKan/astrogo/time"
 )
 
 // ErrAPIError indicates a MAST API error response.
@@ -51,8 +52,8 @@ func (p *Provider) Capabilities() []resolve.Capability {
 }
 
 // Resolve resolves a query to a target.
-func (p *Provider) Resolve(query string) (resolve.Target, bool) {
-	targets := p.Search(query)
+func (p *Provider) Resolve(ctx context.Context, query string) (resolve.Target, bool) {
+	targets := p.Search(ctx, query)
 	if len(targets) > 0 {
 		return targets[0], true
 	}
@@ -61,8 +62,7 @@ func (p *Provider) Resolve(query string) (resolve.Target, bool) {
 }
 
 // Search searches for targets matching the query.
-func (p *Provider) Search(query string) []resolve.Target {
-	ctx := context.TODO()
+func (p *Provider) Search(ctx context.Context, query string) []resolve.Target {
 	req := resolve.ObjectRequest{Query: query, Limit: 10}
 
 	iter := p.ResolveObject(ctx, req)
@@ -125,10 +125,10 @@ func (p *Provider) ResolveObject(ctx context.Context, req resolve.ObjectRequest)
 		if trimmed := bytes.TrimSpace(data); len(trimmed) > 0 && trimmed[0] == '<' {
 			var xmlPayload struct {
 				ResolvedCoordinate []struct {
-					CanonicalName string  `xml:"canonicalName"`
-					Resolver      string  `xml:"resolver"`
-					RA            float64 `xml:"ra"`
-					Dec           float64 `xml:"dec"`
+					CanonicalName string   `xml:"canonicalName"`
+					Resolver      string   `xml:"resolver"`
+					RA            *float64 `xml:"ra"`
+					Dec           *float64 `xml:"dec"`
 				} `xml:"resolvedCoordinate"`
 			}
 
@@ -139,23 +139,17 @@ func (p *Provider) ResolveObject(ctx context.Context, req resolve.ObjectRequest)
 
 			targets = make([]resolve.Target, 0, len(xmlPayload.ResolvedCoordinate))
 			for _, match := range xmlPayload.ResolvedCoordinate {
-				targets = append(targets, resolve.Target{
-					ID:       match.CanonicalName,
-					Name:     match.CanonicalName,
-					Coord:    coord.NewICRS(angle.Deg(match.RA), angle.Deg(match.Dec)),
-					HasCoord: true,
-					Catalog:  match.Resolver,
-				})
+				targets = append(targets, newMASTTarget(match.CanonicalName, match.Resolver, match.RA, match.Dec))
 			}
 		} else {
 			var jsonPayload struct {
 				Status             string `json:"status"`
 				Msg                string `json:"msg"`
 				ResolvedCoordinate []struct {
-					CanonicalName string  `json:"canonicalName"`
-					Resolver      string  `json:"resolver"`
-					RA            float64 `json:"ra"`
-					Decl          float64 `json:"decl"`
+					CanonicalName string   `json:"canonicalName"`
+					Resolver      string   `json:"resolver"`
+					RA            *float64 `json:"ra"`
+					Decl          *float64 `json:"decl"`
 				} `json:"resolvedCoordinate"`
 			}
 
@@ -171,13 +165,7 @@ func (p *Provider) ResolveObject(ctx context.Context, req resolve.ObjectRequest)
 
 			targets = make([]resolve.Target, 0, len(jsonPayload.ResolvedCoordinate))
 			for _, match := range jsonPayload.ResolvedCoordinate {
-				targets = append(targets, resolve.Target{
-					ID:       match.CanonicalName,
-					Name:     match.CanonicalName,
-					Coord:    coord.NewICRS(angle.Deg(match.RA), angle.Deg(match.Decl)),
-					HasCoord: true,
-					Catalog:  match.Resolver,
-				})
+				targets = append(targets, newMASTTarget(match.CanonicalName, match.Resolver, match.RA, match.Decl))
 			}
 		}
 
@@ -192,6 +180,45 @@ func (p *Provider) ResolveObject(ctx context.Context, req resolve.ObjectRequest)
 			}
 		}
 	}
+}
+
+// newMASTTarget builds a resolve.Target from one decoded resolvedCoordinate
+// match, in either the XML or JSON response shape.
+//
+// ra/dec are pointers rather than bare float64 so a genuinely-absent field
+// (no <ra> element, no "ra" JSON key) decodes to nil instead of a
+// masquerading 0.0 — HasCoord is only set true when both are actually
+// present, matching how every other astrogo catalog provider treats a
+// missing position as absent rather than real.
+//
+// Catalog is always "mast" (consistent with every other provider setting
+// Catalog to its own name), never the relayed sub-resolver name (NED,
+// Simbad, VizieR) MAST's Name.Lookup service internally used to answer —
+// that information isn't discarded, it's preserved as an alias instead, so
+// Catalog keeps one consistent meaning ("which provider produced this row")
+// across the whole package.
+//
+// Epoch defaults to time.J2000 as a best-effort assumption: the API doesn't
+// report which sub-resolver's native epoch actually answered, but
+// SIMBAD/NED name-lookup responses are conventionally J2000.
+func newMASTTarget(canonicalName, resolver string, ra, dec *float64) resolve.Target {
+	t := resolve.Target{
+		ID:      canonicalName,
+		Name:    canonicalName,
+		Catalog: "mast",
+		Epoch:   time.J2000,
+	}
+
+	if resolver != "" {
+		t.Aliases = []string{resolver}
+	}
+
+	if ra != nil && dec != nil {
+		t.Coord = coord.NewICRS(angle.Deg(*ra), angle.Deg(*dec))
+		t.HasCoord = true
+	}
+
+	return t
 }
 
 // ConeSearch is not yet implemented for CAOM spatial search: STScI's

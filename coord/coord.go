@@ -6,14 +6,16 @@ import (
 	"math"
 
 	"github.com/TuSKan/astrogo/angle"
+	"github.com/TuSKan/astrogo/internal/gofaext"
 	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/vector"
 )
 
 // Sentinel errors for coordinate validation.
 var (
-	ErrNotFinite     = errors.New("coordinate component must be finite")
-	ErrLatitudeRange = errors.New("latitude/altitude out of range")
+	ErrNotFinite         = errors.New("coordinate component must be finite")
+	ErrLatitudeRange     = errors.New("latitude/altitude out of range")
+	ErrPropagationFailed = errors.New("coord: space-motion propagation failed")
 )
 
 // Object represents any celestial entity that has a predictable position
@@ -547,4 +549,50 @@ func PositionAngle(from, to ICRS) angle.Angle {
 	x := math.Cos(d1)*math.Tan(d2) - math.Sin(d1)*math.Cos(dra)
 
 	return angle.Atan2(y, x).Wrap360()
+}
+
+// PropagateEpoch applies rigorous SOFA space-motion propagation (proper
+// motion, parallax, light-time/relativistic correction via Pmsafe) to move
+// an ICRS position with kinematics from fromEpoch to toEpoch. If c has no
+// proper motion, parallax, or radial velocity, the position is returned
+// unchanged — propagation over any interval is a no-op for a motionless
+// point. A zero fromEpoch or toEpoch (time.Time{}) is treated as
+// time.J2000, matching the epoch convention most catalogs cross-matched
+// against assume when they don't report one explicitly.
+//
+// This is rigorous relativistic space-motion propagation (good to
+// sub-milliarcsecond over the years-to-decades spans catalog cross-matching
+// needs) — a different problem from Context.AtTime's O(1) approximate
+// short-span Earth-rotation update, which re-derives observer-frame state,
+// not a star's own kinematics.
+func PropagateEpoch(c ICRS, fromEpoch, toEpoch time.Time) (ICRS, error) {
+	if fromEpoch.IsZero() {
+		fromEpoch = time.J2000
+	}
+
+	if toEpoch.IsZero() {
+		toEpoch = time.J2000
+	}
+
+	if fromEpoch.Equal(toEpoch) {
+		return c, nil
+	}
+
+	ep1a, ep1b := fromEpoch.TT().JDParts()
+	ep2a, ep2b := toEpoch.TT().JDParts()
+
+	ra2, dec2, pmr2, pmd2, px2, rv2, status := gofaext.Pmsafe(
+		c.RA().Radians(), c.Dec().Radians(),
+		c.PmRA().Radians(), c.PmDec().Radians(),
+		c.Parallax().Arcseconds(), c.RV(),
+		ep1a, ep1b, ep2a, ep2b,
+	)
+	if status < 0 {
+		return ICRS{}, fmt.Errorf("%w: status %d", ErrPropagationFailed, status)
+	}
+
+	out := NewICRSWithKinematics(angle.Rad(ra2), angle.Rad(dec2), angle.Rad(pmr2), angle.Rad(pmd2), angle.Arcsec(px2), rv2)
+	out.SetDist(c.Dist())
+
+	return out, nil
 }

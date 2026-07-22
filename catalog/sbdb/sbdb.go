@@ -45,8 +45,8 @@ func (p *Provider) Capabilities() []resolve.Capability {
 }
 
 // Resolve performs exact-match resolution for a query.
-func (p *Provider) Resolve(query string) (resolve.Target, bool) {
-	targets := p.Search(query)
+func (p *Provider) Resolve(ctx context.Context, query string) (resolve.Target, bool) {
+	targets := p.Search(ctx, query)
 	if len(targets) > 0 {
 		return targets[0], true
 	}
@@ -55,8 +55,7 @@ func (p *Provider) Resolve(query string) (resolve.Target, bool) {
 }
 
 // Search performs fuzzy search across all MPC-registered small bodies.
-func (p *Provider) Search(query string) []resolve.Target {
-	ctx := context.TODO()
+func (p *Provider) Search(ctx context.Context, query string) []resolve.Target {
 	req := resolve.ObjectRequest{Query: query, Limit: 1}
 
 	iter := p.ResolveObject(ctx, req)
@@ -122,9 +121,9 @@ func (p *Provider) ResolveObject(ctx context.Context, req resolve.ObjectRequest)
 			return
 		}
 
-		kindStr := "Asteroid"
+		kind := resolve.KindAsteroid
 		if payload.Object.Kind == "c" {
-			kindStr = "Comet"
+			kind = resolve.KindComet
 		}
 
 		t := resolve.Target{
@@ -132,7 +131,7 @@ func (p *Provider) ResolveObject(ctx context.Context, req resolve.ObjectRequest)
 			Name:        payload.Object.FullName,
 			Designation: payload.Object.Des,
 			SPKID:       payload.Object.SpkID,
-			Kind:        resolve.Kind(kindStr),
+			Kind:        kind,
 			Catalog:     "sbdb",
 		}
 

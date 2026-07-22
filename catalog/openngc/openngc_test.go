@@ -1,6 +1,7 @@
 package openngc
 
 import (
+	"context"
 	"testing"
 
 	"github.com/TuSKan/astrogo/catalog/resolve"
@@ -49,7 +50,7 @@ func TestProvider(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.query, func(t *testing.T) {
-			got, ok := p.Resolve(tt.query)
+			got, ok := p.Resolve(context.Background(), tt.query)
 			if ok != tt.found {
 				t.Errorf("Resolve(%q) ok = %v, want %v", tt.query, ok, tt.found)
 				return
@@ -65,7 +66,7 @@ func TestProvider(t *testing.T) {
 func TestSearch(t *testing.T) {
 	p := newTestProvider()
 
-	results := p.Search("orion")
+	results := p.Search(context.Background(), "orion")
 	if len(results) == 0 {
 		t.Fatalf("Search(%q) returned no results", "orion")
 	}
@@ -88,7 +89,7 @@ func BenchmarkSearch(b *testing.B) {
 	p := newTestProvider()
 
 	for range b.N {
-		p.Search("nebula")
+		p.Search(context.Background(), "nebula")
 	}
 }
 

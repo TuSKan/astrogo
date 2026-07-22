@@ -1,6 +1,7 @@
 package resolve
 
 import (
+	"context"
 	"errors"
 	"strings"
 
@@ -35,6 +36,12 @@ const (
 	KindAsterism Kind = "Asterism"
 	// KindDoubleStar represents a double star.
 	KindDoubleStar Kind = "DoubleStar"
+	// KindAsteroid represents a minor planet (asteroid).
+	KindAsteroid Kind = "Asteroid"
+	// KindComet represents a comet.
+	KindComet Kind = "Comet"
+	// KindSatellite represents an artificial Earth satellite.
+	KindSatellite Kind = "Satellite"
 	// KindOther represents other celestial objects.
 	KindOther Kind = "Other"
 )
@@ -109,6 +116,10 @@ type Target struct {
 	HasCoord bool
 	// HasOblateness is true if the target has oblateness information.
 	HasOblateness bool
+	// Provenance maps each populated field name to the provider name
+	// (Provider.Name(), never Target.Catalog) that contributed its value
+	// in a merged Target. Nil for a Target sourced from a single provider.
+	Provenance map[string]string
 }
 
 // ICRS implements coord.Object for a static catalog Target.
@@ -119,8 +130,8 @@ func (t Target) ICRS(_ time.Time) (coord.ICRS, error) {
 // Provider defines the interface for astronomical catalogs.
 type Provider interface {
 	Name() string
-	Resolve(query string) (Target, bool)
-	Search(query string) []Target
+	Resolve(ctx context.Context, query string) (Target, bool)
+	Search(ctx context.Context, query string) []Target
 }
 
 var (

@@ -53,8 +53,20 @@ func TestMastOfflineResolve(t *testing.T) {
 	}
 
 	testutil.AssertEqual(t, "Name", targets[0].Name, "M31")
-	testutil.AssertEqual(t, "Catalog", targets[0].Catalog, "NED")
+	// Catalog is always "mast" (consistent with every other provider setting
+	// Catalog to its own name), never the relayed sub-resolver name — see
+	// newMASTTarget's doc comment. That name is preserved as an alias instead.
+	testutil.AssertEqual(t, "Catalog", targets[0].Catalog, "mast")
+
+	if len(targets[0].Aliases) != 1 || targets[0].Aliases[0] != "NED" {
+		t.Errorf("expected relayed resolver name preserved as an alias, got %v", targets[0].Aliases)
+	}
+
 	testutil.AssertEqual(t, "RA", targets[0].Coord.RA().Degrees(), 10.684)
+
+	if targets[0].Epoch.IsZero() {
+		t.Error("expected a default J2000 Epoch, got zero value")
+	}
 }
 
 // TestMastOfflineResolveXML covers a live-observed MAST quirk: the invoke
@@ -94,7 +106,12 @@ func TestMastOfflineResolveXML(t *testing.T) {
 	}
 
 	testutil.AssertEqual(t, "Name", targets[0].Name, "M  31")
-	testutil.AssertEqual(t, "Catalog", targets[0].Catalog, "SIMBAD")
+	testutil.AssertEqual(t, "Catalog", targets[0].Catalog, "mast")
+
+	if len(targets[0].Aliases) != 1 || targets[0].Aliases[0] != "SIMBAD" {
+		t.Errorf("expected relayed resolver name preserved as an alias, got %v", targets[0].Aliases)
+	}
+
 	testutil.AssertEqual(t, "RA", targets[0].Coord.RA().Degrees(), 10.684708)
 	testutil.AssertEqual(t, "Dec", targets[0].Coord.Dec().Degrees(), 41.26875)
 }
@@ -135,6 +152,30 @@ func TestMastOfflineResolveXMLNoMatch(t *testing.T) {
 	}
 }
 
+// TestNewMASTTarget_MissingCoordIsNotFake is a regression test: a match with
+// no ra/dec (nil pointers, e.g. an XML response with no <ra>/<dec> element)
+// must yield HasCoord=false, never a fake (0,0) reported as real — the same
+// bug class fixed in Gaia's row parsing.
+func TestNewMASTTarget_MissingCoordIsNotFake(t *testing.T) {
+	got := newMASTTarget("M31", "NED", nil, nil)
+
+	if got.HasCoord {
+		t.Errorf("expected HasCoord=false for a match with no coordinate, got HasCoord=true Coord=%v", got.Coord)
+	}
+
+	if got.Catalog != "mast" {
+		t.Errorf("Catalog = %q, want mast", got.Catalog)
+	}
+
+	if len(got.Aliases) != 1 || got.Aliases[0] != "NED" {
+		t.Errorf("expected relayed resolver name preserved as an alias, got %v", got.Aliases)
+	}
+
+	if got.Epoch.IsZero() {
+		t.Error("expected a default J2000 Epoch even without a coordinate")
+	}
+}
+
 type mockTransport struct {
 	Handler http.Handler
 }
@@ -163,8 +204,8 @@ func TestProviderInterface(t *testing.T) {
 	// offline — see CLAUDE.md's build-tag convention.
 	p.client.HTTPClient.Transport = errTransport{}
 
-	_, _ = p.Resolve("non_existent_body")
-	_ = p.Search("non_existent_body")
+	_, _ = p.Resolve(context.Background(), "non_existent_body")
+	_ = p.Search(context.Background(), "non_existent_body")
 }
 
 var errNoTransport = errors.New("errTransport: no network access in this test")

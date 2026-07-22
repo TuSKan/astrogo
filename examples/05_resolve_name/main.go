@@ -2,6 +2,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/TuSKan/astrogo/catalog"
@@ -17,13 +18,15 @@ func main() {
 	// No need to import catalog/openngc directly.
 	remote.EnableDownloads(remote.OpenNGC, 5<<20) // ~2 MB combined source CSVs
 
+	ctx := context.Background()
+
 	resolver := catalog.NewResolver(catalog.OpenNGC, catalog.SIMBAD, catalog.MAST)
 
 	query := "Andromeda"
 	fmt.Printf("Executing advanced Search for ambiguous query: %q...\n", query)
 
 	// 3. Perform a fuzzy Search combining all endpoints
-	results := resolver.Search(query)
+	results := resolver.Search(ctx, query)
 
 	if len(results) == 0 {
 		fmt.Println("No matches found.")
@@ -50,11 +53,13 @@ func main() {
 		fmt.Println("    -------------------------------------------------------------------")
 	}
 
-	// 5. Demonstrate the strict Resolve() guarantee
-	fmt.Printf("\nExecuting strict Resolve() on %q...\n", "M31")
+	// 5. Demonstrate Resolve(), which now cross-matches and merges every
+	// provider's hit for the query into a single, richer Target instead of
+	// returning the first provider that happens to answer.
+	fmt.Printf("\nExecuting Resolve() on %q...\n", "M31")
 
-	exact, err := resolver.Resolve("M31")
+	exact, err := resolver.Resolve(ctx, "M31")
 	if err == nil {
-		fmt.Printf("Strictly matched: %s (%s) perfectly.\n", exact.Name, exact.ID)
+		fmt.Printf("Matched: %s (%s), merged from %d field(s) with attributed provenance.\n", exact.Name, exact.ID, len(exact.Provenance))
 	}
 }

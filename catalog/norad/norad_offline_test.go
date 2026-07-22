@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/remote"
 )
 
@@ -45,14 +46,20 @@ func TestNewFetchSearchResolve(t *testing.T) {
 		t.Errorf("Capabilities() = %v, want exactly one capability", caps)
 	}
 
-	targets := p.Search("ISS")
+	targets := p.Search(context.Background(), "ISS")
 	if len(targets) != 1 || targets[0].Name != "ISS (ZARYA)" {
 		t.Fatalf("Search(%q) = %+v, want a single ISS (ZARYA) target", "ISS", targets)
 	}
 
-	target, ok := p.Resolve("ISS")
+	target, ok := p.Resolve(context.Background(), "ISS")
 	if !ok || target.Name != "ISS (ZARYA)" {
 		t.Fatalf("Resolve(%q) = %+v, %v, want ISS (ZARYA), true", "ISS", target, ok)
+	}
+
+	// Regression: Kind must be the canonical resolve.KindSatellite constant,
+	// not an ad hoc resolve.Kind("Satellite") string built outside the enum.
+	if target.Kind != resolve.KindSatellite {
+		t.Errorf("Kind = %q, want %q", target.Kind, resolve.KindSatellite)
 	}
 
 	gp, err := p.FetchByID(context.Background(), 25544)

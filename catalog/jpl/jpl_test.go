@@ -228,7 +228,7 @@ func TestJPLResolve_ReturnsRealMatch(t *testing.T) {
 	result := "Target body name: Mars (499)                      {source: mar099}\n"
 	prov := newMockProvider(jsonResultPayload(t, result))
 
-	target, ok := prov.Resolve("Mars")
+	target, ok := prov.Resolve(context.Background(), "Mars")
 	testutil.AssertEqual(t, "Resolve Ok", ok, true)
 	testutil.AssertEqual(t, "Resolve Name", target.Name, "Mars")
 }
@@ -307,7 +307,7 @@ func TestProviderInterface(t *testing.T) {
 
 	// Fast fail search / resolve without any real network call.
 	// This hits the missing coverage lines.
-	_, ok := p.Resolve("non_existent_body_to_trigger_miss")
+	_, ok := p.Resolve(context.Background(), "non_existent_body_to_trigger_miss")
 	if ok {
 		t.Error("expected Resolve to fail with no transport")
 	}

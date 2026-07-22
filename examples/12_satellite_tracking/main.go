@@ -34,7 +34,7 @@ func main() {
 
 	resolver := catalog.NewResolver(catalog.NORAD)
 
-	target, err := resolver.Resolve("ISS (Zarya)")
+	target, err := resolver.Resolve(context.Background(), "ISS (Zarya)")
 	if err != nil {
 		log.Fatalf("Failed to resolve ISS (Zarya): %v", err)
 	}

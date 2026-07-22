@@ -105,6 +105,7 @@ Resolve real catalog targets, check tonight's twilight and Moon, score observabi
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 
@@ -145,14 +146,15 @@ func main() {
 	// ── Targets ──
 	// Resolve by name — coordinates come from SIMBAD/OpenNGC automatically.
 	resolver := catalog.NewResolver(catalog.SIMBAD, catalog.OpenNGC)
+	ctx := context.Background()
 
-	omegaCenCat, err := resolver.Resolve("NGC 5139") // Omega Centauri
+	omegaCenCat, err := resolver.Resolve(ctx, "NGC 5139") // Omega Centauri
 	if err != nil {
 		log.Fatal(err)
 	}
 	omegaCen := plan.FromCatalog(omegaCenCat, nil)
 
-	sgrACat, err := resolver.Resolve("Sgr A*")
+	sgrACat, err := resolver.Resolve(ctx, "Sgr A*")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -341,7 +343,7 @@ Appulse: 2026-11-16 01:38 UTC (min sep: 1.19°)
 ```go
 // Resolve ISS from the live NORAD/CelestTrak catalog.
 resolver := catalog.NewResolver(catalog.NORAD)
-target, _ := resolver.Resolve("ISS (Zarya)")
+target, _ := resolver.Resolve(context.Background(), "ISS (Zarya)")
 
 // SGP4 provider — implements the same Provider interface as JPL planets.
 prov, _ := ephemeris.NewProvider(ephemeris.Satellites, target.Name,

@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `catalog.Resolver` now cross-matches and merges every registered provider's hit for a query into one `Target`, instead of `Resolve` returning whichever provider answered first and `Search` deduplicating only on the useless `Catalog+":"+ID` key (which can never catch a cross-provider duplicate). Cross-matching is by shared alias/ID first (union-find over `Target.ID`/`Target.Aliases`), falling back to angular separation — after epoch-normalizing each candidate to J2000 via the new `coord.PropagateEpoch` — for candidates with no alias/ID overlap. `catalog.Gaia`/`catalog.VizieR`, whose `Resolve`/`Search` are permanently stubbed (neither does name-based lookup), are now bridged in via their `resolve.ConeSearcher` capability around each group's anchor position, so their astrometry can participate in a merge instead of being reachable only through a separate `ConeSearch` call. Each merged field is chosen by a per-field provider-precedence table (Coord/Parallax/PmRA/PmDec are treated as one coupled cluster, taken from a single provider, never mixed field-by-field); `Target.Provenance map[string]string` records which provider (`Provider.Name()`) contributed each field, nil for a `Target` sourced from a single provider.
+- `(*catalog.Resolver).PositionMatchThreshold(threshold angle.Angle) *Resolver` — sets the maximum angular separation, after epoch normalization, at which two `Target`s are considered the same object (default 2 arcsec); returns the receiver for chaining, e.g. `catalog.NewResolver(catalog.SIMBAD).PositionMatchThreshold(angle.Arcsec(2)).Resolve(ctx, "...")`.
+- `(*catalog.Resolver).Limit(n int) *Resolver` — sets `Search`'s maximum result count (default 10, previously hardcoded); also chainable.
+- `coord.PropagateEpoch(c ICRS, fromEpoch, toEpoch time.Time) (ICRS, error)` — rigorous SOFA (`Pmsafe`) space-motion propagation of an ICRS position's proper motion/parallax/radial velocity from one epoch to another; a zero epoch is treated as `time.J2000`. `internal/gofaext.Pmsafe` wraps the underlying SOFA call.
+- `time.J2000` — the standard epoch J2000.0 (JD 2451545.0 TT).
+- `resolve.Kind` constants `KindAsteroid`, `KindComet`, `KindSatellite`, canonicalizing string values `catalog/sbdb` and `catalog/norad` already used informally as bare `resolve.Kind("Asteroid")`/`"Comet"`/`"Satellite"` literals.
+
+### Changed — BREAKING
+- **`resolve.Provider`'s `Resolve`/`Search` methods now take `ctx context.Context` as their first parameter.** This ripples into every catalog provider package (`simbad`, `mast`, `jpl`, `sbdb`, `norad`, `gaia`, `vizier`, `openngc`) and every caller — a provider or `Resolver` that built its own internal `context.Background()`/`context.TODO()` now forwards the caller's `ctx` instead, so cancellation propagates end-to-end, including into the `ConeSearch` bridge calls above. `catalog.Resolver.Resolve`/`Search` already took a `ctx`; this closes the gap at the interface's own layer rather than only at the top-level orchestrator.
+
+### Fixed
+- `catalog/gaia`'s CSV row parser discarded RA/Dec `ParseFloat` errors and still reported `HasCoord: true`, so a malformed or empty position silently became a fake `(0, 0)` reported as real. Rows with an unparseable RA or Dec are now skipped entirely.
+- `catalog/mast`'s XML/JSON decode set `HasCoord: true` unconditionally, independent of whether a `<ra>`/`<dec>` (or `ra`/`decl`) field was actually present in the response, for the same reason as above. RA/Dec now decode into presence-aware (`*float64`) fields, and `HasCoord` is only set when both are genuinely present.
+- `catalog/mast`'s `Target.Catalog` held the relayed sub-resolver name (`"NED"`, `"SIMBAD"`, `"VizieR"` — whichever service MAST's `Mast.Name.Lookup` internally answered from) instead of `"mast"`, inconsistent with every other provider setting `Catalog` to its own name. `Catalog` is now always `"mast"`; the relayed resolver name is preserved as an `Aliases` entry instead of being discarded.
+- `catalog/mast` never set `Target.Epoch`; it now defaults to `time.J2000` (SIMBAD/NED name-lookup responses are conventionally J2000 — a documented best-effort assumption, since the API doesn't report which sub-resolver actually answered).
+- `catalog/vizier`'s `ConeSearch` never populated `Target.ID`, even though the same designation value was already used for `Name`/`Designation`. `ID` is now set from the same value.
+- `catalog/vizier`'s `ConeSearch` never set `Target.Epoch`, despite its three registered tables having genuinely different native reference epochs (2MASS ~J2000, Hipparcos J1991.25, Gaia DR3 J2016.0). Each table's schema (`tables.go`) now carries its own `Epoch`, stamped onto every row it produces.
+- `catalog/openngc` never set `Target.Epoch`, despite its RA/Dec being J2000 by the catalog's own convention. Rows now carry `Epoch: time.J2000` explicitly.
+
 ## [0.7.0] — 2026-07-21
 
 ### Added

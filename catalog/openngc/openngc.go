@@ -61,8 +61,10 @@ func New() *Provider {
 // Name returns the provider identifier.
 func (p *Provider) Name() string { return "openngc" }
 
-// Resolve performs exact-match resolution for a query.
-func (p *Provider) Resolve(query string) (resolve.Target, bool) {
+// Resolve performs exact-match resolution for a query. ctx is accepted for
+// resolve.Provider conformance only — resolution runs over the in-memory
+// index built once at New(), with no I/O to cancel.
+func (p *Provider) Resolve(_ context.Context, query string) (resolve.Target, bool) {
 	q := resolve.Normalize(query)
 	if idx, ok := p.byKey[q]; ok {
 		return p.targets[idx], true
@@ -71,8 +73,9 @@ func (p *Provider) Resolve(query string) (resolve.Target, bool) {
 	return resolve.Target{}, false
 }
 
-// Search performs fuzzy search across all NGC/IC objects.
-func (p *Provider) Search(query string) []resolve.Target {
+// Search performs fuzzy search across all NGC/IC objects. ctx is accepted
+// for resolve.Provider conformance only — see Resolve.
+func (p *Provider) Search(_ context.Context, query string) []resolve.Target {
 	q := resolve.Normalize(query)
 	if q == "" {
 		return nil
