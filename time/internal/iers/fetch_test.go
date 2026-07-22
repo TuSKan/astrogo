@@ -153,6 +153,25 @@ func (nonTableModel) EOP(_ float64) (EOP, error) {
 	return EOP{}, nil
 }
 
+// TestEnsureLoadedFastPathSkipsLockWhenAlreadyCovered covers the very
+// first, unlocked covered(mjd) check — the lock-free fast path taken when
+// the registered model already covers the query, before EnsureLoaded ever
+// touches fetchMu.
+func TestEnsureLoadedFastPathSkipsLockWhenAlreadyCovered(t *testing.T) {
+	t.Cleanup(func() { RegisterModel(ZeroModel{}) })
+
+	table, err := ParseFinals2000A(strings.NewReader(sampleFinals2000A))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	RegisterModel(table)
+
+	if err := EnsureLoaded(41684); err != nil {
+		t.Errorf("expected nil for an already-covered MJD, got %v", err)
+	}
+}
+
 func TestEnsureLoadedRespectsCooldownAcrossMJDs(t *testing.T) {
 	// EnsureLoaded-calling tests earlier in this package's run share the
 	// package-level cooldown state (lastAttempt/errLastFetch) — reset it
@@ -212,6 +231,55 @@ func TestEnsureLoadedRespectsCooldownAcrossMJDs(t *testing.T) {
 
 	if got := getCount.Load(); got != 1 {
 		t.Errorf("expected still 1 GET (cooldown should suppress a retry), got %d", got)
+	}
+}
+
+// TestEnsureLoadedFallsThroughOnCorruptPreSeededCache covers the disk-read
+// step's failure path: a pre-seeded cache file that fails to parse (e.g.
+// truncated, hand-edited badly) must not crash or get stuck — EnsureLoaded
+// falls through to the consent-gated fetch step exactly as if no cache
+// file existed at all.
+func TestEnsureLoadedFallsThroughOnCorruptPreSeededCache(t *testing.T) {
+	fetchMu.Lock()
+	lastAttempt = time.Time{}
+	errLastFetch = nil
+	fetchMu.Unlock()
+
+	t.Cleanup(func() {
+		RegisterModel(ZeroModel{})
+		remote.Reset()
+		SetRetryCooldown(5 * time.Minute)
+	})
+
+	// Disable the retry cooldown so the corrupt file's mtime-seeded
+	// throttle (proven separately by TestEnsureLoadedSeedsCooldownFromCacheMtime)
+	// doesn't mask what this test checks: that a failed disk-read/parse
+	// genuinely falls through to the consent-gated fetch step, not just to
+	// a suppressed no-op.
+	SetRetryCooldown(0)
+
+	remote.SetDataDirPath(t.TempDir())
+	t.Cleanup(func() { remote.SetDataDir("") })
+
+	cacheFile, err := CacheFile()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// A single line with no newline, past bufio.Scanner's default token
+	// limit, makes ParseFinals2000A's scan fail.
+	if err := cacheFile.WriteAll([]byte(strings.Repeat("x", 70*1024))); err != nil {
+		t.Fatal(err)
+	}
+
+	// No consent granted: the fetch step, reached after the corrupt cache
+	// read fails, must deny rather than hang or panic.
+	if err := EnsureLoaded(41684); !errors.Is(err, remote.ErrDownloadDenied) {
+		t.Fatalf("expected ErrDownloadDenied after a corrupt pre-seeded cache, got %v", err)
+	}
+
+	if _, ok := GetModel().(ZeroModel); !ok {
+		t.Errorf("model must stay ZeroModel after a corrupt cache read, got %T", GetModel())
 	}
 }
 
