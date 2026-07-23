@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] — 2026-07-22
+
 ### Added
 - `catalog.Resolver` now cross-matches and merges every registered provider's hit for a query into one `Target`, instead of `Resolve` returning whichever provider answered first and `Search` deduplicating only on the useless `Catalog+":"+ID` key (which can never catch a cross-provider duplicate). Cross-matching is by shared alias/ID first (union-find over `Target.ID`/`Target.Aliases`), falling back to angular separation — after epoch-normalizing each candidate to J2000 via the new `coord.PropagateEpoch` — for candidates with no alias/ID overlap. `catalog.Gaia`/`catalog.VizieR`, whose `Resolve`/`Search` are permanently stubbed (neither does name-based lookup), are now bridged in via their `resolve.ConeSearcher` capability around each group's anchor position, so their astrometry can participate in a merge instead of being reachable only through a separate `ConeSearch` call. Each merged field is chosen by a per-field provider-precedence table (Coord/Parallax/PmRA/PmDec are treated as one coupled cluster, taken from a single provider, never mixed field-by-field); `Target.Provenance map[string]string` records which provider (`Provider.Name()`) contributed each field, nil for a `Target` sourced from a single provider.
 - `(*catalog.Resolver).PositionMatchThreshold(threshold angle.Angle) *Resolver` — sets the maximum angular separation, after epoch normalization, at which two `Target`s are considered the same object (default 2 arcsec); returns the receiver for chaining, e.g. `catalog.NewResolver(catalog.SIMBAD).PositionMatchThreshold(angle.Arcsec(2)).Resolve(ctx, "...")`.
