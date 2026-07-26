@@ -18,6 +18,9 @@ const (
 	CapConeSearch Capability = "ConeSearch"
 	// CapFullCatalog indicates that the provider can provide full catalog data.
 	CapFullCatalog Capability = "FullCatalog"
+	// CapMagnitudeBrowse indicates that the provider can enumerate objects
+	// brighter than a magnitude bound, independent of name or position.
+	CapMagnitudeBrowse Capability = "MagnitudeBrowse"
 )
 
 // ObjectRequest represents a request to resolve a specific object name or ID.
@@ -64,6 +67,26 @@ type ConeSearcher interface {
 	Capabilities() []Capability
 	// ConeSearch searches for targets within a given radius of a center coordinate.
 	ConeSearch(ctx context.Context, req ConeRequest) SeqIterator[Target]
+}
+
+// BrightRequest bounds a magnitude-filtered bulk query — the counterpart to
+// ObjectRequest (name-driven) and ConeRequest (position-driven): neither a
+// name nor a position, just "everything brighter than this."
+type BrightRequest struct {
+	// MaxVMag is the magnitude bound: only objects brighter than (numerically
+	// less than) this value are returned.
+	MaxVMag float64
+	// Limit is the maximum number of results to return.
+	Limit int
+}
+
+// BrightObjectSearcher lets a provider bulk-list every object it knows about
+// brighter than a magnitude bound, independent of name or position.
+type BrightObjectSearcher interface {
+	// Capabilities returns the capabilities of the catalog provider.
+	Capabilities() []Capability
+	// SearchBright returns every object brighter than req.MaxVMag.
+	SearchBright(ctx context.Context, req BrightRequest) SeqIterator[Target]
 }
 
 // SeqIterator is an alias for iter.Seq2 for explicit documentation of expected return type.

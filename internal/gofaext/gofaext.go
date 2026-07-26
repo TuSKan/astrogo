@@ -344,3 +344,29 @@ func Pmsafe(ra1, dec1, pmr1, pmd1, px1, rv1, ep1a, ep1b, ep2a, ep2b float64) (ra
 
 	return ra2, dec2, pmr2, pmd2, px2, rv2, status
 }
+
+// Epb2jd converts a Besselian epoch (e.g. 1875.0) to a two-part Julian
+// date (djm0, djm); djm0 is always 2400000.5. Needed for classical
+// (pre-IAU 2006) epochs like B1875.0, the equinox the official IAU
+// constellation boundaries are defined against.
+func Epb2jd(epb float64) (djm0, djm float64) {
+	gofa.Epb2jd(epb, &djm0, &djm)
+	return djm0, djm
+}
+
+// Pmat76 returns the IAU 1976 precession rotation matrix from J2000.0 to
+// the TT epoch given by the two-part Julian date (date1, date2).
+func Pmat76(date1, date2 float64) [3][3]float64 {
+	var rmatp [3][3]float64
+	gofa.Pmat76(date1, date2, &rmatp)
+
+	return rmatp
+}
+
+// Rxp rotates the vector p by the matrix r, returning r·p.
+func Rxp(r [3][3]float64, p [3]float64) [3]float64 {
+	var rp [3]float64
+	gofa.Rxp(r, p, &rp)
+
+	return rp
+}

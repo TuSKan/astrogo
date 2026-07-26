@@ -184,6 +184,28 @@ func NewProvider(ctx context.Context, source core.Source, kernel string, opts ..
 				return nil, fmt.Errorf("jpl: failed to load small-body kernel: %w", err)
 			}
 		}
+	case core.Moons:
+		// Unlike Asteroids/Comets/SmallBody, a planetary satellite kernel
+		// needs no separate planetary base kernel for center resolution —
+		// NAIF's own satellite SPKs (e.g. jup365.bsp, sat441.bsp) already
+		// include the Sun, Earth, and the relevant planet barycenter
+		// directly relative to the Solar System Barycenter, confirmed
+		// against NAIF's own published segment summaries
+		// (naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/satellites/aa_summaries.txt).
+		if p.kernel == "" {
+			return nil, fmt.Errorf("%w: a satellite kernel name is required (e.g. \"sat441\")", ErrUnknownSource)
+		}
+
+		spkPath := filepath.Join(p.DataDir, "satellites", p.kernel+".bsp")
+
+		k, err := spk.CacheDownload(ctx, "satellites/"+p.kernel+".bsp")
+		if err != nil {
+			return nil, fmt.Errorf("jpl: failed to load satellite kernel: %w", err)
+		}
+
+		if err := p.addKernelPath(k, spkPath); err != nil {
+			return nil, fmt.Errorf("jpl: failed to load satellite kernel: %w", err)
+		}
 	case core.Satellites:
 		return nil, fmt.Errorf("%w: satellites", ErrNotImplemented)
 	case core.Stations:

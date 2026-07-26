@@ -3,6 +3,7 @@ package openngc
 import (
 	"context"
 	"log"
+	"sort"
 	"strings"
 
 	"github.com/TuSKan/astrogo/catalog/resolve"
@@ -60,6 +61,33 @@ func New() *Provider {
 
 // Name returns the provider identifier.
 func (p *Provider) Name() string { return "openngc" }
+
+// Capabilities returns the set of supported resolution operations.
+func (p *Provider) Capabilities() []resolve.Capability {
+	return []resolve.Capability{resolve.CapObjectResolution, resolve.CapMagnitudeBrowse}
+}
+
+// SearchBright returns every OpenNGC object brighter than req.MaxVMag,
+// brightest-first — a plain in-memory filter over the catalog already
+// loaded at New() time, since (unlike SIMBAD/SBDB) there's no remote query
+// to make.
+func (p *Provider) SearchBright(_ context.Context, req resolve.BrightRequest) resolve.SeqIterator[resolve.Target] {
+	var matches []resolve.Target
+
+	for _, t := range p.targets {
+		if t.HasVMag && t.VMag < req.MaxVMag {
+			matches = append(matches, t)
+		}
+	}
+
+	sort.Slice(matches, func(i, j int) bool { return matches[i].VMag < matches[j].VMag })
+
+	if req.Limit > 0 && len(matches) > req.Limit {
+		matches = matches[:req.Limit]
+	}
+
+	return resolve.SliceSeq(matches)
+}
 
 // Resolve performs exact-match resolution for a query. ctx is accepted for
 // resolve.Provider conformance only — resolution runs over the in-memory

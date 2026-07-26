@@ -188,6 +188,31 @@ func (c AltAz) Az() angle.Angle { return c.az }
 // Dist returns the distance of the AltAz coordinate.
 func (c AltAz) Dist() float64 { return c.dist }
 
+// compassPoints are the 16 standard compass points, each spanning 22.5°,
+// centered on multiples of 22.5° starting from true north (0°).
+var compassPoints = [16]string{
+	"N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE",
+	"S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW",
+}
+
+// CompassDirection returns az as a 16-point compass label (N, NNE, NE,
+// ENE, E, ESE, SE, SSE, S, SSW, SW, WSW, W, WNW, NW, NNW) — the everyday
+// "which way do I look" complement to the numeric azimuth degrees.
+func CompassDirection(az angle.Angle) string {
+	deg := az.Wrap360().Degrees()
+	idx := int(math.Round(deg/22.5)) % 16
+
+	if idx < 0 {
+		idx += 16
+	}
+
+	return compassPoints[idx]
+}
+
+// Compass returns c's azimuth as a 16-point compass label — see
+// CompassDirection.
+func (c AltAz) Compass() string { return CompassDirection(c.az) }
+
 // SetAlt sets the altitude of the AltAz coordinate.
 func (c *AltAz) SetAlt(a angle.Angle) { c.alt = a }
 

@@ -29,8 +29,15 @@ const (
 	// small-body SPK kernels (KB–MB scale files).
 	JPLHorizons EndpointID = "jpl.horizons"
 
-	// JPLSBDB is the JPL Small-Body Database query API (catalog/sbdb).
+	// JPLSBDB is the JPL Small-Body Database identify API (catalog/sbdb) —
+	// resolves one object by name/designation.
 	JPLSBDB EndpointID = "jpl.sbdb"
+
+	// JPLSBDBQuery is JPL's separate SBDB *query* API (catalog/sbdb) — bulk
+	// enumerates asteroids/comets matching a filter (e.g. absolute magnitude
+	// below a bound), distinct from JPLSBDB's single-object identify
+	// endpoint despite both living under the same JPL SBDB service.
+	JPLSBDBQuery EndpointID = "jpl.sbdb.query"
 
 	// SIMBAD is the CDS SIMBAD TAP service (catalog/simbad).
 	SIMBAD EndpointID = "cds.simbad"
@@ -183,8 +190,18 @@ func defaultEndpoints() map[EndpointID]Endpoint {
 			URL:         "https://ssd-api.jpl.nasa.gov/sbdb.api",
 			Kind:        KindAPI,
 			Subsystem:   "catalog/sbdb",
-			Description: "JPL Small-Body Database query API",
+			Description: "JPL Small-Body Database identify API",
 			ApproxSize:  100_000,
+			Enabled:     true,
+			Timeout:     30 * time.Second,
+		},
+		JPLSBDBQuery: {
+			ID:          JPLSBDBQuery,
+			URL:         "https://ssd-api.jpl.nasa.gov/sbdb_query.api",
+			Kind:        KindAPI,
+			Subsystem:   "catalog/sbdb",
+			Description: "JPL Small-Body Database bulk query API (asteroid/comet browse)",
+			ApproxSize:  SizeVaries,
 			Enabled:     true,
 			Timeout:     30 * time.Second,
 		},

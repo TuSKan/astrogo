@@ -67,6 +67,44 @@ func containsNormalized(aliases []string, id string) bool {
 	return false
 }
 
+func TestNewProvider(t *testing.T) {
+	for _, src := range []Source{OpenNGC, SIMBAD, MAST, JPL, SBDB, Gaia, VizieR, NORAD} {
+		p, err := NewProvider(src)
+		if err != nil {
+			t.Errorf("NewProvider(%d): unexpected error: %v", src, err)
+			continue
+		}
+
+		if p == nil {
+			t.Errorf("NewProvider(%d): got nil Provider, want a concrete one", src)
+		}
+	}
+}
+
+func TestNewProvider_UnknownSource(t *testing.T) {
+	_, err := NewProvider(Source(999))
+	if !errors.Is(err, ErrUnknownSource) {
+		t.Errorf("NewProvider(999) error = %v, want ErrUnknownSource", err)
+	}
+}
+
+// TestNewProvider_BrightObjectSearcherTypeAssertion confirms the pattern
+// NewProvider's doc comment describes — a caller type-asserting the
+// returned Provider to a narrower capability interface, the same way this
+// package's own NewResolver does internally for resolve.ConeSearcher —
+// actually works for a provider that implements
+// resolve.BrightObjectSearcher.
+func TestNewProvider_BrightObjectSearcherTypeAssertion(t *testing.T) {
+	p, err := NewProvider(OpenNGC)
+	if err != nil {
+		t.Fatalf("NewProvider(OpenNGC): %v", err)
+	}
+
+	if _, ok := p.(resolve.BrightObjectSearcher); !ok {
+		t.Error("expected the OpenNGC provider to implement resolve.BrightObjectSearcher")
+	}
+}
+
 func TestResolver_Resolve(t *testing.T) {
 	p1 := &mockProvider{
 		name: "p1",

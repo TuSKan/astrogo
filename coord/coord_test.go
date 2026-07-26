@@ -21,6 +21,44 @@ func TestValidation(t *testing.T) {
 	testutil.AssertError(t, c3.Validate())
 }
 
+func TestCompassDirection(t *testing.T) {
+	tests := []struct {
+		deg  float64
+		want string
+	}{
+		{0, "N"},
+		{11, "N"},
+		{22.5, "NNE"},
+		{45, "NE"},
+		{90, "E"},
+		{135, "SE"},
+		{180, "S"},
+		{225, "SW"},
+		{270, "W"},
+		{315, "NW"},
+		{337.5, "NNW"},
+		{360, "N"},
+		{359, "N"},
+		{-11, "N"}, // negative azimuth normalizes via Wrap360
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.want, func(t *testing.T) {
+			got := coord.CompassDirection(angle.Deg(tt.deg))
+			if got != tt.want {
+				t.Errorf("CompassDirection(%v°) = %q, want %q", tt.deg, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestAltAz_Compass(t *testing.T) {
+	aa := coord.NewAltAz(angle.Deg(45), angle.Deg(180))
+	if got := aa.Compass(); got != "S" {
+		t.Errorf("AltAz.Compass() = %q, want %q", got, "S")
+	}
+}
+
 func TestToUnitVector_ICRS(t *testing.T) {
 	c1 := coord.NewICRS(angle.Deg(0), angle.Deg(0))
 	v1 := c1.ToUnitVector()

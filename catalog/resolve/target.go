@@ -18,8 +18,16 @@ const (
 	KindStar Kind = "Star"
 	// KindPlanet represents a planet.
 	KindPlanet Kind = "Planet"
-	// KindMoon represents a moon.
+	// KindMoon represents Earth's own Moon specifically (a real lunar-phase
+	// apparent-magnitude model, not the generic reflectance model below).
 	KindMoon Kind = "Moon"
+	// KindPlanetaryMoon represents a natural satellite of another planet
+	// (e.g. Io, Titan, Triton) — its apparent magnitude comes from the same
+	// heliocentric H-G reflectance model as KindAsteroid, just with H/G
+	// sourced from published per-moon physical-parameter data instead of a
+	// bulk catalog query (there is no bulk "moon browse" API analogous to
+	// SBDB's asteroid/comet one).
+	KindPlanetaryMoon Kind = "PlanetaryMoon"
 	// KindGalaxy represents a galaxy.
 	KindGalaxy Kind = "Galaxy"
 	// KindNebula represents a nebula.
@@ -38,6 +46,10 @@ const (
 	KindDoubleStar Kind = "DoubleStar"
 	// KindAsteroid represents a minor planet (asteroid).
 	KindAsteroid Kind = "Asteroid"
+	// KindDwarfPlanet represents one of the IAU-recognized dwarf planets
+	// (Ceres, Pluto, Eris, Haumea, Makemake) — otherwise indistinguishable
+	// from KindAsteroid in a bulk minor-body catalog like SBDB.
+	KindDwarfPlanet Kind = "DwarfPlanet"
 	// KindComet represents a comet.
 	KindComet Kind = "Comet"
 	// KindSatellite represents an artificial Earth satellite.
