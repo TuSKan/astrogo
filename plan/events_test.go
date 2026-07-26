@@ -297,9 +297,7 @@ func BenchmarkEventSolver(b *testing.B) {
 		Threshold: angle.Deg(20),
 	}
 
-	b.ResetTimer()
-
-	for range b.N {
+	for b.Loop() {
 		_, _ = solver.Find(spec, start, end)
 	}
 }

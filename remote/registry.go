@@ -321,6 +321,8 @@ func constName(id EndpointID) string {
 		return "JPLHorizons"
 	case JPLSBDB:
 		return "JPLSBDB"
+	case JPLSBDBQuery:
+		return "JPLSBDBQuery"
 	case SIMBAD:
 		return "SIMBAD"
 	case VizieR:

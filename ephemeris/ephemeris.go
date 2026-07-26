@@ -91,6 +91,10 @@ const (
 	Satellites = core.Satellites
 	// Stations is the source for stations.
 	Stations = core.Stations
+	// Moons is the source for natural planetary satellites (e.g. Io,
+	// Titan, Triton) — distinct from Satellites above, which is artificial
+	// (TLE/SGP4-based) satellites.
+	Moons = core.Moons
 )
 
 var (
@@ -199,7 +203,7 @@ func NewProvider(ctx context.Context, source Source, kernel string, opts ...Opti
 	}
 
 	switch source {
-	case Planets, SmallBody, Asteroids, Comets:
+	case Planets, SmallBody, Asteroids, Comets, Moons:
 		var jplOpts []jpl.Option
 		if cfg.DataDir != "" {
 			jplOpts = append(jplOpts, jpl.WithDataDir(cfg.DataDir))

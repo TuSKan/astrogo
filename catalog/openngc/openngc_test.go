@@ -12,8 +12,9 @@ import (
 // fetch pipeline is covered separately in fetch_test.go.
 func newTestProvider() *Provider {
 	targets := []resolve.Target{
-		{ID: "NGC1976", Name: "Orion Nebula", Kind: resolve.KindNebula, Catalog: "openngc", Aliases: []string{"M42", "M 42", "Messier 42"}},
-		{ID: "NGC224", Name: "Andromeda Galaxy", Kind: resolve.KindGalaxy, Catalog: "openngc", Aliases: []string{"M31", "M 31", "Messier 31"}},
+		{ID: "NGC1976", Name: "Orion Nebula", Kind: resolve.KindNebula, Catalog: "openngc", Aliases: []string{"M42", "M 42", "Messier 42"}, VMag: 4.0, HasVMag: true},
+		{ID: "NGC224", Name: "Andromeda Galaxy", Kind: resolve.KindGalaxy, Catalog: "openngc", Aliases: []string{"M31", "M 31", "Messier 31"}, VMag: 3.4, HasVMag: true},
+		{ID: "NGC9999", Name: "Faint Test Object", Kind: resolve.KindNebula, Catalog: "openngc"},
 	}
 
 	p := &Provider{targets: targets, byKey: make(map[string]int)}
@@ -97,5 +98,62 @@ func TestProviderInterface(t *testing.T) {
 	p := New()
 	if p.Name() != "openngc" {
 		t.Errorf("expected openngc, got %s", p.Name())
+	}
+
+	caps := p.Capabilities()
+	if len(caps) != 2 || caps[0] != resolve.CapObjectResolution || caps[1] != resolve.CapMagnitudeBrowse {
+		t.Errorf("expected CapObjectResolution and CapMagnitudeBrowse, got %v", caps)
+	}
+}
+
+func TestSearchBright(t *testing.T) {
+	p := newTestProvider()
+
+	var got []resolve.Target
+
+	iter := p.SearchBright(context.Background(), resolve.BrightRequest{MaxVMag: 5})
+	iter(func(t resolve.Target, err error) bool {
+		if err != nil {
+			return false
+		}
+
+		got = append(got, t)
+
+		return true
+	})
+
+	if len(got) != 2 {
+		t.Fatalf("expected 2 targets brighter than mag 5, got %d: %v", len(got), got)
+	}
+
+	// Brightest-first: Andromeda Galaxy (3.4) before Orion Nebula (4.0).
+	if got[0].ID != "NGC224" || got[1].ID != "NGC1976" {
+		t.Errorf("expected [NGC224, NGC1976] in brightest-first order, got [%s, %s]", got[0].ID, got[1].ID)
+	}
+
+	for _, tgt := range got {
+		if tgt.ID == "NGC9999" {
+			t.Error("expected the HasVMag=false fixture to be excluded, not just below threshold")
+		}
+	}
+}
+
+func TestSearchBright_RespectsLimit(t *testing.T) {
+	p := newTestProvider()
+
+	var got []resolve.Target
+
+	iter := p.SearchBright(context.Background(), resolve.BrightRequest{MaxVMag: 5, Limit: 1})
+	iter(func(t resolve.Target, _ error) bool {
+		got = append(got, t)
+		return true
+	})
+
+	if len(got) != 1 {
+		t.Fatalf("expected Limit=1 to cap results at 1, got %d", len(got))
+	}
+
+	if got[0].ID != "NGC224" {
+		t.Errorf("expected the single brightest result (NGC224), got %s", got[0].ID)
 	}
 }

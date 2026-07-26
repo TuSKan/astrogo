@@ -4,6 +4,7 @@ linters:
   default: all
   enable:
     - gomodguard_v2
+    - modernize
   disable:
     # ── Complexity: keep only one signal ───────────────────────────────
     - cyclop          # redundant with gocognit for our purposes

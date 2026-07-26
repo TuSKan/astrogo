@@ -3,6 +3,7 @@ package catalog
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sort"
 	"sync"
 
@@ -110,6 +111,44 @@ type Resolver struct {
 	cfg           resolverConfig
 }
 
+// ErrUnknownSource is returned by NewProvider for a Source value with no
+// registered provider.
+var ErrUnknownSource = errors.New("catalog: unknown source")
+
+// NewProvider constructs the single underlying provider for source — the
+// same construction NewResolver uses internally for each of its sources,
+// exposed directly so a caller needing one specific provider (rather than
+// Resolver's cross-provider reconciliation) never has to import a
+// catalog subpackage (catalog/simbad, catalog/openngc, ...) itself.
+//
+// The returned Provider is the base resolve.Provider interface; a caller
+// needing a provider's narrower capabilities (resolve.BrightObjectSearcher,
+// resolve.ConeSearcher, resolve.ObjectResolver, ...) type-asserts the
+// result, the same way this package's own NewResolver detects ConeSearcher
+// support internally.
+func NewProvider(source Source) (Provider, error) {
+	switch source {
+	case OpenNGC:
+		return openngc.New(), nil
+	case SIMBAD:
+		return simbad.New(), nil
+	case MAST:
+		return mast.New(), nil
+	case JPL:
+		return jpl.New(), nil
+	case SBDB:
+		return sbdb.New(), nil
+	case Gaia:
+		return gaia.New(), nil
+	case VizieR:
+		return vizier.New(), nil
+	case NORAD:
+		return norad.New(), nil
+	default:
+		return nil, fmt.Errorf("%w: %d", ErrUnknownSource, source)
+	}
+}
+
 // NewResolver instantiates remote and local catalog implementations
 // securely for the given sources. Use Limit/PositionMatchThreshold on the
 // returned Resolver to override their defaults (10 results, 2 arcsec).
@@ -122,23 +161,8 @@ func NewResolver(sources ...Source) *Resolver {
 	var providers []Provider
 
 	for _, src := range sources {
-		switch src {
-		case OpenNGC:
-			providers = append(providers, openngc.New())
-		case SIMBAD:
-			providers = append(providers, simbad.New())
-		case MAST:
-			providers = append(providers, mast.New())
-		case JPL:
-			providers = append(providers, jpl.New())
-		case SBDB:
-			providers = append(providers, sbdb.New())
-		case Gaia:
-			providers = append(providers, gaia.New())
-		case VizieR:
-			providers = append(providers, vizier.New())
-		case NORAD:
-			providers = append(providers, norad.New())
+		if p, err := NewProvider(src); err == nil {
+			providers = append(providers, p)
 		}
 	}
 

@@ -38,7 +38,7 @@ func (p *Provider) Name() string {
 
 // Capabilities lists the supported remote query capacities.
 func (p *Provider) Capabilities() []resolve.Capability {
-	return []resolve.Capability{resolve.CapObjectResolution}
+	return []resolve.Capability{resolve.CapObjectResolution, resolve.CapMagnitudeBrowse}
 }
 
 // Resolve matches a single object by returning the most relevant hit.
@@ -93,6 +93,52 @@ func (p *Provider) Search(ctx context.Context, query string) []resolve.Target {
 	})
 
 	return targets
+}
+
+// SearchBright returns every SIMBAD object brighter than req.MaxVMag,
+// brightest-first — the bulk counterpart to Resolve/Search's name-driven
+// lookup (see BuildBrightQuery for why this can't reuse ResolveObject's
+// query/parse path directly).
+func (p *Provider) SearchBright(ctx context.Context, req resolve.BrightRequest) resolve.SeqIterator[resolve.Target] {
+	cacheKey := fmt.Sprintf("bright:%f:%d", req.MaxVMag, req.Limit)
+	if seq, ok := p.cache.Get(cacheKey); ok {
+		return seq
+	}
+
+	adql := BuildBrightQuery(req)
+	v := TAPRequest(adql)
+
+	return func(yield func(resolve.Target, error) bool) {
+		body, err := p.client.PostForm(ctx, remote.SIMBAD, "", v)
+		if err != nil {
+			yield(resolve.Target{}, err)
+			return
+		}
+		defer func() { _ = body.Close() }()
+
+		data, err := io.ReadAll(body)
+		if err != nil {
+			yield(resolve.Target{}, err)
+			return
+		}
+
+		targets, err := ParseBrightCSV(strings.NewReader(string(data)))
+		if err != nil {
+			yield(resolve.Target{}, err)
+			return
+		}
+
+		if err := p.cache.Set(cacheKey, targets); err != nil {
+			yield(resolve.Target{}, err)
+			return
+		}
+
+		for _, t := range targets {
+			if !yield(t, nil) {
+				return
+			}
+		}
+	}
 }
 
 // ResolveObject provides an async streaming mechanism using ADQL.

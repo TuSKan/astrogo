@@ -65,6 +65,10 @@ const (
 	Satellites Source = "satellites" // Artificial satellites (NORAD TLE/GP → SGP4)
 	// Stations is the source type for ground station ephemeris.
 	Stations Source = "stations" // Ground stations (reserved)
+	// Moons is the source type for natural planetary satellite ephemeris —
+	// NAIF's per-planet SPK kernels (e.g. jup365.bsp, sat441.bsp), distinct
+	// from Satellites above (which is artificial, TLE/SGP4-based).
+	Moons Source = "moons" // JPL/NAIF planetary satellite SPK
 )
 
 // ─── Body ID ─────────────────────────────────────────────────────────────────

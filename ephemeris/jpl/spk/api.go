@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	gofs "github.com/ungerik/go-fs"
@@ -38,6 +39,34 @@ type HorizonsResponse struct {
 	} `json:"signature"`
 	Spk       string `json:"spk"`
 	SpkFileID string `json:"spk_file_id"`
+}
+
+// maxNumberedAsteroidRecord is Horizons' own documented ceiling for a bare
+// numeric COMMAND to resolve directly as a numbered-asteroid record ("IAU
+// numbered asteroids: 1-895910", from its own out-of-bounds error message
+// — confirmed live, not copied from documentation). Every real SBDB
+// SPK-ID uses a different numbering scheme entirely (asteroids:
+// 2000000+number; comets: their own 1000000+/900000+ ranges) and always
+// exceeds this ceiling, so a bare attempt for one is guaranteed to fail.
+const maxNumberedAsteroidRecord = 895910
+
+// commandCandidates returns the ordered Horizons COMMAND strings CacheAPI
+// should try for kernel, stopping at the first one that produces a direct
+// SPK. The bare form is skipped when kernel is unambiguously outside the
+// numbered-asteroid record range (a real SBDB SPK-ID always is) — trying
+// it first would just be a wasted, guaranteed-to-fail round trip before
+// falling through to DES=; a genuinely short designation like "433" still
+// gets the bare form first, since "DES=433;" alone resolves to a
+// different, unrelated body (confirmed live — see CacheAPI's doc comment).
+func commandCandidates(kernel string) []string {
+	des := "DES=" + kernel + ";"
+	desCAP := des + "CAP"
+
+	if n, err := strconv.Atoi(kernel); err == nil && n > maxNumberedAsteroidRecord {
+		return []string{des, desCAP}
+	}
+
+	return []string{kernel, des, desCAP}
 }
 
 // CacheAPI caches an SPK file from JPL Horizons if it doesn't exist.
@@ -78,9 +107,52 @@ func CacheAPI(ctx context.Context, kernel string, startTime, endTime time.Time, 
 		return nil, fmt.Errorf("jpl: SPK kernel %s: %w", kernel, err)
 	}
 
-	resp, err := apiHorizonsRequest(ctx, kernel, startTime, endTime)
-	if err != nil {
-		return nil, fmt.Errorf("jpl: failed to get SPK %s: %w", spkPath, err)
+	// Horizons' COMMAND field resolves differently depending on exactly
+	// how the designation is written — confirmed live against the real
+	// API, not inferred from documentation:
+	//   - A bare small number within the numbered-asteroid record range
+	//     (roughly 1-895910, e.g. "433") resolves directly as that
+	//     numbered body — this is what this package's own doc examples
+	//     and jpl_test.go's TestSmallBodyEros already rely on, and it
+	//     must keep working unchanged.
+	//   - A bare number OUTSIDE that range — which every real SBDB
+	//     asteroid/comet SPK-ID always is (asteroids: 2000000+number;
+	//     comets: their own 1000000+/900000+ ranges) — is rejected
+	//     outright ("requested IOBJ=... is out of bounds"). It must be
+	//     wrapped as "DES=<id>;" instead.
+	//   - Confusingly, "DES=<n>;" for a SHORT number like "433" does NOT
+	//     mean the same thing as the bare-number form above — it matched
+	//     a completely different, unrelated body in live testing. So the
+	//     bare form must be tried first, not skipped in favor of DES=.
+	//   - A comet's designation additionally needs Horizons' "closest
+	//     apparition" suffix (DES=<id>;CAP) even when DES=<id>; alone
+	//     would otherwise be correct for its SPK-ID — without CAP,
+	//     Horizons returns an epoch-disambiguation table instead of a
+	//     direct SPK.
+	//
+	// So: try the bare form first (preserves existing behavior and stays
+	// a single request for every case that already worked), escalate to
+	// DES=<id>; only if that didn't produce a direct SPK, then to
+	// DES=<id>;CAP only if that didn't either — except when kernel is
+	// unambiguously outside the numbered-asteroid range (see
+	// commandCandidates), where the bare attempt is skipped entirely
+	// since it's guaranteed to fail: confirmed live that every real SBDB
+	// SPK-ID this package is actually called with (from
+	// plan.VisibleTonight's Stage 2) takes this path, so skipping the
+	// doomed bare attempt roughly halves live network round trips for
+	// that real workload.
+	var resp *HorizonsResponse
+
+	for _, command := range commandCandidates(kernel) {
+		r, err := apiHorizonsRequest(ctx, command, startTime, endTime)
+		if err != nil {
+			return nil, fmt.Errorf("jpl: failed to get SPK %s: %w", spkPath, err)
+		}
+
+		resp = r
+		if resp.SpkFileID != "" && resp.Spk != "" {
+			break
+		}
 	}
 
 	if resp.SpkFileID != "" && resp.Spk != "" {

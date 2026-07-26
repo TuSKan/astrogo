@@ -351,103 +351,169 @@ func EvaluateSegment(s *Segment, r *Reader, et float64) (pos, vel vector.Vec3, e
 	}
 }
 
+// maxAllowedDim is the largest per-component difference-table size (MAXDIM)
+// this evaluator accepts — matches SPICE's own MAXTRM constant for type 21
+// (spk21.inc), also adopted independently by whiskie14142/spktype21 (a
+// from-scratch reimplementation used to cross-check the algorithm below).
+const maxAllowedDim = 25
+
+// evaluateType21 evaluates a type 21 (Extended Modified Difference Arrays)
+// segment. The on-disk layout — confirmed against real Horizons-generated
+// small-body kernels, not just the SPK Required Reading text, which
+// describes an ordering that doesn't match actual data (the same
+// discrepancy independently documented by whiskie14142/spktype21, a
+// from-scratch Python port this implementation was cross-checked against):
+//
+//	[ nRecs records, each DLSIZE = 4*MAXDIM+11 doubles ]
+//	[ nRecs epoch values, one per record                ]
+//	[ optional epoch directory (nRecs/100 doubles) — a search accelerator
+//	  for huge segments, skipped here in favor of a direct search over the
+//	  epoch table, which is correct regardless of segment size            ]
+//	[ MAXDIM  (a single double, at EndAddr-1)            ]
+//	[ nRecs   (a single double, at EndAddr)              ]
+//
+// Unlike type 1 (which fixes MAXDIM at 15), type 21's whole point is a
+// variable, per-segment difference-table size, so it must be read from the
+// segment itself rather than assumed.
+//
+// Each record itself is laid out as:
+//
+//	t0 (1) | G stepsize vector (MAXDIM) | (refPos,refVel) interleaved per
+//	axis, x,y,z (6) | MDA divided-difference table, grouped by axis
+//	(3*MAXDIM) | KQMAX1 (1) | per-axis integration order KQ[3]
+//
+// and the position/velocity extrapolation itself follows SPICE's spke21_
+// algorithm: build FC/WC coefficient arrays from the stepsize vector, then
+// recursively build the W(k) weights used to sum each axis's difference
+// table up to that axis's own order KQ[axis] (not one order shared across
+// all three axes).
 func evaluateType21(s *Segment, r *Reader, et float64) (pos, vel vector.Vec3, err error) {
-	// Type 21 segments have N records, then N epochs, then N.
-	meta, err := r.ReadDoubles(s.EndAddr, s.EndAddr)
+	meta, err := r.ReadDoubles(s.EndAddr-1, s.EndAddr)
 	if err != nil {
 		return vector.Vec3{}, vector.Vec3{}, err
 	}
 
-	nRecs := int32(meta[0])
+	maxDim := int32(meta[0])
+	nRecs := int32(meta[1])
+
 	if nRecs <= 0 {
 		return vector.Vec3{}, vector.Vec3{}, fmt.Errorf("%w: %d", ErrInvalidRecordCount, nRecs)
 	}
 
-	epochs, err := r.ReadDoubles(s.EndAddr-nRecs, s.EndAddr-1)
+	if maxDim <= 0 || maxDim > maxAllowedDim {
+		return vector.Vec3{}, vector.Vec3{}, fmt.Errorf("%w: MAXDIM=%d, allowed [1,%d]", ErrInvalidOrder, maxDim, maxAllowedDim)
+	}
+
+	dlSize := 4*maxDim + 11
+
+	epochBase := s.StartAddr + nRecs*dlSize
+
+	epochs, err := r.ReadDoubles(epochBase, epochBase+nRecs-1)
 	if err != nil {
 		return vector.Vec3{}, vector.Vec3{}, err
 	}
 
-	// Binary search for the epoch interval containing et.
-	// sort.Search returns the smallest i such that epochs[i] > et,
-	// so the record index is (i - 1), clamped to valid bounds.
+	// The smallest index whose epoch exceeds et is the record whose
+	// difference line is valid there — used directly, with no -1
+	// adjustment (confirmed against the reference implementation: it
+	// keeps the found 1-based loop index as-is for the record number,
+	// which is this same 0-based search index here).
 	idx := int32(sort.Search(int(nRecs), func(i int) bool {
 		return epochs[i] > et
 	}))
-	if idx > 0 {
-		idx--
-	}
-
 	if idx >= nRecs {
 		idx = nRecs - 1
 	}
 
-	// Calculate record length
-	recordAreaLen := s.EndAddr - nRecs - s.StartAddr
-	L := recordAreaLen / nRecs
+	recStart := s.StartAddr + idx*dlSize
 
-	recStart := s.StartAddr + idx*L
-
-	rec, err := r.ReadDoubles(recStart, recStart+L-1)
+	rec, err := r.ReadDoubles(recStart, recStart+dlSize-1)
 	if err != nil {
 		return vector.Vec3{}, vector.Vec3{}, err
 	}
 
-	// Validate record length: need at least 68 doubles (t0 + 15 dt + 3 p0 + 3 v0 + 45 MDA + maxOrd).
-	if len(rec) < 68 {
-		return vector.Vec3{}, vector.Vec3{}, fmt.Errorf("%w: %d doubles (need >= 68)", ErrRecordTooShort, len(rec))
+	if int32(len(rec)) < dlSize {
+		return vector.Vec3{}, vector.Vec3{}, fmt.Errorf("%w: %d doubles (need >= %d)", ErrRecordTooShort, len(rec), dlSize)
 	}
 
-	// Extended Modified Difference Array Algorithm
 	t0 := rec[0]
-	dt := rec[1:16]
-	p0 := rec[16:19]
-	v0 := rec[19:22]
-	mda := rec[22 : 22+45]
-	maxOrd := int(rec[67])
+	g := rec[1 : maxDim+1]
+	refPos := [3]float64{rec[maxDim+1], rec[maxDim+3], rec[maxDim+5]}
+	refVel := [3]float64{rec[maxDim+2], rec[maxDim+4], rec[maxDim+6]}
+	dt := rec[maxDim+7 : maxDim+7+3*maxDim] // column-major: axis i occupies dt[i*maxDim : (i+1)*maxDim]
+	kqmax1 := int32(rec[4*maxDim+7])
+	kq := [3]int32{int32(rec[4*maxDim+8]), int32(rec[4*maxDim+9]), int32(rec[4*maxDim+10])}
 
-	// Bounds-check maxOrd against the fixed-size arrays.
-	const maxAllowedOrd = 15
-	if maxOrd < 0 || maxOrd > maxAllowedOrd {
-		return vector.Vec3{}, vector.Vec3{}, fmt.Errorf("%w: maxOrd=%d, allowed [0,%d]", ErrInvalidOrder, maxOrd, maxAllowedOrd)
+	if kqmax1 < 2 || kqmax1 > maxAllowedDim+1 {
+		return vector.Vec3{}, vector.Vec3{}, fmt.Errorf("%w: KQMAX1=%d, allowed [2,%d]", ErrInvalidOrder, kqmax1, maxAllowedDim+1)
 	}
-
-	// rec[68:71] are additional weights W if needed, but we calculate them
 
 	delta := et - t0
-	if delta == 0 {
-		return vector.Vec3{X: p0[0], Y: p0[1], Z: p0[2]}, vector.Vec3{X: v0[0], Y: v0[1], Z: v0[2]}, nil
-	}
 
-	// Precompute recursive weights
-	var (
-		g  [maxAllowedOrd + 1]float64
-		gd [maxAllowedOrd + 1]float64
-		w  [maxAllowedOrd]float64
-	)
+	// fc/wc/w are sized generously beyond any index the recursion below
+	// can reach (bounded by kqmax1 <= maxAllowedDim+1) — cheap, fixed-size
+	// stack arrays, not a tight/fragile bound.
+	const arrSize = 2 * (maxAllowedDim + 2)
 
+	var fc, w [arrSize]float64
+
+	var wc [arrSize]float64
+
+	mq2 := kqmax1 - 2
 	tp := delta
-	g[0] = 1.0
-	gd[0] = 0.0
 
-	for i := 1; i <= maxOrd; i++ {
-		w[i-1] = tp / dt[i-1]
-		tp = delta + dt[i-1]
-		g[i] = w[i-1] * g[i-1]
-		gd[i] = w[i-1]*gd[i-1] + g[i-1]/dt[i-1]
+	for j := int32(1); j <= mq2; j++ {
+		if g[j-1] == 0 {
+			return vector.Vec3{}, vector.Vec3{}, fmt.Errorf("%w: zero step size at index %d", ErrInvalidOrder, j)
+		}
+
+		fc[j] = tp / g[j-1]
+		wc[j-1] = delta / g[j-1]
+		tp = delta + g[j-1]
 	}
 
-	// Interpolate each component
-	posArr := [3]float64{p0[0], p0[1], p0[2]}
-	velArr := [3]float64{v0[0], v0[1], v0[2]}
+	for j := int32(1); j <= kqmax1; j++ {
+		w[j-1] = 1.0 / float64(j)
+	}
 
-	for i := 1; i <= maxOrd; i++ {
-		for j := range 3 {
-			// MDA is 3x15, stored as [order1_x, order1_y, order1_z, order2_x, ...]
-			val := mda[(i-1)*3+j]
-			posArr[j] += g[i] * val
-			velArr[j] += gd[i] * val
+	ks := kqmax1 - 1
+	ks1 := ks - 1
+	jx := int32(0)
+
+	for ks >= 2 {
+		jx++
+
+		for j := int32(1); j <= jx; j++ {
+			w[j+ks-1] = fc[j]*w[j+ks1-1] - wc[j-1]*w[j+ks-1]
 		}
+
+		ks = ks1
+		ks1--
+	}
+
+	axisSum := func(axis int32) float64 {
+		sum := 0.0
+		for j := kq[axis]; j >= 1; j-- {
+			sum += dt[axis*maxDim+j-1] * w[j+ks-1]
+		}
+
+		return sum
+	}
+
+	var posArr [3]float64
+	for i := range int32(3) {
+		posArr[i] = refPos[i] + delta*(refVel[i]+delta*axisSum(i))
+	}
+
+	for j := int32(1); j <= jx; j++ {
+		w[j+ks-1] = fc[j]*w[j+ks1-1] - wc[j-1]*w[j+ks-1]
+	}
+
+	ks--
+
+	var velArr [3]float64
+	for i := range int32(3) {
+		velArr[i] = refVel[i] + delta*axisSum(i)
 	}
 
 	return vector.Vec3{X: posArr[0], Y: posArr[1], Z: posArr[2]},
