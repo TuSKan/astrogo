@@ -128,6 +128,7 @@ func TestNewSkipsBodyWhenUnchanged(t *testing.T) {
 
 func TestNewDefaultDenyIssuesNoRequest(t *testing.T) {
 	t.Cleanup(remote.Reset)
+	remote.SetDataDirPath(t.TempDir())
 
 	var hits atomic.Int32
 
