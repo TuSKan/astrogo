@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.0] — 2026-07-29
 ### Added
 - `remote.Capture`/`(Scope).Restore`/`WithScope` — scoped snapshot/restore for endpoint config, download consent, offline mode, and the data directory. Fixes two related test-isolation bugs in `Reset()` (missed the data directory; over-broad revocation of consent granted at a wider scope).
 - `remote.DataDirEnv` (`ASTROGO_CACHE_DIR`) — env var override for `remote.DataDir()`, between an explicit `SetDataDir` and the OS default cache directory.
@@ -442,13 +443,13 @@ topocentric planet corrections, CI hardening, IERS auto-update, and Equinox show
 
 ### Validation
 
-| Metric | Result |
-|--------|--------|
+| Metric                                          | Result                                  |
+| ----------------------------------------------- | --------------------------------------- |
 | sHG1G2 vs FINK phunk (8467 Benoitcarry, r-band) | mean Δ=0.011 mag, 100% within 0.025 mag |
-| 2026 Eclipses vs NASA | all 4 within ≤1 min |
-| 2024–2033 Seasons vs USNO | all within ≤1 min (41/41 tests) |
-| Orbital eccentricity | e=0.016671 (matches IAU) |
-| Topocentric Moon parallax | ~1° correction applied |
+| 2026 Eclipses vs NASA                           | all 4 within ≤1 min                     |
+| 2024–2033 Seasons vs USNO                       | all within ≤1 min (41/41 tests)         |
+| Orbital eccentricity                            | e=0.016671 (matches IAU)                |
+| Topocentric Moon parallax                       | ~1° correction applied                  |
 
 ## [0.1.2] — 2026-05-06
 
@@ -478,14 +479,14 @@ Refraction hardening: USNO-standard rise/set pipeline, sub-minute accuracy, Plan
 
 ### Validation
 
-| Metric | v0.1.1 | v0.1.2 |
-|--------|--------|--------|
-| Sun rise/set vs USNO | <1.3 min | **≤0.5 min** |
-| Moon rise/set vs USNO | <1.6 min | **≤0.6 min** |
-| USNO integration tests | 41/41 | 41/41 |
+| Metric                  | v0.1.1         | v0.1.2                           |
+| ----------------------- | -------------- | -------------------------------- |
+| Sun rise/set vs USNO    | <1.3 min       | **≤0.5 min**                     |
+| Moon rise/set vs USNO   | <1.6 min       | **≤0.6 min**                     |
+| USNO integration tests  | 41/41          | 41/41                            |
 | AstroPixels moon phases | 44,524 matched | 44,524 matched (mean Δ=1.87 min) |
-| NASA lunar eclipses | 1,424/1,424 | 1,424/1,424 (mean Δ=0.8 min) |
-| NASA solar eclipses | 1,383/1,383 | 1,383/1,383 (mean Δ=0.8 min) |
+| NASA lunar eclipses     | 1,424/1,424    | 1,424/1,424 (mean Δ=0.8 min)     |
+| NASA solar eclipses     | 1,383/1,383    | 1,383/1,383 (mean Δ=0.8 min)     |
 
 ## [0.1.1] — 2026-04-21
 
@@ -602,14 +603,14 @@ First observatory-grade release. Validated against USNO, JPL Horizons, and NASA 
 
 ### Performance
 
-| Operation | Cost | Allocs |
-|-----------|------|--------|
-| `coord.NewContext` (SOFA Apco13) | 91 µs | 1 |
-| `ICRSToAltAz` (cached Context) | 325 ns | 1 |
-| 100-star batch (cached vs scalar) | 73× speedup | — |
-| Time scale conversion | 18–90 ns | 0 |
-| Refraction (rigorous) | 14 ns | 0 |
-| Scheduler (100 blocks, SwapOptimized) | 123 ms | linear |
+| Operation                             | Cost        | Allocs |
+| ------------------------------------- | ----------- | ------ |
+| `coord.NewContext` (SOFA Apco13)      | 91 µs       | 1      |
+| `ICRSToAltAz` (cached Context)        | 325 ns      | 1      |
+| 100-star batch (cached vs scalar)     | 73× speedup | —      |
+| Time scale conversion                 | 18–90 ns    | 0      |
+| Refraction (rigorous)                 | 14 ns       | 0      |
+| Scheduler (100 blocks, SwapOptimized) | 123 ms      | linear |
 
 ### Validation
 
