@@ -75,7 +75,12 @@ time, angle, vector, unit, constants, remote, optics     ← primitives
 
 ## Conventions for this codebase
 
-- **Git: never run mutating git commands** (`add`, `commit`, `tag`, `push`, `reset`, etc.). The user manages version control. Read-only `git status`/`diff`/`log` are fine.
+- **Git workflow**:
+  - Never commit on `main` — for any code change, create a new branch first.
+  - On a branch you created, you have write access: `git add`/`commit`/`push` freely, no need to ask each time.
+  - Opening a pull request needs an explicit instruction — if the user hasn't clearly asked for one, ask before creating it.
+  - Merging (a PR, or into `main`) only happens on explicit instruction — never merge on your own initiative.
+  - Read-only `git status`/`diff`/`log` are always fine, including on `main`.
 - **Named returns are intentional** for astronomical quantities (`ra`, `dec`, `jd`, `az`, `alt`, `dist`); short domain variable names (`r`, `t`, `jd`, `tt`, `ut1`) are idiomatic here. `nonamedreturns`/`varnamelen` are disabled deliberately.
 - **"Magic numbers" are physical constants, coefficients, and NAIF IDs** — `mnd`/`goconst` are off. Do not abstract constants out of published formulas; keep algorithms readable against their reference paper/SOFA routine/Horizons fixture rather than splitting into many helpers.
 - **Errors**: prefer static sentinels wrapped with `%w` over dynamic `fmt.Errorf` strings. No hidden global mutation or `init()` side effects.

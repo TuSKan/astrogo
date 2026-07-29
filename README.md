@@ -397,6 +397,8 @@ AOS: 19:45:03 UTC  Max El: 73.1°  LOS: 19:51:47 UTC  Duration: 6m44s
 | **Sky Brightness** | Moonlight (Krisciunas & Schaefer 1991), zodiacal light (Leinert 1998), airglow, light-pollution floor — folds into observability scoring |
 | **Planning** | Sub-second Chandrupatla/Brent boundary refinement, constraint-based scoring, `Greedy`/`Priority`/`SwapOptimized` scheduling strategies |
 | **Events** | Rise/Set/Transit, Moon Phases, Seasons, Apsides, Eclipses, Conjunctions, Elongations, Satellite Passes, 20 historical lunar-crescent criteria |
+| **Reference Data** | Built-in registry of 10 well-known observatory sites (`plan.KnownSites`), the 9 IMO Class I annual meteor showers with ZHR rate prediction (`plan.MeteorShowers`), 21 major planetary moons (`plan.PlanetaryMoon`), all 88 IAU constellations (`constellation.List`) |
+| **Optics** | Pure equipment-optics arithmetic (`optics`) — magnification, true/apparent FOV, exit pupil, Dawes limit, pixel scale for a `Telescope`/`Eyepiece`/`Sensor` combination |
 
 <details>
 <summary><strong>Full feature list</strong> (by package)</summary>
@@ -422,6 +424,7 @@ AOS: 19:45:03 UTC  Max El: 73.1°  LOS: 19:51:47 UTC  Duration: 6m44s
 - Dynamic DUT1 tracking and Polar Motion (XP/YP) caching via IERS EOP rapid data
 - One-time log warning when IERS data is unavailable (UT1 ≈ UTC fallback)
 - Aberration, light deflection, proper motion, parallax handled natively
+- `coord.SubPoint`/`SmallCircle` — the geodetic point where a distant body (Sun, Moon, planet) is at the zenith, and a spherical small-circle sampler for drawing it (used by `plan.Terminator` below)
 
 ### Atmospheric Modeling (`atmosphere`)
 - **SOFA-rigorous refraction by default** at all altitudes (ICAO standard atmosphere)
@@ -437,6 +440,7 @@ AOS: 19:45:03 UTC  Max El: 73.1°  LOS: 19:51:47 UTC  Duration: 6m44s
 - Epsilon-tolerant site equality (1e-12 rad)
 - Defensive catalog pointer copying
 - **Stateful `Context`** caching for batch transforms (73× speedup for 100-star batches)
+- `plan.KnownSites`/`NewKnownSite` — built-in registry of 10 well-known observatory sites (Mauna Kea, Paranal, La Palma, Cerro Tololo, Kitt Peak, La Silla, Siding Spring, Palomar, Cerro Pachón, Greenwich), each a fully-built `*Site` carrying its own IAU Minor Planet Center observatory code and aliases (`Site.MPCCode()`/`Aliases()`); matched by name or alias, case/space-insensitive
 
 ### Ephemerides
 - Sun and Moon positions
@@ -459,6 +463,7 @@ AOS: 19:45:03 UTC  Max El: 73.1°  LOS: 19:51:47 UTC  Duration: 6m44s
 
 ### Catalogs & Data Services (`catalog/resolve`)
 - Unified `resolve.Provider` interfaces (`ObjectResolver`, `ConeSearcher`, `BrightObjectSearcher` — bulk-list every object a provider knows brighter than a magnitude bound; implemented by SIMBAD, OpenNGC, and SBDB)
+- `resolve.KindInterstellar` — classification for bodies confidently on a hyperbolic/parabolic orbit (1I/'Oumuamua, 2I/Borisov, ...), decoded from `catalog/sbdb`'s orbit-classification data with an eccentricity margin that excludes near-parabolic long-period comets from false-positiving as interstellar
 - Hardware-optimized native caching via **Apache Arrow** columnar batches
 - Modern Go 1.23 streaming `iter.Seq2` iteration for memory-safe big data fetching
 - Resilient network layers with exponential backoff retry
@@ -479,6 +484,11 @@ AOS: 19:45:03 UTC  Max El: 73.1°  LOS: 19:51:47 UTC  Duration: 6m44s
 
 ### Visibility & Planning
 - `plan.VisibleTonight` — "what's visible in the sky tonight brighter than magnitude X", across stars, deep-sky objects, planets, the Moon, asteroids, and comets in one call, each annotated with its constellation and extinction-adjusted apparent magnitude; `plan.WithPlanetaryMoons()` opts into the 21 major moons of Mars/Jupiter/Saturn/Uranus/Neptune/Pluto too (off by default — their SPK kernels run ~64 MB–1.1 GB each)
+- `plan.PlanetaryMoon`/`NewPlanetaryMoon` — dedicated type for natural satellites of planets other than Earth (Io, Titan, Triton, Charon, ...), embedding the same H-G reflectance model `Asteroid` uses; `Parent()` returns the NAIF ID of the planet it orbits
+- `plan.MeteorShower`/`MeteorShowers`/`NewMeteorShower` — the 9 IMO "Class I" annual showers (Quadrantids through Ursids); `RadiantAt`/`IsActive` key off the Sun's real ecliptic longitude (year-independent, not calendar date), and `ObservedRate` predicts meteors/hour for a real site/time/sky-brightness condition via IMO's own ZHR formula
+- `plan.AngularDiameter`/`BodyEquatorialRadius` — apparent angular diameter for the Sun, Moon, and planets, auto-populating `TargetDetails.AngularSize`
+- `plan.SubsolarPoint`/`SublunarPoint`/`Terminator` — day/night terminator and twilight-circle computation (`TwilightKind`: geometric, apparent, civil, nautical, astronomical)
+- `constellation.List`/`Centroid` — enumerate all 88 IAU constellations and compute a boundary centroid; `plan.Constellation`/`NewConstellation` wraps this into a fixed `Observable` target (e.g. "when is Orion well-placed tonight")
 - **Sub-second boundary refinement** — Chandrupatla (continuous altitude) + bisection (discrete constraints)
 - Observable windows with constraint evaluation
 - Altitude/airmass/separation constraints
@@ -517,6 +527,12 @@ AOS: 19:45:03 UTC  Max El: 73.1°  LOS: 19:51:47 UTC  Duration: 6m44s
 - **20 Historical Criteria (1910–2021)** — Fotheringham, Danjon, Yallop, Odeh, Caldwell, MABIMS, and more
 - Evaluates topocentric parameters (Altitude/Azimuth, Elongation, ArcV/Width, Lag Time)
 - `EvaluateAll` for batch assessment across all 20 models simultaneously
+
+### Optical Tools (`optics`)
+- Pure equipment-optics arithmetic — no astrometry, no ephemeris, no network access
+- `Telescope`/`Eyepiece`/`Sensor` — validating constructors, `WithBarlow`/`WithFieldStop` options
+- `Magnification`, `TrueFOV` (field-stop-based, or apparent-FOV fallback), `ExitPupil`, `MaxUsefulMagnification`, `DawesLimit`, `LimitingMagnitude`
+- `PixelScale`/`SensorFOV` for imaging setups
 
 </details>
 
@@ -616,7 +632,8 @@ flowchart TD
 | `catalog/vizier` | ConeSearch against any registered VizieR table (2MASS, Hipparcos, Gaia DR3; extensible via `tables.go`) | ✅ Stable |
 | `catalog/jpl` | Horizons name resolution — ambiguous major/small-body match tables and unambiguous exact matches | ✅ Stable |
 | `magnitude` | Apparent magnitude (planets, asteroids, comets, satellites, stars) | ✅ Stable |
-| `constellation` | IAU constellation lookup from an ICRS position (official 1930 boundaries) | ✅ Stable |
+| `constellation` | IAU constellation lookup from an ICRS position (official 1930 boundaries), `List`/`Centroid` enumeration | ✅ Stable |
+| `optics` | Equipment-optics arithmetic (`Telescope`/`Eyepiece`/`Sensor`) — magnification, FOV, exit pupil, Dawes limit, pixel scale | ✅ Stable |
 | `fits` | FITS I/O, WCS (TAN projection), mmap, Arrow export | ✅ Stable |
 | `fits/plan` | FITS↔plan bridge (`SiteFromFITS`, `TargetFromFITS`) | ✅ Stable |
 | `plan` | Observability, constraints, events, scheduling, satellite passes | ✅ Stable |
@@ -750,6 +767,11 @@ remote.Disable(remote.SIMBAD)                // block one endpoint (ErrEndpointD
 remote.SetURL(remote.SIMBAD, "https://mirror.example/tap") // point at a mirror/proxy
 remote.SetOffline(true)                      // global kill switch, all network access
 ```
+
+`remote.Capture(ids...)` snapshots endpoint config, download consent, offline mode, and
+the data directory; `(Scope).Restore()` (or `WithScope`) puts it all back — useful in
+tests (`t.Cleanup(remote.Capture(remote.NAIFSPK).Restore)`) without the over-broad
+revocation `remote.Reset()` causes when consent was granted at a wider scope.
 
 ### Building from source
 
