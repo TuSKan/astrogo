@@ -709,6 +709,17 @@ const (
 	NauticalTwilight
 	// AstronomicalTwilight is Sun at -18° altitude.
 	AstronomicalTwilight
+	// GeometricTwilight is the Sun's geometric center at 0° altitude —
+	// the true geometric day/night boundary, no refraction or
+	// semidiameter correction. Used by Terminator (plan/terminator.go)
+	// for "the terminator" in the strict geometric sense.
+	GeometricTwilight
+	// ApparentTwilight is the visually apparent horizon: the Sun's
+	// geometric center at -50′ altitude, combining standard atmospheric
+	// refraction (~34′) and the Sun's own angular semidiameter (~16′) —
+	// the same correction Site.SunRiseSetThreshold documents for rise/set
+	// altitude. Used by Terminator for the visually apparent terminator.
+	ApparentTwilight
 )
 
 func (k TwilightKind) String() string {
@@ -719,6 +730,10 @@ func (k TwilightKind) String() string {
 		return "Nautical"
 	case AstronomicalTwilight:
 		return "Astronomical"
+	case GeometricTwilight:
+		return "Geometric"
+	case ApparentTwilight:
+		return "Apparent"
 	default:
 		return "Unknown"
 	}
@@ -729,6 +744,8 @@ var TwilightThresholds = map[TwilightKind]float64{
 	CivilTwilight:        -6.0,
 	NauticalTwilight:     -12.0,
 	AstronomicalTwilight: -18.0,
+	GeometricTwilight:    0.0,
+	ApparentTwilight:     -50.0 / 60.0, // -50′
 }
 
 // TwilightEvent groups a dawn and dusk occurrence for a specific twilight level.

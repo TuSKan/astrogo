@@ -41,11 +41,21 @@ func SetDataDirPath(path string) {
 	SetDataDir(gofs.File(path))
 }
 
-// DataDir returns the base directory for all astrogo data. Unless
-// overridden via SetDataDir, it defaults to os.UserCacheDir()/astrogo
+// DataDirEnv is the environment variable that overrides the default
+// astrogo data directory when SetDataDir/SetDataDirPath hasn't been
+// called explicitly — see DataDir's precedence order. Useful for CI and
+// containers that want a fixed cache location without touching
+// application code.
+const DataDirEnv = "ASTROGO_CACHE_DIR"
+
+// DataDir returns the base directory for all astrogo data, resolved in
+// this order: an explicit SetDataDir/SetDataDirPath call, then the
+// DataDirEnv environment variable, then os.UserCacheDir()/astrogo
 // (falling back to os.TempDir() when the user cache dir is unavailable):
 // ~/.cache/astrogo on Linux, %LocalAppData%\astrogo on Windows,
-// ~/Library/Caches/astrogo on macOS.
+// ~/Library/Caches/astrogo on macOS. Re-resolved on every call — there is
+// nothing to invalidate if the environment or an explicit override
+// changes between calls.
 func DataDir() gofs.File {
 	dataMu.RLock()
 
@@ -55,6 +65,10 @@ func DataDir() gofs.File {
 
 	if d != "" {
 		return d
+	}
+
+	if env := os.Getenv(DataDirEnv); env != "" {
+		return gofs.File(env)
 	}
 
 	base, err := os.UserCacheDir()

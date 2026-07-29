@@ -16,6 +16,14 @@ var (
 	ErrNotFinite         = errors.New("coordinate component must be finite")
 	ErrLatitudeRange     = errors.New("latitude/altitude out of range")
 	ErrPropagationFailed = errors.New("coord: space-motion propagation failed")
+	// ErrZeroVector indicates SubPoint was given a zero-length direction
+	// vector, which has no well-defined right ascension/declination.
+	ErrZeroVector = errors.New("coord: zero-length vector has no direction")
+	// ErrTooFewPoints indicates SmallCircle was asked for fewer than 3
+	// points, too few to describe a circle.
+	ErrTooFewPoints = errors.New("coord: at least 3 points are required")
+	// ErrNilCenter indicates SmallCircle was given a nil center.
+	ErrNilCenter = errors.New("coord: center must not be nil")
 )
 
 // Object represents any celestial entity that has a predictable position

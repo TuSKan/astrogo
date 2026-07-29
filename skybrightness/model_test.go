@@ -111,7 +111,7 @@ func BenchmarkCompositeSurfaceBrightness(b *testing.B) {
 	aa := coord.NewAltAz(angle.Deg(45), angle.Deg(0))
 
 	var sink skybrightness.SurfaceBrightnessV
-	for range b.N {
+	for b.Loop() {
 		sink, _ = m.SurfaceBrightness(aa, nil)
 	}
 

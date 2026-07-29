@@ -57,10 +57,10 @@ See the README's "Data downloads & offline usage" section for the user-facing pi
 Strictly layered, unidirectional imports (no cycles). Lower layers never import higher ones:
 
 ```
-plan, catalog, fits/plan                         ← orchestration (observability, scheduling, events, resolvers, FITS↔plan bridge)
-ephemeris, coord, atmosphere, fits, skybrightness ← scientific engines
-skybrightness/lpmap                              ← data providers (live light-pollution API)
-time, angle, vector, unit, constants, remote      ← primitives
+plan, catalog, fits/plan                                ← orchestration (observability, scheduling, events, resolvers, FITS↔plan bridge)
+ephemeris, coord, atmosphere, fits, skybrightness        ← scientific engines
+skybrightness/lpmap                                     ← data providers (live light-pollution API)
+time, angle, vector, unit, constants, remote, optics     ← primitives
 ```
 
 - **`time`** is the sole gateway for Earth Orientation Parameters and epoch arithmetic. `time/internal/iers` (unexported — nothing outside `time/` can import it) fetches/parses IERS EOP data; `time` re-exports what's needed (`time.EOP`, `time.RegisterModel`/`GetModel`/`Coverage`/`SetRetryCooldown`) and adds `Time.EOP()`, `Time.MJD()`, `Time.GAST()`, `Time.JulianEpochYear()`, `Time.DayOfYear()`. EOP data loads automatically and lazily the first time `Time.EOP()`/`Time.UTC()`/`Time.UT1()` needs it — a pre-seeded on-disk cache file, then (if `remote.EnableDownloads(remote.IERSFinals2000A, ...)` was called) a network fetch, then a zero-EOP-plus-one-time-warning degradation — no explicit populate call needed. `coord` and every other package get EOP/epoch values through these `time` APIs — never by hand-rolling MJD/GAST arithmetic or importing EOP internals directly.
@@ -71,6 +71,7 @@ time, angle, vector, unit, constants, remote      ← primitives
 - **`catalog`** + `catalog/resolve` expose unified `resolve.Provider` interfaces over SIMBAD/MAST/Gaia/VizieR/JPL/SBDB/OpenNGC/NORAD/FINK, with Apache Arrow columnar caching. All network access goes through `remote.Client`.
 - **`internal/gofaext`** wraps [github.com/hebl/gofa](https://github.com/hebl/gofa) (SOFA-derived algorithms). All low-level SOFA calls go through here to keep public APIs clean and the backend swappable.
 - **`internal/testutil`** holds float/error test helpers used across packages.
+- **`optics`** is pure equipment-optics arithmetic (magnification, field of view, exit pupil, resolving power, pixel scale) for a `Telescope`/`Eyepiece`/`Sensor` combination — no astrometry, no ephemeris, no network access. A top-level primitive, not a `plan` subpackage.
 
 ## Conventions for this codebase
 
@@ -81,3 +82,5 @@ time, angle, vector, unit, constants, remote      ← primitives
 - **`//nolint` only when locally scoped with a documented reason.** Do not downgrade `.golangci.yml` or remove linters to pass CI.
 - **Cross-platform**: tests must pass on Linux, macOS (ARM64), and Windows. Use tolerance-based float comparisons (account for FMA/atan2 rounding); prefer inequality bounds near precision limits; document any tolerance you relax.
 - **Tests**: add a regression test for bug fixes; prefer known reference values, explicit tolerances, deterministic fixtures, and edge cases (poles, horizon, angle wrap 0→360, epoch boundaries, circumpolar/never-rising targets).
+- **CHANGELOG.md entries** (forward-only — never rewrite already-released entries): 1–3 lines, ending with a `[#NN]` PR link. Deep forensic detail (root cause, before/after numbers, live-test confirmation) belongs in the PR description or the code's own doc comment, not the changelog — the changelog is an index, not the record. Use the full [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) vocabulary the file header already claims adherence to: `### Added`, `### Changed`, `### Deprecated`, `### Removed`, `### Fixed`, `### Security` — not just `Added`/`Fixed`. Keep the established `### Changed — BREAKING` variant for public API breaks.
+- **Deprecating a public symbol**: mark it with a trailing `// Deprecated: <use X instead>.` doc-comment paragraph (the form `staticcheck`/`gopls`/pkg.go.dev recognize). Pre-1.0, a deprecated symbol must survive at least 2 minor releases before removal; post-1.0, it survives the entire major cycle. A mark lands as a `### Deprecated` CHANGELOG entry in that release; a removal lands as `### Removed`. Enforcement is already automatic: `.golangci.yml`'s `default: all` runs `staticcheck`'s `SA1019`, so deprecating a symbol requires migrating every internal caller in the same PR (or a locally-scoped, documented `//nolint:staticcheck`).

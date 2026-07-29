@@ -133,3 +133,39 @@ func TestSBDBNetworkSearchBright(t *testing.T) {
 		t.Error("expected at least one comet in the live result set")
 	}
 }
+
+// TestSBDBNetworkResolveInterstellar confirms both P2 fixes against the
+// real API: 1I/'Oumuamua's live SBDB record reports its "kind" field as
+// "au" (asteroid, unnumbered) — the isComet strict-"c"-equality bug this
+// session found and fixed would have silently misparsed that regardless —
+// and its orbit_class.code as "HYA" (Hyperbolic Asteroid), which
+// classifyKind must map to resolve.KindInterstellar, not resolve.KindAsteroid.
+func TestSBDBNetworkResolveInterstellar(t *testing.T) {
+	requireSBDB(t)
+
+	prov := New()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	iter := prov.ResolveObject(ctx, resolve.ObjectRequest{Query: "1I", Limit: 1})
+
+	var targets []resolve.Target
+
+	iter(func(tar resolve.Target, err error) bool {
+		if err != nil {
+			t.Fatalf("Live network failed: %v", err)
+		}
+
+		targets = append(targets, tar)
+
+		return true
+	})
+
+	if len(targets) == 0 {
+		t.Fatal("expected a live result for 1I/'Oumuamua")
+	}
+
+	if got := targets[0].Kind; got != resolve.KindInterstellar {
+		t.Errorf("1I/'Oumuamua Kind = %v, want %v", got, resolve.KindInterstellar)
+	}
+}

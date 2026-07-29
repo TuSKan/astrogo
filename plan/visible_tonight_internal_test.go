@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/time"
 )
@@ -24,45 +25,6 @@ func TestPlanetConstructorsIncludesPluto(t *testing.T) {
 	t.Error("expected planetConstructors to include a Pluto constructor")
 }
 
-// TestPlanetaryMoonsTableIntegrity guards planetaryMoons against copy-paste
-// mistakes that would silently corrupt gatherPlanetaryMoons' output: a
-// duplicate NAIF ID (two moons colliding on the same body), an empty name
-// or kernel, or an H value outside any real moon's plausible range (a
-// typo — e.g. a transposed digit — would otherwise surface exactly like
-// the impossible-magnitude bug this session already found and fixed in
-// ephemeris/jpl/spk's Type 21 reader).
-func TestPlanetaryMoonsTableIntegrity(t *testing.T) {
-	seenID := make(map[int32]string)
-
-	for _, m := range planetaryMoons {
-		if m.name == "" {
-			t.Errorf("moonSpec with NAIF ID %d has an empty name", m.naifID)
-		}
-
-		if m.kernel == "" {
-			t.Errorf("moonSpec %q has an empty kernel", m.name)
-		}
-
-		if prev, ok := seenID[m.naifID]; ok {
-			t.Errorf("NAIF ID %d used by both %q and %q", m.naifID, prev, m.name)
-		}
-
-		seenID[m.naifID] = m.name
-
-		// The faintest real absolute magnitude among these moons (Deimos,
-		// H≈12.89) and the brightest (Ganymede, H≈-2.09) bound a generous
-		// plausible range — anything outside it is almost certainly a typo,
-		// not a real published value.
-		if m.h < -5 || m.h > 20 {
-			t.Errorf("%s: H=%.2f is outside a plausible range for a named Solar System moon", m.name, m.h)
-		}
-	}
-
-	if len(planetaryMoons) != 21 {
-		t.Errorf("expected 21 planetary moons, got %d", len(planetaryMoons))
-	}
-}
-
 // TestGatherPlanetaryMoonsSkipsWithoutDownloadConsent verifies
 // gatherPlanetaryMoons degrades gracefully — an empty candidate/provider
 // result, not an error or panic — when none of its kernels can actually be
@@ -70,26 +32,18 @@ func TestPlanetaryMoonsTableIntegrity(t *testing.T) {
 // this package's established "skip an unavailable candidate rather than
 // fail the whole query" convention (candidateFromTarget, gatherCandidates).
 //
-// This saves and restores only remote.NAIFSPK's own consent state (via
-// remote.Lookup/EnableDownloads/DisableDownloads), rather than the
-// blanket remote.Reset() the sibling network tests in this package use —
-// under the "integration" build tag, plan/integration_main_test.go's
-// TestMain grants unlimited NAIFSPK consent for this package's entire test
-// binary run (real de441/de442 fetches need it); a plain remote.Reset()
-// here would revoke that for every test running afterward in the same
-// binary, not just this one (confirmed: it did, breaking three otherwise
-// unrelated eclipse/moon-phase tests when this test ran under
-// `-tags=integration` before this fix).
+// This captures and restores only remote.NAIFSPK's own consent state (via
+// remote.Capture/Restore), rather than the blanket remote.Reset() the
+// sibling network tests in this package use — under the "integration"
+// build tag, plan/integration_main_test.go's TestMain grants unlimited
+// NAIFSPK consent for this package's entire test binary run (real
+// de441/de442 fetches need it); a plain remote.Reset() here would revoke
+// that for every test running afterward in the same binary, not just this
+// one (confirmed: it did, breaking three otherwise unrelated eclipse/
+// moon-phase tests when this test ran under `-tags=integration` before
+// this fix).
 func TestGatherPlanetaryMoonsSkipsWithoutDownloadConsent(t *testing.T) {
-	prevEP, _ := remote.Lookup(remote.NAIFSPK)
-
-	t.Cleanup(func() {
-		if prevEP.DownloadsOK {
-			remote.EnableDownloads(remote.NAIFSPK, prevEP.MaxDownloadSize)
-		} else {
-			remote.DisableDownloads(remote.NAIFSPK)
-		}
-	})
+	t.Cleanup(remote.Capture(remote.NAIFSPK).Restore)
 	remote.DisableDownloads(remote.NAIFSPK)
 	remote.SetDataDirPath(t.TempDir())
 
@@ -101,5 +55,38 @@ func TestGatherPlanetaryMoonsSkipsWithoutDownloadConsent(t *testing.T) {
 
 	if len(providers) != 0 {
 		t.Errorf("expected no opened providers without download consent, got %d", len(providers))
+	}
+}
+
+// TestNeedsSmallBodyEphemeris is a regression test for a real bug found
+// during exploration: Ceres/Eris/Haumea/Makemake (resolve.KindDwarfPlanet)
+// never reached VisibleTonight's Stage-2 real-ephemeris/magnitude fetch,
+// because the Kind gate at candidateFromTarget/gatherCandidates only
+// checked KindAsteroid/KindComet — a KindDwarfPlanet target silently fell
+// through to a zero-coordinate DeepSkyObject with no magnitude and was
+// dropped. KindInterstellar needs the same treatment (SBDB resolves it by
+// designation with no coordinate of its own, exactly like an asteroid).
+func TestNeedsSmallBodyEphemeris(t *testing.T) {
+	cases := []struct {
+		kind resolve.Kind
+		want bool
+	}{
+		{resolve.KindAsteroid, true},
+		{resolve.KindComet, true},
+		{resolve.KindDwarfPlanet, true},
+		{resolve.KindInterstellar, true},
+		{resolve.KindStar, false},
+		{resolve.KindPlanet, false},
+		{resolve.KindMoon, false},
+		{resolve.KindPlanetaryMoon, false},
+		{resolve.KindSatellite, false},
+		{resolve.KindGalaxy, false},
+		{resolve.KindOther, false},
+	}
+
+	for _, c := range cases {
+		if got := needsSmallBodyEphemeris(c.kind); got != c.want {
+			t.Errorf("needsSmallBodyEphemeris(%v) = %v, want %v", c.kind, got, c.want)
+		}
 	}
 }

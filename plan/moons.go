@@ -2,6 +2,7 @@ package plan
 
 import (
 	"context"
+	"fmt"
 
 	"golang.org/x/sync/errgroup"
 
@@ -10,6 +11,43 @@ import (
 	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/time"
 )
+
+// PlanetaryMoon is a natural satellite of a planet other than Earth,
+// observed via the same heliocentric H-G reflectance model plan.Asteroid
+// already implements — see moonSpecs' doc comment for the per-moon H
+// sourcing. It is distinct from Earth's own Moon (see NewMoon, which
+// returns a *Planet): Earth's Moon uses a real lunar-phase magnitude model
+// instead, completely different physics, so it deliberately keeps its own
+// type rather than becoming a PlanetaryMoon.
+type PlanetaryMoon struct {
+	*Asteroid
+
+	parent eph.ID
+}
+
+// NewPlanetaryMoon looks up name (matched against every moonSpecs entry's
+// name, case- and space-insensitive) and builds a *PlanetaryMoon using
+// provider for its ephemeris, or returns ErrUnknownPlanetaryMoon. The
+// table's own H value (and the shared moonDefaultG slope) are used unless
+// opts overrides them.
+func NewPlanetaryMoon(name string, provider eph.Provider, opts ...AsteroidOption) (*PlanetaryMoon, error) {
+	spec, ok := moonSpecs[normalizeSiteName(name)]
+	if !ok {
+		return nil, fmt.Errorf("%w: %q", ErrUnknownPlanetaryMoon, name)
+	}
+
+	base := make([]AsteroidOption, 1, 1+len(opts))
+	base[0] = WithHG(spec.h, moonDefaultG)
+
+	return &PlanetaryMoon{
+		Asteroid: NewAsteroid(spec.name, eph.ID(spec.naifID), provider, append(base, opts...)...), //nolint:gosec // naifID is a fixed, small, positive NAIF body ID (401-901)
+		parent:   spec.parent,
+	}, nil
+}
+
+// Parent returns the NAIF ID of the planet this moon orbits (e.g.
+// eph.Jupiter for Io).
+func (m *PlanetaryMoon) Parent() eph.ID { return m.parent }
 
 // moonDefaultG is the phase-law slope parameter used for every planetary
 // moon below — none of the sources this data was sourced from (Horizons'
@@ -53,45 +91,50 @@ type moonSpec struct {
 	// moons below share one kernel (e.g. all eight of Saturn's) —
 	// gatherPlanetaryMoons fetches each distinct kernel only once.
 	kernel string
+	// parent is the NAIF ID of the planet this moon orbits (e.g.
+	// eph.Jupiter for Io) — carried through to the constructed
+	// *PlanetaryMoon's Parent() method.
+	parent eph.ID
 	naifID int32
 	h      float64
 }
 
-// planetaryMoons is the fixed list of natural satellites VisibleTonight
-// evaluates, one real per-planet SPK kernel per group. Kernel sizes vary
-// enormously — from ~64 MB (Mars, mar099s.bsp's 1995-2050 short span) to
-// ~1.1 GB (Jupiter, jup365.bsp) — since NAIF's smaller per-planet kernels
-// only cover obscure irregular moonlets, not these bright, named ones.
-// Nothing in this package downloads any of these without the same explicit
-// remote.EnableDownloads(remote.NAIFSPK, maxSize) consent every other
-// kernel in this library requires.
-var planetaryMoons = []moonSpec{
-	{"Phobos", "mar099s", 401, 11.8},
-	{"Deimos", "mar099s", 402, 12.89},
+// moonSpecs is the fixed table of natural satellites VisibleTonight
+// evaluates, keyed by lowercase name, one real per-planet SPK kernel per
+// group. Kernel sizes vary enormously — from ~64 MB (Mars, mar099s.bsp's
+// 1995-2050 short span) to ~1.1 GB (Jupiter, jup365.bsp) — since NAIF's
+// smaller per-planet kernels only cover obscure irregular moonlets, not
+// these bright, named ones. Nothing in this package downloads any of these
+// without the same explicit remote.EnableDownloads(remote.NAIFSPK, maxSize)
+// consent every other kernel in this library requires. See NewPlanetaryMoon
+// for name-based lookup.
+var moonSpecs = map[string]moonSpec{
+	"phobos": {name: "Phobos", kernel: "mar099s", parent: eph.Mars, naifID: 401, h: 11.8},
+	"deimos": {name: "Deimos", kernel: "mar099s", parent: eph.Mars, naifID: 402, h: 12.89},
 
-	{"Io", "jup365", 501, -1.68},
-	{"Europa", "jup365", 502, -1.41},
-	{"Ganymede", "jup365", 503, -2.09},
-	{"Callisto", "jup365", 504, -1.05},
+	"io":       {name: "Io", kernel: "jup365", parent: eph.Jupiter, naifID: 501, h: -1.68},
+	"europa":   {name: "Europa", kernel: "jup365", parent: eph.Jupiter, naifID: 502, h: -1.41},
+	"ganymede": {name: "Ganymede", kernel: "jup365", parent: eph.Jupiter, naifID: 503, h: -2.09},
+	"callisto": {name: "Callisto", kernel: "jup365", parent: eph.Jupiter, naifID: 504, h: -1.05},
 
-	{"Mimas", "sat441", 601, 3.3},
-	{"Enceladus", "sat441", 602, 2.2},
-	{"Tethys", "sat441", 603, 0.7},
-	{"Dione", "sat441", 604, 0.8},
-	{"Rhea", "sat441", 605, 0.1},
-	{"Titan", "sat441", 606, -1.2},
-	{"Hyperion", "sat441", 607, 4.8},
-	{"Iapetus", "sat441", 608, 1.5},
+	"mimas":     {name: "Mimas", kernel: "sat441", parent: eph.Saturn, naifID: 601, h: 3.3},
+	"enceladus": {name: "Enceladus", kernel: "sat441", parent: eph.Saturn, naifID: 602, h: 2.2},
+	"tethys":    {name: "Tethys", kernel: "sat441", parent: eph.Saturn, naifID: 603, h: 0.7},
+	"dione":     {name: "Dione", kernel: "sat441", parent: eph.Saturn, naifID: 604, h: 0.8},
+	"rhea":      {name: "Rhea", kernel: "sat441", parent: eph.Saturn, naifID: 605, h: 0.1},
+	"titan":     {name: "Titan", kernel: "sat441", parent: eph.Saturn, naifID: 606, h: -1.2},
+	"hyperion":  {name: "Hyperion", kernel: "sat441", parent: eph.Saturn, naifID: 607, h: 4.8},
+	"iapetus":   {name: "Iapetus", kernel: "sat441", parent: eph.Saturn, naifID: 608, h: 1.5},
 
-	{"Ariel", "ura184_part-3", 701, 1.45},
-	{"Umbriel", "ura184_part-3", 702, 2.10},
-	{"Titania", "ura184_part-3", 703, 1.02},
-	{"Oberon", "ura184_part-3", 704, 1.23},
-	{"Miranda", "ura184_part-3", 705, 3.6},
+	"ariel":   {name: "Ariel", kernel: "ura184_part-3", parent: eph.Uranus, naifID: 701, h: 1.45},
+	"umbriel": {name: "Umbriel", kernel: "ura184_part-3", parent: eph.Uranus, naifID: 702, h: 2.10},
+	"titania": {name: "Titania", kernel: "ura184_part-3", parent: eph.Uranus, naifID: 703, h: 1.02},
+	"oberon":  {name: "Oberon", kernel: "ura184_part-3", parent: eph.Uranus, naifID: 704, h: 1.23},
+	"miranda": {name: "Miranda", kernel: "ura184_part-3", parent: eph.Uranus, naifID: 705, h: 3.6},
 
-	{"Triton", "nep097", 801, -1.24},
+	"triton": {name: "Triton", kernel: "nep097", parent: eph.Neptune, naifID: 801, h: -1.24},
 
-	{"Charon", "plu060", 901, 1.0},
+	"charon": {name: "Charon", kernel: "plu060", parent: eph.Pluto, naifID: 901, h: 1.0},
 }
 
 // gatherPlanetaryMoons builds every moon in planetaryMoons, filtered by
@@ -113,7 +156,7 @@ func gatherPlanetaryMoons(ctx context.Context, at time.Time, magLimit float64) (
 
 	var kernels []string
 
-	for _, m := range planetaryMoons {
+	for _, m := range moonSpecs {
 		if _, ok := byKernel[m.kernel]; !ok {
 			kernels = append(kernels, m.kernel)
 		}
@@ -152,7 +195,10 @@ func gatherPlanetaryMoons(ctx context.Context, at time.Time, magLimit float64) (
 		opened = append(opened, p)
 
 		for _, m := range byKernel[kernels[i]] {
-			moon := NewAsteroid(m.name, eph.ID(m.naifID), p, WithHG(m.h, moonDefaultG)) //nolint:gosec // naifID is a fixed, small, positive NAIF body ID (401-901)
+			moon, err := NewPlanetaryMoon(m.name, p)
+			if err != nil {
+				continue // m.name always resolves against moonSpecs — defense in depth only
+			}
 
 			mag, err := moon.ApparentMagnitude(at)
 			if err == nil && mag < magLimit {

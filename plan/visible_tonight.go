@@ -361,7 +361,7 @@ func gatherCandidates(ctx context.Context, targets []resolve.Target, start, end 
 	g.SetLimit(maxConcurrentEphemerisFetches)
 
 	for i, tgt := range targets {
-		if tgt.Kind != resolve.KindAsteroid && tgt.Kind != resolve.KindComet {
+		if !needsSmallBodyEphemeris(tgt.Kind) {
 			if obj, closer := candidateFromTarget(ctx, tgt, start, end); obj != nil {
 				slots[i] = visibleCandidate{obj: obj, target: tgt, closer: closer}
 			}
@@ -409,8 +409,23 @@ func gatherCandidates(ctx context.Context, targets []resolve.Target, start, end 
 // evaluated — FromCatalog's Comet/Asteroid wrapper holds it for the
 // lifetime of the evaluation, but the underlying SPK/LSK file handles must
 // not outlive that.
+// needsSmallBodyEphemeris reports whether kind requires a real per-body
+// Horizons-generated SPK ephemeris fetch (Stage 2) rather than the plain
+// FromCatalog(tgt, nil) path — asteroids, comets, dwarf planets, and
+// interstellar objects are all resolved by name/designation through SBDB
+// with no coordinate of their own, so all four need this. Kept as one
+// function rather than repeating the Kind list at both call sites below.
+func needsSmallBodyEphemeris(kind resolve.Kind) bool {
+	switch kind { //nolint:exhaustive // every other Kind takes the FromCatalog(tgt, nil) path via default
+	case resolve.KindAsteroid, resolve.KindComet, resolve.KindDwarfPlanet, resolve.KindInterstellar:
+		return true
+	default:
+		return false
+	}
+}
+
 func candidateFromTarget(ctx context.Context, tgt resolve.Target, start, end time.Time) (Observable, eph.Provider) {
-	if tgt.Kind != resolve.KindAsteroid && tgt.Kind != resolve.KindComet {
+	if !needsSmallBodyEphemeris(tgt.Kind) {
 		return FromCatalog(tgt, nil), nil
 	}
 

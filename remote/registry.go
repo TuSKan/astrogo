@@ -112,8 +112,14 @@ func Offline() bool {
 }
 
 // Reset restores the default registry state (all endpoints at their
-// built-in URLs, downloads disabled, online, no custom policy). Intended
-// for tests; pair with t.Cleanup(remote.Reset).
+// built-in URLs, downloads disabled, online, no custom policy). It does
+// NOT touch the data directory (a separate global — see DataDir) or
+// restore any consent a broader scope (e.g. a package TestMain) may have
+// granted for the whole test binary run; a test using Reset for the
+// latter can silently break tests that run after it, which has happened
+// before. Prefer Capture/Restore (or WithScope) for scoped test setup —
+// Reset remains for the "give me an untouched registry, unconditionally"
+// case.
 func Reset() {
 	regMu.Lock()
 	defer regMu.Unlock()

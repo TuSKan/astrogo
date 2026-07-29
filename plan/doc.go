@@ -12,7 +12,8 @@
 // The exported surface is large; here's a task-oriented index instead of an
 // alphabetical one:
 //
-//   - Site & observatory setup — [NewSite], [Site]
+//   - Site & observatory setup — [NewSite], [Site]; well-known sites —
+//     [KnownSites], [NewKnownSite]
 //   - Targets to observe — [Planet] (via [NewSun]...[NewPluto], [NewPlanet]),
 //     [Star] (via [NewStar]), [Asteroid] (via [NewAsteroid]), [Comet] (via
 //     [NewComet]), [DeepSkyObject] (via [NewDeepSkyObject]), [Satellite] (via

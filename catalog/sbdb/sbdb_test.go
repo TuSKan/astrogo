@@ -115,25 +115,42 @@ func TestSBDBResolver_CometKind(t *testing.T) {
 
 func TestClassifyKind(t *testing.T) {
 	tests := []struct {
-		name    string
-		spkID   string
-		isComet bool
-		want    resolve.Kind
+		name         string
+		spkID        string
+		orbitClass   string
+		eccentricity float64
+		isComet      bool
+		want         resolve.Kind
 	}{
-		{"Ceres", "20000001", false, resolve.KindDwarfPlanet},
-		{"Pluto", "20134340", false, resolve.KindDwarfPlanet},
-		{"Eris", "20136199", false, resolve.KindDwarfPlanet},
-		{"Haumea", "20136108", false, resolve.KindDwarfPlanet},
-		{"Makemake", "20136472", false, resolve.KindDwarfPlanet},
-		{"Vesta", "20000004", false, resolve.KindAsteroid},
-		{"ordinary comet", "1000036", true, resolve.KindComet},
-		{"a comet SPK-ID that happens to match a dwarf-planet ID", "20000001", true, resolve.KindComet},
+		{"Ceres", "20000001", "MBA", 0.08, false, resolve.KindDwarfPlanet},
+		{"Pluto", "20134340", "TNO", 0.25, false, resolve.KindDwarfPlanet},
+		{"Eris", "20136199", "TNO", 0.44, false, resolve.KindDwarfPlanet},
+		{"Haumea", "20136108", "TNO", 0.2, false, resolve.KindDwarfPlanet},
+		{"Makemake", "20136472", "TNO", 0.16, false, resolve.KindDwarfPlanet},
+		{"Vesta", "20000004", "MBA", 0.09, false, resolve.KindAsteroid},
+		{"ordinary comet", "1000036", "HTC", 0.97, true, resolve.KindComet},
+		{"a comet SPK-ID that happens to match a dwarf-planet ID", "20000001", "JFC", 0.5, true, resolve.KindComet},
+		// Real orbit_class codes and eccentricities confirmed live against
+		// JPL SBDB: 1I/'Oumuamua reports "HYA" (Hyperbolic Asteroid),
+		// e=1.2; 2I/Borisov reports "HYP" (Hyperbolic Comet), e=3.36 —
+		// both take priority over the asteroid/comet/dwarf-planet
+		// classification.
+		{"'Oumuamua (hyperbolic asteroid)", "50788063", "HYA", 1.2, false, resolve.KindInterstellar},
+		{"Borisov (hyperbolic comet)", "1003639", "HYP", 3.36, true, resolve.KindInterstellar},
+		{"a hyperbolic orbit that also happens to be a dwarf-planet SPK-ID", "20000001", "HYA", 1.2, false, resolve.KindInterstellar},
+		// Regression case: a real false positive confirmed live against
+		// SBDB — an ordinary long-period (Oort-cloud) comet whose current
+		// best-fit osculating orbit sits fractionally above e=1 (a known
+		// fitting/perturbation artifact, e.g. real C/1937 C1 Whipple at
+		// e=1.0002) is NOT interstellar and must not be classified as one,
+		// even though JPL itself labels its orbit_class "HYP".
+		{"marginally-hyperbolic long-period comet (not interstellar)", "1001030", "HYP", 1.0002, true, resolve.KindComet},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := classifyKind(tt.spkID, tt.isComet); got != tt.want {
-				t.Errorf("classifyKind(%q, %v) = %q, want %q", tt.spkID, tt.isComet, got, tt.want)
+			if got := classifyKind(tt.spkID, tt.orbitClass, tt.eccentricity, tt.isComet); got != tt.want {
+				t.Errorf("classifyKind(%q, %q, %v, %v) = %q, want %q", tt.spkID, tt.orbitClass, tt.eccentricity, tt.isComet, got, tt.want)
 			}
 		})
 	}
@@ -142,18 +159,19 @@ func TestClassifyKind(t *testing.T) {
 func TestSearchBrightMock(t *testing.T) {
 	asteroidJSON := `{
 		"signature": {"version": "1.0"},
-		"fields": ["full_name", "spkid", "H", "G"],
+		"fields": ["full_name", "spkid", "H", "G", "class", "e"],
 		"data": [
-			["1 Ceres", "20000001", 3.34, 0.12],
-			["4 Vesta", "20000004", 3.25, 0.32]
+			["1 Ceres", "20000001", 3.34, 0.12, "MBA", 0.08],
+			["4 Vesta", "20000004", 3.25, 0.32, "MBA", 0.09],
+			["'Oumuamua (A/2017 U1)", "50788063", 22.08, 0.15, "HYA", 1.2]
 		],
-		"count": 2
+		"count": 3
 	}`
 	cometJSON := `{
 		"signature": {"version": "1.0"},
-		"fields": ["full_name", "spkid", "M1", "K1"],
+		"fields": ["full_name", "spkid", "M1", "K1", "class", "e"],
 		"data": [
-			["1P/Halley", "1000036", 4.5, 8.0]
+			["1P/Halley", "1000036", 4.5, 8.0, "HTC", 0.97]
 		],
 		"count": 1
 	}`
@@ -193,8 +211,8 @@ func TestSearchBrightMock(t *testing.T) {
 		return true
 	})
 
-	if len(got) != 3 {
-		t.Fatalf("expected 3 targets (2 asteroids + 1 comet), got %d: %+v", len(got), got)
+	if len(got) != 4 {
+		t.Fatalf("expected 4 targets (3 asteroids + 1 comet), got %d: %+v", len(got), got)
 	}
 
 	// 1 Ceres (SPK-ID 20000001) is one of the five IAU-recognized dwarf
@@ -218,7 +236,15 @@ func TestSearchBrightMock(t *testing.T) {
 		t.Errorf("unexpected asteroid target: %+v", vesta)
 	}
 
-	halley := got[2]
+	// 'Oumuamua reports orbit_class "HYA" (Hyperbolic Asteroid) — takes
+	// priority over the plain-asteroid classification its sb-kind alone
+	// would otherwise give it.
+	oumuamua := got[2]
+	if oumuamua.SPKID != "50788063" || oumuamua.Kind != resolve.KindInterstellar {
+		t.Errorf("unexpected interstellar target: %+v", oumuamua)
+	}
+
+	halley := got[3]
 	if halley.Name != "1P/Halley" || halley.Kind != resolve.KindComet {
 		t.Errorf("unexpected comet target: %+v", halley)
 	}

@@ -198,6 +198,15 @@ func fillMovingBody(d *TargetDetails, mb MovingBody, t time.Time, ctx *coord.Con
 		return
 	}
 
+	// Apparent/angular diameter — silently skipped for bodies with no
+	// known physical radius (asteroids, comets), same best-effort
+	// pattern as Elongation below. A caller-injected "AngularSize" prop
+	// (applyProps, called after computeDetails' fillMovingBody) still
+	// overrides this.
+	if diam, err := AngularDiameter(mb, t, ctx); err == nil {
+		d.AngularSize = formatAngularSize(diam)
+	}
+
 	// Elongation from the Sun (topocentric).
 	sunVec, err := eph.Position(mb.Provider(), eph.Sun, t)
 	if err == nil {
