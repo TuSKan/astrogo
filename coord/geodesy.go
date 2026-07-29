@@ -48,6 +48,16 @@ func NewGeodetic(lon, lat angle.Angle, height float64) (*Geodetic, error) {
 	return &Geodetic{lon: lon, lat: lat, height: height}, nil
 }
 
+// MustGeodetic creates a Geodetic coordinate, panicking if parameters are out of range.
+func MustGeodetic(lon, lat angle.Angle, height float64) *Geodetic {
+	g, err := NewGeodetic(lon, lat, height)
+	if err != nil {
+		panic(err)
+	}
+
+	return g
+}
+
 // NewEarthLocation creates a Geodetic coordinate from latitude, longitude
 // (in degrees) and height above the ellipsoid (in meters).
 //

@@ -18,6 +18,8 @@ import (
 // explicitly disabled (overriding this package's TestMain-granted consent)
 // must fail with an actionable ErrDownloadDenied, not a silent download.
 func TestNewProvider_ColdCacheDownloadsDisabled(t *testing.T) {
+	t.Cleanup(remote.Capture(remote.NAIFSPK).Restore)
+
 	remote.DisableDownloads(remote.NAIFSPK)
 	// A fresh, empty data dir: NAIFSPK downloads are always resolved
 	// through remote's own cache directory (see remote.CacheDir), not
@@ -25,11 +27,6 @@ func TestNewProvider_ColdCacheDownloadsDisabled(t *testing.T) {
 	// the shared cache other tests in this package populate requires
 	// remote.SetDataDirPath rather than the jpl.Option.
 	remote.SetDataDirPath(t.TempDir())
-
-	t.Cleanup(func() {
-		remote.EnableDownloads(remote.NAIFSPK, 0)
-		remote.SetDataDir("")
-	})
 
 	_, err := jpl.NewProvider(context.Background(), core.Planets, "de440s")
 	if !errors.Is(err, remote.ErrDownloadDenied) {

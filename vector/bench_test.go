@@ -17,9 +17,7 @@ func BenchmarkDot(b *testing.B) {
 	a := vector.V3(1, 2, 3)
 	c := vector.V3(4, 5, 6)
 
-	b.ResetTimer()
-
-	for range b.N {
+	for b.Loop() {
 		sink = a.Dot(c)
 	}
 }
@@ -28,9 +26,7 @@ func BenchmarkCross(b *testing.B) {
 	a := vector.V3(1, 2, 3)
 	c := vector.V3(4, 5, 6)
 
-	b.ResetTimer()
-
-	for range b.N {
+	for b.Loop() {
 		vecSink = a.Cross(c)
 	}
 }
@@ -38,9 +34,7 @@ func BenchmarkCross(b *testing.B) {
 func BenchmarkNorm(b *testing.B) {
 	v := vector.V3(1, 2, 3)
 
-	b.ResetTimer()
-
-	for range b.N {
+	for b.Loop() {
 		sink = v.Norm()
 	}
 }
@@ -48,9 +42,7 @@ func BenchmarkNorm(b *testing.B) {
 func BenchmarkUnit(b *testing.B) {
 	v := vector.V3(1, 2, 3)
 
-	b.ResetTimer()
-
-	for range b.N {
+	for b.Loop() {
 		vecSink = v.Unit()
 	}
 }
@@ -58,9 +50,7 @@ func BenchmarkUnit(b *testing.B) {
 func BenchmarkFromSpherical(b *testing.B) {
 	lon, lat := 1.234, 0.567
 
-	b.ResetTimer()
-
-	for range b.N {
+	for b.Loop() {
 		vecSink = vector.FromSpherical(lon, lat)
 	}
 }
@@ -68,9 +58,7 @@ func BenchmarkFromSpherical(b *testing.B) {
 func BenchmarkToSpherical(b *testing.B) {
 	v := vector.FromSpherical(1.234, 0.567)
 
-	b.ResetTimer()
-
-	for range b.N {
+	for b.Loop() {
 		sink, sink = v.ToSpherical()
 	}
 }
@@ -79,9 +67,7 @@ func BenchmarkRotateZ(b *testing.B) {
 	v := vector.V3(1, 0, 0)
 	rad := math.Pi / 4
 
-	b.ResetTimer()
-
-	for range b.N {
+	for b.Loop() {
 		vecSink = v.RotateZ(rad)
 	}
 }
@@ -90,9 +76,7 @@ func BenchmarkAdd(b *testing.B) {
 	a := vector.V3(1, 2, 3)
 	c := vector.V3(4, 5, 6)
 
-	b.ResetTimer()
-
-	for range b.N {
+	for b.Loop() {
 		vecSink = a.Add(c)
 	}
 }

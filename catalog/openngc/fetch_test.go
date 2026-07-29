@@ -54,7 +54,7 @@ func serveSources(t *testing.T, getCounts map[string]*int32) *httptest.Server {
 }
 
 func TestNewFetchesFromNetworkWhenDownloadsEnabled(t *testing.T) {
-	t.Cleanup(remote.Reset)
+	t.Cleanup(remote.Capture().Restore)
 
 	getCounts := map[string]*int32{
 		"/NGC.csv":      new(int32),
@@ -70,7 +70,6 @@ func TestNewFetchesFromNetworkWhenDownloadsEnabled(t *testing.T) {
 
 	remote.EnableDownloads(remote.OpenNGC, 0)
 	remote.SetDataDirPath(t.TempDir())
-	t.Cleanup(func() { remote.SetDataDir("") })
 
 	p := New()
 
@@ -91,7 +90,7 @@ func TestNewFetchesFromNetworkWhenDownloadsEnabled(t *testing.T) {
 }
 
 func TestNewSkipsBodyWhenUnchanged(t *testing.T) {
-	t.Cleanup(remote.Reset)
+	t.Cleanup(remote.Capture().Restore)
 
 	getCounts := map[string]*int32{
 		"/NGC.csv":      new(int32),
@@ -107,7 +106,6 @@ func TestNewSkipsBodyWhenUnchanged(t *testing.T) {
 
 	remote.EnableDownloads(remote.OpenNGC, 0)
 	remote.SetDataDirPath(t.TempDir())
-	t.Cleanup(func() { remote.SetDataDir("") })
 
 	_ = New()
 
@@ -127,7 +125,7 @@ func TestNewSkipsBodyWhenUnchanged(t *testing.T) {
 }
 
 func TestNewDefaultDenyIssuesNoRequest(t *testing.T) {
-	t.Cleanup(remote.Reset)
+	t.Cleanup(remote.Capture().Restore)
 	remote.SetDataDirPath(t.TempDir())
 
 	var hits atomic.Int32
@@ -159,7 +157,7 @@ func TestNewDefaultDenyIssuesNoRequest(t *testing.T) {
 // calls must reuse a single cache file per source name, never leave stale
 // versions behind (the concern that originally motivated fetchSource).
 func TestNewDoesNotAccumulateCacheFiles(t *testing.T) {
-	t.Cleanup(remote.Reset)
+	t.Cleanup(remote.Capture().Restore)
 
 	srv := serveSources(t, map[string]*int32{})
 	defer srv.Close()
@@ -170,7 +168,6 @@ func TestNewDoesNotAccumulateCacheFiles(t *testing.T) {
 
 	remote.EnableDownloads(remote.OpenNGC, 0)
 	remote.SetDataDirPath(t.TempDir())
-	t.Cleanup(func() { remote.SetDataDir("") })
 
 	for range 3 {
 		_ = New()

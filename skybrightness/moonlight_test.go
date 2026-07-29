@@ -117,7 +117,7 @@ func BenchmarkMoonBrightnessNL(b *testing.B) {
 	z := 40 * degToRad
 
 	var sink float64
-	for range b.N {
+	for b.Loop() {
 		sink = moonBrightnessNL(75, 35, z, z, 0.172)
 	}
 

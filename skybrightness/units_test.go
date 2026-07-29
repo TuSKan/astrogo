@@ -93,7 +93,7 @@ func BenchmarkNanolambertConversion(b *testing.B) {
 	sb := skybrightness.SurfaceBrightnessV(21.0)
 
 	var sink skybrightness.SurfaceBrightnessV
-	for range b.N {
+	for b.Loop() {
 		sink = sb.Nanolamberts().SurfaceBrightnessV()
 	}
 

@@ -89,7 +89,7 @@ func TestSearch(t *testing.T) {
 func BenchmarkSearch(b *testing.B) {
 	p := newTestProvider()
 
-	for range b.N {
+	for b.Loop() {
 		p.Search(context.Background(), "nebula")
 	}
 }

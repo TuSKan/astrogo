@@ -52,8 +52,22 @@ const (
 	KindDwarfPlanet Kind = "DwarfPlanet"
 	// KindComet represents a comet.
 	KindComet Kind = "Comet"
+	// KindInterstellar represents an interstellar object — a body on a
+	// hyperbolic or parabolic orbit (eccentricity >= 1), not gravitationally
+	// bound to the Solar System (e.g. 1I/'Oumuamua, 2I/Borisov). Otherwise
+	// physically identical to KindAsteroid/KindComet — same ephemeris and
+	// photometry paths, just orbitally unbound.
+	KindInterstellar Kind = "Interstellar"
 	// KindSatellite represents an artificial Earth satellite.
 	KindSatellite Kind = "Satellite"
+	// KindConstellation represents one of the 88 IAU constellations,
+	// observed at its boundary centroid (see plan.NewConstellation) — a
+	// fixed sky region, not a resolvable catalog target in its own right.
+	KindConstellation Kind = "Constellation"
+	// KindMeteorShower represents an annual meteor shower's radiant (see
+	// plan.MeteorShower) — not a resolvable catalog target in its own
+	// right, since a radiant's position depends on the observation time.
+	KindMeteorShower Kind = "MeteorShower"
 	// KindOther represents other celestial objects.
 	KindOther Kind = "Other"
 )

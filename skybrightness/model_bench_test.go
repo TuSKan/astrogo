@@ -43,7 +43,7 @@ func BenchmarkCompositeFull(b *testing.B) {
 
 	var sink SurfaceBrightnessV
 
-	for range b.N {
+	for b.Loop() {
 		sb, err := model.SurfaceBrightness(aa, ctx)
 		if err != nil {
 			b.Fatalf("SurfaceBrightness: %v", err)

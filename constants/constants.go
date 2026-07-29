@@ -8,8 +8,8 @@ const pi = 3.141592653589793238462643383279502884197
 // ── Physical constants ────────────────────────────────────────────────────────
 
 // SpeedOfLight is the speed of light in vacuum, in metres per second.
-// This value is exact by the 2019 SI redefinition of the metre.
-// Source: CODATA 2018 / BIPM.
+// It is exact by definition in the International System of Units.
+// Source: BIPM SI Brochure / 26th CGPM Resolution 1.
 const SpeedOfLight = 299_792_458.0 // m/s
 
 // ── Astronomical constants ────────────────────────────────────────────────────

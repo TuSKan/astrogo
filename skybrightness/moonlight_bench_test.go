@@ -18,7 +18,7 @@ func BenchmarkMoonlightRadiance(b *testing.B) {
 
 	var sink Nanolambert
 
-	for range b.N {
+	for b.Loop() {
 		r, err := m.Radiance(aa, ctx)
 		if err != nil {
 			b.Fatalf("Radiance: %v", err)

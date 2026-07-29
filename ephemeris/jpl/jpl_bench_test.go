@@ -20,13 +20,13 @@ func BenchmarkEvalChebyshev(b *testing.B) {
 	radius := 100.0
 
 	b.Run("PositionOnly", func(b *testing.B) {
-		for range b.N {
+		for b.Loop() {
 			spk.EvalChebyshev(coeffs, tau, radius, false)
 		}
 	})
 
 	b.Run("WithDerivative", func(b *testing.B) {
-		for range b.N {
+		for b.Loop() {
 			spk.EvalChebyshev(coeffs, tau, radius, true)
 		}
 	})
@@ -75,7 +75,7 @@ func BenchmarkFindSegment(b *testing.B) {
 	const searchTarget = int32(5)
 
 	b.Run("GlobalScan", func(b *testing.B) {
-		for range b.N {
+		for b.Loop() {
 			et := 0.0
 			found := false
 
@@ -96,7 +96,7 @@ func BenchmarkFindSegment(b *testing.B) {
 	})
 
 	b.Run("TargetScan", func(b *testing.B) {
-		for range b.N {
+		for b.Loop() {
 			_, err := p.FindSegment(searchTarget, 0.0)
 			if err != nil {
 				b.Fatalf("failed: %v", err)

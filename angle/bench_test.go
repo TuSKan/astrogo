@@ -12,9 +12,7 @@ import (
 func BenchmarkWrap2Pi(b *testing.B) {
 	a := angle.Deg(540.123)
 
-	b.ResetTimer()
-
-	for range b.N {
+	for b.Loop() {
 		_ = a.Wrap2Pi()
 	}
 }
@@ -23,9 +21,7 @@ func BenchmarkWrap2Pi(b *testing.B) {
 func BenchmarkWrapPi(b *testing.B) {
 	a := angle.Deg(270.456)
 
-	b.ResetTimer()
-
-	for range b.N {
+	for b.Loop() {
 		_ = a.WrapPi()
 	}
 }
@@ -35,9 +31,7 @@ func BenchmarkWrapPi(b *testing.B) {
 func BenchmarkSin(b *testing.B) {
 	a := angle.Deg(37.5)
 
-	b.ResetTimer()
-
-	for range b.N {
+	for b.Loop() {
 		_ = a.Sin()
 	}
 }
@@ -46,9 +40,7 @@ func BenchmarkSin(b *testing.B) {
 func BenchmarkCos(b *testing.B) {
 	a := angle.Deg(37.5)
 
-	b.ResetTimer()
-
-	for range b.N {
+	for b.Loop() {
 		_ = a.Cos()
 	}
 }
@@ -57,9 +49,7 @@ func BenchmarkCos(b *testing.B) {
 func BenchmarkDMSString(b *testing.B) {
 	a := angle.Deg(123.456789)
 
-	b.ResetTimer()
-
-	for range b.N {
+	for b.Loop() {
 		_ = a.DMSString(3)
 	}
 }
@@ -68,9 +58,7 @@ func BenchmarkDMSString(b *testing.B) {
 func BenchmarkHMSString(b *testing.B) {
 	a := angle.Hour(12.3456789)
 
-	b.ResetTimer()
-
-	for range b.N {
+	for b.Loop() {
 		_ = a.HMSString(3)
 	}
 }
@@ -79,9 +67,7 @@ func BenchmarkHMSString(b *testing.B) {
 func BenchmarkParseDMS(b *testing.B) {
 	s := `+12°34'56.789"`
 
-	b.ResetTimer()
-
-	for range b.N {
+	for b.Loop() {
 		_, _ = angle.ParseDMS(s)
 	}
 }
@@ -90,9 +76,7 @@ func BenchmarkParseDMS(b *testing.B) {
 func BenchmarkDegConvert(b *testing.B) {
 	v := math.Pi / 4
 
-	b.ResetTimer()
-
-	for range b.N {
+	for b.Loop() {
 		_ = angle.Rad(v).Degrees()
 	}
 }

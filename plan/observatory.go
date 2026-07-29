@@ -1,21 +1,14 @@
 package plan
 
 import (
-	"errors"
 	"fmt"
 	"math"
+	"strings"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/time"
-)
-
-var (
-	// ErrInvalidHorizon is returned when the horizon is outside the valid range.
-	ErrInvalidHorizon = errors.New("horizon must be between -90 and 90 degrees")
-	// ErrNilLocation is returned when the geodetic location is nil.
-	ErrNilLocation = errors.New("geodetic location must not be nil")
 )
 
 // Site represents a physical observing location.
@@ -24,7 +17,144 @@ type Site struct {
 	location *coord.Geodetic
 	timeZone *time.Location
 	name     string
+	mpcCode  string
+	aliases  []string
 	horizon  angle.Angle
+}
+
+// KnownSites maps a modest, defensible starter list of well-known observing
+// sites (not an exhaustive observatory database) to fully-built *Site
+// values, keyed by a lowercase/underscore slug. Coordinates and elevations
+// are the published geodetic values from each site's own Wikipedia
+// infobox, cross-checked against the IAU Minor Planet Center's own
+// observatory code list (https://minorplanetcenter.net/iau/lists/ObsCodesF.html)
+// where a code is set. A caller needing survey-grade precision for their
+// own site should always supply their own measured coordinates via
+// NewSite — this table is a convenience for "somewhere near Mauna Kea,"
+// not a substitute for that. See NewKnownSite for name/alias-based lookup.
+var KnownSites = map[string]*Site{
+	"greenwich": {
+		name:     "Greenwich",
+		location: coord.MustGeodetic(angle.Zero(), angle.Deg(51.4772), 45),
+		timeZone: time.MustLocation("Europe/London"),
+		mpcCode:  "000",
+		aliases:  []string{"Royal Observatory"},
+		horizon:  angle.Zero(),
+	},
+	"mauna_kea": {
+		name:     "Mauna Kea",
+		location: coord.MustGeodetic(angle.Deg(-155.47441), angle.Deg(19.8263), 4145),
+		timeZone: time.MustLocation("Pacific/Honolulu"),
+		mpcCode:  "568",
+		aliases:  []string{"Keck", "W. M. Keck Observatory"},
+		horizon:  angle.Zero(),
+	},
+	"paranal": {
+		name:     "Paranal",
+		location: coord.MustGeodetic(angle.Deg(-70.40417), angle.Deg(-24.62722), 2635),
+		timeZone: time.MustLocation("America/Santiago"),
+		mpcCode:  "309",
+		aliases:  []string{"VLT", "Cerro Paranal", "Very Large Telescope"},
+		horizon:  angle.Zero(),
+	},
+	"la_palma": {
+		name:     "La Palma",
+		location: coord.MustGeodetic(angle.Deg(-17.8947), angle.Deg(28.7636), 2396),
+		timeZone: time.MustLocation("Atlantic/Canary"),
+		mpcCode:  "950",
+		aliases:  []string{"Roque de los Muchachos", "ORM"},
+		horizon:  angle.Zero(),
+	},
+	"cerro_tololo": {
+		name:     "Cerro Tololo",
+		location: coord.MustGeodetic(angle.Deg(-70.80639), angle.Deg(-30.16917), 2207),
+		timeZone: time.MustLocation("America/Santiago"),
+		mpcCode:  "807",
+		aliases:  []string{"CTIO"},
+		horizon:  angle.Zero(),
+	},
+	"kitt_peak": {
+		name:     "Kitt Peak",
+		location: coord.MustGeodetic(angle.Deg(-111.5967), angle.Deg(31.9583), 2096),
+		timeZone: time.MustLocation("America/Phoenix"),
+		mpcCode:  "695",
+		aliases:  []string{"KPNO"},
+		horizon:  angle.Zero(),
+	},
+	"la_silla": {
+		name:     "La Silla",
+		location: coord.MustGeodetic(angle.Deg(-70.7375), angle.Deg(-29.2575), 2400),
+		timeZone: time.MustLocation("America/Santiago"),
+		mpcCode:  "809",
+		aliases:  []string{"ESO La Silla"},
+		horizon:  angle.Zero(),
+	},
+	"siding_spring": {
+		name:     "Siding Spring",
+		location: coord.MustGeodetic(angle.Deg(149.06444), angle.Deg(-31.27333), 1165),
+		timeZone: time.MustLocation("Australia/Sydney"),
+		mpcCode:  "413",
+		aliases:  []string{"SSO"},
+		horizon:  angle.Zero(),
+	},
+	"palomar": {
+		name:     "Palomar",
+		location: coord.MustGeodetic(angle.Deg(-116.865), angle.Deg(33.3564), 1712),
+		timeZone: time.MustLocation("America/Los_Angeles"),
+		mpcCode:  "675",
+		aliases:  []string{"Palomar Mountain", "Palomar Observatory"},
+		horizon:  angle.Zero(),
+	},
+	"cerro_pachon": {
+		name:     "Cerro Pachón",
+		location: coord.MustGeodetic(angle.Deg(-70.74942), angle.Deg(-30.24464), 2647),
+		timeZone: time.MustLocation("America/Santiago"),
+		mpcCode:  "X05",
+		aliases:  []string{"Rubin Observatory", "Vera C. Rubin Observatory", "LSST"},
+		horizon:  angle.Zero(),
+	},
+}
+
+// normalizeSiteName lowercases and replaces spaces with underscores so lookups match
+// "Mauna Kea", "mauna kea", and "MaunaKea" alike.
+func normalizeSiteName(s string) string {
+	return strings.ToLower(strings.ReplaceAll(strings.TrimSpace(s), " ", "_"))
+}
+
+// lookupKnownSite finds a KnownSites entry by its map key (the normalized
+// form of its Name) or any Alias, case- and space-insensitive.
+func lookupKnownSite(name string) (*Site, bool) {
+	want := normalizeSiteName(name)
+
+	if s, ok := KnownSites[want]; ok {
+		return s, true
+	}
+
+	for _, s := range KnownSites {
+		for _, alias := range s.aliases {
+			if normalizeSiteName(alias) == want {
+				return s, true
+			}
+		}
+	}
+
+	return nil, false
+}
+
+// NewKnownSite looks up name (matched against every KnownSites entry's
+// Name and Aliases, case- and space-insensitive) and returns its *Site, or
+// ErrUnknownSite if no entry matches. The registry's shared *Site is
+// returned directly — a caller wanting a variant (a different horizon,
+// time zone, ...) should chain the returned Site's own WithHorizon/
+// WithTimeZone rather than have NewKnownSite rebuild one, since those
+// already do exactly that without duplicating this lookup's logic.
+func NewKnownSite(name string) (*Site, error) {
+	s, ok := lookupKnownSite(name)
+	if !ok {
+		return nil, fmt.Errorf("%w: %q", ErrUnknownSite, name)
+	}
+
+	return s, nil
 }
 
 // SiteOption configures optional NewSite parameters.
@@ -42,10 +172,25 @@ func WithTimeZone(tz *time.Location) SiteOption {
 	return func(s *Site) { s.timeZone = tz }
 }
 
+// WithMPCCode sets the site's IAU Minor Planet Center observatory code
+// (e.g. "568" for Mauna Kea). Purely informational metadata — see
+// Site.MPCCode's doc comment for why it doesn't participate in Equal.
+func WithMPCCode(code string) SiteOption {
+	return func(s *Site) { s.mpcCode = code }
+}
+
+// WithSiteAliases sets additional names this site is known by (e.g. "Keck" for
+// Mauna Kea). Purely informational metadata — see Site.Aliases' doc
+// comment for why it doesn't participate in Equal.
+func WithSiteAliases(aliases ...string) SiteOption {
+	return func(s *Site) { s.aliases = aliases }
+}
+
 // NewSite creates a new observing site with validation.
 // name: A human-readable name for the site.
 // loc: The geodetic location (longitude, latitude, height).
-// opts: optional parameters — see WithHorizon and WithTimeZone.
+// opts: optional parameters — see WithHorizon, WithTimeZone, WithMPCCode,
+// and WithSiteAliases.
 func NewSite(name string, loc *coord.Geodetic, opts ...SiteOption) (*Site, error) {
 	if loc == nil {
 		return nil, ErrNilLocation
@@ -76,6 +221,23 @@ func (s *Site) Location() *coord.Geodetic { return s.location }
 
 // Horizon returns the local horizon elevation limit.
 func (s *Site) Horizon() angle.Angle { return s.horizon }
+
+// MPCCode returns the site's IAU Minor Planet Center observatory code, or
+// "" if none was set. Informational metadata only — see WithMPCCode.
+func (s *Site) MPCCode() string { return s.mpcCode }
+
+// Aliases returns a copy of the additional names this site is known by, or
+// nil if none were set. Informational metadata only — see WithSiteAliases.
+func (s *Site) Aliases() []string {
+	if s.aliases == nil {
+		return nil
+	}
+
+	out := make([]string, len(s.aliases))
+	copy(out, s.aliases)
+
+	return out
+}
 
 // TimeZone returns the site's local time zone, or UTC if nil.
 func (s *Site) TimeZone() *time.Location {
@@ -154,13 +316,24 @@ func (s *Site) MoonRiseSetThreshold() angle.Angle {
 	return angle.Deg(-moonSemiDiameter - standardRefraction - s.HorizonDip().Degrees())
 }
 
-// String returns a compact representation of the site.
+// String returns a compact representation of the site, appending the MPC
+// code (when set) as a bracketed suffix.
 func (s *Site) String() string {
+	if s.mpcCode != "" {
+		return fmt.Sprintf("Site(%s [%s]: %s, Hor=%s)", s.name, s.mpcCode, s.location, s.horizon)
+	}
+
 	return fmt.Sprintf("Site(%s: %s, Hor=%s)", s.name, s.location, s.horizon)
 }
 
 // Equal reports whether s and other represent the same observing site
 // (same name, location, horizon, and time zone).
+//
+// MPCCode and Aliases deliberately do NOT participate in this comparison —
+// they're informational metadata about which named registry entry (if
+// any) a site came from, not part of its physical/observational identity.
+// A hand-built Site at Mauna Kea's exact coordinates is the same *site* as
+// the registry's Mauna Kea entry even without carrying its MPC code.
 //
 // Coordinates and horizon are compared with a tolerance of 1e-12 radians
 // (~0.2 μas) to avoid false negatives from float64 round-trip drift.
@@ -188,7 +361,7 @@ func (s *Site) Equal(other *Site) bool {
 
 // WithHorizon returns a copy of s with the given horizon limit.
 func (s *Site) WithHorizon(h angle.Angle) (*Site, error) {
-	return NewSite(s.name, s.location, WithHorizon(h), WithTimeZone(s.timeZone))
+	return NewSite(s.name, s.location, WithHorizon(h), WithTimeZone(s.timeZone), WithMPCCode(s.mpcCode), WithSiteAliases(s.aliases...))
 }
 
 // WithTimeZone returns a copy of s with the given time zone.
@@ -198,6 +371,8 @@ func (s *Site) WithTimeZone(tz *time.Location) *Site {
 		location: s.location,
 		horizon:  s.horizon,
 		timeZone: tz,
+		mpcCode:  s.mpcCode,
+		aliases:  s.Aliases(),
 	}
 }
 

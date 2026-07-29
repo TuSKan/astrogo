@@ -2,6 +2,8 @@ package plan
 
 import (
 	"errors"
+	"math"
+	"strings"
 	"testing"
 
 	"github.com/TuSKan/astrogo/angle"
@@ -109,4 +111,184 @@ func TestLocalSiderealTime(t *testing.T) {
 	// Known GAST at J2000.0 ~280.46° ± 0.5°
 	expectedDeg := 280.46
 	testutil.AssertNear(t, "LST at Greenwich J2000", lst.Degrees(), expectedDeg, 0.5)
+}
+
+// TestKnownSitesTableIntegrity guards KnownSites' fixed data table against
+// copy-paste mistakes: no duplicate names/aliases/MPC codes and every
+// coordinate in a physically valid range.
+func TestKnownSitesTableIntegrity(t *testing.T) {
+	seenName := make(map[string]string)
+	seenCode := make(map[string]string)
+
+	if len(KnownSites) == 0 {
+		t.Fatal("expected a non-empty starter list of known sites")
+	}
+
+	for _, s := range KnownSites {
+		if s.Name() == "" {
+			t.Errorf("a KnownSites entry has an empty Name")
+		}
+
+		norm := strings.ToLower(strings.ReplaceAll(s.Name(), " ", ""))
+		if prev, ok := seenName[norm]; ok {
+			t.Errorf("name %q collides with %q", s.Name(), prev)
+		}
+
+		seenName[norm] = s.Name()
+
+		for _, alias := range s.Aliases() {
+			an := strings.ToLower(strings.ReplaceAll(alias, " ", ""))
+			if prev, ok := seenName[an]; ok {
+				t.Errorf("%s: alias %q collides with %q", s.Name(), alias, prev)
+			}
+
+			seenName[an] = s.Name()
+		}
+
+		if code := s.MPCCode(); code != "" {
+			if prev, ok := seenCode[code]; ok {
+				t.Errorf("MPC code %q used by both %q and %q", code, prev, s.Name())
+			}
+
+			seenCode[code] = s.Name()
+		}
+
+		if lat := s.Latitude().Degrees(); lat < -90 || lat > 90 {
+			t.Errorf("%s: Latitude=%v out of range [-90,90]", s.Name(), lat)
+		}
+
+		if lon := s.Longitude().Degrees(); lon < -180 || lon > 180 {
+			t.Errorf("%s: Longitude=%v out of range [-180,180]", s.Name(), lon)
+		}
+
+		if h := s.HeightMeters(); h < 0 || h > 6000 {
+			t.Errorf("%s: HeightMeters=%v outside a plausible ground-observatory range", s.Name(), h)
+		}
+	}
+}
+
+// TestNewKnownSiteCaseAndAliasInsensitive verifies the documented matching
+// behavior directly, against real entries rather than a synthetic fixture.
+func TestNewKnownSiteCaseAndAliasInsensitive(t *testing.T) {
+	cases := []string{"Mauna Kea", "mauna kea", "mauna_kea", "MAUNA_KEA", "Keck", "keck"}
+
+	for _, name := range cases {
+		s, err := NewKnownSite(name)
+		if err != nil {
+			t.Errorf("NewKnownSite(%q): %v", name, err)
+			continue
+		}
+
+		if s.Name() != "Mauna Kea" {
+			t.Errorf("NewKnownSite(%q).Name() = %q, want %q", name, s.Name(), "Mauna Kea")
+		}
+	}
+
+	if _, err := NewKnownSite("Nonexistent Observatory"); !errors.Is(err, ErrUnknownSite) {
+		t.Errorf("NewKnownSite(nonexistent) error = %v, want ErrUnknownSite", err)
+	}
+}
+
+// TestKnownSiteElevationSpotChecks cross-checks a couple of well-known,
+// independently-verifiable elevations, guarding against a transposed digit
+// slipping through the range check above unnoticed.
+func TestKnownSiteElevationSpotChecks(t *testing.T) {
+	want := map[string]float64{
+		"Mauna Kea": 4145,
+		"Paranal":   2635,
+	}
+
+	for name, wantM := range want {
+		s, err := NewKnownSite(name)
+		if err != nil {
+			t.Fatalf("NewKnownSite(%q): %v", name, err)
+		}
+
+		if math.Abs(s.HeightMeters()-wantM) > 1 {
+			t.Errorf("%s: HeightMeters() = %v, want %v", name, s.HeightMeters(), wantM)
+		}
+	}
+}
+
+// TestNewKnownSiteUnknownName verifies the ErrUnknownSite sentinel path.
+func TestNewKnownSiteUnknownName(t *testing.T) {
+	if _, err := NewKnownSite("Nowhere Observatory"); !errors.Is(err, ErrUnknownSite) {
+		t.Errorf("NewKnownSite(unknown name) error = %v, want ErrUnknownSite", err)
+	}
+}
+
+// TestNewKnownSite_WithHorizonVariant confirms a caller wanting a variant
+// of a known site (e.g. a custom horizon for their own dome) can chain the
+// returned *Site's own WithHorizon rather than needing NewKnownSite itself
+// to accept options.
+func TestNewKnownSite_WithHorizonVariant(t *testing.T) {
+	base, err := NewKnownSite("Greenwich")
+	if err != nil {
+		t.Fatalf("NewKnownSite: %v", err)
+	}
+
+	site, err := base.WithHorizon(angle.Deg(15))
+	if err != nil {
+		t.Fatalf("WithHorizon: %v", err)
+	}
+
+	if site.Name() != "Greenwich" {
+		t.Errorf("Name() = %q, want %q", site.Name(), "Greenwich")
+	}
+
+	if site.Latitude().Degrees() < 51 || site.Latitude().Degrees() > 52 {
+		t.Errorf("Latitude() = %v, want ~51.48°", site.Latitude().Degrees())
+	}
+
+	if site.MPCCode() != "000" {
+		t.Errorf("MPCCode() = %q, want %q", site.MPCCode(), "000")
+	}
+
+	if math.Abs(site.Horizon().Degrees()-15) > 1e-9 {
+		t.Errorf("Horizon() = %v, want 15", site.Horizon().Degrees())
+	}
+}
+
+// TestKnownSite_MPCCodeAndAliasesPopulated confirms a *Site built from the
+// registry actually carries MPCCode/Aliases.
+func TestKnownSite_MPCCodeAndAliasesPopulated(t *testing.T) {
+	s, err := NewKnownSite("Mauna Kea")
+	if err != nil {
+		t.Fatalf("NewKnownSite: %v", err)
+	}
+
+	if s.MPCCode() != "568" {
+		t.Errorf("MPCCode() = %q, want %q", s.MPCCode(), "568")
+	}
+
+	found := false
+
+	for _, a := range s.Aliases() {
+		if a == "Keck" {
+			found = true
+		}
+	}
+
+	if !found {
+		t.Errorf("Aliases() = %v, want it to include %q", s.Aliases(), "Keck")
+	}
+}
+
+// TestNewKnownSiteReturnsSharedInstanceWithoutOpts confirms the no-opts
+// fast path returns the registry's own *Site rather than an unnecessary
+// rebuilt copy.
+func TestNewKnownSiteReturnsSharedInstanceWithoutOpts(t *testing.T) {
+	s1, err := NewKnownSite("Greenwich")
+	if err != nil {
+		t.Fatalf("NewKnownSite: %v", err)
+	}
+
+	s2, err := NewKnownSite("greenwich")
+	if err != nil {
+		t.Fatalf("NewKnownSite: %v", err)
+	}
+
+	if s1 != s2 {
+		t.Errorf("NewKnownSite with no opts should return the shared registry *Site, got distinct pointers")
+	}
 }

@@ -20,9 +20,7 @@ func BenchmarkNewContext(b *testing.B) {
 	atm := atmosphere.AtAltitude(2635)
 	t := time.FromJD(2460000.5, time.UTC)
 
-	b.ResetTimer()
-
-	for range b.N {
+	for b.Loop() {
 		_ = coord.NewContext(t, loc, atm)
 	}
 }
@@ -32,9 +30,7 @@ func BenchmarkNewContext_SeaLevel(b *testing.B) {
 	atm := atmosphere.StandardAtmosphere
 	t := time.FromJD(2460000.5, time.UTC)
 
-	b.ResetTimer()
-
-	for range b.N {
+	for b.Loop() {
 		_ = coord.NewContext(t, loc, atm)
 	}
 }
@@ -49,9 +45,7 @@ func BenchmarkICRSToAltAz(b *testing.B) {
 	t := time.FromJD(2460000.5, time.UTC)
 	pos := coord.NewICRS(angle.Hour(5.5), angle.Deg(-5.4)) // Orion
 
-	b.ResetTimer()
-
-	for range b.N {
+	for b.Loop() {
 		ctx := coord.NewContext(t, loc, atm)
 		_, _ = ctx.ICRSToAltAz(pos)
 	}
@@ -67,9 +61,7 @@ func BenchmarkICRSToAltAz_CachedContext(b *testing.B) {
 	ctx := coord.NewContext(t, loc, atm)
 	pos := coord.NewICRS(angle.Hour(5.5), angle.Deg(-5.4))
 
-	b.ResetTimer()
-
-	for range b.N {
+	for b.Loop() {
 		_, _ = ctx.ICRSToAltAz(pos)
 	}
 }
@@ -90,9 +82,7 @@ func BenchmarkICRSToAltAz_100Stars_NewContext(b *testing.B) {
 		stars[i] = coord.NewICRS(ra, dec)
 	}
 
-	b.ResetTimer()
-
-	for range b.N {
+	for b.Loop() {
 		// One context per star (scalar pattern — what the current code does)
 		for _, s := range stars {
 			ctx := coord.NewContext(t, loc, atm)
@@ -113,9 +103,7 @@ func BenchmarkICRSToAltAz_100Stars_CachedContext(b *testing.B) {
 		stars[i] = coord.NewICRS(ra, dec)
 	}
 
-	b.ResetTimer()
-
-	for range b.N {
+	for b.Loop() {
 		// One context for all stars (batched pattern)
 		ctx := coord.NewContext(t, loc, atm)
 		for _, s := range stars {
@@ -134,9 +122,7 @@ func BenchmarkReducer(b *testing.B) {
 	// Simulate a geocentric Moon-like vector (in AU)
 	v := vector.Vec3{X: 0.00257, Y: 0.00010, Z: 0.00005}
 
-	b.ResetTimer()
-
-	for range b.N {
+	for b.Loop() {
 		r := coord.NewReducer(loc, t, atm)
 		_ = r.Reduce(v)
 	}
@@ -153,9 +139,7 @@ func BenchmarkReducer_Cached(b *testing.B) {
 	r := coord.NewReducer(loc, t, atm)
 	_ = r.Reduce(v) // warm up the cache
 
-	b.ResetTimer()
-
-	for range b.N {
+	for b.Loop() {
 		_ = r.Reduce(v)
 	}
 }
@@ -180,12 +164,12 @@ func BenchmarkICRSBatchToAltAz_10k(b *testing.B) {
 	out := make([]coord.AltAz, n)
 
 	b.Run("Serial", func(b *testing.B) {
-		for range b.N {
+		for b.Loop() {
 			ctx.ICRSBatchToAltAz(stars, out)
 		}
 	})
 	b.Run("Parallel", func(b *testing.B) {
-		for range b.N {
+		for b.Loop() {
 			ctx.ICRSBatchToAltAzParallel(stars, out)
 		}
 	})
@@ -211,12 +195,12 @@ func BenchmarkReduceBatch_10k(b *testing.B) {
 	out := make([]coord.AltAz, n)
 
 	b.Run("Serial", func(b *testing.B) {
-		for range b.N {
+		for b.Loop() {
 			ctx.ReduceBatch(vecs, out)
 		}
 	})
 	b.Run("Parallel", func(b *testing.B) {
-		for range b.N {
+		for b.Loop() {
 			ctx.ReduceBatchParallel(vecs, out)
 		}
 	})

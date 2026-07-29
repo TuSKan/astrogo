@@ -100,6 +100,17 @@ const (
 // LoadLocation loads a location from the standard library.
 var LoadLocation = time.LoadLocation
 
+// MustLocation loads a location from the standard library, panicking if the
+// location cannot be loaded.
+var MustLocation = func(name string) *time.Location {
+	loc, err := time.LoadLocation(name)
+	if err != nil {
+		panic(err)
+	}
+
+	return loc
+}
+
 // LocationUTC is the UTC location.
 var LocationUTC = time.UTC
 

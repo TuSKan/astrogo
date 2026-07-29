@@ -4,6 +4,11 @@ import "errors"
 
 // Sentinel errors for observation planning.
 var (
+	// ErrInvalidHorizon is returned when the horizon is outside the valid range.
+	ErrInvalidHorizon = errors.New("horizon must be between -90 and 90 degrees")
+	// ErrNilLocation is returned when the geodetic location is nil.
+	ErrNilLocation = errors.New("geodetic location must not be nil")
+
 	// ErrNoPrimaryTarget indicates an event spec missing its primary target.
 	ErrNoPrimaryTarget = errors.New("event spec must contain a primary target")
 	// ErrNoObserverLocation indicates visibility events require a geodetic location.
@@ -30,4 +35,28 @@ var (
 	ErrBracketingViolated = errors.New("solver: bracketing condition violated: f(a) and f(b) have the same sign")
 	// ErrEventNotFound indicates no event was found in the search window.
 	ErrEventNotFound = errors.New("no event found in search window")
+
+	// ErrUnknownSite indicates NewKnownSite found no entry matching the
+	// requested name (checked against every known site's name and
+	// aliases, case- and space-insensitive — see KnownSites).
+	ErrUnknownSite = errors.New("plan: unknown site name")
+
+	// ErrNoPhysicalRadius indicates AngularDiameter was asked for a body
+	// with no known equatorial radius (e.g. an asteroid or comet) — see
+	// BodyEquatorialRadius for the covered set.
+	ErrNoPhysicalRadius = errors.New("plan: no known physical radius for this body")
+	// ErrZeroDistance indicates AngularDiameter was asked to compute a
+	// diameter at zero (or negative) topocentric distance, which would
+	// otherwise divide by zero.
+	ErrZeroDistance = errors.New("plan: distance is zero or negative")
+
+	// ErrUnknownMeteorShower indicates NewMeteorShower found no entry
+	// matching the requested name (checked against every shower's Name and
+	// Code, case- and space-insensitive — see MeteorShowers).
+	ErrUnknownMeteorShower = errors.New("plan: unknown meteor shower name")
+
+	// ErrUnknownPlanetaryMoon indicates NewPlanetaryMoon found no entry
+	// matching the requested name (checked case- and space-insensitively
+	// against every entry's Name — see PlanetaryMoons).
+	ErrUnknownPlanetaryMoon = errors.New("plan: unknown planetary moon name")
 )

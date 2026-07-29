@@ -59,17 +59,21 @@ var (
 	_ Observable = (*Comet)(nil)
 	_ Observable = (*Satellite)(nil)
 	_ Observable = (*GenericBody)(nil)
+	_ Observable = (*PlanetaryMoon)(nil)
+	_ Observable = (*Constellation)(nil)
 
 	_ MovingBody = (*Planet)(nil)
 	_ MovingBody = (*Asteroid)(nil)
 	_ MovingBody = (*Comet)(nil)
 	_ MovingBody = (*Satellite)(nil)
 	_ MovingBody = (*GenericBody)(nil)
+	_ MovingBody = (*PlanetaryMoon)(nil)
 
 	_ MagnitudeComputer = (*Planet)(nil)
 	_ MagnitudeComputer = (*Asteroid)(nil)
 	_ MagnitudeComputer = (*Comet)(nil)
 	_ MagnitudeComputer = (*Satellite)(nil)
+	_ MagnitudeComputer = (*PlanetaryMoon)(nil)
 
 	_ StaticMagnitude = (*Star)(nil)
 	_ StaticMagnitude = (*DeepSkyObject)(nil)
