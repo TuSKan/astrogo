@@ -12,26 +12,30 @@ import (
 
 // bodyEquatorialRadiusM maps each Solar System body this package can
 // compute a real ephemeris position for to its published equatorial
-// radius, in metres — see constants/bodies.go for the values and their
-// IAU sourcing. The eph.ID-keyed map itself lives here rather than in
-// constants: constants sits below ephemeris in this codebase's layering
-// (see CLAUDE.md's Architecture section) and must stay dependency-free,
-// so it can only publish the bare radius values, not a table keyed by
-// ephemeris/core's eph.ID.
+// radius, in metres — see constants/iau2015.go for the values and their
+// per-body IAU sourcing. The eph.ID-keyed map itself lives here rather
+// than in constants: constants sits below ephemeris in this codebase's
+// layering (see CLAUDE.md's Architecture section) and imports nothing
+// but unit, so it can only publish the radii as bare constants.Constant
+// values, not a table keyed by ephemeris/core's eph.ID.
+//
+// Earth's entry is the WGS 84 semi-major axis, not an IAU2015 member —
+// it is exact to the WGS84 standard and consistent with IAU 2015 B3's
+// own Earth value.
 //
 //nolint:gochecknoglobals // fixed reference data, same convention as plan.planetaryMoons/knownSites
 var bodyEquatorialRadiusM = map[eph.ID]float64{
-	eph.Sun:     constants.SunEquatorialRadius,
-	eph.Moon:    constants.MoonEquatorialRadius,
-	eph.Mercury: constants.MercuryEquatorialRadius,
-	eph.Venus:   constants.VenusEquatorialRadius,
-	eph.Earth:   constants.WGS84SemiMajorAxis,
-	eph.Mars:    constants.MarsEquatorialRadius,
-	eph.Jupiter: constants.JupiterEquatorialRadius,
-	eph.Saturn:  constants.SaturnEquatorialRadius,
-	eph.Uranus:  constants.UranusEquatorialRadius,
-	eph.Neptune: constants.NeptuneEquatorialRadius,
-	eph.Pluto:   constants.PlutoEquatorialRadius,
+	eph.Sun:     constants.IAU.SunEquatorialRadius.Value,
+	eph.Moon:    constants.IAU.MoonEquatorialRadius.Value,
+	eph.Mercury: constants.IAU.MercuryEquatorialRadius.Value,
+	eph.Venus:   constants.IAU.VenusEquatorialRadius.Value,
+	eph.Earth:   constants.WGS84.SemiMajorAxis.Value,
+	eph.Mars:    constants.IAU.MarsEquatorialRadius.Value,
+	eph.Jupiter: constants.IAU.JupiterEquatorialRadius.Value,
+	eph.Saturn:  constants.IAU.SaturnEquatorialRadius.Value,
+	eph.Uranus:  constants.IAU.UranusEquatorialRadius.Value,
+	eph.Neptune: constants.IAU.NeptuneEquatorialRadius.Value,
+	eph.Pluto:   constants.IAU.PlutoEquatorialRadius.Value,
 }
 
 // BodyEquatorialRadius returns id's published equatorial radius in
@@ -78,7 +82,7 @@ func AngularDiameter(mb MovingBody, t time.Time, ctx *coord.Context) (angle.Angl
 		return angle.Zero(), fmt.Errorf("plan: angular diameter: %w", ErrZeroDistance)
 	}
 
-	radiusOverDist := radiusM / (topoDistAU * constants.AstronomicalUnit)
+	radiusOverDist := radiusM / (topoDistAU * constants.IAU.AstronomicalUnit.Value)
 	if radiusOverDist > 1 {
 		// Only reachable for a synthetic/broken distance placing the
 		// observer inside the body — clamp rather than let asin produce

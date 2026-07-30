@@ -18,10 +18,15 @@ import (
 )
 
 // kmPerAU is the number of kilometres in one Astronomical Unit.
-const kmPerAU = constants.AstronomicalUnit / 1e3 // 149597870.7 km
+//
+// var, not const: constants.IAU.AstronomicalUnit is a struct, and Go does
+// not permit selecting a struct field inside a constant expression.
+// constants.IAU (not IAU2015) so this automatically tracks whichever IAU
+// vintage constants.IAU currently points at — see constants/iau2015.go.
+var kmPerAU = constants.IAU.AstronomicalUnit.Value / 1e3 // 149597870.7 km
 
 // secPerDay is the number of seconds in a Julian day.
-const secPerDay = constants.JulianDaySeconds // 86400
+var secPerDay = constants.Derived.JulianDaySeconds.Value // 86400
 
 // ErrPropagation indicates an SGP4 propagation failure.
 var ErrPropagation = errors.New("satellite: sgp4 propagation failed")
