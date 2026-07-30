@@ -33,6 +33,11 @@ var (
 
 	// ErrBracketingViolated indicates f(a) and f(b) have the same sign in root finding.
 	ErrBracketingViolated = errors.New("solver: bracketing condition violated: f(a) and f(b) have the same sign")
+	// ErrNonFiniteEvaluation indicates an Evaluator returned NaN or ±Inf, or
+	// a solver's internal step computation produced a non-finite trial
+	// point — both FindRoot and FindExtremum guard against silently
+	// converging on (and returning as success) a non-finite result.
+	ErrNonFiniteEvaluation = errors.New("solver: evaluator returned a non-finite value")
 	// ErrEventNotFound indicates no event was found in the search window.
 	ErrEventNotFound = errors.New("no event found in search window")
 
