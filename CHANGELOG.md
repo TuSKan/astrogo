@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.0] — 2026-07-29
 ### Added
 - `constants.SI2019` (`c`, `h`, `k_B` — exact by the 2019 SI redefinition) and `constants.CODATA2022`/`constants.CODATA2018` (`G`, `m_e`, `m_p`, `α`, `σ_e`, each carrying its published standard uncertainty, verified against the live NIST CODATA tables) — the first fundamental physical constants in this library, published as separate per-adjustment sets rather than one silently-updated symbol so a caller can pin the CODATA vintage its reduction was made against. `constants.CODATA`/`constants.IAU` are unversioned aliases pointing at the currently-recommended vintage, so internal code and most callers never hardcode a year.
 - `constants.Constant` gains `Quantity()` (bridges into `unit.Quantity` for dimensional conversion), `RelativeUncertainty()`, and `String()`; `constants.Set`/`constants.Sets()` enumerate every set and member, so a pipeline can archive the exact provenance of every constant it used.
