@@ -15,6 +15,7 @@ import (
 // Routing logic:
 //   - Satellite TLE → *Satellite
 //   - Planet/Moon/Star with provider → *Planet
+//   - PlanetaryMoon (a name plan.NewPlanetaryMoon recognizes) with provider → *PlanetaryMoon
 //   - HasM1 (comet photometry) → *Comet
 //   - HasH (asteroid photometry) → *Asteroid
 //   - Star kind → *Star
@@ -29,6 +30,19 @@ func FromCatalog(c catalog.Target, p eph.Provider) Observable {
 
 	// ── Moving body with provider ──
 	if p != nil {
+		// PlanetaryMoon — resolve.KindPlanetaryMoon-tagged candidates (e.g.
+		// from plan/moons.go's gatherPlanetaryMoons) round-tripped through
+		// FromCatalog used to silently degrade to *GenericBody here, losing
+		// the H-G photometry NewPlanetaryMoon already knows how to build.
+		// An unrecognized name (not in plan's fixed moon table) falls
+		// through to the generic path below rather than failing, since
+		// FromCatalog has no error return.
+		if c.Kind == resolve.KindPlanetaryMoon {
+			if m, err := NewPlanetaryMoon(c.Name, p); err == nil {
+				return m
+			}
+		}
+
 		switch c.Kind { //nolint:exhaustive // only planet/moon/star routed here
 		case resolve.KindPlanet, resolve.KindMoon, resolve.KindStar:
 			// Sun/Moon/planets — the resolver uses KindStar for Sun
