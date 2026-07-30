@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Fixed
+- `ephemeris/jpl/spk`'s DAF/SPK binary reader no longer trusts file-derived integers (record counts, summary sizes, MAXDIM/KQ table indices, Chebyshev record layout) before validating them, closing several slice-bounds/makeslice panics and an unbounded-FWD-chain hang reachable from a corrupted or truncated kernel. New `FuzzNewReaderReadSummaries`/`FuzzEvaluateSegment`/`FuzzReadDoubles` fuzz the parser on every `go test ./...` run via their seed corpus.
 
 ## [0.11.0] — 2026-07-29
 ### Added

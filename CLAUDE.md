@@ -34,6 +34,18 @@ Tests are partitioned by build tag — the default `go test ./...` runs only fas
 - `validation` — numerical comparisons against JPL Horizons and SOFA fixtures, mostly under [ephemeris/jpl/validation/](ephemeris/jpl/validation/) and `plan/{usno,nasa_eclipse,astropixels}_test.go`.
 - `integration` — cross-provider tests with offline caches.
 
+## Fuzzing
+
+`ephemeris/jpl/spk/fuzz_test.go` fuzzes the hand-rolled DAF/SPK binary parser against corrupted, truncated, and adversarial kernel bytes — the property under test is "never panics or hangs on attacker-influenceable input," not correctness (that's covered elsewhere by `TestSPKReader`/`TestEvaluateType21`). Its seed corpus (`f.Add(...)` literals only — no checked-in binary fixtures) runs as an ordinary test under `go test ./...`, so it's part of every CI run for free. Extended fuzzing beyond the seed corpus is a manual, periodic step, not a CI gate — run it locally when touching `ephemeris/jpl/spk/reader.go`:
+
+```bash
+go test -run=^$ -fuzz=FuzzNewReaderReadSummaries -fuzztime=60s ./ephemeris/jpl/spk/
+go test -run=^$ -fuzz=FuzzEvaluateSegment -fuzztime=60s ./ephemeris/jpl/spk/
+go test -run=^$ -fuzz=FuzzReadDoubles -fuzztime=60s ./ephemeris/jpl/spk/
+```
+
+Any crasher Go writes to `testdata/fuzz/` should be committed — that's the one place a small binary fixture is legitimate here, since it's a regression test for a bug the fuzzer found, not a data source.
+
 ## Embedded data
 
 There is no `go:generate` step in this codebase — it was removed deliberately. No package uses `go:embed` either — every data source is obtained at runtime through `remote.GetFile`, either explicitly (`catalog/openngc`, see [catalog/openngc/openngc.go](catalog/openngc/openngc.go)) or via a lazy, on-first-query load (`time`'s Earth Orientation Parameters, see [time/eop.go](time/eop.go) and the unexported `time/internal/iers`).
