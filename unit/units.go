@@ -114,6 +114,11 @@ var (
 	// Day is 86400 seconds.
 	Day = Unit{Dimension: Time, ScaleFactor: 86400.0, Name: "day", Symbol: "d"}
 
+	// One is the dimensionless unity unit, for pure ratios (a flattening,
+	// the fine-structure constant, a radians-per-degree scale factor) that
+	// are not angles despite also being dimensionless — Compatible with
+	// Radian by dimension, but conceptually distinct, hence its own symbol.
+	One = Unit{Dimension: Dimensionless, ScaleFactor: 1.0, Name: "one", Symbol: "1"}
 	// Radian is the SI unit of angle (dimensionless).
 	Radian = Unit{Dimension: Dimensionless, ScaleFactor: 1.0, Name: "radian", Symbol: "rad"}
 	// Degree is π/180 radians.

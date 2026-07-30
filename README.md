@@ -619,7 +619,7 @@ flowchart TD
 | Package | Purpose | Status |
 | :--- | :--- | :--- |
 | `remote` | Centralized endpoint registry, HTTP client (retry/backoff), consent-gated downloads, configurable data storage | ✅ Stable |
-| `constants` | Universal and astronomical constants | ✅ Stable |
+| `constants` | Typed, versioned constant sets (SI 2019, CODATA, IAU 2015, WGS 84, derived) | ✅ Stable |
 | `angle` | Angular types, HMS/DMS parsing | ✅ Stable |
 | `vector` | 3D geometry primitives | ✅ Stable |
 | `time` | Astronomical time scales (JD-based, UTC/TAI/TT/TDB/UT1), Earth Orientation Parameters (DUT1, polar motion), epoch arithmetic (MJD, GAST, Julian epoch year, day-of-year) | ✅ Stable |

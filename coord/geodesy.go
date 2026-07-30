@@ -16,10 +16,16 @@ type Ellipsoid struct {
 }
 
 // WGS84 returns the WGS84 reference ellipsoid.
+//
+// The semi-major axis comes from the WGS 84 standard's own defining
+// parameters; the flattening f is derived (f = 1/(1/f)) rather than
+// tabulated by the standard, so constants publishes it in its Derived
+// set — see constants.WGS84.InverseFlattening for the value it comes
+// from.
 func WGS84() Ellipsoid {
 	return Ellipsoid{
-		A: constants.WGS84SemiMajorAxis,
-		F: constants.WGS84Flattening,
+		A: constants.WGS84.SemiMajorAxis.Value,
+		F: constants.Derived.WGS84Flattening.Value,
 	}
 }
 

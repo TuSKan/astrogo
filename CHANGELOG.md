@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `constants.SI2019` (`c`, `h`, `k_B` — exact by the 2019 SI redefinition) and `constants.CODATA2022`/`constants.CODATA2018` (`G`, `m_e`, `m_p`, `α`, `σ_e`, each carrying its published standard uncertainty, verified against the live NIST CODATA tables) — the first fundamental physical constants in this library, published as separate per-adjustment sets rather than one silently-updated symbol so a caller can pin the CODATA vintage its reduction was made against. `constants.CODATA`/`constants.IAU` are unversioned aliases pointing at the currently-recommended vintage, so internal code and most callers never hardcode a year.
+- `constants.Constant` gains `Quantity()` (bridges into `unit.Quantity` for dimensional conversion), `RelativeUncertainty()`, and `String()`; `constants.Set`/`constants.Sets()` enumerate every set and member, so a pipeline can archive the exact provenance of every constant it used.
+- `unit.One` — the dimensionless unity unit, for pure ratios (WGS 84 flattening, the fine-structure constant, the radian/degree scale factors).
+
+### Changed — BREAKING
+- **`constants` now publishes typed, versioned constant *sets* instead of 20 flat untyped consts.** Each value is a `constants.Constant` (Name, Symbol, Value, Uncertainty, `unit.Unit`, Reference, Exact) inside one of five sets — `SI2019`, `CODATA2022`/`CODATA2018`, `IAU2015` (the au, the nominal mean Earth radius, and the 10 body equatorial radii, each keeping its own IAU 2012 B2 / IAU 2015 B3 / WGCCRE 2015 reference), `WGS84` (defining `a` and `1/f`), and `Derived` (the exact arithmetic and angle-conversion factors, plus the computed WGS 84 flattening). Every call site moves from `constants.X` to `constants.<Set>.<Member>.Value`, e.g. `constants.WGS84SemiMajorAxis` → `constants.WGS84.SemiMajorAxis.Value`, `constants.SunEquatorialRadius` → `constants.IAU.SunEquatorialRadius.Value`, `constants.WGS84Flattening` → `constants.Derived.WGS84Flattening.Value`. No numeric value changed. The package now imports `unit` (a peer in the primitives layer, not an upward import).
+- **A `constants` value can no longer appear in a Go constant expression**, since it is now a struct field: a caller deriving a scale factor needs `var`, not `const` (`ephemeris/satellite`'s internal `kmPerAU`/`secPerDay` did).
+
 ## [0.10.0] — 2026-07-29
 ### Added
 - `remote.Capture`/`(Scope).Restore`/`WithScope` — scoped snapshot/restore for endpoint config, download consent, offline mode, and the data directory. Fixes two related test-isolation bugs in `Reset()` (missed the data directory; over-broad revocation of consent granted at a wider scope).
