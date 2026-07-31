@@ -89,6 +89,7 @@ The best way to see whether a library's numbers are trustworthy is to point it a
 | **Moonlit Sky Brightness** | How much does a full moon actually degrade your limiting magnitude, and by how many degrees of separation does that recover? | [`examples/18_sky_brightness/`](examples/18_sky_brightness/) |
 | **Satellite Tracking** | Predict ISS passes over your location from live NORAD/CelestTrak data — AOS, max elevation, LOS, ground track. | [`examples/12_satellite_tracking/`](examples/12_satellite_tracking/) |
 | **What's Visible Tonight** | What can I actually see in the sky tonight brighter than magnitude X — stars, deep-sky objects, planets, the Moon, even asteroids and comets, all in one query? | [`examples/20_whats_visible_tonight/`](examples/20_whats_visible_tonight/) |
+| **Meteor Shower Forecast** | The Perseids peak every August — but how many will a real observer at a real site actually see, hour by hour, once radiant altitude and real sky brightness are accounted for? | [`examples/21_meteor_shower_forecast/`](examples/21_meteor_shower_forecast/) |
 
 ---
 

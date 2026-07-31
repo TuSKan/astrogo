@@ -14,13 +14,29 @@ import (
 // Site represents a physical observing location.
 // Sites are immutable by convention.
 type Site struct {
-	location *coord.Geodetic
-	timeZone *time.Location
-	name     string
-	mpcCode  string
-	aliases  []string
-	horizon  angle.Angle
+	location       *coord.Geodetic
+	timeZone       *time.Location
+	name           string
+	mpcCode        string
+	aliases        []string
+	horizon        angle.Angle
+	horizonProfile HorizonProfile
 }
+
+// HorizonProfile computes the local horizon elevation limit at a given
+// azimuth, for a site whose sky isn't uniformly clear down to a single
+// scalar Horizon() — "my east horizon is blocked to 30° by a ridge, west
+// is open to the flat scalar limit." azimuth is measured from North,
+// increasing eastward, matching this package's existing azimuth
+// convention.
+//
+// This is purely additive data plumbing today: no production call site
+// consumes it yet (RiseSetThreshold and friends use HorizonDip, the
+// atmospheric dip from elevation, not this) — a future Horizon
+// constraint gating visibility per-azimuth (see docs/ROADMAP.md #29)
+// would be the natural consumer. Set it via WithHorizonProfile;
+// Site.HorizonAt falls back to the scalar Horizon() when none is set.
+type HorizonProfile func(azimuth angle.Angle) angle.Angle
 
 // KnownSites maps a modest, defensible starter list of well-known observing
 // sites (not an exhaustive observatory database) to fully-built *Site
@@ -166,6 +182,15 @@ func WithHorizon(h angle.Angle) SiteOption {
 	return func(s *Site) { s.horizon = h }
 }
 
+// WithHorizonProfile sets a per-azimuth horizon profile, consulted by
+// Site.HorizonAt in preference to the scalar Horizon() wherever it's set.
+// A nil profile (the default) makes HorizonAt fall back to Horizon() for
+// every azimuth. See HorizonProfile's doc comment for the current
+// (additive-only) scope.
+func WithHorizonProfile(p HorizonProfile) SiteOption {
+	return func(s *Site) { s.horizonProfile = p }
+}
+
 // WithTimeZone sets the site's local time zone. Defaults to UTC if omitted
 // (see Site.TimeZone).
 func WithTimeZone(tz *time.Location) SiteOption {
@@ -221,6 +246,21 @@ func (s *Site) Location() *coord.Geodetic { return s.location }
 
 // Horizon returns the local horizon elevation limit.
 func (s *Site) Horizon() angle.Angle { return s.horizon }
+
+// HorizonProfile returns the site's per-azimuth horizon profile, or nil if
+// none was set via WithHorizonProfile.
+func (s *Site) HorizonProfile() HorizonProfile { return s.horizonProfile }
+
+// HorizonAt returns the local horizon elevation limit at azimuth: the
+// profile's value if one is set via WithHorizonProfile, otherwise the
+// scalar Horizon() for every azimuth.
+func (s *Site) HorizonAt(azimuth angle.Angle) angle.Angle {
+	if s.horizonProfile != nil {
+		return s.horizonProfile(azimuth)
+	}
+
+	return s.horizon
+}
 
 // MPCCode returns the site's IAU Minor Planet Center observatory code, or
 // "" if none was set. Informational metadata only — see WithMPCCode.
@@ -334,6 +374,10 @@ func (s *Site) String() string {
 // any) a site came from, not part of its physical/observational identity.
 // A hand-built Site at Mauna Kea's exact coordinates is the same *site* as
 // the registry's Mauna Kea entry even without carrying its MPC code.
+// HorizonProfile also does not participate — func values are not
+// comparable in Go (a plain == would be a compile error), and there's no
+// meaningful equality to define between two arbitrary azimuth→altitude
+// functions short of calling both at every azimuth.
 //
 // Coordinates and horizon are compared with a tolerance of 1e-12 radians
 // (~0.2 μas) to avoid false negatives from float64 round-trip drift.
@@ -361,18 +405,19 @@ func (s *Site) Equal(other *Site) bool {
 
 // WithHorizon returns a copy of s with the given horizon limit.
 func (s *Site) WithHorizon(h angle.Angle) (*Site, error) {
-	return NewSite(s.name, s.location, WithHorizon(h), WithTimeZone(s.timeZone), WithMPCCode(s.mpcCode), WithSiteAliases(s.aliases...))
+	return NewSite(s.name, s.location, WithHorizon(h), WithTimeZone(s.timeZone), WithMPCCode(s.mpcCode), WithSiteAliases(s.aliases...), WithHorizonProfile(s.horizonProfile))
 }
 
 // WithTimeZone returns a copy of s with the given time zone.
 func (s *Site) WithTimeZone(tz *time.Location) *Site {
 	return &Site{
-		name:     s.name,
-		location: s.location,
-		horizon:  s.horizon,
-		timeZone: tz,
-		mpcCode:  s.mpcCode,
-		aliases:  s.Aliases(),
+		name:           s.name,
+		location:       s.location,
+		horizon:        s.horizon,
+		horizonProfile: s.horizonProfile,
+		timeZone:       tz,
+		mpcCode:        s.mpcCode,
+		aliases:        s.Aliases(),
 	}
 }
 

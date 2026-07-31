@@ -11,20 +11,19 @@ import "github.com/TuSKan/astrogo/unit"
 // Resolution B3, Table 1 (and Exact, since B3 defines its nominal
 // conversion constants as exact by convention); the other eight body
 // radii are IAU WGCCRE 2015 (Archinal et al. 2018, Celestial Mechanics
-// and Dynamical Astronomy 130:22, Table 4) and are measured, not exact —
-// but that report's own headline Table 4 column carries no quoted
-// uncertainty, so Uncertainty is 0 for those eight despite Exact being
-// false; see Constant's own doc comment for why Exact, not Uncertainty ==
-// 0, is the right test.
+// and Dynamical Astronomy 130:22, Table 4) and are measured, not exact.
+// Their Uncertainty values are the real published 1σ figures — verified
+// against JPL SSD's Planetary Physical Parameters
+// (ssd.jpl.nasa.gov/planets/phys_par.html) and Satellite Physical
+// Parameters (ssd.jpl.nasa.gov/sats/phys_par/) pages, both of which cite
+// this same Table 4 — not fabricated. Pluto's relative uncertainty
+// (1.6/1188.3 ≈ 1.3e-3) is the largest in this whole package, well above
+// every other member here, since its shape remains the least precisely
+// determined of the bodies in this table.
 //
 // There is deliberately no EarthEquatorialRadius member — Earth's
 // equatorial radius is WGS84.SemiMajorAxis, exact to the WGS84 standard
 // and consistent with B3's own Earth value.
-//
-// Known, deliberately unfixed wart: MercuryEquatorialRadius is WGCCRE
-// Table 4's 2440.53 km rounded to 2440.5 km, unlike every other body here
-// which matches Table 4 exactly. Un-rounding it changes a published
-// number and belongs in a separate, value-changing change, not this one.
 type IAUSet struct {
 	// Vintage names this set's currently-active IAU nominal-value realization.
 	Vintage string
@@ -82,22 +81,22 @@ var IAU2015 = IAUSet{
 	},
 	MoonEquatorialRadius: Constant{
 		Name: "Moon equatorial radius", Symbol: "R_Moon",
-		Value: 1_737_400.0, Unit: unit.Meter,
+		Value: 1_737_400.0, Uncertainty: 100.0, Unit: unit.Meter,
 		Reference: "IAU WGCCRE 2015 (Archinal et al. 2018, CMDA 130:22), Table 4",
 	},
 	MercuryEquatorialRadius: Constant{
 		Name: "Mercury equatorial radius", Symbol: "R_Mercury",
-		Value: 2_440_500.0, Unit: unit.Meter,
+		Value: 2_440_530.0, Uncertainty: 40.0, Unit: unit.Meter,
 		Reference: "IAU WGCCRE 2015 (Archinal et al. 2018, CMDA 130:22), Table 4",
 	},
 	VenusEquatorialRadius: Constant{
 		Name: "Venus equatorial radius", Symbol: "R_Venus",
-		Value: 6_051_800.0, Unit: unit.Meter,
+		Value: 6_051_800.0, Uncertainty: 1_000.0, Unit: unit.Meter,
 		Reference: "IAU WGCCRE 2015 (Archinal et al. 2018, CMDA 130:22), Table 4",
 	},
 	MarsEquatorialRadius: Constant{
 		Name: "Mars equatorial radius", Symbol: "R_Mars",
-		Value: 3_396_190.0, Unit: unit.Meter,
+		Value: 3_396_190.0, Uncertainty: 100.0, Unit: unit.Meter,
 		Reference: "IAU WGCCRE 2015 (Archinal et al. 2018, CMDA 130:22), Table 4",
 	},
 	JupiterEquatorialRadius: Constant{
@@ -107,22 +106,22 @@ var IAU2015 = IAUSet{
 	},
 	SaturnEquatorialRadius: Constant{
 		Name: "Saturn equatorial radius", Symbol: "R_Saturn",
-		Value: 60_268_000.0, Unit: unit.Meter,
+		Value: 60_268_000.0, Uncertainty: 4_000.0, Unit: unit.Meter,
 		Reference: "IAU WGCCRE 2015 (Archinal et al. 2018, CMDA 130:22), Table 4",
 	},
 	UranusEquatorialRadius: Constant{
 		Name: "Uranus equatorial radius", Symbol: "R_Uranus",
-		Value: 25_559_000.0, Unit: unit.Meter,
+		Value: 25_559_000.0, Uncertainty: 4_000.0, Unit: unit.Meter,
 		Reference: "IAU WGCCRE 2015 (Archinal et al. 2018, CMDA 130:22), Table 4",
 	},
 	NeptuneEquatorialRadius: Constant{
 		Name: "Neptune equatorial radius", Symbol: "R_Neptune",
-		Value: 24_764_000.0, Unit: unit.Meter,
+		Value: 24_764_000.0, Uncertainty: 15_000.0, Unit: unit.Meter,
 		Reference: "IAU WGCCRE 2015 (Archinal et al. 2018, CMDA 130:22), Table 4",
 	},
 	PlutoEquatorialRadius: Constant{
 		Name: "Pluto equatorial radius", Symbol: "R_Pluto",
-		Value: 1_188_300.0, Unit: unit.Meter,
+		Value: 1_188_300.0, Uncertainty: 1_600.0, Unit: unit.Meter,
 		Reference: "IAU WGCCRE 2015 (Archinal et al. 2018, CMDA 130:22), Table 4",
 	},
 }

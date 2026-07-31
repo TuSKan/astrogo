@@ -114,15 +114,15 @@ Krisciunas & Schaefer 1991, Leinert et al. 1998.
 
 ## 29. Horizon Profile Constraint
 
-**Status:** 🔲 Not Started
+**Status:** 🟡 In Progress
 
 Per-azimuth altitude minimums from terrain data, replacing the flat-horizon assumption.
 
-- [ ] `HorizonProfile` type — azimuth → minimum altitude lookup (interpolated)
+- [x] `HorizonProfile` type — azimuth → altitude function (`plan.HorizonProfile`, `Site.WithHorizonProfile`/`HorizonAt`)
 - [ ] Load from CSV/JSON (azimuth, altitude pairs)
 - [ ] Load from terrain raycasting (DEM/SRTM input)
 - [ ] `Horizon` constraint — rejects targets below the local terrain horizon at their azimuth
-- [ ] Integration with `NewSite` — optional profile per observatory
+- [x] Integration with `NewSite` — optional profile per observatory (via `WithHorizonProfile`, propagated through `Site.WithHorizon`/`WithTimeZone`)
 
 **Inspiration:** astroplan's `AltitudeConstraint` with custom horizon, KStars terrain profiles.
 
