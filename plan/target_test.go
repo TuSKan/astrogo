@@ -140,6 +140,21 @@ func TestFromCatalog(t *testing.T) {
 		t.Error("Expected Sun planet")
 	}
 
+	// Planet with no provider supplied — regression test: this used to
+	// silently fall through to a static *DeepSkyObject (built from
+	// whatever, or no, fixed coordinate happened to be on the target)
+	// instead of a real, moving *Planet, since the planet-routing switch
+	// only ever ran inside FromCatalog's `if p != nil` block. FromCatalog
+	// must fall back to eph.Default() for a major named body instead.
+	planetNoProvider := FromCatalog(catalog.Target{
+		ID: "4", Name: "Mars", Kind: resolve.KindPlanet,
+	}, nil)
+	if p, ok := planetNoProvider.(*Planet); !ok {
+		t.Errorf("FromCatalog Planet (no provider) returned %T, want *Planet", planetNoProvider)
+	} else if p.Name() != "Mars" {
+		t.Errorf("FromCatalog Planet (no provider) name = %q, want Mars", p.Name())
+	}
+
 	// DSO
 	dso := FromCatalog(catalog.Target{
 		Name: "M31", Kind: resolve.KindGalaxy, HasCoord: true,
