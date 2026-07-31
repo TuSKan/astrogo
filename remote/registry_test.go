@@ -163,7 +163,7 @@ func TestEnableAllDownloadsAndDisableAllDownloads(t *testing.T) {
 
 	EnableAllDownloads(50 << 20)
 
-	for _, id := range []EndpointID{IERSFinals2000A, NAIFSPK, NAIFLSK, OpenNGC} {
+	for _, id := range []EndpointID{IERSFinals2000A, NAIFSPK, NAIFLSK, OpenNGC, JPLHorizons} {
 		ok, maxSize := DownloadsEnabled(id)
 		if !ok {
 			t.Errorf("EnableAllDownloads: %s: expected DownloadsOK=true", id)
@@ -174,17 +174,56 @@ func TestEnableAllDownloadsAndDisableAllDownloads(t *testing.T) {
 		}
 	}
 
-	// A KindAPI endpoint has no download-consent gate — EnableAllDownloads
-	// must not touch it either way.
+	// A non-Downloadable KindAPI endpoint has no download-consent gate —
+	// EnableAllDownloads must not touch it either way.
 	if ok, _ := DownloadsEnabled(SIMBAD); ok {
-		t.Error("EnableAllDownloads must not grant consent to a KindAPI endpoint")
+		t.Error("EnableAllDownloads must not grant consent to a non-Downloadable endpoint")
 	}
 
 	DisableAllDownloads()
 
-	for _, id := range []EndpointID{IERSFinals2000A, NAIFSPK, NAIFLSK, OpenNGC} {
+	for _, id := range []EndpointID{IERSFinals2000A, NAIFSPK, NAIFLSK, OpenNGC, JPLHorizons} {
 		if ok, maxSize := DownloadsEnabled(id); ok || maxSize != 0 {
 			t.Errorf("DisableAllDownloads: %s: expected DownloadsOK=false, MaxDownloadSize=0, got ok=%v maxSize=%d", id, ok, maxSize)
+		}
+	}
+}
+
+// TestEnableAllDownloadsCoversHorizons is a regression test for a real
+// consent-scope bug: JPLHorizons is a KindAPI endpoint whose small-body
+// SPK generation is nonetheless a genuine file download
+// (ephemeris/jpl/spk.CacheAPI), gated the same as any KindFile endpoint
+// — but EnableAllDownloads used to only ever grant KindFile endpoints,
+// so a caller who called EnableAllDownloads reasonably believed every
+// download was unblocked while every asteroid/comet ephemeris fetch
+// still silently failed with ErrDownloadDenied.
+func TestEnableAllDownloadsCoversHorizons(t *testing.T) {
+	t.Cleanup(Reset)
+
+	EnableAllDownloads(0)
+
+	if ok, _ := DownloadsEnabled(JPLHorizons); !ok {
+		t.Fatal("EnableAllDownloads(0) must grant consent to JPLHorizons — its small-body SPK generation is a real file download")
+	}
+}
+
+// TestDownloadableEndpointsAreExactlyTheExpectedSet is a golden-list
+// assertion: a future endpoint that can genuinely perform a download
+// must have Downloadable set explicitly, or EnableAllDownloads silently
+// leaves it ungranted — the same failure mode this file's other tests
+// exist to catch for JPLHorizons.
+func TestDownloadableEndpointsAreExactlyTheExpectedSet(t *testing.T) {
+	want := map[EndpointID]bool{
+		IERSFinals2000A: true,
+		NAIFSPK:         true,
+		NAIFLSK:         true,
+		OpenNGC:         true,
+		JPLHorizons:     true,
+	}
+
+	for _, ep := range Endpoints() {
+		if ep.Downloadable != want[ep.ID] {
+			t.Errorf("Endpoint %s: Downloadable = %v, want %v", ep.ID, ep.Downloadable, want[ep.ID])
 		}
 	}
 }
