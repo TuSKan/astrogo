@@ -5,6 +5,7 @@ package sbdb
 
 import (
 	"context"
+	"math"
 	"net"
 	"testing"
 	"time"
@@ -128,7 +129,7 @@ func TestSBDBNetworkSearchBright(t *testing.T) {
 		t.Fatal("expected at least one real asteroid/comet from the live SBDB query API")
 	}
 
-	sawAsteroid, sawComet := false, false
+	sawAsteroid, sawComet, sawElements := false, false, false
 
 	for _, tgt := range got {
 		if tgt.Name == "" || tgt.SPKID == "" {
@@ -157,6 +158,32 @@ func TestSBDBNetworkSearchBright(t *testing.T) {
 		default:
 			t.Errorf("unexpected Kind from SearchBright: %+v", tgt)
 		}
+
+		// Phase 2 of the ephemeris-integration plan: queryBright's bulk
+		// path must carry real orbital elements too, not just identity +
+		// photometry — this is the live confirmation that sbdb_query.api
+		// genuinely accepts a/i/om/w/ma/epoch as field names (verified
+		// once by hand via curl during implementation; this test is what
+		// keeps that confirmed going forward).
+		//
+		// No narrow positive band on SemiMajorAxis: a live run at this
+		// MaxVMag genuinely includes distant TNOs/Sednoids (a up to
+		// ~1000 AU) and hyperbolic comets, whose SBDB convention is a
+		// *negative* semi-major axis — real diversity this decoder must
+		// carry faithfully, not reject (rejecting e>=1 is
+		// ephemeris/kepler.Validate's job downstream, not this test's).
+		// Only assert the value is finite and nonzero.
+		if tgt.HasElements {
+			sawElements = true
+
+			if tgt.SemiMajorAxis == 0 || math.IsNaN(tgt.SemiMajorAxis) || math.IsInf(tgt.SemiMajorAxis, 0) {
+				t.Errorf("%s: SemiMajorAxis = %v, expected a finite nonzero value", tgt.Name, tgt.SemiMajorAxis)
+			}
+
+			if tgt.Epoch.IsZero() {
+				t.Errorf("%s: HasElements=true but Epoch is zero", tgt.Name)
+			}
+		}
 	}
 
 	// At the generous prefilter this test uses (MaxVMag 1 + the
@@ -170,6 +197,10 @@ func TestSBDBNetworkSearchBright(t *testing.T) {
 
 	if !sawComet {
 		t.Error("expected at least one comet in the live result set")
+	}
+
+	if !sawElements {
+		t.Error("expected at least one candidate with HasElements=true from the live bulk query — queryBright's element fields may not be parsing")
 	}
 }
 
