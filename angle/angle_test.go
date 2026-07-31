@@ -301,6 +301,16 @@ func TestDMSString(t *testing.T) {
 		// precision >= 0) and rendered the invalid `20'60"`.
 		{"carry negative precision", `+10°21'00"`, 10 + 20.0/60 + 59.6/3600, -1},
 		{"carry p0 (same value)", `+10°21'00"`, 10 + 20.0/60 + 59.6/3600, 0},
+		// Regression: a seconds value that rounds up into two digits
+		// (9.6 -> "10" at p0) must not still get judged "single digit"
+		// by the unrounded value — that previously rendered the
+		// malformed "94°52'010"" (leading zero + the now-2-digit
+		// rounded value) instead of "94°52'10"".
+		{"leading-zero rounds to 10, p0", `+94°52'10"`, 94 + 52.0/60 + 9.6/3600, 0},
+		// Same defect at positive precision: 9.96 rounds to "10.0" at
+		// p1, but the unrounded-value check would still write a
+		// leading zero, producing "010.0" instead of "10.0".
+		{"leading-zero rounds to 10.0, p1", `+00°00'10.0"`, 9.96 / 3600, 1},
 	}
 	for i, c := range cases {
 		got := angle.Deg(c.deg).DMSString(c.precision)
@@ -327,6 +337,10 @@ func TestHMSString(t *testing.T) {
 		// Regression: negative precision must still carry, matching p0 —
 		// see the identical DMSString regression case above.
 		{"carry negative precision", "10h21m00s", 10 + 20.0/60 + 59.6/3600, -1},
+		// Regression: same leading-zero-vs-rounded-value defect as
+		// DMSString's — see the identical case there.
+		{"leading-zero rounds to 10, p0", "00h00m10s", 9.6 / 3600, 0},
+		{"leading-zero rounds to 10.0, p1", "00h00m10.0s", 9.96 / 3600, 1},
 	}
 	for i, c := range cases {
 		got := angle.Hour(c.hours).HMSString(c.precision)
