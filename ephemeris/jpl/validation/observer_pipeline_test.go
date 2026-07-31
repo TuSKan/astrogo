@@ -21,8 +21,13 @@ func init() {
 func TestPhase1ObserverPipelineAgainstHorizons(t *testing.T) {
 	requireHorizons(t)
 
-	// The Earth Observer setup
-	site, err := coord.NewGeodetic(angle.Deg(51.477), angle.Deg(0.0), 0.0)
+	// The Earth Observer setup — real Greenwich (Royal Observatory), matching
+	// plan.KnownSites' entry. NewGeodetic is (lon, lat, height); this used
+	// to be swapped (lon=51.477°, lat=0°, an equatorial point off Somalia,
+	// not Greenwich) — see docs/VALIDATION.md's precision-floor section for
+	// why that swap likely explains the historical Az/El deviation
+	// asymmetry this test's own comments below discuss.
+	site, err := coord.NewGeodetic(angle.Zero(), angle.Deg(51.4772), 45.0)
 	if err != nil {
 		t.Fatalf("Failed to create site: %v", err)
 	}
