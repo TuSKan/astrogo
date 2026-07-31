@@ -78,8 +78,35 @@ type observerPrecisionBody struct {
 // isolation. The pattern looks like a nonlinear combination of HA, dec,
 // and date together, consistent with several small sub-arcsecond effects
 // superimposed near the noise floor rather than one dominant unmodeled
-// term — a conclusion, not just an open question, reached after this
-// investigation, not asserted going in.
+// term.
+//
+// Two of the escalation items below were also checked directly, live,
+// rather than left as open guesses. Item 3 (whether Horizons' Azi/Elev
+// columns are genuinely airless under this test's query) is CONFIRMED
+// correct, from Horizons' own response header for this exact query:
+// "Atmos refraction: NO (AIRLESS)" — both sides are airless, ruling this
+// out as a contributing mismatch. A follow-up lead — Horizons' EOP is only
+// "DATA-BASED" (measured) through the query date and "PREDICTS"
+// (extrapolated) a few months past it, per its own header, so late-2026
+// epochs in this matrix mix measured and predicted Earth-orientation data
+// — was tested with a controlled same-target daily scan straddling that
+// boundary (a slow-moving outer planet, so elevation drifts smoothly day
+// to day) and is REFUTED: day-to-day azDiff noise was 0.043" just before
+// the boundary vs. 0.052" just after (a marginal, not qualitative,
+// difference), with no discontinuity in azDiff, elDiff, DUT1, or polar
+// motion at the boundary itself — the smallest day-to-day change in the
+// whole 90-day scan was the boundary crossing itself. An earlier
+// year-over-year comparison that looked more promising for this same
+// lead turned out to be confounded by the target's real elevation
+// differing between the two compared years.
+//
+// Net result after this investigation: the near-zenith-projection,
+// parallactic-angle, day-of-year, and EOP-prediction-divergence
+// hypotheses are each refuted; the airless-column assumption is confirmed
+// correct. What remains solid is the measured floor itself (total
+// separation, bounded — see max above) — a genuine, reproducible result,
+// even without a single identified root cause for the smaller azimuth
+// residual within it.
 // See toleranceArcsec's comment, the escalation-path comment at the
 // bottom of this file, and docs/VALIDATION.md for the full writeup.
 //
@@ -320,11 +347,22 @@ func absF(v float64) float64 {
 }
 
 // Escalation path if crossTrack doesn't explain the Az/El asymmetry —
-// each of these is its own future follow-up plan, not built here:
+// each remaining item is its own future follow-up plan, not built here.
+// Items 3 and (indirectly) 1 have already been checked live, see the
+// doc comment above:
 //  1. DUT1 interpolation in time/internal/iers (currently nearest/linear
-//     from the finals2000A table — verify against Horizons' own DUT1).
-//  2. Polar-motion application in coord/context.go's Pom00/Sp00 path.
+//     from the finals2000A table). A related lead — EOP prediction
+//     divergence between astrogo and Horizons for future dates — was
+//     tested directly (a controlled daily scan across Horizons' own
+//     measured/predicted EOP boundary) and refuted: no discontinuity at
+//     the boundary. The interpolation *method* itself (nearest vs. linear
+//     within the measured range) is still unverified against Horizons'
+//     own DUT1 and remains open.
+//  2. Polar-motion application in coord/context.go's Pom00/Sp00 path —
+//     still open, not checked.
 //  3. Whether Horizons' "Azi (a-app)" column is genuinely airless under
-//     the query parameters this test sends (REFRACTION not explicitly
-//     disabled — verify live).
-//  4. Light-time/aberration treatment of the injected astrometric position.
+//     the query parameters this test sends — CONFIRMED correct: Horizons'
+//     own response header states "Atmos refraction: NO (AIRLESS)" for
+//     this exact query.
+//  4. Light-time/aberration treatment of the injected astrometric
+//     position — still open, not checked.
