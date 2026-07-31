@@ -3,6 +3,7 @@
 package jpl_test
 
 import (
+	"math"
 	"testing"
 
 	"github.com/TuSKan/astrogo/angle"
@@ -53,8 +54,32 @@ type observerPrecisionBody struct {
 // investigation did not pin down a single root cause for the azimuth-
 // specific residual. DUT1 magnitude (up to ~0.07s, logged per row) is
 // roughly the right order of magnitude to produce a comparable
-// hour-angle-driven azimuth error and is the most promising escalation
-// lead, but the correlation isn't clean enough here to call it confirmed.
+// hour-angle-driven azimuth error but doesn't correlate cleanly either.
+//
+// A follow-up diagnostic (parallactic angle eta, logged per row — see the
+// eta computation inline below) was checked and also ruled out as the
+// sole driver: at a fixed site, rows with eta of opposite sign still show
+// azDiff of the same sign (Mauna Kea, Polar), and rows with similar eta
+// at the same site/date but different bodies show azDiff of opposite sign
+// (e.g. Mars vs. Mercury @ Mauna Kea, 2026-10-02). A diurnal/HA-only
+// explanation (DUT1, polar motion, or parallactic-angle projection alone)
+// does not fit that pattern. What loosely does: the sign flips cluster by
+// time of year more than by site geometry, which is more consistent with
+// an annual (aberration-scale) term than a purely diurnal one — a hint
+// toward escalation item 4 below.
+//
+// That hint was also checked (day-of-year, logged per row) and is
+// likewise refuted, more cleanly than eta: Mercury @ Mauna Kea on two
+// dates with nearly identical declination (-24.34 vs -24.83 deg) gives
+// opposite-sign azDiff (+0.419" vs -0.907"), and on a single date at the
+// same site Mars/Jupiter stay positive while Mercury flips negative. So
+// three single-variable hypotheses (elevation projection, parallactic
+// angle, day-of-year/declination) have each been tested and refuted in
+// isolation. The pattern looks like a nonlinear combination of HA, dec,
+// and date together, consistent with several small sub-arcsecond effects
+// superimposed near the noise floor rather than one dominant unmodeled
+// term — a conclusion, not just an open question, reached after this
+// investigation, not asserted going in.
 // See toleranceArcsec's comment, the escalation-path comment at the
 // bottom of this file, and docs/VALIDATION.md for the full writeup.
 //
@@ -218,9 +243,35 @@ func TestObserverPrecisionMatrix(t *testing.T) {
 
 				eop := obsTime.EOP()
 
-				t.Logf("%-8s @ %-16s %s  el=%6.2f  az=%7.2f  HA=%6.2fh  dec=%6.2f  DUT1=%+.3fs  xp=%.2e yp=%.2e  azDiff=%7.3f\"  elDiff=%6.3f\"  crossTrack=%6.3f\"  sep=%6.3f\"",
-					body.name, ns.name, obsTime.Format("2006-01-02 15:04"),
-					observed.Alt().Degrees(), observed.Az().Degrees(), haHours, hp.AppDec,
+				// Parallactic angle eta: the angle at the target, in the
+				// pole-zenith-target spherical triangle, between the
+				// direction to the north celestial pole and the direction
+				// to the zenith. Standard sine-rule form:
+				//   sin(eta) = cos(lat) * sin(HA) / cos(alt)
+				// computed here via atan2 (cos(lat)*sin(HA), tan(lat)*cos(dec) - sin(dec)*cos(HA))
+				// for a numerically stable full-circle result rather than a
+				// bare asin. Logged as a diagnostic only — not yet used in
+				// any assertion — to test whether the azDiff/elDiff split
+				// tracks parallactic angle (a timing/HA error's effect on
+				// Az vs Alt is eta-dependent, strongest near transit)
+				// better than it tracks elevation alone, which the doc
+				// comment above already found does not cleanly explain it.
+				haRad := haHours * 15 * math.Pi / 180
+				decRad := hp.AppDec * math.Pi / 180
+				latRad := loc.Lat().Radians()
+				parallacticDeg := math.Atan2(math.Sin(haRad), math.Tan(latRad)*math.Cos(decRad)-math.Sin(decRad)*math.Cos(haRad)) * 180 / math.Pi
+
+				// Day-of-year, logged as a diagnostic to test the annual-term
+				// hint noted above: eta was ruled out as the sole driver of
+				// the azDiff sign pattern, and the sign flips observed so
+				// far cluster more by time of year than by site geometry —
+				// consistent with an aberration-scale (annual) term rather
+				// than a purely diurnal one. Not yet used in any assertion.
+				doy := obsTime.DayOfYear()
+
+				t.Logf("%-8s @ %-16s %s (doy=%3.0f)  el=%6.2f  az=%7.2f  HA=%6.2fh  dec=%6.2f  eta=%7.2f  DUT1=%+.3fs  xp=%.2e yp=%.2e  azDiff=%7.3f\"  elDiff=%6.3f\"  crossTrack=%6.3f\"  sep=%6.3f\"",
+					body.name, ns.name, obsTime.Format("2006-01-02 15:04"), doy,
+					observed.Alt().Degrees(), observed.Az().Degrees(), haHours, hp.AppDec, parallacticDeg,
 					eop.DUT1, eop.XP, eop.YP,
 					azDiffDeg*3600, elDiffArcsec, crossTrackArcsec, sepArcsec)
 
