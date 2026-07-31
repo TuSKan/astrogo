@@ -178,24 +178,29 @@ func (a Angle) DMSString(precision int) string {
 	m := int64(rem)
 	s := (rem - float64(m)) * 60
 
-	// Handle rounding up to 60s. precision <= 0 and precision > 0 must use
-	// the exact same rounding rule the final digit-writing branch below
-	// applies (math.Round(s) vs pow-scaled rounding) — otherwise a value
-	// that carries only under one rule but not the other renders an
-	// invalid sexagesimal string like `00'60"` instead of carrying to the
-	// next unit. This previously only guarded precision >= 0, silently
-	// skipping the carry for any negative precision.
-	var carries bool
+	// Round s to the same precision that will actually be printed, once,
+	// up front — the carry check, the leading-zero decision, and the
+	// printed digits must all agree on the same rounded value. Using the
+	// raw (unrounded) s for the leading-zero check while printing a
+	// separately-rounded value can disagree right at a rounding
+	// boundary: unrounded s=9.96 prints as "10.0" at precision 1 (or
+	// s=9.6 prints as "10" at precision 0), but "s < 10" on the raw
+	// value still calls for a leading zero, producing the malformed
+	// "010.0"/"010". This also folds in the >=60 carry rule, which must
+	// use this same rounding (not a separately-computed one) so a value
+	// that carries under one rule but not the other can't render the
+	// invalid `00'60"` this previously risked for negative precision.
+	var sRounded float64
 
 	if precision > 0 {
 		pow := math.Pow10(precision)
-		carries = math.Round(s*pow)/pow >= 60
+		sRounded = math.Round(s*pow) / pow
 	} else {
-		carries = math.Round(s) >= 60
+		sRounded = math.Round(s)
 	}
 
-	if carries {
-		s = 0
+	if sRounded >= 60 {
+		sRounded = 0
 
 		m++
 		if m >= 60 {
@@ -219,14 +224,14 @@ func (a Angle) DMSString(precision int) string {
 	b.WriteString(strconv.FormatInt(m, 10))
 	b.WriteString("'")
 	// Second
-	if s < 10 {
+	if sRounded < 10 {
 		b.WriteByte('0')
 	}
 
 	if precision <= 0 {
-		b.WriteString(strconv.FormatInt(int64(math.Round(s)), 10))
+		b.WriteString(strconv.FormatInt(int64(sRounded), 10))
 	} else {
-		b.WriteString(strconv.FormatFloat(s, 'f', precision, 64))
+		b.WriteString(strconv.FormatFloat(sRounded, 'f', precision, 64))
 	}
 
 	b.WriteByte('"')
@@ -245,20 +250,22 @@ func (a Angle) HMSString(precision int) string {
 	m := int64(rem)
 	s := (rem - float64(m)) * 60
 
-	// Handle rounding up to 60s — see the identical comment in DMSString for
-	// why this must apply the same rule for negative precision, not just
-	// precision >= 0.
-	var carries bool
+	// Round s once up front and reuse it for the carry check, the
+	// leading-zero decision, and the printed digits — see the identical
+	// comment in DMSString for why using the raw (unrounded) s for the
+	// leading-zero check while printing a separately-rounded value is
+	// wrong at a rounding boundary.
+	var sRounded float64
 
 	if precision > 0 {
 		pow := math.Pow10(precision)
-		carries = math.Round(s*pow)/pow >= 60
+		sRounded = math.Round(s*pow) / pow
 	} else {
-		carries = math.Round(s) >= 60
+		sRounded = math.Round(s)
 	}
 
-	if carries {
-		s = 0
+	if sRounded >= 60 {
+		sRounded = 0
 
 		m++
 		if m >= 60 {
@@ -286,14 +293,14 @@ func (a Angle) HMSString(precision int) string {
 	b.WriteString(strconv.FormatInt(m, 10))
 	b.WriteString("m")
 	// Second
-	if s < 10 {
+	if sRounded < 10 {
 		b.WriteByte('0')
 	}
 
 	if precision <= 0 {
-		b.WriteString(strconv.FormatInt(int64(math.Round(s)), 10))
+		b.WriteString(strconv.FormatInt(int64(sRounded), 10))
 	} else {
-		b.WriteString(strconv.FormatFloat(s, 'f', precision, 64))
+		b.WriteString(strconv.FormatFloat(sRounded, 'f', precision, 64))
 	}
 
 	b.WriteString("s")
