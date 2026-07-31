@@ -50,6 +50,17 @@ func DefaultSolver() Solver {
 // It returns the metric value and an error if the computation fails.
 type Evaluator func(t time.Time) (float64, error)
 
+// finite reports whether v is neither NaN nor ±Inf. FindRoot and
+// FindExtremum both guard every evaluator result (and every internal step
+// computation derived from one) with this — without it, a NaN/Inf value
+// can silently satisfy every convergence/comparison test in these
+// algorithms (NaN comparisons are always false; Inf-Inf arithmetic yields
+// NaN) and be returned as a "successful" result with a nil error instead
+// of failing loudly.
+func finite(v float64) bool {
+	return !math.IsNaN(v) && !math.IsInf(v, 0)
+}
+
 // FindRoot finds the time t in [t1, t2] where eval(t) ≈ 0 using Chandrupatla's method.
 //
 // Precondition: eval(t1) and eval(t2) must have opposite signs (bracketing condition).
@@ -81,9 +92,17 @@ func (s Solver) FindRoot(eval Evaluator, t1, t2 time.Time) (time.Time, float64, 
 		return time.Time{}, 0, fmt.Errorf("solver: eval at a: %w", err)
 	}
 
+	if !finite(fa) {
+		return time.Time{}, 0, fmt.Errorf("solver: eval at a: %w", ErrNonFiniteEvaluation)
+	}
+
 	fb, err := eval(timeAt(xb))
 	if err != nil {
 		return time.Time{}, 0, fmt.Errorf("solver: eval at b: %w", err)
+	}
+
+	if !finite(fb) {
+		return time.Time{}, 0, fmt.Errorf("solver: eval at b: %w", ErrNonFiniteEvaluation)
 	}
 
 	// Verify bracketing condition
@@ -134,22 +153,40 @@ func (s Solver) FindRoot(eval Evaluator, t1, t2 time.Time) (time.Time, float64, 
 				t = fa*fc/((fb-fa)*(fb-fc)) +
 					(xc-xa)/(xb-xa)*fa*fb/((fc-fa)*(fc-fb))
 
-				// Clamp to prevent stepping too close to bracket boundaries
-				tlim := 0.5 * tolSec / math.Abs(xb-xa)
-				if tlim < 1e-12 {
-					tlim = 1e-12
-				}
+				// Clamp to prevent stepping too close to bracket boundaries.
+				// xb == xa (bracket already converged to zero width) would
+				// otherwise divide by zero here, producing an Inf/NaN tlim
+				// that propagates into xt below — bail to plain bisection
+				// (t stays 0.5) instead. In practice the outer loop's own
+				// convergence check (math.Abs(xb-xa) <= tolSec) already
+				// breaks before this is reached for any tolSec > 0, but
+				// guard it directly rather than relying on that.
+				if width := math.Abs(xb - xa); width > 0 {
+					tlim := 0.5 * tolSec / width
+					if tlim < 1e-12 {
+						tlim = 1e-12
+					}
 
-				t = math.Max(tlim, math.Min(1-tlim, t))
+					t = math.Max(tlim, math.Min(1-tlim, t))
+				} else {
+					t = 0.5
+				}
 			}
 		}
 
 		// ── Evaluate at new trial point ────────────────────────────────
 		xt := xa + t*(xb-xa)
+		if !finite(xt) {
+			return time.Time{}, 0, fmt.Errorf("solver: non-finite trial point at iter %d: %w", i, ErrNonFiniteEvaluation)
+		}
 
 		ft, err := eval(timeAt(xt))
 		if err != nil {
 			return time.Time{}, 0, fmt.Errorf("solver: eval at iter %d: %w", i, err)
+		}
+
+		if !finite(ft) {
+			return time.Time{}, 0, fmt.Errorf("solver: eval at iter %d: %w", i, ErrNonFiniteEvaluation)
 		}
 
 		// ── Update bracket and third point ─────────────────────────────
@@ -194,6 +231,10 @@ func (s Solver) FindExtremum(eval Evaluator, t1, t3 time.Time, isMax bool) (time
 		return time.Time{}, 0, fmt.Errorf("solver: extremum eval at x: %w", err)
 	}
 
+	if !finite(fx) {
+		return time.Time{}, 0, fmt.Errorf("solver: extremum eval at x: %w", ErrNonFiniteEvaluation)
+	}
+
 	if isMax {
 		fx = -fx
 	}
@@ -230,12 +271,17 @@ func (s Solver) FindExtremum(eval Evaluator, t1, t3 time.Time, isMax bool) (time
 				q = -q
 			}
 
-			// Accept parabolic step if within bracket and reducing distance
-			if math.Abs(p) < math.Abs(0.5*q*float64(e)) &&
+			// Accept parabolic step if within bracket and reducing distance.
+			// step is checked finite before use — a degenerate fit (q≈0)
+			// can otherwise produce an Inf/NaN p/q that would convert to
+			// time.Duration with implementation-defined behavior.
+			step := p / q
+			if finite(step) &&
+				math.Abs(p) < math.Abs(0.5*q*float64(e)) &&
 				p > q*float64(a.Sub(x)) &&
 				p < q*float64(b.Sub(x)) {
 				e = d
-				d = time.Duration(p / q)
+				d = time.Duration(step)
 				useParabolic = true
 			}
 		}
@@ -249,6 +295,9 @@ func (s Solver) FindExtremum(eval Evaluator, t1, t3 time.Time, isMax bool) (time
 			}
 
 			d = time.Duration(float64(e) * goldenRatio)
+			if !finite(float64(d)) {
+				return time.Time{}, 0, fmt.Errorf("solver: extremum non-finite step at iter %d: %w", i, ErrNonFiniteEvaluation)
+			}
 		}
 
 		// Evaluate at the new trial point
@@ -266,6 +315,10 @@ func (s Solver) FindExtremum(eval Evaluator, t1, t3 time.Time, isMax bool) (time
 		fu, err := eval(u)
 		if err != nil {
 			return time.Time{}, 0, fmt.Errorf("solver: extremum eval at iter %d: %w", i, err)
+		}
+
+		if !finite(fu) {
+			return time.Time{}, 0, fmt.Errorf("solver: extremum eval at iter %d: %w", i, ErrNonFiniteEvaluation)
 		}
 
 		if isMax {
@@ -305,7 +358,11 @@ func (s Solver) FindExtremum(eval Evaluator, t1, t3 time.Time, isMax bool) (time
 		return time.Time{}, 0, fmt.Errorf("solver: final eval: %w", err)
 	}
 
-	return x, finalVal, err
+	if !finite(finalVal) {
+		return time.Time{}, 0, fmt.Errorf("solver: final eval: %w", ErrNonFiniteEvaluation)
+	}
+
+	return x, finalVal, nil
 }
 
 // CrossesTarget checks whether a cyclic quantity moved through a target angle
