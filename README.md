@@ -90,6 +90,7 @@ The best way to see whether a library's numbers are trustworthy is to point it a
 | **Satellite Tracking** | Predict ISS passes over your location from live NORAD/CelestTrak data — AOS, max elevation, LOS, ground track. | [`examples/12_satellite_tracking/`](examples/12_satellite_tracking/) |
 | **What's Visible Tonight** | What can I actually see in the sky tonight brighter than magnitude X — stars, deep-sky objects, planets, the Moon, even asteroids and comets, all in one query? | [`examples/20_whats_visible_tonight/`](examples/20_whats_visible_tonight/) |
 | **Meteor Shower Forecast** | The Perseids peak every August — but how many will a real observer at a real site actually see, hour by hour, once radiant altitude and real sky brightness are accounted for? | [`examples/21_meteor_shower_forecast/`](examples/21_meteor_shower_forecast/) |
+| **Kepler Propagation, No Kernel** | Six orbital elements and an epoch — no SPK kernel, no network — is enough to place 1 Ceres in the sky and feed it straight into rise/transit/set, exactly like any catalog-resolved target. | [`examples/22_kepler_propagator/`](examples/22_kepler_propagator/) |
 
 ---
 

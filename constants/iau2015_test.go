@@ -1,6 +1,7 @@
 package constants_test
 
 import (
+	"math"
 	"strings"
 	"testing"
 
@@ -116,11 +117,63 @@ func TestIAU2015_BodyRadii_StrictlyDecreasing(t *testing.T) {
 	}
 }
 
-func TestIAU2015_AllMeters(t *testing.T) {
-	for _, c := range constants.IAU2015.All() {
+// TestIAU2015_LengthMembersAreMeters checks the length-dimensioned
+// subset of All() — the astronomical unit and the eleven body radii.
+// SunGravitationalParameter (m³/s²) and ObliquityJ2000 (radian) are
+// deliberately excluded, not oversights: see TestIAU2015_SunGravitationalParameter
+// and TestIAU2015_ObliquityJ2000.
+func TestIAU2015_LengthMembersAreMeters(t *testing.T) {
+	s := constants.IAU2015
+	lengths := []constants.Constant{
+		s.AstronomicalUnit, s.MeanEarthRadius,
+		s.SunEquatorialRadius, s.MoonEquatorialRadius, s.MercuryEquatorialRadius,
+		s.VenusEquatorialRadius, s.MarsEquatorialRadius, s.JupiterEquatorialRadius,
+		s.SaturnEquatorialRadius, s.UranusEquatorialRadius, s.NeptuneEquatorialRadius,
+		s.PlutoEquatorialRadius,
+	}
+
+	for _, c := range lengths {
 		if c.Unit != unit.Meter {
 			t.Errorf("%s: Unit = %v, want unit.Meter", c.Symbol, c.Unit)
 		}
+	}
+}
+
+// TestIAU2015_SunGravitationalParameter checks the nominal solar mass
+// parameter against IAU 2015 Resolution B3, Table 1 — verified live
+// against the peer-reviewed publication (Prša et al. 2016, AJ 152:41),
+// not transcribed from memory.
+func TestIAU2015_SunGravitationalParameter(t *testing.T) {
+	c := constants.IAU2015.SunGravitationalParameter
+	testutil.AssertExact(t, "SunGravitationalParameter", c.Value, 1.327_124_4e20)
+
+	if !c.Exact {
+		t.Errorf("SunGravitationalParameter.Exact = false, want true")
+	}
+
+	if c.Unit.Dimension != unit.Volume.Div(unit.Time.PowInt(2)) {
+		t.Errorf("SunGravitationalParameter.Unit.Dimension = %v, want m^3/s^2", c.Unit.Dimension)
+	}
+}
+
+// TestIAU2015_ObliquityJ2000 checks the IAU 2006 (P03) mean obliquity of
+// the ecliptic at J2000.0 — 84381.406 arcsec, the same value SOFA's
+// Obl06 returns at exactly the J2000.0 epoch (2451545.0 TT), verified
+// live against Hilton et al. 2006.
+func TestIAU2015_ObliquityJ2000(t *testing.T) {
+	c := constants.IAU2015.ObliquityJ2000
+
+	wantDeg := 84_381.406 / 3600.0
+	if got := c.Value * 180 / math.Pi; math.Abs(got-wantDeg) > 1e-12 {
+		t.Errorf("ObliquityJ2000 = %v deg, want %v deg", got, wantDeg)
+	}
+
+	if !c.Exact {
+		t.Errorf("ObliquityJ2000.Exact = false, want true")
+	}
+
+	if c.Unit != unit.Radian {
+		t.Errorf("ObliquityJ2000.Unit = %v, want unit.Radian", c.Unit)
 	}
 }
 

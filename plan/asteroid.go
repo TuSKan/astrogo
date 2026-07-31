@@ -73,6 +73,34 @@ func NewAsteroid(name string, id eph.ID, provider eph.Provider, opts ...Asteroid
 	return a
 }
 
+// keplerSyntheticID is the eph.ID used internally by NewAsteroidFromElements
+// to identify its propagated body to its own private eph.NewFromElements
+// provider. There is no real NAIF ID for an arbitrary elements-only body,
+// and none is needed: each NewAsteroidFromElements call gets its own
+// dedicated provider instance that only ever compares this ID against
+// itself, so a fixed sentinel — chosen well above the major-body ID
+// range (1-12, see ephemeris/core.ID's consts) so it can never be
+// mistaken for Sun/Earth/etc. — is safe regardless of how many such
+// Asteroids exist side by side.
+const keplerSyntheticID eph.ID = 1_000_000
+
+// NewAsteroidFromElements creates an asteroid whose position comes from
+// two-body Keplerian propagation of el (see eph.NewFromElements) rather
+// than a real SPK-kernel-backed provider — a lighter-weight, network-free
+// alternative for when only classical orbital elements, not a kernel,
+// are available. See eph.Elements and the ephemeris/kepler package doc
+// for the algorithm and its accuracy/scope limitations (elliptical
+// two-body only; no planetary perturbations). Unlike NewAsteroid, this
+// can fail (invalid elements), hence the error return.
+func NewAsteroidFromElements(name string, el eph.Elements, opts ...AsteroidOption) (*Asteroid, error) {
+	provider, err := eph.NewFromElements(keplerSyntheticID, el)
+	if err != nil {
+		return nil, fmt.Errorf("plan: new asteroid from elements: %w", err)
+	}
+
+	return NewAsteroid(name, keplerSyntheticID, provider, opts...), nil
+}
+
 // Name returns the asteroid's display name.
 func (a *Asteroid) Name() string { return a.name }
 
