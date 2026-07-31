@@ -8,8 +8,10 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/remote"
+	atime "github.com/TuSKan/astrogo/time"
 )
 
 // ErrAPIError indicates a SBDB API error response.
@@ -105,6 +107,7 @@ func (p *Provider) ResolveObject(ctx context.Context, req resolve.ObjectRequest)
 				Value string `json:"value"`
 			} `json:"phys_par"`
 			Orbit struct {
+				Epoch    string `json:"epoch"` // JD, TDB — confirmed live against the same convention as the elements' own "tp" (time of perihelion passage), which SBDB explicitly labels units:"TDB"
 				Elements []struct {
 					Name  string `json:"name"`
 					Value string `json:"value"`
@@ -136,17 +139,53 @@ func (p *Provider) ResolveObject(ctx context.Context, req resolve.ObjectRequest)
 		// response; checking the leading letter is the correct test.
 		isComet := strings.HasPrefix(payload.Object.Kind, "c")
 
-		var eccentricity float64
+		// SBDB's own real "orbit.elements" array (verified live, not
+		// guessed) publishes e, a (au), i/om/w/ma (deg) natively in the
+		// units resolve.Target's own orbital-element fields expect — no
+		// unit conversion needed, unlike Horizons' ELEMENTS ephemeris
+		// type (which defaults to km-seconds).
+		var (
+			eccentricity                           float64
+			semiMajorAxis, incl, node, argp, ma    float64
+			hasA, hasIncl, hasNode, hasArgp, hasMA bool
+		)
 
 		for _, el := range payload.Orbit.Elements {
-			if el.Name == "e" {
+			switch el.Name {
+			case "e":
 				if v, err := parseFloat(el.Value); err == nil {
 					eccentricity = v
 				}
-
-				break
+			case "a":
+				if v, err := parseFloat(el.Value); err == nil {
+					semiMajorAxis = v
+					hasA = true
+				}
+			case "i":
+				if v, err := parseFloat(el.Value); err == nil {
+					incl = v
+					hasIncl = true
+				}
+			case "om":
+				if v, err := parseFloat(el.Value); err == nil {
+					node = v
+					hasNode = true
+				}
+			case "w":
+				if v, err := parseFloat(el.Value); err == nil {
+					argp = v
+					hasArgp = true
+				}
+			case "ma":
+				if v, err := parseFloat(el.Value); err == nil {
+					ma = v
+					hasMA = true
+				}
 			}
 		}
+
+		epochJD, epochErr := parseFloat(payload.Orbit.Epoch)
+		hasElements := hasA && hasIncl && hasNode && hasArgp && hasMA && epochErr == nil
 
 		t := resolve.Target{
 			ID:          payload.Object.SpkID,
@@ -155,6 +194,17 @@ func (p *Provider) ResolveObject(ctx context.Context, req resolve.ObjectRequest)
 			SPKID:       payload.Object.SpkID,
 			Kind:        classifyKind(payload.Object.SpkID, payload.Object.OrbitClass.Code, eccentricity, isComet),
 			Catalog:     "sbdb",
+			HasElements: hasElements,
+		}
+
+		if hasElements {
+			t.Epoch = atime.FromJD(epochJD, atime.TDB)
+			t.SemiMajorAxis = semiMajorAxis
+			t.Eccentricity = eccentricity
+			t.Inclination = angle.Deg(incl)
+			t.AscendingNode = angle.Deg(node)
+			t.ArgPeriapsis = angle.Deg(argp)
+			t.MeanAnomaly = angle.Deg(ma)
 		}
 
 		// Parse physical parameters for magnitude computation.

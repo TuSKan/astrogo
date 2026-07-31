@@ -128,6 +128,41 @@ type Target struct {
 	RadialVelocity float64
 	// G1 is the phase coefficient of the target.
 	G1 float64
+	// SemiMajorAxis is the osculating semi-major axis of the target's
+	// heliocentric orbit, in astronomical units. Set only when HasElements
+	// is true.
+	SemiMajorAxis float64
+	// Eccentricity is the osculating eccentricity of the target's orbit.
+	// Set only when HasElements is true.
+	Eccentricity float64
+	// Inclination is the osculating inclination of the target's orbit.
+	// Set only when HasElements is true.
+	Inclination angle.Angle
+	// AscendingNode is the osculating longitude of the ascending node of
+	// the target's orbit. Set only when HasElements is true.
+	AscendingNode angle.Angle
+	// ArgPeriapsis is the osculating argument of periapsis of the
+	// target's orbit. Set only when HasElements is true.
+	ArgPeriapsis angle.Angle
+	// MeanAnomaly is the osculating mean anomaly of the target's orbit at
+	// Epoch. Set only when HasElements is true — and when it is, Epoch
+	// carries the elements' own epoch of osculation (the JPL/MPC
+	// convention, TDB), not a stellar catalog reference epoch like
+	// J2000. These six fields share their names with
+	// [github.com/TuSKan/astrogo/ephemeris.Elements]'s own fields
+	// one-for-one, so a caller can build one directly from a Target:
+	//
+	//	el := eph.Elements{
+	//		Epoch: t.Epoch, SemiMajorAxis: t.SemiMajorAxis, Eccentricity: t.Eccentricity,
+	//		Inclination: t.Inclination, AscendingNode: t.AscendingNode,
+	//		ArgPeriapsis: t.ArgPeriapsis, MeanAnomaly: t.MeanAnomaly,
+	//	}
+	MeanAnomaly angle.Angle
+	// HasElements is true if the target has real published osculating
+	// orbital elements (SemiMajorAxis, Eccentricity, Inclination,
+	// AscendingNode, ArgPeriapsis, MeanAnomaly, and an elements-epoch
+	// Epoch) — currently populated only by catalog/sbdb.
+	HasElements bool
 	// HasM1 is true if the target has M1.
 	HasM1 bool
 	// HasG1G2 is true if the target has G1 and G2.
