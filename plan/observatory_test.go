@@ -95,6 +95,117 @@ func TestWithHorizon(t *testing.T) {
 	testutil.AssertError(t, err)
 }
 
+// TestHorizonAt_FallsBackToScalar confirms HorizonAt returns the plain
+// scalar Horizon() at every azimuth when no profile was set — the
+// zero-value (nil HorizonProfile) case every existing Site already has.
+func TestHorizonAt_FallsBackToScalar(t *testing.T) {
+	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(0), 0)
+	site, _ := NewSite("Test", loc, WithHorizon(angle.Deg(12)))
+
+	if site.HorizonProfile() != nil {
+		t.Errorf("HorizonProfile() = %v, want nil (none set)", site.HorizonProfile())
+	}
+
+	for _, az := range []float64{0, 90, 180, 270, 359} {
+		got := site.HorizonAt(angle.Deg(az)).Degrees()
+		if math.Abs(got-12) > 1e-12 {
+			t.Errorf("HorizonAt(%g°) = %v, want 12 (scalar fallback)", az, got)
+		}
+	}
+}
+
+// TestHorizonAt_ProfileWinsOverScalar confirms a set profile takes
+// precedence over the scalar Horizon() wherever HorizonAt is consulted.
+func TestHorizonAt_ProfileWinsOverScalar(t *testing.T) {
+	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(0), 0)
+
+	// A ridge blocking the eastern sky to 30°, clear (0°) everywhere else.
+	profile := func(az angle.Angle) angle.Angle {
+		if az.Degrees() >= 45 && az.Degrees() <= 135 {
+			return angle.Deg(30)
+		}
+
+		return angle.Zero()
+	}
+
+	site, _ := NewSite("Test", loc, WithHorizon(angle.Deg(5)), WithHorizonProfile(profile))
+
+	if got := site.HorizonAt(angle.Deg(90)).Degrees(); math.Abs(got-30) > 1e-12 {
+		t.Errorf("HorizonAt(90°) = %v, want 30 (profile, not the 5° scalar)", got)
+	}
+
+	if got := site.HorizonAt(angle.Deg(270)).Degrees(); math.Abs(got-0) > 1e-12 {
+		t.Errorf("HorizonAt(270°) = %v, want 0 (profile, not the 5° scalar)", got)
+	}
+
+	// The plain scalar accessor is untouched by the profile.
+	if got := site.Horizon().Degrees(); math.Abs(got-5) > 1e-12 {
+		t.Errorf("Horizon() = %v, want 5 (unchanged scalar)", got)
+	}
+}
+
+// TestHorizonProfile_SurvivesCopyConstructors is a regression test for the
+// class of bug where a new Site field is silently dropped by one of the
+// two copy-with methods — both WithHorizon (rebuilds via NewSite+options)
+// and WithTimeZone (a hand-copied struct literal) must carry the profile
+// forward.
+func TestHorizonProfile_SurvivesCopyConstructors(t *testing.T) {
+	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(0), 0)
+	profile := func(angle.Angle) angle.Angle { return angle.Deg(7) }
+
+	site, _ := NewSite("Test", loc, WithHorizonProfile(profile))
+	if site.HorizonProfile() == nil {
+		t.Fatal("HorizonProfile() = nil right after construction, want the set profile")
+	}
+
+	viaHorizon, err := site.WithHorizon(angle.Deg(3))
+	testutil.AssertNoError(t, err)
+
+	if viaHorizon.HorizonProfile() == nil {
+		t.Error("WithHorizon dropped the horizon profile")
+	} else if got := viaHorizon.HorizonAt(angle.Zero()).Degrees(); math.Abs(got-7) > 1e-12 {
+		t.Errorf("WithHorizon-copied HorizonAt(0°) = %v, want 7 (from the surviving profile)", got)
+	}
+
+	tz, _ := time.LoadLocation("Europe/Rome")
+	viaTimeZone := site.WithTimeZone(tz)
+
+	if viaTimeZone.HorizonProfile() == nil {
+		t.Error("WithTimeZone dropped the horizon profile")
+	} else if got := viaTimeZone.HorizonAt(angle.Zero()).Degrees(); math.Abs(got-7) > 1e-12 {
+		t.Errorf("WithTimeZone-copied HorizonAt(0°) = %v, want 7 (from the surviving profile)", got)
+	}
+}
+
+// TestHorizonProfile_AzimuthWrap confirms a profile is consulted correctly
+// right at the 0°/360° azimuth wrap boundary — a plausible off-by-wrap bug
+// site for any future CSV/DEM-backed profile implementation to trip on.
+func TestHorizonProfile_AzimuthWrap(t *testing.T) {
+	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(0), 0)
+
+	// Blocked due north (a wrap-straddling band from 350° through 10°).
+	profile := func(az angle.Angle) angle.Angle {
+		d := az.Degrees()
+		if d >= 350 || d <= 10 {
+			return angle.Deg(25)
+		}
+
+		return angle.Zero()
+	}
+
+	site, _ := NewSite("Test", loc, WithHorizonProfile(profile))
+
+	for _, az := range []float64{0, 5, 355, 359.9} {
+		if got := site.HorizonAt(angle.Deg(az)).Degrees(); math.Abs(got-25) > 1e-9 {
+			t.Errorf("HorizonAt(%g°) = %v, want 25 (inside the wrap-straddling band)", az, got)
+		}
+	}
+
+	if got := site.HorizonAt(angle.Deg(180)).Degrees(); math.Abs(got-0) > 1e-12 {
+		t.Errorf("HorizonAt(180°) = %v, want 0 (outside the band)", got)
+	}
+}
+
 func TestLocalSiderealTime(t *testing.T) {
 	// Greenwich (lon=0) at J2000.0 (2000-01-01 12:00:00 UTC = JD 2451545.0)
 	// GAST at J2000.0 is approximately 18.697 hours = 280.46 degrees

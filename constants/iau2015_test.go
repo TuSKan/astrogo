@@ -42,7 +42,7 @@ func TestIAU2015_BodyRadii_Values(t *testing.T) {
 	}{
 		{"Sun", s.SunEquatorialRadius, 696_000_000.0},
 		{"Moon", s.MoonEquatorialRadius, 1_737_400.0},
-		{"Mercury", s.MercuryEquatorialRadius, 2_440_500.0},
+		{"Mercury", s.MercuryEquatorialRadius, 2_440_530.0},
 		{"Venus", s.VenusEquatorialRadius, 6_051_800.0},
 		{"Mars", s.MarsEquatorialRadius, 3_396_190.0},
 		{"Jupiter", s.JupiterEquatorialRadius, 71_492_000.0},
@@ -54,6 +54,35 @@ func TestIAU2015_BodyRadii_Values(t *testing.T) {
 
 	for _, tt := range cases {
 		testutil.AssertExact(t, tt.name+" equatorial radius", tt.c.Value, tt.want)
+	}
+}
+
+// TestIAU2015_BodyRadii_Uncertainties checks the real published WGCCRE
+// Table 4 1σ uncertainties for the eight measured body radii — verified
+// live against JPL SSD's Planetary Physical Parameters
+// (ssd.jpl.nasa.gov/planets/phys_par.html) and Satellite Physical
+// Parameters (ssd.jpl.nasa.gov/sats/phys_par/) pages, both of which cite
+// this same Table 4, not fabricated.
+func TestIAU2015_BodyRadii_Uncertainties(t *testing.T) {
+	s := constants.IAU2015
+
+	cases := []struct {
+		name string
+		c    constants.Constant
+		want float64
+	}{
+		{"Moon", s.MoonEquatorialRadius, 100.0},
+		{"Mercury", s.MercuryEquatorialRadius, 40.0},
+		{"Venus", s.VenusEquatorialRadius, 1_000.0},
+		{"Mars", s.MarsEquatorialRadius, 100.0},
+		{"Saturn", s.SaturnEquatorialRadius, 4_000.0},
+		{"Uranus", s.UranusEquatorialRadius, 4_000.0},
+		{"Neptune", s.NeptuneEquatorialRadius, 15_000.0},
+		{"Pluto", s.PlutoEquatorialRadius, 1_600.0},
+	}
+
+	for _, tt := range cases {
+		testutil.AssertExact(t, tt.name+" equatorial radius uncertainty", tt.c.Uncertainty, tt.want)
 	}
 }
 
@@ -118,8 +147,8 @@ func TestIAU2015_ExactnessSplit(t *testing.T) {
 			t.Errorf("%s: Exact = true, want false (WGCCRE-measured)", c.Symbol)
 		}
 
-		if c.Uncertainty != 0 {
-			t.Errorf("%s: Uncertainty = %v, want 0 (WGCCRE Table 4 quotes none)", c.Symbol, c.Uncertainty)
+		if c.Uncertainty <= 0 {
+			t.Errorf("%s: Uncertainty = %v, want a real positive WGCCRE Table 4 value", c.Symbol, c.Uncertainty)
 		}
 
 		if !strings.Contains(c.Reference, "WGCCRE") {

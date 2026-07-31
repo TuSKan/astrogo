@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+- `plan.HorizonProfile` / `Site.WithHorizonProfile`/`HorizonAt` — an optional per-azimuth horizon function, propagated through `Site.WithHorizon`/`WithTimeZone`, for a site whose sky isn't uniformly clear to a single scalar `Horizon()`. Purely additive data plumbing today — no production constraint consumes it yet (see `docs/ROADMAP.md` #29).
+- `examples/21_meteor_shower_forecast` — the Perseids' real solar-longitude activity window, radiant drift, and a real hourly `ObservedRate` forecast for Paranal.
+
+### Fixed
+- `constants.IAU2015.MercuryEquatorialRadius` corrected from the rounded 2440.5 km to WGCCRE Table 4's real 2440.53 km. `Uncertainty` is now populated with the real published 1σ values for all 8 measured WGCCRE body radii (Moon, Mercury, Venus, Mars, Saturn, Uranus, Neptune, Pluto) — verified against JPL SSD's Planetary/Satellite Physical Parameters pages, which cite the same source. Pluto's relative uncertainty (~1.35e-3) is now the package's largest, raising `TestConstants_RelativeUncertaintyIsSmall`'s gate from 1e-3 to 5e-3.
 
 ## [0.11.0] — 2026-07-29
 ### Added

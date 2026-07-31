@@ -232,8 +232,13 @@ func TestConstants_NoDuplicateNameOrSymbolWithinSet(t *testing.T) {
 }
 
 // TestConstants_RelativeUncertaintyIsSmall catches an exponent typo in an
-// uncertainty — the worst real case among this package's constants is G
-// at a relative uncertainty of ~2.2e-5.
+// uncertainty — the worst real case among this package's constants is
+// IAU2015's Pluto equatorial radius at a relative uncertainty of
+// ~1.35e-3 (1.6 km on 1188.3 km — Pluto's shape is the least precisely
+// determined body in the WGCCRE table), which is why the gate sits at
+// 5e-3 rather than tighter: still an order of magnitude of headroom
+// above every real value here, so a genuine exponent typo (10x the
+// legitimate uncertainty) still trips it.
 func TestConstants_RelativeUncertaintyIsSmall(t *testing.T) {
 	for _, s := range constants.Sets() {
 		for _, c := range s.All() {
@@ -241,7 +246,7 @@ func TestConstants_RelativeUncertaintyIsSmall(t *testing.T) {
 				continue
 			}
 
-			if rel := c.RelativeUncertainty(); rel >= 1e-3 {
+			if rel := c.RelativeUncertainty(); rel >= 5e-3 {
 				t.Errorf("%s: %s has implausibly large relative uncertainty %v", s.Name(), c.Symbol, rel)
 			}
 		}
