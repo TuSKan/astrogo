@@ -707,6 +707,27 @@ var scalarFieldRules = []fieldRule{
 			setProvenance(dst, "PhysicalParams", provider)
 		},
 	},
+	{
+		// SBDB-only osculating orbital-element cluster — Epoch here is the
+		// elements' own epoch of osculation, so it's taken alongside them
+		// as one coupled unit rather than through the separate Epoch rule
+		// above (which would let a stellar-catalog epoch from another
+		// provider silently mismatch these elements).
+		precedence: []string{"sbdb"},
+		hasField:   func(t Target) bool { return t.HasElements },
+		take: func(dst *Target, src Target, provider string) {
+			dst.HasElements = true
+			dst.Epoch = src.Epoch
+			dst.SemiMajorAxis = src.SemiMajorAxis
+			dst.Eccentricity = src.Eccentricity
+			dst.Inclination = src.Inclination
+			dst.AscendingNode = src.AscendingNode
+			dst.ArgPeriapsis = src.ArgPeriapsis
+			dst.MeanAnomaly = src.MeanAnomaly
+			setProvenance(dst, "OrbitalElements", provider)
+			setProvenance(dst, "Epoch", provider) // overwrites whatever the generic Epoch rule above set — this one is authoritative for an elements-bearing Target
+		},
+	},
 }
 
 // astrometricPrecedence orders providers for Coord/Parallax/PmRA/PmDec,
