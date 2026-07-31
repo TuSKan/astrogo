@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Fixed
+- `plan.Solver.FindRoot`/`FindExtremum` no longer silently return a non-finite (NaN/±Inf) result as a success — both now guard every evaluator output and internal step computation, returning the new `plan.ErrNonFiniteEvaluation` instead. Also fixes a latent divide-by-zero in `FindRoot`'s inverse-quadratic-interpolation step-clamp when the bracket has already converged to zero width.
 
 ## [0.11.0] — 2026-07-29
 ### Added
