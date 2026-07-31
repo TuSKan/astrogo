@@ -1,12 +1,16 @@
 // Package main propagates 1 Ceres from its real published heliocentric
-// osculating orbital elements — no SPK kernel, no network access — via
-// ephemeris/kepler's two-body Keplerian propagator, then feeds the
-// resulting Observable straight into the same rise/transit/set machinery
-// every other target in this library uses.
+// osculating orbital elements — resolved live from JPL SBDB, no SPK
+// kernel needed — via ephemeris/kepler's two-body Keplerian propagator,
+// then feeds the resulting Observable straight into the same
+// rise/transit/set machinery every other target in this library uses.
 //
 // This showcase demonstrates:
+//   - catalog/sbdb decoding a resolve.Target's real osculating elements
+//     (HasElements/SemiMajorAxis/Eccentricity/.../Epoch) directly from
+//     SBDB's own orbit.elements payload — no manual Horizons ELEMENTS
+//     query or unit conversion needed
 //   - eph.NewFromElements / plan.NewAsteroidFromElements: a full
-//     Observable built from six numbers and an epoch, nothing else
+//     Observable built from those six numbers and an epoch, nothing else
 //   - Position/magnitude drifting away from a kernel-backed ephemeris as
 //     |t - Epoch| grows, since planetary perturbations aren't modeled
 //   - plan.VisibilityEvents working on a Kepler-propagated body exactly
@@ -16,39 +20,47 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 
-	"github.com/TuSKan/astrogo/angle"
+	"github.com/TuSKan/astrogo/catalog"
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/plan"
-	"github.com/TuSKan/astrogo/time"
 )
 
 func main() {
-	// Real osculating elements for 1 Ceres, fetched live from JPL Horizons
-	// (EPHEM_TYPE=ELEMENTS, CENTER='@10', TIME_TYPE=TDB) at the epoch
-	// below — not fabricated, and re-verifiable with any Horizons client.
-	epoch := time.FromJDParts(2461041.5, 0, time.TDB) // 2026-01-01 00:00 TDB
+	// Resolve 1 Ceres's real, current osculating elements live from JPL
+	// SBDB — catalog/sbdb decodes orbit.elements (e, a, i, om, w, ma) and
+	// orbit.epoch directly, natively in AU/degrees, no unit conversion.
+	resolver := catalog.NewResolver(catalog.SBDB)
 
-	const kmPerAU = 149_597_870.7
+	target, err := resolver.Resolve(context.Background(), "1")
+	if err != nil {
+		log.Fatalf("resolve 1 Ceres: %v", err)
+	}
+
+	if !target.HasElements {
+		log.Fatalf("SBDB response for %q carried no orbital elements", target.Name)
+	}
 
 	el := eph.Elements{
-		Epoch:         epoch,
-		SemiMajorAxis: 4.137214871842388e8 / kmPerAU, // ~2.766 AU
-		Eccentricity:  7.960223186187999e-02,
-		Inclination:   angle.Deg(10.58794645426135),
-		AscendingNode: angle.Deg(80.24910869423201),
-		ArgPeriapsis:  angle.Deg(73.30682825990756),
-		MeanAnomaly:   angle.Deg(240.3212260946607),
+		Epoch:         target.Epoch,
+		SemiMajorAxis: target.SemiMajorAxis,
+		Eccentricity:  target.Eccentricity,
+		Inclination:   target.Inclination,
+		AscendingNode: target.AscendingNode,
+		ArgPeriapsis:  target.ArgPeriapsis,
+		MeanAnomaly:   target.MeanAnomaly,
 	}
+	epoch := el.Epoch
 
 	fmt.Println("═══════════════════════════════════════════════════════════════════")
 	fmt.Println("  1 CERES — two-body Keplerian propagation from published elements")
-	fmt.Println("  AstroGo | ephemeris/kepler | no SPK kernel, no network access")
+	fmt.Println("  AstroGo | ephemeris/kepler | elements resolved live from JPL SBDB")
 	fmt.Println("═══════════════════════════════════════════════════════════════════")
 	fmt.Println()
-	fmt.Println("── Osculating elements (JPL Horizons, epoch below) ────────────────")
+	fmt.Println("── Osculating elements (JPL SBDB, epoch below) ─────────────────────")
 	fmt.Println()
 	fmt.Printf("  Epoch            %s TDB\n", epoch.Format("2006-01-02 15:04:05"))
 	fmt.Printf("  Semi-major axis  %.6f AU\n", el.SemiMajorAxis)
@@ -58,11 +70,15 @@ func main() {
 	fmt.Printf("  Arg. periapsis   %s\n", el.ArgPeriapsis.DMSString(1))
 	fmt.Printf("  Mean anomaly     %s (at epoch)\n", el.MeanAnomaly.DMSString(1))
 
-	// Note what does NOT happen here: no remote.EnableDownloads, no SPK
+	if !target.HasH {
+		log.Fatalf("SBDB response for %q carried no H/G photometric parameters", target.Name)
+	}
+
+	// Note what does NOT happen here: no remote.EnableDownloads for a
 	// kernel, no de440s (~32 MB) download — eph.NewFromElements's default
-	// base provider is pure analytical SOFA (Sun/Moon/planets), so this
-	// entire example runs offline from six numbers and an epoch.
-	asteroid, err := plan.NewAsteroidFromElements("1 Ceres", el, plan.WithHG(3.34, 0.12))
+	// base provider is pure analytical SOFA (Sun/Moon/planets), so once
+	// the elements above are in hand, everything from here runs offline.
+	asteroid, err := plan.NewAsteroidFromElements(target.Name, el, plan.WithHG(target.H, target.G))
 	if err != nil {
 		log.Fatalf("new asteroid from elements: %v", err)
 	}

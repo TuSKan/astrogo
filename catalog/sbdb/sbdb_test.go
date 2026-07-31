@@ -3,6 +3,7 @@ package sbdb
 import (
 	"context"
 	"fmt"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -52,6 +53,12 @@ func TestSBDBResolver(t *testing.T) {
 	// not an ad hoc resolve.Kind("Asteroid") string built outside the enum.
 	if tar.Kind != resolve.KindAsteroid {
 		t.Errorf("Kind = %q, want %q", tar.Kind, resolve.KindAsteroid)
+	}
+
+	// This fixture has no "orbit" object at all — HasElements must stay
+	// false rather than reporting zero-valued elements as real ones.
+	if tar.HasElements {
+		t.Error("HasElements = true, want false: fixture has no orbit.elements")
 	}
 
 	// Test cache bypassing HTTP mock and testing async SeqIterator
@@ -110,6 +117,125 @@ func TestSBDBResolver_CometKind(t *testing.T) {
 
 	if tar.Kind != resolve.KindComet {
 		t.Errorf("Kind = %q, want %q", tar.Kind, resolve.KindComet)
+	}
+}
+
+// TestSBDBResolver_OrbitalElements uses a fixture matching the real live
+// SBDB response for 1 Ceres (fields trimmed to what parsing needs),
+// fetched and verified live before this test was written — not
+// fabricated. SBDB natively publishes a in au and i/om/w/ma in degrees,
+// so this also confirms no unit conversion is silently applied.
+func TestSBDBResolver_OrbitalElements(t *testing.T) {
+	jsonData := `{
+		"object": {
+			"spkid": "20000001",
+			"fullname": "1 Ceres (A801 AA)",
+			"des": "1",
+			"kind": "an",
+			"orbit_class": {"code": "MBA"}
+		},
+		"orbit": {
+			"epoch": "2461200.5",
+			"elements": [
+				{"name": "e", "value": "0.0797"},
+				{"name": "a", "value": "2.77"},
+				{"name": "q", "value": "2.55"},
+				{"name": "i", "value": "10.6"},
+				{"name": "om", "value": "80.2"},
+				{"name": "w", "value": "73.3"},
+				{"name": "ma", "value": "274"},
+				{"name": "tp", "value": "2461599.841"},
+				{"name": "per", "value": "1680"}
+			]
+		}
+	}`
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+
+		if _, err := fmt.Fprint(w, jsonData); err != nil {
+			t.Errorf("failed to write response: %v", err)
+		}
+	}))
+	defer server.Close()
+
+	t.Cleanup(remote.Reset)
+
+	if err := remote.SetURL(remote.JPLSBDB, server.URL); err != nil {
+		t.Fatal(err)
+	}
+
+	prov := New()
+
+	tar, ok := prov.Resolve(context.Background(), "ceres")
+	if !ok {
+		t.Fatalf("Failed to resolve Ceres")
+	}
+
+	if !tar.HasElements {
+		t.Fatal("HasElements = false, want true: fixture has complete orbit.elements + epoch")
+	}
+
+	testutil.AssertNear(t, "SemiMajorAxis", tar.SemiMajorAxis, 2.77, 1e-9)
+	testutil.AssertNear(t, "Eccentricity", tar.Eccentricity, 0.0797, 1e-9)
+	testutil.AssertNear(t, "Inclination", tar.Inclination.Degrees(), 10.6, 1e-9)
+	testutil.AssertNear(t, "AscendingNode", tar.AscendingNode.Degrees(), 80.2, 1e-9)
+	testutil.AssertNear(t, "ArgPeriapsis", tar.ArgPeriapsis.Degrees(), 73.3, 1e-9)
+	testutil.AssertNear(t, "MeanAnomaly", tar.MeanAnomaly.Degrees(), 274, 1e-9)
+
+	wantEpochJD, wantEpochFrac := tar.Epoch.JDParts()
+	if gotJD := wantEpochJD + wantEpochFrac; math.Abs(gotJD-2461200.5) > 1e-6 {
+		t.Errorf("Epoch JD = %v, want 2461200.5", gotJD)
+	}
+}
+
+// TestSBDBResolver_IncompleteElements confirms a partial elements set
+// (missing "ma" here) leaves HasElements false rather than reporting an
+// incomplete, unusable set of orbital elements as real ones.
+func TestSBDBResolver_IncompleteElements(t *testing.T) {
+	jsonData := `{
+		"object": {
+			"spkid": "20000001",
+			"fullname": "1 Ceres (A801 AA)",
+			"des": "1",
+			"kind": "an"
+		},
+		"orbit": {
+			"epoch": "2461200.5",
+			"elements": [
+				{"name": "e", "value": "0.0797"},
+				{"name": "a", "value": "2.77"},
+				{"name": "i", "value": "10.6"},
+				{"name": "om", "value": "80.2"},
+				{"name": "w", "value": "73.3"}
+			]
+		}
+	}`
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+
+		if _, err := fmt.Fprint(w, jsonData); err != nil {
+			t.Errorf("failed to write response: %v", err)
+		}
+	}))
+	defer server.Close()
+
+	t.Cleanup(remote.Reset)
+
+	if err := remote.SetURL(remote.JPLSBDB, server.URL); err != nil {
+		t.Fatal(err)
+	}
+
+	prov := New()
+
+	tar, ok := prov.Resolve(context.Background(), "ceres")
+	if !ok {
+		t.Fatalf("Failed to resolve Ceres")
+	}
+
+	if tar.HasElements {
+		t.Error("HasElements = true, want false: fixture is missing mean anomaly (ma)")
 	}
 }
 
