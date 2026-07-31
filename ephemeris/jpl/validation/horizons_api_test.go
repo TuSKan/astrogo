@@ -237,3 +237,126 @@ func fetchObserverTable(naifID int, bodyName string, lon, lat, height float64, s
 
 	return target, nil
 }
+
+// parseObserverRow decodes one CSV row of a Horizons OBSERVER-table
+// response into an ObserverPoint. The column layout is read from the END
+// of the row (cLen-9, cLen-8, ...) rather than fixed positions, because
+// the leading columns vary in count depending on which optional
+// solar/lunar-presence flag columns Horizons includes — see
+// fetchObserverTable's own comment for the confirmed real layout. Shared
+// by fetchObserverTable (single-row) and fetchObserverSeries (every row).
+func parseObserverRow(cols []string, bodyName string) ObserverPoint {
+	cLen := len(cols)
+
+	parseFloat := func(idx int) float64 {
+		v, _ := strconv.ParseFloat(strings.TrimSpace(cols[idx]), 64)
+		return v
+	}
+
+	parseAngleStr := func(idx int, isRA bool) float64 {
+		s := strings.TrimSpace(cols[idx])
+		parts := strings.Fields(s)
+		if len(parts) != 3 {
+			return 0
+		}
+		d, _ := strconv.ParseFloat(parts[0], 64)
+		m, _ := strconv.ParseFloat(parts[1], 64)
+		sec, _ := strconv.ParseFloat(parts[2], 64)
+
+		sign := 1.0
+		if strings.HasPrefix(s, "-") {
+			sign = -1.0
+			d = math.Abs(d)
+		}
+
+		val := d + m/60.0 + sec/3600.0
+		if isRA {
+			val *= 15.0
+		}
+		return sign * val
+	}
+
+	// CAL_FORMAT='JD' (set by both callers) guarantees cols[0] is the bare
+	// Julian Date, regardless of how many presence-flag columns follow it —
+	// same JD-to-ET conversion fetchVector uses.
+	etSeconds := (parseFloat(0) - 2451545.0) * 86400.0
+
+	return ObserverPoint{
+		Body:      bodyName,
+		ET:        etSeconds,
+		AstroRA:   parseAngleStr(cLen-9, true),
+		AstroDec:  parseAngleStr(cLen-8, false),
+		AppRA:     parseAngleStr(cLen-7, true),
+		AppDec:    parseAngleStr(cLen-6, false),
+		Azimuth:   parseFloat(cLen - 5),
+		Elevation: parseFloat(cLen - 4),
+		Range:     parseFloat(cLen - 3),
+	}
+}
+
+// fetchObserverSeries queries the Horizons API for a ground-based observer
+// across a time range (START_TIME/STOP_TIME/STEP_SIZE), returning every row
+// of the OBSERVER table — unlike fetchObserverTable, which only parses
+// lines[0]. This lets the precision-floor matrix cover many epochs per
+// (body, site) pair in a single request instead of one request per epoch.
+func fetchObserverSeries(naifID int, bodyName string, lon, lat, height float64, startStr, stopStr, stepStr string) ([]ObserverPoint, error) {
+	baseURL := "https://ssd.jpl.nasa.gov/api/horizons.api"
+
+	params := url.Values{}
+	params.Add("format", "text")
+	params.Add("COMMAND", fmt.Sprintf("'%d'", naifID))
+	params.Add("CENTER", "'coord@399'") // Earth Observer
+	params.Add("SITE_COORD", fmt.Sprintf("'%f,%f,%f'", lon, lat, height/1000.0))
+	params.Add("MAKE_EPHEM", "'YES'")
+	params.Add("EPHEM_TYPE", "'OBSERVER'")
+	params.Add("START_TIME", fmt.Sprintf("'%s'", startStr))
+	params.Add("STOP_TIME", fmt.Sprintf("'%s'", stopStr))
+	params.Add("STEP_SIZE", fmt.Sprintf("'%s'", stepStr))
+	params.Add("QUANTITIES", "'1,2,4,20'")
+	params.Add("CAL_FORMAT", "'JD'")
+	params.Add("CSV_FORMAT", "'YES'")
+	params.Add("OBJ_DATA", "'NO'")
+
+	encodedQuery := strings.ReplaceAll(params.Encode(), "+", "%20")
+	reqURL := fmt.Sprintf("%s?%s", baseURL, encodedQuery)
+
+	resp, err := http.Get(reqURL)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	bodyBytes, _ := io.ReadAll(resp.Body)
+	responseStr := string(bodyBytes)
+
+	soeIdx := strings.Index(responseStr, "$$SOE")
+	eoeIdx := strings.Index(responseStr, "$$EOE")
+	if soeIdx == -1 || eoeIdx == -1 {
+		return nil, fmt.Errorf("ephemeris data not found in response")
+	}
+
+	csvBlock := responseStr[soeIdx+6 : eoeIdx]
+	lines := strings.Split(strings.TrimSpace(csvBlock), "\n")
+
+	points := make([]ObserverPoint, 0, len(lines))
+
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+
+		cols := strings.Split(line, ",")
+		if len(cols) < 8 {
+			return nil, fmt.Errorf("unexpected column count in observer output: %d", len(cols))
+		}
+
+		points = append(points, parseObserverRow(cols, bodyName))
+	}
+
+	if len(points) == 0 {
+		return nil, fmt.Errorf("no observer rows found")
+	}
+
+	return points, nil
+}
