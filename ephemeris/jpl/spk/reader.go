@@ -246,40 +246,91 @@ func (r *Reader) Close() error {
 	return nil
 }
 
-// ReadSummaries reads all segments summaries.
+// maxSummaryRecords bounds how many summary records ReadSummaries will
+// follow through the FWD linked list before giving up. Every legitimate
+// SPK kernel this library encounters has at most a few hundred summary
+// records; this cap is orders of magnitude more generous than that while
+// still turning a self-referential or corrupted FWD chain into a bounded
+// error instead of an unbounded append or an infinite loop. A cycle is
+// also detected directly (via visited), independent of this cap.
+const maxSummaryRecords = 1_000_000
+
+// ReadSummaries reads all segment summaries.
 func (r *Reader) ReadSummaries() ([]Summary, error) {
 	var summaries []Summary
 
+	nd, ni := int(r.FileRec.ND), int(r.FileRec.NI)
+	if nd < 0 || ni < 0 || nd+ni == 0 {
+		return nil, fmt.Errorf("%w: invalid summary shape ND=%d, NI=%d", ErrCorruptSPK, nd, ni)
+	}
+
+	// sumLen is derived from file-controlled ND/NI, then used below to slice
+	// a fixed 1024-byte record buffer — bound it against the record size
+	// itself (a summary that couldn't fit even one entry in its own
+	// directory record is structurally invalid, regardless of file type)
+	// rather than trusting it directly, which is what let a corrupted or
+	// adversarial ND/NI drive a slice-bounds panic here before this check.
+	sumLen := (nd + (ni+1)/2) * 8
+	if sumLen <= 0 || sumLen > RecordSize-24 {
+		return nil, fmt.Errorf("%w: invalid summary size %d bytes (from ND=%d, NI=%d)", ErrCorruptSPK, sumLen, nd, ni)
+	}
+
 	next := r.FileRec.FWD
+	visited := make(map[int32]bool)
 
 	for next != 0 {
+		if next < 0 {
+			return nil, fmt.Errorf("%w: negative FWD record pointer %d", ErrCorruptSPK, next)
+		}
+
+		if visited[next] {
+			return nil, fmt.Errorf("%w: cyclic FWD chain revisits record %d", ErrCorruptSPK, next)
+		}
+
+		visited[next] = true
+		if len(visited) > maxSummaryRecords {
+			return nil, fmt.Errorf("%w: exceeded %d summary records following the FWD chain", ErrCorruptSPK, maxSummaryRecords)
+		}
+
 		buf := make([]byte, RecordSize)
 		if _, err := r.F.ReadAt(buf, int64(next-1)*RecordSize); err != nil {
 			return nil, fmt.Errorf("spk: read summary record: %w", err)
 		}
 
 		fwdFloat := math.Float64frombits(r.FileRec.Order.Uint64(buf[0:8]))
+		if !finite(fwdFloat) {
+			return nil, fmt.Errorf("%w: non-finite FWD pointer in summary record", ErrCorruptSPK)
+		}
+
 		fwd := int32(fwdFloat)
-		nSum := int32(math.Float64frombits(r.FileRec.Order.Uint64(buf[16:24])))
-		sumLen := int(r.FileRec.ND+(r.FileRec.NI+1)/2) * 8
+
+		nSumFloat := math.Float64frombits(r.FileRec.Order.Uint64(buf[16:24]))
+		if !finite(nSumFloat) || nSumFloat < 0 {
+			return nil, fmt.Errorf("%w: invalid summary count in summary record", ErrCorruptSPK)
+		}
+
+		nSum := int32(nSumFloat)
+		if int64(24)+int64(nSum)*int64(sumLen) > RecordSize {
+			return nil, fmt.Errorf("%w: %d summaries of %d bytes overflow the %d-byte record", ErrCorruptSPK, nSum, sumLen, RecordSize)
+		}
 
 		for i := range nSum {
 			offset := 24 + int(i)*sumLen
 			sumBuf := buf[offset : offset+sumLen]
 
 			s := Summary{
-				Doubles:  make([]float64, r.FileRec.ND),
-				Integers: make([]int32, r.FileRec.NI),
+				Doubles:  make([]float64, nd),
+				Integers: make([]int32, ni),
 			}
 
-			for d := range r.FileRec.ND {
+			for d := range nd {
 				bits := r.FileRec.Order.Uint64(sumBuf[d*8 : (d+1)*8])
 				s.Doubles[d] = math.Float64frombits(bits)
 			}
 
-			intStart := int(r.FileRec.ND) * 8
-			for j := range r.FileRec.NI {
-				s.Integers[j] = int32(r.FileRec.Order.Uint32(sumBuf[intStart+int(j)*4 : intStart+int(j+1)*4]))
+			intStart := nd * 8
+			for j := range ni {
+				s.Integers[j] = int32(r.FileRec.Order.Uint32(sumBuf[intStart+j*4 : intStart+(j+1)*4]))
 			}
 
 			summaries = append(summaries, s)
@@ -291,21 +342,31 @@ func (r *Reader) ReadSummaries() ([]Summary, error) {
 	return summaries, nil
 }
 
+// maxDoublesPerRead bounds a single ReadDoubles call to 16Mi doubles
+// (128 MiB) — far more than any legitimate DAF record request needs (SPK
+// segments read at most a few thousand doubles at a time), while turning a
+// corrupted or adversarial word range into a bounded error instead of an
+// attempted multi-gigabyte allocation. Computing count in int64 (rather
+// than the file-controlled int32 startWord/endWord) also avoids the int32
+// overflow that could otherwise make a huge count wrap negative and slip
+// past a naive count<=0 check.
+const maxDoublesPerRead = 16 << 20
+
 // ReadDoubles reads a range of float64 from the data area.
 func (r *Reader) ReadDoubles(startWord, endWord int32) ([]float64, error) {
-	count := endWord - startWord + 1
-	if count <= 0 {
-		return nil, fmt.Errorf("%w: %d to %d", ErrInvalidWordBounds, startWord, endWord)
+	count := int64(endWord) - int64(startWord) + 1
+	if count <= 0 || count > maxDoublesPerRead {
+		return nil, fmt.Errorf("%w: %d to %d (count=%d)", ErrInvalidWordBounds, startWord, endWord, count)
 	}
 
 	buf := make([]byte, count*8)
 
-	n, err := r.F.ReadAt(buf, int64(startWord-1)*8)
+	n, err := r.F.ReadAt(buf, (int64(startWord)-1)*8)
 	if err != nil && !errors.Is(err, io.EOF) {
 		return nil, fmt.Errorf("spk: read doubles: %w", err)
 	}
 
-	if n < len(buf) && (errors.Is(err, io.EOF) || err == nil) {
+	if int64(n) < int64(len(buf)) && (errors.Is(err, io.EOF) || err == nil) {
 		return nil, fmt.Errorf("%w: unexpected EOF reading word %d", ErrCorruptSPK, startWord)
 	}
 
@@ -316,6 +377,14 @@ func (r *Reader) ReadDoubles(startWord, endWord int32) ([]float64, error) {
 	}
 
 	return res, nil
+}
+
+// finite reports whether v is neither NaN nor ±Inf — used throughout this
+// file to reject a corrupted or adversarial kernel's non-finite metadata
+// (record counts, step sizes, epochs) before it can propagate into a
+// slice index or division.
+func finite(v float64) bool {
+	return !math.IsNaN(v) && !math.IsInf(v, 0)
 }
 
 // Segment represents an SPK segment descriptor.
@@ -393,10 +462,18 @@ func evaluateType21(s *Segment, r *Reader, et float64) (pos, vel vector.Vec3, er
 		return vector.Vec3{}, vector.Vec3{}, err
 	}
 
+	if !finite(meta[0]) || !finite(meta[1]) {
+		return vector.Vec3{}, vector.Vec3{}, fmt.Errorf("%w: non-finite MAXDIM/nRecs metadata", ErrCorruptSPK)
+	}
+
 	maxDim := int32(meta[0])
 	nRecs := int32(meta[1])
 
-	if nRecs <= 0 {
+	// maxType21Records is a generous upper bound guarding nRecs*dlSize
+	// (below) against int32 overflow — no real Horizons-generated small-body
+	// kernel this library targets has anywhere near this many records.
+	const maxType21Records = 10_000_000
+	if nRecs <= 0 || nRecs > maxType21Records {
 		return vector.Vec3{}, vector.Vec3{}, fmt.Errorf("%w: %d", ErrInvalidRecordCount, nRecs)
 	}
 
@@ -441,11 +518,32 @@ func evaluateType21(s *Segment, r *Reader, et float64) (pos, vel vector.Vec3, er
 	refPos := [3]float64{rec[maxDim+1], rec[maxDim+3], rec[maxDim+5]}
 	refVel := [3]float64{rec[maxDim+2], rec[maxDim+4], rec[maxDim+6]}
 	dt := rec[maxDim+7 : maxDim+7+3*maxDim] // column-major: axis i occupies dt[i*maxDim : (i+1)*maxDim]
+
+	if !finite(rec[4*maxDim+7]) || !finite(rec[4*maxDim+8]) || !finite(rec[4*maxDim+9]) || !finite(rec[4*maxDim+10]) {
+		return vector.Vec3{}, vector.Vec3{}, fmt.Errorf("%w: non-finite KQMAX1/KQ metadata", ErrCorruptSPK)
+	}
+
 	kqmax1 := int32(rec[4*maxDim+7])
 	kq := [3]int32{int32(rec[4*maxDim+8]), int32(rec[4*maxDim+9]), int32(rec[4*maxDim+10])}
 
 	if kqmax1 < 2 || kqmax1 > maxAllowedDim+1 {
 		return vector.Vec3{}, vector.Vec3{}, fmt.Errorf("%w: KQMAX1=%d, allowed [2,%d]", ErrInvalidOrder, kqmax1, maxAllowedDim+1)
+	}
+
+	// KQMAX1/KQ are read straight from the record with no guarantee they
+	// stay within this segment's own MAXDIM — unlike the maxAllowedDim+1
+	// check above (a fixed library-wide ceiling), this is the check that a
+	// small, valid-looking MAXDIM (e.g. 1) can't be paired with a
+	// KQMAX1/KQ large enough to index g/dt/w out of their MAXDIM-sized
+	// bounds below.
+	if kqmax1 > maxDim+1 {
+		return vector.Vec3{}, vector.Vec3{}, fmt.Errorf("%w: KQMAX1=%d exceeds this segment's own MAXDIM=%d", ErrInvalidOrder, kqmax1, maxDim)
+	}
+
+	for axis, k := range kq {
+		if k < 0 || k > maxDim {
+			return vector.Vec3{}, vector.Vec3{}, fmt.Errorf("%w: KQ[%d]=%d exceeds MAXDIM=%d", ErrInvalidOrder, axis, k, maxDim)
+		}
 	}
 
 	delta := et - t0
@@ -516,8 +614,38 @@ func evaluateType21(s *Segment, r *Reader, et float64) (pos, vel vector.Vec3, er
 		velArr[i] = refVel[i] + delta*axisSum(i)
 	}
 
-	return vector.Vec3{X: posArr[0], Y: posArr[1], Z: posArr[2]},
-		vector.Vec3{X: velArr[0], Y: velArr[1], Z: velArr[2]}, nil
+	pos = vector.Vec3{X: posArr[0], Y: posArr[1], Z: posArr[2]}
+	vel = vector.Vec3{X: velArr[0], Y: velArr[1], Z: velArr[2]}
+
+	if !finite(pos.X) || !finite(pos.Y) || !finite(pos.Z) || !finite(vel.X) || !finite(vel.Y) || !finite(vel.Z) {
+		// A non-finite step size (g) not already caught by the zero check
+		// above, or other corrupted difference-table data, can still
+		// propagate a NaN/Inf through the FC/WC/W recursion — fail loudly
+		// here rather than hand a silently-bad state/velocity to a caller.
+		return vector.Vec3{}, vector.Vec3{}, fmt.Errorf("%w: non-finite evaluated position/velocity", ErrCorruptSPK)
+	}
+
+	return pos, vel, nil
+}
+
+// validateChebyshevMeta checks the (tInit, tLen, rSize) triple
+// evaluateType2/evaluateType3 derive their record layout from, before that
+// layout is used to size any read, slice, or division. A corrupt kernel
+// could otherwise supply a non-finite or non-positive tLen (dividing to
+// ±Inf/NaN in the idx computation below), or an rSize too small to hold
+// even the leading mid/radius pair — evaluateType2/3 used to read rec[0]
+// and rec[1] unconditionally, so a too-short record panicked instead of
+// erroring.
+func validateChebyshevMeta(tInit, tLen float64, rSize int32) error {
+	if !finite(tInit) || !finite(tLen) || tLen <= 0 {
+		return fmt.Errorf("%w: non-finite or non-positive record length %g", ErrCorruptSPK, tLen)
+	}
+
+	if rSize < 2 {
+		return fmt.Errorf("%w: record size %d too small (need >= 2)", ErrRecordTooShort, rSize)
+	}
+
+	return nil
 }
 
 func evaluateType2(s *Segment, r *Reader, et float64) (pos, vel vector.Vec3, err error) {
@@ -527,7 +655,14 @@ func evaluateType2(s *Segment, r *Reader, et float64) (pos, vel vector.Vec3, err
 	}
 
 	tInit, tLen, rSize := meta[0], meta[1], int32(meta[2])
+	if err := validateChebyshevMeta(tInit, tLen, rSize); err != nil {
+		return vector.Vec3{}, vector.Vec3{}, err
+	}
+
 	nCoeffs := (rSize - 2) / 3
+	if nCoeffs <= 0 {
+		return vector.Vec3{}, vector.Vec3{}, fmt.Errorf("%w: %d coefficients derived from record size %d", ErrRecordTooShort, nCoeffs, rSize)
+	}
 
 	idx := max(int32((et-tInit)/tLen), 0)
 
@@ -538,11 +673,23 @@ func evaluateType2(s *Segment, r *Reader, et float64) (pos, vel vector.Vec3, err
 		return vector.Vec3{}, vector.Vec3{}, err
 	}
 
+	if int32(len(rec)) < 2+3*nCoeffs {
+		return vector.Vec3{}, vector.Vec3{}, fmt.Errorf("%w: %d doubles (need >= %d)", ErrRecordTooShort, len(rec), 2+3*nCoeffs)
+	}
+
 	mid, radius := rec[0], rec[1]
+	if !finite(mid) || !finite(radius) || radius == 0 {
+		return vector.Vec3{}, vector.Vec3{}, fmt.Errorf("%w: invalid mid=%g/radius=%g", ErrCorruptSPK, mid, radius)
+	}
+
 	tau := (et - mid) / radius
 	pos.X, vel.X = EvalChebyshev(rec[2:2+nCoeffs], tau, radius, true)
 	pos.Y, vel.Y = EvalChebyshev(rec[2+nCoeffs:2+2*nCoeffs], tau, radius, true)
 	pos.Z, vel.Z = EvalChebyshev(rec[2+2*nCoeffs:2+3*nCoeffs], tau, radius, true)
+
+	if !finite(pos.X) || !finite(pos.Y) || !finite(pos.Z) || !finite(vel.X) || !finite(vel.Y) || !finite(vel.Z) {
+		return vector.Vec3{}, vector.Vec3{}, fmt.Errorf("%w: non-finite evaluated position/velocity", ErrCorruptSPK)
+	}
 
 	return pos, vel, nil
 }
@@ -554,7 +701,14 @@ func evaluateType3(s *Segment, r *Reader, et float64) (pos, vel vector.Vec3, err
 	}
 
 	tInit, tLen, rSize := meta[0], meta[1], int32(meta[2])
+	if err := validateChebyshevMeta(tInit, tLen, rSize); err != nil {
+		return vector.Vec3{}, vector.Vec3{}, err
+	}
+
 	nCoeffs := (rSize - 2) / 6
+	if nCoeffs <= 0 {
+		return vector.Vec3{}, vector.Vec3{}, fmt.Errorf("%w: %d coefficients derived from record size %d", ErrRecordTooShort, nCoeffs, rSize)
+	}
 
 	idx := max(int32((et-tInit)/tLen), 0)
 
@@ -565,7 +719,15 @@ func evaluateType3(s *Segment, r *Reader, et float64) (pos, vel vector.Vec3, err
 		return vector.Vec3{}, vector.Vec3{}, err
 	}
 
+	if int32(len(rec)) < 2+6*nCoeffs {
+		return vector.Vec3{}, vector.Vec3{}, fmt.Errorf("%w: %d doubles (need >= %d)", ErrRecordTooShort, len(rec), 2+6*nCoeffs)
+	}
+
 	mid, radius := rec[0], rec[1]
+	if !finite(mid) || !finite(radius) || radius == 0 {
+		return vector.Vec3{}, vector.Vec3{}, fmt.Errorf("%w: invalid mid=%g/radius=%g", ErrCorruptSPK, mid, radius)
+	}
+
 	tau := (et - mid) / radius
 	pos.X, _ = EvalChebyshev(rec[2:2+nCoeffs], tau, radius, false)
 	pos.Y, _ = EvalChebyshev(rec[2+nCoeffs:2+2*nCoeffs], tau, radius, false)
@@ -574,6 +736,10 @@ func evaluateType3(s *Segment, r *Reader, et float64) (pos, vel vector.Vec3, err
 	vel.X, _ = EvalChebyshev(rec[vStart:vStart+nCoeffs], tau, radius, false)
 	vel.Y, _ = EvalChebyshev(rec[vStart+nCoeffs:vStart+2*nCoeffs], tau, radius, false)
 	vel.Z, _ = EvalChebyshev(rec[vStart+2*nCoeffs:vStart+3*nCoeffs], tau, radius, false)
+
+	if !finite(pos.X) || !finite(pos.Y) || !finite(pos.Z) || !finite(vel.X) || !finite(vel.Y) || !finite(vel.Z) {
+		return vector.Vec3{}, vector.Vec3{}, fmt.Errorf("%w: non-finite evaluated position/velocity", ErrCorruptSPK)
+	}
 
 	return pos, vel, nil
 }
