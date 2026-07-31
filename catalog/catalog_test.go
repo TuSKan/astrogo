@@ -213,6 +213,71 @@ func TestResolver_ProviderPriority(t *testing.T) {
 	}
 }
 
+// TestResolver_MergePreservesOrbitalElements is a regression test for a
+// real bug: resolve.Target's osculating-orbital-element fields
+// (HasElements/SemiMajorAxis/.../MeanAnomaly, added alongside
+// catalog/sbdb's element decoding) were never wired into mergeGroup's
+// scalarFieldRules, so a Resolver-mediated Resolve() silently dropped
+// them even though the underlying SBDB provider populated them
+// correctly — only a direct sbdb.New() caller kept them. Also confirms
+// the elements' own Epoch wins over a differently-sourced generic Epoch,
+// since pairing these elements with a foreign epoch would be physically
+// wrong.
+func TestResolver_MergePreservesOrbitalElements(t *testing.T) {
+	elementsEpoch := time.FromJDParts(2461200.5, 0, time.TDB)
+
+	p1 := &mockProvider{name: "sbdb", targets: map[string]Target{
+		"target": {
+			ID: "20000001", Name: "1 Ceres", Aliases: []string{"shared"}, HasElements: true,
+			Epoch:         elementsEpoch,
+			SemiMajorAxis: 2.77,
+			Eccentricity:  0.0797,
+			Inclination:   angle.Deg(10.6),
+			AscendingNode: angle.Deg(80.2),
+			ArgPeriapsis:  angle.Deg(73.3),
+			MeanAnomaly:   angle.Deg(274),
+		},
+	}}
+	p2 := &mockProvider{name: "simbad", targets: map[string]Target{
+		"target": {
+			ID: "simbad-1", Aliases: []string{"shared"}, Epoch: time.J2000, // a different, unrelated epoch — must not win
+		},
+	}}
+
+	r := &Resolver{
+		providers: []resolve.Provider{p1, p2},
+		cfg:       resolverConfig{positionMatchThreshold: defaultPositionMatchThreshold, cap: defaultCap},
+	}
+
+	got, err := r.Resolve(context.Background(), "target")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !got.HasElements {
+		t.Fatal("expected merged Target to carry HasElements=true from sbdb")
+	}
+
+	if got.Provenance["OrbitalElements"] != "sbdb" {
+		t.Errorf("expected OrbitalElements provenance = sbdb, got %q", got.Provenance["OrbitalElements"])
+	}
+
+	testutil.AssertNear(t, "merged SemiMajorAxis", got.SemiMajorAxis, 2.77, 1e-9)
+	testutil.AssertNear(t, "merged Eccentricity", got.Eccentricity, 0.0797, 1e-9)
+	testutil.AssertNear(t, "merged Inclination", got.Inclination.Degrees(), 10.6, 1e-9)
+	testutil.AssertNear(t, "merged AscendingNode", got.AscendingNode.Degrees(), 80.2, 1e-9)
+	testutil.AssertNear(t, "merged ArgPeriapsis", got.ArgPeriapsis.Degrees(), 73.3, 1e-9)
+	testutil.AssertNear(t, "merged MeanAnomaly", got.MeanAnomaly.Degrees(), 274, 1e-9)
+
+	if !got.Epoch.Equal(elementsEpoch) {
+		t.Errorf("expected merged Epoch to be the elements' own epoch %v, got %v", elementsEpoch, got.Epoch)
+	}
+
+	if got.Provenance["Epoch"] != "sbdb" {
+		t.Errorf("expected Epoch provenance = sbdb (paired with the elements, not simbad's unrelated epoch), got %q", got.Provenance["Epoch"])
+	}
+}
+
 func TestNormalize(t *testing.T) {
 	tests := []struct {
 		input string

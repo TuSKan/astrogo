@@ -55,6 +55,45 @@ func TestSBDBNetworkResolve(t *testing.T) {
 	}
 }
 
+// TestSBDBNetworkResolveOrbitalElements confirms the live SBDB identify
+// API returns a complete, plausible orbital-element set for a
+// well-known numbered asteroid — 1 Ceres, whose real elements are
+// stable and well-documented (a ~2.77 au, e ~0.08, i ~10.6 deg).
+// Tolerances are loose since SBDB periodically re-fits and republishes
+// its best orbit solution.
+func TestSBDBNetworkResolveOrbitalElements(t *testing.T) {
+	requireSBDB(t)
+
+	prov := New()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	tar, ok := prov.Resolve(ctx, "1")
+	if !ok {
+		t.Fatal("failed to resolve 1 Ceres")
+	}
+
+	if !tar.HasElements {
+		t.Fatal("HasElements = false, want true for a well-numbered asteroid")
+	}
+
+	if tar.SemiMajorAxis < 2.5 || tar.SemiMajorAxis > 3.0 {
+		t.Errorf("SemiMajorAxis = %v AU, outside plausible band for 1 Ceres (~2.77 AU)", tar.SemiMajorAxis)
+	}
+
+	if tar.Eccentricity < 0 || tar.Eccentricity > 0.2 {
+		t.Errorf("Eccentricity = %v, outside plausible band for 1 Ceres (~0.08)", tar.Eccentricity)
+	}
+
+	if incl := tar.Inclination.Degrees(); incl < 9 || incl > 12 {
+		t.Errorf("Inclination = %v deg, outside plausible band for 1 Ceres (~10.6 deg)", incl)
+	}
+
+	if tar.Epoch.IsZero() {
+		t.Error("Epoch is zero, want the elements' real epoch of osculation")
+	}
+}
+
 // TestSBDBNetworkSearchBright confirms the bulk asteroid+comet query API
 // (a distinct endpoint from the identify API TestSBDBNetworkResolve
 // exercises) is reachable and returns real, correctly-typed data.
