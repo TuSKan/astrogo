@@ -170,18 +170,54 @@ func WithKeplerBase(p Provider) KeplerOption {
 	return kepler.WithBase(p)
 }
 
+// NewElements constructs a validated set of classical heliocentric
+// osculating orbital elements, referred to the J2000 ecliptic frame.
+// Returns an error immediately (rather than deferring the failure to
+// first use inside NewFromElements/NewMovingBodyProvider) when the
+// elements are invalid — e.g. e >= 1, which two-body elliptical
+// propagation cannot represent.
+func NewElements(epoch time.Time, semiMajorAxis, eccentricity float64,
+	inclination, ascendingNode, argPeriapsis, meanAnomaly angle.Angle,
+) (Elements, error) {
+	el, err := kepler.NewElements(epoch, semiMajorAxis, eccentricity, inclination, ascendingNode, argPeriapsis, meanAnomaly)
+	if err != nil {
+		return Elements{}, fmt.Errorf("eph: new elements: %w", err)
+	}
+
+	return el, nil
+}
+
+// NewMovingBodyProvider returns a generic Provider that answers a major
+// body (Sun/Moon/Mercury-Neptune/SolarSystemBarycenter) via the same
+// SOFA source Default() uses, and any small body whose elements have
+// been registered onto it (see Provider.Register) via two-body
+// Keplerian propagation — the standard "default ephemeris for a moving
+// body" concept in this library: a Provider built with nothing
+// registered answers every SOFA-covered body, and each Register call
+// extends it, with no other change to how it's used. Unlike Default(),
+// a fresh NewMovingBodyProvider() has *not* had Pluto registered — call
+// Register(ID for Pluto, plutoElements-equivalent) explicitly, or start
+// from Default() (itself a *kepler.Provider) if Pluto coverage is
+// wanted alongside your own registered bodies. opts configures the
+// fallback base (default: the internal SOFA source); see WithKeplerBase.
+func NewMovingBodyProvider(opts ...KeplerOption) *kepler.Provider {
+	return kepler.New(opts...)
+}
+
 // NewFromElements returns a Provider that answers id via two-body
 // Keplerian propagation of el, and every other body via opts'
 // WithKeplerBase (or the internal SOFA default) — dropping into
 // plan.NewAsteroid/NewComet/NewGenericBody exactly like any
 // SPK-kernel-backed provider from NewProvider, with no new plan type
-// needed.
+// needed. Convenience for the common single-body case; for several
+// Kepler-propagated bodies sharing one provider/base, use
+// NewMovingBodyProvider directly and register each body on it.
 //
-//	el := eph.Elements{Epoch: t, SemiMajorAxis: 2.77, Eccentricity: 0.076, ...}
+//	el, err := eph.NewElements(t, 2.77, 0.076, incl, node, argp, ma)
 //	p, err := eph.NewFromElements(eph.ID(2000001), el) // 1 Ceres
 func NewFromElements(id ID, el Elements, opts ...KeplerOption) (Provider, error) {
-	p, err := kepler.New(id, el, opts...)
-	if err != nil {
+	p := NewMovingBodyProvider(opts...)
+	if err := p.Register(id, el); err != nil {
 		return nil, fmt.Errorf("eph: new from elements: %w", err)
 	}
 
@@ -297,9 +333,49 @@ func NewProvider(ctx context.Context, source Source, kernel string, opts ...Opti
 
 // ─── Default SOFA Provider ───────────────────────────────────────────────────
 
-// Default returns a SOFA-based ephemeris provider for the Sun and Moon.
+// plutoElements are Pluto's classical heliocentric osculating elements at
+// epoch J2000.0, in the J2000 mean ecliptic frame — the T=0 row of E.M.
+// Standish (JPL/Caltech Solar System Dynamics Group), "Keplerian Elements
+// for Approximate Positions of the Major Planets," Table 1 (valid
+// 1800 AD - 2050 AD): a=39.48211675 AU, e=0.24882730, i=17.14001206°,
+// L=238.92903833°, ϖ=224.06891629°, Ω=110.30393684°, giving
+// ω=ϖ-Ω=113.76497945° and M=L-ϖ=14.86012204° at J2000.0.
+var plutoElements = func() Elements {
+	el, err := kepler.NewElements(time.J2000, 39.48211675, 0.24882730,
+		angle.Deg(17.14001206), angle.Deg(110.30393684), angle.Deg(113.76497945), angle.Deg(14.86012204))
+	if err != nil {
+		panic(fmt.Sprintf("ephemeris: built-in Pluto elements are invalid: %v", err))
+	}
+
+	return el
+}()
+
+// Default returns the standard offline ephemeris provider for every
+// named body core.ID defines: the Sun, Moon, Mercury through Neptune,
+// and the Solar System Barycenter via SOFA analytical models (no kernel
+// or network access), plus Pluto — which SOFA has no analytical model
+// for — via two-body Keplerian propagation from plutoElements. No named
+// core.ID this library defines returns ErrUnsupportedBody from here.
+//
+// Pluto's accuracy is the same documented limitation as any other
+// Kepler-backed body (see Elements' doc comment): two-body propagation
+// ignores planetary perturbations, and Pluto's real motion is measurably
+// perturbed by its 3:2 mean-motion resonance with Neptune, so it drifts
+// away from J2000.0 faster than a typical asteroid does. This is an
+// approximate offline position, not a claim of high-precision Pluto
+// ephemeris — for that, use a real SPK-kernel-backed provider instead
+// (NewProvider with Planets; de440s and later kernels carry Pluto).
+//
+// The concrete type returned is a *kepler.Provider with Pluto
+// registered — see NewMovingBodyProvider for the same construction
+// starting from an empty (no Pluto) Provider.
 func Default() Provider {
-	return &sofaProvider{}
+	p := kepler.New(kepler.WithBase(&sofaProvider{}))
+	if err := p.Register(Pluto, plutoElements); err != nil {
+		panic(fmt.Sprintf("ephemeris: failed to register built-in Pluto elements: %v", err))
+	}
+
+	return p
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -405,6 +481,19 @@ func (s *sofaProvider) State(id ID, t time.Time) (State, error) {
 		return State{
 			Pos: vector.Vec3{X: pv[0][0], Y: pv[0][1], Z: pv[0][2]},
 			Vel: vector.Vec3{X: pv[1][0], Y: pv[1][1], Z: pv[1][2]},
+		}, nil
+
+	case SolarSystemBarycenter:
+		_, pvb, status := gofaext.Epv00(d1, d2)
+		if status < 0 {
+			return State{}, ErrSofaEpv00
+		}
+
+		// pvb is Earth's barycentric position/velocity (SSB -> Earth), so
+		// the SSB's own geocentric state (SSB - Earth) is its negation.
+		return State{
+			Pos: vector.Vec3{X: -pvb[0][0], Y: -pvb[0][1], Z: -pvb[0][2]},
+			Vel: vector.Vec3{X: -pvb[1][0], Y: -pvb[1][1], Z: -pvb[1][2]},
 		}, nil
 
 	case Mercury, Venus, Earth, Mars, Jupiter, Saturn, Uranus, Neptune:

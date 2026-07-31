@@ -106,6 +106,58 @@ func TestUnsupportedBody(t *testing.T) {
 	}
 }
 
+// TestDefault_CoversEveryNamedBody is a regression test: Default() must
+// answer State for every named core.ID this library defines — Pluto and
+// SolarSystemBarycenter were both missing (ErrUnsupportedBody) until
+// Default() started Register-ing Pluto's own Kepler elements on top of
+// a SOFA base extended to cover the barycenter. Only an arbitrary,
+// unnamed ID (see TestUnsupportedBody) is still expected to error.
+func TestDefault_CoversEveryNamedBody(t *testing.T) {
+	p := eph.Default()
+	tm := time.NowUTC()
+
+	bodies := []struct {
+		name string
+		id   eph.ID
+	}{
+		{"Mercury", eph.Mercury}, {"Venus", eph.Venus}, {"Earth", eph.Earth},
+		{"Mars", eph.Mars}, {"Jupiter", eph.Jupiter}, {"Saturn", eph.Saturn},
+		{"Uranus", eph.Uranus}, {"Neptune", eph.Neptune}, {"Pluto", eph.Pluto},
+		{"Moon", eph.Moon}, {"Sun", eph.Sun},
+		{"SolarSystemBarycenter", eph.SolarSystemBarycenter},
+	}
+
+	for _, b := range bodies {
+		st, err := p.State(b.id, tm)
+		if err != nil {
+			t.Errorf("State(%s): unexpected error: %v", b.name, err)
+			continue
+		}
+
+		if st.Pos.Norm() == 0 {
+			t.Errorf("State(%s): zero-norm position", b.name)
+		}
+	}
+}
+
+// TestDefault_PlutoDistancePlausible sanity-checks Default()'s
+// Kepler-propagated Pluto against Pluto's real heliocentric distance
+// range (~29.7-49.3 AU) — geocentric distance stays within roughly
+// +/-1.5 AU of that band regardless of the current date, so this bound
+// is safe without pinning a specific epoch.
+func TestDefault_PlutoDistancePlausible(t *testing.T) {
+	p := eph.Default()
+	tm := time.NowUTC()
+
+	vec, err := eph.Position(p, eph.Pluto, tm)
+	testutil.AssertNoError(t, err)
+
+	distAU := vec.Norm()
+	if distAU < 25 || distAU > 55 {
+		t.Errorf("Pluto geocentric distance = %.2f AU, want within [25, 55]", distAU)
+	}
+}
+
 const (
 	lightAUPerDay = 173.144632674
 	arcsecPerRad  = 206264.80624709636
