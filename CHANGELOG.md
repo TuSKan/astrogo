@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Fixed
+- `plan.Solver.FindRoot`/`FindExtremum` no longer silently return a non-finite (NaN/±Inf) result as a success — both now guard every evaluator output and internal step computation, returning the new `plan.ErrNonFiniteEvaluation` instead. Also fixes a latent divide-by-zero in `FindRoot`'s inverse-quadratic-interpolation step-clamp when the bracket has already converged to zero width.
 - `plan.FromCatalog` now routes a `resolve.KindPlanetaryMoon` candidate through `plan.NewPlanetaryMoon`, instead of silently degrading it to a `*plan.GenericBody` with no photometric model — the gap affected any caller round-tripping a moon target through the catalog layer rather than calling `NewPlanetaryMoon` directly.
 
 ## [0.11.0] — 2026-07-29
