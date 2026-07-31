@@ -24,6 +24,10 @@ var (
 	ErrTooFewPoints = errors.New("coord: at least 3 points are required")
 	// ErrNilCenter indicates SmallCircle was given a nil center.
 	ErrNilCenter = errors.New("coord: center must not be nil")
+	// ErrSofaEpv00Failed indicates gofaext.Epv00 returned a failure
+	// status — see HeliocentricRVCorrection, the one place in this
+	// package that calls it outside of Context construction.
+	ErrSofaEpv00Failed = errors.New("coord: sofa epv00 failed")
 )
 
 // Object represents any celestial entity that has a predictable position

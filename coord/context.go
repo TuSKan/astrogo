@@ -5,6 +5,7 @@ import (
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
+	"github.com/TuSKan/astrogo/constants"
 	"github.com/TuSKan/astrogo/internal/gofaext"
 	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/vector"
@@ -336,4 +337,20 @@ func (ctx *Context) AltAzToICRS(c AltAz) (ICRS, error) {
 	)
 
 	return NewICRS(angle.Rad(ra).Wrap360(), angle.Rad(dec)), nil
+}
+
+// BarycentricVelocity returns the observer's velocity relative to the
+// solar system barycenter, in km/s, ICRS-aligned. This is a unit
+// conversion of ctx's already-cached astrometry parameters
+// (ASTROM.V, in units of c, built once at Context construction by
+// Apco13) — not a new computation. It includes both Earth's own
+// barycentric orbital velocity and the observing site's diurnal
+// rotation velocity, since Apco13 builds V topocentrically.
+//
+// See coord/radialvelocity.go for the radial-velocity corrections this
+// exists to support.
+func (ctx *Context) BarycentricVelocity() vector.Vec3 {
+	kmPerSec := constants.SI2019.SpeedOfLight.Value / 1000.0
+
+	return vector.V3(ctx.astrom.V[0], ctx.astrom.V[1], ctx.astrom.V[2]).MulScalar(kmPerSec)
 }
