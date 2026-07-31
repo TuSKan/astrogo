@@ -64,9 +64,17 @@
 //
 // What still does not belong here is anything model-dependent or
 // series-valued: TT-TDB coefficients, nutation and precession series
-// terms, IERS Earth orientation parameters, and planetary mass parameters
-// stay in the packages that implement the model they belong to (see
-// time, coord, ephemeris).
+// terms, and IERS Earth orientation parameters stay in the packages that
+// implement the model they belong to (see time, coord, ephemeris).
+//
+// [IAU2015.SunGravitationalParameter] and [IAU2015.ObliquityJ2000] are a
+// narrow, deliberate exception to "planetary mass parameters stay
+// elsewhere": both are single fixed values published by name in the same
+// IAU resolutions already represented in this set (B3's Table 1 for the
+// former, IAU 2006 Resolution B1/P03 for the latter's mean-obliquity
+// term), not a general mass-parameter table or a time-varying series —
+// ephemeris/kepler is the one current consumer, needed for the two-body
+// Kepler equation's mean motion and the perifocal-to-equatorial rotation.
 //
 // # Units and exactness
 //

@@ -11,6 +11,7 @@ import (
 	"github.com/TuSKan/astrogo/ephemeris/core"
 	"github.com/TuSKan/astrogo/ephemeris/jpl"
 	"github.com/TuSKan/astrogo/ephemeris/jpl/spk"
+	"github.com/TuSKan/astrogo/ephemeris/kepler"
 	"github.com/TuSKan/astrogo/ephemeris/satellite"
 	"github.com/TuSKan/astrogo/internal/gofaext"
 	"github.com/TuSKan/astrogo/time"
@@ -146,6 +147,46 @@ type Satellite = satellite.Satellite
 
 // JPL is the JPL DE4xx numerical ephemeris provider.
 type JPL = jpl.Provider
+
+// ─── Kepler two-body propagator ───────────────────────────────────────────────
+
+// Elements are classical heliocentric osculating orbital elements for
+// two-body Keplerian propagation via NewFromElements — a lighter-weight,
+// network-free alternative to a real SPK-kernel-backed Provider. See
+// ephemeris/kepler's package doc for the full algorithm, reference
+// frame, and accuracy/scope limitations (elliptical two-body only; no
+// planetary perturbations, so accuracy drifts away from Elements.Epoch).
+type Elements = kepler.Elements
+
+// KeplerOption configures a NewFromElements provider.
+type KeplerOption = kepler.Option
+
+// WithKeplerBase sets the Provider NewFromElements delegates to for any
+// body other than the one it propagates from Elements — in particular
+// Sun, which every consumer (magnitude/elongation computations) expects
+// to be answerable. Defaults to a small internal SOFA-only source
+// (Sun/Moon/planets, no kernel or network access) when not set.
+func WithKeplerBase(p Provider) KeplerOption {
+	return kepler.WithBase(p)
+}
+
+// NewFromElements returns a Provider that answers id via two-body
+// Keplerian propagation of el, and every other body via opts'
+// WithKeplerBase (or the internal SOFA default) — dropping into
+// plan.NewAsteroid/NewComet/NewGenericBody exactly like any
+// SPK-kernel-backed provider from NewProvider, with no new plan type
+// needed.
+//
+//	el := eph.Elements{Epoch: t, SemiMajorAxis: 2.77, Eccentricity: 0.076, ...}
+//	p, err := eph.NewFromElements(eph.ID(2000001), el) // 1 Ceres
+func NewFromElements(id ID, el Elements, opts ...KeplerOption) (Provider, error) {
+	p, err := kepler.New(id, el, opts...)
+	if err != nil {
+		return nil, fmt.Errorf("eph: new from elements: %w", err)
+	}
+
+	return p, nil
+}
 
 // ─── Options ─────────────────────────────────────────────────────────────────
 

@@ -1,6 +1,10 @@
 package constants
 
-import "github.com/TuSKan/astrogo/unit"
+import (
+	"math"
+
+	"github.com/TuSKan/astrogo/unit"
+)
 
 // IAUSet holds the currently-active IAU nominal astronomical constants:
 // the astronomical unit, the nominal mean Earth radius, and the ten other
@@ -24,22 +28,29 @@ import "github.com/TuSKan/astrogo/unit"
 // There is deliberately no EarthEquatorialRadius member — Earth's
 // equatorial radius is WGS84.SemiMajorAxis, exact to the WGS84 standard
 // and consistent with B3's own Earth value.
+//
+// Two further members, SunGravitationalParameter and ObliquityJ2000, are
+// single fixed values rather than the body-radius family above — see the
+// package doc's Scope section for why they still belong here rather than
+// in ephemeris/kepler, the one package that currently needs them.
 type IAUSet struct {
 	// Vintage names this set's currently-active IAU nominal-value realization.
 	Vintage string
 
-	AstronomicalUnit        Constant
-	MeanEarthRadius         Constant
-	SunEquatorialRadius     Constant
-	MoonEquatorialRadius    Constant
-	MercuryEquatorialRadius Constant
-	VenusEquatorialRadius   Constant
-	MarsEquatorialRadius    Constant
-	JupiterEquatorialRadius Constant
-	SaturnEquatorialRadius  Constant
-	UranusEquatorialRadius  Constant
-	NeptuneEquatorialRadius Constant
-	PlutoEquatorialRadius   Constant
+	AstronomicalUnit          Constant
+	MeanEarthRadius           Constant
+	SunEquatorialRadius       Constant
+	MoonEquatorialRadius      Constant
+	MercuryEquatorialRadius   Constant
+	VenusEquatorialRadius     Constant
+	MarsEquatorialRadius      Constant
+	JupiterEquatorialRadius   Constant
+	SaturnEquatorialRadius    Constant
+	UranusEquatorialRadius    Constant
+	NeptuneEquatorialRadius   Constant
+	PlutoEquatorialRadius     Constant
+	SunGravitationalParameter Constant
+	ObliquityJ2000            Constant
 }
 
 // Name reports the set's vintage, implementing [Set].
@@ -53,7 +64,7 @@ func (s IAUSet) All() []Constant {
 		s.SunEquatorialRadius, s.MoonEquatorialRadius, s.MercuryEquatorialRadius,
 		s.VenusEquatorialRadius, s.MarsEquatorialRadius, s.JupiterEquatorialRadius,
 		s.SaturnEquatorialRadius, s.UranusEquatorialRadius, s.NeptuneEquatorialRadius,
-		s.PlutoEquatorialRadius,
+		s.PlutoEquatorialRadius, s.SunGravitationalParameter, s.ObliquityJ2000,
 	}
 }
 
@@ -123,6 +134,17 @@ var IAU2015 = IAUSet{
 		Name: "Pluto equatorial radius", Symbol: "R_Pluto",
 		Value: 1_188_300.0, Uncertainty: 1_600.0, Unit: unit.Meter,
 		Reference: "IAU WGCCRE 2015 (Archinal et al. 2018, CMDA 130:22), Table 4",
+	},
+	SunGravitationalParameter: Constant{
+		Name: "nominal solar mass parameter", Symbol: "(GM)_Sun",
+		Value: 1.327_124_4e20, Unit: cubicMeterPerSecondSquared,
+		Reference: "IAU 2015 Resolution B3, Table 1", Exact: true,
+	},
+	ObliquityJ2000: Constant{
+		Name: "mean obliquity of the ecliptic at J2000.0", Symbol: "eps_0",
+		Value: 84_381.406 * math.Pi / 648_000, Unit: unit.Radian,
+		Reference: "IAU 2006 Resolution B1 (P03; Hilton et al. 2006), mean obliquity at J2000.0",
+		Exact:     true,
 	},
 }
 

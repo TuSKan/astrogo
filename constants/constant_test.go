@@ -82,7 +82,7 @@ func TestSets_Count(t *testing.T) {
 		t.Fatalf("len(Sets()) = %d, want 6", len(sets))
 	}
 
-	wantCounts := []int{3, 5, 5, 12, 2, 5} // SI2019, CODATA2022, CODATA2018, IAU2015, WGS84, Derived
+	wantCounts := []int{3, 5, 5, 14, 2, 5} // SI2019, CODATA2022, CODATA2018, IAU2015, WGS84, Derived
 
 	total := 0
 
@@ -95,8 +95,8 @@ func TestSets_Count(t *testing.T) {
 		}
 	}
 
-	if total != 32 {
-		t.Errorf("total constants across all sets = %d, want 32", total)
+	if total != 34 {
+		t.Errorf("total constants across all sets = %d, want 34", total)
 	}
 }
 

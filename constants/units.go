@@ -37,4 +37,11 @@ var (
 		Name: "cubic meter per kilogram second squared", Symbol: "m³/(kg·s²)",
 		ScaleFactor: 1, Dimension: unit.Volume.Div(unit.Mass).Div(unit.Time.PowInt(2)),
 	}
+	// cubicMeterPerSecondSquared is m³·s⁻² — a standard gravitational
+	// parameter GM (mass already folded in, unlike G alone) —
+	// SunGravitationalParameter.
+	cubicMeterPerSecondSquared = unit.Unit{
+		Name: "cubic meter per second squared", Symbol: "m³/s²",
+		ScaleFactor: 1, Dimension: unit.Volume.Div(unit.Time.PowInt(2)),
+	}
 )
