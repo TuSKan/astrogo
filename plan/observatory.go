@@ -1,13 +1,17 @@
 package plan
 
 import (
+	"context"
 	"fmt"
 	"math"
+	"net/url"
+	"strconv"
 	"strings"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
+	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/time"
 )
 
@@ -236,6 +240,116 @@ func NewSite(name string, loc *coord.Geodetic, opts ...SiteOption) (*Site, error
 	}
 
 	return s, nil
+}
+
+// NewSiteEarthLocation builds a Site directly from decimal-degree
+// latitude/longitude and a height in meters — a thin convenience over
+// coord.NewEarthLocation + NewSite so a caller building a site from plain
+// numbers doesn't need to import coord just for that one call.
+func NewSiteEarthLocation(name string, latDeg, lonDeg, heightMeters float64, opts ...SiteOption) (*Site, error) {
+	loc, err := coord.NewEarthLocation(latDeg, lonDeg, heightMeters)
+	if err != nil {
+		return nil, fmt.Errorf("plan: %w", err)
+	}
+
+	return NewSite(name, loc, opts...)
+}
+
+// geocodeResult is one row of a Nominatim /search response — only the
+// fields NewSiteEarthAddress uses are decoded.
+type geocodeResult struct {
+	Lat string `json:"lat"`
+	Lon string `json:"lon"`
+}
+
+// elevationResponse is an Open-Elevation /lookup response — only the
+// field NewSiteEarthAddress uses is decoded.
+type elevationResponse struct {
+	Results []struct {
+		Elevation float64 `json:"elevation"`
+	} `json:"results"`
+}
+
+// NewSiteEarthAddress builds a Site by geocoding a free-text address (e.g.
+// "Quinta Calixto, Extrema, MG, Brazil") via OpenStreetMap's Nominatim API
+// (remote.Nominatim) — for when a site's coordinates aren't already known,
+// unlike NewSiteEarthLocation. Nominatim doesn't report elevation, so the
+// resolved latitude/longitude is then looked up against the Open-Elevation
+// API (remote.OpenElevation) to fill in height above sea level. Like every
+// other remote.KindAPI endpoint, both are reachable by default; disable
+// one with remote.DisableEndpoint or remote.SetOffline(true) if that's
+// undesired — a caller who already knows a site's coordinates and height
+// should use NewSiteEarthLocation instead, which needs neither.
+func NewSiteEarthAddress(ctx context.Context, name, address string, opts ...SiteOption) (*Site, error) {
+	lat, lon, err := geocodeAddress(ctx, address)
+	if err != nil {
+		return nil, err
+	}
+
+	heightMeters, err := lookupElevation(ctx, lat, lon)
+	if err != nil {
+		return nil, err
+	}
+
+	return NewSiteEarthLocation(name, lat, lon, heightMeters, opts...)
+}
+
+// geocodeAddress resolves address to decimal-degree latitude/longitude via
+// the Nominatim API (remote.Nominatim).
+func geocodeAddress(ctx context.Context, address string) (lat, lon float64, err error) {
+	client, err := remote.NewClientFor(remote.Nominatim)
+	if err != nil {
+		return 0, 0, fmt.Errorf("plan: geocode client: %w", err)
+	}
+
+	q := url.Values{}
+	q.Set("q", address)
+	q.Set("format", "json")
+	q.Set("limit", "1")
+
+	var results []geocodeResult
+	if err := client.GetJSON(ctx, remote.Nominatim, "", q, &results); err != nil {
+		return 0, 0, fmt.Errorf("plan: geocode %q: %w", address, err)
+	}
+
+	if len(results) == 0 {
+		return 0, 0, fmt.Errorf("%w: %q", ErrGeocodeNoResult, address)
+	}
+
+	lat, err = strconv.ParseFloat(results[0].Lat, 64)
+	if err != nil {
+		return 0, 0, fmt.Errorf("plan: geocode %q: parse latitude: %w", address, err)
+	}
+
+	lon, err = strconv.ParseFloat(results[0].Lon, 64)
+	if err != nil {
+		return 0, 0, fmt.Errorf("plan: geocode %q: parse longitude: %w", address, err)
+	}
+
+	return lat, lon, nil
+}
+
+// lookupElevation resolves a latitude/longitude to a height above sea
+// level (meters) via the Open-Elevation API (remote.OpenElevation).
+func lookupElevation(ctx context.Context, lat, lon float64) (float64, error) {
+	client, err := remote.NewClientFor(remote.OpenElevation)
+	if err != nil {
+		return 0, fmt.Errorf("plan: elevation client: %w", err)
+	}
+
+	q := url.Values{}
+	q.Set("locations", fmt.Sprintf("%.6f,%.6f", lat, lon))
+
+	var resp elevationResponse
+	if err := client.GetJSON(ctx, remote.OpenElevation, "", q, &resp); err != nil {
+		return 0, fmt.Errorf("plan: elevation lookup (%.6f,%.6f): %w", lat, lon, err)
+	}
+
+	if len(resp.Results) == 0 {
+		return 0, fmt.Errorf("%w: elevation (%.6f,%.6f)", ErrGeocodeNoResult, lat, lon)
+	}
+
+	return resp.Results[0].Elevation, nil
 }
 
 // Name returns the site's human-readable name.

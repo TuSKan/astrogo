@@ -16,7 +16,6 @@ import (
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/catalog"
-	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/plan"
 	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/time"
@@ -30,9 +29,8 @@ func main() {
 	// so a re-run only costs a HEAD probe once cached).
 	remote.EnableDownloads(remote.OpenNGC, 5<<20) // ~2 MB combined source CSVs
 
-	// ── Observatory: São Paulo (-23.5505°, -46.6333°, 760m) ─────────────
-	loc, _ := coord.NewEarthLocation(-23.5505, -46.6333, 760)
-	site, _ := plan.NewSite("São Paulo", loc)
+	// ── Observatory: Quinta Calixto (-22.528478°, -46.473002°, 835.05m) ──
+	site, _ := plan.NewSiteEarthLocation("Quinta Calixto", -22.528478, -46.473002, 835.05)
 
 	// ── Observation epoch: 2026-04-15 at local midnight ──────────────────
 	tz, _ := time.LoadLocation("America/Sao_Paulo")
@@ -92,7 +90,7 @@ func main() {
 
 	// ── Header ───────────────────────────────────────────────────────────
 	fmt.Println("══════════════════════════════════════════════════════════════")
-	fmt.Println("  Composite Target Scoring — São Paulo")
+	fmt.Println("  Composite Target Scoring — Quinta Calixto")
 	fmt.Printf("  Epoch: %s\n", tm)
 	fmt.Println("══════════════════════════════════════════════════════════════")
 

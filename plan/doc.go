@@ -12,8 +12,10 @@
 // The exported surface is large; here's a task-oriented index instead of an
 // alphabetical one:
 //
-//   - Site & observatory setup — [NewSite], [Site]; well-known sites —
-//     [KnownSites], [NewKnownSite]
+//   - Site & observatory setup — [NewSite], [Site], [NewSiteEarthLocation]
+//     (plain lat/lon/height, no [github.com/TuSKan/astrogo/coord] import
+//     needed), [NewSiteEarthAddress] (geocoded from a free-text address);
+//     well-known sites — [KnownSites], [NewKnownSite]
 //   - Targets to observe — [Planet] (via [NewSun]...[NewPluto], [NewPlanet]),
 //     [Star] (via [NewStar]), [Asteroid] (via [NewAsteroid]), [Comet] (via
 //     [NewComet]), [DeepSkyObject] (via [NewDeepSkyObject]), [Satellite] (via

@@ -13,8 +13,8 @@ import (
 )
 
 func main() {
-	// 1. Define the observer's location (São Paulo, Brazil)
-	loc, err := coord.NewEarthLocation(-23.5505, -46.6333, 760)
+	// 1. Define the observer's location (Quinta Calixto, Brazil)
+	loc, err := coord.NewEarthLocation(-22.528478, -46.473002, 835.05)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -41,7 +41,7 @@ func main() {
 	}
 
 	fmt.Printf("Time: %s (%s)\n", tm, tm.Format("2006-01-02 15:04:05 -0700"))
-	fmt.Printf("Observer: São Paulo, Brazil\n")
+	fmt.Printf("Observer: Quinta Calixto, Brazil\n")
 	fmt.Printf("Mars Altitude: %.2f°\n", skyPos.Alt().Degrees())
 	fmt.Printf("Mars Azimuth:  %.2f°\n", skyPos.Az().Degrees())
 }

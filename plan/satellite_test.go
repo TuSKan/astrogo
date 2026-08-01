@@ -72,17 +72,12 @@ func TestPlanSatellite_PositionAndDetails(t *testing.T) {
 		t.Error("Provider() did not return the constructor-supplied provider")
 	}
 
-	loc, err := coord.NewGeodetic(angle.Deg(-46.63), angle.Deg(-23.55), 760)
+	site, err := NewSiteEarthLocation("Quinta Calixto", -22.528478, -46.473002, 835.05)
 	if err != nil {
-		t.Fatalf("NewGeodetic: %v", err)
+		t.Fatalf("NewSiteEarthLocation: %v", err)
 	}
 
-	site, err := NewSite("São Paulo", loc)
-	if err != nil {
-		t.Fatalf("NewSite: %v", err)
-	}
-
-	ctx := coord.NewContext(tm, loc, site.Atmosphere())
+	ctx := coord.NewContext(tm, site.Location(), site.Atmosphere())
 
 	d, err := sat.GetDetails(ctx)
 	if err != nil {
@@ -106,17 +101,12 @@ func TestPlanSatellite_ApparentMagnitudeRequiresContext(t *testing.T) {
 		t.Error("expected ApparentMagnitude to fail without observer context")
 	}
 
-	loc, err := coord.NewGeodetic(angle.Deg(-46.63), angle.Deg(-23.55), 760)
+	site, err := NewSiteEarthLocation("Quinta Calixto", -22.528478, -46.473002, 835.05)
 	if err != nil {
-		t.Fatalf("NewGeodetic: %v", err)
+		t.Fatalf("NewSiteEarthLocation: %v", err)
 	}
 
-	site, err := NewSite("São Paulo", loc)
-	if err != nil {
-		t.Fatalf("NewSite: %v", err)
-	}
-
-	ctx := coord.NewContext(tm, loc, site.Atmosphere())
+	ctx := coord.NewContext(tm, site.Location(), site.Atmosphere())
 
 	m, err := sat.ApparentMagnitudeCtx(tm, ctx)
 	if err != nil {
@@ -134,7 +124,7 @@ func TestPlanSatellite_ApparentMagnitudeRequiresContext(t *testing.T) {
 func TestLookAngle_ISS(t *testing.T) {
 	prov := newISSProvider(t)
 
-	loc, err := coord.NewGeodetic(angle.Deg(-46.63), angle.Deg(-23.55), 760)
+	loc, err := coord.NewGeodetic(angle.Deg(-46.473002), angle.Deg(-22.528478), 835.05)
 	if err != nil {
 		t.Fatalf("NewGeodetic: %v", err)
 	}
@@ -160,7 +150,7 @@ func TestLookAngle_ISS(t *testing.T) {
 func TestSatellitePasses_ISS(t *testing.T) {
 	prov := newISSProvider(t)
 
-	loc, err := coord.NewGeodetic(angle.Deg(-46.63), angle.Deg(-23.55), 760)
+	loc, err := coord.NewGeodetic(angle.Deg(-46.473002), angle.Deg(-22.528478), 835.05)
 	if err != nil {
 		t.Fatalf("NewGeodetic: %v", err)
 	}

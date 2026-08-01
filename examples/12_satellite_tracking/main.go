@@ -90,10 +90,10 @@ func main() {
 	// ═══════════════════════════════════════════════════════════════════════
 	// 4. Look Angle via coord.Context (same API for ISS (Zarya) and Mars)
 	// ═══════════════════════════════════════════════════════════════════════
-	header("Look Angle — São Paulo, Brazil")
+	header("Look Angle — Quinta Calixto, Brazil")
 
-	// Observer: São Paulo (-23.5505°, -46.6333°, 760m)
-	observer, err := coord.NewEarthLocation(-23.5505, -46.6333, 760)
+	// Observer: Quinta Calixto (-22.528478°, -46.473002°, 835.05m)
+	observer, err := coord.NewEarthLocation(-22.528478, -46.473002, 835.05)
 	if err != nil {
 		log.Fatalf("NewEarthLocation failed: %v", err)
 	}

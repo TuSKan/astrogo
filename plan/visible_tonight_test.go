@@ -36,17 +36,12 @@ func (m *mockBrightSource) SearchBright(_ context.Context, req resolve.BrightReq
 	return resolve.SliceSeq(matches)
 }
 
-func saoPauloSite(t *testing.T) *plan.Site {
+func quintaCalixtoSite(t *testing.T) *plan.Site {
 	t.Helper()
 
-	loc, err := coord.NewEarthLocation(-23.5505, -46.6333, 760)
+	site, err := plan.NewSiteEarthLocation("Quinta Calixto", -22.528478, -46.473002, 835.05)
 	if err != nil {
-		t.Fatalf("NewEarthLocation: %v", err)
-	}
-
-	site, err := plan.NewSite("Sao Paulo", loc)
-	if err != nil {
-		t.Fatalf("NewSite: %v", err)
+		t.Fatalf("NewSiteEarthLocation: %v", err)
 	}
 
 	return site
@@ -54,8 +49,8 @@ func saoPauloSite(t *testing.T) *plan.Site {
 
 // sirius is a real, well-known bright star confirmed (via manual
 // verification against this exact site/date) to clear the horizon
-// overnight from São Paulo — a genuine reference value, not a fixture
-// tuned to pass.
+// overnight from Quinta Calixto — a genuine reference value, not a
+// fixture tuned to pass.
 var sirius = resolve.Target{
 	ID: "* alf CMa", Name: "Sirius", Kind: resolve.KindStar,
 	Coord:    coord.NewICRS(angle.Deg(101.28715), angle.Deg(-16.71611)),
@@ -63,8 +58,8 @@ var sirius = resolve.Target{
 }
 
 // polaris sits within a few degrees of the north celestial pole — never
-// above the horizon from a southern-hemisphere site like São Paulo
-// (lat -23.55°), a well-known, real fact, not a contrived fixture.
+// above the horizon from a southern-hemisphere site like Quinta Calixto
+// (lat -22.53°), a well-known, real fact, not a contrived fixture.
 var polaris = resolve.Target{
 	ID: "* alf UMi", Name: "Polaris", Kind: resolve.KindStar,
 	Coord:    coord.NewICRS(angle.Deg(37.95456), angle.Deg(89.26410)),
@@ -72,11 +67,11 @@ var polaris = resolve.Target{
 }
 
 // vega transits well within the astronomical-dusk-to-dawn window on
-// testNight from São Paulo (confirmed via live testing — unlike sirius,
-// whose real transit for this same night/site falls just after dawn),
-// giving TestVisibleTonight_PeakConsistentWithTransit a fixture that
-// actually exercises the Peak-vs-Transit cross-check instead of always
-// skipping it.
+// testNight from Quinta Calixto (confirmed via live testing — unlike
+// sirius, whose real transit for this same night/site falls just after
+// dawn), giving TestVisibleTonight_PeakConsistentWithTransit a fixture
+// that actually exercises the Peak-vs-Transit cross-check instead of
+// always skipping it.
 var vega = resolve.Target{
 	ID: "* alf Lyr", Name: "Vega", Kind: resolve.KindStar,
 	Coord:    coord.NewICRS(angle.Deg(279.234735), angle.Deg(38.783689)),
@@ -109,7 +104,7 @@ func TestVisibleTonight_FiltersAndReturnsVisibleStar(t *testing.T) {
 
 	sources := []resolve.BrightObjectSearcher{&mockBrightSource{targets: []resolve.Target{sirius, faint}}}
 
-	results, err := plan.VisibleTonight(context.Background(), saoPauloSite(t), testNight, 2, sources, ephemeris.Default())
+	results, err := plan.VisibleTonight(context.Background(), quintaCalixtoSite(t), testNight, 2, sources, ephemeris.Default())
 	if err != nil {
 		t.Fatalf("VisibleTonight: %v", err)
 	}
@@ -155,7 +150,7 @@ func TestVisibleTonight_FiltersAndReturnsVisibleStar(t *testing.T) {
 func TestVisibleTonight_PeakConsistentWithTransit(t *testing.T) {
 	sources := []resolve.BrightObjectSearcher{&mockBrightSource{targets: []resolve.Target{vega}}}
 
-	results, err := plan.VisibleTonight(context.Background(), saoPauloSite(t), testNight, 2, sources, ephemeris.Default())
+	results, err := plan.VisibleTonight(context.Background(), quintaCalixtoSite(t), testNight, 2, sources, ephemeris.Default())
 	if err != nil {
 		t.Fatalf("VisibleTonight: %v", err)
 	}
@@ -195,12 +190,12 @@ func TestVisibleTonight_PeakConsistentWithTransit(t *testing.T) {
 // error surfaced. testNight (noon UTC) never exercised this path, since
 // noon always falls between a morning's dawn and that evening's dusk.
 func TestVisibleTonight_MidnightNightOrdersDawnAfterDusk(t *testing.T) {
-	// Local midnight in São Paulo (UTC-3) on 2026-08-01 is 2026-08-01T03:00:00Z.
+	// Local midnight at Quinta Calixto (UTC-3) on 2026-08-01 is 2026-08-01T03:00:00Z.
 	midnightNight := time.Date(2026, time.August, 1, 3, 0, 0, 0, time.LocationUTC)
 
 	sources := []resolve.BrightObjectSearcher{&mockBrightSource{targets: []resolve.Target{sirius}}}
 
-	results, err := plan.VisibleTonight(context.Background(), saoPauloSite(t), midnightNight, 2, sources, ephemeris.Default())
+	results, err := plan.VisibleTonight(context.Background(), quintaCalixtoSite(t), midnightNight, 2, sources, ephemeris.Default())
 	if err != nil {
 		t.Fatalf("VisibleTonight: %v", err)
 	}
@@ -213,19 +208,19 @@ func TestVisibleTonight_MidnightNightOrdersDawnAfterDusk(t *testing.T) {
 func TestVisibleTonight_ExcludesObjectNeverAboveHorizon(t *testing.T) {
 	sources := []resolve.BrightObjectSearcher{&mockBrightSource{targets: []resolve.Target{polaris}}}
 
-	results, err := plan.VisibleTonight(context.Background(), saoPauloSite(t), testNight, 5, sources, ephemeris.Default())
+	results, err := plan.VisibleTonight(context.Background(), quintaCalixtoSite(t), testNight, 5, sources, ephemeris.Default())
 	if err != nil {
 		t.Fatalf("VisibleTonight: %v", err)
 	}
 
 	if _, ok := findByName(results, "Polaris"); ok {
-		t.Fatalf("expected Polaris (never visible from Sao Paulo) to be excluded, got %+v", results)
+		t.Fatalf("expected Polaris (never visible from Quinta Calixto) to be excluded, got %+v", results)
 	}
 }
 
 func TestVisibleTonight_MoonAppearsWhenBright(t *testing.T) {
 	// No star sources at all — this isolates the Moon/planet path.
-	results, err := plan.VisibleTonight(context.Background(), saoPauloSite(t), testNight, -5, nil, ephemeris.Default())
+	results, err := plan.VisibleTonight(context.Background(), quintaCalixtoSite(t), testNight, -5, nil, ephemeris.Default())
 	if err != nil {
 		t.Fatalf("VisibleTonight: %v", err)
 	}
@@ -257,7 +252,7 @@ func TestVisibleTonight_MoonAppearsWhenBright(t *testing.T) {
 // moonNote's illumination/separation path, which is where the direct
 // eph.Position call lives.
 func TestVisibleTonight_NilPlanetProviderDoesNotPanic(t *testing.T) {
-	results, err := plan.VisibleTonight(context.Background(), saoPauloSite(t), testNight, -5, nil, nil)
+	results, err := plan.VisibleTonight(context.Background(), quintaCalixtoSite(t), testNight, -5, nil, nil)
 	if err != nil {
 		t.Fatalf("VisibleTonight(nil planetProvider): %v", err)
 	}
@@ -278,7 +273,7 @@ func TestVisibleTonight_NilPlanetProviderDoesNotPanic(t *testing.T) {
 func TestVisibleTonight_SortedByApparentMag(t *testing.T) {
 	sources := []resolve.BrightObjectSearcher{&mockBrightSource{targets: []resolve.Target{sirius}}}
 
-	results, err := plan.VisibleTonight(context.Background(), saoPauloSite(t), testNight, -1, sources, ephemeris.Default())
+	results, err := plan.VisibleTonight(context.Background(), quintaCalixtoSite(t), testNight, -1, sources, ephemeris.Default())
 	if err != nil {
 		t.Fatalf("VisibleTonight: %v", err)
 	}
@@ -313,7 +308,7 @@ func TestVisibleTonight_ExtinctionCanPushBorderlineStarOverMagLimit(t *testing.T
 
 	sources := []resolve.BrightObjectSearcher{&mockBrightSource{targets: []resolve.Target{borderline}}}
 
-	results, err := plan.VisibleTonight(context.Background(), saoPauloSite(t), testNight, magLimit, sources, ephemeris.Default())
+	results, err := plan.VisibleTonight(context.Background(), quintaCalixtoSite(t), testNight, magLimit, sources, ephemeris.Default())
 	if err != nil {
 		t.Fatalf("VisibleTonight: %v", err)
 	}
@@ -338,7 +333,7 @@ func TestVisibleTonight_WithMinAltitude(t *testing.T) {
 		return []resolve.BrightObjectSearcher{&mockBrightSource{targets: []resolve.Target{sirius}}}
 	}
 
-	site := saoPauloSite(t)
+	site := quintaCalixtoSite(t)
 
 	loose, err := plan.VisibleTonight(context.Background(), site, testNight, 2, sources(), ephemeris.Default())
 	if err != nil {
@@ -356,7 +351,7 @@ func TestVisibleTonight_WithMinAltitude(t *testing.T) {
 	}
 
 	if _, ok := findByName(tight, "Sirius"); ok {
-		t.Fatalf("expected an 80°-minimum-altitude threshold to exclude Sirius (never that high from Sao Paulo), got %+v", tight)
+		t.Fatalf("expected an 80°-minimum-altitude threshold to exclude Sirius (never that high from Quinta Calixto), got %+v", tight)
 	}
 }
 
@@ -365,7 +360,7 @@ func TestVisibleTonight_EmptySourcesAndNoPlanetsStillSucceeds(t *testing.T) {
 	// can't support any planet (ephemeris.Default() is Sun/Moon-only, and
 	// mag -30 excludes even the Moon) should return an empty, error-free
 	// result — not a panic or a spurious error.
-	results, err := plan.VisibleTonight(context.Background(), saoPauloSite(t), testNight, -30, nil, ephemeris.Default())
+	results, err := plan.VisibleTonight(context.Background(), quintaCalixtoSite(t), testNight, -30, nil, ephemeris.Default())
 	if err != nil {
 		t.Fatalf("VisibleTonight: %v", err)
 	}

@@ -27,10 +27,10 @@ import (
 )
 
 func main() {
-	// ── Observatory: São Paulo ───────────────────────────────────────────
+	// ── Observatory: Quinta Calixto ───────────────────────────────────────
 	tz, _ := time.LoadLocation("America/Sao_Paulo")
-	loc, _ := coord.NewEarthLocation(-23.5505, -46.6333, 760)
-	site, _ := plan.NewSite("São Paulo", loc, plan.WithTimeZone(tz))
+	site, _ := plan.NewSiteEarthLocation("Quinta Calixto", -22.528478, -46.473002, 835.05, plan.WithTimeZone(tz))
+	loc := site.Location()
 
 	// JPL kernel downloads are opt-in — see README "Data downloads &
 	// offline usage". de442 is ~115 MB; naif0012.tls (leap seconds) ~5 KB.
@@ -52,7 +52,7 @@ func main() {
 	moonrise, moonset, _ := plan.MoonriseMoonset(start, end, site, provider)
 
 	fmt.Println("══════════════════════════════════════════════════════════════")
-	fmt.Println("  Sky Brightness & Limiting Magnitude — São Paulo")
+	fmt.Println("  Sky Brightness & Limiting Magnitude — Quinta Calixto")
 	fmt.Printf("  Moon: %.0f%% illuminated (phase angle %.0f°)\n", frac*100, phase.Degrees())
 	printEvent("  Astronomical dusk", dusk, tz)
 	printEvent("  Astronomical dawn", dawn, tz)
@@ -83,9 +83,9 @@ func main() {
 		skybrightness.NewZodiacalLight(provider),
 	}
 
-	if floor, err := lpmap.New().Floor(context.Background(), -23.5505, -46.6333); err == nil {
+	if floor, err := lpmap.New().Floor(context.Background(), -22.528478, -46.473002); err == nil {
 		sqm, _ := floor.Radiance(coord.NewAltAz(angle.Deg(90), angle.Deg(0)), nil)
-		fmt.Printf("\n  Discovered São Paulo light-pollution floor: %.2f V mag/arcsec² (Falchi 2015)\n",
+		fmt.Printf("\n  Discovered Quinta Calixto light-pollution floor: %.2f V mag/arcsec² (Falchi 2015)\n",
 			float64(sqm.SurfaceBrightnessV()))
 
 		components = append(components, floor)

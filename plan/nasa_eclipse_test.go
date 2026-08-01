@@ -9,6 +9,12 @@
 // These tests require an active internet connection to reach
 // https://eclipse.gsfc.nasa.gov/ catalog pages.
 // They also require a JPL DE441 kernel (auto-downloaded on first run, ~1.5 GB).
+//
+// Under a shorter ambient -timeout (e.g. CI's generic 10m integration job,
+// well under the 60m this file needs from a cold cache), requireNASA and
+// nasaBudgetOK make these tests skip cleanly — with a clear message —
+// rather than let the ambient timeout kill the whole test binary mid
+// request. Run with the full 60m budget locally for complete coverage.
 package plan_test
 
 import (
@@ -16,6 +22,7 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"net"
 	"net/http"
 	"regexp"
 	"strconv"
@@ -238,32 +245,93 @@ func parseNASASolarEclipses(html string) []nasaEclipseRef {
 
 // ── Fetch Helper ─────────────────────────────────────────────────────────────
 
+// requireNASA skips the calling test when eclipse.gsfc.nasa.gov is
+// unreachable — the same TCP pre-check every other live-network test in
+// this repo uses (see e.g. catalog/simbad's requireSimbad), so an
+// unreachable/blackholed host is skipped in seconds instead of grinding
+// through fetchNASAPage's own per-request timeout across every century
+// subtest until the ambient `go test -timeout` kills the whole binary.
+func requireNASA(t *testing.T) {
+	t.Helper()
+
+	conn, err := net.DialTimeout("tcp", "eclipse.gsfc.nasa.gov:443", 5*gotime.Second)
+	if err != nil {
+		t.Skipf("NASA eclipse catalog unreachable, skipping: %v", err)
+	}
+
+	_ = conn.Close()
+}
+
+// nasaBudgetOK reports whether at least margin remains before the ambient
+// `go test -timeout` deadline, skipping the calling (sub)test and
+// returning false otherwise. This file's own doc comment recommends
+// `-timeout 60m` for a from-cold-cache DE441 download (multi-GB) plus a
+// dozen live NASA fetches; CI's generic integration job instead applies a
+// blanket 10m across every package, which this suite alone can't reliably
+// finish within. Checking the remaining budget before each expensive step
+// turns a hard mid-request kill (a confusing goroutine-dump failure) into
+// a clean, explained skip.
+func nasaBudgetOK(t *testing.T, margin gotime.Duration) bool {
+	t.Helper()
+
+	deadline, ok := t.Deadline()
+	if !ok {
+		return true // no -timeout set (e.g. a local `go test` run) — no budget limit
+	}
+
+	if gotime.Until(deadline) < margin {
+		t.Skip("not enough time left before the test binary's -timeout for this step — rerun with a longer -timeout (see this file's package doc) for full coverage")
+		return false
+	}
+
+	return true
+}
+
 func fetchNASAPage(t *testing.T, url string) string {
 	t.Helper()
-	client := &http.Client{Timeout: 30 * time.Second}
-	req, err := http.NewRequest("GET", url, nil)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		t.Fatalf("Failed to create request for %s: %v", url, err)
 	}
+
 	req.Header.Set("User-Agent", "Mozilla/5.0 (compatible; astrogo-test/1.0)")
+
+	// Belt-and-suspenders: the request context above already bounds the
+	// whole round trip, but Client.Timeout is kept too since it's what
+	// every other client in this codebase relies on for cancellation.
+	client := &http.Client{Timeout: 25 * time.Second}
+
 	resp, err := client.Do(req)
 	if err != nil {
 		t.Skipf("NASA endpoint unreachable, skipping: %v", err)
 	}
 	defer resp.Body.Close()
+
 	if resp.StatusCode != 200 {
 		t.Skipf("NASA returned status %d for %s", resp.StatusCode, url)
 	}
+
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		t.Fatalf("Failed to read NASA response: %v", err)
 	}
+
 	return string(body)
 }
 
 // ── Test: Lunar Eclipses vs NASA ─────────────────────────────────────────────
 
 func TestNASA_LunarEclipses_Historical(t *testing.T) {
+	requireNASA(t)
+
+	if !nasaBudgetOK(t, 6*time.Minute) {
+		return
+	}
+
 	prov, err := eph.NewProvider(context.Background(), eph.Planets, "de441_part-1", eph.WithKernel("de441_part-2"))
 	if err != nil {
 		t.Fatalf("Failed to create DE441 provider: %v", err)
@@ -289,6 +357,10 @@ func TestNASA_LunarEclipses_Historical(t *testing.T) {
 	for _, c := range centuries {
 		name := fmt.Sprintf("LE_%04d-%04d", c.start, c.end)
 		t.Run(name, func(t *testing.T) {
+			if !nasaBudgetOK(t, 45*time.Second) {
+				return
+			}
+
 			html := fetchNASAPage(t, c.url)
 			refs := parseNASALunarEclipses(html)
 			t.Logf("Parsed %d lunar eclipses from NASA %04d-%04d", len(refs), c.start, c.end)
@@ -378,6 +450,12 @@ func TestNASA_LunarEclipses_Historical(t *testing.T) {
 // ── Test: Solar Eclipses vs NASA ─────────────────────────────────────────────
 
 func TestNASA_SolarEclipses_Historical(t *testing.T) {
+	requireNASA(t)
+
+	if !nasaBudgetOK(t, 6*time.Minute) {
+		return
+	}
+
 	prov, err := eph.NewProvider(context.Background(), eph.Planets, "de441_part-1", eph.WithKernel("de441_part-2"))
 	if err != nil {
 		t.Fatalf("Failed to create DE441 provider: %v", err)
@@ -402,6 +480,10 @@ func TestNASA_SolarEclipses_Historical(t *testing.T) {
 	for _, c := range centuries {
 		name := fmt.Sprintf("SE_%04d-%04d", c.start, c.end)
 		t.Run(name, func(t *testing.T) {
+			if !nasaBudgetOK(t, 45*time.Second) {
+				return
+			}
+
 			html := fetchNASAPage(t, c.url)
 			refs := parseNASASolarEclipses(html)
 			t.Logf("Parsed %d solar eclipses from NASA %04d-%04d", len(refs), c.start, c.end)
@@ -489,6 +571,12 @@ func TestNASA_SolarEclipses_Historical(t *testing.T) {
 // matches NASA's tabulated ΔT values from the Five Millennium Eclipse Catalog.
 // Both sources use the Espenak & Meeus (2006) model, so they should agree closely.
 func TestNASA_DeltaT_CrossValidation(t *testing.T) {
+	requireNASA(t)
+
+	if !nasaBudgetOK(t, 2*time.Minute) {
+		return
+	}
+
 	centuries := []struct {
 		start, end int
 		url        string
@@ -506,6 +594,10 @@ func TestNASA_DeltaT_CrossValidation(t *testing.T) {
 	for _, c := range centuries {
 		name := fmt.Sprintf("DeltaT_%04d-%04d", c.start, c.end)
 		t.Run(name, func(t *testing.T) {
+			if !nasaBudgetOK(t, 45*time.Second) {
+				return
+			}
+
 			html := fetchNASAPage(t, c.url)
 			refs := parseNASALunarEclipses(html)
 

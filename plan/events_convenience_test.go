@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/TuSKan/astrogo/angle"
-	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/time"
 )
@@ -161,14 +160,9 @@ func TestFullMoonOppositions_MatchesMoonPhases(t *testing.T) {
 }
 
 func TestVisibilityEvents_Star(t *testing.T) {
-	loc, err := coord.NewGeodetic(angle.Deg(-46.63), angle.Deg(-23.55), 760)
+	site, err := NewSiteEarthLocation("Quinta Calixto", -22.528478, -46.473002, 835.05)
 	if err != nil {
-		t.Fatalf("NewGeodetic: %v", err)
-	}
-
-	site, err := NewSite("São Paulo", loc)
-	if err != nil {
-		t.Fatalf("NewSite: %v", err)
+		t.Fatalf("NewSiteEarthLocation: %v", err)
 	}
 
 	star := NewStar("Test Star", angle.Deg(100), angle.Deg(-10))
