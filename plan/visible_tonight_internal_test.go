@@ -142,7 +142,12 @@ func TestCandidateFromTarget_ElementsBearingTargetIsOffline(t *testing.T) {
 	// WithSmallBodyKernels must force the kernel path even with elements
 	// present — since remote is offline, that path is expected to fail
 	// and return a nil Observable (not the Kepler-backed one from above).
-	obj2, _ := candidateFromTarget(context.Background(), tgt, start, end, visibleTonightConfig{forceSmallBodyKernels: true})
+	// Built via the real exported option (not a direct struct literal),
+	// so this also exercises WithSmallBodyKernels itself.
+	var forcedCfg visibleTonightConfig
+	WithSmallBodyKernels()(&forcedCfg)
+
+	obj2, _ := candidateFromTarget(context.Background(), tgt, start, end, forcedCfg)
 	if obj2 != nil {
 		t.Errorf("expected WithSmallBodyKernels to force the (here, offline-failing) kernel path, got a non-nil %T", obj2)
 	}

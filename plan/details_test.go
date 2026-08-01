@@ -204,6 +204,10 @@ func TestGetDetails_RadialVelocity(t *testing.T) {
 
 	wantTopo := ctx.ObservedRadialVelocity(coord.NewICRS(ra, dec), rvBarycentric)
 	testutil.AssertNear(t, "topocentric RV", gotTopo, wantTopo, 0.01)
+
+	if s := d.String(); !strings.Contains(s, "Radial velocity:") {
+		t.Errorf("String() output missing the Radial velocity line: %q", s)
+	}
 }
 
 // TestGetDetails_RadialVelocity_NotSet confirms RadialVelocity stays

@@ -130,8 +130,20 @@ func TestNewElements_RejectsBadInputs(t *testing.T) {
 
 func TestNewElements_AcceptsGoodInputs(t *testing.T) {
 	epoch := atime.Date(2026, atime.January, 1, 0, 0, 0, 0, atime.LocationUTC)
-	_, err := kepler.NewElements(epoch, 2.7, 0.15, angle.Deg(10), angle.Deg(80), angle.Deg(73), angle.Deg(20))
+	el, err := kepler.NewElements(epoch, 2.7, 0.15, angle.Deg(10), angle.Deg(80), angle.Deg(73), angle.Deg(20))
 	testutil.AssertNoError(t, err)
+
+	// Every accessor must round-trip the value passed to NewElements.
+	if !el.Epoch().Equal(epoch) {
+		t.Errorf("Epoch() = %v, want %v", el.Epoch(), epoch)
+	}
+
+	testutil.AssertNear(t, "SemiMajorAxis", el.SemiMajorAxis(), 2.7, 1e-12)
+	testutil.AssertNear(t, "Eccentricity", el.Eccentricity(), 0.15, 1e-12)
+	testutil.AssertNear(t, "Inclination", el.Inclination().Degrees(), 10, 1e-9)
+	testutil.AssertNear(t, "AscendingNode", el.AscendingNode().Degrees(), 80, 1e-9)
+	testutil.AssertNear(t, "ArgPeriapsis", el.ArgPeriapsis().Degrees(), 73, 1e-9)
+	testutil.AssertNear(t, "MeanAnomaly", el.MeanAnomaly().Degrees(), 20, 1e-9)
 }
 
 // TestElements_StateAt_KnownGeometry_Inclination0 locks in the
