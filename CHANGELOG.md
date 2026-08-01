@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.12.0] — 2026-08-01
 ### Added
 - `plan.HorizonProfile` / `Site.WithHorizonProfile`/`HorizonAt` — an optional per-azimuth horizon function, propagated through `Site.WithHorizon`/`WithTimeZone`, for a site whose sky isn't uniformly clear to a single scalar `Horizon()`. Purely additive data plumbing today — no production constraint consumes it yet (see `docs/ROADMAP.md` #29).
 - `examples/21_meteor_shower_forecast` — the Perseids' real solar-longitude activity window, radiant drift, and a real hourly `ObservedRate` forecast for Paranal.
