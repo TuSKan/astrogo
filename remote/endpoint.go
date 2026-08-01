@@ -127,6 +127,18 @@ type Endpoint struct {
 	// CSVs). Empty for endpoints without a fixed manifest — JPL kernels are
 	// named by the caller, so NAIFSPK/NAIFLSK leave this nil.
 	Files []string
+	// Downloadable reports whether this endpoint can deliver bulk file
+	// content through the CheckDownload/GetFile consent gate — i.e.
+	// whether EnableDownloads(id, ...) means anything for it. True for
+	// every KindFile endpoint, and additionally for JPLHorizons, which is
+	// a KindAPI endpoint that nonetheless returns a whole SPK kernel
+	// (base64-encoded inside its JSON body) from
+	// ephemeris/jpl/spk.CacheAPI's small-body ephemeris generation. A
+	// KindAPI endpoint that only ever returns small text/JSON payloads
+	// (SIMBAD, VizieR, SBDB, Gaia, MAST, CelesTrak, FINK, ...) leaves this
+	// false: it has no download-consent gate at all, and
+	// EnableAllDownloads/DisableAllDownloads deliberately never touch it.
+	Downloadable bool
 }
 
 // SizeVaries marks an endpoint whose per-fetch size cannot be usefully
@@ -152,6 +164,7 @@ func defaultEndpoints() map[EndpointID]Endpoint {
 			Enabled:         true,
 			DownloadTimeout: 30 * time.Second,
 			Mutable:         true,
+			Downloadable:    true,
 		},
 		NAIFSPK: {
 			ID:              NAIFSPK,
@@ -163,6 +176,7 @@ func defaultEndpoints() map[EndpointID]Endpoint {
 			Enabled:         true,
 			DownloadTimeout: 30 * time.Minute,
 			Mutable:         false,
+			Downloadable:    true,
 		},
 		NAIFLSK: {
 			ID:              NAIFLSK,
@@ -174,16 +188,18 @@ func defaultEndpoints() map[EndpointID]Endpoint {
 			Enabled:         true,
 			DownloadTimeout: 1 * time.Minute,
 			Mutable:         false,
+			Downloadable:    true,
 		},
 		JPLHorizons: {
-			ID:          JPLHorizons,
-			URL:         "https://ssd.jpl.nasa.gov/api/horizons.api",
-			Kind:        KindAPI,
-			Subsystem:   "ephemeris/jpl, catalog/jpl",
-			Description: "JPL Horizons API (name resolution and small-body SPK generation)",
-			ApproxSize:  SizeVaries,
-			Enabled:     true,
-			Timeout:     2 * time.Minute,
+			ID:           JPLHorizons,
+			URL:          "https://ssd.jpl.nasa.gov/api/horizons.api",
+			Kind:         KindAPI,
+			Subsystem:    "ephemeris/jpl, catalog/jpl",
+			Description:  "JPL Horizons API (name resolution and small-body SPK generation)",
+			ApproxSize:   SizeVaries,
+			Enabled:      true,
+			Timeout:      2 * time.Minute,
+			Downloadable: true,
 		},
 		JPLSBDB: {
 			ID:          JPLSBDB,
@@ -285,6 +301,7 @@ func defaultEndpoints() map[EndpointID]Endpoint {
 			Enabled:         true,
 			DownloadTimeout: 2 * time.Minute,
 			Mutable:         true,
+			Downloadable:    true,
 			Files:           []string{"NGC.csv", "addendum.csv"},
 		},
 	}

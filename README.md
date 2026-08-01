@@ -720,8 +720,14 @@ To grant consent for every download-gated endpoint at once instead of enumeratin
 individually, use `remote.EnableAllDownloads` (and its counterpart `DisableAllDownloads`):
 
 ```go
-remote.EnableAllDownloads(200 << 20) // NAIFSPK, NAIFLSK, IERSFinals2000A, OpenNGC — all at once
+remote.EnableAllDownloads(200 << 20) // NAIFSPK, NAIFLSK, IERSFinals2000A, OpenNGC, JPLHorizons — all at once
 ```
+
+`JPLHorizons` is included even though it's an API endpoint, not a file endpoint — its
+small-body SPK generation (used for asteroid/comet ephemeris) is a real file download in
+effect, gated the same way. An endpoint that only ever returns small text/JSON payloads
+(SIMBAD, VizieR, SBDB, Gaia, MAST, ...) has no download-consent gate at all and is unaffected
+either way.
 
 For total control, install a custom policy instead of per-endpoint limits:
 

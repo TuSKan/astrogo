@@ -187,16 +187,26 @@ func DisableDownloads(id EndpointID) {
 }
 
 // EnableAllDownloads grants file-download consent for every registered
-// KindFile endpoint (today: IERSFinals2000A, NAIFSPK, NAIFLSK, OpenNGC),
-// applying the same maxSize cap to each. Equivalent to calling
-// EnableDownloads(id, maxSize) once per KindFile endpoint. KindAPI
-// endpoints are unaffected — they have no download-consent gate.
+// endpoint that can actually perform a download — every KindFile
+// endpoint (IERSFinals2000A, NAIFSPK, NAIFLSK, OpenNGC) plus
+// JPLHorizons, whose small-body SPK generation is a real file download
+// in effect even though the endpoint itself is KindAPI (see
+// Endpoint.Downloadable). Applies the same maxSize cap to each.
+// Equivalent to calling EnableDownloads(id, maxSize) once per
+// Downloadable endpoint. An endpoint that only ever returns small
+// text/JSON payloads (SIMBAD, VizieR, SBDB, Gaia, MAST, ...) has no
+// download-consent gate at all and is unaffected.
+//
+// After this call, "I enabled all downloads" is true without
+// qualification: nothing in this library will fail with
+// ErrDownloadDenied because of a consent scope the caller didn't know
+// about.
 func EnableAllDownloads(maxSize int64) {
 	regMu.Lock()
 	defer regMu.Unlock()
 
 	for id, ep := range endpoints {
-		if ep.Kind != KindFile {
+		if !ep.Downloadable {
 			continue
 		}
 
@@ -207,13 +217,14 @@ func EnableAllDownloads(maxSize int64) {
 }
 
 // DisableAllDownloads revokes file-download consent for every registered
-// KindFile endpoint (the default state for each).
+// Downloadable endpoint (the default state for each) — see
+// EnableAllDownloads for exactly which endpoints that covers.
 func DisableAllDownloads() {
 	regMu.Lock()
 	defer regMu.Unlock()
 
 	for id, ep := range endpoints {
-		if ep.Kind != KindFile {
+		if !ep.Downloadable {
 			continue
 		}
 
