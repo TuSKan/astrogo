@@ -37,21 +37,16 @@ func FromCatalog(c catalog.Target, p eph.Provider) Observable {
 	//
 	// isPlanetID(id) means this target really is a major named body (the
 	// resolver tags the Sun with KindStar, not KindPlanet, hence checking
-	// all three Kinds here). eph.Default() answers every one of them —
-	// Sun, Moon, Mercury-Neptune, Pluto, and the Solar System Barycenter —
-	// so a caller who didn't supply a provider still gets a real,
-	// moving *Planet instead of silently degrading to a static,
-	// non-moving fixed-target Observable built from whatever (or no)
-	// fixed coordinate happened to be on c.Coord. A caller-supplied
-	// provider (a real kernel, for perturbation-aware accuracy) always
-	// takes precedence.
+	// all three Kinds here). NewPlanet itself defaults a nil provider to
+	// eph.Default() — which answers every one of these bodies (Sun, Moon,
+	// Mercury-Neptune, Pluto, the Solar System Barycenter) — so a caller
+	// who didn't supply a provider still gets a real, moving *Planet
+	// instead of silently degrading to a static, non-moving fixed-target
+	// Observable built from whatever (or no) fixed coordinate happened to
+	// be on c.Coord. A caller-supplied provider (a real kernel, for
+	// perturbation-aware accuracy) always takes precedence, unchanged.
 	if (c.Kind == resolve.KindPlanet || c.Kind == resolve.KindMoon || c.Kind == resolve.KindStar) && isPlanetID(id) {
-		provider := p
-		if provider == nil {
-			provider = eph.Default()
-		}
-
-		return NewPlanet(c.Name, id, provider)
+		return NewPlanet(c.Name, id, p)
 	}
 
 	// ── Moving body with provider ──

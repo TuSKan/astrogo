@@ -164,3 +164,34 @@ func TestFromCatalog(t *testing.T) {
 		t.Errorf("FromCatalog DSO returned %T, want *DeepSkyObject", dso)
 	}
 }
+
+// TestNewPlanet_NilProviderDefaults is a regression test at the
+// constructor level, not just FromCatalog's — a direct call like
+// plan.NewMars(nil) (bypassing FromCatalog entirely) used to construct
+// successfully but fail at the first Position()/ApparentMagnitude() call,
+// since NewPlanet stored whatever provider it was given, nil included.
+// Every convenience constructor (NewSun, NewMoon, NewMercury...NewPluto)
+// delegates through NewPlanet, so fixing it there covers all of them.
+func TestNewPlanet_NilProviderDefaults(t *testing.T) {
+	epoch := time.FromJD(2451545.0, time.UTC)
+
+	mars := NewMars(nil)
+	if _, err := mars.Position(epoch); err != nil {
+		t.Errorf("NewMars(nil).Position(): unexpected error: %v", err)
+	}
+
+	sun := NewSun(nil)
+	if _, err := sun.Position(epoch); err != nil {
+		t.Errorf("NewSun(nil).Position(): unexpected error: %v", err)
+	}
+
+	moon := NewMoon(nil)
+	if _, err := moon.Position(epoch); err != nil {
+		t.Errorf("NewMoon(nil).Position(): unexpected error: %v", err)
+	}
+
+	pluto := NewPluto(nil)
+	if _, err := pluto.Position(epoch); err != nil {
+		t.Errorf("NewPluto(nil).Position(): unexpected error: %v", err)
+	}
+}

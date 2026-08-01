@@ -247,6 +247,34 @@ func TestVisibleTonight_MoonAppearsWhenBright(t *testing.T) {
 	}
 }
 
+// TestVisibleTonight_NilPlanetProviderDoesNotPanic is a regression test
+// for a real latent nil-pointer-panic risk: VisibleTonight's unexported
+// moonNote helper calls eph.Position(planetProvider, eph.Moon, t) directly
+// (bypassing plan.NewMoon, which would have defaulted a nil provider
+// itself) — calling a method on a nil interface value panics, not just
+// errors. A magLimit loose enough to guarantee the Moon is a candidate
+// (same bound TestVisibleTonight_MoonAppearsWhenBright uses) exercises
+// moonNote's illumination/separation path, which is where the direct
+// eph.Position call lives.
+func TestVisibleTonight_NilPlanetProviderDoesNotPanic(t *testing.T) {
+	results, err := plan.VisibleTonight(context.Background(), saoPauloSite(t), testNight, -5, nil, nil)
+	if err != nil {
+		t.Fatalf("VisibleTonight(nil planetProvider): %v", err)
+	}
+
+	found := false
+
+	for _, r := range results {
+		if r.Target.Kind == resolve.KindMoon {
+			found = true
+		}
+	}
+
+	if !found {
+		t.Error("expected the Moon in the results with a nil planetProvider, same as with ephemeris.Default()")
+	}
+}
+
 func TestVisibleTonight_SortedByApparentMag(t *testing.T) {
 	sources := []resolve.BrightObjectSearcher{&mockBrightSource{targets: []resolve.Target{sirius}}}
 

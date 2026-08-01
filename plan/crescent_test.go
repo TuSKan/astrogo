@@ -3,6 +3,10 @@ package plan
 import (
 	"math"
 	"testing"
+
+	"github.com/TuSKan/astrogo/angle"
+	"github.com/TuSKan/astrogo/coord"
+	"github.com/TuSKan/astrogo/time"
 )
 
 // ── Category 1: Altitude & Azimuth ──────────────────────────────────────────
@@ -640,4 +644,20 @@ func searchStr(s, substr string) bool {
 	}
 
 	return false
+}
+
+// TestNewCrescentParams_NilProviderDefaults is a regression test:
+// NewCrescentParams calls eph.Position(prov, ...) directly (bypassing
+// plan.NewSun/NewMoon), so it needs its own nil-provider guard.
+func TestNewCrescentParams_NilProviderDefaults(t *testing.T) {
+	loc, err := coord.NewGeodetic(angle.Deg(35.2137), angle.Deg(31.7683), 754)
+	if err != nil {
+		t.Fatalf("NewGeodetic: %v", err)
+	}
+
+	epoch := time.FromJD(2451545.0, time.UTC)
+
+	if _, err := NewCrescentParams(epoch, loc, nil); err != nil {
+		t.Errorf("NewCrescentParams(nil): unexpected error: %v", err)
+	}
 }

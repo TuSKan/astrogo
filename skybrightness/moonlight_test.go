@@ -111,6 +111,25 @@ func TestMoonlightBelowHorizonZero(t *testing.T) {
 	}
 }
 
+// TestWithProvider_NilDefaults confirms WithProvider(nil) doesn't leave
+// Moonlight with an unusable provider — matching NewMoonlight's own
+// zero-value default (ephemeris.Default()) rather than silently
+// overwriting it with nil.
+func TestWithProvider_NilDefaults(t *testing.T) {
+	m := NewMoonlight(WithProvider(nil))
+
+	site, err := coord.NewGeodetic(angle.Deg(0), angle.Deg(45), 0)
+	if err != nil {
+		t.Fatalf("NewGeodetic: %v", err)
+	}
+
+	ctx := coord.NewContext(time.FromJD(2451545.0, time.UTC), site, atmosphere.Atmosphere{})
+
+	if _, err := m.Radiance(coord.NewAltAz(angle.Deg(45), angle.Deg(0)), ctx); err != nil {
+		t.Errorf("Radiance after WithProvider(nil): unexpected error: %v", err)
+	}
+}
+
 func BenchmarkMoonBrightnessNL(b *testing.B) {
 	b.ReportAllocs()
 
