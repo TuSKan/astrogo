@@ -302,8 +302,9 @@ asteroids now would ship confidently wrong numbers, so moons stay kernel-only
 `coord.Context.BarycentricVelocity`/`BarycentricRVCorrection`/`HeliocentricRVCorrection`
 ship (classical, non-relativistic projection of the observer's own barycentric
 motion, ~1 m/s accuracy) and are demonstrated end-to-end in
-`examples/23_radial_velocity_correction`. Not yet wired into `plan`'s observability
-pipeline — a caller has to call the `coord` methods directly.
+`examples/23_radial_velocity_correction`. Now wired into `plan`'s observability
+pipeline too — `plan.TargetDetails.RadialVelocity` auto-populates for any target
+implementing `MeasuredRadialVelocity` (currently `*Star`).
 
 - [x] `Context.BarycentricVelocity` — observer's barycentric velocity from `Apco13`'s
       already-computed astrometry, no new SOFA call
@@ -311,9 +312,10 @@ pipeline — a caller has to call the `coord` methods directly.
       projection, sign convention documented and tested explicitly
 - [x] Analytic property tests (bounded magnitude, annual sinusoid, antipodal sign flip,
       diurnal amplitude vs. site latitude)
-- [ ] `plan.TargetDetails.RadialVelocity` — a `MeasuredRadialVelocity` capability
+- [x] `plan.TargetDetails.RadialVelocity` — a `MeasuredRadialVelocity` capability
       interface (mirroring `StaticMagnitude`) on `*Star`, wired into `computeDetails`
-      alongside the magnitude dispatch block
+      alongside the magnitude dispatch block; `Context.ObservedRadialVelocity` is the
+      inverse of `BarycentricRVCorrection`, tested to round-trip exactly
 - [ ] `resolve.Target.HasRadialVelocity` — distinguishes a true-zero measured RV from
       "no RV on file" (today a zero `RadialVelocity` is ambiguous)
 - [ ] Cross-implementation fixture test against Astropy's

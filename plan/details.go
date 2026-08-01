@@ -13,23 +13,24 @@ import (
 
 // TargetDetails holds descriptive and ephemeris properties of an Observable.
 type TargetDetails struct {
-	ExtraProps   map[string]string
-	SetTime      *time.Time
-	TransitTime  *time.Time
-	RiseTime     *time.Time
-	AngularSize  string
-	Description  string
-	Source       string
-	Magnitude    string
-	Name         string
-	DistanceUnit string
-	Distance     float64
-	Azimuth      angle.Angle
-	RiseAzimuth  angle.Angle
-	Altitude     angle.Angle
-	MaxElevation angle.Angle
-	SetAzimuth   angle.Angle
-	Elongation   angle.Angle
+	ExtraProps     map[string]string
+	SetTime        *time.Time
+	TransitTime    *time.Time
+	RiseTime       *time.Time
+	AngularSize    string
+	Description    string
+	Source         string
+	Magnitude      string
+	RadialVelocity string
+	Name           string
+	DistanceUnit   string
+	Distance       float64
+	Azimuth        angle.Angle
+	RiseAzimuth    angle.Angle
+	Altitude       angle.Angle
+	MaxElevation   angle.Angle
+	SetAzimuth     angle.Angle
+	Elongation     angle.Angle
 
 	// RA is the astrometric topocentric right ascension in the ICRS frame (J2000).
 	// For moving bodies this includes diurnal parallax correction but does NOT
@@ -57,6 +58,10 @@ func (d TargetDetails) String() string {
 
 	if d.Magnitude != "" {
 		fmt.Fprintf(&b, "Magnitude:\t%s\n", d.Magnitude)
+	}
+
+	if d.RadialVelocity != "" {
+		fmt.Fprintf(&b, "Radial velocity:\t%s\n", d.RadialVelocity)
 	}
 
 	fmt.Fprintf(&b, "RA (ICRS):\t%s\n", d.RA.HMSString(1))
@@ -150,6 +155,9 @@ func computeDetails(obs Observable, ctx *coord.Context, props ...string) (*Targe
 		fillStaticMagnitude(d, obs)
 	}
 
+	// ── Radial velocity via interface dispatch ──
+	fillRadialVelocity(d, obs, pos, ctx)
+
 	// ── Type-specific catalog properties ──
 	fillTypedProps(d, obs)
 
@@ -231,6 +239,34 @@ func fillStaticMagnitude(d *TargetDetails, obs Observable) {
 	}
 }
 
+// ── Radial velocity ─────────────────────────────────────────────────────────
+
+// fillRadialVelocity computes the topocentric radial velocity an observer
+// at ctx would measure right now for a target with a catalog (barycentric)
+// RV, via coord.Context.ObservedRadialVelocity. Silently skipped (never a
+// hard error) for a target with no MeasuredRadialVelocity, or one that
+// implements the interface but has no RV set — same best-effort
+// convention AngularDiameter/Elongation already use in fillMovingBody.
+// pos is the target's astrometric ICRS position already computed by
+// computeDetails (its own catalog coordinates, not a topocentric-adjusted
+// one — the only type implementing MeasuredRadialVelocity today, *Star,
+// is never a MovingBody, so this is always the right line-of-sight
+// direction regardless of which branch of computeDetails ran first).
+func fillRadialVelocity(d *TargetDetails, obs Observable, pos coord.ICRS, ctx *coord.Context) {
+	mrv, ok := obs.(MeasuredRadialVelocity)
+	if !ok {
+		return
+	}
+
+	rvBarycentric, has := mrv.MeasuredRadialVelocity()
+	if !has {
+		return
+	}
+
+	rvObserved := ctx.ObservedRadialVelocity(pos, rvBarycentric)
+	d.RadialVelocity = fmt.Sprintf("%+.2f km/s topocentric (%+.2f km/s barycentric)", rvObserved, rvBarycentric)
+}
+
 // ── Type-specific property extraction ───────────────────────────────────────
 
 // fillTypedProps extracts type-specific properties into ExtraProps.
@@ -285,6 +321,8 @@ func applyProps(d *TargetDetails, props []string) {
 			d.Source = val
 		case "Magnitude":
 			d.Magnitude = val
+		case "RadialVelocity":
+			d.RadialVelocity = val
 		case "AngularSize":
 			d.AngularSize = val
 		default:

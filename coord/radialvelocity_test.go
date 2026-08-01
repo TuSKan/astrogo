@@ -249,3 +249,43 @@ func TestHeliocentricRVCorrection_DiffersFromBarycentric(t *testing.T) {
 		t.Errorf("|bary - helio| = %v km/s, expected a small (<0.1 km/s) difference from the Sun's own barycentric motion", math.Abs(bary-helio))
 	}
 }
+
+// TestObservedRadialVelocity_RoundTripsWithBarycentricRVCorrection
+// confirms ObservedRadialVelocity is exactly the algebraic inverse of
+// BarycentricRVCorrection, per its own documented derivation
+// (rvObserved = rvBarycentric - correction) — feeding a barycentric RV
+// through ObservedRadialVelocity and the result back through
+// BarycentricRVCorrection's own defining relation must recover the
+// original value, for several distinct target directions and epochs so
+// this isn't just true by coincidence for one geometry.
+func TestObservedRadialVelocity_RoundTripsWithBarycentricRVCorrection(t *testing.T) {
+	site := equatorSite(t)
+
+	targets := []coord.ICRS{
+		coord.NewICRS(angle.Zero(), angle.Zero()),
+		coord.NewICRS(angle.Deg(90), angle.Deg(30)),
+		coord.NewICRS(angle.Deg(200), angle.Deg(-45)),
+		coord.NewICRS(angle.Deg(315), angle.Deg(60)),
+	}
+
+	epochs := []time.Time{
+		time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC),
+		time.Date(2026, time.July, 1, 0, 0, 0, 0, time.LocationUTC),
+	}
+
+	const rvBarycentric = -12.34
+
+	for _, tm := range epochs {
+		ctx := coord.NewContext(tm, site, noRefraction)
+
+		for _, target := range targets {
+			rvObserved := ctx.ObservedRadialVelocity(target, rvBarycentric)
+
+			// The defining relation BarycentricRVCorrection documents:
+			// rvBarycentric = rvMeasured + ctx.BarycentricRVCorrection(target).
+			roundTripped := rvObserved + ctx.BarycentricRVCorrection(target)
+
+			testutil.AssertNear(t, "round-tripped barycentric RV", roundTripped, rvBarycentric, 1e-9)
+		}
+	}
+}

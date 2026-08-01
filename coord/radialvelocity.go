@@ -35,6 +35,21 @@ func (ctx *Context) BarycentricRVCorrection(target ICRS) float64 {
 	return ctx.BarycentricVelocity().Dot(target.ToUnitVector())
 }
 
+// ObservedRadialVelocity returns the topocentric radial velocity, in
+// km/s, an observer at ctx would measure right now for a target whose
+// barycentric RV is rvBarycentric — the inverse of
+// BarycentricRVCorrection, and the direction almost every real use
+// needs: published catalog RVs (SIMBAD's rvz_radvel, for one) are
+// already barycentric, so applying BarycentricRVCorrection to one
+// directly double-corrects by up to ~60 km/s peak-to-peak. Derived
+// directly from BarycentricRVCorrection's own documented sign
+// convention (rvBarycentric = rvMeasured + correction):
+//
+//	rvObserved = rvBarycentric - ctx.BarycentricRVCorrection(target)
+func (ctx *Context) ObservedRadialVelocity(target ICRS, rvBarycentric float64) float64 {
+	return rvBarycentric - ctx.BarycentricRVCorrection(target)
+}
+
 // HeliocentricRVCorrection is [Context.BarycentricRVCorrection], but
 // relative to the Sun's own barycentric motion rather than the solar
 // system barycenter itself — the correction to ADD to a measured RV to
