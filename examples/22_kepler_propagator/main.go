@@ -1,16 +1,22 @@
-// Package main propagates 1 Ceres from its real published heliocentric
-// osculating orbital elements — resolved live from JPL SBDB, no SPK
-// kernel needed — via ephemeris/kepler's two-body Keplerian propagator,
-// then feeds the resulting Observable straight into the same
-// rise/transit/set machinery every other target in this library uses.
+// Package main resolves 1 Ceres's real published heliocentric osculating
+// orbital elements live from JPL SBDB, then hands the resulting
+// resolve.Target straight to plan.FromCatalog with no provider — the
+// standard entry point every catalog-resolved target goes through.
+// FromCatalog itself builds the two-body Keplerian propagator
+// (ephemeris/kepler) from those elements, no SPK kernel needed, and the
+// result feeds into the same rise/transit/set machinery every other
+// target in this library uses.
 //
 // This showcase demonstrates:
 //   - catalog/sbdb decoding a resolve.Target's real osculating elements
 //     (HasElements/SemiMajorAxis/Eccentricity/.../Epoch) directly from
 //     SBDB's own orbit.elements payload — no manual Horizons ELEMENTS
 //     query or unit conversion needed
-//   - eph.NewFromElements / plan.NewAsteroidFromElements: a full
-//     Observable built from those six numbers and an epoch, nothing else
+//   - plan.FromCatalog(target, nil) building a Kepler-propagated
+//     *plan.Asteroid automatically whenever HasElements is true and no
+//     provider is supplied — "Kepler as the default" for a small body
+//     with published elements, the same call any other FromCatalog user
+//     already makes
 //   - Position/magnitude drifting away from a kernel-backed ephemeris as
 //     |t - Epoch| grows, since planetary perturbations aren't modeled
 //   - plan.VisibilityEvents working on a Kepler-propagated body exactly
@@ -25,7 +31,6 @@ import (
 	"log"
 
 	"github.com/TuSKan/astrogo/catalog"
-	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/plan"
 )
 
@@ -44,44 +49,35 @@ func main() {
 		log.Fatalf("SBDB response for %q carried no orbital elements", target.Name)
 	}
 
-	el := eph.Elements{
-		Epoch:         target.Epoch,
-		SemiMajorAxis: target.SemiMajorAxis,
-		Eccentricity:  target.Eccentricity,
-		Inclination:   target.Inclination,
-		AscendingNode: target.AscendingNode,
-		ArgPeriapsis:  target.ArgPeriapsis,
-		MeanAnomaly:   target.MeanAnomaly,
-	}
-	epoch := el.Epoch
-
 	fmt.Println("═══════════════════════════════════════════════════════════════════")
 	fmt.Println("  1 CERES — two-body Keplerian propagation from published elements")
-	fmt.Println("  AstroGo | ephemeris/kepler | elements resolved live from JPL SBDB")
+	fmt.Println("  AstroGo | plan.FromCatalog | elements resolved live from JPL SBDB")
 	fmt.Println("═══════════════════════════════════════════════════════════════════")
 	fmt.Println()
 	fmt.Println("── Osculating elements (JPL SBDB, epoch below) ─────────────────────")
 	fmt.Println()
-	fmt.Printf("  Epoch            %s TDB\n", epoch.Format("2006-01-02 15:04:05"))
-	fmt.Printf("  Semi-major axis  %.6f AU\n", el.SemiMajorAxis)
-	fmt.Printf("  Eccentricity     %.6f\n", el.Eccentricity)
-	fmt.Printf("  Inclination      %s\n", el.Inclination.DMSString(1))
-	fmt.Printf("  Ascending node   %s\n", el.AscendingNode.DMSString(1))
-	fmt.Printf("  Arg. periapsis   %s\n", el.ArgPeriapsis.DMSString(1))
-	fmt.Printf("  Mean anomaly     %s (at epoch)\n", el.MeanAnomaly.DMSString(1))
-
-	if !target.HasH {
-		log.Fatalf("SBDB response for %q carried no H/G photometric parameters", target.Name)
-	}
+	fmt.Printf("  Epoch            %s TDB\n", target.Epoch.Format("2006-01-02 15:04:05"))
+	fmt.Printf("  Semi-major axis  %.6f AU\n", target.SemiMajorAxis)
+	fmt.Printf("  Eccentricity     %.6f\n", target.Eccentricity)
+	fmt.Printf("  Inclination      %s\n", target.Inclination.DMSString(1))
+	fmt.Printf("  Ascending node   %s\n", target.AscendingNode.DMSString(1))
+	fmt.Printf("  Arg. periapsis   %s\n", target.ArgPeriapsis.DMSString(1))
+	fmt.Printf("  Mean anomaly     %s (at epoch)\n", target.MeanAnomaly.DMSString(1))
 
 	// Note what does NOT happen here: no remote.EnableDownloads for a
-	// kernel, no de440s (~32 MB) download — eph.NewFromElements's default
-	// base provider is pure analytical SOFA (Sun/Moon/planets), so once
-	// the elements above are in hand, everything from here runs offline.
-	asteroid, err := plan.NewAsteroidFromElements(target.Name, el, plan.WithHG(target.H, target.G))
-	if err != nil {
-		log.Fatalf("new asteroid from elements: %v", err)
+	// kernel, no de440s (~32 MB) download, no manual eph.NewElements/
+	// eph.NewFromElements call — FromCatalog(target, nil) sees
+	// target.HasElements, builds the Kepler-propagated provider itself,
+	// and returns a fully-formed *plan.Asteroid. Everything from here
+	// runs entirely offline.
+	obs := plan.FromCatalog(target, nil)
+
+	asteroid, ok := obs.(*plan.Asteroid)
+	if !ok {
+		log.Fatalf("FromCatalog did not build a Kepler-propagated *plan.Asteroid for %q (got %T)", target.Name, obs)
 	}
+
+	epoch := target.Epoch
 
 	// ── Part 1: position/magnitude drift across the year ────────────────────
 	fmt.Println()
@@ -116,9 +112,11 @@ func main() {
 	fmt.Println("  Two-body propagation ignores planetary perturbations by design —")
 	fmt.Println("  accuracy drifts away from Epoch (arcseconds within days, arcminutes")
 	fmt.Println("  within months for a main-belt body). For perturbation-aware")
-	fmt.Println("  accuracy over long spans, use a real SPK kernel instead:")
-	fmt.Println("  eph.NewProvider(ctx, eph.SmallBody, \"1\") — see ephemeris/kepler's")
-	fmt.Println("  package doc for the full scope/accuracy discussion.")
+	fmt.Println("  accuracy over long spans, pass a real SPK-kernel-backed provider")
+	fmt.Println("  to FromCatalog instead — e.g. eph.NewProvider(ctx, eph.SmallBody,")
+	fmt.Println("  \"1\") — see ephemeris/kepler's package doc for the full")
+	fmt.Println("  scope/accuracy discussion, and plan.WithSmallBodyKernels for the")
+	fmt.Println("  equivalent override inside plan.VisibleTonight.")
 
 	// ── Part 2: it's a full Observable — rise/transit/set works unchanged ──
 	fmt.Println()
