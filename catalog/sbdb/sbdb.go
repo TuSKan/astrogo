@@ -414,18 +414,34 @@ func (p *Provider) SearchBright(ctx context.Context, req resolve.BrightRequest) 
 	}
 }
 
+// elementFields requests the same six osculating orbital elements plus
+// their epoch (JD, TDB) that ResolveObject's single-object identify path
+// already decodes from payload.Orbit — verified live against the real
+// sbdb_query.api that it accepts these exact field names and returns
+// values matching the identify endpoint's own orbit.elements (e.g. 1
+// Ceres: a=2.766, e=0.0797, i=10.59, om=80.25, w=73.29, ma=274.42,
+// epoch=2461200.5). Riding along on the same bulk query costs nothing
+// extra (one request per sb-kind either way), so a Stage-1 bright-search
+// Target carries everything ephemeris.NewFromElements needs and
+// plan.FromCatalog can build a network-free Kepler-propagated body with
+// no Stage-2 kernel fetch at all. "e" (eccentricity) is folded in here
+// rather than requested separately — it was already fetched alone for
+// classifyKind, now decoded once alongside the rest.
+const elementFields = ",e,a,i,om,w,ma,epoch"
+
 // queryBright issues one sb-kind-scoped bulk query against
 // remote.JPLSBDBQuery, filtering by magField < maxVal, sorted magField
 // ascending (brightest first — confirmed live that the query API's `sort`
 // parameter, distinct from ADQL-style syntax, accepts a bare field name
 // with ascending as the default direction) so that limit always keeps the
 // genuinely brightest candidates rather than an arbitrary subset. Decodes
-// the column-oriented response into identity-only resolve.Targets — H/G
-// for asteroids, M1/K1 for comets, selected by which magField was queried.
+// the column-oriented response into resolve.Targets carrying identity,
+// H/G (asteroids) or M1/K1 (comets), and — when the full set parses —
+// osculating orbital elements (see elementFields).
 func (p *Provider) queryBright(ctx context.Context, sbKind, magField string, maxVal float64, limit int) ([]resolve.Target, error) {
-	fields := "full_name,spkid,H,G,class,e"
+	fields := "full_name,spkid,H,G,class" + elementFields
 	if magField == "M1" {
-		fields = "full_name,spkid,M1,K1,class,e"
+		fields = "full_name,spkid,M1,K1,class" + elementFields
 	}
 
 	params := url.Values{}
@@ -469,12 +485,71 @@ func (p *Provider) queryBright(ctx context.Context, sbKind, magField string, max
 			}
 		}
 
+		// Same all-or-nothing gate as ResolveObject's identify-endpoint
+		// decode: HasElements is only true when every one of
+		// a/i/om/w/ma/epoch parsed, never on a partial row.
+		var (
+			semiMajorAxis, incl, node, argp, ma    float64
+			hasA, hasIncl, hasNode, hasArgp, hasMA bool
+			epochJD                                float64
+			hasEpoch                               bool
+		)
+
+		if idx, ok := col["a"]; ok {
+			if v, err := parseFloat(cellString(row[idx])); err == nil {
+				semiMajorAxis, hasA = v, true
+			}
+		}
+
+		if idx, ok := col["i"]; ok {
+			if v, err := parseFloat(cellString(row[idx])); err == nil {
+				incl, hasIncl = v, true
+			}
+		}
+
+		if idx, ok := col["om"]; ok {
+			if v, err := parseFloat(cellString(row[idx])); err == nil {
+				node, hasNode = v, true
+			}
+		}
+
+		if idx, ok := col["w"]; ok {
+			if v, err := parseFloat(cellString(row[idx])); err == nil {
+				argp, hasArgp = v, true
+			}
+		}
+
+		if idx, ok := col["ma"]; ok {
+			if v, err := parseFloat(cellString(row[idx])); err == nil {
+				ma, hasMA = v, true
+			}
+		}
+
+		if idx, ok := col["epoch"]; ok {
+			if v, err := parseFloat(cellString(row[idx])); err == nil {
+				epochJD, hasEpoch = v, true
+			}
+		}
+
+		hasElements := hasA && hasIncl && hasNode && hasArgp && hasMA && hasEpoch
+
 		t := resolve.Target{
-			ID:      spkID,
-			Name:    strings.TrimSpace(cellString(row[col["full_name"]])),
-			SPKID:   spkID,
-			Kind:    classifyKind(spkID, orbitClass, eccentricity, sbKind == "c"),
-			Catalog: "sbdb",
+			ID:          spkID,
+			Name:        strings.TrimSpace(cellString(row[col["full_name"]])),
+			SPKID:       spkID,
+			Kind:        classifyKind(spkID, orbitClass, eccentricity, sbKind == "c"),
+			Catalog:     "sbdb",
+			HasElements: hasElements,
+		}
+
+		if hasElements {
+			t.Epoch = atime.FromJD(epochJD, atime.TDB)
+			t.SemiMajorAxis = semiMajorAxis
+			t.Eccentricity = eccentricity
+			t.Inclination = angle.Deg(incl)
+			t.AscendingNode = angle.Deg(node)
+			t.ArgPeriapsis = angle.Deg(argp)
+			t.MeanAnomaly = angle.Deg(ma)
 		}
 
 		if magField == "H" {

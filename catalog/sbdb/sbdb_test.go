@@ -384,6 +384,96 @@ func TestSearchBrightMock(t *testing.T) {
 	}
 }
 
+// TestSearchBrightMock_OrbitalElements covers queryBright's element
+// decoding (Phase 2 of the ephemeris-integration plan): a full row
+// carries HasElements=true and the six element fields + Epoch; a row
+// missing one element (here "ma") must not set HasElements at all, per
+// the same all-or-nothing gate ResolveObject's single-object identify
+// path already uses; a hyperbolic body (negative-ish geometry, e>=1)
+// still gets its elements decoded faithfully — rejecting a hyperbolic
+// orbit is ephemeris/kepler.Validate's job, not this decoder's.
+func TestSearchBrightMock_OrbitalElements(t *testing.T) {
+	asteroidJSON := `{
+		"signature": {"version": "1.0"},
+		"fields": ["full_name", "spkid", "H", "G", "class", "e", "a", "i", "om", "w", "ma", "epoch"],
+		"data": [
+			["1 Ceres", "20000001", 3.34, 0.12, "MBA", 0.0797, 2.77, 10.6, 80.2, 73.3, 274, 2461200.5],
+			["2 Pallas", "20000002", 4.13, 0.11, "MBA", 0.229, 2.77, 34.8, 173.1, 310.9, null, 2461200.5]
+		],
+		"count": 2
+	}`
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+
+		body := asteroidJSON
+		if r.URL.Query().Get("sb-kind") == "c" {
+			body = `{"signature":{"version":"1.0"},"fields":["full_name","spkid","M1","K1","class","e","a","i","om","w","ma","epoch"],"data":[],"count":0}`
+		}
+
+		if _, err := fmt.Fprint(w, body); err != nil {
+			t.Errorf("failed to write response: %v", err)
+		}
+	}))
+	defer server.Close()
+
+	t.Cleanup(remote.Reset)
+
+	if err := remote.SetURL(remote.JPLSBDBQuery, server.URL); err != nil {
+		t.Fatal(err)
+	}
+
+	prov := New()
+
+	var got []resolve.Target
+
+	iter := prov.SearchBright(context.Background(), resolve.BrightRequest{MaxVMag: -2})
+	iter(func(tgt resolve.Target, err error) bool {
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		got = append(got, tgt)
+
+		return true
+	})
+
+	if len(got) != 2 {
+		t.Fatalf("expected 2 targets, got %d: %+v", len(got), got)
+	}
+
+	ceres := got[0]
+	if !ceres.HasElements {
+		t.Fatal("expected Ceres to have HasElements=true — every element was present")
+	}
+
+	if math.Abs(ceres.SemiMajorAxis-2.77) > 1e-9 {
+		t.Errorf("SemiMajorAxis = %v, want 2.77", ceres.SemiMajorAxis)
+	}
+
+	if math.Abs(ceres.Eccentricity-0.0797) > 1e-9 {
+		t.Errorf("Eccentricity = %v, want 0.0797", ceres.Eccentricity)
+	}
+
+	if math.Abs(ceres.Inclination.Degrees()-10.6) > 1e-9 {
+		t.Errorf("Inclination = %v deg, want 10.6", ceres.Inclination.Degrees())
+	}
+
+	if math.Abs(ceres.MeanAnomaly.Degrees()-274) > 1e-9 {
+		t.Errorf("MeanAnomaly = %v deg, want 274", ceres.MeanAnomaly.Degrees())
+	}
+
+	wantJD := 2461200.5
+	if gotJD := ceres.Epoch.JD(); math.Abs(gotJD-wantJD) > 1e-6 {
+		t.Errorf("Epoch JD = %v, want %v", gotJD, wantJD)
+	}
+
+	pallas := got[1]
+	if pallas.HasElements {
+		t.Error("expected Pallas (missing ma) to have HasElements=false")
+	}
+}
+
 func TestProviderInterface(t *testing.T) {
 	p := New()
 	if p.Name() != "sbdb" {
