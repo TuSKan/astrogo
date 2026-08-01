@@ -228,6 +228,42 @@ func TestDownloadableEndpointsAreExactlyTheExpectedSet(t *testing.T) {
 	}
 }
 
+// TestConstName is a golden-list check: every registered EndpointID must
+// map back to its own exported Go constant name, so a download-denied
+// error message (the only caller of constName) always shows copy-pasteable
+// code rather than the raw registry key. An id with no case falls through
+// to the raw string — exercised via a made-up id that isn't registered.
+func TestConstName(t *testing.T) {
+	want := map[EndpointID]string{
+		IERSFinals2000A: "IERSFinals2000A",
+		NAIFSPK:         "NAIFSPK",
+		NAIFLSK:         "NAIFLSK",
+		JPLHorizons:     "JPLHorizons",
+		JPLSBDB:         "JPLSBDB",
+		JPLSBDBQuery:    "JPLSBDBQuery",
+		SIMBAD:          "SIMBAD",
+		VizieR:          "VizieR",
+		GaiaTAP:         "GaiaTAP",
+		MAST:            "MAST",
+		CelesTrak:       "CelesTrak",
+		FINK:            "FINK",
+		LightPollution:  "LightPollution",
+		OpenNGC:         "OpenNGC",
+		Nominatim:       "Nominatim",
+		OpenElevation:   "OpenElevation",
+	}
+
+	for id, name := range want {
+		if got := constName(id); got != name {
+			t.Errorf("constName(%s) = %q, want %q", id, got, name)
+		}
+	}
+
+	if got := constName("no.such.endpoint"); got != "no.such.endpoint" {
+		t.Errorf("constName(unregistered) = %q, want the raw id back", got)
+	}
+}
+
 var errKernelsForbidden = errors.New("kernels forbidden here")
 
 func TestCustomPolicy(t *testing.T) {

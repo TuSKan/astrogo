@@ -3,7 +3,10 @@ package plan
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
@@ -63,6 +66,121 @@ func TestNewSiteEarthAddress_Offline(t *testing.T) {
 	_, err := NewSiteEarthAddress(context.Background(), "Quinta Calixto", "Extrema, MG, Brazil")
 	if !errors.Is(err, remote.ErrOffline) {
 		t.Errorf("NewSiteEarthAddress while offline: got %v, want wrapping remote.ErrOffline", err)
+	}
+}
+
+// jsonServer starts an httptest.Server that always responds with body as a
+// JSON payload — the same offline-mock shape catalog/sbdb's own tests use
+// (remote.SetURL pointed at a local server instead of the real endpoint).
+func jsonServer(t *testing.T, body string) *httptest.Server {
+	t.Helper()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+
+		if _, err := fmt.Fprint(w, body); err != nil {
+			t.Errorf("failed to write response: %v", err)
+		}
+	}))
+	t.Cleanup(srv.Close)
+
+	return srv
+}
+
+// TestNewSiteEarthAddress_Success exercises the full geocode + elevation
+// round trip against mocked Nominatim/Open-Elevation responses — the real
+// live services are covered separately by the network-tagged
+// TestNewSiteEarthAddress_Live.
+func TestNewSiteEarthAddress_Success(t *testing.T) {
+	geo := jsonServer(t, `[{"lat":"-22.528478","lon":"-46.473002"}]`)
+	elev := jsonServer(t, `{"results":[{"elevation":835.05}]}`)
+
+	t.Cleanup(remote.Capture(remote.Nominatim, remote.OpenElevation).Restore)
+
+	if err := remote.SetURL(remote.Nominatim, geo.URL); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := remote.SetURL(remote.OpenElevation, elev.URL); err != nil {
+		t.Fatal(err)
+	}
+
+	site, err := NewSiteEarthAddress(context.Background(), "Quinta Calixto", "Extrema, MG, Brazil")
+	if err != nil {
+		t.Fatalf("NewSiteEarthAddress: %v", err)
+	}
+
+	testutil.AssertEqual(t, "Name", site.Name(), "Quinta Calixto")
+	testutil.AssertEqual(t, "Latitude", site.Latitude().Degrees(), -22.528478)
+	testutil.AssertEqual(t, "Longitude", site.Longitude().Degrees(), -46.473002)
+	testutil.AssertEqual(t, "Height", site.HeightMeters(), 835.05)
+}
+
+// TestNewSiteEarthAddress_NoResult confirms ErrGeocodeNoResult surfaces
+// whether the empty result comes from Nominatim (no match for the address)
+// or from Open-Elevation (no elevation for otherwise-valid coordinates).
+func TestNewSiteEarthAddress_NoResult(t *testing.T) {
+	cases := []struct {
+		name           string
+		geocodeBody    string
+		elevationBody  string
+		skipElevServer bool
+	}{
+		{"GeocodeEmpty", `[]`, "", true},
+		{"ElevationEmpty", `[{"lat":"-22.528478","lon":"-46.473002"}]`, `{"results":[]}`, false},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			geo := jsonServer(t, c.geocodeBody)
+
+			t.Cleanup(remote.Capture(remote.Nominatim, remote.OpenElevation).Restore)
+
+			if err := remote.SetURL(remote.Nominatim, geo.URL); err != nil {
+				t.Fatal(err)
+			}
+
+			if !c.skipElevServer {
+				elev := jsonServer(t, c.elevationBody)
+				if err := remote.SetURL(remote.OpenElevation, elev.URL); err != nil {
+					t.Fatal(err)
+				}
+			}
+
+			_, err := NewSiteEarthAddress(context.Background(), "Nowhere", "a place that doesn't exist")
+			if !errors.Is(err, ErrGeocodeNoResult) {
+				t.Errorf("got %v, want wrapping ErrGeocodeNoResult", err)
+			}
+		})
+	}
+}
+
+// TestNewSiteEarthAddress_BadCoordinates confirms a malformed lat/lon in
+// Nominatim's response surfaces as an error rather than a silently-zeroed
+// coordinate.
+func TestNewSiteEarthAddress_BadCoordinates(t *testing.T) {
+	cases := []struct {
+		name string
+		body string
+	}{
+		{"BadLatitude", `[{"lat":"not-a-number","lon":"-46.473002"}]`},
+		{"BadLongitude", `[{"lat":"-22.528478","lon":"not-a-number"}]`},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			geo := jsonServer(t, c.body)
+
+			t.Cleanup(remote.Capture(remote.Nominatim).Restore)
+
+			if err := remote.SetURL(remote.Nominatim, geo.URL); err != nil {
+				t.Fatal(err)
+			}
+
+			if _, err := NewSiteEarthAddress(context.Background(), "Bad", "somewhere"); err == nil {
+				t.Error("expected a parse error for a non-numeric coordinate")
+			}
+		})
 	}
 }
 
