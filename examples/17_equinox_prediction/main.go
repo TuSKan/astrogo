@@ -50,7 +50,7 @@ func main() {
 
 	fmt.Println("═══════════════════════════════════════════════════════════════════")
 	fmt.Println("  EQUINOX & SOLSTICE PREDICTION — 2024–2033")
-	fmt.Println("  AstroGo | JPL DE442 | São Paulo (23°33'S, 46°38'W)")
+	fmt.Println("  AstroGo | JPL DE442 | Quinta Calixto (22°31'43\"S, 46°28'23\"W)")
 	fmt.Println("═══════════════════════════════════════════════════════════════════")
 
 	// ── Part 1: Seasons for a decade ────────────────────────────────────────
@@ -203,14 +203,14 @@ func main() {
 
 	// ── Part 6: Topocentric Moon (diurnal parallax) ──────────────────────────
 	fmt.Println()
-	fmt.Println("── Topocentric Moon (São Paulo, Vernal Equinox 2026) ──────────────")
+	fmt.Println("── Topocentric Moon (Quinta Calixto, Vernal Equinox 2026) ─────────")
 	fmt.Println()
 
 	moonTarget := plan.NewMoon(prov)
 	now := events26[0].Time // Use the actual vernal equinox moment
-	loc, _ := coord.NewEarthLocation(-23.5505, -46.6333, 760.0)
-	site, _ := plan.NewSite("São Paulo", loc, plan.WithTimeZone(brtz))
-	atm := atmosphere.AtAltitude(760)
+	site, _ := plan.NewSiteEarthLocation("Quinta Calixto", -22.528478, -46.473002, 835.05, plan.WithTimeZone(brtz))
+	loc := site.Location()
+	atm := atmosphere.AtAltitude(835.05)
 	ctx := coord.NewContext(now, loc, atm)
 
 	details, err := moonTarget.GetDetails(ctx)

@@ -44,7 +44,6 @@ import (
 
 	"github.com/TuSKan/astrogo/catalog"
 	"github.com/TuSKan/astrogo/catalog/resolve"
-	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/plan"
 	"github.com/TuSKan/astrogo/remote"
@@ -112,14 +111,9 @@ func main() {
 		log.Fatalf("failed to load timezone: %v", err)
 	}
 
-	loc, err := coord.NewEarthLocation(-23.5505, -46.6333, 760)
+	site, err := plan.NewSiteEarthLocation("Quinta Calixto", -22.528478, -46.473002, 835.05, plan.WithTimeZone(brtz))
 	if err != nil {
-		log.Fatalf("NewEarthLocation: %v", err)
-	}
-
-	site, err := plan.NewSite("São Paulo", loc, plan.WithTimeZone(brtz))
-	if err != nil {
-		log.Fatalf("NewSite: %v", err)
+		log.Fatalf("NewSiteEarthLocation: %v", err)
 	}
 
 	// ── Bright-object sources ───────────────────────────────────────────
@@ -135,12 +129,12 @@ func main() {
 	}
 
 	// A fixed date keeps this example's output reproducible run to run —
-	// August 1, 2026, a clear midwinter night from São Paulo's southern
+	// August 1, 2026, a clear midwinter night from Quinta Calixto's southern
 	// hemisphere. night should be an instant earlier in the same calendar
 	// day as dusk; local midnight is the natural choice.
 	night := time.Date(2026, time.August, 1, 0, 0, 0, 0, brtz)
 
-	fmt.Printf("\nSite: %s (%.4f, %.4f)\n", site.Name(), -23.5505, -46.6333)
+	fmt.Printf("\nSite: %s (%.4f, %.4f)\n", site.Name(), -22.528478, -46.473002)
 	fmt.Printf("Night of: %s\n", night.Format("2006-01-02"))
 	fmt.Println("Fetching bright-object candidates and computing visibility — this")
 	fmt.Println("does real network queries (SIMBAD/OpenNGC/SBDB) and, for any")

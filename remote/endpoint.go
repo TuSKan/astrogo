@@ -66,6 +66,16 @@ const (
 	// only when the caller has called remote.EnableDownloads(OpenNGC, ...)
 	// — never implicitly.
 	OpenNGC EndpointID = "openngc.github"
+
+	// Nominatim is OpenStreetMap's Nominatim geocoding API, used by
+	// plan.NewSiteEarthAddress to resolve a free-text address into
+	// latitude/longitude.
+	Nominatim EndpointID = "osm.nominatim"
+
+	// OpenElevation is the Open-Elevation API, used by
+	// plan.NewSiteEarthAddress to resolve a latitude/longitude (from
+	// Nominatim) into a height above sea level.
+	OpenElevation EndpointID = "open-elevation"
 )
 
 // Kind distinguishes request/response APIs from bulk file downloads.
@@ -303,6 +313,26 @@ func defaultEndpoints() map[EndpointID]Endpoint {
 			Mutable:         true,
 			Downloadable:    true,
 			Files:           []string{"NGC.csv", "addendum.csv"},
+		},
+		Nominatim: {
+			ID:          Nominatim,
+			URL:         "https://nominatim.openstreetmap.org/search",
+			Kind:        KindAPI,
+			Subsystem:   "plan",
+			Description: "OpenStreetMap Nominatim geocoding API (address to coordinates)",
+			ApproxSize:  2_000,
+			Enabled:     true,
+			Timeout:     30 * time.Second,
+		},
+		OpenElevation: {
+			ID:          OpenElevation,
+			URL:         "https://api.open-elevation.com/api/v1/lookup",
+			Kind:        KindAPI,
+			Subsystem:   "plan",
+			Description: "Open-Elevation API (coordinates to height above sea level)",
+			ApproxSize:  2_000,
+			Enabled:     true,
+			Timeout:     30 * time.Second,
 		},
 	}
 }

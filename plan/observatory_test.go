@@ -1,6 +1,7 @@
 package plan
 
 import (
+	"context"
 	"errors"
 	"math"
 	"strings"
@@ -9,6 +10,7 @@ import (
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/internal/testutil"
+	"github.com/TuSKan/astrogo/remote"
 
 	"github.com/TuSKan/astrogo/time"
 )
@@ -27,6 +29,41 @@ func TestNewSite(t *testing.T) {
 	testutil.AssertEqual(t, "Height", site.HeightMeters(), 500.0)
 	testutil.AssertEqual(t, "Horizon", site.Horizon().Degrees(), 20.0)
 	testutil.AssertEqual(t, "TimeZone", site.TimeZone().String(), "Europe/Rome")
+}
+
+// TestNewSiteEarthLocation confirms the plain lat/lon/height convenience
+// constructor produces the same Site a caller would get by hand-building a
+// coord.Geodetic via coord.NewEarthLocation + NewSite — the whole point is
+// that a caller no longer needs to import coord for this common case.
+func TestNewSiteEarthLocation(t *testing.T) {
+	site, err := NewSiteEarthLocation("Quinta Calixto", -22.528478, -46.473002, 835.05)
+	testutil.AssertNoError(t, err)
+
+	testutil.AssertEqual(t, "Name", site.Name(), "Quinta Calixto")
+	testutil.AssertEqual(t, "Latitude", site.Latitude().Degrees(), -22.528478)
+	testutil.AssertEqual(t, "Longitude", site.Longitude().Degrees(), -46.473002)
+	testutil.AssertEqual(t, "Height", site.HeightMeters(), 835.05)
+}
+
+// TestNewSiteEarthLocation_InvalidLatitude confirms the underlying
+// coord.NewEarthLocation validation error still surfaces (not swallowed).
+func TestNewSiteEarthLocation_InvalidLatitude(t *testing.T) {
+	if _, err := NewSiteEarthLocation("Bad", 200, 0, 0); err == nil {
+		t.Error("expected an error for a latitude outside [-90, 90]")
+	}
+}
+
+// TestNewSiteEarthAddress_Offline confirms remote.SetOffline's ErrOffline
+// surfaces through NewSiteEarthAddress rather than being swallowed — the
+// same offline-mode gate every other remote.KindAPI caller respects.
+func TestNewSiteEarthAddress_Offline(t *testing.T) {
+	t.Cleanup(remote.Capture(remote.Nominatim).Restore)
+	remote.SetOffline(true)
+
+	_, err := NewSiteEarthAddress(context.Background(), "Quinta Calixto", "Extrema, MG, Brazil")
+	if !errors.Is(err, remote.ErrOffline) {
+		t.Errorf("NewSiteEarthAddress while offline: got %v, want wrapping remote.ErrOffline", err)
+	}
 }
 
 func TestDefaultTimeZone(t *testing.T) {

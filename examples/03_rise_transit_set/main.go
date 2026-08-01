@@ -7,15 +7,13 @@ import (
 	"log"
 
 	"github.com/TuSKan/astrogo/catalog"
-	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/plan"
 	"github.com/TuSKan/astrogo/time"
 )
 
 func main() {
-	// 1. Setup Observatory (São Paulo, Brazil)
-	loc, _ := coord.NewEarthLocation(-23.5505, -46.6333, 760)
-	site, _ := plan.NewSite("São Paulo", loc)
+	// 1. Setup Observatory (Quinta Calixto, Brazil)
+	site, _ := plan.NewSiteEarthLocation("Quinta Calixto", -22.528478, -46.473002, 835.05)
 
 	// 2. Set a Deep Space Target
 	sirius, err := catalog.NewResolver(catalog.SIMBAD).Resolve(context.Background(), "Sirius")

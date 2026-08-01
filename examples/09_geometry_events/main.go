@@ -7,7 +7,6 @@ import (
 	"log"
 
 	"github.com/TuSKan/astrogo/angle"
-	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/plan"
 	"github.com/TuSKan/astrogo/remote"
@@ -44,11 +43,10 @@ func main() {
 	sun := plan.NewSun(prov)
 	moon := plan.NewMoon(prov)
 
-	// 3. Setup Observatory (São Paulo, Brazil with precise coordinates from user's app)
+	// 3. Setup Observatory (Quinta Calixto, Brazil with precise coordinates from user's app)
 	// Geocentric Events (like Full Moon syzygy) do not depend on the observer to occur,
 	// but we can map the generated event timestamp against an observer to see if the event is visible locally!
-	loc, _ := coord.NewEarthLocation(-23.5505, -46.6333, 760) // São Paulo
-	site, _ := plan.NewSite("São Paulo", loc)
+	site, _ := plan.NewSiteEarthLocation("Quinta Calixto", -22.528478, -46.473002, 835.05)
 
 	// ----------------------------------------------------
 	// Conjunction: Mars and Venus having the same Right Ascension
@@ -118,7 +116,7 @@ func main() {
 	}
 
 	for i, ecl := range lunarEclipses {
-		// Evaluate if the Moon is actually visible from São Paulo at eclipse time
+		// Evaluate if the Moon is actually visible from Quinta Calixto at eclipse time
 		altCheck := plan.Altitude{Threshold: angle.Zero()}
 		res, _ := altCheck.Check(moon, ecl.Time, site)
 

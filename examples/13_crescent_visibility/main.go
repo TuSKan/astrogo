@@ -1,8 +1,9 @@
 // Example: Evaluate lunar crescent visibility from computed ephemeris.
 //
 // This finds the next New Moon, then evaluates crescent visibility on the
-// following evening from São Paulo using real Sun/Moon positions computed
-// via NewCrescentParams. All 20 modern criteria (1910–2021) are evaluated.
+// following evening from Quinta Calixto using real Sun/Moon positions
+// computed via NewCrescentParams. All 20 modern criteria (1910–2021) are
+// evaluated.
 //
 // Reference:
 //
@@ -14,7 +15,6 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/plan"
 	"github.com/TuSKan/astrogo/time"
@@ -22,13 +22,12 @@ import (
 
 func main() {
 	fmt.Println("══════════════════════════════════════════════════════════════")
-	fmt.Println("  Lunar Crescent Visibility — São Paulo")
+	fmt.Println("  Lunar Crescent Visibility — Quinta Calixto")
 	fmt.Println("══════════════════════════════════════════════════════════════")
 	fmt.Println()
 
-	// ── Observer: São Paulo, Brazil ──────────────────────────────────────
-	loc, _ := coord.NewEarthLocation(-23.5505, -46.6333, 760)
-	site, _ := plan.NewSite("São Paulo", loc)
+	// ── Observer: Quinta Calixto, Brazil ─────────────────────────────────
+	site, _ := plan.NewSiteEarthLocation("Quinta Calixto", -22.528478, -46.473002, 835.05)
 
 	prov := eph.Default()
 
@@ -53,7 +52,7 @@ func main() {
 		log.Fatalf("SunriseSunset: %v", err)
 	}
 
-	fmt.Printf("  Sunset (São Paulo): %s\n\n", sunset.Time)
+	fmt.Printf("  Sunset (Quinta Calixto): %s\n\n", sunset.Time)
 
 	// ── Compute crescent parameters ~20 min after sunset ────────────────
 	// Best-practice observation window: 15–30 min after sunset, when the
@@ -62,7 +61,7 @@ func main() {
 	obsTime := sunset.Time.Add(20 * time.Minute)
 	fmt.Printf("  Observation time:   %s (sunset + 20 min)\n\n", obsTime)
 
-	params, err := plan.NewCrescentParams(obsTime, loc, prov)
+	params, err := plan.NewCrescentParams(obsTime, site.Location(), prov)
 	if err != nil {
 		log.Fatalf("NewCrescentParams: %v", err)
 	}

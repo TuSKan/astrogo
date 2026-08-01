@@ -1,5 +1,5 @@
 // Package main reconstructs the "Great Planet Parade" of February 28, 2025 — when all
-// seven planets were simultaneously above the horizon in the evening sky from São Paulo.
+// seven planets were simultaneously above the horizon in the evening sky from Quinta Calixto.
 //
 // This example demonstrates:
 //   - JPL DE442 ephemerides for all 7 planets
@@ -33,7 +33,7 @@ type planetDef struct {
 func main() {
 	fmt.Println("═══════════════════════════════════════════════════════════════")
 	fmt.Println("  The Great Planet Parade — February 28, 2025")
-	fmt.Println("  Seven Planets in the Evening Sky from São Paulo")
+	fmt.Println("  Seven Planets in the Evening Sky from Quinta Calixto")
 	fmt.Println("═══════════════════════════════════════════════════════════════")
 
 	// ── Setup: JPL DE442 ──────────────────────────────────────────────
@@ -58,9 +58,9 @@ func main() {
 		log.Fatalf("failed to load timezone: %v", err)
 	}
 
-	loc, _ := coord.NewEarthLocation(-23.5505, -46.6333, 760)
-	site, _ := plan.NewSite("São Paulo", loc, plan.WithTimeZone(brtz))
-	atm := atmosphere.AtAltitude(760)
+	site, _ := plan.NewSiteEarthLocation("Quinta Calixto", -22.528478, -46.473002, 835.05, plan.WithTimeZone(brtz))
+	loc := site.Location()
+	atm := atmosphere.AtAltitude(835.05)
 
 	planets := []planetDef{
 		{plan.NewMercury(prov), "Mercury"},

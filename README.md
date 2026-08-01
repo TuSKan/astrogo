@@ -17,7 +17,7 @@ Scale-aware time arithmetic · SOFA-rigorous coordinate transforms · sub-minute
 
 ## See it work
 
-Fifteen lines: where's a star right now, and when does it rise, transit, and set from your backyard?
+Fifteen lines: where's Mars right now, and when does it rise, transit, and set from your backyard?
 
 ```go
 package main
@@ -26,21 +26,20 @@ import (
 	"fmt"
 
 	"github.com/TuSKan/astrogo/angle"
-	"github.com/TuSKan/astrogo/coord"
+	"github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/plan"
 	"github.com/TuSKan/astrogo/time"
 )
 
 func main() {
-	loc, _ := coord.NewEarthLocation(-23.5505, -46.6333, 760) // São Paulo
-	site, _ := plan.NewSite("Backyard", loc)
-	sirius := plan.NewStar("Sirius", angle.Hour(6.7525), angle.Deg(-16.7161))
+	site, _ := plan.NewSiteEarthLocation("Quinta Calixto", -22.528478, -46.473002, 835.05)
+	mars := plan.NewMars(ephemeris.Default())
 
 	tonight := time.Date(2026, 4, 15, 22, 0, 0, 0, time.LocationUTC)
-	eval, _ := plan.IsObservable(sirius, tonight, site, plan.Altitude{Threshold: angle.Deg(30)})
-	events, _ := plan.VisibilityEvents(tonight, tonight.AddDays(1), sirius, site)
+	eval, _ := plan.IsObservable(mars, tonight, site, plan.Altitude{Threshold: angle.Deg(30)})
+	events, _ := plan.VisibilityEvents(tonight, tonight.AddDays(1), mars, site)
 
-	fmt.Printf("Sirius right now: altitude %.1f°, observable above 30°: %v\n",
+	fmt.Printf("Mars right now: altitude %.1f°, observable above 30°: %v\n",
 		eval.AltAz.Alt().Degrees(), eval.Observable)
 	for _, e := range events {
 		fmt.Printf("  %-8s %s\n", e.Kind, e.Time.Format("2006-01-02 15:04 MST"))
@@ -49,10 +48,10 @@ func main() {
 ```
 
 ```
-Sirius right now: altitude 64.8°, observable above 30°: true
-  Set      2026-04-16 02:49 UTC
-  Rise     2026-04-16 13:40 UTC
-  Transit  2026-04-16 20:12 UTC
+Mars right now: altitude -30.4°, observable above 30°: false
+  Rise     2026-04-16 07:46 UTC
+  Transit  2026-04-16 13:47 UTC
+  Set      2026-04-16 19:49 UTC
 ```
 
 No API keys, no downloads, no Python underneath for this example — every number above came from SOFA-derived algorithms running in pure Go. (Higher-precision JPL ephemerides are available too, opt-in — see [Data downloads & offline usage](#data-downloads--offline-usage).) Every code sample in this README is copy-pasted from a program that was actually compiled and run; none of it is aspirational.
@@ -116,7 +115,6 @@ import (
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/catalog"
-	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/plan"
 	"github.com/TuSKan/astrogo/time"
@@ -125,9 +123,8 @@ import (
 const layout = "2006-01-02 15:04 MST"
 
 func main() {
-	// ── Observer Setup: São Paulo ──
-	loc, _ := coord.NewEarthLocation(-23.5505, -46.6333, 760)
-	site, _ := plan.NewSite("São Paulo", loc)
+	// ── Observer Setup: Quinta Calixto ──
+	site, _ := plan.NewSiteEarthLocation("Quinta Calixto", -22.528478, -46.473002, 835.05)
 
 	// ── Night boundaries ──
 	eph := ephemeris.Default()
@@ -212,23 +209,23 @@ func main() {
 
 ```
 Sunset:  2026-04-16 20:55 UTC
-Sunrise: 2026-04-16 09:17 UTC
-Astro dusk: 2026-04-15 22:07 UTC → Astro dawn: 2026-04-16 08:05 UTC
+Sunrise: 2026-04-16 09:15 UTC
+Astro dusk: 2026-04-15 22:07 UTC → Astro dawn: 2026-04-16 08:04 UTC
 Next Full Moon: 2026-05-01 17:23 UTC
 Moon illumination: 3%
 
 ── Observability ──────────────────────
-  HD 116586            Observable: false  Score:   0.0
-  Sgr A*                Observable: false  Score:   0.0
-  Mars                  Observable: false  Score:   0.0
+  Cl* NGC 5139    WSB V115  Observable: false  Score:   0.0
+  NAME Sgr A*         Observable: false  Score:   0.0
+  Mars                Observable: false  Score:   0.0
 
 ── Schedule ──────────────────────────
   SgrA: 2026-04-15 22:12 UTC → 2026-04-15 23:12 UTC  (score: 45.0)
   Mars: 2026-04-15 23:12 UTC → 2026-04-15 23:32 UTC  (score: 29.0)
-  OmCen: 2026-04-15 23:32 UTC → 2026-04-16 00:17 UTC  (score: 41.4)
+  OmCen: 2026-04-15 23:32 UTC → 2026-04-16 00:17 UTC  (score: 41.0)
 ```
 
-Two notes on that output: the individual `Observable` checks are evaluated at exactly `tonight` (22:00 UTC), which is still twilight in São Paulo — that's expected, not a bug. The scheduler's own window search (`dusk` → `dawn`) is what actually finds when each target clears the constraints, which is why it successfully places all three blocks with real scores. And since `resolver.Resolve` hits live SIMBAD, the exact target name it returns for NGC 5139 (here `HD 116586`, one of its many catalog aliases) and the last decimal of the score can vary slightly between runs — everything else is deterministic.
+Two notes on that output: the individual `Observable` checks are evaluated at exactly `tonight` (22:00 UTC), which is still twilight at Quinta Calixto — that's expected, not a bug. The scheduler's own window search (`dusk` → `dawn`) is what actually finds when each target clears the constraints, which is why it successfully places all three blocks with real scores. And since `resolver.Resolve` hits live SIMBAD, the exact target name it returns for NGC 5139 (here `Cl* NGC 5139    WSB V115`, one of its many catalog aliases) and the last decimal of the score can vary slightly between runs — everything else is deterministic.
 
 <details>
 <summary><strong>More examples</strong> — batch transforms, moon phases &amp; eclipses, lunar crescent, planetary geometry, satellite tracking</summary>
@@ -237,8 +234,8 @@ Two notes on that output: the individual `Observable` checks are evaluated at ex
 
 ```go
 // Create one Context per epoch — amortizes the 91 µs SOFA Apco13 cost.
-loc, _ := coord.NewEarthLocation(-23.55, -46.63, 760)  // São Paulo
-atm := atmosphere.AtAltitude(760)  // SOFA refraction at all altitudes
+loc, _ := coord.NewEarthLocation(-22.528478, -46.473002, 835.05)  // Quinta Calixto
+atm := atmosphere.AtAltitude(835.05)  // SOFA refraction at all altitudes
 ctx := coord.NewContext(time.NowUTC(), loc, atm)
 
 // Transform 100 catalog stars for ~325 ns each (instead of ~91 µs each).
@@ -680,10 +677,11 @@ against what was cached, not a wall-clock expiration window, since the two sourc
 mutate on their own schedules rather than yours.
 
 Catalog resolvers (`catalog/simbad`, `catalog/gaia`, `catalog/vizier`, `catalog/mast`,
-`catalog/sbdb`, `catalog/norad`, `catalog/fink`) and `skybrightness/lpmap` make small
-request/response API calls, not bulk downloads — those are gated by endpoint
-enable/disable and offline mode, not by download-size consent (the network call itself
-is the explicit purpose of the method you're calling).
+`catalog/sbdb`, `catalog/norad`, `catalog/fink`), `skybrightness/lpmap`, and
+`plan.NewSiteEarthAddress` (`remote.Nominatim`/`remote.OpenElevation`, for geocoding a
+site by address) make small request/response API calls, not bulk downloads — those are
+gated by endpoint enable/disable and offline mode, not by download-size consent (the
+network call itself is the explicit purpose of the method you're calling).
 
 ### Enabling a download
 

@@ -49,7 +49,7 @@ func TestVisibleTonight_MinorBodiesRespectMagLimit(t *testing.T) {
 	remote.EnableDownloads(remote.NAIFLSK, 0)
 	remote.EnableDownloads(remote.JPLHorizons, 0)
 
-	site := saoPauloSite(t)
+	site := quintaCalixtoSite(t)
 	sources := []resolve.BrightObjectSearcher{sbdb.New()}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
@@ -121,7 +121,7 @@ func TestVisibleTonight_PlanetaryMoons(t *testing.T) {
 	remote.EnableDownloads(remote.NAIFSPK, 110<<20)
 	remote.EnableDownloads(remote.NAIFLSK, 0)
 
-	site := saoPauloSite(t)
+	site := quintaCalixtoSite(t)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 180*time.Second)
 	defer cancel()

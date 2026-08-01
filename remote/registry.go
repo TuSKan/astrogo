@@ -356,6 +356,10 @@ func constName(id EndpointID) string {
 		return "LightPollution"
 	case OpenNGC:
 		return "OpenNGC"
+	case Nominatim:
+		return "Nominatim"
+	case OpenElevation:
+		return "OpenElevation"
 	default:
 		return string(id)
 	}
