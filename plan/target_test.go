@@ -140,6 +140,21 @@ func TestFromCatalog(t *testing.T) {
 		t.Error("Expected Sun planet")
 	}
 
+	// Planet with no provider supplied — regression test: this used to
+	// silently fall through to a static *DeepSkyObject (built from
+	// whatever, or no, fixed coordinate happened to be on the target)
+	// instead of a real, moving *Planet, since the planet-routing switch
+	// only ever ran inside FromCatalog's `if p != nil` block. FromCatalog
+	// must fall back to eph.Default() for a major named body instead.
+	planetNoProvider := FromCatalog(catalog.Target{
+		ID: "4", Name: "Mars", Kind: resolve.KindPlanet,
+	}, nil)
+	if p, ok := planetNoProvider.(*Planet); !ok {
+		t.Errorf("FromCatalog Planet (no provider) returned %T, want *Planet", planetNoProvider)
+	} else if p.Name() != "Mars" {
+		t.Errorf("FromCatalog Planet (no provider) name = %q, want Mars", p.Name())
+	}
+
 	// DSO
 	dso := FromCatalog(catalog.Target{
 		Name: "M31", Kind: resolve.KindGalaxy, HasCoord: true,
@@ -147,5 +162,36 @@ func TestFromCatalog(t *testing.T) {
 	}, nil)
 	if _, ok := dso.(*DeepSkyObject); !ok {
 		t.Errorf("FromCatalog DSO returned %T, want *DeepSkyObject", dso)
+	}
+}
+
+// TestNewPlanet_NilProviderDefaults is a regression test at the
+// constructor level, not just FromCatalog's — a direct call like
+// plan.NewMars(nil) (bypassing FromCatalog entirely) used to construct
+// successfully but fail at the first Position()/ApparentMagnitude() call,
+// since NewPlanet stored whatever provider it was given, nil included.
+// Every convenience constructor (NewSun, NewMoon, NewMercury...NewPluto)
+// delegates through NewPlanet, so fixing it there covers all of them.
+func TestNewPlanet_NilProviderDefaults(t *testing.T) {
+	epoch := time.FromJD(2451545.0, time.UTC)
+
+	mars := NewMars(nil)
+	if _, err := mars.Position(epoch); err != nil {
+		t.Errorf("NewMars(nil).Position(): unexpected error: %v", err)
+	}
+
+	sun := NewSun(nil)
+	if _, err := sun.Position(epoch); err != nil {
+		t.Errorf("NewSun(nil).Position(): unexpected error: %v", err)
+	}
+
+	moon := NewMoon(nil)
+	if _, err := moon.Position(epoch); err != nil {
+		t.Errorf("NewMoon(nil).Position(): unexpected error: %v", err)
+	}
+
+	pluto := NewPluto(nil)
+	if _, err := pluto.Position(epoch); err != nil {
+		t.Errorf("NewPluto(nil).Position(): unexpected error: %v", err)
 	}
 }

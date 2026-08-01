@@ -43,6 +43,14 @@ type StaticMagnitude interface {
 	StaticMagnitude() (float64, bool)
 }
 
+// MeasuredRadialVelocity is implemented by targets with a catalog
+// (barycentric) radial velocity — currently *Star, via
+// WithRadialVelocity. ok is false when no RV was ever set, distinct
+// from a genuine measured RV of exactly zero.
+type MeasuredRadialVelocity interface {
+	MeasuredRadialVelocity() (kmPerSec float64, ok bool)
+}
+
 // Compile-time assertions that every concrete target type implements the
 // interfaces it's documented (README/CHANGELOG) to implement. Interface
 // satisfaction in Go is structural and silent — a method signature drift
@@ -78,4 +86,6 @@ var (
 	_ StaticMagnitude = (*Star)(nil)
 	_ StaticMagnitude = (*DeepSkyObject)(nil)
 	_ StaticMagnitude = (*Satellite)(nil)
+
+	_ MeasuredRadialVelocity = (*Star)(nil)
 )

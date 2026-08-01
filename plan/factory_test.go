@@ -4,6 +4,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/catalog"
 	"github.com/TuSKan/astrogo/catalog/resolve"
 	eph "github.com/TuSKan/astrogo/ephemeris"
@@ -68,5 +69,109 @@ func TestFromCatalog_UnknownPlanetaryMoonFallsThrough(t *testing.T) {
 
 	if _, ok := obj.(*plan.GenericBody); !ok {
 		t.Fatalf("FromCatalog: got %T, want *plan.GenericBody", obj)
+	}
+}
+
+// ceresLikeTarget returns a catalog.Target carrying real, valid (1
+// Ceres-like) osculating orbital elements — the Phase 3 "Kepler as the
+// default for small bodies" wiring's fixture, shared by the tests below.
+func ceresLikeTarget(kind resolve.Kind) catalog.Target {
+	return catalog.Target{
+		Name:          "1 Ceres",
+		ID:            "20000001",
+		SPKID:         "20000001",
+		Kind:          kind,
+		HasElements:   true,
+		Epoch:         time.Date(2026, time.June, 9, 0, 0, 0, 0, time.LocationUTC),
+		SemiMajorAxis: 2.77,
+		Eccentricity:  0.0797,
+		Inclination:   angle.Deg(10.6),
+		AscendingNode: angle.Deg(80.2),
+		ArgPeriapsis:  angle.Deg(73.3),
+		MeanAnomaly:   angle.Deg(274),
+	}
+}
+
+// TestFromCatalog_ElementsToAsteroid confirms FromCatalog builds a
+// Kepler-propagated *plan.Asteroid from a target's published elements
+// when no provider is supplied — the core new capability of Phase 3:
+// "Kepler as the default" for a small body with HasElements=true,
+// reached via the exact call (FromCatalog(target, nil)) any ordinary
+// caller already makes.
+func TestFromCatalog_ElementsToAsteroid(t *testing.T) {
+	c := ceresLikeTarget(resolve.KindAsteroid)
+	c.H, c.HasH, c.G = 3.34, true, 0.12
+
+	obj := plan.FromCatalog(c, nil)
+
+	ast, ok := obj.(*plan.Asteroid)
+	if !ok {
+		t.Fatalf("FromCatalog: got %T, want *plan.Asteroid", obj)
+	}
+
+	// EphID should be the real SPK ID parsed from c.SPKID (2000001),
+	// not the keplerSyntheticID fallback — confirms the real ID, not a
+	// sentinel, threads through when one is available.
+	if got := ast.EphID(); got != eph.ID(20000001) {
+		t.Errorf("EphID() = %v, want 20000001 (parsed from SPKID, not the synthetic fallback)", got)
+	}
+
+	pos, err := ast.Position(c.Epoch)
+	if err != nil {
+		t.Fatalf("Position: %v", err)
+	}
+
+	if pos.RA().Radians() == 0 && pos.Dec().Radians() == 0 {
+		t.Error("Position returned the zero value — Kepler propagation likely did not run")
+	}
+}
+
+// TestFromCatalog_ElementsToComet mirrors TestFromCatalog_ElementsToAsteroid
+// for the comet (M1/K1) branch.
+func TestFromCatalog_ElementsToComet(t *testing.T) {
+	c := ceresLikeTarget(resolve.KindComet)
+	c.M1, c.HasM1, c.K1 = 4.5, true, 8.0
+
+	obj := plan.FromCatalog(c, nil)
+
+	if _, ok := obj.(*plan.Comet); !ok {
+		t.Fatalf("FromCatalog: got %T, want *plan.Comet", obj)
+	}
+}
+
+// TestFromCatalog_ElementsHyperbolicFallsThrough confirms a target whose
+// published eccentricity is >= 1 (which ephemeris/kepler's two-body
+// propagator cannot represent — eph.NewElements rejects it with
+// ErrUnsupportedOrbit) falls straight through to the fixed-target path
+// rather than panicking or silently building a broken Observable, since
+// FromCatalog has no error return.
+func TestFromCatalog_ElementsHyperbolicFallsThrough(t *testing.T) {
+	c := ceresLikeTarget(resolve.KindInterstellar)
+	c.Eccentricity = 1.2 // hyperbolic
+	c.H, c.HasH = 22.0, true
+
+	obj := plan.FromCatalog(c, nil)
+
+	if _, ok := obj.(*plan.DeepSkyObject); !ok {
+		t.Fatalf("FromCatalog: got %T, want the fixed-target fallback *plan.DeepSkyObject", obj)
+	}
+}
+
+// TestFromCatalog_ProviderTakesPrecedenceOverElements confirms a
+// caller-supplied provider always wins over HasElements — the Kepler
+// branch is only ever reached when p == nil.
+func TestFromCatalog_ProviderTakesPrecedenceOverElements(t *testing.T) {
+	c := ceresLikeTarget(resolve.KindAsteroid)
+	c.H, c.HasH, c.G = 3.34, true, 0.12
+
+	obj := plan.FromCatalog(c, stubMoonProvider{})
+
+	ast, ok := obj.(*plan.Asteroid)
+	if !ok {
+		t.Fatalf("FromCatalog: got %T, want *plan.Asteroid", obj)
+	}
+
+	if ast.Provider() != (eph.Provider)(stubMoonProvider{}) {
+		t.Error("expected the caller-supplied provider to be used, not a Kepler-built one")
 	}
 }

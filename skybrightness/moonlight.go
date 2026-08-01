@@ -39,9 +39,16 @@ func WithExtinction(k float64) MoonlightOption {
 }
 
 // WithProvider sets the ephemeris provider used for Moon and Sun positions.
-// The default is ephemeris.Default().
+// The default is ephemeris.Default(); an explicit nil is treated the same
+// way, rather than leaving Moonlight without a usable provider.
 func WithProvider(p eph.Provider) MoonlightOption {
-	return func(m *Moonlight) { m.provider = p }
+	return func(m *Moonlight) {
+		if p == nil {
+			p = eph.Default()
+		}
+
+		m.provider = p
+	}
 }
 
 // NewMoonlight creates a scattered-moonlight component.

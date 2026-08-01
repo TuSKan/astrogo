@@ -31,6 +31,10 @@ func (k TwilightKind) zenithAngle() angle.Angle {
 // exactly at the zenith at time t — see coord.SubPoint for the underlying
 // geometry and how it differs from a nearby-body sub-point.
 func SubsolarPoint(p eph.Provider, t time.Time) (*coord.Geodetic, error) {
+	if p == nil {
+		p = eph.Default()
+	}
+
 	vec, err := eph.Position(p, eph.Sun, t)
 	if err != nil {
 		return nil, fmt.Errorf("plan: subsolar point: %w", err)
@@ -51,6 +55,10 @@ func SubsolarPoint(p eph.Provider, t time.Time) (*coord.Geodetic, error) {
 // SubsolarPoint; it is not the (much closer) "sub-satellite" style
 // computation ephemeris/satellite uses for orbiting bodies.
 func SublunarPoint(p eph.Provider, t time.Time) (*coord.Geodetic, error) {
+	if p == nil {
+		p = eph.Default()
+	}
+
 	vec, err := eph.Position(p, eph.Moon, t)
 	if err != nil {
 		return nil, fmt.Errorf("plan: sublunar point: %w", err)
@@ -70,6 +78,10 @@ func SublunarPoint(p eph.Provider, t time.Time) (*coord.Geodetic, error) {
 // geometry and its documented, negligible ellipsoidal approximation).
 // Returns ErrTooFewPoints (via coord.SmallCircle) if n < 3.
 func Terminator(p eph.Provider, t time.Time, kind TwilightKind, n int) ([]*coord.Geodetic, error) {
+	if p == nil {
+		p = eph.Default()
+	}
+
 	sub, err := SubsolarPoint(p, t)
 	if err != nil {
 		return nil, fmt.Errorf("plan: terminator: %w", err)

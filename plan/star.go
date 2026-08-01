@@ -18,6 +18,7 @@ type Star struct {
 	radialVelocity float64
 	vMag           float64
 	hasVMag        bool
+	hasRV          bool
 }
 
 // StarOption configures optional Star fields.
@@ -33,9 +34,12 @@ func WithParallax(p angle.Angle) StarOption {
 	return func(s *Star) { s.parallax = p }
 }
 
-// WithRadialVelocity sets the radial velocity in km/s.
+// WithRadialVelocity sets the star's measured (catalog, barycentric) radial
+// velocity in km/s. A true-zero RV is physically legitimate (a target
+// with no measurable motion along the line of sight) and is tracked
+// distinctly from "no RV set" — see MeasuredRadialVelocity.
 func WithRadialVelocity(rv float64) StarOption {
-	return func(s *Star) { s.radialVelocity = rv }
+	return func(s *Star) { s.radialVelocity = rv; s.hasRV = true }
 }
 
 // WithStarMagnitude sets the catalog V-band magnitude.
@@ -89,3 +93,7 @@ func (s *Star) GetDetails(ctx *coord.Context, props ...string) (*TargetDetails, 
 
 // StaticMagnitude returns the catalog V-band magnitude if set.
 func (s *Star) StaticMagnitude() (float64, bool) { return s.vMag, s.hasVMag }
+
+// MeasuredRadialVelocity returns the star's measured (catalog,
+// barycentric) radial velocity in km/s if WithRadialVelocity was set.
+func (s *Star) MeasuredRadialVelocity() (float64, bool) { return s.radialVelocity, s.hasRV }

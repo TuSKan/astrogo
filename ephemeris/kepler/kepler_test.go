@@ -80,47 +80,70 @@ func keplerPeriodDays(a float64) float64 {
 	return periodSeconds / constants.Derived.JulianDaySeconds.Value
 }
 
-func testElements(epoch atime.Time, a, e float64, incl, node, argp, m0 angle.Angle) kepler.Elements {
-	return kepler.Elements{
-		Epoch: epoch, SemiMajorAxis: a, Eccentricity: e,
-		Inclination: incl, AscendingNode: node, ArgPeriapsis: argp, MeanAnomaly: m0,
-	}
+// testElements builds a known-good Elements for tests that only care
+// about StateAt's geometry, not construction-time validation — since
+// NewElements now validates immediately, any invalid input here would
+// be a bug in the test itself, so it's reported via t.Fatal rather than
+// threaded through as a return value every call site would have to
+// check.
+func testElements(t *testing.T, epoch atime.Time, a, e float64, incl, node, argp, m0 angle.Angle) kepler.Elements {
+	t.Helper()
+
+	el, err := kepler.NewElements(epoch, a, e, incl, node, argp, m0)
+	testutil.AssertNoError(t, err)
+
+	return el
 }
 
-func TestElements_Validate_RejectsBadInputs(t *testing.T) {
+// TestNewElements_RejectsBadInputs confirms invalid elements are
+// rejected at construction — the whole point of NewElements validating
+// immediately is that a caller can never hold an invalid Elements to
+// pass to StateAt in the first place, so there is no separate
+// StateAt-rejects-bad-elements case left to test here.
+func TestNewElements_RejectsBadInputs(t *testing.T) {
 	epoch := atime.Date(2026, atime.January, 1, 0, 0, 0, 0, atime.LocationUTC)
 
 	cases := []struct {
-		name string
-		el   kepler.Elements
-		want error
+		name                 string
+		a, e                 float64
+		incl, node, argp, m0 angle.Angle
+		want                 error
 	}{
-		{"e=1 (parabolic)", testElements(epoch, 2.5, 1.0, 0, 0, 0, 0), kepler.ErrUnsupportedOrbit},
-		{"e=1.5 (hyperbolic)", testElements(epoch, 2.5, 1.5, 0, 0, 0, 0), kepler.ErrUnsupportedOrbit},
-		{"e=-0.1", testElements(epoch, 2.5, -0.1, 0, 0, 0, 0), kepler.ErrUnsupportedOrbit},
-		{"e=NaN", testElements(epoch, 2.5, math.NaN(), 0, 0, 0, 0), kepler.ErrUnsupportedOrbit},
-		{"a=0", testElements(epoch, 0, 0.1, 0, 0, 0, 0), kepler.ErrInvalidElements},
-		{"a=-1", testElements(epoch, -1, 0.1, 0, 0, 0, 0), kepler.ErrInvalidElements},
-		{"a=Inf", testElements(epoch, math.Inf(1), 0.1, 0, 0, 0, 0), kepler.ErrInvalidElements},
-		{"M0=NaN", testElements(epoch, 2.5, 0.1, 0, 0, 0, angle.Rad(math.NaN())), kepler.ErrInvalidElements},
-		{"i=Inf", testElements(epoch, 2.5, 0.1, angle.Rad(math.Inf(1)), 0, 0, 0), kepler.ErrInvalidElements},
+		{"e=1 (parabolic)", 2.5, 1.0, 0, 0, 0, 0, kepler.ErrUnsupportedOrbit},
+		{"e=1.5 (hyperbolic)", 2.5, 1.5, 0, 0, 0, 0, kepler.ErrUnsupportedOrbit},
+		{"e=-0.1", 2.5, -0.1, 0, 0, 0, 0, kepler.ErrUnsupportedOrbit},
+		{"e=NaN", 2.5, math.NaN(), 0, 0, 0, 0, kepler.ErrUnsupportedOrbit},
+		{"a=0", 0, 0.1, 0, 0, 0, 0, kepler.ErrInvalidElements},
+		{"a=-1", -1, 0.1, 0, 0, 0, 0, kepler.ErrInvalidElements},
+		{"a=Inf", math.Inf(1), 0.1, 0, 0, 0, 0, kepler.ErrInvalidElements},
+		{"M0=NaN", 2.5, 0.1, 0, 0, 0, angle.Rad(math.NaN()), kepler.ErrInvalidElements},
+		{"i=Inf", 2.5, 0.1, angle.Rad(math.Inf(1)), 0, 0, 0, kepler.ErrInvalidElements},
 	}
 
 	for _, tt := range cases {
 		t.Run(tt.name, func(t *testing.T) {
-			err := tt.el.Validate()
-			testutil.AssertErrorIs(t, err, tt.want)
-
-			_, _, err = tt.el.StateAt(epoch)
+			_, err := kepler.NewElements(epoch, tt.a, tt.e, tt.incl, tt.node, tt.argp, tt.m0)
 			testutil.AssertErrorIs(t, err, tt.want)
 		})
 	}
 }
 
-func TestElements_Validate_AcceptsGoodInputs(t *testing.T) {
+func TestNewElements_AcceptsGoodInputs(t *testing.T) {
 	epoch := atime.Date(2026, atime.January, 1, 0, 0, 0, 0, atime.LocationUTC)
-	el := testElements(epoch, 2.7, 0.15, angle.Deg(10), angle.Deg(80), angle.Deg(73), angle.Deg(20))
-	testutil.AssertNoError(t, el.Validate())
+	el, err := kepler.NewElements(epoch, 2.7, 0.15, angle.Deg(10), angle.Deg(80), angle.Deg(73), angle.Deg(20))
+	testutil.AssertNoError(t, err)
+
+	// Every accessor must round-trip the value passed to NewElements.
+	if !el.Epoch().Equal(epoch) {
+		t.Errorf("Epoch() = %v, want %v", el.Epoch(), epoch)
+	}
+
+	testutil.AssertNear(t, "SemiMajorAxis", el.SemiMajorAxis(), 2.7, 1e-12)
+	testutil.AssertNear(t, "Eccentricity", el.Eccentricity(), 0.15, 1e-12)
+	testutil.AssertNear(t, "Inclination", el.Inclination().Degrees(), 10, 1e-9)
+	testutil.AssertNear(t, "AscendingNode", el.AscendingNode().Degrees(), 80, 1e-9)
+	testutil.AssertNear(t, "ArgPeriapsis", el.ArgPeriapsis().Degrees(), 73, 1e-9)
+	testutil.AssertNear(t, "MeanAnomaly", el.MeanAnomaly().Degrees(), 20, 1e-9)
 }
 
 // TestElements_StateAt_KnownGeometry_Inclination0 locks in the
@@ -139,7 +162,7 @@ func TestElements_StateAt_KnownGeometry_Inclination0(t *testing.T) {
 	const a = 2.0
 
 	epoch := atime.Date(2026, atime.January, 1, 0, 0, 0, 0, atime.LocationUTC)
-	el := testElements(epoch, a, 0, angle.Zero(), angle.Zero(), angle.Deg(90), angle.Deg(0))
+	el := testElements(t, epoch, a, 0, angle.Zero(), angle.Zero(), angle.Deg(90), angle.Deg(0))
 
 	quarterPeriod := epoch.AddDays(keplerPeriodDays(a) / 4)
 
@@ -165,7 +188,7 @@ func TestElements_StateAt_KnownGeometry_Inclination90(t *testing.T) {
 	const a = 2.0
 
 	epoch := atime.Date(2026, atime.January, 1, 0, 0, 0, 0, atime.LocationUTC)
-	el := testElements(epoch, a, 0, angle.Deg(90), angle.Zero(), angle.Zero(), angle.Deg(0))
+	el := testElements(t, epoch, a, 0, angle.Deg(90), angle.Zero(), angle.Zero(), angle.Deg(0))
 
 	quarterPeriod := epoch.AddDays(keplerPeriodDays(a) / 4)
 
@@ -181,12 +204,12 @@ func TestElements_StateAt_KnownGeometry_Inclination90(t *testing.T) {
 
 func TestElements_StateAt_OnePeriodClosure(t *testing.T) {
 	epoch := atime.Date(2026, atime.January, 1, 0, 0, 0, 0, atime.LocationUTC)
-	el := testElements(epoch, 2.7, 0.2, angle.Deg(12), angle.Deg(50), angle.Deg(200), angle.Deg(30))
+	el := testElements(t, epoch, 2.7, 0.2, angle.Deg(12), angle.Deg(50), angle.Deg(200), angle.Deg(30))
 
 	pos0, vel0, err := el.StateAt(epoch)
 	testutil.AssertNoError(t, err)
 
-	pos1, vel1, err := el.StateAt(epoch.AddDays(keplerPeriodDays(el.SemiMajorAxis)))
+	pos1, vel1, err := el.StateAt(epoch.AddDays(keplerPeriodDays(el.SemiMajorAxis())))
 	testutil.AssertNoError(t, err)
 
 	testutil.AssertNear(t, "x", pos1.X, pos0.X, 1e-6)
@@ -202,12 +225,12 @@ func TestElements_StateAt_OnePeriodClosure(t *testing.T) {
 // several points around the orbit, in SI units.
 func TestElements_StateAt_EnergyConservation(t *testing.T) {
 	epoch := atime.Date(2026, atime.January, 1, 0, 0, 0, 0, atime.LocationUTC)
-	el := testElements(epoch, 1.8, 0.35, angle.Deg(7), angle.Deg(120), angle.Deg(300), angle.Deg(10))
+	el := testElements(t, epoch, 1.8, 0.35, angle.Deg(7), angle.Deg(120), angle.Deg(300), angle.Deg(10))
 
 	gm := constants.IAU.SunGravitationalParameter.Value
 	auM := constants.IAU.AstronomicalUnit.Value
 	dayS := constants.Derived.JulianDaySeconds.Value
-	aM := el.SemiMajorAxis * auM
+	aM := el.SemiMajorAxis() * auM
 
 	for _, dtDays := range []float64{0, 10, 50, 123.4, 400} {
 		pos, vel, err := el.StateAt(epoch.AddDays(dtDays))
@@ -226,14 +249,14 @@ func TestElements_StateAt_EnergyConservation(t *testing.T) {
 // orbit, in SI units.
 func TestElements_StateAt_AngularMomentumConservation(t *testing.T) {
 	epoch := atime.Date(2026, atime.January, 1, 0, 0, 0, 0, atime.LocationUTC)
-	el := testElements(epoch, 3.1, 0.5, angle.Deg(15), angle.Deg(200), angle.Deg(80), angle.Deg(-40))
+	el := testElements(t, epoch, 3.1, 0.5, angle.Deg(15), angle.Deg(200), angle.Deg(80), angle.Deg(-40))
 
 	gm := constants.IAU.SunGravitationalParameter.Value
 	auM := constants.IAU.AstronomicalUnit.Value
 	dayS := constants.Derived.JulianDaySeconds.Value
-	aM := el.SemiMajorAxis * auM
+	aM := el.SemiMajorAxis() * auM
 
-	want := math.Sqrt(gm * aM * (1 - el.Eccentricity*el.Eccentricity))
+	want := math.Sqrt(gm * aM * (1 - el.Eccentricity()*el.Eccentricity()))
 
 	for _, dtDays := range []float64{0, 5, 77, 300} {
 		pos, vel, err := el.StateAt(epoch.AddDays(dtDays))
@@ -252,7 +275,7 @@ func TestElements_StateAt_AngularMomentumConservation(t *testing.T) {
 // several points around the orbit.
 func TestElements_StateAt_VelocityMatchesFiniteDifference(t *testing.T) {
 	epoch := atime.Date(2026, atime.January, 1, 0, 0, 0, 0, atime.LocationUTC)
-	el := testElements(epoch, 2.2, 0.4, angle.Deg(20), angle.Deg(60), angle.Deg(150), angle.Deg(90))
+	el := testElements(t, epoch, 2.2, 0.4, angle.Deg(20), angle.Deg(60), angle.Deg(150), angle.Deg(90))
 
 	const h = 1e-3 // days
 

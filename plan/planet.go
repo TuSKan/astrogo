@@ -18,8 +18,21 @@ type Planet struct {
 	id       eph.ID
 }
 
-// NewPlanet creates a planet target.
+// NewPlanet creates a planet target. A nil provider defaults to
+// ephemeris.Default() — every named body NewPlanet can represent (Sun,
+// Moon, Mercury-Pluto) is one ephemeris.Default() already answers, so
+// there's no reason a caller who didn't supply one should end up with a
+// *Planet whose Position()/ApparentMagnitude() silently fails at first
+// use. Every convenience constructor below (NewSun, NewMoon, NewMercury
+// ... NewPluto) delegates through here, so this one guard covers all of
+// them, plus every plan/events.go function that builds a Sun/Moon via
+// NewSun/NewMoon (SunEvents, MoonEvents, CivilDawnDusk and friends,
+// FullMoonOppositions, NextNewMoon, NextFullMoon, ...).
 func NewPlanet(name string, id eph.ID, provider eph.Provider) *Planet {
+	if provider == nil {
+		provider = eph.Default()
+	}
+
 	return &Planet{name: name, id: id, provider: provider}
 }
 

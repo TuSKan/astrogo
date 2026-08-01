@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/time"
@@ -88,5 +89,66 @@ func TestNeedsSmallBodyEphemeris(t *testing.T) {
 		if got := needsSmallBodyEphemeris(c.kind); got != c.want {
 			t.Errorf("needsSmallBodyEphemeris(%v) = %v, want %v", c.kind, got, c.want)
 		}
+	}
+}
+
+// TestCandidateFromTarget_ElementsBearingTargetIsOffline confirms the
+// Phase 3 "Kepler as the default" wiring: candidateFromTarget for an
+// asteroid target carrying real published elements (HasElements=true)
+// never reaches the network — remote.SetOffline(true) here would turn
+// any real HTTP attempt into an error/skip (nil Observable), so a
+// non-nil result with a nil closer (no SPK file handle at all) proves
+// the whole call stayed on the offline Kepler path. WithSmallBodyKernels
+// (cfg.forceSmallBodyKernels) must override this back to the kernel
+// path even when elements are present.
+func TestCandidateFromTarget_ElementsBearingTargetIsOffline(t *testing.T) {
+	t.Cleanup(remote.Capture().Restore)
+	remote.SetOffline(true)
+
+	tgt := resolve.Target{
+		Name:          "1 Ceres",
+		ID:            "20000001",
+		SPKID:         "20000001",
+		Kind:          resolve.KindAsteroid,
+		HasElements:   true,
+		HasH:          true,
+		H:             3.34,
+		G:             0.12,
+		Epoch:         time.Date(2026, time.June, 9, 0, 0, 0, 0, time.LocationUTC),
+		SemiMajorAxis: 2.77,
+		Eccentricity:  0.0797,
+		Inclination:   angle.Deg(10.6),
+		AscendingNode: angle.Deg(80.2),
+		ArgPeriapsis:  angle.Deg(73.3),
+		MeanAnomaly:   angle.Deg(274),
+	}
+
+	start := tgt.Epoch
+	end := start.AddDays(1)
+
+	obj, closer := candidateFromTarget(context.Background(), tgt, start, end, visibleTonightConfig{})
+	if obj == nil {
+		t.Fatal("expected a non-nil Observable from the offline Kepler path, got nil")
+	}
+
+	if closer != nil {
+		t.Error("expected a nil closer — a Kepler-backed candidate holds no SPK file handle to close")
+	}
+
+	if _, ok := obj.(*Asteroid); !ok {
+		t.Errorf("got %T, want *Asteroid", obj)
+	}
+
+	// WithSmallBodyKernels must force the kernel path even with elements
+	// present — since remote is offline, that path is expected to fail
+	// and return a nil Observable (not the Kepler-backed one from above).
+	// Built via the real exported option (not a direct struct literal),
+	// so this also exercises WithSmallBodyKernels itself.
+	var forcedCfg visibleTonightConfig
+	WithSmallBodyKernels()(&forcedCfg)
+
+	obj2, _ := candidateFromTarget(context.Background(), tgt, start, end, forcedCfg)
+	if obj2 != nil {
+		t.Errorf("expected WithSmallBodyKernels to force the (here, offline-failing) kernel path, got a non-nil %T", obj2)
 	}
 }

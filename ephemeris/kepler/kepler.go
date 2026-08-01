@@ -18,40 +18,86 @@ func finite(v float64) bool { return !math.IsNaN(v) && !math.IsInf(v, 0) }
 // MPC- and JPL-published orbital elements are conventionally given.
 //
 // Only elliptical orbits (0 <= Eccentricity < 1) are supported; a
-// hyperbolic or parabolic Eccentricity is rejected by Validate/StateAt
-// with ErrUnsupportedOrbit. Hyperbolic/parabolic propagation and an
+// hyperbolic or parabolic Eccentricity is rejected by NewElements with
+// ErrUnsupportedOrbit. Hyperbolic/parabolic propagation and an
 // MPC-style FromPerihelion constructor (q, e, T_peri rather than a, M0)
 // are deliberate, documented follow-ups, not built here.
+//
+// Elements is always constructed via NewElements, which validates
+// immediately — there is no way to hold an Elements value whose fields
+// haven't already passed Validate.
 type Elements struct {
-	// Epoch is the osculation epoch MeanAnomaly is given at.
-	Epoch time.Time
-	// SemiMajorAxis is in astronomical units.
-	SemiMajorAxis float64
-	// Eccentricity must satisfy 0 <= e < 1.
-	Eccentricity float64
-	// Inclination, AscendingNode, and ArgPeriapsis are the orbit's
-	// orientation angles in the J2000 ecliptic frame.
-	Inclination   angle.Angle
-	AscendingNode angle.Angle
-	ArgPeriapsis  angle.Angle
-	// MeanAnomaly is the mean anomaly at Epoch.
-	MeanAnomaly angle.Angle
+	epoch                                                 time.Time
+	semiMajorAxis, eccentricity                           float64
+	inclination, ascendingNode, argPeriapsis, meanAnomaly angle.Angle
 }
 
-// Validate reports whether el's fields are finite and within the
-// elliptical-orbit range this package supports.
-func (el Elements) Validate() error {
-	if !finite(el.SemiMajorAxis) || el.SemiMajorAxis <= 0 {
-		return fmt.Errorf("%w: semi-major axis %v must be finite and positive", ErrInvalidElements, el.SemiMajorAxis)
+// NewElements constructs a validated set of classical heliocentric
+// osculating orbital elements, referred to the J2000 ecliptic frame —
+// epoch is the osculation epoch meanAnomaly is given at; semiMajorAxis
+// is in astronomical units; eccentricity must satisfy 0 <= e < 1;
+// inclination/ascendingNode/argPeriapsis are the orbit's orientation
+// angles in the J2000 ecliptic frame. Returns ErrInvalidElements/
+// ErrUnsupportedOrbit immediately rather than deferring the failure to
+// first use (e.g. inside StateAt) — a caller building Elements from
+// external data (a resolve.Target's HasElements fields, a hand-typed
+// literal) gets a construction-time error instead of a silently-broken
+// propagator.
+func NewElements(epoch time.Time, semiMajorAxis, eccentricity float64,
+	inclination, ascendingNode, argPeriapsis, meanAnomaly angle.Angle,
+) (Elements, error) {
+	el := Elements{
+		epoch: epoch, semiMajorAxis: semiMajorAxis, eccentricity: eccentricity,
+		inclination: inclination, ascendingNode: ascendingNode,
+		argPeriapsis: argPeriapsis, meanAnomaly: meanAnomaly,
+	}
+	if err := el.Validate(); err != nil {
+		return Elements{}, err
 	}
 
-	if !finite(el.Eccentricity) || el.Eccentricity < 0 || el.Eccentricity >= 1 {
-		return fmt.Errorf("%w: eccentricity %v", ErrUnsupportedOrbit, el.Eccentricity)
+	return el, nil
+}
+
+// Epoch is the osculation epoch MeanAnomaly is given at.
+func (el Elements) Epoch() time.Time { return el.epoch }
+
+// SemiMajorAxis is in astronomical units.
+func (el Elements) SemiMajorAxis() float64 { return el.semiMajorAxis }
+
+// Eccentricity satisfies 0 <= e < 1.
+func (el Elements) Eccentricity() float64 { return el.eccentricity }
+
+// Inclination is the orbit's inclination in the J2000 ecliptic frame.
+func (el Elements) Inclination() angle.Angle { return el.inclination }
+
+// AscendingNode is the orbit's longitude of ascending node in the J2000
+// ecliptic frame.
+func (el Elements) AscendingNode() angle.Angle { return el.ascendingNode }
+
+// ArgPeriapsis is the orbit's argument of periapsis in the J2000
+// ecliptic frame.
+func (el Elements) ArgPeriapsis() angle.Angle { return el.argPeriapsis }
+
+// MeanAnomaly is the mean anomaly at Epoch.
+func (el Elements) MeanAnomaly() angle.Angle { return el.meanAnomaly }
+
+// Validate reports whether el's fields are finite and within the
+// elliptical-orbit range this package supports. Elements built via
+// NewElements has already passed this check; it is exported mainly for
+// StateAt's own defense-in-depth and for anything within this package
+// that constructs an Elements value via a bare struct literal (tests).
+func (el Elements) Validate() error {
+	if !finite(el.semiMajorAxis) || el.semiMajorAxis <= 0 {
+		return fmt.Errorf("%w: semi-major axis %v must be finite and positive", ErrInvalidElements, el.semiMajorAxis)
+	}
+
+	if !finite(el.eccentricity) || el.eccentricity < 0 || el.eccentricity >= 1 {
+		return fmt.Errorf("%w: eccentricity %v", ErrUnsupportedOrbit, el.eccentricity)
 	}
 
 	for name, a := range map[string]angle.Angle{
-		"inclination": el.Inclination, "ascending node": el.AscendingNode,
-		"argument of periapsis": el.ArgPeriapsis, "mean anomaly": el.MeanAnomaly,
+		"inclination": el.inclination, "ascending node": el.ascendingNode,
+		"argument of periapsis": el.argPeriapsis, "mean anomaly": el.meanAnomaly,
 	} {
 		if !finite(a.Radians()) {
 			return fmt.Errorf("%w: %s is not finite", ErrInvalidElements, name)
@@ -155,22 +201,22 @@ func (el Elements) StateAt(t time.Time) (pos, vel vector.Vec3, err error) {
 
 	gm := constants.IAU.SunGravitationalParameter.Value // m^3/s^2
 	auMeters := constants.IAU.AstronomicalUnit.Value    // m
-	aMeters := el.SemiMajorAxis * auMeters
+	aMeters := el.semiMajorAxis * auMeters
 
 	nRadPerDay := math.Sqrt(gm/(aMeters*aMeters*aMeters)) * constants.Derived.JulianDaySeconds.Value
 
-	dtDays := t.SubDays(el.Epoch)
-	m := el.MeanAnomaly.Radians() + nRadPerDay*dtDays
+	dtDays := t.SubDays(el.epoch)
+	m := el.meanAnomaly.Radians() + nRadPerDay*dtDays
 
-	ea, err := SolveKepler(angle.Rad(m), el.Eccentricity)
+	ea, err := SolveKepler(angle.Rad(m), el.eccentricity)
 	if err != nil {
 		return vector.Zero(), vector.Zero(), err
 	}
 
-	e := el.Eccentricity
+	e := el.eccentricity
 	cosE, sinE := ea.Cos(), ea.Sin()
 	sqrtOneMinusE2 := math.Sqrt(1 - e*e)
-	a := el.SemiMajorAxis
+	a := el.semiMajorAxis
 
 	posPf := vector.V3(a*(cosE-e), a*sqrtOneMinusE2*sinE, 0)
 
@@ -179,8 +225,8 @@ func (el Elements) StateAt(t time.Time) (pos, vel vector.Vec3, err error) {
 	eDot := nRadPerDay / (1 - e*cosE)
 	velPf := vector.V3(-a*sinE*eDot, a*sqrtOneMinusE2*cosE*eDot, 0)
 
-	posEcl := rotatePerifocalToEcliptic(posPf, el.Inclination, el.AscendingNode, el.ArgPeriapsis)
-	velEcl := rotatePerifocalToEcliptic(velPf, el.Inclination, el.AscendingNode, el.ArgPeriapsis)
+	posEcl := rotatePerifocalToEcliptic(posPf, el.inclination, el.ascendingNode, el.argPeriapsis)
+	velEcl := rotatePerifocalToEcliptic(velPf, el.inclination, el.ascendingNode, el.argPeriapsis)
 
 	return rotateEclipticToEquatorialJ2000(posEcl), rotateEclipticToEquatorialJ2000(velEcl), nil
 }

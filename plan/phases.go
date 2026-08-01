@@ -101,6 +101,10 @@ func moonElongation(t time.Time, prov eph.Provider) (float64, error) {
 // and uses Brent's method (via Solver) to refine the instant when the elongation
 // crosses 0°, 90°, 180°, or 270°.
 func MoonPhases(start, end time.Time, prov eph.Provider) ([]MoonPhaseEvent, error) {
+	if prov == nil {
+		prov = eph.Default()
+	}
+
 	const step = 6 * time.Hour // ~4 samples per day → won't miss any phase
 
 	solver := DefaultSolver()
@@ -253,6 +257,10 @@ func sunEclipticLongitude(t time.Time, prov eph.Provider) (float64, error) {
 // Seasons computes all equinoxes and solstices for a given year.
 // Returns events in chronological order.
 func Seasons(year int, prov eph.Provider) ([]SeasonEvent, error) {
+	if prov == nil {
+		prov = eph.Default()
+	}
+
 	start := time.Date(year, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
 	end := time.Date(year+1, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
 
@@ -325,6 +333,10 @@ func seasonEvaluator(target float64, prov eph.Provider) Evaluator {
 // MoonIllumination returns the fraction of the Moon's disk illuminated [0, 1]
 // and the phase angle in degrees at time t.
 func MoonIllumination(t time.Time, prov eph.Provider) (fraction float64, phaseAngle angle.Angle, err error) {
+	if prov == nil {
+		prov = eph.Default()
+	}
+
 	sunPos, err := eph.Position(prov, eph.Sun, t)
 	if err != nil {
 		return 0, 0, fmt.Errorf("illumination: sun position: %w", err)
@@ -389,6 +401,10 @@ type ApsisEvent struct {
 // Uses Brent's minimization (via Solver.FindExtremum) on the geocentric
 // Earth-Sun distance. Perihelion occurs around January 3, aphelion around July 4.
 func Apsides(year int, prov eph.Provider) ([]ApsisEvent, error) {
+	if prov == nil {
+		prov = eph.Default()
+	}
+
 	solver := DefaultSolver()
 
 	var events []ApsisEvent
@@ -549,6 +565,10 @@ func moonSunSeparation(t time.Time, prov eph.Provider) (float64, error) {
 //
 //nolint:dupl // shares structure with SolarEclipses but differs in phase filter and separation function.
 func LunarEclipses(start, end time.Time, prov eph.Provider) ([]EclipseEvent, error) {
+	if prov == nil {
+		prov = eph.Default()
+	}
+
 	const penumbralLimit = 1.58 // degrees
 
 	phases, err := MoonPhases(start, end, prov)
@@ -613,6 +633,10 @@ func LunarEclipses(start, end time.Time, prov eph.Provider) ([]EclipseEvent, err
 //
 //nolint:dupl // shares structure with LunarEclipses but differs in phase filter and separation function.
 func SolarEclipses(start, end time.Time, prov eph.Provider) ([]EclipseEvent, error) {
+	if prov == nil {
+		prov = eph.Default()
+	}
+
 	const partialLimit = 1.58 // degrees
 
 	phases, err := MoonPhases(start, end, prov)

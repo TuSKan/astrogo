@@ -80,9 +80,10 @@ type VisibleObject struct {
 }
 
 type visibleTonightConfig struct {
-	minAltitude  angle.Angle
-	step         time.Duration
-	includeMoons bool
+	minAltitude           angle.Angle
+	step                  time.Duration
+	includeMoons          bool
+	forceSmallBodyKernels bool
 }
 
 // VisibleTonightOption configures VisibleTonight.
@@ -114,6 +115,29 @@ func WithStep(d time.Duration) VisibleTonightOption {
 // this option only controls whether VisibleTonight asks for them at all.
 func WithPlanetaryMoons() VisibleTonightOption {
 	return func(c *visibleTonightConfig) { c.includeMoons = true }
+}
+
+// WithSmallBodyKernels forces every asteroid/comet/dwarf-planet/
+// interstellar candidate to use a real JPL-Horizons-generated SPK
+// kernel, instead of the default: two-body Keplerian propagation
+// (ephemeris/kepler) from the candidate's own published elements when
+// SBDB provided them (resolve.Target.HasElements).
+//
+// The default is Kepler because it is free — no network round trip, no
+// remote.EnableDownloads(remote.JPLHorizons, ...) consent, no file
+// handle — and, for a single night's visibility-window search, accurate
+// well beyond what that search itself resolves (~0.04″ near the
+// elements' own epoch, ~0.56″ at 30 days out — see CHANGELOG for the
+// live 433 Eros validation). A candidate with no published elements, or
+// whose orbit is hyperbolic/parabolic (every KindInterstellar object,
+// and near-parabolic comets — two-body propagation cannot represent
+// either), still takes the kernel path regardless of this option.
+//
+// Use this when real, perturbed, kernel-backed positions matter more
+// than the network/consent cost: astrometry, occultation prediction,
+// close-approach work, or any epoch far from the elements' own.
+func WithSmallBodyKernels() VisibleTonightOption {
+	return func(c *visibleTonightConfig) { c.forceSmallBodyKernels = true }
 }
 
 // visibleCandidate pairs a constructed Observable with the resolve.Target
@@ -157,20 +181,26 @@ var planetConstructors = []func(eph.Provider) *Planet{
 // resolve.BrightObjectSearcher (catalog/simbad, catalog/openngc, and
 // catalog/sbdb's Provider all implement it structurally; pass whichever
 // combination you want included). The Moon and naked-eye planets come from
-// planetProvider (a real ephemeris — ephemeris.NewProvider(ctx,
-// ephemeris.Planets, "de440s") or similar; ephemeris.Default() only covers
-// Sun/Moon, not the other planets).
+// planetProvider — a nil planetProvider falls back to ephemeris.Default()
+// (SOFA-analytic, offline, covers Sun/Moon/Mercury-Neptune/Pluto). For
+// higher-fidelity, perturbation-aware planet positions over longer spans,
+// pass a real kernel-backed provider instead — ephemeris.NewProvider(ctx,
+// ephemeris.Planets, "de440s") or similar.
 //
 // magLimit governs every category uniformly, including asteroids/comets
 // surfaced by an SBDB-backed brightSources entry: at a tight limit (e.g. 2)
 // essentially none qualify (no known asteroid has ever been observed
 // brighter than ~mag 5.1), but at a looser one (e.g. 5) real candidates
 // near a favorable opposition legitimately appear — a property of the
-// physics, not a special case in this function. Each such candidate needs
-// its own per-body ephemeris (a real JPL Horizons small-body SPK fetch,
-// gated by the same remote.EnableDownloads(remote.JPLHorizons, ...)
-// consent every other kernel download in this library requires); a
-// candidate whose kernel can't be fetched is skipped, not treated as fatal.
+// physics, not a special case in this function. Each such candidate is
+// resolved via two-body Keplerian propagation of its own published
+// elements by default (ephemeris/kepler) — free, no network round trip,
+// no download consent — falling back to a real JPL-Horizons-generated
+// SPK kernel (gated by remote.EnableDownloads(remote.JPLHorizons, ...))
+// only when the candidate has no published elements or an orbit two-body
+// propagation can't represent; see WithSmallBodyKernels to force the
+// kernel path unconditionally. A candidate whose ephemeris (either path)
+// can't be obtained is skipped, not treated as fatal.
 func VisibleTonight(
 	ctx context.Context,
 	site *Site,
@@ -180,6 +210,10 @@ func VisibleTonight(
 	planetProvider eph.Provider,
 	opts ...VisibleTonightOption,
 ) ([]VisibleObject, error) {
+	if planetProvider == nil {
+		planetProvider = eph.Default()
+	}
+
 	cfg := visibleTonightConfig{
 		minAltitude: site.RiseSetThreshold(),
 		step:        10 * time.Minute,
@@ -222,7 +256,7 @@ func VisibleTonight(
 	start, end := dusk.Time, dawn.Time
 	mid := start.Add(end.Sub(start) / 2)
 
-	candidates := gatherCandidates(ctx, gatherBrightTargets(ctx, brightSources, magLimit), start, end)
+	candidates := gatherCandidates(ctx, gatherBrightTargets(ctx, brightSources, magLimit), start, end, cfg)
 	candidates = append(candidates, gatherSolarSystemCandidates(planetProvider, mid, magLimit)...)
 
 	if cfg.includeMoons {
@@ -354,7 +388,7 @@ const coverageMargin = 24 * time.Hour
 // ("no coverage for target at requested epoch"), making the entire
 // category permanently absent from every result regardless of real
 // brightness.
-func gatherCandidates(ctx context.Context, targets []resolve.Target, start, end time.Time) []visibleCandidate {
+func gatherCandidates(ctx context.Context, targets []resolve.Target, start, end time.Time, cfg visibleTonightConfig) []visibleCandidate {
 	slots := make([]visibleCandidate, len(targets))
 
 	g := new(errgroup.Group)
@@ -362,7 +396,7 @@ func gatherCandidates(ctx context.Context, targets []resolve.Target, start, end 
 
 	for i, tgt := range targets {
 		if !needsSmallBodyEphemeris(tgt.Kind) {
-			if obj, closer := candidateFromTarget(ctx, tgt, start, end); obj != nil {
+			if obj, closer := candidateFromTarget(ctx, tgt, start, end, cfg); obj != nil {
 				slots[i] = visibleCandidate{obj: obj, target: tgt, closer: closer}
 			}
 
@@ -370,7 +404,7 @@ func gatherCandidates(ctx context.Context, targets []resolve.Target, start, end 
 		}
 
 		g.Go(func() error {
-			if obj, closer := candidateFromTarget(ctx, tgt, start, end); obj != nil {
+			if obj, closer := candidateFromTarget(ctx, tgt, start, end, cfg); obj != nil {
 				slots[i] = visibleCandidate{obj: obj, target: tgt, closer: closer}
 			}
 
@@ -424,9 +458,36 @@ func needsSmallBodyEphemeris(kind resolve.Kind) bool {
 	}
 }
 
-func candidateFromTarget(ctx context.Context, tgt resolve.Target, start, end time.Time) (Observable, eph.Provider) {
+// isFixedTarget reports whether obs is one of the two types
+// FromCatalog's fixed-target fall-through can produce (*Star,
+// *DeepSkyObject) — the signal that a preceding elements-based
+// construction attempt inside FromCatalog fell through rather than
+// succeeding, since a real small-body Observable is always
+// *Asteroid/*Comet/*GenericBody, never one of these two.
+func isFixedTarget(obs Observable) bool {
+	switch obs.(type) {
+	case *Star, *DeepSkyObject:
+		return true
+	default:
+		return false
+	}
+}
+
+func candidateFromTarget(ctx context.Context, tgt resolve.Target, start, end time.Time, cfg visibleTonightConfig) (Observable, eph.Provider) {
 	if !needsSmallBodyEphemeris(tgt.Kind) {
 		return FromCatalog(tgt, nil), nil
+	}
+
+	// Kepler first: try FromCatalog's own elements-based construction
+	// (no provider passed) before ever reaching for a kernel — see
+	// WithSmallBodyKernels' doc comment for the full rationale. Falls
+	// through to the kernel path below when elements weren't published,
+	// are hyperbolic/parabolic, or the caller forced kernels via
+	// WithSmallBodyKernels.
+	if !cfg.forceSmallBodyKernels && tgt.HasElements {
+		if obj := FromCatalog(tgt, nil); !isFixedTarget(obj) {
+			return obj, nil
+		}
 	}
 
 	minorProvider, err := eph.NewProvider(ctx, eph.SmallBody, tgt.SPKID,

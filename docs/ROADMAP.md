@@ -272,6 +272,63 @@ atmospheric dispersion compensator planning.
 
 ---
 
+## 39. Central-Body Keplerian Propagation (Planetary Moons)
+
+**Status:** 🔲 Not Started
+
+`ephemeris/kepler` propagates asteroids/comets from heliocentric elements around the
+Sun's GM; a planetary moon needs the same two-body machinery around its *parent
+planet's* GM instead, plus a Laplace-plane frame correction — real, non-trivial
+physics, not just missing plumbing. Verdict from investigation: forcing parity with
+asteroids now would ship confidently wrong numbers, so moons stay kernel-only
+(`ephemeris/jpl` SPK, gated by `remote.EnableDownloads`) until this is built properly.
+
+- [ ] Per-parent GM constants (Mars/Jupiter/Saturn/Uranus/Neptune/Pluto system GMs) —
+      IAU 2015 B3 Table 1 only publishes Sun/Earth/Jupiter; the rest need their own
+      versioned, cited constants set (comparable scope to the `constants` refactor).
+- [ ] Central-body (not heliocentric) two-body propagation in `ephemeris/kepler`
+- [ ] Laplace-plane frame handling for published *mean* moon elements (tabulated pole,
+      secular precession) — these are not osculating J2000-ecliptic elements and can't
+      be fed into the existing propagator unmodified
+- [ ] J₂-driven apsidal precession / mean-motion resonance corrections for moons where
+      two-body motion diverges within weeks (e.g. the Galilean Laplace resonance)
+- [ ] Offline base-state fallback for parents with no SOFA analytical source (Pluto,
+      for Charon) — depends on `ephemeris.Default()`'s Pluto coverage (done, see below)
+
+## 40. Radial-Velocity Corrections
+
+**Status:** 🟡 In Progress
+
+`coord.Context.BarycentricVelocity`/`BarycentricRVCorrection`/`HeliocentricRVCorrection`
+ship (classical, non-relativistic projection of the observer's own barycentric
+motion, ~1 m/s accuracy) and are demonstrated end-to-end in
+`examples/23_radial_velocity_correction`. Now wired into `plan`'s observability
+pipeline too — `plan.TargetDetails.RadialVelocity` auto-populates for any target
+implementing `MeasuredRadialVelocity` (currently `*Star`).
+
+- [x] `Context.BarycentricVelocity` — observer's barycentric velocity from `Apco13`'s
+      already-computed astrometry, no new SOFA call
+- [x] `BarycentricRVCorrection`/`HeliocentricRVCorrection` — classical velocity
+      projection, sign convention documented and tested explicitly
+- [x] Analytic property tests (bounded magnitude, annual sinusoid, antipodal sign flip,
+      diurnal amplitude vs. site latitude)
+- [x] `plan.TargetDetails.RadialVelocity` — a `MeasuredRadialVelocity` capability
+      interface (mirroring `StaticMagnitude`) on `*Star`, wired into `computeDetails`
+      alongside the magnitude dispatch block; `Context.ObservedRadialVelocity` is the
+      inverse of `BarycentricRVCorrection`, tested to round-trip exactly
+- [ ] `resolve.Target.HasRadialVelocity` — distinguishes a true-zero measured RV from
+      "no RV on file" (today a zero `RadialVelocity` is ambiguous)
+- [ ] Cross-implementation fixture test against Astropy's
+      `SkyCoord.radial_velocity_correction` (a reference table is scaffolded and
+      `t.Skip`-guarded in `coord/radialvelocity_fixture_test.go`, pending real values —
+      not fabricated)
+- [ ] Full Wright & Eastman (2014) treatment for sub-1-m/s precision-RV work
+      (gravitational redshift, light-travel-time to barycenter, target proper
+      motion/parallax effects on the projection geometry) — the current classical
+      projection is explicitly documented as insufficient for this
+
+---
+
 # 🎯 Strategic Direction
 
 AstroGo positions itself as:

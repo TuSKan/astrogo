@@ -237,3 +237,39 @@ func TestEclipseType_StringUnknown(t *testing.T) {
 		t.Errorf("expected an unknown-value string for out-of-range EclipseType, got %q", got)
 	}
 }
+
+// TestPhasesFunctions_NilProviderDefaults is a regression test: every
+// exported function in this file calls eph.Position(prov, ...) directly
+// (bypassing plan.NewPlanet/NewSun/NewMoon, which default a nil provider
+// themselves), so each one needs its own guard. A short interval keeps
+// this fast — the point is confirming no error/panic on a nil provider,
+// not exercising the solvers' full behavior (already covered elsewhere
+// in this file).
+func TestPhasesFunctions_NilProviderDefaults(t *testing.T) {
+	start := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
+	end := start.AddDays(35)
+
+	if _, err := MoonPhases(start, end, nil); err != nil {
+		t.Errorf("MoonPhases(nil): unexpected error: %v", err)
+	}
+
+	if _, err := Seasons(2026, nil); err != nil {
+		t.Errorf("Seasons(nil): unexpected error: %v", err)
+	}
+
+	if _, _, err := MoonIllumination(start, nil); err != nil {
+		t.Errorf("MoonIllumination(nil): unexpected error: %v", err)
+	}
+
+	if _, err := Apsides(2026, nil); err != nil {
+		t.Errorf("Apsides(nil): unexpected error: %v", err)
+	}
+
+	if _, err := LunarEclipses(start, end, nil); err != nil {
+		t.Errorf("LunarEclipses(nil): unexpected error: %v", err)
+	}
+
+	if _, err := SolarEclipses(start, end, nil); err != nil {
+		t.Errorf("SolarEclipses(nil): unexpected error: %v", err)
+	}
+}

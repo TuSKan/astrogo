@@ -214,3 +214,23 @@ func TestSublunarPoint_Basic(t *testing.T) {
 		t.Errorf("sublunar latitude = %v°, outside the Moon's plausible ±28° declination range", lat)
 	}
 }
+
+// TestTerminatorFunctions_NilProviderDefaults is a regression test: all
+// three exported functions in this file call eph.Position(p, ...)
+// directly (bypassing plan.NewSun/NewMoon), so each needs its own
+// nil-provider guard.
+func TestTerminatorFunctions_NilProviderDefaults(t *testing.T) {
+	tm := time.FromJD(2461000.25, time.UTC)
+
+	if _, err := SubsolarPoint(nil, tm); err != nil {
+		t.Errorf("SubsolarPoint(nil): unexpected error: %v", err)
+	}
+
+	if _, err := SublunarPoint(nil, tm); err != nil {
+		t.Errorf("SublunarPoint(nil): unexpected error: %v", err)
+	}
+
+	if _, err := Terminator(nil, tm, GeometricTwilight, 12); err != nil {
+		t.Errorf("Terminator(nil): unexpected error: %v", err)
+	}
+}

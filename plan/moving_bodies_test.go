@@ -177,31 +177,32 @@ func TestAsteroid_PositionAndGetDetails(t *testing.T) {
 	}
 }
 
-// TestNewAsteroidFromElements exercises the NewAsteroidFromElements wiring
-// (plan -> eph.NewFromElements -> ephemeris/kepler) end to end, using a
-// real internal SOFA-based provider (no test double) — the underlying
-// Keplerian physics itself is covered by ephemeris/kepler's own test
-// suite; this only confirms the plan-layer plumbing works.
-func TestNewAsteroidFromElements(t *testing.T) {
+// TestNewAsteroid_KeplerBackedProvider exercises the Kepler-provider
+// wiring (eph.NewElements -> eph.NewFromElements -> NewAsteroid) end to
+// end, using a real internal SOFA-based fallback (no test double) — the
+// underlying Keplerian physics itself is covered by ephemeris/kepler's
+// own test suite; this only confirms the plan-layer plumbing works when
+// a caller builds the provider itself and passes it to NewAsteroid like
+// any other provider (there is no separate "from elements" constructor
+// — see plan.FromCatalog for the automatic version of this same wiring).
+func TestNewAsteroid_KeplerBackedProvider(t *testing.T) {
 	epoch := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
 
 	// Illustrative main-belt-asteroid-like elements (roughly Ceres'
 	// real values) — precision doesn't matter here, only that the
 	// plumbing produces a real, non-degenerate result.
-	el := eph.Elements{
-		Epoch:         epoch,
-		SemiMajorAxis: 2.77,
-		Eccentricity:  0.076,
-		Inclination:   angle.Deg(10.6),
-		AscendingNode: angle.Deg(80.3),
-		ArgPeriapsis:  angle.Deg(73.6),
-		MeanAnomaly:   angle.Deg(0),
+	el, err := eph.NewElements(epoch, 2.77, 0.076,
+		angle.Deg(10.6), angle.Deg(80.3), angle.Deg(73.6), angle.Deg(0))
+	if err != nil {
+		t.Fatalf("NewElements: %v", err)
 	}
 
-	a, err := NewAsteroidFromElements("Test Ceres-like", el, WithHG(3.34, 0.12))
+	provider, err := eph.NewFromElements(keplerSyntheticID, el)
 	if err != nil {
-		t.Fatalf("NewAsteroidFromElements: %v", err)
+		t.Fatalf("NewFromElements: %v", err)
 	}
+
+	a := NewAsteroid("Test Ceres-like", keplerSyntheticID, provider, WithHG(3.34, 0.12))
 
 	if a.Name() != "Test Ceres-like" {
 		t.Errorf("Name = %q, want %q", a.Name(), "Test Ceres-like")
@@ -224,8 +225,8 @@ func TestNewAsteroidFromElements(t *testing.T) {
 	// closer than (perihelion - 1.5 AU of Earth's own orbit) nor
 	// farther than (aphelion + 1.5 AU) — loose, just catches a
 	// degenerate zero-vector or wildly wrong result.
-	minPlausible := el.SemiMajorAxis*(1-el.Eccentricity) - 1.5
-	maxPlausible := el.SemiMajorAxis*(1+el.Eccentricity) + 1.5
+	minPlausible := el.SemiMajorAxis()*(1-el.Eccentricity()) - 1.5
+	maxPlausible := el.SemiMajorAxis()*(1+el.Eccentricity()) + 1.5
 
 	if vec.Norm() < minPlausible || vec.Norm() > maxPlausible {
 		t.Errorf("GeocentricVec norm = %v AU, outside plausible band [%v, %v]", vec.Norm(), minPlausible, maxPlausible)
@@ -241,15 +242,11 @@ func TestNewAsteroidFromElements(t *testing.T) {
 	}
 }
 
-func TestNewAsteroidFromElements_RejectsInvalidElements(t *testing.T) {
-	el := eph.Elements{
-		Epoch:         time.FromJD(2451545.0, time.UTC),
-		SemiMajorAxis: 2.77,
-		Eccentricity:  1.2, // hyperbolic — unsupported by ephemeris/kepler
-	}
-
-	if _, err := NewAsteroidFromElements("Bad Orbit", el); err == nil {
-		t.Fatal("NewAsteroidFromElements: expected error for hyperbolic eccentricity, got nil")
+func TestNewElements_RejectsHyperbolicEccentricity(t *testing.T) {
+	_, err := eph.NewElements(time.FromJD(2451545.0, time.UTC), 2.77, 1.2, // hyperbolic — unsupported by ephemeris/kepler
+		angle.Zero(), angle.Zero(), angle.Zero(), angle.Zero())
+	if err == nil {
+		t.Fatal("NewElements: expected error for hyperbolic eccentricity, got nil")
 	}
 }
 

@@ -27,23 +27,27 @@ func WithBase(p core.Provider) Option {
 	return func(c *config) { c.base = p }
 }
 
-// Provider adapts a single body's Elements into a core.Provider,
+// Provider is a generic core.Provider for moving bodies: it answers
+// State(id, t) via two-body Keplerian propagation for every id it has
+// been given elements for (see Register), and delegates any other id to
+// a base provider — by default the same offline SOFA source
+// ephemeris.Default() uses (Sun/Moon/Mercury-Neptune). A Provider built
+// with zero registered elements behaves exactly like that default
+// source for major bodies; each Register call extends it to also
+// answer one more small body, with no other change to how it's used —
 // dropping into plan.NewAsteroid/NewComet/NewGenericBody exactly like
-// any SPK-kernel-backed provider — no new plan type is needed for a
-// Kepler-propagated body to become a full Observable.
+// any SPK-kernel-backed provider, no new plan type needed.
 type Provider struct {
-	id   core.ID
-	el   Elements
-	base core.Provider
+	elements map[core.ID]Elements
+	base     core.Provider
 }
 
-// New returns a Provider that answers id via Keplerian propagation of el,
-// and every other body via opts' WithBase (or the internal SOFA default).
-func New(id core.ID, el Elements, opts ...Option) (*Provider, error) {
-	if err := el.Validate(); err != nil {
-		return nil, err
-	}
-
+// New returns a Provider with no small bodies registered yet — every
+// body id is answered by opts' WithBase (or the internal SOFA default)
+// until Register is called. Use New(...).Register(id, el) to build a
+// single-body provider, or call Register repeatedly to share one
+// provider (and its base) across several bodies.
+func New(opts ...Option) *Provider {
 	cfg := config{}
 	for _, opt := range opts {
 		opt(&cfg)
@@ -53,18 +57,38 @@ func New(id core.ID, el Elements, opts ...Option) (*Provider, error) {
 		cfg.base = &sofaBase{}
 	}
 
-	return &Provider{id: id, el: el, base: cfg.base}, nil
+	return &Provider{elements: make(map[core.ID]Elements), base: cfg.base}
 }
 
-// State returns id's geocentric state at t — the propagated Elements'
-// body if id matches, otherwise delegated to the configured base
-// provider. core.Provider.State is contractually geocentric, so the
-// propagated body's own heliocentric StateAt result is converted via
+// Register adds (or replaces) id's orbital elements on p, validating
+// them first. A Provider with id already registered silently overwrites
+// the prior entry — the same last-write-wins semantics a plain map has.
+//
+// Not safe to call concurrently with State — populate every body a
+// Provider will ever answer before sharing it across concurrent
+// readers (e.g. plan.VisibleTonight's candidate-gathering pipeline
+// registers every Kepler-eligible candidate sequentially before its
+// concurrent evaluation phase begins reading via State).
+func (p *Provider) Register(id core.ID, el Elements) error {
+	if err := el.Validate(); err != nil {
+		return err
+	}
+
+	p.elements[id] = el
+
+	return nil
+}
+
+// State returns id's geocentric state at t — the propagated Elements
+// for id if registered, otherwise delegated to the configured base
+// provider. core.Provider.State is contractually geocentric, so a
+// registered body's own heliocentric StateAt result is converted via
 // Earth's heliocentric position from gofaext.Epv00, matching how every
 // other core.Provider in this codebase (ephemeris's own sofaProvider)
 // derives a geocentric state from heliocentric SOFA/JPL data.
 func (p *Provider) State(id core.ID, t time.Time) (core.State, error) {
-	if id != p.id {
+	el, ok := p.elements[id]
+	if !ok {
 		st, err := p.base.State(id, t)
 		if err != nil {
 			return core.State{}, fmt.Errorf("kepler: base provider: %w", err)
@@ -73,7 +97,7 @@ func (p *Provider) State(id core.ID, t time.Time) (core.State, error) {
 		return st, nil
 	}
 
-	heloPos, heloVel, err := p.el.StateAt(t)
+	heloPos, heloVel, err := el.StateAt(t)
 	if err != nil {
 		return core.State{}, err
 	}
@@ -99,21 +123,25 @@ func (p *Provider) State(id core.ID, t time.Time) (core.State, error) {
 func (p *Provider) Close() error { return nil }
 
 // sofaBase is the default WithBase delegate: a small, offline,
-// SOFA-only core.Provider covering the Sun, Moon, and the eight major
-// planets — deliberately duplicated from ephemeris's own unexported
-// sofaProvider rather than importing the ephemeris root package, which
-// would cycle (ephemeris imports kepler to re-export Elements/
-// NewFromElements).
+// SOFA-only core.Provider covering the Sun, Moon, the eight major
+// planets, and the Solar System Barycenter — deliberately duplicated
+// from ephemeris's own unexported sofaProvider rather than importing
+// the ephemeris root package, which would cycle (ephemeris imports
+// kepler to re-export Elements/NewFromElements). Pluto has no SOFA
+// analytical source and is not covered here — ephemeris.Default()
+// closes that gap by Register-ing Pluto's own elements on top of a
+// Provider using this as its base, rather than teaching this SOFA-only
+// type about a body SOFA itself has no model for.
 type sofaBase struct{}
 
 func (s *sofaBase) State(id core.ID, t time.Time) (core.State, error) {
 	tdb := t.TDB()
 	d1, d2 := tdb.JDParts()
 
-	//nolint:exhaustive // Pluto/SolarSystemBarycenter have no SOFA
-	// (gofaext.Epv00/Plan94) analytical source — mirrors ephemeris's own
-	// sofaProvider, which has the same intentional gap; the default case
-	// below returns ErrUnsupportedBody for both.
+	//nolint:exhaustive // Pluto has no SOFA (gofaext.Epv00/Plan94)
+	// analytical source — mirrors ephemeris's own sofaProvider, which has
+	// the same intentional gap; the default case below returns
+	// ErrUnsupportedBody for it and anything else unnamed.
 	switch id {
 	case core.Sun:
 		pvh, _, status := gofaext.Epv00(d1, d2)
@@ -132,6 +160,19 @@ func (s *sofaBase) State(id core.ID, t time.Time) (core.State, error) {
 		return core.State{
 			Pos: vector.V3(pv[0][0], pv[0][1], pv[0][2]),
 			Vel: vector.V3(pv[1][0], pv[1][1], pv[1][2]),
+		}, nil
+
+	case core.SolarSystemBarycenter:
+		_, pvb, status := gofaext.Epv00(d1, d2)
+		if status < 0 {
+			return core.State{}, fmt.Errorf("%w: gofaext.Epv00 status %d", ErrSofaFailure, status)
+		}
+
+		// pvb is Earth's barycentric position/velocity (SSB -> Earth), so
+		// the SSB's own geocentric state (SSB - Earth) is its negation.
+		return core.State{
+			Pos: vector.V3(-pvb[0][0], -pvb[0][1], -pvb[0][2]),
+			Vel: vector.V3(-pvb[1][0], -pvb[1][1], -pvb[1][2]),
 		}, nil
 
 	case core.Mercury, core.Venus, core.Earth, core.Mars,

@@ -144,15 +144,15 @@ func fetchHelioElements(designation string, at atime.Time) (epochJD float64, el 
 
 	const kmPerAU = 149_597_870.7
 
-	return jdtdb, kepler.Elements{
-		Epoch:         atime.FromJDParts(jdtdb, 0, atime.TDB),
-		SemiMajorAxis: aKm / kmPerAU,
-		Eccentricity:  ec,
-		Inclination:   angle.Deg(incl),
-		AscendingNode: angle.Deg(node),
-		ArgPeriapsis:  angle.Deg(argp),
-		MeanAnomaly:   angle.Deg(ma),
-	}, nil
+	el, err = kepler.NewElements(
+		atime.FromJDParts(jdtdb, 0, atime.TDB), aKm/kmPerAU, ec,
+		angle.Deg(incl), angle.Deg(node), angle.Deg(argp), angle.Deg(ma),
+	)
+	if err != nil {
+		return 0, kepler.Elements{}, fmt.Errorf("build elements: %w", err)
+	}
+
+	return jdtdb, el, nil
 }
 
 // fetchHelioVector queries Horizons for designation's real heliocentric
@@ -242,8 +242,8 @@ func TestElements_StateAt_AgainstHorizons_433Eros(t *testing.T) {
 	epochJD, el, err := fetchHelioElements(designation, atime.Date(2026, atime.January, 1, 0, 0, 0, 0, atime.LocationUTC))
 	testutil.AssertNoError(t, err)
 
-	if el.SemiMajorAxis < 1.0 || el.SemiMajorAxis > 2.0 {
-		t.Fatalf("sanity check failed: 433 Eros semi-major axis = %v AU, expected ~1.458 AU", el.SemiMajorAxis)
+	if el.SemiMajorAxis() < 1.0 || el.SemiMajorAxis() > 2.0 {
+		t.Fatalf("sanity check failed: 433 Eros semi-major axis = %v AU, expected ~1.458 AU", el.SemiMajorAxis())
 	}
 
 	epoch := atime.FromJDParts(epochJD, 0, atime.TDB)
