@@ -30,18 +30,109 @@ func (ZeroModel) EOP(_ float64) (EOP, error) {
 	return EOP{}, nil
 }
 
+// Values EOPSource returns, naming where the currently active model came
+// from — see EOPSource's own doc comment.
+const (
+	SourceZero     = "zero"
+	SourceExplicit = "explicit"
+	SourceCache    = "cache"
+	SourceNetwork  = "network"
+)
+
 //nolint:gochecknoglobals // singleton EOP model with RWMutex guard
 var (
 	modelMu     sync.RWMutex
 	globalModel Model = ZeroModel{}
+	// explicitModel is true once a caller has called RegisterModel
+	// directly — see RegisterModel and EnsureLoaded (fetch.go) for what
+	// this gates.
+	explicitModel bool
+	// modelSource records provenance for EOPSource — purely observational,
+	// never consulted by any decision logic in this package.
+	modelSource = SourceZero
 )
 
-// RegisterModel sets the globally used Earth orientation parameter model.
+// RegisterModel sets the globally used Earth orientation parameter model,
+// and marks the choice authoritative: EnsureLoaded's lazy loader (an
+// on-disk cache probe, then — if download consent was granted — a network
+// fetch) will not run again after this call, so it can never silently
+// replace what was explicitly registered.
+//
+// This matters most for RegisterModel(ZeroModel{}): before this guard
+// existed, that call — the natural way to ask for deterministic zero EOP —
+// was itself overridden the moment an uncovered lookup found a
+// finals2000A file sitting in the cache directory, which made "did this
+// run use real or zero EOP" depend on ambient machine state rather than
+// the caller's own choice. See EOPSource to observe which case is active.
+//
+// Use registerModelInternal for the lazy loader's own opportunistic
+// registration — it must NOT set explicitModel, or a caller's later
+// RegisterModel call would have nothing left to override.
 func RegisterModel(m Model) {
 	modelMu.Lock()
 	defer modelMu.Unlock()
 
 	globalModel = m
+	explicitModel = true
+	modelSource = SourceExplicit
+}
+
+// registerModelInternal installs m without marking the choice explicit —
+// EnsureLoaded's own lazy-load path (fetch.go) uses this so a caller's own
+// RegisterModel call, past or future, remains authoritative. See
+// RegisterModel's doc comment. source records provenance for EOPSource
+// (SourceCache or SourceNetwork).
+func registerModelInternal(m Model, source string) {
+	modelMu.Lock()
+	defer modelMu.Unlock()
+
+	if explicitModel {
+		return
+	}
+
+	globalModel = m
+	modelSource = source
+}
+
+// Reset restores the model to its pristine default state — ZeroModel, not
+// explicit, source SourceZero — discarding whatever was previously
+// registered or lazily loaded. Unlike RegisterModel(ZeroModel{}), this does
+// NOT mark the result explicit, so a subsequent EnsureLoaded is free to
+// lazily load real data again; use it to start over, not to pin zero EOP
+// (for that, call RegisterModel(ZeroModel{}) instead). Mirrors remote.Reset's
+// role in that package: primarily for tests, but not test-only — any
+// caller that wants a clean slate can use it.
+func Reset() {
+	modelMu.Lock()
+	defer modelMu.Unlock()
+
+	globalModel = ZeroModel{}
+	explicitModel = false
+	modelSource = SourceZero
+}
+
+// modelIsExplicit reports whether RegisterModel has been called directly,
+// as opposed to internally by the lazy loader — see EnsureLoaded, which
+// skips its own disk-probe/network-fetch dance entirely once this is true.
+func modelIsExplicit() bool {
+	modelMu.RLock()
+	defer modelMu.RUnlock()
+
+	return explicitModel
+}
+
+// EOPSource reports where the currently active model came from: SourceZero
+// (the untouched default, ZeroModel), SourceExplicit (a direct RegisterModel
+// call — including RegisterModel(ZeroModel{})), SourceCache (the lazy
+// loader read a pre-seeded finals2000A file from disk), or SourceNetwork
+// (the lazy loader fetched one). Exists so a test — or a caller who cares —
+// can assert "this ran with real EOP" instead of inferring it indirectly
+// from a lookup's numeric result.
+func EOPSource() string {
+	modelMu.RLock()
+	defer modelMu.RUnlock()
+
+	return modelSource
 }
 
 // GetModel retrieves the globally used Earth orientation parameter model.

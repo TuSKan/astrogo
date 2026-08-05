@@ -7,8 +7,8 @@
 // at compile time, not just by convention). Application code, including
 // coord and every other astrogo package, gets EOP data exclusively through
 // time's public re-exports: [time.EOP], [time.RegisterModel],
-// [time.GetModel], [time.Coverage], [time.SetRetryCooldown], and the
-// [time.Time.EOP] method.
+// [time.GetModel], [time.EOPSource], [time.ResetEOP], [time.Coverage],
+// [time.SetRetryCooldown], and the [time.Time.EOP] method.
 //
 // # Data source
 //
@@ -28,6 +28,14 @@
 //     path) and register it.
 //  3. Otherwise, the query degrades to the zero-EOP fallback described
 //     below — EnsureLoaded never blocks indefinitely or errors loudly.
+//
+// [RegisterModel] is authoritative: once called, none of the above runs —
+// the lazy loader will never replace what a caller explicitly registered,
+// including RegisterModel(ZeroModel{}) for deliberate, deterministic zero
+// EOP. Call [Reset] (a plain restore-to-pristine-default, not itself
+// authoritative) to undo an explicit registration and let the lazy loader
+// run again. [EOPSource] reports which of the above actually populated the
+// current model.
 //
 // Importing this package (transitively, through time) never does network
 // I/O, disk I/O, or registers anything on its own — the lazy load only

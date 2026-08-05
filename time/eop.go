@@ -38,13 +38,42 @@ var (
 //nolint:wrapcheck // pure delegation to the unexported time/internal/iers, not a true external dependency
 func ParseFinals2000A(r io.Reader) (*Table, error) { return iers.ParseFinals2000A(r) }
 
-// RegisterModel sets the process-wide Earth orientation parameter model.
+// RegisterModel sets the process-wide Earth orientation parameter model
+// and marks the choice authoritative: the automatic lazy load a
+// [Time.EOP]/[Time.UTC]/[Time.UT1] query would otherwise trigger (a
+// pre-seeded on-disk cache file, then — if download consent was granted —
+// a network fetch) will not run afterward, so it can never silently
+// replace what was explicitly registered here.
+//
+// This matters most for RegisterModel(ZeroModel{}) — the natural way to
+// ask for deterministic zero EOP — which previously WAS silently
+// overridden the moment an uncovered lookup happened to find a
+// finals2000A file already sitting in the cache directory, making "did
+// this run use real or zero EOP" depend on ambient machine state rather
+// than this call. See [EOPSource] to observe which source is active, and
+// [ResetEOP] to undo this without pinning anything.
 func RegisterModel(m Model) { iers.RegisterModel(m) }
 
 // GetModel retrieves the process-wide Earth orientation parameter model.
 // Defaults to ZeroModel until RegisterModel populates it, or a lazy load
 // triggered by an EOP query succeeds.
 func GetModel() Model { return iers.GetModel() }
+
+// EOPSource reports where the currently active model came from:
+// "zero" (the untouched default), "explicit" (a direct RegisterModel
+// call), "cache" (the lazy loader read a pre-seeded finals2000A file from
+// disk), or "network" (the lazy loader fetched one). Lets a caller — a
+// test in particular — assert "this ran with real EOP" directly instead
+// of inferring it from a lookup's numeric result.
+func EOPSource() string { return iers.EOPSource() }
+
+// ResetEOP restores the model to its pristine default state — ZeroModel,
+// not explicit — discarding whatever RegisterModel or a lazy load
+// previously set. Unlike RegisterModel(ZeroModel{}), this does not pin
+// zero EOP: a later EOP query is still free to lazily load real data. Use
+// this to start over; use RegisterModel(ZeroModel{}) to deliberately force
+// zero EOP going forward.
+func ResetEOP() { iers.Reset() }
 
 // Coverage reports the currently-registered model's valid MJD range. ok
 // is false if the model doesn't expose one (e.g. ZeroModel).

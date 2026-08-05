@@ -13,6 +13,32 @@ import (
 const sampleFinals2000AForGateway = `73 1 2 41684.00 I  0.120733 0.009786  0.136966 0.015902  I 0.8084178 0.0002710  0.0000 0.1916  P    -0.766    0.199    -0.720    0.300   .143000   .137000   .8075000   -18.637    -3.667
 73 1 3 41685.00 I  0.118980 0.011039  0.135656 0.013616  I 0.8056163 0.0002710  3.5563 0.1916  P    -0.751    0.199    -0.701    0.300   .141000   .134000   .8044000   -18.636    -3.571  `
 
+// TestEOPSourceGateway proves the public gateway actually reaches
+// time/internal/iers.EOPSource, covering both the pristine default
+// ("zero") and the explicit state RegisterModel sets (see
+// RegisterModel's own doc comment on why that distinction matters) --
+// ResetEOP is what returns to "zero" afterward, not another
+// RegisterModel(ZeroModel{}) call.
+func TestEOPSourceGateway(t *testing.T) {
+	t.Cleanup(atime.ResetEOP)
+
+	if got := atime.EOPSource(); got != "zero" {
+		t.Errorf(`EOPSource() = %q before any RegisterModel call, want "zero"`, got)
+	}
+
+	atime.RegisterModel(atime.ZeroModel{})
+
+	if got := atime.EOPSource(); got != "explicit" {
+		t.Errorf(`EOPSource() = %q after RegisterModel, want "explicit"`, got)
+	}
+
+	atime.ResetEOP()
+
+	if got := atime.EOPSource(); got != "zero" {
+		t.Errorf(`EOPSource() = %q after ResetEOP, want "zero"`, got)
+	}
+}
+
 func TestParseFinals2000AGateway(t *testing.T) {
 	table, err := atime.ParseFinals2000A(strings.NewReader(sampleFinals2000AForGateway))
 	if err != nil {
@@ -32,7 +58,7 @@ func TestParseFinals2000AGateway(t *testing.T) {
 // httptest server below) zero network access.
 func TestEOPLazyLoadFindsPreSeededCacheWithoutConsent(t *testing.T) {
 	t.Cleanup(func() {
-		atime.RegisterModel(atime.ZeroModel{})
+		atime.ResetEOP()
 		remote.Reset()
 	})
 
@@ -87,7 +113,7 @@ func TestEOPLazyLoadFindsPreSeededCacheWithoutConsent(t *testing.T) {
 // FetchIfStale call needed.
 func TestEOPLazyLoadFetchesWithConsent(t *testing.T) {
 	t.Cleanup(func() {
-		atime.RegisterModel(atime.ZeroModel{})
+		atime.ResetEOP()
 		remote.Reset()
 		atime.SetRetryCooldown(5 * atime.Minute)
 	})
@@ -128,7 +154,7 @@ func TestEOPLazyLoadFetchesWithConsent(t *testing.T) {
 // erroring.
 func TestEOPLazyLoadDegradesToZeroWithoutCacheOrConsent(t *testing.T) {
 	t.Cleanup(func() {
-		atime.RegisterModel(atime.ZeroModel{})
+		atime.ResetEOP()
 		remote.Reset()
 	})
 

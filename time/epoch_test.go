@@ -48,7 +48,8 @@ func TestTimeGASTFallsBackToUTCOnUT1Error(t *testing.T) {
 	t.Cleanup(func() { remote.SetDataDir("") })
 
 	atime.RegisterModel(errorEOP{})
-	defer atime.RegisterModel(atime.ZeroModel{})
+
+	defer atime.ResetEOP()
 
 	tm := atime.FromJD(2451545.0, atime.UTC)
 
@@ -69,7 +70,8 @@ func TestTimeEOPDegradesToZeroWithWarning(t *testing.T) {
 	t.Cleanup(func() { remote.SetDataDir("") })
 
 	atime.RegisterModel(errorEOP{})
-	defer atime.RegisterModel(atime.ZeroModel{})
+
+	defer atime.ResetEOP()
 
 	tm := atime.FromJD(2451545.0, atime.UTC)
 
@@ -86,7 +88,8 @@ func TestTimeUTCFromUT1FallsBackOnEOPError(t *testing.T) {
 	t.Cleanup(func() { remote.SetDataDir("") })
 
 	atime.RegisterModel(errorEOP{})
-	defer atime.RegisterModel(atime.ZeroModel{})
+
+	defer atime.ResetEOP()
 
 	// A UT1-scale Time converting to UTC hits dut1OrFallback, which
 	// substitutes DUT1=0 (UT1≈UTC) and logs a one-time warning on lookup
