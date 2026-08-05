@@ -1,6 +1,8 @@
 package plan
 
 import (
+	"errors"
+	"fmt"
 	stdtime "time"
 
 	"testing"
@@ -307,5 +309,194 @@ func TestEpisodeNeverRisesReturnsNilNil(t *testing.T) {
 
 	if rise != nil || set != nil {
 		t.Errorf("expected rise == set == nil for a target that never rises, got rise=%v set=%v", rise, set)
+	}
+}
+
+// ── Error propagation ───────────────────────────────────────────────────
+//
+// errObservable and countingObservable are deliberately declared as plain
+// Observable (not MovingBody): solveVisibility's evalVal only takes the
+// GeocentricVec fast path for a MovingBody target, so wrapping even a
+// *Planet this way forces every call in this file through target.Position
+// -- the exact path isAboveHorizon/searchEvent/DayEvents call directly.
+
+var errAlwaysFails = errors.New("day_episode_test: observable always fails")
+
+// errObservable's Position always fails -- the simplest fixture for
+// proving a Position error is wrapped and propagated, not swallowed.
+type errObservable struct{}
+
+func (errObservable) Name() string { return "ErrTarget" }
+func (errObservable) Position(time.Time) (coord.ICRS, error) {
+	return coord.ICRS{}, errAlwaysFails
+}
+
+func (errObservable) GetDetails(*coord.Context, ...string) (*TargetDetails, error) {
+	return nil, errAlwaysFails
+}
+
+var errCountingObservable = errors.New("day_episode_test: injected Position failure")
+
+// countingObservable wraps a real Observable, delegating Position calls
+// and counting them. If failAfter > 0, the (failAfter+1)th call onward
+// fails instead of delegating -- lets a test let some number of calls
+// succeed with real geometry, then fail deterministically from an exact
+// point onward.
+type countingObservable struct {
+	Observable
+
+	calls     *int
+	failAfter int
+}
+
+func (o countingObservable) Position(t time.Time) (coord.ICRS, error) {
+	*o.calls++
+
+	if o.failAfter > 0 && *o.calls > o.failAfter {
+		return coord.ICRS{}, errCountingObservable
+	}
+
+	pos, err := o.Observable.Position(t)
+	if err != nil {
+		return coord.ICRS{}, fmt.Errorf("countingObservable: %w", err)
+	}
+
+	return pos, nil
+}
+
+func TestDayEventsPropagatesVisibilityError(t *testing.T) {
+	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(40), 0)
+	site, _ := NewSite("Test", loc)
+
+	day := time.FromJD(2451545.0, time.UTC)
+
+	_, _, _, err := DayEvents(day, stdtime.UTC, errObservable{}, site)
+	if !errors.Is(err, errAlwaysFails) {
+		t.Fatalf("expected errAlwaysFails, got %v", err)
+	}
+}
+
+func TestIsAboveHorizonPropagatesPositionError(t *testing.T) {
+	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(40), 0)
+	site, _ := NewSite("Test", loc)
+
+	_, err := isAboveHorizon(errObservable{}, site, time.FromJD(2451545.0, time.UTC))
+	if !errors.Is(err, errAlwaysFails) {
+		t.Fatalf("expected errAlwaysFails, got %v", err)
+	}
+}
+
+func TestSearchEventPropagatesVisibilityError(t *testing.T) {
+	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(40), 0)
+	site, _ := NewSite("Test", loc)
+
+	from := time.FromJD(2451544.5, time.UTC)
+
+	_, err := searchEvent(errObservable{}, site, from, EventRise, true, 5)
+	if !errors.Is(err, errAlwaysFails) {
+		t.Fatalf("expected errAlwaysFails, got %v", err)
+	}
+}
+
+func TestEpisodePropagatesIsAboveHorizonError(t *testing.T) {
+	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(40), 0)
+	site, _ := NewSite("Test", loc)
+
+	from := time.FromJD(2451544.5, time.UTC)
+	to := from.AddDays(1)
+
+	_, _, err := Episode(from, to, errObservable{}, site)
+	if !errors.Is(err, errAlwaysFails) {
+		t.Fatalf("expected errAlwaysFails, got %v", err)
+	}
+}
+
+// TestEpisodeWidensSpanBeyondDefaultWindow covers Episode's widen-past-
+// episodeSearchWindow branch: a caller-supplied [from, to] wider than the
+// default year still works correctly, using its own (wider) span as the
+// search bound rather than silently truncating to episodeSearchWindow.
+func TestEpisodeWidensSpanBeyondDefaultWindow(t *testing.T) {
+	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(40), 0)
+	site, _ := NewSite("Test", loc)
+	sun := NewSun(eph.Default())
+
+	from := time.FromJD(2451544.5, time.UTC)
+	to := from.AddDays(400) // > episodeSearchWindow's 366 days
+
+	if span := to.Sub(from); span <= episodeSearchWindow {
+		t.Fatal("test setup: span must exceed episodeSearchWindow to exercise the widen branch")
+	}
+
+	rise, set, err := Episode(from, to, sun, site)
+	testutil.AssertNoError(t, err)
+
+	if rise == nil || set == nil {
+		t.Fatal("expected both rise and set within a normal day for the Sun")
+	}
+
+	if !rise.Time.Before(set.Time) {
+		t.Errorf("expected rise before set, got rise=%v set=%v", rise.Time, set.Time)
+	}
+}
+
+// TestEpisodeRiseSearchErrorPropagates covers Episode's own error check
+// after its first searchEvent call (the rise search): isAboveHorizon's own
+// single Position call (failAfter=1) succeeds, but every call after that
+// -- all of them inside the rise search's own visibility grid -- fails.
+func TestEpisodeRiseSearchErrorPropagates(t *testing.T) {
+	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(40), 0)
+	site, _ := NewSite("Test", loc)
+	sun := NewSun(eph.Default())
+
+	from := time.FromJD(2451544.5, time.UTC)
+	to := from.AddDays(1)
+
+	calls := 0
+	failing := countingObservable{Observable: sun, calls: &calls, failAfter: 1}
+
+	_, _, err := Episode(from, to, failing, site)
+	if !errors.Is(err, errCountingObservable) {
+		t.Fatalf("expected errCountingObservable, got %v", err)
+	}
+}
+
+// TestEpisodeSetSearchErrorPropagates covers Episode's error check after
+// its SECOND searchEvent call (the set search), which needs the first
+// (rise) search to fully succeed first. Rather than guess how many
+// Position calls a successful isAboveHorizon+rise-search sequence makes,
+// this discovers the exact count by replaying the identical, deterministic
+// sequence Episode itself would make (same target/site/from/maxSpanDays),
+// then replays it again through Episode with failures injected starting
+// exactly one call past that boundary -- the set search's own first call.
+func TestEpisodeSetSearchErrorPropagates(t *testing.T) {
+	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(40), 0)
+	site, _ := NewSite("Test", loc)
+	sun := NewSun(eph.Default())
+
+	from := time.FromJD(2451544.5, time.UTC)
+	maxSpanDays := episodeSearchWindow.Hours() / 24
+
+	calls := 0
+	counting := countingObservable{Observable: sun, calls: &calls}
+
+	up, err := isAboveHorizon(counting, site, from)
+	testutil.AssertNoError(t, err)
+
+	rise, err := searchEvent(counting, site, from, EventRise, !up, maxSpanDays)
+	testutil.AssertNoError(t, err)
+
+	if rise == nil {
+		t.Fatal("test setup: expected to find a rise within the default window")
+	}
+
+	// Replay through Episode with a FRESH call counter, failing every call
+	// past the exact boundary just proven above -- isAboveHorizon and the
+	// rise search reproduce the same successful sequence unchanged, and
+	// the set search's own first Position call is the first to fail.
+	failing := countingObservable{Observable: sun, calls: new(int), failAfter: calls}
+
+	_, _, err = Episode(from, from.AddDays(1), failing, site)
+	if !errors.Is(err, errCountingObservable) {
+		t.Fatalf("expected errCountingObservable, got %v", err)
 	}
 }

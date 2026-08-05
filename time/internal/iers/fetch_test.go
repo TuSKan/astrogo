@@ -172,6 +172,34 @@ func TestEnsureLoadedFastPathSkipsLockWhenAlreadyCovered(t *testing.T) {
 	}
 }
 
+// TestEnsureLoadedSkipsEntirelyWhenModelExplicit covers EnsureLoaded's own
+// fast path added alongside RegisterModel's authoritative contract: once a
+// caller has explicitly registered a model -- even ZeroModel, which covers
+// nothing -- EnsureLoaded must return immediately without touching disk or
+// network at all, for ANY mjd. Proven by granting no download consent and
+// pointing at an empty cache dir: if the fast path didn't fire,
+// EnsureLoaded would fall through to a real fetch attempt and fail with
+// remote.ErrDownloadDenied, not return nil.
+func TestEnsureLoadedSkipsEntirelyWhenModelExplicit(t *testing.T) {
+	t.Cleanup(func() {
+		resetForTest()
+		remote.Reset()
+	})
+
+	remote.SetDataDirPath(t.TempDir())
+	t.Cleanup(func() { remote.SetDataDir("") })
+
+	RegisterModel(ZeroModel{})
+
+	if err := EnsureLoaded(41684); err != nil {
+		t.Fatalf("EnsureLoaded with an explicit model should short-circuit and return nil, got: %v", err)
+	}
+
+	if _, _, ok := Coverage(); ok {
+		t.Error("expected the explicitly-registered ZeroModel to remain untouched, not silently replaced")
+	}
+}
+
 func TestEnsureLoadedRespectsCooldownAcrossMJDs(t *testing.T) {
 	// EnsureLoaded-calling tests earlier in this package's run share the
 	// package-level cooldown state (lastAttempt/errLastFetch) — reset it

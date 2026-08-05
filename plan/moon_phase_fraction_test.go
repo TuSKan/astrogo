@@ -1,6 +1,7 @@
 package plan
 
 import (
+	"errors"
 	"math"
 	"testing"
 
@@ -171,5 +172,55 @@ func TestMoonElongationDistinguishesWaxingFromWaning(t *testing.T) {
 
 	if fracA <= 0.5 {
 		t.Errorf("waning fraction should be > 0.5, got %v", fracA)
+	}
+}
+
+// TestMoonElongationNilProviderDefaultsToDefault verifies MoonElongation's
+// nil-provider guard: a nil eph.Provider produces the exact same result as
+// passing eph.Default() explicitly, not a panic or a distinct code path.
+func TestMoonElongationNilProviderDefaultsToDefault(t *testing.T) {
+	tm := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
+
+	withNil, err := MoonElongation(tm, nil)
+	if err != nil {
+		t.Fatalf("MoonElongation(nil): %v", err)
+	}
+
+	withDefault, err := MoonElongation(tm, eph.Default())
+	if err != nil {
+		t.Fatalf("MoonElongation(eph.Default()): %v", err)
+	}
+
+	if withNil.Degrees() != withDefault.Degrees() {
+		t.Errorf("MoonElongation(nil) = %v, want exactly MoonElongation(eph.Default()) = %v", withNil, withDefault)
+	}
+}
+
+var errMoonPhaseTestProvider = errors.New("moon_phase_fraction_test: provider always fails")
+
+// errStateProvider is an eph.Provider whose State always fails -- the
+// simplest fixture for proving MoonElongation/MoonPhaseFraction wrap and
+// propagate a provider error rather than swallowing it.
+type errStateProvider struct{}
+
+func (errStateProvider) State(eph.ID, time.Time) (eph.State, error) {
+	return eph.State{}, errMoonPhaseTestProvider
+}
+
+func (errStateProvider) Close() error { return nil }
+
+// TestMoonElongationAndMoonPhaseFractionPropagateProviderError covers both
+// functions' error paths: MoonElongation wraps moonElongation's own error,
+// and MoonPhaseFraction (built on MoonElongation) inherits the same
+// failure rather than silently producing a zero fraction.
+func TestMoonElongationAndMoonPhaseFractionPropagateProviderError(t *testing.T) {
+	tm := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
+
+	if _, err := MoonElongation(tm, errStateProvider{}); !errors.Is(err, errMoonPhaseTestProvider) {
+		t.Errorf("MoonElongation: expected errMoonPhaseTestProvider, got %v", err)
+	}
+
+	if _, err := MoonPhaseFraction(tm, errStateProvider{}); !errors.Is(err, errMoonPhaseTestProvider) {
+		t.Errorf("MoonPhaseFraction: expected errMoonPhaseTestProvider, got %v", err)
 	}
 }

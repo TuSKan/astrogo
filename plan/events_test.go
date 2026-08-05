@@ -313,6 +313,94 @@ func TestTwilightEventsEdgeEventsLeftHalfNil(t *testing.T) {
 	}
 }
 
+// TestGroupTwilightEvents exercises groupTwilightEvents directly against
+// hand-built event sequences -- including the back-to-back-dusk (and
+// back-to-back-dawn) case TwilightEvents' own doc comment describes as
+// reachable at high latitude but which real Sun/solver geometry has no
+// convenient, reliably-reproducible fixture for.
+func TestGroupTwilightEvents(t *testing.T) {
+	t0 := time.FromJD(2451544.5, time.UTC)
+	dusk := func(h float64) Event {
+		return Event{Kind: EventSet, Time: t0.Add(time.Duration(h * float64(time.Hour)))}
+	}
+	dawn := func(h float64) Event {
+		return Event{Kind: EventRise, Time: t0.Add(time.Duration(h * float64(time.Hour)))}
+	}
+
+	t.Run("empty input", func(t *testing.T) {
+		got := groupTwilightEvents(nil, AstronomicalTwilight)
+		if len(got) != 0 {
+			t.Errorf("expected no events, got %v", got)
+		}
+	})
+
+	t.Run("single dusk-dawn pair", func(t *testing.T) {
+		got := groupTwilightEvents([]Event{dusk(0), dawn(8)}, AstronomicalTwilight)
+		if len(got) != 1 {
+			t.Fatalf("expected 1 paired event, got %d: %v", len(got), got)
+		}
+
+		if got[0].Dusk == nil || got[0].Dawn == nil {
+			t.Errorf("expected both Dusk and Dawn set, got Dusk=%v Dawn=%v", got[0].Dusk, got[0].Dawn)
+		}
+
+		if got[0].Kind != AstronomicalTwilight {
+			t.Errorf("Kind = %v, want %v", got[0].Kind, AstronomicalTwilight)
+		}
+	})
+
+	t.Run("leading dawn-only (dusk before start)", func(t *testing.T) {
+		got := groupTwilightEvents([]Event{dawn(2)}, AstronomicalTwilight)
+		if len(got) != 1 || got[0].Dawn == nil || got[0].Dusk != nil {
+			t.Fatalf("expected 1 Dawn-only event, got %v", got)
+		}
+	})
+
+	t.Run("trailing dusk-only (dawn after end)", func(t *testing.T) {
+		got := groupTwilightEvents([]Event{dusk(0)}, AstronomicalTwilight)
+		if len(got) != 1 || got[0].Dusk == nil || got[0].Dawn != nil {
+			t.Fatalf("expected 1 Dusk-only event, got %v", got)
+		}
+	})
+
+	// The documented high-latitude edge case: a second dusk arrives with
+	// no intervening dawn. The earlier one must be flushed as its own
+	// Dusk-only result, not silently overwritten or dropped.
+	t.Run("back-to-back dusks flush the earlier one", func(t *testing.T) {
+		got := groupTwilightEvents([]Event{dusk(0), dusk(4), dawn(8)}, AstronomicalTwilight)
+		if len(got) != 2 {
+			t.Fatalf("expected 2 events (flushed dusk-only + paired), got %d: %v", len(got), got)
+		}
+
+		if got[0].Dusk == nil || got[0].Dawn != nil {
+			t.Errorf("first result should be the flushed, Dusk-only earlier dusk: %v", got[0])
+		}
+
+		if !got[0].Dusk.Time.Equal(t0) {
+			t.Errorf("flushed dusk should be the FIRST dusk (t=0h), got t=%v", got[0].Dusk.Time)
+		}
+
+		if got[1].Dusk == nil || got[1].Dawn == nil {
+			t.Errorf("second result should pair the second dusk with the dawn: %v", got[1])
+		}
+	})
+
+	// Symmetric case: two dawns in a row (no dusk between them) -- neither
+	// has a pendingDusk to pair with, so both are independently Dawn-only.
+	t.Run("back-to-back dawns are both independently dawn-only", func(t *testing.T) {
+		got := groupTwilightEvents([]Event{dawn(0), dawn(4)}, AstronomicalTwilight)
+		if len(got) != 2 {
+			t.Fatalf("expected 2 independent Dawn-only events, got %d: %v", len(got), got)
+		}
+
+		for i, ev := range got {
+			if ev.Dawn == nil || ev.Dusk != nil {
+				t.Errorf("event %d: expected Dawn-only, got Dawn=%v Dusk=%v", i, ev.Dawn, ev.Dusk)
+			}
+		}
+	})
+}
+
 func TestTwilight_Sequence(t *testing.T) {
 	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(40), 0)
 	site, _ := NewSite("Test", loc)

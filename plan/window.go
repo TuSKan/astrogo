@@ -6,6 +6,17 @@ import (
 	"github.com/TuSKan/astrogo/time"
 )
 
+// Window represents a contiguous time interval.
+type Window struct {
+	Start time.Time
+	End   time.Time
+}
+
+// Duration returns the duration of the window as a standard time.Duration.
+func (w Window) Duration() time.Duration {
+	return w.End.Sub(w.Start)
+}
+
 // Overlaps reports whether w and o share any instant, including a shared
 // boundary — w.End == o.Start or o.End == w.Start count as overlapping,
 // with zero shared duration. This inclusive convention is what lets Union's

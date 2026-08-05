@@ -889,6 +889,18 @@ func TwilightEvents(start, end time.Time, site *Site, prov eph.Provider, kind Tw
 		return nil, err
 	}
 
+	return groupTwilightEvents(events, kind), nil
+}
+
+// groupTwilightEvents pairs a flat, chronologically-sorted event sequence
+// into TwilightEvents: each dusk (EventSet) is paired with the next dawn
+// (EventRise) that follows it. Extracted from TwilightEvents as its own
+// pure function so the edge cases described on TwilightEvent's and
+// TwilightEvents' doc comments (interval-boundary half-nil results,
+// back-to-back same-kind events) can be tested directly against hand-built
+// event sequences, rather than needing real Sun/solver geometry to
+// reproduce a rare high-latitude pattern.
+func groupTwilightEvents(events []Event, kind TwilightKind) []TwilightEvent {
 	var (
 		twilightEvents []TwilightEvent
 		pendingDusk    *Event // a dusk seen but not yet paired with its dawn
@@ -918,7 +930,7 @@ func TwilightEvents(start, end time.Time, site *Site, prov eph.Provider, kind Tw
 		twilightEvents = append(twilightEvents, TwilightEvent{Kind: kind, Dusk: pendingDusk})
 	}
 
-	return twilightEvents, nil
+	return twilightEvents
 }
 
 // CivilDawnDusk returns the first civil dawn and first civil dusk found in the interval.

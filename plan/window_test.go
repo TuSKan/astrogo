@@ -172,6 +172,17 @@ func TestUnion(t *testing.T) {
 		}
 	})
 
+	t.Run("equal starts sort as a tie, still merge", func(t *testing.T) {
+		// Exercises the sort comparator's equal-Start branch directly
+		// (Overlaps alone can't distinguish "equal starts" from "one
+		// starts after the other" -- the comparator's own tie-break path
+		// only runs when two Starts are truly equal).
+		got := Union([]Window{h(0, 1), h(0, 2)})
+		if !windowsEqual(got, []Window{h(0, 2)}) {
+			t.Errorf("got %v", got)
+		}
+	})
+
 	t.Run("chain of overlaps merges into one", func(t *testing.T) {
 		got := Union([]Window{h(4, 5), h(0, 1), h(1, 2), h(2, 3), h(3, 4)})
 		if !windowsEqual(got, []Window{h(0, 5)}) {

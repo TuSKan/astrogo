@@ -565,17 +565,6 @@ func RankObservables(
 	return scored, nil
 }
 
-// Window represents a contiguous time interval.
-type Window struct {
-	Start time.Time
-	End   time.Time
-}
-
-// Duration returns the duration of the window as a standard time.Duration.
-func (w Window) Duration() time.Duration {
-	return w.End.Sub(w.Start)
-}
-
 // maxObservableStep is the maximum step size allowed for sampled observability
 // searches. Steps larger than this risk silently missing short visibility
 // windows and produce unreliable results.
