@@ -93,6 +93,7 @@ time, angle, vector, unit, constants, remote, optics     ← primitives
   - Opening a pull request needs an explicit instruction — if the user hasn't clearly asked for one, ask before creating it.
   - Merging (a PR, or into `main`) only happens on explicit instruction — never merge on your own initiative.
   - Read-only `git status`/`diff`/`log` are always fine, including on `main`.
+  - A commit fixing a filed issue must use a real GitHub closing keyword (`Closes #NN.`/`Fixes #NN.`) on its own line in the commit body — a bare `(#NN)` in the title (the CHANGELOG citation style) is not a closing keyword and will not auto-close the issue on merge. In a PR body/description referencing multiple issues, repeat the keyword per issue (`Closes #20, closes #21, ...`) — GitHub does not chain one keyword across a comma-separated list.
 - **Named returns are intentional** for astronomical quantities (`ra`, `dec`, `jd`, `az`, `alt`, `dist`); short domain variable names (`r`, `t`, `jd`, `tt`, `ut1`) are idiomatic here. `nonamedreturns`/`varnamelen` are disabled deliberately.
 - **"Magic numbers" are physical constants, coefficients, and NAIF IDs** — `mnd`/`goconst` are off. Do not abstract constants out of published formulas; keep algorithms readable against their reference paper/SOFA routine/Horizons fixture rather than splitting into many helpers.
 - **Errors**: prefer static sentinels wrapped with `%w` over dynamic `fmt.Errorf` strings. No hidden global mutation or `init()` side effects.
