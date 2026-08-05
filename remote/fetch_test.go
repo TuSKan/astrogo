@@ -1,12 +1,15 @@
 package remote
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"io"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -306,6 +309,41 @@ func TestGetFileWithProgressReportsBytesValidatedPath(t *testing.T) {
 
 	if last != int64(len(payload)) {
 		t.Errorf("final downloaded = %d, want %d", last, len(payload))
+	}
+}
+
+func TestGetFileDoesNotLogDownloadingWhenConsentDenied(t *testing.T) {
+	cleanRemoteState(t)
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte("kernel-bytes"))
+	}))
+	defer srv.Close()
+
+	if err := SetURL(NAIFSPK, srv.URL); err != nil {
+		t.Fatal(err)
+	}
+
+	var logBuf bytes.Buffer
+
+	prevOutput := log.Writer()
+	prevFlags := log.Flags()
+
+	log.SetOutput(&logBuf)
+	log.SetFlags(0)
+
+	t.Cleanup(func() {
+		log.SetOutput(prevOutput)
+		log.SetFlags(prevFlags)
+	})
+
+	_, err := GetFile(context.Background(), NAIFSPK, "planets/de442.bsp")
+	if !errors.Is(err, ErrDownloadDenied) {
+		t.Fatalf("expected ErrDownloadDenied, got %v", err)
+	}
+
+	if strings.Contains(logBuf.String(), "remote: downloading") {
+		t.Errorf("logged a \"downloading\" message despite consent being denied:\n%s", logBuf.String())
 	}
 }
 

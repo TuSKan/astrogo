@@ -123,12 +123,6 @@ func GetFile(ctx context.Context, id EndpointID, name string, opts ...ReadOption
 		timeout = DefaultDownloadTimeout
 	}
 
-	if ep.ApproxSize == SizeVaries {
-		log.Printf("remote: downloading %s (endpoint %s, size varies)", cacheFile, id)
-	} else {
-		log.Printf("remote: downloading %s (endpoint %s, approx %d bytes)", cacheFile, id, ep.ApproxSize)
-	}
-
 	if err := fetchInto(ctx, id, name, cacheFile, timeout, cfg.validate, cfg.progress); err != nil {
 		return "", err
 	}
@@ -167,6 +161,12 @@ func fetchInto(ctx context.Context, id EndpointID, path string, dest gofs.File, 
 	ep, _ := Lookup(id)
 	if err := CheckDownload(id, name, ep.ApproxSize); err != nil {
 		return err
+	}
+
+	if ep.ApproxSize == SizeVaries {
+		log.Printf("remote: downloading %s (endpoint %s, size varies)", dest, id)
+	} else {
+		log.Printf("remote: downloading %s (endpoint %s, approx %d bytes)", dest, id, ep.ApproxSize)
 	}
 
 	ctx, cancel := context.WithTimeout(ctx, timeout)
