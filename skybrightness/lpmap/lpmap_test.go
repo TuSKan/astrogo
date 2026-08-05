@@ -4,10 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
+	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/remote"
@@ -173,14 +175,108 @@ func TestWithLayerOverridesDefault(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	c := New(WithAPIKey("test-key"), WithHTTPClient(server.Client()), WithLayer("viirs_2023"))
+	c := New(WithAPIKey("test-key"), WithHTTPClient(server.Client()), WithLayer("viirs_2018"))
 
 	_, err := c.Floor(context.Background(), -23.5505, -46.6333)
 	testutil.AssertNoError(t, err)
 
-	if gotLayer != "viirs_2023" {
-		t.Errorf("layer query param = %q, want %q", gotLayer, "viirs_2023")
+	if gotLayer != "viirs_2018" {
+		t.Errorf("layer query param = %q, want %q", gotLayer, "viirs_2018")
 	}
+}
+
+// TestUnknownLayerReturnsError confirms a layer in neither "ql" family
+// fails closed with ErrUnknownLayer instead of being silently misread as
+// mcd/m² — the exact bug WithLayer("viirs_2018") used to have before
+// layers carried a known unit.
+func TestUnknownLayerReturnsError(t *testing.T) {
+	t.Cleanup(remote.Reset)
+
+	for _, layer := range []string{
+		"",           // empty
+		"wa_2020",    // World Atlas family, but no such layer shape
+		"viirs",      // family prefix with no year
+		"viirs_20xx", // non-numeric year
+		"viirs_202",  // too few digits
+		"sky_2024",   // unrelated family
+	} {
+		c := New(WithAPIKey("test-key"), WithLayer(layer))
+
+		if _, err := c.Floor(context.Background(), -23.5505, -46.6333); !errors.Is(err, ErrUnknownLayer) {
+			t.Errorf("Floor with layer %q: got %v, want ErrUnknownLayer", layer, err)
+		}
+
+		if _, err := c.SQM(context.Background(), -23.5505, -46.6333); !errors.Is(err, ErrUnknownLayer) {
+			t.Errorf("SQM with layer %q: got %v, want ErrUnknownLayer", layer, err)
+		}
+	}
+}
+
+// TestVIIRSFamilyAcceptsAnyYear is a regression test for a real defect: a
+// hardcoded viirs_2013..viirs_2018 whitelist rejected viirs_2019 and later
+// as "unknown", even though the service publishes composites through 2025
+// and gains a year annually. Unit dispatch depends on the FAMILY, not the
+// year, so every well-formed viirs_<year> must be accepted and the server
+// left to judge which years it actually carries.
+func TestVIIRSFamilyAcceptsAnyYear(t *testing.T) {
+	t.Cleanup(remote.Reset)
+
+	for _, layer := range []string{"viirs_2012", "viirs_2019", "viirs_2023", "viirs_2025", "viirs_2031"} {
+		unit, ok := layerUnitFor(layer)
+		if !ok {
+			t.Errorf("layerUnitFor(%q) rejected a well-formed VIIRS layer", layer)
+
+			continue
+		}
+
+		if unit != unitRadiance {
+			t.Errorf("layerUnitFor(%q) = %v, want unitRadiance", layer, unit)
+		}
+	}
+
+	if unit, ok := layerUnitFor("wa_2015"); !ok || unit != unitMcdM2 {
+		t.Errorf(`layerUnitFor("wa_2015") = %v, %v; want unitMcdM2, true`, unit, ok)
+	}
+}
+
+// TestRadianceLayerUnitDispatch confirms a "viirs_*" layer's raw response
+// value is interpreted as radiance (via skybrightness.RadianceToArtificialSB)
+// rather than mcd/m² — the live unit bug this dispatch fixes.
+func TestRadianceLayerUnitDispatch(t *testing.T) {
+	t.Cleanup(remote.Reset)
+
+	const radiance = 5.0
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		if _, err := fmt.Fprintf(w, "-46.6333,-23.5505,%v", radiance); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}))
+	defer server.Close()
+
+	if err := remote.SetURL(remote.LightPollution, server.URL); err != nil {
+		t.Fatal(err)
+	}
+
+	c := New(WithAPIKey("test-key"), WithHTTPClient(server.Client()), WithLayer("viirs_2018"))
+
+	gotFloor, err := c.Floor(context.Background(), -23.5505, -46.6333)
+	testutil.AssertNoError(t, err)
+
+	gotSB, err := gotFloor.Radiance(coord.NewAltAz(angle.Deg(90), angle.Deg(0)), nil)
+	testutil.AssertNoError(t, err)
+
+	wantArtificial := skybrightness.RadianceToArtificialSB(radiance, skybrightness.DefaultRadianceSlope, skybrightness.DefaultRadianceZeroPoint)
+	wantNL := wantArtificial.Nanolamberts()
+
+	testutil.AssertNear(t, "radiance-layer Floor", float64(gotSB), float64(wantNL), 1e-6)
+
+	gotSQM, err := c.SQM(context.Background(), -23.5505, -46.6333)
+	testutil.AssertNoError(t, err)
+
+	wantTotal := skybrightness.DefaultRadianceSlope*math.Log10(radiance) + skybrightness.DefaultRadianceZeroPoint
+	testutil.AssertNear(t, "radiance-layer SQM (total)", float64(gotSQM), wantTotal, 1e-9)
 }
 
 // TestArtificialBrightnessRetriesOnTransientFailure verifies a transient 503
@@ -216,7 +312,7 @@ func TestArtificialBrightnessRetriesOnTransientFailure(t *testing.T) {
 
 	c := New(WithAPIKey("test-key"), WithHTTPClient(server.Client()))
 
-	got, err := c.artificialBrightness(context.Background(), -23.5505, -46.6333)
+	got, err := c.queryRaster(context.Background(), -23.5505, -46.6333)
 	testutil.AssertNoError(t, err)
 	testutil.AssertNear(t, "artificial brightness after retry", got, artMcdM2, 1e-9)
 
@@ -247,7 +343,7 @@ func TestArtificialBrightnessNonRetriableStatus(t *testing.T) {
 
 	c := New(WithAPIKey("test-key"), WithHTTPClient(server.Client()))
 
-	_, err := c.artificialBrightness(context.Background(), -23.5505, -46.6333)
+	_, err := c.queryRaster(context.Background(), -23.5505, -46.6333)
 	if !errors.Is(err, ErrBadResponse) {
 		t.Fatalf("expected ErrBadResponse, got %v", err)
 	}

@@ -85,7 +85,7 @@ The best way to see whether a library's numbers are trustworthy is to point it a
 | [**When Did Jesus Die?**](docs/JESUS.md) | *"The sky keeps receipts."* Three historical dating puzzles — the Star of Bethlehem, the ministry's start, the Crucifixion — resolved with eclipses, conjunctions, and lunar crescent visibility instead of manuscripts. | [`examples/10_jesus_christ/`](examples/10_jesus_christ/) |
 | [**The Great Planet Parade**](docs/PLANET_PARADE.md) | On Feb 28 2025, all seven planets were above the horizon at once from São Paulo. Was that actually visible, and how rare is it? | [`examples/16_planet_parade/`](examples/16_planet_parade/) |
 | [**Equinox & Solstice Almanac**](docs/EQUINOX.md) | A decade of seasons, eclipses, and apsides computed from first principles — no lookup tables, no curve fits, just JPL DE442 and root-finding. | [`examples/17_equinox_prediction/`](examples/17_equinox_prediction/) |
-| **Moonlit Sky Brightness** | How much does a full moon actually degrade your limiting magnitude, and by how many degrees of separation does that recover? | [`examples/18_sky_brightness/`](examples/18_sky_brightness/) |
+| **Moonlit Sky Brightness & Light Pollution** | How much does a full moon actually degrade your limiting magnitude, and by how many degrees of separation does that recover? Then the same light-pollution question put to all three sources side by side — VIIRS 2025, the Falchi et al. 2016 World Atlas, and the lightpollutionmap.info API — across a rural backyard, two megacity cores, and two premier dark-sky observatories. | [`examples/18_sky_brightness/`](examples/18_sky_brightness/) |
 | **Satellite Tracking** | Predict ISS passes over your location from live NORAD/CelestTrak data — AOS, max elevation, LOS, ground track. | [`examples/12_satellite_tracking/`](examples/12_satellite_tracking/) |
 | **What's Visible Tonight** | What can I actually see in the sky tonight brighter than magnitude X — stars, deep-sky objects, planets, the Moon, even asteroids and comets, all in one query? | [`examples/20_whats_visible_tonight/`](examples/20_whats_visible_tonight/) |
 | **Meteor Shower Forecast** | The Perseids peak every August — but how many will a real observer at a real site actually see, hour by hour, once radiant altitude and real sky brightness are accounted for? | [`examples/21_meteor_shower_forecast/`](examples/21_meteor_shower_forecast/) |
@@ -510,8 +510,23 @@ AOS: 19:45:03 UTC  Max El: 73.1°  LOS: 19:51:47 UTC  Duration: 6m44s
   - `ZodiacalLight` — Leinert et al. (1998) Table 17, bilinear interpolation
   - `Airglow` — dark-sky floor (Noll et al. 2012 / Patat 2008)
   - `Floor` — light-pollution baseline from scalar SQM, directional `SQMGrid`, or `FloorFromBortle`
-- `skybrightness/atlas` — offline, pure-Go artificial-brightness atlas providers (Falchi et al. 2016 World Atlas GeoTIFF, VIIRS-DNB)
-- `skybrightness/lpmap` — live client for the lightpollutionmap.info QueryRaster API, with retry/backoff on transient failures
+- `skybrightness/atlas` — pure-Go artificial-brightness atlas providers (Falchi et al. 2016 World Atlas GeoTIFF, VIIRS-DNB), the consent-gated downloaders that fetch them, and **`atlas.FloorAt` / `atlas.Resolver`** — pick a `Layer` and get a `Floor`:
+
+  ```go
+  // LayerAuto (the default) is freshness-first: VIIRS (newest published
+  // year) → World Atlas 2015 → your configured fallbacks, reporting what
+  // it tried in Result.Attempts. Ask for LayerWorldAtlas explicitly when
+  // the propagated model matters more than the last decade of change.
+  result, err := atlas.FloorAt(ctx, site.Location(), atlas.WithBortleClass(4))
+  ```
+
+  | Layer | Source | Needs |
+  |---|---|---|
+  | `LayerWorldAtlas` | Falchi et al. 2016, propagated, highest fidelity (frozen 2015) | ~653 MB download (CC BY-NC 4.0) |
+  | `LayerVIIRS` | VIIRS annual composite, freshest (newest published year, auto-detected), raw-radiance fit — but floors at zero below the satellite's detection limit, so it cannot rank dark sites | ~700 MB–1 GB download, no API key |
+  | `LayerLightPollutionMap` | live lightpollutionmap.info point query (World Atlas 2015 unless the client sets `lpmap.WithLayer`) | manually-issued API key |
+  | `LayerBortle` / `LayerScalar` | fixed estimate | nothing |
+- `skybrightness/lpmap` — live client for the lightpollutionmap.info QueryRaster API, with retry/backoff on transient failures. The API key is issued manually by the site owner (no self-serve signup); the downloaded `atlas` layers need no key at all.
 - `plan.LimitingMagnitudeConstraint` / `ScoreObservableSky` — folds sky-brightness-derived limiting magnitude into observability constraints and scoring
 
 ### Event Solver
@@ -560,6 +575,7 @@ flowchart TD
 
     %% Data Providers
     lpmap["skybrightness/lpmap"]
+    atlas["skybrightness/atlas"]
 
     %% Primitive Foundation
     subgraph Primitives
@@ -597,6 +613,9 @@ flowchart TD
 
     skybrightness --> angle
     lpmap --> skybrightness
+    atlas --> skybrightness
+    atlas --> lpmap
+    atlas --> remote
 
     coord --> atmosphere
     coord --> time
@@ -639,7 +658,8 @@ flowchart TD
 | `fits` | FITS I/O, WCS (TAN projection), mmap, Arrow export | ✅ Stable |
 | `fits/plan` | FITS↔plan bridge (`SiteFromFITS`, `TargetFromFITS`) | ✅ Stable |
 | `plan` | Observability, constraints, events, scheduling, satellite passes | ✅ Stable |
-| `skybrightness`, `skybrightness/atlas` | Sky brightness model (moonlight, zodiacal light, airglow, light-pollution floor) | ✅ Stable |
+| `skybrightness` | Sky brightness model (moonlight, zodiacal light, airglow, light-pollution floor) | ✅ Stable |
+| `skybrightness/atlas` | Light-pollution atlases: GeoTIFF/HDF5 decoders, consent-gated downloads, and the `Layer`/`FloorAt` resolver | ✅ Stable |
 | `skybrightness/lpmap` | Live lightpollutionmap.info client | ✅ Stable |
 | `unit` | Physical unit and quantity system | ✅ Stable |
 
@@ -666,6 +686,8 @@ happens.
 | Planetary satellite SPK (Io, Titan, Triton, ...) | `remote.NAIFSPK` | ~64 MB (Mars) – ~1.1 GB (Jupiter), ~2.4 GB for all 6 kernels | `eph.NewProvider(eph.Moons, "sat441")`, or `plan.VisibleTonight(..., plan.WithPlanetaryMoons())` |
 | IERS Earth-orientation data | `remote.IERSFinals2000A` | ~3.7 MB | automatic on first `Time.EOP()`/`.UTC()`/`.UT1()` query needing it |
 | OpenNGC catalog CSVs | `remote.OpenNGC` | ~2 MB combined | `catalog.NewResolver(catalog.OpenNGC, ...)` |
+| World Atlas 2015 light-pollution GeoTIFF (Falchi et al. 2016) | `remote.WorldAtlas` | ~653 MB zip, ~2.8 GB extracted | `skybrightness/atlas.EnsureWorldAtlas`/`.OpenWorldAtlas` — **CC BY-NC 4.0, non-commercial use only** |
+| VIIRS annual nighttime-lights composite (2012-2025, no API key) | `remote.VIIRSAnnual` | ~700 MB-1 GB per year | `skybrightness/atlas.EnsureVIIRSAnnual`/`.OpenVIIRSAnnual` — CC0, credit lightpollutionmap.info + NASA Black Marble |
 
 For an accuracy/offline tradeoff comparison across `ephemeris.Default()` and the
 JPL kernels above, see the [`ephemeris` package doc](ephemeris/doc.go)'s
@@ -720,7 +742,7 @@ To grant consent for every download-gated endpoint at once instead of enumeratin
 individually, use `remote.EnableAllDownloads` (and its counterpart `DisableAllDownloads`):
 
 ```go
-remote.EnableAllDownloads(200 << 20) // NAIFSPK, NAIFLSK, IERSFinals2000A, OpenNGC, JPLHorizons — all at once
+remote.EnableAllDownloads(200 << 20) // NAIFSPK, NAIFLSK, IERSFinals2000A, OpenNGC, JPLHorizons, WorldAtlas — all at once
 ```
 
 `JPLHorizons` is included even though it's an API endpoint, not a file endpoint — its

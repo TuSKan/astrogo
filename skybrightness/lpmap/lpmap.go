@@ -30,12 +30,72 @@ const apiKeyEnv = "LIGHTPOLLUTIONMAP_KEY"
 // anchored to the natural zenith background naturalLuminanceCdM2 ≡ 22.0 V
 // mag/arcsec² (Falchi et al. 2016).
 const (
-	// naturalLuminanceCdM2 is the natural zenith background, 0.171168465 mcd/m²
-	// ≡ 22.00 V mag/arcsec² (lightpollutionmap.info/help.html).
-	naturalLuminanceCdM2 = 1.71168465e-4
+	// naturalLuminanceCdM2 is skybrightness.NaturalZenithMcdM2 (the single
+	// source for this constant, mcd/m²) converted to cd/m² for this file's
+	// own unit convention.
+	naturalLuminanceCdM2 = skybrightness.NaturalZenithMcdM2 * 1e-3
 	// magLuminanceZeroPoint is the SQM zero-point, 1.08e8 mcd/m².
 	magLuminanceZeroPoint = 1.08e5
 )
+
+// layerUnit is the physical unit a QueryRaster "ql" layer reports its
+// values in — the two documented families are not interchangeable (see
+// WithLayer's doc comment).
+type layerUnit int
+
+const (
+	// unitMcdM2 is World Atlas artificial brightness, mcd/m².
+	unitMcdM2 layerUnit = iota
+	// unitRadiance is raw VIIRS-DNB upward radiance, nW·cm⁻²·sr⁻¹.
+	unitRadiance
+)
+
+// viirsLayerPrefix marks the raw-radiance layer family; the rest of the
+// name is the composite's year.
+const viirsLayerPrefix = "viirs_"
+
+// VIIRSLayer names the raw-radiance annual composite for year, for use
+// with [WithLayer]:
+//
+//	lpmap.New(lpmap.WithLayer(lpmap.VIIRSLayer(2025)))
+//
+// Exists because the default layer is "wa_2015" — World Atlas 2015, the
+// higher-FIDELITY but decade-old source. A caller who wants this client on
+// the freshest data has to say so: nothing here probes upstream for which
+// years exist (that is atlas.NewestVIIRSYear's job, and it costs a network
+// round trip). Naming a year upstream does not carry surfaces as an error
+// from [Client.SQM]/[Client.Floor], never as a silently wrong value.
+func VIIRSLayer(year int) string { return fmt.Sprintf("%s%d", viirsLayerPrefix, year) }
+
+// layerUnitFor reports the physical unit a QueryRaster "ql" layer reports
+// its values in, and whether the layer name is one this client knows how
+// to interpret at all.
+//
+// This deliberately matches the "viirs_<year>" FAMILY by shape rather than
+// enumerating specific years: every VIIRS composite reports radiance
+// whatever its year, so a hardcoded year list would add no safety while
+// silently rejecting each new year upstream publishes (they run 2012
+// through at least 2025 and grow annually). Existence is the server's
+// call — it answers with an error for a year it does not carry. What the
+// client must get right, and all this decides, is the UNIT: reading a
+// radiance value as mcd/m² produces a plausible-looking wrong brightness
+// rather than an obvious failure, which is exactly the bug this replaced.
+func layerUnitFor(layer string) (layerUnit, bool) {
+	if layer == defaultLayer {
+		return unitMcdM2, true
+	}
+
+	year, found := strings.CutPrefix(layer, viirsLayerPrefix)
+	if !found || len(year) != 4 {
+		return 0, false
+	}
+
+	if _, err := strconv.Atoi(year); err != nil {
+		return 0, false
+	}
+
+	return unitRadiance, true
+}
 
 // Sentinel errors.
 var (
@@ -43,13 +103,19 @@ var (
 	ErrNoAPIKey = errors.New("lpmap: no API key (use WithAPIKey or set LIGHTPOLLUTIONMAP_KEY)")
 	// ErrBadResponse is returned when the API response cannot be parsed.
 	ErrBadResponse = errors.New("lpmap: unexpected API response")
+	// ErrUnknownLayer is returned when the configured layer belongs to
+	// neither known "ql" family (see layerUnitFor), so its unit — and
+	// therefore how to interpret its numeric value — isn't known.
+	ErrUnknownLayer = errors.New("lpmap: unknown raster layer")
 )
 
 // Client queries the lightpollutionmap.info QueryRaster service.
 type Client struct {
-	apiKey string
-	layer  string
-	client *remote.Client
+	apiKey            string
+	layer             string
+	radianceSlope     float64
+	radianceZeroPoint float64
+	client            *remote.Client
 }
 
 // Option configures a Client.
@@ -58,8 +124,23 @@ type Option func(*Client)
 // WithAPIKey sets the QueryRaster API key, overriding LIGHTPOLLUTIONMAP_KEY.
 func WithAPIKey(key string) Option { return func(c *Client) { c.apiKey = key } }
 
-// WithLayer overrides the raster layer (default "wa_2015").
+// WithLayer overrides the raster layer (default "wa_2015"). QueryRaster
+// layers span two incompatible units: "wa_2015" (World Atlas, mcd/m²
+// artificial brightness) and "viirs_<year>" (raw VIIRS-DNB radiance,
+// nW·cm⁻²·sr⁻¹) — Client dispatches on the family to interpret its
+// value correctly; a name in neither family returns ErrUnknownLayer from
+// SQM/Floor rather than being silently misread. See WithRadianceCoefficients
+// to override the radiance→brightness fit used for a "viirs_*" layer.
 func WithLayer(layer string) Option { return func(c *Client) { c.layer = layer } }
+
+// WithRadianceCoefficients overrides the log-linear radiance→brightness fit
+// (SB = slope·log₁₀(radiance) + zeroPoint) used for a "viirs_*" layer —
+// e.g. with a VIIRS-DNB-calibrated pair once one is published; see
+// skybrightness.RadianceToArtificialSB for the default coefficients'
+// provenance. Meaningless for the "wa_2015" layer.
+func WithRadianceCoefficients(slope, zeroPoint float64) Option {
+	return func(c *Client) { c.radianceSlope, c.radianceZeroPoint = slope, zeroPoint }
+}
 
 // WithHTTPClient sets a custom HTTP client (transport, proxy, TLS config).
 func WithHTTPClient(h *http.Client) Option { return func(c *Client) { c.client.HTTPClient = h } }
@@ -76,9 +157,11 @@ func New(opts ...Option) *Client {
 	}
 
 	c := &Client{
-		apiKey: os.Getenv(apiKeyEnv),
-		layer:  defaultLayer,
-		client: client,
+		apiKey:            os.Getenv(apiKeyEnv),
+		layer:             defaultLayer,
+		radianceSlope:     skybrightness.DefaultRadianceSlope,
+		radianceZeroPoint: skybrightness.DefaultRadianceZeroPoint,
+		client:            client,
 	}
 
 	for _, opt := range opts {
@@ -89,40 +172,73 @@ func New(opts ...Option) *Client {
 }
 
 // SQM returns the TOTAL zenith sky surface brightness (V mag/arcsec²) at the
-// given geodetic latitude and longitude (degrees), combining the World Atlas
+// given geodetic latitude and longitude (degrees), combining the layer's
 // artificial brightness with the natural background. This is a self-contained
 // answer to "how bright is the sky here" — do not feed it into a
 // skybrightness.CompositeModel alongside Airglow/Zodiacal/Moonlight, since
 // those already add their own natural-background components and would
 // double-count it. Use Floor for the composable, artificial-only value.
 func (c *Client) SQM(ctx context.Context, latDeg, lonDeg float64) (skybrightness.SurfaceBrightnessV, error) {
-	art, err := c.artificialBrightness(ctx, latDeg, lonDeg)
-	if err != nil {
-		return 0, err
-	}
-
-	return artificialToSQM(art), nil
+	total, _, err := c.resolveBrightness(ctx, latDeg, lonDeg)
+	return total, err
 }
 
 // Floor returns a skybrightness.Floor built from the site's resolved
-// ARTIFICIAL-ONLY sky brightness (World Atlas 2015 layer) — consistent with
-// the artificial-only contract skybrightness/atlas's Falchi/VIIRS providers
-// use (see skybrightness/atlas/doc.go), so it composes safely with
+// ARTIFICIAL-ONLY sky brightness — consistent with the artificial-only
+// contract skybrightness/atlas's Falchi/VIIRS providers use (see
+// skybrightness/atlas/doc.go), so it composes safely with
 // Airglow/Zodiacal/Moonlight in a skybrightness.CompositeModel without
 // double-counting the natural background. Use SQM instead for a
 // self-contained total (artificial+natural) brightness value.
 func (c *Client) Floor(ctx context.Context, latDeg, lonDeg float64) (skybrightness.Floor, error) {
-	art, err := c.artificialBrightness(ctx, latDeg, lonDeg)
+	_, artificial, err := c.resolveBrightness(ctx, latDeg, lonDeg)
 	if err != nil {
 		return skybrightness.Floor{}, err
 	}
 
-	return skybrightness.NewFloorSQM(skybrightness.SurfaceBrightnessFromMcdM2(art)), nil
+	return skybrightness.NewFloorSQM(artificial), nil
 }
 
-// artificialBrightness fetches the World Atlas artificial sky brightness
-// (mcd/m²) at the site.
-func (c *Client) artificialBrightness(ctx context.Context, latDeg, lonDeg float64) (float64, error) {
+// resolveBrightness fetches the raw QueryRaster value for the client's
+// configured layer and converts it to both a TOTAL and an ARTIFICIAL-ONLY
+// V-band zenith surface brightness, dispatching on the layer's physical
+// unit (see WithLayer's doc comment): mixing a "viirs_*" layer's raw
+// radiance into the mcd/m² path used to silently produce a
+// plausible-looking wrong number.
+func (c *Client) resolveBrightness(ctx context.Context, latDeg, lonDeg float64) (total, artificial skybrightness.SurfaceBrightnessV, err error) {
+	unit, ok := layerUnitFor(c.layer)
+	if !ok {
+		return 0, 0, fmt.Errorf("%w: %q", ErrUnknownLayer, c.layer)
+	}
+
+	raw, err := c.queryRaster(ctx, latDeg, lonDeg)
+	if err != nil {
+		return 0, 0, err
+	}
+
+	if unit == unitRadiance {
+		if raw <= 0 {
+			inf := skybrightness.SurfaceBrightnessV(math.Inf(1))
+			return inf, inf, nil
+		}
+
+		total = skybrightness.SurfaceBrightnessV(c.radianceSlope*math.Log10(raw) + c.radianceZeroPoint)
+		artificial = skybrightness.RadianceToArtificialSB(raw, c.radianceSlope, c.radianceZeroPoint)
+
+		return total, artificial, nil
+	}
+
+	// unitMcdM2: negative values are clamped to zero (no light) rather
+	// than passed through, which would otherwise send a negative argument
+	// into SurfaceBrightnessFromMcdM2's log10.
+	mcdM2 := max(raw, 0)
+
+	return artificialToSQM(mcdM2), skybrightness.SurfaceBrightnessFromMcdM2(mcdM2), nil
+}
+
+// queryRaster fetches the raw QueryRaster numeric value (unit depends on
+// the configured layer — see WithLayer) at the site.
+func (c *Client) queryRaster(ctx context.Context, latDeg, lonDeg float64) (float64, error) {
 	if c.apiKey == "" {
 		return 0, ErrNoAPIKey
 	}

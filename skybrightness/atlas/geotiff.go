@@ -13,12 +13,32 @@ import (
 )
 
 // ErrUnsupportedTIFF is returned for a TIFF/GeoTIFF feature this minimal reader
-// does not handle (e.g. LZW compression, a horizontal predictor, or a
-// non-float sample format). The wrapped detail says which.
+// does not handle (e.g. BigTIFF, a multi-band image, or a non-float sample
+// format). The wrapped detail says which.
 var ErrUnsupportedTIFF = errors.New("atlas: unsupported TIFF feature")
 
 // ErrBadTIFF is returned when the bytes are not a well-formed classic TIFF.
 var ErrBadTIFF = errors.New("atlas: malformed TIFF")
+
+// TIFF Compression tag (259) values this reader handles. 32946 is the
+// pre-standard deflate code some older writers still emit; it is byte-identical
+// to 8.
+const (
+	compressionNone       = 1
+	compressionLZW        = 5
+	compressionDeflate    = 8
+	compressionOldDeflate = 32946
+)
+
+// TIFF Predictor tag (317) values. Horizontal differencing (2) is defined only
+// for integer samples, so it cannot appear on a file this float-only reader
+// accepts at all; the floating-point predictor (3) is the one that can, and it
+// shuffles each row into per-byte planes before differencing rather than
+// differencing whole samples.
+const (
+	predictorNone  = 1
+	predictorFloat = 3
+)
 
 // TIFF tag numbers used here.
 const (
@@ -133,6 +153,7 @@ type geoTIFF struct {
 	bits          int
 	sampleFormat  int
 	compression   int
+	predictor     int
 
 	tiled                 bool
 	rowsPerStrip          int
@@ -296,12 +317,14 @@ func (t *geoTIFF) configure(f map[uint16]field, override *GeoTransform) error {
 	}
 
 	t.compression = clampPos(first(tagCompression, 1))
-	if t.compression != 1 && t.compression != 8 && t.compression != 32946 {
-		return fmt.Errorf("%w: compression %d (only none/deflate)", ErrUnsupportedTIFF, t.compression)
+	if t.compression != compressionNone && t.compression != compressionLZW &&
+		t.compression != compressionDeflate && t.compression != compressionOldDeflate {
+		return fmt.Errorf("%w: compression %d (only none/LZW/deflate)", ErrUnsupportedTIFF, t.compression)
 	}
 
-	if pred := first(tagPredictor, 1); pred != 1 {
-		return fmt.Errorf("%w: predictor %d (only none)", ErrUnsupportedTIFF, pred)
+	t.predictor = clampPos(first(tagPredictor, predictorNone))
+	if t.predictor != predictorNone && t.predictor != predictorFloat {
+		return fmt.Errorf("%w: predictor %d (only none/floating-point)", ErrUnsupportedTIFF, t.predictor)
 	}
 
 	if err := t.configureLayout(f); err != nil {
@@ -426,11 +449,19 @@ func (t *geoTIFF) decodeBlock(i int) ([]float64, error) {
 		return nil, err
 	}
 
-	if t.compression == 8 || t.compression == 32946 {
+	switch t.compression {
+	case compressionDeflate, compressionOldDeflate:
 		raw, err = inflate(raw)
-		if err != nil {
-			return nil, err
-		}
+	case compressionLZW:
+		raw, err = unlzw(raw)
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	if t.predictor != predictorNone {
+		t.undoPredictor(raw, t.blockRowSamples())
 	}
 
 	samples := t.decodeSamples(raw)
@@ -456,6 +487,210 @@ func (t *geoTIFF) decodeSamples(raw []byte) []float64 {
 	}
 
 	return out
+}
+
+// blockRowSamples is the number of samples in one row of a strip or tile.
+// Constant across blocks: a tile is padded out to its full declared width, and
+// a short final strip is short in ROWS, never in columns.
+func (t *geoTIFF) blockRowSamples() int {
+	if t.tiled {
+		return t.tileWidth
+	}
+
+	return t.width
+}
+
+// LZW code-space constants from TIFF 6.0 §13. Codes 0-255 are literals, so the
+// dictionary proper starts at 258.
+const (
+	lzwClearCode = 256
+	lzwEOICode   = 257
+	lzwFirstCode = 258
+	lzwMaxCode   = 4096
+	lzwMinWidth  = 9
+	lzwMaxWidth  = 12
+)
+
+// unlzw decompresses LZW-compressed strip or tile bytes.
+//
+// This is TIFF's own LZW variant, not the one compress/lzw implements. Both are
+// MSB-first over 8-bit literals, but TIFF (like PDF, unlike GIF) uses the
+// "early change" convention: the code width grows one code SOONER than the
+// textbook algorithm — at 511, 1023, 2047 rather than 512, 1024, 2048. Feeding
+// a real TIFF strip to compress/lzw desyncs the code table within the first few
+// hundred codes; against the real VIIRS 2025 composite it fails outright with
+// "lzw: invalid code", which is how this was caught.
+func unlzw(raw []byte) ([]byte, error) {
+	var (
+		prefix [lzwMaxCode]int32 // -1 for a single-byte root
+		suffix [lzwMaxCode]byte  // last byte of the entry
+		first  [lzwMaxCode]byte  // first byte, cached so KwKwK is O(1)
+		length [lzwMaxCode]int32
+	)
+
+	reset := func() {
+		for i := range int32(256) {
+			prefix[i], suffix[i], first[i], length[i] = -1, byte(i), byte(i), 1
+		}
+	}
+
+	reset()
+
+	var (
+		out    = make([]byte, 0, len(raw)*3)
+		next   = int32(lzwFirstCode)
+		width  = uint(lzwMinWidth)
+		prev   = int32(-1)
+		bitBuf uint32
+		bitCnt uint
+		pos    int
+	)
+
+	// readCode pulls the next width-bit big-endian code, reporting false at
+	// end of input. A strip whose data ends without an explicit EOI is
+	// tolerated — some writers omit it — so this is not itself an error.
+	readCode := func() (uint32, bool) {
+		for bitCnt < width {
+			if pos >= len(raw) {
+				return 0, false
+			}
+
+			bitBuf = bitBuf<<8 | uint32(raw[pos])
+			pos++
+			bitCnt += 8
+		}
+
+		bitCnt -= width
+
+		return (bitBuf >> bitCnt) & (1<<width - 1), true
+	}
+
+	// firstByteOf is first[] behind a bounds check. Every caller passes a
+	// code already validated against next, so the guard is unreachable in
+	// practice; it is here so the indexing is provably in range rather than
+	// in-range-by-argument.
+	firstByteOf := func(code int32) byte {
+		if code < 0 || code >= lzwMaxCode {
+			return 0
+		}
+
+		return first[code]
+	}
+
+	// emit appends code's full expansion, walking the prefix chain backwards
+	// into the space just reserved for it.
+	emit := func(code int32) {
+		n := int(length[code])
+		start := len(out)
+		out = append(out, make([]byte, n)...)
+
+		for i := n - 1; i >= 0; i-- {
+			out[start+i] = suffix[code]
+			code = prefix[code]
+		}
+	}
+
+	add := func(prevCode int32, firstByte byte) {
+		if next >= lzwMaxCode || prevCode < 0 || prevCode >= lzwMaxCode {
+			return
+		}
+
+		prefix[next], suffix[next], first[next] = prevCode, firstByte, firstByteOf(prevCode)
+		length[next] = length[prevCode] + 1
+		next++
+	}
+
+	for {
+		raw, ok := readCode()
+		if !ok {
+			return out, nil
+		}
+
+		// Unreachable while width <= lzwMaxWidth (12 bits caps a code at
+		// 4095), but it is what makes the code provably a valid index into
+		// the dictionary arrays below rather than one by argument.
+		if raw >= lzwMaxCode {
+			return nil, fmt.Errorf("%w: lzw code %d outside the 12-bit code space", ErrBadTIFF, raw)
+		}
+
+		code := int32(raw)
+
+		switch {
+		case code == lzwEOICode:
+			return out, nil
+
+		case code == lzwClearCode:
+			reset()
+
+			next, width, prev = lzwFirstCode, lzwMinWidth, -1
+
+			continue
+
+		case prev < 0: // first code after a clear is always a literal
+			if code >= next {
+				return nil, fmt.Errorf("%w: lzw code %d before any dictionary entry", ErrBadTIFF, code)
+			}
+
+			emit(code)
+
+		case code < next: // in the dictionary
+			emit(code)
+			add(prev, firstByteOf(code))
+
+		case code == next: // the KwKwK case: entry defined by this very code
+			add(prev, firstByteOf(prev))
+			emit(code)
+
+		default:
+			return nil, fmt.Errorf("%w: lzw code %d past dictionary end %d", ErrBadTIFF, code, next)
+		}
+
+		prev = code
+
+		// Early change: grow one code before the width would actually
+		// overflow. This single "-1" is the whole difference from
+		// compress/lzw.
+		if next >= 1<<width-1 && width < lzwMaxWidth {
+			width++
+		}
+	}
+}
+
+// undoPredictor reverses the floating-point predictor (TIFF tag 317 = 3) in
+// place, one row at a time.
+//
+// The encoder splits each row's samples into per-byte planes (all the
+// high-order bytes, then all the second bytes, ...) and horizontally
+// differences the result, which makes the near-constant exponent bytes of a
+// smooth float raster compress far better. Undoing it is therefore two passes:
+// accumulate the differences across the whole row, then de-interleave the byte
+// planes back into consecutive samples.
+//
+// The accumulation stride is one BYTE, not one sample — the differencing runs
+// over the shuffled byte planes, where adjacent bytes are the same byte
+// position of neighbouring samples. (libtiff's fpAcc uses the sample-count
+// stride, which is 1 here because this reader only accepts single-band files;
+// see the SamplesPerPixel check in configure.)
+func (t *geoTIFF) undoPredictor(raw []byte, rowSamples int) {
+	step := t.bits / 8
+	rowBytes := rowSamples * step
+
+	for off := 0; off+rowBytes <= len(raw); off += rowBytes {
+		row := raw[off : off+rowBytes]
+
+		for i := 1; i < len(row); i++ {
+			row[i] += row[i-1]
+		}
+
+		shuffled := make([]byte, rowBytes)
+		copy(shuffled, row)
+
+		for i := range rowSamples {
+			for b := range step {
+				row[i*step+b] = shuffled[b*rowSamples+i]
+			}
+		}
+	}
 }
 
 // inflate decompresses zlib/deflate-compressed strip or tile bytes.

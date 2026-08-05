@@ -178,6 +178,6 @@ func TestNewVIIRSHDF5Provider(t *testing.T) {
 		t.Fatalf("ZenithBrightness: %v", err)
 	}
 
-	want := radianceToArtificialSB(float64(data[1]), viirsSlope, viirsZeroPoint)
+	want := skybrightness.RadianceToArtificialSB(float64(data[1]), viirsSlope, viirsZeroPoint)
 	testutil.AssertNear(t, "VIIRS HDF5 SB", float64(got), float64(want), 1e-4)
 }

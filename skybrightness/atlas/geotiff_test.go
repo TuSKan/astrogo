@@ -23,31 +23,171 @@ type synthTIFF struct {
 	tiled         bool
 	tileW, tileH  int
 	deflate       bool
-	noData        *float64
-	originLon     float64
-	originLat     float64
-	pxSize        float64
+	lzw           bool // mutually exclusive with deflate
+	// floatPredictor emits TIFF predictor 3, applying the same byte-plane
+	// shuffle + differencing a real writer would before compressing.
+	floatPredictor bool
+	noData         *float64
+	originLon      float64
+	originLat      float64
+	pxSize         float64
 }
 
-func maybeDeflate(t *testing.T, raw []byte, on bool) []byte {
+// packBlock applies the configured predictor and compression to one strip or
+// tile, in the order a real TIFF writer does: predict, then compress.
+// rowSamples is the block's row width in samples, which the float predictor
+// needs since it shuffles byte planes per row.
+func packBlock(t *testing.T, raw []byte, s synthTIFF, rowSamples int) []byte {
 	t.Helper()
 
-	if !on {
-		return raw
+	if s.floatPredictor {
+		raw = applyFloatPredictor(raw, rowSamples)
 	}
 
 	var buf bytes.Buffer
 
-	zw := zlib.NewWriter(&buf)
-	if _, err := zw.Write(raw); err != nil {
-		t.Fatalf("zlib write: %v", err)
-	}
+	switch {
+	case s.deflate:
+		zw := zlib.NewWriter(&buf)
+		if _, err := zw.Write(raw); err != nil {
+			t.Fatalf("zlib write: %v", err)
+		}
 
-	if err := zw.Close(); err != nil {
-		t.Fatalf("zlib close: %v", err)
+		if err := zw.Close(); err != nil {
+			t.Fatalf("zlib close: %v", err)
+		}
+	case s.lzw:
+		return tiffLZWEncode(raw)
+	default:
+		return raw
 	}
 
 	return buf.Bytes()
+}
+
+// tiffLZWEncode is a straightforward TIFF 6.0 §13 LZW encoder, written from the
+// spec's own algorithm rather than wrapping compress/lzw.
+//
+// That distinction is the whole point of the fixture. compress/lzw's MSB mode
+// looks like TIFF's variant but does not implement the early code-width change,
+// so a round trip through Go's writer AND Go's reader agrees with itself while
+// disagreeing with every real TIFF file — which is exactly the false green this
+// test existed to give before the real VIIRS composite disproved it. Encoding
+// here from the spec means the round trip pins the decoder against the format,
+// not against a sibling implementation.
+func tiffLZWEncode(raw []byte) []byte {
+	var (
+		out    []byte
+		bitBuf uint32
+		bitCnt uint
+	)
+
+	width := uint(lzwMinWidth)
+
+	put := func(code int32) {
+		bitBuf = bitBuf<<width | uint32(code)
+		bitCnt += width
+
+		for bitCnt >= 8 {
+			bitCnt -= 8
+			out = append(out, byte(bitBuf>>bitCnt))
+		}
+	}
+
+	table := map[string]int32{}
+	next := int32(lzwFirstCode)
+
+	reset := func() {
+		clear(table)
+
+		next, width = lzwFirstCode, lzwMinWidth
+	}
+
+	put(lzwClearCode)
+	reset()
+
+	var omega []byte
+
+	for _, b := range raw {
+		k := append(append([]byte(nil), omega...), b)
+
+		// A single byte is always representable (it is its own literal
+		// code), so only longer strings need a table lookup.
+		if _, ok := table[string(k)]; ok || len(k) == 1 {
+			omega = k
+
+			continue
+		}
+
+		put(codeFor(table, omega))
+
+		if next < lzwMaxCode {
+			table[string(k)] = next
+			next++
+		} else {
+			put(lzwClearCode)
+			reset()
+		}
+
+		// Early change, mirroring the decoder: the encoder must widen one
+		// code before the value would actually need the extra bit.
+		if next >= 1<<width-1 && width < lzwMaxWidth {
+			width++
+		}
+
+		omega = []byte{b}
+	}
+
+	if len(omega) > 0 {
+		put(codeFor(table, omega))
+	}
+
+	put(lzwEOICode)
+
+	if bitCnt > 0 { // flush the final partial byte
+		out = append(out, byte(bitBuf<<(8-bitCnt)))
+	}
+
+	return out
+}
+
+// codeFor resolves a string to its code: single bytes are their own literal
+// code, everything else must already be in the table.
+func codeFor(table map[string]int32, s []byte) int32 {
+	if len(s) == 1 {
+		return int32(s[0])
+	}
+
+	return table[string(s)]
+}
+
+// applyFloatPredictor is the forward TIFF predictor-3 transform — the exact
+// inverse of geoTIFF.undoPredictor, so a round trip through both is what
+// actually pins the byte-plane order and differencing stride.
+func applyFloatPredictor(raw []byte, rowSamples int) []byte {
+	const step = 4 // this fixture is always 32-bit float
+
+	rowBytes := rowSamples * step
+	out := make([]byte, len(raw))
+
+	for off := 0; off+rowBytes <= len(raw); off += rowBytes {
+		row := raw[off : off+rowBytes]
+		shuffled := make([]byte, rowBytes)
+
+		for i := range rowSamples {
+			for b := range step {
+				shuffled[b*rowSamples+i] = row[i*step+b]
+			}
+		}
+
+		for i := len(shuffled) - 1; i > 0; i-- {
+			shuffled[i] -= shuffled[i-1]
+		}
+
+		copy(out[off:off+rowBytes], shuffled)
+	}
+
+	return out
 }
 
 // blocks encodes the pixel data into strip or tile blocks (little-endian
@@ -84,7 +224,7 @@ func (s synthTIFF) blocks(t *testing.T) [][]byte {
 					}
 				}
 
-				out = append(out, maybeDeflate(t, buf, s.deflate))
+				out = append(out, packBlock(t, buf, s, s.tileW))
 			}
 		}
 
@@ -108,7 +248,7 @@ func (s synthTIFF) blocks(t *testing.T) [][]byte {
 			}
 		}
 
-		out = append(out, maybeDeflate(t, buf, s.deflate))
+		out = append(out, packBlock(t, buf, s, s.width))
 	}
 
 	return out
@@ -150,8 +290,17 @@ func (s synthTIFF) build(t *testing.T) []byte {
 	n := len(blocks)
 
 	compression := uint16(1)
-	if s.deflate {
+
+	switch {
+	case s.deflate:
 		compression = 8
+	case s.lzw:
+		compression = 5
+	}
+
+	predictor := uint16(1)
+	if s.floatPredictor {
+		predictor = 3
 	}
 
 	entries := []tentry{
@@ -159,6 +308,7 @@ func (s synthTIFF) build(t *testing.T) []byte {
 		{tag: tagImageLength, typ: typeLong, count: 1, data: u32(uint32(s.height))},
 		{tag: tagBitsPerSample, typ: typeShort, count: 1, data: u16(32)},
 		{tag: tagCompression, typ: typeShort, count: 1, data: u16(compression)},
+		{tag: tagPredictor, typ: typeShort, count: 1, data: u16(predictor)},
 		{tag: tagSamplesPerPixel, typ: typeShort, count: 1, data: u16(1)},
 		{tag: tagSampleFormat, typ: typeShort, count: 1, data: u16(3)},
 		{tag: tagModelPixelScale, typ: typeDouble, count: 3, data: f64s([]float64{s.pxSize, s.pxSize, 0})},
@@ -338,6 +488,66 @@ func TestGeoTIFFDeflate(t *testing.T) {
 		width: 4, height: 3, pixels: rampPixels(4, 3, 5), deflate: true,
 		originLon: -46, originLat: -23, pxSize: 0.25,
 	})
+}
+
+// TestGeoTIFFLZW covers the real VIIRS annual composites, which
+// lightpollutionmap.info publishes as LZW-compressed one-row strips
+// (compression 5, predictor 1) — the layout that made every VIIRS layer fail
+// validation after a ~1 GB download.
+//
+// The round trip is the point: compress/lzw's MSB order has to agree with
+// TIFF's LZW variant on when the code width increases. If it didn't, the code
+// table would desync partway through a strip and the pixels would come back
+// wrong rather than erroring, so a decode-only test against hand-written bytes
+// would not catch it.
+func TestGeoTIFFLZW(t *testing.T) {
+	t.Parallel()
+	readPixelCenters(t, synthTIFF{
+		width: 4, height: 3, pixels: rampPixels(4, 3, 5), lzw: true,
+		originLon: -46, originLat: -23, pxSize: 0.25,
+	})
+}
+
+// TestGeoTIFFLZWMultiStrip exercises LZW across strip boundaries with one row
+// per strip — exactly how the real VIIRS files are written (33 600 strips of
+// 86 400 samples each), where a per-strip decoder-state leak would show up.
+func TestGeoTIFFLZWMultiStrip(t *testing.T) {
+	t.Parallel()
+	readPixelCenters(t, synthTIFF{
+		width: 5, height: 4, pixels: rampPixels(5, 4, 3), lzw: true, rowsPerStrip: 1,
+		originLon: 10, originLat: 50, pxSize: 0.1,
+	})
+}
+
+// TestGeoTIFFFloatPredictor pins the predictor-3 undo pass against the forward
+// transform a real writer applies. No VIIRS year uses it today (they all ship
+// predictor 1), but it is the predictor float rasters actually get written
+// with, so decoding it wrong later would be the same silent-wrong-value trap.
+func TestGeoTIFFFloatPredictor(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		name string
+		fix  synthTIFF
+	}{
+		{"lzw", synthTIFF{
+			width: 6, height: 4, pixels: rampPixels(6, 4, 7), lzw: true, floatPredictor: true,
+			rowsPerStrip: 2, originLon: -3, originLat: 40, pxSize: 0.05,
+		}},
+		{"deflate", synthTIFF{
+			width: 6, height: 4, pixels: rampPixels(6, 4, 7), deflate: true, floatPredictor: true,
+			originLon: -3, originLat: 40, pxSize: 0.05,
+		}},
+		{"tiled", synthTIFF{
+			width: 6, height: 4, pixels: rampPixels(6, 4, 7), lzw: true, floatPredictor: true,
+			tiled: true, tileW: 4, tileH: 2, originLon: -3, originLat: 40, pxSize: 0.05,
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			readPixelCenters(t, tc.fix)
+		})
+	}
 }
 
 // TestGeoTIFFBilinearMidpoint checks interpolation halfway between two pixels.

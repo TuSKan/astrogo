@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -114,6 +115,24 @@ func GetFile(ctx context.Context, id EndpointID, name string, opts ...ReadOption
 		return cacheFile, nil
 	}
 
+	// Hold an exclusive lock across the "still missing? then download"
+	// decision, not just the download itself — otherwise two callers can
+	// both observe the cache-miss above and both proceed to download.
+	// See acquireLock's doc comment for why this must be a cross-process
+	// lock, not merely an in-package mutex.
+	release, _, lockErr := acquireLock(ctx, cacheFile)
+	if lockErr != nil {
+		return "", lockErr
+	}
+
+	defer release()
+
+	// Re-check: whoever held the lock before us may have already filled
+	// this cache entry while we were waiting for it.
+	if cacheFile.Exists() && (!ep.Mutable || unchanged(ctx, id, name, cacheFile)) {
+		return cacheFile, nil
+	}
+
 	timeout := cfg.timeout
 	if timeout == 0 {
 		timeout = ep.DownloadTimeout
@@ -177,6 +196,23 @@ func fetchInto(ctx context.Context, id EndpointID, path string, dest gofs.File, 
 		return fmt.Errorf("remote: new request: %w", err)
 	}
 
+	// Resume a previously interrupted transfer. Only the streaming path
+	// resumes: the validate path buffers the whole body in memory to check
+	// it before anything is trusted, so a partial is useless there.
+	// If-Range makes this safe — the server replies 206 only if the ETag
+	// still matches, and a plain 200 (changed content, or no range
+	// support) transparently restarts the download.
+	var resumeOffset int64
+
+	if validate == nil {
+		if offset, validator := resumePoint(dest); offset > 0 {
+			resumeOffset = offset
+
+			req.Header.Set("Range", fmt.Sprintf("bytes=%d-", offset))
+			req.Header.Set("If-Range", validator)
+		}
+	}
+
 	client, err := NewClientFor(id, WithTimeout(timeout))
 	if err != nil {
 		return err
@@ -189,7 +225,20 @@ func fetchInto(ctx context.Context, id EndpointID, path string, dest gofs.File, 
 
 	defer func() { _ = resp.Body.Close() }()
 
-	if err := CheckDownload(id, name, resp.ContentLength); err != nil {
+	// A 206 carries only the remaining bytes, so the consent check (and
+	// the progress total) must add back what is already on disk — the
+	// gate is about the file's full size, not this leg of it.
+	resumed := resp.StatusCode == http.StatusPartialContent
+	if !resumed {
+		resumeOffset = 0
+	}
+
+	total := resp.ContentLength
+	if total >= 0 {
+		total += resumeOffset
+	}
+
+	if err := CheckDownload(id, name, total); err != nil {
 		return err
 	}
 
@@ -198,9 +247,9 @@ func fetchInto(ctx context.Context, id EndpointID, path string, dest gofs.File, 
 	var bodyReader io.Reader = body
 
 	if progress != nil {
-		total := max(resp.ContentLength, 0)
-
-		bodyReader = &progressReader{r: body, total: total, onProgress: progress}
+		// read starts at resumeOffset so a resumed transfer reports
+		// cumulative progress, not a restart from zero.
+		bodyReader = &progressReader{r: body, total: max(total, 0), read: resumeOffset, onProgress: progress}
 	}
 
 	if validate != nil {
@@ -220,11 +269,39 @@ func fetchInto(ctx context.Context, id EndpointID, path string, dest gofs.File, 
 		return nil
 	}
 
-	if err := Save(bodyReader, dest); err != nil {
+	if err := writePartial(bodyReader, dest, resumed, resp.Header.Get("ETag")); err != nil {
+		return fmt.Errorf("%w: %w", ErrDownloadFailed, err)
+	}
+
+	if err := promotePartial(dest); err != nil {
 		return fmt.Errorf("%w: %w", ErrDownloadFailed, err)
 	}
 
 	return nil
+}
+
+// Exists reports whether endpoint id currently serves the file at name.
+// It issues a HEAD request, which transfers no body and therefore never
+// triggers the download-consent gate — so a caller may use this to
+// discover what is available before deciding whether to ask for consent
+// (see skybrightness/atlas.NewestVIIRSYear, which probes forward for
+// newly-published data years).
+//
+// A 404 is reported as (false, nil): the endpoint answered, the file just
+// is not there. Any other failure — offline mode, a disabled endpoint, a
+// network error, a 5xx — returns a non-nil error, so "missing" is never
+// confused with "could not tell".
+func Exists(ctx context.Context, id EndpointID, name string) (bool, error) {
+	if _, err := probe(ctx, id, name); err != nil {
+		var httpErr *HTTPError
+		if errors.As(err, &httpErr) && httpErr.StatusCode == http.StatusNotFound {
+			return false, nil
+		}
+
+		return false, err
+	}
+
+	return true, nil
 }
 
 // probe issues a HEAD request against endpoint id's URL joined with path

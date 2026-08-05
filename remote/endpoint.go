@@ -76,6 +76,39 @@ const (
 	// plan.NewSiteEarthAddress to resolve a latitude/longitude (from
 	// Nominatim) into a height above sea level.
 	OpenElevation EndpointID = "open-elevation"
+
+	// VIIRSAnnual is lightpollutionmap.info's own unauthenticated mirror of
+	// NASA's VIIRS annual nighttime-lights composites (Black Marble
+	// VNP46A4/VJ146A4, "AllAngle_Composite_Snow_Free" subset), one raw
+	// single-band Float32 GeoTIFF zip per year 2012-2025
+	// (viirs_<year>_raw.zip, base URL
+	// https://www2.lightpollutionmap.info/data/v2/, caller supplies the
+	// year-specific filename — the year varies per call the same way a
+	// NAIFSPK kernel name does). Live-confirmed 2026-08-01: no login/API
+	// key required, unlike NOAA/EOG's own hosting of the same underlying
+	// product, which now requires OAuth2. Source data is CC0 (public
+	// domain; NASA Black Marble). LICENSE NOTE for the mirror itself: per
+	// lightpollutionmap.info/help.html FAQ 14, using VIIRS/Sky Brightness
+	// data from this site "should be credited to 'Jurij Stare,
+	// www.lightpollutionmap.info'" and should "also include 'NASA's Black
+	// Marble nighttime lights product'". Used by
+	// skybrightness/atlas.EnsureVIIRSAnnual/.OpenVIIRSAnnual.
+	VIIRSAnnual EndpointID = "lightpollutionmap.viirs"
+
+	// WorldAtlas is GFZ Data Services' hosting of Falchi et al. 2016's
+	// World Atlas 2015 of artificial night sky brightness (World_Atlas_2015.zip,
+	// ~653 MB, frozen since 2019-11-18 under DOI 10.5880/GFZ.1.4.2016.001),
+	// downloaded on demand by skybrightness/atlas.EnsureWorldAtlas.
+	//
+	// LICENSE: this dataset is CC BY-NC 4.0 (Attribution-NonCommercial) —
+	// https://creativecommons.org/licenses/by-nc/4.0/, confirmed against
+	// GFZ's own catalog record for this DOI. Non-commercial use only;
+	// callers must attribute Falchi, C.C.M., et al. (2016), "The new world
+	// atlas of artificial night sky brightness", Science Advances 2,
+	// e1600377. This notice is deliberately repeated in
+	// EnsureWorldAtlas's own doc comment and in the download consent log
+	// line — not buried here alone.
+	WorldAtlas EndpointID = "gfz.worldatlas"
 )
 
 // Kind distinguishes request/response APIs from bulk file downloads.
@@ -333,6 +366,46 @@ func defaultEndpoints() map[EndpointID]Endpoint {
 			ApproxSize:  2_000,
 			Enabled:     true,
 			Timeout:     30 * time.Second,
+		},
+		VIIRSAnnual: {
+			ID:   VIIRSAnnual,
+			URL:  "https://www2.lightpollutionmap.info/data/v2/",
+			Kind: KindFile,
+			// Subsystem doubles as CacheDir's path token, same convention
+			// as WorldAtlas below — both live under skybrightness/atlas's
+			// cache directory since both feed the same GeoTIFF decoder.
+			Subsystem: "atlas",
+			Description: "NASA VIIRS annual nighttime-lights composites (Black Marble " +
+				"VNP46A4/VJ146A4), mirrored unauthenticated by lightpollutionmap.info, " +
+				"one raw GeoTIFF zip per year 2012-2025. Source data is CC0; the mirror " +
+				"itself asks for credit to \"Jurij Stare, www.lightpollutionmap.info\" " +
+				"plus \"NASA's Black Marble nighttime lights product\" " +
+				"(lightpollutionmap.info/help.html FAQ 14).",
+			ApproxSize:      SizeVaries, // ~700 MB (2012) to ~1 GB (2025), grows over time
+			Enabled:         true,
+			DownloadTimeout: 60 * time.Minute,
+			Mutable:         true, // past years are occasionally reprocessed in place (e.g. the 2025-06 Black Marble v2.0 switch)
+			Downloadable:    true,
+		},
+		WorldAtlas: {
+			ID:   WorldAtlas,
+			URL:  "https://datapub.gfz.de/download/10.5880.GFZ.1.4.2016.001/",
+			Kind: KindFile,
+			// Subsystem doubles as CacheDir's path token (see Endpoint.Subsystem) —
+			// "atlas" for skybrightness/atlas's other offline decoders, not
+			// "skybrightness/atlas" (no path separators allowed there).
+			Subsystem: "atlas",
+			Description: "Falchi et al. 2016 World Atlas 2015 of artificial night sky " +
+				"brightness (GFZ Data Services, DOI 10.5880/GFZ.1.4.2016.001, frozen " +
+				"2019-11-18). LICENSE: CC BY-NC 4.0 (non-commercial), " +
+				"https://creativecommons.org/licenses/by-nc/4.0/ — attribute Falchi " +
+				"et al. (2016), Sci. Adv. 2, e1600377.",
+			ApproxSize:      684_266_450, // World_Atlas_2015.zip, live-confirmed Content-Length
+			Enabled:         true,
+			DownloadTimeout: 60 * time.Minute,
+			Mutable:         false, // DOI-versioned, frozen since 2019-11-18
+			Downloadable:    true,
+			Files:           []string{"World_Atlas_2015.zip"},
 		},
 	}
 }

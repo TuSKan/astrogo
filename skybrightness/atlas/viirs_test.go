@@ -46,7 +46,7 @@ func TestVIIRSArtificialOnly(t *testing.T) {
 	}
 
 	totalMcd := skybrightness.SurfaceBrightnessV(totalSB).McdM2()
-	want := skybrightness.SurfaceBrightnessFromMcdM2(totalMcd - viirsNaturalMcdM2)
+	want := skybrightness.SurfaceBrightnessFromMcdM2(totalMcd - 0.171168465) // natural zenith background ≡ 22.0 mag/arcsec²
 
 	testutil.AssertNear(t, "artificial SB", float64(got), float64(want), 1e-4)
 
@@ -64,7 +64,7 @@ func TestVIIRSMonotonic(t *testing.T) {
 	prev := math.Inf(1)
 
 	for _, rad := range []float64{0.5, 2, 10, 50, 200} {
-		got := float64(radianceToArtificialSB(rad, viirsSlope, viirsZeroPoint))
+		got := float64(skybrightness.RadianceToArtificialSB(rad, viirsSlope, viirsZeroPoint))
 		if got >= prev {
 			t.Errorf("radiance %g gave SB %.3f not brighter than previous %.3f", rad, got, prev)
 		}
@@ -79,14 +79,14 @@ func TestVIIRSMonotonic(t *testing.T) {
 func TestVIIRSNoLight(t *testing.T) {
 	t.Parallel()
 
-	if sb := radianceToArtificialSB(0, viirsSlope, viirsZeroPoint); !math.IsInf(float64(sb), 1) {
+	if sb := skybrightness.RadianceToArtificialSB(0, viirsSlope, viirsZeroPoint); !math.IsInf(float64(sb), 1) {
 		t.Errorf("zero radiance: got %v, want +Inf", float64(sb))
 	}
 
 	// A radiance whose total SB is fainter than the 22.0 natural floor ⇒ no
 	// artificial excess ⇒ +Inf.
 	faint := radianceForTotalSB(23.0)
-	if sb := radianceToArtificialSB(faint, viirsSlope, viirsZeroPoint); !math.IsInf(float64(sb), 1) {
+	if sb := skybrightness.RadianceToArtificialSB(faint, viirsSlope, viirsZeroPoint); !math.IsInf(float64(sb), 1) {
 		t.Errorf("sub-natural radiance: got %v, want +Inf", float64(sb))
 	}
 }

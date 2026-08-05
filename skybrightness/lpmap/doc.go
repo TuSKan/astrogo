@@ -3,17 +3,41 @@
 // i.e. the Falchi et al. 2016 atlas) and converts it to a skybrightness floor.
 //
 // lpmap is a live-API sibling of [github.com/TuSKan/astrogo/skybrightness/atlas]:
-// both resolve the same World Atlas artificial-brightness data for the same
+// both resolve the same kind of artificial-brightness data for the same
 // purpose (a [skybrightness.Floor] input), but atlas decodes a
-// caller-supplied offline file (no API key, no network) while lpmap queries
-// the service live (requires an API key, needs network access). Pick atlas
-// for offline/bundled-data use, lpmap when a live per-request query is
-// preferred over managing a data file.
+// caller-supplied (or, via atlas.EnsureWorldAtlas, automatically
+// downloaded) offline file, while lpmap queries the service live. For most
+// callers atlas is the better default — see
+// [github.com/TuSKan/astrogo/skybrightness/atlas.Resolver] for a resolver
+// that tries atlas first and falls back to lpmap only if configured with a key.
 //
-// The QueryRaster API requires a free API key (https://www.lightpollutionmap.info,
-// 500 requests/day). Supply it via [WithAPIKey] or the LIGHTPOLLUTIONMAP_KEY
-// environment variable. No data is bundled and nothing is fetched unless you
-// call a client method.
+// # Getting an API key
+//
+// There is no self-serve signup. The QueryRaster key is issued manually,
+// one at a time, by emailing the service's owner, Jurij Stare
+// (starej@t-2.net) — see https://www.lightpollutionmap.info/help.html. The
+// free tier is 500 requests/day. Supply the key via [WithAPIKey] or the
+// LIGHTPOLLUTIONMAP_KEY environment variable. No data is bundled and
+// nothing is fetched unless you call a client method.
+//
+// # Layers
+//
+// Two "ql" families exist, reporting different physical quantities:
+// "wa_2015" (World Atlas 2015, mcd/m² artificial brightness — the
+// default) and "viirs_<year>" (raw VIIRS-DNB radiance, nW·cm⁻²·sr⁻¹).
+// [Client] dispatches on the family to interpret the returned number
+// correctly (see [WithLayer]); a name in neither family returns
+// [ErrUnknownLayer].
+//
+// The service publishes no machine-readable list of valid "ql" values —
+// its help page documents the map UI and the bulk GeoTIFF downloads, not
+// the QueryRaster parameters — so this client deliberately does NOT
+// hardcode a year whitelist it cannot verify or keep current. It
+// validates the family (which determines the UNIT, and getting that wrong
+// yields a plausible-looking wrong brightness rather than an error) and
+// lets the server be authoritative on which years it actually carries.
+// For reference, the site's own bulk downloads run 2012 through 2025 and
+// gain a year annually.
 //
 // The 500/day figure is a usage-pattern quota, not a burst rate — the service
 // documents no per-second limit, so there is nothing meaningful for this
