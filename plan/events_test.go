@@ -226,6 +226,93 @@ func TestTwilightEvents(t *testing.T) {
 	}
 }
 
+// TestTwilightEventsGroupsDuskWithFollowingDawn is the regression test for
+// the documented-but-unimplemented grouping contract: over a normal
+// mid-latitude night, TwilightEvents must return exactly ONE fully-paired
+// TwilightEvent (both Dawn and Dusk set), with Dusk before Dawn — not two
+// half-populated results, which is what the pre-fix implementation
+// returned (one per solver event, never both set on the same element).
+func TestTwilightEventsGroupsDuskWithFollowingDawn(t *testing.T) {
+	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(40), 0)
+	site, _ := NewSite("Test", loc)
+	eph := eph.Default()
+
+	// A window starting in daylight and running long enough to see one
+	// full dusk-to-dawn astronomical-twilight span, with margin on both
+	// ends so neither edge is truncated.
+	start := time.FromJD(2451544.5, time.UTC) // local midday-ish
+	end := start.Add(36 * time.Hour)
+
+	events, err := TwilightEvents(start, end, site, eph, AstronomicalTwilight)
+	testutil.AssertNoError(t, err)
+
+	var fullyPaired int
+
+	for _, e := range events {
+		if e.Dawn != nil && e.Dusk != nil {
+			fullyPaired++
+
+			if !e.Dusk.Time.Before(e.Dawn.Time) {
+				t.Errorf("paired event: Dusk (%v) should be before Dawn (%v)", e.Dusk.Time, e.Dawn.Time)
+			}
+
+			testutil.AssertNear(t, "dusk altitude", e.Dusk.GeometricAltitude.Degrees(), TwilightThresholds[AstronomicalTwilight], 0.02)
+			testutil.AssertNear(t, "dawn altitude", e.Dawn.GeometricAltitude.Degrees(), TwilightThresholds[AstronomicalTwilight], 0.02)
+		}
+	}
+
+	if fullyPaired == 0 {
+		t.Fatal("expected at least one fully-paired (Dawn and Dusk both set) TwilightEvent over a 36h mid-latitude window")
+	}
+}
+
+// TestTwilightEventsEdgeEventsLeftHalfNil verifies the documented edge
+// behavior: an event whose partner falls outside [start, end] is still
+// returned, with the missing side nil rather than the whole event dropped
+// or paired with the wrong neighbor. A window that starts and ends
+// mid-twilight (not a clean multiple of a full day) reliably produces
+// this at least one edge.
+func TestTwilightEventsEdgeEventsLeftHalfNil(t *testing.T) {
+	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(40), 0)
+	site, _ := NewSite("Test", loc)
+	eph := eph.Default()
+
+	// First find one real dusk/dawn pair, then shrink the window to start
+	// strictly between them -- guaranteeing the leading result in the
+	// narrowed window is Dawn-only (its dusk fell before the new start).
+	wide := time.FromJD(2451544.5, time.UTC)
+	events, err := TwilightEvents(wide, wide.Add(36*time.Hour), site, eph, AstronomicalTwilight)
+	testutil.AssertNoError(t, err)
+
+	var pair *TwilightEvent
+
+	for i := range events {
+		if events[i].Dawn != nil && events[i].Dusk != nil {
+			pair = &events[i]
+
+			break
+		}
+	}
+
+	if pair == nil {
+		t.Fatal("test setup: expected a fully-paired event in the wide window")
+	}
+
+	mid := pair.Dusk.Time.Add(pair.Dawn.Time.Sub(pair.Dusk.Time) / 2)
+
+	narrowed, err := TwilightEvents(mid, wide.Add(36*time.Hour), site, eph, AstronomicalTwilight)
+	testutil.AssertNoError(t, err)
+
+	if len(narrowed) == 0 {
+		t.Fatal("expected at least one event in the narrowed window")
+	}
+
+	first := narrowed[0]
+	if first.Dusk != nil || first.Dawn == nil {
+		t.Errorf("leading event in a window starting mid-twilight should be Dawn-only (Dusk=nil), got Dawn=%v Dusk=%v", first.Dawn, first.Dusk)
+	}
+}
+
 func TestTwilight_Sequence(t *testing.T) {
 	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(40), 0)
 	site, _ := NewSite("Test", loc)

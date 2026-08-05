@@ -748,8 +748,15 @@ var TwilightThresholds = map[TwilightKind]float64{
 	ApparentTwilight:     -50.0 / 60.0, // -50′
 }
 
-// TwilightEvent groups a dawn and dusk occurrence for a specific twilight level.
-// If an event did not occur within the search interval, the pointer will be nil.
+// TwilightEvent pairs one night's dusk (Sun descending through the
+// threshold) with the Dawn that ends it (Sun ascending back through it) —
+// the twilight/darkness span between them. Either pointer is nil at an
+// interval edge where the paired event fell outside [start, end]: a
+// leading TwilightEvent with only Dawn set (dusk was before start), or a
+// trailing one with only Dusk set (dawn is after end). See TwilightEvents'
+// doc comment for how consecutive same-kind events (a real possibility at
+// high latitude, where the Sun can graze back below a deep threshold
+// without a full cycle) are handled.
 type TwilightEvent struct {
 	Dawn *Event
 	Dusk *Event
@@ -845,7 +852,22 @@ func MoonriseMoonset(start, end time.Time, site *Site, prov eph.Provider) (rise,
 	return rise, set, nil
 }
 
-// TwilightEvents returns grouped dawn/dusk pairs for the given twilight kind and interval.
+// TwilightEvents returns grouped dawn/dusk pairs for the given twilight
+// kind and interval: each result pairs a dusk (EventSet, Sun descending
+// through the threshold) with the chronologically next dawn (EventRise,
+// Sun ascending back through it) — the twilight/darkness span between
+// them, matching how AstronomicalDawnDusk and friends already frame "the
+// night" elsewhere in this package.
+//
+// An event with no partner within [start, end] is still returned, with
+// the missing side left nil rather than dropped: a leading Dawn-only
+// result means its dusk fell before start, a trailing Dusk-only result
+// means its dawn falls after end. Two dusks in a row with no intervening
+// dawn — reachable at high latitude, where the Sun can graze back below a
+// deep threshold (e.g. astronomical, -18°) without completing a full
+// rise — flush the earlier one as its own Dusk-only result rather than
+// silently discarding it; the same happens symmetrically for two dawns in
+// a row.
 func TwilightEvents(start, end time.Time, site *Site, prov eph.Provider, kind TwilightKind) ([]TwilightEvent, error) {
 	threshold, ok := TwilightThresholds[kind]
 	if !ok {
@@ -867,18 +889,33 @@ func TwilightEvents(start, end time.Time, site *Site, prov eph.Provider, kind Tw
 		return nil, err
 	}
 
-	var twilightEvents []TwilightEvent
+	var (
+		twilightEvents []TwilightEvent
+		pendingDusk    *Event // a dusk seen but not yet paired with its dawn
+	)
 
 	for i := range events {
 		e := events[i]
+
 		switch e.Kind { //nolint:exhaustive // only rise/set create twilight pairs
-		case EventRise:
-			ec := e
-			twilightEvents = append(twilightEvents, TwilightEvent{Kind: kind, Dawn: &ec})
-		case EventSet:
-			ec := e
-			twilightEvents = append(twilightEvents, TwilightEvent{Kind: kind, Dusk: &ec})
+		case EventSet: // dusk
+			if pendingDusk != nil {
+				twilightEvents = append(twilightEvents, TwilightEvent{Kind: kind, Dusk: pendingDusk})
+			}
+
+			pendingDusk = &e
+		case EventRise: // dawn
+			if pendingDusk != nil {
+				twilightEvents = append(twilightEvents, TwilightEvent{Kind: kind, Dusk: pendingDusk, Dawn: &e})
+				pendingDusk = nil
+			} else {
+				twilightEvents = append(twilightEvents, TwilightEvent{Kind: kind, Dawn: &e})
+			}
 		}
+	}
+
+	if pendingDusk != nil {
+		twilightEvents = append(twilightEvents, TwilightEvent{Kind: kind, Dusk: pendingDusk})
 	}
 
 	return twilightEvents, nil
