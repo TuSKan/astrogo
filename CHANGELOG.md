@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.0] — 2026-08-05
+
 ### Added
 - `plan.MoonElongation`/`plan.MoonPhaseFraction` — `MoonIllumination`'s illumination fraction and phase angle are both symmetric about full moon, so neither can answer "is tonight's Moon waxing or waning" on its own; `MoonElongation` exports the already-computed, monotonically-increasing ecliptic elongation (0°→360° across a lunation) that answers it, and `MoonPhaseFraction` is the same information as a continuous 0=new/0.5=full/→1=new-again cycle position. Cross-checked against `MoonPhases`' own independently root-found event times (#21).
 - `plan.IsCircumpolar`/`plan.IsNeverUp(dec angle.Angle, site *Site, opts ...CircumpolarOption) bool` — the purely geometric "does this declination ever set (or ever rise) at this site" question, answered by one closed-form pair of altitude evaluations (upper/lower culmination) instead of a numerical search or an indirect empty-`VisibilityEvents`-result inference (which can't tell circumpolar apart from never-rises without a second check of its own). `WithRefraction` includes the standard ~34′ atmospheric refraction correction `Site.SunRiseSetThreshold`/`MoonRiseSetThreshold` already use (off by default, matching `Site.RiseSetThreshold`'s own convention); `WithHorizonAltitude` substitutes a caller-supplied minimum altitude for the site's true horizon (#20).
