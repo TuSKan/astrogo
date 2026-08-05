@@ -115,6 +115,24 @@ func GetFile(ctx context.Context, id EndpointID, name string, opts ...ReadOption
 		return cacheFile, nil
 	}
 
+	// Hold an exclusive lock across the "still missing? then download"
+	// decision, not just the download itself — otherwise two callers can
+	// both observe the cache-miss above and both proceed to download.
+	// See acquireLock's doc comment for why this must be a cross-process
+	// lock, not merely an in-package mutex.
+	release, _, lockErr := acquireLock(ctx, cacheFile)
+	if lockErr != nil {
+		return "", lockErr
+	}
+
+	defer release()
+
+	// Re-check: whoever held the lock before us may have already filled
+	// this cache entry while we were waiting for it.
+	if cacheFile.Exists() && (!ep.Mutable || unchanged(ctx, id, name, cacheFile)) {
+		return cacheFile, nil
+	}
+
 	timeout := cfg.timeout
 	if timeout == 0 {
 		timeout = ep.DownloadTimeout
