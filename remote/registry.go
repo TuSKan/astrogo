@@ -360,6 +360,10 @@ func constName(id EndpointID) string {
 		return "Nominatim"
 	case OpenElevation:
 		return "OpenElevation"
+	case WorldAtlas:
+		return "WorldAtlas"
+	case VIIRSAnnual:
+		return "VIIRSAnnual"
 	default:
 		return string(id)
 	}

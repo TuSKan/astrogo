@@ -219,6 +219,8 @@ func TestDownloadableEndpointsAreExactlyTheExpectedSet(t *testing.T) {
 		NAIFLSK:         true,
 		OpenNGC:         true,
 		JPLHorizons:     true,
+		WorldAtlas:      true,
+		VIIRSAnnual:     true,
 	}
 
 	for _, ep := range Endpoints() {
@@ -251,6 +253,8 @@ func TestConstName(t *testing.T) {
 		OpenNGC:         "OpenNGC",
 		Nominatim:       "Nominatim",
 		OpenElevation:   "OpenElevation",
+		WorldAtlas:      "WorldAtlas",
+		VIIRSAnnual:     "VIIRSAnnual",
 	}
 
 	for id, name := range want {

@@ -1,15 +1,41 @@
 // Package atlas decodes published light-pollution atlases (artificial zenith
 // sky brightness, in mcd/m²) into a geographic
-// [github.com/TuSKan/astrogo/skybrightness.SQMProvider].
+// [github.com/TuSKan/astrogo/skybrightness.SQMProvider], and composes them
+// (plus [github.com/TuSKan/astrogo/skybrightness/lpmap]'s live API and the
+// data-free Bortle/scalar fallbacks) into one easy entry point, [Resolver].
 //
-// It is a pure-Go, no-CGO sibling of the core skybrightness package and is NEVER
-// imported by it (enforced by an import-graph test in the core package). Loaders
-// perform no runtime downloads: the caller supplies the data file as an
-// io.ReaderAt; this file lists the source URLs/DOIs.
+// # Just want a light-pollution floor?
 //
-// See also [github.com/TuSKan/astrogo/skybrightness/lpmap] for a live-API
-// alternative resolving the same World Atlas data with no downloaded file,
-// at the cost of requiring an API key and network access per query.
+//	result, err := atlas.FloorAt(ctx, site.Location(), atlas.WithLayer(atlas.LayerWorldAtlas))
+//
+// Pick a [Layer] and call [FloorAt] — that's the whole surface most
+// callers need. ([NewResolver] + [Resolver.Floor] is the same thing with
+// the atlas file held open across many queries; prefer it when resolving
+// a whole list of sites.) [LayerAuto] (the default) tries the FRESHEST
+// available source automatically — VIIRS (newest published year) before
+// the 2015-frozen World Atlas — and reports what it tried and why an
+// earlier choice didn't answer (see [Result.Attempts]). Freshness is not
+// the same as fidelity: see "Sources and fidelity order" below, and pick
+// [LayerWorldAtlas] explicitly when the propagated model matters more than
+// the decade of lighting change since 2015. A download-backed layer
+// ([LayerWorldAtlas]/[LayerVIIRS]) downloads and extracts its archive
+// automatically on first use (still consent-gated, see below) and logs its
+// own progress by default (see [WithQuiet] to disable it) — no separate
+// download/progress plumbing to wire up.
+//
+// The lower-level pieces are still exported and independently usable:
+// [NewFalchiProvider]/[NewVIIRSProvider]/etc. decode a caller-supplied file
+// with no download at all, and [EnsureWorldAtlas]/[OpenWorldAtlas]/
+// [EnsureVIIRSAnnual]/[OpenVIIRSAnnual] handle exactly one source's
+// download+extract+validate without the multi-layer fallback logic.
+//
+// This is a pure-Go, no-CGO sibling of the core skybrightness package and is
+// NEVER imported by it (enforced by an import-graph test in the core
+// package) — atlas is free to import its own siblings ([Resolver] imports
+// [github.com/TuSKan/astrogo/skybrightness/lpmap] for [LayerLightPollutionMap]),
+// just never the other way around. Every download in this package goes
+// through the same remote-package consent gate every other bulk download in
+// this library uses — nothing here bypasses it.
 //
 // # Quantity and conversion
 //
@@ -31,9 +57,13 @@
 //
 //   - WA — Falchi et al. 2016, "The new world atlas of artificial night sky
 //     brightness", Sci. Adv. 2, e1600377. Data ("World Atlas 2015", ~2.9 GB
-//     Float32 GeoTIFF, 30″, mcd/m²): GFZ DOI 10.5880/GFZ.1.4.2016.001. Default
-//     floor (propagated + downloadable, frozen 2014/15). [NewFalchiProvider]
-//     (windowed) / [LoadFalchiGrid] (clipped tiles).
+//     Float32 GeoTIFF, 30″, mcd/m²): GFZ DOI 10.5880/GFZ.1.4.2016.001,
+//     CC BY-NC 4.0 (non-commercial). The highest-fidelity floor this package can
+//     reach (propagated + downloadable), but frozen at 2014/15 — which is why
+//     [LayerAuto] tries VIIRS first and this second. [NewFalchiProvider] (windowed) / [LoadFalchiGrid]
+//     (clipped tiles) both take a caller-supplied file; [EnsureWorldAtlas] /
+//     [OpenWorldAtlas] additionally handle downloading and extracting the
+//     archive itself, opt-in and consent-gated via remote.WorldAtlas.
 //   - LPA — Lorenz "Light Pollution Atlas 2024", djlorenz.github.io/astronomy/lp/ —
 //     freshest propagated atlas, same units, but not published as a clean
 //     numeric grid today (see [NewLorenzProvider]).
@@ -47,7 +77,11 @@
 //
 // # File formats
 //
-// GeoTIFF is read by a built-in pure-Go windowed reader (see [NewFalchiProvider]).
+// GeoTIFF is read by a built-in pure-Go windowed reader (see [NewFalchiProvider]):
+// classic (non-BigTIFF) single-band 32/64-bit float, striped or tiled,
+// uncompressed / LZW / deflate, with the floating-point predictor. LZW is
+// implemented here rather than via compress/lzw — TIFF's variant widens codes
+// one step earlier, and the stdlib reader rejects real files outright.
 // HDF5 (NASA Black Marble granules) is read via the pure-Go github.com/scigolib/hdf5
 // library (no CGO) through [LoadHDF5Grid] / [NewVIIRSHDF5Provider]; the whole
 // dataset is loaded, so use per-tile granules rather than the global mosaic.

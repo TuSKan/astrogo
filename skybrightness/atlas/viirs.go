@@ -3,42 +3,24 @@ package atlas
 import (
 	"fmt"
 	"io"
-	"math"
 	"sync"
 
 	"github.com/TuSKan/astrogo/skybrightness"
 )
 
-// Sánchez de Miguel et al. (2020), "The nature of the diffuse light near cities
-// detected in nighttime satellite imagery", Sci. Rep. 10, 7829
-// (https://doi.org/10.1038/s41598-020-64673-2), fit a log-linear relation
-// between satellite night-light radiance L (nW·cm⁻²·sr⁻¹) and zenith sky
-// brightness SB (mag/arcsec²):
-//
-//	SB = a·log₁₀(L) + b
-//
-// The paper publishes coefficients for two sensors — DMSP: a=−1.40±0.02,
-// b=20.71±0.01 (R²=1, valid SB>19); ISS HDR: a=−1.71±0.1, b=20.00±0.05 (R²=0.98,
-// valid SB>18.5) — and shows VIIRS-DNB data only graphically (Fig. 9, against
-// comparison lines of the ISS slope). The relation predicts the TOTAL observed
-// zenith SB; this provider subtracts the natural background in linear space to
-// return the ARTIFICIAL-only floor (see [github.com/TuSKan/astrogo/skybrightness],
-// §1.2 double-count warning).
-//
-// TODO(verify): a VIIRS-DNB-specific (a,b). The paper publishes NO DNB
-// coefficient pair, and cautions (Methods) that "as long as only broadband
-// sensors are available, the correspondence between satellite radiance and
-// skyglow will need to be adjusted locally". The defaults below are therefore
-// the ISS pair used as the closest published broadband anchor — NOT a DNB
-// calibration. Override with [WithVIIRSCoefficients] once a DNB-calibrated pair
-// is known. This is exactly why the VIIRS floor is LOWER FIDELITY than the
-// propagated WA/LPA atlases.
+// The radiance→SB conversion (Sánchez de Miguel et al. 2020's log-linear
+// fit) lives in [skybrightness.RadianceToArtificialSB] — shared with
+// [github.com/TuSKan/astrogo/skybrightness/lpmap]'s VIIRS-layer handling,
+// which needs the identical conversion for a live-queried radiance value.
+// See that function's doc for the full provenance/caveats, including the
+// still-unresolved TODO(verify): no VIIRS-DNB-specific (a,b) pair exists in
+// the literature — [DefaultRadianceSlope]/[DefaultRadianceZeroPoint] below
+// are the closest published broadband (ISS-HDR) anchor, not a DNB
+// calibration. This is exactly why the VIIRS floor is LOWER FIDELITY than
+// the propagated WA/LPA atlases.
 const (
-	viirsSlope     = -1.71
-	viirsZeroPoint = 20.00
-	// viirsNaturalMcdM2 is the natural zenith background (mcd/m²) ≡ 22.0
-	// mag/arcsec², subtracted to keep the floor artificial-only.
-	viirsNaturalMcdM2 = 0.171168465
+	viirsSlope     = skybrightness.DefaultRadianceSlope
+	viirsZeroPoint = skybrightness.DefaultRadianceZeroPoint
 )
 
 // viirsConfig holds optional VIIRS-loader settings.
@@ -110,7 +92,7 @@ func (p *viirsProvider) ZenithBrightness(latDeg, lonDeg float64) (skybrightness.
 		return 0, err
 	}
 
-	return radianceToArtificialSB(rad, p.slope, p.zeroPoint), nil
+	return skybrightness.RadianceToArtificialSB(rad, p.slope, p.zeroPoint), nil
 }
 
 // viirsGridProvider applies the VIIRS radiance→SB fit over an in-memory [Grid]
@@ -146,25 +128,5 @@ func (p viirsGridProvider) ZenithBrightness(latDeg, lonDeg float64) (skybrightne
 		return 0, err
 	}
 
-	return radianceToArtificialSB(rad, p.slope, p.zeroPoint), nil
-}
-
-// radianceToArtificialSB converts a VIIRS radiance (nW·cm⁻²·sr⁻¹) to an
-// artificial-only zenith surface brightness. It applies the log-linear fit to
-// get the TOTAL predicted SB, then subtracts the natural background in linear
-// luminance so the result is artificial-only. Non-positive radiance (no
-// detected light) yields an infinitely faint artificial floor.
-func radianceToArtificialSB(radiance, slope, zeroPoint float64) skybrightness.SurfaceBrightnessV {
-	if radiance <= 0 {
-		return skybrightness.SurfaceBrightnessV(math.Inf(1))
-	}
-
-	totalSB := slope*math.Log10(radiance) + zeroPoint
-
-	artificialMcd := skybrightness.SurfaceBrightnessV(totalSB).McdM2() - viirsNaturalMcdM2
-	if artificialMcd <= 0 {
-		return skybrightness.SurfaceBrightnessV(math.Inf(1))
-	}
-
-	return skybrightness.SurfaceBrightnessFromMcdM2(artificialMcd)
+	return skybrightness.RadianceToArtificialSB(rad, p.slope, p.zeroPoint), nil
 }
