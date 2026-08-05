@@ -25,7 +25,7 @@ const sampleFinals2000A = `73 1 2 41684.00 I  0.120733 0.009786  0.136966 0.0159
 
 func TestEnsureLoadedFetchesWhenUncovered(t *testing.T) {
 	t.Cleanup(func() {
-		RegisterModel(ZeroModel{})
+		resetForTest()
 		remote.Reset()
 	})
 
@@ -56,7 +56,7 @@ func TestEnsureLoadedFetchesWhenUncovered(t *testing.T) {
 
 func TestEnsureLoadedSkipsBodyWhenETagUnchanged(t *testing.T) {
 	t.Cleanup(func() {
-		RegisterModel(ZeroModel{})
+		resetForTest()
 		remote.Reset()
 		SetRetryCooldown(5 * time.Minute)
 	})
@@ -117,7 +117,7 @@ func TestEnsureLoadedHTTPError(t *testing.T) {
 	fetchMu.Unlock()
 
 	t.Cleanup(func() {
-		RegisterModel(ZeroModel{})
+		resetForTest()
 		remote.Reset()
 	})
 
@@ -158,14 +158,14 @@ func (nonTableModel) EOP(_ float64) (EOP, error) {
 // the registered model already covers the query, before EnsureLoaded ever
 // touches fetchMu.
 func TestEnsureLoadedFastPathSkipsLockWhenAlreadyCovered(t *testing.T) {
-	t.Cleanup(func() { RegisterModel(ZeroModel{}) })
+	t.Cleanup(resetForTest)
 
 	table, err := ParseFinals2000A(strings.NewReader(sampleFinals2000A))
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	RegisterModel(table)
+	registerModelInternal(table, SourceZero) // prime a starting model without pinning it explicit
 
 	if err := EnsureLoaded(41684); err != nil {
 		t.Errorf("expected nil for an already-covered MJD, got %v", err)
@@ -183,7 +183,7 @@ func TestEnsureLoadedRespectsCooldownAcrossMJDs(t *testing.T) {
 	fetchMu.Unlock()
 
 	t.Cleanup(func() {
-		RegisterModel(ZeroModel{})
+		resetForTest()
 		remote.Reset()
 	})
 
@@ -208,7 +208,7 @@ func TestEnsureLoadedRespectsCooldownAcrossMJDs(t *testing.T) {
 
 	// nonTableModel never reports coverage, so the fast-path check can't
 	// short-circuit the fetch regardless of the requested MJD.
-	RegisterModel(nonTableModel{})
+	registerModelInternal(nonTableModel{}, SourceZero) // prime, not pin — see registerModelInternal
 
 	if err := EnsureLoaded(41684); err != nil {
 		t.Fatalf("EnsureLoaded (cold): %v", err)
@@ -246,7 +246,7 @@ func TestEnsureLoadedFallsThroughOnCorruptPreSeededCache(t *testing.T) {
 	fetchMu.Unlock()
 
 	t.Cleanup(func() {
-		RegisterModel(ZeroModel{})
+		resetForTest()
 		remote.Reset()
 		SetRetryCooldown(5 * time.Minute)
 	})
@@ -340,7 +340,7 @@ func TestEnsureLoadedRejectsCorruptDownload(t *testing.T) {
 	fetchMu.Unlock()
 
 	t.Cleanup(func() {
-		RegisterModel(ZeroModel{})
+		resetForTest()
 		remote.Reset()
 	})
 
@@ -381,9 +381,9 @@ func TestEnsureLoadedRejectsCorruptDownload(t *testing.T) {
 }
 
 func TestCoveredNonTableModel(t *testing.T) {
-	t.Cleanup(func() { RegisterModel(ZeroModel{}) })
+	t.Cleanup(resetForTest)
 
-	RegisterModel(nonTableModel{})
+	registerModelInternal(nonTableModel{}, SourceZero) // prime, not pin — see registerModelInternal
 
 	if covered(41684) {
 		t.Error("covered() must return false for a non-*Table Model")
@@ -397,7 +397,7 @@ func TestCoveredNonTableModel(t *testing.T) {
 // access and no download consent required.
 func TestEnsureLoadedReadsPreSeededCacheWithoutNetwork(t *testing.T) {
 	t.Cleanup(func() {
-		RegisterModel(ZeroModel{})
+		resetForTest()
 		remote.Reset()
 	})
 
@@ -446,7 +446,7 @@ func TestEnsureLoadedReadsPreSeededCacheWithoutNetwork(t *testing.T) {
 // doesn't cause an immediate network fetch attempt.
 func TestEnsureLoadedSeedsCooldownFromCacheMtime(t *testing.T) {
 	t.Cleanup(func() {
-		RegisterModel(ZeroModel{})
+		resetForTest()
 		remote.Reset()
 		SetRetryCooldown(5 * time.Minute)
 	})
@@ -499,7 +499,7 @@ func TestEnsureLoadedSeedsCooldownFromCacheMtime(t *testing.T) {
 
 func TestEnsureLoadedConcurrent(t *testing.T) {
 	t.Cleanup(func() {
-		RegisterModel(ZeroModel{})
+		resetForTest()
 		remote.Reset()
 	})
 
@@ -527,7 +527,7 @@ func TestEnsureLoadedConcurrent(t *testing.T) {
 	remote.SetDataDirPath(t.TempDir())
 	t.Cleanup(func() { remote.SetDataDir("") })
 
-	RegisterModel(nonTableModel{})
+	registerModelInternal(nonTableModel{}, SourceZero) // prime, not pin — see registerModelInternal
 
 	var wg sync.WaitGroup
 
@@ -553,7 +553,7 @@ func TestEnsureLoadedConcurrent(t *testing.T) {
 // be observed at this lower layer.
 func TestFetchContextCancellation(t *testing.T) {
 	t.Cleanup(func() {
-		RegisterModel(ZeroModel{})
+		resetForTest()
 		remote.Reset()
 	})
 
@@ -593,7 +593,7 @@ func TestFetchContextCancellation(t *testing.T) {
 // otherwise make repeat calls no-ops after the first success.
 func TestFetchDoesNotAccumulateCacheFiles(t *testing.T) {
 	t.Cleanup(func() {
-		RegisterModel(ZeroModel{})
+		resetForTest()
 		remote.Reset()
 	})
 
@@ -641,7 +641,7 @@ func TestFetchDoesNotAccumulateCacheFiles(t *testing.T) {
 
 func TestSetRetryCooldown(t *testing.T) {
 	t.Cleanup(func() {
-		RegisterModel(ZeroModel{})
+		resetForTest()
 		remote.Reset()
 		SetRetryCooldown(5 * time.Minute)
 	})
@@ -680,13 +680,13 @@ func TestSetRetryCooldown(t *testing.T) {
 	t.Cleanup(func() { remote.SetDataDir("") })
 
 	SetRetryCooldown(0)
-	RegisterModel(nonTableModel{})
+	registerModelInternal(nonTableModel{}, SourceZero) // prime, not pin — see registerModelInternal
 
 	if err := EnsureLoaded(41684); err != nil {
 		t.Fatalf("first EnsureLoaded: %v", err)
 	}
 
-	RegisterModel(nonTableModel{}) // force a second real attempt (never covers)
+	registerModelInternal(nonTableModel{}, SourceZero) // prime, not pin; forces a second real attempt (never covers)
 
 	if err := EnsureLoaded(99999); err != nil {
 		t.Fatalf("second EnsureLoaded: %v", err)

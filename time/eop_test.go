@@ -32,7 +32,7 @@ func TestParseFinals2000AGateway(t *testing.T) {
 // httptest server below) zero network access.
 func TestEOPLazyLoadFindsPreSeededCacheWithoutConsent(t *testing.T) {
 	t.Cleanup(func() {
-		atime.RegisterModel(atime.ZeroModel{})
+		atime.ResetEOP()
 		remote.Reset()
 	})
 
@@ -87,7 +87,7 @@ func TestEOPLazyLoadFindsPreSeededCacheWithoutConsent(t *testing.T) {
 // FetchIfStale call needed.
 func TestEOPLazyLoadFetchesWithConsent(t *testing.T) {
 	t.Cleanup(func() {
-		atime.RegisterModel(atime.ZeroModel{})
+		atime.ResetEOP()
 		remote.Reset()
 		atime.SetRetryCooldown(5 * atime.Minute)
 	})
@@ -128,7 +128,7 @@ func TestEOPLazyLoadFetchesWithConsent(t *testing.T) {
 // erroring.
 func TestEOPLazyLoadDegradesToZeroWithoutCacheOrConsent(t *testing.T) {
 	t.Cleanup(func() {
-		atime.RegisterModel(atime.ZeroModel{})
+		atime.ResetEOP()
 		remote.Reset()
 	})
 

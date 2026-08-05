@@ -31,7 +31,13 @@ var (
 // elsewhere in this codebase. It never logs; callers (time.lookupEOP)
 // decide whether to warn-and-degrade or propagate the returned error.
 //
-// Order of attempts:
+// Skipped entirely once a caller has called RegisterModel directly (see
+// modelIsExplicit): an explicit choice — including RegisterModel(ZeroModel{})
+// for deterministic zero EOP — is authoritative, not something this lazy
+// loader gets to silently override the moment an uncovered lookup happens
+// to find a finals2000A file sitting in the cache directory.
+//
+// Order of attempts otherwise:
 //  1. Fast path (no lock): the current model already covers mjd.
 //  2. Under fetchMu (re-checked immediately after acquiring it): read and
 //     parse whatever finals2000A file already exists on disk, with no
@@ -50,6 +56,10 @@ var (
 // check is repeated inside the lock so a successful concurrent load is
 // respected immediately.
 func EnsureLoaded(mjd float64) error {
+	if modelIsExplicit() {
+		return nil
+	}
+
 	if covered(mjd) {
 		return nil
 	}
@@ -58,8 +68,9 @@ func EnsureLoaded(mjd float64) error {
 	defer fetchMu.Unlock()
 
 	// Re-check after acquiring the lock — another goroutine may have
-	// loaded successfully while we were waiting.
-	if covered(mjd) {
+	// loaded successfully (or explicitly registered a model) while we
+	// were waiting.
+	if modelIsExplicit() || covered(mjd) {
 		return nil
 	}
 
@@ -70,7 +81,7 @@ func EnsureLoaded(mjd float64) error {
 			}
 
 			if data, rerr := cacheFile.ReadAll(); rerr == nil {
-				if _, perr := parseAndRegister(data); perr == nil && covered(mjd) {
+				if _, perr := parseAndRegister(data, SourceCache); perr == nil && covered(mjd) {
 					return nil
 				}
 			}
@@ -122,14 +133,18 @@ func CacheFile() (gofs.File, error) {
 
 // parseAndRegister parses raw finals2000A bytes and, on success, registers
 // the resulting Table as the global model — the shared core of both a
-// network fetch and a raw on-disk cache read.
-func parseAndRegister(data []byte) (*Table, error) {
+// network fetch and a raw on-disk cache read. Uses registerModelInternal,
+// not RegisterModel: this is the lazy loader's own opportunistic
+// registration, which must never override a caller's explicit choice (see
+// RegisterModel's doc comment). source is SourceCache or SourceNetwork,
+// recorded purely for EOPSource.
+func parseAndRegister(data []byte, source string) (*Table, error) {
 	table, err := ParseFinals2000A(bytes.NewReader(data))
 	if err != nil {
 		return nil, err
 	}
 
-	RegisterModel(table)
+	registerModelInternal(table, source)
 
 	return table, nil
 }
@@ -161,7 +176,7 @@ func fetch(ctx context.Context) error {
 		return fmt.Errorf("iers: read EOP data: %w", err)
 	}
 
-	table, err := parseAndRegister(data)
+	table, err := parseAndRegister(data, SourceNetwork)
 	if err != nil {
 		return fmt.Errorf("iers: parse EOP data: %w", err)
 	}

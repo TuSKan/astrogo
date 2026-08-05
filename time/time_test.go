@@ -219,7 +219,7 @@ func TestTime_UT1(t *testing.T) {
 
 	// Register the mock model
 	iers.RegisterModel(mockEOP{})
-	t.Cleanup(func() { iers.RegisterModel(iers.ZeroModel{}) })
+	t.Cleanup(iers.Reset)
 
 	utc := atime.FromJD(2451545.0, atime.UTC) // J2000 UTC
 
@@ -307,7 +307,7 @@ func TestTime_LocationPropagation(t *testing.T) {
 	// file left by another test/run and silently swap out mockEOP{}.
 	remote.SetDataDirPath(t.TempDir())
 	t.Cleanup(func() { remote.SetDataDir("") })
-	t.Cleanup(func() { iers.RegisterModel(iers.ZeroModel{}) })
+	t.Cleanup(iers.Reset)
 
 	brt := time.FixedZone("BRT", -3*3600)
 	tm := atime.Date(2026, 4, 14, 22, 0, 0, 0, brt)
@@ -413,7 +413,7 @@ func TestConversionRoundTrips(t *testing.T) {
 	// file left by another test/run and silently swap out mockEOP{}.
 	remote.SetDataDirPath(t.TempDir())
 	t.Cleanup(func() { remote.SetDataDir("") })
-	t.Cleanup(func() { iers.RegisterModel(iers.ZeroModel{}) })
+	t.Cleanup(iers.Reset)
 
 	// Full chain: UTC → TAI → TT → TDB → TT → TAI → UTC
 	utc := atime.FromJD(2460000.5, atime.UTC)
@@ -577,7 +577,8 @@ func TestUT1_Error(t *testing.T) {
 
 	// Register a model that always fails
 	iers.RegisterModel(errorEOP{})
-	defer iers.RegisterModel(iers.ZeroModel{}) // restore
+
+	defer iers.Reset() // restore
 
 	utc := atime.FromJD(2451545.0, atime.UTC)
 
@@ -596,7 +597,8 @@ func TestTT_FromAllScales(t *testing.T) {
 	t.Cleanup(func() { remote.SetDataDir("") })
 
 	iers.RegisterModel(mockEOP{})
-	defer iers.RegisterModel(iers.ZeroModel{})
+
+	defer iers.Reset()
 
 	utc := atime.FromJD(2451545.0, atime.UTC)
 	expectedTT := utc.TT()
