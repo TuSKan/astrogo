@@ -366,6 +366,43 @@ func MoonIllumination(t time.Time, prov eph.Provider) (fraction float64, phaseAn
 	return frac, sep, nil
 }
 
+// MoonElongation returns the Moon's ecliptic elongation from the Sun at
+// time t: the Moon's ecliptic longitude minus the Sun's, normalized to
+// [0°, 360°). 0° at new moon, 90° at first quarter, 180° at full moon, 270°
+// at last quarter — monotonically increasing across a full lunation, unlike
+// [MoonIllumination]'s phaseAngle (the Sun–Moon–observer separation, which
+// is symmetric about full and so takes the same value on both the waxing
+// and waning side of a lunation). Use this — or [MoonPhaseFraction] — for
+// "is tonight's Moon waxing or waning", which phaseAngle alone can't answer.
+func MoonElongation(t time.Time, prov eph.Provider) (angle.Angle, error) {
+	if prov == nil {
+		prov = eph.Default()
+	}
+
+	elongDeg, err := moonElongation(t, prov)
+	if err != nil {
+		return 0, err
+	}
+
+	return angle.Deg(elongDeg), nil
+}
+
+// MoonPhaseFraction returns the Moon's position in its current synodic
+// cycle as a continuous fraction: 0.0 at new moon, 0.25 at first quarter,
+// 0.5 at full moon, 0.75 at last quarter, approaching 1.0 as the next new
+// moon nears. Waxing corresponds to [0, 0.5), waning to [0.5, 1) — this one
+// number carries both cycle position and waxing/waning, which is usually
+// what a presentation layer actually wants; MoonElongation is the same
+// information in degrees, for callers who want it in that form instead.
+func MoonPhaseFraction(t time.Time, prov eph.Provider) (float64, error) {
+	elong, err := MoonElongation(t, prov)
+	if err != nil {
+		return 0, err
+	}
+
+	return elong.Degrees() / 360.0, nil
+}
+
 // ── Earth's Apsides ─────────────────────────────────────────────────────────
 
 // Apsis identifies an orbital apsis event.
