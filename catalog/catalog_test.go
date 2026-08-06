@@ -427,6 +427,51 @@ func TestMergeGroup_VMagPrecedence(t *testing.T) {
 	}
 }
 
+// TestMergeGroup_RadialVelocityZeroSurvivesMerge regression-tests the
+// HasRadialVelocity fix: RadialVelocity == 0 is physically legitimate (a
+// star moving neither toward nor away), so the merge must not treat it the
+// same as "no RV on file" the way a bare `RadialVelocity != 0` presence
+// check would.
+func TestMergeGroup_RadialVelocityZeroSurvivesMerge(t *testing.T) {
+	g := group{candidates: []candidate{
+		{provider: "simbad", target: Target{RadialVelocity: 0, HasRadialVelocity: true}},
+	}}
+
+	got := mergeGroup(g)
+
+	if !got.HasRadialVelocity {
+		t.Error("expected HasRadialVelocity=true to survive the merge for a genuine zero RV")
+	}
+
+	if got.RadialVelocity != 0 {
+		t.Errorf("expected RadialVelocity=0, got %v", got.RadialVelocity)
+	}
+
+	if got.Provenance["RadialVelocity"] != "simbad" {
+		t.Errorf("expected provenance simbad, got %v", got.Provenance["RadialVelocity"])
+	}
+}
+
+// TestMergeGroup_RadialVelocityUnsetIsDropped confirms the inverse: a
+// candidate with no RV on file at all (HasRadialVelocity=false) does not
+// contribute a value, so a differently-sourced field on the same merged
+// Target doesn't spuriously pick up a stray 0.
+func TestMergeGroup_RadialVelocityUnsetIsDropped(t *testing.T) {
+	g := group{candidates: []candidate{
+		{provider: "simbad", target: Target{RadialVelocity: 0, HasRadialVelocity: false, VMag: 5.0, HasVMag: true}},
+	}}
+
+	got := mergeGroup(g)
+
+	if got.HasRadialVelocity {
+		t.Error("expected HasRadialVelocity=false to survive the merge when no provider set it")
+	}
+
+	if _, ok := got.Provenance["RadialVelocity"]; ok {
+		t.Error("expected no RadialVelocity provenance entry when no candidate had HasRadialVelocity=true")
+	}
+}
+
 // ── Cross-match integration tests (via Resolver.Resolve/Search) ────────────
 
 // TestResolver_CrossMatchByAlias confirms two providers sharing the same ID

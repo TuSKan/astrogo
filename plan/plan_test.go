@@ -313,6 +313,43 @@ func TestRankObservables(t *testing.T) {
 	})
 }
 
+// TestPlannerRankObservable is a regression test for Planner.RankObservable
+// (the peak-altitude-within-a-window method, distinct from the
+// package-level RankObservables function TestRankObservables already
+// covers): before the fix it returned ErrNotCoordObject for every real
+// Observable in this package -- none of Star/Planet/Asteroid/... implement
+// coord.Object directly, only Observable.Position -- so this method was
+// unreachable dead code with zero production callers. A plain *Star must
+// now rank successfully.
+func TestPlannerRankObservable(t *testing.T) {
+	loc, _ := coord.NewGeodetic(angle.Zero(), angle.Deg(45), 0)
+	site, _ := NewSite("Test", loc)
+
+	p, err := NewPlanner(site, nil)
+	testutil.AssertNoError(t, err)
+
+	start := time.FromJD(2451545.0, time.UTC)
+	end := start.AddDays(1)
+
+	objs := []Observable{
+		NewStar("High", angle.Hour(12), angle.Deg(80)),
+		NewStar("Low", angle.Hour(12), angle.Deg(-80)),
+	}
+
+	ranked, err := p.RankObservable(objs, start, end)
+	if err != nil {
+		if errors.Is(err, ErrNotCoordObject) {
+			t.Fatal("RankObservable should never return ErrNotCoordObject for a plain Observable")
+		}
+
+		t.Fatalf("RankObservable: %v", err)
+	}
+
+	if len(ranked) != 2 {
+		t.Fatalf("expected 2 ranked objects (no constraints, so both pass), got %d", len(ranked))
+	}
+}
+
 func TestObservableWindows_StepTooLarge(t *testing.T) {
 	loc, _ := coord.NewGeodetic(angle.Zero(), angle.Zero(), 0)
 	site, _ := NewSite("Test", loc)

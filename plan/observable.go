@@ -51,6 +51,16 @@ type MeasuredRadialVelocity interface {
 	MeasuredRadialVelocity() (kmPerSec float64, ok bool)
 }
 
+// PhysicalRadius is implemented by targets with a known or estimated
+// physical radius that isn't one of the fixed Sun/Moon/planets set
+// BodyEquatorialRadius covers — currently *Asteroid, via WithDiameter
+// (measured) or WithAlbedo (H+albedo estimate). AngularDiameter uses this
+// as its fallback when BodyEquatorialRadius has no entry for the target's
+// EphID. ok is false when neither option was ever set.
+type PhysicalRadius interface {
+	PhysicalRadius() (metres float64, ok bool)
+}
+
 // Compile-time assertions that every concrete target type implements the
 // interfaces it's documented (README/CHANGELOG) to implement. Interface
 // satisfaction in Go is structural and silent — a method signature drift
@@ -88,4 +98,6 @@ var (
 	_ StaticMagnitude = (*Satellite)(nil)
 
 	_ MeasuredRadialVelocity = (*Star)(nil)
+
+	_ PhysicalRadius = (*Asteroid)(nil)
 )

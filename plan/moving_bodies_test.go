@@ -108,6 +108,65 @@ func TestAsteroid_HG_OppositionMagnitude(t *testing.T) {
 	}
 }
 
+// TestAsteroid_PhysicalRadius covers the three PhysicalRadius states:
+// neither WithDiameter nor WithAlbedo set (ok=false), WithAlbedo-only (the
+// H+albedo estimate), and both set (WithDiameter, the real measurement,
+// wins). Reference numbers are 433 Eros's real, live-verified SBDB
+// phys_par values (H=10.40, diameter=16.84 km, albedo=0.25) -- the
+// estimate formula doesn't reproduce Eros's real (markedly non-spherical,
+// 34.4x11.2x11.2 km) diameter exactly, so the assertion is a loose
+// same-order-of-magnitude bound, not an exact match.
+func TestAsteroid_PhysicalRadius(t *testing.T) {
+	prov := newOppositionProvider(2000433)
+
+	t.Run("neither set", func(t *testing.T) {
+		a := NewAsteroid("Eros", 2000433, prov, WithHG(10.40, 0.46))
+
+		if _, ok := a.PhysicalRadius(); ok {
+			t.Error("expected ok=false with neither WithDiameter nor WithAlbedo set")
+		}
+	})
+
+	t.Run("albedo-only estimate", func(t *testing.T) {
+		a := NewAsteroid("Eros", 2000433, prov, WithHG(10.40, 0.46), WithAlbedo(0.25))
+
+		gotM, ok := a.PhysicalRadius()
+		if !ok {
+			t.Fatal("expected ok=true with WithAlbedo set")
+		}
+
+		wantDiameterKm := 1329 / math.Sqrt(0.25) * math.Pow(10, -0.2*10.40)
+		wantM := wantDiameterKm * 1000 / 2
+
+		if math.Abs(gotM-wantM) > 1 {
+			t.Errorf("PhysicalRadius = %.1f m, want %.1f m (H+albedo estimate)", gotM, wantM)
+		}
+
+		// Loose sanity bound against Eros's real ~16.84 km mean diameter
+		// (8.42 km mean radius) -- the estimate assumes a sphere, Eros is
+		// markedly elongated, so this is order-of-magnitude, not exact.
+		if gotM < 4000 || gotM > 15000 {
+			t.Errorf("PhysicalRadius = %.0f m is not in the right ballpark for Eros (~8420 m real mean radius)", gotM)
+		}
+	})
+
+	t.Run("measured diameter wins over albedo estimate", func(t *testing.T) {
+		const measuredDiameterKm = 16.84 // real SBDB value
+
+		a := NewAsteroid("Eros", 2000433, prov, WithHG(10.40, 0.46), WithAlbedo(0.25), WithDiameter(measuredDiameterKm))
+
+		gotM, ok := a.PhysicalRadius()
+		if !ok {
+			t.Fatal("expected ok=true with WithDiameter set")
+		}
+
+		wantM := measuredDiameterKm * 1000 / 2
+		if gotM != wantM {
+			t.Errorf("PhysicalRadius = %.1f m, want exactly %.1f m (measured diameter, not the albedo estimate)", gotM, wantM)
+		}
+	})
+}
+
 func TestAsteroid_HG1G2AndSHG1G2(t *testing.T) {
 	const asteroidID eph.ID = 2000002
 

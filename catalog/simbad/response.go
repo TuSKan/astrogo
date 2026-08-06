@@ -131,6 +131,7 @@ func ParseCSV(r io.Reader) ([]resolve.Target, error) {
 			if rvStr, ok := colIdx["rvz_radvel"]; ok && row[rvStr] != "" {
 				if v, err := strconv.ParseFloat(row[rvStr], 64); err == nil {
 					t.RadialVelocity = v
+					t.HasRadialVelocity = true
 				}
 			}
 			// V-band magnitude from allfluxes table. The column name is
@@ -262,6 +263,7 @@ func ParseBrightCSV(r io.Reader) ([]resolve.Target, error) {
 			if rvStr, ok := colIdx["rvz_radvel"]; ok && row[rvStr] != "" {
 				if v, err := strconv.ParseFloat(row[rvStr], 64); err == nil {
 					t.RadialVelocity = v
+					t.HasRadialVelocity = true
 				}
 			}
 		}

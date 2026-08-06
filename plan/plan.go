@@ -4,14 +4,12 @@ import (
 	"container/list"
 	"fmt"
 	"math"
-	"runtime"
 	"sort"
 	"sync"
 
-	"golang.org/x/sync/errgroup"
-
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
+	"github.com/TuSKan/astrogo/internal/parallel"
 
 	"github.com/TuSKan/astrogo/time"
 )
@@ -43,38 +41,17 @@ func (p *Planner) Observable(obj Observable, t time.Time) (bool, error) {
 // FilterObservable returns the subset of objects that satisfy all constraints
 // at the given time. Objects are evaluated concurrently.
 func (p *Planner) FilterObservable(objects []Observable, t time.Time) ([]Observable, error) {
-	type indexedResult struct {
-		idx int
-		ok  bool
-	}
-
-	results := make([]indexedResult, len(objects))
-
-	g := new(errgroup.Group)
-	g.SetLimit(runtime.GOMAXPROCS(0))
-
-	for i, obj := range objects {
-		g.Go(func() error {
-			ok, err := p.Observable(obj, t)
-			if err != nil {
-				return err
-			}
-
-			results[i] = indexedResult{idx: i, ok: ok}
-
-			return nil
-		})
-	}
-
-	err := g.Wait()
+	results, err := parallel.Map(objects, 0, func(_ int, obj Observable) (bool, error) {
+		return p.Observable(obj, t)
+	})
 	if err != nil {
 		return nil, fmt.Errorf("plan: filter visibility: %w", err)
 	}
 
 	var filtered []Observable
 
-	for i, r := range results {
-		if r.ok {
+	for i, ok := range results {
+		if ok {
 			filtered = append(filtered, objects[i])
 		}
 	}
@@ -92,44 +69,38 @@ type RankedObject struct {
 // time window. Only objects that satisfy constraints at least once in the
 // window are included. Objects are evaluated concurrently.
 func (p *Planner) RankObservable(objects []Observable, start, end time.Time) ([]RankedObject, error) {
-	type indexedResult struct {
+	type scored struct {
 		obj   Observable
 		score float64
 		ok    bool
 	}
 
-	results := make([]indexedResult, len(objects))
+	results, err := parallel.Map(objects, 0, func(_ int, obj Observable) (scored, error) {
+		// TransitEstimate only needs coord.Object's ICRS(t) — prefer a
+		// native implementation if obj happens to have one, otherwise
+		// wrap it via observableObject, which forwards to Observable's own
+		// Position(t). No concrete Observable in this package (Star,
+		// Planet, Asteroid, Satellite, ...) implements coord.Object
+		// directly, so this wrap is what makes RankObservable actually
+		// work for any of them, not just a hypothetical caller-supplied
+		// type that happens to implement both interfaces.
+		skyObj, ok := obj.(coord.Object)
+		if !ok {
+			skyObj = observableObject{obj}
+		}
 
-	g := new(errgroup.Group)
-	g.SetLimit(runtime.GOMAXPROCS(0))
+		transitTime, peakAlt, err := TransitEstimate(skyObj, p.Site, start, end)
+		if err != nil {
+			return scored{}, err
+		}
 
-	for i, obj := range objects {
-		g.Go(func() error {
-			// TransitEstimate expects coord.Object for now.
-			skyObj, ok := obj.(coord.Object)
-			if !ok {
-				return fmt.Errorf("%w: %T", ErrNotCoordObject, obj)
-			}
+		observable, err := p.Observable(obj, transitTime)
+		if err != nil {
+			return scored{}, err
+		}
 
-			transitTime, peakAlt, err := TransitEstimate(skyObj, p.Site, start, end)
-			if err != nil {
-				return err
-			}
-
-			observable, err := p.Observable(obj, transitTime)
-			if err != nil {
-				return err
-			}
-
-			if observable {
-				results[i] = indexedResult{obj: obj, score: peakAlt.Degrees(), ok: true}
-			}
-
-			return nil
-		})
-	}
-
-	err := g.Wait()
+		return scored{obj: obj, score: peakAlt.Degrees(), ok: observable}, nil
+	})
 	if err != nil {
 		return nil, fmt.Errorf("plan: rank: %w", err)
 	}
@@ -519,29 +490,9 @@ func RankObservables(
 	site *Site,
 	constraints ...Constraint,
 ) ([]ScoredTarget, error) {
-	type indexedScore struct {
-		score float64
-	}
-
-	scores := make([]indexedScore, len(objs))
-
-	g := new(errgroup.Group)
-	g.SetLimit(runtime.GOMAXPROCS(0))
-
-	for i, obj := range objs {
-		g.Go(func() error {
-			s, err := ScoreObservable(obj, t, site, nil, nil, constraints...)
-			if err != nil {
-				return err
-			}
-
-			scores[i] = indexedScore{score: s}
-
-			return nil
-		})
-	}
-
-	err := g.Wait()
+	scores, err := parallel.Map(objs, 0, func(_ int, obj Observable) (float64, error) {
+		return ScoreObservable(obj, t, site, nil, nil, constraints...)
+	})
 	if err != nil {
 		return nil, fmt.Errorf("plan: score: %w", err)
 	}
@@ -549,10 +500,10 @@ func RankObservables(
 	var scored []ScoredTarget
 
 	for i, s := range scores {
-		if s.score > 0 {
+		if s > 0 {
 			scored = append(scored, ScoredTarget{
 				Object: objs[i],
-				Score:  s.score,
+				Score:  s,
 			})
 		}
 	}

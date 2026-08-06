@@ -223,6 +223,50 @@ func TestParseCSV_PopulatesVMag(t *testing.T) {
 	if !tgt.HasVMag || tgt.VMag != -1.46 {
 		t.Errorf("VMag = %v (HasVMag=%v), want -1.46 (HasVMag=true)", tgt.VMag, tgt.HasVMag)
 	}
+
+	// The fixture's rvz_radvel column (-5.5) was already being parsed here
+	// but never asserted on -- confirm HasRadialVelocity is set alongside
+	// the value, not just the value itself.
+	if !tgt.HasRadialVelocity || tgt.RadialVelocity != -5.5 {
+		t.Errorf("RadialVelocity = %v (HasRadialVelocity=%v), want -5.5 (HasRadialVelocity=true)",
+			tgt.RadialVelocity, tgt.HasRadialVelocity)
+	}
+}
+
+// TestParseCSV_ZeroRadialVelocityStillHasFlag is the actual regression
+// case HasRadialVelocity exists for: a genuine 0 km/s measured RV (moving
+// neither toward nor away) must still set HasRadialVelocity=true -- the
+// old `RadialVelocity != 0` presence check this field replaced would have
+// silently treated this identically to "no RV on file at all".
+func TestParseCSV_ZeroRadialVelocityStillHasFlag(t *testing.T) {
+	f, err := os.Open("testdata/rv_zero.csv")
+	if err != nil {
+		t.Fatalf("failed to open test fixture: %v", err)
+	}
+
+	t.Cleanup(func() {
+		if err := f.Close(); err != nil {
+			t.Errorf("failed to close file: %v", err)
+		}
+	})
+
+	targets, err := ParseCSV(f)
+	if err != nil {
+		t.Fatalf("ParseCSV failed: %v", err)
+	}
+
+	if len(targets) != 1 {
+		t.Fatalf("expected 1 target, got %d", len(targets))
+	}
+
+	tgt := targets[0]
+	if !tgt.HasRadialVelocity {
+		t.Error("expected HasRadialVelocity=true for a genuine 0 km/s measured RV")
+	}
+
+	if tgt.RadialVelocity != 0 {
+		t.Errorf("RadialVelocity = %v, want 0", tgt.RadialVelocity)
+	}
 }
 
 func TestBuildBrightQuery(t *testing.T) {
