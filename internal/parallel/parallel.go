@@ -1,13 +1,25 @@
-// Package parallel provides a small generic concurrency primitive for the
-// "run independent per-item work, collect results in input order" idiom
-// this codebase's own errgroup call sites (plan.FilterObservable,
-// plan.RankObservable, plan.RankObservables, plan.gatherPlanetaryMoons,
-// plan.VisibleTonight's candidate-gathering stages) each hand-rolled
-// separately before this package existed.
+// Package parallel provides small generic concurrency primitives for two
+// distinct "run independent work across goroutines" shapes this codebase
+// otherwise hand-rolls per call site:
+//
+//   - Map: one goroutine call per item, bounded concurrency — right for
+//     uneven or expensive per-item work (a network fetch, an ephemeris
+//     lookup). Used by plan.FilterObservable, plan.RankObservable,
+//     plan.RankObservables, plan.gatherPlanetaryMoons, and
+//     plan.VisibleTonight's candidate-gathering stages, each of which
+//     hand-rolled its own errgroup before this package existed.
+//   - MapChunked: a fixed number of goroutines, each processing a
+//     contiguous chunk of indices — right for cheap, uniform per-item work
+//     where goroutine-scoped setup (e.g. cloning a not-safe-to-share
+//     resource) must happen once per goroutine, not once per item. Used by
+//     coord.Context.ReduceBatchParallel/ICRSBatchToAltAzParallel, which
+//     hand-rolled the identical chunk-and-clone loop twice before this
+//     package existed.
 package parallel
 
 import (
 	"runtime"
+	"sync"
 
 	"golang.org/x/sync/errgroup"
 )
@@ -53,4 +65,59 @@ func Map[T, R any](in []T, limit int, f func(i int, item T) (R, error)) ([]R, er
 	}
 
 	return out, nil
+}
+
+// MapChunked runs f over every index in [0, n) using workers goroutines,
+// each handling one contiguous chunk of indices — the shape Map does not
+// cover: goroutine-scoped setup that must happen once per goroutine, not
+// once per item.
+//
+// newWorker is called exactly once per goroutine (workers times, not n
+// times — or once total on the small-n synchronous path below) to build
+// whatever state that goroutine's f calls need; return the same value
+// every time if no per-goroutine setup is required. f is responsible for
+// writing its own result (typically indexing into a caller-owned output
+// slice from a closure, e.g. out[i] = ...) — MapChunked itself returns
+// nothing, matching the write-into-caller-supplied-slice convention its
+// two call sites (coord.Context.ReduceBatchParallel/ICRSBatchToAltAzParallel)
+// already use.
+//
+// workers <= 0 means runtime.GOMAXPROCS(0). For n < 2*workers, MapChunked
+// runs synchronously in the calling goroutine with a single newWorker
+// call and no goroutines spawned at all — chunking a batch too small to
+// benefit would only add scheduling overhead.
+func MapChunked[W any](n, workers int, newWorker func() W, f func(w W, i int)) {
+	if workers <= 0 {
+		workers = runtime.GOMAXPROCS(0)
+	}
+
+	if n < workers*2 {
+		w := newWorker()
+		for i := range n {
+			f(w, i)
+		}
+
+		return
+	}
+
+	var wg sync.WaitGroup
+
+	chunkSize := (n + workers - 1) / workers
+
+	for start := 0; start < n; start += chunkSize {
+		end := min(start+chunkSize, n)
+
+		wg.Add(1)
+
+		go func(lo, hi int) {
+			defer wg.Done()
+
+			w := newWorker()
+			for i := lo; i < hi; i++ {
+				f(w, i)
+			}
+		}(start, end)
+	}
+
+	wg.Wait()
 }
