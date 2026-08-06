@@ -16,18 +16,39 @@ import "math"
 // (Fig. 9, against comparison lines of the ISS slope). No VIIRS-DNB-specific
 // (a,b) pair exists in the literature: the paper cautions (Methods) that "as
 // long as only broadband sensors are available, the correspondence between
-// satellite radiance and skyglow will need to be adjusted locally." Live
-// evidence of this gap (2026-08-06): for several city centres, this fit
-// applied to a real VIIRS-DNB 2025 annual composite reads ~3x brighter than
-// the same locations' World Atlas 2015 (radiative-transfer-modelled)
-// value — cross-checked against lightpollutionmap.info's own live
-// viirs_2025 layer, which agrees with this package's VIIRS decode within
-// ~10-30% (vs. ~1-3% for the two sources' wa_2015 agreement), so the ~3x
-// gap is real, not a decode bug — but it isn't fully attributable to this
-// fit's miscalibration either: real growth in detected artificial light
-// between 2015 and 2025 is a genuine, separate contributor, and the two
-// cannot be cleanly separated without a proper VIIRS-DNB calibration. The
-// defaults below are therefore the ISS pair used as the closest published
+// satellite radiance and skyglow will need to be adjusted locally."
+//
+// Live-measured (2026-08-06), and root-caused, not just observed: for
+// several city centres, this fit applied to a real VIIRS-DNB 2025 annual
+// composite reads ~3x brighter than the same locations' World Atlas 2015
+// (radiative-transfer-modelled) value. Cross-checking against
+// lightpollutionmap.info's own live viirs_2025/wa_2015 layers at the same
+// coordinates showed wa_2015 agreeing with this package's own decode within
+// ~1-3%, but viirs_2025 only within ~10-30% at a MODERATE-brightness site —
+// and diagnosing that gap by sampling raw radiance at neighbouring VIIRS
+// pixels (±1-10 pixels, ~460 m-4.6 km) found the radiance there swinging
+// from 0 to >6 nW·cm⁻²·sr⁻¹ within that radius, with the live API showing
+// the identical zero/nonzero pixel pattern — i.e. this is real VIIRS-DNB
+// per-pixel spatial noise (this package's decoder and the live API agree on
+// WHICH pixels are dark), not a decode or georeferencing bug. The deeper
+// reason: raw satellite-nadir radiance at one ~15-arcsec pixel is not the
+// physical quantity zenith skyglow is — Falchi et al. 2016's atmospheric
+// propagation model exists specifically because scattered light reaching an
+// observer's zenith integrates contributions from sources up to ~300 km
+// away, which single-pixel VIIRS radiance structurally cannot capture. This
+// is why VIIRS is fine at a city core (many contiguous saturated-bright
+// pixels — noise averages out) or a confirmed-dark remote site (already
+// pinned to the detection floor), but genuinely imprecise — tens of percent,
+// not a coefficient-tuning problem — at a moderate-brightness site whose
+// neighbourhood has real pixel-to-pixel light-source heterogeneity, e.g. a
+// rural property near scattered individual light sources. Real growth in
+// detected artificial light 2015→2025 remains a separate, additional
+// contributor to the ~3x city-centre gap, on top of this. LayerAuto tries
+// VIIRS first regardless (freshness over fidelity, by design -- see its own
+// doc comment) and returns it as soon as it succeeds, imprecise or not;
+// request [skybrightness/atlas.LayerWorldAtlas] explicitly for the
+// fidelity-first choice at exactly this class of site. The defaults below
+// are therefore the ISS pair used as the closest published
 // broadband anchor — NOT a DNB calibration — for both this package's own
 // VIIRS-layer consumers ([skybrightness/lpmap]) and
 // [skybrightness/atlas]'s VIIRS loaders. Override via the slope/zeroPoint
