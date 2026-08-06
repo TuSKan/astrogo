@@ -65,7 +65,9 @@ func main() {
 
 	// No consent call for the lightpollutionmap.info live API: it needs a
 	// manually-issued key in LIGHTPOLLUTIONMAP_KEY, not a download budget.
-	// Without one its column below reads "—" and the rest still works.
+	// Without one it's simply not offered to LayerAuto below (and its
+	// column in the comparison table reads "—") — the rest still works.
+	lpClient := lpmap.New()
 
 	// ── Observatory: Quinta Calixto ───────────────────────────────────────
 	tz, err := time.LoadLocation("America/Sao_Paulo")
@@ -146,9 +148,14 @@ func main() {
 	)
 
 	// One call: LayerAuto is freshness-first — VIIRS (newest published
-	// year), then the 2015-frozen World Atlas, then the Bortle fallback —
-	// and reports what it tried in Result.Attempts.
-	floor, err := atlas.FloorAt(ctx, site.Location(), atlas.WithBortleClass(fallbackBortleClass))
+	// year), then the 2015-frozen World Atlas, then the live
+	// lightpollutionmap.info API (if lpClient has a key), then the Bortle
+	// fallback — and reports what it tried in Result.Attempts. Passing
+	// lpClient unconditionally is safe even with no key configured:
+	// LayerAuto simply skips a tier whose requirement isn't met (see
+	// atlas.autoOrder's doc comment) rather than attempting and failing it.
+	floor, err := atlas.FloorAt(ctx, site.Location(),
+		atlas.WithLightPollutionMap(lpClient), atlas.WithBortleClass(fallbackBortleClass))
 	if err != nil {
 		log.Fatalf("resolve light-pollution floor: %v", err)
 	}
@@ -290,6 +297,15 @@ func compareLayers(ctx context.Context) {
 	fmt.Println("    reports 0.00 nW/cm²·sr at Mauna Kea for every year 2012-2025).")
 	fmt.Println("    The World Atlas is a propagation model, so it still separates them")
 	fmt.Println("    — at the cost of being frozen at 2015.")
+	fmt.Println()
+	fmt.Println("    VIIRS reads ~3x brighter than WA/LPmap at the two cities above — live-")
+	fmt.Println("    verified (2026-08-06) against lightpollutionmap.info's own viirs_2025")
+	fmt.Println("    layer, which agrees with this package's own VIIRS decode within ~10-30%")
+	fmt.Println("    (vs. ~1-3% for wa_2015 against the same API), so this is a real gap")
+	fmt.Println("    between sources, not a decode bug. Two contributing causes, not fully")
+	fmt.Println("    separable: real growth in detected artificial light 2015->2025, and the")
+	fmt.Println("    documented fact that skybrightness.DefaultRadianceSlope/ZeroPoint are an")
+	fmt.Println("    ISS-HDR fit, not VIIRS-DNB-calibrated (see skybrightness.RadianceToArtificialSB).")
 }
 
 // formatFloor renders one artificial-floor value for the table, in mcd/m².

@@ -7,7 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- `examples/18_sky_brightness` now actually offers the lightpollutionmap.info API to `LayerAuto` in its main run — previously only the separate comparison table configured it, so a caller with `LIGHTPOLLUTIONMAP_KEY` set still fell through to the Bortle-4 fallback whenever World Atlas/VIIRS download consent wasn't granted, the original gap that motivated adding the API client at all.
+
 ### Added
+- `skybrightness/lpmap`: two live regression tests (`network`-tagged) — `TestFloorWA2015_MatchesFrozenReference` pins the `wa_2015` layer's artificial-brightness value at two sites against a live-verified reference (guards the unit-dispatch logic against a future regression), `TestSQMViirs2025_SaoPauloBrighterThanDarkSite` exercises the `viirs_<year>` raw-radiance dispatch path against the real API instead of only a synthetic fixture.
 - `internal/parallel.Map[T, R any]` — the order-preserving, `GOMAXPROCS`-bounded "run independent per-item work, collect results in input order" primitive five call sites (`plan.FilterObservable`/`RankObservable`/`RankObservables`, `gatherPlanetaryMoons`'s kernel fetch, `VisibleTonight`'s three concurrent gathering stages) had each hand-rolled separately via their own `errgroup`. All five now share this one implementation.
 - `internal/parallel.MapChunked[W any]` — the sibling "fixed number of goroutines, each a contiguous index chunk, goroutine-scoped setup called once per goroutine" primitive `coord.Context.ReduceBatchParallel`/`ICRSBatchToAltAzParallel` had each hand-rolled identically (both need one `Context.Clone()` per goroutine, not per element, to avoid sharing SOFA's mutable refraction-coefficient cache). Both now call `MapChunked`; behavior, thresholds, and benchmarked throughput are unchanged.
 - `catalog/xmatch.Match(a, b []resolve.Target, opts ...Option) []Pair` — a standalone catalog cross-match primitive (alias-graph union-find, epoch-normalized positional fallback via `coord.PropagateEpoch`) operating directly on plain `resolve.Target` slices, independent of `catalog.Resolver`. Reports matched pairs only — field reconciliation stays the caller's own concern (ROADMAP #38).
