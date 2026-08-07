@@ -73,7 +73,7 @@ func main() {
 		log.Fatalf("load timezone: %v", err)
 	}
 
-	site, err := plan.NewSiteEarthLocation("Quinta Calixto", -22.5190,-46.4673, 835.05, plan.WithTimeZone(tz))
+	site, err := plan.NewSiteEarthLocation("Quinta Calixto", -22.5190, -46.4673, 835.05, plan.WithTimeZone(tz))
 	if err != nil {
 		log.Fatalf("build site: %v", err)
 	}
