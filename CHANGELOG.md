@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.14.0] — 2026-08-07
+
 ### Fixed
 - `examples/18_sky_brightness` now actually offers the lightpollutionmap.info API to `LayerAuto` in its main run — previously only the separate comparison table configured it, so a caller with `LIGHTPOLLUTIONMAP_KEY` set still fell through to the Bortle-4 fallback whenever World Atlas/VIIRS download consent wasn't granted, the original gap that motivated adding the API client at all.
 
