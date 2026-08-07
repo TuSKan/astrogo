@@ -6,6 +6,7 @@ import (
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/catalog/resolve"
+	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/time"
 )
@@ -150,5 +151,70 @@ func TestCandidateFromTarget_ElementsBearingTargetIsOffline(t *testing.T) {
 	obj2, _ := candidateFromTarget(context.Background(), tgt, start, end, forcedCfg)
 	if obj2 != nil {
 		t.Errorf("expected WithSmallBodyKernels to force the (here, offline-failing) kernel path, got a non-nil %T", obj2)
+	}
+}
+
+// TestGatherCandidates_SmallBodyPathOffline exercises gatherCandidates'
+// concurrent small-body branch (parallel.Map over needsSmallBodyEphemeris
+// targets, bounded by maxConcurrentEphemerisFetches) alongside its
+// synchronous fast-path branch, in one call — nothing previously called
+// gatherCandidates with a small-body-kind target at all. The asteroid
+// target carries real elements (like
+// TestCandidateFromTarget_ElementsBearingTargetIsOffline), so its Stage 2
+// resolves via the offline Kepler path — deterministic, no network — while
+// the star target takes the inline fast path. Both must survive into the
+// final candidate slice, in their original order.
+func TestGatherCandidates_SmallBodyPathOffline(t *testing.T) {
+	epoch := time.Date(2026, time.June, 9, 0, 0, 0, 0, time.LocationUTC)
+
+	targets := []resolve.Target{
+		{
+			Name:     "A Star",
+			Kind:     resolve.KindStar,
+			HasCoord: true,
+			Coord:    coord.NewICRS(angle.Deg(10), angle.Deg(20)),
+		},
+		{
+			Name:          "1 Ceres",
+			ID:            "20000001",
+			SPKID:         "20000001",
+			Kind:          resolve.KindAsteroid,
+			HasElements:   true,
+			HasH:          true,
+			H:             3.34,
+			G:             0.12,
+			Epoch:         epoch,
+			SemiMajorAxis: 2.77,
+			Eccentricity:  0.0797,
+			Inclination:   angle.Deg(10.6),
+			AscendingNode: angle.Deg(80.2),
+			ArgPeriapsis:  angle.Deg(73.3),
+			MeanAnomaly:   angle.Deg(274),
+		},
+	}
+
+	start := epoch
+	end := start.AddDays(1)
+
+	candidates := gatherCandidates(context.Background(), targets, start, end, visibleTonightConfig{})
+
+	if len(candidates) != 2 {
+		t.Fatalf("len(candidates) = %d, want 2", len(candidates))
+	}
+
+	if candidates[0].target.Name != "A Star" {
+		t.Errorf("candidates[0].target.Name = %q, want %q (order preserved)", candidates[0].target.Name, "A Star")
+	}
+
+	if candidates[1].target.Name != "1 Ceres" {
+		t.Errorf("candidates[1].target.Name = %q, want %q (order preserved)", candidates[1].target.Name, "1 Ceres")
+	}
+
+	if _, ok := candidates[1].obj.(*Asteroid); !ok {
+		t.Errorf("candidates[1].obj = %T, want *Asteroid (from the offline Kepler path)", candidates[1].obj)
+	}
+
+	if candidates[1].closer != nil {
+		t.Error("expected a nil closer for the Kepler-backed small-body candidate")
 	}
 }

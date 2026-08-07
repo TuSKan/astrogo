@@ -126,6 +126,18 @@ func TestMatch_EmptyInputs(t *testing.T) {
 	}
 }
 
+func TestMatch_EmptyIDAndAliasesNeverBucketed(t *testing.T) {
+	// An item with no ID and only an empty-string alias must never create
+	// a "" bucket that spuriously unions it with every other such item.
+	a := []resolve.Target{{Name: "A", ID: "", Aliases: []string{""}}}
+	b := []resolve.Target{{Name: "B", ID: "", Aliases: []string{""}}}
+
+	pairs := Match(a, b)
+	if len(pairs) != 0 {
+		t.Fatalf("len(pairs) = %d, want 0 (empty ID/alias must never bucket-match)", len(pairs))
+	}
+}
+
 func TestMatch_UnmatchedSingletonsProduceNoPair(t *testing.T) {
 	a := []resolve.Target{
 		star("A1", "Alpha", nil, 10, 20, true),

@@ -350,6 +350,52 @@ func TestPlannerRankObservable(t *testing.T) {
 	}
 }
 
+var errCoordObjectICRS = errors.New("erroringCoordObject: ICRS always fails")
+
+// erroringCoordObject implements both Observable and coord.Object directly
+// — unlike every real Observable in this package (Star, Planet, Asteroid,
+// Satellite, ...), none of which implement coord.Object directly, per
+// RankObservable's own doc comment. This exercises the "obj already
+// satisfies coord.Object, no observableObject wrap needed" branch of the
+// type assertion, and its always-failing ICRS exercises TransitEstimate's
+// error propagation through RankObservable's per-item closure — neither
+// path is reached by TestPlannerRankObservable's plain *Star objects.
+type erroringCoordObject struct{}
+
+func (erroringCoordObject) Name() string { return "erroring" }
+
+func (erroringCoordObject) Position(time.Time) (coord.ICRS, error) {
+	return coord.ICRS{}, errCoordObjectICRS
+}
+
+func (erroringCoordObject) GetDetails(*coord.Context, ...string) (*TargetDetails, error) {
+	return nil, errCoordObjectICRS
+}
+
+func (erroringCoordObject) ICRS(time.Time) (coord.ICRS, error) {
+	return coord.ICRS{}, errCoordObjectICRS
+}
+
+func TestPlannerRankObservable_DirectCoordObjectAndTransitError(t *testing.T) {
+	loc, _ := coord.NewGeodetic(angle.Zero(), angle.Deg(45), 0)
+	site, _ := NewSite("Test", loc)
+
+	p, err := NewPlanner(site, nil)
+	testutil.AssertNoError(t, err)
+
+	start := time.FromJD(2451545.0, time.UTC)
+	end := start.AddDays(1)
+
+	_, err = p.RankObservable([]Observable{erroringCoordObject{}}, start, end)
+	if err == nil {
+		t.Fatal("expected an error from an object whose ICRS always fails")
+	}
+
+	if !errors.Is(err, errCoordObjectICRS) {
+		t.Errorf("RankObservable error = %v, want it to wrap errCoordObjectICRS", err)
+	}
+}
+
 func TestObservableWindows_StepTooLarge(t *testing.T) {
 	loc, _ := coord.NewGeodetic(angle.Zero(), angle.Zero(), 0)
 	site, _ := NewSite("Test", loc)

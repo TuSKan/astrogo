@@ -472,6 +472,39 @@ func TestMergeGroup_RadialVelocityUnsetIsDropped(t *testing.T) {
 	}
 }
 
+// TestMergeGroup_PhysicalParamsClusterIncludesDiameterAndAlbedo regression-
+// tests the SBDB-only H/G/M1/K1/M2/K2/G1/G2/Diameter/Albedo cluster rule —
+// real Eros phys_par values, confirming the merge carries the measured
+// Diameter/Albedo through as one coupled unit alongside H/G, not just the
+// pre-existing H/G/M1/K1 fields the rule predates.
+func TestMergeGroup_PhysicalParamsClusterIncludesDiameterAndAlbedo(t *testing.T) {
+	g := group{candidates: []candidate{
+		{provider: "sbdb", target: Target{
+			H: 10.40, G: 0.46, HasH: true,
+			Diameter: 16.84, HasDiameter: true,
+			Albedo: 0.25, HasAlbedo: true,
+		}},
+	}}
+
+	got := mergeGroup(g)
+
+	if !got.HasH || got.H != 10.40 {
+		t.Errorf("H = %v (has=%v), want 10.40 (has=true)", got.H, got.HasH)
+	}
+
+	if !got.HasDiameter || got.Diameter != 16.84 {
+		t.Errorf("Diameter = %v (has=%v), want 16.84 (has=true)", got.Diameter, got.HasDiameter)
+	}
+
+	if !got.HasAlbedo || got.Albedo != 0.25 {
+		t.Errorf("Albedo = %v (has=%v), want 0.25 (has=true)", got.Albedo, got.HasAlbedo)
+	}
+
+	if got.Provenance["PhysicalParams"] != "sbdb" {
+		t.Errorf("expected provenance sbdb, got %v", got.Provenance["PhysicalParams"])
+	}
+}
+
 // ── Cross-match integration tests (via Resolver.Resolve/Search) ────────────
 
 // TestResolver_CrossMatchByAlias confirms two providers sharing the same ID

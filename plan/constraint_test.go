@@ -1,6 +1,7 @@
 package plan
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/TuSKan/astrogo/angle"
@@ -192,6 +193,17 @@ func TestSunMoonConstraints(t *testing.T) {
 
 		if withNil.Value != withDefault.Value {
 			t.Errorf("nil Provider gave %v, eph.Default() gave %v -- should be identical", withNil.Value, withDefault.Value)
+		}
+	})
+
+	t.Run("MoonIllum propagates a provider error", func(t *testing.T) {
+		obj := NewStar("T", angle.Deg(0), angle.Deg(0))
+
+		c := MoonIllum{Threshold: 0.5, Provider: errStateProvider{}}
+
+		_, err := c.Check(obj, tmNight, site)
+		if !errors.Is(err, errMoonPhaseTestProvider) {
+			t.Errorf("Check error = %v, want it to wrap errMoonPhaseTestProvider", err)
 		}
 	})
 }
