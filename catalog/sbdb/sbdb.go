@@ -236,6 +236,16 @@ func (p *Provider) ResolveObject(ctx context.Context, req resolve.ObjectRequest)
 				if v, err := parseFloat(pp.Value); err == nil {
 					t.K2 = v
 				}
+			case "diameter":
+				if v, err := parseFloat(pp.Value); err == nil {
+					t.Diameter = v
+					t.HasDiameter = true
+				}
+			case "albedo":
+				if v, err := parseFloat(pp.Value); err == nil {
+					t.Albedo = v
+					t.HasAlbedo = true
+				}
 			}
 		}
 

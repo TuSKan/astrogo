@@ -4,10 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"runtime"
 	"sort"
-
-	"golang.org/x/sync/errgroup"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
@@ -15,6 +12,7 @@ import (
 	"github.com/TuSKan/astrogo/constellation"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
+	"github.com/TuSKan/astrogo/internal/parallel"
 	"github.com/TuSKan/astrogo/magnitude"
 	"github.com/TuSKan/astrogo/time"
 )
@@ -277,32 +275,28 @@ func VisibleTonight(
 	// gatherCandidates' network fetches, there's no external server to be
 	// considerate of here, so this uses every core rather than a small
 	// fixed bound.
-	evaluated := make([]VisibleObject, len(candidates))
-	visible := make([]bool, len(candidates))
-
-	g := new(errgroup.Group)
-	g.SetLimit(runtime.GOMAXPROCS(0))
-
-	for i, c := range candidates {
-		g.Go(func() error {
-			vo, ok := evaluateCandidate(c, start, end, site, planetProvider, magLimit, cfg)
-			evaluated[i], visible[i] = vo, ok
-
-			if c.closer != nil {
-				_ = c.closer.Close()
-			}
-
-			return nil // evaluateCandidate reports failure via ok, not an error — never fails the group
-		})
+	type evalResult struct {
+		vo VisibleObject
+		ok bool
 	}
 
-	_ = g.Wait() // never returns a non-nil error — see the comment above
+	// evaluateCandidate reports failure via ok, not an error, so
+	// parallel.Map's own error return is never non-nil here.
+	evaluated, _ := parallel.Map(candidates, 0, func(_ int, c visibleCandidate) (evalResult, error) {
+		vo, ok := evaluateCandidate(c, start, end, site, planetProvider, magLimit, cfg)
+
+		if c.closer != nil {
+			_ = c.closer.Close()
+		}
+
+		return evalResult{vo: vo, ok: ok}, nil
+	})
 
 	results := make([]VisibleObject, 0, len(candidates))
 
-	for i, vo := range evaluated {
-		if visible[i] {
-			results = append(results, vo)
+	for _, r := range evaluated {
+		if r.ok {
+			results = append(results, r.vo)
 		}
 	}
 
@@ -319,30 +313,22 @@ func VisibleTonight(
 // reason to wait on each other; each source writes into its own slice
 // index, so no mutex is needed to combine them afterward.
 func gatherBrightTargets(ctx context.Context, sources []resolve.BrightObjectSearcher, magLimit float64) []resolve.Target {
-	perSource := make([][]resolve.Target, len(sources))
+	// A source's own query error is handled per-item below (skipped, not
+	// propagated), so parallel.Map's own error return is never non-nil.
+	perSource, _ := parallel.Map(sources, 0, func(_ int, src resolve.BrightObjectSearcher) ([]resolve.Target, error) {
+		var targets []resolve.Target
 
-	g := new(errgroup.Group)
+		iter := src.SearchBright(ctx, resolve.BrightRequest{MaxVMag: magLimit})
+		iter(func(tgt resolve.Target, err error) bool {
+			if err == nil {
+				targets = append(targets, tgt)
+			}
 
-	for i, src := range sources {
-		g.Go(func() error {
-			var targets []resolve.Target
-
-			iter := src.SearchBright(ctx, resolve.BrightRequest{MaxVMag: magLimit})
-			iter(func(tgt resolve.Target, err error) bool {
-				if err == nil {
-					targets = append(targets, tgt)
-				}
-
-				return true
-			})
-
-			perSource[i] = targets
-
-			return nil // a source's own query error is already handled above — never fails the group
+			return true
 		})
-	}
 
-	_ = g.Wait() // never returns a non-nil error — see the comment above
+		return targets, nil
+	})
 
 	var targets []resolve.Target
 	for _, ts := range perSource {
@@ -391,8 +377,7 @@ const coverageMargin = 24 * time.Hour
 func gatherCandidates(ctx context.Context, targets []resolve.Target, start, end time.Time, cfg visibleTonightConfig) []visibleCandidate {
 	slots := make([]visibleCandidate, len(targets))
 
-	g := new(errgroup.Group)
-	g.SetLimit(maxConcurrentEphemerisFetches)
+	var smallBodyIdx []int
 
 	for i, tgt := range targets {
 		if !needsSmallBodyEphemeris(tgt.Kind) {
@@ -403,21 +388,28 @@ func gatherCandidates(ctx context.Context, targets []resolve.Target, start, end 
 			continue
 		}
 
-		g.Go(func() error {
-			if obj, closer := candidateFromTarget(ctx, tgt, start, end, cfg); obj != nil {
-				slots[i] = visibleCandidate{obj: obj, target: tgt, closer: closer}
-			}
-
-			// A candidate's own fetch failure is a skip, not a group-wide
-			// failure — candidateFromTarget already reports that by
-			// returning a nil Observable rather than an error, so this
-			// goroutine never actually fails the group; SetLimit is the
-			// only errgroup feature in play here.
-			return nil
-		})
+		smallBodyIdx = append(smallBodyIdx, i)
 	}
 
-	_ = g.Wait() // never returns a non-nil error — see the comment above
+	// Only the small-body subset goes through parallel.Map, bounded by
+	// maxConcurrentEphemerisFetches — the fast local candidates above need
+	// no such cap and stay fully synchronous, avoiding goroutine dispatch
+	// overhead for the common case. A candidate's own fetch failure is a
+	// skip, not a group-wide failure — candidateFromTarget already reports
+	// that by returning a nil Observable rather than an error, so Map's
+	// own error return is never non-nil here.
+	results, _ := parallel.Map(smallBodyIdx, maxConcurrentEphemerisFetches, func(_ int, idx int) (visibleCandidate, error) {
+		tgt := targets[idx]
+		if obj, closer := candidateFromTarget(ctx, tgt, start, end, cfg); obj != nil {
+			return visibleCandidate{obj: obj, target: tgt, closer: closer}, nil
+		}
+
+		return visibleCandidate{}, nil
+	})
+
+	for j, idx := range smallBodyIdx {
+		slots[idx] = results[j]
+	}
 
 	candidates := make([]visibleCandidate, 0, len(slots))
 

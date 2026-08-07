@@ -684,18 +684,23 @@ var scalarFieldRules = []fieldRule{
 		},
 	},
 	{
+		// t.RadialVelocity != 0 used to gate this — silently dropped a
+		// genuinely-measured 0 km/s RV (moving neither toward nor away,
+		// physically legitimate) the same way an absent measurement would
+		// be dropped. HasRadialVelocity makes the two cases distinguishable.
 		precedence: []string{"simbad"},
-		hasField:   func(t Target) bool { return t.RadialVelocity != 0 },
+		hasField:   func(t Target) bool { return t.HasRadialVelocity },
 		take: func(dst *Target, src Target, provider string) {
-			dst.RadialVelocity = src.RadialVelocity
+			dst.RadialVelocity, dst.HasRadialVelocity = src.RadialVelocity, true
 			setProvenance(dst, "RadialVelocity", provider)
 		},
 	},
 	{
-		// SBDB-only physical-parameter cluster (H/G/M1/K1/M2/K2/G1/G2) —
-		// no other provider populates any of these today.
+		// SBDB-only physical-parameter cluster (H/G/M1/K1/M2/K2/G1/G2/
+		// Diameter/Albedo) — no other provider populates any of these
+		// today.
 		precedence: []string{"sbdb"},
-		hasField:   func(t Target) bool { return t.HasH || t.HasM1 || t.HasG1G2 },
+		hasField:   func(t Target) bool { return t.HasH || t.HasM1 || t.HasG1G2 || t.HasDiameter || t.HasAlbedo },
 		take: func(dst *Target, src Target, provider string) {
 			dst.H, dst.HasH = src.H, src.HasH
 			dst.G = src.G
@@ -704,6 +709,8 @@ var scalarFieldRules = []fieldRule{
 			dst.M2 = src.M2
 			dst.K2 = src.K2
 			dst.G1, dst.G2, dst.HasG1G2 = src.G1, src.G2, src.HasG1G2
+			dst.Diameter, dst.HasDiameter = src.Diameter, src.HasDiameter
+			dst.Albedo, dst.HasAlbedo = src.Albedo, src.HasAlbedo
 			setProvenance(dst, "PhysicalParams", provider)
 		},
 	},

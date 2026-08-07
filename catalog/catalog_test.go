@@ -427,6 +427,84 @@ func TestMergeGroup_VMagPrecedence(t *testing.T) {
 	}
 }
 
+// TestMergeGroup_RadialVelocityZeroSurvivesMerge regression-tests the
+// HasRadialVelocity fix: RadialVelocity == 0 is physically legitimate (a
+// star moving neither toward nor away), so the merge must not treat it the
+// same as "no RV on file" the way a bare `RadialVelocity != 0` presence
+// check would.
+func TestMergeGroup_RadialVelocityZeroSurvivesMerge(t *testing.T) {
+	g := group{candidates: []candidate{
+		{provider: "simbad", target: Target{RadialVelocity: 0, HasRadialVelocity: true}},
+	}}
+
+	got := mergeGroup(g)
+
+	if !got.HasRadialVelocity {
+		t.Error("expected HasRadialVelocity=true to survive the merge for a genuine zero RV")
+	}
+
+	if got.RadialVelocity != 0 {
+		t.Errorf("expected RadialVelocity=0, got %v", got.RadialVelocity)
+	}
+
+	if got.Provenance["RadialVelocity"] != "simbad" {
+		t.Errorf("expected provenance simbad, got %v", got.Provenance["RadialVelocity"])
+	}
+}
+
+// TestMergeGroup_RadialVelocityUnsetIsDropped confirms the inverse: a
+// candidate with no RV on file at all (HasRadialVelocity=false) does not
+// contribute a value, so a differently-sourced field on the same merged
+// Target doesn't spuriously pick up a stray 0.
+func TestMergeGroup_RadialVelocityUnsetIsDropped(t *testing.T) {
+	g := group{candidates: []candidate{
+		{provider: "simbad", target: Target{RadialVelocity: 0, HasRadialVelocity: false, VMag: 5.0, HasVMag: true}},
+	}}
+
+	got := mergeGroup(g)
+
+	if got.HasRadialVelocity {
+		t.Error("expected HasRadialVelocity=false to survive the merge when no provider set it")
+	}
+
+	if _, ok := got.Provenance["RadialVelocity"]; ok {
+		t.Error("expected no RadialVelocity provenance entry when no candidate had HasRadialVelocity=true")
+	}
+}
+
+// TestMergeGroup_PhysicalParamsClusterIncludesDiameterAndAlbedo regression-
+// tests the SBDB-only H/G/M1/K1/M2/K2/G1/G2/Diameter/Albedo cluster rule —
+// real Eros phys_par values, confirming the merge carries the measured
+// Diameter/Albedo through as one coupled unit alongside H/G, not just the
+// pre-existing H/G/M1/K1 fields the rule predates.
+func TestMergeGroup_PhysicalParamsClusterIncludesDiameterAndAlbedo(t *testing.T) {
+	g := group{candidates: []candidate{
+		{provider: "sbdb", target: Target{
+			H: 10.40, G: 0.46, HasH: true,
+			Diameter: 16.84, HasDiameter: true,
+			Albedo: 0.25, HasAlbedo: true,
+		}},
+	}}
+
+	got := mergeGroup(g)
+
+	if !got.HasH || got.H != 10.40 {
+		t.Errorf("H = %v (has=%v), want 10.40 (has=true)", got.H, got.HasH)
+	}
+
+	if !got.HasDiameter || got.Diameter != 16.84 {
+		t.Errorf("Diameter = %v (has=%v), want 16.84 (has=true)", got.Diameter, got.HasDiameter)
+	}
+
+	if !got.HasAlbedo || got.Albedo != 0.25 {
+		t.Errorf("Albedo = %v (has=%v), want 0.25 (has=true)", got.Albedo, got.HasAlbedo)
+	}
+
+	if got.Provenance["PhysicalParams"] != "sbdb" {
+		t.Errorf("expected provenance sbdb, got %v", got.Provenance["PhysicalParams"])
+	}
+}
+
 // ── Cross-match integration tests (via Resolver.Resolve/Search) ────────────
 
 // TestResolver_CrossMatchByAlias confirms two providers sharing the same ID

@@ -127,7 +127,7 @@ func FromCatalog(c catalog.Target, p eph.Provider) Observable {
 			opts = append(opts, WithParallax(c.Parallax))
 		}
 
-		if c.RadialVelocity != 0 {
+		if c.HasRadialVelocity {
 			opts = append(opts, WithRadialVelocity(c.RadialVelocity))
 		}
 
@@ -206,6 +206,14 @@ func asteroidOptsFrom(c catalog.Target) []AsteroidOption {
 		}
 
 		opts = append(opts, WithHG(c.H, g))
+	}
+
+	if c.HasDiameter {
+		opts = append(opts, WithDiameter(c.Diameter))
+	}
+
+	if c.HasAlbedo {
+		opts = append(opts, WithAlbedo(c.Albedo))
 	}
 
 	return opts

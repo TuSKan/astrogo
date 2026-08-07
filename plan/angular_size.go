@@ -61,15 +61,20 @@ func BodyEquatorialRadius(id eph.ID) (metres float64, ok bool) {
 // Ang-diam quantity — not the geocentric distance, which differs by up to
 // ~1.7% for the Moon depending on the observer's position on Earth's disc.
 //
-// Returns ErrNoPhysicalRadius if mb's EphID has no known radius (e.g. an
-// asteroid or comet — this library has no general-purpose physical-size
-// catalog for minor bodies; a future extension could estimate one from
-// absolute magnitude H and albedo via D = 1329/√p_V · 10^(-0.2H) km, but
-// that needs an albedo this library doesn't carry today).
+// Returns ErrNoPhysicalRadius if mb's EphID has no known radius AND mb
+// doesn't implement the PhysicalRadius optional capability — a comet or
+// satellite, for instance, since this library has no general-purpose
+// physical-size catalog for either.
 func AngularDiameter(mb MovingBody, t time.Time, ctx *coord.Context) (angle.Angle, error) {
 	radiusM, ok := BodyEquatorialRadius(mb.EphID())
 	if !ok {
-		return angle.Zero(), fmt.Errorf("plan: angular diameter of %v: %w", mb.EphID(), ErrNoPhysicalRadius)
+		if pr, isPR := mb.(PhysicalRadius); isPR {
+			radiusM, ok = pr.PhysicalRadius()
+		}
+
+		if !ok {
+			return angle.Zero(), fmt.Errorf("plan: angular diameter of %v: %w", mb.EphID(), ErrNoPhysicalRadius)
+		}
 	}
 
 	vec, err := mb.GeocentricVec(t)

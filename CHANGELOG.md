@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- `examples/18_sky_brightness` now actually offers the lightpollutionmap.info API to `LayerAuto` in its main run — previously only the separate comparison table configured it, so a caller with `LIGHTPOLLUTIONMAP_KEY` set still fell through to the Bortle-4 fallback whenever World Atlas/VIIRS download consent wasn't granted, the original gap that motivated adding the API client at all.
+
+### Added
+- `skybrightness/lpmap`: two live regression tests (`network`-tagged) — `TestFloorWA2015_MatchesFrozenReference` pins the `wa_2015` layer's artificial-brightness value at two sites against a live-verified reference (guards the unit-dispatch logic against a future regression), `TestSQMViirs2025_SaoPauloBrighterThanDarkSite` exercises the `viirs_<year>` raw-radiance dispatch path against the real API instead of only a synthetic fixture.
+- `internal/parallel.Map[T, R any]` — the order-preserving, `GOMAXPROCS`-bounded "run independent per-item work, collect results in input order" primitive five call sites (`plan.FilterObservable`/`RankObservable`/`RankObservables`, `gatherPlanetaryMoons`'s kernel fetch, `VisibleTonight`'s three concurrent gathering stages) had each hand-rolled separately via their own `errgroup`. All five now share this one implementation.
+- `internal/parallel.MapChunked[W any]` — the sibling "fixed number of goroutines, each a contiguous index chunk, goroutine-scoped setup called once per goroutine" primitive `coord.Context.ReduceBatchParallel`/`ICRSBatchToAltAzParallel` had each hand-rolled identically (both need one `Context.Clone()` per goroutine, not per element, to avoid sharing SOFA's mutable refraction-coefficient cache). Both now call `MapChunked`; behavior, thresholds, and benchmarked throughput are unchanged.
+- `catalog/xmatch.Match(a, b []resolve.Target, opts ...Option) []Pair` — a standalone catalog cross-match primitive (alias-graph union-find, epoch-normalized positional fallback via `coord.PropagateEpoch`) operating directly on plain `resolve.Target` slices, independent of `catalog.Resolver`. Reports matched pairs only — field reconciliation stays the caller's own concern (ROADMAP #38).
+- `resolve.Target.HasRadialVelocity` — distinguishes a genuinely-measured zero radial velocity from no measurement at all, mirroring the existing `HasVMag`/`HasCoord`/... presence-flag pattern.
+- `resolve.Target.Diameter`/`HasDiameter` and `Albedo`/`HasAlbedo`, decoded from `catalog/sbdb`'s `phys_par` response — a real measured `Diameter` (occultation/thermal/radar) is now preferred over the existing H+albedo estimate. `plan.Asteroid.PhysicalRadius()` (implements the new `plan.PhysicalRadius` optional-capability interface) resolves diameter → albedo-estimate → unavailable, in that order, and `plan.AngularDiameter` now falls back to it when a body has no fixed `BodyEquatorialRadius` table entry.
+- `plan.MoonIllum` — a `Constraint`/`ConstraintCtx` (companion to `MoonSep`) that rejects/penalizes targets above a lunar-illumination-fraction threshold; always passes for the Moon itself (ROADMAP #32).
+
+### Changed
+- `Planner.RankObservable` no longer requires its `Observable` argument to also implement `coord.Object` — it was returning `ErrNotCoordObject` for any other type (a satellite, a generic moving body), and had zero test coverage or callers anywhere in the repo despite the type constraint. It now falls back to the existing `observableObject` adapter, the same one `visible_tonight.go` already uses for this exact purpose. `ErrNotCoordObject` is deprecated, not removed.
+- `TransitEstimate` similarly widens from `coord.Object` to `Observable`, matching `RankObservable`'s own fix.
+
+### Fixed
+- `catalog.go`'s field-precedence merge rule for `RadialVelocity` checked `RadialVelocity != 0` instead of the new `HasRadialVelocity` flag, silently dropping a genuinely-measured 0 km/s radial velocity during cross-provider reconciliation — the same bug class the orbital-elements merge rule had before it.
+
 ## [0.13.0] — 2026-08-05
 
 ### Added

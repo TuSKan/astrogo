@@ -107,6 +107,32 @@ func TestAngularDiameter_ErrNoPhysicalRadius(t *testing.T) {
 	}
 }
 
+// TestAngularDiameter_AsteroidPhysicalRadiusFallback confirms AngularDiameter
+// now succeeds for an *Asteroid with WithAlbedo/WithDiameter set, instead
+// of always failing with ErrNoPhysicalRadius the way any Asteroid did
+// before AngularDiameter fell back to the PhysicalRadius optional
+// capability.
+func TestAngularDiameter_AsteroidPhysicalRadiusFallback(t *testing.T) {
+	ctx := testContext(t)
+	tm := ctx.Time()
+
+	const asteroidID eph.ID = 2000433 // Eros, not in bodyEquatorialRadiusM
+
+	// 1 AU topocentric distance, matching TestAngularDiameter_KnownValues'
+	// own convention for an easy-to-check angle.
+	prov := &fixedVecProvider{vec: ctx.ObsVec().Add(vector.Vec3{X: 1.0})}
+	a := NewAsteroid("Eros", asteroidID, prov, WithHG(10.40, 0.46), WithAlbedo(0.25))
+
+	got, err := AngularDiameter(a, tm, ctx)
+	if err != nil {
+		t.Fatalf("AngularDiameter: %v (expected success via PhysicalRadius fallback)", err)
+	}
+
+	if got.Arcseconds() <= 0 {
+		t.Errorf("AngularDiameter = %v, want a positive angle", got)
+	}
+}
+
 // TestAngularDiameter_ZeroDistance confirms the divide-by-zero guard: a
 // body placed exactly at the observer's own ICRS position (zero
 // topocentric distance) fails with ErrZeroDistance instead of propagating

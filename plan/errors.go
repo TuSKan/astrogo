@@ -23,6 +23,10 @@ var (
 	ErrMoonRequired = errors.New("illumination solver requires a Moon target")
 
 	// ErrNotCoordObject indicates the object does not implement coord.Object.
+	//
+	// Deprecated: RankObservable no longer returns this — every Observable
+	// is now usable regardless of whether it happens to also implement
+	// coord.Object directly (see observableObject in visible_tonight.go).
 	ErrNotCoordObject = errors.New("object does not implement coord.Object required for ranking")
 	// ErrStepNotPositive indicates a non-positive time step.
 	ErrStepNotPositive = errors.New("step must be positive")

@@ -1,0 +1,2 @@
+oid,main_id,ra,dec,otype,pmra,pmdec,plx_value,rvz_radvel,id,V
+2,* zero RV test,10.0,20.0,V*,0.0,0.0,10.0,0.0,ZeroRVStar,8.0

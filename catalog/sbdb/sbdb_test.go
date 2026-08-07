@@ -239,6 +239,57 @@ func TestSBDBResolver_IncompleteElements(t *testing.T) {
 	}
 }
 
+// TestSBDBResolver_PhysicalDiameterAlbedo covers decoding the "diameter"
+// and "albedo" phys_par entries into Target.Diameter/Albedo (and their
+// Has* flags) -- live-verified against the real 433 Eros SBDB response
+// (H=10.40, diameter=16.84 km, albedo=0.25) during implementation.
+func TestSBDBResolver_PhysicalDiameterAlbedo(t *testing.T) {
+	jsonData := `{
+		"object": {
+			"spkid": "2000433",
+			"fullname": "433 Eros (A898 PA)",
+			"des": "433",
+			"kind": "a"
+		},
+		"phys_par": [
+			{"name": "H", "value": "10.40"},
+			{"name": "G", "value": "0.46"},
+			{"name": "diameter", "value": "16.84"},
+			{"name": "albedo", "value": "0.25"}
+		]
+	}`
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+
+		if _, err := fmt.Fprint(w, jsonData); err != nil {
+			t.Errorf("failed to write response: %v", err)
+		}
+	}))
+	defer server.Close()
+
+	t.Cleanup(remote.Reset)
+
+	if err := remote.SetURL(remote.JPLSBDB, server.URL); err != nil {
+		t.Fatal(err)
+	}
+
+	prov := New()
+
+	tar, ok := prov.Resolve(context.Background(), "eros")
+	if !ok {
+		t.Fatalf("Failed to resolve Eros")
+	}
+
+	if !tar.HasDiameter || tar.Diameter != 16.84 {
+		t.Errorf("Diameter = %v (HasDiameter=%v), want 16.84 (HasDiameter=true)", tar.Diameter, tar.HasDiameter)
+	}
+
+	if !tar.HasAlbedo || tar.Albedo != 0.25 {
+		t.Errorf("Albedo = %v (HasAlbedo=%v), want 0.25 (HasAlbedo=true)", tar.Albedo, tar.HasAlbedo)
+	}
+}
+
 func TestClassifyKind(t *testing.T) {
 	tests := []struct {
 		name         string

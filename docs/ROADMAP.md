@@ -163,14 +163,19 @@ above the observer's horizon, the observer is in darkness, and the satellite is 
 
 ## 32. Moon Illumination Constraint
 
-**Status:** 🔲 Not Started
+**Status:** 🟢 Done
 
 Companion to the existing `MoonSep` constraint: gate or penalize faint targets
 when lunar phase / sky brightness from moonlight is too high.
 
-- [ ] `MoonIllumination` constraint — reject/penalize above an illumination fraction
+- [x] `MoonIllumination` constraint — `plan.MoonIllum` rejects/penalizes above an
+      illumination fraction threshold, via the existing `plan.MoonIllumination` helper;
+      always passes for the Moon itself. Implements `ConstraintCtx` (added to the
+      compile-time assertion block alongside `MoonSep`).
 - [ ] Optional coupling with `MoonSep` (separation × illumination scoring)
-- [ ] Integration with `ScoreObservable`
+- [x] Integration with `ScoreObservable` — `MoonIllum` composes as an ordinary
+      `Constraint`/`ConstraintCtx`, same as every other constraint `ScoreObservable`
+      accepts.
 
 **Inspiration:** astroplan `MoonIlluminationConstraint`.
 
@@ -252,22 +257,38 @@ atmospheric dispersion compensator planning.
 
 ## 37. Batch / High-Throughput APIs
 
-**Status:** 🔲 Not Started
+**Status:** 🟡 In Progress
 
-- [ ] Batch coordinate transforms (vectorized)
+- [x] Batch coordinate transforms (vectorized) — already shipped in `coord/batch.go`
+      (`ReduceBatch`/`ReduceBatchParallel`, `ICRSBatchToAltAz`/`ICRSBatchToAltAzParallel`);
+      discovered still-current during this pass, no changes needed.
 - [ ] Batch ephemeris evaluation
-- [ ] Batch visibility computation
+- [x] Batch visibility computation — `internal/parallel.Map` (order-preserving,
+      `GOMAXPROCS`-bounded) now backs `Planner.FilterObservable`/`RankObservable`,
+      package-level `RankObservables`, `gatherPlanetaryMoons`'s kernel fetch, and
+      `VisibleTonight`'s three concurrent gathering stages — one shared primitive
+      replacing five separately hand-rolled `errgroup` call sites.
 - [ ] Batch event solving
-- [ ] Concurrency-safe kernel/cache usage
+- [x] Concurrency-safe kernel/cache usage — `ephemeris/jpl.Provider` already guards
+      `AddKernel`/`State`/`FindSegment`/`SupportedBodies` with an internal
+      `sync.RWMutex` (pre-existing, confirmed still current).
 
 ---
 
 ## 38. Cross-Match Algorithms
 
-**Status:** 🔲 Not Started
+**Status:** 🟡 In Progress
 
-- [ ] Positional cross-match (nearest neighbor, cone radius)
-- [ ] Multi-catalog cross-match (SIMBAD × Gaia × OpenNGC)
+- [x] Positional cross-match (nearest neighbor, cone radius) — `catalog/xmatch.Match`'s
+      positional fallback pass (epoch-normalized via `coord.PropagateEpoch`, nearest
+      match within `WithPositionMatchThreshold`, default 2″).
+- [x] Multi-catalog cross-match (SIMBAD × Gaia × OpenNGC) — `catalog/xmatch.Match`
+      operates on any two `resolve.Target` slices, independent of `catalog.Resolver`;
+      alias-graph union-find (shared ID/`Aliases` entries) is the primary signal, the
+      positional pass above the fallback for entries sharing neither. Deliberately does
+      not merge fields — see the package doc for why, and `catalog.Resolver`'s own
+      internal (unexported) cross-match for the field-reconciling counterpart this
+      package intentionally does not duplicate.
 - [ ] Probabilistic matching (Bayesian, with proper motion correction)
 
 ---

@@ -62,6 +62,7 @@ var (
 	_ ConstraintCtx = Airmass{}
 	_ ConstraintCtx = Sun{}
 	_ ConstraintCtx = MoonSep{}
+	_ ConstraintCtx = MoonIllum{}
 )
 
 // Altitude passes if the target's altitude is >= a threshold.
@@ -222,6 +223,64 @@ func (c MoonSep) CheckCtx(obj Observable, _ time.Time, _ *Site, ctx *coord.Conte
 	return Result{
 		Pass:   pass,
 		Value:  val,
+		Reason: reason,
+	}, nil
+}
+
+// MoonIllum passes if the Moon's illuminated fraction at the evaluated
+// time is at or below a threshold — the companion to MoonSep for the
+// "too much moonlight" case a pure separation check can't catch on its
+// own: a bright, near-full Moon can wash out a faint target even well
+// outside MoonSep's separation threshold, and conversely a target close
+// to a thin crescent Moon may still be perfectly observable.
+//
+// Unlike MoonSep, illumination doesn't depend on obj's own position, so
+// a target passes automatically when it IS the Moon (its own illumination
+// isn't a meaningful constraint on observing it).
+type MoonIllum struct {
+	// Threshold is the illuminated fraction, [0, 1], at or below which the
+	// constraint passes.
+	Threshold float64
+	// Provider supplies the Moon's position/phase geometry. A nil
+	// Provider defaults to eph.Default(), matching this package's
+	// established nil-provider convention (see plan.NewPlanet and
+	// friends) — MoonSep's own hardcoded eph.Default() predates that
+	// convention and is not what this mirrors.
+	Provider eph.Provider
+}
+
+// Check evaluates Moon illumination for a given target and time.
+func (c MoonIllum) Check(obj Observable, t time.Time, site *Site) (Result, error) {
+	ctx := coord.NewContext(t, site.Location(), site.Atmosphere())
+	return c.CheckCtx(obj, t, site, ctx)
+}
+
+// CheckCtx evaluates Moon illumination using a pre-built coord.Context.
+func (c MoonIllum) CheckCtx(obj Observable, _ time.Time, _ *Site, ctx *coord.Context) (Result, error) {
+	if p, ok := obj.(*Planet); ok && p.IsMoon() {
+		return Result{Pass: true, Value: 0}, nil
+	}
+
+	prov := c.Provider
+	if prov == nil {
+		prov = eph.Default()
+	}
+
+	frac, _, err := MoonIllumination(ctx.Time(), prov)
+	if err != nil {
+		return Result{}, fmt.Errorf("constraint: moon illumination: %w", err)
+	}
+
+	pass := frac <= c.Threshold
+
+	reason := ""
+	if !pass {
+		reason = fmt.Sprintf("moon illumination %.2f exceeds threshold %.2f", frac, c.Threshold)
+	}
+
+	return Result{
+		Pass:   pass,
+		Value:  frac,
 		Reason: reason,
 	}, nil
 }

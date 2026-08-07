@@ -7,6 +7,7 @@ import (
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/catalog"
 	"github.com/TuSKan/astrogo/catalog/resolve"
+	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/plan"
 	"github.com/TuSKan/astrogo/time"
@@ -174,4 +175,105 @@ func TestFromCatalog_ProviderTakesPrecedenceOverElements(t *testing.T) {
 	if ast.Provider() != (eph.Provider)(stubMoonProvider{}) {
 		t.Error("expected the caller-supplied provider to be used, not a Kepler-built one")
 	}
+}
+
+// TestFromCatalog_StarRadialVelocity confirms a Star target's
+// HasRadialVelocity flag is threaded through to the built *plan.Star via
+// WithRadialVelocity, including the true-zero case — the merge-rule bug
+// this Has-flag exists to prevent (catalog.go silently dropping a
+// genuinely-measured 0 km/s value) has no equivalent here since
+// FromCatalog reads the flag directly, but the wiring itself still needs
+// its own test: nothing previously called FromCatalog with
+// HasRadialVelocity set at all.
+func TestFromCatalog_StarRadialVelocity(t *testing.T) {
+	cases := []struct {
+		name    string
+		hasRV   bool
+		rv      float64
+		wantHas bool
+	}{
+		{"measured negative", true, -5.5, true},
+		{"measured true zero", true, 0, true},
+		{"unset", false, 0, false},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			tgt := catalog.Target{
+				Name:              "Test Star",
+				Kind:              resolve.KindStar,
+				HasCoord:          true,
+				Coord:             coord.NewICRS(angle.Deg(10), angle.Deg(20)),
+				HasRadialVelocity: c.hasRV,
+				RadialVelocity:    c.rv,
+			}
+
+			obj := plan.FromCatalog(tgt, nil)
+
+			star, ok := obj.(*plan.Star)
+			if !ok {
+				t.Fatalf("FromCatalog: got %T, want *plan.Star", obj)
+			}
+
+			gotRV, gotHas := star.MeasuredRadialVelocity()
+			if gotHas != c.wantHas {
+				t.Errorf("MeasuredRadialVelocity() has = %v, want %v", gotHas, c.wantHas)
+			}
+
+			if gotHas && gotRV != c.rv {
+				t.Errorf("MeasuredRadialVelocity() rv = %v, want %v", gotRV, c.rv)
+			}
+		})
+	}
+}
+
+// TestFromCatalog_AsteroidDiameterAndAlbedo confirms asteroidOptsFrom
+// wires SBDB's decoded phys_par Diameter/Albedo through to the built
+// *plan.Asteroid's PhysicalRadius() — the measured-diameter and
+// albedo-estimate branches are otherwise never exercised by any existing
+// FromCatalog test (ceresLikeTarget sets neither).
+func TestFromCatalog_AsteroidDiameterAndAlbedo(t *testing.T) {
+	t.Run("measured diameter", func(t *testing.T) {
+		c := ceresLikeTarget(resolve.KindAsteroid)
+		c.H, c.HasH, c.G = 3.34, true, 0.12
+		c.HasDiameter, c.Diameter = true, 16.84 // km, real Eros value
+
+		obj := plan.FromCatalog(c, nil)
+
+		ast, ok := obj.(*plan.Asteroid)
+		if !ok {
+			t.Fatalf("FromCatalog: got %T, want *plan.Asteroid", obj)
+		}
+
+		metres, ok := ast.PhysicalRadius()
+		if !ok {
+			t.Fatal("PhysicalRadius: ok = false, want true (measured diameter present)")
+		}
+
+		if want := 16.84 * 1000 / 2; metres != want {
+			t.Errorf("PhysicalRadius() = %v, want %v (16.84 km diameter -> radius in metres)", metres, want)
+		}
+	})
+
+	t.Run("albedo estimate", func(t *testing.T) {
+		c := ceresLikeTarget(resolve.KindAsteroid)
+		c.H, c.HasH, c.G = 3.34, true, 0.12
+		c.HasAlbedo, c.Albedo = true, 0.25 // real Eros value
+
+		obj := plan.FromCatalog(c, nil)
+
+		ast, ok := obj.(*plan.Asteroid)
+		if !ok {
+			t.Fatalf("FromCatalog: got %T, want *plan.Asteroid", obj)
+		}
+
+		metres, ok := ast.PhysicalRadius()
+		if !ok {
+			t.Fatal("PhysicalRadius: ok = false, want true (albedo present, estimate should apply)")
+		}
+
+		if metres <= 0 {
+			t.Errorf("PhysicalRadius() = %v, want a positive H+albedo estimate", metres)
+		}
+	})
 }

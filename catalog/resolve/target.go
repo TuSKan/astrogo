@@ -124,6 +124,18 @@ type Target struct {
 	M2 float64
 	// K2 is the phase coefficient of the target.
 	K2 float64
+	// Diameter is the target's measured physical diameter, in kilometres
+	// (SBDB's "diameter" phys_par entry) — real occultation/thermal/radar
+	// measurement, not derived from H. Set only when HasDiameter is true.
+	Diameter float64
+	// HasDiameter is true if the target has a measured Diameter.
+	HasDiameter bool
+	// Albedo is the target's geometric albedo (SBDB's "albedo" phys_par
+	// entry), used together with H to estimate a diameter for a target
+	// with no direct Diameter measurement. Set only when HasAlbedo is true.
+	Albedo float64
+	// HasAlbedo is true if the target has a measured Albedo.
+	HasAlbedo bool
 	// RadialVelocity is the radial velocity of the target.
 	RadialVelocity float64
 	// G1 is the phase coefficient of the target.
@@ -177,6 +189,11 @@ type Target struct {
 	HasCoord bool
 	// HasOblateness is true if the target has oblateness information.
 	HasOblateness bool
+	// HasRadialVelocity is true if the target has a measured radial
+	// velocity on file — distinguishes a genuine zero RadialVelocity
+	// (moving neither toward nor away, physically legitimate) from no
+	// measurement at all, which RadialVelocity's own zero value can't.
+	HasRadialVelocity bool
 	// Provenance maps each populated field name to the provider name
 	// (Provider.Name(), never Target.Catalog) that contributed its value
 	// in a merged Target. Nil for a Target sourced from a single provider.

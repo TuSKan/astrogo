@@ -4,9 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"golang.org/x/sync/errgroup"
-
 	eph "github.com/TuSKan/astrogo/ephemeris"
+	"github.com/TuSKan/astrogo/internal/parallel"
 
 	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/time"
@@ -164,24 +163,19 @@ func gatherPlanetaryMoons(ctx context.Context, at time.Time, magLimit float64) (
 		byKernel[m.kernel] = append(byKernel[m.kernel], m)
 	}
 
-	providers := make([]eph.Provider, len(kernels))
+	// parallel.Map's own error return is never non-nil here: a failed
+	// kernel fetch yields a nil provider (kept in the slice, filtered
+	// below) rather than a hard error, matching gatherCandidates' own
+	// skip-on-fetch-failure convention -- this kernel's moons are simply
+	// unavailable tonight, not fatal to the others.
+	providers, _ := parallel.Map(kernels, 0, func(_ int, kernel string) (eph.Provider, error) {
+		p, err := eph.NewProvider(ctx, eph.Moons, kernel)
+		if err != nil {
+			return nil, nil //nolint:nilerr,nilnil // see comment above: a failed kernel fetch is a documented skip, not an error
+		}
 
-	g := new(errgroup.Group)
-
-	for i, kernel := range kernels {
-		g.Go(func() error {
-			p, err := eph.NewProvider(ctx, eph.Moons, kernel)
-			if err != nil {
-				return nil //nolint:nilerr // this kernel's moons are simply unavailable tonight — not fatal, matching gatherCandidates' skip-on-fetch-failure convention
-			}
-
-			providers[i] = p
-
-			return nil
-		})
-	}
-
-	_ = g.Wait() // never returns a non-nil error — see the comment above
+		return p, nil
+	})
 
 	var candidates []visibleCandidate
 
