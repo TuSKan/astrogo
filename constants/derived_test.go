@@ -92,6 +92,21 @@ func TestDerived_AllExact(t *testing.T) {
 	}
 }
 
+// TestDerived_StefanBoltzmannConstant checks the value computed from
+// SI2019's c, h, k_B against the published CODATA value
+// (5.670374419e-8 W/(m2 K4), exact since the 2019 SI redefinition) — this
+// is the cross-check the formula could otherwise get subtly wrong (e.g. a
+// missing factor of 2, or pi^5 vs pi^4).
+func TestDerived_StefanBoltzmannConstant(t *testing.T) {
+	sigma := constants.Derived.StefanBoltzmannConstant
+
+	testutil.AssertRelNear(t, "StefanBoltzmannConstant", sigma.Value, 5.670374419e-8, 1e-9)
+
+	if !sigma.Exact {
+		t.Error("StefanBoltzmannConstant.Exact = false, want true (derived from exact SI2019 constants)")
+	}
+}
+
 func TestDerived_Name(t *testing.T) {
 	if got := constants.Derived.Name(); got != "derived" {
 		t.Errorf("Derived.Name() = %q, want %q", got, "derived")

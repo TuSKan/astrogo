@@ -20,4 +20,18 @@
 //
 // Use [Quantity] for general physics (lengths, masses, times) and
 // `angle.Angle` for coordinate geometry and telescope pointing.
+//
+// # Radiometric type safety
+//
+// [Steradian] is dimensionally identical to [One], exactly as [Radian] is —
+// [Dimension] has only the seven SI base exponents and no tag distinguishing
+// a solid angle from a bare dimensionless ratio, so [Radiance] and
+// [Irradiance] compare Compatible and even Equals in dimension despite being
+// physically distinct quantities. This is deliberate, not an oversight: a
+// Steradian addition documents the radiometric units correctly and lets
+// provenance/boundary code serialize them, but it cannot and does not
+// protect a caller from cancelling a radiance into an irradiance by
+// accident. Radiometric type safety in astrogo is provided by the named
+// scalar types in package skybrightness (SpectralRadiance, Irradiance,
+// LuminanceCdM2, ...), not by unit.Dimension — see docs/skybrightness.md §3.
 package unit
