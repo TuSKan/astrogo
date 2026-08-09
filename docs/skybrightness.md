@@ -207,7 +207,9 @@ skybrightness/surrogate/       PURE: reference-data format, inference, basis, do
 skybrightness/calib/           PURE: measurement schema, instrument models, fitting, splits
 skybrightness/dataset/         IO tier: source metadata, download/extract/validate pattern
 skybrightness/dataset/raster/  pure-Go GeoTIFF engine (carried from v1's atlas/{geotiff,grid,sample}.go)
-skybrightness/dataset/granule/ HDF5 reader — the ONLY importer of github.com/scigolib/hdf5
+skybrightness/dataset/granule/ HDF5 reader — the only importer of github.com/scigolib/hdf5
+                                within skybrightness (atmosphere/dataset/cams is a second,
+                                independent importer outside this tree — see its doc comment)
 skybrightness/dataset/blackmarble/  VNP46/VJ146 readers (NASA Black Marble)
 skybrightness/dataset/eog/     EOG VIIRS annual/monthly readers
 skybrightness/dataset/worldatlas/   Falchi 2016 — reference/validation dataset only

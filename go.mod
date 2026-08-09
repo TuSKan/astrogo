@@ -11,6 +11,7 @@ require (
 	github.com/hebl/gofa v1.19.1
 	github.com/joshuaferrara/go-satellite v0.0.0-20220611180459-512638c64e5b
 	github.com/klauspost/pgzip v1.2.6
+	github.com/scigolib/hdf5 v0.14.0
 	github.com/ungerik/go-fs v0.1.0
 	github.com/ungerik/go-fs/s3fs v0.1.0
 )

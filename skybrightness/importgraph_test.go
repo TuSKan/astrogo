@@ -79,7 +79,13 @@ func TestCoreDoesNotImportSiblings(t *testing.T) {
 	}
 }
 
-// ioOnlyImports are only ever legitimate from the IO tier (rule 3).
+// ioOnlyImports are only ever legitimate from the IO tier (rule 3), for
+// packages under skybrightness's own tree. This rule is scoped to
+// skybrightness's siblings, not a repo-wide exclusivity claim:
+// atmosphere/dataset/cams independently imports github.com/scigolib/hdf5
+// from outside this tree entirely (see its own doc comment) — this test
+// has no opinion on that package, and none is needed, since it lives
+// under a different root than corePkg below.
 var ioOnlyImports = []string{
 	"net/http",
 	"github.com/TuSKan/astrogo/remote",
