@@ -11,13 +11,14 @@ import (
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/skybrightness"
 	astrotime "github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // constComponent is a test-only Component reporting a fixed spectral
 // radiance everywhere, tagged with a caller-chosen ComponentID.
 type constComponent struct {
 	id    skybrightness.ComponentID
-	value skybrightness.SpectralRadiance
+	value unit.SpectralRadiance
 }
 
 func (c constComponent) ID() skybrightness.ComponentID { return c.id }
@@ -130,20 +131,20 @@ func TestInvariant_PassbandIntegrationIsLinear(t *testing.T) {
 	grid := skybrightness.DefaultOpticalGrid()
 	pb := skybrightness.Gaussian("test.g", 550, 100)
 
-	s1 := make([]skybrightness.SpectralRadiance, grid.Len())
-	s2 := make([]skybrightness.SpectralRadiance, grid.Len())
+	s1 := make([]unit.SpectralRadiance, grid.Len())
+	s2 := make([]unit.SpectralRadiance, grid.Len())
 
 	for i := range s1 {
 		lam := float64(grid.At(i))
-		s1[i] = skybrightness.SpectralRadiance(1e-9 * math.Exp(-((lam-500)*(lam-500))/5000))
-		s2[i] = skybrightness.SpectralRadiance(2e-9 * math.Exp(-((lam-600)*(lam-600))/8000))
+		s1[i] = unit.SpectralRadiance(1e-9 * math.Exp(-((lam-500)*(lam-500))/5000))
+		s2[i] = unit.SpectralRadiance(2e-9 * math.Exp(-((lam-600)*(lam-600))/8000))
 	}
 
 	const a, b = 2.0, 3.0
 
-	combo := make([]skybrightness.SpectralRadiance, grid.Len())
+	combo := make([]unit.SpectralRadiance, grid.Len())
 	for i := range combo {
-		combo[i] = skybrightness.SpectralRadiance(a*float64(s1[i]) + b*float64(s2[i]))
+		combo[i] = unit.SpectralRadiance(a*float64(s1[i]) + b*float64(s2[i]))
 	}
 
 	i1, err := skybrightness.IntegrateRadiance(grid, s1, pb)
@@ -170,9 +171,9 @@ func TestInvariant_PassbandIntegrationIsLinear(t *testing.T) {
 // TestInvariant_ABRoundTrip asserts ABSurfaceBrightness/ABToBandMean
 // round-trip to << 0.01 mag (the mandate's numerical target).
 func TestInvariant_ABRoundTrip(t *testing.T) {
-	pivot := skybrightness.WavelengthNM(551)
+	pivot := unit.WavelengthNM(551)
 
-	for _, mean := range []skybrightness.SpectralRadiance{1e-9, 1e-12, 1e-15, 5e-10} {
+	for _, mean := range []unit.SpectralRadiance{1e-9, 1e-12, 1e-15, 5e-10} {
 		ab := skybrightness.ABSurfaceBrightness(mean, pivot)
 		back := skybrightness.ABToBandMean(ab, pivot)
 

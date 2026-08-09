@@ -1,6 +1,10 @@
 package skybrightness
 
-import "math"
+import (
+	"math"
+
+	"github.com/TuSKan/astrogo/unit"
+)
 
 // bortleZeroPointCdM2 relates a V mag/arcsec^2 value to photopic luminance:
 // m = -2.5*log10(L_cdm2 / bortleZeroPointCdM2). Carried from astrogo v1's
@@ -44,7 +48,7 @@ var bortleNames = [10]string{
 // model *input* would silently discard precision the rest of the engine
 // worked to preserve. Report a class for a human reader; never feed one
 // back into an atmosphere.Atmosphere or emission model.
-func BortleFromLuminance(l LuminanceCdM2) (class int, name string) {
+func BortleFromLuminance(l unit.LuminanceCdM2) (class int, name string) {
 	mag := math.Inf(1)
 	if l > 0 {
 		mag = -2.5 * math.Log10(float64(l)/bortleZeroPointCdM2)

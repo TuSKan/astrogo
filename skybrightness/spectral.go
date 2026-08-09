@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"math"
+
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // ErrInvalidSpectralGrid is returned by NewSpectralGrid/UniformSpectralGrid
@@ -22,7 +24,7 @@ type GridID [16]byte
 // on, plus the trapezoid quadrature weights precomputed for it. Immutable
 // after construction.
 type SpectralGrid struct {
-	lambda  []WavelengthNM
+	lambda  []unit.WavelengthNM
 	weights []float64
 	id      GridID
 }
@@ -30,12 +32,12 @@ type SpectralGrid struct {
 // NewSpectralGrid builds a SpectralGrid from a strictly increasing
 // wavelength array, copying lambda so the caller's slice can be reused or
 // mutated afterward with no effect on the grid.
-func NewSpectralGrid(lambda []WavelengthNM) (SpectralGrid, error) {
+func NewSpectralGrid(lambda []unit.WavelengthNM) (SpectralGrid, error) {
 	if len(lambda) < 2 {
 		return SpectralGrid{}, fmt.Errorf("%w: need at least 2 points, got %d", ErrInvalidSpectralGrid, len(lambda))
 	}
 
-	cp := make([]WavelengthNM, len(lambda))
+	cp := make([]unit.WavelengthNM, len(lambda))
 	copy(cp, lambda)
 
 	for i := 1; i < len(cp); i++ {
@@ -50,7 +52,7 @@ func NewSpectralGrid(lambda []WavelengthNM) (SpectralGrid, error) {
 
 // UniformSpectralGrid builds a SpectralGrid of n evenly spaced points from
 // lo to hi inclusive.
-func UniformSpectralGrid(lo, hi WavelengthNM, n int) (SpectralGrid, error) {
+func UniformSpectralGrid(lo, hi unit.WavelengthNM, n int) (SpectralGrid, error) {
 	if n < 2 {
 		return SpectralGrid{}, fmt.Errorf("%w: n must be >= 2, got %d", ErrInvalidSpectralGrid, n)
 	}
@@ -59,11 +61,11 @@ func UniformSpectralGrid(lo, hi WavelengthNM, n int) (SpectralGrid, error) {
 		return SpectralGrid{}, fmt.Errorf("%w: hi (%g) must be > lo (%g)", ErrInvalidSpectralGrid, float64(hi), float64(lo))
 	}
 
-	lambda := make([]WavelengthNM, n)
-	step := (hi - lo) / WavelengthNM(n-1)
+	lambda := make([]unit.WavelengthNM, n)
+	step := (hi - lo) / unit.WavelengthNM(n-1)
 
 	for i := range lambda {
-		lambda[i] = lo + WavelengthNM(i)*step
+		lambda[i] = lo + unit.WavelengthNM(i)*step
 	}
 
 	lambda[n-1] = hi // avoid float accumulation drift on the last point
@@ -86,11 +88,11 @@ func DefaultOpticalGrid() SpectralGrid {
 func (g SpectralGrid) Len() int { return len(g.lambda) }
 
 // At returns the i'th wavelength.
-func (g SpectralGrid) At(i int) WavelengthNM { return g.lambda[i] }
+func (g SpectralGrid) At(i int) unit.WavelengthNM { return g.lambda[i] }
 
 // Lambda returns a read-only view of the grid's wavelengths. Callers must
 // not mutate the returned slice.
-func (g SpectralGrid) Lambda() []WavelengthNM { return g.lambda }
+func (g SpectralGrid) Lambda() []unit.WavelengthNM { return g.lambda }
 
 // Weights returns the precomputed trapezoid quadrature weights, in
 // nanometres, one per wavelength point. Callers must not mutate the
@@ -101,7 +103,7 @@ func (g SpectralGrid) Weights() []float64 { return g.weights }
 func (g SpectralGrid) ID() GridID { return g.id }
 
 // Covers reports whether the grid's range fully spans [lo, hi].
-func (g SpectralGrid) Covers(lo, hi WavelengthNM) bool {
+func (g SpectralGrid) Covers(lo, hi unit.WavelengthNM) bool {
 	if len(g.lambda) == 0 {
 		return false
 	}
@@ -109,7 +111,7 @@ func (g SpectralGrid) Covers(lo, hi WavelengthNM) bool {
 	return g.lambda[0] <= lo && g.lambda[len(g.lambda)-1] >= hi
 }
 
-func trapezoidWeights(lambda []WavelengthNM) []float64 {
+func trapezoidWeights(lambda []unit.WavelengthNM) []float64 {
 	n := len(lambda)
 	w := make([]float64, n)
 
@@ -127,7 +129,7 @@ func trapezoidWeights(lambda []WavelengthNM) []float64 {
 	return w
 }
 
-func gridID(lambda []WavelengthNM) GridID {
+func gridID(lambda []unit.WavelengthNM) GridID {
 	h := sha256.New()
 	buf := make([]byte, 8)
 
@@ -154,12 +156,12 @@ func gridID(lambda []WavelengthNM) GridID {
 // allocation-flat regardless of how many directions are requested.
 type SpectralField struct {
 	nDir, nLambda int
-	data          []SpectralRadiance
+	data          []unit.SpectralRadiance
 }
 
 // NewSpectralField allocates a zeroed field of the given dimensions.
 func NewSpectralField(nDir, nLambda int) SpectralField {
-	return SpectralField{nDir: nDir, nLambda: nLambda, data: make([]SpectralRadiance, nDir*nLambda)}
+	return SpectralField{nDir: nDir, nLambda: nLambda, data: make([]unit.SpectralRadiance, nDir*nLambda)}
 }
 
 // Dims returns the field's dimensions.
@@ -171,16 +173,16 @@ func (f SpectralField) Empty() bool { return len(f.data) == 0 }
 
 // Row returns direction i's spectrum as a mutable, no-copy view into the
 // field's backing array.
-func (f SpectralField) Row(i int) []SpectralRadiance {
+func (f SpectralField) Row(i int) []unit.SpectralRadiance {
 	return f.data[i*f.nLambda : (i+1)*f.nLambda]
 }
 
 // At returns the value at direction dir, wavelength index k.
-func (f SpectralField) At(dir, k int) SpectralRadiance { return f.data[dir*f.nLambda+k] }
+func (f SpectralField) At(dir, k int) unit.SpectralRadiance { return f.data[dir*f.nLambda+k] }
 
 // Clone returns a deep copy.
 func (f SpectralField) Clone() SpectralField {
-	cp := make([]SpectralRadiance, len(f.data))
+	cp := make([]unit.SpectralRadiance, len(f.data))
 	copy(cp, f.data)
 
 	return SpectralField{nDir: f.nDir, nLambda: f.nLambda, data: cp}
@@ -206,7 +208,7 @@ func (f *SpectralField) AddScaled(o SpectralField, s float64) {
 	}
 
 	for i := range f.data {
-		f.data[i] += SpectralRadiance(s) * o.data[i]
+		f.data[i] += unit.SpectralRadiance(s) * o.data[i]
 	}
 }
 

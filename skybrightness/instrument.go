@@ -4,6 +4,9 @@ import (
 	"errors"
 	"fmt"
 	"math"
+
+	"github.com/TuSKan/astrogo/constants"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // ErrInvalidInstrument is returned by Instrument.Validate.
@@ -55,10 +58,10 @@ func (i Instrument) Validate() error {
 // BackgroundRate converts a passband-integrated sky photon radiance into a
 // per-pixel detector background rate: aperture collecting area x pixel
 // solid angle x throughput x quantum efficiency.
-func (i Instrument) BackgroundRate(sky PhotonRadiance) ElectronsPerPixelPerSecond {
-	apertureArea := math.Pi * (i.ApertureM / 2) * (i.ApertureM / 2) // m^2
-	pixelRad := i.PixelScaleArcsec * math.Sqrt(arcsecond2SR)        // pixel scale, radians
-	pixelSolidAngle := pixelRad * pixelRad                          // steradians
+func (i Instrument) BackgroundRate(sky unit.PhotonRadiance) unit.ElectronsPerPixelPerSecond {
+	apertureArea := math.Pi * (i.ApertureM / 2) * (i.ApertureM / 2)                   // m^2
+	pixelRad := i.PixelScaleArcsec * math.Sqrt(constants.ArcsecondSquaredToSteradian) // pixel scale, radians
+	pixelSolidAngle := pixelRad * pixelRad                                            // steradians
 
-	return ElectronsPerPixelPerSecond(float64(sky) * apertureArea * pixelSolidAngle * i.Throughput * i.QuantumEfficiency)
+	return unit.ElectronsPerPixelPerSecond(float64(sky) * apertureArea * pixelSolidAngle * i.Throughput * i.QuantumEfficiency)
 }

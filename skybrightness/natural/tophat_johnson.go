@@ -1,6 +1,9 @@
 package natural
 
-import "github.com/TuSKan/astrogo/skybrightness"
+import (
+	"github.com/TuSKan/astrogo/skybrightness"
+	"github.com/TuSKan/astrogo/unit"
+)
 
 // TopHatJohnsonV returns an analytic, flat-top-hat stand-in for the
 // Johnson V passband, in astrogo v1's Garstang-nanolambert convention —
@@ -19,10 +22,10 @@ func TopHatJohnsonV() *skybrightness.Passband {
 		ID:         "tophat.johnson.V",
 		System:     skybrightness.SystemVega,
 		Detector:   skybrightness.EnergyIntegrating,
-		Wavelength: []skybrightness.WavelengthNM{topHatVLo, topHatVHi},
+		Wavelength: []unit.WavelengthNM{topHatVLo, topHatVHi},
 		Response:   []float64{1, 1},
 		VegaZP: &skybrightness.VegaZeroPoint{
-			MeanFlambda: skybrightness.SpectralRadiance(garstangVegaZeroPoint),
+			MeanFlambda: unit.SpectralRadiance(garstangVegaZeroPoint),
 			Spectrum:    "Garstang nanolambert convention, not a real Vega spectrum",
 			Uncertainty: 0,
 		},
@@ -51,7 +54,7 @@ func TopHatVGrid() skybrightness.SpectralGrid {
 // integrates back to the exact original V magnitude through
 // VegaSurfaceBrightness against TopHatJohnsonV (see garstang_units.go).
 // len(values) must equal out's direction count.
-func fillFlat(grid skybrightness.SpectralGrid, out skybrightness.SpectralField, values []skybrightness.SpectralRadiance) {
+func fillFlat(grid skybrightness.SpectralGrid, out skybrightness.SpectralField, values []unit.SpectralRadiance) {
 	lambda := grid.Lambda()
 
 	for d, v := range values {

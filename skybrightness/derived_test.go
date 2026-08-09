@@ -9,18 +9,19 @@ import (
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/skybrightness"
 	"github.com/TuSKan/astrogo/skybrightness/natural"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // fixedTransmission is a TransmissionModel test double returning a
 // constant transmission at every wavelength, so Point's
 // ComputeTransmission path has something deterministic to reproduce.
-type fixedTransmission struct{ value skybrightness.Transmission }
+type fixedTransmission struct{ value unit.Transmission }
 
 func (fixedTransmission) Algorithm() skybrightness.AlgorithmRef {
 	return skybrightness.AlgorithmRef{Name: "fixedTransmission", Version: "test"}
 }
 
-func (f fixedTransmission) LineOfSight(_ coord.AltAz, _ *atmosphere.Atmosphere, g skybrightness.SpectralGrid, out []skybrightness.Transmission) error {
+func (f fixedTransmission) LineOfSight(_ coord.AltAz, _ *atmosphere.Atmosphere, g skybrightness.SpectralGrid, out []unit.Transmission) error {
 	for i := range out {
 		out[i] = f.value
 	}
@@ -190,7 +191,7 @@ func TestPoint_IntegrationErrorSurfaces(t *testing.T) {
 	// coverage, guaranteed to fail resampleResponse's coverage check.
 	badPassband := &skybrightness.Passband{
 		ID:         "bad-passband",
-		Wavelength: []skybrightness.WavelengthNM{50, 100},
+		Wavelength: []unit.WavelengthNM{50, 100},
 		Response:   []float64{1, 1},
 	}
 

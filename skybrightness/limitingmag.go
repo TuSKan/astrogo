@@ -1,6 +1,10 @@
 package skybrightness
 
-import "math"
+import (
+	"math"
+
+	"github.com/TuSKan/astrogo/unit"
+)
 
 // LimitingMagInput is the input to LimitingMagModel.LimitingMagnitude — a
 // sky background expressed in both magnitude systems (a model uses
@@ -8,8 +12,8 @@ import "math"
 // along the line of sight.
 type LimitingMagInput struct {
 	Passband PassbandID
-	SkyVega  SurfaceBrightnessVega
-	SkyAB    SurfaceBrightnessAB
+	SkyVega  unit.SurfaceBrightnessVega
+	SkyAB    unit.SurfaceBrightnessAB
 	Airmass  float64
 }
 

@@ -9,6 +9,7 @@ import (
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/skybrightness"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 func skyTestFixture(t *testing.T) (*Site, time.Time, *coord.Context) {
@@ -44,14 +45,14 @@ const (
 	testGarstangExp   = 20.7233
 )
 
-func testVegaZeroPoint() skybrightness.SpectralRadiance {
-	return skybrightness.SpectralRadiance(testGarstangScale * math.Exp(testGarstangExp))
+func testVegaZeroPoint() unit.SpectralRadiance {
+	return unit.SpectralRadiance(testGarstangScale * math.Exp(testGarstangExp))
 }
 
 func testPassband() *skybrightness.Passband {
 	return &skybrightness.Passband{
 		ID: "test.V", System: skybrightness.SystemVega, Detector: skybrightness.EnergyIntegrating,
-		Wavelength: []skybrightness.WavelengthNM{470, 700}, Response: []float64{1, 1},
+		Wavelength: []unit.WavelengthNM{470, 700}, Response: []float64{1, 1},
 		VegaZP: &skybrightness.VegaZeroPoint{MeanFlambda: testVegaZeroPoint()},
 	}
 }
@@ -69,7 +70,7 @@ func (fixedSQMComponent) Algorithm() skybrightness.AlgorithmRef {
 }
 
 func (f fixedSQMComponent) Eval(_ context.Context, in skybrightness.EvalInput, out skybrightness.SpectralField) (skybrightness.ComponentReport, error) {
-	nl := skybrightness.SpectralRadiance(testGarstangScale * math.Exp(testGarstangExp-0.92104*f.sqm))
+	nl := unit.SpectralRadiance(testGarstangScale * math.Exp(testGarstangExp-0.92104*f.sqm))
 
 	for d := range in.Directions {
 		row := out.Row(d)

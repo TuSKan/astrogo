@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/TuSKan/astrogo/skybrightness"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // DefaultConstantAirglowV is the default dark-sky airglow + diffuse
@@ -54,9 +55,9 @@ func (a *ConstantAirglow) Eval(_ context.Context, in skybrightness.EvalInput, ou
 		sb = DefaultConstantAirglowV
 	}
 
-	nl := skybrightness.SpectralRadiance(garstangNanolambert(sb))
+	nl := unit.SpectralRadiance(garstangNanolambert(sb))
 
-	values := make([]skybrightness.SpectralRadiance, nDir)
+	values := make([]unit.SpectralRadiance, nDir)
 	for i := range values {
 		values[i] = nl
 	}

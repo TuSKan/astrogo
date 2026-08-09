@@ -10,6 +10,7 @@ import (
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/skybrightness"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // ErrNilAstroContext is returned when VBandMoonlight is evaluated with a
@@ -109,7 +110,7 @@ func (m *VBandMoonlight) Eval(_ context.Context, in skybrightness.EvalInput, out
 		return skybrightness.ComponentReport{}, fmt.Errorf("natural: moon alt-az: %w", err)
 	}
 
-	values := make([]skybrightness.SpectralRadiance, len(in.Directions))
+	values := make([]unit.SpectralRadiance, len(in.Directions))
 
 	if moonAA.Alt().Degrees() > 0 {
 		sunVec, err := eph.Position(m.provider, eph.Sun, t)
@@ -141,7 +142,7 @@ func (m *VBandMoonlight) Eval(_ context.Context, in skybrightness.EvalInput, out
 				nl = 0
 			}
 
-			values[i] = skybrightness.SpectralRadiance(nl)
+			values[i] = unit.SpectralRadiance(nl)
 		}
 	}
 

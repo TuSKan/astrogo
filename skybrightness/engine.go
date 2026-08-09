@@ -11,6 +11,7 @@ import (
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/internal/parallel"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // ErrDuplicateComponent is returned by NewCompositeEngine when two
@@ -38,7 +39,7 @@ type TransmissionModel interface {
 	// LineOfSight fills out (length g.Len()) with the transmission at
 	// each of g's wavelengths, for the path from top-of-atmosphere to an
 	// observer looking toward dir under atmospheric state st.
-	LineOfSight(dir coord.AltAz, st *atmosphere.Atmosphere, g SpectralGrid, out []Transmission) error
+	LineOfSight(dir coord.AltAz, st *atmosphere.Atmosphere, g SpectralGrid, out []unit.Transmission) error
 }
 
 // Engine is the spectral sky-radiance evaluator.
@@ -209,13 +210,13 @@ func (e *CompositeEngine) evaluateOne(ctx context.Context, req Request, scratch 
 		return Result{}, ErrNonFiniteComponentSum
 	}
 
-	var transmission []Transmission
+	var transmission []unit.Transmission
 
 	transAlgo := AlgorithmRef{}
 
 	if req.Options.ComputeTransmission && e.cfg.Transmission != nil {
 		transAlgo = e.cfg.Transmission.Algorithm()
-		transmission = make([]Transmission, nDir*nLambda)
+		transmission = make([]unit.Transmission, nDir*nLambda)
 
 		for d, dir := range req.Directions {
 			if err := e.cfg.Transmission.LineOfSight(dir, atm, req.Grid, transmission[d*nLambda:(d+1)*nLambda]); err != nil {
@@ -277,11 +278,11 @@ func (e *CompositeEngine) computeDerived(req Request, res Result) DerivedQuantit
 
 	if opts.Derived.Mask.Has(DerivePassbands) {
 		for _, pb := range req.Passbands {
-			pr := PassbandResult{Passband: pb.ID, AB: make([]SurfaceBrightnessAB, nDir)}
+			pr := PassbandResult{Passband: pb.ID, AB: make([]unit.SurfaceBrightnessAB, nDir)}
 
 			hasVega := pb.VegaZP != nil
 			if hasVega {
-				pr.Vega = make([]SurfaceBrightnessVega, nDir)
+				pr.Vega = make([]unit.SurfaceBrightnessVega, nDir)
 			}
 
 			pivot := pb.PivotWavelength()
@@ -289,7 +290,7 @@ func (e *CompositeEngine) computeDerived(req Request, res Result) DerivedQuantit
 			for i := range nDir {
 				mean, err := BandMeanSpectralRadiance(req.Grid, res.Total.Row(i), pb)
 				if err != nil {
-					pr.AB[i] = SurfaceBrightnessAB(math.NaN())
+					pr.AB[i] = unit.SurfaceBrightnessAB(math.NaN())
 					continue
 				}
 
@@ -308,7 +309,7 @@ func (e *CompositeEngine) computeDerived(req Request, res Result) DerivedQuantit
 	}
 
 	if opts.Derived.Mask.Has(DeriveLuminance) {
-		d.Luminance = make([]LuminanceCdM2, nDir)
+		d.Luminance = make([]unit.LuminanceCdM2, nDir)
 
 		for i := range nDir {
 			if v, err := PhotopicLuminance(req.Grid, res.Total.Row(i), photopicPassband(req.Grid)); err == nil {
@@ -361,7 +362,7 @@ func (e *CompositeEngine) computeDerived(req Request, res Result) DerivedQuantit
 	}
 
 	if opts.Derived.Mask.Has(DeriveDetectorBackground) && opts.Derived.Instrument != nil && len(req.Passbands) > 0 {
-		d.DetectorBackground = make([]ElectronsPerPixelPerSecond, nDir)
+		d.DetectorBackground = make([]unit.ElectronsPerPixelPerSecond, nDir)
 		pb := req.Passbands[0]
 
 		for i := range nDir {
@@ -398,12 +399,12 @@ func (e *CompositeEngine) computeDerived(req Request, res Result) DerivedQuantit
 				}
 			}
 
-			d.MeanAllSky = Radiance(sum / float64(len(vals)))
+			d.MeanAllSky = unit.Radiance(sum / float64(len(vals)))
 			d.BrightestDirection = best
 
 			sorted := append([]float64(nil), vals...)
 			sort.Float64s(sorted)
-			d.MedianAllSky = Radiance(sorted[len(sorted)/2])
+			d.MedianAllSky = unit.Radiance(sorted[len(sorted)/2])
 		}
 	}
 
@@ -428,7 +429,7 @@ func (e *CompositeEngine) computeDerived(req Request, res Result) DerivedQuantit
 // with no passband weighting) — used only for the anthropogenic/natural
 // ratio, which compares two components' bolometric contributions, not a
 // passband-specific brightness.
-func sumRow(g SpectralGrid, spec []SpectralRadiance) float64 {
+func sumRow(g SpectralGrid, spec []unit.SpectralRadiance) float64 {
 	w := g.Weights()
 	sum := 0.0
 
@@ -524,7 +525,7 @@ func computeUncertainty(req Request, res Result) UncertaintyResult {
 	// via ComponentUncertainty.Spectral).
 	totalRelSigma := math.Sqrt(totalVariance)
 	for i := range relSigma.data {
-		relSigma.data[i] = SpectralRadiance(totalRelSigma)
+		relSigma.data[i] = unit.SpectralRadiance(totalRelSigma)
 	}
 
 	p05 := res.Total.Clone()
@@ -546,6 +547,6 @@ func scaleField(f *SpectralField, s float64) {
 	}
 
 	for i := range f.data {
-		f.data[i] *= SpectralRadiance(s)
+		f.data[i] *= unit.SpectralRadiance(s)
 	}
 }

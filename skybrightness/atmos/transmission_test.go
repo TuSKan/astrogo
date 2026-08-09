@@ -8,6 +8,7 @@ import (
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/skybrightness"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // TestRayleighOnly_ZenithHasHighestTransmission confirms transmission is
@@ -22,12 +23,12 @@ func TestRayleighOnly_ZenithHasHighestTransmission(t *testing.T) {
 		t.Fatalf("build atmosphere: %v", err)
 	}
 
-	zenith := make([]skybrightness.Transmission, grid.Len())
+	zenith := make([]unit.Transmission, grid.Len())
 	if err := r.LineOfSight(coord.NewAltAz(angle.Deg(90), angle.Deg(0)), atm, grid, zenith); err != nil {
 		t.Fatalf("LineOfSight(zenith): %v", err)
 	}
 
-	low := make([]skybrightness.Transmission, grid.Len())
+	low := make([]unit.Transmission, grid.Len())
 	if err := r.LineOfSight(coord.NewAltAz(angle.Deg(15), angle.Deg(0)), atm, grid, low); err != nil {
 		t.Fatalf("LineOfSight(low): %v", err)
 	}
@@ -55,7 +56,7 @@ func TestRayleighOnly_BluerIsMoreAttenuated(t *testing.T) {
 		t.Fatalf("build atmosphere: %v", err)
 	}
 
-	out := make([]skybrightness.Transmission, grid.Len())
+	out := make([]unit.Transmission, grid.Len())
 	if err := r.LineOfSight(coord.NewAltAz(angle.Deg(45), angle.Deg(0)), atm, grid, out); err != nil {
 		t.Fatalf("LineOfSight: %v", err)
 	}
@@ -77,7 +78,7 @@ func TestRayleighOnly_BelowHorizonErrors(t *testing.T) {
 		t.Fatalf("build atmosphere: %v", err)
 	}
 
-	out := make([]skybrightness.Transmission, grid.Len())
+	out := make([]unit.Transmission, grid.Len())
 	if err := r.LineOfSight(coord.NewAltAz(angle.Deg(-5), angle.Deg(0)), atm, grid, out); err == nil {
 		t.Error("expected an error for a below-horizon direction, got nil")
 	}
@@ -101,12 +102,12 @@ func TestRayleighOnly_HigherPressureMoreAttenuation(t *testing.T) {
 		t.Fatalf("build high-altitude atmosphere: %v", err)
 	}
 
-	tSea := make([]skybrightness.Transmission, grid.Len())
+	tSea := make([]unit.Transmission, grid.Len())
 	if err := r.LineOfSight(dir, seaLevel, grid, tSea); err != nil {
 		t.Fatalf("LineOfSight(sea level): %v", err)
 	}
 
-	tHigh := make([]skybrightness.Transmission, grid.Len())
+	tHigh := make([]unit.Transmission, grid.Len())
 	if err := r.LineOfSight(dir, highAlt, grid, tHigh); err != nil {
 		t.Fatalf("LineOfSight(high altitude): %v", err)
 	}

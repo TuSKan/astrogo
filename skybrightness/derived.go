@@ -7,6 +7,7 @@ import (
 
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // PointQuery is the input to Point — the convenience half of this
@@ -49,7 +50,7 @@ type PointQuery struct {
 // true.
 type ComponentBrightness struct {
 	ID       ComponentID
-	Radiance Radiance
+	Radiance unit.Radiance
 	RelSigma float64
 	Quality  QualityFlags
 }
@@ -57,10 +58,10 @@ type ComponentBrightness struct {
 // PointResult is Point's output: everything a caller typically needs from
 // one direction, already reduced to scalars.
 type PointResult struct {
-	AB          SurfaceBrightnessAB
-	Vega        SurfaceBrightnessVega // NaN when Passband has no VegaZeroPoint
-	Radiance    Radiance
-	Luminance   LuminanceCdM2
+	AB          unit.SurfaceBrightnessAB
+	Vega        unit.SurfaceBrightnessVega // NaN when Passband has no VegaZeroPoint
+	Radiance    unit.Radiance
+	Luminance   unit.LuminanceCdM2
 	Sigma       float64 // relative 1-sigma fraction; 0 when uncertainty wasn't computed
 	AnthroRatio float64
 	Quality     QualityFlags
@@ -71,7 +72,7 @@ type PointResult struct {
 	// Transmission is the per-wavelength line-of-sight transmission,
 	// aligned to the evaluation grid — nil unless
 	// PointQuery.ComputeTransmission was true.
-	Transmission []Transmission
+	Transmission []unit.Transmission
 	// LimitingMagnitude is the derived limiting magnitude for
 	// PointQuery.Passband, valid only when HasLimitingMag is true — which
 	// requires both PointQuery.LimitingMag and PointQuery.Passband to have
@@ -182,7 +183,7 @@ func Point(ctx context.Context, e Engine, q PointQuery) (PointResult, error) {
 			if len(pr.Vega) > 0 {
 				out.Vega = pr.Vega[0]
 			} else {
-				out.Vega = SurfaceBrightnessVega(math.NaN())
+				out.Vega = unit.SurfaceBrightnessVega(math.NaN())
 			}
 		}
 	}

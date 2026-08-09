@@ -16,6 +16,7 @@ import (
 
 	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/skybrightness"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // ErrInvalidBundle is returned by OpenBundle for a malformed manifest or
@@ -97,7 +98,7 @@ func loadCurve(dir string, c manifestCurve) (*skybrightness.Passband, error) {
 
 	if c.VegaMeanFlambda > 0 {
 		pb.VegaZP = &skybrightness.VegaZeroPoint{
-			MeanFlambda: skybrightness.SpectralRadiance(c.VegaMeanFlambda),
+			MeanFlambda: unit.SpectralRadiance(c.VegaMeanFlambda),
 			Spectrum:    c.VegaSpectrum,
 			Uncertainty: c.VegaUncertainty,
 		}
@@ -110,7 +111,7 @@ func loadCurve(dir string, c manifestCurve) (*skybrightness.Passband, error) {
 	return pb, nil
 }
 
-func parseCurveCSV(r io.Reader) ([]skybrightness.WavelengthNM, []float64, error) {
+func parseCurveCSV(r io.Reader) ([]unit.WavelengthNM, []float64, error) {
 	cr := csv.NewReader(r)
 
 	rows, err := cr.ReadAll()
@@ -122,7 +123,7 @@ func parseCurveCSV(r io.Reader) ([]skybrightness.WavelengthNM, []float64, error)
 		return nil, nil, fmt.Errorf("%w: curve CSV needs a header row and >= 1 data row", ErrInvalidBundle)
 	}
 
-	wl := make([]skybrightness.WavelengthNM, 0, len(rows)-1)
+	wl := make([]unit.WavelengthNM, 0, len(rows)-1)
 	resp := make([]float64, 0, len(rows)-1)
 
 	for _, row := range rows[1:] { // skip header
@@ -140,7 +141,7 @@ func parseCurveCSV(r io.Reader) ([]skybrightness.WavelengthNM, []float64, error)
 			return nil, nil, fmt.Errorf("%w: bad response %q", ErrInvalidBundle, row[1])
 		}
 
-		wl = append(wl, skybrightness.WavelengthNM(w))
+		wl = append(wl, unit.WavelengthNM(w))
 		resp = append(resp, r)
 	}
 

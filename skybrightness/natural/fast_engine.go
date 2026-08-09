@@ -29,8 +29,7 @@ type FastConfig struct {
 // NewFastEngine builds a skybrightness.Engine running only the two fast,
 // simplified components (constant airglow + Krisciunas & Schaefer
 // scattered moonlight) in ModeFast — the fastest, fully-offline,
-// zero-data-dependency engine this package offers, and the direct
-// successor to astrogo v1's default behavior. See docs/skybrightness.md
+// zero-data-dependency engine this package offers. See docs/skybrightness.md
 // §15.
 func NewFastEngine(cfg FastConfig) (skybrightness.Engine, error) {
 	k := cfg.ExtinctionV

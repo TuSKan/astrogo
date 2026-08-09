@@ -305,3 +305,41 @@ Full verification gate re-run clean after all three changes: `gofmt`, `go build`
 `go test ./...`, and the tagged suite (two unrelated live-network flakes observed —
 `catalog/gaia`'s Gaia TAP-server timeout and `ephemeris/jpl`'s JPL Horizons 503 — neither in a
 package this round touched; both are transient external-service issues, not regressions).
+
+## Addendum 3 — remove `skybrightness/units.go` (same branch, still before Phase 2)
+
+Asked directly why `skybrightness/units.go`'s 26-member type-alias block existed at all, the
+honest answer was ergonomics only (short in-package names instead of the `unit.`-qualified
+ones) — `unit` was already the single source of truth for every one of these quantity types,
+confirmed by `unit/doc.go`'s own doc comment predating this change. The user asked for the
+file to be removed outright.
+
+**What changed**: `skybrightness/units.go` is deleted. Every occurrence of a bare type name
+(`SpectralRadiance`, `WavelengthNM`, `Radiance`, `PhotonRadiance`, `SurfaceBrightnessAB`,
+`SurfaceBrightnessVega`, `LuminanceCdM2`, `Transmission`, `Irradiance`,
+`ElectronsPerPixelPerSecond`) across `skybrightness` core (`spectral.go`, `passband.go`,
+`result.go`, `derived.go`, `engine.go`, `bortle.go`, `instrument.go`, `limitingmag.go`,
+`scratch.go`) and its `natural`/`atmos`/`dataset/passband` siblings is now qualified as
+`unit.X`, with `unit` imported directly wherever it wasn't already. `ToPhoton`/`ToEnergy`
+(package-level var aliases onto `constants.ToPhoton`/`constants.ToEnergy`) and `arcsecond2SR`
+(onto `constants.ArcsecondSquaredToSteradian`) are gone the same way — call sites in
+`passband.go` and `instrument.go` now call `constants.ToPhoton`/`constants.ArcsecondSquaredToSteradian`
+directly. `ToEnergy` turned out to be genuinely dead code (declared, never called anywhere,
+inside or outside the package) — confirmed by grep before removing it, not assumed.
+
+**How this was done safely**: a blind identifier-wide find/replace was not safe on its own —
+several of these exact names are also used as **struct field names** whose type happens to
+share the name (`ComponentBrightness.Radiance Radiance`, `PointResult.Transmission
+[]Transmission`, `Scratch`'s `Transmission()` accessor method) — replacing the field/method
+name too would have been a silent, wrong edit that still compiles as a field-name change but
+breaks composite-literal call sites elsewhere. The actual method: delete the file, then use
+`go build`'s own `undefined: X` error list (via `go build -gcflags="-e"` to see every error at
+once instead of the default 10-per-package cap) as the exact, compiler-verified worklist —
+field names and method names are never flagged this way, only genuine type references are, so
+every fix applied was confirmed necessary and complete by the compiler itself, not by
+pattern-matching. Iterated to a clean `go build ./...`, then `go vet`/tests surfaced the
+remaining test-file-only references the same way.
+
+Full verification gate re-run clean: `gofmt`, `go build`, `go vet` (untagged and tagged),
+`golangci-lint run --max-issues-per-linter=0 --max-same-issues=0` (0 issues), full untagged
+`go test ./...` green.

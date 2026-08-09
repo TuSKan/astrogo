@@ -6,6 +6,7 @@ import (
 	"math"
 
 	"github.com/TuSKan/astrogo/constants"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // PassbandID names one passband/response curve.
@@ -57,9 +58,9 @@ const (
 // band-mean spectral radiance in this band, which SurfaceBrightnessVega
 // values in this passband are magnitudes relative to.
 type VegaZeroPoint struct {
-	MeanFlambda SpectralRadiance // Vega's band-mean spectral radiance in this band
-	Spectrum    string           // e.g. "CALSPEC alpha_lyr_stis_011"
-	Uncertainty float64          // mag
+	MeanFlambda unit.SpectralRadiance // Vega's band-mean spectral radiance in this band
+	Spectrum    string                // e.g. "CALSPEC alpha_lyr_stis_011"
+	Uncertainty float64               // mag
 }
 
 // ErrInvalidPassband is returned by Passband.Validate.
@@ -130,9 +131,9 @@ type Passband struct {
 	ID         PassbandID
 	System     MagSystem
 	Detector   DetectorType
-	Wavelength []WavelengthNM // strictly increasing
-	Response   []float64      // dimensionless, >= 0
-	VegaZP     *VegaZeroPoint // nil unless calibrated
+	Wavelength []unit.WavelengthNM // strictly increasing
+	Response   []float64           // dimensionless, >= 0
+	VegaZP     *VegaZeroPoint      // nil unless calibrated
 	Version    DatasetVersion
 	Source     SourceRef
 }
@@ -168,7 +169,7 @@ func (p *Passband) Validate() error {
 }
 
 // Range returns the passband's native wavelength range.
-func (p *Passband) Range() (lo, hi WavelengthNM) {
+func (p *Passband) Range() (lo, hi unit.WavelengthNM) {
 	return p.Wavelength[0], p.Wavelength[len(p.Wavelength)-1]
 }
 
@@ -177,7 +178,7 @@ func (p *Passband) Range() (lo, hi WavelengthNM) {
 // The pivot wavelength is the point at which photon-flux and energy-flux
 // calibration agree, and is the conventional reference wavelength for
 // ABSurfaceBrightness.
-func (p *Passband) PivotWavelength() WavelengthNM {
+func (p *Passband) PivotWavelength() unit.WavelengthNM {
 	num, den := 0.0, 0.0
 
 	for i := range p.Wavelength {
@@ -191,14 +192,14 @@ func (p *Passband) PivotWavelength() WavelengthNM {
 		return 0
 	}
 
-	return WavelengthNM(math.Sqrt(num / den))
+	return unit.WavelengthNM(math.Sqrt(num / den))
 }
 
 // EffectiveWavelength returns the passband's response-weighted mean
 // wavelength: integral(R*lambda dlambda) / integral(R dlambda). A simpler,
 // deliberately different quantity from PivotWavelength (which accounts for
 // photon-vs-energy weighting) — see docs/skybrightness.md §3.
-func (p *Passband) EffectiveWavelength() WavelengthNM {
+func (p *Passband) EffectiveWavelength() unit.WavelengthNM {
 	num, den := 0.0, 0.0
 
 	for i := range p.Wavelength {
@@ -211,10 +212,10 @@ func (p *Passband) EffectiveWavelength() WavelengthNM {
 		return 0
 	}
 
-	return WavelengthNM(num / den)
+	return unit.WavelengthNM(num / den)
 }
 
-func nativeWeight(lambda []WavelengthNM, i int) float64 {
+func nativeWeight(lambda []unit.WavelengthNM, i int) float64 {
 	n := len(lambda)
 
 	switch {
@@ -232,10 +233,10 @@ func nativeWeight(lambda []WavelengthNM, i int) float64 {
 // TopHat returns an analytic rectangular passband, Response == 1 across
 // [lo, hi] and 0 outside — for tests and quick analytic use, never a
 // substitute for a real response curve.
-func TopHat(id PassbandID, lo, hi WavelengthNM) *Passband {
+func TopHat(id PassbandID, lo, hi unit.WavelengthNM) *Passband {
 	return &Passband{
 		ID: id, System: SystemPhotometricNone, Detector: PhotonCounting,
-		Wavelength: []WavelengthNM{lo, hi}, Response: []float64{1, 1},
+		Wavelength: []unit.WavelengthNM{lo, hi}, Response: []float64{1, 1},
 		Source: SourceRef{Name: "skybrightness.TopHat (analytic, test-grade)", Fidelity: FidelitySynthetic},
 	}
 }
@@ -243,18 +244,18 @@ func TopHat(id PassbandID, lo, hi WavelengthNM) *Passband {
 // Gaussian returns an analytic Gaussian passband centered at center with
 // the given full width at half maximum — for tests and quick analytic
 // use, never a substitute for a real response curve.
-func Gaussian(id PassbandID, center, fwhm WavelengthNM) *Passband {
+func Gaussian(id PassbandID, center, fwhm unit.WavelengthNM) *Passband {
 	sigma := float64(fwhm) / 2.3548200450309493 // 2*sqrt(2*ln2)
 	n := 41
 	lo := float64(center) - 3*sigma
 	step := 6 * sigma / float64(n-1)
 
-	wl := make([]WavelengthNM, n)
+	wl := make([]unit.WavelengthNM, n)
 	resp := make([]float64, n)
 
 	for i := range n {
 		lam := lo + float64(i)*step
-		wl[i] = WavelengthNM(lam)
+		wl[i] = unit.WavelengthNM(lam)
 		d := (lam - float64(center)) / sigma
 		resp[i] = math.Exp(-0.5 * d * d)
 	}
@@ -312,7 +313,7 @@ func resampleResponse(g SpectralGrid, p *Passband) (resp []float64, err error) {
 	return resp, nil
 }
 
-func interpResponse(p *Passband, lam WavelengthNM) float64 {
+func interpResponse(p *Passband, lam unit.WavelengthNM) float64 {
 	wl := p.Wavelength
 	if lam < wl[0] || lam > wl[len(wl)-1] {
 		return 0
@@ -339,7 +340,7 @@ func interpResponse(p *Passband, lam WavelengthNM) float64 {
 	return p.Response[lo] + frac*(p.Response[hi]-p.Response[lo])
 }
 
-func nativeWeights(lambda []WavelengthNM) []float64 {
+func nativeWeights(lambda []unit.WavelengthNM) []float64 {
 	w := make([]float64, len(lambda))
 	for i := range lambda {
 		w[i] = nativeWeight(lambda, i)
@@ -380,7 +381,7 @@ func equivalentWidth(resp []float64, weights []float64) float64 {
 
 // BandMeanSpectralRadiance returns the response-weighted mean spectral
 // radiance over the passband: integral(L*R dlambda) / integral(R dlambda).
-func BandMeanSpectralRadiance(g SpectralGrid, spec []SpectralRadiance, p *Passband) (SpectralRadiance, error) {
+func BandMeanSpectralRadiance(g SpectralGrid, spec []unit.SpectralRadiance, p *Passband) (unit.SpectralRadiance, error) {
 	if len(spec) != g.Len() {
 		return 0, fmt.Errorf("%w: spec length %d != grid length %d", ErrInvalidPassband, len(spec), g.Len())
 	}
@@ -402,12 +403,12 @@ func BandMeanSpectralRadiance(g SpectralGrid, spec []SpectralRadiance, p *Passba
 		return 0, fmt.Errorf("%w: zero response integral on grid", ErrInvalidPassband)
 	}
 
-	return SpectralRadiance(num / den), nil
+	return unit.SpectralRadiance(num / den), nil
 }
 
 // IntegrateRadiance returns the passband-integrated radiance:
 // BandMeanSpectralRadiance x equivalent width (docs/skybrightness.md §3).
-func IntegrateRadiance(g SpectralGrid, spec []SpectralRadiance, p *Passband) (Radiance, error) {
+func IntegrateRadiance(g SpectralGrid, spec []unit.SpectralRadiance, p *Passband) (unit.Radiance, error) {
 	if len(spec) != g.Len() {
 		return 0, fmt.Errorf("%w: spec length %d != grid length %d", ErrInvalidPassband, len(spec), g.Len())
 	}
@@ -431,12 +432,12 @@ func IntegrateRadiance(g SpectralGrid, spec []SpectralRadiance, p *Passband) (Ra
 
 	mean := num / den
 
-	return Radiance(mean * equivalentWidth(resp, w)), nil
+	return unit.Radiance(mean * equivalentWidth(resp, w)), nil
 }
 
 // IntegratePhotonRadiance is IntegrateRadiance's photon-flux analogue: spec
-// is first converted per-wavelength via SpectralRadiance.ToPhoton.
-func IntegratePhotonRadiance(g SpectralGrid, spec []SpectralRadiance, p *Passband) (PhotonRadiance, error) {
+// is first converted per-wavelength via constants.ToPhoton.
+func IntegratePhotonRadiance(g SpectralGrid, spec []unit.SpectralRadiance, p *Passband) (unit.PhotonRadiance, error) {
 	if len(spec) != g.Len() {
 		return 0, fmt.Errorf("%w: spec length %d != grid length %d", ErrInvalidPassband, len(spec), g.Len())
 	}
@@ -452,7 +453,7 @@ func IntegratePhotonRadiance(g SpectralGrid, spec []SpectralRadiance, p *Passban
 	num, den := 0.0, 0.0
 
 	for i, l := range spec {
-		photon := float64(ToPhoton(l, lambda[i]))
+		photon := float64(constants.ToPhoton(l, lambda[i]))
 		num += photon * resp[i] * w[i]
 		den += resp[i] * w[i]
 	}
@@ -463,7 +464,7 @@ func IntegratePhotonRadiance(g SpectralGrid, spec []SpectralRadiance, p *Passban
 
 	mean := num / den
 
-	return PhotonRadiance(mean * equivalentWidth(resp, w)), nil
+	return unit.PhotonRadiance(mean * equivalentWidth(resp, w)), nil
 }
 
 // ABSurfaceBrightness converts a band-mean spectral radiance (at the given
@@ -477,18 +478,18 @@ func IntegratePhotonRadiance(g SpectralGrid, spec []SpectralRadiance, p *Passban
 // Returns +Inf for mean <= 0 (a measured zero, not an error — see
 // docs/skybrightness.md §1's forbidden-shortcuts discussion of the
 // analogous VIIRS zero case).
-func ABSurfaceBrightness(mean SpectralRadiance, pivot WavelengthNM) SurfaceBrightnessAB {
+func ABSurfaceBrightness(mean unit.SpectralRadiance, pivot unit.WavelengthNM) unit.SurfaceBrightnessAB {
 	if mean <= 0 || pivot <= 0 {
-		return SurfaceBrightnessAB(math.Inf(1))
+		return unit.SurfaceBrightnessAB(math.Inf(1))
 	}
 
 	fNuPerArcsec2 := fNuPerArcsec2FromFLambda(mean, pivot)
 
-	return SurfaceBrightnessAB(-2.5 * math.Log10(fNuPerArcsec2/constants.Photometric.ABZeroPoint.Value))
+	return unit.SurfaceBrightnessAB(-2.5 * math.Log10(fNuPerArcsec2/constants.Photometric.ABZeroPoint.Value))
 }
 
 // ABToBandMean is the round-trip inverse of ABSurfaceBrightness.
-func ABToBandMean(ab SurfaceBrightnessAB, pivot WavelengthNM) SpectralRadiance {
+func ABToBandMean(ab unit.SurfaceBrightnessAB, pivot unit.WavelengthNM) unit.SpectralRadiance {
 	if pivot <= 0 {
 		return 0
 	}
@@ -498,20 +499,20 @@ func ABToBandMean(ab SurfaceBrightnessAB, pivot WavelengthNM) SpectralRadiance {
 	return fLambdaFromFNuPerArcsec2(fNuPerArcsec2, pivot)
 }
 
-func fNuPerArcsec2FromFLambda(mean SpectralRadiance, lambda WavelengthNM) float64 {
+func fNuPerArcsec2FromFLambda(mean unit.SpectralRadiance, lambda unit.WavelengthNM) float64 {
 	lambdaM := float64(lambda) * 1e-9
 	fLambdaPerM := float64(mean) * 1e9 // W/m^2/sr/nm -> W/m^2/sr/m
 	fNuPerSr := fLambdaPerM * lambdaM * lambdaM / constants.SI2019.SpeedOfLight.Value
 
-	return fNuPerSr * arcsecond2SR
+	return fNuPerSr * constants.ArcsecondSquaredToSteradian
 }
 
-func fLambdaFromFNuPerArcsec2(fNuPerArcsec2 float64, lambda WavelengthNM) SpectralRadiance {
+func fLambdaFromFNuPerArcsec2(fNuPerArcsec2 float64, lambda unit.WavelengthNM) unit.SpectralRadiance {
 	lambdaM := float64(lambda) * 1e-9
-	fNuPerSr := fNuPerArcsec2 / arcsecond2SR
+	fNuPerSr := fNuPerArcsec2 / constants.ArcsecondSquaredToSteradian
 	fLambdaPerM := fNuPerSr * constants.SI2019.SpeedOfLight.Value / (lambdaM * lambdaM)
 
-	return SpectralRadiance(fLambdaPerM * 1e-9)
+	return unit.SpectralRadiance(fLambdaPerM * 1e-9)
 }
 
 // ErrNoVegaZeroPoint is returned by VegaSurfaceBrightness for a passband
@@ -520,16 +521,16 @@ var ErrNoVegaZeroPoint = errors.New("skybrightness: passband has no Vega zero po
 
 // VegaSurfaceBrightness converts a band-mean spectral radiance into a
 // Vega-system surface brightness, mag/arcsec^2, relative to p.VegaZP.
-func VegaSurfaceBrightness(mean SpectralRadiance, p *Passband) (SurfaceBrightnessVega, error) {
+func VegaSurfaceBrightness(mean unit.SpectralRadiance, p *Passband) (unit.SurfaceBrightnessVega, error) {
 	if p.VegaZP == nil {
 		return 0, fmt.Errorf("%w: passband %q", ErrNoVegaZeroPoint, p.ID)
 	}
 
 	if mean <= 0 {
-		return SurfaceBrightnessVega(math.Inf(1)), nil
+		return unit.SurfaceBrightnessVega(math.Inf(1)), nil
 	}
 
-	return SurfaceBrightnessVega(-2.5 * math.Log10(float64(mean)/float64(p.VegaZP.MeanFlambda))), nil
+	return unit.SurfaceBrightnessVega(-2.5 * math.Log10(float64(mean)/float64(p.VegaZP.MeanFlambda))), nil
 }
 
 // cieLuminousEfficacyLmPerW is the defined photopic luminous efficacy at
@@ -544,17 +545,17 @@ const cieScotopicPeakEfficacyLmPerW = 1700.0
 // PhotopicLuminance returns the CIE photopic luminance of spec, weighted
 // by vlambda (the CIE V(lambda) response, System == SystemPhotometricNone):
 // L_v = 683 lm/W * integral(L(lambda)*V(lambda) dlambda).
-func PhotopicLuminance(g SpectralGrid, spec []SpectralRadiance, vlambda *Passband) (LuminanceCdM2, error) {
+func PhotopicLuminance(g SpectralGrid, spec []unit.SpectralRadiance, vlambda *Passband) (unit.LuminanceCdM2, error) {
 	return weightedLuminance(g, spec, vlambda, cieLuminousEfficacyLmPerW)
 }
 
 // ScotopicLuminance is PhotopicLuminance's scotopic analogue, weighted by
 // the CIE scotopic V'(lambda) response.
-func ScotopicLuminance(g SpectralGrid, spec []SpectralRadiance, vPrimeLambda *Passband) (LuminanceCdM2, error) {
+func ScotopicLuminance(g SpectralGrid, spec []unit.SpectralRadiance, vPrimeLambda *Passband) (unit.LuminanceCdM2, error) {
 	return weightedLuminance(g, spec, vPrimeLambda, cieScotopicPeakEfficacyLmPerW)
 }
 
-func weightedLuminance(g SpectralGrid, spec []SpectralRadiance, resp *Passband, efficacy float64) (LuminanceCdM2, error) {
+func weightedLuminance(g SpectralGrid, spec []unit.SpectralRadiance, resp *Passband, efficacy float64) (unit.LuminanceCdM2, error) {
 	if len(spec) != g.Len() {
 		return 0, fmt.Errorf("%w: spec length %d != grid length %d", ErrInvalidPassband, len(spec), g.Len())
 	}
@@ -571,7 +572,7 @@ func weightedLuminance(g SpectralGrid, spec []SpectralRadiance, resp *Passband, 
 		integral += float64(l) * r[i] * w[i]
 	}
 
-	return LuminanceCdM2(efficacy * integral), nil
+	return unit.LuminanceCdM2(efficacy * integral), nil
 }
 
 // HorizontalIrradiance returns the bolometric (full-grid) irradiance on a
@@ -579,7 +580,7 @@ func weightedLuminance(g SpectralGrid, spec []SpectralRadiance, resp *Passband, 
 // wavelength-integrated radiance, projected by cos(zenith) = sin(altitude)
 // and weighted by the direction's own solid angle. Directions at or below
 // the horizon contribute nothing.
-func HorizontalIrradiance(g SpectralGrid, f SpectralField, altitudesRad []float64, solidAngleSR []float64) (Irradiance, error) {
+func HorizontalIrradiance(g SpectralGrid, f SpectralField, altitudesRad []float64, solidAngleSR []float64) (unit.Irradiance, error) {
 	nDir, nLambda := f.Dims()
 	if nLambda != g.Len() {
 		return 0, fmt.Errorf("%w: field wavelength count %d != grid length %d", ErrInvalidPassband, nLambda, g.Len())
@@ -610,5 +611,5 @@ func HorizontalIrradiance(g SpectralGrid, f SpectralField, altitudesRad []float6
 		total += bolo * cosZ * solidAngleSR[d]
 	}
 
-	return Irradiance(total), nil
+	return unit.Irradiance(total), nil
 }

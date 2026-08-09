@@ -7,6 +7,7 @@ import (
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/skybrightness"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // ErrTargetBelowHorizon is returned by RayleighOnly.LineOfSight for a
@@ -40,7 +41,7 @@ func (r *RayleighOnly) Algorithm() skybrightness.AlgorithmRef {
 }
 
 // LineOfSight implements skybrightness.TransmissionModel.
-func (r *RayleighOnly) LineOfSight(dir coord.AltAz, st *atmosphere.Atmosphere, g skybrightness.SpectralGrid, out []skybrightness.Transmission) error {
+func (r *RayleighOnly) LineOfSight(dir coord.AltAz, st *atmosphere.Atmosphere, g skybrightness.SpectralGrid, out []unit.Transmission) error {
 	airmass, err := atmosphere.Airmass(dir.Alt())
 	if err != nil {
 		return ErrTargetBelowHorizon
@@ -60,7 +61,7 @@ func (r *RayleighOnly) LineOfSight(dir coord.AltAz, st *atmosphere.Atmosphere, g
 	lambda := g.Lambda()
 	for i, lam := range lambda {
 		tau := rayleighOpticalDepth(float64(lam)) * pressureRatio
-		out[i] = skybrightness.Transmission(math.Exp(-tau * airmass))
+		out[i] = unit.Transmission(math.Exp(-tau * airmass))
 	}
 
 	return nil

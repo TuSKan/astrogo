@@ -1,6 +1,6 @@
 package natural
 
-import "github.com/TuSKan/astrogo/skybrightness"
+import "github.com/TuSKan/astrogo/unit"
 
 // FalchiNaturalZenithLuminance is the natural (non-artificial) zenith sky
 // luminance Falchi et al. (2016), Sci. Adv. 2, e1600377 uses as the World
@@ -11,4 +11,4 @@ import "github.com/TuSKan/astrogo/skybrightness"
 // atlas's own natural-background assumption, not a universal physical
 // constant), so it lives here rather than in package constants — see
 // docs/skybrightness.md §3's photometric-constants table.
-const FalchiNaturalZenithLuminance skybrightness.LuminanceCdM2 = 0.171168465e-3
+const FalchiNaturalZenithLuminance unit.LuminanceCdM2 = 0.171168465e-3

@@ -83,31 +83,46 @@ step — for the RT engines in §9.
 ## 3. Units and canonical types
 
 All internal computation is in SI (or SI-derived, documented) units. Every physical quantity
-is a distinct Go type so a radiance can never be assigned to an irradiance by accident:
+is a distinct Go type, declared in package `unit` (`unit/quantity_types.go`) and used with the
+`unit.` prefix throughout `skybrightness` and its siblings — so a radiance can never be
+assigned to an irradiance by accident:
 
 | Type | Meaning | Unit |
 |---|---|---|
-| `WavelengthNM` | vacuum wavelength (unless the source states air) | nm |
-| `SpectralRadiance` | the primary quantity of the whole engine | W·m⁻²·sr⁻¹·nm⁻¹ |
-| `PhotonSpectralRadiance` | photon-counting analogue | photon·s⁻¹·m⁻²·sr⁻¹·nm⁻¹ |
-| `SpectralIrradiance` | | W·m⁻²·nm⁻¹ |
-| `Radiance` | passband-integrated | W·m⁻²·sr⁻¹ |
-| `PhotonRadiance` | | photon·s⁻¹·m⁻²·sr⁻¹ |
-| `Irradiance` | | W·m⁻² |
-| `LuminanceCdM2` | photopic/scotopic derived output | cd·m⁻² |
-| `SurfaceBrightnessAB` | always paired with a `PassbandID` | AB mag·arcsec⁻² |
-| `SurfaceBrightnessVega` | always paired with a `PassbandID` + Vega zero-point version | Vega mag·arcsec⁻² |
-| `Transmission` | | [0, 1] |
-| `OpticalDepth`, `AerosolOpticalDepth` | vertical unless documented as slant | ≥ 0 |
-| `SingleScatteringAlbedo` | | [0, 1] |
-| `AsymmetryParameter` | Henyey–Greenstein g | [−1, 1] |
-| `AngstromExponent` | | dimensionless |
-| `CloudFraction` | **sky cover** — not optical depth, not opacity | [0, 1] |
-| `CloudOpticalDepth` | at 550 nm unless stated | ≥ 0 |
-| `EffectiveRadiusUM`, `OzoneColumnDU`, `PrecipitableWaterMM`, `PressureHPa`, `TemperatureK`, `AltitudeM`, `SpectralAlbedo`, `ElectronsPerPixelPerSecond` | as named | as named |
+| `unit.WavelengthNM` | vacuum wavelength (unless the source states air) | nm |
+| `unit.SpectralRadiance` | the primary quantity of the whole engine | W·m⁻²·sr⁻¹·nm⁻¹ |
+| `unit.PhotonSpectralRadiance` | photon-counting analogue | photon·s⁻¹·m⁻²·sr⁻¹·nm⁻¹ |
+| `unit.SpectralIrradiance` | | W·m⁻²·nm⁻¹ |
+| `unit.Radiance` | passband-integrated | W·m⁻²·sr⁻¹ |
+| `unit.PhotonRadiance` | | photon·s⁻¹·m⁻²·sr⁻¹ |
+| `unit.Irradiance` | | W·m⁻² |
+| `unit.LuminanceCdM2` | photopic/scotopic derived output | cd·m⁻² |
+| `unit.SurfaceBrightnessAB` | always paired with a `PassbandID` | AB mag·arcsec⁻² |
+| `unit.SurfaceBrightnessVega` | always paired with a `PassbandID` + Vega zero-point version | Vega mag·arcsec⁻² |
+| `unit.Transmission` | | [0, 1] |
+| `unit.OpticalDepth`, `unit.AerosolOpticalDepth` | vertical unless documented as slant | ≥ 0 |
+| `unit.SingleScatteringAlbedo` | | [0, 1] |
+| `unit.AsymmetryParameter` | Henyey–Greenstein g | [−1, 1] |
+| `unit.AngstromExponent` | | dimensionless |
+| `unit.CloudFraction` | **sky cover** — not optical depth, not opacity | [0, 1] |
+| `unit.CloudOpticalDepth` | at 550 nm unless stated | ≥ 0 |
+| `unit.EffectiveRadiusUM`, `unit.OzoneColumnDU`, `unit.PrecipitableWaterMM`, `unit.PressureHPa`, `unit.TemperatureK`, `unit.AltitudeM`, `unit.SpectralAlbedo`, `unit.ElectronsPerPixelPerSecond` | as named | as named |
 
-`CloudFraction` and `CloudOpticalDepth` are deliberately distinct types (§8) so the mandate's
-"never collapse cloud state to one scalar" rule is enforced by the compiler, not by convention.
+`unit.CloudFraction` and `unit.CloudOpticalDepth` are deliberately distinct types (§8) so the
+mandate's "never collapse cloud state to one scalar" rule is enforced by the compiler, not by
+convention.
+
+**Revised, one release later**: these types used to be re-declared as a 26-member type-alias
+block in `skybrightness/units.go` (`type SpectralRadiance = unit.SpectralRadiance`, and so on)
+purely so in-package code could write the short name instead of the `unit.`-qualified one.
+That file was removed: every one of these types already appears in nearly every function
+signature across `skybrightness`, `skybrightness/natural`, `skybrightness/atmos`, and
+`skybrightness/dataset/passband`, all of which already import `unit` directly for other
+reasons, so the alias layer was pure indirection with no real ergonomic win, and it created a
+second name for the same identity most readers only half-remembered. `unit` was already the
+single source of truth for these types before the removal (`unit.Dimension`'s doc comment has
+said so since before this round); the removal just stopped `skybrightness` from also
+re-exporting them under its own name.
 
 **The explicit integration path** — one exported function per arrow, nothing implicit:
 
@@ -128,21 +143,24 @@ coverage sets `QualityFlagPassbandTruncated`, and coverage below 99% of the resp
 is a hard error — never a silent truncation. `ABToBandMean` is the round-trip inverse, tested
 to < 1e-12 mag (§12).
 
-**Where units live: a deliberate hybrid, not `unit.Quantity` throughout.** Bespoke named
+**Where units live: a deliberate hybrid, not `unit.Quantity` throughout.** The bespoke named
 `float64` types (the table above) carry type safety and appear in every hot loop — an all-sky
 evaluation is 10⁴ directions × 10²–10³ wavelengths and must stay `[]float64`-shaped with zero
-per-element indirection; `unit.Quantity` is a struct and does not fit that shape. `unit/`
-separately gains `Watt`, `Joule`, `Hertz`, `Nanometre`, `Steradian`, and composed
-`Irradiance`/`Radiance`/`SpectralRadiance`/`SpectralIrradiance`/`Luminance` vars, but these are
-used *only* for documentation, provenance serialization, and boundary parsing — never in the
-numeric core. This is stated plainly rather than implied: `unit.Dimension` has only the 7 SI
-base exponents and no tag distinguishing a solid angle from a bare dimensionless ratio
-(`unit.Radian` and `unit.One` already collide by the package's own documented design). Adding
-`Steradian` gives it **no** type-level protection against a radiance silently cancelling into
-an irradiance — claiming that protection in the docs would be a lie. `unit/doc.go` states this
-explicitly: "Steradian is dimensionally identical to One, exactly as Radian is. Radiometric
-type safety in astrogo comes from the named scalar types in package `skybrightness`, not from
-`unit.Dimension`."
+per-element indirection; `unit.Quantity` is a struct and does not fit that shape. These types
+are declared once, in `unit/quantity_types.go` — not re-declared in `skybrightness` — alongside
+`unit.Watt`/`Joule`/`Hertz`/`Nanometre`/`Steradian` and composed `unit.Irradiance`/`Radiance`/
+`SpectralRadiance`/`SpectralIrradiance`/`Luminance` vars, which are used *only* for
+documentation, provenance serialization, and boundary parsing — never in the numeric core. This
+is stated plainly rather than implied: `unit.Dimension` has only the 7 SI base exponents and no
+tag distinguishing a solid angle from a bare dimensionless ratio (`unit.Radian` and `unit.One`
+already collide by the package's own documented design). Adding `Steradian` gives it **no**
+type-level protection against a radiance silently cancelling into an irradiance — claiming that
+protection in the docs would be a lie. `unit/doc.go` states this explicitly: "Steradian is
+dimensionally identical to One, exactly as Radian is... Real radiometric type safety instead
+comes from the zero-cost quantity TYPES declared in quantity_types.go — Radiance, Irradiance,
+SpectralRadiance, LuminanceCdM2, and their neighbors... These live directly in this package
+(not duplicated into a consumer package) specifically so a hot numeric loop — e.g.
+skybrightness's spectral sky-radiance engine... — can use them with zero struct overhead."
 
 **Photometric constants, split by `constants/doc.go`'s own scope rule** (a fixed single value
 from a cited authority belongs in `constants`; anything model-dependent or series-valued does

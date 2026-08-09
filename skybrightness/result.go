@@ -1,6 +1,9 @@
 package skybrightness
 
-import "github.com/TuSKan/astrogo/coord"
+import (
+	"github.com/TuSKan/astrogo/coord"
+	"github.com/TuSKan/astrogo/unit"
+)
 
 // ComponentResults holds each evaluated component's SpectralField (when
 // materialized) and ComponentReport, indexed by ComponentID via a
@@ -58,8 +61,8 @@ func (r *ComponentResults) set(c ComponentID, f SpectralField, rep ComponentRepo
 // PassbandResult is one Passband's derived per-direction brightness.
 type PassbandResult struct {
 	Passband PassbandID
-	AB       []SurfaceBrightnessAB
-	Vega     []SurfaceBrightnessVega // NaN-free only when the passband has a VegaZeroPoint
+	AB       []unit.SurfaceBrightnessAB
+	Vega     []unit.SurfaceBrightnessVega // NaN-free only when the passband has a VegaZeroPoint
 }
 
 // DerivedQuantities carries every optional derived output an evaluation
@@ -67,14 +70,14 @@ type PassbandResult struct {
 // when its DerivedMask bit was requested; otherwise it stays nil/zero.
 type DerivedQuantities struct {
 	Passbands            []PassbandResult
-	Luminance            []LuminanceCdM2
+	Luminance            []unit.LuminanceCdM2
 	AnthroRatio          []float64 // artificial/natural passband-radiance ratio, per direction
 	LimitingMagnitude    []float64 // per direction
-	DetectorBackground   []ElectronsPerPixelPerSecond
-	MeanAllSky           Radiance
-	MedianAllSky         Radiance
+	DetectorBackground   []unit.ElectronsPerPixelPerSecond
+	MeanAllSky           unit.Radiance
+	MedianAllSky         unit.Radiance
 	BrightestDirection   int // index into Result.Directions; -1 if not computed
-	HorizontalIrradiance Irradiance
+	HorizontalIrradiance unit.Irradiance
 }
 
 // Result is the outcome of one Evaluate call.
@@ -86,7 +89,7 @@ type Result struct {
 	// Transmission is a flat, direction-major [nDir x nLambda] buffer of
 	// atmospheric transmission, matching SpectralField's own layout —
 	// empty unless Options.ComputeTransmission.
-	Transmission []Transmission
+	Transmission []unit.Transmission
 	Derived      DerivedQuantities
 	Uncertainty  UncertaintyResult
 	Provenance   Provenance
