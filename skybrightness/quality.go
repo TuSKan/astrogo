@@ -10,9 +10,9 @@ const (
 	// QualityFlagOK is the zero value: no caveat applies.
 	QualityFlagOK QualityFlags = 0
 
-	// QualityFlagLegacyPhysics marks output produced by a Legacy* fast
-	// model (ModeLegacy) rather than the full spectral physics.
-	QualityFlagLegacyPhysics QualityFlags = 1 << iota
+	// QualityFlagApproximatePhysics marks output produced by a fast,
+	// simplified model (ModeFast) rather than the full spectral physics.
+	QualityFlagApproximatePhysics QualityFlags = 1 << iota
 
 	// QualityFlagPassbandTruncated marks a passband integration where the
 	// spectral grid did not fully cover the passband's response range.
@@ -64,7 +64,7 @@ const (
 )
 
 var qualityFlagNames = map[QualityFlags]string{
-	QualityFlagLegacyPhysics:        "LegacyPhysics",
+	QualityFlagApproximatePhysics:   "ApproximatePhysics",
 	QualityFlagPassbandTruncated:    "PassbandTruncated",
 	QualityFlagOutOfSurrogateDomain: "OutOfSurrogateDomain",
 	QualityFlagStaleAtmosphere:      "StaleAtmosphere",

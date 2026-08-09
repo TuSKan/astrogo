@@ -3,6 +3,7 @@ package skybrightness
 import (
 	"context"
 
+	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
 )
 
@@ -93,7 +94,7 @@ type EvalInput struct {
 
 	// Atmosphere is never nil: ClimatologyDefaultAtmosphere is substituted
 	// when a Request specifies none.
-	Atmosphere *AtmosphereState
+	Atmosphere *atmosphere.State
 
 	Mode    Mode
 	Options EvaluationOptions

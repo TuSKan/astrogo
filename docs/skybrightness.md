@@ -67,7 +67,7 @@ E(position, λ, upward_direction, t) = intensity(position, t)
                                      × spectral_mixture(position, λ, t)
                                      × angular_emission(position, upward_direction, t)
 
-L_artificial(λ) = Propagate[E](λ, observer_direction, AtmosphereState)
+L_artificial(λ) = Propagate[E](λ, observer_direction, atmosphere.State)
 ```
 
 **VIIRS-DNB supplies `intensity` only.** It has one broad panchromatic band (~500–900 nm) with
@@ -155,7 +155,7 @@ not — the same test already used for `ObliquityJ2000`/`SunGravitationalParamet
 | Vega zero points | `skybrightness`, from the passband bundle | depends on *which* Vega spectrum (Hayes vs. CALSPEC alpha_lyr_stis) — series-valued, out of `constants` scope |
 | Solar spectral irradiance | a dataset | a spectrum, not a constant |
 | Falchi 2016 natural zenith, 0.171168465 mcd/m² | `natural.FalchiNaturalZenithLuminance` | model-dependent, carried verbatim with citation from v1's `NaturalZenithMcdM2` |
-| Garstang nL↔mag constants (34.08, 20.7233) | `natural` package, unexported | only `LegacyAirglow`/`LegacyMoonlight` may use them; not public API |
+| Garstang nL↔mag constants (34.08, 20.7233) | `natural` package, unexported | only `ConstantAirglow`/`KrisciunasSchaeferMoonlight` may use them; not public API |
 
 **Passbands, with zero `go:embed`.** CLAUDE.md forbids `go:embed` project-wide, and §5/§25
 forbid undocumented embedded response curves regardless. Core defines `PassbandSet`
@@ -215,14 +215,21 @@ machine-enforced in the rewritten `importgraph_test.go`:
 5. `constants`, `unit`, `atmosphere` never import anything under `skybrightness`.
 
 Core stays the one dependency `plan` sees, preserving the CLAUDE.md rule that an HDF5-scale
-dependency never reaches a `plan` user's build. `AtmosphereState`'s *data* type lives in core
-(it is part of `Request`'s contract; a sibling home would create an import cycle); its
-*optics* live in `atmos`; its *loaders* live in `dataset/atmostate`. The existing peer
-`atmosphere/` package (Airmass, refraction, ISA barometric profile) keeps its narrow scope and
-is imported by `skybrightness`, never the reverse — CLAUDE.md's layering diagram lists it as a
-peer scientific engine of `skybrightness`, not a primitive underneath it, and widening it to
-carry AOD/clouds/BRDF would change the dependency profile of a package `plan` and every
-example already use for a two-line airmass call.
+dependency never reaches a `plan` user's build. **Revised from the original Phase 0 sketch**:
+`AtmosphereState`'s *data* type (`atmosphere.State`, built via `atmosphere.NewBuilder()`) lives
+in the peer `atmosphere/` package, not in core `skybrightness` — general aerosol/cloud/
+surface-optical atmospheric state is not sky-brightness-specific (a future weather or seeing
+constraint needs the identical type), and canonicalizing it where a peer package already sits
+avoids the alternative of skybrightness owning a concept it doesn't exclusively use. `atmos`
+still owns the *optics* (transmission models consuming `atmosphere.State`); `dataset/atmostate`
+still owns the *loaders*. `skybrightness` references `atmosphere.State` directly in `Request`/
+`EvalInput` — no alias — matching how `coord.Context` is already referenced directly rather
+than aliased; general data-provenance primitives (`SourceRef`/`Fidelity`/`TimeRange`/
+`DatasetVersion`) live in `atmosphere` too, aliased into `skybrightness` only because they
+also appear pervasively in `skybrightness`'s own `Provenance`/`ComponentProvenance`/`Passband`
+types. `atmosphere` keeps its narrow refraction/airmass/ISA scope for its `Atmosphere` type —
+`State` is a new, separate type living alongside it, not a widening of `Atmosphere` itself,
+so every existing airmass/refraction call site is unaffected.
 
 ---
 
@@ -241,7 +248,7 @@ type Request struct {
     Grid       SpectralGrid
     Passbands  []*Passband
     Mode       Mode
-    Atmosphere *AtmosphereState
+    Atmosphere *atmosphere.State
     Selection  ComponentSelection
     Options    EvaluationOptions
 }
@@ -301,7 +308,7 @@ dataset/{blackmarble,eog,atmostate,passband,worldatlas}   ← reader returns raw
         │                                                    quality mask + SourceRef, never
         │  wrapped as an EmissionField / AtmosphereProvider  interpolates missing pixels
         ▼
-immutable state (AtmosphereState, EmissionField snapshot, PassbandSet)
+immutable state (atmosphere.State, EmissionField snapshot, PassbandSet)
         │
         ▼
 Component.Eval / TransmissionModel.LineOfSight   ← pure, deterministic, given the same state
@@ -330,13 +337,13 @@ const (
     ModeNowcast                   // recent state; carries issue time + age
     ModeForecast                  // init time + lead time + ensemble uncertainty
     ModeUserSupplied              // caller provides every physical state directly
-    ModeLegacy                    // v1-equivalent empirical physics, re-implemented (§15)
+    ModeFast                      // v1-equivalent empirical physics, re-implemented (§15)
 )
 ```
 
 **Fallback between modes defaults to forbidden.** `EvaluationOptions.Fallback` is
 `FallbackForbidden` unless a caller explicitly opts into `FallbackToClimatology` or
-`FallbackToLegacy` — and every fallback that does occur is recorded as a `FallbackRecord{From,
+`FallbackToFast` — and every fallback that does occur is recorded as a `FallbackRecord{From,
 To, Reason, At}` in `Provenance.Fallbacks`. This directly replaces v1's `atlas.LayerAuto`
 freshness-first ladder, which silently tried five data tiers in sequence with no caller-visible
 record of which one actually answered beyond a post-hoc `Result.Attempts` field — exactly the
@@ -349,7 +356,9 @@ step that was actually taken.
 ## 8. Atmosphere model
 
 ```go
-type AtmosphereState struct { /* immutable; built only via AtmosphereBuilder */ }
+// Lives in package atmosphere, not core skybrightness — general
+// atmospheric state, not sky-brightness-specific (§4 above).
+type State struct { /* immutable; built only via atmosphere.Builder */ }
 
 type CloudLayer struct {
     Fraction      CloudFraction       // sky cover [0,1] — a DIFFERENT TYPE from OpticalDepth
@@ -370,12 +379,12 @@ in the mandate and four separate Go fields here — never collapsed into one sca
 number. `CloudFraction` and `CloudOpticalDepth` being *distinct types* (not both bare
 `float64`) means a caller cannot accidentally pass one where the other belongs; the compiler
 enforces the mandate's "never collapse to one scalar" rule rather than a code-review
-convention having to catch it. `AtmosphereState` also carries surface pressure/temperature, a
+convention having to catch it. `atmosphere.State` also carries surface pressure/temperature, a
 vertical profile, precipitable water vapour, ozone column, aerosol optical depth + Ångström
 exponent + wavelength-dependent single-scattering albedo + phase-function asymmetry + vertical
 profile, boundary-layer height, surface spectral albedo/BRDF, snow state, and a horizon
 profile. `AtmosphereProvider` is the interface future CAMS/ERA5/local-instrument providers
-implement; the physical core (`atmos/`) depends only on the immutable `AtmosphereState` type,
+implement; the physical core (`atmos/`) depends only on the immutable `atmosphere.State` type,
 never on a specific provider.
 
 ---
@@ -537,9 +546,9 @@ prediction is stays aspirational until real observational data enters this repos
 | Phase | Scope | Entry condition | Exit condition |
 |---|---|---|---|
 | 0 | This document | Mandate received | Internally consistent, no open contradictions |
-| 1 | Spectral foundation: canonical types, `Engine`/`Request`/`Result`, passband integration, provenance/uncertainty/quality types, legacy fast-model components, `plan` + example rewrite | Phase 0 complete | Repo compiles, 10 invariant tests + benchmarks pass, `plan` works end-to-end |
+| 1 | Spectral foundation: canonical types, `Engine`/`Request`/`Result`, passband integration, provenance/uncertainty/quality types, fast simplified-model components, `plan` + example rewrite | Phase 0 complete | Repo compiles, 10 invariant tests + benchmarks pass, `plan` works end-to-end |
 | 2 | Natural-sky baseline: spectral zodiacal/airglow/moonlight, twilight guard, starlight/DGL interface | Phase 1 complete | Comparison fixtures + monotonicity/symmetry tests pass |
-| 3 | Atmosphere: `AtmosphereState`, molecular/aerosol/cloud optics, terrain, local provider | Phase 2 complete | Zero-aerosol/zero-cloud limits proven exact |
+| 3 | Atmosphere: `atmosphere.State`, molecular/aerosol/cloud optics, terrain, local provider | Phase 2 complete | Zero-aerosol/zero-cloud limits proven exact |
 | 4 | Artificial clear sky: emission-field providers, spectral mixture/angular models, log-polar aggregation, `ClearSkyPhysical` | Phase 3 complete | Zero-emission ⇒ zero artificial radiance (bitwise); aggregation-invariance test passes |
 | 5 | Clouds: `CloudyAllSkyPhysical`, `FastCloudApproximation` | Phase 4 complete | Clear-sky limit proven as `Fraction→0` |
 | 6 | Reference simulation + surrogate | Phase 5 complete | `.sbsur` format + OOD detection tested on synthetic data; pipeline documented as unbuilt/optional |
@@ -615,7 +624,7 @@ none will be added. The "replaced by" column is the adaptation recipe.
 | `SurfaceBrightnessV` | `SurfaceBrightnessAB` / `SurfaceBrightnessVega`, always with a `PassbandID` | Name the passband explicitly — there is no unqualified "V magnitude" any more |
 | `Nanolambert` | `SpectralRadiance` (per-wavelength) or `Radiance` (passband-integrated) | Work in linear spectral radiance, integrate through a named `Passband` |
 | `SQMProvider` | `calib.Measurement` + `Instrument` (Phase 7) | An SQM reading is an observation through a device response, not a model input |
-| `Floor` | `AtmosphereState` + an `EmissionField`-backed `Component` (Phase 4) | There is no standalone "floor" concept; light pollution is one component of the full decomposition |
+| `Floor` | `atmosphere.State` + an `EmissionField`-backed `Component` (Phase 4) | There is no standalone "floor" concept; light pollution is one component of the full decomposition |
 | `CompositeModel`/`NewCompositeModel` | `CompositeEngine`/`NewCompositeEngine` (§5) | Same idea (sum components), spectral instead of scalar |
 | `RadianceToArtificialSB` | `EmissionField` → `SpectralMixtureModel` → `AngularEmissionModel` → `rt.ClearSkyPhysical`/`CloudyAllSkyPhysical` (§9) | There is no direct pixel-to-brightness function any more, by design |
 | `atlas.Resolver`/`LayerAuto` | Explicit `Mode` + `FallbackPolicy` + `Provenance.Fallbacks` (§7) | Choose a mode explicitly; opt into fallback if you want it, and it will be recorded |

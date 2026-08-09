@@ -86,8 +86,8 @@ type staticPassbandSet struct {
 
 // NewPassbandSet builds a PassbandSet from caller-supplied passbands — a
 // pure, in-memory implementation with no I/O, suitable for tests, the
-// Legacy analytic passbands, or a caller that already has its curves in
-// hand.
+// fast top-hat analytic passbands, or a caller that already has its
+// curves in hand.
 func NewPassbandSet(version DatasetVersion, pbs ...*Passband) PassbandSet {
 	s := &staticPassbandSet{version: version, byID: make(map[PassbandID]*Passband, len(pbs))}
 

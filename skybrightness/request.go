@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
 )
 
@@ -64,7 +65,7 @@ type FallbackPolicy uint8
 const (
 	FallbackForbidden FallbackPolicy = iota
 	FallbackToClimatology
-	FallbackToLegacy
+	FallbackToFast
 )
 
 // String implements fmt.Stringer.
@@ -74,8 +75,8 @@ func (p FallbackPolicy) String() string {
 		return "Forbidden"
 	case FallbackToClimatology:
 		return "ToClimatology"
-	case FallbackToLegacy:
-		return "ToLegacy"
+	case FallbackToFast:
+		return "ToFast"
 	default:
 		return "FallbackPolicy(unknown)"
 	}
@@ -118,7 +119,7 @@ type Request struct {
 	// substituted, which is itself recorded in Provenance.Fallbacks only
 	// if Mode != ModeClimatology (a Climatology request supplying no
 	// atmosphere is using the mode as intended, not falling back).
-	Atmosphere *AtmosphereState
+	Atmosphere *atmosphere.State
 	Selection  ComponentSelection
 	Options    EvaluationOptions
 }
@@ -158,13 +159,13 @@ type BatchRequest struct {
 	Mode       Mode
 	// Atmosphere has length 1 (shared across every epoch) or
 	// len(Astro) (one per epoch).
-	Atmosphere []*AtmosphereState
+	Atmosphere []*atmosphere.State
 	Selection  ComponentSelection
 	Options    EvaluationOptions
 }
 
 func (r BatchRequest) at(i int) Request {
-	var atm *AtmosphereState
+	var atm *atmosphere.State
 
 	switch {
 	case len(r.Atmosphere) == 1:

@@ -50,10 +50,10 @@ type LimitingMagnitudeConstraint struct {
 	// Atmosphere is the atmospheric state to evaluate under; nil lets the
 	// Engine substitute its own default for Mode (e.g.
 	// ClimatologyDefaultAtmosphere under ModeClimatology).
-	Atmosphere *skybrightness.AtmosphereState
+	Atmosphere *atmosphere.State
 	// Conversion turns the sky background + airmass into a limiting
 	// magnitude. A nil Conversion defaults to
-	// skybrightness.NewLegacySchaeferNELM().
+	// skybrightness.NewSchaeferNELM().
 	Conversion skybrightness.LimitingMagModel
 	// Required returns the minimum limiting magnitude needed to observe
 	// the target. If nil, the target's static catalog magnitude is used;
@@ -159,7 +159,7 @@ func (c LimitingMagnitudeConstraint) evaluate(obj Observable, t time.Time, ctx *
 
 	conv := c.Conversion
 	if conv == nil {
-		conv = skybrightness.NewLegacySchaeferNELM()
+		conv = skybrightness.NewSchaeferNELM()
 	}
 
 	pbID := skybrightness.PassbandID("")

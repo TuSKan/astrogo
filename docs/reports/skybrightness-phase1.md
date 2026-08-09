@@ -4,10 +4,10 @@
 
 **Delivered**: the full spectral foundation — canonical SI-based scalar types, `SpectralGrid`/
 `SpectralField`, the `Passband`/integration API, `Component`/`Engine`/`Request`/`Result`/
-`AtmosphereState`/`Provenance`/`UncertaintyResult`/`QualityFlags` types, a working
+`atmosphere.State`/`Provenance`/`UncertaintyResult`/`QualityFlags` types, a working
 `CompositeEngine` (linear-space summation, batch evaluation via
-`internal/parallel.MapChunked`), the `Legacy*` fast models (`natural.LegacyAirglow`,
-`natural.LegacyMoonlight`, `skybrightness.LegacySchaeferNELM`) re-implementing v1's exact
+`internal/parallel.MapChunked`), the fast, simplified models (`natural.ConstantAirglow`,
+`natural.KrisciunasSchaeferMoonlight`, `skybrightness.SchaeferNELM`) re-implementing v1's exact
 physics against the new API, an analytic Rayleigh-only transmission model
 (`atmos.RayleighOnly`), a structurally-complete (not yet populated) passband-bundle provider
 (`dataset/passband`), `plan`'s rewritten `LimitingMagnitudeConstraint`/`ScoreObservableSky`,
@@ -16,7 +16,7 @@ rewritten against the new API.
 
 **Deferred, by design**: real spectral zodiacal light / integrated starlight / diffuse
 galactic light / twilight / aurora (Phase 2); the full molecular/aerosol/cloud transmission
-model, `AtmosphereState`'s aerosol/cloud fields being physically exercised (Phase 3); the
+model, `atmosphere.State`'s aerosol/cloud fields being physically exercised (Phase 3); the
 artificial emission-field pipeline, spectral-mixture/angular-emission models, spatial
 aggregation, `rt.ClearSkyPhysical` (Phase 4); `rt.CloudyAllSkyPhysical`/
 `rt.FastCloudApproximation` (Phase 5); the offline reference-simulation pipeline and
@@ -78,10 +78,12 @@ importer (`skybrightness/atlas`) is gone; it returns in Phase 4 with `dataset/gr
 
 Breaking, no backward compatibility (full symbol table in `docs/skybrightness.md` §16).
 Headline additions: `skybrightness.Engine`/`Component`/`CompositeEngine`/`Request`/
-`BatchRequest`/`Result`/`BatchResult`/`AtmosphereState`/`AtmosphereBuilder`/`Passband`/
-`PassbandSet`/`Provenance`/`UncertaintyResult`/`QualityFlags`/`Mode`/`LimitingMagModel`
-(new signature)/`LegacySchaeferNELM`/`Point`; `natural.LegacyAirglow`/`LegacyMoonlight`/
-`NewLegacyEngine`/`LegacyJohnsonV`/`LegacyVGrid`; `atmos.RayleighOnly`;
+`BatchRequest`/`Result`/`BatchResult`/`Passband`/`PassbandSet`/`Provenance`/
+`UncertaintyResult`/`QualityFlags`/`Mode`/`LimitingMagModel` (new signature)/`SchaeferNELM`/
+`Point`; `atmosphere.State`/`Builder` (moved out of core `skybrightness` in a follow-up
+API-polish pass — see the note at the end of this report); `natural.ConstantAirglow`/
+`KrisciunasSchaeferMoonlight`/`NewFastEngine`/`TopHatJohnsonV`/`TopHatVGrid`;
+`atmos.RayleighOnly`;
 `passband.OpenBundle`/`Remote`/`FromFITS` (FromFITS deferred — see §9); `unit.SpectralRadiance`
 and 25 sibling types; `constants.Photometric`; `remote.PassbandBundle`.
 
@@ -110,13 +112,13 @@ and 25 sibling types; `constants.Photometric`; `remote.PassbandBundle`.
 
 ## 5. Data assumptions and their uncertainty
 
-- `LegacyAirglow`/`LegacyMoonlight`: RelSigma 0.3 / 0.15 respectively (carried from the
+- `ConstantAirglow`/`KrisciunasSchaeferMoonlight`: RelSigma 0.3 / 0.15 respectively (carried from the
   original physics' own accuracy claims — KS1991's own stated ~8-23% moonlight accuracy,
   documented in the component's `Assumptions`).
 - `atmos.RayleighOnly`: no aerosol, no molecular absorption, no ozone — an explicit,
   documented approximation, not assigned a numeric uncertainty (Phase 3 replaces it with a
   model whose uncertainty is meaningful to quote).
-- The Garstang nanolambert↔V-magnitude round trip (`LegacyJohnsonV`) is precise to ~1.5e-4
+- The Garstang nanolambert↔V-magnitude round trip (`TopHatJohnsonV`) is precise to ~1.5e-4
   mag at V≈22, bounded by the historically-published 0.92104 coefficient's own rounding (not
   by anything introduced in this phase) — measured and documented in
   `natural/legacy_units.go` and `natural/legacy_test.go`.
@@ -131,7 +133,7 @@ component-selection exclusion exactness, 64-goroutine concurrent-evaluate consis
 high-latitude/polar direction finiteness. 4 import-graph tests (rewritten
 `importgraph_test.go`, rules 1/2/3/4 from `docs/skybrightness.md` §4). 5
 `natural/legacy_test.go` tests (round-trip precision, zero-value default, below-horizon zero,
-nil-context error, `NewLegacyEngine` end-to-end). 5 `atmos/transmission_test.go` tests
+nil-context error, `NewFastEngine` end-to-end). 5 `atmos/transmission_test.go` tests
 (zenith-vs-low-altitude ordering, wavelength-dependence sign, below-horizon error,
 pressure-dependence sign, Hansen-Travis numeric sanity check). 3
 `dataset/passband/passband_test.go` tests (round trip, missing manifest, unknown ID). 2 new
@@ -141,7 +143,7 @@ tests, all passing against the new API with a test-local fixed-SQM `Component`).
 
 ## 7. Benchmarks
 
-Not added this phase — deferred to Phase 2, when there is real (non-Legacy) physics whose
+Not added this phase — deferred to Phase 2, when there is real (non-fast-model) physics whose
 performance is worth characterizing. The mandate's benchmark targets (`BenchmarkPointSpectral`,
 `BenchmarkAllSky10k`, `BenchmarkBatchTimeSeries`, `BenchmarkPassbandIntegrate`) remain a Phase
 2 action item, noted here rather than silently dropped.
@@ -153,7 +155,7 @@ performance is worth characterizing. The mandate's benchmark targets (`Benchmark
   exists yet to compare against ESO SkyCalc/Paranal cases.
 - **Level 3 (observations)**: not attempted, and structurally cannot be until real
   ground-truth SQM/TESS data enters this repository — see `docs/skybrightness.md` §13.
-- **Level 4 (regression fixtures)**: the Legacy round-trip and Rayleigh sanity checks are the
+- **Level 4 (regression fixtures)**: the fast-model round-trip and Rayleigh sanity checks are the
   closest analogue this phase has; no external fixture files were introduced.
 - **What Phase 1 does NOT prove**: physical accuracy of any component's output. It proves
   unit correctness, integration correctness, additivity, determinism, and allocation-shape
@@ -167,8 +169,8 @@ performance is worth characterizing. The mandate's benchmark targets (`Benchmark
   `Remote` (the primary and secondary paths) are both implemented and tested.
   `remote.PassbandBundle` has no published bundle yet, so `Remote` is structurally complete
   but unexercised against real data.
-  `examples/18_sky_brightness` therefore uses `natural.LegacyJohnsonV()` — the only passband
-  whose output is physically meaningful given Phase 1's Legacy-only components — rather than
+  `examples/18_sky_brightness` therefore uses `natural.TopHatJohnsonV()` — the only passband
+  whose output is physically meaningful given Phase 1's fast-model-only components — rather than
   a real Johnson V/Sloan r curve; the mandate's literal "Johnson V and Sloan r" end-to-end
   example is Phase 2 scope, once real spectral components exist to make a second passband's
   output meaningful.
@@ -190,3 +192,38 @@ re-derived from this phase's carried-forward v1 constants); (b) a decision is ma
 `natural/starlight.go`/`dgl.go`'s versioned all-sky template is sourced or deferred further;
 (c) Phase 1's benchmark gap (§7) is closed before or alongside Phase 2, so performance
 characterization exists before real (more expensive) physics lands on top of it.
+
+## Addendum — post-Phase-1 API polish (same branch, before Phase 2)
+
+Before Phase 2 started, a design review (prompted directly by feedback that the shipped API
+wasn't "astrogo-integrated" enough) produced four changes, all still within Phase 1's scope
+(no new physics), applied on top of what's described above:
+
+1. **`atmosphere.State`/`Builder`/`Aerosol`/`CloudLayer`/`SurfaceOptical`/`HorizonProfile`
+   moved out of core `skybrightness` into the peer `atmosphere` package.** General
+   atmospheric state isn't sky-brightness-specific — a future weather/seeing constraint needs
+   the identical type. `skybrightness` now references `atmosphere.State` directly (no alias),
+   matching how `coord.Context` is already referenced. General data-provenance primitives
+   (`SourceRef`/`Fidelity`/`TimeRange`/`DatasetVersion`) moved alongside it, aliased back into
+   `skybrightness` since they also appear pervasively in `skybrightness`'s own `Provenance`
+   types.
+2. **`ToPhoton`/`ToEnergy`/`ArcsecondSquaredToSteradian` moved into `constants`** (as
+   `var`-aliased in `skybrightness` for unchanged call-site syntax) — reusable by any future
+   photometry code, not skybrightness-only.
+3. **Renamed the "Legacy" naming scheme to be citation/descriptive-based**:
+   `LegacyAirglow`→`ConstantAirglow`, `LegacyMoonlight`→`KrisciunasSchaeferMoonlight`,
+   `LegacySchaeferNELM`→`SchaeferNELM`, `LegacyJohnsonV`→`TopHatJohnsonV`,
+   `NewLegacyEngine`/`LegacyConfig`→`NewFastEngine`/`FastConfig`, `ModeLegacy`→`ModeFast`,
+   `FallbackToLegacy`→`FallbackToFast`, `QualityFlagLegacyPhysics`→
+   `QualityFlagApproximatePhysics`. "Legacy" implied "about to be removed," which
+   contradicts writing brand-new code, and risked colliding with a future real spectral
+   moonlight model's more deserving claim to the plain name.
+4. **`natural.FastConfig` gained a `Transmission` field**, `Point()`/`PointResult` gained an
+   optional `Components`/`ComponentBrightness` breakdown, and `Provenance` gained a
+   `String()` method — closing gaps found while checking whether the "simple path"
+   (`natural.NewFastEngine`, `Point()`) could actually reproduce what `examples/18` needed
+   without dropping to `Engine.Evaluate`/raw `encoding/json`.
+
+Full verification gate re-run clean after all four changes: `gofmt`, `go vet`, `go build`,
+`golangci-lint run` (0 issues repo-wide), full untagged `go test ./...`, and the tagged
+integration/network/validation suite for every touched package.

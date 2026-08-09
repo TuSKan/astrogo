@@ -32,12 +32,13 @@ func skyTestFixture(t *testing.T) (*Site, time.Time, *coord.Context) {
 
 // The constants/helpers below reproduce, minimally and test-locally, the
 // exact Garstang nanolambert<->V-magnitude round-trip
-// skybrightness/natural/legacy_units.go uses for LegacyAirglow/
-// LegacyMoonlight (see that file's doc comment for the derivation) — this
-// package cannot import skybrightness/natural (only core skybrightness;
-// skybrightness/importgraph_test.go's TestPlanImportsOnlyCoreSkybrightness
-// enforces this), so a fixed-SQM test double is built directly against
-// the Component/Engine interfaces instead.
+// skybrightness/natural/garstang_units.go uses for ConstantAirglow/
+// KrisciunasSchaeferMoonlight (see that file's doc comment for the
+// derivation) — this package cannot import skybrightness/natural (only
+// core skybrightness; skybrightness/importgraph_test.go's
+// TestPlanImportsOnlyCoreSkybrightness enforces this), so a fixed-SQM
+// test double is built directly against the Component/Engine interfaces
+// instead.
 const (
 	testGarstangScale = 34.08
 	testGarstangExp   = 20.7233
@@ -103,7 +104,7 @@ func TestLimitingMagBooleanGate(t *testing.T) {
 	high := NewStar("High", angle.Hour(18.69), angle.Deg(0))
 	site, tm, ctx := skyTestFixture(t)
 
-	conv := skybrightness.NewLegacySchaeferNELM()
+	conv := skybrightness.NewSchaeferNELM()
 	need6 := func(Observable) float64 { return 6.0 }
 
 	dark := LimitingMagnitudeConstraint{
@@ -140,7 +141,7 @@ func TestLimitingMagSoftMonotonic(t *testing.T) {
 	high := NewStar("High", angle.Hour(18.69), angle.Deg(0))
 	site, tm, ctx := skyTestFixture(t)
 
-	conv := skybrightness.NewLegacySchaeferNELM()
+	conv := skybrightness.NewSchaeferNELM()
 	prev := -1.0
 
 	for _, sqm := range []float64{16, 18, 20, 22} {
@@ -173,7 +174,7 @@ func TestLimitingMagBelowHorizon(t *testing.T) {
 	low := NewStar("Low", angle.Hour(6.69), angle.Deg(0)) // anti-zenith (~nadir) at the fixture epoch
 	site, tm, ctx := skyTestFixture(t)
 
-	conv := skybrightness.NewLegacySchaeferNELM()
+	conv := skybrightness.NewSchaeferNELM()
 	engine := fixedSQMEngine(t, 22.0)
 
 	gate := LimitingMagnitudeConstraint{
@@ -209,7 +210,7 @@ func TestScoreObservableSky(t *testing.T) {
 	high := NewStar("High", angle.Hour(18.69), angle.Deg(0))
 	site, tm, ctx := skyTestFixture(t)
 
-	conv := skybrightness.NewLegacySchaeferNELM()
+	conv := skybrightness.NewSchaeferNELM()
 	need := func(Observable) float64 { return 5.0 }
 
 	base, err := ScoreObservable(high, tm, site, nil, ctx)

@@ -58,7 +58,7 @@ func testEngine(t *testing.T, components ...skybrightness.Component) *skybrightn
 }
 
 func testRequest(grid skybrightness.SpectralGrid, dirs []coord.AltAz, materialize bool) skybrightness.Request {
-	atm, err := skybrightness.NewAtmosphereBuilder().Build()
+	atm, err := atmosphere.NewBuilder().Build()
 	if err != nil {
 		panic(err) // fixed, valid inputs
 	}

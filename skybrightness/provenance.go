@@ -4,74 +4,36 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
+
+	"github.com/TuSKan/astrogo/atmosphere"
 )
 
-// DatasetVersion identifies a specific, citable version of a dataset or
-// algorithm implementation — a semver string, a DOI-versioned release tag,
-// or similar.
-type DatasetVersion string
+// DatasetVersion is a general data-provenance primitive that lives in
+// package atmosphere (a peer scientific-engine package, not specific to
+// sky brightness) since any atmospheric or dataset-backed consumer needs
+// it, not just this package — along with Fidelity, TimeRange, and
+// SourceRef below. Aliased here, not redeclared, so skybrightness's own
+// Provenance/ComponentProvenance/Passband can keep writing the short
+// names.
+//
+//nolint:revive // one doc comment intentionally describes this whole small alias block, not any single member's name
+type (
+	DatasetVersion = atmosphere.DatasetVersion
+	Fidelity       = atmosphere.Fidelity
+	TimeRange      = atmosphere.TimeRange
+	SourceRef      = atmosphere.SourceRef
+)
 
-// Fidelity classifies how a SourceRef's data relates to physical reality.
-type Fidelity uint8
-
+// The four fidelity levels, aliased from package atmosphere — see
+// atmosphere.Fidelity's doc comment for what each means.
 const (
-	// FidelityMeasured means the data is a direct field/satellite
-	// measurement.
-	FidelityMeasured Fidelity = iota
-
-	// FidelityModelPropagated means the data is the output of a
-	// radiative-transfer or other physical model, not itself a
-	// measurement — e.g. the World Atlas 2015, which can never serve as
-	// Level-3 observational validation (see docs/skybrightness.md §13).
-	FidelityModelPropagated
-
-	// FidelityPrior means the data is a prior/regional-average assumption
-	// (e.g. a spectral-mixture regional prior) rather than sourced from
-	// this specific site.
-	FidelityPrior
-
-	// FidelitySynthetic means the data is synthetic/test fixture data,
-	// never to be presented as physically meaningful.
-	FidelitySynthetic
+	FidelityMeasured        = atmosphere.FidelityMeasured
+	FidelityModelPropagated = atmosphere.FidelityModelPropagated
+	FidelityPrior           = atmosphere.FidelityPrior
+	FidelitySynthetic       = atmosphere.FidelitySynthetic
 )
-
-// String implements fmt.Stringer.
-func (f Fidelity) String() string {
-	switch f {
-	case FidelityMeasured:
-		return "Measured"
-	case FidelityModelPropagated:
-		return "ModelPropagated"
-	case FidelityPrior:
-		return "Prior"
-	case FidelitySynthetic:
-		return "Synthetic"
-	default:
-		return "Fidelity(unknown)"
-	}
-}
-
-// TimeRange is a closed time interval, [Start, End].
-type TimeRange struct {
-	Start, End time.Time
-}
-
-// SourceRef records the provenance of one dataset that contributed to a
-// Result: what it is, which version, over what period it was acquired,
-// when this process retrieved it, its checksum, its licence, and its
-// Fidelity. Every dataset that enters the pipeline attaches one of these
-// at the point it is opened (docs/skybrightness.md §6).
-type SourceRef struct {
-	Name      string
-	Version   DatasetVersion
-	Acquired  TimeRange // the observation period the data represents
-	Retrieved time.Time
-	Checksum  string // "sha256:..."
-	Licence   string
-	Endpoint  string // remote.EndpointID as a string; empty for user-supplied data
-	Fidelity  Fidelity
-}
 
 // FallbackRecord documents one explicit mode fallback that occurred while
 // producing a Result (see EvaluationOptions.Fallback). Fallback defaults to
@@ -87,7 +49,7 @@ type FallbackRecord struct {
 // name, its semantic version, and (where applicable) the paper it
 // implements.
 type AlgorithmRef struct {
-	Name     string // e.g. "natural.LegacyMoonlight"
+	Name     string // e.g. "natural.KrisciunasSchaeferMoonlight"
 	Version  string // semver of the implementation
 	Citation string // e.g. "Krisciunas & Schaefer (1991), PASP 103, 1033"
 }
@@ -100,13 +62,10 @@ type ComponentProvenance struct {
 	Datasets  []SourceRef
 }
 
-// AtmosphereProvenance records where an AtmosphereState came from and how
-// current it is.
-type AtmosphereProvenance struct {
-	Source   SourceRef
-	IssueAt  time.Time // when the state was issued (nowcast/forecast)
-	LeadTime time.Duration
-}
+// AtmosphereProvenance records where an atmosphere.State came from and
+// how current it is — an alias for atmosphere.Provenance, the type
+// atmosphere.State.Provenance() itself returns.
+type AtmosphereProvenance = atmosphere.Provenance
 
 // SurrogateRef is a placeholder for Phase 6 surrogate provenance; nil
 // until that phase populates it.
@@ -168,4 +127,44 @@ func (p Provenance) Digest() [32]byte {
 	}
 
 	return sha256.Sum256(b)
+}
+
+// String implements fmt.Stringer with a human-readable multi-line summary
+// — engine, mode, components, datasets, fallbacks, and the digest — so a
+// caller can print(res.Provenance) directly without knowing this type
+// also implements json.Marshaler. A caller wanting the full JSON should
+// call json.Marshal(res.Provenance) (or MarshalJSON) explicitly; this
+// method is for eyeballing, not for storage or reproducible hashing.
+func (p Provenance) String() string {
+	var b strings.Builder
+
+	fmt.Fprintf(&b, "Provenance (schema %s)\n", p.SchemaVersion)
+	fmt.Fprintf(&b, "  Engine:       %s %s", p.Engine.Name, p.Engine.Version)
+
+	if p.Engine.Citation != "" {
+		fmt.Fprintf(&b, " (%s)", p.Engine.Citation)
+	}
+
+	fmt.Fprintf(&b, "\n  Mode:         %s\n", p.Mode)
+
+	if p.Transmission.Name != "" {
+		fmt.Fprintf(&b, "  Transmission: %s %s\n", p.Transmission.Name, p.Transmission.Version)
+	}
+
+	for _, c := range p.Components {
+		fmt.Fprintf(&b, "  Component:    %-16s %s %s\n", c.Component, c.Algorithm.Name, c.Algorithm.Version)
+	}
+
+	for _, d := range p.Datasets {
+		fmt.Fprintf(&b, "  Dataset:      %s %s (%s)\n", d.Name, d.Version, d.Fidelity)
+	}
+
+	for _, f := range p.Fallbacks {
+		fmt.Fprintf(&b, "  Fallback:     %s -> %s (%s)\n", f.From, f.To, f.Reason)
+	}
+
+	fmt.Fprintf(&b, "  Evaluated at: %s\n", p.EvaluatedAt.Format(time.RFC3339Nano))
+	fmt.Fprintf(&b, "  Digest:       %x", p.Digest())
+
+	return b.String()
 }

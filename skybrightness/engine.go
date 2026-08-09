@@ -8,6 +8,7 @@ import (
 	"sort"
 	"time"
 
+	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/internal/parallel"
 )
@@ -17,9 +18,9 @@ import (
 var ErrDuplicateComponent = errors.New("skybrightness: duplicate ComponentID in CompositeConfig.Components")
 
 // ErrMissingAtmosphere is returned when a Request supplies no
-// AtmosphereState under a Mode that requires one, and
+// atmosphere.State under a Mode that requires one, and
 // EvaluationOptions.Fallback is FallbackForbidden (the default).
-var ErrMissingAtmosphere = errors.New("skybrightness: no AtmosphereState supplied and fallback is forbidden")
+var ErrMissingAtmosphere = errors.New("skybrightness: no atmosphere.State supplied and fallback is forbidden")
 
 // ErrEmptyBatch is returned by EvaluateBatch when BatchRequest.Astro is
 // empty.
@@ -37,7 +38,7 @@ type TransmissionModel interface {
 	// LineOfSight fills out (length g.Len()) with the transmission at
 	// each of g's wavelengths, for the path from top-of-atmosphere to an
 	// observer looking toward dir under atmospheric state st.
-	LineOfSight(dir coord.AltAz, st *AtmosphereState, g SpectralGrid, out []Transmission) error
+	LineOfSight(dir coord.AltAz, st *atmosphere.State, g SpectralGrid, out []Transmission) error
 }
 
 // Engine is the spectral sky-radiance evaluator.
@@ -140,23 +141,23 @@ func (e *CompositeEngine) evaluateOne(ctx context.Context, req Request, scratch 
 	var fallbacks []FallbackRecord
 
 	if atm == nil {
-		// ModeClimatology and ModeLegacy are both self-sufficient,
+		// ModeClimatology and ModeFast are both self-sufficient,
 		// deterministic, offline defaults — neither requires an explicit
-		// AtmosphereState, unlike Historical/Nowcast/Forecast/UserSupplied,
+		// atmosphere.State, unlike Historical/Nowcast/Forecast/UserSupplied,
 		// where a missing atmosphere is a real gap the caller must either
 		// fill or explicitly opt to fall back from (docs/skybrightness.md
-		// §7). ModeLegacy in particular exists so natural.NewLegacyEngine
-		// works with zero setup, matching v1's own zero-configuration
-		// default behavior.
-		if req.Mode != ModeClimatology && req.Mode != ModeLegacy && req.Options.Fallback == FallbackForbidden {
+		// §7). ModeFast in particular exists so natural.NewFastEngine works
+		// with zero setup, matching v1's own zero-configuration default
+		// behavior.
+		if req.Mode != ModeClimatology && req.Mode != ModeFast && req.Options.Fallback == FallbackForbidden {
 			return Result{}, ErrMissingAtmosphere
 		}
 
 		atm = ClimatologyDefaultAtmosphere(nil)
 
-		if req.Mode != ModeClimatology && req.Mode != ModeLegacy {
+		if req.Mode != ModeClimatology && req.Mode != ModeFast {
 			fallbacks = append(fallbacks, FallbackRecord{
-				From: req.Mode, To: ModeClimatology, Reason: "no AtmosphereState supplied", At: time.Now(),
+				From: req.Mode, To: ModeClimatology, Reason: "no atmosphere.State supplied", At: time.Now(),
 			})
 		}
 	}

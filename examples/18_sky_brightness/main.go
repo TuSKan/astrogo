@@ -6,10 +6,10 @@
 // -> limiting magnitude -> full provenance.
 //
 // Phase 1 honesty note, stated here and in the printed output: this
-// package's ONLY real physics today is the Legacy* fast models
-// (natural.LegacyAirglow, natural.LegacyMoonlight — the exact v1
-// Krisciunas & Schaefer 1991 physics, re-implemented against the new
-// spectral API) plus an analytic Rayleigh-only transmission model
+// package's ONLY real physics today is the fast, simplified models
+// (natural.ConstantAirglow, natural.KrisciunasSchaeferMoonlight — the
+// exact v1 Krisciunas & Schaefer 1991 physics, re-implemented against the
+// new spectral API) plus an analytic Rayleigh-only transmission model
 // (atmos.RayleighOnly). Real spectral zodiacal light, starlight, diffuse
 // galactic light, twilight, and artificial-emission propagation are
 // Phase 2-5 scope — see docs/skybrightness.md's staged implementation
@@ -18,24 +18,23 @@
 // This pairs the plan event API with the new skybrightness.Engine:
 //   - plan.AstronomicalDawnDusk frames the true-night window,
 //   - plan.MoonIllumination / plan.MoonriseMoonset describe the Moon,
-//   - a skybrightness.CompositeEngine (LegacyAirglow + LegacyMoonlight,
-//     ModeLegacy) gives the sky's spectral radiance toward a pointing,
-//     reduced to a V-band magnitude through natural.LegacyJohnsonV() —
+//   - natural.NewFastEngine (ConstantAirglow + KrisciunasSchaeferMoonlight,
+//     ModeFast) gives the sky's spectral radiance toward a pointing,
+//     reduced to a V-band magnitude through natural.TopHatJohnsonV() —
 //     the only passband whose output is physically meaningful in Phase 1
-//     (see legacy_units.go's doc comment for why),
-//   - skybrightness.LegacySchaeferNELM turns that into a limiting
-//     magnitude, and
+//     (see garstang_units.go's doc comment for why),
+//   - skybrightness.SchaeferNELM turns that into a limiting magnitude, and
 //   - plan.ScoreObservableSky shows LimitingMagnitudeConstraint demoting a
 //     target's observability score under the moonlit sky.
 package main
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log"
 
 	"github.com/TuSKan/astrogo/angle"
+	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/plan"
@@ -141,48 +140,48 @@ func main() {
 	fmt.Printf("\n  Observing %s — Moon at altitude %.0f deg\n",
 		obs.In(tz).Format("Jan 02 15:04 MST"), moonAA.Alt().Degrees())
 
-	// ── Atmosphere: explicit, user-supplied, immutable ───────────────────
-	atmState, err := skybrightness.NewAtmosphereBuilder().
+	// ── Atmosphere: explicit, user-supplied, immutable — a general
+	// atmosphere.State (package atmosphere, not skybrightness — the same
+	// state a future weather/seeing constraint would use, not something
+	// sky-brightness-specific) ────────────────────────────────────────
+	atmState, err := atmosphere.NewBuilder().
 		Surface(1013.25, 288.15).
 		Clear(). // no cloud layers — Phase 1 has no cloud optics yet regardless
-		SurfaceAlbedo(skybrightness.UniformAlbedo(0.15)).
-		Source(skybrightness.SourceRef{Name: "user-supplied", Fidelity: skybrightness.FidelityMeasured}).
+		SurfaceAlbedo(atmosphere.UniformAlbedo(0.15)).
+		Source(atmosphere.SourceRef{Name: "user-supplied", Fidelity: atmosphere.FidelityMeasured}).
 		Build()
 	if err != nil {
 		log.Fatalf("atmosphere: %v", err)
 	}
 
-	// ── Engine: components assembled by the application, not by plan or
-	// by core skybrightness (docs/skybrightness.md §4) ───────────────────
-	sky, err := skybrightness.NewCompositeEngine(skybrightness.CompositeConfig{
-		Name: skybrightness.AlgorithmRef{Name: "examples/18_sky_brightness", Version: "phase1"},
-		Components: []skybrightness.Component{
-			natural.NewLegacyAirglow(),
-			natural.NewLegacyMoonlight(natural.WithLegacyMoonProvider(provider)),
-		},
+	// ── Engine: natural.NewFastEngine assembles the fast, offline
+	// ConstantAirglow + KrisciunasSchaeferMoonlight components for us —
+	// an application only needs to name its transmission model
+	// (docs/skybrightness.md §4) ───────────────────────────────────────
+	sky, err := natural.NewFastEngine(natural.FastConfig{
+		Ephemeris:    provider,
 		Transmission: atmos.NewRayleighOnly(),
-		Mode:         skybrightness.ModeLegacy,
 	})
 	if err != nil {
 		log.Fatalf("build engine: %v", err)
 	}
 
 	grid := skybrightness.DefaultOpticalGrid()
-	johnsonV := natural.LegacyJohnsonV()
+	johnsonV := natural.TopHatJohnsonV()
 
 	dir := coord.NewAltAz(angle.Deg(pointingAltitude), angle.Deg(120))
 
 	res, err := sky.Evaluate(ctx, skybrightness.Request{
 		Astro: astro, Directions: []coord.AltAz{dir}, Grid: grid,
 		Passbands: []*skybrightness.Passband{johnsonV},
-		Mode:      skybrightness.ModeLegacy, Atmosphere: atmState,
+		Mode:      skybrightness.ModeFast, Atmosphere: atmState,
 		Selection: skybrightness.ComponentSelection{Materialize: true},
 		Options: skybrightness.EvaluationOptions{
 			ComputeTransmission: true,
 			Derived:             skybrightness.DerivePassbands | skybrightness.DeriveLimitingMag,
 			Uncertainty:         skybrightness.UncLinearized,
 			Fallback:            skybrightness.FallbackForbidden,
-			LimitingMag:         skybrightness.NewLegacySchaeferNELM(),
+			LimitingMag:         skybrightness.NewSchaeferNELM(),
 		},
 	})
 	if err != nil {
@@ -190,7 +189,7 @@ func main() {
 	}
 
 	fmt.Println("\n── Component decomposition (Garstang nanolambert convention, Phase 1) ──")
-	fmt.Println("  Meaningful only through LegacyJohnsonV — see the doc comment above.")
+	fmt.Println("  Meaningful only through TopHatJohnsonV — see the doc comment above.")
 
 	res.Components.Each(func(id skybrightness.ComponentID, f skybrightness.SpectralField, rep skybrightness.ComponentReport) bool {
 		r, ierr := skybrightness.IntegrateRadiance(grid, f.Row(0), johnsonV)
@@ -220,19 +219,17 @@ func main() {
 	}
 
 	if len(res.Derived.LimitingMagnitude) > 0 {
-		fmt.Printf("\n  Limiting magnitude (Schaefer 1990, LegacyJohnsonV): %.2f\n", res.Derived.LimitingMagnitude[0])
+		fmt.Printf("\n  Limiting magnitude (Schaefer 1990, TopHatJohnsonV): %.2f\n", res.Derived.LimitingMagnitude[0])
 	}
 
 	fmt.Printf("  Quality flags: %v\n", res.Quality.Strings())
 
-	prov, err := json.MarshalIndent(res.Provenance, "", "  ")
-	if err != nil {
-		log.Fatalf("marshal provenance: %v", err)
-	}
-
+	// Provenance implements fmt.Stringer directly — no need to reach for
+	// encoding/json to get a human-readable summary. A caller wanting the
+	// full JSON (for storage/logging) calls json.Marshal(res.Provenance)
+	// explicitly; Provenance already implements json.Marshaler.
 	fmt.Printf("\n── Provenance ────────────────────────────────────────────────────────\n")
-	fmt.Printf("  digest: %x\n", res.Provenance.Digest())
-	fmt.Printf("%s\n", prov)
+	fmt.Println(res.Provenance)
 
 	// ── Score a target through the moonlit sky ───────────────────────────
 	// A real fixed-RA/Dec target that happens to sit at dir right now —
@@ -247,8 +244,8 @@ func main() {
 	target := plan.NewStar("Demo target", targetICRS.RA(), targetICRS.Dec())
 
 	constraint := plan.LimitingMagnitudeConstraint{
-		Engine: sky, Passband: johnsonV, Mode: skybrightness.ModeLegacy, Atmosphere: atmState,
-		Conversion: skybrightness.NewLegacySchaeferNELM(),
+		Engine: sky, Passband: johnsonV, Mode: skybrightness.ModeFast, Atmosphere: atmState,
+		Conversion: skybrightness.NewSchaeferNELM(),
 		Required:   func(plan.Observable) float64 { return targetVMag },
 	}
 

@@ -112,20 +112,21 @@ func main() {
 		log.Fatal("no astronomical night found in this window")
 	}
 
-	// Sky Brightness V2 (docs/skybrightness.md): ModeLegacy runs only the
-	// two Legacy* fast components (airglow + scattered moonlight) — the
-	// same physics v1's CompositeModel(Airglow, ZodiacalLight, Moonlight)
-	// ran, minus zodiacal light (Phase 2 scope; not yet re-implemented),
-	// re-expressed against the new spectral Engine/Component API. This is
-	// a brand-new type, not a v1 compatibility shim — see §15.
-	sky, err := natural.NewLegacyEngine(natural.LegacyConfig{Ephemeris: prov})
+	// Sky Brightness V2 (docs/skybrightness.md): ModeFast runs only the
+	// two fast, simplified components (constant airglow + Krisciunas &
+	// Schaefer scattered moonlight) — the same physics v1's
+	// CompositeModel(Airglow, ZodiacalLight, Moonlight) ran, minus
+	// zodiacal light (Phase 2 scope; not yet re-implemented), re-expressed
+	// against the new spectral Engine/Component API. This is a brand-new
+	// type, not a v1 compatibility shim — see §15.
+	sky, err := natural.NewFastEngine(natural.FastConfig{Ephemeris: prov})
 	if err != nil {
 		log.Fatalf("sky engine: %v", err)
 	}
 
 	constraint := plan.LimitingMagnitudeConstraint{
-		Engine: sky, Passband: natural.LegacyJohnsonV(),
-		Conversion: skybrightness.NewLegacySchaeferNELM(),
+		Engine: sky, Passband: natural.TopHatJohnsonV(),
+		Conversion: skybrightness.NewSchaeferNELM(),
 	}
 
 	tz, err := time.LoadLocation("America/Santiago")

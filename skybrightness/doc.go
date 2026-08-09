@@ -61,7 +61,7 @@
 // # Modes and fallback
 //
 // A Request always names a Mode (Climatology, Historical, Nowcast,
-// Forecast, UserSupplied, or Legacy). Modes never fall back into one
+// Forecast, UserSupplied, or Fast). Modes never fall back into one
 // another silently: EvaluationOptions.Fallback defaults to
 // FallbackForbidden, and any fallback that does occur under an explicit
 // opt-in is recorded in Provenance.Fallbacks.

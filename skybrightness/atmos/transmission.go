@@ -40,7 +40,7 @@ func (r *RayleighOnly) Algorithm() skybrightness.AlgorithmRef {
 }
 
 // LineOfSight implements skybrightness.TransmissionModel.
-func (r *RayleighOnly) LineOfSight(dir coord.AltAz, st *skybrightness.AtmosphereState, g skybrightness.SpectralGrid, out []skybrightness.Transmission) error {
+func (r *RayleighOnly) LineOfSight(dir coord.AltAz, st *atmosphere.State, g skybrightness.SpectralGrid, out []skybrightness.Transmission) error {
 	airmass, err := atmosphere.Airmass(dir.Alt())
 	if err != nil {
 		return ErrTargetBelowHorizon

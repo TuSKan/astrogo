@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/TuSKan/astrogo/angle"
+	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/skybrightness"
 )
@@ -16,7 +17,7 @@ func TestRayleighOnly_ZenithHasHighestTransmission(t *testing.T) {
 	r := NewRayleighOnly()
 	grid := skybrightness.DefaultOpticalGrid()
 
-	atm, err := skybrightness.NewAtmosphereBuilder().Build()
+	atm, err := atmosphere.NewBuilder().Build()
 	if err != nil {
 		t.Fatalf("build atmosphere: %v", err)
 	}
@@ -49,7 +50,7 @@ func TestRayleighOnly_BluerIsMoreAttenuated(t *testing.T) {
 	r := NewRayleighOnly()
 	grid := skybrightness.DefaultOpticalGrid()
 
-	atm, err := skybrightness.NewAtmosphereBuilder().Build()
+	atm, err := atmosphere.NewBuilder().Build()
 	if err != nil {
 		t.Fatalf("build atmosphere: %v", err)
 	}
@@ -71,7 +72,7 @@ func TestRayleighOnly_BelowHorizonErrors(t *testing.T) {
 	r := NewRayleighOnly()
 	grid := skybrightness.DefaultOpticalGrid()
 
-	atm, err := skybrightness.NewAtmosphereBuilder().Build()
+	atm, err := atmosphere.NewBuilder().Build()
 	if err != nil {
 		t.Fatalf("build atmosphere: %v", err)
 	}
@@ -90,12 +91,12 @@ func TestRayleighOnly_HigherPressureMoreAttenuation(t *testing.T) {
 	grid := skybrightness.DefaultOpticalGrid()
 	dir := coord.NewAltAz(angle.Deg(60), angle.Deg(0))
 
-	seaLevel, err := skybrightness.NewAtmosphereBuilder().Surface(1013.25, 288.15).Build()
+	seaLevel, err := atmosphere.NewBuilder().Surface(1013.25, 288.15).Build()
 	if err != nil {
 		t.Fatalf("build sea-level atmosphere: %v", err)
 	}
 
-	highAlt, err := skybrightness.NewAtmosphereBuilder().Surface(600, 270).Build()
+	highAlt, err := atmosphere.NewBuilder().Surface(600, 270).Build()
 	if err != nil {
 		t.Fatalf("build high-altitude atmosphere: %v", err)
 	}

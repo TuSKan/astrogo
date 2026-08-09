@@ -12,42 +12,45 @@ import (
 	"github.com/TuSKan/astrogo/skybrightness"
 )
 
-// ErrNilAstroContext is returned when LegacyMoonlight is evaluated with a
-// nil EvalInput.Astro.
+// ErrNilAstroContext is returned when KrisciunasSchaeferMoonlight is
+// evaluated with a nil EvalInput.Astro.
 var ErrNilAstroContext = errors.New("natural: nil coord.Context")
 
-// DefaultLegacyExtinctionV is the default V-band atmospheric extinction
+// DefaultMoonExtinctionV is the default V-band atmospheric extinction
 // coefficient (mag/airmass) — the value Krisciunas & Schaefer (1991) used
 // for Mauna Kea. Carried verbatim from astrogo v1.
-const DefaultLegacyExtinctionV = 0.172
+const DefaultMoonExtinctionV = 0.172
 
 const degToRad = math.Pi / 180
 
-// LegacyMoonlight is astrogo v1's scattered-moonlight component,
-// re-implemented against the new Component interface: the closed-form
-// V-band model of Krisciunas & Schaefer (1991), PASP 103, 1033, accurate
-// to ~8-23% away from full Moon. Zero when the Moon is below the horizon.
-// See docs/skybrightness.md §15 — a brand-new type, not a compatibility
-// shim.
-type LegacyMoonlight struct {
+// KrisciunasSchaeferMoonlight is astrogo v1's scattered-moonlight
+// component, re-implemented against the new Component interface: the
+// closed-form V-band model of Krisciunas & Schaefer (1991), PASP 103,
+// 1033, accurate to ~8-23% away from full Moon. Zero when the Moon is
+// below the horizon. Named for the paper it implements, not for its
+// vintage — a future spectral moonlight model (Jones et al. 2013) is a
+// different algorithm, not a replacement for this one. See
+// docs/skybrightness.md §15 — a brand-new type, not a compatibility shim.
+type KrisciunasSchaeferMoonlight struct {
 	provider eph.Provider
 	k        float64
 }
 
-// LegacyMoonlightOption configures optional LegacyMoonlight fields.
-type LegacyMoonlightOption func(*LegacyMoonlight)
+// KrisciunasSchaeferMoonlightOption configures optional
+// KrisciunasSchaeferMoonlight fields.
+type KrisciunasSchaeferMoonlightOption func(*KrisciunasSchaeferMoonlight)
 
-// WithLegacyMoonExtinction sets the V-band atmospheric extinction
-// coefficient (mag/airmass). The default is DefaultLegacyExtinctionV.
-func WithLegacyMoonExtinction(k float64) LegacyMoonlightOption {
-	return func(m *LegacyMoonlight) { m.k = k }
+// WithMoonExtinction sets the V-band atmospheric extinction coefficient
+// (mag/airmass). The default is DefaultMoonExtinctionV.
+func WithMoonExtinction(k float64) KrisciunasSchaeferMoonlightOption {
+	return func(m *KrisciunasSchaeferMoonlight) { m.k = k }
 }
 
-// WithLegacyMoonProvider sets the ephemeris provider used for Moon and Sun
+// WithMoonProvider sets the ephemeris provider used for Moon and Sun
 // positions. The default is ephemeris.Default(); an explicit nil is
 // treated the same way.
-func WithLegacyMoonProvider(p eph.Provider) LegacyMoonlightOption {
-	return func(m *LegacyMoonlight) {
+func WithMoonProvider(p eph.Provider) KrisciunasSchaeferMoonlightOption {
+	return func(m *KrisciunasSchaeferMoonlight) {
 		if p == nil {
 			p = eph.Default()
 		}
@@ -56,9 +59,9 @@ func WithLegacyMoonProvider(p eph.Provider) LegacyMoonlightOption {
 	}
 }
 
-// NewLegacyMoonlight creates a scattered-moonlight component.
-func NewLegacyMoonlight(opts ...LegacyMoonlightOption) *LegacyMoonlight {
-	m := &LegacyMoonlight{provider: eph.Default(), k: DefaultLegacyExtinctionV}
+// NewKrisciunasSchaeferMoonlight creates a scattered-moonlight component.
+func NewKrisciunasSchaeferMoonlight(opts ...KrisciunasSchaeferMoonlightOption) *KrisciunasSchaeferMoonlight {
+	m := &KrisciunasSchaeferMoonlight{provider: eph.Default(), k: DefaultMoonExtinctionV}
 	for _, opt := range opts {
 		opt(m)
 	}
@@ -67,18 +70,20 @@ func NewLegacyMoonlight(opts ...LegacyMoonlightOption) *LegacyMoonlight {
 }
 
 // ID implements skybrightness.Component.
-func (m *LegacyMoonlight) ID() skybrightness.ComponentID { return skybrightness.MoonScattered }
+func (m *KrisciunasSchaeferMoonlight) ID() skybrightness.ComponentID {
+	return skybrightness.MoonScattered
+}
 
 // Algorithm implements skybrightness.Component.
-func (m *LegacyMoonlight) Algorithm() skybrightness.AlgorithmRef {
+func (m *KrisciunasSchaeferMoonlight) Algorithm() skybrightness.AlgorithmRef {
 	return skybrightness.AlgorithmRef{
-		Name: "natural.LegacyMoonlight", Version: "1.0.0",
+		Name: "natural.KrisciunasSchaeferMoonlight", Version: "1.0.0",
 		Citation: "Krisciunas & Schaefer (1991), PASP 103, 1033",
 	}
 }
 
 // Eval implements skybrightness.Component.
-func (m *LegacyMoonlight) Eval(_ context.Context, in skybrightness.EvalInput, out skybrightness.SpectralField) (skybrightness.ComponentReport, error) {
+func (m *KrisciunasSchaeferMoonlight) Eval(_ context.Context, in skybrightness.EvalInput, out skybrightness.SpectralField) (skybrightness.ComponentReport, error) {
 	if in.Astro == nil {
 		return skybrightness.ComponentReport{}, ErrNilAstroContext
 	}
@@ -136,18 +141,18 @@ func (m *LegacyMoonlight) Eval(_ context.Context, in skybrightness.EvalInput, ou
 		}
 	}
 
-	fillLegacyFlat(in.Grid, out, values)
+	fillFlat(in.Grid, out, values)
 
 	return skybrightness.ComponentReport{
 		Assumptions: []string{
 			"V-band closed-form fit, accurate to ~8-23% away from full Moon (KS 1991)",
-			"Garstang nanolambert convention, not SI radiance — meaningful only via VegaSurfaceBrightness against LegacyJohnsonV",
+			"Garstang nanolambert convention, not SI radiance — meaningful only via VegaSurfaceBrightness against TopHatJohnsonV",
 		},
 		Uncertainty: skybrightness.ComponentUncertainty{RelSigma: 0.15, Group: skybrightness.GroupNatural, Kind: skybrightness.Aleatoric},
 		Provenance: skybrightness.ComponentProvenance{
 			Component: skybrightness.MoonScattered, Algorithm: m.Algorithm(),
 		},
-		Quality: skybrightness.QualityFlagLegacyPhysics,
+		Quality: skybrightness.QualityFlagApproximatePhysics,
 	}, nil
 }
 

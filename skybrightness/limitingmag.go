@@ -32,40 +32,40 @@ type LimitingMagModel interface {
 // forward verbatim from astrogo v1 (docs/skybrightness.md §15) — same
 // constants, same formula.
 const (
-	legacyNelmBright = 7.93  // bright-limit NELM as the sky becomes infinitely dark
-	legacyNelmScale  = 4.316 // sky-brightness scale constant
+	schaeferNelmBright = 7.93  // bright-limit NELM as the sky becomes infinitely dark
+	schaeferNelmScale  = 4.316 // sky-brightness scale constant
 )
 
-// DefaultLegacyLimMagExtinction is the default V-band extinction
-// coefficient (mag/airmass) for LegacySchaeferNELM's airmass penalty
+// DefaultSchaeferNELMExtinction is the default V-band extinction
+// coefficient (mag/airmass) for SchaeferNELM's airmass penalty
 // (Krisciunas & Schaefer 1991 Mauna Kea value).
-const DefaultLegacyLimMagExtinction = 0.172
+const DefaultSchaeferNELMExtinction = 0.172
 
-// LegacySchaeferNELM is a naked-eye/visual LimitingMagModel using the
-// Schaefer (1990) sky-brightness -> NELM relation, with an optional
-// extinction penalty k*(X-1) for additional dimming at airmass X > 1. It
-// operates on LimitingMagInput.SkyVega, which the caller is responsible
-// for having computed in an approximately-Johnson-V passband — the
-// formula's constants were calibrated against V-band visual observations
-// and are not meaningful in an arbitrary passband.
-type LegacySchaeferNELM struct {
+// SchaeferNELM is a naked-eye/visual LimitingMagModel using the Schaefer
+// (1990) sky-brightness -> NELM relation, with an optional extinction
+// penalty k*(X-1) for additional dimming at airmass X > 1. It operates on
+// LimitingMagInput.SkyVega, which the caller is responsible for having
+// computed in an approximately-Johnson-V passband — the formula's
+// constants were calibrated against V-band visual observations and are
+// not meaningful in an arbitrary passband.
+type SchaeferNELM struct {
 	k float64
 }
 
-// LegacySchaeferNELMOption configures a LegacySchaeferNELM.
-type LegacySchaeferNELMOption func(*LegacySchaeferNELM)
+// SchaeferNELMOption configures a SchaeferNELM.
+type SchaeferNELMOption func(*SchaeferNELM)
 
-// WithLegacyExtinction sets the V-band extinction coefficient
-// (mag/airmass) used for the airmass penalty. The default is
-// DefaultLegacyLimMagExtinction.
-func WithLegacyExtinction(k float64) LegacySchaeferNELMOption {
-	return func(c *LegacySchaeferNELM) { c.k = k }
+// WithExtinction sets the V-band extinction coefficient (mag/airmass)
+// used for the airmass penalty. The default is
+// DefaultSchaeferNELMExtinction.
+func WithExtinction(k float64) SchaeferNELMOption {
+	return func(c *SchaeferNELM) { c.k = k }
 }
 
-// NewLegacySchaeferNELM creates a Schaefer (1990) visual limiting-magnitude
+// NewSchaeferNELM creates a Schaefer (1990) visual limiting-magnitude
 // model.
-func NewLegacySchaeferNELM(opts ...LegacySchaeferNELMOption) *LegacySchaeferNELM {
-	c := &LegacySchaeferNELM{k: DefaultLegacyLimMagExtinction}
+func NewSchaeferNELM(opts ...SchaeferNELMOption) *SchaeferNELM {
+	c := &SchaeferNELM{k: DefaultSchaeferNELMExtinction}
 	for _, opt := range opts {
 		opt(c)
 	}
@@ -74,9 +74,9 @@ func NewLegacySchaeferNELM(opts ...LegacySchaeferNELMOption) *LegacySchaeferNELM
 }
 
 // Algorithm implements LimitingMagModel.
-func (c *LegacySchaeferNELM) Algorithm() AlgorithmRef {
+func (c *SchaeferNELM) Algorithm() AlgorithmRef {
 	return AlgorithmRef{
-		Name:     "skybrightness.LegacySchaeferNELM",
+		Name:     "skybrightness.SchaeferNELM",
 		Version:  "1.0.0",
 		Citation: "Schaefer (1990), PASP 102, 212; Unihedron SQM<->NELM converter",
 	}
@@ -85,10 +85,10 @@ func (c *LegacySchaeferNELM) Algorithm() AlgorithmRef {
 // LimitingMagnitude returns the visual limiting magnitude for the given
 // sky background and airmass. An infinitely dark sky yields the bright
 // limit (7.93); brighter skies and larger airmass reduce the limit.
-func (c *LegacySchaeferNELM) LimitingMagnitude(in LimitingMagInput) (float64, error) {
+func (c *SchaeferNELM) LimitingMagnitude(in LimitingMagInput) (float64, error) {
 	// 10^(4.316 - m_sky/5): for an infinitely faint sky (m_sky = +Inf)
 	// this is 0, so NELM -> 7.93 with no special-casing required.
-	nelm := legacyNelmBright - 5*math.Log10(math.Pow(10, legacyNelmScale-float64(in.SkyVega)/5)+1)
+	nelm := schaeferNelmBright - 5*math.Log10(math.Pow(10, schaeferNelmScale-float64(in.SkyVega)/5)+1)
 
 	x := in.Airmass
 	if x < 1 {

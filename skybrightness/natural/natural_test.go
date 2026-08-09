@@ -24,22 +24,24 @@ func testAstro() *coord.Context {
 	return coord.NewContext(t, site, atmosphere.StandardAtmosphere)
 }
 
-// legacyRoundTripToleranceMag bounds the Garstang nanolambert round-trip
-// precision — see legacy_units.go's doc comment: the shared, historically
-// rounded 0.92104 literal (not the more precise 0.4*ln(10)) means the
-// round trip is precise to ~1.5e-4 mag at V~22, not to float64 precision.
-const legacyRoundTripToleranceMag = 5e-4
+// roundTripToleranceMag bounds the Garstang nanolambert round-trip
+// precision — see garstang_units.go's doc comment: the shared,
+// historically rounded 0.92104 literal (not the more precise 0.4*ln(10))
+// means the round trip is precise to ~1.5e-4 mag at V~22, not to float64
+// precision.
+const roundTripToleranceMag = 5e-4
 
-// TestLegacyAirglow_RoundTripToHistoricalPrecision confirms the Garstang
-// nanolambert convention reproduces the original V mag/arcsec^2 through
-// VegaSurfaceBrightness against LegacyJohnsonV, to the precision of v1's
-// own shared 0.92104 literal (see legacy_units.go's doc comment).
-func TestLegacyAirglow_RoundTripToHistoricalPrecision(t *testing.T) {
-	grid := LegacyVGrid()
-	pb := LegacyJohnsonV()
+// TestConstantAirglow_RoundTripToHistoricalPrecision confirms the
+// Garstang nanolambert convention reproduces the original V mag/arcsec^2
+// through VegaSurfaceBrightness against TopHatJohnsonV, to the precision
+// of v1's own shared 0.92104 literal (see garstang_units.go's doc
+// comment).
+func TestConstantAirglow_RoundTripToHistoricalPrecision(t *testing.T) {
+	grid := TopHatVGrid()
+	pb := TopHatJohnsonV()
 
 	for _, v := range []float64{21.9, 18.0, 22.0, 16.5} {
-		a := NewLegacyAirglowSB(v)
+		a := NewConstantAirglowSB(v)
 		out := skybrightness.NewSpectralField(1, grid.Len())
 
 		_, err := a.Eval(context.Background(), skybrightness.EvalInput{
@@ -60,19 +62,19 @@ func TestLegacyAirglow_RoundTripToHistoricalPrecision(t *testing.T) {
 			t.Fatalf("VegaSurfaceBrightness: %v", err)
 		}
 
-		if diff := math.Abs(float64(got) - v); diff > legacyRoundTripToleranceMag {
-			t.Errorf("v=%v: round trip gave %v (diff %v, want <= %v)", v, got, diff, legacyRoundTripToleranceMag)
+		if diff := math.Abs(float64(got) - v); diff > roundTripToleranceMag {
+			t.Errorf("v=%v: round trip gave %v (diff %v, want <= %v)", v, got, diff, roundTripToleranceMag)
 		}
 	}
 }
 
-// TestLegacyAirglow_ZeroValueDefaults confirms a zero-value LegacyAirglow
-// (constructed without NewLegacyAirglow) falls back to
-// DefaultLegacyAirglowV, matching v1's behavior.
-func TestLegacyAirglow_ZeroValueDefaults(t *testing.T) {
-	a := &LegacyAirglow{}
-	grid := LegacyVGrid()
-	pb := LegacyJohnsonV()
+// TestConstantAirglow_ZeroValueDefaults confirms a zero-value
+// ConstantAirglow (constructed without NewConstantAirglow) falls back to
+// DefaultConstantAirglowV, matching v1's behavior.
+func TestConstantAirglow_ZeroValueDefaults(t *testing.T) {
+	a := &ConstantAirglow{}
+	grid := TopHatVGrid()
+	pb := TopHatJohnsonV()
 
 	out := skybrightness.NewSpectralField(1, grid.Len())
 
@@ -93,20 +95,20 @@ func TestLegacyAirglow_ZeroValueDefaults(t *testing.T) {
 		t.Fatalf("VegaSurfaceBrightness: %v", err)
 	}
 
-	if diff := math.Abs(float64(got) - DefaultLegacyAirglowV); diff > legacyRoundTripToleranceMag {
-		t.Errorf("zero-value LegacyAirglow gave %v, want default %v (diff %v, want <= %v)",
-			got, DefaultLegacyAirglowV, diff, legacyRoundTripToleranceMag)
+	if diff := math.Abs(float64(got) - DefaultConstantAirglowV); diff > roundTripToleranceMag {
+		t.Errorf("zero-value ConstantAirglow gave %v, want default %v (diff %v, want <= %v)",
+			got, DefaultConstantAirglowV, diff, roundTripToleranceMag)
 	}
 }
 
-// TestLegacyMoonlight_BelowHorizonIsZero confirms zero contribution when
-// the Moon is below the horizon.
-func TestLegacyMoonlight_BelowHorizonIsZero(t *testing.T) {
+// TestKrisciunasSchaeferMoonlight_BelowHorizonIsZero confirms zero
+// contribution when the Moon is below the horizon.
+func TestKrisciunasSchaeferMoonlight_BelowHorizonIsZero(t *testing.T) {
 	prov := eph.Default()
-	m := NewLegacyMoonlight(WithLegacyMoonProvider(prov))
+	m := NewKrisciunasSchaeferMoonlight(WithMoonProvider(prov))
 
 	astro := testAstro()
-	grid := LegacyVGrid()
+	grid := TopHatVGrid()
 
 	// Find a time where the Moon is genuinely below the horizon by
 	// scanning: not all epochs guarantee this at lat/lon (0,0), so pick a
@@ -151,11 +153,11 @@ func TestLegacyMoonlight_BelowHorizonIsZero(t *testing.T) {
 	}
 }
 
-// TestLegacyMoonlight_NilAstroErrors confirms a nil EvalInput.Astro
-// errors rather than panicking.
-func TestLegacyMoonlight_NilAstroErrors(t *testing.T) {
-	m := NewLegacyMoonlight()
-	grid := LegacyVGrid()
+// TestKrisciunasSchaeferMoonlight_NilAstroErrors confirms a nil
+// EvalInput.Astro errors rather than panicking.
+func TestKrisciunasSchaeferMoonlight_NilAstroErrors(t *testing.T) {
+	m := NewKrisciunasSchaeferMoonlight()
+	grid := TopHatVGrid()
 	out := skybrightness.NewSpectralField(1, grid.Len())
 
 	_, err := m.Eval(context.Background(), skybrightness.EvalInput{
@@ -166,31 +168,31 @@ func TestLegacyMoonlight_NilAstroErrors(t *testing.T) {
 	}
 }
 
-// TestNewLegacyEngine_Builds confirms NewLegacyEngine assembles a working
+// TestNewFastEngine_Builds confirms NewFastEngine assembles a working
 // Engine with no errors.
-func TestNewLegacyEngine_Builds(t *testing.T) {
-	eng, err := NewLegacyEngine(LegacyConfig{Ephemeris: eph.Default()})
+func TestNewFastEngine_Builds(t *testing.T) {
+	eng, err := NewFastEngine(FastConfig{Ephemeris: eph.Default()})
 	if err != nil {
-		t.Fatalf("NewLegacyEngine: %v", err)
+		t.Fatalf("NewFastEngine: %v", err)
 	}
 
-	grid := LegacyVGrid()
+	grid := TopHatVGrid()
 
 	res, err := eng.Evaluate(context.Background(), skybrightness.Request{
 		Astro:      testAstro(),
 		Directions: []coord.AltAz{coord.NewAltAz(angle.Deg(60), angle.Deg(30))},
 		Grid:       grid,
-		Mode:       skybrightness.ModeLegacy,
+		Mode:       skybrightness.ModeFast,
 	})
 	if err != nil {
 		t.Fatalf("Evaluate: %v", err)
 	}
 
 	if !res.Total.MinNonNegative() {
-		t.Error("LegacyEngine produced a non-finite/negative Total")
+		t.Error("FastEngine produced a non-finite/negative Total")
 	}
 
-	if !res.Quality.Has(skybrightness.QualityFlagLegacyPhysics) {
-		t.Error("expected QualityFlagLegacyPhysics on a ModeLegacy result")
+	if !res.Quality.Has(skybrightness.QualityFlagApproximatePhysics) {
+		t.Error("expected QualityFlagApproximatePhysics on a ModeFast result")
 	}
 }

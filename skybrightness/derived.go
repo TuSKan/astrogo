@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 
+	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
 )
 
@@ -17,10 +18,28 @@ type PointQuery struct {
 	Direction  coord.AltAz
 	Passband   *Passband
 	Mode       Mode
-	Atmosphere *AtmosphereState
+	Atmosphere *atmosphere.State
 	// Grid is the spectral grid to evaluate on; the zero value substitutes
 	// DefaultOpticalGrid().
 	Grid SpectralGrid
+	// Components, when true, additionally computes each evaluated
+	// component's own passband-integrated radiance (PointResult.Components)
+	// — the per-component breakdown a caller inspecting *why* the sky is
+	// as bright as it is wants, without dropping to Engine.Evaluate
+	// directly. Costs one extra SpectralField per component
+	// (Selection.Materialize:true) versus the false default.
+	Components bool
+}
+
+// ComponentBrightness is one component's own passband-integrated
+// radiance, alongside its self-reported uncertainty and quality —
+// PointResult.Components, populated only when PointQuery.Components is
+// true.
+type ComponentBrightness struct {
+	ID       ComponentID
+	Radiance Radiance
+	RelSigma float64
+	Quality  QualityFlags
 }
 
 // PointResult is Point's output: everything a caller typically needs from
@@ -34,6 +53,9 @@ type PointResult struct {
 	AnthroRatio float64
 	Quality     QualityFlags
 	Provenance  Provenance
+	// Components is the per-component passband-integrated breakdown, in
+	// ComponentID order — nil unless PointQuery.Components was true.
+	Components []ComponentBrightness
 }
 
 // Point evaluates e at one direction and reduces the result to scalars in
@@ -59,7 +81,7 @@ func Point(ctx context.Context, e Engine, q PointQuery) (PointResult, error) {
 		Passbands:  passbands,
 		Mode:       q.Mode,
 		Atmosphere: q.Atmosphere,
-		Selection:  ComponentSelection{Materialize: false},
+		Selection:  ComponentSelection{Materialize: q.Components},
 		Options: EvaluationOptions{
 			Derived:     DerivePassbands | DeriveLuminance | DeriveAnthroRatio,
 			Uncertainty: UncLinearized,
@@ -70,6 +92,22 @@ func Point(ctx context.Context, e Engine, q PointQuery) (PointResult, error) {
 	}
 
 	out := PointResult{Quality: res.Quality, Provenance: res.Provenance}
+
+	if q.Components {
+		res.Components.Each(func(id ComponentID, f SpectralField, rep ComponentReport) bool {
+			cb := ComponentBrightness{ID: id, RelSigma: rep.Uncertainty.RelSigma, Quality: rep.Quality}
+
+			if q.Passband != nil && !f.Empty() {
+				if r, err := IntegrateRadiance(grid, f.Row(0), q.Passband); err == nil {
+					cb.Radiance = r
+				}
+			}
+
+			out.Components = append(out.Components, cb)
+
+			return true
+		})
+	}
 
 	if q.Passband != nil {
 		if r, err := IntegrateRadiance(grid, res.Total.Row(0), q.Passband); err == nil {

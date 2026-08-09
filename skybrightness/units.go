@@ -52,46 +52,14 @@ type (
 	ElectronsPerPixelPerSecond = unit.ElectronsPerPixelPerSecond
 )
 
-// arcsecond2SR is the solid angle, in steradians, subtended by a
-// (1 arcsec)x(1 arcsec) patch in the flat small-angle limit — exactly the
-// convention "per square arcsecond" surface-brightness units already use.
-// Computed from constants, not hardcoded, so it tracks the same arcsecond
-// definition the rest of the library uses.
-var arcsecond2SR = func() float64 {
-	rad := constants.Derived.ArcSecondsPerRadian.Value // arcsec per radian
-	perArcsec := 1 / rad                               // radians per arcsec
-
-	return perArcsec * perArcsec
-}()
-
-// photonEnergyJ returns the energy of one photon at wavelength lambda, in
-// joules: E = hc/lambda.
-func photonEnergyJ(lambda WavelengthNM) float64 {
-	lambdaM := float64(lambda) * 1e-9
-	if lambdaM <= 0 {
-		return 0
-	}
-
-	return constants.SI2019.PlanckConstant.Value * constants.SI2019.SpeedOfLight.Value / lambdaM
-}
-
-// ToPhoton converts an energy-flux spectral radiance into the equivalent
-// photon-flux spectral radiance at wavelength lambda: divide by the energy
-// of one photon at that wavelength. A free function, not a method — l's
-// underlying type is declared in package unit, which must not import
-// constants (see constants/doc.go), so this conversion (which needs
-// Planck's constant and the speed of light) lives here instead.
-func ToPhoton(l SpectralRadiance, lambda WavelengthNM) PhotonSpectralRadiance {
-	e := photonEnergyJ(lambda)
-	if e <= 0 {
-		return 0
-	}
-
-	return PhotonSpectralRadiance(float64(l) / e)
-}
-
-// ToEnergy is the inverse of ToPhoton: converts a photon-flux spectral
-// radiance back into energy-flux spectral radiance at wavelength lambda.
-func ToEnergy(p PhotonSpectralRadiance, lambda WavelengthNM) SpectralRadiance {
-	return SpectralRadiance(float64(p) * photonEnergyJ(lambda))
-}
+// ToPhoton and ToEnergy are photon<->energy spectral-radiance conversions,
+// aliased from package constants — they need Planck's constant and the
+// speed of light (constants.SI2019), which unit must not import (see
+// constants/doc.go), so they live one layer up from the quantity types
+// themselves. ArcsecondSquaredToSteradian is the solid-angle conversion
+// factor "per square arcsecond" surface-brightness units need.
+var (
+	ToPhoton     = constants.ToPhoton
+	ToEnergy     = constants.ToEnergy
+	arcsecond2SR = constants.ArcsecondSquaredToSteradian
+)

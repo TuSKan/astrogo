@@ -25,11 +25,12 @@ const (
 	// (AtmosphereState, emission field, ...) directly.
 	ModeUserSupplied
 
-	// ModeLegacy selects the v1-equivalent empirical physics —
-	// LegacyAirglow, LegacyMoonlight, LegacySchaeferNELM — re-implemented
-	// against the new spectral API, not a compatibility shim for the old
-	// package. See docs/skybrightness.md §15.
-	ModeLegacy
+	// ModeFast selects the v1-equivalent empirical physics —
+	// natural.ConstantAirglow, natural.KrisciunasSchaeferMoonlight,
+	// SchaeferNELM — re-implemented against the new spectral API, not a
+	// compatibility shim for the old package. See docs/skybrightness.md
+	// §15.
+	ModeFast
 )
 
 // String implements fmt.Stringer.
@@ -45,8 +46,8 @@ func (m Mode) String() string {
 		return "Forecast"
 	case ModeUserSupplied:
 		return "UserSupplied"
-	case ModeLegacy:
-		return "Legacy"
+	case ModeFast:
+		return "Fast"
 	default:
 		return "Mode(unknown)"
 	}
