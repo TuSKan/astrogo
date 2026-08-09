@@ -1,39 +1,78 @@
-// Package skybrightness models night-sky surface brightness as a sum of
-// additive physical components evaluated per pointing and per time, and derives
-// observability quantities (such as a limiting magnitude) from the total.
+// Package skybrightness is astrogo's spectral, all-sky, observatory-grade
+// sky-brightness engine (Sky Brightness V2). It predicts ground-observed
+// spectral sky radiance
 //
-// The design separates the brightness MODEL from the observability CONSTRAINT.
-// A [Model] returns the total sky surface brightness toward a horizontal
-// pointing at a given epoch; a limiting-magnitude conversion and the
-// scheduling constraint that consumes it live in the plan package. This lets a
-// caller run a cheap "light-pollution floor only" model or compose the floor
-// with scattered moonlight, zodiacal light, and airglow purely by adding
-// components — without changing the constraint.
+//	L_lambda(lambda, altitude, azimuth, site, epoch)   W*m^-2*sr^-1*nm^-1
+//
+// for arbitrary terrestrial sites, arbitrary horizontal directions, point
+// or all-sky queries, spectral or passband-integrated output, decomposed
+// into natural and anthropogenic components, under clear, partly-cloudy,
+// or overcast skies, in climatological, historical, nowcast, or forecast
+// atmospheric states, with uncertainty and full provenance attached to
+// every result. See docs/skybrightness.md for the full design document —
+// this comment is a summary, not a substitute for it.
+//
+// # No backward compatibility
+//
+// This is a complete, ground-up replacement of astrogo v1's skybrightness
+// package. There is no shim, no adapter, and no deprecation cycle — v1's
+// Model, Component (old shape), SurfaceBrightnessV, Nanolambert,
+// SQMProvider, Floor, CompositeModel, RadianceToArtificialSB, and
+// atlas.Resolver are all deleted, not renamed. See
+// docs/skybrightness.md §16 for a symbol-by-symbol migration table.
+//
+// # Six quantities this package never conflates
+//
+// Satellite upward radiance, V-band surface brightness, an SQM reading,
+// luminance, horizontal irradiance, and limiting magnitude are six
+// distinct physical quantities. This package never treats any pair of
+// them as interchangeable; every conversion between them is an explicit,
+// named, unit-tested function (see units.go and passband.go). In
+// particular, a raw VIIRS-DNB pixel is never converted directly to a sky
+// brightness via a single empirical fit — see the Artificial component's
+// documentation (skybrightness/artificial, from Phase 4) for why: one
+// ~15-arcsec satellite pixel measures upward radiance from one small patch
+// of ground, while zenith skyglow is an additive flux integral over
+// scattered light from sources up to ~300 km away.
 //
 // # Linear flux space
 //
-// Surface brightnesses are LOGARITHMIC (mag/arcsec²). Component contributions
-// MUST therefore be summed as linear radiances ([Nanolambert]) and converted
-// back to a [SurfaceBrightnessV] only at the boundary. Summing magnitudes is a
-// correctness bug; see [Nanolambert].
+// Every Component computes a contribution to L_total in LINEAR spectral
+// radiance space. Surface brightnesses are logarithmic (mag/arcsec^2);
+// summing them instead of the underlying radiances is a correctness bug.
+// The engine sums components into Result.Total before any magnitude
+// conversion happens, and Result.Components retains each component's own
+// linear-space contribution.
 //
-// # Accuracy and scope
+// # Package layout
 //
-// This is observatory-grade-*lite*, not a full radiative-transfer sky model.
-// The scattered-moonlight component (Krisciunas & Schaefer 1991) is accurate to
-// ~8–23% away from full Moon. The model targets true night; the twilight
-// scattered-sunlight regime is out of scope (gate it with the existing Sun /
-// AtNight twilight logic). No data tables are downloaded at runtime — spatial
-// light-pollution grids must be supplied by the caller.
+// This package (core) is pure: types, interfaces, the composite engine,
+// and derived-output functions — no I/O, no network, no heavy
+// dependencies. Real physics lives in siblings (skybrightness/natural,
+// skybrightness/atmos, skybrightness/artificial, skybrightness/rt,
+// skybrightness/surrogate, skybrightness/calib, landing across Phases
+// 2-7), and real datasets live under skybrightness/dataset/... — the only
+// tier allowed to import remote, fits, net/http, or
+// github.com/scigolib/hdf5. plan imports this core package only; an
+// Engine is assembled by the application (an example's main, or a
+// caller's own setup) and injected into plan, not constructed inside it.
+// importgraph_test.go machine-enforces this shape.
 //
-// # References
+// # Modes and fallback
 //
-//   - Falchi et al. 2016, "The new world atlas of artificial night sky
-//     brightness", Sci. Adv. 2, e1600377 — artificial-skyglow floor.
-//   - Krisciunas & Schaefer 1991, PASP 103, 1033, "A model of the brightness of
-//     moonlight" — scattered moonlight (V-band, closed form).
-//   - Leinert et al. 1998, A&AS 127, 1 — zodiacal-light prescription.
-//   - Noll et al. 2012, A&A 543, A92; Patat 2008, A&A 481, 575 — Cerro Paranal
-//     sky-model component decomposition and airglow (reference for the dark-sky
-//     floor value).
+// A Request always names a Mode (Climatology, Historical, Nowcast,
+// Forecast, UserSupplied, or Legacy). Modes never fall back into one
+// another silently: EvaluationOptions.Fallback defaults to
+// FallbackForbidden, and any fallback that does occur under an explicit
+// opt-in is recorded in Provenance.Fallbacks.
+//
+// # Accuracy, honestly stated
+//
+// This package's Phase 1 foundation proves unit correctness, passband
+// integration correctness, linear-space additivity, determinism, and
+// allocation behavior — it proves nothing about physical accuracy. This
+// repository holds no ground-truth SQM/TESS field measurements today, so
+// the accuracy targets in docs/skybrightness.md §12 are engineering
+// goals, not achieved claims, until real observational data exists to
+// validate against.
 package skybrightness

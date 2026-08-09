@@ -37,28 +37,36 @@ var (
 	Steradian = Unit{Dimension: Dimensionless, ScaleFactor: 1, Name: "steradian", Symbol: "sr"}
 )
 
-// Composed radiometric units. Each is built through the same Mul/Div
-// composition every other composite unit in this codebase uses (see
-// constants/units.go), so a wrong exponent is a compile-time-visible
-// composition error, not a hand-typed literal.
+// Composed radiometric units (unit.Unit values, for documentation,
+// provenance serialization, and boundary parsing). Named with a "Unit"
+// suffix specifically to avoid colliding with the zero-cost quantity
+// TYPES of nearly the same name declared in quantity_types.go
+// (unit.Irradiance, unit.Radiance, ...) — those are what application code
+// actually computes with; these unit.Unit values exist only to describe
+// them. Each is built through the same Mul/Div composition every other
+// composite unit in this codebase uses (see constants/units.go), so a
+// wrong exponent is a compile-time-visible composition error, not a
+// hand-typed literal.
 //
 //nolint:gochecknoglobals // composed from the vars above; same convention
 var (
-	// Irradiance is W·m⁻².
-	Irradiance = Watt.Div(Meter.PowInt(2))
+	// IrradianceUnit is W·m⁻².
+	IrradianceUnit = Watt.Div(Meter.PowInt(2))
 
-	// Radiance is W·m⁻²·sr⁻¹. Dimensionally identical to Irradiance — see
-	// the Steradian note above; do not use this fact to justify treating
-	// the two as interchangeable in application code.
-	Radiance = Irradiance.Div(Steradian)
+	// RadianceUnit is W·m⁻²·sr⁻¹. Dimensionally identical to
+	// IrradianceUnit — see the Steradian note above; do not use this fact
+	// to justify treating the two as interchangeable in application code
+	// (use the distinct unit.Radiance/unit.Irradiance TYPES for that).
+	RadianceUnit = IrradianceUnit.Div(Steradian)
 
-	// SpectralRadiance is W·m⁻²·sr⁻¹·nm⁻¹ — the primary quantity of the
-	// skybrightness spectral engine, L_λ(λ, altitude, azimuth, site, epoch).
-	SpectralRadiance = Radiance.Div(Nanometre)
+	// SpectralRadianceUnit is W·m⁻²·sr⁻¹·nm⁻¹ — the primary quantity of
+	// the skybrightness spectral engine, L_λ(λ, altitude, azimuth, site,
+	// epoch).
+	SpectralRadianceUnit = RadianceUnit.Div(Nanometre)
 
-	// SpectralIrradiance is W·m⁻²·nm⁻¹.
-	SpectralIrradiance = Irradiance.Div(Nanometre)
+	// SpectralIrradianceUnit is W·m⁻²·nm⁻¹.
+	SpectralIrradianceUnit = IrradianceUnit.Div(Nanometre)
 
-	// Luminance is cd·m⁻².
-	Luminance = Candela.Div(Meter.PowInt(2))
+	// LuminanceUnit is cd·m⁻².
+	LuminanceUnit = Candela.Div(Meter.PowInt(2))
 )

@@ -1,89 +1,97 @@
 package skybrightness
 
-import "math"
-
-// SurfaceBrightnessV is sky surface brightness in V-band magnitudes per square
-// arcsecond (mag/arcsec²). Because it is a magnitude, LARGER values are FAINTER
-// (darker) skies. A pristine dark site is ~21.9 mag/arcsec²; bright urban skies
-// are ~17–18.
-type SurfaceBrightnessV float64
-
-// Nanolambert is a linear sky-surface radiance in nanolamberts (nL), the unit
-// used by Krisciunas & Schaefer (1991). Unlike [SurfaceBrightnessV], radiances
-// are additive: the total sky brightness toward a pointing is the linear sum of
-// its component radiances, and LARGER values are BRIGHTER skies.
-//
-// Combine sky-brightness components by summing Nanolambert values (use [Add] or
-// the + operator), never by averaging or summing [SurfaceBrightnessV]
-// magnitudes — magnitudes are logarithmic and summing them is a correctness
-// bug.
-type Nanolambert float64
-
-// Coefficients for the nanolambert ↔ V mag/arcsec² conversion, from
-// Krisciunas & Schaefer (1991), PASP 103, 1033 (after Garstang 1989):
-//
-//	B[nL] = 34.08 · exp(20.7233 − 0.92104 · V)
-//
-// Verified against the published model
-// (https://adsabs.harvard.edu/abs/1991PASP..103.1033K).
-const (
-	// nlGarstangScale is the Garstang/KS zero-point scale (nL).
-	nlGarstangScale = 34.08
-	// nlGarstangExp is the KS 1991 exponent constant.
-	nlGarstangExp = 20.7233
-	// pogsonNat is the natural-log brightness change per magnitude, 0.4·ln(10).
-	// KS 1991 writes it as the rounded literal 0.92104; using the exact value
-	// keeps the doubling invariant (see Nanolambert) exact to machine precision.
-	pogsonNat = 0.4 * math.Ln10
+import (
+	"github.com/TuSKan/astrogo/constants"
+	"github.com/TuSKan/astrogo/unit"
 )
 
-// Nanolamberts converts a V-band surface brightness to its linear radiance in
-// nanolamberts via the Krisciunas & Schaefer (1991) / Garstang relation.
-func (v SurfaceBrightnessV) Nanolamberts() Nanolambert {
-	return Nanolambert(nlGarstangScale * math.Exp(nlGarstangExp-pogsonNat*float64(v)))
-}
+// Canonical scalar types for the spectral sky-radiance engine, declared as
+// a group below: WavelengthNM, SpectralRadiance, PhotonSpectralRadiance,
+// SpectralIrradiance, Radiance, PhotonRadiance, Irradiance, LuminanceCdM2,
+// SurfaceBrightnessAB, SurfaceBrightnessVega, Transmission, OpticalDepth,
+// AerosolOpticalDepth, SingleScatteringAlbedo, AsymmetryParameter,
+// AngstromExponent, CloudFraction, CloudOpticalDepth, EffectiveRadiusUM,
+// OzoneColumnDU, PrecipitableWaterMM, PressureHPa, TemperatureK, AltitudeM,
+// SpectralAlbedo, ElectronsPerPixelPerSecond. These are Go type ALIASES
+// (not new types) onto the zero-cost quantity types declared in
+// unit/quantity_types.go — unit is the single source of truth for them
+// (docs/skybrightness.md §3), and every method already defined there (e.g.
+// Transmission.ToOpticalDepth/OpticalDepth.ToTransmission) is automatically
+// available on these names too, since an alias is literally the same type.
+// skybrightness only re-declares the names here so the rest of this
+// package's source can write SpectralRadiance instead of
+// unit.SpectralRadiance.
+//
+//nolint:revive // one doc comment intentionally describes this whole 26-member alias block, not any single member's name
+type (
+	WavelengthNM               = unit.WavelengthNM
+	SpectralRadiance           = unit.SpectralRadiance
+	PhotonSpectralRadiance     = unit.PhotonSpectralRadiance
+	SpectralIrradiance         = unit.SpectralIrradiance
+	Radiance                   = unit.Radiance
+	PhotonRadiance             = unit.PhotonRadiance
+	Irradiance                 = unit.Irradiance
+	LuminanceCdM2              = unit.LuminanceCdM2
+	SurfaceBrightnessAB        = unit.SurfaceBrightnessAB
+	SurfaceBrightnessVega      = unit.SurfaceBrightnessVega
+	Transmission               = unit.Transmission
+	OpticalDepth               = unit.OpticalDepth
+	AerosolOpticalDepth        = unit.AerosolOpticalDepth
+	SingleScatteringAlbedo     = unit.SingleScatteringAlbedo
+	AsymmetryParameter         = unit.AsymmetryParameter
+	AngstromExponent           = unit.AngstromExponent
+	CloudFraction              = unit.CloudFraction
+	CloudOpticalDepth          = unit.CloudOpticalDepth
+	EffectiveRadiusUM          = unit.EffectiveRadiusUM
+	OzoneColumnDU              = unit.OzoneColumnDU
+	PrecipitableWaterMM        = unit.PrecipitableWaterMM
+	PressureHPa                = unit.PressureHPa
+	TemperatureK               = unit.TemperatureK
+	AltitudeM                  = unit.AltitudeM
+	SpectralAlbedo             = unit.SpectralAlbedo
+	ElectronsPerPixelPerSecond = unit.ElectronsPerPixelPerSecond
+)
 
-// SurfaceBrightnessV converts a linear radiance back to a V-band surface
-// brightness (mag/arcsec²). A non-positive radiance represents zero flux and
-// maps to an infinitely faint sky (+Inf mag).
-func (b Nanolambert) SurfaceBrightnessV() SurfaceBrightnessV {
-	if b <= 0 {
-		return SurfaceBrightnessV(math.Inf(1))
+// arcsecond2SR is the solid angle, in steradians, subtended by a
+// (1 arcsec)x(1 arcsec) patch in the flat small-angle limit — exactly the
+// convention "per square arcsecond" surface-brightness units already use.
+// Computed from constants, not hardcoded, so it tracks the same arcsecond
+// definition the rest of the library uses.
+var arcsecond2SR = func() float64 {
+	rad := constants.Derived.ArcSecondsPerRadian.Value // arcsec per radian
+	perArcsec := 1 / rad                               // radians per arcsec
+
+	return perArcsec * perArcsec
+}()
+
+// photonEnergyJ returns the energy of one photon at wavelength lambda, in
+// joules: E = hc/lambda.
+func photonEnergyJ(lambda WavelengthNM) float64 {
+	lambdaM := float64(lambda) * 1e-9
+	if lambdaM <= 0 {
+		return 0
 	}
 
-	return SurfaceBrightnessV((nlGarstangExp - math.Log(float64(b)/nlGarstangScale)) / pogsonNat)
+	return constants.SI2019.PlanckConstant.Value * constants.SI2019.SpeedOfLight.Value / lambdaM
 }
 
-// Add returns the linear sum of two radiances. This is the correct way to
-// combine sky-brightness components; it is equivalent to the + operator and
-// exists to document that intent.
-func (b Nanolambert) Add(other Nanolambert) Nanolambert { return b + other }
-
-// Constants for the millicandela-per-square-metre ↔ V mag/arcsec² conversion
-// used by light-pollution atlases (Falchi et al. 2016; lightpollutionmap.info):
-//
-//	m[mag/arcsec²] = −2.5·log₁₀(L[mcd/m²] / 1.08e8)
-//
-// The natural zenith background 0.171168465 mcd/m² maps to 22.00 mag/arcsec².
-// Source: lightpollutionmap.info/help.html. These are citable, not invented.
-// mcdZeroPoint is the SQM photometric zero-point in mcd/m². The natural zenith
-// background 0.171168465 mcd/m² maps through it to 22.0 mag/arcsec².
-const mcdZeroPoint = 1.08e8
-
-// SurfaceBrightnessFromMcdM2 converts a luminance in millicandelas per square
-// metre (the unit used by light-pollution atlases) to a V-band surface
-// brightness (mag/arcsec²) via m = −2.5·log₁₀(L/1.08e8). A non-positive
-// luminance maps to an infinitely faint sky (+Inf mag).
-func SurfaceBrightnessFromMcdM2(mcdM2 float64) SurfaceBrightnessV {
-	if mcdM2 <= 0 {
-		return SurfaceBrightnessV(math.Inf(1))
+// ToPhoton converts an energy-flux spectral radiance into the equivalent
+// photon-flux spectral radiance at wavelength lambda: divide by the energy
+// of one photon at that wavelength. A free function, not a method — l's
+// underlying type is declared in package unit, which must not import
+// constants (see constants/doc.go), so this conversion (which needs
+// Planck's constant and the speed of light) lives here instead.
+func ToPhoton(l SpectralRadiance, lambda WavelengthNM) PhotonSpectralRadiance {
+	e := photonEnergyJ(lambda)
+	if e <= 0 {
+		return 0
 	}
 
-	return SurfaceBrightnessV(-2.5 * math.Log10(mcdM2/mcdZeroPoint))
+	return PhotonSpectralRadiance(float64(l) / e)
 }
 
-// McdM2 converts a V-band surface brightness back to a luminance in
-// millicandelas per square metre.
-func (v SurfaceBrightnessV) McdM2() float64 {
-	return mcdZeroPoint * math.Pow(10, -0.4*float64(v))
+// ToEnergy is the inverse of ToPhoton: converts a photon-flux spectral
+// radiance back into energy-flux spectral radiance at wavelength lambda.
+func ToEnergy(p PhotonSpectralRadiance, lambda WavelengthNM) SpectralRadiance {
+	return SpectralRadiance(float64(p) * photonEnergyJ(lambda))
 }

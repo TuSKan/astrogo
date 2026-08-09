@@ -221,6 +221,7 @@ func TestDownloadableEndpointsAreExactlyTheExpectedSet(t *testing.T) {
 		JPLHorizons:     true,
 		WorldAtlas:      true,
 		VIIRSAnnual:     true,
+		PassbandBundle:  true,
 	}
 
 	for _, ep := range Endpoints() {
@@ -255,6 +256,7 @@ func TestConstName(t *testing.T) {
 		OpenElevation:   "OpenElevation",
 		WorldAtlas:      "WorldAtlas",
 		VIIRSAnnual:     "VIIRSAnnual",
+		PassbandBundle:  "PassbandBundle",
 	}
 
 	for id, name := range want {

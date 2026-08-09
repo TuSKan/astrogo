@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed — BREAKING
+- **Sky Brightness V2**: `skybrightness` is rewritten from scratch as a spectral, all-sky, observatory-grade sky-radiance engine (`L_λ(λ, altitude, azimuth, site, epoch)`, W·m⁻²·sr⁻¹·nm⁻¹), replacing the V-band-only model with no backward compatibility. Deleted outright: `Model`, `Component` (old shape), `SurfaceBrightnessV`, `Nanolambert`, `SQMProvider`, `Floor`, `CompositeModel`, `RadianceToArtificialSB`, and the whole `skybrightness/atlas` package (`atlas.Resolver`/`FloorAt`/`Layer*`, `EnsureWorldAtlas`/`EnsureVIIRSAnnual`). See [`docs/skybrightness.md`](docs/skybrightness.md) §16 for the full symbol-by-symbol migration table and §15 for why this is a rewrite, not an extension.
+- New core API: `skybrightness.Engine`/`Component`/`Request`/`Result`/`AtmosphereState`, canonical spectral types (`SpectralRadiance`, `WavelengthNM`, `SurfaceBrightnessAB`/`Vega`, ...) now living in `unit` as zero-cost named types (`unit.SpectralRadiance` etc.), passband integration (`IntegrateRadiance`, `ABSurfaceBrightness`, `VegaSurfaceBrightness`, `PhotopicLuminance`, `HorizontalIrradiance`), linearized uncertainty (`UncertaintyResult`), and deterministic `Provenance` (`Provenance.Digest()`).
+- New `skybrightness/natural` package: `LegacyAirglow`/`LegacyMoonlight`/`LegacySchaeferNELM`/`NewLegacyEngine` — new types re-implementing the prior V-band physics (Krisciunas & Schaefer 1991, Schaefer 1990) against the new spectral API for a zero-setup, fully-offline engine.
+- New `skybrightness/atmos` package: `RayleighOnly`, an analytic Rayleigh-scattering-only transmission model (Hansen & Travis 1974 approximation).
+- New `skybrightness/dataset/passband` package + `remote.PassbandBundle` endpoint: a versioned, checksummed passband-curve provider (`OpenBundle`/`Remote`). No bundle is published yet.
+- `plan.LimitingMagnitudeConstraint` is rewritten against the new `Engine`/`Passband` API (`Engine`/`Passband`/`Conversion` fields replace `Model`/`Conversion`); `plan` continues to import core `skybrightness` only, never a subpackage (machine-enforced by `skybrightness/importgraph_test.go`).
+- `unit` gains `Watt`/`Joule`/`Hertz`/`Nanometre`/`Candela`/`Steradian` units plus the zero-cost radiometric quantity types listed above; `constants` gains a `Photometric` set (AB zero point) and `Derived.StefanBoltzmannConstant`.
+- `skybrightness/lpmap` is unchanged and kept as a live cross-check data source.
+
+### Removed
+- `skybrightness/atlas` (World Atlas/VIIRS GeoTIFF decoders, download pipeline, `Resolver`) — its `dataset/raster`/`dataset/blackmarble`/`dataset/eog`/`dataset/worldatlas` replacements are Sky Brightness V2 Phase 4 scope, not yet built. `remote.WorldAtlas`/`remote.VIIRSAnnual` stay registered, re-scoped as future dataset inputs.
+
 ## [0.14.0] — 2026-08-07
 
 ### Fixed

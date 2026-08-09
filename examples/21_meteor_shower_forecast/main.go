@@ -24,6 +24,7 @@ import (
 	"github.com/TuSKan/astrogo/plan"
 	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/skybrightness"
+	"github.com/TuSKan/astrogo/skybrightness/natural"
 	"github.com/TuSKan/astrogo/time"
 )
 
@@ -111,13 +112,21 @@ func main() {
 		log.Fatal("no astronomical night found in this window")
 	}
 
-	sky := skybrightness.NewCompositeModel(
-		skybrightness.NewAirglow(),
-		skybrightness.NewZodiacalLight(prov),
-		skybrightness.NewMoonlight(skybrightness.WithProvider(prov)),
-	)
-	conv := skybrightness.NewVisualLimitingMag()
-	constraint := plan.LimitingMagnitudeConstraint{Model: sky, Conversion: conv}
+	// Sky Brightness V2 (docs/skybrightness.md): ModeLegacy runs only the
+	// two Legacy* fast components (airglow + scattered moonlight) — the
+	// same physics v1's CompositeModel(Airglow, ZodiacalLight, Moonlight)
+	// ran, minus zodiacal light (Phase 2 scope; not yet re-implemented),
+	// re-expressed against the new spectral Engine/Component API. This is
+	// a brand-new type, not a v1 compatibility shim — see §15.
+	sky, err := natural.NewLegacyEngine(natural.LegacyConfig{Ephemeris: prov})
+	if err != nil {
+		log.Fatalf("sky engine: %v", err)
+	}
+
+	constraint := plan.LimitingMagnitudeConstraint{
+		Engine: sky, Passband: natural.LegacyJohnsonV(),
+		Conversion: skybrightness.NewLegacySchaeferNELM(),
+	}
 
 	tz, err := time.LoadLocation("America/Santiago")
 	if err != nil {

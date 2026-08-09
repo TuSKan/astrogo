@@ -85,7 +85,7 @@ The best way to see whether a library's numbers are trustworthy is to point it a
 | [**When Did Jesus Die?**](docs/JESUS.md) | *"The sky keeps receipts."* Three historical dating puzzles — the Star of Bethlehem, the ministry's start, the Crucifixion — resolved with eclipses, conjunctions, and lunar crescent visibility instead of manuscripts. | [`examples/10_jesus_christ/`](examples/10_jesus_christ/) |
 | [**The Great Planet Parade**](docs/PLANET_PARADE.md) | On Feb 28 2025, all seven planets were above the horizon at once from São Paulo. Was that actually visible, and how rare is it? | [`examples/16_planet_parade/`](examples/16_planet_parade/) |
 | [**Equinox & Solstice Almanac**](docs/EQUINOX.md) | A decade of seasons, eclipses, and apsides computed from first principles — no lookup tables, no curve fits, just JPL DE442 and root-finding. | [`examples/17_equinox_prediction/`](examples/17_equinox_prediction/) |
-| **Moonlit Sky Brightness & Light Pollution** | How much does a full moon actually degrade your limiting magnitude, and by how many degrees of separation does that recover? Then the same light-pollution question put to all three sources side by side — VIIRS 2025, the Falchi et al. 2016 World Atlas, and the lightpollutionmap.info API — across a rural backyard, two megacity cores, and two premier dark-sky observatories. | [`examples/18_sky_brightness/`](examples/18_sky_brightness/) |
+| **Sky Brightness V2 — spectral engine** | The Sky Brightness V2 end-to-end demonstration: site + time + atmosphere + direction → component decomposition → passband brightness → limiting magnitude → provenance, using Phase 1's `Legacy*` fast models plus an analytic Rayleigh transmission — then scores a target's observability through the resulting moonlit sky. | [`examples/18_sky_brightness/`](examples/18_sky_brightness/) |
 | **Satellite Tracking** | Predict ISS passes over your location from live NORAD/CelestTrak data — AOS, max elevation, LOS, ground track. | [`examples/12_satellite_tracking/`](examples/12_satellite_tracking/) |
 | **What's Visible Tonight** | What can I actually see in the sky tonight brighter than magnitude X — stars, deep-sky objects, planets, the Moon, even asteroids and comets, all in one query? | [`examples/20_whats_visible_tonight/`](examples/20_whats_visible_tonight/) |
 | **Meteor Shower Forecast** | The Perseids peak every August — but how many will a real observer at a real site actually see, hour by hour, once radiant altitude and real sky brightness are accounted for? | [`examples/21_meteor_shower_forecast/`](examples/21_meteor_shower_forecast/) |
@@ -504,30 +504,17 @@ AOS: 19:45:03 UTC  Max El: 73.1°  LOS: 19:51:47 UTC  Duration: 6m44s
     - **`SwapOptimizedStrategy`** — local search with adjacent swaps + gap insertion (monotonic improvement)
   - Linear scaling benchmarked to 100 blocks
 
-### Sky Brightness & Light Pollution (`skybrightness`, `skybrightness/lpmap`)
-- Night-sky surface brightness decomposed into additive components, summed in linear flux space and converted to V mag/arcsec² only at the boundary:
-  - `Moonlight` — scattered moonlight, Krisciunas & Schaefer (1991) closed form
-  - `ZodiacalLight` — Leinert et al. (1998) Table 17, bilinear interpolation
-  - `Airglow` — dark-sky floor (Noll et al. 2012 / Patat 2008)
-  - `Floor` — light-pollution baseline from scalar SQM, directional `SQMGrid`, or `FloorFromBortle`
-- `skybrightness/atlas` — pure-Go artificial-brightness atlas providers (Falchi et al. 2016 World Atlas GeoTIFF, VIIRS-DNB), the consent-gated downloaders that fetch them, and **`atlas.FloorAt` / `atlas.Resolver`** — pick a `Layer` and get a `Floor`:
+### Sky Brightness V2 (`skybrightness`)
+A spectral, all-sky, observatory-grade sky-radiance engine — `L_λ(λ, altitude, azimuth, site, epoch)` in W·m⁻²·sr⁻¹·nm⁻¹ — replacing astrogo's earlier V-band-only model outright (**no backward compatibility**; see [`docs/skybrightness.md`](docs/skybrightness.md) §16 for the migration table). Components sum in **linear spectral-radiance space**, never as magnitudes, and are converted to a passband-specific AB/Vega surface brightness only at the boundary — every conversion between satellite radiance, surface brightness, SQM, luminance, irradiance, and limiting magnitude is explicit and named, never implicit.
 
-  ```go
-  // LayerAuto (the default) is freshness-first: VIIRS (newest published
-  // year) → World Atlas 2015 → your configured fallbacks, reporting what
-  // it tried in Result.Attempts. Ask for LayerWorldAtlas explicitly when
-  // the propagated model matters more than the last decade of change.
-  result, err := atlas.FloorAt(ctx, site.Location(), atlas.WithBortleClass(4))
-  ```
+- **Core `skybrightness`** — pure types (`WavelengthNM`, `SpectralRadiance`, `SurfaceBrightnessAB`/`Vega`, ...), the `Engine`/`Component`/`Request`/`Result` API, passband integration (`IntegrateRadiance`, `ABSurfaceBrightness`, `VegaSurfaceBrightness`, `PhotopicLuminance`, ...), provenance (`Provenance.Digest()`), and linearized uncertainty. No I/O, no network.
+- **`skybrightness/natural`** — real natural-sky physics lands in stages (Phase 2+); Phase 1 ships the `Legacy*` fast models — `LegacyAirglow`, `LegacyMoonlight` (Krisciunas & Schaefer 1991), `LegacySchaeferNELM` — new types re-implementing the prior V-band physics against the new spectral API, plus `NewLegacyEngine` for a zero-setup, fully-offline sky.
+- **`skybrightness/atmos`** — atmospheric transmission; Phase 1 ships an analytic `RayleighOnly` model.
+- **`skybrightness/dataset/passband`** — the versioned, checksummed passband-curve provider (`OpenBundle`/`Remote`); core never tabulates a response curve in Go source.
+- **`skybrightness/lpmap`** — live client for the lightpollutionmap.info QueryRaster API (a cross-check data source; manually-issued API key, no self-serve signup).
+- `plan.LimitingMagnitudeConstraint` / `ScoreObservableSky` — folds an injected `skybrightness.Engine`'s limiting magnitude into observability constraints and scoring; `plan` imports core `skybrightness` only.
 
-  | Layer | Source | Needs |
-  |---|---|---|
-  | `LayerWorldAtlas` | Falchi et al. 2016, propagated, highest fidelity (frozen 2015) | ~653 MB download (CC BY-NC 4.0) |
-  | `LayerVIIRS` | VIIRS annual composite, freshest (newest published year, auto-detected), raw-radiance fit — but floors at zero below the satellite's detection limit, so it cannot rank dark sites | ~700 MB–1 GB download, no API key |
-  | `LayerLightPollutionMap` | live lightpollutionmap.info point query (World Atlas 2015 unless the client sets `lpmap.WithLayer`) | manually-issued API key |
-  | `LayerBortle` / `LayerScalar` | fixed estimate | nothing |
-- `skybrightness/lpmap` — live client for the lightpollutionmap.info QueryRaster API, with retry/backoff on transient failures. The API key is issued manually by the site owner (no self-serve signup); the downloaded `atlas` layers need no key at all.
-- `plan.LimitingMagnitudeConstraint` / `ScoreObservableSky` — folds sky-brightness-derived limiting magnitude into observability constraints and scoring
+See [`docs/skybrightness.md`](docs/skybrightness.md) for the full design: scientific scope, canonical types, package architecture, uncertainty strategy, validation matrix, and the staged Phase 0-7 implementation plan.
 
 ### Event Solver
 - **Unified `Solver`** — Chandrupatla root-finding (1997) + Brent's minimization
@@ -575,7 +562,7 @@ flowchart TD
 
     %% Data Providers
     lpmap["skybrightness/lpmap"]
-    atlas["skybrightness/atlas"]
+    passband["skybrightness/dataset/passband"]
 
     %% Primitive Foundation
     subgraph Primitives
@@ -612,10 +599,11 @@ flowchart TD
     plan --> satellite
 
     skybrightness --> angle
+    skybrightness --> unit
     lpmap --> skybrightness
-    atlas --> skybrightness
-    atlas --> lpmap
-    atlas --> remote
+    lpmap --> remote
+    passband --> skybrightness
+    passband --> remote
 
     coord --> atmosphere
     coord --> time
@@ -658,8 +646,10 @@ flowchart TD
 | `fits` | FITS I/O, WCS (TAN projection), mmap, Arrow export | ✅ Stable |
 | `fits/plan` | FITS↔plan bridge (`SiteFromFITS`, `TargetFromFITS`) | ✅ Stable |
 | `plan` | Observability, constraints, events, scheduling, satellite passes | ✅ Stable |
-| `skybrightness` | Sky brightness model (moonlight, zodiacal light, airglow, light-pollution floor) | ✅ Stable |
-| `skybrightness/atlas` | Light-pollution atlases: GeoTIFF/HDF5 decoders, consent-gated downloads, and the `Layer`/`FloorAt` resolver | ✅ Stable |
+| `skybrightness` | Sky Brightness V2 — spectral, all-sky engine (`Engine`/`Component`/`Request`/`Result`, passband integration, provenance, uncertainty) | 🟡 Phase 1 (spectral foundation) |
+| `skybrightness/natural` | Natural-sky components; Phase 1 ships `Legacy*` fast models (Krisciunas & Schaefer 1991 moonlight, constant airglow) | 🟡 Phase 1 (Legacy only) |
+| `skybrightness/atmos` | Atmospheric transmission; Phase 1 ships an analytic Rayleigh-only model | 🟡 Phase 1 |
+| `skybrightness/dataset/passband` | Versioned, checksummed passband-curve provider | 🟡 Phase 1 (no published bundle yet) |
 | `skybrightness/lpmap` | Live lightpollutionmap.info client | ✅ Stable |
 | `unit` | Physical unit and quantity system | ✅ Stable |
 
@@ -686,8 +676,9 @@ happens.
 | Planetary satellite SPK (Io, Titan, Triton, ...) | `remote.NAIFSPK` | ~64 MB (Mars) – ~1.1 GB (Jupiter), ~2.4 GB for all 6 kernels | `eph.NewProvider(eph.Moons, "sat441")`, or `plan.VisibleTonight(..., plan.WithPlanetaryMoons())` |
 | IERS Earth-orientation data | `remote.IERSFinals2000A` | ~3.7 MB | automatic on first `Time.EOP()`/`.UTC()`/`.UT1()` query needing it |
 | OpenNGC catalog CSVs | `remote.OpenNGC` | ~2 MB combined | `catalog.NewResolver(catalog.OpenNGC, ...)` |
-| World Atlas 2015 light-pollution GeoTIFF (Falchi et al. 2016) | `remote.WorldAtlas` | ~653 MB zip, ~2.8 GB extracted | `skybrightness/atlas.EnsureWorldAtlas`/`.OpenWorldAtlas` — **CC BY-NC 4.0, non-commercial use only** |
-| VIIRS annual nighttime-lights composite (2012-2025, no API key) | `remote.VIIRSAnnual` | ~700 MB-1 GB per year | `skybrightness/atlas.EnsureVIIRSAnnual`/`.OpenVIIRSAnnual` — CC0, credit lightpollutionmap.info + NASA Black Marble |
+| World Atlas 2015 light-pollution GeoTIFF (Falchi et al. 2016) | `remote.WorldAtlas` | ~653 MB zip, ~2.8 GB extracted | Reference/validation dataset (Sky Brightness V2 Phase 4); frozen registry entry today — **CC BY-NC 4.0, non-commercial use only** |
+| VIIRS annual nighttime-lights composite (2012-2025, no API key) | `remote.VIIRSAnnual` | ~700 MB-1 GB per year | Artificial emission-intensity field input (Sky Brightness V2 Phase 4); frozen registry entry today — CC0, credit lightpollutionmap.info + NASA Black Marble |
+| Passband response-curve bundle (Johnson-Cousins, Sloan, Gaia, CIE, SQM) | `remote.PassbandBundle` | ~2 MB | `skybrightness/dataset/passband.Remote`/`.OpenBundle` — not yet published (Sky Brightness V2 Phase 1) |
 
 For an accuracy/offline tradeoff comparison across `ephemeris.Default()` and the
 JPL kernels above, see the [`ephemeris` package doc](ephemeris/doc.go)'s

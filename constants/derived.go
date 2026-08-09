@@ -82,8 +82,13 @@ var Derived = DerivedSet{
 	// result against the published CODATA value (5.670374419e-8 W/(m2 K4)).
 	StefanBoltzmannConstant: Constant{
 		Name: "Stefan-Boltzmann constant", Symbol: "sigma",
-		Value: 2 * math.Pow(math.Pi, 5) * math.Pow(SI2019.BoltzmannConstant.Value, 4) /
-			(15 * math.Pow(SI2019.PlanckConstant.Value, 3) * SI2019.SpeedOfLight.Value * SI2019.SpeedOfLight.Value),
+		Value: func() float64 {
+			kB, h, c := SI2019.BoltzmannConstant.Value, SI2019.PlanckConstant.Value, SI2019.SpeedOfLight.Value
+			kB4 := kB * kB * kB * kB
+			h3 := h * h * h
+
+			return 2 * math.Pow(math.Pi, 5) * kB4 / (15 * h3 * c * c)
+		}(),
 		Unit:      wattPerSquareMeterKelvin4,
 		Reference: "derived: 2*pi^5*k_B^4 / (15*h^3*c^2), exact since the 2019 SI redefinition",
 		Exact:     true,

@@ -95,6 +95,16 @@ const (
 	// skybrightness/atlas.EnsureVIIRSAnnual/.OpenVIIRSAnnual.
 	VIIRSAnnual EndpointID = "lightpollutionmap.viirs"
 
+	// PassbandBundle is astrogo's own versioned, checksummed bundle of
+	// photometric passband response curves (Johnson-Cousins UBVRI, Sloan
+	// ugriz, Gaia G/BP/RP, CIE photopic/scotopic, SQM), used by
+	// skybrightness/dataset/passband — the only place a passband curve
+	// enters astrogo's runtime; core skybrightness never tabulates one in
+	// Go source (docs/skybrightness.md §3). No bundle is published here
+	// yet as of Sky Brightness V2 Phase 1 — see
+	// skybrightness/dataset/passband's doc comment.
+	PassbandBundle EndpointID = "astrogo.passbands"
+
 	// WorldAtlas is GFZ Data Services' hosting of Falchi et al. 2016's
 	// World Atlas 2015 of artificial night sky brightness (World_Atlas_2015.zip,
 	// ~653 MB, frozen since 2019-11-18 under DOI 10.5880/GFZ.1.4.2016.001),
@@ -386,6 +396,22 @@ func defaultEndpoints() map[EndpointID]Endpoint {
 			DownloadTimeout: 60 * time.Minute,
 			Mutable:         true, // past years are occasionally reprocessed in place (e.g. the 2025-06 Black Marble v2.0 switch)
 			Downloadable:    true,
+		},
+		PassbandBundle: {
+			ID:        PassbandBundle,
+			URL:       "https://github.com/TuSKan/astrogo/releases/download/passbands-v1/",
+			Kind:      KindFile,
+			Subsystem: "skybrightness/dataset/passband",
+			Description: "Versioned, checksummed passband response-curve bundle " +
+				"(Johnson-Cousins, Sloan, Gaia, CIE, SQM) — not yet published as of " +
+				"Sky Brightness V2 Phase 1; endpoint declared ahead of the dataset " +
+				"per this registry's own convention (see WorldAtlas/VIIRSAnnual).",
+			ApproxSize:      2 << 20,
+			Enabled:         true,
+			DownloadTimeout: 2 * time.Minute,
+			Mutable:         false, // pinned by semver + checksums in the manifest
+			Downloadable:    true,
+			Files:           []string{"passbands-v1.tar.gz"},
 		},
 		WorldAtlas: {
 			ID:   WorldAtlas,

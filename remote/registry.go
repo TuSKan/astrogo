@@ -364,6 +364,8 @@ func constName(id EndpointID) string {
 		return "WorldAtlas"
 	case VIIRSAnnual:
 		return "VIIRSAnnual"
+	case PassbandBundle:
+		return "PassbandBundle"
 	default:
 		return string(id)
 	}
