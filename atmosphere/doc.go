@@ -35,4 +35,15 @@
 // meanings at once, so freeing "Atmosphere" for the richer type
 // necessarily retired the refraction struct's old name immediately, not
 // over a deprecation cycle.
+//
+// [StandardDefault] is the zero-aerosol reference constructor.
+// [RuralAerosol], [UrbanAerosol], [DesertAerosol], and [MaritimeAerosol]
+// seed a [Builder] with a real, named, published aerosol-type optical
+// model (Hess, Koepke & Schult 1998's OPAC dataset) instead — single-
+// scattering albedo, asymmetry parameter, and Angstrom exponent come
+// from that source; aerosol optical depth stays a caller-supplied,
+// real-time-varying parameter, never hardcoded. Each returns a *Builder,
+// not a terminal *Atmosphere, so a caller can chain further
+// customization (PrecipitableWater, SurfaceAlbedo, Source, ...) before
+// Build().
 package atmosphere

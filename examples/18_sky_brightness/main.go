@@ -178,8 +178,12 @@ func main() {
 	// that previously forced this example back onto Evaluate directly
 	// (see docs/skybrightness.md §15's worked example).
 	res, err := skybrightness.Point(ctx, sky, skybrightness.PointQuery{
-		Astro: astro, Direction: dir, Passband: johnsonV, Mode: skybrightness.ModeFast,
-		Atmosphere: atmState, Grid: grid,
+		Astro:               astro,
+		Direction:           dir,
+		Passband:            johnsonV,
+		Mode:                skybrightness.ModeFast,
+		Atmosphere:          atmState,
+		Grid:                grid,
 		Components:          true,
 		ComputeTransmission: true,
 		LimitingMag:         skybrightness.NewSchaeferNELM(),

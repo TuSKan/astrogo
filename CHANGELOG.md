@@ -29,6 +29,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - `skybrightness/dataset/passband`'s `OpenBundle`/`loadCurve` now read through `gofs.File` (`.Join`/`.ReadAll`/`.OpenReader`) instead of raw `os.ReadFile`/`os.Open`/`filepath.Join`, matching this codebase's own `remote`-file-access methodology; `parseCurveCSV` streams rows via `csv.Reader.Read()` in a loop instead of buffering the whole curve into memory with `ReadAll()`. No public API change.
 
+### Added
+- `atmosphere.RuralAerosol`/`UrbanAerosol`/`DesertAerosol`/`MaritimeAerosol(heightM, aod550 float64) *Builder` — named, published aerosol-type presets (Hess, Koepke & Schult 1998, OPAC's "Continental average"/"Urban"/"Desert"/"Maritime clean" types, Table 3, 0.55µm, 80% RH), seeding a `Builder` with real single-scattering albedo/asymmetry-parameter/Ångström-exponent values instead of requiring a caller to look them up; aerosol optical depth stays a caller-supplied, real-time-varying parameter, never hardcoded. Each returns a `*Builder` (not a terminal `*Atmosphere`), so further customization chains before `Build()`. `StandardDefault`'s doc comment now cross-references these and states explicitly that its zero aerosol is the exact Rayleigh-only reference case.
+
 ## [0.14.0] — 2026-08-07
 
 ### Fixed

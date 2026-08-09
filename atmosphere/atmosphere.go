@@ -410,7 +410,11 @@ func (b *Builder) Build() (*Atmosphere, error) {
 // StandardDefault returns a deterministic, offline, site-elevation-aware
 // default Atmosphere: no aerosol, no clouds, pressure/temperature from the
 // ICAO ISA barometric profile (AtAltitude) at heightM, zero surface
-// albedo.
+// albedo. Its zero aerosol is exact, not approximate — this is the
+// Rayleigh-only reference case, the Atmosphere counterpart to
+// atmos.RayleighOnly's transmission model. For a real, named aerosol
+// regime instead of the zero-aerosol baseline, see RuralAerosol/
+// UrbanAerosol/DesertAerosol/MaritimeAerosol.
 func StandardDefault(heightM float64) *Atmosphere {
 	s := Atmosphere{
 		surface: AtAltitude(heightM),
