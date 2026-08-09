@@ -25,7 +25,7 @@ func testAstro() *coord.Context {
 }
 
 // roundTripToleranceMag bounds the Garstang nanolambert round-trip
-// precision — see garstang_units.go's doc comment: the shared,
+// precision — see constant_airglow.go's doc comment: the shared,
 // historically rounded 0.92104 literal (not the more precise 0.4*ln(10))
 // means the round trip is precise to ~1.5e-4 mag at V~22, not to float64
 // precision.
@@ -34,7 +34,7 @@ const roundTripToleranceMag = 5e-4
 // TestConstantAirglow_RoundTripToHistoricalPrecision confirms the
 // Garstang nanolambert convention reproduces the original V mag/arcsec^2
 // through VegaSurfaceBrightness against TopHatJohnsonV, to the precision
-// of v1's own shared 0.92104 literal (see garstang_units.go's doc
+// of v1's own shared 0.92104 literal (see constant_airglow.go's doc
 // comment).
 func TestConstantAirglow_RoundTripToHistoricalPrecision(t *testing.T) {
 	grid := TopHatVGrid()

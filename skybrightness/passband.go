@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 
+	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/constants"
 	"github.com/TuSKan/astrogo/unit"
 )
@@ -76,11 +77,11 @@ var ErrPassbandNotFound = errors.New("skybrightness: passband not found")
 type PassbandSet interface {
 	Get(id PassbandID) (*Passband, error)
 	List() []PassbandID
-	Version() DatasetVersion
+	Version() atmosphere.DatasetVersion
 }
 
 type staticPassbandSet struct {
-	version DatasetVersion
+	version atmosphere.DatasetVersion
 	byID    map[PassbandID]*Passband
 	order   []PassbandID
 }
@@ -89,7 +90,7 @@ type staticPassbandSet struct {
 // pure, in-memory implementation with no I/O, suitable for tests, the
 // fast top-hat analytic passbands, or a caller that already has its
 // curves in hand.
-func NewPassbandSet(version DatasetVersion, pbs ...*Passband) PassbandSet {
+func NewPassbandSet(version atmosphere.DatasetVersion, pbs ...*Passband) PassbandSet {
 	s := &staticPassbandSet{version: version, byID: make(map[PassbandID]*Passband, len(pbs))}
 
 	for _, p := range pbs {
@@ -119,7 +120,7 @@ func (s *staticPassbandSet) List() []PassbandID {
 	return cp
 }
 
-func (s *staticPassbandSet) Version() DatasetVersion { return s.version }
+func (s *staticPassbandSet) Version() atmosphere.DatasetVersion { return s.version }
 
 // Passband is a response curve: a wavelength grid and a dimensionless,
 // non-negative response at each point. No passband response curves are
@@ -134,8 +135,8 @@ type Passband struct {
 	Wavelength []unit.WavelengthNM // strictly increasing
 	Response   []float64           // dimensionless, >= 0
 	VegaZP     *VegaZeroPoint      // nil unless calibrated
-	Version    DatasetVersion
-	Source     SourceRef
+	Version    atmosphere.DatasetVersion
+	Source     atmosphere.SourceRef
 }
 
 // Validate checks the passband's internal consistency.
@@ -237,7 +238,7 @@ func TopHat(id PassbandID, lo, hi unit.WavelengthNM) *Passband {
 	return &Passband{
 		ID: id, System: SystemPhotometricNone, Detector: PhotonCounting,
 		Wavelength: []unit.WavelengthNM{lo, hi}, Response: []float64{1, 1},
-		Source: SourceRef{Name: "skybrightness.TopHat (analytic, test-grade)", Fidelity: FidelitySynthetic},
+		Source: atmosphere.SourceRef{Name: "skybrightness.TopHat (analytic, test-grade)", Fidelity: atmosphere.FidelitySynthetic},
 	}
 }
 
@@ -263,7 +264,7 @@ func Gaussian(id PassbandID, center, fwhm unit.WavelengthNM) *Passband {
 	return &Passband{
 		ID: id, System: SystemPhotometricNone, Detector: PhotonCounting,
 		Wavelength: wl, Response: resp,
-		Source: SourceRef{Name: "skybrightness.Gaussian (analytic, test-grade)", Fidelity: FidelitySynthetic},
+		Source: atmosphere.SourceRef{Name: "skybrightness.Gaussian (analytic, test-grade)", Fidelity: atmosphere.FidelitySynthetic},
 	}
 }
 

@@ -172,7 +172,7 @@ not — the same test already used for `ObliquityJ2000`/`SunGravitationalParamet
 | Stefan–Boltzmann σ, Wien displacement constant | `constants.Derived` | exactly derivable from the SI2019 defining constants already in `constants` |
 | Vega zero points | `skybrightness`, from the passband bundle | depends on *which* Vega spectrum (Hayes vs. CALSPEC alpha_lyr_stis) — series-valued, out of `constants` scope |
 | Solar spectral irradiance | a dataset | a spectrum, not a constant |
-| Falchi 2016 natural zenith, 0.171168465 mcd/m² | `natural.FalchiNaturalZenithLuminance` | model-dependent, carried verbatim with citation from v1's `NaturalZenithMcdM2` |
+| Falchi 2016 natural zenith, 0.171168465 mcd/m² | removed (2026-08-09) | carried forward from v1's `NaturalZenithMcdM2` as `natural.FalchiNaturalZenithLuminance`, but never gained a consumer — deleted as dead code rather than kept as an unused re-export; reintroduce at the point of use if a future natural-sky component needs it |
 | Garstang nL↔mag constants (34.08, 20.7233) | `natural` package, unexported | only `ConstantAirglow`/`VBandMoonlight` may use them; not public API |
 
 **Passbands, with zero `go:embed`.** CLAUDE.md forbids `go:embed` project-wide, and §5/§25

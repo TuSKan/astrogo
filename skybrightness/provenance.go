@@ -10,31 +10,6 @@ import (
 	"github.com/TuSKan/astrogo/atmosphere"
 )
 
-// DatasetVersion is a general data-provenance primitive that lives in
-// package atmosphere (a peer scientific-engine package, not specific to
-// sky brightness) since any atmospheric or dataset-backed consumer needs
-// it, not just this package — along with Fidelity, TimeRange, and
-// SourceRef below. Aliased here, not redeclared, so skybrightness's own
-// Provenance/ComponentProvenance/Passband can keep writing the short
-// names.
-//
-//nolint:revive // one doc comment intentionally describes this whole small alias block, not any single member's name
-type (
-	DatasetVersion = atmosphere.DatasetVersion
-	Fidelity       = atmosphere.Fidelity
-	TimeRange      = atmosphere.TimeRange
-	SourceRef      = atmosphere.SourceRef
-)
-
-// The four fidelity levels, aliased from package atmosphere — see
-// atmosphere.Fidelity's doc comment for what each means.
-const (
-	FidelityMeasured        = atmosphere.FidelityMeasured
-	FidelityModelPropagated = atmosphere.FidelityModelPropagated
-	FidelityPrior           = atmosphere.FidelityPrior
-	FidelitySynthetic       = atmosphere.FidelitySynthetic
-)
-
 // FallbackRecord documents one explicit mode fallback that occurred while
 // producing a Result (see EvaluationOptions.Fallback). Fallback defaults to
 // forbidden; a record here only ever exists when the caller opted in.
@@ -59,27 +34,22 @@ type AlgorithmRef struct {
 type ComponentProvenance struct {
 	Component ComponentID
 	Algorithm AlgorithmRef
-	Datasets  []SourceRef
+	Datasets  []atmosphere.SourceRef
 }
-
-// AtmosphereProvenance records where an atmosphere.Atmosphere came from and
-// how current it is — an alias for atmosphere.Provenance, the type
-// atmosphere.Atmosphere.Provenance() itself returns.
-type AtmosphereProvenance = atmosphere.Provenance
 
 // SurrogateRef is a placeholder for Phase 6 surrogate provenance; nil
 // until that phase populates it.
-type SurrogateRef struct{ Version DatasetVersion }
+type SurrogateRef struct{ Version atmosphere.DatasetVersion }
 
 // CalibrationRef is a placeholder for Phase 7 calibration provenance; nil
 // until that phase populates it.
-type CalibrationRef struct{ Version DatasetVersion }
+type CalibrationRef struct{ Version atmosphere.DatasetVersion }
 
 // PassbandRef records a Passband's identity and dataset version for
 // provenance purposes.
 type PassbandRef struct {
 	ID      PassbandID
-	Version DatasetVersion
+	Version atmosphere.DatasetVersion
 }
 
 // Provenance is attached to every Result. Two evaluations with identical
@@ -91,8 +61,8 @@ type Provenance struct {
 	Mode          Mode
 	Components    []ComponentProvenance
 	Transmission  AlgorithmRef
-	Datasets      []SourceRef
-	Atmosphere    AtmosphereProvenance
+	Datasets      []atmosphere.SourceRef
+	Atmosphere    atmosphere.Provenance
 	Surrogate     *SurrogateRef
 	Calibration   *CalibrationRef
 	Passbands     []PassbandRef

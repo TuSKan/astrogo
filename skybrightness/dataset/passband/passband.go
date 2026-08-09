@@ -14,6 +14,9 @@ import (
 	"strconv"
 	"strings"
 
+	gofs "github.com/ungerik/go-fs"
+
+	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/skybrightness"
 	"github.com/TuSKan/astrogo/unit"
@@ -44,10 +47,13 @@ type manifest struct {
 // OpenBundle reads a versioned, checksummed passband bundle directory
 // (see doc.go for the format) and returns it as a skybrightness.PassbandSet.
 // No network access; a caller-supplied or already-extracted directory.
+//
+// Reads through gofs.File, matching this codebase's own methodology
+// (remote/file.go and Remote below) rather than raw os.ReadFile/os.Open.
 func OpenBundle(dir string) (skybrightness.PassbandSet, error) {
-	manifestPath := filepath.Join(dir, "manifest.json")
+	manifestFile := gofs.File(dir).Join("manifest.json")
 
-	raw, err := os.ReadFile(manifestPath) //nolint:gosec // caller-supplied bundle path, not astrogo-managed remote data
+	raw, err := manifestFile.ReadAll()
 	if err != nil {
 		return nil, fmt.Errorf("%w: read manifest: %w", ErrInvalidBundle, err)
 	}
@@ -68,17 +74,19 @@ func OpenBundle(dir string) (skybrightness.PassbandSet, error) {
 		pbs = append(pbs, pb)
 	}
 
-	return skybrightness.NewPassbandSet(skybrightness.DatasetVersion(m.Version), pbs...), nil
+	return skybrightness.NewPassbandSet(atmosphere.DatasetVersion(m.Version), pbs...), nil
 }
 
 func loadCurve(dir string, c manifestCurve) (*skybrightness.Passband, error) {
-	f, err := os.Open(filepath.Join(dir, c.File)) //nolint:gosec // path assembled from a caller-supplied bundle's own manifest
+	f := gofs.File(dir).Join(c.File)
+
+	r, err := f.OpenReader()
 	if err != nil {
 		return nil, fmt.Errorf("open curve file: %w", err)
 	}
-	defer f.Close() //nolint:errcheck // read-only, nothing to flush
+	defer r.Close() //nolint:errcheck // read-only, nothing to flush
 
-	wl, resp, err := parseCurveCSV(f)
+	wl, resp, err := parseCurveCSV(r)
 	if err != nil {
 		return nil, err
 	}
@@ -89,10 +97,10 @@ func loadCurve(dir string, c manifestCurve) (*skybrightness.Passband, error) {
 		Detector:   parseDetector(c.Detector),
 		Wavelength: wl,
 		Response:   resp,
-		Version:    skybrightness.DatasetVersion(c.Checksum),
-		Source: skybrightness.SourceRef{
+		Version:    atmosphere.DatasetVersion(c.Checksum),
+		Source: atmosphere.SourceRef{
 			Name: c.Source, Checksum: c.Checksum, Licence: c.Licence,
-			Fidelity: skybrightness.FidelityMeasured,
+			Fidelity: atmosphere.FidelityMeasured,
 		},
 	}
 
@@ -111,22 +119,35 @@ func loadCurve(dir string, c manifestCurve) (*skybrightness.Passband, error) {
 	return pb, nil
 }
 
+// parseCurveCSV streams the curve CSV row by row via cr.Read(), rather than
+// cr.ReadAll() (which buffers the whole file into a [][]string at once) —
+// bounded memory regardless of curve length, matching how extractTarGz
+// above already streams tar entries instead of buffering the archive.
 func parseCurveCSV(r io.Reader) ([]unit.WavelengthNM, []float64, error) {
 	cr := csv.NewReader(r)
 
-	rows, err := cr.ReadAll()
-	if err != nil {
-		return nil, nil, fmt.Errorf("%w: read curve CSV: %w", ErrInvalidBundle, err)
+	if _, err := cr.Read(); err != nil { // header row; columns unused, only its presence matters
+		if errors.Is(err, io.EOF) {
+			return nil, nil, fmt.Errorf("%w: curve CSV needs a header row and >= 1 data row", ErrInvalidBundle)
+		}
+
+		return nil, nil, fmt.Errorf("%w: read curve CSV header: %w", ErrInvalidBundle, err)
 	}
 
-	if len(rows) < 2 {
-		return nil, nil, fmt.Errorf("%w: curve CSV needs a header row and >= 1 data row", ErrInvalidBundle)
-	}
+	var wl []unit.WavelengthNM
 
-	wl := make([]unit.WavelengthNM, 0, len(rows)-1)
-	resp := make([]float64, 0, len(rows)-1)
+	var resp []float64
 
-	for _, row := range rows[1:] { // skip header
+	for {
+		row, err := cr.Read()
+		if errors.Is(err, io.EOF) {
+			break
+		}
+
+		if err != nil {
+			return nil, nil, fmt.Errorf("%w: read curve CSV row: %w", ErrInvalidBundle, err)
+		}
+
 		if len(row) < 2 {
 			continue
 		}
@@ -136,13 +157,17 @@ func parseCurveCSV(r io.Reader) ([]unit.WavelengthNM, []float64, error) {
 			return nil, nil, fmt.Errorf("%w: bad wavelength %q", ErrInvalidBundle, row[0])
 		}
 
-		r, err := strconv.ParseFloat(strings.TrimSpace(row[1]), 64)
+		v, err := strconv.ParseFloat(strings.TrimSpace(row[1]), 64)
 		if err != nil {
 			return nil, nil, fmt.Errorf("%w: bad response %q", ErrInvalidBundle, row[1])
 		}
 
 		wl = append(wl, unit.WavelengthNM(w))
-		resp = append(resp, r)
+		resp = append(resp, v)
+	}
+
+	if len(wl) == 0 {
+		return nil, nil, fmt.Errorf("%w: curve CSV needs a header row and >= 1 data row", ErrInvalidBundle)
 	}
 
 	return wl, resp, nil
