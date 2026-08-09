@@ -31,6 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - `atmosphere.RuralAerosol`/`UrbanAerosol`/`DesertAerosol`/`MaritimeAerosol(heightM, aod550 float64) *Builder` — named, published aerosol-type presets (Hess, Koepke & Schult 1998, OPAC's "Continental average"/"Urban"/"Desert"/"Maritime clean" types, Table 3, 0.55µm, 80% RH), seeding a `Builder` with real single-scattering albedo/asymmetry-parameter/Ångström-exponent values instead of requiring a caller to look them up; aerosol optical depth stays a caller-supplied, real-time-varying parameter, never hardcoded. Each returns a `*Builder` (not a terminal `*Atmosphere`), so further customization chains before `Build()`. `StandardDefault`'s doc comment now cross-references these and states explicitly that its zero aerosol is the exact Rayleigh-only reference case.
+- `docs/skybrightness.md` §8 gains a new "CAMS aerosol data — validated technical notes (Phase 3/7)" subsection: real grid/chunking/tracer-availability facts and the pressure-reconstruction formula for a future `dataset/atmostate` CAMS reader, plus the aermr-tracer→species→PSD→refractive-index→MOPSMAP mapping identified as the eventual live-data replacement for the OPAC presets above. Documentation only — no code in this release.
 
 ## [0.14.0] — 2026-08-07
 

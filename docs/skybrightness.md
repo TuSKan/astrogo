@@ -441,6 +441,68 @@ profile. `AtmosphereProvider` is the interface future CAMS/ERA5/local-instrument
 implement; the physical core (`atmos/`) depends only on the immutable `atmosphere.Atmosphere` type,
 never on a specific provider.
 
+### CAMS aerosol data — validated technical notes (Phase 3/7, not yet built)
+
+Investigated live against real CAMS GLOBAL EODATA NetCDF files (2026-08, via a separate agent
+session with real Atmosphere Data Store access) as the eventual `dataset/atmostate` CAMS
+provider's data-format contract. These are the modern, per-location, per-time operational
+counterpart to the static named-climatology presets (`atmosphere.RuralAerosol`/`UrbanAerosol`/
+`DesertAerosol`/`MaritimeAerosol`, OPAC-sourced, §3) — the two tiers coexist rather than one
+superseding the other: the OPAC presets are the pure, offline, zero-dependency default for a
+caller with no live atmospheric data; a CAMS provider is the live, geographically-resolved
+tier for a caller with real-time access. Recorded here for the Phase 3/7 implementer, not
+implemented now — the practical blockers (an ADS API key, a NetCDF4/HDF5 reader, and the
+species-to-optics mapping below) make this real, scoped, later work, not a quick swap-in.
+
+**Grid and file layout.** CAMS analysis files use a global regular 0.4° grid — 900 longitude ×
+451 latitude points (longitude 0..359.6° east, latitude 90..-90°; 451 points at 0.4° spacing
+from +90° to -90° is an exact pole-to-pole match, `(90-(-90))/0.4 = 450` intervals), 137 ECMWF
+model levels (the IFS L137 hybrid sigma-pressure vertical coordinate — the same vertical
+discretization used across ECMWF's reanalysis and forecast products), one timestamp per file.
+Aerosol mixing-ratio fields (`aermr01`…`aermr18`) are `float64`, dimensioned
+`(time, level, latitude, longitude)`, units kg·kg⁻¹.
+
+**Chunk layout is bulk-friendly, point-query-hostile.** The aerosol NetCDF-4/HDF5 chunking is
+`[1, 1, 451, 900]` — one whole global horizontal plane per `(time, level)` pair, deflate
+level 1. Excellent for bulk/global preprocessing; poor for a runtime "give me the vertical
+column above this observatory" query, since answering one column touches up to 137 chunks,
+each a full global plane. Keep CAMS NetCDF as the authoritative source format and derive a
+runtime representation reorganized around geographic tiles/vertical columns rather than
+point-reading the original files — the same "authoritative source format ≠ runtime access
+pattern" split this repo already applied to VIIRS/GeoTIFF windowed reads (Phase 4 quality
+work) and to the passband bundle's checksummed-manifest-over-raw-curve-files split (§3).
+
+**Deriving mass concentration and true pressure/altitude.** `den(time,level,lat,lon)` is
+atmospheric density in kg·m⁻³; `lnsp(time,lat,lon)` is the log of surface pressure (no level
+dimension). Aerosol mass concentration is therefore `C_i = aermr_i × den`. The 137 model-level
+indices are **not** altitude or pressure directly — real pressure at each level must be
+reconstructed from ECMWF's L137 hybrid A/B half-level coefficients and
+`ps = exp(lnsp)` via the standard hybrid sigma-pressure formula
+(`p_half(k) = A(k) + B(k)·ps`, layer values from adjacent half-levels) — never assume level
+index is a proxy for altitude.
+
+**Tracer availability is dataset/version-specific.** The investigated EODATA snapshot exposes
+`aermr01`…`aermr11` and `aermr16`…`aermr18` — `aermr12`…`aermr15` are absent in this
+particular product/version and must not be assumed present; any future `dataset/atmostate`
+CAMS reader has to keep dataset/version differences explicit (matching `Provenance`'s existing
+`DatasetVersion` field, §3) rather than silently treating a missing tracer as zero.
+
+**The real next scientific task, and what NOT to do.** Do not invent aerosol microphysical
+constants to bridge CAMS tracers to optical properties — that would repeat exactly the mistake
+§15 already rejected the log-linear VIIRS→SB shortcut for. The correct next step is a real,
+versioned mapping, built from authoritative CAMS/IFS-AER literature and documentation (not
+guessed): `CAMS aermr tracer → species/bin → particle size distribution → particle density →
+hygroscopic growth model → wavelength-dependent complex refractive index → particle shape →
+MOPSMAP inputs` (Gasteiger & Wiegner's "Modeled optical properties of ensembles of aerosol
+particles" tool, the standard way to turn aerosol microphysics into extinction/single-
+scattering-albedo/phase-function). This mapping is the eventual, live-data-driven replacement
+for the OPAC named-type tables — not a constant-swap, a genuine physical pipeline with its own
+citations at every stage, following the same never-invent-a-constant discipline already
+established for `atmosphere.RuralAerosol`/`UrbanAerosol`/`DesertAerosol`/`MaritimeAerosol`.
+`float64` stays the type throughout this reference/scientific pipeline; premature `float32`
+optimization or hand-tuned lookup tables come only after the physical mapping itself is
+established and validated, never before.
+
 ---
 
 ## 9. Artificial emission and spatial aggregation
@@ -602,7 +664,7 @@ prediction is stays aspirational until real observational data enters this repos
 | 0 | This document | Mandate received | Internally consistent, no open contradictions |
 | 1 | Spectral foundation: canonical types, `Engine`/`Request`/`Result`, passband integration, provenance/uncertainty/quality types, fast simplified-model components, `plan` + example rewrite | Phase 0 complete | Repo compiles, 10 invariant tests + benchmarks pass, `plan` works end-to-end |
 | 2 | Natural-sky baseline: spectral zodiacal/airglow/moonlight, twilight guard, starlight/DGL interface | Phase 1 complete | Comparison fixtures + monotonicity/symmetry tests pass |
-| 3 | Atmosphere: `atmosphere.Atmosphere`, molecular/aerosol/cloud optics, terrain, local provider | Phase 2 complete | Zero-aerosol/zero-cloud limits proven exact |
+| 3 | Atmosphere: `atmosphere.Atmosphere`, molecular/aerosol/cloud optics, terrain, local provider, `dataset/atmostate` CAMS reader (see §8's CAMS notes for the validated grid/tracer/pressure-reconstruction contract) | Phase 2 complete | Zero-aerosol/zero-cloud limits proven exact |
 | 4 | Artificial clear sky: emission-field providers, spectral mixture/angular models, log-polar aggregation, `ClearSkyPhysical` | Phase 3 complete | Zero-emission ⇒ zero artificial radiance (bitwise); aggregation-invariance test passes |
 | 5 | Clouds: `CloudyAllSkyPhysical`, `FastCloudApproximation` | Phase 4 complete | Clear-sky limit proven as `Fraction→0` |
 | 6 | Reference simulation + surrogate | Phase 5 complete | `.sbsur` format + OOD detection tested on synthetic data; pipeline documented as unbuilt/optional |
