@@ -212,9 +212,15 @@ skybrightness/dataset/blackmarble/  VNP46/VJ146 readers (NASA Black Marble)
 skybrightness/dataset/eog/     EOG VIIRS annual/monthly readers
 skybrightness/dataset/worldatlas/   Falchi 2016 — reference/validation dataset only
 skybrightness/dataset/passband/     passband bundle provider (remote + fits + disk cache)
-skybrightness/dataset/atmostate/    CAMS/ERA5/local atmospheric-state providers
 skybrightness/lpmap/           live lightpollutionmap.info cross-check client (kept, re-scoped)
 ```
+
+CAMS/ERA5/local atmospheric-state providers live in `atmosphere/dataset/cams` (and any future
+`atmosphere/dataset/era5`), **outside** the `skybrightness/dataset/...` tree above — the
+loaders sit next to `atmosphere.Atmosphere`, the type they populate, one level up from
+`skybrightness` itself (see the revised package-home rationale two paragraphs below). An
+earlier draft of this document sketched a `skybrightness/dataset/atmostate` package for this;
+that name was never built and is superseded by `atmosphere/dataset/cams`.
 
 This widens v1's two-tier split (pure core / `atlas`+`lpmap` IO siblings) rather than
 replacing it — `skybrightness/importgraph_test.go` already machine-enforces that core never
@@ -240,7 +246,10 @@ the rich atmospheric-state *data* type (`atmosphere.Atmosphere`, built via
 sky-brightness-specific (a future weather or seeing constraint needs the identical type), and
 canonicalizing it where a peer package already sits avoids the alternative of skybrightness
 owning a concept it doesn't exclusively use. `atmos` still owns the *optics* (transmission
-models consuming `atmosphere.Atmosphere`); `dataset/atmostate` still owns the *loaders*.
+models consuming `atmosphere.Atmosphere`); `atmosphere/dataset/cams` (and any future
+`atmosphere/dataset/era5`) — a peer of `skybrightness/dataset/...`, not a member of it — owns
+the *loaders*, for the same reason the data type itself lives in `atmosphere`: a CAMS/ERA5
+reader's output feeds `atmosphere.Atmosphere`, not something `skybrightness`-specific.
 `skybrightness` references `atmosphere.Atmosphere` directly in `Request`/`EvalInput` — no
 alias — matching how `coord.Context` is already referenced directly rather than aliased;
 general data-provenance primitives (`SourceRef`/`Fidelity`/`TimeRange`/`DatasetVersion`) live
@@ -358,8 +367,8 @@ case).
 external dataset (VIIRS/Black Marble/CAMS/...)
         │  remote.GetFile (consent-gated, checksummed)
         ▼
-dataset/{blackmarble,eog,atmostate,passband,worldatlas}   ← reader returns raw values +
-        │                                                    quality mask + SourceRef, never
+dataset/{blackmarble,eog,passband,worldatlas},           ← reader returns raw values +
+atmosphere/dataset/cams                                     quality mask + SourceRef, never
         │  wrapped as an EmissionField / AtmosphereProvider  interpolates missing pixels
         ▼
 immutable state (atmosphere.Atmosphere, EmissionField snapshot, PassbandSet)
@@ -441,18 +450,27 @@ profile. `AtmosphereProvider` is the interface future CAMS/ERA5/local-instrument
 implement; the physical core (`atmos/`) depends only on the immutable `atmosphere.Atmosphere` type,
 never on a specific provider.
 
-### CAMS aerosol data — validated technical notes (Phase 3/7, not yet built)
+### CAMS aerosol data — validated technical notes (Phase 3/7, `atmosphere/dataset/cams`, not yet built)
 
 Investigated live against real CAMS GLOBAL EODATA NetCDF files (2026-08, via a separate agent
-session with real Atmosphere Data Store access) as the eventual `dataset/atmostate` CAMS
-provider's data-format contract. These are the modern, per-location, per-time operational
-counterpart to the static named-climatology presets (`atmosphere.RuralAerosol`/`UrbanAerosol`/
-`DesertAerosol`/`MaritimeAerosol`, OPAC-sourced, §3) — the two tiers coexist rather than one
-superseding the other: the OPAC presets are the pure, offline, zero-dependency default for a
-caller with no live atmospheric data; a CAMS provider is the live, geographically-resolved
-tier for a caller with real-time access. Recorded here for the Phase 3/7 implementer, not
-implemented now — the practical blockers (an ADS API key, a NetCDF4/HDF5 reader, and the
-species-to-optics mapping below) make this real, scoped, later work, not a quick swap-in.
+session with real Copernicus Data Space Ecosystem S3 access) as the eventual
+`atmosphere/dataset/cams` provider's data-format contract. These are the modern,
+per-location, per-time operational counterpart to the static named-climatology presets
+(`atmosphere.RuralAerosol`/`UrbanAerosol`/`DesertAerosol`/`MaritimeAerosol`, OPAC-sourced,
+§3) — the two tiers coexist rather than one superseding the other: the OPAC presets are the
+pure, offline, zero-dependency default for a caller with no live atmospheric data; a CAMS
+provider is the live, geographically-resolved tier for a caller with real-time access.
+
+**Credential blocker resolved, data-format blockers remain.** The original access route
+considered here (an ADS API key against the CAMS EAC4 reanalysis product) has been
+superseded: CAMS global analysis files are fetched via the Copernicus Data Space Ecosystem's
+S3-compatible `eodata` bucket instead (`remote.CopernicusEODATA`, `remote/s3`'s `Transport`
+implementation — credentials resolve through the AWS SDK v2's own default chain, never a
+credential file astrogo reads itself). That access mechanism is built and tested; see
+`remote/s3/doc.go`. What remains before `atmosphere/dataset/cams` can be built — a
+NetCDF4/HDF5 reader capable of the chunked, deflate-compressed layout below, and the
+species-to-optics mapping described further down — is real, scoped, later work, not a quick
+swap-in once the reader exists.
 
 **Grid and file layout.** CAMS analysis files use a global regular 0.4° grid — 900 longitude ×
 451 latitude points (longitude 0..359.6° east, latitude 90..-90°; 451 points at 0.4° spacing
@@ -483,8 +501,8 @@ index is a proxy for altitude.
 
 **Tracer availability is dataset/version-specific.** The investigated EODATA snapshot exposes
 `aermr01`…`aermr11` and `aermr16`…`aermr18` — `aermr12`…`aermr15` are absent in this
-particular product/version and must not be assumed present; any future `dataset/atmostate`
-CAMS reader has to keep dataset/version differences explicit (matching `Provenance`'s existing
+particular product/version and must not be assumed present; the future `atmosphere/dataset/cams`
+reader has to keep dataset/version differences explicit (matching `Provenance`'s existing
 `DatasetVersion` field, §3) rather than silently treating a missing tracer as zero.
 
 **The real next scientific task, and what NOT to do.** Do not invent aerosol microphysical
@@ -664,7 +682,7 @@ prediction is stays aspirational until real observational data enters this repos
 | 0 | This document | Mandate received | Internally consistent, no open contradictions |
 | 1 | Spectral foundation: canonical types, `Engine`/`Request`/`Result`, passband integration, provenance/uncertainty/quality types, fast simplified-model components, `plan` + example rewrite | Phase 0 complete | Repo compiles, 10 invariant tests + benchmarks pass, `plan` works end-to-end |
 | 2 | Natural-sky baseline: spectral zodiacal/airglow/moonlight, twilight guard, starlight/DGL interface | Phase 1 complete | Comparison fixtures + monotonicity/symmetry tests pass |
-| 3 | Atmosphere: `atmosphere.Atmosphere`, molecular/aerosol/cloud optics, terrain, local provider, `dataset/atmostate` CAMS reader (see §8's CAMS notes for the validated grid/tracer/pressure-reconstruction contract) | Phase 2 complete | Zero-aerosol/zero-cloud limits proven exact |
+| 3 | Atmosphere: `atmosphere.Atmosphere`, molecular/aerosol/cloud optics, terrain, local provider, `atmosphere/dataset/cams` CAMS reader (see §8's CAMS notes for the validated grid/tracer/pressure-reconstruction contract) | Phase 2 complete | Zero-aerosol/zero-cloud limits proven exact |
 | 4 | Artificial clear sky: emission-field providers, spectral mixture/angular models, log-polar aggregation, `ClearSkyPhysical` | Phase 3 complete | Zero-emission ⇒ zero artificial radiance (bitwise); aggregation-invariance test passes |
 | 5 | Clouds: `CloudyAllSkyPhysical`, `FastCloudApproximation` | Phase 4 complete | Clear-sky limit proven as `Fraction→0` |
 | 6 | Reference simulation + surrogate | Phase 5 complete | `.sbsur` format + OOD detection tested on synthetic data; pipeline documented as unbuilt/optional |
@@ -757,7 +775,8 @@ none will be added. The "replaced by" column is the adaptation recipe.
 | VIIRS annual composites (lightpollutionmap.info mirror of Black Marble) | source data CC0; mirror asks credit to Jurij Stare + NASA Black Marble | Not redistributed; downloaded per-user via `remote.VIIRSAnnual` | none | ~700 MB–1 GB per year | yes (past years occasionally reprocessed) |
 | NASA Black Marble VNP46A3/A4, VJ146A3/A4 (LAADS DAAC, full multi-SDS) | NASA open data | Not redistributed | LAADS App Key | per-granule | yes |
 | EOG VIIRS annual v2 | EOG terms | Not redistributed | OAuth2 bearer token | ~6 GB | yes |
-| CAMS EAC4 reanalysis | Copernicus licence | Not redistributed | ADS API key | per-request | yes |
+| CAMS global analysis (Copernicus Data Space Ecosystem `eodata` S3 bucket, via `remote.CopernicusEODATA`/`remote/s3`) | Copernicus licence | Not redistributed; downloaded per-user via `remote.GetFile` | Copernicus Data Space S3 credentials (AWS SDK v2 default chain — env vars, `~/.aws/credentials`, or an IAM role; never a credential file astrogo reads itself) | 1.3 MB (`lnsp`) – ~180 MB (a 137-level aerosol tracer) per file | yes (new analysis cycles ~4×/day) |
+| CAMS EAC4 reanalysis (ADS, an older/alternate CAMS product — not currently used by any `remote` endpoint) | Copernicus licence | Not redistributed | ADS API key | per-request | yes |
 | ERA5 single levels | Copernicus licence | Not redistributed | CDS API key | per-request | yes |
 | Passband curves (Johnson-Cousins, Sloan, Gaia, CIE, SQM) | Gaia: ESA CC BY-SA (attribution required); others: verify per-source at Phase 1 implementation time | Redistributed in `remote.PassbandBundle`, checksummed | none | ~2 MB | no (pinned by semver + SHA-256) |
 | lightpollutionmap.info live API (`lpmap`) | provider terms, manual API key issuance | Not redistributed; live queries only | manual-issue API key | n/a | n/a (live) |
