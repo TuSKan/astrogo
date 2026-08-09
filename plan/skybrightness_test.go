@@ -25,7 +25,7 @@ func skyTestFixture(t *testing.T) (*Site, time.Time, *coord.Context) {
 	}
 
 	tm := time.FromJD(2451545.0, time.UTC) // target RA 18.69h is near zenith at Greenwich
-	ctx := coord.NewContext(tm, loc, site.Atmosphere())
+	ctx := coord.NewContext(tm, loc, site.Refraction())
 
 	return site, tm, ctx
 }
@@ -33,7 +33,7 @@ func skyTestFixture(t *testing.T) (*Site, time.Time, *coord.Context) {
 // The constants/helpers below reproduce, minimally and test-locally, the
 // exact Garstang nanolambert<->V-magnitude round-trip
 // skybrightness/natural/garstang_units.go uses for ConstantAirglow/
-// KrisciunasSchaeferMoonlight (see that file's doc comment for the
+// VBandMoonlight (see that file's doc comment for the
 // derivation) — this package cannot import skybrightness/natural (only
 // core skybrightness; skybrightness/importgraph_test.go's
 // TestPlanImportsOnlyCoreSkybrightness enforces this), so a fixed-SQM

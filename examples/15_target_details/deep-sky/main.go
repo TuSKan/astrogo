@@ -28,7 +28,7 @@ func main() {
 
 	tz, _ := time.LoadLocation("UTC")
 	t := time.Date(2026, 4, 25, 20, 0, 0, 0, tz)
-	ctx := coord.NewContext(t, loc, atmosphere.StandardAtmosphere)
+	ctx := coord.NewContext(t, loc, atmosphere.StandardRefraction)
 
 	resolver := catalog.NewResolver(catalog.OpenNGC, catalog.SIMBAD)
 

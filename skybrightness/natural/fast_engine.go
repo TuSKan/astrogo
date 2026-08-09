@@ -43,7 +43,7 @@ func NewFastEngine(cfg FastConfig) (skybrightness.Engine, error) {
 		airglow = NewConstantAirglowSB(cfg.AirglowSB)
 	}
 
-	moon := NewKrisciunasSchaeferMoonlight(
+	moon := NewVBandMoonlight(
 		WithMoonProvider(cfg.Ephemeris),
 		WithMoonExtinction(k),
 	)

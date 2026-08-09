@@ -28,7 +28,7 @@ type Reduction struct {
 // matrix and IERS EOP lookup (~91 µs each). This makes Reducer suitable for
 // batch reduction of many targets at the same epoch.
 type Reducer struct {
-	atmos atmosphere.Atmosphere
+	atmos atmosphere.Refraction
 	time  time.Time
 	site  *Geodetic
 	ctx   *Context
@@ -36,7 +36,7 @@ type Reducer struct {
 }
 
 // NewReducer creates a new apparent-place reduction pipeline.
-func NewReducer(site *Geodetic, t time.Time, atmos atmosphere.Atmosphere) *Reducer {
+func NewReducer(site *Geodetic, t time.Time, atmos atmosphere.Refraction) *Reducer {
 	return &Reducer{
 		site:  site,
 		time:  t,

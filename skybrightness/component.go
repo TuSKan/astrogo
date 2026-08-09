@@ -94,7 +94,7 @@ type EvalInput struct {
 
 	// Atmosphere is never nil: ClimatologyDefaultAtmosphere is substituted
 	// when a Request specifies none.
-	Atmosphere *atmosphere.State
+	Atmosphere *atmosphere.Atmosphere
 
 	Mode    Mode
 	Options EvaluationOptions

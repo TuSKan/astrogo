@@ -49,7 +49,7 @@ type FallbackRecord struct {
 // name, its semantic version, and (where applicable) the paper it
 // implements.
 type AlgorithmRef struct {
-	Name     string // e.g. "natural.KrisciunasSchaeferMoonlight"
+	Name     string // e.g. "natural.VBandMoonlight"
 	Version  string // semver of the implementation
 	Citation string // e.g. "Krisciunas & Schaefer (1991), PASP 103, 1033"
 }
@@ -62,9 +62,9 @@ type ComponentProvenance struct {
 	Datasets  []SourceRef
 }
 
-// AtmosphereProvenance records where an atmosphere.State came from and
+// AtmosphereProvenance records where an atmosphere.Atmosphere came from and
 // how current it is — an alias for atmosphere.Provenance, the type
-// atmosphere.State.Provenance() itself returns.
+// atmosphere.Atmosphere.Provenance() itself returns.
 type AtmosphereProvenance = atmosphere.Provenance
 
 // SurrogateRef is a placeholder for Phase 6 surrogate provenance; nil

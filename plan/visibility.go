@@ -24,7 +24,7 @@ func IsVisible(obj coord.Object, t time.Time, site *Site, minAlt angle.Angle) (b
 		return false, fmt.Errorf("visibility: ICRS: %w", err)
 	}
 
-	ctx := coord.NewContext(t, site.Location(), site.Atmosphere())
+	ctx := coord.NewContext(t, site.Location(), site.Refraction())
 
 	aa, err := ctx.ICRSToAltAz(pos)
 	if err != nil {
@@ -53,7 +53,7 @@ func refineVisibility(
 			return 0, fmt.Errorf("visibility: ICRS: %w", err)
 		}
 
-		ctx := coord.NewContext(t, site.Location(), site.Atmosphere())
+		ctx := coord.NewContext(t, site.Location(), site.Refraction())
 
 		aa, err := ctx.ICRSToAltAz(pos)
 		if err != nil {
@@ -137,7 +137,7 @@ func VisibleIntervals(
 			return nil, fmt.Errorf("visibility: ICRS: %w", err)
 		}
 
-		ctx := coord.NewContext(t, site.Location(), site.Atmosphere())
+		ctx := coord.NewContext(t, site.Location(), site.Refraction())
 
 		aa, err := ctx.ICRSToAltAz(pos)
 		if err != nil {
@@ -203,7 +203,7 @@ func TransitEstimate(obj coord.Object, site *Site, start, end time.Time) (time.T
 			return time.Time{}, angle.Deg(0), err
 		}
 
-		ctx := coord.NewContext(t, site.Location(), site.Atmosphere())
+		ctx := coord.NewContext(t, site.Location(), site.Refraction())
 
 		aa, err := ctx.ICRSToAltAz(pos)
 		if err != nil {
@@ -235,7 +235,7 @@ func TransitEstimate(obj coord.Object, site *Site, start, end time.Time) (time.T
 			return 0, fmt.Errorf("visibility: transit ICRS: %w", err)
 		}
 
-		ctx := coord.NewContext(t, site.Location(), site.Atmosphere())
+		ctx := coord.NewContext(t, site.Location(), site.Refraction())
 
 		aa, err := ctx.ICRSToAltAz(pos)
 		if err != nil {
@@ -257,7 +257,7 @@ func TransitEstimate(obj coord.Object, site *Site, start, end time.Time) (time.T
 		return time.Time{}, angle.Deg(0), err
 	}
 
-	resCtx := coord.NewContext(resTime, site.Location(), site.Atmosphere())
+	resCtx := coord.NewContext(resTime, site.Location(), site.Refraction())
 
 	aa, err := resCtx.ICRSToAltAz(pos)
 	if err != nil {

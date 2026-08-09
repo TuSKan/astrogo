@@ -29,7 +29,7 @@ func TestSunAltitudeMovement(t *testing.T) {
 	posStart, err := eph.ToICRS(vecStart)
 	testutil.AssertNoError(t, err)
 
-	ctxStart := coord.NewContext(tm, site.Location(), atmosphere.StandardAtmosphere)
+	ctxStart := coord.NewContext(tm, site.Location(), atmosphere.StandardRefraction)
 	aaStart, _ := ctxStart.ICRSToAltAz(posStart)
 
 	tmLate := tm.AddDays(0.25) // +6 hours
@@ -39,7 +39,7 @@ func TestSunAltitudeMovement(t *testing.T) {
 	posLate, err := eph.ToICRS(vecLate)
 	testutil.AssertNoError(t, err)
 
-	ctxLate := coord.NewContext(tmLate, site.Location(), atmosphere.StandardAtmosphere)
+	ctxLate := coord.NewContext(tmLate, site.Location(), atmosphere.StandardRefraction)
 	aaLate, _ := ctxLate.ICRSToAltAz(posLate)
 
 	t.Logf("Sun Alt @ Noon: %.2f", aaStart.Alt().Degrees())
@@ -272,7 +272,7 @@ func TestApparentState_LightTimeActuallyChangesResult(t *testing.T) {
 	site, err := coord.NewGeodetic(angle.Deg(-155.4700), angle.Deg(19.8261), 4205)
 	testutil.AssertNoError(t, err)
 
-	atm := atmosphere.Atmosphere{}
+	atm := atmosphere.Refraction{}
 	atm.Model = atmosphere.RefractionNone{}
 
 	mock := &mockLinearProvider{
@@ -304,7 +304,7 @@ func TestApparentState_DistantObjectHasTinyCorrection(t *testing.T) {
 	site, err := coord.NewGeodetic(angle.Deg(-17.8890), angle.Deg(28.7606), 2390)
 	testutil.AssertNoError(t, err)
 
-	atm := atmosphere.Atmosphere{}
+	atm := atmosphere.Refraction{}
 	atm.Model = atmosphere.RefractionNone{}
 
 	mock := &mockLinearProvider{

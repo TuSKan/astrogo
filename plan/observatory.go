@@ -411,11 +411,16 @@ func (s *Site) Latitude() angle.Angle { return s.location.Lat() }
 // HeightMeters returns the site's height above the reference ellipsoid in meters.
 func (s *Site) HeightMeters() float64 { return s.location.Height() }
 
-// Atmosphere returns an atmospheric profile adjusted for the site's elevation
+// Refraction returns a refraction profile adjusted for the site's elevation
 // using the ICAO International Standard Atmosphere barometric formula.
 // Pressure and temperature are reduced for altitude; humidity, wavelength,
 // and the refraction model are inherited from the sea-level standard.
-func (s *Site) Atmosphere() atmosphere.Atmosphere {
+//
+// Renamed from Atmosphere alongside atmosphere.Atmosphere/Refraction's own
+// swap (see atmosphere/doc.go) — this method has always returned the small
+// refraction-input struct, never the package's richer atmospheric-state
+// type, so the new name matches what it actually returns.
+func (s *Site) Refraction() atmosphere.Refraction {
 	return atmosphere.AtAltitude(s.location.Height())
 }
 

@@ -407,4 +407,4 @@ func testSite() *coord.Geodetic {
 	return site
 }
 
-func testAtmosphere() atmosphere.Atmosphere { return atmosphere.StandardAtmosphere }
+func testAtmosphere() atmosphere.Refraction { return atmosphere.StandardRefraction }

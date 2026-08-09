@@ -18,9 +18,9 @@ import (
 var ErrDuplicateComponent = errors.New("skybrightness: duplicate ComponentID in CompositeConfig.Components")
 
 // ErrMissingAtmosphere is returned when a Request supplies no
-// atmosphere.State under a Mode that requires one, and
+// atmosphere.Atmosphere under a Mode that requires one, and
 // EvaluationOptions.Fallback is FallbackForbidden (the default).
-var ErrMissingAtmosphere = errors.New("skybrightness: no atmosphere.State supplied and fallback is forbidden")
+var ErrMissingAtmosphere = errors.New("skybrightness: no atmosphere.Atmosphere supplied and fallback is forbidden")
 
 // ErrEmptyBatch is returned by EvaluateBatch when BatchRequest.Astro is
 // empty.
@@ -38,7 +38,7 @@ type TransmissionModel interface {
 	// LineOfSight fills out (length g.Len()) with the transmission at
 	// each of g's wavelengths, for the path from top-of-atmosphere to an
 	// observer looking toward dir under atmospheric state st.
-	LineOfSight(dir coord.AltAz, st *atmosphere.State, g SpectralGrid, out []Transmission) error
+	LineOfSight(dir coord.AltAz, st *atmosphere.Atmosphere, g SpectralGrid, out []Transmission) error
 }
 
 // Engine is the spectral sky-radiance evaluator.
@@ -49,13 +49,16 @@ type Engine interface {
 }
 
 // CompositeConfig configures a CompositeEngine: the set of components to
-// sum, the transmission model, the passband set derived outputs may
-// resolve IDs against, and the Mode this engine answers for.
+// sum, the transmission model, and the Mode this engine answers for.
+// Passbands to integrate derived quantities against are a per-Request
+// concern (Request.Passbands), not an engine-construction one — an
+// earlier CompositeConfig.Passbands field was removed as dead: nothing
+// ever read it, since every derived-quantity computation already consults
+// Request.Passbands directly.
 type CompositeConfig struct {
 	Name         AlgorithmRef
 	Components   []Component
 	Transmission TransmissionModel
-	Passbands    PassbandSet
 	Mode         Mode
 }
 
@@ -91,7 +94,7 @@ func (e *CompositeEngine) Evaluate(ctx context.Context, req Request) (Result, er
 		return Result{}, err
 	}
 
-	scratch := req.Options.Buffers.scratchOrNew(len(req.Directions), req.Grid.Len())
+	scratch := req.Options.Performance.Buffers.scratchOrNew(len(req.Directions), req.Grid.Len())
 
 	return e.evaluateOne(ctx, req, scratch)
 }
@@ -110,7 +113,7 @@ func (e *CompositeEngine) EvaluateBatch(ctx context.Context, req BatchRequest) (
 
 	results := make([]Result, n)
 	errs := make([]error, n)
-	workers := req.Options.Parallelism
+	workers := req.Options.Performance.Parallelism
 
 	parallel.MapChunked(n, workers,
 		func() *Scratch { return NewScratch(nDir, nLambda) },
@@ -143,7 +146,7 @@ func (e *CompositeEngine) evaluateOne(ctx context.Context, req Request, scratch 
 	if atm == nil {
 		// ModeClimatology and ModeFast are both self-sufficient,
 		// deterministic, offline defaults — neither requires an explicit
-		// atmosphere.State, unlike Historical/Nowcast/Forecast/UserSupplied,
+		// atmosphere.Atmosphere, unlike Historical/Nowcast/Forecast/UserSupplied,
 		// where a missing atmosphere is a real gap the caller must either
 		// fill or explicitly opt to fall back from (docs/skybrightness.md
 		// §7). ModeFast in particular exists so natural.NewFastEngine works
@@ -157,7 +160,7 @@ func (e *CompositeEngine) evaluateOne(ctx context.Context, req Request, scratch 
 
 		if req.Mode != ModeClimatology && req.Mode != ModeFast {
 			fallbacks = append(fallbacks, FallbackRecord{
-				From: req.Mode, To: ModeClimatology, Reason: "no atmosphere.State supplied", At: time.Now(),
+				From: req.Mode, To: ModeClimatology, Reason: "no atmosphere.Atmosphere supplied", At: time.Now(),
 			})
 		}
 	}
@@ -272,7 +275,7 @@ func (e *CompositeEngine) computeDerived(req Request, res Result) DerivedQuantit
 	opts := req.Options
 	nDir := len(req.Directions)
 
-	if opts.Derived.Has(DerivePassbands) {
+	if opts.Derived.Mask.Has(DerivePassbands) {
 		for _, pb := range req.Passbands {
 			pr := PassbandResult{Passband: pb.ID, AB: make([]SurfaceBrightnessAB, nDir)}
 
@@ -304,7 +307,7 @@ func (e *CompositeEngine) computeDerived(req Request, res Result) DerivedQuantit
 		}
 	}
 
-	if opts.Derived.Has(DeriveLuminance) {
+	if opts.Derived.Mask.Has(DeriveLuminance) {
 		d.Luminance = make([]LuminanceCdM2, nDir)
 
 		for i := range nDir {
@@ -314,7 +317,7 @@ func (e *CompositeEngine) computeDerived(req Request, res Result) DerivedQuantit
 		}
 	}
 
-	if opts.Derived.Has(DeriveAnthroRatio) && res.Components.Has(Artificial) {
+	if opts.Derived.Mask.Has(DeriveAnthroRatio) && res.Components.Has(Artificial) {
 		d.AnthroRatio = make([]float64, nDir)
 
 		artField, _ := res.Components.Field(Artificial)
@@ -333,7 +336,7 @@ func (e *CompositeEngine) computeDerived(req Request, res Result) DerivedQuantit
 		}
 	}
 
-	if opts.Derived.Has(DeriveLimitingMag) && opts.LimitingMag != nil && len(req.Passbands) > 0 {
+	if opts.Derived.Mask.Has(DeriveLimitingMag) && opts.Derived.LimitingMag != nil && len(req.Passbands) > 0 {
 		d.LimitingMagnitude = make([]float64, nDir)
 		pb := req.Passbands[0]
 
@@ -348,7 +351,7 @@ func (e *CompositeEngine) computeDerived(req Request, res Result) DerivedQuantit
 
 			airmass := airmassFor(req.Directions[i])
 
-			lm, err := opts.LimitingMag.LimitingMagnitude(LimitingMagInput{
+			lm, err := opts.Derived.LimitingMag.LimitingMagnitude(LimitingMagInput{
 				Passband: pb.ID, SkyVega: vega, SkyAB: ab, Airmass: airmass,
 			})
 			if err == nil {
@@ -357,7 +360,7 @@ func (e *CompositeEngine) computeDerived(req Request, res Result) DerivedQuantit
 		}
 	}
 
-	if opts.Derived.Has(DeriveDetectorBackground) && opts.Instrument != nil && len(req.Passbands) > 0 {
+	if opts.Derived.Mask.Has(DeriveDetectorBackground) && opts.Derived.Instrument != nil && len(req.Passbands) > 0 {
 		d.DetectorBackground = make([]ElectronsPerPixelPerSecond, nDir)
 		pb := req.Passbands[0]
 
@@ -367,11 +370,11 @@ func (e *CompositeEngine) computeDerived(req Request, res Result) DerivedQuantit
 				continue
 			}
 
-			d.DetectorBackground[i] = opts.Instrument.BackgroundRate(photonRad)
+			d.DetectorBackground[i] = opts.Derived.Instrument.BackgroundRate(photonRad)
 		}
 	}
 
-	if opts.Derived.Has(DeriveAllSkyStats) && nDir > 0 && len(req.Passbands) > 0 {
+	if opts.Derived.Mask.Has(DeriveAllSkyStats) && nDir > 0 && len(req.Passbands) > 0 {
 		pb := req.Passbands[0]
 		vals := make([]float64, 0, nDir)
 
@@ -404,7 +407,7 @@ func (e *CompositeEngine) computeDerived(req Request, res Result) DerivedQuantit
 		}
 	}
 
-	if opts.Derived.Has(DeriveIrradiance) && nDir > 0 {
+	if opts.Derived.Mask.Has(DeriveIrradiance) && nDir > 0 {
 		alts := make([]float64, nDir)
 		solid := make([]float64, nDir)
 
@@ -474,13 +477,13 @@ func photopicPassband(_ SpectralGrid) *Passband {
 }
 
 func computeUncertainty(req Request, res Result) UncertaintyResult {
-	if req.Options.Uncertainty == UncNone {
+	if req.Options.Uncertainty.Mode == UncNone {
 		return UncertaintyResult{Mode: UncNone}
 	}
 
-	if req.Options.Uncertainty != UncLinearized {
+	if req.Options.Uncertainty.Mode != UncLinearized {
 		return UncertaintyResult{
-			Mode:     req.Options.Uncertainty,
+			Mode:     req.Options.Uncertainty.Mode,
 			Warnings: []DomainWarning{{Message: ErrUncertaintyModeUnimplemented.Error()}},
 		}
 	}

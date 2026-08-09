@@ -456,7 +456,7 @@ func TestUSNO_CelNav(t *testing.T) {
 	geodetic, _ := coord.NewGeodetic(angle.Deg(-46.6525), angle.Deg(-23.600833), 0)
 	tz, _ := time.LoadLocation("America/Sao_Paulo")
 	site, _ := plan.NewSite("São Paulo", geodetic, plan.WithTimeZone(tz))
-	ctx := coord.NewContext(tm, site.Location(), site.Atmosphere())
+	ctx := coord.NewContext(tm, site.Location(), site.Refraction())
 
 	// Validate Sun position
 	var prov eph.Provider
@@ -1577,7 +1577,7 @@ func TestUSNO_CelNav_EdgeCases(t *testing.T) {
 			tm := time.Date(y, time.Month(mo), d, h, m, s, 0, time.LocationUTC)
 			geodetic, _ := coord.NewGeodetic(angle.Deg(tc.lon), angle.Deg(tc.lat), tc.height)
 			site, _ := plan.NewSite("test", geodetic, plan.WithTimeZone(time.LocationUTC))
-			ctx := coord.NewContext(tm, site.Location(), site.Atmosphere())
+			ctx := coord.NewContext(tm, site.Location(), site.Refraction())
 
 			prov := newEph(t)
 

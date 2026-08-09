@@ -43,7 +43,7 @@ var bortleNames = [10]string{
 // entirely rather than merely discouraged): using a Bortle class as a
 // model *input* would silently discard precision the rest of the engine
 // worked to preserve. Report a class for a human reader; never feed one
-// back into an AtmosphereState or emission model.
+// back into an atmosphere.Atmosphere or emission model.
 func BortleFromLuminance(l LuminanceCdM2) (class int, name string) {
 	mag := math.Inf(1)
 	if l > 0 {

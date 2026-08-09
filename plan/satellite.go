@@ -170,7 +170,7 @@ func (s *Satellite) StaticMagnitude() (float64, bool) {
 }
 
 // defaultAtm is used for satellite pass prediction when no atmosphere is specified.
-var defaultAtm = atmosphere.Atmosphere{}
+var defaultAtm = atmosphere.Refraction{}
 
 // LookAngle computes the topocentric look angle (altitude, azimuth, distance)
 // from an observer to any celestial body at time t.
@@ -188,7 +188,7 @@ func LookAngle(prov eph.Provider, id eph.ID, ctx *coord.Context) (coord.AltAz, e
 	// Use the Reducer pipeline: computes observer GCRS position, subtracts it
 	// from the geocentric state, converts to ENU, then az/el. This gives the
 	// correct topocentric range for nearby objects (satellites).
-	reducer := coord.NewReducer(ctx.Site(), ctx.Time(), ctx.Atmosphere())
+	reducer := coord.NewReducer(ctx.Site(), ctx.Time(), ctx.Refraction())
 	reduction := reducer.Reduce(st.Pos)
 
 	// The Reducer works in AU — convert topocentric distance to km.

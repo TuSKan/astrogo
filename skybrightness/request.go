@@ -89,21 +89,51 @@ type BufferPool struct {
 	scratch *Scratch
 }
 
+// DerivedOptions groups every option governing which DerivedQuantities an
+// evaluation computes and what it needs to compute them: the bitmask
+// itself, plus the two optional models (LimitingMag, Instrument) that
+// DeriveLimitingMag/DeriveDetectorBackground consult. Grouped out of
+// EvaluationOptions so "how do I get a limiting magnitude" is answered by
+// one field path (Derived.LimitingMag), not a flat option list mixed in
+// with performance/uncertainty concerns.
+type DerivedOptions struct {
+	Mask        DerivedMask
+	LimitingMag LimitingMagModel
+	Instrument  *Instrument
+}
+
+// UncertaintyOptions groups every option governing uncertainty
+// propagation: the mode, the Monte Carlo/ensemble sample count (ignored by
+// UncLinearized), and the RNG seed.
+type UncertaintyOptions struct {
+	Mode    UncertaintyMode
+	Samples int
+	Seed    uint64
+}
+
+// PerformanceOptions groups every option governing evaluation throughput:
+// worker count, scattering-order truncation, and caller-owned buffer
+// reuse. None of these affect what an evaluation computes, only how fast
+// and with how much allocation.
+type PerformanceOptions struct {
+	Parallelism      int         // 0 = runtime.GOMAXPROCS
+	ScatteringOrders int         // 0 = engine default; recorded in Provenance
+	Buffers          *BufferPool // optional caller-owned reuse
+}
+
 // EvaluationOptions configures one Evaluate/EvaluateBatch call beyond the
-// physical Request itself.
+// physical Request itself. Grouped into three cohesive sub-structs
+// (Derived, Uncertainty, Performance) rather than one flat 12-field
+// struct — each group is self-explaining by name, and RequestBuilder
+// (request_builder.go) is the recommended way to construct one without
+// hand-nesting these literals.
 type EvaluationOptions struct {
 	ComputeTransmission bool
-	Derived             DerivedMask
-	Uncertainty         UncertaintyMode
-	UncertaintySamples  int
-	Seed                uint64
 	Fallback            FallbackPolicy
 	MaxInputAge         time.Duration // 0 = no staleness check
-	Parallelism         int           // 0 = runtime.GOMAXPROCS
-	ScatteringOrders    int           // 0 = engine default; recorded in Provenance
-	Buffers             *BufferPool   // optional caller-owned reuse
-	LimitingMag         LimitingMagModel
-	Instrument          *Instrument
+	Derived             DerivedOptions
+	Uncertainty         UncertaintyOptions
+	Performance         PerformanceOptions
 }
 
 // Request is one spectral sky-radiance evaluation.
@@ -119,7 +149,7 @@ type Request struct {
 	// substituted, which is itself recorded in Provenance.Fallbacks only
 	// if Mode != ModeClimatology (a Climatology request supplying no
 	// atmosphere is using the mode as intended, not falling back).
-	Atmosphere *atmosphere.State
+	Atmosphere *atmosphere.Atmosphere
 	Selection  ComponentSelection
 	Options    EvaluationOptions
 }
@@ -159,13 +189,13 @@ type BatchRequest struct {
 	Mode       Mode
 	// Atmosphere has length 1 (shared across every epoch) or
 	// len(Astro) (one per epoch).
-	Atmosphere []*atmosphere.State
+	Atmosphere []*atmosphere.Atmosphere
 	Selection  ComponentSelection
 	Options    EvaluationOptions
 }
 
 func (r BatchRequest) at(i int) Request {
-	var atm *atmosphere.State
+	var atm *atmosphere.Atmosphere
 
 	switch {
 	case len(r.Atmosphere) == 1:

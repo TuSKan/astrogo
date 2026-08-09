@@ -42,7 +42,7 @@ func TestIntegration(t *testing.T) {
 	obsTime := astrot.Date(2026, 4, 6, 0, 0, 0, 0, time.UTC)
 
 	// Compute target's altitude and azimuth properties from the Observatory at that time
-	ctx := coord.NewContext(obsTime, obs.Location(), atmosphere.StandardAtmosphere)
+	ctx := coord.NewContext(obsTime, obs.Location(), atmosphere.StandardRefraction)
 
 	altaz, err := ctx.ICRSToAltAz(andromeda.Coord)
 	if err != nil {

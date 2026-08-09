@@ -77,7 +77,7 @@ func TestPlanSatellite_PositionAndDetails(t *testing.T) {
 		t.Fatalf("NewSiteEarthLocation: %v", err)
 	}
 
-	ctx := coord.NewContext(tm, site.Location(), site.Atmosphere())
+	ctx := coord.NewContext(tm, site.Location(), site.Refraction())
 
 	d, err := sat.GetDetails(ctx)
 	if err != nil {
@@ -106,7 +106,7 @@ func TestPlanSatellite_ApparentMagnitudeRequiresContext(t *testing.T) {
 		t.Fatalf("NewSiteEarthLocation: %v", err)
 	}
 
-	ctx := coord.NewContext(tm, site.Location(), site.Atmosphere())
+	ctx := coord.NewContext(tm, site.Location(), site.Refraction())
 
 	m, err := sat.ApparentMagnitudeCtx(tm, ctx)
 	if err != nil {

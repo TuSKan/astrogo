@@ -150,7 +150,7 @@ func main() {
 			log.Fatalf("radiant: %v", err)
 		}
 
-		ctx := coord.NewContext(tt, site.Location(), site.Atmosphere())
+		ctx := coord.NewContext(tt, site.Location(), site.Refraction())
 
 		aa, err := ctx.ICRSToAltAz(coord.NewICRS(ra, dec))
 		if err != nil {

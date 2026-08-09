@@ -99,7 +99,7 @@ func main() {
 	}
 
 	// Build the observation context (caches SOFA matrices for this time+site).
-	ctx := coord.NewContext(epoch, observer, atmosphere.Atmosphere{})
+	ctx := coord.NewContext(epoch, observer, atmosphere.Refraction{})
 
 	altaz, err := plan.LookAngle(prov, 0, ctx)
 	if err != nil {

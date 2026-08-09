@@ -67,7 +67,7 @@ E(position, λ, upward_direction, t) = intensity(position, t)
                                      × spectral_mixture(position, λ, t)
                                      × angular_emission(position, upward_direction, t)
 
-L_artificial(λ) = Propagate[E](λ, observer_direction, atmosphere.State)
+L_artificial(λ) = Propagate[E](λ, observer_direction, atmosphere.Atmosphere)
 ```
 
 **VIIRS-DNB supplies `intensity` only.** It has one broad panchromatic band (~500–900 nm) with
@@ -155,7 +155,7 @@ not — the same test already used for `ObliquityJ2000`/`SunGravitationalParamet
 | Vega zero points | `skybrightness`, from the passband bundle | depends on *which* Vega spectrum (Hayes vs. CALSPEC alpha_lyr_stis) — series-valued, out of `constants` scope |
 | Solar spectral irradiance | a dataset | a spectrum, not a constant |
 | Falchi 2016 natural zenith, 0.171168465 mcd/m² | `natural.FalchiNaturalZenithLuminance` | model-dependent, carried verbatim with citation from v1's `NaturalZenithMcdM2` |
-| Garstang nL↔mag constants (34.08, 20.7233) | `natural` package, unexported | only `ConstantAirglow`/`KrisciunasSchaeferMoonlight` may use them; not public API |
+| Garstang nL↔mag constants (34.08, 20.7233) | `natural` package, unexported | only `ConstantAirglow`/`VBandMoonlight` may use them; not public API |
 
 **Passbands, with zero `go:embed`.** CLAUDE.md forbids `go:embed` project-wide, and §5/§25
 forbid undocumented embedded response curves regardless. Core defines `PassbandSet`
@@ -181,7 +181,7 @@ before any bundle ships — a Phase 0 checklist item, not assumed clear (§16).
 ```
 skybrightness/                 PURE core: types, interfaces, composite engine, derived outputs
 skybrightness/natural/         PURE: airglow, zodiacal, starlight, diffuse-galactic, moon,
-                                twilight, aurora, legacy_airglow, legacy_moon
+                                twilight, aurora, constant_airglow, vband_moonlight
 skybrightness/atmos/           PURE: molecular, aerosol, cloud, terrain, transmission
 skybrightness/artificial/      PURE: emission, spectral_mixture, angular emission, aggregation
 skybrightness/rt/              PURE: clear-sky, cloudy, fast-cloud approximation
@@ -216,20 +216,37 @@ machine-enforced in the rewritten `importgraph_test.go`:
 
 Core stays the one dependency `plan` sees, preserving the CLAUDE.md rule that an HDF5-scale
 dependency never reaches a `plan` user's build. **Revised from the original Phase 0 sketch**:
-`AtmosphereState`'s *data* type (`atmosphere.State`, built via `atmosphere.NewBuilder()`) lives
-in the peer `atmosphere/` package, not in core `skybrightness` — general aerosol/cloud/
-surface-optical atmospheric state is not sky-brightness-specific (a future weather or seeing
-constraint needs the identical type), and canonicalizing it where a peer package already sits
-avoids the alternative of skybrightness owning a concept it doesn't exclusively use. `atmos`
-still owns the *optics* (transmission models consuming `atmosphere.State`); `dataset/atmostate`
-still owns the *loaders*. `skybrightness` references `atmosphere.State` directly in `Request`/
-`EvalInput` — no alias — matching how `coord.Context` is already referenced directly rather
-than aliased; general data-provenance primitives (`SourceRef`/`Fidelity`/`TimeRange`/
-`DatasetVersion`) live in `atmosphere` too, aliased into `skybrightness` only because they
-also appear pervasively in `skybrightness`'s own `Provenance`/`ComponentProvenance`/`Passband`
-types. `atmosphere` keeps its narrow refraction/airmass/ISA scope for its `Atmosphere` type —
-`State` is a new, separate type living alongside it, not a widening of `Atmosphere` itself,
-so every existing airmass/refraction call site is unaffected.
+the rich atmospheric-state *data* type (`atmosphere.Atmosphere`, built via
+`atmosphere.NewBuilder()`) lives in the peer `atmosphere/` package, not in core
+`skybrightness` — general aerosol/cloud/surface-optical atmospheric state is not
+sky-brightness-specific (a future weather or seeing constraint needs the identical type), and
+canonicalizing it where a peer package already sits avoids the alternative of skybrightness
+owning a concept it doesn't exclusively use. `atmos` still owns the *optics* (transmission
+models consuming `atmosphere.Atmosphere`); `dataset/atmostate` still owns the *loaders*.
+`skybrightness` references `atmosphere.Atmosphere` directly in `Request`/`EvalInput` — no
+alias — matching how `coord.Context` is already referenced directly rather than aliased;
+general data-provenance primitives (`SourceRef`/`Fidelity`/`TimeRange`/`DatasetVersion`) live
+in `atmosphere` too, aliased into `skybrightness` only because they also appear pervasively in
+`skybrightness`'s own `Provenance`/`ComponentProvenance`/`Passband` types.
+
+**Revised again, one release later**: `atmosphere.Atmosphere` and `atmosphere.Refraction`
+swapped names. The narrow, refraction-model-input struct (`Model`/`Pressure`/`Temperature`/
+`Humidity`/`Wavelength`) used to be exported as `Atmosphere`; the rich, Builder-validated
+aerosol/cloud/surface-optical/provenance type used to be exported as `State`. Both names now
+match what a reader expects: `atmosphere.Atmosphere` is the rich type, `atmosphere.Refraction`
+is the small one every hot `coord`/`plan` refraction call site still constructs as a cheap
+literal. `atmosphere.Atmosphere` composes an embedded `atmosphere.Refraction` as its own
+surface-conditions field (`Atmosphere.Surface()` returns Kelvin; `Atmosphere.Refraction()`
+returns the embedded `Refraction` value directly, in `Refraction`'s own Celsius convention —
+the one explicit unit conversion this composition needs, at the single boundary
+`Builder.Surface` owns) rather than duplicating pressure/temperature as separate raw fields.
+This was a deliberate, same-release hard break with no deprecation alias for the old
+`atmosphere.Atmosphere` name — Go cannot alias one identifier to two different meanings at
+once, so freeing "Atmosphere" for the richer type necessarily retired the refraction struct's
+old name immediately, an explicit, stated exception to CLAUDE.md's normal 2-release
+deprecation policy (see `atmosphere/doc.go` and the CHANGELOG's `### Changed — BREAKING`
+entry). `coord.Context.Atmosphere()`/`plan.Site.Atmosphere()` were renamed to `.Refraction()`
+to match — both have always returned the refraction-input struct, never the richer type.
 
 ---
 
@@ -248,7 +265,7 @@ type Request struct {
     Grid       SpectralGrid
     Passbands  []*Passband
     Mode       Mode
-    Atmosphere *atmosphere.State
+    Atmosphere *atmosphere.Atmosphere
     Selection  ComponentSelection
     Options    EvaluationOptions
 }
@@ -287,14 +304,33 @@ parallel.MapChunked(len(req.Astro), workers,
 
 A convenience point API covers the "simple" half of the dual requirement without forcing every
 caller through the full batch machinery: `Point(ctx, Engine, PointQuery) (PointResult, error)`,
-where `PointQuery{Astro, Direction, Passband, Mode, Atmosphere, Grid}` and `PointResult{AB,
-Vega, Radiance, Luminance, Sigma, AnthroRatio, Quality, Provenance}`.
+where `PointQuery{Astro, Direction, Passband, Mode, Atmosphere, Grid, Components,
+ComputeTransmission, LimitingMag}` and `PointResult{AB, Vega, Radiance, Luminance, Sigma,
+AnthroRatio, Quality, Provenance, Components, Transmission, LimitingMagnitude,
+HasLimitingMag}`. **Revised, one release later**: `ComputeTransmission` and `LimitingMag` were
+added to close the gap that used to force even a single-point caller back onto `Evaluate`
+directly whenever it wanted transmission or a limiting magnitude — the two derived quantities
+`examples/18_sky_brightness` actually needs. `Point` now builds its own `Request` via
+`RequestBuilder` (below) internally, rather than a second, parallel construction path, and
+surfaces `IntegrateRadiance` failures as errors instead of silently returning a zero radiance.
+
+**`EvaluationOptions` construction — `RequestBuilder`, one release later**: `EvaluationOptions`
+is grouped into three cohesive sub-structs — `DerivedOptions{Mask, LimitingMag, Instrument}`,
+`UncertaintyOptions{Mode, Samples, Seed}`, `PerformanceOptions{Parallelism, ScatteringOrders,
+Buffers}` — cutting the flat option surface from 12 fields to 6, each self-explaining by group
+name. `NewRequestBuilder(astro, directions, grid) *RequestBuilder` is the recommended,
+documented way to assemble a `Request` (mirroring `atmosphere.NewBuilder()`'s established
+pattern) via chained methods (`.Atmosphere(...)`, `.Mode(...)`, `.Derive(...)`,
+`.LimitingMag(...)`, `.Uncertainty(...)`, `.Performance(...)`, ...) ending in `.Build() (Request,
+error)`, which runs `Request.Validate()` internally. `Request{...}` struct-literal construction
+stays fully valid — no field is hidden — `RequestBuilder` is additive, not a gate.
 
 **Buffer ownership contract**: `SpectralField` is the only container ever used for spectral
 output (a flat `[nDir×nLambda]` direction-major `[]SpectralRadiance`, never `[][]float64`).
 `Scratch` is per-goroutine, caller-constructed via `NewScratch`, never shared across
-goroutines, never returned to a caller. `EvaluationOptions.Buffers *BufferPool` lets a caller
-reuse allocations across repeated calls (the `plan` scoring loop's actual use case).
+goroutines, never returned to a caller. `EvaluationOptions.Performance.Buffers *BufferPool`
+lets a caller reuse allocations across repeated calls (the `plan` scoring loop's actual use
+case).
 
 ---
 
@@ -308,7 +344,7 @@ dataset/{blackmarble,eog,atmostate,passband,worldatlas}   ← reader returns raw
         │                                                    quality mask + SourceRef, never
         │  wrapped as an EmissionField / AtmosphereProvider  interpolates missing pixels
         ▼
-immutable state (atmosphere.State, EmissionField snapshot, PassbandSet)
+immutable state (atmosphere.Atmosphere, EmissionField snapshot, PassbandSet)
         │
         ▼
 Component.Eval / TransmissionModel.LineOfSight   ← pure, deterministic, given the same state
@@ -379,12 +415,12 @@ in the mandate and four separate Go fields here — never collapsed into one sca
 number. `CloudFraction` and `CloudOpticalDepth` being *distinct types* (not both bare
 `float64`) means a caller cannot accidentally pass one where the other belongs; the compiler
 enforces the mandate's "never collapse to one scalar" rule rather than a code-review
-convention having to catch it. `atmosphere.State` also carries surface pressure/temperature, a
+convention having to catch it. `atmosphere.Atmosphere` also carries surface pressure/temperature, a
 vertical profile, precipitable water vapour, ozone column, aerosol optical depth + Ångström
 exponent + wavelength-dependent single-scattering albedo + phase-function asymmetry + vertical
 profile, boundary-layer height, surface spectral albedo/BRDF, snow state, and a horizon
 profile. `AtmosphereProvider` is the interface future CAMS/ERA5/local-instrument providers
-implement; the physical core (`atmos/`) depends only on the immutable `atmosphere.State` type,
+implement; the physical core (`atmos/`) depends only on the immutable `atmosphere.Atmosphere` type,
 never on a specific provider.
 
 ---
@@ -548,7 +584,7 @@ prediction is stays aspirational until real observational data enters this repos
 | 0 | This document | Mandate received | Internally consistent, no open contradictions |
 | 1 | Spectral foundation: canonical types, `Engine`/`Request`/`Result`, passband integration, provenance/uncertainty/quality types, fast simplified-model components, `plan` + example rewrite | Phase 0 complete | Repo compiles, 10 invariant tests + benchmarks pass, `plan` works end-to-end |
 | 2 | Natural-sky baseline: spectral zodiacal/airglow/moonlight, twilight guard, starlight/DGL interface | Phase 1 complete | Comparison fixtures + monotonicity/symmetry tests pass |
-| 3 | Atmosphere: `atmosphere.State`, molecular/aerosol/cloud optics, terrain, local provider | Phase 2 complete | Zero-aerosol/zero-cloud limits proven exact |
+| 3 | Atmosphere: `atmosphere.Atmosphere`, molecular/aerosol/cloud optics, terrain, local provider | Phase 2 complete | Zero-aerosol/zero-cloud limits proven exact |
 | 4 | Artificial clear sky: emission-field providers, spectral mixture/angular models, log-polar aggregation, `ClearSkyPhysical` | Phase 3 complete | Zero-emission ⇒ zero artificial radiance (bitwise); aggregation-invariance test passes |
 | 5 | Clouds: `CloudyAllSkyPhysical`, `FastCloudApproximation` | Phase 4 complete | Clear-sky limit proven as `Fraction→0` |
 | 6 | Reference simulation + surrogate | Phase 5 complete | `.sbsur` format + OOD detection tested on synthetic data; pipeline documented as unbuilt/optional |
@@ -624,7 +660,7 @@ none will be added. The "replaced by" column is the adaptation recipe.
 | `SurfaceBrightnessV` | `SurfaceBrightnessAB` / `SurfaceBrightnessVega`, always with a `PassbandID` | Name the passband explicitly — there is no unqualified "V magnitude" any more |
 | `Nanolambert` | `SpectralRadiance` (per-wavelength) or `Radiance` (passband-integrated) | Work in linear spectral radiance, integrate through a named `Passband` |
 | `SQMProvider` | `calib.Measurement` + `Instrument` (Phase 7) | An SQM reading is an observation through a device response, not a model input |
-| `Floor` | `atmosphere.State` + an `EmissionField`-backed `Component` (Phase 4) | There is no standalone "floor" concept; light pollution is one component of the full decomposition |
+| `Floor` | `atmosphere.Atmosphere` + an `EmissionField`-backed `Component` (Phase 4) | There is no standalone "floor" concept; light pollution is one component of the full decomposition |
 | `CompositeModel`/`NewCompositeModel` | `CompositeEngine`/`NewCompositeEngine` (§5) | Same idea (sum components), spectral instead of scalar |
 | `RadianceToArtificialSB` | `EmissionField` → `SpectralMixtureModel` → `AngularEmissionModel` → `rt.ClearSkyPhysical`/`CloudyAllSkyPhysical` (§9) | There is no direct pixel-to-brightness function any more, by design |
 | `atlas.Resolver`/`LayerAuto` | Explicit `Mode` + `FallbackPolicy` + `Provenance.Fallbacks` (§7) | Choose a mode explicitly; opt into fallback if you want it, and it will be recorded |

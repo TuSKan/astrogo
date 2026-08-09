@@ -12,8 +12,8 @@ import (
 	"github.com/TuSKan/astrogo/skybrightness"
 )
 
-// ErrNilAstroContext is returned when KrisciunasSchaeferMoonlight is
-// evaluated with a nil EvalInput.Astro.
+// ErrNilAstroContext is returned when VBandMoonlight is evaluated with a
+// nil EvalInput.Astro.
 var ErrNilAstroContext = errors.New("natural: nil coord.Context")
 
 // DefaultMoonExtinctionV is the default V-band atmospheric extinction
@@ -23,34 +23,38 @@ const DefaultMoonExtinctionV = 0.172
 
 const degToRad = math.Pi / 180
 
-// KrisciunasSchaeferMoonlight is astrogo v1's scattered-moonlight
-// component, re-implemented against the new Component interface: the
-// closed-form V-band model of Krisciunas & Schaefer (1991), PASP 103,
-// 1033, accurate to ~8-23% away from full Moon. Zero when the Moon is
-// below the horizon. Named for the paper it implements, not for its
-// vintage — a future spectral moonlight model (Jones et al. 2013) is a
-// different algorithm, not a replacement for this one. See
+// VBandMoonlight is astrogo v1's scattered-moonlight component,
+// re-implemented against the new Component interface: the closed-form
+// V-band model of Krisciunas & Schaefer (1991), PASP 103, 1033, accurate
+// to ~8-23% away from full Moon. Zero when the Moon is below the horizon.
+//
+// Named for what's scientifically distinct about it — a broadband V-band
+// model, not spectral — the same convention ConstantAirglow's name
+// follows, rather than for the paper it cites (that citation lives in
+// Algorithm's AlgorithmRef, not the type name). This protects against
+// collision with *any* future spectral moonlight model, not just Jones et
+// al. 2013 specifically: "broadband V vs. spectral" is a structural
+// distinction, independent of which paper a future model implements. See
 // docs/skybrightness.md §15 — a brand-new type, not a compatibility shim.
-type KrisciunasSchaeferMoonlight struct {
+type VBandMoonlight struct {
 	provider eph.Provider
 	k        float64
 }
 
-// KrisciunasSchaeferMoonlightOption configures optional
-// KrisciunasSchaeferMoonlight fields.
-type KrisciunasSchaeferMoonlightOption func(*KrisciunasSchaeferMoonlight)
+// VBandMoonlightOption configures optional VBandMoonlight fields.
+type VBandMoonlightOption func(*VBandMoonlight)
 
 // WithMoonExtinction sets the V-band atmospheric extinction coefficient
 // (mag/airmass). The default is DefaultMoonExtinctionV.
-func WithMoonExtinction(k float64) KrisciunasSchaeferMoonlightOption {
-	return func(m *KrisciunasSchaeferMoonlight) { m.k = k }
+func WithMoonExtinction(k float64) VBandMoonlightOption {
+	return func(m *VBandMoonlight) { m.k = k }
 }
 
 // WithMoonProvider sets the ephemeris provider used for Moon and Sun
 // positions. The default is ephemeris.Default(); an explicit nil is
 // treated the same way.
-func WithMoonProvider(p eph.Provider) KrisciunasSchaeferMoonlightOption {
-	return func(m *KrisciunasSchaeferMoonlight) {
+func WithMoonProvider(p eph.Provider) VBandMoonlightOption {
+	return func(m *VBandMoonlight) {
 		if p == nil {
 			p = eph.Default()
 		}
@@ -59,9 +63,9 @@ func WithMoonProvider(p eph.Provider) KrisciunasSchaeferMoonlightOption {
 	}
 }
 
-// NewKrisciunasSchaeferMoonlight creates a scattered-moonlight component.
-func NewKrisciunasSchaeferMoonlight(opts ...KrisciunasSchaeferMoonlightOption) *KrisciunasSchaeferMoonlight {
-	m := &KrisciunasSchaeferMoonlight{provider: eph.Default(), k: DefaultMoonExtinctionV}
+// NewVBandMoonlight creates a scattered-moonlight component.
+func NewVBandMoonlight(opts ...VBandMoonlightOption) *VBandMoonlight {
+	m := &VBandMoonlight{provider: eph.Default(), k: DefaultMoonExtinctionV}
 	for _, opt := range opts {
 		opt(m)
 	}
@@ -70,20 +74,20 @@ func NewKrisciunasSchaeferMoonlight(opts ...KrisciunasSchaeferMoonlightOption) *
 }
 
 // ID implements skybrightness.Component.
-func (m *KrisciunasSchaeferMoonlight) ID() skybrightness.ComponentID {
+func (m *VBandMoonlight) ID() skybrightness.ComponentID {
 	return skybrightness.MoonScattered
 }
 
 // Algorithm implements skybrightness.Component.
-func (m *KrisciunasSchaeferMoonlight) Algorithm() skybrightness.AlgorithmRef {
+func (m *VBandMoonlight) Algorithm() skybrightness.AlgorithmRef {
 	return skybrightness.AlgorithmRef{
-		Name: "natural.KrisciunasSchaeferMoonlight", Version: "1.0.0",
+		Name: "natural.VBandMoonlight", Version: "1.0.0",
 		Citation: "Krisciunas & Schaefer (1991), PASP 103, 1033",
 	}
 }
 
 // Eval implements skybrightness.Component.
-func (m *KrisciunasSchaeferMoonlight) Eval(_ context.Context, in skybrightness.EvalInput, out skybrightness.SpectralField) (skybrightness.ComponentReport, error) {
+func (m *VBandMoonlight) Eval(_ context.Context, in skybrightness.EvalInput, out skybrightness.SpectralField) (skybrightness.ComponentReport, error) {
 	if in.Astro == nil {
 		return skybrightness.ComponentReport{}, ErrNilAstroContext
 	}

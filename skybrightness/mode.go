@@ -22,11 +22,11 @@ const (
 	ModeForecast
 
 	// ModeUserSupplied means the caller provided every physical state
-	// (AtmosphereState, emission field, ...) directly.
+	// (atmosphere.Atmosphere, emission field, ...) directly.
 	ModeUserSupplied
 
 	// ModeFast selects the v1-equivalent empirical physics —
-	// natural.ConstantAirglow, natural.KrisciunasSchaeferMoonlight,
+	// natural.ConstantAirglow, natural.VBandMoonlight,
 	// SchaeferNELM — re-implemented against the new spectral API, not a
 	// compatibility shim for the old package. See docs/skybrightness.md
 	// §15.

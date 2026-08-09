@@ -12,7 +12,7 @@ import "github.com/TuSKan/astrogo/skybrightness"
 //
 // A caller wanting a real, SI-consistent Johnson V response curve should
 // use skybrightness/dataset/passband instead — this exists only to keep
-// ConstantAirglow/KrisciunasSchaeferMoonlight/example 21 fully offline
+// ConstantAirglow/VBandMoonlight/example 21 fully offline
 // with zero data dependency (docs/skybrightness.md §14 Phase 1 scope).
 func TopHatJohnsonV() *skybrightness.Passband {
 	return &skybrightness.Passband{

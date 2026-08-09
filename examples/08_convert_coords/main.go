@@ -21,7 +21,7 @@ func main() {
 	loc, _ := coord.NewEarthLocation(-22.528478, -46.473002, 835.05) // Quinta Calixto
 	now := time.NowUTC()
 
-	ctx := coord.NewContext(now, loc, atmosphere.StandardAtmosphere)
+	ctx := coord.NewContext(now, loc, atmosphere.StandardRefraction)
 
 	altaz, err := ctx.ICRSToAltAz(icrs)
 	if err != nil {

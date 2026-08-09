@@ -22,7 +22,7 @@ const (
 	// state fell outside a surrogate model's trained domain (Phase 6).
 	QualityFlagOutOfSurrogateDomain
 
-	// QualityFlagStaleAtmosphere marks an AtmosphereState older than
+	// QualityFlagStaleAtmosphere marks an atmosphere.Atmosphere older than
 	// EvaluationOptions.MaxInputAge.
 	QualityFlagStaleAtmosphere
 

@@ -7,7 +7,7 @@
 //
 // Phase 1 honesty note, stated here and in the printed output: this
 // package's ONLY real physics today is the fast, simplified models
-// (natural.ConstantAirglow, natural.KrisciunasSchaeferMoonlight — the
+// (natural.ConstantAirglow, natural.VBandMoonlight — the
 // exact v1 Krisciunas & Schaefer 1991 physics, re-implemented against the
 // new spectral API) plus an analytic Rayleigh-only transmission model
 // (atmos.RayleighOnly). Real spectral zodiacal light, starlight, diffuse
@@ -18,7 +18,7 @@
 // This pairs the plan event API with the new skybrightness.Engine:
 //   - plan.AstronomicalDawnDusk frames the true-night window,
 //   - plan.MoonIllumination / plan.MoonriseMoonset describe the Moon,
-//   - natural.NewFastEngine (ConstantAirglow + KrisciunasSchaeferMoonlight,
+//   - natural.NewFastEngine (ConstantAirglow + VBandMoonlight,
 //     ModeFast) gives the sky's spectral radiance toward a pointing,
 //     reduced to a V-band magnitude through natural.TopHatJohnsonV() —
 //     the only passband whose output is physically meaningful in Phase 1
@@ -125,7 +125,7 @@ func main() {
 	// reused for every pointing evaluated below (the hard repo-wide
 	// convention coord.Context itself documents; also see
 	// docs/skybrightness.md §5's Request.Astro contract).
-	astro := coord.NewContext(obs, site.Location(), site.Atmosphere())
+	astro := coord.NewContext(obs, site.Location(), site.Refraction())
 
 	moonPos, err := plan.NewMoon(provider).Position(obs)
 	if err != nil {
@@ -141,7 +141,7 @@ func main() {
 		obs.In(tz).Format("Jan 02 15:04 MST"), moonAA.Alt().Degrees())
 
 	// ── Atmosphere: explicit, user-supplied, immutable — a general
-	// atmosphere.State (package atmosphere, not skybrightness — the same
+	// atmosphere.Atmosphere (package atmosphere, not skybrightness — the same
 	// state a future weather/seeing constraint would use, not something
 	// sky-brightness-specific) ────────────────────────────────────────
 	atmState, err := atmosphere.NewBuilder().
@@ -155,7 +155,7 @@ func main() {
 	}
 
 	// ── Engine: natural.NewFastEngine assembles the fast, offline
-	// ConstantAirglow + KrisciunasSchaeferMoonlight components for us —
+	// ConstantAirglow + VBandMoonlight components for us —
 	// an application only needs to name its transmission model
 	// (docs/skybrightness.md §4) ───────────────────────────────────────
 	sky, err := natural.NewFastEngine(natural.FastConfig{
@@ -171,18 +171,18 @@ func main() {
 
 	dir := coord.NewAltAz(angle.Deg(pointingAltitude), angle.Deg(120))
 
-	res, err := sky.Evaluate(ctx, skybrightness.Request{
-		Astro: astro, Directions: []coord.AltAz{dir}, Grid: grid,
-		Passbands: []*skybrightness.Passband{johnsonV},
-		Mode:      skybrightness.ModeFast, Atmosphere: atmState,
-		Selection: skybrightness.ComponentSelection{Materialize: true},
-		Options: skybrightness.EvaluationOptions{
-			ComputeTransmission: true,
-			Derived:             skybrightness.DerivePassbands | skybrightness.DeriveLimitingMag,
-			Uncertainty:         skybrightness.UncLinearized,
-			Fallback:            skybrightness.FallbackForbidden,
-			LimitingMag:         skybrightness.NewSchaeferNELM(),
-		},
+	// A single skybrightness.Point call replaces what used to be a
+	// 13-line Engine.Evaluate Request literal plus a manual
+	// res.Components.Each+IntegrateRadiance loop — Point now covers
+	// transmission and limiting magnitude too, the two derived quantities
+	// that previously forced this example back onto Evaluate directly
+	// (see docs/skybrightness.md §15's worked example).
+	res, err := skybrightness.Point(ctx, sky, skybrightness.PointQuery{
+		Astro: astro, Direction: dir, Passband: johnsonV, Mode: skybrightness.ModeFast,
+		Atmosphere: atmState, Grid: grid,
+		Components:          true,
+		ComputeTransmission: true,
+		LimitingMag:         skybrightness.NewSchaeferNELM(),
 	})
 	if err != nil {
 		log.Fatalf("evaluate: %v", err)
@@ -191,24 +191,13 @@ func main() {
 	fmt.Println("\n── Component decomposition (Garstang nanolambert convention, Phase 1) ──")
 	fmt.Println("  Meaningful only through TopHatJohnsonV — see the doc comment above.")
 
-	res.Components.Each(func(id skybrightness.ComponentID, f skybrightness.SpectralField, rep skybrightness.ComponentReport) bool {
-		r, ierr := skybrightness.IntegrateRadiance(grid, f.Row(0), johnsonV)
-		if ierr != nil {
-			fmt.Printf("  %-16s (integration error: %v)\n", id, ierr)
-			return true
-		}
-
+	for _, cb := range res.Components {
 		fmt.Printf("  %-16s %12.4g  (+/- %.0f%%)  %v\n",
-			id, float64(r), 100*rep.Uncertainty.RelSigma, rep.Quality.Strings())
-
-		return true
-	})
+			cb.ID, float64(cb.Radiance), 100*cb.RelSigma, cb.Quality.Strings())
+	}
 
 	fmt.Println("\n── Passband brightness ──────────────────────────────────────────────")
-
-	for _, pb := range res.Derived.Passbands {
-		fmt.Printf("  %-16s Vega = %.2f mag/arcsec^2\n", pb.Passband, pb.Vega[0])
-	}
+	fmt.Printf("  %-16s Vega = %.2f mag/arcsec^2\n", johnsonV.ID, res.Vega)
 
 	fmt.Printf("\n  Atmospheric transmission (Rayleigh-only, Phase 1) at grid ends:\n")
 
@@ -218,8 +207,8 @@ func main() {
 			float64(grid.At(grid.Len()-1)), res.Transmission[grid.Len()-1])
 	}
 
-	if len(res.Derived.LimitingMagnitude) > 0 {
-		fmt.Printf("\n  Limiting magnitude (Schaefer 1990, TopHatJohnsonV): %.2f\n", res.Derived.LimitingMagnitude[0])
+	if res.HasLimitingMag {
+		fmt.Printf("\n  Limiting magnitude (Schaefer 1990, TopHatJohnsonV): %.2f\n", res.LimitingMagnitude)
 	}
 
 	fmt.Printf("  Quality flags: %v\n", res.Quality.Strings())

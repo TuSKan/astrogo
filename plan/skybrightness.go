@@ -50,7 +50,7 @@ type LimitingMagnitudeConstraint struct {
 	// Atmosphere is the atmospheric state to evaluate under; nil lets the
 	// Engine substitute its own default for Mode (e.g.
 	// ClimatologyDefaultAtmosphere under ModeClimatology).
-	Atmosphere *atmosphere.State
+	Atmosphere *atmosphere.Atmosphere
 	// Conversion turns the sky background + airmass into a limiting
 	// magnitude. A nil Conversion defaults to
 	// skybrightness.NewSchaeferNELM().
@@ -75,7 +75,7 @@ var _ ConstraintCtx = LimitingMagnitudeConstraint{}
 
 // Check evaluates the constraint, building a coord.Context for (t, site).
 func (c LimitingMagnitudeConstraint) Check(obj Observable, t time.Time, site *Site) (Result, error) {
-	ctx := coord.NewContext(t, site.Location(), site.Atmosphere())
+	ctx := coord.NewContext(t, site.Location(), site.Refraction())
 
 	return c.CheckCtx(obj, t, site, ctx)
 }

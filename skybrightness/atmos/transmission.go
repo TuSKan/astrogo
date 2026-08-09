@@ -16,7 +16,7 @@ var ErrTargetBelowHorizon = errors.New("atmos: direction is at or below the hori
 // RayleighOnly is a molecular-scattering-only, aerosol-free, cloud-free
 // TransmissionModel: an analytic approximation of Rayleigh optical depth
 // (Hansen & Travis 1974, Space Sci. Rev. 16, 527, their commonly-cited
-// sea-level fit), scaled to the AtmosphereState's own surface pressure
+// sea-level fit), scaled to the atmosphere.Atmosphere's own surface pressure
 // and combined with Pickering (2002) airmass (atmosphere.Airmass — the
 // same primitive plan/constraint.go already uses).
 //
@@ -40,7 +40,7 @@ func (r *RayleighOnly) Algorithm() skybrightness.AlgorithmRef {
 }
 
 // LineOfSight implements skybrightness.TransmissionModel.
-func (r *RayleighOnly) LineOfSight(dir coord.AltAz, st *atmosphere.State, g skybrightness.SpectralGrid, out []skybrightness.Transmission) error {
+func (r *RayleighOnly) LineOfSight(dir coord.AltAz, st *atmosphere.Atmosphere, g skybrightness.SpectralGrid, out []skybrightness.Transmission) error {
 	airmass, err := atmosphere.Airmass(dir.Alt())
 	if err != nil {
 		return ErrTargetBelowHorizon

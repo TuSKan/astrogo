@@ -21,7 +21,7 @@ func testAstro() *coord.Context {
 
 	t := astrotime.FromJD(2451545.0, astrotime.UTC)
 
-	return coord.NewContext(t, site, atmosphere.StandardAtmosphere)
+	return coord.NewContext(t, site, atmosphere.StandardRefraction)
 }
 
 // roundTripToleranceMag bounds the Garstang nanolambert round-trip
@@ -101,11 +101,11 @@ func TestConstantAirglow_ZeroValueDefaults(t *testing.T) {
 	}
 }
 
-// TestKrisciunasSchaeferMoonlight_BelowHorizonIsZero confirms zero
+// TestVBandMoonlight_BelowHorizonIsZero confirms zero
 // contribution when the Moon is below the horizon.
-func TestKrisciunasSchaeferMoonlight_BelowHorizonIsZero(t *testing.T) {
+func TestVBandMoonlight_BelowHorizonIsZero(t *testing.T) {
 	prov := eph.Default()
-	m := NewKrisciunasSchaeferMoonlight(WithMoonProvider(prov))
+	m := NewVBandMoonlight(WithMoonProvider(prov))
 
 	astro := testAstro()
 	grid := TopHatVGrid()
@@ -153,10 +153,10 @@ func TestKrisciunasSchaeferMoonlight_BelowHorizonIsZero(t *testing.T) {
 	}
 }
 
-// TestKrisciunasSchaeferMoonlight_NilAstroErrors confirms a nil
+// TestVBandMoonlight_NilAstroErrors confirms a nil
 // EvalInput.Astro errors rather than panicking.
-func TestKrisciunasSchaeferMoonlight_NilAstroErrors(t *testing.T) {
-	m := NewKrisciunasSchaeferMoonlight()
+func TestVBandMoonlight_NilAstroErrors(t *testing.T) {
+	m := NewVBandMoonlight()
 	grid := TopHatVGrid()
 	out := skybrightness.NewSpectralField(1, grid.Len())
 

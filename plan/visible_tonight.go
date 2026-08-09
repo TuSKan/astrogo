@@ -618,7 +618,7 @@ func evaluateCandidate(c visibleCandidate, start, end time.Time, site *Site, pla
 		return VisibleObject{}, false
 	}
 
-	astroCtx := coord.NewContext(peakTime, site.Location(), site.Atmosphere())
+	astroCtx := coord.NewContext(peakTime, site.Location(), site.Refraction())
 
 	aa, err := astroCtx.ICRSToAltAz(pos)
 	if err != nil {

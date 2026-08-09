@@ -227,3 +227,81 @@ wasn't "astrogo-integrated" enough) produced four changes, all still within Phas
 Full verification gate re-run clean after all four changes: `gofmt`, `go vet`, `go build`,
 `golangci-lint run` (0 issues repo-wide), full untagged `go test ./...`, and the tagged
 integration/network/validation suite for every touched package.
+
+## Addendum 2 — Round 2 API polish (same branch, still before Phase 2)
+
+The user pushed back further, by name, on the addendum above: "you are not understand me
+well," asking why `atmosphere.State` wasn't merged into `atmosphere.Atmosphere`, proposing
+alternative names for `KrisciunasSchaeferMoonlight`/`TopHatJohnsonV`, and stating plainly that
+`FastConfig.Transmission` "didnt solve the problem, it just swept the dirt under the rug" —
+because `examples/18_sky_brightness` still called `Engine.Evaluate` directly. A full
+discuss-first pass (real source read before any design proposed, every open question put back
+via `AskUserQuestion` rather than decided unilaterally) landed on three further changes, again
+all within Phase 1's scope:
+
+1. **`atmosphere.Atmosphere`/`atmosphere.Refraction` swapped names, and `Atmosphere` now
+   composes `Refraction` instead of duplicating pressure/temperature.** The refraction-model
+   input struct (previously `atmosphere.Atmosphere`, unchanged content) is renamed
+   `atmosphere.Refraction`; the rich, Builder-validated state type (previously
+   `atmosphere.State`) is renamed `atmosphere.Atmosphere` and now embeds a `Refraction` as its
+   own surface-conditions field (`Atmosphere.Surface()` stays Kelvin;
+   `Atmosphere.Refraction()` returns the embedded value directly, in `Refraction`'s own
+   Celsius convention — the one explicit unit conversion this composition needs, at the single
+   boundary `Builder.Surface` owns). Unlike everything else in this Sky Brightness V2 work,
+   `atmosphere.Atmosphere` (old meaning) was real, shipped v0.14.0 public API, used outside
+   this branch in 13 files (`coord`, `plan`, `ephemeris` tests, one example). The swap was
+   confirmed with the user as a **deliberate, same-release hard break with no deprecation
+   alias** — Go cannot alias one identifier to two different meanings in the same release, so
+   freeing the name "Atmosphere" for the richer type necessarily retired the refraction
+   struct's old name immediately; there is no way to give this a 2-release deprecation cycle
+   while also achieving the rename. `coord.Context.Atmosphere()`/`plan.Site.Atmosphere()`
+   (methods that have always returned the refraction-input struct) were renamed to
+   `.Refraction()` to match — a real rename sweep of ~30 call sites across `coord`/`plan`/
+   examples/tests, all mechanical, all compiler-verified (no alias means nothing compiles
+   half-migrated).
+2. **`KrisciunasSchaeferMoonlight`→`VBandMoonlight`.** Matches `ConstantAirglow`'s own naming
+   convention (named for what's scientifically distinct — broadband V-band, not spectral —
+   rather than for which paper) instead of breaking it. "Broadband V vs. spectral" is a
+   structural distinction, protecting against collision with *any* future spectral moonlight
+   model, not just the Jones et al. 2013 one specifically. `TopHatJohnsonV` was kept as-is
+   (confirmed with the user): "top-hat" is the correct term of art, and the name already
+   carries a real usage-contract warning ("simple" would misrepresent it as a generic drop-in
+   passband, when it's a controlled, paired convention with a fake Vega zero point encoding
+   the Garstang nanolambert convention).
+3. **`EvaluationOptions` regrouped + `RequestBuilder` + `Point()`/`PointQuery`/`PointResult`
+   completed — the actual fix for "swept the dirt under the rug."** Tracing the complaint to
+   its root found the real gap: `Point()` hardcoded its derived-quantity set, so it could
+   never express `ComputeTransmission: true` + `DeriveLimitingMag` together — exactly what
+   `examples/18` needs, forcing it back onto a 13-line `Request` literal and a manual
+   `res.Components.Each`+`IntegrateRadiance` loop every time. Fixed at the root: `PointQuery`
+   gained `ComputeTransmission`/`LimitingMag`; `PointResult` gained `Transmission`/
+   `LimitingMagnitude`/`HasLimitingMag`; `Point()` now builds its `Request` via the new
+   `NewRequestBuilder` (one construction path, not two parallel ones) and surfaces
+   `IntegrateRadiance` failures as errors instead of silently returning a zero radiance.
+   `examples/18_sky_brightness` was rewritten to call `Point()` exclusively — the acceptance
+   proof — and no longer touches `Engine.Evaluate` or `encoding/json` at all. Separately,
+   `EvaluationOptions`'s 12 flat fields were regrouped into `DerivedOptions`/
+   `UncertaintyOptions`/`PerformanceOptions` (6 top-level fields, each self-explaining by
+   group name), and a new `NewRequestBuilder(astro, directions, grid) *RequestBuilder` fluent
+   constructor (mirroring `atmosphere.NewBuilder()`'s established pattern) became the
+   documented, recommended way to assemble a `Request` — `Request{...}` struct-literal
+   construction stays fully valid, not hidden. The dead, never-read
+   `CompositeConfig.Passbands` field (confirmed via grep: written, read nowhere —
+   `Request.Passbands` is what every derived-quantity path actually consults) was deleted in
+   the same pass.
+
+New test coverage: `atmosphere/atmosphere_test.go` (surface round-trip, `Builder.Refraction`,
+`StandardDefault` matches `AtAltitude` exactly — proving the composition is
+behavior-preserving), `skybrightness/request_builder_test.go` (`RequestBuilder` output
+field-for-field equal to an equivalent hand-written `Request` literal), and
+`skybrightness/derived_test.go` (`Point()`'s new `ComputeTransmission`/`LimitingMag` fields
+reproduce exactly what direct `Evaluate` produces, `HasLimitingMag` stays false rather than a
+fabricated zero when never requested, and a deliberately out-of-range passband now returns an
+error from `Point()` instead of a silent zero radiance).
+
+Full verification gate re-run clean after all three changes: `gofmt`, `go build`, `go vet`
+(both untagged and with `integration,network,validation` tags), `golangci-lint run
+--max-issues-per-linter=0 --max-same-issues=0` (0 issues repo-wide), full untagged
+`go test ./...`, and the tagged suite (two unrelated live-network flakes observed —
+`catalog/gaia`'s Gaia TAP-server timeout and `ephemeris/jpl`'s JPL Horizons 503 — neither in a
+package this round touched; both are transient external-service issues, not regressions).

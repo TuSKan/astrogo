@@ -184,7 +184,7 @@ func TestObserverPrecisionMatrix(t *testing.T) {
 		epochs[i] = epochStart.AddDays(float64(i) * 45)
 	}
 
-	atmNoRef := atmosphere.StandardAtmosphere
+	atmNoRef := atmosphere.StandardRefraction
 	atmNoRef.Model = atmosphere.RefractionNone{}
 
 	// 3.0" was chosen from real measured data, not picked in advance: a

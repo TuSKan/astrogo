@@ -288,7 +288,7 @@ func (s EventSolver) solveVisibility(spec EventSpec, start, end time.Time) ([]Ev
 	// the USNO/Explanatory Supplement convention. Using geometric altitude
 	// avoids the discontinuity at alt=0° that SOFA's tan(z) refraction
 	// series would introduce in the root-finder.
-	geomAtm := atmosphere.Atmosphere{Pressure: 0} // zero pressure → no refraction
+	geomAtm := atmosphere.Refraction{Pressure: 0} // zero pressure → no refraction
 
 	// eventCtxRefresh bounds how far a coord.Context.AtTime derivation may
 	// drift from its last full coord.NewContext rebuild. AtTime's documented
@@ -304,8 +304,8 @@ func (s EventSolver) solveVisibility(spec EventSpec, start, end time.Time) ([]Ev
 	// only when t has drifted more than eventCtxRefresh from the last
 	// rebuild, deriving every other call cheaply via AtTime. evalVal and
 	// evalHA use independent caches since they evaluate under different
-	// atmospheres (geomAtm vs. spec.Observer.Atmosphere()).
-	contextCache := func(atm atmosphere.Atmosphere) func(t time.Time) *coord.Context {
+	// atmospheres (geomAtm vs. spec.Observer.Refraction()).
+	contextCache := func(atm atmosphere.Refraction) func(t time.Time) *coord.Context {
 		var base *coord.Context
 
 		return func(t time.Time) *coord.Context {
@@ -324,7 +324,7 @@ func (s EventSolver) solveVisibility(spec EventSpec, start, end time.Time) ([]Ev
 	// single cache persists across every sample and bisection iteration,
 	// and across multiple transit candidates, within this solveVisibility call.
 	evalCtx := contextCache(geomAtm)
-	evalHACtx := contextCache(spec.Observer.Atmosphere())
+	evalHACtx := contextCache(spec.Observer.Refraction())
 
 	evalVal := func(t time.Time) (float64, error) {
 		ctx := evalCtx(t)
@@ -487,7 +487,7 @@ func (s EventSolver) solveVisibility(spec EventSpec, start, end time.Time) ([]Ev
 					continue // Skip if solver fails
 				}
 
-				resCtx := coord.NewContext(resTime, spec.Observer.Location(), spec.Observer.Atmosphere())
+				resCtx := coord.NewContext(resTime, spec.Observer.Location(), spec.Observer.Refraction())
 
 				pos, err := spec.Target.Position(resTime)
 				if err != nil {

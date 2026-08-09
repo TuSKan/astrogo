@@ -108,7 +108,7 @@ func TestScientificStability(t *testing.T) {
 			appState, _ := eph.ApparentState(mock, eph.ID(c.TargetID), obsTime)
 
 			// Get standard Earth model matrices to extract Topocentric offset
-			atm := atmosphere.StandardAtmosphere
+			atm := atmosphere.StandardRefraction
 			atm.Model = atmosphere.RefractionNone{} // We bypass explicit analytical limits here to verify absolute pure geometry.
 
 			// Route flawlessly through native Topocentric offset builder!

@@ -96,7 +96,7 @@ func TestSunMoonConstraints(t *testing.T) {
 		var c ConstraintCtx = MoonSep{Threshold: angle.Deg(30)}
 
 		obj := NewStar("T", angle.Deg(0), angle.Deg(0))
-		ctx := coord.NewContext(tmNight, site.Location(), site.Atmosphere())
+		ctx := coord.NewContext(tmNight, site.Location(), site.Refraction())
 
 		want, err := MoonSep{Threshold: angle.Deg(30)}.Check(obj, tmNight, site)
 		testutil.AssertNoError(t, err)
@@ -169,7 +169,7 @@ func TestSunMoonConstraints(t *testing.T) {
 		var c ConstraintCtx = MoonIllum{Threshold: 0.5}
 
 		obj := NewStar("T", angle.Deg(0), angle.Deg(0))
-		ctx := coord.NewContext(tmNight, site.Location(), site.Atmosphere())
+		ctx := coord.NewContext(tmNight, site.Location(), site.Refraction())
 
 		want, err := MoonIllum{Threshold: 0.5}.Check(obj, tmNight, site)
 		testutil.AssertNoError(t, err)

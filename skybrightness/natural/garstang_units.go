@@ -4,7 +4,7 @@ import "math"
 
 // Garstang nanolambert<->V-magnitude conversion constants, carried
 // verbatim from astrogo v1's skybrightness/units.go. Unexported: only
-// ConstantAirglow/KrisciunasSchaeferMoonlight may use them — this is
+// ConstantAirglow/VBandMoonlight may use them — this is
 // explicitly NOT public API (docs/skybrightness.md §3's
 // photometric-constants table).
 //
