@@ -2,8 +2,10 @@ package cams
 
 import (
 	"fmt"
+	"io"
 	"maps"
 	"math"
+	"os"
 	"slices"
 	"sync"
 
@@ -17,6 +19,10 @@ type File struct {
 	mu   sync.Mutex // guards every call into hf; see the package doc comment's concurrency note
 	hf   *hdf5.File
 	path gofs.File
+
+	// scratchPath is the temp file Open staged f's content into (see
+	// Open's doc comment for why); removed by Close.
+	scratchPath string
 
 	// dims maps a dimension name (longitude/latitude/level/time) to its
 	// length, read once at Open time from the file's dimension-scale
@@ -35,25 +41,60 @@ type File struct {
 	vars map[string]*hdf5.Dataset
 }
 
-// Open opens f — which must already be on the local filesystem, e.g. the
-// result of remote.GetFile against remote.CopernicusEODATA — as a CAMS
-// NetCDF-4/HDF5 file. Every dimension-scale dataset (longitude, latitude,
-// level if present, time) is read eagerly; data variables are indexed by
-// name but not read until Var.ReadPlane/Var.At is called.
+// Open opens f — e.g. the result of remote.GetFile against
+// remote.CopernicusEODATA — as a CAMS NetCDF-4/HDF5 file, reading its
+// content through f.OpenReader() rather than assuming f is backed by the
+// local filesystem (f may be local, or on any other backend go-fs
+// supports). Every dimension-scale dataset (longitude, latitude, level
+// if present, time) is read eagerly; data variables are indexed by name
+// but not read until Var.ReadPlane/Var.At is called.
 func Open(f gofs.File) (*File, error) {
-	path := f.LocalPath()
-	if path == "" {
-		return nil, fmt.Errorf("%w: %s", ErrNotLocal, f)
+	r, err := f.OpenReader()
+	if err != nil {
+		return nil, fmt.Errorf("cams: open %s: %w", f, err)
+	}
+	defer func() { _ = r.Close() }()
+
+	// scigolib/hdf5's only public entry point is Open(filename string) --
+	// no io.Reader/io.ReaderAt constructor exists in this dependency, and
+	// HDF5's own on-disk format needs true random access (B-tree chunk
+	// index traversal) a plain io.Reader cannot support anyway. Staging
+	// through a scratch temp file, read via f's own OpenReader rather
+	// than assuming f is already local, is this package's equivalent of
+	// catalog/fink's os.CreateTemp exception (CLAUDE.md) -- a narrow,
+	// documented workaround for a third-party library that needs a real
+	// OS path, not a way to special-case "local" file.File values.
+	tmp, err := os.CreateTemp("", "cams-*.nc")
+	if err != nil {
+		return nil, fmt.Errorf("cams: %s: create scratch file: %w", f, err)
 	}
 
-	hf, err := hdf5.Open(path)
+	tmpPath := tmp.Name()
+
+	if _, err := io.Copy(tmp, r); err != nil {
+		_ = tmp.Close()
+		_ = os.Remove(tmpPath)
+
+		return nil, fmt.Errorf("cams: %s: stage to scratch file: %w", f, err)
+	}
+
+	if err := tmp.Close(); err != nil {
+		_ = os.Remove(tmpPath)
+
+		return nil, fmt.Errorf("cams: %s: close scratch file: %w", f, err)
+	}
+
+	hf, err := hdf5.Open(tmpPath)
 	if err != nil {
+		_ = os.Remove(tmpPath)
+
 		return nil, fmt.Errorf("cams: open %s: %w", f, err)
 	}
 
 	cf := &File{
 		hf:          hf,
 		path:        f,
+		scratchPath: tmpPath,
 		dims:        make(map[string]int),
 		dimNameByID: make(map[int32]string),
 		vars:        make(map[string]*hdf5.Dataset),
@@ -61,19 +102,30 @@ func Open(f gofs.File) (*File, error) {
 
 	if err := cf.index(); err != nil {
 		_ = hf.Close()
+		_ = os.Remove(tmpPath)
+
 		return nil, err
 	}
 
 	return cf, nil
 }
 
-// Close closes the underlying file. Safe to call once; a File must not
-// be used afterward.
+// Close closes the underlying file and removes Open's scratch temp
+// file. Safe to call once; a File must not be used afterward.
 func (cf *File) Close() error {
 	cf.mu.Lock()
 	defer cf.mu.Unlock()
 
 	err := cf.hf.Close()
+
+	if cf.scratchPath != "" {
+		if rmErr := os.Remove(cf.scratchPath); rmErr != nil && err == nil {
+			err = rmErr
+		}
+
+		cf.scratchPath = ""
+	}
+
 	if err != nil {
 		return fmt.Errorf("cams: close %s: %w", cf.path, err)
 	}

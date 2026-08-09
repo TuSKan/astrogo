@@ -470,9 +470,10 @@ func TestAtIndexOutOfRange(t *testing.T) {
 	}
 }
 
-func TestOpenRejectsNonLocalFile(t *testing.T) {
-	_, err := Open(gofs.File("s3://some-bucket/some/key.nc"))
-	if !errors.Is(err, ErrNotLocal) {
-		t.Errorf("Open(non-local) err = %v, want ErrNotLocal", err)
+func TestOpenSurfacesOpenReaderError(t *testing.T) {
+	missing := gofs.File(filepath.Join(t.TempDir(), "does-not-exist.nc"))
+
+	if _, err := Open(missing); err == nil {
+		t.Error("Open(missing file) = nil error, want a real error from OpenReader")
 	}
 }

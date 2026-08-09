@@ -13,9 +13,14 @@
 // Files are fetched via remote.GetFile against remote.CopernicusEODATA,
 // using remote/s3 as the transport (see that package's doc comment for
 // the credential contract — this package never reads a credential file
-// or an S3 key itself, and knows nothing about S3 at all: it only opens
-// an already-local gofs.File). This package's own scope starts once a
-// file is sitting on local disk.
+// or an S3 key itself, and knows nothing about S3 at all). Open reads f
+// through its own File.OpenReader() rather than assuming a particular
+// backend: f is normally a local cache file remote.GetFile already
+// produced, but this package never special-cases that — the same Open
+// call works for any gofs.File, since scigolib/hdf5's on-disk format
+// needs true random access to the file it decodes, forcing a scratch
+// temp-file staging step Open performs generically (see Open's own doc
+// comment for exactly why and how).
 //
 // # Why github.com/scigolib/hdf5, and what was verified before using it
 //

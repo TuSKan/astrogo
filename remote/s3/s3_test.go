@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -88,20 +87,78 @@ func fakeS3Server(t *testing.T, objects map[string]*fakeObject) (*httptest.Serve
 		}
 
 		w.Header().Set("ETag", obj.etag)
-		w.Header().Set("Content-Length", strconv.Itoa(len(obj.data)))
+		w.Header().Set("Accept-Ranges", "bytes")
 
 		if r.Method == http.MethodHead {
+			w.Header().Set("Content-Length", strconv.Itoa(len(obj.data)))
 			w.WriteHeader(http.StatusOK)
 
 			return
 		}
 
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write(obj.data)
+		// s3fs.OpenReader/ReadAll switch to manager.NewDownloader (concurrent
+		// ranged GETs) for any object at or above MultipartDownloadThreshold
+		// (10 MiB) — so a large-object test (e.g.
+		// TestFetchIntoStreamsWithoutBufferingWholeObject's 32 MiB payload)
+		// genuinely needs real Range support here, not just a full-body
+		// response, or the SDK downloader sees a mismatched part length and
+		// fails with a body-read error (observed as a bare "EOF").
+		start, end, ok := parseRangeHeader(r.Header.Get("Range"), len(obj.data))
+		if !ok {
+			w.Header().Set("Content-Length", strconv.Itoa(len(obj.data)))
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write(obj.data)
+
+			return
+		}
+
+		w.Header().Set("Content-Range", fmt.Sprintf("bytes %d-%d/%d", start, end, len(obj.data)))
+		w.Header().Set("Content-Length", strconv.Itoa(end-start+1))
+		w.WriteHeader(http.StatusPartialContent)
+		_, _ = w.Write(obj.data[start : end+1])
 	}))
 	t.Cleanup(srv.Close)
 
 	return srv, &lastPath
+}
+
+// parseRangeHeader parses a single-range "bytes=start-end" HTTP Range
+// header value against a resource of the given size, returning the
+// inclusive byte bounds. ok is false when h is empty or malformed, in
+// which case the caller should serve the full body.
+func parseRangeHeader(h string, size int) (start, end int, ok bool) {
+	const prefix = "bytes="
+
+	if !strings.HasPrefix(h, prefix) {
+		return 0, 0, false
+	}
+
+	parts := strings.SplitN(strings.TrimPrefix(h, prefix), "-", 2)
+	if len(parts) != 2 {
+		return 0, 0, false
+	}
+
+	start, errStart := strconv.Atoi(parts[0])
+	if errStart != nil || start < 0 || start >= size {
+		return 0, 0, false
+	}
+
+	if parts[1] == "" {
+		end = size - 1
+	} else {
+		var errEnd error
+
+		end, errEnd = strconv.Atoi(parts[1])
+		if errEnd != nil || end < start {
+			return 0, 0, false
+		}
+	}
+
+	if end >= size {
+		end = size - 1
+	}
+
+	return start, end, true
 }
 
 func testClient(url string) *awss3.Client {
@@ -410,21 +467,39 @@ func TestFetchIntoProgressReportsIncrementally(t *testing.T) {
 	}
 }
 
-// TestFetchIntoStreamsWithoutBufferingWholeObject is a memory-bound
-// regression test for the redesign this package's doc comment documents:
-// FetchInto must stream GetObjectOutput.Body straight to remote.Save, not
-// buffer the whole object first (the behavior s3fs.ReadAll/OpenReader
-// have, and the reason this package doesn't route bytes through them).
-// This can't prove zero extra allocation, but a clear, generous bound
-// well below the object size is enough to catch a regression back to
-// io.ReadAll-the-whole-thing.
-func TestFetchIntoStreamsWithoutBufferingWholeObject(t *testing.T) {
+// TestFetchIntoLargeObjectRoundTrip is a correctness regression test for
+// fetching an object at or above s3fs's MultipartDownloadThreshold
+// (10 MiB), which switches s3fs.OpenReader onto its concurrent
+// manager.NewDownloader path (real ranged GET requests against the fake
+// server's new Range support — see fakeS3Server/parseRangeHeader) instead
+// of a single plain GET.
+//
+// This does NOT assert a memory bound. An earlier version of this test
+// did (measuring runtime.MemStats before/after with GC() bracketing both
+// sides), on the theory that FetchInto should stream and therefore never
+// hold the whole object in memory at once. That is no longer this
+// package's design: FetchInto reads via gofs.File.OpenReader() (s3fs),
+// and s3fs@v0.1.0 has no streaming code path at all in this dependency
+// version — confirmed by reading its source, not assumed — every read,
+// large or small, ends in a full in-memory buffer (io.ReadAll below
+// MultipartDownloadThreshold, manager.NewWriteAtBuffer at or above it).
+// See FetchInto's own doc comment for that tradeoff, accepted
+// deliberately in exchange for routing all object reads through gofs's
+// File API rather than a second, hand-rolled GetObject/streaming path.
+// A before/after MemStats bound also can't actually detect this: any
+// temporary buffer s3fs allocates is unreachable and GC-collected by the
+// time this test's own post-operation runtime.GC() runs, regardless of
+// whether the implementation streamed or buffered — so the old assertion
+// passed even when it was measuring nothing. What's left worth testing
+// here is correctness: the large object round-trips byte-for-byte
+// through the ranged multipart-download path.
+func TestFetchIntoLargeObjectRoundTrip(t *testing.T) {
 	remote.SetDataDirPath(t.TempDir())
 	t.Cleanup(func() { remote.SetDataDir("") })
 
 	const key = "CAMS/GLOBAL/2023/01/01/aermr01.nc"
 
-	const objectSize = 32 << 20 // 32 MiB — large enough to make a whole-object buffer visible
+	const objectSize = 32 << 20 // 32 MiB — well above MultipartDownloadThreshold (10 MiB)
 
 	payload := make([]byte, objectSize)
 	if _, err := rand.Read(payload); err != nil {
@@ -434,31 +509,17 @@ func TestFetchIntoStreamsWithoutBufferingWholeObject(t *testing.T) {
 	srv, _ := fakeS3Server(t, map[string]*fakeObject{key: {data: payload, etag: `"v1"`}})
 	mustRegister(t, srv)
 
-	runtime.GC()
-
-	var before runtime.MemStats
-
-	runtime.ReadMemStats(&before)
-
-	if _, err := remote.GetFile(context.Background(), testEndpointID, key); err != nil {
+	f, err := remote.GetFile(context.Background(), testEndpointID, key)
+	if err != nil {
 		t.Fatalf("GetFile: %v", err)
 	}
 
-	runtime.GC()
+	got, err := f.ReadAll()
+	if err != nil {
+		t.Fatalf("ReadAll cached file: %v", err)
+	}
 
-	var after runtime.MemStats
-
-	runtime.ReadMemStats(&after)
-
-	// A generous bound: a whole-object buffer would show growth on the
-	// order of objectSize (32 MiB); streaming through io.Copy's default
-	// buffer should show growth on the order of tens of KB. Bound at
-	// objectSize/4 so this is robust to normal GC/allocator noise while
-	// still failing hard on a real regression to buffered reads.
-	const bound = objectSize / 4
-
-	if grew := int64(after.HeapAlloc) - int64(before.HeapAlloc); grew > bound {
-		t.Errorf("heap grew by %d bytes fetching a %d-byte object, want well under %d (streaming, not buffered)",
-			grew, objectSize, bound)
+	if !bytes.Equal(got, payload) {
+		t.Errorf("cached file content mismatch: got %d bytes, want %d bytes matching the original payload", len(got), len(payload))
 	}
 }

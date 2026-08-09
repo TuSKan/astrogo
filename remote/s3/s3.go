@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"os"
 	"sync"
 	"time"
 
@@ -53,8 +54,18 @@ func WithRegion(region string) Option {
 
 // bucketState is the per-endpoint state Register populates.
 type bucketState struct {
+	// client is used for exactly one thing: HeadObject metadata calls
+	// (Probe's ETag/size, and FetchInto's pre-download exact-size
+	// consent check). It never touches an object's body — see FetchInto's
+	// doc comment for why that goes through s3fs/gofs.File instead, and
+	// this type's own doc comment for why HeadObject specifically cannot.
 	client *awss3.Client
 	bucket string
+	// fs is the gofs.FileSystem this Register call installed into go-fs's
+	// own global filesystem registry (see s3fsRegistry's doc comment for
+	// why it must be tracked and explicitly Unregistered on replacement,
+	// rather than left to a plain re-Register).
+	fs gofs.FileSystem
 }
 
 var (
@@ -72,8 +83,8 @@ var (
 // registration installs the same transport{} value regardless of id).
 //
 // See this package's doc comment for the credential contract (AWS SDK v2
-// default chain only) and why FetchInto/Probe bypass s3fs's own
-// File-reading methods.
+// default chain only) and why FetchInto/Probe are split the way they are
+// between s3fs and a direct HeadObject call.
 func Register(ctx context.Context, id remote.EndpointID, opts ...Option) error {
 	ep, ok := remote.Lookup(id)
 	if !ok {
@@ -126,14 +137,27 @@ func Register(ctx context.Context, id remote.EndpointID, opts ...Option) error {
 	}
 
 	stateMu.Lock()
-	state[id] = &bucketState{client: client, bucket: ep.Bucket}
-	stateMu.Unlock()
+	defer stateMu.Unlock()
 
-	// Registers gofs.File("s3://"+ep.Bucket+"/...") as a working value
-	// through go-fs's own filesystem registry for any *other* future
-	// caller in this codebase — not used by this package's own
-	// FetchInto/Probe below; see doc.go for why.
-	s3fs.NewAndRegister(client, ep.Bucket, true)
+	// go-fs's own Register (github.com/ungerik/go-fs/registry.go) is
+	// refcounted BY PREFIX, not replace-on-reregister — confirmed by
+	// reading it directly: a second Register call for an already-present
+	// prefix ("s3://"+ep.Bucket) only increments a counter and returns
+	// early; it never overwrites the stored *fs.FileSystem*. So without
+	// this Unregister, re-Registering this id (rotated credentials, a
+	// new injected WithClient in a test, ...) would silently leave every
+	// gofs.File("s3://"+ep.Bucket+"...") — including FetchInto/Probe's
+	// own s3URIFor calls — resolving through the FIRST registration's
+	// client forever, no matter how many times Register is called again.
+	if prev, ok := state[id]; ok && prev.fs != nil {
+		gofs.Unregister(prev.fs)
+	}
+
+	// Registers gofs.File("s3://"+ep.Bucket+"...") through go-fs's own
+	// filesystem registry — this is what FetchInto's OpenReader call
+	// below actually goes through, not a side effect for someone else.
+	newFS := s3fs.NewAndRegister(client, ep.Bucket, true)
+	state[id] = &bucketState{client: client, bucket: ep.Bucket, fs: newFS}
 
 	remote.RegisterTransport(remote.KindS3, transport{})
 
@@ -157,14 +181,44 @@ type transport struct{}
 
 var _ remote.Transport = transport{}
 
-// FetchInto downloads endpoint id's object at key (the raw, unprefixed S3
-// key — no leading slash, never built from a gofs.File URI; see doc.go)
-// into dest, streaming the SDK's GetObjectOutput.Body directly through to
-// remote.Save so peak memory stays bounded by the copy buffer, not the
-// object size, in the common (non-validated) case. With validate
-// non-nil, the body is buffered and checked before being written, the
-// same tradeoff remote's built-in HTTP transport already accepts for
-// WithValidate.
+// s3URIFor builds the gofs.File URI that s3fs's own CleanPathFromURI
+// (strings.TrimPrefix(uri, "s3://"+bucket), confirmed by reading
+// s3fs.go directly — no separator handling at all) turns into exactly
+// key, with no leading slash. s3fs's own "natural" URI form
+// ("s3://bucket/key") would instead trim to "/key" — a leading slash —
+// which every s3fs method then uses verbatim as the literal S3 object
+// Key. That's s3fs's own self-consistent convention for objects it
+// wrote itself, but real CAMS EODATA objects (written by Copernicus's
+// own pipeline, confirmed against the user's own working `aws s3 cp`
+// command) have no leading slash. Concatenating bucket and key with no
+// separating slash compensates for that trim rather than tripping over
+// it: TrimPrefix("s3://"+bucket+key, "s3://"+bucket) == key exactly.
+func s3URIFor(bucket, key string) gofs.File {
+	return gofs.File("s3://" + bucket + key)
+}
+
+// FetchInto downloads endpoint id's object at key into dest via
+// gofs.File.OpenReader() — i.e. through s3fs, not a direct GetObject
+// call — matching the rest of this codebase's rule that remote (and its
+// transports) read file content through go-fs's own methods rather than
+// reinventing them. One direct HeadObject call still runs first: s3fs's
+// own File.OpenReader fetches eagerly (HEAD then GET as one call with no
+// way to intercept in between — confirmed by reading its
+// implementation), so without a HeadObject beforehand a SizeVaries
+// endpoint like CopernicusEODATA would have no real exact-size consent
+// gate before real network transfer begins. That HeadObject is cheap
+// (metadata only, no body) and is the same call Probe already needs for
+// the ETag s3fs's own Stat cannot provide (see bucketState's doc
+// comment) — not a second, separate design.
+//
+// s3fs@v0.1.0's OpenReader fully buffers the object in memory before
+// returning (confirmed by reading its source — every code path ends in
+// io.ReadAll or a full in-memory manager.WriteAtBuffer; there is no
+// streaming path in this dependency version at all). Routing through it
+// therefore does not bound peak memory below the object's own size —
+// documented here plainly, not hidden — but it does mean this package
+// no longer hand-rolls a second GetObject/body-streaming implementation
+// alongside s3fs's own.
 func (transport) FetchInto(ctx context.Context, id remote.EndpointID, key string, dest gofs.File, timeout time.Duration, validate func([]byte) error, progress func(downloaded, total int64)) error {
 	st, err := lookupState(id)
 	if err != nil {
@@ -177,39 +231,38 @@ func (transport) FetchInto(ctx context.Context, id remote.EndpointID, key string
 		return fmt.Errorf("remote/s3: %w", err)
 	}
 
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	total, err := headObjectSize(ctx, st, key)
+	if err != nil {
+		return err
+	}
+
+	if err := remote.CheckDownload(id, key, total); err != nil {
+		return fmt.Errorf("remote/s3: %w", err)
+	}
+
 	if ep.ApproxSize == remote.SizeVaries {
-		log.Printf("remote/s3: downloading %s (endpoint %s, size varies)", dest, id)
+		log.Printf("remote/s3: downloading %s (endpoint %s, %d bytes)", dest, id, total)
 	} else {
 		log.Printf("remote/s3: downloading %s (endpoint %s, approx %d bytes)", dest, id, ep.ApproxSize)
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
-
-	out, err := st.client.GetObject(ctx, &awss3.GetObjectInput{
-		Bucket: aws.String(st.bucket),
-		Key:    aws.String(key),
-	})
+	r, err := s3URIFor(st.bucket, key).OpenReader()
 	if err != nil {
-		var noSuchKey *types.NoSuchKey
-		if errors.As(err, &noSuchKey) {
+		if errors.Is(err, os.ErrNotExist) {
 			return fmt.Errorf("%w: %s: no such key", remote.ErrDownloadFailed, key)
 		}
 
 		return fmt.Errorf("%w: %s: %w", remote.ErrDownloadFailed, key, err)
 	}
 
-	defer func() { _ = out.Body.Close() }()
+	defer func() { _ = r.Close() }()
 
-	total := aws.ToInt64(out.ContentLength)
-	if err := remote.CheckDownload(id, key, total); err != nil {
-		return fmt.Errorf("remote/s3: %w", err)
-	}
-
-	var body io.Reader = out.Body
-
+	var body io.Reader = r
 	if progress != nil {
-		body = &progressReader{r: out.Body, total: max(total, 0), onProgress: progress}
+		body = &progressReader{r: r, total: total, onProgress: progress}
 	}
 
 	if validate != nil {
@@ -240,7 +293,9 @@ func (transport) FetchInto(ctx context.Context, id remote.EndpointID, key string
 // a direct HeadObject call — not s3fs.Stat, which discards the ETag
 // remote.Signature.ETag needs (confirmed by reading s3fs's Stat
 // implementation: it builds a private fileInfo{name,size,time} and never
-// reads the HeadObject response's ETag field at all).
+// reads the HeadObject response's ETag field at all — Sys() also
+// unconditionally returns nil, so there is no escape hatch to recover it
+// through go-fs's own File.Stat() either).
 func (transport) Probe(ctx context.Context, id remote.EndpointID, key string) (remote.Signature, error) {
 	st, err := lookupState(id)
 	if err != nil {
@@ -261,6 +316,26 @@ func (transport) Probe(ctx context.Context, id remote.EndpointID, key string) (r
 	}
 
 	return remote.Signature{ETag: aws.ToString(head.ETag), ContentLength: aws.ToInt64(head.ContentLength)}, nil
+}
+
+// headObjectSize is FetchInto's pre-download exact-size check; see
+// FetchInto's own doc comment for why this direct HeadObject call is
+// necessary ahead of s3fs.File.OpenReader's own eager fetch.
+func headObjectSize(ctx context.Context, st *bucketState, key string) (int64, error) {
+	head, err := st.client.HeadObject(ctx, &awss3.HeadObjectInput{
+		Bucket: aws.String(st.bucket),
+		Key:    aws.String(key),
+	})
+	if err != nil {
+		var notFound *types.NotFound
+		if errors.As(err, &notFound) {
+			return 0, fmt.Errorf("%w: %s: no such key", remote.ErrDownloadFailed, key)
+		}
+
+		return 0, fmt.Errorf("%w: %s: %w", remote.ErrDownloadFailed, key, err)
+	}
+
+	return aws.ToInt64(head.ContentLength), nil
 }
 
 // progressReader wraps r, invoking onProgress after every Read that

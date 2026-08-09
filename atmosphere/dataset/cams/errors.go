@@ -4,14 +4,6 @@ import "errors"
 
 // Sentinel errors returned by this package. Match with errors.Is.
 var (
-	// ErrNotLocal is returned by Open when f is not backed by the local
-	// filesystem (e.g. a gofs.File whose registered filesystem isn't
-	// go-fs's Local) — scigolib/hdf5 requires a real on-disk path, and
-	// every CAMS file this package reads is one remote.GetFile has
-	// already cached locally, so a non-local File is a caller error, not
-	// a supported input.
-	ErrNotLocal = errors.New("cams: file is not on the local filesystem")
-
 	// ErrNoLevelDimension is returned by Var.ReadPlane/Var.At when a
 	// non-zero level index is requested against a variable with no level
 	// axis (e.g. lnsp, which is (time, latitude, longitude) only).
