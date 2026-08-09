@@ -16,6 +16,14 @@ func TestDefaultEndpointsHaveExplicitTimeouts(t *testing.T) {
 			if ep.DownloadTimeout == 0 {
 				t.Errorf("%s: KindFile endpoint has no explicit DownloadTimeout", ep.ID)
 			}
+		case KindS3:
+			if ep.DownloadTimeout == 0 {
+				t.Errorf("%s: KindS3 endpoint has no explicit DownloadTimeout", ep.ID)
+			}
+
+			if ep.Bucket == "" {
+				t.Errorf("%s: KindS3 endpoint has no Bucket", ep.ID)
+			}
 		}
 	}
 }

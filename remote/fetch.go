@@ -1,13 +1,10 @@
 package remote
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
-	"log"
 	"net/http"
 	"time"
 
@@ -86,8 +83,13 @@ func GetFile(ctx context.Context, id EndpointID, name string, opts ...ReadOption
 		return "", fmt.Errorf("%w: %q", ErrUnknownEndpoint, id)
 	}
 
-	if ep.Kind != KindFile {
+	if !ep.Kind.cacheable() {
 		return "", fmt.Errorf("%w: %q", ErrNotFileEndpoint, id)
+	}
+
+	tr, err := transportFor(ep.Kind)
+	if err != nil {
+		return "", err
 	}
 
 	var cfg readCfg
@@ -111,7 +113,7 @@ func GetFile(ctx context.Context, id EndpointID, name string, opts ...ReadOption
 
 	cacheFile := dir.Join(cacheName)
 
-	if cacheFile.Exists() && (!ep.Mutable || unchanged(ctx, id, name, cacheFile)) {
+	if cacheFile.Exists() && (!ep.Mutable || unchanged(ctx, ep, tr, name, cacheFile)) {
 		return cacheFile, nil
 	}
 
@@ -129,7 +131,7 @@ func GetFile(ctx context.Context, id EndpointID, name string, opts ...ReadOption
 
 	// Re-check: whoever held the lock before us may have already filled
 	// this cache entry while we were waiting for it.
-	if cacheFile.Exists() && (!ep.Mutable || unchanged(ctx, id, name, cacheFile)) {
+	if cacheFile.Exists() && (!ep.Mutable || unchanged(ctx, ep, tr, name, cacheFile)) {
 		return cacheFile, nil
 	}
 
@@ -142,15 +144,15 @@ func GetFile(ctx context.Context, id EndpointID, name string, opts ...ReadOption
 		timeout = DefaultDownloadTimeout
 	}
 
-	if err := fetchInto(ctx, id, name, cacheFile, timeout, cfg.validate, cfg.progress); err != nil {
-		return "", err
+	if err := tr.FetchInto(ctx, id, name, cacheFile, timeout, cfg.validate, cfg.progress); err != nil {
+		return "", fmt.Errorf("remote: fetch %s: %w", name, err)
 	}
 
 	if ep.Mutable {
 		// Best-effort: losing the signature only costs a redundant
 		// download next time, so a probe failure here doesn't fail the
 		// whole fetch.
-		if sig, perr := probe(ctx, id, name); perr == nil {
+		if sig, perr := tr.Probe(ctx, id, name); perr == nil {
 			_ = saveSignature(cacheFile, sig)
 		}
 	}
@@ -158,133 +160,12 @@ func GetFile(ctx context.Context, id EndpointID, name string, opts ...ReadOption
 	return cacheFile, nil
 }
 
-// fetchInto downloads endpoint id's URL joined with path into dest,
-// enforcing astrogo's download-consent rules: the registry gate (offline
-// mode, endpoint enabled, URL override), the consent check against the
-// endpoint's ApproxSize, then again with the exact Content-Length once
-// response headers arrive. With validate non-nil, the full body is
-// buffered and validated before being written to dest; otherwise the
-// response streams straight through to Save. With progress non-nil, it's
-// invoked as the body is read regardless of which of those two paths runs.
-func fetchInto(ctx context.Context, id EndpointID, path string, dest gofs.File, timeout time.Duration, validate func([]byte) error, progress func(downloaded, total int64)) error {
-	base, err := URL(id)
-	if err != nil {
-		return err
-	}
-
-	name := path
-	if name == "" {
-		name = dest.Name()
-	}
-
-	ep, _ := Lookup(id)
-	if err := CheckDownload(id, name, ep.ApproxSize); err != nil {
-		return err
-	}
-
-	if ep.ApproxSize == SizeVaries {
-		log.Printf("remote: downloading %s (endpoint %s, size varies)", dest, id)
-	} else {
-		log.Printf("remote: downloading %s (endpoint %s, approx %d bytes)", dest, id, ep.ApproxSize)
-	}
-
-	ctx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, joinURL(base, path), nil)
-	if err != nil {
-		return fmt.Errorf("remote: new request: %w", err)
-	}
-
-	// Resume a previously interrupted transfer. Only the streaming path
-	// resumes: the validate path buffers the whole body in memory to check
-	// it before anything is trusted, so a partial is useless there.
-	// If-Range makes this safe — the server replies 206 only if the ETag
-	// still matches, and a plain 200 (changed content, or no range
-	// support) transparently restarts the download.
-	var resumeOffset int64
-
-	if validate == nil {
-		if offset, validator := resumePoint(dest); offset > 0 {
-			resumeOffset = offset
-
-			req.Header.Set("Range", fmt.Sprintf("bytes=%d-", offset))
-			req.Header.Set("If-Range", validator)
-		}
-	}
-
-	client, err := NewClientFor(id, WithTimeout(timeout))
-	if err != nil {
-		return err
-	}
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return fmt.Errorf("%w: %s: %w", ErrDownloadFailed, name, err)
-	}
-
-	defer func() { _ = resp.Body.Close() }()
-
-	// A 206 carries only the remaining bytes, so the consent check (and
-	// the progress total) must add back what is already on disk — the
-	// gate is about the file's full size, not this leg of it.
-	resumed := resp.StatusCode == http.StatusPartialContent
-	if !resumed {
-		resumeOffset = 0
-	}
-
-	total := resp.ContentLength
-	if total >= 0 {
-		total += resumeOffset
-	}
-
-	if err := CheckDownload(id, name, total); err != nil {
-		return err
-	}
-
-	body := resp.Body
-
-	var bodyReader io.Reader = body
-
-	if progress != nil {
-		// read starts at resumeOffset so a resumed transfer reports
-		// cumulative progress, not a restart from zero.
-		bodyReader = &progressReader{r: body, total: max(total, 0), read: resumeOffset, onProgress: progress}
-	}
-
-	if validate != nil {
-		data, err := io.ReadAll(bodyReader)
-		if err != nil {
-			return fmt.Errorf("%w: %s: %w", ErrDownloadFailed, name, err)
-		}
-
-		if verr := validate(data); verr != nil {
-			return fmt.Errorf("remote: validate %s: %w", name, verr)
-		}
-
-		if err := Save(bytes.NewReader(data), dest); err != nil {
-			return fmt.Errorf("%w: %w", ErrDownloadFailed, err)
-		}
-
-		return nil
-	}
-
-	if err := writePartial(bodyReader, dest, resumed, resp.Header.Get("ETag")); err != nil {
-		return fmt.Errorf("%w: %w", ErrDownloadFailed, err)
-	}
-
-	if err := promotePartial(dest); err != nil {
-		return fmt.Errorf("%w: %w", ErrDownloadFailed, err)
-	}
-
-	return nil
-}
-
 // Exists reports whether endpoint id currently serves the file at name.
-// It issues a HEAD request, which transfers no body and therefore never
-// triggers the download-consent gate — so a caller may use this to
-// discover what is available before deciding whether to ask for consent
-// (see skybrightness/atlas.NewestVIIRSYear, which probes forward for
+// It issues a HEAD request (or its transport's equivalent), which
+// transfers no body and therefore never triggers the download-consent
+// gate — so a caller may use this to discover what is available before
+// deciding whether to ask for consent (see
+// skybrightness/atlas.NewestVIIRSYear, which probes forward for
 // newly-published data years).
 //
 // A 404 is reported as (false, nil): the endpoint answered, the file just
@@ -292,7 +173,7 @@ func fetchInto(ctx context.Context, id EndpointID, path string, dest gofs.File, 
 // network error, a 5xx — returns a non-nil error, so "missing" is never
 // confused with "could not tell".
 func Exists(ctx context.Context, id EndpointID, name string) (bool, error) {
-	if _, err := probe(ctx, id, name); err != nil {
+	if _, err := probeFor(ctx, id, name); err != nil {
 		var httpErr *HTTPError
 		if errors.As(err, &httpErr) && httpErr.StatusCode == http.StatusNotFound {
 			return false, nil
@@ -304,49 +185,46 @@ func Exists(ctx context.Context, id EndpointID, name string) (bool, error) {
 	return true, nil
 }
 
-// probe issues a HEAD request against endpoint id's URL joined with path
-// and returns its current Signature. A HEAD transfers no body, so it never
-// triggers the download-consent check.
-func probe(ctx context.Context, id EndpointID, path string) (Signature, error) {
-	base, err := URL(id)
+// probeFor resolves id's registered Transport and returns the remote
+// Signature for path, so callers holding only an EndpointID (Exists)
+// dispatch identically to GetFile's own transport-aware path. A Transport
+// implementation must report a not-found path as an *HTTPError with
+// StatusCode 404, matching httpTransport's own HEAD-based behavior, so
+// this 404-to-(false,nil) mapping in Exists works for every Kind.
+func probeFor(ctx context.Context, id EndpointID, path string) (Signature, error) {
+	ep, ok := Lookup(id)
+	if !ok {
+		return Signature{}, fmt.Errorf("%w: %q", ErrUnknownEndpoint, id)
+	}
+
+	tr, err := transportFor(ep.Kind)
 	if err != nil {
 		return Signature{}, err
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodHead, joinURL(base, path), nil)
+	sig, err := tr.Probe(ctx, id, path)
 	if err != nil {
-		return Signature{}, fmt.Errorf("remote: new HEAD request: %w", err)
+		return Signature{}, fmt.Errorf("remote: probe %s: %w", path, err)
 	}
 
-	client, err := NewClientFor(id)
-	if err != nil {
-		return Signature{}, err
-	}
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return Signature{}, fmt.Errorf("remote: HEAD %s: %w", req.URL, err)
-	}
-
-	defer func() { _ = resp.Body.Close() }()
-
-	return Signature{ETag: resp.Header.Get("ETag"), ContentLength: resp.ContentLength}, nil
+	return sig, nil
 }
 
-// unchanged reports whether the remote content at endpoint id + path still
+// unchanged reports whether the remote content at endpoint ep + path still
 // matches the Signature previously recorded for cacheFile — true means the
 // caller can skip a full re-download. Comparison prefers ETag when the
 // server provides one, falling back to Content-Length otherwise. Any
 // failure — no signature recorded yet, the probe erroring, offline mode —
 // returns false ("assume changed"), so GetFile always falls through to its
-// normal download path.
-func unchanged(ctx context.Context, id EndpointID, path string, cacheFile gofs.File) bool {
+// normal download path. tr is ep's already-resolved Transport (GetFile
+// already looked it up), so this never has to look it up again.
+func unchanged(ctx context.Context, ep Endpoint, tr Transport, path string, cacheFile gofs.File) bool {
 	want := loadSignature(cacheFile)
 	if want == (Signature{}) {
 		return false
 	}
 
-	got, err := probe(ctx, id, path)
+	got, err := tr.Probe(ctx, ep.ID, path)
 	if err != nil {
 		return false
 	}

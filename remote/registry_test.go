@@ -214,14 +214,15 @@ func TestEnableAllDownloadsCoversHorizons(t *testing.T) {
 // exist to catch for JPLHorizons.
 func TestDownloadableEndpointsAreExactlyTheExpectedSet(t *testing.T) {
 	want := map[EndpointID]bool{
-		IERSFinals2000A: true,
-		NAIFSPK:         true,
-		NAIFLSK:         true,
-		OpenNGC:         true,
-		JPLHorizons:     true,
-		WorldAtlas:      true,
-		VIIRSAnnual:     true,
-		PassbandBundle:  true,
+		IERSFinals2000A:  true,
+		NAIFSPK:          true,
+		NAIFLSK:          true,
+		OpenNGC:          true,
+		JPLHorizons:      true,
+		WorldAtlas:       true,
+		VIIRSAnnual:      true,
+		PassbandBundle:   true,
+		CopernicusEODATA: true,
 	}
 
 	for _, ep := range Endpoints() {
@@ -238,25 +239,26 @@ func TestDownloadableEndpointsAreExactlyTheExpectedSet(t *testing.T) {
 // to the raw string — exercised via a made-up id that isn't registered.
 func TestConstName(t *testing.T) {
 	want := map[EndpointID]string{
-		IERSFinals2000A: "IERSFinals2000A",
-		NAIFSPK:         "NAIFSPK",
-		NAIFLSK:         "NAIFLSK",
-		JPLHorizons:     "JPLHorizons",
-		JPLSBDB:         "JPLSBDB",
-		JPLSBDBQuery:    "JPLSBDBQuery",
-		SIMBAD:          "SIMBAD",
-		VizieR:          "VizieR",
-		GaiaTAP:         "GaiaTAP",
-		MAST:            "MAST",
-		CelesTrak:       "CelesTrak",
-		FINK:            "FINK",
-		LightPollution:  "LightPollution",
-		OpenNGC:         "OpenNGC",
-		Nominatim:       "Nominatim",
-		OpenElevation:   "OpenElevation",
-		WorldAtlas:      "WorldAtlas",
-		VIIRSAnnual:     "VIIRSAnnual",
-		PassbandBundle:  "PassbandBundle",
+		IERSFinals2000A:  "IERSFinals2000A",
+		NAIFSPK:          "NAIFSPK",
+		NAIFLSK:          "NAIFLSK",
+		JPLHorizons:      "JPLHorizons",
+		JPLSBDB:          "JPLSBDB",
+		JPLSBDBQuery:     "JPLSBDBQuery",
+		SIMBAD:           "SIMBAD",
+		VizieR:           "VizieR",
+		GaiaTAP:          "GaiaTAP",
+		MAST:             "MAST",
+		CelesTrak:        "CelesTrak",
+		FINK:             "FINK",
+		LightPollution:   "LightPollution",
+		OpenNGC:          "OpenNGC",
+		Nominatim:        "Nominatim",
+		OpenElevation:    "OpenElevation",
+		WorldAtlas:       "WorldAtlas",
+		VIIRSAnnual:      "VIIRSAnnual",
+		PassbandBundle:   "PassbandBundle",
+		CopernicusEODATA: "CopernicusEODATA",
 	}
 
 	for id, name := range want {

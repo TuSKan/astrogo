@@ -91,16 +91,17 @@ func subsystemDir(subsystem string) (gofs.File, error) {
 	return dir, nil
 }
 
-// CacheDir returns the on-disk cache directory for a KindFile endpoint,
-// creating it if needed. Returns ErrUnknownEndpoint for an unregistered id
-// or an error if id is a KindAPI endpoint (which has no cache directory).
+// CacheDir returns the on-disk cache directory for a file-bearing endpoint
+// (KindFile, KindS3), creating it if needed. Returns ErrUnknownEndpoint
+// for an unregistered id or an error for a KindAPI endpoint, which has no
+// cache directory.
 func CacheDir(id EndpointID) (gofs.File, error) {
 	ep, ok := Lookup(id)
 	if !ok {
 		return "", fmt.Errorf("%w: %q", ErrUnknownEndpoint, id)
 	}
 
-	if ep.Kind != KindFile {
+	if !ep.Kind.cacheable() {
 		return "", fmt.Errorf("%w: %q has no cache directory", ErrNotFileEndpoint, id)
 	}
 

@@ -119,6 +119,27 @@ const (
 	// EnsureWorldAtlas's own doc comment and in the download consent log
 	// line — not buried here alone.
 	WorldAtlas EndpointID = "gfz.worldatlas"
+
+	// CopernicusEODATA is the Copernicus Data Space Ecosystem's
+	// S3-compatible "eodata" object-storage bucket
+	// (https://eodata.dataspace.copernicus.eu). It is a general,
+	// multi-product access point — Sentinel imagery, CLMS, and CAMS all
+	// live in the same bucket, separated only by key prefix — so it is
+	// named for the service, matching NAIFSPK's one-endpoint/many-
+	// resources pattern rather than WorldAtlas's one-endpoint/one-dataset
+	// pattern. CAMS-specific key construction belongs to
+	// atmosphere/dataset/cams, not to this endpoint's identity.
+	//
+	// Access requires Copernicus Data Space credentials (free registration
+	// at dataspace.copernicus.eu, then S3 keys generated on the user's own
+	// dashboard). astrogo never reads a credential file of its own: the
+	// remote/s3 transport resolves credentials exclusively through AWS SDK
+	// v2's standard default chain (AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY
+	// environment variables, ~/.aws/credentials, or an IAM role). The
+	// service URL above is a fixed public fact, identical for every
+	// Copernicus user, and is therefore registered here rather than read
+	// from an AWS_ENDPOINT_URL environment variable.
+	CopernicusEODATA EndpointID = "copernicus.eodata"
 )
 
 // Kind distinguishes request/response APIs from bulk file downloads.
@@ -134,7 +155,23 @@ const (
 	// KindFile marks bulk file-download endpoints. Downloads are DENIED by
 	// default and must be enabled per endpoint with EnableDownloads.
 	KindFile Kind = "file"
+
+	// KindS3 marks bulk file endpoints served over the S3 object-storage
+	// protocol rather than HTTP. Consent, caching, and GetFile semantics
+	// are identical to KindFile; only the byte-transfer step differs, and
+	// that step lives behind remote.Transport — remote itself never links
+	// an S3 client. A KindS3 endpoint addresses objects by Bucket + key,
+	// with URL naming the S3-compatible service endpoint. Import
+	// remote/s3 and call its Register function before the first GetFile
+	// against a KindS3 endpoint, or GetFile fails with ErrNoTransport.
+	KindS3 Kind = "s3"
 )
+
+// cacheable reports whether endpoints of this Kind deliver bulk file
+// content into remote's on-disk cache — i.e. whether CacheDir and GetFile
+// apply to them. KindAPI endpoints are request/response only and have no
+// cache directory.
+func (k Kind) cacheable() bool { return k == KindFile || k == KindS3 }
 
 // Endpoint describes one remote service: where it lives, what it is for,
 // and how much data a request against it typically moves.
@@ -144,7 +181,15 @@ type Endpoint struct {
 	// URL is the endpoint's base URL. Override with SetURL to point at a
 	// mirror or proxy.
 	URL string
-	// Kind is KindAPI or KindFile.
+	// Bucket is the S3 bucket name for a KindS3 endpoint, addressed
+	// together with a caller-supplied object key (the name argument to
+	// GetFile). Empty for every other Kind, where URL + path-join is the
+	// whole address. Note the bucket is not implied by URL: one
+	// S3-compatible service endpoint can host many buckets, and one
+	// bucket (Copernicus's "eodata") hosts many unrelated products
+	// distinguished only by key prefix.
+	Bucket string
+	// Kind is KindAPI, KindFile, or KindS3.
 	Kind Kind
 	// Subsystem names the astrogo package family using this endpoint. For
 	// KindFile it is also the literal cache-dir token resolved by CacheDir;
@@ -418,8 +463,9 @@ func defaultEndpoints() map[EndpointID]Endpoint {
 			URL:  "https://datapub.gfz.de/download/10.5880.GFZ.1.4.2016.001/",
 			Kind: KindFile,
 			// Subsystem doubles as CacheDir's path token (see Endpoint.Subsystem) —
-			// "atlas" for skybrightness/atlas's other offline decoders, not
-			// "skybrightness/atlas" (no path separators allowed there).
+			// "atlas" for skybrightness/atlas's other offline decoders. Nested
+			// tokens are supported (see PassbandBundle above) and resolve to
+			// nested directories on every platform via subsystemDir/filepath.Join.
 			Subsystem: "atlas",
 			Description: "Falchi et al. 2016 World Atlas 2015 of artificial night sky " +
 				"brightness (GFZ Data Services, DOI 10.5880/GFZ.1.4.2016.001, frozen " +
@@ -432,6 +478,27 @@ func defaultEndpoints() map[EndpointID]Endpoint {
 			Mutable:         false, // DOI-versioned, frozen since 2019-11-18
 			Downloadable:    true,
 			Files:           []string{"World_Atlas_2015.zip"},
+		},
+		CopernicusEODATA: {
+			ID:        CopernicusEODATA,
+			URL:       "https://eodata.dataspace.copernicus.eu",
+			Bucket:    "eodata",
+			Kind:      KindS3,
+			Subsystem: "atmosphere/dataset/cams",
+			Description: "Copernicus Data Space Ecosystem EODATA S3 bucket — a general " +
+				"multi-product object store (Sentinel, CLMS, CAMS, ...) keyed by product " +
+				"prefix, not a CAMS-specific service. astrogo uses the CAMS/GLOBAL/... " +
+				"prefix for CAMS global analysis NetCDF-4 files (one variable per file, " +
+				"1.3 MB for lnsp up to ~180 MB for a 137-level aerosol tracer, " +
+				"live-measured). Requires Copernicus Data Space S3 credentials supplied " +
+				"through the standard AWS SDK v2 credential chain; astrogo reads no " +
+				"credential file of its own. NOTE: unlike astrogo's HTTP transport, this " +
+				"one has no Range-based resume.",
+			ApproxSize:      SizeVaries, // 1.3 MB (lnsp) to ~180 MB (a 137-level aerosol tracer)
+			Enabled:         true,
+			DownloadTimeout: 30 * time.Minute,
+			Mutable:         true, // CAMS publishes new analysis cycles ~4x/day and reprocesses
+			Downloadable:    true,
 		},
 	}
 }
