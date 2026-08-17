@@ -818,42 +818,34 @@ source in hand.
 
 ## 17. Open scientific questions
 
-**Kawara et al. (2017) DGL coefficients — `b` resolved, `c`'s decade is not.**
+**Kawara et al. (2017) DGL coefficients — RESOLVED, including a misreading of my own.**
 
-GAMBONS Eq. 13/14 derives diffuse galactic light from the Schlegel–Finkbeiner–Davis 100 µm
-map, which is public (IRAS + COBE/DIRBE, on NASA LAMBDA). The relation is Kawara et al.
-(2017) PASJ 69, 31, Eq. 7:
+I claimed the published units were dimensionally impossible. They are not, and the reason
+is in the adjacent row: the slope is tabulated as **`νb_i`**, not `b_i`, with
+`νb_i = [3000/λ(µm)]·b_i`. So Eq. 7 is written in `I_ν` (MJy sr⁻¹) throughout, which makes
+`b` dimensionless and `c` in `(MJy sr⁻¹)⁻¹` — exactly as printed. I had read the tabulated
+slope as `b` itself.
 
-	ν·I_ν(DGL) = b·I_ν,100 − c·I²_ν,100        with  I_ν,100 = I_ν,SFD − 0.8 MJy sr⁻¹
+That leaves only the power of ten, and the physics settles it. The quadratic turns over at
+`I₁₀₀ = b/(2c)`; Kawara fit samples bounded at 5, 10, 15, 20, 30 and 50 MJy sr⁻¹, and
+Masana et al. restrict the relation to `I₁₀₀ < 50`. Reading the tabulated `c` as ×10⁻⁵:
 
-**`b` is unambiguous.** Table 2, in nW m⁻² sr⁻¹ per MJy sr⁻¹, at effective wavelengths
-0.225, 0.274, 0.319, 0.369, 0.418, 0.472, 0.550, 0.648 µm:
+| λ (µm) | 0.319 | 0.369 | 0.418 | 0.472 | 0.550 | 0.648 |
+| :--- | ---: | ---: | ---: | ---: | ---: | ---: |
+| turnover (MJy sr⁻¹) | 46.3 | 47.5 | 39.5 | 41.7 | 41.9 | 50.4 |
 
-	b = 3.0, 3.9, 6.1, 8.5, 13.6, 17.5, 20.1, 21.0
-	σ = 1.4, 0.3, 0.4, 0.5,  0.5,  0.6,  0.6,  0.9
+Every well-measured band turns over at the top of the fit's own range — where a quadratic
+fitted to saturating data should. The printed `10⁵` would put the turnover at 10⁻⁹ MJy sr⁻¹
+and make DGL negative over the whole sky, so the printed exponent sign is a typo.
 
-**`c`'s values are clear, its scale is not.** The tabulated numbers are
-`0.1, 0.3, 0.7, 1.1, 2.4, 3.3, 4.4, 4.5` (σ = 0.4, 0.1, 0.1, 0.2, 0.3, 0.3, 0.4, 0.7), but
-the row header extracts as "10⁵ (MJy sr⁻¹)⁻¹", which is dimensionally impossible: for
-`c·I²` to be a radiance with `I` in MJy sr⁻¹, `c` must be in
-nW m⁻² sr⁻¹ (MJy sr⁻¹)⁻². The power of ten and one exponent are lost in extraction.
+Implemented as `DiffuseGalacticLight` and `DGLCoefficientsAt`, with
+`TestDGLTurnoverMatchesTheFittedRange` asserting the turnover for every band — the evidence
+for the reading is executable, not a comment.
 
-The self-consistency argument points one way. The quadratic turns over at
-`I₁₀₀ = b/(2c)`, and Kawara fit samples bounded at 5, 10, 15, 20, 30 and 50 MJy sr⁻¹ —
-GAMBONS then restricts use to `I_SFD < 50`. Taking the tabulated `c` × 10⁻¹ puts the
-turnover at 23, 23, 28 and 44 MJy sr⁻¹ for the four best-measured bands: the top of the
-fitted range, exactly where a quadratic fit to saturating data should turn. Any other
-decade is untenable — × 1 makes DGL go negative above 4.6 MJy sr⁻¹, well inside the data;
-× 10⁻² removes the saturation the quadratic exists to capture.
-
-That is an inference from the fit's behaviour, not a reading of the paper, so `c` is **not
-implemented** and DGL waits — the same call made for Kocifaj Eq. 5, and for the same
-reason. A photograph of Table 2's "DGL quadratic coefficient" row header would settle it in
-one line.
-
-Note also that Kawara's coverage stops at 0.648 µm. It spans 330–650 nm of the default
-optical grid but not 650–1000 nm, so the red end needs extrapolation and a flag whatever
-happens to `c`.
+**Remaining limit:** Kawara stops at 648 nm. The default grid runs to 1000 nm, so the red
+end holds the endpoint coefficients rather than extrapolating a still-rising slope, and
+reports `ExtrapolatedModel`. Masana et al. interpolate across the same gap without saying
+so.
 
 **Kocifaj 2022 Eq. 2's "missing source-area term" — RESOLVED, and the earlier entry here
 was wrong.**
