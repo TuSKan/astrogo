@@ -81,8 +81,8 @@ func main() {
 
 	// JPL kernel downloads are opt-in — see README "Data downloads &
 	// offline usage". de440 is ~114 MB; naif0012.tls (leap seconds) ~5 KB.
-	remote.EnableDownloads(remote.NAIFSPK, 200<<20)
-	remote.EnableDownloads(remote.NAIFLSK, 0)
+	remote.EnableDownloads(200<<20, remote.NAIFSPK)
+	remote.EnableDownloads(0, remote.NAIFLSK)
 
 	jplProv, err := eph.NewProvider(context.Background(), eph.Planets, "de440")
 	if err != nil {

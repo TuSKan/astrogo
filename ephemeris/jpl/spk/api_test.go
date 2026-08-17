@@ -7,12 +7,13 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/remote"
+	"github.com/TuSKan/astrogo/remote/api"
+	"github.com/TuSKan/astrogo/remote/file"
 	"github.com/TuSKan/astrogo/time"
 )
 
@@ -40,9 +41,9 @@ func TestApiHorizonsRequest(t *testing.T) {
 	// every test that runs afterward (e.g. reader_test.go's TestSPKReader),
 	// so restore only the specific override this test makes instead of
 	// resetting the whole registry.
-	origEndpoint, _ := remote.Lookup(remote.JPLHorizons)
+	origEndpoint, _ := remote.Lookup(remote.JPLHorizonsSPK)
 
-	t.Cleanup(func() { _ = remote.SetURL(remote.JPLHorizons, origEndpoint.URL) })
+	t.Cleanup(func() { _ = remote.SetURL(remote.JPLHorizonsSPK, origEndpoint.URL) })
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if got := r.URL.Query().Get("COMMAND"); got != "'499'" {
@@ -54,7 +55,7 @@ func TestApiHorizonsRequest(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	if err := remote.SetURL(remote.JPLHorizons, srv.URL); err != nil {
+	if err := remote.SetURL(remote.JPLHorizonsSPK, srv.URL); err != nil {
 		t.Fatal(err)
 	}
 
@@ -83,13 +84,13 @@ func TestMapHorizonsStatus(t *testing.T) {
 	}
 
 	for _, tt := range cases {
-		httpErr := &remote.HTTPError{StatusCode: tt.status}
+		httpErr := &api.HTTPError{StatusCode: tt.status}
 		if got := mapHorizonsStatus(httpErr); !errors.Is(got, tt.want) {
 			t.Errorf("mapHorizonsStatus(%d) = %v, want %v", tt.status, got, tt.want)
 		}
 	}
 
-	unexpected := mapHorizonsStatus(&remote.HTTPError{StatusCode: http.StatusTeapot})
+	unexpected := mapHorizonsStatus(&api.HTTPError{StatusCode: http.StatusTeapot})
 	if unexpected == nil {
 		t.Error("mapHorizonsStatus(teapot) = nil, want ErrHorizonsUnexpected-wrapped error")
 	}
@@ -100,16 +101,16 @@ func TestMapHorizonsStatus(t *testing.T) {
 }
 
 func TestCacheAPIReusesExistingFile(t *testing.T) {
-	dir := t.TempDir()
+	bucket := tempBucket(t)
 
-	if err := os.WriteFile(filepath.Join(dir, "433.bsp"), testDAFHeader(), 0o600); err != nil {
-		t.Fatalf("seed kernel file: %v", err)
+	if err := bucket.WriteAll(context.Background(), "433.bsp", testDAFHeader(), nil); err != nil {
+		t.Fatalf("seed kernel object: %v", err)
 	}
 
 	start := time.FromJD(2451545.0, time.UTC)
 	end := time.FromJD(2451546.0, time.UTC)
 
-	readers, err := CacheAPI(context.Background(), "433", start, end, dir)
+	readers, err := CacheAPI(context.Background(), bucket, "", "433", start, end)
 	if err != nil {
 		t.Fatalf("CacheAPI: %v", err)
 	}
@@ -127,11 +128,11 @@ func TestCacheAPIGeneratesFromHorizons(t *testing.T) {
 	// See TestApiHorizonsRequest: restore only the URL override, never
 	// call remote.Reset() (it would revoke TestMain's download consent
 	// for the rest of this package's test binary).
-	origEndpoint, _ := remote.Lookup(remote.JPLHorizons)
+	origEndpoint, _ := remote.Lookup(remote.JPLHorizonsSPK)
 
-	t.Cleanup(func() { _ = remote.SetURL(remote.JPLHorizons, origEndpoint.URL) })
+	t.Cleanup(func() { _ = remote.SetURL(remote.JPLHorizonsSPK, origEndpoint.URL) })
 
-	dir := t.TempDir()
+	bucket := tempBucket(t)
 
 	spkB64 := base64.StdEncoding.EncodeToString(testDAFHeader())
 
@@ -141,16 +142,16 @@ func TestCacheAPIGeneratesFromHorizons(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	if err := remote.SetURL(remote.JPLHorizons, srv.URL); err != nil {
+	if err := remote.SetURL(remote.JPLHorizonsSPK, srv.URL); err != nil {
 		t.Fatal(err)
 	}
 
-	remote.EnableDownloads(remote.JPLHorizons, 0)
+	remote.EnableDownloads(0, remote.JPLHorizonsSPK)
 
 	start := time.FromJD(2451545.0, time.UTC)
 	end := time.FromJD(2451546.0, time.UTC)
 
-	readers, err := CacheAPI(context.Background(), "433", start, end, dir)
+	readers, err := CacheAPI(context.Background(), bucket, "", "433", start, end)
 	if err != nil {
 		t.Fatalf("CacheAPI: %v", err)
 	}
@@ -163,8 +164,8 @@ func TestCacheAPIGeneratesFromHorizons(t *testing.T) {
 		t.Errorf("close: %v", err)
 	}
 
-	if !fileExists(filepath.Join(dir, "generated433.bsp")) {
-		t.Error("expected the generated SPK file to be saved to disk")
+	if exists, _ := bucket.Exists(context.Background(), "generated433.bsp"); !exists {
+		t.Error("expected the generated SPK object to be stored in the bucket")
 	}
 }
 
@@ -187,11 +188,11 @@ func TestCacheAPIGeneratesFromHorizons(t *testing.T) {
 // isolation; this test's mock server would fail loudly (via the "default"
 // unmatched-command branch) if CacheAPI ever sent the bare form anyway.
 func TestCacheAPIEscalatesToDESForOutOfRangeIDs(t *testing.T) {
-	origEndpoint, _ := remote.Lookup(remote.JPLHorizons)
+	origEndpoint, _ := remote.Lookup(remote.JPLHorizonsSPK)
 
-	t.Cleanup(func() { _ = remote.SetURL(remote.JPLHorizons, origEndpoint.URL) })
+	t.Cleanup(func() { _ = remote.SetURL(remote.JPLHorizonsSPK, origEndpoint.URL) })
 
-	dir := t.TempDir()
+	bucket := tempBucket(t)
 	spkB64 := base64.StdEncoding.EncodeToString(testDAFHeader())
 
 	var commands []string
@@ -215,16 +216,16 @@ func TestCacheAPIEscalatesToDESForOutOfRangeIDs(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	if err := remote.SetURL(remote.JPLHorizons, srv.URL); err != nil {
+	if err := remote.SetURL(remote.JPLHorizonsSPK, srv.URL); err != nil {
 		t.Fatal(err)
 	}
 
-	remote.EnableDownloads(remote.JPLHorizons, 0)
+	remote.EnableDownloads(0, remote.JPLHorizonsSPK)
 
 	start := time.FromJD(2451545.0, time.UTC)
 	end := time.FromJD(2451546.0, time.UTC)
 
-	readers, err := CacheAPI(context.Background(), "20000004", start, end, dir)
+	readers, err := CacheAPI(context.Background(), bucket, "", "20000004", start, end)
 	if err != nil {
 		t.Fatalf("CacheAPI: %v", err)
 	}
@@ -258,11 +259,11 @@ func TestCacheAPIEscalatesToDESForOutOfRangeIDs(t *testing.T) {
 // TestCacheAPIEscalatesToDESForOutOfRangeIDs) the bare attempt is skipped
 // and this starts directly at "DES=<id>;".
 func TestCacheAPIRetriesWithCAPForComets(t *testing.T) {
-	origEndpoint, _ := remote.Lookup(remote.JPLHorizons)
+	origEndpoint, _ := remote.Lookup(remote.JPLHorizonsSPK)
 
-	t.Cleanup(func() { _ = remote.SetURL(remote.JPLHorizons, origEndpoint.URL) })
+	t.Cleanup(func() { _ = remote.SetURL(remote.JPLHorizonsSPK, origEndpoint.URL) })
 
-	dir := t.TempDir()
+	bucket := tempBucket(t)
 	spkB64 := base64.StdEncoding.EncodeToString(testDAFHeader())
 
 	var commands []string
@@ -282,16 +283,16 @@ func TestCacheAPIRetriesWithCAPForComets(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	if err := remote.SetURL(remote.JPLHorizons, srv.URL); err != nil {
+	if err := remote.SetURL(remote.JPLHorizonsSPK, srv.URL); err != nil {
 		t.Fatal(err)
 	}
 
-	remote.EnableDownloads(remote.JPLHorizons, 0)
+	remote.EnableDownloads(0, remote.JPLHorizonsSPK)
 
 	start := time.FromJD(2451545.0, time.UTC)
 	end := time.FromJD(2451546.0, time.UTC)
 
-	readers, err := CacheAPI(context.Background(), "1000036", start, end, dir)
+	readers, err := CacheAPI(context.Background(), bucket, "", "1000036", start, end)
 	if err != nil {
 		t.Fatalf("CacheAPI: %v", err)
 	}
@@ -351,8 +352,14 @@ func TestCommandCandidates(t *testing.T) {
 	}
 }
 
-func fileExists(path string) bool {
-	_, err := os.Stat(path)
+// tempBucket is a throwaway local bucket standing in for remote's cache.
+func tempBucket(t *testing.T) *file.Bucket {
+	t.Helper()
 
-	return err == nil
+	b, err := file.Open(context.Background(), testutil.FileURL(t, t.TempDir()))
+	if err != nil {
+		t.Fatalf("open bucket: %v", err)
+	}
+
+	return b
 }

@@ -16,7 +16,7 @@ func main() {
 	// first use of catalog.OpenNGC below fetches it automatically
 	// (content-checked, so a re-run only costs a HEAD probe once cached).
 	// No need to import catalog/openngc directly.
-	remote.EnableDownloads(remote.OpenNGC, 5<<20) // ~2 MB combined source CSVs
+	remote.EnableDownloads(5<<20, remote.OpenNGC) // ~2 MB combined source CSVs
 
 	ctx := context.Background()
 

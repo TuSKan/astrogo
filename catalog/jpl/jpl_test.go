@@ -12,6 +12,8 @@ import (
 
 	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/internal/testutil"
+
+	"github.com/TuSKan/astrogo/remote"
 )
 
 // jsonResultPayload builds a minimal Horizons JSON envelope carrying the
@@ -29,17 +31,19 @@ func jsonResultPayload(t *testing.T, result string) string {
 }
 
 // newMockProvider spins up an httptest.Server always returning jsonPayload
-// and wires it into a fresh Provider's transport, bypassing real network I/O.
-func newMockProvider(jsonPayload string) *Provider {
+// and points the Horizons endpoint at it, bypassing real network I/O.
+func newMockProvider(t *testing.T, jsonPayload string) *Provider {
+	t.Helper()
+
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		fmt.Fprint(w, jsonPayload) //nolint:errcheck // test server, write failure would fail the test via response assertions
 	}))
+	t.Cleanup(server.Close)
 
-	prov := New()
-	prov.client.HTTPClient.Transport = &mockTransport{Handler: server.Config.Handler}
+	redirect(t, remote.JPLHorizons, server.URL)
 
-	return prov
+	return New()
 }
 
 // TestJPLResolveObject_AmbiguousMajorBody uses a real Horizons "Multiple
@@ -59,7 +63,7 @@ func TestJPLResolveObject_AmbiguousMajorBody(t *testing.T) {
 		"   Number of matches =  3. Use ID# to make unique selection.\n" +
 		"*******************************************************************************\n"
 
-	prov := newMockProvider(jsonResultPayload(t, result))
+	prov := newMockProvider(t, jsonResultPayload(t, result))
 
 	var got []resolve.Target
 
@@ -97,7 +101,7 @@ func TestJPLResolveObject_AmbiguousSmallBody(t *testing.T) {
 		"    90000733    1930    73P            73P             Schwassmann-Wachmann 3\n" +
 		"    90000740    1995    73P-A          73P-A           Schwassmann-Wachmann 3\n"
 
-	prov := newMockProvider(jsonResultPayload(t, result))
+	prov := newMockProvider(t, jsonResultPayload(t, result))
 
 	var got []resolve.Target
 
@@ -150,7 +154,7 @@ func TestJPLResolveObject_ExactMatch(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			prov := newMockProvider(jsonResultPayload(t, tt.result))
+			prov := newMockProvider(t, jsonResultPayload(t, tt.result))
 
 			var got []resolve.Target
 
@@ -184,7 +188,7 @@ func TestJPLResolveObject_ZeroMatches(t *testing.T) {
 		" Matching small-bodies: \n    No matches found.\n" +
 		"*******************************************************************************\n"
 
-	prov := newMockProvider(jsonResultPayload(t, result))
+	prov := newMockProvider(t, jsonResultPayload(t, result))
 
 	var (
 		got    []resolve.Target
@@ -209,7 +213,7 @@ func TestJPLResolveObject_ZeroMatches(t *testing.T) {
 // matches none of the three known shapes still surfaces ErrNotImplemented
 // rather than silently returning nothing or fabricating a Target.
 func TestJPLResolveObject_UnrecognizedShape(t *testing.T) {
-	prov := newMockProvider(jsonResultPayload(t, "Some entirely novel Horizons output shape with no recognizable marker text.\n"))
+	prov := newMockProvider(t, jsonResultPayload(t, "Some entirely novel Horizons output shape with no recognizable marker text.\n"))
 
 	iter := prov.ResolveObject(context.Background(), resolve.ObjectRequest{Query: "???"})
 	iter(func(_ resolve.Target, err error) bool {
@@ -226,24 +230,11 @@ func TestJPLResolveObject_UnrecognizedShape(t *testing.T) {
 // Target for an unambiguous query instead of always returning ok=false.
 func TestJPLResolve_ReturnsRealMatch(t *testing.T) {
 	result := "Target body name: Mars (499)                      {source: mar099}\n"
-	prov := newMockProvider(jsonResultPayload(t, result))
+	prov := newMockProvider(t, jsonResultPayload(t, result))
 
 	target, ok := prov.Resolve(context.Background(), "Mars")
 	testutil.AssertEqual(t, "Resolve Ok", ok, true)
 	testutil.AssertEqual(t, "Resolve Name", target.Name, "Mars")
-}
-
-type mockTransport struct {
-	Handler http.Handler
-}
-
-func (m *mockTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	rec := httptest.NewRecorder()
-	m.Handler.ServeHTTP(rec, req)
-	resp := rec.Result()
-	resp.Request = req
-
-	return resp, nil
 }
 
 func TestJPLErrorResponse(t *testing.T) {
@@ -262,7 +253,8 @@ func TestJPLErrorResponse(t *testing.T) {
 	defer server.Close()
 
 	prov := New()
-	prov.client.HTTPClient.Transport = &mockTransport{Handler: server.Config.Handler}
+
+	redirect(t, remote.JPLHorizons, server.URL)
 
 	req := resolve.ObjectRequest{Query: "!!!ERROR!!!"}
 	iter := prov.ResolveObject(context.Background(), req)
@@ -283,17 +275,6 @@ func TestJPLErrorResponse(t *testing.T) {
 	})
 }
 
-// errTransport fails every request locally, so exercising the miss path
-// below never reaches the real network (this is a default, non-network-tagged
-// test — see CLAUDE.md's build-tag convention).
-type errTransport struct{}
-
-var errNoTransport = errors.New("errTransport: no network access in this test")
-
-func (errTransport) RoundTrip(*http.Request) (*http.Response, error) {
-	return nil, errNoTransport
-}
-
 func TestProviderInterface(t *testing.T) {
 	p := New()
 	testutil.AssertEqual(t, "Name", p.Name(), "jpl")
@@ -303,12 +284,27 @@ func TestProviderInterface(t *testing.T) {
 		t.Errorf("expected CapObjectResolution, got %v", caps)
 	}
 
-	p.client.HTTPClient.Transport = errTransport{}
+	redirect(t, remote.JPLHorizons, "http://127.0.0.1:1")
 
 	// Fast fail search / resolve without any real network call.
 	// This hits the missing coverage lines.
 	_, ok := p.Resolve(context.Background(), "non_existent_body_to_trigger_miss")
 	if ok {
 		t.Error("expected Resolve to fail with no transport")
+	}
+}
+
+// redirect points endpoint id at a test server for the duration of one
+// test. It replaces the old http.RoundTripper injection: remote/api's
+// Client is opaque by design, and every request resolves its URL through
+// remote.URL(id) anyway, so the registry is the natural seam.
+func redirect(t *testing.T, id remote.EndpointID, url string) {
+	t.Helper()
+
+	scope := remote.Capture(id)
+	t.Cleanup(scope.Restore)
+
+	if err := remote.SetURL(id, url); err != nil {
+		t.Fatalf("SetURL(%s): %v", id, err)
 	}
 }

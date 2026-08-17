@@ -4,15 +4,17 @@ import (
 	"bytes"
 	"context"
 	"encoding/binary"
+	"errors"
+	"io"
 	"math"
-	"os"
-	"path/filepath"
 	"testing"
 
 	"github.com/TuSKan/astrogo/ephemeris/core"
 	"github.com/TuSKan/astrogo/ephemeris/jpl"
 	"github.com/TuSKan/astrogo/ephemeris/jpl/spk"
 	"github.com/TuSKan/astrogo/internal/testutil"
+	"github.com/TuSKan/astrogo/remote"
+	"github.com/TuSKan/astrogo/remote/file"
 )
 
 // fakeReaderAt adapts a *bytes.Reader (which already implements io.ReaderAt)
@@ -50,12 +52,15 @@ func TestSPKReader(t *testing.T) {
 		}
 	})
 
-	spkPath := filepath.Join(prov.DataDir, "planets", "de440s.bsp")
+	ctx := context.Background()
 
-	f, err := os.Open(spkPath)
+	bucket, prefix, err := remote.CacheDir(ctx, remote.NAIFSPK)
 	testutil.AssertNoError(t, err)
 
-	r, err := spk.NewReader(f)
+	ra, err := file.NewReaderAt(ctx, bucket, prefix+"planets/de440s.bsp")
+	testutil.AssertNoError(t, err)
+
+	r, err := spk.NewReader(ra)
 	testutil.AssertNoError(t, err)
 
 	t.Cleanup(func() {
@@ -196,4 +201,73 @@ func TestEvaluateType21(t *testing.T) {
 	testutil.AssertNear(t, "vel.X @ delta=5", vel.X, refVel[0], 1e-9)
 	testutil.AssertNear(t, "vel.Y @ delta=5", vel.Y, refVel[1], 1e-9)
 	testutil.AssertNear(t, "vel.Z @ delta=5", vel.Z, refVel[2], 1e-9)
+}
+
+// Regression test for a real, live-measured bug: reading an SPK segment
+// used to issue one Bucket.NewRangeReader — and, under fileblob, one
+// os.Open — per ReadAt. At the volume of small reads segment evaluation
+// makes, that took a single moon-phase root-find from milliseconds to over
+// two minutes on Windows. file.NewReaderAt fixes it generically by
+// chunking, so this exercises the scattered, overlapping access pattern
+// Chebyshev-coefficient lookups produce against a real bucket.
+func TestReaderAtManySmallScatteredReads(t *testing.T) {
+	ctx := context.Background()
+
+	url := testutil.FileURL(t, t.TempDir())
+
+	bucket, err := file.Open(ctx, url)
+	testutil.AssertNoError(t, err)
+
+	const key = "test.bsp"
+
+	// A deterministic, easily-indexable byte pattern: byte i has value
+	// byte(i), so ReadAt at any offset/length is independently verifiable.
+	data := make([]byte, 8*1024)
+	for i := range data {
+		data[i] = byte(i)
+	}
+
+	testutil.AssertNoError(t, bucket.WriteAll(ctx, key, data, nil))
+
+	ra, err := file.NewReaderAt(ctx, bucket, key)
+	testutil.AssertNoError(t, err)
+
+	t.Cleanup(func() { _ = ra.Close() })
+
+	// Scattered, non-sequential, overlapping small reads — the exact
+	// access pattern SPK Chebyshev-coefficient lookups produce.
+	offsets := []int64{4096, 0, 4088, 100, 4095, 8016, 16, 4096, 0}
+
+	for _, off := range offsets {
+		buf := make([]byte, 16)
+
+		n, rerr := ra.ReadAt(buf, off)
+		testutil.AssertNoError(t, rerr)
+
+		if int64(n) != 16 {
+			t.Fatalf("ReadAt(off=%d): n = %d, want 16", off, n)
+		}
+
+		for i, b := range buf {
+			want := byte(off + int64(i))
+			if b != want {
+				t.Fatalf("ReadAt(off=%d)[%d] = %d, want %d", off, i, b, want)
+			}
+		}
+	}
+
+	// A read that runs off the end must still return the valid prefix with
+	// io.EOF, matching io.ReaderAt's documented contract — exercised here
+	// against the cached-*os.File fast path specifically (a plain
+	// NewRangeReader-per-call already covered this before the fix).
+	tail := make([]byte, 16)
+
+	n, err := ra.ReadAt(tail, int64(len(data)-8))
+	if n != 8 {
+		t.Errorf("tail ReadAt: n = %d, want 8", n)
+	}
+
+	if !errors.Is(err, io.EOF) {
+		t.Errorf("tail ReadAt: err = %v, want io.EOF", err)
+	}
 }

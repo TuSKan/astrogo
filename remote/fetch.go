@@ -1,98 +1,81 @@
 package remote
 
 import (
+	"cmp"
 	"context"
-	"encoding/json"
-	"errors"
 	"fmt"
-	"net/http"
+	"io"
+	"log"
 	"time"
 
-	gofs "github.com/ungerik/go-fs"
+	"gocloud.dev/gcerrors"
+
+	"github.com/TuSKan/astrogo/remote/file"
 )
 
-// Signature is a lightweight remote-content fingerprint captured via a HEAD
-// request (ETag and/or Content-Length) — the alternative to a wall-clock
-// expiration window for sources that actually mutate over time (e.g. the
-// IERS EOP bulletin, an upstream catalog CSV). Comparing signatures lets
-// GetFile skip a re-download entirely when nothing changed upstream,
-// instead of trusting an arbitrary "still fresh enough" age threshold.
-type Signature struct {
-	ETag          string
-	ContentLength int64
-}
-
-// readCfg carries per-GetFile options.
-type readCfg struct {
+// readConfig carries per-GetFile options.
+type readConfig struct {
 	cacheName string
-	validate  func([]byte) error
+	validate  func(io.Reader) error
 	timeout   time.Duration
 	progress  func(downloaded, total int64)
 }
 
 // ReadOption customizes a single GetFile call.
-type ReadOption func(*readCfg)
+type ReadOption func(*readConfig)
 
-// WithCacheName sets the on-disk cache filename when it differs from the
-// URL path segment (e.g. IERSFinals2000A: URL is the whole resource,
-// path=="", cache file is "finals2000A.data"). Required when name=="".
-func WithCacheName(cacheName string) ReadOption {
-	return func(c *readCfg) { c.cacheName = cacheName }
+// WithCacheName sets the cache key when it differs from the source name —
+// IERS serves finals2000A.all, which time caches as finals2000A.data.
+func WithCacheName(key string) ReadOption {
+	return func(c *readConfig) { c.cacheName = key }
 }
 
-// WithValidate runs f on freshly downloaded (not cached) bytes before
-// they're trusted; on error GetFile returns the error instead of writing
-// the cache file or saving a signature, so corrupt content is never
-// cached.
-func WithValidate(f func([]byte) error) ReadOption {
-	return func(c *readCfg) { c.validate = f }
+// WithValidate runs f over the freshly downloaded bytes before they are
+// promoted into the cache, so a corrupt fetch is never cached and never
+// reused. f is not called for a cache hit. It reads a stream, not a
+// buffer: a multi-GB kernel must not have to fit in memory to be checked.
+func WithValidate(f func(io.Reader) error) ReadOption {
+	return func(c *readConfig) { c.validate = f }
 }
 
-// WithDownloadTimeout overrides Endpoint.DownloadTimeout for this one call.
+// WithDownloadTimeout overrides Endpoint.DownloadTimeout for one call.
 func WithDownloadTimeout(d time.Duration) ReadOption {
-	return func(c *readCfg) { c.timeout = d }
+	return func(c *readConfig) { c.timeout = d }
 }
 
 // WithProgress registers a callback invoked as a download progresses, with
-// the bytes transferred so far and the total (0 if unknown, e.g. no
-// Content-Length header). Never called for a cache hit.
+// the bytes transferred so far and the total (0 if unknown). Never called
+// for a cache hit.
 func WithProgress(f func(downloaded, total int64)) ReadOption {
-	return func(c *readCfg) { c.progress = f }
+	return func(c *readConfig) { c.progress = f }
 }
 
-// GetFile ensures endpoint id's content at path is present and valid in
-// the local cache, then returns the gofs.File itself — the caller opens it
-// however it needs (OpenReader for sequential access, OpenReadSeeker for
-// random access, ReadAll for whole-content).
+// GetFile ensures endpoint id's object named name is present and current
+// in the cache, returning the cache Bucket and the key within it. The
+// caller reads it however it needs — ReadAll, NewReader, file.NewReaderAt.
 //
-//   - Endpoint.Mutable == false: the cache is reused if merely present, no
-//     HEAD probe (immutable/versioned content — JPL kernels).
-//   - Endpoint.Mutable == true: the cache is reused only if a HEAD probe
-//     shows nothing changed upstream (IERS, OpenNGC).
-//
-// A cache miss downloads (consent-gated: ErrDownloadDenied unless
-// EnableDownloads was called for id) using Endpoint.DownloadTimeout unless
-// overridden by WithDownloadTimeout. With WithValidate, the downloaded
-// bytes are buffered and checked before being written to disk (so corrupt
-// content is never cached); without it, the transfer streams straight to
-// disk without buffering the whole thing in memory (needed for multi-GB
-// JPL kernels).
-func GetFile(ctx context.Context, id EndpointID, name string, opts ...ReadOption) (gofs.File, error) {
+// An immutable endpoint's cache entry is reused on existence alone; a
+// Mutable one is revalidated against the source's current ETag first. A
+// miss downloads, which requires consent (ErrDownloadDenied otherwise) and
+// is serialized against other processes doing the same.
+func GetFile(ctx context.Context, id EndpointID, name string, opts ...ReadOption) (bucket *file.Bucket, key string, err error) {
 	ep, ok := Lookup(id)
 	if !ok {
-		return "", fmt.Errorf("%w: %q", ErrUnknownEndpoint, id)
+		return nil, "", fmt.Errorf("%w: %q", ErrUnknownEndpoint, id)
+	}
+
+	// URL is the offline/Disable gate. It runs first so a blocked endpoint
+	// fails before any cache directory is resolved or lock taken, and so
+	// the source below is never opened for a URL the caller may not reach.
+	if _, err := URL(id); err != nil {
+		return nil, "", err
 	}
 
 	if !ep.Kind.cacheable() {
-		return "", fmt.Errorf("%w: %q", ErrNotFileEndpoint, id)
+		return nil, "", fmt.Errorf("%w: %q", ErrNotFileEndpoint, id)
 	}
 
-	tr, err := transportFor(ep.Kind)
-	if err != nil {
-		return "", err
-	}
-
-	var cfg readCfg
+	var cfg readConfig
 	for _, opt := range opts {
 		opt(&cfg)
 	}
@@ -103,174 +86,210 @@ func GetFile(ctx context.Context, id EndpointID, name string, opts ...ReadOption
 	}
 
 	if cacheName == "" {
-		return "", fmt.Errorf("%w: endpoint %q", ErrCacheNameRequired, id)
+		return nil, "", fmt.Errorf("%w: endpoint %q", ErrCacheNameRequired, id)
 	}
 
-	dir, err := CacheDir(id)
+	cacheBucket, prefix, err := CacheDir(ctx, id)
 	if err != nil {
-		return "", err
+		return nil, "", err
 	}
 
-	cacheFile := dir.Join(cacheName)
+	cacheKey := prefix + cacheName
 
-	if cacheFile.Exists() && (!ep.Mutable || unchanged(ctx, ep, tr, name, cacheFile)) {
-		return cacheFile, nil
+	// An immutable endpoint's cache hit is answered before the source is
+	// ever resolved, so a fully-cached kernel stays readable even when its
+	// source is unreachable — no network, no credentials, no driver.
+	if !ep.Mutable {
+		if exists, existsErr := cacheBucket.Exists(ctx, cacheKey); existsErr == nil && exists {
+			return cacheBucket, cacheKey, nil
+		}
 	}
 
-	// Hold an exclusive lock across the "still missing? then download"
-	// decision, not just the download itself — otherwise two callers can
-	// both observe the cache-miss above and both proceed to download.
-	// See acquireLock's doc comment for why this must be a cross-process
-	// lock, not merely an in-package mutex.
-	release, _, lockErr := acquireLock(ctx, cacheFile)
-	if lockErr != nil {
-		return "", lockErr
+	srcBucket, err := file.Open(ctx, ep.URL)
+	if err != nil {
+		// A caller who never granted consent gets ErrDownloadDenied rather
+		// than this source error even when the source is genuinely
+		// unreachable: consent is the actionable blocker from their side,
+		// and reporting it consistently matches the documented contract.
+		// Routed through CheckDownload so a custom Policy still decides.
+		// A caller who did grant consent sees the real error.
+		if cerr := CheckDownload(id, name, ep.ApproxSize); cerr != nil {
+			return nil, "", cerr
+		}
+
+		return nil, "", fmt.Errorf("remote: open source %s: %w", ep.URL, err)
+	}
+
+	if fresh, freshErr := freshInCache(ctx, ep, srcBucket, cacheBucket, name, cacheKey); freshErr == nil && fresh {
+		return cacheBucket, cacheKey, nil
+	}
+
+	// The lock spans the "still missing? then download" decision, not just
+	// the transfer: without it two callers both observe the miss and both
+	// write. go test runs each package as its own process and several
+	// share one JPL kernel, so this is a cross-process race that no
+	// in-process mutex can fix.
+	release, err := acquireLock(ctx, cacheBucket, cacheKey)
+	if err != nil {
+		return nil, "", err
 	}
 
 	defer release()
 
-	// Re-check: whoever held the lock before us may have already filled
-	// this cache entry while we were waiting for it.
-	if cacheFile.Exists() && (!ep.Mutable || unchanged(ctx, ep, tr, name, cacheFile)) {
-		return cacheFile, nil
+	// Whoever held the lock before us may have filled the entry already.
+	if fresh, freshErr := freshInCache(ctx, ep, srcBucket, cacheBucket, name, cacheKey); freshErr == nil && fresh {
+		return cacheBucket, cacheKey, nil
 	}
 
-	timeout := cfg.timeout
-	if timeout == 0 {
-		timeout = ep.DownloadTimeout
+	timeout := cmp.Or(cfg.timeout, ep.DownloadTimeout, DefaultDownloadTimeout)
+
+	if err := fetchInto(ctx, id, ep, srcBucket, cacheBucket, name, cacheKey, timeout, cfg); err != nil {
+		return nil, "", fmt.Errorf("remote: fetch %s: %w", name, err)
 	}
 
-	if timeout == 0 {
-		timeout = DefaultDownloadTimeout
-	}
-
-	if err := tr.FetchInto(ctx, id, name, cacheFile, timeout, cfg.validate, cfg.progress); err != nil {
-		return "", fmt.Errorf("remote: fetch %s: %w", name, err)
-	}
-
-	if ep.Mutable {
-		// Best-effort: losing the signature only costs a redundant
-		// download next time, so a probe failure here doesn't fail the
-		// whole fetch.
-		if sig, perr := tr.Probe(ctx, id, name); perr == nil {
-			_ = saveSignature(cacheFile, sig)
-		}
-	}
-
-	return cacheFile, nil
+	return cacheBucket, cacheKey, nil
 }
 
-// Exists reports whether endpoint id currently serves the file at name.
-// It issues a HEAD request (or its transport's equivalent), which
-// transfers no body and therefore never triggers the download-consent
-// gate — so a caller may use this to discover what is available before
-// deciding whether to ask for consent (see
-// skybrightness/atlas.NewestVIIRSYear, which probes forward for
-// newly-published data years).
+// Exists reports whether endpoint id currently serves an object at name.
+// It is a metadata-only probe that transfers no body and so never triggers
+// the consent gate — a caller may use it to discover what is available
+// before deciding whether to ask for consent.
 //
-// A 404 is reported as (false, nil): the endpoint answered, the file just
-// is not there. Any other failure — offline mode, a disabled endpoint, a
-// network error, a 5xx — returns a non-nil error, so "missing" is never
+// A missing object is (false, nil): the source answered and it is not
+// there. Any other failure returns an error, so "missing" is never
 // confused with "could not tell".
 func Exists(ctx context.Context, id EndpointID, name string) (bool, error) {
-	if _, err := probeFor(ctx, id, name); err != nil {
-		var httpErr *HTTPError
-		if errors.As(err, &httpErr) && httpErr.StatusCode == http.StatusNotFound {
+	ep, ok := Lookup(id)
+	if !ok {
+		return false, fmt.Errorf("%w: %q", ErrUnknownEndpoint, id)
+	}
+
+	if _, err := URL(id); err != nil {
+		return false, err
+	}
+
+	srcBucket, err := file.Open(ctx, ep.URL)
+	if err != nil {
+		return false, fmt.Errorf("remote: open source %s: %w", ep.URL, err)
+	}
+
+	if _, err := srcBucket.Attributes(ctx, name); err != nil {
+		if gcerrors.Code(err) == gcerrors.NotFound {
 			return false, nil
 		}
 
-		return false, err
+		return false, fmt.Errorf("remote: probe %s: %w", name, err)
 	}
 
 	return true, nil
 }
 
-// probeFor resolves id's registered Transport and returns the remote
-// Signature for path, so callers holding only an EndpointID (Exists)
-// dispatch identically to GetFile's own transport-aware path. A Transport
-// implementation must report a not-found path as an *HTTPError with
-// StatusCode 404, matching httpTransport's own HEAD-based behavior, so
-// this 404-to-(false,nil) mapping in Exists works for every Kind.
-func probeFor(ctx context.Context, id EndpointID, path string) (Signature, error) {
-	ep, ok := Lookup(id)
-	if !ok {
-		return Signature{}, fmt.Errorf("%w: %q", ErrUnknownEndpoint, id)
-	}
-
-	tr, err := transportFor(ep.Kind)
+// freshInCache reports whether cacheKey already holds current content for
+// ep+name, so GetFile can skip the transfer entirely.
+func freshInCache(ctx context.Context, ep Endpoint, srcBucket, cacheBucket *file.Bucket, name, cacheKey string) (bool, error) {
+	exists, err := cacheBucket.Exists(ctx, cacheKey)
 	if err != nil {
-		return Signature{}, err
+		return false, fmt.Errorf("remote: check cache %s: %w", cacheKey, err)
 	}
 
-	sig, err := tr.Probe(ctx, id, path)
-	if err != nil {
-		return Signature{}, fmt.Errorf("remote: probe %s: %w", path, err)
+	if !exists {
+		return false, nil
 	}
 
-	return sig, nil
+	if !ep.Mutable {
+		return true, nil
+	}
+
+	return unchanged(ctx, srcBucket, cacheBucket, name, cacheKey), nil
 }
 
-// unchanged reports whether the remote content at endpoint ep + path still
-// matches the Signature previously recorded for cacheFile — true means the
-// caller can skip a full re-download. Comparison prefers ETag when the
-// server provides one, falling back to Content-Length otherwise. Any
-// failure — no signature recorded yet, the probe erroring, offline mode —
-// returns false ("assume changed"), so GetFile always falls through to its
-// normal download path. tr is ep's already-resolved Transport (GetFile
-// already looked it up), so this never has to look it up again.
-func unchanged(ctx context.Context, ep Endpoint, tr Transport, path string, cacheFile gofs.File) bool {
-	want := loadSignature(cacheFile)
-	if want == (Signature{}) {
-		return false
-	}
-
-	got, err := tr.Probe(ctx, ep.ID, path)
+// unchanged compares the source ETag recorded on the cached object at
+// fetch time against the source's current one. Any failure — an erroring
+// probe, offline mode — reports "changed", so GetFile falls through to its
+// normal download path.
+//
+// The recorded ETag is deliberately not the cached object's own: for a
+// local cache, fileblob derives ETag from the file's (ModTime, Size),
+// which has nothing to do with the source's, so that comparison would
+// never match and every reuse check would degrade into a full re-download.
+func unchanged(ctx context.Context, srcBucket, cacheBucket *file.Bucket, name, cacheKey string) bool {
+	want, err := cacheBucket.Attributes(ctx, cacheKey)
 	if err != nil {
 		return false
 	}
 
-	if want.ETag != "" && got.ETag != "" {
-		return want.ETag == got.ETag
-	}
-
-	return want.ContentLength > 0 && want.ContentLength == got.ContentLength
-}
-
-// signatureFile returns the sidecar File loadSignature/saveSignature use to
-// persist cacheFile's Signature, on the same go-fs filesystem as cacheFile
-// itself.
-func signatureFile(cacheFile gofs.File) gofs.File {
-	return cacheFile + ".signature.json"
-}
-
-// loadSignature reads cacheFile's previously recorded Signature, returning
-// the zero Signature if none was ever saved (or it's unreadable — never
-// treated as fatal, just as "assume changed").
-func loadSignature(cacheFile gofs.File) Signature {
-	b, err := signatureFile(cacheFile).ReadAll()
+	got, err := srcBucket.Attributes(ctx, name)
 	if err != nil {
-		return Signature{}
+		return false
 	}
 
-	var sig Signature
-	if err := json.Unmarshal(b, &sig); err != nil {
-		return Signature{}
+	if recorded := want.Metadata[sourceETagKey]; recorded != "" && got.ETag != "" {
+		return recorded == got.ETag
 	}
 
-	return sig
+	return want.Size > 0 && want.Size == got.Size
 }
 
-// saveSignature persists sig as cacheFile's Signature sidecar, so a future
-// unchanged call has something to compare the remote content against.
-func saveSignature(cacheFile gofs.File, sig Signature) error {
-	b, err := json.Marshal(sig)
+// fetchInto performs the transfer from srcBucket/name into
+// cacheBucket/cacheKey. It owns all policy — consent, timeout, progress,
+// resume, validation — for every backend uniformly; buckets only move
+// bytes.
+func fetchInto(ctx context.Context, id EndpointID, ep Endpoint, srcBucket, cacheBucket *file.Bucket,
+	name, cacheKey string, timeout time.Duration, cfg readConfig,
+) error {
+	// Consent is checked twice: once on the registered estimate before any
+	// request, and again below on the size the source actually reports.
+	if err := CheckDownload(id, name, ep.ApproxSize); err != nil {
+		return err
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	attrs, err := srcBucket.Attributes(ctx, name)
 	if err != nil {
-		return fmt.Errorf("remote: marshal signature: %w", err)
+		return fmt.Errorf("%w: %s: %w", ErrDownloadFailed, name, err)
 	}
 
-	if err := signatureFile(cacheFile).WriteAll(b); err != nil {
-		return fmt.Errorf("remote: write signature: %w", err)
+	if err := CheckDownload(id, name, attrs.Size); err != nil {
+		return err
 	}
 
-	return nil
+	offset := resumePoint(ctx, cacheBucket, cacheKey, attrs.ETag)
+
+	log.Printf("remote: downloading %s (endpoint %s, %d bytes)", cacheKey, id, attrs.Size)
+
+	r, err := srcBucket.NewRangeReader(ctx, name, offset, -1, nil)
+	if err != nil {
+		return fmt.Errorf("%w: %s: %w", ErrDownloadFailed, name, err)
+	}
+
+	defer func() { _ = r.Close() }()
+
+	var body io.Reader = r
+	if cfg.progress != nil {
+		body = &progressReader{r: r, total: offset + r.Size(), read: offset, onProgress: cfg.progress}
+	}
+
+	return stageAndPromote(ctx, cacheBucket, cacheKey, body, offset, attrs.ETag, cfg.validate)
+}
+
+// progressReader reports the running byte count after every Read that
+// returns data.
+type progressReader struct {
+	r          io.Reader
+	total      int64
+	read       int64
+	onProgress func(downloaded, total int64)
+}
+
+func (p *progressReader) Read(b []byte) (int, error) {
+	n, err := p.r.Read(b)
+	if n > 0 {
+		p.read += int64(n)
+		p.onProgress(p.read, p.total)
+	}
+
+	//nolint:wrapcheck // must forward io.EOF unwrapped: io.Copy identity-checks it
+	return n, err
 }

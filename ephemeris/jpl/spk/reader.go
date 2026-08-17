@@ -13,9 +13,10 @@ import (
 	"sort"
 	"strings"
 
-	gofs "github.com/ungerik/go-fs"
+	"gocloud.dev/gcerrors"
 
 	"github.com/TuSKan/astrogo/remote"
+	"github.com/TuSKan/astrogo/remote/file"
 	"github.com/TuSKan/astrogo/vector"
 )
 
@@ -62,7 +63,7 @@ type Reader struct {
 // remote.NAIFSPK. Downloads are gated by remote's consent configuration —
 // planetary kernels are large (de440s ≈ 32 MB, de440/de442 ≈ 115 MB,
 // de441 parts multi-GB), and astrogo never downloads them without an
-// explicit remote.EnableDownloads(remote.NAIFSPK, maxSize) call or a
+// explicit remote.EnableDownloads(maxSize, remote.NAIFSPK) call or a
 // pre-seeded file.
 //
 // It provides an auto-healing mechanism for CI environments by automatically
@@ -78,20 +79,20 @@ type Reader struct {
 //  2. Removes the corrupt file from the filesystem.
 //  3. Returns the error wrapped with a descriptive message.
 func CacheDownload(ctx context.Context, kernel string) (*Reader, error) {
-	spkFile, err := remote.GetFile(ctx, remote.NAIFSPK, kernel, remote.WithCacheName(kernel))
+	bucket, key, err := remote.GetFile(ctx, remote.NAIFSPK, kernel, remote.WithCacheName(kernel))
 	if err != nil {
 		return nil, fmt.Errorf("jpl: SPK kernel %s: %w", kernel, err)
 	}
 
-	ra, err := openReaderAt(spkFile)
+	ra, err := file.NewReaderAt(ctx, bucket, key)
 	if err != nil {
-		return nil, fmt.Errorf("jpl: failed to open SPK: %w", err)
+		return nil, fmt.Errorf("jpl: open SPK %s: %w", key, err)
 	}
 
 	r, err := NewReader(ra)
 	if err != nil {
 		closeErr := ra.Close()
-		removeErr := spkFile.Remove()
+		removeErr := bucket.Delete(ctx, key)
 
 		return nil, errors.Join(err, closeErr, removeErr)
 	}
@@ -99,12 +100,19 @@ func CacheDownload(ctx context.Context, kernel string) (*Reader, error) {
 	// Validate physical file size against DAF logical file length
 	// FREE is the 1-based index of the first free double precision word.
 	// Therefore, (FREE - 1) words * 8 bytes is the absolute minimum byte length.
-	size := spkFile.Size()
+	attrs, err := bucket.Attributes(ctx, key)
+	if err != nil {
+		closeErr := r.Close()
+
+		return nil, errors.Join(fmt.Errorf("jpl: stat SPK %s: %w", key, err), closeErr)
+	}
+
+	size := attrs.Size
 	expectedMinSize := int64(r.FileRec.FREE-1) * 8
 
 	if size < expectedMinSize {
 		closeErr := r.Close()
-		removeErr := spkFile.Remove()
+		removeErr := bucket.Delete(ctx, key)
 
 		return nil, errors.Join(
 			fmt.Errorf("%w: truncated %d bytes, expected min %d bytes", ErrCorruptSPK, size, expectedMinSize),
@@ -115,7 +123,7 @@ func CacheDownload(ctx context.Context, kernel string) (*Reader, error) {
 	// Verify file integrity immediately to auto-heal CI pipelines
 	if _, err := r.ReadSummaries(); err != nil {
 		closeErr := r.Close()
-		removeErr := spkFile.Remove()
+		removeErr := bucket.Delete(ctx, key)
 
 		return nil, errors.Join(fmt.Errorf("jpl: corrupt SPK file gracefully deleted: %w", err), closeErr, removeErr)
 	}
@@ -127,10 +135,10 @@ func CacheDownload(ctx context.Context, kernel string) (*Reader, error) {
 	// record our own SHA-256 the first time a kernel is trusted and compare
 	// against it on every later open of the same cached path. Hashing reads
 	// through the already-open ra handle instead of opening the file again.
-	if err := verifyOrBootstrapChecksum(spkFile, ra, size); err != nil {
+	if err := verifyOrBootstrapChecksum(ctx, bucket, key, ra, size); err != nil {
 		closeErr := r.Close()
-		removeErr := spkFile.Remove()
-		sumRemoveErr := removeChecksumSidecar(spkFile)
+		removeErr := bucket.Delete(ctx, key)
+		sumRemoveErr := removeChecksumSidecar(ctx, bucket, key)
 
 		return nil, errors.Join(fmt.Errorf("jpl: corrupt SPK file gracefully deleted: %w", err), closeErr, removeErr, sumRemoveErr)
 	}
@@ -138,35 +146,20 @@ func CacheDownload(ctx context.Context, kernel string) (*Reader, error) {
 	return r, nil
 }
 
-// openReaderAt opens f for random access, giving Reader the io.ReaderAt it
-// needs for segment lookups. gofs.File.OpenReadSeeker's returned
-// ReadSeekCloser already implements io.ReaderAt as part of its interface
-// (Read/ReaderAt/Seeker/Closer combined), so it satisfies ReadAtCloser
-// directly with no further unwrapping.
-func openReaderAt(f gofs.File) (ReadAtCloser, error) {
-	rsc, err := f.OpenReadSeeker()
-	if err != nil {
-		return nil, fmt.Errorf("%s: %w", f, err)
-	}
-
-	return rsc, nil
-}
-
-// checksumSidecarFile returns the File used to persist a kernel's recorded
+// checksumSidecarKey returns the key used to persist a kernel's recorded
 // SHA-256, alongside the kernel itself.
-func checksumSidecarFile(spkFile gofs.File) gofs.File {
-	return spkFile + ".sha256"
-}
+func checksumSidecarKey(key string) string { return key + ".sha256" }
 
 // removeChecksumSidecar deletes a kernel's checksum sidecar, ignoring a
-// missing file (nothing to clean up).
-func removeChecksumSidecar(spkFile gofs.File) error {
-	sumFile := checksumSidecarFile(spkFile)
-	if !sumFile.Exists() {
-		return nil
+// missing one (nothing to clean up).
+func removeChecksumSidecar(ctx context.Context, bucket *file.Bucket, key string) error {
+	sumKey := checksumSidecarKey(key)
+
+	if exists, err := bucket.Exists(ctx, sumKey); err != nil || !exists {
+		return nil //nolint:nilerr // a failed existence check just means "nothing to clean up here either"
 	}
 
-	if err := sumFile.Remove(); err != nil {
+	if err := bucket.Delete(ctx, sumKey); err != nil {
 		return fmt.Errorf("jpl: checksum: remove sidecar: %w", err)
 	}
 
@@ -179,25 +172,25 @@ func removeChecksumSidecar(spkFile gofs.File) error {
 // current hash is trusted and recorded for future opens instead of failing.
 // Hashing reads through the already-open ra (a SectionReader over its
 // io.ReaderAt) instead of opening the kernel a second time.
-func verifyOrBootstrapChecksum(spkFile gofs.File, ra io.ReaderAt, size int64) error {
+func verifyOrBootstrapChecksum(ctx context.Context, bucket *file.Bucket, key string, ra io.ReaderAt, size int64) error {
 	h := sha256.New()
 	if _, err := io.Copy(h, io.NewSectionReader(ra, 0, size)); err != nil {
 		return fmt.Errorf("jpl: checksum: read: %w", err)
 	}
 
 	sum := hex.EncodeToString(h.Sum(nil))
-	sumFile := checksumSidecarFile(spkFile)
+	sumKey := checksumSidecarKey(key)
 
-	if !sumFile.Exists() {
-		if err := remote.Save(strings.NewReader(sum), sumFile); err != nil {
-			return fmt.Errorf("jpl: checksum: write sidecar: %w", err)
+	existing, err := bucket.ReadAll(ctx, sumKey)
+	if err != nil {
+		if gcerrors.Code(err) == gcerrors.NotFound {
+			if err := file.Save(ctx, bucket, sumKey, strings.NewReader(sum)); err != nil {
+				return fmt.Errorf("jpl: checksum: write sidecar: %w", err)
+			}
+
+			return nil
 		}
 
-		return nil
-	}
-
-	existing, err := sumFile.ReadAll()
-	if err != nil {
 		return fmt.Errorf("jpl: checksum: read sidecar: %w", err)
 	}
 

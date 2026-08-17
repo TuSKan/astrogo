@@ -28,7 +28,7 @@ type Provider struct {
 // New creates a new OpenNGC catalog provider — like every other astrogo
 // catalog provider, it does its own network access rather than reading
 // build-time embedded data. It fetches and merges the two upstream source
-// CSVs if remote.EnableDownloads(remote.OpenNGC, ...) has been called,
+// CSVs if remote.EnableDownloads(..., remote.OpenNGC) has been called,
 // reusing a local cache untouched when a HEAD probe shows nothing changed
 // upstream. If downloads aren't enabled, or the fetch fails for any other
 // reason, New returns an empty, warning-logged provider — the same

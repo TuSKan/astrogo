@@ -5,6 +5,7 @@ package gaia
 
 import (
 	"context"
+	"errors"
 	"net"
 	"testing"
 	"time"
@@ -28,6 +29,20 @@ func requireGaia(t *testing.T) {
 	_ = conn.Close()
 }
 
+// skipIfUnresponsive turns a timed-out query into a skip. The TCP
+// pre-check above is not sufficient on its own: ESA's TAP front end
+// routinely accepts the connection and then never answers, which is
+// downtime rather than wrong data, and the policy is that only wrong data
+// from a responsive endpoint fails.
+func skipIfUnresponsive(t *testing.T, err error) {
+	t.Helper()
+
+	var netErr net.Error
+	if errors.Is(err, context.DeadlineExceeded) || (errors.As(err, &netErr) && netErr.Timeout()) {
+		t.Skipf("Gaia TAP accepted the connection but did not answer, skipping live test: %v", err)
+	}
+}
+
 func TestGaiaNetworkConeSearch(t *testing.T) {
 	requireGaia(t)
 
@@ -46,6 +61,7 @@ func TestGaiaNetworkConeSearch(t *testing.T) {
 	var targets []resolve.Target
 	iter(func(tar resolve.Target, err error) bool {
 		if err != nil {
+			skipIfUnresponsive(t, err)
 			t.Fatalf("Live network failed: %v", err)
 		}
 		targets = append(targets, tar)

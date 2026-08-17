@@ -1,6 +1,7 @@
 package cams
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"maps"
@@ -10,18 +11,19 @@ import (
 	"sync"
 
 	"github.com/scigolib/hdf5"
-	gofs "github.com/ungerik/go-fs"
+
+	"github.com/TuSKan/astrogo/remote/file"
 )
 
 // File is an open CAMS NetCDF-4/HDF5 file. See the package doc comment
 // for how shape and axis order are discovered.
 type File struct {
-	mu   sync.Mutex // guards every call into hf; see the package doc comment's concurrency note
-	hf   *hdf5.File
-	path gofs.File
+	mu  sync.Mutex // guards every call into hf; see the package doc comment's concurrency note
+	hf  *hdf5.File
+	key string // the bucket key Open was given, kept only for error messages
 
-	// scratchPath is the temp file Open staged f's content into (see
-	// Open's doc comment for why); removed by Close.
+	// scratchPath is the temp file Open staged bucket/key's content into
+	// (see Open's doc comment for why); removed by Close.
 	scratchPath string
 
 	// dims maps a dimension name (longitude/latitude/level/time) to its
@@ -41,17 +43,17 @@ type File struct {
 	vars map[string]*hdf5.Dataset
 }
 
-// Open opens f — e.g. the result of remote.GetFile against
+// Open opens bucket/key — e.g. the result of remote.GetFile against
 // remote.CopernicusEODATA — as a CAMS NetCDF-4/HDF5 file, reading its
-// content through f.OpenReader() rather than assuming f is backed by the
-// local filesystem (f may be local, or on any other backend go-fs
-// supports). Every dimension-scale dataset (longitude, latitude, level
-// if present, time) is read eagerly; data variables are indexed by name
-// but not read until Var.ReadPlane/Var.At is called.
-func Open(f gofs.File) (*File, error) {
-	r, err := f.OpenReader()
+// content through bucket.NewReader rather than assuming it's backed by
+// the local filesystem (bucket may be local, S3, or any other
+// remote/file backend). Every dimension-scale dataset (longitude,
+// latitude, level if present, time) is read eagerly; data variables are
+// indexed by name but not read until Var.ReadPlane/Var.At is called.
+func Open(ctx context.Context, bucket *file.Bucket, key string) (*File, error) {
+	r, err := bucket.NewReader(ctx, key, nil)
 	if err != nil {
-		return nil, fmt.Errorf("cams: open %s: %w", f, err)
+		return nil, fmt.Errorf("cams: open %s: %w", key, err)
 	}
 	defer func() { _ = r.Close() }()
 
@@ -59,14 +61,14 @@ func Open(f gofs.File) (*File, error) {
 	// no io.Reader/io.ReaderAt constructor exists in this dependency, and
 	// HDF5's own on-disk format needs true random access (B-tree chunk
 	// index traversal) a plain io.Reader cannot support anyway. Staging
-	// through a scratch temp file, read via f's own OpenReader rather
-	// than assuming f is already local, is this package's equivalent of
-	// catalog/fink's os.CreateTemp exception (CLAUDE.md) -- a narrow,
-	// documented workaround for a third-party library that needs a real
-	// OS path, not a way to special-case "local" file.File values.
+	// through a scratch temp file, read via bucket's own NewReader rather
+	// than assuming the bucket is already local, is this package's
+	// equivalent of catalog/fink's os.CreateTemp exception (CLAUDE.md) --
+	// a narrow, documented workaround for a third-party library that
+	// needs a real OS path, not a way to special-case a local bucket.
 	tmp, err := os.CreateTemp("", "cams-*.nc")
 	if err != nil {
-		return nil, fmt.Errorf("cams: %s: create scratch file: %w", f, err)
+		return nil, fmt.Errorf("cams: %s: create scratch file: %w", key, err)
 	}
 
 	tmpPath := tmp.Name()
@@ -75,25 +77,25 @@ func Open(f gofs.File) (*File, error) {
 		_ = tmp.Close()
 		_ = os.Remove(tmpPath)
 
-		return nil, fmt.Errorf("cams: %s: stage to scratch file: %w", f, err)
+		return nil, fmt.Errorf("cams: %s: stage to scratch file: %w", key, err)
 	}
 
 	if err := tmp.Close(); err != nil {
 		_ = os.Remove(tmpPath)
 
-		return nil, fmt.Errorf("cams: %s: close scratch file: %w", f, err)
+		return nil, fmt.Errorf("cams: %s: close scratch file: %w", key, err)
 	}
 
 	hf, err := hdf5.Open(tmpPath)
 	if err != nil {
 		_ = os.Remove(tmpPath)
 
-		return nil, fmt.Errorf("cams: open %s: %w", f, err)
+		return nil, fmt.Errorf("cams: open %s: %w", key, err)
 	}
 
 	cf := &File{
 		hf:          hf,
-		path:        f,
+		key:         key,
 		scratchPath: tmpPath,
 		dims:        make(map[string]int),
 		dimNameByID: make(map[int32]string),
@@ -127,7 +129,7 @@ func (cf *File) Close() error {
 	}
 
 	if err != nil {
-		return fmt.Errorf("cams: close %s: %w", cf.path, err)
+		return fmt.Errorf("cams: close %s: %w", cf.key, err)
 	}
 
 	return nil
@@ -201,13 +203,13 @@ func (cf *File) index() error {
 
 		vals, err := ds.Read()
 		if err != nil {
-			walkErr = fmt.Errorf("cams: %s: read dimension-scale %s: %w", cf.path, ds.Name(), err)
+			walkErr = fmt.Errorf("cams: %s: read dimension-scale %s: %w", cf.key, ds.Name(), err)
 			return
 		}
 
 		id, hasID, err := readInt32Attribute(ds, "_Netcdf4Dimid")
 		if err != nil {
-			walkErr = fmt.Errorf("cams: %s: %s: %w", cf.path, ds.Name(), err)
+			walkErr = fmt.Errorf("cams: %s: %s: %w", cf.key, ds.Name(), err)
 			return
 		}
 
@@ -234,7 +236,7 @@ func (cf *File) index() error {
 func (cf *File) newVar(name string, ds *hdf5.Dataset) (*Var, error) {
 	coordIDs, err := readInt32SliceAttribute(ds, "_Netcdf4Coordinates")
 	if err != nil {
-		return nil, fmt.Errorf("cams: %s: %s: %w", cf.path, name, err)
+		return nil, fmt.Errorf("cams: %s: %s: %w", cf.key, name, err)
 	}
 
 	axisNames := make([]string, len(coordIDs))
@@ -243,7 +245,7 @@ func (cf *File) newVar(name string, ds *hdf5.Dataset) (*Var, error) {
 		axisName, ok := cf.dimNameByID[id]
 		if !ok {
 			return nil, fmt.Errorf("cams: %s: %s: %w: dimension id %d has no matching dimension-scale dataset",
-				cf.path, name, ErrUnsupportedAxis, id)
+				cf.key, name, ErrUnsupportedAxis, id)
 		}
 
 		axisNames[i] = axisName

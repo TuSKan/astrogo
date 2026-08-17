@@ -3,6 +3,7 @@
 package jpl_test
 
 import (
+	"errors"
 	"math"
 	"testing"
 	"time"
@@ -41,6 +42,10 @@ func TestPhase1ObserverPipelineAgainstHorizons(t *testing.T) {
 
 	// Fetch Topocentric Observer Table for Mars (NAIF ID: 499)
 	marsHorizons, err := fetchObserverTable(499, "Mars", site.Lon().Degrees(), site.Lat().Degrees(), site.Height(), tStrStart, tStrStop)
+	if errors.Is(err, errHorizonsUnavailable) {
+		t.Skipf("JPL Horizons is not answering with API data, skipping live comparison: %v", err)
+	}
+
 	if err != nil {
 		t.Fatalf("Failed to fetch Horizons data: %v", err)
 	}

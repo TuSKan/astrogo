@@ -11,6 +11,8 @@ import (
 	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/internal/testutil"
+
+	"github.com/TuSKan/astrogo/remote"
 )
 
 func TestGaiaOfflineConeSearch(t *testing.T) {
@@ -28,7 +30,8 @@ func TestGaiaOfflineConeSearch(t *testing.T) {
 	defer server.Close()
 
 	prov := New()
-	prov.client.HTTPClient.Transport = &mockTransport{Handler: server.Config.Handler}
+
+	redirect(t, remote.GaiaTAP, server.URL)
 
 	req := resolve.ConeRequest{
 		Center: coord.NewICRS(angle.Deg(10), angle.Deg(40)),
@@ -77,7 +80,8 @@ func TestGaiaOfflineConeSearch_SkipsUnparseableRow(t *testing.T) {
 	defer server.Close()
 
 	prov := New()
-	prov.client.HTTPClient.Transport = &mockTransport{Handler: server.Config.Handler}
+
+	redirect(t, remote.GaiaTAP, server.URL)
 
 	req := resolve.ConeRequest{
 		Center: coord.NewICRS(angle.Deg(10), angle.Deg(40)),
@@ -107,19 +111,6 @@ func TestGaiaOfflineConeSearch_SkipsUnparseableRow(t *testing.T) {
 	}
 }
 
-type mockTransport struct {
-	Handler http.Handler
-}
-
-func (m *mockTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	rec := httptest.NewRecorder()
-	m.Handler.ServeHTTP(rec, req)
-	resp := rec.Result()
-	resp.Request = req
-
-	return resp, nil
-}
-
 func TestProviderInterface(t *testing.T) {
 	p := New()
 	testutil.AssertEqual(t, "Name", p.Name(), "gaia")
@@ -136,5 +127,20 @@ func TestProviderInterface(t *testing.T) {
 
 	if p.Search(context.Background(), "foo") != nil {
 		t.Error("expected Search to return nil")
+	}
+}
+
+// redirect points endpoint id at a test server for the duration of one
+// test. It replaces the old http.RoundTripper injection: remote/api's
+// Client is opaque by design, and every request resolves its URL through
+// remote.URL(id) anyway, so the registry is the natural seam.
+func redirect(t *testing.T, id remote.EndpointID, url string) {
+	t.Helper()
+
+	scope := remote.Capture(id)
+	t.Cleanup(scope.Restore)
+
+	if err := remote.SetURL(id, url); err != nil {
+		t.Fatalf("SetURL(%s): %v", id, err)
 	}
 }

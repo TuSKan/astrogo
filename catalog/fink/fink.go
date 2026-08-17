@@ -14,6 +14,7 @@ import (
 
 	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/remote"
+	"github.com/TuSKan/astrogo/remote/api"
 
 	"github.com/apache/arrow-go/v18/parquet/file"
 	"github.com/apache/arrow-go/v18/parquet/pqarrow"
@@ -68,7 +69,7 @@ type ssoRecord struct {
 //   - Full-table parquet download for bulk indexing (lazy, cached in memory)
 type Provider struct {
 	loadErr  error
-	client   *remote.Client
+	client   *api.Client
 	byNumber map[int64]*ssoRecord
 	byName   map[string]*ssoRecord
 	version  string
@@ -83,7 +84,7 @@ func New() *Provider {
 
 // NewWithVersion returns a Provider targeting a specific SSOFT release (e.g. "2025.04").
 func NewWithVersion(version string) *Provider {
-	client, err := remote.NewClientFor(remote.FINK)
+	client, err := api.NewClient(remote.FINK)
 	if err != nil {
 		panic(err) // unregistered endpoint would be a programmer error
 	}
@@ -191,7 +192,7 @@ func (p *Provider) querySingle(ctx context.Context, number int64, name string) (
 
 	body, err := p.client.PostJSON(ctx, remote.FINK, "", payload)
 	if err != nil {
-		var httpErr *remote.HTTPError
+		var httpErr *api.HTTPError
 		if errors.As(err, &httpErr) {
 			return nil, fmt.Errorf("%w: %d: %s", ErrHTTPStatus, httpErr.StatusCode, httpErr.Body[:min(200, len(httpErr.Body))])
 		}
@@ -445,7 +446,7 @@ func (p *Provider) downloadSSOFT() (_ []ssoRecord, err error) {
 
 	body, err := p.client.PostJSON(context.Background(), remote.FINK, "", payload)
 	if err != nil {
-		var httpErr *remote.HTTPError
+		var httpErr *api.HTTPError
 		if errors.As(err, &httpErr) {
 			return nil, fmt.Errorf("%w: %d: %s", ErrHTTPStatus, httpErr.StatusCode, httpErr.Body[:min(200, len(httpErr.Body))])
 		}

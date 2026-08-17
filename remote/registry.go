@@ -111,15 +111,13 @@ func Offline() bool {
 	return offline
 }
 
-// Reset restores the default registry state (all endpoints at their
-// built-in URLs, downloads disabled, online, no custom policy). It does
-// NOT touch the data directory (a separate global — see DataDir) or
-// restore any consent a broader scope (e.g. a package TestMain) may have
-// granted for the whole test binary run; a test using Reset for the
-// latter can silently break tests that run after it, which has happened
-// before. Prefer Capture/Restore (or WithScope) for scoped test setup —
-// Reset remains for the "give me an untouched registry, unconditionally"
-// case.
+// Reset restores the default registry state: every endpoint at its
+// built-in URL, downloads disabled, online, no custom policy. It does not
+// touch the data directory (see DataDir).
+//
+// Reset discards consent a broader scope — a package TestMain — granted
+// for the whole binary, so a test using it can break tests that run
+// after. Prefer Capture/Restore or WithScope for scoped setup.
 func Reset() {
 	regMu.Lock()
 	defer regMu.Unlock()
@@ -153,83 +151,49 @@ func URL(id EndpointID) (string, error) {
 	return ep.URL, nil
 }
 
-// EnableDownloads grants file-download consent for one endpoint. maxSize
-// caps a single download in bytes; 0 means unlimited. Downloads are always
-// denied until this is called — astrogo never auto-downloads anything.
+// EnableDownloads grants file-download consent, capping a single download
+// at maxSize bytes (0 means unlimited). With no ids it applies to every
+// Downloadable endpoint; otherwise only to the ones named. Downloads are
+// always denied until this is called — astrogo never auto-downloads.
 //
-// Example: allow JPL planetary kernels up to 200 MB plus the tiny
-// leap-second kernel:
+//	remote.EnableDownloads(200<<20, remote.NAIFSPK, remote.NAIFLSK)
+//	remote.EnableDownloads(0) // everything, no size cap
 //
-//	remote.EnableDownloads(remote.NAIFSPK, 200<<20)
-//	remote.EnableDownloads(remote.NAIFLSK, 0)
-func EnableDownloads(id EndpointID, maxSize int64) {
-	regMu.Lock()
-	defer regMu.Unlock()
-
-	if ep, ok := endpoints[id]; ok {
-		ep.DownloadsOK = true
-		ep.MaxDownloadSize = maxSize
-		endpoints[id] = ep
-	}
+// Naming an endpoint that cannot download (SIMBAD, VizieR, ...) does
+// nothing: it has no consent gate to open.
+func EnableDownloads(maxSize int64, ids ...EndpointID) {
+	setConsent(true, maxSize, ids)
 }
 
-// DisableDownloads revokes file-download consent for one endpoint
-// (the default state).
-func DisableDownloads(id EndpointID) {
-	regMu.Lock()
-	defer regMu.Unlock()
-
-	if ep, ok := endpoints[id]; ok {
-		ep.DownloadsOK = false
-		ep.MaxDownloadSize = 0
-		endpoints[id] = ep
-	}
+// DisableDownloads revokes file-download consent — for every Downloadable
+// endpoint with no ids, or only the ones named. This is the default state.
+func DisableDownloads(ids ...EndpointID) {
+	setConsent(false, 0, ids)
 }
 
-// EnableAllDownloads grants file-download consent for every registered
-// endpoint that can actually perform a download — every KindFile
-// endpoint (IERSFinals2000A, NAIFSPK, NAIFLSK, OpenNGC) plus
-// JPLHorizons, whose small-body SPK generation is a real file download
-// in effect even though the endpoint itself is KindAPI (see
-// Endpoint.Downloadable). Applies the same maxSize cap to each.
-// Equivalent to calling EnableDownloads(id, maxSize) once per
-// Downloadable endpoint. An endpoint that only ever returns small
-// text/JSON payloads (SIMBAD, VizieR, SBDB, Gaia, MAST, ...) has no
-// download-consent gate at all and is unaffected.
-//
-// After this call, "I enabled all downloads" is true without
-// qualification: nothing in this library will fail with
-// ErrDownloadDenied because of a consent scope the caller didn't know
-// about.
-func EnableAllDownloads(maxSize int64) {
+// setConsent applies a consent decision. An empty ids means every
+// Downloadable endpoint; naming ids explicitly still skips those with no
+// download path at all, so consent is never recorded against an endpoint
+// that would never consult it.
+func setConsent(ok bool, maxSize int64, ids []EndpointID) {
 	regMu.Lock()
 	defer regMu.Unlock()
 
-	for id, ep := range endpoints {
-		if !ep.Downloadable {
+	if len(ids) == 0 {
+		ids = make([]EndpointID, 0, len(endpoints))
+		for id := range endpoints {
+			ids = append(ids, id)
+		}
+	}
+
+	for _, id := range ids {
+		ep, found := endpoints[id]
+		if !found || !ep.Downloadable {
 			continue
 		}
 
-		ep.DownloadsOK = true
+		ep.DownloadsOK = ok
 		ep.MaxDownloadSize = maxSize
-		endpoints[id] = ep
-	}
-}
-
-// DisableAllDownloads revokes file-download consent for every registered
-// Downloadable endpoint (the default state for each) — see
-// EnableAllDownloads for exactly which endpoints that covers.
-func DisableAllDownloads() {
-	regMu.Lock()
-	defer regMu.Unlock()
-
-	for id, ep := range endpoints {
-		if !ep.Downloadable {
-			continue
-		}
-
-		ep.DownloadsOK = false
-		ep.MaxDownloadSize = 0
 		endpoints[id] = ep
 	}
 }
@@ -264,12 +228,11 @@ func SetPolicy(p Policy) {
 	policy = p
 }
 
-// CheckDownload applies the download-consent configuration to a
-// prospective file download of the given size (semantics as in Policy).
-// It returns nil when the download may proceed. Download itself calls this
-// automatically; it is exported for file-producing paths that don't go
-// through Download (e.g. Horizons SPK generation, whose payload arrives
-// base64-encoded inside a JSON API response).
+// CheckDownload applies the consent configuration to a prospective
+// download of the given size (semantics as in Policy), returning nil when
+// it may proceed. GetFile calls this itself; it is exported for
+// file-producing paths that bypass GetFile — JPLHorizonsSPK generation,
+// whose kernel arrives base64-encoded inside a JSON response.
 func CheckDownload(id EndpointID, name string, size int64) error {
 	regMu.RLock()
 
@@ -292,14 +255,14 @@ func CheckDownload(id EndpointID, name string, size int64) error {
 
 	if !ep.DownloadsOK {
 		return fmt.Errorf(
-			"%w: %s (%s from %s); astrogo never downloads without consent — call remote.EnableDownloads(remote.%s, maxSize) or pre-seed the file (see README \"Data downloads & offline usage\")",
+			"%w: %s (%s from %s); astrogo never downloads without consent — call remote.EnableDownloads(maxSize, remote.%s) or pre-seed the file (see README \"Data downloads & offline usage\")",
 			ErrDownloadDenied, name, sizeLabel(size), ep.URL, constName(id),
 		)
 	}
 
 	if ep.MaxDownloadSize > 0 && size > ep.MaxDownloadSize {
 		return fmt.Errorf(
-			"%w: %s is %s, above the %s limit set by remote.EnableDownloads(remote.%s, ...)",
+			"%w: %s is %s, above the %s limit set by remote.EnableDownloads(..., remote.%s)",
 			ErrDownloadDenied, name, sizeLabel(size), sizeLabel(ep.MaxDownloadSize), constName(id),
 		)
 	}
@@ -336,6 +299,8 @@ func constName(id EndpointID) string {
 		return "NAIFLSK"
 	case JPLHorizons:
 		return "JPLHorizons"
+	case JPLHorizonsSPK:
+		return "JPLHorizonsSPK"
 	case JPLSBDB:
 		return "JPLSBDB"
 	case JPLSBDBQuery:
@@ -360,6 +325,8 @@ func constName(id EndpointID) string {
 		return "Nominatim"
 	case OpenElevation:
 		return "OpenElevation"
+	case CALSPEC:
+		return "CALSPEC"
 	case WorldAtlas:
 		return "WorldAtlas"
 	case VIIRSAnnual:

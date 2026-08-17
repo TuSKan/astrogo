@@ -43,14 +43,6 @@ var (
 	// ErrCacheNameRequired is returned by GetFile when both name and
 	// WithCacheName are empty, leaving no cache filename to resolve.
 	ErrCacheNameRequired = errors.New("remote: name or WithCacheName required")
-
-	// ErrNoTransport is returned when a request targets an Endpoint whose
-	// Kind has no registered Transport. remote itself only ships the
-	// stdlib net/http transport (KindAPI, KindFile); KindS3 requires the
-	// caller to import remote/s3 and call its Register function first, so
-	// remote never links an S3/AWS SDK dependency into a build that does
-	// not use one.
-	ErrNoTransport = errors.New("remote: no transport registered for endpoint kind")
 )
 
 // HTTPError represents a non-2xx response from an external API endpoint

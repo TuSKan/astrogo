@@ -14,6 +14,8 @@ import (
 	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/internal/testutil"
+
+	"github.com/TuSKan/astrogo/remote"
 )
 
 func TestVizierOfflineConeSearch(t *testing.T) {
@@ -30,7 +32,8 @@ func TestVizierOfflineConeSearch(t *testing.T) {
 	defer server.Close()
 
 	prov := New()
-	prov.client.HTTPClient.Transport = &mockTransport{Handler: server.Config.Handler}
+
+	redirect(t, server.URL)
 
 	req := resolve.ConeRequest{
 		Center: coord.NewICRS(angle.Deg(10), angle.Deg(40)),
@@ -140,7 +143,8 @@ func TestVizierConeSearch_RegisteredTable(t *testing.T) {
 	defer server.Close()
 
 	prov := New()
-	prov.client.HTTPClient.Transport = &mockTransport{Handler: server.Config.Handler}
+
+	redirect(t, server.URL)
 
 	req := resolve.ConeRequest{
 		Table:  "I/239/hip_main",
@@ -215,7 +219,8 @@ func TestVizierConeSearch_CacheKeyIncludesTable(t *testing.T) {
 	defer server.Close()
 
 	prov := New()
-	prov.client.HTTPClient.Transport = &mockTransport{Handler: server.Config.Handler}
+
+	redirect(t, server.URL)
 
 	center := coord.NewICRS(angle.Deg(10.684), angle.Deg(41.269))
 	radius := angle.Deg(0.01)
@@ -247,19 +252,6 @@ func TestVizierConeSearch_CacheKeyIncludesTable(t *testing.T) {
 	}
 }
 
-type mockTransport struct {
-	Handler http.Handler
-}
-
-func (m *mockTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	rec := httptest.NewRecorder()
-	m.Handler.ServeHTTP(rec, req)
-	resp := rec.Result()
-	resp.Request = req
-
-	return resp, nil
-}
-
 func TestProviderInterface(t *testing.T) {
 	p := New()
 	if p.Name() != "vizier" {
@@ -282,7 +274,7 @@ func TestProviderInterface(t *testing.T) {
 
 	// errTransport keeps this default (non-network-tagged) test fully
 	// offline — see CLAUDE.md's build-tag convention.
-	p.client.HTTPClient.Transport = errTransport{}
+	redirect(t, "http://127.0.0.1:1")
 
 	iter := p.ConeSearch(context.Background(), resolve.ConeRequest{})
 	iter(func(_ resolve.Target, err error) bool {
@@ -294,10 +286,19 @@ func TestProviderInterface(t *testing.T) {
 	})
 }
 
-type errTransport struct{}
+// redirect points endpoint id at a test server for the duration of one
+// test. It replaces the old http.RoundTripper injection: remote/api's
+// Client is opaque by design, and every request resolves its URL through
+// remote.URL(id) anyway, so the registry is the natural seam.
+func redirect(t *testing.T, url string) {
+	t.Helper()
 
-var errNoTransport = errors.New("errTransport: no network access in this test")
+	id := remote.VizieR
 
-func (errTransport) RoundTrip(*http.Request) (*http.Response, error) {
-	return nil, errNoTransport
+	scope := remote.Capture(id)
+	t.Cleanup(scope.Restore)
+
+	if err := remote.SetURL(id, url); err != nil {
+		t.Fatalf("SetURL(%s): %v", id, err)
+	}
 }

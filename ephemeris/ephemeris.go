@@ -232,16 +232,10 @@ type Option func(*config)
 type config struct {
 	Start        time.Time
 	End          time.Time
-	DataDir      string
 	TLEName      string
 	TLELine1     string
 	TLELine2     string
 	ExtraKernels []string
-}
-
-// WithDataDir sets the local cache directory for downloaded kernels.
-func WithDataDir(dir string) Option {
-	return func(c *config) { c.DataDir = dir }
 }
 
 // WithTimeInterval restricts the ephemeris coverage window (for small-body SPK).
@@ -282,9 +276,6 @@ func NewProvider(ctx context.Context, source Source, kernel string, opts ...Opti
 	switch source {
 	case Planets, SmallBody, Asteroids, Comets, Moons:
 		var jplOpts []jpl.Option
-		if cfg.DataDir != "" {
-			jplOpts = append(jplOpts, jpl.WithDataDir(cfg.DataDir))
-		}
 
 		if !cfg.Start.IsZero() && !cfg.End.IsZero() {
 			jplOpts = append(jplOpts, jpl.WithTimeInterval(cfg.Start, cfg.End))

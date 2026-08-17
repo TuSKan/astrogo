@@ -1,13 +1,17 @@
 package cams
 
 import (
+	"context"
 	"errors"
 	"math"
 	"path/filepath"
 	"testing"
 
 	"github.com/scigolib/hdf5"
-	gofs "github.com/ungerik/go-fs"
+
+	"github.com/TuSKan/astrogo/remote/file"
+
+	"github.com/TuSKan/astrogo/internal/testutil"
 )
 
 // fillValue mirrors the real CAMS/NetCDF default double fill value
@@ -47,10 +51,17 @@ const fillValue = 9.969209968386687e+36
 // Every data value is level*100 + lat*10 + lon (aermr01) or 1000 + lat*10
 // + lon (lnsp), so ReadPlane/At results are checkable by direct formula
 // rather than a second fixture-specific table.
-func synthFixture(t *testing.T) gofs.File {
+//
+// Returns a *file.Bucket rooted at the temp dir the fixture was written
+// into, plus its key within that bucket — the same (bucket, key) shape
+// Open takes, so a test caller never touches a raw OS path.
+func synthFixture(t *testing.T) (*file.Bucket, string) {
 	t.Helper()
 
-	path := filepath.Join(t.TempDir(), "synthetic.nc")
+	const key = "synthetic.nc"
+
+	dir := t.TempDir()
+	path := filepath.Join(dir, key)
 
 	fw, err := hdf5.CreateForWrite(path, hdf5.CreateTruncate)
 	if err != nil {
@@ -131,7 +142,14 @@ func synthFixture(t *testing.T) gofs.File {
 		t.Fatalf("Close FileWriter: %v", err)
 	}
 
-	return gofs.File(path)
+	url := testutil.FileURL(t, dir)
+
+	bucket, err := file.Open(context.Background(), url)
+	if err != nil {
+		t.Fatalf("Open fixture bucket: %v", err)
+	}
+
+	return bucket, key
 }
 
 func writeDimScale(t *testing.T, fw *hdf5.FileWriter, name string, dtype hdf5.Datatype, data any, dimid int32, units, longName string) {
@@ -233,7 +251,9 @@ func reflectLen(t *testing.T, data any) int {
 }
 
 func TestOpenAndDims(t *testing.T) {
-	f, err := Open(synthFixture(t))
+	bucket, key := synthFixture(t)
+
+	f, err := Open(context.Background(), bucket, key)
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
@@ -251,7 +271,9 @@ func TestOpenAndDims(t *testing.T) {
 }
 
 func TestVarNotFound(t *testing.T) {
-	f, err := Open(synthFixture(t))
+	bucket, key := synthFixture(t)
+
+	f, err := Open(context.Background(), bucket, key)
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
@@ -265,7 +287,9 @@ func TestVarNotFound(t *testing.T) {
 }
 
 func TestVarMetadataAndAxisOrder(t *testing.T) {
-	f, err := Open(synthFixture(t))
+	bucket, key := synthFixture(t)
+
+	f, err := Open(context.Background(), bucket, key)
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
@@ -326,7 +350,9 @@ func TestVarMetadataAndAxisOrder(t *testing.T) {
 }
 
 func TestReadPlaneAndFillValue(t *testing.T) {
-	f, err := Open(synthFixture(t))
+	bucket, key := synthFixture(t)
+
+	f, err := Open(context.Background(), bucket, key)
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
@@ -379,7 +405,9 @@ func TestReadPlaneAndFillValue(t *testing.T) {
 }
 
 func TestReadPlaneRejectsLevelOnSurfaceVariable(t *testing.T) {
-	f, err := Open(synthFixture(t))
+	bucket, key := synthFixture(t)
+
+	f, err := Open(context.Background(), bucket, key)
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
@@ -410,7 +438,9 @@ func TestReadPlaneRejectsLevelOnSurfaceVariable(t *testing.T) {
 }
 
 func TestAtAndPlaneCache(t *testing.T) {
-	f, err := Open(synthFixture(t))
+	bucket, key := synthFixture(t)
+
+	f, err := Open(context.Background(), bucket, key)
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
@@ -448,7 +478,9 @@ func TestAtAndPlaneCache(t *testing.T) {
 }
 
 func TestAtIndexOutOfRange(t *testing.T) {
-	f, err := Open(synthFixture(t))
+	bucket, key := synthFixture(t)
+
+	f, err := Open(context.Background(), bucket, key)
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
@@ -471,9 +503,14 @@ func TestAtIndexOutOfRange(t *testing.T) {
 }
 
 func TestOpenSurfacesOpenReaderError(t *testing.T) {
-	missing := gofs.File(filepath.Join(t.TempDir(), "does-not-exist.nc"))
+	url := testutil.FileURL(t, t.TempDir())
 
-	if _, err := Open(missing); err == nil {
-		t.Error("Open(missing file) = nil error, want a real error from OpenReader")
+	bucket, err := file.Open(context.Background(), url)
+	if err != nil {
+		t.Fatalf("Open bucket: %v", err)
+	}
+
+	if _, err := Open(context.Background(), bucket, "does-not-exist.nc"); err == nil {
+		t.Error("Open(missing key) = nil error, want a real error from bucket.NewReader")
 	}
 }

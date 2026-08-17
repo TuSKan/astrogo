@@ -27,7 +27,7 @@ func main() {
 	// Enabling downloads here is enough — catalog.NewResolver's first use
 	// of catalog.OpenNGC below fetches it automatically (content-checked,
 	// so a re-run only costs a HEAD probe once cached).
-	remote.EnableDownloads(remote.OpenNGC, 5<<20) // ~2 MB combined source CSVs
+	remote.EnableDownloads(5<<20, remote.OpenNGC) // ~2 MB combined source CSVs
 
 	// ── Observatory: Quinta Calixto (-22.528478°, -46.473002°, 835.05m) ──
 	site, _ := plan.NewSiteEarthLocation("Quinta Calixto", -22.528478, -46.473002, 835.05)

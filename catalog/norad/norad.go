@@ -11,6 +11,7 @@ import (
 
 	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/remote"
+	"github.com/TuSKan/astrogo/remote/api"
 	"github.com/TuSKan/astrogo/time"
 )
 
@@ -248,13 +249,13 @@ const (
 
 // Provider implements resolve.Provider for NORAD satellite catalog lookups.
 type Provider struct {
-	client *remote.Client
+	client *api.Client
 	cache  resolve.Cache
 }
 
 // New returns a Provider configured with sensible defaults.
 func New() *Provider {
-	client, err := remote.NewClientFor(remote.CelesTrak)
+	client, err := api.NewClient(remote.CelesTrak)
 	if err != nil {
 		panic(err) // unregistered endpoint would be a programmer error
 	}

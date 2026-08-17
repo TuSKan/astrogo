@@ -15,13 +15,17 @@ func TestCaptureRestoreFullSnapshot(t *testing.T) {
 	t.Cleanup(Reset)
 	t.Cleanup(func() { SetDataDir("") })
 
-	SetDataDirPath("before")
-	EnableDownloads(NAIFSPK, 10<<20)
+	// SetDataDir (not SetDataDirPath) stores the given string verbatim, no
+	// path resolution — the exact round trip this test wants to pin,
+	// distinct from TestDataDirEnvOverride's real path-resolution check
+	// below.
+	SetDataDir("before")
+	EnableDownloads(10<<20, NAIFSPK)
 
 	snap := Capture()
 
 	// Mutate everything the snapshot should restore.
-	SetDataDirPath("after")
+	SetDataDir("after")
 	DisableDownloads(NAIFSPK)
 
 	if err := SetURL(NAIFSPK, "https://example.invalid/mutated"); err != nil {
@@ -35,8 +39,8 @@ func TestCaptureRestoreFullSnapshot(t *testing.T) {
 
 	snap.Restore()
 
-	if got := DataDir(); got != "before" {
-		t.Errorf("DataDir after Restore = %q, want %q", got, "before")
+	if got := DataDirURL(); got != "before" {
+		t.Errorf("DataDirURL after Restore = %q, want %q", got, "before")
 	}
 
 	if ok, maxSize := DownloadsEnabled(NAIFSPK); !ok || maxSize != 10<<20 {
@@ -72,7 +76,7 @@ func TestCaptureRestoreFullSnapshot(t *testing.T) {
 func TestCaptureSubsetLeavesOtherEndpointsAlone(t *testing.T) {
 	t.Cleanup(Reset)
 
-	EnableDownloads(NAIFLSK, 0) // stands in for a TestMain-wide grant
+	EnableDownloads(0, NAIFLSK) // stands in for a TestMain-wide grant
 
 	snap := Capture(NAIFSPK)
 
@@ -97,7 +101,7 @@ func TestCaptureSubsetLeavesOtherEndpointsAlone(t *testing.T) {
 func TestWithScopeRestoresOnPanic(t *testing.T) {
 	t.Cleanup(Reset)
 
-	EnableDownloads(NAIFSPK, 5<<20)
+	EnableDownloads(5<<20, NAIFSPK)
 
 	func() {
 		defer func() { _ = recover() }()
@@ -114,22 +118,27 @@ func TestWithScopeRestoresOnPanic(t *testing.T) {
 	}
 }
 
-// TestDataDirEnvOverride exercises DataDir's full precedence chain:
-// explicit SetDataDir wins over DataDirEnv, which wins over the OS
-// default.
+// DataDir's precedence chain: an explicit SetDataDir wins over
+// DataDirEnv, which wins over the OS default. Both are bucket URLs — the
+// environment variable is taken verbatim, not converted from a path, so
+// it can point at any backend a driver serves.
 func TestDataDirEnvOverride(t *testing.T) {
 	t.Cleanup(func() { SetDataDir("") })
 
-	SetDataDir("")
-	t.Setenv(DataDirEnv, "/from/env")
+	const envURL = "s3://cache-from-env"
 
-	if got := DataDir(); got != "/from/env" {
-		t.Errorf("DataDir() with only %s set = %q, want %q", DataDirEnv, got, "/from/env")
+	SetDataDir("")
+	t.Setenv(DataDirEnv, envURL)
+
+	if got := DataDirURL(); got != envURL {
+		t.Errorf("DataDirURL() with only %s set = %q, want %q", DataDirEnv, got, envURL)
 	}
 
-	SetDataDirPath("/explicit")
+	const explicitURL = "file:///explicit?create_dir=true"
 
-	if got := DataDir(); got != "/explicit" {
-		t.Errorf("DataDir() with SetDataDirPath set = %q, want the explicit value to win over %s", got, DataDirEnv)
+	SetDataDir(explicitURL)
+
+	if got := DataDirURL(); got != explicitURL {
+		t.Errorf("DataDirURL() with SetDataDir set = %q, want %q (explicit must win over %s)", got, explicitURL, DataDirEnv)
 	}
 }

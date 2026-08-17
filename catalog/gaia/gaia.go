@@ -12,19 +12,20 @@ import (
 	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/remote"
+	"github.com/TuSKan/astrogo/remote/api"
 	"github.com/TuSKan/astrogo/time"
 )
 
 // Provider implements resolve.Provider and resolve.ConeSearcher
 // explicitly pointing at Gaia DR3 to extract astrometric parameters.
 type Provider struct {
-	client *remote.Client
+	client *api.Client
 	cache  resolve.Cache
 }
 
 // New creates a new Gaia DR3 catalog provider.
 func New() *Provider {
-	client, err := remote.NewClientFor(remote.GaiaTAP)
+	client, err := api.NewClient(remote.GaiaTAP)
 	if err != nil {
 		panic(err) // unregistered endpoint would be a programmer error
 	}

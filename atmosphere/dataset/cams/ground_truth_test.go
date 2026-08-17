@@ -16,11 +16,13 @@
 package cams
 
 import (
+	"context"
 	"math"
-	"path/filepath"
 	"testing"
 
-	gofs "github.com/ungerik/go-fs"
+	"github.com/TuSKan/astrogo/remote/file"
+
+	"github.com/TuSKan/astrogo/internal/testutil"
 )
 
 // credentialsDir is where these real files live in this session's local
@@ -28,35 +30,56 @@ import (
 // per the CAMS EODATA plan's own stated intent), not per-test.
 const credentialsDir = `../../../remote/credentials`
 
-func lnspFixture(t *testing.T) gofs.File {
+// credentialsBucket opens credentialsDir as a *file.Bucket, once per test
+// process — real files live directly as keys within it.
+func credentialsBucket(t *testing.T) *file.Bucket {
 	t.Helper()
 
-	path := filepath.Join(credentialsDir, "z_cams_c_ecmf_20230101000000_prod_an_ml_000_lnsp.nc")
-	f := gofs.File(path)
-	if !f.Exists() {
-		t.Skipf("real CAMS file not present at %s -- skipping ground-truth test", path)
+	url := testutil.FileURL(t, credentialsDir)
+
+	bucket, err := file.Open(context.Background(), url)
+	if err != nil {
+		t.Fatalf("Open credentials bucket: %v", err)
 	}
 
-	return f
+	return bucket
 }
 
-func aermr01Fixture(t *testing.T) gofs.File {
+func lnspFixture(t *testing.T) (*file.Bucket, string) {
 	t.Helper()
 
-	path := filepath.Join(credentialsDir, "z_cams_c_ecmf_20230101000000_prod_an_ml_000_aermr01.nc")
-	f := gofs.File(path)
-	if !f.Exists() {
-		t.Skipf("real CAMS file not present at %s -- skipping ground-truth test", path)
+	const key = "z_cams_c_ecmf_20230101000000_prod_an_ml_000_lnsp.nc"
+
+	bucket := credentialsBucket(t)
+
+	if exists, _ := bucket.Exists(context.Background(), key); !exists { //nolint:errcheck // a failed existence check just means "not present" for this skip
+		t.Skipf("real CAMS file not present at %s/%s -- skipping ground-truth test", credentialsDir, key)
 	}
 
-	return f
+	return bucket, key
+}
+
+func aermr01Fixture(t *testing.T) (*file.Bucket, string) {
+	t.Helper()
+
+	const key = "z_cams_c_ecmf_20230101000000_prod_an_ml_000_aermr01.nc"
+
+	bucket := credentialsBucket(t)
+
+	if exists, _ := bucket.Exists(context.Background(), key); !exists { //nolint:errcheck // a failed existence check just means "not present" for this skip
+		t.Skipf("real CAMS file not present at %s/%s -- skipping ground-truth test", credentialsDir, key)
+	}
+
+	return bucket, key
 }
 
 // TestGroundTruthLnspGrid cross-checks File.Dims and the dimension-scale
 // values against ncdump -v longitude,latitude,time output for the real
 // lnsp file -- ncdump -v longitude/latitude, this file's own header.
 func TestGroundTruthLnspGrid(t *testing.T) {
-	f, err := Open(lnspFixture(t))
+	bucket, key := lnspFixture(t)
+
+	f, err := Open(context.Background(), bucket, key)
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
@@ -85,7 +108,9 @@ func TestGroundTruthLnspGrid(t *testing.T) {
 //	  lnsp[time=0,lat=225,lon=450] = 11.5226371884346   (flat index 202950)
 //	  lnsp[time=0,lat=450,lon=899] = 11.1248897910118   (flat index 405899, the last value)
 func TestGroundTruthLnspValues(t *testing.T) {
-	f, err := Open(lnspFixture(t))
+	bucket, key := lnspFixture(t)
+
+	f, err := Open(context.Background(), bucket, key)
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
@@ -133,7 +158,9 @@ func TestGroundTruthLnspValues(t *testing.T) {
 //	    aermr01:long_name = "Sea Salt Aerosol (0.03 - 0.5 um) Mixing Ratio" ;
 //	  level = 1..137 (137 values, confirmed via ncdump -v level)
 func TestGroundTruthAermr01Shape(t *testing.T) {
-	f, err := Open(aermr01Fixture(t))
+	bucket, key := aermr01Fixture(t)
+
+	f, err := Open(context.Background(), bucket, key)
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
@@ -184,7 +211,9 @@ func TestGroundTruthAermr01Shape(t *testing.T) {
 // path against the actual 182 MB file, checking ReadPlane's and At's two
 // independent code paths never disagree.
 func TestGroundTruthAermrInternalConsistency(t *testing.T) {
-	f, err := Open(aermr01Fixture(t))
+	bucket, key := aermr01Fixture(t)
+
+	f, err := Open(context.Background(), bucket, key)
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}

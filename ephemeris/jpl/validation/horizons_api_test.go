@@ -3,6 +3,7 @@
 package jpl_test
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -22,6 +23,20 @@ type StateVector struct {
 	Vel     []float64 `json:"vel"`
 	UnitPos string    `json:"unit_pos"`
 	UnitVel string    `json:"unit_vel"`
+}
+
+// errHorizonsUnavailable marks a response that is not a Horizons API
+// answer at all — ssd.jpl.nasa.gov intermittently serves its HTML error
+// page under load. That is downtime, not wrong ephemeris data, so callers
+// skip on it; a real Horizons answer with bad numbers still fails.
+var errHorizonsUnavailable = errors.New("JPL Horizons served a non-API response")
+
+// horizonsUnavailable reports whether body is JPL's web error page rather
+// than the API's text output.
+func horizonsUnavailable(body string) bool {
+	head := strings.ToLower(strings.TrimSpace(body))
+
+	return strings.HasPrefix(head, "<!doctype html") || strings.HasPrefix(head, "<html")
 }
 
 func fetchVector(naifID int, bodyName string, startStr, stopStr string) (*StateVector, error) {
@@ -58,6 +73,10 @@ func fetchVector(naifID int, bodyName string, startStr, stopStr string) (*StateV
 
 	bodyBytes, _ := io.ReadAll(resp.Body)
 	responseStr := string(bodyBytes)
+
+	if horizonsUnavailable(responseStr) {
+		return nil, errHorizonsUnavailable
+	}
 
 	soeIdx := strings.Index(responseStr, "$$SOE")
 	eoeIdx := strings.Index(responseStr, "$$EOE")
@@ -168,6 +187,10 @@ func fetchObserverTable(naifID int, bodyName string, lon, lat, height float64, s
 
 	bodyBytes, _ := io.ReadAll(resp.Body)
 	responseStr := string(bodyBytes)
+
+	if horizonsUnavailable(responseStr) {
+		return nil, errHorizonsUnavailable
+	}
 
 	soeIdx := strings.Index(responseStr, "$$SOE")
 	eoeIdx := strings.Index(responseStr, "$$EOE")

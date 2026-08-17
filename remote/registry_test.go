@@ -89,7 +89,7 @@ func TestSetURLOverride(t *testing.T) {
 func TestReset(t *testing.T) {
 	Disable(SIMBAD)
 	SetOffline(true)
-	EnableDownloads(NAIFSPK, 1)
+	EnableDownloads(1, NAIFSPK)
 	Reset()
 
 	if Offline() {
@@ -125,7 +125,7 @@ func TestDownloadConsentDefaultDeny(t *testing.T) {
 func TestDownloadConsentEnableAndLimit(t *testing.T) {
 	t.Cleanup(Reset)
 
-	EnableDownloads(NAIFSPK, 50<<20)
+	EnableDownloads(50<<20, NAIFSPK)
 
 	if err := CheckDownload(NAIFSPK, "de440s.bsp", 32<<20); err != nil {
 		t.Errorf("32MB under a 50MB limit should pass: %v", err)
@@ -137,7 +137,7 @@ func TestDownloadConsentEnableAndLimit(t *testing.T) {
 	}
 
 	// Unlimited.
-	EnableDownloads(NAIFSPK, 0)
+	EnableDownloads(0, NAIFSPK)
 
 	if err := CheckDownload(NAIFSPK, "de441_part-1.bsp", 3<<30); err != nil {
 		t.Errorf("unlimited consent should pass any size: %v", err)
@@ -145,7 +145,7 @@ func TestDownloadConsentEnableAndLimit(t *testing.T) {
 
 	// Unknown size passes an enabled endpoint (re-checked with the exact
 	// Content-Length once headers arrive).
-	EnableDownloads(NAIFSPK, 50<<20)
+	EnableDownloads(50<<20, NAIFSPK)
 
 	if err := CheckDownload(NAIFSPK, "unknown.bsp", -1); err != nil {
 		t.Errorf("unknown size should defer to the Content-Length check: %v", err)
@@ -158,71 +158,73 @@ func TestDownloadConsentEnableAndLimit(t *testing.T) {
 	}
 }
 
-func TestEnableAllDownloadsAndDisableAllDownloads(t *testing.T) {
+func TestEnableAndDisableDownloadsWithNoIDs(t *testing.T) {
 	t.Cleanup(Reset)
 
-	EnableAllDownloads(50 << 20)
+	EnableDownloads(50 << 20)
 
-	for _, id := range []EndpointID{IERSFinals2000A, NAIFSPK, NAIFLSK, OpenNGC, JPLHorizons} {
+	for _, id := range []EndpointID{IERSFinals2000A, NAIFSPK, NAIFLSK, OpenNGC, JPLHorizonsSPK} {
 		ok, maxSize := DownloadsEnabled(id)
 		if !ok {
-			t.Errorf("EnableAllDownloads: %s: expected DownloadsOK=true", id)
+			t.Errorf("EnableDownloads: %s: expected DownloadsOK=true", id)
 		}
 
 		if maxSize != 50<<20 {
-			t.Errorf("EnableAllDownloads: %s: MaxDownloadSize = %d, want %d", id, maxSize, 50<<20)
+			t.Errorf("EnableDownloads: %s: MaxDownloadSize = %d, want %d", id, maxSize, 50<<20)
 		}
 	}
 
-	// A non-Downloadable KindAPI endpoint has no download-consent gate —
-	// EnableAllDownloads must not touch it either way.
-	if ok, _ := DownloadsEnabled(SIMBAD); ok {
-		t.Error("EnableAllDownloads must not grant consent to a non-Downloadable endpoint")
+	// A non-Downloadable endpoint has no consent gate at all, so a
+	// blanket grant must leave it alone — including JPLHorizons, which
+	// shares a URL with JPLHorizonsSPK but only resolves names.
+	for _, id := range []EndpointID{SIMBAD, JPLHorizons} {
+		if ok, _ := DownloadsEnabled(id); ok {
+			t.Errorf("EnableDownloads must not grant consent to non-Downloadable %s", id)
+		}
 	}
 
-	DisableAllDownloads()
+	DisableDownloads()
 
-	for _, id := range []EndpointID{IERSFinals2000A, NAIFSPK, NAIFLSK, OpenNGC, JPLHorizons} {
+	for _, id := range []EndpointID{IERSFinals2000A, NAIFSPK, NAIFLSK, OpenNGC, JPLHorizonsSPK} {
 		if ok, maxSize := DownloadsEnabled(id); ok || maxSize != 0 {
-			t.Errorf("DisableAllDownloads: %s: expected DownloadsOK=false, MaxDownloadSize=0, got ok=%v maxSize=%d", id, ok, maxSize)
+			t.Errorf("DisableDownloads: %s: expected DownloadsOK=false, MaxDownloadSize=0, got ok=%v maxSize=%d", id, ok, maxSize)
 		}
 	}
 }
 
-// TestEnableAllDownloadsCoversHorizons is a regression test for a real
-// consent-scope bug: JPLHorizons is a KindAPI endpoint whose small-body
-// SPK generation is nonetheless a genuine file download
-// (ephemeris/jpl/spk.CacheAPI), gated the same as any KindFile endpoint
-// — but EnableAllDownloads used to only ever grant KindFile endpoints,
-// so a caller who called EnableAllDownloads reasonably believed every
-// download was unblocked while every asteroid/comet ephemeris fetch
-// still silently failed with ErrDownloadDenied.
-func TestEnableAllDownloadsCoversHorizons(t *testing.T) {
+// A blanket grant must cover JPLHorizonsSPK: it is KindAPI, but its
+// response carries a whole kernel, so it is a real download. Name
+// resolution through JPLHorizons stays ungated — that is why the two are
+// separate endpoints over one URL.
+func TestBlanketGrantCoversHorizonsSPKOnly(t *testing.T) {
 	t.Cleanup(Reset)
 
-	EnableAllDownloads(0)
+	EnableDownloads(0)
 
-	if ok, _ := DownloadsEnabled(JPLHorizons); !ok {
-		t.Fatal("EnableAllDownloads(0) must grant consent to JPLHorizons — its small-body SPK generation is a real file download")
+	if ok, _ := DownloadsEnabled(JPLHorizonsSPK); !ok {
+		t.Error("EnableDownloads(0) must grant consent to JPLHorizonsSPK — its response carries a kernel")
+	}
+
+	if ok, _ := DownloadsEnabled(JPLHorizons); ok {
+		t.Error("EnableDownloads(0) must not gate JPLHorizons — name resolution needs no consent")
 	}
 }
 
-// TestDownloadableEndpointsAreExactlyTheExpectedSet is a golden-list
-// assertion: a future endpoint that can genuinely perform a download
-// must have Downloadable set explicitly, or EnableAllDownloads silently
-// leaves it ungranted — the same failure mode this file's other tests
-// exist to catch for JPLHorizons.
+// A golden list: an endpoint that can genuinely download must set
+// Downloadable explicitly, or a blanket EnableDownloads silently leaves
+// it ungranted.
 func TestDownloadableEndpointsAreExactlyTheExpectedSet(t *testing.T) {
 	want := map[EndpointID]bool{
 		IERSFinals2000A:  true,
 		NAIFSPK:          true,
 		NAIFLSK:          true,
 		OpenNGC:          true,
-		JPLHorizons:      true,
+		JPLHorizonsSPK:   true,
 		WorldAtlas:       true,
 		VIIRSAnnual:      true,
 		PassbandBundle:   true,
 		CopernicusEODATA: true,
+		CALSPEC:          true,
 	}
 
 	for _, ep := range Endpoints() {
@@ -354,7 +356,7 @@ func TestRegistryConcurrency(t *testing.T) {
 
 				Disable(GaiaTAP)
 				Enable(GaiaTAP)
-				EnableDownloads(NAIFSPK, 1<<20)
+				EnableDownloads(1<<20, NAIFSPK)
 
 				_, _ = DownloadsEnabled(NAIFSPK)
 
