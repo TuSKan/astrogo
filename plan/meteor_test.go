@@ -8,7 +8,6 @@ import (
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
-	"github.com/TuSKan/astrogo/skybrightness"
 	"github.com/TuSKan/astrogo/time"
 )
 
@@ -199,38 +198,6 @@ func TestMeteorShower_IsActive(t *testing.T) {
 	}
 }
 
-// fakeEmptyEngine/fakeLimMagModel let ObservedRate's tests fix the sky's
-// limiting magnitude to an exact, known value, isolating the ZHR/altitude/
-// population-index arithmetic from the real (and here irrelevant)
-// moonlight/zodiacal-light/light-pollution computation. fakeEmptyEngine is
-// a real, zero-component skybrightness.Engine (Total is identically zero,
-// which is finite/non-negative and passes the engine's own invariant
-// check) — fakeLimMagModel ignores whatever sky value Point() derives
-// from it and always returns the fixed limMag these tests want.
-func fakeEmptyEngine(t *testing.T) skybrightness.Engine {
-	t.Helper()
-
-	eng, err := skybrightness.NewCompositeEngine(skybrightness.CompositeConfig{
-		Name: skybrightness.AlgorithmRef{Name: "fakeEmptyEngine", Version: "test"},
-		Mode: skybrightness.ModeUserSupplied,
-	})
-	if err != nil {
-		t.Fatalf("NewCompositeEngine: %v", err)
-	}
-
-	return eng
-}
-
-type fakeLimMagModel struct{ limMag float64 }
-
-func (fakeLimMagModel) Algorithm() skybrightness.AlgorithmRef {
-	return skybrightness.AlgorithmRef{Name: "fakeLimMagModel", Version: "test"}
-}
-
-func (f fakeLimMagModel) LimitingMagnitude(_ skybrightness.LimitingMagInput) (float64, error) {
-	return f.limMag, nil
-}
-
 // TestMeteorShower_ObservedRate_ZeroBelowHorizon confirms a radiant below
 // the horizon yields rate 0, not an error.
 func TestMeteorShower_ObservedRate_ZeroBelowHorizon(t *testing.T) {
@@ -255,9 +222,10 @@ func TestMeteorShower_ObservedRate_ZeroBelowHorizon(t *testing.T) {
 		t.Fatalf("NewSite: %v", err)
 	}
 
-	c := LimitingMagnitudeConstraint{Engine: fakeEmptyEngine(t), Conversion: fakeLimMagModel{limMag: 6.5}}
-
-	rate, err := m.ObservedRate(time.FromJD(2451545.0, time.UTC), site, prov, c)
+	// The limiting magnitude is now a direct input, so these tests pin it
+	// to the IMO standard 6.5 and isolate the ZHR/altitude/population-index
+	// arithmetic from any sky-brightness model.
+	rate, err := m.ObservedRate(time.FromJD(2451545.0, time.UTC), site, prov, 6.5)
 	if err != nil {
 		t.Fatalf("ObservedRate: %v", err)
 	}
@@ -294,9 +262,10 @@ func TestMeteorShower_ObservedRate_StandardConditionsEqualsZHR(t *testing.T) {
 		t.Fatalf("NewSite: %v", err)
 	}
 
-	c := LimitingMagnitudeConstraint{Engine: fakeEmptyEngine(t), Conversion: fakeLimMagModel{limMag: 6.5}}
-
-	rate, err := m.ObservedRate(time.FromJD(2451545.0, time.UTC), site, prov, c)
+	// The limiting magnitude is now a direct input, so these tests pin it
+	// to the IMO standard 6.5 and isolate the ZHR/altitude/population-index
+	// arithmetic from any sky-brightness model.
+	rate, err := m.ObservedRate(time.FromJD(2451545.0, time.UTC), site, prov, 6.5)
 	if err != nil {
 		t.Fatalf("ObservedRate: %v", err)
 	}

@@ -9,6 +9,8 @@ import (
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/time"
+
+	"github.com/TuSKan/astrogo/internal/testutil"
 )
 
 // TestPlanetConstructorsIncludesPluto is a regression test: Pluto has its
@@ -47,7 +49,7 @@ func TestPlanetConstructorsIncludesPluto(t *testing.T) {
 func TestGatherPlanetaryMoonsSkipsWithoutDownloadConsent(t *testing.T) {
 	t.Cleanup(remote.Capture(remote.NAIFSPK).Restore)
 	remote.DisableDownloads(remote.NAIFSPK)
-	remote.SetDataDirPath(t.TempDir())
+	remote.SetDataDir(testutil.FileURL(t, t.TempDir()))
 
 	candidates, providers := gatherPlanetaryMoons(context.Background(), time.Date(2026, time.August, 1, 0, 0, 0, 0, time.LocationUTC), 30)
 

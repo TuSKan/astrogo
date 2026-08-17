@@ -1,78 +1,55 @@
-// Package skybrightness is astrogo's spectral, all-sky, observatory-grade
-// sky-brightness engine (Sky Brightness V2). It predicts ground-observed
-// spectral sky radiance
+// Package skybrightness predicts the spectral radiance of the night sky
+// an instrument will actually see.
 //
-//	L_lambda(lambda, altitude, azimuth, site, epoch)   W*m^-2*sr^-1*nm^-1
+//	L_lambda(lambda, direction, observer, time, atmosphere)   W m^-2 sr^-1 nm^-1
 //
-// for arbitrary terrestrial sites, arbitrary horizontal directions, point
-// or all-sky queries, spectral or passband-integrated output, decomposed
-// into natural and anthropogenic components, under clear, partly-cloudy,
-// or overcast skies, in climatological, historical, nowcast, or forecast
-// atmospheric states, with uncertainty and full provenance attached to
-// every result. See docs/skybrightness.md for the full design document —
-// this comment is a summary, not a substitute for it.
+// It answers one question: given a place, a time, a viewing direction, an
+// atmospheric state, a cloud field, a surrounding artificial-light
+// environment and an observing instrument, what spectral sky background
+// does that instrument see, and how uncertain is the prediction?
 //
-// # No backward compatibility
+// # Spectral radiance is the primary quantity
 //
-// This is a complete, ground-up replacement of astrogo v1's skybrightness
-// package. There is no shim, no adapter, and no deprecation cycle — v1's
-// Model, Component (old shape), SurfaceBrightnessV, Nanolambert,
-// SQMProvider, Floor, CompositeModel, RadianceToArtificialSB, and
-// atlas.Resolver are all deleted, not renamed. See
-// docs/skybrightness.md §16 for a symbol-by-symbol migration table.
+// Everything is computed as spectral radiance and stays spectral until
+// the moment a caller asks for something else. Surface brightness in
+// mag/arcsec^2, an SQM reading, luminance, a photon rate and a detector
+// electron rate are all *projections* of that one spectral state, produced
+// by [magnitude] and [optics] respectively. They are never the internal
+// representation, because a model can reproduce a correct V magnitude with
+// an entirely wrong spectrum, and every instrument projection downstream
+// would then be wrong.
 //
-// # Six quantities this package never conflates
+// Radiance is linear and additive; magnitudes are logarithmic and are not.
+// Components sum in radiance space, and the conversion happens once, at
+// the end.
 //
-// Satellite upward radiance, V-band surface brightness, an SQM reading,
-// luminance, horizontal irradiance, and limiting magnitude are six
-// distinct physical quantities. This package never treats any pair of
-// them as interchangeable; every conversion between them is an explicit,
-// named, unit-tested function (see units.go and passband.go). In
-// particular, a raw VIIRS-DNB pixel is never converted directly to a sky
-// brightness via a single empirical fit — see the Artificial component's
-// documentation (skybrightness/artificial, from Phase 4) for why: one
-// ~15-arcsec satellite pixel measures upward radiance from one small patch
-// of ground, while zenith skyglow is an additive flux integral over
-// scattered light from sources up to ~300 km away.
+// # What this package owns, and what it does not
 //
-// # Linear flux space
+// This package owns radiance transport: the [Scene], the [Component]
+// contract, the [Model] that sums components, and the uncertainty, quality
+// and provenance attached to a [Estimate].
 //
-// Every Component computes a contribution to L_total in LINEAR spectral
-// radiance space. Surface brightnesses are logarithmic (mag/arcsec^2);
-// summing them instead of the underlying radiances is a correctness bug.
-// The engine sums components into Result.Total before any magnitude
-// conversion happens, and Result.Components retains each component's own
-// linear-space contribution.
+// It deliberately owns nothing else. Atmospheric physics — Rayleigh and
+// aerosol scattering, molecular absorption, transmission, vertical
+// profiles, cloud optical properties — lives in [atmosphere]. Passbands
+// and magnitude systems live in [magnitude]. Instrument throughput and
+// detector rates live in [optics]. Spectral quantity types and the shared
+// wavelength axis live in [unit]. Geometry, ephemerides and time scales
+// come from [coord], [ephemeris] and [time]. A capability that belongs to
+// one of those packages is added there, not duplicated here.
 //
-// # Package layout
+// # Phase 0
 //
-// This package (core) is pure: types, interfaces, the composite engine,
-// and derived-output functions — no I/O, no network, no heavy
-// dependencies. Real physics lives in siblings (skybrightness/natural,
-// skybrightness/atmos, skybrightness/artificial, skybrightness/rt,
-// skybrightness/surrogate, skybrightness/calib, landing across Phases
-// 2-7), and real datasets live under skybrightness/dataset/... — the only
-// tier allowed to import remote, fits, net/http, or
-// github.com/scigolib/hdf5. plan imports this core package only; an
-// Engine is assembled by the application (an example's main, or a
-// caller's own setup) and injected into plan, not constructed inside it.
-// importgraph_test.go machine-enforces this shape.
+// This is the spectral foundation only. It ships no [Component]
+// implementations at all: a [Model] with no components returns a zero
+// radiance and says so through [Quality]. Nothing here should be read as a
+// physical sky prediction yet.
 //
-// # Modes and fallback
-//
-// A Request always names a Mode (Climatology, Historical, Nowcast,
-// Forecast, UserSupplied, or Fast). Modes never fall back into one
-// another silently: EvaluationOptions.Fallback defaults to
-// FallbackForbidden, and any fallback that does occur under an explicit
-// opt-in is recorded in Provenance.Fallbacks.
-//
-// # Accuracy, honestly stated
-//
-// This package's Phase 1 foundation proves unit correctness, passband
-// integration correctness, linear-space additivity, determinism, and
-// allocation behavior — it proves nothing about physical accuracy. This
-// repository holds no ground-truth SQM/TESS field measurements today, so
-// the accuracy targets in docs/skybrightness.md §12 are engineering
-// goals, not achieved claims, until real observational data exists to
-// validate against.
+// The scientific components arrive in the order set out in
+// docs/skybrightness.md: atmosphere, then artificial clear sky
+// (Kocifaj, Bara & Falchi 2022), clouds (Kocifaj, Falchi & Kundracik
+// 2025), the natural sky (GAMBONS), and the Moon (Jones 2013 with
+// Kieffer-Stone reflectance and Winkler 2022 scattering). Each lands only
+// once its primary literature is in hand; none is approximated to make a
+// phase look finished.
 package skybrightness

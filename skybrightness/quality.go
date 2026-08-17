@@ -2,110 +2,123 @@ package skybrightness
 
 import "strings"
 
-// QualityFlags is a bitset of caveats attached to a Component's or
-// Result's output. QualityFlagOK (the zero value) means no caveat applies.
-type QualityFlags uint64
+// Flag records how a prediction was actually constrained, so a caller can
+// tell a result driven by current observatory measurements from one driven
+// mostly by climatology.
+//
+// These are structured flags rather than log lines because the distinction
+// is part of the answer, not a diagnostic: a scheduler may accept a
+// climatological aerosol but refuse a climatological cloud field, and it
+// can only do that if the result says which it got.
+type Flag uint32
 
+// Quality flags. Each names what a specific input was, not how good the
+// result is — "good" is a judgement the caller makes from these.
 const (
-	// QualityFlagOK is the zero value: no caveat applies.
-	QualityFlagOK QualityFlags = 0
-
-	// QualityFlagApproximatePhysics marks output produced by a fast,
-	// simplified model (ModeFast) rather than the full spectral physics.
-	QualityFlagApproximatePhysics QualityFlags = 1 << iota
-
-	// QualityFlagPassbandTruncated marks a passband integration where the
-	// spectral grid did not fully cover the passband's response range.
-	QualityFlagPassbandTruncated
-
-	// QualityFlagOutOfSurrogateDomain marks a request whose atmospheric
-	// state fell outside a surrogate model's trained domain (Phase 6).
-	QualityFlagOutOfSurrogateDomain
-
-	// QualityFlagStaleAtmosphere marks an atmosphere.Atmosphere older than
-	// EvaluationOptions.MaxInputAge.
-	QualityFlagStaleAtmosphere
-
-	// QualityFlagFallbackApplied marks a Result produced after an
-	// explicit, recorded mode fallback (see Provenance.Fallbacks).
-	QualityFlagFallbackApplied
-
-	// QualityFlagNoVegaZeroPoint marks a Vega-system output request
-	// against a Passband with no VegaZeroPoint.
-	QualityFlagNoVegaZeroPoint
-
-	// QualityFlagTwilightExtrapolated marks output computed by
-	// extrapolating a twilight model beyond its validated solar
-	// depression range.
-	QualityFlagTwilightExtrapolated
-
-	// QualityFlagHorizonBlocked marks a direction/source pair where a
-	// horizon profile blocked a direct contribution.
-	QualityFlagHorizonBlocked
-
-	// QualityFlagCloudUncalibrated marks output from
-	// rt.FastCloudApproximation (Phase 5) rather than the full physical
-	// cloudy-sky model.
-	QualityFlagCloudUncalibrated
-
-	// QualityFlagSourceDataMasked marks a request where an emission-field
-	// pixel was masked (snow/cloud/lunar contamination, or otherwise
-	// flagged Poor/Missing by its dataset) rather than silently
-	// interpolated.
-	QualityFlagSourceDataMasked
-
-	// QualityFlagSingleScatteringOnly marks rt.ClearSkyPhysical output
-	// computed with higher scattering orders disabled.
-	QualityFlagSingleScatteringOnly
-
-	// QualityFlagBelowHorizon marks a direction at or below the local
-	// horizon.
-	QualityFlagBelowHorizon
+	// MeasuredAtmosphere marks surface conditions from real measurements.
+	MeasuredAtmosphere Flag = 1 << iota
+	// ClimatologicalAtmosphere marks surface conditions from climatology.
+	ClimatologicalAtmosphere
+	// MeasuredAerosol marks aerosol properties from measurement (AERONET,
+	// a photometer) rather than assumption.
+	MeasuredAerosol
+	// ClimatologicalAerosol marks assumed or climatological aerosol.
+	ClimatologicalAerosol
+	// MeasuredCloud marks an observed cloud field.
+	MeasuredCloud
+	// ForecastCloud marks a forecast cloud field.
+	ForecastCloud
+	// UnknownCloud marks a cloud state that was not supplied at all.
+	UnknownCloud
+	// MeasuredAirglow marks airglow constrained by recent local data.
+	MeasuredAirglow
+	// SolarAdjustedAirglow marks airglow scaled by a solar-activity index.
+	SolarAdjustedAirglow
+	// ClimatologicalAirglow marks airglow from climatology alone.
+	ClimatologicalAirglow
+	// MeasuredSourceSpectrum marks an artificial-source spectral power
+	// distribution taken from a real inventory.
+	MeasuredSourceSpectrum
+	// AssumedSourceSpectrum marks an assumed source spectrum — satellite
+	// radiance alone cannot determine one.
+	AssumedSourceSpectrum
+	// MeasuredEmissionFunction marks a measured upward emission function.
+	MeasuredEmissionFunction
+	// AssumedEmissionFunction marks an assumed upward emission function.
+	AssumedEmissionFunction
+	// PrecomputedRT marks radiance taken from a precomputed
+	// radiative-transfer product rather than evaluated natively.
+	PrecomputedRT
+	// ExtrapolatedModel marks evaluation outside a component's stated
+	// validity domain.
+	ExtrapolatedModel
+	// ApproximateMultipleScattering marks radiance whose higher scattering
+	// orders come from an empirical broadband factor rather than a
+	// radiative-transfer solution. It is closer than single scattering
+	// alone, and it is still a fit made at one site.
+	ApproximateMultipleScattering
+	// NoComponents marks a model with nothing registered — the Phase 0
+	// state. The radiance is identically zero and is not a sky prediction.
+	NoComponents
 )
 
-var qualityFlagNames = map[QualityFlags]string{
-	QualityFlagApproximatePhysics:   "ApproximatePhysics",
-	QualityFlagPassbandTruncated:    "PassbandTruncated",
-	QualityFlagOutOfSurrogateDomain: "OutOfSurrogateDomain",
-	QualityFlagStaleAtmosphere:      "StaleAtmosphere",
-	QualityFlagFallbackApplied:      "FallbackApplied",
-	QualityFlagNoVegaZeroPoint:      "NoVegaZeroPoint",
-	QualityFlagTwilightExtrapolated: "TwilightExtrapolated",
-	QualityFlagHorizonBlocked:       "HorizonBlocked",
-	QualityFlagCloudUncalibrated:    "CloudUncalibrated",
-	QualityFlagSourceDataMasked:     "SourceDataMasked",
-	QualityFlagSingleScatteringOnly: "SingleScatteringOnly",
-	QualityFlagBelowHorizon:         "BelowHorizon",
+// flagNames pairs each flag with its name, in declaration order.
+//
+//nolint:gochecknoglobals // lookup table for String
+var flagNames = []struct {
+	flag Flag
+	name string
+}{
+	{MeasuredAtmosphere, "MeasuredAtmosphere"},
+	{ClimatologicalAtmosphere, "ClimatologicalAtmosphere"},
+	{MeasuredAerosol, "MeasuredAerosol"},
+	{ClimatologicalAerosol, "ClimatologicalAerosol"},
+	{MeasuredCloud, "MeasuredCloud"},
+	{ForecastCloud, "ForecastCloud"},
+	{UnknownCloud, "UnknownCloud"},
+	{MeasuredAirglow, "MeasuredAirglow"},
+	{SolarAdjustedAirglow, "SolarAdjustedAirglow"},
+	{ClimatologicalAirglow, "ClimatologicalAirglow"},
+	{MeasuredSourceSpectrum, "MeasuredSourceSpectrum"},
+	{AssumedSourceSpectrum, "AssumedSourceSpectrum"},
+	{MeasuredEmissionFunction, "MeasuredEmissionFunction"},
+	{AssumedEmissionFunction, "AssumedEmissionFunction"},
+	{PrecomputedRT, "PrecomputedRT"},
+	{ExtrapolatedModel, "ExtrapolatedModel"},
+	{ApproximateMultipleScattering, "ApproximateMultipleScattering"},
+	{NoComponents, "NoComponents"},
 }
 
-// Has reports whether every bit set in f is also set in q.
-func (q QualityFlags) Has(f QualityFlags) bool { return q&f == f }
+// Has reports whether every flag in want is set.
+func (f Flag) Has(want Flag) bool { return f&want == want }
 
-// Strings returns the set flags' names, in ascending bit order. Returns
-// nil for QualityFlagOK.
-func (q QualityFlags) Strings() []string {
-	if q == QualityFlagOK {
-		return nil
+// String lists the set flags, pipe-separated.
+func (f Flag) String() string {
+	if f == 0 {
+		return "none"
 	}
 
-	var out []string
+	var set []string
 
-	for bit := QualityFlags(1); bit != 0; bit <<= 1 {
-		if q.Has(bit) {
-			if name, ok := qualityFlagNames[bit]; ok {
-				out = append(out, name)
-			}
+	for _, fn := range flagNames {
+		if f&fn.flag != 0 {
+			set = append(set, fn.name)
 		}
 	}
 
-	return out
+	return strings.Join(set, "|")
 }
 
-// String implements fmt.Stringer.
-func (q QualityFlags) String() string {
-	if q == QualityFlagOK {
-		return "OK"
-	}
-
-	return strings.Join(q.Strings(), "|")
+// Quality is the set of flags describing one Estimate.
+type Quality struct {
+	Flags Flag
 }
+
+// Add sets flags.
+func (q *Quality) Add(f Flag) { q.Flags |= f }
+
+// Has reports whether every flag in want is set.
+func (q Quality) Has(want Flag) bool { return q.Flags.Has(want) }
+
+// String renders the flag set.
+func (q Quality) String() string { return q.Flags.String() }

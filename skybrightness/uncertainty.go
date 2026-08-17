@@ -1,155 +1,123 @@
 package skybrightness
 
-import "errors"
+import (
+	"math"
 
-// CovarianceGroup names one of the nine sources of uncertainty this engine
-// tracks separately. Contributions within one group are combined linearly
-// (treated as fully correlated); contributions across groups are combined
-// in quadrature. See docs/skybrightness.md §10 for why naive
-// all-quadrature combination is wrong (VIIRS intensity error, for one, is
-// spatially correlated across an entire city, not an independent per-pixel
-// draw).
-type CovarianceGroup uint8
-
-// The nine covariance groups, in declaration order.
-const (
-	GroupEmissionIntensity CovarianceGroup = iota
-	GroupSourceSpectrum
-	GroupAngularEmission
-	GroupAerosol
-	GroupCloud
-	GroupNatural
-	GroupSurrogate
-	GroupCalibration
-	GroupInputAge
+	"github.com/TuSKan/astrogo/unit"
 )
 
-const numCovarianceGroups = int(GroupInputAge) + 1
-
-// String implements fmt.Stringer.
-func (g CovarianceGroup) String() string {
-	switch g {
-	case GroupEmissionIntensity:
-		return "EmissionIntensity"
-	case GroupSourceSpectrum:
-		return "SourceSpectrum"
-	case GroupAngularEmission:
-		return "AngularEmission"
-	case GroupAerosol:
-		return "Aerosol"
-	case GroupCloud:
-		return "Cloud"
-	case GroupNatural:
-		return "Natural"
-	case GroupSurrogate:
-		return "Surrogate"
-	case GroupCalibration:
-		return "Calibration"
-	case GroupInputAge:
-		return "InputAge"
-	default:
-		return "CovarianceGroup(unknown)"
-	}
-}
-
-// UncertaintyKind distinguishes the three kinds of uncertainty the mandate
-// requires this engine to distinguish, rather than lumping them together.
-type UncertaintyKind uint8
-
-// The three kinds of uncertainty.
-const (
-	Aleatoric UncertaintyKind = iota
-	Epistemic
-	Measurement
-)
-
-// String implements fmt.Stringer.
-func (k UncertaintyKind) String() string {
-	switch k {
-	case Aleatoric:
-		return "Aleatoric"
-	case Epistemic:
-		return "Epistemic"
-	case Measurement:
-		return "Measurement"
-	default:
-		return "UncertaintyKind(unknown)"
-	}
-}
-
-// UncertaintyMode selects how uncertainty is propagated through an
-// evaluation.
-type UncertaintyMode uint8
-
-const (
-	// UncNone disables uncertainty propagation entirely.
-	UncNone UncertaintyMode = iota
-
-	// UncLinearized uses first-order linearized propagation with
-	// covariance groups — the only mode Phase 1 implements.
-	UncLinearized
-
-	// UncEnsemble uses deterministic ensemble members. Not implemented
-	// before Phase 6/7.
-	UncEnsemble
-
-	// UncMonteCarlo uses seeded Monte Carlo sampling. Not implemented
-	// before Phase 6/7.
-	UncMonteCarlo
-)
-
-// String implements fmt.Stringer.
-func (m UncertaintyMode) String() string {
-	switch m {
-	case UncNone:
-		return "None"
-	case UncLinearized:
-		return "Linearized"
-	case UncEnsemble:
-		return "Ensemble"
-	case UncMonteCarlo:
-		return "MonteCarlo"
-	default:
-		return "UncertaintyMode(unknown)"
-	}
-}
-
-// ErrUncertaintyModeUnimplemented is returned when EvaluationOptions.Uncertainty
-// requests UncEnsemble or UncMonteCarlo — neither is implemented before
-// Phase 6/7 (docs/skybrightness.md §14). Returning this error, rather than
-// silently degrading to UncLinearized or UncNone, is the honest choice: a
-// caller that asked for ensemble/Monte Carlo uncertainty and silently got
-// something else would draw wrong conclusions from UncertaintyResult.
-var ErrUncertaintyModeUnimplemented = errors.New("skybrightness: uncertainty mode not implemented before Phase 6/7")
-
-// GroupContribution is one covariance group's contribution to the total
-// uncertainty of a Result.
-type GroupContribution struct {
-	Group    CovarianceGroup
-	Kind     UncertaintyKind
-	Variance float64 // (relative sigma)^2, this group's contribution
-	Share    float64 // this group's fraction of total variance, in [0,1]
-}
-
-// DomainWarning documents a request that fell outside a model's validated
-// or trained domain (e.g. QualityFlagOutOfSurrogateDomain).
-type DomainWarning struct {
+// Uncertainty is the uncertainty of one contribution, expressed as a
+// relative standard uncertainty on its radiance.
+//
+// Relative rather than absolute because the dominant terms — airglow
+// variability, aerosol loading, assumed source spectra — are multiplicative
+// in nature: airglow is quoted as a factor-of-two swing, not as a fixed
+// W m^-2 sr^-1 nm^-1 offset.
+type Uncertainty struct {
+	// Component identifies what this uncertainty belongs to.
 	Component ComponentID
-	Message   string
+
+	// Relative is the 1-sigma relative standard uncertainty, e.g. 0.3 for
+	// 30 per cent.
+	Relative float64
+
+	// Source names the dominant contributor, e.g. "airglow variability",
+	// "assumed source SPD".
+	Source string
 }
 
-// UncertaintyResult carries every uncertainty output the mandate
-// requires: per-wavelength percentile fields, a per-wavelength relative
-// sigma, per-group and per-component variance shares, and any domain
-// warnings raised while producing the Result.
-type UncertaintyResult struct {
-	Mode UncertaintyMode
+// UncertaintyBudget holds per-component uncertainties and combines them
+// into a total.
+//
+// Component-level uncertainties are kept rather than collapsed immediately
+// into one number, because which term dominates is itself the useful
+// output: a caller can act on "airglow dominates" by taking a measurement,
+// but cannot act on a single opaque percentage.
+type UncertaintyBudget struct {
+	// Components holds one entry per contributing component.
+	Components []Uncertainty
 
-	P05, P50, P95 SpectralField
-	RelSigma      SpectralField // relative (fractional) 1-sigma, per wavelength
+	// Correlated marks the budget as combining terms in phase rather than
+	// in quadrature. Independence is not assumed: two components sharing
+	// an aerosol assumption are correlated through it, and a caller that
+	// knows this sets the flag rather than accepting an optimistic total.
+	Correlated bool
+}
 
-	ByGroup     [numCovarianceGroups]GroupContribution
-	ByComponent [numComponents]float64 // this component's fraction of total variance
+// Add records a component's uncertainty.
+func (b *UncertaintyBudget) Add(u Uncertainty) {
+	b.Components = append(b.Components, u)
+}
 
-	Warnings []DomainWarning
+// Total combines the per-component relative uncertainties into a relative
+// uncertainty on the total radiance, weighting each component by its share
+// of that total.
+//
+// weights maps a component to its radiance contribution. A component's
+// uncertainty matters in proportion to how much it contributes: 50 per
+// cent uncertainty on a term carrying 1 per cent of the flux is 0.5 per
+// cent on the answer.
+//
+// Terms combine in quadrature when Correlated is false and linearly when
+// it is true. Linear is the conservative choice and is what a shared
+// systematic actually does.
+func (b *UncertaintyBudget) Total(weights map[ComponentID]unit.Radiance) float64 {
+	var total unit.Radiance
+
+	for _, w := range weights {
+		total += w
+	}
+
+	if total <= 0 {
+		return 0
+	}
+
+	var sum float64
+
+	for _, u := range b.Components {
+		share := float64(weights[u.Component]) / float64(total)
+		contribution := share * u.Relative
+
+		if b.Correlated {
+			sum += contribution
+
+			continue
+		}
+
+		sum += contribution * contribution
+	}
+
+	if b.Correlated {
+		return sum
+	}
+
+	return math.Sqrt(sum)
+}
+
+// Dominant returns the component contributing most to the combined
+// uncertainty, and its share. It answers "what should I measure to improve
+// this prediction?" — the question the budget exists to serve.
+func (b *UncertaintyBudget) Dominant(weights map[ComponentID]unit.Radiance) (Uncertainty, float64) {
+	var (
+		total unit.Radiance
+		best  Uncertainty
+		bestC float64
+	)
+
+	for _, w := range weights {
+		total += w
+	}
+
+	if total <= 0 {
+		return Uncertainty{}, 0
+	}
+
+	for _, u := range b.Components {
+		share := float64(weights[u.Component]) / float64(total)
+		if c := share * u.Relative; c > bestC {
+			best, bestC = u, c
+		}
+	}
+
+	return best, bestC
 }

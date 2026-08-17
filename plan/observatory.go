@@ -12,6 +12,7 @@ import (
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/remote"
+	"github.com/TuSKan/astrogo/remote/api"
 	"github.com/TuSKan/astrogo/time"
 )
 
@@ -297,7 +298,7 @@ func NewSiteEarthAddress(ctx context.Context, name, address string, opts ...Site
 // geocodeAddress resolves address to decimal-degree latitude/longitude via
 // the Nominatim API (remote.Nominatim).
 func geocodeAddress(ctx context.Context, address string) (lat, lon float64, err error) {
-	client, err := remote.NewClientFor(remote.Nominatim)
+	client, err := api.NewClient(remote.Nominatim)
 	if err != nil {
 		return 0, 0, fmt.Errorf("plan: geocode client: %w", err)
 	}
@@ -332,7 +333,7 @@ func geocodeAddress(ctx context.Context, address string) (lat, lon float64, err 
 // lookupElevation resolves a latitude/longitude to a height above sea
 // level (meters) via the Open-Elevation API (remote.OpenElevation).
 func lookupElevation(ctx context.Context, lat, lon float64) (float64, error) {
-	client, err := remote.NewClientFor(remote.OpenElevation)
+	client, err := api.NewClient(remote.OpenElevation)
 	if err != nil {
 		return 0, fmt.Errorf("plan: elevation client: %w", err)
 	}

@@ -109,7 +109,7 @@ func WithStep(d time.Duration) VisibleTonightOption {
 // Galilean moons), since NAIF's only kernels covering these bright, named
 // moons also carry very long high-precision integration spans; there is no
 // smaller official alternative. Each kernel still requires the same
-// remote.EnableDownloads(remote.NAIFSPK, maxSize) consent as any other —
+// remote.EnableDownloads(maxSize, remote.NAIFSPK) consent as any other —
 // this option only controls whether VisibleTonight asks for them at all.
 func WithPlanetaryMoons() VisibleTonightOption {
 	return func(c *visibleTonightConfig) { c.includeMoons = true }
@@ -122,7 +122,7 @@ func WithPlanetaryMoons() VisibleTonightOption {
 // SBDB provided them (resolve.Target.HasElements).
 //
 // The default is Kepler because it is free — no network round trip, no
-// remote.EnableDownloads(remote.JPLHorizons, ...) consent, no file
+// remote.EnableDownloads(..., remote.JPLHorizonsSPK) consent, no file
 // handle — and, for a single night's visibility-window search, accurate
 // well beyond what that search itself resolves (~0.04″ near the
 // elements' own epoch, ~0.56″ at 30 days out — see CHANGELOG for the
@@ -194,7 +194,7 @@ var planetConstructors = []func(eph.Provider) *Planet{
 // resolved via two-body Keplerian propagation of its own published
 // elements by default (ephemeris/kepler) — free, no network round trip,
 // no download consent — falling back to a real JPL-Horizons-generated
-// SPK kernel (gated by remote.EnableDownloads(remote.JPLHorizons, ...))
+// SPK kernel (gated by remote.EnableDownloads(..., remote.JPLHorizonsSPK))
 // only when the candidate has no published elements or an orbit two-body
 // propagation can't represent; see WithSmallBodyKernels to force the
 // kernel path unconditionally. A candidate whose ephemeris (either path)

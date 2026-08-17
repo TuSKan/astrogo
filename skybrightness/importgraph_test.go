@@ -6,145 +6,80 @@ import (
 	"testing"
 )
 
-const corePkg = "github.com/TuSKan/astrogo/skybrightness"
+const modulePath = "github.com/TuSKan/astrogo"
 
-// coreAllowedImports is docs/skybrightness.md §4 rule 1, verbatim: core
-// skybrightness may import only stdlib, angle, vector, unit, constants,
-// time, coord, ephemeris, atmosphere, internal/parallel. Extend this list
-// only alongside a matching update to docs/skybrightness.md §4.
-var coreAllowedImports = map[string]bool{
-	"github.com/TuSKan/astrogo/angle":             true,
-	"github.com/TuSKan/astrogo/vector":            true,
-	"github.com/TuSKan/astrogo/unit":              true,
-	"github.com/TuSKan/astrogo/constants":         true,
-	"github.com/TuSKan/astrogo/time":              true,
-	"github.com/TuSKan/astrogo/coord":             true,
-	"github.com/TuSKan/astrogo/ephemeris":         true,
-	"github.com/TuSKan/astrogo/atmosphere":        true,
-	"github.com/TuSKan/astrogo/internal/parallel": true,
+// forbidden lists packages the sky-radiance core must not import directly,
+// with the reason, so a failure explains itself.
+//
+//nolint:gochecknoglobals // test fixture table
+var forbidden = map[string]string{
+	modulePath + "/remote":      "the core resolves no data; a provider layer hands it in already resolved",
+	modulePath + "/remote/file": "the core touches no storage",
+	modulePath + "/remote/api":  "the core makes no network calls",
+	modulePath + "/fits":        "the core carries no file-format dependency",
+	modulePath + "/plan":        "plan is orchestration and sits above this package",
+	"net/http":                  "the core makes no network calls",
+	"os":                        "the core touches no filesystem",
+	"github.com/scigolib/hdf5":  "the core carries no heavy dataset dependency",
 }
 
-// TestCoreImportsOnlyAllowedPackages enforces rule 1: every non-stdlib
-// import of core skybrightness must be in coreAllowedImports.
-func TestCoreImportsOnlyAllowedPackages(t *testing.T) {
+// The core is a pure numeric package: it computes radiance from a Scene it
+// was handed, and resolves nothing itself. Datasets are fetched by a
+// provider layer, which will live under skybrightness/dataset/... and is
+// the only tier permitted these imports.
+//
+// This checks DIRECT imports. A transitive ban would be wrong rather than
+// stricter: the spec requires reusing coord, ephemeris and time, and those
+// legitimately reach remote for Earth-orientation data and JPL kernels,
+// both consent-gated. What the core must not do is resolve data itself.
+// That evaluation genuinely performs no network access is asserted
+// behaviourally by TestEstimateWorksOffline, which is the real guarantee.
+func TestCoreDoesNotImportIOPackages(t *testing.T) {
 	t.Parallel()
 
-	pkg, err := build.Default.Import(corePkg, "", 0)
+	pkg, err := build.Import(modulePath+"/skybrightness", "", 0)
 	if err != nil {
-		t.Fatalf("import %s: %v", corePkg, err)
+		t.Fatalf("import skybrightness: %v", err)
 	}
 
 	for _, imp := range pkg.Imports {
-		if !strings.Contains(imp, ".") { // stdlib import (no dot in the first path element's domain)
-			continue
-		}
-
-		if !coreAllowedImports[imp] {
-			t.Errorf("core skybrightness imports %q, not in the allowed list (docs/skybrightness.md §4 rule 1)", imp)
+		if reason, bad := forbidden[imp]; bad {
+			t.Errorf("skybrightness imports %q (%s)", imp, reason)
 		}
 	}
 }
 
-// TestCoreDoesNotImportSiblings enforces rules 2/3: core must never
-// import any of its own siblings (the pure physics packages, or the IO
-// tier under dataset/ and lpmap) — siblings depend on core, never the
-// reverse.
-func TestCoreDoesNotImportSiblings(t *testing.T) {
+// Every astrogo package the core imports must itself be a layer at or
+// below it, so the dependency direction stays one-way.
+func TestCoreImportsOnlyLowerLayers(t *testing.T) {
 	t.Parallel()
 
-	siblings := []string{
-		corePkg + "/natural",
-		corePkg + "/atmos",
-		corePkg + "/artificial",
-		corePkg + "/rt",
-		corePkg + "/surrogate",
-		corePkg + "/calib",
-		corePkg + "/dataset",
-		corePkg + "/lpmap",
+	allowed := map[string]bool{
+		modulePath + "/angle":          true,
+		modulePath + "/atmosphere":     true,
+		modulePath + "/constants":      true,
+		modulePath + "/coord":          true,
+		modulePath + "/ephemeris":      true,
+		modulePath + "/ephemeris/core": true,
+		modulePath + "/magnitude":      true,
+		modulePath + "/optics":         true,
+		modulePath + "/time":           true,
+		modulePath + "/unit":           true,
+		modulePath + "/vector":         true,
 	}
 
-	pkg, err := build.Default.Import(corePkg, "", 0)
+	pkg, err := build.Import(modulePath+"/skybrightness", "", 0)
 	if err != nil {
-		t.Fatalf("import %s: %v", corePkg, err)
+		t.Fatalf("import skybrightness: %v", err)
 	}
 
-	all := append(append([]string{}, pkg.Imports...), pkg.TestImports...)
-
-	for _, imp := range all {
-		for _, sibling := range siblings {
-			if imp == sibling || strings.HasPrefix(imp, sibling+"/") {
-				t.Errorf("core skybrightness must not import %s (found %q)", sibling, imp)
-			}
-		}
-	}
-}
-
-// ioOnlyImports are only ever legitimate from the IO tier (rule 3), for
-// packages under skybrightness's own tree. This rule is scoped to
-// skybrightness's siblings, not a repo-wide exclusivity claim:
-// atmosphere/dataset/cams independently imports github.com/scigolib/hdf5
-// from outside this tree entirely (see its own doc comment) — this test
-// has no opinion on that package, and none is needed, since it lives
-// under a different root than corePkg below.
-var ioOnlyImports = []string{
-	"net/http",
-	"github.com/TuSKan/astrogo/remote",
-	"github.com/TuSKan/astrogo/fits",
-	"github.com/scigolib/hdf5",
-}
-
-// TestPureSiblingsDoNotImportIO enforces rule 3 for the pure-physics
-// siblings that exist today: natural and atmos must never import remote,
-// fits, net/http, or the HDF5 library — only skybrightness/dataset/... and
-// skybrightness/lpmap may.
-func TestPureSiblingsDoNotImportIO(t *testing.T) {
-	t.Parallel()
-
-	pure := []string{corePkg + "/natural", corePkg + "/atmos"}
-
-	for _, p := range pure {
-		t.Run(p, func(t *testing.T) {
-			t.Parallel()
-
-			pkg, err := build.Default.Import(p, "", 0)
-			if err != nil {
-				t.Fatalf("import %s: %v", p, err)
-			}
-
-			for _, imp := range append(append([]string{}, pkg.Imports...), pkg.TestImports...) {
-				for _, forbidden := range ioOnlyImports {
-					if imp == forbidden {
-						t.Errorf("%s must not import %s (IO tier only)", p, forbidden)
-					}
-				}
-
-				if strings.HasPrefix(imp, corePkg+"/dataset") || imp == corePkg+"/lpmap" {
-					t.Errorf("%s must not import the IO tier %q", p, imp)
-				}
-			}
-		})
-	}
-}
-
-// TestPlanImportsOnlyCoreSkybrightness enforces rule 4: plan may import
-// core skybrightness only, never any of its subpackages. This preserves
-// the CLAUDE.md rule that an HDF5-scale dependency never reaches a plan
-// user's build — engines are assembled by the application and injected.
-func TestPlanImportsOnlyCoreSkybrightness(t *testing.T) {
-	t.Parallel()
-
-	pkg, err := build.Default.Import("github.com/TuSKan/astrogo/plan", "", 0)
-	if err != nil {
-		t.Fatalf("import plan: %v", err)
-	}
-
-	for _, imp := range append(append([]string{}, pkg.Imports...), pkg.TestImports...) {
-		if imp == corePkg {
-			continue
+	for _, imp := range pkg.Imports {
+		if !strings.HasPrefix(imp, modulePath) {
+			continue // standard library
 		}
 
-		if strings.HasPrefix(imp, corePkg+"/") {
-			t.Errorf("plan must import only %s, not %q", corePkg, imp)
+		if !allowed[imp] {
+			t.Errorf("skybrightness imports %q, which is not a declared lower layer", imp)
 		}
 	}
 }

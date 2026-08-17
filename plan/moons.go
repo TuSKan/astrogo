@@ -104,7 +104,7 @@ type moonSpec struct {
 // 1995-2050 short span) to ~1.1 GB (Jupiter, jup365.bsp) — since NAIF's
 // smaller per-planet kernels only cover obscure irregular moonlets, not
 // these bright, named ones. Nothing in this package downloads any of these
-// without the same explicit remote.EnableDownloads(remote.NAIFSPK, maxSize)
+// without the same explicit remote.EnableDownloads(maxSize, remote.NAIFSPK)
 // consent every other kernel in this library requires. See NewPlanetaryMoon
 // for name-based lookup.
 var moonSpecs = map[string]moonSpec{
