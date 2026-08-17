@@ -1,788 +1,924 @@
-# Sky Brightness V2 — Design
+# Sky Brightness — Design
 
-**Status:** Phase 0 design document. This is the internally-consistent architecture the
-implementation phases below build against. It supersedes the v1 `skybrightness` package
-entirely — there is no backward compatibility (see §15).
+**Status:** Phase 0 (spectral foundation) and Phase 1 (atmospheric scattering) implemented. Phases 2–8 planned.
 
-This document is the single source of truth for *why* the package is shaped the way it is.
-Individual package doc comments explain *how* to use a given type; this file explains the
-decisions that made that shape inevitable, so a future maintainer does not have to re-derive
-them from source.
+This document is the single source of truth for *why* the package is shaped the way it is,
+and for the scientific provenance of everything it computes. Package doc comments explain
+how to use a type; this explains the decisions behind it, so a maintainer does not have to
+re-derive them from source.
 
----
-
-## 1. Scientific scope and non-scope
-
-Sky Brightness V2 predicts ground-observed spectral sky radiance
-
-```
-L_λ(λ, altitude, azimuth, site, epoch)      W·m⁻²·sr⁻¹·nm⁻¹
-```
-
-for arbitrary terrestrial sites, arbitrary horizontal directions, point or all-sky queries,
-spectral or passband-integrated output, decomposed into natural and anthropogenic components,
-under clear, partly-cloudy, or overcast skies, in climatological, historical, nowcast, or
-forecast atmospheric states, with uncertainty and full provenance attached to every result.
-
-**Six quantities the package never treats as interchangeable**, each with its own named,
-unit-tested conversion function (§3):
-
-| Quantity | What it actually is | How V2 gets from it to sky brightness |
-|---|---|---|
-| Satellite upward radiance (VIIRS-DNB) | Radiance leaving the ground toward a satellite, one ~15″ pixel, one small ground patch | An `EmissionField` input to §9's clear/cloudy propagation — never a direct SB conversion (§9, §25) |
-| V-band surface brightness | A photometric magnitude system, tied to the Johnson V passband | One of many `Passband` outputs of `IntegrateRadiance` (§3) — never the implicit default |
-| SQM reading | An instrument measurement through a specific, imperfect device response curve | A `calib.Measurement` with an `Instrument` model (§10 Phase 7) — never assumed equal to Johnson V |
-| Luminance | A photopically-weighted radiometric quantity (cd/m²) | `PhotopicLuminance`/`ScotopicLuminance` (§3) — a derived output, not an input unit |
-| Horizontal irradiance | An integral of radiance over the visible hemisphere | `HorizontalIrradiance` (§3) — a derived output |
-| Limiting magnitude | A function of sky background *and* an explicitly chosen visual/detector model | `LimitingMagModel.LimitingMagnitude(...)` (§5) — the model is always named in `Provenance` |
-
-**Explicitly out of scope for this design**: a GUI (ROADMAP's own Non-Goals rule this out
-project-wide); a from-scratch reimplementation of a validated commercial radiative-transfer
-package (LPTRAN/SkyGlow); a neural-network runtime in the first surrogate pass (§10 Phase 6);
-running MCARaTS or any external RT solver from Go (§13); claiming any accuracy target has been
-*met* before real field data exists in this repo (§12).
+The authoritative requirement is the implementation specification supplied by the project
+owner. Where this document and that specification disagree, the specification wins.
 
 ---
 
-## 2. Mathematical decomposition
+## 1. Scope and the question this answers
 
-Total spectral radiance is additive **in linear space**:
-
-```
-L_total(λ) = L_airglow(λ) + L_zodiacal(λ) + L_starlight(λ) + L_diffuse_galactic(λ)
-           + L_moon_scattered(λ) + L_twilight(λ) + L_artificial(λ) + L_aurora(λ)
-```
-
-Magnitudes are logarithmic; summing them is a correctness bug (this was already stated in
-v1's `doc.go` and remains true — the difference in V2 is that it now applies per-wavelength,
-not just to one V-band scalar). Every `Component` (§5) returns `SpectralRadiance` on the
-caller's `SpectralGrid`; the engine sums components into `Result.Total` before any
-magnitude conversion happens, and `Result.Components` retains the individual linear-space
-contributions for inspection.
-
-The artificial component is itself a pipeline, not a single equation:
+The module predicts the spectral radiance of the night sky an instrument will actually see:
 
 ```
-E(position, λ, upward_direction, t) = intensity(position, t)
-                                     × spectral_mixture(position, λ, t)
-                                     × angular_emission(position, upward_direction, t)
-
-L_artificial(λ) = Propagate[E](λ, observer_direction, atmosphere.Atmosphere)
+L_λ(λ, direction, observer, time, atmosphere)      W·m⁻²·sr⁻¹·nm⁻¹
 ```
 
-**VIIRS-DNB supplies `intensity` only.** It has one broad panchromatic band (~500–900 nm) with
-essentially no spectral resolution and no view-angle diversity per pixel — it cannot constrain
-`spectral_mixture` or `angular_emission`. Treating a VIIRS pixel as if it already encoded
-brightness (v1's `RadianceToArtificialSB`, a single log-linear fit) conflates three physically
-distinct factors into one empirical scalar. V2 keeps them as three pluggable, independently
-uncertain models (§9) and reserves the actual radiative-transfer integral — the `Propagate[]`
-step — for the RT engines in §9.
+for arbitrary terrestrial sites, arbitrary viewing directions, point or all-sky queries,
+under clear and cloudy skies, with uncertainty and provenance attached to every result.
+
+It exists to answer one operational question:
+
+> Given this place, time, direction, atmosphere, cloud field, surrounding artificial-light
+> environment and observing instrument, what spectral sky background will this instrument
+> see, and how uncertain is that prediction?
+
+Applications: observation scheduling, exposure-time estimation, instrument background
+prediction, site characterisation, and light-pollution impact studies.
+
+### What this is not
+
+This is explicitly *not* the conventional architecture of
+
+```
+KS91 moonlight + constant dark-sky value + Bortle/VIIRS-derived zenith brightness
+```
+
+Every element of that is prohibited in production: a constant dark sky, KS91 as the
+production Moon, Bortle class as physics, VIIRS radiance read as sky brightness,
+geographic averaging in place of propagation, a universal cloud multiplier, and a single
+extinction coefficient. Those approximations may exist only as separately named, documented
+legacy or fast modes, and must never silently back the production model.
 
 ---
 
-## 3. Units and canonical types
+## 2. Scientific baseline
 
-All internal computation is in SI (or SI-derived, documented) units. Every physical quantity
-is a distinct Go type, declared in package `unit` (`unit/quantity_types.go`) and used with the
-`unit.` prefix throughout `skybrightness` and its siblings — so a radiance can never be
-assigned to an irradiance by accident:
+| Contribution | Model adopted | Primary reference | Status |
+| :--- | :--- | :--- | :--- |
+| Artificial, clear sky | Semi-analytic two-parameter all-sky | Kocifaj, Bará & Falchi (2022), MNRAS Lett. 513, L25; arXiv 2203.09322 | **In hand** |
+| Artificial, cloudy sky | All-sky model spanning full cloud range | Kocifaj, Falchi & Kundracik (2025), PNAS 122(44) e2508001122 | **In hand** |
+| Spectral/directional architecture | Per-pixel wavelength-dependent NSB | Roellinghoff, Spencer & Funk (2025), A&A; arXiv 2505.12895 | **In hand** |
+| Lunar spectral reflectance | ROLO disk-equivalent albedo, model 311g | Kieffer & Stone (2005), AJ 129, 2887 | **In hand** |
+| Lunar atmospheric scattering | Revised simplified scattering (RSS) | Winkler (2022), MNRAS 514, 208; doi:10.1093/mnras/stac1387 | **In hand** |
+| Moonlight framework | Spectral moonlight model | Jones et al. (2013), A&A 560, A91 | To confirm |
+| Natural sky | GAMBONS | Masana et al. (2021), MNRAS 501, 5443; arXiv 2101.01500 and arXiv 2408.17371 | Open access |
+| Sky model / airglow | ESO SkyCalc | Noll et al. (2012), A&A 543, A92 | Open access |
 
-| Type | Meaning | Unit |
-|---|---|---|
-| `unit.WavelengthNM` | vacuum wavelength (unless the source states air) | nm |
-| `unit.SpectralRadiance` | the primary quantity of the whole engine | W·m⁻²·sr⁻¹·nm⁻¹ |
-| `unit.PhotonSpectralRadiance` | photon-counting analogue | photon·s⁻¹·m⁻²·sr⁻¹·nm⁻¹ |
-| `unit.SpectralIrradiance` | | W·m⁻²·nm⁻¹ |
-| `unit.Radiance` | passband-integrated | W·m⁻²·sr⁻¹ |
-| `unit.PhotonRadiance` | | photon·s⁻¹·m⁻²·sr⁻¹ |
-| `unit.Irradiance` | | W·m⁻² |
-| `unit.LuminanceCdM2` | photopic/scotopic derived output | cd·m⁻² |
-| `unit.SurfaceBrightnessAB` | always paired with a `PassbandID` | AB mag·arcsec⁻² |
-| `unit.SurfaceBrightnessVega` | always paired with a `PassbandID` + Vega zero-point version | Vega mag·arcsec⁻² |
-| `unit.Transmission` | | [0, 1] |
-| `unit.OpticalDepth`, `unit.AerosolOpticalDepth` | vertical unless documented as slant | ≥ 0 |
-| `unit.SingleScatteringAlbedo` | | [0, 1] |
-| `unit.AsymmetryParameter` | Henyey–Greenstein g | [−1, 1] |
-| `unit.AngstromExponent` | | dimensionless |
-| `unit.CloudFraction` | **sky cover** — not optical depth, not opacity | [0, 1] |
-| `unit.CloudOpticalDepth` | at 550 nm unless stated | ≥ 0 |
-| `unit.EffectiveRadiusUM`, `unit.OzoneColumnDU`, `unit.PrecipitableWaterMM`, `unit.PressureHPa`, `unit.TemperatureK`, `unit.AltitudeM`, `unit.SpectralAlbedo`, `unit.ElectronsPerPixelPerSecond` | as named | as named |
+Reference PDFs are **not** committed to the repository (copyright). Equations and
+coefficients are transcribed here and into source comments with full citation, which is
+normal scientific practice; the papers themselves are obtained by the reader.
 
-`unit.CloudFraction` and `unit.CloudOpticalDepth` are deliberately distinct types (§8) so the
-mandate's "never collapse cloud state to one scalar" rule is enforced by the compiler, not by
-convention.
+### The rule that governs every component
 
-**Revised, one release later**: these types used to be re-declared as a 26-member type-alias
-block in `skybrightness/units.go` (`type SpectralRadiance = unit.SpectralRadiance`, and so on)
-purely so in-package code could write the short name instead of the `unit.`-qualified one.
-That file was removed: every one of these types already appears in nearly every function
-signature across `skybrightness`, `skybrightness/natural`, `skybrightness/atmos`, and
-`skybrightness/dataset/passband`, all of which already import `unit` directly for other
-reasons, so the alias layer was pure indirection with no real ergonomic win, and it created a
-second name for the same identity most readers only half-remembered. `unit` was already the
-single source of truth for these types before the removal (`unit.Dimension`'s doc comment has
-said so since before this round); the removal just stopped `skybrightness` from also
-re-exporting them under its own name.
-
-**The explicit integration path** — one exported function per arrow, nothing implicit:
-
-```
-spectral radiance ──ToPhoton──▶ photon radiance ──IntegrateRadiance──▶ passband radiance
-        │                                                                     │
-        │                                                          ABSurfaceBrightness
-        │                                                                     ▼
-        └─────────────────────────────────────────────────▶ AB mag/arcsec² ──▶ VegaSurfaceBrightness ──▶ Vega mag/arcsec²
-                                                                                                              │
-                                                                                              (Instrument, §5) ▼
-                                                                                          detector background e⁻/s
-```
-
-`IntegrateRadiance`/`IntegratePhotonRadiance`/`BandMeanSpectralRadiance` resample a
-`Passband.Response` onto the caller's `SpectralGrid` by linear interpolation; partial spectral
-coverage sets `QualityFlagPassbandTruncated`, and coverage below 99% of the response integral
-is a hard error — never a silent truncation. `ABToBandMean` is the round-trip inverse, tested
-to < 1e-12 mag (§12).
-
-**Where units live: a deliberate hybrid, not `unit.Quantity` throughout.** The bespoke named
-`float64` types (the table above) carry type safety and appear in every hot loop — an all-sky
-evaluation is 10⁴ directions × 10²–10³ wavelengths and must stay `[]float64`-shaped with zero
-per-element indirection; `unit.Quantity` is a struct and does not fit that shape. These types
-are declared once, in `unit/quantity_types.go` — not re-declared in `skybrightness` — alongside
-`unit.Watt`/`Joule`/`Hertz`/`Nanometre`/`Steradian` and composed `unit.Irradiance`/`Radiance`/
-`SpectralRadiance`/`SpectralIrradiance`/`Luminance` vars, which are used *only* for
-documentation, provenance serialization, and boundary parsing — never in the numeric core. This
-is stated plainly rather than implied: `unit.Dimension` has only the 7 SI base exponents and no
-tag distinguishing a solid angle from a bare dimensionless ratio (`unit.Radian` and `unit.One`
-already collide by the package's own documented design). Adding `Steradian` gives it **no**
-type-level protection against a radiance silently cancelling into an irradiance — claiming that
-protection in the docs would be a lie. `unit/doc.go` states this explicitly: "Steradian is
-dimensionally identical to One, exactly as Radian is... Real radiometric type safety instead
-comes from the zero-cost quantity TYPES declared in quantity_types.go — Radiance, Irradiance,
-SpectralRadiance, LuminanceCdM2, and their neighbors... These live directly in this package
-(not duplicated into a consumer package) specifically so a hot numeric loop — e.g.
-skybrightness's spectral sky-radiance engine... — can use them with zero struct overhead."
-
-**Photometric constants, split by `constants/doc.go`'s own scope rule** (a fixed single value
-from a cited authority belongs in `constants`; anything model-dependent or series-valued does
-not — the same test already used for `ObliquityJ2000`/`SunGravitationalParameter`):
-
-| Value | Home | Why |
-|---|---|---|
-| AB zero point, 3631 Jy (Oke & Gunn 1983) | `constants.Photometric` (new set) | fixed defined value |
-| Stefan–Boltzmann σ, Wien displacement constant | `constants.Derived` | exactly derivable from the SI2019 defining constants already in `constants` |
-| Vega zero points | `skybrightness`, from the passband bundle | depends on *which* Vega spectrum (Hayes vs. CALSPEC alpha_lyr_stis) — series-valued, out of `constants` scope |
-| Solar spectral irradiance | a dataset | a spectrum, not a constant |
-| Falchi 2016 natural zenith, 0.171168465 mcd/m² | removed (2026-08-09) | carried forward from v1's `NaturalZenithMcdM2` as `natural.FalchiNaturalZenithLuminance`, but never gained a consumer — deleted as dead code rather than kept as an unused re-export; reintroduce at the point of use if a future natural-sky component needs it |
-| Garstang nL↔mag constants (34.08, 20.7233) | `natural` package, unexported | only `ConstantAirglow`/`VBandMoonlight` may use them; not public API |
-
-**Passbands, with zero `go:embed`.** CLAUDE.md forbids `go:embed` project-wide, and §5/§25
-forbid undocumented embedded response curves regardless. Core defines `PassbandSet`
-(`Get`/`List`/`Version`) plus `TopHat`/`Gaussian` analytic constructors — so unit tests never
-need real data or a network call. Three real providers live in `skybrightness/dataset/passband`
-and are the only place passband curves ever touch the filesystem or network:
-
-- `passband.OpenBundle(path)` — a versioned, checksummed bundle directory (one CSV or FITS
-  BinTable per curve, plus a `manifest.json` carrying SHA-256s, provenance, licence, and Vega
-  zero points). Deterministic, offline. The primary path.
-- `passband.Remote(ctx, opts)` — `remote.GetFile(remote.PassbandBundle)` (consent-gated,
-  `KindFile`), checksum-verified, then `OpenBundle`.
-- `passband.FromFITS(r io.ReaderAt)` — reads an SVO Filter Profile Service-style FITS BinTable
-  using the existing `fits` package with zero changes to it.
-
-Licensing (Gaia curves are ESA CC BY-SA and need attribution; SDSS/SVO terms) is verified
-before any bundle ships — a Phase 0 checklist item, not assumed clear (§16).
+A component whose primary source cannot be obtained confidently is **not implemented**. It
+becomes an entry in §16 stating what is blocked and what would unblock it. No coefficient
+is ever invented, tuned, or inferred from a secondary summary to make a phase look
+finished. This is what separates this module from a plausible-looking one.
 
 ---
 
-## 4. Package architecture
+## 3. Package placement — nothing is segmented
 
-```
-skybrightness/                 PURE core: types, interfaces, composite engine, derived outputs
-skybrightness/natural/         PURE: airglow, zodiacal, starlight, diffuse-galactic, moon,
-                                twilight, aurora, constant_airglow, vband_moonlight
-skybrightness/atmos/           PURE: molecular, aerosol, cloud, terrain, transmission
-skybrightness/artificial/      PURE: emission, spectral_mixture, angular emission, aggregation
-skybrightness/rt/              PURE: clear-sky, cloudy, fast-cloud approximation
-skybrightness/surrogate/       PURE: reference-data format, inference, basis, domain checking
-skybrightness/calib/           PURE: measurement schema, instrument models, fitting, splits
-skybrightness/dataset/         IO tier: source metadata, download/extract/validate pattern
-skybrightness/dataset/raster/  pure-Go GeoTIFF engine (carried from v1's atlas/{geotiff,grid,sample}.go)
-skybrightness/dataset/granule/ HDF5 reader — the only importer of github.com/scigolib/hdf5
-                                within skybrightness (atmosphere/dataset/cams is a second,
-                                independent importer outside this tree — see its doc comment)
-skybrightness/dataset/blackmarble/  VNP46/VJ146 readers (NASA Black Marble)
-skybrightness/dataset/eog/     EOG VIIRS annual/monthly readers
-skybrightness/dataset/worldatlas/   Falchi 2016 — reference/validation dataset only
-skybrightness/dataset/passband/     passband bundle provider (remote + fits + disk cache)
-skybrightness/lpmap/           live lightpollutionmap.info cross-check client (kept, re-scoped)
-```
+Capability that belongs to an existing astrogo package is added *to that package*. The
+module does not grow a private copy of atmospheric physics or photometry.
 
-CAMS/ERA5/local atmospheric-state providers live in `atmosphere/dataset/cams` (and any future
-`atmosphere/dataset/era5`), **outside** the `skybrightness/dataset/...` tree above — the
-loaders sit next to `atmosphere.Atmosphere`, the type they populate, one level up from
-`skybrightness` itself (see the revised package-home rationale two paragraphs below). An
-earlier draft of this document sketched a `skybrightness/dataset/atmostate` package for this;
-that name was never built and is superseded by `atmosphere/dataset/cams`.
+| Capability | Home | Rationale |
+| :--- | :--- | :--- |
+| Rayleigh and aerosol scattering, molecular absorption, transmission, vertical profiles, spherical airmass, cloud optical properties | `atmosphere` | Already owns `Atmosphere`, `Aerosol`, `CloudLayer`, `CloudPhase`, `VerticalProfile`, `Airmass`. A weather or seeing constraint needs the same physics. |
+| Passbands, response curves, AB/Vega/ST systems, surface brightness | `magnitude` | Already owns photometric conversion (`GaiaGToJohnsonV`, `StarApparent`, `ExtinctionAtAltitude`). |
+| Throughput, detector QE/PDE, collecting area, pixel solid angle, photon and electron rates | `optics` | Already owns `Telescope`, `Eyepiece`, `Sensor`. One `Sensor` definition then serves both optical arithmetic and background rates. |
+| Spectral quantity types, the shared wavelength axis | `unit` | `SpectralRadiance`, `WavelengthNM`, `SpectralGrid` and friends. Must sit below both `magnitude` and `skybrightness`. |
+| Physical constants | `constants` | `PhotonEnergyJ`, `ToPhoton`/`ToEnergy`, `ArcsecondSquaredToSteradian`, `SI2019`. |
+| Geometry, Sun/Moon, time scales | `coord`, `ephemeris`, `time` | No astronomy is re-implemented here. |
+| Dataset acquisition | `remote`, `remote/file` | Consent-gated bucket/key layer. |
 
-This widens v1's two-tier split (pure core / `atlas`+`lpmap` IO siblings) rather than
-replacing it — `skybrightness/importgraph_test.go` already machine-enforces that core never
-imports its siblings, only the reverse. V2 keeps that shape and adds four more rules, all
-machine-enforced in the rewritten `importgraph_test.go`:
+**`skybrightness` therefore owns only radiance transport**: `Scene`, `Component`, `Model`,
+`Query`, `Estimate`, uncertainty, quality, provenance, and all-sky operations. Files, not
+subpackages. The single exception will be `skybrightness/dataset/...`, the only tier
+permitted I/O.
 
-1. Core `skybrightness` imports only stdlib, `angle`, `vector`, `unit`, `constants`, `time`,
-   `coord`, `ephemeris`, `atmosphere`, `internal/parallel`.
-2. `natural`/`atmos`/`artificial`/`rt`/`surrogate`/`calib` import core and each other along a
-   declared DAG (`rt` → `atmos` + `artificial`; nothing else imports `rt`). None import
-   `dataset/*` or `lpmap`.
-3. Only `dataset/...` and `lpmap` import `remote`, `fits`, `net/http`, `github.com/scigolib/hdf5`.
-4. `plan` imports core `skybrightness` **only** — never `natural`, `atmos`, `rt`, `dataset/*`,
-   or `lpmap`. Engines are assembled by the application (examples, user `main`) and injected
-   into `plan`, exactly as `plan` never imported `atlas` in v1.
-5. `constants`, `unit`, `atmosphere` never import anything under `skybrightness`.
-
-Core stays the one dependency `plan` sees, preserving the CLAUDE.md rule that an HDF5-scale
-dependency never reaches a `plan` user's build. **Revised from the original Phase 0 sketch**:
-the rich atmospheric-state *data* type (`atmosphere.Atmosphere`, built via
-`atmosphere.NewBuilder()`) lives in the peer `atmosphere/` package, not in core
-`skybrightness` — general aerosol/cloud/surface-optical atmospheric state is not
-sky-brightness-specific (a future weather or seeing constraint needs the identical type), and
-canonicalizing it where a peer package already sits avoids the alternative of skybrightness
-owning a concept it doesn't exclusively use. `atmos` still owns the *optics* (transmission
-models consuming `atmosphere.Atmosphere`); `atmosphere/dataset/cams` (and any future
-`atmosphere/dataset/era5`) — a peer of `skybrightness/dataset/...`, not a member of it — owns
-the *loaders*, for the same reason the data type itself lives in `atmosphere`: a CAMS/ERA5
-reader's output feeds `atmosphere.Atmosphere`, not something `skybrightness`-specific.
-`skybrightness` references `atmosphere.Atmosphere` directly in `Request`/`EvalInput` — no
-alias — matching how `coord.Context` is already referenced directly rather than aliased;
-general data-provenance primitives (`SourceRef`/`Fidelity`/`TimeRange`/`DatasetVersion`) live
-in `atmosphere` too, aliased into `skybrightness` only because they also appear pervasively in
-`skybrightness`'s own `Provenance`/`ComponentProvenance`/`Passband` types.
-
-**Revised again, one release later**: `atmosphere.Atmosphere` and `atmosphere.Refraction`
-swapped names. The narrow, refraction-model-input struct (`Model`/`Pressure`/`Temperature`/
-`Humidity`/`Wavelength`) used to be exported as `Atmosphere`; the rich, Builder-validated
-aerosol/cloud/surface-optical/provenance type used to be exported as `State`. Both names now
-match what a reader expects: `atmosphere.Atmosphere` is the rich type, `atmosphere.Refraction`
-is the small one every hot `coord`/`plan` refraction call site still constructs as a cheap
-literal. `atmosphere.Atmosphere` composes an embedded `atmosphere.Refraction` as its own
-surface-conditions field (`Atmosphere.Surface()` returns Kelvin; `Atmosphere.Refraction()`
-returns the embedded `Refraction` value directly, in `Refraction`'s own Celsius convention —
-the one explicit unit conversion this composition needs, at the single boundary
-`Builder.Surface` owns) rather than duplicating pressure/temperature as separate raw fields.
-This was a deliberate, same-release hard break with no deprecation alias for the old
-`atmosphere.Atmosphere` name — Go cannot alias one identifier to two different meanings at
-once, so freeing "Atmosphere" for the richer type necessarily retired the refraction struct's
-old name immediately, an explicit, stated exception to CLAUDE.md's normal 2-release
-deprecation policy (see `atmosphere/doc.go` and the CHANGELOG's `### Changed — BREAKING`
-entry). `coord.Context.Atmosphere()`/`plan.Site.Atmosphere()` were renamed to `.Refraction()`
-to match — both have always returned the refraction-input struct, never the richer type.
+A concrete payoff: Winkler (2022) and Kocifaj et al. (2022) independently adopt the **same**
+Henyey–Greenstein aerosol phase function over a theoretical Rayleigh base. Under this rule
+that becomes one implementation in `atmosphere` shared by the Moon and artificial
+components, rather than two that can silently diverge.
 
 ---
 
-## 5. API proposal
+## 4. Physical quantity model
+
+The internal quantity is spectral radiance, W·m⁻²·sr⁻¹·nm⁻¹, and it stays spectral until
+the moment a caller asks for something else.
+
+`mag/arcsec²`, an SQM reading, luminance, a photon rate and a detector electron rate are
+all *projections* of that one state. They are never the internal representation, because a
+model can reproduce a correct V magnitude with an entirely wrong spectrum — and every
+instrument projection downstream would then be wrong.
+
+Radiance is linear and additive; magnitude is logarithmic and is not. Components sum in
+radiance space and the conversion happens once, at the end. Summing magnitudes is a
+correctness bug, and `TestComponentsSumLinearly` asserts the linear behaviour directly.
+
+### The spectral grid
+
+`unit.SpectralGrid` is a uniform axis: `StartNM`, `StepNM`, `N`. Uniform spacing makes
+integration a fixed-weight sum, grid equality a three-field comparison, and resampling a
+pure index computation. Datasets arriving on a non-uniform axis are resampled at their
+provider boundary, where the interpolation choice is documented, rather than silently
+inside a numeric kernel.
+
+`DefaultOpticalGrid` is 330–1000 nm at 1 nm. The lower bound is where ozone Huggins-band
+absorption makes ground-level night-sky radiance negligible and most detectors lose
+response; the upper bound covers the near-infrared OH airglow bands that dominate a dark
+site beyond 700 nm. 1 nm resolves airglow line structure well enough for broadband
+projection while keeping a full-sky evaluation tractable.
+
+Integration is trapezoidal. The integrands are products of measured response curves and
+modelled spectra, both carrying sampling error far larger than the quadrature difference,
+and Simpson would additionally require an odd sample count callers have no reason to
+guarantee.
+
+---
+
+## 5. Public API
+
+Two layers, as the specification requires: a high-level call for ordinary use and full
+specification for expert use. Scientific choices are explicit rather than hidden behind
+defaults.
 
 ```go
-type Engine interface {
-    Algorithm() AlgorithmRef
-    Evaluate(ctx context.Context, req Request) (Result, error)
-    EvaluateBatch(ctx context.Context, req BatchRequest) (BatchResult, error)
-}
+model, err := skybrightness.NewModel("v1", components...)
 
-type Request struct {
-    Astro      *coord.Context      // ONE per epoch, reused — hard repo convention
-    Directions []coord.AltAz
-    Grid       SpectralGrid
-    Passbands  []*Passband
-    Mode       Mode
-    Atmosphere *atmosphere.Atmosphere
-    Selection  ComponentSelection
-    Options    EvaluationOptions
-}
+est, err := model.Estimate(ctx, skybrightness.Query{
+    Scene:     scene,               // observer, time, atmosphere
+    Direction: coord.NewAltAz(alt, az),
+    Grid:      skybrightness.DefaultOpticalGrid(),
+    Fidelity:  skybrightness.Standard,
+})
 
-type Result struct {
-    Grid         SpectralGrid
-    Directions   []coord.AltAz
-    Total        SpectralField
-    Components   ComponentResults
-    Transmission SpectralField      // empty unless Options.ComputeTransmission
-    Derived      DerivedQuantities
-    Uncertainty  UncertaintyResult
-    Provenance   Provenance
-    Quality      QualityFlags
+v,    err := est.SurfaceBrightness(johnsonV, magnitude.Vega)
+g,    err := est.SurfaceBrightness(sdssG, magnitude.AB)
+rate, err := est.ElectronRate(camera)
+
+spectrum   := est.SpectralRadiance()
+components := est.ComponentIDs()
+quality    := est.Quality
+```
+
+All of these originate from the same stored spectrum, which is what keeps them mutually
+consistent.
+
+---
+
+## 6. Scene
+
+`Scene` is the physical state an evaluation runs against: observer, time, atmosphere,
+and (from Phase 3) an ephemeris provider.
+
+It is explicit and caller-owned rather than hidden inside components, so two evaluations
+differing in aerosol loading differ in a value the caller can see and record, not in a
+component's private default. Every component reads the same `Scene`, which is what keeps
+the Moon, the artificial sky and the natural sky consistent with one another.
+
+A `Scene` carries no I/O. Atmospheric and cloud state are resolved by a provider layer and
+handed in already populated. There is no default atmosphere: an unstated atmosphere is the
+single largest source of silent error in a sky prediction, so it must be chosen explicitly
+even when the choice is a climatology.
+
+---
+
+## 7. Three grids, kept separate
+
+Confusing these is a category error the specification calls out explicitly.
+
+| Grid | What it discretises |
+| :--- | :--- |
+| **Source grid** | Geographic distribution of artificial emitters. |
+| **Atmospheric grid** | Vertical and horizontal structure the atmosphere and cloud models need. |
+| **Sky grid** | Directions at the observer. |
+
+A geographic grid is a numerical discretisation of emitters. It is **not** the
+light-propagation algorithm. Averaging neighbouring cells is not atmospheric scattering.
+The propagation kernel determines how light emitted by each source element reaches each
+observer direction.
+
+---
+
+## 8. Fidelity levels
+
+All levels share one API and one physics. They differ in approximation, not in model.
+
+| Level | Permitted |
+| :--- | :--- |
+| `Fast` | Lookup tables, cached natural sky, spectral basis compression, surrogate kernels, reduced angular or spectral resolution. **Not** different undocumented physics. |
+| `Standard` | The native semi-analytic model. Default. |
+| `Reference` | Finest spectral grids, detailed atmospheric calculation, precomputed radiative transfer, minimal approximation. |
+
+Every surrogate must be generated from, and its error measured against, the model it
+stands in for. A regression fitted to observations and called radiative transfer is not a
+surrogate; it is a different model wearing the name.
+
+The fidelity used is recorded in `Reproducibility`.
+
+---
+
+## 9. Component contract
+
+```go
+type Component interface {
+    ID() ComponentID
+    AddRadiance(ctx, dst SpectralRadiance, grid unit.SpectralGrid, dir coord.AltAz, scene *Scene) error
+    Provenance() Provenance
 }
 ```
 
-`Component` is the unit of physics: `ID()`, `Algorithm()`,
-`Eval(ctx, EvalInput, out SpectralField) (ComponentReport, error)` — implementations must be
-concurrency-safe after construction, must not retain any input slice, and must not read `out`
-(the engine pre-zeroes it). `ComponentSelection.Materialize` controls memory: when false,
-components accumulate straight into `Total` and their own `SpectralField`s are never
-allocated — proven bit-identical to `Materialize: true` in a Phase-1 invariant (§12). `Result`
-uses fixed-size, `ComponentID`-indexed arrays (`ComponentResults`), never a map, in the return
-path — maps and interface dispatch are reserved for setup, not the inner numeric loop.
+Components accumulate into a caller-owned buffer rather than returning a new spectrum: a
+full-sky evaluation runs this across ~10⁴ directions, and allocating per component per
+direction would dominate cost.
 
-Batch evaluation reuses `internal/parallel.MapChunked`, which constructs a worker (one
-`Scratch` + one cloned `coord.Context`) **once per goroutine**, not once per direction —
-exactly the primitive `coord.Context.ReduceBatchParallel` already uses for the same reason:
+A component must add **observer-level** radiance — light arriving after atmospheric
+propagation — not a top-of-atmosphere emission. Summing unpropagated source terms is
+physically wrong. The interface cannot enforce this, so it is stated in the contract and
+each component's provenance records how it propagates.
 
-```go
-parallel.MapChunked(len(req.Astro), workers,
-    func() *Scratch { return NewScratch(nDir, nLambda) },
-    func(s *Scratch, i int) error { out[i], err = e.evaluateOne(ctx, req.at(i), s); return err })
+The physically distinct contributions are separated because each has its own literature,
+data, validity domain and uncertainty: starlight, diffuse Galactic light, extragalactic
+background, zodiacal light, airglow continuum, airglow lines, moonlight, twilight,
+artificial.
+
+Radiance is validated **per component**, not only on the total: a negative term cancelled
+by a positive one would otherwise pass unnoticed, and the point of the check is to name
+which component is wrong.
+
+---
+
+## 10. Uncertainty, quality, provenance, reproducibility
+
+**Uncertainty** is a first-class output, kept per component rather than collapsed into one
+scalar. Which term dominates is itself the useful answer: a caller can act on "airglow
+dominates" by taking a measurement, but cannot act on a single opaque percentage.
+Uncertainties are relative because the dominant terms — airglow variability, aerosol
+loading, assumed source spectra — are multiplicative. Independence is not assumed;
+`UncertaintyBudget.Correlated` combines linearly when terms share a systematic.
+
+**Quality** flags record how the prediction was constrained: measured versus
+climatological atmosphere, aerosol, cloud, airglow; measured versus assumed source spectrum
+and emission function; precomputed RT; extrapolation beyond a validity domain. A caller
+must be able to distinguish a prediction constrained by current observatory measurements
+from one resting on climatology. Phase 0 sets `NoComponents`.
+
+**Provenance** per component: model, version, primary and secondary references, the
+equations implemented, datasets with versions, validity domain, known approximations,
+expected accuracy. Naming a paper is not enough — a reader needs to know which equations
+this code actually reproduces.
+
+**Reproducibility** carries model version, fidelity, grid, atmospheric provider and
+timestamp, dataset versions and per-component provenance, so a scientific user can explain
+why two calculations differ.
+
+---
+
+## 11. Component design notes
+
+Each section below is written before its component is implemented, and carries the
+**equation → Go function → validation test** map the specification requires.
+
+### 11.1 Artificial clear sky — Kocifaj, Bará & Falchi (2022)
+
+**Goal.** All-sky spectral radiance from one ground source, summed over surrounding
+sources.
+
+**Scientific model.** A semi-analytic two-parameter model whose parameters `t` and `g`
+encode the atmospheric state, the source–observer distance, and the source's angular and
+spectral emission pattern. It generalises Kocifaj & Bará (2019) to include scattering
+orders up to the fifth, provided *ab initio* rather than fitted a posteriori to site
+imagery.
+
+**Equations.**
+
+| Paper | Content | Go function | Validation test |
+| :--- | :--- | :--- | :--- |
+| Eq. 1 | Total scattering phase function `P(g,Θ) = [P_a(g_a,Θ)·ϖ_a·k_a + P_R(Θ)·k_R] / (k_a + k_R)` | `atmosphere.CombinedPhaseFunction` | `TestCombinedPhaseFunctionWeighting`, `TestRayleighPhaseFunctionNormalisation` |
+| Eq. 2 | All-sky radiance `L(z,A)` from `L_S`, `P(g,Θ)`, `(1−g)²/(1+g)`, `M(z)`, `M_S`, `t` | `AllSkyRadiance` | `TestKocifaj2022Eq2HorizonLimit`, `…FallsWithDistance`, `…BrightensTowardTheHorizon`, `…SingularityIsSmooth`, `…NearHorizonTurnover` |
+| Eq. 3 | `t = (τ_a/H_a + τ_R/H_R)·D / M_S` for an exponential atmosphere | `OpticalParameterT` | `TestKocifaj2022Eq3ExponentialAtmosphere` |
+| Eq. 4 | `g = c₀ + c₁·g_a + c₂·g_a²` | `AsymmetryParameter` | `TestKocifaj2022Eq4CleanAtmosphereAsymptote`, `…Monotonic` |
+| Eq. 5 | `c₀ = 0.33 + 0.15τ_a`, `c₁ = 0.9τ_a^0.51`, `c₂ = 1.3τ_a^1.85` | `AsymmetryParameter` | `TestKocifaj2022Eq5Coefficients`, `…LeavesPhysicalRange` |
+
+**Symbols.** `z` observational zenith angle; `A` azimuth; `Θ` scattering angle; `L_S` the
+radiance leaving the source in the observer's azimuth (azimuthal symmetry assumed), as it
+**reaches** the observer — see the Eq. 2 discussion below, since this is the single easiest
+thing to get wrong about the model;
+`M(z)`, `M_S` optical air mass toward the sky element and toward the source; `τ_a`, `τ_R`
+vertical aerosol and molecular optical thickness; `H_a`, `H_R` the corresponding scale
+heights; `D` source–observer separation; `ϖ_a` aerosol single-scattering albedo; `g_a`
+aerosol asymmetry parameter.
+
+**Behaviour worth checking.** At the horizon Eq. 2 reduces to `L_S·P(g,Θ)·(1−g)²/(1+g)`,
+which is a cheap analytic check — and, as the next section explains, a badly insufficient
+one on its own. As `τ_a → 0`, `g → 0.33`, excluding isotropic scattering even in a clean
+atmosphere, consistent with `c₀`'s constant term.
+
+**Validation.** Figure 1 gives `g` versus `g_a` for three aerosol optical depths; that is
+the Level-2 reproduction target. The paper's corroboration used the MSOS multiple-scattering
+code at 450 and 550 nm, scale heights 1.5 and 2.2 km, `g_a` from 0 to 0.9, to fifth
+scattering order, with `ϖ_a ≈ 0.95`.
+
+**Known limitation, to be recorded in the implementation.** The `g` fit is derived at
+550 nm (and 450 nm), stated as representative over roughly a ±20–30 nm band. The artificial
+component is therefore *not* spectrally resolved to the same degree as the rest of the
+model, and its error budget must say so rather than implying full spectral fidelity.
+
+**Implementation status.** Eq. 1 (`atmosphere.CombinedPhaseFunction`, shared with the
+lunar model), Eq. 2 (`AllSkyRadiance`), Eq. 3 (`OpticalParameterT`) and Eq. 4/5
+(`AsymmetryParameter`) are all implemented and tested.
+
+**Eq. 2, and why it was withdrawn once.**
+
+	L(z,A) = L_S · P(g,θ) · (1−g)²/(1+g) · M(z)/(M_S·t) · (e^{[M_S−M(z)]t} − 1)/(M_S − M(z))
+
+A first implementation was withdrawn after tests found radiance *growing* with distance —
+a city at 80 km coming out brighter than the same city at 10 km. The typeset equation
+later confirmed the transcription had been correct all along, including the paper's stated
+horizon limit. **The test was wrong, not the equation**, and the mistake is worth recording
+because it is easy to repeat.
+
+Eq. 2 contains no distance term. Distance enters twice, and both are the caller's
+responsibility:
+
+- through `t`, which Eq. 3 makes proportional to the source–observer separation `D`;
+- through `L_S`, which is the source radiance **as it reaches the observer**, and must
+  therefore already carry the transmission `e^{−M_S·t}` over that separation — `M_S·t` is
+  exactly that optical depth, which is the physical meaning Eq. 3 attaches to the product.
+
+The withdrawn test varied `t` with distance while holding `L_S` fixed, which is not a more
+distant city; it is the same city with more air in front of it and no dimming applied. The
+kernel alone does grow with `M_S·t`, so that produced a two-order-of-magnitude inversion.
+Apply the transmission that belongs with it and the fall-off is monotonic, which
+`TestKocifaj2022Eq2FallsWithDistance` now asserts — while a companion assertion pins the
+bare kernel's growth, so a future change cannot quietly make the doc comment's warning
+false.
+
+The horizon limit could not have caught this: at `M_S = M(z)` the exponential is 1 under
+either sign convention. Analytic limits check transcription; only physical trends check
+understanding, and the trend has to be the one the model actually claims.
+
+**Directional structure, and where it inverts.** The brightest direction is set by one
+number, `M_S·t`. Below about 2 — the ordinary case — radiance rises monotonically from the
+zenith to the source's horizon, several times over. Above it the maximum moves inward: at
+`M_S·t = 6` it sits at airmass 3 and the zenith is *brighter* than the horizon. That is a
+very distant or very hazy source, under a quarter of a per cent transmission, and the model
+inverting its directional structure there is documented by
+`TestKocifaj2022Eq2NearHorizonTurnover` rather than asserted to be correct.
+
+**Numerics.** The removable singularity at `M_S = M(z)` is evaluated as
+`t·expm1(u·t)/(u·t)` with `u = M_S − M(z)`, exact at `u = 0` and accurate approaching it,
+where a bare `(e^{u·t}−1)/u` loses all precision. Without that the sky map would carry a
+notch or a spike at the source azimuth.
+
+**The component, and the two choices the paper leaves open.** `ArtificialSkyglow` joins
+emitters, geometry and the kernel. Eq. 2 needs `L_S` and `M_S`, and arXiv:2203.09322 says
+how to get neither from a real installation, so both are decided here and stated rather
+than buried:
+
+1. **`M_S` is the horizon airmass.** The paper's own limit — Eq. 2 reducing to
+   `L_S·P·(1−g)²/(1+g)` at the horizon — holds exactly when `M(z)` reaches `M_S`. A ground
+   source beyond a few kilometres sits at the observer's horizon, so taking `M_S` at zero
+   elevation is what makes the model consistent with its own stated limit.
+2. **Light leaves the source horizontally**, so the emission function is evaluated at zero
+   elevation above the source's horizon — the same geometry, and the part of a luminaire's
+   output that reaches a distant sky at all, which is why `UpwardEmission` carries
+   `HorizontalFraction` separately from its cosine lobe. `WithEscapeElevation` overrides it.
+
+The component applies the transmission `e^{−M_S·t}` to each emitter's output before calling
+`AllSkyRadiance`, which is that function's documented contract and the step whose absence
+withdrew the kernel once.
+
+| Claim | Validation test |
+| :--- | :--- |
+| A city twice as far contributes *less* | `TestArtificialSkyglowFallsWithDistance` |
+| Sources add in linear radiance space | `TestArtificialSkyglowSumsLinearly` |
+| Shielding reduces skyglow | `TestArtificialSkyglowRespondsToShielding` |
+| The hoisted phase weighting equals Eq. 12 | `TestArtificialSkyglowPhaseWeighting` |
+| Emitter quality flags reach the caller | `TestArtificialSkyglowPropagatesEmitterFlags` |
+
+**The azimuthal profile is not monotonic, and that is the physics.** Skyglow is brightest
+toward the city, darkest about **90° away in azimuth**, and rises again toward the
+anti-city direction. The rise is the back-scattering lobe of the Rayleigh phase function,
+which goes as `1.06 + cos²Θ` and is therefore equally strong at 20° and 160°; the
+Henyey–Greenstein aerosol term is what tilts the profile forward on top of it. A scalar
+"sky quality" number cannot represent any of this, which is the argument for a directional
+model in one sentence.
+
+**Cost.** 54 µs per direction per source on the 671-point default grid, zero allocations —
+about 12× the moonlight component, because that one evaluates 32 ROLO bands and resamples
+while this one evaluates every grid point. The band-independent molecular phase function is
+hoisted out of the per-band loop (13%); the rest is Phase 8 work.
+
+**Where it is weakest.** The asymmetry parameter is evaluated per band from Eq. 4/5, which
+was fitted at 450 and 550 nm for a band 20–30 nm wide — so this component is *less*
+spectrally resolved than the grid it writes onto, and the validity domain says so. Values
+of `g` that leave (−1, 1) are clamped to ±0.95 and flagged `ExtrapolatedModel` rather than
+failing the whole sky for a hazy atmosphere.
+
+### 11.2 Artificial cloudy sky — Kocifaj, Falchi & Kundracik (2025)
+
+**Goal.** Artificial sky radiance over the hemisphere for cloud fractions from clear to
+overcast, with cloud type and geometry.
+
+**Scientific model.** Radiance decomposes as `L = L₁ + L₂ + L∞`, with the scattering angle
+evaluated at height and the observational zenith angle carried through. Clouds participate
+in propagation rather than multiplying a clear-sky answer.
+
+**Validation targets (from the paper's own results, Žilina, Slovakia, ~80,000 population).**
+
+| Quantity | Reported effect |
+| :--- | :--- |
+| Zenith artificial radiance over the city | amplified more than ×15 |
+| Ground-level irradiance over the city | amplified more than ×4 |
+| Zenith luminance, photopic, low cloud | up to ×27 |
+| Horizontal illuminance, photopic | up to ×17 |
+| Outside the city | screening — radiance *reduced* |
+
+The sign reversal between "over the city" and "outside the city" is the qualitative
+behaviour a universal cloud multiplier cannot reproduce, and is the acceptance criterion
+for this component: amplification and screening must both emerge from geometry alone.
+Regimes to test: pristine clear, urban clear, thin cloud, broken cloud, cloud over the
+observer, cloud over the source city, cloud between city and observer, overcast.
+
+### 11.3 Moon — Kieffer & Stone (2005) reflectance, Winkler (2022) scattering
+
+**Goal.** Spectral moonlight scattered into the line of sight.
+
+**Chain.** Solar spectral irradiance → Sun–Moon geometry → ROLO reflectance → lunar
+spectral irradiance at Earth → Moon–target geometry → Rayleigh and aerosol scattering →
+atmospheric attenuation → multiple-scattering correction → observer radiance.
+
+**ROLO disk-equivalent albedo, model 311g.** Kieffer & Stone (2005) Eq. 10:
+
+```
+ln A_k = Σ(i=0..3) a_ik·g^i + Σ(j=1..3) b_jk·Φ^(2j−1)
+         + c₁·θ + c₂·φ + c₃·Φθ + c₄·Φφ
+         + d₁k·e^(−g/p₁) + d₂k·e^(−g/p₂) + d₃k·cos((g−p₃)/p₄)
 ```
 
-A convenience point API covers the "simple" half of the dual requirement without forcing every
-caller through the full batch machinery: `Point(ctx, Engine, PointQuery) (PointResult, error)`,
-where `PointQuery{Astro, Direction, Passband, Mode, Atmosphere, Grid, Components,
-ComputeTransmission, LimitingMag}` and `PointResult{AB, Vega, Radiance, Luminance, Sigma,
-AnthroRatio, Quality, Provenance, Components, Transmission, LimitingMagnitude,
-HasLimitingMag}`. **Revised, one release later**: `ComputeTransmission` and `LimitingMag` were
-added to close the gap that used to force even a single-point caller back onto `Evaluate`
-directly whenever it wanted transmission or a limiting magnitude — the two derived quantities
-`examples/18_sky_brightness` actually needs. `Point` now builds its own `Request` via
-`RequestBuilder` (below) internally, rather than a second, parallel construction path, and
-surfaces `IntegrateRadiance` failures as errors instead of silently returning a zero radiance.
+`g` absolute phase angle; `θ`, `φ` selenographic latitude and longitude of the observer;
+`Φ` selenographic longitude of the Sun. `a` multiplies powers of `g`; `b` the odd powers of
+`Φ`; `c` the four libration terms; `d` two exponentials and a cosine scaled by `p₁–p₄`.
 
-**`EvaluationOptions` construction — `RequestBuilder`, one release later**: `EvaluationOptions`
-is grouped into three cohesive sub-structs — `DerivedOptions{Mask, LimitingMag, Instrument}`,
-`UncertaintyOptions{Mode, Samples, Seed}`, `PerformanceOptions{Parallelism, ScatteringOrders,
-Buffers}` — cutting the flat option surface from 12 fields to 6, each self-explaining by group
-name. `NewRequestBuilder(astro, directions, grid) *RequestBuilder` is the recommended,
-documented way to assemble a `Request` (mirroring `atmosphere.NewBuilder()`'s established
-pattern) via chained methods (`.Atmosphere(...)`, `.Mode(...)`, `.Derive(...)`,
-`.LimitingMag(...)`, `.Uncertainty(...)`, `.Performance(...)`, ...) ending in `.Build() (Request,
-error)`, which runs `Request.Validate()` internally. `Request{...}` struct-literal construction
-stays fully valid — no field is hidden — `RequestBuilder` is additive, not a gate.
+- 32 bands, 350–2383.6 nm, 10 wavelength-dependent coefficients each (Table 4). These are
+  **triple-sourced and verified**: an HTML transcription, the rendered table, and the
+  journal's ASCII export agree row for row, including `549.1 nm d₃ = −0.00000`, the
+  `2126.3 nm` outlier band (`a₁ = −2.55069`, `a₂ = 2.10026`) and the `2383.6 nm` sign flips
+  on `b₂`/`b₃`. The published precision is 5 decimals.
+- 8 wavelength-independent coefficients (Table 5, asterisked): `c₁ = 0.0003`,
+  `c₂ = −0.0013`, `c₃ = 0.0010`, `c₄ = 0.0006` (deg⁻¹ and deg⁻¹·rad⁻¹); `p₁ = 4.06`,
+  `p₂ = 12.88`, `p₃ = −30.59`, `p₄ = 16.75` (deg).
+- Lunar solid angle `Ω_M = 6.4177×10⁻⁵ sr`. Phase-angle validity 1.55°–97°. Fit residual
+  0.0096 in ln(reflectance), residual σ 0.015.
+- Uncertainty budget (Table 6), for §10: atmospheric correction 0.743 % statistics-based /
+  0.7 % practical; radiance calibration 0.216 % / 3.1 %; lunar disk centring 0.075 % /
+  0.4 %; sum-to-irradiance 0.00432 % / 0.2 %; bias 0.0368 %; dark current 0.0846 %;
+  flat-fielding 2.23×10⁻⁴ %.
 
-**Buffer ownership contract**: `SpectralField` is the only container ever used for spectral
-output (a flat `[nDir×nLambda]` direction-major `[]SpectralRadiance`, never `[][]float64`).
-`Scratch` is per-goroutine, caller-constructed via `NewScratch`, never shared across
-goroutines, never returned to a caller. `EvaluationOptions.Performance.Buffers *BufferPool`
-lets a caller reuse allocations across repeated calls (the `plan` scoring loop's actual use
-case).
+**Implementation status.** Eq. 10 is implemented as `magnitude.ROLOReflectance`, with the
+full Table 4 and Table 5 coefficients. It lives in `magnitude`, not here: the package
+already owns solar-system photometry (`AsteroidHG`, the Mallama planet models,
+`SatelliteMagnitude`), and lunar disk-equivalent reflectance is that same kind of thing.
+`magnitude.ROLOIrradiance` converts reflectance to irradiance at the observer.
 
----
+| Equation | Go function | Validation test |
+| :--- | :--- | :--- |
+| Eq. 10 | `magnitude.ROLOReflectance` | `TestROLOReflectanceEquation10` (term-by-term hand evaluation) |
+| — | — | `TestROLOReflectanceMatchesKnownGeometricAlbedo` (external reference) |
+| — | — | `TestROLOReflectanceUsesBothAngleUnits`, `…OppositionSurge`, `…WaxingWaningAsymmetry` |
+| E = A·E_sun·Ω_M/π | `magnitude.ROLOIrradiance` | `TestROLOIrradiance` |
 
-## 6. Data flow
+**The unit trap in Eq. 10.** `g` appears in two units in the same equation: radians in the
+`a` polynomial, because those coefficients are published as rad⁻ⁱ, and degrees in the `d`
+exponentials and cosine, because `p₁–p₄` are published in degrees. `Φ` is in radians and
+`θ`, `φ` in degrees. An implementation that picks one unit throughout produces smooth,
+plausible, wrong numbers, so the API takes `angle.Angle` rather than `float64` and a test
+asserts the all-radians reading is far from the correct one.
 
-```
-external dataset (VIIRS/Black Marble/CAMS/...)
-        │  remote.GetFile (consent-gated, checksummed)
-        ▼
-dataset/{blackmarble,eog,passband,worldatlas},           ← reader returns raw values +
-atmosphere/dataset/cams                                     quality mask + SourceRef, never
-        │  wrapped as an EmissionField / AtmosphereProvider  interpolates missing pixels
-        ▼
-immutable state (atmosphere.Atmosphere, EmissionField snapshot, PassbandSet)
-        │
-        ▼
-Component.Eval / TransmissionModel.LineOfSight   ← pure, deterministic, given the same state
-        │
-        ▼
-CompositeEngine.Evaluate → Result{Total, Components, Derived, Uncertainty, Provenance}
-```
+**Independent validation.** The reflectance the model returns near full Moon at 553.8 nm is
+0.134, against an independently known lunar V-band geometric albedo of about 0.12 — and at
+zero phase those two quantities are the same thing by definition. The 2383.6 nm / 553.8 nm
+ratio comes out at 2.4, reproducing the Moon's red slope. Neither number comes from
+Kieffer & Stone, so this is a genuine external check on the coefficient table, the unit
+conventions and the term structure at once.
 
-Every dataset that enters the pipeline attaches a `SourceRef{Name, Version, Acquired
-TimeRange, Retrieved, Checksum, Licence, Endpoint, Fidelity}` at the point it is opened;
-`Provenance.Datasets` is the concatenation of every `SourceRef` that contributed to a given
-`Result`. Raster/granule readers (`dataset/raster`, `dataset/granule`) cache decoded blocks in
-a bounded LRU (carried from v1's `geotiff.go`); the observer-centric aggregation grid (§9) is
-cached in a separate bounded LRU keyed by `(site, dataset version, r_max, refinement)`. Neither
-cache is unbounded, and both bounds are documented constants.
+**Precision caveat, a real error-budget line.** Table 5 prints `c₁–c₄` at 1–2 significant
+figures against listed Effects on `ln A` of 0.005–0.028. The rounding is a material
+fraction of the libration terms' own contribution. Full precision exists in the paper's
+display equation and in the journal's ASCII export of that table; until captured, the
+implementation records this limitation rather than implying ROLO's full accuracy.
 
----
+A second caveat on the same eight constants: Table 5 is headed "Example Lunar Irradiance
+Model Coefficients" and its *wavelength-dependent* values match no Table 4 row, so it shows
+a different fit. Only its asterisked entries are used, on the strength of its NOTE that
+those are constant for all wavelengths — which is also why Table 4, tabulating only
+per-band terms, omits them. The reading is sound but it is a reading.
 
-## 7. Runtime modes
+**The selenographic angles are an open input.** `Φ`, `θ` and `φ` need the Moon's
+orientation — IAU rotation elements or a JPL binary PCK — which this module does not yet
+have, so `ROLOGeometry` takes them as explicit inputs rather than deriving them. `θ` and
+`φ` are the four smallest terms in the model (≤ 0.03 in `ln A` by Table 5's own accounting,
+pinned by `TestROLOLibrationIsASmallCorrection`), so a caller can pass zero and record the
+omission. `Φ` is not small — its `b` terms carry effects of 0.137–0.157 — and it is what
+makes the model asymmetric between waxing and waning Moon. Because the Moon's prime
+meridian points at Earth to within libration, `Φ` is close to the signed phase angle, but
+this module deliberately ships no helper asserting that: an approximation with no primary
+source behind it does not get to look like geometry. See §16.
 
-```go
-type Mode uint8
-const (
-    ModeClimatology Mode = iota  // versioned, deterministic, fully offline baseline
-    ModeHistorical                // dataset-backed state for a specified past epoch
-    ModeNowcast                   // recent state; carries issue time + age
-    ModeForecast                  // init time + lead time + ensemble uncertainty
-    ModeUserSupplied              // caller provides every physical state directly
-    ModeFast                      // v1-equivalent empirical physics, re-implemented (§15)
-)
-```
+**The component.** `skybrightness.ScatteredMoonlight` joins the two halves:
+`magnitude.ROLOReflectance` for what the Moon sends, `atmosphere.SingleScatteredRadiance`
+for what the air does with it, and `atmosphere.CombinedPhaseFunction` for the angular
+redistribution. It caches the direction-independent geometry per scene behind a read-write
+lock and pools its scratch buffers, so a full-sky evaluation resolves the Moon's position
+once and allocates nothing per direction (4.6 µs, 0 allocs).
 
-**Fallback between modes defaults to forbidden.** `EvaluationOptions.Fallback` is
-`FallbackForbidden` unless a caller explicitly opts into `FallbackToClimatology` or
-`FallbackToFast` — and every fallback that does occur is recorded as a `FallbackRecord{From,
-To, Reason, At}` in `Provenance.Fallbacks`. This directly replaces v1's `atlas.LayerAuto`
-freshness-first ladder, which silently tried five data tiers in sequence with no caller-visible
-record of which one actually answered beyond a post-hoc `Result.Attempts` field — exactly the
-silent-fallback behavior the mandate forbids. A caller who wants ladder-like behavior in V2
-builds it explicitly, one `Mode` at a time, and gets a `Provenance.Fallbacks` entry for every
-step that was actually taken.
+| Step | Go function | Validation test |
+| :--- | :--- | :--- |
+| Reflectance → irradiance → scattering → radiance | `ScatteredMoonlight.AddRadiance` | `TestScatteredMoonlightFullMoonSkyBrightness` |
+| Directional falloff away from the Moon | — | `TestScatteredMoonlightDarkensAwayFromTheMoon` |
+| Per-scene geometry cache | — | `TestScatteredMoonlightCacheRespectsScene`, `…Concurrent` |
 
----
+**What it does not do, stated plainly.** Single scattering only — there is no
+multiple-scattering term, so the sky is *underestimated*, increasingly with optical depth
+and toward the horizon, which is exactly where a bright Moon matters most. Every call
+therefore returns the `SingleScatteringOnly` flag. The selenographic libration angles are
+not supplied (bounded at 0.03 in ln A), the Moon–observer distance is geocentric rather
+than topocentric (up to 3.3% in irradiance), and the solar spectrum is a required caller
+input because this package ships none and the choice moves the absolute scale.
 
-## 8. Atmosphere model
+**Why `Component.AddRadiance` returns a `Flag`.** The interface was changed for this
+component, while there were still zero implementations and the change was free. Flags
+cannot be fixed per component: the same model is an interpolation in one geometry and an
+extrapolation in another, and a caller deciding whether to trust a number needs to know
+which case it got. `Model.Estimate` ORs them into the `Estimate`'s `Quality`.
 
-```go
-// Lives in package atmosphere, not core skybrightness — general
-// atmospheric state, not sky-brightness-specific (§4 above).
-type State struct { /* immutable; built only via atmosphere.Builder */ }
+**Atmospheric scattering — Winkler (2022).** The revised simplified scattering model,
+derived from SAAO Sutherland multifilter photometry across a wide range of sky directions,
+lunar phases and lunar positions. Rayleigh phase function per Bucholtz (1995); Mie via
+**Henyey–Greenstein**, explicitly replacing the exponential angular relationship used by
+earlier work including KS91. Eq. 13 gives the Rayleigh optical depth
+`τ_R = P·(1.229×10¹⁰)·λ^−4.05`. Deviations attributable to multiple scattering and airglow
+are quantified in the paper and become error-budget entries here.
 
-type CloudLayer struct {
-    Fraction      CloudFraction       // sky cover [0,1] — a DIFFERENT TYPE from OpticalDepth
-    BaseAlt, TopAlt AltitudeM
-    OpticalDepth  CloudOpticalDepth   // at 550nm; independent of Fraction
-    Phase         CloudPhase          // Liquid | Ice | Mixed
-    EffRadius     EffectiveRadiusUM
-    Albedo        SpectralAlbedo
-    Asymmetry     AsymmetryParameter
-    Morphology    CloudMorphology     // Stratiform | Cumuliform | Cirriform | Unknown
-    Uncertainty   CloudUncertainty
-    Source        SourceRef
-}
-```
+**KS91.** Retained only as `LegacyKS91` for regression and comparison — the comparison
+Winkler's own paper motivates. It is never the production path and never a silent fallback.
 
-`Fraction`, `OpticalDepth`, sky cover, and explicit layer geometry are four separate concepts
-in the mandate and four separate Go fields here — never collapsed into one scalar "cloudiness"
-number. `CloudFraction` and `CloudOpticalDepth` being *distinct types* (not both bare
-`float64`) means a caller cannot accidentally pass one where the other belongs; the compiler
-enforces the mandate's "never collapse to one scalar" rule rather than a code-review
-convention having to catch it. `atmosphere.Atmosphere` also carries surface pressure/temperature, a
-vertical profile, precipitable water vapour, ozone column, aerosol optical depth + Ångström
-exponent + wavelength-dependent single-scattering albedo + phase-function asymmetry + vertical
-profile, boundary-layer height, surface spectral albedo/BRDF, snow state, and a horizon
-profile. `AtmosphereProvider` is the interface future CAMS/ERA5/local-instrument providers
-implement; the physical core (`atmos/`) depends only on the immutable `atmosphere.Atmosphere` type,
-never on a specific provider.
+### 11.5 Atmosphere — Rayleigh, aerosol and molecular absorption
 
-### CAMS aerosol data — validated technical notes (Phase 3/7, `atmosphere/dataset/cams`, not yet built)
+**Implemented (Phase 1), in `atmosphere`.**
 
-Investigated live against real CAMS GLOBAL EODATA NetCDF files (2026-08, via a separate agent
-session with real Copernicus Data Space Ecosystem S3 access) as the eventual
-`atmosphere/dataset/cams` provider's data-format contract. These are the modern,
-per-location, per-time operational counterpart to the static named-climatology presets
-(`atmosphere.RuralAerosol`/`UrbanAerosol`/`DesertAerosol`/`MaritimeAerosol`, OPAC-sourced,
-§3) — the two tiers coexist rather than one superseding the other: the OPAC presets are the
-pure, offline, zero-dependency default for a caller with no live atmospheric data; a CAMS
-provider is the live, geographically-resolved tier for a caller with real-time access.
+**Rayleigh choice, now settled.** Winkler (2022) is adopted over Bodhaine et al. (1999).
+The reason is consistency rather than preference: the lunar scattering model derives its
+own published results with these expressions, and the artificial model (Kocifaj et al.
+2022) uses the same Henyey–Greenstein aerosol phase function, so one shared implementation
+keeps the two components from silently disagreeing about the atmosphere they propagate
+through. A future switch to Bodhaine must be made for both at once, with its own
+validation.
 
-**Credential blocker resolved, data-format blockers remain.** The original access route
-considered here (an ADS API key against the CAMS EAC4 reanalysis product) has been
-superseded: CAMS global analysis files are fetched via the Copernicus Data Space Ecosystem's
-S3-compatible `eodata` bucket instead (`remote.CopernicusEODATA`, `remote/s3`'s `Transport`
-implementation — credentials resolve through the AWS SDK v2's own default chain, never a
-credential file astrogo reads itself). That access mechanism is built and tested; see
-`remote/s3/doc.go`. What remains before `atmosphere/dataset/cams` can be built — a
-NetCDF4/HDF5 reader capable of the chunked, deflate-compressed layout below, and the
-species-to-optics mapping described further down — is real, scoped, later work, not a quick
-swap-in once the reader exists.
+| Paper | Content | Go function | Validation test |
+| :--- | :--- | :--- | :--- |
+| Winkler Eq. 13 | `τ_R = (P/P₀)·1.229×10¹⁰·λ^−4.05`, P₀ = 1013.5 hPa, λ in nm (after Dutton et al. 1994) | `atmosphere.RayleighOpticalDepth` | `TestRayleighOpticalDepthSeaLevel550` (≈0.098 at 550 nm, an independently known value), `…ScalesWithPressure`, `…SpectralSlope` |
+| Winkler Eq. 9 | `p_R(Θ) = 3(1−ρ)/(16π(1+2ρ))·[(1+3ρ)/(1−ρ) + cos²Θ]` (after Bucholtz 1995) | `atmosphere.RayleighPhaseFunction` | `TestRayleighPhaseFunctionNormalisation` (integrates to 1 over the sphere), `…Symmetry` |
+| — | `ρ = 0.0148`, giving `(1+3ρ)/(1−ρ) = 1.06` | `atmosphere.RayleighDepolarisation` | `TestRayleighDepolarisationMatchesKS91Coefficient` |
+| Winkler Eq. 10 | `p_M(Θ) = (1−g²)/(4π(1+g²−2g·cosΘ)^{3/2})` (Henyey & Greenstein 1941) | `atmosphere.HenyeyGreensteinPhaseFunction` | `TestHenyeyGreensteinNormalisation`, `…Limits` |
+| Winkler Eq. 12 | `p(Θ) = (τ_R/τ_s)·p_R + (τ_M/τ_s)·p_M` | `atmosphere.CombinedPhaseFunction` | `TestCombinedPhaseFunction` (normalisation plus both pure limits) |
+| Ångström | `τ_a(λ) = τ_a(λ₀)·(λ/λ₀)^−α` | `atmosphere.AerosolOpticalDepth` | `TestAerosolOpticalDepthAngstrom` |
 
-**Grid and file layout.** CAMS analysis files use a global regular 0.4° grid — 900 longitude ×
-451 latitude points (longitude 0..359.6° east, latitude 90..-90°; 451 points at 0.4° spacing
-from +90° to -90° is an exact pole-to-pole match, `(90-(-90))/0.4 = 450` intervals), 137 ECMWF
-model levels (the IFS L137 hybrid sigma-pressure vertical coordinate — the same vertical
-discretization used across ECMWF's reanalysis and forecast products), one timestamp per file.
-Aerosol mixing-ratio fields (`aermr01`…`aermr18`) are `float64`, dimensioned
-`(time, level, latitude, longitude)`, units kg·kg⁻¹.
+The `ρ = 0.0148` value is worth noting: it is the depolarisation for which Bucholtz's
+theoretical phase function reproduces the `1.06 + cos²Θ` coefficient Krisciunas & Schaefer
+(1991) had fitted empirically, and it lies inside Bucholtz's tabulated 0.01384–0.01557. The
+resulting peak-to-side ratio is 1.9434, not the ideal-dipole 2 — a detail the test asserts
+exactly rather than approximately.
 
-**Chunk layout is bulk-friendly, point-query-hostile.** The aerosol NetCDF-4/HDF5 chunking is
-`[1, 1, 451, 900]` — one whole global horizontal plane per `(time, level)` pair, deflate
-level 1. Excellent for bulk/global preprocessing; poor for a runtime "give me the vertical
-column above this observatory" query, since answering one column touches up to 137 chunks,
-each a full global plane. Keep CAMS NetCDF as the authoritative source format and derive a
-runtime representation reorganized around geographic tiles/vertical columns rather than
-point-reading the original files — the same "authoritative source format ≠ runtime access
-pattern" split this repo already applied to VIIRS/GeoTIFF windowed reads (Phase 4 quality
-work) and to the passband bundle's checksummed-manifest-over-raw-curve-files split (§3).
+**Airmass.** `atmosphere.Airmass` already implements Pickering (2002), which stays
+well-behaved to the horizon where a plane-parallel `sec z` diverges. It is reused rather
+than replaced. Minimum altitude per fidelity is set when the components that need it land.
 
-**Deriving mass concentration and true pressure/altitude.** `den(time,level,lat,lon)` is
-atmospheric density in kg·m⁻³; `lnsp(time,lat,lon)` is the log of surface pressure (no level
-dimension). Aerosol mass concentration is therefore `C_i = aermr_i × den`. The 137 model-level
-indices are **not** altitude or pressure directly — real pressure at each level must be
-reconstructed from ECMWF's L137 hybrid A/B half-level coefficients and
-`ps = exp(lnsp)` via the standard hybrid sigma-pressure formula
-(`p_half(k) = A(k) + B(k)·ps`, layer values from adjacent half-levels) — never assume level
-index is a proxy for altitude.
+**Molecular absorption.** `atmosphere.CrossSection` applies a tabulated cross section over
+a column via Beer–Lambert, with the Dobson Unit derived from the SI-exact Boltzmann
+constant and the STP definition rather than hardcoded (`TestDobsonUnitDerivation`
+reproduces 2.687×10¹⁶ molecules·cm⁻²).
 
-**Tracer availability is dataset/version-specific.** The investigated EODATA snapshot exposes
-`aermr01`…`aermr11` and `aermr16`…`aermr18` — `aermr12`…`aermr15` are absent in this
-particular product/version and must not be assumed present; the future `atmosphere/dataset/cams`
-reader has to keep dataset/version differences explicit (matching `Provenance`'s existing
-`DatasetVersion` field, §3) rather than silently treating a missing tracer as zero.
+It ships **no tabulated cross-section data**. O₃ (Chappuis), O₂ (A and B bands) and H₂O
+are the species that matter over 330–1000 nm, but their cross sections are datasets with
+their own provenance — Serdyuchenko et al. (2014) for ozone, HITRAN for O₂ and H₂O — and
+inventing numbers for them is exactly what the design forbids. See §16.
 
-**The real next scientific task, and what NOT to do.** Do not invent aerosol microphysical
-constants to bridge CAMS tracers to optical properties — that would repeat exactly the mistake
-§15 already rejected the log-linear VIIRS→SB shortcut for. The correct next step is a real,
-versioned mapping, built from authoritative CAMS/IFS-AER literature and documentation (not
-guessed): `CAMS aermr tracer → species/bin → particle size distribution → particle density →
-hygroscopic growth model → wavelength-dependent complex refractive index → particle shape →
-MOPSMAP inputs` (Gasteiger & Wiegner's "Modeled optical properties of ensembles of aerosol
-particles" tool, the standard way to turn aerosol microphysics into extinction/single-
-scattering-albedo/phase-function). This mapping is the eventual, live-data-driven replacement
-for the OPAC named-type tables — not a constant-swap, a genuine physical pipeline with its own
-citations at every stage, following the same never-invent-a-constant discipline already
-established for `atmosphere.RuralAerosol`/`UrbanAerosol`/`DesertAerosol`/`MaritimeAerosol`.
-`float64` stays the type throughout this reference/scientific pipeline; premature `float32`
-optimization or hand-tuned lookup tables come only after the physical mapping itself is
-established and validated, never before.
+One caveat recorded in the code: Beer–Lambert with a band-averaged cross section is valid
+for the ozone Chappuis continuum and **wrong** for the narrow O₂ A band, where a 1 nm grid
+cannot resolve individual lines and a band-averaged transmittance is not the average of the
+monochromatic transmittances. A provider supplying O₂ must supply an already
+band-averaged effective cross section for the target grid and say so.
+
+### 11.4 Natural sky — GAMBONS
+
+Integrated starlight from Gaia, plus diffuse Galactic light, extragalactic background,
+zodiacal light and airglow, with atmospheric attenuation and scattering. Design detail is
+written when the component is implemented; the architectural requirements are already
+fixed: Gaia DR3 with spatial indexing rather than per-query iteration over sources, a
+documented error budget for every approximation, DGL as its own component rather than
+folded into a constant, EBL explicit with its own spectrum and uncertainty, zodiacal light
+directional rather than a single offset, and airglow with continuum and lines separated
+plus climatology/solar-adjusted/calibrated modes whose uncertainty propagates.
 
 ---
 
-## 9. Artificial emission and spatial aggregation
+## 12. Dataset and provider architecture
 
-The v1 package converted one VIIRS-DNB pixel directly to sky brightness via a single
-empirical log-linear fit (`RadianceToArtificialSB`, Sánchez de Miguel 2020 ISS-HDR
-coefficients). Its own 50-line doc comment, preserved here verbatim because it is the primary
-evidence motivating everything in this section, recorded a real, live-measured finding from
-this project's own investigation (2026-08-06):
+**`skybrightness/dataset/raster`** decodes georeferenced single-band GeoTIFFs — classic
+TIFF, LZW and deflate, strips and tiles, 32/64-bit float samples, the floating-point
+predictor — either wholly into a `Grid` or through a window for a composite too large to
+hold. It is source-agnostic and **carries no units**, precisely because the products it
+serves are satellite radiances and reading one as a sky brightness is the error this module
+exists to prevent.
 
-> Raw satellite-nadir radiance at one ~15-arcsec VIIRS pixel is not the physical quantity
-> zenith skyglow is. A single pixel measures upward radiance from one small patch of ground;
-> zenith skyglow is an additive flux integral over scattered light from sources up to ~300 km
-> away. Live neighbourhood-pixel sampling (±1 to ±10 pixels, ~460 m–4.6 km) at a
-> moderate-brightness site showed raw VIIRS-DNB 2025 radiance swinging from 0 to over
-> 6.5 nW·cm⁻²·sr⁻¹ within that radius — and the live lightpollutionmap.info API showed the
-> *identical* zero/nonzero pixel pattern at the same offsets, ruling out a decode bug and
-> confirming the ~3× disagreement against World Atlas 2015 at that site is real VIIRS-DNB
-> per-pixel spatial noise, not a coefficient-calibration problem. Falchi et al. 2016's
-> atmospheric propagation model exists specifically because scattered light reaching an
-> observer's zenith integrates contributions from sources up to ~300 km away — a single-pixel
-> log-linear fit cannot reproduce that integral by construction, regardless of how well its
-> coefficients are calibrated.
+**`skybrightness/dataset/viirs`** turns NASA VIIRS annual nighttime-lights composites into
+`GroundEmitter`s. Its contract is the §14 one: VIIRS is a *source input*, never a sky
+brightness. A pixel radiance cannot determine a spectrum — high-pressure sodium, 3000 K LED
+and metal halide give the same DNB reading and scatter completely differently under a
+λ⁻⁴ law — nor an upward emission function, so both are required inputs and every emitter is
+flagged `AssumedSourceSpectrum | AssumedEmissionFunction`. Bins outside coverage or
+resolving to no-data are **dropped, not zeroed**: missing data is not measured darkness.
 
-V2's artificial component is therefore a real emission-to-propagation pipeline (§2), and the
-propagation step needs contributions from a wide neighbourhood around every observer, not one
-pixel. Iterating every native-resolution source pixel within 300 km for every pointing is
-computationally prohibitive at all-sky scale, so V2 builds an **observer-centric log-polar
-geodesic grid**: radial rings at `r_i = r₀·q^i` out to a configurable `r_max` (default 300 km,
-justified by the same atmospheric-scattering-geometry argument the quote above makes), each
-ring divided into azimuthal sectors sized to keep every cell's solid angle at the observer
-bounded, cell boundaries snapped to a deterministic global index so aggregation order is
-reproducible byte-for-byte, and elevation-aware splitting when the DEM elevation spread inside
-a cell exceeds a threshold. The built grid is cached in a bounded LRU keyed by `(site, dataset
-version, r_max, refinement params)`.
 
-**Rejected: HEALPix.** Equal-area tessellation of the sphere is exactly right for *storage and
-output* (and is adopted for the surrogate's angular basis and offline global-map generation,
-§10 Phase 6) but wrong for *observer-centric refinement* — it gives no natural way to be fine
-near the observer and coarse 200 km away. **Rejected: a spherical quadtree.** Better
-refinement behavior than HEALPix, but geodesic distance/bearing at the cell level becomes
-awkward and deterministic ordering is harder to guarantee across refinement levels.
 
-The emission field itself is three independently-uncertain, pluggable models, per §2:
-`EmissionField.Intensity` returns the dataset's own native units and quality mask and never
-interpolates across a missing pixel; `SpectralMixtureModel` reconstructs a spectral shape from
-regional priors, user-supplied spectra, or local lighting inventories, with a default ≥25%
-relative uncertainty in the 400–500 nm band specifically because VIIRS-DNB has almost no
-sensitivity there and cannot meaningfully constrain that part of the spectrum;
-`AngularEmissionModel` supplies an upward emission function from configurable priors (Garstang
-1986, Cinzano & Falchi arXiv:1209.2031, Kocifaj) or local calibration, each carrying a prior
-covariance rather than being treated as exact.
+Large scientific datasets never become generated Go source. They are fetched by an explicit
+provider layer through `remote`, which is consent-gated, and handed to the numeric layer
+already resolved.
+
+Anticipated products: Gaia-derived sky tiles, DGL maps, zodiacal lookup data, atmospheric
+cross-sections, molecular spectra, lunar coefficients, VIIRS rasters, DEM data, cloud
+fields, RT lookup tables.
+
+The numeric API is decoupled from storage and assumes nothing about a local POSIX
+filesystem — `remote/file` addresses everything as a bucket plus key.
+
+**No hidden network dependency.** `Model.Estimate` is deterministic for a given scene and
+dataset version and performs no acquisition. This is enforced behaviourally:
+`TestEstimateWorksOffline` runs an evaluation under `remote.SetOffline(true)` and requires
+byte-identical output. A structural direct-import check complements it
+(`TestCoreDoesNotImportIOPackages`); a *transitive* ban would be wrong rather than
+stricter, because the specification requires reusing `coord`, `ephemeris` and `time`, which
+legitimately reach `remote` for Earth-orientation data and JPL kernels, both consent-gated.
 
 ---
 
-## 10. Uncertainty strategy
+## 13. Validation strategy
 
-Nine covariance groups, matching the mandate's uncertainty-source list one-to-one:
-`EmissionIntensity`, `SourceSpectrum`, `AngularEmission`, `Aerosol`, `Cloud`, `Natural`,
-`Surrogate`, `Calibration`, `InputAge`. Each contribution is tagged `Aleatoric`, `Epistemic`,
-or `Measurement`.
+| Level | Content |
+| :--- | :--- |
+| 1 — equation | Each equation checked against values computed independently from the paper. |
+| 2 — published figures and tables | Reproduce reference plots or tables, e.g. Kocifaj 2022 Fig. 1, the Kocifaj 2025 amplification factors. |
+| 3 — cross-model | Compare against ESO SkyCalc, GAMBONS output, published Kocifaj calculations, Illumina-v2. |
 
-**Combination rule** (Phase 1 implements `UncLinearized`; `UncEnsemble`/`UncMonteCarlo` are
-later phases of the same interface): within one covariance group, contributions add
-**linearly** — they are treated as fully correlated. Across groups, they add **in
-quadrature**. Naive all-quadrature combination is explicitly rejected, with the reason stated
-in the doc comment: VIIRS intensity error is spatially correlated across an entire city (the
-same calibration/sensor bias affects every pixel of that city's emission field together), not
-an independent per-pixel draw — treating it as independent would understate the true
-uncertainty on any aggregate quantity. `UncertaintyResult` reports `P05/P50/P95` spectral
-fields, a per-wavelength relative sigma, per-group and per-component variance shares, and a
-list of `DomainWarning`s — including, once §10 Phase 6's surrogate exists, an explicit warning
-whenever a requested atmospheric state falls outside the surrogate's trained domain rather
-than a silent extrapolation.
+**The GAMBONS web tool is a Level-3 target, not a data source.** Its "Calculate Radiance"
+export returns azimuth, altitude and mag arcsec⁻² per pixel — the sky *after* GAMBONS' own
+atmospheric propagation — so it cannot feed this module, which applies its own. It is
+directly usable the other way round: run it for a site, date and atmosphere, run astrogo's
+natural-sky components with matching parameters, and compare all-sky. Its MultiQuery mode
+returns a time series in one file, which makes a night-long comparison a single export.
 
----
+Two conditions must match for that comparison to mean anything. GAMBONS excludes the Moon
+and the Sun, so astrogo must be queried with only its natural-sky components registered —
+`ScatteredMoonlight` off. And GAMBONS' airglow is an ESO SkyCalc spectrum computed for
+Paranal (2640 m, 350–1050 nm, 100 sfu by default) scaled by a percentage; the same spectrum
+has to be handed to astrogo, because airglow is a free parameter in both models rather than
+a prediction. Comparing two different airglow assumptions would measure nothing.
 
-## 11. Validation matrix
+GAMBONS' band set fixes what can be compared without a passband of our own: **UBVRI** and
+**Gaia G** in the Vega system; **SQM**, **TESS-W**, **RGB** and **Sloan ugriz** in AB.
+UBVRI and RGB use filters normalised to unit peak transmission; Gaia G and Sloan do not —
+which changes the zero point, not just the shape.
+| 4 — observational | Infrastructure for calibrated all-sky cameras, SQM networks, photometry, spectrometers, extinction measurements, AERONET. |
 
-| Component / claim | Level 1 (invariants) | Level 2 (reference models) | Level 3 (observations) | Level 4 (regression fixtures) |
-|---|---|---|---|---|
-| Unit algebra, passband integration | **done**, Phase 1 | analytic single-scattering cases planned | n/a | done, Phase 1 |
-| Zodiacal, airglow, moonlight, twilight | planned, Phase 2 | ESO SkyCalc/Cerro Paranal comparison, planned | **blocked — no data**, see §13 | planned, Phase 2 |
-| Clear-sky artificial propagation | planned, Phase 4 | Cinzano & Falchi analytic single-scattering, planned | **blocked — no data** | planned, Phase 4 |
-| Cloudy-sky propagation | planned, Phase 5 | PNAS 122,e2508001122 published scenarios, planned (licensing TBC) | **blocked — no data** | planned, Phase 5 |
-| Surrogate | planned, Phase 6 | held-out locked-test MCARaTS split, planned | **blocked — no data** | planned, Phase 6 |
-| Calibration fit | n/a | n/a | **blocked — no data**; framework unit-testable on synthetic data only | n/a |
+Validation is **spectral and directional**, not V-band-at-zenith. A model can obtain the
+right V magnitude with the wrong spectrum, and the instrument layer depends on the
+spectrum. Directional cases: zenith, 30°, 15°, near horizon, toward and away from a light
+dome, toward the zodiacal light, Galactic plane, high Galactic latitude, several Moon
+separations.
 
-A cell marked *blocked — no data* is a structural fact about this repository today (§13), not
-a scheduling gap — it stays blocked until real calibrated field data is acquired.
+Reference sites spanning real conditions: Paranal, Armazones, Mauna Kea, La Palma, an urban
+European site, a remote dark site, a high-aerosol site, a humid site, a high-altitude dry
+site, both hemispheres. The model is not tuned to one observatory and then claimed global.
 
----
-
-## 12. Accuracy targets
-
-Engineering goals, not present-tense claims:
-
-- Clear photometric conditions: median passband error ≤ 0.15 mag/arcsec², 90th-percentile
-  ≤ 0.30 mag/arcsec².
-- Partly cloudy conditions: median ≤ 0.30 mag/arcsec², 90th-percentile ≤ 0.60 mag/arcsec²,
-  with calibrated empirical interval coverage.
-- Synthetic passband integration: ≤ 0.01 mag numerical error at the supported spectral
-  resolution — Phase 1's actual round-trip error is ~1e-12 mag, roughly 10⁹× inside this
-  target, which is a statement about numerical correctness, not physical accuracy.
-
-If real observation ever shows these targets are unrealistic, the target is revised with the
-evidence stated plainly — never met by loosening a test's tolerance without a matching, cited
-reason.
+**Phase 0 proves none of this.** It proves unit correctness, integration correctness,
+linear additivity, determinism, projection consistency and allocation behaviour. It ships
+no physics, so it makes no accuracy claim whatsoever.
 
 ---
 
-## 13. Non-goals and honest blockers for this repository
+## 14. Legacy classification
 
-- **Zero ground-truth SQM/TESS field measurements exist in this repo today.** Level-3
-  observational validation cannot be performed until real data arrives; the §12 accuracy
-  targets are unverifiable until then, and claiming them met before that would be a
-  fabrication this project explicitly forbids (§25). Phase 7's calibration framework can be
-  built and unit-tested against synthetic fixtures but cannot be *fitted*. Acquiring roughly
-  50 nights of calibrated SQM/TESS data from 5+ sites spanning different regimes is the
-  single highest-value unblocking action for this whole effort, and it is not a coding task.
-- **NOAA/EOG's VIIRS hosting requires OAuth2**, confirmed live this session.
-  `remote.EOGAnnualV2` ships `Downloadable: false`; `dataset/eog` supports local files only.
-  `remote.VIIRSAnnual` (lightpollutionmap.info's unauthenticated Black Marble mirror) is the
-  only unauthenticated global DNB source found — a third-party mirror with no SLA, documented
-  as a single point of failure, not hidden behind a generic "data source" label.
-- **NASA LAADS DAAC requires an App Key** for the full multi-SDS VNP46A4/VJ146A4 product
-  (which is what carries the QA/StdDev/Snow/CloudMask bands §9's emission-field design wants).
-  `dataset/blackmarble` exposes `WithAppKey`/`OpenDir`; no key ships in the repo, and no key is
-  prompted for or required by any test.
-- **No MCARaTS or other external radiative-transfer solver is invoked from Go, by design.**
-  The offline reference-simulation pipeline lives entirely outside the Go module
-  (`tools/skybrightness-refsim/`, no `.go` files participate in `go build ./...`), stays
-  optional, and is not built by Phases 0–5. Phase 6's `surrogate/` package can ship its
-  interchange format, inference code, and out-of-domain detection tested against synthetic
-  fixtures, but the surrogate itself is scientifically empty — not physically meaningful —
-  until real reference simulation output exists to train it on.
-- **World Atlas 2015/2016 is a model output, not an observation**, and can never serve as
-  Level-3 ground truth; it is used only as a Level-2 reference-model comparison target.
-- **Digitized published-figure fixtures may not be redistributable.** Where a PNAS/MNRAS
-  scenario's underlying data cannot legally be committed to this repository, the comparison
-  stays manual and is documented as manual — never silently skipped or claimed automated.
-- **Passband curve licensing needs verification before publication** — Gaia (ESA CC BY-SA,
-  needs attribution), SDSS, and SVO Filter Profile Service redistribution terms are checked in
-  Phase 0/1, not assumed.
+The previous package (3,911 LOC) had approximately the right architecture and almost none
+of the physics.
 
-**What Phase 0–1 can actually prove and ship**, given the above: a compiling, documented,
-benchmarked, `-race`-clean spectral foundation with correct unit algebra, round-trip-exact
-passband integration, enforced linear-space additivity, deterministic provenance digests, a
-working `plan` integration, and two runnable examples — with **zero physical-accuracy claims**.
-How bright the sky actually is stays aspirational until Phase 2 and beyond; how accurate any
-prediction is stays aspirational until real observational data enters this repository.
+| Disposition | Items |
+| :--- | :--- |
+| Superseded, re-derived | Spectral grid and integration, provenance, quality, uncertainty shapes. |
+| Moved to their proper packages | Instrument → `optics`; passband and derived outputs → `magnitude`; transmission → `atmosphere`. |
+| Legacy-only, explicitly named | KS91 → `LegacyKS91`; constant airglow → named climatology fallback. |
+| Deleted | `bortle.go`, `natural.TophatJohnson`, `natural.NewFastEngine`, `mode.go` (replaced by `Fidelity`), `scratch.go`, `atmos.RayleighOnly`, `limitingmag.go`. |
+
+`plan.LimitingMagnitudeConstraint`, `plan.ScoreObservableSky` and examples 18 and 21 were
+removed with it; they return once Phases 2–3 make a defensible limiting magnitude possible.
+`plan.MeteorShower.ObservedRate` now takes a limiting magnitude directly, which decoupled
+meteor-rate arithmetic from sky brightness entirely.
 
 ---
 
-## 14. Staged implementation plan
+## 15. Phase roadmap
 
-| Phase | Scope | Entry condition | Exit condition |
-|---|---|---|---|
-| 0 | This document | Mandate received | Internally consistent, no open contradictions |
-| 1 | Spectral foundation: canonical types, `Engine`/`Request`/`Result`, passband integration, provenance/uncertainty/quality types, fast simplified-model components, `plan` + example rewrite | Phase 0 complete | Repo compiles, 10 invariant tests + benchmarks pass, `plan` works end-to-end |
-| 2 | Natural-sky baseline: spectral zodiacal/airglow/moonlight, twilight guard, starlight/DGL interface | Phase 1 complete | Comparison fixtures + monotonicity/symmetry tests pass |
-| 3 | Atmosphere: `atmosphere.Atmosphere`, molecular/aerosol/cloud optics, terrain, local provider, `atmosphere/dataset/cams` CAMS reader (see §8's CAMS notes for the validated grid/tracer/pressure-reconstruction contract) | Phase 2 complete | Zero-aerosol/zero-cloud limits proven exact |
-| 4 | Artificial clear sky: emission-field providers, spectral mixture/angular models, log-polar aggregation, `ClearSkyPhysical` | Phase 3 complete | Zero-emission ⇒ zero artificial radiance (bitwise); aggregation-invariance test passes |
-| 5 | Clouds: `CloudyAllSkyPhysical`, `FastCloudApproximation` | Phase 4 complete | Clear-sky limit proven as `Fraction→0` |
-| 6 | Reference simulation + surrogate | Phase 5 complete | `.sbsur` format + OOD detection tested on synthetic data; pipeline documented as unbuilt/optional |
-| 7 | Calibration + operating modes + planner integration | Phase 6 complete | `calib/` unit-tested on synthetic data; `plan` constraint family complete |
+**What the module can and cannot do today.** Two `Component`s are implemented,
+`ScatteredMoonlight` and `ArtificialSkyglow`. The first validates end to end: a near-full Moon at Paranal comes out at
+**18.9 mag/arcsec² in V**, against a long-established full-moon sky brightness of about 18.
+That number is independent of every paper in the chain, so landing on it exercises ROLO's
+reflectance, the Ω/π conversion, both inverse squares, the Rayleigh optical depth, the
+phase function and the transfer integral all at once.
 
-Each phase leaves the repository compiling, documented, and tested, and closes with a written
-report at `docs/reports/skybrightness-phase<N>.md` covering: scope delivered/deferred; files
-added/modified/deleted; public API changes; equations implemented (source, equation number,
-verified-against-original yes/no); data assumptions with a numeric relative sigma each; tests
-added and what each proves; benchmarks; validation evidence and what is explicitly not
-validated; known limitations; next-phase entry conditions.
+`ArtificialSkyglow` has no comparable external anchor, so it is tested on the model's own
+physical claims: falling with distance, summing linearly, responding to shielding, and the
+azimuthal structure described in §11.1. `skybrightness/dataset/viirs` supplies its sources
+from NASA's annual composites — but see §17: Eq. 2 has no source-area term, so a
+raster-derived prediction's **absolute** scale is not yet meaningful, only its directional
+and relative structure.
 
----
+What is still missing is the *natural* sky. A `Model` holding these two predicts moonlight
+and artificial light only — no airglow, no starlight, no zodiacal light — so a moonless
+night far from any city returns zero. That is a correct answer to the question asked and
+the wrong answer to the question a user probably meant; the `Quality` flags are what carry
+the difference, and Phase 2 is what closes it.
 
-## 15. Rejected alternatives
+| Phase | Content | State |
+| :--- | :--- | :--- |
+| 0 | Architecture and spectral foundation | **Done** |
+| 1 | Atmospheric foundation, into `atmosphere` | **Done** — scattering, transfer and scale heights complete. Absorption is infrastructure only: no citable cross-section dataset is shipped (§16) |
+| 2 | Natural moonless sky (GAMBONS, Gaia DR3) | **Not started, and the largest remaining piece.** Needs the GAMBONS equations plus four separate datasets — see below |
+| 3 | Modern Moon (Jones 2013, ROLO, Winkler 2022) | **`ScatteredMoonlight` shipped** — ROLO reflectance + single-scattering transfer, validated at 18.9 mag/arcsec². Remaining: Winkler's multiple-scattering terms (not transcribed) and a shipped solar spectrum (§16) |
+| 4 | Artificial clear sky (Kocifaj 2022, VIIRS as source) | **`ArtificialSkyglow` + `dataset/viirs` shipped.** Absolute scale is blocked on Eq. 2's missing area term (§17); the Fig. 1 reproduction remains |
+| 5 | Clouds (Kocifaj 2025) | Planned |
+| 6 | External high-fidelity RT (Illumina-v2, precomputed) | Planned |
+| 7 | Operational observatory calibration | Planned |
+| 8 | Performance: LUTs, surrogates, caching, loop optimisation | Planned |
 
-**Why not extend the current V-band package instead of rewriting it?** The v1 contract is a
-scalar `SurfaceBrightnessV` returned by a one-method interface,
-`Model.SurfaceBrightness(altaz, ctx) (SurfaceBrightnessV, error)`. Every V2 requirement —
-spectral output, per-component decomposition, uncertainty, provenance, mode selection,
-allocation-conscious batch buffers — is a change to that one signature. There is no
-evolutionary path from a scalar return to a spectral field; extending it would mean either
-breaking the signature anyway (making "extension" a rewrite in disguise) or bolting a second,
-parallel API onto the first and carrying both forever. The user explicitly authorized the
-clean break (§6), so V2 takes the honest option: delete the old symbols, rewrite the one
-production consumer and both examples in the same change, and document the migration as a
-symbol table (§16) rather than a compatibility shim.
+Delivery order departs from the numbering: Phase 1, then 4, then 3, because their literature
+was in hand. Phase 2 is last because it is not one model but five — integrated starlight,
+diffuse galactic light, extragalactic background, zodiacal light and airglow — each with its
+own literature and its own dataset:
 
-**Why not one universal log-linear VIIRS→SB equation?** See §9's quoted finding — a ~3×
-measured disagreement at a real site, root-caused to VIIRS-DNB per-pixel spatial noise that no
-single-pixel coefficient fit can average away, because the physical quantity it needs to
-approximate is a ~300 km spatial integral, not a point sample.
+| Phase 2 ingredient | What it needs |
+| :--- | :--- |
+| Integrated starlight | GAMBONS' equations, plus precomputed all-sky Gaia DR3 tiles. `catalog/gaia` does cone searches; an all-sky integral needs a different, prepared product. |
+| Diffuse galactic light | Its own scattering model over a dust map. |
+| Extragalactic background | A tabulated spectrum. |
+| Zodiacal light | A solar-elongation-dependent model, e.g. Leinert et al. (1998). |
+| Airglow | A solar-activity-scaled continuum plus line list; the single most variable term in a dark sky. |
 
-**Why bespoke typed floats instead of `unit.Quantity` throughout?** Hot-loop allocation and
-indirection cost at all-sky scale, plus the honest admission (§3) that `unit.Dimension` cannot
-distinguish a steradian from a bare dimensionless ratio — adding `Steradian` to `unit` gives
-real documentation value but zero type-level protection, so the protection has to live where
-it can actually be enforced: in `skybrightness`'s own named types.
+Nothing here is blocked on a decision — it is blocked on obtaining five sources and their
+data, and §2 forbids standing in for any of them with a fitted constant. The arXiv listing
+for GAMBONS (2101.01500) is reachable but its PDF does not yield equations to automated
+extraction; a supplied copy would unblock the starlight term, as it did for Kocifaj and
+Kieffer & Stone.
 
-**Why log-polar observer-centric aggregation instead of HEALPix or a spherical quadtree?**
-See §9 — HEALPix is right for equal-area storage/output (and is used for exactly that in
-Phase 6), wrong for observer-centric fine/coarse refinement; a quadtree makes geodesic
-distance/bearing and deterministic cell ordering harder to guarantee.
+### Phase 0 baseline
 
-**Why no neural-network surrogate in v1?** The mandate's own admission bar — "unless it
-demonstrably improves held-out accuracy" — cannot be met without held-out validation data,
-and this repo has none (§13). A neural surrogate is not ruled out permanently, only until that
-bar can honestly be cleared.
+Framework cost with five trivial components on the 671-sample default grid, before any
+physics. Recorded so later phases can distinguish a machinery regression from the expected
+cost of real models.
 
-**Why is `Bortle` output-only in V2, with no `BortleToBrightness`?** The Bortle 1–9 scale is a
-lossy, human-authored, non-invertible qualitative descriptor. v1 already documented
-`BortleClass` as non-round-trippable; V2 keeps it strictly as a reporting helper
-(`BortleFromLuminance`) and removes the reverse direction entirely, since using it as a model
-*input* would silently discard precision the rest of the engine worked to preserve.
+| Workload | ns/op | allocs/op |
+| :--- | ---: | ---: |
+| Single direction | 21,570 | 20 |
+| 100 directions | 1,302,310 | 2,008 |
+| Full sky, 18 rings | 9,945,475 | 16,570 |
+| Single band | 1,675 | 17 |
+| Full spectrum | 10,405 | 18 |
+| Surface-brightness projection | 3,870 | 2 |
+| Electron-rate projection | 5,030 | 3 |
 
-**Why is v1's `atlas.Resolver` freshness-first fallback ladder gone?** It tried five data
-tiers in sequence with no caller-visible record of which one actually answered beyond a
-post-hoc `Attempts` field — precisely the silent mode-fallback behavior §16 forbids. V2
-replaces it with an explicit `Mode` per request, a `FallbackPolicy` that defaults to
-forbidden, and a `Provenance.Fallbacks` record for every fallback step actually taken.
-
----
-
-## 16. Migration note — there is no backward compatibility
-
-Every symbol below is **deleted**, not deprecated, not aliased. There is no shim package and
-none will be added. The "replaced by" column is the adaptation recipe.
-
-| Old symbol (`skybrightness` v1) | Replaced by | Adaptation |
-|---|---|---|
-| `Model` interface | `Engine` (§5) | Build a `CompositeEngine` from `Component`s instead of implementing one method |
-| `Component` interface | `Component` (new shape, §5) | `Radiance(altaz, ctx) (Nanolambert, error)` → `Eval(ctx, EvalInput, out SpectralField) (ComponentReport, error)` |
-| `SurfaceBrightnessV` | `SurfaceBrightnessAB` / `SurfaceBrightnessVega`, always with a `PassbandID` | Name the passband explicitly — there is no unqualified "V magnitude" any more |
-| `Nanolambert` | `SpectralRadiance` (per-wavelength) or `Radiance` (passband-integrated) | Work in linear spectral radiance, integrate through a named `Passband` |
-| `SQMProvider` | `calib.Measurement` + `Instrument` (Phase 7) | An SQM reading is an observation through a device response, not a model input |
-| `Floor` | `atmosphere.Atmosphere` + an `EmissionField`-backed `Component` (Phase 4) | There is no standalone "floor" concept; light pollution is one component of the full decomposition |
-| `CompositeModel`/`NewCompositeModel` | `CompositeEngine`/`NewCompositeEngine` (§5) | Same idea (sum components), spectral instead of scalar |
-| `RadianceToArtificialSB` | `EmissionField` → `SpectralMixtureModel` → `AngularEmissionModel` → `rt.ClearSkyPhysical`/`CloudyAllSkyPhysical` (§9) | There is no direct pixel-to-brightness function any more, by design |
-| `atlas.Resolver`/`LayerAuto` | Explicit `Mode` + `FallbackPolicy` + `Provenance.Fallbacks` (§7) | Choose a mode explicitly; opt into fallback if you want it, and it will be recorded |
-| `LimitingMagModel` | `LimitingMagModel` (new signature, §5) | Now takes a `LimitingMagInput{Passband, SkyVega, SkyAB, Airmass}` instead of a bare `(SurfaceBrightnessV, airmass)` pair |
-| `plan.LimitingMagnitudeConstraint` | `plan.LimitingMagnitudeConstraint` (rewritten) + `plan.SkyConditions` | Construct a `SkyConditions{Engine, Passband, ...}` once and pass it in; the constraint itself keeps its below-horizon short-circuit |
+Nothing is optimised yet; that is Phase 8. The point is numbers before opinions.
 
 ---
 
-## 17. Data licensing inventory
+## 16. Unresolved dependencies
 
-| Dataset | Licence | Redistribution | Auth required | Approx. size | Mutable |
-|---|---|---|---|---|---|
-| World Atlas 2015 (Falchi et al. 2016) | CC BY-NC 4.0 (non-commercial) | Not redistributed; downloaded per-user via `remote.WorldAtlas` | none | ~684 MB zip, ~2.8 GB extracted | no (frozen 2019-11-18) |
-| VIIRS annual composites (lightpollutionmap.info mirror of Black Marble) | source data CC0; mirror asks credit to Jurij Stare + NASA Black Marble | Not redistributed; downloaded per-user via `remote.VIIRSAnnual` | none | ~700 MB–1 GB per year | yes (past years occasionally reprocessed) |
-| NASA Black Marble VNP46A3/A4, VJ146A3/A4 (LAADS DAAC, full multi-SDS) | NASA open data | Not redistributed | LAADS App Key | per-granule | yes |
-| EOG VIIRS annual v2 | EOG terms | Not redistributed | OAuth2 bearer token | ~6 GB | yes |
-| CAMS global analysis (Copernicus Data Space Ecosystem `eodata` S3 bucket, via `remote.CopernicusEODATA`/`remote/s3`) | Copernicus licence | Not redistributed; downloaded per-user via `remote.GetFile` | Copernicus Data Space S3 credentials (AWS SDK v2 default chain — env vars, `~/.aws/credentials`, or an IAM role; never a credential file astrogo reads itself) | 1.3 MB (`lnsp`) – ~180 MB (a 137-level aerosol tracer) per file | yes (new analysis cycles ~4×/day) |
-| CAMS EAC4 reanalysis (ADS, an older/alternate CAMS product — not currently used by any `remote` endpoint) | Copernicus licence | Not redistributed | ADS API key | per-request | yes |
-| ERA5 single levels | Copernicus licence | Not redistributed | CDS API key | per-request | yes |
-| Passband curves (Johnson-Cousins, Sloan, Gaia, CIE, SQM) | Gaia: ESA CC BY-SA (attribution required); others: verify per-source at Phase 1 implementation time | Redistributed in `remote.PassbandBundle`, checksummed | none | ~2 MB | no (pinned by semver + SHA-256) |
-| lightpollutionmap.info live API (`lpmap`) | provider terms, manual API key issuance | Not redistributed; live queries only | manual-issue API key | n/a | n/a (live) |
+| Item | Blocks | What would unblock it |
+| :--- | :--- | :--- |
+| ROLO `c₁–c₄` at full precision | Nothing outright; caps Phase 3 accuracy | The display equation following "the eight constant 311g coefficients are", or the ASCII export of Table 5. |
+| Lunar orientation (IAU rotation elements or a JPL binary PCK) | The selenographic longitude of the Sun `Φ` and the libration angles `θ`, `φ`, which `magnitude.ROLOReflectance` therefore takes as inputs. Archinal et al. (2018) WGCCRE report, or PCK support in `ephemeris/jpl`, would close it. |
+| **Solar spectral irradiance at the 32 ROLO bands** | Absolute lunar irradiance. `magnitude.ROLOIrradiance` takes the solar spectrum as a parameter rather than picking a reference silently, since ROLO's absolute scale depends on that choice. |
+| O₃, O₂, H₂O absorption cross sections | Absorption is infrastructure-only until supplied | Serdyuchenko et al. (2014) ozone cross sections; HITRAN line lists band-averaged to the target grid for O₂ and H₂O. The machinery (`atmosphere.CrossSection`) is in place and tested. |
+| Jones et al. (2013) confirmation | Phase 3 framing | Confirm the A&A open-access text. |
+| Illumina-v2 product format | Phase 6 | A sample precomputed product and its dimension conventions. |
 
-This table is the authoritative pre-publication checklist for §3's passband bundle and every
-Phase 4+ dataset provider — nothing in that list ships until its row here is verified against
-the primary source, not a secondary summary.
+No component is blocked outright. Every model named in the specification has its primary
+source in hand.
+
+---
+
+## 17. Open scientific questions
+
+**Kawara et al. (2017) DGL coefficients — `b` resolved, `c`'s decade is not.**
+
+GAMBONS Eq. 13/14 derives diffuse galactic light from the Schlegel–Finkbeiner–Davis 100 µm
+map, which is public (IRAS + COBE/DIRBE, on NASA LAMBDA). The relation is Kawara et al.
+(2017) PASJ 69, 31, Eq. 7:
+
+	ν·I_ν(DGL) = b·I_ν,100 − c·I²_ν,100        with  I_ν,100 = I_ν,SFD − 0.8 MJy sr⁻¹
+
+**`b` is unambiguous.** Table 2, in nW m⁻² sr⁻¹ per MJy sr⁻¹, at effective wavelengths
+0.225, 0.274, 0.319, 0.369, 0.418, 0.472, 0.550, 0.648 µm:
+
+	b = 3.0, 3.9, 6.1, 8.5, 13.6, 17.5, 20.1, 21.0
+	σ = 1.4, 0.3, 0.4, 0.5,  0.5,  0.6,  0.6,  0.9
+
+**`c`'s values are clear, its scale is not.** The tabulated numbers are
+`0.1, 0.3, 0.7, 1.1, 2.4, 3.3, 4.4, 4.5` (σ = 0.4, 0.1, 0.1, 0.2, 0.3, 0.3, 0.4, 0.7), but
+the row header extracts as "10⁵ (MJy sr⁻¹)⁻¹", which is dimensionally impossible: for
+`c·I²` to be a radiance with `I` in MJy sr⁻¹, `c` must be in
+nW m⁻² sr⁻¹ (MJy sr⁻¹)⁻². The power of ten and one exponent are lost in extraction.
+
+The self-consistency argument points one way. The quadratic turns over at
+`I₁₀₀ = b/(2c)`, and Kawara fit samples bounded at 5, 10, 15, 20, 30 and 50 MJy sr⁻¹ —
+GAMBONS then restricts use to `I_SFD < 50`. Taking the tabulated `c` × 10⁻¹ puts the
+turnover at 23, 23, 28 and 44 MJy sr⁻¹ for the four best-measured bands: the top of the
+fitted range, exactly where a quadratic fit to saturating data should turn. Any other
+decade is untenable — × 1 makes DGL go negative above 4.6 MJy sr⁻¹, well inside the data;
+× 10⁻² removes the saturation the quadratic exists to capture.
+
+That is an inference from the fit's behaviour, not a reading of the paper, so `c` is **not
+implemented** and DGL waits — the same call made for Kocifaj Eq. 5, and for the same
+reason. A photograph of Table 2's "DGL quadratic coefficient" row header would settle it in
+one line.
+
+Note also that Kawara's coverage stops at 0.648 µm. It spans 330–650 nm of the default
+optical grid but not 650–1000 nm, so the red end needs extrapolation and a flag whatever
+happens to `c`.
+
+**Kocifaj 2022 Eq. 2's "missing source-area term" — RESOLVED, and the earlier entry here
+was wrong.**
+
+An earlier revision of this document claimed Eq. 2 carried no source-area term and that a
+raster-derived prediction's absolute scale was therefore meaningless. That was a
+misreading. Kocifaj & Bará (2019) Eq. 9 — the model Eq. 2 generalises — defines the
+quantity exactly:
+
+> `L_i(π/2, A_0i)` is the line-of-sight radiance, measured at the detector, of the i-th
+> city or town located on the horizon
+
+`L_S` is what a photometer pointed at the horizon in the source's direction reads. It is
+not a property of the source's surface and needs no area factor. No term is missing.
+
+What *was* wrong was this repository's own code: `dataset/viirs` binned the raster into
+rings **and** sectors, stacking several emitters at one azimuth. Eq. 9 sums over
+**azimuthally separated** sources — one per direction. That double-counting, not the
+paper, produced the N-scaling. Fixed: `Region` now takes `Sectors` (the emitter count) and
+`RadialSamples` (which refines the estimate within a sector without adding emitters), and
+`TestEmittersOnePerAzimuth` pins it.
+
+One genuine gap remains, and it is narrower: Kocifaj & Bará say `L_i` "can be inferred from
+satellite radiance data" and cite **Elvidge et al. (2017)** for the method. That method is
+not implemented. `dataset/viirs` instead sums upward radiances along each azimuth and
+places the result at the radiance-weighted mean distance — which preserves Eq. 9's
+structure and the relative weighting between azimuths, but is not the published inference.
+Absolute scale uncalibrated; directional structure meaningful.
+
+**Kocifaj 2022 Eq. 5 exponents — RESOLVED.** The typeset equation confirms the exponents
+sit on `τ_a`, not on the coefficients:
+
+	c₀ = 0.33 + 0.15·τ_a,  c₁ = 0.9·τ_a^0.51,  c₂ = 1.3·τ_a^1.85
+
+Implemented as `AsymmetryParameter`. One property of the published fit is worth recording:
+it is not bounded to the physical range, and around `τ_a = 0.5` with `g_a = 0.9` it
+evaluates above 1, where a Henyey–Greenstein phase function is undefined. That is a limit
+of the parameterisation, so the value is returned together with `ErrAsymmetryOutOfRange`
+rather than clamped.
+
+The superseded analysis follows, kept because it explains why the ambiguity was real.
+
+**Historical — why the text layer was ambiguous.**
+
+`c₀ = 0.33 + 0.15·τ_a` is settled: it is corroborated independently by the paper's own
+statement that `g → 0.33` as `τ_a → 0`, which the constant term reproduces exactly.
+
+`c₁` and `c₂` are not. Raw PDF text extraction yields the token sequences `0.9`, `0.51`,
+`a` and `1.3`, `1.85`, `a`. In `c₀` the τ glyph drops out of extraction entirely, leaving a
+bare `a` for `τ_a`, so those sequences are consistent with **either** reading:
+
+| Reading | `c₁` | `c₂` |
+| :--- | :--- | :--- |
+| A — exponent on `τ_a` | `0.9·τ_a^0.51` | `1.3·τ_a^1.85` |
+| B — exponent on the coefficient | `0.9^0.51·τ_a` = `0.949·τ_a` | `1.3^1.85·τ_a` = `1.62·τ_a` |
+
+Physical plausibility does not discriminate: both give `g = 0.33` at `τ_a = 0`, and both
+give `g > 1` at `τ_a = 0.5, g_a = 0.9`, which is invalid for a Henyey–Greenstein
+asymmetry parameter — so the formula's validity domain is bounded under either reading and
+cannot be used to rule one out. Reading A has the shape of an empirical fit with distinct
+exponents; Reading B would more naturally have been written as `0.95` and `1.62`.
+
+Resolving it needs the typeset Eq. 5, or Fig. 1's plotted `g` values to test a reproduction
+against. Until then `g` stays an explicit input.
+
+**Airglow calibration state.** The `Calibrated` mode implies a fitting procedure against
+recent local measurements. Which observable is fitted, over what window, and how the
+resulting uncertainty is reported are open and must be settled before Phase 2.

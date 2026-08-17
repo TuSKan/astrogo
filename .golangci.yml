@@ -60,6 +60,14 @@ linters:
     gocritic:
       disabled-checks:
         - captLocal   # IAU photometric notation (H, G, R, M1, M2)
+    gomoddirectives:
+      # remote/file is deliberately built against the user's own go-cloud
+      # fork (github.com/TuSKan/go-cloud), which carries SFTP/multipart
+      # upload/HTTP-driver work not yet merged upstream — this replace
+      # directive is the whole point of that architecture, not a
+      # workaround to remove.
+      replace-allow-list:
+        - gocloud.dev
     gomodguard_v2:
       local-replace-directives: true
 

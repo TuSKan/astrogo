@@ -21,12 +21,25 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"path/filepath"
 
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/time"
 )
+
+// cacheLocation names where an endpoint's files are expected, for display
+// only. Nothing here is assumed to be on local disk: the data directory is
+// a bucket URL and the cache is a key prefix within it, so this prints
+// exactly the two pieces a pre-seeding operator needs, whether that bucket
+// is a directory, an S3 bucket, or anything else.
+func cacheLocation(ctx context.Context, id remote.EndpointID, name string) string {
+	_, prefix, err := remote.CacheDir(ctx, id)
+	if err != nil {
+		return name
+	}
+
+	return remote.DataDirURL() + " [" + prefix + name + "]"
+}
 
 func main() {
 	fmt.Println("=== astrogo offline / air-gapped setup ===")
@@ -64,13 +77,13 @@ func main() {
 	// constructor to bypass remote with.
 	fmt.Println("\n[2] eph.NewProvider against a pre-seeded cache, zero network")
 
-	jplDir := remote.DataDir().Join("jpl").LocalPath()
-	lskPath := filepath.Join(jplDir, "lsk", "naif0012.tls")
-	spkPath := filepath.Join(jplDir, "planets", "de440s.bsp")
+	ctx := context.Background()
+	lskLoc := cacheLocation(ctx, remote.NAIFLSK, "naif0012.tls")
+	spkLoc := cacheLocation(ctx, remote.NAIFSPK, "planets/de440s.bsp")
 
-	p, err := eph.NewProvider(context.Background(), eph.Planets, "de440s")
+	p, err := eph.NewProvider(ctx, eph.Planets, "de440s")
 	if err != nil {
-		fmt.Printf("    no local kernels found at %s (%v)\n", jplDir, err)
+		fmt.Printf("    no cached kernels found at %s (%v)\n", remote.DataDirURL(), err)
 		fmt.Println("    run example 09 or 11 first (with downloads enabled) to populate the")
 		fmt.Println("    cache, or copy pre-built de440s.bsp/naif0012.tls files there yourself.")
 	} else {
@@ -81,21 +94,21 @@ func main() {
 			fmt.Printf("    State: %v\n", err)
 		} else {
 			fmt.Printf("    Mars geocentric distance: %.4f AU (from %s, %s)\n",
-				state.Pos.Norm(), lskPath, spkPath)
+				state.Pos.Norm(), lskLoc, spkLoc)
 		}
 	}
 
 	// ── 3. Time.EOP() — local Earth-orientation data, loaded automatically ──
 	fmt.Println("\n[3] Time.EOP() — local Earth-orientation data, loaded automatically")
 
-	iersPath := remote.DataDir().Join("iers").Join("finals2000A.data").LocalPath()
+	iersLoc := cacheLocation(ctx, remote.IERSFinals2000A, "finals2000A.data")
 
 	_ = time.NowUTC().EOP() // never errors; triggers the lazy load as a side effect
 
 	if lo, hi, ok := time.Coverage(); ok {
-		fmt.Printf("    loaded EOP data automatically: MJD %.0f–%.0f (from %s)\n", lo, hi, iersPath)
+		fmt.Printf("    loaded EOP data automatically: MJD %.0f–%.0f (from %s)\n", lo, hi, iersLoc)
 	} else {
-		fmt.Printf("    no local EOP cache at %s — call remote.EnableDownloads(remote.IERSFinals2000A, 0)\n", iersPath)
+		fmt.Printf("    no local EOP cache at %s — call remote.EnableDownloads(0, remote.IERSFinals2000A)\n", iersLoc)
 		fmt.Println("    once (with network access) to populate it, or ship a finals2000A.data file with your deployment.")
 	}
 

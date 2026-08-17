@@ -25,7 +25,7 @@
 // example downloads — from ~64 MB (Mars) up to ~1.1 GB (Jupiter's
 // Galilean moons), ~2.4 GB total for every kernel. To try it: pass
 // plan.WithPlanetaryMoons() to the VisibleTonight call below, raise this
-// example's remote.EnableDownloads(remote.NAIFSPK, ...) cap accordingly,
+// example's remote.EnableDownloads(..., remote.NAIFSPK) cap accordingly,
 // and loosen magLimit — every one of these moons is fainter than mag 4 in
 // real apparent brightness (Titan/Triton, the brightest, are ~+8.4/+13.5),
 // so magLimit=2 (this example's default) will never surface any of them
@@ -90,11 +90,11 @@ func main() {
 	// (~32 MB) backs the Moon/planets and, via VisibleTonight's Stage 2,
 	// any asteroid/comet candidate SIMBAD/OpenNGC/SBDB's bulk prefilter
 	// surfaces; naif0012.tls (~6 KB) provides leap seconds for all of them.
-	remote.EnableDownloads(remote.IERSFinals2000A, 0)
-	remote.EnableDownloads(remote.OpenNGC, 0)
-	remote.EnableDownloads(remote.NAIFSPK, 200<<20)
-	remote.EnableDownloads(remote.NAIFLSK, 0)
-	remote.EnableDownloads(remote.JPLHorizons, 0)
+	remote.EnableDownloads(0, remote.IERSFinals2000A)
+	remote.EnableDownloads(0, remote.OpenNGC)
+	remote.EnableDownloads(200<<20, remote.NAIFSPK)
+	remote.EnableDownloads(0, remote.NAIFLSK)
+	remote.EnableDownloads(0, remote.JPLHorizonsSPK)
 
 	planetProvider, err := eph.NewProvider(ctx, eph.Planets, "de440s")
 	if err != nil {
