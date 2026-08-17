@@ -25,11 +25,15 @@ annual composites). The natural moonless sky is the component still missing.
 
 Specifically, I would like to ask about the data behind **Table 3 of Masana et al. (2021),
 MNRAS 501, 5443**: the radiance outside the Earth's atmosphere, per HEALPix pixel, combining
-integrated starlight, diffuse galactic light and extragalactic background light. The paper
-notes the full table is available online, and Masana et al. (2022, IJSL) mentions that a
-standalone version of GAMBONS is available on request. I was unable to locate a direct
-download from https://gambons.fqa.ub.edu, which appears to serve the interactive calculator
-rather than the underlying table.
+integrated starlight, diffuse galactic light and extragalactic background light — in its
+**current form**, built on Gaia EDR3/DR3 rather than DR2. Your announcement of the EDR3
+update noted a bug in the DR2 version that underestimated the ISL, particularly in the Milky
+Way and other bright patches, so I would not want to work from anything of that vintage.
+
+The 2021 paper notes the full table is available online, and Masana et al. (2022, IJSL)
+mentions that a standalone version of GAMBONS is available on request. I was unable to
+locate a direct download from https://gambons.fqa.ub.edu, which serves the interactive
+calculator rather than the underlying table.
 
 I should be clear that this is not the web tool's own download, which I have used. That
 returns azimuth, altitude and mag arcsec⁻² per pixel — the sky *after* GAMBONS' atmospheric
@@ -52,8 +56,13 @@ redistributed, I would have the library fetch it from a URL you designate rather
 bundling it, which is how astrogo already handles IERS, JPL, VIIRS and CALSPEC data.
 
 I am happy to share what the implementation looks like, or to contribute anything useful
-back — the library already has a tested HEALPix implementation and the atmospheric
-scattering layer this would plug into.
+back. The library already has a tested HEALPix implementation, the atmospheric scattering
+layer this would plug into, and the diffuse-galactic-light relation of Kawara et al. (2017)
+that your Eq. 13–14 uses — so if it is easier to supply only the integrated starlight
+component rather than the combined map, that would be equally useful.
+
+I note your invitation on the mailing list to get in touch with any questions, which is what
+prompted me to write.
 
 Thank you for making GAMBONS available, and for considering this.
 
@@ -71,6 +80,12 @@ https://github.com/TuSKan/astrogo
   so — but it returns the propagated sky (az, alt, mag arcsec⁻²), not the extra-atmospheric
   map. Without saying this up front, the natural answer is "just use the download button",
   and a second email is needed to explain why that does not work.
+- **Ask for the current data explicitly.** Their EDR3 announcement records a DR2-era bug
+  that underestimated integrated starlight, worst in the Milky Way. Naming it shows you have
+  followed the project and rules out being sent an old table.
+- **Offer the narrower ask as a fallback.** With Kawara's DGL relation now implemented and
+  the EBL a single constant, only the integrated starlight is genuinely needed. Saying so
+  gives them a smaller thing to say yes to.
 - **Ask only for what is needed.** The extra-atmospheric map, not the full standalone model.
   It is a smaller favour, and it is genuinely what astrogo needs.
 - **Offer the validation.** Saying you intend to check astrogo against their published tool
