@@ -1,8 +1,10 @@
 package fits
 
 import (
+	"encoding/binary"
 	"fmt"
 	"io"
+	"math"
 	"strconv"
 	"strings"
 
@@ -21,7 +23,148 @@ type BintableHDU struct {
 	RowSize int
 }
 
-// ReadBintable scaffolds the ingestion of BINTABLE payloads structurally translating them into Arrow schemas.
+// tformField is one parsed TFORMn: a repeat count and a FITS data-type code.
+type tformField struct {
+	repeat int
+	code   byte
+}
+
+// parseTForm splits a TFORM value such as "1E", "20A" or "J" into its repeat
+// count and type code. An absent count means one, per the FITS standard.
+func parseTForm(tform string) (tformField, error) {
+	t := strings.TrimSpace(tform)
+
+	i := 0
+	for i < len(t) && t[i] >= '0' && t[i] <= '9' {
+		i++
+	}
+
+	repeat := 1
+
+	if i > 0 {
+		n, err := strconv.Atoi(t[:i])
+		if err != nil {
+			return tformField{}, fmt.Errorf("%w: repeat count in %q", ErrBadTForm, tform)
+		}
+
+		repeat = n
+	}
+
+	if i >= len(t) {
+		return tformField{}, fmt.Errorf("%w: no type code in %q", ErrBadTForm, tform)
+	}
+
+	return tformField{repeat: repeat, code: t[i]}, nil
+}
+
+// width returns the byte width of one element of this field's type.
+func (f tformField) width() int {
+	switch f.code {
+	case 'L', 'B', 'A':
+		return 1
+	case 'I':
+		return 2
+	case 'J', 'E':
+		return 4
+	case 'K', 'D', 'C', 'P':
+		return 8
+	case 'M', 'Q':
+		return 16
+	default:
+		return 0
+	}
+}
+
+// size returns the field's total byte width within a row.
+func (f tformField) size() int {
+	if f.code == 'X' {
+		// A bit array: the repeat count is a number of bits.
+		return (f.repeat + 7) / 8
+	}
+
+	return f.repeat * f.width()
+}
+
+// arrowType maps the field to the Arrow type its values are decoded into.
+//
+// Only scalar columns are decoded — a repeat count above one on a numeric
+// type is a vector per row, which has no scalar equivalent. Those columns
+// keep their place in the schema as nulls so the column indices still line
+// up with the file, and reading one returns zeros rather than another
+// column's values.
+func (f tformField) arrowType() arrow.DataType {
+	if f.code == 'A' {
+		return arrow.BinaryTypes.String
+	}
+
+	if f.repeat != 1 {
+		return arrow.Null
+	}
+
+	switch f.code {
+	case 'L':
+		return arrow.FixedWidthTypes.Boolean
+	case 'B':
+		return arrow.PrimitiveTypes.Uint8
+	case 'I':
+		return arrow.PrimitiveTypes.Int16
+	case 'J':
+		return arrow.PrimitiveTypes.Int32
+	case 'K':
+		return arrow.PrimitiveTypes.Int64
+	case 'E':
+		return arrow.PrimitiveTypes.Float32
+	case 'D':
+		return arrow.PrimitiveTypes.Float64
+	default:
+		return arrow.Null
+	}
+}
+
+// appendValue decodes one field from a row and appends it to its builder.
+//
+// FITS binary tables are big-endian regardless of the host, which is why the
+// bytes are assembled explicitly rather than cast.
+func (f tformField) appendValue(bldr array.Builder, row []byte) {
+	switch b := bldr.(type) {
+	case *array.NullBuilder:
+		b.AppendNull()
+	case *array.StringBuilder:
+		b.Append(strings.TrimRightFunc(string(row[:f.repeat]), func(r rune) bool {
+			return r == ' ' || r == 0
+		}))
+	case *array.BooleanBuilder:
+		b.Append(row[0] == 'T')
+	case *array.Uint8Builder:
+		b.Append(row[0])
+	case *array.Int16Builder:
+		// FITS stores signed integers in two's complement, so this is a
+		// reinterpretation of the same bits rather than a range conversion.
+		b.Append(int16(binary.BigEndian.Uint16(row))) //nolint:gosec // two's-complement reinterpretation
+	case *array.Int32Builder:
+		b.Append(int32(binary.BigEndian.Uint32(row))) //nolint:gosec // two's-complement reinterpretation
+	case *array.Int64Builder:
+		b.Append(int64(binary.BigEndian.Uint64(row))) //nolint:gosec // two's-complement reinterpretation
+	case *array.Float32Builder:
+		b.Append(math.Float32frombits(binary.BigEndian.Uint32(row)))
+	case *array.Float64Builder:
+		b.Append(math.Float64frombits(binary.BigEndian.Uint64(row)))
+	default:
+		bldr.AppendNull()
+	}
+}
+
+// ReadBintable reads a FITS BINTABLE extension into an Arrow record batch.
+//
+// The payload is row-major and big-endian: each row is NAXIS1 bytes holding
+// TFIELDS fields laid out consecutively, each sized by its TFORM. Decoding it
+// means walking the rows and transposing into per-column builders.
+//
+// Scaling keywords (TSCALn, TZEROn) and variable-length arrays (the P and Q
+// descriptors) are not applied; a column declaring them decodes to its raw
+// stored values. Columns whose TFORM has a repeat count above one are vectors
+// per row and are kept as null columns rather than being flattened, so a
+// caller never receives one column's numbers under another column's name.
 func ReadBintable(h *Header, r io.Reader) (*BintableHDU, error) {
 	tfields, err := h.GetInt("TFIELDS")
 	if err != nil {
@@ -43,64 +186,72 @@ func ReadBintable(h *Header, r io.Reader) (*BintableHDU, error) {
 	}
 
 	fields := make([]arrow.Field, tfields)
-	for i := 1; i <= tfields; i++ {
-		ttype, _ := h.GetString(fmt.Sprintf("TTYPE%d", i))
-		tform, _ := h.GetString(fmt.Sprintf("TFORM%d", i))
+	parsed := make([]tformField, tfields)
+	offsets := make([]int, tfields)
 
-		// Basic mapper matching FITS Data types to Arrow standard datatypes
-		tform = strings.TrimSpace(tform)
+	offset := 0
 
-		var dt arrow.DataType
+	for i := range tfields {
+		ttype, _ := h.GetString(fmt.Sprintf("TTYPE%d", i+1))
+		tform, _ := h.GetString(fmt.Sprintf("TFORM%d", i+1))
 
-		switch {
-		case strings.HasSuffix(tform, "J"): // 32-bit int
-			dt = arrow.PrimitiveTypes.Int32
-		case strings.HasSuffix(tform, "K"): // 64-bit int
-			dt = arrow.PrimitiveTypes.Int64
-		case strings.HasSuffix(tform, "E"): // float32
-			dt = arrow.PrimitiveTypes.Float32
-		case strings.HasSuffix(tform, "D"): // float64
-			dt = arrow.PrimitiveTypes.Float64
-		case strings.Contains(tform, "A"): // Characters
-			dt = arrow.BinaryTypes.String
-		default:
-			dt = arrow.PrimitiveTypes.Float64 // Fallback
+		field, err := parseTForm(tform)
+		if err != nil {
+			return nil, fmt.Errorf("column %d: %w", i+1, err)
 		}
 
-		fields[i-1] = arrow.Field{Name: ttype, Type: dt}
+		// FITS pads string values out to the width of their card, so a
+		// column arrives as "WAVELENGTH " rather than "WAVELENGTH".
+		name := strings.TrimSpace(ttype)
+		if name == "" {
+			name = fmt.Sprintf("COL%d", i+1)
+		}
+
+		parsed[i] = field
+		offsets[i] = offset
+		fields[i] = arrow.Field{Name: name, Type: field.arrowType(), Nullable: true}
+
+		offset += field.size()
 	}
 
-	schema := arrow.NewSchema(fields, nil)
-	mem := memory.NewGoAllocator()
+	if offset != rowSize {
+		return nil, fmt.Errorf("%w: TFORM widths sum to %d bytes, NAXIS1 declares %d",
+			ErrBadTForm, offset, rowSize)
+	}
 
-	bldr := array.NewRecordBuilder(mem, schema)
+	payload := make([]byte, int64(rowSize)*int64(rows))
+	if _, err := io.ReadFull(r, payload); err != nil {
+		return nil, fmt.Errorf("failed reading bintable payload: %w", err)
+	}
+
+	bldr := array.NewRecordBuilder(memory.NewGoAllocator(), arrow.NewSchema(fields, nil))
 	defer bldr.Release()
 
-	// Constructing columns from row-based binary buffers requires traversing the chunk stream.
-	// For P1 prototype scaffolding we build out empty RecordBatches.
-	bldr.Reserve(rows)
+	for row := range rows {
+		base := row * rowSize
+		for i := range tfields {
+			at := base + offsets[i]
+			parsed[i].appendValue(bldr.Field(i), payload[at:at+parsed[i].size()])
+		}
+	}
+
 	hdu.Batch = bldr.NewRecordBatch()
 
-	// Consume entire payload exactly to advance stream
-	totalPayloadBytes := int64(rowSize) * int64(rows)
-
+	// A heap-allocated PCOUNT area follows the table proper, and the whole
+	// extension is padded out to a block boundary.
 	pcount, err := h.GetInt("PCOUNT")
-	if err == nil {
-		totalPayloadBytes += int64(pcount)
+	if err != nil {
+		pcount = 0
 	}
 
-	// Just read out the bytes and toss them to skip
-	skipBuf := make([]byte, totalPayloadBytes)
-	if _, err := io.ReadFull(r, skipBuf); err != nil {
-		return nil, fmt.Errorf("failed allocating/reading bintable payload: %w", err)
+	consumed := int64(rowSize)*int64(rows) + int64(pcount)
+
+	if _, err := io.CopyN(io.Discard, r, int64(pcount)); err != nil {
+		return nil, fmt.Errorf("failed reading bintable heap: %w", err)
 	}
 
-	paddingBytes := int(totalPayloadBytes) % BlockSize
-	if paddingBytes != 0 {
-		padLen := BlockSize - paddingBytes
-
-		padBuf := make([]byte, padLen)
-		if _, err := io.ReadFull(r, padBuf); err != nil {
+	if pad := consumed % int64(BlockSize); pad != 0 {
+		if _, err := io.CopyN(io.Discard, r, int64(BlockSize)-pad); err != nil {
 			return nil, fmt.Errorf("failed reading bintable padding: %w", err)
 		}
 	}

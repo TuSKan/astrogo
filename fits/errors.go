@@ -4,6 +4,10 @@ import "errors"
 
 // Sentinel errors for FITS operations.
 var (
+	// ErrBadTForm indicates a binary-table column declares a TFORM this
+	// reader cannot lay out, or that the column widths disagree with the
+	// declared row length.
+	ErrBadTForm = errors.New("fits: unusable TFORM")
 	// ErrUninitBatch indicates a bintable batch was used before initialization.
 	ErrUninitBatch = errors.New("fits: uninitialized bintable batch")
 	// ErrColumnNotFound indicates a requested column does not exist.

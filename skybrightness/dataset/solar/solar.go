@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"strings"
 
 	"github.com/apache/arrow-go/v18/arrow/array"
 
@@ -215,15 +216,29 @@ func columns(f *fits.File) ([]float64, []float64, error) {
 
 // floatColumn reads one named column as float64, whatever width it was
 // stored at.
+//
+// The name is matched on its trimmed, case-folded form. FITS pads a string
+// value out to the width its TFORM declares, so CALSPEC's columns arrive as
+// "WAVELENGTH " and "FLUX    " — an exact-match lookup finds neither, and the
+// file then looks like one that carries no spectrum at all. That is the same
+// mistake as reading the Gaia archive's lowercased column names against a
+// caller's own casing, and it is invisible until a real file is parsed.
 func floatColumn(table *fits.BintableHDU, name string) []float64 {
-	schema := table.Batch.Schema()
+	index := -1
 
-	idx := schema.FieldIndices(name)
-	if len(idx) == 0 {
+	for i, field := range table.Batch.Schema().Fields() {
+		if strings.EqualFold(strings.TrimSpace(field.Name), name) {
+			index = i
+
+			break
+		}
+	}
+
+	if index < 0 {
 		return nil
 	}
 
-	switch col := table.Batch.Column(idx[0]).(type) {
+	switch col := table.Batch.Column(index).(type) {
 	case *array.Float64:
 		out := make([]float64, col.Len())
 		for i := range out {
