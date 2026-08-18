@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/TuSKan/astrogo/angle"
+	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	astrotime "github.com/TuSKan/astrogo/time"
@@ -399,5 +400,187 @@ func (a *Airglow) Provenance() Provenance {
 		},
 		ExpectedAccuracy: "Dominated by the zenith spectrum's own provenance rather than " +
 			"by the geometry.",
+	}
+}
+
+// ── Integrated starlight ────────────────────────────────────────────────────
+
+// ErrNoStarMap is returned when a starlight component is built without one.
+var ErrNoStarMap = errors.New("skybrightness: integrated starlight needs a sky map")
+
+// StarMap samples band-integrated extra-atmospheric radiance by direction.
+//
+// The values are outside the atmosphere: attenuating them is the component's
+// job, not the map's, because the same map serves every site and airmass.
+type StarMap interface {
+	// RadianceAt returns W m^-2 sr^-1 in the map's own frame.
+	RadianceAt(lon, lat angle.Angle) (float64, error)
+
+	// Galactic reports whether the map is indexed in galactic coordinates.
+	// An ICRS map returns false. Reading one as the other rotates the Milky
+	// Way across the sky and still returns plausible numbers everywhere,
+	// which is why the map carries the answer rather than the caller.
+	Galactic() bool
+}
+
+// IntegratedStarlight is the [Component] for the summed light of resolved and
+// unresolved stars, attenuated on its way to the observer.
+//
+// # Direct attenuation only
+//
+// Masana et al. (2021) Eq. 8 splits the observed radiance into a directly
+// attenuated term and a scattered term, and this implements the first:
+//
+//	L_obs = L_0 * T(lambda, z)
+//
+// The scattered term returns to the line of sight some of what extinction
+// removed, and for a source that fills the sky the two partly cancel. Omitting
+// it therefore **overstates** the dimming toward the horizon — Masana et al.
+// put the difference between their full and simplified scattering at under
+// 0.1 mag arcsec^-2. Every result carries [ExtrapolatedModel] past 60 degrees
+// from the zenith to say where that matters.
+//
+// A value is safe for concurrent use.
+type IntegratedStarlight struct {
+	sky   StarMap
+	shape []float64
+
+	frame frameCache
+}
+
+// NewIntegratedStarlight builds the component over a sky map and a spectral
+// shape.
+//
+// A published starlight map is band-integrated, so spreading it across
+// wavelengths needs an assumed spectrum: integrated starlight is the summed
+// light of stars of every type, and no single blackbody is right. shape gives
+// the relative spectral radiance per grid point, normalised however the
+// caller likes — only its shape matters, since it is rescaled to reproduce
+// the map's band value.
+func NewIntegratedStarlight(sky StarMap, shape []float64) (*IntegratedStarlight, error) {
+	if sky == nil {
+		return nil, ErrNoStarMap
+	}
+
+	if len(shape) == 0 {
+		return nil, fmt.Errorf("%w: no spectral shape", ErrNoStarMap)
+	}
+
+	var total float64
+
+	for _, v := range shape {
+		if v < 0 {
+			return nil, fmt.Errorf("%w: negative spectral shape", ErrNoStarMap)
+		}
+
+		total += v
+	}
+
+	if total <= 0 {
+		return nil, fmt.Errorf("%w: spectral shape sums to zero", ErrNoStarMap)
+	}
+
+	return &IntegratedStarlight{sky: sky, shape: append([]float64(nil), shape...)}, nil
+}
+
+// ID implements [Component].
+func (s *IntegratedStarlight) ID() ComponentID { return Starlight }
+
+// AddRadiance implements [Component].
+func (s *IntegratedStarlight) AddRadiance(
+	_ context.Context,
+	dst SpectralRadiance,
+	grid unit.SpectralGrid,
+	dir coord.AltAz,
+	scene *Scene,
+) (Flag, error) {
+	if dir.Alt() <= 0 {
+		return 0, nil
+	}
+
+	if len(s.shape) != grid.Len() {
+		return 0, fmt.Errorf("%w: shape has %d values, grid has %d",
+			ErrNoStarMap, len(s.shape), grid.Len())
+	}
+
+	frame, err := s.frame.get(scene)
+	if err != nil {
+		return 0, err
+	}
+
+	icrs, err := frame.ctx.AltAzToICRS(dir)
+	if err != nil {
+		return 0, fmt.Errorf("skybrightness: starlight: direction: %w", err)
+	}
+
+	lon, lat := icrs.RA(), icrs.Dec()
+	if s.sky.Galactic() {
+		g := coord.ICRSToGalactic(icrs)
+		lon, lat = g.L(), g.B()
+	}
+
+	band, err := s.sky.RadianceAt(lon, lat)
+	if err != nil || band <= 0 {
+		return UnknownCloud, nil //nolint:nilerr // absence of map coverage is not a failure
+	}
+
+	airmass, err := atmosphere.Airmass(dir.Alt())
+	if err != nil {
+		return 0, fmt.Errorf("skybrightness: starlight: airmass: %w", err)
+	}
+
+	flags := Flag(0)
+	if dir.Alt().Degrees() < 30 {
+		flags |= ExtrapolatedModel
+	}
+
+	pressure, _ := scene.Atmosphere.Surface()
+	aerosol := scene.Atmosphere.Aerosol()
+
+	// The shape is rescaled so its band integral reproduces the map's value,
+	// then each wavelength is attenuated by its own optical depth.
+	var norm float64
+
+	for i := range grid.Len() {
+		norm += s.shape[i]
+	}
+
+	for i := range dst {
+		lambda := grid.At(i)
+
+		rayleigh, err := atmosphere.RayleighOpticalDepth(lambda, float64(pressure))
+		if err != nil {
+			return 0, fmt.Errorf("skybrightness: starlight: %w", err)
+		}
+
+		slant := (rayleigh + unit.OpticalDepth(aerosol.TauAt(lambda))) * unit.OpticalDepth(airmass)
+
+		dst[i] += band * s.shape[i] / norm * float64(atmosphere.Transmission(slant))
+	}
+
+	return flags, nil
+}
+
+// Provenance implements [Component].
+func (s *IntegratedStarlight) Provenance() Provenance {
+	return Provenance{
+		Model:            "tabulated extra-atmospheric starlight with direct attenuation",
+		PrimaryReference: "Masana, E. et al. (2021), MNRAS 501, 5443, Eq. 8",
+		SecondaryReferences: []string{
+			"Gaia Collaboration (2021), A&A 649, A1 (EDR3)",
+			"Leinert, Ch. et al. (1998), A&AS 127, 1, section 10",
+		},
+		Equations:      "L_obs = L_0 * exp(-tau * M(z))",
+		ValidityDomain: "Above the horizon; the direct term alone is reliable within about 60 degrees of the zenith",
+		KnownApproximations: []string{
+			"Only the directly attenuated term of Masana et al. Eq. 8 is applied. " +
+				"The scattered term returns some of the extinguished light to the " +
+				"line of sight, so this overstates the dimming toward the horizon.",
+			"The band value is spread across wavelengths by a caller-supplied " +
+				"spectral shape, since integrated starlight has no single one.",
+			"Whatever the supplied map omits — bright stars, faint completion, " +
+				"colour imputation — is omitted here too.",
+		},
+		ExpectedAccuracy: "Dominated by the map's own provenance.",
 	}
 }

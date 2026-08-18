@@ -37,6 +37,7 @@ import (
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
+	"github.com/TuSKan/astrogo/skybrightness"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -414,3 +415,32 @@ func (s SpectralShape) Scale() ([]float64, error) {
 
 	return out, nil
 }
+
+// bandView adapts one band of a Map to [skybrightness.StarMap].
+type bandView struct {
+	m    *Map
+	band string
+}
+
+// Band exposes one band of a map as a [skybrightness.StarMap], ready for
+// [skybrightness.NewIntegratedStarlight].
+//
+// The frame travels with it, so the component knows whether to convert a
+// viewing direction to galactic coordinates or leave it in ICRS — reading one
+// as the other rotates the Milky Way across the sky while still returning
+// plausible numbers everywhere.
+func (m *Map) Band(name string) (skybrightness.StarMap, error) {
+	if _, ok := m.bands[name]; !ok {
+		return nil, fmt.Errorf("%w: %q", ErrBand, name)
+	}
+
+	return bandView{m: m, band: name}, nil
+}
+
+// RadianceAt implements [skybrightness.StarMap].
+func (b bandView) RadianceAt(lon, lat angle.Angle) (float64, error) {
+	return b.m.RadianceAt(b.band, lon, lat)
+}
+
+// Galactic implements [skybrightness.StarMap].
+func (b bandView) Galactic() bool { return b.m.frame == Galactic }

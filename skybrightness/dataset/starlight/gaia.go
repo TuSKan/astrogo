@@ -83,13 +83,6 @@ type GaiaBand struct {
 	// depends on colour.
 	ColourTerm []float64
 
-	// DefaultColour stands in for the 300 million-odd faint sources with no
-	// BP-RP measurement. Masana et al. use the mean colour of the
-	// surrounding area; a single value here is coarser, and the count of
-	// affected sources is reported per pixel so a caller can judge the
-	// damage.
-	DefaultColour float64
-
 	// FluxToRadiance converts one unit of the archive's flux — e-/s, as
 	// phot_g_mean_flux reports — into W m^-2, before the pixel solid angle
 	// is divided out. It carries the band's zero point and the photometric
@@ -111,12 +104,21 @@ func (b GaiaBand) validate() error {
 }
 
 // expression renders the band's per-star flux as ADQL.
+//
+// Sources without a BP-RP colour make the polynomial null, so SQL drops them
+// from the sum. That is deliberate rather than merely tolerated: the archive's
+// ADQL parser rejects both COALESCE and CASE, so there is no way to substitute
+// a default colour inside the aggregate, and inventing one outside it would be
+// worse than excluding them.
+//
+// The cost is small and measurable. Colourless sources are the faintest few
+// per cent of the catalogue — roughly 1 per cent of a typical pixel's count,
+// and less of its flux, since flux is dominated by bright stars. Both counts
+// come back per pixel so a caller can see exactly what was dropped.
 func (b GaiaBand) expression() string {
 	if len(b.ColourTerm) == 0 {
 		return "SUM(phot_g_mean_flux)"
 	}
-
-	colour := fmt.Sprintf("COALESCE(bp_rp,%g)", b.DefaultColour)
 
 	var poly strings.Builder
 
@@ -128,7 +130,7 @@ func (b GaiaBand) expression() string {
 		fmt.Fprintf(&poly, "%g", c)
 
 		for range i {
-			poly.WriteString("*" + colour)
+			poly.WriteString("*bp_rp")
 		}
 	}
 
@@ -179,14 +181,20 @@ func (g GaiaBuild) ADQL(firstPixel, lastPixel int64) (string, error) {
 		fmt.Fprintf(&columns, ", %s AS %s", b.expression(), columnName(b.Name))
 	}
 
+	// Two things here are dictated by what the archive's ADQL parser accepts,
+	// both learned by having a query rejected:
+	//
+	//   - GROUP BY takes the select-list alias, not the expression. Repeating
+	//     source_id/N there is a parse error, not merely redundant.
+	//   - COUNT(bp_rp) counts the non-null colours, so COUNT(*) minus it gives
+	//     the sources a transformed band drops. A CASE expression would say
+	//     that more directly and is rejected, as is COALESCE.
 	return fmt.Sprintf(
-		"SELECT source_id/%d AS hpx, COUNT(*) AS n, "+
-			"SUM(CASE WHEN bp_rp IS NULL THEN 1 ELSE 0 END) AS nocolour%s "+
+		"SELECT source_id/%d AS hpx, COUNT(*) AS n, COUNT(bp_rp) AS ncolour%s "+
 			"FROM gaiadr3.gaia_source "+
-			"WHERE source_id BETWEEN %d AND %d GROUP BY source_id/%d",
+			"WHERE source_id BETWEEN %d AND %d GROUP BY hpx",
 		divisor, columns.String(),
 		firstPixel*divisor, (lastPixel+1)*divisor-1,
-		divisor,
 	), nil
 }
 
@@ -245,11 +253,11 @@ func columnName(name string) string {
 // method and the part that needs the catalogue.
 //
 // It does not add the bright stars Gaia omits, which Masana et al. take from
-// Hipparcos and which carry disproportionate weight; it does not use the
-// local mean colour for sources without BP-RP, only [GaiaBand.DefaultColour];
-// and it does not add the faint-star completion below G = 20 that Masana et
-// al. draw from the Besancon model, worth under 3 per cent away from the
-// galactic plane. A map built here is therefore a floor, not a replacement,
+// Hipparcos and which carry disproportionate weight; it drops sources with no
+// BP-RP colour from transformed bands rather than imputing one, where Masana
+// et al. use the local mean; and it does not add the faint-star completion
+// below G = 20 that Masana et al. draw from the Besancon model, worth under
+// 3 per cent away from the galactic plane. A map built here is therefore a floor, not a replacement,
 // and the per-pixel counts are returned so those gaps can be assessed.
 //
 // Masana et al. shipped a bug in their own DR2 aggregation that
@@ -302,6 +310,45 @@ func BuildFromGaia(ctx context.Context, build GaiaBuild) (*Map, []int64, error) 
 	}
 
 	m.Source = fmt.Sprintf("gaiadr3.gaia_source aggregated at HEALPix order %d", build.Order)
+
+	return m, counts, nil
+}
+
+// RunChunk aggregates a single range of pixels, for callers who want to
+// inspect one chunk rather than build a whole sky — and for the network test
+// that proves the archive accepts the query this package generates.
+//
+// The returned map covers the full sphere at the build's order with only the
+// requested pixels populated, so it is a probe rather than a usable sky.
+func RunChunk(ctx context.Context, build GaiaBuild, first, last int64) (*Map, []int64, error) {
+	build, err := build.withDefaults()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	npix := pixelsPerOrder(build.Order)
+	solidAngle := 4 * math.Pi / float64(npix)
+
+	bands := make(map[string][]float64, len(build.Bands))
+	for _, b := range build.Bands {
+		bands[b.Name] = make([]float64, npix)
+	}
+
+	counts := make([]int64, npix)
+
+	client, err := api.NewClient(remote.GaiaTAP)
+	if err != nil {
+		return nil, nil, fmt.Errorf("starlight: gaia client: %w", err)
+	}
+
+	if err := build.fetchChunk(ctx, client, first, last, bands, counts, solidAngle); err != nil {
+		return nil, nil, err
+	}
+
+	m, err := NewMap(ICRS, bands)
+	if err != nil {
+		return nil, nil, err
+	}
 
 	return m, counts, nil
 }
@@ -375,7 +422,9 @@ func (g GaiaBuild) accumulate(
 		}
 
 		for _, b := range g.Bands {
-			i, ok := index[columnName(b.Name)]
+			// The archive returns its column names lowercased, and the index
+			// is built that way, so the lookup has to match.
+			i, ok := index[strings.ToLower(columnName(b.Name))]
 			if !ok {
 				return fmt.Errorf("%w: no column for band %q", ErrGaiaResponse, b.Name)
 			}

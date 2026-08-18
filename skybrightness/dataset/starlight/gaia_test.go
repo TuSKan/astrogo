@@ -77,7 +77,6 @@ func TestGaiaADQLAppliesColourPerStar(t *testing.T) {
 	band := starlight.GaiaBand{
 		Name:           "V",
 		ColourTerm:     []float64{0.02, 0.007, 0.17},
-		DefaultColour:  0.8,
 		FluxToRadiance: 1e-18,
 	}
 
@@ -92,21 +91,31 @@ func TestGaiaADQLAppliesColourPerStar(t *testing.T) {
 	}
 
 	// Every order of the polynomial must appear.
-	for _, want := range []string{"0.02", "0.007*COALESCE(bp_rp,0.8)", "0.17*COALESCE(bp_rp,0.8)*COALESCE(bp_rp,0.8)"} {
+	for _, want := range []string{"0.02", "0.007*bp_rp", "0.17*bp_rp*bp_rp"} {
 		if !strings.Contains(adql, want) {
 			t.Errorf("missing %q from the polynomial:\n%s", want, adql)
 		}
 	}
 
-	// Sources with no colour must fall back rather than vanish.
-	if !strings.Contains(adql, "COALESCE(bp_rp,0.8)") {
-		t.Errorf("sources without BP-RP must fall back to the default colour:\n%s", adql)
+	// The archive rejects COALESCE alongside CASE, so a transformed band
+	// cannot substitute a default colour inside the aggregate. Sources
+	// without BP-RP make the polynomial null and SQL drops them, which is
+	// why their count is reported separately.
+	if strings.Contains(adql, "COALESCE") {
+		t.Errorf("the archive rejects COALESCE with a 400:\n%s", adql)
 	}
 
-	// And the count of those sources must be reported, so a caller can see
-	// how much of a pixel rests on the fallback.
-	if !strings.Contains(adql, "bp_rp IS NULL") {
-		t.Errorf("the colourless-source count must be reported:\n%s", adql)
+	// And the count of those sources must be recoverable, so a caller can see
+	// how much of a pixel rests on the fallback. COUNT(bp_rp) counts the
+	// non-null colours; the archive's ADQL parser rejects a CASE expression
+	// with an HTTP 400, which is why it is written this way rather than more
+	// directly.
+	if !strings.Contains(adql, "COUNT(bp_rp) AS ncolour") {
+		t.Errorf("the colour count must be reported: %s", adql)
+	}
+
+	if strings.Contains(adql, "CASE") {
+		t.Errorf("the archive rejects CASE expressions with a 400: %s", adql)
 	}
 }
 

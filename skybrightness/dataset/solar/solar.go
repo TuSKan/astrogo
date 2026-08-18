@@ -22,7 +22,9 @@ import (
 	"github.com/apache/arrow-go/v18/arrow/array"
 
 	"github.com/TuSKan/astrogo/fits"
+	"github.com/TuSKan/astrogo/magnitude"
 	"github.com/TuSKan/astrogo/remote"
+	"github.com/TuSKan/astrogo/skybrightness"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -239,4 +241,36 @@ func floatColumn(table *fits.BintableHDU, name string) []float64 {
 	default:
 		return nil
 	}
+}
+
+// NewScatteredMoonlight fetches the CALSPEC solar reference and builds a
+// moonlight component with it.
+//
+// This is the convenience path: [skybrightness.NewScatteredMoonlight] takes
+// the spectrum as an argument because the engine performs no I/O, and this
+// supplies it from the reference GAMBONS also uses. A caller with their own
+// solar spectrum — a different CALSPEC revision, a measured one, an
+// instrument's own calibration chain — constructs the component directly
+// instead.
+//
+// The download is consent-gated like every other bulk fetch; see [Open].
+func NewScatteredMoonlight(ctx context.Context) (*skybrightness.ScatteredMoonlight, error) {
+	spectrum, err := Open(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	bands := magnitude.ROLOBands()
+
+	sampled := make([]float64, len(bands))
+	if err := spectrum.Resample(sampled, bands); err != nil {
+		return nil, fmt.Errorf("solar: sample onto the ROLO bands: %w", err)
+	}
+
+	m, err := skybrightness.NewScatteredMoonlight(sampled)
+	if err != nil {
+		return nil, fmt.Errorf("solar: build moonlight component: %w", err)
+	}
+
+	return m, nil
 }
