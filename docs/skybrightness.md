@@ -711,6 +711,27 @@ drops it; the archive rejects both `CASE` and `COALESCE`, so no default can be s
 in the query. Each pixel therefore reports two counts — total sources and sources with a
 colour — so the exclusion is visible rather than assumed small.
 
+**The map, measured.** A full order-8 build over all 786,432 pixels aggregated
+1,811,709,771 sources — Gaia DR3's entire catalogue, which is what proves the chunks
+tile the sky exactly rather than overlapping or leaving gaps. It took 38 minutes over
+787 queries and left no pixel empty. Binned by galactic latitude:
+
+| \|b\| | mag arcsec⁻² |
+| :--- | :--- |
+| 0–15° | 21.01 |
+| 15–30° | 22.06 |
+| 30–45° | 22.29 |
+| 45–60° | 22.34 |
+| 60–75° | 23.19 |
+| 75–90° | 23.48 |
+
+The polar value lands on the ~23.5 that Masana et al. and Leinert et al. give for
+high-latitude integrated starlight, with nothing tuned to put it there, and the sky spans
+6.2 magnitudes between its 1st and 99th percentile pixels. That contrast is also the
+sharpest available test of the frame: mislabelling an ICRS map as galactic does not dim
+the plane, it moves it, so the plane and the cap would come out alike while every value
+stayed positive and every direction stayed covered.
+
 **Known limitations.**
 
 - The scattered term of Eq. 8 is not modelled. It returns to the line of sight some of

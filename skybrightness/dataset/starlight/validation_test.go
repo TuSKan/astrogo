@@ -9,6 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/TuSKan/astrogo/angle"
+	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/skybrightness/dataset/starlight"
 )
 
@@ -96,5 +98,122 @@ func TestGaiaMapMatchesThePublishedSurfaceBrightness(t *testing.T) {
 	// zero-point or unit error would miss by far more than that.
 	if mag < 22.5 || mag > 24.5 {
 		t.Errorf("integrated starlight is %.2f mag arcsec^-2, want 23.5 within a magnitude", mag)
+	}
+}
+
+// runOf finds a run of n consecutive pixels whose centres all satisfy want,
+// so a targeted query can sample one part of the sky without aggregating the
+// whole of it.
+func runOf(t *testing.T, grid coord.HEALPix, n int, want func(b angle.Angle) bool) (first int64) {
+	t.Helper()
+
+	streak := int64(0)
+
+	for pixel := range grid.NumPixels() {
+		lon, lat, err := grid.Center(pixel)
+		if err != nil {
+			t.Fatalf("Center(%d): %v", pixel, err)
+		}
+
+		if want(coord.ICRSToGalactic(coord.NewICRS(lon, lat)).B()) {
+			streak++
+			if streak == int64(n) {
+				return pixel - int64(n) + 1
+			}
+
+			continue
+		}
+
+		streak = 0
+	}
+
+	t.Fatal("no run of pixels satisfied the latitude condition")
+
+	return 0
+}
+
+// The Milky Way has to be where the Milky Way is.
+//
+// Gaia indexes HEALPix in ICRS, and the map says so. Labelling it galactic
+// instead would rotate the plane across the sky — and because the map still
+// covers every direction and every value stays positive, nothing else here
+// would notice. The plane-to-cap contrast is what does: a frame swap does not
+// dim the plane, it moves it, so the two samples would come out alike.
+//
+// The full order-8 build puts the plane at 21.0 and the cap at 23.5
+// mag arcsec^-2. This samples sixteen pixels of each rather than 786,432, so
+// the bound is loose, but a washed-out contrast is unmissable.
+func TestGaiaMapPutsTheMilkyWayInThePlane(t *testing.T) {
+	//nolint:noctx // a reachability pre-check, not a request that should honour a deadline
+	if c, err := net.DialTimeout("tcp", "gea.esac.esa.int:443", 5*time.Second); err != nil {
+		t.Skipf("Gaia archive unreachable: %v", err)
+	} else {
+		_ = c.Close()
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+
+	build := starlight.GaiaBuild{
+		Order: 6,
+		Chunk: 16,
+		Bands: []starlight.GaiaBand{starlight.GaiaJohnsonV()},
+	}
+
+	// NewHEALPix takes nside, which is 2^order.
+	grid, err := coord.NewHEALPix(1 << 6)
+	if err != nil {
+		t.Fatalf("NewHEALPix: %v", err)
+	}
+
+	const run = 16
+
+	plane := runOf(t, grid, run, func(b angle.Angle) bool { return math.Abs(b.Degrees()) < 10 })
+	highLat := runOf(t, grid, run, func(b angle.Angle) bool { return math.Abs(b.Degrees()) > 60 })
+
+	sample := func(first int64) float64 {
+		m, _, err := starlight.RunChunk(ctx, build, first, first+run-1)
+		if err != nil {
+			t.Fatalf("RunChunk(%d): %v", first, err)
+		}
+
+		var total float64
+
+		var n int
+
+		for pixel := first; pixel <= first+run-1; pixel++ {
+			v, err := m.Pixel("V", pixel)
+			if err != nil {
+				t.Fatalf("Pixel(%d): %v", pixel, err)
+			}
+
+			if v > 0 {
+				total += v
+				n++
+			}
+		}
+
+		if n == 0 {
+			t.Fatalf("pixels %d-%d carried no flux", first, first+run-1)
+		}
+
+		return total / float64(n)
+	}
+
+	const (
+		vZeroFlux      = 3.63e-11
+		arcsec2PerSter = 4.254517e10
+	)
+
+	toMag := func(v float64) float64 { return -2.5 * math.Log10(v/(vZeroFlux*arcsec2PerSter)) }
+
+	planeMag, capMag := toMag(sample(plane)), toMag(sample(highLat))
+
+	t.Logf("plane (pixels %d+) %.2f, cap (pixels %d+) %.2f mag arcsec^-2",
+		plane, planeMag, highLat, capMag)
+
+	if capMag-planeMag < 1.0 {
+		t.Errorf("plane %.2f and cap %.2f differ by %.2f mag; the plane must be at least 1 mag brighter",
+			planeMag, capMag, capMag-planeMag)
 	}
 }
