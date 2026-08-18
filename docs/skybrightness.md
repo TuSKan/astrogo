@@ -647,16 +647,95 @@ cannot resolve individual lines and a band-averaged transmittance is not the ave
 monochromatic transmittances. A provider supplying O₂ must supply an already
 band-averaged effective cross section for the target grid and say so.
 
-### 11.4 Natural sky — GAMBONS
+### 11.4 Natural sky — integrated starlight
 
-Integrated starlight from Gaia, plus diffuse Galactic light, extragalactic background,
-zodiacal light and airglow, with atmospheric attenuation and scattering. Design detail is
-written when the component is implemented; the architectural requirements are already
-fixed: Gaia DR3 with spatial indexing rather than per-query iteration over sources, a
-documented error budget for every approximation, DGL as its own component rather than
-folded into a constant, EBL explicit with its own spectrum and uncertainty, zodiacal light
-directional rather than a single offset, and airglow with continuum and lines separated
-plus climatology/solar-adjusted/calibrated modes whose uncertainty propagates.
+**Goal.** The summed light of resolved and unresolved stars, as seen from the ground.
+
+**Scientific model.** Masana et al. (2021) Eq. 8 splits the observed radiance into a
+directly attenuated term and a scattered term. `IntegratedStarlight` implements the
+first:
+
+    L_obs(lambda) = L_0(lambda) * T(lambda, z)
+
+`L_0` is an extra-atmospheric map, `T` the line-of-sight transmission at that wavelength
+and airmass, built from `atmosphere.RayleighOpticalDepth` and the scene's aerosol.
+
+**Primary references.** Masana, E., Carrasco, J.M., Bará, S. & Ribas, S.J. (2021), MNRAS
+501, 5443 (GAMBONS); Riello, M. et al. (2021), A&A 649, A3 and the Gaia DR3 photometric
+documentation Table 5.7 for the G to V transformation; Górski, K.M. et al. (2005), ApJ
+622, 759 for the HEALPix indexing the map is built on.
+
+**Inputs.** A `StarMap` — passband-averaged extra-atmospheric spectral radiance by
+direction, in its own frame — a spectral shape, the spectral grid, and the passband the
+map's values are averaged over.
+
+**Why the passband is required.** The map holds one number per direction. Spreading it
+across wavelengths needs an assumed spectrum, and scaling that spectrum needs a
+definition of what "reproduces the map value" means. Dividing the shape by the sum of its
+samples is the obvious choice and is wrong: it makes the answer depend on the grid
+spacing, so refining the grid halves the starlight while every value stays positive and
+plausible. Dividing by the shape's average over the passband is exact and
+resolution-independent, and it is what `TestIntegratedStarlightIsIndependentOfGridResolution`
+holds in place.
+
+**Why the spectral shape is the caller's.** Integrated starlight is the summed light of
+stars of every spectral type, and no single blackbody is right. This is one of the two
+inputs the module refuses to guess; the other is the airglow zenith spectrum.
+
+**Why the frame travels with the map.** A galactic map read as equatorial rotates the
+Milky Way across the sky and still returns plausible numbers everywhere. `StarMap.Galactic`
+carries the answer so the component converts rather than assumes, and
+`TestIntegratedStarlightHonoursTheMapFrame` asserts the two frames are sampled at
+different coordinates.
+
+**The map: server-side Gaia aggregation.** A Gaia `source_id` carries its HEALPix index in
+the high bits, so `source_id / 2^(59-2k)` is the level-k nested pixel and the whole
+aggregation becomes a `GROUP BY` the archive performs. At order 8 — GAMBONS' grid,
+786,432 pixels — that is 787 chunked TAP queries of about two seconds each, against a bulk
+download of 600 GB across 1,097 files for the same result. `starlight.BuildFromGaia` does
+this; `starlight.GaiaJohnsonV` supplies the band.
+
+**Why the band is a constructor.** Converting Gaia G flux to Johnson V spectral flux
+density needs three published numbers from three sources: G's VEGAMAG zero point
+(25.6874), the G to V colour transformation, and Johnson V's own Vega zero point
+(3.63e-11 W m⁻² nm⁻¹). Using G's zero point with V's flux density and no colour term is
+the obvious mistake and produces a map that is neither a G map nor a V map, wrong by the
+colour of whatever mix of spectral types each pixel holds — plausible everywhere, worst
+along the Galactic plane where the ensemble is reddest. One constructor removes the
+opportunity.
+
+**Sources without a colour.** The transformation is applied per star inside the aggregate,
+because transforming a sum is not the same as summing transformations when the
+transformation depends on colour. A source with no BP-RP makes the polynomial null and SQL
+drops it; the archive rejects both `CASE` and `COALESCE`, so no default can be substituted
+in the query. Each pixel therefore reports two counts — total sources and sources with a
+colour — so the exclusion is visible rather than assumed small.
+
+**Known limitations.**
+
+- The scattered term of Eq. 8 is not modelled. It returns to the line of sight some of
+  what extinction removed, so attenuation alone **overstates** the dimming toward the
+  horizon. Masana et al. put the difference between their full and simplified scattering
+  at under 0.1 mag arcsec⁻², and every result below 30° altitude carries
+  `ExtrapolatedModel`.
+- The colour transformation is fitted for −0.5 < BP−RP < 5.0 and extrapolates outside it.
+- A direction the map does not cover returns nothing and flags it, rather than reading as
+  a dark sightline.
+
+**Equation → function → test.**
+
+| Equation | Go | Test |
+| :--- | :--- | :--- |
+| Masana Eq. 8, direct term | `IntegratedStarlight.AddRadiance` | `TestIntegratedStarlightDimsTowardTheHorizon`, `TestIntegratedStarlightReddens` |
+| Shape normalisation | `NewIntegratedStarlight` | `TestIntegratedStarlightReproducesTheMapValue`, `TestIntegratedStarlightIsIndependentOfGridResolution` |
+| `source_id / 2^(59−2k)` | `GaiaBuild.ADQL` | `TestGaiaADQLDivisor`, `TestGaiaQueryIsAcceptedByTheArchive` |
+| Riello Table 5.7, negated | `GaiaJohnsonV` | `TestGaiaJohnsonV`, `TestGaiaJohnsonVBrightensRedStars` |
+
+**Still outstanding for this section.** The extragalactic background light is not
+implemented and is not folded into anything else; it is a separate component with its own
+spectrum and uncertainty when its reference is settled. Airglow currently takes a
+caller-supplied zenith spectrum without separating continuum from lines, and without the
+climatology / solar-adjusted / calibrated modes the architecture calls for.
 
 ---
 
@@ -849,7 +928,7 @@ Nothing is optimised yet; that is Phase 8. The point is numbers before opinions.
 | :--- | :--- | :--- |
 | ROLO `c₁–c₄` at full precision | Nothing outright; caps Phase 3 accuracy | The display equation following "the eight constant 311g coefficients are", or the ASCII export of Table 5. |
 | Lunar orientation (IAU rotation elements or a JPL binary PCK) | The selenographic longitude of the Sun `Φ` and the libration angles `θ`, `φ`, which `magnitude.ROLOReflectance` therefore takes as inputs. Archinal et al. (2018) WGCCRE report, or PCK support in `ephemeris/jpl`, would close it. |
-| **Solar spectral irradiance at the 32 ROLO bands** | Absolute lunar irradiance. `magnitude.ROLOIrradiance` takes the solar spectrum as a parameter rather than picking a reference silently, since ROLO's absolute scale depends on that choice. |
+| ~~Solar spectral irradiance at the 32 ROLO bands~~ | **Resolved.** `skybrightness/dataset/solar` fetches the CALSPEC reference (`sun_reference_stis_002.fits`) and `solar.NewScatteredMoonlight` samples it onto the ROLO bands. `magnitude.ROLOIrradiance` still takes the spectrum as a parameter, since ROLO's absolute scale depends on the choice and the engine performs no I/O. |
 | O₃, O₂, H₂O absorption cross sections | Absorption is infrastructure-only until supplied | Serdyuchenko et al. (2014) ozone cross sections; HITRAN line lists band-averaged to the target grid for O₂ and H₂O. The machinery (`atmosphere.CrossSection`) is in place and tested. |
 | Jones et al. (2013) confirmation | Phase 3 framing | Confirm the A&A open-access text. |
 | Illumina-v2 product format | Phase 6 | A sample precomputed product and its dimension conventions. |
