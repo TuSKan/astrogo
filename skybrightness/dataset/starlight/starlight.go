@@ -38,7 +38,6 @@ import (
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/skybrightness"
-	"github.com/TuSKan/astrogo/unit"
 )
 
 // Sentinel errors for the starlight map.
@@ -356,64 +355,6 @@ func assemble(rows map[int64][]float64, names []string, nbands int, frame Frame)
 	}
 
 	return NewMap(frame, bands)
-}
-
-// SpectralShape spreads a band-integrated radiance across wavelengths.
-//
-// A published map gives one number per band. Turning that into the spectral
-// radiance this module's engine works in needs the spectral shape of the
-// light and the response of the band it was integrated over:
-//
-//	L_lambda(lambda) = L_band * S(lambda) / INT S(lambda) R(lambda) d lambda
-//
-// The shape's absolute scale cancels, so a normalised curve, a stellar
-// spectrum or a synthetic composite all work. What it cannot be is
-// "flat" by default: integrated starlight is the summed light of stars of
-// every spectral type, and assuming a shape is a real assumption that this
-// package makes the caller state.
-type SpectralShape struct {
-	// WavelengthNM is the common grid, ascending.
-	WavelengthNM []unit.WavelengthNM
-
-	// Shape is the relative spectral radiance, on any scale.
-	Shape []float64
-
-	// Response is the band's relative spectral response on the same grid.
-	Response []float64
-}
-
-// Scale returns the factor converting a band-integrated radiance in
-// W m^-2 sr^-1 into spectral radiance in W m^-2 sr^-1 nm^-1 at each grid
-// wavelength.
-func (s SpectralShape) Scale() ([]float64, error) {
-	n := len(s.WavelengthNM)
-	if n < 2 || len(s.Shape) != n || len(s.Response) != n {
-		return nil, fmt.Errorf("%w: %d wavelengths, %d shape, %d response",
-			ErrMapFormat, n, len(s.Shape), len(s.Response))
-	}
-
-	var overlap float64
-
-	for i := 1; i < n; i++ {
-		if s.WavelengthNM[i] <= s.WavelengthNM[i-1] {
-			return nil, fmt.Errorf("%w: wavelengths are not ascending at index %d", ErrMapFormat, i)
-		}
-
-		lo := s.Shape[i-1] * s.Response[i-1]
-		hi := s.Shape[i] * s.Response[i]
-		overlap += 0.5 * (lo + hi) * float64(s.WavelengthNM[i]-s.WavelengthNM[i-1])
-	}
-
-	if overlap <= 0 || math.IsNaN(overlap) {
-		return nil, fmt.Errorf("%w: shape and response overlap integrates to %g", ErrMapFormat, overlap)
-	}
-
-	out := make([]float64, n)
-	for i, v := range s.Shape {
-		out[i] = v / overlap
-	}
-
-	return out, nil
 }
 
 // bandView adapts one band of a Map to [skybrightness.StarMap].

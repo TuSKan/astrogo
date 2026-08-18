@@ -11,6 +11,7 @@ import (
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
+	"github.com/TuSKan/astrogo/magnitude"
 	astrotime "github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
@@ -408,12 +409,18 @@ func (a *Airglow) Provenance() Provenance {
 // ErrNoStarMap is returned when a starlight component is built without one.
 var ErrNoStarMap = errors.New("skybrightness: integrated starlight needs a sky map")
 
-// StarMap samples band-integrated extra-atmospheric radiance by direction.
+// StarMap samples extra-atmospheric starlight radiance by direction.
 //
 // The values are outside the atmosphere: attenuating them is the component's
 // job, not the map's, because the same map serves every site and airmass.
 type StarMap interface {
-	// RadianceAt returns W m^-2 sr^-1 in the map's own frame.
+	// RadianceAt returns the passband-averaged spectral radiance in the
+	// map's own frame, W m^-2 sr^-1 nm^-1 — the response-weighted mean the
+	// magnitude systems are defined against, which is what a zero point
+	// converts a summed catalogue flux into. The passband it averages over
+	// is the one handed to [NewIntegratedStarlight]; a map built for one
+	// band and read against another is a silent error this interface
+	// cannot catch.
 	RadianceAt(lon, lat angle.Angle) (float64, error)
 
 	// Galactic reports whether the map is indexed in galactic coordinates.
@@ -443,44 +450,72 @@ type StarMap interface {
 // A value is safe for concurrent use.
 type IntegratedStarlight struct {
 	sky   StarMap
-	shape []float64
+	shape []float64 // rescaled so its own passband average is exactly one
+	grid  unit.SpectralGrid
+	band  magnitude.Passband
 
 	frame frameCache
 }
 
+// starlightBandCoverage is the fraction of the passband the spectral grid
+// must span before the shape's average over it means anything. A grid
+// covering half the band averages the shape over the wrong support and
+// rescales it by the wrong factor, which is a quiet error rather than a
+// loud one, so the bar is set just short of complete.
+const starlightBandCoverage = 0.99
+
 // NewIntegratedStarlight builds the component over a sky map and a spectral
 // shape.
 //
-// A published starlight map is band-integrated, so spreading it across
+// A starlight map holds one number per direction, so spreading it across
 // wavelengths needs an assumed spectrum: integrated starlight is the summed
 // light of stars of every type, and no single blackbody is right. shape gives
 // the relative spectral radiance per grid point, normalised however the
-// caller likes — only its shape matters, since it is rescaled to reproduce
-// the map's band value.
-func NewIntegratedStarlight(sky StarMap, shape []float64) (*IntegratedStarlight, error) {
+// caller likes — only its shape matters.
+//
+// band is the passband the map's values are averaged over, and it is what
+// makes the rescaling exact. The shape is divided by its own passband
+// average, so the component adds a spectrum whose average over that same band
+// reproduces the map's number by construction. Normalising by the sum of the
+// samples instead would tie the answer to how finely the grid is sampled,
+// halving the starlight whenever the grid is refined.
+func NewIntegratedStarlight(
+	sky StarMap,
+	shape SpectralRadiance,
+	grid unit.SpectralGrid,
+	band magnitude.Passband,
+) (*IntegratedStarlight, error) {
 	if sky == nil {
 		return nil, ErrNoStarMap
 	}
 
-	if len(shape) == 0 {
-		return nil, fmt.Errorf("%w: no spectral shape", ErrNoStarMap)
+	if len(shape) != grid.Len() {
+		return nil, fmt.Errorf("%w: shape has %d values, grid has %d",
+			ErrNoStarMap, len(shape), grid.Len())
 	}
-
-	var total float64
 
 	for _, v := range shape {
 		if v < 0 {
 			return nil, fmt.Errorf("%w: negative spectral shape", ErrNoStarMap)
 		}
-
-		total += v
 	}
 
-	if total <= 0 {
-		return nil, fmt.Errorf("%w: spectral shape sums to zero", ErrNoStarMap)
+	mean, err := magnitude.MeanFluxDensity(shape, grid, band, starlightBandCoverage)
+	if err != nil {
+		return nil, fmt.Errorf("skybrightness: integrated starlight: %w", err)
 	}
 
-	return &IntegratedStarlight{sky: sky, shape: append([]float64(nil), shape...)}, nil
+	if mean <= 0 {
+		return nil, fmt.Errorf("%w: spectral shape averages to zero across %q",
+			ErrNoStarMap, band.Name)
+	}
+
+	norm := make([]float64, len(shape))
+	for i, v := range shape {
+		norm[i] = v / mean
+	}
+
+	return &IntegratedStarlight{sky: sky, shape: norm, grid: grid, band: band}, nil
 }
 
 // ID implements [Component].
@@ -498,9 +533,9 @@ func (s *IntegratedStarlight) AddRadiance(
 		return 0, nil
 	}
 
-	if len(s.shape) != grid.Len() {
-		return 0, fmt.Errorf("%w: shape has %d values, grid has %d",
-			ErrNoStarMap, len(s.shape), grid.Len())
+	if !s.grid.Equal(grid) {
+		return 0, fmt.Errorf("%w: component holds %v, asked for %v",
+			ErrNoStarMap, s.grid, grid)
 	}
 
 	frame, err := s.frame.get(scene)
@@ -519,8 +554,8 @@ func (s *IntegratedStarlight) AddRadiance(
 		lon, lat = g.L(), g.B()
 	}
 
-	band, err := s.sky.RadianceAt(lon, lat)
-	if err != nil || band <= 0 {
+	value, err := s.sky.RadianceAt(lon, lat)
+	if err != nil || value <= 0 {
 		return UnknownCloud, nil //nolint:nilerr // absence of map coverage is not a failure
 	}
 
@@ -537,14 +572,10 @@ func (s *IntegratedStarlight) AddRadiance(
 	pressure, _ := scene.Atmosphere.Surface()
 	aerosol := scene.Atmosphere.Aerosol()
 
-	// The shape is rescaled so its band integral reproduces the map's value,
-	// then each wavelength is attenuated by its own optical depth.
-	var norm float64
-
-	for i := range grid.Len() {
-		norm += s.shape[i]
-	}
-
+	// The shape already averages to one across the band, so scaling it by
+	// the map's value reproduces that value exactly. Each wavelength is then
+	// attenuated by its own optical depth, which is what makes the result
+	// redder than the map: extinction is steepest at the blue end.
 	for i := range dst {
 		lambda := grid.At(i)
 
@@ -555,7 +586,7 @@ func (s *IntegratedStarlight) AddRadiance(
 
 		slant := (rayleigh + unit.OpticalDepth(aerosol.TauAt(lambda))) * unit.OpticalDepth(airmass)
 
-		dst[i] += band * s.shape[i] / norm * float64(atmosphere.Transmission(slant))
+		dst[i] += value * s.shape[i] * float64(atmosphere.Transmission(slant))
 	}
 
 	return flags, nil

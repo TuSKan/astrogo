@@ -3,13 +3,11 @@ package starlight_test
 import (
 	"errors"
 	"fmt"
-	"math"
 	"strings"
 	"testing"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/skybrightness/dataset/starlight"
-	"github.com/TuSKan/astrogo/unit"
 )
 
 // tableFor renders a whole nside-1 map (12 pixels) as the plain text format
@@ -266,115 +264,6 @@ func TestNewMapCopiesInput(t *testing.T) {
 
 	if got, _ := m.Pixel("V", 3); got != 7 {
 		t.Errorf("pixel 3 = %v after mutating the caller's slice, want 7", got)
-	}
-}
-
-// A flat shape through a flat 100 nm response spreads a band radiance evenly:
-// 1 W m^-2 sr^-1 over 100 nm is 0.01 W m^-2 sr^-1 nm^-1.
-func TestSpectralShapeScale(t *testing.T) {
-	t.Parallel()
-
-	s := starlight.SpectralShape{
-		WavelengthNM: []unit.WavelengthNM{500, 600},
-		Shape:        []float64{1, 1},
-		Response:     []float64{1, 1},
-	}
-
-	scale, err := s.Scale()
-	if err != nil {
-		t.Fatalf("Scale: %v", err)
-	}
-
-	for i, got := range scale {
-		if want := 0.01; math.Abs(got-want) > 1e-12 {
-			t.Errorf("scale[%d] = %v, want %v", i, got, want)
-		}
-	}
-
-	// The shape's absolute scale must cancel against the overlap integral.
-	scaled := starlight.SpectralShape{
-		WavelengthNM: s.WavelengthNM,
-		Shape:        []float64{25, 25},
-		Response:     s.Response,
-	}
-
-	other, err := scaled.Scale()
-	if err != nil {
-		t.Fatalf("Scale: %v", err)
-	}
-
-	for i := range other {
-		if math.Abs(other[i]-scale[i]) > 1e-12 {
-			t.Errorf("a 25x shape gave scale[%d] = %v, want the same %v", i, other[i], scale[i])
-		}
-	}
-}
-
-// A narrower response concentrates the same band radiance into fewer
-// nanometres, so the spectral radiance must rise.
-func TestSpectralShapeNarrowerResponseIsBrighter(t *testing.T) {
-	t.Parallel()
-
-	wide := starlight.SpectralShape{
-		WavelengthNM: []unit.WavelengthNM{500, 600},
-		Shape:        []float64{1, 1},
-		Response:     []float64{1, 1},
-	}
-
-	narrow := starlight.SpectralShape{
-		WavelengthNM: []unit.WavelengthNM{500, 600},
-		Shape:        []float64{1, 1},
-		Response:     []float64{0.5, 0.5},
-	}
-
-	w, err := wide.Scale()
-	if err != nil {
-		t.Fatalf("Scale: %v", err)
-	}
-
-	n, err := narrow.Scale()
-	if err != nil {
-		t.Fatalf("Scale: %v", err)
-	}
-
-	if n[0] <= w[0] {
-		t.Errorf("halving the response gave %v, want more than %v", n[0], w[0])
-	}
-}
-
-func TestSpectralShapeRejectsBadInput(t *testing.T) {
-	t.Parallel()
-
-	cases := []struct {
-		name  string
-		shape starlight.SpectralShape
-	}{
-		{"empty", starlight.SpectralShape{}},
-		{"length mismatch", starlight.SpectralShape{
-			WavelengthNM: []unit.WavelengthNM{500, 600},
-			Shape:        []float64{1},
-			Response:     []float64{1, 1},
-		}},
-		{"descending", starlight.SpectralShape{
-			WavelengthNM: []unit.WavelengthNM{600, 500},
-			Shape:        []float64{1, 1},
-			Response:     []float64{1, 1},
-		}},
-		{"zero response", starlight.SpectralShape{
-			WavelengthNM: []unit.WavelengthNM{500, 600},
-			Shape:        []float64{1, 1},
-			Response:     []float64{0, 0},
-		}},
-	}
-
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-
-			if _, err := tc.shape.Scale(); !errors.Is(err, starlight.ErrMapFormat) {
-				t.Errorf("err = %v, want ErrMapFormat", err)
-			}
-		})
 	}
 }
 

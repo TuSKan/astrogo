@@ -84,9 +84,16 @@ type GaiaBand struct {
 	ColourTerm []float64
 
 	// FluxToRadiance converts one unit of the archive's flux — e-/s, as
-	// phot_g_mean_flux reports — into W m^-2, before the pixel solid angle
-	// is divided out. It carries the band's zero point and the photometric
-	// system, neither of which this package can supply.
+	// phot_g_mean_flux reports — into the passband-averaged spectral
+	// flux density W m^-2 nm^-1, before the pixel solid angle is divided
+	// out. It carries the band's zero point and the photometric system,
+	// neither of which this package can supply — for Gaia G on the Vega
+	// scale that is 3.63e-11 * 10^(-25.6874/2.5).
+	//
+	// Per nanometre, not integrated over the band: a zero point converts a
+	// flux into a mean flux density, and [skybrightness.NewIntegratedStarlight]
+	// consumes it as one. Mixing the two conventions changes the answer by
+	// the band width and is not otherwise visible.
 	FluxToRadiance float64
 }
 
@@ -436,5 +443,41 @@ func (g GaiaBuild) accumulate(
 
 			bands[b.Name][pixel] = flux * b.FluxToRadiance / solidAngle
 		}
+	}
+}
+
+// GaiaJohnsonV returns the Gaia G to Johnson V band, ready for [GaiaBuild].
+//
+// It exists because the conversion needs three published numbers that come
+// from three different places, and mixing them is invisible in the result:
+//
+//   - Gaia DR3's G-band VEGAMAG zero point, 25.6874, which turns
+//     phot_g_mean_flux in e-/s into a G magnitude.
+//   - The G to V colour transformation of Riello et al. (2021), Gaia DR3
+//     photometric documentation Table 5.7, entered here as G - V so the
+//     query's +0.4 exponent brightens a red star in V. It is the same
+//     polynomial as [magnitude.GaiaGToJohnsonV], negated.
+//   - Johnson V's Vega zero point, 3.63e-11 W m^-2 nm^-1, which turns that V
+//     magnitude into a spectral flux density.
+//
+// Using G's zero point with V's flux density and no colour term — the obvious
+// mistake — produces a map that is neither a G map nor a V map, and is wrong
+// by the colour term of whatever mix of spectral types the pixel holds. The
+// result is plausible everywhere and badly wrong along the Galactic plane,
+// where the ensemble is reddest.
+//
+// The transformation is fitted for -0.5 < BP-RP < 5.0. Sources with no colour
+// at all make the polynomial null and SQL drops them from the sum; their count
+// comes back per pixel so the caller can see how much of a pixel that is.
+func GaiaJohnsonV() GaiaBand {
+	const (
+		gZeroPoint = 25.6874 // Gaia DR3 G VEGAMAG zero point
+		vZeroFlux  = 3.63e-11
+	)
+
+	return GaiaBand{
+		Name:           "V",
+		ColourTerm:     []float64{0.02704, -0.01424, 0.2156, -0.01426},
+		FluxToRadiance: vZeroFlux / math.Pow(10, gZeroPoint/2.5),
 	}
 }
