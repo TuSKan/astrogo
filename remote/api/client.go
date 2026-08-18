@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/url"
+	"sync"
 	"time"
 
 	"resty.dev/v3"
@@ -18,16 +19,21 @@ const DefaultTimeout = 30 * time.Second
 
 // defaultUserAgent identifies astrogo to the services it calls. Several of
 // them (Nominatim in particular) require a real one.
-const defaultUserAgent = "AstroGo/1.0"
+// It names the project rather than only the library so an operator seeing
+// unwelcome traffic has somewhere to look and someone to contact. An
+// unidentified client is indistinguishable from abuse, and a shared research
+// service that cannot tell the difference has to assume the worse one.
+const defaultUserAgent = "AstroGo/1.0 (+https://github.com/TuSKan/astrogo)"
 
 // defaultRetries bounds attempts for a retriable failure.
 const defaultRetries = 3
 
 // config carries NewClient's options.
 type config struct {
-	timeout   time.Duration
-	retries   int
-	userAgent string
+	timeout     time.Duration
+	retries     int
+	userAgent   string
+	minInterval time.Duration
 }
 
 // Option customizes a NewClient call.
@@ -49,6 +55,21 @@ func WithUserAgent(ua string) Option {
 	return func(c *config) { c.userAgent = ua }
 }
 
+// WithMinInterval spaces this client's requests at least d apart.
+//
+// It exists for the case where a caller issues hundreds of queries in a row
+// against a shared research service that is free, anonymous and not obliged to
+// serve anyone in particular. Such a service will defend itself, and the
+// defence is rarely a clear error: submissions simply stop being answered,
+// including ones that should fail instantly at the parser.
+//
+// The pacing is per client and serialises its requests, so it is a rate limit
+// and a concurrency limit at once. That is the intent — a burst of parallel
+// queries is what a limiter notices first.
+func WithMinInterval(d time.Duration) Option {
+	return func(c *config) { c.minInterval = d }
+}
+
 // Client talks to one or more registered API endpoints. It is built for a
 // specific endpoint — that is where its timeout comes from — but each
 // method takes an EndpointID so a provider covering two endpoints of the
@@ -57,6 +78,12 @@ func WithUserAgent(ua string) Option {
 // Safe for concurrent use.
 type Client struct {
 	rc *resty.Client
+
+	// mu serialises paced requests and guards last. Both are unused when no
+	// minimum interval was asked for, so an ordinary client pays nothing.
+	minInterval time.Duration
+	mu          sync.Mutex
+	last        time.Time
 }
 
 // NewClient builds a client configured from endpoint id: its registered
@@ -94,7 +121,7 @@ func NewClient(id remote.EndpointID, opts ...Option) (*Client, error) {
 			resty.RetryConditionStatusZero,
 		)
 
-	return &Client{rc: rc}, nil
+	return &Client{rc: rc, minInterval: cfg.minInterval}, nil
 }
 
 // Close releases the client's idle connections. A Client is usually held
@@ -115,6 +142,12 @@ func (c *Client) Get(ctx context.Context, id remote.EndpointID, path string, que
 	if err != nil {
 		return nil, err
 	}
+
+	release, err := c.pace(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer release()
 
 	resp, err := c.rc.R().
 		SetContext(ctx).
@@ -152,6 +185,12 @@ func (c *Client) PostForm(ctx context.Context, id remote.EndpointID, path string
 		return nil, err
 	}
 
+	release, err := c.pace(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer release()
+
 	resp, err := c.rc.R().
 		SetContext(ctx).
 		SetFormDataFromValues(form).
@@ -174,6 +213,12 @@ func (c *Client) PostJSON(ctx context.Context, id remote.EndpointID, path string
 		return nil, fmt.Errorf("remote/api: marshal JSON body: %w", err)
 	}
 
+	release, err := c.pace(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer release()
+
 	resp, err := c.rc.R().
 		SetContext(ctx).
 		SetHeader("Content-Type", "application/json").
@@ -182,6 +227,38 @@ func (c *Client) PostJSON(ctx context.Context, id remote.EndpointID, path string
 		Post(full)
 
 	return body(resp, err)
+}
+
+// pace blocks until this client is allowed to make its next request.
+//
+// It returns a release function so the caller holds the slot for the duration
+// of the request rather than only its start: the point is that one request is
+// in flight at a time, not that departures are evenly spaced.
+func (c *Client) pace(ctx context.Context) (release func(), err error) {
+	if c.minInterval <= 0 {
+		return func() {}, nil
+	}
+
+	c.mu.Lock()
+
+	wait := time.Until(c.last.Add(c.minInterval))
+	if wait > 0 {
+		timer := time.NewTimer(wait)
+		defer timer.Stop()
+
+		select {
+		case <-ctx.Done():
+			c.mu.Unlock()
+
+			return nil, fmt.Errorf("api: waiting to pace a request: %w", ctx.Err())
+		case <-timer.C:
+		}
+	}
+
+	return func() {
+		c.last = time.Now()
+		c.mu.Unlock()
+	}, nil
 }
 
 // requestURL resolves id through the registry gate — the single place

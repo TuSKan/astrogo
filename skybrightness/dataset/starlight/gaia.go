@@ -302,6 +302,26 @@ func columnName(name string) string {
 }
 
 // BuildFromGaia aggregates integrated starlight over the whole sky from the
+//
+// Prefer [Fetch] unless a whole sky is genuinely needed.
+//
+// # This is heavy use of a shared service
+//
+// A build at order 8 sends 787 queries over about forty minutes to a free,
+// anonymous research service. Doing that repeatedly is enough to stop being
+// served: after three builds and some probing in one afternoon, submissions to
+// the query endpoint returned nothing at all — not an error, silence — while
+// ordinary GETs to the same host kept answering. A malformed query that should
+// have failed at the parser in milliseconds got the same silence, which is how
+// a defending service looks from outside and not how a broken one does.
+//
+// The queries are spaced and serialised (see [aggregationPace]) for that
+// reason. If a full sky is what you want rather than the directions you intend
+// to observe, consider the bulk release instead: ESA publishes gaia_source as
+// files keyed by HEALPix level-8 range, which is this aggregation's own grid,
+// and it exists so that heavy users do not have to ask the query service 787
+// times. It costs far more bandwidth and far less of somebody else's service.
+//
 // ESA Gaia archive, returning a map in the ICRS frame.
 //
 // # What this reproduces, and what it does not
@@ -438,9 +458,26 @@ const aggregationRetries = 4
 // 182, then stopped responding entirely.
 const aggregationBudget = 6 * time.Minute
 
-// aggregationClient builds the TAP client a whole-sky build uses.
+// aggregationPace is the minimum gap between queries this package sends.
+//
+// The Gaia archive is free, anonymous, and under no obligation to serve
+// anyone. A whole-sky build asks it 787 questions in a row; three such builds
+// and a handful of probes in one afternoon was enough that submissions stopped
+// being answered at all — not with an error, but with silence, including for a
+// deliberately malformed query that should have failed at the parser in
+// milliseconds. GETs to the same host kept working throughout, which is what
+// distinguishes a defending service from a broken one.
+//
+// So the queries are spaced and serialised. It makes a whole-sky build slower
+// and that is the correct trade: the cost of being wrong here is borne by
+// every other user of a shared research instrument, not by us.
+const aggregationPace = 2 * time.Second
+
+// aggregationClient builds the TAP client this package's queries go through.
 func aggregationClient() (*api.Client, error) {
-	client, err := api.NewClient(remote.GaiaTAP, api.WithTimeout(aggregationTimeout))
+	client, err := api.NewClient(remote.GaiaTAP,
+		api.WithTimeout(aggregationTimeout),
+		api.WithMinInterval(aggregationPace))
 	if err != nil {
 		return nil, fmt.Errorf("starlight: gaia client: %w", err)
 	}
