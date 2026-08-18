@@ -89,8 +89,19 @@ func assembleSky(t *testing.T, when gotime.Time) (*skybrightness.Model, *skybrig
 		t.Fatalf("NewArtificialSkyglow: %v", err)
 	}
 
+	// A uniform star map at the radiance the order-6 Gaia patch actually
+	// measured off the Galactic plane, 8.05e-10 W m^-2 sr^-1 nm^-1 in V. A real
+	// map varies by two orders of magnitude between the plane and the caps;
+	// this is the quiet end, so the share integrated starlight takes here is a
+	// floor rather than a typical value.
+	stars, err := skybrightness.NewIntegratedStarlight(
+		uniformSky{value: 8.05e-10, galactic: true}, solarShape(grid), grid, testBand())
+	if err != nil {
+		t.Fatalf("NewIntegratedStarlight: %v", err)
+	}
+
 	model, err := skybrightness.NewModel("full-sky-test",
-		moon, skybrightness.NewZodiacalLight(), dgl, glow, artificial)
+		moon, skybrightness.NewZodiacalLight(), dgl, glow, artificial, stars)
 	if err != nil {
 		t.Fatalf("NewModel: %v", err)
 	}
@@ -356,8 +367,8 @@ func TestFullSkyProvenance(t *testing.T) {
 		t.Fatalf("Estimate: %v", err)
 	}
 
-	if n := len(est.Reproducibility.Components); n != 5 {
-		t.Fatalf("got %d provenance records, want 5", n)
+	if n := len(est.Reproducibility.Components); n != 6 {
+		t.Fatalf("got %d provenance records, want 6", n)
 	}
 
 	for _, p := range est.Reproducibility.Components {
