@@ -26,6 +26,13 @@ var (
 	// can address.
 	ErrGaiaOrder = errors.New("starlight: HEALPix order must be between 1 and 12")
 
+	// ErrGaiaCut is returned when the magnitude cut was left at its zero
+	// value. It is required rather than defaulted because it changes the
+	// map's total brightness by more than every other setting combined, and
+	// because no value is right for every instrument.
+	ErrGaiaCut = errors.New(
+		"starlight: set FainterThan explicitly, or NoMagnitudeCut to include every source")
+
 	// ErrGaiaResponse is returned when the archive's answer cannot be read.
 	ErrGaiaResponse = errors.New("starlight: cannot read the Gaia archive response")
 )
@@ -158,9 +165,38 @@ type GaiaBuild struct {
 	// Bands are the output bands, at least one.
 	Bands []GaiaBand
 
+	// FainterThan excludes sources brighter than this Gaia G magnitude,
+	// keeping only what is fainter.
+	//
+	// It has no default because it has no physically correct value, and
+	// because it is the largest lever in the whole map. Measured over a
+	// thousand order-8 pixels, a cut at G = 6 drops 0.11 per cent of the
+	// sources and 19 per cent of the light; at G = 10 it drops 0.31 per cent
+	// of the sources and 64 per cent of the light. A map built with the wrong
+	// cut is wrong by more than every other choice here combined.
+	//
+	// Whether a star belongs to the background at all depends on the
+	// instrument: a 13.7 arcminute pixel holds stars a telescope resolves and
+	// an eye does not. Set [NoMagnitudeCut] to include everything and get the
+	// total integrated light of the sky, bright stars included.
+	FainterThan float64
+
 	// Progress, if set, is called after each chunk.
 	Progress func(done, total int)
 }
+
+// NoMagnitudeCut includes every source, however bright.
+//
+// The resulting map is the total integrated light of the sky rather than its
+// diffuse background: a single naked-eye star lands in one pixel and takes it
+// to about 14 mag arcsec^-2, seven magnitudes above the median sky. That is
+// faithful to what Gaia holds and is the wrong quantity to subtract from an
+// observation of that star.
+// Its value is brighter than any real source, so it reads as what it does.
+// The predicate is omitted rather than rendered, because any predicate on
+// phot_g_mean_mag would also drop the few sources that have no G magnitude at
+// all, and "everything" has to mean everything.
+const NoMagnitudeCut = -1000
 
 // pixelsPerOrder returns 12*4^order.
 func pixelsPerOrder(order int) int64 { return 12 << (2 * order) }
@@ -200,10 +236,19 @@ func (g GaiaBuild) ADQL(firstPixel, lastPixel int64) (string, error) {
 	return fmt.Sprintf(
 		"SELECT source_id/%d AS hpx, COUNT(*) AS n, COUNT(bp_rp) AS ncolour%s "+
 			"FROM gaiadr3.gaia_source "+
-			"WHERE source_id BETWEEN %d AND %d GROUP BY hpx",
+			"WHERE source_id BETWEEN %d AND %d%s GROUP BY hpx",
 		divisor, columns.String(),
-		firstPixel*divisor, (lastPixel+1)*divisor-1,
+		firstPixel*divisor, (lastPixel+1)*divisor-1, g.magnitudePredicate(),
 	), nil
+}
+
+// magnitudePredicate renders the cut, or nothing when there is none.
+func (g GaiaBuild) magnitudePredicate() string {
+	if g.FainterThan <= NoMagnitudeCut {
+		return ""
+	}
+
+	return fmt.Sprintf(" AND phot_g_mean_mag > %g", g.FainterThan)
 }
 
 // withDefaults fills in and validates a build.
@@ -228,6 +273,11 @@ func (g GaiaBuild) withDefaults() (GaiaBuild, error) {
 		if err := b.validate(); err != nil {
 			return g, err
 		}
+	}
+
+	// Last, so a build that is broken in more basic ways says so first.
+	if g.FainterThan == 0 {
+		return g, ErrGaiaCut
 	}
 
 	return g, nil
@@ -377,6 +427,17 @@ const aggregationTimeout = 3 * time.Minute
 // between a tool that finishes and one that has to be babysat.
 const aggregationRetries = 4
 
+// aggregationBudget bounds the total time one chunk may spend across all its
+// attempts.
+//
+// Without it the retry multiplies rather than absorbs: the Gaia archive
+// answers a given query in three seconds when it is quiet and times out its
+// own SQL statement when it is not, and four retries of the latter is twelve
+// minutes of waiting to arrive at the same failure. Measured against the live
+// service in one afternoon, the same forty-pixel query took 18 seconds, then
+// 182, then stopped responding entirely.
+const aggregationBudget = 6 * time.Minute
+
 // aggregationClient builds the TAP client a whole-sky build uses.
 func aggregationClient() (*api.Client, error) {
 	client, err := api.NewClient(remote.GaiaTAP, api.WithTimeout(aggregationTimeout))
@@ -409,8 +470,19 @@ func (g GaiaBuild) fetchChunkWithRetry(
 ) error {
 	var err error
 
+	deadline := time.Now().Add(aggregationBudget)
+
 	for attempt := range aggregationRetries {
 		if attempt > 0 {
+			// A server-side timeout consumes the whole per-request budget, so
+			// retrying four of them costs four times three minutes and turns a
+			// slow archive into a twelve-minute failure. Retries are worth
+			// having for a transient stumble and not for a congested service,
+			// so they stop when the chunk has had long enough overall.
+			if time.Now().After(deadline) {
+				break
+			}
+
 			select {
 			case <-ctx.Done():
 				return fmt.Errorf("starlight: pixels %d-%d: %w", first, last, ctx.Err())
@@ -446,6 +518,27 @@ func (g GaiaBuild) fetchChunk(
 		return err
 	}
 
+	return g.runQuery(ctx, client, adql, bands, counts, solidAngle,
+		fmt.Sprintf("pixels %d-%d", first, last))
+}
+
+// runQuery posts one ADQL statement and accumulates its rows.
+//
+// The query goes in a POST body rather than a URL: asking about several
+// hundred scattered pixels renders tens of kilobytes of disjunction, which no
+// query string will carry.
+//
+// what names the pixels for the error message, since a caller looking at a
+// failure needs to know which part of the sky it was about.
+func (g GaiaBuild) runQuery(
+	ctx context.Context,
+	client *api.Client,
+	adql string,
+	bands map[string][]float64,
+	counts []int64,
+	solidAngle float64,
+	what string,
+) error {
 	v := url.Values{}
 	v.Set("REQUEST", "doQuery")
 	v.Set("LANG", "ADQL")
@@ -454,7 +547,7 @@ func (g GaiaBuild) fetchChunk(
 
 	body, err := client.PostForm(ctx, remote.GaiaTAP, "", v)
 	if err != nil {
-		return fmt.Errorf("starlight: pixels %d-%d: %w", first, last, err)
+		return fmt.Errorf("starlight: %s: %w", what, err)
 	}
 	defer func() { _ = body.Close() }()
 

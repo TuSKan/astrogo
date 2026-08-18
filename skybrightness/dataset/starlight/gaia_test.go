@@ -22,7 +22,7 @@ func gBand() starlight.GaiaBand {
 func TestGaiaADQLDivisor(t *testing.T) {
 	t.Parallel()
 
-	adql, err := starlight.GaiaBuild{Bands: []starlight.GaiaBand{gBand()}}.ADQL(0, 999)
+	adql, err := starlight.GaiaBuild{FainterThan: starlight.NoMagnitudeCut, Bands: []starlight.GaiaBand{gBand()}}.ADQL(0, 999)
 	if err != nil {
 		t.Fatalf("ADQL: %v", err)
 	}
@@ -37,7 +37,7 @@ func TestGaiaADQLDivisor(t *testing.T) {
 	}
 
 	// Order 12 is the finest source_id addresses.
-	fine, err := starlight.GaiaBuild{Order: 12, Bands: []starlight.GaiaBand{gBand()}}.ADQL(0, 0)
+	fine, err := starlight.GaiaBuild{FainterThan: starlight.NoMagnitudeCut, Order: 12, Bands: []starlight.GaiaBand{gBand()}}.ADQL(0, 0)
 	if err != nil {
 		t.Fatalf("ADQL: %v", err)
 	}
@@ -53,7 +53,7 @@ func TestGaiaADQLDivisor(t *testing.T) {
 func TestGaiaADQLPlainBand(t *testing.T) {
 	t.Parallel()
 
-	adql, err := starlight.GaiaBuild{Bands: []starlight.GaiaBand{gBand()}}.ADQL(0, 9)
+	adql, err := starlight.GaiaBuild{FainterThan: starlight.NoMagnitudeCut, Bands: []starlight.GaiaBand{gBand()}}.ADQL(0, 9)
 	if err != nil {
 		t.Fatalf("ADQL: %v", err)
 	}
@@ -80,7 +80,7 @@ func TestGaiaADQLAppliesColourPerStar(t *testing.T) {
 		FluxToRadiance: 1e-18,
 	}
 
-	adql, err := starlight.GaiaBuild{Bands: []starlight.GaiaBand{band}}.ADQL(0, 9)
+	adql, err := starlight.GaiaBuild{FainterThan: starlight.NoMagnitudeCut, Bands: []starlight.GaiaBand{band}}.ADQL(0, 9)
 	if err != nil {
 		t.Fatalf("ADQL: %v", err)
 	}
@@ -125,7 +125,7 @@ func TestGaiaADQLAppliesColourPerStar(t *testing.T) {
 func TestGaiaColourTermSign(t *testing.T) {
 	t.Parallel()
 
-	adql, err := starlight.GaiaBuild{
+	adql, err := starlight.GaiaBuild{FainterThan: starlight.NoMagnitudeCut,
 		Bands: []starlight.GaiaBand{{
 			Name: "red", ColourTerm: []float64{0.5}, FluxToRadiance: 1,
 		}},
@@ -146,20 +146,20 @@ func TestGaiaBuildValidates(t *testing.T) {
 		t.Errorf("no bands: err = %v, want ErrGaiaBand", err)
 	}
 
-	noName := starlight.GaiaBuild{Bands: []starlight.GaiaBand{{FluxToRadiance: 1}}}
+	noName := starlight.GaiaBuild{FainterThan: starlight.NoMagnitudeCut, Bands: []starlight.GaiaBand{{FluxToRadiance: 1}}}
 	if _, err := noName.ADQL(0, 9); !errors.Is(err, starlight.ErrGaiaBand) {
 		t.Errorf("unnamed band: err = %v, want ErrGaiaBand", err)
 	}
 
 	// A band with no flux-to-radiance factor cannot produce a radiance, and
 	// guessing a zero point is exactly what this package refuses to do.
-	noZero := starlight.GaiaBuild{Bands: []starlight.GaiaBand{{Name: "V"}}}
+	noZero := starlight.GaiaBuild{FainterThan: starlight.NoMagnitudeCut, Bands: []starlight.GaiaBand{{Name: "V"}}}
 	if _, err := noZero.ADQL(0, 9); !errors.Is(err, starlight.ErrGaiaBand) {
 		t.Errorf("band without a zero point: err = %v, want ErrGaiaBand", err)
 	}
 
 	for _, order := range []int{-1, 13, 20} {
-		bad := starlight.GaiaBuild{Order: order, Bands: []starlight.GaiaBand{gBand()}}
+		bad := starlight.GaiaBuild{FainterThan: starlight.NoMagnitudeCut, Order: order, Bands: []starlight.GaiaBand{gBand()}}
 		if _, err := bad.ADQL(0, 9); !errors.Is(err, starlight.ErrGaiaOrder) {
 			t.Errorf("order %d: err = %v, want ErrGaiaOrder", order, err)
 		}
@@ -176,7 +176,7 @@ func TestGaiaChunksTileTheSky(t *testing.T) {
 		chunk = 100
 	)
 
-	build := starlight.GaiaBuild{Order: order, Chunk: chunk, Bands: []starlight.GaiaBand{gBand()}}
+	build := starlight.GaiaBuild{FainterThan: starlight.NoMagnitudeCut, Order: order, Chunk: chunk, Bands: []starlight.GaiaBand{gBand()}}
 
 	var lastEnd int64 = -1
 

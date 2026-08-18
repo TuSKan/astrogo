@@ -37,7 +37,7 @@ func TestGaiaMapMatchesThePublishedSurfaceBrightness(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 
-	build := starlight.GaiaBuild{
+	build := starlight.GaiaBuild{FainterThan: starlight.NoMagnitudeCut,
 		Order: 6,
 		Chunk: 64,
 		Bands: []starlight.GaiaBand{starlight.GaiaJohnsonV()},
@@ -154,7 +154,7 @@ func TestGaiaMapPutsTheMilkyWayInThePlane(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 
-	build := starlight.GaiaBuild{
+	build := starlight.GaiaBuild{FainterThan: starlight.NoMagnitudeCut,
 		Order: 6,
 		Chunk: 16,
 		Bands: []starlight.GaiaBand{starlight.GaiaJohnsonV()},
