@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/remote/api"
@@ -287,9 +288,9 @@ func BuildFromGaia(ctx context.Context, build GaiaBuild) (*Map, []int64, error) 
 
 	counts := make([]int64, npix)
 
-	client, err := api.NewClient(remote.GaiaTAP)
+	client, err := aggregationClient()
 	if err != nil {
-		return nil, nil, fmt.Errorf("starlight: gaia client: %w", err)
+		return nil, nil, err
 	}
 
 	chunks := int((npix + int64(build.Chunk) - 1) / int64(build.Chunk))
@@ -302,7 +303,7 @@ func BuildFromGaia(ctx context.Context, build GaiaBuild) (*Map, []int64, error) 
 			last = npix - 1
 		}
 
-		if err := build.fetchChunk(ctx, client, first, last, bands, counts, solidAngle); err != nil {
+		if err := build.fetchChunkWithRetry(ctx, client, first, last, bands, counts, solidAngle); err != nil {
 			return nil, nil, err
 		}
 
@@ -343,9 +344,9 @@ func RunChunk(ctx context.Context, build GaiaBuild, first, last int64) (*Map, []
 
 	counts := make([]int64, npix)
 
-	client, err := api.NewClient(remote.GaiaTAP)
+	client, err := aggregationClient()
 	if err != nil {
-		return nil, nil, fmt.Errorf("starlight: gaia client: %w", err)
+		return nil, nil, err
 	}
 
 	if err := build.fetchChunk(ctx, client, first, last, bands, counts, solidAngle); err != nil {
@@ -358,6 +359,77 @@ func RunChunk(ctx context.Context, build GaiaBuild, first, last int64) (*Map, []
 	}
 
 	return m, counts, nil
+}
+
+// aggregationTimeout is the per-request budget for one chunk.
+//
+// The registered Gaia endpoint allows 30 seconds, which suits a catalogue
+// lookup. One chunk here is a GROUP BY over a few million sources and the
+// archive's own queueing, and 30 seconds is not reliably enough: a run of 787
+// chunks meets a slow one sooner or later.
+const aggregationTimeout = 3 * time.Minute
+
+// aggregationRetries is how many times a chunk is re-attempted.
+//
+// A whole-sky build is hundreds of queries over half an hour, so the chance
+// that none of them times out is not the chance any single one succeeds.
+// Losing the completed chunks because query 360 was slow is the difference
+// between a tool that finishes and one that has to be babysat.
+const aggregationRetries = 4
+
+// aggregationClient builds the TAP client a whole-sky build uses.
+func aggregationClient() (*api.Client, error) {
+	client, err := api.NewClient(remote.GaiaTAP, api.WithTimeout(aggregationTimeout))
+	if err != nil {
+		return nil, fmt.Errorf("starlight: gaia client: %w", err)
+	}
+
+	return client, nil
+}
+
+// fetchChunkWithRetry runs one chunk, re-attempting a transient failure.
+//
+// The client already retries the statuses resty classifies as retriable; what
+// it cannot retry is a request whose own timeout expired, because by then the
+// context is done. That is the failure a long build actually hits, so it is
+// retried here with a fresh deadline and a backoff.
+//
+// A cancelled parent context is not a transient failure and stops immediately.
+//
+// Retries are not reported through Progress. Overloading a (done, total)
+// callback with a sentinel would make every existing caller's arithmetic
+// wrong; a caller that wants to see the stumbles can wrap the client.
+func (g GaiaBuild) fetchChunkWithRetry(
+	ctx context.Context,
+	client *api.Client,
+	first, last int64,
+	bands map[string][]float64,
+	counts []int64,
+	solidAngle float64,
+) error {
+	var err error
+
+	for attempt := range aggregationRetries {
+		if attempt > 0 {
+			select {
+			case <-ctx.Done():
+				return fmt.Errorf("starlight: pixels %d-%d: %w", first, last, ctx.Err())
+			case <-time.After(time.Duration(attempt) * 5 * time.Second):
+			}
+		}
+
+		err = g.fetchChunk(ctx, client, first, last, bands, counts, solidAngle)
+		if err == nil {
+			return nil
+		}
+
+		if ctx.Err() != nil {
+			return err
+		}
+	}
+
+	return fmt.Errorf("starlight: pixels %d-%d after %d attempts: %w",
+		first, last, aggregationRetries, err)
 }
 
 // fetchChunk runs one chunk's query and accumulates it.
