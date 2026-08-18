@@ -189,3 +189,58 @@ func MultipleScatteringFactor(rayleigh unit.OpticalDepth) (float64, error) {
 
 	return 1 + 4.5*float64(rayleigh), nil
 }
+
+// Airglow layer geometry.
+const (
+	// VanRhijnEarthRadiusKM is the Earth radius Leinert et al. (1998) Eq. 13
+	// uses, in kilometres.
+	VanRhijnEarthRadiusKM = 6378.0
+
+	// AirglowLayerHeightM is the height of the emitting layer adopted by
+	// Masana et al. (2021) after Hart (2019), in metres.
+	//
+	// The choice only matters near the horizon, and it is a simplification:
+	// the OH, O2 and Na emissions arise near 90 km while the OI 630 nm lines
+	// come from 200 to 300 km, so no single height describes the whole
+	// spectrum. A line-dominated band evaluated at this height is wrong at
+	// large zenith angles.
+	AirglowLayerHeightM = 87_000.0
+)
+
+// VanRhijn returns the brightness of a thin, uniformly emitting atmospheric
+// layer at zenith angle z, relative to its brightness at the zenith.
+//
+// Leinert et al. (1998) Eq. 13, after van Rhijn (1921):
+//
+//	I(z)/I(0) = 1 / sqrt(1 - [R/(R+h)]^2 * sin^2 z)
+//
+// A layer seen obliquely is thicker along the line of sight, so airglow
+// brightens toward the horizon even with no scattering at all — the opposite
+// of how an extinguished source behaves, and the reason airglow cannot be
+// treated as a constant floor.
+//
+// This is the geometry only. Extinction and scattering along the longer path
+// work against it, and Leinert et al. note they change the behaviour
+// materially beyond about 40 degrees from the zenith; applying this factor
+// alone overstates the horizon brightness.
+//
+// For h = 100 km the maximum is 5.7 at the horizon (Roach & Meinel 1955),
+// which TestVanRhijnAgainstRoachAndMeinel checks.
+func VanRhijn(z angle.Angle, layerHeightM float64) (float64, error) {
+	if layerHeightM <= 0 || math.IsNaN(layerHeightM) || math.IsInf(layerHeightM, 0) {
+		return 0, fmt.Errorf("%w: layer height %g m", ErrScaleHeightRange, layerHeightM)
+	}
+
+	radius := VanRhijnEarthRadiusKM * 1000
+	ratio := radius / (radius + layerHeightM)
+
+	sinZ := z.Sin()
+
+	denom := 1 - ratio*ratio*sinZ*sinZ
+	if denom <= 0 {
+		return 0, fmt.Errorf("%w: zenith angle %g deg is past the layer's limb",
+			ErrAirmassRange, z.Degrees())
+	}
+
+	return 1 / math.Sqrt(denom), nil
+}

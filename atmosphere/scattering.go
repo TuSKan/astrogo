@@ -35,6 +35,10 @@ var (
 	// ErrTemperature is returned for a non-positive or non-finite
 	// temperature.
 	ErrTemperature = errors.New("atmosphere: temperature must be positive and finite")
+
+	// ErrScaleHeightRange is returned for a non-positive or non-finite layer
+	// height or scale height.
+	ErrScaleHeightRange = errors.New("atmosphere: layer height must be positive and finite")
 )
 
 // Scattering reference values and their provenance.
