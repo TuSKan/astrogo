@@ -29,14 +29,22 @@ import (
 //
 // # What this does not do
 //
-// Kocifaj & Bará say L_S "can be inferred from satellite radiance data" and
-// cite Elvidge et al. (2017) for the method. That method is not implemented
-// here. What this package does instead is stated plainly: it sums the
-// upward radiances along each azimuth and places the result at the
-// radiance-weighted mean distance, which preserves Eq. 9's one-source-per-
-// azimuth structure and the relative weighting between azimuths, but is not
-// the published inference. Treat the absolute scale as uncalibrated and the
-// directional structure as meaningful.
+// Kocifaj & Bará say L_S "can be inferred from satellite radiance data",
+// citing Elvidge et al. (2017). That citation is to the data — Elvidge et al.
+// is an instrument and product description, and carries no conversion from a
+// DNB pixel to a line-of-sight radiance. There is, as far as this package's
+// authors can find, no published recipe to implement.
+//
+// What this package does instead is stated plainly: it sums the upward
+// radiances along each azimuth and places the result at the radiance-weighted
+// mean distance. That preserves Eq. 9's one-source-per-azimuth structure and
+// the relative weighting between azimuths, and it is not a published
+// inference. Treat the absolute scale as uncalibrated and the directional
+// structure as meaningful.
+//
+// The one thing Elvidge et al. does settle is the unit: the annual composites
+// are average radiances in nW cm^-2 sr^-1, which is what SourceSpectrum
+// converts from.
 type Region struct {
 	// Site is the observer, at the centre of the sampling.
 	Site *coord.Geodetic

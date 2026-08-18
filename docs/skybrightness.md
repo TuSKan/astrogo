@@ -788,8 +788,8 @@ the difference, and Phase 2 is what closes it.
 | Phase | Content | State |
 | :--- | :--- | :--- |
 | 0 | Architecture and spectral foundation | **Done** |
-| 1 | Atmospheric foundation, into `atmosphere` | **Done** — scattering, transfer and scale heights complete. Absorption is infrastructure only: no citable cross-section dataset is shipped (§16) |
-| 2 | Natural moonless sky (GAMBONS, Gaia DR3) | **Not started, and the largest remaining piece.** Needs the GAMBONS equations plus four separate datasets — see below |
+| 1 | Atmospheric foundation, into `atmosphere` | **Done.** Scattering, transfer, scale heights and van Rhijn; absorption reads through `dataset/crosssection`. No cross-section dataset is shipped, and deliberately: ozone's Chappuis-band cross section is strongly temperature-dependent, so a reference and a temperature are the caller's scientific choice |
+| 2 | Natural moonless sky (GAMBONS, Gaia DR3) | **Largely built.** DGL, zodiacal light and airglow are implemented and validated; `dataset/starlight` holds the map type, its loader and a Gaia TAP builder. What remains is reference data, not code: an ISL map (requested, or buildable), Kawara's `c` decade (resolved), and band transformations |
 | 3 | Modern Moon (Jones 2013, ROLO, Winkler 2022) | **`ScatteredMoonlight` shipped** — ROLO reflectance + single-scattering transfer, validated at 18.9 mag/arcsec². Remaining: Winkler's multiple-scattering terms (not transcribed) and a shipped solar spectrum (§16) |
 | 4 | Artificial clear sky (Kocifaj 2022, VIIRS as source) | **`ArtificialSkyglow` + `dataset/viirs` shipped.** Absolute scale is blocked on Eq. 2's missing area term (§17); the Fig. 1 reproduction remains |
 | 5 | Clouds (Kocifaj 2025) | Planned |
@@ -948,9 +948,12 @@ paper, produced the N-scaling. Fixed: `Region` now takes `Sectors` (the emitter 
 `RadialSamples` (which refines the estimate within a sector without adding emitters), and
 `TestEmittersOnePerAzimuth` pins it.
 
-One genuine gap remains, and it is narrower: Kocifaj & Bará say `L_i` "can be inferred from
-satellite radiance data" and cite **Elvidge et al. (2017)** for the method. That method is
-not implemented. `dataset/viirs` instead sums upward radiances along each azimuth and
+One genuine gap remains, and it is narrower than it looked. Kocifaj & Bará say `L_i` "can be
+inferred from satellite radiance data", citing **Elvidge et al. (2017)** — but that paper
+was obtained and is an instrument and product description. It carries no conversion from a
+DNB pixel to a line-of-sight radiance, so the citation is to the data rather than to a
+recipe, and there appears to be no published method to implement. It does settle the unit:
+average radiance in nW cm⁻² sr⁻¹. `dataset/viirs` instead sums upward radiances along each azimuth and
 places the result at the radiance-weighted mean distance — which preserves Eq. 9's
 structure and the relative weighting between azimuths, but is not the published inference.
 Absolute scale uncalibrated; directional structure meaningful.
