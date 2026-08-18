@@ -854,6 +854,50 @@ source in hand.
 
 ## 17. Open scientific questions
 
+**Integrated starlight can be built from Gaia without the bulk download — tested.**
+
+The ESA Gaia archive's TAP service aggregates server-side, and `source_id` encodes the
+HEALPix index directly: `source_id / 2^43` is the level-8 (nside 256) nested pixel, which is
+exactly GAMBONS' grid. A single ADQL query returns summed flux per pixel:
+
+	SELECT source_id/8796093022208 AS hpx8, COUNT(*), SUM(phot_g_mean_flux)
+	FROM gaiadr3.gaia_source WHERE source_id BETWEEN ... GROUP BY hpx8
+
+Verified against the live service: 1,000 pixels in one synchronous query, no truncation,
+sub-second. Each chunk is a `source_id` range, so it uses the primary-key index rather than
+scanning the table. **786,432 pixels is 787 such queries — roughly half an hour, against
+600 GB and 1,097 files for the bulk route.** astrogo already has the TAP client.
+
+A spot check confirms the numbers are real: pixel 100000 holds 567 sources summing to
+4.94×10⁶ e⁻/s, which is G = 8.95 integrated, or **23.5 mag/arcsec²** over the pixel's
+1.5979×10⁻⁵ sr — a textbook integrated-starlight surface brightness at high galactic
+latitude.
+
+The colour-dependent per-star transformation also evaluates inline, so the band conversion
+happens inside the aggregate rather than after it — which matters, because transforming a
+summed flux is not the same as summing transformed fluxes when the transformation depends
+on colour:
+
+	SUM(phot_g_mean_flux * POWER(10, -0.4*(a + b*bp_rp + c*bp_rp*bp_rp)))
+
+**Gaia DR3 is the right source.** DR3 shares EDR3's source list, astrometry and G/BP/RP
+photometry — DR3 only *added* astrophysical parameters, variability and spectra. So the
+`gdr3` tables carry exactly the photometry GAMBONS' current version uses.
+
+**What this does not yet solve**, and none of it is a data-availability problem:
+
+| Gap | Note |
+| :--- | :--- |
+| Photometric transformations | The coefficients above were a placeholder for the capability test and the sign convention in it was wrong. Real ones must come from GAMBONS' recomputed EDR3 transformations or the Gaia documentation, verified. |
+| Bright stars | Gaia omits the brightest; Hipparcos supplies them, and they carry disproportionate weight. |
+| Missing colours | Over 300 million faint sources have no BP−RP. GAMBONS assigns the local mean colour. |
+| Faint-star completion | Below G = 20, via the Besançon model. Under 3% except on the galactic plane. |
+| Independent validation | GAMBONS shipped a DR2 bug that underestimated ISL for months. A from-scratch pipeline needs checking against their web export (§13). |
+
+This is still a data-preparation job producing a map, not a runtime operation — the
+architecture is unchanged, since `dataset/starlight` already consumes such a map. What it
+changes is that the map can now be produced without waiting on anyone.
+
 **Kawara et al. (2017) DGL coefficients — RESOLVED, including a misreading of my own.**
 
 I claimed the published units were dimensionally impossible. They are not, and the reason
