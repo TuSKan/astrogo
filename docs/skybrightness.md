@@ -692,8 +692,19 @@ different coordinates.
 the high bits, so `source_id / 2^(59-2k)` is the level-k nested pixel and the whole
 aggregation becomes a `GROUP BY` the archive performs. At order 8 — GAMBONS' grid,
 786,432 pixels — that is 787 chunked TAP queries of about two seconds each, against a bulk
-download of 600 GB across 1,097 files for the same result. `starlight.BuildFromGaia` does
-this; `starlight.GaiaJohnsonV` supplies the band.
+download of at least 649 GB across at least 2,911 files for the same result. Those bulk
+figures are measured from the CDN listing, which was still truncated where the count
+stopped, so the real corpus is larger again. `starlight.BuildFromGaia` does this;
+`starlight.GaiaJohnsonV` supplies the band.
+
+The bulk files are named for the HEALPix level-8 range they hold
+(`GaiaSource_000000-003111.csv.gz`), which is exactly this aggregation grid, so a bulk
+route would parallelise and resume cleanly. What rules it out is the column ratio:
+`gaia_source` carries about 150 columns, this needs three, and CSV.gz cannot be pruned
+server-side — so it would move roughly 700 GB to use two per cent of it and then redo
+arithmetic the archive performs for free. Bulk becomes the right choice only for
+something TAP cannot aggregate: several orders from one pass, a transformation varied
+without re-querying, or reproducibility pinned to a byte-identical local corpus.
 
 **Why the band is a constructor.** Converting Gaia G flux to Johnson V spectral flux
 density needs three published numbers from three sources: G's VEGAMAG zero point
@@ -973,7 +984,7 @@ exactly GAMBONS' grid. A single ADQL query returns summed flux per pixel:
 Verified against the live service: 1,000 pixels in one synchronous query, no truncation,
 sub-second. Each chunk is a `source_id` range, so it uses the primary-key index rather than
 scanning the table. **786,432 pixels is 787 such queries — roughly half an hour, against
-600 GB and 1,097 files for the bulk route.** astrogo already has the TAP client.
+at least 649 GB and 2,911 files for the bulk route.** astrogo already has the TAP client.
 
 A spot check confirms the numbers are real: pixel 100000 holds 567 sources summing to
 4.94×10⁶ e⁻/s, which is G = 8.95 integrated, or **23.5 mag/arcsec²** over the pixel's
