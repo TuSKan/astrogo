@@ -89,8 +89,15 @@ func assembleSky(t *testing.T, when gotime.Time) (*skybrightness.Model, *skybrig
 		t.Fatalf("NewArtificialSkyglow: %v", err)
 	}
 
-	// A uniform star map at the radiance the order-6 Gaia patch actually
-	// measured off the Galactic plane, 8.05e-10 W m^-2 sr^-1 nm^-1 in V. A real
+	// A uniform star map at the radiance the order-6 Gaia patch measured off
+	// the Galactic plane, 8.05e-10 W m^-2 sr^-1 nm^-1 in V.
+	//
+	// That measurement predates the magnitude cut and therefore includes
+	// resolved bright stars, which carry about a fifth of the light at G = 6.
+	// A cut map is the quantity a background model should use, so this figure
+	// is an overestimate of the diffuse background and will move once a cut
+	// map has been built and re-measured. It is a plausible number for a
+	// composition test, not a validated one. A real
 	// map varies by two orders of magnitude between the plane and the caps;
 	// this is the quiet end, so the share integrated starlight takes here is a
 	// floor rather than a typical value.

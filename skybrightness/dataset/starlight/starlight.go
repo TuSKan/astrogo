@@ -213,7 +213,8 @@ func (m *Map) Pixel(band string, pixel int64) (float64, error) {
 func Load(r io.Reader, frame Frame) (*Map, error) {
 	var (
 		names   []string
-		rows    = map[int64][]float64{}
+		pixels  []int64
+		flat    []float64
 		nbands  = -1
 		scanner = bufio.NewScanner(r)
 	)
@@ -249,18 +250,15 @@ func Load(r io.Reader, frame Frame) (*Map, error) {
 				ErrMapFormat, line, len(values), nbands)
 		}
 
-		if _, dup := rows[pixel]; dup {
-			return nil, fmt.Errorf("%w: pixel %d appears twice", ErrMapFormat, pixel)
-		}
-
-		rows[pixel] = values
+		pixels = append(pixels, pixel)
+		flat = append(flat, values...)
 	}
 
 	if err := scanner.Err(); err != nil {
 		return nil, fmt.Errorf("starlight: read map: %w", err)
 	}
 
-	return assemble(rows, names, nbands, frame)
+	return assemble(pixels, flat, names, nbands, frame)
 }
 
 // bandHeader recognises a "# bands: ..." comment.
@@ -321,8 +319,40 @@ func parseRow(text string) (int64, []float64, error) {
 
 // assemble turns parsed rows into a dense map, insisting every pixel is
 // present.
-func assemble(rows map[int64][]float64, names []string, nbands int, frame Frame) (*Map, error) {
-	grid, err := gridFor(len(rows))
+// assemble scatters the parsed rows into per-band arrays.
+//
+// The rows arrive as two flat slices rather than a map from pixel to values.
+// A map of 786,432 single-element slices costs about ninety bytes a pixel in
+// bucket and allocation overhead — measured at 73 MB of heap to load a 6 MB
+// map — and buys only the duplicate check, which a bitmap does for an eighth
+// of a byte.
+func assemble(pixels []int64, flat []float64, names []string, nbands int, frame Frame) (*Map, error) {
+	// Duplicates are found before the pixel count is judged, because a
+	// repeated pixel also makes the count wrong and the count's complaint
+	// would bury the cause.
+	var highest int64
+
+	for _, pixel := range pixels {
+		if pixel > highest {
+			highest = pixel
+		}
+	}
+
+	seen := make([]bool, highest+1)
+
+	for _, pixel := range pixels {
+		if pixel < 0 {
+			return nil, fmt.Errorf("%w: %d is negative", ErrPixelRange, pixel)
+		}
+
+		if seen[pixel] {
+			return nil, fmt.Errorf("%w: pixel %d appears twice", ErrMapFormat, pixel)
+		}
+
+		seen[pixel] = true
+	}
+
+	grid, err := gridFor(len(pixels))
 	if err != nil {
 		return nil, err
 	}
@@ -341,16 +371,16 @@ func assemble(rows map[int64][]float64, names []string, nbands int, frame Frame)
 
 	bands := make(map[string][]float64, nbands)
 	for _, name := range names {
-		bands[name] = make([]float64, len(rows))
+		bands[name] = make([]float64, len(pixels))
 	}
 
-	for pixel, values := range rows {
-		if pixel < 0 || pixel >= grid.NumPixels() {
+	for row, pixel := range pixels {
+		if pixel >= grid.NumPixels() {
 			return nil, fmt.Errorf("%w: %d not in [0, %d)", ErrPixelRange, pixel, grid.NumPixels())
 		}
 
 		for i, name := range names {
-			bands[name][pixel] = values[i]
+			bands[name][pixel] = flat[row*nbands+i]
 		}
 	}
 

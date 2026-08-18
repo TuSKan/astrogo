@@ -691,20 +691,35 @@ different coordinates.
 **The map: server-side Gaia aggregation.** A Gaia `source_id` carries its HEALPix index in
 the high bits, so `source_id / 2^(59-2k)` is the level-k nested pixel and the whole
 aggregation becomes a `GROUP BY` the archive performs. At order 8 — GAMBONS' grid,
-786,432 pixels — that is 787 chunked TAP queries of about two seconds each, against a bulk
-download of at least 649 GB across at least 2,911 files for the same result. Those bulk
-figures are measured from the CDN listing, which was still truncated where the count
-stopped, so the real corpus is larger again. `starlight.BuildFromGaia` does this;
-`starlight.GaiaJohnsonV` supplies the band.
+786,432 pixels — that is 787 chunked TAP queries. **This is heavy use of a shared
+service and is not the recommended path.** `starlight.Fetch` asks about the directions a
+caller intends to observe, which is a single query for a night's target list, and caches
+what it gets; `BuildFromGaia` exists for the case where a whole sky is genuinely wanted.
 
-The bulk files are named for the HEALPix level-8 range they hold
-(`GaiaSource_000000-003111.csv.gz`), which is exactly this aggregation grid, so a bulk
-route would parallelise and resume cleanly. What rules it out is the column ratio:
-`gaia_source` carries about 150 columns, this needs three, and CSV.gz cannot be pruned
-server-side — so it would move roughly 700 GB to use two per cent of it and then redo
-arithmetic the archive performs for free. Bulk becomes the right choice only for
-something TAP cannot aggregate: several orders from one pass, a transformation varied
-without re-querying, or reproducibility pinned to a byte-identical local corpus.
+**What a whole-sky build actually costs, measured.** The first successful run took 38
+minutes. Timing per query is not stable: the same forty-pixel query took 3 seconds when
+the archive was quiet, 18 seconds later the same afternoon, then 182 seconds, and then
+the query endpoint stopped answering altogether — returning no bytes at all, including
+for a deliberately malformed query that should have failed at its parser in milliseconds,
+while ordinary GETs to the same host kept returning 200 throughout. TCP and TLS completed
+normally. That is a service defending itself, not a service that is broken, and three
+whole-sky builds plus some probing in one afternoon is a plausible cause.
+
+Queries are therefore spaced and serialised (`api.WithMinInterval`, two seconds here),
+which roughly doubles a whole-sky build. The cost of getting this wrong is paid by every
+other user of a shared research instrument rather than by us.
+
+The bulk release deserves more credit than an earlier draft of this section gave it. ESA
+publishes `gaia_source` as at least 2,911 files totalling at least 649 GB compressed —
+measured from the CDN listing, which was still truncated where the count stopped. The
+files are named for the HEALPix level-8 range they hold
+(`GaiaSource_000000-003111.csv.gz`), which is exactly this aggregation's grid, so a bulk
+route parallelises and resumes cleanly. Against it: `gaia_source` carries about 150
+columns where this needs three, and CSV.gz cannot be pruned server-side, so it moves
+roughly 700 GB to use two per cent of it. That trade is about *our* bandwidth. The bulk
+files exist precisely so that heavy users do not ask the query service 787 times, and for
+a whole-sky map that argument now looks stronger than the bandwidth one. TAP remains
+clearly right for `Fetch`-scale use: tens of pixels, once per observing session.
 
 **Why the band is a constructor.** Converting Gaia G flux to Johnson V spectral flux
 density needs three published numbers from three sources: G's VEGAMAG zero point
