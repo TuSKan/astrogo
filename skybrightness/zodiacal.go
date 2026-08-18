@@ -350,7 +350,7 @@ func ZodiacalColourCorrection(lambda unit.WavelengthNM, elongation angle.Angle) 
 	return 1 + slope*ratio
 }
 
-// ZodiacalLight accumulates the spectral radiance of sunlight scattered by
+// ZodiacalRadiance accumulates the spectral radiance of sunlight scattered by
 // interplanetary dust into dst.
 //
 // The tabulated 500 nm map is carried to other wavelengths and epochs by
@@ -364,7 +364,7 @@ func ZodiacalColourCorrection(lambda unit.WavelengthNM, elongation angle.Angle) 
 //
 // Directions the table excludes return [ErrZodiacalGeometry] rather than a
 // number.
-func ZodiacalLight(dst SpectralRadiance, grid unit.SpectralGrid, geom ZodiacalGeometry) (Flag, error) {
+func ZodiacalRadiance(dst SpectralRadiance, grid unit.SpectralGrid, geom ZodiacalGeometry) (Flag, error) {
 	if len(dst) != grid.Len() {
 		return 0, fmt.Errorf("%w: %d destination slots, grid has %d",
 			unit.ErrGridMismatch, len(dst), grid.Len())

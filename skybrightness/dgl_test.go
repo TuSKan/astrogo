@@ -57,8 +57,8 @@ func TestDGLAgainstTabulatedSlope(t *testing.T) {
 	dst := skybrightness.NewSpectralRadiance(grid)
 
 	// One MJy/sr of dust, plus the offset that gets subtracted back off.
-	if _, err := skybrightness.DiffuseGalacticLight(dst, grid, 1+skybrightness.DustEmissionOffsetMJy); err != nil {
-		t.Fatalf("DiffuseGalacticLight: %v", err)
+	if _, err := skybrightness.DiffuseGalacticRadiance(dst, grid, 1+skybrightness.DustEmissionOffsetMJy); err != nil {
+		t.Fatalf("DiffuseGalacticRadiance: %v", err)
 	}
 
 	// nu*b*I - nu*c*I^2, in nW m^-2 sr^-1, with nu*c = (3000/0.55)*4.4e-5.
@@ -83,8 +83,8 @@ func TestDGLBelowTheOffsetIsZero(t *testing.T) {
 	for _, sfd := range []float64{0, 0.4, skybrightness.DustEmissionOffsetMJy} {
 		dst := skybrightness.NewSpectralRadiance(grid)
 
-		if _, err := skybrightness.DiffuseGalacticLight(dst, grid, sfd); err != nil {
-			t.Fatalf("DiffuseGalacticLight(%v): %v", sfd, err)
+		if _, err := skybrightness.DiffuseGalacticRadiance(dst, grid, sfd); err != nil {
+			t.Fatalf("DiffuseGalacticRadiance(%v): %v", sfd, err)
 		}
 
 		for i, v := range dst {
@@ -107,8 +107,8 @@ func TestDGLIsNearlyLinearWhenThin(t *testing.T) {
 
 	at := func(dust float64) float64 {
 		dst := skybrightness.NewSpectralRadiance(grid)
-		if _, err := skybrightness.DiffuseGalacticLight(dst, grid, dust+skybrightness.DustEmissionOffsetMJy); err != nil {
-			t.Fatalf("DiffuseGalacticLight: %v", err)
+		if _, err := skybrightness.DiffuseGalacticRadiance(dst, grid, dust+skybrightness.DustEmissionOffsetMJy); err != nil {
+			t.Fatalf("DiffuseGalacticRadiance: %v", err)
 		}
 
 		return dst[0]
@@ -137,8 +137,8 @@ func TestDGLSaturates(t *testing.T) {
 
 	at := func(sfd float64) float64 {
 		dst := skybrightness.NewSpectralRadiance(grid)
-		if _, err := skybrightness.DiffuseGalacticLight(dst, grid, sfd); err != nil {
-			t.Fatalf("DiffuseGalacticLight(%v): %v", sfd, err)
+		if _, err := skybrightness.DiffuseGalacticRadiance(dst, grid, sfd); err != nil {
+			t.Fatalf("DiffuseGalacticRadiance(%v): %v", sfd, err)
 		}
 
 		return dst[0]
@@ -161,9 +161,9 @@ func TestDGLSaturates(t *testing.T) {
 	// hold and the result must be flagged rather than silently zero.
 	dst := skybrightness.NewSpectralRadiance(grid)
 
-	flags, err := skybrightness.DiffuseGalacticLight(dst, grid, 500)
+	flags, err := skybrightness.DiffuseGalacticRadiance(dst, grid, 500)
 	if err != nil {
-		t.Fatalf("DiffuseGalacticLight: %v", err)
+		t.Fatalf("DiffuseGalacticRadiance: %v", err)
 	}
 
 	if dst[0] != 0 {
@@ -231,9 +231,9 @@ func TestDGLOnTheDefaultGridFlagsExtrapolation(t *testing.T) {
 	grid := skybrightness.DefaultOpticalGrid()
 	dst := skybrightness.NewSpectralRadiance(grid)
 
-	flags, err := skybrightness.DiffuseGalacticLight(dst, grid, 5)
+	flags, err := skybrightness.DiffuseGalacticRadiance(dst, grid, 5)
 	if err != nil {
-		t.Fatalf("DiffuseGalacticLight: %v", err)
+		t.Fatalf("DiffuseGalacticRadiance: %v", err)
 	}
 
 	if flags&skybrightness.ExtrapolatedModel == 0 {
@@ -257,14 +257,14 @@ func TestDGLAccumulates(t *testing.T) {
 	}
 
 	once := skybrightness.NewSpectralRadiance(grid)
-	if _, err := skybrightness.DiffuseGalacticLight(once, grid, 5); err != nil {
-		t.Fatalf("DiffuseGalacticLight: %v", err)
+	if _, err := skybrightness.DiffuseGalacticRadiance(once, grid, 5); err != nil {
+		t.Fatalf("DiffuseGalacticRadiance: %v", err)
 	}
 
 	twice := skybrightness.NewSpectralRadiance(grid)
 	for range 2 {
-		if _, err := skybrightness.DiffuseGalacticLight(twice, grid, 5); err != nil {
-			t.Fatalf("DiffuseGalacticLight: %v", err)
+		if _, err := skybrightness.DiffuseGalacticRadiance(twice, grid, 5); err != nil {
+			t.Fatalf("DiffuseGalacticRadiance: %v", err)
 		}
 	}
 
@@ -278,14 +278,14 @@ func TestDGLRejectsBadInput(t *testing.T) {
 
 	grid := skybrightness.DefaultOpticalGrid()
 
-	if _, err := skybrightness.DiffuseGalacticLight(make(skybrightness.SpectralRadiance, 3), grid, 5); !errors.Is(err, unit.ErrGridMismatch) {
+	if _, err := skybrightness.DiffuseGalacticRadiance(make(skybrightness.SpectralRadiance, 3), grid, 5); !errors.Is(err, unit.ErrGridMismatch) {
 		t.Errorf("short destination: err = %v, want ErrGridMismatch", err)
 	}
 
 	dst := skybrightness.NewSpectralRadiance(grid)
 
 	for _, sfd := range []float64{-1, math.NaN(), math.Inf(1)} {
-		if _, err := skybrightness.DiffuseGalacticLight(dst, grid, sfd); !errors.Is(err, skybrightness.ErrDustIntensity) {
+		if _, err := skybrightness.DiffuseGalacticRadiance(dst, grid, sfd); !errors.Is(err, skybrightness.ErrDustIntensity) {
 			t.Errorf("SFD %v: err = %v, want ErrDustIntensity", sfd, err)
 		}
 	}
@@ -299,7 +299,7 @@ func BenchmarkDiffuseGalacticLight(b *testing.B) {
 	b.ResetTimer()
 
 	for range b.N {
-		if _, err := skybrightness.DiffuseGalacticLight(dst, grid, 5); err != nil {
+		if _, err := skybrightness.DiffuseGalacticRadiance(dst, grid, 5); err != nil {
 			b.Fatal(err)
 		}
 	}

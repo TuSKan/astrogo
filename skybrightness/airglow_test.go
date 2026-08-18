@@ -119,8 +119,8 @@ func TestAirglowScalesTheZenithSpectrum(t *testing.T) {
 
 	const z = 60.0
 
-	if _, err := skybrightness.Airglow(dst, grid, zenith, angle.Deg(z), 0); err != nil {
-		t.Fatalf("Airglow: %v", err)
+	if _, err := skybrightness.AirglowRadiance(dst, grid, zenith, angle.Deg(z), 0); err != nil {
+		t.Fatalf("AirglowRadiance: %v", err)
 	}
 
 	want, err := atmosphere.VanRhijn(angle.Deg(z), atmosphere.AirglowLayerHeightM)
@@ -144,8 +144,8 @@ func TestAirglowBrightensTowardTheHorizon(t *testing.T) {
 
 	at := func(z float64) float64 {
 		dst := skybrightness.NewSpectralRadiance(grid)
-		if _, err := skybrightness.Airglow(dst, grid, zenith, angle.Deg(z), 0); err != nil {
-			t.Fatalf("Airglow(%v): %v", z, err)
+		if _, err := skybrightness.AirglowRadiance(dst, grid, zenith, angle.Deg(z), 0); err != nil {
+			t.Fatalf("AirglowRadiance(%v): %v", z, err)
 		}
 
 		return dst[0]
@@ -179,9 +179,9 @@ func TestAirglowFlagsLargeZenithAngles(t *testing.T) {
 	flagsAt := func(z float64) skybrightness.Flag {
 		dst := skybrightness.NewSpectralRadiance(grid)
 
-		flags, err := skybrightness.Airglow(dst, grid, zenith, angle.Deg(z), 0)
+		flags, err := skybrightness.AirglowRadiance(dst, grid, zenith, angle.Deg(z), 0)
 		if err != nil {
-			t.Fatalf("Airglow(%v): %v", z, err)
+			t.Fatalf("AirglowRadiance(%v): %v", z, err)
 		}
 
 		return flags
@@ -215,8 +215,8 @@ func TestAirglowBelowTheHorizon(t *testing.T) {
 	grid, zenith := airglowFixture(t, 1e-9)
 	dst := skybrightness.NewSpectralRadiance(grid)
 
-	if _, err := skybrightness.Airglow(dst, grid, zenith, angle.Deg(95), 0); err != nil {
-		t.Fatalf("Airglow: %v", err)
+	if _, err := skybrightness.AirglowRadiance(dst, grid, zenith, angle.Deg(95), 0); err != nil {
+		t.Fatalf("AirglowRadiance: %v", err)
 	}
 
 	for i, v := range dst {
@@ -232,14 +232,14 @@ func TestAirglowAccumulates(t *testing.T) {
 	grid, zenith := airglowFixture(t, 2e-9)
 
 	once := skybrightness.NewSpectralRadiance(grid)
-	if _, err := skybrightness.Airglow(once, grid, zenith, angle.Deg(30), 0); err != nil {
-		t.Fatalf("Airglow: %v", err)
+	if _, err := skybrightness.AirglowRadiance(once, grid, zenith, angle.Deg(30), 0); err != nil {
+		t.Fatalf("AirglowRadiance: %v", err)
 	}
 
 	twice := skybrightness.NewSpectralRadiance(grid)
 	for range 2 {
-		if _, err := skybrightness.Airglow(twice, grid, zenith, angle.Deg(30), 0); err != nil {
-			t.Fatalf("Airglow: %v", err)
+		if _, err := skybrightness.AirglowRadiance(twice, grid, zenith, angle.Deg(30), 0); err != nil {
+			t.Fatalf("AirglowRadiance: %v", err)
 		}
 	}
 
@@ -254,18 +254,18 @@ func TestAirglowRejectsBadInput(t *testing.T) {
 	grid, zenith := airglowFixture(t, 1e-9)
 	dst := skybrightness.NewSpectralRadiance(grid)
 
-	if _, err := skybrightness.Airglow(make(skybrightness.SpectralRadiance, 2), grid, zenith, 0, 0); !errors.Is(err, unit.ErrGridMismatch) {
+	if _, err := skybrightness.AirglowRadiance(make(skybrightness.SpectralRadiance, 2), grid, zenith, 0, 0); !errors.Is(err, unit.ErrGridMismatch) {
 		t.Errorf("short destination: err = %v, want ErrGridMismatch", err)
 	}
 
-	if _, err := skybrightness.Airglow(dst, grid, make(skybrightness.SpectralRadiance, 2), 0, 0); !errors.Is(err, skybrightness.ErrAirglowSpectrum) {
+	if _, err := skybrightness.AirglowRadiance(dst, grid, make(skybrightness.SpectralRadiance, 2), 0, 0); !errors.Is(err, skybrightness.ErrAirglowSpectrum) {
 		t.Errorf("short spectrum: err = %v, want ErrAirglowSpectrum", err)
 	}
 
 	negative := skybrightness.NewSpectralRadiance(grid)
 	negative[2] = -1
 
-	if _, err := skybrightness.Airglow(dst, grid, negative, 0, 0); !errors.Is(err, skybrightness.ErrAirglowSpectrum) {
+	if _, err := skybrightness.AirglowRadiance(dst, grid, negative, 0, 0); !errors.Is(err, skybrightness.ErrAirglowSpectrum) {
 		t.Errorf("negative spectrum: err = %v, want ErrAirglowSpectrum", err)
 	}
 }
@@ -284,7 +284,7 @@ func BenchmarkAirglow(b *testing.B) {
 	b.ResetTimer()
 
 	for range b.N {
-		if _, err := skybrightness.Airglow(dst, grid, zenith, angle.Deg(45), 0); err != nil {
+		if _, err := skybrightness.AirglowRadiance(dst, grid, zenith, angle.Deg(45), 0); err != nil {
 			b.Fatal(err)
 		}
 	}

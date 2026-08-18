@@ -250,12 +250,12 @@ func TestZodiacalHeliocentricScaling(t *testing.T) {
 	at := func(au float64) float64 {
 		dst := skybrightness.NewSpectralRadiance(grid)
 
-		if _, err := skybrightness.ZodiacalLight(dst, grid, skybrightness.ZodiacalGeometry{
+		if _, err := skybrightness.ZodiacalRadiance(dst, grid, skybrightness.ZodiacalGeometry{
 			DifferentialLongitude: angle.Deg(90),
 			EclipticLatitude:      angle.Deg(0),
 			SunDistanceAU:         au,
 		}); err != nil {
-			t.Fatalf("ZodiacalLight(%v AU): %v", au, err)
+			t.Fatalf("ZodiacalRadiance(%v AU): %v", au, err)
 		}
 
 		return dst[0]
@@ -286,13 +286,13 @@ func TestZodiacalSeasonalTerm(t *testing.T) {
 	at := func(beta, earthLon float64) float64 {
 		dst := skybrightness.NewSpectralRadiance(grid)
 
-		if _, err := skybrightness.ZodiacalLight(dst, grid, skybrightness.ZodiacalGeometry{
+		if _, err := skybrightness.ZodiacalRadiance(dst, grid, skybrightness.ZodiacalGeometry{
 			DifferentialLongitude: angle.Deg(90),
 			EclipticLatitude:      angle.Deg(beta),
 			SunDistanceAU:         1,
 			EarthLongitude:        angle.Deg(earthLon),
 		}); err != nil {
-			t.Fatalf("ZodiacalLight: %v", err)
+			t.Fatalf("ZodiacalRadiance: %v", err)
 		}
 
 		return dst[0]
@@ -325,7 +325,7 @@ func TestZodiacalLightRejectsBadInput(t *testing.T) {
 		SunDistanceAU:         1,
 	}
 
-	if _, err := skybrightness.ZodiacalLight(make(skybrightness.SpectralRadiance, 3), grid, good); !errors.Is(err, unit.ErrGridMismatch) {
+	if _, err := skybrightness.ZodiacalRadiance(make(skybrightness.SpectralRadiance, 3), grid, good); !errors.Is(err, unit.ErrGridMismatch) {
 		t.Errorf("short destination: err = %v, want ErrGridMismatch", err)
 	}
 
@@ -335,7 +335,7 @@ func TestZodiacalLightRejectsBadInput(t *testing.T) {
 		bad := good
 		bad.SunDistanceAU = au
 
-		if _, err := skybrightness.ZodiacalLight(dst, grid, bad); !errors.Is(err, skybrightness.ErrZodiacalGeometry) {
+		if _, err := skybrightness.ZodiacalRadiance(dst, grid, bad); !errors.Is(err, skybrightness.ErrZodiacalGeometry) {
 			t.Errorf("%v AU: err = %v, want ErrZodiacalGeometry", au, err)
 		}
 	}
@@ -357,14 +357,14 @@ func TestZodiacalLightAccumulates(t *testing.T) {
 	}
 
 	once := skybrightness.NewSpectralRadiance(grid)
-	if _, err := skybrightness.ZodiacalLight(once, grid, geom); err != nil {
-		t.Fatalf("ZodiacalLight: %v", err)
+	if _, err := skybrightness.ZodiacalRadiance(once, grid, geom); err != nil {
+		t.Fatalf("ZodiacalRadiance: %v", err)
 	}
 
 	twice := skybrightness.NewSpectralRadiance(grid)
 	for range 2 {
-		if _, err := skybrightness.ZodiacalLight(twice, grid, geom); err != nil {
-			t.Fatalf("ZodiacalLight: %v", err)
+		if _, err := skybrightness.ZodiacalRadiance(twice, grid, geom); err != nil {
+			t.Fatalf("ZodiacalRadiance: %v", err)
 		}
 	}
 
@@ -411,7 +411,7 @@ func BenchmarkZodiacalLight(b *testing.B) {
 	b.ResetTimer()
 
 	for range b.N {
-		if _, err := skybrightness.ZodiacalLight(dst, grid, geom); err != nil {
+		if _, err := skybrightness.ZodiacalRadiance(dst, grid, geom); err != nil {
 			b.Fatal(err)
 		}
 	}

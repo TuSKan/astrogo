@@ -13,7 +13,7 @@ import (
 // destination grid.
 var ErrAirglowSpectrum = errors.New("skybrightness: airglow zenith spectrum must be on the destination grid")
 
-// Airglow accumulates the chemiluminescent emission of the upper atmosphere
+// AirglowRadiance accumulates the chemiluminescent emission of the upper atmosphere
 // into dst, from a zenith spectrum and the viewing zenith angle.
 //
 //   - Model: Leinert et al. (1998) Eq. 13, the van Rhijn function, applied to
@@ -40,7 +40,7 @@ var ErrAirglowSpectrum = errors.New("skybrightness: airglow zenith spectrum must
 // The result carries [ClimatologicalAirglow] unless the caller's own flags say
 // otherwise, because a supplied reference spectrum is climatology until it is
 // tied to a measurement of the night in question.
-func Airglow(
+func AirglowRadiance(
 	dst SpectralRadiance,
 	grid unit.SpectralGrid,
 	zenith SpectralRadiance,

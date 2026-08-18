@@ -152,7 +152,7 @@ func dimensionlessSlope(row dglCoefficient) float64 {
 	return row.NuB * float64(row.Lambda) / 1000 / 3000
 }
 
-// DiffuseGalacticLight accumulates the spectral radiance of starlight
+// DiffuseGalacticRadiance accumulates the spectral radiance of starlight
 // scattered by interstellar dust into dst, from the 100 micron intensity of
 // the Schlegel, Finkbeiner & Davis (1998) map along that line of sight.
 //
@@ -181,7 +181,7 @@ func dimensionlessSlope(row dglCoefficient) float64 {
 // DGL-to-integrated-starlight ratio at 0.35, after Toller (1981). That needs
 // the starlight in the same direction, which this function does not have, so
 // it belongs to whatever assembles the natural sky from its parts.
-func DiffuseGalacticLight(dst SpectralRadiance, grid unit.SpectralGrid, sfdIntensity float64) (Flag, error) {
+func DiffuseGalacticRadiance(dst SpectralRadiance, grid unit.SpectralGrid, sfdIntensity float64) (Flag, error) {
 	if len(dst) != grid.Len() {
 		return 0, fmt.Errorf("%w: %d destination slots, grid has %d",
 			unit.ErrGridMismatch, len(dst), grid.Len())

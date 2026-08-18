@@ -765,25 +765,32 @@ meteor-rate arithmetic from sky brightness entirely.
 
 ## 15. Phase roadmap
 
-**What the module can and cannot do today.** Two `Component`s are implemented,
-`ScatteredMoonlight` and `ArtificialSkyglow`. The first validates end to end: a near-full Moon at Paranal comes out at
-**18.9 mag/arcsec² in V**, against a long-established full-moon sky brightness of about 18.
-That number is independent of every paper in the chain, so landing on it exercises ROLO's
-reflectance, the Ω/π conversion, both inverse squares, the Rayleigh optical depth, the
-phase function and the transfer integral all at once.
+**What the module can and cannot do today.** All five components are implemented and the
+engine runs them together. Assembled over Paranal on a moonless night — a reference airglow
+spectrum, a stand-in uniform dust map and one modest city 30 km away — it produces:
 
-`ArtificialSkyglow` has no comparable external anchor, so it is tested on the model's own
-physical claims: falling with distance, summing linearly, responding to shielding, and the
-azimuthal structure described in §11.1. `skybrightness/dataset/viirs` supplies its sources
-from NASA's annual composites — but see §17: Eq. 2 has no source-area term, so a
-raster-derived prediction's **absolute** scale is not yet meaningful, only its directional
-and relative structure.
+| Component | Radiance at 554 nm | Share | mag/arcsec² |
+| :--- | ---: | ---: | ---: |
+| Airglow | 1.52×10⁻⁹ | 40.5% | 22.52 |
+| Zodiacal | 1.34×10⁻⁹ | 35.6% | 22.66 |
+| Artificial | 8.18×10⁻¹⁰ | 21.8% | 23.19 |
+| Diffuse galactic | 7.79×10⁻¹¹ | 2.1% | 25.74 |
+| Moonlight | — | — | absent, new Moon |
+| **Total** | | | **21.48** |
 
-What is still missing is the *natural* sky. A `Model` holding these two predicts moonlight
-and artificial light only — no airglow, no starlight, no zodiacal light — so a moonless
-night far from any city returns zero. That is a correct answer to the question asked and
-the wrong answer to the question a user probably meant; the `Quality` flags are what carry
-the difference, and Phase 2 is what closes it.
+Paranal's real moonless V sky is 21.5 to 22.0 mag arcsec⁻², and Leinert et al. and Masana et
+al. both put airglow first among the natural terms with zodiacal light second. Both the
+total and the ordering come out right, which is a stronger check than any single component's
+because a term entering with the wrong scale would leave the total plausible while the
+composition was wrong. `TestFullSkyComponentShares` asserts it.
+
+One term is still absent: **integrated starlight**, which needs a map. `dataset/starlight`
+holds the map type, its loader and a Gaia TAP builder; what it does not yet hold is data.
+Until it does, the Milky Way is missing from the sky this engine draws, and a sightline
+along the galactic plane is underestimated accordingly.
+
+Performance: 287 µs per direction with all five components and per-scene caches warm, 40
+allocations.
 
 | Phase | Content | State |
 | :--- | :--- | :--- |
