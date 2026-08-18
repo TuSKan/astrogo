@@ -94,6 +94,12 @@ func assembleSky(t *testing.T, when gotime.Time) (*skybrightness.Model, *skybrig
 	// map varies by two orders of magnitude between the plane and the caps;
 	// this is the quiet end, so the share integrated starlight takes here is a
 	// floor rather than a typical value.
+	//
+	// The value was measured in Johnson V and is normalised here against the
+	// synthetic band the rest of this file uses. The two overlap closely enough
+	// for a composition test on a smooth solar-like shape, but it is the
+	// mismatch StarMap's own documentation warns about, and a production caller
+	// passes the band its map was actually built for.
 	stars, err := skybrightness.NewIntegratedStarlight(
 		uniformSky{value: 8.05e-10, galactic: true}, solarShape(grid), grid, testBand())
 	if err != nil {
