@@ -441,6 +441,42 @@ for this component: amplification and screening must both emerge from geometry a
 Regimes to test: pristine clear, urban clear, thin cloud, broken cloud, cloud over the
 observer, cloud over the source city, cloud between city and observer, overcast.
 
+### 11.2b Zodiacal light and diffuse galactic light
+
+**Zodiacal light** — Leinert et al. (1998) Table 17 for the 500 nm spatial distribution,
+Eq. 22 for the colour correction, with the heliocentric `R^-2.3` and the high-latitude
+seasonal factor applied as Masana et al. (2021) Eq. 18 does.
+
+| Piece | Go function | Validation test |
+| :--- | :--- | :--- |
+| Table 17 map | `ZodiacalBrightnessAt` | `TestZodiacalPoleMatchesKnownBrightness`, `…TableCorners` |
+| Eq. 22 colour | `ZodiacalColourCorrection` | `TestZodiacalColourCorrectionSign` |
+| Full component | `ZodiacalLight` | `…HeliocentricScaling`, `…SeasonalTerm` |
+
+**The external anchor:** the ecliptic pole comes out at **23.26 mag/arcsec² in V**. A dark
+site's total V sky brightness is around 22.0 and zodiacal light is roughly a quarter of it
+at high ecliptic latitude, which puts the component near 23.5 — so landing at 23.3
+exercises the table's `10⁻⁸` prefix, the per-micron to per-nanometre conversion and the
+separately quoted pole value at once. A factor of ten anywhere shows up as 2.5 magnitudes.
+
+**The solar vicinity is refused, not extrapolated.** Table 17 is blank within roughly 15° of
+the Sun, where the brightness climbs by another order of magnitude. `ErrZodiacalGeometry`
+is returned there; a night-sky model has no business reporting a number a few degrees from
+the Sun.
+
+**A numerical trap worth recording.** `angle.Angle` holds radians, so a direction given in
+degrees round-trips imprecisely — `angle.Deg(15).Degrees()` is 14.999999999999998. Without
+snapping, a direction sitting exactly on a grid line gives the neighbouring cell a weight of
+4×10⁻¹⁶. Harmless in an ordinary interpolation; fatal at the edge of the blank region, where
+that neighbour is missing and a vanishing weight still vetoes the lookup. It cost the
+brightest cell in the table. `bracketAxis` now snaps within `gridSnapTolerance`, and the
+corner weights are computed *before* the missing-data check so a zero-weight blank never
+vetoes anything. This is the third time this session that a degree-to-radian round trip has
+bitten on an exact grid line — see also the HEALPix 45° face boundary.
+
+**Diffuse galactic light** — see §17 for the Kawara et al. (2017) coefficient reading;
+`DiffuseGalacticLight` implements Eq. 7 over the SFD 100 µm map.
+
 ### 11.3 Moon — Kieffer & Stone (2005) reflectance, Winkler (2022) scattering
 
 **Goal.** Spectral moonlight scattered into the line of sight.
