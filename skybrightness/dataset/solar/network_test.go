@@ -20,6 +20,7 @@ import (
 func reachable(t *testing.T) {
 	t.Helper()
 
+	//nolint:noctx // a reachability pre-check, not a request that should honour a deadline
 	c, err := net.DialTimeout("tcp", "archive.stsci.edu:443", 5*time.Second)
 	if err != nil {
 		t.Skipf("CALSPEC archive unreachable: %v", err)

@@ -21,6 +21,7 @@ import (
 func TestGaiaQueryIsAcceptedByTheArchive(t *testing.T) {
 	t.Parallel()
 
+	//nolint:noctx // a reachability pre-check, not a request that should honour a deadline
 	if c, err := net.DialTimeout("tcp", "gea.esac.esa.int:443", 5*time.Second); err != nil {
 		t.Skipf("Gaia archive unreachable: %v", err)
 	} else {
