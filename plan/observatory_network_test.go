@@ -7,7 +7,8 @@ import (
 	"errors"
 	"net"
 	"testing"
-	"time"
+
+	"github.com/TuSKan/astrogo/internal/testutil"
 )
 
 // requireGeocoding skips when either service the address lookup needs is
@@ -18,12 +19,7 @@ func requireGeocoding(t *testing.T) {
 	t.Helper()
 
 	for _, host := range []string{"nominatim.openstreetmap.org:443", "api.open-elevation.com:443"} {
-		conn, err := net.DialTimeout("tcp", host, 5*time.Second)
-		if err != nil {
-			t.Skipf("%s unreachable, skipping live test: %v", host, err)
-		}
-
-		_ = conn.Close()
+		testutil.RequireReachable(t, host)
 	}
 }
 

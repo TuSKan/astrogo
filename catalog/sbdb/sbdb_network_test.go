@@ -5,9 +5,10 @@ package sbdb
 import (
 	"context"
 	"math"
-	"net"
 	"testing"
 	"time"
+
+	"github.com/TuSKan/astrogo/internal/testutil"
 
 	"github.com/TuSKan/astrogo/catalog/resolve"
 )
@@ -18,12 +19,7 @@ import (
 func requireSBDB(t *testing.T) {
 	t.Helper()
 
-	conn, err := net.DialTimeout("tcp", "ssd-api.jpl.nasa.gov:443", 5*time.Second)
-	if err != nil {
-		t.Skipf("SBDB unreachable, skipping live test: %v", err)
-	}
-
-	_ = conn.Close()
+	testutil.RequireReachable(t, "ssd-api.jpl.nasa.gov:443")
 }
 
 func TestSBDBNetworkResolve(t *testing.T) {

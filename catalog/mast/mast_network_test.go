@@ -4,9 +4,10 @@ package mast
 
 import (
 	"context"
-	"net"
 	"testing"
 	"time"
+
+	"github.com/TuSKan/astrogo/internal/testutil"
 
 	"github.com/TuSKan/astrogo/catalog/resolve"
 )
@@ -17,12 +18,7 @@ import (
 func requireMast(t *testing.T) {
 	t.Helper()
 
-	conn, err := net.DialTimeout("tcp", "mast.stsci.edu:443", 5*time.Second)
-	if err != nil {
-		t.Skipf("MAST unreachable, skipping live test: %v", err)
-	}
-
-	_ = conn.Close()
+	testutil.RequireReachable(t, "mast.stsci.edu:443")
 }
 
 func TestMastNetworkResolve(t *testing.T) {

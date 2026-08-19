@@ -6,9 +6,10 @@ import (
 	"context"
 	"errors"
 	"math"
-	"net"
 	"testing"
 	"time"
+
+	"github.com/TuSKan/astrogo/internal/testutil"
 
 	"github.com/TuSKan/astrogo/magnitude"
 	"github.com/TuSKan/astrogo/remote"
@@ -20,13 +21,7 @@ import (
 func reachable(t *testing.T) {
 	t.Helper()
 
-	//nolint:noctx // a reachability pre-check, not a request that should honour a deadline
-	c, err := net.DialTimeout("tcp", "archive.stsci.edu:443", 5*time.Second)
-	if err != nil {
-		t.Skipf("CALSPEC archive unreachable: %v", err)
-	}
-
-	_ = c.Close()
+	testutil.RequireReachable(t, "archive.stsci.edu:443")
 }
 
 // The convenience constructor is the whole reason the moonlight component is

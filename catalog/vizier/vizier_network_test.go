@@ -4,9 +4,10 @@ package vizier
 
 import (
 	"context"
-	"net"
 	"testing"
 	"time"
+
+	"github.com/TuSKan/astrogo/internal/testutil"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/catalog/resolve"
@@ -43,12 +44,7 @@ func skipOnServerUnavailable(t *testing.T, err error) {
 func requireVizier(t *testing.T) {
 	t.Helper()
 
-	conn, err := net.DialTimeout("tcp", "tapvizier.u-strasbg.fr:80", 5*time.Second)
-	if err != nil {
-		t.Skipf("VizieR unreachable, skipping live test: %v", err)
-	}
-
-	_ = conn.Close()
+	testutil.RequireReachable(t, "tapvizier.u-strasbg.fr:80")
 }
 
 // coneSearchWithRetry runs req up to 3 times, retrying on ANY error with a

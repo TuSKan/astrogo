@@ -12,9 +12,10 @@ package norad
 
 import (
 	"context"
-	"net"
 	"testing"
 	"time"
+
+	"github.com/TuSKan/astrogo/internal/testutil"
 )
 
 // requireCelestrak skips the test when the CelestTrak API endpoint is
@@ -23,12 +24,7 @@ import (
 func requireCelestrak(t *testing.T) {
 	t.Helper()
 
-	conn, err := net.DialTimeout("tcp", "celestrak.org:443", 5*time.Second)
-	if err != nil {
-		t.Skipf("CelestTrak unreachable, skipping live test: %v", err)
-	}
-
-	_ = conn.Close()
+	testutil.RequireReachable(t, "celestrak.org:443")
 }
 
 func TestFetchISS_Live(t *testing.T) {

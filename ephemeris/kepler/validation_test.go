@@ -7,13 +7,11 @@ import (
 	"fmt"
 	"io"
 	"math"
-	"net"
 	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/ephemeris/kepler"
@@ -28,12 +26,7 @@ import (
 func requireHorizons(t *testing.T) {
 	t.Helper()
 
-	conn, err := net.DialTimeout("tcp", "ssd.jpl.nasa.gov:443", 5*time.Second)
-	if err != nil {
-		t.Skipf("JPL Horizons unreachable, skipping live test: %v", err)
-	}
-
-	_ = conn.Close()
+	testutil.RequireReachable(t, "ssd.jpl.nasa.gov:443")
 }
 
 // horizonsGet issues a GET against the Horizons API and returns the

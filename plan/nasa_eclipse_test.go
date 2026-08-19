@@ -22,13 +22,14 @@ import (
 	"fmt"
 	"io"
 	"math"
-	"net"
 	"net/http"
 	"regexp"
 	"strconv"
 	"strings"
 	"testing"
 	gotime "time"
+
+	"github.com/TuSKan/astrogo/internal/testutil"
 
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/plan"
@@ -266,12 +267,7 @@ func parseNASASolarEclipses(html string) []nasaEclipseRef {
 func requireNASA(t *testing.T) {
 	t.Helper()
 
-	conn, err := net.DialTimeout("tcp", "eclipse.gsfc.nasa.gov:443", 5*gotime.Second)
-	if err != nil {
-		t.Skipf("NASA eclipse catalog unreachable, skipping: %v", err)
-	}
-
-	_ = conn.Close()
+	testutil.RequireReachable(t, "eclipse.gsfc.nasa.gov:443")
 }
 
 // nasaBudgetOK reports whether at least margin remains before the ambient

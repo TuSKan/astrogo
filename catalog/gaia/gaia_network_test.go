@@ -9,6 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/TuSKan/astrogo/internal/testutil"
+
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/coord"
@@ -20,12 +22,7 @@ import (
 func requireGaia(t *testing.T) {
 	t.Helper()
 
-	conn, err := net.DialTimeout("tcp", "gea.esac.esa.int:443", 5*time.Second)
-	if err != nil {
-		t.Skipf("Gaia TAP unreachable, skipping live test: %v", err)
-	}
-
-	_ = conn.Close()
+	testutil.RequireReachable(t, "gea.esac.esa.int:443")
 }
 
 // skipIfUnresponsive turns a timed-out query into a skip. The TCP

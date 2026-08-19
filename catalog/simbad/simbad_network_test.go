@@ -4,9 +4,10 @@ package simbad
 
 import (
 	"context"
-	"net"
 	"testing"
 	"time"
+
+	"github.com/TuSKan/astrogo/internal/testutil"
 
 	"github.com/TuSKan/astrogo/catalog/resolve"
 )
@@ -17,12 +18,7 @@ import (
 func requireSimbad(t *testing.T) {
 	t.Helper()
 
-	conn, err := net.DialTimeout("tcp", "simbad.cds.unistra.fr:80", 5*time.Second)
-	if err != nil {
-		t.Skipf("SIMBAD unreachable, skipping live test: %v", err)
-	}
-
-	_ = conn.Close()
+	testutil.RequireReachable(t, "simbad.cds.unistra.fr:80")
 }
 
 func TestSimbadNetworkResolve(t *testing.T) {

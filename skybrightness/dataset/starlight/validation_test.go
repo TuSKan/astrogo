@@ -5,9 +5,10 @@ package starlight_test
 import (
 	"context"
 	"math"
-	"net"
 	"testing"
 	"time"
+
+	"github.com/TuSKan/astrogo/internal/testutil"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
@@ -27,12 +28,7 @@ import (
 //
 // This builds a small patch of real sky and asserts that number.
 func TestGaiaMapMatchesThePublishedSurfaceBrightness(t *testing.T) {
-	//nolint:noctx // a reachability pre-check, not a request that should honour a deadline
-	if c, err := net.DialTimeout("tcp", "gea.esac.esa.int:443", 5*time.Second); err != nil {
-		t.Skipf("Gaia archive unreachable: %v", err)
-	} else {
-		_ = c.Close()
-	}
+	testutil.RequireReachable(t, "gea.esac.esa.int:443")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
@@ -144,12 +140,7 @@ func runOf(t *testing.T, grid coord.HEALPix, n int, want func(b angle.Angle) boo
 // mag arcsec^-2. This samples sixteen pixels of each rather than 786,432, so
 // the bound is loose, but a washed-out contrast is unmissable.
 func TestGaiaMapPutsTheMilkyWayInThePlane(t *testing.T) {
-	//nolint:noctx // a reachability pre-check, not a request that should honour a deadline
-	if c, err := net.DialTimeout("tcp", "gea.esac.esa.int:443", 5*time.Second); err != nil {
-		t.Skipf("Gaia archive unreachable: %v", err)
-	} else {
-		_ = c.Close()
-	}
+	testutil.RequireReachable(t, "gea.esac.esa.int:443")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()

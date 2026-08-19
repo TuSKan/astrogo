@@ -5,9 +5,10 @@ package crosssection_test
 import (
 	"context"
 	"math"
-	"net"
 	"testing"
 	"time"
+
+	"github.com/TuSKan/astrogo/internal/testutil"
 
 	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/skybrightness/dataset/crosssection"
@@ -22,12 +23,7 @@ import (
 // nm, four orders of magnitude apart. Both are properties of the molecule, not
 // of this repository.
 func TestOzoneMatchesItsKnownBands(t *testing.T) {
-	//nolint:noctx // a reachability pre-check, not a request that should honour a deadline
-	if c, err := net.DialTimeout("tcp", "www.uv-vis-spectral-atlas-mainz.org:443", 5*time.Second); err != nil {
-		t.Skipf("MPI-Mainz atlas unreachable: %v", err)
-	} else {
-		_ = c.Close()
-	}
+	testutil.RequireReachable(t, "www.uv-vis-spectral-atlas-mainz.org:443")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
 	defer cancel()

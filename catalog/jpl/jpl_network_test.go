@@ -4,9 +4,10 @@ package jpl
 
 import (
 	"context"
-	"net"
 	"testing"
 	"time"
+
+	"github.com/TuSKan/astrogo/internal/testutil"
 
 	"github.com/TuSKan/astrogo/catalog/resolve"
 )
@@ -17,12 +18,7 @@ import (
 func requireHorizons(t *testing.T) {
 	t.Helper()
 
-	conn, err := net.DialTimeout("tcp", "ssd.jpl.nasa.gov:443", 5*time.Second)
-	if err != nil {
-		t.Skipf("JPL Horizons unreachable, skipping live test: %v", err)
-	}
-
-	_ = conn.Close()
+	testutil.RequireReachable(t, "ssd.jpl.nasa.gov:443")
 }
 
 // TestJPLNetworkResolve confirms the provider reaches the live Horizons API

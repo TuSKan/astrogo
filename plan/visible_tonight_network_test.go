@@ -4,7 +4,6 @@ package plan_test
 
 import (
 	"context"
-	"net"
 	"testing"
 
 	"github.com/TuSKan/astrogo/catalog/resolve"
@@ -23,12 +22,7 @@ import (
 func requireJPL(t *testing.T) {
 	t.Helper()
 
-	conn, err := net.DialTimeout("tcp", "ssd-api.jpl.nasa.gov:443", 5*time.Second)
-	if err != nil {
-		t.Skipf("JPL unreachable, skipping live test: %v", err)
-	}
-
-	_ = conn.Close()
+	testutil.RequireReachable(t, "ssd-api.jpl.nasa.gov:443")
 }
 
 // TestVisibleTonight_MinorBodiesRespectMagLimit is the live end-to-end

@@ -5,10 +5,11 @@ package starlight_test
 import (
 	"context"
 	"errors"
-	"net"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/TuSKan/astrogo/internal/testutil"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
@@ -25,12 +26,7 @@ import (
 func TestGaiaQueryIsAcceptedByTheArchive(t *testing.T) {
 	t.Parallel()
 
-	//nolint:noctx // a reachability pre-check, not a request that should honour a deadline
-	if c, err := net.DialTimeout("tcp", "gea.esac.esa.int:443", 5*time.Second); err != nil {
-		t.Skipf("Gaia archive unreachable: %v", err)
-	} else {
-		_ = c.Close()
-	}
+	testutil.RequireReachable(t, "gea.esac.esa.int:443")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
 	defer cancel()
@@ -86,12 +82,7 @@ func TestGaiaQueryIsAcceptedByTheArchive(t *testing.T) {
 // will parse and answer in a reasonable time, which is the whole premise of
 // fetching narrowly instead of building a sky.
 func TestFetchAnswersATargetList(t *testing.T) {
-	//nolint:noctx // a reachability pre-check, not a request that should honour a deadline
-	if c, err := net.DialTimeout("tcp", "gea.esac.esa.int:443", 5*time.Second); err != nil {
-		t.Skipf("Gaia archive unreachable: %v", err)
-	} else {
-		_ = c.Close()
-	}
+	testutil.RequireReachable(t, "gea.esac.esa.int:443")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Minute)
 	defer cancel()

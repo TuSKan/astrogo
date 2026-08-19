@@ -5,9 +5,9 @@
 package fink
 
 import (
-	"net"
 	"testing"
-	"time"
+
+	"github.com/TuSKan/astrogo/internal/testutil"
 )
 
 // requireFink skips the test when the FINK SSOFT API is unreachable — per
@@ -16,12 +16,7 @@ import (
 func requireFink(t *testing.T) {
 	t.Helper()
 
-	conn, err := net.DialTimeout("tcp", "api.ztf.fink-portal.org:443", 5*time.Second)
-	if err != nil {
-		t.Skipf("FINK unreachable, skipping live test: %v", err)
-	}
-
-	_ = conn.Close()
+	testutil.RequireReachable(t, "api.ztf.fink-portal.org:443")
 }
 
 func TestFINKProvider_SingleObjectJSON(t *testing.T) {
