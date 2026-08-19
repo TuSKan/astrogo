@@ -215,17 +215,18 @@ func TestBlanketGrantCoversHorizonsSPKOnly(t *testing.T) {
 // it ungranted.
 func TestDownloadableEndpointsAreExactlyTheExpectedSet(t *testing.T) {
 	want := map[EndpointID]bool{
-		IERSFinals2000A:  true,
-		NAIFSPK:          true,
-		NAIFLSK:          true,
-		OpenNGC:          true,
-		JPLHorizonsSPK:   true,
-		WorldAtlas:       true,
-		VIIRSAnnual:      true,
-		PassbandBundle:   true,
-		CopernicusEODATA: true,
-		CALSPEC:          true,
-		GaiaStarMap:      true,
+		IERSFinals2000A:       true,
+		NAIFSPK:               true,
+		NAIFLSK:               true,
+		OpenNGC:               true,
+		JPLHorizonsSPK:        true,
+		WorldAtlas:            true,
+		VIIRSAnnual:           true,
+		PassbandBundle:        true,
+		CopernicusEODATA:      true,
+		CALSPEC:               true,
+		GaiaStarMap:           true,
+		MPIMainzCrossSections: true,
 	}
 
 	for _, ep := range Endpoints() {

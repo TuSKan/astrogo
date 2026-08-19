@@ -118,6 +118,22 @@ const (
 	// a detail.
 	CALSPEC EndpointID = "stsci.calspec"
 
+	// MPIMainzCrossSections is the MPI-Mainz UV/VIS Spectral Atlas of gaseous
+	// molecules of atmospheric interest (skybrightness/dataset/crosssection).
+	MPIMainzCrossSections EndpointID = "mpimainz.uvvis"
+)
+
+// OzoneSerdyuchenko223K is the ozone cross-section file this module uses.
+//
+// The reference, the temperature and the atlas's own version are all in the
+// name, which is why the endpoint is not Mutable: a different choice arrives
+// under a different name rather than replacing this one. 223 K is the nearest
+// measured temperature to the effective temperature of stratospheric ozone;
+// see docs/skybrightness.md section 16.
+const OzoneSerdyuchenko223K = "Ozone/O3_Serdyuchenko(2014)_223K_213-1100nm(2013 version).txt"
+
+const (
+
 	// GaiaStarMap is the prebuilt integrated-starlight map published with
 	// astrogo's own releases (skybrightness/dataset/starlight).
 	//
@@ -463,6 +479,21 @@ func defaultEndpoints() map[EndpointID]Endpoint {
 			Downloadable:    true,
 			Files:           []string{"passbands-v1.tar.gz"},
 		},
+		MPIMainzCrossSections: {
+			ID:        MPIMainzCrossSections,
+			URL:       "https://www.uv-vis-spectral-atlas-mainz.org/uvvis_data/cross_sections/",
+			Kind:      KindFile,
+			Subsystem: "skybrightness/dataset/crosssection",
+			Description: "MPI-Mainz UV/VIS Spectral Atlas; ozone absorption cross sections of " +
+				"Serdyuchenko et al. (2014), 213-1100 nm at eleven temperatures",
+			ApproxSize:      4 << 20,
+			Enabled:         true,
+			DownloadTimeout: 5 * time.Minute,
+			Mutable:         false, // the reference, temperature and version are in the filename
+			Downloadable:    true,
+			Files:           []string{OzoneSerdyuchenko223K},
+		},
+
 		GaiaStarMap: {
 			ID:        GaiaStarMap,
 			URL:       "https://github.com/TuSKan/astrogo/releases/download/starmap-v1/",
