@@ -40,7 +40,7 @@ func requireHorizons(t *testing.T) {
 // $$SOE/$$EOE-delimited data block.
 func horizonsGet(params url.Values) (string, error) {
 	encoded := strings.ReplaceAll(params.Encode(), "+", "%20")
-	reqURL := fmt.Sprintf("https://ssd.jpl.nasa.gov/api/horizons.api?%s", encoded)
+	reqURL := "https://ssd.jpl.nasa.gov/api/horizons.api?" + encoded
 
 	resp, err := http.Get(reqURL) //nolint:noctx // fixed, trusted host; network-tagged test, not production code
 	if err != nil {

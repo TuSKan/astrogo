@@ -96,11 +96,11 @@ type usnoCelNavEntry struct {
 		Zn  float64 `json:"zn"`
 	} `json:"almanac_data"`
 	AltCorrections struct {
-		IsCorrected bool        `json:"isCorrected"`
-		Refr        interface{} `json:"refr"`
-		PA          interface{} `json:"pa"`
-		SD          interface{} `json:"sd"`
-		Sum         interface{} `json:"sum"`
+		IsCorrected bool `json:"isCorrected"`
+		Refr        any  `json:"refr"`
+		PA          any  `json:"pa"`
+		SD          any  `json:"sd"`
+		Sum         any  `json:"sum"`
 	} `json:"altitude_corrections"`
 }
 
@@ -241,7 +241,9 @@ func parseUSNOTime(s string) (h, m int, ok bool) {
 	if s == "" || s == "null" {
 		return 0, 0, false
 	}
+
 	_, err := fmt.Sscanf(s, "%d:%d", &h, &m)
+
 	return h, m, err == nil
 }
 
@@ -262,21 +264,27 @@ func deltaMinutes(usnoMin, astroMin float64) float64 {
 	if d > 12*60 { // Handle day boundary
 		d = 24*60 - d
 	}
+
 	return d
 }
 
 func newEph(t *testing.T) eph.Provider {
 	t.Helper()
+
 	p, err := eph.NewProvider(context.Background(), eph.Planets, "de442")
 	if err != nil {
 		t.Logf("DE442 unavailable (%v), falling back to default", err)
+
 		def := eph.Default()
 		if def == nil {
 			t.Fatal("Failed to create ephemeris: nil provider")
 		}
+
 		return def
 	}
+
 	t.Cleanup(func() { p.Close() })
+
 	return p
 }
 
@@ -297,6 +305,7 @@ func TestUSNO_SunMoonOneDay(t *testing.T) {
 				if loc.DST {
 					dstParam = "true"
 				}
+
 				url := fmt.Sprintf(
 					"https://aa.usno.navy.mil/api/rstt/oneday?date=%s&coords=%.6f,%.6f&tz=%.0f&height=%.0f&dst=%s",
 					dateStr, loc.Lat, loc.Lon, loc.TZ, loc.Height, dstParam,
@@ -317,10 +326,12 @@ func TestUSNO_SunMoonOneDay(t *testing.T) {
 				if err != nil {
 					t.Fatalf("Failed to load timezone: %v", err)
 				}
+
 				geodetic, err := coord.NewGeodetic(angle.Deg(loc.Lon), angle.Deg(loc.Lat), loc.Height)
 				if err != nil {
 					t.Fatalf("Failed to create geodetic: %v", err)
 				}
+
 				site, err := plan.NewSite(loc.Name, geodetic, plan.WithTimeZone(tz))
 				if err != nil {
 					t.Fatalf("Failed to create site: %v", err)
@@ -340,9 +351,11 @@ func TestUSNO_SunMoonOneDay(t *testing.T) {
 					if !ok {
 						continue
 					}
+
 					usnoMin := minutesFromMidnight(h, m)
 
 					var matchKind plan.EventKind
+
 					switch sp.Phen {
 					case "Rise":
 						matchKind = plan.EventRise
@@ -355,10 +368,12 @@ func TestUSNO_SunMoonOneDay(t *testing.T) {
 					}
 
 					found := false
+
 					for _, ev := range sunEvents {
 						if ev.Kind != matchKind {
 							continue
 						}
+
 						astroMin := eventMinutesIn(ev.Time, tz)
 						delta := deltaMinutes(usnoMin, astroMin)
 						t.Logf("Sun %-12s  USNO=%02d:%02d  astrogo=%s  Δ=%.1f min",
@@ -370,12 +385,16 @@ func TestUSNO_SunMoonOneDay(t *testing.T) {
 						if matchKind == plan.EventTransit {
 							tol = 1.0
 						}
+
 						if delta > tol {
 							t.Errorf("Sun %s: Δ=%.1f min exceeds %.0f min tolerance", sp.Phen, delta, tol)
 						}
+
 						found = true
+
 						break
 					}
+
 					if !found {
 						t.Logf("Sun %s at %02d:%02d: no matching astrogo event found", sp.Phen, h, m)
 					}
@@ -392,9 +411,11 @@ func TestUSNO_SunMoonOneDay(t *testing.T) {
 					if !ok {
 						continue
 					}
+
 					usnoMin := minutesFromMidnight(h, m)
 
 					var matchKind plan.EventKind
+
 					switch mp.Phen {
 					case "Rise":
 						matchKind = plan.EventRise
@@ -407,10 +428,12 @@ func TestUSNO_SunMoonOneDay(t *testing.T) {
 					}
 
 					found := false
+
 					for _, ev := range moonEvents {
 						if ev.Kind != matchKind {
 							continue
 						}
+
 						astroMin := eventMinutesIn(ev.Time, tz)
 						delta := deltaMinutes(usnoMin, astroMin)
 						t.Logf("Moon %-12s  USNO=%02d:%02d  astrogo=%s  Δ=%.1f min",
@@ -422,12 +445,16 @@ func TestUSNO_SunMoonOneDay(t *testing.T) {
 						if matchKind == plan.EventTransit {
 							tol = 1.0
 						}
+
 						if delta > tol {
 							t.Errorf("Moon %s: Δ=%.1f min exceeds %.0f min tolerance", mp.Phen, delta, tol)
 						}
+
 						found = true
+
 						break
 					}
+
 					if !found {
 						t.Logf("Moon %s at %02d:%02d: no matching astrogo event found", mp.Phen, h, m)
 					}
@@ -460,9 +487,11 @@ func TestUSNO_CelNav(t *testing.T) {
 
 	// Validate Sun position
 	var prov eph.Provider
+
 	jplProv, err := eph.NewProvider(context.Background(), eph.Planets, "de442")
 	if err != nil {
 		t.Logf("failed to load jpl de442: %v", err)
+
 		prov = eph.Default()
 	} else {
 		prov = jplProv
@@ -472,6 +501,7 @@ func TestUSNO_CelNav(t *testing.T) {
 		if entry.Object == "ARIES" {
 			continue // GHA Aries is a sidereal reference, skip
 		}
+
 		if entry.AlmanacData.Hc == 0 && entry.AlmanacData.Zn == 0 {
 			continue // No position data
 		}
@@ -479,14 +509,17 @@ func TestUSNO_CelNav(t *testing.T) {
 		// We can validate Sun position via ephemeris
 		if entry.Object == "Sun" {
 			sunTarget := plan.NewSun(prov)
+
 			pos, err := sunTarget.Position(tm)
 			if err != nil {
 				t.Logf("Sun position error: %v", err)
 				continue
 			}
+
 			aa, _ := ctx.ICRSToAltAz(pos)
 
 			deltaAlt := math.Abs(aa.Alt().Degrees() - entry.AlmanacData.Hc)
+
 			deltaAz := math.Abs(aa.Az().Degrees() - entry.AlmanacData.Zn)
 			if deltaAz > 180 {
 				deltaAz = 360 - deltaAz
@@ -500,9 +533,11 @@ func TestUSNO_CelNav(t *testing.T) {
 			if math.Abs(entry.AlmanacData.Hc) < 5.0 {
 				altTol = 1.0 // Near-horizon refraction model differences
 			}
+
 			if deltaAlt > altTol {
 				t.Errorf("Sun altitude Δ=%.4f° exceeds %.1f° tolerance", deltaAlt, altTol)
 			}
+
 			if deltaAz > 0.5 {
 				t.Errorf("Sun azimuth Δ=%.4f° exceeds 0.5° tolerance", deltaAz)
 			}
@@ -549,6 +584,7 @@ func TestUSNO_MoonPhases(t *testing.T) {
 	// Compute astrogo moon phases for Jan-Apr 2026
 	start := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
 	end := time.Date(2026, time.May, 1, 0, 0, 0, 0, time.LocationUTC)
+
 	astroPhases, err := plan.MoonPhases(start, end, eph)
 	if err != nil {
 		t.Fatalf("MoonPhases failed: %v", err)
@@ -573,10 +609,12 @@ func TestUSNO_MoonPhases(t *testing.T) {
 		if !ok {
 			continue
 		}
+
 		usnoTime := time.Date(usnoP.Year, time.Month(usnoP.Month), usnoP.Day, h, m, 0, 0, time.LocationUTC)
 
 		// Find matching astrogo phase
 		found := false
+
 		for _, ap := range astroPhases {
 			if ap.Phase != astroPhase {
 				continue
@@ -593,10 +631,13 @@ func TestUSNO_MoonPhases(t *testing.T) {
 				if delta > 30 {
 					t.Errorf("%s: Δ=%.0f min exceeds 30 min tolerance", usnoP.Phase, delta)
 				}
+
 				found = true
+
 				break
 			}
 		}
+
 		if !found {
 			t.Errorf("%s at %s: no matching astrogo phase found", usnoP.Phase, usnoTime.Format("2006-01-02"))
 		}
@@ -641,10 +682,12 @@ func TestUSNO_Seasons(t *testing.T) {
 		if !ok {
 			continue
 		}
+
 		usnoTime := time.Date(usSeason.Year, time.Month(usSeason.Month), usSeason.Day, h, m, 0, 0, time.LocationUTC)
 
 		// Find matching astrogo season by date proximity
 		found := false
+
 		for _, as := range astroSeasons {
 			delta := math.Abs(as.Time.Sub(usnoTime).Minutes())
 			if delta < 7*24*60 { // Within 7 days
@@ -657,10 +700,13 @@ func TestUSNO_Seasons(t *testing.T) {
 				if delta > 30 {
 					t.Errorf("%s: Δ=%.0f min exceeds 30 min tolerance", as.Season, delta)
 				}
+
 				found = true
+
 				break
 			}
 		}
+
 		if !found {
 			t.Errorf("%s at %s: no matching astrogo season found", usSeason.Phenom, usnoTime.Format("2006-01-02"))
 		}
@@ -689,6 +735,7 @@ func TestUSNO_JulianDate(t *testing.T) {
 			jd := tm.JD()
 			delta := math.Abs(jd - tc.expectedJD)
 			t.Logf("JD: expected=%.1f  astrogo=%.6f  Δ=%.6f days", tc.expectedJD, jd, delta)
+
 			if delta > 0.001 {
 				t.Errorf("JD Δ=%.6f exceeds tolerance", delta)
 			}
@@ -703,7 +750,6 @@ func TestUSNO_SiderealTime(t *testing.T) {
 	// USNO Sidereal Time API may not be REST-accessible; use reference values.
 	// At J2000.0 epoch (2000-01-01 12:00:00 TT), GMST ≈ 18h 41m 50.55s
 	// At 2026-04-06 21:00:00 UT, validate against our computation.
-
 	tz, _ := time.LoadLocation("America/Sao_Paulo")
 	geodetic, _ := coord.NewGeodetic(angle.Deg(-46.6525), angle.Deg(-23.600833), 786)
 	site, _ := plan.NewSite("São Paulo", geodetic, plan.WithTimeZone(tz))
@@ -723,6 +769,7 @@ func TestUSNO_SiderealTime(t *testing.T) {
 			if err != nil {
 				t.Fatalf("LocalSiderealTime failed: %v", err)
 			}
+
 			t.Logf("LST at %s: %s (%.6f°)", tc.name, lst.HMSString(3), lst.Degrees())
 			// Sanity: LST must be in [0, 360)
 			if lst.Degrees() < 0 || lst.Degrees() >= 360 {
@@ -769,14 +816,17 @@ func TestUSNO_Apsides(t *testing.T) {
 		if !ok {
 			continue
 		}
+
 		usnoTime := time.Date(entry.Year, time.Month(entry.Month), entry.Day, h, m, 0, 0, time.LocationUTC)
 
 		// Find matching astrogo apsis
 		found := false
+
 		for _, a := range apsides {
 			if a.Apsis != expectedApsis {
 				continue
 			}
+
 			delta := math.Abs(a.Time.Sub(usnoTime).Minutes())
 			t.Logf("%-12s  USNO=%s  astrogo=%s  Δ=%.0f min  (%.6f AU)",
 				a.Apsis,
@@ -787,9 +837,12 @@ func TestUSNO_Apsides(t *testing.T) {
 			if delta > 120 { // 2-hour tolerance (USNO rounds to nearest minute)
 				t.Errorf("%s: Δ=%.0f min exceeds 120 min tolerance", a.Apsis, delta)
 			}
+
 			found = true
+
 			break
 		}
+
 		if !found {
 			t.Errorf("%s: no matching astrogo event found", entry.Phenom)
 		}
@@ -816,18 +869,21 @@ func TestUSNO_Eclipses(t *testing.T) {
 		knownDates := []string{"2026-03-03", "2026-08-28"}
 
 		t.Logf("Found %d lunar eclipse candidates:", len(eclipses))
+
 		for _, ecl := range eclipses {
 			t.Logf("  %s  β=%.3f°  γ=%.3f", ecl.Time.Format("2006-01-02 15:04"), ecl.EclipticLatitude.Degrees(), ecl.Gamma)
 		}
 
 		for _, expected := range knownDates {
 			found := false
+
 			for _, ecl := range eclipses {
 				if ecl.Time.Format("2006-01-02") == expected {
 					found = true
 					break
 				}
 			}
+
 			if !found {
 				t.Errorf("expected lunar eclipse on %s not detected", expected)
 			}
@@ -843,18 +899,21 @@ func TestUSNO_Eclipses(t *testing.T) {
 		knownDates := []string{"2026-02-17", "2026-08-12"}
 
 		t.Logf("Found %d solar eclipse candidates:", len(eclipses))
+
 		for _, ecl := range eclipses {
 			t.Logf("  %s  β=%.3f°  γ=%.3f", ecl.Time.Format("2006-01-02 15:04"), ecl.EclipticLatitude.Degrees(), ecl.Gamma)
 		}
 
 		for _, expected := range knownDates {
 			found := false
+
 			for _, ecl := range eclipses {
 				if ecl.Time.Format("2006-01-02") == expected {
 					found = true
 					break
 				}
 			}
+
 			if !found {
 				t.Errorf("expected solar eclipse on %s not detected", expected)
 			}
@@ -929,8 +988,11 @@ func TestUSNO_PolarSun(t *testing.T) {
 			}
 
 			// Catalog USNO Sun phenomena — count rise/set vs null entries
-			var hasRise, hasSet, hasTransit bool
-			var riseNull, setNull bool
+			var (
+				hasRise, hasSet, hasTransit bool
+				riseNull, setNull           bool
+			)
+
 			for _, sp := range resp.Properties.Data.SunData {
 				_, _, ok := parseUSNOTime(sp.Time)
 				switch sp.Phen {
@@ -966,6 +1028,7 @@ func TestUSNO_PolarSun(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Failed to create geodetic: %v", err)
 			}
+
 			site, err := plan.NewSite(loc.Name, geodetic, plan.WithTimeZone(time.LocationUTC))
 			if err != nil {
 				t.Fatalf("Failed to create site: %v", err)
@@ -981,6 +1044,7 @@ func TestUSNO_PolarSun(t *testing.T) {
 
 			// Count astrogo events
 			var astroRise, astroSet, astroTransit int
+
 			for _, ev := range sunEvents {
 				switch ev.Kind {
 				case plan.EventRise:
@@ -991,6 +1055,7 @@ func TestUSNO_PolarSun(t *testing.T) {
 					astroTransit++
 				}
 			}
+
 			t.Logf("astrogo Sun events: %d rise, %d set, %d transit", astroRise, astroSet, astroTransit)
 
 			switch tc.expect {
@@ -1000,17 +1065,21 @@ func TestUSNO_PolarSun(t *testing.T) {
 				if hasRise {
 					t.Logf("USNO reports Sun rise during midnight sun — checking astrogo agrees")
 				}
+
 				if hasSet {
 					t.Logf("USNO reports Sun set during midnight sun — checking astrogo agrees")
 				}
+
 				if !hasRise && !hasSet {
 					// Circumpolar: astrogo should have no rise/set either
 					if astroRise != 0 {
 						t.Errorf("Expected 0 Sun rises (midnight sun), got %d", astroRise)
 					}
+
 					if astroSet != 0 {
 						t.Errorf("Expected 0 Sun sets (midnight sun), got %d", astroSet)
 					}
+
 					t.Logf("✓ Both USNO and astrogo agree: Sun does not rise/set (midnight sun)")
 				}
 
@@ -1021,9 +1090,11 @@ func TestUSNO_PolarSun(t *testing.T) {
 					if astroRise != 0 {
 						t.Errorf("Expected 0 Sun rises (polar night), got %d", astroRise)
 					}
+
 					if astroSet != 0 {
 						t.Errorf("Expected 0 Sun sets (polar night), got %d", astroSet)
 					}
+
 					t.Logf("✓ Both USNO and astrogo agree: Sun does not rise/set (polar night)")
 				}
 
@@ -1032,6 +1103,7 @@ func TestUSNO_PolarSun(t *testing.T) {
 				if hasRise && astroRise == 0 {
 					t.Errorf("USNO reports sunrise but astrogo found none")
 				}
+
 				if hasSet && astroSet == 0 {
 					t.Errorf("USNO reports sunset but astrogo found none")
 				}
@@ -1066,7 +1138,7 @@ func TestUSNO_HighAltitude(t *testing.T) {
 	dates := []string{"2026-03-20", "2026-06-21", "2026-12-21"}
 
 	for _, dateStr := range dates {
-		t.Run(fmt.Sprintf("Everest/%s", dateStr), func(t *testing.T) {
+		t.Run("Everest/"+dateStr, func(t *testing.T) {
 			// USNO ignores height — query at height=0 to get their actual reference.
 			url := fmt.Sprintf(
 				"https://aa.usno.navy.mil/api/rstt/oneday?date=%s&coords=%.6f,%.6f&tz=%.2f&height=0&dst=false",
@@ -1105,14 +1177,17 @@ func TestUSNO_HighAltitude(t *testing.T) {
 			if err != nil {
 				t.Fatalf("SunEvents (0m) failed: %v", err)
 			}
+
 			sunEvents, err := plan.SunEvents(start, end, site, eph)
 			if err != nil {
 				t.Fatalf("SunEvents (8849m) failed: %v", err)
 			}
+
 			moonEvents0, err := plan.MoonEvents(start, end, site0, eph)
 			if err != nil {
 				t.Fatalf("MoonEvents (0m) failed: %v", err)
 			}
+
 			moonEvents, err := plan.MoonEvents(start, end, site, eph)
 			if err != nil {
 				t.Fatalf("MoonEvents (8849m) failed: %v", err)
@@ -1120,13 +1195,17 @@ func TestUSNO_HighAltitude(t *testing.T) {
 
 			// ── Part 1: Sea-level astrogo vs USNO (must match ≤2 min) ──
 			t.Log("── Sea-level comparison (astrogo 0m vs USNO) ──")
+
 			for _, sp := range resp.Properties.Data.SunData {
 				h, m, ok := parseUSNOTime(sp.Time)
 				if !ok {
 					continue
 				}
+
 				usnoMin := minutesFromMidnight(h, m)
+
 				var matchKind plan.EventKind
+
 				switch sp.Phen {
 				case "Rise":
 					matchKind = plan.EventRise
@@ -1137,31 +1216,40 @@ func TestUSNO_HighAltitude(t *testing.T) {
 				default:
 					continue
 				}
+
 				for _, ev := range sunEvents0 {
 					if ev.Kind != matchKind {
 						continue
 					}
+
 					astroMin := eventMinutesIn(ev.Time, tz)
 					delta := deltaMinutes(usnoMin, astroMin)
 					t.Logf("Sun %-12s  USNO=%02d:%02d  astrogo(0m)=%s  Δ=%.1f min",
 						sp.Phen, h, m, ev.Time.In(tz).Format("15:04:05"), delta)
+
 					tol := 2.0
 					if matchKind == plan.EventTransit {
 						tol = 1.0
 					}
+
 					if delta > tol {
 						t.Errorf("Sun %s (0m vs USNO): Δ=%.1f min exceeds %.0f min", sp.Phen, delta, tol)
 					}
+
 					break
 				}
 			}
+
 			for _, mp := range resp.Properties.Data.MoonData {
 				h, m, ok := parseUSNOTime(mp.Time)
 				if !ok {
 					continue
 				}
+
 				usnoMin := minutesFromMidnight(h, m)
+
 				var matchKind plan.EventKind
+
 				switch mp.Phen {
 				case "Rise":
 					matchKind = plan.EventRise
@@ -1172,64 +1260,83 @@ func TestUSNO_HighAltitude(t *testing.T) {
 				default:
 					continue
 				}
+
 				for _, ev := range moonEvents0 {
 					if ev.Kind != matchKind {
 						continue
 					}
+
 					astroMin := eventMinutesIn(ev.Time, tz)
 					delta := deltaMinutes(usnoMin, astroMin)
 					t.Logf("Moon %-12s  USNO=%02d:%02d  astrogo(0m)=%s  Δ=%.1f min",
 						mp.Phen, h, m, ev.Time.In(tz).Format("15:04:05"), delta)
+
 					tol := 3.0
 					if matchKind == plan.EventTransit {
 						tol = 1.0
 					}
+
 					if delta > tol {
 						t.Errorf("Moon %s (0m vs USNO): Δ=%.1f min exceeds %.0f min", mp.Phen, delta, tol)
 					}
+
 					break
 				}
 			}
 
 			// ── Part 2: Altitude correction (astrogo 8849m vs 0m) ──
 			t.Log("── Altitude correction (8849m vs 0m) ──")
+
 			logAltEvents := func(label string, events0, events []plan.Event) {
-				var rise0, riseH, set0, setH float64
-				var haveR0, haveRH, haveS0, haveSH bool
+				var (
+					rise0, riseH, set0, setH       float64
+					haveR0, haveRH, haveS0, haveSH bool
+				)
 				for _, ev := range events0 {
 					if ev.Kind == plan.EventRise && !haveR0 {
 						rise0 = eventMinutesIn(ev.Time, tz)
 						haveR0 = true
+
 						t.Logf("%s Rise    (0m)=%s", label, ev.Time.In(tz).Format("15:04:05"))
 					}
+
 					if ev.Kind == plan.EventSet && !haveS0 {
 						set0 = eventMinutesIn(ev.Time, tz)
 						haveS0 = true
+
 						t.Logf("%s Set     (0m)=%s", label, ev.Time.In(tz).Format("15:04:05"))
 					}
 				}
+
 				for _, ev := range events {
 					if ev.Kind == plan.EventRise && !haveRH {
 						riseH = eventMinutesIn(ev.Time, tz)
 						haveRH = true
+
 						t.Logf("%s Rise (8849m)=%s", label, ev.Time.In(tz).Format("15:04:05"))
 					}
+
 					if ev.Kind == plan.EventSet && !haveSH {
 						setH = eventMinutesIn(ev.Time, tz)
 						haveSH = true
+
 						t.Logf("%s Set  (8849m)=%s", label, ev.Time.In(tz).Format("15:04:05"))
 					}
 				}
+
 				if haveR0 && haveRH {
 					shift := rise0 - riseH
 					t.Logf("%s sunrise shift: %.1f min earlier at 8849m", label, shift)
+
 					if shift < 3 {
 						t.Errorf("%s sunrise should be earlier at 8849m (shift=%.1f min)", label, shift)
 					}
 				}
+
 				if haveS0 && haveSH {
 					shift := setH - set0
 					t.Logf("%s sunset shift: %.1f min later at 8849m", label, shift)
+
 					if shift < 3 {
 						t.Errorf("%s sunset should be later at 8849m (shift=%.1f min)", label, shift)
 					}
@@ -1255,7 +1362,7 @@ func TestUSNO_Equator(t *testing.T) {
 	dates := []string{"2026-03-20", "2026-06-21", "2026-12-21"}
 
 	for _, dateStr := range dates {
-		t.Run(fmt.Sprintf("Equator/%s", dateStr), func(t *testing.T) {
+		t.Run("Equator/"+dateStr, func(t *testing.T) {
 			url := fmt.Sprintf(
 				"https://aa.usno.navy.mil/api/rstt/oneday?date=%s&coords=%.6f,%.6f&tz=0&height=0&dst=false",
 				dateStr, loc.Lat, loc.Lon,
@@ -1274,6 +1381,7 @@ func TestUSNO_Equator(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Failed to create geodetic: %v", err)
 			}
+
 			site, err := plan.NewSite(loc.Name, geodetic, plan.WithTimeZone(time.LocationUTC))
 			if err != nil {
 				t.Fatalf("Failed to create site: %v", err)
@@ -1293,9 +1401,11 @@ func TestUSNO_Equator(t *testing.T) {
 				if !ok {
 					continue
 				}
+
 				usnoMin := minutesFromMidnight(h, m)
 
 				var matchKind plan.EventKind
+
 				switch sp.Phen {
 				case "Rise":
 					matchKind = plan.EventRise
@@ -1308,10 +1418,12 @@ func TestUSNO_Equator(t *testing.T) {
 				}
 
 				found := false
+
 				for _, ev := range sunEvents {
 					if ev.Kind != matchKind {
 						continue
 					}
+
 					astroMin := eventMinutesIn(ev.Time, time.LocationUTC)
 					delta := deltaMinutes(usnoMin, astroMin)
 					t.Logf("Sun %-12s  USNO=%02d:%02d  astrogo=%s  Δ=%.1f min",
@@ -1322,36 +1434,46 @@ func TestUSNO_Equator(t *testing.T) {
 					if matchKind == plan.EventTransit {
 						tol = 1.0
 					}
+
 					if delta > tol {
 						t.Errorf("Sun %s: Δ=%.1f min exceeds %.0f min tolerance", sp.Phen, delta, tol)
 					}
+
 					found = true
+
 					break
 				}
+
 				if !found {
 					t.Logf("Sun %s at %02d:%02d: no matching astrogo event", sp.Phen, h, m)
 				}
 			}
 
 			// At the equator, day length should always be ~12h (± 10 min)
-			var riseMin, setMin float64
-			var haveRise, haveSet bool
+			var (
+				riseMin, setMin   float64
+				haveRise, haveSet bool
+			)
 			for _, ev := range sunEvents {
 				if ev.Kind == plan.EventRise && !haveRise {
 					riseMin = eventMinutesIn(ev.Time, time.LocationUTC)
 					haveRise = true
 				}
+
 				if ev.Kind == plan.EventSet && !haveSet {
 					setMin = eventMinutesIn(ev.Time, time.LocationUTC)
 					haveSet = true
 				}
 			}
+
 			if haveRise && haveSet {
 				dayLength := setMin - riseMin
 				if dayLength < 0 {
 					dayLength += 24 * 60
 				}
+
 				t.Logf("Day length at equator: %.1f min (%.1f hours)", dayLength, dayLength/60)
+
 				if math.Abs(dayLength-12*60) > 15 {
 					t.Errorf("Equator day length %.1f min deviates >15 min from 12h", dayLength)
 				}
@@ -1390,6 +1512,7 @@ func TestUSNO_PolarMoon(t *testing.T) {
 			if loc.DST {
 				dstParam = "true"
 			}
+
 			url := fmt.Sprintf(
 				"https://aa.usno.navy.mil/api/rstt/oneday?date=%s&coords=%.6f,%.6f&tz=%.0f&height=%.0f&dst=%s",
 				tc.date, loc.Lat, loc.Lon, loc.TZ, loc.Height, dstParam,
@@ -1402,8 +1525,11 @@ func TestUSNO_PolarMoon(t *testing.T) {
 			}
 
 			// Count USNO Moon events
-			var usnoMoonRise, usnoMoonSet, usnoMoonTransit int
-			var usnoMoonRiseNull, usnoMoonSetNull bool
+			var (
+				usnoMoonRise, usnoMoonSet, usnoMoonTransit int
+				usnoMoonRiseNull, usnoMoonSetNull          bool
+			)
+
 			for _, mp := range resp.Properties.Data.MoonData {
 				_, _, ok := parseUSNOTime(mp.Time)
 				switch mp.Phen {
@@ -1425,6 +1551,7 @@ func TestUSNO_PolarMoon(t *testing.T) {
 					}
 				}
 			}
+
 			t.Logf("USNO Moon: rise=%d(null=%v) set=%d(null=%v) transit=%d",
 				usnoMoonRise, usnoMoonRiseNull, usnoMoonSet, usnoMoonSetNull, usnoMoonTransit)
 
@@ -1433,17 +1560,21 @@ func TestUSNO_PolarMoon(t *testing.T) {
 			fmt.Sscanf(tc.date, "%d-%d-%d", &y, &mo, &d)
 
 			tz := time.LocationUTC
+
 			if loc.TZName != "" {
 				var err error
+
 				tz, err = time.LoadLocation(loc.TZName)
 				if err != nil {
 					t.Fatalf("Failed to load timezone: %v", err)
 				}
 			}
+
 			geodetic, err := coord.NewGeodetic(angle.Deg(loc.Lon), angle.Deg(loc.Lat), loc.Height)
 			if err != nil {
 				t.Fatalf("Failed to create geodetic: %v", err)
 			}
+
 			site, err := plan.NewSite(loc.Name, geodetic, plan.WithTimeZone(tz))
 			if err != nil {
 				t.Fatalf("Failed to create site: %v", err)
@@ -1458,6 +1589,7 @@ func TestUSNO_PolarMoon(t *testing.T) {
 			}
 
 			var astroRise, astroSet, astroTransit int
+
 			for _, ev := range moonEvents {
 				switch ev.Kind {
 				case plan.EventRise:
@@ -1468,6 +1600,7 @@ func TestUSNO_PolarMoon(t *testing.T) {
 					astroTransit++
 				}
 			}
+
 			t.Logf("astrogo Moon events: %d rise, %d set, %d transit", astroRise, astroSet, astroTransit)
 
 			// If USNO says Moon never rises (null), astrogo shouldn't find rises either
@@ -1486,9 +1619,11 @@ func TestUSNO_PolarMoon(t *testing.T) {
 					if !ok {
 						continue
 					}
+
 					usnoMin := minutesFromMidnight(h, m)
 
 					var matchKind plan.EventKind
+
 					switch mp.Phen {
 					case "Rise":
 						matchKind = plan.EventRise
@@ -1501,10 +1636,12 @@ func TestUSNO_PolarMoon(t *testing.T) {
 					}
 
 					found := false
+
 					for _, ev := range moonEvents {
 						if ev.Kind != matchKind {
 							continue
 						}
+
 						astroMin := eventMinutesIn(ev.Time, tz)
 						delta := deltaMinutes(usnoMin, astroMin)
 						t.Logf("Moon %-12s  USNO=%02d:%02d  astrogo=%s  Δ=%.1f min",
@@ -1516,12 +1653,16 @@ func TestUSNO_PolarMoon(t *testing.T) {
 						if matchKind == plan.EventTransit {
 							tol = 2.0
 						}
+
 						if delta > tol {
 							t.Errorf("Moon %s: Δ=%.1f min exceeds %.0f min tolerance", mp.Phen, delta, tol)
 						}
+
 						found = true
+
 						break
 					}
+
 					if !found {
 						t.Logf("Moon %s at %02d:%02d: no matching astrogo event", mp.Phen, h, m)
 					}
@@ -1571,6 +1712,7 @@ func TestUSNO_CelNav_EdgeCases(t *testing.T) {
 			// Set up astrogo context
 			var y, mo, d int
 			fmt.Sscanf(tc.date, "%d-%d-%d", &y, &mo, &d)
+
 			var h, m, s int
 			fmt.Sscanf(tc.utcTime, "%d:%d:%d", &h, &m, &s)
 
@@ -1585,20 +1727,24 @@ func TestUSNO_CelNav_EdgeCases(t *testing.T) {
 				if entry.Object == "ARIES" {
 					continue
 				}
+
 				if entry.AlmanacData.Hc == 0 && entry.AlmanacData.Zn == 0 {
 					continue
 				}
 
 				if entry.Object == "Sun" {
 					sunTarget := plan.NewSun(prov)
+
 					pos, err := sunTarget.Position(tm)
 					if err != nil {
 						t.Logf("Sun position error: %v", err)
 						continue
 					}
+
 					aa, _ := ctx.ICRSToAltAz(pos)
 
 					deltaAlt := math.Abs(aa.Alt().Degrees() - entry.AlmanacData.Hc)
+
 					deltaAz := math.Abs(aa.Az().Degrees() - entry.AlmanacData.Zn)
 					if deltaAz > 180 {
 						deltaAz = 360 - deltaAz
@@ -1612,6 +1758,7 @@ func TestUSNO_CelNav_EdgeCases(t *testing.T) {
 					if math.Abs(entry.AlmanacData.Hc) < 5.0 {
 						altTol = 1.5 // Near-horizon refraction model differences
 					}
+
 					if deltaAlt > altTol {
 						t.Errorf("Sun altitude Δ=%.4f° exceeds %.1f° tolerance", deltaAlt, altTol)
 					}
@@ -1623,11 +1770,13 @@ func TestUSNO_CelNav_EdgeCases(t *testing.T) {
 
 				if entry.Object == "Moon" {
 					moonTarget := plan.NewMoon(prov)
+
 					pos, err := moonTarget.Position(tm)
 					if err != nil {
 						t.Logf("Moon position error: %v", err)
 						continue
 					}
+
 					aa, _ := ctx.ICRSToAltAz(pos)
 
 					deltaAlt := math.Abs(aa.Alt().Degrees() - entry.AlmanacData.Hc)
@@ -1659,8 +1808,10 @@ func TestUSNO_AltitudeShift(t *testing.T) {
 		{"EverestSummit", 8849},
 	}
 
-	var riseTimes []float64
-	var setTimes []float64
+	var (
+		riseTimes []float64
+		setTimes  []float64
+	)
 
 	for _, ac := range altCases {
 		t.Run(ac.name, func(t *testing.T) {
@@ -1668,7 +1819,9 @@ func TestUSNO_AltitudeShift(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Failed to create geodetic: %v", err)
 			}
+
 			tz, _ := time.LoadLocation("Asia/Kathmandu")
+
 			site, err := plan.NewSite(ac.name, geodetic, plan.WithTimeZone(tz))
 			if err != nil {
 				t.Fatalf("Failed to create site: %v", err)
@@ -1702,6 +1855,7 @@ func TestUSNO_AltitudeShift(t *testing.T) {
 	// Verify altitude shift: Everest sunrise should be EARLIER than sea level
 	if len(riseTimes) >= 2 {
 		t.Logf("Sunrise shift (sea→summit): %.1f min", riseTimes[0]-riseTimes[1])
+
 		if riseTimes[1] >= riseTimes[0] {
 			t.Errorf("Everest sunrise (%.1f) should be earlier than sea level (%.1f)", riseTimes[1], riseTimes[0])
 		}
@@ -1709,6 +1863,7 @@ func TestUSNO_AltitudeShift(t *testing.T) {
 	// Verify altitude shift: Everest sunset should be LATER than sea level
 	if len(setTimes) >= 2 {
 		t.Logf("Sunset shift (sea→summit): %.1f min", setTimes[1]-setTimes[0])
+
 		if setTimes[1] <= setTimes[0] {
 			t.Errorf("Everest sunset (%.1f) should be later than sea level (%.1f)", setTimes[1], setTimes[0])
 		}
@@ -1719,14 +1874,17 @@ func TestUSNO_AltitudeShift(t *testing.T) {
 
 func compareSunMoonEvents(t *testing.T, body string, usnoPhenomena []usnoPhenomenon, astroEvents []plan.Event, tz *time.Location, tol float64) {
 	t.Helper()
+
 	for _, sp := range usnoPhenomena {
 		h, m, ok := parseUSNOTime(sp.Time)
 		if !ok {
 			continue
 		}
+
 		usnoMin := minutesFromMidnight(h, m)
 
 		var matchKind plan.EventKind
+
 		switch sp.Phen {
 		case "Rise":
 			matchKind = plan.EventRise
@@ -1742,6 +1900,7 @@ func compareSunMoonEvents(t *testing.T, body string, usnoPhenomena []usnoPhenome
 			if ev.Kind != matchKind {
 				continue
 			}
+
 			astroMin := eventMinutesIn(ev.Time, tz)
 			delta := deltaMinutes(usnoMin, astroMin)
 			t.Logf("%s %-12s  USNO=%02d:%02d  astrogo=%s  Δ=%.1f min",
@@ -1750,6 +1909,7 @@ func compareSunMoonEvents(t *testing.T, body string, usnoPhenomena []usnoPhenome
 			if delta > tol {
 				t.Errorf("%s %s: Δ=%.1f min exceeds %.0f min tolerance", body, sp.Phen, delta, tol)
 			}
+
 			break
 		}
 	}

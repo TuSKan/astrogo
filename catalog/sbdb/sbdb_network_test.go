@@ -1,5 +1,4 @@
 //go:build network
-// +build network
 
 package sbdb
 
@@ -31,6 +30,7 @@ func TestSBDBNetworkResolve(t *testing.T) {
 	requireSBDB(t)
 
 	prov := New()
+
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -38,11 +38,14 @@ func TestSBDBNetworkResolve(t *testing.T) {
 	iter := prov.ResolveObject(ctx, req)
 
 	var targets []resolve.Target
+
 	iter(func(tar resolve.Target, err error) bool {
 		if err != nil {
 			t.Fatalf("Live network failed: %v", err)
 		}
+
 		targets = append(targets, tar)
+
 		return true
 	})
 
@@ -66,6 +69,7 @@ func TestSBDBNetworkResolveOrbitalElements(t *testing.T) {
 	requireSBDB(t)
 
 	prov := New()
+
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -102,6 +106,7 @@ func TestSBDBNetworkSearchBright(t *testing.T) {
 	requireSBDB(t)
 
 	prov := New()
+
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
@@ -214,6 +219,7 @@ func TestSBDBNetworkResolveInterstellar(t *testing.T) {
 	requireSBDB(t)
 
 	prov := New()
+
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 

@@ -109,6 +109,7 @@ func TestPhase1ObserverPipelineAgainstHorizons(t *testing.T) {
 	if azDiff > 180 {
 		azDiff = 360.0 - azDiff
 	}
+
 	altDiff := math.Abs(observed.Alt().Degrees() - marsHorizons.Elevation)
 
 	t.Logf("Topocentric Deviation -> Azimuth: %.3f arcsec, Elevation: %.3f arcsec", azDiff*3600.0, altDiff*3600.0)
@@ -117,6 +118,7 @@ func TestPhase1ObserverPipelineAgainstHorizons(t *testing.T) {
 	if azDiff*3600 > 1.0 {
 		t.Errorf("Topocentric Azimuth mathematically deviated from Horizons by %.3f arcsec", azDiff*3600)
 	}
+
 	if altDiff*3600 > 1.0 {
 		t.Errorf("Topocentric Elevation mathematically deviated from Horizons by %.3f arcsec", altDiff*3600)
 	}

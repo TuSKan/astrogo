@@ -52,7 +52,7 @@ func lnspFixture(t *testing.T) (*file.Bucket, string) {
 
 	bucket := credentialsBucket(t)
 
-	if exists, _ := bucket.Exists(context.Background(), key); !exists { //nolint:errcheck // a failed existence check just means "not present" for this skip
+	if exists, _ := bucket.Exists(context.Background(), key); !exists {
 		t.Skipf("real CAMS file not present at %s/%s -- skipping ground-truth test", credentialsDir, key)
 	}
 
@@ -66,7 +66,7 @@ func aermr01Fixture(t *testing.T) (*file.Bucket, string) {
 
 	bucket := credentialsBucket(t)
 
-	if exists, _ := bucket.Exists(context.Background(), key); !exists { //nolint:errcheck // a failed existence check just means "not present" for this skip
+	if exists, _ := bucket.Exists(context.Background(), key); !exists {
 		t.Skipf("real CAMS file not present at %s/%s -- skipping ground-truth test", credentialsDir, key)
 	}
 
@@ -83,15 +83,18 @@ func TestGroundTruthLnspGrid(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
+
 	t.Cleanup(func() { _ = f.Close() })
 
 	dims := f.Dims()
+
 	want := map[string]int{"longitude": 900, "latitude": 451, "time": 1}
 	for name, n := range want {
 		if dims[name] != n {
 			t.Errorf("Dims()[%q] = %d, want %d (ncdump -h)", name, dims[name], n)
 		}
 	}
+
 	if _, hasLevel := dims["level"]; hasLevel {
 		t.Error(`Dims() has "level", but the real lnsp file has no level dimension (ncdump -h)`)
 	}
@@ -114,6 +117,7 @@ func TestGroundTruthLnspValues(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
+
 	t.Cleanup(func() { _ = f.Close() })
 
 	lnsp, err := f.Var("lnsp")
@@ -164,9 +168,11 @@ func TestGroundTruthAermr01Shape(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
+
 	t.Cleanup(func() { _ = f.Close() })
 
 	dims := f.Dims()
+
 	want := map[string]int{"longitude": 900, "latitude": 451, "level": 137, "time": 1}
 	for name, n := range want {
 		if dims[name] != n {
@@ -182,18 +188,22 @@ func TestGroundTruthAermr01Shape(t *testing.T) {
 	if !aermr.HasLevel() {
 		t.Error("aermr01.HasLevel() = false, want true")
 	}
+
 	if got := aermr.Units(); got != "kg kg**-1" {
 		t.Errorf("aermr01.Units() = %q, want %q (ncdump -h)", got, "kg kg**-1")
 	}
+
 	if got := aermr.LongName(); got != "Sea Salt Aerosol (0.03 - 0.5 um) Mixing Ratio" {
 		t.Errorf("aermr01.LongName() = %q, want %q (ncdump -h)", got, "Sea Salt Aerosol (0.03 - 0.5 um) Mixing Ratio")
 	}
 
 	wantAxes := []string{"time", "level", "latitude", "longitude"}
+
 	gotAxes := aermr.AxisNames()
 	if len(gotAxes) != len(wantAxes) {
 		t.Fatalf("aermr01.AxisNames() = %v, want %v", gotAxes, wantAxes)
 	}
+
 	for i, a := range wantAxes {
 		if gotAxes[i] != a {
 			t.Errorf("aermr01.AxisNames()[%d] = %q, want %q", i, gotAxes[i], a)
@@ -217,6 +227,7 @@ func TestGroundTruthAermrInternalConsistency(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
+
 	t.Cleanup(func() { _ = f.Close() })
 
 	aermr, err := f.Var("aermr01")
@@ -232,6 +243,7 @@ func TestGroundTruthAermrInternalConsistency(t *testing.T) {
 		if err != nil {
 			t.Fatalf("ReadPlane(0,%d): %v", level, err)
 		}
+
 		if len(plane) != latN*lonN {
 			t.Fatalf("ReadPlane(0,%d) len = %d, want %d", level, len(plane), latN*lonN)
 		}

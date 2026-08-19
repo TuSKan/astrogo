@@ -1,5 +1,4 @@
 //go:build network
-// +build network
 
 package simbad
 
@@ -30,6 +29,7 @@ func TestSimbadNetworkResolve(t *testing.T) {
 	requireSimbad(t)
 
 	prov := New()
+
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
@@ -38,11 +38,14 @@ func TestSimbadNetworkResolve(t *testing.T) {
 	iter := prov.ResolveObject(ctx, req)
 
 	var targets []resolve.Target
+
 	iter(func(tar resolve.Target, err error) bool {
 		if err != nil {
 			t.Fatalf("Live network failed: %v", err)
 		}
+
 		targets = append(targets, tar)
+
 		return true
 	})
 
@@ -54,6 +57,7 @@ func TestSimbadNetworkResolve(t *testing.T) {
 	if tgt.ID == "" {
 		t.Errorf("Expected ID populated from live server")
 	}
+
 	if !tgt.HasCoord {
 		t.Fatalf("Expected live coordinates for M31")
 	}
@@ -69,17 +73,21 @@ func TestSimbadNetworkSearchBright(t *testing.T) {
 	requireSimbad(t)
 
 	prov := New()
+
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	iter := prov.SearchBright(ctx, resolve.BrightRequest{MaxVMag: 2, Limit: 20})
 
 	var targets []resolve.Target
+
 	iter(func(tgt resolve.Target, err error) bool {
 		if err != nil {
 			t.Fatalf("live SearchBright failed: %v", err)
 		}
+
 		targets = append(targets, tgt)
+
 		return true
 	})
 

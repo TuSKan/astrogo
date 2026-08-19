@@ -49,6 +49,7 @@ type imcceCard struct {
 
 func fetchIMCCE(t *testing.T, name string) (H, G float64) {
 	t.Helper()
+
 	resp, err := http.Get("https://ssp.imcce.fr/webservices/ssodnet/api/ssocard/" + name)
 	if err != nil {
 		t.Skipf("IMCCE network unavailable: %v", err)
@@ -77,6 +78,7 @@ func fetchIMCCE(t *testing.T, name string) (H, G float64) {
 	}
 
 	t.Logf("IMCCE %s: H=%.3f G=%.3f", card.Title, H, G)
+
 	return H, G
 }
 
@@ -91,6 +93,7 @@ func TestIMCCE_CeresOpposition(t *testing.T) {
 	if math.Abs(mag-expected) > 0.01 {
 		t.Errorf("Ceres at opposition: got %.3f, expected %.3f", mag, expected)
 	}
+
 	t.Logf("Ceres opposition: V=%.2f (H=%.3f from IMCCE)", mag, H)
 }
 
@@ -109,6 +112,7 @@ func TestIMCCE_VestaOpposition(t *testing.T) {
 	if mag > 8 || mag < 3 {
 		t.Errorf("Vesta V=%.2f out of physical range", mag)
 	}
+
 	t.Logf("Vesta opposition: V=%.2f (H=%.3f from IMCCE)", mag, H)
 }
 
@@ -149,6 +153,7 @@ func TestIMCCE_MultiBodyConsistency(t *testing.T) {
 		if mag < 0 || mag > 25 {
 			t.Errorf("%s: V=%.2f out of range (H=%.3f G=%.3f)", name, mag, H, G)
 		}
+
 		t.Logf("%s: V=%.2f at r=%.1f Δ=%.1f α=10° (H=%.3f G=%.3f)", name, mag, r, delta, H, G)
 	}
 }

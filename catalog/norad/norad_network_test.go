@@ -22,10 +22,12 @@ import (
 // CI failures for transient network issues.
 func requireCelestrak(t *testing.T) {
 	t.Helper()
+
 	conn, err := net.DialTimeout("tcp", "celestrak.org:443", 5*time.Second)
 	if err != nil {
 		t.Skipf("CelestTrak unreachable, skipping live test: %v", err)
 	}
+
 	conn.Close()
 }
 
@@ -36,6 +38,7 @@ func TestFetchISS_Live(t *testing.T) {
 	defer cancel()
 
 	p := New()
+
 	gps, err := p.Fetch(ctx, QueryCatNr, "25544")
 	if err != nil {
 		t.Fatalf("Failed to fetch ISS data: %v", err)
@@ -46,6 +49,7 @@ func TestFetchISS_Live(t *testing.T) {
 	}
 
 	gp := gps[0]
+
 	t.Logf("ISS GP Data:")
 	t.Logf("  Name:       %s", gp.ObjectName)
 	t.Logf("  ID:         %s", gp.ObjectID)
@@ -64,6 +68,7 @@ func TestFetchISS_Live(t *testing.T) {
 	if gp.Inclination < 50 || gp.Inclination > 53 {
 		t.Errorf("ISS inclination %.2f° outside expected 50-53° range", gp.Inclination)
 	}
+
 	if gp.MeanMotion < 15 || gp.MeanMotion > 16 {
 		t.Errorf("ISS mean motion %.2f outside expected 15-16 rev/day", gp.MeanMotion)
 	}
@@ -81,6 +86,7 @@ func TestFetchGroup_Live(t *testing.T) {
 	defer cancel()
 
 	p := New()
+
 	gps, err := p.Fetch(ctx, QueryGroup, GroupStations)
 	if err != nil {
 		t.Fatalf("Failed to fetch Stations group: %v", err)
@@ -91,11 +97,13 @@ func TestFetchGroup_Live(t *testing.T) {
 	}
 
 	t.Logf("Fetched %d space stations", len(gps))
+
 	for i, gp := range gps {
 		if i >= 5 {
 			t.Logf("  ... and %d more", len(gps)-5)
 			break
 		}
+
 		t.Logf("  [%d] %s (Cat %d)", i, gp.ObjectName, gp.NoradCatID)
 	}
 }
@@ -104,6 +112,7 @@ func TestResolve_Live(t *testing.T) {
 	requireCelestrak(t)
 
 	p := New()
+
 	target, ok := p.Resolve(context.Background(), "ISS")
 	if !ok {
 		t.Fatal("Failed to resolve ISS")

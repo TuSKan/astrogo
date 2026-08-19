@@ -1,5 +1,4 @@
 //go:build network
-// +build network
 
 package jpl
 
@@ -33,6 +32,7 @@ func TestJPLNetworkResolve(t *testing.T) {
 	requireHorizons(t)
 
 	prov := New()
+
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -83,6 +83,7 @@ func TestJPLNetworkResolveExact(t *testing.T) {
 	requireHorizons(t)
 
 	prov := New()
+
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 

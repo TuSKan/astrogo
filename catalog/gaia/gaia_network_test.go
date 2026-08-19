@@ -1,5 +1,4 @@
 //go:build network
-// +build network
 
 package gaia
 
@@ -47,6 +46,7 @@ func TestGaiaNetworkConeSearch(t *testing.T) {
 	requireGaia(t)
 
 	prov := New()
+
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second) // ESA TAP can be slower
 	defer cancel()
 
@@ -58,13 +58,17 @@ func TestGaiaNetworkConeSearch(t *testing.T) {
 	}
 
 	iter := prov.ConeSearch(ctx, req)
+
 	var targets []resolve.Target
+
 	iter(func(tar resolve.Target, err error) bool {
 		if err != nil {
 			skipIfUnresponsive(t, err)
 			t.Fatalf("Live network failed: %v", err)
 		}
+
 		targets = append(targets, tar)
+
 		return true
 	})
 

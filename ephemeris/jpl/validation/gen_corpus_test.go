@@ -57,6 +57,7 @@ func TestGenerateCorpus(t *testing.T) {
 		stopTime := c.EpochStr[:14] + "01"
 
 		t.Logf("Downloading Baseline %d for %s...", i, c.TargetName)
+
 		data, err := fetchObserverTable(c.TargetID, c.TargetName, c.ObserverLon, c.ObserverLat, c.ObserverEle, c.EpochStr, stopTime)
 		if err != nil {
 			// Live-confirmed this session (curl, isolated from astrogo):
@@ -70,6 +71,7 @@ func TestGenerateCorpus(t *testing.T) {
 			// than fail the whole corpus generation run on it.
 			t.Skipf("Horizons rejected the query for %s: %v (known Horizons limitation, not astrogo — see observer_precision_test.go)", c.TargetName, err)
 		}
+
 		c.Data = data
 
 		vecData, err := fetchVector(c.TargetID, c.TargetName, c.EpochStr, stopTime)
@@ -80,6 +82,7 @@ func TestGenerateCorpus(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Horizons rejected Vector query: %v", err)
 		}
+
 		copy(c.GeoVector[:], vecData.Pos)
 		copy(c.GeoVelocity[:], vecData.Vel)
 	}

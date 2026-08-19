@@ -30,6 +30,7 @@ func (m *mockLinearProvider) State(id eph.ID, t atime.Time) (eph.State, error) {
 	dtDays := (jd1_req - jd1_base) + (jd2_req - jd2_base)
 
 	p := m.pos.Add(m.vel.MulScalar(dtDays))
+
 	return eph.State{Pos: p, Vel: m.vel}, nil
 }
 
@@ -82,6 +83,7 @@ func TestScientificStability(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Failed to parse baseline epoch time string %s: %v", c.EpochStr, err)
 			}
+
 			obsTime := atime.FromGo(parsedTime)
 
 			// Map exactly the true NASA Geocentric Cartesian Vector
@@ -117,10 +119,12 @@ func TestScientificStability(t *testing.T) {
 			observed := obsCtx.GeocentricToObserved(appState.Pos)
 
 			appICRS, _ := eph.ToICRS(appState.Pos)
+
 			dRA_raw := math.Abs(appICRS.RA().Degrees() - c.Data.AstroRA)
 			if dRA_raw > 180.0 {
 				dRA_raw = 360.0 - dRA_raw
 			}
+
 			dRA := dRA_raw * math.Cos(appICRS.Dec().Radians()) * 3600.0
 			dDec := math.Abs(appICRS.Dec().Degrees()-c.Data.AstroDec) * 3600.0
 
@@ -132,6 +136,7 @@ func TestScientificStability(t *testing.T) {
 			if dAzDeg > 180 {
 				dAzDeg = 360.0 - dAzDeg
 			}
+
 			dAz := dAzDeg * math.Cos(observed.Alt().Radians()) * 3600.0
 
 			t.Logf("DEBUG [%s]: AstroRA: %.5f, AppICRS.RA: %.5f | AstroDec: %.5f, AppICRS.Dec: %.5f", c.TargetName, c.Data.AstroRA, appICRS.RA().Degrees(), c.Data.AstroDec, appICRS.Dec().Degrees())

@@ -53,6 +53,7 @@ var phaseEntryRegex = regexp.MustCompile(`([A-Z][a-z]{2})\s+(\d{1,2})\s+(\d{2}):
 // parseAstroPixelsPage parses a century page and returns all phase events.
 func parseAstroPixelsPage(html string) []apPhaseEvent {
 	var events []apPhaseEvent
+
 	currentYear := 0
 
 	// Find all <pre> blocks
@@ -64,10 +65,12 @@ func parseAstroPixelsPage(html string) []apPhaseEvent {
 			inPre = true
 			continue
 		}
+
 		if strings.Contains(rawLine, "</pre>") {
 			inPre = false
 			continue
 		}
+
 		if !inPre {
 			continue
 		}
@@ -108,6 +111,7 @@ func parseAstroPixelsPage(html string) []apPhaseEvent {
 			start, end int
 			phase      plan.MoonPhase
 		}
+
 		cols := []colDef{
 			{8, 24, plan.PhaseNewMoon},
 			{24, 43, plan.PhaseFirstQuarter},
@@ -119,10 +123,9 @@ func parseAstroPixelsPage(html string) []apPhaseEvent {
 			if len(line) < col.start {
 				continue
 			}
-			end := col.end
-			if end > len(line) {
-				end = len(line)
-			}
+
+			end := min(col.end, len(line))
+
 			field := line[col.start:end]
 
 			matches := phaseEntryRegex.FindStringSubmatch(field)
@@ -160,31 +163,39 @@ func parseAstroPixelsPage(html string) []apPhaseEvent {
 			})
 		}
 	}
+
 	return events
 }
 
 // fetchAstroPixelsPage downloads a single AstroPixels century page.
 func fetchAstroPixelsPage(t *testing.T, startYear int) string {
 	t.Helper()
+
 	url := fmt.Sprintf("https://astropixels.com/ephemeris/phasescat/phases%04d.html", startYear)
 	client := &http.Client{Timeout: 30 * time.Second}
-	req, err := http.NewRequest("GET", url, nil)
+
+	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
 		t.Fatalf("Failed to create request for %s: %v", url, err)
 	}
+
 	req.Header.Set("User-Agent", "Mozilla/5.0 (compatible; astrogo-test/1.0)")
+
 	resp, err := client.Do(req)
 	if err != nil {
 		t.Skipf("AstroPixels unreachable, skipping: %v", err)
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode != 200 {
+
+	if resp.StatusCode != http.StatusOK {
 		t.Skipf("AstroPixels returned status %d for %s", resp.StatusCode, url)
 	}
+
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		t.Fatalf("Failed to read AstroPixels response: %v", err)
 	}
+
 	return string(body)
 }
 
@@ -213,9 +224,11 @@ func TestAstroPixels_MoonPhases(t *testing.T) {
 	}
 
 	// Track global statistics
-	var totalEvents, matchedEvents int
-	var totalDelta, maxDelta float64
-	var maxDeltaEvent string
+	var (
+		totalEvents, matchedEvents int
+		totalDelta, maxDelta       float64
+		maxDeltaEvent              string
+	)
 
 	for _, centuryStart := range centuryStarts {
 		t.Run(fmt.Sprintf("Century_%04d", centuryStart), func(t *testing.T) {
@@ -228,9 +241,11 @@ func TestAstroPixels_MoonPhases(t *testing.T) {
 				t.Fatalf("No events parsed — parser may be broken")
 			}
 
-			var centuryDelta float64
-			var centuryMax float64
-			var centuryCount int
+			var (
+				centuryDelta float64
+				centuryMax   float64
+				centuryCount int
+			)
 
 			for _, ref := range refEvents {
 				totalEvents++
@@ -245,16 +260,19 @@ func TestAstroPixels_MoonPhases(t *testing.T) {
 				if err != nil {
 					t.Logf("  SKIP %04d-%02d-%02d %02d:%02d %s: MoonPhases error: %v",
 						ref.Year, ref.Month, ref.Day, ref.Hour, ref.Min, ref.Phase, err)
+
 					continue
 				}
 
 				// Find matching phase
 				bestDelta := math.MaxFloat64
 				found := false
+
 				for _, p := range phases {
 					if p.Phase != ref.Phase {
 						continue
 					}
+
 					delta := math.Abs(p.Time.JD()-ref.JDtd) * 24 * 60 // minutes
 					if delta < bestDelta {
 						bestDelta = delta
@@ -265,15 +283,18 @@ func TestAstroPixels_MoonPhases(t *testing.T) {
 				if !found {
 					t.Errorf("  MISS %04d-%02d-%02d %02d:%02d %-14s: no matching phase found in ±2d window",
 						ref.Year, ref.Month, ref.Day, ref.Hour, ref.Min, ref.Phase)
+
 					continue
 				}
 
 				matchedEvents++
 				centuryDelta += bestDelta
 				centuryCount++
+
 				if bestDelta > centuryMax {
 					centuryMax = bestDelta
 				}
+
 				totalDelta += bestDelta
 				if bestDelta > maxDelta {
 					maxDelta = bestDelta
@@ -301,9 +322,11 @@ func TestAstroPixels_MoonPhases(t *testing.T) {
 
 	t.Logf("\n══════════════════════════════════════════════════════════")
 	t.Logf("AstroPixels Summary: %d/%d events matched", matchedEvents, totalEvents)
+
 	if matchedEvents > 0 {
 		t.Logf("Mean Δ = %.2f min, Max Δ = %.2f min (%s)",
 			totalDelta/float64(matchedEvents), maxDelta, maxDeltaEvent)
 	}
+
 	t.Logf("══════════════════════════════════════════════════════════")
 }

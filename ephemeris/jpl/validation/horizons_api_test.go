@@ -79,20 +79,22 @@ func fetchVector(naifID int, bodyName string, startStr, stopStr string) (*StateV
 	}
 
 	soeIdx := strings.Index(responseStr, "$$SOE")
+
 	eoeIdx := strings.Index(responseStr, "$$EOE")
 	if soeIdx == -1 || eoeIdx == -1 {
 		return nil, fmt.Errorf("ephemeris data not found in response: %s", responseStr[:int(math.Min(float64(len(responseStr)), 500))])
 	}
 
 	csvBlock := responseStr[soeIdx+6 : eoeIdx]
+
 	lines := strings.Split(strings.TrimSpace(csvBlock), "\n")
 	if len(lines) == 0 {
-		return nil, fmt.Errorf("no vector lines found")
+		return nil, errors.New("no vector lines found")
 	}
 
 	cols := strings.Split(lines[0], ",")
 	if len(cols) < 8 {
-		return nil, fmt.Errorf("unexpected column count")
+		return nil, errors.New("unexpected column count")
 	}
 
 	// Safely parse a specific index from the cols slice
@@ -100,6 +102,7 @@ func fetchVector(naifID int, bodyName string, startStr, stopStr string) (*StateV
 		if idx >= len(cols) {
 			return 0, fmt.Errorf("index %d out of bounds for cols length %d", idx, len(cols))
 		}
+
 		return strconv.ParseFloat(strings.TrimSpace(cols[idx]), 64)
 	}
 
@@ -108,11 +111,12 @@ func fetchVector(naifID int, bodyName string, startStr, stopStr string) (*StateV
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse JDTDB: %w", err)
 	}
+
 	etSeconds := (jdTDB - 2451545.0) * 86400.0
 
 	// 2. Parse Positions (X, Y, Z)
 	pos := make([]float64, 3)
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		if pos[i], err = parseIdx(i + 2); err != nil {
 			return nil, fmt.Errorf("failed to parse position axis %d: %w", i, err)
 		}
@@ -120,7 +124,7 @@ func fetchVector(naifID int, bodyName string, startStr, stopStr string) (*StateV
 
 	// 3. Parse Velocities (VX, VY, VZ)
 	vel := make([]float64, 3)
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		if vel[i], err = parseIdx(i + 5); err != nil {
 			return nil, fmt.Errorf("failed to parse velocity axis %d: %w", i, err)
 		}
@@ -193,15 +197,17 @@ func fetchObserverTable(naifID int, bodyName string, lon, lat, height float64, s
 	}
 
 	soeIdx := strings.Index(responseStr, "$$SOE")
+
 	eoeIdx := strings.Index(responseStr, "$$EOE")
 	if soeIdx == -1 || eoeIdx == -1 {
-		return nil, fmt.Errorf("ephemeris data not found in response")
+		return nil, errors.New("ephemeris data not found in response")
 	}
 
 	csvBlock := responseStr[soeIdx+6 : eoeIdx]
+
 	lines := strings.Split(strings.TrimSpace(csvBlock), "\n")
 	if len(lines) == 0 || lines[0] == "" {
-		return nil, fmt.Errorf("no observer lines found")
+		return nil, errors.New("no observer lines found")
 	}
 
 	cols := strings.Split(lines[0], ",")
@@ -226,10 +232,12 @@ func fetchObserverTable(naifID int, bodyName string, lon, lat, height float64, s
 
 	parseAngleStr := func(idx int, isRA bool) float64 {
 		s := strings.TrimSpace(cols[idx])
+
 		parts := strings.Fields(s)
 		if len(parts) != 3 {
 			return 0
 		}
+
 		d, _ := strconv.ParseFloat(parts[0], 64)
 		m, _ := strconv.ParseFloat(parts[1], 64)
 		sec, _ := strconv.ParseFloat(parts[2], 64)
@@ -244,6 +252,7 @@ func fetchObserverTable(naifID int, bodyName string, lon, lat, height float64, s
 		if isRA {
 			val *= 15.0 // Convert hours to degrees
 		}
+
 		return sign * val
 	}
 
@@ -278,10 +287,12 @@ func parseObserverRow(cols []string, bodyName string) ObserverPoint {
 
 	parseAngleStr := func(idx int, isRA bool) float64 {
 		s := strings.TrimSpace(cols[idx])
+
 		parts := strings.Fields(s)
 		if len(parts) != 3 {
 			return 0
 		}
+
 		d, _ := strconv.ParseFloat(parts[0], 64)
 		m, _ := strconv.ParseFloat(parts[1], 64)
 		sec, _ := strconv.ParseFloat(parts[2], 64)
@@ -296,6 +307,7 @@ func parseObserverRow(cols []string, bodyName string) ObserverPoint {
 		if isRA {
 			val *= 15.0
 		}
+
 		return sign * val
 	}
 
@@ -353,9 +365,10 @@ func fetchObserverSeries(naifID int, bodyName string, lon, lat, height float64, 
 	responseStr := string(bodyBytes)
 
 	soeIdx := strings.Index(responseStr, "$$SOE")
+
 	eoeIdx := strings.Index(responseStr, "$$EOE")
 	if soeIdx == -1 || eoeIdx == -1 {
-		return nil, fmt.Errorf("ephemeris data not found in response")
+		return nil, errors.New("ephemeris data not found in response")
 	}
 
 	csvBlock := responseStr[soeIdx+6 : eoeIdx]
@@ -378,7 +391,7 @@ func fetchObserverSeries(naifID int, bodyName string, lon, lat, height float64, 
 	}
 
 	if len(points) == 0 {
-		return nil, fmt.Errorf("no observer rows found")
+		return nil, errors.New("no observer rows found")
 	}
 
 	return points, nil
