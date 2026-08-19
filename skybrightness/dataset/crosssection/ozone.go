@@ -2,6 +2,7 @@ package crosssection
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/TuSKan/astrogo/atmosphere"
@@ -60,4 +61,44 @@ func Ozone(ctx context.Context) (atmosphere.CrossSection, error) {
 	}
 
 	return xs, nil
+}
+
+// ErrLineAbsorber is returned for a species whose absorption cannot be
+// represented as a cross section on a wavelength grid.
+//
+// It exists so the gap is programmatic rather than editorial. Before it, the
+// reason O2 and H2O were absent lived in a doc comment and in
+// docs/skybrightness.md; a caller who wanted them got no absorption and no
+// explanation, which is indistinguishable from a model that considered them
+// and found them negligible.
+var ErrLineAbsorber = errors.New(
+	"crosssection: this species absorbs in lines and needs a band model, not a cross section")
+
+// ErrNoSource is returned for a species this package has no data for at all,
+// which is a different situation from one it cannot represent.
+var ErrNoSource = errors.New("crosssection: no source for this species")
+
+// Species returns the absorption cross section for a molecule.
+//
+// Only ozone is available, and the refusal for the others is deliberate rather
+// than pending. O2 (688 and 762 nm) and H2O (720, 820 and 940 nm) absorb in
+// dense narrow lines. Averaging their cross section onto a nanometre grid and
+// applying Beer-Lambert overestimates absorption systematically, because
+// exp(-tau) is convex: the mean of the transmission is not the transmission of
+// the mean. The error is invisible — every number stays positive and
+// plausible — which is why this returns [ErrLineAbsorber] rather than a value.
+//
+// Representing them correctly means tabulating band-averaged transmittance
+// against airmass rather than a cross section against wavelength, which is a
+// different shape of dataset and a different calculation. HITRAN supplies the
+// line lists when that exists.
+func Species(ctx context.Context, name string) (atmosphere.CrossSection, error) {
+	switch name {
+	case "O3":
+		return Ozone(ctx)
+	case "O2", "H2O":
+		return atmosphere.CrossSection{}, fmt.Errorf("%w: %s", ErrLineAbsorber, name)
+	default:
+		return atmosphere.CrossSection{}, fmt.Errorf("%w: %q", ErrNoSource, name)
+	}
 }

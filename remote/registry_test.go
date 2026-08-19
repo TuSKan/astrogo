@@ -2,6 +2,7 @@ package remote
 
 import (
 	"errors"
+	"regexp"
 	"strings"
 	"sync"
 	"testing"
@@ -368,4 +369,45 @@ func TestRegistryConcurrency(t *testing.T) {
 	}
 
 	wg.Wait()
+}
+
+// A key must never arrive pre-encoded.
+//
+// The MPI-Mainz ozone file has a space in its name. Writing it as %20 in the
+// registry looked like the careful thing to do and was the opposite: the blob
+// layer percent-encodes what it is given, so the percent sign itself became
+// %25 and the request went out for %2520. The server answered 404, which reads
+// as a missing file rather than as a double-encoded one, and the cause took
+// longer to find than it should have.
+//
+// Encoding belongs to the layer that builds the URL. A key holds the literal
+// name, spaces and all.
+func TestEndpointFilesAreNotPreEncoded(t *testing.T) {
+	t.Parallel()
+
+	// %XX where XX is hex. Anything matching is a key that has already been
+	// through an encoder once.
+	encoded := regexp.MustCompile(`%[0-9A-Fa-f]{2}`)
+
+	for _, ep := range Endpoints() {
+		for _, name := range ep.Files {
+			if encoded.MatchString(name) {
+				t.Errorf("endpoint %s file %q is percent-encoded; keys hold literal names "+
+					"and the blob layer encodes them", ep.ID, name)
+			}
+		}
+	}
+}
+
+// The same rule for the endpoint URLs' path segments, which are joined to a
+// key and handed to blob.OpenBucket.
+func TestEndpointURLsHaveNoDoubleEncoding(t *testing.T) {
+	t.Parallel()
+
+	for _, ep := range Endpoints() {
+		if strings.Contains(ep.URL, "%25") {
+			t.Errorf("endpoint %s URL contains %%25, which is a percent sign that has "+
+				"already been encoded once: %s", ep.ID, ep.URL)
+		}
+	}
 }
