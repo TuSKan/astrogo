@@ -292,6 +292,7 @@ func newEph(t *testing.T) eph.Provider {
 
 // ── Test: Complete Sun and Moon Data for One Day ──────────────────────────────
 
+//nolint:dupl,gocognit // the Sun and Moon blocks read different USNO response fields and are kept parallel so each stays readable against its own source; the branching is the reference comparison itself; splitting it separates a fixture from the assertions that read it; the branching is the reference comparison itself; splitting it separates a fixture from the assertions that read it
 func TestUSNO_SunMoonOneDay(t *testing.T) {
 	requireUSNO(t)
 
@@ -948,6 +949,7 @@ var edgeCaseLocations = []testLocation{
 // 2. astrogo's SunEvents returns no rise/set events for polar night/midnight sun.
 // 3. When events DO exist near the polar boundary, they agree within tolerance.
 
+//nolint:gocognit // the branching is the reference comparison itself; splitting it separates a fixture from the assertions that read it
 func TestUSNO_PolarSun(t *testing.T) {
 	requireUSNO(t)
 
@@ -1052,6 +1054,7 @@ func TestUSNO_PolarSun(t *testing.T) {
 			var astroRise, astroSet, astroTransit int
 
 			for _, ev := range sunEvents {
+				//nolint:exhaustive // counts the named kinds; the rest are legitimately not this test's subject
 				switch ev.Kind {
 				case plan.EventRise:
 					astroRise++
@@ -1135,6 +1138,7 @@ func TestUSNO_PolarSun(t *testing.T) {
 //     (sunrise earlier, sunset later, shift ≈ 10–15 min at Everest latitude).
 //  3. Transit times (height-independent) are compared against USNO — must match ≤2 min.
 
+//nolint:gocognit // the branching is the reference comparison itself; splitting it separates a fixture from the assertions that read it
 func TestUSNO_HighAltitude(t *testing.T) {
 	requireUSNO(t)
 
@@ -1496,6 +1500,7 @@ func TestUSNO_Equator(t *testing.T) {
 // The Moon at polar latitudes can also be circumpolar or below horizon for
 // extended periods. This tests the Moon event solver at extreme latitudes.
 
+//nolint:dupl,gocognit // the Sun and Moon blocks read different USNO response fields and are kept parallel so each stays readable against its own source; the branching is the reference comparison itself; splitting it separates a fixture from the assertions that read it
 func TestUSNO_PolarMoon(t *testing.T) {
 	requireUSNO(t)
 
@@ -1603,6 +1608,7 @@ func TestUSNO_PolarMoon(t *testing.T) {
 			var astroRise, astroSet, astroTransit int
 
 			for _, ev := range moonEvents {
+				//nolint:exhaustive // counts the named kinds; the rest are legitimately not this test's subject
 				switch ev.Kind {
 				case plan.EventRise:
 					astroRise++
@@ -1856,6 +1862,7 @@ func TestUSNO_AltitudeShift(t *testing.T) {
 
 			for _, ev := range sunEvents {
 				minutes := eventMinutesIn(ev.Time, tz)
+				//nolint:exhaustive // counts the named kinds; the rest are legitimately not this test's subject
 				switch ev.Kind {
 				case plan.EventRise:
 					t.Logf("Sunrise: %s (%.1f min from midnight)", ev.Time.In(tz).Format("15:04:05"), minutes)

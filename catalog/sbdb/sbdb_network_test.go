@@ -137,6 +137,7 @@ func TestSBDBNetworkSearchBright(t *testing.T) {
 			t.Errorf("expected populated Name/SPKID from live server, got %+v", tgt)
 		}
 
+		//nolint:exhaustive // counts the named kinds; the rest are legitimately not this test's subject
 		switch tgt.Kind {
 		case resolve.KindAsteroid, resolve.KindDwarfPlanet:
 			// At MaxVMag 1, Stage 1's H-sorted-ascending result set is

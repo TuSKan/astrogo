@@ -331,6 +331,7 @@ func fetchNASAPage(t *testing.T, url string) string {
 
 // ── Test: Lunar Eclipses vs NASA ─────────────────────────────────────────────
 
+//nolint:dupl // parallel blocks over two distinct NASA reference tables; the repetition is what keeps each checkable against its own source
 func TestNASA_LunarEclipses_Historical(t *testing.T) {
 	requireNASA(t)
 
@@ -464,6 +465,7 @@ func TestNASA_LunarEclipses_Historical(t *testing.T) {
 
 // ── Test: Solar Eclipses vs NASA ─────────────────────────────────────────────
 
+//nolint:dupl // parallel blocks over two distinct NASA reference tables; the repetition is what keeps each checkable against its own source
 func TestNASA_SolarEclipses_Historical(t *testing.T) {
 	requireNASA(t)
 
