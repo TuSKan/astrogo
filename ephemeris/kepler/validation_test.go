@@ -20,6 +20,15 @@ import (
 	"github.com/TuSKan/astrogo/vector"
 )
 
+// Static errors for the Horizons response parser, so a caller can tell a
+// changed output format from a network failure with errors.Is.
+var (
+	errNoDataBlock       = errors.New("horizons: no $$SOE/$$EOE data block in the response")
+	errNoElementRows     = errors.New("horizons: no element rows returned")
+	errNoVectorRows      = errors.New("horizons: no vector rows returned")
+	errUnexpectedColumns = errors.New("horizons: unexpected column count")
+)
+
 // requireHorizons skips the test when the JPL Horizons API is
 // unreachable — a reachability failure must never fail CI outright,
 // matching ephemeris/jpl/validation's own network test policy.
@@ -52,7 +61,7 @@ func horizonsGet(params url.Values) (string, error) {
 	eoe := strings.Index(s, "$$EOE")
 
 	if soe == -1 || eoe == -1 {
-		return "", fmt.Errorf("no $$SOE/$$EOE data block in response: %.500s", s)
+		return "", fmt.Errorf("%w: %.500s", errNoDataBlock, s)
 	}
 
 	return strings.TrimSpace(s[soe+6 : eoe]), nil
@@ -88,12 +97,12 @@ func fetchHelioElements(designation string, at atime.Time) (epochJD float64, el 
 
 	lines := strings.Split(block, "\n")
 	if len(lines) == 0 || strings.TrimSpace(lines[0]) == "" {
-		return 0, kepler.Elements{}, fmt.Errorf("no elements rows returned for %q", designation)
+		return 0, kepler.Elements{}, fmt.Errorf("%w: %q", errNoElementRows, designation)
 	}
 
 	cols := strings.Split(lines[0], ",")
 	if len(cols) < 14 {
-		return 0, kepler.Elements{}, fmt.Errorf("unexpected elements column count: %d", len(cols))
+		return 0, kepler.Elements{}, fmt.Errorf("%w: elements output had %d", errUnexpectedColumns, len(cols))
 	}
 
 	f := func(idx int) (float64, error) {
@@ -176,12 +185,12 @@ func fetchHelioVector(designation string, at atime.Time) (pos, vel vector.Vec3, 
 
 	lines := strings.Split(block, "\n")
 	if len(lines) == 0 || strings.TrimSpace(lines[0]) == "" {
-		return vector.Zero(), vector.Zero(), fmt.Errorf("no vector rows returned for %q", designation)
+		return vector.Zero(), vector.Zero(), fmt.Errorf("%w: %q", errNoVectorRows, designation)
 	}
 
 	cols := strings.Split(lines[0], ",")
 	if len(cols) < 8 {
-		return vector.Zero(), vector.Zero(), fmt.Errorf("unexpected vector column count: %d", len(cols))
+		return vector.Zero(), vector.Zero(), fmt.Errorf("%w: vector output had %d", errUnexpectedColumns, len(cols))
 	}
 
 	f := func(idx int) (float64, error) {
