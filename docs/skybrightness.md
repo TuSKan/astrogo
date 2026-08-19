@@ -585,8 +585,7 @@ fitted parameter with a quoted uncertainty, and it comes from one site under low
 loading. It is a function of the molecular depth alone, because Winkler notes a larger
 share of the Mie optical depth may be absorption than usually assumed. Every call
 therefore returns `ApproximateMultipleScattering`. The selenographic libration angles are
-not supplied (bounded at 0.03 in ln A), the Moon–observer distance is geocentric rather
-than topocentric (up to 3.3% in irradiance), and the solar spectrum is a required caller
+not supplied (bounded at 0.03 in ln A) and the solar spectrum is a required caller
 input because this package ships none and the choice moves the absolute scale.
 
 **Why `Component.AddRadiance` returns a `Flag`.** The interface was changed for this
