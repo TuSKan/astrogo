@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
-	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -87,9 +86,13 @@ func TestOpenFetchesAndParses(t *testing.T) {
 	remote.EnableDownloads(16<<20, remote.GaiaStarMap)
 	defer remote.DisableDownloads(remote.GaiaStarMap)
 
-	m, err := starlight.Open(context.Background(), publishedSpec())
+	m, err := starlight.Open(context.Background())
 	if err != nil {
 		t.Fatalf("Open: %v", err)
+	}
+
+	if m.Source != starlight.TotalStarlightMap {
+		t.Errorf("Source = %q, want %q", m.Source, starlight.TotalStarlightMap)
 	}
 
 	if got := m.Grid().NumPixels(); got != 786432 {
@@ -107,23 +110,6 @@ func TestOpenFetchesAndParses(t *testing.T) {
 
 	if view.Galactic() {
 		t.Error("an ICRS map must not report itself as galactic")
-	}
-}
-
-// Asking for a map nobody published is an error naming what exists, not a
-// download of something that will 404 halfway through a night.
-func TestOpenRejectsAnUnpublishedMap(t *testing.T) {
-	t.Parallel()
-
-	spec := publishedSpec()
-	spec.FainterThan = 12 // a cut with no published asset
-
-	if _, err := starlight.Open(context.Background(), spec); !errors.Is(err, starlight.ErrNoPublishedMap) {
-		t.Errorf("err = %v, want ErrNoPublishedMap", err)
-	}
-
-	if len(starlight.PublishedMaps()) == 0 {
-		t.Error("PublishedMaps must name what Open can fetch")
 	}
 }
 

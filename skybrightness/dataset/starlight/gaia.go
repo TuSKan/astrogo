@@ -169,6 +169,12 @@ type GaiaBuild struct {
 	// FainterThan excludes sources brighter than this Gaia G magnitude,
 	// keeping only what is fainter.
 	//
+	// No published reference applies such a cut: Masana et al. (2021)
+	// integrate "each and every star" and extend to the bright end with
+	// Hipparcos rather than trimming it. This exists because a caller
+	// modelling an instrument may reasonably want to exclude light it would
+	// resolve out, which is a different question from what the sky emits.
+	//
 	// It has no default because it has no physically correct value, and
 	// because it is the largest lever in the whole map. Measured over a
 	// thousand order-8 pixels, a cut at G = 6 drops 0.11 per cent of the
@@ -186,17 +192,25 @@ type GaiaBuild struct {
 	Progress func(done, total int)
 }
 
-// NoMagnitudeCut includes every source, however bright.
+// NoMagnitudeCut applies no cut of this package's own.
 //
-// The resulting map is the total integrated light of the sky rather than its
-// diffuse background: a single naked-eye star lands in one pixel and takes it
-// to about 14 mag arcsec^-2, seven magnitudes above the median sky. That is
-// faithful to what Gaia holds and is the wrong quantity to subtract from an
-// observation of that star.
+// It does not mean the map holds every star. Gaia cannot observe objects
+// brighter than G = 5, so a Gaia-only aggregation is already cut — by the
+// instrument rather than by the caller — and Masana et al. (2021) put those
+// missing stars at around 20 per cent of the total integrated starlight. That
+// is why GAMBONS reaches the bright end with Hipparcos, and why a map built
+// with this constant must not be described as total.
+//
+// The resulting map is the integrated light of everything Gaia sees, bright
+// stars included. A single naked-eye star lands in one order-8 pixel and takes
+// it to about 14 mag arcsec^-2, seven magnitudes above the median sky, which is
+// faithful to what that patch of sky emits and is the wrong quantity to
+// subtract from an observation of that star.
+//
 // Its value is brighter than any real source, so it reads as what it does.
 // The predicate is omitted rather than rendered, because any predicate on
 // phot_g_mean_mag would also drop the few sources that have no G magnitude at
-// all, and "everything" has to mean everything.
+// all, and "no cut" has to mean no cut.
 const NoMagnitudeCut = -1000
 
 // pixelsPerOrder returns 12*4^order.

@@ -11,67 +11,41 @@ import (
 	"github.com/TuSKan/astrogo/remote"
 )
 
-// ErrNoPublishedMap is returned when no published map matches a request.
-var ErrNoPublishedMap = errors.New("starlight: no published map for that order, band and cut")
+// ErrNoPublishedMap is returned when the published map is not what it claims.
+var ErrNoPublishedMap = errors.New("starlight: the published map does not match its name")
 
-// published lists the maps astrogo releases, keyed by their cache name.
+// TotalStarlightMap is the asset astrogo publishes.
 //
-// Each is its own build. A cut map cannot be derived from an uncut one —
-// removing bright stars from an already-summed aggregate is impossible, the
-// information is gone — so every cut published costs its own aggregation run
-// and its own asset.
+// "total" rather than "all" because the distinction matters and cost this
+// project a wasted build to learn. A Gaia-only map is not the total integrated
+// starlight: Gaia cannot observe objects brighter than G = 5, and Masana et al.
+// (2021) put those stars at around 20 per cent of the flux, which is why
+// GAMBONS reaches the bright end with Hipparcos. A file named "all" that is
+// missing a fifth of the light is a promise the data does not keep.
 //
-// Two are published rather than one because there is no universally correct
-// cut, and baking this project's judgement into the only available file would
-// undo the reason [GaiaBuild.FainterThan] is required in the first place.
-var published = map[string]GaiaBuild{
-	"starmap-o8-V-g6.txt.gz": {
-		Order:       8,
-		FainterThan: 6,
-		Bands:       []GaiaBand{GaiaJohnsonV()},
-	},
-	"starmap-o8-V-all.txt.gz": {
-		Order:       8,
-		FainterThan: NoMagnitudeCut,
-		Bands:       []GaiaBand{GaiaJohnsonV()},
-	},
-}
+// The name therefore records the composition, for the same reason the cut and
+// the order are in it: each changes the numbers, and two files that differ by
+// twenty per cent must never share a name.
+const TotalStarlightMap = "starmap-o8-V-total.txt.gz"
 
-// Open fetches a published integrated-starlight map.
+// Open fetches the published integrated-starlight map.
 //
-// This is the path a caller should normally take. It costs one download of
-// about five megabytes, cached afterwards and valid indefinitely because the
-// order and the cut are in the filename. [Fetch] queries the archive for named
-// directions and is right when a finer grid or a different cut is needed;
-// [BuildFromGaia] aggregates a whole sky and is heavy use of a shared service.
+// One download of about five megabytes, cached afterwards and valid
+// indefinitely because the order, band and composition are all in the filename.
+// [Fetch] queries the archive for named directions and is right when a finer
+// grid or a magnitude cut is needed; [BuildFromGaia] aggregates a whole sky and
+// is heavy use of a shared service.
+//
+// The map is HEALPix order 8 in Johnson V, matching GAMBONS' own grid — 786,432
+// pixels of 1.5979e-5 sr — so the two are directly comparable.
 //
 // The download is consent-gated like every other bulk fetch: call
 // [remote.EnableDownloads] with [remote.GaiaStarMap] first, or this fails with
 // [remote.ErrDownloadDenied].
-//
-// spec selects which published map to fetch. Its order, band name and
-// magnitude cut must match one that exists, because a map is only meaningful
-// against the cut it was built with — see [PublishedMaps] for the list.
-func Open(ctx context.Context, spec GaiaBuild) (*Map, error) {
-	spec, err := spec.withDefaults()
+func Open(ctx context.Context) (*Map, error) {
+	bucket, key, err := remote.GetFile(ctx, remote.GaiaStarMap, TotalStarlightMap)
 	if err != nil {
-		return nil, err
-	}
-
-	if len(spec.Bands) != 1 {
-		return nil, fmt.Errorf("%w: one band, got %d", ErrNoPublishedMap, len(spec.Bands))
-	}
-
-	name := spec.cacheKey() + ".gz"
-
-	if _, ok := published[name]; !ok {
-		return nil, fmt.Errorf("%w: %s; published maps are %s",
-			ErrNoPublishedMap, name, strings.Join(PublishedMaps(), ", "))
-	}
-
-	bucket, key, err := remote.GetFile(ctx, remote.GaiaStarMap, name)
-	if err != nil {
-		return nil, fmt.Errorf("starlight: fetch %s: %w", name, err)
+		return nil, fmt.Errorf("starlight: fetch %s: %w", TotalStarlightMap, err)
 	}
 
 	r, err := bucket.NewReader(ctx, key, nil)
@@ -91,28 +65,18 @@ func Open(ctx context.Context, spec GaiaBuild) (*Map, error) {
 		return nil, err
 	}
 
-	// The name promises an order and the content has to keep that promise.
-	// A map served under the wrong name is indistinguishable from the right
-	// one at every later call site, and would put the sky at the wrong
-	// resolution without any value looking out of place.
-	if want := pixelsPerOrder(spec.Order); m.Grid().NumPixels() != want {
+	// The name promises an order and the content has to keep that promise. A
+	// map served under the wrong name is indistinguishable from the right one
+	// at every later call site, and would put the sky at the wrong resolution
+	// without any value looking out of place.
+	if want := pixelsPerOrder(GaiaMapOrder); m.Grid().NumPixels() != want {
 		return nil, fmt.Errorf("%w: %s holds %d pixels, order %d needs %d",
-			ErrNoPublishedMap, name, m.Grid().NumPixels(), spec.Order, want)
+			ErrNoPublishedMap, TotalStarlightMap, m.Grid().NumPixels(), GaiaMapOrder, want)
 	}
 
-	m.Source = name
+	m.Source = TotalStarlightMap
 
 	return m, nil
-}
-
-// PublishedMaps names the maps [Open] can fetch.
-func PublishedMaps() []string {
-	out := make([]string, 0, len(published))
-	for name := range published {
-		out = append(out, name)
-	}
-
-	return out
 }
 
 // Header renders the provenance block that belongs at the top of a published
