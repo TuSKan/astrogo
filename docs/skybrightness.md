@@ -763,6 +763,30 @@ sharpest available test of the frame: mislabelling an ICRS map as galactic does 
 the plane, it moves it, so the plane and the cap would come out alike while every value
 stayed positive and every direction stayed covered.
 
+**The map is Gaia-only, and Gaia does not see the brightest stars.** Masana et al. (2021)
+state it directly: *"Gaia cannot observe very bright objects (with G < 5 mag). For those
+stars, the Hipparcos catalogue"* is used instead, and *"in terms of flux, the Hipparcos
+stars account for around 20 per cent of the total integrated star light."*
+
+So `NoMagnitudeCut` is a misleading name for what it produces: a map already missing the
+brightest fifth of the light, cut not by us but by the instrument. Two consequences, both
+of which invalidate earlier claims in this document.
+
+First, comparing that map against a published *total* integrated-starlight figure is not a
+validation. The order-8 build gives 23.48 mag arcsec⁻² at the cap against a quoted ~23.5,
+and that agreement is arithmetically impossible to be meaningful when a fifth of the flux
+is absent — it is luck, and it was reported here as confirmation.
+
+Second, it makes the internal comparison the discriminating one. Cutting at G > 6 moved
+the cap from 23.48 to 23.68, a 17 per cent flux reduction, against the 19 per cent
+measured directly over a thousand pixels and the ~20 per cent Masana et al. attribute to
+Hipparcos. Three routes to the same fraction, and that consistency is a real check where
+the absolute comparison was not.
+
+Closing this needs Hipparcos for G < 5, which is what GAMBONS does and what would make an
+absolute comparison mean something. Until then, no published map should claim to be total
+integrated starlight.
+
 **Known limitations.**
 
 - The scattered term of Eq. 8 is not modelled. It returns to the line of sight some of
