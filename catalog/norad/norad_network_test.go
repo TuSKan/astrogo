@@ -1,5 +1,7 @@
 //go:build integration
 
+package norad
+
 // Package norad contains integration tests that validate live queries
 // against the CelestTrak GP API (celestrak.org).
 //
@@ -8,7 +10,6 @@
 // These tests require an active internet connection to reach
 // https://celestrak.org/NORAD/elements/gp.php endpoints.
 // If the endpoint is unreachable, tests are skipped automatically.
-package norad
 
 import (
 	"context"

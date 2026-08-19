@@ -1,5 +1,7 @@
 //go:build integration
 
+package cams
+
 // Ground-truth test against the real CAMS files this package was built
 // and validated against (see doc.go's decision-gate spike notes). Every
 // expected value below was obtained independently of this package's own
@@ -13,7 +15,6 @@
 //
 // Never commit or embed these .nc files (see doc.go and CLAUDE.md's
 // "Embedded data" section) — remote/credentials/ is gitignored.
-package cams
 
 import (
 	"context"

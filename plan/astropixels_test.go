@@ -1,5 +1,7 @@
 //go:build integration
 
+package plan_test
+
 // Package plan_test contains integration tests that validate astrogo's
 // moon phase computations against Fred Espenak's Six Millennium Catalog
 // of Phases of the Moon (AstroPixels).
@@ -9,7 +11,6 @@
 // These tests require an active internet connection to reach
 // https://astropixels.com/ephemeris/phasescat/ pages.
 // They also require a JPL DE441 kernel (auto-downloaded on first run, ~1.5 GB).
-package plan_test
 
 import (
 	"context"
@@ -136,7 +137,7 @@ func parseAstroPixelsPage(html string) []apPhaseEvent {
 			month := monthMap[matches[1]]
 			day, _ := strconv.Atoi(matches[2])
 			hour, _ := strconv.Atoi(matches[3])
-			min, _ := strconv.Atoi(matches[4])
+			minute, _ := strconv.Atoi(matches[4])
 
 			if month == 0 {
 				continue
@@ -148,14 +149,14 @@ func parseAstroPixelsPage(html string) []apPhaseEvent {
 			// Build UT time from calendar; .TDB() auto-applies ΔT for historical dates
 			var tUT time.Time
 			if isJulian {
-				tUT = time.DateJulianCal(currentYear, month, day, hour, min, 0)
+				tUT = time.DateJulianCal(currentYear, month, day, hour, minute, 0)
 			} else {
-				tUT = time.Date(currentYear, gotime.Month(month), day, hour, min, 0, 0, gotime.UTC)
+				tUT = time.Date(currentYear, gotime.Month(month), day, hour, minute, 0, 0, gotime.UTC)
 			}
 
 			events = append(events, apPhaseEvent{
 				Year: currentYear, Month: month, Day: day,
-				Hour: hour, Min: min,
+				Hour: hour, Min: minute,
 				Phase:       col.phase,
 				JDut:        tUT.JD(),
 				JDtd:        tUT.TDB().JD(),
@@ -314,7 +315,7 @@ func TestAstroPixels_MoonPhases(t *testing.T) {
 			}
 
 			if centuryCount > 0 {
-				t.Logf("Century %04d: %d events, mean Δ=%.1f min, max Δ=%.1f min",
+				t.Logf("Century %04d: %d events, mean Δ=%.1f minute, max Δ=%.1f min",
 					centuryStart, centuryCount, centuryDelta/float64(centuryCount), centuryMax)
 			}
 		})
@@ -324,7 +325,7 @@ func TestAstroPixels_MoonPhases(t *testing.T) {
 	t.Logf("AstroPixels Summary: %d/%d events matched", matchedEvents, totalEvents)
 
 	if matchedEvents > 0 {
-		t.Logf("Mean Δ = %.2f min, Max Δ = %.2f min (%s)",
+		t.Logf("Mean Δ = %.2f minute, Max Δ = %.2f minOf (%s)",
 			totalDelta/float64(matchedEvents), maxDelta, maxDeltaEvent)
 	}
 

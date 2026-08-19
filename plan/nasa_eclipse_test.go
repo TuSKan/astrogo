@@ -1,5 +1,7 @@
 //go:build integration
 
+package plan_test
+
 // Package plan_test contains integration tests that validate astrogo's
 // eclipse detection against NASA's Five Millennium Catalogs of
 // Solar and Lunar Eclipses (eclipse.gsfc.nasa.gov).
@@ -15,7 +17,6 @@
 // nasaBudgetOK make these tests skip cleanly — with a clear message —
 // rather than let the ambient timeout kill the whole test binary mid
 // request. Run with the full 60m budget locally for complete coverage.
-package plan_test
 
 import (
 	"context"

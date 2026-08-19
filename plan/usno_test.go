@@ -1,5 +1,7 @@
 //go:build integration
 
+package plan_test
+
 // Package plan_test contains integration tests that validate astrogo's
 // astronomical computations against the U.S. Naval Observatory (USNO) API.
 //
@@ -7,7 +9,6 @@
 //
 // These tests require an active internet connection to reach
 // https://aa.usno.navy.mil/api/ endpoints.
-package plan_test
 
 import (
 	"context"
