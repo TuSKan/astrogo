@@ -42,10 +42,24 @@ var (
 //
 // This file provides the machinery to apply a cross section; it
 // deliberately ships NO tabulated cross-section data. Those are datasets
-// with their own provenance and versioning — the ozone cross sections of
-// Serdyuchenko et al. (2014), the HITRAN line lists for O2 and H2O — and
-// inventing numbers for them would be exactly the fabrication the design
-// forbids. A provider layer supplies them; see docs/skybrightness.md §16.
+// with their own provenance and versioning, and inventing numbers for them
+// would be exactly the fabrication the design forbids. A provider layer
+// supplies them; see docs/skybrightness.md §16.
+//
+// Ozone is what this machinery is for. Its Chappuis band is a broad
+// continuum across the visible, which a tabulated cross section on a
+// nanometre grid represents exactly. Serdyuchenko et al. (2014) is the
+// chosen source and 223 K the chosen temperature — the nearest measured
+// point to the effective temperature of stratospheric ozone.
+//
+// O2 and H2O are a different problem and are not merely unsupplied. They
+// absorb in narrow lines — O2 at 688 and 762 nm, water vapour at 720, 820
+// and 940 nm — and Beer-Lambert with a cross section band-averaged onto a
+// nanometre grid is systematically wrong for them, always overestimating
+// absorption, because exp(-tau) is convex and averaging the cross section
+// first is not the same as averaging the transmission. They need a band
+// model or correlated-k treatment, which is a capability this package does
+// not have rather than a dataset it lacks.
 
 // dobsonUnitMoleculesPerCM2 is the column density of one Dobson Unit, in
 // molecules per square centimetre.
