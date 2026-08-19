@@ -185,7 +185,7 @@ func fetchAstroPixelsPage(t *testing.T, startYear int) string {
 	if err != nil {
 		t.Skipf("AstroPixels unreachable, skipping: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		t.Skipf("AstroPixels returned status %d for %s", resp.StatusCode, url)
@@ -207,7 +207,7 @@ func TestAstroPixels_MoonPhases(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create DE441 provider: %v", err)
 	}
-	defer prov.Close()
+	defer func() { _ = prov.Close() }()
 
 	// Century start years to test — spans the full catalog
 	// AstroPixels covers 0001-4000 CE (common era pages)

@@ -69,7 +69,7 @@ func fetchVector(naifID int, bodyName string, startStr, stopStr string) (*StateV
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	bodyBytes, _ := io.ReadAll(resp.Body)
 	responseStr := string(bodyBytes)
@@ -187,7 +187,7 @@ func fetchObserverTable(naifID int, bodyName string, lon, lat, height float64, s
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	bodyBytes, _ := io.ReadAll(resp.Body)
 	responseStr := string(bodyBytes)
@@ -359,7 +359,7 @@ func fetchObserverSeries(naifID int, bodyName string, lon, lat, height float64, 
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	bodyBytes, _ := io.ReadAll(resp.Body)
 	responseStr := string(bodyBytes)

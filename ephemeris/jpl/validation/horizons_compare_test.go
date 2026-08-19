@@ -52,7 +52,7 @@ func runHorizonsTest(t *testing.T, bodyName string) {
 	if err != nil {
 		t.Fatalf("failed to create provider: %v", err)
 	}
-	defer p.Close()
+	defer func() { _ = p.Close() }()
 
 	cases := loadCases(t)
 

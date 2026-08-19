@@ -54,7 +54,7 @@ func fetchIMCCE(t *testing.T, name string) (H, G float64) {
 	if err != nil {
 		t.Skipf("IMCCE network unavailable: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	var card imcceCard
 	if err := json.NewDecoder(resp.Body).Decode(&card); err != nil {

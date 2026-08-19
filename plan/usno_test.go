@@ -283,7 +283,7 @@ func newEph(t *testing.T) eph.Provider {
 		return def
 	}
 
-	t.Cleanup(func() { p.Close() })
+	t.Cleanup(func() { _ = p.Close() })
 
 	return p
 }
@@ -319,7 +319,9 @@ func TestUSNO_SunMoonOneDay(t *testing.T) {
 
 				// Parse date
 				var y, mo, d int
-				fmt.Sscanf(dateStr, "%d-%d-%d", &y, &mo, &d)
+				if _, err := fmt.Sscanf(dateStr, "%d-%d-%d", &y, &mo, &d); err != nil {
+					t.Fatalf("parsing the fixture date: %v", err)
+				}
 
 				// Set up astrogo
 				tz, err := time.LoadLocation(loc.TZName)
@@ -1020,7 +1022,9 @@ func TestUSNO_PolarSun(t *testing.T) {
 
 			// Set up astrogo — use UTC to match USNO query timezone
 			var y, mo, d int
-			fmt.Sscanf(tc.date, "%d-%d-%d", &y, &mo, &d)
+			if _, err := fmt.Sscanf(tc.date, "%d-%d-%d", &y, &mo, &d); err != nil {
+				t.Fatalf("parsing the fixture date: %v", err)
+			}
 
 			// Even for locations with a named timezone, we use UTC for the
 			// computation interval to match the USNO query (tz=0).
@@ -1152,7 +1156,9 @@ func TestUSNO_HighAltitude(t *testing.T) {
 			}
 
 			var y, mo, d int
-			fmt.Sscanf(dateStr, "%d-%d-%d", &y, &mo, &d)
+			if _, err := fmt.Sscanf(dateStr, "%d-%d-%d", &y, &mo, &d); err != nil {
+				t.Fatalf("parsing the fixture date: %v", err)
+			}
 
 			tz, err := time.LoadLocation(loc.TZName)
 			if err != nil {
@@ -1375,7 +1381,9 @@ func TestUSNO_Equator(t *testing.T) {
 			}
 
 			var y, mo, d int
-			fmt.Sscanf(dateStr, "%d-%d-%d", &y, &mo, &d)
+			if _, err := fmt.Sscanf(dateStr, "%d-%d-%d", &y, &mo, &d); err != nil {
+				t.Fatalf("parsing the fixture date: %v", err)
+			}
 
 			geodetic, err := coord.NewGeodetic(angle.Deg(loc.Lon), angle.Deg(loc.Lat), loc.Height)
 			if err != nil {
@@ -1557,7 +1565,9 @@ func TestUSNO_PolarMoon(t *testing.T) {
 
 			// Set up astrogo
 			var y, mo, d int
-			fmt.Sscanf(tc.date, "%d-%d-%d", &y, &mo, &d)
+			if _, err := fmt.Sscanf(tc.date, "%d-%d-%d", &y, &mo, &d); err != nil {
+				t.Fatalf("parsing the fixture date: %v", err)
+			}
 
 			tz := time.LocationUTC
 
@@ -1711,10 +1721,14 @@ func TestUSNO_CelNav_EdgeCases(t *testing.T) {
 
 			// Set up astrogo context
 			var y, mo, d int
-			fmt.Sscanf(tc.date, "%d-%d-%d", &y, &mo, &d)
+			if _, err := fmt.Sscanf(tc.date, "%d-%d-%d", &y, &mo, &d); err != nil {
+				t.Fatalf("parsing the fixture date: %v", err)
+			}
 
 			var h, m, s int
-			fmt.Sscanf(tc.utcTime, "%d:%d:%d", &h, &m, &s)
+			if _, err := fmt.Sscanf(tc.utcTime, "%d:%d:%d", &h, &m, &s); err != nil {
+				t.Fatalf("parsing the fixture date: %v", err)
+			}
 
 			tm := time.Date(y, time.Month(mo), d, h, m, s, 0, time.LocationUTC)
 			geodetic, _ := coord.NewGeodetic(angle.Deg(tc.lon), angle.Deg(tc.lat), tc.height)

@@ -321,7 +321,7 @@ func fetchNASAPage(t *testing.T, url string) string {
 	if err != nil {
 		t.Skipf("NASA endpoint unreachable, skipping: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		t.Skipf("NASA returned status %d for %s", resp.StatusCode, url)
@@ -348,7 +348,7 @@ func TestNASA_LunarEclipses_Historical(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create DE441 provider: %v", err)
 	}
-	defer prov.Close()
+	defer func() { _ = prov.Close() }()
 
 	// Century ranges matching NASA catalog URLs
 	centuries := []struct {
@@ -485,7 +485,7 @@ func TestNASA_SolarEclipses_Historical(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create DE441 provider: %v", err)
 	}
-	defer prov.Close()
+	defer func() { _ = prov.Close() }()
 
 	centuries := []struct {
 		start, end int

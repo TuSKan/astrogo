@@ -28,7 +28,7 @@ func requireCelestrak(t *testing.T) {
 		t.Skipf("CelestTrak unreachable, skipping live test: %v", err)
 	}
 
-	conn.Close()
+	_ = conn.Close()
 }
 
 func TestFetchISS_Live(t *testing.T) {

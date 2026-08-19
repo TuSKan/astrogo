@@ -17,7 +17,7 @@ func runSOFATest(t *testing.T, bid eph.ID) {
 	if err != nil {
 		t.Skipf("skipping SOFA comparison: JPL provider failed: %v", err)
 	}
-	defer p.Close()
+	defer func() { _ = p.Close() }()
 
 	sofa := eph.Default()
 
