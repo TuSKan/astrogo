@@ -14,7 +14,7 @@ package plan_test
 //
 // Under a shorter ambient -timeout (e.g. CI's generic 10m integration job,
 // well under the 60m this file needs from a cold cache), requireNASA and
-// nasaBudgetOK make these tests skip cleanly — with a clear message —
+// nasaBudgetOK makes these tests skip cleanly — with a clear message —
 // rather than let the ambient timeout kill the whole test binary mid
 // request. Run with the full 60m budget locally for complete coverage.
 
@@ -271,7 +271,7 @@ func requireNASA(t *testing.T) {
 	testutil.RequireReachable(t, "eclipse.gsfc.nasa.gov:443")
 }
 
-// nasaBudgetOK reports whether at least margin remains before the ambient
+// nasaBudgetOK skips the test unless at least margin remains before the ambient
 // `go test -timeout` deadline, skipping the calling (sub)test and
 // returning false otherwise. This file's own doc comment recommends
 // `-timeout 60m` for a from-cold-cache DE441 download (multi-GB) plus a
@@ -280,20 +280,17 @@ func requireNASA(t *testing.T) {
 // finish within. Checking the remaining budget before each expensive step
 // turns a hard mid-request kill (a confusing goroutine-dump failure) into
 // a clean, explained skip.
-func nasaBudgetOK(t *testing.T, margin gotime.Duration) bool {
+func nasaBudgetOK(t *testing.T, margin gotime.Duration) {
 	t.Helper()
 
 	deadline, ok := t.Deadline()
 	if !ok {
-		return true // no -timeout set (e.g. a local `go test` run) — no budget limit
+		return
 	}
 
 	if gotime.Until(deadline) < margin {
 		t.Skip("not enough time left before the test binary's -timeout for this step — rerun with a longer -timeout (see this file's package doc) for full coverage")
-		return false
 	}
-
-	return true
 }
 
 func fetchNASAPage(t *testing.T, url string) string {
@@ -337,9 +334,7 @@ func fetchNASAPage(t *testing.T, url string) string {
 func TestNASA_LunarEclipses_Historical(t *testing.T) {
 	requireNASA(t)
 
-	if !nasaBudgetOK(t, 6*time.Minute) {
-		return
-	}
+	nasaBudgetOK(t, 6*time.Minute)
 
 	prov, err := eph.NewProvider(context.Background(), eph.Planets, "de441_part-1", eph.WithKernel("de441_part-2"))
 	if err != nil {
@@ -368,9 +363,7 @@ func TestNASA_LunarEclipses_Historical(t *testing.T) {
 	for _, c := range centuries {
 		name := fmt.Sprintf("LE_%04d-%04d", c.start, c.end)
 		t.Run(name, func(t *testing.T) {
-			if !nasaBudgetOK(t, 45*time.Second) {
-				return
-			}
+			nasaBudgetOK(t, 45*time.Second)
 
 			html := fetchNASAPage(t, c.url)
 			refs := parseNASALunarEclipses(html)
@@ -474,9 +467,7 @@ func TestNASA_LunarEclipses_Historical(t *testing.T) {
 func TestNASA_SolarEclipses_Historical(t *testing.T) {
 	requireNASA(t)
 
-	if !nasaBudgetOK(t, 6*time.Minute) {
-		return
-	}
+	nasaBudgetOK(t, 6*time.Minute)
 
 	prov, err := eph.NewProvider(context.Background(), eph.Planets, "de441_part-1", eph.WithKernel("de441_part-2"))
 	if err != nil {
@@ -504,9 +495,7 @@ func TestNASA_SolarEclipses_Historical(t *testing.T) {
 	for _, c := range centuries {
 		name := fmt.Sprintf("SE_%04d-%04d", c.start, c.end)
 		t.Run(name, func(t *testing.T) {
-			if !nasaBudgetOK(t, 45*time.Second) {
-				return
-			}
+			nasaBudgetOK(t, 45*time.Second)
 
 			html := fetchNASAPage(t, c.url)
 			refs := parseNASASolarEclipses(html)
@@ -608,9 +597,7 @@ func TestNASA_SolarEclipses_Historical(t *testing.T) {
 func TestNASA_DeltaT_CrossValidation(t *testing.T) {
 	requireNASA(t)
 
-	if !nasaBudgetOK(t, 2*time.Minute) {
-		return
-	}
+	nasaBudgetOK(t, 2*time.Minute)
 
 	centuries := []struct {
 		start, end int
@@ -631,9 +618,7 @@ func TestNASA_DeltaT_CrossValidation(t *testing.T) {
 	for _, c := range centuries {
 		name := fmt.Sprintf("DeltaT_%04d-%04d", c.start, c.end)
 		t.Run(name, func(t *testing.T) {
-			if !nasaBudgetOK(t, 45*time.Second) {
-				return
-			}
+			nasaBudgetOK(t, 45*time.Second)
 
 			html := fetchNASAPage(t, c.url)
 			refs := parseNASALunarEclipses(html)

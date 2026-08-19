@@ -14,10 +14,10 @@ import (
 	atime "github.com/TuSKan/astrogo/time"
 )
 
-// ensure EOP is loaded before tests
-func init() {
-	// earth package auto-loads finals2000A in its init, so EOP is fully online.
-}
+// EOP needs no explicit load here: the time package pulls finals2000A lazily
+// the first time an epoch conversion asks for it, so these tests are already
+// online by the time they convert anything. This file used to carry an empty
+// init saying so, which was a comment pretending to be code.
 
 func TestPhase1ObserverPipelineAgainstHorizons(t *testing.T) {
 	requireHorizons(t)

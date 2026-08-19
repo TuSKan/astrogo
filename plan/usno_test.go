@@ -155,6 +155,7 @@ func requireUSNO(t *testing.T) {
 	t.Helper()
 
 	usnoReachableOnce.Do(func() {
+		//nolint:noctx // a liveness probe, not a request that should carry a deadline
 		conn, err := net.DialTimeout("tcp", "aa.usno.navy.mil:443", 5*time.Second)
 		if err != nil {
 			return
@@ -1200,7 +1201,7 @@ func TestUSNO_HighAltitude(t *testing.T) {
 				t.Fatalf("MoonEvents (8849m) failed: %v", err)
 			}
 
-			// ── Part 1: Sea-level astrogo vs USNO (must match ≤2 min) ──
+			// ── Part 1: Sea-level astrogo vs USNO (must match ≤2 minutes) ──
 			t.Log("── Sea-level comparison (astrogo 0m vs USNO) ──")
 
 			for _, sp := range resp.Properties.Data.SunData {
@@ -1336,7 +1337,7 @@ func TestUSNO_HighAltitude(t *testing.T) {
 					t.Logf("%s sunrise shift: %.1f min earlier at 8849m", label, shift)
 
 					if shift < 3 {
-						t.Errorf("%s sunrise should be earlier at 8849m (shift=%.1f min)", label, shift)
+						t.Errorf("%s sunrise should be earlier at 8849m (shift=%.1f minutes)", label, shift)
 					}
 				}
 
@@ -1345,7 +1346,7 @@ func TestUSNO_HighAltitude(t *testing.T) {
 					t.Logf("%s sunset shift: %.1f min later at 8849m", label, shift)
 
 					if shift < 3 {
-						t.Errorf("%s sunset should be later at 8849m (shift=%.1f min)", label, shift)
+						t.Errorf("%s sunset should be later at 8849m (shift=%.1f minutes)", label, shift)
 					}
 				}
 			}
@@ -1458,7 +1459,7 @@ func TestUSNO_Equator(t *testing.T) {
 				}
 			}
 
-			// At the equator, day length should always be ~12h (± 10 min)
+			// At the equator, day length should always be ~12h (± 10 minutes)
 			var (
 				riseMin, setMin   float64
 				haveRise, haveSet bool
@@ -1658,7 +1659,7 @@ func TestUSNO_PolarMoon(t *testing.T) {
 						t.Logf("Moon %-12s  USNO=%02d:%02d  astrogo=%s  Δ=%.1f min",
 							mp.Phen, h, m, ev.Time.In(tz).Format("15:04:05"), delta)
 
-						// Polar locations: wider tolerance (5 min) due to
+						// Polar locations: wider tolerance (5 minutes) due to
 						// grazing horizon geometry amplifying refraction errors
 						tol := 5.0
 						if matchKind == plan.EventTransit {
@@ -1854,14 +1855,14 @@ func TestUSNO_AltitudeShift(t *testing.T) {
 			}
 
 			for _, ev := range sunEvents {
-				min := eventMinutesIn(ev.Time, tz)
+				minutes := eventMinutesIn(ev.Time, tz)
 				switch ev.Kind {
 				case plan.EventRise:
-					t.Logf("Sunrise: %s (%.1f min from midnight)", ev.Time.In(tz).Format("15:04:05"), min)
-					riseTimes = append(riseTimes, min)
+					t.Logf("Sunrise: %s (%.1f min from midnight)", ev.Time.In(tz).Format("15:04:05"), minutes)
+					riseTimes = append(riseTimes, minutes)
 				case plan.EventSet:
-					t.Logf("Sunset:  %s (%.1f min from midnight)", ev.Time.In(tz).Format("15:04:05"), min)
-					setTimes = append(setTimes, min)
+					t.Logf("Sunset:  %s (%.1f min from midnight)", ev.Time.In(tz).Format("15:04:05"), minutes)
+					setTimes = append(setTimes, minutes)
 				}
 			}
 		})
