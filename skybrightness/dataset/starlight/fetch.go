@@ -49,14 +49,10 @@ const fetchBatch = 400
 //
 // # The cache accumulates
 //
-// Everything fetched is written back under a key naming the order, band and
-// magnitude cut, and later calls read it first. A second night on the same
+// Everything fetched is written back under a key naming the order and band,
+// and later calls read it first. A second night on the same
 // targets costs nothing, and a regular observer's cache grows into a partial
 // map of the sky they actually use rather than the sky they do not.
-//
-// Two different magnitude cuts are two different datasets and are cached
-// separately. They are not interchangeable and mixing them silently would be
-// worse than fetching twice.
 //
 // The archive is only contacted for pixels the cache lacks, so a fully cached
 // call performs no network access at all.
@@ -136,8 +132,8 @@ func assembleFetch(spec GaiaBuild, values []float64, _ []int64, band string) (*M
 		return nil, err
 	}
 
-	m.Source = fmt.Sprintf("gaiadr3.gaia_source at HEALPix order %d, %s",
-		spec.Order, spec.cutDescription())
+	m.Source = fmt.Sprintf("gaiadr3.gaia_source at HEALPix order %d",
+		spec.Order)
 
 	return m, nil
 }
@@ -233,32 +229,17 @@ func (g GaiaBuild) adqlForPixels(pixels []int64) (string, error) {
 	return fmt.Sprintf(
 		"SELECT source_id/%d AS hpx, COUNT(*) AS n, COUNT(bp_rp) AS ncolour%s "+
 			"FROM gaiadr3.gaia_source "+
-			"WHERE (%s)%s GROUP BY hpx",
-		divisor, columns.String(), ranges.String(), g.magnitudePredicate(),
+			"WHERE (%s) GROUP BY hpx",
+		divisor, columns.String(), ranges.String(),
 	), nil
 }
 
 // cacheKey names the dataset this build produces.
 //
-// The order, band and cut all change the numbers, so all three are in the
-// name. Two cuts sharing one cache would mix a background map with a
-// total-light map and neither would be recoverable afterwards.
+// The order and the band are both in it because both change the numbers, and
+// two files whose values differ must never share a name.
 func (g GaiaBuild) cacheKey() string {
-	cut := "all"
-	if g.FainterThan > NoMagnitudeCut {
-		cut = fmt.Sprintf("g%g", g.FainterThan)
-	}
-
-	return fmt.Sprintf("starmap-o%d-%s-%s.txt", g.Order, g.Bands[0].Name, cut)
-}
-
-// cutDescription renders the magnitude cut for provenance.
-func (g GaiaBuild) cutDescription() string {
-	if g.FainterThan <= NoMagnitudeCut {
-		return "every source"
-	}
-
-	return fmt.Sprintf("sources fainter than G = %g", g.FainterThan)
+	return fmt.Sprintf("starmap-o%d-%s.txt", g.Order, g.Bands[0].Name)
 }
 
 // readCache fills values from a previously written partial map.

@@ -34,8 +34,7 @@ func TestGaiaQueryIsAcceptedByTheArchive(t *testing.T) {
 	// A few pixels only: enough to prove the archive parses and answers the
 	// query this package generates, without aggregating a meaningful share of
 	// 1.8 billion sources.
-	build := starlight.GaiaBuild{FainterThan: starlight.NoMagnitudeCut,
-		Order: 8,
+	build := starlight.GaiaBuild{Order: 8,
 		Chunk: 4,
 		Bands: []starlight.GaiaBand{{
 			Name:           "V",
@@ -95,9 +94,8 @@ func TestFetchAnswersATargetList(t *testing.T) {
 	}
 
 	spec := starlight.GaiaBuild{
-		Order:       8,
-		FainterThan: 6,
-		Bands:       []starlight.GaiaBand{starlight.GaiaJohnsonV()},
+		Order: 8,
+		Bands: []starlight.GaiaBand{starlight.GaiaJohnsonV()},
 	}
 
 	start := time.Now()

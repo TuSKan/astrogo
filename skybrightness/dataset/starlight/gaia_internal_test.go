@@ -16,8 +16,7 @@ import (
 func TestAccumulateMatchesLowercaseHeader(t *testing.T) {
 	t.Parallel()
 
-	build := GaiaBuild{FainterThan: NoMagnitudeCut,
-		Order: 4,
+	build := GaiaBuild{Order: 4,
 		Bands: []GaiaBand{{Name: "G", FluxToRadiance: 2.0}},
 	}
 
@@ -58,7 +57,7 @@ func TestAccumulateMatchesLowercaseHeader(t *testing.T) {
 func TestAccumulateRejectsMissingBand(t *testing.T) {
 	t.Parallel()
 
-	build := GaiaBuild{FainterThan: NoMagnitudeCut, Order: 4, Bands: []GaiaBand{{Name: "V", FluxToRadiance: 1}}}
+	build := GaiaBuild{Order: 4, Bands: []GaiaBand{{Name: "V", FluxToRadiance: 1}}}
 
 	err := build.accumulate(
 		strings.NewReader("hpx,n,ncolour,b_g\n0,1,1,1.0\n"),
@@ -76,7 +75,7 @@ func TestAccumulateRejectsMissingBand(t *testing.T) {
 func TestAccumulateRejectsPixelOutOfRange(t *testing.T) {
 	t.Parallel()
 
-	build := GaiaBuild{FainterThan: NoMagnitudeCut, Order: 4, Bands: []GaiaBand{{Name: "G", FluxToRadiance: 1}}}
+	build := GaiaBuild{Order: 4, Bands: []GaiaBand{{Name: "G", FluxToRadiance: 1}}}
 
 	for _, row := range []string{"99999,1,1,1.0", "-1,1,1,1.0", "abc,1,1,1.0"} {
 		err := build.accumulate(
@@ -96,7 +95,7 @@ func TestAccumulateRejectsPixelOutOfRange(t *testing.T) {
 func TestAccumulateSkipsUnusableFlux(t *testing.T) {
 	t.Parallel()
 
-	build := GaiaBuild{FainterThan: NoMagnitudeCut, Order: 4, Bands: []GaiaBand{{Name: "G", FluxToRadiance: 1}}}
+	build := GaiaBuild{Order: 4, Bands: []GaiaBand{{Name: "G", FluxToRadiance: 1}}}
 	bands := map[string][]float64{"G": make([]float64, 3072)}
 
 	csv := "hpx,n,ncolour,b_g\n0,1,1,\n1,1,1,-5\n2,1,1,7\n"

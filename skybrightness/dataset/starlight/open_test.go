@@ -17,9 +17,8 @@ import (
 // publishedSpec is the map astrogo releases with a bright-star cut applied.
 func publishedSpec() starlight.GaiaBuild {
 	return starlight.GaiaBuild{
-		Order:       8,
-		FainterThan: 6,
-		Bands:       []starlight.GaiaBand{starlight.GaiaJohnsonV()},
+		Order: 8,
+		Bands: []starlight.GaiaBand{starlight.GaiaJohnsonV()},
 	}
 }
 
@@ -29,9 +28,8 @@ func tinyMap(t *testing.T) []byte {
 	t.Helper()
 
 	spec := starlight.GaiaBuild{
-		Order:       1,
-		FainterThan: 6,
-		Bands:       []starlight.GaiaBand{starlight.GaiaJohnsonV()},
+		Order: 1,
+		Bands: []starlight.GaiaBand{starlight.GaiaJohnsonV()},
 	}
 
 	var plain bytes.Buffer
@@ -123,26 +121,18 @@ func TestPublishedHeaderCarriesProvenance(t *testing.T) {
 	header := publishedSpec().Header()
 
 	for _, want := range []string{
-		"gaiadr3.gaia_source",   // which catalogue release
-		"HEALPix order 8",       // which grid
-		"ICRS",                  // which frame
-		"fainter than G = 6",    // which cut
-		"W m^-2 sr^-1 nm^-1",    // which quantity, per nanometre
-		"Riello",                // the colour transformation's source
-		"25.6874",               // the Gaia G zero point
-		"3.63e-11",              // the Johnson V zero point
-		"sources with no BP-RP", // what was dropped
+		"gaiadr3.gaia_source",        // which catalogue release
+		"HEALPix order 8",            // which grid
+		"ICRS",                       // which frame
+		"Gaia sees nothing brighter", // the limit the instrument itself imposes
+		"W m^-2 sr^-1 nm^-1",         // which quantity, per nanometre
+		"Riello",                     // the colour transformation's source
+		"25.6874",                    // the Gaia G zero point
+		"3.63e-11",                   // the Johnson V zero point
+		"sources with no BP-RP",      // what was dropped
 	} {
 		if !strings.Contains(header, want) {
 			t.Errorf("header omits %q:\n%s", want, header)
 		}
-	}
-
-	// The uncut map must say so rather than staying silent about it.
-	every := publishedSpec()
-	every.FainterThan = starlight.NoMagnitudeCut
-
-	if !strings.Contains(every.Header(), "every source") {
-		t.Errorf("an uncut map must declare it:\n%s", every.Header())
 	}
 }

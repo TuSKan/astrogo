@@ -98,7 +98,7 @@ func (g GaiaBuild) Header() string {
 	fmt.Fprintf(&b, "# bands: %s\n", band)
 	fmt.Fprintf(&b, "# catalogue: gaiadr3.gaia_source\n")
 	fmt.Fprintf(&b, "# grid: HEALPix order %d, NESTED, ICRS\n", g.Order)
-	fmt.Fprintf(&b, "# cut: %s\n", g.cutDescription())
+	fmt.Fprintf(&b, "# composition: every source Gaia observes; Gaia sees nothing brighter than G = 5\n")
 	fmt.Fprintf(&b, "# quantity: passband-averaged spectral radiance, W m^-2 sr^-1 nm^-1\n")
 
 	if len(g.Bands) > 0 && len(g.Bands[0].ColourTerm) > 0 {

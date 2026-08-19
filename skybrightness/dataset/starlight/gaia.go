@@ -27,13 +27,6 @@ var (
 	// can address.
 	ErrGaiaOrder = errors.New("starlight: HEALPix order must be between 1 and 12")
 
-	// ErrGaiaCut is returned when the magnitude cut was left at its zero
-	// value. It is required rather than defaulted because it changes the
-	// map's total brightness by more than every other setting combined, and
-	// because no value is right for every instrument.
-	ErrGaiaCut = errors.New(
-		"starlight: set FainterThan explicitly, or NoMagnitudeCut to include every source")
-
 	// ErrGaiaResponse is returned when the archive's answer cannot be read.
 	ErrGaiaResponse = errors.New("starlight: cannot read the Gaia archive response")
 )
@@ -166,52 +159,9 @@ type GaiaBuild struct {
 	// Bands are the output bands, at least one.
 	Bands []GaiaBand
 
-	// FainterThan excludes sources brighter than this Gaia G magnitude,
-	// keeping only what is fainter.
-	//
-	// No published reference applies such a cut: Masana et al. (2021)
-	// integrate "each and every star" and extend to the bright end with
-	// Hipparcos rather than trimming it. This exists because a caller
-	// modelling an instrument may reasonably want to exclude light it would
-	// resolve out, which is a different question from what the sky emits.
-	//
-	// It has no default because it has no physically correct value, and
-	// because it is the largest lever in the whole map. Measured over a
-	// thousand order-8 pixels, a cut at G = 6 drops 0.11 per cent of the
-	// sources and 19 per cent of the light; at G = 10 it drops 0.31 per cent
-	// of the sources and 64 per cent of the light. A map built with the wrong
-	// cut is wrong by more than every other choice here combined.
-	//
-	// Whether a star belongs to the background at all depends on the
-	// instrument: a 13.7 arcminute pixel holds stars a telescope resolves and
-	// an eye does not. Set [NoMagnitudeCut] to include everything and get the
-	// total integrated light of the sky, bright stars included.
-	FainterThan float64
-
 	// Progress, if set, is called after each chunk.
 	Progress func(done, total int)
 }
-
-// NoMagnitudeCut applies no cut of this package's own.
-//
-// It does not mean the map holds every star. Gaia cannot observe objects
-// brighter than G = 5, so a Gaia-only aggregation is already cut — by the
-// instrument rather than by the caller — and Masana et al. (2021) put those
-// missing stars at around 20 per cent of the total integrated starlight. That
-// is why GAMBONS reaches the bright end with Hipparcos, and why a map built
-// with this constant must not be described as total.
-//
-// The resulting map is the integrated light of everything Gaia sees, bright
-// stars included. A single naked-eye star lands in one order-8 pixel and takes
-// it to about 14 mag arcsec^-2, seven magnitudes above the median sky, which is
-// faithful to what that patch of sky emits and is the wrong quantity to
-// subtract from an observation of that star.
-//
-// Its value is brighter than any real source, so it reads as what it does.
-// The predicate is omitted rather than rendered, because any predicate on
-// phot_g_mean_mag would also drop the few sources that have no G magnitude at
-// all, and "no cut" has to mean no cut.
-const NoMagnitudeCut = -1000
 
 // pixelsPerOrder returns 12*4^order.
 func pixelsPerOrder(order int) int64 { return 12 << (2 * order) }
@@ -251,19 +201,10 @@ func (g GaiaBuild) ADQL(firstPixel, lastPixel int64) (string, error) {
 	return fmt.Sprintf(
 		"SELECT source_id/%d AS hpx, COUNT(*) AS n, COUNT(bp_rp) AS ncolour%s "+
 			"FROM gaiadr3.gaia_source "+
-			"WHERE source_id BETWEEN %d AND %d%s GROUP BY hpx",
+			"WHERE source_id BETWEEN %d AND %d GROUP BY hpx",
 		divisor, columns.String(),
-		firstPixel*divisor, (lastPixel+1)*divisor-1, g.magnitudePredicate(),
+		firstPixel*divisor, (lastPixel+1)*divisor-1,
 	), nil
-}
-
-// magnitudePredicate renders the cut, or nothing when there is none.
-func (g GaiaBuild) magnitudePredicate() string {
-	if g.FainterThan <= NoMagnitudeCut {
-		return ""
-	}
-
-	return fmt.Sprintf(" AND phot_g_mean_mag > %g", g.FainterThan)
 }
 
 // withDefaults fills in and validates a build.
@@ -288,11 +229,6 @@ func (g GaiaBuild) withDefaults() (GaiaBuild, error) {
 		if err := b.validate(); err != nil {
 			return g, err
 		}
-	}
-
-	// Last, so a build that is broken in more basic ways says so first.
-	if g.FainterThan == 0 {
-		return g, ErrGaiaCut
 	}
 
 	return g, nil

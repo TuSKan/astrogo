@@ -129,7 +129,7 @@ func TestGaiaJohnsonV(t *testing.T) {
 
 	// The band must be usable as it stands — this is the whole point of it
 	// being a constructor rather than three numbers at the call site.
-	if _, err := (starlight.GaiaBuild{FainterThan: starlight.NoMagnitudeCut, Bands: []starlight.GaiaBand{band}}).ADQL(0, 9); err != nil {
+	if _, err := (starlight.GaiaBuild{Bands: []starlight.GaiaBand{band}}).ADQL(0, 9); err != nil {
 		t.Errorf("ADQL: %v", err)
 	}
 }

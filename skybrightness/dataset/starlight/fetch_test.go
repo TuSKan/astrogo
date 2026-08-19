@@ -12,7 +12,7 @@ import (
 )
 
 func fetchSpec() GaiaBuild {
-	return GaiaBuild{Order: 8, FainterThan: 6, Bands: []GaiaBand{GaiaJohnsonV()}}
+	return GaiaBuild{Order: 8, Bands: []GaiaBand{GaiaJohnsonV()}}
 }
 
 // A scattered set of directions must become one query with one BETWEEN each,
@@ -45,71 +45,23 @@ func TestADQLForPixelsIsADisjunction(t *testing.T) {
 	}
 }
 
-// The cut is the largest lever in the map, so it has to reach the query.
-func TestMagnitudeCutReachesTheQuery(t *testing.T) {
-	t.Parallel()
-
-	adql, err := fetchSpec().ADQL(0, 9)
-	if err != nil {
-		t.Fatalf("ADQL: %v", err)
-	}
-
-	if !strings.Contains(adql, "phot_g_mean_mag > 6") {
-		t.Errorf("the cut must appear in the query:\n%s", adql)
-	}
-
-	// NoMagnitudeCut emits no predicate at all rather than a permissive one,
-	// because any predicate on phot_g_mean_mag also drops the sources that
-	// have no G magnitude.
-	every := fetchSpec()
-	every.FainterThan = NoMagnitudeCut
-
-	adql, err = every.ADQL(0, 9)
-	if err != nil {
-		t.Fatalf("ADQL: %v", err)
-	}
-
-	if strings.Contains(adql, "phot_g_mean_mag") {
-		t.Errorf("NoMagnitudeCut must emit no predicate:\n%s", adql)
-	}
-}
-
-// The zero value is rejected rather than read as either extreme. A silent
-// G > 0 quietly discards the brightest sources; a silent "no cut" hands back a
-// map whose brightest pixels are single stars. Both look like a working map,
-// which is why neither is a default.
-func TestMagnitudeCutIsRequired(t *testing.T) {
-	t.Parallel()
-
-	unset := GaiaBuild{Order: 8, Bands: []GaiaBand{GaiaJohnsonV()}}
-
-	if _, err := unset.ADQL(0, 9); !errors.Is(err, ErrGaiaCut) {
-		t.Errorf("unset cut: err = %v, want ErrGaiaCut", err)
-	}
-}
-
-// Two cuts are two datasets. Sharing a cache between them would blend a
-// background map with a total-light map, and afterwards neither is
-// recoverable — so the cut, the band and the order are all in the key.
+// Two builds whose values differ must never share a cache key. The order and
+// the band both change the numbers, so both are in the name.
 func TestCacheKeySeparatesDatasets(t *testing.T) {
 	t.Parallel()
 
 	base := fetchSpec()
 
-	other := base
-	other.FainterThan = 10
-
 	coarse := base
 	coarse.Order = 6
 
-	everything := base
-	everything.FainterThan = NoMagnitudeCut
+	otherBand := base
+	otherBand.Bands = []GaiaBand{{Name: "G", FluxToRadiance: 1e-18}}
 
 	keys := map[string]string{
-		"G>6":     base.cacheKey(),
-		"G>10":    other.cacheKey(),
-		"order 6": coarse.cacheKey(),
-		"all":     everything.cacheKey(),
+		"order 8 V": base.cacheKey(),
+		"order 6 V": coarse.cacheKey(),
+		"order 8 G": otherBand.cacheKey(),
 	}
 
 	seen := map[string]string{}
@@ -122,8 +74,8 @@ func TestCacheKeySeparatesDatasets(t *testing.T) {
 		seen[key] = name
 	}
 
-	if !strings.Contains(keys["G>6"], "o8") || !strings.Contains(keys["G>6"], "V") {
-		t.Errorf("the key must name the order and band: %q", keys["G>6"])
+	if !strings.Contains(keys["order 8 V"], "o8") || !strings.Contains(keys["order 8 V"], "V") {
+		t.Errorf("the key must name the order and band: %q", keys["order 8 V"])
 	}
 }
 

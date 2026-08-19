@@ -726,20 +726,20 @@ files exist precisely so that heavy users do not ask the query service 787 times
 a whole-sky map that argument now looks stronger than the bandwidth one. TAP remains
 clearly right for `Fetch`-scale use: tens of pixels, once per observing session.
 
-**One published map, and why the cut is not in it.** GAMBONS applies no bright-star cut —
-it integrates *"the contributions of all the stars"* and reaches the bright end with
-Hipparcos rather than trimming it. The `FainterThan` cut in this package was reasoned from
-"a resolved star is not background", which is defensible for an instrument and is not what
-the reference does; a map built with it cannot be compared to any published figure, which
-is how it became unvalidatable. So one asset is published, `starmap-o8-V-total.txt.gz`,
-matching GAMBONS' definition and its grid. `FainterThan` remains available for a caller
-modelling an instrument, and `Open` no longer takes a specification because there is one
-map to fetch.
+**One published map, and no magnitude cut.** GAMBONS applies none — it integrates *"the
+contributions of all the stars"* and reaches the bright end with Hipparcos rather than
+trimming it. This package briefly carried a `FainterThan` cut, reasoned from "a resolved
+star is not background". That is defensible for an instrument and is not what the reference
+does, and a map built with it could not be compared to any published figure — which is how
+the map became unvalidatable. The cut is removed entirely rather than left as an option
+nobody should reach for.
 
-The name says `total` rather than `all` deliberately. A Gaia-only map is missing the
-brightest fifth of the light, so `all` would be a promise the data does not keep — and the
-composition sits in the filename for the same reason the order and the cut do: each
-changes the numbers, and two files differing by twenty per cent must never share a name.
+The published asset is `starmap-o8-V-total.txt.gz`, matching GAMBONS' definition and its
+grid, and `Open` takes no specification because there is one map to fetch. `total` rather
+than `all`: Gaia sees nothing brighter than G = 5, so `all` would promise what the data
+does not hold, and the composition sits in the filename for the same reason the order and
+band do — each changes the numbers, and two files differing by twenty per cent must never
+share a name.
 
 **Why the band is a constructor.** Converting Gaia G flux to Johnson V spectral flux
 density needs three published numbers from three sources: G's VEGAMAG zero point
