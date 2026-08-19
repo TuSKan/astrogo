@@ -575,10 +575,16 @@ once and allocates nothing per direction (4.6 µs, 0 allocs).
 | Directional falloff away from the Moon | — | `TestScatteredMoonlightDarkensAwayFromTheMoon` |
 | Per-scene geometry cache | — | `TestScatteredMoonlightCacheRespectsScene`, `…Concurrent` |
 
-**What it does not do, stated plainly.** Single scattering only — there is no
-multiple-scattering term, so the sky is *underestimated*, increasingly with optical depth
-and toward the horizon, which is exactly where a bright Moon matters most. Every call
-therefore returns the `SingleScatteringOnly` flag. The selenographic libration angles are
+**What it does not do, stated plainly.** Multiple scattering is applied, but as an
+empirical factor rather than a transfer solution: `atmosphere.MultipleScatteringFactor`
+gives `f = L/L1 = 1 + 4.5·τ_R` from Winkler (2022) §5.2, which revises the
+`1 + 2.2·τ_R` of Noll et al. (2012) after Staude (1975). Winkler states the coefficient
+as approximately 4.5, on the grounds that it better matches both his measured values and
+the most likely single-scattering albedos — it is a suggested revision, not a formally
+fitted parameter with a quoted uncertainty, and it comes from one site under low aerosol
+loading. It is a function of the molecular depth alone, because Winkler notes a larger
+share of the Mie optical depth may be absorption than usually assumed. Every call
+therefore returns `ApproximateMultipleScattering`. The selenographic libration angles are
 not supplied (bounded at 0.03 in ln A), the Moon–observer distance is geocentric rather
 than topocentric (up to 3.3% in irradiance), and the solar spectrum is a required caller
 input because this package ships none and the choice moves the absolute scale.
@@ -923,7 +929,7 @@ allocations.
 | 0 | Architecture and spectral foundation | **Done** |
 | 1 | Atmospheric foundation, into `atmosphere` | **Done.** Scattering, transfer, scale heights and van Rhijn; absorption reads through `dataset/crosssection`. No cross-section dataset is shipped, and deliberately: ozone's Chappuis-band cross section is strongly temperature-dependent, so a reference and a temperature are the caller's scientific choice |
 | 2 | Natural moonless sky (GAMBONS, Gaia DR3) | **Largely built.** DGL, zodiacal light and airglow are implemented and validated; `dataset/starlight` holds the map type, its loader and a Gaia TAP builder. What remains is reference data, not code: an ISL map (requested, or buildable), Kawara's `c` decade (resolved), and band transformations |
-| 3 | Modern Moon (Jones 2013, ROLO, Winkler 2022) | **`ScatteredMoonlight` shipped** — ROLO reflectance + single-scattering transfer, validated at 18.9 mag/arcsec². Remaining: Winkler's multiple-scattering terms (not transcribed) and a shipped solar spectrum (§16) |
+| 3 | Modern Moon (Jones 2013, ROLO, Winkler 2022) | **`ScatteredMoonlight` shipped** — ROLO reflectance + single-scattering transfer with Winkler's multiple-scattering factor, validated at 18.9 mag/arcsec². The solar spectrum is now supplied by `dataset/solar` from CALSPEC. Remaining: Winkler's own model is empirical at one site, so the multiple-scattering factor is a correction rather than a transfer solution |
 | 4 | Artificial clear sky (Kocifaj 2022, VIIRS as source) | **`ArtificialSkyglow` + `dataset/viirs` shipped.** Absolute scale is blocked on Eq. 2's missing area term (§17); the Fig. 1 reproduction remains |
 | 5 | Clouds (Kocifaj 2025) | Planned |
 | 6 | External high-fidelity RT (Illumina-v2, precomputed) | Planned |
