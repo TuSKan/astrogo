@@ -54,7 +54,11 @@ func assembleSky(t *testing.T, when gotime.Time) (*skybrightness.Model, *skybrig
 		t.Fatalf("NewScatteredMoonlight: %v", err)
 	}
 
-	dgl, err := skybrightness.NewDiffuseGalacticLight(uniformDust(3.0))
+	// Capped against the same star map the starlight component uses, which is
+	// the pairing Masana et al. intend: dust cannot scatter more light than
+	// the stars along that sightline provide.
+	dgl, err := skybrightness.NewDiffuseGalacticLight(
+		uniformDust(3.0), uniformSky{value: 8.05e-10, galactic: true}, testBand())
 	if err != nil {
 		t.Fatalf("NewDiffuseGalacticLight: %v", err)
 	}

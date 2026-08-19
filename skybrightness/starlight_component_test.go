@@ -429,3 +429,171 @@ func TestIntegratedStarlightIsZeroBelowTheHorizon(t *testing.T) {
 		}
 	}
 }
+
+// Dust scatters starlight, so the diffuse galactic light cannot exceed a
+// bounded fraction of the starlight along the same sightline. Masana et al.
+// (2021) apply 0.35 after Toller (1981).
+//
+// The Kawara correlation this package evaluates is fitted at high galactic
+// latitude and carries no such knowledge: pointed at a dusty low-latitude
+// sightline it predicts more scattered light than there is starlight to
+// scatter. Nothing in the arithmetic complains, which is why the bound is
+// imposed from outside it.
+func TestDiffuseGalacticLightIsCappedAgainstStarlight(t *testing.T) {
+	t.Parallel()
+
+	grid := skybrightness.DefaultOpticalGrid()
+	scene := starlightScene(t)
+	dir := coord.NewAltAz(angle.Deg(60), angle.Deg(0))
+
+	// Dust bright enough that the uncapped correlation overshoots a faint sky.
+	const (
+		dusty      = 8.0
+		faintStars = 1e-11
+	)
+
+	measure := func(sky skybrightness.StarMap) (float64, skybrightness.Flag) {
+		t.Helper()
+
+		dgl, err := skybrightness.NewDiffuseGalacticLight(uniformDust(dusty), sky, testBand())
+		if err != nil {
+			t.Fatalf("NewDiffuseGalacticLight: %v", err)
+		}
+
+		dst := skybrightness.NewSpectralRadiance(grid)
+
+		flags, err := dgl.AddRadiance(context.Background(), dst, grid, dir, scene)
+		if err != nil {
+			t.Fatalf("AddRadiance: %v", err)
+		}
+
+		mean, err := magnitude.MeanFluxDensity(dst, grid, testBand(), 0)
+		if err != nil {
+			t.Fatalf("MeanFluxDensity: %v", err)
+		}
+
+		return mean, flags
+	}
+
+	uncapped, _ := measure(nil)
+	capped, flags := measure(uniformSky{value: faintStars, galactic: true})
+
+	if uncapped <= 0 {
+		t.Fatal("the uncapped correlation produced nothing to cap")
+	}
+
+	limit := skybrightness.MaxDGLToStarlightRatio * faintStars
+
+	if capped > limit*(1+1e-9) {
+		t.Errorf("capped DGL is %.4e, above the %.4e the starlight allows", capped, limit)
+	}
+
+	if capped >= uncapped {
+		t.Errorf("capping did nothing: %.4e against an uncapped %.4e", capped, uncapped)
+	}
+
+	// Reaching the cap means the correlation was extrapolated past where it
+	// describes anything, and the result is bounded rather than trusted.
+	if flags&skybrightness.ExtrapolatedModel == 0 {
+		t.Error("a capped result must carry ExtrapolatedModel")
+	}
+}
+
+// A sightline already inside the bound must be left exactly alone — the cap is
+// a ceiling, not a scaling.
+func TestDiffuseGalacticLightBelowTheCapIsUntouched(t *testing.T) {
+	t.Parallel()
+
+	grid := skybrightness.DefaultOpticalGrid()
+	scene := starlightScene(t)
+	dir := coord.NewAltAz(angle.Deg(60), angle.Deg(0))
+
+	value := func(sky skybrightness.StarMap) float64 {
+		t.Helper()
+
+		dgl, err := skybrightness.NewDiffuseGalacticLight(uniformDust(3.0), sky, testBand())
+		if err != nil {
+			t.Fatalf("NewDiffuseGalacticLight: %v", err)
+		}
+
+		dst := skybrightness.NewSpectralRadiance(grid)
+		if _, err := dgl.AddRadiance(context.Background(), dst, grid, dir, scene); err != nil {
+			t.Fatalf("AddRadiance: %v", err)
+		}
+
+		mean, err := magnitude.MeanFluxDensity(dst, grid, testBand(), 0)
+		if err != nil {
+			t.Fatalf("MeanFluxDensity: %v", err)
+		}
+
+		return mean
+	}
+
+	// Starlight far above anything the correlation will predict here.
+	generous := value(uniformSky{value: 1e-6, galactic: true})
+	uncapped := value(nil)
+
+	if math.Abs(generous-uncapped)/uncapped > 1e-12 {
+		t.Errorf("a sightline inside the bound changed: %.6e against %.6e", generous, uncapped)
+	}
+}
+
+// Without a star map the correlation runs unbounded, and the result has to say
+// so rather than looking like a capped one.
+func TestDiffuseGalacticLightWithoutAMapSaysItIsUnbounded(t *testing.T) {
+	t.Parallel()
+
+	grid := skybrightness.DefaultOpticalGrid()
+
+	dgl, err := skybrightness.NewDiffuseGalacticLight(uniformDust(3.0), nil, magnitude.Passband{})
+	if err != nil {
+		t.Fatalf("NewDiffuseGalacticLight: %v", err)
+	}
+
+	dst := skybrightness.NewSpectralRadiance(grid)
+
+	flags, err := dgl.AddRadiance(context.Background(), dst, grid,
+		coord.NewAltAz(angle.Deg(60), angle.Deg(0)), starlightScene(t))
+	if err != nil {
+		t.Fatalf("AddRadiance: %v", err)
+	}
+
+	if flags&skybrightness.ExtrapolatedModel == 0 {
+		t.Error("an uncapped result must carry ExtrapolatedModel")
+	}
+}
+
+// A sightline the star map does not cover cannot be capped. It must be left
+// alone and flagged, not capped against zero — which would erase the DGL
+// entirely on exactly the sightlines where a map is most likely to be missing.
+func TestDiffuseGalacticLightUncoveredSightlineIsNotCappedToZero(t *testing.T) {
+	t.Parallel()
+
+	grid := skybrightness.DefaultOpticalGrid()
+
+	dgl, err := skybrightness.NewDiffuseGalacticLight(uniformDust(3.0), emptySky{}, testBand())
+	if err != nil {
+		t.Fatalf("NewDiffuseGalacticLight: %v", err)
+	}
+
+	dst := skybrightness.NewSpectralRadiance(grid)
+
+	flags, err := dgl.AddRadiance(context.Background(), dst, grid,
+		coord.NewAltAz(angle.Deg(60), angle.Deg(0)), starlightScene(t))
+	if err != nil {
+		t.Fatalf("AddRadiance: %v", err)
+	}
+
+	var total float64
+	for _, v := range dst {
+		total += v
+	}
+
+	if total <= 0 {
+		t.Error("an uncovered sightline was capped to nothing")
+	}
+
+	if flags&skybrightness.UnknownCloud == 0 {
+		t.Error("an uncappable sightline must be flagged")
+	}
+}

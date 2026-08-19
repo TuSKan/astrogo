@@ -141,15 +141,47 @@ type DustMap interface {
 type DiffuseGalacticLight struct {
 	dust  DustMap
 	frame frameCache
+
+	// sky, band and scratch support the Toller cap. They are nil when the
+	// caller supplied no star map, in which case the cap is not applied and
+	// every result says so.
+	sky     StarMap
+	band    magnitude.Passband
+	scratch sync.Pool
 }
 
 // NewDiffuseGalacticLight builds the component over a 100 micron dust map.
-func NewDiffuseGalacticLight(dust DustMap) (*DiffuseGalacticLight, error) {
+//
+// sky and band are optional and enable the Toller cap: dust scatters
+// starlight, so the diffuse galactic light cannot exceed
+// [MaxDGLToStarlightRatio] of the integrated starlight along the same
+// sightline. Pass a nil map to skip it, and every result then carries
+// [ExtrapolatedModel] to say the correlation is running unbounded.
+//
+// The band is the passband the star map's values are averaged over, because
+// the cap compares two radiances and they have to be compared over the same
+// support. It is the same requirement, for the same reason, as
+// [NewIntegratedStarlight]'s.
+func NewDiffuseGalacticLight(
+	dust DustMap,
+	sky StarMap,
+	band magnitude.Passband,
+) (*DiffuseGalacticLight, error) {
 	if dust == nil {
 		return nil, ErrNoDustMap
 	}
 
-	return &DiffuseGalacticLight{dust: dust}, nil
+	d := &DiffuseGalacticLight{dust: dust}
+
+	if sky != nil {
+		if err := band.Validate(); err != nil {
+			return nil, fmt.Errorf("%w: capping needs a usable passband: %w", ErrNoDustMap, err)
+		}
+
+		d.sky, d.band = sky, band
+	}
+
+	return d, nil
 }
 
 // ID implements [Component].
@@ -183,10 +215,39 @@ func (d *DiffuseGalacticLight) AddRadiance(
 	if err != nil {
 		// A direction the map does not cover is missing data, not a dark
 		// sightline, so it contributes nothing and says so.
-		return UnknownCloud, nil //nolint:nilerr // absence of map coverage is not a failure
+		return UnknownCloud, nil
 	}
 
-	return DiffuseGalacticRadiance(dst, grid, intensity)
+	if d.sky == nil {
+		// Uncapped: the correlation is free to predict more scattered light
+		// than there is starlight to scatter, which is what the flag says.
+		flags, err := DiffuseGalacticRadiance(dst, grid, intensity)
+
+		return flags | ExtrapolatedModel, err
+	}
+
+	// Capped, so the spectrum is built aside and scaled before it is added.
+	scratch, ok := d.scratch.Get().(SpectralRadiance)
+	if !ok || len(scratch) != grid.Len() {
+		scratch = NewSpectralRadiance(grid)
+	}
+
+	clear(scratch)
+	defer d.scratch.Put(scratch) //nolint:staticcheck // a slice header, deliberately pooled
+
+	flags, err := DiffuseGalacticRadiance(scratch, grid, intensity)
+	if err != nil {
+		return 0, err
+	}
+
+	scale, capFlags := d.capFactor(scratch, grid, icrs, galactic)
+	flags |= capFlags
+
+	for i := range dst {
+		dst[i] += scratch[i] * scale
+	}
+
+	return flags, nil
 }
 
 // Provenance implements [Component].
@@ -211,6 +272,46 @@ func (d *DiffuseGalacticLight) Provenance() Provenance {
 		ExpectedAccuracy: "The correlation's own scatter is large; Kawara et al. quote " +
 			"uncertainties of 10 to 50 per cent on the slope depending on band.",
 	}
+}
+
+// capFactor returns the factor bringing the diffuse galactic light within
+// [MaxDGLToStarlightRatio] of the starlight along the same sightline, and 1
+// when it is already inside it.
+//
+// The two radiances are compared over the star map's own passband, because a
+// ratio between quantities averaged over different supports is not a ratio of
+// anything. A sightline the star map does not cover cannot be capped, and says
+// so rather than being capped against zero — which would erase the DGL
+// entirely on exactly the sightlines where a map is most likely to be missing.
+func (d *DiffuseGalacticLight) capFactor(
+	dgl SpectralRadiance,
+	grid unit.SpectralGrid,
+	icrs coord.ICRS,
+	galactic coord.Galactic,
+) (scale float64, flags Flag) {
+	lon, lat := icrs.RA(), icrs.Dec()
+	if d.sky.Galactic() {
+		lon, lat = galactic.L(), galactic.B()
+	}
+
+	starlight, err := d.sky.RadianceAt(lon, lat)
+	if err != nil || starlight <= 0 {
+		return 1, UnknownCloud
+	}
+
+	mean, err := magnitude.MeanFluxDensity(dgl, grid, d.band, 0)
+	if err != nil || mean <= 0 {
+		return 1, 0
+	}
+
+	limit := MaxDGLToStarlightRatio * starlight
+	if mean <= limit {
+		return 1, 0
+	}
+
+	// Hitting the cap means the correlation was extrapolated past where it
+	// describes anything, so the result is bounded rather than trusted.
+	return limit / mean, ExtrapolatedModel
 }
 
 // ── Zodiacal light ──────────────────────────────────────────────────────────

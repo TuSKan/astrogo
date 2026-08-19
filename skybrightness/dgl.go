@@ -152,6 +152,17 @@ func dimensionlessSlope(row dglCoefficient) float64 {
 	return row.NuB * float64(row.Lambda) / 1000 / 3000
 }
 
+// MaxDGLToStarlightRatio caps the diffuse galactic light against the
+// integrated starlight along the same sightline.
+//
+// Dust scatters starlight, so the DGL cannot exceed a bounded fraction of the
+// starlight available to be scattered. Masana et al. (2021) apply 0.35 after
+// Toller (1981). The correlation this package evaluates is fitted at high
+// galactic latitude and has no such knowledge of its own: extended to a dusty
+// low-latitude sightline it will happily predict more scattered light than
+// there is starlight to scatter.
+const MaxDGLToStarlightRatio = 0.35
+
 // DiffuseGalacticRadiance accumulates the spectral radiance of starlight
 // scattered by interstellar dust into dst, from the 100 micron intensity of
 // the Schlegel, Finkbeiner & Davis (1998) map along that line of sight.
@@ -180,7 +191,8 @@ func dimensionlessSlope(row dglCoefficient) float64 {
 // One constraint is deliberately not applied here. Masana et al. cap the
 // DGL-to-integrated-starlight ratio at 0.35, after Toller (1981). That needs
 // the starlight in the same direction, which this function does not have, so
-// it belongs to whatever assembles the natural sky from its parts.
+// it belongs to whatever assembles the natural sky from its parts —
+// [DiffuseGalacticLight] applies it when given a star map.
 func DiffuseGalacticRadiance(dst SpectralRadiance, grid unit.SpectralGrid, sfdIntensity float64) (Flag, error) {
 	if len(dst) != grid.Len() {
 		return 0, fmt.Errorf("%w: %d destination slots, grid has %d",
