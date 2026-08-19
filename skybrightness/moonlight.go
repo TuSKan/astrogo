@@ -272,8 +272,6 @@ func (m *ScatteredMoonlight) Provenance() Provenance {
 				"0.03 in ln A by Kieffer & Stone Table 5's own accounting.",
 			"The selenographic longitude of the Sun is taken as the signed phase " +
 				"angle, exact to the Sun's excursion from the lunar equator.",
-			"The Moon-observer distance is geocentric, not topocentric: up to " +
-				"3.3% in irradiance.",
 			"ROLO is defined at 32 discrete bands; values between them are a " +
 				"linear interpolation and are not reliable across the telluric " +
 				"water bands near 943 and 1400 nm.",
@@ -337,7 +335,9 @@ func (m *ScatteredMoonlight) computeGeometry(scene *Scene) (*moonGeometry, error
 		return nil, fmt.Errorf("skybrightness: moonlight: moon direction: %w", err)
 	}
 
-	altaz, err := coord.NewContext(at, scene.Observer, scene.Atmosphere.Refraction()).ICRSToAltAz(moonICRS)
+	ctx := coord.NewContext(at, scene.Observer, scene.Atmosphere.Refraction())
+
+	altaz, err := ctx.ICRSToAltAz(moonICRS)
 	if err != nil {
 		return nil, fmt.Errorf("skybrightness: moonlight: moon altaz: %w", err)
 	}
@@ -373,14 +373,20 @@ func (m *ScatteredMoonlight) computeGeometry(scene *Scene) (*moonGeometry, error
 
 	geom.extrapolated = err != nil
 
-	// Distances: the Sun-Moon leg in AU, the Moon-observer leg in km. The
-	// latter is geocentric rather than topocentric, which is at most an
-	// Earth radius out — up to 3.3% in irradiance, inside ROLO's own stated
-	// absolute accuracy but recorded in the provenance all the same.
+	// Distances: the Sun-Moon leg in AU, the Moon-observer leg in km.
+	//
+	// The second is topocentric. An Earth radius is 1.7 per cent of the
+	// Moon's distance and irradiance goes as its inverse square, so using the
+	// geocentric distance costs up to 3.3 per cent — an observer with the Moon
+	// overhead is that much closer to it than the Earth's centre is. The
+	// correction is one subtraction because coord.Context already computes the
+	// observer's geocentric position in ICRS to do its own parallax work.
 	kmPerAU := constants.IAU.AstronomicalUnit.Value / 1e3
 
+	topocentric := moon.Pos.Sub(ctx.ObsVec())
+
 	if err := magnitude.ROLOIrradiance(geom.irradiance, reflectance, m.solar,
-		moon.Pos.Sub(sun.Pos).Norm(), moon.Pos.Norm()*kmPerAU); err != nil {
+		moon.Pos.Sub(sun.Pos).Norm(), topocentric.Norm()*kmPerAU); err != nil {
 		return nil, fmt.Errorf("skybrightness: moonlight: %w", err)
 	}
 
