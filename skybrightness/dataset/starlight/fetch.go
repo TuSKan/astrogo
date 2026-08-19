@@ -93,7 +93,7 @@ func Fetch(ctx context.Context, spec GaiaBuild, directions ...coord.ICRS) (*Map,
 		key = path.Join(prefix, spec.cacheKey())
 		// A cache that cannot be read is not a failure: it means fetching
 		// what it would have supplied.
-		_ = readCache(ctx, bucket, key, values)
+		_ = readCache(ctx, bucket, key, values, counts)
 	}
 
 	wanted := wantedPixels(grid, directions, values)
@@ -123,7 +123,7 @@ func Fetch(ctx context.Context, spec GaiaBuild, directions ...coord.ICRS) (*Map,
 	if cacheErr == nil {
 		// A cache that cannot be written costs the next call its time, not
 		// this one its answer.
-		_ = writeCache(ctx, bucket, key, band, values)
+		_ = writeCache(ctx, bucket, key, band, values, counts)
 	}
 
 	return assembleFetch(spec, values, counts, band)
@@ -266,14 +266,14 @@ func (g GaiaBuild) cutDescription() string {
 // It tolerates gaps, which is what separates it from [Load]: a published map
 // missing a pixel is malformed, while a cache missing a pixel simply has not
 // been asked about it yet.
-func readCache(ctx context.Context, bucket *file.Bucket, key string, values []float64) error {
+func readCache(ctx context.Context, bucket *file.Bucket, key string, values []float64, counts []int64) error {
 	r, err := bucket.NewReader(ctx, key, nil)
 	if err != nil {
 		return err //nolint:wrapcheck // the caller treats any failure as a cold cache
 	}
 	defer func() { _ = r.Close() }()
 
-	return parseCache(r, values)
+	return parseCache(r, values, counts)
 }
 
 // parseCache reads the cache format, skipping anything it cannot use.
@@ -281,7 +281,7 @@ func readCache(ctx context.Context, bucket *file.Bucket, key string, values []fl
 // A malformed line costs the pixels on it, not the whole file: a truncated
 // write should leave the rest of the cache usable rather than forcing a
 // re-fetch of everything.
-func parseCache(r io.Reader, values []float64) error {
+func parseCache(r io.Reader, values []float64, counts []int64) error {
 	scanner := bufio.NewScanner(r)
 	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
 
@@ -292,7 +292,7 @@ func parseCache(r io.Reader, values []float64) error {
 		}
 
 		fields := strings.Fields(text)
-		if len(fields) != 2 {
+		if len(fields) < 2 {
 			continue
 		}
 
@@ -307,19 +307,36 @@ func parseCache(r io.Reader, values []float64) error {
 		}
 
 		values[pixel] = v
+
+		// The source count is optional: a cache written before counts were
+		// stored is still usable, it just cannot report the total.
+		if counts != nil && len(fields) > 2 {
+			if n, err := strconv.ParseInt(fields[2], 10, 64); err == nil && n >= 0 {
+				counts[pixel] = n
+			}
+		}
 	}
 
 	return scanner.Err() //nolint:wrapcheck // the caller treats any failure as a cold cache
 }
 
 // writeCache stores every pixel held so far.
-func writeCache(ctx context.Context, bucket *file.Bucket, key, band string, values []float64) error {
+func writeCache(ctx context.Context, bucket *file.Bucket, key, band string, values []float64, counts []int64) error {
 	var buf strings.Builder
 
 	fmt.Fprintf(&buf, "# bands: %s\n# partial map, fetched on demand\n", band)
 
+	// The source count rides alongside each value so a resumed build can still
+	// report the total that proves it tiled the sky. Without it, a build that
+	// resumed would count only the chunks its final run happened to fetch.
 	for pixel, v := range values {
-		if v > 0 {
+		if v <= 0 {
+			continue
+		}
+
+		if counts != nil {
+			fmt.Fprintf(&buf, "%d %.6e %d\n", pixel, v, counts[pixel])
+		} else {
 			fmt.Fprintf(&buf, "%d %.6e\n", pixel, v)
 		}
 	}

@@ -188,7 +188,7 @@ func TestCacheRoundTripsSparsely(t *testing.T) {
 	}
 
 	restored := make([]float64, 3072)
-	if err := parseCache(strings.NewReader("# bands: V\n"+buf.String()), restored); err != nil {
+	if err := parseCache(strings.NewReader("# bands: V\n"+buf.String()), restored, nil); err != nil {
 		t.Fatalf("parseCache: %v", err)
 	}
 
@@ -201,11 +201,92 @@ func TestCacheRoundTripsSparsely(t *testing.T) {
 	// Malformed lines are skipped rather than failing the whole cache: a
 	// truncated write should cost the pixels it lost, not every pixel.
 	partial := make([]float64, 3072)
-	if err := parseCache(strings.NewReader("# bands: V\n7 1.25e-09\nbroken\n9 not-a-number\n1e9 5\n"), partial); err != nil {
+	if err := parseCache(strings.NewReader("# bands: V\n7 1.25e-09\nbroken\n9 not-a-number\n1e9 5\n"), partial, nil); err != nil {
 		t.Fatalf("parseCache: %v", err)
 	}
 
 	if partial[7] != 1.25e-9 {
 		t.Errorf("the good line was lost: %v", partial[7])
+	}
+}
+
+// A build that dies partway must keep what it finished.
+//
+// The order-8 build is 787 queries against a shared service. When one was
+// throttled at chunk 360, the run discarded 360 chunks of completed work and
+// the only way forward was to ask for all of it again, which is the behaviour
+// that earns a throttle. Checkpointing means a stumble costs a minute and a
+// resume asks only for what is missing.
+func TestCacheRoundTripsCounts(t *testing.T) {
+	t.Parallel()
+
+	values := make([]float64, 3072)
+	counts := make([]int64, 3072)
+	values[7], counts[7] = 1.25e-9, 812
+	values[100], counts[100] = 4e-10, 45
+
+	var buf strings.Builder
+
+	buf.WriteString("# bands: V\n")
+
+	for pixel, v := range values {
+		if v > 0 {
+			fmt.Fprintf(&buf, "%d %.6e %d\n", pixel, v, counts[pixel])
+		}
+	}
+
+	gotValues := make([]float64, 3072)
+	gotCounts := make([]int64, 3072)
+
+	if err := parseCache(strings.NewReader(buf.String()), gotValues, gotCounts); err != nil {
+		t.Fatalf("parseCache: %v", err)
+	}
+
+	// The source total is what proves a whole-sky build tiled the sky, so it
+	// has to survive a resume rather than counting only the final run.
+	if gotCounts[7] != 812 || gotCounts[100] != 45 {
+		t.Errorf("counts = %d, %d, want 812, 45", gotCounts[7], gotCounts[100])
+	}
+
+	if gotValues[7] != 1.25e-9 {
+		t.Errorf("value = %v, want 1.25e-9", gotValues[7])
+	}
+
+	// A cache written before counts existed still loads; it just cannot report
+	// the total.
+	old := make([]float64, 3072)
+	if err := parseCache(strings.NewReader("# bands: V\n7 1.250000e-09\n"), old, make([]int64, 3072)); err != nil {
+		t.Fatalf("parseCache without counts: %v", err)
+	}
+
+	if old[7] != 1.25e-9 {
+		t.Errorf("a two-column cache did not load: %v", old[7])
+	}
+}
+
+// A chunk already held is not asked for again, which is what makes a resume
+// cheap rather than a rerun.
+func TestChunkIsCachedSkipsCompletedRanges(t *testing.T) {
+	t.Parallel()
+
+	build := fetchSpec()
+	values := make([]float64, 100)
+
+	if build.chunkIsCached(values, 0, 9) {
+		t.Error("an empty range must not read as cached")
+	}
+
+	for i := range 10 {
+		values[i] = 1e-9
+	}
+
+	if !build.chunkIsCached(values, 0, 9) {
+		t.Error("a fully populated range must read as cached")
+	}
+
+	// One gap is enough to refetch: a partial chunk is not a chunk.
+	values[5] = 0
+	if build.chunkIsCached(values, 0, 9) {
+		t.Error("a range with a hole must be refetched")
 	}
 }

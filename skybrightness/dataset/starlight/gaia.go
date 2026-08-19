@@ -8,6 +8,7 @@ import (
 	"io"
 	"math"
 	"net/url"
+	"path"
 	"strconv"
 	"strings"
 	"time"
@@ -363,6 +364,30 @@ func BuildFromGaia(ctx context.Context, build GaiaBuild) (*Map, []int64, error) 
 		return nil, nil, err
 	}
 
+	// The build checkpoints into the same accumulating cache Fetch uses, so a
+	// run that dies partway keeps what it had. Before this, a throttle at
+	// chunk 360 of 787 discarded 360 chunks of somebody else's service time
+	// as well as fourteen minutes of ours, and the only recovery was to ask
+	// for all of it again — which is precisely the behaviour that gets a
+	// client throttled in the first place.
+	band := build.Bands[0].Name
+	values := bands[band]
+
+	bucket, prefix, cacheErr := remote.CacheDir(ctx, remote.GaiaTAP)
+
+	key := ""
+	if cacheErr == nil {
+		key = path.Join(prefix, build.cacheKey())
+		_ = readCache(ctx, bucket, key, values, counts)
+	}
+
+	checkpoint := func() {
+		if cacheErr == nil {
+			_ = writeCache(ctx, bucket, key, band, values, counts)
+		}
+	}
+	defer checkpoint() // a failed build still keeps its completed chunks
+
 	chunks := int((npix + int64(build.Chunk) - 1) / int64(build.Chunk))
 
 	for c := range chunks {
@@ -373,8 +398,20 @@ func BuildFromGaia(ctx context.Context, build GaiaBuild) (*Map, []int64, error) 
 			last = npix - 1
 		}
 
+		if build.chunkIsCached(values, first, last) {
+			if build.Progress != nil {
+				build.Progress(c+1, chunks)
+			}
+
+			continue
+		}
+
 		if err := build.fetchChunkWithRetry(ctx, client, first, last, bands, counts, solidAngle); err != nil {
 			return nil, nil, err
+		}
+
+		if (c+1)%checkpointEvery == 0 {
+			checkpoint()
 		}
 
 		if build.Progress != nil {
@@ -472,6 +509,31 @@ const aggregationBudget = 6 * time.Minute
 // and that is the correct trade: the cost of being wrong here is borne by
 // every other user of a shared research instrument, not by us.
 const aggregationPace = 2 * time.Second
+
+// checkpointEvery is how many chunks are aggregated between cache writes.
+//
+// Writing after every chunk would rewrite the whole partial map 787 times for
+// one order-8 build. Writing only at the end is what made a failure cost
+// everything. Twenty-five chunks is about a minute of work at the paced rate,
+// which is the most a stumble should cost.
+const checkpointEvery = 25
+
+// chunkIsCached reports whether every pixel in the range already has a value,
+// so a resumed build can skip the query rather than repeat it.
+//
+// A pixel with genuinely no flux is indistinguishable from an unfetched one
+// here, so such a pixel is queried again on every resume. At order 8 the real
+// map has none — every pixel holds sources — and paying one redundant chunk
+// beats inventing a separate presence bitmap to avoid it.
+func (g GaiaBuild) chunkIsCached(values []float64, first, last int64) bool {
+	for pixel := first; pixel <= last && pixel < int64(len(values)); pixel++ {
+		if values[pixel] <= 0 {
+			return false
+		}
+	}
+
+	return true
+}
 
 // aggregationClient builds the TAP client this package's queries go through.
 func aggregationClient() (*api.Client, error) {
