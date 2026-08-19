@@ -106,7 +106,7 @@ func parseNASALunarEclipses(html string) []nasaEclipseRef {
 		}
 
 		hour, _ := strconv.Atoi(timeParts[0])
-		min, _ := strconv.Atoi(timeParts[1])
+		minute, _ := strconv.Atoi(timeParts[1])
 		sec, _ := strconv.Atoi(timeParts[2])
 
 		// Parse ΔT
@@ -139,14 +139,14 @@ func parseNASALunarEclipses(html string) []nasaEclipseRef {
 
 		var jdTD float64
 		if isJulianCal {
-			jdTD = time.DateJulianCal(year, month, day, hour, min, sec).JD()
+			jdTD = time.DateJulianCal(year, month, day, hour, minute, sec).JD()
 		} else {
-			jdTD = time.Date(year, gotime.Month(month), day, hour, min, sec, 0, gotime.UTC).JD()
+			jdTD = time.Date(year, gotime.Month(month), day, hour, minute, sec, 0, gotime.UTC).JD()
 		}
 
 		eclipses = append(eclipses, nasaEclipseRef{
 			Year: year, Month: month, Day: day,
-			Hour: hour, Min: min, Sec: sec,
+			Hour: hour, Min: minute, Sec: sec,
 			DeltaT:      dt,
 			EclipseType: eclType,
 			JDtd:        jdTD,
@@ -205,7 +205,7 @@ func parseNASASolarEclipses(html string) []nasaEclipseRef {
 		}
 
 		hour, _ := strconv.Atoi(timeParts[0])
-		min, _ := strconv.Atoi(timeParts[1])
+		minute, _ := strconv.Atoi(timeParts[1])
 		sec, _ := strconv.Atoi(timeParts[2])
 
 		dt, err := strconv.ParseFloat(parts[5], 64)
@@ -240,14 +240,14 @@ func parseNASASolarEclipses(html string) []nasaEclipseRef {
 
 		var jdTD float64
 		if isJulianCal {
-			jdTD = time.DateJulianCal(year, month, day, hour, min, sec).JD()
+			jdTD = time.DateJulianCal(year, month, day, hour, minute, sec).JD()
 		} else {
-			jdTD = time.Date(year, gotime.Month(month), day, hour, min, sec, 0, gotime.UTC).JD()
+			jdTD = time.Date(year, gotime.Month(month), day, hour, minute, sec, 0, gotime.UTC).JD()
 		}
 
 		eclipses = append(eclipses, nasaEclipseRef{
 			Year: year, Month: month, Day: day,
-			Hour: hour, Min: min, Sec: sec,
+			Hour: hour, Min: minute, Sec: sec,
 			DeltaT:      dt,
 			EclipseType: eclType,
 			JDtd:        jdTD,
@@ -448,7 +448,7 @@ func TestNASA_LunarEclipses_Historical(t *testing.T) {
 			}
 
 			if detected > 0 {
-				t.Logf("Century %04d-%04d: %d/%d eclipses detected, mean Δ=%.1f min, max Δ=%.1f min",
+				t.Logf("Century %04d-%04d: %d/%d eclipses detected, mean Δ=%.1f minute, max Δ=%.1f min",
 					c.start, c.end, detected, tested, centuryDelta/float64(detected), centuryMax)
 			} else {
 				t.Logf("Century %04d-%04d: %d/%d sampled eclipses detected",
@@ -460,7 +460,7 @@ func TestNASA_LunarEclipses_Historical(t *testing.T) {
 	t.Logf("\n══════════════════════════════════════════════════════════")
 
 	if totalDetected > 0 {
-		t.Logf("NASA Lunar Eclipses: %d/%d detected, mean Δ=%.1f min, max Δ=%.1f min",
+		t.Logf("NASA Lunar Eclipses: %d/%d detected, mean Δ=%.1f minute, max Δ=%.1f min",
 			totalDetected, totalRef, totalDelta/float64(totalDetected), maxDelta)
 	} else {
 		t.Logf("NASA Lunar Eclipses: %d/%d detected", totalDetected, totalRef)
@@ -581,7 +581,7 @@ func TestNASA_SolarEclipses_Historical(t *testing.T) {
 			}
 
 			if detected > 0 {
-				t.Logf("Century %04d-%04d: %d/%d eclipses detected, mean Δ=%.1f min, max Δ=%.1f min",
+				t.Logf("Century %04d-%04d: %d/%d eclipses detected, mean Δ=%.1f minute, max Δ=%.1f min",
 					c.start, c.end, detected, tested, centuryDelta/float64(detected), centuryMax)
 			} else {
 				t.Logf("Century %04d-%04d: %d/%d eclipses detected",
@@ -593,7 +593,7 @@ func TestNASA_SolarEclipses_Historical(t *testing.T) {
 	t.Logf("\n══════════════════════════════════════════════════════════")
 
 	if totalDetected > 0 {
-		t.Logf("NASA Solar Eclipses: %d/%d detected, mean Δ=%.1f min, max Δ=%.1f min",
+		t.Logf("NASA Solar Eclipses: %d/%d detected, mean Δ=%.1f minute, max Δ=%.1f min",
 			totalDetected, totalRef, totalDelta/float64(totalDetected), maxDelta)
 	} else {
 		t.Logf("NASA Solar Eclipses: %d/%d detected", totalDetected, totalRef)

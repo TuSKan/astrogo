@@ -24,7 +24,7 @@ type mockLinearProvider struct {
 	vel      vector.Vec3
 }
 
-func (m *mockLinearProvider) State(id eph.ID, t atime.Time) (eph.State, error) {
+func (m *mockLinearProvider) State(_ eph.ID, t atime.Time) (eph.State, error) {
 	jd1Req, jd2Req := t.JDParts()
 	jd1Base, jd2Base := m.baseTime.JDParts()
 	dtDays := (jd1Req - jd1Base) + (jd2Req - jd2Base)

@@ -86,7 +86,7 @@ func fetchVector(naifID int, bodyName string, startStr, stopStr string) (*StateV
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("querying Horizons: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
@@ -209,7 +209,7 @@ func fetchObserverTable(naifID int, bodyName string, lon, lat, height float64, s
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("querying Horizons: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
@@ -386,7 +386,7 @@ func fetchObserverSeries(naifID int, bodyName string, lon, lat, height float64, 
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("querying Horizons: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 

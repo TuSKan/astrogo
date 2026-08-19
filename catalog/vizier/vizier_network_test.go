@@ -66,7 +66,7 @@ func requireVizier(t *testing.T) {
 // absorbs the proven backend-routing flakiness. Only the final attempt's
 // error, if every attempt failed, is handed to
 // skipOnServerUnavailable/t.Fatalf.
-func coneSearchWithRetry(t *testing.T, ctx context.Context, req resolve.ConeRequest) int {
+func coneSearchWithRetry(ctx context.Context, t *testing.T, req resolve.ConeRequest) int {
 	t.Helper()
 
 	const attempts = 3
@@ -84,7 +84,7 @@ func coneSearchWithRetry(t *testing.T, ctx context.Context, req resolve.ConeRequ
 		count = 0
 		lastErr = nil
 
-		New().ConeSearch(ctx, req)(func(tar resolve.Target, err error) bool {
+		New().ConeSearch(ctx, req)(func(_ resolve.Target, err error) bool {
 			if err != nil {
 				lastErr = err
 
@@ -121,7 +121,7 @@ func TestVizierNetworkConeSearch(t *testing.T) {
 		Limit:  10,
 	}
 
-	count := coneSearchWithRetry(t, ctx, req)
+	count := coneSearchWithRetry(ctx, t, req)
 
 	// VizieR 2MASS should return sources inside a 36-arcsecond radius of
 	// Andromeda's core; parseCSV now really parses the response (see R22 fix).
@@ -151,7 +151,7 @@ func TestVizierNetworkConeSearch_RegisteredTable(t *testing.T) {
 		Limit:  5,
 	}
 
-	count := coneSearchWithRetry(t, ctx, req)
+	count := coneSearchWithRetry(ctx, t, req)
 
 	if count == 0 {
 		t.Error("expected at least one Hipparcos star within 2 degrees of Andromeda's core")
