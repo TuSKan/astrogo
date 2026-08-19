@@ -3,6 +3,7 @@
 package jpl_test
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -65,7 +66,12 @@ func fetchVector(naifID int, bodyName string, startStr, stopStr string) (*StateV
 	reqURL := fmt.Sprintf("%s?%s", baseURL, encodedQuery)
 
 	// 4. Execute the request
-	resp, err := http.Get(reqURL)
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, reqURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("building the request: %w", err)
+	}
+
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -183,7 +189,12 @@ func fetchObserverTable(naifID int, bodyName string, lon, lat, height float64, s
 	encodedQuery := strings.ReplaceAll(params.Encode(), "+", "%20")
 	reqURL := fmt.Sprintf("%s?%s", baseURL, encodedQuery)
 
-	resp, err := http.Get(reqURL)
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, reqURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("building the request: %w", err)
+	}
+
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -355,7 +366,12 @@ func fetchObserverSeries(naifID int, bodyName string, lon, lat, height float64, 
 	encodedQuery := strings.ReplaceAll(params.Encode(), "+", "%20")
 	reqURL := fmt.Sprintf("%s?%s", baseURL, encodedQuery)
 
-	resp, err := http.Get(reqURL)
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, reqURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("building the request: %w", err)
+	}
+
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, err
 	}

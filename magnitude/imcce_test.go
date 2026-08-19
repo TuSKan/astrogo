@@ -10,6 +10,7 @@
 package magnitude_test
 
 import (
+	"context"
 	"encoding/json"
 	"math"
 	"net/http"
@@ -50,7 +51,12 @@ type imcceCard struct {
 func fetchIMCCE(t *testing.T, name string) (H, G float64) {
 	t.Helper()
 
-	resp, err := http.Get("https://ssp.imcce.fr/webservices/ssodnet/api/ssocard/" + name)
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, "https://ssp.imcce.fr/webservices/ssodnet/api/ssocard/"+name, nil)
+	if err != nil {
+		t.Fatalf("building the IMCCE request: %v", err)
+	}
+
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Skipf("IMCCE network unavailable: %v", err)
 	}

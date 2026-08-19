@@ -15,6 +15,8 @@ import (
 )
 
 func loadCases(t *testing.T) []*StateVector {
+	t.Helper()
+
 	sun, err := fetchVector(10, "Sun", "2000-01-01 12:00 TDB", "2000-01-01 12:01")
 	if errors.Is(err, errHorizonsUnavailable) {
 		t.Skipf("JPL Horizons is not answering with API data, skipping live comparison: %v", err)
@@ -46,6 +48,8 @@ func loadCases(t *testing.T) []*StateVector {
 }
 
 func runHorizonsTest(t *testing.T, bodyName string) {
+	t.Helper()
+
 	requireHorizons(t)
 
 	p, err := jpl.NewProvider(context.Background(), core.Planets, "de440")
@@ -113,13 +117,19 @@ func runHorizonsTest(t *testing.T, bodyName string) {
 }
 
 func TestJPLStateAgainstHorizonsSun(t *testing.T) {
+	t.Helper()
+
 	runHorizonsTest(t, "Sun")
 }
 
 func TestJPLStateAgainstHorizonsMoon(t *testing.T) {
+	t.Helper()
+
 	runHorizonsTest(t, "Moon")
 }
 
 func TestJPLStateAgainstHorizonsPlanetaryBodies(t *testing.T) {
+	t.Helper()
+
 	runHorizonsTest(t, "Planetary")
 }

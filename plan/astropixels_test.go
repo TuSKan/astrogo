@@ -174,7 +174,7 @@ func fetchAstroPixelsPage(t *testing.T, startYear int) string {
 	url := fmt.Sprintf("https://astropixels.com/ephemeris/phasescat/phases%04d.html", startYear)
 	client := &http.Client{Timeout: 30 * time.Second}
 
-	req, err := http.NewRequest(http.MethodGet, url, nil)
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, url, nil)
 	if err != nil {
 		t.Fatalf("Failed to create request for %s: %v", url, err)
 	}

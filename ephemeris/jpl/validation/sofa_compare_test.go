@@ -13,6 +13,8 @@ import (
 )
 
 func runSOFATest(t *testing.T, bid eph.ID) {
+	t.Helper()
+
 	p, err := jpl.NewProvider(context.Background(), core.Planets, "de440")
 	if err != nil {
 		t.Skipf("skipping SOFA comparison: JPL provider failed: %v", err)
@@ -59,9 +61,13 @@ func runSOFATest(t *testing.T, bid eph.ID) {
 }
 
 func TestJPLStateAgainstSOFASun(t *testing.T) {
+	t.Helper()
+
 	runSOFATest(t, eph.Sun)
 }
 
 func TestJPLStateAgainstSOFAMoon(t *testing.T) {
+	t.Helper()
+
 	runSOFATest(t, eph.Moon)
 }
