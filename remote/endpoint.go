@@ -118,6 +118,15 @@ const (
 	// a detail.
 	CALSPEC EndpointID = "stsci.calspec"
 
+	// GaiaStarMap is the prebuilt integrated-starlight map published with
+	// astrogo's own releases (skybrightness/dataset/starlight).
+	//
+	// It is a release asset rather than a third-party archive because the map
+	// is a derived product: 787 aggregation queries against the Gaia archive,
+	// reduced to one 5 MB file. Publishing it means a caller never has to run
+	// that against a shared service, and every caller gets the same numbers.
+	GaiaStarMap EndpointID = "astrogo.starmap"
+
 	// CopernicusEODATA is the Copernicus Data Space Ecosystem's
 	// S3-compatible "eodata" object store. It is a general, multi-product
 	// access point — Sentinel, CLMS and CAMS share one bucket, separated
@@ -454,6 +463,24 @@ func defaultEndpoints() map[EndpointID]Endpoint {
 			Downloadable:    true,
 			Files:           []string{"passbands-v1.tar.gz"},
 		},
+		GaiaStarMap: {
+			ID:        GaiaStarMap,
+			URL:       "https://github.com/TuSKan/astrogo/releases/download/starmap-v1/",
+			Kind:      KindFile,
+			Subsystem: "skybrightness/dataset/starlight",
+			Description: "Integrated starlight aggregated from Gaia DR3 onto HEALPix order 8, " +
+				"in Johnson V; one asset per magnitude cut",
+			ApproxSize:      8 << 20,
+			Enabled:         true,
+			DownloadTimeout: 5 * time.Minute,
+			Mutable:         false, // the cut and the order are in the filename
+			Downloadable:    true,
+			Files: []string{
+				"starmap-o8-V-g6.txt.gz",
+				"starmap-o8-V-all.txt.gz",
+			},
+		},
+
 		CALSPEC: {
 			ID:        CALSPEC,
 			URL:       "https://archive.stsci.edu/hlsps/reference-atlases/cdbs/current_calspec/",

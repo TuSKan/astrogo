@@ -225,6 +225,7 @@ func TestDownloadableEndpointsAreExactlyTheExpectedSet(t *testing.T) {
 		PassbandBundle:   true,
 		CopernicusEODATA: true,
 		CALSPEC:          true,
+		GaiaStarMap:      true,
 	}
 
 	for _, ep := range Endpoints() {

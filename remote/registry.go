@@ -311,6 +311,8 @@ func constName(id EndpointID) string {
 		return "VizieR"
 	case GaiaTAP:
 		return "GaiaTAP"
+	case GaiaStarMap:
+		return "GaiaStarMap"
 	case MAST:
 		return "MAST"
 	case CelesTrak:
