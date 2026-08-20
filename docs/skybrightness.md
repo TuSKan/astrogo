@@ -783,37 +783,98 @@ came out brighter than the Gaia G map it was built from**, which no band this na
 The replacement test anchors on the Sun and on that inequality rather than on a coefficient
 list, because a coefficient list cannot tell a sign error from a correct one.
 
-**The corrected order-9 map, rebuilt and measured.** 3,145,727 pixels, 1,811,709,771 sources,
-one whole-sky query of sixteen minutes:
+**The corrected map, rebuilt at order 8 and measured.** 786,432 pixels, 1,811,709,771
+sources, one whole-sky query of thirteen minutes:
 
-| \|b\| | mag arcsec⁻² |
-| :--- | ---: |
-| 0–10° | **21.99** |
-| 10–20° | 22.52 |
-| 20–30° | 23.00 |
-| 30–40° | 23.33 |
-| 40–50° | 23.52 |
-| 50–60° | 23.69 |
-| 60–70° | 23.70 |
-| 70–80° | 23.89 |
-| 80–90° | **23.96** |
-| whole sky | 22.84 |
+| \|b\| | Gaia only | with bright stars |
+| :--- | ---: | ---: |
+| 0–10° | **21.99** | **21.91** |
+| 10–30° | 22.73 | 22.66 |
+| 30–50° | 23.41 | 23.39 |
+| 50–70° | 23.70 | 23.60 |
+| 70–90° | **23.91** | **23.87** |
+| whole sky | 22.84 | 22.77 |
 
 Against the inverted build the whole-sky mean moves 21.88 → 22.84, so the previous map
-carried **2.4 times too much flux**. The per-pixel ratio has a median of 0.595 and a first
-percentile of 0.079: no pixel got brighter, and the plane moved about twice as far as the
-cap, which is the colour-dependent signature the error had to have.
+carried **2.4 times too much flux**. Measured at order 9 before the move, the per-pixel
+ratio had a median of 0.595 and a first percentile of 0.079: no pixel got brighter, and the
+plane moved about twice as far as the cap, which is the colour-dependent signature the error
+had to have.
 
-**Why the old map appeared to validate, and why the new one should not.** The published
-~23.5 mag arcsec⁻² counts every star. This map counts neither end of the distribution — not
-the bright stars Gaia saturates on below G = 5, nor anything past its G = 21 limit — so it
-**must come out fainter**. The inverted map read 23.44 at high latitude and looked like a
-match; it was a coincidence, the ~0.5 mag of excess brightness at the bluest part of the sky
-cancelling the ~0.5 mag of stars that are missing. The corrected map reads 23.96 there,
-0.46 mag fainter than the published total, and that gap is now attributable to two omissions
-this document already records rather than to luck.
+**The bright stars Gaia cannot see: 74 of them, worth 6.4 per cent.** Hipparcos positions
+propagated to J2016.0 and matched against every Gaia source brighter than G = 9 leave
+exactly 74 stars with no counterpart, out of 15,404 brighter than V = 7. They are the ones
+anybody could name — Sirius, Canopus, Arcturus, Alpha Centauri, Vega, Capella, Rigel,
+Procyon, Betelgeuse, Achernar — and **70 of the 74 are brighter than V = 3**, which locates
+Gaia's saturation limit without having to look it up. They carry 22.9 per cent of the flux
+of the V < 7 Hipparcos sample and **6.4 per cent of the whole-sky map**.
 
-That is the shape a real validation has: the residual points at something named.
+The match is insensitive to the tolerance: 81 stars at 2 arcsec, 74 at 5, 66 at 10, 64 at
+20. And 6.4 per cent independently reproduces the 2.6 per cent this document recorded
+against the inverted map, which was 2.4 times too bright — 2.6 × 2.4 = 6.2.
+
+**Not 18,693.** The count of Hipparcos stars lacking an entry in
+`gaiadr3.hipparcos2_best_neighbour` is 18,693, and taking that as the missing set would have
+added 250 times too many stars, double-counting almost all of them. A missing crossmatch row
+means the crossmatch failed — close pairs, high proper motion — not that Gaia never saw the
+star. Only a positional check answers the question that matters, which is whether the light
+is already in the map.
+
+**Why the old map appeared to validate, and why comparing to a single number never could.**
+The inverted map read 23.44 at high latitude against a quoted ~23.5 and looked like a match.
+It was a coincidence: the excess brightness at the bluest part of the sky cancelled what the
+map was missing. But the deeper problem is that the comparison sets two different
+quantities against each other. This map is **integrated starlight alone**; quoted all-sky background figures
+include diffuse galactic light — 20 to 30 per cent of the Milky Way's integrated light, per
+Leinert et al. — and the extragalactic background on top. Both are separate components here
+by construction.
+
+So the accounting at high latitude runs: 23.91 for Gaia alone, 23.87 once the 74 bright
+stars are in, and under 3 per cent more for everything past G = 21, which Masana et al.
+bound directly. What remains between that and ~23.5 is the size of DGL plus EBL, which is
+what those components are for.
+
+**Order 9 was built, measured and abandoned.** The obvious refinement is a finer grid, so
+it was tried: 3,145,728 pixels of 6.9 arcmin against order 8's 786,432 of 13.7. Three
+measurements sent it back.
+
+It does not resolve diffuse structure, it isolates stars. Splitting each order-8 pixel into
+its four order-9 children, a perfectly diffuse sky gives each a 0.25 share. The measured
+median share of the largest child is **0.472**, one child exceeds 70 per cent in 16.9 per
+cent of pixels, and **36.5 per cent of the sky's flux** lives in those. The median
+coefficient of variation among four children is 0.601.
+
+So the apparent extra detail is that lumpiness. For a single direction the median
+\|order 9 − order 8\| is **0.575 mag**, rising to 1.73 at the 90th percentile, and only 10.3
+per cent of directions agree within 0.1 mag. A caller asking how bright the sky is would get
+an answer swinging by half a magnitude depending on which side of a 6.9 arcmin boundary a
+star fell.
+
+And the one principled argument for building fine — that a more local mean colour improves
+the colourless-source correction — does not survive measurement. Correcting at order 9 and
+degrading to order 8 differs from correcting at order 8 directly by a median of **0.0000
+mag**, a 99th percentile of 0.0023, and 0.06 per cent of pixels past 0.01 mag.
+
+Order 8 is therefore what ships: it is GAMBONS' own grid, so the comparison is direct, it is
+a quarter the size, and nothing measurable is lost.
+
+**What is actually validated, and what is not.** The absolute scale of this map has no free
+parameter — it is a sum of catalogue fluxes through two zero points and one polynomial — so
+validating it means validating those three things:
+
+| link | check | result |
+| :--- | :--- | ---: |
+| Gaia G VEGAMAG zero point | `G + 2.5·log₁₀(flux)` over 177,426 DR3 sources | **25.687367**, scatter 3×10⁻⁷ |
+| G → V transformation | 4,000 stars with Gaia and Tycho-2 photometry | **−0.002 mag**, ±0.03 per colour bin |
+| Johnson V Vega zero point | not independently checked here | 3.63×10⁻¹¹ W m⁻² nm⁻¹, adopted |
+
+The zero point this package uses, 25.6874, rounds the catalogue's own 25.687367 — an error
+of 3×10⁻⁵ mag, or three parts in a hundred thousand.
+
+That is a validation of the chain, not of the sky. An end-to-end comparison against an
+independent measurement of integrated starlight is still absent, and it stays absent until
+a reference is obtained whose composition is stated precisely enough to compare against —
+which a single quoted number is not.
 
 **Sources without a colour — a systematic error, not a rounding one.** The colour
 transformation is applied per star inside the aggregate, because transforming a sum is not

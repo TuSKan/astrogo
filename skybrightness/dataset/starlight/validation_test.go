@@ -22,14 +22,25 @@ import (
 // in V — the figure Masana et al. (2021) and Leinert et al. (1998) both land on,
 // and roughly a hundredth of the natural sky's total.
 //
-// A Gaia-only map must come out **fainter** than that, not equal to it. The
-// published figure counts every star; this map is missing both ends, the bright
-// stars Gaia saturates on below G = 5 and everything past its G = 21 limit. An
-// earlier revision asserted equality within a magnitude and passed while the
-// colour transformation was inverted, because at high latitude the resulting
-// 0.5 mag of excess brightness happened to cancel the 0.5 mag of missing stars.
-// Bounding it on both sides, with the lower bound set by what is absent rather
-// than by the published total, is what makes the assertion mean something.
+// This map must come out **fainter** than that, and the reasons are now
+// measured rather than assumed:
+//
+//   - It is integrated starlight alone. Quoted all-sky background figures
+//     include diffuse galactic light, which Leinert et al. put at 20-30 per
+//     cent of the integrated light of the Milky Way, plus the extragalactic
+//     background. Both are separate Components here by design.
+//   - It omits the stars Gaia saturates on. Measured against Hipparcos with
+//     proper motion propagated to J2016.0, exactly **74** stars brighter than
+//     V = 7 have no Gaia counterpart, 70 of them brighter than V = 3, and they
+//     carry **6.4 per cent** of the whole-sky flux.
+//   - It omits stars past G = 21, which Masana et al. put below 3 per cent
+//     everywhere except a few points on the Galactic plane.
+//
+// An earlier revision asserted equality within a magnitude and passed while the
+// colour transformation was inverted, because the resulting excess brightness
+// happened to cancel what the map was missing. Bounding it on one side, against
+// a total the map is a known subset of, is what makes the assertion mean
+// something.
 func TestGaiaMapMatchesThePublishedSurfaceBrightness(t *testing.T) {
 	testutil.RequireReachable(t, "gea.esac.esa.int:443")
 
@@ -142,9 +153,9 @@ func runOf(t *testing.T, grid coord.HEALPix, n int, want func(b angle.Angle) boo
 // would notice. The plane-to-cap contrast is what does: a frame swap does not
 // dim the plane, it moves it, so the two samples would come out alike.
 //
-// The full order-9 build puts the plane at 21.99 and the polar cap at 23.96
+// The full order-8 build puts the plane at 21.99 and the polar cap at 23.91
 // mag arcsec^-2, over a monotonic profile in galactic latitude. This samples
-// sixteen pixels of each rather than 3,145,728, so the bound is loose, but a
+// sixteen pixels of each rather than 786,432, so the bound is loose, but a
 // washed-out contrast is unmissable.
 func TestGaiaMapPutsTheMilkyWayInThePlane(t *testing.T) {
 	testutil.RequireReachable(t, "gea.esac.esa.int:443")
