@@ -1264,7 +1264,7 @@ Nothing is optimised yet; that is Phase 8. The point is numbers before opinions.
 | ROLO `c₁–c₄` at full precision | Nothing outright; caps Phase 3 accuracy | The display equation following "the eight constant 311g coefficients are", or the ASCII export of Table 5. |
 | Lunar orientation (IAU rotation elements or a JPL binary PCK) | The selenographic longitude of the Sun `Φ` and the libration angles `θ`, `φ`, which `magnitude.ROLOReflectance` therefore takes as inputs. Archinal et al. (2018) WGCCRE report, or PCK support in `ephemeris/jpl`, would close it. |
 | ~~Solar spectral irradiance at the 32 ROLO bands~~ | **Resolved.** `skybrightness/dataset/solar` fetches the CALSPEC reference (`sun_reference_stis_002.fits`) and `solar.NewScatteredMoonlight` samples it onto the ROLO bands. `magnitude.ROLOIrradiance` still takes the spectrum as a parameter, since ROLO's absolute scale depends on the choice and the engine performs no I/O. |
-| O₃ absorption cross section | Molecular absorption in the visible | **Decided, not yet wired.** Serdyuchenko et al. (2014), AMT 7, 609 and 625: 213–1100 nm at 0.02–0.06 nm in the UV–visible, eleven temperatures from 193 to 293 K in 10 K steps, better than 3 per cent absolute over most of the range. It spans the 330–1000 nm grid with no extrapolation at either end, and it is on MPI-Mainz, whose format `dataset/crosssection` already parses. **223 K** is the temperature to ship: ozone peaks near 22 km where the stratosphere is roughly 220–230 K, and 223 K is the nearest *measured* point to the ~226 K effective temperature used in total-column retrieval — interpolating a table to 226 K would be inventing data to gain nothing. The choice rests on the Chappuis band being far less temperature-sensitive than the UV Huggins band, which should be confirmed against Part 2 once the data is in hand; if it does not hold, the cross section has to be weighted per scene against `atmosphere`'s vertical profile instead. |
+| ~~O₃ absorption cross section~~ | **Resolved.** `skybrightness/dataset/crosssection.Ozone` fetches it and `crosssection.OzoneTemperatureK` pins the choice at 223 K. The reasoning below is kept because the temperature is a judgement, not a lookup. | Serdyuchenko et al. (2014), AMT 7, 609 and 625: 213–1100 nm at 0.02–0.06 nm in the UV–visible, eleven temperatures from 193 to 293 K in 10 K steps, better than 3 per cent absolute over most of the range. It spans the 330–1000 nm grid with no extrapolation at either end, and it is on MPI-Mainz, whose format `dataset/crosssection` already parses. **223 K** is the temperature to ship: ozone peaks near 22 km where the stratosphere is roughly 220–230 K, and 223 K is the nearest *measured* point to the ~226 K effective temperature used in total-column retrieval — interpolating a table to 226 K would be inventing data to gain nothing. The choice rests on the Chappuis band being far less temperature-sensitive than the UV Huggins band, which should be confirmed against Part 2 once the data is in hand; if it does not hold, the cross section has to be weighted per scene against `atmosphere`'s vertical profile instead. |
 | O₂ and H₂O absorption | Nothing in the visible continuum; narrow bands only | **Not a data gap — a capability gap.** These are line absorbers: O₂ at 688 and 762 nm, water vapour at 720, 820 and 940 nm. Beer–Lambert with a cross section band-averaged onto a 1 nm grid is systematically wrong and always in the same direction, because `exp(−τ)` is convex — averaging the cross section first overestimates absorption. Representing them needs a band model or a correlated-k treatment, which is a different capability from `atmosphere.CrossSection` rather than a dataset for it. HITRAN supplies the line lists whenever that capability exists. |
 | Jones et al. (2013) confirmation | Phase 3 framing | Confirm the A&A open-access text. |
 | Illumina-v2 product format | Phase 6 | A sample precomputed product and its dimension conventions. |
@@ -1290,10 +1290,16 @@ sub-second. Each chunk is a `source_id` range, so it uses the primary-key index 
 scanning the table. **786,432 pixels is 787 such queries — roughly half an hour, against
 at least 649 GB and 2,911 files for the bulk route.** astrogo already has the TAP client.
 
-A spot check confirms the numbers are real: pixel 100000 holds 567 sources summing to
-4.94×10⁶ e⁻/s, which is G = 8.95 integrated, or **23.5 mag/arcsec²** over the pixel's
-1.5979×10⁻⁵ sr — a textbook integrated-starlight surface brightness at high galactic
-latitude.
+A spot check confirms the query returns real numbers: pixel 100000 holds 567 sources
+summing to 4.94×10⁶ e⁻/s, which is G = 8.95 integrated over the pixel's 1.5979×10⁻⁵ sr.
+
+**That is all it confirms, and an earlier revision of this paragraph claimed more.** It
+converted that sum straight through Johnson V's zero point to 23.5 mag/arcsec² and called
+the result "a textbook integrated-starlight surface brightness" — but the sum carries no
+colour transformation, so treating it as a V surface brightness is exactly the G-zero-point-
+with-V-flux-density mistake §11.4 warns against, and the agreement was coincidence. The
+published map, built with the transformation applied per star, puts pixel 100000 at **23.76
+mag/arcsec²**. A number that happens to land near a remembered one is not a check.
 
 The colour-dependent per-star transformation also evaluates inline, so the band conversion
 happens inside the aggregate rather than after it — which matters, because transforming a
