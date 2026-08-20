@@ -1162,9 +1162,50 @@ two items §16 still lists: the airglow spectrum is not wired, and the extragala
 background is not implemented. The reference is recorded here so that when they are, the
 comparison is a single run rather than another afternoon of clicking.
 
-The location fields on that form are read-only and set through its "Change location" dialog;
-the airglow factor accepts 0, which removes airglow entirely and would isolate the
-astronomical components for a cleaner first comparison.
+The location fields on that form are read-only and set through its "Change location" dialog.
+
+**The airglow=0 run, and the first external check this map has had.** Repeating the export
+with the airglow factor at 0 and everything else unchanged leaves ISL, DGL, EBL and zodiacal
+light, propagated:
+
+| zenith angle | airglow 100 % | airglow 0 % | difference |
+| :--- | ---: | ---: | ---: |
+| 0–5°, overhead | 21.13 | **21.74** | 0.61 |
+| 0–90°, whole sky | 21.21 | **22.17** | 0.96 |
+| 60–90°, near horizon | 21.15 | **22.35** | 1.20 |
+| horizontal irradiance | 1.457 | 0.678 µW m⁻² | ×2.15 |
+
+Two things confirm both runs are behaving. Airglow matters more near the horizon than
+overhead, 1.20 mag against 0.61, which is the van Rhijn enhancement. And with airglow off
+the altitude profile becomes monotonic — 22.65 median at 0–15° altitude rising to 21.82 at
+75–90° — because extinction is then the only thing shaping it, where the airglow run was
+non-monotonic from the two effects opposing each other.
+
+Now the check. Write the ground-level astronomical total as
+
+	GAMBONS = ISL_extra-atmospheric × (1 + f) × T
+
+with f the ratio of DGL + EBL + zodiacal to integrated starlight and T the all-sky mean
+transmission. Our published map gives ISL alone, extra-atmospheric, at 22.77 whole-sky, and
+GAMBONS gives 22.17, so (1+f)·T = 1.738 and f follows once T is chosen:
+
+| map | (1+f)·T | implied f at T = 0.70 / 0.75 / 0.85 |
+| :--- | ---: | :--- |
+| **corrected, published** | 1.738 | **+1.48 / +1.32 / +1.04** |
+| the inverted map | 0.766 | +0.09 / +0.02 / −0.10 |
+
+Against the literature — DGL 0.2–0.3 of ISL (Leinert et al. via Toller 1981), zodiacal
+roughly 0.5–1.5 depending on ecliptic latitude and elongation, EBL a few per cent, so f of
+about 0.75–1.85 — the corrected map lands inside the expected range across every plausible
+transmission. **The inverted map requires DGL, zodiacal light and the extragalactic
+background together to contribute nothing at all, and at the higher transmissions to
+contribute negative flux.** Leinert's figure for DGL alone rules that out.
+
+That is an external falsification of the inverted map and an external corroboration of the
+corrected one, from a model that shares neither our code nor our transformation. It is not
+yet the full Level-3 comparison — that still needs our own five components run for this
+scene — but it is the first number from outside this repository that the map has had to
+survive, and the sign error would not have survived it.
 
 Two conditions must match for that comparison to mean anything. GAMBONS excludes the Moon
 and the Sun, so astrogo must be queried with only its natural-sky components registered —
