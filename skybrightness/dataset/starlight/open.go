@@ -16,16 +16,22 @@ var ErrNoPublishedMap = errors.New("starlight: the published map does not match 
 
 // TotalStarlightMap is the asset astrogo publishes.
 //
-// "total" rather than "all" because the distinction matters and cost this
-// project a wasted build to learn. A Gaia-only map is not the total integrated
-// starlight: Gaia cannot observe objects brighter than G = 5, and Masana et al.
-// (2021) put those stars at around 20 per cent of the flux, which is why
-// GAMBONS reaches the bright end with Hipparcos. A file named "all" that is
-// missing a fifth of the light is a promise the data does not keep.
+// "total" rather than "all", and the map has to earn it. Gaia saturates on the
+// brightest sky, so a Gaia-only map is not the total integrated starlight and a
+// file named "all" would promise what the data does not hold. This one closes
+// that gap the way GAMBONS does, with Hipparcos: 74 stars with no Gaia DR3
+// counterpart, matched positionally with proper motion propagated to J2016.0,
+// carrying 6.4 per cent of the whole-sky flux. Seventy of the 74 are brighter
+// than V = 3, which is where Gaia's limit actually sits.
 //
-// The name therefore records the composition, for the same reason the cut and
-// the order are in it: each changes the numbers, and two files that differ by
-// twenty per cent must never share a name.
+// Six per cent rather than the twenty Masana et al. report, because theirs is a
+// DR2 figure: DR2 lacked a counterpart for some 35,000 Hipparcos stars and DR3
+// recovered nearly all of them. The correction shrank because the catalogue
+// improved, not because the physics changed.
+//
+// The name records the composition, for the same reason the order and band are
+// in it: each changes the numbers, and two files that differ must never share a
+// name.
 const TotalStarlightMap = "starmap-o8-V-total.txt.gz"
 
 // Open fetches the published integrated-starlight map.
