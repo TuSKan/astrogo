@@ -185,9 +185,20 @@ func (b GaiaBand) colourRecoveryColumns() string {
 		return ""
 	}
 
+	// The mean colour is weighted by flux, not by count.
+	//
+	// AVG(bp_rp) is dominated by the numerous faint red stars, while the flux
+	// being recovered is dominated by bright ones, which are systematically
+	// bluer. Measured on the worst pixel in the sky, the count-weighted mean is
+	// 1.452 against a flux-weighted 0.924, and using the former over-corrects
+	// by 19 per cent. Since what is being scaled is flux, the colour has to
+	// represent the light rather than the population.
+	name := columnName(b.Name)
+
 	return fmt.Sprintf(", SUM(phot_g_mean_flux) AS %s_all, "+
-		"SUM(phot_g_mean_flux+0*bp_rp) AS %s_col, AVG(bp_rp) AS %s_mc",
-		columnName(b.Name), columnName(b.Name), columnName(b.Name))
+		"SUM(phot_g_mean_flux+0*bp_rp) AS %s_col, "+
+		"SUM(phot_g_mean_flux*bp_rp)/SUM(phot_g_mean_flux+0*bp_rp) AS %s_mc",
+		name, name, name)
 }
 
 // GaiaBuild configures a map build.

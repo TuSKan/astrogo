@@ -815,6 +815,48 @@ reliable exactly where the flux concentrates. Pixels whose recovered flux domina
 measured flux should be treated as uncertain, and the per-pixel counts that ship with the
 map are what make that visible.
 
+**The fix: weight the mean colour by flux, not by count.** `AVG(bp_rp)` answers "what
+colour is a typical star here", but the quantity being scaled is flux, and flux is not
+distributed like stars. The numerous faint red sources dominate the average while the
+bright, bluer ones dominate the light. Replacing it with
+
+	SUM(phot_g_mean_flux*bp_rp)/SUM(phot_g_mean_flux+0*bp_rp)
+
+asks the question the correction actually needs. On pixel 138978 the count-weighted mean is
+BP−RP = 1.452 while the flux-weighted mean is 0.924 — the light really is much bluer than
+the population — and the correction factor falls from 1.469 to 1.188, so the count-weighted
+form was over-correcting that pixel by 19 per cent. The NULL-propagation trick carries over
+unchanged: with no coloured source in the pixel the denominator is a `SUM` over an all-NULL
+set, which is NULL rather than zero, so the expression degrades to no correction instead of
+failing the query.
+
+**Where the residual error lives, measured by magnitude.** Binning colourless sources by G
+and summing their flux, over a block of 45,474 order-9 pixels and a second block elsewhere:
+
+| | first block | second block |
+| :--- | ---: | ---: |
+| sources | 2,816,168 | 292,300 |
+| colourless, by count | 1.38 % | 1.17 % |
+| colourless, by flux | 0.19 % | 0.15 % |
+| **dropped flux from G < 13** | **54.9 %** | **46.1 %** |
+| carried by | 161 sources (0.41 % of colourless) | 15 (0.44 %) |
+
+About four in a thousand colourless sources carry roughly half the dropped flux, and one
+G = 7 star carries 18 per cent of it in the first block. Neither block samples the crowded
+plane — both come out near 1.3 per cent colourless against 14.95 per cent all-sky — so these
+fractions describe the quiet sky, where the deficit is a few bright stars rather than many
+faint ones. That is what bounds the mean-colour assumption: no weighting scheme recovers the
+colour of one specific saturated star from its neighbours.
+
+**Those stars can be resolved exactly rather than assumed.** `gaiadr3.tycho2tdsc_merge`
+carries `bt_mag`/`vt_mag` and is reachable from `gaia_source` through
+`tycho2tdsc_merge_best_neighbour`; both are present on Gaia@AIP. Tycho-2 photometry converts
+to Johnson V by the published ESA (1997, Vol. 1, §1.3, Eq. 1.3.20) transformation
+V = V_T − 0.090 (B_T − V_T) — a catalogue measurement, not an inferred colour. Of the 161
+bright colourless sources in the first block, 22 have such a counterpart and those 22 hold
+58.8 per cent of the bright colourless flux, so about 32 per cent of all the dropped flux in
+that block can be replaced by a measured magnitude.
+
 A pixel with no coloured source at all cannot be corrected by any local mean, and no global
 mean is substituted — that would be the fabrication this package refuses elsewhere. The
 per-pixel `ncolour` count still ships so a caller can see how much of a pixel rests on the

@@ -263,7 +263,7 @@ func TestColourRecoveryColumnsAreRequested(t *testing.T) {
 	for _, want := range []string{
 		"SUM(phot_g_mean_flux) AS b_V_all",
 		"SUM(phot_g_mean_flux+0*bp_rp) AS b_V_col",
-		"AVG(bp_rp) AS b_V_mc",
+		"SUM(phot_g_mean_flux*bp_rp)/SUM(phot_g_mean_flux+0*bp_rp) AS b_V_mc",
 	} {
 		if !strings.Contains(adql, want) {
 			t.Errorf("missing %q from:\n%s", want, adql)
@@ -285,7 +285,7 @@ func TestColourRecoveryColumnsAreRequested(t *testing.T) {
 		t.Fatalf("ADQL: %v", err)
 	}
 
-	if strings.Contains(adql, "_all") || strings.Contains(adql, "AVG(") {
+	if strings.Contains(adql, "_all") || strings.Contains(adql, "_mc") {
 		t.Errorf("an untransformed band needs no recovery columns:\n%s", adql)
 	}
 }
