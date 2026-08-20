@@ -60,9 +60,9 @@ func ExtinctionAtAltitude(k0, altitudeM float64) float64 {
 //	G − V = −0.02704 + 0.01424·(BP−RP) − 0.2156·(BP−RP)² + 0.01426·(BP−RP)³
 //
 // so V = G − (G−V). The table is tabulated as G minus the target band, and
-// reading it the other way round costs about half a magnitude at solar colour
-// and far more for red stars, in the direction that makes every star too
-// bright.
+// reading it the other way round costs 2(G−V) — about 0.3 mag at solar colour,
+// 0.5 mag at the colour most catalogue stars have and over 3 mag for an M
+// dwarf — always in the direction that makes the star too bright.
 //
 // Three independent checks fix the direction. The Sun has G = −26.90 against
 // V = −26.76, so G − V = −0.14, and the polynomial at the solar BP−RP of 0.82

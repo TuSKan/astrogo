@@ -142,7 +142,7 @@ func TestGaiaJohnsonV(t *testing.T) {
 // nm, so a star always carries more flux in G than in V and the ratio is below
 // one for every ordinary colour. Entering the table with the sign inverted
 // leaves the map plausible and positive everywhere while making it 1.6 times
-// too bright at solar colour and seventeen times too bright at BP-RP = 3 -
+// too bright at the sky's median colour and seventeen times at BP-RP = 3 -
 // worst along the Galactic plane, where the ensemble is reddest and the map is
 // brightest. Nothing else in this package's tests would notice.
 func TestGaiaJohnsonVColourFactorDirection(t *testing.T) {
