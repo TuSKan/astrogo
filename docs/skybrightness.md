@@ -750,72 +750,35 @@ colour of whatever mix of spectral types each pixel holds — plausible everywhe
 along the Galactic plane where the ensemble is reddest. One constructor removes the
 opportunity.
 
-**Sources without a colour.** The transformation is applied per star inside the aggregate,
-because transforming a sum is not the same as summing transformations when the
-transformation depends on colour. A source with no BP-RP makes the polynomial null and SQL
-drops it; the archive rejects both `CASE` and `COALESCE`, so no default can be substituted
-in the query. Each pixel therefore reports two counts — total sources and sources with a
-colour — so the exclusion is visible rather than assumed small.
+**Sources without a colour — a systematic error, not a rounding one.** The colour
+transformation is applied per star inside the aggregate, because transforming a sum is not
+the same as summing transformations when the transformation depends on colour. A source
+with no BP−RP makes the polynomial null and SQL drops it, and the archive rejects both
+`CASE` and `COALESCE`, so no default can be substituted in the query.
 
-**Cross-validated by two independent builds.** The same order-8 map was produced twice by
-different routes: 787 chunked queries against ESA's archive, and a single whole-sky
-`GROUP BY` against Gaia@AIP returning all 786,432 rows at once. Both report
-1,811,709,771 sources, and the pixel values agree to a maximum relative difference of
-5×10⁻⁷ — which is the precision limit of the text format's six decimal places, not a
-disagreement. That single check exercises the ADQL, the chunk tiling, the accumulation,
-the colour transformation and both services simultaneously; nothing else in this work
-tests so much at once.
+An earlier revision of this section called that *"about one per cent of a pixel's sources
+and less of its flux"*. **That was measured on sparse high-latitude sky and generalised
+without checking.** Counted across the whole order-8 build:
 
-The single-query route took 17 minutes against 38, needs no chunking, no checkpointing and
-no retry logic, and returns 14.7 MB of typed Parquet rather than 15 MB of text. It requires
-an authenticated caller and the `2h` job queue — AIP's default `30s` queue cannot finish a
-whole-sky aggregation, and reports that as a statement timeout rather than as a queue
-limit.
-
-**The map, measured.** A full order-8 build over all 786,432 pixels aggregated
-1,811,709,771 sources — Gaia DR3's entire catalogue, which is what proves the chunks
-tile the sky exactly rather than overlapping or leaving gaps. It took 38 minutes over
-787 queries and left no pixel empty. Binned by galactic latitude:
-
-| \|b\| | mag arcsec⁻² |
+| region | sources dropped |
 | :--- | :--- |
-| 0–15° | 21.01 |
-| 15–30° | 22.06 |
-| 30–45° | 22.29 |
-| 45–60° | 22.34 |
-| 60–75° | 23.19 |
-| 75–90° | 23.48 |
+| all sky | **14.95 per cent** |
+| densest 0.1 per cent of pixels | **53.7 per cent** |
+| densest 1 per cent | 41.0 per cent |
+| densest 10 per cent | 21.6 per cent |
+| sparsest 50 per cent | 1.3 per cent |
 
-The polar value lands on the ~23.5 that Masana et al. and Leinert et al. give for
-high-latitude integrated starlight, with nothing tuned to put it there, and the sky spans
-6.2 magnitudes between its 1st and 99th percentile pixels. That contrast is also the
-sharpest available test of the frame: mislabelling an ICRS map as galactic does not dim
-the plane, it moves it, so the plane and the cap would come out alike while every value
-stayed positive and every direction stayed covered.
+So the map systematically underestimates the Galactic plane, where more than half the
+sources are discarded, and the plane is where it is brightest. Sources lacking BP−RP are
+predominantly faint, so the flux shortfall is smaller than the count shortfall — but it is
+not one per cent and it is not uniform, which is the part that matters: a direction-
+dependent deficit cannot be absorbed into an overall calibration.
 
-**The map is Gaia-only, and Gaia does not see the brightest stars.** Masana et al. (2021)
-state it directly: *"Gaia cannot observe very bright objects (with G < 5 mag). For those
-stars, the Hipparcos catalogue"* is used instead, and *"in terms of flux, the Hipparcos
-stars account for around 20 per cent of the total integrated star light."*
-
-So `NoMagnitudeCut` is a misleading name for what it produces: a map already missing the
-brightest fifth of the light, cut not by us but by the instrument. Two consequences, both
-of which invalidate earlier claims in this document.
-
-First, comparing that map against a published *total* integrated-starlight figure is not a
-validation. The order-8 build gives 23.48 mag arcsec⁻² at the cap against a quoted ~23.5,
-and that agreement is arithmetically impossible to be meaningful when a fifth of the flux
-is absent — it is luck, and it was reported here as confirmation.
-
-Second, it makes the internal comparison the discriminating one. Cutting at G > 6 moved
-the cap from 23.48 to 23.68, a 17 per cent flux reduction, against the 19 per cent
-measured directly over a thousand pixels and the ~20 per cent Masana et al. attribute to
-Hipparcos. Three routes to the same fraction, and that consistency is a real check where
-the absolute comparison was not.
-
-Closing this needs Hipparcos for G < 5, which is what GAMBONS does and what would make an
-absolute comparison mean something. Until then, no published map should claim to be total
-integrated starlight.
+Masana et al. handle this by assigning such stars the local mean colour. The fix here is
+one more aggregate in the same query — PostgreSQL's `FILTER (WHERE bp_rp IS NOT NULL)`
+gives the G-flux of the coloured subset directly, and Gaia@AIP accepts `LANG=postgresql`
+where ESA does not. Until that lands, the per-pixel `ncolour` count ships with the map so
+a caller can see how much of any pixel rests on it.
 
 **Known limitations.**
 
