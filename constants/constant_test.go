@@ -116,7 +116,7 @@ func TestSets_AllCoversEveryConstantField(t *testing.T) {
 
 		for i := range v.NumField() {
 			if v.Type().Field(i).Type == constantType {
-				if c, ok := v.Field(i).Interface().(constants.Constant); ok {
+				if c, ok := reflect.TypeAssert[constants.Constant](v.Field(i)); ok {
 					fields = append(fields, c)
 				}
 			}

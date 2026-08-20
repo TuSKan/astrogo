@@ -105,7 +105,8 @@ func (g GaiaBuild) Header() string {
 		fmt.Fprintf(&b, "# colour transformation: G - %s polynomial in BP-RP, "+
 			"Gaia DR3 photometric documentation, Sect. 5.5.1, Table 5.9\n", band)
 		fmt.Fprintf(&b, "# zero points: Gaia DR3 G VEGAMAG 25.6874; Johnson V 3.63e-11 W m^-2 nm^-1\n")
-		fmt.Fprintf(&b, "# excluded: sources with no BP-RP, which the transformation cannot reach\n")
+		fmt.Fprintf(&b, "# colourless sources: recovered, not dropped - their G flux is scaled by "+
+			"the polynomial at the pixel's flux-weighted mean BP-RP, clamped to [-0.5, 5.0]\n")
 	}
 
 	return b.String()
@@ -117,6 +118,15 @@ func WriteMap(w io.Writer, spec GaiaBuild, m *Map) error {
 
 	if _, err := io.WriteString(w, spec.Header()); err != nil {
 		return fmt.Errorf("starlight: write header: %w", err)
+	}
+
+	// Anything added after the aggregation records itself on the map rather
+	// than on the build spec, because the spec describes one query and the map
+	// can hold more than that query returned.
+	if m.Source != "" {
+		if _, err := fmt.Fprintf(w, "# added: %s\n", m.Source); err != nil {
+			return fmt.Errorf("starlight: write source: %w", err)
+		}
 	}
 
 	for pixel := range m.Grid().NumPixels() {

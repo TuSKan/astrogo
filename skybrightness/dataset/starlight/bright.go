@@ -86,6 +86,19 @@ func AddBrightStars(m *Map, band string, stars []BrightStar) error {
 		values[pixel] += irradiance / solidAngle
 	}
 
+	// Record the addition on the map. A published map holding Hipparcos
+	// photometry while claiming only gaiadr3.gaia_source misdescribes itself,
+	// and the difference is 6.4 per cent of the sky.
+	if len(stars) > 0 {
+		note := fmt.Sprintf("%d Hipparcos stars with no Gaia DR3 counterpart, "+
+			"Johnson V taken directly from I/239/hip_main", len(stars))
+		if m.Source == "" {
+			m.Source = note
+		} else {
+			m.Source += "; " + note
+		}
+	}
+
 	return nil
 }
 

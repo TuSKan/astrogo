@@ -29,7 +29,8 @@ linters:
 
 
     # ── Style choices (documented rationale) ──────────────────────────
-    - exhaustruct     # partial struct init is idiomatic Go
+    - exhaustruct     # deprecated name; replaced by exhaustruct_v5
+    - exhaustruct_v5  # partial struct init is idiomatic Go
     - varnamelen      # short vars (r, t, jd) standard in astronomy
     - godox           # TODO/FIXME tracked in roadmap
     - goheader        # no license header requirement

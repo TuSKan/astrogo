@@ -130,7 +130,8 @@ func TestPublishedHeaderCarriesProvenance(t *testing.T) {
 		"G - V polynomial in BP-RP",  // and which direction it is tabulated in
 		"25.6874",                    // the Gaia G zero point
 		"3.63e-11",                   // the Johnson V zero point
-		"sources with no BP-RP",      // what was dropped
+		"recovered, not dropped",     // what happens to sources with no BP-RP
+		"flux-weighted mean BP-RP",   // and on what basis
 	} {
 		if !strings.Contains(header, want) {
 			t.Errorf("header omits %q:\n%s", want, header)
