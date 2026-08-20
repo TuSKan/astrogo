@@ -796,6 +796,34 @@ mean is substituted — that would be the fabrication this package refuses elsew
 per-pixel `ncolour` count still ships so a caller can see how much of a pixel rests on the
 assumption.
 
+**The bright-star gap, measured against the DR3 crossmatch.** Masana et al. report 35,000
+Hipparcos stars absent from Gaia DR2, carrying about 20 per cent of the integrated
+starlight. Against DR3, counted through `gaiadr3.hipparcos2_best_neighbour` on Gaia@AIP:
+
+| | |
+| :--- | :--- |
+| Hipparcos stars with a DR3 counterpart | 99,524 |
+| **without one** | **18,693 (15.8 per cent)** |
+| flux they carry, of Hipparcos' total | **33.6 per cent** |
+| brighter than V = 2 / 4 / 6 / 8 | 47 / 232 / 1,077 / 6,959 |
+| as a fraction of the map's all-sky mean radiance | **5.6 per cent** |
+| **with no ICRS position in `I/239/hip_main`** | **262** |
+
+So DR3 halves the gap DR2 left, and the residual is 5.6 per cent of the sky rather than
+20 — a real correction, still worth making, and much smaller than the reference implies
+because the catalogue improved between their work and ours.
+
+Two earlier figures in this work were wrong and are superseded. A positional match against
+Gaia sources brighter than G = 7 found 73 missing stars carrying 2.6 per cent; it counted
+only the V < 6 subset and mistook reddened stars for absent ones. The crossmatch is the
+correct instrument and gives more than double.
+
+The 262 stars with no ICRS position are a requirement, not an edge case: `I/239/hip_main`
+leaves `RAICRS`/`DEICRS` empty where Hipparcos' astrometric fit failed on a multiple, and
+only the sexagesimal `RAhms`/`DEdms` remain. An exploratory script silently dropped three
+of them and it took a row count to notice. Any implementation must read the fallback
+columns.
+
 **Known limitations.**
 
 - The scattered term of Eq. 8 is not modelled. It returns to the line of sight some of
