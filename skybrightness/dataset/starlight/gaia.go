@@ -112,23 +112,12 @@ func (b GaiaBand) validate() error {
 	return nil
 }
 
-// expression renders the band's per-star flux as ADQL.
+// colourPolynomial renders the G-to-band magnitude offset as an ADQL
+// expression in bp_rp, and evaluates it in Go for a given colour.
 //
-// Sources without a BP-RP colour make the polynomial null, so SQL drops them
-// from the sum. That is deliberate rather than merely tolerated: the archive's
-// ADQL parser rejects both COALESCE and CASE, so there is no way to substitute
-// a default colour inside the aggregate, and inventing one outside it would be
-// worse than excluding them.
-//
-// The cost is small and measurable. Colourless sources are the faintest few
-// per cent of the catalogue — roughly 1 per cent of a typical pixel's count,
-// and less of its flux, since flux is dominated by bright stars. Both counts
-// come back per pixel so a caller can see exactly what was dropped.
-func (b GaiaBand) expression() string {
-	if len(b.ColourTerm) == 0 {
-		return "SUM(phot_g_mean_flux)"
-	}
-
+// One definition serves both, because the correction for colourless sources
+// has to use exactly the polynomial the query used. Two copies would drift.
+func (b GaiaBand) colourPolynomial() string {
 	var poly strings.Builder
 
 	for i, c := range b.ColourTerm {
@@ -143,9 +132,62 @@ func (b GaiaBand) expression() string {
 		}
 	}
 
-	// flux_band = flux_G * 10^(0.4*(G - m_band)), since a positive G - m
-	// means the band magnitude is brighter and so carries more flux.
-	return fmt.Sprintf("SUM(phot_g_mean_flux*POWER(10,0.4*(%s)))", poly.String())
+	return poly.String()
+}
+
+// colourFactor evaluates 10^(0.4*(G-band)) for one colour — the same factor
+// the query applies per star, for use on the sources the query had to drop.
+func (b GaiaBand) colourFactor(bpRP float64) float64 {
+	var offset, term float64 = 0, 1
+
+	for _, c := range b.ColourTerm {
+		offset += c * term
+		term *= bpRP
+	}
+
+	return math.Pow(10, 0.4*offset)
+}
+
+// expression renders the band's per-star flux as ADQL.
+//
+// Sources without a BP-RP colour make the polynomial null, so SQL drops them
+// from the sum. That is not a rounding error: across the whole order-8 build
+// 14.95 per cent of sources lack a colour, rising above 50 per cent in the
+// densest pixels of the Galactic plane, so the loss is both large and
+// direction-dependent — the worst combination, because a deficit that varies
+// across the sky cannot be absorbed into an overall calibration.
+//
+// They are recovered rather than excluded. The query returns two further
+// sums — the total G flux and the G flux of coloured sources alone — whose
+// difference is the flux the polynomial dropped, plus the mean colour of the
+// pixel. [GaiaBuild.accumulate] then assigns that flux the pixel's own mean
+// colour, which is what Masana et al. (2021) do. The counts still come back
+// per pixel so a caller can see how much of a pixel rests on the assumption.
+func (b GaiaBand) expression() string {
+	if len(b.ColourTerm) == 0 {
+		return "SUM(phot_g_mean_flux)"
+	}
+
+	return fmt.Sprintf("SUM(phot_g_mean_flux*POWER(10,0.4*(%s)))", b.colourPolynomial())
+}
+
+// colourRecoveryColumns renders the extra aggregates that make the colourless
+// sources recoverable.
+//
+// The trick is NULL propagation rather than CASE or FILTER, both of which one
+// archive or the other rejects: adding 0*bp_rp to a flux makes the whole term
+// null exactly when the colour is missing, so the sum covers coloured sources
+// alone. Subtracting it from the unconditional sum leaves the dropped flux.
+// Plain arithmetic like this parses everywhere, which CASE and FILTER do not —
+// ESA rejects CASE, and Gaia@AIP rejects FILTER.
+func (b GaiaBand) colourRecoveryColumns() string {
+	if len(b.ColourTerm) == 0 {
+		return ""
+	}
+
+	return fmt.Sprintf(", SUM(phot_g_mean_flux) AS %s_all, "+
+		"SUM(phot_g_mean_flux+0*bp_rp) AS %s_col, AVG(bp_rp) AS %s_mc",
+		columnName(b.Name), columnName(b.Name), columnName(b.Name))
 }
 
 // GaiaBuild configures a map build.
@@ -187,7 +229,8 @@ func (g GaiaBuild) ADQL(firstPixel, lastPixel int64) (string, error) {
 	var columns strings.Builder
 
 	for _, b := range g.Bands {
-		fmt.Fprintf(&columns, ", %s AS %s", b.expression(), columnName(b.Name))
+		fmt.Fprintf(&columns, ", %s AS %s%s", b.expression(), columnName(b.Name),
+			b.colourRecoveryColumns())
 	}
 
 	// Two things here are dictated by what the archive's ADQL parser accepts,
@@ -655,9 +698,62 @@ func (g GaiaBuild) accumulate(
 				continue // a pixel with no usable sources contributes nothing
 			}
 
+			flux += g.recoverColourless(b, index, row)
+
 			bands[b.Name][pixel] = flux * b.FluxToRadiance / solidAngle
 		}
 	}
+}
+
+// recoverColourless returns the flux the colour polynomial dropped, scaled as
+// though those sources carried the pixel's mean colour.
+//
+// Sources without BP-RP are 15 per cent of the sky and over half of the
+// densest pixels, so dropping them underestimates the Galactic plane
+// specifically. Masana et al. (2021) assign such stars the local mean colour;
+// this does the same, per HEALPix pixel, which is as local as the aggregate
+// allows.
+//
+// It returns zero — leaving the uncorrected sum — when the response predates
+// these columns, when nothing was dropped, or when a pixel has no coloured
+// source at all to average. That last case cannot be corrected by any local
+// mean, and inventing a global one would be exactly the fabrication this
+// package refuses elsewhere.
+func (g GaiaBuild) recoverColourless(b GaiaBand, index map[string]int, row []string) float64 {
+	if len(b.ColourTerm) == 0 {
+		return 0
+	}
+
+	col := strings.ToLower(columnName(b.Name))
+
+	value := func(suffix string) (float64, bool) {
+		i, ok := index[col+suffix]
+		if !ok || i >= len(row) {
+			return 0, false
+		}
+
+		v, err := strconv.ParseFloat(strings.TrimSpace(row[i]), 64)
+		if err != nil {
+			return 0, false
+		}
+
+		return v, true
+	}
+
+	all, okAll := value("_all")
+	coloured, okCol := value("_col")
+	mean, okMean := value("_mc")
+
+	if !okAll || !okCol || !okMean {
+		return 0
+	}
+
+	dropped := all - coloured
+	if dropped <= 0 {
+		return 0
+	}
+
+	return dropped * b.colourFactor(mean)
 }
 
 // johnsonVZeroFlux is Johnson V's Vega zero point: the spectral flux density

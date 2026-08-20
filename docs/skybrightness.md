@@ -774,11 +774,27 @@ predominantly faint, so the flux shortfall is smaller than the count shortfall �
 not one per cent and it is not uniform, which is the part that matters: a direction-
 dependent deficit cannot be absorbed into an overall calibration.
 
-Masana et al. handle this by assigning such stars the local mean colour. The fix here is
-one more aggregate in the same query — PostgreSQL's `FILTER (WHERE bp_rp IS NOT NULL)`
-gives the G-flux of the coloured subset directly, and Gaia@AIP accepts `LANG=postgresql`
-where ESA does not. Until that lands, the per-pixel `ncolour` count ships with the map so
-a caller can see how much of any pixel rests on it.
+**Fixed by assigning the local mean colour**, which is what Masana et al. do. The query
+returns two further sums and a mean: the unconditional G flux, the G flux of coloured
+sources alone, and the pixel's mean BP−RP. Their difference is the flux the polynomial
+dropped, and it is scaled by the same polynomial evaluated at that mean colour.
+
+The mechanism is NULL propagation, not `CASE` or `FILTER`. Adding `0*bp_rp` to a flux makes
+the term null exactly when the colour is missing, so the sum covers coloured sources alone.
+That is plain arithmetic and parses everywhere; `CASE` is rejected by ESA and `FILTER` by
+Gaia@AIP, so either would have tied the build to one archive.
+
+Measured on the densest pixel in the sky (hpx 467974, 74,126 sources): **57.2 per cent of
+its sources carry no colour, and they account for 7.2 per cent of its flux.** The count
+deficit is far larger than the flux deficit because colourless sources are predominantly
+faint — which is why the earlier one-per-cent claim survived as long as it did. Seven per
+cent is 0.075 mag on the brightest part of the map: real, worth correcting, and not the
+catastrophe the source count alone suggests.
+
+A pixel with no coloured source at all cannot be corrected by any local mean, and no global
+mean is substituted — that would be the fabrication this package refuses elsewhere. The
+per-pixel `ncolour` count still ships so a caller can see how much of a pixel rests on the
+assumption.
 
 **Known limitations.**
 

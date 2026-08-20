@@ -242,3 +242,116 @@ func TestChunkIsCachedSkipsCompletedRanges(t *testing.T) {
 		t.Error("a range with a hole must be refetched")
 	}
 }
+
+// Colourless sources must be recovered, not dropped.
+//
+// Across the whole order-8 build 14.95 per cent of sources carry no BP-RP, and
+// in the densest pixels of the Galactic plane it passes 50 per cent. Dropping
+// them underestimates the plane specifically — the brightest part of the map —
+// and a deficit that varies with direction cannot be calibrated away the way a
+// uniform one could.
+func TestColourRecoveryColumnsAreRequested(t *testing.T) {
+	t.Parallel()
+
+	adql, err := fetchSpec().ADQL(0, 9)
+	if err != nil {
+		t.Fatalf("ADQL: %v", err)
+	}
+
+	// The unconditional sum, the colour-propagating sum whose difference gives
+	// the dropped flux, and the pixel's mean colour to assign it.
+	for _, want := range []string{
+		"SUM(phot_g_mean_flux) AS b_V_all",
+		"SUM(phot_g_mean_flux+0*bp_rp) AS b_V_col",
+		"AVG(bp_rp) AS b_V_mc",
+	} {
+		if !strings.Contains(adql, want) {
+			t.Errorf("missing %q from:\n%s", want, adql)
+		}
+	}
+
+	// NULL propagation rather than CASE or FILTER: one archive rejects each.
+	for _, forbidden := range []string{"CASE", "FILTER", "COALESCE"} {
+		if strings.Contains(adql, forbidden) {
+			t.Errorf("%s is rejected by one archive or the other:\n%s", forbidden, adql)
+		}
+	}
+
+	// A band with no colour term has nothing to recover.
+	plain := GaiaBuild{Order: 8, Bands: []GaiaBand{{Name: "G", FluxToRadiance: 1e-18}}}
+
+	adql, err = plain.ADQL(0, 9)
+	if err != nil {
+		t.Fatalf("ADQL: %v", err)
+	}
+
+	if strings.Contains(adql, "_all") || strings.Contains(adql, "AVG(") {
+		t.Errorf("an untransformed band needs no recovery columns:\n%s", adql)
+	}
+}
+
+// The recovered flux must be scaled by the same polynomial the query applied,
+// evaluated at the pixel's mean colour. A different factor here than in the
+// query is a seam that no downstream check could see.
+func TestColourRecoveryUsesTheSamePolynomial(t *testing.T) {
+	t.Parallel()
+
+	band := GaiaJohnsonV()
+
+	// At bp_rp = 0 the polynomial collapses to its constant term.
+	if got, want := band.colourFactor(0), math.Pow(10, 0.4*band.ColourTerm[0]); math.Abs(got-want) > 1e-15 {
+		t.Errorf("colourFactor(0) = %v, want %v", got, want)
+	}
+
+	// And the rendered ADQL must contain every coefficient the Go evaluation
+	// uses, in the same order.
+	poly := band.colourPolynomial()
+	for _, c := range []string{"0.02704", "-0.01424*bp_rp", "0.2156*bp_rp*bp_rp"} {
+		if !strings.Contains(poly, c) {
+			t.Errorf("polynomial %q omits %q", poly, c)
+		}
+	}
+}
+
+// The recovery reads the response, so it must survive responses that lack the
+// columns, carry nothing to recover, or have no colour to average.
+func TestColourRecoveryDegradesSafely(t *testing.T) {
+	t.Parallel()
+
+	band := GaiaJohnsonV()
+	spec := fetchSpec()
+
+	cases := []struct {
+		name  string
+		index map[string]int
+		row   []string
+		want  float64
+	}{
+		{"columns absent", map[string]int{}, nil, 0},
+		{
+			"nothing dropped",
+			map[string]int{"b_v_all": 0, "b_v_col": 1, "b_v_mc": 2},
+			[]string{"100", "100", "0.8"},
+			0,
+		},
+		{
+			"no colour to average",
+			map[string]int{"b_v_all": 0, "b_v_col": 1, "b_v_mc": 2},
+			[]string{"100", "0", ""},
+			0,
+		},
+		{
+			"recovers the difference",
+			map[string]int{"b_v_all": 0, "b_v_col": 1, "b_v_mc": 2},
+			[]string{"100", "60", "0"},
+			40 * band.colourFactor(0),
+		},
+	}
+
+	for _, tc := range cases {
+		got := spec.recoverColourless(band, tc.index, tc.row)
+		if math.Abs(got-tc.want) > 1e-12 {
+			t.Errorf("%s: got %v, want %v", tc.name, got, tc.want)
+		}
+	}
+}
