@@ -1,0 +1,173 @@
+package starlight
+
+import (
+	"errors"
+	"fmt"
+	"math"
+
+	"github.com/TuSKan/astrogo/angle"
+	"github.com/TuSKan/astrogo/coord"
+)
+
+// ErrBrightStar is returned when a bright star cannot be placed.
+var ErrBrightStar = errors.New("starlight: unusable bright star")
+
+// BrightStar is a star bright enough that Gaia does not record it.
+//
+// Gaia saturates on the brightest sky: measured against DR3, 73 of the 4,992
+// Hipparcos stars brighter than V = 6 have no counterpart within five
+// arcseconds, and they are exactly the ones anybody could name — Sirius,
+// Canopus, Arcturus, Alpha Centauri, Vega, Capella, Rigel, Procyon, Achernar,
+// Betelgeuse. A map built from Gaia alone is missing them.
+type BrightStar struct {
+	// HIP is the Hipparcos identifier, carried for provenance.
+	HIP int
+
+	// RA and Dec are ICRS coordinates.
+	RA, Dec angle.Angle
+
+	// Vmag is the Johnson V magnitude. The Hipparcos catalogue supplies it
+	// directly, so unlike the Gaia path there is no colour transformation
+	// and no band conversion — see [GaiaJohnsonV] for what that costs when
+	// the catalogue does not.
+	Vmag float64
+}
+
+// AddBrightStars sums stars into an existing map's band.
+//
+// # Why this is addition and not a rebuild
+//
+// Radiance is linear, so a star's contribution adds to whatever the pixel
+// already holds. The Gaia aggregation does not have to be repeated to include
+// them — which matters, because that aggregation is 787 queries against a
+// shared service and this is a few dozen rows.
+//
+// # What it corrects
+//
+// Measured against the order-8 Gaia DR3 map, the missing stars carry about
+// 2.6 per cent of the all-sky mean radiance. Masana et al. (2021) put the
+// equivalent correction at around 20 per cent, but that is a **DR2** figure:
+// DR2 lacked a counterpart for some 35,000 Hipparcos stars, DR3 recovered
+// nearly all of them, and what remains is only the handful Gaia saturates on.
+// The correction shrank because the catalogue improved, not because the
+// physics changed.
+//
+// A star outside the map's grid, or with a magnitude that cannot produce a
+// finite irradiance, is an error rather than a silently dropped row: these are
+// the brightest objects in the sky and losing one is not a rounding error.
+func AddBrightStars(m *Map, band string, stars []BrightStar) error {
+	if m == nil {
+		return fmt.Errorf("%w: no map", ErrBrightStar)
+	}
+
+	values, ok := m.bands[band]
+	if !ok {
+		return fmt.Errorf("%w: %q", ErrBand, band)
+	}
+
+	grid := m.Grid()
+	solidAngle := 4 * math.Pi / float64(grid.NumPixels())
+
+	for _, s := range stars {
+		if math.IsNaN(s.Vmag) || math.IsInf(s.Vmag, 0) {
+			return fmt.Errorf("%w: HIP %d has V = %v", ErrBrightStar, s.HIP, s.Vmag)
+		}
+
+		pixel := grid.PixelOf(s.RA, s.Dec)
+		if pixel < 0 || pixel >= int64(len(values)) {
+			return fmt.Errorf("%w: HIP %d falls on pixel %d, outside [0, %d)",
+				ErrBrightStar, s.HIP, pixel, len(values))
+		}
+
+		// The same Johnson V zero point the Gaia band conversion rests on,
+		// reused rather than restated so the two paths cannot drift apart.
+		irradiance := johnsonVZeroFlux * math.Pow(10, -0.4*s.Vmag)
+
+		values[pixel] += irradiance / solidAngle
+	}
+
+	return nil
+}
+
+// BrightStarsMissingFromGaia reports which of the given Hipparcos stars have no
+// Gaia counterpart, propagating Hipparcos positions to Gaia's epoch first.
+//
+// Hipparcos is catalogued at J1991.25 and Gaia DR3 at J2016.0, so a star has
+// moved by nearly twenty-five years of proper motion between them. Matching
+// without that shift misses genuine counterparts for exactly the nearby, fast
+// stars that are also the brightest, which would then be added twice.
+//
+// radius is the match tolerance. The result is not sensitive to it: at five
+// arcseconds 73 stars are unmatched and at fifteen, 69 — a five per cent change
+// in a correction that is itself under three per cent of the sky.
+func BrightStarsMissingFromGaia(
+	hipparcos []BrightStar,
+	pmRA, pmDec []float64,
+	gaiaRA, gaiaDec []angle.Angle,
+	radius angle.Angle,
+) ([]BrightStar, error) {
+	if len(pmRA) != len(hipparcos) || len(pmDec) != len(hipparcos) {
+		return nil, fmt.Errorf("%w: %d stars but %d/%d proper motions",
+			ErrBrightStar, len(hipparcos), len(pmRA), len(pmDec))
+	}
+
+	if len(gaiaRA) != len(gaiaDec) {
+		return nil, fmt.Errorf("%w: %d Gaia positions but %d declinations",
+			ErrBrightStar, len(gaiaRA), len(gaiaDec))
+	}
+
+	const epochGap = 2016.0 - 1991.25 // Gaia DR3 minus Hipparcos, in years
+
+	missing := make([]BrightStar, 0, 128)
+
+	for i, s := range hipparcos {
+		ra, dec := propagate(s.RA, s.Dec, pmRA[i], pmDec[i], epochGap)
+
+		if !hasCounterpart(ra, dec, gaiaRA, gaiaDec, radius) {
+			missing = append(missing, s)
+		}
+	}
+
+	return missing, nil
+}
+
+// propagate moves a position by proper motion, in milliarcseconds per year,
+// over the given number of years.
+func propagate(ra, dec angle.Angle, pmRA, pmDec, years float64) (angle.Angle, angle.Angle) {
+	// Proper motion in right ascension is already the great-circle rate for
+	// these catalogues, so it is divided by cos(dec) to become a coordinate
+	// increment rather than multiplied by it.
+	cosDec := math.Cos(dec.Radians())
+	if cosDec == 0 {
+		cosDec = 1e-9
+	}
+
+	const masToDeg = 1.0 / 3.6e6
+
+	return ra + angle.Deg(pmRA*masToDeg*years/cosDec), dec + angle.Deg(pmDec*masToDeg*years)
+}
+
+// hasCounterpart reports whether any Gaia position lies within radius.
+func hasCounterpart(ra, dec angle.Angle, gaiaRA, gaiaDec []angle.Angle, radius angle.Angle) bool {
+	cosDec := math.Cos(dec.Radians())
+
+	for i := range gaiaRA {
+		dDec := (gaiaDec[i] - dec).Degrees()
+		if math.Abs(dDec) > radius.Degrees() {
+			continue // cheap reject before the trigonometry
+		}
+
+		dRA := (gaiaRA[i] - ra).Degrees() * cosDec
+		if math.Hypot(dRA, dDec) <= radius.Degrees() {
+			return true
+		}
+	}
+
+	return false
+}
+
+// pixelOfStar is used by the tests to check placement without exporting the
+// grid arithmetic.
+func pixelOfStar(grid coord.HEALPix, s BrightStar) int64 {
+	return grid.PixelOf(s.RA, s.Dec)
+}

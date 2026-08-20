@@ -660,6 +660,16 @@ func (g GaiaBuild) accumulate(
 	}
 }
 
+// johnsonVZeroFlux is Johnson V's Vega zero point: the spectral flux density
+// of a V = 0 star, in W m^-2 nm^-1.
+//
+// Both paths into a V-band map rest on it — the Gaia conversion in
+// [GaiaJohnsonV] and the Hipparcos one in [AddBrightStars] — so it is declared
+// once. Two copies of a zero point are two chances for them to drift apart,
+// and a map built half on each would be wrong by the difference with nothing
+// to show it.
+const johnsonVZeroFlux = 3.63e-11
+
 // GaiaJohnsonV returns the Gaia G to Johnson V band, ready for [GaiaBuild].
 //
 // It exists because the conversion needs three published numbers that come
@@ -684,14 +694,11 @@ func (g GaiaBuild) accumulate(
 // at all make the polynomial null and SQL drops them from the sum; their count
 // comes back per pixel so the caller can see how much of a pixel that is.
 func GaiaJohnsonV() GaiaBand {
-	const (
-		gZeroPoint = 25.6874 // Gaia DR3 G VEGAMAG zero point
-		vZeroFlux  = 3.63e-11
-	)
+	const gZeroPoint = 25.6874 // Gaia DR3 G VEGAMAG zero point
 
 	return GaiaBand{
 		Name:           "V",
 		ColourTerm:     []float64{0.02704, -0.01424, 0.2156, -0.01426},
-		FluxToRadiance: vZeroFlux / math.Pow(10, gZeroPoint/2.5),
+		FluxToRadiance: johnsonVZeroFlux / math.Pow(10, gZeroPoint/2.5),
 	}
 }

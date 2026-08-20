@@ -34,6 +34,8 @@ type config struct {
 	retries     int
 	userAgent   string
 	minInterval time.Duration
+	authScheme  string
+	authToken   string
 }
 
 // Option customizes a NewClient call.
@@ -53,6 +55,28 @@ func WithRetries(n int) Option {
 // WithUserAgent overrides the User-Agent header sent with every request.
 func WithUserAgent(ua string) Option {
 	return func(c *config) { c.userAgent = ua }
+}
+
+// WithAuthToken authenticates every request with an HTTP Authorization header
+// of the given scheme.
+//
+// The scheme is a parameter because services disagree and the disagreement is
+// silent. Gaia@AIP accepts "Token" and ignores "Bearer" — an unrecognised
+// scheme is not rejected, the request simply proceeds anonymously, so the
+// symptom of getting it wrong is not an authentication error but a query that
+// mysteriously still hits the anonymous limits.
+//
+// Services that serve anonymously but throttle hard often lift their limits for
+// an identified caller: Gaia@AIP caps an anonymous query at a five-second
+// statement timeout, which no whole-sky aggregation can fit inside.
+//
+// The token is a secret and is treated as one. It goes in a header, never in a
+// URL query string, because URLs are logged by proxies and servers as a matter
+// of course. It is never written to disk by this package — resolving where it
+// comes from belongs to [github.com/TuSKan/astrogo/remote], which owns
+// credential policy the same way it owns the consent gate.
+func WithAuthToken(scheme, token string) Option {
+	return func(c *config) { c.authScheme, c.authToken = scheme, token }
 }
 
 // WithMinInterval spaces this client's requests at least d apart.
@@ -120,6 +144,10 @@ func NewClient(id remote.EndpointID, opts ...Option) (*Client, error) {
 			resty.RetryConditionStatus5XX,
 			resty.RetryConditionStatusZero,
 		)
+
+	if cfg.authToken != "" {
+		rc = rc.SetAuthScheme(cfg.authScheme).SetAuthToken(cfg.authToken)
+	}
 
 	return &Client{rc: rc, minInterval: cfg.minInterval}, nil
 }

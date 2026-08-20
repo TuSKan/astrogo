@@ -1,6 +1,9 @@
 package remote
 
-import "time"
+import (
+	"os"
+	"time"
+)
 
 // EndpointID names a remote service astrogo can contact. The set below is
 // exhaustive — there are no hidden hosts. Inspect them at runtime with
@@ -134,6 +137,14 @@ const OzoneSerdyuchenko223K = "Ozone/O3_Serdyuchenko(2014)_223K_213-1100nm(2013 
 
 const (
 
+	// GaiaAIP is the Gaia mirror at Leibniz-Institut für Astrophysik Potsdam.
+	//
+	// It exists in the registry alongside the ESA archive rather than instead
+	// of it. ESA was unreachable for most of a day while this answered in
+	// about a second, and it carries tables ESA's own service does not expose
+	// in bulk — the Hipparcos crossmatch among them.
+	GaiaAIP EndpointID = "aip.gaia"
+
 	// GaiaStarMap is the prebuilt integrated-starlight map published with
 	// astrogo's own releases (skybrightness/dataset/starlight).
 	//
@@ -242,6 +253,20 @@ type Endpoint struct {
 	// returning only small payloads leaves this false and has no consent
 	// gate at all.
 	Downloadable bool
+
+	// TokenEnv names the environment variable holding an API token for this
+	// service, or is empty when the service needs none.
+	//
+	// The name is registered rather than hardcoded at a call site so the
+	// registry stays the single source of truth for how astrogo talks to a
+	// service. astrogo reads no credential file of its own — the same rule
+	// the Copernicus endpoint follows — so the value comes from the
+	// environment, is never written to disk by this module, and is sent in a
+	// header rather than a query string.
+	//
+	// A token is an optimisation, never a requirement: every endpoint that
+	// declares one must still work without it.
+	TokenEnv string
 }
 
 // SizeVaries marks an endpoint whose per-fetch size cannot be usefully
@@ -479,6 +504,22 @@ func defaultEndpoints() map[EndpointID]Endpoint {
 			Downloadable:    true,
 			Files:           []string{"passbands-v1.tar.gz"},
 		},
+		//nolint:gosec // TokenEnv names an environment variable; it is not a credential
+		GaiaAIP: {
+			ID:        GaiaAIP,
+			URL:       "https://gaia.aip.de/tap/sync",
+			Kind:      KindAPI,
+			Subsystem: "catalog/gaia, skybrightness/dataset/starlight",
+			Description: "Gaia@AIP TAP mirror; serves every Gaia release plus the Hipparcos " +
+				"crossmatch tables, and answers far faster than the ESA archive",
+			Enabled: true,
+			Timeout: 60 * time.Second,
+			// TokenEnv holds the *name* of an environment variable, never a
+			// secret. The registry is the right place for it precisely
+			// because nothing else should have to know it.
+			TokenEnv: "ASTROGO_GAIA_AIP_TOKEN",
+		},
+
 		MPIMainzCrossSections: {
 			ID:        MPIMainzCrossSections,
 			URL:       "https://www.uv-vis-spectral-atlas-mainz.org/uvvis_data/cross_sections/",
@@ -555,4 +596,24 @@ func defaultEndpoints() map[EndpointID]Endpoint {
 			Downloadable:    true,
 		},
 	}
+}
+
+// Token returns the API token registered for an endpoint, or an empty string
+// when the endpoint declares none or the environment does not supply one.
+//
+// A token is always an optimisation and never a requirement: Gaia@AIP serves
+// anonymously but caps a query at a five-second statement timeout, and an
+// identified caller gets a far larger budget. Code that uses this must work
+// when it returns nothing.
+//
+// The value is read from the environment on each call rather than cached, so a
+// process that acquires a token mid-run picks it up, and nothing holds a secret
+// in memory longer than the request that uses it.
+func Token(id EndpointID) string {
+	ep, ok := Lookup(id)
+	if !ok || ep.TokenEnv == "" {
+		return ""
+	}
+
+	return os.Getenv(ep.TokenEnv)
 }
