@@ -135,9 +135,27 @@ func (b GaiaBand) colourPolynomial() string {
 	return poly.String()
 }
 
+// colourValidLo and colourValidHi bound the interval Riello et al. (2021)
+// fitted the transformation over.
+const (
+	colourValidLo = -0.5
+	colourValidHi = 5.0
+)
+
 // colourFactor evaluates 10^(0.4*(G-band)) for one colour — the same factor
 // the query applies per star, for use on the sources the query had to drop.
+//
+// The colour is clamped to the fitted interval first. This matters here and not
+// in the query because the value passed in is a pixel's flux-weighted mean
+// colour, and weighting by flux lets one dominant star carry the mean well past
+// any individual population: measured over the order-9 sky the mean reaches
+// BP-RP = 7.41, where a cubic fitted to 5.0 is no longer describing anything.
+// Clamping refuses to extrapolate rather than inventing a value for it, and
+// costs 0.0003 per cent of the whole-sky map across the 194 pixels that reach
+// outside the interval.
 func (b GaiaBand) colourFactor(bpRP float64) float64 {
+	bpRP = math.Min(colourValidHi, math.Max(colourValidLo, bpRP))
+
 	var offset, term float64 = 0, 1
 
 	for _, c := range b.ColourTerm {
@@ -785,9 +803,14 @@ const johnsonVZeroFlux = 3.63e-11
 //   - Gaia DR3's G-band VEGAMAG zero point, 25.6874, which turns
 //     phot_g_mean_flux in e-/s into a G magnitude.
 //   - The G to V colour transformation of Riello et al. (2021), Gaia DR3
-//     photometric documentation Table 5.7, entered here as G - V so the
-//     query's +0.4 exponent brightens a red star in V. It is the same
-//     polynomial as [magnitude.GaiaGToJohnsonV], negated.
+//     photometric documentation Table 5.7. The table is tabulated as G minus
+//     the target band, so its polynomial is G - V directly and is entered
+//     here unchanged, which is what the query's +0.4 exponent needs: the
+//     factor is 10^(0.4*(G-V)) = F_V/F_G. G - V is negative for ordinary
+//     stars, so a red star loses flux in V, which is the physical direction
+//   - G spans 330-1050 nm against V's 500-600 nm, so a star is always
+//     brighter in G. See [magnitude.GaiaGToJohnsonV] for how the direction
+//     was established.
 //   - Johnson V's Vega zero point, 3.63e-11 W m^-2 nm^-1, which turns that V
 //     magnitude into a spectral flux density.
 //
@@ -805,7 +828,7 @@ func GaiaJohnsonV() GaiaBand {
 
 	return GaiaBand{
 		Name:           "V",
-		ColourTerm:     []float64{0.02704, -0.01424, 0.2156, -0.01426},
+		ColourTerm:     []float64{-0.02704, 0.01424, -0.2156, 0.01426},
 		FluxToRadiance: johnsonVZeroFlux / math.Pow(10, gZeroPoint/2.5),
 	}
 }

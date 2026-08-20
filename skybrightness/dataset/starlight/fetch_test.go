@@ -306,7 +306,7 @@ func TestColourRecoveryUsesTheSamePolynomial(t *testing.T) {
 	// And the rendered ADQL must contain every coefficient the Go evaluation
 	// uses, in the same order.
 	poly := band.colourPolynomial()
-	for _, c := range []string{"0.02704", "-0.01424*bp_rp", "0.2156*bp_rp*bp_rp"} {
+	for _, c := range []string{"-0.02704", "0.01424*bp_rp", "-0.2156*bp_rp*bp_rp"} {
 		if !strings.Contains(poly, c) {
 			t.Errorf("polynomial %q omits %q", poly, c)
 		}
@@ -352,6 +352,40 @@ func TestColourRecoveryDegradesSafely(t *testing.T) {
 		got := spec.recoverColourless(band, tc.index, tc.row)
 		if math.Abs(got-tc.want) > 1e-12 {
 			t.Errorf("%s: got %v, want %v", tc.name, got, tc.want)
+		}
+	}
+}
+
+// A mean colour outside the fitted interval must not be extrapolated.
+//
+// Flux-weighting the mean colour is what makes this reachable: one dominant
+// star can carry a pixel's mean past any colour a real star has, and over the
+// order-9 sky it reaches BP-RP = 7.41. A cubic fitted to 5.0 evaluated at 7.41
+// is not a transformation, it is an artefact, so the colour is clamped and the
+// factor stops changing beyond the interval.
+func TestColourFactorRefusesToExtrapolate(t *testing.T) {
+	t.Parallel()
+
+	band := GaiaJohnsonV()
+
+	if got, want := band.colourFactor(9.0), band.colourFactor(colourValidHi); got != want {
+		t.Errorf("BP-RP = 9 gives %v, want the value at the %v bound, %v", got, colourValidHi, want)
+	}
+
+	if got, want := band.colourFactor(-4.0), band.colourFactor(colourValidLo); got != want {
+		t.Errorf("BP-RP = -4 gives %v, want the value at the %v bound, %v", got, colourValidLo, want)
+	}
+
+	// Inside the interval nothing is clamped, so the factor still varies.
+	if band.colourFactor(1.0) == band.colourFactor(2.0) {
+		t.Error("the factor stopped varying inside the fitted interval")
+	}
+
+	// And the clamped extremes stay physical: a factor is a flux ratio and the
+	// unbounded cubic is what produced ratios of a hundred.
+	for _, c := range []float64{-4, -0.5, 0, 2.5, 5, 9} {
+		if f := band.colourFactor(c); f <= 0 || f > 1.05 {
+			t.Errorf("BP-RP = %v gives F_V/F_G = %v, outside anything a band ratio can be", c, f)
 		}
 	}
 }

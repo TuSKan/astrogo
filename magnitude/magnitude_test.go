@@ -500,22 +500,56 @@ func TestExtinctionAtAltitude(t *testing.T) {
 	t.Logf("k(V) at 2500m = %.4f", k2500)
 }
 
+// The direction of the G to V transformation, anchored on a star whose
+// magnitudes in both systems are known independently.
+//
+// The previous version of this test asserted |V - G| < 0.5 and logged the rest,
+// which passes for either sign of the polynomial. It did not: the function
+// returned G + (G-V) instead of G - (G-V), making every star about half a
+// magnitude too bright and red stars far more, and the whole integrated
+// starlight map was built through it.
 func TestGaiaGToJohnsonV(t *testing.T) {
-	// Solar-type star (BP-RP ≈ 0.82).
-	G := 10.0
-	bpRp := 0.82
-	V := magnitude.GaiaGToJohnsonV(G, bpRp)
-	// V-G should be about -0.15 for solar type.
-	diff := V - G
-	if math.Abs(diff) > 0.5 {
-		t.Errorf("G→V diff = %.3f, expected < 0.5", diff)
+	// The Sun: G = -26.895 (Casagrande & VandenBerg 2018) against the long
+	// established Johnson V = -26.76, at a solar BP-RP of 0.82. Nothing in this
+	// repository chose any of those three numbers, which is what makes them a
+	// check rather than a restatement.
+	const (
+		solarG    = -26.895
+		solarBPRP = 0.82
+		solarV    = -26.76
+	)
+
+	if got := magnitude.GaiaGToJohnsonV(solarG, solarBPRP); math.Abs(got-solarV) > 0.05 {
+		t.Errorf("the Sun comes out at V = %.3f, want %.3f within 0.05", got, solarV)
 	}
 
-	t.Logf("G=%.1f BP-RP=%.2f → V=%.3f (ΔV=%.3f)", G, bpRp, V, diff)
+	// A star is brighter in G than in V for any ordinary colour, because G spans
+	// 330-1050 nm against V's 500-600 nm and so collects more light. V must
+	// therefore be the fainter, larger number, and increasingly so as the star
+	// reddens. Reading the table backwards inverts exactly this.
+	prev := math.Inf(-1)
 
-	// Red dwarf (BP-RP ≈ 3.0): should give larger negative correction.
-	Vred := magnitude.GaiaGToJohnsonV(15.0, 3.0)
-	t.Logf("Red dwarf: G=15.0 BP-RP=3.0 → V=%.3f", Vred)
+	for _, c := range []float64{0.0, 0.5, 1.0, 2.0, 3.0, 4.0} {
+		v := magnitude.GaiaGToJohnsonV(10.0, c)
+		if c > 0 && v <= 10.0 {
+			t.Errorf("BP-RP = %.1f gives V = %.3f for G = 10; a red star cannot be brighter in V", c, v)
+		}
+
+		if v <= prev {
+			t.Errorf("V = %.3f at BP-RP = %.1f did not increase over %.3f; V-G must grow with colour", v, c, prev)
+		}
+
+		prev = v
+	}
+
+	// The conversion is a pure magnitude offset, so it must commute with a
+	// change of brightness at fixed colour.
+	a := magnitude.GaiaGToJohnsonV(10.0, 1.0)
+	b := magnitude.GaiaGToJohnsonV(15.0, 1.0)
+
+	if math.Abs((b-a)-5.0) > 1e-12 {
+		t.Errorf("five magnitudes of G became %.6f of V", b-a)
+	}
 }
 
 // ══════════════════════════════════════════════════════════════════════════════

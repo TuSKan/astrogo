@@ -180,9 +180,11 @@ func parseCSV(body io.Reader) ([]resolve.Target, error) {
 			if gMag, err := strconv.ParseFloat(row[gIdx], 64); err == nil {
 				if bpRpIdx, ok2 := col["bp_rp"]; ok2 && row[bpRpIdx] != "" {
 					if bpRp, err2 := strconv.ParseFloat(row[bpRpIdx], 64); err2 == nil {
-						// Gaia DR3 polynomial: V − G = −0.02704 + 0.01424·c − 0.2156·c² + 0.01426·c³
-						dV := -0.02704 + 0.01424*bpRp - 0.2156*bpRp*bpRp + 0.01426*bpRp*bpRp*bpRp
-						t.VMag = gMag + dV
+						// Riello et al. (2021) Table 5.7 is tabulated as G minus the
+						// target band, so this is G − V and V is G less it. See
+						// [magnitude.GaiaGToJohnsonV] for the evidence on the direction.
+						gMinusV := -0.02704 + 0.01424*bpRp - 0.2156*bpRp*bpRp + 0.01426*bpRp*bpRp*bpRp
+						t.VMag = gMag - gMinusV
 						t.HasVMag = true
 					}
 				} else {

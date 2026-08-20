@@ -750,6 +750,38 @@ colour of whatever mix of spectral types each pixel holds — plausible everywhe
 along the Galactic plane where the ensemble is reddest. One constructor removes the
 opportunity.
 
+**The direction of that colour transformation was wrong, and it made the map 1.6 times too
+bright.** Riello et al. (2021) Table 5.7 is tabulated as *G minus the target band*. This
+package read it as V − G and negated it, so the query applied 10^(0.4(V−G)) where
+10^(0.4(G−V)) was needed — the reciprocal. Both `magnitude.GaiaGToJohnsonV` and
+`catalog/gaia` carried the same inversion, returning `G + (G−V)` instead of `G − (G−V)`.
+
+The error is invisible to every internal check. It leaves the map positive, smooth and
+monotonic plane-to-cap; it survived a ±1 mag absolute comparison because it is only 0.53
+mag at solar colour; and the one test that covered the sign, `TestGaiaJohnsonVBrightensRedStars`,
+asserted the inversion as its premise — *"a red star is fainter in G than in V"*, which is
+backwards. Gaia's G spans 330–1050 nm against Johnson V's ~500–600 nm, so a star is always
+brighter in G, G − V is negative, and a red star must **lose** flux in V. Because the error
+scales with colour it is worst exactly where the map is brightest: 1.6× at BP−RP = 1.1,
+17× at BP−RP = 3.
+
+Three independent checks fix the direction, none of them internal:
+
+| check | result |
+| :--- | :--- |
+| the Sun: G = −26.895, V = −26.76, so G − V = −0.14 | polynomial at BP−RP = 0.82 gives **−0.15** |
+| 4,000 stars with both Gaia and Tycho-2 photometry, V = G − P(c) | median residual **−0.002 mag** |
+| the same 4,000 stars, V = G + P(c) — what the code did | median residual **−0.479 mag** |
+| binned by colour across −0.5 < BP−RP < 5.0 | correct form holds to **±0.03 mag** in every bin |
+
+Measured on the sky: over 3,000 order-9 pixels at galactic latitude 71°, the inverted map
+reads 23.59 mag arcsec⁻², the corrected one 24.11, and the raw untransformed G sum 23.88.
+That middle row is the tell that needed no external reference at all — **a Johnson V map
+came out brighter than the Gaia G map it was built from**, which no band this narrow can be.
+
+The replacement test anchors on the Sun and on that inequality rather than on a coefficient
+list, because a coefficient list cannot tell a sign error from a correct one.
+
 **Sources without a colour — a systematic error, not a rounding one.** The colour
 transformation is applied per star inside the aggregate, because transforming a sum is not
 the same as summing transformations when the transformation depends on colour. A source
@@ -908,7 +940,7 @@ columns.
 | Masana Eq. 8, direct term | `IntegratedStarlight.AddRadiance` | `TestIntegratedStarlightDimsTowardTheHorizon`, `TestIntegratedStarlightReddens` |
 | Shape normalisation | `NewIntegratedStarlight` | `TestIntegratedStarlightReproducesTheMapValue`, `TestIntegratedStarlightIsIndependentOfGridResolution` |
 | `source_id / 2^(59−2k)` | `GaiaBuild.ADQL` | `TestGaiaADQLDivisor`, `TestGaiaQueryIsAcceptedByTheArchive` |
-| Riello Table 5.7, negated | `GaiaJohnsonV` | `TestGaiaJohnsonV`, `TestGaiaJohnsonVBrightensRedStars` |
+| Riello Table 5.7, as printed | `GaiaJohnsonV` | `TestGaiaJohnsonV`, `TestGaiaJohnsonVColourFactorDirection` |
 
 **Still outstanding for this section.** The extragalactic background light is not
 implemented and is not folded into anything else; it is a separate component with its own
