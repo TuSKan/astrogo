@@ -153,6 +153,36 @@ func (e *ExtragalacticBackground) AddRadiance(
 	return flags, nil
 }
 
+// Provenance implements [Component].
+func (e *ExtragalacticBackground) Provenance() Provenance {
+	return Provenance{
+		Model:            "integrated galaxy light, isotropic, with direct attenuation",
+		Version:          "koushan2021-table3",
+		PrimaryReference: "Koushan, S. et al. (2021), MNRAS 503, 2033 (GAMA/DEVILS)",
+		SecondaryReferences: []string{
+			"Driver, S. P. et al. (2016b), ApJ 827, 108 — superseded over 0.3-2.2 um",
+		},
+		Equations: "Table 3 integrated EBL per band, pivot wavelengths from Table 1",
+		ValidityDomain: "357.7-2154.9 nm, the pivot wavelengths of u to Ks; outside " +
+			"that range the endpoint value is held and ExtrapolatedModel is set",
+		KnownApproximations: []string{
+			"The integrated galaxy light is a lower limit, not a central estimate: " +
+				"it counts detected galaxies, so undetected sources and any truly " +
+				"diffuse component are absent by construction. Koushan et al. find " +
+				"very-high-energy gamma-ray attenuation consistent with these values " +
+				"across u-Ks without needing additional diffuse light, which bounds " +
+				"the headroom above the floor.",
+			"Nine published bands are interpolated linearly in wavelength. The " +
+				"spectrum is sampled, not resolved, and that coarseness is part of " +
+				"the error budget rather than separate from it.",
+			"Isotropic. The measured anisotropy of the extragalactic background is " +
+				"far below the precision of anything else in this package.",
+			"Only the directly attenuated term is applied; light scattered out of " +
+				"the beam is not returned to it, matching IntegratedStarlight.",
+		},
+	}
+}
+
 // at interpolates the tabulated spectral radiance, reporting whether the
 // wavelength fell outside the measured range.
 //
@@ -184,34 +214,4 @@ func (e *ExtragalacticBackground) at(lambdaNM float64) (value float64, extrapola
 	t := (lambdaNM - lo) / (hi - lo)
 
 	return e.spectral[i-1] + t*(e.spectral[i]-e.spectral[i-1]), false
-}
-
-// Provenance implements [Component].
-func (e *ExtragalacticBackground) Provenance() Provenance {
-	return Provenance{
-		Model:            "integrated galaxy light, isotropic, with direct attenuation",
-		Version:          "koushan2021-table3",
-		PrimaryReference: "Koushan, S. et al. (2021), MNRAS 503, 2033 (GAMA/DEVILS)",
-		SecondaryReferences: []string{
-			"Driver, S. P. et al. (2016b), ApJ 827, 108 — superseded over 0.3-2.2 um",
-		},
-		Equations: "Table 3 integrated EBL per band, pivot wavelengths from Table 1",
-		ValidityDomain: "357.7-2154.9 nm, the pivot wavelengths of u to Ks; outside " +
-			"that range the endpoint value is held and ExtrapolatedModel is set",
-		KnownApproximations: []string{
-			"The integrated galaxy light is a lower limit, not a central estimate: " +
-				"it counts detected galaxies, so undetected sources and any truly " +
-				"diffuse component are absent by construction. Koushan et al. find " +
-				"very-high-energy gamma-ray attenuation consistent with these values " +
-				"across u-Ks without needing additional diffuse light, which bounds " +
-				"the headroom above the floor.",
-			"Nine published bands are interpolated linearly in wavelength. The " +
-				"spectrum is sampled, not resolved, and that coarseness is part of " +
-				"the error budget rather than separate from it.",
-			"Isotropic. The measured anisotropy of the extragalactic background is " +
-				"far below the precision of anything else in this package.",
-			"Only the directly attenuated term is applied; light scattered out of " +
-				"the beam is not returned to it, matching IntegratedStarlight.",
-		},
-	}
 }
