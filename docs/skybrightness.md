@@ -757,6 +757,21 @@ drops it; the archive rejects both `CASE` and `COALESCE`, so no default can be s
 in the query. Each pixel therefore reports two counts — total sources and sources with a
 colour — so the exclusion is visible rather than assumed small.
 
+**Cross-validated by two independent builds.** The same order-8 map was produced twice by
+different routes: 787 chunked queries against ESA's archive, and a single whole-sky
+`GROUP BY` against Gaia@AIP returning all 786,432 rows at once. Both report
+1,811,709,771 sources, and the pixel values agree to a maximum relative difference of
+5×10⁻⁷ — which is the precision limit of the text format's six decimal places, not a
+disagreement. That single check exercises the ADQL, the chunk tiling, the accumulation,
+the colour transformation and both services simultaneously; nothing else in this work
+tests so much at once.
+
+The single-query route took 17 minutes against 38, needs no chunking, no checkpointing and
+no retry logic, and returns 14.7 MB of typed Parquet rather than 15 MB of text. It requires
+an authenticated caller and the `2h` job queue — AIP's default `30s` queue cannot finish a
+whole-sky aggregation, and reports that as a statement timeout rather than as a queue
+limit.
+
 **The map, measured.** A full order-8 build over all 786,432 pixels aggregated
 1,811,709,771 sources — Gaia DR3's entire catalogue, which is what proves the chunks
 tile the sky exactly rather than overlapping or leaving gaps. It took 38 minutes over
