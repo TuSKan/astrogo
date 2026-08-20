@@ -791,6 +791,30 @@ faint — which is why the earlier one-per-cent claim survived as long as it did
 cent is 0.075 mag on the brightest part of the map: real, worth correcting, and not the
 catastrophe the source count alone suggests.
 
+**Where the mean-colour assumption is weakest, measured.** Degrading the corrected order-9
+build to order 8 and comparing against the uncorrected chunked map gives a median
+difference of +0.12 per cent, +5.2 per cent at the 99th percentile, and 1,571 pixels (0.2
+per cent) differing by more than 10 per cent. The distribution is the correction's own
+signature: negligible across the empty sky, several per cent where sources crowd.
+
+The tail is more interesting than the median. Pixel 138978 has 229 sources of which 225
+carry a colour — 1.7 per cent dropped by count — yet those four colourless sources hold
+four times the flux of the other 225 combined, and the correction raises the pixel by 596
+per cent.
+
+That contradicts something stated earlier in this section. Colourless sources are
+predominantly faint **by count**, which is why the deficit went unnoticed for so long, but
+**BP/RP photometry also fails at the bright end through saturation**. So a pixel can lose
+most of its flux to a handful of bright sources while losing almost none of its count, and
+the correction then assigns the mean colour of many faint stars to a few bright ones whose
+colour it does not know.
+
+Correcting is still clearly better than dropping — those four sources are 80 per cent of
+that pixel's light, and the alternative is discarding them — but the assumption is least
+reliable exactly where the flux concentrates. Pixels whose recovered flux dominates their
+measured flux should be treated as uncertain, and the per-pixel counts that ship with the
+map are what make that visible.
+
 A pixel with no coloured source at all cannot be corrected by any local mean, and no global
 mean is substituted — that would be the fabrication this package refuses elsewhere. The
 per-pixel `ncolour` count still ships so a caller can see how much of a pixel rests on the
