@@ -866,7 +866,27 @@ validating it means validating those three things:
 | :--- | :--- | ---: |
 | Gaia G VEGAMAG zero point | `G + 2.5·log₁₀(flux)` over 177,426 DR3 sources | **25.687367**, scatter 3×10⁻⁷ |
 | G → V transformation | 4,000 stars with Gaia and Tycho-2 photometry | **−0.002 mag**, ±0.03 per colour bin |
+| HEALPix tiling by `source_id` | map summed back up against the catalogue | **exact** on counts |
+| flux conservation | same | 2.4×10⁻¹¹ relative |
 | Johnson V Vega zero point | not independently checked here | 3.63×10⁻¹¹ W m⁻² nm⁻¹, adopted |
+
+**The tiling is exact, and that is worth checking rather than assuming.** The aggregation
+assigns a source to a pixel by integer division of its `source_id`, which is only correct if
+the high bits really are the nested HEALPix index at every order. Summing the published map
+back up and comparing against the catalogue queried without a `GROUP BY`:
+
+| | map summed | catalogue direct |
+| :--- | ---: | ---: |
+| sources | 1,811,709,771 | 1,811,709,771 |
+| with BP−RP | 1,540,770,489 | 1,540,770,489 |
+| total G flux | 1.00213307311044e13 | 1.00213307311068e13 |
+| coloured G flux | 9.94290378118816e12 | 9.94290378119190e12 |
+
+The counts agree exactly, and the source total is Gaia DR3's own published size, so every
+source in the catalogue landed in exactly one pixel — none dropped at a boundary, none
+counted twice. No pixel is empty and no pixel lacks a coloured source. The flux differs at
+2.4×10⁻¹¹, which is what summing 1.8 billion doubles in two different orders costs: √N·ε is
+about 10⁻¹¹. That is arithmetic noise, not a missing source.
 
 The zero point this package uses, 25.6874, rounds the catalogue's own 25.687367 — an error
 of 3×10⁻⁵ mag, or three parts in a hundred thousand.

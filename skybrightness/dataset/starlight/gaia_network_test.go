@@ -170,3 +170,74 @@ func archiveCongested(err error) bool {
 
 	return false
 }
+
+// The same sky, aggregated at two orders, must hold the same stars.
+//
+// The whole build rests on one arithmetic claim: the high bits of a Gaia
+// source_id are its nested HEALPix index, so source_id/2^(59-2k) is the level-k
+// pixel. If that is wrong the query still runs, still returns a pixel per row
+// and still produces a smooth, plausible map - it just puts the light in the
+// wrong places, or loses it at boundaries.
+//
+// Four order-8 pixels starting on a multiple of four span exactly the source_id
+// range of one order-7 pixel, because the order-7 divisor is four times the
+// order-8 one. So the two aggregations cover identical sources and their totals
+// must agree exactly. A divisor wrong by any power of two breaks this; so does
+// an off-by-one in the range arithmetic.
+//
+// Checked once at full scale against the whole catalogue: summing the published
+// order-8 map returns 1,811,709,771 sources and 1,540,770,489 with BP-RP, both
+// exactly the values the archive reports for gaiadr3.gaia_source with no GROUP
+// BY at all. This is the cheap version of that, four pixels instead of 786,432.
+func TestSourceIDTilingAgreesAcrossOrders(t *testing.T) {
+	t.Parallel()
+
+	testutil.RequireReachable(t, "gea.esac.esa.int:443")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	defer cancel()
+
+	band := starlight.GaiaBand{Name: "V", FluxToRadiance: 1e-21}
+
+	const (
+		fineFirst = 100000 // a multiple of four, so it aligns with an order-7 pixel
+		fineLast  = 100003
+		coarse    = fineFirst / 4
+	)
+
+	total := func(order int, first, last int64) int64 {
+		build := starlight.GaiaBuild{
+			Order: order,
+			Chunk: 4,
+			Bands: []starlight.GaiaBand{band},
+		}
+
+		_, counts, err := starlight.RunChunk(ctx, build, first, last)
+		if err != nil {
+			t.Skipf("archive did not answer the order-%d chunk: %v", order, err)
+		}
+
+		var sum int64
+
+		for _, c := range counts {
+			sum += c
+		}
+
+		return sum
+	}
+
+	fine := total(8, fineFirst, fineLast)
+	coarseTotal := total(7, coarse, coarse)
+
+	t.Logf("order 8 pixels %d-%d: %d sources; order 7 pixel %d: %d sources",
+		fineFirst, fineLast, fine, coarse, coarseTotal)
+
+	if fine == 0 {
+		t.Skip("the archive returned an empty patch; nothing to compare")
+	}
+
+	if fine != coarseTotal {
+		t.Errorf("the same sky holds %d sources at order 8 and %d at order 7; "+
+			"the source_id divisor does not tile consistently", fine, coarseTotal)
+	}
+}
