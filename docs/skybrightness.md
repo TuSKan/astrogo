@@ -1119,6 +1119,53 @@ directly usable the other way round: run it for a site, date and atmosphere, run
 natural-sky components with matching parameters, and compare all-sky. Its MultiQuery mode
 returns a time series in one file, which makes a night-long comparison a single export.
 
+**A reference export, taken 2026-08-20, so the target is a number rather than an
+intention.** Barcelona (41.38 N, 2.11 E, sea level), 21 August 2026 01:16 GMT+2, Sun at
+−35.7° and Moon at −8.6° so both are down, band V (Johnson), RH 70 per cent, Continental
+Clean aerosol, AOD 0.056 from the model, airglow `ESO_SkyCalc_100_10.dat` at 100 per cent,
+high resolution. The export is 129,600 points on a 0.5° grid carrying azimuth, altitude,
+radiance and magnitude:
+
+| quantity | value |
+| :--- | ---: |
+| zenith, 0–5° | **21.13** mag arcsec⁻² |
+| whole sky, 0–90° | **21.21** |
+| horizontal irradiance | 1.457 µW m⁻² |
+| mean upper-hemisphere radiance | 0.470 µW m⁻² |
+
+| altitude band | median | p05 | p95 |
+| :--- | ---: | ---: | ---: |
+| 0–15° | 21.128 | 20.879 | 22.056 |
+| 15–30° | 21.107 | 20.832 | 21.280 |
+| 30–45° | 21.272 | 20.982 | 21.496 |
+| 45–60° | 21.399 | 21.011 | 21.603 |
+| 60–75° | 21.378 | 20.915 | 21.566 |
+| 75–90° | 21.238 | 20.858 | 21.469 |
+
+Medians rather than means: single bright stars spike individual pixels, and the brightest in
+this export is 17.75 against a horizon of 22.15. The same effect puts Sirius at 13.1 in our
+own map, so it is a property of star-catalogue sky maps rather than of either model.
+
+The profile is not monotonic in altitude — brightest around 15–30°, faintest around 45–60° —
+because airglow's van Rhijn enhancement toward the horizon and atmospheric extinction pull
+in opposite directions. Any comparison that assumes a monotonic limb-brightening will
+disagree with GAMBONS for the wrong reason.
+
+**What this does not yet establish.** Our published map is *extra-atmospheric integrated
+starlight alone* at 22.77 whole-sky, and the number above is the *ground-level natural total*
+after propagation. The 1.56 mag between them is the combined weight of diffuse galactic
+light, the extragalactic background, zodiacal light and airglow, minus extinction — about a
+factor of four, which is the right order for a natural sky that airglow usually dominates,
+and nothing more than that. Turning this into a validation means running all five components
+plus atmospheric transport for this exact scene and comparing 21.21. That is blocked on the
+two items §16 still lists: the airglow spectrum is not wired, and the extragalactic
+background is not implemented. The reference is recorded here so that when they are, the
+comparison is a single run rather than another afternoon of clicking.
+
+The location fields on that form are read-only and set through its "Change location" dialog;
+the airglow factor accepts 0, which removes airglow entirely and would isolate the
+astronomical components for a cleaner first comparison.
+
 Two conditions must match for that comparison to mean anything. GAMBONS excludes the Moon
 and the Sun, so astrogo must be queried with only its natural-sky components registered —
 `ScatteredMoonlight` off. And GAMBONS' airglow is an ESO SkyCalc spectrum computed for
