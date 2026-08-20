@@ -55,7 +55,7 @@ func ExtinctionAtAltitude(k0, altitudeM float64) float64 {
 
 // GaiaGToJohnsonV converts a Gaia DR3 G-band magnitude to an approximate
 // Johnson V-band magnitude using the polynomial fit from the Gaia DR3
-// photometric documentation (Riello et al. 2021, Table 5.7):
+// photometric documentation, Section 5.5.1, Table 5.9:
 //
 //	G − V = −0.02704 + 0.01424·(BP−RP) − 0.2156·(BP−RP)² + 0.01426·(BP−RP)³
 //
@@ -87,27 +87,39 @@ func GaiaGToJohnsonV(G, bpMinusRp float64) float64 {
 }
 
 // GaiaGToJohnsonB converts a Gaia DR3 G-band magnitude to an approximate
-// Johnson B-band magnitude:
+// Johnson B-band magnitude, using the quartic of the Gaia DR3 photometric
+// documentation, Section 5.5.1, Table 5.9:
 //
-//	B − G = −0.02907 + 0.6399·(BP−RP) − 0.09631·(BP−RP)² + 0.01023·(BP−RP)³
+//	G − B = 0.01448 − 0.6874·(BP−RP) − 0.3604·(BP−RP)²
+//	        + 0.06718·(BP−RP)³ − 0.006061·(BP−RP)⁴
 //
-// From Gaia DR3 photometric documentation.
+// so B = G − (G−B), the same tabulation and the same direction as
+// [GaiaGToJohnsonV]. Published σ is 0.0633 mag, twice that of the V relation.
 //
-// UNVERIFIED, and it fails an empirical check. Measured against 4,000 stars
-// carrying both Gaia and Tycho-2 photometry, with Johnson B taken from Tycho as
-// B = B_T − 0.240(B_T − V_T), this relation is off by −0.46 mag at BP−RP ≈ 0 and
-// the residual grows monotonically to −2.0 mag by BP−RP = 3. Reversing the sign
-// does not fix it — that orientation runs from −0.46 to −4.6 — so the shape is
-// wrong, not just the direction, and this is a different fault from the G to V
-// inversion corrected alongside it. Under the same check GaiaGToJohnsonV holds
-// to ±0.03 mag in every colour bin.
+// The coefficients this function previously carried — −0.02907, 0.6399,
+// −0.09631, 0.01023, cited only as "Gaia DR3 photometric documentation" — appear
+// nowhere in that table. They are a cubic where the published relation is a
+// quartic, and they failed an empirical check in both orientations by −0.46 mag
+// at BP−RP ≈ 0 growing to −2.0 by BP−RP = 3, so the shape was wrong rather than
+// the sign. Measured against 4,000 stars carrying both Gaia and Tycho-2
+// photometry, with Johnson B taken from Tycho as B = B_T − 0.240(B_T − V_T), the
+// published quartic has a median residual of −0.010 mag over the range it is
+// unrestrictedly valid on.
 //
-// The coefficients are left exactly as they were rather than adjusted to fit,
-// because inventing a coefficient is worse than shipping a documented one. Do
-// not rely on this until it has been checked against the primary table.
+// # Validity
+//
+// Fitted for −0.5 < BP−RP < 4.0, and Table 5.10 restricts it further: **beyond
+// BP−RP = 1.75 it holds only for M giants.** The same Tycho check shows why —
+// the residual is −0.01 below 1.75, −0.08 by 2.5 and +0.69 beyond it. Nothing
+// is clamped here, so a caller working with red stars has to respect that bound
+// itself.
+//
+// Parameters:
+//   - G: Gaia DR3 G-band magnitude
+//   - bpMinusRp: Gaia BP − RP colour index
 func GaiaGToJohnsonB(G, bpMinusRp float64) float64 {
 	c := bpMinusRp
-	dB := -0.02907 + 0.6399*c - 0.09631*c*c + 0.01023*c*c*c
+	gMinusB := 0.01448 - 0.6874*c - 0.3604*c*c + 0.06718*c*c*c - 0.006061*c*c*c*c
 
-	return G + dB
+	return G - gMinusB
 }

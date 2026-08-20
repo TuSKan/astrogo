@@ -126,7 +126,8 @@ func TestPublishedHeaderCarriesProvenance(t *testing.T) {
 		"ICRS",                       // which frame
 		"Gaia sees nothing brighter", // the limit the instrument itself imposes
 		"W m^-2 sr^-1 nm^-1",         // which quantity, per nanometre
-		"Riello",                     // the colour transformation's source
+		"Table 5.9",                  // the colour transformation's source, by table
+		"G - V polynomial in BP-RP",  // and which direction it is tabulated in
 		"25.6874",                    // the Gaia G zero point
 		"3.63e-11",                   // the Johnson V zero point
 		"sources with no BP-RP",      // what was dropped

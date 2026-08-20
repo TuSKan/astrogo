@@ -103,7 +103,7 @@ func TestGaiaJohnsonV(t *testing.T) {
 		t.Errorf("Name = %q, want V", band.Name)
 	}
 
-	// The colour term is Riello et al. (2021) Table 5.7 as printed: the table
+	// The colour term is the Gaia DR3 documentation Table 5.9 as printed: the table
 	// is tabulated as G minus the target band, which is exactly what the
 	// query's +0.4 exponent needs, since the factor is 10^(0.4*(G-V)).
 	want := []float64{-0.02704, 0.01424, -0.2156, 0.01426}

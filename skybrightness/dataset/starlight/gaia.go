@@ -803,7 +803,8 @@ const johnsonVZeroFlux = 3.63e-11
 //   - Gaia DR3's G-band VEGAMAG zero point, 25.6874, which turns
 //     phot_g_mean_flux in e-/s into a G magnitude.
 //   - The G to V colour transformation of Riello et al. (2021), Gaia DR3
-//     photometric documentation Table 5.7. The table is tabulated as G minus
+//     photometric documentation, Section 5.5.1, Table 5.9. The table is
+//     tabulated as G minus
 //     the target band, so its polynomial is G - V directly and is entered
 //     here unchanged, which is what the query's +0.4 exponent needs: the
 //     factor is 10^(0.4*(G-V)) = F_V/F_G. G - V is negative for ordinary

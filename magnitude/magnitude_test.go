@@ -552,6 +552,55 @@ func TestGaiaGToJohnsonV(t *testing.T) {
 	}
 }
 
+// The G to Johnson B transformation, against the same star and the same
+// inequality.
+//
+// This function previously carried coefficients cited only as "Gaia DR3
+// photometric documentation" that appear nowhere in it: a cubic where the
+// published relation is a quartic. They missed by -0.46 mag at BP-RP = 0 and
+// -2.0 mag by BP-RP = 3, in both orientations, and no test covered them.
+func TestGaiaGToJohnsonB(t *testing.T) {
+	const (
+		solarG    = -26.895
+		solarBPRP = 0.82
+		solarB    = -26.107 // V = -26.76 with (B-V) = 0.653, Ramirez et al. (2012)
+	)
+
+	if got := magnitude.GaiaGToJohnsonB(solarG, solarBPRP); math.Abs(got-solarB) > 0.1 {
+		t.Errorf("the Sun comes out at B = %.3f, want %.3f within 0.1", got, solarB)
+	}
+
+	// Johnson B is narrow and blue where Gaia G is broad, so a star redder than
+	// the reference carries less flux in B and B is the fainter, larger number —
+	// by more as the star reddens. The condition is on stars redder than Vega,
+	// not on all of them: these are Vega-normalised magnitudes, so at BP-RP = 0
+	// every band agrees by construction and the relation's 0.014 mag offset there
+	// is fit scatter rather than a physical claim.
+	prev := math.Inf(-1)
+
+	for _, c := range []float64{0.0, 0.25, 0.5, 1.0, 1.5, 1.75} {
+		b := magnitude.GaiaGToJohnsonB(10.0, c)
+		if c > 0 && b <= 10.0 {
+			t.Errorf("BP-RP = %.2f gives B = %.3f for G = 10; a star cannot be brighter in B than in G", c, b)
+		}
+
+		if b <= prev {
+			t.Errorf("B = %.3f at BP-RP = %.2f did not increase over %.3f; B-G must grow with colour", b, c, prev)
+		}
+
+		prev = b
+	}
+
+	// The two transformations are independent fits, so making them agree on a
+	// colour index exercises both at once. The Sun's B-V is 0.653; a sign error
+	// or a wrong polynomial in either one breaks this while leaving each
+	// function's own value superficially plausible.
+	bv := magnitude.GaiaGToJohnsonB(solarG, solarBPRP) - magnitude.GaiaGToJohnsonV(solarG, solarBPRP)
+	if math.Abs(bv-0.653) > 0.1 {
+		t.Errorf("the Sun's B-V comes out %.3f, want 0.653 within 0.1", bv)
+	}
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
 // Cubic Spline — Validation against sbpy knot tables
 // ══════════════════════════════════════════════════════════════════════════════

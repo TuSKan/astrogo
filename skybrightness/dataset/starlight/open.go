@@ -103,7 +103,7 @@ func (g GaiaBuild) Header() string {
 
 	if len(g.Bands) > 0 && len(g.Bands[0].ColourTerm) > 0 {
 		fmt.Fprintf(&b, "# colour transformation: G - %s polynomial in BP-RP, "+
-			"Riello et al. (2021), Gaia DR3 photometry, Table 5.7\n", band)
+			"Gaia DR3 photometric documentation, Sect. 5.5.1, Table 5.9\n", band)
 		fmt.Fprintf(&b, "# zero points: Gaia DR3 G VEGAMAG 25.6874; Johnson V 3.63e-11 W m^-2 nm^-1\n")
 		fmt.Fprintf(&b, "# excluded: sources with no BP-RP, which the transformation cannot reach\n")
 	}

@@ -667,7 +667,7 @@ and airmass, built from `atmosphere.RayleighOpticalDepth` and the scene's aeroso
 
 **Primary references.** Masana, E., Carrasco, J.M., Bará, S. & Ribas, S.J. (2021), MNRAS
 501, 5443 (GAMBONS); Riello, M. et al. (2021), A&A 649, A3 and the Gaia DR3 photometric
-documentation Table 5.7 for the G to V transformation; Górski, K.M. et al. (2005), ApJ
+documentation Section 5.5.1 Table 5.9 for the G to V transformation; Górski, K.M. et al. (2005), ApJ
 622, 759 for the HEALPix indexing the map is built on.
 
 **Inputs.** A `StarMap` — passband-averaged extra-atmospheric spectral radiance by
@@ -751,7 +751,8 @@ along the Galactic plane where the ensemble is reddest. One constructor removes 
 opportunity.
 
 **The direction of that colour transformation was wrong, and it made the map 1.6 times too
-bright.** Riello et al. (2021) Table 5.7 is tabulated as *G minus the target band*. This
+bright.** The Gaia DR3 photometric documentation, Section 5.5.1, Table 5.9, is tabulated as
+*G minus the target band*. This
 package read it as V − G and negated it, so the query applied 10^(0.4(V−G)) where
 10^(0.4(G−V)) was needed — the reciprocal. Both `magnitude.GaiaGToJohnsonV` and
 `catalog/gaia` carried the same inversion, returning `G + (G−V)` instead of `G − (G−V)`.
@@ -972,7 +973,7 @@ columns.
 | Masana Eq. 8, direct term | `IntegratedStarlight.AddRadiance` | `TestIntegratedStarlightDimsTowardTheHorizon`, `TestIntegratedStarlightReddens` |
 | Shape normalisation | `NewIntegratedStarlight` | `TestIntegratedStarlightReproducesTheMapValue`, `TestIntegratedStarlightIsIndependentOfGridResolution` |
 | `source_id / 2^(59−2k)` | `GaiaBuild.ADQL` | `TestGaiaADQLDivisor`, `TestGaiaQueryIsAcceptedByTheArchive` |
-| Riello Table 5.7, as printed | `GaiaJohnsonV` | `TestGaiaJohnsonV`, `TestGaiaJohnsonVColourFactorDirection` |
+| Gaia DR3 doc Table 5.9, as printed | `GaiaJohnsonV` | `TestGaiaJohnsonV`, `TestGaiaJohnsonVColourFactorDirection` |
 
 **Still outstanding for this section.** The extragalactic background light is not
 implemented and is not folded into anything else; it is a separate component with its own
