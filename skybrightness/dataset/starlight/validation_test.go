@@ -15,18 +15,21 @@ import (
 	"github.com/TuSKan/astrogo/skybrightness/dataset/starlight"
 )
 
-// The absolute scale of the map, checked against a number nobody in this
-// repository chose.
+// The absolute scale of the map, bounded by numbers nobody in this repository
+// chose.
 //
 // Integrated starlight away from the Galactic plane is about 23.5 mag arcsec^-2
 // in V — the figure Masana et al. (2021) and Leinert et al. (1998) both land on,
-// and roughly a hundredth of the natural sky's total. Every other test here
-// checks that the query is well formed or that the arithmetic is
-// self-consistent; none of them would notice if the three zero points behind
-// GaiaJohnsonV were combined wrongly, because a factor-of-ten error in the
-// absolute scale is invisible to an internal consistency check.
+// and roughly a hundredth of the natural sky's total.
 //
-// This builds a small patch of real sky and asserts that number.
+// A Gaia-only map must come out **fainter** than that, not equal to it. The
+// published figure counts every star; this map is missing both ends, the bright
+// stars Gaia saturates on below G = 5 and everything past its G = 21 limit. An
+// earlier revision asserted equality within a magnitude and passed while the
+// colour transformation was inverted, because at high latitude the resulting
+// 0.5 mag of excess brightness happened to cancel the 0.5 mag of missing stars.
+// Bounding it on both sides, with the lower bound set by what is absent rather
+// than by the published total, is what makes the assertion mean something.
 func TestGaiaMapMatchesThePublishedSurfaceBrightness(t *testing.T) {
 	testutil.RequireReachable(t, "gea.esac.esa.int:443")
 
@@ -88,11 +91,15 @@ func TestGaiaMapMatchesThePublishedSurfaceBrightness(t *testing.T) {
 	t.Logf("%d pixels, %d sources, mean %.4e W m^-2 sr^-1 nm^-1, %.2f mag arcsec^-2",
 		sampled, sources, mean, mag)
 
-	// One magnitude either side: the patch is not the exact sky the published
-	// figure averages over, and the shape of the Galaxy varies across it. A
-	// zero-point or unit error would miss by far more than that.
-	if mag < 22.5 || mag > 24.5 {
-		t.Errorf("integrated starlight is %.2f mag arcsec^-2, want 23.5 within a magnitude", mag)
+	// The patch is not the exact sky the published figure averages over and the
+	// Galaxy varies across it, so the window is wide — but it is one-sided about
+	// the published value. Brighter than 23.5 means the map has more light than
+	// every star in the sky put together, which it cannot; fainter than 25.0
+	// means most of the light is missing. A zero-point, unit or sign error lands
+	// outside one end or the other.
+	if mag < 23.5 || mag > 25.0 {
+		t.Errorf("integrated starlight is %.2f mag arcsec^-2; a Gaia-only map must sit between "+
+			"23.5 (every star in the sky) and 25.0 (most of the light missing)", mag)
 	}
 }
 
@@ -135,9 +142,10 @@ func runOf(t *testing.T, grid coord.HEALPix, n int, want func(b angle.Angle) boo
 // would notice. The plane-to-cap contrast is what does: a frame swap does not
 // dim the plane, it moves it, so the two samples would come out alike.
 //
-// The full order-8 build puts the plane at 21.0 and the cap at 23.5
-// mag arcsec^-2. This samples sixteen pixels of each rather than 786,432, so
-// the bound is loose, but a washed-out contrast is unmissable.
+// The full order-9 build puts the plane at 21.99 and the polar cap at 23.96
+// mag arcsec^-2, over a monotonic profile in galactic latitude. This samples
+// sixteen pixels of each rather than 3,145,728, so the bound is loose, but a
+// washed-out contrast is unmissable.
 func TestGaiaMapPutsTheMilkyWayInThePlane(t *testing.T) {
 	testutil.RequireReachable(t, "gea.esac.esa.int:443")
 

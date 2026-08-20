@@ -782,6 +782,38 @@ came out brighter than the Gaia G map it was built from**, which no band this na
 The replacement test anchors on the Sun and on that inequality rather than on a coefficient
 list, because a coefficient list cannot tell a sign error from a correct one.
 
+**The corrected order-9 map, rebuilt and measured.** 3,145,727 pixels, 1,811,709,771 sources,
+one whole-sky query of sixteen minutes:
+
+| \|b\| | mag arcsec⁻² |
+| :--- | ---: |
+| 0–10° | **21.99** |
+| 10–20° | 22.52 |
+| 20–30° | 23.00 |
+| 30–40° | 23.33 |
+| 40–50° | 23.52 |
+| 50–60° | 23.69 |
+| 60–70° | 23.70 |
+| 70–80° | 23.89 |
+| 80–90° | **23.96** |
+| whole sky | 22.84 |
+
+Against the inverted build the whole-sky mean moves 21.88 → 22.84, so the previous map
+carried **2.4 times too much flux**. The per-pixel ratio has a median of 0.595 and a first
+percentile of 0.079: no pixel got brighter, and the plane moved about twice as far as the
+cap, which is the colour-dependent signature the error had to have.
+
+**Why the old map appeared to validate, and why the new one should not.** The published
+~23.5 mag arcsec⁻² counts every star. This map counts neither end of the distribution — not
+the bright stars Gaia saturates on below G = 5, nor anything past its G = 21 limit — so it
+**must come out fainter**. The inverted map read 23.44 at high latitude and looked like a
+match; it was a coincidence, the ~0.5 mag of excess brightness at the bluest part of the sky
+cancelling the ~0.5 mag of stars that are missing. The corrected map reads 23.96 there,
+0.46 mag fainter than the published total, and that gap is now attributable to two omissions
+this document already records rather than to luck.
+
+That is the shape a real validation has: the residual points at something named.
+
 **Sources without a colour — a systematic error, not a rounding one.** The colour
 transformation is applied per star inside the aggregate, because transforming a sum is not
 the same as summing transformations when the transformation depends on colour. A source
