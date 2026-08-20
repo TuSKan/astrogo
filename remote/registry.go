@@ -313,6 +313,8 @@ func constName(id EndpointID) string {
 		return "GaiaTAP"
 	case GaiaAIP:
 		return "GaiaAIP"
+	case IRSADust:
+		return "IRSADust"
 	case GaiaStarMap:
 		return "GaiaStarMap"
 	case MPIMainzCrossSections:

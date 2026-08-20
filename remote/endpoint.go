@@ -137,6 +137,15 @@ const OzoneSerdyuchenko223K = "Ozone/O3_Serdyuchenko(2014)_223K_213-1100nm(2013 
 
 const (
 
+	// IRSADust is NASA/IPAC's Galactic Dust Extinction Service.
+	//
+	// It serves the 100 micron thermal emission of interstellar dust that the
+	// diffuse-galactic-light correlation is fitted against, reprocessed from
+	// IRAS, COBE/DIRBE and Planck. Queried per position rather than downloaded
+	// whole, which is why skybrightness/dataset/dust fetches and caches the
+	// directions a caller asks about.
+	IRSADust EndpointID = "irsa.dust"
+
 	// GaiaAIP is the Gaia mirror at Leibniz-Institut für Astrophysik Potsdam.
 	//
 	// It exists in the registry alongside the ESA archive rather than instead
@@ -504,6 +513,17 @@ func defaultEndpoints() map[EndpointID]Endpoint {
 			Downloadable:    true,
 			Files:           []string{"passbands-v1.tar.gz"},
 		},
+		IRSADust: {
+			ID:        IRSADust,
+			URL:       "https://irsa.ipac.caltech.edu/cgi-bin/DUST/nph-dust",
+			Kind:      KindAPI,
+			Subsystem: "skybrightness/dataset/dust",
+			Description: "NASA/IPAC Galactic Dust Extinction Service; 100 micron emission in " +
+				"MJy/sr and E(B-V), from IRAS, COBE/DIRBE and Planck",
+			Enabled: true,
+			Timeout: 60 * time.Second,
+		},
+
 		//nolint:gosec // TokenEnv names an environment variable; it is not a credential
 		GaiaAIP: {
 			ID:        GaiaAIP,
