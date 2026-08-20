@@ -119,6 +119,28 @@ func (g GaiaBuild) Header() string {
 }
 
 // WriteMap writes a map in the published format, provenance header first.
+//
+// # Regenerating the published asset
+//
+// This is the last step of four, and the whole sequence is committed code so
+// the published file can be rebuilt rather than remembered:
+//
+//	build := GaiaBuild{Order: GaiaMapOrder, Bands: []GaiaBand{GaiaJohnsonV()}}
+//
+//	m, _, err := BuildFromGaia(ctx, build)                  // ~787 queries
+//	stars, err := FetchBrightStars(ctx,                     // ~90 seconds
+//		BrightStarLimitV, BrightStarMatchRadius)
+//	err = AddBrightStars(m, "V", stars)
+//	err = WriteMap(gzipWriter, build, m)
+//
+// gzip the result, name it [TotalStarlightMap], and attach it to the release
+// tag [github.com/TuSKan/astrogo/remote.GaiaStarMap] resolves against.
+//
+// [BuildFromGaia] chunks the sky into 787 paced queries because that is polite
+// to a shared service. One whole-sky query returns the same aggregate in about
+// thirteen minutes — the two were cross-checked to 5e-7 — but it needs an
+// asynchronous job, which this package does not implement; the chunked path is
+// what is reproducible from here today.
 func WriteMap(w io.Writer, spec GaiaBuild, m *Map) error {
 	band := spec.Bands[0].Name
 

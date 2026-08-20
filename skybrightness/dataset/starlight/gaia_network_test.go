@@ -5,6 +5,7 @@ package starlight_test
 import (
 	"context"
 	"errors"
+	"math"
 	"strings"
 	"testing"
 	"time"
@@ -239,5 +240,85 @@ func TestSourceIDTilingAgreesAcrossOrders(t *testing.T) {
 	if fine != coarseTotal {
 		t.Errorf("the same sky holds %d sources at order 8 and %d at order 7; "+
 			"the source_id divisor does not tile consistently", fine, coarseTotal)
+	}
+}
+
+// The bright-star correction, end to end against both archives.
+//
+// This is the piece that makes the published map reproducible from committed
+// code: without it the 74 stars have to be produced by a script nobody kept.
+//
+// The count is not asserted exactly. It depends on the match radius and on
+// which Gaia sources currently carry a usable flux, and the point is that the
+// answer stays in the dozens rather than the tens of thousands - the failure
+// mode being guarded against is taking the 18,693 Hipparcos stars absent from
+// gaiadr3.hipparcos2_best_neighbour as the missing set, which double-counts
+// nearly all of them.
+func TestFetchBrightStarsFindsTheSaturatedStars(t *testing.T) {
+	t.Parallel()
+
+	testutil.RequireReachable(t, "gea.esac.esa.int:443")
+	testutil.RequireReachable(t, "tapvizier.u-strasbg.fr:80")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
+	defer cancel()
+
+	stars, err := starlight.FetchBrightStars(ctx,
+		starlight.BrightStarLimitV, starlight.BrightStarMatchRadius)
+	if err != nil {
+		t.Skipf("an archive did not answer: %v", err)
+	}
+
+	t.Logf("%d Hipparcos stars have no Gaia counterpart", len(stars))
+
+	if len(stars) == 0 {
+		t.Fatal("no missing stars at all; Gaia does not reach V = 3")
+	}
+
+	if len(stars) > 2000 {
+		t.Errorf("%d stars reported missing; that is the crossmatch-complement "+
+			"mistake, not Gaia's saturation limit", len(stars))
+	}
+
+	// The population is defined by saturation, so it has to be dominated by the
+	// very brightest sky. Measured: 70 of 74 brighter than V = 3.
+	var brighterThan3, brightest int
+
+	brightestV := math.Inf(1)
+
+	for i, s := range stars {
+		if s.Vmag < 3 {
+			brighterThan3++
+		}
+
+		if s.Vmag < brightestV {
+			brightestV, brightest = s.Vmag, i
+		}
+	}
+
+	t.Logf("brightest is HIP %d at V = %.2f; %d of %d are brighter than V = 3",
+		stars[brightest].HIP, brightestV, brighterThan3, len(stars))
+
+	if frac := float64(brighterThan3) / float64(len(stars)); frac < 0.5 {
+		t.Errorf("only %.0f%% of the missing stars are brighter than V = 3; "+
+			"this set should be saturation-limited", 100*frac)
+	}
+
+	// Sirius is the brightest star in the sky and Gaia cannot measure it, so it
+	// has to be in any correct answer.
+	const sirius = 32349
+
+	found := false
+
+	for _, s := range stars {
+		if s.HIP == sirius {
+			found = true
+
+			break
+		}
+	}
+
+	if !found {
+		t.Errorf("HIP %d (Sirius) is not in the missing set", sirius)
 	}
 }
