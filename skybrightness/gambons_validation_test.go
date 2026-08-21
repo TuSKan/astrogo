@@ -136,10 +136,9 @@ func TestAgainstGAMBONS(t *testing.T) {
 		t.Fatalf("NewIntegratedStarlight: %v", err)
 	}
 
-	// Diffuse galactic light needs the 100 micron intensity toward the zenith.
-	zenithGal := zenithGalactic(t, scene)
-
-	dustMap, err := dust.Fetch(ctx, nil, dust.Direction{L: zenithGal.L(), B: zenithGal.B()})
+	// Diffuse galactic light needs the 100 micron intensity along every
+	// sightline the cap average will use, not just the zenith.
+	dustMap, err := dust.Fetch(ctx, nil, capDustDirections(t, scene, gambonsCapDeg, gambonsCapSamples)...)
 	if err != nil {
 		t.Skipf("IRSA did not answer: %v", err)
 	}
@@ -176,11 +175,17 @@ func TestAgainstGAMBONS(t *testing.T) {
 		t.Fatalf("NewModel: %v", err)
 	}
 
-	zenith := coord.NewAltAz(angle.Deg(89.9), angle.Deg(0))
+	// GAMBONS reports "0-5 degrees" of zenith angle, which is an average over
+	// that cap and not a point at the zenith. Comparing a single 13.7 arcmin
+	// HEALPix pixel against it is not like for like: the pixels around this
+	// zenith span 20.5 to 23.3 mag arcsec^-2, so a point sample and a cap mean
+	// can differ by several tenths for reasons that have nothing to do with
+	// either model.
+	directions := zenithCap(gambonsCapDeg, gambonsCapSamples)
 
 	got := map[string]float64{
-		"with airglow": bandMagnitude(t, ctx, withAirglow, scene, grid, band, zenith),
-		"no airglow":   bandMagnitude(t, ctx, noAirglow, scene, grid, band, zenith),
+		"with airglow": capMagnitude(t, ctx, withAirglow, scene, grid, band, directions),
+		"no airglow":   capMagnitude(t, ctx, noAirglow, scene, grid, band, directions),
 	}
 
 	t.Logf("GAMBONS zenith: %.2f with airglow, %.2f without",
@@ -208,7 +213,7 @@ func TestAgainstGAMBONS(t *testing.T) {
 	// Where our total comes from, so a disagreement is attributable to a
 	// component rather than left as one number.
 	est, err := withAirglow.Estimate(ctx,
-		skybrightness.Query{Scene: scene, Direction: zenith, Grid: grid})
+		skybrightness.Query{Scene: scene, Direction: directions[0], Grid: grid})
 	if err != nil {
 		t.Fatalf("Estimate for the breakdown: %v", err)
 	}
@@ -339,4 +344,93 @@ func bandFlux(
 	}
 
 	return mean
+}
+
+// The cap GAMBONS' first row averages over, and how finely it is sampled here.
+const (
+	gambonsCapDeg     = 5.0
+	gambonsCapSamples = 64
+)
+
+// zenithCap returns directions spread over the cap within capDeg of the zenith,
+// equal solid angle per sample so a plain mean of their radiances is the
+// solid-angle average.
+//
+// Deterministic rather than random: cos(zenith angle) steps uniformly and the
+// azimuth advances by the golden angle, which spreads the samples without
+// needing a seed a test would have to pin.
+func zenithCap(capDeg float64, samples int) []coord.AltAz {
+	const goldenAngleDeg = 137.507764
+
+	cosCap := math.Cos(capDeg * math.Pi / 180)
+	out := make([]coord.AltAz, 0, samples)
+
+	for k := range samples {
+		cosZ := 1 - (float64(k)+0.5)/float64(samples)*(1-cosCap)
+		zenithAngle := math.Acos(cosZ) * 180 / math.Pi
+
+		out = append(out, coord.NewAltAz(
+			angle.Deg(90-zenithAngle),
+			angle.Deg(math.Mod(float64(k)*goldenAngleDeg, 360)),
+		))
+	}
+
+	return out
+}
+
+// capDustDirections carries the cap's sightlines to galactic coordinates, which
+// is what the dust provider is indexed by.
+func capDustDirections(t *testing.T, scene *skybrightness.Scene, capDeg float64, samples int) []dust.Direction {
+	t.Helper()
+
+	cc := coord.NewContext(astrotime.FromGo(scene.Time), scene.Observer,
+		scene.Atmosphere.Refraction())
+
+	dirs := zenithCap(capDeg, samples)
+	out := make([]dust.Direction, 0, len(dirs))
+
+	for _, d := range dirs {
+		icrs, err := cc.AltAzToICRS(d)
+		if err != nil {
+			t.Fatalf("AltAzToICRS: %v", err)
+		}
+
+		gal := coord.ICRSToGalactic(icrs)
+		out = append(out, dust.Direction{L: gal.L(), B: gal.B()})
+	}
+
+	return out
+}
+
+// capMagnitude averages a model over a set of directions and converts once.
+//
+// The radiances are averaged, never the magnitudes. A mean of magnitudes is the
+// geometric mean of the radiances, which is not what an instrument or a model
+// reports over a solid angle, and it is systematically fainter than the truth
+// wherever the sky is structured - which is exactly where the difference would
+// matter.
+func capMagnitude(
+	t *testing.T,
+	ctx context.Context,
+	model *skybrightness.Model,
+	scene *skybrightness.Scene,
+	grid unit.SpectralGrid,
+	band magnitude.Passband,
+	directions []coord.AltAz,
+) float64 {
+	t.Helper()
+
+	var sum float64
+
+	for _, dir := range directions {
+		est, err := model.Estimate(ctx,
+			skybrightness.Query{Scene: scene, Direction: dir, Grid: grid})
+		if err != nil {
+			t.Fatalf("Estimate(%v): %v", dir, err)
+		}
+
+		sum += bandFlux(t, est.SpectralRadiance(), grid, band)
+	}
+
+	return toMag(sum / float64(len(directions)))
 }

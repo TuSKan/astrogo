@@ -1387,60 +1387,75 @@ is; a hand-worked example in the offline tests lands at 22.00 independently.
 
 ### The end-to-end comparison, run
 
-`TestAgainstGAMBONS` builds all five natural components for the scene above — the published
-star map, dust from IRSA, Leinert zodiacal light, airglow from ESO SkyCalc at the same
-msolflux 100, and the extragalactic background — and evaluates the zenith in V:
+`TestAgainstGAMBONS` builds all five natural components for the scene above and compares
+against GAMBONS' own numbers in V:
 
 | | GAMBONS | astrogo | difference |
 | :--- | ---: | ---: | ---: |
-| with airglow | 21.13 | **21.66** | +0.53 |
-| airglow removed | 21.74 | **22.17** | +0.43 |
-| airglow's own contribution | +0.61 | **+0.51** | −0.10 |
+| with airglow | 21.13 | 21.41 | +0.28 |
+| **astronomical sky, airglow removed** | **21.74** | **21.79** | **+0.05** |
 
-At the zenith rather than all-sky because diffuse galactic light is one IRSA request per
-direction: a whole sky would be tens of thousands of requests to answer what one direction
-already answers.
+**The astronomical sky agrees to 0.05 magnitudes** — five per cent in flux, between two
+implementations sharing no code, no catalogue aggregation and no transport. Integrated
+starlight, diffuse galactic light, zodiacal light and the extragalactic background, summed
+and propagated, land on the same number.
 
-The component breakdown, which is what makes the number diagnostic rather than a single
-verdict:
-
-| component | mag arcsec⁻² | share of flux |
+| component | mag arcsec⁻² | share |
 | :--- | ---: | ---: |
-| airglow | 22.73 | 37.4 % |
-| zodiacal | 23.05 | 27.8 % |
-| integrated starlight | 23.14 | 25.5 % |
-| diffuse galactic | 24.28 | 8.9 % |
+| integrated starlight | 22.48 | 38.6 % |
+| airglow | 22.73 | 30.7 % |
+| zodiacal | 23.22 | 19.5 % |
+| diffuse galactic | 23.85 | 10.9 % |
 | extragalactic | 27.90 | 0.3 % |
 
-**What it found.** Diffuse galactic light was not being attenuated. Starlight and the
-extragalactic background both cross the atmosphere and are dimmed by it; DGL was added to
-the total as though it were emitted below. It showed up as a DGL-to-starlight ratio of
-0.409 against a cap of 0.35 — and 0.35/0.409 is 0.855, the zenith transmission exactly,
-because the cap is applied above the atmosphere and only starlight was then dimmed. With
-the attenuation applied the ratio is 0.349, at the cap where it belongs. The same pass
-found the component's provenance still claiming the 0.35 cap "is not applied here", which
-stopped being true when the dust provider landed.
+Getting there took three corrections, and none of them was visible from inside this module.
 
-That is what an end-to-end comparison is for. Neither defect is visible from inside: the
-sky stayed positive, smooth and plausible, and every unit test passed throughout.
+**A poisoned cache had been serving a fake sky.** `starlight.Open` was returning a
+placeholder written into the real cache directory by `TestOpenFetchesAndParses`: the right
+filename, exactly 786,432 rows so the order check passed, a header claiming order 1, and
+`1.000000e-09` in every single pixel. Integrated starlight was a constant, plausible,
+entirely fictional 22.97 mag arcsec⁻² in every direction. It was caught by printing the
+neighbourhood of one pixel and finding 81 consecutive pixels identical to three decimals.
 
-**What the remaining 0.43 mag is, as far as it can be attributed.** Our sky is fainter, and
-the largest known reason is that every component here applies *direct attenuation only* —
-light scattered out of the beam is removed and light scattered into it is never returned,
-which is recorded as a known approximation on each of them. GAMBONS solves the transport.
-For an extended source that omission can only lose light, and it is bounded above by
-removing extinction altogether: 2.5·log₁₀(1/T) is about 0.17 mag at this zenith. The rest is
-spread across the zodiacal term, which is 28 per cent of the total and where two
-independent readings of Leinert's tables can easily differ by tenths, and the tophat used
-for Johnson V.
+The mechanism is worth stating because it will recur. `remote.SetURL` redirects where bytes
+come from, not where they land, so a test that redirects an endpoint still writes into the
+user's real cache — and `GetFile` reuses a cached object for an immutable endpoint on
+existence alone, so nothing ever re-fetched it. Three things now stand in the way: the test
+takes its own cache directory, its fixture carries structure instead of one repeated value,
+and `Open` checks the content and not only the shape, rejecting any map whose brightest and
+faintest pixel differ by less than a factor of ten. The real map spans six million.
 
-Airglow agreeing to 0.10 mag is the strongest single line here: both models drive it from
-the same ESO spectrum, so it isolates the scaling and the geometry from the source data.
+**Two components were not being attenuated.** Diffuse galactic light and zodiacal light both
+arrive from outside the atmosphere and both were added to the total as though emitted below
+it. DGL showed itself as a DGL-to-starlight ratio of 0.409 against a cap of 0.35, and
+0.35/0.409 is 0.855 — the zenith transmission exactly, because the cap is applied above the
+atmosphere and only starlight was then dimmed. Zodiacal mattered more, being three times the
+size. Airglow is deliberately left unattenuated and says so: it is emitted at about 87 km,
+where the van Rhijn enhancement and extinction work against each other, and that is a
+recorded approximation rather than an omission.
 
-Two independent six-term implementations of the same sky landing within half a magnitude,
-with the dominant term inside a tenth, is a real result. It is also not tight enough to
-call the absolute scale validated, and the gap has a named leading candidate rather than a
-shrug — which is the difference between a residual and an excuse.
+**The comparison itself was not like for like.** GAMBONS' first row is "0°–5°" of zenith
+angle, which is an average over that cap, and it was being compared against a single 13.7
+arcmin HEALPix pixel. Around this particular zenith the pixels span 20.5 to 23.3 mag
+arcsec⁻², so a point sample and a cap mean differ by several tenths for reasons belonging to
+neither model. The comparison now averages 64 equal-solid-angle samples across the same cap,
+and averages *radiances* — a mean of magnitudes is a geometric mean of radiances, which is
+systematically too faint wherever the sky has structure.
+
+**What remains is airglow, and only airglow.** Ours contributes +0.38 mag against their
++0.61, so theirs is about 1.8 times brighter. Both draw on ESO SkyCalc at msolflux 100 and
+both apply it at a sea-level site, so the difference is in which of SkyCalc's columns is
+taken as airglow or in a scaling applied to it — a specific, named, checkable difference
+rather than a residual. This package sums `flux_ael` and `flux_arc`, the emission lines and
+the residual continuum, and deliberately not the `flux` total.
+
+**On the precision that is available here.** A 10⁻¹² agreement is what §13's tiling check
+reaches, because that compares the same sum in two orders. It is not available against
+GAMBONS at any effort: Koushan's extragalactic values carry 4–7 per cent, Kawara's DGL slope
+10–50 per cent, the two models aggregate different Gaia releases, and one solves the
+transport where the other attenuates directly. Inputs known to five per cent cannot produce
+agreement at twelve digits, and an implementation tuned until they did would only be
+agreeing with itself.
 
 ## 17. Open scientific questions
 

@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/skybrightness/dataset/starlight"
 )
@@ -28,7 +29,7 @@ func tinyMap(t *testing.T) []byte {
 	t.Helper()
 
 	spec := starlight.GaiaBuild{
-		Order: 1,
+		Order: starlight.GaiaMapOrder,
 		Bands: []starlight.GaiaBand{starlight.GaiaJohnsonV()},
 	}
 
@@ -36,12 +37,17 @@ func tinyMap(t *testing.T) []byte {
 
 	plain.WriteString(spec.Header())
 
-	// A whole order-8 sky. It is 15 MB of text that gzips to a few kilobytes
-	// because every value is the same, and it is generated in full rather than
-	// shortened because Open checks that the content matches the order its name
-	// promises — a shorter map is exactly what that check exists to reject.
+	// A whole order-8 sky, generated in full rather than shortened because Open
+	// checks the content against the order its name promises.
+	//
+	// The values vary. An earlier version wrote 1e-9 into every pixel, and Open
+	// accepted it because it only counted rows - so when this test leaked the
+	// file into the real cache, every later caller silently got a constant sky.
+	// Open now also requires structure, and a fixture without any would be
+	// testing the wrong thing regardless.
 	for pixel := range 786432 {
-		if _, err := fmt.Fprintf(&plain, "%d 1.000000e-09\n", pixel); err != nil {
+		value := 1e-10 * float64(1+pixel%997)
+		if _, err := fmt.Fprintf(&plain, "%d %.6e\n", pixel, value); err != nil {
 			t.Fatalf("write row: %v", err)
 		}
 	}
@@ -76,6 +82,14 @@ func TestOpenFetchesAndParses(t *testing.T) {
 
 	scope := remote.Capture(remote.GaiaStarMap)
 	t.Cleanup(scope.Restore)
+
+	// A cache of this test's own. SetURL redirects where the bytes come from
+	// but not where they land, so without this the fixture is written into the
+	// user's real cache under the published map's own filename - and every
+	// later Open returns it, because an immutable endpoint reuses a cached
+	// object on existence alone. That happened, and it took an end-to-end
+	// comparison against another model to find it.
+	remote.SetDataDir(testutil.FileURL(t, t.TempDir()))
 
 	if err := remote.SetURL(remote.GaiaStarMap, srv.URL+"/"); err != nil {
 		t.Fatalf("SetURL: %v", err)

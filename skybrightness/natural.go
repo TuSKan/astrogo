@@ -351,6 +351,10 @@ func (d *DiffuseGalacticLight) capFactor(
 // A value is safe for concurrent use.
 type ZodiacalLight struct {
 	frame frameCache
+
+	// scratch holds the unattenuated spectrum while the atmosphere is
+	// applied to it, the same reason DiffuseGalacticLight carries one.
+	scratch sync.Pool
 }
 
 // NewZodiacalLight builds the component. It needs an ephemeris in the scene
@@ -395,7 +399,15 @@ func (z *ZodiacalLight) AddRadiance(
 		EarthLongitude: frame.sunEcliptic.Lon() + angle.Deg(180),
 	}
 
-	flags, err := ZodiacalRadiance(dst, grid, geom)
+	scratch, ok := z.scratch.Get().(SpectralRadiance)
+	if !ok || len(scratch) != grid.Len() {
+		scratch = NewSpectralRadiance(grid)
+	}
+
+	clear(scratch)
+	defer z.scratch.Put(scratch) //nolint:staticcheck // a slice header, deliberately pooled
+
+	flags, err := ZodiacalRadiance(scratch, grid, geom)
 	if errors.Is(err, ErrZodiacalGeometry) {
 		// Inside the solar vicinity the table does not reach. That is a real
 		// gap in the model, not a failure of the evaluation, and a caller
@@ -404,7 +416,38 @@ func (z *ZodiacalLight) AddRadiance(
 		return ExtrapolatedModel, nil
 	}
 
-	return flags, err
+	if err != nil {
+		return flags, err
+	}
+
+	// Zodiacal light is sunlight scattered by interplanetary dust, so it
+	// reaches the top of the atmosphere and then has to cross it, exactly as
+	// starlight and the extragalactic background do. An earlier revision added
+	// it unattenuated, which made it too bright by 1/T and mattered more than
+	// the same omission in diffuse galactic light because this term is three
+	// times the size.
+	airmass, err := atmosphere.Airmass(dir.Alt())
+	if err != nil {
+		return 0, fmt.Errorf("skybrightness: zodiacal: airmass: %w", err)
+	}
+
+	pressure, _ := scene.Atmosphere.Surface()
+	aerosol := scene.Atmosphere.Aerosol()
+
+	for i := range dst {
+		lambda := grid.At(i)
+
+		rayleigh, err := atmosphere.RayleighOpticalDepth(lambda, float64(pressure))
+		if err != nil {
+			return 0, fmt.Errorf("skybrightness: zodiacal: %w", err)
+		}
+
+		slant := (rayleigh + unit.OpticalDepth(aerosol.TauAt(lambda))) * unit.OpticalDepth(airmass)
+
+		dst[i] += scratch[i] * float64(atmosphere.Transmission(slant))
+	}
+
+	return flags, nil
 }
 
 // Provenance implements [Component].
@@ -427,6 +470,8 @@ func (z *ZodiacalLight) Provenance() Provenance {
 				"table is explicit that it cannot be.",
 			"The seasonal term applies a single sinusoid above 60 degrees of " +
 				"ecliptic latitude rather than a cloud model.",
+			"Only the directly attenuated term is applied; light scattered out of " +
+				"the beam is not returned to it, matching IntegratedStarlight.",
 		},
 		ExpectedAccuracy: "Leinert et al. describe the table as good to roughly 10 per " +
 			"cent away from the solar vicinity.",

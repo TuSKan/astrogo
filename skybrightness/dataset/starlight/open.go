@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"strings"
 
 	"github.com/TuSKan/astrogo/remote"
@@ -80,6 +81,10 @@ func Open(ctx context.Context) (*Map, error) {
 			ErrNoPublishedMap, TotalStarlightMap, m.Grid().NumPixels(), GaiaMapOrder, want)
 	}
 
+	if err := m.plausibleSky(); err != nil {
+		return nil, err
+	}
+
 	m.Source = TotalStarlightMap
 
 	return m, nil
@@ -116,6 +121,63 @@ func (g GaiaBuild) Header() string {
 	}
 
 	return b.String()
+}
+
+// MinPublishedSkyContrast is the smallest ratio between the brightest and
+// faintest populated pixel that a published map has to show.
+//
+// The real order-8 map spans 13.1 to 30.0 mag arcsec^-2, a factor of six
+// million, so ten is not a demanding threshold. It exists to catch a file that
+// is the right shape and the wrong content.
+const MinPublishedSkyContrast = 10
+
+// plausibleSky rejects a map whose pixels carry no structure.
+//
+// # Why a pixel count is not enough
+//
+// This check was added after a placeholder fixture, written into the real cache
+// directory by an earlier test run, was served by [Open] for weeks. It had the
+// right filename and exactly 786,432 rows, so the order check passed; every row
+// held 1.000000e-09, and its header claimed order 1 while the content said
+// order 8. Downstream nothing looked wrong - integrated starlight simply became
+// a constant, plausible, entirely fictional 22.97 mag arcsec^-2 in every
+// direction, and it took an end-to-end comparison against another model to
+// notice.
+//
+// A cached object for an immutable endpoint is reused on existence alone, so
+// nothing else in the chain would ever have re-fetched it. The content is the
+// only thing left that can tell a real sky from a stand-in, and the cheapest
+// property that separates them is that a sky has structure.
+func (m *Map) plausibleSky() error {
+	for _, band := range m.Bands() {
+		values, ok := m.bands[band]
+		if !ok {
+			continue
+		}
+
+		lo, hi := math.Inf(1), 0.0
+
+		for _, v := range values {
+			if v <= 0 {
+				continue
+			}
+
+			lo = math.Min(lo, v)
+			hi = math.Max(hi, v)
+		}
+
+		if math.IsInf(lo, 1) {
+			return fmt.Errorf("%w: band %q has no positive pixel", ErrNoPublishedMap, band)
+		}
+
+		if hi/lo < MinPublishedSkyContrast {
+			return fmt.Errorf("%w: band %q spans only %.3g to %.3g, a factor of %.2f; "+
+				"a real sky spans millions, so this is a placeholder rather than a map",
+				ErrNoPublishedMap, band, lo, hi, hi/lo)
+		}
+	}
+
+	return nil
 }
 
 // WriteMap writes a map in the published format, provenance header first.
