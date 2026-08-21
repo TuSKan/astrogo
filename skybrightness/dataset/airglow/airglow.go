@@ -294,16 +294,50 @@ func Parse(r io.Reader) (*Spectrum, error) {
 		return nil, err
 	}
 
+	// All three columns are read from one table and so carry NumRows entries
+	// each, but the shortest is taken rather than assumed: a response is not a
+	// file this package wrote.
+	rows := min(len(lambda), min(len(lines), len(continuum)))
+
 	out := &Spectrum{
-		LambdaNM: lambda,
-		Radiance: make([]float64, len(lambda)),
+		LambdaNM: make([]float64, 0, rows),
+		Radiance: make([]float64, 0, rows),
 	}
 
-	for i, nm := range lambda {
-		perNMPerSr := (lines[i] + continuum[i]) / 1000 / constants.ArcsecondSquaredToSteradian
+	for i := range rows {
+		nm := lambda[i]
 
-		out.Radiance[i] = float64(constants.ToEnergy(
-			unit.PhotonSpectralRadiance(perNMPerSr), unit.WavelengthNM(nm)))
+		// A sample that is not a number is dropped rather than carried. A NaN
+		// here does not stay local: it becomes a NaN radiance, which sums into
+		// the scene's total and comes back out as a NaN magnitude, by which
+		// point nothing identifies where it entered. This is the same
+		// screening solar.Parse does on the CALSPEC spectrum.
+		if nm <= 0 || math.IsNaN(nm) || math.IsInf(nm, 0) {
+			continue
+		}
+
+		flux := lines[i] + continuum[i]
+		if math.IsNaN(flux) || math.IsInf(flux, 0) {
+			continue
+		}
+
+		// A negative airglow is a subtraction artefact in the model that
+		// produced it, not emission removed from the sky.
+		if flux < 0 {
+			flux = 0
+		}
+
+		perNMPerSr := flux / 1000 / constants.ArcsecondSquaredToSteradian
+
+		out.LambdaNM = append(out.LambdaNM, nm)
+		out.Radiance = append(out.Radiance, float64(constants.ToEnergy(
+			unit.PhotonSpectralRadiance(perNMPerSr), unit.WavelengthNM(nm))))
+	}
+
+	// At interpolates between samples and needs two to do it; one row is not a
+	// spectrum, and zero rows means the table held no usable data at all.
+	if len(out.LambdaNM) < 2 {
+		return nil, fmt.Errorf("%w: %d usable rows", ErrService, len(out.LambdaNM))
 	}
 
 	return out, nil
