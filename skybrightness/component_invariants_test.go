@@ -184,7 +184,7 @@ func TestExtraAtmosphericComponentsDimTowardTheHorizon(t *testing.T) {
 	mid := grid.Len() / 2
 
 	for name, c := range cases {
-		var previous float64 = math.Inf(1)
+		previous := math.Inf(1)
 
 		for _, alt := range []float64{90, 75, 60, 45, 30, 20, 10, 5, 2, 1} {
 			dst, err := evaluate(t, c, scene, grid, coord.NewAltAz(angle.Deg(alt), angle.Deg(0)))
@@ -262,5 +262,4 @@ func TestModelTotalIsTheLinearSumOfComponents(t *testing.T) {
 				float64(grid.At(i)), total[i], sum[i])
 		}
 	}
-
 }

@@ -2,6 +2,7 @@ package skybrightness_test
 
 import (
 	"context"
+	"fmt"
 	"math"
 	"testing"
 	gotime "time"
@@ -118,9 +119,12 @@ func evaluate(
 	t.Helper()
 
 	dst := skybrightness.NewSpectralRadiance(grid)
-	_, err := c.AddRadiance(context.Background(), dst, grid, dir, scene)
 
-	return dst, err
+	if _, err := c.AddRadiance(context.Background(), dst, grid, dir, scene); err != nil {
+		return dst, fmt.Errorf("audit: AddRadiance: %w", err)
+	}
+
+	return dst, nil
 }
 
 // Nothing below the horizon may contribute. The ground is not the sky.
@@ -339,6 +343,7 @@ func TestComponentsRejectAnOversizedDestination(t *testing.T) {
 
 		func() {
 			defer func() { panicked = recover() }()
+
 			_, err = c.AddRadiance(context.Background(), oversized, grid, dir, scene)
 		}()
 
