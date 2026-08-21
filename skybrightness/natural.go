@@ -218,15 +218,8 @@ func (d *DiffuseGalacticLight) AddRadiance(
 		return UnknownCloud, nil
 	}
 
-	if d.sky == nil {
-		// Uncapped: the correlation is free to predict more scattered light
-		// than there is starlight to scatter, which is what the flag says.
-		flags, err := DiffuseGalacticRadiance(dst, grid, intensity)
-
-		return flags | ExtrapolatedModel, err
-	}
-
-	// Capped, so the spectrum is built aside and scaled before it is added.
+	// The spectrum is always built aside, because both the cap and the
+	// atmosphere scale it before it reaches dst.
 	scratch, ok := d.scratch.Get().(SpectralRadiance)
 	if !ok || len(scratch) != grid.Len() {
 		scratch = NewSpectralRadiance(grid)
@@ -240,11 +233,43 @@ func (d *DiffuseGalacticLight) AddRadiance(
 		return 0, err
 	}
 
-	scale, capFlags := d.capFactor(scratch, grid, icrs, galactic)
-	flags |= capFlags
+	scale := 1.0
+
+	if d.sky == nil {
+		// Uncapped: the correlation is free to predict more scattered light
+		// than there is starlight to scatter, which is what the flag says.
+		flags |= ExtrapolatedModel
+	} else {
+		capScale, capFlags := d.capFactor(scratch, grid, icrs, galactic)
+		scale, flags = capScale, flags|capFlags
+	}
+
+	// Diffuse galactic light reaches the top of the atmosphere and then has to
+	// cross it, exactly as integrated starlight does. An earlier revision
+	// added it to dst unattenuated, which made it too bright by 1/T - about
+	// 17 per cent at the zenith at sea level and more toward the horizon - and
+	// showed up as a DGL-to-starlight ratio of 0.41 against a cap of 0.35,
+	// since the cap is applied above the atmosphere and only starlight was
+	// then dimmed by it.
+	airmass, err := atmosphere.Airmass(dir.Alt())
+	if err != nil {
+		return 0, fmt.Errorf("skybrightness: diffuse galactic: airmass: %w", err)
+	}
+
+	pressure, _ := scene.Atmosphere.Surface()
+	aerosol := scene.Atmosphere.Aerosol()
 
 	for i := range dst {
-		dst[i] += scratch[i] * scale
+		lambda := grid.At(i)
+
+		rayleigh, err := atmosphere.RayleighOpticalDepth(lambda, float64(pressure))
+		if err != nil {
+			return 0, fmt.Errorf("skybrightness: diffuse galactic: %w", err)
+		}
+
+		slant := (rayleigh + unit.OpticalDepth(aerosol.TauAt(lambda))) * unit.OpticalDepth(airmass)
+
+		dst[i] += scratch[i] * scale * float64(atmosphere.Transmission(slant))
 	}
 
 	return flags, nil
@@ -266,8 +291,8 @@ func (d *DiffuseGalacticLight) Provenance() Provenance {
 				"against the printed 1e5; see docs/skybrightness.md section 17.",
 			"Kawara's coefficients stop at 648 nm, so the red half of the optical " +
 				"grid holds the endpoint values.",
-			"The DGL-to-starlight ratio cap of 0.35 that Masana et al. apply needs " +
-				"integrated starlight in the same direction and is not applied here.",
+			"Only the directly attenuated term is applied; light scattered out of " +
+				"the beam is not returned to it, matching IntegratedStarlight.",
 		},
 		ExpectedAccuracy: "The correlation's own scatter is large; Kawara et al. quote " +
 			"uncertainties of 10 to 50 per cent on the slope depending on band.",

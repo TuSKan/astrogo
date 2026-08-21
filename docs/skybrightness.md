@@ -1385,6 +1385,63 @@ by a factor of 1000, 4.25×10¹⁰ or 3.6×10⁻¹⁹. Measured live at Paranal 
 the band mean over 500-600 nm is 22.37 mag arcsec⁻², which is what dark-site zenith airglow
 is; a hand-worked example in the offline tests lands at 22.00 independently.
 
+### The end-to-end comparison, run
+
+`TestAgainstGAMBONS` builds all five natural components for the scene above — the published
+star map, dust from IRSA, Leinert zodiacal light, airglow from ESO SkyCalc at the same
+msolflux 100, and the extragalactic background — and evaluates the zenith in V:
+
+| | GAMBONS | astrogo | difference |
+| :--- | ---: | ---: | ---: |
+| with airglow | 21.13 | **21.66** | +0.53 |
+| airglow removed | 21.74 | **22.17** | +0.43 |
+| airglow's own contribution | +0.61 | **+0.51** | −0.10 |
+
+At the zenith rather than all-sky because diffuse galactic light is one IRSA request per
+direction: a whole sky would be tens of thousands of requests to answer what one direction
+already answers.
+
+The component breakdown, which is what makes the number diagnostic rather than a single
+verdict:
+
+| component | mag arcsec⁻² | share of flux |
+| :--- | ---: | ---: |
+| airglow | 22.73 | 37.4 % |
+| zodiacal | 23.05 | 27.8 % |
+| integrated starlight | 23.14 | 25.5 % |
+| diffuse galactic | 24.28 | 8.9 % |
+| extragalactic | 27.90 | 0.3 % |
+
+**What it found.** Diffuse galactic light was not being attenuated. Starlight and the
+extragalactic background both cross the atmosphere and are dimmed by it; DGL was added to
+the total as though it were emitted below. It showed up as a DGL-to-starlight ratio of
+0.409 against a cap of 0.35 — and 0.35/0.409 is 0.855, the zenith transmission exactly,
+because the cap is applied above the atmosphere and only starlight was then dimmed. With
+the attenuation applied the ratio is 0.349, at the cap where it belongs. The same pass
+found the component's provenance still claiming the 0.35 cap "is not applied here", which
+stopped being true when the dust provider landed.
+
+That is what an end-to-end comparison is for. Neither defect is visible from inside: the
+sky stayed positive, smooth and plausible, and every unit test passed throughout.
+
+**What the remaining 0.43 mag is, as far as it can be attributed.** Our sky is fainter, and
+the largest known reason is that every component here applies *direct attenuation only* —
+light scattered out of the beam is removed and light scattered into it is never returned,
+which is recorded as a known approximation on each of them. GAMBONS solves the transport.
+For an extended source that omission can only lose light, and it is bounded above by
+removing extinction altogether: 2.5·log₁₀(1/T) is about 0.17 mag at this zenith. The rest is
+spread across the zodiacal term, which is 28 per cent of the total and where two
+independent readings of Leinert's tables can easily differ by tenths, and the tophat used
+for Johnson V.
+
+Airglow agreeing to 0.10 mag is the strongest single line here: both models drive it from
+the same ESO spectrum, so it isolates the scaling and the geometry from the source data.
+
+Two independent six-term implementations of the same sky landing within half a magnitude,
+with the dominant term inside a tenth, is a real result. It is also not tight enough to
+call the absolute scale validated, and the gap has a named leading candidate rather than a
+shrug — which is the difference between a residual and an excuse.
+
 ## 17. Open scientific questions
 
 **Integrated starlight can be built from Gaia without the bulk download — tested.**

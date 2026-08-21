@@ -1,0 +1,342 @@
+//go:build validation
+
+package skybrightness_test
+
+import (
+	"context"
+	"math"
+	"testing"
+	gotime "time"
+
+	"github.com/TuSKan/astrogo/angle"
+	"github.com/TuSKan/astrogo/atmosphere"
+	"github.com/TuSKan/astrogo/coord"
+	eph "github.com/TuSKan/astrogo/ephemeris"
+	"github.com/TuSKan/astrogo/internal/testutil"
+	"github.com/TuSKan/astrogo/magnitude"
+	"github.com/TuSKan/astrogo/remote"
+	"github.com/TuSKan/astrogo/skybrightness"
+	"github.com/TuSKan/astrogo/skybrightness/dataset/airglow"
+	"github.com/TuSKan/astrogo/skybrightness/dataset/dust"
+	"github.com/TuSKan/astrogo/skybrightness/dataset/starlight"
+	astrotime "github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
+)
+
+// The GAMBONS scene, reproduced exactly. See docs/skybrightness.md §13.
+const (
+	gambonsLatDeg  = 41.38
+	gambonsLonDeg  = 2.11
+	gambonsElevM   = 0
+	gambonsAOD550  = 0.056
+	gambonsSolarSF = 100 // ESO_SkyCalc_100_10.dat is msolflux = 100
+
+	// Their published zenith figures, 0-5 degrees of zenith angle.
+	gambonsZenithWithAirglow = 21.13
+	gambonsZenithNoAirglow   = 21.74
+)
+
+// gambonsEpoch is 21 August 2026 01:16 GMT+2, which is what the run recorded.
+func gambonsEpoch() gotime.Time {
+	return gotime.Date(2026, 8, 20, 23, 16, 0, 0, gotime.UTC)
+}
+
+// johnsonVTophat approximates the Johnson V response.
+//
+// This module ships no V curve, and inventing a detailed one would be the thing
+// it refuses to do. A tophat over 500-600 nm is what the rest of this package's
+// tests use, and it is close to V's real 505-595 nm half-power span. It is an
+// approximation and it is the largest one in this comparison: the published map
+// is a V-band average and reading it against a slightly different band shifts
+// the answer by a few hundredths of a magnitude.
+func johnsonVTophat() magnitude.Passband {
+	return magnitude.Passband{
+		Name:         "Johnson V (tophat approximation)",
+		WavelengthNM: []unit.WavelengthNM{499, 500, 600, 601},
+		Response:     []float64{0, 1, 1, 0},
+		Detector:     magnitude.PhotonCounting,
+
+		// Bessell, Castelli & Plez (1998). It cross-checks against the
+		// 3.63e-11 W m^-2 nm^-1 the star map's own zero point uses: 3636 Jy
+		// at V's 545 nm effective wavelength is 3.67e-11 in those units, one
+		// per cent away, which is the difference between their effective
+		// wavelength and the 550 nm round number.
+		VegaZeroPointJy: 3636,
+
+		Reference: "tophat over V's half-power span, Vega zero point from " +
+			"Bessell, Castelli & Plez (1998); see this test's own caveat",
+	}
+}
+
+// solarLikeShape is the starlight spectral shape.
+//
+// Integrated starlight is the summed light of stars of every type, so no single
+// blackbody is right and the component makes the caller choose rather than
+// guessing. A 5500 K Planck function is the conventional stand-in and is what
+// the rest of this package's tests use. The component renormalises it so its
+// passband average is one, so the choice affects the spectrum's colour, not the
+// V-band value the map already fixes.
+func solarLikeShape(grid unit.SpectralGrid) skybrightness.SpectralRadiance {
+	shape := skybrightness.NewSpectralRadiance(grid)
+	for i := range shape {
+		lambda := float64(grid.At(i)) * 1e-9
+		shape[i] = 1 / (math.Pow(lambda, 5) * (math.Exp(0.0143877696/(lambda*5500)) - 1))
+	}
+
+	return shape
+}
+
+// The end-to-end comparison against GAMBONS.
+//
+// Every other check in this repository is either internal or checks one link.
+// This runs the whole chain — the published star map, dust from IRSA, zodiacal
+// light, airglow from ESO SkyCalc, the extragalactic background, and
+// atmospheric transport — against an independent model of the same sky, in the
+// same band, for the same site, epoch and atmosphere.
+//
+// It compares at the zenith rather than all-sky because diffuse galactic light
+// is fetched per direction from IRSA at one request each: a whole sky would be
+// tens of thousands of requests to a shared service to answer a question the
+// zenith already answers.
+//
+// The bound is deliberately loose. Two independent implementations of a
+// six-term radiative model agreeing to a few tenths of a magnitude is a
+// meaningful result; agreeing to a hundredth would mean one had been tuned to
+// the other. What this is built to catch is the class of error this module has
+// already shipped once — a factor, a sign, a unit — which lands whole
+// magnitudes away, not tenths.
+func TestAgainstGAMBONS(t *testing.T) {
+	testutil.RequireReachable(t, "irsa.ipac.caltech.edu:443")
+	testutil.RequireReachable(t, "etimecalret-002.eso.org:443")
+	testutil.RequireReachable(t, "github.com:443")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 15*gotime.Minute)
+	defer cancel()
+
+	remote.EnableDownloads(32<<20, remote.GaiaStarMap)
+
+	grid := skybrightness.DefaultOpticalGrid()
+	band := johnsonVTophat()
+
+	scene := gambonsScene(t)
+
+	// The published integrated-starlight map.
+	skyMap, err := starlight.Open(ctx)
+	if err != nil {
+		t.Skipf("could not fetch the published star map: %v", err)
+	}
+
+	stars, err := skyMap.Band("V")
+	if err != nil {
+		t.Fatalf("Band: %v", err)
+	}
+
+	isl, err := skybrightness.NewIntegratedStarlight(stars, solarLikeShape(grid), grid, band)
+	if err != nil {
+		t.Fatalf("NewIntegratedStarlight: %v", err)
+	}
+
+	// Diffuse galactic light needs the 100 micron intensity toward the zenith.
+	zenithGal := zenithGalactic(t, scene)
+
+	dustMap, err := dust.Fetch(ctx, nil, dust.Direction{L: zenithGal.L(), B: zenithGal.B()})
+	if err != nil {
+		t.Skipf("IRSA did not answer: %v", err)
+	}
+
+	dgl, err := skybrightness.NewDiffuseGalacticLight(dustMap, stars, band)
+	if err != nil {
+		t.Fatalf("NewDiffuseGalacticLight: %v", err)
+	}
+
+	// Airglow at the solar flux GAMBONS' own reference spectrum was built at.
+	glow, err := airglow.NewAirglow(ctx, airglow.Spec{
+		Observatory:  airglow.Paranal,
+		SolarFluxSFU: gambonsSolarSF,
+		MinNM:        float64(grid.At(0)) - 1,
+		MaxNM:        float64(grid.At(grid.Len()-1)) + 1,
+		StepNM:       0.1,
+	}, grid, 87_000)
+	if err != nil {
+		t.Skipf("SkyCalc did not answer: %v", err)
+	}
+
+	zodiacal := skybrightness.NewZodiacalLight()
+	egb := skybrightness.NewExtragalacticBackground()
+
+	// Two models: the whole natural sky, and the same without airglow, which
+	// is the pairing the GAMBONS runs provide.
+	withAirglow, err := skybrightness.NewModel("gambons-comparison", isl, dgl, zodiacal, glow, egb)
+	if err != nil {
+		t.Fatalf("NewModel: %v", err)
+	}
+
+	noAirglow, err := skybrightness.NewModel("gambons-comparison-no-airglow", isl, dgl, zodiacal, egb)
+	if err != nil {
+		t.Fatalf("NewModel: %v", err)
+	}
+
+	zenith := coord.NewAltAz(angle.Deg(89.9), angle.Deg(0))
+
+	got := map[string]float64{
+		"with airglow": bandMagnitude(t, ctx, withAirglow, scene, grid, band, zenith),
+		"no airglow":   bandMagnitude(t, ctx, noAirglow, scene, grid, band, zenith),
+	}
+
+	t.Logf("GAMBONS zenith: %.2f with airglow, %.2f without",
+		gambonsZenithWithAirglow, gambonsZenithNoAirglow)
+	t.Logf("astrogo zenith: %.2f with airglow, %.2f without",
+		got["with airglow"], got["no airglow"])
+
+	for _, c := range []struct {
+		name string
+		want float64
+	}{
+		{"with airglow", gambonsZenithWithAirglow},
+		{"no airglow", gambonsZenithNoAirglow},
+	} {
+		diff := got[c.name] - c.want
+		t.Logf("  %-13s astrogo %.2f vs GAMBONS %.2f, %+.2f mag", c.name, got[c.name], c.want, diff)
+
+		if math.Abs(diff) > 1.0 {
+			t.Errorf("%s: %.2f against GAMBONS' %.2f is %+.2f mag apart; two independent "+
+				"models of the same sky should not disagree by a factor of two and a half",
+				c.name, got[c.name], c.want, diff)
+		}
+	}
+
+	// Where our total comes from, so a disagreement is attributable to a
+	// component rather than left as one number.
+	est, err := withAirglow.Estimate(ctx,
+		skybrightness.Query{Scene: scene, Direction: zenith, Grid: grid})
+	if err != nil {
+		t.Fatalf("Estimate for the breakdown: %v", err)
+	}
+
+	totalFlux := bandFlux(t, est.SpectralRadiance(), grid, band)
+
+	t.Log("component breakdown at the zenith:")
+
+	for _, id := range est.ComponentIDs() {
+		spectrum, ok := est.Component(id)
+		if !ok {
+			continue
+		}
+
+		flux := bandFlux(t, spectrum, grid, band)
+		if flux <= 0 {
+			t.Logf("  %-18s (no contribution)", id)
+
+			continue
+		}
+
+		mag, err := magnitude.SurfaceBrightness(spectrum, grid, band, magnitude.Vega, 0.5)
+		if err != nil {
+			t.Fatalf("SurfaceBrightness(%s): %v", id, err)
+		}
+
+		t.Logf("  %-18s %6.2f mag arcsec^-2  %5.1f%% of the total", id, mag, 100*flux/totalFlux)
+	}
+
+	// The airglow term itself, which both models isolate the same way.
+	ourAirglow := got["no airglow"] - got["with airglow"]
+	theirAirglow := gambonsZenithNoAirglow - gambonsZenithWithAirglow
+
+	t.Logf("airglow contributes %+.2f mag here against GAMBONS' %+.2f", ourAirglow, theirAirglow)
+
+	if math.Abs(ourAirglow-theirAirglow) > 0.6 {
+		t.Errorf("airglow moves the zenith by %.2f mag here and %.2f in GAMBONS; "+
+			"both drive it from the same ESO spectrum, so this is the scaling",
+			ourAirglow, theirAirglow)
+	}
+}
+
+// gambonsScene builds the scene the GAMBONS run used.
+func gambonsScene(t *testing.T) *skybrightness.Scene {
+	t.Helper()
+
+	loc, err := coord.NewGeodetic(angle.Deg(gambonsLonDeg), angle.Deg(gambonsLatDeg), gambonsElevM)
+	if err != nil {
+		t.Fatalf("NewGeodetic: %v", err)
+	}
+
+	// Sea-level pressure and a late-summer surface temperature. GAMBONS took
+	// relative humidity and a "Continental Clean" aerosol type; the Angstrom
+	// exponent, single-scattering albedo and asymmetry below are that type's
+	// conventional values rather than numbers GAMBONS published, which is an
+	// approximation this comparison carries.
+	atm, err := atmosphere.NewBuilder().
+		Surface(1013, 293).
+		Aerosol(gambonsAOD550, 550, 1.3, 0.95, 0.65).
+		BoundaryLayer(1000).
+		Build()
+	if err != nil {
+		t.Fatalf("atmosphere Build: %v", err)
+	}
+
+	return &skybrightness.Scene{
+		Observer:   loc,
+		Time:       gambonsEpoch(),
+		Atmosphere: atm,
+		Ephemeris:  eph.Default(),
+	}
+}
+
+// zenithGalactic returns the galactic coordinates the zenith points at.
+func zenithGalactic(t *testing.T, scene *skybrightness.Scene) coord.Galactic {
+	t.Helper()
+
+	cc := coord.NewContext(astrotime.FromGo(scene.Time), scene.Observer,
+		scene.Atmosphere.Refraction())
+
+	icrs, err := cc.AltAzToICRS(coord.NewAltAz(angle.Deg(89.9), angle.Deg(0)))
+	if err != nil {
+		t.Fatalf("AltAzToICRS: %v", err)
+	}
+
+	return coord.ICRSToGalactic(icrs)
+}
+
+// bandMagnitude evaluates a model and projects it to a V surface brightness.
+func bandMagnitude(
+	t *testing.T,
+	ctx context.Context,
+	model *skybrightness.Model,
+	scene *skybrightness.Scene,
+	grid unit.SpectralGrid,
+	band magnitude.Passband,
+	dir coord.AltAz,
+) float64 {
+	t.Helper()
+
+	est, err := model.Estimate(ctx, skybrightness.Query{Scene: scene, Direction: dir, Grid: grid})
+	if err != nil {
+		t.Fatalf("Estimate: %v", err)
+	}
+
+	mag, err := est.SurfaceBrightness(band, magnitude.Vega)
+	if err != nil {
+		t.Fatalf("SurfaceBrightness: %v", err)
+	}
+
+	return mag
+}
+
+// bandFlux is the passband-averaged radiance, which is what shares are taken
+// over. Magnitudes are logarithmic and must never be summed or differenced for
+// this purpose.
+func bandFlux(
+	t *testing.T,
+	spectrum skybrightness.SpectralRadiance,
+	grid unit.SpectralGrid,
+	band magnitude.Passband,
+) float64 {
+	t.Helper()
+
+	mean, err := magnitude.MeanFluxDensity(spectrum, grid, band, 0.5)
+	if err != nil {
+		t.Fatalf("MeanFluxDensity: %v", err)
+	}
+
+	return mean
+}
