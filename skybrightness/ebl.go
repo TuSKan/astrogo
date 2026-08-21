@@ -118,6 +118,11 @@ func (e *ExtragalacticBackground) AddRadiance(
 	dir coord.AltAz,
 	scene *Scene,
 ) (Flag, error) {
+	if len(dst) != grid.Len() {
+		return 0, fmt.Errorf("%w: %d destination slots, grid has %d",
+			unit.ErrGridMismatch, len(dst), grid.Len())
+	}
+
 	if dir.Alt() <= 0 {
 		return 0, nil
 	}

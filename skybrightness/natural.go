@@ -199,6 +199,11 @@ func (d *DiffuseGalacticLight) AddRadiance(
 		return 0, nil
 	}
 
+	if len(dst) != grid.Len() {
+		return 0, fmt.Errorf("%w: %d destination slots, grid has %d",
+			unit.ErrGridMismatch, len(dst), grid.Len())
+	}
+
 	frame, err := d.frame.get(scene)
 	if err != nil {
 		return 0, err
@@ -376,6 +381,11 @@ func (z *ZodiacalLight) AddRadiance(
 ) (Flag, error) {
 	if dir.Alt() <= 0 {
 		return 0, nil
+	}
+
+	if len(dst) != grid.Len() {
+		return 0, fmt.Errorf("%w: %d destination slots, grid has %d",
+			unit.ErrGridMismatch, len(dst), grid.Len())
 	}
 
 	frame, err := z.frame.get(scene)
@@ -702,6 +712,11 @@ func (s *IntegratedStarlight) AddRadiance(
 ) (Flag, error) {
 	if dir.Alt() <= 0 {
 		return 0, nil
+	}
+
+	if len(dst) != grid.Len() {
+		return 0, fmt.Errorf("%w: %d destination slots, grid has %d",
+			unit.ErrGridMismatch, len(dst), grid.Len())
 	}
 
 	if !s.grid.Equal(grid) {
