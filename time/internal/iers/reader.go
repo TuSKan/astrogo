@@ -64,10 +64,43 @@ func ParseFinals2000A(r io.Reader) (*Table, error) {
 		dut1Str := strings.TrimSpace(line[58:68])
 		lodStr := strings.TrimSpace(line[79:86])
 
-		x, _ := strconv.ParseFloat(xStr, 64)
-		y, _ := strconv.ParseFloat(yStr, 64)
-		dut1, _ := strconv.ParseFloat(dut1Str, 64)
-		lod, _ := strconv.ParseFloat(lodStr, 64)
+		// Polar motion and UT1-UTC are what make a row an orientation. A row
+		// that has an MJD and none of them is the bulletin running out, not an
+		// epoch at which the pole is centred and UT1 equals UTC.
+		//
+		// finals2000A is padded to full width for its whole length, so those
+		// rows are not short and the length check above does not reach them.
+		// Parsing them with the error discarded stored fifty records of
+		// exactly zero at the end of the current file - fifty days over which
+		// Coverage claimed data it did not have, EOP answered instead of
+		// returning ErrOutOfRange, the one-time "EOP unavailable" warning
+		// therefore never fired, and the last real day was interpolated into a
+		// fabricated zero. A DUT1 of zero asserts UT1 = UTC, which is wrong by
+		// up to 0.9 seconds: thirteen and a half arcseconds of Earth rotation,
+		// applied silently to every topocentric position in the window.
+		x, err := strconv.ParseFloat(xStr, 64)
+		if err != nil {
+			continue
+		}
+
+		y, err := strconv.ParseFloat(yStr, 64)
+		if err != nil {
+			continue
+		}
+
+		dut1, err := strconv.ParseFloat(dut1Str, 64)
+		if err != nil {
+			continue
+		}
+
+		// Length of day is genuinely optional. It is absent from far more rows
+		// than the others - hundreds rather than tens in the current file - it
+		// is a rate rather than an offset, and zero is its own physical
+		// default: no excess over 86400 seconds.
+		lod, err := strconv.ParseFloat(lodStr, 64)
+		if err != nil {
+			lod = 0
+		}
 
 		records = append(records, Record{
 			MJD:  mjd,

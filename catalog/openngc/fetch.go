@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"sort"
 	"strconv"
 	"strings"
@@ -307,16 +308,52 @@ func gatherAliases(id, mID, commonNames, identifiers string) []string {
 	return aliases
 }
 
-func parseRA(s string) (float64, error) {
-	// HH:MM:SS.SS
+// sexagesimal splits an H:M:S or D:M:S string into three numbers.
+//
+// Each part's parse error is returned rather than discarded. Discarding them
+// made these two functions unable to fail on anything but the wrong number of
+// colons: "XX:30:00" parsed its hours as zero and returned a right ascension
+// of 7.5 degrees with a nil error, so the caller's own "skip this row" branch
+// never ran and a malformed row became a target with a confident wrong
+// position instead of being dropped.
+//
+// The ranges are checked for the same reason. A catalogue row is not repaired
+// by reading 99 minutes as an hour and change; there is no way to know what it
+// was meant to say, and the honest result is that the row has no position.
+func sexagesimal(s string, sentinel error, maxFirst float64) (first, minutes, seconds float64, err error) {
 	parts := strings.Split(s, ":")
 	if len(parts) != 3 {
-		return 0, errInvalidRA
+		return 0, 0, 0, sentinel
 	}
 
-	h, _ := strconv.ParseFloat(parts[0], 64)
-	m, _ := strconv.ParseFloat(parts[1], 64)
-	sVal, _ := strconv.ParseFloat(parts[2], 64)
+	if first, err = strconv.ParseFloat(strings.TrimSpace(parts[0]), 64); err != nil {
+		return 0, 0, 0, fmt.Errorf("%w: %q", sentinel, s)
+	}
+
+	if minutes, err = strconv.ParseFloat(strings.TrimSpace(parts[1]), 64); err != nil {
+		return 0, 0, 0, fmt.Errorf("%w: %q", sentinel, s)
+	}
+
+	if seconds, err = strconv.ParseFloat(strings.TrimSpace(parts[2]), 64); err != nil {
+		return 0, 0, 0, fmt.Errorf("%w: %q", sentinel, s)
+	}
+
+	if first < 0 || first > maxFirst ||
+		minutes < 0 || minutes >= 60 ||
+		seconds < 0 || seconds >= 60 ||
+		math.IsNaN(first) || math.IsNaN(minutes) || math.IsNaN(seconds) {
+		return 0, 0, 0, fmt.Errorf("%w: %q", sentinel, s)
+	}
+
+	return first, minutes, seconds, nil
+}
+
+func parseRA(s string) (float64, error) {
+	// HH:MM:SS.SS
+	h, m, sVal, err := sexagesimal(s, errInvalidRA, 24)
+	if err != nil {
+		return 0, err
+	}
 
 	return h*15 + m/4 + sVal/240, nil
 }
@@ -324,21 +361,19 @@ func parseRA(s string) (float64, error) {
 func parseDec(s string) (float64, error) {
 	// +DD:MM:SS.S
 	sign := 1.0
-	if strings.HasPrefix(s, "-") {
+
+	switch {
+	case strings.HasPrefix(s, "-"):
 		sign = -1.0
 		s = s[1:]
-	} else if strings.HasPrefix(s, "+") {
+	case strings.HasPrefix(s, "+"):
 		s = s[1:]
 	}
 
-	parts := strings.Split(s, ":")
-	if len(parts) != 3 {
-		return 0, errInvalidDec
+	d, m, sVal, err := sexagesimal(s, errInvalidDec, 90)
+	if err != nil {
+		return 0, err
 	}
-
-	d, _ := strconv.ParseFloat(parts[0], 64)
-	m, _ := strconv.ParseFloat(parts[1], 64)
-	sVal, _ := strconv.ParseFloat(parts[2], 64)
 
 	return sign * (d + m/60 + sVal/3600), nil
 }
