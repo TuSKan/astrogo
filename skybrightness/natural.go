@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
 	"sync"
 	"time"
 
@@ -33,6 +34,9 @@ type sceneFrame struct {
 	observer *coord.Geodetic
 	at       time.Time
 
+	// refraction is part of the cache key, because ctx was built with it.
+	refraction atmosphere.Refraction
+
 	ctx *coord.Context
 
 	// sunEcliptic is the Sun's apparent ecliptic position; sunDistanceAU is
@@ -43,7 +47,43 @@ type sceneFrame struct {
 
 // matches reports whether this frame was built for the given scene.
 func (f *sceneFrame) matches(scene *Scene) bool {
-	return f != nil && f.at.Equal(scene.Time) && f.observer == scene.Observer
+	if f == nil || !f.at.Equal(scene.Time) || f.observer != scene.Observer {
+		return false
+	}
+
+	// The refraction belongs in the key because the cached transform context
+	// was built with it: Context.AltAzToICRS feeds the pressure, temperature,
+	// humidity and wavelength straight into Atoc13. Two scenes at the same
+	// epoch and site with different surface conditions used to share one
+	// context, and the second silently reused the first one's refraction —
+	// worth tens of arcminutes near the horizon, which is more than an order-8
+	// pixel, so the sky was read from the wrong place.
+	//
+	// The observer is compared by pointer because coord.NewGeodetic returns
+	// one, which is also why the stale frame only appears when a caller reuses
+	// a site across scenes. That is the ordinary way to model one observatory
+	// under changing weather.
+	return sameRefraction(f.refraction, scene.Atmosphere.Refraction())
+}
+
+// sameRefraction reports whether two refraction settings would build the same
+// transform context.
+//
+// The model is compared by type rather than by value. Every model this package
+// ships is a stateless empty struct, so type identity is the right equivalence,
+// and comparing the interface directly would panic for a caller whose own model
+// happens to be a non-comparable type.
+func sameRefraction(a, b atmosphere.Refraction) bool {
+	if a.Pressure != b.Pressure || a.Temperature != b.Temperature ||
+		a.Humidity != b.Humidity || a.Wavelength != b.Wavelength {
+		return false
+	}
+
+	if a.Model == nil || b.Model == nil {
+		return a.Model == nil && b.Model == nil
+	}
+
+	return reflect.TypeOf(a.Model) == reflect.TypeOf(b.Model)
 }
 
 // newSceneFrame resolves a scene's transform context and Sun position.
@@ -58,9 +98,10 @@ func newSceneFrame(scene *Scene, needSun bool) (*sceneFrame, error) {
 	at := astrotime.FromGo(scene.Time)
 
 	frame := &sceneFrame{
-		observer: scene.Observer,
-		at:       scene.Time,
-		ctx:      coord.NewContext(at, scene.Observer, scene.Atmosphere.Refraction()),
+		observer:   scene.Observer,
+		at:         scene.Time,
+		refraction: scene.Atmosphere.Refraction(),
+		ctx:        coord.NewContext(at, scene.Observer, scene.Atmosphere.Refraction()),
 	}
 
 	if !needSun {
