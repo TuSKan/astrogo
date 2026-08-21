@@ -143,8 +143,10 @@ const (
 //
 //	M(h) = 2.0016 / (sin h + sqrt(sin^2 h + 0.003147))
 //
-// It gives 1.0008 at the zenith and 35.7 at the horizon, where a
-// plane-parallel sec(z) diverges.
+// It gives 1.0000139 at the zenith and 35.68 at the horizon, where a
+// plane-parallel sec(z) diverges. The scale that would make the zenith
+// exactly one is 2.001572, so the published 2.0016 is that value rounded and
+// the 1.4e-5 excess is the rounding rather than a property of the fit.
 //
 // This exists alongside [Airmass], which is Pickering (2002), because the
 // artificial-skyglow model is calibrated against *this* formula: its
