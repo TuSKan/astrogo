@@ -25,6 +25,9 @@ func plusHours(h float64) astrotime.Time {
 	return solverEpoch().Add(astrotime.Duration(h * float64(astrotime.Hour)))
 }
 
+// errEvaluator stands in for whatever an ephemeris lookup can fail with.
+var errEvaluator = errors.New("evaluator failed")
+
 // A bracket must be verified by the sign of the two endpoints, not by their
 // product.
 //
@@ -126,13 +129,11 @@ func TestFindRootPropagatesFailure(t *testing.T) {
 
 	solver := plan.DefaultSolver()
 
-	failure := errors.New("evaluator failed")
-
 	// Failing at the very first evaluation.
 	_, _, err := solver.FindRoot(
-		func(astrotime.Time) (float64, error) { return 0, failure },
+		func(astrotime.Time) (float64, error) { return 0, errEvaluator },
 		solverEpoch(), plusHours(6))
-	if !errors.Is(err, failure) {
+	if !errors.Is(err, errEvaluator) {
 		t.Errorf("a failing evaluator gave err = %v, want the evaluator's own error", err)
 	}
 

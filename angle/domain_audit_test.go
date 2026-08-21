@@ -20,8 +20,12 @@ func TestWrapRangesAreRespected(t *testing.T) {
 
 	const twoPi = 2 * math.Pi
 
+	// math.Copysign, not the literal -0.0: Go parses that as positive zero,
+	// so writing it would have quietly tested the same case twice.
+	negativeZero := math.Copysign(0, -1)
+
 	inputs := []float64{
-		0, -0.0,
+		0, negativeZero,
 		math.SmallestNonzeroFloat64, -math.SmallestNonzeroFloat64,
 		1e-300, -1e-300, 1e-18, -1e-18, 1e-16, -1e-16,
 		-4.4e-16, -4.5e-16, // either side of half an ULP of 2*pi
@@ -85,7 +89,7 @@ func TestSexagesimalFormattingIsWellFormed(t *testing.T) {
 	t.Parallel()
 
 	values := []float64{
-		0, -0.0, 1e-9, -1e-9, 0.5 / 3600, -0.5 / 3600,
+		0, math.Copysign(0, -1), 1e-9, -1e-9, 0.5 / 3600, -0.5 / 3600,
 		1.0 / 3600, -1.0 / 3600, 59.999 / 3600, -59.999 / 3600,
 		1, -1, 9.9999999, -9.9999999, 59.9999999 / 60, 89.9999999, -89.9999999,
 		90, -90, 179.9999999, 180, -180, 359.9999999, 360,

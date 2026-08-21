@@ -26,7 +26,11 @@ func win(fromHours, toHours float64) plan.Window {
 
 // randomSet builds a set of windows with a deterministic generator, so a
 // failure is reproducible from the seed printed with it.
-func randomSet(r *rand.Rand, n int, span float64) []plan.Window {
+func randomSet(r *rand.Rand, n int) []plan.Window {
+	// Two days, so a generated set spans several windows with plenty of
+	// overlap between them.
+	const span = 48.0
+
 	out := make([]plan.Window, 0, n)
 
 	for range n {
@@ -56,7 +60,7 @@ func TestUnionNormalizes(t *testing.T) {
 	r := rand.New(rand.NewPCG(1, 2))
 
 	for trial := range 500 {
-		in := randomSet(r, 1+r.IntN(8), 48)
+		in := randomSet(r, 1+r.IntN(8))
 		got := plan.Union(in)
 
 		for i := 1; i < len(got); i++ {
@@ -98,8 +102,8 @@ func TestIntersectLaws(t *testing.T) {
 	r := rand.New(rand.NewPCG(3, 4))
 
 	for trial := range 500 {
-		a := randomSet(r, 1+r.IntN(6), 48)
-		b := randomSet(r, 1+r.IntN(6), 48)
+		a := randomSet(r, 1+r.IntN(6))
+		b := randomSet(r, 1+r.IntN(6))
 
 		ab := plan.Intersect(a, b)
 		ba := plan.Intersect(b, a)
@@ -140,8 +144,8 @@ func TestSubtractConservesTime(t *testing.T) {
 	r := rand.New(rand.NewPCG(5, 6))
 
 	for trial := range 500 {
-		a := randomSet(r, 1+r.IntN(6), 48)
-		b := randomSet(r, 1+r.IntN(6), 48)
+		a := randomSet(r, 1+r.IntN(6))
+		b := randomSet(r, 1+r.IntN(6))
 
 		rest := plan.Subtract(a, b)
 		common := plan.Intersect(a, b)
