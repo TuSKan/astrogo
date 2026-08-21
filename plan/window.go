@@ -109,7 +109,14 @@ func Intersect(a, b []Window) []Window {
 
 	i, j := 0, 0
 	for i < len(ua) && j < len(ub) {
-		if iw, ok := ua[i].Intersect(ub[j]); ok {
+		// The pairwise Intersect reports a shared boundary as an overlap of
+		// zero duration, which is the right answer for two windows but the
+		// wrong one for two window sets: a set intersection is consumed as
+		// observing time, and a caller reading len(Intersect(a, b)) > 0 as
+		// "these sets share time" would be told yes for an instant that
+		// cannot be observed in. Windows that only touch contribute nothing
+		// here.
+		if iw, ok := ua[i].Intersect(ub[j]); ok && iw.Duration() > 0 {
 			out = append(out, iw)
 		}
 
@@ -161,7 +168,12 @@ func Subtract(a, b []Window) []Window {
 // sits strictly inside w, splitting it in half).
 func subtractOne(w, wb Window) []Window {
 	iw, ok := w.Intersect(wb)
-	if !ok {
+	if !ok || iw.Duration() <= 0 {
+		// A zero-duration overlap removes no time, so it must leave w whole.
+		// Without this an instant falling strictly inside w splits it in two:
+		// the total duration still balances, but the caller is handed two
+		// observing sessions where there is one, and will plan a slew and a
+		// re-acquisition across a gap of no length.
 		return []Window{w}
 	}
 
