@@ -120,6 +120,73 @@ func TestGalacticAnchors(t *testing.T) {
 	}
 }
 
+// The ecliptic pair needs its own anchors, for the same reason the galactic
+// pair does: two mutually inverse transforms can both be wrong, and a round
+// trip closes either way.
+//
+// It is not hypothetical here. The gofaext wrappers these go through had their
+// two directions documented backwards - iauEceq06 is ecliptic to equatorial
+// and iauEqec06 is equatorial to ecliptic, and the comments and parameter
+// names said the reverse. coord called them correctly, having evidently been
+// written against SOFA rather than against the wrapper, but nothing in the
+// tests would have noticed if it had not: every argument is a float64 in
+// radians, so a longitude and a right ascension are indistinguishable to the
+// compiler, and the round trip above passes under a consistent swap.
+func TestEclipticAnchors(t *testing.T) {
+	t.Parallel()
+
+	// J2000, where the equinox and solstice points are at their defining
+	// positions and the obliquity is 23.4393 degrees.
+	at := astrotime.FromGo(gotime.Date(2000, 1, 1, 12, 0, 0, 0, gotime.UTC))
+
+	const obliquity = 23.4393
+
+	for _, c := range []struct {
+		name             string
+		ra, dec          float64
+		wantLon, wantLat float64
+	}{
+		// The four cardinal points of the ecliptic, which is where the two
+		// frames are related by the obliquity alone.
+		{"vernal equinox", 0, 0, 0, 0},
+		{"summer solstice point", 90, obliquity, 90, 0},
+		{"autumnal equinox", 180, 0, 180, 0},
+		{"winter solstice point", 270, -obliquity, 270, 0},
+	} {
+		ecl := coord.ICRSToEcliptic(coord.NewICRS(angle.Deg(c.ra), angle.Deg(c.dec)), at)
+
+		if sep := separation(ecl.Lon(), ecl.Lat(), angle.Deg(c.wantLon), angle.Deg(c.wantLat)); sep > 0.01 {
+			t.Errorf("%s: ICRS (%.1f, %+.4f) gave ecliptic (%.4f, %+.4f), %.4f degrees from (%.1f, %+.1f)",
+				c.name, c.ra, c.dec, ecl.Lon().Degrees(), ecl.Lat().Degrees(), sep, c.wantLon, c.wantLat)
+		}
+	}
+
+	// The north ecliptic pole sits at right ascension 18h and a declination of
+	// ninety degrees less the obliquity. Its longitude is undefined, so the two
+	// are compared as directions.
+	pole := coord.EclipticToICRS(coord.NewEcliptic(angle.Deg(0), angle.Deg(90)), at)
+
+	if sep := separation(pole.RA(), pole.Dec(), angle.Deg(270), angle.Deg(90-obliquity)); sep > 0.01 {
+		t.Errorf("the north ecliptic pole came back at ICRS (%.4f, %+.4f), %.4f degrees from (270, %+.4f)",
+			pole.RA().Degrees(), pole.Dec().Degrees(), sep, 90-obliquity)
+	}
+
+	// And the direction of the tilt, which is the part a swap would invert: a
+	// point on the equator a quarter turn from the equinox is north of the
+	// ecliptic, not south.
+	north := coord.ICRSToEcliptic(coord.NewICRS(angle.Deg(90), angle.Deg(0)), at)
+	if north.Lat().Degrees() >= 0 {
+		t.Errorf("ICRS (90, 0) is %+.4f degrees from the ecliptic; it lies south of it",
+			north.Lat().Degrees())
+	}
+
+	south := coord.ICRSToEcliptic(coord.NewICRS(angle.Deg(270), angle.Deg(0)), at)
+	if south.Lat().Degrees() <= 0 {
+		t.Errorf("ICRS (270, 0) is %+.4f degrees from the ecliptic; it lies north of it",
+			south.Lat().Degrees())
+	}
+}
+
 // Horizontal and equatorial must invert, which exercises the whole astrometric
 // reduction rather than a rotation matrix.
 //

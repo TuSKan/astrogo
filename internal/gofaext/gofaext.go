@@ -73,9 +73,11 @@ func Atci13(
 	return ri, di, eo
 }
 
-// Atio13 performs the full observed → ICRS transformation including
-// refraction, diurnal aberration, and Earth rotation.
-// Atio13 performs the CIRS → observed transformation.
+// Atio13 performs the CIRS → observed transformation, applying refraction,
+// diurnal aberration and Earth rotation.
+//
+// Observed → ICRS is [Atoc13], not this: an earlier version of this comment
+// claimed both directions in consecutive sentences.
 func Atio13(
 	ri, di float64, // CIRS RA, Dec (radians)
 	utc1, utc2, dut1 float64,
@@ -129,16 +131,24 @@ func G2icrs(gl, gb float64) (ra, dec float64) {
 	return ra, dec
 }
 
-// Eceq06 converts ICRS to Ecliptic coordinates (IAU 2006).
-func Eceq06(date1, date2, ra, dec float64) (elon, elat float64) {
-	gofa.Eceq06(date1, date2, ra, dec, &elon, &elat)
-	return elon, elat
+// Eceq06 converts Ecliptic to ICRS equatorial coordinates (IAU 2006).
+//
+// The direction is the one SOFA's name states - ecliptic to equatorial - and
+// not the reverse. This comment and the parameter names said the reverse until
+// they were checked against iauEceq06 itself. Every argument here is a
+// float64 in radians, so nothing but the names distinguishes a longitude from
+// a right ascension, and a caller reading the wrapper rather than SOFA would
+// have called this pair backwards with no complaint from anything.
+func Eceq06(date1, date2, elon, elat float64) (ra, dec float64) {
+	gofa.Eceq06(date1, date2, elon, elat, &ra, &dec)
+	return ra, dec
 }
 
-// Eqec06 converts Ecliptic to ICRS coordinates (IAU 2006).
-func Eqec06(date1, date2, elon, elat float64) (ra, dec float64) {
-	gofa.Eqec06(date1, date2, elon, elat, &ra, &dec)
-	return ra, dec
+// Eqec06 converts ICRS equatorial to Ecliptic coordinates (IAU 2006). See
+// [Eceq06] on the direction of the pair.
+func Eqec06(date1, date2, ra, dec float64) (elon, elat float64) {
+	gofa.Eqec06(date1, date2, ra, dec, &elon, &elat)
+	return elon, elat
 }
 
 // Atic13 converts CIRS to ICRS coordinates.
