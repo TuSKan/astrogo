@@ -68,7 +68,30 @@ func (h HEALPix) PixelArea() float64 { return 4 * math.Pi / float64(h.NumPixels(
 // galactic, equatorial or horizontal. The pixelation itself is
 // frame-agnostic; keeping the frames straight is the caller's job, and
 // getting it wrong rotates the entire Milky Way across the sky.
+//
+// Latitude must lie in [-90, 90]. Outside that, and for a latitude or
+// longitude that is not a number, the result is -1, which is not a pixel
+// index; callers already test the returned index against the map's length,
+// and a negative index fails that test.
+//
+// The guard is not pedantry. The index comes from sin(latitude), and sine
+// folds: 120 degrees has the same sine as 60, so an out-of-domain latitude
+// used to return the pixel at 60 degrees on the *same* longitude — while the
+// direction "120 degrees of latitude" actually means 60 degrees at the
+// longitude 180 away. The answer was a real direction, plausible in every
+// downstream check, and not the one asked for.
 func (h HEALPix) PixelOf(lon, lat angle.Angle) int64 {
+	const outsideTheSphere = -1
+
+	degrees := lat.Degrees()
+	if math.IsNaN(degrees) || math.Abs(degrees) > 90 {
+		return outsideTheSphere
+	}
+
+	if math.IsNaN(lon.Radians()) {
+		return outsideTheSphere
+	}
+
 	z := math.Sin(lat.Radians())
 	za := math.Abs(z)
 
