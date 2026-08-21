@@ -178,11 +178,19 @@ func (a Angle) DMSString(precision int) string {
 	degVal := a.Degrees()
 	if degVal < 0 {
 		b.WriteByte('-')
-
-		degVal = -degVal
 	} else {
 		b.WriteByte('+')
 	}
+
+	// math.Abs rather than the negation the sign branch would otherwise do,
+	// because negative zero takes neither branch as written: -0.0 < 0 is
+	// false, so it kept its sign bit into the seconds, and FormatFloat spelt
+	// that back out mid-string as "+00 deg 00' 0-0.0"" - a malformed
+	// coordinate rather than a wrong one. Negative zero is not exotic here: an
+	// angle negated, scaled by a negative, or passed through math.Asin all
+	// produce it, and it compares equal to zero everywhere except in the sign
+	// bit that printing reveals.
+	degVal = math.Abs(degVal)
 
 	d := int64(degVal)
 	rem := (degVal - float64(d)) * 60
@@ -254,7 +262,11 @@ func (a Angle) DMSString(precision int) string {
 func (a Angle) HMSString(precision int) string {
 	var b strings.Builder
 
-	hVal := a.Wrap2Pi().Hours()
+	// Absolute value for the same reason DMSString takes one: Wrap2Pi carries
+	// a negative zero through unchanged - it is in [0, 2pi) by every
+	// comparison - and the sign bit would then surface inside the seconds
+	// field as "00h00m0-0.0s".
+	hVal := math.Abs(a.Wrap2Pi().Hours())
 
 	h := int64(hVal)
 	rem := (hVal - float64(h)) * 60
