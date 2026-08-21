@@ -20,6 +20,10 @@ var (
 	// A single sample has no interval and cannot be integrated over.
 	ErrGridLength = errors.New("unit: spectral grid needs at least 2 samples")
 
+	// ErrSourceNotIncreasing is returned when a curve handed to Resample is
+	// not sampled in strictly increasing wavelength order.
+	ErrSourceNotIncreasing = errors.New("unit: source wavelengths must be strictly increasing")
+
 	// ErrGridMismatch is returned when an operation receives a value slice
 	// whose length does not match the grid it is supposed to lie on.
 	ErrGridMismatch = errors.New("unit: value count does not match spectral grid")
@@ -143,10 +147,20 @@ func (g SpectralGrid) Integrate(values []float64) (float64, error) {
 // are set to fill, which callers use to declare whether an out-of-range
 // response is zero (a filter with no transmission there) or something else.
 //
-// src must be strictly increasing. Linear interpolation is chosen because
-// response curves are tabulated densely relative to their own structure;
-// a spline would introduce ringing and can produce negative response
-// between positive samples, which is unphysical for a throughput.
+// src must be strictly increasing, and Resample returns
+// ErrSourceNotIncreasing rather than interpolating if it is not. The
+// interpolation walks a cursor forward on the assumption of that order, so
+// out-of-order input does not fail loudly: a curve tabulated from the red end
+// down resamples to all zeros, and a single transposed pair in an otherwise
+// sorted table resamples to a curve that is positive, smooth, plausible and
+// wrong by a factor of five at the peak. A throughput is not the kind of
+// quantity where a wrong answer announces itself downstream, so the order is
+// checked here, at the one point that can still tell.
+//
+// Linear interpolation is chosen because response curves are tabulated densely
+// relative to their own structure; a spline would introduce ringing and can
+// produce negative response between positive samples, which is unphysical for
+// a throughput.
 func (g SpectralGrid) Resample(dst []float64, src []WavelengthNM, values []float64, fill float64) error {
 	switch {
 	case len(dst) != g.N:
@@ -159,6 +173,14 @@ func (g SpectralGrid) Resample(dst []float64, src []WavelengthNM, values []float
 		}
 
 		return nil
+	}
+
+	// One pass, the same order as the resample itself.
+	for i := 1; i < len(src); i++ {
+		if src[i] <= src[i-1] {
+			return fmt.Errorf("%w: src[%d] = %g does not exceed src[%d] = %g",
+				ErrSourceNotIncreasing, i, float64(src[i]), i-1, float64(src[i-1]))
+		}
 	}
 
 	j := 0

@@ -108,6 +108,17 @@ func (a Angle) Wrap2Pi() Angle {
 	v := math.Mod(float64(a), twoPi)
 	if v < 0 {
 		v += twoPi
+
+		// The range above is half-open, and adding 2*pi to a very small
+		// negative value lands on exactly 2*pi rather than just below it:
+		// anything under half an ULP of 2*pi, about 4.4e-16 radians, has no
+		// representable sum other than 2*pi itself. So Deg(-1e-14).Wrap360()
+		// returned 360 degrees, which is the one value this is documented not
+		// to return, and it arises from something as ordinary as differencing
+		// two nearly equal longitudes.
+		if v >= twoPi {
+			v = 0
+		}
 	}
 
 	return Angle(v)
