@@ -1305,7 +1305,7 @@ own literature and its own dataset:
 | :--- | :--- |
 | Integrated starlight | GAMBONS' equations, plus precomputed all-sky Gaia DR3 tiles. `catalog/gaia` does cone searches; an all-sky integral needs a different, prepared product. |
 | Diffuse galactic light | Its own scattering model over a dust map. |
-| Extragalactic background | **Decided, values not yet verified.** Koushan et al. (2021), MNRAS 503, 2033 (GAMA/DEVILS): integrated galaxy light over 0.3-2.2 um, which spans the optical grid, superseding Driver et al. (2016b) in that range by a stated 5-15 per cent. Table 3 gives per-band EBL in nW m^-2 sr^-1 for u, g, r, i, Z, Y, J, H, Ks with pivot wavelengths from 0.3577 to 2.1549 um — six of the nine fall inside 330-1000 nm, so the component interpolates between roughly six published points rather than a dense spectrum, and that coarseness belongs in its error budget. **The numbers themselves reached this document through a fetched summary of the publisher's page, not through the paper's own text, and must be confirmed against the preprint before any of them enters the code.** A summariser's table is not a primary source, and the rule about never fabricating a coefficient does not weaken just because a plausible table was easy to obtain. |
+| ~~Extragalactic background~~ | **Resolved.** `skybrightness.ExtragalacticBackground` implements it, isotropic with direct attenuation. The nine values were confirmed against the paper’s own LaTeX source and every one matched the summary that had been recorded here; `TestKoushanTableIsTranscribedCorrectly` now guards them row by row, because a wrong digit in a component worth one per cent of the sky changes no total while making the component wrong. Table 3 is nu*I_nu in nW/m2/sr, so it is divided by the pivot wavelength to become a spectral radiance — checked against a hand-worked 27.70 mag arcsec⁻² at r. The original note is kept below because the reasoning it records is why the check happened. | **Was: decided, values not yet verified.** Koushan et al. (2021), MNRAS 503, 2033 (GAMA/DEVILS): integrated galaxy light over 0.3-2.2 um, which spans the optical grid, superseding Driver et al. (2016b) in that range by a stated 5-15 per cent. Table 3 gives per-band EBL in nW m^-2 sr^-1 for u, g, r, i, Z, Y, J, H, Ks with pivot wavelengths from 0.3577 to 2.1549 um — six of the nine fall inside 330-1000 nm, so the component interpolates between roughly six published points rather than a dense spectrum, and that coarseness belongs in its error budget. **The numbers themselves reached this document through a fetched summary of the publisher's page, not through the paper's own text, and must be confirmed against the preprint before any of them enters the code.** A summariser's table is not a primary source, and the rule about never fabricating a coefficient does not weaken just because a plausible table was easy to obtain. |
 | Extragalactic background, uncertainty model | **Decided.** Integrated galaxy counts are a floor by construction — galaxies that were not detected were not counted — so the value is reported as a lower limit rather than a central estimate, with the very-high-energy gamma-ray absorption constraint carried as one-sided headroom for anything undetected. Koushan et al. state the VHE data are consistent with their IGL across u to Ks "without the need to include any significant additional source of diffuse light", which is the bound this uses. This differs deliberately from the other components' symmetric uncertainties, because the measurement is asymmetric and pretending otherwise would misreport it. |
 | Zodiacal light | A solar-elongation-dependent model, e.g. Leinert et al. (1998). |
 | Airglow | **Decided, not yet wired.** ESO SkyCalc, Noll et al. (2012), A&A 543, A92 — the Cerro Paranal sky model, already cited here — which carries the pseudo-continuum, the emission lines and the solar-activity scaling in one place rather than requiring a line atlas and a continuum to be reconciled onto one grid. Its interface and terms of use need checking before anything is wired. |
@@ -1361,6 +1361,29 @@ No component is blocked outright. Every model named in the specification has its
 source in hand.
 
 ---
+
+**Airglow is wired, and the spectrum is fetched rather than shipped.**
+`skybrightness/dataset/airglow` calls ESO's SkyCalc — the same source GAMBONS uses — and
+returns a zenith spectrum the component applies van Rhijn to. Fetching rather than shipping a
+table follows the rule that no package embeds data, and it lets a caller ask for the solar
+flux of the night being modelled instead of a climatological average.
+
+Three things about that service had to be found by using it rather than by reading about it.
+Its protocol is three calls, not one: a POST that runs the model and returns a temporary
+directory name, a GET for the FITS inside it, and a GET that releases it — and the third is
+not optional, because skipping it leaves a directory on ESO's server for every request ever
+made. It rejects a partial request body with a 500 rather than filling the gaps from its own
+defaults, so all thirty-five parameters are sent every time. And its columns are named `lam`,
+`flux_ael` and `flux_arc` where the documentation says `LAM`, `FLUX_AEL` and `FLUX_ARC`, which
+is why the reader tries both cases.
+
+Only the two airglow columns are read, not the `flux` total, so what comes back is a
+component to add rather than a sky to subtract from. SkyCalc reports
+photons/s/m²/µm/arcsec²; a radiance is per nanometre, per steradian and in watts, and
+missing any of those three conversions leaves a spectrum that is positive, smooth and wrong
+by a factor of 1000, 4.25×10¹⁰ or 3.6×10⁻¹⁹. Measured live at Paranal with msolflux 100,
+the band mean over 500-600 nm is 22.37 mag arcsec⁻², which is what dark-site zenith airglow
+is; a hand-worked example in the offline tests lands at 22.00 independently.
 
 ## 17. Open scientific questions
 

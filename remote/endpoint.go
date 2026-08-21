@@ -56,6 +56,16 @@ const (
 	// GaiaTAP is ESA's Gaia archive TAP service (catalog/gaia).
 	GaiaTAP EndpointID = "esa.gaia"
 
+	// ESOSkyCalc is ESO's Cerro Paranal Advanced Sky Model service
+	// (skybrightness/dataset/airglow).
+	//
+	// The URL is the directory the service's three operations hang off,
+	// because it takes three: a POST that runs the model, a GET that
+	// collects the FITS it wrote, and a GET that releases the temporary
+	// directory it wrote it into. The last is not optional politeness -
+	// skipping it leaves a directory on ESO's server for every request.
+	ESOSkyCalc EndpointID = "eso.skycalc"
+
 	// MAST is STScI's MAST invoke API (catalog/mast).
 	MAST EndpointID = "stsci.mast"
 
@@ -401,6 +411,16 @@ func defaultEndpoints() map[EndpointID]Endpoint {
 			ApproxSize:  100_000,
 			Enabled:     true,
 			Timeout:     30 * time.Second,
+		},
+		ESOSkyCalc: {
+			ID:          ESOSkyCalc,
+			URL:         "https://etimecalret-002.eso.org/observing/etc/",
+			Kind:        KindAPI,
+			Subsystem:   "skybrightness/dataset/airglow",
+			Description: "ESO SkyCalc Cerro Paranal Advanced Sky Model",
+			ApproxSize:  20_000_000,
+			Enabled:     true,
+			Timeout:     3 * time.Minute,
 		},
 		GaiaTAP: {
 			ID:          GaiaTAP,
