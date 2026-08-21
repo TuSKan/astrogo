@@ -231,28 +231,50 @@ func Normalize(query string) string {
 	return q
 }
 
-// Score evaluates how well a candidate string matches a target query (0.0 to 1.0).
+// Score evaluates how well a candidate string matches a target query (0.0 to
+// 1.0). Both sides are normalized first, so a caller may pass either a raw
+// query or one already put through [Normalize].
+//
+// It normalizes the query rather than requiring the caller to, because
+// requiring it did not work. Only the candidate used to be normalized, which
+// made a pre-normalized query an unstated precondition: catalog's resolver met
+// it and catalog/simbad's did not, passing the user's string through
+// untouched. The cost is not subtle. An exact match of "NGC 224" against
+// "NGC 224" scored 0.129 rather than 1.0, because the capitals and the space
+// pushed it out of the equality test and all the way down into the Levenshtein
+// term, whose ceiling is 0.3. "Messier 31" against "M31" scored 0.06. Every
+// candidate collapsing into the same narrow band leaves the ranking to decide
+// between near-identical numbers, which is not what a scorer with an
+// exact-match rung is for.
+//
+// Normalize is idempotent, so normalizing here costs a caller that already did
+// it nothing but the call.
 func Score(query, candidate string) float64 {
-	if query == "" || candidate == "" {
+	q, c := Normalize(query), Normalize(candidate)
+
+	// Tested after normalizing, not before. A query of nothing but spaces is
+	// not empty as a string but is empty as a name, and every string begins
+	// with the empty string — so reaching the prefix rung with one would score
+	// 0.8 against every candidate in the catalogue.
+	if q == "" || c == "" {
 		return 0
 	}
 
-	c := Normalize(candidate)
-	if query == c {
+	if q == c {
 		return 1.0
 	}
 
-	if strings.HasPrefix(c, query) {
+	if strings.HasPrefix(c, q) {
 		return 0.8
 	}
 
-	if strings.Contains(c, query) {
+	if strings.Contains(c, q) {
 		return 0.5
 	}
 
-	dist := levenshtein(query, c)
+	dist := levenshtein(q, c)
 
-	maxLen := max(len(c), len(query))
+	maxLen := max(len(c), len(q))
 
 	lScore := 1.0 - float64(dist)/float64(maxLen)
 	if lScore < 0 {
