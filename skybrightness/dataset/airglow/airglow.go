@@ -219,6 +219,23 @@ func Fetch(ctx context.Context, spec Spec) (*Spectrum, error) {
 		return nil, err
 	}
 
+	spectrum, err := fetchRequest(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+
+	spectrum.Source = spec.describe()
+
+	return spectrum, nil
+}
+
+// fetchRequest posts an already-built request and parses what comes back.
+//
+// Separate from [Fetch] so that a caller inside this package can vary a field
+// the Spec does not expose — the wavelength gridding and the line-spread
+// function, in particular — without rebuilding the three-call protocol around
+// it.
+func fetchRequest(ctx context.Context, req skycalcRequest) (*Spectrum, error) {
 	client, err := api.NewClient(remote.ESOSkyCalc)
 	if err != nil {
 		return nil, fmt.Errorf("airglow: client: %w", err)
@@ -262,8 +279,6 @@ func Fetch(ctx context.Context, spec Spec) (*Spectrum, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	spectrum.Source = spec.describe()
 
 	return spectrum, nil
 }
