@@ -260,3 +260,78 @@ func TestParseAcceptsEitherColumnCase(t *testing.T) {
 		}
 	}
 }
+
+// The photon-to-radiance conversion, exercised through Parse itself.
+//
+// TestPhotonConversionMatchesAHandWorkedValue computes the same conversion
+// from constants and checks its own arithmetic; it never calls this package,
+// so a factor of a thousand or a missing photon energy in Parse would not have
+// disturbed it. This drives the identical worked example through the parser.
+//
+// SkyCalc reports photons s^-1 m^-2 um^-1 arcsec^-2. The radiance is that
+// divided by a thousand for micrometres to nanometres, divided by the solid
+// angle of a square arcsecond, and multiplied by the energy of one photon at
+// its own wavelength.
+func TestParseConversionMatchesTheWorkedExample(t *testing.T) {
+	t.Parallel()
+
+	const (
+		perMicronPerArcsec2 = 160.0
+		lambdaNM            = 550.0
+
+		arcsec2PerSter = 4.254517e10
+		planck         = 6.62607015e-34
+		lightSpeed     = 2.99792458e8
+	)
+
+	want := perMicronPerArcsec2 / 1000 * arcsec2PerSter * (planck * lightSpeed / (lambdaNM * 1e-9))
+
+	// The emission lines carry it all in one case and the continuum in the
+	// other, because Parse adds the two and a dropped column would otherwise
+	// look like a correct answer halved.
+	for _, c := range []struct {
+		name     string
+		ael, arc float64
+	}{
+		{"all in the emission lines", perMicronPerArcsec2, 0},
+		{"all in the continuum", 0, perMicronPerArcsec2},
+		{"split between them", perMicronPerArcsec2 / 2, perMicronPerArcsec2 / 2},
+	} {
+		got, err := airglow.Parse(bytes.NewReader(bintableFITS(
+			[]string{"lam", "flux_ael", "flux_arc"},
+			[][]float64{
+				{lambdaNM - 1, lambdaNM, lambdaNM + 1},
+				{c.ael, c.ael, c.ael},
+				{c.arc, c.arc, c.arc},
+			},
+		)))
+		if err != nil {
+			t.Fatalf("%s: Parse: %v", c.name, err)
+		}
+
+		radiance := got.At(lambdaNM)
+
+		if rel := math.Abs(radiance-want) / want; rel > 1e-6 {
+			t.Errorf("%s: %g ph/s/m^2/um/arcsec^2 at %g nm parsed to %.6g W m^-2 sr^-1 nm^-1, "+
+				"want %.6g (%.3g relative)", c.name, perMicronPerArcsec2, lambdaNM, radiance, want, rel)
+		}
+	}
+
+	// And the scale is linear, so a spectrum twice as bright is twice the
+	// radiance rather than twice some offset.
+	half, err := airglow.Parse(bytes.NewReader(bintableFITS(
+		[]string{"lam", "flux_ael", "flux_arc"},
+		[][]float64{{549, 550, 551}, {80, 80, 80}, {0, 0, 0}},
+	)))
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+
+	// The same 1e-6 as above: want is built from this test's own Planck and
+	// speed-of-light literals while the parser uses the values in constants,
+	// and the two differ in their last digits. That is a 1.4e-8 disagreement
+	// about physical constants, not about the conversion.
+	if ratio := want / half.At(lambdaNM); math.Abs(ratio-2) > 1e-6 {
+		t.Errorf("halving the photon flux changed the radiance by a factor of %.9f, want 2", ratio)
+	}
+}
