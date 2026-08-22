@@ -156,6 +156,28 @@ const (
 	// directions a caller asks about.
 	IRSADust EndpointID = "irsa.dust"
 
+	// SFDDustMap is the Schlegel, Finkbeiner & Davis (1998) 100 micron
+	// all-sky map, as files rather than as a per-position query
+	// (skybrightness/dataset/dust).
+	//
+	// The same data [IRSADust] serves, obtained whole. That service answers
+	// one sightline per request in a couple of seconds, which is fine for a
+	// handful and is the wrong shape for a sky: an all-sky map at one degree
+	// is twenty thousand sightlines, and dust is indexed by galactic
+	// direction, so a service with real users converges on querying the whole
+	// sky one pixel at a time.
+	//
+	// It has to be SFD specifically and not a better modern dust product. The
+	// diffuse-galactic correlation is fitted against this map, and the
+	// 0.8 MJy/sr the model subtracts is this map's own zero-point term, so
+	// substituting Planck's thermal-dust maps would quietly invalidate the
+	// coefficients.
+	//
+	// Archived at Harvard Dataverse under doi:10.7910/DVN/EWCNL5. The
+	// original Princeton and Berkeley distributions this data was published
+	// from are both gone.
+	SFDDustMap EndpointID = "sfd.dustmap"
+
 	// SVOFilterProfile is the Spanish Virtual Observatory's Filter Profile
 	// Service (skybrightness/dataset/passband).
 	//
@@ -570,6 +592,26 @@ func defaultEndpoints() map[EndpointID]Endpoint {
 				"MJy/sr and E(B-V), from IRAS, COBE/DIRBE and Planck",
 			Enabled: true,
 			Timeout: 60 * time.Second,
+		},
+
+		SFDDustMap: {
+			ID: SFDDustMap,
+			// The Dataverse file-access endpoint, with the numeric file
+			// identifiers as names. Not filenames, because Dataverse
+			// addresses a deposited file by id; the deposit is
+			// doi:10.7910/DVN/EWCNL5 and the ids are checked against the
+			// FITS headers the files actually carry.
+			URL:       "https://dataverse.harvard.edu/api/access/datafile/",
+			Kind:      KindFile,
+			Subsystem: "skybrightness/dataset/dust",
+			Description: "Schlegel, Finkbeiner & Davis (1998) 100 micron all-sky maps, " +
+				"4096 squared per galactic hemisphere in MJy/sr",
+			Files:           []string{"2902710", "2902711"},
+			ApproxSize:      64 << 20, // each; two hemispheres
+			Enabled:         true,
+			Downloadable:    true,
+			Mutable:         false, // a 1999 archival product with a DOI
+			DownloadTimeout: 20 * time.Minute,
 		},
 
 		SVOFilterProfile: {

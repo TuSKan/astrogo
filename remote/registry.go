@@ -319,6 +319,8 @@ func constName(id EndpointID) string {
 		return "GaiaAIPAsync"
 	case IRSADust:
 		return "IRSADust"
+	case SFDDustMap:
+		return "SFDDustMap"
 	case SVOFilterProfile:
 		return "SVOFilterProfile"
 	case GaiaStarMap:

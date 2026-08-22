@@ -29,6 +29,7 @@ import (
 	"net/url"
 	"path"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -348,4 +349,51 @@ func parse(doc string) (float64, error) {
 	}
 
 	return v, nil
+}
+
+// Cached is one direction the service has already been asked about, and what
+// it answered.
+type Cached struct {
+	L, B      angle.Angle
+	Intensity float64
+}
+
+// CachedDirections returns every answer already held on disk.
+//
+// The intensity toward a direction does not change, so an answer fetched once
+// is an answer for good, and the cache accumulates whatever a caller has ever
+// asked for. Exposing it is what lets the local all-sky map be validated
+// against the service without asking the service anything: the comparison runs
+// against questions it has already answered.
+//
+// A cache that cannot be read is an empty result rather than an error — a cold
+// cache is a normal state, not a failure.
+func CachedDirections(ctx context.Context) ([]Cached, error) {
+	bucket, prefix, err := remote.CacheDir(ctx, remote.IRSADust)
+	if err != nil {
+		return nil, fmt.Errorf("dust: cache: %w", err)
+	}
+
+	held := readCache(ctx, bucket, path.Join(prefix, cacheFile))
+
+	out := make([]Cached, 0, len(held))
+	for c, v := range held {
+		out = append(out, Cached{
+			L:         angle.Deg(float64(c.l) * cellSizeDeg),
+			B:         angle.Deg(float64(c.b) * cellSizeDeg),
+			Intensity: v,
+		})
+	}
+
+	// A stable order, so a comparison reports the same worst case twice
+	// running.
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].B != out[j].B {
+			return out[i].B < out[j].B
+		}
+
+		return out[i].L < out[j].L
+	})
+
+	return out, nil
 }
