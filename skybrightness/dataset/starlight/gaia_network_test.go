@@ -322,3 +322,112 @@ func TestFetchBrightStarsFindsTheSaturatedStars(t *testing.T) {
 		t.Errorf("HIP %d (Sirius) is not in the missing set", sirius)
 	}
 }
+
+// Four bands cost one pass, not four.
+//
+// This is the fact the whole multi-band map rests on. The aggregation is one
+// query per source_id range with each band as extra select columns under a
+// single GROUP BY, so adding B, R and I alongside V widens the rows and does
+// not multiply the queries. If it did, building four bands would mean four
+// sweeps of 787 chunks against a shared research archive instead of one, which
+// is the difference between a job worth running and one that is not.
+//
+// The substring assertions elsewhere cannot check this: a four-band query is
+// four times as much ADQL and the only thing that says the archive will parse
+// and answer it is sending one.
+func TestFourBandQueryIsOnePass(t *testing.T) {
+	t.Parallel()
+
+	testutil.RequireReachable(t, "gea.esac.esa.int:443")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	defer cancel()
+
+	bands := make([]starlight.GaiaBand, 0, 4)
+
+	for _, name := range []string{"B", "V", "R", "I"} {
+		colour, err := starlight.JohnsonCousinsColourTerm(name)
+		if err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+
+		bands = append(bands, starlight.GaiaBand{
+			Name:           name,
+			ColourTerm:     colour,
+			FluxToRadiance: 1e-21,
+		})
+	}
+
+	build := starlight.GaiaBuild{Order: 8, Chunk: 4, Bands: bands}
+
+	adql, err := build.ADQL(100000, 100003)
+	if err != nil {
+		t.Fatalf("ADQL: %v", err)
+	}
+
+	// One SELECT and one GROUP BY however many bands are asked for.
+	if n := strings.Count(strings.ToUpper(adql), "SELECT"); n != 1 {
+		t.Errorf("the four-band query has %d SELECT clauses; it must be one pass", n)
+	}
+
+	if n := strings.Count(strings.ToUpper(adql), "GROUP BY"); n != 1 {
+		t.Errorf("the four-band query has %d GROUP BY clauses; it must be one pass", n)
+	}
+
+	t.Logf("query (%d characters): %s", len(adql), adql)
+
+	m, counts, err := starlight.RunChunk(ctx, build, 100000, 100003)
+	if err != nil {
+		t.Fatalf("the archive rejected the four-band query: %v", err)
+	}
+
+	var stars int64
+	for _, c := range counts {
+		stars += c
+	}
+
+	if stars == 0 {
+		t.Fatal("four pixels of the Gaia catalogue held no sources at all")
+	}
+
+	if m == nil {
+		t.Fatal("no map returned")
+	}
+
+	got := m.Bands()
+	if len(got) != 4 {
+		t.Fatalf("the map carries %d bands (%v), want four", len(got), got)
+	}
+
+	// Every band has to carry light, and the reddest has to carry the most:
+	// the sky's integrated starlight is dominated by cool stars, so a pixel is
+	// brighter in I than in B. A band wired to the wrong colour polynomial or
+	// the wrong zero point shows here rather than after a 787-chunk build.
+	radiance := map[string]float64{}
+
+	for _, name := range got {
+		var total float64
+
+		for pixel := int64(100000); pixel <= 100003; pixel++ {
+			v, err := m.Pixel(name, pixel)
+			if err != nil {
+				t.Fatalf("%s at pixel %d: %v", name, pixel, err)
+			}
+
+			total += v
+		}
+
+		radiance[name] = total
+		t.Logf("  %s: %.6e W m^-2 sr^-1 nm^-1 over four pixels", name, total)
+
+		if total <= 0 {
+			t.Errorf("%s carries no light", name)
+		}
+	}
+
+	if radiance["I"] <= radiance["B"] {
+		t.Errorf("these pixels are %.4e in I and %.4e in B; integrated starlight is "+
+			"dominated by cool stars, so the red band must carry more",
+			radiance["I"], radiance["B"])
+	}
+}
