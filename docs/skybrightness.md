@@ -1177,14 +1177,30 @@ Rhijn's limb brightening and extinction pull opposite ways.
 
 **Two mechanisms account for the residual, and both were declared before it was measured.**
 
-*Airglow carries no extinction along its slant path.* `Airglow.Provenance` lists this among
-its known approximations and puts the geometry's validity within 40° of the zenith. The
+*Airglow, compared as flux rather than as a difference of magnitudes.* How much airglow
+"adds" in magnitudes depends on the airglow-free sky underneath it, so differencing the two
+runs' magnitudes does not compare the airglow itself — an earlier version of this section did
+exactly that and made the agreement look far better than it is. Ours is taken from the
+component directly; GAMBONS' is the flux difference of their two exports, available only for
+the two bands they recorded both runs for.
+
+That comparison separates two distinct problems.
+
+**The slope is too steep.** `Airglow.Provenance` already lists the missing slant extinction
+among its known approximations and puts the geometry's validity within 40° of the zenith; the
 emitting layer sits at 87 km, above essentially the whole column, so the omitted term is very
-nearly the full slant extinction. At the 0–15° band the equal-area mean airmass is 7.32,
-which at a representative clear-site 0.12 mag airmass⁻¹ is **0.879 mag** of extinction never
-applied; our airglow there is **0.86 mag** stronger than GAMBONS'. Predicted and observed
-agree to two hundredths. In the 75–90° band the same arithmetic gives 0.122 mag and the
-measured excess is −0.11: inside the stated validity the geometry alone is right.
+nearly the full slant extinction. Our airglow relative to theirs swings **−0.915 mag** from
+the 75–90° band to the 0–15° one. The slant extinction never applied differs by **+0.756 mag**
+across the same span, leaving **0.159 mag** it does not account for — the van Rhijn layer
+height, or their own angular treatment.
+
+**The normalisation is low, and this is the larger finding.** Near the zenith, where the
+geometry is reliable and extinction is about a tenth of a magnitude, our airglow is a factor
+of roughly **1.6 fainter** than GAMBONS' (0.52 mag in the 75–90° band, 0.69 mag at the 0–5°
+zenith cap). Both models drive airglow from an ESO SkyCalc spectrum, so this is a parameter
+difference rather than physics: their reference is `ESO_SkyCalc_100_10.dat` and this test asks
+SkyCalc for 100 sfu, which need not be the same normalisation. Airglow is a free parameter in
+both models, so this is the first thing to reconcile before any of the rest is worth refining.
 
 *Nothing is scattered back into the beam.* Starlight, diffuse galactic light, zodiacal light
 and the extragalactic background are attenuated by the atmosphere, and no light is scattered

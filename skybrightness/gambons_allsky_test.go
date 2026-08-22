@@ -309,6 +309,10 @@ func TestAgainstGAMBONSAllSky(t *testing.T) {
 		sinAlt          float64
 		magOn, magOff   float64
 		fluxOn, fluxOff float64
+
+		// The airglow components' own band flux, taken directly rather than
+		// inferred from the difference of two magnitudes.
+		fluxAirglow float64
 	}
 
 	results := make([]result, 0, len(samples))
@@ -345,13 +349,14 @@ func TestAgainstGAMBONSAllSky(t *testing.T) {
 		fluxOff := bandFlux(t, withoutAirglow, grid, band)
 
 		results = append(results, result{
-			bandIdx: s.bandIdx,
-			solidSR: s.solidSR,
-			sinAlt:  s.dir.Alt().Sin(),
-			magOn:   magFromRadiance(fluxOn, band),
-			magOff:  magFromRadiance(fluxOff, band),
-			fluxOn:  fluxOn,
-			fluxOff: fluxOff,
+			bandIdx:     s.bandIdx,
+			solidSR:     s.solidSR,
+			sinAlt:      s.dir.Alt().Sin(),
+			magOn:       magFromRadiance(fluxOn, band),
+			magOff:      magFromRadiance(fluxOff, band),
+			fluxOn:      fluxOn,
+			fluxOff:     fluxOff,
+			fluxAirglow: fluxOn - fluxOff,
 		})
 
 		// Solid-angle-weighted share of each component over the whole sky.
@@ -572,39 +577,92 @@ func TestAgainstGAMBONSAllSky(t *testing.T) {
 	t.Log("")
 	t.Log("difference budget:")
 	t.Log("")
-	t.Log("  1. airglow carries no extinction along the slant path.")
-	t.Log("     Airglow.Provenance lists this among its known approximations and")
-	t.Log("     puts the geometry's validity within 40 degrees of the zenith. The")
-	t.Log("     emitting layer is at 87 km, above essentially the whole column, so")
-	t.Log("     the omitted term is very nearly the full slant extinction.")
-	t.Logf("     %-12s %9s %11s %13s %13s", "band", "mid alt", "airmass", "unapplied", "our excess")
+	t.Log("  1. airglow: compared as flux, not as a difference of magnitudes.")
+	t.Log("     How much airglow 'adds' in magnitudes depends on the airglow-free")
+	t.Log("     sky underneath it, so differencing the two runs' magnitudes does")
+	t.Log("     not compare the airglow. Ours is taken from the component itself;")
+	t.Log("     theirs is the flux difference of their two exports, which is only")
+	t.Log("     available for the two bands they recorded both runs for.")
+	t.Logf("     %-12s %13s %13s %11s %11s", "band", "our airglow", "their airglow", "ours/theirs", "unapplied")
 
 	const representativeKV = 0.12 // mag per airmass, a clear sea-level site in V
 
+	airglowRatioMag := make(map[int]float64)
+
 	for bi, b := range gambonsAltitudeBands {
+		var ours []float64
+
+		for _, r := range results {
+			if r.bandIdx == bi {
+				ours = append(ours, r.fluxAirglow)
+			}
+		}
+
+		sort.Float64s(ours)
+
+		ourFlux := quantile(ours, 0.5)
+
 		sinMid := (math.Sin(b.loAlt*math.Pi/180) + math.Sin(b.hiAlt*math.Pi/180)) / 2
 		mid := math.Asin(sinMid) * 180 / math.Pi
 
-		am, err := atmosphere.Airmass(angle.Deg(mid))
-		if err != nil {
+		unapplied := math.NaN()
+		if am, err := atmosphere.Airmass(angle.Deg(mid)); err == nil {
+			unapplied = representativeKV * am
+		}
+
+		if math.IsNaN(b.medianNoAirglow) {
+			t.Logf("     %3.0f-%3.0f deg %13.4g %13s %11s %11.3f",
+				b.loAlt, b.hiAlt, ourFlux, "(not recorded)", "-", unapplied)
+
 			continue
 		}
 
-		ourAirglow := mediansOff[bi] - medians[bi]
+		// Their airglow is the difference of the two runs, in flux.
+		theirFlux := math.Pow(10, -0.4*b.median) - math.Pow(10, -0.4*b.medianNoAirglow)
 
-		theirAirglow := math.NaN()
-		if !math.IsNaN(b.medianNoAirglow) {
-			theirAirglow = b.medianNoAirglow - b.median
-		}
+		// Ours is in physical units and theirs in the arbitrary units of that
+		// power law, so only the ratio between the two bands is meaningful;
+		// it is normalised below against the highest band.
+		airglowRatioMag[bi] = -2.5 * math.Log10(ourFlux/theirFlux)
 
-		excess := "  (not recorded)"
-		if !math.IsNaN(theirAirglow) {
-			excess = fmt.Sprintf("%+13.2f", ourAirglow-theirAirglow)
-		}
-
-		t.Logf("     %3.0f-%3.0f deg  %9.2f %11.3f %13.3f %s",
-			b.loAlt, b.hiAlt, mid, am, representativeKV*am, excess)
+		t.Logf("     %3.0f-%3.0f deg %13.4g %13.4g %11s %11.3f",
+			b.loAlt, b.hiAlt, ourFlux, theirFlux, "see below", unapplied)
 	}
+
+	// Only the change in the ratio across the sky is free of the unit
+	// mismatch, and that change is what extinction would explain.
+	if lo, okLo := airglowRatioMag[0]; okLo {
+		if hi, okHi := airglowRatioMag[len(gambonsAltitudeBands)-1]; okHi {
+			swing := lo - hi
+
+			var differential float64
+
+			amLo, errLo := atmosphere.Airmass(angle.Deg(7.44))
+			amHi, errHi := atmosphere.Airmass(angle.Deg(79.41))
+
+			if errLo == nil && errHi == nil {
+				differential = representativeKV * (amLo - amHi)
+			}
+
+			t.Log("")
+			t.Logf("     our airglow relative to theirs swings %+.3f mag from the 75-90 band"+
+				" to the 0-15 one", swing)
+			t.Logf("     the slant extinction never applied differs by %+.3f mag across the same span",
+				differential)
+			t.Logf("     leaving %+.3f mag the missing extinction does not account for, which is"+
+				" the van Rhijn layer height or their own angular treatment",
+				math.Abs(swing)-differential)
+		}
+	}
+
+	t.Log("")
+	t.Log("     Separately from the slope, the normalisation differs. Near the")
+	t.Log("     zenith, where the geometry is reliable and extinction is a tenth")
+	t.Log("     of a magnitude, our airglow is a factor of about 1.6 fainter than")
+	t.Log("     GAMBONS'. Both drive it from an ESO SkyCalc spectrum, so that is a")
+	t.Log("     parameter difference rather than physics: their reference file is")
+	t.Log("     ESO_SkyCalc_100_10.dat and this test asks SkyCalc for 100 sfu,")
+	t.Log("     which need not be the same normalisation.")
 
 	t.Log("")
 	t.Log("  2. no light is scattered back into the beam.")

@@ -184,8 +184,8 @@ func TestAgainstGAMBONS(t *testing.T) {
 	directions := zenithCap(gambonsCapDeg, gambonsCapSamples)
 
 	got := map[string]float64{
-		"with airglow": capMagnitude(t, ctx, withAirglow, scene, grid, band, directions),
-		"no airglow":   capMagnitude(t, ctx, noAirglow, scene, grid, band, directions),
+		"with airglow": capMagnitude(ctx, t, withAirglow, scene, grid, band, directions),
+		"no airglow":   capMagnitude(ctx, t, noAirglow, scene, grid, band, directions),
 	}
 
 	t.Logf("GAMBONS zenith: %.2f with airglow, %.2f without",
@@ -287,46 +287,6 @@ func gambonsScene(t *testing.T) *skybrightness.Scene {
 	}
 }
 
-// zenithGalactic returns the galactic coordinates the zenith points at.
-func zenithGalactic(t *testing.T, scene *skybrightness.Scene) coord.Galactic {
-	t.Helper()
-
-	cc := coord.NewContext(astrotime.FromGo(scene.Time), scene.Observer,
-		scene.Atmosphere.Refraction())
-
-	icrs, err := cc.AltAzToICRS(coord.NewAltAz(angle.Deg(89.9), angle.Deg(0)))
-	if err != nil {
-		t.Fatalf("AltAzToICRS: %v", err)
-	}
-
-	return coord.ICRSToGalactic(icrs)
-}
-
-// bandMagnitude evaluates a model and projects it to a V surface brightness.
-func bandMagnitude(
-	t *testing.T,
-	ctx context.Context,
-	model *skybrightness.Model,
-	scene *skybrightness.Scene,
-	grid unit.SpectralGrid,
-	band magnitude.Passband,
-	dir coord.AltAz,
-) float64 {
-	t.Helper()
-
-	est, err := model.Estimate(ctx, skybrightness.Query{Scene: scene, Direction: dir, Grid: grid})
-	if err != nil {
-		t.Fatalf("Estimate: %v", err)
-	}
-
-	mag, err := est.SurfaceBrightness(band, magnitude.Vega)
-	if err != nil {
-		t.Fatalf("SurfaceBrightness: %v", err)
-	}
-
-	return mag
-}
-
 // bandFlux is the passband-averaged radiance, which is what shares are taken
 // over. Magnitudes are logarithmic and must never be summed or differenced for
 // this purpose.
@@ -410,8 +370,8 @@ func capDustDirections(t *testing.T, scene *skybrightness.Scene, capDeg float64,
 // wherever the sky is structured - which is exactly where the difference would
 // matter.
 func capMagnitude(
-	t *testing.T,
 	ctx context.Context,
+	t *testing.T,
 	model *skybrightness.Model,
 	scene *skybrightness.Scene,
 	grid unit.SpectralGrid,
