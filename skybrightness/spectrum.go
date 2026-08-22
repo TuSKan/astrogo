@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 
+	"github.com/TuSKan/astrogo/constants"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -121,4 +122,79 @@ func DefaultOpticalGrid() unit.SpectralGrid {
 	}
 
 	return g
+}
+
+// BlackbodyShape returns a Planck spectral radiance over grid, at temperature
+// t in kelvin.
+//
+// # What it is for
+//
+// [PresetInputs.StarShape] and [NewIntegratedStarlight] both require a spectral
+// shape from the caller, and deliberately: integrated starlight is the summed
+// light of stars of every type, no single blackbody is right for it, and a
+// package that picked one silently would be choosing the answer's colour on the
+// caller's behalf. But every caller needs *some* shape, and until this existed
+// each one had to write Planck's law out again — which is how two callers end
+// up with two different constants.
+//
+// A 5500 K Planck function is the conventional stand-in for the integrated
+// light of the sky, close to the Sun's effective temperature and to the
+// flux-weighted mean of a typical stellar population. It is an approximation
+// with a name, which is the most this can offer.
+//
+// # What it does not affect
+//
+// The components renormalise a shape so its average across the passband is
+// one. So the temperature sets the spectrum's colour — how the band-integrated
+// value is distributed across wavelength, and therefore how extinction, which
+// is steepest in the blue, redistributes it — and not the band value itself,
+// which the star map already fixes.
+//
+// Returned in W m^-2 sr^-1 nm^-1 for a blackbody of unit emissivity, though
+// only the shape survives renormalisation.
+func BlackbodyShape(grid unit.SpectralGrid, t float64) (SpectralRadiance, error) {
+	if err := grid.Validate(); err != nil {
+		return nil, fmt.Errorf("%w: %w", ErrNoGrid, err)
+	}
+
+	if t <= 0 || math.IsNaN(t) || math.IsInf(t, 0) {
+		return nil, fmt.Errorf("%w: temperature %g K", ErrNoGrid, t)
+	}
+
+	// Planck's law per unit wavelength,
+	//
+	//	B(lambda, T) = 2hc^2 / lambda^5 / (exp(hc / (lambda k T)) - 1)
+	//
+	// with the constants taken from the module's own set rather than written
+	// out, and the result per nanometre rather than per metre.
+	const (
+		metrePerNM  = 1e-9
+		perMToPerNM = 1e-9
+	)
+
+	var (
+		h  = constants.SI2019.PlanckConstant.Value
+		c  = constants.SI2019.SpeedOfLight.Value
+		kB = constants.SI2019.BoltzmannConstant.Value
+	)
+
+	out := NewSpectralRadiance(grid)
+
+	for i := range out {
+		lambda := float64(grid.At(i)) * metrePerNM
+
+		exponent := h * c / (lambda * kB * t)
+		if exponent > 700 {
+			// exp overflows past about 709 and the radiance there is zero to
+			// any precision that matters, so the far blue of a cool source is
+			// filled in rather than turned into an infinity.
+			out[i] = 0
+
+			continue
+		}
+
+		out[i] = 2 * h * c * c / (math.Pow(lambda, 5) * math.Expm1(exponent)) * perMToPerNM
+	}
+
+	return out, nil
 }

@@ -77,14 +77,21 @@ func johnsonVTophat() magnitude.Passband {
 // passband average is one, so the choice affects the spectrum's colour, not the
 // V-band value the map already fixes.
 func solarLikeShape(grid unit.SpectralGrid) skybrightness.SpectralRadiance {
-	shape := skybrightness.NewSpectralRadiance(grid)
-	for i := range shape {
-		lambda := float64(grid.At(i)) * 1e-9
-		shape[i] = 1 / (math.Pow(lambda, 5) * (math.Exp(0.0143877696/(lambda*5500)) - 1))
+	// [skybrightness.BlackbodyShape] rather than Planck's law written out
+	// again. This helper used to carry its own copy, with the second radiation
+	// constant inlined as a literal; the package now owns the physics and the
+	// constants come from the module's own set.
+	shape, err := skybrightness.BlackbodyShape(grid, solarLikeTemperatureK)
+	if err != nil {
+		panic("skybrightness test: blackbody shape: " + err.Error())
 	}
 
 	return shape
 }
+
+// solarLikeTemperatureK is the conventional stand-in for the integrated light
+// of the sky.
+const solarLikeTemperatureK = 5500
 
 // The end-to-end comparison against GAMBONS.
 //
