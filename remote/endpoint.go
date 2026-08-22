@@ -203,8 +203,12 @@ const (
 	KindFile Kind = "file"
 )
 
-// cacheable reports whether this Kind delivers bulk file content into the
-// cache — i.e. whether CacheDir and GetFile apply.
+// cacheable reports whether this Kind delivers bulk file content that
+// GetFile can fetch by name from a bucket URL.
+//
+// This is GetFile's question, not CacheDir's. Every endpoint has a cache
+// directory — somewhere to put a decoded payload is not the same as being
+// fetchable as a file.
 func (k Kind) cacheable() bool { return k == KindFile }
 
 // Endpoint describes one remote service: where it lives, what it is for,

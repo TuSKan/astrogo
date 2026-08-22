@@ -100,19 +100,28 @@ func DataDir(ctx context.Context) (*file.Bucket, error) {
 	return b, nil
 }
 
-// CacheDir returns the Bucket and key prefix a file-bearing endpoint
-// caches under. It creates nothing: a bucket "directory" is only a key
-// prefix, so the first write under it is all the backend needs. Returns
-// ErrUnknownEndpoint for an unregistered id, or ErrNotFileEndpoint for a
-// KindAPI endpoint, which has no cache.
+// CacheDir returns the Bucket and key prefix an endpoint caches under. It
+// creates nothing: a bucket "directory" is only a key prefix, so the first
+// write under it is all the backend needs. Returns ErrUnknownEndpoint for an
+// unregistered id.
+//
+// Every registered endpoint has one, KindAPI included. A cache directory is
+// somewhere to put bytes, which is a different question from whether GetFile
+// can fetch them: GetFile needs a bucket URL and a name and so still requires
+// KindFile, but a decoded API payload is content this module is expected to
+// keep - file.Save exists for exactly that - and it needs a place to go.
+//
+// This used to refuse KindAPI, which made that impossible and quietly
+// disabled the callers that had already been written for it. starlight asks
+// for esa.gaia's cache directory to checkpoint an hour-long Gaia aggregation
+// and resume it across sessions; both its read and its write sat behind a
+// "cache directory was available" branch that could never be taken, so the
+// aggregation restarted from nothing every time. Nothing reported it, because
+// a cache that cannot be reached is indistinguishable from a cold one.
 func CacheDir(ctx context.Context, id EndpointID) (bucket *file.Bucket, prefix string, err error) {
 	ep, ok := Lookup(id)
 	if !ok {
 		return nil, "", fmt.Errorf("%w: %q", ErrUnknownEndpoint, id)
-	}
-
-	if !ep.Kind.cacheable() {
-		return nil, "", fmt.Errorf("%w: %q has no cache directory", ErrNotFileEndpoint, id)
 	}
 
 	bucket, err = DataDir(ctx)

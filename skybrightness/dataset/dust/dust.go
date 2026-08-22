@@ -20,12 +20,14 @@
 package dust
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"fmt"
 	"io"
 	"math"
 	"net/url"
+	"path"
 	"regexp"
 	"strconv"
 	"strings"
@@ -35,6 +37,7 @@ import (
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/remote/api"
+	"github.com/TuSKan/astrogo/remote/file"
 )
 
 // Sentinel errors for the dust provider.
@@ -148,13 +151,32 @@ func Fetch(ctx context.Context, into *Map, directions ...Direction) (*Map, error
 		return into, nil
 	}
 
-	client, err := api.NewClient(remote.IRSADust,
-		api.WithMinInterval(queryPace),
-		api.WithTimeout(90*time.Second))
-	if err != nil {
-		return nil, fmt.Errorf("dust: client: %w", err)
+	// What previous sessions already learned. A sightline's 100 micron
+	// intensity does not change, so a value fetched once is a value fetched
+	// for good; the alternative is asking a shared facility the same question
+	// every run, which is how this package spent twenty-five minutes of IRSA's
+	// time answering a question it had already answered.
+	bucket, prefix, cacheErr := remote.CacheDir(ctx, remote.IRSADust)
+
+	key := ""
+	held := map[cell]float64{}
+
+	if cacheErr == nil {
+		key = path.Join(prefix, cacheFile)
+		// A cache that cannot be read is a cold cache, not a failure.
+		held = readCache(ctx, bucket, key)
 	}
-	defer func() { _ = client.Close() }()
+
+	var (
+		client  *api.Client
+		fetched bool
+	)
+
+	defer func() {
+		if client != nil {
+			_ = client.Close()
+		}
+	}()
 
 	seen := make(map[cell]struct{}, len(directions))
 
@@ -167,18 +189,115 @@ func Fetch(ctx context.Context, into *Map, directions ...Direction) (*Map, error
 		seen[c] = struct{}{}
 
 		if _, err := into.IntensityAt(d.L, d.B); err == nil {
-			continue // already held
+			continue // already held in memory
+		}
+
+		if v, ok := held[c]; ok {
+			into.set(d.L, d.B, v)
+
+			continue // already held on disk
+		}
+
+		// The client is built on the first sightline that actually needs
+		// asking, so a fully cached call makes no connection at all.
+		if client == nil {
+			c, err := api.NewClient(remote.IRSADust,
+				api.WithMinInterval(queryPace),
+				api.WithTimeout(90*time.Second))
+			if err != nil {
+				return nil, fmt.Errorf("dust: client: %w", err)
+			}
+
+			client = c
 		}
 
 		v, err := query(ctx, client, d)
 		if err != nil {
+			// Keep whatever this call did learn: being cut off part way
+			// through a long list should cost the remaining sightlines, not
+			// the ones already paid for.
+			if fetched && key != "" {
+				_ = writeCache(ctx, bucket, key, held)
+			}
+
 			return nil, err
 		}
 
 		into.set(d.L, d.B, v)
+
+		held[c] = v
+		fetched = true
+	}
+
+	if fetched && key != "" {
+		// A cache that cannot be written costs the next run its time, not
+		// this one its answer.
+		_ = writeCache(ctx, bucket, key, held)
 	}
 
 	return into, nil
+}
+
+// cacheFile is where fetched intensities accumulate under the endpoint's
+// cache directory.
+const cacheFile = "i100.txt"
+
+// readCache returns the intensities a previous session stored, keyed by cell.
+//
+// Any failure is a cold cache: the file may not exist yet, and a truncated or
+// malformed line costs the sightline on it rather than the whole file, since
+// the worst case is asking IRSA again for that one direction.
+func readCache(ctx context.Context, bucket *file.Bucket, key string) map[cell]float64 {
+	out := map[cell]float64{}
+
+	r, err := bucket.NewReader(ctx, key, nil)
+	if err != nil {
+		return out
+	}
+	defer func() { _ = r.Close() }()
+
+	scanner := bufio.NewScanner(r)
+	for scanner.Scan() {
+		fields := strings.Fields(scanner.Text())
+		if len(fields) != 3 {
+			continue
+		}
+
+		l, errL := strconv.Atoi(fields[0])
+		b, errB := strconv.Atoi(fields[1])
+
+		v, errV := strconv.ParseFloat(fields[2], 64)
+		if errL != nil || errB != nil || errV != nil {
+			continue
+		}
+
+		if v < 0 || math.IsNaN(v) || math.IsInf(v, 0) {
+			continue
+		}
+
+		out[cell{l: l, b: b}] = v
+	}
+
+	return out
+}
+
+// writeCache stores every intensity held, replacing the file.
+//
+// The whole map each time rather than an append: the file is a few tens of
+// bytes per sightline, and rewriting it keeps one reader implementation
+// instead of one for the file and another for its tail.
+func writeCache(ctx context.Context, bucket *file.Bucket, key string, held map[cell]float64) error {
+	var buf strings.Builder
+
+	for c, v := range held {
+		fmt.Fprintf(&buf, "%d %d %.6e\n", c.l, c.b, v)
+	}
+
+	if err := file.Save(ctx, bucket, key, strings.NewReader(buf.String())); err != nil {
+		return fmt.Errorf("dust: write cache %s: %w", key, err)
+	}
+
+	return nil
 }
 
 // hundredMicron matches the 100 micron block's reference-pixel value, in
