@@ -1575,6 +1575,42 @@ This is still a data-preparation job producing a map, not a runtime operation �
 architecture is unchanged, since `dataset/starlight` already consumes such a map. What it
 changes is that the map can now be produced without waiting on anyone.
 
+**The Table 2 starlight-to-zodiacal ratio — PARTLY EXPLAINED, and not by the star map.**
+
+Our zenith starlight/zodiacal ratio is 1.236 against Table 2's 1.075, a 15 per cent
+difference that survives every transfer change tried against it. It was carried for a while
+as a suspected 15 per cent excess in the integrated-starlight map. It is not that, or at
+least it is not established as that, for two reasons.
+
+**The transfer cannot produce it, as arithmetic rather than as a claim about the code.**
+Under the effective-optical-depth transfer, every extended component in a given direction is
+multiplied by the same `exp(-κτm)` — same airmass, same depth, same factor. A ratio of two
+extended components at one direction is invariant under any change to κ, to the airmass law
+or to the aerosol load. That is why the number never moved: nothing in the transfer *can*
+move it. `TestPresetsDifferOnlyInTransfer` holds the other half of that statement.
+
+**The missing scattered-in term is a real contributor with the right sign, and explains
+about a quarter of it.** Table 2 comes from the paper's full model, Eq. 11, which adds light
+scattered *into* the beam from the rest of the sky. That term scales with a component's
+radiance over the whole hemisphere rather than in the direction observed, so it is not a
+common factor: it favours components with light away from the zenith.
+`TestScatteredInTermExplainsTheZenithRatio` measures the hemisphere-mean-to-zenith ratio of
+both components over 96 epochs and 20,736 sightlines at the Table 2 geometry — zodiacal
+1.051, starlight 0.867 — which is the sign needed. But closing the whole gap would need a
+scattered-in coefficient near 2.7, against the 0.223 of scattering optical depth the scene
+has at 552.4 nm. At the depth actually available it supplies 26 per cent. **The other 74 per
+cent is unexplained.**
+
+Two consequences. Table 2 **cannot** be used to attribute a discrepancy to any one
+component, because a component-by-component comparison against a full-model composition is
+confounded by a term this module does not implement, in an amount that is small but not
+negligible. And an earlier reading of that table which put starlight 41 per cent high was an
+artifact: it used the 3.1 vs 3.5 per cent background column as the reference, whose two
+significant figures cannot support a ratio. Read against the all-sky export instead — the
+web-service model, which is the one we implement, and where the airglow-off sky agrees to
+4 per cent — the same ratio difference splits to roughly starlight +7 per cent and zodiacal
+−7 per cent, which is the honest size of the thing still to be explained.
+
 **Kawara et al. (2017) DGL coefficients — RESOLVED, including a misreading of my own.**
 
 I claimed the published units were dimensionally impossible. They are not, and the reason
