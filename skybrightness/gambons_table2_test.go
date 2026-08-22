@@ -78,10 +78,18 @@ func johnsonVFromTable1() magnitude.Passband {
 	lo, hi := centre-width/2, centre+width/2
 
 	return magnitude.Passband{
-		Name:            "Johnson-Cousins V (tophat on Masana et al. 2024 Table 1)",
-		WavelengthNM:    []unit.WavelengthNM{unit.WavelengthNM(lo - 1), unit.WavelengthNM(lo), unit.WavelengthNM(hi), unit.WavelengthNM(hi + 1)},
-		Response:        []float64{0, 1, 1, 0},
-		Detector:        magnitude.PhotonCounting,
+		Name: "Johnson-Cousins V (tophat on Masana et al. 2024 Table 1)",
+		WavelengthNM: []unit.WavelengthNM{
+			unit.WavelengthNM(lo - 1), unit.WavelengthNM(lo),
+			unit.WavelengthNM(hi), unit.WavelengthNM(hi + 1),
+		},
+		Response: []float64{0, 1, 1, 0},
+
+		// Energy, not photons. Masana et al. (2021) Section 3.2 state they take
+		// Bessell & Murphy's photonic V and transform it back to its original
+		// energy response form, because the classical V system is defined on
+		// in-band irradiance rather than photon number.
+		Detector:        magnitude.EnergyIntegrating,
 		VegaZeroPointJy: 3636,
 		Reference:       "Masana et al. (2024) Table 1, effective wavelength and width",
 	}
@@ -137,14 +145,14 @@ func TestAgainstGAMBONSTable2(t *testing.T) {
 		len(epochs), table2CapSamples, table2CapDeg)
 
 	// Every sightline this test will look along, so dust is fetched once.
-	cap := zenithCap(table2CapDeg, table2CapSamples)
+	capDirs := zenithCap(table2CapDeg, table2CapSamples)
 
-	var dirs []dust.Direction
+	dirs := make([]dust.Direction, 0, len(capDirs)*len(epochs))
 
 	for _, when := range epochs {
 		cc := coord.NewContext(astrotime.FromGo(when), site, atm.Refraction())
 
-		for _, d := range cap {
+		for _, d := range capDirs {
 			icrs, err := cc.AltAzToICRS(d)
 			if err != nil {
 				t.Fatalf("AltAzToICRS: %v", err)
@@ -219,7 +227,7 @@ func TestAgainstGAMBONSTable2(t *testing.T) {
 			Ephemeris:  provider,
 		}
 
-		for _, d := range cap {
+		for _, d := range capDirs {
 			est, err := model.Estimate(ctx,
 				skybrightness.Query{Scene: scene, Direction: d, Grid: grid})
 			if err != nil {
@@ -243,6 +251,13 @@ func TestAgainstGAMBONSTable2(t *testing.T) {
 					share["zodiacal"] += flux
 				case skybrightness.DiffuseGalactic, skybrightness.Extragalactic:
 					share["background"] += flux
+
+				case skybrightness.Moonlight, skybrightness.Twilight, skybrightness.Artificial:
+					// GAMBONS is a model of the natural sky on a moonless
+					// night, so Table 2 has no column for any of these and a
+					// scene that produced one would not be comparable with it.
+					t.Fatalf("component %q has no counterpart in Table 2; this scene is not "+
+						"the one the table was computed for", id)
 				}
 
 				total += flux
@@ -317,7 +332,7 @@ func table2Epochs(
 		var dark []gotime.Time
 
 		for step := range 48 {
-			when := day.Add(gotime.Duration(step) * 30 * gotime.Minute)
+			when := day.Add(gotime.Duration(step*30) * gotime.Minute) //nolint:durationcheck // step*30 is a count of minutes, not a duration
 
 			cc := coord.NewContext(astrotime.FromGo(when), site, atm.Refraction())
 
