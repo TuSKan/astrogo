@@ -2,14 +2,12 @@ package starlight
 
 import (
 	"context"
-	"encoding/csv"
 	"errors"
 	"fmt"
 	"io"
 	"math"
 	"net/url"
 	"path"
-	"strconv"
 	"strings"
 	"time"
 
@@ -711,7 +709,14 @@ func (g GaiaBuild) runQuery(
 
 		defer func() { _ = body.Close() }()
 
-		return g.accumulate(body, bands, counts, solidAngle)
+		rows, err := newParquetRows(ctx, body)
+		if err != nil {
+			return fmt.Errorf("starlight: %s: %w", what, err)
+		}
+
+		defer rows.Close()
+
+		return g.accumulate(rows, bands, counts, solidAngle)
 	}
 
 	v := url.Values{}
@@ -726,66 +731,62 @@ func (g GaiaBuild) runQuery(
 	}
 	defer func() { _ = body.Close() }()
 
-	return g.accumulate(body, bands, counts, solidAngle)
+	rows, err := newCSVRows(body)
+	if err != nil {
+		return fmt.Errorf("starlight: %s: %w", what, err)
+	}
+
+	return g.accumulate(rows, bands, counts, solidAngle)
 }
 
-// accumulate reads one chunk's CSV into the map under construction.
+// accumulate reads an aggregation result into the map under construction.
+//
+// The result is read through [resultRows] rather than through a format, so the
+// same code serves the CSV a synchronous query returns and the Parquet an
+// asynchronous one does.
 func (g GaiaBuild) accumulate(
-	r io.Reader,
+	rows resultRows,
 	bands map[string][]float64,
 	counts []int64,
 	solidAngle float64,
 ) error {
-	reader := csv.NewReader(r)
-	reader.FieldsPerRecord = -1
-
-	header, err := reader.Read()
-	if err != nil {
-		return fmt.Errorf("%w: %w", ErrGaiaResponse, err)
-	}
-
-	index := map[string]int{}
-	for i, name := range header {
-		index[strings.ToLower(strings.TrimSpace(name))] = i
-	}
-
-	for {
-		row, err := reader.Read()
-		if errors.Is(err, io.EOF) {
-			return nil
+	for rows.Next() {
+		pixel, ok := integer(rows, "hpx")
+		if !ok || pixel < 0 || pixel >= int64(len(counts)) {
+			return fmt.Errorf("%w: pixel index out of range", ErrGaiaResponse)
 		}
 
-		if err != nil {
-			return fmt.Errorf("%w: %w", ErrGaiaResponse, err)
-		}
-
-		pixel, err := strconv.ParseInt(strings.TrimSpace(row[index["hpx"]]), 10, 64)
-		if err != nil || pixel < 0 || pixel >= int64(len(counts)) {
-			return fmt.Errorf("%w: pixel index %q", ErrGaiaResponse, row[index["hpx"]])
-		}
-
-		if i, ok := index["n"]; ok {
-			counts[pixel], _ = strconv.ParseInt(strings.TrimSpace(row[i]), 10, 64)
+		if n, ok := integer(rows, "n"); ok {
+			counts[pixel] = n
 		}
 
 		for _, b := range g.Bands {
-			// The archive returns its column names lowercased, and the index
-			// is built that way, so the lookup has to match.
-			i, ok := index[strings.ToLower(columnName(b.Name))]
-			if !ok {
+			// The archive returns its column names lowercased, and the lookup
+			// is done that way.
+			col := strings.ToLower(columnName(b.Name))
+
+			// A band with no column at all is a build asking for something the
+			// query never selected, which no pixel can fix.
+			if !rows.Has(col) {
 				return fmt.Errorf("%w: no column for band %q", ErrGaiaResponse, b.Name)
 			}
 
-			flux, err := strconv.ParseFloat(strings.TrimSpace(row[i]), 64)
-			if err != nil || flux < 0 {
+			flux, ok := rows.Number(col)
+			if !ok || flux < 0 {
 				continue // a pixel with no usable sources contributes nothing
 			}
 
-			flux += g.recoverColourless(b, index, row)
+			flux += g.recoverColourless(b, rows)
 
 			bands[b.Name][pixel] = flux * b.FluxToRadiance / solidAngle
 		}
 	}
+
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("%w: %w", ErrGaiaResponse, err)
+	}
+
+	return nil
 }
 
 // recoverColourless returns the flux the colour polynomial dropped, scaled as
@@ -802,32 +803,24 @@ func (g GaiaBuild) accumulate(
 // source at all to average. That last case cannot be corrected by any local
 // mean, and inventing a global one would be exactly the fabrication this
 // package refuses elsewhere.
-func (g GaiaBuild) recoverColourless(b GaiaBand, index map[string]int, row []string) float64 {
+func (g GaiaBuild) recoverColourless(b GaiaBand, rows resultRows) float64 {
 	if len(b.ColourTerm) == 0 {
 		return 0
 	}
 
 	col := strings.ToLower(columnName(b.Name))
 
-	value := func(suffix string) (float64, bool) {
-		i, ok := index[col+suffix]
-		if !ok || i >= len(row) {
-			return 0, false
-		}
-
-		v, err := strconv.ParseFloat(strings.TrimSpace(row[i]), 64)
-		if err != nil {
-			return 0, false
-		}
-
-		return v, true
+	// A result predating these columns carries no correction, and a pixel with
+	// no coloured source has no mean to apply. Both leave the sum uncorrected.
+	if !rows.Has(col+"_all") || !rows.Has(col+"_col") || !rows.Has(col+"_mc") {
+		return 0
 	}
 
-	all, okAll := value("_all")
-	coloured, okCol := value("_col")
-	mean, okMean := value("_mc")
+	all, haveAll := rows.Number(col + "_all")
+	coloured, haveColoured := rows.Number(col + "_col")
+	mean, haveMean := rows.Number(col + "_mc")
 
-	if !okAll || !okCol || !okMean {
+	if !haveAll || !haveColoured || !haveMean {
 		return 0
 	}
 
@@ -839,45 +832,14 @@ func (g GaiaBuild) recoverColourless(b GaiaBand, index map[string]int, row []str
 	return dropped * b.colourFactor(mean)
 }
 
-// johnsonVZeroFlux is Johnson V's Vega zero point: the spectral flux density
-// of a V = 0 star, in W m^-2 nm^-1.
+// GaiaJohnsonV is the Johnson V band on the zero point this package carries as
+// a literal.
 //
-// Both paths into a V-band map rest on it — the Gaia conversion in
-// [GaiaJohnsonV] and the Hipparcos one in [AddBrightStars] — so it is declared
-// once. Two copies of a zero point are two chances for them to drift apart,
-// and a map built half on each would be wrong by the difference with nothing
-// to show it.
-const johnsonVZeroFlux = 3.63e-11
-
-// GaiaJohnsonV returns the Gaia G to Johnson V band, ready for [GaiaBuild].
-//
-// It exists because the conversion needs three published numbers that come
-// from three different places, and mixing them is invisible in the result:
-//
-//   - Gaia DR3's G-band VEGAMAG zero point, 25.6874, which turns
-//     phot_g_mean_flux in e-/s into a G magnitude.
-//   - The G to V colour transformation of Riello et al. (2021), Gaia DR3
-//     photometric documentation, Section 5.5.1, Table 5.9. The table is
-//     tabulated as G minus
-//     the target band, so its polynomial is G - V directly and is entered
-//     here unchanged, which is what the query's +0.4 exponent needs: the
-//     factor is 10^(0.4*(G-V)) = F_V/F_G. G - V is negative for ordinary
-//     stars, so a red star loses flux in V, which is the physical direction
-//   - G spans 330-1050 nm against V's 500-600 nm, so a star is always
-//     brighter in G. See [magnitude.GaiaGToJohnsonV] for how the direction
-//     was established.
-//   - Johnson V's Vega zero point, 3.63e-11 W m^-2 nm^-1, which turns that V
-//     magnitude into a spectral flux density.
-//
-// Using G's zero point with V's flux density and no colour term — the obvious
-// mistake — produces a map that is neither a G map nor a V map, and is wrong
-// by the colour term of whatever mix of spectral types the pixel holds. The
-// result is plausible everywhere and badly wrong along the Galactic plane,
-// where the ensemble is reddest.
-//
-// The transformation is fitted for -0.5 < BP-RP < 5.0. Sources with no colour
-// at all make the polynomial null and SQL drops them from the sum; their count
-// comes back per pixel so the caller can see how much of a pixel that is.
+// [GaiaJohnsonCousins] is the general form and the one to reach for: it covers
+// B, V, R and I, and it takes the zero point from a passband's own published
+// calibration rather than from a number written down here. This remains
+// because the Hipparcos bright-star path rests on the same literal, so the two
+// have to agree, and a V band built from it is the thing that says they do.
 func GaiaJohnsonV() GaiaBand {
 	const gZeroPoint = 25.6874 // Gaia DR3 G VEGAMAG zero point
 
@@ -887,6 +849,16 @@ func GaiaJohnsonV() GaiaBand {
 		FluxToRadiance: johnsonVZeroFlux / math.Pow(10, gZeroPoint/2.5),
 	}
 }
+
+// johnsonVZeroFlux is Johnson V's Vega zero point: the spectral flux density
+// of a zero-magnitude star, in W m^-2 nm^-1.
+//
+// The Hipparcos bright-star path in [AddBrightStars] rests on it, and so does
+// the check that [VegaZeroFlux] reproduces it from a passband's own published
+// calibration. Two copies of a zero point are two chances for them to drift
+// apart, and a map built half on each would be wrong by the difference with
+// nothing to show it.
+const johnsonVZeroFlux = 3.63e-11
 
 // JohnsonCousinsColourTerm returns the published Gaia G-to-band polynomial for
 // one of the Johnson-Cousins bands B, V, R or I.
@@ -1010,9 +982,11 @@ func isAsync(id remote.EndpointID) bool {
 // rather than re-run the query. Nothing in the CSV depends on the zero points,
 // which are applied here, so the same result serves any calibration.
 //
-// r is the CSV the service returns for the query [GaiaBuild.ADQL] generates:
-// one row per pixel, with the per-band flux and colour-recovery columns.
-func BuildFromResult(r io.Reader, build GaiaBuild) (*Map, []int64, error) {
+// r is the result the service returns for the query [GaiaBuild.ADQL]
+// generates: one row per pixel, with the per-band flux and colour-recovery
+// columns. Parquet and CSV are both accepted and told apart by the file's own
+// magic, so a caller does not have to remember which format a job asked for.
+func BuildFromResult(ctx context.Context, r io.Reader, build GaiaBuild) (*Map, []int64, error) {
 	build, err := build.withDefaults()
 	if err != nil {
 		return nil, nil, err
@@ -1028,7 +1002,16 @@ func BuildFromResult(r io.Reader, build GaiaBuild) (*Map, []int64, error) {
 
 	counts := make([]int64, npix)
 
-	if err := build.accumulate(r, bands, counts, solidAngle); err != nil {
+	rows, err := openResult(ctx, r)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	if closer, ok := rows.(*parquetRows); ok {
+		defer closer.Close()
+	}
+
+	if err := build.accumulate(rows, bands, counts, solidAngle); err != nil {
 		return nil, nil, err
 	}
 

@@ -322,34 +322,32 @@ func TestColourRecoveryDegradesSafely(t *testing.T) {
 	spec := fetchSpec()
 
 	cases := []struct {
-		name  string
-		index map[string]int
-		row   []string
-		want  float64
+		name   string
+		header string
+		row    string
+		want   float64
 	}{
-		{"columns absent", map[string]int{}, nil, 0},
-		{
-			"nothing dropped",
-			map[string]int{"b_v_all": 0, "b_v_col": 1, "b_v_mc": 2},
-			[]string{"100", "100", "0.8"},
-			0,
-		},
-		{
-			"no colour to average",
-			map[string]int{"b_v_all": 0, "b_v_col": 1, "b_v_mc": 2},
-			[]string{"100", "0", ""},
-			0,
-		},
-		{
-			"recovers the difference",
-			map[string]int{"b_v_all": 0, "b_v_col": 1, "b_v_mc": 2},
-			[]string{"100", "60", "0"},
-			40 * band.colourFactor(0),
-		},
+		{"no recovery columns", "hpx", "0", 0},
+		{"nothing dropped", "b_v_all,b_v_col,b_v_mc", "100,100,0", 0},
+		{"no coloured source to average", "b_v_all,b_v_col,b_v_mc", "100,0,", 0},
+		{"recovers the difference", "b_v_all,b_v_col,b_v_mc", "100,60,0", 40 * band.colourFactor(0)},
 	}
 
+	// One header line and one data line, which is the smallest thing
+	// newCSVRows will read.
+	const NL = "\n"
+
 	for _, tc := range cases {
-		got := spec.recoverColourless(band, tc.index, tc.row)
+		rows, err := newCSVRows(strings.NewReader(tc.header + NL + tc.row + NL))
+		if err != nil {
+			t.Fatalf("%s: newCSVRows: %v", tc.name, err)
+		}
+
+		if !rows.Next() {
+			t.Fatalf("%s: no row", tc.name)
+		}
+
+		got := spec.recoverColourless(band, rows)
 		if math.Abs(got-tc.want) > 1e-12 {
 			t.Errorf("%s: got %v, want %v", tc.name, got, tc.want)
 		}

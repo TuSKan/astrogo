@@ -30,7 +30,12 @@ func TestAccumulateMatchesLowercaseHeader(t *testing.T) {
 
 	const solidAngle = 4 * math.Pi / 3072
 
-	if err := build.accumulate(strings.NewReader(csv), bands, counts, solidAngle); err != nil {
+	rows, err := newCSVRows(strings.NewReader(csv))
+	if err != nil {
+		t.Fatalf("newCSVRows: %v", err)
+	}
+
+	if err := build.accumulate(rows, bands, counts, solidAngle); err != nil {
 		t.Fatalf("accumulate: %v", err)
 	}
 
@@ -60,7 +65,7 @@ func TestAccumulateRejectsMissingBand(t *testing.T) {
 	build := GaiaBuild{Order: 4, Bands: []GaiaBand{{Name: "V", FluxToRadiance: 1}}}
 
 	err := build.accumulate(
-		strings.NewReader("hpx,n,ncolour,b_g\n0,1,1,1.0\n"),
+		mustRows(t, "hpx,n,ncolour,b_g\n0,1,1,1.0\n"),
 		map[string][]float64{"V": make([]float64, 3072)},
 		make([]int64, 3072),
 		1,
@@ -79,7 +84,7 @@ func TestAccumulateRejectsPixelOutOfRange(t *testing.T) {
 
 	for _, row := range []string{"99999,1,1,1.0", "-1,1,1,1.0", "abc,1,1,1.0"} {
 		err := build.accumulate(
-			strings.NewReader("hpx,n,ncolour,b_g\n"+row+"\n"),
+			mustRows(t, "hpx,n,ncolour,b_g\n"+row+"\n"),
 			map[string][]float64{"G": make([]float64, 3072)},
 			make([]int64, 3072),
 			1,
@@ -100,7 +105,7 @@ func TestAccumulateSkipsUnusableFlux(t *testing.T) {
 
 	csv := "hpx,n,ncolour,b_g\n0,1,1,\n1,1,1,-5\n2,1,1,7\n"
 
-	if err := build.accumulate(strings.NewReader(csv), bands, make([]int64, 3072), 1); err != nil {
+	if err := build.accumulate(mustRows(t, csv), bands, make([]int64, 3072), 1); err != nil {
 		t.Fatalf("accumulate: %v", err)
 	}
 
@@ -111,4 +116,16 @@ func TestAccumulateSkipsUnusableFlux(t *testing.T) {
 	if bands["G"][2] != 7 {
 		t.Errorf("the usable flux became %v, want 7", bands["G"][2])
 	}
+}
+
+// mustRows builds a CSV row reader for a test body.
+func mustRows(t *testing.T, body string) resultRows {
+	t.Helper()
+
+	rows, err := newCSVRows(strings.NewReader(body))
+	if err != nil {
+		t.Fatalf("newCSVRows: %v", err)
+	}
+
+	return rows
 }

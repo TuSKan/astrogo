@@ -54,7 +54,16 @@ func runAsync(ctx context.Context, client *api.Client, id remote.EndpointID, adq
 	v := url.Values{}
 	v.Set("REQUEST", "doQuery")
 	v.Set("LANG", "ADQL")
-	v.Set("FORMAT", "csv")
+	// Parquet, not CSV.
+	//
+	// The synchronous endpoints ignore FORMAT and answer VOTable whatever is
+	// asked for; the asynchronous one honours it, which is the only place the
+	// choice is available. Columnar, typed and compressed: a whole-sky
+	// four-band result is about sixty megabytes against two hundred and
+	// forty-five as CSV, and no number crosses the wire as a decimal string to
+	// be parsed back, so the flux this package accumulates is the double the
+	// archive computed rather than a re-reading of its printed form.
+	v.Set("FORMAT", "parquet")
 	v.Set("PHASE", "RUN") // start on creation, so no separate run step is needed
 	v.Set("QUERY", adql)
 
