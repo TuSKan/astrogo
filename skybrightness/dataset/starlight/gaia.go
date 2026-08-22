@@ -13,6 +13,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/TuSKan/astrogo/constants"
+	"github.com/TuSKan/astrogo/magnitude"
 	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/remote/api"
 )
@@ -832,4 +834,107 @@ func GaiaJohnsonV() GaiaBand {
 		ColourTerm:     []float64{-0.02704, 0.01424, -0.2156, 0.01426},
 		FluxToRadiance: johnsonVZeroFlux / math.Pow(10, gZeroPoint/2.5),
 	}
+}
+
+// JohnsonCousinsColourTerm returns the published Gaia G-to-band polynomial for
+// one of the Johnson-Cousins bands B, V, R or I.
+//
+// The coefficients are the Gaia DR3 photometric documentation, Section 5.5.1,
+// Table 5.9, tabulated as G minus the target band and in ascending powers of
+// BP-RP. They are the same relations [github.com/TuSKan/astrogo/magnitude]
+// exposes as functions; here they are needed as data, because the aggregation
+// renders them into ADQL and evaluates them server-side inside the SUM.
+//
+// U is absent and cannot be added: Gaia's bluest band starts around 330 nm and
+// Table 5.9 publishes no G-to-U relation, because Gaia does not constrain the
+// Balmer jump well enough to support one. A four-band map is what this
+// catalogue can produce.
+func JohnsonCousinsColourTerm(band string) ([]float64, error) {
+	switch band {
+	case "B":
+		return []float64{0.01448, -0.6874, -0.3604, 0.06718, -0.006061}, nil
+	case "V":
+		return []float64{-0.02704, 0.01424, -0.2156, 0.01426}, nil
+	case "R":
+		return []float64{-0.02275, 0.3961, -0.1243, -0.01396, 0.003775}, nil
+	case "I":
+		return []float64{0.01753, 0.76, -0.0991}, nil
+	default:
+		return nil, fmt.Errorf("%w: no published Gaia relation for band %q; Table 5.9 has "+
+			"B, V, R and I, and no U", ErrGaiaBand, band)
+	}
+}
+
+// VegaZeroFlux returns a passband's Vega zero point as a spectral flux
+// density in W m^-2 nm^-1: the flux of a zero-magnitude star.
+//
+// Derived from the passband rather than tabulated, because a zero point and
+// the curve it belongs to are one calibration and transcribing half of it
+// invites the two to drift. The service publishes the zero point in janskys,
+// which is per unit frequency; converting to per unit wavelength needs the
+// band's pivot wavelength, which is the wavelength at which that conversion is
+// exact for any spectrum:
+//
+//	F_lambda = F_nu * c / lambda_pivot^2
+//
+// Checked against the value this package used to carry as a literal: Bessell V
+// at 3630.22 Jy and a pivot of 547.77 nm gives 3.627e-11, against the 3.63e-11
+// that was written down.
+func VegaZeroFlux(band magnitude.Passband) (float64, error) {
+	if band.VegaZeroPointJy <= 0 {
+		return 0, fmt.Errorf("%w: passband %q carries no Vega zero point",
+			ErrGaiaBand, band.Name)
+	}
+
+	pivot, err := band.PivotWavelength()
+	if err != nil {
+		return 0, fmt.Errorf("%w: passband %q: %w", ErrGaiaBand, band.Name, err)
+	}
+
+	const (
+		jansky      = 1e-26 // W m^-2 Hz^-1
+		metrePerNM  = 1e-9
+		perMToPerNM = 1e-9
+	)
+
+	lambdaM := float64(pivot) * metrePerNM
+
+	return band.VegaZeroPointJy * jansky *
+		constants.SI2019.SpeedOfLight.Value / (lambdaM * lambdaM) * perMToPerNM, nil
+}
+
+// GaiaJohnsonCousins describes one output band of the map, given the passband
+// it is calibrated on.
+//
+// One constructor rather than a GaiaJohnsonB/V/R/I apiece: the band differs
+// only in its colour polynomial and its zero point, and the first comes from
+// [JohnsonCousinsColourTerm] while the second comes from the passband the
+// caller already has. A caller resolves that passband from
+// [github.com/TuSKan/astrogo/skybrightness/dataset/passband], so the curve,
+// the detector convention and the zero point all arrive together from one
+// published calibration.
+//
+// name selects the published relation and labels the band in the map; it is
+// one of "B", "V", "R", "I".
+func GaiaJohnsonCousins(name string, band magnitude.Passband) (GaiaBand, error) {
+	colour, err := JohnsonCousinsColourTerm(name)
+	if err != nil {
+		return GaiaBand{}, err
+	}
+
+	zero, err := VegaZeroFlux(band)
+	if err != nil {
+		return GaiaBand{}, err
+	}
+
+	// The Gaia DR3 G VEGAMAG zero point, which turns a catalogue flux in
+	// electrons per second into a magnitude and so has to be undone before the
+	// target band's zero point is applied.
+	const gZeroPoint = 25.6874
+
+	return GaiaBand{
+		Name:           name,
+		ColourTerm:     colour,
+		FluxToRadiance: zero / math.Pow(10, gZeroPoint/2.5),
+	}, nil
 }

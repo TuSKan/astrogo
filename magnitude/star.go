@@ -123,3 +123,72 @@ func GaiaGToJohnsonB(G, bpMinusRp float64) float64 {
 
 	return G - gMinusB
 }
+
+// GaiaGToJohnsonR converts a Gaia DR3 G-band magnitude to an approximate
+// Johnson-Cousins R-band magnitude, using the quartic of the Gaia DR3
+// photometric documentation, Section 5.5.1, Table 5.9:
+//
+//	G − R = −0.02275 + 0.3961·(BP−RP) − 0.1243·(BP−RP)²
+//	        − 0.01396·(BP−RP)³ + 0.003775·(BP−RP)⁴
+//
+// so R = G − (G−R), the same tabulation and the same direction as
+// [GaiaGToJohnsonV]. Published σ is 0.03167 mag.
+//
+// Anchored on the Sun: at the solar BP−RP of 0.82 the polynomial gives
+// G − R = 0.2125, which with G − V = −0.1525 from [GaiaGToJohnsonV] puts the
+// solar V − R at 0.365 against a published 0.35 to 0.36. The sign is the one
+// physical check that matters — G spans 330 to 1050 nm and R sits redward of
+// its centre, so a star is fainter in G than in R and G − R is positive for
+// anything cooler than a hot blue star.
+//
+// # Validity
+//
+// Fitted for 0.0 < BP−RP < 4.0, and Table 5.10 restricts it further: beyond
+// BP−RP = 2.0 it holds only for M giants. Nothing is clamped here.
+//
+// Parameters:
+//   - G: Gaia DR3 G-band magnitude
+//   - bpMinusRp: Gaia BP − RP colour index
+func GaiaGToJohnsonR(G, bpMinusRp float64) float64 {
+	c := bpMinusRp
+	gMinusR := -0.02275 + 0.3961*c - 0.1243*c*c - 0.01396*c*c*c + 0.003775*c*c*c*c
+
+	return G - gMinusR
+}
+
+// GaiaGToCousinsI converts a Gaia DR3 G-band magnitude to an approximate
+// Cousins I-band magnitude, using the quadratic of the Gaia DR3 photometric
+// documentation, Section 5.5.1, Table 5.9:
+//
+//	G − I_C = 0.01753 + 0.76·(BP−RP) − 0.0991·(BP−RP)²
+//
+// so I = G − (G−I), the same tabulation and the same direction as
+// [GaiaGToJohnsonV]. Published σ is 0.03765 mag.
+//
+// # It is a quadratic, and the table's own layout is what says so
+//
+// This is the one relation in Table 5.9 whose degree is not obvious from
+// reading it: the row carries three numbers after the label where the V row
+// carries four and the B and R rows carry five, and in every other row the
+// last of them is σ. Two readings of the rendered table disagreed about
+// whether 0.03765 is a cubic coefficient or the σ. The cell counts settle it —
+// coefficients plus σ, so three numbers means two coefficients and a
+// constant — and the Sun confirms it: the quadratic gives a solar V − I of
+// 0.727 against a published 0.71 to 0.72, where reading 0.03765 as a cubic
+// term gives 0.747.
+//
+// # Validity
+//
+// Fitted for −0.5 < BP−RP < 4.5, with no M-giant restriction, which makes it
+// the least encumbered of the four Johnson-Cousins relations. Nothing is
+// clamped here.
+//
+// Parameters:
+//   - G: Gaia DR3 G-band magnitude
+//   - bpMinusRp: Gaia BP − RP colour index
+func GaiaGToCousinsI(G, bpMinusRp float64) float64 {
+	c := bpMinusRp
+	gMinusI := 0.01753 + 0.76*c - 0.0991*c*c
+
+	return G - gMinusI
+}
