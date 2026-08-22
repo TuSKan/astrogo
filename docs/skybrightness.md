@@ -1575,6 +1575,47 @@ This is still a data-preparation job producing a map, not a runtime operation �
 architecture is unchanged, since `dataset/starlight` already consumes such a map. What it
 changes is that the map can now be produced without waiting on anyone.
 
+**The airglow disagreement is a colour error, not a normalisation — measured across five
+bands.**
+
+The V-band comparison put airglow 8.8 percentage points below Table 2 and could say nothing
+about why, because one band cannot distinguish a component that is uniformly too faint from
+one whose spectrum has the wrong shape. Five bands can, and the passband provider
+(`skybrightness/dataset/passband`) makes five available: real Bessell (1990) curves from SVO
+with the published detector convention and zero point.
+
+The zodiacal-to-airglow ratio is the one Table 2 quantity reachable without a star map —
+integrated starlight exists only in V, and diffuse galactic light is correlated against that
+same map, so both are V-only until four more Gaia aggregations are run. The ratio is
+dimensionless, immune to the zero point and to the absolute airglow level, and published in
+all five bands.
+
+| band | astrogo | Table 2 | ours/theirs | grid coverage |
+| :--- | ---: | ---: | ---: | ---: |
+| U | 0.4028 | 0.1920 | 2.098 | 90% |
+| B | 0.8101 | 0.7367 | **1.100** | 100% |
+| V | 0.8066 | 0.5750 | 1.403 | 100% |
+| R | 0.5816 | 0.3506 | 1.659 | 100% |
+| I | 0.2108 | 0.1169 | 1.804 | 100% |
+
+Geometric mean 1.575, **spread 1.91×**. A flat offset would have meant one component is
+scaled wrong and the spectrum's shape is right; a spread this size means the shape itself
+differs. The two call for entirely different work, which is exactly what the single-band
+comparison could not say.
+
+The shape of it is the lead: B agrees to 10 per cent while U, V, R and I do not, and the
+disagreement is not monotonic in wavelength, so it is not a smooth colour term. That points
+at line systems rather than at a continuum slope — the [OI] 557.7 nm line sits inside V, the
+Herzberg O₂ bands dominate U and the OH Meinel bands dominate I, while B is comparatively
+line-poor. The next thing to establish is which SkyCalc request GAMBONS actually made:
+their reference file is `ESO_SkyCalc_100_10.dat` and this comparison asks for 100 sfu, which
+need not be the same parameters. `TestAgainstGAMBONSTable2AcrossBands` holds the
+measurement.
+
+**U is over a truncated band.** `DefaultOpticalGrid` starts at 330 nm and Bessell U runs
+blueward of that, so its 90 per cent coverage is reported rather than hidden. The U figure
+is the least trustworthy of the five and should not carry the argument on its own.
+
 **The Table 2 starlight-to-zodiacal ratio — PARTLY EXPLAINED, and not by the star map.**
 
 Our zenith starlight/zodiacal ratio is 1.236 against Table 2's 1.075, a 15 per cent
