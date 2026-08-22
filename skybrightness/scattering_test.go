@@ -335,3 +335,91 @@ func TestScatteredInRejectsBadInput(t *testing.T) {
 		}
 	}
 }
+
+// A sky map and a direction-by-direction evaluation agree exactly.
+//
+// SkyMap samples the incoming field once and shares it across every direction,
+// where Estimate samples one per call. That is a pure optimisation — L_0 is the
+// radiance above the atmosphere and does not depend on where the observer looks
+// — so the two must produce the same numbers, not merely close ones.
+//
+// If they ever diverge, the shared field has picked up a dependence on the
+// view direction, which would make every all-sky map subtly wrong in a way no
+// single-direction test could see.
+func TestSkyMapAgreesWithPerDirectionEstimates(t *testing.T) {
+	t.Parallel()
+
+	in := presetInputs(t)
+
+	model, err := skybrightness.NewPreset(skybrightness.GAMBONSFull, in)
+	if err != nil {
+		t.Fatalf("NewPreset: %v", err)
+	}
+
+	scene := presetGoldenScene(t, skybrightness.GAMBONSFull)
+	q := skybrightness.Query{
+		Scene: scene, Grid: in.Grid, Fidelity: skybrightness.Reference,
+	}
+
+	points, err := model.SkyMap(t.Context(), q, 4)
+	if err != nil {
+		t.Fatalf("SkyMap: %v", err)
+	}
+
+	if len(points) == 0 {
+		t.Fatal("the map is empty")
+	}
+
+	var compared int
+
+	for _, p := range points {
+		// The same direction, evaluated on its own with no shared field.
+		alone, err := model.Direction(t.Context(), q, p.Direction.Alt(), p.Direction.Az())
+		if err != nil {
+			t.Fatalf("Direction %v: %v", p.Direction, err)
+		}
+
+		mapped := p.Estimate.SpectralRadiance()
+		single := alone.SpectralRadiance()
+
+		if len(mapped) != len(single) {
+			t.Fatalf("%v: %d slots against %d", p.Direction, len(mapped), len(single))
+		}
+
+		for i := range mapped {
+			if single[i] == 0 {
+				continue
+			}
+
+			if rel := math.Abs(mapped[i]-single[i]) / math.Abs(single[i]); rel > 1e-12 {
+				t.Fatalf("%v slot %d: map %.17g, single %.17g, relative %.3g — the shared "+
+					"incoming field has picked up a dependence on the view direction",
+					p.Direction, i, mapped[i], single[i], rel)
+			}
+
+			compared++
+		}
+
+		// Per component too: a compensating pair would pass the total.
+		for _, id := range alone.ComponentIDs() {
+			a, okA := p.Estimate.Component(id)
+			b, okB := alone.Component(id)
+
+			if !okA || !okB {
+				t.Fatalf("%v: %s present in one evaluation and not the other", p.Direction, id)
+			}
+
+			for i := range a {
+				if b[i] == 0 {
+					continue
+				}
+
+				if rel := math.Abs(a[i]-b[i]) / math.Abs(b[i]); rel > 1e-12 {
+					t.Fatalf("%v, %s slot %d: map %.17g, single %.17g", p.Direction, id, i, a[i], b[i])
+				}
+			}
+		}
+	}
+
+	t.Logf("%d directions, %d spectral values, all identical to 1e-12", len(points), compared)
+}

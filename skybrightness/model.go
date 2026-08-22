@@ -80,6 +80,12 @@ type Query struct {
 	// Components restricts evaluation to these IDs. Empty means all
 	// registered components.
 	Components []ComponentID
+
+	// field is an incoming field already sampled over the hemisphere, for
+	// reference fidelity. Unexported because it is an optimisation SkyMap
+	// applies to itself rather than a parameter of the question being asked:
+	// the answer is identical with or without it, only the cost differs.
+	field *hemisphereField
 }
 
 // grid returns the query's grid, defaulted.
@@ -212,7 +218,7 @@ func (m *Model) Estimate(ctx context.Context, q Query) (*Estimate, error) {
 	// dearer than a standard one. That is the trade the paper describes and the
 	// reason its own web service does not make it.
 	if q.Fidelity == Reference && evaluated > 0 {
-		if err := m.addScatteredIn(ctx, est, q, grid, 0); err != nil {
+		if err := m.addScatteredIn(ctx, est, q, grid, q.field, 0); err != nil {
 			return nil, err
 		}
 	}

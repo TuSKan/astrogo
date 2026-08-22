@@ -5,6 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"runtime"
+
+	"golang.org/x/sync/errgroup"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
@@ -62,12 +65,39 @@ func (m *Model) SkyMap(ctx context.Context, q Query, rings int) ([]SkyPoint, err
 		return nil, err
 	}
 
-	var out []SkyPoint
+	// The incoming field, once for the whole map.
+	//
+	// Eq. 11's L_0 is the radiance above the atmosphere: it depends on where
+	// the light comes from and not on where the observer looks, so it is the
+	// same field for every direction of this map. Sampling it once turns the
+	// expensive half of a reference-fidelity sky from tens of thousands of
+	// component evaluations into a few hundred, and leaves each direction with
+	// arithmetic that carries no coordinate transform and no transcendental.
+	//
+	// At any other fidelity there is no scattering integral, so nothing is
+	// sampled and nothing is spent.
+	if q.Fidelity == Reference {
+		grid := q.grid()
+		if err := grid.Validate(); err != nil {
+			return nil, fmt.Errorf("%w: %w", ErrNoGrid, err)
+		}
 
+		field, err := m.sampleHemisphere(ctx, q.Scene, grid, 0)
+		if err != nil {
+			return nil, err
+		}
+
+		q.field = field
+	}
+
+	// Every direction the map will hold, laid out before any is evaluated.
+	//
 	// Ring centres sit at half-steps so no sample lands exactly on the
 	// horizon, where airmass diverges and most models leave their stated
 	// validity domain.
 	step := 90.0 / float64(rings)
+
+	var out []SkyPoint
 
 	for r := range rings {
 		altDeg := step * (float64(r) + 0.5)
@@ -75,7 +105,7 @@ func (m *Model) SkyMap(ctx context.Context, q Query, rings int) ([]SkyPoint, err
 		// Azimuth samples scale with cos(alt) so the sky is covered at
 		// roughly constant angular density: a ring near the zenith is
 		// short and needs few samples, one near the horizon is long.
-		n := max(int(math.Round(4*float64(rings)*math.Cos(altDeg*math.Pi/180))), 1)
+		count := max(int(math.Round(4*float64(rings)*math.Cos(altDeg*math.Pi/180))), 1)
 
 		// Each sample owns a patch: one ring's altitude band divided by
 		// the number of azimuth samples around it.
@@ -83,20 +113,50 @@ func (m *Model) SkyMap(ctx context.Context, q Query, rings int) ([]SkyPoint, err
 		hi := (altDeg + step/2) * math.Pi / 180
 		ringSR := 2 * math.Pi * (math.Sin(hi) - math.Sin(lo))
 
-		for a := range n {
-			azDeg := 360 * float64(a) / float64(n)
-
-			est, err := m.Direction(ctx, q, angle.Deg(altDeg), angle.Deg(azDeg))
-			if err != nil {
-				return nil, err
-			}
-
+		for a := range count {
 			out = append(out, SkyPoint{
-				Direction:    coord.NewAltAz(angle.Deg(altDeg), angle.Deg(azDeg)),
-				Estimate:     est,
-				SolidAngleSR: ringSR / float64(n),
+				Direction: coord.NewAltAz(
+					angle.Deg(altDeg), angle.Deg(360*float64(a)/float64(count))),
+				SolidAngleSR: ringSR / float64(count),
 			})
 		}
+	}
+
+	// Evaluated across cores.
+	//
+	// The directions are independent: each reads the scene, the components and
+	// the shared incoming field, and writes only its own estimate. The
+	// components hold their own caches behind mutexes — TestComponentsAreConcurrencySafe
+	// is what says so — and the incoming field is written once before any
+	// worker starts and only read after.
+	//
+	// A sky is thousands of directions and a reference-fidelity one is
+	// milliseconds each, so this is the difference between a map a user waits
+	// for and one they give up on. The order of out is unchanged: each worker
+	// writes to its own index.
+	workers := max(min(runtime.GOMAXPROCS(0), len(out)), 1)
+
+	group, groupCtx := errgroup.WithContext(ctx)
+	group.SetLimit(workers)
+
+	for i := range out {
+		group.Go(func() error {
+			local := q
+			local.Direction = out[i].Direction
+
+			est, err := m.Estimate(groupCtx, local)
+			if err != nil {
+				return err
+			}
+
+			out[i].Estimate = est
+
+			return nil
+		})
+	}
+
+	if err := group.Wait(); err != nil {
+		return nil, fmt.Errorf("skybrightness: sky map: %w", err)
 	}
 
 	return out, nil

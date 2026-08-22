@@ -109,36 +109,13 @@ func ScatteredIn(
 		return fmt.Errorf("%w: view airmass: %w", ErrScattering, err)
 	}
 
-	pressure, _ := scene.Atmosphere.Surface()
-	aerosol := scene.Atmosphere.Aerosol()
-
-	// The optical depths do not depend on the source direction, so they are
-	// formed once for the whole hemisphere rather than once per sample.
-	rayleigh := make([]unit.OpticalDepth, grid.Len())
-	aer := make([]unit.OpticalDepth, grid.Len())
-	scattering := make([]unit.OpticalDepth, grid.Len())
-	extinction := make([]unit.OpticalDepth, grid.Len())
-
-	for i := range rayleigh {
-		lambda := grid.At(i)
-
-		r, err := atmosphere.RayleighOpticalDepth(lambda, float64(pressure))
-		if err != nil {
-			return fmt.Errorf("%w: %w", ErrScattering, err)
-		}
-
-		a := unit.OpticalDepth(aerosol.TauAt(lambda))
-
-		rayleigh[i], aer[i] = r, a
-		extinction[i] = r + a
-
-		// Aerosol removes light by absorption as well as scattering; the
-		// single-scattering albedo is the share that scatters. Molecular
-		// extinction at optical wavelengths is scattering outright.
-		scattering[i] = r + a*unit.OpticalDepth(aerosol.SingleScatteringAlbedo)
+	kernel, err := newScatterKernel(scene, grid)
+	if err != nil {
+		return err
 	}
 
 	source := NewSpectralRadiance(grid)
+	path := make([]float64, grid.Len())
 
 	const halfPi = math.Pi / 2
 
@@ -152,6 +129,12 @@ func ScatteredIn(
 		if err != nil {
 			return fmt.Errorf("%w: source airmass at %v: %w", ErrScattering, alt, err)
 		}
+
+		// Once per ring, not once per sample. The path integral depends on the
+		// source airmass, which is a function of altitude alone, so every
+		// azimuth around a ring shares it — and a ring near the horizon
+		// carries dozens of them.
+		kernel.pathFactor(path, sourceAirmass, viewAirmass)
 
 		// Azimuths in proportion to the ring's circumference, so the samples
 		// carry roughly equal solid angle and the pole is not oversampled.
@@ -168,31 +151,15 @@ func ScatteredIn(
 				return fmt.Errorf("%w: incoming field at %v: %w", ErrScattering, dir, err)
 			}
 
-			theta := separation(view, dir)
-
-			for i := range dst {
-				if source[i] == 0 {
-					continue
-				}
-
-				phase, err := atmosphere.CombinedPhaseFunction(theta,
-					rayleigh[i], aer[i], float64(aerosol.Asymmetry),
-					atmosphere.RayleighDepolarisation)
-				if err != nil {
-					return fmt.Errorf("%w: %w", ErrScattering, err)
-				}
-
-				// The patch's irradiance at the top of the atmosphere is its
-				// radiance times the solid angle it subtends, which is what
-				// turns a radiance field into the source term the kernel takes.
-				l, err := atmosphere.SingleScatteredRadiance(source[i]*dOmega, phase,
-					scattering[i], extinction[i], sourceAirmass, viewAirmass)
-				if err != nil {
-					return fmt.Errorf("%w: %w", ErrScattering, err)
-				}
-
-				dst[i] += l
+			// Once per sample, not once per wavelength: the phase functions
+			// depend on the scattering angle alone, and only the weights that
+			// mix them vary across the band.
+			phaseRayleigh, phaseAerosol, err := kernel.phaseAt(separation(view, dir))
+			if err != nil {
+				return err
 			}
+
+			kernel.accumulate(dst, source, path, dOmega, phaseRayleigh, phaseAerosol)
 		}
 	}
 
@@ -328,38 +295,6 @@ func deExtinction(scene *Scene, dir coord.AltAz, grid unit.SpectralGrid) ([]floa
 	return out, nil
 }
 
-// naturalField builds the incoming field of a single component.
-//
-// The per-component form of [Model.AboveAtmosphere], and the reason
-// [Model.Estimate] can attribute scattered light to the component that
-// supplied it rather than reporting only the sum. Without that attribution the
-// starlight-to-zodiacal comparison against Masana et al. Table 2 could not be
-// made at all.
-func naturalField(c Component, scene *Scene, grid unit.SpectralGrid) SkyRadiance {
-	return func(ctx context.Context, dst SpectralRadiance, dir coord.AltAz) error {
-		if dir.Alt() <= 0 {
-			return nil
-		}
-
-		buf := NewSpectralRadiance(grid)
-
-		if _, err := c.AddRadiance(ctx, buf, grid, dir, scene); err != nil {
-			return fmt.Errorf("%w: %q: %w", ErrScattering, c.ID(), err)
-		}
-
-		gain, err := deExtinction(scene, dir, grid)
-		if err != nil {
-			return err
-		}
-
-		for i := range dst {
-			dst[i] += buf[i] * gain[i]
-		}
-
-		return nil
-	}
-}
-
 // scattersIntoItsOwnBeam reports whether a component is already a scattering
 // integral over a source that is not part of the sky field.
 //
@@ -384,55 +319,87 @@ func scattersIntoItsOwnBeam(id ComponentID) bool {
 // Called only at [Reference] fidelity. The components have already written
 // their direct radiance into est, which under a scene at kappa = 1 is the L_d
 // of Masana et al. Eq. 8; this adds the L_s that completes it.
+//
+// field may be nil, in which case one is sampled for this direction alone.
+// [Model.SkyMap] passes one it sampled once for the whole map, which is what
+// makes an all-sky reference evaluation affordable: the incoming field does not
+// depend on where the observer looks.
 func (m *Model) addScatteredIn(
-	ctx context.Context, est *Estimate, q Query, grid unit.SpectralGrid, rings int,
+	ctx context.Context, est *Estimate, q Query, grid unit.SpectralGrid,
+	field *hemisphereField, rings int,
 ) error {
-	for _, c := range m.components {
-		buf, ok := est.components[c.ID()]
-		if !ok {
-			continue
+	if field == nil {
+		sampled, err := m.sampleHemisphere(ctx, q.Scene, grid, rings)
+		if err != nil {
+			return err
 		}
 
+		field = sampled
+	}
+
+	kernel, err := newScatterKernel(q.Scene, grid)
+	if err != nil {
+		return err
+	}
+
+	// One buffer per component, so the scattered light is attributed to
+	// whatever supplied it rather than reported as a lump.
+	into := make(map[ComponentID][]float64, len(field.components))
+
+	for _, id := range field.components {
+		if _, ok := est.components[id]; ok {
+			into[id] = make([]float64, grid.Len())
+		}
+	}
+
+	for _, c := range m.components {
 		if scattersIntoItsOwnBeam(c.ID()) {
 			est.Quality.Add(PartialScattering)
-
-			continue
 		}
+	}
 
-		scattered := NewSpectralRadiance(grid)
+	if err := field.scatterInto(est, kernel, q.Direction, into); err != nil {
+		return err
+	}
 
-		if err := ScatteredIn(ctx, scattered, naturalField(c, q.Scene, grid),
-			q.Scene, q.Direction, grid, rings); err != nil {
-			return fmt.Errorf("%w: %q: %w", ErrComponentFailed, c.ID(), err)
-		}
+	// Higher scattering orders, when the scene asks for them. Eq. 11's kernel
+	// is first order, so this is the one place they can be added without
+	// double-counting: the direct term is extinction and has no scattering
+	// order at all.
+	var multiple []float64
 
-		// Higher scattering orders, when the scene asks for them. Eq. 11's
-		// kernel is first order, so this is the one place they can be added
-		// without double-counting: the direct term is extinction and has no
-		// scattering order at all.
-		if q.Scene.Atmosphere.MultipleScattering() {
-			pressure, _ := q.Scene.Atmosphere.Surface()
+	if q.Scene.Atmosphere.MultipleScattering() {
+		multiple = make([]float64, grid.Len())
+		pressure, _ := q.Scene.Atmosphere.Surface()
 
-			for i := range buf {
-				rayleigh, err := atmosphere.RayleighOpticalDepth(grid.At(i), float64(pressure))
-				if err != nil {
-					return fmt.Errorf("%w: %q: %w", ErrComponentFailed, c.ID(), err)
-				}
-
-				multiple, err := atmosphere.MultipleScatteringFactor(rayleigh)
-				if err != nil {
-					return fmt.Errorf("%w: %q: %w", ErrComponentFailed, c.ID(), err)
-				}
-
-				scattered[i] *= multiple
+		for i := range multiple {
+			rayleigh, err := atmosphere.RayleighOpticalDepth(grid.At(i), float64(pressure))
+			if err != nil {
+				return fmt.Errorf("%w: %w", ErrScattering, err)
 			}
 
-			est.Quality.Add(ApproximateMultipleScattering)
+			factor, err := atmosphere.MultipleScatteringFactor(rayleigh)
+			if err != nil {
+				return fmt.Errorf("%w: %w", ErrScattering, err)
+			}
+
+			multiple[i] = factor
 		}
 
+		est.Quality.Add(ApproximateMultipleScattering)
+	}
+
+	for id, scattered := range into {
+		buf := est.components[id]
+
 		for i := range buf {
-			buf[i] += scattered[i]
-			est.total[i] += scattered[i]
+			v := scattered[i]
+			if multiple != nil {
+				v *= multiple[i]
+			}
+
+			buf[i] += v
+			est.total[i] += v
 		}
 	}
 

@@ -30,10 +30,12 @@ func BenchmarkPresetSkyMap(b *testing.B) {
 	} {
 		// Reference-fidelity presets are benchmarked over fewer rings, since
 		// each direction is a thousand times dearer.
-		rings := 12
-		if fidelity, _ := p.Fidelity(); fidelity == skybrightness.Reference {
-			rings = 3
-		}
+		// The same resolution for every preset, so the comparison is like for
+		// like. It also has to be enough directions that the reference
+		// presets' one-time hemisphere sampling is amortised the way a real
+		// map amortises it: at three rings it is a tenth of the run and the
+		// per-direction figure is meaningless.
+		const rings = 12
 
 		b.Run(string(p), func(b *testing.B) {
 			in := benchPresetInputs(b, p)
