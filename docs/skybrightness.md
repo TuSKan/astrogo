@@ -1151,16 +1151,66 @@ because airglow's van Rhijn enhancement toward the horizon and atmospheric extin
 in opposite directions. Any comparison that assumes a monotonic limb-brightening will
 disagree with GAMBONS for the wrong reason.
 
-**What this does not yet establish.** Our published map is *extra-atmospheric integrated
-starlight alone* at 22.77 whole-sky, and the number above is the *ground-level natural total*
-after propagation. The 1.56 mag between them is the combined weight of diffuse galactic
-light, the extragalactic background, zodiacal light and airglow, minus extinction — about a
-factor of four, which is the right order for a natural sky that airglow usually dominates,
-and nothing more than that. Turning this into a validation means running all five components
-plus atmospheric transport for this exact scene and comparing 21.21. That is blocked on the
-two items §16 still lists: the airglow spectrum is not wired, and the extragalactic
-background is not implemented. The reference is recorded here so that when they are, the
-comparison is a single run rather than another afternoon of clicking.
+**The whole-sky comparison, run.** Both blockers are cleared — the airglow spectrum comes
+from ESO SkyCalc and the extragalactic background is implemented — so all five natural
+components plus atmospheric transport have now been run against this export.
+`TestAgainstGAMBONSAllSky` samples 24 directions in each of GAMBONS' six altitude bands,
+equal-area within the band, fetching the 100 micron intensity separately for every sightline;
+each band's median is compared against theirs, and the bands are recombined by solid angle.
+
+| altitude band | astrogo | GAMBONS | difference |
+| :--- | ---: | ---: | ---: |
+| 0–15° | 20.830 | 21.128 | **−0.298** |
+| 15–30° | 21.260 | 21.107 | +0.153 |
+| 30–45° | 21.554 | 21.272 | +0.282 |
+| 45–60° | 21.652 | 21.399 | +0.253 |
+| 60–75° | 21.678 | 21.378 | +0.300 |
+| 75–90° | 21.579 | 21.238 | +0.341 |
+| **whole sky, airglow on** | **21.264** | **21.210** | **+0.054** |
+| whole sky, airglow off | 22.426 | 22.170 | +0.256 |
+| airglow's share of the irradiance | ×2.081 | ×2.149 | −3 % |
+
+Both profile shapes are reproduced. With airglow off the sky brightens monotonically from
+horizon to zenith, extinction being the only thing shaping it; with airglow on the profile
+turns over at an interior band — ours faintest at 60–75°, theirs at 45–60° — because van
+Rhijn's limb brightening and extinction pull opposite ways.
+
+**Two mechanisms account for the residual, and both were declared before it was measured.**
+
+*Airglow carries no extinction along its slant path.* `Airglow.Provenance` lists this among
+its known approximations and puts the geometry's validity within 40° of the zenith. The
+emitting layer sits at 87 km, above essentially the whole column, so the omitted term is very
+nearly the full slant extinction. At the 0–15° band the equal-area mean airmass is 7.32,
+which at a representative clear-site 0.12 mag airmass⁻¹ is **0.879 mag** of extinction never
+applied; our airglow there is **0.86 mag** stronger than GAMBONS'. Predicted and observed
+agree to two hundredths. In the 75–90° band the same arithmetic gives 0.122 mag and the
+measured excess is −0.11: inside the stated validity the geometry alone is right.
+
+*Nothing is scattered back into the beam.* Starlight, diffuse galactic light, zodiacal light
+and the extragalactic background are attenuated by the atmosphere, and no light is scattered
+in to replace what is scattered out. `atmosphere.MultipleScatteringFactor` exists and is
+applied only by the moonlight component, so the airglow-free sky here is the singly
+transmitted sky alone. At 550 nm and 1013 hPa the Rayleigh depth is 0.0979, so that factor is
+1 + 4.5τ = 1.441, worth 0.396 mag; the measured airglow-off shortfall is 0.256 mag, a factor
+of 1.266. Same sign, same order, about a third short of the full correction — which is what
+should be expected, since the factor is a broadband fit to a single-scattering calculation
+rather than the transport GAMBONS solves.
+
+These pull opposite ways in the airglow-on total: too much light at the horizon, too little
+everywhere from the missing scattered-in term. **The whole-sky airglow-on agreement of 0.054
+mag is therefore partly cancellation and must not be read as the model being right in both
+respects.** The band table is the honest statement; the single number is not.
+
+**A third, smaller item.** Diffuse galactic light comes out at 1.8 per cent of the whole-sky
+V radiance against integrated starlight's 14.3. Leinert et al. put DGL at 20–30 per cent of
+integrated starlight, which would be 2.9–4.3 per cent here, so ours is low by something
+between a half and a third. It is too small a term to account for the residual above, and it
+is recorded rather than adjusted.
+
+**What the comparison cannot resolve.** The band medians carry a standard error near 0.08 mag
+at 24 samples, the Johnson V response is a tophat standing in for the real curve, and the
+aerosol type is matched by name rather than by GAMBONS' own single-scattering albedo and
+asymmetry. Differences below about a tenth of a magnitude are not attributable.
 
 The location fields on that form are read-only and set through its "Change location" dialog.
 
