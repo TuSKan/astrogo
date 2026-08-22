@@ -246,3 +246,73 @@ func VanRhijn(z angle.Angle, layerHeightM float64) (float64, error) {
 
 	return 1 / math.Sqrt(denom), nil
 }
+
+// Scale heights and the default effective-depth factor for extended sources,
+// from Masana et al. (2021) Section 7.
+const (
+	// MolecularScaleHeightM is the exponential scale height of the molecular
+	// atmosphere, Masana et al. (2021) Eq. 25.
+	MolecularScaleHeightM = 8000.0
+
+	// AerosolScaleHeightM is the same for aerosols, which are concentrated far
+	// nearer the ground — a difference that only shows for an observer above
+	// sea level, where a smaller fraction of the aerosol column remains
+	// overhead than of the molecular one.
+	AerosolScaleHeightM = 1540.0
+
+	// DefaultDiffuseKappa is the effective-depth factor applied to sources
+	// that fill the sky, and it is the value the GAMBONS web service uses.
+	//
+	// Hong et al. (1998) put the range at 0.5 to 0.9 depending on the aerosol
+	// albedo and asymmetry parameter; Duriscoe (2013) uses 0.75 after Kwon
+	// (1989). Set it per scene with Builder.DiffuseScattering rather than
+	// treating this default as a physical constant.
+	DefaultDiffuseKappa = 0.5
+)
+
+// ExtendedSourceOpticalDepth returns the slant optical depth an extended
+// source is attenuated by, following Masana et al. (2021) Eq. 29.
+//
+//	tau(lambda, z; h) = kappa * [ tau_M(lambda) m_M(z) exp(-h/H_M)
+//	                            + tau_A(lambda) m_A(z) exp(-h/H_A) ]
+//
+// Two things separate this from multiplying a vertical depth by an airmass.
+//
+// The molecular and aerosol columns are carried separately, each with its own
+// scale height, so an observer above sea level sees the correct fraction of
+// each remaining overhead rather than the same fraction of both. At sea level
+// the exponentials are one and this reduces to the familiar product.
+//
+// And kappa scales the whole thing, because a source covering the sky does not
+// lose everything scattered out of the line of sight: it is replaced by light
+// scattered in from the rest of the sky. See [Atmosphere.DiffuseKappa].
+//
+// The airmasses are passed in rather than computed here so the caller chooses
+// the law. Masana et al. use Kasten & Young (1989); this module's [Airmass] is
+// Pickering (2002), and the two agree to better than three parts in a thousand
+// above five degrees of altitude, diverging only in the last degrees where
+// Pickering is the better behaved.
+func ExtendedSourceOpticalDepth(
+	rayleigh, aerosol unit.OpticalDepth,
+	molecularAirmass, aerosolAirmass float64,
+	observerHeightM, kappa float64,
+) (unit.OpticalDepth, error) {
+	switch {
+	case rayleigh < 0 || math.IsNaN(float64(rayleigh)) || math.IsInf(float64(rayleigh), 0):
+		return 0, fmt.Errorf("%w: rayleigh %g", ErrOpticalDepth, float64(rayleigh))
+	case aerosol < 0 || math.IsNaN(float64(aerosol)) || math.IsInf(float64(aerosol), 0):
+		return 0, fmt.Errorf("%w: aerosol %g", ErrOpticalDepth, float64(aerosol))
+	case molecularAirmass < 1 || aerosolAirmass < 1:
+		return 0, fmt.Errorf("%w: airmass %g/%g is below one",
+			ErrAirmassRange, molecularAirmass, aerosolAirmass)
+	case observerHeightM < 0 || math.IsNaN(observerHeightM):
+		return 0, fmt.Errorf("%w: observer height %g m", ErrOpticalDepth, observerHeightM)
+	case kappa <= 0 || kappa > 1:
+		return 0, fmt.Errorf("%w: kappa %g is outside (0, 1]", ErrOpticalDepth, kappa)
+	}
+
+	molecular := float64(rayleigh) * molecularAirmass * math.Exp(-observerHeightM/MolecularScaleHeightM)
+	particulate := float64(aerosol) * aerosolAirmass * math.Exp(-observerHeightM/AerosolScaleHeightM)
+
+	return unit.OpticalDepth(kappa * (molecular + particulate)), nil
+}

@@ -101,8 +101,8 @@ func TestParseReadsAWellFormedTable(t *testing.T) {
 	arc := []float64{5e2, 5e2, 5e2, 5e2}
 
 	got, err := airglow.Parse(bytes.NewReader(bintableFITS(
-		[]string{"lam", "flux_ael", "flux_arc"},
-		[][]float64{lam, ael, arc},
+		[]string{"lam", "flux_ael", "flux_arc", "trans"},
+		[][]float64{lam, ael, arc, unity(len(lam))},
 	)))
 	if err != nil {
 		t.Fatalf("Parse: %v", err)
@@ -151,8 +151,8 @@ func TestParseDropsUnusableSamples(t *testing.T) {
 	lam[3] = math.NaN()
 
 	got, err := airglow.Parse(bytes.NewReader(bintableFITS(
-		[]string{"lam", "flux_ael", "flux_arc"},
-		[][]float64{lam, ael, arc},
+		[]string{"lam", "flux_ael", "flux_arc", "trans"},
+		[][]float64{lam, ael, arc, unity(len(lam))},
 	)))
 	if err != nil {
 		t.Fatalf("Parse: %v", err)
@@ -183,11 +183,12 @@ func TestParseClampsNegativeFlux(t *testing.T) {
 	t.Parallel()
 
 	got, err := airglow.Parse(bytes.NewReader(bintableFITS(
-		[]string{"lam", "flux_ael", "flux_arc"},
+		[]string{"lam", "flux_ael", "flux_arc", "trans"},
 		[][]float64{
 			{500, 501, 502},
 			{-5e3, 1e3, 0},
 			{0, 0, 0},
+			{1, 1, 1},
 		},
 	)))
 	if err != nil {
@@ -225,8 +226,8 @@ func TestParseRefusesTooFewRows(t *testing.T) {
 		},
 	} {
 		_, err := airglow.Parse(bytes.NewReader(bintableFITS(
-			[]string{"lam", "flux_ael", "flux_arc"},
-			[][]float64{c.lam, c.ael, c.arc},
+			[]string{"lam", "flux_ael", "flux_arc", "trans"},
+			[][]float64{c.lam, c.ael, c.arc, unity(len(c.lam))},
 		)))
 		if err == nil {
 			t.Errorf("%s: Parse accepted a table that is not a spectrum", c.name)
@@ -241,13 +242,14 @@ func TestParseAcceptsEitherColumnCase(t *testing.T) {
 	t.Parallel()
 
 	for _, names := range [][]string{
-		{"lam", "flux_ael", "flux_arc"},
-		{"LAM", "FLUX_AEL", "FLUX_ARC"},
+		{"lam", "flux_ael", "flux_arc", "trans"},
+		{"LAM", "FLUX_AEL", "FLUX_ARC", "TRANS"},
 	} {
 		got, err := airglow.Parse(bytes.NewReader(bintableFITS(names, [][]float64{
 			{500, 501, 502},
 			{1e3, 1e3, 1e3},
 			{5e2, 5e2, 5e2},
+			{1, 1, 1},
 		})))
 		if err != nil {
 			t.Errorf("columns named %v: %v", names, err)
@@ -298,11 +300,12 @@ func TestParseConversionMatchesTheWorkedExample(t *testing.T) {
 		{"split between them", perMicronPerArcsec2 / 2, perMicronPerArcsec2 / 2},
 	} {
 		got, err := airglow.Parse(bytes.NewReader(bintableFITS(
-			[]string{"lam", "flux_ael", "flux_arc"},
+			[]string{"lam", "flux_ael", "flux_arc", "trans"},
 			[][]float64{
 				{lambdaNM - 1, lambdaNM, lambdaNM + 1},
 				{c.ael, c.ael, c.ael},
 				{c.arc, c.arc, c.arc},
+				{1, 1, 1},
 			},
 		)))
 		if err != nil {
@@ -320,8 +323,8 @@ func TestParseConversionMatchesTheWorkedExample(t *testing.T) {
 	// And the scale is linear, so a spectrum twice as bright is twice the
 	// radiance rather than twice some offset.
 	half, err := airglow.Parse(bytes.NewReader(bintableFITS(
-		[]string{"lam", "flux_ael", "flux_arc"},
-		[][]float64{{549, 550, 551}, {80, 80, 80}, {0, 0, 0}},
+		[]string{"lam", "flux_ael", "flux_arc", "trans"},
+		[][]float64{{549, 550, 551}, {80, 80, 80}, {0, 0, 0}, {1, 1, 1}},
 	)))
 	if err != nil {
 		t.Fatalf("Parse: %v", err)
@@ -333,5 +336,84 @@ func TestParseConversionMatchesTheWorkedExample(t *testing.T) {
 	// about physical constants, not about the conversion.
 	if ratio := want / half.At(lambdaNM); math.Abs(ratio-2) > 1e-6 {
 		t.Errorf("halving the photon flux changed the radiance by a factor of %.9f, want 2", ratio)
+	}
+}
+
+// clear returns a transmittance column of unity, which leaves the conversion
+// unchanged and lets a fixture say "no atmosphere in the way".
+func unity(rows int) []float64 {
+	out := make([]float64, rows)
+	for i := range out {
+		out[i] = 1
+	}
+
+	return out
+}
+
+// The spectrum SkyCalc returns has already crossed Paranal's atmosphere, and
+// Parse divides it back out.
+//
+// Masana et al. (2021) Eq. 20: the van Rhijn geometry downstream needs the
+// radiance at the emitting layer, not at a telescope 2640 m up with the whole
+// column above it. Skipping this leaves airglow too faint by the reciprocal of
+// the transmittance and then attenuates it a second time for the observer's
+// own site.
+func TestParseDividesOutTheTransmittance(t *testing.T) {
+	t.Parallel()
+
+	const (
+		lambdaNM = 550.0
+		flux     = 1000.0
+	)
+
+	at := func(trans float64) float64 {
+		got, err := airglow.Parse(bytes.NewReader(bintableFITS(
+			[]string{"lam", "flux_ael", "flux_arc", "trans"},
+			[][]float64{
+				{lambdaNM - 1, lambdaNM, lambdaNM + 1},
+				{flux, flux, flux},
+				{0, 0, 0},
+				{trans, trans, trans},
+			},
+		)))
+		if err != nil {
+			t.Fatalf("Parse at transmittance %g: %v", trans, err)
+		}
+
+		return got.At(lambdaNM)
+	}
+
+	// A transparent atmosphere leaves the spectrum alone.
+	reference := at(1.0)
+
+	for _, trans := range []float64{0.9, 0.8, 0.5, 0.25} {
+		got := at(trans)
+
+		if want := reference / trans; math.Abs(got-want)/want > 1e-9 {
+			t.Errorf("at transmittance %g the emitted radiance is %.6g, want %.6g — Eq. 20 "+
+				"divides the observed spectrum by the transmittance it already crossed",
+				trans, got, want)
+		}
+	}
+
+	// A transmittance that is not a fraction cannot be divided by, and a
+	// sample carrying one is not usable at the emitting layer.
+	for _, bad := range []float64{0, -0.5, 1.5} {
+		got, err := airglow.Parse(bytes.NewReader(bintableFITS(
+			[]string{"lam", "flux_ael", "flux_arc", "trans"},
+			[][]float64{
+				{549, 550, 551, 552},
+				{flux, flux, flux, flux},
+				{0, 0, 0, 0},
+				{bad, 1, 1, 1},
+			},
+		)))
+		if err != nil {
+			t.Fatalf("Parse: %v", err)
+		}
+
+		if len(got.LambdaNM) != 3 {
+			t.Errorf("a transmittance of %g left %d rows, want the 3 usable ones", bad, len(got.LambdaNM))
+		}
 	}
 }

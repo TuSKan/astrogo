@@ -304,6 +304,8 @@ func (d *DiffuseGalacticLight) AddRadiance(
 
 	pressure, _ := scene.Atmosphere.Surface()
 	aerosol := scene.Atmosphere.Aerosol()
+	height := scene.Observer.Height()
+	kappa := scene.Atmosphere.DiffuseKappa()
 
 	for i := range dst {
 		lambda := grid.At(i)
@@ -313,7 +315,16 @@ func (d *DiffuseGalacticLight) AddRadiance(
 			return 0, fmt.Errorf("skybrightness: diffuse galactic: %w", err)
 		}
 
-		slant := (rayleigh + unit.OpticalDepth(aerosol.TauAt(lambda))) * unit.OpticalDepth(airmass)
+		// Masana et al. (2021) Eq. 29: the molecular and aerosol columns carry
+		// their own scale heights, and kappa accounts for the light scattered
+		// back into the line of sight from the rest of the sky, which a source
+		// filling that sky supplies and a point source does not.
+		slant, slantErr := atmosphere.ExtendedSourceOpticalDepth(
+			rayleigh, unit.OpticalDepth(aerosol.TauAt(lambda)),
+			airmass, airmass, height, kappa)
+		if slantErr != nil {
+			return 0, fmt.Errorf("skybrightness: %s: %w", "diffuse galactic", slantErr)
+		}
 
 		dst[i] += scratch[i] * scale * float64(atmosphere.Transmission(slant))
 	}
@@ -484,6 +495,8 @@ func (z *ZodiacalLight) AddRadiance(
 
 	pressure, _ := scene.Atmosphere.Surface()
 	aerosol := scene.Atmosphere.Aerosol()
+	height := scene.Observer.Height()
+	kappa := scene.Atmosphere.DiffuseKappa()
 
 	for i := range dst {
 		lambda := grid.At(i)
@@ -493,7 +506,16 @@ func (z *ZodiacalLight) AddRadiance(
 			return 0, fmt.Errorf("skybrightness: zodiacal: %w", err)
 		}
 
-		slant := (rayleigh + unit.OpticalDepth(aerosol.TauAt(lambda))) * unit.OpticalDepth(airmass)
+		// Masana et al. (2021) Eq. 29: the molecular and aerosol columns carry
+		// their own scale heights, and kappa accounts for the light scattered
+		// back into the line of sight from the rest of the sky, which a source
+		// filling that sky supplies and a point source does not.
+		slant, slantErr := atmosphere.ExtendedSourceOpticalDepth(
+			rayleigh, unit.OpticalDepth(aerosol.TauAt(lambda)),
+			airmass, airmass, height, kappa)
+		if slantErr != nil {
+			return 0, fmt.Errorf("skybrightness: %s: %w", "zodiacal", slantErr)
+		}
 
 		dst[i] += scratch[i] * float64(atmosphere.Transmission(slant))
 	}
@@ -644,6 +666,8 @@ func (a *Airglow) AddRadiance(
 
 	pressure, _ := scene.Atmosphere.Surface()
 	aerosol := scene.Atmosphere.Aerosol()
+	height := scene.Observer.Height()
+	kappa := scene.Atmosphere.DiffuseKappa()
 
 	for i := range dst {
 		lambda := grid.At(i)
@@ -653,7 +677,16 @@ func (a *Airglow) AddRadiance(
 			return 0, fmt.Errorf("skybrightness: airglow: %w", rErr)
 		}
 
-		slant := (rayleigh + unit.OpticalDepth(aerosol.TauAt(lambda))) * unit.OpticalDepth(airmass)
+		// Masana et al. (2021) Eq. 29: the molecular and aerosol columns carry
+		// their own scale heights, and kappa accounts for the light scattered
+		// back into the line of sight from the rest of the sky, which a source
+		// filling that sky supplies and a point source does not.
+		slant, slantErr := atmosphere.ExtendedSourceOpticalDepth(
+			rayleigh, unit.OpticalDepth(aerosol.TauAt(lambda)),
+			airmass, airmass, height, kappa)
+		if slantErr != nil {
+			return 0, fmt.Errorf("skybrightness: %s: %w", "airglow", slantErr)
+		}
 
 		dst[i] += scratch[i] * float64(atmosphere.Transmission(slant))
 	}
@@ -865,6 +898,8 @@ func (s *IntegratedStarlight) AddRadiance(
 
 	pressure, _ := scene.Atmosphere.Surface()
 	aerosol := scene.Atmosphere.Aerosol()
+	height := scene.Observer.Height()
+	kappa := scene.Atmosphere.DiffuseKappa()
 
 	// The shape already averages to one across the band, so scaling it by
 	// the map's value reproduces that value exactly. Each wavelength is then
@@ -878,7 +913,16 @@ func (s *IntegratedStarlight) AddRadiance(
 			return 0, fmt.Errorf("skybrightness: starlight: %w", err)
 		}
 
-		slant := (rayleigh + unit.OpticalDepth(aerosol.TauAt(lambda))) * unit.OpticalDepth(airmass)
+		// Masana et al. (2021) Eq. 29: the molecular and aerosol columns carry
+		// their own scale heights, and kappa accounts for the light scattered
+		// back into the line of sight from the rest of the sky, which a source
+		// filling that sky supplies and a point source does not.
+		slant, slantErr := atmosphere.ExtendedSourceOpticalDepth(
+			rayleigh, unit.OpticalDepth(aerosol.TauAt(lambda)),
+			airmass, airmass, height, kappa)
+		if slantErr != nil {
+			return 0, fmt.Errorf("skybrightness: %s: %w", "starlight", slantErr)
+		}
 
 		dst[i] += value * s.shape[i] * float64(atmosphere.Transmission(slant))
 	}

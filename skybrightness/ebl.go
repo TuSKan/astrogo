@@ -134,6 +134,8 @@ func (e *ExtragalacticBackground) AddRadiance(
 
 	pressure, _ := scene.Atmosphere.Surface()
 	aerosol := scene.Atmosphere.Aerosol()
+	height := scene.Observer.Height()
+	kappa := scene.Atmosphere.DiffuseKappa()
 
 	flags := Flag(0)
 
@@ -150,7 +152,16 @@ func (e *ExtragalacticBackground) AddRadiance(
 			return 0, fmt.Errorf("skybrightness: extragalactic: %w", err)
 		}
 
-		slant := (rayleigh + unit.OpticalDepth(aerosol.TauAt(lambda))) * unit.OpticalDepth(airmass)
+		// Masana et al. (2021) Eq. 29: the molecular and aerosol columns carry
+		// their own scale heights, and kappa accounts for the light scattered
+		// back into the line of sight from the rest of the sky, which a source
+		// filling that sky supplies and a point source does not.
+		slant, slantErr := atmosphere.ExtendedSourceOpticalDepth(
+			rayleigh, unit.OpticalDepth(aerosol.TauAt(lambda)),
+			airmass, airmass, height, kappa)
+		if slantErr != nil {
+			return 0, fmt.Errorf("skybrightness: %s: %w", "extragalactic", slantErr)
+		}
 
 		dst[i] += value * float64(atmosphere.Transmission(slant))
 	}

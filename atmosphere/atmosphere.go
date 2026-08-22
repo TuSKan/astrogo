@@ -196,6 +196,34 @@ type Atmosphere struct {
 	horizon       HorizonProfile
 	provenance    Provenance
 	issuedAt      time.Time
+
+	// diffuseKappa scales the optical depth an extended source is attenuated
+	// by; see DiffuseKappa. Zero means unset and reads as DefaultDiffuseKappa.
+	diffuseKappa float64
+}
+
+// DiffuseKappa returns the factor the optical depth is scaled by when
+// attenuating a source that fills the sky rather than a point one.
+//
+// A star loses everything scattered out of the line of sight. A source
+// covering the whole sky does not: what is scattered out of one direction is
+// replaced by light scattered in from every other, so attenuating an extended
+// source by the full optical depth overstates the loss. Masana et al. (2021)
+// Section 7 handles this by replacing the optical depth with an effective one,
+// tau_eff = kappa * tau, and notes that kappa depends on the aerosol albedo
+// and asymmetry parameter with typical values from 0.5 to 0.9 (Hong et al.
+// 1998). Duriscoe (2013) uses 0.75 for diffuse sources, after Kwon (1989);
+// the GAMBONS web service uses 0.5.
+//
+// It is not a fudge factor for matching a reference. It stands in for the
+// scattered term of Masana et al. Eq. 8, whose exact form is a double integral
+// over the hemisphere for every direction of observation.
+func (s *Atmosphere) DiffuseKappa() float64 {
+	if s.diffuseKappa <= 0 {
+		return DefaultDiffuseKappa
+	}
+
+	return s.diffuseKappa
 }
 
 // Surface returns the surface pressure and temperature.
@@ -319,6 +347,20 @@ func (b *Builder) Aerosol(aod, referenceNM, angstrom, ssa, g float64) *Builder {
 	b.s.aerosol.AngstromExp = unit.AngstromExponent(angstrom)
 	b.s.aerosol.SingleScatteringAlbedo = unit.SingleScatteringAlbedo(ssa)
 	b.s.aerosol.Asymmetry = unit.AsymmetryParameter(g)
+
+	return b
+}
+
+// DiffuseScattering sets the effective-optical-depth factor kappa used when
+// attenuating sources that fill the sky. See [Atmosphere.DiffuseKappa].
+//
+// Values outside (0, 1] are ignored: kappa above one would mean an extended
+// source is dimmed more than a point source in the same air, which is the
+// wrong way round, and zero or negative would mean the atmosphere brightens it.
+func (b *Builder) DiffuseScattering(kappa float64) *Builder {
+	if kappa > 0 && kappa <= 1 {
+		b.s.diffuseKappa = kappa
+	}
 
 	return b
 }

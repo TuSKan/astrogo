@@ -278,6 +278,16 @@ func Fetch(ctx context.Context, spec Spec) (*Spectrum, error) {
 // the service included and hand the caller a sky to subtract from rather than
 // a component to add.
 //
+// # Why the transmission column too
+//
+// SkyCalc reports the sky as seen from Cerro Paranal, so its airglow has
+// already crossed the atmosphere above that site. The van Rhijn geometry that
+// consumes this spectrum needs the radiance at the emitting layer instead, and
+// Masana et al. (2021) Eq. 20 recovers it by dividing by the vertical
+// transmittance the same request returns. Skipping that leaves the airglow too
+// faint by the reciprocal of that transmittance and then attenuates it a
+// second time for the observer's own site.
+//
 // SkyCalc reports photons s^-1 m^-2 um^-1 arcsec^-2. Spectral radiance is that
 // divided by a thousand for micrometres to nanometres, divided by the solid
 // angle of a square arcsecond, and multiplied by the energy of one photon at
@@ -289,7 +299,7 @@ func Parse(r io.Reader) (*Spectrum, error) {
 		return nil, fmt.Errorf("%w: %w", ErrService, err)
 	}
 
-	lambda, lines, continuum, err := columns(f)
+	lambda, lines, continuum, transmittance, err := columns(f)
 	if err != nil {
 		return nil, err
 	}
@@ -297,7 +307,7 @@ func Parse(r io.Reader) (*Spectrum, error) {
 	// All three columns are read from one table and so carry NumRows entries
 	// each, but the shortest is taken rather than assumed: a response is not a
 	// file this package wrote.
-	rows := min(len(lambda), min(len(lines), len(continuum)))
+	rows := min(len(lambda), min(len(lines), min(len(continuum), len(transmittance))))
 
 	out := &Spectrum{
 		LambdaNM: make([]float64, 0, rows),
@@ -325,6 +335,25 @@ func Parse(r io.Reader) (*Spectrum, error) {
 		// produced it, not emission removed from the sky.
 		if flux < 0 {
 			flux = 0
+		}
+
+		// Divide out the atmosphere SkyCalc already applied.
+		//
+		// SkyCalc reports the sky as a telescope at Cerro Paranal sees it, so
+		// its airglow columns have already crossed the 2640 m column above
+		// that site. What the van Rhijn geometry needs is the radiance at the
+		// emitting layer, before any of that: Masana et al. (2021) Eq. 20
+		// recovers it by dividing by the vertical transmittance the same
+		// request returns. Using the observed spectrum as if it were the
+		// emitted one leaves the airglow too faint everywhere by the
+		// reciprocal of that transmittance, and then attenuates it a second
+		// time on the way to the observer's own site.
+		if t := transmittance[i]; t > 0 && t <= 1 {
+			flux /= t
+		} else {
+			// A transmittance that is not a fraction cannot be divided by, and
+			// a sample without one is not usable at the emitting layer.
+			continue
 		}
 
 		perNMPerSr := flux / 1000 / constants.ArcsecondSquaredToSteradian
@@ -536,7 +565,7 @@ func floatColumn(table *fits.BintableHDU, name string) ([]float64, error) {
 }
 
 // columns pulls the wavelength and the two airglow terms out of the table.
-func columns(f *fits.File) (lambda, lines, continuum []float64, err error) {
+func columns(f *fits.File) (lambda, lines, continuum, transmittance []float64, err error) {
 	for _, hdu := range f.HDUs {
 		table, ok := hdu.(*fits.BintableHDU)
 		if !ok {
@@ -550,21 +579,28 @@ func columns(f *fits.File) (lambda, lines, continuum []float64, err error) {
 
 		lines, err = floatColumn(table, "flux_ael")
 		if err != nil {
-			return nil, nil, nil, fmt.Errorf("%w: no airglow emission-line column: %w", ErrService, err)
+			return nil, nil, nil, nil, fmt.Errorf("%w: no airglow emission-line column: %w", ErrService, err)
 		}
 
 		continuum, err = floatColumn(table, "flux_arc")
 		if err != nil {
-			return nil, nil, nil, fmt.Errorf("%w: no airglow continuum column: %w", ErrService, err)
+			return nil, nil, nil, nil, fmt.Errorf("%w: no airglow continuum column: %w", ErrService, err)
 		}
 
-		if len(lambda) != len(lines) || len(lambda) != len(continuum) {
-			return nil, nil, nil, fmt.Errorf("%w: %d wavelengths against %d and %d fluxes",
-				ErrService, len(lambda), len(lines), len(continuum))
+		// The atmospheric transmittance the same request returns, which is
+		// what turns an observed airglow spectrum back into an emitted one.
+		transmittance, err = floatColumn(table, "trans")
+		if err != nil {
+			return nil, nil, nil, nil, fmt.Errorf("%w: no transmission column: %w", ErrService, err)
+		}
+
+		if len(lambda) != len(lines) || len(lambda) != len(continuum) || len(lambda) != len(transmittance) {
+			return nil, nil, nil, nil, fmt.Errorf("%w: %d wavelengths against %d, %d and %d",
+				ErrService, len(lambda), len(lines), len(continuum), len(transmittance))
 		}
 
 		if len(lambda) == 0 {
-			return nil, nil, nil, fmt.Errorf("%w: the table is empty", ErrService)
+			return nil, nil, nil, nil, fmt.Errorf("%w: the table is empty", ErrService)
 		}
 
 		// SkyCalc's LAM is in nanometres when the request was, but the header
@@ -576,8 +612,8 @@ func columns(f *fits.File) (lambda, lines, continuum []float64, err error) {
 			}
 		}
 
-		return lambda, lines, continuum, nil
+		return lambda, lines, continuum, transmittance, nil
 	}
 
-	return nil, nil, nil, fmt.Errorf("%w: no binary table in the response", ErrService)
+	return nil, nil, nil, nil, fmt.Errorf("%w: no binary table in the response", ErrService)
 }
