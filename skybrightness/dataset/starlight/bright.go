@@ -7,6 +7,7 @@ import (
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
+	"github.com/TuSKan/astrogo/magnitude"
 )
 
 // ErrBrightStar is returned when a bright star cannot be placed.
@@ -26,11 +27,53 @@ type BrightStar struct {
 	// RA and Dec are ICRS coordinates.
 	RA, Dec angle.Angle
 
-	// Vmag is the Johnson V magnitude. The Hipparcos catalogue supplies it
-	// directly, so unlike the Gaia path there is no colour transformation
-	// and no band conversion — see [GaiaJohnsonV] for what that costs when
-	// the catalogue does not.
+	// Vmag is the Johnson V magnitude, which the Hipparcos catalogue supplies
+	// directly.
 	Vmag float64
+
+	// Mag holds the star's magnitude in every band it is known in, keyed by
+	// the band name the map uses. V is always present and equals Vmag.
+	//
+	// # Where the other bands come from, and why none of them is a fit
+	//
+	// Unlike the Gaia path there is no colour polynomial here. Every band is
+	// arithmetic on published colour indices:
+	//
+	//	B = V + (B-V)          Hipparcos I/239/hip_main
+	//	I = V - (V-I)          Hipparcos I/239/hip_main
+	//	R = V - (V-I) + (R-I)  the last from the Bright Star Catalogue V/50
+	//
+	// The R identity is the one worth stating: V-R = (V-I) - (R-I), so R
+	// follows exactly from two catalogued indices with nothing interpolated.
+	// Hipparcos publishes no R and no V-R, and the alternative — a
+	// colour-colour relation predicting V-R from B-V — would be a fit, which
+	// is what this package refuses everywhere else. A star that the Bright
+	// Star Catalogue does not cover therefore has no R entry at all rather
+	// than an estimated one.
+	Mag map[string]float64
+
+	// vMinusI is the Hipparcos colour, kept only long enough to turn the
+	// Bright Star Catalogue's R-I into an R magnitude. Unexported because it
+	// is a step in building Mag rather than part of what a star is.
+	vMinusI    float64
+	hasVminusI bool
+}
+
+// magnitudeIn returns the star's magnitude in a band, and whether it has one.
+func (s BrightStar) magnitudeIn(band string) (float64, bool) {
+	if s.Mag != nil {
+		v, ok := s.Mag[band]
+
+		return v, ok
+	}
+
+	// A star carrying only Vmag still answers for V, which keeps a
+	// hand-constructed one usable.
+	if band == "V" {
+		return s.Vmag, true
+	}
+
+	return 0, false
 }
 
 // AddBrightStars sums stars into an existing map's band.
@@ -55,22 +98,42 @@ type BrightStar struct {
 // A star outside the map's grid, or with a magnitude that cannot produce a
 // finite irradiance, is an error rather than a silently dropped row: these are
 // the brightest objects in the sky and losing one is not a rounding error.
-func AddBrightStars(m *Map, band string, stars []BrightStar) error {
+func AddBrightStars(m *Map, name string, band magnitude.Passband, stars []BrightStar) error {
 	if m == nil {
 		return fmt.Errorf("%w: no map", ErrBrightStar)
 	}
 
-	values, ok := m.bands[band]
+	values, ok := m.bands[name]
 	if !ok {
-		return fmt.Errorf("%w: %q", ErrBand, band)
+		return fmt.Errorf("%w: %q", ErrBand, name)
+	}
+
+	// The zero point comes from the passband's own published calibration, the
+	// same one the Gaia band conversion uses, so the two paths into a map
+	// cannot rest on different numbers.
+	zeroFlux, err := VegaZeroFlux(band)
+	if err != nil {
+		return fmt.Errorf("%w: band %q: %w", ErrBrightStar, name, err)
 	}
 
 	grid := m.Grid()
 	solidAngle := 4 * math.Pi / float64(grid.NumPixels())
 
+	var added int
+
 	for _, s := range stars {
-		if math.IsNaN(s.Vmag) || math.IsInf(s.Vmag, 0) {
-			return fmt.Errorf("%w: HIP %d has V = %v", ErrBrightStar, s.HIP, s.Vmag)
+		mag, ok := s.magnitudeIn(name)
+		if !ok {
+			// Not every catalogue covers every band, and a star with no
+			// magnitude in this one contributes nothing to it. Silently, and
+			// deliberately: the alternative is to invent a colour, and the
+			// count is reported below so the gap is visible rather than
+			// assumed away.
+			continue
+		}
+
+		if math.IsNaN(mag) || math.IsInf(mag, 0) {
+			return fmt.Errorf("%w: HIP %d has %s = %v", ErrBrightStar, s.HIP, name, mag)
 		}
 
 		pixel := grid.PixelOf(s.RA, s.Dec)
@@ -79,19 +142,16 @@ func AddBrightStars(m *Map, band string, stars []BrightStar) error {
 				ErrBrightStar, s.HIP, pixel, len(values))
 		}
 
-		// The same Johnson V zero point the Gaia band conversion rests on,
-		// reused rather than restated so the two paths cannot drift apart.
-		irradiance := johnsonVZeroFlux * math.Pow(10, -0.4*s.Vmag)
-
-		values[pixel] += irradiance / solidAngle
+		values[pixel] += zeroFlux * math.Pow(10, -0.4*mag) / solidAngle
+		added++
 	}
 
 	// Record the addition on the map. A published map holding Hipparcos
 	// photometry while claiming only gaiadr3.gaia_source misdescribes itself,
 	// and the difference is 6.4 per cent of the sky.
-	if len(stars) > 0 {
-		note := fmt.Sprintf("%d Hipparcos stars with no Gaia DR3 counterpart, "+
-			"Johnson V taken directly from I/239/hip_main", len(stars))
+	if added > 0 {
+		note := fmt.Sprintf("%d of %d Hipparcos stars with no Gaia DR3 counterpart added in %s, "+
+			"from I/239/hip_main photometry", added, len(stars), name)
 		if m.Source == "" {
 			m.Source = note
 		} else {

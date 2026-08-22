@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/TuSKan/astrogo/angle"
+	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/remote/api"
 )
@@ -35,6 +36,20 @@ const (
 	// [angle.Angle] is radians and its constructors are functions, so the
 	// alternative is an exported variable somebody could reassign.
 	BrightStarMatchRadius = angle.Angle(5 * math.Pi / 180 / 3600)
+
+	// BrightStarCatalogueRadius is the tolerance for matching a bright star to
+	// the Bright Star Catalogue, thirty arcseconds.
+	//
+	// Six times the Gaia radius, and it can afford to be. That match decides
+	// whether Gaia saw a star at all, where a false positive silently drops a
+	// star from the map; this one only attaches a colour index, the catalogue
+	// holds about 9,100 stars over the whole sky — one per four square
+	// degrees — so a window this size almost never contains two, and the
+	// nearest is unambiguous. The slack also absorbs the eight and three
+	// quarter years of proper motion between the Hipparcos epoch and J2000
+	// without propagating it: over that span even Sirius moves about eleven
+	// arcseconds.
+	BrightStarCatalogueRadius = angle.Angle(30 * math.Pi / 180 / 3600)
 )
 
 // FetchBrightStars returns the Hipparcos stars Gaia has no counterpart for,
@@ -99,8 +114,16 @@ func fetchHipparcos(ctx context.Context, faintestV float64) ([]BrightStar, []flo
 
 	defer func() { _ = client.Close() }()
 
-	adql := fmt.Sprintf("SELECT HIP, RAICRS, DEICRS, Vmag, pmRA, pmDE, RAhms, DEdms "+
-		"FROM %cI/239/hip_main%c WHERE Vmag < %g", '"', '"', faintestV)
+	// B-V and V-I come back with the photometry, which is what makes a
+	// multi-band map possible without a colour fit: B = V + (B-V) and
+	// I = V - (V-I), both exact.
+	// No HD: the VizieR view of this table does not carry one, which the
+	// service reports as an unresolved identifier and which is why the Bright
+	// Star Catalogue is matched by position rather than joined by number.
+	adql := fmt.Sprintf("SELECT HIP, RAICRS, DEICRS, Vmag, %cB-V%c, %cV-I%c, "+
+		"pmRA, pmDE, RAhms, DEdms "+
+		"FROM %cI/239/hip_main%c WHERE Vmag < %g",
+		'"', '"', '"', '"', '"', '"', faintestV)
 
 	body, err := client.PostForm(ctx, remote.VizieR, "", tapForm(adql))
 	if err != nil {
@@ -139,7 +162,27 @@ func parseHipparcos(r io.Reader) ([]BrightStar, []float64, []float64, error) {
 		pra, _ := numField(index, row, "pmra")
 		pde, _ := numField(index, row, "pmde")
 
-		stars = append(stars, BrightStar{HIP: int(hip), RA: raA, Dec: decA, Vmag: v})
+		star := BrightStar{
+			HIP:  int(hip),
+			RA:   raA,
+			Dec:  decA,
+			Vmag: v,
+			Mag:  map[string]float64{"V": v},
+		}
+
+		// B and I follow from the catalogue's own colour indices. A star
+		// missing one simply has no magnitude in that band; nothing is
+		// interpolated to fill it.
+		if bv, ok := numField(index, row, "b-v"); ok {
+			star.Mag["B"] = v + bv
+		}
+
+		if vi, ok := numField(index, row, "v-i"); ok {
+			star.Mag["I"] = v - vi
+			star.vMinusI, star.hasVminusI = vi, true
+		}
+
+		stars = append(stars, star)
 		pmRA = append(pmRA, pra)
 		pmDec = append(pmDec, pde)
 	}
@@ -313,4 +356,135 @@ func sexagesimal(s string, isHours bool) (angle.Angle, bool) {
 	}
 
 	return angle.Deg(deg), true
+}
+
+// AddCousinsR fills in each star's R magnitude from the Bright Star Catalogue,
+// returning how many it matched.
+//
+// # Why this is a separate step
+//
+// It is the one band that needs a second catalogue, and [FetchBrightStars]
+// does not call it. A caller wanting only V, B and I should not have their
+// fetch fail because a service they do not need is down, and a caller wanting
+// R should see that failure rather than get a map quietly missing its
+// brightest stars in one band.
+//
+// # Why a second catalogue at all
+//
+// Hipparcos publishes V, B-V and V-I but no R and no V-R, so R is the one
+// Johnson-Cousins band its photometry cannot reach. The Bright Star Catalogue
+// (Hoffleit & Jaschek 1991, VizieR V/50) publishes R-I for the same stars, and
+// the two together give R exactly:
+//
+//	V-R = (V-I) - (R-I)
+//	R   = V - (V-I) + (R-I)
+//
+// Nothing is fitted. The alternative would be a colour-colour relation
+// predicting V-R from B-V, which is a regression over somebody's sample, and
+// putting an estimate into a map that is otherwise measurements — for the
+// brightest stars in the sky, where an error is least forgivable — is what
+// this package refuses everywhere else.
+//
+// # The match
+//
+// By position, because the VizieR view of I/239/hip_main carries no HD number
+// to join on. The radius is generous and can afford to be: the Bright Star
+// Catalogue holds about 9,100 stars over the whole sky, one per four square
+// degrees, so a window this size almost never contains two and the nearest is
+// unambiguous. That also absorbs the eight and three quarter years of proper
+// motion between the Hipparcos epoch and J2000 without propagating it — over
+// which even Sirius, among the fastest bright stars, moves about eleven
+// arcseconds.
+//
+// A star the catalogue does not cover keeps no R entry, and [AddBrightStars]
+// then contributes it to every other band and not to R.
+func AddCousinsR(ctx context.Context, stars []BrightStar) (matched int, err error) {
+	var wanted int
+
+	for _, s := range stars {
+		if s.hasVminusI {
+			wanted++
+		}
+	}
+
+	if wanted == 0 {
+		return 0, nil
+	}
+
+	client, err := api.NewClient(remote.VizieR,
+		api.WithTimeout(aggregationTimeout),
+		api.WithMinInterval(aggregationPace))
+	if err != nil {
+		return 0, fmt.Errorf("starlight: vizier client: %w", err)
+	}
+
+	defer func() { _ = client.Close() }()
+
+	// The whole catalogue is nine thousand rows of three columns. The
+	// alternative is a positional disjunction over every star we hold, which
+	// is a longer query than the answer.
+	adql := fmt.Sprintf("SELECT RAJ2000, DEJ2000, %cR-I%c FROM %cV/50/catalog%c "+
+		"WHERE %cR-I%c IS NOT NULL", '"', '"', '"', '"', '"', '"')
+
+	body, err := client.PostForm(ctx, remote.VizieR, "", tapForm(adql))
+	if err != nil {
+		return 0, fmt.Errorf("starlight: bright star catalogue query: %w", err)
+	}
+
+	defer func() { _ = body.Close() }()
+
+	rows, index, err := readTAPCSV(body)
+	if err != nil {
+		return 0, err
+	}
+
+	type entry struct {
+		ra, dec angle.Angle
+		ri      float64
+	}
+
+	catalogue := make([]entry, 0, len(rows))
+
+	for _, row := range rows {
+		ra, okRA := numField(index, row, "raj2000")
+		dec, okDec := numField(index, row, "dej2000")
+
+		ri, okRI := numField(index, row, "r-i")
+		if !okRA || !okDec || !okRI {
+			continue
+		}
+
+		catalogue = append(catalogue, entry{angle.Deg(ra), angle.Deg(dec), ri})
+	}
+
+	if len(catalogue) == 0 {
+		return 0, fmt.Errorf("%w: the bright star catalogue returned no usable rows",
+			ErrBrightStar)
+	}
+
+	for i := range stars {
+		s := &stars[i]
+
+		if !s.hasVminusI {
+			continue
+		}
+
+		here := coord.NewICRS(s.RA, s.Dec)
+		best, found := -1, angle.Angle(math.Inf(1))
+
+		for j, c := range catalogue {
+			if d := coord.Separation(here, coord.NewICRS(c.ra, c.dec)); d < found {
+				best, found = j, d
+			}
+		}
+
+		if best < 0 || found > BrightStarCatalogueRadius {
+			continue
+		}
+
+		s.Mag["R"] = s.Vmag - s.vMinusI + catalogue[best].ri
+		matched++
+	}
+
+	return matched, nil
 }

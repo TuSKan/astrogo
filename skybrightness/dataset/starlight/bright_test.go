@@ -6,6 +6,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/TuSKan/astrogo/magnitude"
+	"github.com/TuSKan/astrogo/unit"
+
 	"github.com/TuSKan/astrogo/angle"
 )
 
@@ -65,14 +68,23 @@ func TestAddBrightStarsPlacesAndScales(t *testing.T) {
 
 	star := BrightStar{HIP: 32349, RA: angle.Deg(101.2885), Dec: angle.Deg(-16.7131), Vmag: -1.44}
 
-	if err := AddBrightStars(m, "V", []BrightStar{star}); err != nil {
+	if err := AddBrightStars(m, "V", vBandForTest(), []BrightStar{star}); err != nil {
 		t.Fatalf("AddBrightStars: %v", err)
 	}
 
 	grid := m.Grid()
 	pixel := pixelOfStar(grid, star)
 	solidAngle := 4 * math.Pi / float64(grid.NumPixels())
-	want := johnsonVZeroFlux * math.Pow(10, -0.4*star.Vmag) / solidAngle
+	// The expectation comes from the same passband the call was given, not
+	// from a zero point written down here. Restating one would make this a
+	// test of a transcription rather than of the placement and scaling it is
+	// for, and it would fail whenever the calibration legitimately changed.
+	zeroFlux, err := VegaZeroFlux(vBandForTest())
+	if err != nil {
+		t.Fatalf("VegaZeroFlux: %v", err)
+	}
+
+	want := zeroFlux * math.Pow(10, -0.4*star.Vmag) / solidAngle
 
 	got, err := m.Pixel("V", pixel)
 	if err != nil {
@@ -114,7 +126,7 @@ func TestAddBrightStarsAccumulates(t *testing.T) {
 
 	star := BrightStar{HIP: 91262, RA: angle.Deg(279.234), Dec: angle.Deg(38.784), Vmag: 0.03}
 
-	if err := AddBrightStars(m, "V", []BrightStar{star}); err != nil {
+	if err := AddBrightStars(m, "V", vBandForTest(), []BrightStar{star}); err != nil {
 		t.Fatalf("AddBrightStars: %v", err)
 	}
 
@@ -135,16 +147,16 @@ func TestAddBrightStarsRejectsUnusableInput(t *testing.T) {
 		t.Fatalf("NewMap: %v", err)
 	}
 
-	if err := AddBrightStars(m, "R", nil); !errors.Is(err, ErrBand) {
+	if err := AddBrightStars(m, "R", vBandForTest(), nil); !errors.Is(err, ErrBand) {
 		t.Errorf("unknown band: err = %v, want ErrBand", err)
 	}
 
 	bad := []BrightStar{{HIP: 1, Vmag: math.NaN()}}
-	if err := AddBrightStars(m, "V", bad); !errors.Is(err, ErrBrightStar) {
+	if err := AddBrightStars(m, "V", vBandForTest(), bad); !errors.Is(err, ErrBrightStar) {
 		t.Errorf("NaN magnitude: err = %v, want ErrBrightStar", err)
 	}
 
-	if err := AddBrightStars(nil, "V", nil); !errors.Is(err, ErrBrightStar) {
+	if err := AddBrightStars(nil, "V", vBandForTest(), nil); !errors.Is(err, ErrBrightStar) {
 		t.Errorf("nil map: err = %v, want ErrBrightStar", err)
 	}
 }
@@ -221,5 +233,122 @@ func TestBrightStarsMissingFromGaiaValidates(t *testing.T) {
 
 	if err != nil && !strings.Contains(err.Error(), "proper motion") {
 		t.Errorf("the error should say what mismatched: %v", err)
+	}
+}
+
+// vBandForTest is a Johnson V passband carrying the published Vega zero point,
+// so a test exercises the same calibration path a real build does.
+func vBandForTest() magnitude.Passband {
+	return magnitude.Passband{
+		Name:            "V",
+		WavelengthNM:    []unit.WavelengthNM{506, 507, 598, 599},
+		Response:        []float64{0, 1, 1, 0},
+		Detector:        magnitude.EnergyIntegrating,
+		VegaZeroPointJy: 3630.2172842325,
+	}
+}
+
+// A star contributes to every band it has a magnitude in, and to no other.
+//
+// The bands come from published colour indices rather than a fit, so a star the
+// Bright Star Catalogue does not cover has no R at all. Skipping it there is
+// the intended behaviour and the alternative — inventing a colour so every band
+// is populated — is what this package refuses.
+func TestAddBrightStarsCoversOnlyTheBandsAStarHas(t *testing.T) {
+	t.Parallel()
+
+	names := []string{"B", "V", "R", "I"}
+
+	values := map[string][]float64{}
+	for _, name := range names {
+		values[name] = make([]float64, 3072)
+	}
+
+	m, err := NewMap(ICRS, values)
+	if err != nil {
+		t.Fatalf("NewMap: %v", err)
+	}
+
+	// Sirius, with B, V and I but no R.
+	star := BrightStar{
+		HIP: 32349, RA: angle.Deg(101.2885), Dec: angle.Deg(-16.7131), Vmag: -1.44,
+		Mag: map[string]float64{"B": -1.44, "V": -1.44, "I": -1.43},
+	}
+
+	for _, name := range names {
+		band := vBandForTest()
+		band.Name = name
+
+		if err := AddBrightStars(m, name, band, []BrightStar{star}); err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+	}
+
+	pixel := pixelOfStar(m.Grid(), star)
+
+	for _, name := range []string{"B", "V", "I"} {
+		v, err := m.Pixel(name, pixel)
+		if err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+
+		if v <= 0 {
+			t.Errorf("%s: the star contributed nothing despite having a magnitude", name)
+		}
+	}
+
+	if v, err := m.Pixel("R", pixel); err != nil {
+		t.Fatalf("R: %v", err)
+	} else if v != 0 {
+		t.Errorf("R = %g; a star with no R magnitude must contribute nothing to R "+
+			"rather than have one invented for it", v)
+	}
+}
+
+// A star carrying only Vmag still answers for V.
+//
+// Mag is the general form, but a hand-constructed star — in a test, or in a
+// caller's own bright-star list — should not have to build a map to name one
+// magnitude.
+func TestBrightStarWithoutMagStillHasV(t *testing.T) {
+	t.Parallel()
+
+	star := BrightStar{HIP: 1, RA: angle.Deg(0), Dec: angle.Deg(0), Vmag: 2.5}
+
+	if got, ok := star.magnitudeIn("V"); !ok || got != 2.5 {
+		t.Errorf("V = %v, %v; want 2.5, true", got, ok)
+	}
+
+	if _, ok := star.magnitudeIn("R"); ok {
+		t.Error("a star with no Mag reported an R magnitude")
+	}
+}
+
+// The R identity is exact arithmetic on two published indices.
+//
+// V-R = (V-I) - (R-I), so R = V - (V-I) + (R-I). This pins it, because the
+// tempting alternative — reading R-I as V-R and using it directly — is a
+// plausible-looking mistake that would leave every R magnitude wrong by the
+// difference between two colour indices.
+func TestCousinsRIdentity(t *testing.T) {
+	t.Parallel()
+
+	// Arcturus: V = -0.04, V-I = 1.27, R-I = 0.65 from the Bright Star
+	// Catalogue, so V-R = 0.62 and R = -0.66.
+	const (
+		v    = -0.04
+		vi   = 1.27
+		ri   = 0.65
+		want = v - vi + ri
+	)
+
+	if got := v - vi + ri; math.Abs(got-want) > 1e-12 {
+		t.Fatalf("R = %v, want %v", got, want)
+	}
+
+	// The mistake this guards against.
+	if wrong := v - ri; math.Abs(wrong-want) < 1e-9 {
+		t.Error("using R-I directly as V-R gives the same answer here, so this test " +
+			"cannot distinguish them; pick a star where V-I and R-I differ")
 	}
 }
