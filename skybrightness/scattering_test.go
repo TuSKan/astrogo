@@ -423,3 +423,177 @@ func TestSkyMapAgreesWithPerDirectionEstimates(t *testing.T) {
 
 	t.Logf("%d directions, %d spectral values, all identical to 1e-12", len(points), compared)
 }
+
+// The scattering angle stays accurate at small separations.
+//
+// Forward scattering is where the Henyey-Greenstein phase function is most
+// peaked, so it is where the angle has to be most accurate — and it is exactly
+// where an acos of the dot product is worst. This compares against an
+// independent great-circle formula over separations spanning nine orders of
+// magnitude.
+func TestSeparationIsAccurateNearZero(t *testing.T) {
+	t.Parallel()
+
+	// A reference through coord, which computes the same quantity by the same
+	// stable route for equatorial coordinates. Altitude and azimuth are a
+	// spherical frame like any other, so a separation in one is a separation
+	// in the other.
+	reference := func(a, b coord.AltAz) float64 {
+		return coord.Separation(
+			coord.NewICRS(a.Az(), a.Alt()),
+			coord.NewICRS(b.Az(), b.Alt()),
+		).Radians()
+	}
+
+	base := coord.NewAltAz(angle.Deg(35), angle.Deg(120))
+
+	for _, deltaDeg := range []float64{
+		1e-7, 1e-6, 1e-5, 1e-4, 1e-3, 1e-2, 0.1, 1, 10, 45, 90, 135, 179,
+	} {
+		other := coord.NewAltAz(angle.Deg(35+deltaDeg), angle.Deg(120))
+
+		got := skybrightness.SeparationForTest(base, other)
+		want := reference(base, other)
+
+		if want == 0 {
+			continue
+		}
+
+		if rel := math.Abs(got-want) / want; rel > 1e-12 {
+			t.Errorf("at %g degrees: got %.17g, want %.17g, relative %.3g",
+				deltaDeg, got, want, rel)
+		}
+	}
+}
+
+// How the hemispheric quadrature converges, and what limits it.
+//
+// The integral is over solid angle, dOmega = sin(z) dz dphi. The azimuth half
+// is periodic and a uniform rule is spectrally accurate there; the zenith half
+// is midpoint, which converges as the square of the step for a smooth
+// integrand.
+//
+// # The finding
+//
+// It is not the rule that limits the accuracy, it is the field. Against a
+// smooth field the midpoint rule converges cleanly and quadratically. Against
+// a field with an edge in it the error stops falling and oscillates at a few
+// tenths of a per cent however fine the grid gets, which is what any
+// quadrature does on a discontinuity — the error becomes a question of where
+// the samples happen to fall relative to the edge.
+//
+// That matters because the real incoming field HAS edges: it is built from a
+// HEALPix star map and a dust map, both piecewise constant. So replacing
+// midpoint with a higher-order rule would buy nothing on the term that
+// actually dominates, and the honest way to buy accuracy is more samples.
+// Which is affordable now, and is why the default is what it is.
+func TestScatteredInQuadratureConvergence(t *testing.T) {
+	t.Parallel()
+
+	view := coord.NewAltAz(angle.Deg(55), angle.Deg(200))
+
+	// A smooth field: radiance varying gently with altitude, no edge anywhere.
+	smooth := func(_ context.Context, dst skybrightness.SpectralRadiance, dir coord.AltAz) error {
+		v := 1e-9 * (1 + 0.5*math.Cos(2*dir.Alt().Radians()))
+		for i := range dst {
+			dst[i] += v
+		}
+
+		return nil
+	}
+
+	// A field with an edge: a band twenty degrees wide across the hemisphere,
+	// standing in for the Milky Way and for the pixel edges of a real map.
+	edged := func(_ context.Context, dst skybrightness.SpectralRadiance, dir coord.AltAz) error {
+		const inclination = 60 * math.Pi / 180
+
+		alt, az := dir.Alt().Radians(), dir.Az().Radians()
+		z := math.Sin(alt)*math.Cos(inclination) - math.Cos(alt)*math.Sin(az)*math.Sin(inclination)
+
+		if math.Abs(math.Asin(math.Max(-1, math.Min(1, z)))) > 10*math.Pi/180 {
+			return nil
+		}
+
+		for i := range dst {
+			dst[i] += 1e-9
+		}
+
+		return nil
+	}
+
+	counts := []int{4, 8, 12, 16, 24, 32, 48}
+
+	for _, c := range []struct {
+		name  string
+		field skybrightness.SkyRadiance
+	}{
+		{"smooth", smooth},
+		{"with an edge", edged},
+	} {
+		// A fine run stands in for the true value.
+		truth := scatteredAt(t, c.field, view, 200)
+		if truth <= 0 {
+			t.Fatalf("%s: the reference integral is %g", c.name, truth)
+		}
+
+		t.Logf("")
+		t.Logf("  field %s:", c.name)
+		t.Logf("    %6s %14s %10s", "rings", "value", "error")
+
+		errs := map[int]float64{}
+
+		for _, rings := range counts {
+			got := scatteredAt(t, c.field, view, rings)
+			errs[rings] = math.Abs(got-truth) / truth
+
+			t.Logf("    %6d %14.6e %9.4f%%", rings, got, 100*errs[rings])
+		}
+
+		if c.name == "smooth" {
+			// Quadratic convergence: quadrupling the rings should cut the
+			// error by about sixteen. Allowing a factor of four of slack still
+			// distinguishes a working rule from a broken one.
+			if ratio := errs[8] / errs[32]; ratio < 4 {
+				t.Errorf("smooth field: 8 rings is %.3g and 32 is %.3g, a factor of %.1f; "+
+					"midpoint should be roughly quadratic and this is not converging",
+					errs[8], errs[32], ratio)
+			}
+
+			// The default has to be well under the physical uncertainty, and
+			// it is: half a per cent is six thousandths of a magnitude,
+			// against the 0.046 mag by which this module and GAMBONS disagree
+			// about the same sky. One per cent is the bound because that is
+			// still an order of magnitude below what the model itself is
+			// worth; the measured value is 0.55, and a change that pushed it
+			// past one would mean the rule had degraded rather than merely
+			// moved.
+			if def := errs[skybrightness.DefaultScatteringRings]; def > 0.01 {
+				t.Errorf("smooth field: the default of %d rings is %.3f per cent off, "+
+					"which is no longer an order of magnitude below the physical uncertainty",
+					skybrightness.DefaultScatteringRings, 100*def)
+			}
+		}
+
+		if c.name == "with an edge" {
+			// No bound here of the kind the smooth case gets, because there is
+			// nothing to converge to: the error against a discontinuity is set
+			// by where the samples land, not by the step, and it does not fall
+			// with resolution. What is asserted is only that it stays within
+			// the band it wanders in, so a change that made the rule much
+			// worse would still show.
+			//
+			// This is not the accuracy of a real evaluation. A real field is
+			// edged, but its edges are HEALPix pixels far smaller than a
+			// quadrature cell, and integrated over the hemisphere they average
+			// out: measured against the published star map, twelve rings and
+			// twenty-four differ by four hundredths of a per cent. This
+			// integrand is one large edge and is the adversarial case.
+			for rings, e := range errs {
+				if e > 0.10 {
+					t.Errorf("with an edge: %d rings is %.1f per cent off, beyond the band "+
+						"this rule wanders in", rings, 100*e)
+				}
+			}
+		}
+	}
+}

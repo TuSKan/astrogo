@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/unit"
@@ -27,12 +26,34 @@ type SkyRadiance func(ctx context.Context, dst SpectralRadiance, dir coord.AltAz
 // DefaultScatteringRings is the zenith-angle resolution [ScatteredIn] uses
 // when none is given.
 //
-// Twelve rings is about 900 source directions over the hemisphere under the
-// azimuth rule below, which is enough for the integral to converge to well
-// under a hundredth of a magnitude while staying affordable — the cost of the
-// whole integral is one evaluation of the incoming field per source direction,
-// so this is the parameter that decides whether an all-sky map takes seconds
-// or hours.
+// # Chosen by measurement, and twenty-four was tried and rejected
+//
+// Against a smooth field the midpoint rule converges better than
+// quadratically: 0.55 per cent here, 0.11 at twenty-four rings, 0.026 at
+// forty-eight. Half a per cent is six thousandths of a magnitude, against the
+// 0.046 mag by which this module and GAMBONS disagree about the same sky, so
+// the quadrature is already an order of magnitude below the physical
+// uncertainty.
+//
+// Twenty-four was tried. The direction count goes as the square of the rings
+// and the per-direction sum is over all of them, so it costs four times as
+// much everywhere rather than only in the one-time sampling — a whole
+// reference sky went from sixteen seconds to a minute. Measured against the
+// published star map it moved the Table 2 starlight-to-zodiacal ratio from
+// 1.1758 to 1.1763, four hundredths of a per cent, against a discrepancy with
+// the paper of five per cent. Four times the cost for a fortieth of the error
+// that matters is not a trade worth making, and a caller who needs it can pass
+// a ring count.
+//
+// # What no ring count fixes
+//
+// Against a field with an edge in it the error stops falling around a per cent
+// however fine the grid gets, because it becomes a question of where the
+// samples land relative to the edge rather than of the step size. The real
+// incoming field is built from a HEALPix star map and a dust map, both
+// piecewise constant. That, and not this constant, is what limits the
+// integral; closing it needs the field averaged over each quadrature cell
+// rather than sampled at its centre. Recorded in docs/skybrightness.md.
 const DefaultScatteringRings = 12
 
 // ScatteredIn evaluates Masana et al. (2024) Eq. 11: the radiance scattered
@@ -116,51 +137,41 @@ func ScatteredIn(
 
 	source := NewSpectralRadiance(grid)
 	path := make([]float64, grid.Len())
+	ring := -1
 
-	const halfPi = math.Pi / 2
-
-	dz := halfPi / float64(rings)
-
-	for k := range rings {
-		z := (float64(k) + 0.5) * dz
-		alt := angle.Rad(halfPi - z)
-
-		sourceAirmass, err := atmosphere.Airmass(alt)
-		if err != nil {
-			return fmt.Errorf("%w: source airmass at %v: %w", ErrScattering, alt, err)
-		}
-
-		// Once per ring, not once per sample. The path integral depends on the
-		// source airmass, which is a function of altitude alone, so every
-		// azimuth around a ring shares it — and a ring near the horizon
-		// carries dozens of them.
-		kernel.pathFactor(path, sourceAirmass, viewAirmass)
-
-		// Azimuths in proportion to the ring's circumference, so the samples
-		// carry roughly equal solid angle and the pole is not oversampled.
-		azimuths := max(4, int(math.Round(4*float64(rings)*math.Sin(z))))
-		dOmega := math.Sin(z) * dz * (2 * math.Pi / float64(azimuths))
-
-		for j := range azimuths {
-			az := angle.Rad(2 * math.Pi * float64(j) / float64(azimuths))
-			dir := coord.NewAltAz(alt, az)
-
-			clear(source)
-
-			if err := above(ctx, source, dir); err != nil {
-				return fmt.Errorf("%w: incoming field at %v: %w", ErrScattering, dir, err)
-			}
-
-			// Once per sample, not once per wavelength: the phase functions
-			// depend on the scattering angle alone, and only the weights that
-			// mix them vary across the band.
-			phaseRayleigh, phaseAerosol, err := kernel.phaseAt(separation(view, dir))
+	for _, p := range hemisphereQuadrature(rings) {
+		if p.ring != ring {
+			sourceAirmass, err := atmosphere.Airmass(p.alt)
 			if err != nil {
-				return err
+				return fmt.Errorf("%w: source airmass at %v: %w", ErrScattering, p.alt, err)
 			}
 
-			kernel.accumulate(dst, source, path, dOmega, phaseRayleigh, phaseAerosol)
+			// Once per ring, not once per sample. The path integral depends
+			// on the source airmass, which is a function of altitude alone, so
+			// every azimuth around a ring shares it — and a ring near the
+			// horizon carries dozens of them.
+			kernel.pathFactor(path, sourceAirmass, viewAirmass)
+
+			ring = p.ring
 		}
+
+		dir := coord.NewAltAz(p.alt, p.az)
+
+		clear(source)
+
+		if err := above(ctx, source, dir); err != nil {
+			return fmt.Errorf("%w: incoming field at %v: %w", ErrScattering, dir, err)
+		}
+
+		// Once per sample, not once per wavelength: the phase functions depend
+		// on the scattering angle alone, and only the weights that mix them
+		// vary across the band.
+		phaseRayleigh, phaseAerosol, err := kernel.phaseAt(separation(view, dir))
+		if err != nil {
+			return err
+		}
+
+		kernel.accumulate(dst, source, path, p.dOmega, phaseRayleigh, phaseAerosol)
 	}
 
 	return nil
@@ -170,13 +181,35 @@ func ScatteredIn(
 //
 // The scattering angle of Eq. 11: zero when the source lies along the line of
 // sight, pi when it is directly behind the observer's head.
+//
+// # Why atan2 and not acos
+//
+// The obvious form, acos of the dot product, is ill-conditioned exactly where
+// this is used most sharply. Near zero the dot product is 1 - theta^2/2, so an
+// absolute error of one part in 10^16 in the dot becomes a relative error of
+// 10^-16/theta^2 in the angle: eight significant digits gone by a hundredth of
+// a radian, and worse closer in. Forward scattering is where the
+// Henyey-Greenstein phase function is most peaked — at an asymmetry of 0.65 it
+// is two orders of magnitude above its backward value — so the angles this
+// resolves least well are the ones that contribute most.
+//
+// atan2 of the cross-product norm against the dot is well conditioned over the
+// whole range, and it is the same form [github.com/TuSKan/astrogo/coord.Separation]
+// uses for the same reason.
 func separation(a, b coord.AltAz) float64 {
-	sinA, cosA := math.Sincos(a.Alt().Radians())
-	sinB, cosB := math.Sincos(b.Alt().Radians())
+	sinAltA, cosAltA := math.Sincos(a.Alt().Radians())
+	sinAzA, cosAzA := math.Sincos(a.Az().Radians())
+	sinAltB, cosAltB := math.Sincos(b.Alt().Radians())
+	sinAzB, cosAzB := math.Sincos(b.Az().Radians())
 
-	cos := sinA*sinB + cosA*cosB*math.Cos(a.Az().Radians()-b.Az().Radians())
+	ax, ay, az := cosAltA*cosAzA, cosAltA*sinAzA, sinAltA
+	bx, by, bz := cosAltB*cosAzB, cosAltB*sinAzB, sinAltB
 
-	return math.Acos(math.Min(1, math.Max(-1, cos)))
+	cx := ay*bz - az*by
+	cy := az*bx - ax*bz
+	cz := ax*by - ay*bx
+
+	return math.Atan2(math.Sqrt(cx*cx+cy*cy+cz*cz), ax*bx+ay*by+az*bz)
 }
 
 // AboveAtmosphere returns the extra-atmospheric field this model implies, for

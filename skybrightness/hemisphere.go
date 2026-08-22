@@ -3,9 +3,7 @@ package skybrightness
 import (
 	"context"
 	"fmt"
-	"math"
 
-	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/unit"
@@ -102,61 +100,51 @@ func (m *Model) sampleHemisphere(
 		return field, nil
 	}
 
-	const halfPi = math.Pi / 2
-
 	width := grid.Len()
-	dz := halfPi / float64(rings)
 	buf := NewSpectralRadiance(grid)
 
-	for k := range rings {
-		z := (float64(k) + 0.5) * dz
-		alt := angle.Rad(halfPi - z)
-
-		airmass, err := atmosphere.Airmass(alt)
-		if err != nil {
-			return nil, fmt.Errorf("%w: source airmass at %v: %w", ErrScattering, alt, err)
-		}
-
-		field.ringAirmass[k] = airmass
-
-		azimuths := max(4, int(math.Round(4*float64(rings)*math.Sin(z))))
-		dOmega := math.Sin(z) * dz * (2 * math.Pi / float64(azimuths))
-
-		// The de-extinction factor depends on the direction and the
-		// wavelength but not on the component, so it is formed once here and
-		// applied to all of them.
-		for j := range azimuths {
-			az := angle.Rad(2 * math.Pi * float64(j) / float64(azimuths))
-			dir := coord.NewAltAz(alt, az)
-
-			gain, err := deExtinction(scene, dir, grid)
+	for _, p := range hemisphereQuadrature(rings) {
+		if field.ringAirmass[p.ring] == 0 {
+			airmass, err := atmosphere.Airmass(p.alt)
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("%w: source airmass at %v: %w", ErrScattering, p.alt, err)
 			}
 
-			sample := hemisphereSample{
-				dir:      dir,
-				ring:     k,
-				dOmega:   dOmega,
-				radiance: make([]float64, len(eligible)*width),
-			}
-
-			for c, component := range eligible {
-				clear(buf)
-
-				if _, err := component.AddRadiance(ctx, buf, grid, dir, scene); err != nil {
-					return nil, fmt.Errorf("%w: %q at %v: %w",
-						ErrScattering, component.ID(), dir, err)
-				}
-
-				into := sample.spectrumOf(c, width)
-				for i := range into {
-					into[i] = buf[i] * gain[i]
-				}
-			}
-
-			field.samples = append(field.samples, sample)
+			field.ringAirmass[p.ring] = airmass
 		}
+
+		dir := coord.NewAltAz(p.alt, p.az)
+
+		// The de-extinction factor depends on the direction and the wavelength
+		// but not on the component, so it is formed once here and applied to
+		// all of them.
+		gain, err := deExtinction(scene, dir, grid)
+		if err != nil {
+			return nil, err
+		}
+
+		sample := hemisphereSample{
+			dir:      dir,
+			ring:     p.ring,
+			dOmega:   p.dOmega,
+			radiance: make([]float64, len(eligible)*width),
+		}
+
+		for c, component := range eligible {
+			clear(buf)
+
+			if _, err := component.AddRadiance(ctx, buf, grid, dir, scene); err != nil {
+				return nil, fmt.Errorf("%w: %q at %v: %w",
+					ErrScattering, component.ID(), dir, err)
+			}
+
+			into := sample.spectrumOf(c, width)
+			for i := range into {
+				into[i] = buf[i] * gain[i]
+			}
+		}
+
+		field.samples = append(field.samples, sample)
 	}
 
 	return field, nil

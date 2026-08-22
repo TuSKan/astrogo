@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 
+	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/unit"
 )
@@ -157,4 +158,66 @@ func (k *scatterKernel) accumulate(
 		phase := k.rayleighWeight[i]*phaseRayleigh + k.aerosolWeight[i]*phaseAerosol
 		dst[i] += radiance * dOmega * phase * path[i]
 	}
+}
+
+// quadraturePoint is one sample of the hemispheric integral.
+type quadraturePoint struct {
+	ring   int
+	alt    angle.Angle
+	az     angle.Angle
+	dOmega float64
+}
+
+// hemisphereQuadrature returns the sample points of the Eq. 11 integral.
+//
+// One definition, used by both [ScatteredIn] and the sampled field
+// [Model.sampleHemisphere]. They have to agree exactly — the second exists to
+// let the first be reused across view directions — and two copies of a
+// quadrature are two chances for them to stop agreeing.
+//
+// Midpoint in zenith angle, so the outermost ring stays off the horizon where
+// the airmass diverges and most models leave their stated validity domain. The
+// number of azimuths in each ring is proportional to sin(z), so every sample
+// carries roughly the same solid angle rather than the pole being oversampled.
+//
+// # One thing tried and rejected
+//
+// Rotating each ring by the golden angle, so samples do not stack into radial
+// columns across rings. It is the standard fix for aliasing and it does not
+// help here: measured over a sweep of a sharp feature across the sky, the
+// coefficient of variation went from 3.97 per cent unrotated to 4.32 per cent
+// rotated. The aliasing this rule suffers is in altitude, not azimuth — a
+// feature crossing the sky cuts across rings — so decorrelating the azimuths
+// addresses the wrong axis. TestScatteredInIsStableAsAFeatureMoves is the
+// measurement, and it is kept so the next person to have the idea can see it
+// was tried.
+func hemisphereQuadrature(rings int) []quadraturePoint {
+	if rings <= 0 {
+		rings = DefaultScatteringRings
+	}
+
+	const halfPi = math.Pi / 2
+
+	dz := halfPi / float64(rings)
+
+	out := make([]quadraturePoint, 0, 4*rings*rings)
+
+	for k := range rings {
+		z := (float64(k) + 0.5) * dz
+		alt := angle.Rad(halfPi - z)
+
+		azimuths := max(4, int(math.Round(4*float64(rings)*math.Sin(z))))
+		dOmega := math.Sin(z) * dz * (2 * math.Pi / float64(azimuths))
+
+		for j := range azimuths {
+			out = append(out, quadraturePoint{
+				ring:   k,
+				alt:    alt,
+				az:     angle.Rad(2 * math.Pi * float64(j) / float64(azimuths)),
+				dOmega: dOmega,
+			})
+		}
+	}
+
+	return out
 }
