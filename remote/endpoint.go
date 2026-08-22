@@ -156,6 +156,18 @@ const (
 	// directions a caller asks about.
 	IRSADust EndpointID = "irsa.dust"
 
+	// SVOFilterProfile is the Spanish Virtual Observatory's Filter Profile
+	// Service (skybrightness/dataset/passband).
+	//
+	// It serves the transmission curve of a named photometric filter along
+	// with the two things a passband needs and which cannot be recovered from
+	// the curve itself: the detector convention the curve is meant to be
+	// integrated under, and the zero point of the magnitude system, in
+	// janskys. Both are properties of how the filter was calibrated, so a
+	// provider that returned only the curve would leave the caller to guess
+	// them.
+	SVOFilterProfile EndpointID = "svo.fps"
+
 	// GaiaAIP is the Gaia mirror at Leibniz-Institut für Astrophysik Potsdam.
 	//
 	// It exists in the registry alongside the ESA archive rather than instead
@@ -544,6 +556,17 @@ func defaultEndpoints() map[EndpointID]Endpoint {
 			Subsystem: "skybrightness/dataset/dust",
 			Description: "NASA/IPAC Galactic Dust Extinction Service; 100 micron emission in " +
 				"MJy/sr and E(B-V), from IRAS, COBE/DIRBE and Planck",
+			Enabled: true,
+			Timeout: 60 * time.Second,
+		},
+
+		SVOFilterProfile: {
+			ID:        SVOFilterProfile,
+			URL:       "https://svo2.cab.inta-csic.es/theory/fps/fps.php",
+			Kind:      KindAPI,
+			Subsystem: "skybrightness/dataset/passband",
+			Description: "Spanish Virtual Observatory Filter Profile Service; filter " +
+				"transmission curves with detector convention and zero point",
 			Enabled: true,
 			Timeout: 60 * time.Second,
 		},
