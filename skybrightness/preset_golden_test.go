@@ -35,17 +35,22 @@ const goldenTol = 1e-12
 // Every input is written here rather than fetched, so the numbers reproduce on
 // any machine and in any year. The site is Cerro Paranal, the instant is a
 // fixed UTC one, and the atmosphere carries the preset's own transfer factor.
-func presetGoldenScene(t *testing.T, p skybrightness.Preset) *skybrightness.Scene {
-	t.Helper()
+func presetGoldenScene(tb testing.TB, p skybrightness.Preset) *skybrightness.Scene {
+	tb.Helper()
 
 	loc, err := coord.NewGeodetic(angle.Deg(-70.4045), angle.Deg(-24.6272), 2635)
 	if err != nil {
-		t.Fatalf("NewGeodetic: %v", err)
+		tb.Fatalf("NewGeodetic: %v", err)
 	}
 
 	kappa, err := p.DiffuseKappa()
 	if err != nil {
-		t.Fatalf("DiffuseKappa: %v", err)
+		tb.Fatalf("DiffuseKappa: %v", err)
+	}
+
+	multiple, err := p.MultipleScattering()
+	if err != nil {
+		tb.Fatalf("MultipleScattering: %v", err)
 	}
 
 	atm, err := atmosphere.NewBuilder().
@@ -53,9 +58,10 @@ func presetGoldenScene(t *testing.T, p skybrightness.Preset) *skybrightness.Scen
 		Aerosol(0.02, 550, 1.3, 0.95, 0.65).
 		BoundaryLayer(1500).
 		DiffuseScattering(kappa).
+		MultipleScattering(multiple).
 		Build()
 	if err != nil {
-		t.Fatalf("atmosphere Build: %v", err)
+		tb.Fatalf("atmosphere Build: %v", err)
 	}
 
 	return &skybrightness.Scene{

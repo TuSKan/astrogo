@@ -5,19 +5,23 @@ import (
 	"math"
 	"testing"
 
+	gotime "time"
+
 	"github.com/TuSKan/astrogo/angle"
+	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
+	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/magnitude"
 	"github.com/TuSKan/astrogo/skybrightness"
 	"github.com/TuSKan/astrogo/unit"
 )
 
-func presetInputs(t *testing.T) skybrightness.PresetInputs {
-	t.Helper()
+func presetInputs(tb testing.TB) skybrightness.PresetInputs {
+	tb.Helper()
 
 	grid, err := unit.NewSpectralGrid(400, 1, 401)
 	if err != nil {
-		t.Fatalf("NewSpectralGrid: %v", err)
+		tb.Fatalf("NewSpectralGrid: %v", err)
 	}
 
 	shape := skybrightness.NewSpectralRadiance(grid)
@@ -381,5 +385,205 @@ func TestTheTwoGAMBONSModelsDifferAsThePaperDescribes(t *testing.T) {
 			t.Errorf("at %g degrees the two models differ by %.4f mag, above the tenth of a "+
 				"magnitude the paper expects between them", altDeg, d)
 		}
+	}
+}
+
+// observatoryInputs adds what the Observatory preset needs beyond the natural
+// sky: a solar spectrum for the lunar reflectance and a ground-emitter
+// inventory for artificial skyglow.
+func observatoryInputs(tb testing.TB) skybrightness.PresetInputs {
+	tb.Helper()
+
+	in := presetInputs(tb)
+	in.SolarSpectrum = solarSpectrumFixture(tb)
+	in.Emitters = []skybrightness.GroundEmitter{cityAt(tb, 0, 30, 1e-3)}
+
+	return in
+}
+
+// Observatory registers the two components the reproductions must not.
+//
+// This is the difference between a preset that answers "what would GAMBONS
+// say" and one that answers "how bright is this sky". Moonlight and artificial
+// skyglow are absent from GAMBONS by design — it models the natural sky on a
+// moonless night — so a preset carrying them cannot be validated against their
+// export, and one lacking them cannot answer for a real night.
+func TestObservatoryCarriesMoonlightAndSkyglow(t *testing.T) {
+	t.Parallel()
+
+	model, err := skybrightness.NewPreset(skybrightness.Observatory, observatoryInputs(t))
+	if err != nil {
+		t.Fatalf("NewPreset: %v", err)
+	}
+
+	got := map[skybrightness.ComponentID]bool{}
+	for _, id := range model.Components() {
+		got[id] = true
+	}
+
+	for _, id := range []skybrightness.ComponentID{
+		skybrightness.Starlight, skybrightness.DiffuseGalactic, skybrightness.Extragalactic,
+		skybrightness.Zodiacal, skybrightness.AirglowContinuum,
+		skybrightness.Moonlight, skybrightness.Artificial,
+	} {
+		if !got[id] {
+			t.Errorf("no %s component", id)
+		}
+	}
+
+	// And the reproductions still must not.
+	for _, p := range []skybrightness.Preset{
+		skybrightness.GAMBONSWeb, skybrightness.NaturalSky, skybrightness.GAMBONSFull,
+	} {
+		reproduction, err := skybrightness.NewPreset(p, observatoryInputs(t))
+		if err != nil {
+			t.Fatalf("%s: %v", p, err)
+		}
+
+		for _, id := range reproduction.Components() {
+			if id == skybrightness.Moonlight || id == skybrightness.Artificial {
+				t.Errorf("%s registered %s; supplying the inputs must not change what a "+
+					"preset reproducing a moonless-night model contains", p, id)
+			}
+		}
+	}
+}
+
+// Observatory refuses without the data only it needs.
+//
+// Both are inputs rather than defaults because neither can be invented: ROLO's
+// absolute scale depends on the solar spectrum chosen, and satellite radiance
+// alone cannot determine a source spectrum or an upward emission function. A
+// preset that supplied either would be reporting somebody else's sky.
+func TestObservatoryRefusesWithoutItsOwnInputs(t *testing.T) {
+	t.Parallel()
+
+	for _, c := range []struct {
+		name    string
+		breakIt func(*skybrightness.PresetInputs)
+	}{
+		{"no solar spectrum", func(in *skybrightness.PresetInputs) { in.SolarSpectrum = nil }},
+		{"no emitters", func(in *skybrightness.PresetInputs) { in.Emitters = nil }},
+	} {
+		in := observatoryInputs(t)
+		c.breakIt(&in)
+
+		if _, err := skybrightness.NewPreset(skybrightness.Observatory, in); !errors.Is(
+			err, skybrightness.ErrPreset,
+		) {
+			t.Errorf("%s: err = %v, want ErrPreset", c.name, err)
+		}
+	}
+}
+
+// Higher scattering orders add light, and only where they belong.
+//
+// Winkler (2022) puts the shortfall of a single-scattering treatment
+// proportional to the molecular optical depth, so turning it on must brighten
+// the sky. It applies to the scattered term alone: the direct term is
+// extinction and has no scattering order, and under the simplified transfer
+// the scattered light is already stood in for by kappa, so a factor there
+// would count it twice.
+func TestMultipleScatteringBrightensOnlyTheScatteredTerm(t *testing.T) {
+	t.Parallel()
+
+	in := presetInputs(t)
+
+	model, err := skybrightness.NewPreset(skybrightness.GAMBONSFull, in)
+	if err != nil {
+		t.Fatalf("NewPreset: %v", err)
+	}
+
+	at := func(multiple bool, fidelity skybrightness.Fidelity) float64 {
+		t.Helper()
+
+		atm, err := atmosphere.NewBuilder().
+			Surface(743, 284).
+			Aerosol(0.02, 550, 1.3, 0.95, 0.65).
+			BoundaryLayer(1500).
+			DiffuseScattering(1).
+			MultipleScattering(multiple).
+			Build()
+		if err != nil {
+			t.Fatalf("atmosphere Build: %v", err)
+		}
+
+		loc, err := coord.NewGeodetic(angle.Deg(-70.4045), angle.Deg(-24.6272), 2635)
+		if err != nil {
+			t.Fatalf("NewGeodetic: %v", err)
+		}
+
+		est, err := model.Estimate(t.Context(), skybrightness.Query{
+			Scene: &skybrightness.Scene{
+				Observer:   loc,
+				Time:       gotime.Date(2026, 3, 20, 5, 0, 0, 0, gotime.UTC),
+				Atmosphere: atm,
+				Ephemeris:  eph.Default(),
+			},
+			Direction: coord.NewAltAz(angle.Deg(90), angle.Deg(0)),
+			Grid:      in.Grid,
+			Fidelity:  fidelity,
+		})
+		if err != nil {
+			t.Fatalf("Estimate: %v", err)
+		}
+
+		r, err := est.Radiance()
+		if err != nil {
+			t.Fatalf("Radiance: %v", err)
+		}
+
+		return float64(r)
+	}
+
+	off, on := at(false, skybrightness.Reference), at(true, skybrightness.Reference)
+
+	if on <= off {
+		t.Errorf("with higher orders %.6e, without %.6e; they must add light", on, off)
+	}
+
+	t.Logf("higher scattering orders add %.2f per cent at the zenith", 100*(on/off-1))
+
+	// At Standard fidelity there is no scattered term for it to apply to, so
+	// the setting must change nothing at all.
+	if a, b := at(false, skybrightness.Standard), at(true, skybrightness.Standard); a != b {
+		t.Errorf("without the scattering integral the setting changed the answer, "+
+			"%.10e against %.10e; there is no scattered term for it to multiply", a, b)
+	}
+}
+
+// Each preset reports whether it wants higher scattering orders.
+//
+// The third transport choice a scene has to carry, after kappa and fidelity,
+// and the quietest of the three to get wrong: a scene that forgets it produces
+// a sky a few per cent fainter with nothing to say why. Only the module's own
+// model wants it — Eq. 11 is explicitly first order, so a scene claiming to be
+// GAMBONS and carrying higher orders is no longer reproducing GAMBONS.
+func TestPresetMultipleScattering(t *testing.T) {
+	t.Parallel()
+
+	for _, c := range []struct {
+		preset skybrightness.Preset
+		want   bool
+	}{
+		{skybrightness.GAMBONSWeb, false},
+		{skybrightness.NaturalSky, false},
+		{skybrightness.GAMBONSFull, false},
+		{skybrightness.Observatory, true},
+	} {
+		got, err := c.preset.MultipleScattering()
+		if err != nil {
+			t.Fatalf("%s: %v", c.preset, err)
+		}
+
+		if got != c.want {
+			t.Errorf("%s: multiple scattering = %v, want %v", c.preset, got, c.want)
+		}
+	}
+
+	if _, err := skybrightness.Preset("no-such-preset").MultipleScattering(); !errors.Is(
+		err, skybrightness.ErrPreset,
+	) {
+		t.Error("an unknown preset answered rather than erroring")
 	}
 }

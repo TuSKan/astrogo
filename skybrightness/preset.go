@@ -111,6 +111,43 @@ const (
 	// right one here. Conversely the published all-sky export is a web-version
 	// run, so it validates [GAMBONSWeb] and cannot validate this.
 	GAMBONSFull Preset = "gambons-full"
+
+	// Observatory is this module's own model, and the only preset that is not
+	// trying to be somebody else.
+	//
+	// The other three reproduce a published model, which means their job is to
+	// match it including where it is approximate. This one's job is to be as
+	// right as the module can make it, so it departs from GAMBONS wherever a
+	// departure was measured to be an improvement rather than assumed to be
+	// one:
+	//
+	//   - The full Eq. 11 scattering integral, with kappa = 1 so the direct
+	//     term is true extinction. Measured against Table 2 it closes 37 per
+	//     cent of the discrepancy the simplified transfer cannot touch.
+	//   - Higher scattering orders on the scattered term, after Winkler
+	//     (2022). Eq. 11's kernel is first order and GAMBONS stops there;
+	//     against the published all-sky export our airglow-free sky is 0.046
+	//     mag too faint, which is the direction this corrects.
+	//   - Moonlight, from ROLO reflectance and single scattering. GAMBONS
+	//     models a moonless night and has no term for it at all, which makes
+	//     this the largest single capability difference and the reason this
+	//     preset cannot be checked against their export.
+	//   - Artificial skyglow over a caller's ground-emitter inventory,
+	//     Kocifaj (2022). Also absent from GAMBONS, which models the natural
+	//     sky alone.
+	//   - Pickering (2002) airmass rather than Kasten & Young (1989).
+	//     Measured, the two agree to better than three parts in a thousand
+	//     above five degrees — no hundredths of a magnitude in any band — and
+	//     diverge only in the last degrees, where Pickering is better behaved.
+	//
+	// # What it costs
+	//
+	// Reference fidelity, so about three orders of magnitude more per
+	// direction than [GAMBONSWeb], and two inputs the others do not need: a
+	// solar spectrum for the lunar reflectance and a ground-emitter inventory.
+	// A caller without either should use [NaturalSky], which is the same
+	// natural sky under the simplified transfer.
+	Observatory Preset = "observatory"
 )
 
 // Fidelity returns the level [Model.Estimate] must be asked for to evaluate
@@ -125,7 +162,7 @@ func (p Preset) Fidelity() (Fidelity, error) {
 	switch p {
 	case GAMBONSWeb, NaturalSky:
 		return Standard, nil
-	case GAMBONSFull:
+	case GAMBONSFull, Observatory:
 		return Reference, nil
 	default:
 		return 0, fmt.Errorf("%w: unknown preset %q", ErrPreset, p)
@@ -145,13 +182,37 @@ func (p Preset) DiffuseKappa() (float64, error) {
 		return 0.5, nil
 	case NaturalSky:
 		return 0.75, nil
-	case GAMBONSFull:
+	case GAMBONSFull, Observatory:
 		// Not a scattering choice: the absence of one. The full model puts
 		// the scattered light in Eq. 11 rather than in an effective depth,
 		// so the direct term carries the true extinction.
 		return 1, nil
 	default:
 		return 0, fmt.Errorf("%w: unknown preset %q", ErrPreset, p)
+	}
+}
+
+// MultipleScattering reports whether this preset wants the higher scattering
+// orders a first-order integral misses, for
+// [github.com/TuSKan/astrogo/atmosphere.Builder.MultipleScattering].
+//
+// Only [Observatory]. The three reproductions must not have it: Masana et al.
+// (2024) Eq. 11 is explicitly first order, so a scene claiming to be GAMBONS
+// and carrying higher orders is no longer reproducing GAMBONS.
+//
+// Reported for the same reason as [Preset.DiffuseKappa] and [Preset.Fidelity]:
+// it belongs to the atmosphere, the scene owns the atmosphere, and a caller
+// who has to remember it is a caller who will one day forget it. Forgetting
+// this one is quiet — the sky simply comes out a few per cent fainter with
+// nothing to say why.
+func (p Preset) MultipleScattering() (bool, error) {
+	switch p {
+	case GAMBONSWeb, NaturalSky, GAMBONSFull:
+		return false, nil
+	case Observatory:
+		return true, nil
+	default:
+		return false, fmt.Errorf("%w: unknown preset %q", ErrPreset, p)
 	}
 }
 
@@ -183,6 +244,24 @@ type PresetInputs struct {
 	// the night being modelled rather than from a reference, which changes
 	// the quality flag the component reports.
 	AirglowMeasured bool
+
+	// SolarSpectrum is the solar spectral irradiance at the 32 ROLO bands,
+	// which the lunar reflectance is multiplied by. Required by [Observatory]
+	// and unused by the others, since GAMBONS models a moonless night.
+	//
+	// [github.com/TuSKan/astrogo/skybrightness/dataset/solar] fetches the
+	// CALSPEC reference and samples it onto those bands. It is an input rather
+	// than a constant because ROLO's absolute scale depends on the choice.
+	SolarSpectrum []float64
+
+	// Emitters is the ground-emitter inventory artificial skyglow is computed
+	// over. Required by [Observatory].
+	//
+	// There is no default and there cannot be one: satellite radiance alone
+	// cannot determine a source spectrum or an upward emission function, and
+	// a preset that invented an inventory would be reporting somebody else's
+	// city.
+	Emitters []GroundEmitter
 
 	// Grid and Band are the spectral grid everything is evaluated on and the
 	// passband the star map is averaged over.
@@ -237,8 +316,28 @@ func NewPreset(p Preset, in PresetInputs) (*Model, error) {
 		return nil, fmt.Errorf("%w %q: %w", ErrPreset, p, err)
 	}
 
-	model, err := NewModel(string(p),
-		starlight, galactic, NewExtragalacticBackground(), NewZodiacalLight(), glow)
+	components := []Component{
+		starlight, galactic, NewExtragalacticBackground(), NewZodiacalLight(), glow,
+	}
+
+	// Observatory adds the two terms GAMBONS has no counterpart for. Both need
+	// data the natural sky does not, which is why they are the preset's own
+	// required inputs rather than optional extras on every preset.
+	if p == Observatory {
+		moon, err := NewScatteredMoonlight(in.SolarSpectrum)
+		if err != nil {
+			return nil, fmt.Errorf("%w %q: moonlight: %w", ErrPreset, p, err)
+		}
+
+		artificial, err := NewArtificialSkyglow(in.Emitters)
+		if err != nil {
+			return nil, fmt.Errorf("%w %q: artificial skyglow: %w", ErrPreset, p, err)
+		}
+
+		components = append(components, moon, artificial)
+	}
+
+	model, err := NewModel(string(p), components...)
 	if err != nil {
 		return nil, fmt.Errorf("%w %q: %w", ErrPreset, p, err)
 	}

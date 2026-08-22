@@ -25,8 +25,8 @@ import (
 // spectrum on purpose, and this one is good to roughly 20% across the
 // optical, which is enough for the order-of-magnitude checks below and not
 // enough for anything else.
-func solarSpectrumFixture(t *testing.T) []float64 {
-	t.Helper()
+func solarSpectrumFixture(tb testing.TB) []float64 {
+	tb.Helper()
 
 	const (
 		h    = 6.62607015e-34 // J s, SI 2019 exact

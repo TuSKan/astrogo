@@ -406,6 +406,30 @@ func (m *Model) addScatteredIn(
 			return fmt.Errorf("%w: %q: %w", ErrComponentFailed, c.ID(), err)
 		}
 
+		// Higher scattering orders, when the scene asks for them. Eq. 11's
+		// kernel is first order, so this is the one place they can be added
+		// without double-counting: the direct term is extinction and has no
+		// scattering order at all.
+		if q.Scene.Atmosphere.MultipleScattering() {
+			pressure, _ := q.Scene.Atmosphere.Surface()
+
+			for i := range buf {
+				rayleigh, err := atmosphere.RayleighOpticalDepth(grid.At(i), float64(pressure))
+				if err != nil {
+					return fmt.Errorf("%w: %q: %w", ErrComponentFailed, c.ID(), err)
+				}
+
+				multiple, err := atmosphere.MultipleScatteringFactor(rayleigh)
+				if err != nil {
+					return fmt.Errorf("%w: %q: %w", ErrComponentFailed, c.ID(), err)
+				}
+
+				scattered[i] *= multiple
+			}
+
+			est.Quality.Add(ApproximateMultipleScattering)
+		}
+
 		for i := range buf {
 			buf[i] += scattered[i]
 			est.total[i] += scattered[i]

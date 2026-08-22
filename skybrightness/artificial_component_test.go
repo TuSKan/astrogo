@@ -16,8 +16,8 @@ import (
 
 // cityAt builds a uniform emitter at a bearing and distance from Paranal,
 // with a flat spectrum and a mostly unshielded emission function.
-func cityAt(t *testing.T, bearingDeg, distanceKM, radiance float64) *skybrightness.UniformEmitter {
-	t.Helper()
+func cityAt(tb testing.TB, bearingDeg, distanceKM, radiance float64) *skybrightness.UniformEmitter {
+	tb.Helper()
 
 	// Walk out from the observer along a great circle. At these distances a
 	// flat-Earth offset in latitude and longitude is accurate enough for a
@@ -31,7 +31,7 @@ func cityAt(t *testing.T, bearingDeg, distanceKM, radiance float64) *skybrightne
 
 	at, err := coord.NewGeodetic(angle.Deg(lon), angle.Deg(lat), 2000)
 	if err != nil {
-		t.Fatalf("NewGeodetic: %v", err)
+		tb.Fatalf("NewGeodetic: %v", err)
 	}
 
 	return &skybrightness.UniformEmitter{

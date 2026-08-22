@@ -199,7 +199,8 @@ type Atmosphere struct {
 
 	// diffuseKappa scales the optical depth an extended source is attenuated
 	// by; see DiffuseKappa. Zero means unset and reads as DefaultDiffuseKappa.
-	diffuseKappa float64
+	diffuseKappa       float64
+	multipleScattering bool
 }
 
 // DiffuseKappa returns the factor the optical depth is scaled by when
@@ -225,6 +226,14 @@ func (s *Atmosphere) DiffuseKappa() float64 {
 
 	return s.diffuseKappa
 }
+
+// MultipleScattering reports whether higher scattering orders should be added
+// to a first-order result.
+//
+// Off by default, because the models this module implements are first-order
+// and a caller reproducing one of them must get what the paper describes.
+// See [Builder.MultipleScattering].
+func (s *Atmosphere) MultipleScattering() bool { return s.multipleScattering }
 
 // Surface returns the surface pressure and temperature.
 func (s *Atmosphere) Surface() (unit.PressureHPa, unit.TemperatureK) {
@@ -361,6 +370,32 @@ func (b *Builder) DiffuseScattering(kappa float64) *Builder {
 	if kappa > 0 && kappa <= 1 {
 		b.s.diffuseKappa = kappa
 	}
+
+	return b
+}
+
+// MultipleScattering turns on the higher scattering orders that a first-order
+// treatment misses.
+//
+// Photons scattered twice or more still reach the observer, and a
+// single-scattering integral does not carry them. Winkler (2022) quantifies
+// the shortfall against SAAO measurements as proportional to the molecular
+// optical depth, which is what
+// [github.com/TuSKan/astrogo/atmosphere.MultipleScatteringFactor] returns and
+// what the moonlight component has always applied.
+//
+// It is off by default and has to be asked for, because turning it on stops a
+// model reproducing the paper it came from: Masana et al. (2024) Eq. 11 is
+// explicitly first-order, so a scene claiming to be GAMBONS must not carry
+// this. It belongs to a model that is trying to be right rather than trying to
+// be somebody else.
+//
+// It applies to the scattered term only. The direct term is extinction, which
+// has no scattering order, and under the effective-optical-depth transfer the
+// scattered light is already stood in for by kappa - applying a factor there
+// would count it twice.
+func (b *Builder) MultipleScattering(on bool) *Builder {
+	b.s.multipleScattering = on
 
 	return b
 }
