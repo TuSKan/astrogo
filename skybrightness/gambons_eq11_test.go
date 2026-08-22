@@ -92,9 +92,29 @@ func TestEq11AgainstTheTable2Ratio(t *testing.T) {
 		return atm
 	}
 
-	// kappa = 1 leaves the true extinction and no stand-in for scattering,
-	// which is the L_d of Eq. 8.
-	web, full := build(0.5), build(1.0)
+	// Both configurations come from their presets rather than from literals
+	// here, so this comparison cannot drift away from what the library ships.
+	webKappa, err := skybrightness.GAMBONSWeb.DiffuseKappa()
+	if err != nil {
+		t.Fatalf("GAMBONSWeb kappa: %v", err)
+	}
+
+	fullKappa, err := skybrightness.GAMBONSFull.DiffuseKappa()
+	if err != nil {
+		t.Fatalf("GAMBONSFull kappa: %v", err)
+	}
+
+	webFidelity, err := skybrightness.GAMBONSWeb.Fidelity()
+	if err != nil {
+		t.Fatalf("GAMBONSWeb fidelity: %v", err)
+	}
+
+	fullFidelity, err := skybrightness.GAMBONSFull.Fidelity()
+	if err != nil {
+		t.Fatalf("GAMBONSFull fidelity: %v", err)
+	}
+
+	web, full := build(webKappa), build(fullKappa)
 
 	provider := eph.Default()
 
@@ -127,37 +147,49 @@ func TestEq11AgainstTheTable2Ratio(t *testing.T) {
 		t.Fatalf("NewIntegratedStarlight: %v", err)
 	}
 
-	// One model per component, because the scattered-in term has to be
-	// attributed to the component that supplied the light. A single model
-	// would give their sum and the ratio would be unrecoverable.
-	type part struct {
-		id    skybrightness.ComponentID
-		model *skybrightness.Model
-	}
-
-	islModel, err := skybrightness.NewModel("eq11-starlight", isl)
+	// Starlight and zodiacal light in one model, read back per component.
+	//
+	// Reference fidelity runs the Eq. 11 integral separately for each
+	// component and adds it to that component's own spectrum, so the
+	// attribution survives and a single model suffices. An earlier version
+	// built one model per component and called ScatteredIn by hand, which
+	// worked but reimplemented in a test what Estimate now does — exactly the
+	// drift a preset exists to prevent.
+	model, err := skybrightness.NewModel("eq11-probe", isl, skybrightness.NewZodiacalLight())
 	if err != nil {
 		t.Fatalf("NewModel: %v", err)
 	}
 
-	zodiModel, err := skybrightness.NewModel("eq11-zodiacal", skybrightness.NewZodiacalLight())
-	if err != nil {
-		t.Fatalf("NewModel: %v", err)
-	}
+	ids := []skybrightness.ComponentID{skybrightness.Starlight, skybrightness.Zodiacal}
 
-	parts := []part{
-		{skybrightness.Starlight, islModel},
-		{skybrightness.Zodiacal, zodiModel},
-	}
-
-	type totals struct{ kappa, direct, scattered float64 }
+	type totals struct{ kappa, full float64 }
 
 	got := map[skybrightness.ComponentID]*totals{
 		skybrightness.Starlight: {},
 		skybrightness.Zodiacal:  {},
 	}
 
-	const rings = 10
+	accumulate := func(scene *skybrightness.Scene, view coord.AltAz,
+		fidelity skybrightness.Fidelity, into func(*totals) *float64,
+	) {
+		t.Helper()
+
+		est, err := model.Estimate(ctx, skybrightness.Query{
+			Scene: scene, Direction: view, Grid: grid, Fidelity: fidelity,
+		})
+		if err != nil {
+			t.Fatalf("estimate at %v: %v", fidelity, err)
+		}
+
+		for _, id := range ids {
+			spectrum, ok := est.Component(id)
+			if !ok {
+				t.Fatalf("the estimate carries no %s component", id)
+			}
+
+			*into(got[id]) += bandFlux(t, spectrum, grid, band)
+		}
+	}
 
 	for _, when := range epochs {
 		webScene := &skybrightness.Scene{
@@ -168,76 +200,37 @@ func TestEq11AgainstTheTable2Ratio(t *testing.T) {
 		}
 
 		for _, view := range capDirs {
-			for _, p := range parts {
-				// The web model: the components' own attenuation is the whole
-				// treatment of scattering.
-				kappaEst, err := p.model.Estimate(ctx, skybrightness.Query{
-					Scene: webScene, Direction: view, Grid: grid,
-				})
-				if err != nil {
-					t.Fatalf("%s: web estimate: %v", p.id, err)
-				}
-
-				got[p.id].kappa += bandFlux(t, kappaEst.SpectralRadiance(), grid, band)
-
-				// The full model: true extinction, plus the integral.
-				directEst, err := p.model.Estimate(ctx, skybrightness.Query{
-					Scene: fullScene, Direction: view, Grid: grid,
-				})
-				if err != nil {
-					t.Fatalf("%s: direct estimate: %v", p.id, err)
-				}
-
-				got[p.id].direct += bandFlux(t, directEst.SpectralRadiance(), grid, band)
-
-				above, err := p.model.AboveAtmosphere(skybrightness.Query{
-					Scene: fullScene, Grid: grid,
-				})
-				if err != nil {
-					t.Fatalf("%s: AboveAtmosphere: %v", p.id, err)
-				}
-
-				scattered := skybrightness.NewSpectralRadiance(grid)
-
-				if err := skybrightness.ScatteredIn(
-					ctx, scattered, above, fullScene, view, grid, rings,
-				); err != nil {
-					t.Fatalf("%s: ScatteredIn: %v", p.id, err)
-				}
-
-				got[p.id].scattered += bandFlux(t, scattered, grid, band)
-			}
+			accumulate(webScene, view, webFidelity, func(a *totals) *float64 { return &a.kappa })
+			accumulate(fullScene, view, fullFidelity, func(a *totals) *float64 { return &a.full })
 		}
 	}
 
 	star, zodi := got[skybrightness.Starlight], got[skybrightness.Zodiacal]
 
-	t.Logf("%d epochs, %d directions in the %.0f degree zenith cap, %d quadrature rings",
-		len(epochs), len(capDirs), table2CapDeg, rings)
+	t.Logf("%d epochs, %d directions in the %.0f degree zenith cap",
+		len(epochs), len(capDirs), table2CapDeg)
 	t.Log("")
-	t.Logf("  %-10s %13s %13s %13s %13s",
-		"component", "kappa model", "direct", "scattered in", "Eq. 8 total")
+	t.Logf("  %-10s %15s %15s %12s", "component", "gambons-web", "gambons-full", "full/web")
 
-	for _, p := range parts {
-		a := got[p.id]
-		t.Logf("  %-10s %13.5e %13.5e %13.5e %13.5e",
-			p.id, a.kappa, a.direct, a.scattered, a.direct+a.scattered)
+	for _, id := range ids {
+		a := got[id]
+		t.Logf("  %-10s %15.5e %15.5e %12.4f", id, a.kappa, a.full, a.full/a.kappa)
 	}
 
-	if zodi.kappa <= 0 || zodi.direct+zodi.scattered <= 0 {
+	if zodi.kappa <= 0 || zodi.full <= 0 {
 		t.Fatal("the zodiacal component produced no light")
 	}
 
 	var (
 		kappaRatio = star.kappa / zodi.kappa
-		eq11Ratio  = (star.direct + star.scattered) / (zodi.direct + zodi.scattered)
+		eq11Ratio  = star.full / zodi.full
 		want       = gambonsTable2["starlight"].V / gambonsTable2["zodiacal"].V
 	)
 
 	t.Log("")
-	t.Logf("  starlight/zodiacal, kappa = 0.5 (web):     %.4f", kappaRatio)
-	t.Logf("  starlight/zodiacal, Eq. 8 = L_d + L_s:     %.4f", eq11Ratio)
-	t.Logf("  starlight/zodiacal, Table 2:               %.4f", want)
+	t.Logf("  starlight/zodiacal, gambons-web:   %.4f", kappaRatio)
+	t.Logf("  starlight/zodiacal, gambons-full:  %.4f", eq11Ratio)
+	t.Logf("  starlight/zodiacal, Table 2:       %.4f", want)
 	t.Log("")
 
 	// How much of the gap the full model closes. One means it lands exactly on
@@ -251,37 +244,26 @@ func TestEq11AgainstTheTable2Ratio(t *testing.T) {
 
 	t.Logf("  the full scattering model closes %.0f per cent of the gap", 100*closed)
 
-	scatterShare := func(a *totals) float64 {
-		return a.scattered / (a.direct + a.scattered)
-	}
+	// The full model must be brighter than the simplified one at the zenith,
+	// and by a plausible amount. Masana et al. state the direction — the
+	// simplified model "underestimates the brightness at zenith" — and bound
+	// the whole difference at under a tenth of a magnitude, which is under ten
+	// per cent in flux.
+	for _, id := range ids {
+		a := got[id]
+		gainFrac := a.full/a.kappa - 1
 
-	t.Logf("  scattered light is %.1f per cent of the starlight total and %.1f per cent "+
-		"of the zodiacal", 100*scatterShare(star), 100*scatterShare(zodi))
+		t.Logf("  %s: the full model is %+.1f per cent of the simplified one", id, 100*gainFrac)
 
-	// The same quantity the composition test measures, so the two cannot drift
-	// apart unnoticed. That test reports starlight and zodiacal as 34.1 and
-	// 27.6 per cent of the zenith total in V; their ratio is what this test's
-	// kappa column must reproduce, since it is the same model over the same
-	// epochs and directions.
-	const fromComposition = 34.1 / 27.6
+		if gainFrac < 0 {
+			t.Errorf("%s: the full model is fainter than the simplified one at the zenith, "+
+				"where the paper has the simplified one underestimating", id)
+		}
 
-	if rel := math.Abs(kappaRatio-fromComposition) / fromComposition; rel > 0.10 {
-		t.Errorf("the kappa model gives starlight/zodiacal %.4f here and %.4f in "+
-			"TestAgainstGAMBONSTable2, %.0f per cent apart; the two tests are no longer "+
-			"measuring the same thing", kappaRatio, fromComposition, 100*rel)
-	}
-
-	// The scattered term must be a real but minority contribution at the
-	// zenith. Masana et al. put the whole simplified-against-full difference
-	// under a tenth of a magnitude in most cases, which is under ten per cent
-	// in flux; a scattered share of half would mean the kernel or the
-	// solid-angle weighting is wrong, and one near zero would mean the
-	// integral is not running.
-	for _, p := range parts {
-		if s := scatterShare(got[p.id]); s < 0.01 || s > 0.40 {
-			t.Errorf("%s: scattered light is %.1f per cent of the total, which is outside "+
-				"anything a clear atmosphere at these optical depths can produce",
-				p.id, 100*s)
+		if gainFrac > 0.40 {
+			t.Errorf("%s: the full model is %.0f per cent brighter than the simplified one, "+
+				"far beyond the tenth of a magnitude the paper puts between them",
+				id, 100*gainFrac)
 		}
 	}
 

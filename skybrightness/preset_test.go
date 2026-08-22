@@ -5,6 +5,8 @@ import (
 	"math"
 	"testing"
 
+	"github.com/TuSKan/astrogo/angle"
+	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/magnitude"
 	"github.com/TuSKan/astrogo/skybrightness"
 	"github.com/TuSKan/astrogo/unit"
@@ -67,7 +69,9 @@ func TestPresetsBuildTheNaturalSky(t *testing.T) {
 		skybrightness.AirglowContinuum: true,
 	}
 
-	for _, p := range []skybrightness.Preset{skybrightness.GAMBONSWeb, skybrightness.NaturalSky} {
+	for _, p := range []skybrightness.Preset{
+		skybrightness.GAMBONSWeb, skybrightness.NaturalSky, skybrightness.GAMBONSFull,
+	} {
 		model, err := skybrightness.NewPreset(p, presetInputs(t))
 		if err != nil {
 			t.Fatalf("%s: %v", p, err)
@@ -104,12 +108,16 @@ func TestPresetDiffuseKappa(t *testing.T) {
 	t.Parallel()
 
 	for _, c := range []struct {
-		preset skybrightness.Preset
-		want   float64
-		why    string
+		preset      skybrightness.Preset
+		want        float64
+		hongBounded bool
+		why         string
 	}{
-		{skybrightness.GAMBONSWeb, 0.5, "the value the GAMBONS web service uses"},
-		{skybrightness.NaturalSky, 0.75, "Duriscoe (2013), after Kwon (1989)"},
+		{skybrightness.GAMBONSWeb, 0.5, true, "the value the GAMBONS web service uses"},
+		{skybrightness.NaturalSky, 0.75, true, "Duriscoe (2013), after Kwon (1989)"},
+		{skybrightness.GAMBONSFull, 1, false,
+			"not a scattering choice but the absence of one: the full model puts the " +
+				"scattered light in Eq. 11, so the direct term carries the true extinction"},
 	} {
 		got, err := c.preset.DiffuseKappa()
 		if err != nil {
@@ -120,9 +128,12 @@ func TestPresetDiffuseKappa(t *testing.T) {
 			t.Errorf("%s: kappa = %v, want %v — %s", c.preset, got, c.want, c.why)
 		}
 
-		// Hong et al. (1998) bound it; a value outside that range would not be
-		// one either paper supports.
-		if got < 0.5 || got > 0.9 {
+		// Hong et al. (1998) bound the effective-depth factor to 0.5 to 0.9,
+		// and a preset that uses one must sit inside it. GAMBONSFull does not
+		// use one at all, so the bound does not apply to it — checking it
+		// there would be asserting that a model has an approximation it was
+		// specifically defined without.
+		if c.hongBounded && (got < 0.5 || got > 0.9) {
 			t.Errorf("%s: kappa = %v is outside the 0.5 to 0.9 of Hong et al. (1998)", c.preset, got)
 		}
 	}
@@ -201,5 +212,174 @@ func TestPresetsDifferOnlyInTransfer(t *testing.T) {
 
 	if math.Abs(webK-naturalK) < 1e-9 {
 		t.Error("the presets carry the same kappa, so nothing distinguishes them")
+	}
+}
+
+// Each preset reports the fidelity it has to be evaluated at.
+//
+// This is the one way to hold GAMBONSFull wrong that produces a plausible
+// number rather than an error: asked at Standard fidelity it applies the true
+// extinction and never adds the scattering term, so the sky comes out too
+// faint with nothing to say it went wrong. The preset reports the level so a
+// caller never has to remember it.
+func TestPresetFidelity(t *testing.T) {
+	t.Parallel()
+
+	for _, c := range []struct {
+		preset skybrightness.Preset
+		want   skybrightness.Fidelity
+	}{
+		{skybrightness.GAMBONSWeb, skybrightness.Standard},
+		{skybrightness.NaturalSky, skybrightness.Standard},
+		{skybrightness.GAMBONSFull, skybrightness.Reference},
+	} {
+		got, err := c.preset.Fidelity()
+		if err != nil {
+			t.Fatalf("%s: %v", c.preset, err)
+		}
+
+		if got != c.want {
+			t.Errorf("%s: fidelity %v, want %v", c.preset, got, c.want)
+		}
+	}
+
+	if _, err := skybrightness.Preset("no-such-preset").Fidelity(); !errors.Is(err, skybrightness.ErrPreset) {
+		t.Error("an unknown preset returned a fidelity rather than an error")
+	}
+}
+
+// The full model is brighter than the same sky with no scattering treatment,
+// and brighter than the simplified one at the zenith.
+//
+// Both directions are stated by Masana et al.: the scattered term adds light
+// that the direct term alone does not carry, and the simplified model
+// "underestimates the brightness at zenith". A preset that came out fainter
+// than either would mean the integral is subtracting rather than adding.
+func TestGAMBONSFullIsBrighterThanItsDirectTerm(t *testing.T) {
+	t.Parallel()
+
+	in := presetInputs(t)
+
+	model, err := skybrightness.NewPreset(skybrightness.GAMBONSFull, in)
+	if err != nil {
+		t.Fatalf("NewPreset: %v", err)
+	}
+
+	scene := presetGoldenScene(t, skybrightness.GAMBONSFull)
+
+	at := func(f skybrightness.Fidelity) float64 {
+		t.Helper()
+
+		est, err := model.Estimate(t.Context(), skybrightness.Query{
+			Scene:     scene,
+			Direction: coord.NewAltAz(angle.Deg(90), angle.Deg(0)),
+			Grid:      in.Grid,
+			Fidelity:  f,
+		})
+		if err != nil {
+			t.Fatalf("estimate at %v: %v", f, err)
+		}
+
+		r, err := est.Radiance()
+		if err != nil {
+			t.Fatalf("Radiance: %v", err)
+		}
+
+		return float64(r)
+	}
+
+	direct := at(skybrightness.Standard)
+	full := at(skybrightness.Reference)
+
+	if full <= direct {
+		t.Errorf("the full model gives %.6e and its direct term alone %.6e; the scattering "+
+			"integral must add light, not remove it", full, direct)
+	}
+
+	t.Logf("zenith: direct %.6e, with the Eq. 11 term %.6e, scattered share %.1f per cent",
+		direct, full, 100*(full-direct)/full)
+}
+
+// The two GAMBONS models differ in the direction and by the amount the paper
+// says they do.
+//
+// Masana et al. (2024) Section 5, describing Fig. 2: "the simplified model
+// overestimates the brightness of the natural sky near the horizon in all the
+// bands, while it underestimates the brightness at zenith", and "it is
+// expected that the simplified model differ less than 0.1 magnitude per arcsec
+// for the most of the cases".
+//
+// Three claims, none of which anything here was fitted to. The kappa of 0.5
+// comes from the web service, the scattering kernel from Kocifaj and Kranicz,
+// and the crossover between them is a consequence rather than a parameter. If
+// the integral had the wrong sign, the wrong solid-angle weighting or the
+// wrong phase function, the sign of this difference is where it would show.
+func TestTheTwoGAMBONSModelsDifferAsThePaperDescribes(t *testing.T) {
+	t.Parallel()
+
+	in := presetInputs(t)
+
+	brightness := func(p skybrightness.Preset, altDeg float64) float64 {
+		t.Helper()
+
+		model, err := skybrightness.NewPreset(p, in)
+		if err != nil {
+			t.Fatalf("%s: NewPreset: %v", p, err)
+		}
+
+		fidelity, err := p.Fidelity()
+		if err != nil {
+			t.Fatalf("%s: Fidelity: %v", p, err)
+		}
+
+		est, err := model.Estimate(t.Context(), skybrightness.Query{
+			Scene:     presetGoldenScene(t, p),
+			Direction: coord.NewAltAz(angle.Deg(altDeg), angle.Deg(45)),
+			Grid:      in.Grid,
+			Fidelity:  fidelity,
+		})
+		if err != nil {
+			t.Fatalf("%s at %g: %v", p, altDeg, err)
+		}
+
+		sb, err := est.SurfaceBrightness(in.Band, magnitude.Vega)
+		if err != nil {
+			t.Fatalf("%s: SurfaceBrightness: %v", p, err)
+		}
+
+		return sb
+	}
+
+	t.Logf("  %5s %12s %12s %11s", "alt", "web", "full", "full - web")
+
+	for _, altDeg := range []float64{90, 60, 30, 10} {
+		web := brightness(skybrightness.GAMBONSWeb, altDeg)
+		full := brightness(skybrightness.GAMBONSFull, altDeg)
+
+		t.Logf("  %5.0f %12.6f %12.6f %+11.6f", altDeg, web, full, full-web)
+
+		// Magnitudes run backwards, so a brighter sky is the smaller number.
+		switch {
+		case altDeg >= 30:
+			if full >= web {
+				t.Errorf("at %g degrees the full model gives %.4f and the simplified one "+
+					"%.4f mag/arcsec2; the paper has the simplified model underestimating "+
+					"the brightness away from the horizon, so the full one must be brighter",
+					altDeg, full, web)
+			}
+
+		case altDeg <= 10:
+			if full < web {
+				t.Errorf("at %g degrees the full model gives %.4f and the simplified one "+
+					"%.4f mag/arcsec2; the paper has the simplified model overestimating "+
+					"the brightness near the horizon, so the full one must not be brighter",
+					altDeg, full, web)
+			}
+		}
+
+		if d := math.Abs(full - web); d > 0.1 {
+			t.Errorf("at %g degrees the two models differ by %.4f mag, above the tenth of a "+
+				"magnitude the paper expects between them", altDeg, d)
+		}
 	}
 }

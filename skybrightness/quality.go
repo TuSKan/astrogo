@@ -57,6 +57,15 @@ const (
 	// radiative-transfer solution. It is closer than single scattering
 	// alone, and it is still a fit made at one site.
 	ApproximateMultipleScattering
+	// PartialScattering marks a reference-fidelity estimate in which some
+	// component did not receive the hemispheric scattering term.
+	//
+	// Moonlight and artificial skyglow are already scattering integrals over
+	// a source that is not part of the sky field, so passing them through
+	// Eq. 11 a second time would count the same photons twice. They keep
+	// their own treatment, and this records that the estimate is a mixture
+	// of two scattering models rather than one applied throughout.
+	PartialScattering
 	// NoComponents marks a model with nothing registered — the Phase 0
 	// state. The radiance is identically zero and is not a sky prediction.
 	NoComponents
@@ -86,6 +95,7 @@ var flagNames = []struct {
 	{PrecomputedRT, "PrecomputedRT"},
 	{ExtrapolatedModel, "ExtrapolatedModel"},
 	{ApproximateMultipleScattering, "ApproximateMultipleScattering"},
+	{PartialScattering, "PartialScattering"},
 	{NoComponents, "NoComponents"},
 }
 

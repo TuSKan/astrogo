@@ -327,3 +327,90 @@ func deExtinction(scene *Scene, dir coord.AltAz, grid unit.SpectralGrid) ([]floa
 
 	return out, nil
 }
+
+// naturalField builds the incoming field of a single component.
+//
+// The per-component form of [Model.AboveAtmosphere], and the reason
+// [Model.Estimate] can attribute scattered light to the component that
+// supplied it rather than reporting only the sum. Without that attribution the
+// starlight-to-zodiacal comparison against Masana et al. Table 2 could not be
+// made at all.
+func naturalField(c Component, scene *Scene, grid unit.SpectralGrid) SkyRadiance {
+	return func(ctx context.Context, dst SpectralRadiance, dir coord.AltAz) error {
+		if dir.Alt() <= 0 {
+			return nil
+		}
+
+		buf := NewSpectralRadiance(grid)
+
+		if _, err := c.AddRadiance(ctx, buf, grid, dir, scene); err != nil {
+			return fmt.Errorf("%w: %q: %w", ErrScattering, c.ID(), err)
+		}
+
+		gain, err := deExtinction(scene, dir, grid)
+		if err != nil {
+			return err
+		}
+
+		for i := range dst {
+			dst[i] += buf[i] * gain[i]
+		}
+
+		return nil
+	}
+}
+
+// scattersIntoItsOwnBeam reports whether a component is already a scattering
+// integral over a source that is not part of the sky field.
+//
+// Moonlight and artificial skyglow are. Running them through [ScatteredIn]
+// would scatter light that has already been scattered, counting it twice, so
+// the reference-fidelity pass leaves them as they are and the estimate says so
+// through [PartialScattering].
+func scattersIntoItsOwnBeam(id ComponentID) bool {
+	switch id {
+	case Moonlight, Artificial:
+		return true
+	case Starlight, DiffuseGalactic, Extragalactic, Zodiacal,
+		AirglowContinuum, AirglowLines, Twilight:
+		return false
+	default:
+		return false
+	}
+}
+
+// addScatteredIn adds the Eq. 11 term to every component that has one.
+//
+// Called only at [Reference] fidelity. The components have already written
+// their direct radiance into est, which under a scene at kappa = 1 is the L_d
+// of Masana et al. Eq. 8; this adds the L_s that completes it.
+func (m *Model) addScatteredIn(
+	ctx context.Context, est *Estimate, q Query, grid unit.SpectralGrid, rings int,
+) error {
+	for _, c := range m.components {
+		buf, ok := est.components[c.ID()]
+		if !ok {
+			continue
+		}
+
+		if scattersIntoItsOwnBeam(c.ID()) {
+			est.Quality.Add(PartialScattering)
+
+			continue
+		}
+
+		scattered := NewSpectralRadiance(grid)
+
+		if err := ScatteredIn(ctx, scattered, naturalField(c, q.Scene, grid),
+			q.Scene, q.Direction, grid, rings); err != nil {
+			return fmt.Errorf("%w: %q: %w", ErrComponentFailed, c.ID(), err)
+		}
+
+		for i := range buf {
+			buf[i] += scattered[i]
+			est.total[i] += scattered[i]
+		}
+	}
+
+	return nil
+}

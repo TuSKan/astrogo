@@ -79,7 +79,58 @@ const (
 	// properties of the natural sky, and a preset that quietly included them
 	// would answer a different question from the one asked.
 	NaturalSky Preset = "natural-sky"
+
+	// GAMBONSFull is GAMBONS as the paper computes it, not as the web service
+	// does.
+	//
+	// Masana et al. (2024) Section 5 describe both. [GAMBONSWeb] is the
+	// simplification; this is Eq. 11, the scattering integral over the whole
+	// hemisphere for every direction of observation, which they use "for
+	// routine sky brightness calculations" and which is available in their
+	// stand-alone version. The two are different models and neither is a
+	// tuning of the other.
+	//
+	// What it sets: the same five natural components, and kappa = 1. That
+	// kappa is not a choice about scattering, it is the absence of one — with
+	// no effective-depth stand-in the components apply the true extinction and
+	// nothing else, which is exactly the direct term L_d of Eq. 8. The
+	// scattered term L_s comes from the integral, which [Model.Estimate] adds
+	// when the query asks for [Reference] fidelity. Use [Preset.Fidelity] to
+	// get the level a preset expects rather than assuming it.
+	//
+	// A query at [Standard] fidelity against this preset is not a cheaper
+	// version of it, it is a sky with no scattering treatment at all and will
+	// come out too faint. That is the one way to hold this preset wrong, and
+	// it is why the fidelity is reported rather than left to the caller's
+	// memory.
+	//
+	// # What it is validated against
+	//
+	// Table 2 of the same paper, which is a full-model zenith composition.
+	// That table was never a target [GAMBONSWeb] could be held to and is the
+	// right one here. Conversely the published all-sky export is a web-version
+	// run, so it validates [GAMBONSWeb] and cannot validate this.
+	GAMBONSFull Preset = "gambons-full"
 )
+
+// Fidelity returns the level [Model.Estimate] must be asked for to evaluate
+// this preset as its source defines it.
+//
+// [GAMBONSFull] needs [Reference], because its scattering term is the
+// hemispheric integral and that is the level which runs it. The other two are
+// [Standard]: their transfer is already inside the components, and asking for
+// Reference would add a scattering term on top of a stand-in for one and count
+// it twice.
+func (p Preset) Fidelity() (Fidelity, error) {
+	switch p {
+	case GAMBONSWeb, NaturalSky:
+		return Standard, nil
+	case GAMBONSFull:
+		return Reference, nil
+	default:
+		return 0, fmt.Errorf("%w: unknown preset %q", ErrPreset, p)
+	}
+}
 
 // DiffuseKappa returns the effective-optical-depth factor this preset uses,
 // ready for [github.com/TuSKan/astrogo/atmosphere.Builder.DiffuseScattering].
@@ -94,6 +145,11 @@ func (p Preset) DiffuseKappa() (float64, error) {
 		return 0.5, nil
 	case NaturalSky:
 		return 0.75, nil
+	case GAMBONSFull:
+		// Not a scattering choice: the absence of one. The full model puts
+		// the scattered light in Eq. 11 rather than in an effective depth,
+		// so the direct term carries the true extinction.
+		return 1, nil
 	default:
 		return 0, fmt.Errorf("%w: unknown preset %q", ErrPreset, p)
 	}

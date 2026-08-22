@@ -1643,17 +1643,37 @@ zenith cap, comparing the web simplification against Eq. 8's `L_obs = L_d + L_s`
 
 | | starlight/zodiacal |
 | :--- | ---: |
-| κ = 0.5, the web model | 1.2361 |
-| Eq. 8, `L_d + L_s` | 1.1809 |
+| `GAMBONSWeb`, κ = 0.5 | 1.2361 |
+| `GAMBONSFull`, Eq. 8 `L_d + L_s` | 1.1758 |
 | Table 2 | 1.0751 |
 
-**The full scattering model closes 34 per cent of the gap.** Scattered light is 12.2 per cent
-of the starlight total at the zenith and 16.1 per cent of the zodiacal, and it is the
-difference between those two shares that moves the ratio. Two thirds of the gap remains.
+**The full model closes 37 per cent of the gap.** The mechanism is visible per component:
+against the simplified model, starlight changes by +0.03 per cent and zodiacal by
+**+5.2 per cent**. The scattered term is not moving starlight at all at these epochs — κ = 0.5
+already stands in for what starlight scatters — and it is the zodiacal gain alone that moves
+the ratio. Just under two thirds of the gap remains.
 
 The κ column reproduces the composition test's 34.1/27.6 = 1.2355 to within 0.05 per cent,
 which is what makes the comparison trustworthy — the two tests measure the same model over
 the same sky by two different routes.
+
+**The two are separate presets and are locked separately.** `GAMBONSWeb` and `GAMBONSFull`
+are different models, not two settings of one, and neither table predicts the other. They
+are also validated against different things: the published all-sky export is a
+web-version run and can only validate `GAMBONSWeb`, while Table 2 is a full-model zenith
+composition and was never a target the web preset could be held to. `GAMBONSFull` reports
+`Reference` fidelity through `Preset.Fidelity`, because asking it at `Standard` gives a sky
+with no scattering treatment at all — a plausible number rather than an error, and the one
+way to hold it wrong silently.
+
+**An independent check neither model was fitted to.** Masana et al. state that the
+simplified model "overestimates the brightness of the natural sky near the horizon ...
+while it underestimates the brightness at zenith", by under a tenth of a magnitude. The
+two presets reproduce exactly that crossover: full minus web is −0.041 mag at the zenith,
+−0.040 at 60°, −0.049 at 30° and **+0.002 at 10°**. The sign flips between 30 and 10
+degrees and every difference is inside a tenth of a magnitude. Nothing here was tuned to
+produce it — κ comes from the web service, the kernel from Kocifaj and Kránicz, and the
+crossover is a consequence.
 
 **An earlier estimate here said "about a quarter", and its method was wrong even though its
 answer was close.** It used each component's hemisphere-mean-to-zenith radiance ratio as a

@@ -1,7 +1,6 @@
 package skybrightness_test
 
 import (
-	"context"
 	"fmt"
 	"math"
 	"testing"
@@ -144,19 +143,85 @@ var gambonsWebGolden = []goldenRow{
 	{10, totalSurfaceBrightness, 20.403688174955519},
 }
 
+// gambonsFullGolden is the locked output of [skybrightness.GAMBONSFull].
+//
+// Locked separately from [skybrightness.GAMBONSWeb] and not derived from it,
+// because they are different models rather than two settings of one. The web
+// preset puts the scattered light into an effective optical depth; this one
+// puts it into the Eq. 11 integral and carries the true extinction in the
+// direct term. Nothing about either table predicts the other, and a single
+// lock over both would hide a change that moved one and not the other.
+var gambonsFullGolden = []goldenRow{
+	{90, skybrightness.Starlight, 9.9185382323796635e-10},
+	{90, skybrightness.DiffuseGalactic, 4.2844393144166162e-11},
+	{90, skybrightness.Extragalactic, 1.238079005964017e-11},
+	{90, skybrightness.Zodiacal, 1.5462146488353121e-09},
+	{90, skybrightness.AirglowContinuum, 2.5788686481672765e-09},
+	{90, totalSurfaceBrightness, 21.189600937170674},
+
+	{60, skybrightness.Starlight, 9.8960429863641313e-10},
+	{60, skybrightness.DiffuseGalactic, 4.2747222054880267e-11},
+	{60, skybrightness.Extragalactic, 1.2352710426156573e-11},
+	{60, skybrightness.Zodiacal, 1.8455650514032244e-09},
+	{60, skybrightness.AirglowContinuum, 2.9516262945475295e-09},
+	{60, totalSurfaceBrightness, 21.057612781632692},
+
+	{30, skybrightness.Starlight, 9.7624049428941108e-10},
+	{30, skybrightness.DiffuseGalactic, 4.2169955451747658e-11},
+	{30, skybrightness.Extragalactic, 1.2185897079127065e-11},
+	{30, skybrightness.Zodiacal, 1.1225177167672987e-09},
+	{30, skybrightness.AirglowContinuum, 4.7739343029753323e-09},
+	{30, totalSurfaceBrightness, 20.873496398132644},
+
+	{10, skybrightness.Starlight, 9.1001151633863401e-10},
+	{10, skybrightness.DiffuseGalactic, 3.9309110131218376e-11},
+	{10, skybrightness.Extragalactic, 1.135919555047209e-11},
+	{10, skybrightness.Zodiacal, 8.7347407170088074e-10},
+	{10, skybrightness.AirglowContinuum, 8.8603798273970622e-09},
+	{10, totalSurfaceBrightness, 20.405794529405075},
+}
+
 // The GAMBONS web preset produces exactly the numbers it produced when they
 // were recorded.
 func TestGAMBONSWebPresetGolden(t *testing.T) {
 	t.Parallel()
 
+	checkPresetGolden(t, skybrightness.GAMBONSWeb, gambonsWebGolden)
+}
+
+// The full GAMBONS preset likewise, and separately.
+//
+// This runs the hemispheric integral at every altitude, so it is the expensive
+// test in this file by three orders of magnitude — about a third of a second
+// against a hundredth. That is the cost of the model and not of the test.
+func TestGAMBONSFullPresetGolden(t *testing.T) {
+	t.Parallel()
+
+	checkPresetGolden(t, skybrightness.GAMBONSFull, gambonsFullGolden)
+}
+
+// checkPresetGolden compares one preset against its own locked table.
+//
+// The fidelity comes from the preset rather than from the caller. Asking
+// GAMBONSFull at Standard would evaluate a sky with no scattering treatment at
+// all and lock those numbers instead, which is the one mistake here that
+// produces a plausible table rather than an error.
+func checkPresetGolden(t *testing.T, p skybrightness.Preset, table []goldenRow) {
+	t.Helper()
+
 	in := presetInputs(t)
 
-	model, err := skybrightness.NewPreset(skybrightness.GAMBONSWeb, in)
+	model, err := skybrightness.NewPreset(p, in)
 	if err != nil {
 		t.Fatalf("NewPreset: %v", err)
 	}
 
-	scene := presetGoldenScene(t, skybrightness.GAMBONSWeb)
+	fidelity, err := p.Fidelity()
+	if err != nil {
+		t.Fatalf("Fidelity: %v", err)
+	}
+
+	scene := presetGoldenScene(t, p)
 
 	// 550 nm on the 400 nm, 1 nm grid presetInputs defines.
 	const idx550 = 150
@@ -168,10 +233,10 @@ func TestGAMBONSWebPresetGolden(t *testing.T) {
 
 	// An empty table prints itself rather than passing vacuously, so
 	// regenerating after a deliberate change is one run and a paste.
-	generate := len(gambonsWebGolden) == 0
+	generate := len(table) == 0
 
-	want := make(map[string]float64, len(gambonsWebGolden))
-	for _, row := range gambonsWebGolden {
+	want := make(map[string]float64, len(table))
+	for _, row := range table {
 		want[goldenKey(row.altDeg, row.id)] = row.value
 	}
 
@@ -179,46 +244,47 @@ func TestGAMBONSWebPresetGolden(t *testing.T) {
 		t.Helper()
 
 		if generate {
-			t.Logf("\t{%g, %s, %.17g},", altDeg, goldenGoName(id), got)
+			t.Logf("	{%g, %s, %.17g},", altDeg, goldenGoName(id), got)
 
 			return
 		}
 
 		w, ok := want[goldenKey(altDeg, id)]
 		if !ok {
-			t.Errorf("alt %g, %s: not in the table", altDeg, id)
+			t.Errorf("%s: alt %g, %s: not in the table", p, altDeg, id)
 
 			return
 		}
 
 		if w == 0 {
 			if got != 0 {
-				t.Errorf("alt %g, %s: got %.17g, want exactly 0", altDeg, id, got)
+				t.Errorf("%s: alt %g, %s: got %.17g, want exactly 0", p, altDeg, id, got)
 			}
 
 			return
 		}
 
 		if rel := math.Abs(got-w) / math.Abs(w); rel > goldenTol {
-			t.Errorf("alt %g, %s: got %.17g, want %.17g — relative %.3g, over the %.0e lock",
-				altDeg, id, got, w, rel, goldenTol)
+			t.Errorf("%s: alt %g, %s: got %.17g, want %.17g — relative %.3g, over the %.0e lock",
+				p, altDeg, id, got, w, rel, goldenTol)
 		}
 	}
 
 	for _, altDeg := range goldenAltitudes {
-		est, err := model.Estimate(context.Background(), skybrightness.Query{
+		est, err := model.Estimate(t.Context(), skybrightness.Query{
 			Scene:     scene,
 			Direction: coord.NewAltAz(angle.Deg(altDeg), angle.Deg(45)),
 			Grid:      in.Grid,
+			Fidelity:  fidelity,
 		})
 		if err != nil {
-			t.Fatalf("alt %g: Estimate: %v", altDeg, err)
+			t.Fatalf("%s: alt %g: Estimate: %v", p, altDeg, err)
 		}
 
 		for _, id := range goldenComponents {
 			spec, ok := est.Component(id)
 			if !ok {
-				t.Fatalf("alt %g: the estimate carries no %s component", altDeg, id)
+				t.Fatalf("%s: alt %g: the estimate carries no %s component", p, altDeg, id)
 			}
 
 			check(altDeg, id, spec[idx550])
@@ -229,14 +295,14 @@ func TestGAMBONSWebPresetGolden(t *testing.T) {
 		// changes would still show.
 		sb, err := est.SurfaceBrightness(in.Band, magnitude.Vega)
 		if err != nil {
-			t.Fatalf("alt %g: SurfaceBrightness: %v", altDeg, err)
+			t.Fatalf("%s: alt %g: SurfaceBrightness: %v", p, altDeg, err)
 		}
 
 		check(altDeg, totalSurfaceBrightness, sb)
 	}
 
 	if generate {
-		t.Fatal("the golden table is empty; the logged lines above are its contents")
+		t.Fatalf("%s: the golden table is empty; the logged lines above are its contents", p)
 	}
 }
 
@@ -255,7 +321,7 @@ func TestPresetsDifferNumerically(t *testing.T) {
 			t.Fatalf("%s: NewPreset: %v", p, err)
 		}
 
-		est, err := model.Estimate(context.Background(), skybrightness.Query{
+		est, err := model.Estimate(t.Context(), skybrightness.Query{
 			Scene:     presetGoldenScene(t, p),
 			Direction: coord.NewAltAz(angle.Deg(30), angle.Deg(45)),
 			Grid:      in.Grid,

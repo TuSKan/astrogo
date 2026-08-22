@@ -199,6 +199,24 @@ func (m *Model) Estimate(ctx context.Context, q Query) (*Estimate, error) {
 		evaluated++
 	}
 
+	// Reference fidelity is the full scattering model.
+	//
+	// The components have written their direct radiance, which under a scene at
+	// kappa = 1 is the L_d of Masana et al. (2024) Eq. 8. This adds the L_s
+	// that completes it: the hemispheric integral of Eq. 11, evaluated per
+	// component so a breakdown still attributes scattered light to whatever
+	// supplied it.
+	//
+	// It costs one evaluation of every component in about nine hundred
+	// directions, so a reference estimate is roughly three orders of magnitude
+	// dearer than a standard one. That is the trade the paper describes and the
+	// reason its own web service does not make it.
+	if q.Fidelity == Reference && evaluated > 0 {
+		if err := m.addScatteredIn(ctx, est, q, grid, 0); err != nil {
+			return nil, err
+		}
+	}
+
 	if evaluated == 0 {
 		est.Quality.Add(NoComponents)
 	}
