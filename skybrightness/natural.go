@@ -547,6 +547,10 @@ type Airglow struct {
 	grid         unit.SpectralGrid
 	layerHeightM float64
 	measured     bool
+
+	// scratch holds the unattenuated spectrum while the atmosphere is
+	// applied to it, the same reason ZodiacalLight carries one.
+	scratch sync.Pool
 }
 
 // NewAirglow builds the component from a zenith spectrum on a given grid.
@@ -577,13 +581,29 @@ func (a *Airglow) AddRadiance(
 	dst SpectralRadiance,
 	grid unit.SpectralGrid,
 	dir coord.AltAz,
-	_ *Scene,
+	scene *Scene,
 ) (Flag, error) {
 	if !a.grid.Equal(grid) {
 		return 0, fmt.Errorf("%w: component holds %v, asked for %v", ErrAirglowSpectrum, a.grid, grid)
 	}
 
-	flags, err := AirglowRadiance(dst, grid, a.zenith, angle.Deg(90)-dir.Alt(), a.layerHeightM)
+	// AirglowRadiance checks this for whatever slice it is handed, and it used
+	// to be handed dst. Now that it fills a scratch buffer instead, dst is
+	// only ever indexed here and has to be checked here.
+	if len(dst) != grid.Len() {
+		return 0, fmt.Errorf("%w: %d destination slots, grid has %d",
+			unit.ErrGridMismatch, len(dst), grid.Len())
+	}
+
+	scratch, ok := a.scratch.Get().(SpectralRadiance)
+	if !ok || len(scratch) != grid.Len() {
+		scratch = NewSpectralRadiance(grid)
+	}
+
+	clear(scratch)
+	defer a.scratch.Put(scratch) //nolint:staticcheck // a slice header, deliberately pooled
+
+	flags, err := AirglowRadiance(scratch, grid, a.zenith, angle.Deg(90)-dir.Alt(), a.layerHeightM)
 	if err != nil {
 		return 0, err
 	}
@@ -591,6 +611,51 @@ func (a *Airglow) AddRadiance(
 	if a.measured {
 		flags &^= ClimatologicalAirglow
 		flags |= MeasuredAirglow
+	}
+
+	// Airglow is emitted at about 87 km, which is above essentially the whole
+	// atmosphere, so what reaches the observer has crossed nearly the same
+	// column that starlight crosses and is extinguished by nearly the same
+	// amount. van Rhijn lengthens the path through the emitting layer and
+	// brightens the limb; extinction lengthens the path through everything
+	// below it and darkens the limb. Applying only the first is what made this
+	// component too bright toward the horizon.
+	//
+	// The airmass is the ordinary atmospheric one for the line of sight, not
+	// the van Rhijn factor: the two describe different paths through different
+	// layers and are not interchangeable.
+	//
+	// Measured against GAMBONS before this was applied, our airglow ran 1.55
+	// times theirs in the 0-15 degree altitude band while agreeing within the
+	// stated validity near the zenith - a slope error of very nearly the
+	// extinction that was missing.
+	// Below the horizon AirglowRadiance has already returned zero, so there is
+	// nothing to attenuate and no airmass to attenuate it over. Asked
+	// explicitly rather than inferred from Airmass refusing, so a future
+	// failure there is reported instead of read as a direction off the sky.
+	if dir.Alt().Degrees() <= 0 {
+		return flags, nil
+	}
+
+	airmass, err := atmosphere.Airmass(dir.Alt())
+	if err != nil {
+		return 0, fmt.Errorf("skybrightness: airglow: airmass: %w", err)
+	}
+
+	pressure, _ := scene.Atmosphere.Surface()
+	aerosol := scene.Atmosphere.Aerosol()
+
+	for i := range dst {
+		lambda := grid.At(i)
+
+		rayleigh, rErr := atmosphere.RayleighOpticalDepth(lambda, float64(pressure))
+		if rErr != nil {
+			return 0, fmt.Errorf("skybrightness: airglow: %w", rErr)
+		}
+
+		slant := (rayleigh + unit.OpticalDepth(aerosol.TauAt(lambda))) * unit.OpticalDepth(airmass)
+
+		dst[i] += scratch[i] * float64(atmosphere.Transmission(slant))
 	}
 
 	return flags, nil
@@ -611,13 +676,15 @@ func (a *Airglow) Provenance() Provenance {
 			"Roach, F.E. & Meinel, A.B. (1955)",
 			"Masana, E. et al. (2021), MNRAS 501, 5443, Eq. 19-20",
 		},
-		Equations:      "Leinert Eq. 13 as atmosphere.VanRhijn",
-		ValidityDomain: "Above the horizon; the geometry alone is reliable within about 40 degrees of the zenith",
+		Equations: "Leinert Eq. 13 as atmosphere.VanRhijn",
+		ValidityDomain: "Above the horizon. The geometry alone is reliable within about 40 " +
+			"degrees of the zenith, and extinction is applied beyond it",
 		KnownApproximations: []string{
 			"A single thin emitting layer, where the real emissions arise between " +
 				"about 90 km and 300 km depending on species.",
-			"No extinction or scattering along the longer slant path, which work " +
-				"against the geometric enhancement and matter beyond 40 degrees.",
+			"Extinction along the slant path is applied, but not the light " +
+				"scattered back into it, so the horizon is still somewhat too faint " +
+				"rather than, as before, much too bright.",
 			"The zenith spectrum is not predicted; airglow varies by up to 100 per " +
 				"cent night to night and with the solar cycle.",
 		},
