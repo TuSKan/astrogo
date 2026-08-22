@@ -1630,17 +1630,39 @@ extended components at one direction is invariant under any change to κ, to the
 or to the aerosol load. That is why the number never moved: nothing in the transfer *can*
 move it. `TestPresetsDifferOnlyInTransfer` holds the other half of that statement.
 
-**The missing scattered-in term is a real contributor with the right sign, and explains
-about a quarter of it.** Table 2 comes from the paper's full model, Eq. 11, which adds light
-scattered *into* the beam from the rest of the sky. That term scales with a component's
-radiance over the whole hemisphere rather than in the direction observed, so it is not a
-common factor: it favours components with light away from the zenith.
-`TestScatteredInTermExplainsTheZenithRatio` measures the hemisphere-mean-to-zenith ratio of
-both components over 96 epochs and 20,736 sightlines at the Table 2 geometry — zodiacal
-1.051, starlight 0.867 — which is the sign needed. But closing the whole gap would need a
-scattered-in coefficient near 2.7, against the 0.223 of scattering optical depth the scene
-has at 552.4 nm. At the depth actually available it supplies 26 per cent. **The other 74 per
-cent is unexplained.**
+**The missing scattered-in term is a real contributor, and Eq. 11 now measures it at a third
+of the gap.** Table 2 comes from the paper's full model, Eq. 11, which adds light scattered
+*into* the beam from the rest of the sky. That term scales with a component's radiance over
+the whole hemisphere rather than in the direction observed, so it is not a common factor: it
+favours components with light where the scattering kernel is strongest.
+
+`ScatteredIn` implements Eq. 11 directly — the Kocifaj & Kránicz (2011) first-order kernel
+under the aerosol-and-molecular phase function the paper specifies, both already in
+`atmosphere`. Run at the Table 2 geometry over the same 96 epochs and the same 10-degree
+zenith cap, comparing the web simplification against Eq. 8's `L_obs = L_d + L_s`:
+
+| | starlight/zodiacal |
+| :--- | ---: |
+| κ = 0.5, the web model | 1.2361 |
+| Eq. 8, `L_d + L_s` | 1.1809 |
+| Table 2 | 1.0751 |
+
+**The full scattering model closes 34 per cent of the gap.** Scattered light is 12.2 per cent
+of the starlight total at the zenith and 16.1 per cent of the zodiacal, and it is the
+difference between those two shares that moves the ratio. Two thirds of the gap remains.
+
+The κ column reproduces the composition test's 34.1/27.6 = 1.2355 to within 0.05 per cent,
+which is what makes the comparison trustworthy — the two tests measure the same model over
+the same sky by two different routes.
+
+**An earlier estimate here said "about a quarter", and its method was wrong even though its
+answer was close.** It used each component's hemisphere-mean-to-zenith radiance ratio as a
+proxy for how much scattered light it supplies, which weights every direction equally. The
+kernel does not: measured, the overhead third of the sky delivers 4.4 times what the horizon
+third does to a zenith sightline for the same flux, because light from near the horizon is
+spent crossing its own slant path before it can scatter and arrives where the Rayleigh phase
+function is weakest. The proxy landed near the right number by luck, and is superseded by
+the integral.
 
 Two consequences. Table 2 **cannot** be used to attribute a discrepancy to any one
 component, because a component-by-component comparison against a full-model composition is
