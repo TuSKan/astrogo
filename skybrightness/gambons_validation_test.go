@@ -270,10 +270,19 @@ func gambonsScene(t *testing.T) *skybrightness.Scene {
 	// exponent, single-scattering albedo and asymmetry below are that type's
 	// conventional values rather than numbers GAMBONS published, which is an
 	// approximation this comparison carries.
+	// The transfer factor belongs to the atmosphere, so the preset reports it
+	// and the scene sets it. Taking it from the preset rather than writing 0.5
+	// here is what keeps the two from drifting apart.
+	kappa, err := skybrightness.GAMBONSWeb.DiffuseKappa()
+	if err != nil {
+		t.Fatalf("DiffuseKappa: %v", err)
+	}
+
 	atm, err := atmosphere.NewBuilder().
 		Surface(1013, 293).
 		Aerosol(gambonsAOD550, 550, 1.3, 0.95, 0.65).
 		BoundaryLayer(1000).
+		DiffuseScattering(kappa).
 		Build()
 	if err != nil {
 		t.Fatalf("atmosphere Build: %v", err)

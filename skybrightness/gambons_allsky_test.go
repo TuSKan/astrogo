@@ -225,11 +225,6 @@ func runAllSky(t *testing.T) allSkyRun {
 		t.Fatalf("Band: %v", err)
 	}
 
-	isl, err := skybrightness.NewIntegratedStarlight(stars, solarLikeShape(grid), grid, band)
-	if err != nil {
-		t.Fatalf("NewIntegratedStarlight: %v", err)
-	}
-
 	// Every direction this test will evaluate, band by band.
 	type sample struct {
 		dir      coord.AltAz
@@ -291,27 +286,23 @@ func runAllSky(t *testing.T) allSkyRun {
 
 	t.Logf("fetched %d dust cells in %v", dustMap.Len(), gotime.Since(fetchStart).Round(gotime.Second))
 
-	dgl, err := skybrightness.NewDiffuseGalacticLight(dustMap, stars, band)
+	// Built from the preset rather than assembled here.
+	//
+	// This is the whole point of having one: what is being compared against
+	// the GAMBONS export is the configuration the library ships, not one a
+	// test wired up by hand and which could drift away from it unnoticed. If
+	// this comparison holds, [skybrightness.GAMBONSWeb] reproduces GAMBONS;
+	// if the preset changes, this test says so.
+	model, err := skybrightness.NewPreset(skybrightness.GAMBONSWeb, skybrightness.PresetInputs{
+		Stars:         stars,
+		StarShape:     solarLikeShape(grid),
+		Dust:          dustMap,
+		AirglowZenith: gambonsAirglow(ctx, t, grid),
+		Grid:          grid,
+		Band:          band,
+	})
 	if err != nil {
-		t.Fatalf("NewDiffuseGalacticLight: %v", err)
-	}
-
-	glow, err := airglow.NewAirglow(ctx, airglow.Spec{
-		Observatory:  airglow.Paranal,
-		SolarFluxSFU: gambonsSolarSF,
-		MinNM:        float64(grid.At(0)) - 1,
-		MaxNM:        float64(grid.At(grid.Len()-1)) + 1,
-		StepNM:       0.1,
-	}, grid, 87_000)
-	if err != nil {
-		t.Skipf("SkyCalc did not answer: %v", err)
-	}
-
-	model, err := skybrightness.NewModel("gambons-allsky",
-		isl, dgl, skybrightness.NewZodiacalLight(), glow,
-		skybrightness.NewExtragalacticBackground())
-	if err != nil {
-		t.Fatalf("NewModel: %v", err)
+		t.Fatalf("NewPreset: %v", err)
 	}
 
 	// One evaluation per direction. The airglow-free sky is that same estimate
@@ -902,4 +893,30 @@ func bandMedians(results []allSkySample) (medians, mediansOff []float64) {
 	}
 
 	return medians, mediansOff
+}
+
+// gambonsAirglow fetches the reference airglow spectrum onto a grid.
+//
+// The same request GAMBONS describes: Cerro Paranal, the solar-cycle average
+// flux, de-extinguished back to the emitting layer by [airglow.Parse].
+func gambonsAirglow(ctx context.Context, t *testing.T, grid unit.SpectralGrid) skybrightness.SpectralRadiance {
+	t.Helper()
+
+	spectrum, err := airglow.Fetch(ctx, airglow.Spec{
+		Observatory:  airglow.Paranal,
+		SolarFluxSFU: gambonsSolarSF,
+		MinNM:        float64(grid.At(0)) - 1,
+		MaxNM:        float64(grid.At(grid.Len()-1)) + 1,
+		StepNM:       0.1,
+	})
+	if err != nil {
+		t.Skipf("SkyCalc did not answer: %v", err)
+	}
+
+	out := skybrightness.NewSpectralRadiance(grid)
+	for i := range out {
+		out[i] = spectrum.At(float64(grid.At(i)))
+	}
+
+	return out
 }
