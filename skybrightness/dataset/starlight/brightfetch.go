@@ -178,7 +178,7 @@ func hipparcosPosition(index map[string]int, row []string) (ra, dec angle.Angle,
 // nothing to the map, so for the question being asked — is this star's light
 // already counted? — it is not a counterpart.
 func fetchGaiaBright(ctx context.Context, faintestG float64) ([]angle.Angle, []angle.Angle, error) {
-	client, err := aggregationClient()
+	client, err := aggregationClient(remote.GaiaTAP)
 	if err != nil {
 		return nil, nil, err
 	}

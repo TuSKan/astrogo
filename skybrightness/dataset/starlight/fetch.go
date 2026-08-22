@@ -97,7 +97,7 @@ func Fetch(ctx context.Context, spec GaiaBuild, directions ...coord.ICRS) (*Map,
 		return assembleFetch(spec, values, counts, band)
 	}
 
-	client, err := aggregationClient()
+	client, err := aggregationClient(remote.GaiaTAP)
 	if err != nil {
 		return nil, err
 	}

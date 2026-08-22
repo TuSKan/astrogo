@@ -234,6 +234,17 @@ type GaiaBuild struct {
 
 	// Progress, if set, is called after each chunk.
 	Progress func(done, total int)
+
+	// Endpoint is the TAP service to aggregate against. Defaults to
+	// [github.com/TuSKan/astrogo/remote.GaiaTAP], ESA's own archive.
+	//
+	// [github.com/TuSKan/astrogo/remote.GaiaAIP] is the Leibniz-Institut
+	// mirror, which answers far faster and, for an identified caller, without
+	// the statement timeout that forces the work into chunks at all. A token
+	// is picked up automatically from the environment variable the registry
+	// names for the endpoint; absent one the service still answers, only under
+	// a five-second cap, so nothing here requires a credential.
+	Endpoint remote.EndpointID
 }
 
 // pixelsPerOrder returns 12*4^order.
@@ -285,6 +296,10 @@ func (g GaiaBuild) ADQL(firstPixel, lastPixel int64) (string, error) {
 func (g GaiaBuild) withDefaults() (GaiaBuild, error) {
 	if g.Order == 0 {
 		g.Order = GaiaMapOrder
+	}
+
+	if g.Endpoint == "" {
+		g.Endpoint = remote.GaiaTAP
 	}
 
 	if g.Order < 1 || g.Order > 12 {
@@ -383,7 +398,7 @@ func BuildFromGaia(ctx context.Context, build GaiaBuild) (*Map, []int64, error) 
 
 	counts := make([]int64, npix)
 
-	client, err := aggregationClient()
+	client, err := aggregationClient(build.Endpoint)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -475,7 +490,7 @@ func RunChunk(ctx context.Context, build GaiaBuild, first, last int64) (*Map, []
 
 	counts := make([]int64, npix)
 
-	client, err := aggregationClient()
+	client, err := aggregationClient(build.Endpoint)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -560,10 +575,24 @@ func (g GaiaBuild) chunkIsCached(values []float64, first, last int64) bool {
 }
 
 // aggregationClient builds the TAP client this package's queries go through.
-func aggregationClient() (*api.Client, error) {
-	client, err := api.NewClient(remote.GaiaTAP,
+func aggregationClient(id remote.EndpointID) (*api.Client, error) {
+	opts := []api.Option{
 		api.WithTimeout(aggregationTimeout),
-		api.WithMinInterval(aggregationPace))
+		api.WithMinInterval(aggregationPace),
+	}
+
+	// An identified caller gets a far larger budget than an anonymous one —
+	// on Gaia@AIP the difference is a five-second statement timeout against
+	// none, which is what makes a whole-sky query possible at all. The token
+	// is read from the environment the registry names, never from a file this
+	// module owns, and it travels in an Authorization header rather than a
+	// query string so it stays out of logs and out of the service's own
+	// request records.
+	if token := remote.Token(id); token != "" {
+		opts = append(opts, api.WithAuthToken("Token", token))
+	}
+
+	client, err := api.NewClient(id, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("starlight: gaia client: %w", err)
 	}
@@ -662,13 +691,36 @@ func (g GaiaBuild) runQuery(
 	solidAngle float64,
 	what string,
 ) error {
+	endpoint := g.Endpoint
+	if endpoint == "" {
+		endpoint = remote.GaiaTAP
+	}
+
+	// An asynchronous endpoint runs the query as a job rather than in the
+	// response. That is the only way a whole-sky aggregation completes: the
+	// synchronous services abort it after about a minute.
+	//
+	// The endpoint was hardcoded to GaiaTAP here until this line, so a build
+	// pointed at another service built its client against that one and then
+	// sent the request to ESA regardless.
+	if isAsync(endpoint) {
+		body, err := runAsync(ctx, client, endpoint, adql)
+		if err != nil {
+			return fmt.Errorf("starlight: %s: %w", what, err)
+		}
+
+		defer func() { _ = body.Close() }()
+
+		return g.accumulate(body, bands, counts, solidAngle)
+	}
+
 	v := url.Values{}
 	v.Set("REQUEST", "doQuery")
 	v.Set("LANG", "ADQL")
 	v.Set("FORMAT", "csv")
 	v.Set("QUERY", adql)
 
-	body, err := client.PostForm(ctx, remote.GaiaTAP, "", v)
+	body, err := client.PostForm(ctx, endpoint, "", v)
 	if err != nil {
 		return fmt.Errorf("starlight: %s: %w", what, err)
 	}
@@ -937,4 +989,55 @@ func GaiaJohnsonCousins(name string, band magnitude.Passband) (GaiaBand, error) 
 		ColourTerm:     colour,
 		FluxToRadiance: zero / math.Pow(10, gZeroPoint/2.5),
 	}, nil
+}
+
+// isAsync reports whether an endpoint runs queries as jobs.
+//
+// A property of the registered endpoint rather than a build option, because it
+// is a fact about the service's URL and not a choice the caller makes: the
+// same query text goes to either, and only the protocol around it differs.
+func isAsync(id remote.EndpointID) bool {
+	return id == remote.GaiaAIPAsync
+}
+
+// BuildFromResult assembles a map from an aggregation result already fetched.
+//
+// The query is the expensive half by orders of magnitude — a whole-sky
+// four-band aggregation is twenty-seven minutes against a second of parsing —
+// and a service that ran one keeps the result for as long as the job lives. So
+// a build that failed while writing, a band that needs a different zero point,
+// or a check against a previously published map should all re-read the result
+// rather than re-run the query. Nothing in the CSV depends on the zero points,
+// which are applied here, so the same result serves any calibration.
+//
+// r is the CSV the service returns for the query [GaiaBuild.ADQL] generates:
+// one row per pixel, with the per-band flux and colour-recovery columns.
+func BuildFromResult(r io.Reader, build GaiaBuild) (*Map, []int64, error) {
+	build, err := build.withDefaults()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	npix := pixelsPerOrder(build.Order)
+	solidAngle := 4 * math.Pi / float64(npix)
+
+	bands := make(map[string][]float64, len(build.Bands))
+	for _, b := range build.Bands {
+		bands[b.Name] = make([]float64, npix)
+	}
+
+	counts := make([]int64, npix)
+
+	if err := build.accumulate(r, bands, counts, solidAngle); err != nil {
+		return nil, nil, err
+	}
+
+	m, err := NewMap(ICRS, bands)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	m.Source = fmt.Sprintf("gaiadr3.gaia_source aggregated at HEALPix order %d", build.Order)
+
+	return m, counts, nil
 }

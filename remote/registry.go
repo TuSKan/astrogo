@@ -315,6 +315,8 @@ func constName(id EndpointID) string {
 		return "ESOSkyCalc"
 	case GaiaAIP:
 		return "GaiaAIP"
+	case GaiaAIPAsync:
+		return "GaiaAIPAsync"
 	case IRSADust:
 		return "IRSADust"
 	case SVOFilterProfile:

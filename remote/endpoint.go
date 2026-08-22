@@ -176,6 +176,18 @@ const (
 	// in bulk — the Hipparcos crossmatch among them.
 	GaiaAIP EndpointID = "aip.gaia"
 
+	// GaiaAIPAsync is the same Gaia@AIP service over its asynchronous
+	// endpoint (skybrightness/dataset/starlight).
+	//
+	// A separate registration rather than a flag, because the two are
+	// different protocols over one service: the synchronous endpoint answers
+	// in the response body and gives up after about a minute, while this one
+	// returns a job to poll and will run for as long as the service allows. A
+	// whole-sky aggregation is a GROUP BY over 1.8 billion rows and does not
+	// fit in the first, which is what forced the work into 787 chunks before
+	// this existed.
+	GaiaAIPAsync EndpointID = "gaia.aip.async"
+
 	// GaiaStarMap is the prebuilt integrated-starlight map published with
 	// astrogo's own releases (skybrightness/dataset/starlight).
 	//
@@ -584,6 +596,19 @@ func defaultEndpoints() map[EndpointID]Endpoint {
 			// TokenEnv holds the *name* of an environment variable, never a
 			// secret. The registry is the right place for it precisely
 			// because nothing else should have to know it.
+			TokenEnv: "ASTROGO_GAIA_AIP_TOKEN",
+		},
+
+		//nolint:gosec // TokenEnv names an environment variable; it is not a credential
+		GaiaAIPAsync: {
+			ID:        GaiaAIPAsync,
+			URL:       "https://gaia.aip.de/tap/async",
+			Kind:      KindAPI,
+			Subsystem: "skybrightness/dataset/starlight",
+			Description: "Gaia@AIP TAP mirror, asynchronous endpoint; runs a query as a job " +
+				"rather than in the response, for aggregations too large to answer inline",
+			Enabled:  true,
+			Timeout:  5 * time.Minute,
 			TokenEnv: "ASTROGO_GAIA_AIP_TOKEN",
 		},
 
