@@ -117,6 +117,25 @@ func Read(r io.Reader) (*File, error) {
 			}
 		}
 
+		// An image is decoded rather than skipped, for the same reason a table
+		// is. Appending a basicHDU and seeking past the payload leaves a
+		// caller type-asserting to *ImageHDU with no image and no error, which
+		// is exactly how ReadBintable was unreachable from here before.
+		//
+		// It costs what the image weighs. A caller who wants headers alone
+		// pays for pixels they will not read, which is the price of the
+		// alternative being a silent empty result.
+		if isImagePayload(header) {
+			hdu, err := ReadImage(header, br)
+			if err != nil {
+				return nil, fmt.Errorf("fits: read image: %w", err)
+			}
+
+			f.HDUs = append(f.HDUs, hdu)
+
+			continue
+		}
+
 		f.HDUs = append(f.HDUs, &basicHDU{header: header, hType: HDUTypeImage})
 
 		// Calculate data payload and skip it
@@ -269,4 +288,25 @@ func ReadBigEndian(r io.Reader, data any) error {
 // Write scaffolds writing a basic HDU to a FITS file.
 func Write(_ string, _ []float64) error {
 	return ErrUnimplemented
+}
+
+// isImagePayload reports whether an HDU carries image pixels this package can
+// decode.
+//
+// NAXIS of zero is a header-only HDU — the usual shape of a primary header in
+// a file whose data lives in extensions — and has no payload to read. An
+// XTENSION this package has no reader for is left to the skip path rather than
+// guessed at.
+func isImagePayload(header *Header) bool {
+	naxis, err := header.GetInt("NAXIS")
+	if err != nil || naxis <= 0 {
+		return false
+	}
+
+	xtension, err := header.GetString("XTENSION")
+	if err != nil {
+		return true // no XTENSION card: the primary HDU
+	}
+
+	return strings.TrimSpace(xtension) == "IMAGE"
 }

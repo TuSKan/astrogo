@@ -161,7 +161,18 @@ func fromImage(img *fits.ImageHDU, name string) (*hemisphere, error) {
 		return nil, fmt.Errorf("%w: %s has %d axes, want 2", ErrSFD, name, len(img.Axes))
 	}
 
-	width, height := int(img.Axes[0]), int(img.Axes[1])
+	// From the header keywords rather than from Axes, which is C-contiguous
+	// and so reports rows before columns — the reverse of NAXIS1, NAXIS2. Both
+	// are 4096 here, so reading it the wrong way round is invisible until the
+	// day it is given a rectangular image.
+	naxis1, err1 := h.GetInt("NAXIS1")
+	naxis2, err2 := h.GetInt("NAXIS2")
+
+	if err1 != nil || err2 != nil {
+		return nil, fmt.Errorf("%w: %s does not state its dimensions", ErrSFD, name)
+	}
+
+	width, height := naxis1, naxis2
 
 	values, err := pixels(img)
 	if err != nil {

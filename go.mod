@@ -3,7 +3,7 @@ module github.com/TuSKan/astrogo
 go 1.25.8
 
 require (
-	github.com/TuSKan/gocloud-ext/blob/httpblob v0.1.0
+	github.com/TuSKan/gocloud-ext/blob/httpblob v0.1.1
 	github.com/hebl/gofa v1.19.1
 	github.com/joshuaferrara/go-satellite v0.0.0-20220611180459-512638c64e5b
 	github.com/klauspost/pgzip v1.2.6

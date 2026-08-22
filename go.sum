@@ -22,8 +22,8 @@ github.com/GoogleCloudPlatform/opentelemetry-operations-go/internal/resourcemapp
 github.com/GoogleCloudPlatform/opentelemetry-operations-go/internal/resourcemapping v0.59.0/go.mod h1:YqwkQPrWSC7+byyc1VlKbWLBF5JsW5IoL6xUkemYSXk=
 github.com/TuSKan/gocloud-ext v0.1.0 h1:YbxoAAQrD+GJM8AhNxK7W+UdUFeJx0Y2fJj6+5va59s=
 github.com/TuSKan/gocloud-ext v0.1.0/go.mod h1:sFauV+Jj1HX5d5anzInk8UX5jL9qdBuqfVwBnHG3/qw=
-github.com/TuSKan/gocloud-ext/blob/httpblob v0.1.0 h1:H4SePZyJvdPR22ymzUHqa+Xfe8NCzdjVzw+vNQjlWts=
-github.com/TuSKan/gocloud-ext/blob/httpblob v0.1.0/go.mod h1:7pfYCYgfpMtXOMO9bQKZvGsDBf3qYPwvxaS2HRckTG0=
+github.com/TuSKan/gocloud-ext/blob/httpblob v0.1.1 h1:F3/kA/CXpDjSkrDyNBh1FI0yaf79fc3s89U3dE3mxko=
+github.com/TuSKan/gocloud-ext/blob/httpblob v0.1.1/go.mod h1:7pfYCYgfpMtXOMO9bQKZvGsDBf3qYPwvxaS2HRckTG0=
 github.com/andybalholm/brotli v1.2.1 h1:R+f5xP285VArJDRgowrfb9DqL18yVK0gKAW/F+eTWro=
 github.com/andybalholm/brotli v1.2.1/go.mod h1:rzTDkvFWvIrjDXZHkuS16NPggd91W3kUSvPlQ1pLaKY=
 github.com/apache/arrow-go/v18 v18.6.0 h1:GX/Jyd3R7mCLiECAwY9FWbbaYblie2WXBSz4Sw8fNpM=
