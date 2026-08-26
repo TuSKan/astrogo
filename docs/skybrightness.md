@@ -1672,7 +1672,7 @@ zenith cap, comparing the web simplification against Eq. 8's `L_obs = L_d + L_s`
 | `GAMBONSFull`, Eq. 8 `L_d + L_s` | 1.1758 |
 | Table 2 | 1.0751 |
 
-**The full model closes 37 per cent of the gap.** The mechanism is visible per component:
+**The full model closes 37.6 per cent of the gap.** The mechanism is visible per component:
 against the simplified model, starlight changes by +0.03 per cent and zodiacal by
 **+5.2 per cent**. The scattered term is not moving starlight at all at these epochs — κ = 0.5
 already stands in for what starlight scatters — and it is the zodiacal gain alone that moves

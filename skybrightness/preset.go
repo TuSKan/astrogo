@@ -122,7 +122,7 @@ const (
 	// one:
 	//
 	//   - The full Eq. 11 scattering integral, with kappa = 1 so the direct
-	//     term is true extinction. Measured against Table 2 it closes 37 per
+	//     term is true extinction. Measured against Table 2 it closes 37.6 per
 	//     cent of the discrepancy the simplified transfer cannot touch.
 	//   - Higher scattering orders on the scattered term, after Winkler
 	//     (2022). Eq. 11's kernel is first order and GAMBONS stops there;
@@ -341,6 +341,11 @@ func NewPreset(p Preset, in PresetInputs) (*Model, error) {
 	if err != nil {
 		return nil, fmt.Errorf("%w %q: %w", ErrPreset, p, err)
 	}
+
+	// The model remembers which preset built it, so that evaluating it under
+	// somebody else's transfer is an error rather than a plausible number.
+	// See [Model.Estimate].
+	model.preset = p
 
 	return model, nil
 }

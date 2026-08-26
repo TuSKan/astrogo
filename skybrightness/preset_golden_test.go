@@ -35,6 +35,21 @@ const goldenTol = 1e-12
 // Every input is written here rather than fetched, so the numbers reproduce on
 // any machine and in any year. The site is Cerro Paranal, the instant is a
 // fixed UTC one, and the atmosphere carries the preset's own transfer factor.
+//
+// # Why this instant and not another
+//
+// The Moon is 73 degrees up and 3 degrees from full here, with the Sun 70
+// degrees down. That matters only for [skybrightness.Observatory], and it
+// matters entirely: at the instant this fixture used before, the Moon was
+// below the horizon, so its moonlight term evaluated to exactly zero at every
+// altitude. Locking a column of zeros would have guarded nothing about the
+// largest capability difference between that preset and GAMBONS, while looking
+// in every way like coverage.
+//
+// The three reproductions have no moonlight term and are indifferent to the
+// Moon. Their numbers still move with the date, through the zodiacal light's
+// dependence on solar elongation, which is why all four tables were regenerated
+// together rather than two of them being left alone.
 func presetGoldenScene(tb testing.TB, p skybrightness.Preset) *skybrightness.Scene {
 	tb.Helper()
 
@@ -66,7 +81,7 @@ func presetGoldenScene(tb testing.TB, p skybrightness.Preset) *skybrightness.Sce
 
 	return &skybrightness.Scene{
 		Observer:   loc,
-		Time:       gotime.Date(2026, 3, 20, 5, 0, 0, 0, gotime.UTC),
+		Time:       gotime.Date(2026, 4, 2, 5, 0, 0, 0, gotime.UTC),
 		Atmosphere: atm,
 		Ephemeris:  eph.Default(),
 	}
@@ -89,6 +104,38 @@ var goldenComponents = []skybrightness.ComponentID{
 	skybrightness.Extragalactic,
 	skybrightness.Zodiacal,
 	skybrightness.AirglowContinuum,
+}
+
+// goldenComponentsFor is the list a given preset should produce.
+//
+// The three reproductions carry the five natural components of Eq. 10.
+// [skybrightness.Observatory] carries two more, and they have to be locked
+// too: they are the largest capability difference between it and GAMBONS, so
+// locking the five it shares and omitting the two it does not would leave its
+// most distinctive half unguarded.
+func goldenComponentsFor(p skybrightness.Preset) []skybrightness.ComponentID {
+	if p != skybrightness.Observatory {
+		return goldenComponents
+	}
+
+	out := make([]skybrightness.ComponentID, 0, len(goldenComponents)+2)
+	out = append(out, goldenComponents...)
+
+	return append(out, skybrightness.Moonlight, skybrightness.Artificial)
+}
+
+// goldenInputs supplies what a given preset needs.
+//
+// [skybrightness.Observatory] refuses without a solar spectrum and a ground
+// emitter, since it is the only preset with terms that consume them.
+func goldenInputs(tb testing.TB, p skybrightness.Preset) skybrightness.PresetInputs {
+	tb.Helper()
+
+	if p == skybrightness.Observatory {
+		return observatoryInputs(tb)
+	}
+
+	return presetInputs(tb)
 }
 
 // totalSurfaceBrightness is not a component; it labels the whole-band row.
@@ -123,30 +170,30 @@ var gambonsWebGolden = []goldenRow{
 	{90, skybrightness.Starlight, 9.7273884516322964e-10},
 	{90, skybrightness.DiffuseGalactic, 4.2018697243834238e-11},
 	{90, skybrightness.Extragalactic, 1.214218783318975e-11},
-	{90, skybrightness.Zodiacal, 1.5220545545442494e-09},
+	{90, skybrightness.Zodiacal, 1.6509994114663615e-09},
 	{90, skybrightness.AirglowContinuum, 2.4318471129080736e-09},
-	{90, totalSurfaceBrightness, 21.248628500932224},
+	{90, totalSurfaceBrightness, 21.220884888629627},
 
 	{60, skybrightness.Starlight, 9.6860563353807089e-10},
 	{60, skybrightness.DiffuseGalactic, 4.1840157886856984e-11},
 	{60, skybrightness.Extragalactic, 1.2090595124461664e-11},
-	{60, skybrightness.Zodiacal, 1.826480625985605e-09},
+	{60, skybrightness.Zodiacal, 1.6943307636991397e-09},
 	{60, skybrightness.AirglowContinuum, 2.7837481071333883e-09},
-	{60, totalSurfaceBrightness, 21.115182920107912},
+	{60, totalSurfaceBrightness, 21.140952714636416},
 
 	{30, skybrightness.Starlight, 9.4639993687408995e-10},
 	{30, skybrightness.DiffuseGalactic, 4.0880954448183097e-11},
 	{30, skybrightness.Extragalactic, 1.1813413082023905e-11},
-	{30, skybrightness.Zodiacal, 1.0675872220787639e-09},
+	{30, skybrightness.Zodiacal, 1.0024839463183623e-09},
 	{30, skybrightness.AirglowContinuum, 4.5529489963254674e-09},
-	{30, totalSurfaceBrightness, 20.940422609961743},
+	{30, totalSurfaceBrightness, 20.951150811900597},
 
 	{10, skybrightness.Starlight, 8.5705815421231311e-10},
 	{10, skybrightness.DiffuseGalactic, 3.7021721997915625e-11},
 	{10, skybrightness.Extragalactic, 1.0698206557862453e-11},
-	{10, skybrightness.Zodiacal, 7.4487976873245172e-10},
+	{10, skybrightness.Zodiacal, 7.1600268379929665e-10},
 	{10, skybrightness.AirglowContinuum, 9.0478164742275109e-09},
-	{10, totalSurfaceBrightness, 20.421634636523333},
+	{10, totalSurfaceBrightness, 20.424569569540587},
 }
 
 // gambonsFullGolden is the locked output of [skybrightness.GAMBONSFull].
@@ -161,30 +208,30 @@ var gambonsFullGolden = []goldenRow{
 	{90, skybrightness.Starlight, 9.9185382323796635e-10},
 	{90, skybrightness.DiffuseGalactic, 4.2844393144166162e-11},
 	{90, skybrightness.Extragalactic, 1.238079005964017e-11},
-	{90, skybrightness.Zodiacal, 1.5462146488353121e-09},
+	{90, skybrightness.Zodiacal, 1.6718266068282146e-09},
 	{90, skybrightness.AirglowContinuum, 2.5788686481672761e-09},
-	{90, totalSurfaceBrightness, 21.207547398738487},
+	{90, totalSurfaceBrightness, 21.18151944351386},
 
 	{60, skybrightness.Starlight, 9.8960429863641313e-10},
 	{60, skybrightness.DiffuseGalactic, 4.2747222054880267e-11},
 	{60, skybrightness.Extragalactic, 1.2352710426156573e-11},
-	{60, skybrightness.Zodiacal, 1.8455650514032244e-09},
+	{60, skybrightness.Zodiacal, 1.7161645720784461e-09},
 	{60, skybrightness.AirglowContinuum, 2.9516262945475295e-09},
-	{60, totalSurfaceBrightness, 21.075559243200498},
+	{60, totalSurfaceBrightness, 21.099857197038787},
 
 	{30, skybrightness.Starlight, 9.7624049428941108e-10},
 	{30, skybrightness.DiffuseGalactic, 4.2169955451747658e-11},
 	{30, skybrightness.Extragalactic, 1.2185897079127065e-11},
-	{30, skybrightness.Zodiacal, 1.1225177167672987e-09},
+	{30, skybrightness.Zodiacal, 1.0578499759206944e-09},
 	{30, skybrightness.AirglowContinuum, 4.7739343029753323e-09},
-	{30, totalSurfaceBrightness, 20.891442859700454},
+	{30, totalSurfaceBrightness, 20.901618125012167},
 
 	{10, skybrightness.Starlight, 9.1001151633863401e-10},
 	{10, skybrightness.DiffuseGalactic, 3.9309110131218376e-11},
 	{10, skybrightness.Extragalactic, 1.135919555047209e-11},
-	{10, skybrightness.Zodiacal, 8.7347407170088064e-10},
+	{10, skybrightness.Zodiacal, 8.4305977148619261e-10},
 	{10, skybrightness.AirglowContinuum, 8.8603798273970605e-09},
-	{10, totalSurfaceBrightness, 20.423740990972878},
+	{10, totalSurfaceBrightness, 20.426833487654395},
 }
 
 // The GAMBONS web preset produces exactly the numbers it produced when they
@@ -206,6 +253,116 @@ func TestGAMBONSFullPresetGolden(t *testing.T) {
 	checkPresetGolden(t, skybrightness.GAMBONSFull, gambonsFullGolden)
 }
 
+// The Duriscoe transfer, locked separately from the two GAMBONS presets.
+//
+// It shares their components and differs only in kappa, which is exactly the
+// case a shared lock would hide: the components could change while this table
+// and one of theirs moved together, and a per-preset lock is what makes the
+// difference attributable.
+func TestNaturalSkyPresetGolden(t *testing.T) {
+	t.Parallel()
+
+	checkPresetGolden(t, skybrightness.NaturalSky, naturalSkyGolden)
+}
+
+// This module's own model, locked.
+//
+// # Why this one matters most
+//
+// The other three reproduce a published model, so each has an external
+// reference: a wrong change shows up as a widening gap against GAMBONS' own
+// export or against Table 2. [skybrightness.Observatory] is not reproducing
+// anybody. It has no published counterpart by construction, which means no
+// external comparison can ever be written for it and a lock like this one is
+// the only regression protection it can have.
+//
+// It went without for a while. Its components were checked for presence and
+// its accessors for value, and its numbers were asserted nowhere - the preset
+// with the least external validation had the least internal validation too.
+func TestObservatoryPresetGolden(t *testing.T) {
+	t.Parallel()
+
+	checkPresetGolden(t, skybrightness.Observatory, observatoryGolden)
+}
+
+// naturalSkyGolden is the locked output of [skybrightness.NaturalSky].
+//
+// Same caveat as every table here: evidence that the preset does not change
+// silently, not evidence that it is right.
+var naturalSkyGolden = []goldenRow{
+	{90, skybrightness.Starlight, 9.5938823606035686e-10},
+	{90, skybrightness.DiffuseGalactic, 4.144200062613079e-11},
+	{90, skybrightness.Extragalactic, 1.1975539195458651e-11},
+	{90, skybrightness.Zodiacal, 1.6283398375415e-09},
+	{90, skybrightness.AirglowContinuum, 2.3984705901508912e-09},
+	{90, totalSurfaceBrightness, 21.236233891494262},
+
+	{60, skybrightness.Starlight, 9.5328000968613116e-10},
+	{60, skybrightness.DiffuseGalactic, 4.1178147983675336e-11},
+	{60, skybrightness.Extragalactic, 1.1899293415481554e-11},
+	{60, skybrightness.Zodiacal, 1.6675224579592969e-09},
+	{60, skybrightness.AirglowContinuum, 2.7397026515720373e-09},
+	{60, totalSurfaceBrightness, 21.158665626006222},
+
+	{30, skybrightness.Starlight, 9.2068709110288861e-10},
+	{30, skybrightness.DiffuseGalactic, 3.9770255222887726e-11},
+	{30, skybrightness.Extragalactic, 1.1492453140275742e-11},
+	{30, skybrightness.Zodiacal, 9.7524734781971e-10},
+	{30, skybrightness.AirglowContinuum, 4.4292494156457222e-09},
+	{30, totalSurfaceBrightness, 20.981732107142076},
+
+	{10, skybrightness.Starlight, 7.9344245891200624e-10},
+	{10, skybrightness.DiffuseGalactic, 3.4273760760353396e-11},
+	{10, skybrightness.Extragalactic, 9.9041252632620779e-12},
+	{10, skybrightness.Zodiacal, 6.6285692193598381e-10},
+	{10, skybrightness.AirglowContinuum, 8.3762364500148613e-09},
+	{10, totalSurfaceBrightness, 20.509814412635347},
+}
+
+// observatoryGolden is the locked output of [skybrightness.Observatory],
+// including its moonlight and artificial-skyglow terms.
+//
+// The scene is the fixed instant presetGoldenScene defines, so the Moon's
+// position - and with it the whole moonlight term - is a constant of the
+// fixture rather than of the day this runs.
+var observatoryGolden = []goldenRow{
+	{90, skybrightness.Starlight, 1.0066020303432268e-09},
+	{90, skybrightness.DiffuseGalactic, 4.3481460793234216e-11},
+	{90, skybrightness.Extragalactic, 1.2564884178802038e-11},
+	{90, skybrightness.Zodiacal, 1.6931040621367361e-09},
+	{90, skybrightness.AirglowContinuum, 2.6478108272245852e-09},
+	{90, skybrightness.Moonlight, 1.0222980573698136e-07},
+	{90, skybrightness.Artificial, 8.4639173450219717e-08},
+	{90, totalSurfaceBrightness, 17.278019390695182},
+
+	{60, skybrightness.Starlight, 1.0062187658169592e-09},
+	{60, skybrightness.DiffuseGalactic, 4.3464905192341308e-11},
+	{60, skybrightness.Extragalactic, 1.2560100089124851e-11},
+	{60, skybrightness.Zodiacal, 1.7404124535615927e-09},
+	{60, skybrightness.AirglowContinuum, 3.0341282189366305e-09},
+	{60, skybrightness.Moonlight, 8.8362963958779112e-08},
+	{60, skybrightness.Artificial, 1.1741516319643428e-07},
+	{60, totalSurfaceBrightness, 17.172950573741115},
+
+	{30, skybrightness.Starlight, 1.0022793132197267e-09},
+	{30, skybrightness.DiffuseGalactic, 4.3294735504132998e-11},
+	{30, skybrightness.Extragalactic, 1.2510925972522657e-11},
+	{30, skybrightness.Zodiacal, 1.0931099720236581e-09},
+	{30, skybrightness.AirglowContinuum, 4.9242262169215958e-09},
+	{30, skybrightness.Moonlight, 7.4084852480146116e-08},
+	{30, skybrightness.Artificial, 2.6030405951465619e-07},
+	{30, totalSurfaceBrightness, 16.654600182714855},
+
+	{10, skybrightness.Starlight, 9.6671969658419908e-10},
+	{10, skybrightness.DiffuseGalactic, 4.1758692430553132e-11},
+	{10, skybrightness.Extragalactic, 1.2067053964519993e-11},
+	{10, skybrightness.Zodiacal, 9.1720124870359424e-10},
+	{10, skybrightness.AirglowContinuum, 9.2177897305315865e-09},
+	{10, skybrightness.Moonlight, 1.2972601340731498e-07},
+	{10, skybrightness.Artificial, 7.8099677446004759e-07},
+	{10, totalSurfaceBrightness, 15.580434407500874},
+}
+
 // checkPresetGolden compares one preset against its own locked table.
 //
 // The fidelity comes from the preset rather than from the caller. Asking
@@ -215,7 +372,7 @@ func TestGAMBONSFullPresetGolden(t *testing.T) {
 func checkPresetGolden(t *testing.T, p skybrightness.Preset, table []goldenRow) {
 	t.Helper()
 
-	in := presetInputs(t)
+	in := goldenInputs(t, p)
 
 	model, err := skybrightness.NewPreset(p, in)
 	if err != nil {
@@ -287,7 +444,7 @@ func checkPresetGolden(t *testing.T, p skybrightness.Preset, table []goldenRow) 
 			t.Fatalf("%s: alt %g: Estimate: %v", p, altDeg, err)
 		}
 
-		for _, id := range goldenComponents {
+		for _, id := range goldenComponentsFor(p) {
 			spec, ok := est.Component(id)
 			if !ok {
 				t.Fatalf("%s: alt %g: the estimate carries no %s component", p, altDeg, id)
@@ -383,9 +540,11 @@ func goldenGoName(id skybrightness.ComponentID) string {
 	case skybrightness.AirglowContinuum:
 		return "skybrightness.AirglowContinuum"
 
-	// Not registered by either preset today. Named anyway, so that a preset
-	// which later gains one of them generates a pasteable line rather than a
-	// quoted string literal that would compile but read as an accident.
+	// Moonlight and Artificial are [skybrightness.Observatory]'s own two
+	// terms; the other two are registered by no preset today. All four are
+	// named so that a preset gaining one generates a pasteable line rather
+	// than a quoted string literal that would compile but read as an
+	// accident - which is exactly how Observatory's two came to be locked.
 	case skybrightness.AirglowLines:
 		return "skybrightness.AirglowLines"
 	case skybrightness.Moonlight:

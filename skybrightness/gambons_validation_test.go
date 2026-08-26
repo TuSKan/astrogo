@@ -37,6 +37,25 @@ const (
 )
 
 // gambonsEpoch is 21 August 2026 01:16 GMT+2, which is what the run recorded.
+// enableStarMapDownload grants consent for the published star map.
+//
+// The budget comes from the registry rather than from a literal here. Consent
+// is checked against the endpoint's own ApproxSize before any request is made,
+// so a number written into a test is a second copy of that one, and the copies
+// drift: when the published map went from one band to four the registered size
+// grew past the literal these tests carried, and they passed only because the
+// headroom happened to be enough. Reading it leaves one number in the module.
+func enableStarMapDownload(tb testing.TB) {
+	tb.Helper()
+
+	endpoint, ok := remote.Lookup(remote.GaiaStarMap)
+	if !ok {
+		tb.Fatal("GaiaStarMap is not registered")
+	}
+
+	remote.EnableDownloads(endpoint.ApproxSize, remote.GaiaStarMap)
+}
+
 func gambonsEpoch() gotime.Time {
 	return gotime.Date(2026, 8, 20, 23, 16, 0, 0, gotime.UTC)
 }
@@ -120,7 +139,7 @@ func TestAgainstGAMBONS(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*gotime.Minute)
 	defer cancel()
 
-	remote.EnableDownloads(32<<20, remote.GaiaStarMap)
+	enableStarMapDownload(t)
 
 	grid := skybrightness.DefaultOpticalGrid()
 	band := johnsonVTophat()

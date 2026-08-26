@@ -13,7 +13,6 @@ import (
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/internal/testutil"
-	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/skybrightness"
 	"github.com/TuSKan/astrogo/skybrightness/dataset/starlight"
 	"github.com/TuSKan/astrogo/unit"
@@ -58,7 +57,7 @@ func TestEq11AgainstTheTable2Ratio(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 40*gotime.Minute)
 	defer cancel()
 
-	remote.EnableDownloads(32<<20, remote.GaiaStarMap)
+	enableStarMapDownload(t)
 
 	// A grid over Johnson V alone, at 2 nm. The integral costs one field evaluation per
 	// source direction per epoch, so the wavelength axis is the one place a
@@ -242,7 +241,11 @@ func TestEq11AgainstTheTable2Ratio(t *testing.T) {
 
 	closed := (kappaRatio - eq11Ratio) / gap
 
-	t.Logf("  the full scattering model closes %.0f per cent of the gap", 100*closed)
+	// One decimal, because this number is quoted in the design doc and in
+	// [skybrightness.Observatory]'s own documentation. At whole-number
+	// precision a drift of half a per cent moves the quoted figure without
+	// ever showing up as a change here.
+	t.Logf("  the full scattering model closes %.1f per cent of the gap", 100*closed)
 
 	// The full model must be brighter than the simplified one at the zenith,
 	// and by a plausible amount. Masana et al. state the direction — the

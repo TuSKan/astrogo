@@ -65,6 +65,14 @@ func (m *Model) SkyMap(ctx context.Context, q Query, rings int) ([]SkyPoint, err
 		return nil, err
 	}
 
+	// Before the hemisphere is sampled, not per direction: a mismatch is a
+	// property of the query, so failing here costs one check instead of one
+	// per direction, and reports the whole map as unevaluated rather than
+	// half-built.
+	if err := m.checkPreset(q); err != nil {
+		return nil, err
+	}
+
 	// The incoming field, once for the whole map.
 	//
 	// Eq. 11's L_0 is the radiance above the atmosphere: it depends on where

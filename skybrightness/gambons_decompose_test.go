@@ -13,7 +13,6 @@ import (
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/magnitude"
-	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/skybrightness"
 	"github.com/TuSKan/astrogo/skybrightness/dataset/airglow"
 	"github.com/TuSKan/astrogo/skybrightness/dataset/dust"
@@ -39,7 +38,7 @@ func TestGAMBONSGapDecomposition(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*gotime.Minute)
 	defer cancel()
 
-	remote.EnableDownloads(32<<20, remote.GaiaStarMap)
+	enableStarMapDownload(t)
 
 	grid := skybrightness.DefaultOpticalGrid()
 	band := johnsonVTophat()

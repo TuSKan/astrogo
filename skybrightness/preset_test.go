@@ -271,6 +271,15 @@ func TestGAMBONSFullIsBrighterThanItsDirectTerm(t *testing.T) {
 
 	scene := presetGoldenScene(t, skybrightness.GAMBONSFull)
 
+	// A controlled comparison of one preset under two transfers, so exactly
+	// one of the two runs can be the preset's own and [Model.Estimate] would
+	// refuse the other. The direct term is not recoverable from the reference
+	// estimate either: at Reference the scattered light is added into each
+	// component's own buffer, precisely so a breakdown still attributes it.
+	// So the measurement needs two evaluations and has to opt out to take
+	// them.
+	model = model.WithoutPreset()
+
 	at := func(f skybrightness.Fidelity) float64 {
 		t.Helper()
 
@@ -385,6 +394,215 @@ func TestTheTwoGAMBONSModelsDifferAsThePaperDescribes(t *testing.T) {
 			t.Errorf("at %g degrees the two models differ by %.4f mag, above the tenth of a "+
 				"magnitude the paper expects between them", altDeg, d)
 		}
+	}
+}
+
+// A preset refuses to be evaluated under somebody else's transfer.
+//
+// # What this guards
+//
+// [skybrightness.NewPreset] builds components; kappa, higher scattering orders
+// and the fidelity that decides whether the Eq. 11 integral runs at all live on
+// the caller's atmosphere and query. Three things to remember, and forgetting
+// any of them used to return a plausible number: a sky smooth, positive,
+// correctly shaped, and not the model whose name was on it.
+//
+// Each case below is a mistake a caller can make in one line, and each produced
+// a usable-looking answer before the check existed.
+func TestEstimateRefusesAMismatchedTransfer(t *testing.T) {
+	t.Parallel()
+
+	in := observatoryInputs(t)
+
+	zenith := coord.NewAltAz(angle.Deg(90), angle.Deg(0))
+
+	cases := []struct {
+		name     string
+		preset   skybrightness.Preset
+		scene    skybrightness.Preset
+		fidelity skybrightness.Fidelity
+	}{{
+		// 0.5 against 1 is a factor of two in the diffuse optical depth.
+		name: "kappa too low", preset: skybrightness.GAMBONSFull,
+		scene: skybrightness.GAMBONSWeb, fidelity: skybrightness.Reference,
+	}, {
+		name: "kappa too high", preset: skybrightness.GAMBONSWeb,
+		scene: skybrightness.GAMBONSFull, fidelity: skybrightness.Standard,
+	}, {
+		// Same kappa, so only the scattering-order flag separates these two.
+		name:   "higher orders on when the preset is first order",
+		preset: skybrightness.GAMBONSFull, scene: skybrightness.Observatory,
+		fidelity: skybrightness.Reference,
+	}, {
+		// The integral silently absent.
+		name: "fidelity below the integral", preset: skybrightness.GAMBONSFull,
+		scene: skybrightness.GAMBONSFull, fidelity: skybrightness.Standard,
+	}, {
+		// The integral added on top of a stand-in for it.
+		name: "fidelity above a simplified transfer", preset: skybrightness.GAMBONSWeb,
+		scene: skybrightness.GAMBONSWeb, fidelity: skybrightness.Reference,
+	}}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+
+			model, err := skybrightness.NewPreset(c.preset, in)
+			if err != nil {
+				t.Fatalf("NewPreset: %v", err)
+			}
+
+			_, err = model.Estimate(t.Context(), skybrightness.Query{
+				Scene:     presetGoldenScene(t, c.scene),
+				Direction: zenith,
+				Grid:      in.Grid,
+				Fidelity:  c.fidelity,
+			})
+			if !errors.Is(err, skybrightness.ErrPresetMismatch) {
+				t.Fatalf("got %v, want ErrPresetMismatch — this evaluates %q under %q's "+
+					"transfer and returns a number for it", err, c.preset, c.scene)
+			}
+		})
+	}
+}
+
+// The matching case is accepted, and so is a cheaper label for a preset that
+// runs no integral.
+//
+// Without this the check could pass its own tests by rejecting everything.
+// [skybrightness.Fast] is deliberately allowed where [skybrightness.Standard]
+// is: the two run the same evaluation, and what the preset is defined by is
+// whether the Eq. 11 integral runs, not which of the two cheaper labels a
+// caller chose.
+func TestEstimateAcceptsTheTransferThePresetNames(t *testing.T) {
+	t.Parallel()
+
+	in := observatoryInputs(t)
+	zenith := coord.NewAltAz(angle.Deg(90), angle.Deg(0))
+
+	for _, c := range []struct {
+		name     string
+		preset   skybrightness.Preset
+		fidelity skybrightness.Fidelity
+	}{
+		{"web at standard", skybrightness.GAMBONSWeb, skybrightness.Standard},
+		{"web at fast", skybrightness.GAMBONSWeb, skybrightness.Fast},
+		{"natural at standard", skybrightness.NaturalSky, skybrightness.Standard},
+		{"full at reference", skybrightness.GAMBONSFull, skybrightness.Reference},
+		{"observatory at reference", skybrightness.Observatory, skybrightness.Reference},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+
+			model, err := skybrightness.NewPreset(c.preset, in)
+			if err != nil {
+				t.Fatalf("NewPreset: %v", err)
+			}
+
+			if _, err := model.Estimate(t.Context(), skybrightness.Query{
+				Scene:     presetGoldenScene(t, c.preset),
+				Direction: zenith,
+				Grid:      in.Grid,
+				Fidelity:  c.fidelity,
+			}); err != nil {
+				t.Fatalf("Estimate: %v", err)
+			}
+		})
+	}
+}
+
+// A hand-assembled model carries no preset and is not checked.
+//
+// Calling [skybrightness.NewModel] is a statement that the caller owns the
+// transfer as well as the components, so there is nothing to contradict. A
+// check that fired here would make the guard a tax on every model rather than
+// a property of presets.
+func TestModelsWithoutAPresetAreNotChecked(t *testing.T) {
+	t.Parallel()
+
+	model, err := skybrightness.NewModel("hand-assembled")
+	if err != nil {
+		t.Fatalf("NewModel: %v", err)
+	}
+
+	if _, ok := model.Preset(); ok {
+		t.Error("a model from NewModel reports a preset")
+	}
+
+	// Any transfer at all, including one no preset uses.
+	if _, err := model.Estimate(t.Context(), skybrightness.Query{
+		Scene:     presetGoldenScene(t, skybrightness.Observatory),
+		Direction: coord.NewAltAz(angle.Deg(90), angle.Deg(0)),
+		Grid:      skybrightness.DefaultOpticalGrid(),
+		Fidelity:  skybrightness.Standard,
+	}); err != nil {
+		t.Fatalf("Estimate: %v", err)
+	}
+}
+
+// WithoutPreset drops the check and keeps the components.
+//
+// The escape hatch has to actually work, because the alternative for anyone
+// measuring what a transfer choice is worth is rebuilding the component set by
+// hand and hoping it stays in step with [skybrightness.NewPreset].
+func TestWithoutPresetDropsTheCheck(t *testing.T) {
+	t.Parallel()
+
+	in := presetInputs(t)
+
+	model, err := skybrightness.NewPreset(skybrightness.GAMBONSFull, in)
+	if err != nil {
+		t.Fatalf("NewPreset: %v", err)
+	}
+
+	free := model.WithoutPreset()
+
+	if p, ok := model.Preset(); !ok || p != skybrightness.GAMBONSFull {
+		t.Errorf("the original reports %q, %t — WithoutPreset must not mutate it", p, ok)
+	}
+
+	if _, ok := free.Preset(); ok {
+		t.Error("the copy still reports a preset")
+	}
+
+	if a, b := model.Components(), free.Components(); len(a) != len(b) {
+		t.Fatalf("the copy holds %d components against %d", len(b), len(a))
+	}
+
+	// The transfer the original would refuse.
+	if _, err := free.Estimate(t.Context(), skybrightness.Query{
+		Scene:     presetGoldenScene(t, skybrightness.GAMBONSFull),
+		Direction: coord.NewAltAz(angle.Deg(90), angle.Deg(0)),
+		Grid:      in.Grid,
+		Fidelity:  skybrightness.Standard,
+	}); err != nil {
+		t.Fatalf("Estimate: %v", err)
+	}
+}
+
+// SkyMap refuses a mismatch too, and before it spends anything.
+//
+// A whole sky at reference fidelity samples the hemisphere once and then
+// evaluates every direction, so a check that lived only in Estimate would
+// report the mistake a few hundred component evaluations late and once per
+// direction.
+func TestSkyMapRefusesAMismatchedTransfer(t *testing.T) {
+	t.Parallel()
+
+	in := presetInputs(t)
+
+	model, err := skybrightness.NewPreset(skybrightness.GAMBONSFull, in)
+	if err != nil {
+		t.Fatalf("NewPreset: %v", err)
+	}
+
+	_, err = model.SkyMap(t.Context(), skybrightness.Query{
+		Scene:    presetGoldenScene(t, skybrightness.GAMBONSWeb),
+		Grid:     in.Grid,
+		Fidelity: skybrightness.Reference,
+	}, 3)
+	if !errors.Is(err, skybrightness.ErrPresetMismatch) {
+		t.Fatalf("got %v, want ErrPresetMismatch", err)
 	}
 }
 
@@ -513,7 +731,7 @@ func TestMultipleScatteringBrightensOnlyTheScatteredTerm(t *testing.T) {
 			t.Fatalf("NewGeodetic: %v", err)
 		}
 
-		est, err := model.Estimate(t.Context(), skybrightness.Query{
+		est, err := model.WithoutPreset().Estimate(t.Context(), skybrightness.Query{
 			Scene: &skybrightness.Scene{
 				Observer:   loc,
 				Time:       gotime.Date(2026, 3, 20, 5, 0, 0, 0, gotime.UTC),
