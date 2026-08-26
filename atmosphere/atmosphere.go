@@ -111,7 +111,7 @@ type Aerosol struct {
 	AngstromExp            unit.AngstromExponent
 	SingleScatteringAlbedo unit.SingleScatteringAlbedo
 	Asymmetry              unit.AsymmetryParameter
-	BoundaryLayerHeight    unit.AltitudeM
+	ScaleHeight            unit.AltitudeM
 }
 
 // TauAt returns the aerosol optical depth at wavelength lambda, via the
@@ -406,15 +406,53 @@ func (b *Builder) Ozone(du float64) *Builder {
 	return b
 }
 
+// SurfaceAtAltitude sets surface pressure and temperature from the ICAO
+// International Standard Atmosphere at a site's elevation.
+//
+// The alternative is asking a caller for two numbers they usually do not have.
+// Nobody knows their observatory's barometric pressure in hectopascals off
+// hand, and the value is not free to guess: pressure sets the Rayleigh optical
+// depth, so a sea-level default at a 2,600 m site overstates molecular
+// scattering by about a quarter.
+//
+// It is a default, not a measurement, and [Surface] still overrides it. A site
+// with a real barometer should use one — ISA is a standard profile, not the
+// weather, and a passing front moves surface pressure by a couple of per cent.
+func (b *Builder) SurfaceAtAltitude(heightM float64) *Builder {
+	isa := AtAltitude(heightM)
+
+	// AtAltitude reports Celsius, as every Refraction does; Surface takes
+	// Kelvin, as every skybrightness-native unit does. The conversion belongs
+	// here rather than at the call site for the same reason Surface itself
+	// converts in the other direction.
+	return b.Surface(isa.Pressure, isa.Temperature+273.15)
+}
+
 // PrecipitableWater sets precipitable water vapour, in millimetres.
 func (b *Builder) PrecipitableWater(mm float64) *Builder {
 	b.s.pwv = unit.PrecipitableWaterMM(mm)
 	return b
 }
 
-// BoundaryLayer sets the aerosol boundary-layer height, in metres.
-func (b *Builder) BoundaryLayer(m float64) *Builder {
-	b.s.aerosol.BoundaryLayerHeight = unit.AltitudeM(m)
+// AerosolScaleHeight sets the height over which aerosol extinction falls by a
+// factor of e, in metres.
+//
+// # Why this is not the boundary-layer height
+//
+// It was called BoundaryLayer, and that was a trap. The models reading it —
+// Kocifaj (2007) Eq. 36, and the transfer in this package — use it as the
+// scale height H of an exponential profile, exp(-h/H). A meteorologist's
+// boundary-layer height is the depth of the mixing layer, which over land at
+// night is typically 100 to 500 m, while the aerosol scale height these
+// models assume is one to two kilometres: Kocifaj's own runs take
+// beta = 0.65 km^-1, so H = 1538 m.
+//
+// A caller who looked up their site's nocturnal boundary layer and typed it
+// in was right by the name and wrong by the model, changing the answer
+// materially with nothing to say so. The name now states which quantity it
+// is.
+func (b *Builder) AerosolScaleHeight(m float64) *Builder {
+	b.s.aerosol.ScaleHeight = unit.AltitudeM(m)
 	return b
 }
 

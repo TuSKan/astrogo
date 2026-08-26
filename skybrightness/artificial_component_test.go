@@ -58,7 +58,7 @@ func artificialScene(t *testing.T) *skybrightness.Scene {
 	atm, err := atmosphere.NewBuilder().
 		Surface(743, 284).
 		Aerosol(0.05, 550, 1.3, 0.9, 0.7).
-		BoundaryLayer(1500).
+		AerosolScaleHeight(1500).
 		Build()
 	if err != nil {
 		t.Fatalf("atmosphere Build: %v", err)
@@ -431,7 +431,7 @@ func BenchmarkArtificialSkyglow(b *testing.B) {
 	atm, err := atmosphere.NewBuilder().
 		Surface(743, 284).
 		Aerosol(0.05, 550, 1.3, 0.9, 0.7).
-		BoundaryLayer(1500).
+		AerosolScaleHeight(1500).
 		Build()
 	if err != nil {
 		b.Fatal(err)
@@ -501,7 +501,7 @@ func TestArtificialSkyglowPhaseWeighting(t *testing.T) {
 	atm, err := atmosphere.NewBuilder().
 		Surface(743, 284).
 		Aerosol(0, 550, 1.3, 0.9, 0.7). // molecular atmosphere only
-		BoundaryLayer(1500).
+		AerosolScaleHeight(1500).
 		Build()
 	if err != nil {
 		t.Fatalf("atmosphere Build: %v", err)

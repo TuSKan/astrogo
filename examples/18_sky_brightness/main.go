@@ -1,8 +1,7 @@
 // How dark is the sky here tonight?
 //
-// Predicts the night-sky surface brightness at a site, in mag/arcsec^2, and
-// prints it from the zenith down to the horizon along with the breakdown that
-// produced it.
+// Predicts the night-sky surface brightness at a site, in mag/arcsec^2, from
+// the zenith down toward the horizon, and says what the sky is made of.
 //
 // Run it:
 //
@@ -22,22 +21,23 @@ import (
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
-	eph "github.com/TuSKan/astrogo/ephemeris"
-	"github.com/TuSKan/astrogo/magnitude"
 	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/skybrightness"
 	"github.com/TuSKan/astrogo/skybrightness/dataset"
 )
 
 // The preset to run. GAMBONSWeb reproduces the GAMBONS web service: the five
-// natural components of a moonless night under a simplified transfer, which is
-// the cheapest of the four and the one with a published number to check
+// natural components of a moonless night under a simplified transfer, which
+// is the cheapest of the four and the one with a published number to check
 // against.
 //
 // NaturalSky is the same physics at Duriscoe's transfer factor. GAMBONSFull
 // runs the full scattering integral and costs about a thousand times more per
 // direction. Observatory adds moonlight and artificial skyglow, and needs a
 // ground-emitter inventory this example does not build.
+//
+// Nothing else here changes when this does: the preset carries its own
+// transfer, fidelity, passband and grid, and dataset.Sky applies them.
 const preset = skybrightness.GAMBONSWeb
 
 func main() {
@@ -51,51 +51,49 @@ func main() {
 	}
 
 	// A moonless night. GAMBONSWeb has no moonlight term at all, so the date
-	// only matters here through the zodiacal light's solar elongation.
+	// matters here only through the zodiacal light's solar elongation.
 	when := time.Date(2026, 3, 20, 5, 0, 0, 0, time.UTC)
 
-	// Consent, granted explicitly and only for what this needs. Nothing in
-	// astrogo downloads a file without it.
+	// Consent, granted explicitly and only for what this preset fetches.
+	// Nothing in astrogo downloads a file without it.
 	ids, size := dataset.Endpoints(preset)
 	remote.EnableDownloads(size, ids...)
 
 	fmt.Println("Fetching reference data (first run downloads ~145 MB)...")
 
-	in, err := dataset.Inputs(ctx, dataset.Spec{Preset: preset, Site: site})
+	sky, err := dataset.Open(ctx, dataset.Spec{Preset: preset, Site: site})
 	if err != nil {
-		log.Fatalf("inputs: %v", err)
+		log.Fatalf("open: %v", err)
 	}
 
-	model, err := skybrightness.NewPreset(preset, in)
-	if err != nil {
-		log.Fatalf("model: %v", err)
-	}
+	// The night's own air. Two numbers, both knowable: the aerosol scale
+	// height, and how much aerosol is overhead.
+	//
+	// The optical properties that go with "rural" — single-scattering albedo,
+	// asymmetry, Angstrom exponent — come from OPAC (Hess, Koepke & Schult
+	// 1998) rather than from this file. The optical depth cannot: it is how
+	// much aerosol is above this site tonight, and varies by an order of
+	// magnitude across a year. CleanMountainAOD550 is a stated starting point
+	// for a high dry site; cams.AOD550 fetches the real figure for a place and
+	// an hour.
+	air := atmosphere.RuralAerosol(1538, atmosphere.CleanMountainAOD550).
+		SurfaceAtAltitude(site.Height())
 
-	scene, err := buildScene(site, when)
+	scene, err := sky.Scene(site, when, air)
 	if err != nil {
 		log.Fatalf("scene: %v", err)
 	}
 
-	fidelity, err := preset.Fidelity()
-	if err != nil {
-		log.Fatalf("fidelity: %v", err)
-	}
-
 	fmt.Printf("\n%s at Cerro Paranal, %s UTC\n\n", preset, when.Format("2006-01-02 15:04"))
-	fmt.Printf("  %-10s  %-18s\n", "altitude", "sky brightness")
+	fmt.Printf("  %-9s  %s\n", "altitude", "sky brightness")
 
 	for _, altDeg := range []float64{90, 60, 30, 15} {
-		est, err := model.Estimate(ctx, skybrightness.Query{
-			Scene:     scene,
-			Direction: coord.NewAltAz(angle.Deg(altDeg), angle.Deg(0)),
-			Grid:      in.Grid,
-			Fidelity:  fidelity,
-		})
+		est, err := sky.Direction(ctx, scene, angle.Deg(altDeg), angle.Deg(0))
 		if err != nil {
 			log.Fatalf("estimate at %g degrees: %v", altDeg, err)
 		}
 
-		sb, err := est.SurfaceBrightness(in.Band, magnitude.Vega)
+		sb, err := sky.SurfaceBrightness(est)
 		if err != nil {
 			log.Fatalf("surface brightness: %v", err)
 		}
@@ -103,7 +101,7 @@ func main() {
 		fmt.Printf("  %6.0f°     %6.2f mag/arcsec²\n", altDeg, sb)
 
 		if altDeg == 90 {
-			breakdown(est, in)
+			composition(sky, est)
 		}
 	}
 
@@ -114,70 +112,22 @@ func main() {
 	fmt.Println("only knew about airmass would miss most of what is going on.")
 }
 
-// buildScene assembles the physical state the model evaluates under.
+// composition prints what the zenith sky is made of.
 //
-// The atmosphere carries the preset's own transfer factor and scattering
-// order. Those are not decoration: a scene that disagrees with the preset it
-// is evaluated against is a different model wearing the same name, and
-// Estimate rejects it rather than returning a plausible number.
-func buildScene(site *coord.Geodetic, when time.Time) (*skybrightness.Scene, error) {
-	kappa, err := preset.DiffuseKappa()
+// Worth seeing once: the total is a sum in linear radiance, so the shares add
+// to one while the magnitudes beside them do not add to anything. Which term
+// leads changes with where you point and how dark the site is.
+func composition(sky *dataset.Sky, est *skybrightness.Estimate) {
+	rows, err := sky.Composition(est)
 	if err != nil {
-		return nil, fmt.Errorf("preset kappa: %w", err)
+		log.Fatalf("composition: %v", err)
 	}
 
-	multiple, err := preset.MultipleScattering()
-	if err != nil {
-		return nil, fmt.Errorf("preset scattering order: %w", err)
-	}
+	fmt.Println()
 
-	air, err := atmosphere.NewBuilder().
-		Surface(743, 284).                   // hPa, K
-		Aerosol(0.02, 550, 1.3, 0.95, 0.65). // a clean, dry night
-		BoundaryLayer(1500).                 // metres
-		DiffuseScattering(kappa).
-		MultipleScattering(multiple).
-		Build()
-	if err != nil {
-		return nil, fmt.Errorf("atmosphere: %w", err)
-	}
-
-	return &skybrightness.Scene{
-		Observer:   site,
-		Time:       when,
-		Atmosphere: air,
-		Ephemeris:  eph.Default(),
-	}, nil
-}
-
-// breakdown prints what each component contributed at 550 nm.
-//
-// Worth seeing once: the total is a sum in linear radiance, and which term
-// dominates changes with where you point and how dark the site is. At a good
-// site on a moonless night airglow and zodiacal light lead, and starlight
-// carries the structure.
-func breakdown(est *skybrightness.Estimate, in skybrightness.PresetInputs) {
-	const nm550 = 550
-
-	idx := 0
-
-	for i := range in.Grid.Len() {
-		if float64(in.Grid.At(i)) >= nm550 {
-			idx = i
-
-			break
-		}
-	}
-
-	fmt.Println("\n             at 550 nm, W m^-2 sr^-1 nm^-1:")
-
-	for _, id := range est.ComponentIDs() {
-		spec, ok := est.Component(id)
-		if !ok {
-			continue
-		}
-
-		fmt.Printf("               %-20s %.3e\n", id, spec[idx])
+	for _, r := range rows {
+		fmt.Printf("      %-20s %6.2f  %5.1f%%\n",
+			r.Component, r.Brightness, 100*r.Fraction)
 	}
 
 	fmt.Println()

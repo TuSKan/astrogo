@@ -81,7 +81,7 @@ func TestEq11AgainstTheTable2Ratio(t *testing.T) {
 		atm, err := atmosphere.NewBuilder().
 			Surface(1013, 288).
 			Aerosol(table2AOD550, 550, table2Angstrom, table2AerosolW, table2Asym).
-			BoundaryLayer(1000).
+			AerosolScaleHeight(1000).
 			DiffuseScattering(kappa).
 			Build()
 		if err != nil {

@@ -394,9 +394,9 @@ func (a *ArtificialSkyglow) resolveSource(
 	pressure, _ := scene.Atmosphere.Surface()
 	aerosol := scene.Atmosphere.Aerosol()
 
-	aerosolScaleHeight := float64(aerosol.BoundaryLayerHeight)
+	aerosolScaleHeight := float64(aerosol.ScaleHeight)
 	if aerosolScaleHeight <= 0 {
-		return zero, 0, fmt.Errorf("%w: the atmosphere has no aerosol boundary-layer height",
+		return zero, 0, fmt.Errorf("%w: the atmosphere has no aerosol scale height",
 			ErrScaleHeight)
 	}
 

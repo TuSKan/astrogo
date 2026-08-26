@@ -307,7 +307,7 @@ func gambonsScene(t *testing.T) *skybrightness.Scene {
 	atm, err := atmosphere.NewBuilder().
 		Surface(1013, 293).
 		Aerosol(gambonsAOD550, 550, 1.3, 0.95, 0.65).
-		BoundaryLayer(1000).
+		AerosolScaleHeight(1000).
 		DiffuseScattering(kappa).
 		Build()
 	if err != nil {

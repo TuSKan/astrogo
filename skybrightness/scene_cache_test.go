@@ -21,7 +21,7 @@ func sceneWithPressure(t *testing.T, loc *coord.Geodetic, hPa, kelvin float64) *
 	atm, err := atmosphere.NewBuilder().
 		Surface(hPa, kelvin).
 		Aerosol(0.02, 550, 1.3, 0.95, 0.65).
-		BoundaryLayer(1500).
+		AerosolScaleHeight(1500).
 		Build()
 	if err != nil {
 		t.Fatalf("atmosphere Build: %v", err)

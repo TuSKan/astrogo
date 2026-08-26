@@ -63,7 +63,7 @@ func TestAgainstGAMBONSTable2AcrossBands(t *testing.T) {
 	atm, err := atmosphere.NewBuilder().
 		Surface(1013, 288).
 		Aerosol(table2AOD550, 550, table2Angstrom, table2AerosolW, table2Asym).
-		BoundaryLayer(1000).
+		AerosolScaleHeight(1000).
 		Build()
 	if err != nil {
 		t.Fatalf("atmosphere Build: %v", err)

@@ -51,6 +51,45 @@ const (
 	maritimeCleanAngstrom = 0.08
 )
 
+// Indicative aerosol optical depths at 550 nm, one per broad regime.
+//
+// # What these are, and what they are not
+//
+// They are starting points, not measurements, and they are not from OPAC.
+// OPAC (Hess, Koepke & Schult 1998) supplies the aerosol *optical properties*
+// the constructors below carry — single-scattering albedo, asymmetry
+// parameter, Angstrom exponent — which are properties of an aerosol type and
+// are legitimately constant for it. Optical depth is not: it is how much of
+// that aerosol is overhead right now, it varies by an order of magnitude at
+// one site across a year, and this package's own doc says so.
+//
+// So these exist for one purpose: to stop a caller inventing a number when
+// they have none. A value typed from nowhere is indistinguishable from a
+// measurement once it is in the code, and these at least carry their status
+// in the name. Anyone who needs the real figure should fetch it — see
+// [github.com/TuSKan/astrogo/atmosphere/dataset/cams.AOD550], which reads the
+// Copernicus analysis for a site and an hour — or take it from an AERONET
+// station.
+//
+// The ranges in each comment are the spread a regime plausibly covers; the
+// constant is a representative value within it.
+const (
+	// CleanMountainAOD550 is a high, dry, remote site — the cleanest air
+	// routinely observed. Roughly 0.02 to 0.05. Paranal and Mauna Kea sit
+	// here, and so does a polar site.
+	CleanMountainAOD550 = 0.03
+
+	// ContinentalAOD550 is ordinary inland background air away from cities.
+	// Roughly 0.05 to 0.15, and the value most temperate rural sites spend
+	// most nights near.
+	ContinentalAOD550 = 0.10
+
+	// UrbanAOD550 is a city or its outskirts. Roughly 0.2 to 0.5, higher
+	// under an inversion or downwind of industry, and the regime where the
+	// aerosol term dominates the sky rather than merely contributing to it.
+	UrbanAOD550 = 0.30
+)
+
 // RuralAerosol seeds a Builder with OPAC's "Continental average" aerosol
 // type (Hess, Koepke & Schult 1998) — background continental aerosol
 // away from major urban or desert sources, the OPAC analogue of the

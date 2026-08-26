@@ -718,7 +718,7 @@ func TestMultipleScatteringBrightensOnlyTheScatteredTerm(t *testing.T) {
 		atm, err := atmosphere.NewBuilder().
 			Surface(743, 284).
 			Aerosol(0.02, 550, 1.3, 0.95, 0.65).
-			BoundaryLayer(1500).
+			AerosolScaleHeight(1500).
 			DiffuseScattering(1).
 			MultipleScattering(multiple).
 			Build()

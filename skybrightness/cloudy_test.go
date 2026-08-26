@@ -32,7 +32,7 @@ func cloudyCity(tb testing.TB, bearingDeg, distanceKM float64) *skybrightness.Un
 // aerosol of Kocifaj (2007) §3: a reference AOD of 0.4 at 500 nm, Angstrom
 // 1.3, single-scattering albedo 0.85 and asymmetry 0.65.
 //
-// The boundary-layer height is 1538 m, which is 1/beta for the paper's
+// The aerosol scale height is 1538 m, which is 1/beta for the paper's
 // beta = 0.65 km^-1 — the same profile written the way this package
 // parameterises it.
 func cloudyScene(tb testing.TB, baseM, albedo float64) *skybrightness.Scene {
@@ -41,7 +41,7 @@ func cloudyScene(tb testing.TB, baseM, albedo float64) *skybrightness.Scene {
 	b := atmosphere.NewBuilder().
 		Surface(1013, 288).
 		Aerosol(0.4, 500, 1.3, 0.85, 0.65).
-		BoundaryLayer(1538)
+		AerosolScaleHeight(1538)
 
 	if baseM > 0 {
 		b = b.AddCloud(atmosphere.CloudLayer{
@@ -317,7 +317,7 @@ func TestTwoCloudLayersAreRefused(t *testing.T) {
 	air, err := atmosphere.NewBuilder().
 		Surface(1013, 288).
 		Aerosol(0.4, 500, 1.3, 0.85, 0.65).
-		BoundaryLayer(1538).
+		AerosolScaleHeight(1538).
 		AddCloud(atmosphere.CloudLayer{Fraction: 0.5, BaseAlt: 1000, TopAlt: 1500, Albedo: 0.6}).
 		AddCloud(atmosphere.CloudLayer{Fraction: 0.5, BaseAlt: 4000, TopAlt: 4500, Albedo: 0.6}).
 		Build()
@@ -345,7 +345,7 @@ func withCloudFraction(tb testing.TB, baseM, albedo, fraction float64) *atmosphe
 	air, err := atmosphere.NewBuilder().
 		Surface(1013, 288).
 		Aerosol(0.4, 500, 1.3, 0.85, 0.65).
-		BoundaryLayer(1538).
+		AerosolScaleHeight(1538).
 		AddCloud(atmosphere.CloudLayer{
 			Fraction:     unit.CloudFraction(fraction),
 			BaseAlt:      unit.AltitudeM(baseM),

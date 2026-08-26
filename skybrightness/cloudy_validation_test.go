@@ -75,7 +75,7 @@ func zilinaScene(tb testing.TB, cover float64) *skybrightness.Scene {
 	b := atmosphere.NewBuilder().
 		Surface(1013, 288).
 		Aerosol(zilinaAOD, 500, 1.3, 0.90, 0.65).
-		BoundaryLayer(1538)
+		AerosolScaleHeight(1538)
 
 	if cover > 0 {
 		b = b.AddCloud(atmosphere.CloudLayer{

@@ -27,7 +27,7 @@ func auditScene(t *testing.T) *skybrightness.Scene {
 	atm, err := atmosphere.NewBuilder().
 		Surface(743, 284).
 		Aerosol(0.02, 550, 1.3, 0.95, 0.65).
-		BoundaryLayer(1500).
+		AerosolScaleHeight(1500).
 		Build()
 	if err != nil {
 		t.Fatalf("atmosphere Build: %v", err)

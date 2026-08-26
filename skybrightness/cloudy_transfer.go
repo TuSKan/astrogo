@@ -36,9 +36,9 @@ func newSkyglowOptics(grid unit.SpectralGrid, scene *Scene) (*skyglowOptics, err
 	pressure, _ := scene.Atmosphere.Surface()
 	aer := scene.Atmosphere.Aerosol()
 
-	aerosolScale := float64(aer.BoundaryLayerHeight)
+	aerosolScale := float64(aer.ScaleHeight)
 	if aerosolScale <= 0 {
-		return nil, fmt.Errorf("%w: the atmosphere has no aerosol boundary-layer height",
+		return nil, fmt.Errorf("%w: the atmosphere has no aerosol scale height",
 			ErrScaleHeight)
 	}
 
