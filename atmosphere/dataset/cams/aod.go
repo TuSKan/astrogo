@@ -14,6 +14,22 @@ import (
 // ErrAOD reports that an aerosol optical depth could not be resolved.
 var ErrAOD = errors.New("cams: aerosol optical depth")
 
+// RegistrationAdvice is appended to a failed fetch, because by far the most
+// likely cause is that the caller has no Copernicus account yet.
+//
+// The account is free and self-service, and it has to be the caller's own:
+// credentials are per-user, sharing them breaches the terms they were issued
+// under, and anything done with a shared key traces back to whoever
+// registered it. So the useful thing to hand somebody here is the URL, not a
+// key.
+const RegistrationAdvice = "Reaching Copernicus needs your own credentials, which are free:\n" +
+	"  1. register at https://dataspace.copernicus.eu\n" +
+	"  2. create S3 credentials in the dashboard\n" +
+	"  3. export them as AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY, which the\n" +
+	"     AWS default chain resolves; astrogo reads no credential file of its own\n" +
+	"  4. blank-import github.com/TuSKan/astrogo/remote/s3, and grant\n" +
+	"     remote.EnableDownloads for remote.CopernicusEODATA"
+
 // AODVariable is the CAMS variable this reads: "Total Aerosol Optical Depth
 // at 550nm", summed over every aerosol species the model carries.
 //
@@ -70,7 +86,7 @@ func AOD550(ctx context.Context, site *coord.Geodetic, when time.Time) (float64,
 
 	bucket, key, err := remote.GetFile(ctx, remote.CopernicusEODATA, AODKey(when))
 	if err != nil {
-		return 0, fmt.Errorf("%w: %w", ErrAOD, err)
+		return 0, fmt.Errorf("%w: %w\n\n%s", ErrAOD, err, RegistrationAdvice)
 	}
 
 	f, err := Open(ctx, bucket, key)
