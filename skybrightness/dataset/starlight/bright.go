@@ -57,6 +57,11 @@ type BrightStar struct {
 	// is a step in building Mag rather than part of what a star is.
 	vMinusI    float64
 	hasVminusI bool
+
+	// pmRA and pmDec are the proper motion in milliarcseconds a year, carried
+	// so a position at the Hipparcos epoch can be brought to the epoch of
+	// whatever it is being matched against.
+	pmRA, pmDec float64
 }
 
 // magnitudeIn returns the star's magnitude in a band, and whether it has one.

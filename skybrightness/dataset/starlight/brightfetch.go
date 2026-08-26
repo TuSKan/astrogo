@@ -38,18 +38,38 @@ const (
 	BrightStarMatchRadius = angle.Angle(5 * math.Pi / 180 / 3600)
 
 	// BrightStarCatalogueRadius is the tolerance for matching a bright star to
-	// the Bright Star Catalogue, thirty arcseconds.
+	// the Bright Star Catalogue, ten arcseconds.
 	//
-	// Six times the Gaia radius, and it can afford to be. That match decides
-	// whether Gaia saw a star at all, where a false positive silently drops a
-	// star from the map; this one only attaches a colour index, the catalogue
-	// holds about 9,100 stars over the whole sky — one per four square
-	// degrees — so a window this size almost never contains two, and the
-	// nearest is unambiguous. The slack also absorbs the eight and three
-	// quarter years of proper motion between the Hipparcos epoch and J2000
-	// without propagating it: over that span even Sirius moves about eleven
-	// arcseconds.
-	BrightStarCatalogueRadius = angle.Angle(30 * math.Pi / 180 / 3600)
+	// Twice the Gaia radius rather than six times, because the two matches
+	// answer different questions. That one decides whether Gaia saw a star at
+	// all, where a false positive silently drops it from the map; this one
+	// only attaches a colour index, and the catalogue holds about 9,100 stars
+	// over the whole sky, so a window this size almost never contains two.
+	//
+	// It was thirty arcseconds, on the reasoning that the slack would absorb
+	// the proper motion between the Hipparcos epoch and J2000 without having
+	// to propagate it. That was wrong, and Alpha Centauri A is where it showed:
+	// at 3.7 arcseconds a year it moves 32 in that interval and fell outside,
+	// so the fourth brightest star in the sky got no R magnitude. Widening
+	// further would have been worse than useless - Alpha Centauri A and B sit
+	// 1.4 arcseconds apart in the catalogue, so a radius large enough to
+	// recover the star is large enough to take the wrong component of the
+	// binary, and picking the nearer would have been luck rather than
+	// correctness. The positions are propagated now, and the radius is what a
+	// position match needs rather than what an unpropagated one needs.
+	BrightStarCatalogueRadius = angle.Angle(10 * math.Pi / 180 / 3600)
+
+	// BrightStarMagnitudeTolerance is how far a candidate's V may sit from the
+	// star's before it is taken to be a different object.
+	//
+	// Both catalogues give Johnson V for the same stars, and the two
+	// populations are well separated: a genuine match agrees to a few
+	// hundredths, while the three multiples in this set where Hipparcos
+	// reports combined light and the Bright Star Catalogue reports a component
+	// differ by 0.60, 0.62 and 0.61. Half a magnitude sits between those, wide
+	// enough to survive real scatter and variability and narrow enough to
+	// refuse a companion.
+	BrightStarMagnitudeTolerance = 0.5
 )
 
 // FetchBrightStars returns the Hipparcos stars Gaia has no counterpart for,
@@ -181,6 +201,8 @@ func parseHipparcos(r io.Reader) ([]BrightStar, []float64, []float64, error) {
 			star.Mag["I"] = v - vi
 			star.vMinusI, star.hasVminusI = vi, true
 		}
+
+		star.pmRA, star.pmDec = pra, pde
 
 		stars = append(stars, star)
 		pmRA = append(pmRA, pra)
@@ -396,8 +418,26 @@ func sexagesimal(s string, isHours bool) (angle.Angle, bool) {
 // which even Sirius, among the fastest bright stars, moves about eleven
 // arcseconds.
 //
-// A star the catalogue does not cover keeps no R entry, and [AddBrightStars]
-// then contributes it to every other band and not to R.
+// # What it does not match, and why that is right
+//
+// Of 74 stars, 66 get an R. Every gap is accounted for:
+//
+//   - Four have a null R-I in the Bright Star Catalogue - Acrux, Beta
+//     Centauri and two others. There is no value to take.
+//   - One is not in the catalogue at all: HIP 39827 at V = 6.77, past its
+//     completeness near 6.5.
+//   - Three are multiples where the two catalogues report different things.
+//     Hipparcos gives the combined light of Gamma Leonis, Xi Ursae Majoris
+//     and Xi Scorpii while the Bright Star Catalogue lists their components
+//     separately, so the candidate carrying R-I is fainter by 0.60, 0.62 and
+//     0.61 magnitudes. That is not measurement scatter, it is the difference
+//     between a pair and one of its stars, and attaching one component's
+//     colour to the pair's magnitude would be inventing a number rather than
+//     reading one.
+//
+// A star with no match keeps no R entry, and [AddBrightStars] then contributes
+// it to every other band and not to R - so the R map is short by exactly those
+// stars rather than carrying colours that belong to something else.
 func AddCousinsR(ctx context.Context, stars []BrightStar) (matched int, err error) {
 	var wanted int
 
@@ -423,7 +463,7 @@ func AddCousinsR(ctx context.Context, stars []BrightStar) (matched int, err erro
 	// The whole catalogue is nine thousand rows of three columns. The
 	// alternative is a positional disjunction over every star we hold, which
 	// is a longer query than the answer.
-	adql := fmt.Sprintf("SELECT RAJ2000, DEJ2000, %cR-I%c FROM %cV/50/catalog%c "+
+	adql := fmt.Sprintf("SELECT RAJ2000, DEJ2000, Vmag, %cR-I%c FROM %cV/50/catalog%c "+
 		"WHERE %cR-I%c IS NOT NULL", '"', '"', '"', '"', '"', '"')
 
 	body, err := client.PostForm(ctx, remote.VizieR, "", tapForm(adql))
@@ -440,6 +480,7 @@ func AddCousinsR(ctx context.Context, stars []BrightStar) (matched int, err erro
 
 	type entry struct {
 		ra, dec angle.Angle
+		vmag    float64
 		ri      float64
 	}
 
@@ -449,18 +490,25 @@ func AddCousinsR(ctx context.Context, stars []BrightStar) (matched int, err erro
 		ra, okRA := numField(index, row, "raj2000")
 		dec, okDec := numField(index, row, "dej2000")
 
+		vmag, okV := numField(index, row, "vmag")
+
 		ri, okRI := numField(index, row, "r-i")
-		if !okRA || !okDec || !okRI {
+		if !okRA || !okDec || !okRI || !okV {
 			continue
 		}
 
-		catalogue = append(catalogue, entry{angle.Deg(ra), angle.Deg(dec), ri})
+		catalogue = append(catalogue, entry{angle.Deg(ra), angle.Deg(dec), vmag, ri})
 	}
 
 	if len(catalogue) == 0 {
 		return 0, fmt.Errorf("%w: the bright star catalogue returned no usable rows",
 			ErrBrightStar)
 	}
+
+	// Hipparcos catalogues at J1991.25 and the Bright Star Catalogue gives
+	// J2000 positions, so a star has moved by eight and three quarter years of
+	// proper motion between them.
+	const epochGap = 2000.0 - 1991.25
 
 	for i := range stars {
 		s := &stars[i]
@@ -469,16 +517,44 @@ func AddCousinsR(ctx context.Context, stars []BrightStar) (matched int, err erro
 			continue
 		}
 
-		here := coord.NewICRS(s.RA, s.Dec)
-		best, found := -1, angle.Angle(math.Inf(1))
+		ra, dec := propagate(s.RA, s.Dec, s.pmRA, s.pmDec, epochGap)
+		here := coord.NewICRS(ra, dec)
+
+		// Brightness decides, not distance. Both are needed: position finds
+		// the candidates and magnitude says which of them is this star.
+		//
+		// Alpha Centauri is why. Its two components sit 1.4 arcseconds apart
+		// in the catalogue while the residual after propagating a position
+		// through eight and three quarter years is about six - the catalogue
+		// quantises its coordinates, and the pair orbits each other besides -
+		// so the nearer of the two was B by two hundredths of an arcsecond.
+		// A coin flip, and it landed on the wrong star: R-I of 0.30 rather
+		// than 0.22, which is the fourth brightest star in the sky given the
+		// colour of its companion.
+		//
+		// V separates them without ambiguity, -0.01 against 1.33, and it is a
+		// property of the star rather than of how well two catalogues agree
+		// about where it is.
+		best, bestDelta := -1, math.Inf(1)
+		bestSep := angle.Angle(math.Inf(1))
 
 		for j, c := range catalogue {
-			if d := coord.Separation(here, coord.NewICRS(c.ra, c.dec)); d < found {
-				best, found = j, d
+			d := coord.Separation(here, coord.NewICRS(c.ra, c.dec))
+			if d > BrightStarCatalogueRadius {
+				continue
+			}
+
+			delta := math.Abs(c.vmag - s.Vmag)
+			if delta < bestDelta || (delta == bestDelta && d < bestSep) {
+				best, bestDelta, bestSep = j, delta, d
 			}
 		}
 
-		if best < 0 || found > BrightStarCatalogueRadius {
+		// A candidate whose brightness does not agree is a neighbour, not this
+		// star. Half a magnitude is far wider than the two catalogues disagree
+		// for the same object and far narrower than the gap between a star and
+		// anything else close enough to be a candidate.
+		if best < 0 || bestDelta > BrightStarMagnitudeTolerance {
 			continue
 		}
 
