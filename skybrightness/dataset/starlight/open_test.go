@@ -95,7 +95,17 @@ func TestOpenFetchesAndParses(t *testing.T) {
 		t.Fatalf("SetURL: %v", err)
 	}
 
-	remote.EnableDownloads(16<<20, remote.GaiaStarMap)
+	// The budget comes from the registry rather than a literal. Consent is
+	// checked against the registered ApproxSize before any request, so a
+	// literal here is a second copy of that number that has to be kept in step
+	// with it — and when the published map grew from one band to four, it was
+	// not: this test failed on a budget it had no opinion about.
+	endpoint, ok := remote.Lookup(remote.GaiaStarMap)
+	if !ok {
+		t.Fatal("GaiaStarMap is not registered")
+	}
+
+	remote.EnableDownloads(endpoint.ApproxSize, remote.GaiaStarMap)
 	defer remote.DisableDownloads(remote.GaiaStarMap)
 
 	m, err := starlight.Open(context.Background())

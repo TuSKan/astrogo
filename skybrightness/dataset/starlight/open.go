@@ -21,30 +21,46 @@ var ErrNoPublishedMap = errors.New("starlight: the published map does not match 
 // brightest sky, so a Gaia-only map is not the total integrated starlight and a
 // file named "all" would promise what the data does not hold. This one closes
 // that gap the way GAMBONS does, with Hipparcos: 74 stars with no Gaia DR3
-// counterpart, matched positionally with proper motion propagated to J2016.0,
-// carrying 6.4 per cent of the whole-sky flux. Seventy of the 74 are brighter
-// than V = 3, which is where Gaia's limit actually sits.
+// counterpart, matched positionally with proper motion propagated to J2016.0.
+// Seventy of the 74 are brighter than V = 3, which is where Gaia's limit
+// actually sits, and they carry 9.4 per cent of the whole-sky flux in B falling
+// to 4.7 in I — relatively more in the blue, because the diffuse Gaia
+// background is the redder of the two.
 //
-// Six per cent rather than the twenty Masana et al. report, because theirs is a
-// DR2 figure: DR2 lacked a counterpart for some 35,000 Hipparcos stars and DR3
-// recovered nearly all of them. The correction shrank because the catalogue
+// Six per cent in V rather than the twenty Masana et al. report, because theirs
+// is a DR2 figure: DR2 lacked a counterpart for some 35,000 Hipparcos stars and
+// DR3 recovered nearly all of them. The correction shrank because the catalogue
 // improved, not because the physics changed.
 //
-// The name records the composition, for the same reason the order and band are
+// B, V and I hold all 74. R holds 66: four have no R-I in the Bright Star
+// Catalogue, one is fainter than its completeness limit, and three are
+// multiples where Hipparcos reports combined light while that catalogue reports
+// components, so no colour on offer belongs to the same object. Those eight are
+// absent from R rather than carrying an invented value.
+//
+// The name records the composition, for the same reason the order and bands are
 // in it: each changes the numbers, and two files that differ must never share a
 // name.
-const TotalStarlightMap = "starmap-o8-V-total.txt.gz"
+const TotalStarlightMap = "starmap-o8-BVRI-total.txt.gz"
 
 // Open fetches the published integrated-starlight map.
 //
-// One download of about five megabytes, cached afterwards and valid
-// indefinitely because the order, band and composition are all in the filename.
-// [Fetch] queries the archive for named directions and is right when a finer
-// grid or a magnitude cut is needed; [BuildFromGaia] aggregates a whole sky and
-// is heavy use of a shared service.
+// One download of about seventeen megabytes, cached afterwards and valid
+// indefinitely because the order, bands and composition are all in the
+// filename. [Fetch] queries the archive for named directions and is right when
+// a finer grid is needed; [BuildFromGaia] aggregates a whole sky and is heavy
+// use of a shared service.
 //
-// The map is HEALPix order 8 in Johnson V, matching GAMBONS' own grid — 786,432
-// pixels of 1.5979e-5 sr — so the two are directly comparable.
+// The map is HEALPix order 8 — 786,432 pixels of 1.5979e-5 sr, matching GAMBONS'
+// own grid, so the two are directly comparable — in the four Johnson-Cousins
+// bands Gaia can reach. There is no U: Gaia's bluest band starts near 330 nm
+// and the photometric documentation publishes no G-to-U relation, so a U column
+// would be a fit rather than a measurement.
+//
+// Every band comes back from one call; select one with [Map.Band]. Its V
+// reproduces the V-only map published before it to 0.08 per cent, that residual
+// being the difference between the passband service's Vega calibration and the
+// rounded literal the earlier file rested on.
 //
 // The download is consent-gated like every other bulk fetch: call
 // [remote.EnableDownloads] with [remote.GaiaStarMap] first, or this fails with
@@ -101,21 +117,43 @@ func Open(ctx context.Context) (*Map, error) {
 func (g GaiaBuild) Header() string {
 	var b strings.Builder
 
-	band := "unknown"
-	if len(g.Bands) > 0 {
-		band = g.Bands[0].Name
+	names := make([]string, 0, len(g.Bands))
+	for _, band := range g.Bands {
+		names = append(names, band.Name)
 	}
 
-	fmt.Fprintf(&b, "# bands: %s\n", band)
+	if len(names) == 0 {
+		names = append(names, "unknown")
+	}
+
+	fmt.Fprintf(&b, "# bands: %s\n", strings.Join(names, " "))
 	fmt.Fprintf(&b, "# catalogue: gaiadr3.gaia_source\n")
 	fmt.Fprintf(&b, "# grid: HEALPix order %d, NESTED, ICRS\n", g.Order)
 	fmt.Fprintf(&b, "# composition: every source Gaia observes; Gaia sees nothing brighter than G = 5\n")
 	fmt.Fprintf(&b, "# quantity: passband-averaged spectral radiance, W m^-2 sr^-1 nm^-1\n")
 
+	// Per band, because each column rests on its own colour transformation and
+	// its own zero point. A header naming only the first would describe one
+	// column and mislabel the rest, which is worse than saying nothing.
+	for _, band := range g.Bands {
+		if len(band.ColourTerm) == 0 {
+			continue
+		}
+
+		fmt.Fprintf(&b, "# colour transformation %s: G - %s polynomial in BP-RP, "+
+			"Gaia DR3 photometric documentation, Sect. 5.5.1, Table 5.9\n",
+			band.Name, band.Name)
+		// Both zero points, and the factor they combine into. The factor is
+		// what actually scales the data, and the two it came from are what let
+		// a reader check it rather than take it.
+		fmt.Fprintf(&b, "# zero points %s: Gaia DR3 G VEGAMAG %g; %s %.6g W m^-2 nm^-1\n",
+			band.Name, GaiaGZeroPoint, band.Name,
+			band.FluxToRadiance*math.Pow(10, GaiaGZeroPoint/2.5))
+		fmt.Fprintf(&b, "# flux to radiance %s: %.6e W m^-2 nm^-1 per electron per second\n",
+			band.Name, band.FluxToRadiance)
+	}
+
 	if len(g.Bands) > 0 && len(g.Bands[0].ColourTerm) > 0 {
-		fmt.Fprintf(&b, "# colour transformation: G - %s polynomial in BP-RP, "+
-			"Gaia DR3 photometric documentation, Sect. 5.5.1, Table 5.9\n", band)
-		fmt.Fprintf(&b, "# zero points: Gaia DR3 G VEGAMAG 25.6874; Johnson V 3.63e-11 W m^-2 nm^-1\n")
 		fmt.Fprintf(&b, "# colourless sources: recovered, not dropped - their G flux is scaled by "+
 			"the polynomial at the pixel's flux-weighted mean BP-RP, clamped to [-0.5, 5.0]\n")
 	}
@@ -182,29 +220,48 @@ func (m *Map) plausibleSky() error {
 
 // WriteMap writes a map in the published format, provenance header first.
 //
+// One line per pixel: the index, then one radiance per band in the order the
+// header names them. A single-band map is the same format with one column,
+// which is what the reader has always accepted.
+//
 // # Regenerating the published asset
 //
-// This is the last step of four, and the whole sequence is committed code so
-// the published file can be rebuilt rather than remembered:
+// The whole sequence is committed code, so the published file can be rebuilt
+// rather than remembered:
 //
-//	build := GaiaBuild{Order: GaiaMapOrder, Bands: []GaiaBand{GaiaJohnsonV()}}
+//	var bands []GaiaBand
+//	var curves []magnitude.Passband
 //
-//	m, _, err := BuildFromGaia(ctx, build)                  // ~787 queries
-//	stars, err := FetchBrightStars(ctx,                     // ~90 seconds
-//		BrightStarLimitV, BrightStarMatchRadius)
-//	err = AddBrightStars(m, "V", stars)
+//	for _, name := range []string{"B", "V", "R", "I"} {
+//		p, err := passband.Fetch(ctx, "Generic/Bessell."+name)
+//		band, err := GaiaJohnsonCousins(name, p)
+//		bands, curves = append(bands, band), append(curves, p)
+//	}
+//
+//	build := GaiaBuild{Order: GaiaMapOrder, Bands: bands,
+//		Endpoint: remote.GaiaAIPAsync}
+//
+//	m, _, err := BuildFromGaia(ctx, build)      // one query, about 27 minutes
+//	stars, err := FetchBrightStars(ctx, BrightStarLimitV, BrightStarMatchRadius)
+//	_, err = AddCousinsR(ctx, stars)            // R needs a second catalogue
+//
+//	for i, name := range []string{"B", "V", "R", "I"} {
+//		err = AddBrightStars(m, name, curves[i], stars)
+//	}
+//
 //	err = WriteMap(gzipWriter, build, m)
 //
-// gzip the result, name it [TotalStarlightMap], and attach it to the release
-// tag [github.com/TuSKan/astrogo/remote.GaiaStarMap] resolves against.
+// gzip the result, name it for the bands it holds, and attach it to the
+// release tag [github.com/TuSKan/astrogo/remote.GaiaStarMap] resolves against.
 //
-// [BuildFromGaia] chunks the sky into 787 paced queries because that is polite
-// to a shared service. One whole-sky query returns the same aggregate in about
-// thirteen minutes — the two were cross-checked to 5e-7 — but it needs an
-// asynchronous job, which this package does not implement; the chunked path is
-// what is reproducible from here today.
+// Against a synchronous endpoint [BuildFromGaia] chunks the sky into 787 paced
+// queries, because that is what politeness to a shared service costs when the
+// whole aggregation cannot be one request. Against an asynchronous one it is a
+// single query; the two return the same aggregate, cross-checked to 5e-7.
 func WriteMap(w io.Writer, spec GaiaBuild, m *Map) error {
-	band := spec.Bands[0].Name
+	if len(spec.Bands) == 0 {
+		return fmt.Errorf("%w: the build names no bands", ErrGaiaBand)
+	}
 
 	if _, err := io.WriteString(w, spec.Header()); err != nil {
 		return fmt.Errorf("starlight: write header: %w", err)
@@ -219,13 +276,21 @@ func WriteMap(w io.Writer, spec GaiaBuild, m *Map) error {
 		}
 	}
 
+	row := make([]string, 0, len(spec.Bands))
+
 	for pixel := range m.Grid().NumPixels() {
-		v, err := m.Pixel(band, pixel)
-		if err != nil {
-			return err
+		row = row[:0]
+
+		for _, band := range spec.Bands {
+			v, err := m.Pixel(band.Name, pixel)
+			if err != nil {
+				return err
+			}
+
+			row = append(row, fmt.Sprintf("%.6e", v))
 		}
 
-		if _, err := fmt.Fprintf(w, "%d %.6e\n", pixel, v); err != nil {
+		if _, err := fmt.Fprintf(w, "%d %s\n", pixel, strings.Join(row, " ")); err != nil {
 			return fmt.Errorf("starlight: write pixel %d: %w", pixel, err)
 		}
 	}

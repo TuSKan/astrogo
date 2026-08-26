@@ -734,12 +734,34 @@ does, and a map built with it could not be compared to any published figure — 
 the map became unvalidatable. The cut is removed entirely rather than left as an option
 nobody should reach for.
 
-The published asset is `starmap-o8-V-total.txt.gz`, matching GAMBONS' definition and its
-grid, and `Open` takes no specification because there is one map to fetch. `total` rather
-than `all`: Gaia sees nothing brighter than G = 5, so `all` would promise what the data
-does not hold, and the composition sits in the filename for the same reason the order and
-band do — each changes the numbers, and two files differing by twenty per cent must never
-share a name.
+The published asset is `starmap-o8-BVRI-total.txt.gz`, matching GAMBONS' definition and
+its grid, and `Open` takes no specification because there is one map to fetch. `total`
+rather than `all`: Gaia sees nothing brighter than G = 5, so `all` would promise what the
+data does not hold, and the composition sits in the filename for the same reason the order
+and bands do — each changes the numbers, and two files differing by twenty per cent must
+never share a name.
+
+**Four bands in one file rather than four files.** The aggregation is one query whichever
+way this goes, because the expensive part is the index scan over 1.8 billion rows and not
+the arithmetic on each one; splitting the output would mean scanning four times to produce
+what one scan already holds. On the reading side a band is a column, so a caller wanting V
+alone pays seventeen megabytes instead of six — a one-off cost, cached afterwards, against
+a component that needs more than one band the moment a colour matters. `Map.Band` selects
+one.
+
+There is no U. Gaia's bluest band starts near 330 nm and the photometric documentation
+publishes no G-to-U relation, so a U column could only be a fit dressed as a measurement.
+
+**The V column moved by 0.08 per cent when the bands went in, and the reason is worth
+recording.** `PivotWavelength` computed the photon-weighted pivot for every passband
+regardless of its detector convention, and the Bessell curves SVO publishes are
+energy-integrating. The two conventions differ by a factor of λ inside both integrals,
+which came to between 0.33 and 0.89 per cent across the five bands — small enough to look
+like calibration scatter and systematic enough not to be. It surfaced because the new map's
+V disagreed with the published V map by 0.9 per cent when the two should have agreed to
+the difference in their zero points alone; the residual after the fix is that difference,
+0.08 per cent, and it is the passband service's Vega calibration against the rounded
+3.63e-11 the earlier file transcribed.
 
 **Why the band is a constructor.** Converting Gaia G flux to Johnson V spectral flux
 density needs three published numbers from three sources: G's VEGAMAG zero point

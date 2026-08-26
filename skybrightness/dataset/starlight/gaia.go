@@ -841,14 +841,21 @@ func (g GaiaBuild) recoverColourless(b GaiaBand, rows resultRows) float64 {
 // because the Hipparcos bright-star path rests on the same literal, so the two
 // have to agree, and a V band built from it is the thing that says they do.
 func GaiaJohnsonV() GaiaBand {
-	const gZeroPoint = 25.6874 // Gaia DR3 G VEGAMAG zero point
-
 	return GaiaBand{
 		Name:           "V",
 		ColourTerm:     []float64{-0.02704, 0.01424, -0.2156, 0.01426},
-		FluxToRadiance: johnsonVZeroFlux / math.Pow(10, gZeroPoint/2.5),
+		FluxToRadiance: johnsonVZeroFlux / math.Pow(10, GaiaGZeroPoint/2.5),
 	}
 }
+
+// GaiaGZeroPoint is the Gaia DR3 G VEGAMAG zero point.
+//
+// It turns a catalogue flux in electrons per second into a magnitude, so a
+// band conversion has to undo it before applying the target band's own zero
+// point. Declared once because it appeared as a local constant in two
+// separate band constructors, and two copies of a zero point are two chances
+// for them to drift apart.
+const GaiaGZeroPoint = 25.6874
 
 // johnsonVZeroFlux is Johnson V's Vega zero point: the spectral flux density
 // of a zero-magnitude star, in W m^-2 nm^-1.
@@ -954,12 +961,10 @@ func GaiaJohnsonCousins(name string, band magnitude.Passband) (GaiaBand, error) 
 	// The Gaia DR3 G VEGAMAG zero point, which turns a catalogue flux in
 	// electrons per second into a magnitude and so has to be undone before the
 	// target band's zero point is applied.
-	const gZeroPoint = 25.6874
-
 	return GaiaBand{
 		Name:           name,
 		ColourTerm:     colour,
-		FluxToRadiance: zero / math.Pow(10, gZeroPoint/2.5),
+		FluxToRadiance: zero / math.Pow(10, GaiaGZeroPoint/2.5),
 	}, nil
 }
 

@@ -671,17 +671,17 @@ func defaultEndpoints() map[EndpointID]Endpoint {
 
 		GaiaStarMap: {
 			ID:        GaiaStarMap,
-			URL:       "https://github.com/TuSKan/astrogo/releases/download/starmap-v1/",
+			URL:       "https://github.com/TuSKan/astrogo/releases/download/starmap-v2/",
 			Kind:      KindFile,
 			Subsystem: "skybrightness/dataset/starlight",
 			Description: "Integrated starlight aggregated from Gaia DR3 onto HEALPix order 8, " +
-				"in Johnson V, Gaia DR3 extended to the bright end with Hipparcos",
-			ApproxSize:      8 << 20,
+				"in Johnson-Cousins B, V, R and I, extended to the bright end with Hipparcos",
+			ApproxSize:      24 << 20,
 			Enabled:         true,
 			DownloadTimeout: 5 * time.Minute,
 			Mutable:         false, // the cut and the order are in the filename
 			Downloadable:    true,
-			Files:           []string{"starmap-o8-V-total.txt.gz"},
+			Files:           []string{"starmap-o8-BVRI-total.txt.gz"},
 		},
 
 		CALSPEC: {
