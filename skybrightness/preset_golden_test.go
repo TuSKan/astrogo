@@ -125,28 +125,28 @@ var gambonsWebGolden = []goldenRow{
 	{90, skybrightness.Extragalactic, 1.214218783318975e-11},
 	{90, skybrightness.Zodiacal, 1.5220545545442494e-09},
 	{90, skybrightness.AirglowContinuum, 2.4318471129080736e-09},
-	{90, totalSurfaceBrightness, 21.23068203936441},
+	{90, totalSurfaceBrightness, 21.248628500932224},
 
 	{60, skybrightness.Starlight, 9.6860563353807089e-10},
 	{60, skybrightness.DiffuseGalactic, 4.1840157886856984e-11},
 	{60, skybrightness.Extragalactic, 1.2090595124461664e-11},
 	{60, skybrightness.Zodiacal, 1.826480625985605e-09},
 	{60, skybrightness.AirglowContinuum, 2.7837481071333883e-09},
-	{60, totalSurfaceBrightness, 21.097236458540106},
+	{60, totalSurfaceBrightness, 21.115182920107912},
 
 	{30, skybrightness.Starlight, 9.4639993687408995e-10},
 	{30, skybrightness.DiffuseGalactic, 4.0880954448183097e-11},
 	{30, skybrightness.Extragalactic, 1.1813413082023905e-11},
 	{30, skybrightness.Zodiacal, 1.0675872220787639e-09},
 	{30, skybrightness.AirglowContinuum, 4.5529489963254674e-09},
-	{30, totalSurfaceBrightness, 20.922476148393937},
+	{30, totalSurfaceBrightness, 20.940422609961743},
 
 	{10, skybrightness.Starlight, 8.5705815421231311e-10},
 	{10, skybrightness.DiffuseGalactic, 3.7021721997915625e-11},
 	{10, skybrightness.Extragalactic, 1.0698206557862453e-11},
 	{10, skybrightness.Zodiacal, 7.4487976873245172e-10},
 	{10, skybrightness.AirglowContinuum, 9.0478164742275109e-09},
-	{10, totalSurfaceBrightness, 20.403688174955519},
+	{10, totalSurfaceBrightness, 20.421634636523333},
 }
 
 // gambonsFullGolden is the locked output of [skybrightness.GAMBONSFull].
@@ -162,29 +162,29 @@ var gambonsFullGolden = []goldenRow{
 	{90, skybrightness.DiffuseGalactic, 4.2844393144166162e-11},
 	{90, skybrightness.Extragalactic, 1.238079005964017e-11},
 	{90, skybrightness.Zodiacal, 1.5462146488353121e-09},
-	{90, skybrightness.AirglowContinuum, 2.5788686481672765e-09},
-	{90, totalSurfaceBrightness, 21.189600937170674},
+	{90, skybrightness.AirglowContinuum, 2.5788686481672761e-09},
+	{90, totalSurfaceBrightness, 21.207547398738487},
 
 	{60, skybrightness.Starlight, 9.8960429863641313e-10},
 	{60, skybrightness.DiffuseGalactic, 4.2747222054880267e-11},
 	{60, skybrightness.Extragalactic, 1.2352710426156573e-11},
 	{60, skybrightness.Zodiacal, 1.8455650514032244e-09},
 	{60, skybrightness.AirglowContinuum, 2.9516262945475295e-09},
-	{60, totalSurfaceBrightness, 21.057612781632692},
+	{60, totalSurfaceBrightness, 21.075559243200498},
 
 	{30, skybrightness.Starlight, 9.7624049428941108e-10},
 	{30, skybrightness.DiffuseGalactic, 4.2169955451747658e-11},
 	{30, skybrightness.Extragalactic, 1.2185897079127065e-11},
 	{30, skybrightness.Zodiacal, 1.1225177167672987e-09},
 	{30, skybrightness.AirglowContinuum, 4.7739343029753323e-09},
-	{30, totalSurfaceBrightness, 20.873496398132644},
+	{30, totalSurfaceBrightness, 20.891442859700454},
 
 	{10, skybrightness.Starlight, 9.1001151633863401e-10},
 	{10, skybrightness.DiffuseGalactic, 3.9309110131218376e-11},
 	{10, skybrightness.Extragalactic, 1.135919555047209e-11},
-	{10, skybrightness.Zodiacal, 8.7347407170088074e-10},
-	{10, skybrightness.AirglowContinuum, 8.8603798273970622e-09},
-	{10, totalSurfaceBrightness, 20.405794529405075},
+	{10, skybrightness.Zodiacal, 8.7347407170088064e-10},
+	{10, skybrightness.AirglowContinuum, 8.8603798273970605e-09},
+	{10, totalSurfaceBrightness, 20.423740990972878},
 }
 
 // The GAMBONS web preset produces exactly the numbers it produced when they

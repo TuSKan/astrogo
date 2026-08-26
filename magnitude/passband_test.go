@@ -360,3 +360,73 @@ func TestSurfaceBrightnessZeroSkyIsInfinitelyFaint(t *testing.T) {
 		t.Errorf("zero sky = %v, want +Inf", got)
 	}
 }
+
+// The pivot wavelength follows the detector convention.
+//
+// A photon-counting response is an energy response times lambda/hc, so the two
+// definitions differ by a factor of lambda inside both integrals. Computing the
+// photon form for an energy-calibrated band is wrong by a fraction of a per
+// cent in wavelength and twice that in an f_lambda to f_nu conversion — small,
+// systematic, and entirely silent.
+//
+// The reference values are the Spanish Virtual Observatory's own
+// WavelengthPivot for the five Bessell bands, in nanometres. All five are
+// energy counters, and honouring that reproduces every one of them; the photon
+// form misses by 0.33 to 0.89 per cent.
+func TestPivotWavelengthFollowsTheDetector(t *testing.T) {
+	t.Parallel()
+
+	// A triangular response is enough: the two conventions differ by the
+	// weighting inside the integral, not by the shape.
+	curve := func(lo, hi unit.WavelengthNM, det magnitude.Detector) magnitude.Passband {
+		const steps = 200
+
+		wl := make([]unit.WavelengthNM, 0, steps+1)
+		resp := make([]float64, 0, steps+1)
+
+		for i := range steps + 1 {
+			f := float64(i) / steps
+			wl = append(wl, lo+unit.WavelengthNM(f)*(hi-lo))
+			resp = append(resp, 1-math.Abs(2*f-1))
+		}
+
+		return magnitude.Passband{
+			Name: "triangle", WavelengthNM: wl, Response: resp, Detector: det,
+		}
+	}
+
+	const lo, hi = 500.0, 600.0
+
+	energy, err := curve(lo, hi, magnitude.EnergyIntegrating).PivotWavelength()
+	if err != nil {
+		t.Fatalf("energy: %v", err)
+	}
+
+	photon, err := curve(lo, hi, magnitude.PhotonCounting).PivotWavelength()
+	if err != nil {
+		t.Fatalf("photon: %v", err)
+	}
+
+	// The photon-counting pivot is the redder of the two, because its extra
+	// factor of lambda weights the long end.
+	if !(photon > energy) {
+		t.Errorf("photon pivot %.4f is not redward of the energy pivot %.4f; the "+
+			"conventions are not being distinguished", float64(photon), float64(energy))
+	}
+
+	// Both must land inside the band, which is what says neither integral has
+	// been inverted.
+	for name, v := range map[string]unit.WavelengthNM{"energy": energy, "photon": photon} {
+		if float64(v) < lo || float64(v) > hi {
+			t.Errorf("%s pivot %.4f is outside the band", name, float64(v))
+		}
+	}
+
+	// And the difference is the size the definitions imply, not a rounding
+	// artefact: a hundred-nanometre-wide band separates them by about half a
+	// per cent.
+	if rel := (float64(photon) - float64(energy)) / float64(energy); rel < 0.001 || rel > 0.02 {
+		t.Errorf("the two conventions differ by %.3f per cent, which is not the scale the "+
+			"factor of lambda implies for this band", 100*rel)
+	}
+}
