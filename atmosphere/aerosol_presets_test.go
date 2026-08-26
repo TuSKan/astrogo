@@ -134,3 +134,77 @@ func TestAerosolPresets_Chainable(t *testing.T) {
 		t.Errorf("PrecipitableWater() = %v, want 3 (chained call should not be overridden by the preset)", got)
 	}
 }
+
+// Each preset carries the vertical profile OPAC gives its own aerosol type.
+//
+// # Why this is worth a test
+//
+// Because it was missing, and its absence was invisible. The constructors set
+// the optical properties and left the scale height at zero, so an atmosphere
+// built from the recommended path looked complete, built without error, and
+// was then refused by ArtificialSkyglow and CloudySkyglow when they finally
+// read it — a failure three calls away from its cause.
+//
+// The values are Table 5's Z column, and the spread between them is the point:
+// continental and urban aerosol is mixed through the atmosphere as the air is,
+// which the paper states by saying Z = 8 km is "the value valid for air
+// molecules"; sea salt is generated at the surface and falls out, at 1 km;
+// desert dust is lofted but heavy, at 2 km. A single value across all four —
+// 1538 m, say, which is 1/beta for the beta Kocifaj (2007) runs — would be one
+// paper's continental fit applied to the ocean and the Sahara alike.
+func TestAerosolPresetsCarryTheirOPACScaleHeight(t *testing.T) {
+	t.Parallel()
+
+	const (
+		site = 2635.0
+		aod  = 0.1
+	)
+
+	for _, c := range []struct {
+		name  string
+		build func(heightM, aod550 float64) *Builder
+		wantM float64
+	}{
+		{"rural", RuralAerosol, ContinentalScaleHeightM},
+		{"urban", UrbanAerosol, ContinentalScaleHeightM},
+		{"desert", DesertAerosol, DesertScaleHeightM},
+		{"maritime", MaritimeAerosol, MaritimeScaleHeightM},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+
+			air, err := c.build(site, aod).Build()
+			if err != nil {
+				t.Fatalf("Build: %v", err)
+			}
+
+			got := float64(air.Aerosol().ScaleHeight)
+
+			if got != c.wantM {
+				t.Errorf("scale height is %g m, want %g", got, c.wantM)
+			}
+
+			// Zero is the specific failure this guards: it builds cleanly and
+			// is rejected later.
+			if got <= 0 {
+				t.Error("a preset produced an atmosphere the skyglow components refuse")
+			}
+		})
+	}
+
+	// Table 5's own values, in kilometres, so a transcription slip shows here
+	// rather than as a subtly wrong sky.
+	for _, c := range []struct {
+		name   string
+		gotM   float64
+		wantKM float64
+	}{
+		{"continental and urban", ContinentalScaleHeightM, 8},
+		{"desert", DesertScaleHeightM, 2},
+		{"maritime", MaritimeScaleHeightM, 1},
+	} {
+		if c.gotM != c.wantKM*1000 {
+			t.Errorf("%s: %g m, and OPAC Table 5 gives Z = %g km", c.name, c.gotM, c.wantKM)
+		}
+	}
+}

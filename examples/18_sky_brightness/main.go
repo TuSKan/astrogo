@@ -66,9 +66,9 @@ func main() {
 		log.Fatalf("open: %v", err)
 	}
 
-	// The night's own air. The site's elevation, which sets surface pressure
-	// and temperature from the standard profile; how much aerosol is
-	// overhead; and the height over which that aerosol thins out.
+	// The night's own air: the site's elevation, which sets surface pressure
+	// and temperature from the standard profile, and how much aerosol is
+	// overhead. The vertical profile comes with the aerosol type.
 	//
 	// The optical properties that go with "rural" — single-scattering albedo,
 	// asymmetry, Angstrom exponent — come from OPAC (Hess, Koepke & Schult
@@ -78,8 +78,7 @@ func main() {
 	// for a high dry site; dataset.LiveAerosol fetches the real figure for a
 	// place and an hour from Copernicus, which is the same call with the
 	// guess taken out.
-	air := atmosphere.RuralAerosol(site.Height(), atmosphere.CleanMountainAOD550).
-		AerosolScaleHeight(1538)
+	air := atmosphere.RuralAerosol(site.Height(), atmosphere.CleanMountainAOD550)
 
 	scene, err := sky.Scene(site, when, air)
 	if err != nil {

@@ -35,8 +35,13 @@ type AerosolPreset func(heightM, aod550 float64) *atmosphere.Builder
 //
 // So this is the opt-in tier the offline presets always pointed at:
 //
-//	air, err := dataset.LiveAerosol(ctx, site, when, atmosphere.RuralAerosol, 1538)
+//	air, err := dataset.LiveAerosol(ctx, site, when, atmosphere.RuralAerosol)
 //	scene, err := sky.Scene(site, when, air)
+//
+// The preset carries its own vertical profile from OPAC's Table 5, so nothing
+// here asks for a scale height. A caller reproducing a published run that
+// used a different one chains [atmosphere.Builder.AerosolScaleHeight] onto
+// the result.
 //
 // # Why it is not a default, and cannot be
 //
@@ -54,7 +59,6 @@ func LiveAerosol(
 	site *coord.Geodetic,
 	when time.Time,
 	preset AerosolPreset,
-	scaleHeightM float64,
 ) (*atmosphere.Builder, error) {
 	if site == nil {
 		return nil, fmt.Errorf("%w: needs a site", ErrSpec)
@@ -65,17 +69,6 @@ func LiveAerosol(
 			ErrSpec)
 	}
 
-	// The scale height is required rather than defaulted, because the OPAC
-	// constructors do not set one and nothing here can source one per aerosol
-	// type. A zero would build an atmosphere that looks complete and that
-	// ArtificialSkyglow and CloudySkyglow both refuse, which is a worse
-	// failure than being asked for the number.
-	if scaleHeightM <= 0 {
-		return nil, fmt.Errorf("%w: needs an aerosol scale height in metres; the models "+
-			"reading it use one to two kilometres, and Kocifaj (2007) takes 1538 m",
-			ErrSpec)
-	}
-
 	aod, err := cams.AOD550(ctx, site, when)
 	if err != nil {
 		return nil, fmt.Errorf("dataset: live aerosol: %w", err)
@@ -83,5 +76,5 @@ func LiveAerosol(
 
 	// The site's own elevation, which is what the OPAC constructors take:
 	// they set surface conditions from the standard profile at that height.
-	return preset(site.Height(), aod).AerosolScaleHeight(scaleHeightM), nil
+	return preset(site.Height(), aod), nil
 }

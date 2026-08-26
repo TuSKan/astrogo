@@ -51,6 +51,50 @@ const (
 	maritimeCleanAngstrom = 0.08
 )
 
+// Aerosol scale heights, in metres, from OPAC's Table 5 "Height profiles of
+// all aerosol types".
+//
+// # What Z is
+//
+// The paper's Eq. 5d distributes particles as
+//
+//	N(h) = N(0) * exp(-h/Z)
+//
+// with h the altitude above ground and Z "the scale height in kilometres,
+// which describes the slope of the profile". That is the same profile
+// [Builder.AerosolScaleHeight] carries: extinction is proportional to number
+// density for a fixed size distribution, so the two share a scale height and
+// no conversion is needed.
+//
+// # Why these differ so much between types
+//
+// They are describing different physics rather than different tunings. Of
+// continental and urban aerosol the paper says Z = 8 km is "the value valid
+// for air molecules", so those types are mixed through the atmosphere exactly
+// as the air is. Sea salt is not: maritime aerosol is generated at the surface
+// and falls out quickly, giving 1 km. Desert dust sits between, lofted but
+// heavy, at 2 km.
+//
+// # What is deliberately not taken from Table 5
+//
+// Its H column, the thickness of the boundary-layer aerosol layer, and Hft,
+// the free troposphere above it. OPAC stacks up to four discrete layers;
+// [Atmosphere] carries one unbounded exponential, so only Z applies. For the
+// continental and urban types the distinction barely arises, since the free
+// troposphere carries Z = 8 km as well and the profile is continuous across
+// the boundary.
+const (
+	// ContinentalScaleHeightM is OPAC's Z for the three continental types
+	// and for Urban: 8 km, the molecular scale height.
+	ContinentalScaleHeightM = 8000
+
+	// DesertScaleHeightM is OPAC's Z for Desert: 2 km.
+	DesertScaleHeightM = 2000
+
+	// MaritimeScaleHeightM is OPAC's Z for the three maritime types: 1 km.
+	MaritimeScaleHeightM = 1000
+)
+
 // Indicative aerosol optical depths at 550 nm, one per broad regime.
 //
 // # What these are, and what they are not
@@ -101,7 +145,7 @@ const (
 // at heightM, matching StandardDefault. Chain further Builder calls
 // (PrecipitableWater, SurfaceAlbedo, Source, ...) before Build().
 func RuralAerosol(heightM, aod550 float64) *Builder {
-	return aerosolBuilder(heightM, aod550, continentalAverageSSA, continentalAverageAsymm, continentalAverageAngstrom,
+	return aerosolBuilder(heightM, aod550, continentalAverageSSA, continentalAverageAsymm, continentalAverageAngstrom, ContinentalScaleHeightM,
 		"OPAC Continental average aerosol (Hess, Koepke & Schult 1998)")
 }
 
@@ -112,7 +156,7 @@ func RuralAerosol(heightM, aod550 float64) *Builder {
 // RuralAerosol's doc comment for parameter/caveat details shared by all
 // four constructors.
 func UrbanAerosol(heightM, aod550 float64) *Builder {
-	return aerosolBuilder(heightM, aod550, urbanSSA, urbanAsymm, urbanAngstrom,
+	return aerosolBuilder(heightM, aod550, urbanSSA, urbanAsymm, urbanAngstrom, ContinentalScaleHeightM,
 		"OPAC Urban aerosol (Hess, Koepke & Schult 1998)")
 }
 
@@ -123,7 +167,7 @@ func UrbanAerosol(heightM, aod550 float64) *Builder {
 // Rural/Urban aerosol. See RuralAerosol's doc comment for parameter/
 // caveat details shared by all four constructors.
 func DesertAerosol(heightM, aod550 float64) *Builder {
-	return aerosolBuilder(heightM, aod550, desertSSA, desertAsymm, desertAngstrom,
+	return aerosolBuilder(heightM, aod550, desertSSA, desertAsymm, desertAngstrom, DesertScaleHeightM,
 		"OPAC Desert aerosol (Hess, Koepke & Schult 1998)")
 }
 
@@ -136,7 +180,7 @@ func DesertAerosol(heightM, aod550 float64) *Builder {
 // air baseline. See RuralAerosol's doc comment for parameter/caveat
 // details shared by all four constructors.
 func MaritimeAerosol(heightM, aod550 float64) *Builder {
-	return aerosolBuilder(heightM, aod550, maritimeCleanSSA, maritimeCleanAsymm, maritimeCleanAngstrom,
+	return aerosolBuilder(heightM, aod550, maritimeCleanSSA, maritimeCleanAsymm, maritimeCleanAngstrom, MaritimeScaleHeightM,
 		"OPAC Maritime clean aerosol (Hess, Koepke & Schult 1998)")
 }
 
@@ -146,9 +190,10 @@ func MaritimeAerosol(heightM, aod550 float64) *Builder {
 // aod550/550nm, and a Source provenance record naming the OPAC type.
 // FidelityPrior matches StandardDefault's own choice — a cited
 // reference/climatological value, not a live site measurement.
-func aerosolBuilder(heightM, aod550, ssa, g, angstrom float64, sourceName string) *Builder {
+func aerosolBuilder(heightM, aod550, ssa, g, angstrom, scaleHeightM float64, sourceName string) *Builder {
 	b := &Builder{s: Atmosphere{surface: AtAltitude(heightM)}}
 	b.Aerosol(aod550, aerosolRefWavelengthNM, angstrom, ssa, g)
+	b.AerosolScaleHeight(scaleHeightM)
 	b.s.provenance.Source = SourceRef{Name: sourceName, Fidelity: FidelityPrior}
 
 	return b

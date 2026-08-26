@@ -49,11 +49,6 @@ func TestOpenRefusesABadSpec(t *testing.T) {
 }
 
 // LiveAerosol refuses what it cannot honestly build, before fetching.
-//
-// The scale height is the one worth pinning: the OPAC constructors do not set
-// one, and an atmosphere carrying zero builds cleanly and is then refused by
-// ArtificialSkyglow and CloudySkyglow at evaluation. Failing here, with the
-// number named, beats failing three calls later inside a component.
 func TestLiveAerosolRefusesAnIncompleteRequest(t *testing.T) {
 	t.Parallel()
 
@@ -63,18 +58,15 @@ func TestLiveAerosolRefusesAnIncompleteRequest(t *testing.T) {
 		name   string
 		site   *coord.Geodetic
 		preset dataset.AerosolPreset
-		scale  float64
 	}{
-		{"no site", nil, atmosphere.RuralAerosol, 1538},
-		{"no preset", site, nil, 1538},
-		{"no scale height", site, atmosphere.RuralAerosol, 0},
-		{"negative scale height", site, atmosphere.RuralAerosol, -100},
+		{"no site", nil, atmosphere.RuralAerosol},
+		{"no preset", site, nil},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			t.Parallel()
 
 			_, err := dataset.LiveAerosol(context.Background(), c.site,
-				gotime.Date(2023, 1, 1, 3, 0, 0, 0, gotime.UTC), c.preset, c.scale)
+				gotime.Date(2023, 1, 1, 3, 0, 0, 0, gotime.UTC), c.preset)
 			if !errors.Is(err, dataset.ErrSpec) {
 				t.Errorf("got %v, want ErrSpec — this must fail on the request rather "+
 					"than by reaching a service", err)
@@ -130,8 +122,7 @@ func TestSceneCarriesThePresetTransfer(t *testing.T) {
 
 			// Built through Preset.Transfer, which is precisely what Sky.Scene
 			// applies; a Sky itself needs a network to exist.
-			builder, err := p.Transfer(atmosphere.RuralAerosol(site.Height(), 0.03).
-				AerosolScaleHeight(1538))
+			builder, err := p.Transfer(atmosphere.RuralAerosol(site.Height(), 0.03))
 			if err != nil {
 				t.Fatalf("Transfer: %v", err)
 			}

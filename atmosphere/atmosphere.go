@@ -443,9 +443,11 @@ func (b *Builder) PrecipitableWater(mm float64) *Builder {
 // Kocifaj (2007) Eq. 36, and the transfer in this package — use it as the
 // scale height H of an exponential profile, exp(-h/H). A meteorologist's
 // boundary-layer height is the depth of the mixing layer, which over land at
-// night is typically 100 to 500 m, while the aerosol scale height these
-// models assume is one to two kilometres: Kocifaj's own runs take
-// beta = 0.65 km^-1, so H = 1538 m.
+// night is typically 100 to 500 m, while an aerosol scale height is
+// kilometres: OPAC's Table 5 gives 8 km for continental and urban aerosol,
+// 2 km for desert dust and 1 km for sea salt, and the preset constructors
+// carry those already. Setting this by hand is for reproducing a published
+// run that used its own — Kocifaj (2007) takes beta = 0.65 km^-1, so 1538 m.
 //
 // A caller who looked up their site's nocturnal boundary layer and typed it
 // in was right by the name and wrong by the model, changing the answer

@@ -26,8 +26,7 @@ import (
 // conditions, aerosol, clouds, terrain. Those describe the night being
 // modelled and nothing here can know them.
 //
-//	air, err := preset.Transfer(atmosphere.RuralAerosol(1538, atmosphere.CleanMountainAOD550).
-//		SurfaceAtAltitude(2635))
+//	air, err := preset.Transfer(atmosphere.RuralAerosol(2635, atmosphere.CleanMountainAOD550))
 //	atm, err := air.Build()
 func (p Preset) Transfer(b *atmosphere.Builder) (*atmosphere.Builder, error) {
 	if b == nil {
