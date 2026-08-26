@@ -73,82 +73,115 @@ func newSkyglowOptics(grid unit.SpectralGrid, scene *Scene) (*skyglowOptics, err
 	return o, nil
 }
 
-// transmission returns the two-leg transmission of Kocifaj (2007) Eq. 11 at
-// one wavelength: up from the source through the slant path its zenith angle
-// implies, and down to the observer along theirs.
+// stepKernel is everything about one point on the line of sight that does not
+// depend on wavelength.
 //
-//	T(h,z,phi) = t(h,z) * t(h,z0_h)
+// # Why this exists
 //
-// with each leg Eq. 9's exp of an airmass-weighted vertical depth. The
-// airmass is Gushchin's, which is what this model lineage adopts and what
-// keeps the horizon finite where a plane-parallel secant would not.
-func (o *skyglowOptics) transmission(i int, heightM, cosObserver, cosSource float64) (float64, error) {
-	molecular, err := atmosphere.ExponentialDepth(
-		unit.AltitudeM(heightM), o.molecular[i], o.molecularScaleM)
-	if err != nil {
-		return 0, fmt.Errorf("skybrightness: cloudy skyglow: %w", err)
-	}
+// The height integral runs a spectral loop inside a height loop, and most of
+// what the inner loop was computing is constant across it. The airmass along
+// each leg depends only on a zenith angle; both phase functions depend only on
+// the scattering angle and the asymmetry; and the exponential profiles factor
+// into a wavelength-independent shape times a per-wavelength column depth,
+// because only the column varies with wavelength and the decay does not.
+//
+// Recomputing those per wavelength meant two square roots, a 1.5 power and
+// four exponentials repeated 671 times per height step for values that never
+// changed. Hoisting them leaves the inner loop with one exponential and a
+// handful of multiplies. This is the same optimisation the Eq. 11 scattering
+// kernel already carries, and it is worth repeating for the same reason: the
+// cost of this component is that inner loop and nothing else.
+type stepKernel struct {
+	// airmassSum is the total slant weighting of the two legs, up from the
+	// source and down to the observer. They share one vertical depth, so the
+	// two transmissions combine into a single exponential.
+	airmassSum float64
 
-	aerosol, err := atmosphere.ExponentialDepth(
-		unit.AltitudeM(heightM), o.aerosol[i], o.aerosolScaleM)
-	if err != nil {
-		return 0, fmt.Errorf("skybrightness: cloudy skyglow: %w", err)
-	}
+	// depthFractionM and depthFractionA are (1 - exp(-h/H)) for the two
+	// profiles: the share of each column lying below this altitude.
+	depthFractionM, depthFractionA float64
 
-	down, err := legTransmission(molecular+aerosol, cosObserver)
-	if err != nil {
-		return 0, err
-	}
+	// extinctionShapeM and extinctionShapeA are exp(-h/H)/H, the profile
+	// shape a column depth is multiplied by to give a local extinction.
+	extinctionShapeM, extinctionShapeA float64
 
-	up, err := legTransmission(molecular+aerosol, cosSource)
-	if err != nil {
-		return 0, err
-	}
-
-	return down * up, nil
+	// The two phase functions at this scattering angle, already normalised
+	// per steradian.
+	rayleighPhase, aerosolPhase float64
 }
 
-// legTransmission applies one slant leg at the given cosine of zenith angle.
-func legTransmission(vertical unit.OpticalDepth, cosZenith float64) (float64, error) {
-	if cosZenith <= 0 {
-		return 0, nil // at or below the horizon nothing gets through
+// newStepKernel evaluates the wavelength-independent terms once.
+//
+// Returned by value rather than by pointer: it is built once per height step
+// and read once per wavelength, so a pointer would put one heap allocation on
+// every step of every direction for a struct that never outlives the loop.
+func (o *skyglowOptics) newStepKernel(
+	heightM, cosObserver, cosSource, theta float64,
+) (kernel stepKernel, ok bool, err error) {
+	if cosObserver <= 0 || cosSource <= 0 {
+		return kernel, false, nil
 	}
 
-	airmass, err := atmosphere.GushchinAirmass(angle.Rad(math.Asin(math.Min(1, cosZenith))))
+	observerAir, err := legAirmass(cosObserver)
 	if err != nil {
-		return 0, fmt.Errorf("skybrightness: cloudy skyglow: %w", err)
+		return kernel, false, err
 	}
 
-	return float64(atmosphere.Transmission(vertical * unit.OpticalDepth(airmass))), nil
+	sourceAir, err := legAirmass(cosSource)
+	if err != nil {
+		return kernel, false, err
+	}
+
+	aerosolPhase, err := atmosphere.HenyeyGreensteinPhaseFunction(theta, o.asymmetry)
+	if err != nil {
+		return kernel, false, fmt.Errorf("skybrightness: cloudy skyglow: %w", err)
+	}
+
+	decayM := math.Exp(-heightM / o.molecularScaleM)
+	decayA := math.Exp(-heightM / o.aerosolScaleM)
+
+	return stepKernel{
+		airmassSum:       observerAir + sourceAir,
+		depthFractionM:   1 - decayM,
+		depthFractionA:   1 - decayA,
+		extinctionShapeM: decayM / o.molecularScaleM,
+		extinctionShapeA: decayA / o.aerosolScaleM,
+		rayleighPhase:    atmosphere.RayleighPhaseFunction(theta, atmosphere.RayleighDepolarisation),
+		aerosolPhase:     aerosolPhase,
+	}, true, nil
 }
 
-// scattering returns Psi, the angular volume scattering coefficient at a
-// height and scattering angle, at one wavelength — Kocifaj (2007) Eq. 18 with
-// the exponential profiles of its Eq. 36.
-func (o *skyglowOptics) scattering(i int, heightM, theta float64) (float64, error) {
-	molecularExt, err := atmosphere.ExponentialExtinction(
-		unit.AltitudeM(heightM), o.molecular[i], o.molecularScaleM)
+// legAirmass returns the slant weighting at a cosine of zenith angle, using
+// the airmass this model lineage adopts.
+func legAirmass(cosZenith float64) (float64, error) {
+	m, err := atmosphere.GushchinAirmass(angle.Rad(math.Asin(math.Min(1, cosZenith))))
 	if err != nil {
 		return 0, fmt.Errorf("skybrightness: cloudy skyglow: %w", err)
 	}
 
-	aerosolExt, err := atmosphere.ExponentialExtinction(
-		unit.AltitudeM(heightM), o.aerosol[i], o.aerosolScaleM)
-	if err != nil {
-		return 0, fmt.Errorf("skybrightness: cloudy skyglow: %w", err)
-	}
+	return m, nil
+}
 
-	// Scattering rather than extinction: the aerosol absorbs a share of what
-	// it removes, and only what it scatters can reach the observer. Molecular
-	// scattering is conservative.
-	psi, err := atmosphere.VolumeScatteringFunction(theta,
-		molecularExt, aerosolExt*o.aerosolAlbedo,
-		o.asymmetry, atmosphere.RayleighDepolarisation)
-	if err != nil {
-		return 0, fmt.Errorf("skybrightness: cloudy skyglow: %w", err)
-	}
+// transmission is Kocifaj (2007) Eq. 11 at one wavelength: the two legs of
+// Eq. 9 combined, since both weight the same vertical depth.
+//
+//	T = exp(-tau(0,h) * [M(z) + M(z0_h)])
+func (k stepKernel) transmission(o *skyglowOptics, i int) float64 {
+	vertical := float64(o.molecular[i])*k.depthFractionM + float64(o.aerosol[i])*k.depthFractionA
 
-	return psi, nil
+	return math.Exp(-vertical * k.airmassSum)
+}
+
+// scattering is Kocifaj (2007) Eq. 18 with the Eq. 36 profiles, at one
+// wavelength: the angular volume scattering coefficient at this point.
+//
+// The aerosol term carries the single-scattering albedo because only what it
+// scatters can reach the observer; molecular scattering is conservative.
+func (k stepKernel) scattering(o *skyglowOptics, i int) float64 {
+	molecular := float64(o.molecular[i]) * k.extinctionShapeM
+	aerosol := float64(o.aerosol[i]) * k.extinctionShapeA * o.aerosolAlbedo
+
+	return molecular*k.rayleighPhase + aerosol*k.aerosolPhase
 }
 
 // addCloudTerm accumulates the first term of Kocifaj (2007) Eq. 27: light
@@ -183,13 +216,17 @@ func (c *CloudySkyglow) addCloudTerm(
 	cos4 := cosZ0 * cosZ0 * cosZ0 * cosZ0
 	scale := 2 * math.Pi * reflectance * cos4 / (baseM * baseM)
 
-	for i := range dst {
-		t, err := optics.transmission(i, baseM, geom.cosZenith, cosZ0)
-		if err != nil {
-			return err
-		}
+	kernel, ok, err := optics.newStepKernel(baseM, geom.cosZenith, cosZ0, 0)
+	if err != nil {
+		return err
+	}
 
-		dst[i] += buf[i] * scale * t
+	if !ok {
+		return nil
+	}
+
+	for i := range dst {
+		dst[i] += buf[i] * scale * kernel.transmission(optics, i)
 	}
 
 	return nil
@@ -267,20 +304,21 @@ func (c *CloudySkyglow) accumulateStep(
 		return fmt.Errorf("skybrightness: cloudy skyglow: %w", err)
 	}
 
-	geometric := cosZ0 * cosZ0 / (h * h)
+	kernel, ok, err := optics.newStepKernel(h, geom.cosZenith, cosZ0, theta)
+	if err != nil {
+		return err
+	}
 
+	if !ok {
+		return nil
+	}
+
+	geometric := cosZ0 * cosZ0 / (h * h) * weight
+
+	// The inner loop, which is where this component's whole cost lives: one
+	// exponential and a few multiplies per wavelength.
 	for i := range dst {
-		t, err := optics.transmission(i, h, geom.cosZenith, cosZ0)
-		if err != nil {
-			return err
-		}
-
-		psi, err := optics.scattering(i, h, theta)
-		if err != nil {
-			return err
-		}
-
-		dst[i] += buf[i] * geometric * t * psi * weight
+		dst[i] += buf[i] * geometric * kernel.transmission(optics, i) * kernel.scattering(optics, i)
 	}
 
 	return nil
