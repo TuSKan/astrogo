@@ -216,12 +216,95 @@ func TestCloudlessRadianceFallsAwayFromTheSource(t *testing.T) {
 	}
 }
 
-// Fractional cover is refused rather than answered.
+// At no cloud cover the two scattering terms sum to the clear sky exactly.
 //
-// Returning the overcast result for a tenth of a sky's cover would be wrong
-// by an order of magnitude in the direction that flatters the model, so this
-// is a case where declining is the honest answer.
-func TestPartialCloudIsRefused(t *testing.T) {
+// # Why this is the strongest test here
+//
+// L_1 integrates below the cloud base and L_2 above it, over the same
+// integrand, because Kocifaj et al. (2025) Eq. 2's extra transmissions
+// compose into the one Eq. 1 already carries. At CF = 0 the weight on L_2 is
+// one and the reflection term is absent, so the pair must reproduce a single
+// integral over the whole atmosphere â€” the answer the component gives when
+// the scene has no cloud layer at all, which takes a different code path.
+//
+// Two paths, one number. A sign, a limit or a transmission wrong in either
+// would show up here as a difference, where every other test in this file
+// would still pass: they check directions and orderings, and this checks a
+// value.
+func TestCloudFractionZeroRecoversTheClearSky(t *testing.T) {
+	t.Parallel()
+
+	city := cloudyCity(t, 0, 5)
+
+	c, err := skybrightness.NewCloudySkyglow([]skybrightness.GroundEmitter{city})
+	if err != nil {
+		t.Fatalf("NewCloudySkyglow: %v", err)
+	}
+
+	// No layer at all: one integral from the ground to the top.
+	noLayer := cloudyScene(t, 0, 0)
+
+	// A layer at 1 km covering none of the sky: the integral is split at
+	// 1 km, and L_2 carries a weight of exactly one.
+	split := cloudyScene(t, 1000, 0.7)
+	split.Atmosphere = withCloudFraction(t, 1000, 0.7, 0)
+
+	for _, alt := range []float64{90, 60, 30} {
+		whole := radianceAt(t, c, noLayer, alt, 0)
+		halves := radianceAt(t, c, split, alt, 0)
+
+		if whole <= 0 {
+			t.Fatalf("at %g degrees the clear sky is %.4g", alt, whole)
+		}
+
+		// Not bit-identical: the split integral runs Simpson over two ranges
+		// where the whole one runs it over a single range, so the quadrature
+		// nodes differ. They agree to the quadrature's own accuracy.
+		if rel := math.Abs(whole-halves) / whole; rel > 5e-3 {
+			t.Errorf("at %g degrees an unsplit integral gives %.6g and one split at the "+
+				"cloud base gives %.6g, a relative difference of %.3g; at zero cover "+
+				"L_1 + L_2 is the clear sky", alt, whole, halves, rel)
+		}
+	}
+}
+
+// Cover between clear and overcast lands between their answers.
+//
+// This is what the 2025 extension buys: the sky over a city under half cover
+// is neither the clear sky nor the overcast one, and a model that could only
+// do the endpoints would have to pick the wrong one.
+func TestCloudFractionInterpolates(t *testing.T) {
+	t.Parallel()
+
+	city := cloudyCity(t, 0, 2)
+
+	c, err := skybrightness.NewCloudySkyglow([]skybrightness.GroundEmitter{city})
+	if err != nil {
+		t.Fatalf("NewCloudySkyglow: %v", err)
+	}
+
+	// The cloud fractions the 2025 paper runs.
+	var previous float64
+
+	for i, cf := range []float64{0, 0.1, 0.3, 0.5, 0.7, 0.9, 1} {
+		scene := cloudyScene(t, 1000, 0.7)
+		scene.Atmosphere = withCloudFraction(t, 1000, 0.7, cf)
+
+		got := radianceAt(t, c, scene, 90, 0)
+
+		t.Logf("CF = %.1f: %.4g", cf, got)
+
+		if i > 0 && got <= previous {
+			t.Errorf("at CF = %.1f the zenith is %.4g, not above the %.4g at the previous "+
+				"cover; over a city more cloud is more light", cf, got, previous)
+		}
+
+		previous = got
+	}
+}
+
+// A second cloud deck is refused, since neither paper solves one.
+func TestTwoCloudLayersAreRefused(t *testing.T) {
 	t.Parallel()
 
 	city := cloudyCity(t, 0, 5)
@@ -235,12 +318,8 @@ func TestPartialCloudIsRefused(t *testing.T) {
 		Surface(1013, 288).
 		Aerosol(0.4, 500, 1.3, 0.85, 0.65).
 		BoundaryLayer(1538).
-		AddCloud(atmosphere.CloudLayer{
-			Fraction: 0.5,
-			BaseAlt:  1000,
-			TopAlt:   1500,
-			Albedo:   0.6,
-		}).
+		AddCloud(atmosphere.CloudLayer{Fraction: 0.5, BaseAlt: 1000, TopAlt: 1500, Albedo: 0.6}).
+		AddCloud(atmosphere.CloudLayer{Fraction: 0.5, BaseAlt: 4000, TopAlt: 4500, Albedo: 0.6}).
 		Build()
 	if err != nil {
 		t.Fatalf("atmosphere Build: %v", err)
@@ -254,9 +333,32 @@ func TestPartialCloudIsRefused(t *testing.T) {
 
 	_, err = c.AddRadiance(t.Context(), dst, grid,
 		coord.NewAltAz(angle.Deg(90), angle.Deg(0)), scene)
-	if !errors.Is(err, skybrightness.ErrPartialCloud) {
-		t.Fatalf("got %v, want ErrPartialCloud", err)
+	if !errors.Is(err, skybrightness.ErrCloudLayers) {
+		t.Fatalf("got %v, want ErrCloudLayers", err)
 	}
+}
+
+// withCloudFraction builds an atmosphere with a deck at a stated cover.
+func withCloudFraction(tb testing.TB, baseM, albedo, fraction float64) *atmosphere.Atmosphere {
+	tb.Helper()
+
+	air, err := atmosphere.NewBuilder().
+		Surface(1013, 288).
+		Aerosol(0.4, 500, 1.3, 0.85, 0.65).
+		BoundaryLayer(1538).
+		AddCloud(atmosphere.CloudLayer{
+			Fraction:     unit.CloudFraction(fraction),
+			BaseAlt:      unit.AltitudeM(baseM),
+			TopAlt:       unit.AltitudeM(baseM + 500),
+			Albedo:       unit.SpectralAlbedo(albedo),
+			OpticalDepth: 20,
+		}).
+		Build()
+	if err != nil {
+		tb.Fatalf("atmosphere Build: %v", err)
+	}
+
+	return air
 }
 
 // The height integral has converged at the default resolution.
@@ -375,5 +477,61 @@ func TestCloudyAndClearSkyglowCannotBothBeRegistered(t *testing.T) {
 	if _, err := skybrightness.NewModel("both", cloudy, clearSky); !errors.Is(
 		err, skybrightness.ErrDuplicateComponent) {
 		t.Fatalf("a model holding both was accepted: %v", err)
+	}
+}
+
+// Cloud brightens the sky over a city and darkens it far away.
+//
+// # The acceptance criterion for this component
+//
+// Kocifaj, Falchi & Kundracik (2025) report both: above their simulated city
+// the cloud amplifies zenith radiance more than fifteenfold, and outside it
+// the same cloud screens, reducing it. The design note calls that sign
+// reversal the thing a universal cloud multiplier cannot reproduce, and it is
+// why this component exists as radiative transfer rather than a factor.
+//
+// It has to emerge from geometry alone, and it does: near the city the cloud
+// overhead is lit from almost directly below, so it returns a great deal of
+// light, while far away the same deck is lit at a grazing angle and returns
+// little — but still blocks the light that would otherwise have scattered
+// down from above it.
+func TestCloudScreensAwayFromTheCityAndAmplifiesOverIt(t *testing.T) {
+	t.Parallel()
+
+	for _, c := range []struct {
+		name       string
+		distanceKM float64
+		amplifies  bool
+	}{
+		{"over the city", 2, true},
+		{"far outside it", 60, false},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+
+			city := cloudyCity(t, 0, c.distanceKM)
+
+			comp, err := skybrightness.NewCloudySkyglow([]skybrightness.GroundEmitter{city})
+			if err != nil {
+				t.Fatalf("NewCloudySkyglow: %v", err)
+			}
+
+			clearSky := radianceAt(t, comp, cloudyScene(t, 0, 0), 90, 0)
+			overcast := radianceAt(t, comp, cloudyScene(t, 1000, 0.7), 90, 0)
+
+			ratio := overcast / clearSky
+
+			t.Logf("%s: overcast/clear = %.3f", c.name, ratio)
+
+			if c.amplifies && ratio <= 1 {
+				t.Errorf("over the city the cloud gives %.3f of the clear sky; it must amplify", ratio)
+			}
+
+			if !c.amplifies && ratio >= 1 {
+				t.Errorf("far from the city the cloud gives %.3f of the clear sky; it must "+
+					"screen, which is the half of the behaviour a cloud multiplier cannot "+
+					"produce", ratio)
+			}
+		})
 	}
 }

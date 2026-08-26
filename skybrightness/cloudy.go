@@ -12,10 +12,12 @@ import (
 
 // Sentinel errors for the cloudy-sky artificial component.
 var (
-	// ErrPartialCloud is returned for a cloud layer that covers part of the
-	// sky. See [CloudySkyglow] for why this is refused rather than
-	// approximated.
-	ErrPartialCloud = errors.New("skybrightness: fractional cloud cover is not modelled")
+	// ErrCloudLayers is returned when a scene carries more than one cloud
+	// deck, which neither published model solves.
+	ErrCloudLayers = errors.New("skybrightness: only one cloud layer is modelled")
+
+	// ErrCloudFraction is returned for a cover outside [0,1].
+	ErrCloudFraction = errors.New("skybrightness: cloud fraction must be in [0,1]")
 
 	// ErrCloudBase is returned when a cloud layer's base altitude is not
 	// above the observer.
@@ -25,16 +27,17 @@ var (
 	ErrIntegrationSteps = errors.New("skybrightness: height integration needs at least one step")
 )
 
-// DefaultCloudySteps is how finely the height integral is sampled.
+// DefaultCloudySteps is how many Simpson intervals each octave of the height
+// integral gets.
 //
-// The integrand is smooth in h but not flat: it is killed at the ground by the
-// emission function going to zero at the source's horizon, rises through the
-// layer where the line of sight passes closest to the source, and is damped
-// above by extinction. Sixty-four intervals of Simpson's rule put the
-// quadrature error well below the uncertainty in any input; the count is
-// exposed because a very close source concentrates the integrand into the
-// lowest few hundred metres.
-const DefaultCloudySteps = 64
+// Per octave, not per integral: the range is subdivided dyadically, so this
+// sets the resolution at every scale rather than one absolute spacing. Each
+// octave holds a smooth piece of the integrand, which is why so few intervals
+// suffice — measured against a city 60 km away, two per octave already give
+// 0.2 per cent and four give 0.015, so eight is comfortable margin rather
+// than a guess. A whole clear column is twenty octaves, so the default costs
+// about 160 evaluations per direction.
+const DefaultCloudySteps = 8
 
 // ClearSkyTopM is the altitude the height integral runs to when there is no
 // cloud.
@@ -47,25 +50,35 @@ const DefaultCloudySteps = 64
 // negligible over most of that range.
 const ClearSkyTopM = 100_000
 
-// CloudySkyglow is artificial skyglow under a cloud deck, after
-// Kocifaj (2007).
+// CloudySkyglow is artificial skyglow under cloud, after Kocifaj (2007) and
+// Kocifaj, Falchi & Kundracik (2025).
 //
 // # What it computes
 //
-// Kocifaj (2007) Eq. 27, the night-sky radiance from ground sources with an
-// overlying reflecting cloud layer. Radiance in one direction is the sum of
-// two physically distinct paths:
+// Radiance in one direction is three physically distinct paths, which the
+// 2025 paper writes as L = L_1 + L_2 + L_infinity:
 //
-//	L = L_cloud + L_air
+//	L_1   = (1/cos z) * INT[0,H] S(z0_h) cos^2(z0_h) [T/h^2] Psi dh
+//	L_2   = (1-CF)[1-o(z,A)] * (1/cos z) * INT[H,top] (the same integrand)
+//	L_inf = CF * 2*pi * alpha * cos^4(z0_H) * S(z0_H) * T(H,z,phi) / H^2
 //
-//	L_cloud = 2*pi * rho * cos^4(z0_H) * S(z0_H) * T(H,z,phi) / H^2
-//	L_air   = (1/cos z) * INT[0,H] S(z0_h) cos^2(z0_h) [T(h,z,phi)/h^2] Psi(h,Theta_h) dh
+// L_1 is light scattered into the line of sight by the air below the cloud,
+// L_2 the same above it, and L_infinity light that reached the cloud base and
+// reflected back down. `S` is the source term, `T` the two-leg transmission
+// (up from the source, down to the observer), `Psi` the angular volume
+// scattering coefficient at height h, `alpha` the cloud reflectance, `CF` the
+// cloud fraction and `o(z,A)` the opacity along the line of sight.
 //
-// The first is light that reached the cloud, reflected off its base and came
-// back down. The second is light scattered by the air between the ground and
-// the cloud. `S` is the source term, `T` the two-leg transmission (up from the
-// source, down to the observer), `Psi` the angular volume scattering
-// coefficient at height h, and `rho` the cloud's reflectance.
+// # Why L_2 shares an integrand with L_1
+//
+// Because the transmissions compose. Eq. 2 carries T_h->H(z) and T_0->H(z)
+// where Eq. 1 carries T_0->h(z), and the first two multiply to the third: a
+// photon scattered above the deck reaches the observer through the same total
+// column as one scattered below it. So the two terms differ only in their
+// limits and in Eq. 2's weight, and at CF = 0 they sum to the clear-sky
+// integral over the whole atmosphere exactly. That is not a coincidence to
+// rely on quietly — it is a property worth testing, and
+// TestCloudFractionZeroRecoversTheClearSky does.
 //
 // # Why this is a separate component from [ArtificialSkyglow]
 //
@@ -82,18 +95,25 @@ const ClearSkyTopM = 100_000
 // would double-count it, and which solution to use is a choice rather than a
 // combination.
 //
-// # What it does not do
+// # Where this departs from the 2025 paper
 //
-// Fractional cloud cover. Kocifaj (2007) solves the clear sky and the
-// overcast sky, and this implements both; a deck covering part of the sky is
-// the subject of Kocifaj, Falchi & Kundracik (2025), which adds an
-// above-cloud scattering term and a line-of-sight cloud opacity that have no
-// counterpart here. A layer with a fraction strictly between zero and one is
-// refused with [ErrPartialCloud] rather than evaluated as overcast, because
-// the difference is not small: over a city the 2025 paper reports overcast
-// amplifying zenith radiance more than fifteenfold, so returning the overcast
-// answer for a tenth of a sky's cover would be wrong by an order of magnitude
-// in the direction that flatters the model.
+// Two places, both because the paper states a quantity without giving a way
+// to compute it.
+//
+// It derives the line-of-sight opacity from a stochastic 3D cloud field —
+// randomised cuboids filled with cloud elements — and reads it off a ray cast
+// through one realisation. The text does not specify that generator closely
+// enough to reproduce, so [cloudDeck.opacity] takes the other route to the
+// same quantity, Beer-Lambert through a deck of stated optical depth. The
+// consequence is real and worth stating: a ray through a realised field is
+// binary per realisation, and this is the ensemble mean, so a broken sky
+// comes out as what its patchiness averages to rather than as patchiness.
+//
+// And its printed Eq. 3 carries no cloud-fraction weight, which cannot be
+// right on its own — a sky one tenth covered would return the reflection of a
+// whole deck. CF is the vertically projected area of cloud over the area of
+// the zone, so it is the share of the reflecting surface that is present, and
+// L_infinity is scaled by it here.
 type CloudySkyglow struct {
 	emitters []GroundEmitter
 	steps    int
@@ -153,13 +173,14 @@ func (c *CloudySkyglow) ID() ComponentID { return Artificial }
 // Provenance implements [Component].
 func (c *CloudySkyglow) Provenance() Provenance {
 	return Provenance{
-		Model:   "Kocifaj (2007) height-resolved artificial sky radiance with a reflecting cloud deck",
-		Version: "Eq. 27",
+		Model: "Kocifaj (2007) height-resolved artificial sky radiance, extended to a " +
+			"fractional cloud deck after Kocifaj, Falchi & Kundracik (2025)",
+		Version: "Eq. 27; 2025 Eq. 1-3",
 		PrimaryReference: "Kocifaj, M. (2007), Appl. Opt. 46, 3013: Light-pollution model " +
 			"for cloudy and cloudless night skies with ground-based light sources",
 		SecondaryReferences: []string{
 			"Kocifaj, M., Falchi, F. & Kundracik, F. (2025), PNAS 122(44) e2508001122, " +
-				"which extends this to a fractional 3D cloud field",
+				"the fractional cloud field and the above-cloud term",
 			"Garstang, R.H. (1986), PASP 98, 364 (upward emission function)",
 			"Gushchin, G.P. (1988), by way of Kocifaj & Bara (2019) (airmass)",
 			"Henyey, L.G. & Greenstein, J.L. (1941), ApJ 93, 70",
@@ -167,15 +188,21 @@ func (c *CloudySkyglow) Provenance() Provenance {
 		Equations: "Eq. 10 and the ray geometry as skyglowGeometry.atHeight; Eq. 18 with " +
 			"Eq. 36's profiles as atmosphere.VolumeScatteringFunction over " +
 			"atmosphere.ExponentialExtinction; Eq. 9/11 as the two-leg transmission; " +
-			"Eq. 27's two terms as addCloudTerm and addAirTerm",
-		ValidityDomain: "Clear sky or a single overcast deck. Ground sources at a horizontal " +
+			"Eq. 27's terms and the 2025 Eq. 2 as addCloudTerm and addAirTerm over two " +
+			"height ranges",
+		ValidityDomain: "Clear sky through overcast, one deck. Ground sources at a horizontal " +
 			"distance large enough that the source subtends little solid angle at the " +
 			"cloud, which the paper states as sqrt(4*A_0/pi) < H/10.",
 		KnownApproximations: []string{
-			"Fractional cloud cover is refused rather than approximated; it needs the " +
-				"above-cloud term and line-of-sight opacity of Kocifaj et al. (2025).",
+			"The line-of-sight opacity is Beer-Lambert through a deck of stated optical " +
+				"depth, where Kocifaj et al. (2025) ray-cast a stochastic 3D cloud " +
+				"field. This is the ensemble mean of that, so a broken sky is what its " +
+				"patchiness averages to rather than patchiness itself.",
+			"L_infinity is scaled by the cloud fraction. The 2025 paper's printed Eq. 3 " +
+				"carries no such weight, and without one a tenth-covered sky returns " +
+				"the reflection of a whole deck.",
 			"One cloud deck. A second layer would return the first's downward light " +
-				"upward again, which Eq. 27 has no term for.",
+				"upward again, which neither paper has a term for.",
 			"First scattering order, as Eq. 27 is derived. Kocifaj (2018) reports " +
 				"higher orders as marginal below 30 km.",
 			"Molecular and aerosol extinction both fall exponentially, the profiles " +
@@ -210,7 +237,7 @@ func (c *CloudySkyglow) AddRadiance(
 		return 0, nil
 	}
 
-	top, reflectance, err := c.deck(scene)
+	deck, err := c.deck(scene)
 	if err != nil {
 		return 0, err
 	}
@@ -224,7 +251,7 @@ func (c *CloudySkyglow) AddRadiance(
 			return 0, fmt.Errorf("skybrightness: cloudy skyglow: %w", err)
 		}
 
-		f, err := c.addEmitter(dst, buf, grid, dir, scene, e, top, reflectance)
+		f, err := c.addEmitter(dst, buf, grid, dir, scene, e, deck)
 		if err != nil {
 			return 0, err
 		}
@@ -237,35 +264,93 @@ func (c *CloudySkyglow) AddRadiance(
 
 // deck resolves the cloud layer into an integration ceiling and a
 // reflectance, and reports zero reflectance for a clear sky.
-func (c *CloudySkyglow) deck(scene *Scene) (topM float64, reflectance float64, err error) {
+type cloudDeck struct {
+	// baseM is the cloud base, and the altitude that splits the two
+	// scattering integrals. ClearSkyTopM when there is no cloud, which
+	// leaves the whole atmosphere below the split and nothing above it.
+	baseM float64
+
+	// fraction is Kocifaj et al. (2025)'s CF: the vertically projected area
+	// of cloud over the area of the zone.
+	fraction float64
+
+	// albedo is the cloud's reflectance, Eq. 3's alpha.
+	albedo float64
+
+	// opticalDepth is the vertical optical depth through the deck, from
+	// which the line-of-sight opacity follows.
+	opticalDepth float64
+}
+
+// opacity is Kocifaj et al. (2025)'s o(z,A): how opaque the deck is along one
+// line of sight.
+//
+// # Where this comes from
+//
+// The paper does not print a formula for it. It derives the quantity from a
+// stochastic 3D cloud field — randomised cuboids filled with cloud elements —
+// and reads the opacity off a ray cast through that realisation. That
+// generator is not specified closely enough in the text to reproduce, so this
+// takes the other route to the same quantity: Beer-Lambert through the deck
+// along the slant path,
+//
+//	o(z) = 1 - exp(-tau_c * M(z))
+//
+// which is what "opacity along the line of sight" means for a deck of stated
+// optical depth. The difference is that a ray through a realised field is
+// binary per realisation and this is the ensemble mean, so this cannot
+// produce the patchiness of a broken sky in one direction — it produces what
+// that patchiness averages to. That is recorded as a known approximation
+// rather than presented as their model.
+func (d cloudDeck) opacity(cosZenith float64) (float64, error) {
+	if d.opticalDepth <= 0 || cosZenith <= 0 {
+		return 0, nil
+	}
+
+	airmass, err := legAirmass(cosZenith)
+	if err != nil {
+		return 0, err
+	}
+
+	return 1 - math.Exp(-d.opticalDepth*airmass), nil
+}
+
+// deck resolves the scene's cloud layer.
+func (c *CloudySkyglow) deck(scene *Scene) (cloudDeck, error) {
 	clouds := scene.Atmosphere.Clouds()
 	if len(clouds) == 0 {
-		return ClearSkyTopM, 0, nil
+		return cloudDeck{baseM: ClearSkyTopM}, nil
 	}
 
 	// One deck. A second layer would reflect the first's downward light back
-	// up again, which Eq. 27 has no term for.
+	// up again, which neither paper has a term for.
 	if len(clouds) > 1 {
-		return 0, 0, fmt.Errorf("%w: %d layers, and Eq. 27 solves one",
-			ErrPartialCloud, len(clouds))
+		return cloudDeck{}, fmt.Errorf("%w: %d layers, and the model solves one",
+			ErrCloudLayers, len(clouds))
 	}
 
 	layer := clouds[0]
 
-	if f := float64(layer.Fraction); f > 0 && f < 1 {
-		return 0, 0, fmt.Errorf("%w: cover is %.2f", ErrPartialCloud, f)
+	fraction := float64(layer.Fraction)
+	if fraction <= 0 {
+		return cloudDeck{baseM: ClearSkyTopM}, nil
 	}
 
-	if layer.Fraction == 0 {
-		return ClearSkyTopM, 0, nil
+	if fraction > 1 || math.IsNaN(fraction) {
+		return cloudDeck{}, fmt.Errorf("%w: cover is %g", ErrCloudFraction, fraction)
 	}
 
-	base := float64(layer.BaseAlt)
-	if base <= 0 || math.IsInf(base, 0) || math.IsNaN(base) {
-		return 0, 0, fmt.Errorf("%w: got %g m", ErrCloudBase, base)
+	baseM := float64(layer.BaseAlt)
+	if baseM <= 0 || math.IsInf(baseM, 0) || math.IsNaN(baseM) {
+		return cloudDeck{}, fmt.Errorf("%w: got %g m", ErrCloudBase, baseM)
 	}
 
-	return base, float64(layer.Albedo), nil
+	return cloudDeck{
+		baseM:        baseM,
+		fraction:     fraction,
+		albedo:       float64(layer.Albedo),
+		opticalDepth: float64(layer.OpticalDepth),
+	}, nil
 }
 
 // addEmitter accumulates one source's contribution.
@@ -276,7 +361,7 @@ func (c *CloudySkyglow) addEmitter(
 	dir coord.AltAz,
 	scene *Scene,
 	emitter GroundEmitter,
-	topM, reflectance float64,
+	deck cloudDeck,
 ) (Flag, error) {
 	at := emitter.Location()
 
@@ -311,17 +396,37 @@ func (c *CloudySkyglow) addEmitter(
 
 	flags := emitter.Quality()
 
-	// The cloud term, evaluated once: it is a single reflection at one
-	// altitude rather than an integral.
-	if reflectance > 0 {
-		if err := c.addCloudTerm(dst, buf, grid, geom, optics,
-			emitter, toObserver, topM, reflectance); err != nil {
+	// L_infinity: one reflection at the cloud base, scaled by how much of the
+	// sky is covered. Eq. 3 as printed carries no CF, and it needs one here:
+	// without it a sky with a tenth of a cloud would return the reflection of
+	// a whole deck. CF is the vertically projected area of cloud over the
+	// area of the zone, so it is the share of the reflecting surface that is
+	// actually there, and the albedo says how well that share reflects.
+	if deck.albedo > 0 && deck.fraction > 0 {
+		if err := c.addCloudTerm(dst, buf, grid, geom, optics, emitter, toObserver,
+			deck.baseM, deck.albedo*deck.fraction); err != nil {
 			return 0, err
 		}
 	}
 
-	if err := c.addAirTerm(dst, buf, grid, geom, optics, emitter, toObserver, topM); err != nil {
+	// L_1: scattering below the deck, always present.
+	if err := c.addAirTerm(dst, buf, grid, geom, optics, emitter, toObserver,
+		0, deck.baseM, 1); err != nil {
 		return 0, err
+	}
+
+	// L_2: scattering above the deck, reaching the observer only through the
+	// part of the sky the cloud does not block. Kocifaj et al. (2025) Eq. 2.
+	if deck.baseM < ClearSkyTopM {
+		opacity, err := deck.opacity(geom.cosZenith)
+		if err != nil {
+			return 0, err
+		}
+
+		if err := c.addAirTerm(dst, buf, grid, geom, optics, emitter, toObserver,
+			deck.baseM, ClearSkyTopM, (1-deck.fraction)*(1-opacity)); err != nil {
+			return 0, err
+		}
 	}
 
 	return flags, nil
