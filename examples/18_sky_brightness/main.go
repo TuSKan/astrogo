@@ -66,18 +66,20 @@ func main() {
 		log.Fatalf("open: %v", err)
 	}
 
-	// The night's own air. Two numbers, both knowable: the aerosol scale
-	// height, and how much aerosol is overhead.
+	// The night's own air. The site's elevation, which sets surface pressure
+	// and temperature from the standard profile; how much aerosol is
+	// overhead; and the height over which that aerosol thins out.
 	//
 	// The optical properties that go with "rural" — single-scattering albedo,
 	// asymmetry, Angstrom exponent — come from OPAC (Hess, Koepke & Schult
 	// 1998) rather than from this file. The optical depth cannot: it is how
 	// much aerosol is above this site tonight, and varies by an order of
 	// magnitude across a year. CleanMountainAOD550 is a stated starting point
-	// for a high dry site; cams.AOD550 fetches the real figure for a place and
-	// an hour.
-	air := atmosphere.RuralAerosol(1538, atmosphere.CleanMountainAOD550).
-		SurfaceAtAltitude(site.Height())
+	// for a high dry site; dataset.LiveAerosol fetches the real figure for a
+	// place and an hour from Copernicus, which is the same call with the
+	// guess taken out.
+	air := atmosphere.RuralAerosol(site.Height(), atmosphere.CleanMountainAOD550).
+		AerosolScaleHeight(1538)
 
 	scene, err := sky.Scene(site, when, air)
 	if err != nil {
