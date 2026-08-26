@@ -38,18 +38,59 @@
 // come from [coord], [ephemeris] and [time]. A capability that belongs to
 // one of those packages is added there, not duplicated here.
 //
-// # Phase 0
+// # Getting a number
 //
-// This is the spectral foundation only. It ships no [Component]
-// implementations at all: a [Model] with no components returns a zero
-// radiance and says so through [Quality]. Nothing here should be read as a
-// physical sky prediction yet.
+// [NewPreset] builds a model from a named configuration, and
+// [github.com/TuSKan/astrogo/skybrightness/dataset.Inputs] gathers the
+// reference data it reads:
 //
-// The scientific components arrive in the order set out in
-// docs/skybrightness.md: atmosphere, then artificial clear sky
-// (Kocifaj, Bara & Falchi 2022), clouds (Kocifaj, Falchi & Kundracik
-// 2025), the natural sky (GAMBONS), and the Moon (Jones 2013 with
-// Kieffer-Stone reflectance and Winkler 2022 scattering). Each lands only
-// once its primary literature is in hand; none is approximated to make a
-// phase look finished.
+//	ids, size := dataset.Endpoints(skybrightness.GAMBONSWeb)
+//	remote.EnableDownloads(size, ids...)
+//
+//	in, err := dataset.Inputs(ctx, dataset.Spec{
+//		Preset: skybrightness.GAMBONSWeb,
+//		Site:   site,
+//	})
+//	model, err := skybrightness.NewPreset(skybrightness.GAMBONSWeb, in)
+//
+//	est, err := model.Estimate(ctx, skybrightness.Query{
+//		Scene:     scene,
+//		Direction: coord.NewAltAz(angle.Deg(90), angle.Deg(0)),
+//		Grid:      in.Grid,
+//		Fidelity:  skybrightness.Standard,
+//	})
+//	mag, err := est.SurfaceBrightness(in.Band, magnitude.Vega)
+//
+// The scene carries the observer, the instant and the atmosphere, and its
+// atmosphere must carry the preset's own transfer — [Preset.DiffuseKappa] and
+// [Preset.MultipleScattering] — at the fidelity [Preset.Fidelity] names. A
+// scene that disagrees is rejected rather than answered, because a sky
+// evaluated under the wrong transfer is smooth, positive and wrong.
+//
+// examples/18_sky_brightness is the whole thing, runnable.
+//
+// # What is implemented
+//
+// Five components make up the natural sky: [IntegratedStarlight],
+// [DiffuseGalacticLight], [ZodiacalLight], [Airglow] and
+// [ExtragalacticBackground]. Two more are the module's own additions to
+// GAMBONS, which models a moonless natural sky and has no term for either:
+// [ScatteredMoonlight] (ROLO reflectance with single-scattering transfer) and
+// [ArtificialSkyglow] (Kocifaj, Bara & Falchi 2022 over a caller's ground
+// emitters).
+//
+// Four presets configure them: [GAMBONSWeb] and [GAMBONSFull] reproduce the
+// published model as its web service and its paper compute it, [NaturalSky] is
+// the same physics at Duriscoe's transfer factor, and [Observatory] is this
+// module's own model — the only one not trying to be somebody else.
+//
+// The natural sky is validated against GAMBONS' published all-sky export at
+// −0.03 mag with airglow removed from both sides. What remains unbuilt is
+// clouds (Kocifaj, Falchi & Kundracik 2025) and an absolute calibration for
+// artificial skyglow, whose directional structure is meaningful and whose
+// overall scale is not; docs/skybrightness.md §16 records why, and it is a
+// literature gap rather than an unwritten function.
+//
+// A [Model] with no components is still legal and returns zero radiance,
+// saying so through [Quality] rather than pretending to be a dark sky.
 package skybrightness

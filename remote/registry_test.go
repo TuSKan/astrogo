@@ -223,7 +223,6 @@ func TestDownloadableEndpointsAreExactlyTheExpectedSet(t *testing.T) {
 		JPLHorizonsSPK:        true,
 		WorldAtlas:            true,
 		VIIRSAnnual:           true,
-		PassbandBundle:        true,
 		CopernicusEODATA:      true,
 		CALSPEC:               true,
 		GaiaStarMap:           true,
@@ -263,7 +262,6 @@ func TestConstName(t *testing.T) {
 		OpenElevation:    "OpenElevation",
 		WorldAtlas:       "WorldAtlas",
 		VIIRSAnnual:      "VIIRSAnnual",
-		PassbandBundle:   "PassbandBundle",
 		CopernicusEODATA: "CopernicusEODATA",
 	}
 

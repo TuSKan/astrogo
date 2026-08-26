@@ -77,6 +77,16 @@ const (
 
 	// LightPollution is the lightpollutionmap.info raster query API
 	// (requires an API key).
+	//
+	// Deprecated: nothing reads it, and nothing should. The service returns
+	// VIIRS-derived raster values, and reading satellite radiance as sky
+	// brightness is on this module's prohibited list — it is an upward
+	// measurement standing in for a downward prediction, which is the
+	// substitution skybrightness exists to avoid. It also needs an API key
+	// astrogo has no way to supply. Model the sky with
+	// [github.com/TuSKan/astrogo/skybrightness.ArtificialSkyglow] over a
+	// ground-emitter inventory instead. This will be removed once it has
+	// survived the two minor releases the deprecation policy requires.
 	LightPollution EndpointID = "lightpollutionmap"
 
 	// OpenNGC is the OpenNGC catalog source CSVs on GitHub, pinned to a
@@ -105,14 +115,6 @@ const (
 	// Marble nighttime lights product".
 	VIIRSAnnual EndpointID = "lightpollutionmap.viirs"
 
-	// PassbandBundle is astrogo's own versioned, checksummed bundle of
-	// photometric passband response curves (Johnson-Cousins UBVRI, Sloan
-	// ugriz, Gaia G/BP/RP, CIE photopic/scotopic, SQM) for
-	// skybrightness/dataset/passband — the only way a passband curve
-	// enters astrogo's runtime (docs/skybrightness.md §3). No bundle is
-	// published at this URL yet.
-	PassbandBundle EndpointID = "astrogo.passbands"
-
 	// WorldAtlas is GFZ Data Services' hosting of Falchi et al. 2016's
 	// World Atlas 2015 of artificial night sky brightness
 	// (World_Atlas_2015.zip, ~653 MB, frozen 2019-11-18 under DOI
@@ -121,6 +123,18 @@ const (
 	// LICENSE: CC BY-NC 4.0, non-commercial only. Attribute Falchi, C.C.M.,
 	// et al. (2016), "The new world atlas of artificial night sky
 	// brightness", Science Advances 2, e1600377.
+	//
+	// Deprecated: the skybrightness/atlas package that read this was removed
+	// in the V2 rewrite and nothing replaced it. The Atlas is a propagated
+	// model output rather than a measurement — [FidelityModelPropagated] in
+	// atmosphere's own vocabulary — so it can neither validate this module
+	// (docs/skybrightness.md §13) nor be served as its answer without
+	// presenting somebody else's model as this one's prediction. Its
+	// non-commercial licence also makes it an awkward thing for a library to
+	// fetch on a caller's behalf. It remains a reasonable thing to compare
+	// against by hand, and a poor thing to depend on. This will be removed
+	// once it has survived the two minor releases the deprecation policy
+	// requires.
 	WorldAtlas EndpointID = "gfz.worldatlas"
 
 	// CALSPEC is STScI's composite stellar and solar flux standards, the
@@ -569,19 +583,6 @@ func defaultEndpoints() map[EndpointID]Endpoint {
 			DownloadTimeout: 60 * time.Minute,
 			Mutable:         true, // past years are occasionally reprocessed in place
 			Downloadable:    true,
-		},
-		PassbandBundle: {
-			ID:              PassbandBundle,
-			URL:             "https://github.com/TuSKan/astrogo/releases/download/passbands-v1/",
-			Kind:            KindFile,
-			Subsystem:       "skybrightness/dataset/passband",
-			Description:     "Versioned, checksummed passband response-curve bundle (Johnson-Cousins, Sloan, Gaia, CIE, SQM)",
-			ApproxSize:      2 << 20,
-			Enabled:         true,
-			DownloadTimeout: 2 * time.Minute,
-			Mutable:         false, // pinned by semver plus manifest checksums
-			Downloadable:    true,
-			Files:           []string{"passbands-v1.tar.gz"},
 		},
 		IRSADust: {
 			ID:        IRSADust,
