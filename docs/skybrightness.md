@@ -489,6 +489,36 @@ base 2 km (0.3, 1.0 and 4.0 km in sensitivity), cloud fractions 0 to 0.9, bands 
 The sign reversal between "over the city" and "outside the city" is the qualitative
 behaviour a universal cloud multiplier cannot reproduce, and is the acceptance criterion
 for this component: amplification and screening must both emerge from geometry alone.
+
+**Measured, both emerge.** `TestZilinaAmplificationAcrossDistance` runs the paper's own
+configuration — AOD 0.1, Ångström 1.3, single-scattering albedo 0.90, asymmetry 0.65, cloud
+base 2 km, CF 0.9, the 500-600 nm band, a town of 3 km radius as eight emitters on a ring —
+and sweeps the observer out from the centre:
+
+| town centre | 0 | 6 | 10.5 | 18.5 | 30 | 45 | 60 | 120 km |
+| :--- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| cloudy / clear at the zenith | 122.5 | 73.1 | 20.3 | 5.44 | 1.92 | 0.98 | 0.74 | 0.64 |
+
+Amplification over the town against the paper's "more than fifteenfold", screening far from
+it, and a monotonic transition between them. Horizontal illuminance over the town rises
+57.8× against their "more than fourfold" irradiance and "up to seventeenfold" photopic
+illuminance.
+
+**The crossover distance does not match and cannot be made to.** It lands near 45 km here
+while their observers reach 18.5 km and already see screening. Two inputs that would move it
+are not in the paper: the cloud albedo, which scales the reflection term directly, and the
+town's upward emission split. Garstang's `q` — the share radiated straight up rather than
+reflected off the ground — governs emission near the horizontal, which is exactly the light
+that reaches a distant cloud, so a better-shielded town screens sooner. The test therefore
+asserts the signs and the ordering and *records* the crossover rather than requiring one;
+tightening it needs their source inventory, not more code.
+
+**The 2007 figures are not digitised, and cannot be from what is in hand.** Figs. 2-6 are
+contour plots in relative units on a logarithmic scale, and the copy available here is a
+text extraction with no image tooling to recover the panels. Reading numbers off them would
+be inventing precision. What the paper states in prose — cloudless radiance falling about
+two orders of magnitude with angular distance from the source — is checked instead, in
+`TestCloudlessRadianceFallsAwayFromTheSource`.
 Regimes to test: pristine clear, urban clear, thin cloud, broken cloud, cloud over the
 observer, cloud over the source city, cloud between city and observer, overcast.
 
@@ -1430,7 +1460,7 @@ allocations.
 | 2 | Natural moonless sky (GAMBONS, Gaia DR3) | **Largely built.** DGL, zodiacal light and airglow are implemented and validated; `dataset/starlight` holds the map type, its loader and a Gaia TAP builder. What remains is reference data, not code: an ISL map (requested, or buildable), Kawara's `c` decade (resolved), and band transformations |
 | 3 | Modern Moon (Jones 2013, ROLO, Winkler 2022) | **`ScatteredMoonlight` shipped** — ROLO reflectance + single-scattering transfer with Winkler's multiple-scattering factor, validated at 18.9 mag/arcsec². The solar spectrum is now supplied by `dataset/solar` from CALSPEC. Remaining: Winkler's own model is empirical at one site, so the multiple-scattering factor is a correction rather than a transfer solution |
 | 4 | Artificial clear sky (Kocifaj 2022, VIIRS as source) | **`ArtificialSkyglow` + `dataset/viirs` shipped.** Absolute scale is uncalibrated, but not for the reason an earlier revision of this row gave: Eq. 2 is not missing an area term, and §17 records why that reading was wrong. The real blocker is narrower and is a literature gap rather than a transcription one — Kocifaj & Bará say `L_i` can be inferred from satellite radiance data and cite Elvidge et al. (2017), which is an instrument and product description carrying no DNB-pixel-to-line-of-sight-radiance conversion. There appears to be no published recipe, so none is implemented and `dataset/viirs` uses a stated substitute; directional structure is meaningful, absolute scale is not. Fig. 1 is checked against the properties the paper states about it (`TestKocifaj2022Fig1Curves`); a digitised comparison remains |
-| 5 | Clouds (Kocifaj 2007 + 2025) | **Done.** `skybrightness.CloudySkyglow` implements Kocifaj (2007) Eq. 27 and the 2025 extension to a fractional deck: `L_1` below the cloud, `L_2` above it weighted by `(1-CF)[1-o(z,A)]`, and `L_infinity` reflected off the base. The acceptance criterion in §11.2 is met — over a city an overcast deck amplifies the zenith **88x**, and 60 km outside it the same deck **screens, at 0.80x** — and both signs emerge from geometry rather than from any tuning. Two departures are recorded in its provenance: the line-of-sight opacity is Beer-Lambert through a deck of stated optical depth where the paper ray-casts a stochastic 3D cloud field it does not specify closely enough to reproduce, and `L_infinity` is scaled by CF where the printed Eq. 3 carries no such weight. Remaining: a digitised comparison against the 2007 figures, and the 2025 amplification factors at their own geometry |
+| 5 | Clouds (Kocifaj 2007 + 2025) | **Done and validated as far as the papers allow.** `skybrightness.CloudySkyglow` implements Kocifaj (2007) Eq. 27 and the 2025 extension to a fractional deck. Against the paper's own Žilina configuration it amplifies the zenith **122×** over the town against their "more than fifteenfold", raises horizontal illuminance **57.8×** against their "more than fourfold", and **screens beyond about 45 km** — both signs, monotonic between them. The crossover sits further out than their 18.5 km and cannot be reconciled without the cloud albedo and shielding split they do not state; §11.2 records the sweep. The 2007 contour figures are not digitised because the copy in hand is text-only, so its prose claim is checked instead. Two departures are in the component's provenance: Beer-Lambert opacity in place of their stochastic 3D cloud field, and a CF weight on `L_infinity` that their printed Eq. 3 lacks |
 | 6 | External high-fidelity RT (Illumina-v2, precomputed) | Planned |
 | 7 | Operational observatory calibration | Planned |
 | 8 | Performance: LUTs, surrogates, caching, loop optimisation | **Partly done, and now with the number it was waiting for.** Caching was built in rather than deferred: `coord.Context` is reused per epoch, every natural component holds a `frameCache`, and `ScatteredMoonlight` caches its per-scene geometry — correctness-shaped decisions that were never Phase 8 work. The row previously said no optimisation should start before a measurement justified it. `CloudySkyglow` produced one: **9.35 ms per direction** against the analytic solution's 9.9 µs, a factor of 942, because its cost is a height integral per wavelength. Loop optimisation alone took it to **0.72 ms, 13× faster**, by hoisting out of the spectral loop everything that does not vary across it — the airmass of each leg, both phase functions, and the exponential profile shapes, which factor into a wavelength-independent decay times a per-wavelength column. Verified exact: 32 sampled radiances moved by at most 1.9 ulps, which is reassociation rather than a change in the model. What remains is LUTs and surrogates, and the measurement to justify *those* has not been taken |
