@@ -6,43 +6,68 @@ import (
 	"context"
 	"errors"
 	"net"
+	"net/url"
 	"testing"
 	"time"
 
 	"github.com/TuSKan/astrogo/internal/testutil"
+	"github.com/TuSKan/astrogo/remote"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/coord"
 )
 
-// requireGaia skips the test when the Gaia TAP endpoint is unreachable —
-// per this project's network test policy, a reachability failure must
-// never fail CI outright.
+// requireGaia skips the test when the default archive is unreachable - per
+// this project's network test policy, a reachability failure must never fail
+// CI outright.
+//
+// The host is derived from the endpoint rather than written down, so it
+// follows [DefaultEndpoint] instead of having to be remembered alongside it.
 func requireGaia(t *testing.T) {
 	t.Helper()
 
-	testutil.RequireReachable(t, "gea.esac.esa.int:443")
+	raw, err := remote.URL(DefaultEndpoint)
+	if err != nil {
+		t.Skipf("%s is not resolvable: %v", DefaultEndpoint, err)
+	}
+
+	u, err := url.Parse(raw)
+	if err != nil {
+		t.Skipf("%s has an unusable URL: %v", DefaultEndpoint, err)
+	}
+
+	port := u.Port()
+	if port == "" {
+		port = "443"
+	}
+
+	testutil.RequireReachable(t, net.JoinHostPort(u.Hostname(), port))
 }
 
-// skipIfUnresponsive turns a timed-out query into a skip. The TCP
-// pre-check above is not sufficient on its own: ESA's TAP front end
-// routinely accepts the connection and then never answers, which is
-// downtime rather than wrong data, and the policy is that only wrong data
-// from a responsive endpoint fails.
+// skipIfUnresponsive turns a timed-out query into a skip. The TCP pre-check
+// above is not sufficient on its own: a TAP front end can accept the
+// connection and then never answer, which is downtime rather than wrong data,
+// and the policy is that only wrong data from a responsive endpoint fails.
+//
+// ESA's did this routinely, which is a large part of why it is no longer the
+// default archive.
 func skipIfUnresponsive(t *testing.T, err error) {
 	t.Helper()
 
 	var netErr net.Error
 	if errors.Is(err, context.DeadlineExceeded) || (errors.As(err, &netErr) && netErr.Timeout()) {
-		t.Skipf("Gaia TAP accepted the connection but did not answer, skipping live test: %v", err)
+		t.Skipf("the archive accepted the connection but did not answer, skipping live test: %v", err)
 	}
 }
 
 func TestGaiaNetworkConeSearch(t *testing.T) {
 	requireGaia(t)
 
-	prov := New()
+	prov, err := New("")
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second) // ESA TAP can be slower
 	defer cancel()

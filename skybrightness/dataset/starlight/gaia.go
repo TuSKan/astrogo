@@ -234,14 +234,19 @@ type GaiaBuild struct {
 	Progress func(done, total int)
 
 	// Endpoint is the TAP service to aggregate against. Defaults to
-	// [github.com/TuSKan/astrogo/remote.GaiaTAP], ESA's own archive.
+	// [github.com/TuSKan/astrogo/remote.GaiaAIP], the Leibniz-Institut
+	// mirror, which answers far faster than ESA's own archive and, for an
+	// identified caller, without the statement timeout that forces the work
+	// into chunks at all. A token is picked up automatically from the
+	// environment variable the registry names for the endpoint; absent one the
+	// service still answers, only under a five-second cap, so nothing here
+	// requires a credential.
 	//
-	// [github.com/TuSKan/astrogo/remote.GaiaAIP] is the Leibniz-Institut
-	// mirror, which answers far faster and, for an identified caller, without
-	// the statement timeout that forces the work into chunks at all. A token
-	// is picked up automatically from the environment variable the registry
-	// names for the endpoint; absent one the service still answers, only under
-	// a five-second cap, so nothing here requires a credential.
+	// [github.com/TuSKan/astrogo/remote.GaiaTAP] is ESA's archive, serving the
+	// same fixed DR3 tables. It remains selectable and is what the two are
+	// compared against, but it is not the default: it is the slower of the two
+	// on every measurement taken here and the one that has been unreachable
+	// for a working day.
 	Endpoint remote.EndpointID
 }
 
@@ -297,7 +302,7 @@ func (g GaiaBuild) withDefaults() (GaiaBuild, error) {
 	}
 
 	if g.Endpoint == "" {
-		g.Endpoint = remote.GaiaTAP
+		g.Endpoint = remote.GaiaAIP
 	}
 
 	if g.Order < 1 || g.Order > 12 {
