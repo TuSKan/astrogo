@@ -425,6 +425,38 @@ overcast, with cloud type and geometry.
 evaluated at height and the observational zenith angle carried through. Clouds participate
 in propagation rather than multiplying a clear-sky answer.
 
+From the paper's own text, the three terms are scattering in the turbid atmosphere **below**
+the cloud level, scattering **above** it, and **reflection by the 3D cloud field**:
+
+```
+L₁ ∝ ∫₀ᴴ I₀(z₀ₕ) T₀→ₕ(z₀ₕ) T₀→ₕ(z) Ψ(h,θₕ) dh
+L₂ ∝ (1−CF)[1−ο(z,A)] T₀→ₕ(z) ∫ₕ^∞ I₀(z₀ₕ) T₀→ₕ(z₀ₕ) Tₕ→ₕ(z) Ψ(h,θₕ) dh
+L∞ ∝ α I₀(z₀ₕ) T₀→ₕ(z₀ₕ) T₀→ₕ(z)
+```
+
+where `I₀(z₀ₕ)` is the upward intensity emitted by the ground source at zenith angle `z₀`,
+`T` a transmission between layers, `Ψ(h,θₕ)` the angular dependence of scattered radiation at
+height `h`, `H` the cloud base altitude, `CF` the cloud fraction, `α` the cloud albedo and
+`ο(z,A)` the cloud opacity along the line of sight.
+
+**Those are proportionalities, and that is the blocker.** The PNAS paper is a results paper:
+it states the decomposition and reports what the model produces, and refers the governing
+equations to its refs. 14, 20, 36 and 37 — the SkyGlow Simulator lineage, Kocifaj (2007),
+(2008), (2017) and (2018). None of the normalising constants, the form of `Ψ`, the
+transmission functions or the cloud-opacity term can be recovered from `∝`. See §16.
+
+**This is not a small addition to §11.1 either.** `ArtificialSkyglow` implements Kocifaj,
+Bará & Falchi (2022), which is the *analytic* formulation — an all-sky radiance (Eq. 2)
+carrying an atmospheric parameter `t` (Eq. 3) and a combined phase function (Eq. 1). It has
+no height integral and no layer-to-layer transmission, so `L₁` is not something the existing
+component already computes with a cloud term bolted on: the 2025 model is a different
+solution of the same problem.
+
+**Parameters the paper does state**, and which any implementation should reproduce: AOD 0.1
+and 0.3, aerosol asymmetry 0.65, single-scattering albedo 0.90, Ångström exponent 1.3, cloud
+base 2 km (0.3, 1.0 and 4.0 km in sensitivity), cloud fractions 0 to 0.9, bands 400–500 and
+500–600 nm, urban radius 2.5–3.5 km, observer at 0 to 18.5 km.
+
 **Validation targets (from the paper's own results, Žilina, Slovakia, ~80,000 population).**
 
 | Quantity | Reported effect |
@@ -1379,7 +1411,7 @@ allocations.
 | 2 | Natural moonless sky (GAMBONS, Gaia DR3) | **Largely built.** DGL, zodiacal light and airglow are implemented and validated; `dataset/starlight` holds the map type, its loader and a Gaia TAP builder. What remains is reference data, not code: an ISL map (requested, or buildable), Kawara's `c` decade (resolved), and band transformations |
 | 3 | Modern Moon (Jones 2013, ROLO, Winkler 2022) | **`ScatteredMoonlight` shipped** — ROLO reflectance + single-scattering transfer with Winkler's multiple-scattering factor, validated at 18.9 mag/arcsec². The solar spectrum is now supplied by `dataset/solar` from CALSPEC. Remaining: Winkler's own model is empirical at one site, so the multiple-scattering factor is a correction rather than a transfer solution |
 | 4 | Artificial clear sky (Kocifaj 2022, VIIRS as source) | **`ArtificialSkyglow` + `dataset/viirs` shipped.** Absolute scale is uncalibrated, but not for the reason an earlier revision of this row gave: Eq. 2 is not missing an area term, and §17 records why that reading was wrong. The real blocker is narrower and is a literature gap rather than a transcription one — Kocifaj & Bará say `L_i` can be inferred from satellite radiance data and cite Elvidge et al. (2017), which is an instrument and product description carrying no DNB-pixel-to-line-of-sight-radiance conversion. There appears to be no published recipe, so none is implemented and `dataset/viirs` uses a stated substitute; directional structure is meaningful, absolute scale is not. Fig. 1 is checked against the properties the paper states about it (`TestKocifaj2022Fig1Curves`); a digitised comparison remains |
-| 5 | Clouds (Kocifaj 2025) | **Planned — but not from nothing.** `atmosphere` already carries the scene vocabulary (`CloudLayer`, `CloudPhase`, `CloudMorphology`) and `skybrightness` already has the `UnknownCloud` quality flag, so a scene can describe a cloud field it cannot yet evaluate. What is missing is the radiative model (`L = L1 + L2 + Linf`), the cloud optical properties in `atmosphere`, and a `Component`. The paper is in hand and open access |
+| 5 | Clouds (Kocifaj 2025) | **Blocked on primary literature, not on effort.** `atmosphere` already carries the scene vocabulary (`CloudLayer`, `CloudPhase`, `CloudMorphology`) and `skybrightness` already has the `UnknownCloud` quality flag, so a scene can describe a cloud field it cannot yet evaluate. What is missing is the radiative model (`L = L1 + L2 + Linf`), the cloud optical properties in `atmosphere`, and a `Component`. The PNAS 2025 paper **is** in hand and open access — an earlier revision of this row stopped there, which read as though the work could start. It cannot: that paper gives the three terms as proportionalities and refers the governing equations to its refs. 14, 20, 36 and 37 (Kocifaj 2007, 2008, 2017, 2018), of which at least the two Applied Optics papers are paywalled. Implementing from `∝` would mean inventing the constants, which §2 prohibits outright. See §16 |
 | 6 | External high-fidelity RT (Illumina-v2, precomputed) | Planned |
 | 7 | Operational observatory calibration | Planned |
 | 8 | Performance: LUTs, surrogates, caching, loop optimisation | **Partly done, and deliberately so.** Caching was built in rather than deferred: `coord.Context` is reused per epoch, every natural component holds a `frameCache`, and `ScatteredMoonlight` caches its per-scene geometry — these are correctness-shaped decisions (a `Context` per direction would dominate a full-sky evaluation) and were never Phase 8 work. The §43 benchmark set exists as the Phase 0 baseline: single direction, 100 directions, full sky, spectral resolution, instrument projection. What remains is LUTs, surrogates and loop optimisation, none of which should start before there is a number saying they are needed |
@@ -1445,6 +1477,7 @@ Nothing is optimised yet; that is Phase 8. The point is numbers before opinions.
 | ~~A HEAD-less fetch in `httpblob`~~ | **Resolved.** Harvard Dataverse answers 403 to HEAD while serving ranged GET normally, and `httpblob.headObject` reached its ranged fallback only on 405. Fixed upstream in `blob/httpblob` v0.1.1. The local SFD map now matches IRSA over the 1,979 directions already cached: median ratio **1.00001**, 5th to 95th percentile 0.956 to 1.056 — the spread is interpolation across a 2.37 arcminute pixel, since IRSA returns the containing pixel's value and this interpolates between them. The worst case, 1.25, is at b = 6.2 degrees in the Galactic plane where the gradient is steepest. |
 | **Cell-averaged incoming field** | The accuracy of the Eq. 11 integral, not its speed | A `StarMap`/`DustMap` that can return the mean over a solid-angle cell rather than the value at a point. Measured, the hemispheric quadrature converges better than quadratically against a smooth field — 0.55 per cent at the default twelve rings, 0.026 at forty-eight — and **does not converge at all** against a field with an edge in it, wandering around a per cent however fine the grid gets. The real field is nothing but edges: a HEALPix star map and a dust map are both piecewise constant. Refining the quadrature cannot fix that, because the error is where the samples land relative to an edge rather than the step size; averaging the field over each cell can. In practice the pixel edges are far smaller than a quadrature cell and average out — twelve rings and twenty-four differ by 0.04 per cent against the published star map — so this is a known ceiling rather than a live defect. |
 | ~~VizieR V/50 position columns~~ | **Resolved.** `RAJ2000`/`DEJ2000` exist and the multi-band bright-star path runs end to end: B, V and I for all 74 stars Gaia cannot see, R for 66. Every R gap is accounted for — four have a null `R-I` in the catalogue, one is fainter than its completeness limit, and three are multiples where Hipparcos reports combined light while the catalogue reports components. Two bugs were found doing it, both in the match: positions were not propagated from the Hipparcos epoch, which lost α Cen A at 32″ of proper motion; and matching on position alone then picked α Cen **B**, 0.02″ nearer than A. The match now propagates and discriminates on V. |
+| **SkyGlow Simulator governing equations** | Phase 5 outright | Kocifaj (2007), *Appl. Opt.* **46**, 3013 is the one that matters — it introduces cloud altitude and spectral reflectance into the model, and is where `L₁`, `L₂` and `L∞` acquire their constants, their transmission functions and the form of `Ψ(h,θₕ)`. Kocifaj (2008), *Appl. Opt.* **47**, 792 extends it to planar sources; the 2017 and 2018 papers add the multiple-scattering treatment. Both Applied Optics papers are paywalled (checked). The PNAS 2025 paper that cites them is open and gives the decomposition only as proportionalities, so it establishes *what* the model computes and not *how*. Institutional access to Applied Optics, or an author preprint, unblocks it. Until then Phase 5 stays unimplemented rather than approximated — a universal cloud multiplier is on §2's prohibited list precisely because it cannot reproduce the amplification-and-screening sign reversal that is this component's acceptance criterion. |
 | Jones et al. (2013) confirmation | Phase 3 framing | Confirm the A&A open-access text. |
 | Illumina-v2 product format | Phase 6 | A sample precomputed product and its dimension conventions. |
 
