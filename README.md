@@ -11,7 +11,7 @@
 
 **Observatory-grade astronomy and observation-planning engine for Go.**
 
-Scale-aware time arithmetic · SOFA-rigorous coordinate transforms · sub-minute rise/set accuracy · production scheduling · validated against USNO, JPL Horizons, and NASA Eclipse Catalogs.
+Scale-aware time arithmetic · SOFA-rigorous coordinate transforms · sub-minute rise/set accuracy · spectral all-sky brightness · production scheduling · validated against USNO, JPL Horizons, NASA Eclipse Catalogs and GAMBONS.
 
 ---
 
@@ -393,7 +393,7 @@ AOS: 19:45:03 UTC  Max El: 73.1°  LOS: 19:51:47 UTC  Duration: 6m44s
 | **Magnitude** | Planets (Mallama & Hilton 2018), asteroids (HG/HG1G2/**sHG1G2**), comets, satellites, stars — validated 100% within 0.025 mag against the FINK/ZTF production pipeline |
 | **Catalogs** | Unified `resolve.Provider` over SIMBAD, MAST, Gaia, VizieR, JPL Horizons & SBDB, OpenNGC, NORAD, FINK — streaming `iter.Seq2`, Arrow caching, retry/backoff |
 | **FITS & WCS** | Image/BinTable/ASCII HDUs, gzip streams, mmap, TAN projection, Arrow export |
-| **Sky Brightness** | Moonlight (Krisciunas & Schaefer 1991), zodiacal light (Leinert 1998), airglow, light-pollution floor — folds into observability scoring |
+| **Sky Brightness** | Spectral all-sky radiance `L_λ(λ, direction, observer, time, atmosphere)` in W·m⁻²·sr⁻¹·nm⁻¹, kept spectral until projection — integrated starlight, diffuse galactic light, extragalactic background, zodiacal light (Leinert 1998), airglow, scattered moonlight (Kieffer & Stone 2005 ROLO + Winkler 2022), and artificial skyglow in clear air or under cloud (Kocifaj) — natural sky validated to **0.05 mag** against GAMBONS, a near-full Moon to 18.9 mag/arcsec² in V |
 | **Planning** | Sub-second Chandrupatla/Brent boundary refinement, constraint-based scoring, `Greedy`/`Priority`/`SwapOptimized` scheduling strategies |
 | **Events** | Rise/Set/Transit, Moon Phases, Seasons, Apsides, Eclipses, Conjunctions, Elongations, Satellite Passes, 20 historical lunar-crescent criteria |
 | **Reference Data** | Built-in registry of 10 well-known observatory sites (`plan.KnownSites`), the 9 IMO Class I annual meteor showers with ZHR rate prediction (`plan.MeteorShowers`), 21 major planetary moons (`plan.PlanetaryMoon`), all 88 IAU constellations (`constellation.List`) |
@@ -507,9 +507,9 @@ A spectral, all-sky sky-radiance engine — `L_λ(λ, direction, observer, time,
 
 Nothing is segmented into a private copy: atmospheric physics lives in `atmosphere`, passbands and magnitude systems in `magnitude`, instrument throughput and detector rates in `optics`, spectral types and the shared wavelength axis in `unit`. `skybrightness` owns only radiance transport — `Scene`, `Component`, `Model`/`Query`/`Estimate`, uncertainty, quality, provenance, and all-sky operations.
 
-The scientific baseline is deliberately not the usual "KS91 moonlight + constant dark sky + Bortle/VIIRS zenith value": artificial skyglow follows Kocifaj, Bará & Falchi (2022) with clouds per Kocifaj, Falchi & Kundracik (2025); the Moon uses Kieffer & Stone (2005) ROLO reflectance with Winkler (2022) multiple scattering, and is deliberately *not* Krisciunas & Schaefer (1991); the natural sky follows GAMBONS. A component whose primary literature cannot be obtained is **not implemented** rather than approximated.
+Every component traces to primary literature: artificial skyglow follows Kocifaj, Bará & Falchi (2022) with clouds per Kocifaj, Falchi & Kundracik (2025); the Moon uses Kieffer & Stone (2005) ROLO reflectance with Winkler (2022) multiple scattering; the natural sky follows GAMBONS (Masana et al. 2021, 2024). A component whose primary literature cannot be obtained is **not implemented** rather than approximated.
 
-> **Status: Phases 0–5 complete.** Seven components ship — integrated starlight, diffuse galactic light, the extragalactic background, zodiacal light, airglow, scattered moonlight, and artificial skyglow in clear air or under cloud — behind four named presets (`GAMBONSWeb`, `NaturalSky`, `GAMBONSFull`, `Observatory`), each carrying its own radiative transfer so a caller cannot silently evaluate one model's components under another's transport. Measured: the astronomical sky agrees with GAMBONS' own published run to **0.05 mag**; a near-full Moon comes out at **18.9 mag/arcsec²** in V against an independently-known ~18; an overcast deck over a city amplifies the zenith **88×** while *screening* at **0.80×** 60 km away, which is the behaviour a universal cloud multiplier cannot produce and the reason this is radiative transfer rather than a factor. Phases 6 and 7 are blocked on other people's data rather than on code. See [`docs/skybrightness.md`](docs/skybrightness.md) for the equation-to-test maps, the full validation record, the phase roadmap and the open questions.
+> **Status: Phases 0–5 complete.** Seven components ship — integrated starlight, diffuse galactic light, the extragalactic background, zodiacal light, airglow, scattered moonlight, and artificial skyglow in clear air or under cloud. Measured: the astronomical sky agrees with GAMBONS' own published run to **0.05 mag**; a near-full Moon comes out at **18.9 mag/arcsec²** in V against an independently-known ~18; an overcast deck over a city amplifies the zenith **88×** while *screening* at **0.80×** 60 km away, which is the behaviour a universal cloud multiplier cannot produce and the reason this is radiative transfer rather than a factor. Phases 6 and 7 are blocked on other people's data rather than on code. See [`docs/skybrightness.md`](docs/skybrightness.md) for the equation-to-test maps, the full validation record, the phase roadmap and the open questions.
 
 ### Event Solver
 - **Unified `Solver`** — Chandrupatla root-finding (1997) + Brent's minimization
@@ -641,7 +641,7 @@ flowchart TD
 | `fits` | FITS I/O, WCS (TAN projection), mmap, Arrow export | ✅ Stable |
 | `fits/plan` | FITS↔plan bridge (`SiteFromFITS`, `TargetFromFITS`) | ✅ Stable |
 | `plan` | Observability, constraints, events, scheduling, satellite passes | ✅ Stable |
-| `skybrightness` | Spectral all-sky radiance engine (`Scene`/`Component`/`Model`/`Estimate`, all-sky ops, uncertainty, provenance) — seven components behind four named presets | ✅ Phases 0–5 (natural sky validated to 0.05 mag against GAMBONS) |
+| `skybrightness` | Spectral all-sky radiance engine (`Scene`/`Component`/`Model`/`Estimate`, all-sky ops, uncertainty, provenance) — seven components | ✅ Phases 0–5 (natural sky validated to 0.05 mag against GAMBONS) |
 | `skybrightness/dataset` | The only tier that performs I/O: star map, dust map, airglow spectrum, passband, solar spectrum and ground-emitter inventory, assembled by `dataset.Open` into a ready-to-evaluate `Sky` | ✅ Stable |
 | `unit` | Physical unit and quantity system | ✅ Stable |
 
@@ -668,9 +668,8 @@ happens.
 | Planetary satellite SPK (Io, Titan, Triton, ...) | `remote.NAIFSPK` | ~64 MB (Mars) – ~1.1 GB (Jupiter), ~2.4 GB for all 6 kernels | `eph.NewProvider(eph.Moons, "sat441")`, or `plan.VisibleTonight(..., plan.WithPlanetaryMoons())` |
 | IERS Earth-orientation data | `remote.IERSFinals2000A` | ~3.7 MB | automatic on first `Time.EOP()`/`.UTC()`/`.UT1()` query needing it |
 | OpenNGC catalog CSVs | `remote.OpenNGC` | ~2 MB combined | `catalog.NewResolver(catalog.OpenNGC, ...)` |
-| World Atlas 2015 light-pollution GeoTIFF (Falchi et al. 2016) | `remote.WorldAtlas` | ~653 MB zip, ~2.8 GB extracted | Reference/validation dataset (sky-brightness Phase 4); frozen registry entry today — **CC BY-NC 4.0, non-commercial use only** |
-| VIIRS annual nighttime-lights composite (2012-2025, no API key) | `remote.VIIRSAnnual` | ~700 MB-1 GB per year | Artificial emission-intensity field input (sky-brightness Phase 4); frozen registry entry today — CC0, credit lightpollutionmap.info + NASA Black Marble |
-| Passband response-curve bundle (Johnson-Cousins, Sloan, Gaia, CIE, SQM) | `remote.PassbandBundle` | ~2 MB | future `skybrightness` dataset provider — not yet published |
+| World Atlas 2015 light-pollution GeoTIFF (Falchi et al. 2016) | `remote.WorldAtlas` | ~653 MB zip, ~2.8 GB extracted | nothing fetches it — deprecated, and a propagated model output rather than a measurement, so it cannot validate this module either; **CC BY-NC 4.0, non-commercial use only** |
+| VIIRS annual nighttime-lights composite (2012-2025, no API key) | `remote.VIIRSAnnual` | ~700 MB-1 GB per year | `viirs.Open(ctx, year)`, for the spatial distribution of artificial emission — CC0, credit lightpollutionmap.info + NASA Black Marble |
 | CAMS global reanalysis NetCDF files (Copernicus EODATA S3) | `remote.CopernicusEODATA` | 1.3 MB (lnsp) – ~180 MB (a 137-level aerosol tracer) | `atmosphere/dataset/cams.Open` — requires Copernicus Data Space S3 credentials (AWS SDK default chain) and a blank import of `remote/s3` |
 
 For an accuracy/offline tradeoff comparison across `ephemeris.Default()` and the
@@ -728,7 +727,7 @@ Omit the endpoint list to grant consent for every download-gated endpoint at onc
 ```go
 remote.EnableDownloads(200 << 20) // every Downloadable endpoint at once (NAIFSPK, NAIFLSK,
                                   // IERSFinals2000A, OpenNGC, JPLHorizonsSPK, VIIRSAnnual,
-                                  // WorldAtlas, PassbandBundle, CopernicusEODATA, ...)
+                                  // WorldAtlas, CopernicusEODATA, ...)
 ```
 
 `JPLHorizonsSPK` is included even though it's an API endpoint, not a file endpoint — its
