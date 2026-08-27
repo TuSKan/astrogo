@@ -91,7 +91,14 @@ type UniformEmitter struct {
 // to hand a caller than a choice of types.
 type EmissionShape interface {
 	// Weight returns the relative emission at elevation above the source's
-	// horizon. Zero or below the horizon returns zero.
+	// horizon, relative to the source's own output at its zenith.
+	//
+	// Strictly below the horizon returns zero. Zero elevation does not:
+	// horizontal escape is the part of a source's output that reaches a
+	// distant sky at all, both shapes here emit there, and
+	// [ArtificialSkyglow] evaluates this at exactly zero by default. An
+	// implementation that returned zero at the horizon would remove that
+	// component's entire contribution without failing.
 	Weight(elevation angle.Angle) float64
 }
 
@@ -178,10 +185,26 @@ type GarstangEmission struct {
 // [UpwardEmission] does. At the zenith z0 is zero, the direct term vanishes
 // and the value is 2*Q*(1-q); a configuration where that is not positive has
 // no zenith emission to normalise against and returns zero.
+//
+// # The horizon is emission, not the absence of it
+//
+// At exactly zero elevation the reflected term vanishes with cos z0 and the
+// direct term does not: z0 is pi/2, so B is 0.554*q*(pi/2)^4, which for
+// Q = q = 0.15 is about twice the zenith value. That is the whole reason
+// Garstang's function carries a z0^4 term — near-horizontal light travels a
+// long slant path and is what carries skyglow to distance — so returning zero
+// there would delete the largest lobe of the shape.
+//
+// It is worth stating because the boundary is load-bearing rather than
+// cosmetic. [ArtificialSkyglow] evaluates the emission function at zero
+// elevation by default, on the grounds that a ground source beyond a few
+// kilometres sits at the observer's horizon, so a guard rejecting the horizon
+// would make that whole component silently produce nothing at all rather than
+// fail. Only elevations strictly below the horizon return zero.
 func (g GarstangEmission) Weight(elevation angle.Angle) float64 {
 	sin := elevation.Sin()
-	if sin <= 0 {
-		return 0 // at or below the source's horizon
+	if sin < 0 {
+		return 0 // below the source's horizon: nothing escapes upward
 	}
 
 	q := clamp01(g.DirectFraction)
