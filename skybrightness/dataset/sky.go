@@ -39,7 +39,13 @@ import (
 // transcribing the transfer by hand, so [Sky.Scene] is a factory: it takes
 // the atmosphere the caller describes and finishes it with the preset's
 // transfer. Everything a Sky itself holds — model, grid, passband, fidelity —
-// is independent of time, so one Sky serves any number of nights.
+// is independent of both time and place, so one Sky serves any number of
+// nights and any number of sites.
+//
+// The single input that does carry a place is the airglow spectrum, which is
+// a named SkyCalc model chosen through [Spec.Observatory] rather than derived
+// from coordinates. A Sky evaluated far from that model's altitude is using
+// it outside its range, and nothing in the geometry will say so.
 type Sky struct {
 	preset   skybrightness.Preset
 	model    *skybrightness.Model
@@ -48,7 +54,10 @@ type Sky struct {
 	system   magnitude.System
 }
 
-// Option configures a [Sky].
+// Option configures what an assembled [Sky] reports.
+//
+// The counterpart to [Spec], which configures what it fetches. See that type
+// for why the two are separate rather than one struct with more fields.
 type Option func(*Sky)
 
 // WithMagSystem sets the magnitude system [Sky.SurfaceBrightness] and
@@ -77,18 +86,31 @@ func Open(ctx context.Context, spec Spec, opts ...Option) (*Sky, error) {
 		return nil, consentAdvice(spec.Preset, err)
 	}
 
-	model, err := skybrightness.NewPreset(spec.Preset, in)
+	return newSky(spec.Preset, in, opts...)
+}
+
+// newSky is everything Open does after the fetch.
+//
+// Split out so that the assembly — which model, which fidelity, which
+// magnitude system, and which observer eventually reaches a scene — can be
+// exercised without five services. Open is the only way a caller gets one,
+// and that is deliberate; a test of the wiring around the inputs should not
+// have to download 145 MB to reach it.
+func newSky(
+	p skybrightness.Preset, in skybrightness.PresetInputs, opts ...Option,
+) (*Sky, error) {
+	model, err := skybrightness.NewPreset(p, in)
 	if err != nil {
 		return nil, fmt.Errorf("dataset: %w", err)
 	}
 
-	fidelity, err := spec.Preset.Fidelity()
+	fidelity, err := p.Fidelity()
 	if err != nil {
 		return nil, fmt.Errorf("dataset: %w", err)
 	}
 
 	s := &Sky{
-		preset:   spec.Preset,
+		preset:   p,
 		model:    model,
 		inputs:   in,
 		fidelity: fidelity,

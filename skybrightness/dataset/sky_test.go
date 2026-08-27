@@ -14,6 +14,7 @@ import (
 	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/skybrightness"
 	"github.com/TuSKan/astrogo/skybrightness/dataset"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 func skySite(tb testing.TB) *coord.Geodetic {
@@ -37,8 +38,7 @@ func TestOpenRefusesABadSpec(t *testing.T) {
 		name string
 		spec dataset.Spec
 	}{
-		{"no site", dataset.Spec{Preset: skybrightness.GAMBONSWeb}},
-		{"unknown preset", dataset.Spec{Preset: "no-such-preset", Site: skySite(t)}},
+		{"unknown preset", dataset.Spec{Preset: "no-such-preset"}},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			if _, err := dataset.Open(context.Background(), c.spec); err == nil {
@@ -157,5 +157,134 @@ func TestSceneCarriesThePresetTransfer(t *testing.T) {
 					float64(a.OpticalDepth))
 			}
 		})
+	}
+}
+
+// uniformStars is a star map with the same radiance in every direction.
+//
+// Flat on purpose. The test below varies the observer's elevation and nothing
+// else, and real sky structure would be a second variable competing with the
+// one under test.
+type uniformStars float64
+
+func (u uniformStars) RadianceAt(_, _ angle.Angle) (float64, error) { return float64(u), nil }
+
+func (uniformStars) Galactic() bool { return true }
+
+// uniformDust is the same idea for the 100 micron map.
+type uniformDust float64
+
+func (u uniformDust) IntensityAt(_, _ angle.Angle) (float64, error) { return float64(u), nil }
+
+// skyInputs is a synthetic PresetInputs: enough for a preset to build and
+// evaluate, with no service behind any of it.
+func skyInputs(tb testing.TB) skybrightness.PresetInputs {
+	tb.Helper()
+
+	grid, err := unit.NewSpectralGrid(400, 1, 401)
+	if err != nil {
+		tb.Fatalf("NewSpectralGrid: %v", err)
+	}
+
+	shape := skybrightness.NewSpectralRadiance(grid)
+	glow := skybrightness.NewSpectralRadiance(grid)
+
+	for i := range shape {
+		// Sloped rather than flat, so a wavelength-indexing error has
+		// somewhere to show.
+		shape[i] = 1 + 0.002*(float64(grid.At(i))-400)
+		glow[i] = 2.5e-9
+	}
+
+	return skybrightness.PresetInputs{
+		Stars:         uniformStars(1e-9),
+		StarShape:     shape,
+		Dust:          uniformDust(2),
+		AirglowZenith: glow,
+		Grid:          grid,
+		Band: magnitude.Passband{
+			Name:            "test V",
+			WavelengthNM:    []unit.WavelengthNM{499, 500, 600, 601},
+			Response:        []float64{0, 1, 1, 0},
+			Detector:        magnitude.EnergyIntegrating,
+			VegaZeroPointJy: 3636,
+		},
+	}
+}
+
+// One Sky answers for many sites, and the site it is handed is the one that
+// counts.
+//
+// # Why this is worth pinning
+//
+// Because Spec used to carry an observer that Inputs validated and then never
+// read. Nothing gathered there depends on where anybody stands, so the field
+// was a second candidate observer — indistinguishable, at every later call,
+// from the one the scene actually uses. Removing it is only safe if the
+// surviving path really does carry the caller's site into the physics, which
+// is what the two halves here check: that the scene holds the site it was
+// given, and that the answer moves when the site does.
+//
+// The direction is not arbitrary either. This preset has no artificial term,
+// so a lower site sits under more air, more of the natural sky is
+// extinguished than the diffuse term puts back, and the sea-level sky comes
+// out *fainter*. That is the correct physics and the opposite of what "sea
+// level against a mountain" suggests to anyone reading a table of it, which
+// is exactly why it deserves an assertion rather than a comment.
+func TestOneSkyServesManySites(t *testing.T) {
+	t.Parallel()
+
+	sky, err := dataset.NewSky(skybrightness.GAMBONSWeb, skyInputs(t))
+	if err != nil {
+		t.Fatalf("NewSky: %v", err)
+	}
+
+	when := gotime.Date(2026, 4, 2, 5, 0, 0, 0, gotime.UTC)
+
+	// The same coordinates at two elevations, so the sky above them is
+	// identical and the air between is the only thing that differs.
+	zenith := func(heightM float64) float64 {
+		t.Helper()
+
+		site, err := coord.NewGeodetic(angle.Deg(-70.4045), angle.Deg(-24.6272), heightM)
+		if err != nil {
+			t.Fatalf("NewGeodetic: %v", err)
+		}
+
+		scene, err := sky.Scene(site, when,
+			atmosphere.RuralAerosol(heightM, atmosphere.CleanMountainAOD550))
+		if err != nil {
+			t.Fatalf("Scene at %g m: %v", heightM, err)
+		}
+
+		if scene.Observer != site {
+			t.Fatalf("the scene at %g m carries an observer other than the one it was "+
+				"handed, so the caller's site is not what gets evaluated", heightM)
+		}
+
+		est, err := sky.Zenith(t.Context(), scene)
+		if err != nil {
+			t.Fatalf("Zenith at %g m: %v", heightM, err)
+		}
+
+		sb, err := sky.SurfaceBrightness(est)
+		if err != nil {
+			t.Fatalf("SurfaceBrightness at %g m: %v", heightM, err)
+		}
+
+		return sb
+	}
+
+	high, low := zenith(2635), zenith(0)
+
+	if high == low {
+		t.Fatalf("both elevations give %.4f mag/arcsec2; the observer is not reaching "+
+			"the physics", high)
+	}
+
+	if low < high {
+		t.Errorf("sea level is %.4f and 2635 m is %.4f mag/arcsec2; with no artificial "+
+			"term the lower site sits under more air, so it must be the fainter of the "+
+			"two", low, high)
 	}
 }

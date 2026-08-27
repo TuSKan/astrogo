@@ -12,10 +12,7 @@
 // [Inputs] is that page. One call, one error to check, and the result goes
 // straight into [skybrightness.NewPreset].
 //
-//	in, err := dataset.Inputs(ctx, dataset.Spec{
-//		Preset: skybrightness.GAMBONSWeb,
-//		Site:   site,
-//	})
+//	in, err := dataset.Inputs(ctx, dataset.Spec{Preset: skybrightness.GAMBONSWeb})
 //	model, err := skybrightness.NewPreset(skybrightness.GAMBONSWeb, in)
 //
 // It also means a caller reaches one package rather than five. The
@@ -49,7 +46,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/magnitude"
 	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/skybrightness"
@@ -92,14 +88,42 @@ const DefaultMapBand = "V"
 // seen is a default nobody knows to question.
 const DefaultStarTemperatureK = 5800
 
-// Spec says which preset the data is for, and where.
+// Spec says which preset the data is for, and how its inputs are sourced.
+//
+// # Spec against Option
+//
+// A [Sky] is configured from two places, which is one more than it looks like
+// it should be. The division is that a Spec decides what data is fetched and
+// from where, while an [Option] decides what the assembled Sky reports back.
+//
+// The line between them is not taste. A Spec field is allowed a documented
+// zero-value default, because a caller who leaves one alone gets a stated
+// choice they can look up. An Option exists precisely where that fails —
+// where the zero value is itself a legitimate setting, so an unset field
+// could not be told from a deliberate one. [WithMagSystem] is the case that
+// forced it, and so far the only one.
+//
+// # Why there is no observer in it
+//
+// Almost nothing gathered here depends on where anybody stands: the star map
+// and the dust map are all-sky, and the grid and passband are spectral. Those
+// inputs serve every site at once, which is what lets one [Sky] answer for a
+// whole network of them, and the observer that does matter is the one
+// [Sky.Scene] takes.
+//
+// The airglow spectrum is the exception, and it is why this is [Observatory]
+// rather than a location. SkyCalc models Paranal at three altitudes rather
+// than an arbitrary site, so the place-dependence here cannot be resolved
+// from coordinates — it can only be chosen, and a caller far from those
+// altitudes needs to know they are choosing.
+//
+// A site field would have obscured exactly that. It would look like the
+// answer to the one question this cannot answer, while every computation
+// ignored it in favour of the observer arriving somewhere else entirely.
 type Spec struct {
 	// Preset is the configuration the inputs are gathered for. Required: it
 	// decides whether a solar spectrum is fetched at all.
 	Preset skybrightness.Preset
-
-	// Site is the observer. Required.
-	Site *coord.Geodetic
 
 	// Grid is the spectral axis every component is sampled onto. Zero means
 	// [skybrightness.DefaultOpticalGrid].
@@ -150,7 +174,8 @@ type Spec struct {
 	// SkyCalc is a model.
 	AirglowMeasured bool
 
-	// Emitters is the artificial-light inventory around Site, required by
+	// Emitters is the artificial-light inventory around the observer,
+	// required by
 	// [skybrightness.Observatory] and unused by the others. There is no
 	// default and there cannot be one; see this package's own doc.
 	Emitters []skybrightness.GroundEmitter
@@ -194,10 +219,6 @@ func Endpoints(p skybrightness.Preset) (ids []remote.EndpointID, maxSize int64) 
 // [Endpoints] for what to grant.
 func Inputs(ctx context.Context, spec Spec) (skybrightness.PresetInputs, error) {
 	var zero skybrightness.PresetInputs
-
-	if spec.Site == nil {
-		return zero, fmt.Errorf("%w: needs an observer site", ErrSpec)
-	}
 
 	// Asking the preset for something only a real preset can answer, so an
 	// unknown name fails here rather than after five downloads.

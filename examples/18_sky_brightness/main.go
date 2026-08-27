@@ -61,7 +61,7 @@ func main() {
 
 	fmt.Println("Fetching reference data (first run downloads ~145 MB)...")
 
-	sky, err := dataset.Open(ctx, dataset.Spec{Preset: preset, Site: site})
+	sky, err := dataset.Open(ctx, dataset.Spec{Preset: preset})
 	if err != nil {
 		log.Fatalf("open: %v", err)
 	}

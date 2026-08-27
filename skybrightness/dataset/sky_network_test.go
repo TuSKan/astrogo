@@ -35,7 +35,6 @@ func TestOpenNamesTheConsentItNeeds(t *testing.T) {
 
 	_, err := dataset.Open(context.Background(), dataset.Spec{
 		Preset: skybrightness.GAMBONSWeb,
-		Site:   skySite(t),
 	})
 	if err == nil {
 		t.Fatal("Open succeeded with no consent granted")

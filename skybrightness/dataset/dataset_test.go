@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/TuSKan/astrogo/angle"
-	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/skybrightness"
 	"github.com/TuSKan/astrogo/skybrightness/dataset"
@@ -27,19 +25,11 @@ import (
 func Example() {
 	ctx := context.Background()
 
-	site, err := coord.NewGeodetic(angle.Deg(-70.4045), angle.Deg(-24.6272), 2635)
-	if err != nil {
-		panic(err)
-	}
-
 	// Consent first, and only for what this preset actually fetches.
 	ids, size := dataset.Endpoints(skybrightness.GAMBONSWeb)
 	remote.EnableDownloads(size, ids...)
 
-	in, err := dataset.Inputs(ctx, dataset.Spec{
-		Preset: skybrightness.GAMBONSWeb,
-		Site:   site,
-	})
+	in, err := dataset.Inputs(ctx, dataset.Spec{Preset: skybrightness.GAMBONSWeb})
 	if err != nil {
 		panic(err)
 	}
@@ -110,18 +100,12 @@ func TestEndpointsCoverWhatEachPresetFetches(t *testing.T) {
 
 // Inputs refuses what it cannot honestly supply.
 //
-// Two of these are the package declining to guess. A site has no default
-// because a sky brightness without a place is not a number; a ground-emitter
-// inventory has none because satellite radiance alone cannot determine a
-// source spectrum or an upward emission function, so any default would be
-// reporting somebody else's city.
+// One of these is the package declining to guess: a ground-emitter inventory
+// has no default because satellite radiance alone cannot determine a source
+// spectrum or an upward emission function, so any default would be reporting
+// somebody else's city.
 func TestInputsRefusesAnIncompleteSpec(t *testing.T) {
 	t.Parallel()
-
-	site, err := coord.NewGeodetic(angle.Deg(-70.4045), angle.Deg(-24.6272), 2635)
-	if err != nil {
-		t.Fatalf("NewGeodetic: %v", err)
-	}
 
 	// Offline, so nothing here reaches a service: each case must fail on the
 	// spec before any fetch is attempted.
@@ -133,16 +117,12 @@ func TestInputsRefusesAnIncompleteSpec(t *testing.T) {
 		spec dataset.Spec
 		want error
 	}{{
-		name: "no site",
-		spec: dataset.Spec{Preset: skybrightness.GAMBONSWeb},
-		want: dataset.ErrSpec,
-	}, {
 		name: "unknown preset",
-		spec: dataset.Spec{Preset: "no-such-preset", Site: site},
+		spec: dataset.Spec{Preset: "no-such-preset"},
 		want: skybrightness.ErrPreset,
 	}, {
 		name: "observatory without emitters",
-		spec: dataset.Spec{Preset: skybrightness.Observatory, Site: site},
+		spec: dataset.Spec{Preset: skybrightness.Observatory},
 		want: dataset.ErrSpec,
 	}}
 

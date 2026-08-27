@@ -47,10 +47,7 @@
 //	ids, size := dataset.Endpoints(skybrightness.GAMBONSWeb)
 //	remote.EnableDownloads(size, ids...)
 //
-//	in, err := dataset.Inputs(ctx, dataset.Spec{
-//		Preset: skybrightness.GAMBONSWeb,
-//		Site:   site,
-//	})
+//	in, err := dataset.Inputs(ctx, dataset.Spec{Preset: skybrightness.GAMBONSWeb})
 //	model, err := skybrightness.NewPreset(skybrightness.GAMBONSWeb, in)
 //
 //	est, err := model.Estimate(ctx, skybrightness.Query{
