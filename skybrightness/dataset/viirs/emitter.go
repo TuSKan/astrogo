@@ -32,8 +32,36 @@ import (
 // Kocifaj & Bará say L_S "can be inferred from satellite radiance data",
 // citing Elvidge et al. (2017). That citation is to the data — Elvidge et al.
 // is an instrument and product description, and carries no conversion from a
-// DNB pixel to a line-of-sight radiance. There is, as far as this package's
-// authors can find, no published recipe to implement.
+// DNB pixel to a line-of-sight radiance.
+//
+// # What a published recipe does cover, and what it leaves
+//
+// Aubé et al. (2020), arXiv:2005.14160 §2.4, correct the DNB signal for
+// atmospheric extinction and for subgrid obstacles — trees and buildings that
+// block the low-angle light the satellite would otherwise see — as
+// Ra_corrected = Ra * F_T * F_o, with F_T = 1/(Ta*Tm) and
+//
+//	theta_lim = arctan(d_o / h_o)
+//	F_o = (1 - cos70) / [1 - f_o*cos(theta_lim) + (f_o - 1)*cos70]
+//
+// over obstacle height h_o, lamp-to-obstacle distance d_o and filling factor
+// f_o. For Tenerife's 9 m, 4 m and 0.9 that is F_o about 4.6.
+//
+// It would apply cleanly here: [skybrightness.ArtificialSkyglow] is
+// homogeneous in source strength to 2e-16, so a factor like this belongs on
+// an emitter rather than on a result — better than that paper's own
+// correction, which is applied to model output with one obstacle set for the
+// whole domain and which its authors name as the likely source of their
+// 10 per cent residual.
+//
+// What it does not give is the reason this package still has no absolute
+// scale. F_o integrates over the 0 to 70 degree cone VIIRS samples, so it
+// anchors how much light goes up and says nothing about the *shape* of the
+// upward emission — and near-horizontal emission is what carries skyglow far,
+// which is why Garstang's function carries a z0^4 term at all. Illumina takes
+// that shape, and the source spectra, from its own inventory. So the recipe
+// settles part of one of the four quantities named above, and needs obstacle
+// parameters this package does not have besides.
 //
 // What this package does instead is stated plainly: it sums the upward
 // radiances along each azimuth and places the result at the radiance-weighted

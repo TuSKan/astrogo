@@ -1215,6 +1215,31 @@ legitimately reach `remote` for Earth-orientation data and JPL kernels, both con
 | 2 — published figures and tables | Reproduce reference plots or tables, e.g. Kocifaj 2022 Fig. 1, the Kocifaj 2025 amplification factors. |
 | 3 — cross-model | Compare against ESO SkyCalc, GAMBONS output, published Kocifaj calculations, Illumina-v2. |
 
+**Illumina v2 at Observatorio del Teide is a Level-3 target with numbers already in
+hand.** Aubé et al. (2020), *Restoring the night sky darkness at Observatorio del Teide*
+(arXiv:2005.14160), Table 5 gives the zenith decomposition at OT in Johnson-Cousins B, V and
+R, in W m⁻² sr⁻¹:
+
+| Band | natural `S_bg` (mag arcsec⁻²) | `R_bg` | `R_a` artificial | `R` total |
+| :--- | ---: | ---: | ---: | ---: |
+| B | 22.73 | 2.06e-07 | 3.89e-08 | 2.45e-07 |
+| V | 21.93 | 2.22e-07 | 2.20e-07 | 4.42e-07 |
+| R | 21.18 | 5.10e-07 | 2.24e-07 | 7.34e-07 |
+
+The rows add up — `R_bg + R_a = R` exactly in all three — and the colour is its own check
+that they have been read correctly: artificial light in B is six times weaker than in V,
+which is what a sodium-dominated inventory produces, and the Canaries legislate for it.
+Tables 1 and 2 of the same paper carry ASTMON camera measurements at OT and ORM, and its
+Fig. 6 apportions the V-band artificial zenith radiance: 97 per cent from Tenerife, La
+Orotava 17 per cent, Güímar 11 per cent, Santa Cruz only 7.
+
+**What stops this being a validation today** is not the numbers but the inventory behind
+them. Reproducing `R_a` needs Tenerife's lighting as Illumina models it — per-municipality
+flux, spectra and angular emission functions from that paper's Table A1 — and `dataset/viirs`
+can supply spatial distribution and relative magnitude but not those. So this is a target
+that becomes reachable when an inventory does, and it is recorded here so that the numbers
+do not have to be found again.
+
 **The GAMBONS web tool is a Level-3 target, not a data source.** Its "Calculate Radiance"
 export returns azimuth, altitude and mag arcsec⁻² per pixel — the sky *after* GAMBONS' own
 atmospheric propagation — so it cannot feed this module, which applies its own. It is
@@ -1459,7 +1484,7 @@ allocations.
 | 1 | Atmospheric foundation, into `atmosphere` | **Done.** Scattering, transfer, scale heights and van Rhijn; absorption reads through `dataset/crosssection`. No cross-section dataset is shipped, and deliberately: ozone's Chappuis-band cross section is strongly temperature-dependent, so a reference and a temperature are the caller's scientific choice |
 | 2 | Natural moonless sky (GAMBONS, Gaia DR3) | **Largely built.** DGL, zodiacal light and airglow are implemented and validated; `dataset/starlight` holds the map type, its loader and a Gaia TAP builder. What remains is reference data, not code: an ISL map (requested, or buildable), Kawara's `c` decade (resolved), and band transformations |
 | 3 | Modern Moon (Jones 2013, ROLO, Winkler 2022) | **`ScatteredMoonlight` shipped** — ROLO reflectance + single-scattering transfer with Winkler's multiple-scattering factor, validated at 18.9 mag/arcsec². The solar spectrum is now supplied by `dataset/solar` from CALSPEC. Remaining: Winkler's own model is empirical at one site, so the multiple-scattering factor is a correction rather than a transfer solution |
-| 4 | Artificial clear sky (Kocifaj 2022, VIIRS as source) | **`ArtificialSkyglow` + `dataset/viirs` shipped.** Absolute scale is uncalibrated, but not for the reason an earlier revision of this row gave: Eq. 2 is not missing an area term, and §17 records why that reading was wrong. The real blocker is narrower and is a literature gap rather than a transcription one — Kocifaj & Bará say `L_i` can be inferred from satellite radiance data and cite Elvidge et al. (2017), which is an instrument and product description carrying no DNB-pixel-to-line-of-sight-radiance conversion. There appears to be no published recipe, so none is implemented and `dataset/viirs` uses a stated substitute; directional structure is meaningful, absolute scale is not. Fig. 1 is checked against the properties the paper states about it (`TestKocifaj2022Fig1Curves`); a digitised comparison remains |
+| 4 | Artificial clear sky (Kocifaj 2022, VIIRS as source) | **`ArtificialSkyglow` + `dataset/viirs` shipped.** Absolute scale is uncalibrated, but not for the reason an earlier revision of this row gave: Eq. 2 is not missing an area term, and §17 records why that reading was wrong. The real blocker is narrower and is a literature gap rather than a transcription one — Kocifaj & Bará say `L_i` can be inferred from satellite radiance data and cite Elvidge et al. (2017), which is an instrument and product description carrying no DNB-pixel-to-line-of-sight-radiance conversion. A recipe for **part** of it does exist and was missed when this row was written: Aubé et al. (2020) §2.4, Eqs. 4 and 8–11, correct the DNB signal for atmospheric extinction and for the subgrid obstacles that block the low-angle light the satellite would otherwise see, giving `Ra_corrected = Ra·F_T·F_o` with `F_o = (1 − cos70°)/[1 − f_o·cos θ_lim + (f_o−1)·cos70°]` and `θ_lim = arctan(d_o/h_o)`. It transplants mechanically — this component is homogeneous in source strength to 2e-16, so such a factor applies per emitter rather than to a result, which is better than that paper's own single-obstacle-set correction to model output and avoids the 10 per cent residual they attribute to it. **It does not lift the blocker**, for two reasons: `F_o` integrates over the 0–70° cone VIIRS samples, so it anchors magnitude and says nothing about the upward emission function, and near-horizontal emission is what carries skyglow far; and Illumina takes spectral power distribution and angular emission from its own inventory regardless. It also needs per-region obstacle height, spacing and filling factor, which is a further dataset. So `dataset/viirs` still uses a stated substitute; directional structure is meaningful, absolute scale is not. Fig. 1 is checked against the properties the paper states about it (`TestKocifaj2022Fig1Curves`); a digitised comparison remains |
 | 5 | Clouds (Kocifaj 2007 + 2025) | **Done and validated as far as the papers allow.** `skybrightness.CloudySkyglow` implements Kocifaj (2007) Eq. 27 and the 2025 extension to a fractional deck. Against the paper's own Žilina configuration it amplifies the zenith **122×** over the town against their "more than fifteenfold", raises horizontal illuminance **57.8×** against their "more than fourfold", and **screens beyond about 45 km** — both signs, monotonic between them. The crossover sits further out than their 18.5 km and cannot be reconciled without the cloud albedo and shielding split they do not state; §11.2 records the sweep. The 2007 contour figures are not digitised because the copy in hand is text-only, so its prose claim is checked instead. Two departures are in the component's provenance: Beer-Lambert opacity in place of their stochastic 3D cloud field, and a CF weight on `L_infinity` that their printed Eq. 3 lacks |
 | 6 | External high-fidelity RT (Illumina-v2, precomputed) | Planned |
 | 7 | Operational observatory calibration | Planned |
