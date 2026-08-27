@@ -1595,6 +1595,20 @@ defaults, so all thirty-five parameters are sent every time. And its columns are
 `flux_ael` and `flux_arc` where the documentation says `LAM`, `FLUX_AEL` and `FLUX_ARC`, which
 is why the reader tries both cases.
 
+A fourth was found by a stopwatch rather than by use. The result was not cached, so every
+call went to Garching: three requests and about 3.7 seconds per `dataset.Open`, however
+many times a caller assembled the same inputs — twelve requests for four identical answers
+when building four models over one night. It was the only dataset in the tier without a
+cache, the others resolving through `remote.GetFile` or their own, and `dataset.Open`'s
+documentation meanwhile claimed a warm cache needed no services at all. The returned FITS
+is now kept under a SHA-256 of the whole outgoing request — not of the `Spec`, since the
+answer depends on all thirty-five parameters and several have no `Spec` field, so hashing
+what is actually sent is the only key that cannot silently collide. Reuse is sound because
+SkyCalc is a model rather than an observation: the same parameters give the same spectrum,
+and the only thing a cached copy can go stale against is ESO revising the model. Repeat
+`dataset.Open` went from 3.73 s to 0.72 s. It is a courtesy as much as a speed-up, SkyCalc
+being a shared research service.
+
 Only the two airglow columns are read, not the `flux` total, so what comes back is a
 component to add rather than a sky to subtract from. SkyCalc reports
 photons/s/m²/µm/arcsec²; a radiance is per nanometre, per steradian and in watts, and
@@ -1674,6 +1688,42 @@ GAMBONS at any effort: Koushan's extragalactic values carry 4–7 per cent, Kawa
 transport where the other attenuates directly. Inputs known to five per cent cannot produce
 agreement at twelve digits, and an implementation tuned until they did would only be
 agreeing with itself.
+
+### Two defects that every test in this module passed
+
+**The preset golden tables were a property of the machine rather than of the code.**
+Zodiacal light is a function of solar elongation and moonlight of the Moon's position, so
+both read the Sun and Moon through `ephemeris`, and that path resolves UT1 through IERS
+Earth orientation parameters — which load lazily from a cache a machine either has or has
+not. A developer's machine and a fresh one therefore computed different skies. The
+difference is small, a fraction of a second of UT1 moving the Sun by milliarcseconds, but
+the lock is 1e-12 relative and the measured divergence was **2.5×10⁻⁶ on zodiacal
+radiance**: six orders past it, and nowhere near the FMA rounding that tolerance was sized
+for. All four tables passed locally and all four failed on every CI platform, which means
+they had never once passed there. A `TestMain` now registers `time.ZeroModel` for the whole
+package — which also marks the choice authoritative, so the lazy load cannot silently
+replace it — and the tables are regenerated under it.
+
+**`GarstangEmission` returned zero at exactly the horizon, which silently emptied
+`ArtificialSkyglow`.** Its guard rejected `sin <= 0` where `UpwardEmission` rejects
+`sin < 0`, and `ArtificialSkyglow` evaluates the emission function at *exactly* zero
+elevation by design: a ground source beyond a few kilometres sits at the observer's horizon,
+which is that component's own documented reasoning. Every Garstang-shaped emitter therefore
+contributed exactly nothing, at every distance and in every direction — not an error, just
+an artificial term that was not there. The physics agrees with the arithmetic. At the
+horizon the reflected term vanishes with `cos z₀` and the direct term does not, leaving
+`0.554·q·(π/2)⁴`, about twice the zenith value at Q = q = 0.15; that near-horizontal lobe is
+the entire reason the function carries a `z₀⁴` term, so the guard deleted the largest part
+of the shape it existed to describe. Nothing caught it because every artificial test builds
+its city with `UpwardEmission`, and the one place `GarstangEmission` was exercised —
+`CloudySkyglow` — derives its elevation from geometry and so lands on exactly zero with
+probability zero. It was found by writing an example.
+
+Both share a shape worth naming, because it is not the shape a tolerance fixes: a suite that
+is green because it never asks the question. The first was never asked on a machine without
+a warm cache. The second was never asked of two shipped types in combination — the grid of
+two emission shapes against two skyglow components had three cells filled and one empty, and
+the defect lived in the empty one.
 
 ## 17. Open scientific questions
 
