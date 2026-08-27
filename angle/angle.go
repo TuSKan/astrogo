@@ -195,7 +195,17 @@ func (a Angle) DMSString(precision int) string {
 	d := int64(degVal)
 	rem := (degVal - float64(d)) * 60
 	m := int64(rem)
-	s := (rem - float64(m)) * 60
+
+	// Clamped at zero. m truncates rem, so this difference is non-negative
+	// in exact arithmetic - but on arm64 Go may keep rem in a wider register
+	// for this subtraction than the value int64(rem) truncated, leaving a
+	// difference of about -1e-17. That is invisible until it reaches
+	// FormatFloat, which renders it "-0.0" while the leading-zero branch
+	// above has already written a '0', producing "00h04m0-0.0s". Deg(1) did
+	// exactly that in CI on macOS while passing on every amd64 machine.
+	// math.Max also normalises a negative zero, which is the other way the
+	// sign reaches the seconds field.
+	s := math.Max(0, (rem-float64(m))*60)
 
 	// Round s to the same precision that will actually be printed, once,
 	// up front — the carry check, the leading-zero decision, and the
@@ -271,7 +281,17 @@ func (a Angle) HMSString(precision int) string {
 	h := int64(hVal)
 	rem := (hVal - float64(h)) * 60
 	m := int64(rem)
-	s := (rem - float64(m)) * 60
+
+	// Clamped at zero. m truncates rem, so this difference is non-negative
+	// in exact arithmetic - but on arm64 Go may keep rem in a wider register
+	// for this subtraction than the value int64(rem) truncated, leaving a
+	// difference of about -1e-17. That is invisible until it reaches
+	// FormatFloat, which renders it "-0.0" while the leading-zero branch
+	// above has already written a '0', producing "00h04m0-0.0s". Deg(1) did
+	// exactly that in CI on macOS while passing on every amd64 machine.
+	// math.Max also normalises a negative zero, which is the other way the
+	// sign reaches the seconds field.
+	s := math.Max(0, (rem-float64(m))*60)
 
 	// Round s once up front and reuse it for the carry check, the
 	// leading-zero decision, and the printed digits — see the identical

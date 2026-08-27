@@ -499,29 +499,44 @@ func project(proj string, ra, dec, alpha0, delta0 float64) (x, y float64, err er
 		y = sinDec*cosD0 - cosDec*sinD0*cosDRA
 
 	case "ARC":
-		sinTheta := sinDec*sinD0 + cosDec*cosD0*cosDRA
-		sinTheta = math.Max(-1, math.Min(1, sinTheta))
-		theta := math.Asin(sinTheta)
+		// The angular distance from the reference point, via Atan2 of the
+		// perpendicular and parallel components rather than through Asin.
+		//
+		// Both forms are correct in exact arithmetic and only one survives
+		// floating point. The parallel component IS cos(c), so the obvious
+		// route is c = pi/2 - asin(cos c) - and asin loses half its
+		// significant digits as its argument approaches 1, which is exactly
+		// where the reference point sits. A 2e-16 rounding in that dot
+		// product emerges as a 2e-8 radian error in c, about 4 milliarcsec,
+		// and whether it appears at all depends on whether the machine fuses
+		// the multiply-add: this passed on every amd64 machine and failed in
+		// CI on arm64. Atan2 is well conditioned across the whole range, and
+		// the two components it needs are the ones phi already uses.
+		perpX := cosDec * sinDRA
+		perpY := sinDec*cosD0 - cosDec*sinD0*cosDRA
 
-		r := math.Pi/2 - theta
+		r := math.Atan2(math.Hypot(perpX, perpY), sinDec*sinD0+cosDec*cosD0*cosDRA)
 		if r < 1e-15 {
 			x, y = 0, 0
 		} else {
-			phi := math.Atan2(cosDec*sinDRA, sinDec*cosD0-cosDec*sinD0*cosDRA)
+			phi := math.Atan2(perpX, perpY)
 			x = r * math.Sin(phi)
 			y = r * math.Cos(phi)
 		}
 
 	case "STG":
-		sinTheta := sinDec*sinD0 + cosDec*cosD0*cosDRA
-		sinTheta = math.Max(-1, math.Min(1, sinTheta))
-		theta := math.Asin(sinTheta)
+		// Same conditioning argument as ARC above: the angular distance c
+		// comes from Atan2, and the stereographic radius is 2*tan(c/2).
+		perpX := cosDec * sinDRA
+		perpY := sinDec*cosD0 - cosDec*sinD0*cosDRA
 
-		r := 2 * math.Tan((math.Pi/2-theta)/2)
+		c := math.Atan2(math.Hypot(perpX, perpY), sinDec*sinD0+cosDec*cosD0*cosDRA)
+
+		r := 2 * math.Tan(c/2)
 		if r < 1e-15 {
 			x, y = 0, 0
 		} else {
-			phi := math.Atan2(cosDec*sinDRA, sinDec*cosD0-cosDec*sinD0*cosDRA)
+			phi := math.Atan2(perpX, perpY)
 			x = r * math.Sin(phi)
 			y = r * math.Cos(phi)
 		}
