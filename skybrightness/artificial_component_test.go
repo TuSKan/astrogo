@@ -547,3 +547,51 @@ func TestArtificialSkyglowPhaseWeighting(t *testing.T) {
 		}
 	}
 }
+
+// Skyglow scales exactly with an emitter's radiance.
+//
+// # Why this is a separate property from summing linearly
+//
+// TestArtificialSkyglowSumsLinearly shows that two sources contribute what
+// each does alone — additivity. This is homogeneity: one source made k times
+// brighter produces k times the skyglow. Together they make the component
+// linear in source strength, and that is what licenses applying a calibration
+// factor to an emitter rather than to a result.
+//
+// It matters because published VIIRS corrections are stated that way. Aubé et
+// al. (2020) correct their modelled radiance by F_T*F_o for atmospheric
+// extinction and obstacle blocking of the DNB signal, applied to the model's
+// output with a single obstacle set for the whole domain — which they name as
+// the likely source of their 10 per cent residual. Applying such a factor per
+// emitter instead is strictly better, and only sound if this holds.
+func TestArtificialSkyglowScalesWithSourceRadiance(t *testing.T) {
+	t.Parallel()
+
+	scene := artificialScene(t)
+
+	for _, k := range []float64{2, 4.6, 100} {
+		base, err := skybrightness.NewArtificialSkyglow(
+			[]skybrightness.GroundEmitter{cityAt(t, 0, 20, 1e-3)})
+		if err != nil {
+			t.Fatalf("NewArtificialSkyglow: %v", err)
+		}
+
+		scaled, err := skybrightness.NewArtificialSkyglow(
+			[]skybrightness.GroundEmitter{cityAt(t, 0, 20, 1e-3*k)})
+		if err != nil {
+			t.Fatalf("NewArtificialSkyglow: %v", err)
+		}
+
+		x := radianceAt(t, base, scene, 45, 0)
+		y := radianceAt(t, scaled, scene, 45, 0)
+
+		if x <= 0 {
+			t.Fatalf("the unscaled source gives %.4g", x)
+		}
+
+		if rel := math.Abs(y/x-k) / k; rel > 1e-12 {
+			t.Errorf("scaling the source by %g scaled the sky by %g, a relative error of "+
+				"%.3g; the component must be homogeneous in source strength", k, y/x, rel)
+		}
+	}
+}
