@@ -208,3 +208,43 @@ func TestAerosolPresetsCarryTheirOPACScaleHeight(t *testing.T) {
 		}
 	}
 }
+
+// The indicative optical depths are ordered and physically plausible.
+//
+// # What this guards, given they are three constants
+//
+// A transposition. These are the numbers a caller with no measurement types
+// instead of inventing one, and their whole value is that clean < continental
+// < urban — swap two and every downstream answer stays positive, stays
+// smooth, and is wrong in a direction nobody notices, since an aerosol
+// optical depth of 0.3 is as valid-looking as one of 0.03.
+//
+// The bounds are deliberately loose. They are not a claim about any site: an
+// AOD below 0.01 is cleaner than the cleanest observed background and one
+// above 1 is a dust storm, so anything landing outside says the constant was
+// mistyped rather than that a judgement was revised.
+func TestIndicativeAODsAreOrderedAndPlausible(t *testing.T) {
+	t.Parallel()
+
+	ordered := []struct {
+		name string
+		aod  float64
+	}{
+		{"CleanMountainAOD550", CleanMountainAOD550},
+		{"ContinentalAOD550", ContinentalAOD550},
+		{"UrbanAOD550", UrbanAOD550},
+	}
+
+	for i, c := range ordered {
+		if c.aod < 0.01 || c.aod > 1 {
+			t.Errorf("%s is %g, outside the 0.01 to 1 an aerosol optical depth at 550 nm "+
+				"plausibly takes", c.name, c.aod)
+		}
+
+		if i > 0 && c.aod <= ordered[i-1].aod {
+			t.Errorf("%s is %g and %s is %g; these are ordered from the cleanest air to "+
+				"the dirtiest, and the ordering is the whole of what they assert",
+				c.name, c.aod, ordered[i-1].name, ordered[i-1].aod)
+		}
+	}
+}

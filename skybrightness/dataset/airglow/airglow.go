@@ -15,19 +15,24 @@
 package airglow
 
 import (
+	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"math"
 	"net/url"
+	"path"
 	"strings"
 
 	"github.com/TuSKan/astrogo/constants"
 	"github.com/TuSKan/astrogo/fits"
 	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/remote/api"
+	"github.com/TuSKan/astrogo/remote/file"
 	"github.com/TuSKan/astrogo/skybrightness"
 	"github.com/TuSKan/astrogo/unit"
 )
@@ -229,13 +234,108 @@ func Fetch(ctx context.Context, spec Spec) (*Spectrum, error) {
 	return spectrum, nil
 }
 
-// fetchRequest posts an already-built request and parses what comes back.
+// fetchRequest returns the spectrum for an already-built request, from the
+// cache when it is there and from SkyCalc when it is not.
 //
 // Separate from [Fetch] so that a caller inside this package can vary a field
 // the Spec does not expose — the wavelength gridding and the line-spread
 // function, in particular — without rebuilding the three-call protocol around
 // it.
+//
+// # Why this caches at all
+//
+// Because SkyCalc is a shared research service and this is the one dataset in
+// the tier that was hitting it on every single call. The star map, the dust
+// map and the solar spectrum all resolve through [remote.GetFile]; the
+// passband caches its own profile; this went to Garching three times per
+// request, for ~3.7 seconds, however many times a caller assembled the same
+// inputs. Building four models over one night meant twelve requests for four
+// identical answers.
+//
+// The answer is reusable because SkyCalc is a model rather than an
+// observation: the same parameters give the same spectrum, so the only thing
+// a cached copy can go stale against is ESO revising the model itself. That is
+// the same bargain [github.com/TuSKan/astrogo/skybrightness/dataset/passband]
+// already makes with SVO, and clearing the cache directory is the way out of
+// it.
 func fetchRequest(ctx context.Context, req skycalcRequest) (*Spectrum, error) {
+	bucket, key, cacheErr := cacheLocation(ctx, req)
+	if cacheErr == nil {
+		if spectrum, ok := cached(ctx, bucket, key); ok {
+			return spectrum, nil
+		}
+	}
+
+	raw, err := fetchSkytable(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+
+	spectrum, err := Parse(bytes.NewReader(raw))
+	if err != nil {
+		return nil, err
+	}
+
+	if cacheErr == nil {
+		// A cache write that fails costs a request next time and nothing else.
+		_ = file.Save(ctx, bucket, key, bytes.NewReader(raw))
+	}
+
+	return spectrum, nil
+}
+
+// cacheLocation resolves where one request's skytable is kept.
+//
+// Keyed on the whole request rather than on the fields [Spec] exposes.
+// SkyCalc's answer is a function of all thirty-five parameters, several of
+// which this package sets without a Spec field for them, so hashing what is
+// actually sent is the only key that cannot silently collide — and a
+// parameter added later changes it without anyone having to remember this
+// function exists.
+func cacheLocation(ctx context.Context, req skycalcRequest) (*file.Bucket, string, error) {
+	bucket, prefix, err := remote.CacheDir(ctx, remote.ESOSkyCalc)
+	if err != nil {
+		return nil, "", fmt.Errorf("%w: cache: %w", ErrService, err)
+	}
+
+	// Marshalling a struct is deterministic in Go — fields in declaration
+	// order — which is what makes this usable as a key at all.
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, "", fmt.Errorf("%w: cache key: %w", ErrService, err)
+	}
+
+	sum := sha256.Sum256(body)
+
+	return bucket, path.Join(prefix, "skytable-"+hex.EncodeToString(sum[:])+".fits"), nil
+}
+
+// cached reads a previously fetched skytable, reporting whether it was there
+// and usable.
+func cached(ctx context.Context, bucket *file.Bucket, key string) (*Spectrum, bool) {
+	r, err := bucket.NewReader(ctx, key, nil)
+	if err != nil {
+		return nil, false
+	}
+
+	defer func() { _ = r.Close() }()
+
+	// A cached table that will not parse is not worth failing over: fall
+	// through and fetch it again, exactly as the passband cache does.
+	spectrum, err := Parse(r)
+	if err != nil {
+		return nil, false
+	}
+
+	return spectrum, true
+}
+
+// fetchSkytable runs SkyCalc's three-call protocol and returns the FITS bytes.
+//
+// The bytes rather than a parsed spectrum, because they are what gets cached:
+// [Parse] is this package's own reader and re-running it on a cached file is
+// cheap, while re-running the request is three round trips to Garching.
+func fetchSkytable(ctx context.Context, req skycalcRequest) ([]byte, error) {
 	client, err := api.NewClient(remote.ESOSkyCalc)
 	if err != nil {
 		return nil, fmt.Errorf("airglow: client: %w", err)
@@ -275,12 +375,12 @@ func fetchRequest(ctx context.Context, req skycalcRequest) (*Spectrum, error) {
 
 	defer func() { _ = body.Close() }()
 
-	spectrum, err := Parse(body)
+	raw, err := io.ReadAll(body)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%w: reading skytable.fits: %w", ErrService, err)
 	}
 
-	return spectrum, nil
+	return raw, nil
 }
 
 // Parse reads a SkyCalc skytable.fits into a spectrum.

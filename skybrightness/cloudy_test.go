@@ -535,3 +535,44 @@ func TestCloudScreensAwayFromTheCityAndAmplifiesOverIt(t *testing.T) {
 		})
 	}
 }
+
+// CloudySkyglow works over an UpwardEmission source too.
+//
+// # Why the combination is worth its own test
+//
+// Because the four pairings of two emission shapes against two skyglow
+// components are four separate code paths through
+// [skybrightness.EmissionShape], and three of them were covered while this one
+// was not. The gap in that grid is exactly where GarstangEmission's horizon
+// guard hid: it was exercised only here, where the elevation comes from
+// geometry and lands on precisely zero with probability zero, so the defect
+// stayed invisible until ArtificialSkyglow — which evaluates at exactly zero
+// by design — met it in an example.
+//
+// This is the last empty cell. It asserts the same physical claim the
+// Garstang pairing does, rather than merely a non-zero number: an overcast
+// deck over a city brightens the sky beneath it, whichever shape describes
+// how the city emits.
+func TestCloudySkyglowWorksWithUpwardEmission(t *testing.T) {
+	t.Parallel()
+
+	city := cityAt(t, 0, 2, 1e-3)
+	city.Emission = skybrightness.UpwardEmission{Cosine: 1, HorizontalFraction: 0.3}
+
+	c, err := skybrightness.NewCloudySkyglow([]skybrightness.GroundEmitter{city})
+	if err != nil {
+		t.Fatalf("NewCloudySkyglow: %v", err)
+	}
+
+	clearSky := radianceAt(t, c, cloudyScene(t, 0, 0), 90, 0)
+	overcast := radianceAt(t, c, cloudyScene(t, 1000, 0.7), 90, 0)
+
+	if clearSky <= 0 {
+		t.Fatalf("the clear sky is %.4g over a Lambertian city, which is not a sky", clearSky)
+	}
+
+	if overcast <= clearSky {
+		t.Errorf("overcast %.4g is not brighter than clear %.4g; the cloud term must "+
+			"return escaping light whatever the emission shape", overcast, clearSky)
+	}
+}
