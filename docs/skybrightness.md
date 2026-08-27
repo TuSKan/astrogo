@@ -1439,19 +1439,35 @@ of the physics.
 | :--- | :--- |
 | Superseded, re-derived | Spectral grid and integration, provenance, quality, uncertainty shapes. |
 | Moved to their proper packages | Instrument → `optics`; passband and derived outputs → `magnitude`; transmission → `atmosphere`. |
-| Legacy-only, explicitly named | KS91 → `LegacyKS91`; constant airglow → named climatology fallback. |
+| ~~Legacy-only, explicitly named~~ | **Not carried out, and the record should say so.** The plan was `KS91 → LegacyKS91` with the constant airglow kept as a named climatology fallback. Neither exists. KS91 was deleted outright rather than preserved under a legacy name, because a closed-form V-band fit has no spectrum to project and keeping it would have meant shipping a component that cannot answer the question this module asks; and the constant airglow became a fetched SkyCalc spectrum rather than a fallback, so there is nothing left to fall back *to*. |
 | Deleted | `bortle.go`, `natural.TophatJohnson`, `natural.NewFastEngine`, `mode.go` (replaced by `Fidelity`), `scratch.go`, `atmos.RayleighOnly`, `limitingmag.go`. |
 
 `plan.LimitingMagnitudeConstraint`, `plan.ScoreObservableSky` and examples 18 and 21 were
-removed with it; they return once Phases 2–3 make a defensible limiting magnitude possible.
-`plan.MeteorShower.ObservedRate` now takes a limiting magnitude directly, which decoupled
-meteor-rate arithmetic from sky brightness entirely.
+removed with it. **Example 18 has returned. The other three have not**, and the condition
+originally written here — "once Phases 2–3 make a defensible limiting magnitude possible" —
+has since been half-met in a way worth stating precisely rather than leaving as a promise
+nobody is tracking.
+
+The *sky* half is done: Phase 3 shipped and validated, and what remains of Phase 2 is
+reference data rather than code. The *detection* half was never the sky's problem and has
+not been started. A limiting magnitude is a contrast threshold against a background, not a
+property of the background — it depends on the eye or the detector, the exposure, the
+aperture and the observer's own acuity, none of which is in this module's scope. The
+obvious candidate is precisely the wrong one: V1 converted through Schaefer (1990) from an
+SQM reading, which consumes a V-band scalar and would discard the spectrum this module
+exists to preserve.
+
+So **`plan` imports nothing from `skybrightness` today**, and that is the honest state
+rather than an oversight. The gap and what would close it are recorded in §16.
+`plan.MeteorShower.ObservedRate` takes a limiting magnitude directly, which decoupled
+meteor-rate arithmetic from sky brightness entirely and is why nothing in `plan` is
+currently blocked on any of this.
 
 ---
 
 ## 15. Phase roadmap
 
-**What the module can and cannot do today.** All five components are implemented and the
+**What the module can and cannot do today.** All seven components are implemented and the
 engine runs them together. Assembled over Paranal on a moonless night — a reference airglow
 spectrum, a stand-in uniform dust map and one modest city 30 km away — it produces:
 
@@ -1554,6 +1570,7 @@ Nothing is optimised yet; that is Phase 8. The point is numbers before opinions.
 | ~~SkyGlow Simulator governing equations~~ | **Resolved.** Kocifaj (2007), *Appl. Opt.* **46**, 3013–3022 is in hand — the author's own preprint, which carries the full Section 2 derivation the PNAS 2025 paper points back to. It is the only one of the four that was needed, and the other three are now positively ruled out rather than merely deprioritised: this paper already handles "real finite-dimensional surface sources … in contrary to frequently used point-source approximation", which is what Kocifaj (2008) was wanted for; it works in the first scattering order, which the 2018 JQSRT abstract calls sufficient below 30 km; and it treats the cloud reflectance `ρ` as an input rather than deriving it, adopting scalar values directly, which is exactly the shape of `atmosphere.CloudLayer.Albedo`. See §11.2 for the equation map. |
 | A published AOD climatology asset | Nothing — deferred, not blocked | **Decided against for now (2026-08-26).** `atmosphere.CleanMountainAOD550` and its siblings are judged sufficient as the offline path, and `cams.AOD550` already serves anyone who wants the real hour. The design, if it is ever wanted: a **monthly median** of CAMS `aod550` on its own 0.4-degree grid, published as a release asset the way `starmap-v2` is, so the zero-setup path stops being a stated guess. Monthly because the seasonal cycle is the dominant signal — the Indo-Gangetic 1.07 measured here is a *January* number and the Saharan maximum moves thousands of kilometres by July, which is what broke this module's first grid-orientation test. Median rather than mean because AOD is skewed and a few dust events drag a mean above any typical night; 10th and 90th percentiles alongside it would let a caller carry a spread instead of a number pretending to certainty. Roughly 58 MB raw for twelve months and three percentiles, and smooth enough to compress toward `starmap-v2`'s order. Two things to settle first: the exact wording of the Copernicus licence on redistributing a derived product, which is the whole basis for publishing one instead of sharing credentials, and whether a three-day sampling across the four available years (~700 MB fetched) is enough for the median or whether it wants every day (~2.1 GB). |
 | **Cloud reaches only the artificial term** | A physically consistent cloudy sky, and any preset for one | **Not a data gap — a capability gap.** `scene.Atmosphere.Clouds()` is read in exactly one place in this module, `CloudySkyglow.deck`, so a deck in the atmosphere changes artificial skyglow and nothing else: moonlight, integrated starlight, diffuse galactic light, zodiacal light and airglow are all evaluated as though the sky were clear. Three different problems sit behind that one sentence. **Extraterrestrial light under cloud** — starlight, zodiacal, extragalactic, and the Moon's direct beam — needs the deck as an attenuator, and the line-of-sight opacity already exists as `cloudDeck.opacity`; what makes it more than plumbing is that a broken deck is binary per realisation while that function is the ensemble mean, so a fractional cover would return a sky nobody standing under it ever sees. **Moonlight under cloud** is a different model rather than a factor: the Moon sits *above* the deck and lights it from above, making the cloud base a bright extended source, which is the mirror image of the ground-source geometry Kocifaj (2007) solves and is not reachable from it by changing the limits of integration. **Airglow** is a third case again, since its emitting layer at 87 km is above any deck, so what a cloud does to it is block it rather than scatter it. Until those exist, note what is and is not constructible today: no preset registers `CloudySkyglow`, and it shares the `Artificial` `ComponentID` with `ArtificialSkyglow` so `NewModel` refuses to hold both — a cloudy model must be assembled by hand, swapping the artificial term rather than adding to a preset. Such a model runs, and its artificial term is right, but a total from it is internally inconsistent and should not be quoted. |
+| **A detection model for limiting magnitude** | Re-wiring `plan` to `skybrightness`: `plan.LimitingMagnitudeConstraint` and `plan.ScoreObservableSky`, and `examples/21_meteor_shower_forecast` | **Not a data gap, and not really this module's gap either.** Sky radiance is the background; a limiting magnitude is a *threshold against* that background, and it depends on the eye or detector, integration time, aperture, magnification and observer acuity. Producing one needs a visual-contrast model — Blackwell (1946) by way of Schaefer (1990), or Crumey (2014), which is the more modern treatment and is derived against a stated photometric system rather than against an SQM number. The candidate to avoid is the one V1 used: Schaefer's SQM→NELM conversion consumes a single V-band scalar, so routing this module's spectrum through it would discard the spectrum in the first step, and every instrument projection built on it would inherit that. What is needed before any of it: a decision on whose contrast model, and a home for it — `optics` already owns detector rates and is the better fit than either `plan` or `skybrightness`. |
 | Jones et al. (2013) confirmation | Phase 3 framing | Confirm the A&A open-access text. |
 | Illumina-v2 product format | Phase 6 | A sample precomputed product and its dimension conventions. |
 

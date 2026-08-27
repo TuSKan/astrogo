@@ -645,7 +645,7 @@ flowchart TD
 | `skybrightness/dataset` | The only tier that performs I/O: star map, dust map, airglow spectrum, passband, solar spectrum and ground-emitter inventory, assembled by `dataset.Open` into a ready-to-evaluate `Sky` | ✅ Stable |
 | `unit` | Physical unit and quantity system | ✅ Stable |
 
-See [`VALIDATION.md`](docs/VALIDATION.md) for scientific validation status, [`USNO.md`](docs/USNO.md) for the U.S. Naval Observatory accuracy report (41/41 tests passing, ≤0.6 min rise/set accuracy across 3 continents + polar/equatorial/8849m edge cases), and the FINK/ZTF sHG1G2 validation (100% match at 0.025 mag against the phunk production pipeline).
+See [`skybrightness.md`](docs/skybrightness.md) for the sky-brightness engine — it is the single source for that module and carries what no other file does: the scientific baseline with a primary reference per model, the equation→function→test maps, the validation record, the phase roadmap, the unresolved dependencies and the open scientific questions. Everything said about `skybrightness` elsewhere in this README is a summary of it. See [`VALIDATION.md`](docs/VALIDATION.md) for scientific validation status, [`USNO.md`](docs/USNO.md) for the U.S. Naval Observatory accuracy report (41/41 tests passing, ≤0.6 min rise/set accuracy across 3 continents + polar/equatorial/8849m edge cases), and the FINK/ZTF sHG1G2 validation (100% match at 0.025 mag against the phunk production pipeline).
 
 ---
 
