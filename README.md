@@ -507,9 +507,9 @@ A spectral, all-sky sky-radiance engine — `L_λ(λ, direction, observer, time,
 
 Nothing is segmented into a private copy: atmospheric physics lives in `atmosphere`, passbands and magnitude systems in `magnitude`, instrument throughput and detector rates in `optics`, spectral types and the shared wavelength axis in `unit`. `skybrightness` owns only radiance transport — `Scene`, `Component`, `Model`/`Query`/`Estimate`, uncertainty, quality, provenance, and all-sky operations.
 
-The scientific baseline is deliberately not the usual "KS91 moonlight + constant dark sky + Bortle/VIIRS zenith value": artificial skyglow follows Kocifaj, Bará & Falchi (2022) with clouds per Kocifaj, Falchi & Kundracik (2025); the Moon follows Jones et al. (2013) with Kieffer–Stone reflectance and Winkler (2022) scattering; the natural sky follows GAMBONS. A component whose primary literature cannot be obtained is **not implemented** rather than approximated.
+The scientific baseline is deliberately not the usual "KS91 moonlight + constant dark sky + Bortle/VIIRS zenith value": artificial skyglow follows Kocifaj, Bará & Falchi (2022) with clouds per Kocifaj, Falchi & Kundracik (2025); the Moon uses Kieffer & Stone (2005) ROLO reflectance with Winkler (2022) multiple scattering, and is deliberately *not* Krisciunas & Schaefer (1991); the natural sky follows GAMBONS. A component whose primary literature cannot be obtained is **not implemented** rather than approximated.
 
-> **Status: Phase 0.** The spectral foundation ships today and contains **no physics** — an empty model returns zero radiance and flags itself as such. It makes no accuracy claim. See [`docs/skybrightness.md`](docs/skybrightness.md) for the full design, per-component equation-to-test maps, validation strategy, phase roadmap and open questions.
+> **Status: Phases 0–5 complete.** Seven components ship — integrated starlight, diffuse galactic light, the extragalactic background, zodiacal light, airglow, scattered moonlight, and artificial skyglow in clear air or under cloud — behind four named presets (`GAMBONSWeb`, `NaturalSky`, `GAMBONSFull`, `Observatory`), each carrying its own radiative transfer so a caller cannot silently evaluate one model's components under another's transport. Measured: the astronomical sky agrees with GAMBONS' own published run to **0.05 mag**; a near-full Moon comes out at **18.9 mag/arcsec²** in V against an independently-known ~18; an overcast deck over a city amplifies the zenith **88×** while *screening* at **0.80×** 60 km away, which is the behaviour a universal cloud multiplier cannot produce and the reason this is radiative transfer rather than a factor. Phases 6 and 7 are blocked on other people's data rather than on code. See [`docs/skybrightness.md`](docs/skybrightness.md) for the equation-to-test maps, the full validation record, the phase roadmap and the open questions.
 
 ### Event Solver
 - **Unified `Solver`** — Chandrupatla root-finding (1997) + Brent's minimization
@@ -592,8 +592,13 @@ flowchart TD
 
     skybrightness --> angle
     skybrightness --> unit
-    lpmap --> remote
-    passband --> remote
+    skybrightness --> coord
+    skybrightness --> atmosphere
+    skybrightness --> magnitude
+    skybrightness --> ephemeris
+
+    sbdata["skybrightness/dataset"] --> skybrightness
+    sbdata --> remote
 
     coord --> atmosphere
     coord --> time
@@ -636,7 +641,8 @@ flowchart TD
 | `fits` | FITS I/O, WCS (TAN projection), mmap, Arrow export | ✅ Stable |
 | `fits/plan` | FITS↔plan bridge (`SiteFromFITS`, `TargetFromFITS`) | ✅ Stable |
 | `plan` | Observability, constraints, events, scheduling, satellite passes | ✅ Stable |
-| `skybrightness` | Spectral all-sky radiance engine (`Scene`/`Component`/`Model`/`Estimate`, all-sky ops, uncertainty, provenance) | 🟡 Phase 0 (foundation, no physics) |
+| `skybrightness` | Spectral all-sky radiance engine (`Scene`/`Component`/`Model`/`Estimate`, all-sky ops, uncertainty, provenance) — seven components behind four named presets | ✅ Phases 0–5 (natural sky validated to 0.05 mag against GAMBONS) |
+| `skybrightness/dataset` | The only tier that performs I/O: star map, dust map, airglow spectrum, passband, solar spectrum and ground-emitter inventory, assembled by `dataset.Open` into a ready-to-evaluate `Sky` | ✅ Stable |
 | `unit` | Physical unit and quantity system | ✅ Stable |
 
 See [`VALIDATION.md`](docs/VALIDATION.md) for scientific validation status, [`USNO.md`](docs/USNO.md) for the U.S. Naval Observatory accuracy report (41/41 tests passing, ≤0.6 min rise/set accuracy across 3 continents + polar/equatorial/8849m edge cases), and the FINK/ZTF sHG1G2 validation (100% match at 0.025 mag against the phunk production pipeline).

@@ -69,11 +69,18 @@ type VisibleObject struct {
 	// above is always computed within Windows[0] specifically.
 	Windows []Window
 	// SkyNote is a Moon-proximity advisory (e.g. "Moon 87% illuminated,
-	// 12° away — may be washed out"), empty otherwise. This is a
-	// heuristic, not the full skybrightness-package light-pollution model
-	// (which needs a caller-supplied light-pollution grid) — a caller
-	// wanting that should layer plan.LimitingMagnitudeConstraint/
-	// ScoreObservableSky themselves using this object's Target/Windows.
+	// 12° away — may be washed out"), empty otherwise.
+	//
+	// A heuristic on Moon separation and illumination, not a sky-brightness
+	// model: it does not know the observer's air, where the Milky Way is, or
+	// whether there is a city over the hill. A caller wanting the real
+	// number evaluates
+	// [github.com/TuSKan/astrogo/skybrightness/dataset.Sky] at this object's
+	// Target and Windows and compares surface brightness themselves. There is
+	// no constraint or scorer wired to it here, deliberately: turning a sky
+	// radiance into a limiting magnitude needs a defensible detection model,
+	// and that is gated behind the same phases the skybrightness roadmap
+	// gates it behind.
 	SkyNote string
 }
 

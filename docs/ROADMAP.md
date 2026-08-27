@@ -88,27 +88,43 @@ on when to commit to the API-stability promise.
 
 **Goal:** model the constraints that real observers face beyond altitude and airmass.
 
-## 28. Sky Brightness & Limiting Magnitude Constraint
+## 28. Sky Brightness
 
-**Status:** ✅ v0.2.0
+**Status:** ✅ Phases 0–5 — **superseded and rewritten**
 
-Delivered as the `skybrightness` package (physics engine) plus a
-`LimitingMagnitudeConstraint` in `plan`. Sky surface brightness is decomposed into
-additive components summed in linear flux space, from which a derived limiting
-magnitude scores or gates targets — going well beyond a static light-pollution floor.
+Originally delivered in v0.2.0 as a magnitude-space model with a
+`LimitingMagnitudeConstraint` in `plan`. That version was **removed in its entirety**
+and rebuilt as a spectral all-sky radiance engine with no backward compatibility, because
+the original made three assumptions that cannot be repaired incrementally: it summed a
+scalar per component rather than a spectrum, so a correct V magnitude could sit on an
+entirely wrong spectrum and every instrument projection would be wrong; it took a
+light-pollution floor as an input rather than propagating light from sources; and its Moon
+was a closed-form V-band fit with no spectrum to project at all.
 
-- [x] `Floor` component — scalar SQM, directional `SQMGrid`, lossy `FloorFromBortle` (SQM canonical)
-- [x] `Moonlight` component — Krisciunas & Schaefer (1991) scattered moonlight (~8–23% accuracy)
-- [x] `ZodiacalLight` component — Leinert (1998) Table 17, bilinear interpolation
-- [x] `Airglow` component — dark-sky floor (Noll 2012 / Patat 2008)
-- [x] `CompositeModel` — linear-flux-space summation, allocation-free hot path
-- [x] `VisualLimitingMag` — Schaefer (1990) / Unihedron SQM→NELM conversion
-- [x] Per-target minimum limiting magnitude threshold (`Required`)
-- [x] Soft monotonic ramp scoring + `Boolean` hard-cutoff mode
-- [x] Integration with `ScoreObservable` via `ScoreObservableSky`
+Nothing from the original checklist survives by name — `Floor`, `SQMGrid`,
+`FloorFromBortle`, `CompositeModel`, `VisualLimitingMag`, `ScoreObservableSky` and
+`LimitingMagnitudeConstraint` are all gone. See the CHANGELOG's `### Removed` entries.
 
-**Inspiration:** ESO Cerro Paranal sky model (Noll et al. 2012), Falchi et al. 2016,
-Krisciunas & Schaefer 1991, Leinert et al. 1998.
+What ships now:
+
+- [x] Spectral radiance `L_λ(λ, direction, observer, time, atmosphere)`, summed in linear
+      radiance space and kept spectral until projection
+- [x] Integrated starlight (Gaia DR3 order-8 map), diffuse galactic light (Kawara 2017),
+      extragalactic background, zodiacal light (Leinert 1998), airglow (van Rhijn over a
+      fetched ESO SkyCalc spectrum)
+- [x] Scattered moonlight — Kieffer & Stone (2005) ROLO reflectance, Winkler (2022)
+      multiple scattering. Explicitly **not** Krisciunas & Schaefer (1991)
+- [x] Artificial skyglow in clear air (Kocifaj, Bará & Falchi 2022) and under cloud
+      (Kocifaj 2007 Eq. 27 + Kocifaj, Falchi & Kundracik 2025)
+- [x] Four named presets carrying their own radiative transfer, so a model cannot be
+      silently evaluated under another's transport
+- [x] A dataset tier (`skybrightness/dataset`) that is the only part permitted to do I/O
+- [ ] **Limiting magnitude returns when Phases 2–3 make a defensible one possible.** It was
+      removed rather than kept, because a limiting magnitude derived from a wrong spectrum
+      is a confident number rather than a useful one
+
+**Inspiration:** GAMBONS (Masana et al. 2021, 2024), Kocifaj's skyglow series,
+Kieffer & Stone (2005), Leinert et al. (1998), ESO SkyCalc.
 
 ---
 

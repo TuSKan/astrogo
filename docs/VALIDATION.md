@@ -74,10 +74,16 @@ Validation should be:
 | Satellite magnitude | ✅ validated | McCants/Molczan | 0.1 mag | Sphere/cylinder phase functions, range scaling |
 | Star extinction | ✅ validated | Bouguer law | 0.01 mag | Altitude-dependent k(λ), Gaia G→V transformation |
 | FINK SSOFT provider | ✅ validated | [FINK REST API v2.5](https://api.ztf.fink-portal.org/swagger.json) | exact schema | Single-object JSON + bulk parquet, r-band preference, fit/status filtering, version pinning (v2025.04) |
-| Scattered moonlight | ⚠️ partially validated | Krisciunas & Schaefer (1991) | ~8–23% (paper's own stated accuracy) | Closed-form KS-1991 model; self-consistency and monotonicity tested, not yet cross-validated against an independent sky-brightness dataset |
+| Natural sky, end to end | ✅ validated | GAMBONS published run (Masana et al. 2021, 2024) | 0.05 mag | Astronomical sky with airglow removed: **21.79 against their 21.74** at the Barcelona zenith — two implementations sharing no code, no catalogue aggregation and no radiative transfer. Including airglow the gap is +0.28, which is a disagreement about airglow level rather than about transport |
+| Scattered moonlight | ✅ validated | Kieffer & Stone (2005) ROLO 311g + Winkler (2022) | ~1 mag | **18.9 mag/arcsec² in V** for a near-full Moon, against an independently-known ~18. Deliberately **not** Krisciunas & Schaefer (1991): that is a closed-form V-band fit with no spectrum to project through a passband or an instrument |
+| Artificial skyglow, clear air | ⚠️ physical claims only | Kocifaj, Bará & Falchi (2022) | — | Falls with distance, and is homogeneous in source strength to **2×10⁻¹⁶**. An absolute check needs a real emitter inventory; satellite radiance alone cannot supply one, since the same VIIRS pixel is produced by many different real installations. See [`docs/skybrightness.md`](skybrightness.md) §16 |
+| Artificial skyglow, under cloud | ✅ validated | Kocifaj, Falchi & Kundracik (2025) | sign and order | Over a city an overcast deck amplifies the zenith **88×**; 60 km away the same deck **screens at 0.80×**. Both signs come out of the geometry, which is what a universal cloud multiplier cannot do. Reproducing their Žilina run: **122.5×** at the zenith against their "more than fifteenfold", **57.8×** horizontal illuminance against "more than fourfold" |
+| Integrated starlight map | ✅ validated | Gaia DR3 + Tycho-2 | see notes | The map's absolute scale has no free parameter, so validating it means validating its three links: Gaia G VEGAMAG zero point **25.687367** (scatter 3×10⁻⁷ over 177,426 sources), G→V transformation **−0.002 mag** against 4,000 Tycho-2 stars, and HEALPix tiling **exact** on counts with flux conserved to 2.4×10⁻¹¹ |
+| SFD dust map, local vs service | ✅ validated | IRSA/IPAC dust service | median ratio 1.00001 | 1,979 directions; 5th–95th percentile 0.956–1.056, the spread being interpolation across a 2.37′ pixel |
+| Gaia archive agreement | ✅ validated | ESA `gea.esac.esa.int` vs Gaia@AIP | 0.0000 mas | 340 sources over one cone at the north galactic pole, with identical source sets. The field is sized against the query's `TOP N` cap on purpose — a truncated result is an arbitrary subset, so two archives could differ in truncation rather than in data |
+| CAMS aerosol optical depth | ✅ validated | physical geography | orientation | The ECMWF grid convention is an assumption a reader cannot see, so it is checked against where aerosol actually is: Indo-Gangetic **1.07** and eastern China 0.69 against Antarctic **0.043** and mid-Pacific 0.157 |
 | Zodiacal light | ✅ validated | Leinert et al. (1998) Table 17 | analytical | Bilinear interpolation of the 500 nm SI radiance table; cross-validated against Table 16's S10(V)⊙ values via the 1.28×10⁻⁸ W conversion |
-| Airglow | ✅ validated | Noll et al. (2012) / Patat (2008) | analytical | Constant dark-sky floor, literature value |
-| Light-pollution floor / Bortle | ⚠️ partially validated | Falchi et al. (2016) | lossy (Bortle) / exact (SQM) | SQM↔radiance conversion exact; `FloorFromBortle`'s Bortle→SQM mapping is a documented lossy approximation, not a physical model |
+| Airglow | ✅ validated | ESO SkyCalc (live) | analytical | van Rhijn geometry over a fetched zenith spectrum, not a constant floor. The band mean over 500–600 nm is **22.37 mag/arcsec²** at Paranal with msolflux 100, which is what dark-site zenith airglow is; an independent hand-worked example in the offline tests lands at 22.00 |
 
 > **Note:** Both the [NASA Five Millennium Eclipse Catalogs](https://eclipse.gsfc.nasa.gov/LEcat5/LEcatalog.html) and the [AstroPixels Moon Phase Tables](https://astropixels.com/ephemeris/phasescat/phasescat.html) are computed by **Fred Espenak** using the same ΔT model (Espenak & Meeus 2006). The `time.DeltaT()` polynomial includes the secular acceleration correction `c = -0.000012932*(y-1955)²` to convert from Morrison & Stephenson's assumed n-dot (−26.0 arcsec/cy²) to the Lunar Laser Ranging value (−25.858 arcsec/cy²) used by both ELP-2000/82 and DE441. For historical dates (pre-1972), `TT()` and `TDB()` automatically apply ΔT, so users never need to handle time scale conversion manually.
 
@@ -88,8 +94,11 @@ Validation should be:
 The following areas are not yet considered scientifically complete:
 
 - Advanced observation scheduling optimization
-- Scattered-moonlight sky brightness (KS-1991) — not yet cross-validated against an independent sky-brightness dataset (e.g. a Cerro Paranal or ESO sky-model comparison); currently relies on the model's own published ~8–23% accuracy figure
-- `FloorFromBortle`'s Bortle-class → SQM mapping is a documented lossy approximation, not a physical model
+- **Artificial skyglow in clear air** is tested on the model's physical claims rather than against a measured sky. An absolute check needs a per-emitter inventory — flux, spectrum and upward emission function — and satellite radiance alone can determine only the first: the same VIIRS pixel is produced by many real installations differing in spectrum and in how much light they throw sideways rather than up.
+- **Cloud reaches only the artificial term.** A cloud deck in the scene's atmosphere changes artificial skyglow and nothing else; moonlight, integrated starlight, diffuse galactic light, zodiacal light and airglow are all evaluated as though the sky were clear. Three separate models are missing behind that one sentence, not one.
+- **The Illumina-v2 comparison at Observatorio del Teide** is a Level-3 target whose published numbers are already transcribed. It is blocked on Tenerife's lighting inventory rather than on the numbers.
+
+All three are recorded with their unblocking conditions in [`docs/skybrightness.md`](skybrightness.md) §16.
 
 ---
 
