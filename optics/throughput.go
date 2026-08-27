@@ -130,6 +130,19 @@ type Instrument struct {
 	// filter, lens and the detector QE multiplied together.
 	Throughput []Throughput
 
+	// ReadNoiseElectrons is the detector's read noise, in electrons RMS
+	// per pixel per readout. Zero describes a noiseless read, which no
+	// real detector has — it is the honest default only because this
+	// field arrived after the type did, and [Instrument.SNR] says what a
+	// zero here means for its answer.
+	ReadNoiseElectrons float64
+
+	// DarkCurrentEPerSec is thermal dark current, in electrons per pixel
+	// per second. Zero is a fair approximation for a cooled sensor over a
+	// short exposure and a poor one for a warm sensor over a long one,
+	// which is the same trade every term in the noise budget makes.
+	DarkCurrentEPerSec float64
+
 	// Name identifies the instrument.
 	Name string
 }

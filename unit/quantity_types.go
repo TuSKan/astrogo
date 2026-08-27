@@ -117,6 +117,16 @@ type (
 
 	// ElectronsPerPixelPerSecond is a detector background rate.
 	ElectronsPerPixelPerSecond float64
+
+	// ElectronsPerSecond is a detector count rate from a source, summed
+	// over whatever pixels it falls on rather than per pixel.
+	//
+	// Distinct from ElectronsPerPixelPerSecond because the two combine
+	// only through the aperture size, and mixing them is the unit error
+	// this package exists to make impossible: a point source's rate is a
+	// total, a sky background's is a density, and the signal-to-noise
+	// ratio needs both at once.
+	ElectronsPerSecond float64
 )
 
 // ToOpticalDepth converts a transmission fraction to the corresponding
