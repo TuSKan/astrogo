@@ -165,6 +165,19 @@ func fetchVector(naifID int, bodyName string, startStr, stopStr string) (*StateV
 }
 
 // ObserverPoint matches the quantities we pull from Horizons OBSERVER table
+// ObserverPoint is one row of a Horizons OBSERVER table.
+//
+// Azimuth and Elevation are **airless** — unrefracted. The queries below send
+// no APPARENT parameter, so Horizons applies its default of AIRLESS, and it
+// says so in its own response header ("Atmos refraction: NO (AIRLESS)"),
+// checked live for this exact query shape. The comparison tests accordingly
+// build their coord.Context with atmosphere.RefractionNone.
+//
+// These two fields were previously documented as "Refracted", which is the
+// opposite of what the service returns. Anyone reconciling that comment with
+// the RefractionNone on the astrogo side would have concluded the comparison
+// was mismatched by a refraction term of up to half a degree near the
+// horizon, and gone looking for a bug that is not there.
 type ObserverPoint struct {
 	Body      string  `json:"body"`
 	ET        float64 `json:"et"`
@@ -172,13 +185,14 @@ type ObserverPoint struct {
 	AstroDec  float64 // Astrometric Dec in degrees
 	AppRA     float64 // Apparent RA in degrees
 	AppDec    float64 // Apparent Dec in degrees
-	Azimuth   float64 // Refracted Azimuth in degrees
-	Elevation float64 // Refracted Elevation in degrees
+	Azimuth   float64 // Airless (unrefracted) azimuth in degrees
+	Elevation float64 // Airless (unrefracted) elevation in degrees
 	Range     float64 // Observer to Target Range in AU
 }
 
-// fetchObserverTable queries the Horizons API for a ground-based observer
-// QUANTITIES='1,2,4' corresponding to Astrometric RA/Dec, Apparent RA/Dec, and Az/El.
+// fetchObserverTable queries the Horizons API for a ground-based observer with
+// QUANTITIES='1,2,4,20': astrometric RA/Dec, apparent RA/Dec, airless Az/El and
+// observer range.
 func fetchObserverTable(naifID int, bodyName string, lon, lat, height float64, startStr, stopStr string) (*ObserverPoint, error) {
 	baseURL := "https://ssd.jpl.nasa.gov/api/horizons.api"
 

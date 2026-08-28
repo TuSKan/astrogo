@@ -4,8 +4,20 @@ import (
 	"os"
 	"testing"
 
+	"github.com/TuSKan/astrogo/constants"
 	"github.com/TuSKan/astrogo/remote"
 )
+
+// kmPerAU converts the AU-valued state differences these suites measure into
+// the kilometres that the reference routines' own accuracy figures are quoted
+// in. The idiom is the one the constants package's doc demonstrates; Value is
+// in metres.
+//
+// It lives in this file, which carries no build tag, because the validation-
+// and network-tagged suites both need it and cannot see each other's files.
+//
+//nolint:gochecknoglobals // a derived constant, same convention as the rest of this repo's reference data
+var kmPerAU = constants.IAU.AstronomicalUnit.Value / 1e3
 
 // TestMain grants download consent for this package's network/validation
 // test suites, which construct real jpl.Provider instances against
