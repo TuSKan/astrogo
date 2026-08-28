@@ -143,7 +143,24 @@ func TestGetFileMutableHeadProbeChanged(t *testing.T) {
 		t.Fatalf("GetFile: %v", err)
 	}
 
-	if err := srcBucket.WriteAll(context.Background(), "NGC.csv", []byte("ngc-catalog-v2"), nil); err != nil {
+	// The two versions differ in length, and that is load-bearing rather
+	// than incidental.
+	//
+	// fileblob derives an ETag from the file's (ModTime, Size), and the
+	// Windows system clock is coarse enough that two writes either side of a
+	// local file copy can land on one tick. Both versions used to be
+	// fourteen bytes, so when that happened the source's ETag was byte-for-
+	// byte identical before and after the edit and unchanged correctly
+	// reported no change — this test failed about one run in fifteen,
+	// asserting something fileblob's own metadata cannot express.
+	//
+	// A differing length makes the change visible whichever branch of
+	// unchanged is taken, so what is under test is the refresh behaviour
+	// rather than the host's timer resolution. The same-length case is not
+	// merely untested here but untestable through this backend; against the
+	// real Mutable endpoints the ETag is server-supplied and content-based,
+	// which is the case that matters.
+	if err := srcBucket.WriteAll(context.Background(), "NGC.csv", []byte("ngc-catalog-version-2"), nil); err != nil {
 		t.Fatalf("update source: %v", err)
 	}
 
@@ -155,7 +172,7 @@ func TestGetFileMutableHeadProbeChanged(t *testing.T) {
 	// Content correctness is asserted by the check below; the read itself
 	// is not expected to fail here.
 	data, _ := bucket.ReadAll(context.Background(), key)
-	if string(data) != "ngc-catalog-v2" {
+	if string(data) != "ngc-catalog-version-2" {
 		t.Errorf("cache not refreshed after upstream change: got %q", data)
 	}
 }
@@ -347,14 +364,24 @@ func TestGetFileWithDownloadTimeoutOverridesEndpointDefault(t *testing.T) {
 
 	EnableDownloads(0, NAIFSPK)
 
-	// A local file read is effectively instantaneous, so there is no way
-	// to simulate real transport latency the way an artificially slow
-	// httptest handler used to. A timeout of 1ns instead guarantees the
-	// context passed to srcBucket.Attributes/NewRangeReader inside
-	// fetchInto is already expired by the time either call runs —
-	// deterministically exercising the same timeout-propagation path,
-	// without depending on real wall-clock delay.
-	_, _, err := GetFile(context.Background(), NAIFSPK, "planets/slow.bsp", WithDownloadTimeout(1))
+	// A local file read is effectively instantaneous, so there is no way to
+	// simulate real transport latency the way an artificially slow httptest
+	// handler used to. An already-past deadline exercises the same
+	// timeout-propagation path without depending on wall-clock delay.
+	//
+	// Past rather than merely tiny: this used to pass 1ns, which is a race
+	// and not a guarantee. context.WithTimeout starts a timer, so with a
+	// positive duration the context is only done once that timer has fired,
+	// and a local Attributes call can win — the test failed about one run in
+	// fifteen. A non-positive duration is different in kind, not degree:
+	// context.WithDeadline cancels immediately when the deadline has already
+	// passed, so the context handed to srcBucket.Attributes/NewRangeReader
+	// inside fetchInto is done before either call is made.
+	//
+	// Note this reaches fetchInto at all only because a negative duration
+	// survives the cmp.Or in GetFile, which treats zero — and only zero — as
+	// "unset, use the endpoint default".
+	_, _, err := GetFile(context.Background(), NAIFSPK, "planets/slow.bsp", WithDownloadTimeout(-1))
 	if err == nil {
 		t.Fatal("expected the request to time out")
 	}

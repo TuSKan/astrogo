@@ -53,6 +53,23 @@ func horizonsUnavailable(body string) bool {
 	return strings.HasPrefix(head, "<!doctype html") || strings.HasPrefix(head, "<html")
 }
 
+// fetchVector returns the geocentric state at one instant.
+//
+// # The scale of the returned ET, and the trap in it
+//
+// TIME_TYPE='UT' below changes the output column, not only the input: with it
+// set, Horizons labels column 0 "JDUT — Julian Day Number, Universal Time"
+// rather than the JDTDB it prints for a vector table by default. The
+// conversion here treats that column as TDB, which is correct only because
+// every caller suffixes startStr with an explicit scale — "2000-01-01 12:00
+// TDB" — and the explicit suffix wins.
+//
+// Call it with a bare "2000-01-01 12:00" and the number that comes back is a
+// UT Julian Date read as TDB: a 69-second error, silent, in a value that
+// looks entirely reasonable. Verified live: with a suffixed start time this
+// path agrees with DE440 to 5e-14 AU, and the corpus generator hit exactly
+// that 69 seconds — about 1040 arcseconds of hour angle — when it used
+// unsuffixed epochs and stored the column as TDB.
 func fetchVector(naifID int, bodyName string, startStr, stopStr string) (*StateVector, error) {
 	// 1. Define the base URL
 	baseURL := "https://ssd.jpl.nasa.gov/api/horizons.api"
