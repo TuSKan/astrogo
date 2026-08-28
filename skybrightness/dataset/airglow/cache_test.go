@@ -2,6 +2,7 @@ package airglow_test
 
 import (
 	"bytes"
+	"errors"
 	"math"
 	"strings"
 	"testing"
@@ -119,6 +120,12 @@ func TestCacheKeyDistinguishesRequests(t *testing.T) {
 		{"upper bound", airglow.Spec{
 			Observatory: airglow.Paranal, SolarFluxSFU: 100, MinNM: 400, MaxNM: 901,
 		}},
+		{"season", airglow.Spec{
+			Observatory: airglow.Paranal, SolarFluxSFU: 100, MinNM: 400, MaxNM: 900, Season: 3,
+		}},
+		{"time of night", airglow.Spec{
+			Observatory: airglow.Paranal, SolarFluxSFU: 100, MinNM: 400, MaxNM: 900, TimeOfNight: 2,
+		}},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			_, key, err := airglow.CacheLocation(t.Context(), c.spec)
@@ -209,5 +216,34 @@ func TestScaleMultipliesAndIsNotInTheCacheKey(t *testing.T) {
 	if !strings.Contains(double.Source, "scaled") {
 		t.Errorf("the scaled spectrum's source is %q and does not record the scaling",
 			double.Source)
+	}
+}
+
+// A season or time of night outside SkyCalc's own range is refused here
+// rather than at Garching.
+//
+// The service answers a bad body with a 500 and no explanation, so a request
+// that cannot succeed is worth catching before it costs a round trip to a
+// shared facility — and before a caller has to guess which of thirty-five
+// parameters it disliked.
+func TestRequestRefusesImpossibleSeasonOrTime(t *testing.T) {
+	t.Parallel()
+
+	for _, c := range []struct {
+		name string
+		spec airglow.Spec
+	}{
+		{"season below range", airglow.Spec{Season: -1}},
+		{"season above range", airglow.Spec{Season: 7}},
+		{"time below range", airglow.Spec{TimeOfNight: -1}},
+		{"time above range", airglow.Spec{TimeOfNight: 4}},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+
+			if _, _, err := airglow.CacheLocation(t.Context(), c.spec); !errors.Is(err, airglow.ErrSpec) {
+				t.Errorf("got %v, want ErrSpec", err)
+			}
+		})
 	}
 }

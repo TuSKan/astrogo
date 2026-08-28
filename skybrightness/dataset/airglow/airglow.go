@@ -82,6 +82,28 @@ type Spec struct {
 	// default, which resolves the OH bands.
 	StepNM float64
 
+	// Season selects the bimonthly period SkyCalc averages airglow over:
+	// 0 for the whole year, then 1 for December-January through 6 for
+	// October-November. Zero is the annual average.
+	//
+	// TimeOfNight selects the third of the night: 0 for all night, then 1,
+	// 2 and 3. Zero is the whole-night average.
+	//
+	// # Why these are worth setting
+	//
+	// Because airglow is not steady and SkyCalc knows it. Measured over
+	// 500-600 nm at msolflux 100, the band mean runs from 0.85 to 1.27 times
+	// the annual all-night average across four sampled combinations — a
+	// spread of about a factor of one and a half, from parameters most
+	// callers leave at zero.
+	//
+	// That matters for reproducing somebody else's run as much as for
+	// modelling a real night: two calculations quoting "SkyCalc at
+	// msolflux 100" can differ by tens of per cent without either being
+	// wrong, and neither would say so.
+	Season      int
+	TimeOfNight int
+
 	// Scale multiplies the returned radiance. Zero means 1, and 1 is what
 	// almost every caller wants.
 	//
@@ -618,6 +640,15 @@ func (s Spec) request() (skycalcRequest, error) {
 		return skycalcRequest{}, fmt.Errorf("%w: solar flux %v sfu", ErrSpec, flux)
 	}
 
+	if s.Season < 0 || s.Season > 6 {
+		return skycalcRequest{}, fmt.Errorf("%w: season %d is not 0-6", ErrSpec, s.Season)
+	}
+
+	if s.TimeOfNight < 0 || s.TimeOfNight > 3 {
+		return skycalcRequest{}, fmt.Errorf("%w: time of night %d is not 0-3",
+			ErrSpec, s.TimeOfNight)
+	}
+
 	minNM, maxNM := s.MinNM, s.MaxNM
 	if minNM == 0 && maxNM == 0 {
 		minNM, maxNM = 300, 2000
@@ -645,6 +676,8 @@ func (s Spec) request() (skycalcRequest, error) {
 	req.Airmass = 1.0
 	req.Observatory = string(obs)
 	req.SolarFlux = flux
+	req.Season = s.Season
+	req.Time = s.TimeOfNight
 
 	// Everything that is not airglow, off.
 	req.InclMoon = "N"

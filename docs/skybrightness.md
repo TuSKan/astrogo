@@ -1702,12 +1702,22 @@ switches every other component off, so `flux_sml`, `flux_zl`, `flux_ssl`, `flux_
 what this package sums already is SkyCalc's whole airglow output for that request. No
 combination of what the table contains reaches 1.8 times it.
 
-That leaves two candidates and the tools to separate them are not in this repository. Either
-GAMBONS' stored `ESO_SkyCalc_100_10.dat` was generated from a SkyCalc revision that differs
-from the one answering today — the model has been revised more than once — or the `_10` in
-that filename encodes a parameter this comparison is not matching. Masana et al. §6 pin the
-solar flux at 100 sfu, Cerro Paranal at 2640 m and 350-1050 nm, all of which this package
-requests, and name none that would be a `10`.
+**Season and time of night are the next suspect, and they are worth more than they look.**
+SkyCalc averages airglow over a bimonthly period and a third of the night, and this package
+requested the annual all-night average because that is the parameter nobody thinks about.
+Measured live over 500-600 nm at msolflux 100, four sampled combinations span **0.85 to 1.27
+times** that average — about a factor of one and a half between the extremes, from two
+integers. Four of eighteen combinations were sampled, so the real range is at least that
+wide. It does not reach 1.8 on its own, but it is the same order, and any comparison quoting
+"SkyCalc at msolflux 100" without naming them is under-specified. [Spec.Season] and
+[Spec.TimeOfNight] now exist so a caller can name them.
+
+What remains after that is the file itself: GAMBONS' stored `ESO_SkyCalc_100_10.dat` may
+come from a SkyCalc revision that differs from the one answering today — the model has been
+revised more than once — or the `_10` may encode a parameter this comparison is not
+matching. Masana et al. §6 pin the solar flux at 100 sfu, Cerro Paranal at 2640 m and
+350-1050 nm, all of which this package requests, and name none that would be a `10`.
+Separating those needs their file, not more measurement here.
 
 **The aerosol type does not reach this comparison, which was worth checking rather than
 assuming.** GAMBONS' reference export used Continental clean at 70% relative humidity; this
