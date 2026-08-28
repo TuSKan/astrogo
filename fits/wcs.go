@@ -499,29 +499,44 @@ func project(proj string, ra, dec, alpha0, delta0 float64) (x, y float64, err er
 		y = sinDec*cosD0 - cosDec*sinD0*cosDRA
 
 	case "ARC":
-		sinTheta := sinDec*sinD0 + cosDec*cosD0*cosDRA
-		sinTheta = math.Max(-1, math.Min(1, sinTheta))
-		theta := math.Asin(sinTheta)
+		// The angular distance from the reference point, via Atan2 of the
+		// perpendicular and parallel components rather than through Asin.
+		//
+		// Both forms are correct in exact arithmetic and only one survives
+		// floating point. The parallel component IS cos(c), so the obvious
+		// route is c = pi/2 - asin(cos c) - and asin loses half its
+		// significant digits as its argument approaches 1, which is exactly
+		// where the reference point sits. A 2e-16 rounding in that dot
+		// product emerges as a 2e-8 radian error in c, about 4 milliarcsec,
+		// and whether it appears at all depends on whether the machine fuses
+		// the multiply-add: this passed on every amd64 machine and failed in
+		// CI on arm64. Atan2 is well conditioned across the whole range, and
+		// the two components it needs are the ones phi already uses.
+		perpX := cosDec * sinDRA
+		perpY := sinDec*cosD0 - cosDec*sinD0*cosDRA
 
-		r := math.Pi/2 - theta
+		r := math.Atan2(math.Hypot(perpX, perpY), sinDec*sinD0+cosDec*cosD0*cosDRA)
 		if r < 1e-15 {
 			x, y = 0, 0
 		} else {
-			phi := math.Atan2(cosDec*sinDRA, sinDec*cosD0-cosDec*sinD0*cosDRA)
+			phi := math.Atan2(perpX, perpY)
 			x = r * math.Sin(phi)
 			y = r * math.Cos(phi)
 		}
 
 	case "STG":
-		sinTheta := sinDec*sinD0 + cosDec*cosD0*cosDRA
-		sinTheta = math.Max(-1, math.Min(1, sinTheta))
-		theta := math.Asin(sinTheta)
+		// Same conditioning argument as ARC above: the angular distance c
+		// comes from Atan2, and the stereographic radius is 2*tan(c/2).
+		perpX := cosDec * sinDRA
+		perpY := sinDec*cosD0 - cosDec*sinD0*cosDRA
 
-		r := 2 * math.Tan((math.Pi/2-theta)/2)
+		c := math.Atan2(math.Hypot(perpX, perpY), sinDec*sinD0+cosDec*cosD0*cosDRA)
+
+		r := 2 * math.Tan(c/2)
 		if r < 1e-15 {
 			x, y = 0, 0
 		} else {
-			phi := math.Atan2(cosDec*sinDRA, sinDec*cosD0-cosDec*sinD0*cosDRA)
+			phi := math.Atan2(perpX, perpY)
 			x = r * math.Sin(phi)
 			y = r * math.Cos(phi)
 		}
@@ -566,11 +581,23 @@ func project(proj string, ra, dec, alpha0, delta0 float64) (x, y float64, err er
 // deproject applies the inverse spherical projection to recover (ra, dec) in radians
 // from intermediate coordinates (x, y) in radians relative to the reference point.
 //
-// Uses the Calabretta & Greisen (2002) conventions where for zenithal projections:
+// It is the exact inverse of project, which produces standard coordinates with
+// x increasing toward the east and y toward the north:
 //
-//	x = R(θ)·sin(φ),  y = −R(θ)·cos(φ)
+//	dec = asin(sinT·sinD0 + (y/r)·cosT·cosD0)
+//	ra  = alpha0 + atan2(x·cosT, r·sinT·cosD0 − y·cosT·sinD0)
 //
-// so sin(φ) = x/R and cos(φ) = −y/R.
+// where theta = atan(1/r) for TAN, so sinT is cos of the angular distance from
+// the reference point and cosT is its sine.
+//
+// An earlier revision was written to the Calabretta & Greisen native-longitude
+// convention, x = R·sin(phi) with y = −R·cos(phi), while project was written to
+// the standard-coordinate one. The two disagreed by a half turn: a position
+// east and north of the reference came back west and south of it. Nothing
+// caught it because the reference pixel itself is exact either way, and because
+// PixelToWorld and WorldToPixel were both wrong in the same direction, so a
+// round trip closed. Only comparing a moved pixel against the sign of its own
+// CDELT shows it.
 func deproject(proj string, x, y, alpha0, delta0 float64) (ra, dec float64, err error) {
 	sinD0, cosD0 := math.Sincos(delta0)
 
@@ -584,8 +611,8 @@ func deproject(proj string, x, y, alpha0, delta0 float64) (ra, dec float64, err 
 		theta := math.Atan(1.0 / r)
 		sinT, cosT := math.Sincos(theta)
 		// cos(φ) = −y/r, sin(φ) = x/r
-		dec = math.Asin(sinT*sinD0 - (y/r)*cosT*cosD0)
-		ra = alpha0 + math.Atan2(-x*cosT, r*sinT*cosD0+y*cosT*sinD0)
+		dec = math.Asin(sinT*sinD0 + (y/r)*cosT*cosD0)
+		ra = alpha0 + math.Atan2(x*cosT, r*sinT*cosD0-y*cosT*sinD0)
 
 	case "SIN":
 		// Orthographic (slant-projection variant with xi=0, eta=0)
@@ -609,8 +636,8 @@ func deproject(proj string, x, y, alpha0, delta0 float64) (ra, dec float64, err 
 
 		theta := math.Pi/2 - r
 		sinT, cosT := math.Sincos(theta)
-		dec = math.Asin(sinT*sinD0 - (y/r)*cosT*cosD0)
-		ra = alpha0 + math.Atan2(-x*cosT, r*sinT*cosD0+y*cosT*sinD0)
+		dec = math.Asin(sinT*sinD0 + (y/r)*cosT*cosD0)
+		ra = alpha0 + math.Atan2(x*cosT, r*sinT*cosD0-y*cosT*sinD0)
 
 	case "STG":
 		// Stereographic: R(θ) = 2·tan((π/2−θ)/2)
@@ -621,8 +648,8 @@ func deproject(proj string, x, y, alpha0, delta0 float64) (ra, dec float64, err 
 
 		theta := math.Pi/2 - 2*math.Atan(r/2)
 		sinT, cosT := math.Sincos(theta)
-		dec = math.Asin(sinT*sinD0 - (y/r)*cosT*cosD0)
-		ra = alpha0 + math.Atan2(-x*cosT, r*sinT*cosD0+y*cosT*sinD0)
+		dec = math.Asin(sinT*sinD0 + (y/r)*cosT*cosD0)
+		ra = alpha0 + math.Atan2(x*cosT, r*sinT*cosD0-y*cosT*sinD0)
 
 	case "AIT":
 		// Hammer-Aitoff (full-sky equal-area, pseudo-cylindrical, theta_0 = 0).

@@ -40,6 +40,21 @@ var ErrPropagation = errors.New("satellite: sgp4 propagation failed")
 // Sun-position bug possible (see CHANGELOG).
 var ErrUnexpectedID = errors.New("satellite: state queried for an id other than the tracked satellite (use core.ID(0))")
 
+// ErrMalformedTLE indicates a two-line element set that is not well formed:
+// the wrong length, the wrong line numbers, a failed checksum, or two lines
+// describing different satellites.
+//
+// SGP4 will initialise happily from a corrupted element set and propagate it
+// for ever, because every field it reads is still a number. A single digit
+// altered in transmission or truncated in a copy moves an inclination or a
+// mean motion to another plausible value and puts the satellite somewhere it
+// has never been. The last character of each line exists to catch exactly
+// that, and is worth checking before trusting the rest.
+var ErrMalformedTLE = errors.New("satellite: malformed TLE")
+
+// tleLineLength is the fixed width of a TLE line, checksum included.
+const tleLineLength = 69
+
 // Satellite wraps a NORAD TLE element set with SGP4 propagation state.
 type Satellite struct {
 	Name       string
@@ -48,7 +63,15 @@ type Satellite struct {
 }
 
 // NewFromTLE creates a Satellite from raw TLE lines.
+//
+// The element set is checked for well-formedness before SGP4 sees it: see
+// [ErrMalformedTLE] for why, since SGP4 itself will accept a corrupted set
+// and propagate it without complaint.
 func NewFromTLE(name, line1, line2 string) (*Satellite, error) {
+	if err := ValidateTLE(line1, line2); err != nil {
+		return nil, err
+	}
+
 	sat := gosatellite.TLEToSat(line1, line2, gosatellite.GravityWGS84)
 	if sat.Error != 0 {
 		return nil, fmt.Errorf("%w: sgp4 init error %d: %s", ErrPropagation, sat.Error, sat.ErrorStr)
@@ -130,6 +153,73 @@ func parseMeanMotion(line2 string) float64 {
 	}
 
 	return mm
+}
+
+// ValidateTLE reports whether the two lines form a well-formed element set.
+//
+// Four things are checked, in the order a corrupted set is most likely to fail
+// them:
+//
+//   - each line is the standard 69 characters;
+//   - the first begins with "1" and the second with "2", which catches them
+//     being supplied in the wrong order;
+//   - the two carry the same satellite number, which catches line 1 of one
+//     object pasted against line 2 of another - a substitution no checksum can
+//     see, since each line is individually intact;
+//   - each line's modulo-10 checksum matches its own last character.
+//
+// None of this validates the orbit. It establishes that the element set
+// arrived as it was sent, which is the part SGP4 cannot tell for itself.
+func ValidateTLE(line1, line2 string) error {
+	for i, line := range [2]string{line1, line2} {
+		want := byte('1' + i)
+
+		if len(line) != tleLineLength {
+			return fmt.Errorf("%w: line %d is %d characters, want %d",
+				ErrMalformedTLE, i+1, len(line), tleLineLength)
+		}
+
+		if line[0] != want {
+			return fmt.Errorf("%w: line %d begins with %q, want %q - are the two lines swapped?",
+				ErrMalformedTLE, i+1, line[0], want)
+		}
+
+		// Compared as a digit rather than by converting the sum to a byte, so
+		// that a checksum character which is not a digit at all is refused
+		// here rather than wrapping into some other digit's value.
+		got := line[tleLineLength-1]
+		if sum := tleChecksum(line[:tleLineLength-1]); got < '0' || got > '9' || int(got-'0') != sum {
+			return fmt.Errorf("%w: line %d checksum is %q, computed %d - a character has been altered or lost",
+				ErrMalformedTLE, i+1, got, sum)
+		}
+	}
+
+	// Columns 3-7 carry the satellite catalogue number on both lines.
+	if a, b := line1[2:7], line2[2:7]; a != b {
+		return fmt.Errorf("%w: line 1 is satellite %q and line 2 is satellite %q",
+			ErrMalformedTLE, strings.TrimSpace(a), strings.TrimSpace(b))
+	}
+
+	return nil
+}
+
+// tleChecksum is the modulo-10 sum a TLE line's last character records: every
+// digit counts for its value and every minus sign for one, with everything
+// else - letters, spaces, decimal points and plus signs - counting for
+// nothing.
+func tleChecksum(line string) int {
+	sum := 0
+
+	for _, c := range line {
+		switch {
+		case c >= '0' && c <= '9':
+			sum += int(c - '0')
+		case c == '-':
+			sum++
+		}
+	}
+
+	return sum % 10
 }
 
 // propagateECI returns the TEME position and velocity (km, km/s) at time t.

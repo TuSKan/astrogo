@@ -44,4 +44,15 @@ var (
 		Name: "cubic meter per second squared", Symbol: "m³/s²",
 		ScaleFactor: 1, Dimension: unit.Volume.Div(unit.Time.PowInt(2)),
 	}
+	// wattPerSquareMeterHertz is W·m⁻²·Hz⁻¹ (spectral flux density, SI
+	// base of the jansky) — PhotometricSet.ABZeroPoint.
+	wattPerSquareMeterHertz = unit.Unit{
+		Name: "watt per square meter hertz", Symbol: "W/(m²·Hz)",
+		ScaleFactor: 1, Dimension: unit.SpectralFlux,
+	}
+	// wattPerSquareMeterKelvin4 is W·m⁻²·K⁻⁴ — StefanBoltzmannConstant.
+	wattPerSquareMeterKelvin4 = unit.Unit{
+		Name: "watt per square meter kelvin4", Symbol: "W/(m²·K⁴)",
+		ScaleFactor: 1, Dimension: unit.Power.Div(unit.Area).Div(unit.Temperature.PowInt(4)),
+	}
 )

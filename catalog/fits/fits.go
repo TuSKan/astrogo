@@ -3,6 +3,7 @@ package fits
 import (
 	"errors"
 	"fmt"
+	"math"
 	"path/filepath"
 	"strings"
 
@@ -56,18 +57,26 @@ func New(filePath string) (*Provider, error) {
 		return nil, ErrMissingColumns
 	}
 
-	rows := len(ids)
+	// Every column comes back with NumRows entries, so these agree; taking the
+	// shortest costs nothing and means a change in the reader cannot turn into
+	// an out-of-range panic on a user-supplied file.
+	rows := min(min(len(ids), len(names)), min(len(ras), len(decs)))
 	targets := make([]resolve.Target, 0, rows)
 
 	for i := range rows {
-		targets = append(targets, resolve.Target{
-			ID:       ids[i],
-			Name:     names[i],
-			Kind:     resolve.KindOther,
-			Coord:    coord.NewICRS(angle.Deg(ras[i]), angle.Deg(decs[i])),
-			HasCoord: true,
-			Catalog:  "FITS",
-		})
+		target := resolve.Target{
+			ID:      ids[i],
+			Name:    names[i],
+			Kind:    resolve.KindOther,
+			Catalog: "FITS",
+		}
+
+		if usableCoord(ras[i], decs[i]) {
+			target.Coord = coord.NewICRS(angle.Deg(ras[i]), angle.Deg(decs[i]))
+			target.HasCoord = true
+		}
+
+		targets = append(targets, target)
 	}
 
 	catalogName := filepath.Base(filePath)
@@ -76,6 +85,43 @@ func New(filePath string) (*Provider, error) {
 		name:    catalogName,
 		targets: targets,
 	}, nil
+}
+
+// usableCoord reports whether a row's right ascension and declination are a
+// position rather than an artefact of reading one that was not there.
+//
+// GetFloatColumn writes the zero value for a null entry, so a row with no
+// position does not arrive as an error or a NaN — it arrives as 0.0, and
+// setting HasCoord on it puts a target in Cetus and points a telescope at it.
+// This is the same failure catalog/mast was fixed for, and the one
+// catalog.trustworthyCoord describes as having been observed in more than one
+// provider; the fix belongs at the source, which is here.
+//
+// The bounds also catch the two substitutions a hand-built FITS table
+// actually makes: a declination outside a right angle is not a declination,
+// and a right ascension outside a full turn is one written in hours or in
+// radians. Neither is repairable by guessing, so the row keeps its name and
+// loses its claim to a position.
+func usableCoord(ra, dec float64) bool {
+	if math.IsNaN(ra) || math.IsNaN(dec) || math.IsInf(ra, 0) || math.IsInf(dec, 0) {
+		return false
+	}
+
+	if dec < -90 || dec > 90 {
+		return false
+	}
+
+	// Both conventions for right ascension are accepted, 0 to 360 and -180 to
+	// 180; NewICRS wraps either.
+	if ra < -360 || ra > 360 {
+		return false
+	}
+
+	// Exactly zero in both is what a pair of null columns reads as. A genuine
+	// target at that point would have to sit on the equator at the equinox to
+	// the last bit of a float64, so reading it as absent is right far more
+	// often than it is wrong.
+	return ra != 0 || dec != 0
 }
 
 // Name returns the provider's literal identifier.

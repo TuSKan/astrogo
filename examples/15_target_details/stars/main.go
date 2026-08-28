@@ -19,7 +19,7 @@ func main() {
 	// enough — catalog.NewResolver's first use of catalog.OpenNGC fetches
 	// it automatically (content-checked, so a re-run only costs a HEAD
 	// probe once cached).
-	remote.EnableDownloads(remote.OpenNGC, 5<<20) // ~2 MB combined source CSVs
+	remote.EnableDownloads(5<<20, remote.OpenNGC) // ~2 MB combined source CSVs
 
 	loc, err := coord.NewEarthLocation(-23.5505, -46.6333, 760.0)
 	if err != nil {
@@ -28,7 +28,7 @@ func main() {
 
 	tz, _ := time.LoadLocation("America/Sao_Paulo")
 	t := time.Date(2026, 4, 25, 23, 0, 0, 0, tz)
-	ctx := coord.NewContext(t, loc, atmosphere.StandardAtmosphere)
+	ctx := coord.NewContext(t, loc, atmosphere.StandardRefraction)
 
 	resolver := catalog.NewResolver(catalog.OpenNGC, catalog.SIMBAD)
 

@@ -21,8 +21,8 @@ import (
 func main() {
 	// de441 parts are multi-GB each; unlimited here since that's the whole
 	// point of this example. naif0012.tls (leap seconds) is ~5 KB.
-	remote.EnableDownloads(remote.NAIFSPK, 0)
-	remote.EnableDownloads(remote.NAIFLSK, 0)
+	remote.EnableDownloads(0, remote.NAIFSPK)
+	remote.EnableDownloads(0, remote.NAIFLSK)
 
 	prov, err := eph.NewProvider(context.Background(), eph.Planets, "de441_part-1")
 	if err != nil {

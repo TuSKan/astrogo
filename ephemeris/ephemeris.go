@@ -232,16 +232,10 @@ type Option func(*config)
 type config struct {
 	Start        time.Time
 	End          time.Time
-	DataDir      string
 	TLEName      string
 	TLELine1     string
 	TLELine2     string
 	ExtraKernels []string
-}
-
-// WithDataDir sets the local cache directory for downloaded kernels.
-func WithDataDir(dir string) Option {
-	return func(c *config) { c.DataDir = dir }
 }
 
 // WithTimeInterval restricts the ephemeris coverage window (for small-body SPK).
@@ -282,9 +276,6 @@ func NewProvider(ctx context.Context, source Source, kernel string, opts ...Opti
 	switch source {
 	case Planets, SmallBody, Asteroids, Comets, Moons:
 		var jplOpts []jpl.Option
-		if cfg.DataDir != "" {
-			jplOpts = append(jplOpts, jpl.WithDataDir(cfg.DataDir))
-		}
 
 		if !cfg.Start.IsZero() && !cfg.End.IsZero() {
 			jplOpts = append(jplOpts, jpl.WithTimeInterval(cfg.Start, cfg.End))
@@ -416,8 +407,27 @@ func Altitude(p Provider, id ID, t time.Time) (float64, error) {
 	return st.DistanceKm() - earthMeanRadiusKm, nil
 }
 
-// ApparentState calculates the rigorously light-time delayed (retarded) geometric state
-// of a target by repeatedly polling the ephemeris Provider at (t - tau).
+// ApparentState returns the apparent state of a target: where it is seen from
+// the Earth at obsTime, with both light time and annual aberration included.
+// It iterates the light time by repeatedly polling the Provider at (t - tau).
+//
+// Apparent, not astrometric. The distinction matters and is easy to miss,
+// because it does not come from the iteration but from what a Provider means
+// by a geocentric state. State(target, t') is target(t') - earth(t'), so
+// asking for it at the retarded epoch moves the observer back along with the
+// target. The astrometric vector wants the opposite: the target retarded and
+// the Earth left where it is. The two differ by earth(t) - earth(t - tau),
+// which is v_earth * tau; and since tau is the range over c, that term is the
+// range times v_earth/c, which is precisely the first-order aberration
+// displacement and in the right direction.
+//
+// So this returns the apparent place, correctly. Do not apply aberration to
+// the result — it is already there, and doubling it puts a planet at
+// opposition some twenty arcseconds from where it is.
+//
+// [coord.Context.GeocentricToObserved] is the matching consumer: it adds
+// diurnal parallax, the rotation into the local horizon and refraction, and
+// deliberately does not touch aberration.
 func ApparentState(p Provider, target ID, obsTime time.Time) (State, error) {
 	st, err := p.State(target, obsTime)
 	if err != nil {

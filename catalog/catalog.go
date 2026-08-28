@@ -139,7 +139,14 @@ func NewProvider(source Source) (Provider, error) {
 	case SBDB:
 		return sbdb.New(), nil
 	case Gaia:
-		return gaia.New(), nil
+		// The zero endpoint means the package's own default, so the choice of
+		// archive stays in one place rather than being restated here.
+		p, err := gaia.New("")
+		if err != nil {
+			return nil, fmt.Errorf("catalog: %w", err)
+		}
+
+		return p, nil
 	case VizieR:
 		return vizier.New(), nil
 	case NORAD:

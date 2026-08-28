@@ -4,7 +4,6 @@ package plan_test
 
 import (
 	"context"
-	"net"
 	"testing"
 
 	"github.com/TuSKan/astrogo/catalog/resolve"
@@ -13,6 +12,8 @@ import (
 	"github.com/TuSKan/astrogo/plan"
 	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/time"
+
+	"github.com/TuSKan/astrogo/internal/testutil"
 )
 
 // requireJPL skips the test when JPL's SBDB/Horizons services are
@@ -21,12 +22,7 @@ import (
 func requireJPL(t *testing.T) {
 	t.Helper()
 
-	conn, err := net.DialTimeout("tcp", "ssd-api.jpl.nasa.gov:443", 5*time.Second)
-	if err != nil {
-		t.Skipf("JPL unreachable, skipping live test: %v", err)
-	}
-
-	_ = conn.Close()
+	testutil.RequireReachable(t, "ssd-api.jpl.nasa.gov:443")
 }
 
 // TestVisibleTonight_MinorBodiesRespectMagLimit is the live end-to-end
@@ -44,10 +40,10 @@ func TestVisibleTonight_MinorBodiesRespectMagLimit(t *testing.T) {
 	requireJPL(t)
 
 	t.Cleanup(remote.Reset)
-	remote.SetDataDirPath(t.TempDir())
-	remote.EnableDownloads(remote.NAIFSPK, 0)
-	remote.EnableDownloads(remote.NAIFLSK, 0)
-	remote.EnableDownloads(remote.JPLHorizons, 0)
+	remote.SetDataDir(testutil.FileURL(t, t.TempDir()))
+	remote.EnableDownloads(0, remote.NAIFSPK)
+	remote.EnableDownloads(0, remote.NAIFLSK)
+	remote.EnableDownloads(0, remote.JPLHorizonsSPK)
 
 	site := quintaCalixtoSite(t)
 	sources := []resolve.BrightObjectSearcher{sbdb.New()}
@@ -117,9 +113,9 @@ func TestVisibleTonight_PlanetaryMoons(t *testing.T) {
 	requireJPL(t)
 
 	t.Cleanup(remote.Reset)
-	remote.SetDataDirPath(t.TempDir())
-	remote.EnableDownloads(remote.NAIFSPK, 110<<20)
-	remote.EnableDownloads(remote.NAIFLSK, 0)
+	remote.SetDataDir(testutil.FileURL(t, t.TempDir()))
+	remote.EnableDownloads(110<<20, remote.NAIFSPK)
+	remote.EnableDownloads(0, remote.NAIFLSK)
 
 	site := quintaCalixtoSite(t)
 

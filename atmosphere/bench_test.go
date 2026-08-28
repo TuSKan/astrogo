@@ -10,7 +10,7 @@ import (
 
 func BenchmarkRefractionRigorous_FromTrue(b *testing.B) {
 	model := RefractionRigorous{}
-	env := StandardAtmosphere
+	env := StandardRefraction
 	alt := angle.Deg(30)
 
 	for b.Loop() {
@@ -20,7 +20,7 @@ func BenchmarkRefractionRigorous_FromTrue(b *testing.B) {
 
 func BenchmarkRefractionRigorous_FromApparent(b *testing.B) {
 	model := RefractionRigorous{}
-	env := StandardAtmosphere
+	env := StandardRefraction
 	alt := angle.Deg(30)
 
 	for b.Loop() {
@@ -30,7 +30,7 @@ func BenchmarkRefractionRigorous_FromApparent(b *testing.B) {
 
 func BenchmarkRefractionApproximate_FromTrue(b *testing.B) {
 	model := RefractionApproximate{}
-	env := StandardAtmosphere
+	env := StandardRefraction
 	alt := angle.Deg(30)
 
 	for b.Loop() {
@@ -40,7 +40,7 @@ func BenchmarkRefractionApproximate_FromTrue(b *testing.B) {
 
 func BenchmarkRefractionRigorous_Horizon(b *testing.B) {
 	model := RefractionRigorous{}
-	env := StandardAtmosphere
+	env := StandardRefraction
 	alt := angle.Deg(0) // worst case: horizon
 
 	for b.Loop() {

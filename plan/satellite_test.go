@@ -17,8 +17,8 @@ import (
 // all unexercised. Uses the same real ISS TLE already validated offline in
 // ephemeris/satellite/satellite_test.go (no network access).
 const (
-	issLine1 = "1 25544U 98067A   26109.48995873  .00010082  00000-0  19194-3 0  9990"
-	issLine2 = "2 25544  51.6329 230.6068 0006631 325.6576  34.3983 15.48833250562650"
+	issLine1 = "1 25544U 98067A   26109.48995873  .00010082  00000-0  19194-3 0  9999"
+	issLine2 = "2 25544  51.6329 230.6068 0006631 325.6576  34.3983 15.48833250562656"
 )
 
 func newISSProvider(t *testing.T) *satellite.Satellite {
@@ -77,7 +77,7 @@ func TestPlanSatellite_PositionAndDetails(t *testing.T) {
 		t.Fatalf("NewSiteEarthLocation: %v", err)
 	}
 
-	ctx := coord.NewContext(tm, site.Location(), site.Atmosphere())
+	ctx := coord.NewContext(tm, site.Location(), site.Refraction())
 
 	d, err := sat.GetDetails(ctx)
 	if err != nil {
@@ -106,7 +106,7 @@ func TestPlanSatellite_ApparentMagnitudeRequiresContext(t *testing.T) {
 		t.Fatalf("NewSiteEarthLocation: %v", err)
 	}
 
-	ctx := coord.NewContext(tm, site.Location(), site.Atmosphere())
+	ctx := coord.NewContext(tm, site.Location(), site.Refraction())
 
 	m, err := sat.ApparentMagnitudeCtx(tm, ctx)
 	if err != nil {

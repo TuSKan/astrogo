@@ -61,6 +61,20 @@ func finite(v float64) bool {
 	return !math.IsNaN(v) && !math.IsInf(v, 0)
 }
 
+// sameSign reports whether a and b are both strictly positive or both
+// strictly negative, which is the bracketing question FindRoot actually asks.
+//
+// It replaces the product test a*b > 0. The product is equivalent in exact
+// arithmetic and not in floating point: two same-signed values small enough
+// that their product underflows to zero - each below about 1e-162 - test as
+// though they bracketed a root, and the solver then runs its whole iteration
+// on an interval containing none, returning a confident answer from a
+// premise that was never checked. Zero is deliberately neither sign, so a
+// root sitting exactly on an endpoint still counts as bracketed.
+func sameSign(a, b float64) bool {
+	return (a > 0 && b > 0) || (a < 0 && b < 0)
+}
+
 // FindRoot finds the time t in [t1, t2] where eval(t) ≈ 0 using Chandrupatla's method.
 //
 // Precondition: eval(t1) and eval(t2) must have opposite signs (bracketing condition).
@@ -106,7 +120,7 @@ func (s Solver) FindRoot(eval Evaluator, t1, t2 time.Time) (time.Time, float64, 
 	}
 
 	// Verify bracketing condition
-	if fa*fb > 0 {
+	if sameSign(fa, fb) {
 		return time.Time{}, 0, fmt.Errorf(
 			"%w: f(a)=%g, f(b)=%g", ErrBracketingViolated, fa, fb)
 	}
@@ -190,7 +204,7 @@ func (s Solver) FindRoot(eval Evaluator, t1, t2 time.Time) (time.Time, float64, 
 		}
 
 		// ── Update bracket and third point ─────────────────────────────
-		if ft*fa > 0 {
+		if sameSign(ft, fa) {
 			// xt is on the same side as a → a is replaced, old a becomes c
 			xc, fc = xa, fa
 			xa, fa = xt, ft

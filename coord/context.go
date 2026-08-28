@@ -21,7 +21,7 @@ import (
 type Context struct {
 	t      time.Time
 	site   *Geodetic
-	atm    atmosphere.Atmosphere
+	atm    atmosphere.Refraction
 	astrom gofaext.ASTROM
 	eop    time.EOP // cached for AltAzToICRS reuse
 
@@ -44,7 +44,7 @@ type Context struct {
 // NewContext prepares the astrometry parameters for a specific observer time and site.
 // The input time is defensively converted to UTC internally, since SOFA's Apco13
 // expects UTC. Callers may pass any time scale; the conversion is a no-op for UTC.
-func NewContext(t time.Time, site *Geodetic, atm atmosphere.Atmosphere) *Context {
+func NewContext(t time.Time, site *Geodetic, atm atmosphere.Refraction) *Context {
 	// SOFA Apco13 requires UTC two-part JD. Enforce UTC regardless of input scale
 	// to prevent silent corruption of the ASTROM cache.
 	t = t.UTC()
@@ -172,8 +172,11 @@ func (ctx *Context) Time() time.Time { return ctx.t }
 // Site returns the encapsulated observation geodetic location.
 func (ctx *Context) Site() *Geodetic { return ctx.site }
 
-// Atmosphere returns the encapsulated atmosphere configuration.
-func (ctx *Context) Atmosphere() atmosphere.Atmosphere { return ctx.atm }
+// Refraction returns the encapsulated refraction configuration. Renamed
+// from Atmosphere alongside atmosphere.Atmosphere/Refraction's own swap
+// (see atmosphere/doc.go) — this has always returned the refraction-input
+// struct, never the package's richer atmospheric-state type.
+func (ctx *Context) Refraction() atmosphere.Refraction { return ctx.atm }
 
 // ObsVec returns the observer's geocentric position in the ICRS frame (AU).
 // This can be subtracted from a body's geocentric vector to obtain the

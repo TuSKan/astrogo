@@ -10,6 +10,8 @@ import (
 
 	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/internal/testutil"
+
+	"github.com/TuSKan/astrogo/remote"
 )
 
 func TestMastOfflineResolve(t *testing.T) {
@@ -33,7 +35,8 @@ func TestMastOfflineResolve(t *testing.T) {
 	defer server.Close()
 
 	prov := New()
-	prov.client.HTTPClient.Transport = &mockTransport{Handler: server.Config.Handler}
+
+	redirect(t, server.URL)
 
 	req := resolve.ObjectRequest{Query: "M31"}
 	iter := prov.ResolveObject(context.Background(), req)
@@ -86,7 +89,8 @@ func TestMastOfflineResolveXML(t *testing.T) {
 	defer server.Close()
 
 	prov := New()
-	prov.client.HTTPClient.Transport = &mockTransport{Handler: server.Config.Handler}
+
+	redirect(t, server.URL)
 
 	req := resolve.ObjectRequest{Query: "M31"}
 	iter := prov.ResolveObject(context.Background(), req)
@@ -132,7 +136,8 @@ func TestMastOfflineResolveXMLNoMatch(t *testing.T) {
 	defer server.Close()
 
 	prov := New()
-	prov.client.HTTPClient.Transport = &mockTransport{Handler: server.Config.Handler}
+
+	redirect(t, server.URL)
 
 	req := resolve.ObjectRequest{Query: "ThisIsNotARealObjectXYZ123"}
 	iter := prov.ResolveObject(context.Background(), req)
@@ -176,19 +181,6 @@ func TestNewMASTTarget_MissingCoordIsNotFake(t *testing.T) {
 	}
 }
 
-type mockTransport struct {
-	Handler http.Handler
-}
-
-func (m *mockTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	rec := httptest.NewRecorder()
-	m.Handler.ServeHTTP(rec, req)
-	resp := rec.Result()
-	resp.Request = req
-
-	return resp, nil
-}
-
 func TestProviderInterface(t *testing.T) {
 	p := New()
 	if p.Name() != "mast" {
@@ -202,18 +194,10 @@ func TestProviderInterface(t *testing.T) {
 
 	// errTransport keeps this default (non-network-tagged) test fully
 	// offline — see CLAUDE.md's build-tag convention.
-	p.client.HTTPClient.Transport = errTransport{}
+	redirect(t, "http://127.0.0.1:1")
 
 	_, _ = p.Resolve(context.Background(), "non_existent_body")
 	_ = p.Search(context.Background(), "non_existent_body")
-}
-
-var errNoTransport = errors.New("errTransport: no network access in this test")
-
-type errTransport struct{}
-
-func (errTransport) RoundTrip(*http.Request) (*http.Response, error) {
-	return nil, errNoTransport
 }
 
 // TestConeSearchNotImplemented confirms ConeSearch surfaces ErrNotImplemented
@@ -231,4 +215,21 @@ func TestConeSearchNotImplemented(t *testing.T) {
 
 		return false
 	})
+}
+
+// redirect points endpoint id at a test server for the duration of one
+// test. It replaces the old http.RoundTripper injection: remote/api's
+// Client is opaque by design, and every request resolves its URL through
+// remote.URL(id) anyway, so the registry is the natural seam.
+func redirect(t *testing.T, url string) {
+	t.Helper()
+
+	id := remote.MAST
+
+	scope := remote.Capture(id)
+	t.Cleanup(scope.Restore)
+
+	if err := remote.SetURL(id, url); err != nil {
+		t.Fatalf("SetURL(%s): %v", id, err)
+	}
 }

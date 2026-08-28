@@ -28,9 +28,8 @@ type Table = iers.Table
 
 // Sentinel errors for EOP lookups and downloads.
 var (
-	ErrOutOfRange    = iers.ErrOutOfRange
-	ErrNoRecords     = iers.ErrNoRecords
-	ErrEOPHTTPStatus = iers.ErrEOPHTTPStatus
+	ErrOutOfRange = iers.ErrOutOfRange
+	ErrNoRecords  = iers.ErrNoRecords
 )
 
 // ParseFinals2000A parses a finals2000A-format IERS bulletin into a Table.
@@ -93,7 +92,7 @@ var warnEOPUnavailableOnce sync.Once
 // instead of calling this).
 func warnEOPUnavailable(mjd float64) {
 	warnEOPUnavailableOnce.Do(func() {
-		log.Printf("astrogo/time: IERS EOP data unavailable (MJD %.1f): using zero DUT1/polar motion/UT1-UTC. Topocentric accuracy degraded to ~1 arcsec; UT1 ≈ UTC (max error ≈ 0.9s). Call remote.EnableDownloads(remote.IERSFinals2000A, ...) or pre-seed finals2000A.data for full accuracy.", mjd)
+		log.Printf("astrogo/time: IERS EOP data unavailable (MJD %.1f): using zero DUT1/polar motion/UT1-UTC. Topocentric accuracy degraded to ~1 arcsec; UT1 ≈ UTC (max error ≈ 0.9s). Call remote.EnableDownloads(..., remote.IERSFinals2000A) or pre-seed finals2000A.data for full accuracy.", mjd)
 	})
 }
 

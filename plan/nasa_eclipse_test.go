@@ -1,5 +1,7 @@
 //go:build integration
 
+package plan_test
+
 // Package plan_test contains integration tests that validate astrogo's
 // eclipse detection against NASA's Five Millennium Catalogs of
 // Solar and Lunar Eclipses (eclipse.gsfc.nasa.gov).
@@ -12,23 +14,23 @@
 //
 // Under a shorter ambient -timeout (e.g. CI's generic 10m integration job,
 // well under the 60m this file needs from a cold cache), requireNASA and
-// nasaBudgetOK make these tests skip cleanly — with a clear message —
+// nasaBudgetOK makes these tests skip cleanly — with a clear message —
 // rather than let the ambient timeout kill the whole test binary mid
 // request. Run with the full 60m budget locally for complete coverage.
-package plan_test
 
 import (
 	"context"
 	"fmt"
 	"io"
 	"math"
-	"net"
 	"net/http"
 	"regexp"
 	"strconv"
 	"strings"
 	"testing"
 	gotime "time"
+
+	"github.com/TuSKan/astrogo/internal/testutil"
 
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/plan"
@@ -53,9 +55,9 @@ func parseNASALunarEclipses(html string) []nasaEclipseRef {
 
 	// Strip HTML tags
 	clean := regexp.MustCompile(`<[^>]+>`).ReplaceAllString(html, "")
-	lines := strings.Split(clean, "\n")
+	lines := strings.SplitSeq(clean, "\n")
 
-	for _, line := range lines {
+	for line := range lines {
 		// Look for lines with catalog numbers (5 digits at start)
 		trimmed := strings.TrimSpace(line)
 		if len(trimmed) < 40 {
@@ -74,6 +76,7 @@ func parseNASALunarEclipses(html string) []nasaEclipseRef {
 		if len(catNum) != 5 {
 			continue
 		}
+
 		if _, err := strconv.Atoi(catNum); err != nil {
 			continue
 		}
@@ -101,8 +104,9 @@ func parseNASALunarEclipses(html string) []nasaEclipseRef {
 		if len(timeParts) != 3 {
 			continue
 		}
+
 		hour, _ := strconv.Atoi(timeParts[0])
-		min, _ := strconv.Atoi(timeParts[1])
+		minute, _ := strconv.Atoi(timeParts[1])
 		sec, _ := strconv.Atoi(timeParts[2])
 
 		// Parse ΔT
@@ -115,6 +119,7 @@ func parseNASALunarEclipses(html string) []nasaEclipseRef {
 		// Parse Saros Num
 		// Parse eclipse type — find "T+", "T-", "T", "P", "N" etc.
 		eclType := ""
+
 		for i := 7; i < len(parts) && i < 10; i++ {
 			p := parts[i]
 			if p == "T+" || p == "T-" || p == "T" ||
@@ -124,27 +129,30 @@ func parseNASALunarEclipses(html string) []nasaEclipseRef {
 				break
 			}
 		}
+
 		if eclType == "" {
 			continue
 		}
 
 		// NASA catalog uses Julian calendar before 1582-10-15, times are in TD ≈ TDB
 		isJulianCal := year < 1582 || (year == 1582 && month < 10) || (year == 1582 && month == 10 && day < 15)
+
 		var jdTD float64
 		if isJulianCal {
-			jdTD = time.DateJulianCal(year, month, day, hour, min, sec).JD()
+			jdTD = time.DateJulianCal(year, month, day, hour, minute, sec).JD()
 		} else {
-			jdTD = time.Date(year, gotime.Month(month), day, hour, min, sec, 0, gotime.UTC).JD()
+			jdTD = time.Date(year, gotime.Month(month), day, hour, minute, sec, 0, gotime.UTC).JD()
 		}
 
 		eclipses = append(eclipses, nasaEclipseRef{
 			Year: year, Month: month, Day: day,
-			Hour: hour, Min: min, Sec: sec,
+			Hour: hour, Min: minute, Sec: sec,
 			DeltaT:      dt,
 			EclipseType: eclType,
 			JDtd:        jdTD,
 		})
 	}
+
 	return eclipses
 }
 
@@ -153,9 +161,9 @@ func parseNASASolarEclipses(html string) []nasaEclipseRef {
 	var eclipses []nasaEclipseRef
 
 	clean := regexp.MustCompile(`<[^>]+>`).ReplaceAllString(html, "")
-	lines := strings.Split(clean, "\n")
+	lines := strings.SplitSeq(clean, "\n")
 
-	for _, line := range lines {
+	for line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if len(trimmed) < 40 {
 			continue
@@ -171,6 +179,7 @@ func parseNASASolarEclipses(html string) []nasaEclipseRef {
 		if len(catNum) != 5 {
 			continue
 		}
+
 		if _, err := strconv.Atoi(catNum); err != nil {
 			continue
 		}
@@ -194,8 +203,9 @@ func parseNASASolarEclipses(html string) []nasaEclipseRef {
 		if len(timeParts) != 3 {
 			continue
 		}
+
 		hour, _ := strconv.Atoi(timeParts[0])
-		min, _ := strconv.Atoi(timeParts[1])
+		minute, _ := strconv.Atoi(timeParts[1])
 		sec, _ := strconv.Atoi(timeParts[2])
 
 		dt, err := strconv.ParseFloat(parts[5], 64)
@@ -205,6 +215,7 @@ func parseNASASolarEclipses(html string) []nasaEclipseRef {
 
 		// Eclipse type for solar: T, A, H, P
 		eclType := ""
+
 		for i := 6; i < len(parts) && i < 12; i++ {
 			p := strings.TrimSpace(parts[i])
 			if len(p) >= 1 && (p[0] == 'T' || p[0] == 'A' || p[0] == 'H' || p[0] == 'P') {
@@ -219,27 +230,30 @@ func parseNASASolarEclipses(html string) []nasaEclipseRef {
 				}
 			}
 		}
+
 		if eclType == "" {
 			continue
 		}
 
 		// NASA catalog uses Julian calendar before 1582-10-15, times are in TD ≈ TDB
 		isJulianCal := year < 1582 || (year == 1582 && month < 10) || (year == 1582 && month == 10 && day < 15)
+
 		var jdTD float64
 		if isJulianCal {
-			jdTD = time.DateJulianCal(year, month, day, hour, min, sec).JD()
+			jdTD = time.DateJulianCal(year, month, day, hour, minute, sec).JD()
 		} else {
-			jdTD = time.Date(year, gotime.Month(month), day, hour, min, sec, 0, gotime.UTC).JD()
+			jdTD = time.Date(year, gotime.Month(month), day, hour, minute, sec, 0, gotime.UTC).JD()
 		}
 
 		eclipses = append(eclipses, nasaEclipseRef{
 			Year: year, Month: month, Day: day,
-			Hour: hour, Min: min, Sec: sec,
+			Hour: hour, Min: minute, Sec: sec,
 			DeltaT:      dt,
 			EclipseType: eclType,
 			JDtd:        jdTD,
 		})
 	}
+
 	return eclipses
 }
 
@@ -254,15 +268,10 @@ func parseNASASolarEclipses(html string) []nasaEclipseRef {
 func requireNASA(t *testing.T) {
 	t.Helper()
 
-	conn, err := net.DialTimeout("tcp", "eclipse.gsfc.nasa.gov:443", 5*gotime.Second)
-	if err != nil {
-		t.Skipf("NASA eclipse catalog unreachable, skipping: %v", err)
-	}
-
-	_ = conn.Close()
+	testutil.RequireReachable(t, "eclipse.gsfc.nasa.gov:443")
 }
 
-// nasaBudgetOK reports whether at least margin remains before the ambient
+// nasaBudgetOK skips the test unless at least margin remains before the ambient
 // `go test -timeout` deadline, skipping the calling (sub)test and
 // returning false otherwise. This file's own doc comment recommends
 // `-timeout 60m` for a from-cold-cache DE441 download (multi-GB) plus a
@@ -271,20 +280,17 @@ func requireNASA(t *testing.T) {
 // finish within. Checking the remaining budget before each expensive step
 // turns a hard mid-request kill (a confusing goroutine-dump failure) into
 // a clean, explained skip.
-func nasaBudgetOK(t *testing.T, margin gotime.Duration) bool {
+func nasaBudgetOK(t *testing.T, margin gotime.Duration) {
 	t.Helper()
 
 	deadline, ok := t.Deadline()
 	if !ok {
-		return true // no -timeout set (e.g. a local `go test` run) — no budget limit
+		return
 	}
 
 	if gotime.Until(deadline) < margin {
 		t.Skip("not enough time left before the test binary's -timeout for this step — rerun with a longer -timeout (see this file's package doc) for full coverage")
-		return false
 	}
-
-	return true
 }
 
 func fetchNASAPage(t *testing.T, url string) string {
@@ -309,9 +315,9 @@ func fetchNASAPage(t *testing.T, url string) string {
 	if err != nil {
 		t.Skipf("NASA endpoint unreachable, skipping: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
-	if resp.StatusCode != 200 {
+	if resp.StatusCode != http.StatusOK {
 		t.Skipf("NASA returned status %d for %s", resp.StatusCode, url)
 	}
 
@@ -325,18 +331,17 @@ func fetchNASAPage(t *testing.T, url string) string {
 
 // ── Test: Lunar Eclipses vs NASA ─────────────────────────────────────────────
 
+//nolint:dupl // parallel blocks over two distinct NASA reference tables; the repetition is what keeps each checkable against its own source
 func TestNASA_LunarEclipses_Historical(t *testing.T) {
 	requireNASA(t)
 
-	if !nasaBudgetOK(t, 6*time.Minute) {
-		return
-	}
+	nasaBudgetOK(t, 6*time.Minute)
 
 	prov, err := eph.NewProvider(context.Background(), eph.Planets, "de441_part-1", eph.WithKernel("de441_part-2"))
 	if err != nil {
 		t.Fatalf("Failed to create DE441 provider: %v", err)
 	}
-	defer prov.Close()
+	defer func() { _ = prov.Close() }()
 
 	// Century ranges matching NASA catalog URLs
 	centuries := []struct {
@@ -351,15 +356,15 @@ func TestNASA_LunarEclipses_Historical(t *testing.T) {
 		{1901, 2000, "https://eclipse.gsfc.nasa.gov/LEcat5/LE1901-2000.html"},
 	}
 
-	var totalRef, totalDetected int
-	var totalDelta, maxDelta float64
+	var (
+		totalRef, totalDetected int
+		totalDelta, maxDelta    float64
+	)
 
 	for _, c := range centuries {
 		name := fmt.Sprintf("LE_%04d-%04d", c.start, c.end)
 		t.Run(name, func(t *testing.T) {
-			if !nasaBudgetOK(t, 45*time.Second) {
-				return
-			}
+			nasaBudgetOK(t, 45*time.Second)
 
 			html := fetchNASAPage(t, c.url)
 			refs := parseNASALunarEclipses(html)
@@ -371,7 +376,9 @@ func TestNASA_LunarEclipses_Historical(t *testing.T) {
 
 			detected := 0
 			tested := 0
+
 			var centuryDelta, centuryMax float64
+
 			for _, ref := range refs {
 				tested++
 				totalRef++
@@ -385,17 +392,21 @@ func TestNASA_LunarEclipses_Historical(t *testing.T) {
 				if err != nil {
 					t.Logf("  SKIP %04d-%02d-%02d: LunarEclipses error: %v",
 						ref.Year, ref.Month, ref.Day, err)
+
 					continue
 				}
 
 				// Find matching eclipse (within ±2 days)
 				found := false
+
 				var bestDelta float64
+
 				for _, ecl := range eclipses {
 					delta := math.Abs(ecl.Time.JD()-ref.JDtd) * 24 * 60 // minutes
 					if delta < 2*24*60 {                                // within 2 days
 						found = true
 						bestDelta = delta
+
 						break
 					}
 				}
@@ -403,14 +414,17 @@ func TestNASA_LunarEclipses_Historical(t *testing.T) {
 				if found {
 					detected++
 					totalDetected++
+
 					centuryDelta += bestDelta
 					if bestDelta > centuryMax {
 						centuryMax = bestDelta
 					}
+
 					totalDelta += bestDelta
 					if bestDelta > maxDelta {
 						maxDelta = bestDelta
 					}
+
 					if bestDelta > 60 {
 						t.Logf("  WARN LE %04d-%02d-%02d %02d:%02d type=%s  Δ=%.0f min",
 							ref.Year, ref.Month, ref.Day, ref.Hour, ref.Min, ref.EclipseType, bestDelta)
@@ -428,7 +442,7 @@ func TestNASA_LunarEclipses_Historical(t *testing.T) {
 			}
 
 			if detected > 0 {
-				t.Logf("Century %04d-%04d: %d/%d eclipses detected, mean Δ=%.1f min, max Δ=%.1f min",
+				t.Logf("Century %04d-%04d: %d/%d eclipses detected, mean Δ=%.1f minute, max Δ=%.1f min",
 					c.start, c.end, detected, tested, centuryDelta/float64(detected), centuryMax)
 			} else {
 				t.Logf("Century %04d-%04d: %d/%d sampled eclipses detected",
@@ -438,29 +452,30 @@ func TestNASA_LunarEclipses_Historical(t *testing.T) {
 	}
 
 	t.Logf("\n══════════════════════════════════════════════════════════")
+
 	if totalDetected > 0 {
-		t.Logf("NASA Lunar Eclipses: %d/%d detected, mean Δ=%.1f min, max Δ=%.1f min",
+		t.Logf("NASA Lunar Eclipses: %d/%d detected, mean Δ=%.1f minute, max Δ=%.1f min",
 			totalDetected, totalRef, totalDelta/float64(totalDetected), maxDelta)
 	} else {
 		t.Logf("NASA Lunar Eclipses: %d/%d detected", totalDetected, totalRef)
 	}
+
 	t.Logf("══════════════════════════════════════════════════════════")
 }
 
 // ── Test: Solar Eclipses vs NASA ─────────────────────────────────────────────
 
+//nolint:dupl // parallel blocks over two distinct NASA reference tables; the repetition is what keeps each checkable against its own source
 func TestNASA_SolarEclipses_Historical(t *testing.T) {
 	requireNASA(t)
 
-	if !nasaBudgetOK(t, 6*time.Minute) {
-		return
-	}
+	nasaBudgetOK(t, 6*time.Minute)
 
 	prov, err := eph.NewProvider(context.Background(), eph.Planets, "de441_part-1", eph.WithKernel("de441_part-2"))
 	if err != nil {
 		t.Fatalf("Failed to create DE441 provider: %v", err)
 	}
-	defer prov.Close()
+	defer func() { _ = prov.Close() }()
 
 	centuries := []struct {
 		start, end int
@@ -474,15 +489,15 @@ func TestNASA_SolarEclipses_Historical(t *testing.T) {
 		{1901, 2000, "https://eclipse.gsfc.nasa.gov/SEcat5/SE1901-2000.html"},
 	}
 
-	var totalRef, totalDetected int
-	var totalDelta, maxDelta float64
+	var (
+		totalRef, totalDetected int
+		totalDelta, maxDelta    float64
+	)
 
 	for _, c := range centuries {
 		name := fmt.Sprintf("SE_%04d-%04d", c.start, c.end)
 		t.Run(name, func(t *testing.T) {
-			if !nasaBudgetOK(t, 45*time.Second) {
-				return
-			}
+			nasaBudgetOK(t, 45*time.Second)
 
 			html := fetchNASAPage(t, c.url)
 			refs := parseNASASolarEclipses(html)
@@ -494,7 +509,9 @@ func TestNASA_SolarEclipses_Historical(t *testing.T) {
 
 			detected := 0
 			tested := 0
+
 			var centuryDelta, centuryMax float64
+
 			for _, ref := range refs {
 				tested++
 				totalRef++
@@ -507,16 +524,20 @@ func TestNASA_SolarEclipses_Historical(t *testing.T) {
 				if err != nil {
 					t.Logf("  SKIP %04d-%02d-%02d: SolarEclipses error: %v",
 						ref.Year, ref.Month, ref.Day, err)
+
 					continue
 				}
 
 				found := false
+
 				var bestDelta float64
+
 				for _, ecl := range eclipses {
 					delta := math.Abs(ecl.Time.JD()-ref.JDtd) * 24 * 60
 					if delta < 2*24*60 {
 						found = true
 						bestDelta = delta
+
 						break
 					}
 				}
@@ -524,14 +545,17 @@ func TestNASA_SolarEclipses_Historical(t *testing.T) {
 				if found {
 					detected++
 					totalDetected++
+
 					centuryDelta += bestDelta
 					if bestDelta > centuryMax {
 						centuryMax = bestDelta
 					}
+
 					totalDelta += bestDelta
 					if bestDelta > maxDelta {
 						maxDelta = bestDelta
 					}
+
 					if bestDelta > 60 {
 						t.Logf("  WARN SE %04d-%02d-%02d %02d:%02d type=%s  Δ=%.0f min",
 							ref.Year, ref.Month, ref.Day, ref.Hour, ref.Min, ref.EclipseType, bestDelta)
@@ -548,7 +572,7 @@ func TestNASA_SolarEclipses_Historical(t *testing.T) {
 			}
 
 			if detected > 0 {
-				t.Logf("Century %04d-%04d: %d/%d eclipses detected, mean Δ=%.1f min, max Δ=%.1f min",
+				t.Logf("Century %04d-%04d: %d/%d eclipses detected, mean Δ=%.1f minute, max Δ=%.1f min",
 					c.start, c.end, detected, tested, centuryDelta/float64(detected), centuryMax)
 			} else {
 				t.Logf("Century %04d-%04d: %d/%d eclipses detected",
@@ -558,12 +582,14 @@ func TestNASA_SolarEclipses_Historical(t *testing.T) {
 	}
 
 	t.Logf("\n══════════════════════════════════════════════════════════")
+
 	if totalDetected > 0 {
-		t.Logf("NASA Solar Eclipses: %d/%d detected, mean Δ=%.1f min, max Δ=%.1f min",
+		t.Logf("NASA Solar Eclipses: %d/%d detected, mean Δ=%.1f minute, max Δ=%.1f min",
 			totalDetected, totalRef, totalDelta/float64(totalDetected), maxDelta)
 	} else {
 		t.Logf("NASA Solar Eclipses: %d/%d detected", totalDetected, totalRef)
 	}
+
 	t.Logf("══════════════════════════════════════════════════════════")
 }
 
@@ -573,9 +599,7 @@ func TestNASA_SolarEclipses_Historical(t *testing.T) {
 func TestNASA_DeltaT_CrossValidation(t *testing.T) {
 	requireNASA(t)
 
-	if !nasaBudgetOK(t, 2*time.Minute) {
-		return
-	}
+	nasaBudgetOK(t, 2*time.Minute)
 
 	centuries := []struct {
 		start, end int
@@ -588,15 +612,15 @@ func TestNASA_DeltaT_CrossValidation(t *testing.T) {
 		{1901, 2000, "https://eclipse.gsfc.nasa.gov/LEcat5/LE1901-2000.html"},
 	}
 
-	var totalEvents int
-	var totalDelta, maxDelta float64
+	var (
+		totalEvents          int
+		totalDelta, maxDelta float64
+	)
 
 	for _, c := range centuries {
 		name := fmt.Sprintf("DeltaT_%04d-%04d", c.start, c.end)
 		t.Run(name, func(t *testing.T) {
-			if !nasaBudgetOK(t, 45*time.Second) {
-				return
-			}
+			nasaBudgetOK(t, 45*time.Second)
 
 			html := fetchNASAPage(t, c.url)
 			refs := parseNASALunarEclipses(html)
@@ -605,12 +629,16 @@ func TestNASA_DeltaT_CrossValidation(t *testing.T) {
 				t.Fatalf("No eclipses parsed")
 			}
 
-			var centuryDelta, centuryMax float64
-			var count int
+			var (
+				centuryDelta, centuryMax float64
+				count                    int
+			)
+
 			for _, ref := range refs {
 				if ref.DeltaT == 0 {
 					continue
 				}
+
 				decYear := float64(ref.Year) + (float64(ref.Month)-0.5)/12.0
 				computed := time.DeltaT(decYear)
 				delta := math.Abs(computed - ref.DeltaT)
@@ -618,10 +646,12 @@ func TestNASA_DeltaT_CrossValidation(t *testing.T) {
 				count++
 				totalEvents++
 				centuryDelta += delta
+
 				totalDelta += delta
 				if delta > centuryMax {
 					centuryMax = delta
 				}
+
 				if delta > maxDelta {
 					maxDelta = delta
 				}
@@ -641,9 +671,11 @@ func TestNASA_DeltaT_CrossValidation(t *testing.T) {
 	}
 
 	t.Logf("\n══════════════════════════════════════════════════════════")
+
 	if totalEvents > 0 {
 		t.Logf("ΔT Cross-Validation: %d events, mean error=%.1f s, max=%.1f s",
 			totalEvents, totalDelta/float64(totalEvents), maxDelta)
 	}
+
 	t.Logf("══════════════════════════════════════════════════════════")
 }

@@ -1,14 +1,14 @@
 //go:build network
-// +build network
 
 package sbdb
 
 import (
 	"context"
 	"math"
-	"net"
 	"testing"
 	"time"
+
+	"github.com/TuSKan/astrogo/internal/testutil"
 
 	"github.com/TuSKan/astrogo/catalog/resolve"
 )
@@ -19,18 +19,14 @@ import (
 func requireSBDB(t *testing.T) {
 	t.Helper()
 
-	conn, err := net.DialTimeout("tcp", "ssd-api.jpl.nasa.gov:443", 5*time.Second)
-	if err != nil {
-		t.Skipf("SBDB unreachable, skipping live test: %v", err)
-	}
-
-	_ = conn.Close()
+	testutil.RequireReachable(t, "ssd-api.jpl.nasa.gov:443")
 }
 
 func TestSBDBNetworkResolve(t *testing.T) {
 	requireSBDB(t)
 
 	prov := New()
+
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -38,11 +34,14 @@ func TestSBDBNetworkResolve(t *testing.T) {
 	iter := prov.ResolveObject(ctx, req)
 
 	var targets []resolve.Target
+
 	iter(func(tar resolve.Target, err error) bool {
 		if err != nil {
 			t.Fatalf("Live network failed: %v", err)
 		}
+
 		targets = append(targets, tar)
+
 		return true
 	})
 
@@ -66,6 +65,7 @@ func TestSBDBNetworkResolveOrbitalElements(t *testing.T) {
 	requireSBDB(t)
 
 	prov := New()
+
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -102,6 +102,7 @@ func TestSBDBNetworkSearchBright(t *testing.T) {
 	requireSBDB(t)
 
 	prov := New()
+
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
@@ -136,6 +137,7 @@ func TestSBDBNetworkSearchBright(t *testing.T) {
 			t.Errorf("expected populated Name/SPKID from live server, got %+v", tgt)
 		}
 
+		//nolint:exhaustive // counts the named kinds; the rest are legitimately not this test's subject
 		switch tgt.Kind {
 		case resolve.KindAsteroid, resolve.KindDwarfPlanet:
 			// At MaxVMag 1, Stage 1's H-sorted-ascending result set is
@@ -214,6 +216,7 @@ func TestSBDBNetworkResolveInterstellar(t *testing.T) {
 	requireSBDB(t)
 
 	prov := New()
+
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 

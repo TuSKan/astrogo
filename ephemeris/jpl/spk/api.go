@@ -9,13 +9,12 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"path/filepath"
 	"strconv"
 	"strings"
 
-	gofs "github.com/ungerik/go-fs"
-
 	"github.com/TuSKan/astrogo/remote"
+	"github.com/TuSKan/astrogo/remote/api"
+	"github.com/TuSKan/astrogo/remote/file"
 	"github.com/TuSKan/astrogo/time"
 )
 
@@ -69,31 +68,26 @@ func commandCandidates(kernel string) []string {
 	return []string{kernel, des, desCAP}
 }
 
-// CacheAPI caches an SPK file from JPL Horizons if it doesn't exist.
+// CacheAPI returns readers for kernel, generating it through JPL Horizons
+// and storing it under prefix in bucket when it is not already there.
+// Horizons delivers a small-body kernel base64-encoded inside its JSON
+// response, so this is a real download and is gated by
+// remote.JPLHorizonsSPK's consent exactly like any other.
 //
-// It automatically handles:
-// - Directory creation
-// - File existence check
-// - Base64 decoding
-// - File writing
-// - Reader creation
-// - Error handling
-func CacheAPI(ctx context.Context, kernel string, startTime, endTime time.Time, path string) ([]*Reader, error) {
+// Storage is a bucket and key prefix, never a directory path: a generated
+// kernel lands wherever remote's cache lives, which need not be local
+// disk.
+func CacheAPI(ctx context.Context, bucket *file.Bucket, prefix, kernel string, startTime, endTime time.Time) ([]*Reader, error) {
 	var readers []*Reader
 
-	spkFile := kernel + ".bsp"
-	spkPath := filepath.Join(path, spkFile)
+	spkFile := prefix + kernel + ".bsp"
 
-	if gofs.File(spkPath).Exists() {
-		// Already exists, just return reader
-		ra, err := openReaderAt(gofs.File(spkPath))
+	// A failed existence check just falls through to the fetch path below,
+	// same as a real miss.
+	if exists, _ := bucket.Exists(ctx, spkFile); exists {
+		reader, err := openKernel(ctx, bucket, spkFile)
 		if err != nil {
-			return nil, fmt.Errorf("jpl: failed to open cached SPK %s: %w", spkPath, err)
-		}
-
-		reader, err := NewReader(ra)
-		if err != nil {
-			return nil, fmt.Errorf("jpl: failed to create reader for %s: %w", spkPath, err)
+			return nil, err
 		}
 
 		return []*Reader{reader}, nil
@@ -102,8 +96,8 @@ func CacheAPI(ctx context.Context, kernel string, startTime, endTime time.Time, 
 	// Generating and storing a small-body SPK kernel via Horizons is a file
 	// download in effect (KB–MB delivered base64-encoded inside the JSON
 	// response), so it requires the same explicit consent as any other
-	// kernel download: remote.EnableDownloads(remote.JPLHorizons, maxSize).
-	if err := remote.CheckDownload(remote.JPLHorizons, spkFile, -1); err != nil {
+	// kernel download: remote.EnableDownloads(maxSize, remote.JPLHorizonsSPK).
+	if err := remote.CheckDownload(remote.JPLHorizonsSPK, spkFile, remote.SizeVaries); err != nil {
 		return nil, fmt.Errorf("jpl: SPK kernel %s: %w", kernel, err)
 	}
 
@@ -146,7 +140,7 @@ func CacheAPI(ctx context.Context, kernel string, startTime, endTime time.Time, 
 	for _, command := range commandCandidates(kernel) {
 		r, err := apiHorizonsRequest(ctx, command, startTime, endTime)
 		if err != nil {
-			return nil, fmt.Errorf("jpl: failed to get SPK %s: %w", spkPath, err)
+			return nil, fmt.Errorf("jpl: failed to get SPK %s: %w", kernel, err)
 		}
 
 		resp = r
@@ -156,8 +150,7 @@ func CacheAPI(ctx context.Context, kernel string, startTime, endTime time.Time, 
 	}
 
 	if resp.SpkFileID != "" && resp.Spk != "" {
-		spkFile = resp.SpkFileID + ".bsp"
-		spkPath = filepath.Join(path, spkFile)
+		spkFile = prefix + resp.SpkFileID + ".bsp"
 
 		// Decode base64 SPK
 		spkData, err := base64.StdEncoding.DecodeString(strings.Map(func(r rune) rune {
@@ -171,18 +164,46 @@ func CacheAPI(ctx context.Context, kernel string, startTime, endTime time.Time, 
 			return nil, fmt.Errorf("jpl: failed to decode SPK data: %w", err)
 		}
 
-		if err := remote.Save(bytes.NewReader(spkData), gofs.File(spkPath)); err != nil {
-			return nil, fmt.Errorf("jpl: failed to save SPK %s: %w", spkPath, err)
+		if err := file.Save(ctx, bucket, spkFile, bytes.NewReader(spkData)); err != nil {
+			return nil, fmt.Errorf("jpl: failed to save SPK %s: %w", spkFile, err)
 		}
 
-		ra, err := openReaderAt(gofs.File(spkPath))
+		reader, err := openKernel(ctx, bucket, spkFile)
 		if err != nil {
-			return nil, fmt.Errorf("jpl: failed to open SPK %s: %w", spkPath, err)
+			return nil, err
 		}
 
-		reader, err := NewReader(ra)
-		if err != nil {
-			return nil, fmt.Errorf("jpl: failed to create reader for %s: %w", spkPath, err)
+		// A freshly Horizons-generated kernel is validated before being
+		// trusted/cached: live-confirmed this session that Horizons can
+		// return a DAF file record whose FWARD claims a first summary
+		// record exists (FWD != 0) while that record — and everything
+		// after the comment area — is entirely zeroed, so ReadSummaries
+		// finds nothing despite the file record's own claim. That specific
+		// contradiction (FWD != 0 but zero summaries actually read) is
+		// what's checked here, not "zero summaries" alone — a kernel that
+		// honestly declares FWD == 0 (no summary records at all) is a
+		// self-consistent, legitimately empty file, not corrupt (this is
+		// exactly the minimal fixture reader_test.go/api_test.go's own
+		// synthetic DAF headers use, and must keep working unchanged).
+		// Caching the inconsistent case would silently and permanently
+		// break every future lookup for kernel, since CacheAPI's own
+		// existence check would keep reusing it — delete it and surface a
+		// clear error instead.
+		if reader.FileRec.FWD != 0 {
+			summaries, err := reader.ReadSummaries()
+			if err != nil {
+				_ = reader.Close()
+				_ = bucket.Delete(ctx, spkFile)
+
+				return nil, fmt.Errorf("jpl: validate SPK %s: %w", spkFile, err)
+			}
+
+			if len(summaries) == 0 {
+				_ = reader.Close()
+				_ = bucket.Delete(ctx, spkFile)
+
+				return nil, fmt.Errorf("%w: %s (kernel %s)", ErrHorizonsEmptyKernel, spkFile, kernel)
+			}
 		}
 
 		readers = append(readers, reader)
@@ -193,9 +214,9 @@ func CacheAPI(ctx context.Context, kernel string, startTime, endTime time.Time, 
 		}
 
 		for _, r := range hRes {
-			sub, err := CacheAPI(ctx, r.ID, startTime, endTime, path)
+			sub, err := CacheAPI(ctx, bucket, prefix, r.ID, startTime, endTime)
 			if err != nil {
-				return nil, fmt.Errorf("jpl: failed to get SPK %s: %w", spkPath, err)
+				return nil, fmt.Errorf("jpl: failed to get SPK %s: %w", kernel, err)
 			}
 
 			readers = append(readers, sub...)
@@ -215,13 +236,13 @@ func apiHorizonsRequest(ctx context.Context, command string, startTime, endTime 
 	params.Set("START_TIME", "'"+startTime.Format("2006-01-02 15:04:05.000")+"'")
 	params.Set("STOP_TIME", "'"+endTime.Format("2006-01-02 15:04:05.000")+"'")
 
-	client, err := remote.NewClientFor(remote.JPLHorizons)
+	client, err := api.NewClient(remote.JPLHorizonsSPK)
 	if err != nil {
 		return nil, fmt.Errorf("jpl: horizons client: %w", err)
 	}
 
 	var resp HorizonsResponse
-	if err := client.GetJSON(ctx, remote.JPLHorizons, "", params, &resp); err != nil {
+	if err := client.GetJSON(ctx, remote.JPLHorizonsSPK, "", params, &resp); err != nil {
 		return nil, mapHorizonsStatus(err)
 	}
 
@@ -232,7 +253,7 @@ func apiHorizonsRequest(ctx context.Context, command string, startTime, endTime 
 // package's documented Horizons sentinels. Non-HTTP errors (registry gate,
 // network failures) pass through wrapped.
 func mapHorizonsStatus(err error) error {
-	var httpErr *remote.HTTPError
+	var httpErr *api.HTTPError
 	if !errors.As(err, &httpErr) {
 		return fmt.Errorf("jpl: horizons request: %w", err)
 	}
@@ -322,4 +343,21 @@ func safeSubstr(s string, start, length int) string {
 	}
 
 	return s[start : start+length]
+}
+
+// openKernel builds a Reader over bucket/key with random access served by
+// remote/file's chunk-caching reader — the same path for a local cache, an
+// S3 bucket, or anything else a driver serves.
+func openKernel(ctx context.Context, bucket *file.Bucket, key string) (*Reader, error) {
+	ra, err := file.NewReaderAt(ctx, bucket, key)
+	if err != nil {
+		return nil, fmt.Errorf("jpl: open SPK %s: %w", key, err)
+	}
+
+	reader, err := NewReader(ra)
+	if err != nil {
+		return nil, fmt.Errorf("jpl: failed to create reader for %s: %w", key, err)
+	}
+
+	return reader, nil
 }

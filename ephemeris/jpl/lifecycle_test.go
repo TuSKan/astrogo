@@ -3,7 +3,6 @@ package jpl_test
 import (
 	"context"
 	"errors"
-	"path/filepath"
 	"strings"
 	"testing"
 
@@ -11,6 +10,8 @@ import (
 	"github.com/TuSKan/astrogo/ephemeris/jpl"
 	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/time"
+
+	"github.com/TuSKan/astrogo/internal/testutil"
 )
 
 // TestNewProvider_ColdCacheDownloadsDisabled confirms astrogo never
@@ -21,12 +22,10 @@ func TestNewProvider_ColdCacheDownloadsDisabled(t *testing.T) {
 	t.Cleanup(remote.Capture(remote.NAIFSPK).Restore)
 
 	remote.DisableDownloads(remote.NAIFSPK)
-	// A fresh, empty data dir: NAIFSPK downloads are always resolved
-	// through remote's own cache directory (see remote.CacheDir), not
-	// jpl.WithDataDir, so isolating this test's "cold cache" scenario from
-	// the shared cache other tests in this package populate requires
-	// remote.SetDataDirPath rather than the jpl.Option.
-	remote.SetDataDirPath(t.TempDir())
+	// A fresh, empty data dir isolates this cold-cache scenario from the
+	// shared cache other tests in this package populate. remote.SetDataDir
+	// is the only control for that: a provider has no data-dir option.
+	remote.SetDataDir(testutil.FileURL(t, t.TempDir()))
 
 	_, err := jpl.NewProvider(context.Background(), core.Planets, "de440s")
 	if !errors.Is(err, remote.ErrDownloadDenied) {
@@ -41,12 +40,12 @@ func TestNewProvider_ColdCacheDownloadsDisabled(t *testing.T) {
 	}
 }
 
-// TestKernelLifecycle exercises Open/AddKernelFile/RemoveKernel/UnloadAll/
-// LoadedKernels against real local kernel files — obtained via NewProvider
-// (this package's TestMain already grants NAIFSPK/NAIFLSK download
-// consent, so this reuses/populates the shared cache like every other test
-// in this file) and then reopened purely from disk with zero network
-// involvement, proving the offline path works independently of NewProvider.
+// TestKernelLifecycle exercises Open/AddKernelFrom/RemoveKernel/UnloadAll/
+// LoadedKernels against real cached kernels — obtained via NewProvider
+// (this package's TestMain grants NAIFSPK/NAIFLSK consent, so this reuses
+// the shared cache like every other test here) and then reopened straight
+// from the cache bucket with zero network involvement, proving the offline
+// path works independently of NewProvider.
 func TestKernelLifecycle(t *testing.T) {
 	seed, err := jpl.NewProvider(context.Background(), core.Planets, "de440s")
 	if err != nil {
@@ -54,22 +53,34 @@ func TestKernelLifecycle(t *testing.T) {
 	}
 
 	kernels := seed.LoadedKernels()
-	if len(kernels) != 1 || kernels[0].Path == "" {
-		t.Fatalf("expected 1 loaded kernel with a recorded path, got %+v", kernels)
+	if len(kernels) != 1 || kernels[0].Key == "" {
+		t.Fatalf("expected 1 loaded kernel with a recorded key, got %+v", kernels)
 	}
 
-	spkPath := kernels[0].Path
-	// The LSK isn't tracked in LoadedKernels (it's a separate field, not a
-	// Kernel) — reconstruct its path from the same "lsk/naif0012.tls"
-	// join NewProvider itself uses (provider.go's lsk.Cache call).
-	lskPath := filepath.Join(seed.DataDir, "lsk", "naif0012.tls")
+	ctx := context.Background()
+
+	spkBucket, spkPrefix, err := remote.CacheDir(ctx, remote.NAIFSPK)
+	if err != nil {
+		t.Fatalf("CacheDir(NAIFSPK): %v", err)
+	}
+
+	spkKey := spkPrefix + kernels[0].Key
+
+	// The LSK is a separate field, not a Kernel, so it is not in
+	// LoadedKernels — name it the same way NewProvider's lsk.Cache does.
+	_, lskPrefix, err := remote.CacheDir(ctx, remote.NAIFLSK)
+	if err != nil {
+		t.Fatalf("CacheDir(NAIFLSK): %v", err)
+	}
+
+	lskKey := lskPrefix + "lsk/naif0012.tls"
 
 	if err := seed.Close(); err != nil {
 		t.Fatalf("close seed provider: %v", err)
 	}
 
-	// Open: pure local construction, zero network.
-	p, err := jpl.Open(lskPath, spkPath)
+	// Open: straight from the cache bucket, zero network.
+	p, err := jpl.Open(ctx, spkBucket, lskKey, spkKey)
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
@@ -81,26 +92,26 @@ func TestKernelLifecycle(t *testing.T) {
 		t.Fatalf("expected 1 kernel after Open, got %d", len(got))
 	}
 
-	if got[0].Path != spkPath {
-		t.Errorf("Path = %q, want %q", got[0].Path, spkPath)
+	if got[0].Key != spkKey {
+		t.Errorf("Key = %q, want %q", got[0].Key, spkKey)
 	}
 
 	if got[0].Segments == 0 {
 		t.Error("expected at least one segment")
 	}
 
-	// AddKernelFile: load the same file again as a second kernel.
-	if err := p.AddKernelFile(spkPath); err != nil {
-		t.Fatalf("AddKernelFile: %v", err)
+	// AddKernelFrom: load the same object again as a second kernel.
+	if err := p.AddKernelFrom(ctx, spkBucket, spkKey); err != nil {
+		t.Fatalf("AddKernelFrom: %v", err)
 	}
 
 	if got := p.LoadedKernels(); len(got) != 2 {
-		t.Fatalf("expected 2 kernels after AddKernelFile, got %d", len(got))
+		t.Fatalf("expected 2 kernels after AddKernelFrom, got %d", len(got))
 	}
 
 	// State should still resolve Mars (index rebuilt correctly after the add).
 	if _, err := p.State(core.Mars, seedEpoch(t)); err != nil {
-		t.Errorf("State after AddKernelFile: %v", err)
+		t.Errorf("State after AddKernelFrom: %v", err)
 	}
 
 	// RemoveKernel: drop the first kernel; the second (identical) one must
@@ -132,12 +143,12 @@ func TestKernelLifecycle(t *testing.T) {
 		t.Fatalf("expected 0 kernels after UnloadAll, got %d", len(got))
 	}
 
-	if err := p.AddKernelFile(spkPath); err != nil {
-		t.Fatalf("AddKernelFile after UnloadAll: %v", err)
+	if err := p.AddKernelFrom(ctx, spkBucket, spkKey); err != nil {
+		t.Fatalf("AddKernelFrom after UnloadAll: %v", err)
 	}
 
 	if _, err := p.State(core.Mars, seedEpoch(t)); err != nil {
-		t.Errorf("State after UnloadAll+AddKernelFile: %v", err)
+		t.Errorf("State after UnloadAll+AddKernelFrom: %v", err)
 	}
 }
 

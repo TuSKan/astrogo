@@ -11,6 +11,8 @@ import (
 	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/internal/testutil"
+
+	"github.com/TuSKan/astrogo/remote"
 )
 
 func TestGaiaOfflineConeSearch(t *testing.T) {
@@ -27,8 +29,9 @@ func TestGaiaOfflineConeSearch(t *testing.T) {
 	}))
 	defer server.Close()
 
-	prov := New()
-	prov.client.HTTPClient.Transport = &mockTransport{Handler: server.Config.Handler}
+	prov := newForTest(t)
+
+	redirect(t, server.URL)
 
 	req := resolve.ConeRequest{
 		Center: coord.NewICRS(angle.Deg(10), angle.Deg(40)),
@@ -76,8 +79,9 @@ func TestGaiaOfflineConeSearch_SkipsUnparseableRow(t *testing.T) {
 	}))
 	defer server.Close()
 
-	prov := New()
-	prov.client.HTTPClient.Transport = &mockTransport{Handler: server.Config.Handler}
+	prov := newForTest(t)
+
+	redirect(t, server.URL)
 
 	req := resolve.ConeRequest{
 		Center: coord.NewICRS(angle.Deg(10), angle.Deg(40)),
@@ -107,21 +111,8 @@ func TestGaiaOfflineConeSearch_SkipsUnparseableRow(t *testing.T) {
 	}
 }
 
-type mockTransport struct {
-	Handler http.Handler
-}
-
-func (m *mockTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	rec := httptest.NewRecorder()
-	m.Handler.ServeHTTP(rec, req)
-	resp := rec.Result()
-	resp.Request = req
-
-	return resp, nil
-}
-
 func TestProviderInterface(t *testing.T) {
-	p := New()
+	p := newForTest(t)
 	testutil.AssertEqual(t, "Name", p.Name(), "gaia")
 
 	caps := p.Capabilities()
@@ -136,5 +127,38 @@ func TestProviderInterface(t *testing.T) {
 
 	if p.Search(context.Background(), "foo") != nil {
 		t.Error("expected Search to return nil")
+	}
+}
+
+// redirect points endpoint id at a test server for the duration of one
+// test. It replaces the old http.RoundTripper injection: remote/api's
+// Client is opaque by design, and every request resolves its URL through
+// remote.URL(id) anyway, so the registry is the natural seam.
+// newForTest builds a provider against the default archive.
+//
+// The tests redirect [DefaultEndpoint] to a local server, so what they
+// exercise is this package's request building and CSV parsing rather than any
+// archive. Naming the constant rather than an endpoint keeps the two in step:
+// were the default to move, a test redirecting the old one would quietly
+// exercise nothing.
+func newForTest(t *testing.T) *Provider {
+	t.Helper()
+
+	p, err := New("")
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+
+	return p
+}
+
+func redirect(t *testing.T, url string) {
+	t.Helper()
+
+	scope := remote.Capture(DefaultEndpoint)
+	t.Cleanup(scope.Restore)
+
+	if err := remote.SetURL(DefaultEndpoint, url); err != nil {
+		t.Fatalf("SetURL(%s): %v", DefaultEndpoint, err)
 	}
 }

@@ -72,7 +72,7 @@ type Altitude struct {
 
 // Check evaluates whether the target's altitude meets the threshold.
 func (c Altitude) Check(obj Observable, t time.Time, site *Site) (Result, error) {
-	ctx := coord.NewContext(t, site.Location(), site.Atmosphere())
+	ctx := coord.NewContext(t, site.Location(), site.Refraction())
 	return c.CheckCtx(obj, t, site, ctx)
 }
 
@@ -106,7 +106,7 @@ type Airmass struct {
 
 // Check evaluates whether the target's airmass is within the threshold.
 func (c Airmass) Check(obj Observable, t time.Time, site *Site) (Result, error) {
-	ctx := coord.NewContext(t, site.Location(), site.Atmosphere())
+	ctx := coord.NewContext(t, site.Location(), site.Refraction())
 	return c.CheckCtx(obj, t, site, ctx)
 }
 
@@ -145,7 +145,7 @@ type Sun struct {
 
 // Check evaluates whether the Sun's altitude meets the threshold.
 func (c Sun) Check(_ Observable, t time.Time, site *Site) (Result, error) {
-	ctx := coord.NewContext(t, site.Location(), site.Atmosphere())
+	ctx := coord.NewContext(t, site.Location(), site.Refraction())
 	return c.CheckCtx(nil, t, site, ctx)
 }
 
@@ -188,7 +188,7 @@ type MoonSep struct {
 
 // Check evaluates Moon separation for a given target and time.
 func (c MoonSep) Check(obj Observable, t time.Time, site *Site) (Result, error) {
-	ctx := coord.NewContext(t, site.Location(), site.Atmosphere())
+	ctx := coord.NewContext(t, site.Location(), site.Refraction())
 	return c.CheckCtx(obj, t, site, ctx)
 }
 
@@ -251,7 +251,7 @@ type MoonIllum struct {
 
 // Check evaluates Moon illumination for a given target and time.
 func (c MoonIllum) Check(obj Observable, t time.Time, site *Site) (Result, error) {
-	ctx := coord.NewContext(t, site.Location(), site.Atmosphere())
+	ctx := coord.NewContext(t, site.Location(), site.Refraction())
 	return c.CheckCtx(obj, t, site, ctx)
 }
 

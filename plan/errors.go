@@ -21,6 +21,10 @@ var (
 	ErrUnsupportedGeom = errors.New("unsupported geometry kind")
 	// ErrMoonRequired indicates the illumination solver requires a Moon target.
 	ErrMoonRequired = errors.New("illumination solver requires a Moon target")
+	// ErrNoSkyDepth indicates a LimitingMagnitudeConstraint with no SkyDepth
+	// to ask. There is no default and there cannot be one: a limiting
+	// magnitude depends on the detector, the exposure and the observer.
+	ErrNoSkyDepth = errors.New("limiting magnitude constraint requires a SkyDepth")
 
 	// ErrNotCoordObject indicates the object does not implement coord.Object.
 	//

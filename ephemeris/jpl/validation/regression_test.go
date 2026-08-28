@@ -24,12 +24,13 @@ type mockLinearProvider struct {
 	vel      vector.Vec3
 }
 
-func (m *mockLinearProvider) State(id eph.ID, t atime.Time) (eph.State, error) {
-	jd1_req, jd2_req := t.JDParts()
-	jd1_base, jd2_base := m.baseTime.JDParts()
-	dtDays := (jd1_req - jd1_base) + (jd2_req - jd2_base)
+func (m *mockLinearProvider) State(_ eph.ID, t atime.Time) (eph.State, error) {
+	jd1Req, jd2Req := t.JDParts()
+	jd1Base, jd2Base := m.baseTime.JDParts()
+	dtDays := (jd1Req - jd1Base) + (jd2Req - jd2Base)
 
 	p := m.pos.Add(m.vel.MulScalar(dtDays))
+
 	return eph.State{Pos: p, Vel: m.vel}, nil
 }
 
@@ -82,6 +83,7 @@ func TestScientificStability(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Failed to parse baseline epoch time string %s: %v", c.EpochStr, err)
 			}
+
 			obsTime := atime.FromGo(parsedTime)
 
 			// Map exactly the true NASA Geocentric Cartesian Vector
@@ -108,7 +110,7 @@ func TestScientificStability(t *testing.T) {
 			appState, _ := eph.ApparentState(mock, eph.ID(c.TargetID), obsTime)
 
 			// Get standard Earth model matrices to extract Topocentric offset
-			atm := atmosphere.StandardAtmosphere
+			atm := atmosphere.StandardRefraction
 			atm.Model = atmosphere.RefractionNone{} // We bypass explicit analytical limits here to verify absolute pure geometry.
 
 			// Route flawlessly through native Topocentric offset builder!
@@ -117,11 +119,13 @@ func TestScientificStability(t *testing.T) {
 			observed := obsCtx.GeocentricToObserved(appState.Pos)
 
 			appICRS, _ := eph.ToICRS(appState.Pos)
-			dRA_raw := math.Abs(appICRS.RA().Degrees() - c.Data.AstroRA)
-			if dRA_raw > 180.0 {
-				dRA_raw = 360.0 - dRA_raw
+
+			dRARaw := math.Abs(appICRS.RA().Degrees() - c.Data.AstroRA)
+			if dRARaw > 180.0 {
+				dRARaw = 360.0 - dRARaw
 			}
-			dRA := dRA_raw * math.Cos(appICRS.Dec().Radians()) * 3600.0
+
+			dRA := dRARaw * math.Cos(appICRS.Dec().Radians()) * 3600.0
 			dDec := math.Abs(appICRS.Dec().Degrees()-c.Data.AstroDec) * 3600.0
 
 			// 2. Decoupled Alt/Az Deltas
@@ -132,6 +136,7 @@ func TestScientificStability(t *testing.T) {
 			if dAzDeg > 180 {
 				dAzDeg = 360.0 - dAzDeg
 			}
+
 			dAz := dAzDeg * math.Cos(observed.Alt().Radians()) * 3600.0
 
 			t.Logf("DEBUG [%s]: AstroRA: %.5f, AppICRS.RA: %.5f | AstroDec: %.5f, AppICRS.Dec: %.5f", c.TargetName, c.Data.AstroRA, appICRS.RA().Degrees(), c.Data.AstroDec, appICRS.Dec().Degrees())

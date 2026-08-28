@@ -1,17 +1,46 @@
 package time_test
 
 import (
-	"net/http"
-	"net/http/httptest"
+	"context"
 	"strings"
 	"testing"
 
 	"github.com/TuSKan/astrogo/remote"
+	"github.com/TuSKan/astrogo/remote/file"
 	atime "github.com/TuSKan/astrogo/time"
+
+	"github.com/TuSKan/astrogo/internal/testutil"
 )
 
 const sampleFinals2000AForGateway = `73 1 2 41684.00 I  0.120733 0.009786  0.136966 0.015902  I 0.8084178 0.0002710  0.0000 0.1916  P    -0.766    0.199    -0.720    0.300   .143000   .137000   .8075000   -18.637    -3.667
 73 1 3 41685.00 I  0.118980 0.011039  0.135656 0.013616  I 0.8056163 0.0002710  3.5563 0.1916  P    -0.751    0.199    -0.701    0.300   .141000   .134000   .8044000   -18.636    -3.571  `
+
+// fakeIERSSourceForGateway opens a fresh temp directory as a *file.Bucket,
+// points remote.IERSFinals2000A's URL at it, and writes content at
+// "finals2000A.all" — the real source object name time/internal/iers's
+// fetch.go reads — a local stand-in for an HTTP source now that GetFile
+// can't reach an http:// URL at all (no httpblob driver registered yet;
+// see remote/file's package doc).
+func fakeIERSSourceForGateway(t *testing.T, content string) {
+	t.Helper()
+
+	dir := t.TempDir()
+
+	url := testutil.FileURL(t, dir)
+
+	if err := remote.SetURL(remote.IERSFinals2000A, url); err != nil {
+		t.Fatal(err)
+	}
+
+	bucket, err := file.Open(context.Background(), url)
+	if err != nil {
+		t.Fatalf("Open fake source: %v", err)
+	}
+
+	if err := bucket.WriteAll(context.Background(), "finals2000A.all", []byte(content), nil); err != nil {
+		t.Fatalf("seed fake source: %v", err)
+	}
+}
 
 // TestEOPSourceGateway proves the public gateway actually reaches
 // time/internal/iers.EOPSource, covering both the pristine default
@@ -62,27 +91,20 @@ func TestEOPLazyLoadFindsPreSeededCacheWithoutConsent(t *testing.T) {
 		remote.Reset()
 	})
 
-	var hits int32
-
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		hits++
-		_, _ = w.Write([]byte(sampleFinals2000AForGateway))
-	}))
-	defer srv.Close()
-
-	if err := remote.SetURL(remote.IERSFinals2000A, srv.URL); err != nil {
-		t.Fatal(err)
-	}
-
-	remote.SetDataDirPath(t.TempDir())
+	// No source is configured at all (remote.SetURL is never called, so
+	// the endpoint keeps its default https:// URL, which has no
+	// registered blob driver in this build — see remote/file's package
+	// doc) — a non-zero EOP below is therefore proof the pre-seeded
+	// cache satisfied the query without ever reaching a fetch attempt.
+	remote.SetDataDir(testutil.FileURL(t, t.TempDir()))
 	t.Cleanup(func() { remote.SetDataDir("") })
 
-	dir, err := remote.CacheDir(remote.IERSFinals2000A)
+	bucket, prefix, err := remote.CacheDir(context.Background(), remote.IERSFinals2000A)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if err := dir.Join("finals2000A.data").WriteAll([]byte(sampleFinals2000AForGateway)); err != nil {
+	if err := bucket.WriteAll(context.Background(), prefix+"finals2000A.data", []byte(sampleFinals2000AForGateway), nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -100,10 +122,6 @@ func TestEOPLazyLoadFindsPreSeededCacheWithoutConsent(t *testing.T) {
 
 	if lo != 41684 || hi != 41685 {
 		t.Errorf("Coverage = [%v, %v], want [41684, 41685]", lo, hi)
-	}
-
-	if hits != 0 {
-		t.Errorf("expected zero network hits when a pre-seeded cache file covers the query, got %d", hits)
 	}
 }
 
@@ -123,17 +141,10 @@ func TestEOPLazyLoadFetchesWithConsent(t *testing.T) {
 	// attempt isn't throttled by that unrelated prior attempt.
 	atime.SetRetryCooldown(0)
 
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		_, _ = w.Write([]byte(sampleFinals2000AForGateway))
-	}))
-	defer srv.Close()
+	fakeIERSSourceForGateway(t, sampleFinals2000AForGateway)
 
-	if err := remote.SetURL(remote.IERSFinals2000A, srv.URL); err != nil {
-		t.Fatal(err)
-	}
-
-	remote.EnableDownloads(remote.IERSFinals2000A, 0)
-	remote.SetDataDirPath(t.TempDir())
+	remote.EnableDownloads(0, remote.IERSFinals2000A)
+	remote.SetDataDir(testutil.FileURL(t, t.TempDir()))
 	t.Cleanup(func() { remote.SetDataDir("") })
 
 	tm := atime.FromJD(2441684.5, atime.UTC) // MJD 41684
@@ -158,7 +169,7 @@ func TestEOPLazyLoadDegradesToZeroWithoutCacheOrConsent(t *testing.T) {
 		remote.Reset()
 	})
 
-	remote.SetDataDirPath(t.TempDir())
+	remote.SetDataDir(testutil.FileURL(t, t.TempDir()))
 	t.Cleanup(func() { remote.SetDataDir("") })
 
 	tm := atime.FromJD(2441684.5, atime.UTC) // MJD 41684

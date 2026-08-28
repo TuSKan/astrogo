@@ -3,267 +3,553 @@ package atmosphere
 import (
 	"errors"
 	"math"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
+	"github.com/TuSKan/astrogo/unit"
 )
 
-// lowAltitudeCutoffDeg is the true/apparent altitude below which
-// RefractionApproximate and RefractionRigorous return zero refraction
-// instead of evaluating Saemundsson (1986) or Bennett (1982).
-//
-// Both formulas divide by (h + a constant) — Saemundsson's tangent argument
-// has 10.3/(h+5.11), Bennett's has 7.31/(h+4.4) — so as h approaches -5.11°
-// or -4.4° respectively, that term diverges and, because it then feeds a
-// tan()/atan() a huge argument reduced mod 360°, the result stops being a
-// smooth extrapolation and becomes effectively arbitrary (it can spike or
-// flip sign depending on where the reduced angle lands). -4.0° clears both
-// singularities with margin (0.4° from Bennett's, 1.11° from Saemundsson's)
-// while still covering the entire physically relevant range: real
-// observations never need refraction correction this far below the horizon.
-//
-// This is a different, independently-justified cutoff from the one used in
-// coord/context.go's SOFA-Refa/Refb path (-1°, i.e. z < 91°) — that model's
-// tan(z) series is well-behaved much closer to the horizon, so it can safely
-// extend further down than the two empirical tangent formulas here.
-const lowAltitudeCutoffDeg = -4.0
+// ErrAtmosphereBuilder is returned by Builder.Build when the accumulated
+// inputs are invalid (out-of-range pressure/temperature/AOD/SSA/etc.).
+var ErrAtmosphereBuilder = errors.New("atmosphere: invalid Atmosphere")
 
-// RefractionModel defines an algorithm that computes the angular refraction shift.
-// It explicitly parses the distinction between forward and reverse tracing.
-type RefractionModel interface {
-	// RefractFromTrue computes the atmospheric refraction correction by propagating a True geometric altitude
-	// forward linearly into refracted Observed appearance (Saemundsson 1986).
-	RefractFromTrue(trueAlt angle.Angle, env Atmosphere) angle.Angle
+// Sentinel components Builder.Build's aggregated error may join, wrapped
+// via errors.Join so a caller can errors.Is against any specific
+// violation.
+var (
+	errSurfacePressure    = errors.New("Surface: pressure must be > 0 hPa")
+	errSurfaceTemperature = errors.New("Surface: temperature must be > 0 K")
+	errAerosolAOD         = errors.New("Aerosol: AOD must be >= 0")
+	errAerosolSSA         = errors.New("Aerosol: single-scattering albedo must be in [0,1]")
+	errAerosolAsymmetry   = errors.New("Aerosol: asymmetry parameter must be in [-1,1]")
+	errCloudFraction      = errors.New("AddCloud: Fraction must be in [0,1]")
+	errCloudOpticalDepth  = errors.New("AddCloud: OpticalDepth must be >= 0")
+)
 
-	// RefractFromApparent computes the atmospheric refraction correction necessary to un-refract an
-	// Observed visual altitude backwards into pure geometric Truth (Bennett 1982).
-	RefractFromApparent(obsAlt angle.Angle, env Atmosphere) angle.Angle
+// CloudPhase distinguishes the thermodynamic phase of a cloud layer.
+type CloudPhase uint8
+
+// The three cloud phases.
+const (
+	CloudLiquid CloudPhase = iota
+	CloudIce
+	CloudMixed
+)
+
+// String implements fmt.Stringer.
+func (p CloudPhase) String() string {
+	switch p {
+	case CloudLiquid:
+		return "Liquid"
+	case CloudIce:
+		return "Ice"
+	case CloudMixed:
+		return "Mixed"
+	default:
+		return "CloudPhase(unknown)"
+	}
 }
 
-// Atmosphere represents meteorological parameters used for calculating atmospheric
-// refraction during astronomical observations.
+// CloudMorphology is a coarse structural descriptor of a cloud layer.
+type CloudMorphology uint8
+
+// The four cloud morphologies.
+const (
+	MorphologyUnknown CloudMorphology = iota
+	MorphologyStratiform
+	MorphologyCumuliform
+	MorphologyCirriform
+)
+
+// String implements fmt.Stringer.
+func (m CloudMorphology) String() string {
+	switch m {
+	case MorphologyUnknown:
+		return "Unknown"
+	case MorphologyStratiform:
+		return "Stratiform"
+	case MorphologyCumuliform:
+		return "Cumuliform"
+	case MorphologyCirriform:
+		return "Cirriform"
+	default:
+		return "Unknown"
+	}
+}
+
+// CloudUncertainty carries a cloud layer's own uncertainty on its
+// fraction and optical depth.
+type CloudUncertainty struct {
+	FractionRelSigma     float64
+	OpticalDepthRelSigma float64
+}
+
+// CloudLayer describes one cloud layer. Fraction (sky cover) and
+// OpticalDepth are deliberately distinct fields of distinct types — sky
+// cover and opacity are never collapsed to one scalar, enforced by the
+// compiler.
+type CloudLayer struct {
+	Fraction        unit.CloudFraction
+	BaseAlt, TopAlt unit.AltitudeM
+	OpticalDepth    unit.CloudOpticalDepth
+	Phase           CloudPhase
+	EffRadius       unit.EffectiveRadiusUM
+	Albedo          unit.SpectralAlbedo
+	Asymmetry       unit.AsymmetryParameter
+	Morphology      CloudMorphology
+	Uncertainty     CloudUncertainty
+	Source          SourceRef
+}
+
+// Aerosol is the broadband aerosol description of an Atmosphere. Phase 1 of
+// Sky Brightness V2 treats it as broadband (one AOD/SSA/g/Angstrom set);
+// a future phase may add a wavelength-dependent SSA table and a vertical
+// profile behind the same accessor.
+type Aerosol struct {
+	OpticalDepth           unit.AerosolOpticalDepth
+	ReferenceWavelength    unit.WavelengthNM
+	AngstromExp            unit.AngstromExponent
+	SingleScatteringAlbedo unit.SingleScatteringAlbedo
+	Asymmetry              unit.AsymmetryParameter
+	ScaleHeight            unit.AltitudeM
+}
+
+// TauAt returns the aerosol optical depth at wavelength lambda, via the
+// Angstrom power law tau(lambda) = tau(lambda0) * (lambda/lambda0)^-alpha.
+func (a Aerosol) TauAt(lambda unit.WavelengthNM) unit.AerosolOpticalDepth {
+	if a.ReferenceWavelength <= 0 || lambda <= 0 {
+		return a.OpticalDepth
+	}
+
+	ratio := float64(lambda) / float64(a.ReferenceWavelength)
+
+	return unit.AerosolOpticalDepth(float64(a.OpticalDepth) * pow(ratio, -float64(a.AngstromExp)))
+}
+
+// SurfaceOptical is the ground reflectance under an Atmosphere. Albedo is
+// broadband in Phase 1 — a genuinely wavelength-resolved spectral
+// albedo/BRDF is future scope, behind this same accessor.
+type SurfaceOptical struct {
+	Albedo       unit.SpectralAlbedo
+	SnowFraction float64 // [0,1]
+}
+
+// UniformAlbedo returns a SurfaceOptical with a flat broadband albedo and
+// no snow.
+func UniformAlbedo(a float64) SurfaceOptical {
+	return SurfaceOptical{Albedo: unit.SpectralAlbedo(a)}
+}
+
+// HorizonProfile reports the local horizon altitude at a given azimuth,
+// for terrain/obstruction screening.
+type HorizonProfile interface {
+	AltitudeAt(az angle.Angle) angle.Angle
+}
+
+// VerticalProfile is a placeholder for a layered pressure/temperature/
+// humidity/molecular-number-density profile; it carries no fields yet.
+// It exists now so Atmosphere's shape does not change again when a future
+// phase starts consuming it.
+type VerticalProfile struct{}
+
+// Provenance records where an Atmosphere came from and how current it is.
+type Provenance struct {
+	Source   SourceRef
+	IssueAt  time.Time // when the state was issued (nowcast/forecast)
+	LeadTime time.Duration
+}
+
+// Atmosphere is an immutable, richer atmospheric description than
+// Refraction (which is scoped to refraction-model inputs only): surface
+// pressure/temperature, aerosol, clouds, surface reflectance, terrain
+// horizon, and provenance. Construct one only via NewBuilder or a
+// package-level default constructor.
+//
+// Renamed from State (v0.14.0-era design work, still unreleased) so the
+// package's richer, general-purpose type gets the name a reader reaches for
+// first — "the atmosphere" — while the narrower refraction-model input
+// struct, which used to hold this name, becomes Refraction (see
+// refraction.go). This is a same-release swap: Go cannot alias one
+// identifier to two meanings at once, so Refraction's rename carries no
+// deprecation cycle either — see refraction.go's doc comment.
+//
+// Atmosphere composes a Refraction as its own surface-conditions field
+// (surface, below) rather than duplicating pressure/temperature as
+// separate raw fields: Refraction stays the single, general-purpose
+// representation of "conditions a refraction model needs," reused here
+// instead of reinvented. Surface()/Refraction() convert at the one boundary
+// where the two types' unit conventions differ (Kelvin here vs. Celsius in
+// Refraction; see Builder.Surface's doc comment).
+//
+// Originally introduced for Sky Brightness V2 (docs/skybrightness.md §8)
+// but general-purpose — any consumer needing aerosol/cloud/surface-optical
+// atmospheric state (a future weather or seeing constraint, for instance)
+// uses this same type rather than reinventing it.
 type Atmosphere struct {
-	Model       RefractionModel
-	Pressure    float64
-	Temperature float64
-	Humidity    float64
-	Wavelength  float64
+	surface       Refraction // pressure/temperature/humidity/wavelength/refraction model
+	profile       VerticalProfile
+	ozone         unit.OzoneColumnDU
+	pwv           unit.PrecipitableWaterMM
+	aerosol       Aerosol
+	clouds        []CloudLayer
+	groundOptical SurfaceOptical
+	horizon       HorizonProfile
+	provenance    Provenance
+	issuedAt      time.Time
+
+	// diffuseKappa scales the optical depth an extended source is attenuated
+	// by; see DiffuseKappa. Zero means unset and reads as DefaultDiffuseKappa.
+	diffuseKappa       float64
+	multipleScattering bool
 }
 
-// ── Models ────────────────────────────────────────────────────────────────────
-
-// RefractionNone entirely disables refraction.
-type RefractionNone struct{}
-
-// RefractFromTrue returns precisely 0 shifting.
-func (RefractionNone) RefractFromTrue(_ angle.Angle, _ Atmosphere) angle.Angle {
-	return 0
-}
-
-// RefractFromApparent returns precisely 0 shifting.
-func (RefractionNone) RefractFromApparent(_ angle.Angle, _ Atmosphere) angle.Angle {
-	return 0
-}
-
-// RefractionApproximate computes refraction extremely quickly using Saemundsson's
-// tangent formula. Accurate to ~0.1 arcmin over 15 degrees.
-type RefractionApproximate struct{}
-
-// RefractFromTrue applies Saemundsson's refraction formula (S&T 1986).
-func (RefractionApproximate) RefractFromTrue(trueAlt angle.Angle, env Atmosphere) angle.Angle {
-	h := trueAlt.Degrees()
-	if h < lowAltitudeCutoffDeg {
-		return 0 // Avoid absurd refraction below horizon
+// DiffuseKappa returns the factor the optical depth is scaled by when
+// attenuating a source that fills the sky rather than a point one.
+//
+// A star loses everything scattered out of the line of sight. A source
+// covering the whole sky does not: what is scattered out of one direction is
+// replaced by light scattered in from every other, so attenuating an extended
+// source by the full optical depth overstates the loss. Masana et al. (2021)
+// Section 7 handles this by replacing the optical depth with an effective one,
+// tau_eff = kappa * tau, and notes that kappa depends on the aerosol albedo
+// and asymmetry parameter with typical values from 0.5 to 0.9 (Hong et al.
+// 1998). Duriscoe (2013) uses 0.75 for diffuse sources, after Kwon (1989);
+// the GAMBONS web service uses 0.5.
+//
+// It is not a fudge factor for matching a reference. It stands in for the
+// scattered term of Masana et al. Eq. 8, whose exact form is a double integral
+// over the hemisphere for every direction of observation.
+func (s *Atmosphere) DiffuseKappa() float64 {
+	if s.diffuseKappa <= 0 {
+		return DefaultDiffuseKappa
 	}
 
-	// Refraction R in arcminutes
-	R := 1.02 / math.Tan((h+10.3/(h+5.11))*math.Pi/180.0)
-
-	factor := (env.Pressure / 1010.0) * (283.0 / (273.15 + env.Temperature))
-
-	return angle.Deg((R * factor) / 60.0)
+	return s.diffuseKappa
 }
 
-// RefractFromApparent applies Bennett's empirical fraction.
-func (RefractionApproximate) RefractFromApparent(obsAlt angle.Angle, env Atmosphere) angle.Angle {
-	h := obsAlt.Degrees()
-	if h < lowAltitudeCutoffDeg {
+// MultipleScattering reports whether higher scattering orders should be added
+// to a first-order result.
+//
+// Off by default, because the models this module implements are first-order
+// and a caller reproducing one of them must get what the paper describes.
+// See [Builder.MultipleScattering].
+func (s *Atmosphere) MultipleScattering() bool { return s.multipleScattering }
+
+// Surface returns the surface pressure and temperature.
+func (s *Atmosphere) Surface() (unit.PressureHPa, unit.TemperatureK) {
+	return unit.PressureHPa(s.surface.Pressure), unit.TemperatureK(s.surface.Temperature + 273.15)
+}
+
+// Refraction returns this Atmosphere's own refraction conditions —
+// pressure, temperature, humidity, wavelength, and refraction model — as a
+// Refraction value, ready to hand to a RefractionModel. No model argument
+// is needed: Atmosphere owns one via Builder.Refraction (zero value means
+// no model was set, which RefractionModel implementations already treat as
+// "let the caller's own default apply").
+func (s *Atmosphere) Refraction() Refraction { return s.surface }
+
+// Profile returns the layered vertical profile (placeholder today).
+func (s *Atmosphere) Profile() VerticalProfile { return s.profile }
+
+// Ozone returns the total-column ozone amount.
+func (s *Atmosphere) Ozone() unit.OzoneColumnDU { return s.ozone }
+
+// PrecipitableWater returns the precipitable water vapour column.
+func (s *Atmosphere) PrecipitableWater() unit.PrecipitableWaterMM { return s.pwv }
+
+// Aerosol returns the broadband aerosol state.
+func (s *Atmosphere) Aerosol() Aerosol { return s.aerosol }
+
+// Clouds returns a defensive copy of the cloud layers — mutating the
+// returned slice never affects the Atmosphere.
+func (s *Atmosphere) Clouds() []CloudLayer {
+	cp := make([]CloudLayer, len(s.clouds))
+	copy(cp, s.clouds)
+
+	return cp
+}
+
+// SurfaceOptical returns the ground reflectance.
+func (s *Atmosphere) SurfaceOptical() SurfaceOptical { return s.groundOptical }
+
+// Horizon returns the terrain/obstruction horizon profile, or nil if none
+// was set.
+func (s *Atmosphere) Horizon() HorizonProfile { return s.horizon }
+
+// Provenance returns this Atmosphere's provenance.
+func (s *Atmosphere) Provenance() Provenance { return s.provenance }
+
+// Age returns now minus the state's issue time (zero if it was never
+// set, e.g. a climatology default).
+func (s *Atmosphere) Age(now time.Time) time.Duration {
+	if s.issuedAt.IsZero() {
 		return 0
 	}
 
-	R := 1.0 / math.Tan((h+7.31/(h+4.4))*math.Pi/180.0)
-	factor := (env.Pressure / 1010.0) * (283.0 / (273.15 + env.Temperature))
-
-	return angle.Deg((R * factor) / 60.0)
+	return now.Sub(s.issuedAt)
 }
 
-// RefractionRigorous explicitly represents the analytical integration model derived from physical meteorological parameters.
-type RefractionRigorous struct{}
+// Builder builds an immutable Atmosphere.
+type Builder struct {
+	s    Atmosphere
+	errs []error
+}
 
-// RefractFromTrue calculates the atmospheric refraction based on the rigorous Saemundsson (1986)
-// model which remains stable and valid down to the true horizon.
-func (RefractionRigorous) RefractFromTrue(trueAlt angle.Angle, env Atmosphere) angle.Angle {
-	h := trueAlt.Degrees()
-	if h < lowAltitudeCutoffDeg {
+// NewBuilder starts a builder with standard-atmosphere defaults (1013.25
+// hPa, 288.15 K), no aerosol, no clouds, zero albedo.
+func NewBuilder() *Builder {
+	return &Builder{s: Atmosphere{surface: Refraction{Pressure: 1013.25, Temperature: 288.15 - 273.15}}}
+}
+
+// Surface sets surface pressure (hPa) and temperature (K) on the Atmosphere's
+// embedded Refraction. tempK is converted to Celsius internally — the one
+// explicit unit conversion this composition needs, since Refraction (shared
+// with coord/plan's hot refraction-call paths) uses Celsius while
+// Atmosphere's own Surface() accessor stays in Kelvin for consistency with
+// every other skybrightness-native unit.
+func (b *Builder) Surface(pressureHPa, tempK float64) *Builder {
+	if pressureHPa <= 0 {
+		b.errs = append(b.errs, errSurfacePressure)
+	}
+
+	if tempK <= 0 {
+		b.errs = append(b.errs, errSurfaceTemperature)
+	}
+
+	b.s.surface.Pressure = pressureHPa
+	b.s.surface.Temperature = tempK - 273.15
+
+	return b
+}
+
+// Refraction sets the remaining fields of the Atmosphere's embedded
+// Refraction — the model, relative humidity [0,1], and wavelength in
+// micrometres — for a caller who wants explicit refraction-model control
+// alongside the sky-brightness Atmosphere. Pressure/temperature stay owned
+// by Surface; this only touches the fields Surface doesn't set.
+func (b *Builder) Refraction(model RefractionModel, humidityFrac, wavelengthUM float64) *Builder {
+	b.s.surface.Model = model
+	b.s.surface.Humidity = humidityFrac
+	b.s.surface.Wavelength = wavelengthUM
+
+	return b
+}
+
+// Aerosol sets a broadband aerosol state: optical depth at referenceNM,
+// the Angstrom exponent, single-scattering albedo, and asymmetry
+// parameter.
+func (b *Builder) Aerosol(aod, referenceNM, angstrom, ssa, g float64) *Builder {
+	if aod < 0 {
+		b.errs = append(b.errs, errAerosolAOD)
+	}
+
+	if ssa < 0 || ssa > 1 {
+		b.errs = append(b.errs, errAerosolSSA)
+	}
+
+	if g < -1 || g > 1 {
+		b.errs = append(b.errs, errAerosolAsymmetry)
+	}
+
+	b.s.aerosol.OpticalDepth = unit.AerosolOpticalDepth(aod)
+	b.s.aerosol.ReferenceWavelength = unit.WavelengthNM(referenceNM)
+	b.s.aerosol.AngstromExp = unit.AngstromExponent(angstrom)
+	b.s.aerosol.SingleScatteringAlbedo = unit.SingleScatteringAlbedo(ssa)
+	b.s.aerosol.Asymmetry = unit.AsymmetryParameter(g)
+
+	return b
+}
+
+// DiffuseScattering sets the effective-optical-depth factor kappa used when
+// attenuating sources that fill the sky. See [Atmosphere.DiffuseKappa].
+//
+// Values outside (0, 1] are ignored: kappa above one would mean an extended
+// source is dimmed more than a point source in the same air, which is the
+// wrong way round, and zero or negative would mean the atmosphere brightens it.
+func (b *Builder) DiffuseScattering(kappa float64) *Builder {
+	if kappa > 0 && kappa <= 1 {
+		b.s.diffuseKappa = kappa
+	}
+
+	return b
+}
+
+// MultipleScattering turns on the higher scattering orders that a first-order
+// treatment misses.
+//
+// Photons scattered twice or more still reach the observer, and a
+// single-scattering integral does not carry them. Winkler (2022) quantifies
+// the shortfall against SAAO measurements as proportional to the molecular
+// optical depth, which is what
+// [github.com/TuSKan/astrogo/atmosphere.MultipleScatteringFactor] returns and
+// what the moonlight component has always applied.
+//
+// It is off by default and has to be asked for, because turning it on stops a
+// model reproducing the paper it came from: Masana et al. (2024) Eq. 11 is
+// explicitly first-order, so a scene claiming to be GAMBONS must not carry
+// this. It belongs to a model that is trying to be right rather than trying to
+// be somebody else.
+//
+// It applies to the scattered term only. The direct term is extinction, which
+// has no scattering order, and under the effective-optical-depth transfer the
+// scattered light is already stood in for by kappa - applying a factor there
+// would count it twice.
+func (b *Builder) MultipleScattering(on bool) *Builder {
+	b.s.multipleScattering = on
+
+	return b
+}
+
+// Ozone sets the total-column ozone amount, in Dobson units.
+func (b *Builder) Ozone(du float64) *Builder {
+	b.s.ozone = unit.OzoneColumnDU(du)
+	return b
+}
+
+// SurfaceAtAltitude sets surface pressure and temperature from the ICAO
+// International Standard Atmosphere at a site's elevation.
+//
+// The alternative is asking a caller for two numbers they usually do not have.
+// Nobody knows their observatory's barometric pressure in hectopascals off
+// hand, and the value is not free to guess: pressure sets the Rayleigh optical
+// depth, so a sea-level default at a 2,600 m site overstates molecular
+// scattering by about a quarter.
+//
+// It is a default, not a measurement, and [Surface] still overrides it. A site
+// with a real barometer should use one — ISA is a standard profile, not the
+// weather, and a passing front moves surface pressure by a couple of per cent.
+func (b *Builder) SurfaceAtAltitude(heightM float64) *Builder {
+	isa := AtAltitude(heightM)
+
+	// AtAltitude reports Celsius, as every Refraction does; Surface takes
+	// Kelvin, as every skybrightness-native unit does. The conversion belongs
+	// here rather than at the call site for the same reason Surface itself
+	// converts in the other direction.
+	return b.Surface(isa.Pressure, isa.Temperature+273.15)
+}
+
+// PrecipitableWater sets precipitable water vapour, in millimetres.
+func (b *Builder) PrecipitableWater(mm float64) *Builder {
+	b.s.pwv = unit.PrecipitableWaterMM(mm)
+	return b
+}
+
+// AerosolScaleHeight sets the height over which aerosol extinction falls by a
+// factor of e, in metres.
+//
+// # Why this is not the boundary-layer height
+//
+// It was called BoundaryLayer, and that was a trap. The models reading it —
+// Kocifaj (2007) Eq. 36, and the transfer in this package — use it as the
+// scale height H of an exponential profile, exp(-h/H). A meteorologist's
+// boundary-layer height is the depth of the mixing layer, which over land at
+// night is typically 100 to 500 m, while an aerosol scale height is
+// kilometres: OPAC's Table 5 gives 8 km for continental and urban aerosol,
+// 2 km for desert dust and 1 km for sea salt, and the preset constructors
+// carry those already. Setting this by hand is for reproducing a published
+// run that used its own — Kocifaj (2007) takes beta = 0.65 km^-1, so 1538 m.
+//
+// A caller who looked up their site's nocturnal boundary layer and typed it
+// in was right by the name and wrong by the model, changing the answer
+// materially with nothing to say so. The name now states which quantity it
+// is.
+func (b *Builder) AerosolScaleHeight(m float64) *Builder {
+	b.s.aerosol.ScaleHeight = unit.AltitudeM(m)
+	return b
+}
+
+// Clear removes every cloud layer — an explicit clear-sky state.
+func (b *Builder) Clear() *Builder {
+	b.s.clouds = nil
+	return b
+}
+
+// AddCloud appends one cloud layer.
+func (b *Builder) AddCloud(l CloudLayer) *Builder {
+	if l.Fraction < 0 || l.Fraction > 1 {
+		b.errs = append(b.errs, errCloudFraction)
+	}
+
+	if l.OpticalDepth < 0 {
+		b.errs = append(b.errs, errCloudOpticalDepth)
+	}
+
+	b.s.clouds = append(b.s.clouds, l)
+
+	return b
+}
+
+// SurfaceAlbedo sets the ground reflectance.
+func (b *Builder) SurfaceAlbedo(s SurfaceOptical) *Builder {
+	b.s.groundOptical = s
+	return b
+}
+
+// Horizon sets the terrain/obstruction horizon profile.
+func (b *Builder) Horizon(h HorizonProfile) *Builder {
+	b.s.horizon = h
+	return b
+}
+
+// Source attaches this state's provenance.
+func (b *Builder) Source(ref SourceRef) *Builder {
+	b.s.provenance.Source = ref
+	return b
+}
+
+// IssuedAt sets the state's issue time (for nowcast/forecast use).
+func (b *Builder) IssuedAt(t time.Time) *Builder {
+	b.s.issuedAt = t
+	b.s.provenance.IssueAt = t
+
+	return b
+}
+
+// LeadTime sets a forecast state's lead time.
+func (b *Builder) LeadTime(d time.Duration) *Builder {
+	b.s.provenance.LeadTime = d
+	return b
+}
+
+// Build validates the accumulated inputs and returns an immutable
+// Atmosphere.
+func (b *Builder) Build() (*Atmosphere, error) {
+	if len(b.errs) > 0 {
+		return nil, errors.Join(append([]error{ErrAtmosphereBuilder}, b.errs...)...)
+	}
+
+	out := b.s // copy the value; the builder's slice fields (clouds) are only appended to, never shared onward
+	out.clouds = append([]CloudLayer(nil), b.s.clouds...)
+
+	return &out, nil
+}
+
+// StandardDefault returns a deterministic, offline, site-elevation-aware
+// default Atmosphere: no aerosol, no clouds, pressure/temperature from the
+// ICAO ISA barometric profile (AtAltitude) at heightM, zero surface
+// albedo. Its zero aerosol is exact, not approximate — this is the
+// Rayleigh-only reference case, the Atmosphere counterpart to
+// atmos.RayleighOnly's transmission model. For a real, named aerosol
+// regime instead of the zero-aerosol baseline, see RuralAerosol/
+// UrbanAerosol/DesertAerosol/MaritimeAerosol.
+func StandardDefault(heightM float64) *Atmosphere {
+	s := Atmosphere{
+		surface: AtAltitude(heightM),
+		provenance: Provenance{
+			Source: SourceRef{
+				Name:     "ICAO ISA barometric profile (standard default)",
+				Fidelity: FidelityPrior,
+			},
+		},
+	}
+
+	return &s
+}
+
+func pow(x, y float64) float64 {
+	if x <= 0 {
 		return 0
 	}
 
-	if env.Pressure <= 0 {
-		return 0
-	}
-
-	// Saemundsson (1986) formula in arcminutes for true (geometric) altitude h
-	denom := h + 5.11
-	inner := h + (10.3 / denom)
-	r0 := 1.02 / math.Tan(inner*math.Pi/180.0)
-
-	correction := (env.Pressure / 1010.0) * (283.0 / (273.15 + env.Temperature))
-
-	wlFactor := 1.0
-	if env.Wavelength > 0 {
-		wlFactor = 1.0 + 0.005*(0.55-env.Wavelength)
-	}
-
-	return angle.Deg((r0 * correction * wlFactor) / 60.0)
-}
-
-// RefractFromApparent derives atmospheric refraction analytically based on the observed visual altitude.
-// Standardized on the robust Bennett (1982) formula which handles zero-altitude gracefully.
-func (RefractionRigorous) RefractFromApparent(obsAlt angle.Angle, env Atmosphere) angle.Angle {
-	h := obsAlt.Degrees()
-	if h < lowAltitudeCutoffDeg {
-		return 0
-	}
-
-	if env.Pressure <= 0 {
-		return 0
-	}
-
-	// Bennett (1982) formula in arcminutes for observed (apparent) altitude h
-	denom := h + 4.4
-	inner := h + (7.31 / denom)
-	r0 := 1.0 / math.Tan(inner*math.Pi/180.0)
-
-	correction := (env.Pressure / 1010.0) * (283.0 / (273.15 + env.Temperature))
-
-	wlFactor := 1.0
-	if env.Wavelength > 0 {
-		wlFactor = 1.0 + 0.005*(0.55-env.Wavelength)
-	}
-
-	return angle.Deg((r0 * correction * wlFactor) / 60.0)
-}
-
-// StandardAtmosphere returns a typical sea-level atmospheric profile using the rigorous backend.
-//
-//nolint:gochecknoglobals // ICAO ISA reference profile — immutable physical constant
-var StandardAtmosphere = Atmosphere{
-	Pressure:    1013.25,
-	Temperature: 15.0,
-	Humidity:    0.5,
-	Wavelength:  0.55,
-	Model:       RefractionRigorous{},
-}
-
-// ── Observational Metrics ─────────────────────────────────────────────────────
-
-// ErrBelowHorizon is returned when the target altitude is below the horizon.
-var ErrBelowHorizon = errors.New("object is below the horizon")
-
-// ZenithDistance returns the zenith distance (90 - Alt) for a given altitude.
-func ZenithDistance(alt angle.Angle) angle.Angle {
-	return angle.Deg(90).Sub(alt)
-}
-
-// Airmass returns the relative airmass for a given apparent altitude using the
-// Pickering (2002) formula. This interpolative model resolves horizon stability properly,
-// overcoming the earlier Kasten & Young approach limitations down to visual zero.
-func Airmass(alt angle.Angle) (float64, error) {
-	if alt.Degrees() < 0 {
-		return 0, ErrBelowHorizon
-	}
-
-	// Pickering (2002) empirical air mass formulation (apparent altitude based).
-	// X = 1 / sin(h + 244 / (165 + 47 * h^1.1))
-	h := alt.Degrees()
-	inner := h + (244.0 / (165.0 + 47.0*math.Pow(h, 1.1)))
-	am := 1.0 / math.Sin(inner*math.Pi/180.0)
-
-	return am, nil
-}
-
-// ── Elevation-Aware Corrections ──────────────────────────────────────────────
-
-// const (
-// 	meanEarthRadius = 6371000.0 // Mean Earth radius in meters (IAU nominal)
-// )
-
-// HorizonDip returns the apparent dip angle of the horizon for an observer at
-// height h meters above the reference ellipsoid. The dip is the angular depression
-// of the visible horizon below the mathematical (level) horizon, corrected for
-// standard atmospheric refraction.
-//
-// Formula: dip ≈ 1.76' × √h (arcminutes), where h is in meters.
-//
-// This is the standard navigational/astronomical formula that accounts for the
-// atmospheric refraction coefficient k ≈ 0.13 (light bending reduces the geometric
-// dip by roughly 1/7). At sea level (h=0), dip = 0. At 786m, dip ≈ 0.82°.
-func HorizonDip(h float64) angle.Angle {
-	if h <= 0 {
-		return angle.Zero()
-	}
-	// 1.76 arcminutes per sqrt(meter), converted to degrees
-	dipArcmin := 1.76 * math.Sqrt(h)
-
-	return angle.Deg(dipArcmin / 60.0)
-}
-
-// AtAltitude returns an Atmosphere with pressure and temperature adjusted for the
-// given altitude h (meters) using the ICAO International Standard Atmosphere model.
-//
-// Barometric formula (troposphere, h < 11000 m):
-//
-//	P(h) = P₀ × (1 − L·h / T₀)^(g·M / (R*·L))
-//	T(h) = T₀ − L·h   (in °C)
-//
-// Constants:
-//   - L  = 0.0065 K/m (temperature lapse rate)
-//   - T₀ = 288.15 K (sea-level standard temperature)
-//   - g  = 9.80665 m/s²
-//   - M  = 0.0289644 kg/mol (molar mass of dry air)
-//   - R* = 8.31447 J/(mol·K) (universal gas constant)
-//
-// The refraction model and wavelength are inherited from [StandardAtmosphere].
-func AtAltitude(h float64) Atmosphere {
-	if h <= 0 {
-		// Sea level: use standard ISA values but let SOFA handle refraction
-		// (Model: nil) for consistency with all other altitudes.
-		return Atmosphere{
-			Pressure:    StandardAtmosphere.Pressure,
-			Temperature: StandardAtmosphere.Temperature,
-			Humidity:    StandardAtmosphere.Humidity,
-			Wavelength:  StandardAtmosphere.Wavelength,
-			Model:       nil,
-		}
-	}
-
-	const (
-		P0       = 1013.25             // Sea-level pressure (hPa)
-		T0       = 288.15              // Sea-level temperature (K)
-		L        = 0.0065              // Temperature lapse rate (K/m)
-		g        = 9.80665             // Gravitational acceleration (m/s²)
-		M        = 0.0289644           // Molar mass of dry air (kg/mol)
-		Rstar    = 8.31447             // Universal gas constant (J/(mol·K))
-		exponent = g * M / (Rstar * L) // ≈ 5.25588
-	)
-
-	pressure := P0 * math.Pow(1.0-L*h/T0, exponent)
-	temperature := (T0 - L*h) - 273.15 // Convert to Celsius
-
-	return Atmosphere{
-		Pressure:    pressure,
-		Temperature: temperature,
-		Humidity:    StandardAtmosphere.Humidity,
-		Wavelength:  StandardAtmosphere.Wavelength,
-		Model:       nil, // Let SOFA compute refraction rigorously via Atcoq
-	}
+	return math.Pow(x, y)
 }

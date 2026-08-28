@@ -1,53 +1,81 @@
-// Package remote centralizes every external network access astrogo makes:
-// a registry of all endpoints the library can contact, an HTTP client with
-// retry/backoff and consistent error handling, a consent-gated file
-// downloader, and the configurable location where downloaded data is
-// stored.
+// Package remote is astrogo's I/O boundary: a registry of every external
+// endpoint the library can reach, a consent gate no bulk download bypasses,
+// and the cache all fetched data lands in.
+//
+// It owns policy. Moving bytes belongs to its two subpackages, split by
+// what is being addressed rather than by protocol:
+//
+//   - [github.com/TuSKan/astrogo/remote/file] — byte-addressable resources
+//     with a stable identity, a size, and range semantics. SPK kernels,
+//     IERS bulletins, catalog CSVs, GeoTIFF bundles. A file on http is a
+//     file with an http backend, not an API.
+//   - [github.com/TuSKan/astrogo/remote/api] — request/response services
+//     whose returned document depends on the query. SIMBAD, VizieR, Gaia,
+//     MAST, CelesTrak, FINK, JPL SBDB and Horizons.
 //
 // # Endpoints
 //
-// Every remote service astrogo can reach is enumerated as an [EndpointID]
-// — there are no hidden hosts. Inspect them with [Endpoints]; block one
-// with [Disable]; point one at a mirror or proxy with [SetURL]; cut all
-// network access with [SetOffline].
+// Every service astrogo can contact is an [EndpointID] — there are no
+// hidden hosts. Inspect them with [Endpoints], block one with [Disable],
+// point one at a mirror with [SetURL], cut all access with [SetOffline].
+// [URL] is the single gate every call site passes through, so those three
+// controls apply uniformly to files and APIs alike.
 //
 // # Downloads are never automatic
 //
-// astrogo never downloads a file without consent. Constructing a JPL
-// ephemeris provider whose kernel is missing from the data directory fails
-// with [ErrDownloadDenied] — stating the file, its size, and its source —
-// until you either pre-seed the file or grant consent per endpoint:
+// astrogo never fetches a bulk file without consent. Constructing a JPL
+// provider whose kernel is missing fails with [ErrDownloadDenied], naming
+// the file, its size and its source, until you pre-seed it or grant
+// consent:
 //
-//	// Allow planetary kernels up to 200 MB (de440/de442 ≈ 115 MB) and
-//	// the ~5 KB leap-second kernel:
-//	remote.EnableDownloads(remote.NAIFSPK, 200<<20)
-//	remote.EnableDownloads(remote.NAIFLSK, 0) // 0 = no size limit
+//	// Planetary kernels up to 200 MB, plus the ~5 KB leap-second kernel:
+//	remote.EnableDownloads(200<<20, remote.NAIFSPK, remote.NAIFLSK)
 //
-// Once enabled, downloads proceed silently up to the configured size
-// limit. [SetPolicy] installs a custom consent callback for finer control.
+//	// Or everything that can download, with one cap:
+//	remote.EnableDownloads(0)
 //
-// Request/response API endpoints (catalog resolvers, the light-pollution
-// client) don't need download consent: the network call is the documented
-// purpose of the method that triggers it. They are still subject to
-// [Disable] and [SetOffline].
+// Consent is checked twice per fetch: once against the endpoint's
+// registered estimate before any request, then again against the size the
+// source actually reports. [SetPolicy] replaces both with your own rule.
 //
-// # Data location
+// An API call needs no consent — the request is the documented purpose of
+// the method making it. The exception is [JPLHorizonsSPK], whose response
+// carries a whole kernel; it is a separate endpoint from [JPLHorizons] so
+// that consent gates kernel generation without also gating name
+// resolution.
 //
-// All downloaded data (JPL SPK/LSK kernels, the IERS EOP cache) lives
-// under one configurable base directory — default
-// os.UserCacheDir()/astrogo — via [SetDataDir]/[SetDataDirPath]. The
-// location is a github.com/ungerik/go-fs File, so a blob/bucket filesystem
-// registered under its own URI scheme (s3://, gs://) can back it without
-// any astrogo call-site changes.
+// # Where data lives
 //
-// # Offline / air-gapped deployments
+// Everything astrogo caches lives under one location, set by [SetDataDir]
+// or the ASTROGO_CACHE_DIR environment variable, defaulting to
+// os.UserCacheDir()/astrogo. It is a bucket URL, not a filesystem path:
 //
-// Pre-seed the data directory with the files you need (kernel .bsp files,
-// naif0012.tls, a finals2000A EOP file), then:
+//	remote.SetDataDir("file:///data/astrogo?create_dir=true")
+//	remote.SetDataDir("s3://my-cache-bucket") // needs a blank import of remote/s3
+//
+// Nothing in astrogo assumes the cache is local disk. [CacheDir] returns a
+// bucket and a key prefix; [GetFile] returns a bucket and a key. There is
+// no API anywhere that takes an OS path, and no local-only fast path — a
+// deployment whose cache is object storage behaves identically.
+//
+// # Fetching
+//
+// [GetFile] is the one entry point for file content. It resolves the
+// source and the cache through the same opener, reuses a cached copy (on
+// existence alone for immutable content, after an ETag check for
+// [Endpoint.Mutable] content), and on a miss downloads under a
+// cross-process lock, staging the bytes and validating them before
+// anything appears at the cache key. An interrupted transfer resumes from
+// the partial rather than restarting.
+//
+// # Offline and air-gapped deployments
+//
+// Pre-seed the cache with the objects you need, then:
 //
 //	remote.SetOffline(true)
 //
-// Every downloader checks the filesystem before the network, so pre-seeded
-// deployments never dial out. See the README section "Data downloads &
-// offline usage" for the full table of files, sizes, and locations.
+// Every fetch checks the cache before the network, so a pre-seeded
+// deployment never dials out even without SetOffline. See the README's
+// "Data downloads & offline usage" for the full table of files, sizes and
+// cache keys.
 package remote

@@ -2,15 +2,13 @@ package openngc
 
 import (
 	"context"
-	"net/http"
-	"net/http/httptest"
-	"os"
-	"strings"
-	"sync/atomic"
 	"testing"
 
 	"github.com/TuSKan/astrogo/remote"
+	"github.com/TuSKan/astrogo/remote/file"
 	astrotime "github.com/TuSKan/astrogo/time"
+
+	"github.com/TuSKan/astrogo/internal/testutil"
 )
 
 const (
@@ -22,54 +20,48 @@ NGC0224;G;00:42:44.3;+41:16:09;31;Andromeda Galaxy;;3.4;4.4
 `
 )
 
-// serveSources returns an httptest.Server that responds to the two OpenNGC
-// source paths (NGC.csv/addendum.csv, as joined onto remote.OpenNGC's base
-// URL) with fixed fixture content, tracking how many GET requests each path
-// received.
-func serveSources(t *testing.T, getCounts map[string]*int32) *httptest.Server {
+// fakeSources opens a fresh temp directory as a *file.Bucket, points
+// remote.OpenNGC's URL at it (SetURL), and writes both real OpenNGC
+// source files (NGC.csv/addendum.csv) into it — a local stand-in for an
+// HTTP source now that GetFile can't reach an http:// URL at all (no
+// httpblob driver registered yet; see remote/file's package doc).
+// fetchSource/New's own consent/caching policy is fully generic over any
+// Bucket, so exercising it here tests the exact same code path an
+// HTTP-backed endpoint will take once that driver exists.
+func fakeSources(t *testing.T) *file.Bucket {
 	t.Helper()
 
-	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		var body string
+	dir := t.TempDir()
 
-		switch {
-		case strings.HasSuffix(r.URL.Path, "NGC.csv"):
-			body = sampleNGCCSV
-		case strings.HasSuffix(r.URL.Path, "addendum.csv"):
-			body = sampleAddendumCSV
-		default:
-			http.NotFound(w, r)
-			return
-		}
+	url := testutil.FileURL(t, dir)
 
-		if r.Method == http.MethodGet {
-			if c, ok := getCounts[r.URL.Path]; ok {
-				atomic.AddInt32(c, 1)
-			}
-		}
+	if err := remote.SetURL(remote.OpenNGC, url); err != nil {
+		t.Fatal(err)
+	}
 
-		w.Header().Set("ETag", `"`+body[:8]+`"`) // stable per-fixture ETag
-		_, _ = w.Write([]byte(body))
-	}))
+	bucket, err := file.Open(context.Background(), url)
+	if err != nil {
+		t.Fatalf("Open fake source: %v", err)
+	}
+
+	if err := bucket.WriteAll(context.Background(), "NGC.csv", []byte(sampleNGCCSV), nil); err != nil {
+		t.Fatalf("seed NGC.csv: %v", err)
+	}
+
+	if err := bucket.WriteAll(context.Background(), "addendum.csv", []byte(sampleAddendumCSV), nil); err != nil {
+		t.Fatalf("seed addendum.csv: %v", err)
+	}
+
+	return bucket
 }
 
 func TestNewFetchesFromNetworkWhenDownloadsEnabled(t *testing.T) {
 	t.Cleanup(remote.Capture().Restore)
 
-	getCounts := map[string]*int32{
-		"/NGC.csv":      new(int32),
-		"/addendum.csv": new(int32),
-	}
+	fakeSources(t)
 
-	srv := serveSources(t, getCounts)
-	defer srv.Close()
-
-	if err := remote.SetURL(remote.OpenNGC, srv.URL); err != nil {
-		t.Fatal(err)
-	}
-
-	remote.EnableDownloads(remote.OpenNGC, 0)
-	remote.SetDataDirPath(t.TempDir())
+	remote.EnableDownloads(0, remote.OpenNGC)
+	remote.SetDataDir(testutil.FileURL(t, t.TempDir()))
 
 	p := New()
 
@@ -92,64 +84,74 @@ func TestNewFetchesFromNetworkWhenDownloadsEnabled(t *testing.T) {
 func TestNewSkipsBodyWhenUnchanged(t *testing.T) {
 	t.Cleanup(remote.Capture().Restore)
 
-	getCounts := map[string]*int32{
-		"/NGC.csv":      new(int32),
-		"/addendum.csv": new(int32),
-	}
+	fakeSources(t)
 
-	srv := serveSources(t, getCounts)
-	defer srv.Close()
-
-	if err := remote.SetURL(remote.OpenNGC, srv.URL); err != nil {
-		t.Fatal(err)
-	}
-
-	remote.EnableDownloads(remote.OpenNGC, 0)
-	remote.SetDataDirPath(t.TempDir())
+	remote.EnableDownloads(0, remote.OpenNGC)
+	remote.SetDataDir(testutil.FileURL(t, t.TempDir()))
 
 	_ = New()
 
-	for path, c := range getCounts {
-		if got := atomic.LoadInt32(c); got != 1 {
-			t.Fatalf("expected 1 GET for %s after first New(), got %d", path, got)
-		}
+	bucket, prefix, err := remote.CacheDir(context.Background(), remote.OpenNGC)
+	if err != nil {
+		t.Fatalf("CacheDir: %v", err)
 	}
 
+	ngcAttrsBefore, err := bucket.Attributes(context.Background(), prefix+"NGC.csv")
+	if err != nil {
+		t.Fatalf("Attributes(NGC.csv): %v", err)
+	}
+
+	addendumAttrsBefore, err := bucket.Attributes(context.Background(), prefix+"addendum.csv")
+	if err != nil {
+		t.Fatalf("Attributes(addendum.csv): %v", err)
+	}
+
+	// Second New() call: the source is untouched (same mtime/size, so the
+	// same fileblob-derived ETag), so both cache files must be reused
+	// untouched — proved by their own ModTime staying identical, which
+	// only happens if fetchInto's promote step never ran a second time.
 	_ = New()
 
-	for path, c := range getCounts {
-		if got := atomic.LoadInt32(c); got != 1 {
-			t.Errorf("expected still 1 GET for %s after second New() (unchanged content should skip download), got %d", path, got)
-		}
+	ngcAttrsAfter, err := bucket.Attributes(context.Background(), prefix+"NGC.csv")
+	if err != nil {
+		t.Fatalf("Attributes(NGC.csv) after: %v", err)
+	}
+
+	addendumAttrsAfter, err := bucket.Attributes(context.Background(), prefix+"addendum.csv")
+	if err != nil {
+		t.Fatalf("Attributes(addendum.csv) after: %v", err)
+	}
+
+	if !ngcAttrsAfter.ModTime.Equal(ngcAttrsBefore.ModTime) {
+		t.Errorf("NGC.csv was rewritten on an unchanged-source New(): ModTime %v -> %v", ngcAttrsBefore.ModTime, ngcAttrsAfter.ModTime)
+	}
+
+	if !addendumAttrsAfter.ModTime.Equal(addendumAttrsBefore.ModTime) {
+		t.Errorf("addendum.csv was rewritten on an unchanged-source New(): ModTime %v -> %v", addendumAttrsBefore.ModTime, addendumAttrsAfter.ModTime)
 	}
 }
 
 func TestNewDefaultDenyIssuesNoRequest(t *testing.T) {
 	t.Cleanup(remote.Capture().Restore)
-	remote.SetDataDirPath(t.TempDir())
+	remote.SetDataDir(testutil.FileURL(t, t.TempDir()))
 
-	var hits atomic.Int32
-
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		hits.Add(1)
-
-		_, _ = w.Write([]byte(sampleNGCCSV))
-	}))
-	defer srv.Close()
-
-	if err := remote.SetURL(remote.OpenNGC, srv.URL); err != nil {
-		t.Fatal(err)
-	}
+	fakeSources(t)
 
 	// Downloads intentionally left disabled (the default).
 	p := New()
 
-	if got := hits.Load(); got != 0 {
-		t.Errorf("New() must not touch the network when downloads aren't enabled; server saw %d hits", got)
-	}
-
 	if _, ok := p.Resolve(context.Background(), "M42"); ok {
 		t.Error("expected an empty provider when downloads are disabled")
+	}
+
+	bucket, prefix, err := remote.CacheDir(context.Background(), remote.OpenNGC)
+	if err != nil {
+		t.Fatalf("CacheDir: %v", err)
+	}
+
+	// A failed existence check is not "exists".
+	if exists, _ := bucket.Exists(context.Background(), prefix+"NGC.csv"); exists {
+		t.Error("New() must not create a cache file when downloads aren't enabled")
 	}
 }
 
@@ -159,46 +161,30 @@ func TestNewDefaultDenyIssuesNoRequest(t *testing.T) {
 func TestNewDoesNotAccumulateCacheFiles(t *testing.T) {
 	t.Cleanup(remote.Capture().Restore)
 
-	srv := serveSources(t, map[string]*int32{})
-	defer srv.Close()
+	fakeSources(t)
 
-	if err := remote.SetURL(remote.OpenNGC, srv.URL); err != nil {
-		t.Fatal(err)
-	}
-
-	remote.EnableDownloads(remote.OpenNGC, 0)
-	remote.SetDataDirPath(t.TempDir())
+	remote.EnableDownloads(0, remote.OpenNGC)
+	remote.SetDataDir(testutil.FileURL(t, t.TempDir()))
 
 	for range 3 {
 		_ = New()
 	}
 
-	dir, err := remote.CacheDir(remote.OpenNGC)
+	bucket, prefix, err := remote.CacheDir(context.Background(), remote.OpenNGC)
 	if err != nil {
 		t.Fatalf("CacheDir: %v", err)
 	}
 
-	entries, err := os.ReadDir(dir.LocalPath())
-	if err != nil {
-		t.Fatalf("ReadDir: %v", err)
-	}
-
 	wantNames := map[string]bool{"NGC.csv": true, "addendum.csv": true}
-	gotFiles := 0
+	got := testutil.BucketKeys(t, bucket, prefix)
 
-	for _, e := range entries {
-		if e.IsDir() || strings.HasSuffix(e.Name(), ".signature.json") {
-			continue
-		}
-
-		gotFiles++
-
-		if !wantNames[e.Name()] {
-			t.Errorf("unexpected cache file %q (possible version accumulation)", e.Name())
+	for _, key := range got {
+		if !wantNames[key] {
+			t.Errorf("unexpected cache object %q (possible version accumulation)", key)
 		}
 	}
 
-	if gotFiles != len(wantNames) {
-		t.Errorf("expected exactly %d cache files after 3 New() calls, got %d", len(wantNames), gotFiles)
+	if len(got) != len(wantNames) {
+		t.Errorf("expected exactly %d cache objects, got %d: %v", len(wantNames), len(got), got)
 	}
 }

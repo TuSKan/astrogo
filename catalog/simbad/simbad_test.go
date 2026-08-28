@@ -8,9 +8,10 @@ import (
 	"os"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/TuSKan/astrogo/catalog/resolve"
+
+	"github.com/TuSKan/astrogo/remote"
 )
 
 func TestParseCSV(t *testing.T) {
@@ -85,9 +86,8 @@ func TestResolveMock(t *testing.T) {
 	// test ParseCSV is the real test. We can just test Provider behavior if we can mock Client Transport.
 
 	p := New()
-	p.client.HTTPClient.Transport = &mockTransport{
-		Handler: server.Config.Handler,
-	}
+
+	redirect(t, remote.SIMBAD, server.URL)
 
 	tgt, ok := p.Resolve(context.Background(), "m31")
 	if !ok {
@@ -97,21 +97,6 @@ func TestResolveMock(t *testing.T) {
 	if tgt.ID != "NAME M  31" {
 		t.Errorf("unexpected ID: %s", tgt.ID)
 	}
-}
-
-type mockTransport struct {
-	Handler http.Handler
-}
-
-func (m *mockTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	rec := httptest.NewRecorder()
-	// Mock executing the request.
-	m.Handler.ServeHTTP(rec, req)
-	resp := rec.Result()
-	// Set the dummy Request so it doesn't fail downstream context tracking
-	resp.Request = req
-
-	return resp, nil
 }
 
 func TestRetryTimeout(t *testing.T) {
@@ -124,14 +109,9 @@ func TestRetryTimeout(t *testing.T) {
 	}))
 	defer server.Close()
 
-	p := New()
-	p.client.HTTPClient.Timeout = 100 * time.Millisecond
-	p.client.UserAgent = "TestUserAgent"
+	redirect(t, remote.SIMBAD, server.URL)
 
-	// Create mock transport directly to our server
-	p.client.HTTPClient.Transport = &mockTransport{
-		Handler: server.Config.Handler,
-	}
+	p := New()
 
 	ctx := context.Background()
 	req := resolve.ObjectRequest{Query: "test"}
@@ -406,7 +386,8 @@ func TestSearchBrightMock(t *testing.T) {
 	defer server.Close()
 
 	p := New()
-	p.client.HTTPClient.Transport = &mockTransport{Handler: server.Config.Handler}
+
+	redirect(t, remote.SIMBAD, server.URL)
 
 	var got []resolve.Target
 
@@ -444,4 +425,19 @@ func TestProviderInterface(t *testing.T) {
 	// Triggers internal error paths since we didn't mock
 	_, _ = p.Resolve(context.Background(), "non_existent_body")
 	_ = p.Search(context.Background(), "non_existent_body")
+}
+
+// redirect points endpoint id at a test server for the duration of one
+// test. It replaces the old http.RoundTripper injection: remote/api's
+// Client is opaque by design, and every request resolves its URL through
+// remote.URL(id) anyway, so the registry is the natural seam.
+func redirect(t *testing.T, id remote.EndpointID, url string) {
+	t.Helper()
+
+	scope := remote.Capture(id)
+	t.Cleanup(scope.Restore)
+
+	if err := remote.SetURL(id, url); err != nil {
+		t.Fatalf("SetURL(%s): %v", id, err)
+	}
 }

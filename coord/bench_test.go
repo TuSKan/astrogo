@@ -27,7 +27,7 @@ func BenchmarkNewContext(b *testing.B) {
 
 func BenchmarkNewContext_SeaLevel(b *testing.B) {
 	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(45), 0)
-	atm := atmosphere.StandardAtmosphere
+	atm := atmosphere.StandardRefraction
 	t := time.FromJD(2460000.5, time.UTC)
 
 	for b.Loop() {

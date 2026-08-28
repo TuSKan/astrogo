@@ -108,6 +108,17 @@ func (a Angle) Wrap2Pi() Angle {
 	v := math.Mod(float64(a), twoPi)
 	if v < 0 {
 		v += twoPi
+
+		// The range above is half-open, and adding 2*pi to a very small
+		// negative value lands on exactly 2*pi rather than just below it:
+		// anything under half an ULP of 2*pi, about 4.4e-16 radians, has no
+		// representable sum other than 2*pi itself. So Deg(-1e-14).Wrap360()
+		// returned 360 degrees, which is the one value this is documented not
+		// to return, and it arises from something as ordinary as differencing
+		// two nearly equal longitudes.
+		if v >= twoPi {
+			v = 0
+		}
 	}
 
 	return Angle(v)
@@ -167,16 +178,34 @@ func (a Angle) DMSString(precision int) string {
 	degVal := a.Degrees()
 	if degVal < 0 {
 		b.WriteByte('-')
-
-		degVal = -degVal
 	} else {
 		b.WriteByte('+')
 	}
 
+	// math.Abs rather than the negation the sign branch would otherwise do,
+	// because negative zero takes neither branch as written: -0.0 < 0 is
+	// false, so it kept its sign bit into the seconds, and FormatFloat spelt
+	// that back out mid-string as "+00 deg 00' 0-0.0"" - a malformed
+	// coordinate rather than a wrong one. Negative zero is not exotic here: an
+	// angle negated, scaled by a negative, or passed through math.Asin all
+	// produce it, and it compares equal to zero everywhere except in the sign
+	// bit that printing reveals.
+	degVal = math.Abs(degVal)
+
 	d := int64(degVal)
 	rem := (degVal - float64(d)) * 60
 	m := int64(rem)
-	s := (rem - float64(m)) * 60
+
+	// Clamped at zero. m truncates rem, so this difference is non-negative
+	// in exact arithmetic - but on arm64 Go may keep rem in a wider register
+	// for this subtraction than the value int64(rem) truncated, leaving a
+	// difference of about -1e-17. That is invisible until it reaches
+	// FormatFloat, which renders it "-0.0" while the leading-zero branch
+	// above has already written a '0', producing "00h04m0-0.0s". Deg(1) did
+	// exactly that in CI on macOS while passing on every amd64 machine.
+	// math.Max also normalises a negative zero, which is the other way the
+	// sign reaches the seconds field.
+	s := math.Max(0, (rem-float64(m))*60)
 
 	// Round s to the same precision that will actually be printed, once,
 	// up front — the carry check, the leading-zero decision, and the
@@ -243,12 +272,26 @@ func (a Angle) DMSString(precision int) string {
 func (a Angle) HMSString(precision int) string {
 	var b strings.Builder
 
-	hVal := a.Wrap2Pi().Hours()
+	// Absolute value for the same reason DMSString takes one: Wrap2Pi carries
+	// a negative zero through unchanged - it is in [0, 2pi) by every
+	// comparison - and the sign bit would then surface inside the seconds
+	// field as "00h00m0-0.0s".
+	hVal := math.Abs(a.Wrap2Pi().Hours())
 
 	h := int64(hVal)
 	rem := (hVal - float64(h)) * 60
 	m := int64(rem)
-	s := (rem - float64(m)) * 60
+
+	// Clamped at zero. m truncates rem, so this difference is non-negative
+	// in exact arithmetic - but on arm64 Go may keep rem in a wider register
+	// for this subtraction than the value int64(rem) truncated, leaving a
+	// difference of about -1e-17. That is invisible until it reaches
+	// FormatFloat, which renders it "-0.0" while the leading-zero branch
+	// above has already written a '0', producing "00h04m0-0.0s". Deg(1) did
+	// exactly that in CI on macOS while passing on every amd64 machine.
+	// math.Max also normalises a negative zero, which is the other way the
+	// sign reaches the seconds field.
+	s := math.Max(0, (rem-float64(m))*60)
 
 	// Round s once up front and reuse it for the carry check, the
 	// leading-zero decision, and the printed digits — see the identical

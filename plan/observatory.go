@@ -12,6 +12,7 @@ import (
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/remote"
+	"github.com/TuSKan/astrogo/remote/api"
 	"github.com/TuSKan/astrogo/time"
 )
 
@@ -297,7 +298,7 @@ func NewSiteEarthAddress(ctx context.Context, name, address string, opts ...Site
 // geocodeAddress resolves address to decimal-degree latitude/longitude via
 // the Nominatim API (remote.Nominatim).
 func geocodeAddress(ctx context.Context, address string) (lat, lon float64, err error) {
-	client, err := remote.NewClientFor(remote.Nominatim)
+	client, err := api.NewClient(remote.Nominatim)
 	if err != nil {
 		return 0, 0, fmt.Errorf("plan: geocode client: %w", err)
 	}
@@ -332,7 +333,7 @@ func geocodeAddress(ctx context.Context, address string) (lat, lon float64, err 
 // lookupElevation resolves a latitude/longitude to a height above sea
 // level (meters) via the Open-Elevation API (remote.OpenElevation).
 func lookupElevation(ctx context.Context, lat, lon float64) (float64, error) {
-	client, err := remote.NewClientFor(remote.OpenElevation)
+	client, err := api.NewClient(remote.OpenElevation)
 	if err != nil {
 		return 0, fmt.Errorf("plan: elevation client: %w", err)
 	}
@@ -411,11 +412,16 @@ func (s *Site) Latitude() angle.Angle { return s.location.Lat() }
 // HeightMeters returns the site's height above the reference ellipsoid in meters.
 func (s *Site) HeightMeters() float64 { return s.location.Height() }
 
-// Atmosphere returns an atmospheric profile adjusted for the site's elevation
+// Refraction returns a refraction profile adjusted for the site's elevation
 // using the ICAO International Standard Atmosphere barometric formula.
 // Pressure and temperature are reduced for altitude; humidity, wavelength,
 // and the refraction model are inherited from the sea-level standard.
-func (s *Site) Atmosphere() atmosphere.Atmosphere {
+//
+// Renamed from Atmosphere alongside atmosphere.Atmosphere/Refraction's own
+// swap (see atmosphere/doc.go) — this method has always returned the small
+// refraction-input struct, never the package's richer atmospheric-state
+// type, so the new name matches what it actually returns.
+func (s *Site) Refraction() atmosphere.Refraction {
 	return atmosphere.AtAltitude(s.location.Height())
 }
 

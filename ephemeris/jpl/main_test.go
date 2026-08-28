@@ -17,9 +17,9 @@ import (
 // offline SPK fixtures and move the network-dependent cases to
 // //go:build network per CLAUDE.md's test-tag convention.
 func TestMain(m *testing.M) {
-	remote.EnableDownloads(remote.NAIFSPK, 0)
-	remote.EnableDownloads(remote.NAIFLSK, 0)
-	remote.EnableDownloads(remote.JPLHorizons, 0)
+	remote.EnableDownloads(0, remote.NAIFSPK)
+	remote.EnableDownloads(0, remote.NAIFLSK)
+	remote.EnableDownloads(0, remote.JPLHorizonsSPK)
 
 	os.Exit(m.Run())
 }

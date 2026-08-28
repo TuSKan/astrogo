@@ -12,8 +12,8 @@ import (
 // de440s kernel — a network/cache dependency that predates remote's
 // consent-gating (see ephemeris/jpl's own TestMain for the same rationale).
 func TestMain(m *testing.M) {
-	remote.EnableDownloads(remote.NAIFSPK, 0)
-	remote.EnableDownloads(remote.NAIFLSK, 0)
+	remote.EnableDownloads(0, remote.NAIFSPK)
+	remote.EnableDownloads(0, remote.NAIFLSK)
 
 	os.Exit(m.Run())
 }

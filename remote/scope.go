@@ -2,8 +2,6 @@ package remote
 
 import (
 	"maps"
-
-	gofs "github.com/ungerik/go-fs"
 )
 
 // Scope is an immutable snapshot of remote's process-wide configuration —
@@ -20,10 +18,10 @@ import (
 // into every test that runs afterward. Capture/Restore snapshot exactly
 // what was asked for and put exactly that back, nothing more or less.
 type Scope struct {
-	endpoints map[EndpointID]Endpoint
-	offline   bool
-	policy    Policy
-	dataDir   gofs.File
+	endpoints  map[EndpointID]Endpoint
+	offline    bool
+	policy     Policy
+	dataDirURL string
 }
 
 // Capture snapshots the current configuration. With no arguments it
@@ -58,10 +56,10 @@ func Capture(ids ...EndpointID) Scope {
 	}
 
 	return Scope{
-		endpoints: snapshot,
-		offline:   offline,
-		policy:    policy,
-		dataDir:   dataDir,
+		endpoints:  snapshot,
+		offline:    offline,
+		policy:     policy,
+		dataDirURL: dataDirURL,
 	}
 }
 
@@ -89,7 +87,7 @@ func (s Scope) Restore() {
 
 	offline = s.offline
 	policy = s.policy
-	dataDir = s.dataDir
+	dataDirURL = s.dataDirURL
 }
 
 // WithScope captures the current configuration, runs fn, and restores the

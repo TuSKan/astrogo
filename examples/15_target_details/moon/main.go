@@ -22,12 +22,12 @@ func main() {
 
 	tz, _ := time.LoadLocation("UTC")
 	t := time.Date(2026, 4, 25, 20, 0, 0, 0, tz)
-	ctx := coord.NewContext(t, loc, atmosphere.StandardAtmosphere)
+	ctx := coord.NewContext(t, loc, atmosphere.StandardRefraction)
 
 	// JPL kernel downloads are opt-in — see README "Data downloads &
 	// offline usage". de442 is ~115 MB; naif0012.tls (leap seconds) ~5 KB.
-	remote.EnableDownloads(remote.NAIFSPK, 200<<20)
-	remote.EnableDownloads(remote.NAIFLSK, 0)
+	remote.EnableDownloads(200<<20, remote.NAIFSPK)
+	remote.EnableDownloads(0, remote.NAIFLSK)
 
 	prov, err := eph.NewProvider(context.Background(), eph.Planets, "de442")
 	if err != nil {

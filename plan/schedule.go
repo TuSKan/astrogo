@@ -120,7 +120,7 @@ func (m *BasicTransitionModel) Overhead(ctx TransitionContext) (time.Duration, e
 			// Same epoch (the common case — ToTime is documented as
 			// "approximate, often FromTime"): share one Context instead of
 			// building two identical ~91µs SOFA transforms for one instant.
-			epochCtx := coord.NewContext(ctx.FromTime, ctx.Site.Location(), ctx.Site.Atmosphere())
+			epochCtx := coord.NewContext(ctx.FromTime, ctx.Site.Location(), ctx.Site.Refraction())
 
 			altAzFrom, err = epochCtx.ICRSToAltAz(posFrom)
 			if err != nil {
@@ -132,12 +132,12 @@ func (m *BasicTransitionModel) Overhead(ctx TransitionContext) (time.Duration, e
 				return 0, fmt.Errorf("schedule: to AltAz: %w", err)
 			}
 		} else {
-			altAzFrom, err = coord.NewContext(ctx.FromTime, ctx.Site.Location(), ctx.Site.Atmosphere()).ICRSToAltAz(posFrom)
+			altAzFrom, err = coord.NewContext(ctx.FromTime, ctx.Site.Location(), ctx.Site.Refraction()).ICRSToAltAz(posFrom)
 			if err != nil {
 				return 0, fmt.Errorf("schedule: from AltAz: %w", err)
 			}
 
-			altAzTo, err = coord.NewContext(ctx.ToTime, ctx.Site.Location(), ctx.Site.Atmosphere()).ICRSToAltAz(posTo)
+			altAzTo, err = coord.NewContext(ctx.ToTime, ctx.Site.Location(), ctx.Site.Refraction()).ICRSToAltAz(posTo)
 			if err != nil {
 				return 0, fmt.Errorf("schedule: to AltAz: %w", err)
 			}
@@ -234,7 +234,7 @@ func checkConstraintsIntervalCtx(target Observable, start, end time.Time, step t
 	var midCtx *coord.Context
 
 	check := func(t time.Time) bool {
-		ctx := coord.NewContext(t, site.Location(), site.Atmosphere())
+		ctx := coord.NewContext(t, site.Location(), site.Refraction())
 		// Capture the context closest to the midpoint for reuse by scoring.
 		if midCtx == nil || absDur(t.Sub(mid)) <= absDur(midCtx.Time().Sub(mid)) {
 			midCtx = ctx

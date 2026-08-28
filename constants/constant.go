@@ -95,7 +95,7 @@ type Set interface {
 }
 
 // Sets returns every constant set this package publishes. The order is
-// stable: SI2019, CODATA2022, CODATA2018, IAU2015, WGS84, Derived.
+// stable: SI2019, CODATA2022, CODATA2018, IAU2015, WGS84, Derived, Photometric.
 func Sets() []Set {
-	return []Set{SI2019, CODATA2022, CODATA2018, IAU2015, WGS84, Derived}
+	return []Set{SI2019, CODATA2022, CODATA2018, IAU2015, WGS84, Derived, Photometric}
 }

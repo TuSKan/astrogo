@@ -56,7 +56,9 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
         uses: golangci/golangci-lint-action@v9
         with:
-          version: v2.12
+          # v2.13+: .golangci.yml disables exhaustruct_v5, which does not
+          # exist before it - v2.12 rejects the whole config with exit 3.
+          version: v2.13
           args: --timeout=5m
 
       - name: Upload coverage to Codecov

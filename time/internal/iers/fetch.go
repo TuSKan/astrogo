@@ -3,19 +3,15 @@ package iers
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
+	"io"
 	"log"
 	"sync"
 	"time"
 
-	gofs "github.com/ungerik/go-fs"
-
 	"github.com/TuSKan/astrogo/remote"
+	"github.com/TuSKan/astrogo/remote/file"
 )
-
-// ErrEOPHTTPStatus indicates an unexpected HTTP status from the IERS EOP download.
-var ErrEOPHTTPStatus = errors.New("iers: EOP download returned unexpected status")
 
 //nolint:gochecknoglobals // fetch rate-limiter state — guarded by sync.Mutex
 var (
@@ -40,17 +36,21 @@ var (
 // Order of attempts otherwise:
 //  1. Fast path (no lock): the current model already covers mjd.
 //  2. Under fetchMu (re-checked immediately after acquiring it): read and
-//     parse whatever finals2000A file already exists on disk, with no
+//     parse whatever finals2000A file already exists in the cache, with no
 //     network access and no consent check — the same thing this package's
-//     former LoadFS did, just from the standard cache path instead of an
-//     arbitrary io/fs.FS. This step is necessary because remote.GetFile's
-//     own cache-hit path requires a signature sidecar that a hand-pre-seeded
-//     file never has (see fetch's doc comment); the parsed table is
-//     registered even if it doesn't cover mjd — still the best available
-//     data — and the attempt falls through to step 3 if it doesn't help.
+//     former LoadFS did, just from the standard cache location. This step
+//     is necessary because remote.GetFile's own cache-hit path requires a
+//     recorded Signature/ETag a hand-pre-seeded file never has; the parsed
+//     table is registered even if it doesn't cover mjd — still the best
+//     available data — and the attempt falls through to step 3 if it
+//     doesn't help.
 //  3. If still uncovered and the retry cooldown has elapsed: the existing
-//     consent-gated fetch (remote.GetFile: HEAD-probe reuse, or a fresh,
-//     EnableDownloads-gated download).
+//     consent-gated fetch (remote.GetFile). NOTE: IERSFinals2000A is a
+//     plain-HTTP KindFile endpoint, and remote/file has no HTTP backend
+//     registered yet (see remote/file's own doc comment) — this step
+//     currently always fails with a clear "no driver for scheme https"
+//     error until that lands. Step 2 (reading a pre-seeded cache file)
+//     still works fully offline in the meantime.
 //
 // Safe for concurrent use: a mutex serialises attempts, and the coverage
 // check is repeated inside the lock so a successful concurrent load is
@@ -74,13 +74,15 @@ func EnsureLoaded(mjd float64) error {
 		return nil
 	}
 
-	if cacheFile, err := CacheFile(); err == nil {
-		if info := cacheFile.Info(); info.Exists {
+	ctx := context.Background()
+
+	if bucket, key, err := CacheFile(ctx); err == nil {
+		if attrs, aerr := bucket.Attributes(ctx, key); aerr == nil {
 			if lastAttempt.IsZero() {
-				lastAttempt = info.Modified
+				lastAttempt = attrs.ModTime
 			}
 
-			if data, rerr := cacheFile.ReadAll(); rerr == nil {
+			if data, rerr := bucket.ReadAll(ctx, key); rerr == nil {
 				if _, perr := parseAndRegister(data, SourceCache); perr == nil && covered(mjd) {
 					return nil
 				}
@@ -94,7 +96,7 @@ func EnsureLoaded(mjd float64) error {
 	}
 
 	lastAttempt = time.Now()
-	errLastFetch = fetch(context.Background())
+	errLastFetch = fetch(ctx)
 
 	return errLastFetch
 }
@@ -120,15 +122,15 @@ func covered(mjd float64) bool {
 	return false
 }
 
-// CacheFile returns the go-fs File where downloaded EOP data is cached,
-// under remote.DataDir()/iers.
-func CacheFile() (gofs.File, error) {
-	dir, err := remote.CacheDir(remote.IERSFinals2000A)
+// CacheFile returns the Bucket and key where downloaded EOP data is
+// cached, under remote's cache directory for IERSFinals2000A.
+func CacheFile(ctx context.Context) (bucket *file.Bucket, key string, err error) {
+	bucket, prefix, err := remote.CacheDir(ctx, remote.IERSFinals2000A)
 	if err != nil {
-		return "", fmt.Errorf("iers: %w", err)
+		return nil, "", fmt.Errorf("iers: %w", err)
 	}
 
-	return dir.Join("finals2000A.data"), nil
+	return bucket, prefix + "finals2000A.data", nil
 }
 
 // parseAndRegister parses raw finals2000A bytes and, on success, registers
@@ -152,26 +154,24 @@ func parseAndRegister(data []byte, source string) (*Table, error) {
 // fetch is the shared core EnsureLoaded serializes on via fetchMu; it
 // holds no lock itself.
 func fetch(ctx context.Context) error {
-	// remote.GetFile reuses the cache untouched when a HEAD probe shows the
-	// IERS bulletin hasn't changed since we last downloaded it — a content
-	// check rather than a wall-clock expiration window, since finals2000A
-	// is updated on IERS's own schedule, not ours. WithValidate parses a
-	// fresh download before it's cached, so a corrupt response never gets
-	// trusted as the new cache.
-	f, err := remote.GetFile(ctx, remote.IERSFinals2000A, "", remote.WithCacheName("finals2000A.data"), remote.WithValidate(func(b []byte) error {
-		_, err := ParseFinals2000A(bytes.NewReader(b))
-		return err
-	}))
-	if err != nil {
-		var httpErr *remote.HTTPError
-		if errors.As(err, &httpErr) {
-			return fmt.Errorf("%w: %d", ErrEOPHTTPStatus, httpErr.StatusCode)
-		}
+	// remote.GetFile reuses the cache untouched when the source's current
+	// ETag shows the IERS bulletin hasn't changed since we last
+	// downloaded it — a content check rather than a wall-clock expiration
+	// window, since finals2000A is updated on IERS's own schedule, not
+	// ours. WithValidate parses a fresh download before it's cached, so a
+	// corrupt response never gets trusted as the new cache.
+	bucket, key, err := remote.GetFile(ctx, remote.IERSFinals2000A, "finals2000A.all",
+		remote.WithCacheName("finals2000A.data"),
+		remote.WithValidate(func(r io.Reader) error {
+			_, err := ParseFinals2000A(r)
 
+			return err
+		}))
+	if err != nil {
 		return fmt.Errorf("iers: fetch EOP data: %w", err)
 	}
 
-	data, err := f.ReadAll()
+	data, err := bucket.ReadAll(ctx, key)
 	if err != nil {
 		return fmt.Errorf("iers: read EOP data: %w", err)
 	}

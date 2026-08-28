@@ -19,7 +19,7 @@ func TestContextAtTime_ZeroDeltaMatchesNewContext(t *testing.T) {
 	site, err := coord.NewGeodetic(angle.Deg(2.1686), angle.Deg(41.3874), 0)
 	testutil.AssertNoError(t, err)
 
-	atm := atmosphere.Atmosphere{Pressure: 0}
+	atm := atmosphere.Refraction{Pressure: 0}
 	base := time.FromJD(2461000.0, time.UTC)
 
 	fresh := coord.NewContext(base, site, atm)
@@ -64,7 +64,7 @@ func TestContextAtTime_DriftStaysWithinDocumentedBound(t *testing.T) {
 	site, err := coord.NewGeodetic(angle.Deg(2.1686), angle.Deg(41.3874), 0)
 	testutil.AssertNoError(t, err)
 
-	atm := atmosphere.Atmosphere{Pressure: 0}
+	atm := atmosphere.Refraction{Pressure: 0}
 	base := time.FromJD(2461000.0, time.UTC)
 	ctx := coord.NewContext(base, site, atm)
 	star := coord.NewICRS(angle.Hour(6.75), angle.Deg(-16.7))
@@ -108,7 +108,7 @@ func TestContextAtTime_AdvancesEarthRotation(t *testing.T) {
 	site, err := coord.NewGeodetic(angle.Deg(2.1686), angle.Deg(41.3874), 0)
 	testutil.AssertNoError(t, err)
 
-	atm := atmosphere.Atmosphere{Pressure: 0}
+	atm := atmosphere.Refraction{Pressure: 0}
 	base := time.FromJD(2461000.0, time.UTC)
 	ctx := coord.NewContext(base, site, atm)
 	star := coord.NewICRS(angle.Hour(6.75), angle.Deg(-16.7))

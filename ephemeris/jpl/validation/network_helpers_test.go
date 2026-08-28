@@ -3,9 +3,9 @@
 package jpl_test
 
 import (
-	"net"
 	"testing"
-	"time"
+
+	"github.com/TuSKan/astrogo/internal/testutil"
 )
 
 // requireHorizons skips the test when the JPL Horizons API is unreachable —
@@ -15,10 +15,5 @@ import (
 func requireHorizons(t *testing.T) {
 	t.Helper()
 
-	conn, err := net.DialTimeout("tcp", "ssd.jpl.nasa.gov:443", 5*time.Second)
-	if err != nil {
-		t.Skipf("JPL Horizons unreachable, skipping live test: %v", err)
-	}
-
-	_ = conn.Close()
+	testutil.RequireReachable(t, "ssd.jpl.nasa.gov:443")
 }

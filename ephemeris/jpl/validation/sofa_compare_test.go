@@ -13,11 +13,13 @@ import (
 )
 
 func runSOFATest(t *testing.T, bid eph.ID) {
+	t.Helper()
+
 	p, err := jpl.NewProvider(context.Background(), core.Planets, "de440")
 	if err != nil {
 		t.Skipf("skipping SOFA comparison: JPL provider failed: %v", err)
 	}
-	defer p.Close()
+	defer func() { _ = p.Close() }()
 
 	sofa := eph.Default()
 
@@ -27,8 +29,10 @@ func runSOFATest(t *testing.T, bid eph.ID) {
 		time.Date(2010, 6, 21, 0, 0, 0, 0, time.LocationUTC),
 	}
 
-	const sunPosTol = 1e-6
-	const moonPosTol = 1e-7
+	const (
+		sunPosTol  = 1e-6
+		moonPosTol = 1e-7
+	)
 
 	for i, tm := range epochs {
 		t.Run(bid.String(), func(t *testing.T) {
@@ -43,6 +47,7 @@ func runSOFATest(t *testing.T, bid eph.ID) {
 			}
 
 			posDiff := jplState.Pos.Sub(sofaState.Pos).Norm()
+
 			tol := sunPosTol
 			if bid == eph.Moon {
 				tol = moonPosTol
@@ -56,9 +61,13 @@ func runSOFATest(t *testing.T, bid eph.ID) {
 }
 
 func TestJPLStateAgainstSOFASun(t *testing.T) {
+	t.Helper()
+
 	runSOFATest(t, eph.Sun)
 }
 
 func TestJPLStateAgainstSOFAMoon(t *testing.T) {
+	t.Helper()
+
 	runSOFATest(t, eph.Moon)
 }

@@ -4,12 +4,13 @@ import (
 	"context"
 	"encoding/binary"
 	"errors"
-	"net/http"
-	"net/http/httptest"
 	"testing"
 
 	"github.com/TuSKan/astrogo/ephemeris/jpl/spk"
 	"github.com/TuSKan/astrogo/remote"
+	"github.com/TuSKan/astrogo/remote/file"
+
+	"github.com/TuSKan/astrogo/internal/testutil"
 )
 
 // fakeDAFHeader builds a minimal but structurally valid DAF/SPK file
@@ -41,22 +42,34 @@ func TestCacheDownloadDetectsChecksumCorruption(t *testing.T) {
 	// resetting the whole registry.
 	t.Cleanup(remote.Capture(remote.NAIFSPK).Restore)
 
-	remote.SetDataDirPath(t.TempDir())
+	remote.SetDataDir(testutil.FileURL(t, t.TempDir()))
 
 	header := fakeDAFHeader()
 
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		_, _ = w.Write(header)
-	}))
-	defer srv.Close()
+	// A local file:// bucket stands in for the source now that GetFile
+	// can't reach an http:// URL at all (no httpblob driver registered
+	// yet; see remote/file's package doc) — see remote/resume_test.go's
+	// fakeSource for the same pattern in package remote itself.
+	srcDir := t.TempDir()
 
-	if err := remote.SetURL(remote.NAIFSPK, srv.URL); err != nil {
+	srcURL := testutil.FileURL(t, srcDir)
+
+	srcBucket, err := file.Open(context.Background(), srcURL)
+	if err != nil {
+		t.Fatalf("Open source: %v", err)
+	}
+
+	if err := srcBucket.WriteAll(context.Background(), "checksum-test.bsp", header, nil); err != nil {
+		t.Fatalf("seed source: %v", err)
+	}
+
+	if err := remote.SetURL(remote.NAIFSPK, srcURL); err != nil {
 		t.Fatal(err)
 	}
 
 	// Redundant with TestMain's grant, kept for self-containment; restored
 	// (not revoked) in cleanup via the Capture above.
-	remote.EnableDownloads(remote.NAIFSPK, 0)
+	remote.EnableDownloads(0, remote.NAIFSPK)
 
 	const kernel = "checksum-test.bsp"
 
@@ -69,19 +82,20 @@ func TestCacheDownloadDetectsChecksumCorruption(t *testing.T) {
 		t.Fatalf("close: %v", err)
 	}
 
-	cacheDir, err := remote.CacheDir(remote.NAIFSPK)
+	cacheBucket, prefix, err := remote.CacheDir(context.Background(), remote.NAIFSPK)
 	if err != nil {
 		t.Fatalf("CacheDir: %v", err)
 	}
 
-	kernelFile := cacheDir.Join(kernel)
-	sumFile := cacheDir.Join(kernel + ".sha256")
+	kernelKey := prefix + kernel
+	sumKey := prefix + kernel + ".sha256"
 
-	if !sumFile.Exists() {
+	// A failed existence check just means "not found" for this assertion.
+	if exists, _ := cacheBucket.Exists(context.Background(), sumKey); !exists {
 		t.Fatal("expected a checksum sidecar to be bootstrapped after the first CacheDownload")
 	}
 
-	if err := sumFile.WriteAll([]byte("0000000000000000000000000000000000000000000000000000000000000000")); err != nil {
+	if err := cacheBucket.WriteAll(context.Background(), sumKey, []byte("0000000000000000000000000000000000000000000000000000000000000000"), nil); err != nil {
 		t.Fatalf("corrupt sidecar: %v", err)
 	}
 
@@ -90,11 +104,12 @@ func TestCacheDownloadDetectsChecksumCorruption(t *testing.T) {
 		t.Fatalf("expected ErrCorruptSPK for a checksum mismatch, got %v", err)
 	}
 
-	if kernelFile.Exists() {
+	// A failed existence check is not "exists".
+	if exists, _ := cacheBucket.Exists(context.Background(), kernelKey); exists {
 		t.Error("a checksum-mismatch kernel should have been auto-removed")
 	}
 
-	if sumFile.Exists() {
+	if exists, _ := cacheBucket.Exists(context.Background(), sumKey); exists {
 		t.Error("a checksum-mismatch kernel's sidecar should have been auto-removed")
 	}
 }

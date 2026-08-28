@@ -66,7 +66,8 @@ func Open(path string) (_ *File, err error) {
 	return Read(f)
 }
 
-// Read processes a FITS file and parses its structure without reading data payloads.
+// Read processes a FITS file, decoding table extensions and skipping image
+// payloads.
 func Read(r io.Reader) (*File, error) {
 	br := NewBlockReader(r)
 
@@ -87,6 +88,52 @@ func Read(r io.Reader) (*File, error) {
 			}
 
 			return nil, err
+		}
+
+		// A table extension is decoded rather than skipped. Reading a FITS
+		// file for its headers alone makes every table consumer silently
+		// empty: ReadBintable was unreachable from here, so a caller asking
+		// a BINTABLE for a column got no rows and no error.
+		if xtension, err := header.GetString("XTENSION"); err == nil {
+			switch strings.TrimSpace(xtension) {
+			case "BINTABLE":
+				hdu, err := ReadBintable(header, br)
+				if err != nil {
+					return nil, fmt.Errorf("fits: read BINTABLE: %w", err)
+				}
+
+				f.HDUs = append(f.HDUs, hdu)
+
+				continue
+			case "TABLE":
+				hdu, err := ReadASCIITable(header, br)
+				if err != nil {
+					return nil, fmt.Errorf("fits: read TABLE: %w", err)
+				}
+
+				f.HDUs = append(f.HDUs, hdu)
+
+				continue
+			}
+		}
+
+		// An image is decoded rather than skipped, for the same reason a table
+		// is. Appending a basicHDU and seeking past the payload leaves a
+		// caller type-asserting to *ImageHDU with no image and no error, which
+		// is exactly how ReadBintable was unreachable from here before.
+		//
+		// It costs what the image weighs. A caller who wants headers alone
+		// pays for pixels they will not read, which is the price of the
+		// alternative being a silent empty result.
+		if isImagePayload(header) {
+			hdu, err := ReadImage(header, br)
+			if err != nil {
+				return nil, fmt.Errorf("fits: read image: %w", err)
+			}
+
+			f.HDUs = append(f.HDUs, hdu)
+
+			continue
 		}
 
 		f.HDUs = append(f.HDUs, &basicHDU{header: header, hType: HDUTypeImage})
@@ -202,6 +249,18 @@ func NewBlockReader(r io.Reader) *BlockReader {
 	return &BlockReader{r: r}
 }
 
+// Read delegates to the underlying stream, so a BlockReader can be handed
+// to a payload decoder that reads byte counts rather than whole blocks.
+// Header cards still go through ReadBlock; the two share one position.
+func (b *BlockReader) Read(p []byte) (int, error) {
+	n, err := b.r.Read(p)
+	if err != nil && !errors.Is(err, io.EOF) {
+		return n, fmt.Errorf("fits: read: %w", err)
+	}
+
+	return n, err //nolint:wrapcheck // io.EOF must pass through unwrapped
+}
+
 // ReadBlock fills the provided buffer with exactly 2880 bytes.
 func (b *BlockReader) ReadBlock(buf []byte) error {
 	if len(buf) != BlockSize {
@@ -229,4 +288,25 @@ func ReadBigEndian(r io.Reader, data any) error {
 // Write scaffolds writing a basic HDU to a FITS file.
 func Write(_ string, _ []float64) error {
 	return ErrUnimplemented
+}
+
+// isImagePayload reports whether an HDU carries image pixels this package can
+// decode.
+//
+// NAXIS of zero is a header-only HDU — the usual shape of a primary header in
+// a file whose data lives in extensions — and has no payload to read. An
+// XTENSION this package has no reader for is left to the skip path rather than
+// guessed at.
+func isImagePayload(header *Header) bool {
+	naxis, err := header.GetInt("NAXIS")
+	if err != nil || naxis <= 0 {
+		return false
+	}
+
+	xtension, err := header.GetString("XTENSION")
+	if err != nil {
+		return true // no XTENSION card: the primary HDU
+	}
+
+	return strings.TrimSpace(xtension) == "IMAGE"
 }

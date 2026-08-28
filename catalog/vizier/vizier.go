@@ -14,6 +14,7 @@ import (
 	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/remote"
+	"github.com/TuSKan/astrogo/remote/api"
 )
 
 // ErrUnexpectedSchema indicates the CSV response is missing a column the
@@ -30,13 +31,13 @@ var ErrUnknownTable = errors.New("vizier: unknown table")
 // Provider implements resolve.Provider and resolve.ConeSearcher
 // for querying tables hosted on VizieR via TAP ADQL.
 type Provider struct {
-	client *remote.Client
+	client *api.Client
 	cache  resolve.Cache
 }
 
 // New creates a new VizieR catalog provider.
 func New() *Provider {
-	client, err := remote.NewClientFor(remote.VizieR)
+	client, err := api.NewClient(remote.VizieR)
 	if err != nil {
 		panic(err) // unregistered endpoint would be a programmer error
 	}

@@ -16,11 +16,12 @@ type DerivedSet struct {
 	// Vintage is fixed to "derived" — this set has no publication epoch.
 	Vintage string
 
-	JulianDaySeconds    Constant
-	RadiansPerDegree    Constant
-	DegreesPerRadian    Constant
-	ArcSecondsPerRadian Constant
-	WGS84Flattening     Constant
+	JulianDaySeconds        Constant
+	RadiansPerDegree        Constant
+	DegreesPerRadian        Constant
+	ArcSecondsPerRadian     Constant
+	WGS84Flattening         Constant
+	StefanBoltzmannConstant Constant
 }
 
 // Name reports the set's vintage, implementing [Set].
@@ -31,7 +32,7 @@ func (s DerivedSet) Name() string { return s.Vintage }
 func (s DerivedSet) All() []Constant {
 	return []Constant{
 		s.JulianDaySeconds, s.RadiansPerDegree, s.DegreesPerRadian,
-		s.ArcSecondsPerRadian, s.WGS84Flattening,
+		s.ArcSecondsPerRadian, s.WGS84Flattening, s.StefanBoltzmannConstant,
 	}
 }
 
@@ -70,6 +71,26 @@ var Derived = DerivedSet{
 		Name: "WGS 84 flattening", Symbol: "f",
 		Value: 1.0 / WGS84.InverseFlattening.Value, Unit: unit.One,
 		Reference: "derived: 1 / WGS84.InverseFlattening (NGA.STND.0036_1.0.0_WGS84)",
+		Exact:     true,
+	},
+	// StefanBoltzmannConstant is computed directly from SI2019's exact
+	// c, h, k_B via sigma = 2*pi^5*k_B^4 / (15*h^3*c^2) — since the 2019 SI
+	// redefinition made c, h, and k_B exact by definition, sigma is exact
+	// too, not merely derived from measured inputs. Computed here (not
+	// hardcoded) so the value is machine-checked against SI2019, matching
+	// WGS84Flattening's own convention above; a unit test cross-checks the
+	// result against the published CODATA value (5.670374419e-8 W/(m2 K4)).
+	StefanBoltzmannConstant: Constant{
+		Name: "Stefan-Boltzmann constant", Symbol: "sigma",
+		Value: func() float64 {
+			kB, h, c := SI2019.BoltzmannConstant.Value, SI2019.PlanckConstant.Value, SI2019.SpeedOfLight.Value
+			kB4 := kB * kB * kB * kB
+			h3 := h * h * h
+
+			return 2 * math.Pow(math.Pi, 5) * kB4 / (15 * h3 * c * c)
+		}(),
+		Unit:      wattPerSquareMeterKelvin4,
+		Reference: "derived: 2*pi^5*k_B^4 / (15*h^3*c^2), exact since the 2019 SI redefinition",
 		Exact:     true,
 	},
 }

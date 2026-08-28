@@ -3,6 +3,7 @@
 package jpl_test
 
 import (
+	"errors"
 	"math"
 	"testing"
 	"time"
@@ -13,10 +14,10 @@ import (
 	atime "github.com/TuSKan/astrogo/time"
 )
 
-// ensure EOP is loaded before tests
-func init() {
-	// earth package auto-loads finals2000A in its init, so EOP is fully online.
-}
+// EOP needs no explicit load here: the time package pulls finals2000A lazily
+// the first time an epoch conversion asks for it, so these tests are already
+// online by the time they convert anything. This file used to carry an empty
+// init saying so, which was a comment pretending to be code.
 
 func TestPhase1ObserverPipelineAgainstHorizons(t *testing.T) {
 	requireHorizons(t)
@@ -41,6 +42,10 @@ func TestPhase1ObserverPipelineAgainstHorizons(t *testing.T) {
 
 	// Fetch Topocentric Observer Table for Mars (NAIF ID: 499)
 	marsHorizons, err := fetchObserverTable(499, "Mars", site.Lon().Degrees(), site.Lat().Degrees(), site.Height(), tStrStart, tStrStop)
+	if errors.Is(err, errHorizonsUnavailable) {
+		t.Skipf("JPL Horizons is not answering with API data, skipping live comparison: %v", err)
+	}
+
 	if err != nil {
 		t.Fatalf("Failed to fetch Horizons data: %v", err)
 	}
@@ -60,7 +65,7 @@ func TestPhase1ObserverPipelineAgainstHorizons(t *testing.T) {
 	// Actually, Astrometric is defined wrt ICRS cleanly.
 
 	// 2. Map through to Apparent!
-	ctx := coord.NewContext(obsTime, site, atmosphere.StandardAtmosphere)
+	ctx := coord.NewContext(obsTime, site, atmosphere.StandardRefraction)
 	apparent := ctx.AstrometricToApparent(coord.NewAstrometric(astro.RA(), astro.Dec()))
 
 	// AstroGo uses CIRS (Celestial Intermediate Reference System) for Apparent coords.
@@ -90,7 +95,7 @@ func TestPhase1ObserverPipelineAgainstHorizons(t *testing.T) {
 	// 3. Map to Observed Topocentric (Alt/Az)
 	// Horizons outputs AIRLESS coordinates unless told otherwise (we specifically stripped REFRACTION flag logic since it breaks output bounds unless specific atmospheric limits are present, which we can't reliably inject).
 	// Therefore, we MUST use our RefractionNone model to properly evaluate that Earth Orientation Parameters apply perfectly natively.
-	atmNoRef := atmosphere.StandardAtmosphere
+	atmNoRef := atmosphere.StandardRefraction
 	atmNoRef.Model = atmosphere.RefractionNone{}
 
 	ctxNoRef := coord.NewContext(obsTime, site, atmNoRef)
@@ -104,6 +109,7 @@ func TestPhase1ObserverPipelineAgainstHorizons(t *testing.T) {
 	if azDiff > 180 {
 		azDiff = 360.0 - azDiff
 	}
+
 	altDiff := math.Abs(observed.Alt().Degrees() - marsHorizons.Elevation)
 
 	t.Logf("Topocentric Deviation -> Azimuth: %.3f arcsec, Elevation: %.3f arcsec", azDiff*3600.0, altDiff*3600.0)
@@ -112,6 +118,7 @@ func TestPhase1ObserverPipelineAgainstHorizons(t *testing.T) {
 	if azDiff*3600 > 1.0 {
 		t.Errorf("Topocentric Azimuth mathematically deviated from Horizons by %.3f arcsec", azDiff*3600)
 	}
+
 	if altDiff*3600 > 1.0 {
 		t.Errorf("Topocentric Elevation mathematically deviated from Horizons by %.3f arcsec", altDiff*3600)
 	}

@@ -53,7 +53,7 @@ func TestRVCorrection_AgainstAstropyFixture(t *testing.T) {
 
 			epoch := time.Date(tc.year, tc.month, tc.day, tc.hour, tc.minute, 0, 0, time.LocationUTC)
 
-			ctx := coord.NewContext(epoch, site, atmosphere.Atmosphere{Pressure: 0})
+			ctx := coord.NewContext(epoch, site, atmosphere.Refraction{Pressure: 0})
 			target := coord.NewICRS(angle.Deg(tc.raDeg), angle.Deg(tc.decDeg))
 
 			bary := ctx.BarycentricRVCorrection(target)

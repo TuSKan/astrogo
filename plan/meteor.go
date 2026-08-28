@@ -266,24 +266,29 @@ func (m MeteorShower) Radiant(t time.Time, prov eph.Provider) (*Star, error) {
 }
 
 // ObservedRate returns the predicted number of m's meteors a single
-// observer at site would see per hour at time t, given the sky conditions
-// c describes (moonlight, zodiacal light, light pollution — the same
-// LimitingMagnitudeConstraint used elsewhere in this package). This is
-// IMO's own standard formula, inverted to predict rather than measure:
+// observer at site would see per hour at time t, given the naked-eye
+// limiting magnitude limitingMag actually reached under the sky
+// conditions of the moment. This is IMO's own standard formula, inverted
+// to predict rather than measure:
 //
 //	observedRate = ZHR · sin(h_R) · r^(LM − 6.5)
 //
-// where h_R is the radiant's altitude and LM is the site's actual
-// limiting magnitude at that moment — under the defining standard
+// where h_R is the radiant's altitude — under the defining standard
 // conditions (h_R=90°, LM=6.5) this reduces to exactly ZHR. Returns 0
-// (not an error) when the radiant is below the horizon.
-func (m MeteorShower) ObservedRate(t time.Time, site *Site, prov eph.Provider, c LimitingMagnitudeConstraint) (float64, error) {
+// (not an error) when the radiant is below the horizon, and likewise for
+// a limiting magnitude of -Inf (a sky too bright to see anything).
+//
+// The limiting magnitude is a caller-supplied input rather than something
+// computed here: it depends on moonlight, zodiacal light and light
+// pollution through a sky-brightness model, which is a separate concern
+// from meteor rate arithmetic.
+func (m MeteorShower) ObservedRate(t time.Time, site *Site, prov eph.Provider, limitingMag float64) (float64, error) {
 	ra, dec, err := m.RadiantAt(t, prov)
 	if err != nil {
 		return 0, fmt.Errorf("meteor: observed rate: %w", err)
 	}
 
-	ctx := coord.NewContext(t, site.Location(), site.Atmosphere())
+	ctx := coord.NewContext(t, site.Location(), site.Refraction())
 
 	aa, err := ctx.ICRSToAltAz(coord.NewICRS(ra, dec))
 	if err != nil {
@@ -294,16 +299,9 @@ func (m MeteorShower) ObservedRate(t time.Time, site *Site, prov eph.Provider, c
 		return 0, nil
 	}
 
-	radiant := NewStar(m.Name+" radiant", ra, dec)
-
-	limMag, _, err := c.evaluate(radiant, t, ctx)
-	if err != nil {
-		return 0, fmt.Errorf("meteor: observed rate: %w", err)
-	}
-
-	if math.IsInf(limMag, -1) {
+	if math.IsInf(limitingMag, -1) {
 		return 0, nil
 	}
 
-	return m.ZHR * aa.Alt().Sin() * math.Pow(m.PopulationIndex, limMag-6.5), nil
+	return m.ZHR * aa.Alt().Sin() * math.Pow(m.PopulationIndex, limitingMag-6.5), nil
 }

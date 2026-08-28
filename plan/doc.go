@@ -26,8 +26,7 @@
 //     [NauticalDawnDusk], [AstronomicalDawnDusk]
 //   - Observability windows & scoring — [VisibilityEvents], [IsObservable],
 //     [ScoreObservable], [RankObservables], [ObservableWindows],
-//     [Constraint] ([Altitude], [Airmass], [Sun], [MoonSep]),
-//     [LimitingMagnitudeConstraint], [ScoreObservableSky]
+//     [Constraint] ([Altitude], [Airmass], [Sun], [MoonSep])
 //   - Geometric events — [Conjunctions], [ConjunctionsEcliptic], [Appulses],
 //     [Oppositions], [GreatestElongations], [FullMoonOppositions]
 //   - Moon phases, seasons, eclipses — [MoonPhases], [MoonIllumination],

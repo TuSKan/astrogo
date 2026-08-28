@@ -69,11 +69,18 @@ type VisibleObject struct {
 	// above is always computed within Windows[0] specifically.
 	Windows []Window
 	// SkyNote is a Moon-proximity advisory (e.g. "Moon 87% illuminated,
-	// 12° away — may be washed out"), empty otherwise. This is a
-	// heuristic, not the full skybrightness-package light-pollution model
-	// (which needs a caller-supplied light-pollution grid) — a caller
-	// wanting that should layer plan.LimitingMagnitudeConstraint/
-	// ScoreObservableSky themselves using this object's Target/Windows.
+	// 12° away — may be washed out"), empty otherwise.
+	//
+	// A heuristic on Moon separation and illumination, not a sky-brightness
+	// model: it does not know the observer's air, where the Milky Way is, or
+	// whether there is a city over the hill. A caller wanting the real
+	// number evaluates
+	// [github.com/TuSKan/astrogo/skybrightness/dataset.Sky] at this object's
+	// Target and Windows and compares surface brightness themselves. There is
+	// no constraint or scorer wired to it here, deliberately: turning a sky
+	// radiance into a limiting magnitude needs a defensible detection model,
+	// and that is gated behind the same phases the skybrightness roadmap
+	// gates it behind.
 	SkyNote string
 }
 
@@ -109,7 +116,7 @@ func WithStep(d time.Duration) VisibleTonightOption {
 // Galilean moons), since NAIF's only kernels covering these bright, named
 // moons also carry very long high-precision integration spans; there is no
 // smaller official alternative. Each kernel still requires the same
-// remote.EnableDownloads(remote.NAIFSPK, maxSize) consent as any other —
+// remote.EnableDownloads(maxSize, remote.NAIFSPK) consent as any other —
 // this option only controls whether VisibleTonight asks for them at all.
 func WithPlanetaryMoons() VisibleTonightOption {
 	return func(c *visibleTonightConfig) { c.includeMoons = true }
@@ -122,7 +129,7 @@ func WithPlanetaryMoons() VisibleTonightOption {
 // SBDB provided them (resolve.Target.HasElements).
 //
 // The default is Kepler because it is free — no network round trip, no
-// remote.EnableDownloads(remote.JPLHorizons, ...) consent, no file
+// remote.EnableDownloads(..., remote.JPLHorizonsSPK) consent, no file
 // handle — and, for a single night's visibility-window search, accurate
 // well beyond what that search itself resolves (~0.04″ near the
 // elements' own epoch, ~0.56″ at 30 days out — see CHANGELOG for the
@@ -194,7 +201,7 @@ var planetConstructors = []func(eph.Provider) *Planet{
 // resolved via two-body Keplerian propagation of its own published
 // elements by default (ephemeris/kepler) — free, no network round trip,
 // no download consent — falling back to a real JPL-Horizons-generated
-// SPK kernel (gated by remote.EnableDownloads(remote.JPLHorizons, ...))
+// SPK kernel (gated by remote.EnableDownloads(..., remote.JPLHorizonsSPK))
 // only when the candidate has no published elements or an orbit two-body
 // propagation can't represent; see WithSmallBodyKernels to force the
 // kernel path unconditionally. A candidate whose ephemeris (either path)
@@ -618,7 +625,7 @@ func evaluateCandidate(c visibleCandidate, start, end time.Time, site *Site, pla
 		return VisibleObject{}, false
 	}
 
-	astroCtx := coord.NewContext(peakTime, site.Location(), site.Atmosphere())
+	astroCtx := coord.NewContext(peakTime, site.Location(), site.Refraction())
 
 	aa, err := astroCtx.ICRSToAltAz(pos)
 	if err != nil {

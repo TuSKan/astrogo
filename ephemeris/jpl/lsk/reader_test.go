@@ -2,8 +2,6 @@ package lsk_test
 
 import (
 	"context"
-	"os"
-	"path/filepath"
 	"testing"
 
 	"github.com/TuSKan/astrogo/time"
@@ -12,6 +10,7 @@ import (
 	"github.com/TuSKan/astrogo/ephemeris/jpl"
 	"github.com/TuSKan/astrogo/ephemeris/jpl/lsk"
 	"github.com/TuSKan/astrogo/internal/testutil"
+	"github.com/TuSKan/astrogo/remote"
 )
 
 func TestLSKReader(t *testing.T) {
@@ -27,10 +26,15 @@ func TestLSKReader(t *testing.T) {
 		}
 	})
 
-	lskPath := filepath.Join(prov.DataDir, "lsk", "naif0012.tls")
+	ctx := context.Background()
 
-	f, err := os.Open(lskPath)
+	bucket, prefix, err := remote.CacheDir(ctx, remote.NAIFLSK)
 	testutil.AssertNoError(t, err)
+
+	f, err := bucket.NewReader(ctx, prefix+"lsk/naif0012.tls", nil)
+	if err != nil {
+		t.Fatalf("open cached LSK: %v", err)
+	}
 
 	r, err := lsk.NewReader(f)
 	testutil.AssertNoError(t, err)

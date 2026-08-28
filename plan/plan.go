@@ -170,7 +170,7 @@ func isObservableCtx(
 	}
 
 	if ctx == nil {
-		ctx = coord.NewContext(t, site.Location(), site.Atmosphere())
+		ctx = coord.NewContext(t, site.Location(), site.Refraction())
 	}
 
 	altAz, err := ctx.ICRSToAltAz(pos)
@@ -379,7 +379,7 @@ func estimateHoursUntilSet(obj Observable, t time.Time, site *Site, currentAlt f
 			continue
 		}
 
-		fctx := coord.NewContext(ft, site.Location(), site.Atmosphere())
+		fctx := coord.NewContext(ft, site.Location(), site.Refraction())
 
 		aa, err := fctx.ICRSToAltAz(pos)
 		if err != nil {

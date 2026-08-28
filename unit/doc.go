@@ -20,4 +20,27 @@
 //
 // Use [Quantity] for general physics (lengths, masses, times) and
 // `angle.Angle` for coordinate geometry and telescope pointing.
+//
+// # Radiometric type safety
+//
+// [Steradian] is dimensionally identical to [One], exactly as [Radian] is —
+// [Dimension] has only the seven SI base exponents and no tag distinguishing
+// a solid angle from a bare dimensionless ratio, so [RadianceUnit] and
+// [IrradianceUnit] (the unit.Unit VALUES, used for documentation and
+// provenance serialization) compare Compatible and even Equals in dimension
+// despite being physically distinct quantities. This is deliberate, not an
+// oversight: unit.Dimension's runtime model cannot and does not protect a
+// caller from cancelling a radiance into an irradiance.
+//
+// Real radiometric type safety instead comes from the zero-cost quantity
+// TYPES declared in quantity_types.go — [Radiance], [Irradiance],
+// [SpectralRadiance], [LuminanceCdM2], and their neighbors — each a
+// distinct named float64 type the Go compiler itself keeps apart, the same
+// way `angle.Angle` is kept apart from a bare float64 meant for something
+// else. These live directly in this package (not duplicated into a
+// consumer package) specifically so a hot numeric loop — e.g.
+// skybrightness's spectral sky-radiance engine, evaluating ~10^4 directions
+// x ~10^2-10^3 wavelengths per call — can use them with zero struct
+// overhead, unlike [Quantity]. See docs/skybrightness.md §3 for the full
+// design rationale.
 package unit

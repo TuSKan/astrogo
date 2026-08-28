@@ -11,7 +11,7 @@
 
 **Observatory-grade astronomy and observation-planning engine for Go.**
 
-Scale-aware time arithmetic · SOFA-rigorous coordinate transforms · sub-minute rise/set accuracy · production scheduling · validated against USNO, JPL Horizons, and NASA Eclipse Catalogs.
+Scale-aware time arithmetic · SOFA-rigorous coordinate transforms · sub-minute rise/set accuracy · spectral all-sky brightness · production scheduling · validated against USNO, JPL Horizons, NASA Eclipse Catalogs and GAMBONS.
 
 ---
 
@@ -85,10 +85,8 @@ The best way to see whether a library's numbers are trustworthy is to point it a
 | [**When Did Jesus Die?**](docs/JESUS.md) | *"The sky keeps receipts."* Three historical dating puzzles — the Star of Bethlehem, the ministry's start, the Crucifixion — resolved with eclipses, conjunctions, and lunar crescent visibility instead of manuscripts. | [`examples/10_jesus_christ/`](examples/10_jesus_christ/) |
 | [**The Great Planet Parade**](docs/PLANET_PARADE.md) | On Feb 28 2025, all seven planets were above the horizon at once from São Paulo. Was that actually visible, and how rare is it? | [`examples/16_planet_parade/`](examples/16_planet_parade/) |
 | [**Equinox & Solstice Almanac**](docs/EQUINOX.md) | A decade of seasons, eclipses, and apsides computed from first principles — no lookup tables, no curve fits, just JPL DE442 and root-finding. | [`examples/17_equinox_prediction/`](examples/17_equinox_prediction/) |
-| **Moonlit Sky Brightness & Light Pollution** | How much does a full moon actually degrade your limiting magnitude, and by how many degrees of separation does that recover? Then the same light-pollution question put to all three sources side by side — VIIRS 2025, the Falchi et al. 2016 World Atlas, and the lightpollutionmap.info API — across a rural backyard, two megacity cores, and two premier dark-sky observatories. | [`examples/18_sky_brightness/`](examples/18_sky_brightness/) |
 | **Satellite Tracking** | Predict ISS passes over your location from live NORAD/CelestTrak data — AOS, max elevation, LOS, ground track. | [`examples/12_satellite_tracking/`](examples/12_satellite_tracking/) |
 | **What's Visible Tonight** | What can I actually see in the sky tonight brighter than magnitude X — stars, deep-sky objects, planets, the Moon, even asteroids and comets, all in one query? | [`examples/20_whats_visible_tonight/`](examples/20_whats_visible_tonight/) |
-| **Meteor Shower Forecast** | The Perseids peak every August — but how many will a real observer at a real site actually see, hour by hour, once radiant altitude and real sky brightness are accounted for? | [`examples/21_meteor_shower_forecast/`](examples/21_meteor_shower_forecast/) |
 | **Kepler Propagation, No Kernel** | Six orbital elements and an epoch — no SPK kernel, no network — is enough to place 1 Ceres in the sky and feed it straight into rise/transit/set, exactly like any catalog-resolved target. | [`examples/22_kepler_propagator/`](examples/22_kepler_propagator/) |
 | **Radial-Velocity Correction** | Sirius's measured RV swings by ~±25 km/s across the year purely from Earth's own orbital motion — barycentric/heliocentric correction removes it. | [`examples/23_radial_velocity_correction/`](examples/23_radial_velocity_correction/) |
 | **Telescope & Eyepiece Optics** | An 8" f/10 SCT with a wide-field and a planetary eyepiece, a 2x Barlow, and a CMOS sensor — magnification, true field of view, exit pupil, and plate scale, no astrometry involved at all. | [`examples/24_optics/`](examples/24_optics/) |
@@ -395,7 +393,7 @@ AOS: 19:45:03 UTC  Max El: 73.1°  LOS: 19:51:47 UTC  Duration: 6m44s
 | **Magnitude** | Planets (Mallama & Hilton 2018), asteroids (HG/HG1G2/**sHG1G2**), comets, satellites, stars — validated 100% within 0.025 mag against the FINK/ZTF production pipeline |
 | **Catalogs** | Unified `resolve.Provider` over SIMBAD, MAST, Gaia, VizieR, JPL Horizons & SBDB, OpenNGC, NORAD, FINK — streaming `iter.Seq2`, Arrow caching, retry/backoff |
 | **FITS & WCS** | Image/BinTable/ASCII HDUs, gzip streams, mmap, TAN projection, Arrow export |
-| **Sky Brightness** | Moonlight (Krisciunas & Schaefer 1991), zodiacal light (Leinert 1998), airglow, light-pollution floor — folds into observability scoring |
+| **Sky Brightness** | Spectral all-sky radiance `L_λ(λ, direction, observer, time, atmosphere)` in W·m⁻²·sr⁻¹·nm⁻¹, kept spectral until projection — integrated starlight, diffuse galactic light, extragalactic background, zodiacal light (Leinert 1998), airglow, scattered moonlight (Kieffer & Stone 2005 ROLO + Winkler 2022), and artificial skyglow in clear air or under cloud (Kocifaj) — natural sky validated to **0.05 mag** against GAMBONS, a near-full Moon to 18.9 mag/arcsec² in V |
 | **Planning** | Sub-second Chandrupatla/Brent boundary refinement, constraint-based scoring, `Greedy`/`Priority`/`SwapOptimized` scheduling strategies |
 | **Events** | Rise/Set/Transit, Moon Phases, Seasons, Apsides, Eclipses, Conjunctions, Elongations, Satellite Passes, 20 historical lunar-crescent criteria |
 | **Reference Data** | Built-in registry of 10 well-known observatory sites (`plan.KnownSites`), the 9 IMO Class I annual meteor showers with ZHR rate prediction (`plan.MeteorShowers`), 21 major planetary moons (`plan.PlanetaryMoon`), all 88 IAU constellations (`constellation.List`) |
@@ -504,30 +502,14 @@ AOS: 19:45:03 UTC  Max El: 73.1°  LOS: 19:51:47 UTC  Duration: 6m44s
     - **`SwapOptimizedStrategy`** — local search with adjacent swaps + gap insertion (monotonic improvement)
   - Linear scaling benchmarked to 100 blocks
 
-### Sky Brightness & Light Pollution (`skybrightness`, `skybrightness/lpmap`)
-- Night-sky surface brightness decomposed into additive components, summed in linear flux space and converted to V mag/arcsec² only at the boundary:
-  - `Moonlight` — scattered moonlight, Krisciunas & Schaefer (1991) closed form
-  - `ZodiacalLight` — Leinert et al. (1998) Table 17, bilinear interpolation
-  - `Airglow` — dark-sky floor (Noll et al. 2012 / Patat 2008)
-  - `Floor` — light-pollution baseline from scalar SQM, directional `SQMGrid`, or `FloorFromBortle`
-- `skybrightness/atlas` — pure-Go artificial-brightness atlas providers (Falchi et al. 2016 World Atlas GeoTIFF, VIIRS-DNB), the consent-gated downloaders that fetch them, and **`atlas.FloorAt` / `atlas.Resolver`** — pick a `Layer` and get a `Floor`:
+### Sky Brightness (`skybrightness`)
+A spectral, all-sky sky-radiance engine — `L_λ(λ, direction, observer, time, atmosphere)` in W·m⁻²·sr⁻¹·nm⁻¹ — rebuilt from first principles against modern literature (**no backward compatibility**). Spectral radiance is the internal quantity and stays spectral until projection: `mag/arcsec²`, an SQM reading, luminance, a photon rate and a detector electron rate are all projections of the *same* stored spectrum, because a model can reproduce a correct V magnitude with an entirely wrong spectrum. Components sum in **linear radiance space**, never as magnitudes.
 
-  ```go
-  // LayerAuto (the default) is freshness-first: VIIRS (newest published
-  // year) → World Atlas 2015 → your configured fallbacks, reporting what
-  // it tried in Result.Attempts. Ask for LayerWorldAtlas explicitly when
-  // the propagated model matters more than the last decade of change.
-  result, err := atlas.FloorAt(ctx, site.Location(), atlas.WithBortleClass(4))
-  ```
+Nothing is segmented into a private copy: atmospheric physics lives in `atmosphere`, passbands and magnitude systems in `magnitude`, instrument throughput and detector rates in `optics`, spectral types and the shared wavelength axis in `unit`. `skybrightness` owns only radiance transport — `Scene`, `Component`, `Model`/`Query`/`Estimate`, uncertainty, quality, provenance, and all-sky operations.
 
-  | Layer | Source | Needs |
-  |---|---|---|
-  | `LayerWorldAtlas` | Falchi et al. 2016, propagated, highest fidelity (frozen 2015) | ~653 MB download (CC BY-NC 4.0) |
-  | `LayerVIIRS` | VIIRS annual composite, freshest (newest published year, auto-detected), raw-radiance fit — but floors at zero below the satellite's detection limit, so it cannot rank dark sites | ~700 MB–1 GB download, no API key |
-  | `LayerLightPollutionMap` | live lightpollutionmap.info point query (World Atlas 2015 unless the client sets `lpmap.WithLayer`) | manually-issued API key |
-  | `LayerBortle` / `LayerScalar` | fixed estimate | nothing |
-- `skybrightness/lpmap` — live client for the lightpollutionmap.info QueryRaster API, with retry/backoff on transient failures. The API key is issued manually by the site owner (no self-serve signup); the downloaded `atlas` layers need no key at all.
-- `plan.LimitingMagnitudeConstraint` / `ScoreObservableSky` — folds sky-brightness-derived limiting magnitude into observability constraints and scoring
+Every component traces to primary literature: artificial skyglow follows Kocifaj, Bará & Falchi (2022) with clouds per Kocifaj, Falchi & Kundracik (2025); the Moon uses Kieffer & Stone (2005) ROLO reflectance with Winkler (2022) multiple scattering; the natural sky follows GAMBONS (Masana et al. 2021, 2024). A component whose primary literature cannot be obtained is **not implemented** rather than approximated.
+
+> **Status: Phases 0–5 complete.** Seven components ship — integrated starlight, diffuse galactic light, the extragalactic background, zodiacal light, airglow, scattered moonlight, and artificial skyglow in clear air or under cloud. Measured: the astronomical sky agrees with GAMBONS' own published run to **0.05 mag**; a near-full Moon comes out at **18.9 mag/arcsec²** in V against an independently-known ~18; an overcast deck over a city amplifies the zenith **88×** while *screening* at **0.80×** 60 km away, which is the behaviour a universal cloud multiplier cannot produce and the reason this is radiative transfer rather than a factor. Phases 6 and 7 are blocked on other people's data rather than on code. See [`docs/skybrightness.md`](docs/skybrightness.md) for the equation-to-test maps, the full validation record, the phase roadmap and the open questions.
 
 ### Event Solver
 - **Unified `Solver`** — Chandrupatla root-finding (1997) + Brent's minimization
@@ -574,8 +556,6 @@ flowchart TD
     skybrightness[skybrightness]
 
     %% Data Providers
-    lpmap["skybrightness/lpmap"]
-    atlas["skybrightness/atlas"]
 
     %% Primitive Foundation
     subgraph Primitives
@@ -592,7 +572,6 @@ flowchart TD
     plan --> ephemeris
     plan --> catalog
     plan --> atmosphere
-    plan --> skybrightness
 
     fitsplan --> fits
     fitsplan --> plan
@@ -612,10 +591,14 @@ flowchart TD
     plan --> satellite
 
     skybrightness --> angle
-    lpmap --> skybrightness
-    atlas --> skybrightness
-    atlas --> lpmap
-    atlas --> remote
+    skybrightness --> unit
+    skybrightness --> coord
+    skybrightness --> atmosphere
+    skybrightness --> magnitude
+    skybrightness --> ephemeris
+
+    sbdata["skybrightness/dataset"] --> skybrightness
+    sbdata --> remote
 
     coord --> atmosphere
     coord --> time
@@ -658,12 +641,11 @@ flowchart TD
 | `fits` | FITS I/O, WCS (TAN projection), mmap, Arrow export | ✅ Stable |
 | `fits/plan` | FITS↔plan bridge (`SiteFromFITS`, `TargetFromFITS`) | ✅ Stable |
 | `plan` | Observability, constraints, events, scheduling, satellite passes | ✅ Stable |
-| `skybrightness` | Sky brightness model (moonlight, zodiacal light, airglow, light-pollution floor) | ✅ Stable |
-| `skybrightness/atlas` | Light-pollution atlases: GeoTIFF/HDF5 decoders, consent-gated downloads, and the `Layer`/`FloorAt` resolver | ✅ Stable |
-| `skybrightness/lpmap` | Live lightpollutionmap.info client | ✅ Stable |
+| `skybrightness` | Spectral all-sky radiance engine (`Scene`/`Component`/`Model`/`Estimate`, all-sky ops, uncertainty, provenance) — seven components | ✅ Phases 0–5 (natural sky validated to 0.05 mag against GAMBONS) |
+| `skybrightness/dataset` | The only tier that performs I/O: star map, dust map, airglow spectrum, passband, solar spectrum and ground-emitter inventory, assembled by `dataset.Open` into a ready-to-evaluate `Sky` | ✅ Stable |
 | `unit` | Physical unit and quantity system | ✅ Stable |
 
-See [`VALIDATION.md`](docs/VALIDATION.md) for scientific validation status, [`USNO.md`](docs/USNO.md) for the U.S. Naval Observatory accuracy report (41/41 tests passing, ≤0.6 min rise/set accuracy across 3 continents + polar/equatorial/8849m edge cases), and the FINK/ZTF sHG1G2 validation (100% match at 0.025 mag against the phunk production pipeline).
+See [`skybrightness.md`](docs/skybrightness.md) for the sky-brightness engine — it is the single source for that module and carries what no other file does: the scientific baseline with a primary reference per model, the equation→function→test maps, the validation record, the phase roadmap, the unresolved dependencies and the open scientific questions. Everything said about `skybrightness` elsewhere in this README is a summary of it. See [`VALIDATION.md`](docs/VALIDATION.md) for scientific validation status, [`USNO.md`](docs/USNO.md) for the U.S. Naval Observatory accuracy report (41/41 tests passing, ≤0.6 min rise/set accuracy across 3 continents + polar/equatorial/8849m edge cases), and the FINK/ZTF sHG1G2 validation (100% match at 0.025 mag against the phunk production pipeline).
 
 ---
 
@@ -682,24 +664,26 @@ happens.
 | JPL planetary kernel (de440, de442) | `remote.NAIFSPK` | ~115 MB | `eph.NewProvider(eph.Planets, "de440"/"de442")` |
 | JPL planetary kernel (de441 parts) | `remote.NAIFSPK` | multi-GB **each** | `eph.NewProvider(eph.Planets, "de441_part-1", eph.WithKernel("de441_part-2"))` |
 | Leap-second kernel (naif0012.tls) | `remote.NAIFLSK` | ~5 KB | always, alongside any JPL kernel |
-| Small-body SPK (Horizons-generated) | `remote.JPLHorizons` | KB–few MB | `eph.NewProvider(eph.SmallBody, "433", ...)` |
+| Small-body SPK (Horizons-generated) | `remote.JPLHorizonsSPK` | KB–few MB | `eph.NewProvider(eph.SmallBody, "433", ...)` |
 | Planetary satellite SPK (Io, Titan, Triton, ...) | `remote.NAIFSPK` | ~64 MB (Mars) – ~1.1 GB (Jupiter), ~2.4 GB for all 6 kernels | `eph.NewProvider(eph.Moons, "sat441")`, or `plan.VisibleTonight(..., plan.WithPlanetaryMoons())` |
 | IERS Earth-orientation data | `remote.IERSFinals2000A` | ~3.7 MB | automatic on first `Time.EOP()`/`.UTC()`/`.UT1()` query needing it |
 | OpenNGC catalog CSVs | `remote.OpenNGC` | ~2 MB combined | `catalog.NewResolver(catalog.OpenNGC, ...)` |
-| World Atlas 2015 light-pollution GeoTIFF (Falchi et al. 2016) | `remote.WorldAtlas` | ~653 MB zip, ~2.8 GB extracted | `skybrightness/atlas.EnsureWorldAtlas`/`.OpenWorldAtlas` — **CC BY-NC 4.0, non-commercial use only** |
-| VIIRS annual nighttime-lights composite (2012-2025, no API key) | `remote.VIIRSAnnual` | ~700 MB-1 GB per year | `skybrightness/atlas.EnsureVIIRSAnnual`/`.OpenVIIRSAnnual` — CC0, credit lightpollutionmap.info + NASA Black Marble |
+| World Atlas 2015 light-pollution GeoTIFF (Falchi et al. 2016) | `remote.WorldAtlas` | ~653 MB zip, ~2.8 GB extracted | nothing fetches it — deprecated, and a propagated model output rather than a measurement, so it cannot validate this module either; **CC BY-NC 4.0, non-commercial use only** |
+| VIIRS annual nighttime-lights composite (2012-2025, no API key) | `remote.VIIRSAnnual` | ~700 MB-1 GB per year | `viirs.Open(ctx, year)`, for the spatial distribution of artificial emission — CC0, credit lightpollutionmap.info + NASA Black Marble |
+| CAMS global reanalysis NetCDF files (Copernicus EODATA S3) | `remote.CopernicusEODATA` | 1.3 MB (lnsp) – ~180 MB (a 137-level aerosol tracer) | `atmosphere/dataset/cams.Open` — requires Copernicus Data Space S3 credentials (AWS SDK default chain) and a blank import of `remote/s3` |
 
 For an accuracy/offline tradeoff comparison across `ephemeris.Default()` and the
 JPL kernels above, see the [`ephemeris` package doc](ephemeris/doc.go)'s
 "Choosing a Provider" section.
 
 Both IERS and OpenNGC skip the download entirely when the upstream content hasn't
-changed since the last fetch — a HEAD-request content check (ETag/Content-Length)
-against what was cached, not a wall-clock expiration window, since the two sources
-mutate on their own schedules rather than yours.
+changed since the last fetch — the source ETag recorded at cache time is compared
+against the source's current one (a metadata-only probe, no body transferred), not a
+wall-clock expiration window, since the two sources mutate on their own schedules
+rather than yours.
 
 Catalog resolvers (`catalog/simbad`, `catalog/gaia`, `catalog/vizier`, `catalog/mast`,
-`catalog/sbdb`, `catalog/norad`, `catalog/fink`), `skybrightness/lpmap`, and
+`catalog/sbdb`, `catalog/norad`, `catalog/fink`) and
 `plan.NewSiteEarthAddress` (`remote.Nominatim`/`remote.OpenElevation`, for geocoding a
 site by address) make small request/response API calls, not bulk downloads — those are
 gated by endpoint enable/disable and offline mode, not by download-size consent (the
@@ -712,10 +696,10 @@ cache and no consent granted, and you get an explicit, actionable error instead 
 multi-hundred-MB surprise:
 
 ```go
-_, err := eph.NewProvider(eph.Planets, "de442")
+_, err := eph.NewProvider(ctx, eph.Planets, "de442")
 // err: jpl: SPK kernel planets/de442.bsp: remote: download denied: planets/de442.bsp
 // (size unknown from https://naif.jpl.nasa.gov/...); astrogo never downloads without
-// consent — call remote.EnableDownloads(remote.NAIFSPK, maxSize) or pre-seed the file
+// consent — call remote.EnableDownloads(maxSize, remote.NAIFSPK) or pre-seed the file
 ```
 
 Grant consent per endpoint, with an optional size cap (`0` = unlimited):
@@ -723,33 +707,36 @@ Grant consent per endpoint, with an optional size cap (`0` = unlimited):
 ```go
 import "github.com/TuSKan/astrogo/remote"
 
-remote.EnableDownloads(remote.NAIFSPK, 200<<20) // allow up to 200 MB
-remote.EnableDownloads(remote.NAIFLSK, 0)       // the ~5 KB leap-second kernel, unlimited
+remote.EnableDownloads(200<<20, remote.NAIFSPK, remote.NAIFLSK) // allow up to 200 MB each
 
-p, err := eph.NewProvider(eph.Planets, "de442") // now downloads (once) and caches
+p, err := eph.NewProvider(ctx, eph.Planets, "de442") // now downloads (once) and caches
 ```
 
 `catalog.OpenNGC` follows the same pattern — enabling the endpoint is the only step required;
 `catalog.NewResolver`'s first use of it fetches and caches the catalog automatically:
 
 ```go
-remote.EnableDownloads(remote.OpenNGC, 5<<20) // ~2 MB combined source CSVs
+remote.EnableDownloads(5<<20, remote.OpenNGC) // ~2 MB combined source CSVs
 
 resolver := catalog.NewResolver(catalog.OpenNGC, catalog.SIMBAD) // fetches OpenNGC on first use
 ```
 
-To grant consent for every download-gated endpoint at once instead of enumerating them
-individually, use `remote.EnableAllDownloads` (and its counterpart `DisableAllDownloads`):
+Omit the endpoint list to grant consent for every download-gated endpoint at once;
+`remote.DisableDownloads` is the counterpart and takes the same form:
 
 ```go
-remote.EnableAllDownloads(200 << 20) // NAIFSPK, NAIFLSK, IERSFinals2000A, OpenNGC, JPLHorizons, WorldAtlas — all at once
+remote.EnableDownloads(200 << 20) // every Downloadable endpoint at once (NAIFSPK, NAIFLSK,
+                                  // IERSFinals2000A, OpenNGC, JPLHorizonsSPK, VIIRSAnnual,
+                                  // WorldAtlas, CopernicusEODATA, ...)
 ```
 
-`JPLHorizons` is included even though it's an API endpoint, not a file endpoint — its
-small-body SPK generation (used for asteroid/comet ephemeris) is a real file download in
-effect, gated the same way. An endpoint that only ever returns small text/JSON payloads
-(SIMBAD, VizieR, SBDB, Gaia, MAST, ...) has no download-consent gate at all and is unaffected
-either way.
+`JPLHorizonsSPK` is included even though it's an API endpoint, not a file endpoint — its
+small-body SPK generation (used for asteroid/comet ephemeris) returns a whole kernel
+base64-encoded in the JSON body, so it is a real download and is gated the same way. It is
+registered separately from `JPLHorizons`, which only resolves names: that split is what
+lets consent gate kernel generation without also gating name resolution. An endpoint that
+only ever returns small text/JSON payloads (SIMBAD, VizieR, SBDB, Gaia, MAST, ...) has no
+download-consent gate at all and is unaffected either way.
 
 For total control, install a custom policy instead of per-endpoint limits:
 
@@ -765,30 +752,50 @@ remote.SetPolicy(func(ep remote.Endpoint, size int64) error {
 ### Where data lives, and pointing it elsewhere
 
 All downloaded/cached data — JPL kernels, the IERS runtime cache — lives under one
-configurable base directory, default `os.UserCacheDir()/astrogo` (`~/.cache/astrogo` on
-Linux, `%LocalAppData%\astrogo` on Windows, `~/Library/Caches/astrogo` on macOS):
+configurable base location, default `os.UserCacheDir()/astrogo` (`~/.cache/astrogo` on
+Linux, `%LocalAppData%\astrogo` on Windows, `~/Library/Caches/astrogo` on macOS).
+
+It is a **bucket URL, not a filesystem path** — nothing in astrogo assumes the cache is
+local disk:
 
 ```go
-remote.SetDataDirPath("/data/astrogo-cache") // or remote.SetDataDir for a github.com/ungerik/go-fs File
+remote.SetDataDir("file:///data/astrogo-cache?create_dir=true")
+remote.SetDataDir("s3://my-cache-bucket") // needs: import _ "github.com/TuSKan/astrogo/remote/s3"
 ```
+
+The `ASTROGO_CACHE_DIR` environment variable sets the same thing, and also takes a URL.
+`remote.CacheDir(ctx, id)` reports the bucket and key prefix an endpoint caches under, and
+`remote.GetFile` returns a bucket and a key. No API takes an OS path and there is no
+local-only fast path, so a deployment whose cache is object storage behaves identically to
+one on disk.
 
 ### Offline / air-gapped deployments
 
-Pre-seed `remote.DataDir()` with the files you need (e.g. copy a kernel to
-`remote.DataDir()/jpl/planets/de442.bsp`), then cut network access entirely:
+Pre-seed the cache with the objects you need (e.g. put a kernel at key
+`jpl/planets/de442.bsp` — `remote.DataDirURL()` reports the bucket, and
+`remote.CacheDir(ctx, remote.NAIFSPK)` the key prefix), then cut network access entirely:
 
 ```go
 remote.SetOffline(true)
 
-p, err := eph.NewProvider(eph.Planets, "de442") // finds the pre-seeded kernel, zero network
+p, err := eph.NewProvider(ctx, eph.Planets, "de442") // finds the pre-seeded kernel, zero network
 ```
 
-Every downloader checks the filesystem before the network, so a pre-seeded deployment
-never dials out even without `SetOffline` — `remote` is the only thing that resolves or
-opens these files, there is no separate local-only constructor to bypass it with.
-IERS EOP data follows the same rule: drop `finals2000A.data` at
-`remote.DataDir()/iers/finals2000A.data` and the first `Time.EOP()`/`.UTC()`/`.UT1()`
-call finds it automatically — no explicit loader call needed.
+Every downloader checks the cache before the network, so a pre-seeded deployment never
+dials out even without `SetOffline` — `remote` is the only thing that resolves or opens
+these files, there is no separate local-only constructor to bypass it with. IERS EOP data
+follows the same rule: put `finals2000A.data` at key `iers/finals2000A.data` and the first
+`Time.EOP()`/`.UTC()`/`.UT1()` call finds it automatically — no explicit loader call
+needed.
+
+If a mirror serves a file under some other layout, point the endpoint at it rather than
+renaming anything. `remote.SetURL` accepts everything `gocloud.dev/blob` understands,
+including `?prefix=` to scope into a subdirectory and `?key=` to serve one exact object
+under whatever name astrogo asks for:
+
+```go
+remote.SetURL(remote.IERSFinals2000A, "https://mirror.example/archive?key=2026-08/eop-dump.dat")
+```
 
 ### Endpoint control
 
@@ -828,7 +835,7 @@ These are wrapped internally to ensure:
 ---
 
 > [!IMPORTANT]
-> astrogo is pre-1.0 (currently **v0.5.0**) — the public API may still change. This release rebuilds the [`remote`](remote/doc.go) package's public API around the `Endpoint` struct (`GetFile`/`CacheDir`/`NewClientFor` replace the previous primitives; see [CHANGELOG.md](CHANGELOG.md) for the full breaking-change list). `catalog/jpl` and `catalog/vizier` — the two providers that previously gated a v1.0.0 API-stability commitment — are fully implemented (see Implementation Status above); see [`docs/ROADMAP.md`](docs/ROADMAP.md) for what's left before v1.0.0.
+> astrogo is pre-1.0 (currently **v0.5.0**) — the public API may still change. This release rebuilds [`remote`](remote/doc.go) as a policy layer over two subpackages — `remote/file` (bucket/key file access on `gocloud.dev/blob`) and `remote/api` (request/response services on `resty.dev/v3`) — with no OS paths in any signature; see [CHANGELOG.md](CHANGELOG.md) for the full breaking-change list. `catalog/jpl` and `catalog/vizier` — the two providers that previously gated a v1.0.0 API-stability commitment — are fully implemented (see Implementation Status above); see [`docs/ROADMAP.md`](docs/ROADMAP.md) for what's left before v1.0.0.
 
 ---
 

@@ -6,14 +6,13 @@ import (
 	"errors"
 	"io"
 	"log"
-	"net/http"
-	"net/http/httptest"
-	"strconv"
+	"path"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"testing"
-	"time"
+
+	"github.com/TuSKan/astrogo/internal/testutil"
+	"github.com/TuSKan/astrogo/remote/file"
 )
 
 var errValidateTest = errors.New("not a valid LSK kernel")
@@ -25,181 +24,159 @@ func cleanRemoteState(t *testing.T) {
 		Reset()
 	})
 
-	SetDataDirPath(t.TempDir())
+	SetDataDir(testutil.FileURL(t, t.TempDir()))
+}
+
+// writeFakeSource is fakeSource (see resume_test.go) minus the return
+// value — used by tests here that never need to inspect/mutate the
+// source bucket directly after seeding it.
+func writeFakeSource(t *testing.T, id EndpointID, name, content string) {
+	t.Helper()
+
+	fakeSource(t, id, name, content)
 }
 
 func TestGetFileImmutableExistenceOnly(t *testing.T) {
 	cleanRemoteState(t)
 
-	var hits atomic.Int32
-
 	const payload = "kernel-v1"
 
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		hits.Add(1)
+	srcDir := t.TempDir()
 
-		_, _ = w.Write([]byte(payload))
-	}))
-	defer srv.Close()
+	url := testutil.FileURL(t, srcDir)
 
-	if err := SetURL(NAIFSPK, srv.URL); err != nil {
+	if err := SetURL(NAIFSPK, url); err != nil {
 		t.Fatal(err)
 	}
 
-	EnableDownloads(NAIFSPK, 0)
+	srcBucket, err := file.Open(context.Background(), url)
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
 
-	f, err := GetFile(context.Background(), NAIFSPK, "planets/de440s.bsp")
+	if err := srcBucket.WriteAll(context.Background(), "planets/de440s.bsp", []byte(payload), nil); err != nil {
+		t.Fatalf("seed source: %v", err)
+	}
+
+	EnableDownloads(0, NAIFSPK)
+
+	bucket, key, err := GetFile(context.Background(), NAIFSPK, "planets/de440s.bsp")
 	if err != nil {
 		t.Fatalf("GetFile: %v", err)
 	}
 
-	data, _ := f.ReadAll()
+	// Content correctness is asserted by the check below; the read itself
+	// is not expected to fail here.
+	data, _ := bucket.ReadAll(context.Background(), key)
 	if string(data) != payload {
 		t.Fatalf("unexpected content %q", data)
 	}
 
-	if _, err := GetFile(context.Background(), NAIFSPK, "planets/de440s.bsp"); err != nil {
-		t.Fatalf("GetFile (cached): %v", err)
+	// Prove the second call reuses the cache without re-reading the
+	// source at all (the real behavior an immutable endpoint's
+	// !ep.Mutable fast path guarantees — freshInCache returns true on
+	// existence alone) by deleting the source out from under it: a
+	// re-fetch attempt would now fail outright, so a second success here
+	// is only possible via the cache.
+	if err := srcBucket.Delete(context.Background(), "planets/de440s.bsp"); err != nil {
+		t.Fatalf("delete source: %v", err)
 	}
 
-	if got := hits.Load(); got != 1 {
-		t.Errorf("immutable endpoint must not re-fetch on second GetFile; got %d hits", got)
+	if _, _, err := GetFile(context.Background(), NAIFSPK, "planets/de440s.bsp"); err != nil {
+		t.Fatalf("GetFile (cached, source now gone): %v", err)
 	}
 }
 
 func TestGetFileMutableHeadProbeReuse(t *testing.T) {
 	cleanRemoteState(t)
 
-	const payload = "eop-data-v1"
+	const payload = "ngc-catalog-v1"
 
-	const etag = `"v1"`
+	writeFakeSource(t, OpenNGC, "NGC.csv", payload)
 
-	var getHits atomic.Int32
+	EnableDownloads(0, OpenNGC)
 
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("ETag", etag)
-
-		if r.Method == http.MethodHead {
-			w.Header().Set("Content-Length", strconv.Itoa(len(payload)))
-			return
-		}
-
-		getHits.Add(1)
-
-		_, _ = w.Write([]byte(payload))
-	}))
-	defer srv.Close()
-
-	if err := SetURL(IERSFinals2000A, srv.URL); err != nil {
-		t.Fatal(err)
-	}
-
-	EnableDownloads(IERSFinals2000A, 0)
-
-	f, err := GetFile(context.Background(), IERSFinals2000A, "", WithCacheName("finals2000A.data"))
+	bucket, key, err := GetFile(context.Background(), OpenNGC, "NGC.csv")
 	if err != nil {
 		t.Fatalf("GetFile: %v", err)
 	}
 
-	data, _ := f.ReadAll()
+	// Content correctness is asserted by the check below; the read itself
+	// is not expected to fail here.
+	data, _ := bucket.ReadAll(context.Background(), key)
 	if string(data) != payload {
 		t.Fatalf("unexpected content %q", data)
 	}
 
-	if got := getHits.Load(); got != 1 {
-		t.Fatalf("expected 1 GET after first fetch, got %d", got)
+	cachedAttrsBefore, err := bucket.Attributes(context.Background(), key)
+	if err != nil {
+		t.Fatalf("Attributes: %v", err)
 	}
 
-	// Second call: HEAD probe reports the same ETag, cache reused untouched.
-	if _, err := GetFile(context.Background(), IERSFinals2000A, "", WithCacheName("finals2000A.data")); err != nil {
+	// Second call: the source is untouched (same mtime/size, so the same
+	// fileblob-derived ETag), so the cache must be reused untouched —
+	// proved by the cache object's own ModTime staying identical, which
+	// only happens if fetchInto/writeResumable's promote step never ran
+	// a second time.
+	if _, _, err := GetFile(context.Background(), OpenNGC, "NGC.csv"); err != nil {
 		t.Fatalf("GetFile (reuse): %v", err)
 	}
 
-	if got := getHits.Load(); got != 1 {
-		t.Errorf("expected no additional GET on unchanged content, got %d hits", got)
+	cachedAttrsAfter, err := bucket.Attributes(context.Background(), key)
+	if err != nil {
+		t.Fatalf("Attributes (after): %v", err)
+	}
+
+	if !cachedAttrsAfter.ModTime.Equal(cachedAttrsBefore.ModTime) {
+		t.Errorf("cache object was rewritten on an unchanged-source GetFile: ModTime %v -> %v", cachedAttrsBefore.ModTime, cachedAttrsAfter.ModTime)
 	}
 }
 
 func TestGetFileMutableHeadProbeChanged(t *testing.T) {
 	cleanRemoteState(t)
 
-	var (
-		mu      sync.Mutex
-		payload = "eop-data-v1"
-		etag    = `"v1"`
-		getHits atomic.Int32
-	)
+	srcBucket := fakeSource(t, OpenNGC, "NGC.csv", "ngc-catalog-v1")
 
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		mu.Lock()
-		p, e := payload, etag
-		mu.Unlock()
+	EnableDownloads(0, OpenNGC)
 
-		w.Header().Set("ETag", e)
-
-		if r.Method == http.MethodHead {
-			w.Header().Set("Content-Length", strconv.Itoa(len(p)))
-			return
-		}
-
-		getHits.Add(1)
-
-		_, _ = w.Write([]byte(p))
-	}))
-	defer srv.Close()
-
-	if err := SetURL(IERSFinals2000A, srv.URL); err != nil {
-		t.Fatal(err)
-	}
-
-	EnableDownloads(IERSFinals2000A, 0)
-
-	if _, err := GetFile(context.Background(), IERSFinals2000A, "", WithCacheName("finals2000A.data")); err != nil {
+	if _, _, err := GetFile(context.Background(), OpenNGC, "NGC.csv"); err != nil {
 		t.Fatalf("GetFile: %v", err)
 	}
 
-	mu.Lock()
-	payload = "eop-data-v2"
-	etag = `"v2"`
-	mu.Unlock()
+	if err := srcBucket.WriteAll(context.Background(), "NGC.csv", []byte("ngc-catalog-v2"), nil); err != nil {
+		t.Fatalf("update source: %v", err)
+	}
 
-	f, err := GetFile(context.Background(), IERSFinals2000A, "", WithCacheName("finals2000A.data"))
+	bucket, key, err := GetFile(context.Background(), OpenNGC, "NGC.csv")
 	if err != nil {
 		t.Fatalf("GetFile (changed): %v", err)
 	}
 
-	data, _ := f.ReadAll()
-	if string(data) != "eop-data-v2" {
+	// Content correctness is asserted by the check below; the read itself
+	// is not expected to fail here.
+	data, _ := bucket.ReadAll(context.Background(), key)
+	if string(data) != "ngc-catalog-v2" {
 		t.Errorf("cache not refreshed after upstream change: got %q", data)
-	}
-
-	if got := getHits.Load(); got != 2 {
-		t.Errorf("expected 2 GETs (initial + refresh), got %d", got)
 	}
 }
 
 func TestGetFileWithValidateRejectsCorruptDownload(t *testing.T) {
 	cleanRemoteState(t)
 
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		_, _ = w.Write([]byte("bad-lsk-content"))
-	}))
-	defer srv.Close()
+	writeFakeSource(t, NAIFLSK, "naif0012.tls", "bad-lsk-content")
 
-	if err := SetURL(NAIFLSK, srv.URL); err != nil {
-		t.Fatal(err)
-	}
+	EnableDownloads(0, NAIFLSK)
 
-	EnableDownloads(NAIFLSK, 0)
-
-	_, err := GetFile(context.Background(), NAIFLSK, "naif0012.tls",
-		WithValidate(func([]byte) error { return errValidateTest }))
+	_, _, err := GetFile(context.Background(), NAIFLSK, "naif0012.tls",
+		WithValidate(func(io.Reader) error { return errValidateTest }))
 	if !errors.Is(err, errValidateTest) {
 		t.Fatalf("expected validate error, got %v", err)
 	}
 
-	dir, _ := CacheDir(NAIFLSK)
-	if dir.Join("naif0012.tls").Exists() {
+	// The CacheDir/Exists errors here are not the thing under test; a
+	// failed existence check is not "exists" either way.
+	bucket, prefix, _ := CacheDir(context.Background(), NAIFLSK)
+	if exists, _ := bucket.Exists(context.Background(), prefix+"naif0012.tls"); exists {
 		t.Error("a validate failure must not leave a cache file behind")
 	}
 }
@@ -207,24 +184,24 @@ func TestGetFileWithValidateRejectsCorruptDownload(t *testing.T) {
 func TestGetFileWithCacheNameDiffersFromPath(t *testing.T) {
 	cleanRemoteState(t)
 
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		_, _ = w.Write([]byte("finals-data"))
-	}))
-	defer srv.Close()
+	// Real production shape of this option (see time/internal/iers's own
+	// call): the fetched name and the on-disk cache name legitimately
+	// differ. IERSFinals2000A's own real usage additionally passes name=""
+	// (its URL alone names the whole HTTP resource) — untestable against a
+	// local fake source, since a bucket always needs a real, non-empty key
+	// unlike an HTTP URL that can BE the whole resource on its own; this
+	// still exercises WithCacheName's actual differing-name behavior.
+	writeFakeSource(t, OpenNGC, "raw-source-name.csv", "ngc-data")
 
-	if err := SetURL(IERSFinals2000A, srv.URL); err != nil {
-		t.Fatal(err)
-	}
+	EnableDownloads(0, OpenNGC)
 
-	EnableDownloads(IERSFinals2000A, 0)
-
-	f, err := GetFile(context.Background(), IERSFinals2000A, "", WithCacheName("finals2000A.data"))
+	_, key, err := GetFile(context.Background(), OpenNGC, "raw-source-name.csv", WithCacheName("NGC.csv"))
 	if err != nil {
 		t.Fatalf("GetFile: %v", err)
 	}
 
-	if f.Name() != "finals2000A.data" {
-		t.Errorf("cache file name = %q, want %q", f.Name(), "finals2000A.data")
+	if path.Base(key) != "NGC.csv" {
+		t.Errorf("cache key = %q, want base %q", key, "NGC.csv")
 	}
 }
 
@@ -233,16 +210,9 @@ func TestGetFileWithProgressReportsBytesDirectSavePath(t *testing.T) {
 
 	const payload = "kernel-progress-payload"
 
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		_, _ = w.Write([]byte(payload))
-	}))
-	defer srv.Close()
+	writeFakeSource(t, NAIFSPK, "planets/progress.bsp", payload)
 
-	if err := SetURL(NAIFSPK, srv.URL); err != nil {
-		t.Fatal(err)
-	}
-
-	EnableDownloads(NAIFSPK, 0)
+	EnableDownloads(0, NAIFSPK)
 
 	var mu sync.Mutex
 
@@ -250,7 +220,7 @@ func TestGetFileWithProgressReportsBytesDirectSavePath(t *testing.T) {
 
 	var calls int
 
-	_, err := GetFile(context.Background(), NAIFSPK, "planets/progress.bsp",
+	_, _, err := GetFile(context.Background(), NAIFSPK, "planets/progress.bsp",
 		WithProgress(func(downloaded, _ int64) {
 			mu.Lock()
 			defer mu.Unlock()
@@ -272,7 +242,7 @@ func TestGetFileWithProgressReportsBytesDirectSavePath(t *testing.T) {
 
 	calls = 0
 
-	if _, err := GetFile(context.Background(), NAIFSPK, "planets/progress.bsp",
+	if _, _, err := GetFile(context.Background(), NAIFSPK, "planets/progress.bsp",
 		WithProgress(func(int64, int64) { calls++ })); err != nil {
 		t.Fatalf("GetFile (cached): %v", err)
 	}
@@ -287,21 +257,14 @@ func TestGetFileWithProgressReportsBytesValidatedPath(t *testing.T) {
 
 	const payload = "leap-second-progress-payload"
 
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		_, _ = w.Write([]byte(payload))
-	}))
-	defer srv.Close()
+	writeFakeSource(t, NAIFLSK, "naif0012.tls", payload)
 
-	if err := SetURL(NAIFLSK, srv.URL); err != nil {
-		t.Fatal(err)
-	}
-
-	EnableDownloads(NAIFLSK, 0)
+	EnableDownloads(0, NAIFLSK)
 
 	var last int64
 
-	_, err := GetFile(context.Background(), NAIFLSK, "naif0012.tls",
-		WithValidate(func([]byte) error { return nil }),
+	_, _, err := GetFile(context.Background(), NAIFLSK, "naif0012.tls",
+		WithValidate(func(io.Reader) error { return nil }),
 		WithProgress(func(downloaded, _ int64) { last = downloaded }))
 	if err != nil {
 		t.Fatalf("GetFile: %v", err)
@@ -315,14 +278,7 @@ func TestGetFileWithProgressReportsBytesValidatedPath(t *testing.T) {
 func TestGetFileDoesNotLogDownloadingWhenConsentDenied(t *testing.T) {
 	cleanRemoteState(t)
 
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		_, _ = w.Write([]byte("kernel-bytes"))
-	}))
-	defer srv.Close()
-
-	if err := SetURL(NAIFSPK, srv.URL); err != nil {
-		t.Fatal(err)
-	}
+	writeFakeSource(t, NAIFSPK, "planets/de442.bsp", "kernel-bytes")
 
 	var logBuf bytes.Buffer
 
@@ -337,7 +293,7 @@ func TestGetFileDoesNotLogDownloadingWhenConsentDenied(t *testing.T) {
 		log.SetFlags(prevFlags)
 	})
 
-	_, err := GetFile(context.Background(), NAIFSPK, "planets/de442.bsp")
+	_, _, err := GetFile(context.Background(), NAIFSPK, "planets/de442.bsp")
 	if !errors.Is(err, ErrDownloadDenied) {
 		t.Fatalf("expected ErrDownloadDenied, got %v", err)
 	}
@@ -350,22 +306,17 @@ func TestGetFileDoesNotLogDownloadingWhenConsentDenied(t *testing.T) {
 func TestGetFileDownloadDeniedWithoutConsent(t *testing.T) {
 	cleanRemoteState(t)
 
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		_, _ = w.Write([]byte("kernel-bytes"))
-	}))
-	defer srv.Close()
+	writeFakeSource(t, NAIFSPK, "planets/de442.bsp", "kernel-bytes")
 
-	if err := SetURL(NAIFSPK, srv.URL); err != nil {
-		t.Fatal(err)
-	}
-
-	_, err := GetFile(context.Background(), NAIFSPK, "planets/de442.bsp")
+	_, _, err := GetFile(context.Background(), NAIFSPK, "planets/de442.bsp")
 	if !errors.Is(err, ErrDownloadDenied) {
 		t.Fatalf("expected ErrDownloadDenied, got %v", err)
 	}
 
-	dir, _ := CacheDir(NAIFSPK)
-	if dir.Join("de442.bsp").Exists() {
+	// The CacheDir/Exists errors here are not the thing under test; a
+	// failed existence check is not "exists" either way.
+	bucket, prefix, _ := CacheDir(context.Background(), NAIFSPK)
+	if exists, _ := bucket.Exists(context.Background(), prefix+"de442.bsp"); exists {
 		t.Error("denied download must not create a cache file")
 	}
 }
@@ -373,18 +324,18 @@ func TestGetFileDownloadDeniedWithoutConsent(t *testing.T) {
 func TestGetFileRespectsOfflineAndDisable(t *testing.T) {
 	cleanRemoteState(t)
 
-	EnableDownloads(NAIFSPK, 0)
+	EnableDownloads(0, NAIFSPK)
 
 	Disable(NAIFSPK)
 
-	if _, err := GetFile(context.Background(), NAIFSPK, "planets/de442.bsp"); !errors.Is(err, ErrEndpointDisabled) {
+	if _, _, err := GetFile(context.Background(), NAIFSPK, "planets/de442.bsp"); !errors.Is(err, ErrEndpointDisabled) {
 		t.Errorf("expected ErrEndpointDisabled, got %v", err)
 	}
 
 	Enable(NAIFSPK)
 	SetOffline(true)
 
-	if _, err := GetFile(context.Background(), NAIFSPK, "planets/de442.bsp"); !errors.Is(err, ErrOffline) {
+	if _, _, err := GetFile(context.Background(), NAIFSPK, "planets/de442.bsp"); !errors.Is(err, ErrOffline) {
 		t.Errorf("expected ErrOffline, got %v", err)
 	}
 }
@@ -392,74 +343,66 @@ func TestGetFileRespectsOfflineAndDisable(t *testing.T) {
 func TestGetFileWithDownloadTimeoutOverridesEndpointDefault(t *testing.T) {
 	cleanRemoteState(t)
 
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		time.Sleep(100 * time.Millisecond)
+	writeFakeSource(t, NAIFSPK, "planets/slow.bsp", "too-slow")
 
-		_, _ = w.Write([]byte("too-slow"))
-	}))
-	defer srv.Close()
+	EnableDownloads(0, NAIFSPK)
 
-	if err := SetURL(NAIFSPK, srv.URL); err != nil {
-		t.Fatal(err)
-	}
-
-	EnableDownloads(NAIFSPK, 0)
-
-	_, err := GetFile(context.Background(), NAIFSPK, "planets/slow.bsp", WithDownloadTimeout(10*time.Millisecond))
+	// A local file read is effectively instantaneous, so there is no way
+	// to simulate real transport latency the way an artificially slow
+	// httptest handler used to. A timeout of 1ns instead guarantees the
+	// context passed to srcBucket.Attributes/NewRangeReader inside
+	// fetchInto is already expired by the time either call runs —
+	// deterministically exercising the same timeout-propagation path,
+	// without depending on real wall-clock delay.
+	_, _, err := GetFile(context.Background(), NAIFSPK, "planets/slow.bsp", WithDownloadTimeout(1))
 	if err == nil {
 		t.Fatal("expected the request to time out")
 	}
 }
 
-func TestGetFileReturnsUsableFileForAllOpenModes(t *testing.T) {
+func TestGetFileReturnsUsableBucketForAllReadModes(t *testing.T) {
 	cleanRemoteState(t)
 
 	const payload = "random-access-content"
 
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		_, _ = w.Write([]byte(payload))
-	}))
-	defer srv.Close()
+	writeFakeSource(t, NAIFSPK, "planets/de440s.bsp", payload)
 
-	if err := SetURL(NAIFSPK, srv.URL); err != nil {
-		t.Fatal(err)
-	}
+	EnableDownloads(0, NAIFSPK)
 
-	EnableDownloads(NAIFSPK, 0)
-
-	f, err := GetFile(context.Background(), NAIFSPK, "planets/de440s.bsp")
+	bucket, key, err := GetFile(context.Background(), NAIFSPK, "planets/de440s.bsp")
 	if err != nil {
 		t.Fatalf("GetFile: %v", err)
 	}
 
-	if all, err := f.ReadAll(); err != nil || string(all) != payload {
+	if all, err := bucket.ReadAll(context.Background(), key); err != nil || string(all) != payload {
 		t.Errorf("ReadAll = %q, %v; want %q, nil", all, err, payload)
 	}
 
-	r, err := f.OpenReader()
+	r, err := bucket.NewReader(context.Background(), key, nil)
 	if err != nil {
-		t.Fatalf("OpenReader: %v", err)
+		t.Fatalf("NewReader: %v", err)
 	}
 
+	// Content correctness is asserted by the check below.
 	seqData, _ := io.ReadAll(r)
 	_ = r.Close()
 
 	if string(seqData) != payload {
-		t.Errorf("OpenReader content = %q, want %q", seqData, payload)
+		t.Errorf("NewReader content = %q, want %q", seqData, payload)
 	}
 
-	rs, err := f.OpenReadSeeker()
+	rr, err := bucket.NewRangeReader(context.Background(), key, 0, int64(len(payload)), nil)
 	if err != nil {
-		t.Fatalf("OpenReadSeeker: %v", err)
+		t.Fatalf("NewRangeReader: %v", err)
 	}
-	defer rs.Close() //nolint:errcheck // test
+	defer rr.Close() //nolint:errcheck // test
 
 	buf := make([]byte, len(payload))
-	if _, err := io.ReadFull(rs, buf); err != nil {
+	if _, err := io.ReadFull(rr, buf); err != nil {
 		t.Fatalf("ReadFull: %v", err)
 	}
 
 	if string(buf) != payload {
-		t.Errorf("OpenReadSeeker content = %q, want %q", buf, payload)
+		t.Errorf("NewRangeReader content = %q, want %q", buf, payload)
 	}
 }

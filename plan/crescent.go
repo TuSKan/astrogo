@@ -534,7 +534,7 @@ func NewCrescentParams(t time.Time, loc *coord.Geodetic, prov eph.Provider) (Cre
 	}
 
 	// Topocentric AltAz for both bodies
-	ctx := coord.NewContext(t, loc, atmosphere.Atmosphere{})
+	ctx := coord.NewContext(t, loc, atmosphere.Refraction{})
 
 	sunAltAz, err := ctx.ICRSToAltAz(sunICRS)
 	if err != nil {

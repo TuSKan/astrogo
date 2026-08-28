@@ -10,6 +10,7 @@
 package magnitude_test
 
 import (
+	"context"
 	"encoding/json"
 	"math"
 	"net/http"
@@ -49,11 +50,17 @@ type imcceCard struct {
 
 func fetchIMCCE(t *testing.T, name string) (H, G float64) {
 	t.Helper()
-	resp, err := http.Get("https://ssp.imcce.fr/webservices/ssodnet/api/ssocard/" + name)
+
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, "https://ssp.imcce.fr/webservices/ssodnet/api/ssocard/"+name, nil)
+	if err != nil {
+		t.Fatalf("building the IMCCE request: %v", err)
+	}
+
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Skipf("IMCCE network unavailable: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	var card imcceCard
 	if err := json.NewDecoder(resp.Body).Decode(&card); err != nil {
@@ -77,6 +84,7 @@ func fetchIMCCE(t *testing.T, name string) (H, G float64) {
 	}
 
 	t.Logf("IMCCE %s: H=%.3f G=%.3f", card.Title, H, G)
+
 	return H, G
 }
 
@@ -91,6 +99,7 @@ func TestIMCCE_CeresOpposition(t *testing.T) {
 	if math.Abs(mag-expected) > 0.01 {
 		t.Errorf("Ceres at opposition: got %.3f, expected %.3f", mag, expected)
 	}
+
 	t.Logf("Ceres opposition: V=%.2f (H=%.3f from IMCCE)", mag, H)
 }
 
@@ -109,6 +118,7 @@ func TestIMCCE_VestaOpposition(t *testing.T) {
 	if mag > 8 || mag < 3 {
 		t.Errorf("Vesta V=%.2f out of physical range", mag)
 	}
+
 	t.Logf("Vesta opposition: V=%.2f (H=%.3f from IMCCE)", mag, H)
 }
 
@@ -149,6 +159,7 @@ func TestIMCCE_MultiBodyConsistency(t *testing.T) {
 		if mag < 0 || mag > 25 {
 			t.Errorf("%s: V=%.2f out of range (H=%.3f G=%.3f)", name, mag, H, G)
 		}
+
 		t.Logf("%s: V=%.2f at r=%.1f Δ=%.1f α=10° (H=%.3f G=%.3f)", name, mag, r, delta, H, G)
 	}
 }

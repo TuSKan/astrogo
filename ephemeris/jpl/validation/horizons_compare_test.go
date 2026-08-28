@@ -4,6 +4,7 @@ package jpl_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	eph "github.com/TuSKan/astrogo/ephemeris"
@@ -14,42 +15,67 @@ import (
 )
 
 func loadCases(t *testing.T) []*StateVector {
+	t.Helper()
+
 	sun, err := fetchVector(10, "Sun", "2000-01-01 12:00 TDB", "2000-01-01 12:01")
+	if errors.Is(err, errHorizonsUnavailable) {
+		t.Skipf("JPL Horizons is not answering with API data, skipping live comparison: %v", err)
+	}
+
 	if err != nil {
 		t.Fatalf("failed to fetch sun vector: %v", err)
 	}
+
 	moon, err := fetchVector(301, "Moon", "2000-01-01 12:00 TDB", "2000-01-01 12:01")
+	if errors.Is(err, errHorizonsUnavailable) {
+		t.Skipf("JPL Horizons is not answering with API data, skipping live comparison: %v", err)
+	}
+
 	if err != nil {
 		t.Fatalf("failed to fetch moon vector: %v", err)
 	}
+
 	mars, err := fetchVector(4, "Mars", "2000-01-01 12:00 TDB", "2000-01-01 12:01")
+	if errors.Is(err, errHorizonsUnavailable) {
+		t.Skipf("JPL Horizons is not answering with API data, skipping live comparison: %v", err)
+	}
+
 	if err != nil {
 		t.Fatalf("failed to fetch mars vector: %v", err)
 	}
+
 	return []*StateVector{sun, moon, mars}
 }
 
 func runHorizonsTest(t *testing.T, bodyName string) {
+	t.Helper()
+
 	requireHorizons(t)
 
 	p, err := jpl.NewProvider(context.Background(), core.Planets, "de440")
 	if err != nil {
 		t.Fatalf("failed to create provider: %v", err)
 	}
-	defer p.Close()
+	defer func() { _ = p.Close() }()
 
 	cases := loadCases(t)
-	const posTol = 1e-7
-	const velTol = 1e-8
+
+	const (
+		posTol = 1e-7
+		velTol = 1e-8
+	)
 
 	found := false
+
 	for _, c := range cases {
 		if c.Body != bodyName && bodyName != "Planetary" {
 			continue
 		}
+
 		if bodyName == "Planetary" && (c.Body == "Sun" || c.Body == "Moon") {
 			continue
 		}
+
 		found = true
 
 		t.Run(c.Body, func(t *testing.T) {
@@ -59,6 +85,7 @@ func runHorizonsTest(t *testing.T, bodyName string) {
 			if c.Body == "Moon" {
 				bid = eph.Moon
 			}
+
 			if c.Body == "Mars" {
 				bid = eph.Mars
 			}
@@ -83,19 +110,26 @@ func runHorizonsTest(t *testing.T, bodyName string) {
 			}
 		})
 	}
+
 	if !found {
 		t.Errorf("No cases found for %s", bodyName)
 	}
 }
 
 func TestJPLStateAgainstHorizonsSun(t *testing.T) {
+	t.Helper()
+
 	runHorizonsTest(t, "Sun")
 }
 
 func TestJPLStateAgainstHorizonsMoon(t *testing.T) {
+	t.Helper()
+
 	runHorizonsTest(t, "Moon")
 }
 
 func TestJPLStateAgainstHorizonsPlanetaryBodies(t *testing.T) {
+	t.Helper()
+
 	runHorizonsTest(t, "Planetary")
 }

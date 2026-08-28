@@ -36,7 +36,7 @@ var (
 	// RetryPolicy implementations can produce/detect it.
 	ErrRetriable = errors.New("remote: retriable status code")
 
-	// ErrNotFileEndpoint is returned by GetFile/CacheDir for an endpoint
+	// ErrNotFileEndpoint is returned by GetFile for an endpoint
 	// registered as KindAPI, which has no cache directory or download path.
 	ErrNotFileEndpoint = errors.New("remote: not a file endpoint")
 

@@ -3,6 +3,8 @@
 package jpl_test
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -10,6 +12,19 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+)
+
+// Static errors for the Horizons response parser. err113 wants these declared
+// rather than built at the raise site, and the reason applies here: a caller
+// deciding whether a validation failure is Horizons changing its output format
+// or the network misbehaving has to be able to test for it, which errors.Is
+// can only do against a value that exists.
+var (
+	errNoEphemerisData   = errors.New("horizons: no ephemeris data in the response")
+	errNoVectorRows      = errors.New("horizons: no vector rows returned")
+	errUnexpectedColumns = errors.New("horizons: unexpected column count")
+	errColumnOutOfRange  = errors.New("horizons: column index out of range")
+	errNoObserverRows    = errors.New("horizons: no observer rows returned")
 )
 
 // StateVector matches your desired JSON output
@@ -22,6 +37,20 @@ type StateVector struct {
 	Vel     []float64 `json:"vel"`
 	UnitPos string    `json:"unit_pos"`
 	UnitVel string    `json:"unit_vel"`
+}
+
+// errHorizonsUnavailable marks a response that is not a Horizons API
+// answer at all — ssd.jpl.nasa.gov intermittently serves its HTML error
+// page under load. That is downtime, not wrong ephemeris data, so callers
+// skip on it; a real Horizons answer with bad numbers still fails.
+var errHorizonsUnavailable = errors.New("JPL Horizons served a non-API response")
+
+// horizonsUnavailable reports whether body is JPL's web error page rather
+// than the API's text output.
+func horizonsUnavailable(body string) bool {
+	head := strings.ToLower(strings.TrimSpace(body))
+
+	return strings.HasPrefix(head, "<!doctype html") || strings.HasPrefix(head, "<html")
 }
 
 func fetchVector(naifID int, bodyName string, startStr, stopStr string) (*StateVector, error) {
@@ -50,37 +79,49 @@ func fetchVector(naifID int, bodyName string, startStr, stopStr string) (*StateV
 	reqURL := fmt.Sprintf("%s?%s", baseURL, encodedQuery)
 
 	// 4. Execute the request
-	resp, err := http.Get(reqURL)
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, reqURL, nil)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("building the request: %w", err)
 	}
-	defer resp.Body.Close()
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("querying Horizons: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 
 	bodyBytes, _ := io.ReadAll(resp.Body)
 	responseStr := string(bodyBytes)
 
+	if horizonsUnavailable(responseStr) {
+		return nil, errHorizonsUnavailable
+	}
+
 	soeIdx := strings.Index(responseStr, "$$SOE")
+
 	eoeIdx := strings.Index(responseStr, "$$EOE")
 	if soeIdx == -1 || eoeIdx == -1 {
-		return nil, fmt.Errorf("ephemeris data not found in response: %s", responseStr[:int(math.Min(float64(len(responseStr)), 500))])
+		return nil, fmt.Errorf("%w: %s", errNoEphemerisData, responseStr[:int(math.Min(float64(len(responseStr)), 500))])
 	}
 
 	csvBlock := responseStr[soeIdx+6 : eoeIdx]
+
 	lines := strings.Split(strings.TrimSpace(csvBlock), "\n")
 	if len(lines) == 0 {
-		return nil, fmt.Errorf("no vector lines found")
+		return nil, errNoVectorRows
 	}
 
 	cols := strings.Split(lines[0], ",")
 	if len(cols) < 8 {
-		return nil, fmt.Errorf("unexpected column count")
+		return nil, errUnexpectedColumns
 	}
 
 	// Safely parse a specific index from the cols slice
 	parseIdx := func(idx int) (float64, error) {
 		if idx >= len(cols) {
-			return 0, fmt.Errorf("index %d out of bounds for cols length %d", idx, len(cols))
+			return 0, fmt.Errorf("%w: %d of %d", errColumnOutOfRange, idx, len(cols))
 		}
+
 		return strconv.ParseFloat(strings.TrimSpace(cols[idx]), 64)
 	}
 
@@ -89,11 +130,12 @@ func fetchVector(naifID int, bodyName string, startStr, stopStr string) (*StateV
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse JDTDB: %w", err)
 	}
+
 	etSeconds := (jdTDB - 2451545.0) * 86400.0
 
 	// 2. Parse Positions (X, Y, Z)
 	pos := make([]float64, 3)
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		if pos[i], err = parseIdx(i + 2); err != nil {
 			return nil, fmt.Errorf("failed to parse position axis %d: %w", i, err)
 		}
@@ -101,7 +143,7 @@ func fetchVector(naifID int, bodyName string, startStr, stopStr string) (*StateV
 
 	// 3. Parse Velocities (VX, VY, VZ)
 	vel := make([]float64, 3)
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		if vel[i], err = parseIdx(i + 5); err != nil {
 			return nil, fmt.Errorf("failed to parse velocity axis %d: %w", i, err)
 		}
@@ -160,25 +202,36 @@ func fetchObserverTable(naifID int, bodyName string, lon, lat, height float64, s
 	encodedQuery := strings.ReplaceAll(params.Encode(), "+", "%20")
 	reqURL := fmt.Sprintf("%s?%s", baseURL, encodedQuery)
 
-	resp, err := http.Get(reqURL)
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, reqURL, nil)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("building the request: %w", err)
 	}
-	defer resp.Body.Close()
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("querying Horizons: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 
 	bodyBytes, _ := io.ReadAll(resp.Body)
 	responseStr := string(bodyBytes)
 
+	if horizonsUnavailable(responseStr) {
+		return nil, errHorizonsUnavailable
+	}
+
 	soeIdx := strings.Index(responseStr, "$$SOE")
+
 	eoeIdx := strings.Index(responseStr, "$$EOE")
 	if soeIdx == -1 || eoeIdx == -1 {
-		return nil, fmt.Errorf("ephemeris data not found in response")
+		return nil, errNoEphemerisData
 	}
 
 	csvBlock := responseStr[soeIdx+6 : eoeIdx]
+
 	lines := strings.Split(strings.TrimSpace(csvBlock), "\n")
 	if len(lines) == 0 || lines[0] == "" {
-		return nil, fmt.Errorf("no observer lines found")
+		return nil, errNoObserverRows
 	}
 
 	cols := strings.Split(lines[0], ",")
@@ -191,7 +244,7 @@ func fetchObserverTable(naifID int, bodyName string, lon, lat, height float64, s
 	// Format is typically: JD, target_presence_flags, RA(ICRF), DEC(ICRF), RA(a-app), DEC(a-app), Azi(a-app), Elev(a-app)
 
 	if len(cols) < 8 {
-		return nil, fmt.Errorf("unexpected column count in observer output: %d", len(cols))
+		return nil, fmt.Errorf("%w: observer output had %d", errUnexpectedColumns, len(cols))
 	}
 
 	// Helper to extract cleanly parsed floats from the end of the array
@@ -203,10 +256,12 @@ func fetchObserverTable(naifID int, bodyName string, lon, lat, height float64, s
 
 	parseAngleStr := func(idx int, isRA bool) float64 {
 		s := strings.TrimSpace(cols[idx])
+
 		parts := strings.Fields(s)
 		if len(parts) != 3 {
 			return 0
 		}
+
 		d, _ := strconv.ParseFloat(parts[0], 64)
 		m, _ := strconv.ParseFloat(parts[1], 64)
 		sec, _ := strconv.ParseFloat(parts[2], 64)
@@ -221,6 +276,7 @@ func fetchObserverTable(naifID int, bodyName string, lon, lat, height float64, s
 		if isRA {
 			val *= 15.0 // Convert hours to degrees
 		}
+
 		return sign * val
 	}
 
@@ -255,10 +311,12 @@ func parseObserverRow(cols []string, bodyName string) ObserverPoint {
 
 	parseAngleStr := func(idx int, isRA bool) float64 {
 		s := strings.TrimSpace(cols[idx])
+
 		parts := strings.Fields(s)
 		if len(parts) != 3 {
 			return 0
 		}
+
 		d, _ := strconv.ParseFloat(parts[0], 64)
 		m, _ := strconv.ParseFloat(parts[1], 64)
 		sec, _ := strconv.ParseFloat(parts[2], 64)
@@ -273,6 +331,7 @@ func parseObserverRow(cols []string, bodyName string) ObserverPoint {
 		if isRA {
 			val *= 15.0
 		}
+
 		return sign * val
 	}
 
@@ -320,19 +379,25 @@ func fetchObserverSeries(naifID int, bodyName string, lon, lat, height float64, 
 	encodedQuery := strings.ReplaceAll(params.Encode(), "+", "%20")
 	reqURL := fmt.Sprintf("%s?%s", baseURL, encodedQuery)
 
-	resp, err := http.Get(reqURL)
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, reqURL, nil)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("building the request: %w", err)
 	}
-	defer resp.Body.Close()
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("querying Horizons: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 
 	bodyBytes, _ := io.ReadAll(resp.Body)
 	responseStr := string(bodyBytes)
 
 	soeIdx := strings.Index(responseStr, "$$SOE")
+
 	eoeIdx := strings.Index(responseStr, "$$EOE")
 	if soeIdx == -1 || eoeIdx == -1 {
-		return nil, fmt.Errorf("ephemeris data not found in response")
+		return nil, errNoEphemerisData
 	}
 
 	csvBlock := responseStr[soeIdx+6 : eoeIdx]
@@ -348,14 +413,14 @@ func fetchObserverSeries(naifID int, bodyName string, lon, lat, height float64, 
 
 		cols := strings.Split(line, ",")
 		if len(cols) < 8 {
-			return nil, fmt.Errorf("unexpected column count in observer output: %d", len(cols))
+			return nil, fmt.Errorf("%w: observer output had %d", errUnexpectedColumns, len(cols))
 		}
 
 		points = append(points, parseObserverRow(cols, bodyName))
 	}
 
 	if len(points) == 0 {
-		return nil, fmt.Errorf("no observer rows found")
+		return nil, errNoObserverRows
 	}
 
 	return points, nil

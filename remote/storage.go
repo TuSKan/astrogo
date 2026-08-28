@@ -1,65 +1,53 @@
 package remote
 
 import (
+	"context"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"sync"
 
-	gofs "github.com/ungerik/go-fs"
+	"github.com/TuSKan/astrogo/remote/file"
 )
 
-// appName is the directory name under the OS user cache dir that holds all
+// appName is the directory name under the OS user cache dir holding all
 // astrogo data by default.
 const appName = "astrogo"
 
-// dataDir holds the process-wide base location for ALL data astrogo stores
-// (JPL SPK/LSK kernels, the IERS EOP cache). It is a go-fs File — a
-// URI-style path backed by a pluggable filesystem registry — so a future
-// blob/bucket backend (s3://, gs://) can be plugged in by registering its
-// scheme with github.com/ungerik/go-fs and calling SetDataDir; astrogo call
-// sites don't change.
+// dataDirURL is the process-wide base location for everything astrogo
+// stores. Empty means "resolve the default lazily" — see DataDirURL.
 //
 //nolint:gochecknoglobals // process-wide data location is this package's purpose
 var (
-	dataMu  sync.RWMutex
-	dataDir gofs.File // empty = resolve default lazily
+	dataMu     sync.RWMutex
+	dataDirURL string
 )
 
-// SetDataDir sets the base directory for all data astrogo stores. Accepts
-// any go-fs File, including ones on filesystems registered under non-local
-// schemes.
-func SetDataDir(dir gofs.File) {
+// DataDirEnv overrides the default data location when SetDataDir has not
+// been called. Its value is a bucket URL, not an OS path — see DataDirURL.
+const DataDirEnv = "ASTROGO_CACHE_DIR"
+
+// SetDataDir sets the base location for all data astrogo stores, as any
+// URL remote/file can open: "file:///home/u/.cache/astrogo?create_dir=true",
+// "s3://my-cache-bucket", "sftp://host/path". Nothing astrogo caches is
+// assumed to live on local disk.
+func SetDataDir(bucketURL string) {
 	dataMu.Lock()
 	defer dataMu.Unlock()
 
-	dataDir = dir
+	dataDirURL = bucketURL
 }
 
-// SetDataDirPath is the local-path convenience form of SetDataDir.
-func SetDataDirPath(path string) {
-	SetDataDir(gofs.File(path))
-}
-
-// DataDirEnv is the environment variable that overrides the default
-// astrogo data directory when SetDataDir/SetDataDirPath hasn't been
-// called explicitly — see DataDir's precedence order. Useful for CI and
-// containers that want a fixed cache location without touching
-// application code.
-const DataDirEnv = "ASTROGO_CACHE_DIR"
-
-// DataDir returns the base directory for all astrogo data, resolved in
-// this order: an explicit SetDataDir/SetDataDirPath call, then the
-// DataDirEnv environment variable, then os.UserCacheDir()/astrogo
-// (falling back to os.TempDir() when the user cache dir is unavailable):
-// ~/.cache/astrogo on Linux, %LocalAppData%\astrogo on Windows,
-// ~/Library/Caches/astrogo on macOS. Re-resolved on every call — there is
-// nothing to invalidate if the environment or an explicit override
-// changes between calls.
-func DataDir() gofs.File {
+// DataDirURL returns the bucket URL astrogo stores all its data under,
+// resolved in order: an explicit SetDataDir call, then DataDirEnv, then
+// the OS user cache directory — ~/.cache/astrogo on Linux,
+// %LocalAppData%\astrogo on Windows, ~/Library/Caches/astrogo on macOS.
+// Re-resolved per call, so a changed environment takes effect immediately.
+func DataDirURL() string {
 	dataMu.RLock()
 
-	d := dataDir
+	d := dataDirURL
 
 	dataMu.RUnlock()
 
@@ -68,41 +56,78 @@ func DataDir() gofs.File {
 	}
 
 	if env := os.Getenv(DataDirEnv); env != "" {
-		return gofs.File(env)
+		return env
 	}
 
+	return defaultDataDirURL()
+}
+
+// defaultDataDirURL is the one place in astrogo that converts an OS
+// filesystem path into a URL. It exists because the default location can
+// only come from os.UserCacheDir; every other path into this package is a
+// URL supplied by the caller. It is deliberately unexported — a general
+// path-to-URL helper would invite call sites that assume local disk.
+//
+// The result carries create_dir=true because fileblob's URL opener
+// defaults CreateDir to false, so a first run would otherwise fail to open
+// a cache directory that does not exist yet. It is built through url.URL
+// rather than concatenation: a '#' in the path would silently truncate it
+// and swallow the query, and a stray '%' would make it unparseable.
+func defaultDataDirURL() string {
 	base, err := os.UserCacheDir()
 	if err != nil {
 		base = os.TempDir()
 	}
 
-	return gofs.File(filepath.Join(base, appName))
-}
-
-// subsystemDir returns DataDir()/<subsystem> (e.g. "jpl", "iers"), creating
-// it if it does not yet exist.
-func subsystemDir(subsystem string) (gofs.File, error) {
-	dir := DataDir().Join(subsystem)
-
-	if err := dir.MakeAllDirs(); err != nil {
-		return dir, fmt.Errorf("remote: mkdir %s: %w", dir, err)
+	slash := filepath.ToSlash(filepath.Join(base, appName))
+	if slash == "" || slash[0] != '/' {
+		slash = "/" + slash // Windows drive-letter paths are not "/"-rooted
 	}
 
-	return dir, nil
+	u := url.URL{Scheme: "file", Path: slash, RawQuery: "create_dir=true"}
+
+	return u.String()
 }
 
-// CacheDir returns the on-disk cache directory for a KindFile endpoint,
-// creating it if needed. Returns ErrUnknownEndpoint for an unregistered id
-// or an error if id is a KindAPI endpoint (which has no cache directory).
-func CacheDir(id EndpointID) (gofs.File, error) {
+// DataDir opens DataDirURL as a Bucket rooted at astrogo's base data
+// location.
+func DataDir(ctx context.Context) (*file.Bucket, error) {
+	b, err := file.Open(ctx, DataDirURL())
+	if err != nil {
+		return nil, fmt.Errorf("remote: open data dir: %w", err)
+	}
+
+	return b, nil
+}
+
+// CacheDir returns the Bucket and key prefix an endpoint caches under. It
+// creates nothing: a bucket "directory" is only a key prefix, so the first
+// write under it is all the backend needs. Returns ErrUnknownEndpoint for an
+// unregistered id.
+//
+// Every registered endpoint has one, KindAPI included. A cache directory is
+// somewhere to put bytes, which is a different question from whether GetFile
+// can fetch them: GetFile needs a bucket URL and a name and so still requires
+// KindFile, but a decoded API payload is content this module is expected to
+// keep - file.Save exists for exactly that - and it needs a place to go.
+//
+// This used to refuse KindAPI, which made that impossible and quietly
+// disabled the callers that had already been written for it. starlight asks
+// for esa.gaia's cache directory to checkpoint an hour-long Gaia aggregation
+// and resume it across sessions; both its read and its write sat behind a
+// "cache directory was available" branch that could never be taken, so the
+// aggregation restarted from nothing every time. Nothing reported it, because
+// a cache that cannot be reached is indistinguishable from a cold one.
+func CacheDir(ctx context.Context, id EndpointID) (bucket *file.Bucket, prefix string, err error) {
 	ep, ok := Lookup(id)
 	if !ok {
-		return "", fmt.Errorf("%w: %q", ErrUnknownEndpoint, id)
+		return nil, "", fmt.Errorf("%w: %q", ErrUnknownEndpoint, id)
 	}
 
-	if ep.Kind != KindFile {
-		return "", fmt.Errorf("%w: %q has no cache directory", ErrNotFileEndpoint, id)
+	bucket, err = DataDir(ctx)
+	if err != nil {
+		return nil, "", err
 	}
 
-	return subsystemDir(ep.Subsystem)
+	return bucket, ep.Subsystem + "/", nil
 }

@@ -8,7 +8,6 @@ import (
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
-	"github.com/TuSKan/astrogo/skybrightness"
 	"github.com/TuSKan/astrogo/time"
 )
 
@@ -199,22 +198,6 @@ func TestMeteorShower_IsActive(t *testing.T) {
 	}
 }
 
-// fakeSkyModel/fakeLimMagModel let ObservedRate's tests fix the sky's
-// limiting magnitude to an exact, known value, isolating the ZHR/altitude/
-// population-index arithmetic from the real (and here irrelevant)
-// moonlight/zodiacal-light/light-pollution computation.
-type fakeSkyModel struct{}
-
-func (fakeSkyModel) SurfaceBrightness(_ coord.AltAz, _ *coord.Context) (skybrightness.SurfaceBrightnessV, error) {
-	return 0, nil
-}
-
-type fakeLimMagModel struct{ limMag float64 }
-
-func (f fakeLimMagModel) LimitingMagnitude(_ skybrightness.SurfaceBrightnessV, _ float64) (float64, error) {
-	return f.limMag, nil
-}
-
 // TestMeteorShower_ObservedRate_ZeroBelowHorizon confirms a radiant below
 // the horizon yields rate 0, not an error.
 func TestMeteorShower_ObservedRate_ZeroBelowHorizon(t *testing.T) {
@@ -239,9 +222,10 @@ func TestMeteorShower_ObservedRate_ZeroBelowHorizon(t *testing.T) {
 		t.Fatalf("NewSite: %v", err)
 	}
 
-	c := LimitingMagnitudeConstraint{Model: fakeSkyModel{}, Conversion: fakeLimMagModel{limMag: 6.5}}
-
-	rate, err := m.ObservedRate(time.FromJD(2451545.0, time.UTC), site, prov, c)
+	// The limiting magnitude is now a direct input, so these tests pin it
+	// to the IMO standard 6.5 and isolate the ZHR/altitude/population-index
+	// arithmetic from any sky-brightness model.
+	rate, err := m.ObservedRate(time.FromJD(2451545.0, time.UTC), site, prov, 6.5)
 	if err != nil {
 		t.Fatalf("ObservedRate: %v", err)
 	}
@@ -278,9 +262,10 @@ func TestMeteorShower_ObservedRate_StandardConditionsEqualsZHR(t *testing.T) {
 		t.Fatalf("NewSite: %v", err)
 	}
 
-	c := LimitingMagnitudeConstraint{Model: fakeSkyModel{}, Conversion: fakeLimMagModel{limMag: 6.5}}
-
-	rate, err := m.ObservedRate(time.FromJD(2451545.0, time.UTC), site, prov, c)
+	// The limiting magnitude is now a direct input, so these tests pin it
+	// to the IMO standard 6.5 and isolate the ZHR/altitude/population-index
+	// arithmetic from any sky-brightness model.
+	rate, err := m.ObservedRate(time.FromJD(2451545.0, time.UTC), site, prov, 6.5)
 	if err != nil {
 		t.Fatalf("ObservedRate: %v", err)
 	}

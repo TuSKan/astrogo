@@ -30,20 +30,20 @@ type Reader struct {
 // Cache opens the LSK file named kernel, downloading it first when it is
 // absent, into remote's registered cache directory for remote.NAIFLSK.
 // Downloads are gated by remote's consent configuration — enable them with
-// remote.EnableDownloads(remote.NAIFLSK, 0) (naif0012.tls is only ~5 KB) or
+// remote.EnableDownloads(0, remote.NAIFLSK) (naif0012.tls is only ~5 KB) or
 // pre-seed the file to stay fully offline.
 //
 // It provides an auto-healing mechanism for CI environments by automatically
 // removing corrupt or truncated files.
 func Cache(ctx context.Context, kernel string) (*Reader, error) {
-	lskFile, err := remote.GetFile(ctx, remote.NAIFLSK, kernel, remote.WithCacheName(kernel))
+	bucket, key, err := remote.GetFile(ctx, remote.NAIFLSK, kernel, remote.WithCacheName(kernel))
 	if err != nil {
 		return nil, fmt.Errorf("jpl: LSK %s: %w", kernel, err)
 	}
 
-	ls, err := lskFile.OpenReader()
+	ls, err := bucket.NewReader(ctx, key, nil)
 	if err != nil {
-		return nil, fmt.Errorf("jpl: failed to load LSK %s: %w", lskFile, err)
+		return nil, fmt.Errorf("jpl: failed to load LSK %s: %w", key, err)
 	}
 
 	return NewReader(ls)

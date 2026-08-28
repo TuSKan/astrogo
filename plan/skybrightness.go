@@ -1,190 +1,227 @@
 package plan
 
 import (
-	"errors"
 	"fmt"
 	"math"
 
-	"github.com/TuSKan/astrogo/atmosphere"
+	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
-	"github.com/TuSKan/astrogo/skybrightness"
 	"github.com/TuSKan/astrogo/time"
 )
 
-// defaultLimMagRamp is the default soft-ramp half-width (magnitudes) used by
-// LimitingMagnitudeConstraint.ScoreMultiplier.
+// defaultLimMagRamp is the soft-ramp half-width, in magnitudes, that
+// [LimitingMagnitudeConstraint.ScoreMultiplier] uses when Ramp is zero.
+//
+// Half a magnitude: wide enough that a target sitting exactly at the limit
+// scores near the middle rather than snapping between 0 and 1 on a hundredth
+// of a magnitude of sky, and narrow enough that a target two magnitudes clear
+// of the limit is not still being penalised for it.
 const defaultLimMagRamp = 0.5
 
-// LimitingMagnitudeConstraint scores or gates targets by comparing the sky's
-// limiting magnitude at the target's pointing and time against the magnitude
-// the target requires to be detectable.
+// SkyDepth reports how faint a source can be at a pointing and an instant and
+// still be detected.
 //
-// By default it is a SOFT scoring modifier: Check never rejects, and the
-// observability merit is delivered through [LimitingMagnitudeConstraint.ScoreMultiplier]
-// as a smooth, monotonic logistic ramp over the margin (limMag − required).
-// Set Boolean to make Check a hard cutoff that fails when the margin is negative.
+// # Why this interface is declared here rather than imported
+//
+// Because it is the whole of what a constraint needs, and declaring it here
+// means the planning engine depends on no sky-brightness code at all — not
+// the engine, not its datasets, not a photometric system. An earlier version
+// of this constraint took a concrete sky-brightness type and needed a bespoke
+// import test to keep that dependency from spreading; this needs no test,
+// because there is no import to police.
+//
+// It also leaves the hard part where it belongs. A limiting magnitude is not
+// a property of the sky: it is a threshold against the sky, and it depends on
+// the detector or the eye, the exposure, the aperture and the observer. An
+// implementation has to decide all of that, and different observers
+// legitimately decide differently.
+// [github.com/TuSKan/astrogo/skybrightness/plan] supplies one for an imaging
+// system; a visual observer's is a different model and is not written yet.
+type SkyDepth interface {
+	// LimitingMagnitudeAt returns the faintest detectable magnitude looking
+	// at (alt, az) at time t. A brighter sky gives a smaller number.
+	LimitingMagnitudeAt(t time.Time, alt, az angle.Angle) (float64, error)
+}
+
+// LimitingMagnitudeConstraint scores or gates targets by comparing how deep
+// the sky is at the target's pointing against the magnitude that target needs
+// in order to be detected.
+//
+// # Soft by default
+//
+// [LimitingMagnitudeConstraint.Check] never rejects unless Boolean is set.
+// Sky brightness is a matter of degree in a way an altitude limit is not —
+// half a magnitude of moonlight makes a target harder rather than impossible
+// — so the merit is delivered through
+// [LimitingMagnitudeConstraint.ScoreMultiplier] as a smooth monotonic ramp
+// over the margin, and a hard cutoff is available for a caller who genuinely
+// wants one.
+//
+// # What it will not do
+//
+// Construct a sky. Sky, the instrument behind it and the detection threshold
+// it assumes are all assembled by the application and injected, because every
+// one of them is a decision this package cannot make on a caller's behalf.
 type LimitingMagnitudeConstraint struct {
-	// Model supplies the total sky surface brightness toward the pointing.
-	Model skybrightness.Model
-	// Conversion turns sky brightness + airmass into a limiting magnitude.
-	Conversion skybrightness.LimitingMagModel
-	// Required returns the minimum limiting magnitude needed to observe the
-	// target. If nil, the target's static catalog magnitude is used; targets
-	// without a known magnitude impose no requirement.
-	Required func(Observable) float64
-	// Ramp is the soft-ramp half-width in magnitudes for ScoreMultiplier
-	// (default 0.5). Ignored when Boolean is true.
+	// Sky is how deep the sky is. Required.
+	Sky SkyDepth
+
+	// Required reports the magnitude a target must reach to count as
+	// detected, and whether it has one at all.
+	//
+	// Nil falls back to the target's catalog magnitude via
+	// [StaticMagnitude]. A target with neither imposes no requirement and
+	// always passes, which is deliberate: a constraint that rejected
+	// everything it could not measure would silently empty a target list.
+	Required func(obj Observable) (float64, bool)
+
+	// Ramp is the soft-ramp half-width in magnitudes. Zero means 0.5.
 	Ramp float64
-	// Boolean switches Check from a soft (never-rejecting) modifier to a hard
-	// cutoff that fails when limMag < required.
+
+	// Boolean makes Check a hard cutoff that fails when the target is
+	// fainter than the sky allows.
 	Boolean bool
 }
 
-// Compile-time assertion that LimitingMagnitudeConstraint implements
-// ConstraintCtx (see the identical assertion block in constraint.go for why
-// this matters: a CheckCtx signature drift drops a type out of the
-// interface with no compiler error, only a missed scheduler fast path).
+// Compile-time assertion that this implements ConstraintCtx. See the
+// identical block in constraint.go for why it matters: a CheckCtx signature
+// drift drops the type out of the interface with no compiler error, and the
+// only symptom is a missed scheduler fast path at runtime.
 var _ ConstraintCtx = LimitingMagnitudeConstraint{}
 
 // Check evaluates the constraint, building a coord.Context for (t, site).
 func (c LimitingMagnitudeConstraint) Check(obj Observable, t time.Time, site *Site) (Result, error) {
-	ctx := coord.NewContext(t, site.Location(), site.Atmosphere())
+	ctx := coord.NewContext(t, site.Location(), site.Refraction())
 
 	return c.CheckCtx(obj, t, site, ctx)
 }
 
 // CheckCtx evaluates the constraint using a pre-built coord.Context.
-func (c LimitingMagnitudeConstraint) CheckCtx(obj Observable, t time.Time, _ *Site, ctx *coord.Context) (Result, error) {
-	limMag, required, err := c.evaluate(obj, t, ctx)
+func (c LimitingMagnitudeConstraint) CheckCtx(
+	obj Observable, _ time.Time, _ *Site, ctx *coord.Context,
+) (Result, error) {
+	limMag, required, err := c.evaluate(obj, ctx)
 	if err != nil {
 		return Result{}, err
 	}
 
+	margin := limMag - required
+
+	// Nothing to require: a target with no photometry is not evidence of a
+	// bad sky.
+	if math.IsInf(required, -1) {
+		return Result{Pass: true, Value: math.Inf(1)}, nil
+	}
+
 	if !c.Boolean {
-		// Soft mode: never gate observability; demotion happens via ScoreMultiplier.
-		return Result{Pass: true, Value: limMag}, nil
+		return Result{Pass: true, Value: margin}, nil
 	}
 
-	pass := limMag >= required
-
-	reason := ""
-	if !pass {
-		reason = fmt.Sprintf("limiting magnitude %.2f below required %.2f", limMag, required)
+	if margin >= 0 {
+		return Result{Pass: true, Value: margin}, nil
 	}
 
-	return Result{Pass: pass, Value: limMag, Reason: reason}, nil
+	return Result{
+		Pass:  false,
+		Value: margin,
+		Reason: fmt.Sprintf("the sky reaches %.2f and the target needs %.2f, short by %.2f mag",
+			limMag, required, -margin),
+	}, nil
 }
 
-// ScoreMultiplier returns the sky-brightness observability merit in [0,1]: a
-// logistic ramp over the margin (limMag − required). It is monotonic — a darker
-// sky (deeper limiting magnitude) never lowers the merit — and is intended to
-// multiply a base observability score (see [ScoreObservableSky]).
-func (c LimitingMagnitudeConstraint) ScoreMultiplier(obj Observable, t time.Time, _ *Site, ctx *coord.Context) (float64, error) {
-	limMag, required, err := c.evaluate(obj, t, ctx)
+// ScoreMultiplier returns the sky-brightness merit in [0,1]: a logistic ramp
+// over the margin between what the sky reaches and what the target needs.
+//
+// Monotonic by construction — a deeper sky never lowers the merit — and
+// intended to multiply a base observability score rather than replace one.
+func (c LimitingMagnitudeConstraint) ScoreMultiplier(
+	obj Observable, ctx *coord.Context,
+) (float64, error) {
+	limMag, required, err := c.evaluate(obj, ctx)
 	if err != nil {
 		return 0, err
 	}
 
-	return softRamp(limMag-required, c.ramp()), nil
+	if math.IsInf(required, -1) {
+		return 1, nil
+	}
+
+	margin := limMag - required
+	if math.IsInf(margin, -1) {
+		return 0, nil
+	}
+
+	return 1 / (1 + math.Exp(-margin/c.ramp())), nil
 }
 
+// ramp is the configured half-width, or the default.
 func (c LimitingMagnitudeConstraint) ramp() float64 {
-	if c.Ramp > 0 {
+	if c.Ramp > 0 && !math.IsInf(c.Ramp, 0) {
 		return c.Ramp
 	}
 
 	return defaultLimMagRamp
 }
 
-// evaluate returns the limiting magnitude at the target's pointing and the
-// magnitude the target requires. A below-horizon target yields limMag = −Inf.
-func (c LimitingMagnitudeConstraint) evaluate(obj Observable, t time.Time, ctx *coord.Context) (limMag, required float64, err error) {
-	aa, err := skyAltAzCtx(obj, t, ctx)
-	if err != nil {
-		return 0, 0, err
+// evaluate resolves how deep the sky is where the target is, and how deep it
+// needs to be.
+//
+// A target below the horizon yields -Inf: it is not that the sky there is
+// bright, it is that there is no sky there. Returning a finite number would
+// let a below-horizon target out-score a visible one under a bright sky.
+func (c LimitingMagnitudeConstraint) evaluate(
+	obj Observable, ctx *coord.Context,
+) (limMag, required float64, err error) {
+	if c.Sky == nil {
+		return 0, 0, fmt.Errorf("constraint: limiting magnitude: %w", ErrNoSkyDepth)
 	}
 
-	required = c.requiredFor(obj)
-
-	airmass, err := atmosphere.Airmass(aa.Alt())
+	pos, err := obj.Position(ctx.Time())
 	if err != nil {
-		if errors.Is(err, atmosphere.ErrBelowHorizon) {
-			// Below the horizon: nothing is observable.
-			return math.Inf(-1), required, nil
-		}
-
-		return 0, 0, fmt.Errorf("constraint: airmass: %w", err)
+		return 0, 0, fmt.Errorf("constraint: limiting magnitude position: %w", err)
 	}
 
-	sky, err := c.Model.SurfaceBrightness(aa, ctx)
+	altaz, err := ctx.ICRSToAltAz(pos)
 	if err != nil {
-		return 0, 0, fmt.Errorf("constraint: sky brightness: %w", err)
+		return 0, 0, fmt.Errorf("constraint: limiting magnitude pointing: %w", err)
 	}
 
-	limMag, err = c.Conversion.LimitingMagnitude(sky, airmass)
+	if altaz.Alt() <= 0 {
+		return math.Inf(-1), c.requiredFor(obj, ctx), nil
+	}
+
+	limMag, err = c.Sky.LimitingMagnitudeAt(ctx.Time(), altaz.Alt(), altaz.Az())
 	if err != nil {
 		return 0, 0, fmt.Errorf("constraint: limiting magnitude: %w", err)
 	}
 
-	return limMag, required, nil
+	return limMag, c.requiredFor(obj, ctx), nil
 }
 
-// requiredFor returns the limiting magnitude the target requires. A nil Required
-// falls back to the target's static catalog magnitude; targets without one
-// impose no requirement (−Inf).
-func (c LimitingMagnitudeConstraint) requiredFor(obj Observable) float64 {
+// requiredFor is the magnitude a target must reach, or -Inf when it declares
+// none.
+func (c LimitingMagnitudeConstraint) requiredFor(obj Observable, ctx *coord.Context) float64 {
 	if c.Required != nil {
-		return c.Required(obj)
+		if m, ok := c.Required(obj); ok {
+			return m
+		}
+
+		return math.Inf(-1)
+	}
+
+	// The time-varying magnitude first, since a planet's brightness is not a
+	// catalog constant and using one would be wrong by magnitudes.
+	if mc, ok := obj.(MagnitudeComputer); ok {
+		if m, err := mc.ApparentMagnitudeCtx(ctx.Time(), ctx); err == nil {
+			return m
+		}
 	}
 
 	if sm, ok := obj.(StaticMagnitude); ok {
-		if mag, has := sm.StaticMagnitude(); has {
-			return mag
+		if m, has := sm.StaticMagnitude(); has {
+			return m
 		}
 	}
 
 	return math.Inf(-1)
-}
-
-// softRamp is a logistic [0,1] ramp over margin with the given half-width. A
-// width <= 0 degrades to a hard step at margin = 0.
-func softRamp(margin, width float64) float64 {
-	if width <= 0 {
-		if margin >= 0 {
-			return 1
-		}
-
-		return 0
-	}
-
-	return 1 / (1 + math.Exp(-margin/width))
-}
-
-// ScoreObservableSky scores obj with [ScoreObservable] and multiplies the result
-// by the sky-brightness merit from c, giving a soft, monotonic demotion as the
-// limiting magnitude approaches the target's requirement.
-func ScoreObservableSky(
-	obj Observable,
-	t time.Time,
-	site *Site,
-	cfg *ScoreConfig,
-	ctx *coord.Context,
-	c LimitingMagnitudeConstraint,
-	constraints ...Constraint,
-) (float64, error) {
-	base, err := ScoreObservable(obj, t, site, cfg, ctx, constraints...)
-	if err != nil {
-		return 0, err
-	}
-
-	if base == 0 {
-		return 0, nil
-	}
-
-	merit, err := c.ScoreMultiplier(obj, t, site, ctx)
-	if err != nil {
-		return 0, err
-	}
-
-	return base * merit, nil
 }

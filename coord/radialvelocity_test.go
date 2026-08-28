@@ -24,7 +24,7 @@ func equatorSite(t *testing.T) *coord.Geodetic {
 	return site
 }
 
-var noRefraction = atmosphere.Atmosphere{Pressure: 0}
+var noRefraction = atmosphere.Refraction{Pressure: 0}
 
 // TestBarycentricRVCorrection_BoundedByEarthPlusSiteSpeed checks
 // |correction| never exceeds Earth's orbital speed (~29.8 km/s) plus a
