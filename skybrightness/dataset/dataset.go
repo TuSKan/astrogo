@@ -168,6 +168,13 @@ type Spec struct {
 	// value, from the Canadian Space Weather Forecast Centre.
 	SolarFluxSFU float64
 
+	// AirglowScale multiplies the fetched airglow spectrum. Zero means 1.
+	//
+	// A flat scaling for a night known to be brighter or quieter than the
+	// reference — see [airglow.Spec.Scale], and note that scaling a
+	// climatology to match a measurement does not make it one.
+	AirglowScale float64
+
 	// AirglowMeasured records that the airglow spectrum describes the night
 	// being modelled rather than a reference, which changes the quality flag
 	// the component reports. False for anything this package fetches, since
@@ -271,6 +278,7 @@ func Inputs(ctx context.Context, spec Spec) (skybrightness.PresetInputs, error) 
 		SolarFluxSFU: spec.SolarFluxSFU,
 		MinNM:        float64(grid.At(0)) - 1,
 		MaxNM:        float64(grid.At(grid.Len()-1)) + 1,
+		Scale:        spec.AirglowScale,
 	})
 	if err != nil {
 		return zero, fmt.Errorf("dataset: airglow: %w", err)

@@ -248,3 +248,122 @@ func TestIndicativeAODsAreOrderedAndPlausible(t *testing.T) {
 		}
 	}
 }
+
+// The four types added alongside the original set carry OPAC Table 3's own
+// numbers, and sit where the physics says they should.
+//
+// # Why an ordering test rather than only the literals
+//
+// Because the literals are the thing most likely to be wrong, and comparing
+// them against themselves proves nothing. OPAC's Table 3 is printed as a
+// column-major block that pdftotext renders with the single-scattering
+// albedo column offset from its row labels — read naively it assigns
+// Maritime clean an albedo of 0.888 and Desert 0.817, which would make
+// desert dust more absorbing than sea salt is reflective and urban soot less
+// absorbing than dust. The orderings below are what distinguishes a correct
+// transcription from that one, and they are physical facts about the
+// aerosols rather than restatements of the table.
+func TestAerosolPresets_AddedTypesMatchOPAC(t *testing.T) {
+	t.Parallel()
+
+	// Soot is what absorbs, and OPAC's continental series adds it in steps:
+	// clean has none at all, average has some, polluted has 2 ug m^-3, urban
+	// 7.8. Single-scattering albedo must fall monotonically along that series.
+	continental := []struct {
+		name string
+		ssa  float64
+	}{
+		{"Continental clean", continentalCleanSSA},
+		{"Continental average", continentalAverageSSA},
+		{"Continental polluted", continentalPollutedSSA},
+		{"Urban", urbanSSA},
+	}
+
+	for i := 1; i < len(continental); i++ {
+		if continental[i].ssa >= continental[i-1].ssa {
+			t.Errorf("%s SSA %v is not below %s's %v; OPAC's continental series adds soot "+
+				"at every step and soot is what absorbs",
+				continental[i].name, continental[i].ssa,
+				continental[i-1].name, continental[i-1].ssa)
+		}
+	}
+
+	// The maritime series runs the other way from the continental one: sea
+	// salt is nearly non-absorbing, and pollution carried out over the water
+	// is what lowers the albedo.
+	if !(maritimePollutedSSA < maritimeCleanSSA) {
+		t.Errorf("Maritime polluted SSA %v is not below Maritime clean's %v",
+			maritimePollutedSSA, maritimeCleanSSA)
+	}
+
+	if !(maritimeCleanSSA < maritimeTropicalSSA) {
+		t.Errorf("Maritime clean SSA %v is not below Maritime tropical's %v; tropical is the "+
+			"cleanest air OPAC tabulates outside the polar types",
+			maritimeCleanSSA, maritimeTropicalSSA)
+	}
+
+	// Every albedo is a fraction, and none reaches one: a real tropospheric
+	// aerosol always absorbs something.
+	for _, c := range []struct {
+		name string
+		ssa  float64
+	}{
+		{"Continental clean", continentalCleanSSA},
+		{"Continental polluted", continentalPollutedSSA},
+		{"Maritime polluted", maritimePollutedSSA},
+		{"Maritime tropical", maritimeTropicalSSA},
+	} {
+		if c.ssa <= 0 || c.ssa >= 1 {
+			t.Errorf("%s SSA %v is not in (0,1)", c.name, c.ssa)
+		}
+	}
+
+	// Particle size again: the continental types are fine-particle and steep,
+	// the maritime ones coarse and nearly grey. Maritime tropical at 0.04 is
+	// the flattest in the table.
+	if continentalCleanAngstrom <= 1 || continentalPollutedAngstrom <= 1 {
+		t.Errorf("continental Angstrom exponents %v and %v should be above 1 (fine particles)",
+			continentalCleanAngstrom, continentalPollutedAngstrom)
+	}
+
+	if maritimeTropicalAngstrom >= maritimePollutedAngstrom {
+		t.Errorf("Maritime tropical Angstrom %v is not below Maritime polluted's %v; the "+
+			"pollution contributes particles far smaller than sea salt",
+			maritimeTropicalAngstrom, maritimePollutedAngstrom)
+	}
+}
+
+// The added types build, and carry the scale height OPAC's Table 5 gives for
+// their family.
+//
+// Continental clean and polluted share the 8 km molecular scale height with
+// the rest of the continental series; both maritime variants share sea
+// salt's 1 km. Getting this wrong is invisible in the optical properties and
+// changes every height-resolved answer.
+func TestAerosolPresets_AddedTypesCarryTheirScaleHeight(t *testing.T) {
+	t.Parallel()
+
+	for _, c := range []struct {
+		name  string
+		build func(heightM, aod550 float64) *Builder
+		want  float64
+	}{
+		{"ContinentalCleanAerosol", ContinentalCleanAerosol, ContinentalScaleHeightM},
+		{"ContinentalPollutedAerosol", ContinentalPollutedAerosol, ContinentalScaleHeightM},
+		{"MaritimePollutedAerosol", MaritimePollutedAerosol, MaritimeScaleHeightM},
+		{"MaritimeTropicalAerosol", MaritimeTropicalAerosol, MaritimeScaleHeightM},
+	} {
+		air, err := c.build(0, 0.1).Build()
+		if err != nil {
+			t.Fatalf("%s: %v", c.name, err)
+		}
+
+		if got := float64(air.Aerosol().ScaleHeight); got != c.want {
+			t.Errorf("%s scale height is %g m, want %g", c.name, got, c.want)
+		}
+
+		if src := air.Provenance().Source.Name; src == "" {
+			t.Errorf("%s records no source; every preset names its OPAC type", c.name)
+		}
+	}
+}

@@ -49,6 +49,22 @@ const (
 	maritimeCleanSSA      = 0.997
 	maritimeCleanAsymm    = 0.772
 	maritimeCleanAngstrom = 0.08
+
+	continentalCleanSSA      = 0.972
+	continentalCleanAsymm    = 0.709
+	continentalCleanAngstrom = 1.42
+
+	continentalPollutedSSA      = 0.892
+	continentalPollutedAsymm    = 0.698
+	continentalPollutedAngstrom = 1.45
+
+	maritimePollutedSSA      = 0.975
+	maritimePollutedAsymm    = 0.756
+	maritimePollutedAngstrom = 0.35
+
+	maritimeTropicalSSA      = 0.998
+	maritimeTropicalAsymm    = 0.774
+	maritimeTropicalAngstrom = 0.04
 )
 
 // Aerosol scale heights, in metres, from OPAC's Table 5 "Height profiles of
@@ -174,17 +190,66 @@ func DesertAerosol(heightM, aod550 float64) *Builder {
 // MaritimeAerosol seeds a Builder with OPAC's "Maritime clean" aerosol
 // type (Hess, Koepke & Schult 1998) — sea-salt-dominated aerosol over
 // open ocean away from continental/pollution influence, the least
-// absorbing (highest single-scattering albedo) of the four presets in
-// this file. OPAC also publishes "Maritime polluted" and "Maritime
-// tropical" variants (not exposed here); this constructor is the clean-
-// air baseline. See RuralAerosol's doc comment for parameter/caveat
-// details shared by all four constructors.
+// absorbing (highest single-scattering albedo) of the continental and
+// maritime presets in this file. OPAC's "Maritime polluted" and "Maritime
+// tropical" variants are [MaritimePollutedAerosol] and
+// [MaritimeTropicalAerosol]; this constructor is the clean-air baseline.
+// See RuralAerosol's doc comment for parameter/caveat details shared by
+// all eight constructors.
 func MaritimeAerosol(heightM, aod550 float64) *Builder {
 	return aerosolBuilder(heightM, aod550, maritimeCleanSSA, maritimeCleanAsymm, maritimeCleanAngstrom, MaritimeScaleHeightM,
 		"OPAC Maritime clean aerosol (Hess, Koepke & Schult 1998)")
 }
 
-// aerosolBuilder is the shared construction path for the four named
+// ContinentalCleanAerosol seeds a Builder with OPAC's "Continental clean"
+// aerosol type (Hess, Koepke & Schult 1998) — remote continental air with
+// very low anthropogenic influence, which OPAC composes with no soot at
+// all and calls "a lower benchmark with respect to absorption in the solar
+// spectral range". It is the least absorbing continental type and the
+// natural companion to [RuralAerosol], which is OPAC's Continental average
+// and does contain soot. See RuralAerosol's doc comment for parameter/
+// caveat details shared by all eight constructors.
+func ContinentalCleanAerosol(heightM, aod550 float64) *Builder {
+	return aerosolBuilder(heightM, aod550, continentalCleanSSA, continentalCleanAsymm, continentalCleanAngstrom, ContinentalScaleHeightM,
+		"OPAC Continental clean aerosol (Hess, Koepke & Schult 1998)")
+}
+
+// ContinentalPollutedAerosol seeds a Builder with OPAC's "Continental
+// polluted" aerosol type (Hess, Koepke & Schult 1998) — areas highly
+// polluted by man-made activity, carrying 2 ug m^-3 of soot and more than
+// twice the water-soluble mass of Continental average. It sits between
+// [RuralAerosol] and [UrbanAerosol] in absorption. See RuralAerosol's doc
+// comment for parameter/caveat details shared by all eight constructors.
+func ContinentalPollutedAerosol(heightM, aod550 float64) *Builder {
+	return aerosolBuilder(heightM, aod550, continentalPollutedSSA, continentalPollutedAsymm, continentalPollutedAngstrom, ContinentalScaleHeightM,
+		"OPAC Continental polluted aerosol (Hess, Koepke & Schult 1998)")
+}
+
+// MaritimePollutedAerosol seeds a Builder with OPAC's "Maritime polluted"
+// aerosol type (Hess, Koepke & Schult 1998) — sea salt with continental
+// pollution carried out over the water, so it absorbs measurably more than
+// [MaritimeAerosol] and its Angstrom exponent is four times as steep, the
+// pollution contributing particles far smaller than sea salt. See
+// RuralAerosol's doc comment for parameter/caveat details shared by all
+// eight constructors.
+func MaritimePollutedAerosol(heightM, aod550 float64) *Builder {
+	return aerosolBuilder(heightM, aod550, maritimePollutedSSA, maritimePollutedAsymm, maritimePollutedAngstrom, MaritimeScaleHeightM,
+		"OPAC Maritime polluted aerosol (Hess, Koepke & Schult 1998)")
+}
+
+// MaritimeTropicalAerosol seeds a Builder with OPAC's "Maritime tropical"
+// aerosol type (Hess, Koepke & Schult 1998) — the cleanest air OPAC
+// tabulates outside the polar types, with a single-scattering albedo of
+// 0.998 and an Angstrom exponent of 0.04, which is very nearly grey: sea
+// salt is large enough that extinction barely varies across the visible.
+// See RuralAerosol's doc comment for parameter/caveat details shared by
+// all eight constructors.
+func MaritimeTropicalAerosol(heightM, aod550 float64) *Builder {
+	return aerosolBuilder(heightM, aod550, maritimeTropicalSSA, maritimeTropicalAsymm, maritimeTropicalAngstrom, MaritimeScaleHeightM,
+		"OPAC Maritime tropical aerosol (Hess, Koepke & Schult 1998)")
+}
+
+// aerosolBuilder is the shared construction path for the eight named
 // aerosol-type presets above: ISA surface conditions at heightM
 // (mirroring StandardDefault), the given aerosol optical properties at
 // aod550/550nm, and a Source provenance record naming the OPAC type.

@@ -81,6 +81,29 @@ type Spec struct {
 	// StepNM is the wavelength sampling. Zero means 0.1 nm, SkyCalc's own
 	// default, which resolves the OH bands.
 	StepNM float64
+
+	// Scale multiplies the returned radiance. Zero means 1, and 1 is what
+	// almost every caller wants.
+	//
+	// # Why a multiplier on top of SolarFluxSFU
+	//
+	// Because they answer different questions. The solar flux is an input to
+	// SkyCalc's model and changes the spectrum's shape as well as its level:
+	// airglow's response to solar activity is not uniform across the OH
+	// bands and the [OI] lines. This is a flat scaling of whatever came back,
+	// which is what a caller reaches for when they have an SQM or an all-sky
+	// camera saying tonight is brighter than the reference and no reason to
+	// believe the colour changed.
+	//
+	// It is the same parameter GAMBONS exposes as its airglow percentage,
+	// where 100 is the reference spectrum unscaled, so a caller reproducing
+	// one of their runs sets Scale to their percentage over a hundred.
+	//
+	// A scaled spectrum is still climatology and still says so: scaling a
+	// reference to match one measured number does not make the reference a
+	// measurement, and [Spec.AirglowMeasured] in the parent dataset package
+	// is what claims otherwise.
+	Scale float64
 }
 
 // skycalcRequest is the JSON body SkyCalc's API takes.
@@ -227,6 +250,16 @@ func Fetch(ctx context.Context, spec Spec) (*Spectrum, error) {
 	spectrum, err := fetchRequest(ctx, req)
 	if err != nil {
 		return nil, err
+	}
+
+	// After the cache, never before it. The scale is this package's own
+	// arithmetic rather than part of the SkyCalc request, so it must not
+	// reach the cache key - two callers wanting the same spectrum at
+	// different scales share one download.
+	if s := spec.Scale; s > 0 && s != 1 {
+		for i := range spectrum.Radiance {
+			spectrum.Radiance[i] *= s
+		}
 	}
 
 	spectrum.Source = spec.describe()
@@ -641,7 +674,12 @@ func (s Spec) describe() string {
 		flux = 130
 	}
 
-	return fmt.Sprintf("ESO SkyCalc, %s, airmass 1, msolflux %g sfu", obs, flux)
+	scaled := ""
+	if s := s.Scale; s > 0 && s != 1 {
+		scaled = fmt.Sprintf(", scaled x%g", s)
+	}
+
+	return fmt.Sprintf("ESO SkyCalc, %s, airmass 1, msolflux %g sfu%s", obs, flux, scaled)
 }
 
 // releaseTmpDir asks the service to delete the directory it wrote into.
