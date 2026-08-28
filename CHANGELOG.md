@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **`ephemeris/jpl/lsk` dropped the last leap second, putting every UTC epoch after 2017-01-01 one second early.** `naif0012.tls` closes its `DELTET/DELTA_AT` block on the same line as its final entry, and the parser cleared its in-block flag before testing it, so `37, @2017-JAN-1` matched neither arm of the guard and was discarded without an error. Measured: `lsk.UTCToTDB` ran 1.0000 s behind `time.TDB()` for every date after the boundary and agreed to 1e-4 s before it, putting the geocentric Sun about 30 km — one second of Earth's orbital motion — from DE440. Every `jpl.Provider.State` result for a UTC-scale time in that range moves; the regression test uses inline fixtures for both terminator shapes, so it needs no kernel and guards the next leap second too (#47).
+
+### Changed
+- **The `Validation` workflow runs weekly instead of on manual dispatch only, and no longer tracks a hardcoded Go version.** Its three suites run under `if: always()`, so a failing one cannot hide the others, and results upload as artifacts. `validation` and `network` had been executing only when somebody remembered (#47).
+- **The DE440-against-SOFA tolerances are derived from the reference routines rather than from astrogo's own last measurement.** Both were wrong, in opposite directions: 1e-6 AU for the Sun is thirteen times `Epv00`'s published worst case, while 1e-7 AU for the Moon was less than half `Moon98`'s 31.7 km, demanding closer agreement than SOFA documents its own routine to achieve. The suite now reports measured p-values beside its contract, and its epochs are fixed — one had been `time.NowUTC()`, so any failure was unreproducible (#47).
+- **`ephemeris/jpl/validation`'s Horizons corpus grows from 3 entries to 255**, across five named sites and three sampling classes (regular, leap-second and J2000 boundaries, and the polar and equatorial geometries `plan.KnownSites` cannot supply), with a manifest recording the query shape, the astrogo commit and the sampling design. `TestGenerateCorpus` now reports what a regeneration would change and writes nothing without `-update-corpus`; it previously overwrote the reference data unconditionally (#47).
+
+### Added
+- **`docs/VALIDATION.md` carries a generated accuracy table** — distribution, contract, status and the date and commit each row was verified at — rewritten from the suites' own machine-readable results. The surrounding prose stays hand-written. A suite that could not run renders as `NOT VERIFIED` rather than vanishing, since an absent row reads exactly like one that never existed (#47).
+- **`internal/metrology`** separates the accuracy *contract* from the *measured* accuracy: a bound that carries the reason it has its value, and a distribution recorded beside it. `NewContract` refuses a bound with no rationale or source, `Reference.SharedAncestor` marks a comparison that shares ancestry with astrogo rather than being independent of it, and `Baseline` flags accuracy regressions that stay inside contract. The topocentric and GAMBONS suites are retrofitted onto it, reproducing their previous numbers (#47).
+
 ## [0.15.0] — 2026-08-28
 
 ### Added
