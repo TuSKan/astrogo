@@ -204,6 +204,19 @@ const (
 	// them.
 	SVOFilterProfile EndpointID = "svo.fps"
 
+	// CVRLLuminosity is the Colour & Vision Research Laboratory database at
+	// UCL's Institute of Ophthalmology.
+	//
+	// It serves the CIE luminous efficiency functions - photopic V(lambda)
+	// and scotopic V'(lambda) - which are what turn a spectral radiance into
+	// a luminance in cd m^-2. Nothing in this module can produce one without
+	// them: they are measurements of the human eye and cannot be derived.
+	//
+	// CIE publishes these as paid standards; CVRL distributes the same
+	// tabulations openly, which is why the registry points here. The URL is
+	// http rather than https because the host does not serve TLS.
+	CVRLLuminosity EndpointID = "cvrl.lum"
+
 	// GaiaAIP is the Gaia mirror at Leibniz-Institut für Astrophysik Potsdam.
 	//
 	// It exists in the registry alongside the ESA archive rather than instead
@@ -613,6 +626,20 @@ func defaultEndpoints() map[EndpointID]Endpoint {
 			Downloadable:    true,
 			Mutable:         false, // a 1999 archival product with a DOI
 			DownloadTimeout: 20 * time.Minute,
+		},
+
+		CVRLLuminosity: {
+			ID:        CVRLLuminosity,
+			URL:       "http://www.cvrl.org/database/data/lum/",
+			Kind:      KindFile,
+			Subsystem: "skybrightness/dataset/luminosity",
+			Description: "CVRL (UCL Institute of Ophthalmology) CIE luminous efficiency " +
+				"functions: photopic V(lambda) 360-830 nm and scotopic V'(lambda) 380-780 nm",
+			ApproxSize:      64_000,
+			Enabled:         true,
+			DownloadTimeout: time.Minute,
+			Downloadable:    true,
+			Files:           []string{"vl1924e_1.csv", "scvle_1.csv"},
 		},
 
 		SVOFilterProfile: {

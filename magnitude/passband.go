@@ -27,6 +27,11 @@ var (
 	// system the passband carries no zero point for — most often Vega,
 	// which is reference-spectrum dependent and must be supplied.
 	ErrZeroPointUnknown = errors.New("magnitude: passband has no zero point for this system")
+
+	// ErrLuminousEfficacy is returned for an efficacy that cannot scale a
+	// luminance. It belongs to the efficiency curve rather than to the
+	// spectrum, so a zero here means the caller has not chosen one.
+	ErrLuminousEfficacy = errors.New("magnitude: luminous efficacy must be positive and finite")
 )
 
 // System names a magnitude system. The systems differ in what defines
