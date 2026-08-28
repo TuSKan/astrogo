@@ -1625,13 +1625,18 @@ against GAMBONS' own numbers in V:
 
 | | GAMBONS | astrogo | difference |
 | :--- | ---: | ---: | ---: |
-| with airglow | 21.13 | 21.41 | +0.28 |
-| **astronomical sky, airglow removed** | **21.74** | **21.79** | **+0.05** |
+| with airglow | 21.13 | 21.33 | +0.20 |
+| **astronomical sky, airglow removed** | **21.74** | **21.71** | **−0.03** |
 
-**The astronomical sky agrees to 0.05 magnitudes** — five per cent in flux, between two
+**The astronomical sky agrees to 0.03 magnitudes** — three per cent in flux, between two
 implementations sharing no code, no catalogue aggregation and no transport. Integrated
 starlight, diffuse galactic light, zodiacal light and the extragalactic background, summed
 and propagated, land on the same number.
+
+These were +0.28 and +0.05 until the golden-table fix above pinned Earth orientation to
+zero. Both moved because zodiacal light is a function of solar elongation, so an ambient
+IERS cache changed the comparison as well as the tables — the agreement did not improve
+because anything got better, it improved because it stopped depending on the machine.
 
 | component | mag arcsec⁻² | share |
 | :--- | ---: | ---: |
@@ -1683,7 +1688,7 @@ neither model. The comparison now averages 64 equal-solid-angle samples across t
 and averages *radiances* — a mean of magnitudes is a geometric mean of radiances, which is
 systematically too faint wherever the sky has structure.
 
-**What remains is airglow, and only airglow.** Ours contributes +0.38 mag against their
+**What remains is airglow, and only airglow.** Ours contributes +0.37 mag against their
 +0.61, so theirs is about 1.8 times brighter. Both draw on ESO SkyCalc at msolflux 100 and
 both apply it at a sea-level site, so the difference is in the spectrum each starts from —
 a specific, named, checkable difference rather than a residual.
@@ -1703,6 +1708,22 @@ from the one answering today — the model has been revised more than once — o
 that filename encodes a parameter this comparison is not matching. Masana et al. §6 pin the
 solar flux at 100 sfu, Cerro Paranal at 2640 m and 350-1050 nm, all of which this package
 requests, and name none that would be a `10`.
+
+**The aerosol type does not reach this comparison, which was worth checking rather than
+assuming.** GAMBONS' reference export used Continental clean at 70% relative humidity; this
+scene sets the optical properties by hand and this module's presets are pinned at 80%, so
+the two are not like for like on paper. Measured, it makes no difference at all: swapping
+the scene's aerosol to OPAC Continental clean and then to Urban — single-scattering albedo
+0.972 against 0.817, the widest gap in the table — leaves the zenith at 21.33 and 21.71 to
+the digit in both cases.
+
+The reason is in the code rather than in the numbers. The natural components attenuate
+through `atmosphere.ExtendedSourceOpticalDepth`, which consumes only `Aerosol.TauAt` —
+optical depth and the Ångström exponent. Single-scattering albedo and asymmetry are never
+read on that path; they enter the Eq. 11 scattering integral, the artificial components and
+the cloud terms, none of which this comparison runs. And α moves τ by well under a per cent
+across V at an optical depth of 0.056. So the humidity gap recorded in §16 is real for the
+scattering-integral presets and irrelevant here.
 
 **On the precision that is available here.** A 10⁻¹² agreement is what §13's tiling check
 reaches, because that compares the same sum in two orders. It is not available against
