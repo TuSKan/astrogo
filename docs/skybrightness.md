@@ -1662,9 +1662,17 @@ arrive from outside the atmosphere and both were added to the total as though em
 it. DGL showed itself as a DGL-to-starlight ratio of 0.409 against a cap of 0.35, and
 0.35/0.409 is 0.855 — the zenith transmission exactly, because the cap is applied above the
 atmosphere and only starlight was then dimmed. Zodiacal mattered more, being three times the
-size. Airglow is deliberately left unattenuated and says so: it is emitted at about 87 km,
-where the van Rhijn enhancement and extinction work against each other, and that is a
-recorded approximation rather than an omission.
+size. Airglow was the third, and this sentence used to
+say it was deliberately left unattenuated because the van Rhijn enhancement and extinction
+work against each other. That reasoning does not survive contact with the zenith, where van
+Rhijn is exactly 1 and extinction is T, so the two cannot offset; the component was
+corrected and this line was not. It is emitted at about 87 km, above essentially the whole
+atmosphere, so it crosses nearly the column starlight crosses and `Airglow.AddRadiance`
+attenuates it over the observer's own slant depth. `dataset/airglow` divides SkyCalc's
+transmission out to recover the radiance at the emitting layer, and the component puts the
+observer's own back: measured over 500-600 nm on a Paranal skytable, the division is a
+factor 1.1328 against a flux-weighted mean transmission of 0.8828, and the two cancel to the
+ground value for an observer at that site.
 
 **The comparison itself was not like for like.** GAMBONS' first row is "0°–5°" of zenith
 angle, which is an average over that cap, and it was being compared against a single 13.7
