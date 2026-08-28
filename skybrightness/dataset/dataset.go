@@ -145,9 +145,10 @@ type Spec struct {
 	MapBand string
 
 	// Observatory selects the site SkyCalc models for airglow. It accepts
-	// only the three SkyCalc offers — "paranal", "paranal-2400",
-	// "paranal-3060" — because it is a Paranal model at three altitudes
-	// rather than a general site calculator. Zero means paranal.
+	// only what that service offers — "paranal", "lasilla", "armazones" and
+	// "3060m" — which is four real sites rather than a general site
+	// calculator. This doc named "paranal-2400" and "paranal-3060" until
+	// those were checked against the service, which has never had them. Zero means paranal.
 	//
 	// A string rather than the airglow package's own type so that reaching
 	// this package does not mean importing that one.

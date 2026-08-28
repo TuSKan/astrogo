@@ -49,15 +49,35 @@ var (
 
 // Observatory names a site SkyCalc models.
 //
-// These are the only three it accepts; it is a Paranal model with two
-// alternative altitudes rather than a general site calculator.
+// Four sites rather than one model at four altitudes: La Silla, Paranal and
+// Armazones are different places with different atmospheres above them, and
+// only the bare 3060 m entry is an altitude without a site attached. It is
+// still not a general site calculator — asking for anywhere else is a
+// rejected request.
+//
+// # Where this list comes from
+//
+// The service itself, and it is not in any documentation found. Asked for an
+// observatory it does not have, SkyCalc answers with its own grid:
+//
+//	string grid ['2400', '2640', '3060', 'lasilla', 'paranal', 'armazones', ' 3060m']
+//
+// So the bare altitudes are accepted as alternative spellings of the named
+// sites, and the leading space on that last entry is the service's own. The
+// four constants below are the readable spellings, each confirmed against a
+// live request. A widely used third-party client also lists a 5000 m site,
+// which the service rejects.
 type Observatory string
 
 // The sites SkyCalc supports.
 const (
-	Paranal      Observatory = "paranal" // 2640 m
-	LaSilla      Observatory = "lasilla" // 2400 m
-	Altitude3060 Observatory = "3060m"   // 3060 m
+	Paranal   Observatory = "paranal"   // 2640 m
+	LaSilla   Observatory = "lasilla"   // 2400 m
+	Armazones Observatory = "armazones" // 3046 m, the ELT site
+
+	// Altitude3060 is 3060 m with no site attached, which is the one entry
+	// that really is just an altitude.
+	Altitude3060 Observatory = "3060m"
 )
 
 // Spec is a request for a zenith airglow spectrum.
@@ -626,7 +646,7 @@ func (s Spec) request() (skycalcRequest, error) {
 	}
 
 	switch obs {
-	case Paranal, LaSilla, Altitude3060:
+	case Paranal, LaSilla, Armazones, Altitude3060:
 	default:
 		return skycalcRequest{}, fmt.Errorf("%w: observatory %q is not one SkyCalc models", ErrSpec, obs)
 	}

@@ -247,3 +247,46 @@ func TestRequestRefusesImpossibleSeasonOrTime(t *testing.T) {
 		})
 	}
 }
+
+// Every observatory constant is one the service accepts, and anything else
+// is refused here.
+//
+// The list was three until skycalc_ipy was read and Armazones turned out to
+// be missing — the ELT site, a real place with its own atmosphere, rejected
+// by this package for no reason but an incomplete transcription. The same
+// client also lists a 5000 m site that SkyCalc refuses, so the list is
+// checked against the service rather than against another client.
+func TestObservatoryConstantsAreTheOnesAccepted(t *testing.T) {
+	t.Parallel()
+
+	for _, obs := range []airglow.Observatory{
+		airglow.Paranal, airglow.LaSilla, airglow.Armazones, airglow.Altitude3060,
+	} {
+		spec := airglow.Spec{Observatory: obs, MinNM: 500, MaxNM: 600}
+
+		if _, _, err := airglow.CacheLocation(t.Context(), spec); err != nil {
+			t.Errorf("%q is a constant this package offers and its own request builder "+
+				"rejects it: %v", obs, err)
+		}
+	}
+
+	for _, obs := range []airglow.Observatory{"5000m", "lapalma", "2640", ""} {
+		spec := airglow.Spec{Observatory: obs, MinNM: 500, MaxNM: 600}
+
+		_, _, err := airglow.CacheLocation(t.Context(), spec)
+
+		// The empty string means "unset" and defaults to Paranal; everything
+		// else must be refused before it costs a round trip.
+		if obs == "" {
+			if err != nil {
+				t.Errorf("an unset observatory was refused: %v", err)
+			}
+
+			continue
+		}
+
+		if !errors.Is(err, airglow.ErrSpec) {
+			t.Errorf("%q was accepted: %v", obs, err)
+		}
+	}
+}
