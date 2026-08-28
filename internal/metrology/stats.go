@@ -155,23 +155,32 @@ func (s *Suite) Stats() Stats {
 
 	sort.Float64s(abs)
 
-	out.P50 = quantile(abs, 0.50)
-	out.P90 = quantile(abs, 0.90)
-	out.P95 = quantile(abs, 0.95)
-	out.P99 = quantile(abs, 0.99)
+	out.P50 = Quantile(abs, 0.50)
+	out.P90 = Quantile(abs, 0.90)
+	out.P95 = Quantile(abs, 0.95)
+	out.P99 = Quantile(abs, 0.99)
 
 	return out
 }
 
-// quantile interpolates linearly between order statistics of an
+// Quantile interpolates linearly between order statistics of an
 // already-sorted slice.
 //
 // The definition matters enough to name: this is the one numpy uses by
 // default and R calls type 7, where the p-th quantile of n points sits at
-// index p*(n-1). Nearest-rank would be defensible too, but the two disagree
-// on small samples, and a percentile whose definition is unstated cannot be
+// index p*(n-1). Nearest-rank is defensible too, but the two disagree on
+// small samples, and a percentile whose definition is unstated cannot be
 // compared against anyone else's.
-func quantile(sorted []float64, p float64) float64 {
+//
+// Exported because a suite sometimes needs the distribution of a measured
+// *quantity* rather than of an error — the median sky brightness in an
+// altitude band, say — and that is the same computation [Stats] performs on
+// residuals. Two copies of it in one repository is how two suites end up
+// reporting percentiles that are not comparable.
+//
+// An empty slice has no quantile; the result is zero, matching Stats on an
+// empty suite rather than propagating a NaN into a log line.
+func Quantile(sorted []float64, p float64) float64 {
 	switch len(sorted) {
 	case 0:
 		return 0

@@ -165,7 +165,7 @@ func (s *Suite) Report(tb TB) Stats {
 	return stats
 }
 
-// NotVerified records that the suite could not run, then skips tb.
+// NotVerified records that one or more suites could not run, then skips tb.
 //
 // Call it instead of tb.Skip whenever a suite is abandoned for a reason
 // outside astrogo — an unreachable service, missing reference data, a kernel
@@ -173,12 +173,23 @@ func (s *Suite) Report(tb TB) Stats {
 // vanishes from the report is indistinguishable from one that never existed,
 // so an endpoint that dies permanently would leave the last good numbers on
 // display with nothing to mark them stale.
-func (s *Suite) NotVerified(tb TB, reason string) {
+//
+// It takes the suites rather than being a method on one because a test
+// function usually measures several quantities from the same fetched data,
+// and all of them go unverified together when the fetch fails. Skipping is
+// terminal for the goroutine, so a per-suite method could only ever record
+// the first of them.
+func NotVerified(tb TB, reason string, suites ...*Suite) {
 	tb.Helper()
 
-	s.write(tb, s.newResult(StatusNotVerified, reason, Stats{}))
+	names := make([]string, 0, len(suites))
 
-	tb.Skipf("%s: NOT VERIFIED — %s", s.Name, reason)
+	for _, s := range suites {
+		s.write(tb, s.newResult(StatusNotVerified, reason, Stats{}))
+		names = append(names, s.Name)
+	}
+
+	tb.Skipf("%s: NOT VERIFIED — %s", strings.Join(names, ", "), reason)
 }
 
 // summary is the human-readable block Report logs.

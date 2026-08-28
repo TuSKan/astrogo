@@ -3,12 +3,15 @@
 package jpl_test
 
 import (
+	"fmt"
 	"math"
 	"testing"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
+	"github.com/TuSKan/astrogo/internal/metrology"
+	"github.com/TuSKan/astrogo/internal/testutil"
 
 	// plan is an orchestration-layer package; ephemeris/jpl/validation sits
 	// below it in CLAUDE.md's architecture diagram. This import is
@@ -116,8 +119,9 @@ type observerPrecisionBody struct {
 // pattern, asserting on unprojected azDiff would still conflate a
 // near-zenith geometric effect with whatever the real residual is.
 func TestObserverPrecisionMatrix(t *testing.T) {
-	requireHorizons(t)
-
+	// Reachability is checked further down, once the suites exist: a run
+	// that cannot happen has to be recorded as NOT VERIFIED before it is
+	// skipped, or it disappears from the accuracy record entirely.
 	bodies := []observerPrecisionBody{
 		{499, "Mars"},
 		{599, "Jupiter"},
@@ -188,22 +192,71 @@ func TestObserverPrecisionMatrix(t *testing.T) {
 	atmNoRef := atmosphere.StandardRefraction
 	atmNoRef.Model = atmosphere.RefractionNone{}
 
-	// 3.0" was chosen from real measured data, not picked in advance: a
-	// live run of this exact matrix found crossTrack/separation up to
-	// ~2.66" specifically at the synthetic 78N site's low-elevation,
-	// near-circumpolar geometries — a second, distinct amplification mode
-	// beyond the near-zenith 1/cos(el) effect crossTrack already corrects
-	// for (azimuth is inherently more sensitive to small position/timing
-	// errors near the celestial pole). Real observatories (Greenwich,
-	// Paranal, Mauna Kea) stayed under ~1.6" throughout the same run. See
-	// docs/VALIDATION.md's Apparent/Observed Coordinates row for the full
-	// writeup.
-	const toleranceArcsec = 3.0
-
-	var (
-		maxCrossTrack, maxElDiff, maxSeparation float64
-		nCompared                               int
+	// The contract, and why it is no longer the number this test last
+	// measured.
+	//
+	// It used to be 3.0 arcseconds, documented as "chosen from real
+	// measured data, not picked in advance" because a live run found up to
+	// 2.66. That is a tolerance pinned to its own measurement: it can only
+	// ever fail for a residual larger than one already seen, which is the
+	// one thing it does not need to detect. The value below is the same
+	// 3.0, and everything about where it comes from is different.
+	//
+	// Both implementations apply the same IAU 2006/2000A reductions to the
+	// same injected astrometric place, so the geometry is shared and cannot
+	// be the residual. What is not shared is Earth orientation: astrogo
+	// resolves UT1 from its own IERS finals2000A interpolation, Horizons
+	// from its own series, and this matrix deliberately spans epochs in the
+	// predicted regime where the two are least likely to agree. An error in
+	// UT1 turns into hour angle at Earth's rotation rate — 15.041 arcsec
+	// per second — so 3 arcseconds is a fifth of a second of UT1. A bound
+	// tighter than that would be measuring the disagreement between two
+	// Earth-orientation series rather than anything about this pipeline.
+	//
+	// Note this is the airless case: RefractionNone on astrogo's side,
+	// AIRLESS on Horizons', confirmed from its own response header. SOFA's
+	// own accuracy note for iauAtco13 (0.05 arcsec optical below 70 degrees
+	// zenith distance) is a statement about its refraction model and does
+	// not apply here.
+	const (
+		contractArcsec  = 3.0
+		earthRotArcsecS = 15.041 // arcsec of hour angle per second of UT1
 	)
+
+	contract := metrology.MustContract(contractArcsec, "arcsec",
+		fmt.Sprintf("%.3g arcsec is %.2f s of UT1 at Earth's rotation rate of %.3f arcsec/s; "+
+			"astrogo and Horizons resolve UT1 from different Earth-orientation series, and this "+
+			"matrix includes epochs in the predicted regime where they least agree",
+			contractArcsec, contractArcsec/earthRotArcsecS, earthRotArcsecS),
+		"IERS Conventions (2010), Earth rotation rate; DUT1 applied is logged per row below")
+
+	// Horizons is an independent implementation of the same IAU models, not
+	// an independent derivation of them, and this test injects Horizons' own
+	// astrometric place. What is genuinely being compared is the apparent
+	// and topocentric stages.
+	ref := metrology.Reference{
+		Kind:    metrology.KindHorizons,
+		Name:    "JPL Horizons",
+		Version: "OBSERVER ephemeris, AIRLESS",
+		Source:  "https://ssd.jpl.nasa.gov/api/horizons.api",
+		Dataset: "DE441 (Horizons side)",
+	}
+
+	// Three quantities from one fetch. Separation is the one the
+	// investigation in this file's doc comment found behaves consistently;
+	// crossTrack and elevation are recorded because their distributions are
+	// what that investigation was reasoning about, and until now they were
+	// visible only as a maximum in a log line.
+	sepSuite := metrology.NewSuite("coord.topocentric.separation", ref, contract)
+	crossSuite := metrology.NewSuite("coord.topocentric.crosstrack", ref, contract)
+	elevSuite := metrology.NewSuite("coord.topocentric.elevation", ref, contract)
+
+	if !testutil.Reachable(horizonsHost) {
+		metrology.NotVerified(t, "JPL Horizons is unreachable",
+			sepSuite, crossSuite, elevSuite)
+	}
+
+	var nCompared int
 
 	for _, body := range bodies {
 		for _, ns := range sites {
@@ -323,27 +376,22 @@ func TestObserverPrecisionMatrix(t *testing.T) {
 
 				nCompared++
 
-				if absF(crossTrackArcsec) > maxCrossTrack {
-					maxCrossTrack = absF(crossTrackArcsec)
-				}
+				// One label and one context per point, shared by the three
+				// suites: whichever quantity turns out to be worst, the
+				// report names the same reproducible scenario.
+				label := fmt.Sprintf("%s @ %s", body.name, ns.name)
+				scenario := fmt.Sprintf("%s el=%.2f az=%.2f HA=%.2fh dec=%.2f DUT1=%+.3fs",
+					obsTime.Format("2006-01-02 15:04"),
+					observed.Alt().Degrees(), observed.Az().Degrees(),
+					haHours, hp.AppDec, eop.DUT1)
 
-				if absF(elDiffArcsec) > maxElDiff {
-					maxElDiff = absF(elDiffArcsec)
-				}
-
-				if sepArcsec > maxSeparation {
-					maxSeparation = sepArcsec
-				}
-
-				if absF(crossTrackArcsec) > toleranceArcsec {
-					t.Errorf("%s @ %s %s: crossTrack=%.3f\" exceeds %.1f\" tolerance",
-						body.name, ns.name, obsTime.Format("2006-01-02"), crossTrackArcsec, toleranceArcsec)
-				}
-
-				if sepArcsec > toleranceArcsec {
-					t.Errorf("%s @ %s %s: total separation=%.3f\" exceeds %.1f\" tolerance",
-						body.name, ns.name, obsTime.Format("2006-01-02"), sepArcsec, toleranceArcsec)
-				}
+				// Separation is unsigned by construction; crossTrack and
+				// elevation keep their sign, so the report can distinguish
+				// scatter from the systematic offset this file's doc
+				// comment spent four hypotheses failing to explain.
+				sepSuite.Add(metrology.Sample{Error: sepArcsec, Label: label, Context: scenario})
+				crossSuite.Add(metrology.Sample{Error: crossTrackArcsec, Label: label, Context: scenario})
+				elevSuite.Add(metrology.Sample{Error: elDiffArcsec, Label: label, Context: scenario})
 			}
 		}
 	}
@@ -353,16 +401,19 @@ func TestObserverPrecisionMatrix(t *testing.T) {
 	}
 
 	t.Logf("── Summary (%d comparison points) ──────────────────────────", nCompared)
-	t.Logf("max |crossTrack| = %.3f\"   max |elDiff| = %.3f\"   max separation = %.3f\"", maxCrossTrack, maxElDiff, maxSeparation)
-	t.Logf("total angular separation is the metric that behaves consistently across the whole matrix (bounded, see max above); crossTrack does not cleanly track elDiff here (ratios vary widely, both directions, no consistent elevation pattern found on inspection) — the simple near-zenith 1/cos(el) projection hypothesis does not fully explain the Az/El split. See this test's doc comment and docs/VALIDATION.md for the full writeup and open escalation path.")
-}
 
-func absF(v float64) float64 {
-	if v < 0 {
-		return -v
-	}
+	sepSuite.Report(t)
+	crossSuite.Report(t)
+	elevSuite.Report(t)
 
-	return v
+	t.Log("Total angular separation is the metric that behaves consistently across the whole " +
+		"matrix; crossTrack does not cleanly track elDiff here (ratios vary widely, both " +
+		"directions, no consistent elevation pattern found on inspection) — the simple " +
+		"near-zenith 1/cos(el) projection hypothesis does not fully explain the Az/El split. " +
+		"The signed mean and range now reported for crossTrack are the numbers that would " +
+		"settle whether the residual is a bias or scatter, which the previous maximum-only " +
+		"summary could not say either way. See this test's doc comment and docs/VALIDATION.md " +
+		"for the full writeup and open escalation path.")
 }
 
 // Escalation path if crossTrack doesn't explain the Az/El asymmetry —

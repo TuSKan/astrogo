@@ -14,6 +14,7 @@ import (
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/constants"
 	"github.com/TuSKan/astrogo/coord"
+	"github.com/TuSKan/astrogo/internal/metrology"
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/magnitude"
 	"github.com/TuSKan/astrogo/skybrightness"
@@ -131,17 +132,6 @@ func bandDirections(loAlt, hiAlt float64, n int) []coord.AltAz {
 	}
 
 	return out
-}
-
-// quantile returns the p-quantile of an already-sorted slice.
-func quantile(sorted []float64, p float64) float64 {
-	if len(sorted) == 0 {
-		return math.NaN()
-	}
-
-	idx := int(p * float64(len(sorted)-1))
-
-	return sorted[idx]
 }
 
 // magFromRadiance turns a passband-averaged spectral radiance back into a
@@ -404,9 +394,29 @@ func TestAgainstGAMBONSAllSky(t *testing.T) {
 	t.Log("altitude band medians, airglow at 100 per cent:")
 	t.Logf("  %-10s %8s %8s %9s   %8s %8s %8s", "band", "astrogo", "GAMBONS", "diff", "p05", "p95", "GAM p05/p95")
 
-	var worst float64
-
-	worstBand := ""
+	// The bound is loose on purpose, as in TestAgainstGAMBONS: two
+	// independent implementations of a six-term radiative model agreeing to
+	// a few tenths is the meaningful result, and what this is built to catch
+	// is a factor, a sign or a unit, which lands whole magnitudes away.
+	//
+	// Unlike the tolerances this repository has had to repair elsewhere, that
+	// reasoning is about the physics rather than about what the code last
+	// produced, so the number does not change here. What it lacked was any
+	// record of how much room was left under it — six band residuals reduced
+	// to a single worst case, printed and forgotten.
+	bandSuite := metrology.NewSuite("skybrightness.gambons.band_medians",
+		metrology.Reference{
+			Kind:    metrology.KindPaper,
+			Name:    "GAMBONS (Masana, Carrasco, Bara & Ribas)",
+			Version: "2021 MNRAS 501, 5443; 2024",
+			Source:  "published run, docs/skybrightness.md section 13",
+			Dataset: "Barcelona 2026-08-21 01:16 GMT+2, V, AOD 0.056, ESO_SkyCalc_100_10.dat, 129,600 points",
+		},
+		metrology.MustContract(1.0, "mag",
+			"a factor, a sign or a unit error lands whole magnitudes away; two independent "+
+				"implementations of a six-term radiative model agreeing to a few tenths is the "+
+				"meaningful result, and one magnitude is a factor of two and a half in radiance",
+			"docs/skybrightness.md section 13; the same bound TestAgainstGAMBONS uses"))
 
 	for bi, b := range gambonsAltitudeBands {
 		var on []float64
@@ -419,18 +429,24 @@ func TestAgainstGAMBONSAllSky(t *testing.T) {
 
 		sort.Float64s(on)
 
-		med := quantile(on, 0.5)
+		med := metrology.Quantile(on, 0.5)
 		diff := med - b.median
 
 		t.Logf("  %3.0f-%3.0f deg %8.3f %8.3f %+9.3f   %8.3f %8.3f   %.2f/%.2f",
 			b.loAlt, b.hiAlt, med, b.median, diff,
-			quantile(on, 0.05), quantile(on, 0.95), b.p05, b.p95)
+			metrology.Quantile(on, 0.05), metrology.Quantile(on, 0.95), b.p05, b.p95)
 
-		if math.Abs(diff) > math.Abs(worst) {
-			worst = diff
-			worstBand = fmt.Sprintf("altitude %.0f-%.0f degrees", b.loAlt, b.hiAlt)
-		}
+		// Signed, so the report can say whether astrogo is systematically
+		// fainter than GAMBONS or merely scattered about it. It is the
+		// former, and a single worst-case magnitude could not have said so.
+		bandSuite.Add(metrology.Sample{
+			Error:   diff,
+			Label:   fmt.Sprintf("altitude %.0f-%.0f degrees", b.loAlt, b.hiAlt),
+			Context: fmt.Sprintf("astrogo %.3f, GAMBONS %.3f, airglow at 100 per cent", med, b.median),
+		})
 	}
+
+	bandSuite.Report(t)
 
 	t.Log("")
 	t.Log("altitude band medians, airglow at 0 per cent:")
@@ -446,7 +462,7 @@ func TestAgainstGAMBONSAllSky(t *testing.T) {
 
 		sort.Float64s(off)
 
-		med := quantile(off, 0.5)
+		med := metrology.Quantile(off, 0.5)
 
 		if math.IsNaN(b.medianNoAirglow) {
 			t.Logf("  %3.0f-%3.0f deg %8.3f    (GAMBONS did not record this band)", b.loAlt, b.hiAlt, med)
@@ -543,8 +559,8 @@ func TestAgainstGAMBONSAllSky(t *testing.T) {
 		sort.Float64s(on)
 		sort.Float64s(off)
 
-		medians[bi] = quantile(on, 0.5)
-		mediansOff[bi] = quantile(off, 0.5)
+		medians[bi] = metrology.Quantile(on, 0.5)
+		mediansOff[bi] = metrology.Quantile(off, 0.5)
 	}
 
 	// With airglow off, extinction is the only thing shaping the profile, and
@@ -603,16 +619,6 @@ func TestAgainstGAMBONSAllSky(t *testing.T) {
 		t.Logf("  the profile does not turn over: ours is faintest at the horizon, which is "+
 			"the missing scattered-in term dimming it too far there: %.2f", medians)
 	}
-
-	// The bound is loose on purpose, as in TestAgainstGAMBONS: two independent
-	// implementations of a six-term radiative model agreeing to a few tenths
-	// is the meaningful result, and what this is built to catch is a factor, a
-	// sign or a unit, which lands whole magnitudes away.
-	if math.Abs(worst) > 1.0 {
-		t.Errorf("the worst band disagrees with GAMBONS by %+.2f mag (%s); "+
-			"a disagreement of more than a magnitude is a factor of two and a half",
-			worst, worstBand)
-	}
 }
 
 // The same comparison with airglow put on a common footing, and an account of
@@ -669,7 +675,7 @@ func TestGAMBONSAllSkyWithAirglowMatched(t *testing.T) {
 
 		sort.Float64s(ours)
 
-		ourTop = quantile(ours, 0.5)
+		ourTop = metrology.Quantile(ours, 0.5)
 
 		b := gambonsAltitudeBands[topBand]
 		theirTop = math.Pow(10, -0.4*b.median) - math.Pow(10, -0.4*b.medianNoAirglow)
@@ -692,7 +698,7 @@ func TestGAMBONSAllSkyWithAirglowMatched(t *testing.T) {
 
 		sort.Float64s(off)
 
-		ourOffTop = quantile(off, 0.5)
+		ourOffTop = metrology.Quantile(off, 0.5)
 		theirOffTop = math.Pow(10, -0.4*gambonsAltitudeBands[topBand].medianNoAirglow)
 	}
 
@@ -717,7 +723,7 @@ func TestGAMBONSAllSkyWithAirglowMatched(t *testing.T) {
 
 		sort.Float64s(scaled)
 
-		med := quantile(scaled, 0.5)
+		med := metrology.Quantile(scaled, 0.5)
 		diff := med - b.median
 
 		if math.Abs(diff) > math.Abs(worstNorm) {
@@ -770,7 +776,7 @@ func TestGAMBONSAllSkyWithAirglowMatched(t *testing.T) {
 
 		sort.Float64s(ours)
 
-		ourFlux := quantile(ours, 0.5)
+		ourFlux := metrology.Quantile(ours, 0.5)
 
 		sinMid := (math.Sin(b.loAlt*math.Pi/180) + math.Sin(b.hiAlt*math.Pi/180)) / 2
 		mid := math.Asin(sinMid) * 180 / math.Pi
@@ -887,8 +893,8 @@ func bandMedians(results []allSkySample) (medians, mediansOff []float64) {
 		sort.Float64s(on)
 		sort.Float64s(off)
 
-		medians[bi] = quantile(on, 0.5)
-		mediansOff[bi] = quantile(off, 0.5)
+		medians[bi] = metrology.Quantile(on, 0.5)
+		mediansOff[bi] = metrology.Quantile(off, 0.5)
 	}
 
 	return medians, mediansOff

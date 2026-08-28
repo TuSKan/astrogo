@@ -207,7 +207,7 @@ func TestNotVerifiedIsRecordedRatherThanOmitted(t *testing.T) {
 	t.Setenv(metrology.OutDirEnv, dir)
 
 	rec := &recorder{}
-	violatingSuite().NotVerified(rec, "JPL Horizons is unreachable")
+	metrology.NotVerified(rec, "JPL Horizons is unreachable", violatingSuite())
 
 	if !rec.skipped {
 		t.Error("NotVerified did not skip the test")
