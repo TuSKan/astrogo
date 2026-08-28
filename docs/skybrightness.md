@@ -1712,6 +1712,23 @@ wide. It does not reach 1.8 on its own, but it is the same order, and any compar
 "SkyCalc at msolflux 100" without naming them is under-specified. [Spec.Season] and
 [Spec.TimeOfNight] now exist so a caller can name them.
 
+**Airmass is the one parameter big enough on its own, and the arithmetic is suggestive.**
+Measured over the same band, SkyCalc's airglow runs 1.500 times the airmass-1 value at
+airmass 1.5 and 1.971 at airmass 2 — very nearly linear, because the van Rhijn enhancement
+dominates the extra extinction at these depths. A ratio of 1.8 corresponds to airmass 1.83.
+Precipitable water, by contrast, is nothing: 10 mm against the 3.5 mm default moves the band
+mean by a factor of 1.0007, which is what the water bands sitting at 720, 820 and 940 nm
+rather than in V predicts.
+
+That makes a specific mechanism worth naming. This package requests airmass 1 deliberately,
+because [skybrightness.Airglow] applies van Rhijn itself and asking SkyCalc to tilt the
+spectrum as well would count the path length twice. GAMBONS applies van Rhijn separately too
+(their Eq. 19), so a stored reference file generated at any airmass above 1 would be
+double-counted by their own geometry — and would be too bright by roughly that factor. It is
+a hypothesis rather than a finding: the parsimonious reading of the filename is
+`ESO_SkyCalc_<msolflux>_<airmass×10>`, which makes the `_10` an airmass of 1.0 and puts them
+exactly where this package is. Both readings fit the name; only their file separates them.
+
 What remains after that is the file itself: GAMBONS' stored `ESO_SkyCalc_100_10.dat` may
 come from a SkyCalc revision that differs from the one answering today — the model has been
 revised more than once — or the `_10` may encode a parameter this comparison is not
