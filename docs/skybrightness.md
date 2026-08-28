@@ -1684,10 +1684,24 @@ systematically too faint wherever the sky has structure.
 
 **What remains is airglow, and only airglow.** Ours contributes +0.38 mag against their
 +0.61, so theirs is about 1.8 times brighter. Both draw on ESO SkyCalc at msolflux 100 and
-both apply it at a sea-level site, so the difference is in which of SkyCalc's columns is
-taken as airglow or in a scaling applied to it — a specific, named, checkable difference
-rather than a residual. This package sums `flux_ael` and `flux_arc`, the emission lines and
-the residual continuum, and deliberately not the `flux` total.
+both apply it at a sea-level site, so the difference is in the spectrum each starts from —
+a specific, named, checkable difference rather than a residual.
+
+**The column choice is not it, which was the obvious suspect and is now ruled out.** This
+package sums `flux_ael` and `flux_arc`, the emission lines and the residual continuum, and
+deliberately not the `flux` total. Measured on a cached skytable over 500-600 nm, `flux`
+comes to 141.101 and `flux_ael + flux_arc` to 141.101 — identical, because the request
+switches every other component off, so `flux_sml`, `flux_zl`, `flux_ssl`, `flux_tie` and
+`flux_tme` are all exactly zero. There is no column we are leaving out and none we could add:
+what this package sums already is SkyCalc's whole airglow output for that request. No
+combination of what the table contains reaches 1.8 times it.
+
+That leaves two candidates and the tools to separate them are not in this repository. Either
+GAMBONS' stored `ESO_SkyCalc_100_10.dat` was generated from a SkyCalc revision that differs
+from the one answering today — the model has been revised more than once — or the `_10` in
+that filename encodes a parameter this comparison is not matching. Masana et al. §6 pin the
+solar flux at 100 sfu, Cerro Paranal at 2640 m and 350-1050 nm, all of which this package
+requests, and name none that would be a `10`.
 
 **On the precision that is available here.** A 10⁻¹² agreement is what §13's tiling check
 reaches, because that compares the same sum in two orders. It is not available against
