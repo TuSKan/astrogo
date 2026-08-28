@@ -5,10 +5,12 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"runtime/debug"
 	"strings"
+	"sync"
 	gotime "time"
 )
 
@@ -62,25 +64,46 @@ type Result struct {
 	Stats     Stats     `json:"stats"`
 }
 
-// buildStamp describes where a result came from.
-//
-// The commit is best-effort: "go test" binaries are not always VCS-stamped,
-// and a result labelled "unknown" is more honest than one labelled with a
-// guess.
-func buildStamp() (commit, goVersion, platform string) {
-	commit = "unknown"
+// commitOnce caches the revision lookup: every suite in a run stamps the same
+// commit, and shelling out once per suite would be waste for a constant.
+var commitOnce = sync.OnceValue(resolveCommit) //nolint:gochecknoglobals // a memoised constant, not mutable state
 
+// resolveCommit finds the astrogo revision a result was produced at.
+//
+// Build info first, which is where it lives for a normal binary. Test binaries
+// are not VCS-stamped, though — which is every caller of this package — so the
+// fallback is git itself, the same way the corpus generator stamps its
+// manifest.
+//
+// Best-effort by design: "unknown" is more honest than a guess, and a result
+// is still worth recording without it. But it is worth trying for, because
+// the commit is what makes a row's staleness visible — a figure confirmed
+// before the module it describes was rewritten is not a validated figure, and
+// a date alone does not say which code it describes.
+func resolveCommit() string {
 	if info, ok := debug.ReadBuildInfo(); ok {
 		for _, s := range info.Settings {
-			if s.Key == "vcs.revision" {
-				commit = s.Value
-
-				break
+			if s.Key == "vcs.revision" && s.Value != "" {
+				return s.Value
 			}
 		}
 	}
 
-	return commit, runtime.Version(), runtime.GOOS + "/" + runtime.GOARCH
+	out, err := exec.Command("git", "rev-parse", "HEAD").Output() //nolint:noctx // a fixed command with no user input
+	if err != nil {
+		return "unknown"
+	}
+
+	if rev := strings.TrimSpace(string(out)); rev != "" {
+		return rev
+	}
+
+	return "unknown"
+}
+
+// buildStamp describes where a result came from.
+func buildStamp() (commit, goVersion, platform string) {
+	return commitOnce(), runtime.Version(), runtime.GOOS + "/" + runtime.GOARCH
 }
 
 // newResult assembles a Result from a suite and an outcome.

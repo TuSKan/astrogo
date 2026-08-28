@@ -28,6 +28,39 @@ Validation should be:
 
 ---
 
+## Measured accuracy
+
+The table below is **generated** from the validation suites themselves, and the
+region between its markers is rewritten by tooling — see
+[`internal/metrology`](../internal/metrology) and its
+`TestRenderAccuracyReport`. Everything outside those markers, including the
+status table and the known-limitation notes further down, is written by hand
+and stays that way: the reasoning about *why* a number is what it is, and which
+hypotheses were tested and refuted, is the part no generator can produce.
+
+Two columns deserve reading together. **Contract** is a claim about what the
+software must achieve and why; it moves only when that reasoning changes.
+Everything to its left is what was **measured** on the date in the last column.
+Encoding one as the other is how a validation suite stops being able to fail
+for the reason it exists, and this repository had that in two places before the
+generated table existed.
+
+<!-- BEGIN GENERATED ACCURACY — do not edit by hand -->
+
+| Suite | Reference | Independence | N | p50 | p95 | p99 | Max | Contract | Status | Last verified |
+|---|---|---|---:|---:|---:|---:|---:|---:|---|---|
+| `coord.topocentric.corpus` | JPL Horizons OBSERVER + VECTORS, AIRLESS | independent | 103 | 0.433 | 1.9 | 1.99 | 2.07 | 3 arcsec | ✅ verified | 2026-08-28 · `edae4af2` |
+| `coord.topocentric.crosstrack` | JPL Horizons OBSERVER ephemeris, AIRLESS | independent | 68 | 0.378 | 1.88 | 1.93 | 1.96 | 3 arcsec | ✅ verified | 2026-08-28 · `edae4af2` |
+| `coord.topocentric.elevation` | JPL Horizons OBSERVER ephemeris, AIRLESS | independent | 68 | 0.0712 | 0.272 | 0.352 | 0.372 | 3 arcsec | ✅ verified | 2026-08-28 · `edae4af2` |
+| `coord.topocentric.separation` | JPL Horizons OBSERVER ephemeris, AIRLESS | independent | 68 | 0.387 | 1.88 | 1.94 | 1.97 | 3 arcsec | ✅ verified | 2026-08-28 · `edae4af2` |
+| `skybrightness.gambons.band_medians` | GAMBONS (Masana, Carrasco, Bara & Ribas) 2021 MNRAS 501, 5443; 2024 | independent | 6 | 0.207 | 0.273 | 0.28 | 0.282 | 1 mag | ✅ verified | 2026-08-28 · `edae4af2` |
+
+Every figure above is a **measured** value over the corpus named in its suite, not a bound. The contract column is the bound, and it is a separate claim: it says what the software must achieve and why, and it does not move when a measurement does. See `internal/metrology` for the reasoning, and each suite's own doc comment for the rationale behind its contract.
+
+<!-- END GENERATED ACCURACY -->
+
+---
+
 ## Status Table
 
 | Area | Status | Reference | Tolerance | Notes |
