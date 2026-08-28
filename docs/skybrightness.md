@@ -1736,10 +1736,25 @@ That makes a specific mechanism worth naming. This package requests airmass 1 de
 because [skybrightness.Airglow] applies van Rhijn itself and asking SkyCalc to tilt the
 spectrum as well would count the path length twice. GAMBONS applies van Rhijn separately too
 (their Eq. 19), so a stored reference file generated at any airmass above 1 would be
-double-counted by their own geometry — and would be too bright by roughly that factor. It is
-a hypothesis rather than a finding: the parsimonious reading of the filename is
-`ESO_SkyCalc_<msolflux>_<airmass×10>`, which makes the `_10` an airmass of 1.0 and puts them
-exactly where this package is. Both readings fit the name; only their file separates them.
+double-counted by their own geometry — and would be too bright by roughly that factor.
+
+**Inverting it argues against that hypothesis rather than for it.** Fetching SkyCalc's
+airglow across a range of airmasses, putting each through this package's own Eq. 20 division
+and comparing against the airmass-1 value, the ratio reaches 1.7863 at airmass 1.80 and
+1.8329 at 1.85. Their published totals imply 1.799, so the airmass that would reproduce the
+disagreement is **1.81**, and propagating the 0.01 mag their numbers are quoted to widens
+that only to 1.77–1.85.
+
+Nobody generates a reference airglow spectrum at airmass 1.81. The choices a person actually
+makes are the zenith, a round 1.5, or a round 2.0 — which give 1.000, 1.500 and 1.971, none
+of them inside the window. The arithmetic fits only at a value with no reason behind it,
+which is the signature of a factor that is not a parameter at all. Running it was worth doing
+precisely because a fit at 1.5 or 2.0 would have been near-conclusive; landing between them
+is what rules the clean-parameter explanation out.
+
+The parsimonious reading of the filename agrees:
+`ESO_SkyCalc_<msolflux>_<airmass×10>` makes the `_10` an airmass of 1.0 and puts GAMBONS
+exactly where this package is. Only their file settles it.
 
 What remains after that is the file itself: GAMBONS' stored `ESO_SkyCalc_100_10.dat` may
 come from a SkyCalc revision that differs from the one answering today — the model has been
