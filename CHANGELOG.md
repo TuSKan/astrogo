@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.15.0] — 2026-08-28
+
 ### Added
 - **`skybrightness` reaches an observing plan again, and `plan` imports none of it.** `plan.SkyDepth` is a one-method interface `plan` declares for itself, and `plan.LimitingMagnitudeConstraint` returns on top of it — soft by default (a logistic ramp over the margin through `ScoreMultiplier`, since half a magnitude of moonlight makes a target harder rather than impossible), `Boolean` for a hard cutoff, `ConstraintCtx` implemented so the scheduler keeps its shared-`coord.Context` fast path. The previous version imported the sky engine directly and needed a bespoke import test to stop that spreading; there is nothing to police now, because there is no import. The new `skybrightness/plan` bridge supplies an implementation, mirroring `fits/plan`.
 - **`optics` gains the detection half of a limiting magnitude**: `Instrument.SNR` and `Instrument.LimitingSignal`, the CCD equation of Merline & Howell (1995) and its closed-form inverse, over new `Instrument.ReadNoiseElectrons` and `DarkCurrentEPerSec` and the new `unit.ElectronsPerSecond`. That unit is separate from `ElectronsPerPixelPerSecond` deliberately: a point source's rate is a total and a sky background's is a density, and the SNR needs both at once. `LimitingSignal` returns a rate rather than a magnitude, because a zero point belongs to `magnitude` and `optics` has no business holding a photometric system.
