@@ -1,0 +1,6684 @@
+{
+  "manifest": {
+    "schema_version": 1,
+    "generated": "2026-08-28T12:22:49Z",
+    "astrogo_commit": "3536d3cd8846848375a7d9694948f232306d22a7",
+    "reference": "JPL Horizons (https://ssd.jpl.nasa.gov/api/horizons.api)",
+    "reference_query": "EPHEM_TYPE=OBSERVER CENTER='coord@399' QUANTITIES='1,2,4,20' CAL_FORMAT=JD; EPHEM_TYPE=VECTORS CENTER='@399' OUT_UNITS=AU-D REF_PLANE=FRAME VEC_TABLE=2 TIME_TYPE=UT",
+    "refraction": "AIRLESS — no APPARENT parameter is sent, so Horizons applies its default and states it in the response header",
+    "sites": [
+      {
+        "name": "Greenwich",
+        "lon_deg": 0,
+        "lat_deg": 51.47720000000001,
+        "height_m": 45,
+        "provenance": "plan.KnownSites; published coordinates cross-checked against the IAU MPC observatory code list"
+      },
+      {
+        "name": "Paranal",
+        "lon_deg": -70.40417,
+        "lat_deg": -24.62722,
+        "height_m": 2635,
+        "provenance": "plan.KnownSites; published coordinates cross-checked against the IAU MPC observatory code list"
+      },
+      {
+        "name": "Mauna Kea",
+        "lon_deg": -155.47441,
+        "lat_deg": 19.8263,
+        "height_m": 4145,
+        "provenance": "plan.KnownSites; published coordinates cross-checked against the IAU MPC observatory code list"
+      },
+      {
+        "name": "Polar (synthetic, 78N)",
+        "lon_deg": 0,
+        "lat_deg": 78,
+        "height_m": 0,
+        "provenance": "synthetic; hour-angle-to-azimuth projection is most extreme near the pole, and plan.KnownSites has nothing above 52 degrees"
+      },
+      {
+        "name": "Equator (synthetic, 0N 0E)",
+        "lon_deg": 0,
+        "lat_deg": 0,
+        "height_m": 0,
+        "provenance": "synthetic; targets transit near the zenith, where azimuth is ill-conditioned"
+      }
+    ],
+    "sampling": "regular: even sampling across three years, which is what catches secular drift (2024-01-01 00:00..2027-01-01 00:00 step 120d); boundary: straddles the 2017-01-01 leap second: the day before, the day of, and the day after (2016-12-30 00:00..2017-01-02 00:00 step 1d); boundary: straddles J2000.0, the origin every reduction in the pipeline is expressed against (1999-12-31 12:00..2000-01-02 12:00 step 1d); no pseudo-random class: Horizons serves evenly spaced series, so each random epoch would cost its own request for no coverage that boundary and adversarial sampling do not already provide",
+    "not_pinned": [
+      "planetary kernel and its hash: no astrogo kernel takes part in producing these values, and the consumer feeds the geocentric state through a linear mock provider on purpose",
+      "Earth-orientation data: the consumer builds a coord.Context and so depends on whichever IERS series is on the machine when the comparison runs"
+    ]
+  },
+  "entries": [
+    {
+      "class": "adversarial",
+      "target_id": 599,
+      "target_name": "Jupiter",
+      "site": "Equator (synthetic, 0N 0E)",
+      "epoch_jd_ut": 2451544,
+      "geo_vector_au": [
+        4.165651804223964,
+        1.840511544849215,
+        0.6869418971841837
+      ],
+      "geo_velocity_au_per_day": [
+        0.01270074195729511,
+        0.00850971678351083,
+        0.003771603178569914
+      ],
+      "observed": {
+        "astro_ra_deg": 23.835416666666667,
+        "astro_dec_deg": 8.576805555555556,
+        "app_ra_deg": 23.833458333333336,
+        "app_dec_deg": 8.575194444444444,
+        "azimuth_deg": 81.15254,
+        "elevation_deg": -14.196616,
+        "range_au": 4.60569864178412
+      }
+    },
+    {
+      "class": "adversarial",
+      "target_id": 599,
+      "target_name": "Jupiter",
+      "site": "Equator (synthetic, 0N 0E)",
+      "epoch_jd_ut": 2451545,
+      "geo_vector_au": [
+        4.178321924191024,
+        1.849156428913722,
+        0.6907721352458732
+      ],
+      "geo_velocity_au_per_day": [
+        0.012639251884789,
+        0.008779874989403365,
+        0.003888806347749291
+      ],
+      "observed": {
+        "astro_ra_deg": 23.870333333333335,
+        "astro_dec_deg": 8.59588888888889,
+        "app_ra_deg": 23.868333333333336,
+        "app_dec_deg": 8.594222222222223,
+        "azimuth_deg": 81.168638,
+        "elevation_deg": -13.256459,
+        "range_au": 4.62118501888187
+      }
+    },
+    {
+      "class": "adversarial",
+      "target_id": 599,
+      "target_name": "Jupiter",
+      "site": "Equator (synthetic, 0N 0E)",
+      "epoch_jd_ut": 2451546,
+      "geo_vector_au": [
+        4.190928283778728,
+        1.858071736722738,
+        0.6947197308975452
+      ],
+      "geo_velocity_au_per_day": [
+        0.01257207071013061,
+        0.009050256285918294,
+        0.004006153285921301
+      ],
+      "observed": {
+        "astro_ra_deg": 23.908458333333336,
+        "astro_dec_deg": 8.616166666666667,
+        "app_ra_deg": 23.90641666666667,
+        "app_dec_deg": 8.614472222222222,
+        "azimuth_deg": 81.180878,
+        "elevation_deg": -12.319417,
+        "range_au": 4.63674186351214
+      }
+    },
+    {
+      "class": "adversarial",
+      "target_id": 599,
+      "target_name": "Jupiter",
+      "site": "Equator (synthetic, 0N 0E)",
+      "epoch_jd_ut": 2457752.5,
+      "geo_vector_au": [
+        -5.217216738509085,
+        -1.857890132968778,
+        -0.6701524758288573
+      ],
+      "geo_velocity_au_per_day": [
+        0.0185950388636844,
+        -0.004095615065677962,
+        -0.001775847295255213
+      ],
+      "observed": {
+        "astro_ra_deg": 199.59945833333333,
+        "astro_dec_deg": -6.898722222222221,
+        "app_ra_deg": 199.81845833333333,
+        "app_dec_deg": -6.985888888888889,
+        "azimuth_deg": 97.114249,
+        "elevation_deg": -10.872873,
+        "range_au": 5.57851564338581
+      }
+    },
+    {
+      "class": "adversarial",
+      "target_id": 599,
+      "target_name": "Jupiter",
+      "site": "Equator (synthetic, 0N 0E)",
+      "epoch_jd_ut": 2457753.5,
+      "geo_vector_au": [
+        -5.198640069941215,
+        -1.861845375136126,
+        -0.6718676354172871
+      ],
+      "geo_velocity_au_per_day": [
+        0.01855694939859297,
+        -0.003814528047578154,
+        -0.001654305438075408
+      ],
+      "observed": {
+        "astro_ra_deg": 199.70279166666668,
+        "astro_dec_deg": -6.936277777777778,
+        "app_ra_deg": 199.92195833333332,
+        "app_dec_deg": -7.023444444444444,
+        "azimuth_deg": 97.132264,
+        "elevation_deg": -9.996676,
+        "range_au": 5.56267501460826
+      }
+    },
+    {
+      "class": "adversarial",
+      "target_id": 599,
+      "target_name": "Jupiter",
+      "site": "Equator (synthetic, 0N 0E)",
+      "epoch_jd_ut": 2457754.5,
+      "geo_vector_au": [
+        -5.180105174822545,
+        -1.865520219433164,
+        -0.6734615625491192
+      ],
+      "geo_velocity_au_per_day": [
+        0.01851204961245342,
+        -0.003535520966127119,
+        -0.001533702085412407
+      ],
+      "observed": {
+        "astro_ra_deg": 199.80383333333333,
+        "astro_dec_deg": -6.972833333333334,
+        "app_ra_deg": 200.02316666666667,
+        "app_dec_deg": -7.06,
+        "azimuth_deg": 97.150732,
+        "elevation_deg": -9.114187,
+        "range_au": 5.54678465173015
+      }
+    },
+    {
+      "class": "adversarial",
+      "target_id": 599,
+      "target_name": "Jupiter",
+      "site": "Equator (synthetic, 0N 0E)",
+      "epoch_jd_ut": 2457755.5,
+      "geo_vector_au": [
+        -5.161617482251731,
+        -1.868915959304201,
+        -0.6749347912242509
+      ],
+      "geo_velocity_au_per_day": [
+        0.01846162965151554,
+        -0.003256168954802547,
+        -0.001412854479989524
+      ],
+      "observed": {
+        "astro_ra_deg": 199.90254166666668,
+        "astro_dec_deg": -7.008388888888889,
+        "app_ra_deg": 200.12208333333334,
+        "app_dec_deg": -7.095555555555555,
+        "azimuth_deg": 97.169843,
+        "elevation_deg": -8.233674,
+        "range_au": 5.53084869198769
+      }
+    },
+    {
+      "class": "adversarial",
+      "target_id": 599,
+      "target_name": "Jupiter",
+      "site": "Equator (synthetic, 0N 0E)",
+      "epoch_jd_ut": 2460310.5,
+      "geo_vector_au": [
+        3.659031087292524,
+        2.409382612596195,
+        0.9433772420100425
+      ],
+      "geo_velocity_au_per_day": [
+        0.01175899473570973,
+        0.00786081439847964,
+        0.003515247056181798
+      ],
+      "observed": {
+        "astro_ra_deg": 33.36095833333333,
+        "astro_dec_deg": 12.151194444444444,
+        "app_ra_deg": 33.685,
+        "app_dec_deg": 12.264027777777779,
+        "azimuth_deg": 283.338445,
+        "elevation_deg": 22.965507,
+        "range_au": 4.48148703765879
+      }
+    },
+    {
+      "class": "adversarial",
+      "target_id": 599,
+      "target_name": "Jupiter",
+      "site": "Equator (synthetic, 0N 0E)",
+      "epoch_jd_ut": 2460430.5,
+      "geo_vector_au": [
+        3.554017105697379,
+        4.447763497539288,
+        1.841624016701625
+      ],
+      "geo_velocity_au_per_day": [
+        -0.0171007066134842,
+        0.01631100602118493,
+        0.007205854869956682
+      ],
+      "observed": {
+        "astro_ra_deg": 51.37041666666667,
+        "astro_dec_deg": 17.92413888888889,
+        "app_ra_deg": 51.708875000000006,
+        "app_dec_deg": 18.008583333333334,
+        "azimuth_deg": 324.754429,
+        "elevation_deg": -67.755888,
+        "range_au": 5.98378996952984
+      }
+    },
+    {
+      "class": "adversarial",
+      "target_id": 599,
+      "target_name": "Jupiter",
+      "site": "Equator (synthetic, 0N 0E)",
+      "epoch_jd_ut": 2460550.5,
+      "geo_vector_au": [
+        1.058906415658519,
+        4.677115991383578,
+        1.958628432836888
+      ],
+      "geo_velocity_au_per_day": [
+        -0.01407636378699276,
+        -0.01124723975050244,
+        -0.00471842712636332
+      ],
+      "observed": {
+        "astro_ra_deg": 77.241,
+        "astro_dec_deg": 22.21636111111111,
+        "app_ra_deg": 77.60962500000001,
+        "app_dec_deg": 22.24863888888889,
+        "azimuth_deg": 67.383316,
+        "elevation_deg": -10.081367,
+        "range_au": 5.18000408675271
+      }
+    },
+    {
+      "class": "adversarial",
+      "target_id": 599,
+      "target_name": "Jupiter",
+      "site": "Equator (synthetic, 0N 0E)",
+      "epoch_jd_ut": 2460670.5,
+      "geo_vector_au": [
+        1.175501201631793,
+        3.6686645807608,
+        1.541318908321323
+      ],
+      "geo_velocity_au_per_day": [
+        0.009978816299972989,
+        0.003016863174536286,
+        0.001480180734514877
+      ],
+      "observed": {
+        "astro_ra_deg": 72.23070833333334,
+        "astro_dec_deg": 21.80591666666667,
+        "app_ra_deg": 72.60933333333332,
+        "app_dec_deg": 21.850805555555556,
+        "azimuth_deg": 316.48844,
+        "elevation_deg": 59.122771,
+        "range_au": 4.14925348383339
+      }
+    },
+    {
+      "class": "adversarial",
+      "target_id": 599,
+      "target_name": "Jupiter",
+      "site": "Equator (synthetic, 0N 0E)",
+      "epoch_jd_ut": 2460790.5,
+      "geo_vector_au": [
+        1.019647022735552,
+        5.230845150711308,
+        2.239940777054897
+      ],
+      "geo_velocity_au_per_day": [
+        -0.01714889336320539,
+        0.01356208512337897,
+        0.006063030985161307
+      ],
+      "observed": {
+        "astro_ra_deg": 78.966625,
+        "astro_dec_deg": 22.797,
+        "app_ra_deg": 79.34466666666665,
+        "app_dec_deg": 22.825777777777777,
+        "azimuth_deg": 300.298112,
+        "elevation_deg": -39.741062,
+        "range_au": 5.78094708160176
+      }
+    },
+    {
+      "class": "adversarial",
+      "target_id": 599,
+      "target_name": "Jupiter",
+      "site": "Equator (synthetic, 0N 0E)",
+      "epoch_jd_ut": 2460910.5,
+      "geo_vector_au": [
+        -1.595829972383448,
+        5.160509381191641,
+        2.231781257735082
+      ],
+      "geo_velocity_au_per_day": [
+        -0.01595075868375904,
+        -0.01429870375834157,
+        -0.006011205092435462
+      ],
+      "observed": {
+        "astro_ra_deg": 107.18129166666668,
+        "astro_dec_deg": 22.449,
+        "app_ra_deg": 107.56333333333333,
+        "app_dec_deg": 22.409138888888886,
+        "azimuth_deg": 59.296688,
+        "elevation_deg": -41.70169,
+        "range_au": 5.84449843102464
+      }
+    },
+    {
+      "class": "adversarial",
+      "target_id": 599,
+      "target_name": "Jupiter",
+      "site": "Equator (synthetic, 0N 0E)",
+      "epoch_jd_ut": 2461030.5,
+      "geo_vector_au": [
+        -1.631382522580588,
+        3.634065377489432,
+        1.592568744257962
+      ],
+      "geo_velocity_au_per_day": [
+        0.01021883804280087,
+        -0.002105229133106922,
+        -0.0007262166495747829
+      ],
+      "observed": {
+        "astro_ra_deg": 114.17358333333333,
+        "astro_dec_deg": 21.79191666666667,
+        "app_ra_deg": 114.56645833333333,
+        "app_dec_deg": 21.733166666666666,
+        "azimuth_deg": 46.400538,
+        "elevation_deg": 57.524045,
+        "range_au": 4.28994290460832
+      }
+    },
+    {
+      "class": "adversarial",
+      "target_id": 599,
+      "target_name": "Jupiter",
+      "site": "Equator (synthetic, 0N 0E)",
+      "epoch_jd_ut": 2461150.5,
+      "geo_vector_au": [
+        -1.584381350650671,
+        4.697794396433091,
+        2.075641923365488
+      ],
+      "geo_velocity_au_per_day": [
+        -0.01497908586249715,
+        0.01080629594872169,
+        0.004863538740503643
+      ],
+      "observed": {
+        "astro_ra_deg": 108.63408333333334,
+        "astro_dec_deg": 22.717527777777775,
+        "app_ra_deg": 109.02975,
+        "app_dec_deg": 22.672555555555558,
+        "azimuth_deg": 292.929987,
+        "elevation_deg": -8.362228,
+        "range_au": 5.37477831974306
+      }
+    },
+    {
+      "class": "adversarial",
+      "target_id": 599,
+      "target_name": "Jupiter",
+      "site": "Equator (synthetic, 0N 0E)",
+      "epoch_jd_ut": 2461270.5,
+      "geo_vector_au": [
+        -4.056189219430359,
+        4.360980463335164,
+        1.950459391246745
+      ],
+      "geo_velocity_au_per_day": [
+        -0.01572408222991063,
+        -0.01680004268593127,
+        -0.00711579704667975
+      ],
+      "observed": {
+        "astro_ra_deg": 132.92379166666666,
+        "astro_dec_deg": 18.13372222222222,
+        "app_ra_deg": 133.29783333333333,
+        "app_dec_deg": 18.034833333333335,
+        "azimuth_deg": 34.799587,
+        "elevation_deg": -67.850492,
+        "range_au": 6.26700076698708
+      }
+    },
+    {
+      "class": "adversarial",
+      "target_id": 599,
+      "target_name": "Jupiter",
+      "site": "Equator (synthetic, 0N 0E)",
+      "epoch_jd_ut": 2461390.5,
+      "geo_vector_au": [
+        -4.017557776247482,
+        2.398845706204791,
+        1.119005442189166
+      ],
+      "geo_velocity_au_per_day": [
+        0.01215825387064964,
+        -0.006493228530330381,
+        -0.002663667759503783
+      ],
+      "observed": {
+        "astro_ra_deg": 149.157125,
+        "astro_dec_deg": 13.450111111111111,
+        "app_ra_deg": 149.52629166666668,
+        "app_dec_deg": 13.320083333333333,
+        "azimuth_deg": 75.344847,
+        "elevation_deg": 24.406973,
+        "range_au": 4.81111543758063
+      }
+    },
+    {
+      "class": "adversarial",
+      "target_id": 599,
+      "target_name": "Jupiter",
+      "site": "Polar (synthetic, 78N)",
+      "epoch_jd_ut": 2451544,
+      "geo_vector_au": [
+        4.165651804223964,
+        1.840511544849215,
+        0.6869418971841837
+      ],
+      "geo_velocity_au_per_day": [
+        0.01270074195729511,
+        0.00850971678351083,
+        0.003771603178569914
+      ],
+      "observed": {
+        "astro_ra_deg": 23.835000000000004,
+        "astro_dec_deg": 8.576305555555555,
+        "app_ra_deg": 23.83304166666667,
+        "app_dec_deg": 8.574694444444445,
+        "azimuth_deg": 74.210559,
+        "elevation_deg": 5.442873,
+        "range_au": 4.60568417119037
+      }
+    },
+    {
+      "class": "adversarial",
+      "target_id": 599,
+      "target_name": "Jupiter",
+      "site": "Polar (synthetic, 78N)",
+      "epoch_jd_ut": 2451545,
+      "geo_vector_au": [
+        4.178321924191024,
+        1.849156428913722,
+        0.6907721352458732
+      ],
+      "geo_velocity_au_per_day": [
+        0.012639251884789,
+        0.008779874989403365,
+        0.003888806347749291
+      ],
+      "observed": {
+        "astro_ra_deg": 23.869958333333336,
+        "astro_dec_deg": 8.59538888888889,
+        "app_ra_deg": 23.867958333333334,
+        "app_dec_deg": 8.59375,
+        "azimuth_deg": 75.131576,
+        "elevation_deg": 5.652158,
+        "range_au": 4.62117107241913
+      }
+    },
+    {
+      "class": "adversarial",
+      "target_id": 599,
+      "target_name": "Jupiter",
+      "site": "Polar (synthetic, 78N)",
+      "epoch_jd_ut": 2451546,
+      "geo_vector_au": [
+        4.190928283778728,
+        1.858071736722738,
+        0.6947197308975452
+      ],
+      "geo_velocity_au_per_day": [
+        0.01257207071013061,
+        0.009050256285918294,
+        0.004006153285921301
+      ],
+      "observed": {
+        "astro_ra_deg": 23.908083333333334,
+        "astro_dec_deg": 8.615666666666666,
+        "app_ra_deg": 23.906041666666667,
+        "app_dec_deg": 8.613999999999999,
+        "azimuth_deg": 76.049347,
+        "elevation_deg": 5.862797,
+        "range_au": 4.63672844060295
+      }
+    },
+    {
+      "class": "adversarial",
+      "target_id": 599,
+      "target_name": "Jupiter",
+      "site": "Polar (synthetic, 78N)",
+      "epoch_jd_ut": 2457752.5,
+      "geo_vector_au": [
+        -5.217216738509085,
+        -1.857890132968778,
+        -0.6701524758288573
+      ],
+      "geo_velocity_au_per_day": [
+        0.0185950388636844,
+        -0.004095615065677962,
+        -0.001775847295255213
+      ],
+      "observed": {
+        "astro_ra_deg": 199.59912500000002,
+        "astro_dec_deg": -6.899166666666666,
+        "app_ra_deg": 199.81812499999998,
+        "app_dec_deg": -6.9863333333333335,
+        "azimuth_deg": 80.721203,
+        "elevation_deg": -9.101894,
+        "range_au": 5.57851433277716
+      }
+    },
+    {
+      "class": "adversarial",
+      "target_id": 599,
+      "target_name": "Jupiter",
+      "site": "Polar (synthetic, 78N)",
+      "epoch_jd_ut": 2457753.5,
+      "geo_vector_au": [
+        -5.198640069941215,
+        -1.861845375136126,
+        -0.6718676354172871
+      ],
+      "geo_velocity_au_per_day": [
+        0.01855694939859297,
+        -0.003814528047578154,
+        -0.001654305438075408
+      ],
+      "observed": {
+        "astro_ra_deg": 199.70241666666666,
+        "astro_dec_deg": -6.936694444444445,
+        "app_ra_deg": 199.921625,
+        "app_dec_deg": -7.023861111111111,
+        "azimuth_deg": 81.596433,
+        "elevation_deg": -8.95739,
+        "range_au": 5.56267423850928
+      }
+    },
+    {
+      "class": "adversarial",
+      "target_id": 599,
+      "target_name": "Jupiter",
+      "site": "Polar (synthetic, 78N)",
+      "epoch_jd_ut": 2457754.5,
+      "geo_vector_au": [
+        -5.180105174822545,
+        -1.865520219433164,
+        -0.6734615625491192
+      ],
+      "geo_velocity_au_per_day": [
+        0.01851204961245342,
+        -0.003535520966127119,
+        -0.001533702085412407
+      ],
+      "observed": {
+        "astro_ra_deg": 199.80345833333334,
+        "astro_dec_deg": -6.97325,
+        "app_ra_deg": 200.02283333333335,
+        "app_dec_deg": -7.060416666666667,
+        "azimuth_deg": 82.477318,
+        "elevation_deg": -8.81018,
+        "range_au": 5.54678441446004
+      }
+    },
+    {
+      "class": "adversarial",
+      "target_id": 599,
+      "target_name": "Jupiter",
+      "site": "Polar (synthetic, 78N)",
+      "epoch_jd_ut": 2457755.5,
+      "geo_vector_au": [
+        -5.161617482251731,
+        -1.868915959304201,
+        -0.6749347912242509
+      ],
+      "geo_velocity_au_per_day": [
+        0.01846162965151554,
+        -0.003256168954802547,
+        -0.001412854479989524
+      ],
+      "observed": {
+        "astro_ra_deg": 199.90220833333333,
+        "astro_dec_deg": -7.0088333333333335,
+        "app_ra_deg": 200.12170833333334,
+        "app_dec_deg": -7.096,
+        "azimuth_deg": 83.355673,
+        "elevation_deg": -8.662012,
+        "range_au": 5.53084899294848
+      }
+    },
+    {
+      "class": "adversarial",
+      "target_id": 599,
+      "target_name": "Jupiter",
+      "site": "Polar (synthetic, 78N)",
+      "epoch_jd_ut": 2460310.5,
+      "geo_vector_au": [
+        3.659031087292524,
+        2.409382612596195,
+        0.9433772420100425
+      ],
+      "geo_velocity_au_per_day": [
+        0.01175899473570973,
+        0.00786081439847964,
+        0.003515247056181798
+      ],
+      "observed": {
+        "astro_ra_deg": 33.36133333333334,
+        "astro_dec_deg": 12.150638888888889,
+        "app_ra_deg": 33.685375,
+        "app_dec_deg": 12.263472222222223,
+        "azimuth_deg": 249.358359,
+        "elevation_deg": 16.791438,
+        "range_au": 4.48149137523044
+      }
+    },
+    {
+      "class": "adversarial",
+      "target_id": 599,
+      "target_name": "Jupiter",
+      "site": "Polar (synthetic, 78N)",
+      "epoch_jd_ut": 2460430.5,
+      "geo_vector_au": [
+        3.554017105697379,
+        4.447763497539288,
+        1.841624016701625
+      ],
+      "geo_velocity_au_per_day": [
+        -0.0171007066134842,
+        0.01631100602118493,
+        0.007205854869956682
+      ],
+      "observed": {
+        "astro_ra_deg": 51.37049999999999,
+        "astro_dec_deg": 17.923861111111112,
+        "app_ra_deg": 51.709,
+        "app_dec_deg": 18.008305555555555,
+        "azimuth_deg": 347.303676,
+        "elevation_deg": 6.312981,
+        "range_au": 5.98374589047893
+      }
+    },
+    {
+      "class": "adversarial",
+      "target_id": 599,
+      "target_name": "Jupiter",
+      "site": "Polar (synthetic, 78N)",
+      "epoch_jd_ut": 2460550.5,
+      "geo_vector_au": [
+        1.058906415658519,
+        4.677115991383578,
+        1.958628432836888
+      ],
+      "geo_velocity_au_per_day": [
+        -0.01407636378699276,
+        -0.01124723975050244,
+        -0.00471842712636332
+      ],
+      "observed": {
+        "astro_ra_deg": 77.240625,
+        "astro_dec_deg": 22.215944444444442,
+        "app_ra_deg": 77.60925,
+        "app_dec_deg": 22.248250000000002,
+        "azimuth_deg": 74.624192,
+        "elevation_deg": 19.509041,
+        "range_au": 5.17998244505465
+      }
+    },
+    {
+      "class": "adversarial",
+      "target_id": 599,
+      "target_name": "Jupiter",
+      "site": "Polar (synthetic, 78N)",
+      "epoch_jd_ut": 2460670.5,
+      "geo_vector_au": [
+        1.175501201631793,
+        3.6686645807608,
+        1.541318908321323
+      ],
+      "geo_velocity_au_per_day": [
+        0.009978816299972989,
+        0.003016863174536286,
+        0.001480180734514877
+      ],
+      "observed": {
+        "astro_ra_deg": 72.23091666666666,
+        "astro_dec_deg": 21.805222222222223,
+        "app_ra_deg": 72.60945833333334,
+        "app_dec_deg": 21.85011111111111,
+        "azimuth_deg": 204.873586,
+        "elevation_deg": 32.85339,
+        "range_au": 4.14926697616997
+      }
+    },
+    {
+      "class": "adversarial",
+      "target_id": 599,
+      "target_name": "Jupiter",
+      "site": "Polar (synthetic, 78N)",
+      "epoch_jd_ut": 2460790.5,
+      "geo_vector_au": [
+        1.019647022735552,
+        5.230845150711308,
+        2.239940777054897
+      ],
+      "geo_velocity_au_per_day": [
+        -0.01714889336320539,
+        0.01356208512337897,
+        0.006063030985161307
+      ],
+      "observed": {
+        "astro_ra_deg": 78.966875,
+        "astro_dec_deg": 22.796694444444444,
+        "app_ra_deg": 79.345,
+        "app_dec_deg": 22.82547222222222,
+        "azimuth_deg": 316.759986,
+        "elevation_deg": 14.272009,
+        "range_au": 5.78090938957313
+      }
+    },
+    {
+      "class": "adversarial",
+      "target_id": 599,
+      "target_name": "Jupiter",
+      "site": "Polar (synthetic, 78N)",
+      "epoch_jd_ut": 2460910.5,
+      "geo_vector_au": [
+        -1.595829972383448,
+        5.160509381191641,
+        2.231781257735082
+      ],
+      "geo_velocity_au_per_day": [
+        -0.01595075868375904,
+        -0.01429870375834157,
+        -0.006011205092435462
+      ],
+      "observed": {
+        "astro_ra_deg": 107.18104166666667,
+        "astro_dec_deg": 22.448722222222223,
+        "app_ra_deg": 107.56312500000001,
+        "app_dec_deg": 22.40888888888889,
+        "azimuth_deg": 41.329984,
+        "elevation_deg": 13.566325,
+        "range_au": 5.84446014027792
+      }
+    },
+    {
+      "class": "adversarial",
+      "target_id": 599,
+      "target_name": "Jupiter",
+      "site": "Polar (synthetic, 78N)",
+      "epoch_jd_ut": 2461030.5,
+      "geo_vector_au": [
+        -1.631382522580588,
+        3.634065377489432,
+        1.592568744257962
+      ],
+      "geo_velocity_au_per_day": [
+        0.01021883804280087,
+        -0.002105229133106922,
+        -0.0007262166495747829
+      ],
+      "observed": {
+        "astro_ra_deg": 114.173375,
+        "astro_dec_deg": 21.79125,
+        "app_ra_deg": 114.56620833333334,
+        "app_dec_deg": 21.732499999999998,
+        "azimuth_deg": 152.539488,
+        "elevation_deg": 32.519193,
+        "range_au": 4.28995598281941
+      }
+    },
+    {
+      "class": "adversarial",
+      "target_id": 599,
+      "target_name": "Jupiter",
+      "site": "Polar (synthetic, 78N)",
+      "epoch_jd_ut": 2461150.5,
+      "geo_vector_au": [
+        -1.584381350650671,
+        4.697794396433091,
+        2.075641923365488
+      ],
+      "geo_velocity_au_per_day": [
+        -0.01497908586249715,
+        0.01080629594872169,
+        0.004863538740503643
+      ],
+      "observed": {
+        "astro_ra_deg": 108.6345,
+        "astro_dec_deg": 22.717138888888886,
+        "app_ra_deg": 109.030125,
+        "app_dec_deg": 22.67213888888889,
+        "azimuth_deg": 283.716122,
+        "elevation_deg": 20.291515,
+        "range_au": 5.37475739456992
+      }
+    },
+    {
+      "class": "adversarial",
+      "target_id": 599,
+      "target_name": "Jupiter",
+      "site": "Polar (synthetic, 78N)",
+      "epoch_jd_ut": 2461270.5,
+      "geo_vector_au": [
+        -4.056189219430359,
+        4.360980463335164,
+        1.950459391246745
+      ],
+      "geo_velocity_au_per_day": [
+        -0.01572408222991063,
+        -0.01680004268593127,
+        -0.00711579704667975
+      ],
+      "observed": {
+        "astro_ra_deg": 132.92370833333334,
+        "astro_dec_deg": 18.13347222222222,
+        "app_ra_deg": 133.29783333333333,
+        "app_dec_deg": 18.034555555555556,
+        "azimuth_deg": 12.503454,
+        "elevation_deg": 6.330132,
+        "range_au": 6.26695664893331
+      }
+    },
+    {
+      "class": "adversarial",
+      "target_id": 599,
+      "target_name": "Jupiter",
+      "site": "Polar (synthetic, 78N)",
+      "epoch_jd_ut": 2461390.5,
+      "geo_vector_au": [
+        -4.017557776247482,
+        2.398845706204791,
+        1.119005442189166
+      ],
+      "geo_velocity_au_per_day": [
+        0.01215825387064964,
+        -0.006493228530330381,
+        -0.002663667759503783
+      ],
+      "observed": {
+        "astro_ra_deg": 149.15675000000002,
+        "astro_dec_deg": 13.449583333333333,
+        "app_ra_deg": 149.525875,
+        "app_dec_deg": 13.319583333333332,
+        "azimuth_deg": 112.019623,
+        "elevation_deg": 18.13536,
+        "range_au": 4.81111980670581
+      }
+    },
+    {
+      "class": "adversarial",
+      "target_id": 499,
+      "target_name": "Mars",
+      "site": "Equator (synthetic, 0N 0E)",
+      "epoch_jd_ut": 2451544,
+      "geo_vector_au": [
+        1.549882810337337,
+        -0.9025884167452861,
+        -0.4292096184629684
+      ],
+      "geo_velocity_au_per_day": [
+        0.01808309867020472,
+        0.01643428451070753,
+        0.007449808653720263
+      ],
+      "observed": {
+        "astro_ra_deg": 329.7820833333334,
+        "astro_dec_deg": -13.459999999999999,
+        "app_ra_deg": 329.77429166666667,
+        "app_dec_deg": -13.461916666666665,
+        "azimuth_deg": 107.281665,
+        "elevation_deg": 38.403773,
+        "range_au": 1.84424010507186
+      }
+    },
+    {
+      "class": "adversarial",
+      "target_id": 499,
+      "target_name": "Mars",
+      "site": "Equator (synthetic, 0N 0E)",
+      "epoch_jd_ut": 2451545,
+      "geo_vector_au": [
+        1.567864302813854,
+        -0.8860148896376784,
+        -0.4216974395381974
+      ],
+      "geo_velocity_au_per_day": [
+        0.01787897089213008,
+        0.01671241103695183,
+        0.007574387678324307
+      ],
+      "observed": {
+        "astro_ra_deg": 330.52562500000005,
+        "astro_dec_deg": -13.180694444444445,
+        "app_ra_deg": 330.5179166666667,
+        "app_dec_deg": -13.182666666666666,
+        "azimuth_deg": 106.987824,
+        "elevation_deg": 38.687754,
+        "range_au": 1.849661212901
+      }
+    },
+    {
+      "class": "adversarial",
+      "target_id": 499,
+      "target_name": "Mars",
+      "site": "Equator (synthetic, 0N 0E)",
+      "epoch_jd_ut": 2451546,
+      "geo_vector_au": [
+        1.585638921967509,
+        -0.8691643341553521,
+        -0.4140611749299568
+      ],
+      "geo_velocity_au_per_day": [
+        0.01766935283761996,
+        0.01698831904304168,
+        0.007697971237220423
+      ],
+      "observed": {
+        "astro_ra_deg": 331.26758333333333,
+        "astro_dec_deg": -12.899388888888888,
+        "app_ra_deg": 331.25987499999997,
+        "app_dec_deg": -12.901388888888889,
+        "azimuth_deg": 106.6899,
+        "elevation_deg": 38.973405,
+        "range_au": 1.85508490268741
+      }
+    },
+    {
+      "class": "adversarial",
+      "target_id": 499,
+      "target_name": "Mars",
+      "site": "Equator (synthetic, 0N 0E)",
+      "epoch_jd_ut": 2457752.5,
+      "geo_vector_au": [
+        1.506147359899773,
+        -0.5540601863537452,
+        -0.2684142448523374
+      ],
+      "geo_velocity_au_per_day": [
+        0.01428353249507244,
+        0.01575448392391244,
+        0.007246993142649618
+      ],
+      "observed": {
+        "astro_ra_deg": 339.7979583333333,
+        "astro_dec_deg": -9.496583333333332,
+        "app_ra_deg": 340.0162083333334,
+        "app_dec_deg": -9.40875,
+        "azimuth_deg": 259.287313,
+        "elevation_deg": -28.423348,
+        "range_au": 1.62721570407224
+      }
+    },
+    {
+      "class": "adversarial",
+      "target_id": 499,
+      "target_name": "Mars",
+      "site": "Equator (synthetic, 0N 0E)",
+      "epoch_jd_ut": 2457753.5,
+      "geo_vector_au": [
+        1.520335008944405,
+        -0.5381844798348565,
+        -0.2611132632539143
+      ],
+      "geo_velocity_au_per_day": [
+        0.01409091200078744,
+        0.01599655784925475,
+        0.007354804676600719
+      ],
+      "observed": {
+        "astro_ra_deg": 340.5013333333333,
+        "astro_dec_deg": -9.198055555555555,
+        "app_ra_deg": 340.71925,
+        "app_dec_deg": -9.109833333333333,
+        "azimuth_deg": 259.598147,
+        "elevation_deg": -28.727698,
+        "range_au": 1.63388035333257
+      }
+    },
+    {
+      "class": "adversarial",
+      "target_id": 499,
+      "target_name": "Mars",
+      "site": "Equator (synthetic, 0N 0E)",
+      "epoch_jd_ut": 2457754.5,
+      "geo_vector_au": [
+        1.534327646003341,
+        -0.5220676499725129,
+        -0.2537048897285165
+      ],
+      "geo_velocity_au_per_day": [
+        0.01389319360258556,
+        0.01623633290647233,
+        0.007461595718176598
+      ],
+      "observed": {
+        "astro_ra_deg": 341.2035416666667,
+        "astro_dec_deg": -8.898361111111111,
+        "app_ra_deg": 341.4211666666667,
+        "app_dec_deg": -8.809777777777779,
+        "azimuth_deg": 259.911278,
+        "elevation_deg": -29.037124,
+        "range_au": 1.64055098709418
+      }
+    },
+    {
+      "class": "adversarial",
+      "target_id": 499,
+      "target_name": "Mars",
+      "site": "Equator (synthetic, 0N 0E)",
+      "epoch_jd_ut": 2457755.5,
+      "geo_vector_au": [
+        1.548119881596495,
+        -0.5057124449075168,
+        -0.2461903468261085
+      ],
+      "geo_velocity_au_per_day": [
+        0.01369044502979593,
+        0.01647365721774768,
+        0.007567305191230517
+      ],
+      "observed": {
+        "astro_ra_deg": 341.90458333333333,
+        "astro_dec_deg": -8.597555555555557,
+        "app_ra_deg": 342.12191666666666,
+        "app_dec_deg": -8.508666666666667,
+        "azimuth_deg": 260.227516,
+        "elevation_deg": -29.343369,
+        "range_au": 1.64722704532354
+      }
+    },
+    {
+      "class": "adversarial",
+      "target_id": 499,
+      "target_name": "Mars",
+      "site": "Equator (synthetic, 0N 0E)",
+      "epoch_jd_ut": 2460310.5,
+      "geo_vector_au": [
+        -0.127481831597179,
+        -2.211417333279142,
+        -0.9840108553082422
+      ],
+      "geo_velocity_au_per_day": [
+        0.03147831607982139,
+        0.001426580757543807,
+        0.0002010419153804935
+      ],
+      "observed": {
+        "astro_ra_deg": 266.69579166666665,
+        "astro_dec_deg": -23.951638888888887,
+        "app_ra_deg": 267.05458333333337,
+        "app_dec_deg": -23.96097222222222,
+        "azimuth_deg": 152.984089,
+        "elevation_deg": -62.879886,
+        "range_au": 2.42384470181542
+      }
+    },
+    {
+      "class": "adversarial",
+      "target_id": 499,
+      "target_name": "Mars",
+      "site": "Equator (synthetic, 0N 0E)",
+      "epoch_jd_ut": 2460430.5,
+      "geo_vector_au": [
+        1.979755538326635,
+        -0.008886433968211602,
+        -0.05152694615469958
+      ],
+      "geo_velocity_au_per_day": [
+        -0.003373884149163749,
+        0.02445362192343284,
+        0.01071104989179131
+      ],
+      "observed": {
+        "astro_ra_deg": 359.73949999999996,
+        "astro_dec_deg": -1.4927222222222223,
+        "app_ra_deg": 0.04583333333333334,
+        "app_dec_deg": -1.359527777777778,
+        "azimuth_deg": 92.188896,
+        "elevation_deg": -51.596606,
+        "range_au": 1.98039739623953
+      }
+    },
+    {
+      "class": "adversarial",
+      "target_id": 499,
+      "target_name": "Mars",
+      "site": "Equator (synthetic, 0N 0E)",
+      "epoch_jd_ut": 2460550.5,
+      "geo_vector_au": [
+        0.1304381785151843,
+        1.330708480509628,
+        0.5722624637347401
+      ],
+      "geo_velocity_au_per_day": [
+        -0.01627886677871082,
+        -0.004126938789947162,
+        -0.001284992903733402
+      ],
+      "observed": {
+        "astro_ra_deg": 84.39975000000001,
+        "astro_dec_deg": 23.170055555555557,
+        "app_ra_deg": 84.7715,
+        "app_dec_deg": 23.185472222222224,
+        "azimuth_deg": 65.748215,
+        "elevation_deg": -16.560735,
+        "range_au": 1.45432680659833
+      }
+    },
+    {
+      "class": "adversarial",
+      "target_id": 499,
+      "target_name": "Mars",
+      "site": "Equator (synthetic, 0N 0E)",
+      "epoch_jd_ut": 2460670.5,
+      "geo_vector_au": [
+        -0.3701300605235104,
+        0.4989915667774544,
+        0.2635358271016043
+      ],
+      "geo_velocity_au_per_day": [
+        0.004521638521702022,
+        -0.001314490704020353,
+        -0.0002866647181839665
+      ],
+      "observed": {
+        "astro_ra_deg": 126.56420833333333,
+        "astro_dec_deg": 22.987972222222222,
+        "app_ra_deg": 126.93729166666665,
+        "app_dec_deg": 22.905277777777776,
+        "azimuth_deg": 51.395483,
+        "elevation_deg": 51.406489,
+        "range_au": 0.67481068506599
+      }
+    },
+    {
+      "class": "adversarial",
+      "target_id": 499,
+      "target_name": "Mars",
+      "site": "Equator (synthetic, 0N 0E)",
+      "epoch_jd_ut": 2460790.5,
+      "geo_vector_au": [
+        -0.7343753880751505,
+        1.035512131449795,
+        0.503842129053235
+      ],
+      "geo_velocity_au_per_day": [
+        -0.01384694105538139,
+        0.002157512030062682,
+        0.0007786502073812648
+      ],
+      "observed": {
+        "astro_ra_deg": 125.3385,
+        "astro_dec_deg": 21.648222222222223,
+        "app_ra_deg": 125.70879166666668,
+        "app_dec_deg": 21.56872222222222,
+        "azimuth_deg": 291.586576,
+        "elevation_deg": 2.273962,
+        "range_au": 1.36587385902783
+      }
+    },
+    {
+      "class": "adversarial",
+      "target_id": 499,
+      "target_name": "Mars",
+      "site": "Equator (synthetic, 0N 0E)",
+      "epoch_jd_ut": 2460910.5,
+      "geo_vector_au": [
+        -2.193466607166804,
+        -0.3516648684856351,
+        -0.1374659750642815
+      ],
+      "geo_velocity_au_per_day": [
+        -0.00005639064890470092,
+        -0.02297806676685939,
+        -0.01042241361678611
+      ],
+      "observed": {
+        "astro_ra_deg": 189.10416666666666,
+        "astro_dec_deg": -3.5392777777777775,
+        "app_ra_deg": 189.43104166666666,
+        "app_dec_deg": -3.679333333333333,
+        "azimuth_deg": 264.02237,
+        "elevation_deg": -51.959934,
+        "range_au": 2.22584351910113
+      }
+    },
+    {
+      "class": "adversarial",
+      "target_id": 499,
+      "target_name": "Mars",
+      "site": "Equator (synthetic, 0N 0E)",
+      "epoch_jd_ut": 2461030.5,
+      "geo_vector_au": [
+        0.1663968436105412,
+        -2.199383390739455,
+        -0.9910184431967967
+      ],
+      "geo_velocity_au_per_day": [
+        0.03189703690703926,
+        0.002641553946360385,
+        0.0008286003936815563
+      ],
+      "observed": {
+        "astro_ra_deg": 274.32116666666667,
+        "astro_dec_deg": -24.19425,
+        "app_ra_deg": 274.7138333333333,
+        "app_dec_deg": -24.18525,
+        "azimuth_deg": 190.75472,
+        "elevation_deg": -65.353855,
+        "range_au": 2.4181426960054
+      }
+    },
+    {
+      "class": "adversarial",
+      "target_id": 499,
+      "target_name": "Mars",
+      "site": "Equator (synthetic, 0N 0E)",
+      "epoch_jd_ut": 2461150.5,
+      "geo_vector_au": [
+        2.244545534858756,
+        0.2878317505991867,
+        0.08358652074169941
+      ],
+      "geo_velocity_au_per_day": [
+        -0.005676257712769054,
+        0.02749511248353483,
+        0.01219545375434315
+      ],
+      "observed": {
+        "astro_ra_deg": 7.3035,
+        "astro_dec_deg": 2.1133611111111112,
+        "app_ra_deg": 7.6375,
+        "app_dec_deg": 2.257361111111111,
+        "azimuth_deg": 83.566101,
+        "elevation_deg": -69.420707,
+        "range_au": 2.26444979540346
+      }
+    },
+    {
+      "class": "adversarial",
+      "target_id": 499,
+      "target_name": "Mars",
+      "site": "Equator (synthetic, 0N 0E)",
+      "epoch_jd_ut": 2461270.5,
+      "geo_vector_au": [
+        -0.1343418453184868,
+        1.754675906630777,
+        0.7726506257751409
+      ],
+      "geo_velocity_au_per_day": [
+        -0.02154108417645187,
+        -0.006002249579209105,
+        -0.002109457648427775
+      ],
+      "observed": {
+        "astro_ra_deg": 94.375125,
+        "astro_dec_deg": 23.703694444444444,
+        "app_ra_deg": 94.78016666666666,
+        "app_dec_deg": 23.694083333333335,
+        "azimuth_deg": 60.75115,
+        "elevation_deg": -34.668932,
+        "range_au": 1.92188881904832
+      }
+    },
+    {
+      "class": "adversarial",
+      "target_id": 499,
+      "target_name": "Mars",
+      "site": "Equator (synthetic, 0N 0E)",
+      "epoch_jd_ut": 2461390.5,
+      "geo_vector_au": [
+        -0.958113565016507,
+        0.3644374910539417,
+        0.2126826062560103
+      ],
+      "geo_velocity_au_per_day": [
+        0.005951829234409446,
+        -0.007317106447188714,
+        -0.003005107767402819
+      ],
+      "observed": {
+        "astro_ra_deg": 159.17383333333333,
+        "astro_dec_deg": 11.722777777777777,
+        "app_ra_deg": 159.534625,
+        "app_dec_deg": 11.581111111111111,
+        "azimuth_deg": 78.015431,
+        "elevation_deg": 14.804535,
+        "range_au": 1.04685515090281
+      }
+    },
+    {
+      "class": "adversarial",
+      "target_id": 499,
+      "target_name": "Mars",
+      "site": "Polar (synthetic, 78N)",
+      "epoch_jd_ut": 2451544,
+      "geo_vector_au": [
+        1.549882810337337,
+        -0.9025884167452861,
+        -0.4292096184629684
+      ],
+      "geo_velocity_au_per_day": [
+        0.01808309867020472,
+        0.01643428451070753,
+        0.007449808653720263
+      ],
+      "observed": {
+        "astro_ra_deg": 329.78125000000006,
+        "astro_dec_deg": -13.461083333333333,
+        "app_ra_deg": 329.7734166666667,
+        "app_dec_deg": -13.463027777777777,
+        "azimuth_deg": 131.243122,
+        "elevation_deg": -5.656984,
+        "range_au": 1.84427073969355
+      }
+    },
+    {
+      "class": "adversarial",
+      "target_id": 499,
+      "target_name": "Mars",
+      "site": "Polar (synthetic, 78N)",
+      "epoch_jd_ut": 2451545,
+      "geo_vector_au": [
+        1.567864302813854,
+        -0.8860148896376784,
+        -0.4216974395381974
+      ],
+      "geo_velocity_au_per_day": [
+        0.01787897089213008,
+        0.01671241103695183,
+        0.007574387678324307
+      ],
+      "observed": {
+        "astro_ra_deg": 330.52483333333333,
+        "astro_dec_deg": -13.181805555555554,
+        "app_ra_deg": 330.5170416666667,
+        "app_dec_deg": -13.183777777777777,
+        "azimuth_deg": 131.431653,
+        "elevation_deg": -5.343553,
+        "range_au": 1.84969178119348
+      }
+    },
+    {
+      "class": "adversarial",
+      "target_id": 499,
+      "target_name": "Mars",
+      "site": "Polar (synthetic, 78N)",
+      "epoch_jd_ut": 2451546,
+      "geo_vector_au": [
+        1.585638921967509,
+        -0.8691643341553521,
+        -0.4140611749299568
+      ],
+      "geo_velocity_au_per_day": [
+        0.01766935283761996,
+        0.01698831904304168,
+        0.007697971237220423
+      ],
+      "observed": {
+        "astro_ra_deg": 331.26675,
+        "astro_dec_deg": -12.900500000000001,
+        "app_ra_deg": 331.2590416666667,
+        "app_dec_deg": -12.9025,
+        "azimuth_deg": 131.621807,
+        "elevation_deg": -5.02797,
+        "range_au": 1.85511540325451
+      }
+    },
+    {
+      "class": "adversarial",
+      "target_id": 499,
+      "target_name": "Mars",
+      "site": "Polar (synthetic, 78N)",
+      "epoch_jd_ut": 2457752.5,
+      "geo_vector_au": [
+        1.506147359899773,
+        -0.5540601863537452,
+        -0.2684142448523374
+      ],
+      "geo_velocity_au_per_day": [
+        0.01428353249507244,
+        0.01575448392391244,
+        0.007246993142649618
+      ],
+      "observed": {
+        "astro_ra_deg": 339.799,
+        "astro_dec_deg": -9.498138888888889,
+        "app_ra_deg": 340.0172916666667,
+        "app_dec_deg": -9.410277777777779,
+        "azimuth_deg": 296.539005,
+        "elevation_deg": -15.004188,
+        "range_au": 1.62720643797548
+      }
+    },
+    {
+      "class": "adversarial",
+      "target_id": 499,
+      "target_name": "Mars",
+      "site": "Polar (synthetic, 78N)",
+      "epoch_jd_ut": 2457753.5,
+      "geo_vector_au": [
+        1.520335008944405,
+        -0.5381844798348565,
+        -0.2611132632539143
+      ],
+      "geo_velocity_au_per_day": [
+        0.01409091200078744,
+        0.01599655784925475,
+        0.007354804676600719
+      ],
+      "observed": {
+        "astro_ra_deg": 340.50237500000003,
+        "astro_dec_deg": -9.199583333333333,
+        "app_ra_deg": 340.7203333333333,
+        "app_dec_deg": -9.11136111111111,
+        "azimuth_deg": 296.880653,
+        "elevation_deg": -14.763092,
+        "range_au": 1.6338707158264
+      }
+    },
+    {
+      "class": "adversarial",
+      "target_id": 499,
+      "target_name": "Mars",
+      "site": "Polar (synthetic, 78N)",
+      "epoch_jd_ut": 2457754.5,
+      "geo_vector_au": [
+        1.534327646003341,
+        -0.5220676499725129,
+        -0.2537048897285165
+      ],
+      "geo_velocity_au_per_day": [
+        0.01389319360258556,
+        0.01623633290647233,
+        0.007461595718176598
+      ],
+      "observed": {
+        "astro_ra_deg": 341.20458333333335,
+        "astro_dec_deg": -8.899861111111111,
+        "app_ra_deg": 341.42225,
+        "app_dec_deg": -8.811305555555556,
+        "azimuth_deg": 297.227537,
+        "elevation_deg": -14.521664,
+        "range_au": 1.64054097502854
+      }
+    },
+    {
+      "class": "adversarial",
+      "target_id": 499,
+      "target_name": "Mars",
+      "site": "Polar (synthetic, 78N)",
+      "epoch_jd_ut": 2457755.5,
+      "geo_vector_au": [
+        1.548119881596495,
+        -0.5057124449075168,
+        -0.2461903468261085
+      ],
+      "geo_velocity_au_per_day": [
+        0.01369044502979593,
+        0.01647365721774768,
+        0.007567305191230517
+      ],
+      "observed": {
+        "astro_ra_deg": 341.90562500000004,
+        "astro_dec_deg": -8.599055555555557,
+        "app_ra_deg": 342.123,
+        "app_dec_deg": -8.510166666666667,
+        "azimuth_deg": 297.571265,
+        "elevation_deg": -14.278413,
+        "range_au": 1.64721665986203
+      }
+    },
+    {
+      "class": "adversarial",
+      "target_id": 499,
+      "target_name": "Mars",
+      "site": "Polar (synthetic, 78N)",
+      "epoch_jd_ut": 2460310.5,
+      "geo_vector_au": [
+        -0.127481831597179,
+        -2.211417333279142,
+        -0.9840108553082422
+      ],
+      "geo_velocity_au_per_day": [
+        0.03147831607982139,
+        0.001426580757543807,
+        0.0002010419153804935
+      ],
+      "observed": {
+        "astro_ra_deg": 266.69558333333333,
+        "astro_dec_deg": -23.952861111111112,
+        "app_ra_deg": 267.05445833333334,
+        "app_dec_deg": -23.962194444444442,
+        "azimuth_deg": 14.756455,
+        "elevation_deg": -35.613126,
+        "range_au": 2.42383154645831
+      }
+    },
+    {
+      "class": "adversarial",
+      "target_id": 499,
+      "target_name": "Mars",
+      "site": "Polar (synthetic, 78N)",
+      "epoch_jd_ut": 2460430.5,
+      "geo_vector_au": [
+        1.979755538326635,
+        -0.008886433968211602,
+        -0.05152694615469958
+      ],
+      "geo_velocity_au_per_day": [
+        -0.003373884149163749,
+        0.02445362192343284,
+        0.01071104989179131
+      ],
+      "observed": {
+        "astro_ra_deg": 359.7389166666667,
+        "astro_dec_deg": -1.4939444444444445,
+        "app_ra_deg": 0.04529166666666667,
+        "app_dec_deg": -1.3607500000000001,
+        "azimuth_deg": 39.182983,
+        "elevation_deg": -10.72861,
+        "range_au": 1.98037193868542
+      }
+    },
+    {
+      "class": "adversarial",
+      "target_id": 499,
+      "target_name": "Mars",
+      "site": "Polar (synthetic, 78N)",
+      "epoch_jd_ut": 2460550.5,
+      "geo_vector_au": [
+        0.1304381785151843,
+        1.330708480509628,
+        0.5722624637347401
+      ],
+      "geo_velocity_au_per_day": [
+        -0.01627886677871082,
+        -0.004126938789947162,
+        -0.001284992903733402
+      ],
+      "observed": {
+        "astro_ra_deg": 84.398375,
+        "astro_dec_deg": 23.168694444444444,
+        "app_ra_deg": 84.77016666666667,
+        "app_dec_deg": 23.18413888888889,
+        "azimuth_deg": 67.576782,
+        "elevation_deg": 19.015789,
+        "range_au": 1.45430082847763
+      }
+    },
+    {
+      "class": "adversarial",
+      "target_id": 499,
+      "target_name": "Mars",
+      "site": "Polar (synthetic, 78N)",
+      "epoch_jd_ut": 2460670.5,
+      "geo_vector_au": [
+        -0.3701300605235104,
+        0.4989915667774544,
+        0.2635358271016043
+      ],
+      "geo_velocity_au_per_day": [
+        0.004521638521702022,
+        -0.001314490704020353,
+        -0.0002866647181839665
+      ],
+      "observed": {
+        "astro_ra_deg": 126.56258333333332,
+        "astro_dec_deg": 22.983777777777778,
+        "app_ra_deg": 126.93558333333331,
+        "app_dec_deg": 22.90111111111111,
+        "azimuth_deg": 144.509914,
+        "elevation_deg": 32.898244,
+        "range_au": 0.67482088525287
+      }
+    },
+    {
+      "class": "adversarial",
+      "target_id": 499,
+      "target_name": "Mars",
+      "site": "Polar (synthetic, 78N)",
+      "epoch_jd_ut": 2460790.5,
+      "geo_vector_au": [
+        -0.7343753880751505,
+        1.035512131449795,
+        0.503842129053235
+      ],
+      "geo_velocity_au_per_day": [
+        -0.01384694105538139,
+        0.002157512030062682,
+        0.0007786502073812648
+      ],
+      "observed": {
+        "astro_ra_deg": 125.34,
+        "astro_dec_deg": 21.646583333333332,
+        "app_ra_deg": 125.71033333333334,
+        "app_dec_deg": 21.567055555555555,
+        "azimuth_deg": 272.317317,
+        "elevation_deg": 21.580621,
+        "range_au": 1.36585992120425
+      }
+    },
+    {
+      "class": "adversarial",
+      "target_id": 499,
+      "target_name": "Mars",
+      "site": "Polar (synthetic, 78N)",
+      "epoch_jd_ut": 2460910.5,
+      "geo_vector_au": [
+        -2.193466607166804,
+        -0.3516648684856351,
+        -0.1374659750642815
+      ],
+      "geo_velocity_au_per_day": [
+        -0.00005639064890470092,
+        -0.02297806676685939,
+        -0.01042241361678611
+      ],
+      "observed": {
+        "astro_ra_deg": 189.10470833333332,
+        "astro_dec_deg": -3.540388888888889,
+        "app_ra_deg": 189.43162500000003,
+        "app_dec_deg": -3.6804444444444444,
+        "azimuth_deg": 321.0074,
+        "elevation_deg": -13.093202,
+        "range_au": 2.22581961358272
+      }
+    },
+    {
+      "class": "adversarial",
+      "target_id": 499,
+      "target_name": "Mars",
+      "site": "Polar (synthetic, 78N)",
+      "epoch_jd_ut": 2461030.5,
+      "geo_vector_au": [
+        0.1663968436105412,
+        -2.199383390739455,
+        -0.9910184431967967
+      ],
+      "geo_velocity_au_per_day": [
+        0.03189703690703926,
+        0.002641553946360385,
+        0.0008286003936815563
+      ],
+      "observed": {
+        "astro_ra_deg": 274.32120833333335,
+        "astro_dec_deg": -24.19547222222222,
+        "app_ra_deg": 274.7139583333333,
+        "app_dec_deg": -24.18647222222222,
+        "azimuth_deg": 354.471037,
+        "elevation_deg": -36.13741,
+        "range_au": 2.41812905375007
+      }
+    },
+    {
+      "class": "adversarial",
+      "target_id": 499,
+      "target_name": "Mars",
+      "site": "Polar (synthetic, 78N)",
+      "epoch_jd_ut": 2461150.5,
+      "geo_vector_au": [
+        2.244545534858756,
+        0.2878317505991867,
+        0.08358652074169941
+      ],
+      "geo_velocity_au_per_day": [
+        -0.005676257712769054,
+        0.02749511248353483,
+        0.01219545375434315
+      ],
+      "observed": {
+        "astro_ra_deg": 7.303208333333333,
+        "astro_dec_deg": 2.1123333333333334,
+        "app_ra_deg": 7.637291666666667,
+        "app_dec_deg": 2.256361111111111,
+        "azimuth_deg": 20.710072,
+        "elevation_deg": -8.982515,
+        "range_au": 2.26441656812948
+      }
+    },
+    {
+      "class": "adversarial",
+      "target_id": 499,
+      "target_name": "Mars",
+      "site": "Polar (synthetic, 78N)",
+      "epoch_jd_ut": 2461270.5,
+      "geo_vector_au": [
+        -0.1343418453184868,
+        1.754675906630777,
+        0.7726506257751409
+      ],
+      "geo_velocity_au_per_day": [
+        -0.02154108417645187,
+        -0.006002249579209105,
+        -0.002109457648427775
+      ],
+      "observed": {
+        "astro_ra_deg": 94.37429166666666,
+        "astro_dec_deg": 23.702805555555553,
+        "app_ra_deg": 94.779375,
+        "app_dec_deg": 23.69322222222222,
+        "azimuth_deg": 48.274653,
+        "elevation_deg": 15.949729,
+        "range_au": 1.92185292568158
+      }
+    },
+    {
+      "class": "adversarial",
+      "target_id": 499,
+      "target_name": "Mars",
+      "site": "Polar (synthetic, 78N)",
+      "epoch_jd_ut": 2461390.5,
+      "geo_vector_au": [
+        -0.958113565016507,
+        0.3644374910539417,
+        0.2126826062560103
+      ],
+      "geo_velocity_au_per_day": [
+        0.005951829234409446,
+        -0.007317106447188714,
+        -0.003005107767402819
+      ],
+      "observed": {
+        "astro_ra_deg": 159.17204166666664,
+        "astro_dec_deg": 11.720444444444444,
+        "app_ra_deg": 159.53279166666667,
+        "app_dec_deg": 11.578805555555554,
+        "azimuth_deg": 102.418137,
+        "elevation_deg": 14.44577,
+        "range_au": 1.04685543141982
+      }
+    },
+    {
+      "class": "adversarial",
+      "target_id": 699,
+      "target_name": "Saturn",
+      "site": "Equator (synthetic, 0N 0E)",
+      "epoch_jd_ut": 2451544,
+      "geo_vector_au": [
+        6.570611990272195,
+        5.280943121843443,
+        1.887191278605129
+      ],
+      "geo_velocity_au_per_day": [
+        0.01296963256325147,
+        0.006151931380525208,
+        0.002779042760442495
+      ],
+      "observed": {
+        "astro_ra_deg": 38.788000000000004,
+        "astro_dec_deg": 12.618194444444445,
+        "app_ra_deg": 38.787416666666665,
+        "app_dec_deg": 12.616694444444445,
+        "azimuth_deg": 75.602786,
+        "elevation_deg": -28.540559,
+        "range_au": 8.63850610687509
+      }
+    },
+    {
+      "class": "adversarial",
+      "target_id": 699,
+      "target_name": "Saturn",
+      "site": "Equator (synthetic, 0N 0E)",
+      "epoch_jd_ut": 2451545,
+      "geo_vector_au": [
+        6.583555122342154,
+        5.287232795933687,
+        1.890029990112491
+      ],
+      "geo_velocity_au_per_day": [
+        0.01291569832925166,
+        0.006427280227771981,
+        0.002898337517002204
+      ],
+      "observed": {
+        "astro_ra_deg": 38.76625,
+        "astro_dec_deg": 12.616249999999999,
+        "app_ra_deg": 38.76558333333334,
+        "app_dec_deg": 12.614722222222222,
+        "azimuth_deg": 75.73788,
+        "elevation_deg": -27.564694,
+        "range_au": 8.65281648864132
+      }
+    },
+    {
+      "class": "adversarial",
+      "target_id": 699,
+      "target_name": "Saturn",
+      "site": "Equator (synthetic, 0N 0E)",
+      "epoch_jd_ut": 2451546,
+      "geo_vector_au": [
+        6.596441528167612,
+        5.293797433220749,
+        1.892987855374125
+      ],
+      "geo_velocity_au_per_day": [
+        0.01285616345767177,
+        0.006701859947753041,
+        0.003017340989320043
+      ],
+      "observed": {
+        "astro_ra_deg": 38.746249999999996,
+        "astro_dec_deg": 12.614888888888888,
+        "app_ra_deg": 38.74558333333333,
+        "app_dec_deg": 12.613333333333333,
+        "azimuth_deg": 75.865529,
+        "elevation_deg": -26.589893,
+        "range_au": 8.66727884423581
+      }
+    },
+    {
+      "class": "adversarial",
+      "target_id": 699,
+      "target_name": "Saturn",
+      "site": "Equator (synthetic, 0N 0E)",
+      "epoch_jd_ut": 2457752.5,
+      "geo_vector_au": [
+        -1.733725906279153,
+        -10.04366519412917,
+        -4.085969696816345
+      ],
+      "geo_velocity_au_per_day": [
+        0.02247957249558601,
+        0.001486917178166489,
+        0.0004394334005334224
+      ],
+      "observed": {
+        "astro_ra_deg": 260.204375,
+        "astro_dec_deg": -21.845166666666664,
+        "app_ra_deg": 260.45170833333333,
+        "app_dec_deg": -21.858111111111114,
+        "azimuth_deg": 141.785199,
+        "elevation_deg": -61.714943,
+        "range_au": 10.9807411421695
+      }
+    },
+    {
+      "class": "adversarial",
+      "target_id": 699,
+      "target_name": "Saturn",
+      "site": "Equator (synthetic, 0N 0E)",
+      "epoch_jd_ut": 2457753.5,
+      "geo_vector_au": [
+        -1.711269856893612,
+        -10.04203767697538,
+        -4.085469329807585
+      ],
+      "geo_velocity_au_per_day": [
+        0.02243158854500529,
+        0.001767961444197149,
+        0.000561240623324592
+      ],
+      "observed": {
+        "astro_ra_deg": 260.32729166666667,
+        "astro_dec_deg": -21.853250000000003,
+        "app_ra_deg": 260.5747083333333,
+        "app_dec_deg": -21.866,
+        "azimuth_deg": 140.561575,
+        "elevation_deg": -61.168248,
+        "range_au": 10.9755419540282
+      }
+    },
+    {
+      "class": "adversarial",
+      "target_id": 699,
+      "target_name": "Saturn",
+      "site": "Equator (synthetic, 0N 0E)",
+      "epoch_jd_ut": 2457754.5,
+      "geo_vector_au": [
+        -1.688864317042203,
+        -10.04012957795815,
+        -4.084847340060932
+      ],
+      "geo_velocity_au_per_day": [
+        0.02237805181433197,
+        0.002048026938047734,
+        0.00068265203058599
+      ],
+      "observed": {
+        "astro_ra_deg": 260.44979166666667,
+        "astro_dec_deg": -21.86116666666667,
+        "app_ra_deg": 260.69733333333335,
+        "app_dec_deg": -21.87375,
+        "azimuth_deg": 139.380156,
+        "elevation_deg": -60.604854,
+        "range_au": 10.9700922179305
+      }
+    },
+    {
+      "class": "adversarial",
+      "target_id": 699,
+      "target_name": "Saturn",
+      "site": "Equator (synthetic, 0N 0E)",
+      "epoch_jd_ut": 2457755.5,
+      "geo_vector_au": [
+        -1.66651533470499,
+        -10.03794195588026,
+        -4.08410417432551
+      ],
+      "geo_velocity_au_per_day": [
+        0.02231899423754239,
+        0.002327030773178826,
+        0.0008035968837816982
+      ],
+      "observed": {
+        "astro_ra_deg": 260.571875,
+        "astro_dec_deg": -21.868916666666667,
+        "app_ra_deg": 260.8195,
+        "app_dec_deg": -21.881333333333334,
+        "azimuth_deg": 138.250857,
+        "elevation_deg": -60.030882,
+        "range_au": 10.9643934793974
+      }
+    },
+    {
+      "class": "adversarial",
+      "target_id": 699,
+      "target_name": "Saturn",
+      "site": "Equator (synthetic, 0N 0E)",
+      "epoch_jd_ut": 2460310.5,
+      "geo_vector_au": [
+        9.161938680560144,
+        -4.18206712865634,
+        -2.132881008994687
+      ],
+      "geo_velocity_au_per_day": [
+        0.01905198380894553,
+        0.007506678948347601,
+        0.003077578975058576
+      ],
+      "observed": {
+        "astro_ra_deg": 335.46320833333334,
+        "astro_dec_deg": -11.957888888888888,
+        "app_ra_deg": 335.7780416666667,
+        "app_dec_deg": -11.839083333333335,
+        "azimuth_deg": 255.749767,
+        "elevation_deg": -33.543627,
+        "range_au": 10.2947242467374
+      }
+    },
+    {
+      "class": "adversarial",
+      "target_id": 699,
+      "target_name": "Saturn",
+      "site": "Equator (synthetic, 0N 0E)",
+      "epoch_jd_ut": 2460430.5,
+      "geo_vector_au": [
+        9.966791578363022,
+        -2.119093772238966,
+        -1.259001078000066
+      ],
+      "geo_velocity_au_per_day": [
+        -0.00926575807393705,
+        0.01709403423284245,
+        0.007246612841380801
+      ],
+      "observed": {
+        "astro_ra_deg": 347.99525,
+        "astro_dec_deg": -7.044277777777777,
+        "app_ra_deg": 348.306,
+        "app_dec_deg": -6.914000000000001,
+        "azimuth_deg": 98.979152,
+        "elevation_deg": -39.529897,
+        "range_au": 10.2670795135733
+      }
+    },
+    {
+      "class": "adversarial",
+      "target_id": 699,
+      "target_name": "Saturn",
+      "site": "Equator (synthetic, 0N 0E)",
+      "epoch_jd_ut": 2460550.5,
+      "geo_vector_au": [
+        8.432574839072291,
+        -1.722358745920582,
+        -1.105792640863175
+      ],
+      "geo_velocity_au_per_day": [
+        -0.00593747257219218,
+        -0.00922945640831641,
+        -0.004150103325545598
+      ],
+      "observed": {
+        "astro_ra_deg": 348.45441666666665,
+        "astro_dec_deg": -7.322,
+        "app_ra_deg": 348.77891666666665,
+        "app_dec_deg": -7.1859166666666665,
+        "azimuth_deg": 121.085303,
+        "elevation_deg": 75.979215,
+        "range_au": 8.67738710596585
+      }
+    },
+    {
+      "class": "adversarial",
+      "target_id": 699,
+      "target_name": "Saturn",
+      "site": "Equator (synthetic, 0N 0E)",
+      "epoch_jd_ut": 2460670.5,
+      "geo_vector_au": [
+        9.531422016220812,
+        -2.411611104945534,
+        -1.421678989134372
+      ],
+      "geo_velocity_au_per_day": [
+        0.0181664691153462,
+        0.006323705123618,
+        0.002605417160119831
+      ],
+      "observed": {
+        "astro_ra_deg": 345.79925,
+        "astro_dec_deg": -8.22861111111111,
+        "app_ra_deg": 346.1225,
+        "app_dec_deg": -8.095277777777778,
+        "azimuth_deg": 261.45188,
+        "elevation_deg": -18.668243,
+        "range_au": 9.93409539364352
+      }
+    },
+    {
+      "class": "adversarial",
+      "target_id": 699,
+      "target_name": "Saturn",
+      "site": "Equator (synthetic, 0N 0E)",
+      "epoch_jd_ut": 2460790.5,
+      "geo_vector_au": [
+        10.34848386712778,
+        -0.3750187894896339,
+        -0.5541426308467658
+      ],
+      "geo_velocity_au_per_day": [
+        -0.009164619033500892,
+        0.01816105367022833,
+        0.007753650201144451
+      ],
+      "observed": {
+        "astro_ra_deg": 357.923,
+        "astro_dec_deg": -3.063833333333333,
+        "app_ra_deg": 358.24345833333336,
+        "app_dec_deg": -2.92475,
+        "azimuth_deg": 95.087622,
+        "elevation_deg": -54.873572,
+        "range_au": 10.3701244986485
+      }
+    },
+    {
+      "class": "adversarial",
+      "target_id": 699,
+      "target_name": "Saturn",
+      "site": "Equator (synthetic, 0N 0E)",
+      "epoch_jd_ut": 2460910.5,
+      "geo_vector_au": [
+        8.666198555513423,
+        0.1822881517417485,
+        -0.3259534935503385
+      ],
+      "geo_velocity_au_per_day": [
+        -0.008421693851488788,
+        -0.008446008021485991,
+        -0.003765359452427075
+      ],
+      "observed": {
+        "astro_ra_deg": 1.2034583333333333,
+        "astro_dec_deg": -2.1542222222222223,
+        "app_ra_deg": 1.5375833333333333,
+        "app_dec_deg": -2.0089166666666665,
+        "azimuth_deg": 94.013495,
+        "elevation_deg": 59.943958,
+        "range_au": 8.6742051023308
+      }
+    },
+    {
+      "class": "adversarial",
+      "target_id": 699,
+      "target_name": "Saturn",
+      "site": "Equator (synthetic, 0N 0E)",
+      "epoch_jd_ut": 2461030.5,
+      "geo_vector_au": [
+        9.495117000588953,
+        -0.5702620760421724,
+        -0.6636034828520035
+      ],
+      "geo_velocity_au_per_day": [
+        0.01706161342329413,
+        0.004923870425501271,
+        0.002047777015607316
+      ],
+      "observed": {
+        "astro_ra_deg": 356.56108333333333,
+        "astro_dec_deg": -3.9913611111111114,
+        "app_ra_deg": 356.8955,
+        "app_dec_deg": -3.8469722222222225,
+        "azimuth_deg": 266.148019,
+        "elevation_deg": -2.918181,
+        "range_au": 9.5353958653342
+      }
+    },
+    {
+      "class": "adversarial",
+      "target_id": 699,
+      "target_name": "Saturn",
+      "site": "Equator (synthetic, 0N 0E)",
+      "epoch_jd_ut": 2461150.5,
+      "geo_vector_au": [
+        10.31115564588462,
+        1.402292713250083,
+        0.1820916804620778
+      ],
+      "geo_velocity_au_per_day": [
+        -0.009037306476043278,
+        0.01890202712575994,
+        0.00812459759418714
+      ],
+      "observed": {
+        "astro_ra_deg": 7.742958333333333,
+        "astro_dec_deg": 1.0017777777777779,
+        "app_ra_deg": 8.076666666666666,
+        "app_dec_deg": 1.1456944444444443,
+        "azimuth_deg": 86.656951,
+        "elevation_deg": -69.947274,
+        "range_au": 10.4077108875464
+      }
+    },
+    {
+      "class": "adversarial",
+      "target_id": 699,
+      "target_name": "Saturn",
+      "site": "Equator (synthetic, 0N 0E)",
+      "epoch_jd_ut": 2461270.5,
+      "geo_vector_au": [
+        8.489168173794486,
+        2.094194898380382,
+        0.4747813521195802
+      ],
+      "geo_velocity_au_per_day": [
+        -0.01086449677750823,
+        -0.00777537966005968,
+        -0.003422340653222391
+      ],
+      "observed": {
+        "astro_ra_deg": 13.856125,
+        "astro_dec_deg": 3.107416666666667,
+        "app_ra_deg": 14.204958333333334,
+        "app_dec_deg": 3.2543888888888888,
+        "azimuth_deg": 85.612799,
+        "elevation_deg": 42.087894,
+        "range_au": 8.75650644048502
+      }
+    },
+    {
+      "class": "adversarial",
+      "target_id": 699,
+      "target_name": "Saturn",
+      "site": "Equator (synthetic, 0N 0E)",
+      "epoch_jd_ut": 2461390.5,
+      "geo_vector_au": [
+        9.037984585850833,
+        1.262662785604759,
+        0.109270441585738
+      ],
+      "geo_velocity_au_per_day": [
+        0.01577790101423161,
+        0.003297765705293493,
+        0.001397434676983488
+      ],
+      "observed": {
+        "astro_ra_deg": 7.951125000000001,
+        "astro_dec_deg": 0.6853055555555556,
+        "app_ra_deg": 8.300583333333334,
+        "app_dec_deg": 0.8355,
+        "azimuth_deg": 270.859777,
+        "elevation_deg": 13.64504,
+        "range_au": 9.12644911849073
+      }
+    },
+    {
+      "class": "adversarial",
+      "target_id": 699,
+      "target_name": "Saturn",
+      "site": "Polar (synthetic, 78N)",
+      "epoch_jd_ut": 2451544,
+      "geo_vector_au": [
+        6.570611990272195,
+        5.280943121843443,
+        1.887191278605129
+      ],
+      "geo_velocity_au_per_day": [
+        0.01296963256325147,
+        0.006151931380525208,
+        0.002779042760442495
+      ],
+      "observed": {
+        "astro_ra_deg": 38.787791666666664,
+        "astro_dec_deg": 12.617944444444445,
+        "app_ra_deg": 38.78725,
+        "app_dec_deg": 12.616444444444443,
+        "azimuth_deg": 58.927162,
+        "elevation_deg": 6.564186,
+        "range_au": 8.63848090998189
+      }
+    },
+    {
+      "class": "adversarial",
+      "target_id": 699,
+      "target_name": "Saturn",
+      "site": "Polar (synthetic, 78N)",
+      "epoch_jd_ut": 2451545,
+      "geo_vector_au": [
+        6.583555122342154,
+        5.287232795933687,
+        1.890029990112491
+      ],
+      "geo_velocity_au_per_day": [
+        0.01291569832925166,
+        0.006427280227771981,
+        0.002898337517002204
+      ],
+      "observed": {
+        "astro_ra_deg": 38.76604166666667,
+        "astro_dec_deg": 12.616,
+        "app_ra_deg": 38.76541666666667,
+        "app_dec_deg": 12.614472222222222,
+        "azimuth_deg": 59.900524,
+        "elevation_deg": 6.742561,
+        "range_au": 8.65279180027687
+      }
+    },
+    {
+      "class": "adversarial",
+      "target_id": 699,
+      "target_name": "Saturn",
+      "site": "Polar (synthetic, 78N)",
+      "epoch_jd_ut": 2451546,
+      "geo_vector_au": [
+        6.596441528167612,
+        5.293797433220749,
+        1.892987855374125
+      ],
+      "geo_velocity_au_per_day": [
+        0.01285616345767177,
+        0.006701859947753041,
+        0.003017340989320043
+      ],
+      "observed": {
+        "astro_ra_deg": 38.74608333333333,
+        "astro_dec_deg": 12.614638888888889,
+        "app_ra_deg": 38.745416666666664,
+        "app_dec_deg": 12.613111111111111,
+        "azimuth_deg": 60.872106,
+        "elevation_deg": 6.922982,
+        "range_au": 8.66725466794883
+      }
+    },
+    {
+      "class": "adversarial",
+      "target_id": 699,
+      "target_name": "Saturn",
+      "site": "Polar (synthetic, 78N)",
+      "epoch_jd_ut": 2457752.5,
+      "geo_vector_au": [
+        -1.733725906279153,
+        -10.04366519412917,
+        -4.085969696816345
+      ],
+      "geo_velocity_au_per_day": [
+        0.02247957249558601,
+        0.001486917178166489,
+        0.0004394334005334224
+      ],
+      "observed": {
+        "astro_ra_deg": 260.2043333333333,
+        "astro_dec_deg": -21.845444444444443,
+        "app_ra_deg": 260.45170833333333,
+        "app_dec_deg": -21.85838888888889,
+        "azimuth_deg": 20.502136,
+        "elevation_deg": -33.179534,
+        "range_au": 10.9807269003039
+      }
+    },
+    {
+      "class": "adversarial",
+      "target_id": 699,
+      "target_name": "Saturn",
+      "site": "Polar (synthetic, 78N)",
+      "epoch_jd_ut": 2457753.5,
+      "geo_vector_au": [
+        -1.711269856893612,
+        -10.04203767697538,
+        -4.085469329807585
+      ],
+      "geo_velocity_au_per_day": [
+        0.02243158854500529,
+        0.001767961444197149,
+        0.000561240623324592
+      ],
+      "observed": {
+        "astro_ra_deg": 260.32725000000005,
+        "astro_dec_deg": -21.8535,
+        "app_ra_deg": 260.57475,
+        "app_dec_deg": -21.86627777777778,
+        "azimuth_deg": 21.456058,
+        "elevation_deg": -33.123184,
+        "range_au": 10.9755278713365
+      }
+    },
+    {
+      "class": "adversarial",
+      "target_id": 699,
+      "target_name": "Saturn",
+      "site": "Polar (synthetic, 78N)",
+      "epoch_jd_ut": 2457754.5,
+      "geo_vector_au": [
+        -1.688864317042203,
+        -10.04012957795815,
+        -4.084847340060932
+      ],
+      "geo_velocity_au_per_day": [
+        0.02237805181433197,
+        0.002048026938047734,
+        0.00068265203058599
+      ],
+      "observed": {
+        "astro_ra_deg": 260.4497083333333,
+        "astro_dec_deg": -21.861416666666667,
+        "app_ra_deg": 260.69733333333335,
+        "app_dec_deg": -21.874,
+        "azimuth_deg": 22.41411,
+        "elevation_deg": -33.063543,
+        "range_au": 10.97007830183
+      }
+    },
+    {
+      "class": "adversarial",
+      "target_id": 699,
+      "target_name": "Saturn",
+      "site": "Polar (synthetic, 78N)",
+      "epoch_jd_ut": 2457755.5,
+      "geo_vector_au": [
+        -1.66651533470499,
+        -10.03794195588026,
+        -4.08410417432551
+      ],
+      "geo_velocity_au_per_day": [
+        0.02231899423754239,
+        0.002327030773178826,
+        0.0008035968837816982
+      ],
+      "observed": {
+        "astro_ra_deg": 260.5717916666667,
+        "astro_dec_deg": -21.869194444444446,
+        "app_ra_deg": 260.8195,
+        "app_dec_deg": -21.881611111111113,
+        "azimuth_deg": 23.367055,
+        "elevation_deg": -33.001273,
+        "range_au": 10.9643797357416
+      }
+    },
+    {
+      "class": "adversarial",
+      "target_id": 699,
+      "target_name": "Saturn",
+      "site": "Polar (synthetic, 78N)",
+      "epoch_jd_ut": 2460310.5,
+      "geo_vector_au": [
+        9.161938680560144,
+        -4.18206712865634,
+        -2.132881008994687
+      ],
+      "geo_velocity_au_per_day": [
+        0.01905198380894553,
+        0.007506678948347601,
+        0.003077578975058576
+      ],
+      "observed": {
+        "astro_ra_deg": 335.46337500000004,
+        "astro_dec_deg": -11.958138888888888,
+        "app_ra_deg": 335.77820833333334,
+        "app_dec_deg": -11.839305555555557,
+        "azimuth_deg": 301.644601,
+        "elevation_deg": -18.395248,
+        "range_au": 10.2947141283841
+      }
+    },
+    {
+      "class": "adversarial",
+      "target_id": 699,
+      "target_name": "Saturn",
+      "site": "Polar (synthetic, 78N)",
+      "epoch_jd_ut": 2460430.5,
+      "geo_vector_au": [
+        9.966791578363022,
+        -2.119093772238966,
+        -1.259001078000066
+      ],
+      "geo_velocity_au_per_day": [
+        -0.00926575807393705,
+        0.01709403423284245,
+        0.007246612841380801
+      ],
+      "observed": {
+        "astro_ra_deg": 347.995125,
+        "astro_dec_deg": -7.044527777777778,
+        "app_ra_deg": 348.30587499999996,
+        "app_dec_deg": -6.91425,
+        "azimuth_deg": 51.892074,
+        "elevation_deg": -14.482437,
+        "range_au": 10.2670630376081
+      }
+    },
+    {
+      "class": "adversarial",
+      "target_id": 699,
+      "target_name": "Saturn",
+      "site": "Polar (synthetic, 78N)",
+      "epoch_jd_ut": 2460550.5,
+      "geo_vector_au": [
+        8.432574839072291,
+        -1.722358745920582,
+        -1.105792640863175
+      ],
+      "geo_velocity_au_per_day": [
+        -0.00593747257219218,
+        -0.00922945640831641,
+        -0.004150103325545598
+      ],
+      "observed": {
+        "astro_ra_deg": 348.45437499999997,
+        "astro_dec_deg": -7.3222499999999995,
+        "app_ra_deg": 348.7787916666666,
+        "app_dec_deg": -7.186166666666667,
+        "azimuth_deg": 167.987346,
+        "elevation_deg": 4.551664,
+        "range_au": 8.6774250436539
+      }
+    },
+    {
+      "class": "adversarial",
+      "target_id": 699,
+      "target_name": "Saturn",
+      "site": "Polar (synthetic, 78N)",
+      "epoch_jd_ut": 2460670.5,
+      "geo_vector_au": [
+        9.531422016220812,
+        -2.411611104945534,
+        -1.421678989134372
+      ],
+      "geo_velocity_au_per_day": [
+        0.0181664691153462,
+        0.006323705123618,
+        0.002605417160119831
+      ],
+      "observed": {
+        "astro_ra_deg": 345.79941666666673,
+        "astro_dec_deg": -8.228833333333334,
+        "app_ra_deg": 346.1227083333333,
+        "app_dec_deg": -8.095527777777779,
+        "azimuth_deg": 286.853891,
+        "elevation_deg": -11.788354,
+        "range_au": 9.93409044573314
+      }
+    },
+    {
+      "class": "adversarial",
+      "target_id": 699,
+      "target_name": "Saturn",
+      "site": "Polar (synthetic, 78N)",
+      "epoch_jd_ut": 2460790.5,
+      "geo_vector_au": [
+        10.34848386712778,
+        -0.3750187894896339,
+        -0.5541426308467658
+      ],
+      "geo_velocity_au_per_day": [
+        -0.009164619033500892,
+        0.01816105367022833,
+        0.007753650201144451
+      ],
+      "observed": {
+        "astro_ra_deg": 357.9229166666667,
+        "astro_dec_deg": -3.064083333333333,
+        "app_ra_deg": 358.2434166666667,
+        "app_dec_deg": -2.925,
+        "azimuth_deg": 35.980695,
+        "elevation_deg": -12.706683,
+        "range_au": 10.3700990191234
+      }
+    },
+    {
+      "class": "adversarial",
+      "target_id": 699,
+      "target_name": "Saturn",
+      "site": "Polar (synthetic, 78N)",
+      "epoch_jd_ut": 2460910.5,
+      "geo_vector_au": [
+        8.666198555513423,
+        0.1822881517417485,
+        -0.3259534935503385
+      ],
+      "geo_velocity_au_per_day": [
+        -0.008421693851488788,
+        -0.008446008021485991,
+        -0.003765359452427075
+      ],
+      "observed": {
+        "astro_ra_deg": 1.2033333333333334,
+        "astro_dec_deg": -2.1545,
+        "app_ra_deg": 1.5374166666666667,
+        "app_dec_deg": -2.0091944444444443,
+        "azimuth_deg": 149.669031,
+        "elevation_deg": 8.375657,
+        "range_au": 8.6742357672231
+      }
+    },
+    {
+      "class": "adversarial",
+      "target_id": 699,
+      "target_name": "Saturn",
+      "site": "Polar (synthetic, 78N)",
+      "epoch_jd_ut": 2461030.5,
+      "geo_vector_au": [
+        9.495117000588953,
+        -0.5702620760421724,
+        -0.6636034828520035
+      ],
+      "geo_velocity_au_per_day": [
+        0.01706161342329413,
+        0.004923870425501271,
+        0.002047777015607316
+      ],
+      "observed": {
+        "astro_ra_deg": 356.56129166666665,
+        "astro_dec_deg": -3.991611111111111,
+        "app_ra_deg": 356.89570833333335,
+        "app_dec_deg": -3.8472222222222223,
+        "azimuth_deg": 272.060528,
+        "elevation_deg": -4.371067,
+        "range_au": 9.5353969358109
+      }
+    },
+    {
+      "class": "adversarial",
+      "target_id": 699,
+      "target_name": "Saturn",
+      "site": "Polar (synthetic, 78N)",
+      "epoch_jd_ut": 2461150.5,
+      "geo_vector_au": [
+        10.31115564588462,
+        1.402292713250083,
+        0.1820916804620778
+      ],
+      "geo_velocity_au_per_day": [
+        -0.009037306476043278,
+        0.01890202712575994,
+        0.00812459759418714
+      ],
+      "observed": {
+        "astro_ra_deg": 7.742875000000001,
+        "astro_dec_deg": 1.0015555555555555,
+        "app_ra_deg": 8.076666666666666,
+        "app_dec_deg": 1.1454722222222222,
+        "azimuth_deg": 20.348077,
+        "elevation_deg": -10.122462,
+        "range_au": 10.4076783573909
+      }
+    },
+    {
+      "class": "adversarial",
+      "target_id": 699,
+      "target_name": "Saturn",
+      "site": "Polar (synthetic, 78N)",
+      "epoch_jd_ut": 2461270.5,
+      "geo_vector_au": [
+        8.489168173794486,
+        2.094194898380382,
+        0.4747813521195802
+      ],
+      "geo_velocity_au_per_day": [
+        -0.01086449677750823,
+        -0.00777537966005968,
+        -0.003422340653222391
+      ],
+      "observed": {
+        "astro_ra_deg": 13.855958333333332,
+        "astro_dec_deg": 3.107138888888889,
+        "app_ra_deg": 14.20475,
+        "app_dec_deg": 3.254111111111111,
+        "azimuth_deg": 131.027038,
+        "elevation_deg": 11.237873,
+        "range_au": 8.7565267005472
+      }
+    },
+    {
+      "class": "adversarial",
+      "target_id": 699,
+      "target_name": "Saturn",
+      "site": "Polar (synthetic, 78N)",
+      "epoch_jd_ut": 2461390.5,
+      "geo_vector_au": [
+        9.037984585850833,
+        1.262662785604759,
+        0.109270441585738
+      ],
+      "geo_velocity_au_per_day": [
+        0.01577790101423161,
+        0.003297765705293493,
+        0.001397434676983488
+      ],
+      "observed": {
+        "astro_ra_deg": 7.951333333333334,
+        "astro_dec_deg": 0.6850555555555555,
+        "app_ra_deg": 8.300791666666667,
+        "app_dec_deg": 0.83525,
+        "azimuth_deg": 256.810389,
+        "elevation_deg": 3.629571,
+        "range_au": 9.12645647222305
+      }
+    },
+    {
+      "class": "boundary",
+      "target_id": 599,
+      "target_name": "Jupiter",
+      "site": "Greenwich",
+      "epoch_jd_ut": 2451544,
+      "geo_vector_au": [
+        4.165651804223964,
+        1.840511544849215,
+        0.6869418971841837
+      ],
+      "geo_velocity_au_per_day": [
+        0.01270074195729511,
+        0.00850971678351083,
+        0.003771603178569914
+      ],
+      "observed": {
+        "astro_ra_deg": 23.835208333333334,
+        "astro_dec_deg": 8.576416666666667,
+        "app_ra_deg": 23.83325,
+        "app_dec_deg": 8.574805555555555,
+        "azimuth_deg": 73.445978,
+        "elevation_deg": -2.068531,
+        "range_au": 4.60568976151071
+      }
+    },
+    {
+      "class": "boundary",
+      "target_id": 599,
+      "target_name": "Jupiter",
+      "site": "Greenwich",
+      "epoch_jd_ut": 2451545,
+      "geo_vector_au": [
+        4.178321924191024,
+        1.849156428913722,
+        0.6907721352458732
+      ],
+      "geo_velocity_au_per_day": [
+        0.012639251884789,
+        0.008779874989403365,
+        0.003888806347749291
+      ],
+      "observed": {
+        "astro_ra_deg": 23.87016666666667,
+        "astro_dec_deg": 8.595472222222222,
+        "app_ra_deg": 23.86816666666667,
+        "app_dec_deg": 8.593833333333334,
+        "azimuth_deg": 74.183406,
+        "elevation_deg": -1.48469,
+        "range_au": 4.62117638311511
+      }
+    },
+    {
+      "class": "boundary",
+      "target_id": 599,
+      "target_name": "Jupiter",
+      "site": "Greenwich",
+      "epoch_jd_ut": 2451546,
+      "geo_vector_au": [
+        4.190928283778728,
+        1.858071736722738,
+        0.6947197308975452
+      ],
+      "geo_velocity_au_per_day": [
+        0.01257207071013061,
+        0.009050256285918294,
+        0.004006153285921301
+      ],
+      "observed": {
+        "astro_ra_deg": 23.90829166666667,
+        "astro_dec_deg": 8.61575,
+        "app_ra_deg": 23.906250000000004,
+        "app_dec_deg": 8.614083333333333,
+        "azimuth_deg": 74.915722,
+        "elevation_deg": -0.89976,
+        "range_au": 4.63673347169665
+      }
+    },
+    {
+      "class": "boundary",
+      "target_id": 599,
+      "target_name": "Jupiter",
+      "site": "Greenwich",
+      "epoch_jd_ut": 2457752.5,
+      "geo_vector_au": [
+        -5.217216738509085,
+        -1.857890132968778,
+        -0.6701524758288573
+      ],
+      "geo_velocity_au_per_day": [
+        0.0185950388636844,
+        -0.004095615065677962,
+        -0.001775847295255213
+      ],
+      "observed": {
+        "astro_ra_deg": 199.5992916666667,
+        "astro_dec_deg": -6.899055555555555,
+        "app_ra_deg": 199.81829166666668,
+        "app_dec_deg": -6.98625,
+        "azimuth_deg": 85.78498,
+        "elevation_deg": -12.277139,
+        "range_au": 5.57851665839921
+      }
+    },
+    {
+      "class": "boundary",
+      "target_id": 599,
+      "target_name": "Jupiter",
+      "site": "Greenwich",
+      "epoch_jd_ut": 2457753.5,
+      "geo_vector_au": [
+        -5.198640069941215,
+        -1.861845375136126,
+        -0.6718676354172871
+      ],
+      "geo_velocity_au_per_day": [
+        0.01855694939859297,
+        -0.003814528047578154,
+        -0.001654305438075408
+      ],
+      "observed": {
+        "astro_ra_deg": 199.702625,
+        "astro_dec_deg": -6.9366111111111115,
+        "app_ra_deg": 199.92179166666668,
+        "app_dec_deg": -7.023777777777778,
+        "azimuth_deg": 86.507042,
+        "elevation_deg": -11.758226,
+        "range_au": 5.56267629223727
+      }
+    },
+    {
+      "class": "boundary",
+      "target_id": 599,
+      "target_name": "Jupiter",
+      "site": "Greenwich",
+      "epoch_jd_ut": 2457754.5,
+      "geo_vector_au": [
+        -5.180105174822545,
+        -1.865520219433164,
+        -0.6734615625491192
+      ],
+      "geo_velocity_au_per_day": [
+        0.01851204961245342,
+        -0.003535520966127119,
+        -0.001533702085412407
+      ],
+      "observed": {
+        "astro_ra_deg": 199.80366666666666,
+        "astro_dec_deg": -6.973166666666667,
+        "app_ra_deg": 200.023,
+        "app_dec_deg": -7.060333333333333,
+        "azimuth_deg": 87.231796,
+        "elevation_deg": -11.234088,
+        "range_au": 5.54678619379645
+      }
+    },
+    {
+      "class": "boundary",
+      "target_id": 599,
+      "target_name": "Jupiter",
+      "site": "Greenwich",
+      "epoch_jd_ut": 2457755.5,
+      "geo_vector_au": [
+        -5.161617482251731,
+        -1.868915959304201,
+        -0.6749347912242509
+      ],
+      "geo_velocity_au_per_day": [
+        0.01846162965151554,
+        -0.003256168954802547,
+        -0.001412854479989524
+      ],
+      "observed": {
+        "astro_ra_deg": 199.902375,
+        "astro_dec_deg": -7.00875,
+        "app_ra_deg": 200.1219166666667,
+        "app_dec_deg": -7.095916666666667,
+        "azimuth_deg": 87.95278,
+        "elevation_deg": -10.709991,
+        "range_au": 5.53085049797566
+      }
+    },
+    {
+      "class": "boundary",
+      "target_id": 599,
+      "target_name": "Jupiter",
+      "site": "Mauna Kea",
+      "epoch_jd_ut": 2451544,
+      "geo_vector_au": [
+        4.165651804223964,
+        1.840511544849215,
+        0.6869418971841837
+      ],
+      "geo_velocity_au_per_day": [
+        0.01270074195729511,
+        0.00850971678351083,
+        0.003771603178569914
+      ],
+      "observed": {
+        "astro_ra_deg": 23.834375,
+        "astro_dec_deg": 8.576638888888889,
+        "app_ra_deg": 23.83241666666667,
+        "app_dec_deg": 8.575055555555556,
+        "azimuth_deg": 281.581464,
+        "elevation_deg": -6.523524,
+        "range_au": 4.60569305094516
+      }
+    },
+    {
+      "class": "boundary",
+      "target_id": 599,
+      "target_name": "Jupiter",
+      "site": "Mauna Kea",
+      "epoch_jd_ut": 2451545,
+      "geo_vector_au": [
+        4.178321924191024,
+        1.849156428913722,
+        0.6907721352458732
+      ],
+      "geo_velocity_au_per_day": [
+        0.012639251884789,
+        0.008779874989403365,
+        0.003888806347749291
+      ],
+      "observed": {
+        "astro_ra_deg": 23.869333333333334,
+        "astro_dec_deg": 8.595694444444446,
+        "app_ra_deg": 23.867333333333335,
+        "app_dec_deg": 8.594083333333334,
+        "azimuth_deg": 281.944053,
+        "elevation_deg": -7.392202,
+        "range_au": 4.62118074986608
+      }
+    },
+    {
+      "class": "boundary",
+      "target_id": 599,
+      "target_name": "Jupiter",
+      "site": "Mauna Kea",
+      "epoch_jd_ut": 2451546,
+      "geo_vector_au": [
+        4.190928283778728,
+        1.858071736722738,
+        0.6947197308975452
+      ],
+      "geo_velocity_au_per_day": [
+        0.01257207071013061,
+        0.009050256285918294,
+        0.004006153285921301
+      ],
+      "observed": {
+        "astro_ra_deg": 23.907458333333334,
+        "astro_dec_deg": 8.615972222222222,
+        "app_ra_deg": 23.905416666666667,
+        "app_dec_deg": 8.614333333333333,
+        "azimuth_deg": 282.310193,
+        "elevation_deg": -8.256273,
+        "range_au": 4.6367389120301
+      }
+    },
+    {
+      "class": "boundary",
+      "target_id": 599,
+      "target_name": "Jupiter",
+      "site": "Mauna Kea",
+      "epoch_jd_ut": 2457752.5,
+      "geo_vector_au": [
+        -5.217216738509085,
+        -1.857890132968778,
+        -0.6701524758288573
+      ],
+      "geo_velocity_au_per_day": [
+        0.0185950388636844,
+        -0.004095615065677962,
+        -0.001775847295255213
+      ],
+      "observed": {
+        "astro_ra_deg": 199.598625,
+        "astro_dec_deg": -6.898861111111111,
+        "app_ra_deg": 199.817625,
+        "app_dec_deg": -6.986055555555556,
+        "azimuth_deg": 267.897514,
+        "elevation_deg": -15.091316,
+        "range_au": 5.57851869959427
+      }
+    },
+    {
+      "class": "boundary",
+      "target_id": 599,
+      "target_name": "Jupiter",
+      "site": "Mauna Kea",
+      "epoch_jd_ut": 2457753.5,
+      "geo_vector_au": [
+        -5.198640069941215,
+        -1.861845375136126,
+        -0.6718676354172871
+      ],
+      "geo_velocity_au_per_day": [
+        0.01855694939859297,
+        -0.003814528047578154,
+        -0.001654305438075408
+      ],
+      "observed": {
+        "astro_ra_deg": 199.70195833333335,
+        "astro_dec_deg": -6.936416666666667,
+        "app_ra_deg": 199.921125,
+        "app_dec_deg": -7.023583333333333,
+        "azimuth_deg": 268.15188,
+        "elevation_deg": -15.932727,
+        "range_au": 5.56267931599192
+      }
+    },
+    {
+      "class": "boundary",
+      "target_id": 599,
+      "target_name": "Jupiter",
+      "site": "Mauna Kea",
+      "epoch_jd_ut": 2457754.5,
+      "geo_vector_au": [
+        -5.180105174822545,
+        -1.865520219433164,
+        -0.6734615625491192
+      ],
+      "geo_velocity_au_per_day": [
+        0.01851204961245342,
+        -0.003535520966127119,
+        -0.001533702085412407
+      ],
+      "observed": {
+        "astro_ra_deg": 199.80295833333332,
+        "astro_dec_deg": -6.972972222222222,
+        "app_ra_deg": 200.02233333333336,
+        "app_dec_deg": -7.060138888888889,
+        "azimuth_deg": 268.409823,
+        "elevation_deg": -16.779998,
+        "range_au": 5.54679020629764
+      }
+    },
+    {
+      "class": "boundary",
+      "target_id": 599,
+      "target_name": "Jupiter",
+      "site": "Mauna Kea",
+      "epoch_jd_ut": 2457755.5,
+      "geo_vector_au": [
+        -5.161617482251731,
+        -1.868915959304201,
+        -0.6749347912242509
+      ],
+      "geo_velocity_au_per_day": [
+        0.01846162965151554,
+        -0.003256168954802547,
+        -0.001412854479989524
+      ],
+      "observed": {
+        "astro_ra_deg": 199.90170833333332,
+        "astro_dec_deg": -7.008527777777778,
+        "app_ra_deg": 200.12120833333333,
+        "app_dec_deg": -7.095722222222222,
+        "azimuth_deg": 268.668724,
+        "elevation_deg": -17.62528,
+        "range_au": 5.53085549578237
+      }
+    },
+    {
+      "class": "boundary",
+      "target_id": 599,
+      "target_name": "Jupiter",
+      "site": "Paranal",
+      "epoch_jd_ut": 2451544,
+      "geo_vector_au": [
+        4.165651804223964,
+        1.840511544849215,
+        0.6869418971841837
+      ],
+      "geo_velocity_au_per_day": [
+        0.01270074195729511,
+        0.00850971678351083,
+        0.003771603178569914
+      ],
+      "observed": {
+        "astro_ra_deg": 23.83491666666667,
+        "astro_dec_deg": 8.576972222222222,
+        "app_ra_deg": 23.83291666666667,
+        "app_dec_deg": 8.57536111111111,
+        "azimuth_deg": 161.820853,
+        "elevation_deg": -73.188474,
+        "range_au": 4.60572902270482
+      }
+    },
+    {
+      "class": "boundary",
+      "target_id": 599,
+      "target_name": "Jupiter",
+      "site": "Paranal",
+      "epoch_jd_ut": 2451545,
+      "geo_vector_au": [
+        4.178321924191024,
+        1.849156428913722,
+        0.6907721352458732
+      ],
+      "geo_velocity_au_per_day": [
+        0.012639251884789,
+        0.008779874989403365,
+        0.003888806347749291
+      ],
+      "observed": {
+        "astro_ra_deg": 23.869875,
+        "astro_dec_deg": 8.596055555555557,
+        "app_ra_deg": 23.86779166666667,
+        "app_dec_deg": 8.594416666666667,
+        "azimuth_deg": 158.734462,
+        "elevation_deg": -72.91484,
+        "range_au": 4.62121601990131
+      }
+    },
+    {
+      "class": "boundary",
+      "target_id": 599,
+      "target_name": "Jupiter",
+      "site": "Paranal",
+      "epoch_jd_ut": 2451546,
+      "geo_vector_au": [
+        4.190928283778728,
+        1.858071736722738,
+        0.6947197308975452
+      ],
+      "geo_velocity_au_per_day": [
+        0.01257207071013061,
+        0.009050256285918294,
+        0.004006153285921301
+      ],
+      "observed": {
+        "astro_ra_deg": 23.908,
+        "astro_dec_deg": 8.616305555555556,
+        "app_ra_deg": 23.905916666666666,
+        "app_dec_deg": 8.614666666666666,
+        "azimuth_deg": 155.755685,
+        "elevation_deg": -72.600515,
+        "range_au": 4.63677347501264
+      }
+    },
+    {
+      "class": "boundary",
+      "target_id": 599,
+      "target_name": "Jupiter",
+      "site": "Paranal",
+      "epoch_jd_ut": 2457752.5,
+      "geo_vector_au": [
+        -5.217216738509085,
+        -1.857890132968778,
+        -0.6701524758288573
+      ],
+      "geo_velocity_au_per_day": [
+        0.0185950388636844,
+        -0.004095615065677962,
+        -0.001775847295255213
+      ],
+      "observed": {
+        "astro_ra_deg": 199.59908333333334,
+        "astro_dec_deg": -6.898499999999999,
+        "app_ra_deg": 199.81799999999998,
+        "app_dec_deg": -6.985694444444444,
+        "azimuth_deg": 163.982736,
+        "elevation_deg": -57.284751,
+        "range_au": 5.57854352216215
+      }
+    },
+    {
+      "class": "boundary",
+      "target_id": 599,
+      "target_name": "Jupiter",
+      "site": "Paranal",
+      "epoch_jd_ut": 2457753.5,
+      "geo_vector_au": [
+        -5.198640069941215,
+        -1.861845375136126,
+        -0.6718676354172871
+      ],
+      "geo_velocity_au_per_day": [
+        0.01855694939859297,
+        -0.003814528047578154,
+        -0.001654305438075408
+      ],
+      "observed": {
+        "astro_ra_deg": 199.70241666666666,
+        "astro_dec_deg": -6.936055555555556,
+        "app_ra_deg": 199.92154166666666,
+        "app_dec_deg": -7.0232222222222225,
+        "azimuth_deg": 162.444334,
+        "elevation_deg": -57.016935,
+        "range_au": 5.56270342653672
+      }
+    },
+    {
+      "class": "boundary",
+      "target_id": 599,
+      "target_name": "Jupiter",
+      "site": "Paranal",
+      "epoch_jd_ut": 2457754.5,
+      "geo_vector_au": [
+        -5.180105174822545,
+        -1.865520219433164,
+        -0.6734615625491192
+      ],
+      "geo_velocity_au_per_day": [
+        0.01851204961245342,
+        -0.003535520966127119,
+        -0.001533702085412407
+      ],
+      "observed": {
+        "astro_ra_deg": 199.80345833333334,
+        "astro_dec_deg": -6.972611111111111,
+        "app_ra_deg": 200.02275000000003,
+        "app_dec_deg": -7.059777777777778,
+        "azimuth_deg": 160.918135,
+        "elevation_deg": -56.728018,
+        "range_au": 5.54681359375738
+      }
+    },
+    {
+      "class": "boundary",
+      "target_id": 599,
+      "target_name": "Jupiter",
+      "site": "Paranal",
+      "epoch_jd_ut": 2457755.5,
+      "geo_vector_au": [
+        -5.161617482251731,
+        -1.868915959304201,
+        -0.6749347912242509
+      ],
+      "geo_velocity_au_per_day": [
+        0.01846162965151554,
+        -0.003256168954802547,
+        -0.001412854479989524
+      ],
+      "observed": {
+        "astro_ra_deg": 199.90216666666666,
+        "astro_dec_deg": -7.008166666666667,
+        "app_ra_deg": 200.121625,
+        "app_dec_deg": -7.095333333333333,
+        "azimuth_deg": 159.419752,
+        "elevation_deg": -56.420729,
+        "range_au": 5.53087815578425
+      }
+    },
+    {
+      "class": "boundary",
+      "target_id": 499,
+      "target_name": "Mars",
+      "site": "Greenwich",
+      "epoch_jd_ut": 2451544,
+      "geo_vector_au": [
+        1.549882810337337,
+        -0.9025884167452861,
+        -0.4292096184629684
+      ],
+      "geo_velocity_au_per_day": [
+        0.01808309867020472,
+        0.01643428451070753,
+        0.007449808653720263
+      ],
+      "observed": {
+        "astro_ra_deg": 329.7816666666667,
+        "astro_dec_deg": -13.460916666666666,
+        "app_ra_deg": 329.77387500000003,
+        "app_dec_deg": -13.46286111111111,
+        "azimuth_deg": 130.14074,
+        "elevation_deg": 11.815265,
+        "range_au": 1.84425778920466
+      }
+    },
+    {
+      "class": "boundary",
+      "target_id": 499,
+      "target_name": "Mars",
+      "site": "Greenwich",
+      "epoch_jd_ut": 2451545,
+      "geo_vector_au": [
+        1.567864302813854,
+        -0.8860148896376784,
+        -0.4216974395381974
+      ],
+      "geo_velocity_au_per_day": [
+        0.01787897089213008,
+        0.01671241103695183,
+        0.007574387678324307
+      ],
+      "observed": {
+        "astro_ra_deg": 330.52525,
+        "astro_dec_deg": -13.18161111111111,
+        "app_ra_deg": 330.51750000000004,
+        "app_dec_deg": -13.183583333333333,
+        "azimuth_deg": 130.211137,
+        "elevation_deg": 12.174036,
+        "range_au": 1.84967880166879
+      }
+    },
+    {
+      "class": "boundary",
+      "target_id": 499,
+      "target_name": "Mars",
+      "site": "Greenwich",
+      "epoch_jd_ut": 2451546,
+      "geo_vector_au": [
+        1.585638921967509,
+        -0.8691643341553521,
+        -0.4140611749299568
+      ],
+      "geo_velocity_au_per_day": [
+        0.01766935283761996,
+        0.01698831904304168,
+        0.007697971237220423
+      ],
+      "observed": {
+        "astro_ra_deg": 331.2672083333333,
+        "astro_dec_deg": -12.900333333333334,
+        "app_ra_deg": 331.2595,
+        "app_dec_deg": -12.902333333333333,
+        "azimuth_deg": 130.282731,
+        "elevation_deg": 12.535376,
+        "range_au": 1.8551023948947
+      }
+    },
+    {
+      "class": "boundary",
+      "target_id": 499,
+      "target_name": "Mars",
+      "site": "Greenwich",
+      "epoch_jd_ut": 2457752.5,
+      "geo_vector_au": [
+        1.506147359899773,
+        -0.5540601863537452,
+        -0.2684142448523374
+      ],
+      "geo_velocity_au_per_day": [
+        0.01428353249507244,
+        0.01575448392391244,
+        0.007246993142649618
+      ],
+      "observed": {
+        "astro_ra_deg": 339.7984583333333,
+        "astro_dec_deg": -9.497805555555555,
+        "app_ra_deg": 340.0167083333333,
+        "app_dec_deg": -9.409944444444445,
+        "azimuth_deg": 287.385027,
+        "elevation_deg": -25.110357,
+        "range_au": 1.62721350382931
+      }
+    },
+    {
+      "class": "boundary",
+      "target_id": 499,
+      "target_name": "Mars",
+      "site": "Greenwich",
+      "epoch_jd_ut": 2457753.5,
+      "geo_vector_au": [
+        1.520335008944405,
+        -0.5381844798348565,
+        -0.2611132632539143
+      ],
+      "geo_velocity_au_per_day": [
+        0.01409091200078744,
+        0.01599655784925475,
+        0.007354804676600719
+      ],
+      "observed": {
+        "astro_ra_deg": 340.50183333333337,
+        "astro_dec_deg": -9.199250000000001,
+        "app_ra_deg": 340.71979166666665,
+        "app_dec_deg": -9.111027777777778,
+        "azimuth_deg": 287.829535,
+        "elevation_deg": -25.039317,
+        "range_au": 1.63387790735801
+      }
+    },
+    {
+      "class": "boundary",
+      "target_id": 499,
+      "target_name": "Mars",
+      "site": "Greenwich",
+      "epoch_jd_ut": 2457754.5,
+      "geo_vector_au": [
+        1.534327646003341,
+        -0.5220676499725129,
+        -0.2537048897285165
+      ],
+      "geo_velocity_au_per_day": [
+        0.01389319360258556,
+        0.01623633290647233,
+        0.007461595718176598
+      ],
+      "observed": {
+        "astro_ra_deg": 341.2040416666667,
+        "astro_dec_deg": -8.899527777777777,
+        "app_ra_deg": 341.42170833333336,
+        "app_dec_deg": -8.810972222222222,
+        "azimuth_deg": 288.279198,
+        "elevation_deg": -24.96965,
+        "range_au": 1.64054829356967
+      }
+    },
+    {
+      "class": "boundary",
+      "target_id": 499,
+      "target_name": "Mars",
+      "site": "Greenwich",
+      "epoch_jd_ut": 2457755.5,
+      "geo_vector_au": [
+        1.548119881596495,
+        -0.5057124449075168,
+        -0.2461903468261085
+      ],
+      "geo_velocity_au_per_day": [
+        0.01369044502979593,
+        0.01647365721774768,
+        0.007567305191230517
+      ],
+      "observed": {
+        "astro_ra_deg": 341.9050833333334,
+        "astro_dec_deg": -8.598722222222223,
+        "app_ra_deg": 342.1224583333333,
+        "app_dec_deg": -8.509833333333333,
+        "azimuth_deg": 288.726671,
+        "elevation_deg": -24.896436,
+        "range_au": 1.64722410449505
+      }
+    },
+    {
+      "class": "boundary",
+      "target_id": 499,
+      "target_name": "Mars",
+      "site": "Mauna Kea",
+      "epoch_jd_ut": 2451544,
+      "geo_vector_au": [
+        1.549882810337337,
+        -0.9025884167452861,
+        -0.4292096184629684
+      ],
+      "geo_velocity_au_per_day": [
+        0.01808309867020472,
+        0.01643428451070753,
+        0.007449808653720263
+      ],
+      "observed": {
+        "astro_ra_deg": 329.78045833333334,
+        "astro_dec_deg": -13.459972222222222,
+        "app_ra_deg": 329.77254166666665,
+        "app_dec_deg": -13.461916666666665,
+        "azimuth_deg": 280.455493,
+        "elevation_deg": -64.531356,
+        "range_au": 1.84430509917507
+      }
+    },
+    {
+      "class": "boundary",
+      "target_id": 499,
+      "target_name": "Mars",
+      "site": "Mauna Kea",
+      "epoch_jd_ut": 2451545,
+      "geo_vector_au": [
+        1.567864302813854,
+        -0.8860148896376784,
+        -0.4216974395381974
+      ],
+      "geo_velocity_au_per_day": [
+        0.01787897089213008,
+        0.01671241103695183,
+        0.007574387678324307
+      ],
+      "observed": {
+        "astro_ra_deg": 330.5240416666667,
+        "astro_dec_deg": -13.180666666666665,
+        "app_ra_deg": 330.51616666666666,
+        "app_dec_deg": -13.182666666666666,
+        "azimuth_deg": 281.245971,
+        "elevation_deg": -64.667302,
+        "range_au": 1.84972641616186
+      }
+    },
+    {
+      "class": "boundary",
+      "target_id": 499,
+      "target_name": "Mars",
+      "site": "Mauna Kea",
+      "epoch_jd_ut": 2451546,
+      "geo_vector_au": [
+        1.585638921967509,
+        -0.8691643341553521,
+        -0.4140611749299568
+      ],
+      "geo_velocity_au_per_day": [
+        0.01766935283761996,
+        0.01698831904304168,
+        0.007697971237220423
+      ],
+      "observed": {
+        "astro_ra_deg": 331.26599999999996,
+        "astro_dec_deg": -12.899388888888888,
+        "app_ra_deg": 331.2581666666666,
+        "app_dec_deg": -12.901416666666668,
+        "azimuth_deg": 282.049876,
+        "elevation_deg": -64.8004,
+        "range_au": 1.85515031430174
+      }
+    },
+    {
+      "class": "boundary",
+      "target_id": 499,
+      "target_name": "Mars",
+      "site": "Mauna Kea",
+      "epoch_jd_ut": 2457752.5,
+      "geo_vector_au": [
+        1.506147359899773,
+        -0.5540601863537452,
+        -0.2684142448523374
+      ],
+      "geo_velocity_au_per_day": [
+        0.01428353249507244,
+        0.01575448392391244,
+        0.007246993142649618
+      ],
+      "observed": {
+        "astro_ra_deg": 339.80016666666666,
+        "astro_dec_deg": -9.497388888888889,
+        "app_ra_deg": 340.0185,
+        "app_dec_deg": -9.409527777777779,
+        "azimuth_deg": 125.659054,
+        "elevation_deg": 43.577199,
+        "range_au": 1.62716597458279
+      }
+    },
+    {
+      "class": "boundary",
+      "target_id": 499,
+      "target_name": "Mars",
+      "site": "Mauna Kea",
+      "epoch_jd_ut": 2457753.5,
+      "geo_vector_au": [
+        1.520335008944405,
+        -0.5381844798348565,
+        -0.2611132632539143
+      ],
+      "geo_velocity_au_per_day": [
+        0.01409091200078744,
+        0.01599655784925475,
+        0.007354804676600719
+      ],
+      "observed": {
+        "astro_ra_deg": 340.5035,
+        "astro_dec_deg": -9.198833333333333,
+        "app_ra_deg": 340.72154166666667,
+        "app_dec_deg": -9.11061111111111,
+        "azimuth_deg": 125.582505,
+        "elevation_deg": 43.982296,
+        "range_au": 1.63383020758859
+      }
+    },
+    {
+      "class": "boundary",
+      "target_id": 499,
+      "target_name": "Mars",
+      "site": "Mauna Kea",
+      "epoch_jd_ut": 2457754.5,
+      "geo_vector_au": [
+        1.534327646003341,
+        -0.5220676499725129,
+        -0.2537048897285165
+      ],
+      "geo_velocity_au_per_day": [
+        0.01389319360258556,
+        0.01623633290647233,
+        0.007461595718176598
+      ],
+      "observed": {
+        "astro_ra_deg": 341.2056666666667,
+        "astro_dec_deg": -8.899138888888888,
+        "app_ra_deg": 341.4234583333334,
+        "app_dec_deg": -8.810555555555556,
+        "azimuth_deg": 125.508976,
+        "elevation_deg": 44.392364,
+        "range_au": 1.64050042120946
+      }
+    },
+    {
+      "class": "boundary",
+      "target_id": 499,
+      "target_name": "Mars",
+      "site": "Mauna Kea",
+      "epoch_jd_ut": 2457755.5,
+      "geo_vector_au": [
+        1.548119881596495,
+        -0.5057124449075168,
+        -0.2461903468261085
+      ],
+      "geo_velocity_au_per_day": [
+        0.01369044502979593,
+        0.01647365721774768,
+        0.007567305191230517
+      ],
+      "observed": {
+        "astro_ra_deg": 341.90670833333337,
+        "astro_dec_deg": -8.598333333333334,
+        "app_ra_deg": 342.12416666666667,
+        "app_dec_deg": -8.509416666666667,
+        "azimuth_deg": 125.431218,
+        "elevation_deg": 44.800966,
+        "range_au": 1.64717606427184
+      }
+    },
+    {
+      "class": "boundary",
+      "target_id": 499,
+      "target_name": "Mars",
+      "site": "Paranal",
+      "epoch_jd_ut": 2451544,
+      "geo_vector_au": [
+        1.549882810337337,
+        -0.9025884167452861,
+        -0.4292096184629684
+      ],
+      "geo_velocity_au_per_day": [
+        0.01808309867020472,
+        0.01643428451070753,
+        0.007449808653720263
+      ],
+      "observed": {
+        "astro_ra_deg": 329.7820833333334,
+        "astro_dec_deg": -13.45911111111111,
+        "app_ra_deg": 329.7742083333334,
+        "app_dec_deg": -13.461055555555555,
+        "azimuth_deg": 116.590084,
+        "elevation_deg": -20.758026,
+        "range_au": 1.84428174612432
+      }
+    },
+    {
+      "class": "boundary",
+      "target_id": 499,
+      "target_name": "Mars",
+      "site": "Paranal",
+      "epoch_jd_ut": 2451545,
+      "geo_vector_au": [
+        1.567864302813854,
+        -0.8860148896376784,
+        -0.4216974395381974
+      ],
+      "geo_velocity_au_per_day": [
+        0.01787897089213008,
+        0.01671241103695183,
+        0.007574387678324307
+      ],
+      "observed": {
+        "astro_ra_deg": 330.52566666666667,
+        "astro_dec_deg": -13.179833333333333,
+        "app_ra_deg": 330.5178333333334,
+        "app_dec_deg": -13.181805555555554,
+        "azimuth_deg": 116.202335,
+        "elevation_deg": -20.713856,
+        "range_au": 1.84970298789902
+      }
+    },
+    {
+      "class": "boundary",
+      "target_id": 499,
+      "target_name": "Mars",
+      "site": "Paranal",
+      "epoch_jd_ut": 2451546,
+      "geo_vector_au": [
+        1.585638921967509,
+        -0.8691643341553521,
+        -0.4140611749299568
+      ],
+      "geo_velocity_au_per_day": [
+        0.01766935283761996,
+        0.01698831904304168,
+        0.007697971237220423
+      ],
+      "observed": {
+        "astro_ra_deg": 331.26762499999995,
+        "astro_dec_deg": -12.898527777777778,
+        "app_ra_deg": 331.25983333333335,
+        "app_dec_deg": -12.900527777777778,
+        "azimuth_deg": 115.811987,
+        "elevation_deg": -20.668006,
+        "range_au": 1.85512681075843
+      }
+    },
+    {
+      "class": "boundary",
+      "target_id": 499,
+      "target_name": "Mars",
+      "site": "Paranal",
+      "epoch_jd_ut": 2457752.5,
+      "geo_vector_au": [
+        1.506147359899773,
+        -0.5540601863537452,
+        -0.2684142448523374
+      ],
+      "geo_velocity_au_per_day": [
+        0.01428353249507244,
+        0.01575448392391244,
+        0.007246993142649618
+      ],
+      "observed": {
+        "astro_ra_deg": 339.79825,
+        "astro_dec_deg": -9.49625,
+        "app_ra_deg": 340.01658333333336,
+        "app_dec_deg": -9.408416666666668,
+        "azimuth_deg": 279.543727,
+        "elevation_deg": 41.532018,
+        "range_au": 1.6271671314099
+      }
+    },
+    {
+      "class": "boundary",
+      "target_id": 499,
+      "target_name": "Mars",
+      "site": "Paranal",
+      "epoch_jd_ut": 2457753.5,
+      "geo_vector_au": [
+        1.520335008944405,
+        -0.5381844798348565,
+        -0.2611132632539143
+      ],
+      "geo_velocity_au_per_day": [
+        0.01409091200078744,
+        0.01599655784925475,
+        0.007354804676600719
+      ],
+      "observed": {
+        "astro_ra_deg": 340.501625,
+        "astro_dec_deg": -9.197694444444444,
+        "app_ra_deg": 340.7196666666666,
+        "app_dec_deg": -9.109472222222221,
+        "azimuth_deg": 279.749618,
+        "elevation_deg": 41.153525,
+        "range_au": 1.63383179283821
+      }
+    },
+    {
+      "class": "boundary",
+      "target_id": 499,
+      "target_name": "Mars",
+      "site": "Paranal",
+      "epoch_jd_ut": 2457754.5,
+      "geo_vector_au": [
+        1.534327646003341,
+        -0.5220676499725129,
+        -0.2537048897285165
+      ],
+      "geo_velocity_au_per_day": [
+        0.01389319360258556,
+        0.01623633290647233,
+        0.007461595718176598
+      ],
+      "observed": {
+        "astro_ra_deg": 341.2037916666667,
+        "astro_dec_deg": -8.897972222222222,
+        "app_ra_deg": 341.42154166666666,
+        "app_dec_deg": -8.809416666666667,
+        "azimuth_deg": 279.951042,
+        "elevation_deg": 40.769086,
+        "range_au": 1.64050244062052
+      }
+    },
+    {
+      "class": "boundary",
+      "target_id": 499,
+      "target_name": "Mars",
+      "site": "Paranal",
+      "epoch_jd_ut": 2457755.5,
+      "geo_vector_au": [
+        1.548119881596495,
+        -0.5057124449075168,
+        -0.2461903468261085
+      ],
+      "geo_velocity_au_per_day": [
+        0.01369044502979593,
+        0.01647365721774768,
+        0.007567305191230517
+      ],
+      "observed": {
+        "astro_ra_deg": 341.90483333333333,
+        "astro_dec_deg": -8.597194444444446,
+        "app_ra_deg": 342.1222916666667,
+        "app_dec_deg": -8.508277777777778,
+        "azimuth_deg": 280.152582,
+        "elevation_deg": 40.386225,
+        "range_au": 1.6471785158937
+      }
+    },
+    {
+      "class": "boundary",
+      "target_id": 699,
+      "target_name": "Saturn",
+      "site": "Greenwich",
+      "epoch_jd_ut": 2451544,
+      "geo_vector_au": [
+        6.570611990272195,
+        5.280943121843443,
+        1.887191278605129
+      ],
+      "geo_velocity_au_per_day": [
+        0.01296963256325147,
+        0.006151931380525208,
+        0.002779042760442495
+      ],
+      "observed": {
+        "astro_ra_deg": 38.78791666666667,
+        "astro_dec_deg": 12.618,
+        "app_ra_deg": 38.787333333333336,
+        "app_dec_deg": 12.6165,
+        "azimuth_deg": 59.070966,
+        "elevation_deg": -7.278141,
+        "range_au": 8.63849119887982
+      }
+    },
+    {
+      "class": "boundary",
+      "target_id": 699,
+      "target_name": "Saturn",
+      "site": "Greenwich",
+      "epoch_jd_ut": 2451545,
+      "geo_vector_au": [
+        6.583555122342154,
+        5.287232795933687,
+        1.890029990112491
+      ],
+      "geo_velocity_au_per_day": [
+        0.01291569832925166,
+        0.006427280227771981,
+        0.002898337517002204
+      ],
+      "observed": {
+        "astro_ra_deg": 38.76616666666667,
+        "astro_dec_deg": 12.616055555555555,
+        "app_ra_deg": 38.7655,
+        "app_dec_deg": 12.614527777777777,
+        "azimuth_deg": 59.899418,
+        "elevation_deg": -6.739234,
+        "range_au": 8.65280182262
+      }
+    },
+    {
+      "class": "boundary",
+      "target_id": 699,
+      "target_name": "Saturn",
+      "site": "Greenwich",
+      "epoch_jd_ut": 2451546,
+      "geo_vector_au": [
+        6.596441528167612,
+        5.293797433220749,
+        1.892987855374125
+      ],
+      "geo_velocity_au_per_day": [
+        0.01285616345767177,
+        0.006701859947753041,
+        0.003017340989320043
+      ],
+      "observed": {
+        "astro_ra_deg": 38.74616666666667,
+        "astro_dec_deg": 12.614694444444444,
+        "app_ra_deg": 38.7455,
+        "app_dec_deg": 12.613138888888889,
+        "azimuth_deg": 60.722169,
+        "elevation_deg": -6.19625,
+        "range_au": 8.66726442173842
+      }
+    },
+    {
+      "class": "boundary",
+      "target_id": 699,
+      "target_name": "Saturn",
+      "site": "Greenwich",
+      "epoch_jd_ut": 2457752.5,
+      "geo_vector_au": [
+        -1.733725906279153,
+        -10.04366519412917,
+        -4.085969696816345
+      ],
+      "geo_velocity_au_per_day": [
+        0.02247957249558601,
+        0.001486917178166489,
+        0.0004394334005334224
+      ],
+      "observed": {
+        "astro_ra_deg": 260.204375,
+        "astro_dec_deg": -21.84536111111111,
+        "app_ra_deg": 260.45170833333333,
+        "app_dec_deg": -21.858305555555557,
+        "azimuth_deg": 32.674053,
+        "elevation_deg": -57.112957,
+        "range_au": 10.9807393903869
+      }
+    },
+    {
+      "class": "boundary",
+      "target_id": 699,
+      "target_name": "Saturn",
+      "site": "Greenwich",
+      "epoch_jd_ut": 2457753.5,
+      "geo_vector_au": [
+        -1.711269856893612,
+        -10.04203767697538,
+        -4.085469329807585
+      ],
+      "geo_velocity_au_per_day": [
+        0.02243158854500529,
+        0.001767961444197149,
+        0.000561240623324592
+      ],
+      "observed": {
+        "astro_ra_deg": 260.32725000000005,
+        "astro_dec_deg": -21.853444444444445,
+        "app_ra_deg": 260.5747083333333,
+        "app_dec_deg": -21.866194444444446,
+        "azimuth_deg": 34.044488,
+        "elevation_deg": -56.824846,
+        "range_au": 10.9755402795643
+      }
+    },
+    {
+      "class": "boundary",
+      "target_id": 699,
+      "target_name": "Saturn",
+      "site": "Greenwich",
+      "epoch_jd_ut": 2457754.5,
+      "geo_vector_au": [
+        -1.688864317042203,
+        -10.04012957795815,
+        -4.084847340060932
+      ],
+      "geo_velocity_au_per_day": [
+        0.02237805181433197,
+        0.002048026938047734,
+        0.00068265203058599
+      ],
+      "observed": {
+        "astro_ra_deg": 260.44975000000005,
+        "astro_dec_deg": -21.861361111111112,
+        "app_ra_deg": 260.69733333333335,
+        "app_dec_deg": -21.873944444444444,
+        "azimuth_deg": 35.403541,
+        "elevation_deg": -56.524322,
+        "range_au": 10.9700906242758
+      }
+    },
+    {
+      "class": "boundary",
+      "target_id": 699,
+      "target_name": "Saturn",
+      "site": "Greenwich",
+      "epoch_jd_ut": 2457755.5,
+      "geo_vector_au": [
+        -1.66651533470499,
+        -10.03794195588026,
+        -4.08410417432551
+      ],
+      "geo_velocity_au_per_day": [
+        0.02231899423754239,
+        0.002327030773178826,
+        0.0008035968837816982
+      ],
+      "observed": {
+        "astro_ra_deg": 260.57183333333336,
+        "astro_dec_deg": -21.86911111111111,
+        "app_ra_deg": 260.8195,
+        "app_dec_deg": -21.881527777777777,
+        "azimuth_deg": 36.73804,
+        "elevation_deg": -56.21464,
+        "range_au": 10.9643919692991
+      }
+    },
+    {
+      "class": "boundary",
+      "target_id": 699,
+      "target_name": "Saturn",
+      "site": "Mauna Kea",
+      "epoch_jd_ut": 2451544,
+      "geo_vector_au": [
+        6.570611990272195,
+        5.280943121843443,
+        1.887191278605129
+      ],
+      "geo_velocity_au_per_day": [
+        0.01296963256325147,
+        0.006151931380525208,
+        0.002779042760442495
+      ],
+      "observed": {
+        "astro_ra_deg": 38.7875,
+        "astro_dec_deg": 12.61813888888889,
+        "app_ra_deg": 38.78691666666667,
+        "app_dec_deg": 12.616666666666667,
+        "azimuth_deg": 280.364263,
+        "elevation_deg": 8.668472,
+        "range_au": 8.63847932910661
+      }
+    },
+    {
+      "class": "boundary",
+      "target_id": 699,
+      "target_name": "Saturn",
+      "site": "Mauna Kea",
+      "epoch_jd_ut": 2451545,
+      "geo_vector_au": [
+        6.583555122342154,
+        5.287232795933687,
+        1.890029990112491
+      ],
+      "geo_velocity_au_per_day": [
+        0.01291569832925166,
+        0.006427280227771981,
+        0.002898337517002204
+      ],
+      "observed": {
+        "astro_ra_deg": 38.765708333333336,
+        "astro_dec_deg": 12.616194444444444,
+        "app_ra_deg": 38.765125000000005,
+        "app_dec_deg": 12.614694444444444,
+        "azimuth_deg": 280.67913,
+        "elevation_deg": 7.736048,
+        "range_au": 8.65279103907131
+      }
+    },
+    {
+      "class": "boundary",
+      "target_id": 699,
+      "target_name": "Saturn",
+      "site": "Mauna Kea",
+      "epoch_jd_ut": 2451546,
+      "geo_vector_au": [
+        6.596441528167612,
+        5.293797433220749,
+        1.892987855374125
+      ],
+      "geo_velocity_au_per_day": [
+        0.01285616345767177,
+        0.006701859947753041,
+        0.003017340989320043
+      ],
+      "observed": {
+        "astro_ra_deg": 38.745749999999994,
+        "astro_dec_deg": 12.614833333333333,
+        "app_ra_deg": 38.745083333333326,
+        "app_dec_deg": 12.613305555555556,
+        "azimuth_deg": 280.996217,
+        "elevation_deg": 6.806408,
+        "range_au": 8.6672547273391
+      }
+    },
+    {
+      "class": "boundary",
+      "target_id": 699,
+      "target_name": "Saturn",
+      "site": "Mauna Kea",
+      "epoch_jd_ut": 2457752.5,
+      "geo_vector_au": [
+        -1.733725906279153,
+        -10.04366519412917,
+        -4.085969696816345
+      ],
+      "geo_velocity_au_per_day": [
+        0.02247957249558601,
+        0.001486917178166489,
+        0.0004394334005334224
+      ],
+      "observed": {
+        "astro_ra_deg": 260.20416666666665,
+        "astro_dec_deg": -21.845388888888888,
+        "app_ra_deg": 260.451625,
+        "app_dec_deg": -21.858333333333334,
+        "azimuth_deg": 227.432408,
+        "elevation_deg": 30.858214,
+        "range_au": 10.9806816669447
+      }
+    },
+    {
+      "class": "boundary",
+      "target_id": 699,
+      "target_name": "Saturn",
+      "site": "Mauna Kea",
+      "epoch_jd_ut": 2457753.5,
+      "geo_vector_au": [
+        -1.711269856893612,
+        -10.04203767697538,
+        -4.085469329807585
+      ],
+      "geo_velocity_au_per_day": [
+        0.02243158854500529,
+        0.001767961444197149,
+        0.000561240623324592
+      ],
+      "observed": {
+        "astro_ra_deg": 260.3270416666667,
+        "astro_dec_deg": -21.853444444444445,
+        "app_ra_deg": 260.574625,
+        "app_dec_deg": -21.866222222222223,
+        "azimuth_deg": 228.040324,
+        "elevation_deg": 30.252429,
+        "range_au": 10.9754830617651
+      }
+    },
+    {
+      "class": "boundary",
+      "target_id": 699,
+      "target_name": "Saturn",
+      "site": "Mauna Kea",
+      "epoch_jd_ut": 2457754.5,
+      "geo_vector_au": [
+        -1.688864317042203,
+        -10.04012957795815,
+        -4.084847340060932
+      ],
+      "geo_velocity_au_per_day": [
+        0.02237805181433197,
+        0.002048026938047734,
+        0.00068265203058599
+      ],
+      "observed": {
+        "astro_ra_deg": 260.4495416666667,
+        "astro_dec_deg": -21.861361111111112,
+        "app_ra_deg": 260.69725,
+        "app_dec_deg": -21.87397222222222,
+        "azimuth_deg": 228.640104,
+        "elevation_deg": 29.637861,
+        "range_au": 10.9700339262193
+      }
+    },
+    {
+      "class": "boundary",
+      "target_id": 699,
+      "target_name": "Saturn",
+      "site": "Mauna Kea",
+      "epoch_jd_ut": 2457755.5,
+      "geo_vector_au": [
+        -1.66651533470499,
+        -10.03794195588026,
+        -4.08410417432551
+      ],
+      "geo_velocity_au_per_day": [
+        0.02231899423754239,
+        0.002327030773178826,
+        0.0008035968837816982
+      ],
+      "observed": {
+        "astro_ra_deg": 260.571625,
+        "astro_dec_deg": -21.86913888888889,
+        "app_ra_deg": 260.81941666666665,
+        "app_dec_deg": -21.881555555555558,
+        "azimuth_deg": 229.226151,
+        "elevation_deg": 29.020528,
+        "range_au": 10.9643357999942
+      }
+    },
+    {
+      "class": "boundary",
+      "target_id": 699,
+      "target_name": "Saturn",
+      "site": "Paranal",
+      "epoch_jd_ut": 2451544,
+      "geo_vector_au": [
+        6.570611990272195,
+        5.280943121843443,
+        1.887191278605129
+      ],
+      "geo_velocity_au_per_day": [
+        0.01296963256325147,
+        0.006151931380525208,
+        0.002779042760442495
+      ],
+      "observed": {
+        "astro_ra_deg": 38.787708333333335,
+        "astro_dec_deg": 12.618277777777779,
+        "app_ra_deg": 38.78708333333334,
+        "app_dec_deg": 12.616805555555556,
+        "azimuth_deg": 219.161613,
+        "elevation_deg": -74.879551,
+        "range_au": 8.6385269128972
+      }
+    },
+    {
+      "class": "boundary",
+      "target_id": 699,
+      "target_name": "Saturn",
+      "site": "Paranal",
+      "epoch_jd_ut": 2451545,
+      "geo_vector_au": [
+        6.583555122342154,
+        5.287232795933687,
+        1.890029990112491
+      ],
+      "geo_velocity_au_per_day": [
+        0.01291569832925166,
+        0.006427280227771981,
+        0.002898337517002204
+      ],
+      "observed": {
+        "astro_ra_deg": 38.76595833333334,
+        "astro_dec_deg": 12.616333333333333,
+        "app_ra_deg": 38.76525,
+        "app_dec_deg": 12.614833333333333,
+        "azimuth_deg": 215.998263,
+        "elevation_deg": -75.436611,
+        "range_au": 8.65283804173513
+      }
+    },
+    {
+      "class": "boundary",
+      "target_id": 699,
+      "target_name": "Saturn",
+      "site": "Paranal",
+      "epoch_jd_ut": 2451546,
+      "geo_vector_au": [
+        6.596441528167612,
+        5.293797433220749,
+        1.892987855374125
+      ],
+      "geo_velocity_au_per_day": [
+        0.01285616345767177,
+        0.006701859947753041,
+        0.003017340989320043
+      ],
+      "observed": {
+        "astro_ra_deg": 38.745958333333334,
+        "astro_dec_deg": 12.614972222222223,
+        "app_ra_deg": 38.74525,
+        "app_dec_deg": 12.613444444444443,
+        "azimuth_deg": 212.614594,
+        "elevation_deg": -75.950871,
+        "range_au": 8.66730113778257
+      }
+    },
+    {
+      "class": "boundary",
+      "target_id": 699,
+      "target_name": "Saturn",
+      "site": "Paranal",
+      "epoch_jd_ut": 2457752.5,
+      "geo_vector_au": [
+        -1.733725906279153,
+        -10.04366519412917,
+        -4.085969696816345
+      ],
+      "geo_velocity_au_per_day": [
+        0.02247957249558601,
+        0.001486917178166489,
+        0.0004394334005334224
+      ],
+      "observed": {
+        "astro_ra_deg": 260.204125,
+        "astro_dec_deg": -21.84511111111111,
+        "app_ra_deg": 260.45145833333333,
+        "app_dec_deg": -21.858083333333333,
+        "azimuth_deg": 231.745375,
+        "elevation_deg": -21.368664,
+        "range_au": 10.9807191878795
+      }
+    },
+    {
+      "class": "boundary",
+      "target_id": 699,
+      "target_name": "Saturn",
+      "site": "Paranal",
+      "epoch_jd_ut": 2457753.5,
+      "geo_vector_au": [
+        -1.711269856893612,
+        -10.04203767697538,
+        -4.085469329807585
+      ],
+      "geo_velocity_au_per_day": [
+        0.02243158854500529,
+        0.001767961444197149,
+        0.000561240623324592
+      ],
+      "observed": {
+        "astro_ra_deg": 260.3270416666667,
+        "astro_dec_deg": -21.853194444444444,
+        "app_ra_deg": 260.57450000000006,
+        "app_dec_deg": -21.865972222222222,
+        "azimuth_deg": 231.185251,
+        "elevation_deg": -21.977,
+        "range_au": 10.9755206153226
+      }
+    },
+    {
+      "class": "boundary",
+      "target_id": 699,
+      "target_name": "Saturn",
+      "site": "Paranal",
+      "epoch_jd_ut": 2457754.5,
+      "geo_vector_au": [
+        -1.688864317042203,
+        -10.04012957795815,
+        -4.084847340060932
+      ],
+      "geo_velocity_au_per_day": [
+        0.02237805181433197,
+        0.002048026938047734,
+        0.00068265203058599
+      ],
+      "observed": {
+        "astro_ra_deg": 260.4495416666667,
+        "astro_dec_deg": -21.861111111111114,
+        "app_ra_deg": 260.69712499999997,
+        "app_dec_deg": -21.873722222222224,
+        "azimuth_deg": 230.613786,
+        "elevation_deg": -22.583761,
+        "range_au": 10.9700715014254
+      }
+    },
+    {
+      "class": "boundary",
+      "target_id": 699,
+      "target_name": "Saturn",
+      "site": "Paranal",
+      "epoch_jd_ut": 2457755.5,
+      "geo_vector_au": [
+        -1.66651533470499,
+        -10.03794195588026,
+        -4.08410417432551
+      ],
+      "geo_velocity_au_per_day": [
+        0.02231899423754239,
+        0.002327030773178826,
+        0.0008035968837816982
+      ],
+      "observed": {
+        "astro_ra_deg": 260.57158333333336,
+        "astro_dec_deg": -21.868861111111112,
+        "app_ra_deg": 260.81929166666663,
+        "app_dec_deg": -21.881305555555556,
+        "azimuth_deg": 230.036227,
+        "elevation_deg": -23.182932,
+        "range_au": 10.9643733855832
+      }
+    },
+    {
+      "class": "regular",
+      "target_id": 599,
+      "target_name": "Jupiter",
+      "site": "Greenwich",
+      "epoch_jd_ut": 2460310.5,
+      "geo_vector_au": [
+        3.659031087292524,
+        2.409382612596195,
+        0.9433772420100425
+      ],
+      "geo_velocity_au_per_day": [
+        0.01175899473570973,
+        0.00786081439847964,
+        0.003515247056181798
+      ],
+      "observed": {
+        "astro_ra_deg": 33.361125,
+        "astro_dec_deg": 12.15075,
+        "app_ra_deg": 33.685208333333335,
+        "app_dec_deg": 12.26361111111111,
+        "azimuth_deg": 259.072697,
+        "elevation_deg": 24.154258,
+        "range_au": 4.48148623819745
+      }
+    },
+    {
+      "class": "regular",
+      "target_id": 599,
+      "target_name": "Jupiter",
+      "site": "Greenwich",
+      "epoch_jd_ut": 2460430.5,
+      "geo_vector_au": [
+        3.554017105697379,
+        4.447763497539288,
+        1.841624016701625
+      ],
+      "geo_velocity_au_per_day": [
+        -0.0171007066134842,
+        0.01631100602118493,
+        0.007205854869956682
+      ],
+      "observed": {
+        "astro_ra_deg": 51.37045833333333,
+        "astro_dec_deg": 17.92388888888889,
+        "app_ra_deg": 51.708916666666674,
+        "app_dec_deg": 18.008333333333333,
+        "azimuth_deg": 346.595869,
+        "elevation_deg": -19.548534,
+        "range_au": 5.9837648713963
+      }
+    },
+    {
+      "class": "regular",
+      "target_id": 599,
+      "target_name": "Jupiter",
+      "site": "Greenwich",
+      "epoch_jd_ut": 2460550.5,
+      "geo_vector_au": [
+        1.058906415658519,
+        4.677115991383578,
+        1.958628432836888
+      ],
+      "geo_velocity_au_per_day": [
+        -0.01407636378699276,
+        -0.01124723975050244,
+        -0.00471842712636332
+      ],
+      "observed": {
+        "astro_ra_deg": 77.24083333333334,
+        "astro_dec_deg": 22.21602777777778,
+        "app_ra_deg": 77.60945833333334,
+        "app_dec_deg": 22.248305555555557,
+        "azimuth_deg": 67.6992,
+        "elevation_deg": 10.789305,
+        "range_au": 5.17998871042696
+      }
+    },
+    {
+      "class": "regular",
+      "target_id": 599,
+      "target_name": "Jupiter",
+      "site": "Greenwich",
+      "epoch_jd_ut": 2460670.5,
+      "geo_vector_au": [
+        1.175501201631793,
+        3.6686645807608,
+        1.541318908321323
+      ],
+      "geo_velocity_au_per_day": [
+        0.009978816299972989,
+        0.003016863174536286,
+        0.001480180734514877
+      ],
+      "observed": {
+        "astro_ra_deg": 72.23079166666666,
+        "astro_dec_deg": 21.805416666666666,
+        "app_ra_deg": 72.60937499999999,
+        "app_dec_deg": 21.850305555555558,
+        "azimuth_deg": 218.78693,
+        "elevation_deg": 55.663079,
+        "range_au": 4.14925488143418
+      }
+    },
+    {
+      "class": "regular",
+      "target_id": 599,
+      "target_name": "Jupiter",
+      "site": "Greenwich",
+      "epoch_jd_ut": 2460790.5,
+      "geo_vector_au": [
+        1.019647022735552,
+        5.230845150711308,
+        2.239940777054897
+      ],
+      "geo_velocity_au_per_day": [
+        -0.01714889336320539,
+        0.01356208512337897,
+        0.006063030985161307
+      ],
+      "observed": {
+        "astro_ra_deg": 78.96675,
+        "astro_dec_deg": 22.796722222222225,
+        "app_ra_deg": 79.34483333333333,
+        "app_dec_deg": 22.825499999999998,
+        "azimuth_deg": 318.170876,
+        "elevation_deg": -5.433323,
+        "range_au": 5.78092395674735
+      }
+    },
+    {
+      "class": "regular",
+      "target_id": 599,
+      "target_name": "Jupiter",
+      "site": "Greenwich",
+      "epoch_jd_ut": 2460910.5,
+      "geo_vector_au": [
+        -1.595829972383448,
+        5.160509381191641,
+        2.231781257735082
+      ],
+      "geo_velocity_au_per_day": [
+        -0.01595075868375904,
+        -0.01429870375834157,
+        -0.006011205092435462
+      ],
+      "observed": {
+        "astro_ra_deg": 107.18116666666667,
+        "astro_dec_deg": 22.44875,
+        "app_ra_deg": 107.56320833333334,
+        "app_dec_deg": 22.40888888888889,
+        "azimuth_deg": 40.265724,
+        "elevation_deg": -6.666439,
+        "range_au": 5.84447511235985
+      }
+    },
+    {
+      "class": "regular",
+      "target_id": 599,
+      "target_name": "Jupiter",
+      "site": "Greenwich",
+      "epoch_jd_ut": 2461030.5,
+      "geo_vector_au": [
+        -1.631382522580588,
+        3.634065377489432,
+        1.592568744257962
+      ],
+      "geo_velocity_au_per_day": [
+        0.01021883804280087,
+        -0.002105229133106922,
+        -0.0007262166495747829
+      ],
+      "observed": {
+        "astro_ra_deg": 114.1735,
+        "astro_dec_deg": 21.791416666666667,
+        "app_ra_deg": 114.56633333333332,
+        "app_dec_deg": 21.732694444444444,
+        "azimuth_deg": 137.837516,
+        "elevation_deg": 54.599146,
+        "range_au": 4.28994413086344
+      }
+    },
+    {
+      "class": "regular",
+      "target_id": 599,
+      "target_name": "Jupiter",
+      "site": "Greenwich",
+      "epoch_jd_ut": 2461150.5,
+      "geo_vector_au": [
+        -1.584381350650671,
+        4.697794396433091,
+        2.075641923365488
+      ],
+      "geo_velocity_au_per_day": [
+        -0.01497908586249715,
+        0.01080629594872169,
+        0.004863538740503643
+      ],
+      "observed": {
+        "astro_ra_deg": 108.63429166666667,
+        "astro_dec_deg": 22.71722222222222,
+        "app_ra_deg": 109.02991666666667,
+        "app_dec_deg": 22.672222222222224,
+        "azimuth_deg": 291.223193,
+        "elevation_deg": 12.180355,
+        "range_au": 5.37476319171344
+      }
+    },
+    {
+      "class": "regular",
+      "target_id": 599,
+      "target_name": "Jupiter",
+      "site": "Greenwich",
+      "epoch_jd_ut": 2461270.5,
+      "geo_vector_au": [
+        -4.056189219430359,
+        4.360980463335164,
+        1.950459391246745
+      ],
+      "geo_velocity_au_per_day": [
+        -0.01572408222991063,
+        -0.01680004268593127,
+        -0.00711579704667975
+      ],
+      "observed": {
+        "astro_ra_deg": 132.92375,
+        "astro_dec_deg": 18.13347222222222,
+        "app_ra_deg": 133.29783333333333,
+        "app_dec_deg": 18.034583333333334,
+        "azimuth_deg": 13.199287,
+        "elevation_deg": -19.551388,
+        "range_au": 6.26697564508911
+      }
+    },
+    {
+      "class": "regular",
+      "target_id": 599,
+      "target_name": "Jupiter",
+      "site": "Greenwich",
+      "epoch_jd_ut": 2461390.5,
+      "geo_vector_au": [
+        -4.017557776247482,
+        2.398845706204791,
+        1.119005442189166
+      ],
+      "geo_velocity_au_per_day": [
+        0.01215825387064964,
+        -0.006493228530330381,
+        -0.002663667759503783
+      ],
+      "observed": {
+        "astro_ra_deg": 149.15695833333334,
+        "astro_dec_deg": 13.449722222222222,
+        "app_ra_deg": 149.52608333333333,
+        "app_dec_deg": 13.319694444444444,
+        "azimuth_deg": 101.534678,
+        "elevation_deg": 25.95136,
+        "range_au": 4.81111441074223
+      }
+    },
+    {
+      "class": "regular",
+      "target_id": 599,
+      "target_name": "Jupiter",
+      "site": "Mauna Kea",
+      "epoch_jd_ut": 2460310.5,
+      "geo_vector_au": [
+        3.659031087292524,
+        2.409382612596195,
+        0.9433772420100425
+      ],
+      "geo_velocity_au_per_day": [
+        0.01175899473570973,
+        0.00786081439847964,
+        0.003515247056181798
+      ],
+      "observed": {
+        "astro_ra_deg": 33.362,
+        "astro_dec_deg": 12.150972222222222,
+        "app_ra_deg": 33.686,
+        "app_dec_deg": 12.263777777777777,
+        "azimuth_deg": 78.764289,
+        "elevation_deg": 5.04511,
+        "range_au": 4.48149993724459
+      }
+    },
+    {
+      "class": "regular",
+      "target_id": 599,
+      "target_name": "Jupiter",
+      "site": "Mauna Kea",
+      "epoch_jd_ut": 2460430.5,
+      "geo_vector_au": [
+        3.554017105697379,
+        4.447763497539288,
+        1.841624016701625
+      ],
+      "geo_velocity_au_per_day": [
+        -0.0171007066134842,
+        0.01631100602118493,
+        0.007205854869956682
+      ],
+      "observed": {
+        "astro_ra_deg": 51.37045833333333,
+        "astro_dec_deg": 17.92425,
+        "app_ra_deg": 51.70904166666667,
+        "app_dec_deg": 18.008694444444444,
+        "azimuth_deg": 262.163363,
+        "elevation_deg": 79.210245,
+        "range_au": 5.98370861282074
+      }
+    },
+    {
+      "class": "regular",
+      "target_id": 599,
+      "target_name": "Jupiter",
+      "site": "Mauna Kea",
+      "epoch_jd_ut": 2460550.5,
+      "geo_vector_au": [
+        1.058906415658519,
+        4.677115991383578,
+        1.958628432836888
+      ],
+      "geo_velocity_au_per_day": [
+        -0.01407636378699276,
+        -0.01124723975050244,
+        -0.00471842712636332
+      ],
+      "observed": {
+        "astro_ra_deg": 77.24004166666667,
+        "astro_dec_deg": 22.216194444444444,
+        "app_ra_deg": 77.60866666666668,
+        "app_dec_deg": 22.248555555555555,
+        "azimuth_deg": 295.556387,
+        "elevation_deg": -4.397845,
+        "range_au": 5.17999993127623
+      }
+    },
+    {
+      "class": "regular",
+      "target_id": 599,
+      "target_name": "Jupiter",
+      "site": "Mauna Kea",
+      "epoch_jd_ut": 2460670.5,
+      "geo_vector_au": [
+        1.175501201631793,
+        3.6686645807608,
+        1.541318908321323
+      ],
+      "geo_velocity_au_per_day": [
+        0.009978816299972989,
+        0.003016863174536286,
+        0.001480180734514877
+      ],
+      "observed": {
+        "astro_ra_deg": 72.23137499999999,
+        "astro_dec_deg": 21.80538888888889,
+        "app_ra_deg": 72.60987499999999,
+        "app_dec_deg": 21.850250000000003,
+        "azimuth_deg": 50.17231,
+        "elevation_deg": -28.056862,
+        "range_au": 4.1493101825961
+      }
+    },
+    {
+      "class": "regular",
+      "target_id": 599,
+      "target_name": "Jupiter",
+      "site": "Mauna Kea",
+      "epoch_jd_ut": 2460790.5,
+      "geo_vector_au": [
+        1.019647022735552,
+        5.230845150711308,
+        2.239940777054897
+      ],
+      "geo_velocity_au_per_day": [
+        -0.01714889336320539,
+        0.01356208512337897,
+        0.006063030985161307
+      ],
+      "observed": {
+        "astro_ra_deg": 78.967125,
+        "astro_dec_deg": 22.797111111111114,
+        "app_ra_deg": 79.34533333333333,
+        "app_dec_deg": 22.82586111111111,
+        "azimuth_deg": 77.642286,
+        "elevation_deg": 69.716003,
+        "range_au": 5.78087983202828
+      }
+    },
+    {
+      "class": "regular",
+      "target_id": 599,
+      "target_name": "Jupiter",
+      "site": "Mauna Kea",
+      "epoch_jd_ut": 2460910.5,
+      "geo_vector_au": [
+        -1.595829972383448,
+        5.160509381191641,
+        2.231781257735082
+      ],
+      "geo_velocity_au_per_day": [
+        -0.01595075868375904,
+        -0.01429870375834157,
+        -0.006011205092435462
+      ],
+      "observed": {
+        "astro_ra_deg": 107.18058333333335,
+        "astro_dec_deg": 22.44902777777778,
+        "app_ra_deg": 107.56270833333333,
+        "app_dec_deg": 22.40925,
+        "azimuth_deg": 285.819856,
+        "elevation_deg": 26.61312,
+        "range_au": 5.84445098163359
+      }
+    },
+    {
+      "class": "regular",
+      "target_id": 599,
+      "target_name": "Jupiter",
+      "site": "Mauna Kea",
+      "epoch_jd_ut": 2461030.5,
+      "geo_vector_au": [
+        -1.631382522580588,
+        3.634065377489432,
+        1.592568744257962
+      ],
+      "geo_velocity_au_per_day": [
+        0.01021883804280087,
+        -0.002105229133106922,
+        -0.0007262166495747829
+      ],
+      "observed": {
+        "astro_ra_deg": 114.17333333333333,
+        "astro_dec_deg": 21.791333333333334,
+        "app_ra_deg": 114.56604166666666,
+        "app_dec_deg": 21.732611111111108,
+        "azimuth_deg": 359.691692,
+        "elevation_deg": -48.44053,
+        "range_au": 4.29001084443935
+      }
+    },
+    {
+      "class": "regular",
+      "target_id": 599,
+      "target_name": "Jupiter",
+      "site": "Mauna Kea",
+      "epoch_jd_ut": 2461150.5,
+      "geo_vector_au": [
+        -1.584381350650671,
+        4.697794396433091,
+        2.075641923365488
+      ],
+      "geo_velocity_au_per_day": [
+        -0.01497908586249715,
+        0.01080629594872169,
+        0.004863538740503643
+      ],
+      "observed": {
+        "astro_ra_deg": 108.63495833333333,
+        "astro_dec_deg": 22.717499999999998,
+        "app_ra_deg": 109.03066666666666,
+        "app_dec_deg": 22.672472222222222,
+        "azimuth_deg": 76.153159,
+        "elevation_deg": 37.662343,
+        "range_au": 5.37474608055926
+      }
+    },
+    {
+      "class": "regular",
+      "target_id": 599,
+      "target_name": "Jupiter",
+      "site": "Mauna Kea",
+      "epoch_jd_ut": 2461270.5,
+      "geo_vector_au": [
+        -4.056189219430359,
+        4.360980463335164,
+        1.950459391246745
+      ],
+      "geo_velocity_au_per_day": [
+        -0.01572408222991063,
+        -0.01680004268593127,
+        -0.00711579704667975
+      ],
+      "observed": {
+        "astro_ra_deg": 132.92345833333331,
+        "astro_dec_deg": 18.133805555555554,
+        "app_ra_deg": 133.29766666666666,
+        "app_dec_deg": 18.034944444444445,
+        "azimuth_deg": 273.525051,
+        "elevation_deg": 54.456204,
+        "range_au": 6.26692657807698
+      }
+    },
+    {
+      "class": "regular",
+      "target_id": 599,
+      "target_name": "Jupiter",
+      "site": "Mauna Kea",
+      "epoch_jd_ut": 2461390.5,
+      "geo_vector_au": [
+        -4.017557776247482,
+        2.398845706204791,
+        1.119005442189166
+      ],
+      "geo_velocity_au_per_day": [
+        0.01215825387064964,
+        -0.006493228530330381,
+        -0.002663667759503783
+      ],
+      "observed": {
+        "astro_ra_deg": 149.15633333333335,
+        "astro_dec_deg": 13.449805555555557,
+        "app_ra_deg": 149.525375,
+        "app_dec_deg": 13.319805555555556,
+        "azimuth_deg": 306.623945,
+        "elevation_deg": -38.283137,
+        "range_au": 4.81115952132477
+      }
+    },
+    {
+      "class": "regular",
+      "target_id": 599,
+      "target_name": "Jupiter",
+      "site": "Paranal",
+      "epoch_jd_ut": 2460310.5,
+      "geo_vector_au": [
+        3.659031087292524,
+        2.409382612596195,
+        0.9433772420100425
+      ],
+      "geo_velocity_au_per_day": [
+        0.01175899473570973,
+        0.00786081439847964,
+        0.003515247056181798
+      ],
+      "observed": {
+        "astro_ra_deg": 33.3615,
+        "astro_dec_deg": 12.151472222222223,
+        "app_ra_deg": 33.685625,
+        "app_dec_deg": 12.264305555555556,
+        "azimuth_deg": 6.389737,
+        "elevation_deg": 52.908713,
+        "range_au": 4.48146960266328
+      }
+    },
+    {
+      "class": "regular",
+      "target_id": 599,
+      "target_name": "Jupiter",
+      "site": "Paranal",
+      "epoch_jd_ut": 2460430.5,
+      "geo_vector_au": [
+        3.554017105697379,
+        4.447763497539288,
+        1.841624016701625
+      ],
+      "geo_velocity_au_per_day": [
+        -0.0171007066134842,
+        0.01631100602118493,
+        0.007205854869956682
+      ],
+      "observed": {
+        "astro_ra_deg": 51.370124999999994,
+        "astro_dec_deg": 17.92441666666667,
+        "app_ra_deg": 51.70866666666667,
+        "app_dec_deg": 18.008861111111113,
+        "azimuth_deg": 284.101,
+        "elevation_deg": -12.940479,
+        "range_au": 5.9837600254929
+      }
+    },
+    {
+      "class": "regular",
+      "target_id": 599,
+      "target_name": "Jupiter",
+      "site": "Paranal",
+      "epoch_jd_ut": 2460550.5,
+      "geo_vector_au": [
+        1.058906415658519,
+        4.677115991383578,
+        1.958628432836888
+      ],
+      "geo_velocity_au_per_day": [
+        -0.01407636378699276,
+        -0.01124723975050244,
+        -0.00471842712636332
+      ],
+      "observed": {
+        "astro_ra_deg": 77.24058333333333,
+        "astro_dec_deg": 22.21638888888889,
+        "app_ra_deg": 77.609125,
+        "app_dec_deg": 22.248722222222224,
+        "azimuth_deg": 104.839242,
+        "elevation_deg": -81.677864,
+        "range_au": 5.1800388058283
+      }
+    },
+    {
+      "class": "regular",
+      "target_id": 599,
+      "target_name": "Jupiter",
+      "site": "Paranal",
+      "epoch_jd_ut": 2460670.5,
+      "geo_vector_au": [
+        1.175501201631793,
+        3.6686645807608,
+        1.541318908321323
+      ],
+      "geo_velocity_au_per_day": [
+        0.009978816299972989,
+        0.003016863174536286,
+        0.001480180734514877
+      ],
+      "observed": {
+        "astro_ra_deg": 72.23137499999999,
+        "astro_dec_deg": 21.806055555555556,
+        "app_ra_deg": 72.60995833333334,
+        "app_dec_deg": 21.850916666666667,
+        "azimuth_deg": 49.135747,
+        "elevation_deg": 24.151819,
+        "range_au": 4.14927256570106
+      }
+    },
+    {
+      "class": "regular",
+      "target_id": 599,
+      "target_name": "Jupiter",
+      "site": "Paranal",
+      "epoch_jd_ut": 2460790.5,
+      "geo_vector_au": [
+        1.019647022735552,
+        5.230845150711308,
+        2.239940777054897
+      ],
+      "geo_velocity_au_per_day": [
+        -0.01714889336320539,
+        0.01356208512337897,
+        0.006063030985161307
+      ],
+      "observed": {
+        "astro_ra_deg": 78.96658333333333,
+        "astro_dec_deg": 22.797333333333334,
+        "app_ra_deg": 79.34475,
+        "app_dec_deg": 22.826138888888888,
+        "azimuth_deg": 302.42002,
+        "elevation_deg": 12.239407,
+        "range_au": 5.78091073010482
+      }
+    },
+    {
+      "class": "regular",
+      "target_id": 599,
+      "target_name": "Jupiter",
+      "site": "Paranal",
+      "epoch_jd_ut": 2460910.5,
+      "geo_vector_au": [
+        -1.595829972383448,
+        5.160509381191641,
+        2.231781257735082
+      ],
+      "geo_velocity_au_per_day": [
+        -0.01595075868375904,
+        -0.01429870375834157,
+        -0.006011205092435462
+      ],
+      "observed": {
+        "astro_ra_deg": 107.18079166666668,
+        "astro_dec_deg": 22.44913888888889,
+        "app_ra_deg": 107.56283333333333,
+        "app_dec_deg": 22.409333333333333,
+        "azimuth_deg": 270.215831,
+        "elevation_deg": -65.70626,
+        "range_au": 5.84450891749082
+      }
+    },
+    {
+      "class": "regular",
+      "target_id": 599,
+      "target_name": "Jupiter",
+      "site": "Paranal",
+      "epoch_jd_ut": 2461030.5,
+      "geo_vector_au": [
+        -1.631382522580588,
+        3.634065377489432,
+        1.592568744257962
+      ],
+      "geo_velocity_au_per_day": [
+        0.01021883804280087,
+        -0.002105229133106922,
+        -0.0007262166495747829
+      ],
+      "observed": {
+        "astro_ra_deg": 114.173875,
+        "astro_dec_deg": 21.79191666666667,
+        "app_ra_deg": 114.56666666666666,
+        "app_dec_deg": 21.733166666666666,
+        "azimuth_deg": 71.930169,
+        "elevation_deg": -13.303463,
+        "range_au": 4.28998864656059
+      }
+    },
+    {
+      "class": "regular",
+      "target_id": 599,
+      "target_name": "Jupiter",
+      "site": "Paranal",
+      "epoch_jd_ut": 2461150.5,
+      "geo_vector_au": [
+        -1.584381350650671,
+        4.697794396433091,
+        2.075641923365488
+      ],
+      "geo_velocity_au_per_day": [
+        -0.01497908586249715,
+        0.01080629594872169,
+        0.004863538740503643
+      ],
+      "observed": {
+        "astro_ra_deg": 108.634375,
+        "astro_dec_deg": 22.71786111111111,
+        "app_ra_deg": 109.030125,
+        "app_dec_deg": 22.67286111111111,
+        "azimuth_deg": 327.238497,
+        "elevation_deg": 35.125218,
+        "range_au": 5.3747475183654
+      }
+    },
+    {
+      "class": "regular",
+      "target_id": 599,
+      "target_name": "Jupiter",
+      "site": "Paranal",
+      "epoch_jd_ut": 2461270.5,
+      "geo_vector_au": [
+        -4.056189219430359,
+        4.360980463335164,
+        1.950459391246745
+      ],
+      "geo_velocity_au_per_day": [
+        -0.01572408222991063,
+        -0.01680004268593127,
+        -0.00711579704667975
+      ],
+      "observed": {
+        "astro_ra_deg": 132.923375,
+        "astro_dec_deg": 18.133944444444445,
+        "app_ra_deg": 133.2974583333333,
+        "app_dec_deg": 18.035083333333336,
+        "azimuth_deg": 274.821963,
+        "elevation_deg": -36.560048,
+        "range_au": 6.26698665832647
+      }
+    },
+    {
+      "class": "regular",
+      "target_id": 599,
+      "target_name": "Jupiter",
+      "site": "Paranal",
+      "epoch_jd_ut": 2461390.5,
+      "geo_vector_au": [
+        -4.017557776247482,
+        2.398845706204791,
+        1.119005442189166
+      ],
+      "geo_velocity_au_per_day": [
+        0.01215825387064964,
+        -0.006493228530330381,
+        -0.002663667759503783
+      ],
+      "observed": {
+        "astro_ra_deg": 149.15699999999998,
+        "astro_dec_deg": 13.450194444444444,
+        "app_ra_deg": 149.52604166666666,
+        "app_dec_deg": 13.320166666666667,
+        "azimuth_deg": 96.554336,
+        "elevation_deg": -46.428048,
+        "range_au": 4.81116394833512
+      }
+    },
+    {
+      "class": "regular",
+      "target_id": 499,
+      "target_name": "Mars",
+      "site": "Greenwich",
+      "epoch_jd_ut": 2460310.5,
+      "geo_vector_au": [
+        -0.127481831597179,
+        -2.211417333279142,
+        -0.9840108553082422
+      ],
+      "geo_velocity_au_per_day": [
+        0.03147831607982139,
+        0.001426580757543807,
+        0.0002010419153804935
+      ],
+      "observed": {
+        "astro_ra_deg": 266.69570833333336,
+        "astro_dec_deg": -23.9525,
+        "app_ra_deg": 267.0545,
+        "app_dec_deg": -23.961861111111112,
+        "azimuth_deg": 25.033135,
+        "elevation_deg": -60.701575,
+        "range_au": 2.4238439211448
+      }
+    },
+    {
+      "class": "regular",
+      "target_id": 499,
+      "target_name": "Mars",
+      "site": "Greenwich",
+      "epoch_jd_ut": 2460430.5,
+      "geo_vector_au": [
+        1.979755538326635,
+        -0.008886433968211602,
+        -0.05152694615469958
+      ],
+      "geo_velocity_au_per_day": [
+        -0.003373884149163749,
+        0.02445362192343284,
+        0.01071104989179131
+      ],
+      "observed": {
+        "astro_ra_deg": 359.73924999999997,
+        "astro_dec_deg": -1.4936944444444444,
+        "app_ra_deg": 0.04558333333333333,
+        "app_dec_deg": -1.3605,
+        "azimuth_deg": 46.054355,
+        "elevation_deg": -30.441234,
+        "range_au": 1.9803856240602
+      }
+    },
+    {
+      "class": "regular",
+      "target_id": 499,
+      "target_name": "Mars",
+      "site": "Greenwich",
+      "epoch_jd_ut": 2460550.5,
+      "geo_vector_au": [
+        0.1304381785151843,
+        1.330708480509628,
+        0.5722624637347401
+      ],
+      "geo_velocity_au_per_day": [
+        -0.01627886677871082,
+        -0.004126938789947162,
+        -0.001284992903733402
+      ],
+      "observed": {
+        "astro_ra_deg": 84.39908333333334,
+        "astro_dec_deg": 23.168916666666668,
+        "app_ra_deg": 84.770875,
+        "app_dec_deg": 23.184361111111112,
+        "azimuth_deg": 61.820961,
+        "elevation_deg": 7.497859,
+        "range_au": 1.45430916787311
+      }
+    },
+    {
+      "class": "regular",
+      "target_id": 499,
+      "target_name": "Mars",
+      "site": "Greenwich",
+      "epoch_jd_ut": 2460670.5,
+      "geo_vector_au": [
+        -0.3701300605235104,
+        0.4989915667774544,
+        0.2635358271016043
+      ],
+      "geo_velocity_au_per_day": [
+        0.004521638521702022,
+        -0.001314490704020353,
+        -0.0002866647181839665
+      ],
+      "observed": {
+        "astro_ra_deg": 126.56341666666668,
+        "astro_dec_deg": 22.984916666666667,
+        "app_ra_deg": 126.9365,
+        "app_dec_deg": 22.90225,
+        "azimuth_deg": 127.133901,
+        "elevation_deg": 52.304776,
+        "range_au": 0.6748102896435
+      }
+    },
+    {
+      "class": "regular",
+      "target_id": 499,
+      "target_name": "Mars",
+      "site": "Greenwich",
+      "epoch_jd_ut": 2460790.5,
+      "geo_vector_au": [
+        -0.7343753880751505,
+        1.035512131449795,
+        0.503842129053235
+      ],
+      "geo_velocity_au_per_day": [
+        -0.01384694105538139,
+        0.002157512030062682,
+        0.0007786502073812648
+      ],
+      "observed": {
+        "astro_ra_deg": 125.33920833333332,
+        "astro_dec_deg": 21.646916666666666,
+        "app_ra_deg": 125.70954166666668,
+        "app_dec_deg": 21.567416666666666,
+        "azimuth_deg": 282.023816,
+        "elevation_deg": 18.198534,
+        "range_au": 1.36586228976735
+      }
+    },
+    {
+      "class": "regular",
+      "target_id": 499,
+      "target_name": "Mars",
+      "site": "Greenwich",
+      "epoch_jd_ut": 2460910.5,
+      "geo_vector_au": [
+        -2.193466607166804,
+        -0.3516648684856351,
+        -0.1374659750642815
+      ],
+      "geo_velocity_au_per_day": [
+        -0.00005639064890470092,
+        -0.02297806676685939,
+        -0.01042241361678611
+      ],
+      "observed": {
+        "astro_ra_deg": 189.10441666666668,
+        "astro_dec_deg": -3.5401666666666665,
+        "app_ra_deg": 189.43133333333333,
+        "app_dec_deg": -3.680222222222222,
+        "azimuth_deg": 313.233518,
+        "elevation_deg": -32.734149,
+        "range_au": 2.22583302945718
+      }
+    },
+    {
+      "class": "regular",
+      "target_id": 499,
+      "target_name": "Mars",
+      "site": "Greenwich",
+      "epoch_jd_ut": 2461030.5,
+      "geo_vector_au": [
+        0.1663968436105412,
+        -2.199383390739455,
+        -0.9910184431967967
+      ],
+      "geo_velocity_au_per_day": [
+        0.03189703690703926,
+        0.002641553946360385,
+        0.0008286003936815563
+      ],
+      "observed": {
+        "astro_ra_deg": 274.32116666666667,
+        "astro_dec_deg": -24.195138888888888,
+        "app_ra_deg": 274.71387500000003,
+        "app_dec_deg": -24.18611111111111,
+        "azimuth_deg": 350.313986,
+        "elevation_deg": -62.451255,
+        "range_au": 2.41814173221626
+      }
+    },
+    {
+      "class": "regular",
+      "target_id": 499,
+      "target_name": "Mars",
+      "site": "Greenwich",
+      "epoch_jd_ut": 2461150.5,
+      "geo_vector_au": [
+        2.244545534858756,
+        0.2878317505991867,
+        0.08358652074169941
+      ],
+      "geo_velocity_au_per_day": [
+        -0.005676257712769054,
+        0.02749511248353483,
+        0.01219545375434315
+      ],
+      "observed": {
+        "astro_ra_deg": 7.303333333333333,
+        "astro_dec_deg": 2.112527777777778,
+        "app_ra_deg": 7.637416666666666,
+        "app_dec_deg": 2.2565555555555554,
+        "azimuth_deg": 24.770694,
+        "elevation_deg": -33.523304,
+        "range_au": 2.26443348317931
+      }
+    },
+    {
+      "class": "regular",
+      "target_id": 499,
+      "target_name": "Mars",
+      "site": "Greenwich",
+      "epoch_jd_ut": 2461270.5,
+      "geo_vector_au": [
+        -0.1343418453184868,
+        1.754675906630777,
+        0.7726506257751409
+      ],
+      "geo_velocity_au_per_day": [
+        -0.02154108417645187,
+        -0.006002249579209105,
+        -0.002109457648427775
+      ],
+      "observed": {
+        "astro_ra_deg": 94.37474999999999,
+        "astro_dec_deg": 23.702916666666667,
+        "app_ra_deg": 94.77979166666667,
+        "app_dec_deg": 23.693305555555554,
+        "azimuth_deg": 45.904077,
+        "elevation_deg": -2.286598,
+        "range_au": 1.92186636137093
+      }
+    },
+    {
+      "class": "regular",
+      "target_id": 499,
+      "target_name": "Mars",
+      "site": "Greenwich",
+      "epoch_jd_ut": 2461390.5,
+      "geo_vector_au": [
+        -0.958113565016507,
+        0.3644374910539417,
+        0.2126826062560103
+      ],
+      "geo_velocity_au_per_day": [
+        0.005951829234409446,
+        -0.007317106447188714,
+        -0.003005107767402819
+      ],
+      "observed": {
+        "astro_ra_deg": 159.17299999999997,
+        "astro_dec_deg": 11.720944444444445,
+        "app_ra_deg": 159.53375,
+        "app_dec_deg": 11.579305555555555,
+        "azimuth_deg": 94.528761,
+        "elevation_deg": 18.432997,
+        "range_au": 1.04685258125409
+      }
+    },
+    {
+      "class": "regular",
+      "target_id": 499,
+      "target_name": "Mars",
+      "site": "Mauna Kea",
+      "epoch_jd_ut": 2460310.5,
+      "geo_vector_au": [
+        -0.127481831597179,
+        -2.211417333279142,
+        -0.9840108553082422
+      ],
+      "geo_velocity_au_per_day": [
+        0.03147831607982139,
+        0.001426580757543807,
+        0.0002010419153804935
+      ],
+      "observed": {
+        "astro_ra_deg": 266.69491666666664,
+        "astro_dec_deg": -23.952638888888888,
+        "app_ra_deg": 267.053875,
+        "app_dec_deg": -23.962027777777777,
+        "azimuth_deg": 221.635285,
+        "elevation_deg": 32.897164,
+        "range_au": 2.42378353116404
+      }
+    },
+    {
+      "class": "regular",
+      "target_id": 499,
+      "target_name": "Mars",
+      "site": "Mauna Kea",
+      "epoch_jd_ut": 2460430.5,
+      "geo_vector_au": [
+        1.979755538326635,
+        -0.008886433968211602,
+        -0.05152694615469958
+      ],
+      "geo_velocity_au_per_day": [
+        -0.003373884149163749,
+        0.02445362192343284,
+        0.01071104989179131
+      ],
+      "observed": {
+        "astro_ra_deg": 359.73770833333333,
+        "astro_dec_deg": -1.4931666666666668,
+        "app_ra_deg": 0.044125,
+        "app_dec_deg": -1.3599722222222224,
+        "azimuth_deg": 258.768843,
+        "elevation_deg": 24.848589,
+        "range_au": 1.98034604488777
+      }
+    },
+    {
+      "class": "regular",
+      "target_id": 499,
+      "target_name": "Mars",
+      "site": "Mauna Kea",
+      "epoch_jd_ut": 2460550.5,
+      "geo_vector_au": [
+        0.1304381785151843,
+        1.330708480509628,
+        0.5722624637347401
+      ],
+      "geo_velocity_au_per_day": [
+        -0.01627886677871082,
+        -0.004126938789947162,
+        -0.001284992903733402
+      ],
+      "observed": {
+        "astro_ra_deg": 84.39629166666667,
+        "astro_dec_deg": 23.169666666666668,
+        "app_ra_deg": 84.76808333333335,
+        "app_dec_deg": 23.18513888888889,
+        "azimuth_deg": 293.937413,
+        "elevation_deg": 2.072335,
+        "range_au": 1.45431314715306
+      }
+    },
+    {
+      "class": "regular",
+      "target_id": 499,
+      "target_name": "Mars",
+      "site": "Mauna Kea",
+      "epoch_jd_ut": 2460670.5,
+      "geo_vector_au": [
+        -0.3701300605235104,
+        0.4989915667774544,
+        0.2635358271016043
+      ],
+      "geo_velocity_au_per_day": [
+        0.004521638521702022,
+        -0.001314490704020353,
+        -0.0002866647181839665
+      ],
+      "observed": {
+        "astro_ra_deg": 126.56166666666667,
+        "astro_dec_deg": 22.984333333333336,
+        "app_ra_deg": 126.93458333333331,
+        "app_dec_deg": 22.901666666666664,
+        "azimuth_deg": 350.013523,
+        "elevation_deg": -46.662219,
+        "range_au": 0.67487508705815
+      }
+    },
+    {
+      "class": "regular",
+      "target_id": 499,
+      "target_name": "Mars",
+      "site": "Mauna Kea",
+      "epoch_jd_ut": 2460790.5,
+      "geo_vector_au": [
+        -0.7343753880751505,
+        1.035512131449795,
+        0.503842129053235
+      ],
+      "geo_velocity_au_per_day": [
+        -0.01384694105538139,
+        0.002157512030062682,
+        0.0007786502073812648
+      ],
+      "observed": {
+        "astro_ra_deg": 125.34208333333333,
+        "astro_dec_deg": 21.64788888888889,
+        "app_ra_deg": 125.71245833333334,
+        "app_dec_deg": 21.568305555555554,
+        "azimuth_deg": 75.226475,
+        "elevation_deg": 26.968055,
+        "range_au": 1.36585623093914
+      }
+    },
+    {
+      "class": "regular",
+      "target_id": 499,
+      "target_name": "Mars",
+      "site": "Mauna Kea",
+      "epoch_jd_ut": 2460910.5,
+      "geo_vector_au": [
+        -2.193466607166804,
+        -0.3516648684856351,
+        -0.1374659750642815
+      ],
+      "geo_velocity_au_per_day": [
+        -0.00005639064890470092,
+        -0.02297806676685939,
+        -0.01042241361678611
+      ],
+      "observed": {
+        "astro_ra_deg": 189.1050833333333,
+        "astro_dec_deg": -3.5397777777777777,
+        "app_ra_deg": 189.432125,
+        "app_dec_deg": -3.6798333333333333,
+        "azimuth_deg": 149.377738,
+        "elevation_deg": 63.074495,
+        "range_au": 2.22577188197347
+      }
+    },
+    {
+      "class": "regular",
+      "target_id": 499,
+      "target_name": "Mars",
+      "site": "Mauna Kea",
+      "epoch_jd_ut": 2461030.5,
+      "geo_vector_au": [
+        0.1663968436105412,
+        -2.199383390739455,
+        -0.9910184431967967
+      ],
+      "geo_velocity_au_per_day": [
+        0.03189703690703926,
+        0.002641553946360385,
+        0.0008286003936815563
+      ],
+      "observed": {
+        "astro_ra_deg": 274.32087500000006,
+        "astro_dec_deg": -24.195333333333334,
+        "app_ra_deg": 274.71375,
+        "app_dec_deg": -24.186333333333334,
+        "azimuth_deg": 204.362219,
+        "elevation_deg": 42.013205,
+        "range_au": 2.41807533774888
+      }
+    },
+    {
+      "class": "regular",
+      "target_id": 499,
+      "target_name": "Mars",
+      "site": "Mauna Kea",
+      "epoch_jd_ut": 2461150.5,
+      "geo_vector_au": [
+        2.244545534858756,
+        0.2878317505991867,
+        0.08358652074169941
+      ],
+      "geo_velocity_au_per_day": [
+        -0.005676257712769054,
+        0.02749511248353483,
+        0.01219545375434315
+      ],
+      "observed": {
+        "astro_ra_deg": 7.3023750000000005,
+        "astro_dec_deg": 2.1130555555555555,
+        "app_ra_deg": 7.636583333333334,
+        "app_dec_deg": 2.2570833333333336,
+        "azimuth_deg": 253.993049,
+        "elevation_deg": 42.702057,
+        "range_au": 2.26438093769474
+      }
+    },
+    {
+      "class": "regular",
+      "target_id": 499,
+      "target_name": "Mars",
+      "site": "Mauna Kea",
+      "epoch_jd_ut": 2461270.5,
+      "geo_vector_au": [
+        -0.1343418453184868,
+        1.754675906630777,
+        0.7726506257751409
+      ],
+      "geo_velocity_au_per_day": [
+        -0.02154108417645187,
+        -0.006002249579209105,
+        -0.002109457648427775
+      ],
+      "observed": {
+        "astro_ra_deg": 94.37279166666666,
+        "astro_dec_deg": 23.703722222222222,
+        "app_ra_deg": 94.77791666666667,
+        "app_dec_deg": 23.694194444444445,
+        "azimuth_deg": 288.853042,
+        "elevation_deg": 20.052632,
+        "range_au": 1.92184996896456
+      }
+    },
+    {
+      "class": "regular",
+      "target_id": 499,
+      "target_name": "Mars",
+      "site": "Mauna Kea",
+      "epoch_jd_ut": 2461390.5,
+      "geo_vector_au": [
+        -0.958113565016507,
+        0.3644374910539417,
+        0.2126826062560103
+      ],
+      "geo_velocity_au_per_day": [
+        0.005951829234409446,
+        -0.007317106447188714,
+        -0.003005107767402819
+      ],
+      "observed": {
+        "astro_ra_deg": 159.16983333333334,
+        "astro_dec_deg": 11.721583333333333,
+        "app_ra_deg": 159.5305,
+        "app_dec_deg": 11.579972222222223,
+        "azimuth_deg": 297.987289,
+        "elevation_deg": -31.32961,
+        "range_au": 1.04688825638416
+      }
+    },
+    {
+      "class": "regular",
+      "target_id": 499,
+      "target_name": "Mars",
+      "site": "Paranal",
+      "epoch_jd_ut": 2460310.5,
+      "geo_vector_au": [
+        -0.127481831597179,
+        -2.211417333279142,
+        -0.9840108553082422
+      ],
+      "geo_velocity_au_per_day": [
+        0.03147831607982139,
+        0.001426580757543807,
+        0.0002010419153804935
+      ],
+      "observed": {
+        "astro_ra_deg": 266.6947083333333,
+        "astro_dec_deg": -23.951444444444444,
+        "app_ra_deg": 267.05354166666666,
+        "app_dec_deg": -23.960833333333333,
+        "azimuth_deg": 233.222028,
+        "elevation_deg": -16.228423,
+        "range_au": 2.42381872522355
+      }
+    },
+    {
+      "class": "regular",
+      "target_id": 499,
+      "target_name": "Mars",
+      "site": "Paranal",
+      "epoch_jd_ut": 2460430.5,
+      "geo_vector_au": [
+        1.979755538326635,
+        -0.008886433968211602,
+        -0.05152694615469958
+      ],
+      "geo_velocity_au_per_day": [
+        -0.003373884149163749,
+        0.02445362192343284,
+        0.01071104989179131
+      ],
+      "observed": {
+        "astro_ra_deg": 359.73816666666664,
+        "astro_dec_deg": -1.4921944444444446,
+        "app_ra_deg": 0.04445833333333333,
+        "app_dec_deg": -1.359027777777778,
+        "azimuth_deg": 234.738107,
+        "elevation_deg": -49.520801,
+        "range_au": 1.98039644728366
+      }
+    },
+    {
+      "class": "regular",
+      "target_id": 499,
+      "target_name": "Mars",
+      "site": "Paranal",
+      "epoch_jd_ut": 2460550.5,
+      "geo_vector_au": [
+        0.1304381785151843,
+        1.330708480509628,
+        0.5722624637347401
+      ],
+      "geo_velocity_au_per_day": [
+        -0.01627886677871082,
+        -0.004126938789947162,
+        -0.001284992903733402
+      ],
+      "observed": {
+        "astro_ra_deg": 84.39804166666667,
+        "astro_dec_deg": 23.170305555555558,
+        "app_ra_deg": 84.76975,
+        "app_dec_deg": 23.18575,
+        "azimuth_deg": 135.476816,
+        "elevation_deg": -87.989023,
+        "range_au": 1.45435725619075
+      }
+    },
+    {
+      "class": "regular",
+      "target_id": 499,
+      "target_name": "Mars",
+      "site": "Paranal",
+      "epoch_jd_ut": 2460670.5,
+      "geo_vector_au": [
+        -0.3701300605235104,
+        0.4989915667774544,
+        0.2635358271016043
+      ],
+      "geo_velocity_au_per_day": [
+        0.004521638521702022,
+        -0.001314490704020353,
+        -0.0002866647181839665
+      ],
+      "observed": {
+        "astro_ra_deg": 126.565625,
+        "astro_dec_deg": 22.98788888888889,
+        "app_ra_deg": 126.93862499999999,
+        "app_dec_deg": 22.905194444444444,
+        "azimuth_deg": 73.200618,
+        "elevation_deg": -19.961332,
+        "range_au": 0.67485852829038
+      }
+    },
+    {
+      "class": "regular",
+      "target_id": 499,
+      "target_name": "Mars",
+      "site": "Paranal",
+      "epoch_jd_ut": 2460790.5,
+      "geo_vector_au": [
+        -0.7343753880751505,
+        1.035512131449795,
+        0.503842129053235
+      ],
+      "geo_velocity_au_per_day": [
+        -0.01384694105538139,
+        0.002157512030062682,
+        0.0007786502073812648
+      ],
+      "observed": {
+        "astro_ra_deg": 125.33987499999999,
+        "astro_dec_deg": 21.649472222222222,
+        "app_ra_deg": 125.71029166666668,
+        "app_dec_deg": 21.569944444444445,
+        "azimuth_deg": 338.732642,
+        "elevation_deg": 40.888894,
+        "range_au": 1.36584756939929
+      }
+    },
+    {
+      "class": "regular",
+      "target_id": 499,
+      "target_name": "Mars",
+      "site": "Paranal",
+      "epoch_jd_ut": 2460910.5,
+      "geo_vector_au": [
+        -2.193466607166804,
+        -0.3516648684856351,
+        -0.1374659750642815
+      ],
+      "geo_velocity_au_per_day": [
+        -0.00005639064890470092,
+        -0.02297806676685939,
+        -0.01042241361678611
+      ],
+      "observed": {
+        "astro_ra_deg": 189.10391666666666,
+        "astro_dec_deg": -3.5388888888888888,
+        "app_ra_deg": 189.43087500000001,
+        "app_dec_deg": -3.678972222222222,
+        "azimuth_deg": 274.357163,
+        "elevation_deg": 18.147815,
+        "range_au": 2.22579665220726
+      }
+    },
+    {
+      "class": "regular",
+      "target_id": 499,
+      "target_name": "Mars",
+      "site": "Paranal",
+      "epoch_jd_ut": 2461030.5,
+      "geo_vector_au": [
+        0.1663968436105412,
+        -2.199383390739455,
+        -0.9910184431967967
+      ],
+      "geo_velocity_au_per_day": [
+        0.03189703690703926,
+        0.002641553946360385,
+        0.0008286003936815563
+      ],
+      "observed": {
+        "astro_ra_deg": 274.32025,
+        "astro_dec_deg": -24.194194444444445,
+        "app_ra_deg": 274.71299999999997,
+        "app_dec_deg": -24.185222222222222,
+        "azimuth_deg": 242.012748,
+        "elevation_deg": -2.278105,
+        "range_au": 2.41810568592904
+      }
+    },
+    {
+      "class": "regular",
+      "target_id": 499,
+      "target_name": "Mars",
+      "site": "Paranal",
+      "epoch_jd_ut": 2461150.5,
+      "geo_vector_au": [
+        2.244545534858756,
+        0.2878317505991867,
+        0.08358652074169941
+      ],
+      "geo_velocity_au_per_day": [
+        -0.005676257712769054,
+        0.02749511248353483,
+        0.01219545375434315
+      ],
+      "observed": {
+        "astro_ra_deg": 7.3023750000000005,
+        "astro_dec_deg": 2.1138055555555555,
+        "app_ra_deg": 7.636416666666666,
+        "app_dec_deg": 2.257833333333333,
+        "azimuth_deg": 253.11438,
+        "elevation_deg": -36.940006,
+        "range_au": 2.26443552153044
+      }
+    },
+    {
+      "class": "regular",
+      "target_id": 499,
+      "target_name": "Mars",
+      "site": "Paranal",
+      "epoch_jd_ut": 2461270.5,
+      "geo_vector_au": [
+        -0.1343418453184868,
+        1.754675906630777,
+        0.7726506257751409
+      ],
+      "geo_velocity_au_per_day": [
+        -0.02154108417645187,
+        -0.006002249579209105,
+        -0.002109457648427775
+      ],
+      "observed": {
+        "astro_ra_deg": 94.37366666666667,
+        "astro_dec_deg": 23.704055555555556,
+        "app_ra_deg": 94.77866666666667,
+        "app_dec_deg": 23.6945,
+        "azimuth_deg": 270.79437,
+        "elevation_deg": -72.829082,
+        "range_au": 1.92190529091149
+      }
+    },
+    {
+      "class": "regular",
+      "target_id": 499,
+      "target_name": "Mars",
+      "site": "Paranal",
+      "epoch_jd_ut": 2461390.5,
+      "geo_vector_au": [
+        -0.958113565016507,
+        0.3644374910539417,
+        0.2126826062560103
+      ],
+      "geo_velocity_au_per_day": [
+        0.005951829234409446,
+        -0.007317106447188714,
+        -0.003005107767402819
+      ],
+      "observed": {
+        "astro_ra_deg": 159.17279166666665,
+        "astro_dec_deg": 11.72325,
+        "app_ra_deg": 159.53345833333333,
+        "app_dec_deg": 11.581583333333333,
+        "azimuth_deg": 105.340566,
+        "elevation_deg": -54.652573,
+        "range_au": 1.04690083075253
+      }
+    },
+    {
+      "class": "regular",
+      "target_id": 699,
+      "target_name": "Saturn",
+      "site": "Greenwich",
+      "epoch_jd_ut": 2460310.5,
+      "geo_vector_au": [
+        9.161938680560144,
+        -4.18206712865634,
+        -2.132881008994687
+      ],
+      "geo_velocity_au_per_day": [
+        0.01905198380894553,
+        0.007506678948347601,
+        0.003077578975058576
+      ],
+      "observed": {
+        "astro_ra_deg": 335.4632916666667,
+        "astro_dec_deg": -11.958083333333333,
+        "app_ra_deg": 335.778125,
+        "app_dec_deg": -11.83925,
+        "azimuth_deg": 290.65512,
+        "elevation_deg": -30.309442,
+        "range_au": 10.2947222027866
+      }
+    },
+    {
+      "class": "regular",
+      "target_id": 699,
+      "target_name": "Saturn",
+      "site": "Greenwich",
+      "epoch_jd_ut": 2460430.5,
+      "geo_vector_au": [
+        9.966791578363022,
+        -2.119093772238966,
+        -1.259001078000066
+      ],
+      "geo_velocity_au_per_day": [
+        -0.00926575807393705,
+        0.01709403423284245,
+        0.007246612841380801
+      ],
+      "observed": {
+        "astro_ra_deg": 347.9951666666667,
+        "astro_dec_deg": -7.044472222222222,
+        "app_ra_deg": 348.3059583333333,
+        "app_dec_deg": -6.914194444444445,
+        "azimuth_deg": 60.960807,
+        "elevation_deg": -29.379887,
+        "range_au": 10.2670733085877
+      }
+    },
+    {
+      "class": "regular",
+      "target_id": 699,
+      "target_name": "Saturn",
+      "site": "Greenwich",
+      "epoch_jd_ut": 2460550.5,
+      "geo_vector_au": [
+        8.432574839072291,
+        -1.722358745920582,
+        -1.105792640863175
+      ],
+      "geo_velocity_au_per_day": [
+        -0.00593747257219218,
+        -0.00922945640831641,
+        -0.004150103325545598
+      ],
+      "observed": {
+        "astro_ra_deg": 348.45441666666665,
+        "astro_dec_deg": -7.3221944444444444,
+        "app_ra_deg": 348.77887499999997,
+        "app_dec_deg": -7.186111111111112,
+        "azimuth_deg": 166.077294,
+        "elevation_deg": 30.424546,
+        "range_au": 8.67740680933528
+      }
+    },
+    {
+      "class": "regular",
+      "target_id": 699,
+      "target_name": "Saturn",
+      "site": "Greenwich",
+      "epoch_jd_ut": 2460670.5,
+      "geo_vector_au": [
+        9.531422016220812,
+        -2.411611104945534,
+        -1.421678989134372
+      ],
+      "geo_velocity_au_per_day": [
+        0.0181664691153462,
+        0.006323705123618,
+        0.002605417160119831
+      ],
+      "observed": {
+        "astro_ra_deg": 345.7993333333333,
+        "astro_dec_deg": -8.228805555555555,
+        "app_ra_deg": 346.1225833333333,
+        "app_dec_deg": -8.095472222222222,
+        "azimuth_deg": 279.852933,
+        "elevation_deg": -18.031112,
+        "range_au": 9.93409493926337
+      }
+    },
+    {
+      "class": "regular",
+      "target_id": 699,
+      "target_name": "Saturn",
+      "site": "Greenwich",
+      "epoch_jd_ut": 2460790.5,
+      "geo_vector_au": [
+        10.34848386712778,
+        -0.3750187894896339,
+        -0.5541426308467658
+      ],
+      "geo_velocity_au_per_day": [
+        -0.009164619033500892,
+        0.01816105367022833,
+        0.007753650201144451
+      ],
+      "observed": {
+        "astro_ra_deg": 357.9229583333334,
+        "astro_dec_deg": -3.0640277777777776,
+        "app_ra_deg": 358.24345833333336,
+        "app_dec_deg": -2.9249444444444443,
+        "azimuth_deg": 43.303781,
+        "elevation_deg": -33.320417,
+        "range_au": 10.3701130835221
+      }
+    },
+    {
+      "class": "regular",
+      "target_id": 699,
+      "target_name": "Saturn",
+      "site": "Greenwich",
+      "epoch_jd_ut": 2460910.5,
+      "geo_vector_au": [
+        8.666198555513423,
+        0.1822881517417485,
+        -0.3259534935503385
+      ],
+      "geo_velocity_au_per_day": [
+        -0.008421693851488788,
+        -0.008446008021485991,
+        -0.003765359452427075
+      ],
+      "observed": {
+        "astro_ra_deg": 1.203375,
+        "astro_dec_deg": -2.154444444444444,
+        "app_ra_deg": 1.5375,
+        "app_dec_deg": -2.009138888888889,
+        "azimuth_deg": 144.444364,
+        "elevation_deg": 30.773853,
+        "range_au": 8.67422013925964
+      }
+    },
+    {
+      "class": "regular",
+      "target_id": 699,
+      "target_name": "Saturn",
+      "site": "Greenwich",
+      "epoch_jd_ut": 2461030.5,
+      "geo_vector_au": [
+        9.495117000588953,
+        -0.5702620760421724,
+        -0.6636034828520035
+      ],
+      "geo_velocity_au_per_day": [
+        0.01706161342329413,
+        0.004923870425501271,
+        0.002047777015607316
+      ],
+      "observed": {
+        "astro_ra_deg": 356.5611666666666,
+        "astro_dec_deg": -3.9915555555555557,
+        "app_ra_deg": 356.895625,
+        "app_dec_deg": -3.847166666666667,
+        "azimuth_deg": 269.887369,
+        "elevation_deg": -4.830075,
+        "range_au": 9.53539727696334
+      }
+    },
+    {
+      "class": "regular",
+      "target_id": 699,
+      "target_name": "Saturn",
+      "site": "Greenwich",
+      "epoch_jd_ut": 2461150.5,
+      "geo_vector_au": [
+        10.31115564588462,
+        1.402292713250083,
+        0.1820916804620778
+      ],
+      "geo_velocity_au_per_day": [
+        -0.009037306476043278,
+        0.01890202712575994,
+        0.00812459759418714
+      ],
+      "observed": {
+        "astro_ra_deg": 7.742916666666666,
+        "astro_dec_deg": 1.0015833333333333,
+        "app_ra_deg": 8.076666666666666,
+        "app_dec_deg": 1.1455277777777777,
+        "azimuth_deg": 24.60793,
+        "elevation_deg": -34.710306,
+        "range_au": 10.4076951674679
+      }
+    },
+    {
+      "class": "regular",
+      "target_id": 699,
+      "target_name": "Saturn",
+      "site": "Greenwich",
+      "epoch_jd_ut": 2461270.5,
+      "geo_vector_au": [
+        8.489168173794486,
+        2.094194898380382,
+        0.4747813521195802
+      ],
+      "geo_velocity_au_per_day": [
+        -0.01086449677750823,
+        -0.00777537966005968,
+        -0.003422340653222391
+      ],
+      "observed": {
+        "astro_ra_deg": 13.856041666666666,
+        "astro_dec_deg": 3.1071944444444446,
+        "app_ra_deg": 14.204875,
+        "app_dec_deg": 3.254166666666667,
+        "azimuth_deg": 123.461427,
+        "elevation_deg": 27.508123,
+        "range_au": 8.75651529922076
+      }
+    },
+    {
+      "class": "regular",
+      "target_id": 699,
+      "target_name": "Saturn",
+      "site": "Greenwich",
+      "epoch_jd_ut": 2461390.5,
+      "geo_vector_au": [
+        9.037984585850833,
+        1.262662785604759,
+        0.109270441585738
+      ],
+      "geo_velocity_au_per_day": [
+        0.01577790101423161,
+        0.003297765705293493,
+        0.001397434676983488
+      ],
+      "observed": {
+        "astro_ra_deg": 7.95125,
+        "astro_dec_deg": 0.6851111111111111,
+        "app_ra_deg": 8.300666666666668,
+        "app_dec_deg": 0.8353055555555556,
+        "azimuth_deg": 259.762692,
+        "elevation_deg": 9.110191,
+        "range_au": 9.12645241497032
+      }
+    },
+    {
+      "class": "regular",
+      "target_id": 699,
+      "target_name": "Saturn",
+      "site": "Mauna Kea",
+      "epoch_jd_ut": 2460310.5,
+      "geo_vector_au": [
+        9.161938680560144,
+        -4.18206712865634,
+        -2.132881008994687
+      ],
+      "geo_velocity_au_per_day": [
+        0.01905198380894553,
+        0.007506678948347601,
+        0.003077578975058576
+      ],
+      "observed": {
+        "astro_ra_deg": 335.4635416666667,
+        "astro_dec_deg": -11.958055555555555,
+        "app_ra_deg": 335.77845833333333,
+        "app_dec_deg": -11.839194444444445,
+        "azimuth_deg": 133.349019,
+        "elevation_deg": 45.953609,
+        "range_au": 10.2946699931882
+      }
+    },
+    {
+      "class": "regular",
+      "target_id": 699,
+      "target_name": "Saturn",
+      "site": "Mauna Kea",
+      "epoch_jd_ut": 2460430.5,
+      "geo_vector_au": [
+        9.966791578363022,
+        -2.119093772238966,
+        -1.259001078000066
+      ],
+      "geo_velocity_au_per_day": [
+        -0.00926575807393705,
+        0.01709403423284245,
+        0.007246612841380801
+      ],
+      "observed": {
+        "astro_ra_deg": 347.994875,
+        "astro_dec_deg": -7.044388888888888,
+        "app_ra_deg": 348.30566666666664,
+        "app_dec_deg": -6.914138888888889,
+        "azimuth_deg": 258.062933,
+        "elevation_deg": 11.911612,
+        "range_au": 10.2670435518921
+      }
+    },
+    {
+      "class": "regular",
+      "target_id": 699,
+      "target_name": "Saturn",
+      "site": "Mauna Kea",
+      "epoch_jd_ut": 2460550.5,
+      "geo_vector_au": [
+        8.432574839072291,
+        -1.722358745920582,
+        -1.105792640863175
+      ],
+      "geo_velocity_au_per_day": [
+        -0.00593747257219218,
+        -0.00922945640831641,
+        -0.004150103325545598
+      ],
+      "observed": {
+        "astro_ra_deg": 348.45441666666665,
+        "astro_dec_deg": -7.322027777777778,
+        "app_ra_deg": 348.77875,
+        "app_dec_deg": -7.185944444444445,
+        "azimuth_deg": 45.412637,
+        "elevation_deg": -72.515621,
+        "range_au": 8.6774691666657
+      }
+    },
+    {
+      "class": "regular",
+      "target_id": 699,
+      "target_name": "Saturn",
+      "site": "Mauna Kea",
+      "epoch_jd_ut": 2460670.5,
+      "geo_vector_au": [
+        9.531422016220812,
+        -2.411611104945534,
+        -1.421678989134372
+      ],
+      "geo_velocity_au_per_day": [
+        0.0181664691153462,
+        0.006323705123618,
+        0.002605417160119831
+      ],
+      "observed": {
+        "astro_ra_deg": 345.79966666666667,
+        "astro_dec_deg": -8.228722222222222,
+        "app_ra_deg": 346.123,
+        "app_dec_deg": -8.09538888888889,
+        "azimuth_deg": 116.781531,
+        "elevation_deg": 36.300381,
+        "range_au": 9.93405646771772
+      }
+    },
+    {
+      "class": "regular",
+      "target_id": 699,
+      "target_name": "Saturn",
+      "site": "Mauna Kea",
+      "epoch_jd_ut": 2460790.5,
+      "geo_vector_au": [
+        10.34848386712778,
+        -0.3750187894896339,
+        -0.5541426308467658
+      ],
+      "geo_velocity_au_per_day": [
+        -0.009164619033500892,
+        0.01816105367022833,
+        0.007753650201144451
+      ],
+      "observed": {
+        "astro_ra_deg": 357.9226666666667,
+        "astro_dec_deg": -3.063944444444444,
+        "app_ra_deg": 358.24325,
+        "app_dec_deg": -2.924861111111111,
+        "azimuth_deg": 255.684885,
+        "elevation_deg": 27.314734,
+        "range_au": 10.370070033551
+      }
+    },
+    {
+      "class": "regular",
+      "target_id": 699,
+      "target_name": "Saturn",
+      "site": "Mauna Kea",
+      "epoch_jd_ut": 2460910.5,
+      "geo_vector_au": [
+        8.666198555513423,
+        0.1822881517417485,
+        -0.3259534935503385
+      ],
+      "geo_velocity_au_per_day": [
+        -0.008421693851488788,
+        -0.008446008021485991,
+        -0.003765359452427075
+      ],
+      "observed": {
+        "astro_ra_deg": 1.2032916666666666,
+        "astro_dec_deg": -2.1543055555555553,
+        "app_ra_deg": 1.5372500000000002,
+        "app_dec_deg": -2.009,
+        "azimuth_deg": 342.626261,
+        "elevation_deg": -71.397957,
+        "range_au": 8.6742824533003
+      }
+    },
+    {
+      "class": "regular",
+      "target_id": 699,
+      "target_name": "Saturn",
+      "site": "Mauna Kea",
+      "epoch_jd_ut": 2461030.5,
+      "geo_vector_au": [
+        9.495117000588953,
+        -0.5702620760421724,
+        -0.6636034828520035
+      ],
+      "geo_velocity_au_per_day": [
+        0.01706161342329413,
+        0.004923870425501271,
+        0.002047777015607316
+      ],
+      "observed": {
+        "astro_ra_deg": 356.56154166666664,
+        "astro_dec_deg": -3.9914444444444444,
+        "app_ra_deg": 356.8960416666667,
+        "app_dec_deg": -3.847055555555556,
+        "azimuth_deg": 103.899616,
+        "elevation_deg": 24.199455,
+        "range_au": 9.5353761935788
+      }
+    },
+    {
+      "class": "regular",
+      "target_id": 699,
+      "target_name": "Saturn",
+      "site": "Mauna Kea",
+      "epoch_jd_ut": 2461150.5,
+      "geo_vector_au": [
+        10.31115564588462,
+        1.402292713250083,
+        0.1820916804620778
+      ],
+      "geo_velocity_au_per_day": [
+        -0.009037306476043278,
+        0.01890202712575994,
+        0.00812459759418714
+      ],
+      "observed": {
+        "astro_ra_deg": 7.742708333333333,
+        "astro_dec_deg": 1.0016944444444444,
+        "app_ra_deg": 8.076583333333334,
+        "app_dec_deg": 1.1456388888888889,
+        "azimuth_deg": 252.371894,
+        "elevation_deg": 42.615834,
+        "range_au": 10.4076419374525
+      }
+    },
+    {
+      "class": "regular",
+      "target_id": 699,
+      "target_name": "Saturn",
+      "site": "Mauna Kea",
+      "epoch_jd_ut": 2461270.5,
+      "geo_vector_au": [
+        8.489168173794486,
+        2.094194898380382,
+        0.4747813521195802
+      ],
+      "geo_velocity_au_per_day": [
+        -0.01086449677750823,
+        -0.00777537966005968,
+        -0.003422340653222391
+      ],
+      "observed": {
+        "astro_ra_deg": 13.855791666666667,
+        "astro_dec_deg": 3.1073055555555555,
+        "app_ra_deg": 14.204500000000001,
+        "app_dec_deg": 3.254277777777778,
+        "azimuth_deg": 312.69662,
+        "elevation_deg": -57.494796,
+        "range_au": 8.75657101967027
+      }
+    },
+    {
+      "class": "regular",
+      "target_id": 699,
+      "target_name": "Saturn",
+      "site": "Mauna Kea",
+      "epoch_jd_ut": 2461390.5,
+      "geo_vector_au": [
+        9.037984585850833,
+        1.262662785604759,
+        0.109270441585738
+      ],
+      "geo_velocity_au_per_day": [
+        0.01577790101423161,
+        0.003297765705293493,
+        0.001397434676983488
+      ],
+      "observed": {
+        "astro_ra_deg": 7.951625000000001,
+        "astro_dec_deg": 0.6852222222222223,
+        "app_ra_deg": 8.301083333333334,
+        "app_dec_deg": 0.8354166666666667,
+        "azimuth_deg": 92.93176,
+        "elevation_deg": 10.513493,
+        "range_au": 9.12645138839308
+      }
+    },
+    {
+      "class": "regular",
+      "target_id": 699,
+      "target_name": "Saturn",
+      "site": "Paranal",
+      "epoch_jd_ut": 2460310.5,
+      "geo_vector_au": [
+        9.161938680560144,
+        -4.18206712865634,
+        -2.132881008994687
+      ],
+      "geo_velocity_au_per_day": [
+        0.01905198380894553,
+        0.007506678948347601,
+        0.003077578975058576
+      ],
+      "observed": {
+        "astro_ra_deg": 335.46325,
+        "astro_dec_deg": -11.95786111111111,
+        "app_ra_deg": 335.778125,
+        "app_dec_deg": -11.839027777777778,
+        "azimuth_deg": 273.860106,
+        "elevation_deg": 37.505449,
+        "range_au": 10.2946747286723
+      }
+    },
+    {
+      "class": "regular",
+      "target_id": 699,
+      "target_name": "Saturn",
+      "site": "Paranal",
+      "epoch_jd_ut": 2460430.5,
+      "geo_vector_au": [
+        9.966791578363022,
+        -2.119093772238966,
+        -1.259001078000066
+      ],
+      "geo_velocity_au_per_day": [
+        -0.00926575807393705,
+        0.01709403423284245,
+        0.007246612841380801
+      ],
+      "observed": {
+        "astro_ra_deg": 347.995,
+        "astro_dec_deg": -7.0441666666666665,
+        "app_ra_deg": 348.3057083333333,
+        "app_dec_deg": -6.913916666666667,
+        "azimuth_deg": 214.672289,
+        "elevation_deg": -52.779893,
+        "range_au": 10.2670863741686
+      }
+    },
+    {
+      "class": "regular",
+      "target_id": 699,
+      "target_name": "Saturn",
+      "site": "Paranal",
+      "epoch_jd_ut": 2460550.5,
+      "geo_vector_au": [
+        8.432574839072291,
+        -1.722358745920582,
+        -1.105792640863175
+      ],
+      "geo_velocity_au_per_day": [
+        -0.00593747257219218,
+        -0.00922945640831641,
+        -0.004150103325545598
+      ],
+      "observed": {
+        "astro_ra_deg": 348.454625,
+        "astro_dec_deg": -7.321861111111111,
+        "app_ra_deg": 348.77904166666667,
+        "app_dec_deg": -7.1857500000000005,
+        "azimuth_deg": 93.465657,
+        "elevation_deg": 9.801209,
+        "range_au": 8.67742121732348
+      }
+    },
+    {
+      "class": "regular",
+      "target_id": 699,
+      "target_name": "Saturn",
+      "site": "Paranal",
+      "epoch_jd_ut": 2460670.5,
+      "geo_vector_au": [
+        9.531422016220812,
+        -2.411611104945534,
+        -1.421678989134372
+      ],
+      "geo_velocity_au_per_day": [
+        0.0181664691153462,
+        0.006323705123618,
+        0.002605417160119831
+      ],
+      "observed": {
+        "astro_ra_deg": 345.7993333333333,
+        "astro_dec_deg": -8.228527777777778,
+        "app_ra_deg": 346.12266666666665,
+        "app_dec_deg": -8.095222222222223,
+        "azimuth_deg": 287.576253,
+        "elevation_deg": 49.766176,
+        "range_au": 9.93404918320781
+      }
+    },
+    {
+      "class": "regular",
+      "target_id": 699,
+      "target_name": "Saturn",
+      "site": "Paranal",
+      "epoch_jd_ut": 2460790.5,
+      "geo_vector_au": [
+        10.34848386712778,
+        -0.3750187894896339,
+        -0.5541426308467658
+      ],
+      "geo_velocity_au_per_day": [
+        -0.009164619033500892,
+        0.01816105367022833,
+        0.007753650201144451
+      ],
+      "observed": {
+        "astro_ra_deg": 357.92275,
+        "astro_dec_deg": -3.0637499999999998,
+        "app_ra_deg": 358.2432083333333,
+        "app_dec_deg": -2.9246666666666665,
+        "azimuth_deg": 236.299668,
+        "elevation_deg": -45.964019,
+        "range_au": 10.3701203121766
+      }
+    },
+    {
+      "class": "regular",
+      "target_id": 699,
+      "target_name": "Saturn",
+      "site": "Paranal",
+      "epoch_jd_ut": 2460910.5,
+      "geo_vector_au": [
+        8.666198555513423,
+        0.1822881517417485,
+        -0.3259534935503385
+      ],
+      "geo_velocity_au_per_day": [
+        -0.008421693851488788,
+        -0.008446008021485991,
+        -0.003765359452427075
+      ],
+      "observed": {
+        "astro_ra_deg": 1.2035416666666665,
+        "astro_dec_deg": -2.154111111111111,
+        "app_ra_deg": 1.537625,
+        "app_dec_deg": -2.008777777777778,
+        "azimuth_deg": 96.214566,
+        "elevation_deg": -8.59098,
+        "range_au": 8.67424838195875
+      }
+    },
+    {
+      "class": "regular",
+      "target_id": 699,
+      "target_name": "Saturn",
+      "site": "Paranal",
+      "epoch_jd_ut": 2461030.5,
+      "geo_vector_au": [
+        9.495117000588953,
+        -0.5702620760421724,
+        -0.6636034828520035
+      ],
+      "geo_velocity_au_per_day": [
+        0.01706161342329413,
+        0.004923870425501271,
+        0.002047777015607316
+      ],
+      "observed": {
+        "astro_ra_deg": 356.56125,
+        "astro_dec_deg": -3.991277777777778,
+        "app_ra_deg": 356.89575,
+        "app_dec_deg": -3.846888888888889,
+        "azimuth_deg": 310.212237,
+        "elevation_deg": 59.972302,
+        "range_au": 9.53535675327968
+      }
+    },
+    {
+      "class": "regular",
+      "target_id": 699,
+      "target_name": "Saturn",
+      "site": "Paranal",
+      "epoch_jd_ut": 2461150.5,
+      "geo_vector_au": [
+        10.31115564588462,
+        1.402292713250083,
+        0.1820916804620778
+      ],
+      "geo_velocity_au_per_day": [
+        -0.009037306476043278,
+        0.01890202712575994,
+        0.00812459759418714
+      ],
+      "observed": {
+        "astro_ra_deg": 7.742708333333333,
+        "astro_dec_deg": 1.0018888888888888,
+        "app_ra_deg": 8.076458333333333,
+        "app_dec_deg": 1.1458055555555555,
+        "azimuth_deg": 252.185455,
+        "elevation_deg": -36.00614,
+        "range_au": 10.4076959203428
+      }
+    },
+    {
+      "class": "regular",
+      "target_id": 699,
+      "target_name": "Saturn",
+      "site": "Paranal",
+      "epoch_jd_ut": 2461270.5,
+      "geo_vector_au": [
+        8.489168173794486,
+        2.094194898380382,
+        0.4747813521195802
+      ],
+      "geo_velocity_au_per_day": [
+        -0.01086449677750823,
+        -0.00777537966005968,
+        -0.003422340653222391
+      ],
+      "observed": {
+        "astro_ra_deg": 13.856125,
+        "astro_dec_deg": 3.1075,
+        "app_ra_deg": 14.204875,
+        "app_dec_deg": 3.254472222222222,
+        "azimuth_deg": 99.373523,
+        "elevation_deg": -26.935379,
+        "range_au": 8.75655434259298
+      }
+    },
+    {
+      "class": "regular",
+      "target_id": 699,
+      "target_name": "Saturn",
+      "site": "Paranal",
+      "epoch_jd_ut": 2461390.5,
+      "geo_vector_au": [
+        9.037984585850833,
+        1.262662785604759,
+        0.109270441585738
+      ],
+      "geo_velocity_au_per_day": [
+        0.01577790101423161,
+        0.003297765705293493,
+        0.001397434676983488
+      ],
+      "observed": {
+        "astro_ra_deg": 7.951375000000001,
+        "astro_dec_deg": 0.6854166666666667,
+        "app_ra_deg": 8.300875000000001,
+        "app_dec_deg": 0.8356111111111112,
+        "azimuth_deg": 346.379074,
+        "elevation_deg": 63.8924,
+        "range_au": 9.12642085038288
+      }
+    }
+  ]
+}

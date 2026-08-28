@@ -165,6 +165,99 @@ func fetchVector(naifID int, bodyName string, startStr, stopStr string) (*StateV
 }
 
 // ObserverPoint matches the quantities we pull from Horizons OBSERVER table
+// fetchVectorSeries queries the Horizons API for geocentric state vectors
+// across a time range, returning every row rather than only the first.
+//
+// The geocentric state does not depend on the observing site, so one series
+// per body covers every site in a corpus at once. That is the difference
+// between a few dozen requests to somebody else's server and a few hundred.
+func fetchVectorSeries(naifID int, bodyName, startStr, stopStr, stepStr string) ([]StateVector, error) {
+	baseURL := "https://ssd.jpl.nasa.gov/api/horizons.api"
+
+	params := url.Values{}
+	params.Add("format", "text")
+	params.Add("COMMAND", fmt.Sprintf("'%d'", naifID))
+	params.Add("CENTER", "'@399'")
+	params.Add("MAKE_EPHEM", "'YES'")
+	params.Add("EPHEM_TYPE", "'VECTORS'")
+	params.Add("START_TIME", fmt.Sprintf("'%s'", startStr))
+	params.Add("STOP_TIME", fmt.Sprintf("'%s'", stopStr))
+	params.Add("STEP_SIZE", fmt.Sprintf("'%s'", stepStr))
+	params.Add("OUT_UNITS", "'AU-D'")
+	params.Add("REF_PLANE", "'FRAME'")
+	params.Add("VEC_TABLE", "'2'")
+	params.Add("CSV_FORMAT", "'YES'")
+	params.Add("OBJ_DATA", "'NO'")
+	params.Add("TIME_TYPE", "'UT'")
+
+	encodedQuery := strings.ReplaceAll(params.Encode(), "+", "%20")
+
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet,
+		fmt.Sprintf("%s?%s", baseURL, encodedQuery), nil)
+	if err != nil {
+		return nil, fmt.Errorf("building the request: %w", err)
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("querying Horizons: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	bodyBytes, _ := io.ReadAll(resp.Body)
+	responseStr := string(bodyBytes)
+
+	if horizonsUnavailable(responseStr) {
+		return nil, errHorizonsUnavailable
+	}
+
+	soeIdx := strings.Index(responseStr, "$$SOE")
+
+	eoeIdx := strings.Index(responseStr, "$$EOE")
+	if soeIdx == -1 || eoeIdx == -1 {
+		return nil, errNoEphemerisData
+	}
+
+	lines := strings.Split(strings.TrimSpace(responseStr[soeIdx+6:eoeIdx]), "\n")
+	out := make([]StateVector, 0, len(lines))
+
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+
+		cols := strings.Split(line, ",")
+		if len(cols) < 8 {
+			return nil, fmt.Errorf("%w: vector output had %d", errUnexpectedColumns, len(cols))
+		}
+
+		val := func(idx int) float64 {
+			v, _ := strconv.ParseFloat(strings.TrimSpace(cols[idx]), 64)
+
+			return v
+		}
+
+		sv := StateVector{
+			Body:    bodyName,
+			NaifID:  naifID,
+			ET:      (val(0) - 2451545.0) * 86400.0,
+			Pos:     []float64{val(2), val(3), val(4)},
+			Vel:     []float64{val(5), val(6), val(7)},
+			UnitPos: "AU",
+			UnitVel: "AU/day",
+		}
+
+		out = append(out, sv)
+	}
+
+	if len(out) == 0 {
+		return nil, errNoVectorRows
+	}
+
+	return out, nil
+}
+
 // ObserverPoint is one row of a Horizons OBSERVER table.
 //
 // Azimuth and Elevation are **airless** — unrefracted. The queries below send
