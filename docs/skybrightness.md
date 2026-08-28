@@ -1712,6 +1712,18 @@ wide. It does not reach 1.8 on its own, but it is the same order, and any compar
 "SkyCalc at msolflux 100" without naming them is under-specified. [Spec.Season] and
 [Spec.TimeOfNight] now exist so a caller can name them.
 
+**Molecular emission and the total-flux reading are both ruled out too.** SkyCalc separates
+the molecular emission of the lower and upper atmosphere from airglow proper, and this
+package switches both off, which raises the obvious question of whether GAMBONS leaves them
+on. Measured at msolflux 100 over 500-600 nm with every component enabled: `flux_tme` is
+**exactly zero**, as the thermal molecular bands sitting in the infrared rather than the
+visible predicts. And the whole-sky `flux` column comes to 526.51 against airglow's 115.20 —
+a factor of **4.57**, far past the 1.8 in question, so a caller reading `flux` as airglow
+would be wrong by much more than the disagreement being explained. The components sum to the
+total exactly (355.50 scattered moonlight, 48.27 zodiacal, 7.53 scattered starlight, 115.20
+airglow), which is itself worth having: it confirms what each column means rather than
+assuming it.
+
 **Airmass is the one parameter big enough on its own, and the arithmetic is suggestive.**
 Measured over the same band, SkyCalc's airglow runs 1.500 times the airmass-1 value at
 airmass 1.5 and 1.971 at airmass 2 — very nearly linear, because the van Rhijn enhancement
