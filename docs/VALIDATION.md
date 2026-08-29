@@ -49,21 +49,21 @@ generated table existed.
 
 | Suite | Reference | Independence | N | p50 | p95 | p99 | Max | Contract | Status | Last verified |
 |---|---|---|---:|---:|---:|---:|---:|---:|---|---|
-| `coord.rv.barycentric` | Astropy SkyCoord.radial_velocity_correction 8.0.1 | shares SOFA/ERFA epv00 — consistency check | 175 | 3.64e-07 | 1.93e-06 | 2.1e-06 | 2.42e-06 | 0.001 km/s | ✅ verified | 2026-08-29 · `5e53d9fc` |
-| `coord.rv.heliocentric` | Astropy SkyCoord.radial_velocity_correction 8.0.1 | shares SOFA/ERFA epv00 — consistency check | 175 | 3.64e-07 | 1.93e-06 | 2.1e-06 | 2.42e-06 | 0.001 km/s | ✅ verified | 2026-08-29 · `5e53d9fc` |
-| `coord.topocentric.corpus` | JPL Horizons OBSERVER + VECTORS, AIRLESS | independent | 103 | 0.433 | 1.9 | 1.99 | 2.07 | 3 arcsec | ✅ verified | 2026-08-29 · `5e53d9fc` |
-| `coord.topocentric.crosstrack` | JPL Horizons OBSERVER ephemeris, AIRLESS | independent | 68 | 0.379 | 1.88 | 1.93 | 1.96 | 3 arcsec | ✅ verified | 2026-08-29 · `5e53d9fc` |
-| `coord.topocentric.elevation` | JPL Horizons OBSERVER ephemeris, AIRLESS | independent | 68 | 0.0665 | 0.272 | 0.352 | 0.372 | 3 arcsec | ✅ verified | 2026-08-29 · `5e53d9fc` |
-| `coord.topocentric.separation` | JPL Horizons OBSERVER ephemeris, AIRLESS | independent | 68 | 0.388 | 1.88 | 1.94 | 1.97 | 3 arcsec | ✅ verified | 2026-08-29 · `5e53d9fc` |
-| `ephemeris.jpl.horizons.position` | JPL Horizons VECTORS, geocentric, ICRF | shares JPL DE — consistency check | 3 | 5.49e-14 | 4.05e-12 | 4.41e-12 | 4.5e-12 | 1e-09 AU | ✅ verified | 2026-08-29 · `5e53d9fc` |
-| `ephemeris.jpl.horizons.velocity` | JPL Horizons VECTORS, geocentric, ICRF | shares JPL DE — consistency check | 3 | 1.22e-14 | 9.02e-13 | 9.81e-13 | 1e-12 | 1e-10 AU/day | ✅ verified | 2026-08-29 · `5e53d9fc` |
-| `ephemeris.jpl.smallbody.position` | JPL Horizons VECTORS, geocentric, ICRF | shares JPL small-body solution — consistency check | 66 | 1.72e-13 | 1.94e-13 | 2.07e-13 | 2.19e-13 | 1e-11 AU | ✅ verified | 2026-08-29 · `dd92fe32` |
-| `ephemeris.jpl.smallbody.velocity` | JPL Horizons VECTORS, geocentric, ICRF | shares JPL small-body solution — consistency check | 66 | 3.96e-14 | 4.61e-14 | 4.62e-14 | 4.62e-14 | 1e-12 AU/day | ✅ verified | 2026-08-29 · `dd92fe32` |
-| `ephemeris.sofa.moon` | gofa (Epv00 / Moon98) v1.19.1 | shares SOFA — consistency check | 3 | 3.65e-08 | 4.5e-08 | 4.58e-08 | 4.6e-08 | 4e-07 AU | ✅ verified | 2026-08-29 · `5e53d9fc` |
-| `ephemeris.sofa.sun` | gofa (Epv00 / Moon98) v1.19.1 | shares SOFA — consistency check | 3 | 2.03e-08 | 2.76e-08 | 2.82e-08 | 2.84e-08 | 1.5e-07 AU | ✅ verified | 2026-08-29 · `5e53d9fc` |
-| `skybrightness.gambons.band_medians` | GAMBONS (Masana, Carrasco, Bara & Ribas) 2021 MNRAS 501, 5443; 2024 | independent | 6 | 0.207 | 0.273 | 0.28 | 0.282 | 1 mag | ✅ verified | 2026-08-29 · `5e53d9fc` |
-| `time.scale.roundtrip.arithmetic` | scale round trip, A to B and back | independent | 120 | 0 | 9.41e-12 | 9.59e-12 | 9.59e-12 | 1e-06 s | ✅ verified | 2026-08-29 · `5e53d9fc` |
-| `time.scale.roundtrip.modelled` | scale round trip, A to B and back | independent | 180 | 0 | 6.83e-06 | 0.943 | 0.943 | 5 s | ✅ verified | 2026-08-29 · `5e53d9fc` |
+| `coord.rv.barycentric` | Astropy SkyCoord.radial_velocity_correction 8.0.1 | shares SOFA/ERFA epv00 — consistency check | 175 | 3.64e-07 | 1.93e-06 | 2.1e-06 | 2.42e-06 | 0.001 km/s | ✅ verified | 2026-08-29 · `c6e09cf0` |
+| `coord.rv.heliocentric` | Astropy SkyCoord.radial_velocity_correction 8.0.1 | shares SOFA/ERFA epv00 — consistency check | 175 | 3.64e-07 | 1.93e-06 | 2.1e-06 | 2.42e-06 | 0.001 km/s | ✅ verified | 2026-08-29 · `c6e09cf0` |
+| `coord.topocentric.corpus` | JPL Horizons OBSERVER + VECTORS, AIRLESS | independent | 116 | 0.434 | 1.92 | 2.11 | 2.15 | 3 arcsec | ✅ verified | 2026-08-29 · `c6e09cf0` |
+| `coord.topocentric.crosstrack` | JPL Horizons OBSERVER ephemeris, AIRLESS | independent | 68 | 0.379 | 1.88 | 1.93 | 1.96 | 3 arcsec | ✅ verified | 2026-08-29 · `c6e09cf0` |
+| `coord.topocentric.elevation` | JPL Horizons OBSERVER ephemeris, AIRLESS | independent | 68 | 0.0665 | 0.272 | 0.352 | 0.372 | 3 arcsec | ✅ verified | 2026-08-29 · `c6e09cf0` |
+| `coord.topocentric.separation` | JPL Horizons OBSERVER ephemeris, AIRLESS | independent | 68 | 0.388 | 1.88 | 1.94 | 1.97 | 3 arcsec | ✅ verified | 2026-08-29 · `c6e09cf0` |
+| `ephemeris.jpl.horizons.position` | JPL Horizons VECTORS, geocentric, ICRF | shares JPL DE — consistency check | 3 | 5.49e-14 | 4.05e-12 | 4.41e-12 | 4.5e-12 | 1e-09 AU | ✅ verified | 2026-08-29 · `c6e09cf0` |
+| `ephemeris.jpl.horizons.velocity` | JPL Horizons VECTORS, geocentric, ICRF | shares JPL DE — consistency check | 3 | 1.22e-14 | 9.02e-13 | 9.81e-13 | 1e-12 | 1e-10 AU/day | ✅ verified | 2026-08-29 · `c6e09cf0` |
+| `ephemeris.jpl.smallbody.position` | JPL Horizons VECTORS, geocentric, ICRF | shares JPL small-body solution — consistency check | 66 | 1.72e-13 | 1.94e-13 | 2.07e-13 | 2.19e-13 | 1e-11 AU | ✅ verified | 2026-08-29 · `c6e09cf0` |
+| `ephemeris.jpl.smallbody.velocity` | JPL Horizons VECTORS, geocentric, ICRF | shares JPL small-body solution — consistency check | 66 | 3.96e-14 | 4.61e-14 | 4.62e-14 | 4.62e-14 | 1e-12 AU/day | ✅ verified | 2026-08-29 · `c6e09cf0` |
+| `ephemeris.sofa.moon` | gofa (Epv00 / Moon98) v1.19.1 | shares SOFA — consistency check | 3 | 3.65e-08 | 4.5e-08 | 4.58e-08 | 4.6e-08 | 4e-07 AU | ✅ verified | 2026-08-29 · `c6e09cf0` |
+| `ephemeris.sofa.sun` | gofa (Epv00 / Moon98) v1.19.1 | shares SOFA — consistency check | 3 | 2.03e-08 | 2.76e-08 | 2.82e-08 | 2.84e-08 | 1.5e-07 AU | ✅ verified | 2026-08-29 · `c6e09cf0` |
+| `skybrightness.gambons.band_medians` | GAMBONS (Masana, Carrasco, Bara & Ribas) 2021 MNRAS 501, 5443; 2024 | independent | 6 | 0.207 | 0.273 | 0.28 | 0.282 | 1 mag | ✅ verified | 2026-08-29 · `c6e09cf0` |
+| `time.scale.roundtrip.arithmetic` | scale round trip, A to B and back | independent | 120 | 0 | 9.41e-12 | 9.59e-12 | 9.59e-12 | 1e-06 s | ✅ verified | 2026-08-29 · `c6e09cf0` |
+| `time.scale.roundtrip.modelled` | scale round trip, A to B and back | independent | 180 | 0 | 6.83e-06 | 0.943 | 0.943 | 5 s | ✅ verified | 2026-08-29 · `c6e09cf0` |
 
 Every figure above is a **measured** value over the corpus named in its suite, not a bound. The contract column is the bound, and it is a separate claim: it says what the software must achieve and why, and it does not move when a measurement does. See `internal/metrology` for the reasoning, and each suite's own doc comment for the rationale behind its contract.
 
