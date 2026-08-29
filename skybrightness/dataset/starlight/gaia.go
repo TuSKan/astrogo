@@ -736,7 +736,9 @@ func (g GaiaBuild) runQuery(
 	}
 	defer func() { _ = body.Close() }()
 
-	rows, err := newCSVRows(body)
+	// Sniffed rather than assumed: this package's default endpoint answers
+	// VOTable whatever format the request asks for. See newSyncRows.
+	rows, err := newSyncRows(body)
 	if err != nil {
 		return fmt.Errorf("starlight: %s: %w", what, err)
 	}

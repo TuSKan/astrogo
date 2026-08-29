@@ -53,6 +53,23 @@ func horizonsUnavailable(body string) bool {
 	return strings.HasPrefix(head, "<!doctype html") || strings.HasPrefix(head, "<html")
 }
 
+// fetchVector returns the geocentric state at one instant.
+//
+// # The scale of the returned ET, and the trap in it
+//
+// TIME_TYPE='UT' below changes the output column, not only the input: with it
+// set, Horizons labels column 0 "JDUT — Julian Day Number, Universal Time"
+// rather than the JDTDB it prints for a vector table by default. The
+// conversion here treats that column as TDB, which is correct only because
+// every caller suffixes startStr with an explicit scale — "2000-01-01 12:00
+// TDB" — and the explicit suffix wins.
+//
+// Call it with a bare "2000-01-01 12:00" and the number that comes back is a
+// UT Julian Date read as TDB: a 69-second error, silent, in a value that
+// looks entirely reasonable. Verified live: with a suffixed start time this
+// path agrees with DE440 to 5e-14 AU, and the corpus generator hit exactly
+// that 69 seconds — about 1040 arcseconds of hour angle — when it used
+// unsuffixed epochs and stored the column as TDB.
 func fetchVector(naifID int, bodyName string, startStr, stopStr string) (*StateVector, error) {
 	// 1. Define the base URL
 	baseURL := "https://ssd.jpl.nasa.gov/api/horizons.api"
@@ -165,6 +182,112 @@ func fetchVector(naifID int, bodyName string, startStr, stopStr string) (*StateV
 }
 
 // ObserverPoint matches the quantities we pull from Horizons OBSERVER table
+// fetchVectorSeries queries the Horizons API for geocentric state vectors
+// across a time range, returning every row rather than only the first.
+//
+// The geocentric state does not depend on the observing site, so one series
+// per body covers every site in a corpus at once. That is the difference
+// between a few dozen requests to somebody else's server and a few hundred.
+func fetchVectorSeries(naifID int, bodyName, startStr, stopStr, stepStr string) ([]StateVector, error) {
+	baseURL := "https://ssd.jpl.nasa.gov/api/horizons.api"
+
+	params := url.Values{}
+	params.Add("format", "text")
+	params.Add("COMMAND", fmt.Sprintf("'%d'", naifID))
+	params.Add("CENTER", "'@399'")
+	params.Add("MAKE_EPHEM", "'YES'")
+	params.Add("EPHEM_TYPE", "'VECTORS'")
+	params.Add("START_TIME", fmt.Sprintf("'%s'", startStr))
+	params.Add("STOP_TIME", fmt.Sprintf("'%s'", stopStr))
+	params.Add("STEP_SIZE", fmt.Sprintf("'%s'", stepStr))
+	params.Add("OUT_UNITS", "'AU-D'")
+	params.Add("REF_PLANE", "'FRAME'")
+	params.Add("VEC_TABLE", "'2'")
+	params.Add("CSV_FORMAT", "'YES'")
+	params.Add("OBJ_DATA", "'NO'")
+	params.Add("TIME_TYPE", "'UT'")
+
+	encodedQuery := strings.ReplaceAll(params.Encode(), "+", "%20")
+
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet,
+		fmt.Sprintf("%s?%s", baseURL, encodedQuery), nil)
+	if err != nil {
+		return nil, fmt.Errorf("building the request: %w", err)
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("querying Horizons: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	bodyBytes, _ := io.ReadAll(resp.Body)
+	responseStr := string(bodyBytes)
+
+	if horizonsUnavailable(responseStr) {
+		return nil, errHorizonsUnavailable
+	}
+
+	soeIdx := strings.Index(responseStr, "$$SOE")
+
+	eoeIdx := strings.Index(responseStr, "$$EOE")
+	if soeIdx == -1 || eoeIdx == -1 {
+		return nil, errNoEphemerisData
+	}
+
+	lines := strings.Split(strings.TrimSpace(responseStr[soeIdx+6:eoeIdx]), "\n")
+	out := make([]StateVector, 0, len(lines))
+
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+
+		cols := strings.Split(line, ",")
+		if len(cols) < 8 {
+			return nil, fmt.Errorf("%w: vector output had %d", errUnexpectedColumns, len(cols))
+		}
+
+		val := func(idx int) float64 {
+			v, _ := strconv.ParseFloat(strings.TrimSpace(cols[idx]), 64)
+
+			return v
+		}
+
+		sv := StateVector{
+			Body:    bodyName,
+			NaifID:  naifID,
+			ET:      (val(0) - 2451545.0) * 86400.0,
+			Pos:     []float64{val(2), val(3), val(4)},
+			Vel:     []float64{val(5), val(6), val(7)},
+			UnitPos: "AU",
+			UnitVel: "AU/day",
+		}
+
+		out = append(out, sv)
+	}
+
+	if len(out) == 0 {
+		return nil, errNoVectorRows
+	}
+
+	return out, nil
+}
+
+// ObserverPoint is one row of a Horizons OBSERVER table.
+//
+// Azimuth and Elevation are **airless** — unrefracted. The queries below send
+// no APPARENT parameter, so Horizons applies its default of AIRLESS, and it
+// says so in its own response header ("Atmos refraction: NO (AIRLESS)"),
+// checked live for this exact query shape. The comparison tests accordingly
+// build their coord.Context with atmosphere.RefractionNone.
+//
+// These two fields were previously documented as "Refracted", which is the
+// opposite of what the service returns. Anyone reconciling that comment with
+// the RefractionNone on the astrogo side would have concluded the comparison
+// was mismatched by a refraction term of up to half a degree near the
+// horizon, and gone looking for a bug that is not there.
 type ObserverPoint struct {
 	Body      string  `json:"body"`
 	ET        float64 `json:"et"`
@@ -172,13 +295,14 @@ type ObserverPoint struct {
 	AstroDec  float64 // Astrometric Dec in degrees
 	AppRA     float64 // Apparent RA in degrees
 	AppDec    float64 // Apparent Dec in degrees
-	Azimuth   float64 // Refracted Azimuth in degrees
-	Elevation float64 // Refracted Elevation in degrees
+	Azimuth   float64 // Airless (unrefracted) azimuth in degrees
+	Elevation float64 // Airless (unrefracted) elevation in degrees
 	Range     float64 // Observer to Target Range in AU
 }
 
-// fetchObserverTable queries the Horizons API for a ground-based observer
-// QUANTITIES='1,2,4' corresponding to Astrometric RA/Dec, Apparent RA/Dec, and Az/El.
+// fetchObserverTable queries the Horizons API for a ground-based observer with
+// QUANTITIES='1,2,4,20': astrometric RA/Dec, apparent RA/Dec, airless Az/El and
+// observer range.
 func fetchObserverTable(naifID int, bodyName string, lon, lat, height float64, startStr, stopStr string) (*ObserverPoint, error) {
 	baseURL := "https://ssd.jpl.nasa.gov/api/horizons.api"
 

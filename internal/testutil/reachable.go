@@ -23,11 +23,29 @@ const ReachableTimeout = 5 * time.Second
 func RequireReachable(t *testing.T, host string) {
 	t.Helper()
 
+	if !Reachable(host) {
+		t.Skipf("%s is unreachable", host)
+	}
+}
+
+// Reachable reports whether host is accepting connections.
+//
+// The predicate behind RequireReachable, exposed separately for the same
+// reason InAbsTol sits behind AssertNear: a caller sometimes needs to do
+// something before skipping. A test measuring several quantities from one
+// fetch has to record all of them as unverified when the fetch cannot happen,
+// and skipping is terminal — so it must decide first and skip afterwards.
+//
+// host is a "name:port" address. The connection is closed immediately;
+// nothing is sent.
+func Reachable(host string) bool {
 	//nolint:noctx // a liveness probe, not a request that should carry a deadline
 	conn, err := net.DialTimeout("tcp", host, ReachableTimeout)
 	if err != nil {
-		t.Skipf("%s is unreachable: %v", host, err)
+		return false
 	}
 
 	_ = conn.Close()
+
+	return true
 }

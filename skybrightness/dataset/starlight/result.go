@@ -1,6 +1,7 @@
 package starlight
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/csv"
@@ -10,6 +11,8 @@ import (
 	"math"
 	"strconv"
 	"strings"
+
+	"github.com/TuSKan/astrogo/internal/votable"
 
 	"github.com/apache/arrow-go/v18/arrow"
 	"github.com/apache/arrow-go/v18/arrow/array"
@@ -285,4 +288,140 @@ func openResult(ctx context.Context, r io.Reader) (resultRows, error) {
 	}
 
 	return newCSVRows(joined)
+}
+
+// voTableRows reads the IVOA VOTable serialisation.
+//
+// It exists because asking for CSV does not get CSV. Gaia@AIP's synchronous
+// endpoint — this package's own default, set by [GaiaBuild.withDefaults] —
+// answers VOTable for FORMAT=csv, RESPONSEFORMAT=csv and text/csv alike,
+// checked against the live service. TAP services must serve VOTable and are
+// only encouraged to serve anything else, so this is conformant behaviour
+// rather than a fault, and a client that assumes its requested format is the
+// format it receives is the thing at fault.
+//
+// Before this existed, every synchronous aggregation against the default
+// endpoint handed an XML document to a CSV reader and failed with
+// "bare \" in non-quoted-field" — a message about byte 15 of an XML
+// declaration, naming neither the format nor the service, for a build that had
+// asked for nothing unusual.
+type voTableRows struct {
+	table *votable.Table
+	index map[string]int
+	at    int
+	row   []string
+}
+
+// newVOTableRows parses a VOTable result into rows addressable by column name.
+//
+// Column names are lowercased on the way in, matching [newCSVRows] and the
+// lowercased lookups in the accumulation: the archives disagree about case —
+// ESA lowercases its CSV headers and VOTable FIELD names keep whatever case
+// the query gave them — and a lookup that depended on that would work against
+// one service and silently find no columns against the other.
+func newVOTableRows(r io.Reader) (*voTableRows, error) {
+	table, err := votable.Read(r)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", ErrGaiaResponse, err)
+	}
+
+	// A truncated result is refused rather than accumulated. The query is a
+	// GROUP BY over a source_id range, so a server-side row limit does not
+	// return fewer pixels of the same map — it returns pixels whose sums are
+	// missing however many sources fell past the cut, and nothing in the
+	// numbers says which. Accepting it would write a map that is quietly too
+	// faint in an unknown subset of the sky, which is worse than no map.
+	if table.Truncated {
+		return nil, fmt.Errorf("%w: the archive truncated the result (QUERY_STATUS OVERFLOW); "+
+			"the aggregation is incomplete and its sums cannot be trusted", ErrGaiaResponse)
+	}
+
+	index := make(map[string]int, len(table.Fields))
+	for i, name := range table.Fields {
+		index[strings.ToLower(strings.TrimSpace(name))] = i
+	}
+
+	return &voTableRows{table: table, index: index}, nil
+}
+
+func (v *voTableRows) Next() bool {
+	if v.at >= len(v.table.Rows) {
+		return false
+	}
+
+	v.row = v.table.Rows[v.at]
+	v.at++
+
+	return true
+}
+
+func (v *voTableRows) Has(column string) bool {
+	_, ok := v.index[column]
+
+	return ok
+}
+
+func (v *voTableRows) Number(column string) (float64, bool) {
+	i, ok := v.index[column]
+	if !ok || i >= len(v.row) {
+		return 0, false
+	}
+
+	// A VOTable renders a null as an empty cell, which is the ordinary way a
+	// pixel says it had nothing to contribute — not a parse failure.
+	f, err := strconv.ParseFloat(strings.TrimSpace(v.row[i]), 64)
+	if err != nil {
+		return 0, false
+	}
+
+	return f, true
+}
+
+// Err always returns nil: votable.Read consumes the whole document before
+// returning, so anything that could fail has already failed by construction.
+func (v *voTableRows) Err() error { return nil }
+
+// newSyncRows reads whichever serialisation the archive actually sent.
+//
+// The format is decided by the payload rather than by the request, the same
+// way catalog/gaia decides it and the same way the star-map loader tells
+// Parquet from CSV by the file's own magic. It has to be: ESA honours
+// FORMAT=csv and Gaia@AIP does not, so what was asked for does not determine
+// what arrives, and a service that changes its mind is then handled rather
+// than discovered.
+//
+// A VOTable begins with an XML declaration or its root element and a CSV with
+// a column name, so the first non-space byte separates them without ambiguity.
+func newSyncRows(r io.Reader) (resultRows, error) {
+	buf := bufio.NewReader(r)
+
+	for {
+		b, err := buf.Peek(1)
+		if err != nil {
+			// An empty body is not a format to guess at. Handing it to the
+			// CSV reader produces "EOF", which reads as a parse failure
+			// rather than as a service that answered with nothing.
+			if errors.Is(err, io.EOF) {
+				return nil, fmt.Errorf("%w: the archive returned an empty body", ErrGaiaResponse)
+			}
+
+			return nil, fmt.Errorf("%w: %w", ErrGaiaResponse, err)
+		}
+
+		// Leading whitespace belongs to neither format, so it is skipped
+		// rather than allowed to decide the answer.
+		if b[0] == ' ' || b[0] == '\n' || b[0] == '\r' || b[0] == '\t' {
+			if _, err := buf.Discard(1); err != nil {
+				return nil, fmt.Errorf("%w: %w", ErrGaiaResponse, err)
+			}
+
+			continue
+		}
+
+		if b[0] == '<' {
+			return newVOTableRows(buf)
+		}
+
+		return newCSVRows(buf)
+	}
 }

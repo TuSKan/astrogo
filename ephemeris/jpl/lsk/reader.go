@@ -65,6 +65,24 @@ func NewReader(r io.ReadCloser) (*Reader, error) {
 			}
 		}
 
+		// Whether this line belongs to the DELTET/DELTA_AT block, decided
+		// before the closing parenthesis is consumed below.
+		//
+		// It has to be captured first because the block's final entry and
+		// its terminator share a line:
+		//
+		//	37,   @2017-JAN-1 )
+		//
+		// Clearing inDeltaAt and only then testing it dropped that entry
+		// silently — the stripped remainder starts with "37,", not "@", so
+		// neither arm of the guard matched. The table therefore ended at
+		// 36 leap seconds (2015-07-01), and every UTC epoch from
+		// 2017-01-01 onward converted one second early: measured as a
+		// 1.0000 s offset against time.TDB(), which put the geocentric Sun
+		// about 30 km — one second of Earth's orbital motion — from where
+		// DE440 has it.
+		inBlock := inDeltaAt
+
 		if inDeltaAt {
 			if idx := strings.Index(line, ")"); idx >= 0 {
 				inDeltaAt = false
@@ -72,7 +90,7 @@ func NewReader(r io.ReadCloser) (*Reader, error) {
 			}
 		}
 
-		if inDeltaAt || (line != "" && !inDeltaAt && strings.HasPrefix(line, "@")) {
+		if inBlock || (line != "" && strings.HasPrefix(line, "@")) {
 			line = strings.ReplaceAll(line, "(", " ")
 			line = strings.ReplaceAll(line, ",", " ")
 

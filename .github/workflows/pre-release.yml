@@ -1,13 +1,24 @@
 name: Validation
 
+# Not on the PR path, by design. These jobs query JPL Horizons, USNO, NASA,
+# ESO and VizieR; someone else's downtime must never block a merge. They run
+# on a schedule so the accuracy record cannot silently rot between releases,
+# and on demand before a release.
 on:
-  workflow_dispatch: # Manual trigger only — run before releases
+  workflow_dispatch:
+  schedule:
+    # Weekly, not nightly: every run costs other people's services real
+    # requests, and nothing here changes fast enough to need daily polling.
+    - cron: '17 4 * * 1'
 
 permissions:
   contents: read
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  # Suites that have been retrofitted onto internal/metrology write their
+  # machine-readable results here. Suites that have not are unaffected.
+  ASTROGO_METROLOGY_OUT: ${{ github.workspace }}/validation-out
 
 jobs:
   validation:
@@ -16,18 +27,45 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
-          go-version: '1.26'
+          # Track go.mod rather than a hardcoded version, so this workflow
+          # cannot drift onto a different toolchain from ci.yml.
+          go-version-file: go.mod
+          cache: true
 
+      - name: Prepare output directory
+        run: mkdir -p "$ASTROGO_METROLOGY_OUT"
+
+      # Every step below runs even when an earlier one fails: a failing
+      # integration suite must not hide the validation numbers, and a
+      # suite that did not run at all has to be visible as "not verified"
+      # rather than merely absent from the report.
       - name: Run integration tests
-        run: go test -tags=integration -v -count=1 -timeout=15m ./...
+        id: integration
+        if: always()
+        shell: bash
+        run: go test -tags=integration -v -count=1 -timeout=15m ./... 2>&1 | tee "$ASTROGO_METROLOGY_OUT/integration.log"
 
       - name: Run validation tests
-        run: go test -tags=validation -v -count=1 -timeout=15m ./...
+        id: validation
+        if: always()
+        shell: bash
+        run: go test -tags=validation -v -count=1 -timeout=15m ./... 2>&1 | tee "$ASTROGO_METROLOGY_OUT/validation.log"
 
       - name: Run network-dependent validation
-        run: go test -tags=network -v -count=1 -timeout=15m ./...
+        id: network
+        if: always()
+        shell: bash
+        run: go test -tags=network -v -count=1 -timeout=15m ./... 2>&1 | tee "$ASTROGO_METROLOGY_OUT/network.log"
+
+      - name: Upload validation results
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: validation-${{ github.sha }}
+          path: ${{ env.ASTROGO_METROLOGY_OUT }}
+          retention-days: 90
