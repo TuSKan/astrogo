@@ -90,4 +90,13 @@
 //
 // A [Model] with no components is still legal and returns zero radiance,
 // saying so through [Quality] rather than pretending to be a dark sky.
+//
+// # Concurrency and I/O
+//
+// Evaluation performs no I/O and no network access: every dataset is resolved
+// by the provider layer under skybrightness/dataset and handed in through the
+// scene, which is enforced behaviourally by a test that evaluates identically
+// under remote.SetOffline and structurally by an import check. A model is
+// read-only once built and may be evaluated from several goroutines; the
+// spectral buffers a caller passes in are the caller's to keep separate.
 package skybrightness

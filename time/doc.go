@@ -49,4 +49,22 @@
 //   - Full bidirectional scale conversion graph (UTC, TAI, TT, TDB, UT1).
 //   - Scale-safe cross-scale comparison and arithmetic.
 //   - Dynamic UT1/UTC derivations via the IERS EOP data model.
+//
+// # Concurrency
+//
+// The scale conversions are pure functions on a value type and are safe to
+// call from any goroutine. Earth-orientation data is process-wide state
+// behind a sync.RWMutex: [RegisterModel] and the lazy load that [Time.EOP],
+// [Time.UTC] and [Time.UT1] trigger are safe to race, and a caller that wants
+// determinism registers a model up front rather than relying on whatever the
+// first lookup happens to load.
+//
+// # Failure and degradation
+//
+// The EOP path degrades rather than failing: a pre-seeded cache object, then
+// a network fetch if consent was granted, then zero EOP with a one-time
+// warning. Zero EOP is a real answer with real error — up to about 0.9 s of
+// UT1 — so a caller who needs to know which of the three it got asks
+// [EOPSource]. [Time.UT1] is the exception and reports the failure instead of
+// degrading.
 package time

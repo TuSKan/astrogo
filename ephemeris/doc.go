@@ -63,4 +63,19 @@
 //
 // Use the [ToICRS] helper to convert Cartesian geocentric positions into
 // spherical [coord.ICRS] coordinates.
+//
+// # Concurrency
+//
+// A [Provider] is expected to be safe for concurrent use, and the ones here
+// are: the JPL provider guards its kernel set with a sync.RWMutex, and the
+// analytical provider is an empty struct. A third-party Provider is under the
+// same expectation, since a planner may call one from several goroutines.
+//
+// # Failure and degradation
+//
+// A missing kernel is an error rather than a silent gap: constructing a JPL
+// provider fails with remote.ErrDownloadDenied unless the caller has granted
+// download consent, and asking for a body or an epoch that a loaded kernel
+// does not cover fails with jpl.ErrNoSegment. Nothing here substitutes an
+// approximation for data it does not have.
 package ephemeris

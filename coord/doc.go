@@ -34,4 +34,14 @@
 // Both [Context] and [Reducer] query the global IERS EOP model for DUT1 and
 // polar motion (XP/YP). If IERS data is unavailable, a one-time log warning
 // is emitted and zero corrections are applied (UT1 ≈ UTC, ~0.9 s worst case).
+//
+// # Concurrency
+//
+// A [Context] is read-only once built: no method assigns to its fields, and
+// [Context.Clone] and [Context.AtTime] return new values rather than mutating
+// the receiver. One Context may therefore be shared across goroutines, which
+// is what makes the "build one per epoch and reuse it" rule practical — the
+// expensive SOFA matrix is computed once and read concurrently.
+//
+// Everything else here is a value type.
 package coord
