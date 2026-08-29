@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"math"
 	"slices"
+	"strconv"
+	"strings"
 	"sync"
 
 	"github.com/TuSKan/astrogo/ephemeris/core"
@@ -41,6 +43,17 @@ var (
 	// resolves to a different object entirely. Getting that wrong is easy;
 	// getting it wrong silently is what this refuses.
 	ErrNoSmallBodyKernel = errors.New("jpl: no small-body kernel for designation")
+
+	// ErrWrongSmallBody is returned when Horizons answers with a body that
+	// is not the one asked for.
+	//
+	// The load succeeds in every mechanical sense — a kernel arrives, a
+	// segment parses, a new body appears — and the object is simply somebody
+	// else. Asking for "1" returns comet 1000036 rather than 1 Ceres,
+	// because a bare number resolves against the major-body and comet
+	// indices first; "DES=433;" returns 248370 rather than Eros. Both are
+	// quieter than a failure and worse.
+	ErrWrongSmallBody = errors.New("jpl: horizons returned a different small body")
 )
 
 // KMPerAU is the number of kilometers per astronomical unit.
@@ -522,15 +535,60 @@ func (p *Provider) loadSmallBodyKernels(readers []*spk.Reader) error {
 		}
 	}
 
-	if len(p.SupportedBodies()) == before {
+	after := p.SupportedBodies()
+
+	if len(after) == before {
 		return fmt.Errorf("%w: %q added no body to the %d already in the planetary "+
 			"base kernel; Horizons matches small bodies by number (\"433\") or by its own "+
-			"designation syntax (\"433;\"), not by name, and some numbers it accepts return "+
-			"a kernel with no small-body segment",
+			"designation syntax (\"433;\"), not by name",
 			ErrNoSmallBodyKernel, p.kernel, before)
 	}
 
-	return nil
+	return p.verifyRequestedBodyLoaded(after)
+}
+
+// numberedAsteroid reports the asteroid number a designation names, and
+// whether it names one at all. "433" and "433;" both name 433; a provisional
+// designation or a comet fragment names nothing predictable.
+func numberedAsteroid(designation string) (int, bool) {
+	n, err := strconv.Atoi(strings.TrimSuffix(designation, ";"))
+	if err != nil || n <= 0 {
+		return 0, false
+	}
+
+	return n, true
+}
+
+// verifyRequestedBodyLoaded checks that the body loaded is the body asked
+// for, when the designation says which one that is.
+//
+// A bare number is ambiguous to Horizons: it resolves against the major-body
+// and comet indices before the numbered-asteroid record, so asking for "1"
+// returns comet 1000036 rather than 1 Ceres — and the load succeeds, because
+// a body genuinely was added. The caller then works with a different object
+// entirely, which is the same failure as "DES=433;" resolving to 248370
+// rather than Eros.
+//
+// A numbered asteroid has a knowable identifier, so this is checkable rather
+// than a matter of trusting the syntax: asteroid n must arrive as
+// [core.SmallBodyID](n). A designation that is not a bare number — a comet
+// fragment, a provisional designation — names nothing this can predict and
+// is left alone.
+func (p *Provider) verifyRequestedBodyLoaded(loaded []core.ID) error {
+	n, ok := numberedAsteroid(p.kernel)
+	if !ok {
+		return nil
+	}
+
+	want := core.SmallBodyID(n)
+	if slices.Contains(loaded, want) {
+		return nil
+	}
+
+	return fmt.Errorf("%w: asked for %q and Horizons returned %v, which does not include %s; "+
+		"a bare number resolves against the major-body and comet indices before the "+
+		"numbered-asteroid record, so the object loaded is not the one requested",
+		ErrWrongSmallBody, p.kernel, loaded, want)
 }
 
 // addKernelPath is AddKernel with a known file path, used internally by

@@ -9,6 +9,7 @@ import (
 
 	"github.com/TuSKan/astrogo/ephemeris/core"
 	"github.com/TuSKan/astrogo/ephemeris/jpl"
+	"github.com/TuSKan/astrogo/ephemeris/jpl/spk"
 	"github.com/TuSKan/astrogo/internal/testutil"
 	atime "github.com/TuSKan/astrogo/time"
 )
@@ -24,25 +25,36 @@ import (
 // way to notice was to ask for a state and get ErrNoSegment much later, in
 // code far from the mistake.
 //
-// Counting readers is not sufficient either: "1;" and "4;" both return a
-// non-empty kernel carrying no small-body segment, so the check is on the
-// body set rather than on the file.
+// Counting readers is not sufficient either: a non-empty kernel can still
+// carry no small-body segment, so the check is on the body set rather than
+// on the file.
+//
+// Two cases moved out of this list as the causes behind them were fixed.
+// "1;" is no longer a failure at all: it returned a kernel whose segment
+// target was 20000001, which the identifier collision folded onto core.ID(1)
+// — Mercury — so the body was dropped as a duplicate. It now loads Ceres,
+// and is covered by TestSemicolonDesignationLoadsTheRequestedBody. "Ceres"
+// still fails, but with ErrHorizonsRefused: Horizons explains itself, and
+// that explanation now reaches the caller rather than being discarded.
 func TestSmallBodyDesignationFailuresAreLoud(t *testing.T) {
 	testutil.RequireReachable(t, "ssd.jpl.nasa.gov:443")
 
 	start := atime.Date(2026, 1, 1, 0, 0, 0, 0, atime.LocationUTC)
 
-	for _, des := range []string{
-		"Ceres",     // a name: Horizons matches small bodies by number
-		"bogus-xyz", // nothing at all
-		"1;",        // valid syntax, kernel with no small-body segment
+	for _, tc := range []struct {
+		des  string
+		want error
+		why  string
+	}{
+		{"bogus-xyz", jpl.ErrNoSmallBodyKernel, "nothing at all"},
+		{"Ceres", spk.ErrHorizonsRefused, "a name: Horizons matches small bodies by number, and says so"},
 	} {
-		t.Run(des, func(t *testing.T) {
-			_, err := jpl.NewProvider(context.Background(), core.SmallBody, des,
+		t.Run(tc.des, func(t *testing.T) {
+			_, err := jpl.NewProvider(context.Background(), core.SmallBody, tc.des,
 				jpl.WithTimeInterval(start.AddDays(-5), start.AddDays(5)))
 
-			if !errors.Is(err, jpl.ErrNoSmallBodyKernel) {
-				t.Fatalf("NewProvider(%q) error = %v, want ErrNoSmallBodyKernel", des, err)
+			if !errors.Is(err, tc.want) {
+				t.Fatalf("NewProvider(%q) error = %v, want %v (%s)", tc.des, err, tc.want, tc.why)
 			}
 		})
 	}
