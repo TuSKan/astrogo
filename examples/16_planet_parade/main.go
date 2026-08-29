@@ -58,7 +58,11 @@ func main() {
 		log.Fatalf("failed to load timezone: %v", err)
 	}
 
-	site, _ := plan.NewSiteEarthLocation("Quinta Calixto", -22.528478, -46.473002, 835.05, plan.WithTimeZone(brtz))
+	site, err := plan.NewSiteEarthLocation("Quinta Calixto", -22.528478, -46.473002, 835.05, plan.WithTimeZone(brtz))
+	if err != nil {
+		log.Fatalf("site: %v", err)
+	}
+
 	loc := site.Location()
 	atm := atmosphere.AtAltitude(835.05)
 
@@ -118,14 +122,22 @@ func main() {
 			continue
 		}
 
-		altaz, _ := ctx.ICRSToAltAz(icrs)
+		altaz, err := ctx.ICRSToAltAz(icrs)
+		if err != nil {
+			log.Fatalf("altaz: %v", err)
+		}
+
 		ecl := coord.ICRSToEcliptic(icrs, civilDusk.Time)
 
 		alt := altaz.Alt().Degrees()
 		amStr := "below"
 
 		if alt > 0 {
-			am, _ := atmosphere.Airmass(altaz.Alt())
+			am, err := atmosphere.Airmass(altaz.Alt())
+			if err != nil {
+				log.Fatalf("am: %v", err)
+			}
+
 			amStr = fmt.Sprintf("%.1f", am)
 		}
 
@@ -169,7 +181,10 @@ func main() {
 				continue
 			}
 
-			altaz, _ := c.ICRSToAltAz(icrs)
+			altaz, err := c.ICRSToAltAz(icrs)
+			if err != nil {
+				log.Fatalf("altaz: %v", err)
+			}
 
 			alt := altaz.Alt().Degrees()
 			if alt < 0 {
@@ -188,7 +203,11 @@ func main() {
 	lons := make([]float64, 0, len(planets))
 
 	for _, p := range planets {
-		icrs, _ := p.Target.Position(civilDusk.Time)
+		icrs, err := p.Target.Position(civilDusk.Time)
+		if err != nil {
+			log.Fatalf("icrs: %v", err)
+		}
+
 		ecl := coord.ICRSToEcliptic(icrs, civilDusk.Time)
 		lons = append(lons, ecl.Lon().Degrees())
 	}

@@ -3,6 +3,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
@@ -18,7 +19,11 @@ func main() {
 	galactic := coord.ICRSToGalactic(icrs)
 
 	// 3. Convert ICRS -> AltAz (requires Site details and Time)
-	loc, _ := coord.NewEarthLocation(-22.528478, -46.473002, 835.05) // Quinta Calixto
+	loc, err := coord.NewEarthLocation(-22.528478, -46.473002, 835.05) // Quinta Calixto
+	if err != nil {
+		log.Fatalf("loc: %v", err)
+	}
+
 	now := time.NowUTC()
 
 	ctx := coord.NewContext(now, loc, atmosphere.StandardRefraction)

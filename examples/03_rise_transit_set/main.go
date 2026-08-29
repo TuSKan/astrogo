@@ -13,7 +13,10 @@ import (
 
 func main() {
 	// 1. Setup Observatory (Quinta Calixto, Brazil)
-	site, _ := plan.NewSiteEarthLocation("Quinta Calixto", -22.528478, -46.473002, 835.05)
+	site, err := plan.NewSiteEarthLocation("Quinta Calixto", -22.528478, -46.473002, 835.05)
+	if err != nil {
+		log.Fatalf("site: %v", err)
+	}
 
 	// 2. Set a Deep Space Target
 	sirius, err := catalog.NewResolver(catalog.SIMBAD).Resolve(context.Background(), "Sirius")
@@ -24,7 +27,11 @@ func main() {
 	target := plan.FromCatalog(sirius, nil)
 
 	// 3. Define the Time interval (next 24 hours starting from 6 PM tonight)
-	tz, _ := time.LoadLocation("America/Sao_Paulo")
+	tz, err := time.LoadLocation("America/Sao_Paulo")
+	if err != nil {
+		log.Fatalf("tz: %v", err)
+	}
+
 	start := time.Date(2026, 4, 6, 18, 0, 0, 0, tz)
 	end := start.Add(24 * time.Hour)
 

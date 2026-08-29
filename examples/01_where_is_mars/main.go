@@ -20,7 +20,11 @@ func main() {
 	}
 
 	// 2. Set the time to 'tonight at 7 PM' in local timezone (UTC-3)
-	tz, _ := time.LoadLocation("America/Sao_Paulo")
+	tz, err := time.LoadLocation("America/Sao_Paulo")
+	if err != nil {
+		log.Fatalf("tz: %v", err)
+	}
+
 	tm := time.Date(2026, 4, 6, 19, 0, 0, 0, tz)
 
 	// 3. Create a moving target for Mars using the built-in default ephemeris

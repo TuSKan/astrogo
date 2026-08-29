@@ -3,6 +3,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/plan"
@@ -11,10 +12,16 @@ import (
 
 func main() {
 	// 1. Setup Observatory (Quinta Calixto, Brazil)
-	site, _ := plan.NewSiteEarthLocation("Quinta Calixto", -22.528478, -46.473002, 835.05)
+	site, err := plan.NewSiteEarthLocation("Quinta Calixto", -22.528478, -46.473002, 835.05)
+	if err != nil {
+		log.Fatalf("site: %v", err)
+	}
 
 	// Ensure targets are at least 20 degrees above the horizon
-	planner, _ := plan.NewPlanner(site, []plan.Constraint{plan.Altitude{Threshold: angle.Deg(20)}})
+	planner, err := plan.NewPlanner(site, []plan.Constraint{plan.Altitude{Threshold: angle.Deg(20)}})
+	if err != nil {
+		log.Fatalf("planner: %v", err)
+	}
 
 	// 2. Configure Transition Overheads
 	transition := &plan.BasicTransitionModel{
@@ -45,7 +52,10 @@ func main() {
 	}
 
 	// 4. Generate a schedule for tonight (starting at 7 PM for 6 hours)
-	tz, _ := time.LoadLocation("America/Sao_Paulo")
+	tz, err := time.LoadLocation("America/Sao_Paulo")
+	if err != nil {
+		log.Fatalf("tz: %v", err)
+	}
 
 	start := time.Date(2026, 4, 6, 19, 0, 0, 0, tz)
 	window := plan.Window{Start: start, End: start.Add(6 * time.Hour)}

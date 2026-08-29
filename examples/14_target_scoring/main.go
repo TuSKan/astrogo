@@ -13,6 +13,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"log"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/catalog"
@@ -30,10 +31,17 @@ func main() {
 	remote.EnableDownloads(5<<20, remote.OpenNGC) // ~2 MB combined source CSVs
 
 	// ── Observatory: Quinta Calixto (-22.528478°, -46.473002°, 835.05m) ──
-	site, _ := plan.NewSiteEarthLocation("Quinta Calixto", -22.528478, -46.473002, 835.05)
+	site, err := plan.NewSiteEarthLocation("Quinta Calixto", -22.528478, -46.473002, 835.05)
+	if err != nil {
+		log.Fatalf("site: %v", err)
+	}
 
 	// ── Observation epoch: 2026-04-15 at local midnight ──────────────────
-	tz, _ := time.LoadLocation("America/Sao_Paulo")
+	tz, err := time.LoadLocation("America/Sao_Paulo")
+	if err != nil {
+		log.Fatalf("tz: %v", err)
+	}
+
 	tm := time.Date(2026, 4, 16, 0, 0, 0, 0, tz)
 
 	// ── Targets (resolved from catalogs) ────────────────────────────────
