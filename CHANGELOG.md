@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.15.1] — 2026-08-28
+
 ### Fixed
 - **`skybrightness/dataset/starlight`'s synchronous Gaia aggregation was broken against its own default endpoint.** It requested `FORMAT=csv` and parsed the reply as CSV, but the default is Gaia@AIP, which answers VOTable for `FORMAT=csv`, `RESPONSEFORMAT=csv` and `text/csv` alike — so every synchronous build failed with `parse error on line 1, column 15: bare " in non-quoted-field`, which is byte 15 of an XML declaration and names neither the format nor the service. The payload is now sniffed rather than assumed, as `catalog/gaia` already does, through the `internal/votable` reader that existed for this and had never been adopted here. A truncated result (`QUERY_STATUS=OVERFLOW`) and an empty body are now refused rather than accumulated: the query is a `GROUP BY`, so a server-side row limit returns pixels whose sums are short by an unknown amount rather than fewer pixels. Five tests were failing on this, none of which runs in ordinary CI (#48).
 - **`ephemeris/jpl/lsk` dropped the last leap second, putting every UTC epoch after 2017-01-01 one second early.** `naif0012.tls` closes its `DELTET/DELTA_AT` block on the same line as its final entry, and the parser cleared its in-block flag before testing it, so `37, @2017-JAN-1` matched neither arm of the guard and was discarded without an error. Measured: `lsk.UTCToTDB` ran 1.0000 s behind `time.TDB()` for every date after the boundary and agreed to 1e-4 s before it, putting the geocentric Sun about 30 km — one second of Earth's orbital motion — from DE440. Every `jpl.Provider.State` result for a UTC-scale time in that range moves; the regression test uses inline fixtures for both terminator shapes, so it needs no kernel and guards the next leap second too (#47).
@@ -935,7 +937,8 @@ First observatory-grade release. Validated against USNO, JPL Horizons, and NASA 
 - `VisibleIntervals` creates independent Contexts per grid step (correct; each step is a different epoch)
 - IERS EOP data fetched via `go:generate`, not at runtime
 
-[Unreleased]: https://github.com/TuSKan/astrogo/compare/v0.15.0...HEAD
+[Unreleased]: https://github.com/TuSKan/astrogo/compare/v0.15.1...HEAD
+[0.15.1]: https://github.com/TuSKan/astrogo/compare/v0.15.0...v0.15.1
 [0.15.0]: https://github.com/TuSKan/astrogo/compare/v0.14.0...v0.15.0
 [0.14.0]: https://github.com/TuSKan/astrogo/compare/v0.13.0...v0.14.0
 [0.13.0]: https://github.com/TuSKan/astrogo/compare/v0.12.0...v0.13.0
