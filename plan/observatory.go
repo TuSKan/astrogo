@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 	"net/url"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -43,6 +44,28 @@ type Site struct {
 // Site.HorizonAt falls back to the scalar Horizon() when none is set.
 type HorizonProfile func(azimuth angle.Angle) angle.Angle
 
+// KnownSiteNames returns the display names of every entry in the built-in
+// site list, sorted, for a caller that wants to offer a choice rather than
+// look one up.
+//
+// It exists so that enumerating the sites does not require reaching into an
+// exported map. Handing callers the map itself makes the list process-wide
+// mutable state: one package deleting or replacing an entry changes what
+// every other caller in the binary sees, which is a reproducibility and
+// test-isolation problem rather than a race one. Use [NewKnownSite] to
+// resolve a name — it accepts aliases and is case- and space-insensitive.
+func KnownSiteNames() []string {
+	out := make([]string, 0, len(KnownSites))
+
+	for _, s := range KnownSites {
+		out = append(out, s.name)
+	}
+
+	sort.Strings(out)
+
+	return out
+}
+
 // KnownSites maps a modest, defensible starter list of well-known observing
 // sites (not an exhaustive observatory database) to fully-built *Site
 // values, keyed by a lowercase/underscore slug. Coordinates and elevations
@@ -53,6 +76,10 @@ type HorizonProfile func(azimuth angle.Angle) angle.Angle
 // own site should always supply their own measured coordinates via
 // NewSite — this table is a convenience for "somewhere near Mauna Kea,"
 // not a substitute for that. See NewKnownSite for name/alias-based lookup.
+//
+// Deprecated: use [KnownSiteNames] to enumerate and [NewKnownSite] to resolve.
+// An exported map is process-wide mutable state, and a caller that deletes or
+// replaces an entry changes what every other caller in the binary sees.
 var KnownSites = map[string]*Site{
 	"greenwich": {
 		name:     "Greenwich",
@@ -152,6 +179,18 @@ func lookupKnownSite(name string) (*Site, bool) {
 	}
 
 	for _, s := range KnownSites {
+		// The site's own display name, before its aliases.
+		//
+		// It used to be checked only via the map key, which works for every
+		// site whose name happens to normalise to that key and fails for the
+		// one that does not: "Cerro Pachón" normalises to "cerro_pachón"
+		// while its key is "cerro_pachon", so the name astrogo prints for
+		// that site was a name astrogo could not resolve. Found by
+		// KnownSiteNames, which made the round trip testable.
+		if normalizeSiteName(s.name) == want {
+			return s, true
+		}
+
 		for _, alias := range s.aliases {
 			if normalizeSiteName(alias) == want {
 				return s, true

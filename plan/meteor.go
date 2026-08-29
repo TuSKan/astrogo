@@ -3,6 +3,7 @@ package plan
 import (
 	"fmt"
 	"math"
+	"sort"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
@@ -65,6 +66,22 @@ type MeteorShower struct {
 	VelocityKmS float64
 }
 
+// MeteorShowerNames returns the names of every built-in shower, sorted.
+//
+// See [KnownSiteNames] for why enumeration goes through a function rather
+// than an exported map. Use [NewMeteorShower] to resolve a name.
+func MeteorShowerNames() []string {
+	out := make([]string, 0, len(MeteorShowers))
+
+	for _, s := range MeteorShowers {
+		out = append(out, s.Name)
+	}
+
+	sort.Strings(out)
+
+	return out
+}
+
 // MeteorShowers is a modest, defensible starter list, not the full IMO
 // working list — the 9 IMO "Class I" (strongest annual) showers, keyed by
 // a lowercase/underscore slug. See NewMeteorShower for name/code-based
@@ -93,6 +110,10 @@ type MeteorShower struct {
 // constellation.Centroid for Ursa Minor) — the source data available
 // wasn't sufficient to derive a reliable rate, and near the peak date the
 // resulting position error from omitting it is small in absolute terms.
+//
+// Deprecated: use [MeteorShowerNames] to enumerate and [NewMeteorShower] to
+// resolve. An exported map is process-wide mutable state; see
+// [KnownSiteNames].
 //
 //nolint:gochecknoglobals // fixed reference data, same convention as plan.PlanetaryMoons/KnownSites
 var MeteorShowers = map[string]MeteorShower{

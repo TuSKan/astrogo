@@ -46,7 +46,38 @@ var (
 // KMPerAU is the number of kilometers per astronomical unit.
 const KMPerAU = 149597870.7
 
+// NAIFFor returns the NAIF integer identifier for a body, and whether the
+// body is one this package has a mapping for.
+//
+// It exists so that reading the mapping does not require reaching into an
+// exported map. A caller that assigns to BodyIDToNAIF changes which SPK
+// segment every other caller in the binary resolves to — silently, and with
+// no way for a later reader to see it happened.
+func NAIFFor(id core.ID) (int, bool) {
+	naif, ok := BodyIDToNAIF[id]
+
+	return naif, ok
+}
+
+// NAIFBodies returns every body this package can map to a NAIF identifier,
+// sorted, for a caller enumerating what a kernel might contain.
+func NAIFBodies() []core.ID {
+	out := make([]core.ID, 0, len(BodyIDToNAIF))
+
+	for id := range BodyIDToNAIF {
+		out = append(out, id)
+	}
+
+	slices.Sort(out)
+
+	return out
+}
+
 // BodyIDToNAIF maps core.ID to NAIF integer IDs.
+//
+// Deprecated: use [NAIFFor] to look up and [NAIFBodies] to enumerate. An
+// exported map is process-wide mutable state, and one package reassigning an
+// entry changes which segment every other caller resolves to.
 var BodyIDToNAIF = map[core.ID]int{
 	core.Sun: 10, core.Moon: 301, core.Mercury: 199, core.Venus: 299,
 	core.Earth: 399, core.Mars: 4, core.Jupiter: 5, core.Saturn: 6,
@@ -241,7 +272,7 @@ func (p *Provider) State(id core.ID, t time.Time) (core.State, error) {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
-	naif, ok := BodyIDToNAIF[id]
+	naif, ok := NAIFFor(id)
 	if !ok {
 		naif = int(id)
 	}
