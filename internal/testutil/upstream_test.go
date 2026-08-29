@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net"
+	"syscall"
 	"testing"
 )
 
@@ -36,6 +38,15 @@ func TestUpstreamFailureClassification(t *testing.T) {
 		{"429 rate limited", &httpStatusError{429}, true},
 		{"408 request timeout", &httpStatusError{408}, true},
 		{"deadline exceeded", context.DeadlineExceeded, true},
+
+		// Dropped mid-transfer: not a timeout, so it needs its own arm.
+		// This is the case that failed CI on #51, which had not touched
+		// the network at all.
+		{"connection reset", &net.OpError{Err: syscall.ECONNRESET}, true},
+		{"wrapped connection reset", fmt.Errorf("read: %w", &net.OpError{Err: syscall.ECONNRESET}), true},
+		{"connection aborted", &net.OpError{Err: syscall.ECONNABORTED}, true},
+		{"broken pipe", &net.OpError{Err: syscall.EPIPE}, true},
+		{"truncated response", io.ErrUnexpectedEOF, true},
 		{"network timeout", timeout, true},
 		{"wrapped 500", fmt.Errorf("norad: fetch failed: %w", &httpStatusError{500}), true},
 

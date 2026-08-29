@@ -3,8 +3,10 @@ package testutil
 import (
 	"context"
 	"errors"
+	"io"
 	"net"
 	"net/http"
+	"syscall"
 	"testing"
 )
 
@@ -17,10 +19,11 @@ import (
 // outage at CelesTrak or JPL is reported as a defect in this repository — and
 // it blocks pull requests that never touched the package.
 //
-// The classification is deliberately narrow. A 5xx, a 429, a 408 or a request
-// that never completed is the upstream's problem. Every other 4xx is not: a
-// 400 or a 404 means astrogo built a request the service rejected, which is
-// exactly the defect these tests exist to catch, and it stays a failure.
+// The classification is deliberately narrow. A 5xx, a 429, a 408, a request
+// that never completed and a connection dropped mid-transfer are the
+// upstream's problem. Every other 4xx is not: a 400 or a 404 means astrogo
+// built a request the service rejected, which is exactly the defect these
+// tests exist to catch, and it stays a failure.
 func SkipOnUpstreamFailure(tb testing.TB, err error) {
 	tb.Helper()
 
@@ -61,6 +64,21 @@ func upstreamFailure(err error) (string, bool) {
 	var nerr net.Error
 	if errors.As(err, &nerr) && nerr.Timeout() {
 		return "network timeout", true
+	}
+
+	// A connection dropped or truncated mid-transfer. Not a timeout, so the
+	// check above misses it — AstroPixels reset one request out of sixteen
+	// while the other fifteen parsed cleanly, which failed CI on a branch
+	// that had not touched the network at all.
+	switch {
+	case errors.Is(err, syscall.ECONNRESET):
+		return "connection reset by peer", true
+	case errors.Is(err, syscall.ECONNABORTED):
+		return "connection aborted", true
+	case errors.Is(err, syscall.EPIPE):
+		return "broken pipe", true
+	case errors.Is(err, io.ErrUnexpectedEOF):
+		return "truncated response", true
 	}
 
 	return "", false
