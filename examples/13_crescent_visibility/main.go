@@ -27,7 +27,10 @@ func main() {
 	fmt.Println()
 
 	// ── Observer: Quinta Calixto, Brazil ─────────────────────────────────
-	site, _ := plan.NewSiteEarthLocation("Quinta Calixto", -22.528478, -46.473002, 835.05)
+	site, err := plan.NewSiteEarthLocation("Quinta Calixto", -22.528478, -46.473002, 835.05)
+	if err != nil {
+		log.Fatalf("site: %v", err)
+	}
 
 	prov := eph.Default()
 

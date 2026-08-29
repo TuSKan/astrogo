@@ -42,7 +42,11 @@ func main() {
 	// ═══════════════════════════════════════════════════════════════════════
 	// Epoch: 2025-Jul-03 12:00:00 UTC
 	// ═══════════════════════════════════════════════════════════════════════
-	utc, _ := time.LoadLocation("UTC")
+	utc, err := time.LoadLocation("UTC")
+	if err != nil {
+		log.Fatalf("utc: %v", err)
+	}
+
 	t := time.Date(2025, 7, 3, 12, 0, 0, 0, utc)
 
 	// JPL Horizons reference (DE441, geocentric, ICRF, astrometric)

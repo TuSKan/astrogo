@@ -24,6 +24,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/ephemeris"
@@ -32,12 +33,21 @@ import (
 )
 
 func main() {
-	site, _ := plan.NewSiteEarthLocation("Quinta Calixto", -22.528478, -46.473002, 835.05)
+	site, err := plan.NewSiteEarthLocation("Quinta Calixto", -22.528478, -46.473002, 835.05)
+	if err != nil {
+		log.Fatalf("site: %v", err)
+	}
 	mars := plan.NewMars(ephemeris.Default())
 
 	tonight := time.Date(2026, 4, 15, 22, 0, 0, 0, time.LocationUTC)
-	eval, _ := plan.IsObservable(mars, tonight, site, plan.Altitude{Threshold: angle.Deg(30)})
-	events, _ := plan.VisibilityEvents(tonight, tonight.AddDays(1), mars, site)
+	eval, err := plan.IsObservable(mars, tonight, site, plan.Altitude{Threshold: angle.Deg(30)})
+	if err != nil {
+		log.Fatalf("eval: %v", err)
+	}
+	events, err := plan.VisibilityEvents(tonight, tonight.AddDays(1), mars, site)
+	if err != nil {
+		log.Fatalf("events: %v", err)
+	}
 
 	fmt.Printf("Mars right now: altitude %.1f°, observable above 30°: %v\n",
 		eval.AltAz.Alt().Degrees(), eval.Observable)
@@ -122,25 +132,40 @@ const layout = "2006-01-02 15:04 MST"
 
 func main() {
 	// ── Observer Setup: Quinta Calixto ──
-	site, _ := plan.NewSiteEarthLocation("Quinta Calixto", -22.528478, -46.473002, 835.05)
+	site, err := plan.NewSiteEarthLocation("Quinta Calixto", -22.528478, -46.473002, 835.05)
+	if err != nil {
+		log.Fatalf("site: %v", err)
+	}
 
 	// ── Night boundaries ──
 	eph := ephemeris.Default()
 	tonight := time.Date(2026, 4, 15, 22, 0, 0, 0, time.LocationUTC)
 	tomorrow := tonight.AddDays(1)
 
-	sunrise, sunset, _ := plan.SunriseSunset(tonight, tomorrow, site, eph)
+	sunrise, sunset, err := plan.SunriseSunset(tonight, tomorrow, site, eph)
+	if err != nil {
+		log.Fatalf("sunrise: %v", err)
+	}
 	fmt.Printf("Sunset:  %s\n", sunset.Time.Format(layout))
 	fmt.Printf("Sunrise: %s\n", sunrise.Time.Format(layout))
 
-	dawn, dusk, _ := plan.AstronomicalDawnDusk(tonight, tomorrow, site, eph)
+	dawn, dusk, err := plan.AstronomicalDawnDusk(tonight, tomorrow, site, eph)
+	if err != nil {
+		log.Fatalf("dawn: %v", err)
+	}
 	fmt.Printf("Astro dusk: %s → Astro dawn: %s\n", dusk.Time.Format(layout), dawn.Time.Format(layout))
 
 	// ── Moon phase check ──
-	nextFull, _ := plan.NextFullMoon(tonight, eph)
+	nextFull, err := plan.NextFullMoon(tonight, eph)
+	if err != nil {
+		log.Fatalf("nextFull: %v", err)
+	}
 	fmt.Printf("Next Full Moon: %s\n", nextFull.Time.Format(layout))
 
-	frac, _, _ := plan.MoonIllumination(tonight, eph)
+	frac, _, err := plan.MoonIllumination(tonight, eph)
+	if err != nil {
+		log.Fatalf("frac: %v", err)
+	}
 	fmt.Printf("Moon illumination: %.0f%%\n", frac*100)
 
 	// ── Targets ──
@@ -171,14 +196,23 @@ func main() {
 
 	fmt.Println("\n── Observability ──────────────────────")
 	for _, obj := range []plan.Observable{omegaCen, sgrA, mars} {
-		eval, _ := plan.IsObservable(obj, tonight, site, constraints...)
-		score, _ := plan.ScoreObservable(obj, tonight, site, nil, nil, constraints...)
+		eval, err := plan.IsObservable(obj, tonight, site, constraints...)
+		if err != nil {
+			log.Fatalf("eval: %v", err)
+		}
+		score, err := plan.ScoreObservable(obj, tonight, site, nil, nil, constraints...)
+		if err != nil {
+			log.Fatalf("score: %v", err)
+		}
 		fmt.Printf("  %-18s  Observable: %-5v  Score: %5.1f\n",
 			obj.Name(), eval.Observable, score)
 	}
 
 	// ── Schedule the night ──
-	planner, _ := plan.NewPlanner(site, nil)
+	planner, err := plan.NewPlanner(site, nil)
+	if err != nil {
+		log.Fatalf("planner: %v", err)
+	}
 	blocks := []*plan.Block{
 		{ID: "OmCen", Target: omegaCen, Duration: 45 * time.Minute, Priority: 3},
 		{ID: "SgrA",  Target: sgrA,     Duration: 60 * time.Minute, Priority: 5},
@@ -192,7 +226,10 @@ func main() {
 	window := plan.Window{Start: dusk.Time, End: dawn.Time}
 	tm := &plan.BasicTransitionModel{BaseSetup: 5 * time.Minute}
 
-	schedule, _ := strategy.Schedule(planner, window, blocks, tm)
+	schedule, err := strategy.Schedule(planner, window, blocks, tm)
+	if err != nil {
+		log.Fatalf("schedule: %v", err)
+	}
 
 	fmt.Println("\n── Schedule ──────────────────────────")
 	for _, sb := range schedule.Blocks {
@@ -232,13 +269,19 @@ Two notes on that output: the individual `Observable` checks are evaluated at ex
 
 ```go
 // Create one Context per epoch — amortizes the 91 µs SOFA Apco13 cost.
-loc, _ := coord.NewEarthLocation(-22.528478, -46.473002, 835.05)  // Quinta Calixto
+loc, err := coord.NewEarthLocation(-22.528478, -46.473002, 835.05)  // Quinta Calixto
+if err != nil {
+	log.Fatalf("loc: %v", err)
+}
 atm := atmosphere.AtAltitude(835.05)  // SOFA refraction at all altitudes
 ctx := coord.NewContext(time.NowUTC(), loc, atm)
 
 // Transform 100 catalog stars for ~325 ns each (instead of ~91 µs each).
 for _, star := range catalogStars {
-    altaz, _ := ctx.ICRSToAltAz(star.ICRS)
+    altaz, err := ctx.ICRSToAltAz(star.ICRS)
+    if err != nil {
+        continue
+    }
     if altaz.Alt().Degrees() > 30 {
         observable = append(observable, star)
     }
@@ -253,20 +296,29 @@ start := time.Date(2026, 1, 1, 0, 0, 0, 0, time.LocationUTC)
 end := start.AddDays(365)
 
 // All lunar phases for 2026
-phases, _ := plan.MoonPhases(start, end, eph)
+phases, err := plan.MoonPhases(start, end, eph)
+if err != nil {
+	log.Fatalf("phases: %v", err)
+}
 for _, p := range phases {
     fmt.Printf("%s: %s\n", p.Phase, p.Time.Format(layout))
 }
 
 // Lunar eclipses — filtered by Danjon ecliptic latitude limit
-eclipses, _ := plan.LunarEclipses(start, end, eph)
+eclipses, err := plan.LunarEclipses(start, end, eph)
+if err != nil {
+	log.Fatalf("eclipses: %v", err)
+}
 for _, e := range eclipses {
     fmt.Printf("Lunar Eclipse: %s (γ=%.2f, lat=%.2f°)\n",
         e.Time.Format(layout), e.Gamma, e.EclipticLatitude.Degrees())
 }
 
 // Next Full Moon from a reference date
-nextFull, _ := plan.NextFullMoon(start, eph)
+nextFull, err := plan.NextFullMoon(start, eph)
+if err != nil {
+	log.Fatalf("nextFull: %v", err)
+}
 fmt.Printf("Next Full Moon: %s (illumination: %.0f%%)\n",
     nextFull.Time.Format(layout), nextFull.Value*100)
 ```
@@ -284,7 +336,10 @@ Next Full Moon: 2026-01-03 10:03 UTC (illumination: 100%)
 
 ```go
 // Compute topocentric parameters for the evening of sighting
-params, _ := plan.NewCrescentParams(sunsetTime, site.Location(), eph)
+params, err := plan.NewCrescentParams(sunsetTime, site.Location(), eph)
+if err != nil {
+	log.Fatalf("params: %v", err)
+}
 
 // Evaluate all 20 historical criteria simultaneously
 result := params.EvaluateAll()
@@ -312,7 +367,10 @@ venus := plan.NewVenus(eph)
 sun := plan.NewSun(eph)
 
 // Greatest elongations of Venus over a full synodic period
-elongations, _ := plan.GreatestElongations(start, end, venus, sun)
+elongations, err := plan.GreatestElongations(start, end, venus, sun)
+if err != nil {
+	log.Fatalf("elongations: %v", err)
+}
 for _, e := range elongations {
     fmt.Printf("%s: %.1f° at %s\n", e.Kind, e.Value, e.Time.Format(layout))
 }
@@ -320,13 +378,19 @@ for _, e := range elongations {
 // Mars-Jupiter conjunctions
 mars := plan.NewMars(eph)
 jupiter := plan.NewJupiter(eph)
-conj, _ := plan.Conjunctions(start, end, mars, jupiter)
+conj, err := plan.Conjunctions(start, end, mars, jupiter)
+if err != nil {
+	log.Fatalf("conj: %v", err)
+}
 for _, c := range conj {
     fmt.Printf("Mars-Jupiter conjunction: %s\n", c.Time.Format(layout))
 }
 
 // Appulses (closest visual approach)
-appulses, _ := plan.Appulses(start, end, mars, jupiter)
+appulses, err := plan.Appulses(start, end, mars, jupiter)
+if err != nil {
+	log.Fatalf("appulses: %v", err)
+}
 for _, a := range appulses {
     fmt.Printf("Appulse: %s (min sep: %.2f°)\n", a.Time.Format(layout), a.Value)
 }
@@ -343,26 +407,44 @@ Appulse: 2026-11-16 01:38 UTC (min sep: 1.19°)
 ```go
 // Resolve ISS from the live NORAD/CelestTrak catalog.
 resolver := catalog.NewResolver(catalog.NORAD)
-target, _ := resolver.Resolve(context.Background(), "ISS (Zarya)")
+target, err := resolver.Resolve(context.Background(), "ISS (Zarya)")
+if err != nil {
+	log.Fatalf("target: %v", err)
+}
 
 // SGP4 provider — implements the same Provider interface as JPL planets.
-prov, _ := ephemeris.NewProvider(ephemeris.Satellites, target.Name,
+prov, err := ephemeris.NewProvider(ephemeris.Satellites, target.Name,
+if err != nil {
+	log.Fatalf("prov: %v", err)
+}
     ephemeris.WithTLE(target.TLELine1, target.TLELine2))
 defer prov.Close()
 
 epoch := target.Epoch
-alt, _ := ephemeris.Altitude(prov, 0, epoch)
+alt, err := ephemeris.Altitude(prov, 0, epoch)
+if err != nil {
+	log.Fatalf("alt: %v", err)
+}
 fmt.Printf("Orbital altitude: %.0f km\n", alt)
 
 // Topocentric look angle — same coord.Context API used for planets and stars.
-observer, _ := coord.NewEarthLocation(-23.5505, -46.6333, 760)
+observer, err := coord.NewEarthLocation(-23.5505, -46.6333, 760)
+if err != nil {
+	log.Fatalf("observer: %v", err)
+}
 ctx := coord.NewContext(epoch, observer, atmosphere.Atmosphere{})
-altaz, _ := plan.LookAngle(prov, 0, ctx)
+altaz, err := plan.LookAngle(prov, 0, ctx)
+if err != nil {
+	log.Fatalf("altaz: %v", err)
+}
 fmt.Printf("Az: %.1f°  El: %.1f°  Range: %.0f km\n",
     altaz.Az().Degrees(), altaz.Alt().Degrees(), altaz.Dist())
 
 // Predict passes over the observer (next 24 hours, min 10° elevation).
-passes, _ := plan.SatellitePasses(prov, target.Name, epoch, epoch.AddDays(1), observer, angle.Deg(10))
+passes, err := plan.SatellitePasses(prov, target.Name, epoch, epoch.AddDays(1), observer, angle.Deg(10))
+if err != nil {
+	log.Fatalf("passes: %v", err)
+}
 for _, pass := range passes {
     fmt.Printf("AOS: %s  Max El: %.1f°  LOS: %s  Duration: %s\n",
         pass.Rise.Time.Format("15:04:05 MST"), pass.Culmination.Elevation.Degrees(),
@@ -835,14 +917,25 @@ These are wrapped internally to ensure:
 ---
 
 > [!IMPORTANT]
-> astrogo is pre-1.0 (currently **v0.5.0**) — the public API may still change. This release rebuilds [`remote`](remote/doc.go) as a policy layer over two subpackages — `remote/file` (bucket/key file access on `gocloud.dev/blob`) and `remote/api` (request/response services on `resty.dev/v3`) — with no OS paths in any signature; see [CHANGELOG.md](CHANGELOG.md) for the full breaking-change list. `catalog/jpl` and `catalog/vizier` — the two providers that previously gated a v1.0.0 API-stability commitment — are fully implemented (see Implementation Status above); see [`docs/ROADMAP.md`](docs/ROADMAP.md) for what's left before v1.0.0.
+> astrogo is **pre-1.0** — the public API may still change, and every release
+> is listed with its breaking changes in [CHANGELOG.md](CHANGELOG.md). For what
+> remains before a v1.0.0 API-stability commitment, see
+> [`docs/ROADMAP.md`](docs/ROADMAP.md).
+>
+> This paragraph deliberately names no version. It used to say "currently
+> v0.5.0" and went on describing that release's contents, which stayed on the
+> front page through ten minor releases — the kind of staleness that makes a
+> reader wonder which of the accuracy claims below is also out of date. The
+> current version is whatever [the latest tag](https://github.com/TuSKan/astrogo/releases)
+> says, and nothing here needs updating to keep that true.
 
 ---
 
 ## Known Limitations & Scope
 
 > [!WARNING]
-> These are documented trade-offs, not bugs. They represent deliberate scope boundaries as of v0.5.0.
+> These are documented trade-offs, not bugs. They are deliberate scope
+> boundaries, reviewed each release rather than pinned to one.
 
 ### Context Caching (Performance)
 
@@ -854,7 +947,10 @@ Built-in constraints (`Altitude`, `Airmass`) implement `ConstraintCtx` automatic
 ```go
 ctx := coord.NewContext(epoch, site.Location(), site.Atmosphere())
 for _, star := range targets {
-    altaz, _ := ctx.ICRSToAltAz(star.ICRS) // ~325 ns, not ~91 µs
+    altaz, err := ctx.ICRSToAltAz(star.ICRS) // ~325 ns, not ~91 µs
+    if err != nil {
+        continue
+    }
 }
 ```
 

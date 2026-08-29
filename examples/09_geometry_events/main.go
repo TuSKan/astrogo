@@ -46,7 +46,10 @@ func main() {
 	// 3. Setup Observatory (Quinta Calixto, Brazil with precise coordinates from user's app)
 	// Geocentric Events (like Full Moon syzygy) do not depend on the observer to occur,
 	// but we can map the generated event timestamp against an observer to see if the event is visible locally!
-	site, _ := plan.NewSiteEarthLocation("Quinta Calixto", -22.528478, -46.473002, 835.05)
+	site, err := plan.NewSiteEarthLocation("Quinta Calixto", -22.528478, -46.473002, 835.05)
+	if err != nil {
+		log.Fatalf("site: %v", err)
+	}
 
 	// ----------------------------------------------------
 	// Conjunction: Mars and Venus having the same Right Ascension
@@ -118,7 +121,11 @@ func main() {
 	for i, ecl := range lunarEclipses {
 		// Evaluate if the Moon is actually visible from Quinta Calixto at eclipse time
 		altCheck := plan.Altitude{Threshold: angle.Zero()}
-		res, _ := altCheck.Check(moon, ecl.Time, site)
+
+		res, err := altCheck.Check(moon, ecl.Time, site)
+		if err != nil {
+			log.Fatalf("res: %v", err)
+		}
 
 		visibilityStr := "Invisible (below horizon)"
 		if res.Pass {
@@ -145,7 +152,11 @@ func main() {
 
 	for i, ecl := range solarEclipses {
 		altCheck := plan.Altitude{Threshold: angle.Zero()}
-		res, _ := altCheck.Check(moon, ecl.Time, site)
+
+		res, err := altCheck.Check(moon, ecl.Time, site)
+		if err != nil {
+			log.Fatalf("res: %v", err)
+		}
 
 		visibilityStr := "Invisible (below horizon)"
 		if res.Pass {

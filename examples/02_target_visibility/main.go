@@ -14,7 +14,10 @@ import (
 
 func main() {
 	// 1. Setup Observatory (Quinta Calixto, Brazil)
-	site, _ := plan.NewSiteEarthLocation("Quinta Calixto", -22.528478, -46.473002, 835.05)
+	site, err := plan.NewSiteEarthLocation("Quinta Calixto", -22.528478, -46.473002, 835.05)
+	if err != nil {
+		log.Fatalf("site: %v", err)
+	}
 
 	// 2. Define Constraints: The target must be above 30 degrees altitude
 	constraints := []plan.Constraint{
@@ -22,7 +25,10 @@ func main() {
 	}
 
 	// Create a planner with the site and constraints
-	planner, _ := plan.NewPlanner(site, constraints)
+	planner, err := plan.NewPlanner(site, constraints)
+	if err != nil {
+		log.Fatalf("planner: %v", err)
+	}
 
 	// 3. Set Target using SIMBAD
 	targetData, err := catalog.NewResolver(catalog.SIMBAD).Resolve(context.Background(), "Orion Nebula")
@@ -33,7 +39,11 @@ func main() {
 	target := plan.FromCatalog(targetData, nil)
 
 	// 4. Set Time to 'tonight at 7 PM' (UTC-3)
-	tz, _ := time.LoadLocation("America/Sao_Paulo")
+	tz, err := time.LoadLocation("America/Sao_Paulo")
+	if err != nil {
+		log.Fatalf("tz: %v", err)
+	}
+
 	tm := time.Date(2026, 4, 6, 19, 0, 0, 0, tz)
 
 	// 5. Check Visibility!

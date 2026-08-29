@@ -51,7 +51,10 @@ func main() {
 	}()
 
 	// Jerusalem: 31.7683°N, 35.2137°E, 754m
-	jerusalem, _ := coord.NewGeodetic(angle.Deg(35.2137), angle.Deg(31.7683), 754)
+	jerusalem, err := coord.NewGeodetic(angle.Deg(35.2137), angle.Deg(31.7683), 754)
+	if err != nil {
+		log.Fatalf("jerusalem: %v", err)
+	}
 
 	fmt.Println("══════════════════════════════════════════════════════════════")
 	fmt.Println("  Passover Moon — Friday Nisan 14 Candidates (AD 26-36)")
@@ -112,7 +115,6 @@ func main() {
 			// Jerusalem is at longitude 35.21°E → UTC offset ≈ +2h21m
 			// So sunset ≈ 15:39 UTC (approximate, varies by season)
 			conjYear, conjMonth, conjDay, _ := nm.Time.Calendar()
-
 			// Check this and next 2 days for first visible crescent
 			for dayOff := range 3 {
 				sunsetUTC := time.Date(

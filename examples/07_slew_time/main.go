@@ -3,6 +3,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/plan"
@@ -11,7 +12,10 @@ import (
 
 func main() {
 	// 1. Setup Observatory (Quinta Calixto, Brazil)
-	site, _ := plan.NewSiteEarthLocation("Quinta Calixto", -22.528478, -46.473002, 835.05)
+	site, err := plan.NewSiteEarthLocation("Quinta Calixto", -22.528478, -46.473002, 835.05)
+	if err != nil {
+		log.Fatalf("site: %v", err)
+	}
 
 	// 2. Define our Transition Model representing the telescope's physical properties
 	model := &plan.BasicTransitionModel{

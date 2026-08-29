@@ -60,12 +60,24 @@ func main() {
 	} else {
 		for i, c := range conjs {
 			// Compute the angular separation at conjunction time
-			jPos, _ := jupiter.Position(c.Time)
-			sPos, _ := saturn.Position(c.Time)
+			jPos, err := jupiter.Position(c.Time)
+			if err != nil {
+				log.Fatalf("jPos: %v", err)
+			}
+
+			sPos, err := saturn.Position(c.Time)
+			if err != nil {
+				log.Fatalf("sPos: %v", err)
+			}
+
 			sep := coord.Separation(jPos, sPos)
 
 			// Compute solar elongation to determine sky position
-			sunPos, _ := sun.Position(c.Time)
+			sunPos, err := sun.Position(c.Time)
+			if err != nil {
+				log.Fatalf("sunPos: %v", err)
+			}
+
 			elong := coord.Separation(jPos, sunPos)
 			sky := skyPosition(elong.Degrees())
 
@@ -118,8 +130,16 @@ func main() {
 		fmt.Println("  No conjunctions found")
 	} else {
 		for _, c := range conjs2 {
-			jPos, _ := jupiter.Position(c.Time)
-			vPos, _ := venus.Position(c.Time)
+			jPos, err := jupiter.Position(c.Time)
+			if err != nil {
+				log.Fatalf("jPos: %v", err)
+			}
+
+			vPos, err := venus.Position(c.Time)
+			if err != nil {
+				log.Fatalf("vPos: %v", err)
+			}
+
 			sep := coord.Separation(jPos, vPos)
 			fmt.Printf("  %s  (sep: %.4f° ≈ %.1f arcmin)\n",
 				c.Time.FormatJulian("2006-01-02 15:04 MST"),

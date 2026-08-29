@@ -80,8 +80,15 @@ func main() {
 	fmt.Println("── Season Durations (2026, Northern Hemisphere) ───────────────────")
 	fmt.Println()
 
-	events26, _ := plan.Seasons(2026, prov)
-	events27, _ := plan.Seasons(2027, prov)
+	events26, err := plan.Seasons(2026, prov)
+	if err != nil {
+		log.Fatalf("events26: %v", err)
+	}
+
+	events27, err := plan.Seasons(2027, prov)
+	if err != nil {
+		log.Fatalf("events27: %v", err)
+	}
 
 	durations := []struct {
 		start time.Time
@@ -164,8 +171,15 @@ func main() {
 	eclStart := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
 	eclEnd := time.Date(2027, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
 
-	lunarEcl, _ := plan.LunarEclipses(eclStart, eclEnd, prov)
-	solarEcl, _ := plan.SolarEclipses(eclStart, eclEnd, prov)
+	lunarEcl, err := plan.LunarEclipses(eclStart, eclEnd, prov)
+	if err != nil {
+		log.Fatalf("lunarEcl: %v", err)
+	}
+
+	solarEcl, err := plan.SolarEclipses(eclStart, eclEnd, prov)
+	if err != nil {
+		log.Fatalf("solarEcl: %v", err)
+	}
 
 	for _, e := range lunarEcl {
 		classification := "Penumbral"
@@ -208,7 +222,12 @@ func main() {
 
 	moonTarget := plan.NewMoon(prov)
 	now := events26[0].Time // Use the actual vernal equinox moment
-	site, _ := plan.NewSiteEarthLocation("Quinta Calixto", -22.528478, -46.473002, 835.05, plan.WithTimeZone(brtz))
+
+	site, err := plan.NewSiteEarthLocation("Quinta Calixto", -22.528478, -46.473002, 835.05, plan.WithTimeZone(brtz))
+	if err != nil {
+		log.Fatalf("site: %v", err)
+	}
+
 	loc := site.Location()
 	atm := atmosphere.AtAltitude(835.05)
 	ctx := coord.NewContext(now, loc, atm)
@@ -221,14 +240,22 @@ func main() {
 	fmt.Println(details)
 
 	// Show moon illumination at equinox
-	frac, phaseAngle, _ := plan.MoonIllumination(now, prov)
+	frac, phaseAngle, err := plan.MoonIllumination(now, prov)
+	if err != nil {
+		log.Fatalf("frac: %v", err)
+	}
+
 	fmt.Printf("  Moon illumination: %.1f%% (phase angle: %.1f°)\n", frac*100, phaseAngle.Degrees())
 
 	// Moon rise/set on equinox day
 	eqDay := time.Date(2026, time.March, 20, 0, 0, 0, 0, time.LocationUTC)
 	eqNext := eqDay.Add(24 * time.Hour)
 
-	moonrise, moonset, _ := plan.MoonriseMoonset(eqDay, eqNext, site, prov)
+	moonrise, moonset, err := plan.MoonriseMoonset(eqDay, eqNext, site, prov)
+	if err != nil {
+		log.Fatalf("moonrise: %v", err)
+	}
+
 	if moonrise != nil {
 		fmt.Printf("  Moonrise:  %s  Az: %s\n", moonrise.Time.In(brtz).Format("15:04:05 MST"), moonrise.Azimuth.DMSString(0))
 	}

@@ -20,7 +20,11 @@ func main() {
 		log.Fatalf("failed to create location: %v", err)
 	}
 
-	tz, _ := time.LoadLocation("UTC")
+	tz, err := time.LoadLocation("UTC")
+	if err != nil {
+		log.Fatalf("tz: %v", err)
+	}
+
 	t := time.Date(2026, 4, 25, 20, 0, 0, 0, tz)
 	ctx := coord.NewContext(t, loc, atmosphere.StandardRefraction)
 

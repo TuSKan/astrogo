@@ -70,7 +70,11 @@ func main() {
 	}
 
 	// Derive RA/Dec from GCRS position.
-	icrs, _ := eph.ToICRS(state.Pos)
+	icrs, err := eph.ToICRS(state.Pos)
+	if err != nil {
+		log.Fatalf("icrs: %v", err)
+	}
+
 	fmt.Printf("  RA:       %s\n", icrs.RA())
 	fmt.Printf("  Dec:      %s\n", icrs.Dec())
 	fmt.Printf("  Distance: %.1f km\n", state.DistanceKm())
@@ -122,7 +126,11 @@ func main() {
 	start := epoch
 	end := epoch.AddDays(1.0)
 	minEl := angle.Deg(20.0)
-	loc, _ := time.LoadLocation("America/Sao_Paulo")
+
+	loc, err := time.LoadLocation("America/Sao_Paulo")
+	if err != nil {
+		log.Fatalf("loc: %v", err)
+	}
 
 	header("Pass Prediction (next 24h, min %1.f° elevation)", minEl.Degrees())
 
