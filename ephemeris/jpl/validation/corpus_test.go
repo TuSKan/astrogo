@@ -1,3 +1,5 @@
+//go:build validation || network
+
 package jpl_test
 
 import (
@@ -7,18 +9,36 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+
+	"github.com/TuSKan/astrogo/constants"
 )
 
-// This file carries no build tag on purpose.
+// This file is built under either tag and neither alone.
 //
 // The generator is network-tagged and the consumer is validation-tagged, so
-// the two cannot see each other's files. They previously coped by each
+// the two cannot see each other's files. A constraint of "validation ||
+// network" is what lets one declaration serve both: an untagged file would
+// serve them too, but then an ordinary "golangci-lint run" — which is the
+// gate CI actually runs, with no tags — sees a file whose every symbol has
+// no consumer, and reports the lot as unused. They previously coped by each
 // declaring its own copy of the on-disk shape — CorpusEntry on one side,
 // RegressionEntry plus BaselinePoint on the other, with a comment noting the
 // duplication was there "to bypass network blocks". Two independent
 // declarations of one serialisation format drift silently: a field renamed on
 // the writing side decodes as a zero on the reading side, and a corpus of
 // zeroes still parses.
+
+// kmPerAU converts the AU-valued state differences these suites measure into
+// the kilometres that the reference routines' own accuracy figures are quoted
+// in. The idiom is the one the constants package's doc demonstrates; Value is
+// in metres.
+//
+// Here rather than in main_test.go because the validation- and network-tagged
+// suites both need it and cannot see each other's files, and main_test.go has
+// to stay untagged so TestMain always compiles.
+//
+//nolint:gochecknoglobals // a derived constant, same convention as the rest of this repo's reference data
+var kmPerAU = constants.IAU.AstronomicalUnit.Value / 1e3
 
 // corpusSchemaVersion is the version of the document below.
 //
