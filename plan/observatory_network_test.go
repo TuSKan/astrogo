@@ -4,8 +4,6 @@ package plan
 
 import (
 	"context"
-	"errors"
-	"net"
 	"testing"
 
 	"github.com/TuSKan/astrogo/internal/testutil"
@@ -23,29 +21,12 @@ func requireGeocoding(t *testing.T) {
 	}
 }
 
-// skipIfUnresponsive turns a timed-out request into a skip. A TCP
-// pre-check is not sufficient on its own: these public endpoints routinely
-// accept a connection and then fail to answer, which is downtime rather
-// than wrong data.
-func skipIfUnresponsive(t *testing.T, err error) {
-	t.Helper()
-
-	var netErr net.Error
-	if errors.Is(err, context.DeadlineExceeded) || (errors.As(err, &netErr) && netErr.Timeout()) {
-		t.Skipf("geocoding service accepted the connection but did not answer, skipping: %v", err)
-	}
-}
-
-// TestNewSiteEarthAddress_Live confirms a real geocoding + elevation round
-// trip against the live Nominatim and Open-Elevation APIs — Greenwich
-// Observatory should resolve to approximately its well-known coordinates
-// (51.48°N, 0°) and elevation (~45m).
 func TestNewSiteEarthAddress_Live(t *testing.T) {
 	requireGeocoding(t)
 
 	site, err := NewSiteEarthAddress(context.Background(), "Greenwich", "Royal Observatory, Greenwich, London, UK")
 	if err != nil {
-		skipIfUnresponsive(t, err)
+		testutil.SkipOnUpstreamFailure(t, err)
 		t.Fatalf("NewSiteEarthAddress: %v", err)
 	}
 

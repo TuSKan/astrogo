@@ -52,6 +52,8 @@ func TestGaiaQueryIsAcceptedByTheArchive(t *testing.T) {
 	t.Logf("query: %s", adql)
 
 	m, counts, err := starlight.RunChunk(ctx, build, 100000, 100003)
+	testutil.SkipOnUpstreamFailure(t, err)
+
 	if err != nil {
 		t.Fatalf("the archive rejected the generated query: %v", err)
 	}
@@ -393,6 +395,8 @@ func TestFourBandQueryIsOnePass(t *testing.T) {
 	t.Logf("query (%d characters): %s", len(adql), adql)
 
 	m, counts, err := starlight.RunChunk(ctx, build, 100000, 100003)
+	testutil.SkipOnUpstreamFailure(t, err)
+
 	if err != nil {
 		t.Fatalf("the archive rejected the four-band query: %v", err)
 	}

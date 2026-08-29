@@ -36,6 +36,8 @@ func TestSimbadNetworkResolve(t *testing.T) {
 	var targets []resolve.Target
 
 	iter(func(tar resolve.Target, err error) bool {
+		testutil.SkipOnUpstreamFailure(t, err)
+
 		if err != nil {
 			t.Fatalf("Live network failed: %v", err)
 		}
@@ -78,6 +80,8 @@ func TestSimbadNetworkSearchBright(t *testing.T) {
 	var targets []resolve.Target
 
 	iter(func(tgt resolve.Target, err error) bool {
+		testutil.SkipOnUpstreamFailure(t, err)
+
 		if err != nil {
 			t.Fatalf("live SearchBright failed: %v", err)
 		}

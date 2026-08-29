@@ -354,3 +354,10 @@ type HTTPError struct {
 func (e *HTTPError) Error() string {
 	return fmt.Sprintf("remote/api: http %d - %s", e.StatusCode, e.Body)
 }
+
+// HTTPStatus returns the status code of the response that produced this error.
+//
+// It exists so a caller can branch on the status — backing off on a 429,
+// treating a 5xx as the service's fault rather than its own — through a small
+// interface rather than a dependency on this package's concrete type.
+func (e *HTTPError) HTTPStatus() int { return e.StatusCode }

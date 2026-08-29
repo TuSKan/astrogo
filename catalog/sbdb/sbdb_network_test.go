@@ -36,6 +36,8 @@ func TestSBDBNetworkResolve(t *testing.T) {
 	var targets []resolve.Target
 
 	iter(func(tar resolve.Target, err error) bool {
+		testutil.SkipOnUpstreamFailure(t, err)
+
 		if err != nil {
 			t.Fatalf("Live network failed: %v", err)
 		}
@@ -117,6 +119,8 @@ func TestSBDBNetworkSearchBright(t *testing.T) {
 	// Wachmann 2) alongside real bright asteroids (H<5 includes Pluto).
 	iter := prov.SearchBright(ctx, resolve.BrightRequest{MaxVMag: 1, Limit: 20})
 	iter(func(tgt resolve.Target, err error) bool {
+		testutil.SkipOnUpstreamFailure(t, err)
+
 		if err != nil {
 			t.Fatalf("live SearchBright failed: %v", err)
 		}
@@ -225,6 +229,8 @@ func TestSBDBNetworkResolveInterstellar(t *testing.T) {
 	var targets []resolve.Target
 
 	iter(func(tar resolve.Target, err error) bool {
+		testutil.SkipOnUpstreamFailure(t, err)
+
 		if err != nil {
 			t.Fatalf("Live network failed: %v", err)
 		}

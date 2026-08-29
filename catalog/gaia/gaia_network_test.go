@@ -4,7 +4,6 @@ package gaia
 
 import (
 	"context"
-	"errors"
 	"net"
 	"net/url"
 	"testing"
@@ -45,22 +44,6 @@ func requireGaia(t *testing.T) {
 	testutil.RequireReachable(t, net.JoinHostPort(u.Hostname(), port))
 }
 
-// skipIfUnresponsive turns a timed-out query into a skip. The TCP pre-check
-// above is not sufficient on its own: a TAP front end can accept the
-// connection and then never answer, which is downtime rather than wrong data,
-// and the policy is that only wrong data from a responsive endpoint fails.
-//
-// ESA's did this routinely, which is a large part of why it is no longer the
-// default archive.
-func skipIfUnresponsive(t *testing.T, err error) {
-	t.Helper()
-
-	var netErr net.Error
-	if errors.Is(err, context.DeadlineExceeded) || (errors.As(err, &netErr) && netErr.Timeout()) {
-		t.Skipf("the archive accepted the connection but did not answer, skipping live test: %v", err)
-	}
-}
-
 func TestGaiaNetworkConeSearch(t *testing.T) {
 	requireGaia(t)
 
@@ -85,7 +68,7 @@ func TestGaiaNetworkConeSearch(t *testing.T) {
 
 	iter(func(tar resolve.Target, err error) bool {
 		if err != nil {
-			skipIfUnresponsive(t, err)
+			testutil.SkipOnUpstreamFailure(t, err)
 			t.Fatalf("Live network failed: %v", err)
 		}
 

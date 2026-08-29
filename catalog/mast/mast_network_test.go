@@ -37,6 +37,8 @@ func TestMastNetworkResolve(t *testing.T) {
 	var targets []resolve.Target
 
 	iter(func(tar resolve.Target, err error) bool {
+		testutil.SkipOnUpstreamFailure(t, err)
+
 		if err != nil {
 			t.Fatalf("Live network failed: %v", err)
 		}
