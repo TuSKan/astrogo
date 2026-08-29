@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"io/fs"
 	"path"
+	"regexp"
 	"slices"
 	"sort"
 	"strconv"
@@ -182,6 +183,29 @@ func LoadEntries(dir fs.FS) ([]Entry, error) {
 	return entries, nil
 }
 
+// citation matches a trailing pull request reference such as "(#61)" or
+// "(#56, #57)".
+var citation = regexp.MustCompile(`\(#\d+(, ?#\d+)*\)\.?$`)
+
+// cite returns the entry body with its pull request appended, in the citation
+// style CHANGELOG.md uses throughout.
+//
+// The pr field used to be read for ordering and then dropped, so the first
+// assembled release carried eleven entries with no way to reach the change
+// behind them, beside two hand-written ones that cited theirs. A changelog is
+// an index, and an index entry with no pointer is decoration.
+//
+// A body that already ends in a citation keeps it, so an entry naming two pull
+// requests — a fix and the follow-up that completed it — is not rewritten to
+// name only one.
+func (e Entry) cite() string {
+	if e.PR == 0 || citation.MatchString(e.Body) {
+		return e.Body
+	}
+
+	return fmt.Sprintf("%s (#%d)", strings.TrimRight(e.Body, " "), e.PR)
+}
+
 // Render turns entries into a CHANGELOG section body, headings in
 // [SectionOrder] and entries within a heading ordered by PR number.
 //
@@ -213,7 +237,7 @@ func Render(entries []Entry) string {
 
 		for _, e := range in {
 			b.WriteString("- ")
-			b.WriteString(e.Body)
+			b.WriteString(e.cite())
 			b.WriteString("\n")
 		}
 	}

@@ -194,10 +194,10 @@ func ExampleRender() {
 	// Output:
 	//
 	// ### Added
-	// - **First.**
+	// - **First.** (#1)
 	//
 	// ### Fixed
-	// - **Second.**
+	// - **Second.** (#2)
 }
 
 // TestAssembleMergesHandWrittenUnreleasedEntries is the case the end-to-end

@@ -132,9 +132,11 @@ func TestRenderOrdersSectionsAndEntries(t *testing.T) {
 		{Type: "Changed — BREAKING", PR: 1, Body: "**A break.**"},
 	})
 
-	want := "\n### Added\n- **An addition.**\n" +
-		"\n### Changed — BREAKING\n- **A break.**\n" +
-		"\n### Fixed\n- **First fix.**\n- **Second fix.**\n"
+	// Each entry carries its pull request: the changelog is an index, and an
+	// index entry with no pointer to the change is decoration.
+	want := "\n### Added\n- **An addition.** (#9)\n" +
+		"\n### Changed — BREAKING\n- **A break.** (#1)\n" +
+		"\n### Fixed\n- **First fix.** (#10)\n- **Second fix.** (#20)\n"
 
 	if got != want {
 		t.Errorf("Render =\n%q\nwant\n%q", got, want)
@@ -160,4 +162,39 @@ func TestCheckedInFragmentsParse(t *testing.T) {
 	}
 
 	t.Logf("%d pending changelog entries", len(entries))
+}
+
+// TestCiteAppendsThePullRequest covers the field that used to be read for
+// ordering and then thrown away.
+func TestCiteAppendsThePullRequest(t *testing.T) {
+	cases := []struct {
+		name string
+		e    Entry
+		want string
+	}{
+		{"a plain body", Entry{Type: "Fixed", PR: 61, Body: "**A thing.**"}, "**A thing.** (#61)"},
+		{"trailing space is not preserved", Entry{Type: "Fixed", PR: 7, Body: "**A thing.**  "}, "**A thing.** (#7)"},
+
+		// A body that already cites keeps what it says. An entry naming a
+		// fix and the follow-up that completed it must not be rewritten to
+		// name only one of them.
+		{"already cited", Entry{Type: "Fixed", PR: 61, Body: "**A thing.** (#61)"}, "**A thing.** (#61)"},
+		{"cites two", Entry{Type: "Fixed", PR: 56, Body: "**A thing.** (#56, #57)"}, "**A thing.** (#56, #57)"},
+		{"cited with a full stop", Entry{Type: "Fixed", PR: 61, Body: "**A thing.** (#61)."}, "**A thing.** (#61)."},
+
+		// No pr field is legitimate — a change with no pull request behind
+		// it should not grow a "(#0)".
+		{"no pull request", Entry{Type: "Fixed", Body: "**A thing.**"}, "**A thing.**"},
+
+		// A number inside the body is not a trailing citation.
+		{"mentions an issue mid-sentence", Entry{Type: "Fixed", PR: 8, Body: "**Fixes (#3) at last.**"}, "**Fixes (#3) at last.** (#8)"},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if got := c.e.cite(); got != c.want {
+				t.Errorf("cite() = %q, want %q", got, c.want)
+			}
+		})
+	}
 }
