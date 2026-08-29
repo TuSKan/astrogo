@@ -48,9 +48,27 @@ var accuracyDoc = filepath.Join("..", "..", "docs", "VALIDATION.md")
 // table full of NOT VERIFIED rows — accurate about that run, and a worse
 // document than the one it replaced.
 func TestRenderAccuracyReport(t *testing.T) {
-	dir := os.Getenv(metrology.OutDirEnv)
+	// Acts only when asked, and never merely because the environment
+	// variable happens to be set.
+	//
+	// It used to fail whenever the rendered table differed from the file,
+	// which sounds like a staleness check and is not one: it cannot tell a
+	// document that has fallen behind from a run that collected only some of
+	// the suites. "go test -tags=validation ./..." with the variable set —
+	// the documented way to collect results — has both properties at once,
+	// since this test runs inside the very invocation still producing the
+	// documents it reads, in whatever order the packages finish. Every such
+	// run failed.
+	if !*updateAccuracy {
+		t.Skipf("pass -args -update-accuracy to rewrite %s; see this test's doc comment", accuracyDoc)
+	}
+
+	// The directory comes from ambientOutDir rather than the environment,
+	// which TestMain empties so this package's fixtures cannot write into a
+	// real collection. See main_test.go.
+	dir := ambientOutDir
 	if dir == "" {
-		t.Skipf("%s is not set; run the suites with it pointing at a directory first — "+
+		t.Fatalf("%s is not set; run the suites with it pointing at a directory first — "+
 			"see this test's doc comment", metrology.OutDirEnv)
 	}
 
@@ -110,23 +128,9 @@ func TestRenderAccuracyReport(t *testing.T) {
 		return
 	}
 
-	if !*updateAccuracy {
-		t.Fatalf("%s would change; rerun with -args -update-accuracy to write it.\n"+
-			"Collected %d results covering: %s", accuracyDoc, len(results), suiteNames(results))
-	}
-
 	if err := os.WriteFile(accuracyDoc, []byte(updated), 0o600); err != nil {
 		t.Fatalf("writing %s: %v", accuracyDoc, err)
 	}
 
 	t.Logf("wrote %d rows to %s", len(results), accuracyDoc)
-}
-
-func suiteNames(results []metrology.Result) string {
-	names := make([]string, 0, len(results))
-	for _, r := range results {
-		names = append(names, r.Suite)
-	}
-
-	return strings.Join(names, ", ")
 }
