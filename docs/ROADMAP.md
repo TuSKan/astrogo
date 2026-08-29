@@ -23,6 +23,28 @@ on when to commit to the API-stability promise.
 
 ---
 
+## Writing a checkbox
+
+A box that **delivers** a symbol should name it package-qualified and put it
+first: `` - [ ] `plan.Weather` — constraint interface … ``. Written that way,
+`internal/docsguard` checks the box against the code in both directions — an
+unchecked box whose symbol already exists, and a tick whose symbol has been
+deleted, both fail the build.
+
+The qualifier is what makes it checkable. A bare `` `Horizon` `` matched a
+field in `atmosphere` and a `*Site` method in `plan`, neither of which is the
+constraint that box is about; a guard that reports three false alarms out of
+four gets switched off. Boxes that describe work rather than name a deliverable
+— "Cloud cover threshold", "Integration with `SatellitePasses`" — are skipped,
+deliberately, since the symbol they mention is the thing being built *on*.
+
+This is not decoration. `resolve.Target.HasRadialVelocity` sat unchecked while
+being declared, populated by `catalog/simbad`, preserved through the
+multi-provider merge and consumed by `plan` — finished work left looking open,
+which sends the next contributor to build it twice.
+
+---
+
 # ✅ Completed
 
 ## Phase 1 — Precision Astronomy
@@ -134,7 +156,7 @@ Kieffer & Stone (2005), Leinert et al. (1998), ESO SkyCalc.
 
 Per-azimuth altitude minimums from terrain data, replacing the flat-horizon assumption.
 
-- [x] `HorizonProfile` type — azimuth → altitude function (`plan.HorizonProfile`, `Site.WithHorizonProfile`/`HorizonAt`)
+- [x] `plan.HorizonProfile` type — azimuth → altitude function (`plan.HorizonProfile`, `Site.WithHorizonProfile`/`HorizonAt`)
 - [ ] Load from CSV/JSON (azimuth, altitude pairs)
 - [ ] Load from terrain raycasting (DEM/SRTM input)
 - [ ] `Horizon` constraint — rejects targets below the local terrain horizon at their azimuth
@@ -150,7 +172,7 @@ Per-azimuth altitude minimums from terrain data, replacing the flat-horizon assu
 
 Real-time or forecast-based weather gating for scheduling decisions.
 
-- [ ] `Weather` constraint interface — cloud cover, wind, humidity, dew point
+- [ ] `plan.Weather` constraint interface — cloud cover, wind, humidity, dew point
 - [ ] Provider abstraction for weather data sources (OpenMeteo, Visual Crossing, local station)
 - [ ] Cloud cover threshold (reject if > N% overcast)
 - [ ] Wind speed limit (telescope safety)
@@ -170,7 +192,7 @@ Real-time or forecast-based weather gating for scheduling decisions.
 Visual satellite observation requires three simultaneous conditions: the satellite is
 above the observer's horizon, the observer is in darkness, and the satellite is in sunlight.
 
-- [ ] `SatelliteIllumination` constraint — Earth shadow geometry
+- [ ] `plan.SatelliteIllumination` constraint — Earth shadow geometry
 - [ ] Cylindrical shadow model (sufficient for LEO/MEO)
 - [ ] Integration with `SatellitePasses` — filter passes by illumination status
 - [ ] Iridium flare prediction (specular reflection geometry)
@@ -184,7 +206,7 @@ above the observer's horizon, the observer is in darkness, and the satellite is 
 Companion to the existing `MoonSep` constraint: gate or penalize faint targets
 when lunar phase / sky brightness from moonlight is too high.
 
-- [x] `MoonIllumination` constraint — `plan.MoonIllum` rejects/penalizes above an
+- [x] `plan.MoonIllumination` constraint — `plan.MoonIllum` rejects/penalizes above an
       illumination fraction threshold, via the existing `plan.MoonIllumination` helper;
       always passes for the Moon itself. Implements `ConstraintCtx` (added to the
       compile-time assertion block alongside `MoonSep`).
@@ -343,9 +365,9 @@ motion, ~1 m/s accuracy) and are demonstrated end-to-end in
 pipeline too — `plan.TargetDetails.RadialVelocity` auto-populates for any target
 implementing `MeasuredRadialVelocity` (currently `*Star`).
 
-- [x] `Context.BarycentricVelocity` — observer's barycentric velocity from `Apco13`'s
+- [x] `coord.Context.BarycentricVelocity` — observer's barycentric velocity from `Apco13`'s
       already-computed astrometry, no new SOFA call
-- [x] `BarycentricRVCorrection`/`HeliocentricRVCorrection` — classical velocity
+- [x] `coord.BarycentricRVCorrection`/`HeliocentricRVCorrection` — classical velocity
       projection, sign convention documented and tested explicitly
 - [x] Analytic property tests (bounded magnitude, annual sinusoid, antipodal sign flip,
       diurnal amplitude vs. site latitude)
@@ -353,8 +375,11 @@ implementing `MeasuredRadialVelocity` (currently `*Star`).
       interface (mirroring `StaticMagnitude`) on `*Star`, wired into `computeDetails`
       alongside the magnitude dispatch block; `Context.ObservedRadialVelocity` is the
       inverse of `BarycentricRVCorrection`, tested to round-trip exactly
-- [ ] `resolve.Target.HasRadialVelocity` — distinguishes a true-zero measured RV from
-      "no RV on file" (today a zero `RadialVelocity` is ambiguous)
+- [x] `resolve.Target.HasRadialVelocity` — distinguishes a true-zero measured RV from
+      "no RV on file", which a zero `RadialVelocity` cannot. Set by `catalog/simbad`,
+      preserved through the multi-provider merge in `catalog`, and consumed by
+      `plan.NewStarFromTarget`; a genuine 0 km/s measurement is covered by tests in all
+      three packages
 - [x] Cross-implementation fixture test against Astropy's
       `SkyCoord.radial_velocity_correction` — 175 cases (5 named sites × 5 epochs × 7
       target directions) agreeing to 0.7 mm/s, generated by the locked
