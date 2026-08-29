@@ -170,29 +170,8 @@ func NewProvider(ctx context.Context, source core.Source, kernel string, opts ..
 			return nil, fmt.Errorf("jpl: failed to get SPK files: %w", err)
 		}
 
-		// What the caller asked for is a body, so that is what is checked
-		// for — not whether a file arrived.
-		//
-		// Counting readers is not enough: Horizons answers some designations
-		// with a kernel carrying no small-body segment at all ("1;" and "4;"
-		// both do), so a non-empty slice can still leave the provider with
-		// nothing but its planetary base. Comparing the body set before and
-		// after states the actual requirement.
-		before := len(p.SupportedBodies())
-
-		for _, reader := range spkReaders {
-			err := p.AddKernel(reader)
-			if err != nil {
-				return nil, fmt.Errorf("jpl: failed to load small-body kernel: %w", err)
-			}
-		}
-
-		if len(p.SupportedBodies()) == before {
-			return nil, fmt.Errorf("%w: %q added no body to the %d already in the planetary "+
-				"base kernel; Horizons matches small bodies by number (\"433\") or by its own "+
-				"designation syntax (\"433;\"), not by name, and some numbers it accepts return "+
-				"a kernel with no small-body segment",
-				ErrNoSmallBodyKernel, p.kernel, before)
+		if err := p.loadSmallBodyKernels(spkReaders); err != nil {
+			return nil, err
 		}
 	case core.Moons:
 		// Unlike Asteroids/Comets/SmallBody, a planetary satellite kernel
@@ -488,6 +467,35 @@ func (p *Provider) SupportedBodies() []core.ID {
 	}
 
 	return res
+}
+
+// loadSmallBodyKernels adds the fetched kernels and reports
+// [ErrNoSmallBodyKernel] when none of them contributed a body.
+//
+// What the caller asked for is a body, so that is what is checked for — not
+// whether a file arrived. Counting readers is not enough: Horizons answers
+// some designations with a kernel carrying no small-body segment at all
+// ("1;" and "4;" both do), so a non-empty slice can still leave the provider
+// with nothing but its planetary base. Comparing the body set before and
+// after states the actual requirement.
+func (p *Provider) loadSmallBodyKernels(readers []*spk.Reader) error {
+	before := len(p.SupportedBodies())
+
+	for _, reader := range readers {
+		if err := p.AddKernel(reader); err != nil {
+			return fmt.Errorf("jpl: failed to load small-body kernel: %w", err)
+		}
+	}
+
+	if len(p.SupportedBodies()) == before {
+		return fmt.Errorf("%w: %q added no body to the %d already in the planetary "+
+			"base kernel; Horizons matches small bodies by number (\"433\") or by its own "+
+			"designation syntax (\"433;\"), not by name, and some numbers it accepts return "+
+			"a kernel with no small-body segment",
+			ErrNoSmallBodyKernel, p.kernel, before)
+	}
+
+	return nil
 }
 
 // addKernelPath is AddKernel with a known file path, used internally by
