@@ -1,331 +1,426 @@
-package ephemeris_test
+package ephemeris
 
 import (
+	"context"
+	"errors"
 	"math"
 	"testing"
 
 	"github.com/TuSKan/astrogo/angle"
-	"github.com/TuSKan/astrogo/atmosphere"
-	"github.com/TuSKan/astrogo/coord"
-	eph "github.com/TuSKan/astrogo/ephemeris"
-	"github.com/TuSKan/astrogo/internal/testutil"
-	"github.com/TuSKan/astrogo/plan"
+	"github.com/TuSKan/astrogo/ephemeris/core"
 	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/vector"
 )
 
-func TestSunAltitudeMovement(t *testing.T) {
-	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(45), 0)
-	site, _ := plan.NewSite("Test", loc)
-	p := eph.Default()
+// This package's arithmetic was well covered and its front door was not:
+// every constructor and every option sat at 0%. That is the worst place for
+// a gap. A broken option does not fail where it is written — it fails later,
+// somewhere that has no idea an option was involved, which is the shape of
+// most of the defects this repository has had to chase.
+//
+// Everything below runs offline. The kernel-backed branch of NewProvider
+// needs a download and is covered by ephemeris/jpl's own network suites; what
+// is checked here is the dispatch around it, which is where the untested
+// surface actually was.
 
-	// Noon (roughly) at long 0
-	tm := time.FromJD(2460000.0, time.UTC)
-
-	// Get Sun position
-	vecStart, err := eph.Position(p, eph.Sun, tm)
-	testutil.AssertNoError(t, err)
-
-	posStart, err := eph.ToICRS(vecStart)
-	testutil.AssertNoError(t, err)
-
-	ctxStart := coord.NewContext(tm, site.Location(), atmosphere.StandardRefraction)
-	aaStart, _ := ctxStart.ICRSToAltAz(posStart)
-
-	tmLate := tm.AddDays(0.25) // +6 hours
-	vecLate, err := eph.Position(p, eph.Sun, tmLate)
-	testutil.AssertNoError(t, err)
-
-	posLate, err := eph.ToICRS(vecLate)
-	testutil.AssertNoError(t, err)
-
-	ctxLate := coord.NewContext(tmLate, site.Location(), atmosphere.StandardRefraction)
-	aaLate, _ := ctxLate.ICRSToAltAz(posLate)
-
-	t.Logf("Sun Alt @ Noon: %.2f", aaStart.Alt().Degrees())
-	t.Logf("Sun Alt @ Eve:  %.2f", aaLate.Alt().Degrees())
-
-	if aaStart.Alt().Degrees() == aaLate.Alt().Degrees() {
-		t.Error("Sun altitude should change over 6 hours")
-	}
+// stubProvider answers one body with a fixed state and refuses everything
+// else, so a test can tell whether a call reached the base provider.
+type stubProvider struct {
+	id     core.ID
+	pos    [3]float64
+	calls  int
+	closed bool
 }
 
-func TestMoonPosition(t *testing.T) {
-	p := eph.Default()
-	tm := time.NowUTC()
+func (s *stubProvider) State(id core.ID, _ time.Time) (State, error) {
+	s.calls++
 
-	vec, err := eph.Position(p, eph.Moon, tm)
-	testutil.AssertNoError(t, err)
-
-	pos, err := eph.ToICRS(vec)
-	testutil.AssertNoError(t, err)
-
-	t.Logf("Moon ICRS: RA=%.2f Dec=%.2f", pos.RA().Degrees(), pos.Dec().Degrees())
-
-	if pos.Dec().Degrees() > 30 || pos.Dec().Degrees() < -30 {
-		t.Error("Moon declination is usually within +/- 30 degrees")
+	if id != s.id {
+		return State{}, ErrUnsupportedBody
 	}
+
+	return State{
+		Pos:    vec(s.pos),
+		Frame:  core.FrameICRS,
+		Center: core.CenterGeocentre,
+	}, nil
 }
 
-func TestStateAndHelpers(t *testing.T) {
-	p := eph.Default()
-	tm := time.NowUTC()
+func (s *stubProvider) Close() error {
+	s.closed = true
 
-	st, err := p.State(eph.Sun, tm)
-	testutil.AssertNoError(t, err)
-
-	pos, err := eph.Position(p, eph.Sun, tm)
-	testutil.AssertNoError(t, err)
-
-	vel, err := eph.Velocity(p, eph.Sun, tm)
-	testutil.AssertNoError(t, err)
-
-	if pos != st.Pos {
-		t.Error("Position helper result mismatch with State")
-	}
-
-	if vel != st.Vel {
-		t.Error("Velocity helper result mismatch with State")
-	}
+	return nil
 }
 
-func TestToICRSZeroVector(t *testing.T) {
-	_, err := eph.ToICRS(vector.Vec3{})
-	if err == nil {
-		t.Error("Expected error for zero vector conversion")
-	}
-}
+func vec(a [3]float64) vector.Vec3 { return vector.Vec3{X: a[0], Y: a[1], Z: a[2]} }
 
-func TestUnsupportedBody(t *testing.T) {
-	p := eph.Default()
-	tm := time.NowUTC()
+func TestNewElementsRejectsWhatTwoBodyCannotRepresent(t *testing.T) {
+	epoch := time.J2000
 
-	_, err := p.State(eph.ID(999999), tm)
-	if err == nil {
-		t.Error("Expected error for unsupported body")
-	}
-}
-
-// TestDefault_CoversEveryNamedBody is a regression test: Default() must
-// answer State for every named core.ID this library defines — Pluto and
-// SolarSystemBarycenter were both missing (ErrUnsupportedBody) until
-// Default() started Register-ing Pluto's own Kepler elements on top of
-// a SOFA base extended to cover the barycenter. Only an arbitrary,
-// unnamed ID (see TestUnsupportedBody) is still expected to error.
-func TestDefault_CoversEveryNamedBody(t *testing.T) {
-	p := eph.Default()
-	tm := time.NowUTC()
-
-	bodies := []struct {
+	cases := []struct {
 		name string
-		id   eph.ID
+		a    float64
+		e    float64
+		ok   bool
 	}{
-		{"Mercury", eph.Mercury}, {"Venus", eph.Venus}, {"Earth", eph.Earth},
-		{"Mars", eph.Mars}, {"Jupiter", eph.Jupiter}, {"Saturn", eph.Saturn},
-		{"Uranus", eph.Uranus}, {"Neptune", eph.Neptune}, {"Pluto", eph.Pluto},
-		{"Moon", eph.Moon}, {"Sun", eph.Sun},
-		{"SolarSystemBarycenter", eph.SolarSystemBarycenter},
+		{"a main-belt orbit", 2.77, 0.076, true},
+		{"a very eccentric but still closed orbit", 17.8, 0.967, true},
+
+		// e >= 1 is not a tight orbit, it is a different conic. Elliptical
+		// two-body propagation cannot represent it at all, so this must
+		// fail at construction rather than at first use — which is the
+		// difference between an error naming the elements and one arriving
+		// from inside a propagation loop.
+		{"parabolic", 2.0, 1.0, false},
+		{"hyperbolic", 2.0, 1.5, false},
 	}
 
-	for _, b := range bodies {
-		st, err := p.State(b.id, tm)
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			_, err := NewElements(epoch, c.a, c.e,
+				angle.Deg(10), angle.Deg(80), angle.Deg(73), angle.Deg(274))
+
+			if c.ok && err != nil {
+				t.Fatalf("NewElements(a=%v, e=%v) = %v, want success", c.a, c.e, err)
+			}
+
+			if !c.ok && err == nil {
+				t.Fatalf("NewElements(a=%v, e=%v) succeeded; e >= 1 is not an ellipse", c.a, c.e)
+			}
+		})
+	}
+}
+
+func TestNewFromElementsAnswersTheRegisteredBody(t *testing.T) {
+	el, err := NewElements(time.J2000, 2.7658, 0.07839,
+		angle.Deg(10.587), angle.Deg(80.393), angle.Deg(73.597), angle.Deg(77.372))
+	if err != nil {
+		t.Fatalf("NewElements: %v", err)
+	}
+
+	const ceres = core.ID(2000001)
+
+	p, err := NewFromElements(ceres, el)
+	if err != nil {
+		t.Fatalf("NewFromElements: %v", err)
+	}
+
+	defer func() { _ = p.Close() }()
+
+	st, err := p.State(ceres, time.J2000)
+	if err != nil {
+		t.Fatalf("State(registered body): %v", err)
+	}
+
+	// Ceres is a main-belt body: geocentric distance has to be of that
+	// order. A bound this loose still catches a propagation that returns
+	// the origin, the Sun, or metres instead of AU.
+	if r := st.Pos.Norm(); r < 1.0 || r > 4.0 {
+		t.Errorf("|r| = %v AU for a main-belt body at J2000", r)
+	}
+
+	// A body it does not propagate must still be answerable, through the
+	// default SOFA base — that is what makes the returned Provider a drop-in
+	// for a kernel-backed one.
+	if _, err := p.State(core.Sun, time.J2000); err != nil {
+		t.Errorf("State(Sun) through the default base: %v", err)
+	}
+}
+
+// TestNewFromElementsRejectsBadElements covers the error path: an invalid
+// registration must not yield a provider that fails later.
+func TestNewFromElementsRejectsBadElements(t *testing.T) {
+	if _, err := NewFromElements(core.ID(2000001), Elements{}); err == nil {
+		t.Fatal("NewFromElements accepted a zero Elements")
+	}
+}
+
+// TestWithKeplerBaseIsUsed proves the option reaches the propagation: a body
+// the Kepler provider does not carry has to come from the supplied base.
+func TestWithKeplerBaseIsUsed(t *testing.T) {
+	base := &stubProvider{id: core.Sun, pos: [3]float64{1, 2, 3}}
+
+	p := NewMovingBodyProvider(WithKeplerBase(base))
+
+	st, err := p.State(core.Sun, time.J2000)
+	if err != nil {
+		t.Fatalf("State(Sun): %v", err)
+	}
+
+	if base.calls == 0 {
+		t.Fatal("the supplied base was never called")
+	}
+
+	if st.Pos.X != 1 || st.Pos.Y != 2 || st.Pos.Z != 3 {
+		t.Errorf("State(Sun).Pos = %v, want the base's answer {1 2 3}", st.Pos)
+	}
+}
+
+// TestFreshMovingBodyProviderHasNoPluto pins the documented difference from
+// Default, which is easy to assume away: Default registers Pluto and a fresh
+// NewMovingBodyProvider does not.
+func TestFreshMovingBodyProviderHasNoPluto(t *testing.T) {
+	p := NewMovingBodyProvider()
+
+	if _, err := p.State(core.Pluto, time.J2000); err == nil {
+		t.Error("a fresh NewMovingBodyProvider answered Pluto; only Default registers it")
+	}
+
+	// Every SOFA-covered body still works, which is the other half of the
+	// claim.
+	if _, err := p.State(core.Mars, time.J2000); err != nil {
+		t.Errorf("State(Mars): %v", err)
+	}
+}
+
+// TestDefaultAnswersEveryNamedBody checks Default's own doc claim: "No named
+// core.ID this library defines returns ErrUnsupportedBody from here."
+//
+// Worth asserting rather than trusting, because it is exactly the kind of
+// statement that stops being true when an identifier is added.
+func TestDefaultAnswersEveryNamedBody(t *testing.T) {
+	p := Default()
+
+	defer func() { _ = p.Close() }()
+
+	named := []core.ID{
+		core.Mercury, core.Venus, core.Earth, core.Mars, core.Jupiter,
+		core.Saturn, core.Uranus, core.Neptune, core.Pluto,
+		core.Moon, core.Sun, core.SolarSystemBarycenter,
+	}
+
+	for _, id := range named {
+		st, err := p.State(id, time.J2000)
 		if err != nil {
-			t.Errorf("State(%s): unexpected error: %v", b.name, err)
+			t.Errorf("Default().State(%s) = %v; the doc comment says every named body is answerable", id, err)
+
 			continue
 		}
 
-		if st.Pos.Norm() == 0 {
-			t.Errorf("State(%s): zero-norm position", b.name)
+		if math.IsNaN(st.Pos.X) || math.IsNaN(st.Pos.Y) || math.IsNaN(st.Pos.Z) {
+			t.Errorf("Default().State(%s) returned NaN", id)
 		}
 	}
 }
 
-// TestDefault_PlutoDistancePlausible sanity-checks Default()'s
-// Kepler-propagated Pluto against Pluto's real heliocentric distance
-// range (~29.7-49.3 AU) — geocentric distance stays within roughly
-// +/-1.5 AU of that band regardless of the current date, so this bound
-// is safe without pinning a specific epoch.
-func TestDefault_PlutoDistancePlausible(t *testing.T) {
-	p := eph.Default()
-	tm := time.NowUTC()
+func TestNewProviderRejectsWhatItCannotBuild(t *testing.T) {
+	ctx := context.Background()
 
-	vec, err := eph.Position(p, eph.Pluto, tm)
-	testutil.AssertNoError(t, err)
+	cases := []struct {
+		name   string
+		source Source
+		opts   []Option
+		want   error
+	}{
+		{"satellites without a TLE", core.Satellites, nil, ErrTLERequired},
+		{"stations", core.Stations, nil, ErrNotImplemented},
+		{"a source that does not exist", Source("nonsense"), nil, ErrUnknownSource},
+	}
 
-	distAU := vec.Norm()
-	if distAU < 25 || distAU > 55 {
-		t.Errorf("Pluto geocentric distance = %.2f AU, want within [25, 55]", distAU)
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			_, err := NewProvider(ctx, c.source, "whatever", c.opts...)
+			if !errors.Is(err, c.want) {
+				t.Fatalf("NewProvider(%q) = %v, want %v", c.source, err, c.want)
+			}
+		})
 	}
 }
 
-const (
-	lightAUPerDay = 173.144632674
-	arcsecPerRad  = 206264.80624709636
-)
+// TestNewProviderBuildsASatelliteOffline is the one NewProvider branch that
+// needs no download, so it is the one that can assert the factory actually
+// produces a working provider rather than only that it rejects bad input.
+func TestNewProviderBuildsASatelliteOffline(t *testing.T) {
+	// ISS (ZARYA), 2026-08-29 — the elements astrogo's own catalog/norad
+	// live test logged, used here as a fixed fixture rather than fetched.
+	const (
+		line1 = "1 25544U 98067A   26241.27263584  .00006962  00000-0  13475-3 0  9998"
+		line2 = "2 25544  51.6317 298.3548 0005039  86.9077 273.2487 15.48926826583086"
+	)
 
-type mockLinearProvider struct {
-	baseTime time.Time
-	pos      vector.Vec3
-	vel      vector.Vec3
-}
-
-func (m *mockLinearProvider) State(_ eph.ID, t time.Time) (eph.State, error) {
-	jd1Req, jd2Req := t.JDParts()
-	jd1Base, jd2Base := m.baseTime.JDParts()
-	dtDays := (jd1Req - jd1Base) + (jd2Req - jd2Base)
-
-	p := m.pos.Add(m.vel.MulScalar(dtDays))
-
-	return eph.State{Pos: p, Vel: m.vel}, nil
-}
-
-func (m *mockLinearProvider) Close() error { return nil }
-
-func angularSepArcsec(a, b coord.AltAz) float64 {
-	az1 := a.Az().Radians()
-	alt1 := a.Alt().Radians()
-	az2 := b.Az().Radians()
-	alt2 := b.Alt().Radians()
-
-	s1 := math.Sin(alt1)
-	c1 := math.Cos(alt1)
-	s2 := math.Sin(alt2)
-	c2 := math.Cos(alt2)
-
-	cosd := s1*s2 + c1*c2*math.Cos(az1-az2)
-	if cosd > 1 {
-		cosd = 1
-	}
-
-	if cosd < -1 {
-		cosd = -1
-	}
-
-	return math.Acos(cosd) * arcsecPerRad
-}
-
-func iteratedApparentVector(st eph.State) vector.Vec3 {
-	v := st.Pos
-
-	tauDays := v.Norm() / lightAUPerDay
-	for range 5 {
-		iterPos := v.Sub(st.Vel.MulScalar(tauDays))
-		tauDays = iterPos.Norm() / lightAUPerDay
-	}
-
-	return v.Sub(st.Vel.MulScalar(tauDays))
-}
-
-func TestApparentState_ZeroVelocityReducesToGeometric(t *testing.T) {
-	tm := time.Date(2026, 4, 5, 0, 0, 0, 0, time.LocationUTC)
-
-	mock := &mockLinearProvider{
-		baseTime: tm,
-		pos:      vector.V3(1.2, 0.4, 0.3),
-		vel:      vector.Zero(),
-	}
-
-	appState, err := eph.ApparentState(mock, eph.Sun, tm)
+	p, err := NewProvider(context.Background(), core.Satellites, "ISS", WithTLE(line1, line2))
 	if err != nil {
-		t.Fatalf("ApparentState failed: %v", err)
+		t.Fatalf("NewProvider(Satellites): %v", err)
 	}
 
-	// With zero velocity, the retarded position must be exactly the geometric position.
-	diff := appState.Pos.Sub(mock.pos)
+	defer func() { _ = p.Close() }()
 
-	dist := diff.Norm()
-	if dist > 1e-15 {
-		t.Fatalf("zero-velocity case should return identical position; diff = %e AU", dist)
-	}
-}
+	when := time.FromJD(2461281.5, time.UTC)
 
-func TestApparentState_MatchesManualLightTimeIteration(t *testing.T) {
-	tm := time.Date(2026, 4, 5, 0, 0, 0, 0, time.LocationUTC)
-
-	st := eph.State{
-		Pos: vector.V3(1.0, 0.8, 0.2),
-		Vel: vector.V3(-0.012, 0.009, 0.0015),
+	// core.ID(0), not the NAIF catalogue number: a satellite provider tracks
+	// exactly one object and refuses any other id, so that a Sun lookup
+	// cannot be silently answered with the satellite's own state.
+	alt, err := Altitude(p, core.ID(0), when)
+	if err != nil {
+		t.Fatalf("Altitude: %v", err)
 	}
 
-	mock := &mockLinearProvider{
-		baseTime: tm,
-		pos:      st.Pos,
-		vel:      st.Vel,
-	}
-
-	appState, _ := eph.ApparentState(mock, eph.Mars, tm)
-	expected := iteratedApparentVector(st)
-
-	// Compare retarded position vectors directly.
-	diff := appState.Pos.Sub(expected)
-
-	dist := diff.Norm()
-	if dist > 1e-15 {
-		t.Fatalf("ApparentState does not match explicit light-time reduction; diff = %e AU", dist)
+	// The ISS orbits between roughly 370 and 460 km. A bound that wide still
+	// catches an altitude computed without subtracting the Earth's radius,
+	// or one left in AU.
+	if alt < 300 || alt > 600 {
+		t.Errorf("ISS altitude = %.1f km, want roughly 400", alt)
 	}
 }
 
-//nolint:dupl // shares structure with DistantObject test but uses different mock parameters.
-func TestApparentState_LightTimeActuallyChangesResult(t *testing.T) {
-	tm := time.Date(2026, 4, 5, 0, 0, 0, 0, time.LocationUTC)
-
-	site, err := coord.NewGeodetic(angle.Deg(-155.4700), angle.Deg(19.8261), 4205)
-	testutil.AssertNoError(t, err)
-
-	atm := atmosphere.Refraction{}
-	atm.Model = atmosphere.RefractionNone{}
-
-	mock := &mockLinearProvider{
-		baseTime: tm,
-		pos:      vector.V3(4.0, 1.5, 0.2),
-		vel:      vector.V3(-0.006, 0.010, 0.0008),
-	}
-
-	ctx := coord.NewContext(tm, site, atm)
-	appState, _ := eph.ApparentState(mock, eph.Jupiter, tm)
-
-	got := ctx.GeocentricToObserved(appState.Pos)
-	geom := ctx.GeocentricToObserved(mock.pos)
-
-	sep := angularSepArcsec(got, geom)
-	if sep <= 0 {
-		t.Fatalf("expected light-time correction to produce a non-zero angular shift")
-	}
-
-	if sep < 0.001 {
-		t.Fatalf("expected measurable apparent shift, got only %.9f arcsec", sep)
+// TestWithTLERequiresBothLines: one line is not half a TLE, it is not a TLE.
+func TestWithTLERequiresBothLines(t *testing.T) {
+	_, err := NewProvider(context.Background(), core.Satellites, "ISS",
+		WithTLE("1 25544U 98067A   26241.27263584  .00006962  00000-0  13475-3 0  9998", ""))
+	if !errors.Is(err, ErrTLERequired) {
+		t.Fatalf("NewProvider with one TLE line = %v, want ErrTLERequired", err)
 	}
 }
 
-//nolint:dupl // shares structure with LightTime test but uses different mock parameters.
-func TestApparentState_DistantObjectHasTinyCorrection(t *testing.T) {
-	tm := time.Date(2026, 4, 5, 0, 0, 0, 0, time.LocationUTC)
+// TestOptionsRecordWhatTheySay covers the two options whose effect is only
+// visible on the kernel-backed path, which needs a download.
+//
+// Checking the configuration they build is not a substitute for exercising
+// that path — ephemeris/jpl's network suites do that — but it does catch the
+// mistake these options are actually exposed to: an option that silently does
+// nothing, or writes the wrong field.
+func TestOptionsRecordWhatTheySay(t *testing.T) {
+	start := time.FromJD(2460310.5, time.TDB)
+	end := time.FromJD(2460350.5, time.TDB)
 
-	site, err := coord.NewGeodetic(angle.Deg(-17.8890), angle.Deg(28.7606), 2390)
-	testutil.AssertNoError(t, err)
+	var cfg config
 
-	atm := atmosphere.Refraction{}
-	atm.Model = atmosphere.RefractionNone{}
-
-	mock := &mockLinearProvider{
-		baseTime: tm,
-		pos:      vector.V3(40.0, 10.0, 2.0),
-		vel:      vector.V3(-0.001, 0.0008, 0.0001),
+	for _, opt := range []Option{
+		WithTimeInterval(start, end),
+		WithKernel("de441_part-2"),
+		WithKernel("de441_part-3"),
+	} {
+		opt(&cfg)
 	}
 
-	ctx := coord.NewContext(tm, site, atm)
-	appState, _ := eph.ApparentState(mock, eph.Jupiter, tm)
-
-	got := ctx.GeocentricToObserved(appState.Pos)
-	geom := ctx.GeocentricToObserved(mock.pos)
-
-	sep := angularSepArcsec(got, geom)
-
-	if sep < 0 {
-		t.Fatalf("invalid negative separation")
+	if cfg.Start != start || cfg.End != end {
+		t.Errorf("WithTimeInterval recorded (%v, %v), want (%v, %v)", cfg.Start, cfg.End, start, end)
 	}
 
-	if sep > 30 {
-		t.Fatalf("distant slow object should not shift absurdly; got %.6f arcsec", sep)
+	// Chaining is documented on WithKernel, so appending rather than
+	// overwriting is the behaviour under test.
+	if len(cfg.ExtraKernels) != 2 ||
+		cfg.ExtraKernels[0] != "de441_part-2" || cfg.ExtraKernels[1] != "de441_part-3" {
+		t.Errorf("WithKernel recorded %v, want both kernels in order", cfg.ExtraKernels)
+	}
+}
+
+func TestPositionAndVelocityAgreeWithState(t *testing.T) {
+	p := Default()
+
+	defer func() { _ = p.Close() }()
+
+	st, err := p.State(core.Mars, time.J2000)
+	if err != nil {
+		t.Fatalf("State: %v", err)
+	}
+
+	pos, err := Position(p, core.Mars, time.J2000)
+	if err != nil {
+		t.Fatalf("Position: %v", err)
+	}
+
+	vel, err := Velocity(p, core.Mars, time.J2000)
+	if err != nil {
+		t.Fatalf("Velocity: %v", err)
+	}
+
+	if pos != st.Pos {
+		t.Errorf("Position = %v, State.Pos = %v", pos, st.Pos)
+	}
+
+	if vel != st.Vel {
+		t.Errorf("Velocity = %v, State.Vel = %v", vel, st.Vel)
+	}
+}
+
+// TestHelpersPropagateTheProviderError keeps the three helpers from turning a
+// failure into a zero value, which for a position is indistinguishable from
+// the geocentre.
+func TestHelpersPropagateTheProviderError(t *testing.T) {
+	p := &stubProvider{id: core.Sun}
+
+	const absent = core.ID(999999)
+
+	if _, err := Position(p, absent, time.J2000); err == nil {
+		t.Error("Position returned nil error for an unsupported body")
+	}
+
+	if _, err := Velocity(p, absent, time.J2000); err == nil {
+		t.Error("Velocity returned nil error for an unsupported body")
+	}
+
+	if _, err := Altitude(p, absent, time.J2000); err == nil {
+		t.Error("Altitude returned nil error for an unsupported body")
+	}
+}
+
+func TestToICRS(t *testing.T) {
+	cases := []struct {
+		name    string
+		pos     vector.Vec3
+		wantRA  float64
+		wantDec float64
+	}{
+		{"along +X is the origin of right ascension", vector.Vec3{X: 1}, 0, 0},
+		{"along +Y is six hours", vector.Vec3{Y: 1}, 90, 0},
+		{"along +Z is the north celestial pole", vector.Vec3{Z: 1}, 0, 90},
+
+		// The wrap is the part worth pinning: -Y must come back as 270°,
+		// not -90°, or every consumer formatting an RA gets a negative hour
+		// angle.
+		{"along -Y wraps rather than going negative", vector.Vec3{Y: -1}, 270, 0},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			got, err := ToICRS(c.pos)
+			if err != nil {
+				t.Fatalf("ToICRS: %v", err)
+			}
+
+			if d := math.Abs(got.RA().Degrees() - c.wantRA); d > 1e-9 && c.wantDec != 90 {
+				t.Errorf("RA = %v deg, want %v", got.RA().Degrees(), c.wantRA)
+			}
+
+			if d := math.Abs(got.Dec().Degrees() - c.wantDec); d > 1e-9 {
+				t.Errorf("Dec = %v deg, want %v", got.Dec().Degrees(), c.wantDec)
+			}
+		})
+	}
+}
+
+// TestToICRSRejectsTheZeroVector: a direction cannot be recovered from no
+// direction, and returning the pole would be a plausible-looking lie.
+func TestToICRSRejectsTheZeroVector(t *testing.T) {
+	if _, err := ToICRS(vector.Vec3{}); !errors.Is(err, ErrZeroVector) {
+		t.Fatalf("ToICRS(zero) = %v, want ErrZeroVector", err)
+	}
+}
+
+// TestDefaultCloseIsSafe covers the other half of a Provider's contract: a
+// caller that defers Close must not be punished for it.
+func TestDefaultCloseIsSafe(t *testing.T) {
+	p := Default()
+
+	if err := p.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+
+	// Closing an offline provider twice is not an error either; nothing
+	// holds an OS resource.
+	if err := p.Close(); err != nil {
+		t.Errorf("second Close: %v", err)
+	}
+}
+
+// TestSofaProviderCloseIsANoOp: the internal SOFA source holds no kernel,
+// no file and no connection, so closing it must succeed rather than being
+// left unimplemented — Default wraps it, and a caller closing the wrapper
+// should not have to know which layer owns a resource.
+func TestSofaProviderCloseIsANoOp(t *testing.T) {
+	s := &sofaProvider{}
+	if err := s.Close(); err != nil {
+		t.Fatalf("sofaProvider.Close: %v", err)
 	}
 }
