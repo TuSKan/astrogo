@@ -1,4 +1,4 @@
-# changelog.d
+# docs/changelog.d
 
 One file per changelog entry, assembled into `CHANGELOG.md` at release time.
 
@@ -17,7 +17,7 @@ file per entry cannot collide, and cannot lose its own section.
 
 ## Adding an entry
 
-Create `changelog.d/<PR-number>-<short-slug>.md`:
+Create `docs/changelog.d/<PR-number>-<short-slug>.md`:
 
 ```markdown
 ---
@@ -55,3 +55,5 @@ nothing rewrites a checked-in file as a side effect of running the tests.
 Without `-update`, `go test ./internal/changelog/` checks that every file here
 parses and names a valid type. A malformed entry fails ordinary CI rather than
 surfacing at release time.
+
+See [PULL_REQUESTS.md](../PULL_REQUESTS.md) for the rest of the workflow this fits into.

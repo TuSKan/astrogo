@@ -12,17 +12,17 @@ import (
 
 //nolint:gochecknoglobals // test flags must be package-level to register
 var (
-	update  = flag.Bool("update", false, "assemble changelog.d into CHANGELOG.md and delete the consumed fragments")
+	update  = flag.Bool("update", false, "assemble docs/changelog.d into CHANGELOG.md and delete the consumed fragments")
 	version = flag.String("release-version", "", "version to assemble under, e.g. 0.17.0")
 )
 
 const (
 	changelogPath = "../../CHANGELOG.md"
-	fragmentDir   = "../../changelog.d"
+	fragmentDir   = "../../docs/changelog.d"
 	unreleased    = "## [Unreleased]"
 )
 
-// TestAssembleRelease folds changelog.d into CHANGELOG.md.
+// TestAssembleRelease folds docs/changelog.d into CHANGELOG.md.
 //
 // Gated behind -update like the Horizons corpus generator and the accuracy
 // table, so running the test suite never rewrites a checked-in file as a
@@ -49,7 +49,7 @@ func TestAssembleRelease(t *testing.T) {
 	}
 
 	if len(entries) == 0 {
-		t.Fatal("no fragments in changelog.d: nothing to release")
+		t.Fatal("no fragments in docs/changelog.d: nothing to release")
 	}
 
 	raw, err := os.ReadFile(changelogPath)
@@ -74,7 +74,7 @@ func TestAssembleRelease(t *testing.T) {
 		}
 	}
 
-	t.Logf("assembled %d entries into %s and cleared changelog.d", len(entries), *version)
+	t.Logf("assembled %d entries into %s and cleared docs/changelog.d", len(entries), *version)
 }
 
 func firstLine(s string) string {
@@ -202,7 +202,7 @@ func ExampleRender() {
 
 // TestAssembleMergesHandWrittenUnreleasedEntries is the case the end-to-end
 // trial caught: the file had entries written directly under [Unreleased]
-// before changelog.d existed, and appending the fragments below them
+// before docs/changelog.d existed, and appending the fragments below them
 // produced two "### Fixed" headings in one release — precisely the silent
 // mis-filing this package exists to prevent.
 func TestAssembleMergesHandWrittenUnreleasedEntries(t *testing.T) {

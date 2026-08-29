@@ -1,5 +1,5 @@
 // Package changelog assembles CHANGELOG.md from the one-file-per-entry
-// fragments in changelog.d.
+// fragments in docs/changelog.d.
 //
 // CHANGELOG.md was the only file five of eight pull requests conflicted on
 // in a single batch of parallel work — never the code, always the changelog,
