@@ -739,7 +739,22 @@ func (k TwilightKind) String() string {
 	}
 }
 
+// TwilightThreshold returns the solar altitude threshold in degrees for a
+// twilight kind, and whether the kind is one this package defines.
+//
+// See [KnownSiteNames] for why this goes through a function rather than an
+// exported map: a caller that assigns to TwilightThresholds redefines what
+// "astronomical twilight" means for every other caller in the binary.
+func TwilightThreshold(kind TwilightKind) (float64, bool) {
+	v, ok := TwilightThresholds[kind]
+
+	return v, ok
+}
+
 // TwilightThresholds maps each twilight kind to its solar altitude threshold (in degrees).
+//
+// Deprecated: use [TwilightThreshold]. An exported map is process-wide
+// mutable state; see [KnownSiteNames].
 var TwilightThresholds = map[TwilightKind]float64{
 	CivilTwilight:        -6.0,
 	NauticalTwilight:     -12.0,
@@ -869,7 +884,7 @@ func MoonriseMoonset(start, end time.Time, site *Site, prov eph.Provider) (rise,
 // silently discarding it; the same happens symmetrically for two dawns in
 // a row.
 func TwilightEvents(start, end time.Time, site *Site, prov eph.Provider, kind TwilightKind) ([]TwilightEvent, error) {
-	threshold, ok := TwilightThresholds[kind]
+	threshold, ok := TwilightThreshold(kind)
 	if !ok {
 		return nil, nil
 	}
@@ -949,7 +964,7 @@ func AstronomicalDawnDusk(start, end time.Time, site *Site, prov eph.Provider) (
 }
 
 func getTwilightPair(start, end time.Time, site *Site, prov eph.Provider, kind TwilightKind) (dawn, dusk *Event, err error) {
-	threshold := TwilightThresholds[kind]
+	threshold, _ := TwilightThreshold(kind)
 	sun := NewSun(prov)
 	solver := NewEventSolver(15*time.Minute, 1*time.Second)
 	spec := EventSpec{
