@@ -7,14 +7,6 @@ import (
 	"github.com/TuSKan/astrogo/internal/metrology"
 )
 
-// ambientOutDir is the output directory the operator asked for, captured
-// before TestMain takes it away.
-//
-// Package-level initialisation runs before TestMain, so this sees the real
-// value; TestRenderAccuracyReport reads it rather than the environment, which
-// by then is deliberately empty.
-var ambientOutDir = os.Getenv(metrology.OutDirEnv)
-
 // TestMain isolates this package's own tests from that directory.
 //
 // The suites here are fixtures — "test.suite", "x", "ephemeris.example" —
