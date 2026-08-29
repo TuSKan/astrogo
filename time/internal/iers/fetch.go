@@ -4,13 +4,9 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"io"
 	"log"
 	"sync"
 	"time"
-
-	"github.com/TuSKan/astrogo/remote"
-	"github.com/TuSKan/astrogo/remote/file"
 )
 
 //nolint:gochecknoglobals // fetch rate-limiter state — guarded by sync.Mutex
@@ -35,22 +31,19 @@ var (
 //
 // Order of attempts otherwise:
 //  1. Fast path (no lock): the current model already covers mjd.
-//  2. Under fetchMu (re-checked immediately after acquiring it): read and
-//     parse whatever finals2000A file already exists in the cache, with no
-//     network access and no consent check — the same thing this package's
-//     former LoadFS did, just from the standard cache location. This step
-//     is necessary because remote.GetFile's own cache-hit path requires a
-//     recorded Signature/ETag a hand-pre-seeded file never has; the parsed
-//     table is registered even if it doesn't cover mjd — still the best
-//     available data — and the attempt falls through to step 3 if it
-//     doesn't help.
-//  3. If still uncovered and the retry cooldown has elapsed: the existing
-//     consent-gated fetch (remote.GetFile). NOTE: IERSFinals2000A is a
-//     plain-HTTP KindFile endpoint, and remote/file has no HTTP backend
-//     registered yet (see remote/file's own doc comment) — this step
-//     currently always fails with a clear "no driver for scheme https"
-//     error until that lands. Step 2 (reading a pre-seeded cache file)
-//     still works fully offline in the meantime.
+//  2. Under fetchMu (re-checked immediately after acquiring it):
+//     [Loader.Cached] — whatever EOP data is already on disk, with no
+//     network access and no consent check. The parsed table is registered
+//     even if it does not cover mjd, since it is still the best available
+//     data, and the attempt falls through to step 3 if it does not help.
+//  3. If still uncovered and the retry cooldown has elapsed:
+//     [Loader.Fetch], which is consent-gated.
+//
+// Both steps go through the registered [Loader] rather than reaching for
+// a cache directory or an HTTP client directly. That is what lets this
+// package, and astrogo/time above it, link neither — see [Loader]. With
+// no loader registered the result is [ErrNoLoader], and the caller
+// degrades to zero EOP exactly as it does when consent is absent.
 //
 // Safe for concurrent use: a mutex serialises attempts, and the coverage
 // check is repeated inside the lock so a successful concurrent load is
@@ -74,19 +67,20 @@ func EnsureLoaded(mjd float64) error {
 		return nil
 	}
 
+	l := GetLoader()
+	if l == nil {
+		return ErrNoLoader
+	}
+
 	ctx := context.Background()
 
-	if bucket, key, err := CacheFile(ctx); err == nil {
-		if attrs, aerr := bucket.Attributes(ctx, key); aerr == nil {
-			if lastAttempt.IsZero() {
-				lastAttempt = attrs.ModTime
-			}
+	if data, err := l.Cached(ctx); err == nil {
+		if lastAttempt.IsZero() {
+			lastAttempt = data.ModTime
+		}
 
-			if data, rerr := bucket.ReadAll(ctx, key); rerr == nil {
-				if _, perr := parseAndRegister(data, SourceCache); perr == nil && covered(mjd) {
-					return nil
-				}
-			}
+		if _, perr := parseAndRegister(data.Raw, SourceCache); perr == nil && covered(mjd) {
+			return nil
 		}
 	}
 
@@ -96,7 +90,7 @@ func EnsureLoaded(mjd float64) error {
 	}
 
 	lastAttempt = time.Now()
-	errLastFetch = fetch(ctx)
+	errLastFetch = fetch(ctx, l)
 
 	return errLastFetch
 }
@@ -122,17 +116,6 @@ func covered(mjd float64) bool {
 	return false
 }
 
-// CacheFile returns the Bucket and key where downloaded EOP data is
-// cached, under remote's cache directory for IERSFinals2000A.
-func CacheFile(ctx context.Context) (bucket *file.Bucket, key string, err error) {
-	bucket, prefix, err := remote.CacheDir(ctx, remote.IERSFinals2000A)
-	if err != nil {
-		return nil, "", fmt.Errorf("iers: %w", err)
-	}
-
-	return bucket, prefix + "finals2000A.data", nil
-}
-
 // parseAndRegister parses raw finals2000A bytes and, on success, registers
 // the resulting Table as the global model — the shared core of both a
 // network fetch and a raw on-disk cache read. Uses registerModelInternal,
@@ -153,30 +136,13 @@ func parseAndRegister(data []byte, source string) (*Table, error) {
 
 // fetch is the shared core EnsureLoaded serializes on via fetchMu; it
 // holds no lock itself.
-func fetch(ctx context.Context) error {
-	// remote.GetFile reuses the cache untouched when the source's current
-	// ETag shows the IERS bulletin hasn't changed since we last
-	// downloaded it — a content check rather than a wall-clock expiration
-	// window, since finals2000A is updated on IERS's own schedule, not
-	// ours. WithValidate parses a fresh download before it's cached, so a
-	// corrupt response never gets trusted as the new cache.
-	bucket, key, err := remote.GetFile(ctx, remote.IERSFinals2000A, "finals2000A.all",
-		remote.WithCacheName("finals2000A.data"),
-		remote.WithValidate(func(r io.Reader) error {
-			_, err := ParseFinals2000A(r)
-
-			return err
-		}))
+func fetch(ctx context.Context, l Loader) error {
+	data, err := l.Fetch(ctx)
 	if err != nil {
 		return fmt.Errorf("iers: fetch EOP data: %w", err)
 	}
 
-	data, err := bucket.ReadAll(ctx, key)
-	if err != nil {
-		return fmt.Errorf("iers: read EOP data: %w", err)
-	}
-
-	table, err := parseAndRegister(data, SourceNetwork)
+	table, err := parseAndRegister(data.Raw, SourceNetwork)
 	if err != nil {
 		return fmt.Errorf("iers: parse EOP data: %w", err)
 	}

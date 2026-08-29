@@ -32,6 +32,47 @@ var (
 	ErrNoRecords  = iers.ErrNoRecords
 )
 
+// EOPData is raw finals2000A content together with when that copy was
+// written. See [EOPLoader].
+type EOPData = iers.Data
+
+// EOPLoader supplies raw EOP data to the lazy load that a
+// [Time.EOP]/[Time.UTC]/[Time.UT1] query triggers.
+//
+// It exists so this package needs no knowledge of caches, HTTP, download
+// consent or blob storage, and links none of it: importing astrogo/time
+// to compute a Julian date used to cost about 17 MB of binary in
+// cloud-storage and gRPC machinery that the arithmetic never touches.
+// Importing astrogo/remote registers a loader automatically, which is
+// what any program granting download consent already does, so nothing
+// changes for a caller that wants downloads.
+//
+// [FileEOPLoader] serves the pre-seeded, no-dependencies case.
+type EOPLoader = iers.Loader
+
+// FileEOPLoader is an [EOPLoader] that reads one finals2000A file from a
+// fixed path using nothing but the standard library — for a deployment
+// that pre-seeds EOP data and wants no cloud-storage dependency. It
+// downloads nothing.
+type FileEOPLoader = iers.FileLoader
+
+// Sentinel errors for the EOP loader path.
+var (
+	// ErrNoEOPLoader is returned when EOP data is needed and no
+	// [EOPLoader] has been registered. The query degrades to zero EOP,
+	// exactly as it does when download consent is absent.
+	ErrNoEOPLoader = iers.ErrNoLoader
+
+	// ErrNoEOPData is what an [EOPLoader] returns when it found nothing:
+	// no pre-seeded file, or a download consent forbade. It is an
+	// ordinary state, not a failure worth propagating.
+	ErrNoEOPData = iers.ErrNoEOPData
+)
+
+// RegisterEOPLoader sets the process-wide [EOPLoader]. Passing nil
+// unregisters. Importing astrogo/remote calls this for you.
+func RegisterEOPLoader(l EOPLoader) { iers.RegisterLoader(l) }
+
 // ParseFinals2000A parses a finals2000A-format IERS bulletin into a Table.
 //
 //nolint:wrapcheck // pure delegation to the unexported time/internal/iers, not a true external dependency

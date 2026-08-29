@@ -29,6 +29,12 @@
 //  3. Otherwise, the query degrades to the zero-EOP fallback described
 //     below — EnsureLoaded never blocks indefinitely or errors loudly.
 //
+// Steps 1 and 2 are performed by a registered [Loader], not by this
+// package reaching for a cache directory or an HTTP client itself.
+// Importing astrogo/remote registers one, which any program calling
+// EnableDownloads necessarily does; a program that imports neither
+// degrades to zero EOP and links no storage backend at all.
+//
 // [RegisterModel] is authoritative: once called, none of the above runs —
 // the lazy loader will never replace what a caller explicitly registered,
 // including RegisterModel(ZeroModel{}) for deliberate, deterministic zero
