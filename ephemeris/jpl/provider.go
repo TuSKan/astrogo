@@ -24,6 +24,23 @@ var (
 	ErrRecursionDepth        = errors.New("jpl: recursion depth exceeded")
 	ErrNilKernel             = errors.New("jpl: kernel is nil")
 	ErrKernelIndexOutOfRange = errors.New("jpl: kernel index out of range")
+
+	// ErrNoSmallBodyKernel indicates Horizons matched no small body for the
+	// requested designation, so the provider would carry only its planetary
+	// base kernel.
+	//
+	// It used to succeed. spk.CacheAPI returns an empty slice rather than an
+	// error when nothing matches, the loop over it did nothing, and the
+	// caller got a provider back with a nil error — for "Ceres", for
+	// "101955", and for "totally-not-a-body-xyz" alike. SupportedBodies then
+	// listed the eleven planetary bodies from the base kernel, which is
+	// exactly what a working provider looks like from the outside.
+	//
+	// Horizons wants its own designation syntax for small bodies: "433" and
+	// "433;" resolve to Eros while the name does not, and "DES=433;"
+	// resolves to a different object entirely. Getting that wrong is easy;
+	// getting it wrong silently is what this refuses.
+	ErrNoSmallBodyKernel = errors.New("jpl: no small-body kernel for designation")
 )
 
 // KMPerAU is the number of kilometers per astronomical unit.
@@ -153,11 +170,29 @@ func NewProvider(ctx context.Context, source core.Source, kernel string, opts ..
 			return nil, fmt.Errorf("jpl: failed to get SPK files: %w", err)
 		}
 
+		// What the caller asked for is a body, so that is what is checked
+		// for — not whether a file arrived.
+		//
+		// Counting readers is not enough: Horizons answers some designations
+		// with a kernel carrying no small-body segment at all ("1;" and "4;"
+		// both do), so a non-empty slice can still leave the provider with
+		// nothing but its planetary base. Comparing the body set before and
+		// after states the actual requirement.
+		before := len(p.SupportedBodies())
+
 		for _, reader := range spkReaders {
 			err := p.AddKernel(reader)
 			if err != nil {
 				return nil, fmt.Errorf("jpl: failed to load small-body kernel: %w", err)
 			}
+		}
+
+		if len(p.SupportedBodies()) == before {
+			return nil, fmt.Errorf("%w: %q added no body to the %d already in the planetary "+
+				"base kernel; Horizons matches small bodies by number (\"433\") or by its own "+
+				"designation syntax (\"433;\"), not by name, and some numbers it accepts return "+
+				"a kernel with no small-body segment",
+				ErrNoSmallBodyKernel, p.kernel, before)
 		}
 	case core.Moons:
 		// Unlike Asteroids/Comets/SmallBody, a planetary satellite kernel
