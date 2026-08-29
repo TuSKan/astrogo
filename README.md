@@ -899,6 +899,14 @@ No package in astrogo embeds data at build time. IERS EOP data is obtained exclu
 at runtime, automatically and lazily the first time it's needed: a pre-seeded
 finals2000A file on disk, then (consent-gated via `remote.EnableDownloads`) a network
 fetch — there is no `iers/data/` directory or `go:embed` to populate before building.
+
+That fetch is supplied by `remote`, not reached for by `time`: importing
+`astrogo/remote` registers the loader, which any program calling
+`remote.EnableDownloads` already does. A program that imports `astrogo/time`
+without `astrogo/remote` links no storage backend at all — measured, a binary
+computing a Julian date is **2.5 MB rather than 19.4 MB** — and degrades to
+zero EOP exactly as an unconsented one does. To read a pre-seeded file without
+that dependency, register `time.FileEOPLoader("/path/to/finals2000A.data")`.
 OpenNGC works the same way — like every other catalog provider, it fetches over the
 network via
 `remote.EnableDownloads(remote.OpenNGC, ...)` (see "Enabling a download" above).

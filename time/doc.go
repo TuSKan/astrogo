@@ -67,4 +67,11 @@
 // UT1 — so a caller who needs to know which of the three it got asks
 // [EOPSource]. [Time.UT1] is the exception and reports the failure instead of
 // degrading.
+//
+// Where those bytes come from is supplied by a registered [EOPLoader], not
+// reached for by this package. Importing astrogo/remote registers one — as
+// any program granting download consent necessarily does — so nothing
+// changes for a caller that wants EOP data. A program that imports neither
+// degrades to zero EOP and links no storage backend at all, which is the
+// difference between a 2.5 MB binary and a 19.4 MB one.
 package time
