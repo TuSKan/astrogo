@@ -1,0 +1,3341 @@
+{
+  "schema_version": 1,
+  "generated": "2026-08-29T02:03:33Z",
+  "astrogo_commit": "a0ed0117382aa210949e0a0ec157c0e1a17cda1a",
+  "generator": {
+    "astropy": "8.0.1",
+    "pyerfa": "2.0.1.5",
+    "numpy": "2.5.2",
+    "python": "3.14.0"
+  },
+  "barycentric_note": "barycentric_km_s is Astropy's full value, which is relativistic: it combines the observer velocity with the line of sight and adds gravitational redshift, about 4.65 m/s above a classical projection. barycentric_classical_km_s is the plain projection of the same observer velocity onto the same line of sight, which is the model astrogo implements and documents. Compare against the classical one; the gap between them is a stated model difference, not an error in either.",
+  "convention": "the velocity to ADD to a measured topocentric radial velocity to refer it to the named frame, in km/s; matches astrogo's rv_barycentric = rv_measured + correction",
+  "shared_ancestry": "Astropy computes the observer's barycentric velocity through pyerfa, and astrogo through gofa; both are SOFA-derived, and both reach it by the same epv00 algorithm. This table therefore validates the projection, the site geodesy, the time scales and the sign convention, and cannot validate the underlying Earth ephemeris \u2014 which astrogo checks separately against DE440.",
+  "cases": [
+    {
+      "name": "ecliptic plane, RA 0 @ Greenwich, 2026-01-04",
+      "site": {
+        "name": "Greenwich",
+        "lon_deg": 0.0,
+        "lat_deg": 51.4772,
+        "height_m": 45.0
+      },
+      "epoch_utc": "2026-01-04T00:00:00",
+      "epoch_note": "near perihelion, Earth fastest",
+      "target": {
+        "name": "ecliptic plane, RA 0",
+        "ra_deg": 0.0,
+        "dec_deg": 0.0
+      },
+      "barycentric_km_s": -29.730629606683287,
+      "barycentric_classical_km_s": -29.735404616848445,
+      "heliocentric_km_s": -29.747816788186483
+    },
+    {
+      "name": "ecliptic plane, RA 180 @ Greenwich, 2026-01-04",
+      "site": {
+        "name": "Greenwich",
+        "lon_deg": 0.0,
+        "lat_deg": 51.4772,
+        "height_m": 45.0
+      },
+      "epoch_utc": "2026-01-04T00:00:00",
+      "epoch_note": "near perihelion, Earth fastest",
+      "target": {
+        "name": "ecliptic plane, RA 180",
+        "ra_deg": 180.0,
+        "dec_deg": 0.0
+      },
+      "barycentric_km_s": 29.74018057431371,
+      "barycentric_classical_km_s": 29.735404616848445,
+      "heliocentric_km_s": 29.747816788186483
+    },
+    {
+      "name": "just below the RA wrap @ Greenwich, 2026-01-04",
+      "site": {
+        "name": "Greenwich",
+        "lon_deg": 0.0,
+        "lat_deg": 51.4772,
+        "height_m": 45.0
+      },
+      "epoch_utc": "2026-01-04T00:00:00",
+      "epoch_note": "near perihelion, Earth fastest",
+      "target": {
+        "name": "just below the RA wrap",
+        "ra_deg": 359.99,
+        "dec_deg": 0.0
+      },
+      "barycentric_km_s": -29.729505630006845,
+      "barycentric_classical_km_s": -29.734280640179243,
+      "heliocentric_km_s": -29.746692738031353
+    },
+    {
+      "name": "north ecliptic pole @ Greenwich, 2026-01-04",
+      "site": {
+        "name": "Greenwich",
+        "lon_deg": 0.0,
+        "lat_deg": 51.4772,
+        "height_m": 45.0
+      },
+      "epoch_utc": "2026-01-04T00:00:00",
+      "epoch_note": "near perihelion, Earth fastest",
+      "target": {
+        "name": "north ecliptic pole",
+        "ra_deg": 270.0,
+        "dec_deg": 66.5607
+      },
+      "barycentric_km_s": 0.033035241892651626,
+      "barycentric_classical_km_s": 0.0282597576692285,
+      "heliocentric_km_s": 0.028495255235742492
+    },
+    {
+      "name": "north celestial pole @ Greenwich, 2026-01-04",
+      "site": {
+        "name": "Greenwich",
+        "lon_deg": 0.0,
+        "lat_deg": 51.4772,
+        "height_m": 45.0
+      },
+      "epoch_utc": "2026-01-04T00:00:00",
+      "epoch_note": "near perihelion, Earth fastest",
+      "target": {
+        "name": "north celestial pole",
+        "ra_deg": 0.0,
+        "dec_deg": 89.9
+      },
+      "barycentric_km_s": -2.807236675806053,
+      "barycentric_classical_km_s": -2.8120121147974673,
+      "heliocentric_km_s": -2.8119591752045316
+    },
+    {
+      "name": "Sirius @ Greenwich, 2026-01-04",
+      "site": {
+        "name": "Greenwich",
+        "lon_deg": 0.0,
+        "lat_deg": 51.4772,
+        "height_m": 45.0
+      },
+      "epoch_utc": "2026-01-04T00:00:00",
+      "epoch_note": "near perihelion, Earth fastest",
+      "target": {
+        "name": "Sirius",
+        "ra_deg": 101.287155,
+        "dec_deg": -16.716116
+      },
+      "barycentric_km_s": 0.32668396929543125,
+      "barycentric_classical_km_s": 0.32190848035019765,
+      "heliocentric_km_s": 0.32381931464796804
+    },
+    {
+      "name": "Vega @ Greenwich, 2026-01-04",
+      "site": {
+        "name": "Greenwich",
+        "lon_deg": 0.0,
+        "lat_deg": 51.4772,
+        "height_m": 45.0
+      },
+      "epoch_utc": "2026-01-04T00:00:00",
+      "epoch_note": "near perihelion, Earth fastest",
+      "target": {
+        "name": "Vega",
+        "ra_deg": 279.234735,
+        "dec_deg": 38.783689
+      },
+      "barycentric_km_s": -0.49095050471391966,
+      "barycentric_classical_km_s": -0.49572598065887236,
+      "heliocentric_km_s": -0.4969088465518207
+    },
+    {
+      "name": "ecliptic plane, RA 0 @ Greenwich, 2026-03-20",
+      "site": {
+        "name": "Greenwich",
+        "lon_deg": 0.0,
+        "lat_deg": 51.4772,
+        "height_m": 45.0
+      },
+      "epoch_utc": "2026-03-20T12:00:00",
+      "epoch_note": "March equinox",
+      "target": {
+        "name": "ecliptic plane, RA 0",
+        "ra_deg": 0.0,
+        "dec_deg": 0.0
+      },
+      "barycentric_km_s": -0.6992084569564021,
+      "barycentric_classical_km_s": -0.7038557584151419,
+      "heliocentric_km_s": -0.7159415857446122
+    },
+    {
+      "name": "ecliptic plane, RA 180 @ Greenwich, 2026-03-20",
+      "site": {
+        "name": "Greenwich",
+        "lon_deg": 0.0,
+        "lat_deg": 51.4772,
+        "height_m": 45.0
+      },
+      "epoch_utc": "2026-03-20T12:00:00",
+      "epoch_note": "March equinox",
+      "target": {
+        "name": "ecliptic plane, RA 180",
+        "ra_deg": 180.0,
+        "dec_deg": 0.0
+      },
+      "barycentric_km_s": 0.7085030817110024,
+      "barycentric_classical_km_s": 0.7038557584151386,
+      "heliocentric_km_s": 0.715941585744609
+    },
+    {
+      "name": "just below the RA wrap @ Greenwich, 2026-03-20",
+      "site": {
+        "name": "Greenwich",
+        "lon_deg": 0.0,
+        "lat_deg": 51.4772,
+        "height_m": 45.0
+      },
+      "epoch_utc": "2026-03-20T12:00:00",
+      "epoch_note": "March equinox",
+      "target": {
+        "name": "just below the RA wrap",
+        "ra_deg": 359.99,
+        "dec_deg": 0.0
+      },
+      "barycentric_km_s": -0.694469549491603,
+      "barycentric_classical_km_s": -0.6991168510164673,
+      "heliocentric_km_s": -0.7112023989225147
+    },
+    {
+      "name": "north ecliptic pole @ Greenwich, 2026-03-20",
+      "site": {
+        "name": "Greenwich",
+        "lon_deg": 0.0,
+        "lat_deg": 51.4772,
+        "height_m": 45.0
+      },
+      "epoch_utc": "2026-03-20T12:00:00",
+      "epoch_note": "March equinox",
+      "target": {
+        "name": "north ecliptic pole",
+        "ra_deg": 270.0,
+        "dec_deg": 66.5607
+      },
+      "barycentric_km_s": -0.11008902947916559,
+      "barycentric_classical_km_s": -0.11473634005663155,
+      "heliocentric_km_s": -0.11449323657847703
+    },
+    {
+      "name": "north celestial pole @ Greenwich, 2026-03-20",
+      "site": {
+        "name": "Greenwich",
+        "lon_deg": 0.0,
+        "lat_deg": 51.4772,
+        "height_m": 45.0
+      },
+      "epoch_utc": "2026-03-20T12:00:00",
+      "epoch_note": "March equinox",
+      "target": {
+        "name": "north celestial pole",
+        "ra_deg": 0.0,
+        "dec_deg": 89.9
+      },
+      "barycentric_km_s": -11.893403730871318,
+      "barycentric_classical_km_s": -11.898050858763447,
+      "heliocentric_km_s": -11.89850063580085
+    },
+    {
+      "name": "Sirius @ Greenwich, 2026-03-20",
+      "site": {
+        "name": "Greenwich",
+        "lon_deg": 0.0,
+        "lat_deg": 51.4772,
+        "height_m": 45.0
+      },
+      "epoch_utc": "2026-03-20T12:00:00",
+      "epoch_note": "March equinox",
+      "target": {
+        "name": "Sirius",
+        "ra_deg": 101.287155,
+        "dec_deg": -16.716116
+      },
+      "barycentric_km_s": -21.943044101292287,
+      "barycentric_classical_km_s": -21.947691073384387,
+      "heliocentric_km_s": -21.946804895887425
+    },
+    {
+      "name": "Vega @ Greenwich, 2026-03-20",
+      "site": {
+        "name": "Greenwich",
+        "lon_deg": 0.0,
+        "lat_deg": 51.4772,
+        "height_m": 45.0
+      },
+      "epoch_utc": "2026-03-20T12:00:00",
+      "epoch_note": "March equinox",
+      "target": {
+        "name": "Vega",
+        "ra_deg": 279.234735,
+        "dec_deg": 38.783689
+      },
+      "barycentric_km_s": 13.355643203807192,
+      "barycentric_classical_km_s": 13.35099568448233,
+      "heliocentric_km_s": 13.350446272534636
+    },
+    {
+      "name": "ecliptic plane, RA 0 @ Greenwich, 2026-07-06",
+      "site": {
+        "name": "Greenwich",
+        "lon_deg": 0.0,
+        "lat_deg": 51.4772,
+        "height_m": 45.0
+      },
+      "epoch_utc": "2026-07-06T00:00:00",
+      "epoch_note": "near aphelion, Earth slowest",
+      "target": {
+        "name": "ecliptic plane, RA 0",
+        "ra_deg": 0.0,
+        "dec_deg": 0.0
+      },
+      "barycentric_km_s": 28.766548308131824,
+      "barycentric_classical_km_s": 28.76196755283715,
+      "heliocentric_km_s": 28.750835261307678
+    },
+    {
+      "name": "ecliptic plane, RA 180 @ Greenwich, 2026-07-06",
+      "site": {
+        "name": "Greenwich",
+        "lon_deg": 0.0,
+        "lat_deg": 51.4772,
+        "height_m": 45.0
+      },
+      "epoch_utc": "2026-07-06T00:00:00",
+      "epoch_note": "near aphelion, Earth slowest",
+      "target": {
+        "name": "ecliptic plane, RA 180",
+        "ra_deg": 180.0,
+        "dec_deg": 0.0
+      },
+      "barycentric_km_s": -28.757387676458173,
+      "barycentric_classical_km_s": -28.76196755283715,
+      "heliocentric_km_s": -28.750835261307678
+    },
+    {
+      "name": "just below the RA wrap @ Greenwich, 2026-07-06",
+      "site": {
+        "name": "Greenwich",
+        "lon_deg": 0.0,
+        "lat_deg": 51.4772,
+        "height_m": 45.0
+      },
+      "epoch_utc": "2026-07-06T00:00:00",
+      "epoch_note": "near aphelion, Earth slowest",
+      "target": {
+        "name": "just below the RA wrap",
+        "ra_deg": 359.99,
+        "dec_deg": 0.0
+      },
+      "barycentric_km_s": 28.765433104126583,
+      "barycentric_classical_km_s": 28.76085234894958,
+      "heliocentric_km_s": 28.749720606214733
+    },
+    {
+      "name": "north ecliptic pole @ Greenwich, 2026-07-06",
+      "site": {
+        "name": "Greenwich",
+        "lon_deg": 0.0,
+        "lat_deg": 51.4772,
+        "height_m": 45.0
+      },
+      "epoch_utc": "2026-07-06T00:00:00",
+      "epoch_note": "near aphelion, Earth slowest",
+      "target": {
+        "name": "north ecliptic pole",
+        "ra_deg": 270.0,
+        "dec_deg": 66.5607
+      },
+      "barycentric_km_s": -0.02516180857854017,
+      "barycentric_classical_km_s": -0.029742123942418562,
+      "heliocentric_km_s": -0.029513460271928155
+    },
+    {
+      "name": "north celestial pole @ Greenwich, 2026-07-06",
+      "site": {
+        "name": "Greenwich",
+        "lon_deg": 0.0,
+        "lat_deg": 51.4772,
+        "height_m": 45.0
+      },
+      "epoch_utc": "2026-07-06T00:00:00",
+      "epoch_note": "near aphelion, Earth slowest",
+      "target": {
+        "name": "north celestial pole",
+        "ra_deg": 0.0,
+        "dec_deg": 89.9
+      },
+      "barycentric_km_s": 2.791522415204969,
+      "barycentric_classical_km_s": 2.786942056818768,
+      "heliocentric_km_s": 2.785809031624988
+    },
+    {
+      "name": "Sirius @ Greenwich, 2026-07-06",
+      "site": {
+        "name": "Greenwich",
+        "lon_deg": 0.0,
+        "lat_deg": 51.4772,
+        "height_m": 45.0
+      },
+      "epoch_utc": "2026-07-06T00:00:00",
+      "epoch_note": "near aphelion, Earth slowest",
+      "target": {
+        "name": "Sirius",
+        "ra_deg": 101.287155,
+        "dec_deg": -16.716116
+      },
+      "barycentric_km_s": -0.17525943076851835,
+      "barycentric_classical_km_s": -0.17983974382713705,
+      "heliocentric_km_s": -0.1803849608016532
+    },
+    {
+      "name": "Vega @ Greenwich, 2026-07-06",
+      "site": {
+        "name": "Greenwich",
+        "lon_deg": 0.0,
+        "lat_deg": 51.4772,
+        "height_m": 45.0
+      },
+      "epoch_utc": "2026-07-06T00:00:00",
+      "epoch_note": "near aphelion, Earth slowest",
+      "target": {
+        "name": "Vega",
+        "ra_deg": 279.234735,
+        "dec_deg": 38.783689
+      },
+      "barycentric_km_s": 0.40250219440926377,
+      "barycentric_classical_km_s": 0.3979218725288218,
+      "heliocentric_km_s": 0.3982502905412503
+    },
+    {
+      "name": "ecliptic plane, RA 0 @ Greenwich, 2026-09-22",
+      "site": {
+        "name": "Greenwich",
+        "lon_deg": 0.0,
+        "lat_deg": 51.4772,
+        "height_m": 45.0
+      },
+      "epoch_utc": "2026-09-22T18:00:00",
+      "epoch_note": "September equinox",
+      "target": {
+        "name": "ecliptic plane, RA 0",
+        "ra_deg": 0.0,
+        "dec_deg": 0.0
+      },
+      "barycentric_km_s": 0.13584151309034317,
+      "barycentric_classical_km_s": 0.13121485083460746,
+      "heliocentric_km_s": 0.12067269588416242
+    },
+    {
+      "name": "ecliptic plane, RA 180 @ Greenwich, 2026-09-22",
+      "site": {
+        "name": "Greenwich",
+        "lon_deg": 0.0,
+        "lat_deg": 51.4772,
+        "height_m": 45.0
+      },
+      "epoch_utc": "2026-09-22T18:00:00",
+      "epoch_note": "September equinox",
+      "target": {
+        "name": "ecliptic plane, RA 180",
+        "ra_deg": 180.0,
+        "dec_deg": 0.0
+      },
+      "barycentric_km_s": -0.12658819261184712,
+      "barycentric_classical_km_s": -0.13121485083460413,
+      "heliocentric_km_s": -0.12067269588415909
+    },
+    {
+      "name": "just below the RA wrap @ Greenwich, 2026-09-22",
+      "site": {
+        "name": "Greenwich",
+        "lon_deg": 0.0,
+        "lat_deg": 51.4772,
+        "height_m": 45.0
+      },
+      "epoch_utc": "2026-09-22T18:00:00",
+      "epoch_note": "September equinox",
+      "target": {
+        "name": "just below the RA wrap",
+        "ra_deg": 359.99,
+        "dec_deg": 0.0
+      },
+      "barycentric_km_s": 0.1310889316041957,
+      "barycentric_classical_km_s": 0.1264622693850106,
+      "heliocentric_km_s": 0.11592080812081856
+    },
+    {
+      "name": "north ecliptic pole @ Greenwich, 2026-09-22",
+      "site": {
+        "name": "Greenwich",
+        "lon_deg": 0.0,
+        "lat_deg": 51.4772,
+        "height_m": 45.0
+      },
+      "epoch_utc": "2026-09-22T18:00:00",
+      "epoch_note": "September equinox",
+      "target": {
+        "name": "north ecliptic pole",
+        "ra_deg": 270.0,
+        "dec_deg": 66.5607
+      },
+      "barycentric_km_s": -0.001708584798834847,
+      "barycentric_classical_km_s": -0.006335244921878862,
+      "heliocentric_km_s": -0.00611212592190603
+    },
+    {
+      "name": "north celestial pole @ Greenwich, 2026-09-22",
+      "site": {
+        "name": "Greenwich",
+        "lon_deg": 0.0,
+        "lat_deg": 51.4772,
+        "height_m": 45.0
+      },
+      "epoch_utc": "2026-09-22T18:00:00",
+      "epoch_note": "September equinox",
+      "target": {
+        "name": "north celestial pole",
+        "ra_deg": 0.0,
+        "dec_deg": 89.9
+      },
+      "barycentric_km_s": 11.803706747065554,
+      "barycentric_classical_km_s": 11.799079904741697,
+      "heliocentric_km_s": 11.79758192242151
+    },
+    {
+      "name": "Sirius @ Greenwich, 2026-09-22",
+      "site": {
+        "name": "Greenwich",
+        "lon_deg": 0.0,
+        "lat_deg": 51.4772,
+        "height_m": 45.0
+      },
+      "epoch_utc": "2026-09-22T18:00:00",
+      "epoch_note": "September equinox",
+      "target": {
+        "name": "Sirius",
+        "ra_deg": 101.287155,
+        "dec_deg": -16.716116
+      },
+      "barycentric_km_s": 22.16147356437857,
+      "barycentric_classical_km_s": 22.15684656219308,
+      "heliocentric_km_s": 22.15551623343549
+    },
+    {
+      "name": "Vega @ Greenwich, 2026-09-22",
+      "site": {
+        "name": "Greenwich",
+        "lon_deg": 0.0,
+        "lat_deg": 51.4772,
+        "height_m": 45.0
+      },
+      "epoch_utc": "2026-09-22T18:00:00",
+      "epoch_note": "September equinox",
+      "target": {
+        "name": "Vega",
+        "ra_deg": 279.234735,
+        "dec_deg": 38.783689
+      },
+      "barycentric_km_s": -13.539691568703311,
+      "barycentric_classical_km_s": -13.544318019908637,
+      "heliocentric_km_s": -13.543506244257864
+    },
+    {
+      "name": "ecliptic plane, RA 0 @ Greenwich, 2026-11-15",
+      "site": {
+        "name": "Greenwich",
+        "lon_deg": 0.0,
+        "lat_deg": 51.4772,
+        "height_m": 45.0
+      },
+      "epoch_utc": "2026-11-15T06:00:00",
+      "epoch_note": "an ordinary date, no special geometry",
+      "target": {
+        "name": "ecliptic plane, RA 0",
+        "ra_deg": 0.0,
+        "dec_deg": 0.0
+      },
+      "barycentric_km_s": -24.28576160117833,
+      "barycentric_classical_km_s": -24.290474599809297,
+      "heliocentric_km_s": -24.30067299095178
+    },
+    {
+      "name": "ecliptic plane, RA 180 @ Greenwich, 2026-11-15",
+      "site": {
+        "name": "Greenwich",
+        "lon_deg": 0.0,
+        "lat_deg": 51.4772,
+        "height_m": 45.0
+      },
+      "epoch_utc": "2026-11-15T06:00:00",
+      "epoch_note": "an ordinary date, no special geometry",
+      "target": {
+        "name": "ecliptic plane, RA 180",
+        "ra_deg": 180.0,
+        "dec_deg": 0.0
+      },
+      "barycentric_km_s": 24.29518836221896,
+      "barycentric_classical_km_s": 24.2904745998093,
+      "heliocentric_km_s": 24.300672990951785
+    },
+    {
+      "name": "just below the RA wrap @ Greenwich, 2026-11-15",
+      "site": {
+        "name": "Greenwich",
+        "lon_deg": 0.0,
+        "lat_deg": 51.4772,
+        "height_m": 45.0
+      },
+      "epoch_utc": "2026-11-15T06:00:00",
+      "epoch_note": "an ordinary date, no special geometry",
+      "target": {
+        "name": "just below the RA wrap",
+        "ra_deg": 359.99,
+        "dec_deg": 0.0
+      },
+      "barycentric_km_s": -24.288605555213955,
+      "barycentric_classical_km_s": -24.293318553793696,
+      "heliocentric_km_s": -24.303516125381506
+    },
+    {
+      "name": "north ecliptic pole @ Greenwich, 2026-11-15",
+      "site": {
+        "name": "Greenwich",
+        "lon_deg": 0.0,
+        "lat_deg": 51.4772,
+        "height_m": 45.0
+      },
+      "epoch_utc": "2026-11-15T06:00:00",
+      "epoch_note": "an ordinary date, no special geometry",
+      "target": {
+        "name": "north ecliptic pole",
+        "ra_deg": 270.0,
+        "dec_deg": 66.5607
+      },
+      "barycentric_km_s": 0.09638374013972072,
+      "barycentric_classical_km_s": 0.09167035818686725,
+      "heliocentric_km_s": 0.0918929335470869
+    },
+    {
+      "name": "north celestial pole @ Greenwich, 2026-11-15",
+      "site": {
+        "name": "Greenwich",
+        "lon_deg": 0.0,
+        "lat_deg": 51.4772,
+        "height_m": 45.0
+      },
+      "epoch_utc": "2026-11-15T06:00:00",
+      "epoch_note": "an ordinary date, no special geometry",
+      "target": {
+        "name": "north celestial pole",
+        "ra_deg": 0.0,
+        "dec_deg": 89.9
+      },
+      "barycentric_km_s": 7.127742939376028,
+      "barycentric_classical_km_s": 7.123029446862257,
+      "heliocentric_km_s": 7.1212187925947825
+    },
+    {
+      "name": "Sirius @ Greenwich, 2026-11-15",
+      "site": {
+        "name": "Greenwich",
+        "lon_deg": 0.0,
+        "lat_deg": 51.4772,
+        "height_m": 45.0
+      },
+      "epoch_utc": "2026-11-15T06:00:00",
+      "epoch_note": "an ordinary date, no special geometry",
+      "target": {
+        "name": "Sirius",
+        "ra_deg": 101.287155,
+        "dec_deg": -16.716116
+      },
+      "barycentric_km_s": 17.803313992065526,
+      "barycentric_classical_km_s": 17.798600331761115,
+      "heliocentric_km_s": 17.79661830276527
+    },
+    {
+      "name": "Vega @ Greenwich, 2026-11-15",
+      "site": {
+        "name": "Greenwich",
+        "lon_deg": 0.0,
+        "lat_deg": 51.4772,
+        "height_m": 45.0
+      },
+      "epoch_utc": "2026-11-15T06:00:00",
+      "epoch_note": "an ordinary date, no special geometry",
+      "target": {
+        "name": "Vega",
+        "ra_deg": 279.234735,
+        "dec_deg": 38.783689
+      },
+      "barycentric_km_s": -11.084593522082182,
+      "barycentric_classical_km_s": -11.08930672825352,
+      "heliocentric_km_s": -11.088093274134918
+    },
+    {
+      "name": "ecliptic plane, RA 0 @ Paranal, 2026-01-04",
+      "site": {
+        "name": "Paranal",
+        "lon_deg": -70.40417,
+        "lat_deg": -24.62722,
+        "height_m": 2635.0
+      },
+      "epoch_utc": "2026-01-04T00:00:00",
+      "epoch_note": "near perihelion, Earth fastest",
+      "target": {
+        "name": "ecliptic plane, RA 0",
+        "ra_deg": 0.0,
+        "dec_deg": 0.0
+      },
+      "barycentric_km_s": -29.677898085640525,
+      "barycentric_classical_km_s": -29.68265871413491,
+      "heliocentric_km_s": -29.69507088547295
+    },
+    {
+      "name": "ecliptic plane, RA 180 @ Paranal, 2026-01-04",
+      "site": {
+        "name": "Paranal",
+        "lon_deg": -70.40417,
+        "lat_deg": -24.62722,
+        "height_m": 2635.0
+      },
+      "epoch_utc": "2026-01-04T00:00:00",
+      "epoch_note": "near perihelion, Earth fastest",
+      "target": {
+        "name": "ecliptic plane, RA 180",
+        "ra_deg": 180.0,
+        "dec_deg": 0.0
+      },
+      "barycentric_km_s": 29.68742028544764,
+      "barycentric_classical_km_s": 29.68265871413491,
+      "heliocentric_km_s": 29.69507088547295
+    },
+    {
+      "name": "just below the RA wrap @ Paranal, 2026-01-04",
+      "site": {
+        "name": "Paranal",
+        "lon_deg": -70.40417,
+        "lat_deg": -24.62722,
+        "height_m": 2635.0
+      },
+      "epoch_utc": "2026-01-04T00:00:00",
+      "epoch_note": "near perihelion, Earth fastest",
+      "target": {
+        "name": "just below the RA wrap",
+        "ra_deg": 359.99,
+        "dec_deg": 0.0
+      },
+      "barycentric_km_s": -29.676847783752223,
+      "barycentric_classical_km_s": -29.68160841230774,
+      "heliocentric_km_s": -29.694020510159852
+    },
+    {
+      "name": "north ecliptic pole @ Paranal, 2026-01-04",
+      "site": {
+        "name": "Paranal",
+        "lon_deg": -70.40417,
+        "lat_deg": -24.62722,
+        "height_m": 2635.0
+      },
+      "epoch_utc": "2026-01-04T00:00:00",
+      "epoch_note": "near perihelion, Earth fastest",
+      "target": {
+        "name": "north ecliptic pole",
+        "ra_deg": 270.0,
+        "dec_deg": 66.5607
+      },
+      "barycentric_km_s": -0.13502450102379768,
+      "barycentric_classical_km_s": -0.13978559869211252,
+      "heliocentric_km_s": -0.1395501011255989
+    },
+    {
+      "name": "north celestial pole @ Paranal, 2026-01-04",
+      "site": {
+        "name": "Paranal",
+        "lon_deg": -70.40417,
+        "lat_deg": -24.62722,
+        "height_m": 2635.0
+      },
+      "epoch_utc": "2026-01-04T00:00:00",
+      "epoch_note": "near perihelion, Earth fastest",
+      "target": {
+        "name": "north celestial pole",
+        "ra_deg": 0.0,
+        "dec_deg": 89.9
+      },
+      "barycentric_km_s": -2.807306301305465,
+      "barycentric_classical_km_s": -2.8120673565398198,
+      "heliocentric_km_s": -2.812014416946884
+    },
+    {
+      "name": "Sirius @ Paranal, 2026-01-04",
+      "site": {
+        "name": "Paranal",
+        "lon_deg": -70.40417,
+        "lat_deg": -24.62722,
+        "height_m": 2635.0
+      },
+      "epoch_utc": "2026-01-04T00:00:00",
+      "epoch_note": "near perihelion, Earth fastest",
+      "target": {
+        "name": "Sirius",
+        "ra_deg": 101.287155,
+        "dec_deg": -16.716116
+      },
+      "barycentric_km_s": 0.7132880479213073,
+      "barycentric_classical_km_s": 0.708526936720176,
+      "heliocentric_km_s": 0.7104377710179471
+    },
+    {
+      "name": "Vega @ Paranal, 2026-01-04",
+      "site": {
+        "name": "Paranal",
+        "lon_deg": -70.40417,
+        "lat_deg": -24.62722,
+        "height_m": 2635.0
+      },
+      "epoch_utc": "2026-01-04T00:00:00",
+      "epoch_note": "near perihelion, Earth fastest",
+      "target": {
+        "name": "Vega",
+        "ra_deg": 279.234735,
+        "dec_deg": 38.783689
+      },
+      "barycentric_km_s": -0.8092443879653242,
+      "barycentric_classical_km_s": -0.8140054749391009,
+      "heliocentric_km_s": -0.8151883408320493
+    },
+    {
+      "name": "ecliptic plane, RA 0 @ Paranal, 2026-03-20",
+      "site": {
+        "name": "Paranal",
+        "lon_deg": -70.40417,
+        "lat_deg": -24.62722,
+        "height_m": 2635.0
+      },
+      "epoch_utc": "2026-03-20T12:00:00",
+      "epoch_note": "March equinox",
+      "target": {
+        "name": "ecliptic plane, RA 0",
+        "ra_deg": 0.0,
+        "dec_deg": 0.0
+      },
+      "barycentric_km_s": -0.3067696732581265,
+      "barycentric_classical_km_s": -0.31143088331552254,
+      "heliocentric_km_s": -0.3235167106449929
+    },
+    {
+      "name": "ecliptic plane, RA 180 @ Paranal, 2026-03-20",
+      "site": {
+        "name": "Paranal",
+        "lon_deg": -70.40417,
+        "lat_deg": -24.62722,
+        "height_m": 2635.0
+      },
+      "epoch_utc": "2026-03-20T12:00:00",
+      "epoch_note": "March equinox",
+      "target": {
+        "name": "ecliptic plane, RA 180",
+        "ra_deg": 180.0,
+        "dec_deg": 0.0
+      },
+      "barycentric_km_s": 0.3160921030399234,
+      "barycentric_classical_km_s": 0.3114308833155192,
+      "heliocentric_km_s": 0.32351671064498955
+    },
+    {
+      "name": "just below the RA wrap @ Paranal, 2026-03-20",
+      "site": {
+        "name": "Paranal",
+        "lon_deg": -70.40417,
+        "lat_deg": -24.62722,
+        "height_m": 2635.0
+      },
+      "epoch_utc": "2026-03-20T12:00:00",
+      "epoch_note": "March equinox",
+      "target": {
+        "name": "just below the RA wrap",
+        "ra_deg": 359.99,
+        "dec_deg": 0.0
+      },
+      "barycentric_km_s": -0.3020021088711358,
+      "barycentric_classical_km_s": -0.306663318995493,
+      "heliocentric_km_s": -0.3187488669015402
+    },
+    {
+      "name": "north ecliptic pole @ Paranal, 2026-03-20",
+      "site": {
+        "name": "Paranal",
+        "lon_deg": -70.40417,
+        "lat_deg": -24.62722,
+        "height_m": 2635.0
+      },
+      "epoch_utc": "2026-03-20T12:00:00",
+      "epoch_note": "March equinox",
+      "target": {
+        "name": "north ecliptic pole",
+        "ra_deg": 270.0,
+        "dec_deg": 66.5607
+      },
+      "barycentric_km_s": -0.04566553623792499,
+      "barycentric_classical_km_s": -0.0503267503302034,
+      "heliocentric_km_s": -0.050083646852050384
+    },
+    {
+      "name": "north celestial pole @ Paranal, 2026-03-20",
+      "site": {
+        "name": "Paranal",
+        "lon_deg": -70.40417,
+        "lat_deg": -24.62722,
+        "height_m": 2635.0
+      },
+      "epoch_utc": "2026-03-20T12:00:00",
+      "epoch_note": "March equinox",
+      "target": {
+        "name": "north celestial pole",
+        "ra_deg": 0.0,
+        "dec_deg": 89.9
+      },
+      "barycentric_km_s": -11.893703202200195,
+      "barycentric_classical_km_s": -11.898364232079365,
+      "heliocentric_km_s": -11.89881400911677
+    },
+    {
+      "name": "Sirius @ Paranal, 2026-03-20",
+      "site": {
+        "name": "Paranal",
+        "lon_deg": -70.40417,
+        "lat_deg": -24.62722,
+        "height_m": 2635.0
+      },
+      "epoch_utc": "2026-03-20T12:00:00",
+      "epoch_note": "March equinox",
+      "target": {
+        "name": "Sirius",
+        "ra_deg": 101.287155,
+        "dec_deg": -16.716116
+      },
+      "barycentric_km_s": -22.170549389347986,
+      "barycentric_classical_km_s": -22.175210259430187,
+      "heliocentric_km_s": -22.17432408193323
+    },
+    {
+      "name": "Vega @ Paranal, 2026-03-20",
+      "site": {
+        "name": "Paranal",
+        "lon_deg": -70.40417,
+        "lat_deg": -24.62722,
+        "height_m": 2635.0
+      },
+      "epoch_utc": "2026-03-20T12:00:00",
+      "epoch_note": "March equinox",
+      "target": {
+        "name": "Vega",
+        "ra_deg": 279.234735,
+        "dec_deg": 38.783689
+      },
+      "barycentric_km_s": 13.530480646734162,
+      "barycentric_classical_km_s": 13.52581922150045,
+      "heliocentric_km_s": 13.525269809552753
+    },
+    {
+      "name": "ecliptic plane, RA 0 @ Paranal, 2026-07-06",
+      "site": {
+        "name": "Paranal",
+        "lon_deg": -70.40417,
+        "lat_deg": -24.62722,
+        "height_m": 2635.0
+      },
+      "epoch_utc": "2026-07-06T00:00:00",
+      "epoch_note": "near aphelion, Earth slowest",
+      "target": {
+        "name": "ecliptic plane, RA 0",
+        "ra_deg": 0.0,
+        "dec_deg": 0.0
+      },
+      "barycentric_km_s": 28.716492192992682,
+      "barycentric_classical_km_s": 28.711925329495383,
+      "heliocentric_km_s": 28.700793037965912
+    },
+    {
+      "name": "ecliptic plane, RA 180 @ Paranal, 2026-07-06",
+      "site": {
+        "name": "Paranal",
+        "lon_deg": -70.40417,
+        "lat_deg": -24.62722,
+        "height_m": 2635.0
+      },
+      "epoch_utc": "2026-07-06T00:00:00",
+      "epoch_note": "near aphelion, Earth slowest",
+      "target": {
+        "name": "ecliptic plane, RA 180",
+        "ra_deg": 180.0,
+        "dec_deg": 0.0
+      },
+      "barycentric_km_s": -28.70735934065125,
+      "barycentric_classical_km_s": -28.711925329495383,
+      "heliocentric_km_s": -28.700793037965912
+    },
+    {
+      "name": "just below the RA wrap @ Paranal, 2026-07-06",
+      "site": {
+        "name": "Paranal",
+        "lon_deg": -70.40417,
+        "lat_deg": -24.62722,
+        "height_m": 2635.0
+      },
+      "epoch_utc": "2026-07-06T00:00:00",
+      "epoch_note": "near aphelion, Earth slowest",
+      "target": {
+        "name": "just below the RA wrap",
+        "ra_deg": 359.99,
+        "dec_deg": 0.0
+      },
+      "barycentric_km_s": 28.715450721323016,
+      "barycentric_classical_km_s": 28.71088385784433,
+      "heliocentric_km_s": 28.699752115109483
+    },
+    {
+      "name": "north ecliptic pole @ Paranal, 2026-07-06",
+      "site": {
+        "name": "Paranal",
+        "lon_deg": -70.40417,
+        "lat_deg": -24.62722,
+        "height_m": 2635.0
+      },
+      "epoch_utc": "2026-07-06T00:00:00",
+      "epoch_note": "near aphelion, Earth slowest",
+      "target": {
+        "name": "north ecliptic pole",
+        "ra_deg": 270.0,
+        "dec_deg": 66.5607
+      },
+      "barycentric_km_s": 0.14299590632291925,
+      "barycentric_classical_km_s": 0.13842947801173452,
+      "heliocentric_km_s": 0.13865814168222454
+    },
+    {
+      "name": "north celestial pole @ Paranal, 2026-07-06",
+      "site": {
+        "name": "Paranal",
+        "lon_deg": -70.40417,
+        "lat_deg": -24.62722,
+        "height_m": 2635.0
+      },
+      "epoch_utc": "2026-07-06T00:00:00",
+      "epoch_note": "near aphelion, Earth slowest",
+      "target": {
+        "name": "north celestial pole",
+        "ra_deg": 0.0,
+        "dec_deg": 89.9
+      },
+      "barycentric_km_s": 2.7915634114741863,
+      "barycentric_classical_km_s": 2.7869969428291124,
+      "heliocentric_km_s": 2.785863917635332
+    },
+    {
+      "name": "Sirius @ Paranal, 2026-07-06",
+      "site": {
+        "name": "Paranal",
+        "lon_deg": -70.40417,
+        "lat_deg": -24.62722,
+        "height_m": 2635.0
+      },
+      "epoch_utc": "2026-07-06T00:00:00",
+      "epoch_note": "near aphelion, Earth slowest",
+      "target": {
+        "name": "Sirius",
+        "ra_deg": 101.287155,
+        "dec_deg": -16.716116
+      },
+      "barycentric_km_s": -0.5627062215636097,
+      "barycentric_classical_km_s": -0.5672726391274217,
+      "heliocentric_km_s": -0.5678178561019385
+    },
+    {
+      "name": "Vega @ Paranal, 2026-07-06",
+      "site": {
+        "name": "Paranal",
+        "lon_deg": -70.40417,
+        "lat_deg": -24.62722,
+        "height_m": 2635.0
+      },
+      "epoch_utc": "2026-07-06T00:00:00",
+      "epoch_note": "near aphelion, Earth slowest",
+      "target": {
+        "name": "Vega",
+        "ra_deg": 279.234735,
+        "dec_deg": 38.783689
+      },
+      "barycentric_km_s": 0.721356046164012,
+      "barycentric_classical_km_s": 0.7167896090477233,
+      "heliocentric_km_s": 0.7171180270601514
+    },
+    {
+      "name": "ecliptic plane, RA 0 @ Paranal, 2026-09-22",
+      "site": {
+        "name": "Paranal",
+        "lon_deg": -70.40417,
+        "lat_deg": -24.62722,
+        "height_m": 2635.0
+      },
+      "epoch_utc": "2026-09-22T18:00:00",
+      "epoch_note": "September equinox",
+      "target": {
+        "name": "ecliptic plane, RA 0",
+        "ra_deg": 0.0,
+        "dec_deg": 0.0
+      },
+      "barycentric_km_s": -0.0036663178133698655,
+      "barycentric_classical_km_s": -0.00825633823509406,
+      "heliocentric_km_s": -0.018798493185539104
+    },
+    {
+      "name": "ecliptic plane, RA 180 @ Paranal, 2026-09-22",
+      "site": {
+        "name": "Paranal",
+        "lon_deg": -70.40417,
+        "lat_deg": -24.62722,
+        "height_m": 2635.0
+      },
+      "epoch_utc": "2026-09-22T18:00:00",
+      "epoch_note": "September equinox",
+      "target": {
+        "name": "ecliptic plane, RA 180",
+        "ra_deg": 180.0,
+        "dec_deg": 0.0
+      },
+      "barycentric_km_s": 0.012846358913472012,
+      "barycentric_classical_km_s": 0.008256338235097346,
+      "heliocentric_km_s": 0.01879849318554239
+    },
+    {
+      "name": "just below the RA wrap @ Paranal, 2026-09-22",
+      "site": {
+        "name": "Paranal",
+        "lon_deg": -70.40417,
+        "lat_deg": -24.62722,
+        "height_m": 2635.0
+      },
+      "epoch_utc": "2026-09-22T18:00:00",
+      "epoch_note": "September equinox",
+      "target": {
+        "name": "just below the RA wrap",
+        "ra_deg": 359.99,
+        "dec_deg": 0.0
+      },
+      "barycentric_km_s": -0.008348754109210252,
+      "barycentric_classical_km_s": -0.012938774440037873,
+      "heliocentric_km_s": -0.023480235704229913
+    },
+    {
+      "name": "north ecliptic pole @ Paranal, 2026-09-22",
+      "site": {
+        "name": "Paranal",
+        "lon_deg": -70.40417,
+        "lat_deg": -24.62722,
+        "height_m": 2635.0
+      },
+      "epoch_utc": "2026-09-22T18:00:00",
+      "epoch_note": "September equinox",
+      "target": {
+        "name": "north ecliptic pole",
+        "ra_deg": 270.0,
+        "dec_deg": 66.5607
+      },
+      "barycentric_km_s": 0.15846418641302418,
+      "barycentric_classical_km_s": 0.15387416355698713,
+      "heliocentric_km_s": 0.15409728255695995
+    },
+    {
+      "name": "north celestial pole @ Paranal, 2026-09-22",
+      "site": {
+        "name": "Paranal",
+        "lon_deg": -70.40417,
+        "lat_deg": -24.62722,
+        "height_m": 2635.0
+      },
+      "epoch_utc": "2026-09-22T18:00:00",
+      "epoch_note": "September equinox",
+      "target": {
+        "name": "north celestial pole",
+        "ra_deg": 0.0,
+        "dec_deg": 89.9
+      },
+      "barycentric_km_s": 11.803804346373546,
+      "barycentric_classical_km_s": 11.79921414514719,
+      "heliocentric_km_s": 11.797716162827003
+    },
+    {
+      "name": "Sirius @ Paranal, 2026-09-22",
+      "site": {
+        "name": "Paranal",
+        "lon_deg": -70.40417,
+        "lat_deg": -24.62722,
+        "height_m": 2635.0
+      },
+      "epoch_utc": "2026-09-22T18:00:00",
+      "epoch_note": "September equinox",
+      "target": {
+        "name": "Sirius",
+        "ra_deg": 101.287155,
+        "dec_deg": -16.716116
+      },
+      "barycentric_km_s": 21.81001031018986,
+      "barycentric_classical_km_s": 21.805419955814408,
+      "heliocentric_km_s": 21.804089627056815
+    },
+    {
+      "name": "Vega @ Paranal, 2026-09-22",
+      "site": {
+        "name": "Paranal",
+        "lon_deg": -70.40417,
+        "lat_deg": -24.62722,
+        "height_m": 2635.0
+      },
+      "epoch_utc": "2026-09-22T18:00:00",
+      "epoch_note": "September equinox",
+      "target": {
+        "name": "Vega",
+        "ra_deg": 279.234735,
+        "dec_deg": 38.783689
+      },
+      "barycentric_km_s": -13.247719183895793,
+      "barycentric_classical_km_s": -13.252309001510095,
+      "heliocentric_km_s": -13.251497225859323
+    },
+    {
+      "name": "ecliptic plane, RA 0 @ Paranal, 2026-11-15",
+      "site": {
+        "name": "Paranal",
+        "lon_deg": -70.40417,
+        "lat_deg": -24.62722,
+        "height_m": 2635.0
+      },
+      "epoch_utc": "2026-11-15T06:00:00",
+      "epoch_note": "an ordinary date, no special geometry",
+      "target": {
+        "name": "ecliptic plane, RA 0",
+        "ra_deg": 0.0,
+        "dec_deg": 0.0
+      },
+      "barycentric_km_s": -24.521083378418535,
+      "barycentric_classical_km_s": -24.525834628348324,
+      "heliocentric_km_s": -24.53603301949081
+    },
+    {
+      "name": "ecliptic plane, RA 180 @ Paranal, 2026-11-15",
+      "site": {
+        "name": "Paranal",
+        "lon_deg": -70.40417,
+        "lat_deg": -24.62722,
+        "height_m": 2635.0
+      },
+      "epoch_utc": "2026-11-15T06:00:00",
+      "epoch_note": "an ordinary date, no special geometry",
+      "target": {
+        "name": "ecliptic plane, RA 180",
+        "ra_deg": 180.0,
+        "dec_deg": 0.0
+      },
+      "barycentric_km_s": 24.530586655738983,
+      "barycentric_classical_km_s": 24.525834628348328,
+      "heliocentric_km_s": 24.53603301949081
+    },
+    {
+      "name": "just below the RA wrap @ Paranal, 2026-11-15",
+      "site": {
+        "name": "Paranal",
+        "lon_deg": -70.40417,
+        "lat_deg": -24.62722,
+        "height_m": 2635.0
+      },
+      "epoch_utc": "2026-11-15T06:00:00",
+      "epoch_note": "an ordinary date, no special geometry",
+      "target": {
+        "name": "just below the RA wrap",
+        "ra_deg": 359.99,
+        "dec_deg": 0.0
+      },
+      "barycentric_km_s": -24.523989176968687,
+      "barycentric_classical_km_s": -24.528740426878052,
+      "heliocentric_km_s": -24.53893799846586
+    },
+    {
+      "name": "north ecliptic pole @ Paranal, 2026-11-15",
+      "site": {
+        "name": "Paranal",
+        "lon_deg": -70.40417,
+        "lat_deg": -24.62722,
+        "height_m": 2635.0
+      },
+      "epoch_utc": "2026-11-15T06:00:00",
+      "epoch_note": "an ordinary date, no special geometry",
+      "target": {
+        "name": "north ecliptic pole",
+        "ra_deg": 270.0,
+        "dec_deg": 66.5607
+      },
+      "barycentric_km_s": -0.043977509550834,
+      "barycentric_classical_km_s": -0.04872914745427255,
+      "heliocentric_km_s": -0.04850657209405289
+    },
+    {
+      "name": "north celestial pole @ Paranal, 2026-11-15",
+      "site": {
+        "name": "Paranal",
+        "lon_deg": -70.40417,
+        "lat_deg": -24.62722,
+        "height_m": 2635.0
+      },
+      "epoch_utc": "2026-11-15T06:00:00",
+      "epoch_note": "an ordinary date, no special geometry",
+      "target": {
+        "name": "north celestial pole",
+        "ra_deg": 0.0,
+        "dec_deg": 89.9
+      },
+      "barycentric_km_s": 7.12797895566117,
+      "barycentric_classical_km_s": 7.123227204045363,
+      "heliocentric_km_s": 7.1214165497778845
+    },
+    {
+      "name": "Sirius @ Paranal, 2026-11-15",
+      "site": {
+        "name": "Paranal",
+        "lon_deg": -70.40417,
+        "lat_deg": -24.62722,
+        "height_m": 2635.0
+      },
+      "epoch_utc": "2026-11-15T06:00:00",
+      "epoch_note": "an ordinary date, no special geometry",
+      "target": {
+        "name": "Sirius",
+        "ra_deg": 101.287155,
+        "dec_deg": -16.716116
+      },
+      "barycentric_km_s": 18.180121275122247,
+      "barycentric_classical_km_s": 18.17536934840876,
+      "heliocentric_km_s": 18.17338731941291
+    },
+    {
+      "name": "Vega @ Paranal, 2026-11-15",
+      "site": {
+        "name": "Paranal",
+        "lon_deg": -70.40417,
+        "lat_deg": -24.62722,
+        "height_m": 2635.0
+      },
+      "epoch_utc": "2026-11-15T06:00:00",
+      "epoch_note": "an ordinary date, no special geometry",
+      "target": {
+        "name": "Vega",
+        "ra_deg": 279.234735,
+        "dec_deg": 38.783689
+      },
+      "barycentric_km_s": -11.386268870726788,
+      "barycentric_classical_km_s": -11.391020328868692,
+      "heliocentric_km_s": -11.389806874750086
+    },
+    {
+      "name": "ecliptic plane, RA 0 @ Mauna Kea, 2026-01-04",
+      "site": {
+        "name": "Mauna Kea",
+        "lon_deg": -155.47441,
+        "lat_deg": 19.8263,
+        "height_m": 4145.0
+      },
+      "epoch_utc": "2026-01-04T00:00:00",
+      "epoch_note": "near perihelion, Earth fastest",
+      "target": {
+        "name": "ecliptic plane, RA 0",
+        "ra_deg": 0.0,
+        "dec_deg": 0.0
+      },
+      "barycentric_km_s": -29.102167166080278,
+      "barycentric_classical_km_s": -29.10687303282771,
+      "heliocentric_km_s": -29.11928520416575
+    },
+    {
+      "name": "ecliptic plane, RA 180 @ Mauna Kea, 2026-01-04",
+      "site": {
+        "name": "Mauna Kea",
+        "lon_deg": -155.47441,
+        "lat_deg": 19.8263,
+        "height_m": 4145.0
+      },
+      "epoch_utc": "2026-01-04T00:00:00",
+      "epoch_note": "near perihelion, Earth fastest",
+      "target": {
+        "name": "ecliptic plane, RA 180",
+        "ra_deg": 180.0,
+        "dec_deg": 0.0
+      },
+      "barycentric_km_s": 29.111579813489122,
+      "barycentric_classical_km_s": 29.10687303282771,
+      "heliocentric_km_s": 29.11928520416575
+    },
+    {
+      "name": "just below the RA wrap @ Mauna Kea, 2026-01-04",
+      "site": {
+        "name": "Mauna Kea",
+        "lon_deg": -155.47441,
+        "lat_deg": 19.8263,
+        "height_m": 4145.0
+      },
+      "epoch_utc": "2026-01-04T00:00:00",
+      "epoch_note": "near perihelion, Earth fastest",
+      "target": {
+        "name": "just below the RA wrap",
+        "ra_deg": 359.99,
+        "dec_deg": 0.0
+      },
+      "barycentric_km_s": -29.101101704255406,
+      "barycentric_classical_km_s": -29.105807571009876,
+      "heliocentric_km_s": -29.11821966886198
+    },
+    {
+      "name": "north ecliptic pole @ Mauna Kea, 2026-01-04",
+      "site": {
+        "name": "Mauna Kea",
+        "lon_deg": -155.47441,
+        "lat_deg": 19.8263,
+        "height_m": 4145.0
+      },
+      "epoch_utc": "2026-01-04T00:00:00",
+      "epoch_note": "near perihelion, Earth fastest",
+      "target": {
+        "name": "north ecliptic pole",
+        "ra_deg": 270.0,
+        "dec_deg": 66.5607
+      },
+      "barycentric_km_s": -0.10184687351154696,
+      "barycentric_classical_km_s": -0.10655319553170213,
+      "heliocentric_km_s": -0.10631769796518852
+    },
+    {
+      "name": "north celestial pole @ Mauna Kea, 2026-01-04",
+      "site": {
+        "name": "Mauna Kea",
+        "lon_deg": -155.47441,
+        "lat_deg": 19.8263,
+        "height_m": 4145.0
+      },
+      "epoch_utc": "2026-01-04T00:00:00",
+      "epoch_note": "near perihelion, Earth fastest",
+      "target": {
+        "name": "north celestial pole",
+        "ra_deg": 0.0,
+        "dec_deg": 89.9
+      },
+      "barycentric_km_s": -2.80781519688159,
+      "barycentric_classical_km_s": -2.8125214764219506,
+      "heliocentric_km_s": -2.812468536829015
+    },
+    {
+      "name": "Sirius @ Mauna Kea, 2026-01-04",
+      "site": {
+        "name": "Mauna Kea",
+        "lon_deg": -155.47441,
+        "lat_deg": 19.8263,
+        "height_m": 4145.0
+      },
+      "epoch_utc": "2026-01-04T00:00:00",
+      "epoch_note": "near perihelion, Earth fastest",
+      "target": {
+        "name": "Sirius",
+        "ra_deg": 101.287155,
+        "dec_deg": -16.716116
+      },
+      "barycentric_km_s": 0.524090948931777,
+      "barycentric_classical_km_s": 0.5193846170468109,
+      "heliocentric_km_s": 0.5212954513445813
+    },
+    {
+      "name": "Vega @ Mauna Kea, 2026-01-04",
+      "site": {
+        "name": "Mauna Kea",
+        "lon_deg": -155.47441,
+        "lat_deg": 19.8263,
+        "height_m": 4145.0
+      },
+      "epoch_utc": "2026-01-04T00:00:00",
+      "epoch_note": "near perihelion, Earth fastest",
+      "target": {
+        "name": "Vega",
+        "ra_deg": 279.234735,
+        "dec_deg": 38.783689
+      },
+      "barycentric_km_s": -0.6713141817520069,
+      "barycentric_classical_km_s": -0.6760204948140652,
+      "heliocentric_km_s": -0.6772033607070137
+    },
+    {
+      "name": "ecliptic plane, RA 0 @ Mauna Kea, 2026-03-20",
+      "site": {
+        "name": "Mauna Kea",
+        "lon_deg": -155.47441,
+        "lat_deg": 19.8263,
+        "height_m": 4145.0
+      },
+      "epoch_utc": "2026-03-20T12:00:00",
+      "epoch_note": "March equinox",
+      "target": {
+        "name": "ecliptic plane, RA 0",
+        "ra_deg": 0.0,
+        "dec_deg": 0.0
+      },
+      "barycentric_km_s": -0.5451429641646236,
+      "barycentric_classical_km_s": -0.5498532753830732,
+      "heliocentric_km_s": -0.5619391027125435
+    },
+    {
+      "name": "ecliptic plane, RA 180 @ Mauna Kea, 2026-03-20",
+      "site": {
+        "name": "Mauna Kea",
+        "lon_deg": -155.47441,
+        "lat_deg": 19.8263,
+        "height_m": 4145.0
+      },
+      "epoch_utc": "2026-03-20T12:00:00",
+      "epoch_note": "March equinox",
+      "target": {
+        "name": "ecliptic plane, RA 180",
+        "ra_deg": 180.0,
+        "dec_deg": 0.0
+      },
+      "barycentric_km_s": 0.5545636038762369,
+      "barycentric_classical_km_s": 0.5498532753830698,
+      "heliocentric_km_s": 0.5619391027125401
+    },
+    {
+      "name": "just below the RA wrap @ Mauna Kea, 2026-03-20",
+      "site": {
+        "name": "Mauna Kea",
+        "lon_deg": -155.47441,
+        "lat_deg": 19.8263,
+        "height_m": 4145.0
+      },
+      "epoch_utc": "2026-03-20T12:00:00",
+      "epoch_note": "March equinox",
+      "target": {
+        "name": "just below the RA wrap",
+        "ra_deg": 359.99,
+        "dec_deg": 0.0
+      },
+      "barycentric_km_s": -0.5402826734621153,
+      "barycentric_classical_km_s": -0.5449929847486457,
+      "heliocentric_km_s": -0.5570785326546929
+    },
+    {
+      "name": "north ecliptic pole @ Mauna Kea, 2026-03-20",
+      "site": {
+        "name": "Mauna Kea",
+        "lon_deg": -155.47441,
+        "lat_deg": 19.8263,
+        "height_m": 4145.0
+      },
+      "epoch_utc": "2026-03-20T12:00:00",
+      "epoch_note": "March equinox",
+      "target": {
+        "name": "north ecliptic pole",
+        "ra_deg": 270.0,
+        "dec_deg": 66.5607
+      },
+      "barycentric_km_s": 0.16628519741422043,
+      "barycentric_classical_km_s": 0.16157487505452373,
+      "heliocentric_km_s": 0.16181797853267674
+    },
+    {
+      "name": "north celestial pole @ Mauna Kea, 2026-03-20",
+      "site": {
+        "name": "Mauna Kea",
+        "lon_deg": -155.47441,
+        "lat_deg": 19.8263,
+        "height_m": 4145.0
+      },
+      "epoch_utc": "2026-03-20T12:00:00",
+      "epoch_note": "March equinox",
+      "target": {
+        "name": "north celestial pole",
+        "ra_deg": 0.0,
+        "dec_deg": 89.9
+      },
+      "barycentric_km_s": -11.893440540290483,
+      "barycentric_classical_km_s": -11.89815067319633,
+      "heliocentric_km_s": -11.898600450233735
+    },
+    {
+      "name": "Sirius @ Mauna Kea, 2026-03-20",
+      "site": {
+        "name": "Mauna Kea",
+        "lon_deg": -155.47441,
+        "lat_deg": 19.8263,
+        "height_m": 4145.0
+      },
+      "epoch_utc": "2026-03-20T12:00:00",
+      "epoch_note": "March equinox",
+      "target": {
+        "name": "Sirius",
+        "ra_deg": 101.287155,
+        "dec_deg": -16.716116
+      },
+      "barycentric_km_s": -22.624958324163384,
+      "barycentric_classical_km_s": -22.629668288457523,
+      "heliocentric_km_s": -22.62878211096056
+    },
+    {
+      "name": "Vega @ Mauna Kea, 2026-03-20",
+      "site": {
+        "name": "Mauna Kea",
+        "lon_deg": -155.47441,
+        "lat_deg": 19.8263,
+        "height_m": 4145.0
+      },
+      "epoch_utc": "2026-03-20T12:00:00",
+      "epoch_note": "March equinox",
+      "target": {
+        "name": "Vega",
+        "ra_deg": 279.234735,
+        "dec_deg": 38.783689
+      },
+      "barycentric_km_s": 13.90985822030619,
+      "barycentric_classical_km_s": 13.905147681965767,
+      "heliocentric_km_s": 13.904598270018074
+    },
+    {
+      "name": "ecliptic plane, RA 0 @ Mauna Kea, 2026-07-06",
+      "site": {
+        "name": "Mauna Kea",
+        "lon_deg": -155.47441,
+        "lat_deg": 19.8263,
+        "height_m": 4145.0
+      },
+      "epoch_utc": "2026-07-06T00:00:00",
+      "epoch_note": "near aphelion, Earth slowest",
+      "target": {
+        "name": "ecliptic plane, RA 0",
+        "ra_deg": 0.0,
+        "dec_deg": 0.0
+      },
+      "barycentric_km_s": 28.140108759610058,
+      "barycentric_classical_km_s": 28.135594961688412,
+      "heliocentric_km_s": 28.12446267015894
+    },
+    {
+      "name": "ecliptic plane, RA 180 @ Mauna Kea, 2026-07-06",
+      "site": {
+        "name": "Mauna Kea",
+        "lon_deg": -155.47441,
+        "lat_deg": 19.8263,
+        "height_m": 4145.0
+      },
+      "epoch_utc": "2026-07-06T00:00:00",
+      "epoch_note": "near aphelion, Earth slowest",
+      "target": {
+        "name": "ecliptic plane, RA 180",
+        "ra_deg": 180.0,
+        "dec_deg": 0.0
+      },
+      "barycentric_km_s": -28.131082010881766,
+      "barycentric_classical_km_s": -28.135594961688412,
+      "heliocentric_km_s": -28.12446267015894
+    },
+    {
+      "name": "just below the RA wrap @ Mauna Kea, 2026-07-06",
+      "site": {
+        "name": "Mauna Kea",
+        "lon_deg": -155.47441,
+        "lat_deg": 19.8263,
+        "height_m": 4145.0
+      },
+      "epoch_utc": "2026-07-06T00:00:00",
+      "epoch_note": "near aphelion, Earth slowest",
+      "target": {
+        "name": "just below the RA wrap",
+        "ra_deg": 359.99,
+        "dec_deg": 0.0
+      },
+      "barycentric_km_s": 28.139052771609737,
+      "barycentric_classical_km_s": 28.134538973692614,
+      "heliocentric_km_s": 28.12340723095776
+    },
+    {
+      "name": "north ecliptic pole @ Mauna Kea, 2026-07-06",
+      "site": {
+        "name": "Mauna Kea",
+        "lon_deg": -155.47441,
+        "lat_deg": 19.8263,
+        "height_m": 4145.0
+      },
+      "epoch_utc": "2026-07-06T00:00:00",
+      "epoch_note": "near aphelion, Earth slowest",
+      "target": {
+        "name": "north ecliptic pole",
+        "ra_deg": 270.0,
+        "dec_deg": 66.5607
+      },
+      "barycentric_km_s": 0.11120698883799993,
+      "barycentric_classical_km_s": 0.10669361290813277,
+      "heliocentric_km_s": 0.10692227657862319
+    },
+    {
+      "name": "north celestial pole @ Mauna Kea, 2026-07-06",
+      "site": {
+        "name": "Mauna Kea",
+        "lon_deg": -155.47441,
+        "lat_deg": 19.8263,
+        "height_m": 4145.0
+      },
+      "epoch_utc": "2026-07-06T00:00:00",
+      "epoch_note": "near aphelion, Earth slowest",
+      "target": {
+        "name": "north celestial pole",
+        "ra_deg": 0.0,
+        "dec_deg": 89.9
+      },
+      "barycentric_km_s": 2.791995818995023,
+      "barycentric_classical_km_s": 2.7874824026481306,
+      "heliocentric_km_s": 2.786349377454351
+    },
+    {
+      "name": "Sirius @ Mauna Kea, 2026-07-06",
+      "site": {
+        "name": "Mauna Kea",
+        "lon_deg": -155.47441,
+        "lat_deg": 19.8263,
+        "height_m": 4145.0
+      },
+      "epoch_utc": "2026-07-06T00:00:00",
+      "epoch_note": "near aphelion, Earth slowest",
+      "target": {
+        "name": "Sirius",
+        "ra_deg": 101.287155,
+        "dec_deg": -16.716116
+      },
+      "barycentric_km_s": -0.3769877543237186,
+      "barycentric_classical_km_s": -0.38150112296318606,
+      "heliocentric_km_s": -0.38204633993770226
+    },
+    {
+      "name": "Vega @ Mauna Kea, 2026-07-06",
+      "site": {
+        "name": "Mauna Kea",
+        "lon_deg": -155.47441,
+        "lat_deg": 19.8263,
+        "height_m": 4145.0
+      },
+      "epoch_utc": "2026-07-06T00:00:00",
+      "epoch_note": "near aphelion, Earth slowest",
+      "target": {
+        "name": "Vega",
+        "ra_deg": 279.234735,
+        "dec_deg": 38.783689
+      },
+      "barycentric_km_s": 0.5861075201549805,
+      "barycentric_classical_km_s": 0.5815941370088075,
+      "heliocentric_km_s": 0.5819225550212348
+    },
+    {
+      "name": "ecliptic plane, RA 0 @ Mauna Kea, 2026-09-22",
+      "site": {
+        "name": "Mauna Kea",
+        "lon_deg": -155.47441,
+        "lat_deg": 19.8263,
+        "height_m": 4145.0
+      },
+      "epoch_utc": "2026-09-22T18:00:00",
+      "epoch_note": "September equinox",
+      "target": {
+        "name": "ecliptic plane, RA 0",
+        "ra_deg": 0.0,
+        "dec_deg": 0.0
+      },
+      "barycentric_km_s": -0.5487228485686988,
+      "barycentric_classical_km_s": -0.5533317415529383,
+      "heliocentric_km_s": -0.5638738965033834
+    },
+    {
+      "name": "ecliptic plane, RA 180 @ Mauna Kea, 2026-09-22",
+      "site": {
+        "name": "Mauna Kea",
+        "lon_deg": -155.47441,
+        "lat_deg": 19.8263,
+        "height_m": 4145.0
+      },
+      "epoch_utc": "2026-09-22T18:00:00",
+      "epoch_note": "September equinox",
+      "target": {
+        "name": "ecliptic plane, RA 180",
+        "ra_deg": 180.0,
+        "dec_deg": 0.0
+      },
+      "barycentric_km_s": 0.5579406514995804,
+      "barycentric_classical_km_s": 0.5533317415529416,
+      "heliocentric_km_s": 0.5638738965033867
+    },
+    {
+      "name": "just below the RA wrap @ Mauna Kea, 2026-09-22",
+      "site": {
+        "name": "Mauna Kea",
+        "lon_deg": -155.47441,
+        "lat_deg": 19.8263,
+        "height_m": 4145.0
+      },
+      "epoch_utc": "2026-09-22T18:00:00",
+      "epoch_note": "September equinox",
+      "target": {
+        "name": "just below the RA wrap",
+        "ra_deg": 359.99,
+        "dec_deg": 0.0
+      },
+      "barycentric_km_s": -0.5534410347985906,
+      "barycentric_classical_km_s": -0.5580499277063768,
+      "heliocentric_km_s": -0.568591388970569
+    },
+    {
+      "name": "north ecliptic pole @ Mauna Kea, 2026-09-22",
+      "site": {
+        "name": "Mauna Kea",
+        "lon_deg": -155.47441,
+        "lat_deg": 19.8263,
+        "height_m": 4145.0
+      },
+      "epoch_utc": "2026-09-22T18:00:00",
+      "epoch_note": "September equinox",
+      "target": {
+        "name": "north ecliptic pole",
+        "ra_deg": 270.0,
+        "dec_deg": 66.5607
+      },
+      "barycentric_km_s": 0.07828771989263725,
+      "barycentric_classical_km_s": 0.07367881736136353,
+      "heliocentric_km_s": 0.07390193636133635
+    },
+    {
+      "name": "north celestial pole @ Mauna Kea, 2026-09-22",
+      "site": {
+        "name": "Mauna Kea",
+        "lon_deg": -155.47441,
+        "lat_deg": 19.8263,
+        "height_m": 4145.0
+      },
+      "epoch_utc": "2026-09-22T18:00:00",
+      "epoch_note": "September equinox",
+      "target": {
+        "name": "north celestial pole",
+        "ra_deg": 0.0,
+        "dec_deg": 89.9
+      },
+      "barycentric_km_s": 11.804290055661157,
+      "barycentric_classical_km_s": 11.799680972765882,
+      "heliocentric_km_s": 11.798182990445698
+    },
+    {
+      "name": "Sirius @ Mauna Kea, 2026-09-22",
+      "site": {
+        "name": "Mauna Kea",
+        "lon_deg": -155.47441,
+        "lat_deg": 19.8263,
+        "height_m": 4145.0
+      },
+      "epoch_utc": "2026-09-22T18:00:00",
+      "epoch_note": "September equinox",
+      "target": {
+        "name": "Sirius",
+        "ra_deg": 101.287155,
+        "dec_deg": -16.716116
+      },
+      "barycentric_km_s": 22.104225112647057,
+      "barycentric_classical_km_s": 22.099615871486908,
+      "heliocentric_km_s": 22.098285542729318
+    },
+    {
+      "name": "Vega @ Mauna Kea, 2026-09-22",
+      "site": {
+        "name": "Mauna Kea",
+        "lon_deg": -155.47441,
+        "lat_deg": 19.8263,
+        "height_m": 4145.0
+      },
+      "epoch_utc": "2026-09-22T18:00:00",
+      "epoch_note": "September equinox",
+      "target": {
+        "name": "Vega",
+        "ra_deg": 279.234735,
+        "dec_deg": 38.783689
+      },
+      "barycentric_km_s": -13.472636119664683,
+      "barycentric_classical_km_s": -13.477244813946996,
+      "heliocentric_km_s": -13.476433038296225
+    },
+    {
+      "name": "ecliptic plane, RA 0 @ Mauna Kea, 2026-11-15",
+      "site": {
+        "name": "Mauna Kea",
+        "lon_deg": -155.47441,
+        "lat_deg": 19.8263,
+        "height_m": 4145.0
+      },
+      "epoch_utc": "2026-11-15T06:00:00",
+      "epoch_note": "an ordinary date, no special geometry",
+      "target": {
+        "name": "ecliptic plane, RA 0",
+        "ra_deg": 0.0,
+        "dec_deg": 0.0
+      },
+      "barycentric_km_s": -24.027983480059408,
+      "barycentric_classical_km_s": -24.03271204320954,
+      "heliocentric_km_s": -24.042910434352024
+    },
+    {
+      "name": "ecliptic plane, RA 180 @ Mauna Kea, 2026-11-15",
+      "site": {
+        "name": "Mauna Kea",
+        "lon_deg": -155.47441,
+        "lat_deg": 19.8263,
+        "height_m": 4145.0
+      },
+      "epoch_utc": "2026-11-15T06:00:00",
+      "epoch_note": "an ordinary date, no special geometry",
+      "target": {
+        "name": "ecliptic plane, RA 180",
+        "ra_deg": 180.0,
+        "dec_deg": 0.0
+      },
+      "barycentric_km_s": 24.037441364540314,
+      "barycentric_classical_km_s": 24.032712043209543,
+      "heliocentric_km_s": 24.042910434352027
+    },
+    {
+      "name": "just below the RA wrap @ Mauna Kea, 2026-11-15",
+      "site": {
+        "name": "Mauna Kea",
+        "lon_deg": -155.47441,
+        "lat_deg": 19.8263,
+        "height_m": 4145.0
+      },
+      "epoch_utc": "2026-11-15T06:00:00",
+      "epoch_note": "an ordinary date, no special geometry",
+      "target": {
+        "name": "just below the RA wrap",
+        "ra_deg": 359.99,
+        "dec_deg": 0.0
+      },
+      "barycentric_km_s": -24.030943338744276,
+      "barycentric_classical_km_s": -24.035671901835375,
+      "heliocentric_km_s": -24.04586947342319
+    },
+    {
+      "name": "north ecliptic pole @ Mauna Kea, 2026-11-15",
+      "site": {
+        "name": "Mauna Kea",
+        "lon_deg": -155.47441,
+        "lat_deg": 19.8263,
+        "height_m": 4145.0
+      },
+      "epoch_utc": "2026-11-15T06:00:00",
+      "epoch_note": "an ordinary date, no special geometry",
+      "target": {
+        "name": "north ecliptic pole",
+        "ra_deg": 270.0,
+        "dec_deg": 66.5607
+      },
+      "barycentric_km_s": -0.16838766121425944,
+      "barycentric_classical_km_s": -0.17311660069628215,
+      "heliocentric_km_s": -0.1728940253360625
+    },
+    {
+      "name": "north celestial pole @ Mauna Kea, 2026-11-15",
+      "site": {
+        "name": "Mauna Kea",
+        "lon_deg": -155.47441,
+        "lat_deg": 19.8263,
+        "height_m": 4145.0
+      },
+      "epoch_utc": "2026-11-15T06:00:00",
+      "epoch_note": "an ordinary date, no special geometry",
+      "target": {
+        "name": "north celestial pole",
+        "ra_deg": 0.0,
+        "dec_deg": 89.9
+      },
+      "barycentric_km_s": 7.12751289657393,
+      "barycentric_classical_km_s": 7.122783841982535,
+      "heliocentric_km_s": 7.120973187715058
+    },
+    {
+      "name": "Sirius @ Mauna Kea, 2026-11-15",
+      "site": {
+        "name": "Mauna Kea",
+        "lon_deg": -155.47441,
+        "lat_deg": 19.8263,
+        "height_m": 4145.0
+      },
+      "epoch_utc": "2026-11-15T06:00:00",
+      "epoch_note": "an ordinary date, no special geometry",
+      "target": {
+        "name": "Sirius",
+        "ra_deg": 101.287155,
+        "dec_deg": -16.716116
+      },
+      "barycentric_km_s": 18.3789095156723,
+      "barycentric_classical_km_s": 18.374180283687746,
+      "heliocentric_km_s": 18.372198254691895
+    },
+    {
+      "name": "Vega @ Mauna Kea, 2026-11-15",
+      "site": {
+        "name": "Mauna Kea",
+        "lon_deg": -155.47441,
+        "lat_deg": 19.8263,
+        "height_m": 4145.0
+      },
+      "epoch_utc": "2026-11-15T06:00:00",
+      "epoch_note": "an ordinary date, no special geometry",
+      "target": {
+        "name": "Vega",
+        "ra_deg": 279.234735,
+        "dec_deg": 38.783689
+      },
+      "barycentric_km_s": -11.563706587611087,
+      "barycentric_classical_km_s": -11.568435347359435,
+      "heliocentric_km_s": -11.567221893240829
+    },
+    {
+      "name": "ecliptic plane, RA 0 @ Equator (synthetic, 0N 0E), 2026-01-04",
+      "site": {
+        "name": "Equator (synthetic, 0N 0E)",
+        "lon_deg": 0.0,
+        "lat_deg": 0.0,
+        "height_m": 0.0
+      },
+      "epoch_utc": "2026-01-04T00:00:00",
+      "epoch_note": "near perihelion, Earth fastest",
+      "target": {
+        "name": "ecliptic plane, RA 0",
+        "ra_deg": 0.0,
+        "dec_deg": 0.0
+      },
+      "barycentric_km_s": -29.90076026645835,
+      "barycentric_classical_km_s": -29.905552632424172,
+      "heliocentric_km_s": -29.91796480376221
+    },
+    {
+      "name": "ecliptic plane, RA 180 @ Equator (synthetic, 0N 0E), 2026-01-04",
+      "site": {
+        "name": "Equator (synthetic, 0N 0E)",
+        "lon_deg": 0.0,
+        "lat_deg": 0.0,
+        "height_m": 0.0
+      },
+      "epoch_utc": "2026-01-04T00:00:00",
+      "epoch_note": "near perihelion, Earth fastest",
+      "target": {
+        "name": "ecliptic plane, RA 180",
+        "ra_deg": 180.0,
+        "dec_deg": 0.0
+      },
+      "barycentric_km_s": 29.91034595455956,
+      "barycentric_classical_km_s": 29.905552632424172,
+      "heliocentric_km_s": 29.91796480376221
+    },
+    {
+      "name": "just below the RA wrap @ Equator (synthetic, 0N 0E), 2026-01-04",
+      "site": {
+        "name": "Equator (synthetic, 0N 0E)",
+        "lon_deg": 0.0,
+        "lat_deg": 0.0,
+        "height_m": 0.0
+      },
+      "epoch_utc": "2026-01-04T00:00:00",
+      "epoch_note": "near perihelion, Earth fastest",
+      "target": {
+        "name": "just below the RA wrap",
+        "ra_deg": 359.99,
+        "dec_deg": 0.0
+      },
+      "barycentric_km_s": -29.89962927558572,
+      "barycentric_classical_km_s": -29.90442164159228,
+      "heliocentric_km_s": -29.916833739444385
+    },
+    {
+      "name": "north ecliptic pole @ Equator (synthetic, 0N 0E), 2026-01-04",
+      "site": {
+        "name": "Equator (synthetic, 0N 0E)",
+        "lon_deg": 0.0,
+        "lat_deg": 0.0,
+        "height_m": 0.0
+      },
+      "epoch_utc": "2026-01-04T00:00:00",
+      "epoch_note": "near perihelion, Earth fastest",
+      "target": {
+        "name": "north ecliptic pole",
+        "ra_deg": 270.0,
+        "dec_deg": 66.5607
+      },
+      "barycentric_km_s": 0.0494301444942581,
+      "barycentric_classical_km_s": 0.044637299743867716,
+      "heliocentric_km_s": 0.044872797310380956
+    },
+    {
+      "name": "north celestial pole @ Equator (synthetic, 0N 0E), 2026-01-04",
+      "site": {
+        "name": "Equator (synthetic, 0N 0E)",
+        "lon_deg": 0.0,
+        "lat_deg": 0.0,
+        "height_m": 0.0
+      },
+      "epoch_utc": "2026-01-04T00:00:00",
+      "epoch_note": "near perihelion, Earth fastest",
+      "target": {
+        "name": "north celestial pole",
+        "ra_deg": 0.0,
+        "dec_deg": 89.9
+      },
+      "barycentric_km_s": -2.807083031825779,
+      "barycentric_classical_km_s": -2.8118758309306653,
+      "heliocentric_km_s": -2.8118228913377297
+    },
+    {
+      "name": "Sirius @ Equator (synthetic, 0N 0E), 2026-01-04",
+      "site": {
+        "name": "Equator (synthetic, 0N 0E)",
+        "lon_deg": 0.0,
+        "lat_deg": 0.0,
+        "height_m": 0.0
+      },
+      "epoch_utc": "2026-01-04T00:00:00",
+      "epoch_note": "near perihelion, Earth fastest",
+      "target": {
+        "name": "Sirius",
+        "ra_deg": 101.287155,
+        "dec_deg": -16.716116
+      },
+      "barycentric_km_s": 0.3207403396209458,
+      "barycentric_classical_km_s": 0.31594749049401993,
+      "heliocentric_km_s": 0.3178583247917903
+    },
+    {
+      "name": "Vega @ Equator (synthetic, 0N 0E), 2026-01-04",
+      "site": {
+        "name": "Equator (synthetic, 0N 0E)",
+        "lon_deg": 0.0,
+        "lat_deg": 0.0,
+        "height_m": 0.0
+      },
+      "epoch_utc": "2026-01-04T00:00:00",
+      "epoch_note": "near perihelion, Earth fastest",
+      "target": {
+        "name": "Vega",
+        "ra_deg": 279.234735,
+        "dec_deg": 38.783689
+      },
+      "barycentric_km_s": -0.4810367825543646,
+      "barycentric_classical_km_s": -0.4858296188626133,
+      "heliocentric_km_s": -0.48701248475556164
+    },
+    {
+      "name": "ecliptic plane, RA 0 @ Equator (synthetic, 0N 0E), 2026-03-20",
+      "site": {
+        "name": "Equator (synthetic, 0N 0E)",
+        "lon_deg": 0.0,
+        "lat_deg": 0.0,
+        "height_m": 0.0
+      },
+      "epoch_utc": "2026-03-20T12:00:00",
+      "epoch_note": "March equinox",
+      "target": {
+        "name": "ecliptic plane, RA 0",
+        "ra_deg": 0.0,
+        "dec_deg": 0.0
+      },
+      "barycentric_km_s": -0.6922033599276054,
+      "barycentric_classical_km_s": -0.6968344500559707,
+      "heliocentric_km_s": -0.7089202773854411
+    },
+    {
+      "name": "ecliptic plane, RA 180 @ Equator (synthetic, 0N 0E), 2026-03-20",
+      "site": {
+        "name": "Equator (synthetic, 0N 0E)",
+        "lon_deg": 0.0,
+        "lat_deg": 0.0,
+        "height_m": 0.0
+      },
+      "epoch_utc": "2026-03-20T12:00:00",
+      "epoch_note": "March equinox",
+      "target": {
+        "name": "ecliptic plane, RA 180",
+        "ra_deg": 180.0,
+        "dec_deg": 0.0
+      },
+      "barycentric_km_s": 0.7014655617484195,
+      "barycentric_classical_km_s": 0.6968344500559674,
+      "heliocentric_km_s": 0.7089202773854377
+    },
+    {
+      "name": "just below the RA wrap @ Equator (synthetic, 0N 0E), 2026-03-20",
+      "site": {
+        "name": "Equator (synthetic, 0N 0E)",
+        "lon_deg": 0.0,
+        "lat_deg": 0.0,
+        "height_m": 0.0
+      },
+      "epoch_utc": "2026-03-20T12:00:00",
+      "epoch_note": "March equinox",
+      "target": {
+        "name": "just below the RA wrap",
+        "ra_deg": 359.99,
+        "dec_deg": 0.0
+      },
+      "barycentric_km_s": -0.6874949409841992,
+      "barycentric_classical_km_s": -0.6921260311897658,
+      "heliocentric_km_s": -0.7042115790958129
+    },
+    {
+      "name": "north ecliptic pole @ Equator (synthetic, 0N 0E), 2026-03-20",
+      "site": {
+        "name": "Equator (synthetic, 0N 0E)",
+        "lon_deg": 0.0,
+        "lat_deg": 0.0,
+        "height_m": 0.0
+      },
+      "epoch_utc": "2026-03-20T12:00:00",
+      "epoch_note": "March equinox",
+      "target": {
+        "name": "north ecliptic pole",
+        "ra_deg": 270.0,
+        "dec_deg": 66.5607
+      },
+      "barycentric_km_s": -0.17961366216104754,
+      "barycentric_classical_km_s": -0.18424476022504108,
+      "heliocentric_km_s": -0.18400165674688804
+    },
+    {
+      "name": "north celestial pole @ Equator (synthetic, 0N 0E), 2026-03-20",
+      "site": {
+        "name": "Equator (synthetic, 0N 0E)",
+        "lon_deg": 0.0,
+        "lat_deg": 0.0,
+        "height_m": 0.0
+      },
+      "epoch_utc": "2026-03-20T12:00:00",
+      "epoch_note": "March equinox",
+      "target": {
+        "name": "north celestial pole",
+        "ra_deg": 0.0,
+        "dec_deg": 89.9
+      },
+      "barycentric_km_s": -11.893432069069288,
+      "barycentric_classical_km_s": -11.898062986184044,
+      "heliocentric_km_s": -11.898512763221447
+    },
+    {
+      "name": "Sirius @ Equator (synthetic, 0N 0E), 2026-03-20",
+      "site": {
+        "name": "Equator (synthetic, 0N 0E)",
+        "lon_deg": 0.0,
+        "lat_deg": 0.0,
+        "height_m": 0.0
+      },
+      "epoch_utc": "2026-03-20T12:00:00",
+      "epoch_note": "March equinox",
+      "target": {
+        "name": "Sirius",
+        "ra_deg": 101.287155,
+        "dec_deg": -16.716116
+      },
+      "barycentric_km_s": -21.78030150061022,
+      "barycentric_classical_km_s": -21.78493226500575,
+      "heliocentric_km_s": -21.784046087508788
+    },
+    {
+      "name": "Vega @ Equator (synthetic, 0N 0E), 2026-03-20",
+      "site": {
+        "name": "Equator (synthetic, 0N 0E)",
+        "lon_deg": 0.0,
+        "lat_deg": 0.0,
+        "height_m": 0.0
+      },
+      "epoch_utc": "2026-03-20T12:00:00",
+      "epoch_note": "March equinox",
+      "target": {
+        "name": "Vega",
+        "ra_deg": 279.234735,
+        "dec_deg": 38.783689
+      },
+      "barycentric_km_s": 13.22208450156931,
+      "barycentric_classical_km_s": 13.21745319642003,
+      "heliocentric_km_s": 13.216903784472338
+    },
+    {
+      "name": "ecliptic plane, RA 0 @ Equator (synthetic, 0N 0E), 2026-07-06",
+      "site": {
+        "name": "Equator (synthetic, 0N 0E)",
+        "lon_deg": 0.0,
+        "lat_deg": 0.0,
+        "height_m": 0.0
+      },
+      "epoch_utc": "2026-07-06T00:00:00",
+      "epoch_note": "near aphelion, Earth slowest",
+      "target": {
+        "name": "ecliptic plane, RA 0",
+        "ra_deg": 0.0,
+        "dec_deg": 0.0
+      },
+      "barycentric_km_s": 28.936452634867013,
+      "barycentric_classical_km_s": 28.931855076173303,
+      "heliocentric_km_s": 28.920722784643832
+    },
+    {
+      "name": "ecliptic plane, RA 180 @ Equator (synthetic, 0N 0E), 2026-07-06",
+      "site": {
+        "name": "Equator (synthetic, 0N 0E)",
+        "lon_deg": 0.0,
+        "lat_deg": 0.0,
+        "height_m": 0.0
+      },
+      "epoch_utc": "2026-07-06T00:00:00",
+      "epoch_note": "near aphelion, Earth slowest",
+      "target": {
+        "name": "ecliptic plane, RA 180",
+        "ra_deg": 180.0,
+        "dec_deg": 0.0
+      },
+      "barycentric_km_s": -28.927258404780943,
+      "barycentric_classical_km_s": -28.931855076173303,
+      "heliocentric_km_s": -28.920722784643832
+    },
+    {
+      "name": "just below the RA wrap @ Equator (synthetic, 0N 0E), 2026-07-06",
+      "site": {
+        "name": "Equator (synthetic, 0N 0E)",
+        "lon_deg": 0.0,
+        "lat_deg": 0.0,
+        "height_m": 0.0
+      },
+      "epoch_utc": "2026-07-06T00:00:00",
+      "epoch_note": "near aphelion, Earth slowest",
+      "target": {
+        "name": "just below the RA wrap",
+        "ra_deg": 359.99,
+        "dec_deg": 0.0
+      },
+      "barycentric_km_s": 28.935330226882225,
+      "barycentric_classical_km_s": 28.930732668169224,
+      "heliocentric_km_s": 28.91960092543438
+    },
+    {
+      "name": "north ecliptic pole @ Equator (synthetic, 0N 0E), 2026-07-06",
+      "site": {
+        "name": "Equator (synthetic, 0N 0E)",
+        "lon_deg": 0.0,
+        "lat_deg": 0.0,
+        "height_m": 0.0
+      },
+      "epoch_utc": "2026-07-06T00:00:00",
+      "epoch_note": "near aphelion, Earth slowest",
+      "target": {
+        "name": "north ecliptic pole",
+        "ra_deg": 270.0,
+        "dec_deg": 66.5607
+      },
+      "barycentric_km_s": -0.04196311035844098,
+      "barycentric_classical_km_s": -0.04656022466942258,
+      "heliocentric_km_s": -0.046331560998932174
+    },
+    {
+      "name": "north celestial pole @ Equator (synthetic, 0N 0E), 2026-07-06",
+      "site": {
+        "name": "Equator (synthetic, 0N 0E)",
+        "lon_deg": 0.0,
+        "lat_deg": 0.0,
+        "height_m": 0.0
+      },
+      "epoch_utc": "2026-07-06T00:00:00",
+      "epoch_note": "near aphelion, Earth slowest",
+      "target": {
+        "name": "north celestial pole",
+        "ra_deg": 0.0,
+        "dec_deg": 89.9
+      },
+      "barycentric_km_s": 2.7913941635201795,
+      "barycentric_classical_km_s": 2.7867970057429,
+      "heliocentric_km_s": 2.78566398054912
+    },
+    {
+      "name": "Sirius @ Equator (synthetic, 0N 0E), 2026-07-06",
+      "site": {
+        "name": "Equator (synthetic, 0N 0E)",
+        "lon_deg": 0.0,
+        "lat_deg": 0.0,
+        "height_m": 0.0
+      },
+      "epoch_utc": "2026-07-06T00:00:00",
+      "epoch_note": "near aphelion, Earth slowest",
+      "target": {
+        "name": "Sirius",
+        "ra_deg": 101.287155,
+        "dec_deg": -16.716116
+      },
+      "barycentric_km_s": -0.16820819644480445,
+      "barycentric_classical_km_s": -0.17280530881134007,
+      "heliocentric_km_s": -0.1733505257858563
+    },
+    {
+      "name": "Vega @ Equator (synthetic, 0N 0E), 2026-07-06",
+      "site": {
+        "name": "Equator (synthetic, 0N 0E)",
+        "lon_deg": 0.0,
+        "lat_deg": 0.0,
+        "height_m": 0.0
+      },
+      "epoch_utc": "2026-07-06T00:00:00",
+      "epoch_note": "near aphelion, Earth slowest",
+      "target": {
+        "name": "Vega",
+        "ra_deg": 279.234735,
+        "dec_deg": 38.783689
+      },
+      "barycentric_km_s": 0.3917474259936905,
+      "barycentric_classical_km_s": 0.3871503049982075,
+      "heliocentric_km_s": 0.38747872301063563
+    },
+    {
+      "name": "ecliptic plane, RA 0 @ Equator (synthetic, 0N 0E), 2026-09-22",
+      "site": {
+        "name": "Equator (synthetic, 0N 0E)",
+        "lon_deg": 0.0,
+        "lat_deg": 0.0,
+        "height_m": 0.0
+      },
+      "epoch_utc": "2026-09-22T18:00:00",
+      "epoch_note": "September equinox",
+      "target": {
+        "name": "ecliptic plane, RA 0",
+        "ra_deg": 0.0,
+        "dec_deg": 0.0
+      },
+      "barycentric_km_s": 0.3106251474071356,
+      "barycentric_classical_km_s": 0.3059984472681525,
+      "heliocentric_km_s": 0.2954562923177074
+    },
+    {
+      "name": "ecliptic plane, RA 180 @ Equator (synthetic, 0N 0E), 2026-09-22",
+      "site": {
+        "name": "Equator (synthetic, 0N 0E)",
+        "lon_deg": 0.0,
+        "lat_deg": 0.0,
+        "height_m": 0.0
+      },
+      "epoch_utc": "2026-09-22T18:00:00",
+      "epoch_note": "September equinox",
+      "target": {
+        "name": "ecliptic plane, RA 180",
+        "ra_deg": 180.0,
+        "dec_deg": 0.0
+      },
+      "barycentric_km_s": -0.3013717566002893,
+      "barycentric_classical_km_s": -0.3059984472681492,
+      "heliocentric_km_s": -0.2954562923177041
+    },
+    {
+      "name": "just below the RA wrap @ Equator (synthetic, 0N 0E), 2026-09-22",
+      "site": {
+        "name": "Equator (synthetic, 0N 0E)",
+        "lon_deg": 0.0,
+        "lat_deg": 0.0,
+        "height_m": 0.0
+      },
+      "epoch_utc": "2026-09-22T18:00:00",
+      "epoch_note": "September equinox",
+      "target": {
+        "name": "just below the RA wrap",
+        "ra_deg": 359.99,
+        "dec_deg": 0.0
+      },
+      "barycentric_km_s": 0.3058718877333572,
+      "barycentric_classical_km_s": 0.3012451877494958,
+      "heliocentric_km_s": 0.2907037264853038
+    },
+    {
+      "name": "north ecliptic pole @ Equator (synthetic, 0N 0E), 2026-09-22",
+      "site": {
+        "name": "Equator (synthetic, 0N 0E)",
+        "lon_deg": 0.0,
+        "lat_deg": 0.0,
+        "height_m": 0.0
+      },
+      "epoch_utc": "2026-09-22T18:00:00",
+      "epoch_note": "September equinox",
+      "target": {
+        "name": "north ecliptic pole",
+        "ra_deg": 270.0,
+        "dec_deg": 66.5607
+      },
+      "barycentric_km_s": -0.0036671681773168398,
+      "barycentric_classical_km_s": -0.008293863447192702,
+      "heliocentric_km_s": -0.008070744447218368
+    },
+    {
+      "name": "north celestial pole @ Equator (synthetic, 0N 0E), 2026-09-22",
+      "site": {
+        "name": "Equator (synthetic, 0N 0E)",
+        "lon_deg": 0.0,
+        "lat_deg": 0.0,
+        "height_m": 0.0
+      },
+      "epoch_utc": "2026-09-22T18:00:00",
+      "epoch_note": "September equinox",
+      "target": {
+        "name": "north celestial pole",
+        "ra_deg": 0.0,
+        "dec_deg": 89.9
+      },
+      "barycentric_km_s": 11.803554824648739,
+      "barycentric_classical_km_s": 11.798927947201264,
+      "heliocentric_km_s": 11.79742996488108
+    },
+    {
+      "name": "Sirius @ Equator (synthetic, 0N 0E), 2026-09-22",
+      "site": {
+        "name": "Equator (synthetic, 0N 0E)",
+        "lon_deg": 0.0,
+        "lat_deg": 0.0,
+        "height_m": 0.0
+      },
+      "epoch_utc": "2026-09-22T18:00:00",
+      "epoch_note": "September equinox",
+      "target": {
+        "name": "Sirius",
+        "ra_deg": 101.287155,
+        "dec_deg": -16.716116
+      },
+      "barycentric_km_s": 22.132475532580738,
+      "barycentric_classical_km_s": 22.12784849571969,
+      "heliocentric_km_s": 22.126518166962093
+    },
+    {
+      "name": "Vega @ Equator (synthetic, 0N 0E), 2026-09-22",
+      "site": {
+        "name": "Equator (synthetic, 0N 0E)",
+        "lon_deg": 0.0,
+        "lat_deg": 0.0,
+        "height_m": 0.0
+      },
+      "epoch_utc": "2026-09-22T18:00:00",
+      "epoch_note": "September equinox",
+      "target": {
+        "name": "Vega",
+        "ra_deg": 279.234735,
+        "dec_deg": 38.783689
+      },
+      "barycentric_km_s": -13.521090460096856,
+      "barycentric_classical_km_s": -13.525716946761037,
+      "heliocentric_km_s": -13.524905171110262
+    },
+    {
+      "name": "ecliptic plane, RA 0 @ Equator (synthetic, 0N 0E), 2026-11-15",
+      "site": {
+        "name": "Equator (synthetic, 0N 0E)",
+        "lon_deg": 0.0,
+        "lat_deg": 0.0,
+        "height_m": 0.0
+      },
+      "epoch_utc": "2026-11-15T06:00:00",
+      "epoch_note": "an ordinary date, no special geometry",
+      "target": {
+        "name": "ecliptic plane, RA 0",
+        "ra_deg": 0.0,
+        "dec_deg": 0.0
+      },
+      "barycentric_km_s": -24.38852554196502,
+      "barycentric_classical_km_s": -24.393238808603446,
+      "heliocentric_km_s": -24.40343719974593
+    },
+    {
+      "name": "ecliptic plane, RA 180 @ Equator (synthetic, 0N 0E), 2026-11-15",
+      "site": {
+        "name": "Equator (synthetic, 0N 0E)",
+        "lon_deg": 0.0,
+        "lat_deg": 0.0,
+        "height_m": 0.0
+      },
+      "epoch_utc": "2026-11-15T06:00:00",
+      "epoch_note": "an ordinary date, no special geometry",
+      "target": {
+        "name": "ecliptic plane, RA 180",
+        "ra_deg": 180.0,
+        "dec_deg": 0.0
+      },
+      "barycentric_km_s": 24.397952842333893,
+      "barycentric_classical_km_s": 24.39323880860345,
+      "heliocentric_km_s": 24.403437199745934
+    },
+    {
+      "name": "just below the RA wrap @ Equator (synthetic, 0N 0E), 2026-11-15",
+      "site": {
+        "name": "Equator (synthetic, 0N 0E)",
+        "lon_deg": 0.0,
+        "lat_deg": 0.0,
+        "height_m": 0.0
+      },
+      "epoch_utc": "2026-11-15T06:00:00",
+      "epoch_note": "an ordinary date, no special geometry",
+      "target": {
+        "name": "just below the RA wrap",
+        "ra_deg": 359.99,
+        "dec_deg": 0.0
+      },
+      "barycentric_km_s": -24.391344809318518,
+      "barycentric_classical_km_s": -24.396058075940857,
+      "heliocentric_km_s": -24.406255647528667
+    },
+    {
+      "name": "north ecliptic pole @ Equator (synthetic, 0N 0E), 2026-11-15",
+      "site": {
+        "name": "Equator (synthetic, 0N 0E)",
+        "lon_deg": 0.0,
+        "lat_deg": 0.0,
+        "height_m": 0.0
+      },
+      "epoch_utc": "2026-11-15T06:00:00",
+      "epoch_note": "an ordinary date, no special geometry",
+      "target": {
+        "name": "north ecliptic pole",
+        "ra_deg": 270.0,
+        "dec_deg": 66.5607
+      },
+      "barycentric_km_s": 0.1528949569168834,
+      "barycentric_classical_km_s": 0.1481813044091045,
+      "heliocentric_km_s": 0.14840387976932415
+    },
+    {
+      "name": "north celestial pole @ Equator (synthetic, 0N 0E), 2026-11-15",
+      "site": {
+        "name": "Equator (synthetic, 0N 0E)",
+        "lon_deg": 0.0,
+        "lat_deg": 0.0,
+        "height_m": 0.0
+      },
+      "epoch_utc": "2026-11-15T06:00:00",
+      "epoch_note": "an ordinary date, no special geometry",
+      "target": {
+        "name": "north celestial pole",
+        "ra_deg": 0.0,
+        "dec_deg": 89.9
+      },
+      "barycentric_km_s": 7.127837724618069,
+      "barycentric_classical_km_s": 7.123123962444714,
+      "heliocentric_km_s": 7.121313308177237
+    },
+    {
+      "name": "Sirius @ Equator (synthetic, 0N 0E), 2026-11-15",
+      "site": {
+        "name": "Equator (synthetic, 0N 0E)",
+        "lon_deg": 0.0,
+        "lat_deg": 0.0,
+        "height_m": 0.0
+      },
+      "epoch_utc": "2026-11-15T06:00:00",
+      "epoch_note": "an ordinary date, no special geometry",
+      "target": {
+        "name": "Sirius",
+        "ra_deg": 101.287155,
+        "dec_deg": -16.716116
+      },
+      "barycentric_km_s": 17.68966084734277,
+      "barycentric_classical_km_s": 17.684946919077067,
+      "heliocentric_km_s": 17.68296489008122
+    },
+    {
+      "name": "Vega @ Equator (synthetic, 0N 0E), 2026-11-15",
+      "site": {
+        "name": "Equator (synthetic, 0N 0E)",
+        "lon_deg": 0.0,
+        "lat_deg": 0.0,
+        "height_m": 0.0
+      },
+      "epoch_utc": "2026-11-15T06:00:00",
+      "epoch_note": "an ordinary date, no special geometry",
+      "target": {
+        "name": "Vega",
+        "ra_deg": 279.234735,
+        "dec_deg": 38.783689
+      },
+      "barycentric_km_s": -10.98845511758274,
+      "barycentric_classical_km_s": -10.993168594938696,
+      "heliocentric_km_s": -10.991955140820092
+    },
+    {
+      "name": "ecliptic plane, RA 0 @ Polar (synthetic, 78N), 2026-01-04",
+      "site": {
+        "name": "Polar (synthetic, 78N)",
+        "lon_deg": 0.0,
+        "lat_deg": 78.0,
+        "height_m": 0.0
+      },
+      "epoch_utc": "2026-01-04T00:00:00",
+      "epoch_note": "near perihelion, Earth fastest",
+      "target": {
+        "name": "ecliptic plane, RA 0",
+        "ra_deg": 0.0,
+        "dec_deg": 0.0
+      },
+      "barycentric_km_s": -29.542557941927754,
+      "barycentric_classical_km_s": -29.54731365877327,
+      "heliocentric_km_s": -29.559725830111308
+    },
+    {
+      "name": "ecliptic plane, RA 180 @ Polar (synthetic, 78N), 2026-01-04",
+      "site": {
+        "name": "Polar (synthetic, 78N)",
+        "lon_deg": 0.0,
+        "lat_deg": 78.0,
+        "height_m": 0.0
+      },
+      "epoch_utc": "2026-01-04T00:00:00",
+      "epoch_note": "near perihelion, Earth fastest",
+      "target": {
+        "name": "ecliptic plane, RA 180",
+        "ra_deg": 180.0,
+        "dec_deg": 0.0
+      },
+      "barycentric_km_s": 29.55207031320647,
+      "barycentric_classical_km_s": 29.54731365877327,
+      "heliocentric_km_s": 29.559725830111308
+    },
+    {
+      "name": "just below the RA wrap @ Polar (synthetic, 78N), 2026-01-04",
+      "site": {
+        "name": "Polar (synthetic, 78N)",
+        "lon_deg": 0.0,
+        "lat_deg": 78.0,
+        "height_m": 0.0
+      },
+      "epoch_utc": "2026-01-04T00:00:00",
+      "epoch_note": "near perihelion, Earth fastest",
+      "target": {
+        "name": "just below the RA wrap",
+        "ra_deg": 359.99,
+        "dec_deg": 0.0
+      },
+      "barycentric_km_s": -29.54144171920987,
+      "barycentric_classical_km_s": -29.546197436034557,
+      "heliocentric_km_s": -29.558609533886663
+    },
+    {
+      "name": "north ecliptic pole @ Polar (synthetic, 78N), 2026-01-04",
+      "site": {
+        "name": "Polar (synthetic, 78N)",
+        "lon_deg": 0.0,
+        "lat_deg": 78.0,
+        "height_m": 0.0
+      },
+      "epoch_utc": "2026-01-04T00:00:00",
+      "epoch_note": "near perihelion, Earth fastest",
+      "target": {
+        "name": "north ecliptic pole",
+        "ra_deg": 270.0,
+        "dec_deg": 66.5607
+      },
+      "barycentric_km_s": 0.014911104284609811,
+      "barycentric_classical_km_s": 0.010154918479482241,
+      "heliocentric_km_s": 0.010390416045996232
+    },
+    {
+      "name": "north celestial pole @ Polar (synthetic, 78N), 2026-01-04",
+      "site": {
+        "name": "Polar (synthetic, 78N)",
+        "lon_deg": 0.0,
+        "lat_deg": 78.0,
+        "height_m": 0.0
+      },
+      "epoch_utc": "2026-01-04T00:00:00",
+      "epoch_note": "near perihelion, Earth fastest",
+      "target": {
+        "name": "north celestial pole",
+        "ra_deg": 0.0,
+        "dec_deg": 89.9
+      },
+      "barycentric_km_s": -2.8074066295065516,
+      "barycentric_classical_km_s": -2.8121627704825847,
+      "heliocentric_km_s": -2.812109830889649
+    },
+    {
+      "name": "Sirius @ Polar (synthetic, 78N), 2026-01-04",
+      "site": {
+        "name": "Polar (synthetic, 78N)",
+        "lon_deg": 0.0,
+        "lat_deg": 78.0,
+        "height_m": 0.0
+      },
+      "epoch_utc": "2026-01-04T00:00:00",
+      "epoch_note": "near perihelion, Earth fastest",
+      "target": {
+        "name": "Sirius",
+        "ra_deg": 101.287155,
+        "dec_deg": -16.716116
+      },
+      "barycentric_km_s": 0.3332547605703242,
+      "barycentric_classical_km_s": 0.3284985698273448,
+      "heliocentric_km_s": 0.3304094041251152
+    },
+    {
+      "name": "Vega @ Polar (synthetic, 78N), 2026-01-04",
+      "site": {
+        "name": "Polar (synthetic, 78N)",
+        "lon_deg": 0.0,
+        "lat_deg": 78.0,
+        "height_m": 0.0
+      },
+      "epoch_utc": "2026-01-04T00:00:00",
+      "epoch_note": "near perihelion, Earth fastest",
+      "target": {
+        "name": "Vega",
+        "ra_deg": 279.234735,
+        "dec_deg": 38.783689
+      },
+      "barycentric_km_s": -0.5019101812848333,
+      "barycentric_classical_km_s": -0.5066663588427665,
+      "heliocentric_km_s": -0.5078492247357148
+    },
+    {
+      "name": "ecliptic plane, RA 0 @ Polar (synthetic, 78N), 2026-03-20",
+      "site": {
+        "name": "Polar (synthetic, 78N)",
+        "lon_deg": 0.0,
+        "lat_deg": 78.0,
+        "height_m": 0.0
+      },
+      "epoch_utc": "2026-03-20T12:00:00",
+      "epoch_note": "March equinox",
+      "target": {
+        "name": "ecliptic plane, RA 0",
+        "ra_deg": 0.0,
+        "dec_deg": 0.0
+      },
+      "barycentric_km_s": -0.7069517868831984,
+      "barycentric_classical_km_s": -0.7116169019273212,
+      "heliocentric_km_s": -0.7237027292567916
+    },
+    {
+      "name": "ecliptic plane, RA 180 @ Polar (synthetic, 78N), 2026-03-20",
+      "site": {
+        "name": "Polar (synthetic, 78N)",
+        "lon_deg": 0.0,
+        "lat_deg": 78.0,
+        "height_m": 0.0
+      },
+      "epoch_utc": "2026-03-20T12:00:00",
+      "epoch_note": "March equinox",
+      "target": {
+        "name": "ecliptic plane, RA 180",
+        "ra_deg": 180.0,
+        "dec_deg": 0.0
+      },
+      "barycentric_km_s": 0.7162820391545894,
+      "barycentric_classical_km_s": 0.7116169019273179,
+      "heliocentric_km_s": 0.7237027292567881
+    },
+    {
+      "name": "just below the RA wrap @ Polar (synthetic, 78N), 2026-03-20",
+      "site": {
+        "name": "Polar (synthetic, 78N)",
+        "lon_deg": 0.0,
+        "lat_deg": 78.0,
+        "height_m": 0.0
+      },
+      "epoch_utc": "2026-03-20T12:00:00",
+      "epoch_note": "March equinox",
+      "target": {
+        "name": "just below the RA wrap",
+        "ra_deg": 359.99,
+        "dec_deg": 0.0
+      },
+      "barycentric_km_s": -0.7021791756965178,
+      "barycentric_classical_km_s": -0.7068442908059354,
+      "heliocentric_km_s": -0.7189298387119826
+    },
+    {
+      "name": "north ecliptic pole @ Polar (synthetic, 78N), 2026-03-20",
+      "site": {
+        "name": "Polar (synthetic, 78N)",
+        "lon_deg": 0.0,
+        "lat_deg": 78.0,
+        "height_m": 0.0
+      },
+      "epoch_utc": "2026-03-20T12:00:00",
+      "epoch_note": "March equinox",
+      "target": {
+        "name": "north ecliptic pole",
+        "ra_deg": 270.0,
+        "dec_deg": 66.5607
+      },
+      "barycentric_km_s": -0.03323273505011213,
+      "barycentric_classical_km_s": -0.03789786056152702,
+      "heliocentric_km_s": -0.037654757083374
+    },
+    {
+      "name": "north celestial pole @ Polar (synthetic, 78N), 2026-03-20",
+      "site": {
+        "name": "Polar (synthetic, 78N)",
+        "lon_deg": 0.0,
+        "lat_deg": 78.0,
+        "height_m": 0.0
+      },
+      "epoch_utc": "2026-03-20T12:00:00",
+      "epoch_note": "March equinox",
+      "target": {
+        "name": "north celestial pole",
+        "ra_deg": 0.0,
+        "dec_deg": 89.9
+      },
+      "barycentric_km_s": -11.893372511973531,
+      "barycentric_classical_km_s": -11.898037452926916,
+      "heliocentric_km_s": -11.89848722996432
+    },
+    {
+      "name": "Sirius @ Polar (synthetic, 78N), 2026-03-20",
+      "site": {
+        "name": "Polar (synthetic, 78N)",
+        "lon_deg": 0.0,
+        "lat_deg": 78.0,
+        "height_m": 0.0
+      },
+      "epoch_utc": "2026-03-20T12:00:00",
+      "epoch_note": "March equinox",
+      "target": {
+        "name": "Sirius",
+        "ra_deg": 101.287155,
+        "dec_deg": -16.716116
+      },
+      "barycentric_km_s": -22.122949060284743,
+      "barycentric_classical_km_s": -22.12761384206627,
+      "heliocentric_km_s": -22.126727664569312
+    },
+    {
+      "name": "Vega @ Polar (synthetic, 78N), 2026-03-20",
+      "site": {
+        "name": "Polar (synthetic, 78N)",
+        "lon_deg": 0.0,
+        "lat_deg": 78.0,
+        "height_m": 0.0
+      },
+      "epoch_utc": "2026-03-20T12:00:00",
+      "epoch_note": "March equinox",
+      "target": {
+        "name": "Vega",
+        "ra_deg": 279.234735,
+        "dec_deg": 38.783689
+      },
+      "barycentric_km_s": 13.50328640278685,
+      "barycentric_classical_km_s": 13.498621066588168,
+      "heliocentric_km_s": 13.498071654640478
+    },
+    {
+      "name": "ecliptic plane, RA 0 @ Polar (synthetic, 78N), 2026-07-06",
+      "site": {
+        "name": "Polar (synthetic, 78N)",
+        "lon_deg": 0.0,
+        "lat_deg": 78.0,
+        "height_m": 0.0
+      },
+      "epoch_utc": "2026-07-06T00:00:00",
+      "epoch_note": "near aphelion, Earth slowest",
+      "target": {
+        "name": "ecliptic plane, RA 0",
+        "ra_deg": 0.0,
+        "dec_deg": 0.0
+      },
+      "barycentric_km_s": 28.578726799787002,
+      "barycentric_classical_km_s": 28.574164727143106,
+      "heliocentric_km_s": 28.563032435613636
+    },
+    {
+      "name": "ecliptic plane, RA 180 @ Polar (synthetic, 78N), 2026-07-06",
+      "site": {
+        "name": "Polar (synthetic, 78N)",
+        "lon_deg": 0.0,
+        "lat_deg": 78.0,
+        "height_m": 0.0
+      },
+      "epoch_utc": "2026-07-06T00:00:00",
+      "epoch_note": "near aphelion, Earth slowest",
+      "target": {
+        "name": "ecliptic plane, RA 180",
+        "ra_deg": 180.0,
+        "dec_deg": 0.0
+      },
+      "barycentric_km_s": -28.56960352401675,
+      "barycentric_classical_km_s": -28.574164727143106,
+      "heliocentric_km_s": -28.563032435613636
+    },
+    {
+      "name": "just below the RA wrap @ Polar (synthetic, 78N), 2026-07-06",
+      "site": {
+        "name": "Polar (synthetic, 78N)",
+        "lon_deg": 0.0,
+        "lat_deg": 78.0,
+        "height_m": 0.0
+      },
+      "epoch_utc": "2026-07-06T00:00:00",
+      "epoch_note": "near aphelion, Earth slowest",
+      "target": {
+        "name": "just below the RA wrap",
+        "ra_deg": 359.99,
+        "dec_deg": 0.0
+      },
+      "barycentric_km_s": 28.577619559826715,
+      "barycentric_classical_km_s": 28.573057487177792,
+      "heliocentric_km_s": 28.56192574444294
+    },
+    {
+      "name": "north ecliptic pole @ Polar (synthetic, 78N), 2026-07-06",
+      "site": {
+        "name": "Polar (synthetic, 78N)",
+        "lon_deg": 0.0,
+        "lat_deg": 78.0,
+        "height_m": 0.0
+      },
+      "epoch_utc": "2026-07-06T00:00:00",
+      "epoch_note": "near aphelion, Earth slowest",
+      "target": {
+        "name": "north ecliptic pole",
+        "ra_deg": 270.0,
+        "dec_deg": 66.5607
+      },
+      "barycentric_km_s": -0.006588615101592046,
+      "barycentric_classical_km_s": -0.011150252832332732,
+      "heliocentric_km_s": -0.010921589161842703
+    },
+    {
+      "name": "north celestial pole @ Polar (synthetic, 78N), 2026-07-06",
+      "site": {
+        "name": "Polar (synthetic, 78N)",
+        "lon_deg": 0.0,
+        "lat_deg": 78.0,
+        "height_m": 0.0
+      },
+      "epoch_utc": "2026-07-06T00:00:00",
+      "epoch_note": "near aphelion, Earth slowest",
+      "target": {
+        "name": "north celestial pole",
+        "ra_deg": 0.0,
+        "dec_deg": 89.9
+      },
+      "barycentric_km_s": 2.7916640843940246,
+      "barycentric_classical_km_s": 2.787102404114263,
+      "heliocentric_km_s": 2.7859693789204827
+    },
+    {
+      "name": "Sirius @ Polar (synthetic, 78N), 2026-07-06",
+      "site": {
+        "name": "Polar (synthetic, 78N)",
+        "lon_deg": 0.0,
+        "lat_deg": 78.0,
+        "height_m": 0.0
+      },
+      "epoch_utc": "2026-07-06T00:00:00",
+      "epoch_note": "near aphelion, Earth slowest",
+      "target": {
+        "name": "Sirius",
+        "ra_deg": 101.287155,
+        "dec_deg": -16.716116
+      },
+      "barycentric_km_s": -0.18305490968290464,
+      "barycentric_classical_km_s": -0.1876165447299806,
+      "heliocentric_km_s": -0.18816176170449683
+    },
+    {
+      "name": "Vega @ Polar (synthetic, 78N), 2026-07-06",
+      "site": {
+        "name": "Polar (synthetic, 78N)",
+        "lon_deg": 0.0,
+        "lat_deg": 78.0,
+        "height_m": 0.0
+      },
+      "epoch_utc": "2026-07-06T00:00:00",
+      "epoch_note": "near aphelion, Earth slowest",
+      "target": {
+        "name": "Vega",
+        "ra_deg": 279.234735,
+        "dec_deg": 38.783689
+      },
+      "barycentric_km_s": 0.414391444586413,
+      "barycentric_classical_km_s": 0.40982980041279554,
+      "heliocentric_km_s": 0.41015821842522365
+    },
+    {
+      "name": "ecliptic plane, RA 0 @ Polar (synthetic, 78N), 2026-09-22",
+      "site": {
+        "name": "Polar (synthetic, 78N)",
+        "lon_deg": 0.0,
+        "lat_deg": 78.0,
+        "height_m": 0.0
+      },
+      "epoch_utc": "2026-09-22T18:00:00",
+      "epoch_note": "September equinox",
+      "target": {
+        "name": "ecliptic plane, RA 0",
+        "ra_deg": 0.0,
+        "dec_deg": 0.0
+      },
+      "barycentric_km_s": -0.05737398763696942,
+      "barycentric_classical_km_s": -0.0620005007158626,
+      "heliocentric_km_s": -0.07254265566630765
+    },
+    {
+      "name": "ecliptic plane, RA 180 @ Polar (synthetic, 78N), 2026-09-22",
+      "site": {
+        "name": "Polar (synthetic, 78N)",
+        "lon_deg": 0.0,
+        "lat_deg": 78.0,
+        "height_m": 0.0
+      },
+      "epoch_utc": "2026-09-22T18:00:00",
+      "epoch_note": "September equinox",
+      "target": {
+        "name": "ecliptic plane, RA 180",
+        "ra_deg": 180.0,
+        "dec_deg": 0.0
+      },
+      "barycentric_km_s": 0.06662701575189314,
+      "barycentric_classical_km_s": 0.062000500715865936,
+      "heliocentric_km_s": 0.07254265566631098
+    },
+    {
+      "name": "just below the RA wrap @ Polar (synthetic, 78N), 2026-09-22",
+      "site": {
+        "name": "Polar (synthetic, 78N)",
+        "lon_deg": 0.0,
+        "lat_deg": 78.0,
+        "height_m": 0.0
+      },
+      "epoch_utc": "2026-09-22T18:00:00",
+      "epoch_note": "September equinox",
+      "target": {
+        "name": "just below the RA wrap",
+        "ra_deg": 359.99,
+        "dec_deg": 0.0
+      },
+      "barycentric_km_s": -0.06212581954205894,
+      "barycentric_classical_km_s": -0.06675233250702987,
+      "heliocentric_km_s": -0.07729379377122192
+    },
+    {
+      "name": "north ecliptic pole @ Polar (synthetic, 78N), 2026-09-22",
+      "site": {
+        "name": "Polar (synthetic, 78N)",
+        "lon_deg": 0.0,
+        "lat_deg": 78.0,
+        "height_m": 0.0
+      },
+      "epoch_utc": "2026-09-22T18:00:00",
+      "epoch_note": "September equinox",
+      "target": {
+        "name": "north ecliptic pole",
+        "ra_deg": 270.0,
+        "dec_deg": 66.5607
+      },
+      "barycentric_km_s": 0.0004566241047060133,
+      "barycentric_classical_km_s": -0.0041698898556776255,
+      "heliocentric_km_s": -0.0039467708557032926
+    },
+    {
+      "name": "north celestial pole @ Polar (synthetic, 78N), 2026-09-22",
+      "site": {
+        "name": "Polar (synthetic, 78N)",
+        "lon_deg": 0.0,
+        "lat_deg": 78.0,
+        "height_m": 0.0
+      },
+      "epoch_utc": "2026-09-22T18:00:00",
+      "epoch_note": "September equinox",
+      "target": {
+        "name": "north celestial pole",
+        "ra_deg": 0.0,
+        "dec_deg": 89.9
+      },
+      "barycentric_km_s": 11.803874582994037,
+      "barycentric_classical_km_s": 11.799247886937545,
+      "heliocentric_km_s": 11.79774990461736
+    },
+    {
+      "name": "Sirius @ Polar (synthetic, 78N), 2026-09-22",
+      "site": {
+        "name": "Polar (synthetic, 78N)",
+        "lon_deg": 0.0,
+        "lat_deg": 78.0,
+        "height_m": 0.0
+      },
+      "epoch_utc": "2026-09-22T18:00:00",
+      "epoch_note": "September equinox",
+      "target": {
+        "name": "Sirius",
+        "ra_deg": 101.287155,
+        "dec_deg": -16.716116
+      },
+      "barycentric_km_s": 22.193529017257703,
+      "barycentric_classical_km_s": 22.188902160738078,
+      "heliocentric_km_s": 22.18757183198048
+    },
+    {
+      "name": "Vega @ Polar (synthetic, 78N), 2026-09-22",
+      "site": {
+        "name": "Polar (synthetic, 78N)",
+        "lon_deg": 0.0,
+        "lat_deg": 78.0,
+        "height_m": 0.0
+      },
+      "epoch_utc": "2026-09-22T18:00:00",
+      "epoch_note": "September equinox",
+      "target": {
+        "name": "Vega",
+        "ra_deg": 279.234735,
+        "dec_deg": 38.783689
+      },
+      "barycentric_km_s": -13.560253989947464,
+      "barycentric_classical_km_s": -13.564880294626219,
+      "heliocentric_km_s": -13.564068518975445
+    },
+    {
+      "name": "ecliptic plane, RA 0 @ Polar (synthetic, 78N), 2026-11-15",
+      "site": {
+        "name": "Polar (synthetic, 78N)",
+        "lon_deg": 0.0,
+        "lat_deg": 78.0,
+        "height_m": 0.0
+      },
+      "epoch_utc": "2026-11-15T06:00:00",
+      "epoch_note": "an ordinary date, no special geometry",
+      "target": {
+        "name": "ecliptic plane, RA 0",
+        "ra_deg": 0.0,
+        "dec_deg": 0.0
+      },
+      "barycentric_km_s": -24.172161123603008,
+      "barycentric_classical_km_s": -24.176873718758348,
+      "heliocentric_km_s": -24.187072109900832
+    },
+    {
+      "name": "ecliptic plane, RA 180 @ Polar (synthetic, 78N), 2026-11-15",
+      "site": {
+        "name": "Polar (synthetic, 78N)",
+        "lon_deg": 0.0,
+        "lat_deg": 78.0,
+        "height_m": 0.0
+      },
+      "epoch_utc": "2026-11-15T06:00:00",
+      "epoch_note": "an ordinary date, no special geometry",
+      "target": {
+        "name": "ecliptic plane, RA 180",
+        "ra_deg": 180.0,
+        "dec_deg": 0.0
+      },
+      "barycentric_km_s": 24.181587074086934,
+      "barycentric_classical_km_s": 24.17687371875835,
+      "heliocentric_km_s": 24.187072109900836
+    },
+    {
+      "name": "just below the RA wrap @ Polar (synthetic, 78N), 2026-11-15",
+      "site": {
+        "name": "Polar (synthetic, 78N)",
+        "lon_deg": 0.0,
+        "lat_deg": 78.0,
+        "height_m": 0.0
+      },
+      "epoch_utc": "2026-11-15T06:00:00",
+      "epoch_note": "an ordinary date, no special geometry",
+      "target": {
+        "name": "just below the RA wrap",
+        "ra_deg": 359.99,
+        "dec_deg": 0.0
+      },
+      "barycentric_km_s": -24.175032367667928,
+      "barycentric_classical_km_s": -24.179744962776663,
+      "heliocentric_km_s": -24.189942534364477
+    },
+    {
+      "name": "north ecliptic pole @ Polar (synthetic, 78N), 2026-11-15",
+      "site": {
+        "name": "Polar (synthetic, 78N)",
+        "lon_deg": 0.0,
+        "lat_deg": 78.0,
+        "height_m": 0.0
+      },
+      "epoch_utc": "2026-11-15T06:00:00",
+      "epoch_note": "an ordinary date, no special geometry",
+      "target": {
+        "name": "north ecliptic pole",
+        "ra_deg": 270.0,
+        "dec_deg": 66.5607
+      },
+      "barycentric_km_s": 0.033912897632955366,
+      "barycentric_classical_km_s": 0.02919992197622183,
+      "heliocentric_km_s": 0.029422497336440735
+    },
+    {
+      "name": "north celestial pole @ Polar (synthetic, 78N), 2026-11-15",
+      "site": {
+        "name": "Polar (synthetic, 78N)",
+        "lon_deg": 0.0,
+        "lat_deg": 78.0,
+        "height_m": 0.0
+      },
+      "epoch_utc": "2026-11-15T06:00:00",
+      "epoch_note": "an ordinary date, no special geometry",
+      "target": {
+        "name": "north celestial pole",
+        "ra_deg": 0.0,
+        "dec_deg": 89.9
+      },
+      "barycentric_km_s": 7.127638051681156,
+      "barycentric_classical_km_s": 7.1229249644187895,
+      "heliocentric_km_s": 7.121114310151312
+    },
+    {
+      "name": "Sirius @ Polar (synthetic, 78N), 2026-11-15",
+      "site": {
+        "name": "Polar (synthetic, 78N)",
+        "lon_deg": 0.0,
+        "lat_deg": 78.0,
+        "height_m": 0.0
+      },
+      "epoch_utc": "2026-11-15T06:00:00",
+      "epoch_note": "an ordinary date, no special geometry",
+      "target": {
+        "name": "Sirius",
+        "ra_deg": 101.287155,
+        "dec_deg": -16.716116
+      },
+      "barycentric_km_s": 17.928952687612014,
+      "barycentric_classical_km_s": 17.92423943064208,
+      "heliocentric_km_s": 17.922257401646227
+    },
+    {
+      "name": "Vega @ Polar (synthetic, 78N), 2026-11-15",
+      "site": {
+        "name": "Polar (synthetic, 78N)",
+        "lon_deg": 0.0,
+        "lat_deg": 78.0,
+        "height_m": 0.0
+      },
+      "epoch_utc": "2026-11-15T06:00:00",
+      "epoch_note": "an ordinary date, no special geometry",
+      "target": {
+        "name": "Vega",
+        "ra_deg": 279.234735,
+        "dec_deg": 38.783689
+      },
+      "barycentric_km_s": -11.19087059901185,
+      "barycentric_classical_km_s": -11.195583398235588,
+      "heliocentric_km_s": -11.194369944116982
+    }
+  ]
+}
