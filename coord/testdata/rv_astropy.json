@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "generated": "2026-08-29T02:03:33Z",
-  "astrogo_commit": "a0ed0117382aa210949e0a0ec157c0e1a17cda1a",
+  "generated": "2026-08-29T02:17:11Z",
+  "astrogo_commit": "aa4ce80ef6f471a743fd7bea8777d545b39541ed",
   "generator": {
     "astropy": "8.0.1",
     "pyerfa": "2.0.1.5",

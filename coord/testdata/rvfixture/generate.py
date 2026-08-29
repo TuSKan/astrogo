@@ -203,7 +203,13 @@ def main():
         "cases": cases,
     }
 
-    with open(OUT, "w", encoding="utf-8") as f:
+    # newline="\n" so the document is byte-identical whichever
+    # platform generated it. Python translates "\n" to the host line
+    # ending by default, which on Windows rewrites all 4,000 lines on every
+    # regeneration and leaves a reviewer unable to see which numbers actually
+    # moved — the diff being reviewable is the whole point of checking the
+    # table in.
+    with open(OUT, "w", encoding="utf-8", newline="\n") as f:
         json.dump(doc, f, indent=2)
         f.write("\n")
 
