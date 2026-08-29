@@ -27,6 +27,8 @@ import (
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/plan"
 	"github.com/TuSKan/astrogo/time"
+
+	"github.com/TuSKan/astrogo/internal/testutil"
 )
 
 // ── AstroPixels Reference Types ──────────────────────────────────────────────
@@ -192,7 +194,12 @@ func fetchAstroPixelsPage(t *testing.T, startYear int) string {
 		t.Skipf("AstroPixels returned status %d for %s", resp.StatusCode, url)
 	}
 
+	// The request succeeded and the status was 200, so the two guards above
+	// have already passed; a failure here is the connection dropping
+	// mid-body, which is the server's doing and not a defect in this parser.
 	body, err := io.ReadAll(resp.Body)
+	testutil.SkipOnUpstreamFailure(t, err)
+
 	if err != nil {
 		t.Fatalf("Failed to read AstroPixels response: %v", err)
 	}
