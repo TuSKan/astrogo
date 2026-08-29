@@ -146,8 +146,24 @@ func TestFetchAnswersATargetList(t *testing.T) {
 	second := time.Since(start)
 	t.Logf("cached repeat took %v", second.Round(time.Millisecond))
 
-	if second > first/2 {
-		t.Errorf("cached repeat took %v against a cold %v; the cache is not being used", second, first)
+	// An absolute ceiling rather than a ratio against the first call.
+	//
+	// The property being asserted is "this did not touch the network", and a
+	// ratio is a poor proxy for it: the first Fetch is only slow when the
+	// on-disk cache is cold, so after any earlier run has warmed it both
+	// calls come back in a few milliseconds and the ratio test fails on a
+	// cache that is working perfectly. Measured here: 3.3 ms against a
+	// "cold" 4.2 ms.
+	//
+	// A real query to the Gaia archive takes hundreds of milliseconds at
+	// best — the aggregation runs measured in this package take seconds — so
+	// anything under 100 ms cannot have made one, whatever the first call
+	// did.
+	const networkFloor = 100 * time.Millisecond
+
+	if second > networkFloor {
+		t.Errorf("cached repeat took %v, over the %v that only a network round trip could need; "+
+			"the cache is not being used (first call: %v)", second, networkFloor, first)
 	}
 }
 

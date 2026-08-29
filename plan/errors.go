@@ -46,6 +46,18 @@ var (
 	// point — both FindRoot and FindExtremum guard against silently
 	// converging on (and returning as success) a non-finite result.
 	ErrNonFiniteEvaluation = errors.New("solver: evaluator returned a non-finite value")
+
+	// ErrNoConvergence indicates the solver exhausted Solver.MaxIter without
+	// bringing the bracket inside Solver.Tolerance.
+	//
+	// The best estimate found is returned alongside it, so a caller who is
+	// content with an approximation can check for this sentinel and keep the
+	// value. What is no longer possible is mistaking one for the other: the
+	// solver used to return its best effort with a nil error, so a caller
+	// doing the ordinary Go thing could not tell a converged root from an
+	// iteration budget that ran out. For an interactive display that is
+	// defensible; for anything that points a telescope it is not.
+	ErrNoConvergence = errors.New("solver: did not converge within MaxIter")
 	// ErrEventNotFound indicates no event was found in the search window.
 	ErrEventNotFound = errors.New("no event found in search window")
 
