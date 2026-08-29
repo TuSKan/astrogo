@@ -119,11 +119,15 @@ func TestFetchIsCached(t *testing.T) {
 	const id = "Generic/Bessell.V"
 
 	first, err := passband.Fetch(t.Context(), id)
+	testutil.SkipOnUpstreamFailure(t, err)
+
 	if err != nil {
 		t.Fatalf("first fetch: %v", err)
 	}
 
 	second, err := passband.Fetch(t.Context(), id)
+	testutil.SkipOnUpstreamFailure(t, err)
+
 	if err != nil {
 		t.Fatalf("second fetch: %v", err)
 	}

@@ -32,6 +32,8 @@ func TestFetchAgainstTheRealService(t *testing.T) {
 		dust.Direction{L: angle.Deg(0), B: angle.Deg(0)},  // Galactic centre
 		dust.Direction{L: angle.Deg(0), B: angle.Deg(90)}, // north Galactic pole
 	)
+	testutil.SkipOnUpstreamFailure(t, err)
+
 	if err != nil {
 		t.Fatalf("Fetch: %v", err)
 	}

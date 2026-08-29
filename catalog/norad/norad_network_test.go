@@ -13,6 +13,7 @@ package norad
 
 import (
 	"context"
+	"sync"
 	"testing"
 	"time"
 
@@ -22,10 +23,33 @@ import (
 // requireCelestrak skips the test when the CelestTrak API endpoint is
 // unreachable (DNS failure, firewall, etc.).  This avoids false-negative
 // CI failures for transient network issues.
+// celestrakHealth is probed once per run and shared by every live test here,
+// so a CelesTrak outage costs one request rather than one per test.
+var celestrakHealth struct {
+	once sync.Once
+	err  error
+}
+
+// requireCelestrak skips unless CelesTrak is both reachable and working.
+//
+// Reachability alone is not enough: CelesTrak answering "500 Internal Server
+// Error" opens a socket perfectly well, so the probe passed and the assertions
+// below failed, reporting a CelesTrak outage as an astrogo defect on pull
+// requests that never touched this package. A 4xx still fails, because that
+// would mean astrogo built a request CelesTrak rejected.
 func requireCelestrak(t *testing.T) {
 	t.Helper()
 
 	testutil.RequireReachable(t, "celestrak.org:443")
+
+	celestrakHealth.once.Do(func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+
+		_, celestrakHealth.err = New().Fetch(ctx, QueryCatNr, "25544")
+	})
+
+	testutil.SkipOnUpstreamFailure(t, celestrakHealth.err)
 }
 
 func TestFetchISS_Live(t *testing.T) {
@@ -37,6 +61,8 @@ func TestFetchISS_Live(t *testing.T) {
 	p := New()
 
 	gps, err := p.Fetch(ctx, QueryCatNr, "25544")
+	testutil.SkipOnUpstreamFailure(t, err)
+
 	if err != nil {
 		t.Fatalf("Failed to fetch ISS data: %v", err)
 	}
@@ -85,6 +111,8 @@ func TestFetchGroup_Live(t *testing.T) {
 	p := New()
 
 	gps, err := p.Fetch(ctx, QueryGroup, GroupStations)
+	testutil.SkipOnUpstreamFailure(t, err)
+
 	if err != nil {
 		t.Fatalf("Failed to fetch Stations group: %v", err)
 	}
