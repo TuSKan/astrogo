@@ -342,9 +342,13 @@ physics, not just missing plumbing. Verdict from investigation: forcing parity w
 asteroids now would ship confidently wrong numbers, so moons stay kernel-only
 (`ephemeris/jpl` SPK, gated by `remote.EnableDownloads`) until this is built properly.
 
-- [ ] Per-parent GM constants (Mars/Jupiter/Saturn/Uranus/Neptune/Pluto system GMs) —
-      IAU 2015 B3 Table 1 only publishes Sun/Earth/Jupiter; the rest need their own
-      versioned, cited constants set (comparable scope to the `constants` refactor).
+- [x] `constants.DE440` — per-parent GM constants, both the system parameter (planet
+      plus satellites, which the ephemeris integrates) and the body parameter (the
+      planet alone, which governs a satellite's motion about it). IAU 2015 B3 Table 1
+      publishes only Sun/Earth/Jupiter, so these come from DE440 via NAIF's
+      `gm_de440.tpc`, with the per-planet values separately sourced from the natural
+      satellite release forms. Verified against the kernel by a network test rather
+      than trusted to transcription; `remote.NAIFPCK` was added to fetch it.
 - [ ] Central-body (not heliocentric) two-body propagation in `ephemeris/kepler`
 - [ ] Laplace-plane frame handling for published *mean* moon elements (tabulated pole,
       secular precession) — these are not osculating J2000-ecliptic elements and can't

@@ -297,6 +297,8 @@ func constName(id EndpointID) string {
 		return "NAIFSPK"
 	case NAIFLSK:
 		return "NAIFLSK"
+	case NAIFPCK:
+		return "NAIFPCK"
 	case JPLHorizons:
 		return "JPLHorizons"
 	case JPLHorizonsSPK:
