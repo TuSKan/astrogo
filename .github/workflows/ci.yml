@@ -4,9 +4,11 @@ on:
   push:
     branches:
       - main
+  # Every pull request, not only those targeting main. A stacked PR — one
+  # opened against another branch while its parent is still in review —
+  # matched no branch filter here and so ran no checks at all, which reads
+  # as "nothing to report" rather than "nothing was run".
   pull_request:
-    branches:
-      - main
 
 permissions:
   contents: read
