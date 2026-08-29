@@ -47,33 +47,35 @@ func smallBodies() []smallBody {
 			why: "main belt at ~3 AU, the slow end of the range",
 		},
 		{
+			id: 1, designation: "1;", name: "Ceres",
+			why: "the largest asteroid, and one of the four that were unreachable until " +
+				"small-body identifiers stopped colliding with the planets",
+		},
+		{
+			id: 4, designation: "4;", name: "Vesta",
+			why: "the collision that exposed the identifier bug: asteroid 4 landed on Mars",
+		},
+		{
 			id: 624, designation: "624;", name: "Hektor",
 			why: "Jupiter trojan at ~5.2 AU, the slowest and most distant case here",
 		},
 	}
 }
 
-// Ceres, Pallas, Juno and Vesta are absent, and the reason is a defect in
-// this repository rather than anything about those bodies.
+// Ceres and Vesta are in the set above deliberately, and were not always
+// loadable.
 //
-// Horizons generates a perfectly good kernel for each — verified, 72,704
-// bytes with a Type 21 segment, for "4;" exactly as for "433;". The segment's
-// target ID is 20000004, which [jpl.Provider.SupportedBodies] maps to a body
-// ID by subtracting 20000000. That gives core.ID(4), and core.ID(4) is Mars:
-// the enum runs Mercury=1, Venus=2, Earth=3, Mars=4. So asteroids 1 through 9
-// land on planet identifiers and the body is silently dropped, taking with it
-// four of the largest and best-observed objects in the solar system.
+// A small body used to be identified by its bare number, so asteroid 4 Vesta
+// and Mars were both core.ID(4) — as were Ceres and Mercury, Pallas and
+// Venus, and every asteroid numbered up to 12. A provider holding a planetary
+// kernel resolved the planet and dropped the asteroid as a duplicate, and
+// ErrNoSmallBodyKernel then blamed the designation, which was never the
+// cause: Horizons returns a perfectly good 72,704-byte Type 21 kernel for
+// "4;". Small bodies now keep NAIF's own 20000000+ identifier — see
+// [core.SmallBodyID] — and the two namespaces cannot overlap.
 //
-// Measured, Mars itself is not corrupted: adding a Vesta kernel to a de440
-// provider changes Mars's position by exactly 0.0 AU, because the lookup goes
-// through BodyIDToNAIF to target 4 and never reaches the asteroid segment.
-// The body is unreachable rather than wrong.
-//
-// What makes it worth naming here is that ErrNoSmallBodyKernel reports it as
-// a designation problem — "Horizons matches small bodies by number ... not by
-// name" — which is exactly what a reader would act on, and is not the cause.
-// Fixing it means deciding how a small body should be identified, which is a
-// public-API question and not one this suite should answer on its own.
+// Keeping the two worst-affected bodies in this suite is the point: they are
+// the cases that would silently disappear again.
 
 // smallBodySPKReference records what this comparison is against.
 //
@@ -192,7 +194,7 @@ func TestSmallBodySPKAgainstHorizons(t *testing.T) {
 				// TestJPLStateAgainstHorizons reads.
 				when := atime.FromJD(2451545.0+ref.ET/86400.0, atime.TDB)
 
-				state, serr := p.State(core.ID(body.id), when)
+				state, serr := p.State(core.SmallBodyID(body.id), when)
 				if serr != nil {
 					t.Errorf("%s: State at JD %.5f: %v", body.name, when.JD(), serr)
 

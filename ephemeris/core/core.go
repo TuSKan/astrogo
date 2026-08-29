@@ -233,6 +233,51 @@ const (
 	SolarSystemBarycenter
 )
 
+// SmallBodyBase is the offset that separates numbered small bodies from the
+// named ones, and is NAIF's own convention for asteroid SPK IDs.
+//
+// It exists because the two namespaces used to overlap. A small body was
+// identified by its bare number, so asteroid 4 Vesta and [Mars] were both
+// ID 4 — as were Ceres and [Mercury], Pallas and [Venus], Juno and [Earth],
+// and every asteroid numbered up to [SolarSystemBarycenter] at 12. A provider
+// holding a planetary kernel resolved the planet and silently dropped the
+// asteroid, which took four of the five largest asteroids out of reach with
+// nothing to say why.
+//
+// Untyped on purpose: it is an offset within the ID space rather than a body,
+// so it has no place among the values a switch over an ID should handle.
+const SmallBodyBase = 20000000
+
+// smallBodySpan bounds the small-body block, matching NAIF's own allocation.
+const smallBodySpan = 1000000
+
+// SmallBodyID returns the identifier for the numbered small body n — 433 for
+// Eros, 3200 for Phaethon — placed clear of the named bodies.
+//
+// This is the form [Provider.SupportedBodies] reports. A bare core.ID(433)
+// still resolves, so existing callers keep working, but it cannot be
+// enumerated without ambiguity and is not what a new caller should write.
+//
+// Returns 0 for an n outside NAIF's small-body block, which is not a valid
+// body identifier and will fail to resolve rather than aliasing another body.
+func SmallBodyID(n int) ID {
+	if n <= 0 || n >= smallBodySpan {
+		return 0
+	}
+
+	return SmallBodyBase + ID(n)
+}
+
+// SmallBodyNumber reports the small-body number this ID stands for, and
+// whether it is one at all.
+func (id ID) SmallBodyNumber() (int, bool) {
+	if id <= SmallBodyBase || id >= SmallBodyBase+smallBodySpan {
+		return 0, false
+	}
+
+	return int(id - SmallBodyBase), true
+}
+
 // String returns the conventional name of the body identifier.
 func (id ID) String() string {
 	switch id {
@@ -261,6 +306,10 @@ func (id ID) String() string {
 	case SolarSystemBarycenter:
 		return "SolarSystemBarycenter"
 	default:
+		if n, ok := id.SmallBodyNumber(); ok {
+			return fmt.Sprintf("SmallBody(%d)", n)
+		}
+
 		return fmt.Sprintf("BodyID(%d)", id)
 	}
 }
