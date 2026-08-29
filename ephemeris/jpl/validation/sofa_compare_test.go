@@ -4,23 +4,26 @@ package jpl_test
 
 import (
 	"context"
+	"fmt"
+	"strings"
 	"testing"
 
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/ephemeris/core"
 	"github.com/TuSKan/astrogo/ephemeris/jpl"
+	"github.com/TuSKan/astrogo/internal/metrology"
 	"github.com/TuSKan/astrogo/time"
 )
 
 // sofaEpoch is one fixed instant in the comparison, named so a failing
-// subtest identifies itself.
+// sample identifies itself.
 //
 // Fixed, because a validation result whose epoch is "now" cannot be
 // reproduced: this test previously used time.NowUTC() for one of its three
 // points, so every run compared a different instant and any failure would
 // have been unreproducible by the person reading the log. It also meant the
 // contract below was re-rolled against a fresh epoch on every run — see
-// sofaContract for why that mattered more than it looks.
+// contractFor for why that mattered more than it looks.
 //
 // All three epochs sit inside both reference routines' documented validity
 // windows: Epv00 quotes its accuracy over 1900-2100, Moon98 over 1950-2100.
@@ -37,8 +40,7 @@ func sofaEpochs() []sofaEpoch {
 	}
 }
 
-// sofaContract is the agreement bound for one body, in AU, together with the
-// reason it has the value it has.
+// contractFor is the agreement bound for one body.
 //
 // # Why these numbers changed, and why the old ones were unsound
 //
@@ -59,8 +61,8 @@ func sofaEpochs() []sofaEpoch {
 // published worst case of 31.7 km, so the Moon bound demanded the two agree
 // twice as closely as SOFA documents its own routine to be accurate. It
 // passed only because the sampled epochs happened to land in a favourable
-// part of the lunar residual, and one of those epochs was time.NowUTC(),
-// so that luck was re-rolled on every single run.
+// part of the lunar residual, and one of those epochs was time.NowUTC(), so
+// that luck was re-rolled on every single run.
 //
 // The bounds below are the published worst cases doubled. The factor is not
 // margin-for-comfort: the quoted figures are against DE405 and ELP/MPP02
@@ -68,75 +70,77 @@ func sofaEpochs() []sofaEpoch {
 // between those reference ephemerides is itself nonzero. Doubling covers it
 // and keeps the bound a genuine scientific limit rather than a transcription
 // of whatever this repository last measured.
-type sofaContract struct {
-	maxAU     float64
-	rationale string
-}
-
-func contractFor(bid eph.ID) sofaContract {
+func contractFor(bid eph.ID) metrology.Contract {
 	if bid == eph.Moon {
-		return sofaContract{
-			maxAU:     4.0e-7,
-			rationale: "2x Moon98's published worst case against ELP/MPP02 (31.7 km, 1950-2100)",
-		}
+		return metrology.MustContract(4.0e-7, "AU",
+			"2x Moon98's published worst case against ELP/MPP02, 31.7 km over 1950-2100, "+
+				"doubled because that figure is against ELP/MPP02 while this compares against DE440",
+			"gofa ephem.go, Moon98 note 3")
 	}
 
-	return sofaContract{
-		maxAU:     1.5e-7,
-		rationale: "2x Epv00's published max heliocentric error against DE405 (11.2 km, 1900-2100)",
+	return metrology.MustContract(1.5e-7, "AU",
+		"2x Epv00's published max heliocentric position error against DE405, 11.2 km over "+
+			"1900-2100, doubled because that figure is against DE405 while this compares against DE440",
+		"gofa ephem.go, Epv00 note 4")
+}
+
+// sofaReference records what this is compared against, and why the agreement
+// is weaker evidence than a tick would suggest.
+//
+// Both sides run through astrogo. One reads a JPL kernel and the other
+// evaluates gofa's analytical series, so the *models* are genuinely
+// independent — but the series is astrogo's own dependency rather than a
+// third party's implementation, so a fault in how astrogo drives gofa is
+// invisible here and only a fault in how it drives the kernel would show.
+// Recording the shared ancestry makes the generated table say so instead of
+// leaving a reader to work it out.
+func sofaReference() metrology.Reference {
+	return metrology.Reference{
+		Kind:           metrology.KindSOFA,
+		Name:           "gofa (Epv00 / Moon98)",
+		Version:        "v1.19.1",
+		Source:         "github.com/hebl/gofa, SOFA-derived",
+		Dataset:        "compared against DE440",
+		SharedAncestor: "SOFA",
 	}
 }
 
 func runSOFATest(t *testing.T, bid eph.ID) {
 	t.Helper()
 
+	suite := metrology.NewSuite("ephemeris.sofa."+strings.ToLower(bid.String()),
+		sofaReference(), contractFor(bid))
+
 	p, err := jpl.NewProvider(context.Background(), core.Planets, "de440")
 	if err != nil {
-		t.Skipf("skipping SOFA comparison: JPL provider failed: %v", err)
+		metrology.NotVerified(t, "the JPL provider could not be built: "+err.Error(), suite)
 	}
 
 	defer func() { _ = p.Close() }()
 
 	sofa := eph.Default()
-	contract := contractFor(bid)
-
-	var worst float64
 
 	for _, e := range sofaEpochs() {
-		t.Run(bid.String()+"_"+e.name, func(t *testing.T) {
-			jplState, err := p.State(bid, e.t)
-			if err != nil {
-				t.Fatalf("JPL State() failed at %s: %v", e.name, err)
-			}
+		jplState, err := p.State(bid, e.t)
+		if err != nil {
+			t.Fatalf("JPL State() failed at %s: %v", e.name, err)
+		}
 
-			sofaState, err := sofa.State(bid, e.t)
-			if err != nil {
-				t.Fatalf("SOFA State() failed at %s: %v", e.name, err)
-			}
+		sofaState, err := sofa.State(bid, e.t)
+		if err != nil {
+			t.Fatalf("SOFA State() failed at %s: %v", e.name, err)
+		}
 
-			posDiff := jplState.Pos.Sub(sofaState.Pos).Norm()
-			if posDiff > worst {
-				worst = posDiff
-			}
+		posDiff := jplState.Pos.Sub(sofaState.Pos).Norm()
 
-			// The measured value is reported unconditionally, not only on
-			// failure. A test that asserts a bound and prints nothing leaves
-			// nobody able to say whether the bound is close to the truth or
-			// an order of magnitude away from it — which is exactly how the
-			// two unsound tolerances above survived.
-			t.Logf("%s @ %s: |DE440 - SOFA| = %.4e AU (%.2f km)",
-				bid, e.name, posDiff, posDiff*kmPerAU)
-
-			if posDiff > contract.maxAU {
-				t.Errorf("%s @ %s: %.4e AU (%.2f km) exceeds the contract %.4e AU (%.2f km)\n  contract rationale: %s",
-					bid, e.name, posDiff, posDiff*kmPerAU,
-					contract.maxAU, contract.maxAU*kmPerAU, contract.rationale)
-			}
+		suite.Add(metrology.Sample{
+			Error:   posDiff,
+			Label:   bid.String() + " @ " + e.name,
+			Context: fmt.Sprintf("%s, |DE440 - SOFA| = %.2f km", e.name, posDiff*kmPerAU),
 		})
 	}
 
-	t.Logf("%s: measured max %.4e AU (%.2f km) against contract %.4e AU (%.2f km) — %s",
-		bid, worst, worst*kmPerAU, contract.maxAU, contract.maxAU*kmPerAU, contract.rationale)
+	suite.Report(t)
 }
 
 func TestJPLStateAgainstSOFASun(t *testing.T) {

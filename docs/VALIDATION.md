@@ -49,11 +49,15 @@ generated table existed.
 
 | Suite | Reference | Independence | N | p50 | p95 | p99 | Max | Contract | Status | Last verified |
 |---|---|---|---:|---:|---:|---:|---:|---:|---|---|
-| `coord.topocentric.corpus` | JPL Horizons OBSERVER + VECTORS, AIRLESS | independent | 103 | 0.433 | 1.9 | 1.99 | 2.07 | 3 arcsec | ✅ verified | 2026-08-28 · `edae4af2` |
-| `coord.topocentric.crosstrack` | JPL Horizons OBSERVER ephemeris, AIRLESS | independent | 68 | 0.378 | 1.88 | 1.93 | 1.96 | 3 arcsec | ✅ verified | 2026-08-28 · `edae4af2` |
-| `coord.topocentric.elevation` | JPL Horizons OBSERVER ephemeris, AIRLESS | independent | 68 | 0.0712 | 0.272 | 0.352 | 0.372 | 3 arcsec | ✅ verified | 2026-08-28 · `edae4af2` |
-| `coord.topocentric.separation` | JPL Horizons OBSERVER ephemeris, AIRLESS | independent | 68 | 0.387 | 1.88 | 1.94 | 1.97 | 3 arcsec | ✅ verified | 2026-08-28 · `edae4af2` |
-| `skybrightness.gambons.band_medians` | GAMBONS (Masana, Carrasco, Bara & Ribas) 2021 MNRAS 501, 5443; 2024 | independent | 6 | 0.207 | 0.273 | 0.28 | 0.282 | 1 mag | ✅ verified | 2026-08-28 · `edae4af2` |
+| `coord.topocentric.corpus` | JPL Horizons OBSERVER + VECTORS, AIRLESS | independent | 103 | 0.433 | 1.9 | 1.99 | 2.07 | 3 arcsec | ✅ verified | 2026-08-28 · `2724324e` |
+| `coord.topocentric.crosstrack` | JPL Horizons OBSERVER ephemeris, AIRLESS | independent | 68 | 0.379 | 1.88 | 1.93 | 1.96 | 3 arcsec | ✅ verified | 2026-08-28 · `2724324e` |
+| `coord.topocentric.elevation` | JPL Horizons OBSERVER ephemeris, AIRLESS | independent | 68 | 0.0665 | 0.272 | 0.352 | 0.372 | 3 arcsec | ✅ verified | 2026-08-28 · `2724324e` |
+| `coord.topocentric.separation` | JPL Horizons OBSERVER ephemeris, AIRLESS | independent | 68 | 0.388 | 1.88 | 1.94 | 1.97 | 3 arcsec | ✅ verified | 2026-08-28 · `2724324e` |
+| `ephemeris.jpl.horizons.position` | JPL Horizons VECTORS, geocentric, ICRF | shares JPL DE — consistency check | 3 | 5.49e-14 | 4.05e-12 | 4.41e-12 | 4.5e-12 | 1e-09 AU | ✅ verified | 2026-08-28 · `2724324e` |
+| `ephemeris.jpl.horizons.velocity` | JPL Horizons VECTORS, geocentric, ICRF | shares JPL DE — consistency check | 3 | 1.22e-14 | 9.02e-13 | 9.81e-13 | 1e-12 | 1e-10 AU/day | ✅ verified | 2026-08-28 · `2724324e` |
+| `ephemeris.sofa.moon` | gofa (Epv00 / Moon98) v1.19.1 | shares SOFA — consistency check | 3 | 3.65e-08 | 4.5e-08 | 4.58e-08 | 4.6e-08 | 4e-07 AU | ✅ verified | 2026-08-28 · `2724324e` |
+| `ephemeris.sofa.sun` | gofa (Epv00 / Moon98) v1.19.1 | shares SOFA — consistency check | 3 | 2.03e-08 | 2.76e-08 | 2.82e-08 | 2.84e-08 | 1.5e-07 AU | ✅ verified | 2026-08-28 · `2724324e` |
+| `skybrightness.gambons.band_medians` | GAMBONS (Masana, Carrasco, Bara & Ribas) 2021 MNRAS 501, 5443; 2024 | independent | 6 | 0.207 | 0.273 | 0.28 | 0.282 | 1 mag | ✅ verified | 2026-08-28 · `2724324e` |
 
 Every figure above is a **measured** value over the corpus named in its suite, not a bound. The contract column is the bound, and it is a separate claim: it says what the software must achieve and why, and it does not move when a measurement does. See `internal/metrology` for the reasoning, and each suite's own doc comment for the rationale behind its contract.
 
@@ -62,6 +66,24 @@ Every figure above is a **measured** value over the corpus named in its suite, n
 ---
 
 ## Status Table
+
+> **Five rows below cite `gofa` as their reference, and that is weaker evidence than a tick
+> suggests.** astrogo reaches every IAU reduction *through* gofa, via `internal/gofaext`, so
+> comparing astrogo against gofa compares the library with its own dependency. Such a row
+> establishes that astrogo drives the routine correctly — argument order, units, time scale,
+> the direction of a rotation — and cannot establish that the underlying model is right, nor
+> catch a fault the two share. Astropy would not fix this: it reaches the same algorithms
+> through ERFA, which is SOFA-derived in turn.
+>
+> The rows this applies to are ICRS ↔ Galactic, ICRS ↔ Ecliptic, ICRS ↔ AltAz, astronomical
+> time scales, and local sidereal time. The generated table above states the same thing per
+> row and mechanically, in its Independence column, which is why that column exists.
+>
+> Genuinely independent references in this table are JPL Horizons, USNO, the NASA eclipse
+> canons, AstroPixels, FINK/ZTF, IRSA/IPAC, GAMBONS and the published papers. Analytical
+> invariants are independent of any implementation and are the only check that can catch an
+> error two implementations share.
+
 
 | Area | Status | Reference | Tolerance | Notes |
 |---|---|---|---:|---|
@@ -73,12 +95,13 @@ Every figure above is a **measured** value over the corpus named in its suite, n
 | ICRS ↔ Ecliptic | ✅ validated | `gofa` (IAU 2006) | 2e-5 deg | poles, Aries, round-trip verified |
 | ICRS ↔ AltAz | ✅ validated | `gofa` + invariants | 1e-7 deg | edge cases + round-trip verified |
 | Coord FromUnitVector | ✅ validated | round-trip | 1e-10 deg | ICRS, Galactic, Ecliptic tested |
+| Radial velocity correction | ⚠️ invariants only | analytical invariants | see notes | `BarycentricRVCorrection`/`HeliocentricRVCorrection` are public API and are checked against physical identities rather than another implementation: the annual sinusoid comes out at **59.86 km/s peak-to-peak** over 2026 for an equatorial target seen from Paranal, against twice Earth's mean orbital speed of 59.56 — the excess being January perihelion plus the site's own diurnal motion. A target perpendicular to the velocity gives zero to 1e-9, antipodal targets flip sign, the diurnal amplitude scales as cos(latitude), and `ObservedRadialVelocity` round-trips. What is missing is an absolute cross-check: `coord/radialvelocity_fixture_test.go` is written for Astropy's `SkyCoord.radial_velocity_correction` and skips because the fixture table is empty — deliberately, since fabricating placeholder values there would validate nothing while looking like it did |
 | Airmass | ✅ validated | analytical | 1e-4 | Pickering (2002) empirical interpolation |
 | Atmospheric Refraction | ✅ validated | SOFA + analytical | 1e-4 deg | SOFA Refa/Refb (Refco via Apco13) + Saemundsson 1986 fallback |
-| Astronomical time scales | ✅ validated | gofa / SOFA | 1e-12 d | UTC ↔ TAI ↔ TT ↔ TDB verified |
+| Astronomical time scales | ✅ validated | gofa / SOFA | 1e-12 d | UTC ↔ TAI ↔ TT ↔ TDB verified in `time`. **Note the scope:** this row covers `time`'s own conversions and never covered `ephemeris/jpl/lsk`, which parses the NAIF leap-second kernel independently — and which dropped the final table entry, so every UTC epoch after 2017-01-01 converted **one second early** and put the geocentric Sun ~30 km from DE440. Fixed, with an offline regression test that also guards the next leap second; the gap was invisible because nothing compared the two paths against each other |
 | Local Sidereal Time | ✅ validated | gofa Gst06a (IAU 2006) | 0.5 deg | GAST at Greenwich J2000.0 |
-| Ephemerides (JPL DE) | ✅ validated | JPL Horizons | 1e-7 AU / 1e-8 AU·d⁻¹ | Sun, Moon, Planets (pos + vel) |
-| Apparent / Observed Coordinates | ✅ validated | JPL Horizons (OBSERVER) | 3 arcseconds (measured max 2.66″; real observatories mostly < 1″) | Full Astrometric -> Local Topocentric Pipeline (EOP mapped); 68-point matrix (4 bodies × 4 sites × up to 9 epochs, `TestObserverPrecisionMatrix`); total angular separation is the metric that behaves consistently — the Az/El split resisted 4 tested single-variable hypotheses (near-zenith projection, parallactic angle, day-of-year, EOP-prediction divergence — all refuted live) and one confirmed non-cause (airless-column assumption, confirmed correct against Horizons' own response header); see the test's doc comment for the full investigation |
+| Ephemerides (JPL DE) | ✅ validated | JPL Horizons (DE441) | 1e-9 AU / 1e-10 AU·d⁻¹ | Sun, Moon, Mars, geocentric position and velocity at J2000.0 — see `ephemeris.jpl.horizons.*` in the generated table above for the measured distribution. **The tolerance column previously read 1e-7 AU / 1e-8 AU·d⁻¹ and was published here as though it were the achieved accuracy.** It never was: measured, the two agree to **5.5×10⁻¹⁴ AU** for the Sun and Mars and **4.5×10⁻¹² AU — 0.67 m — for the Moon**, so the old bound sat about two million times above the largest real residual and could not have failed for the reason it existed. The bound is now derived from the smallest fault worth catching: both sides evaluate the same JPL integration, so a disagreement is a kernel, segment or time-scale fault rather than an ephemeris difference, and one second of time-scale error moves the Moon about a kilometre (6.7×10⁻⁹ AU) |
+| Apparent / Observed Coordinates | ✅ validated | JPL Horizons (OBSERVER, AIRLESS) | 3 arcsec | Full astrometric → local topocentric pipeline. Measured by two independent routes that agree: a live 68-point matrix (4 bodies × 4 sites × 9 epochs) at **max 1.97″, p50 0.39″**, and a frozen 255-entry corpus at **max 2.07″, p50 0.43″** — see `coord.topocentric.*` above. **The 3″ bound is unchanged in value and completely changed in meaning:** it was previously documented as having been chosen because a live run measured 2.66″, which is a bound pinned to its own measurement and unable to fail for the reason it exists. It is now derived — Earth orientation is the only input the two implementations do not share, and at 15.041″ of hour angle per second of UT1, 3″ is a fifth of a second of UT1. The cross-track residual has a **signed mean of −0.505″** over a range of [−1.96, +0.47], so the long-investigated azimuth discrepancy is a bias rather than scatter — which the previous maximum-only summary could not say |
 | Units algebra | ✅ validated | analytical | exact | AU, Parsec, LightYear, Jansky verified |
 | Quantity arithmetic | ✅ validated | analytical | 1e-15 | Scale, Abs, Compare, conversion |
 | Catalog Providers | ✅ validated | API References/Offline Caches | exact schemas | Dual JSON/XML parsing (STScI), Strict ADQL parsing (CDS TAP) |
@@ -111,7 +134,7 @@ Every figure above is a **measured** value over the corpus named in its suite, n
 | Scattered moonlight | ✅ validated | Kieffer & Stone (2005) ROLO 311g + Winkler (2022) | ~1 mag | **18.9 mag/arcsec² in V** for a near-full Moon, against an independently-known ~18. Deliberately **not** Krisciunas & Schaefer (1991): that is a closed-form V-band fit with no spectrum to project through a passband or an instrument |
 | Artificial skyglow, clear air | ⚠️ physical claims only | Kocifaj, Bará & Falchi (2022) | — | Falls with distance, and is homogeneous in source strength to **2×10⁻¹⁶**. An absolute check needs a real emitter inventory; satellite radiance alone cannot supply one, since the same VIIRS pixel is produced by many different real installations. See [`docs/skybrightness.md`](skybrightness.md) §16 |
 | Artificial skyglow, under cloud | ✅ validated | Kocifaj, Falchi & Kundracik (2025) | sign and order | Over a city an overcast deck amplifies the zenith **88×**; 60 km away the same deck **screens at 0.80×**. Both signs come out of the geometry, which is what a universal cloud multiplier cannot do. Reproducing their Žilina run: **122.5×** at the zenith against their "more than fifteenfold", **57.8×** horizontal illuminance against "more than fourfold" |
-| Integrated starlight map | ✅ validated | Gaia DR3 + Tycho-2 | see notes | The map's absolute scale has no free parameter, so validating it means validating its three links: Gaia G VEGAMAG zero point **25.687367** (scatter 3×10⁻⁷ over 177,426 sources), G→V transformation **−0.002 mag** against 4,000 Tycho-2 stars, and HEALPix tiling **exact** on counts with flux conserved to 2.4×10⁻¹¹ |
+| Integrated starlight map | ✅ validated | Gaia DR3 + Tycho-2 | see notes | The map's absolute scale has no free parameter, so validating it means validating its three links: Gaia G VEGAMAG zero point **25.687367** (scatter 3×10⁻⁷ over 177,426 sources), G→V transformation **−0.002 mag** against 4,000 Tycho-2 stars, and HEALPix tiling **exact** on counts with flux conserved to 2.4×10⁻¹¹ **This row asserted a validated map while its validation suite could not run:** the synchronous Gaia path requested CSV and parsed CSV, but the default endpoint answers VOTable regardless, so all five of its network- and validation-tagged tests failed on an XML document handed to a CSV reader. Neither tag runs in ordinary CI, so nothing reported it. Fixed by sniffing the payload; the figures beside this note were re-confirmed afterwards |
 | SFD dust map, local vs service | ✅ validated | IRSA/IPAC dust service | median ratio 1.00001 | 1,979 directions; 5th–95th percentile 0.956–1.056, the spread being interpolation across a 2.37′ pixel |
 | Gaia archive agreement | ✅ validated | ESA `gea.esac.esa.int` vs Gaia@AIP | 0.0000 mas | 340 sources over one cone at the north galactic pole, with identical source sets. The field is sized against the query's `TOP N` cap on purpose — a truncated result is an arbitrary subset, so two archives could differ in truncation rather than in data |
 | CAMS aerosol optical depth | ✅ validated | physical geography | orientation | The ECMWF grid convention is an assumption a reader cannot see, so it is checked against where aerosol actually is: Indo-Gangetic **1.07** and eastern China 0.69 against Antarctic **0.043** and mid-Pacific 0.157 |
@@ -127,6 +150,7 @@ Every figure above is a **measured** value over the corpus named in its suite, n
 The following areas are not yet considered scientifically complete:
 
 - Advanced observation scheduling optimization
+- **Radial-velocity correction has no external reference.** The invariants it satisfies are strong — an annual sinusoid of the right amplitude, the right zeros, the right sign flips and the right latitude scaling — but invariants cannot catch an error both sides of an identity share, and nothing here has ever been compared against Astropy, ERFA or a published table. The fixture table in `coord/radialvelocity_fixture_test.go` is waiting for real `SkyCoord.radial_velocity_correction` output; until it has some, that test skips rather than asserting anything.
 - **Artificial skyglow in clear air** is tested on the model's physical claims rather than against a measured sky. An absolute check needs a per-emitter inventory — flux, spectrum and upward emission function — and satellite radiance alone can determine only the first: the same VIIRS pixel is produced by many real installations differing in spectrum and in how much light they throw sideways rather than up.
 - **Cloud reaches only the artificial term.** A cloud deck in the scene's atmosphere changes artificial skyglow and nothing else; moonlight, integrated starlight, diffuse galactic light, zodiacal light and airglow are all evaluated as though the sky were clear. Three separate models are missing behind that one sentence, not one.
 - **The Illumina-v2 comparison at Observatorio del Teide** is a Level-3 target whose published numbers are already transcribed. It is blocked on Tenerife's lighting inventory rather than on the numbers.
