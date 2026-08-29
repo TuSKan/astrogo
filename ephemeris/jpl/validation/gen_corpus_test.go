@@ -98,12 +98,31 @@ type corpusSpan struct {
 	why   string
 }
 
+// A span must end in the settled past, and that is not a detail.
+//
+// Horizons' answer for a future epoch depends on predicted Earth orientation,
+// which firms up as IERS publishes. The regular span used to run to
+// 2027-01-01, so its last epoch — 2026-12-16 — moved by up to 8.4e-05 degrees
+// between generation and the next run, and TestGenerateCorpus failed every
+// time thereafter. A generator that can never report a clean diff is as
+// useless as one that can never report a dirty one.
+//
+// It is worse than a failing test. A frozen entry whose true value is still
+// moving is a reference that goes quietly out of date: the consumer compares
+// astrogo, using whatever IERS series is on the machine today, against a
+// prediction made on the day the corpus was written, and the two diverge for
+// reasons that have nothing to do with astrogo.
+//
+// IERS values reach final status roughly a year after the fact, so the stop
+// date sits well behind that. [TestCorpusEpochsAreSettled] enforces it.
 func corpusSpans() []corpusSpan {
 	return []corpusSpan{
 		{
 			class: classRegular,
-			start: "2024-01-01 00:00", stop: "2027-01-01 00:00", step: "120d",
-			why: "even sampling across three years, which is what catches secular drift",
+			start: "2021-01-01 00:00", stop: "2025-01-01 00:00", step: "120d",
+			why: "even sampling across four years, which is what catches secular " +
+				"drift, and ends far enough in the past that every epoch has final Earth " +
+				"orientation rather than a prediction",
 		},
 		{
 			class: classBoundary,
