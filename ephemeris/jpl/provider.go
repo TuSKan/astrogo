@@ -263,6 +263,8 @@ func (p *Provider) State(id core.ID, t time.Time) (core.State, error) {
 			Y: relVel.Y * 86400 / KMPerAU,
 			Z: relVel.Z * 86400 / KMPerAU,
 		},
+		Frame:  core.FrameICRS,
+		Center: core.CenterGeocentre,
 	}, nil
 }
 
@@ -539,7 +541,7 @@ func (p *Provider) evaluateRecursive(targetID int32, et float64, baseID int32) (
 	// Limit depth to prevent infinite loops (though SPK trees should be shallow)
 	for range 10 {
 		if currentID == baseID {
-			return core.State{Pos: totalPos, Vel: totalVel}, nil
+			return core.State{Pos: totalPos, Vel: totalVel, Frame: core.FrameICRS, Center: core.CenterGeocentre}, nil
 		}
 
 		ref, err := p.findSegmentLocked(currentID, et)

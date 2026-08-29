@@ -25,6 +25,12 @@ type (
 	Provider = core.Provider
 	// State is an ephemeris state.
 	State = core.State
+
+	// Frame names the reference frame a State's vectors are expressed in.
+	// See [core.State] for why the zero value asserts nothing.
+	Frame = core.Frame
+	// Center names the origin a State's vectors are measured from.
+	Center = core.Center
 	// ID is an ephemeris ID.
 	ID = core.ID
 	// Source is an ephemeris source.
@@ -33,6 +39,28 @@ type (
 	Kind = core.Kind
 	// Body is an ephemeris body.
 	Body = core.Body
+)
+
+// Reference frames and origins a [State] can be labelled with. The
+// unspecified values are the zero values and assert nothing — see
+// [core.State].
+const (
+	FrameUnspecified = core.FrameUnspecified
+	FrameICRS        = core.FrameICRS
+	FrameGCRS        = core.FrameGCRS
+	FrameITRS        = core.FrameITRS
+	FrameTEME        = core.FrameTEME
+
+	CenterUnspecified = core.CenterUnspecified
+	CenterGeocentre   = core.CenterGeocentre
+	CenterBarycentre  = core.CenterBarycentre
+	CenterHeliocentre = core.CenterHeliocentre
+)
+
+// Errors reported by [State.Require].
+var (
+	ErrWrongFrame  = core.ErrWrongFrame
+	ErrWrongCenter = core.ErrWrongCenter
 )
 
 const (
@@ -481,16 +509,20 @@ func (s *sofaProvider) State(id ID, t time.Time) (State, error) {
 		vh := pvh[1]
 
 		return State{
-			Pos: vector.Vec3{X: -ph[0], Y: -ph[1], Z: -ph[2]},
-			Vel: vector.Vec3{X: -vh[0], Y: -vh[1], Z: -vh[2]},
+			Pos:    vector.Vec3{X: -ph[0], Y: -ph[1], Z: -ph[2]},
+			Vel:    vector.Vec3{X: -vh[0], Y: -vh[1], Z: -vh[2]},
+			Frame:  FrameICRS,
+			Center: CenterGeocentre,
 		}, nil
 
 	case Moon:
 		pv := gofaext.Moon98(d1, d2)
 
 		return State{
-			Pos: vector.Vec3{X: pv[0][0], Y: pv[0][1], Z: pv[0][2]},
-			Vel: vector.Vec3{X: pv[1][0], Y: pv[1][1], Z: pv[1][2]},
+			Pos:    vector.Vec3{X: pv[0][0], Y: pv[0][1], Z: pv[0][2]},
+			Vel:    vector.Vec3{X: pv[1][0], Y: pv[1][1], Z: pv[1][2]},
+			Frame:  FrameICRS,
+			Center: CenterGeocentre,
 		}, nil
 
 	case SolarSystemBarycenter:
@@ -502,8 +534,10 @@ func (s *sofaProvider) State(id ID, t time.Time) (State, error) {
 		// pvb is Earth's barycentric position/velocity (SSB -> Earth), so
 		// the SSB's own geocentric state (SSB - Earth) is its negation.
 		return State{
-			Pos: vector.Vec3{X: -pvb[0][0], Y: -pvb[0][1], Z: -pvb[0][2]},
-			Vel: vector.Vec3{X: -pvb[1][0], Y: -pvb[1][1], Z: -pvb[1][2]},
+			Pos:    vector.Vec3{X: -pvb[0][0], Y: -pvb[0][1], Z: -pvb[0][2]},
+			Vel:    vector.Vec3{X: -pvb[1][0], Y: -pvb[1][1], Z: -pvb[1][2]},
+			Frame:  FrameICRS,
+			Center: CenterGeocentre,
 		}, nil
 
 	case Mercury, Venus, Earth, Mars, Jupiter, Saturn, Uranus, Neptune:
@@ -549,6 +583,8 @@ func (s *sofaProvider) State(id ID, t time.Time) (State, error) {
 				Y: pv[1][1] - pvh[1][1],
 				Z: pv[1][2] - pvh[1][2],
 			},
+			Frame:  FrameICRS,
+			Center: CenterGeocentre,
 		}, nil
 
 	default:

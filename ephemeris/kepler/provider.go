@@ -114,8 +114,10 @@ func (p *Provider) State(id core.ID, t time.Time) (core.State, error) {
 	earthVel := vector.V3(pvh[1][0], pvh[1][1], pvh[1][2])
 
 	return core.State{
-		Pos: heloPos.Sub(earthPos),
-		Vel: heloVel.Sub(earthVel),
+		Pos:    heloPos.Sub(earthPos),
+		Vel:    heloVel.Sub(earthVel),
+		Frame:  core.FrameICRS,
+		Center: core.CenterGeocentre,
 	}, nil
 }
 
@@ -150,16 +152,20 @@ func (s *sofaBase) State(id core.ID, t time.Time) (core.State, error) {
 		}
 
 		return core.State{
-			Pos: vector.V3(-pvh[0][0], -pvh[0][1], -pvh[0][2]),
-			Vel: vector.V3(-pvh[1][0], -pvh[1][1], -pvh[1][2]),
+			Pos:    vector.V3(-pvh[0][0], -pvh[0][1], -pvh[0][2]),
+			Vel:    vector.V3(-pvh[1][0], -pvh[1][1], -pvh[1][2]),
+			Frame:  core.FrameICRS,
+			Center: core.CenterGeocentre,
 		}, nil
 
 	case core.Moon:
 		pv := gofaext.Moon98(d1, d2)
 
 		return core.State{
-			Pos: vector.V3(pv[0][0], pv[0][1], pv[0][2]),
-			Vel: vector.V3(pv[1][0], pv[1][1], pv[1][2]),
+			Pos:    vector.V3(pv[0][0], pv[0][1], pv[0][2]),
+			Vel:    vector.V3(pv[1][0], pv[1][1], pv[1][2]),
+			Frame:  core.FrameICRS,
+			Center: core.CenterGeocentre,
 		}, nil
 
 	case core.SolarSystemBarycenter:
@@ -171,8 +177,10 @@ func (s *sofaBase) State(id core.ID, t time.Time) (core.State, error) {
 		// pvb is Earth's barycentric position/velocity (SSB -> Earth), so
 		// the SSB's own geocentric state (SSB - Earth) is its negation.
 		return core.State{
-			Pos: vector.V3(-pvb[0][0], -pvb[0][1], -pvb[0][2]),
-			Vel: vector.V3(-pvb[1][0], -pvb[1][1], -pvb[1][2]),
+			Pos:    vector.V3(-pvb[0][0], -pvb[0][1], -pvb[0][2]),
+			Vel:    vector.V3(-pvb[1][0], -pvb[1][1], -pvb[1][2]),
+			Frame:  core.FrameICRS,
+			Center: core.CenterGeocentre,
 		}, nil
 
 	case core.Mercury, core.Venus, core.Earth, core.Mars,
@@ -193,8 +201,10 @@ func (s *sofaBase) State(id core.ID, t time.Time) (core.State, error) {
 		}
 
 		return core.State{
-			Pos: vector.V3(pv[0][0]-pvh[0][0], pv[0][1]-pvh[0][1], pv[0][2]-pvh[0][2]),
-			Vel: vector.V3(pv[1][0]-pvh[1][0], pv[1][1]-pvh[1][1], pv[1][2]-pvh[1][2]),
+			Pos:    vector.V3(pv[0][0]-pvh[0][0], pv[0][1]-pvh[0][1], pv[0][2]-pvh[0][2]),
+			Vel:    vector.V3(pv[1][0]-pvh[1][0], pv[1][1]-pvh[1][1], pv[1][2]-pvh[1][2]),
+			Frame:  core.FrameICRS,
+			Center: core.CenterGeocentre,
 		}, nil
 
 	default:
