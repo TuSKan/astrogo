@@ -11,18 +11,148 @@
 package core
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/vector"
 )
 
+// Errors reported by [State.Require].
+var (
+	// ErrWrongFrame marks a state expressed in a different reference frame
+	// from the one the caller needs.
+	ErrWrongFrame = errors.New("ephemeris: state is in the wrong reference frame")
+
+	// ErrWrongCenter marks a state measured from a different origin.
+	ErrWrongCenter = errors.New("ephemeris: state is measured from the wrong origin")
+)
+
 // ─── Provider ────────────────────────────────────────────────────────────────
 
+// Frame names the reference frame a [State]'s vectors are expressed in.
+//
+// It exists because "ICRS-like" is not a specification. That was the whole of
+// the frame contract on State until this type: a comment, hedged, on a struct
+// that several providers fill in differently. [github.com/TuSKan/astrogo/ephemeris/jpl]
+// and the SOFA analytical provider produce ICRS; the SGP4 provider in
+// ephemeris/satellite converts TEME to GCRS and produces that. Those differ by
+// frame bias — about 23 milliarcseconds — and nothing in the type distinguished
+// them, so a value from one could be used where the other was meant and remain
+// mathematically valid while being physically wrong.
+type Frame uint8
+
+// The frames astrogo's providers actually produce.
+const (
+	// FrameUnspecified is the zero value, and asserts nothing.
+	//
+	// Deliberately not ICRS: a State that nobody labelled must not claim a
+	// frame it was never checked against. A caller that needs certainty asks
+	// with [State.Require] and gets an error rather than a guess.
+	FrameUnspecified Frame = iota
+
+	// FrameICRS is the International Celestial Reference System, the frame
+	// JPL kernels and the SOFA analytical series are expressed in.
+	FrameICRS
+
+	// FrameGCRS is the Geocentric Celestial Reference System, which
+	// ephemeris/satellite produces after converting SGP4's TEME output.
+	FrameGCRS
+
+	// FrameITRS is the International Terrestrial Reference System, which
+	// rotates with the Earth.
+	FrameITRS
+
+	// FrameTEME is True Equator Mean Equinox, SGP4's own output frame.
+	FrameTEME
+)
+
+func (f Frame) String() string {
+	switch f {
+	case FrameUnspecified:
+		return "unspecified"
+	case FrameICRS:
+		return "ICRS"
+	case FrameGCRS:
+		return "GCRS"
+	case FrameITRS:
+		return "ITRS"
+	case FrameTEME:
+		return "TEME"
+	default:
+		return fmt.Sprintf("Frame(%d)", uint8(f))
+	}
+}
+
+// Center names the origin a [State]'s vectors are measured from.
+type Center uint8
+
+// The origins astrogo's providers actually use.
+const (
+	// CenterUnspecified is the zero value, and asserts nothing. See
+	// [FrameUnspecified] for why that is not the same as assuming a default.
+	CenterUnspecified Center = iota
+
+	// CenterGeocentre is the centre of the Earth.
+	CenterGeocentre
+
+	// CenterBarycentre is the solar system barycentre.
+	CenterBarycentre
+
+	// CenterHeliocentre is the centre of the Sun.
+	CenterHeliocentre
+)
+
+func (c Center) String() string {
+	switch c {
+	case CenterUnspecified:
+		return "unspecified"
+	case CenterGeocentre:
+		return "geocentre"
+	case CenterBarycentre:
+		return "barycentre"
+	case CenterHeliocentre:
+		return "heliocentre"
+	default:
+		return fmt.Sprintf("Center(%d)", uint8(c))
+	}
+}
+
 // State represents the kinematic state of a celestial body.
+//
+// Units stay contractual — AU and AU/day — because putting them in the type
+// would cost the hot path more than it is worth. Frame and origin do not:
+// they are one byte each, they are read once at a boundary rather than in a
+// loop, and getting them wrong produces a number that looks entirely
+// reasonable.
 type State struct {
-	Pos vector.Vec3 // Geocentric position in AU (ICRS-like)
-	Vel vector.Vec3 // Geocentric velocity in AU/day (ICRS-like)
+	Pos vector.Vec3 // position in AU, in Frame, measured from Center
+	Vel vector.Vec3 // velocity in AU/day, in Frame, measured from Center
+
+	// Frame and Center describe the vectors above. Both zero values assert
+	// nothing rather than defaulting, so a provider that has not been taught
+	// to label its output says so instead of claiming ICRS geocentric.
+	Frame  Frame
+	Center Center
+}
+
+// Require reports whether the state is expressed in the frame and origin the
+// caller needs, and returns an error naming the mismatch when it is not.
+//
+// An unspecified frame or centre passes: this is a check against a wrong
+// label, not a demand that every producer be labelled. Tightening it to
+// reject unspecified would turn "we do not know" into a failure at every call
+// site that has not been updated, which is a migration and not a safeguard.
+func (s State) Require(frame Frame, center Center) error {
+	if frame != FrameUnspecified && s.Frame != FrameUnspecified && s.Frame != frame {
+		return fmt.Errorf("%w: state is %s, caller needs %s", ErrWrongFrame, s.Frame, frame)
+	}
+
+	if center != CenterUnspecified && s.Center != CenterUnspecified && s.Center != center {
+		return fmt.Errorf("%w: state is %s, caller needs %s", ErrWrongCenter, s.Center, center)
+	}
+
+	return nil
 }
 
 const kmPerAU = 149597870.7
