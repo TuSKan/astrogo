@@ -86,7 +86,7 @@ func TestParseEntryNamesTheFile(t *testing.T) {
 
 func TestLoadEntriesSkipsReadme(t *testing.T) {
 	dir := fstest.MapFS{
-		"README.md":   {Data: []byte("# changelog.d\n\nNot an entry.\n")},
+		"README.md":   {Data: []byte("# docs/changelog.d\n\nNot an entry.\n")},
 		"58-thing.md": {Data: []byte("---\ntype: Added\npr: 58\n---\nbody\n")},
 		"59-other.md": {Data: []byte("---\ntype: Fixed\npr: 59\n---\nbody\n")},
 		"notes.txt":   {Data: []byte("ignored, not markdown")},
@@ -152,11 +152,11 @@ func TestRenderEmpty(t *testing.T) {
 // TestCheckedInFragmentsParse runs in ordinary CI, so a malformed fragment
 // fails the pull request that added it rather than the release weeks later.
 func TestCheckedInFragmentsParse(t *testing.T) {
-	dir := os.DirFS("../../changelog.d")
+	dir := os.DirFS("../../docs/changelog.d")
 
 	entries, err := LoadEntries(dir)
 	if err != nil {
-		t.Fatalf("changelog.d contains a malformed fragment: %v", err)
+		t.Fatalf("docs/changelog.d contains a malformed fragment: %v", err)
 	}
 
 	t.Logf("%d pending changelog entries", len(entries))

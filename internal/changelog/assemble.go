@@ -33,7 +33,7 @@ var unreleasedLink = regexp.MustCompile(`(?m)^\[Unreleased\]: (\S+/compare/v)([0
 // Anything already written by hand under [Unreleased] is folded into the
 // release alongside the fragments, merged by heading. Appending the two
 // bodies instead would produce a second "### Fixed" under one release,
-// which is the same silently-wrong output that motivated changelog.d in the
+// which is the same silently-wrong output that motivated docs/changelog.d in the
 // first place; and dropping them would lose entries written before the
 // convention existed.
 func Assemble(src, version, date string, entries []Entry) (string, error) {
