@@ -29,8 +29,11 @@ var (
 
 // StateVector matches your desired JSON output
 type StateVector struct {
-	Body    string    `json:"body"`
-	NaifID  int       `json:"naif_id"`
+	Body string `json:"body"`
+	// Command is the Horizons COMMAND payload this row was fetched
+	// with — "499" for a planet, "433;" for a small body — so a row
+	// carries enough to reproduce the request that produced it.
+	Command string    `json:"command"`
 	Epoch   string    `json:"epoch"`
 	ET      float64   `json:"et"`
 	Pos     []float64 `json:"pos"`
@@ -70,14 +73,14 @@ func horizonsUnavailable(body string) bool {
 // path agrees with DE440 to 5e-14 AU, and the corpus generator hit exactly
 // that 69 seconds — about 1040 arcseconds of hour angle — when it used
 // unsuffixed epochs and stored the column as TDB.
-func fetchVector(naifID int, bodyName string, startStr, stopStr string) (*StateVector, error) {
+func fetchVector(command, bodyName string, startStr, stopStr string) (*StateVector, error) {
 	// 1. Define the base URL
 	baseURL := "https://ssd.jpl.nasa.gov/api/horizons.api"
 
 	// 2. Build the query parameters safely
 	params := url.Values{}
 	params.Add("format", "text")
-	params.Add("COMMAND", fmt.Sprintf("'%d'", naifID))
+	params.Add("COMMAND", "'"+command+"'")
 	params.Add("CENTER", "'@399'")
 	params.Add("MAKE_EPHEM", "'YES'")
 	params.Add("EPHEM_TYPE", "'VECTORS'")
@@ -169,7 +172,7 @@ func fetchVector(naifID int, bodyName string, startStr, stopStr string) (*StateV
 	// 4. Build the final struct
 	sv := &StateVector{
 		Body:    bodyName,
-		NaifID:  naifID,
+		Command: command,
 		Epoch:   "2000-01-01T12:00:00Z",
 		ET:      etSeconds,
 		Pos:     pos,
@@ -188,12 +191,12 @@ func fetchVector(naifID int, bodyName string, startStr, stopStr string) (*StateV
 // The geocentric state does not depend on the observing site, so one series
 // per body covers every site in a corpus at once. That is the difference
 // between a few dozen requests to somebody else's server and a few hundred.
-func fetchVectorSeries(naifID int, bodyName, startStr, stopStr, stepStr string) ([]StateVector, error) {
+func fetchVectorSeries(command, bodyName, startStr, stopStr, stepStr string) ([]StateVector, error) {
 	baseURL := "https://ssd.jpl.nasa.gov/api/horizons.api"
 
 	params := url.Values{}
 	params.Add("format", "text")
-	params.Add("COMMAND", fmt.Sprintf("'%d'", naifID))
+	params.Add("COMMAND", "'"+command+"'")
 	params.Add("CENTER", "'@399'")
 	params.Add("MAKE_EPHEM", "'YES'")
 	params.Add("EPHEM_TYPE", "'VECTORS'")
@@ -257,7 +260,7 @@ func fetchVectorSeries(naifID int, bodyName, startStr, stopStr, stepStr string) 
 
 		sv := StateVector{
 			Body:    bodyName,
-			NaifID:  naifID,
+			Command: command,
 			ET:      (val(0) - 2451545.0) * 86400.0,
 			Pos:     []float64{val(2), val(3), val(4)},
 			Vel:     []float64{val(5), val(6), val(7)},
@@ -303,12 +306,12 @@ type ObserverPoint struct {
 // fetchObserverTable queries the Horizons API for a ground-based observer with
 // QUANTITIES='1,2,4,20': astrometric RA/Dec, apparent RA/Dec, airless Az/El and
 // observer range.
-func fetchObserverTable(naifID int, bodyName string, lon, lat, height float64, startStr, stopStr string) (*ObserverPoint, error) {
+func fetchObserverTable(command, bodyName string, lon, lat, height float64, startStr, stopStr string) (*ObserverPoint, error) {
 	baseURL := "https://ssd.jpl.nasa.gov/api/horizons.api"
 
 	params := url.Values{}
 	params.Add("format", "text")
-	params.Add("COMMAND", fmt.Sprintf("'%d'", naifID))
+	params.Add("COMMAND", "'"+command+"'")
 	params.Add("CENTER", "'coord@399'")                                          // Earth Observer
 	params.Add("SITE_COORD", fmt.Sprintf("'%f,%f,%f'", lon, lat, height/1000.0)) // Longitude, Latitude, Elevation in km
 	params.Add("MAKE_EPHEM", "'YES'")
@@ -482,12 +485,12 @@ func parseObserverRow(cols []string, bodyName string) ObserverPoint {
 // of the OBSERVER table — unlike fetchObserverTable, which only parses
 // lines[0]. This lets the precision-floor matrix cover many epochs per
 // (body, site) pair in a single request instead of one request per epoch.
-func fetchObserverSeries(naifID int, bodyName string, lon, lat, height float64, startStr, stopStr, stepStr string) ([]ObserverPoint, error) {
+func fetchObserverSeries(command, bodyName string, lon, lat, height float64, startStr, stopStr, stepStr string) ([]ObserverPoint, error) {
 	baseURL := "https://ssd.jpl.nasa.gov/api/horizons.api"
 
 	params := url.Values{}
 	params.Add("format", "text")
-	params.Add("COMMAND", fmt.Sprintf("'%d'", naifID))
+	params.Add("COMMAND", "'"+command+"'")
 	params.Add("CENTER", "'coord@399'") // Earth Observer
 	params.Add("SITE_COORD", fmt.Sprintf("'%f,%f,%f'", lon, lat, height/1000.0))
 	params.Add("MAKE_EPHEM", "'YES'")

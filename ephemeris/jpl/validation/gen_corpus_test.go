@@ -140,7 +140,7 @@ func TestGenerateCorpus(t *testing.T) {
 			// One vector series per (body, span) — the geocentric state
 			// does not depend on the site, so this is fetched once and
 			// reused across every site below.
-			vectors, err := fetchVectorSeries(target.naifID, target.name, span.start, span.stop, span.step)
+			vectors, err := fetchVectorSeries(target.command(), target.name, span.start, span.stop, span.step)
 			if err != nil {
 				t.Logf("vectors for %s over %s: %v — this span is omitted for this body",
 					target.name, span.class, err)
@@ -149,7 +149,7 @@ func TestGenerateCorpus(t *testing.T) {
 			}
 
 			for _, site := range sites {
-				points, err := fetchObserverSeries(target.naifID, target.name,
+				points, err := fetchObserverSeries(target.command(), target.name,
 					site.Lon, site.Lat, site.Height, span.start, span.stop, span.step)
 				if err != nil {
 					t.Logf("observer table for %s @ %s over %s: %v — omitted",

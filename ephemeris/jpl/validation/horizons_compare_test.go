@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
 	"testing"
 
 	eph "github.com/TuSKan/astrogo/ephemeris"
@@ -55,7 +56,7 @@ func loadCases(t *testing.T) []*StateVector {
 	out := make([]*StateVector, 0, len(horizonsCases()))
 
 	for _, c := range horizonsCases() {
-		sv, err := fetchVector(c.naifID, c.name, start, stop)
+		sv, err := fetchVector(strconv.Itoa(c.naifID), c.name, start, stop)
 		if errors.Is(err, errHorizonsUnavailable) {
 			return nil
 		}

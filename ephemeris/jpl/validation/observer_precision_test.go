@@ -5,6 +5,7 @@ package jpl_test
 import (
 	"fmt"
 	"math"
+	"strconv"
 	"testing"
 
 	"github.com/TuSKan/astrogo/angle"
@@ -30,6 +31,14 @@ type observerPrecisionBody struct {
 	naifID int
 	name   string
 }
+
+// command is the Horizons COMMAND payload for this body.
+//
+// A planet or satellite is addressed by its NAIF ID. A small body needs
+// Horizons' own designation syntax — "433;" rather than "433" — which is why
+// the query builders take a string: an int cannot express the difference,
+// and getting it wrong resolves to a different object rather than failing.
+func (b observerPrecisionBody) command() string { return strconv.Itoa(b.naifID) }
 
 // TestObserverPrecisionMatrix characterizes the real achieved precision of
 // the full astrometric -> apparent -> observed pipeline against JPL
@@ -262,7 +271,7 @@ func TestObserverPrecisionMatrix(t *testing.T) {
 		for _, ns := range sites {
 			loc := ns.site.Location()
 
-			points, err := fetchObserverSeries(body.naifID, body.name,
+			points, err := fetchObserverSeries(body.command(), body.name,
 				loc.Lon().Degrees(), loc.Lat().Degrees(), loc.Height(),
 				startTime, stopTime, stepSize)
 			if err != nil {
