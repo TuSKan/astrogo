@@ -38,6 +38,15 @@ type HorizonsResponse struct {
 	} `json:"signature"`
 	Spk       string `json:"spk"`
 	SpkFileID string `json:"spk_file_id"`
+
+	// Error is Horizons' own explanation when it declines a request.
+	//
+	// It was not parsed at all, so a refusal arrived as an empty kernel
+	// list and a nil error, and the caller was left to guess. Horizons is
+	// specific when it declines — for 101955 Bennu it answers "SPK creation
+	// is not available for pre-computed objects in the major body index" —
+	// and that sentence is worth more than anything this package can infer.
+	Error string `json:"error"`
 }
 
 // maxNumberedAsteroidRecord is Horizons' own documented ceiling for a bare
@@ -135,7 +144,10 @@ func CacheAPI(ctx context.Context, bucket *file.Bucket, prefix, kernel string, s
 	// plan.VisibleTonight's Stage 2) takes this path, so skipping the
 	// doomed bare attempt roughly halves live network round trips for
 	// that real workload.
-	var resp *HorizonsResponse
+	var (
+		resp    *HorizonsResponse
+		refusal string
+	)
 
 	for _, command := range commandCandidates(kernel) {
 		r, err := apiHorizonsRequest(ctx, command, startTime, endTime)
@@ -147,6 +159,17 @@ func CacheAPI(ctx context.Context, bucket *file.Bucket, prefix, kernel string, s
 		if resp.SpkFileID != "" && resp.Spk != "" {
 			break
 		}
+
+		if r.Error != "" {
+			refusal = r.Error
+		}
+	}
+
+	// Horizons answered, and declined. Say why it declined rather than
+	// returning an empty list with a nil error, which reads as success and
+	// surfaces much later as a body that is simply missing.
+	if refusal != "" && (resp == nil || resp.Spk == "") {
+		return nil, fmt.Errorf("%w: %s (kernel %q)", ErrHorizonsRefused, collapseWhitespace(refusal), kernel)
 	}
 
 	if resp.SpkFileID != "" && resp.Spk != "" {
@@ -360,4 +383,13 @@ func openKernel(ctx context.Context, bucket *file.Bucket, key string) (*Reader, 
 	}
 
 	return reader, nil
+}
+
+// collapseWhitespace folds Horizons' multi-line refusal onto one line.
+//
+// The service formats these for a terminal, with embedded newlines and runs
+// of spaces; an error string carrying those wraps badly in a log and reads as
+// several failures rather than one.
+func collapseWhitespace(s string) string {
+	return strings.Join(strings.Fields(s), " ")
 }
