@@ -255,10 +255,41 @@ func (t Time) String() string {
 // ToGo converts the Time to a standard library time.Time.
 // If a display location was set (via [FromGo], [Date], or [Time.In]),
 // the result is expressed in that timezone; otherwise it defaults to UTC.
+//
+// # The scale conversion, and why it was missing
+//
+// time.Time is an instant on the UTC timeline, so a Time on any other scale
+// has to be converted before its numbers mean anything there. This used to
+// subtract the Unix epoch from jd1/jd2 directly, whatever scale they were on,
+// which silently reinterpreted a TT or TDB Julian Date as a UTC one.
+//
+// The effect was that one instant produced different time.Time values
+// depending on which representation the caller happened to be holding:
+//
+//	utc := time.Date(2026, 1, 1, 0, 0, 0, 0, time.LocationUTC)
+//	utc.ToGo()        // 2026-01-01 00:00:00.000
+//	utc.TT().ToGo()   // 2026-01-01 00:01:09.184  — the same instant
+//
+// 69.184 seconds apart, from a conversion that looks total. Since ToGo backs
+// [Time.String], [Time.Format] and every formatted event time in plan, a
+// caller who had converted a scale anywhere upstream got a wrong clock
+// reading with nothing to indicate it.
+//
+// # The one cost
+//
+// Converting a UT1-scale Time needs DUT1, so it can trigger time's lazy
+// Earth-orientation load — which formatting previously never did. That path
+// degrades rather than fails (disk cache, then a consent-gated fetch, then
+// zero EOP with a warning), and |DUT1| < 0.9 s bounds the error even when it
+// degrades. UTC, TAI, TT and TDB convert by arithmetic alone and reach no
+// data at all. Printing the right instant is worth the one scale that has to
+// ask.
 func (t Time) ToGo() time.Time {
+	utc := t.UTC()
+
 	// JD 2440587.5 is 1970-01-01 00:00:00 UTC
-	days1 := t.jd1 - 2440587.5
-	days2 := t.jd2
+	days1 := utc.jd1 - 2440587.5
+	days2 := utc.jd2
 
 	totalSec := days1*86400.0 + days2*86400.0
 
@@ -279,6 +310,9 @@ func (t Time) ToGo() time.Time {
 	}
 
 	gt := time.Unix(sec, nsec).UTC()
+
+	// The display location rides on t rather than on the converted copy,
+	// though UTC() preserves it either way.
 	if t.loc != nil {
 		return gt.In(t.loc)
 	}
@@ -519,9 +553,17 @@ func (t Time) DecimalYear() float64 {
 //
 // The relationship is: TT = UT + ΔT, where ΔT = TT − UT1 encodes the
 // accumulated drift in Earth's rotation rate due to tidal friction.
+//
+// The returned scale is TT, which is what the relationship above defines and
+// what all three paragraphs of this comment describe. It used to be tagged
+// TDB — a flat contradiction between contract and implementation, and one
+// that cost a further 1.7 ms of periodic term on every subsequent conversion
+// plus, for anything that then asked for UTC, the whole TDB->TT->TAI->UTC
+// chain applied to a value that was already TT.
 func (t Time) ApplyDeltaT() Time {
 	dt := DeltaT(t.DecimalYear())
-	return fromPartsPreserveLoc(t, t.jd1, t.jd2+dt/86400.0, TDB)
+
+	return fromPartsPreserveLoc(t, t.jd1, t.jd2+dt/86400.0, TT)
 }
 
 // Location returns the display timezone associated with this Time.
@@ -773,8 +815,42 @@ func (t Time) UTC() Time {
 
 		return fromPartsPreserveLoc(t, t.jd1, utcJD2, UTC)
 	case TT:
+		// Pre-1972 the forward conversion uses the Delta-T polynomial rather
+		// than Delta-AT — see [Time.TT] — and this direction has to gate on
+		// the same epoch or the two stop being inverses.
+		//
+		// They did stop. UTC->TT->UTC on a 1600 date returned an instant
+		// 85.7 seconds later than it started, which is Delta-T(1600) minus
+		// the 32.184 s this branch removed on the way back, with Delta-AT
+		// contributing nothing because leap seconds do not exist there. A
+		// round trip through a scale conversion is the one thing a time
+		// library must not lose, and historical work — eclipse canons,
+		// ancient observations — is exactly where it was losing it.
+		//
+		// Delta-T is a function of the UT year, and this branch starts from
+		// TT — so a single evaluation would use a year that is wrong by
+		// Delta-T itself. That is minutes in 1600 and hours in antiquity,
+		// and against a polynomial with real slope it left the round trip
+		// 0.097 s out at AD 33.
+		//
+		// One correction step removes it: evaluate at TT, subtract, then
+		// re-evaluate at the UT year that produces. Delta-T changes slowly
+		// enough that the second estimate is exact to well below a
+		// microsecond, and the forward direction in [Time.TT] evaluates at
+		// the same UT year, so the two now agree by construction rather
+		// than by luck.
+		yTT, _, _, _, _ := gofaext.JdToDate(t.jd1, t.jd2)
+		if yTT < 1972 {
+			dt := DeltaT(t.DecimalYear())
+			approx := fromPartsPreserveLoc(t, t.jd1, t.jd2-dt/86400.0, UTC)
+			dt = DeltaT(approx.DecimalYear())
+
+			return fromPartsPreserveLoc(t, t.jd1, t.jd2-dt/86400.0, UTC)
+		}
+
 		// TT → TAI → UTC: TAI = TT − 32.184s
 		tai := fromPartsPreserveLoc(t, t.jd1, t.jd2-32.184/86400.0, TAI)
+
 		return tai.UTC()
 	case TDB:
 		// TDB → TT → TAI → UTC
@@ -805,8 +881,20 @@ func (t Time) TAI() Time {
 	case TT:
 		// TAI = TT − 32.184s
 		return fromPartsPreserveLoc(t, t.jd1, t.jd2-32.184/86400.0, TAI)
+	case TDB:
+		// TDB → TT → TAI, all arithmetic.
+		//
+		// This used to route through UTC with UT1, which is wrong for a
+		// conversion between two scales that differ from TAI by a constant
+		// and a periodic term. Going via UTC drags in Delta-AT — and, before
+		// 1972, Delta-T — neither of which is symmetric here, so
+		// TAI->TDB->TAI came back 10,170 seconds late in AD 33: the whole of
+		// Delta-T at that epoch, applied on the way home and never on the way
+		// out. Measured by TestScaleRoundTripMatrix.
+		return t.TT().TAI()
 	default:
-		// TDB, UT1 → UTC → TAI
+		// UT1 → UTC → TAI. UT1 genuinely has to go this way: DUT1 is defined
+		// against UTC, so there is no arithmetic path.
 		return t.UTC().TAI()
 	}
 }

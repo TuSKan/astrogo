@@ -134,9 +134,13 @@ func (s Solver) FindRoot(eval Evaluator, t1, t2 time.Time) (time.Time, float64, 
 		fa, fb = fb, fa
 	}
 
+	converged := false
+
 	for i := range s.MaxIter {
 		// Convergence: bracket width or exact root
 		if math.Abs(xb-xa) <= tolSec || fb == 0 {
+			converged = true
+
 			break
 		}
 
@@ -221,6 +225,13 @@ func (s Solver) FindRoot(eval Evaluator, t1, t2 time.Time) (time.Time, float64, 
 		}
 	}
 
+	// The estimate is returned either way; only the error distinguishes them.
+	if !converged {
+		return timeAt(xb), fb, fmt.Errorf("%w: %d iterations, bracket %v, tolerance %v",
+			ErrNoConvergence, s.MaxIter,
+			time.Duration(math.Abs(xb-xa)*float64(time.Second)), s.Tolerance)
+	}
+
 	return timeAt(xb), fb, nil
 }
 
@@ -258,6 +269,8 @@ func (s Solver) FindExtremum(eval Evaluator, t1, t3 time.Time, isMax bool) (time
 	e := time.Duration(0) // Distance moved on the step before last
 	d := time.Duration(0) // Distance moved on the last step
 
+	converged := false
+
 	for i := range s.MaxIter {
 		midpoint := a.Add(time.Duration(float64(b.Sub(a)) * 0.5))
 		tol1 := float64(s.Tolerance)
@@ -265,6 +278,8 @@ func (s Solver) FindExtremum(eval Evaluator, t1, t3 time.Time, isMax bool) (time
 
 		// Convergence check
 		if math.Abs(float64(x.Sub(midpoint)))+float64(b.Sub(a))/2.0 <= tol2 {
+			converged = true
+
 			break
 		}
 
@@ -374,6 +389,13 @@ func (s Solver) FindExtremum(eval Evaluator, t1, t3 time.Time, isMax bool) (time
 
 	if !finite(finalVal) {
 		return time.Time{}, 0, fmt.Errorf("solver: final eval: %w", ErrNonFiniteEvaluation)
+	}
+
+	// As in FindRoot: the estimate comes back either way, and only the error
+	// tells a caller which of the two they have.
+	if !converged {
+		return x, finalVal, fmt.Errorf("%w: %d iterations, bracket %v, tolerance %v",
+			ErrNoConvergence, s.MaxIter, b.Sub(a), s.Tolerance)
 	}
 
 	return x, finalVal, nil

@@ -189,9 +189,13 @@ type allSkySample struct {
 // the dust cache warm this is seconds rather than minutes, so running it
 // twice costs less than threading one set of results through two tests would
 // cost in clarity.
+// irsaHost serves the SFD dust map every all-sky run needs. Named so the
+// reachability probe and the NOT VERIFIED record below cannot drift apart.
+const irsaHost = "irsa.ipac.caltech.edu:443"
+
 func runAllSky(t *testing.T) allSkyRun {
 	t.Helper()
-	testutil.RequireReachable(t, "irsa.ipac.caltech.edu:443")
+	testutil.RequireReachable(t, irsaHost)
 	testutil.RequireReachable(t, "etimecalret-002.eso.org:443")
 	testutil.RequireReachable(t, "github.com:443")
 
@@ -383,17 +387,7 @@ func runAllSky(t *testing.T) allSkyRun {
 // because airglow's limb brightening and atmospheric extinction pull opposite
 // ways; reproducing that non-monotonicity is a stronger statement than
 // reproducing any one number.
-func TestAgainstGAMBONSAllSky(t *testing.T) {
-	run := runAllSky(t)
-
-	results, band := run.results, run.band
-	componentShare, totalShareFlux := run.componentShare, run.totalShareFlux
-
-	// ── band by band ────────────────────────────────────────────────────────
-	t.Log("")
-	t.Log("altitude band medians, airglow at 100 per cent:")
-	t.Logf("  %-10s %8s %8s %9s   %8s %8s %8s", "band", "astrogo", "GAMBONS", "diff", "p05", "p95", "GAM p05/p95")
-
+func gambonsBandSuite() *metrology.Suite {
 	// The bound is loose on purpose, as in TestAgainstGAMBONS: two
 	// independent implementations of a six-term radiative model agreeing to
 	// a few tenths is the meaningful result, and what this is built to catch
@@ -404,7 +398,7 @@ func TestAgainstGAMBONSAllSky(t *testing.T) {
 	// produced, so the number does not change here. What it lacked was any
 	// record of how much room was left under it — six band residuals reduced
 	// to a single worst case, printed and forgotten.
-	bandSuite := metrology.NewSuite("skybrightness.gambons.band_medians",
+	return metrology.NewSuite("skybrightness.gambons.band_medians",
 		metrology.Reference{
 			Kind:    metrology.KindPaper,
 			Name:    "GAMBONS (Masana, Carrasco, Bara & Ribas)",
@@ -417,6 +411,32 @@ func TestAgainstGAMBONSAllSky(t *testing.T) {
 				"implementations of a six-term radiative model agreeing to a few tenths is the "+
 				"meaningful result, and one magnitude is a factor of two and a half in radiance",
 			"docs/skybrightness.md section 13; the same bound TestAgainstGAMBONS uses"))
+}
+
+func TestAgainstGAMBONSAllSky(t *testing.T) {
+	// The suite is built before the datasets are fetched, so an unreachable
+	// service records a NOT VERIFIED result rather than vanishing.
+	//
+	// It vanished once, live: IRSA went down, runAllSky skipped through
+	// testutil.RequireReachable, and the row simply left the generated
+	// accuracy table. Nothing said the sky model had stopped being checked —
+	// which is the exact failure internal/metrology's NotVerified state was
+	// added to prevent, in a suite that had been retrofitted onto it.
+	bandSuite := gambonsBandSuite()
+
+	if !testutil.Reachable(irsaHost) {
+		metrology.NotVerified(t, irsaHost+" is unreachable", bandSuite)
+	}
+
+	run := runAllSky(t)
+
+	results, band := run.results, run.band
+	componentShare, totalShareFlux := run.componentShare, run.totalShareFlux
+
+	// ── band by band ────────────────────────────────────────────────────────
+	t.Log("")
+	t.Log("altitude band medians, airglow at 100 per cent:")
+	t.Logf("  %-10s %8s %8s %9s   %8s %8s %8s", "band", "astrogo", "GAMBONS", "diff", "p05", "p95", "GAM p05/p95")
 
 	for bi, b := range gambonsAltitudeBands {
 		var on []float64
