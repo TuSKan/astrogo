@@ -57,8 +57,8 @@ generated table existed.
 | `coord.topocentric.separation` | JPL Horizons OBSERVER ephemeris, AIRLESS | independent | 68 | 0.388 | 1.88 | 1.94 | 1.97 | 3 arcsec | ✅ verified | 2026-08-29 · `5e53d9fc` |
 | `ephemeris.jpl.horizons.position` | JPL Horizons VECTORS, geocentric, ICRF | shares JPL DE — consistency check | 3 | 5.49e-14 | 4.05e-12 | 4.41e-12 | 4.5e-12 | 1e-09 AU | ✅ verified | 2026-08-29 · `5e53d9fc` |
 | `ephemeris.jpl.horizons.velocity` | JPL Horizons VECTORS, geocentric, ICRF | shares JPL DE — consistency check | 3 | 1.22e-14 | 9.02e-13 | 9.81e-13 | 1e-12 | 1e-10 AU/day | ✅ verified | 2026-08-29 · `5e53d9fc` |
-| `ephemeris.jpl.smallbody.position` | JPL Horizons VECTORS, geocentric, ICRF | shares JPL small-body solution — consistency check | 44 | 1.72e-13 | 1.97e-13 | 2.11e-13 | 2.19e-13 | 1e-11 AU | ✅ verified | 2026-08-29 · `5e53d9fc` |
-| `ephemeris.jpl.smallbody.velocity` | JPL Horizons VECTORS, geocentric, ICRF | shares JPL small-body solution — consistency check | 44 | 3.95e-14 | 4.6e-14 | 4.62e-14 | 4.62e-14 | 1e-12 AU/day | ✅ verified | 2026-08-29 · `5e53d9fc` |
+| `ephemeris.jpl.smallbody.position` | JPL Horizons VECTORS, geocentric, ICRF | shares JPL small-body solution — consistency check | 66 | 1.72e-13 | 1.94e-13 | 2.07e-13 | 2.19e-13 | 1e-11 AU | ✅ verified | 2026-08-29 · `dd92fe32` |
+| `ephemeris.jpl.smallbody.velocity` | JPL Horizons VECTORS, geocentric, ICRF | shares JPL small-body solution — consistency check | 66 | 3.96e-14 | 4.61e-14 | 4.62e-14 | 4.62e-14 | 1e-12 AU/day | ✅ verified | 2026-08-29 · `dd92fe32` |
 | `ephemeris.sofa.moon` | gofa (Epv00 / Moon98) v1.19.1 | shares SOFA — consistency check | 3 | 3.65e-08 | 4.5e-08 | 4.58e-08 | 4.6e-08 | 4e-07 AU | ✅ verified | 2026-08-29 · `5e53d9fc` |
 | `ephemeris.sofa.sun` | gofa (Epv00 / Moon98) v1.19.1 | shares SOFA — consistency check | 3 | 2.03e-08 | 2.76e-08 | 2.82e-08 | 2.84e-08 | 1.5e-07 AU | ✅ verified | 2026-08-29 · `5e53d9fc` |
 | `skybrightness.gambons.band_medians` | GAMBONS (Masana, Carrasco, Bara & Ribas) 2021 MNRAS 501, 5443; 2024 | independent | 6 | 0.207 | 0.273 | 0.28 | 0.282 | 1 mag | ✅ verified | 2026-08-29 · `5e53d9fc` |

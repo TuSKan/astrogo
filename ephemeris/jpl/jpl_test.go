@@ -256,13 +256,16 @@ func TestSmallBodyEros(t *testing.T) {
 
 	// Check if Eros is in supported bodies
 	bodies := p.SupportedBodies()
-	found := slices.Contains(bodies, core.ID(433))
+	// SupportedBodies reports NAIF's own small-body identifier now, not
+	// the bare number, which used to collide with the planets.
+	found := slices.Contains(bodies, core.SmallBodyID(433))
 
 	if !found {
 		t.Errorf("Eros (433) not found in supported bodies: %v", bodies)
 	}
 
 	// Get state
+	// A bare core.ID(433) still resolves, so this stays as it was.
 	state, err := p.State(core.ID(433), start)
 	if err != nil {
 		t.Fatalf("Failed to get state for Eros: %v", err)

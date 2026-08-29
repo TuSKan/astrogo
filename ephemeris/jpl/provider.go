@@ -479,11 +479,13 @@ func (p *Provider) SupportedBodies() []core.ID {
 	var res []core.ID
 
 	for targetID := range p.ByTarget {
+		// A small body keeps NAIF's own 20000000+ identifier rather than
+		// being folded down to its bare number. Subtracting the offset put
+		// asteroid 4 Vesta on core.ID(4), which is Mars, so the body was
+		// dropped from this list as a duplicate — silently, along with
+		// Ceres, Pallas, Juno and every asteroid numbered up to 12. See
+		// [core.SmallBodyBase].
 		bid := core.ID(targetID)
-		// Map back from asteroid ID if needed
-		if targetID > 20000000 && targetID < 21000000 {
-			bid = core.ID(targetID - 20000000)
-		}
 
 		// Check if it's a known body
 		for b, naif := range BodyIDToNAIF {
