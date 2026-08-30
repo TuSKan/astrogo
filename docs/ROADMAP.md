@@ -349,7 +349,12 @@ asteroids now would ship confidently wrong numbers, so moons stay kernel-only
       `gm_de440.tpc`, with the per-planet values separately sourced from the natural
       satellite release forms. Verified against the kernel by a network test rather
       than trusted to transcription; `remote.NAIFPCK` was added to fetch it.
-- [ ] Central-body (not heliocentric) two-body propagation in `ephemeris/kepler`
+- [x] `kepler.CentralBody` — central-body (not heliocentric) two-body propagation.
+      `Elements.WithCentralBody` refers a set to a planet, `CentralBodyFor` supplies the
+      parent's *body* mass parameter so a caller cannot pick the system one by mistake,
+      and the provider composes a satellite through its parent rather than the Sun.
+      Verified against Kepler's third law: 421,800 km about Jupiter gives 1.7699 days,
+      which is Io's sidereal period, from a distance and a mass parameter alone
 - [ ] Laplace-plane frame handling for published *mean* moon elements (tabulated pole,
       secular precession) — these are not osculating J2000-ecliptic elements and can't
       be fed into the existing propagator unmodified
