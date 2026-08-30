@@ -1,7 +1,9 @@
 package kepler_test
 
 import (
+	"errors"
 	"math"
+	"strings"
 	"testing"
 
 	"github.com/TuSKan/astrogo/angle"
@@ -356,5 +358,244 @@ func TestUnregisteredBodyStillReachesTheBase(t *testing.T) {
 
 	if st.Pos == (vector.Vec3{}) {
 		t.Error("base provider returned a zero position for Mars")
+	}
+}
+
+// TestPeriodOverridesTheDerivedMeanMotion is the behavioural half of
+// [kepler.Elements.WithPeriod]: the supplied period has to be the one the
+// mean anomaly actually advances at, not merely a field that round-trips.
+//
+// A period is testable without any external reference, because after exactly
+// one of them the mean anomaly is back where it started and — with no apsis
+// drift to move the orientation — so is the whole state. The derived
+// two-body period is checked against the same instant and must *not* return,
+// which is what separates an override that took effect from one silently
+// ignored.
+func TestPeriodOverridesTheDerivedMeanMotion(t *testing.T) {
+	jupiter, ok := kepler.CentralBodyFor(core.Jupiter)
+	if !ok {
+		t.Fatal("no central body for Jupiter")
+	}
+
+	// Io, whose tabulated period differs from the two-body one by 0.4%.
+	const ioPeriodDays = 1.762732
+
+	derived := circular(t, jupiter, 421_800)
+	if p := derived.Period(); p != 0 {
+		t.Errorf("Period() = %v on elements that never set one, want 0 for derived", p)
+	}
+
+	tabulated := derived.WithPeriod(ioPeriodDays)
+	if p := tabulated.Period(); p != ioPeriodDays {
+		t.Errorf("Period() = %v, want %v", p, ioPeriodDays)
+	}
+
+	start, _, err := tabulated.StateAt(time.J2000)
+	if err != nil {
+		t.Fatalf("StateAt(epoch): %v", err)
+	}
+
+	after := time.J2000.AddDays(ioPeriodDays)
+
+	closed, _, err := tabulated.StateAt(after)
+	if err != nil {
+		t.Fatalf("StateAt(epoch + P): %v", err)
+	}
+
+	if rel := closed.Sub(start).Norm() / start.Norm(); rel > 1e-12 {
+		t.Errorf("one supplied period left the orbit a relative %.3g from where it began; "+
+			"the mean anomaly is not advancing at the supplied rate", rel)
+	}
+
+	// The same instant under the derived mean motion must land elsewhere:
+	// 0.4% of a revolution is 1.4°, which on this orbit is thousands of km.
+	open, _, err := derived.StateAt(after)
+	if err != nil {
+		t.Fatalf("StateAt(derived, epoch + P): %v", err)
+	}
+
+	if rel := open.Sub(start).Norm() / start.Norm(); rel < 1e-3 {
+		t.Errorf("the derived period closed the orbit too (relative %.3g); WithPeriod "+
+			"cannot be shown to have changed anything", rel)
+	}
+}
+
+// TestPeriodZeroRestoresTheDerivedMeanMotion pins the sentence in
+// [kepler.Elements.WithPeriod]'s doc comment that says so. A zero that
+// silently meant "a period of zero days" would divide by zero rather than
+// fall back, and nothing else in the suite would notice.
+func TestPeriodZeroRestoresTheDerivedMeanMotion(t *testing.T) {
+	jupiter, _ := kepler.CentralBodyFor(core.Jupiter)
+
+	derived := circular(t, jupiter, 421_800)
+	cleared := derived.WithPeriod(3).WithPeriod(0)
+
+	if p := cleared.Period(); p != 0 {
+		t.Errorf("Period() = %v after WithPeriod(0), want 0", p)
+	}
+
+	at := time.J2000.AddDays(9.5)
+
+	want, _, err := derived.StateAt(at)
+	if err != nil {
+		t.Fatalf("StateAt(derived): %v", err)
+	}
+
+	got, _, err := cleared.StateAt(at)
+	if err != nil {
+		t.Fatalf("StateAt(cleared): %v", err)
+	}
+
+	if got != want {
+		t.Errorf("WithPeriod(0) propagated to %v, derived elements to %v", got, want)
+	}
+}
+
+// TestSecularPrecessionTurnsTheApsisBackwards pins the sign, which is the
+// one thing about [kepler.SecularPrecession] that cannot be got right by
+// accident — its own doc comment records that the other sign is eighteen
+// times worse against Horizons.
+//
+// The check reconstructs the expected orientation independently: elements
+// whose argument of periapsis is hand-advanced by -2*pi*dt/(P*365.25) and
+// carry no precession must propagate to the same state as elements that
+// carry the precession and let it do the advancing.
+func TestSecularPrecessionTurnsTheApsisBackwards(t *testing.T) {
+	jupiter, _ := kepler.CentralBodyFor(core.Jupiter)
+
+	// Io's apsis period, in Julian years, from the same JPL table as its
+	// elements. An eccentric, inclined orbit, so that moving the apsis moves
+	// the position: on a circular equatorial orbit it would not.
+	const (
+		apsisYears = 0.0069
+		argpDeg    = 49.1
+	)
+
+	base, err := kepler.NewElements(time.J2000, kmToAU(421_800), 0.004,
+		angle.Deg(2), angle.Deg(0), angle.Deg(argpDeg), angle.Deg(330.9))
+	if err != nil {
+		t.Fatalf("NewElements: %v", err)
+	}
+
+	base = base.WithCentralBody(jupiter)
+
+	if p := base.SecularPrecession(); p.ApsisPeriod != 0 {
+		t.Errorf("SecularPrecession() = %+v on elements that never set one, want zero", p)
+	}
+
+	prec := kepler.SecularPrecession{ApsisPeriod: apsisYears}
+
+	drifting := base.WithSecularPrecession(prec)
+	if got := drifting.SecularPrecession(); got != prec {
+		t.Errorf("SecularPrecession() = %+v, want %+v", got, prec)
+	}
+
+	const dtDays = 10
+
+	at := time.J2000.AddDays(dtDays)
+
+	// The documented rate, rebuilt here rather than read from the package.
+	const daysPerJulianYear = 365.25
+
+	turned := angle.Deg(argpDeg).Radians() - 2*math.Pi*dtDays/(apsisYears*daysPerJulianYear)
+
+	hand, err := kepler.NewElements(time.J2000, kmToAU(421_800), 0.004,
+		angle.Deg(2), angle.Deg(0), angle.Rad(turned), angle.Deg(330.9))
+	if err != nil {
+		t.Fatalf("NewElements(hand): %v", err)
+	}
+
+	want, _, err := hand.WithCentralBody(jupiter).StateAt(at)
+	if err != nil {
+		t.Fatalf("StateAt(hand): %v", err)
+	}
+
+	got, _, err := drifting.StateAt(at)
+	if err != nil {
+		t.Fatalf("StateAt(drifting): %v", err)
+	}
+
+	if sep := got.Sub(want).Norm() * auMeters / 1e3; sep > 1e-6 {
+		t.Errorf("precession put the satellite %.3g km from a hand-advanced apsis; "+
+			"the rate or its sign disagrees with the documented one", sep)
+	}
+
+	// And it is not a no-op: over ten days Io's apsis turns 7.4 degrees, so
+	// the fixed ellipse must land somewhere else entirely.
+	fixed, _, err := base.StateAt(at)
+	if err != nil {
+		t.Fatalf("StateAt(base): %v", err)
+	}
+
+	if sep := fixed.Sub(got).Norm() * auMeters / 1e3; sep < 100 {
+		t.Errorf("precession moved the satellite only %.3g km in ten days; "+
+			"it cannot be shown to have been applied", sep)
+	}
+}
+
+// TestSecularPrecessionZeroIsNoDrift keeps the zero value meaning "none",
+// so that an Elements built from a table with no apsis column propagates
+// exactly as one that never mentioned precession.
+func TestSecularPrecessionZeroIsNoDrift(t *testing.T) {
+	jupiter, _ := kepler.CentralBodyFor(core.Jupiter)
+
+	base := circular(t, jupiter, 421_800)
+	zeroed := base.WithSecularPrecession(kepler.SecularPrecession{})
+
+	at := time.J2000.AddDays(40)
+
+	want, _, err := base.StateAt(at)
+	if err != nil {
+		t.Fatalf("StateAt(base): %v", err)
+	}
+
+	got, _, err := zeroed.StateAt(at)
+	if err != nil {
+		t.Fatalf("StateAt(zeroed): %v", err)
+	}
+
+	if got != want {
+		t.Errorf("a zero SecularPrecession propagated to %v, no precession to %v", got, want)
+	}
+}
+
+// TestSatelliteFailureNamesItsParent covers the failure this whole change
+// exists because of: a satellite whose parent cannot be resolved.
+//
+// Before Pluto was registered on the base, a Charon orbit failed *at
+// Pluto*, and the error said only that some body was unsupported. Composing
+// through the parent means every satellite inherits its parent's failures,
+// so the error has to say which body was being asked for — otherwise the
+// next occurrence is as hard to read as that one was.
+//
+// mockBaseProvider is reused from provider_test.go: it fails for every id,
+// which is exactly a base that cannot answer for the parent.
+func TestSatelliteFailureNamesItsParent(t *testing.T) {
+	jupiter, ok := kepler.CentralBodyFor(core.Jupiter)
+	if !ok {
+		t.Fatal("no central body for Jupiter")
+	}
+
+	const ioID core.ID = 501
+
+	p := kepler.New(kepler.WithBase(&mockBaseProvider{wantErr: errMockBase}))
+	if err := p.Register(ioID, circular(t, jupiter, 421_800)); err != nil {
+		t.Fatalf("Register: %v", err)
+	}
+
+	_, err := p.State(ioID, time.J2000)
+	if err == nil {
+		t.Fatal("State succeeded with a base that cannot answer for the parent")
+	}
+
+	if !errors.Is(err, errMockBase) {
+		t.Errorf("error does not wrap the base's own: %v", err)
+	}
+
+	// The satellite's own id is not the useful one here — the caller asked
+	// for it and knows it. The parent is what they cannot see.
+	if msg := err.Error(); !strings.Contains(msg, "central body") ||
+		!strings.Contains(msg, core.Jupiter.String()) {
+		t.Errorf("error %q names neither the role nor the parent body", msg)
 	}
 }
