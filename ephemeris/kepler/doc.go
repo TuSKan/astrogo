@@ -54,7 +54,19 @@
 // against the wrong plane and, at Jupiter, put Io 16,500 km from where it
 // belongs while the period stays right.
 //
-// What remains unmodelled is the perturbation. The Galilean moons are locked
+// Two secular corrections are available and must be used together:
+// [Elements.WithPeriod] advances the mean anomaly at the published
+// anomalistic period, and [Elements.WithSecularPrecession] turns the line of
+// apsides back at its own rate. Applied as a pair they recover the sidereal
+// period — for Io, 1.769137 days from the table's own two columns — and cut
+// the six-month error against Horizons from 125,000 km to 74,000. Applied
+// singly either one is worse than neither, by an order of magnitude.
+//
+// The tables also publish a node period, and it is deliberately not applied:
+// doing so made the fit worse in both directions and no explanation for that
+// was established.
+//
+// What remains unmodelled is the periodic perturbation. The Galilean moons are locked
 // in the Laplace resonance and Jupiter's J₂ drives apsidal precession, so an
 // unperturbed ellipse drifts — measured against Horizons over ten days from
 // the elements' own epoch, by **up to 5,900 km** across the four Galilean

@@ -120,9 +120,15 @@ func TestProvider_State_DefaultBase_UnsupportedBody(t *testing.T) {
 
 	tm := atime.Date(2026, atime.January, 1, 0, 0, 0, 0, atime.LocationUTC)
 
-	// Pluto has no gofaext analytical source — the default sofaBase's
-	// documented gap (mirrors ephemeris's own sofaProvider).
-	_, err := p.State(core.Pluto, tm)
+	// Pluto used to be the example here, because SOFA has no analytical
+	// source for it. The default base now propagates its Standish elements
+	// so that a satellite of Pluto can be placed, so the gap it stood for is
+	// gone; an unnamed body still falls through.
+	if _, err := p.State(core.Pluto, tm); err != nil {
+		t.Errorf("State(Pluto) = %v; the default base answers it now", err)
+	}
+
+	_, err := p.State(core.ID(987_654), tm)
 	testutil.AssertErrorIs(t, err, kepler.ErrUnsupportedBody)
 }
 

@@ -22,17 +22,22 @@ package constants
 // system's barycentre about the Sun. The plain parameter is the planet's own
 // mass, which is what governs a satellite's motion about it.
 //
-// Using one where the other belongs is a silent error the size of the
-// satellite system. Measured against the kernel: Jupiter's two values differ
-// by one part in 4,830, Saturn's by one part in 4,045, and Mars's by only one
-// part in 19.5 million — Phobos and Deimos are nearly weightless. Every one of
-// those is far larger than the fit's own uncertainty and far too small to look
-// wrong in a printout.
+// The two differ by the mass of the satellites. Measured against the kernel:
+// one part in 4,830 at Jupiter, one part in 4,045 at Saturn, and one part in
+// 19.5 million at Mars, where Phobos and Deimos are nearly weightless.
 //
-// Pluto is the case that makes the distinction impossible to dismiss: Charon
-// is so large relative to Pluto that the system value exceeds the body value
-// by one part in 9. A Charon orbit propagated with the system parameter is
-// wrong by 12%.
+// Which one a satellite orbit needs is not simply "the body". Two-body
+// relative motion is governed by G(M_primary + M_satellite), so the right
+// value is the sum, and the two published figures bracket it: the body
+// parameter omits the satellite, the system parameter adds every satellite.
+// For a negligible moon the body parameter is the closer of the two; for one
+// that dominates its system, the system parameter is.
+//
+// Pluto is the case that settles it. Charon is 12% of Pluto, and its
+// published period of 6.3872 days comes out at 6.3871 using Pluto's *system*
+// parameter and 6.7648 — six percent long — using Pluto's own. An earlier
+// version of this comment asserted the opposite; the period measurement
+// corrected it.
 //
 // The Sun and the Earth-Moon barycentre have no plain counterpart here: the
 // Sun has no satellites in this sense, and Earth's own parameter is

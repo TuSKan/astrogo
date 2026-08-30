@@ -3,6 +3,7 @@ package kepler
 import (
 	"fmt"
 
+	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/ephemeris/core"
 	"github.com/TuSKan/astrogo/internal/gofaext"
 	"github.com/TuSKan/astrogo/time"
@@ -151,6 +152,30 @@ func (p *Provider) State(id core.ID, t time.Time) (core.State, error) {
 // Close releases no resources — Provider holds no files or caches.
 func (p *Provider) Close() error { return nil }
 
+// PlutoElements are Pluto's classical heliocentric osculating elements at
+// J2000.0, in the J2000 mean ecliptic frame.
+//
+// The T=0 row of E. M. Standish (JPL/Caltech Solar System Dynamics Group),
+// "Keplerian Elements for Approximate Positions of the Major Planets",
+// Table 1, valid 1800-2050.
+//
+// They live here rather than a layer up because the default base needs them:
+// SOFA has no analytical Pluto, and without one a satellite registered about
+// Pluto — Charon — cannot be placed at all, since the provider composes a
+// satellite through its parent.
+//
+//nolint:gochecknoglobals // a published element set, read-only
+var PlutoElements = func() Elements {
+	el, err := NewElements(time.J2000, 39.48211675, 0.24882730,
+		angle.Deg(17.14001206), angle.Deg(110.30393684),
+		angle.Deg(113.76497945), angle.Deg(14.86012204))
+	if err != nil {
+		panic(fmt.Sprintf("kepler: built-in Pluto elements are invalid: %v", err))
+	}
+
+	return el
+}()
+
 // sofaBase is the default WithBase delegate: a small, offline,
 // SOFA-only core.Provider covering the Sun, Moon, the eight major
 // planets, and the Solar System Barycenter — deliberately duplicated
@@ -167,10 +192,10 @@ func (s *sofaBase) State(id core.ID, t time.Time) (core.State, error) {
 	tdb := t.TDB()
 	d1, d2 := tdb.JDParts()
 
-	//nolint:exhaustive // Pluto has no SOFA (gofaext.Epv00/Plan94)
-	// analytical source — mirrors ephemeris's own sofaProvider, which has
-	// the same intentional gap; the default case below returns
-	// ErrUnsupportedBody for it and anything else unnamed.
+	// Every named body is handled, Pluto included: it has no SOFA
+	// analytical source and is propagated from [PlutoElements] instead.
+	// The suppression that used to sit here existed only because it was
+	// missing, and the linter noticed the moment it stopped being.
 	switch id {
 	case core.Sun:
 		pvh, _, status := gofaext.Epv00(d1, d2)
@@ -230,6 +255,29 @@ func (s *sofaBase) State(id core.ID, t time.Time) (core.State, error) {
 		return core.State{
 			Pos:    vector.V3(pv[0][0]-pvh[0][0], pv[0][1]-pvh[0][1], pv[0][2]-pvh[0][2]),
 			Vel:    vector.V3(pv[1][0]-pvh[1][0], pv[1][1]-pvh[1][1], pv[1][2]-pvh[1][2]),
+			Frame:  core.FrameICRS,
+			Center: core.CenterGeocentre,
+		}, nil
+
+	case core.Pluto:
+		// SOFA has no Pluto. Two-body propagation of the Standish elements
+		// is an approximation, and documented as one — but it is the
+		// difference between a Charon orbit that can be placed and one that
+		// cannot be, and it is what ephemeris.Default() already offered a
+		// layer up.
+		pos, vel, perr := PlutoElements.StateAt(t)
+		if perr != nil {
+			return core.State{}, fmt.Errorf("kepler: pluto: %w", perr)
+		}
+
+		pvh, _, status := gofaext.Epv00(d1, d2)
+		if status < 0 {
+			return core.State{}, fmt.Errorf("%w: gofaext.Epv00 status %d", ErrSofaFailure, status)
+		}
+
+		return core.State{
+			Pos:    pos.Sub(vector.V3(pvh[0][0], pvh[0][1], pvh[0][2])),
+			Vel:    vel.Sub(vector.V3(pvh[1][0], pvh[1][1], pvh[1][2])),
 			Frame:  core.FrameICRS,
 			Center: core.CenterGeocentre,
 		}, nil
