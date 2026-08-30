@@ -97,9 +97,36 @@ func (p *Provider) State(id core.ID, t time.Time) (core.State, error) {
 		return st, nil
 	}
 
-	heloPos, heloVel, err := el.StateAt(t)
+	relPos, relVel, err := el.StateAt(t)
 	if err != nil {
 		return core.State{}, err
+	}
+
+	// StateAt returns the orbit about its central body. For heliocentric
+	// elements that is already the heliocentric state; for a satellite it is
+	// the offset from its parent, and the parent's own heliocentric position
+	// has to be added before anything can be subtracted from it.
+	//
+	// The parent comes from the base provider rather than being propagated
+	// here: it is a planet, the base already answers for planets, and
+	// re-deriving it would be a second, worse ephemeris for a body this
+	// package can simply ask about.
+	heloPos, heloVel := relPos, relVel
+
+	if central := el.CentralBody(); central.ID != core.Sun {
+		parent, perr := p.base.State(central.ID, t)
+		if perr != nil {
+			return core.State{}, fmt.Errorf("kepler: central body %s: %w", central.ID, perr)
+		}
+
+		// The base answers geocentric, so the Earth term below would cancel
+		// it out; add the parent's geocentric state and return directly.
+		return core.State{
+			Pos:    parent.Pos.Add(relPos),
+			Vel:    parent.Vel.Add(relVel),
+			Frame:  core.FrameICRS,
+			Center: core.CenterGeocentre,
+		}, nil
 	}
 
 	tdb := t.TDB()
