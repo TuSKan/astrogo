@@ -4,7 +4,6 @@ import (
 	"io"
 	"log"
 	"sync"
-	stdtime "time"
 
 	"github.com/TuSKan/astrogo/time/internal/iers"
 )
@@ -122,7 +121,7 @@ func Coverage() (mjdMin, mjdMax float64, ok bool) { return iers.Coverage() }
 // SetRetryCooldown sets the minimum interval the automatic lazy load
 // waits between fetch attempts after a failure (0 disables throttling).
 // Default: 5 minutes.
-func SetRetryCooldown(d stdtime.Duration) { iers.SetRetryCooldown(d) }
+func SetRetryCooldown(d Duration) { iers.SetRetryCooldown(d) }
 
 //nolint:gochecknoglobals // one-time-per-process warning guard
 var warnEOPUnavailableOnce sync.Once
