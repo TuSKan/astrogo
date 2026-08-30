@@ -233,10 +233,16 @@ func TestCentralBodyForRefusesABodyWithNoSystem(t *testing.T) {
 	}
 }
 
-// TestCentralBodyForUsesTheBodyNotTheSystemParameter is the 12% trap. The
-// helper exists precisely so a caller does not have to make this choice, so
-// the choice it makes is worth pinning.
-func TestCentralBodyForUsesTheBodyNotTheSystemParameter(t *testing.T) {
+// TestCentralBodyForReturnsTheBodyParameter pins what the helper chooses,
+// and the reason, which is narrower than it first looks.
+//
+// Two-body relative motion is governed by G(M_primary + M_satellite). The
+// planet's own parameter omits the satellite and the system parameter adds
+// all of them, so the two bracket the right answer rather than one being
+// right. For a negligible satellite the body parameter is closer, and that
+// is what this returns; for Charon it is not — see
+// TestCharonNeedsTheSystemParameter.
+func TestCentralBodyForReturnsTheBodyParameter(t *testing.T) {
 	pluto, ok := kepler.CentralBodyFor(core.Pluto)
 	if !ok {
 		t.Fatal("no central body for Pluto")
@@ -245,10 +251,6 @@ func TestCentralBodyForUsesTheBodyNotTheSystemParameter(t *testing.T) {
 	if pluto.GM != constants.Ephemeris.PlutoGravitationalParameter.Value {
 		t.Errorf("GM = %v, want the body parameter %v",
 			pluto.GM, constants.Ephemeris.PlutoGravitationalParameter.Value)
-	}
-
-	if pluto.GM == constants.Ephemeris.PlutoSystemGravitationalParameter.Value {
-		t.Error("CentralBodyFor returned Pluto's system parameter; Charon makes that 12% wrong")
 	}
 }
 

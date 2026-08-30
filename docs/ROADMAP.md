@@ -363,10 +363,21 @@ asteroids now would ship confidently wrong numbers, so moons stay kernel-only
       satellites — concentrated almost entirely in Io and Europa, which are off in period
       by 0.41% and 0.76% while Ganymede and Callisto agree to one part in 100,000.
       Secular precession of the pole itself is still not applied
-- [ ] J₂-driven apsidal precession / mean-motion resonance corrections for moons where
-      two-body motion diverges within weeks (e.g. the Galilean Laplace resonance)
-- [ ] Offline base-state fallback for parents with no SOFA analytical source (Pluto,
-      for Charon) — depends on `ephemeris.Default()`'s Pluto coverage (done, see below)
+- [x] `kepler.SecularPrecession` — apsidal precession, taken from the *observed* rates
+      JPL tabulates rather than derived from J₂, so it already carries the resonance.
+      It only works paired with `Elements.WithPeriod`, because the table's period is
+      anomalistic: together they recover the sidereal period (Io, 1.769137 d, from the
+      table's own columns) and cut the six-month error against Horizons from 125,000 km
+      to 74,000. Singly, either is an order of magnitude worse than neither. The
+      tabulated *node* rate is measured and deliberately not applied — it worsens the
+      fit in both directions and no explanation was established, so the periodic
+      perturbations remain the open part
+- [x] `kepler.PlutoElements` — offline base-state fallback for parents with no SOFA
+      source. The default base propagates Pluto's Standish elements itself, so a Charon
+      orbit can be placed from a plain provider; before, it failed at the parent rather
+      than the satellite. Charon also settled which mass parameter a satellite needs:
+      the *system* value, since two-body relative motion is governed by
+      G(M_primary + M_satellite) and Charon is 12% of Pluto
 
 ## 40. Radial-Velocity Corrections
 

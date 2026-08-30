@@ -156,18 +156,30 @@ func TestWithKeplerBaseIsUsed(t *testing.T) {
 	}
 }
 
-// TestFreshMovingBodyProviderHasNoPluto pins the documented difference from
-// Default, which is easy to assume away: Default registers Pluto and a fresh
-// NewMovingBodyProvider does not.
-func TestFreshMovingBodyProviderHasNoPluto(t *testing.T) {
+// TestFreshMovingBodyProviderAnswersPluto covers the gap that used to exist
+// here, and the reason it is gone.
+//
+// SOFA has no analytical Pluto, so kepler's default base could not place it
+// and only Default() closed that by registering Pluto's elements. That left a
+// satellite of Pluto — Charon — impossible to place from a plain provider,
+// since a satellite is composed through its parent. The base now propagates
+// the same Standish elements itself.
+func TestFreshMovingBodyProviderAnswersPluto(t *testing.T) {
 	p := NewMovingBodyProvider()
 
-	if _, err := p.State(core.Pluto, time.J2000); err == nil {
-		t.Error("a fresh NewMovingBodyProvider answered Pluto; only Default registers it")
+	st, err := p.State(core.Pluto, time.J2000)
+	if err != nil {
+		t.Fatalf("State(Pluto): %v", err)
 	}
 
-	// Every SOFA-covered body still works, which is the other half of the
-	// claim.
+	// Pluto was near 31 AU from the Sun at J2000; geocentric distance is of
+	// the same order. A bound this loose still catches the origin, the Sun,
+	// or a body confused with another planet.
+	if r := st.Pos.Norm(); r < 25 || r > 40 {
+		t.Errorf("Pluto is %v AU away at J2000, expected roughly 31", r)
+	}
+
+	// Every SOFA-covered body still works, which is the other half.
 	if _, err := p.State(core.Mars, time.J2000); err != nil {
 		t.Errorf("State(Mars): %v", err)
 	}

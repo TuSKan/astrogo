@@ -41,6 +41,14 @@ type Elements struct {
 	// the J2000 ecliptic, which is what heliocentric elements use and what
 	// this package read before satellites needed anything else.
 	plane *LaplacePlane
+
+	// precession is the secular drift of the apsis. The zero value means
+	// none, which is what a fixed two-body ellipse has.
+	precession SecularPrecession
+
+	// periodDays overrides the mean motion implied by the semi-major axis
+	// and the central body's mass parameter. Zero means derive it.
+	periodDays float64
 }
 
 // CentralBody is the body an element set orbits, and the mass parameter
@@ -56,11 +64,14 @@ type CentralBody struct {
 	// ID is the body the orbit is referred to.
 	ID core.ID
 
-	// GM is that body's mass parameter, in m³/s².
+	// GM is the mass parameter governing the orbit, in m³/s².
 	//
-	// For a satellite this is the parent's *body* parameter, not its system
-	// parameter — see [CentralBodyFor], and constants.EphemerisSet for why
-	// the difference reaches 12% at Pluto.
+	// For a satellite that is **μ = G(M_primary + M_satellite)**, not the
+	// primary's mass alone: two-body relative motion is governed by the sum.
+	// The satellite is usually negligible and the primary's own parameter is
+	// then the right approximation, which is what [CentralBodyFor] returns —
+	// but Charon is 12% of Pluto, and there the sum is what matters. See
+	// [CentralBodyFor] for how far each approximation is off.
 	GM float64
 }
 
@@ -118,14 +129,81 @@ func (lp LaplacePlane) rotateToICRF(v vector.Vec3) vector.Vec3 {
 	return v.RotateX(colat).RotateZ(lp.RA.Radians() + math.Pi/2)
 }
 
+// SecularPrecession is the steady turning of an orbit's line of apsides.
+//
+// A two-body ellipse is fixed in space; a real satellite's is not. JPL's
+// satellite tables publish the period of the turn beside the elements, and
+// applying it is what keeps a propagation from drifting in orientation.
+//
+// # It only works with the published period
+//
+// The table's "P (days)" is the **anomalistic** period — periapsis to
+// periapsis — not the sidereal one. For Io the sidereal period is 1.769138
+// days and the table gives 1.762732, and the difference is exactly the apsis
+// rate: n_sidereal + dω/dt = 204.2283°/day, which is 1.762733 days. Verified
+// to seven digits.
+//
+// So mean anomaly must advance at that anomalistic rate, which means
+// [Elements.WithPeriod] as well as this. Applying one without the other makes
+// the result worse than plain two-body motion — measured, thirteen times
+// worse — because the two corrections are two halves of the same statement.
+//
+// # What is deliberately absent
+//
+// The tables also publish a node period, and it is not applied. Doing so made
+// the fit against Horizons worse in both directions — 74,038 km becomes
+// 97,412 or 134,570 — and no explanation for that was established. An
+// unexplained term that measurably hurts is not shipped on the grounds that
+// the table contains it.
+type SecularPrecession struct {
+	// ApsisPeriod is the time for the line of apsides to complete a turn,
+	// in Julian years — the "P apsis" column. Zero means none.
+	ApsisPeriod float64
+}
+
+// rate returns the drift of the argument of periapsis, in radians per day.
+//
+// Negative for a positive published period. That is not a sign error: mean
+// anomaly is being advanced at the anomalistic rate, which already carries
+// the apsis motion, so the orientation has to be walked back by the same
+// amount to leave the sidereal rate behind. Measured both ways — the other
+// sign is eighteen times worse.
+func (p SecularPrecession) rate() float64 {
+	const daysPerJulianYear = 365.25
+
+	if p.ApsisPeriod == 0 {
+		return 0
+	}
+
+	return -2 * math.Pi / (p.ApsisPeriod * daysPerJulianYear)
+}
+
 // CentralBodyFor returns the central body for a satellite of the given
 // planet, using that planet's own mass parameter from the current JPL
 // ephemeris vintage.
 //
-// It exists so a caller does not have to choose between the system and body
-// parameters, which is the error this pairing is most exposed to: the system
-// value includes the satellites and is the wrong one for a satellite's own
-// motion, by one part in 4,830 at Jupiter and by 12% at Pluto.
+// # Which mass parameter is right
+//
+// Two-body relative motion is governed by **μ = G(M_primary + M_satellite)**,
+// so strictly neither published value is it. The two available are the
+// planet's own parameter and the system parameter, which is the planet plus
+// *all* its satellites:
+//
+//   - For a negligible satellite the planet's own parameter is the better
+//     approximation. Io is 4.7e-05 of Jupiter, while Jupiter's system
+//     parameter overshoots by 2.1e-04 because it also carries Europa,
+//     Ganymede and Callisto. This function returns the planet's own.
+//   - For a satellite that dominates its system the sum is what matters, and
+//     the system parameter *is* that sum. Charon is 12% of Pluto: its
+//     published period of 6.3872 days comes out at 6.3871 with Pluto's
+//     system parameter and 6.7648 — six percent long — with Pluto's own.
+//
+// So for Charon, and anything else massive relative to its primary, set
+// [CentralBody.GM] to constants.Ephemeris.PlutoSystemGravitationalParameter
+// rather than taking the default here.
+//
+// An earlier version of this comment had that backwards, and said the system
+// parameter was the wrong one at Pluto. The period measurement settled it.
 //
 // Reports false for a body with no satellite system in the table — the Sun,
 // the Moon, Mercury and Venus.
@@ -181,6 +259,43 @@ func (el Elements) CentralBody() CentralBody {
 
 	return el.central
 }
+
+// WithSecularPrecession returns a copy of el whose apsis and node drift at
+// the given rates rather than staying fixed.
+//
+// JPL's satellite tables publish both periods beside the elements. Applying
+// them removes the largest part of the two-body error for a close satellite:
+// Io's apsis turns 0.74° per day, so over ten days a fixed ellipse is 7.4°
+// out in the orientation of its own long axis.
+func (el Elements) WithSecularPrecession(p SecularPrecession) Elements {
+	el.precession = p
+
+	return el
+}
+
+// SecularPrecession reports the drift applied to the apsis and node.
+func (el Elements) SecularPrecession() SecularPrecession { return el.precession }
+
+// WithPeriod returns a copy of el whose mean anomaly advances at the given
+// period rather than the one implied by the semi-major axis and the central
+// body's mass parameter.
+//
+// Published satellite elements come with their own period, and it is not the
+// two-body one: the table's value is anomalistic, and for Io it differs from
+// the two-body figure by 0.4%, ten minutes per revolution. Use it together
+// with [Elements.WithSecularPrecession] — separately, either makes the result
+// worse than using neither.
+//
+// Zero restores the derived mean motion.
+func (el Elements) WithPeriod(days float64) Elements {
+	el.periodDays = days
+
+	return el
+}
+
+// Period reports the period the mean anomaly advances at, in days: the one
+// supplied by [Elements.WithPeriod], or zero when it is derived.
+func (el Elements) Period() float64 { return el.periodDays }
 
 // WithLaplacePlane returns a copy of el whose angles are read against the
 // given plane rather than the J2000 ecliptic — the form JPL's satellite
@@ -372,6 +487,9 @@ func (el Elements) StateAt(t time.Time) (pos, vel vector.Vec3, err error) {
 	aMeters := el.semiMajorAxis * auMeters
 
 	nRadPerDay := math.Sqrt(gm/(aMeters*aMeters*aMeters)) * constants.Derived.JulianDaySeconds.Value
+	if el.periodDays != 0 {
+		nRadPerDay = 2 * math.Pi / el.periodDays
+	}
 
 	dtDays := t.SubDays(el.epoch)
 	m := el.meanAnomaly.Radians() + nRadPerDay*dtDays
@@ -393,8 +511,14 @@ func (el Elements) StateAt(t time.Time) (pos, vel vector.Vec3, err error) {
 	eDot := nRadPerDay / (1 - e*cosE)
 	velPf := vector.V3(-a*sinE*eDot, a*sqrtOneMinusE2*cosE*eDot, 0)
 
-	posRef := rotatePerifocalToEcliptic(posPf, el.inclination, el.ascendingNode, el.argPeriapsis)
-	velRef := rotatePerifocalToEcliptic(velPf, el.inclination, el.ascendingNode, el.argPeriapsis)
+	// The apsis and node are advanced to the requested epoch before the
+	// orientation is applied. Only the orbit's orientation drifts; its size
+	// and shape are unchanged, which is what makes a secular rate a rate
+	// rather than a re-fit.
+	argp := angle.Rad(el.argPeriapsis.Radians() + el.precession.rate()*dtDays)
+
+	posRef := rotatePerifocalToEcliptic(posPf, el.inclination, el.ascendingNode, argp)
+	velRef := rotatePerifocalToEcliptic(velPf, el.inclination, el.ascendingNode, argp)
 
 	// Both paths end in the ICRF equatorial frame; they differ only in what
 	// the orbit's angles were measured against.

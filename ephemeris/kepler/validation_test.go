@@ -75,15 +75,39 @@ func horizonsGet(params url.Values) (string, error) {
 // km-seconds units by default, since OUT_UNITS is not set) — not
 // guessed — and cross-checked against 433 Eros's well-known real
 // elements (a~1.458 AU, e~0.223, i~10.83 deg) before being trusted.
-func fetchHelioElements(designation string, at time.Time) (epochJD float64, el kepler.Elements, err error) {
+// horizonsEpoch renders an instant for a Horizons query that declares
+// TIME_TYPE='TDB', as a Julian Date rather than a calendar string.
+//
+// A calendar string cannot carry its own scale, and formatting one here got
+// the scale wrong twice over. Time.Format renders the *UTC* calendar
+// representation — 2026-01-01 00:00 TDB comes out as 2025-12-31 23:58:50 —
+// and the query then told Horizons to read that as TDB, shifting the request
+// by 69.18 seconds. It happened once for the elements and again for the
+// vectors they were compared against, so the two disagreed by about 138
+// seconds of Eros's motion: 4.1 arcseconds, where the elements and vectors
+// themselves agree to 0.04.
+//
+// The test used to pass, and that is the interesting part. Before the ToGo
+// fix in #50, Time.Format reinterpreted any scale as UTC, so a TDB instant
+// rendered its TDB calendar fields — exactly what the query needed. Fixing
+// ToGo made this test start failing, which is what a test resting on a
+// defect does when the defect goes away.
+//
+// A Julian Date has no calendar and therefore no scale to lose: JD2461041.5
+// with TIME_TYPE='TDB' means what it says.
+func horizonsEpoch(at atime.Time) string {
+	return fmt.Sprintf("'JD%.9f'", at.JD())
+}
+
+func fetchHelioElements(designation string, at atime.Time) (epochJD float64, el kepler.Elements, err error) {
 	params := url.Values{}
 	params.Add("format", "text")
 	params.Add("COMMAND", fmt.Sprintf("'%s'", designation))
 	params.Add("CENTER", "'@10'")
 	params.Add("MAKE_EPHEM", "'YES'")
 	params.Add("EPHEM_TYPE", "'ELEMENTS'")
-	params.Add("START_TIME", fmt.Sprintf("'%s'", at.Format("2006-01-02 15:04")))
-	params.Add("STOP_TIME", fmt.Sprintf("'%s'", at.AddDays(1.0/1440).Format("2006-01-02 15:04")))
+	params.Add("START_TIME", horizonsEpoch(at))
+	params.Add("STOP_TIME", horizonsEpoch(at.AddDays(1.0/1440)))
 	params.Add("STEP_SIZE", "'1m'")
 	params.Add("TIME_TYPE", "'TDB'")
 	params.Add("CAL_FORMAT", "'JD'")
@@ -168,8 +192,8 @@ func fetchHelioVector(designation string, at time.Time) (pos, vel vector.Vec3, e
 	params.Add("CENTER", "'@10'")
 	params.Add("MAKE_EPHEM", "'YES'")
 	params.Add("EPHEM_TYPE", "'VECTORS'")
-	params.Add("START_TIME", fmt.Sprintf("'%s'", at.Format("2006-01-02 15:04")))
-	params.Add("STOP_TIME", fmt.Sprintf("'%s'", at.AddDays(1.0/1440).Format("2006-01-02 15:04")))
+	params.Add("START_TIME", horizonsEpoch(at))
+	params.Add("STOP_TIME", horizonsEpoch(at.AddDays(1.0/1440)))
 	params.Add("STEP_SIZE", "'1m'")
 	params.Add("TIME_TYPE", "'TDB'")
 	params.Add("OUT_UNITS", "'AU-D'")
