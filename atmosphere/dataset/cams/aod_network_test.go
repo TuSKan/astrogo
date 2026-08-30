@@ -6,7 +6,6 @@ import (
 	"context"
 	"math"
 	"testing"
-	gotime "time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere/dataset/cams"
@@ -14,11 +13,12 @@ import (
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/remote"
 	_ "github.com/TuSKan/astrogo/remote/s3"
+	"github.com/TuSKan/astrogo/time"
 )
 
 // A date the archive is known to hold, used by every test here so they share
 // one cached file rather than fetching one each.
-var aodEpoch = gotime.Date(2023, 1, 1, 3, 0, 0, 0, gotime.UTC)
+var aodEpoch = time.GoDate(2023, 1, 1, 3, 0, 0, 0, time.LocationUTC)
 
 func siteAt(tb testing.TB, lonDeg, latDeg float64) *coord.Geodetic {
 	tb.Helper()
@@ -34,7 +34,7 @@ func siteAt(tb testing.TB, lonDeg, latDeg float64) *coord.Geodetic {
 func aodAt(tb testing.TB, lonDeg, latDeg float64) float64 {
 	tb.Helper()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*gotime.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
 
 	v, err := cams.AOD550(ctx, siteAt(tb, lonDeg, latDeg), aodEpoch)
@@ -160,34 +160,34 @@ func TestAODKeyPicksTheCoveringCycle(t *testing.T) {
 	t.Parallel()
 
 	cases := []struct {
-		when gotime.Time
+		when time.GoTime
 		want string
 	}{{
 		// Exactly on the morning cycle: step zero of that cycle.
-		when: gotime.Date(2023, 1, 1, 0, 0, 0, 0, gotime.UTC),
+		when: time.GoDate(2023, 1, 1, 0, 0, 0, 0, time.LocationUTC),
 		want: "CAMS/GLOBAL/2023/01/01/z_cams_c_ecmf_20230101000000_prod_fc_sfc_000_aod550/" +
 			"z_cams_c_ecmf_20230101000000_prod_fc_sfc_000_aod550.nc",
 	}, {
 		// Three hours later: same cycle, step three.
-		when: gotime.Date(2023, 1, 1, 3, 0, 0, 0, gotime.UTC),
+		when: time.GoDate(2023, 1, 1, 3, 0, 0, 0, time.LocationUTC),
 		want: "CAMS/GLOBAL/2023/01/01/z_cams_c_ecmf_20230101000000_prod_fc_sfc_003_aod550/" +
 			"z_cams_c_ecmf_20230101000000_prod_fc_sfc_003_aod550.nc",
 	}, {
 		// Past midday: the afternoon cycle takes over, not the morning one
 		// extended.
-		when: gotime.Date(2023, 1, 1, 13, 30, 0, 0, gotime.UTC),
+		when: time.GoDate(2023, 1, 1, 13, 30, 0, 0, time.LocationUTC),
 		want: "CAMS/GLOBAL/2023/01/01/z_cams_c_ecmf_20230101120000_prod_fc_sfc_001_aod550/" +
 			"z_cams_c_ecmf_20230101120000_prod_fc_sfc_001_aod550.nc",
 	}, {
 		// A non-UTC instant resolves by its UTC time, not its wall clock.
-		when: gotime.Date(2023, 1, 1, 20, 0, 0, 0, gotime.FixedZone("UTC+7", 7*3600)),
+		when: time.GoDate(2023, 1, 1, 20, 0, 0, 0, time.FixedZone("UTC+7", 7*3600)),
 		want: "CAMS/GLOBAL/2023/01/01/z_cams_c_ecmf_20230101120000_prod_fc_sfc_001_aod550/" +
 			"z_cams_c_ecmf_20230101120000_prod_fc_sfc_001_aod550.nc",
 	}}
 
 	for _, c := range cases {
 		if got := cams.AODKey(c.when); got != c.want {
-			t.Errorf("%s\n got %s\nwant %s", c.when.Format(gotime.RFC3339), got, c.want)
+			t.Errorf("%s\n got %s\nwant %s", c.when.Format(time.RFC3339), got, c.want)
 		}
 	}
 }

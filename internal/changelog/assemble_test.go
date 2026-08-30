@@ -3,11 +3,11 @@ package changelog
 import (
 	"flag"
 	"fmt"
+	"github.com/TuSKan/astrogo/time"
 	"os"
 	"strings"
 	"testing"
 	"testing/fstest"
-	"time"
 )
 
 //nolint:gochecknoglobals // test flags must be package-level to register

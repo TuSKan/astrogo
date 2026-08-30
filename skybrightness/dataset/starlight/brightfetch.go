@@ -9,12 +9,12 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/remote/api"
+	"github.com/TuSKan/astrogo/time"
 )
 
 // Defaults for [FetchBrightStars], measured rather than chosen.

@@ -17,7 +17,6 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
@@ -25,6 +24,7 @@ import (
 	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/skybrightness"
 	"github.com/TuSKan/astrogo/skybrightness/dataset"
+	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -45,7 +45,7 @@ func main() {
 	// A moonless night. None of the presets used here has a moonlight term,
 	// so the date reaches the answer only through the zodiacal light's solar
 	// elongation.
-	when := time.Date(2026, 3, 20, 5, 0, 0, 0, time.UTC)
+	when := time.GoDate(2026, 3, 20, 5, 0, 0, 0, time.LocationUTC)
 
 	// Observatory reads everything the natural presets do and a solar
 	// spectrum besides, so granting for it covers the whole run.
@@ -64,7 +64,7 @@ func main() {
 // The expected result is that almost nothing happens, which is why it is
 // worth printing: the interesting fact about the transfer choice is how
 // little it buys at the zenith.
-func comparePresets(ctx context.Context, when time.Time) {
+func comparePresets(ctx context.Context, when time.GoTime) {
 	site := siteAt(heightM)
 	air := atmosphere.RuralAerosol(site.Height(), atmosphere.CleanMountainAOD550)
 
@@ -127,7 +127,7 @@ ground-emitter inventory this example does not build.
 //
 // Elevation and aerosol together, because they are not independent in
 // practice: the sites that are high are the sites that are dry.
-func compareAir(ctx context.Context, when time.Time) {
+func compareAir(ctx context.Context, when time.GoTime) {
 	// One Sky for every site here. Nothing it holds depends on the observer —
 	// the star and dust maps are all-sky, the grid and passband are spectral
 	// — so the site arrives with the scene instead.
@@ -199,7 +199,7 @@ func whatObservatoryAdds(ctx context.Context) {
 	// exists to show is exactly zero when it is not, and a column of zeros
 	// looks in every way like coverage — a mistake this module's own golden
 	// fixture made once already.
-	when := time.Date(2026, 4, 2, 5, 0, 0, 0, time.UTC)
+	when := time.GoDate(2026, 4, 2, 5, 0, 0, 0, time.LocationUTC)
 	site := siteAt(heightM)
 
 	sky, err := dataset.Open(ctx, dataset.Spec{

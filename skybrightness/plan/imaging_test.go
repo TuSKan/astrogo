@@ -5,12 +5,12 @@ import (
 	"math"
 	"strings"
 	"testing"
-	gotime "time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/optics"
 	sbplan "github.com/TuSKan/astrogo/skybrightness/plan"
+	"github.com/TuSKan/astrogo/time"
 )
 
 // The sky calibrates itself: a source producing exactly the sky's per-pixel
@@ -111,7 +111,7 @@ func TestNewImagingRefusesAnUnusableSpec(t *testing.T) {
 	base := sbplan.Spec{
 		Site:           site,
 		Instrument:     inst,
-		Exposure:       300 * gotime.Second,
+		Exposure:       300 * time.Second,
 		AperturePixels: 9,
 		SNR:            5,
 	}
@@ -129,7 +129,7 @@ func TestNewImagingRefusesAnUnusableSpec(t *testing.T) {
 		{"no sky", "dataset.Sky", func(*sbplan.Spec) {}},
 		{"no site", "site", func(s *sbplan.Spec) { s.Site = nil }},
 		{"zero exposure", "exposure", func(s *sbplan.Spec) { s.Exposure = 0 }},
-		{"negative exposure", "exposure", func(s *sbplan.Spec) { s.Exposure = -gotime.Second }},
+		{"negative exposure", "exposure", func(s *sbplan.Spec) { s.Exposure = -time.Second }},
 		{"zero aperture", "aperture", func(s *sbplan.Spec) { s.AperturePixels = 0 }},
 		{"zero threshold", "threshold", func(s *sbplan.Spec) { s.SNR = 0 }},
 		{"infinite threshold", "threshold", func(s *sbplan.Spec) { s.SNR = math.Inf(1) }},

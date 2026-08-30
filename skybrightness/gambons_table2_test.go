@@ -6,7 +6,6 @@ import (
 	"context"
 	"math"
 	"testing"
-	gotime "time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
@@ -18,7 +17,7 @@ import (
 	"github.com/TuSKan/astrogo/skybrightness/dataset/airglow"
 	"github.com/TuSKan/astrogo/skybrightness/dataset/dust"
 	"github.com/TuSKan/astrogo/skybrightness/dataset/starlight"
-	astrotime "github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -107,7 +106,7 @@ func TestAgainstGAMBONSTable2(t *testing.T) {
 	testutil.RequireReachable(t, "etimecalret-002.eso.org:443")
 	testutil.RequireReachable(t, "github.com:443")
 
-	ctx, cancel := context.WithTimeout(context.Background(), 60*gotime.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Minute)
 	defer cancel()
 
 	enableStarMapDownload(t)
@@ -149,7 +148,7 @@ func TestAgainstGAMBONSTable2(t *testing.T) {
 	dirs := make([]dust.Direction, 0, len(capDirs)*len(epochs))
 
 	for _, when := range epochs {
-		cc := coord.NewContext(astrotime.FromGo(when), site, atm.Refraction())
+		cc := coord.NewContext(time.FromGo(when), site, atm.Refraction())
 
 		for _, d := range capDirs {
 			icrs, err := cc.AltAzToICRS(d)
@@ -314,28 +313,28 @@ func table2Epochs(
 	site *coord.Geodetic,
 	provider eph.Provider,
 	atm *atmosphere.Atmosphere,
-) []gotime.Time {
+) []time.GoTime {
 	t.Helper()
 
-	var out []gotime.Time
+	var out []time.GoTime
 
 	for month := range table2Months {
 		// The fifteenth of each month, which is close enough to the middle for
 		// a yearly mean of something that varies smoothly with solar longitude.
-		day := gotime.Date(2026, gotime.Month(month+1), 15, 0, 0, 0, 0, gotime.UTC)
+		day := time.GoDate(2026, time.Month(month+1), 15, 0, 0, 0, 0, time.LocationUTC)
 
 		var found int
 
 		// Walk the night in half-hour steps and keep the hours that are dark,
 		// spread across the window rather than clustered at its start.
-		var dark []gotime.Time
+		var dark []time.GoTime
 
 		for step := range 48 {
-			when := day.Add(gotime.Duration(step*30) * gotime.Minute) //nolint:durationcheck // step*30 is a count of minutes, not a duration
+			when := day.Add(time.Duration(step*30) * time.Minute) //nolint:durationcheck // step*30 is a count of minutes, not a duration
 
-			cc := coord.NewContext(astrotime.FromGo(when), site, atm.Refraction())
+			cc := coord.NewContext(time.FromGo(when), site, atm.Refraction())
 
-			sun, err := eph.Position(provider, eph.Sun, astrotime.FromGo(when))
+			sun, err := eph.Position(provider, eph.Sun, time.FromGo(when))
 			if err != nil {
 				continue
 			}

@@ -3,8 +3,8 @@
 package jpl_test
 
 import (
+	"github.com/TuSKan/astrogo/time"
 	"testing"
-	"time"
 )
 
 // settledMargin is how far behind the present a corpus epoch must sit.
@@ -52,7 +52,7 @@ func TestCorpusEpochsAreSettled(t *testing.T) {
 	cutoff := time.Now().UTC().Add(-settledMargin)
 
 	var (
-		latest  time.Time
+		latest  time.GoTime
 		offense string
 		count   int
 	)

@@ -11,7 +11,7 @@ import (
 	"github.com/TuSKan/astrogo/ephemeris/jpl"
 	"github.com/TuSKan/astrogo/ephemeris/jpl/spk"
 	"github.com/TuSKan/astrogo/internal/testutil"
-	atime "github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/time"
 )
 
 // A small-body provider that loaded nothing used to be indistinguishable
@@ -39,7 +39,7 @@ import (
 func TestSmallBodyDesignationFailuresAreLoud(t *testing.T) {
 	testutil.RequireReachable(t, "ssd.jpl.nasa.gov:443")
 
-	start := atime.Date(2026, 1, 1, 0, 0, 0, 0, atime.LocationUTC)
+	start := time.Date(2026, 1, 1, 0, 0, 0, 0, time.LocationUTC)
 
 	for _, tc := range []struct {
 		des  string
@@ -64,7 +64,7 @@ func TestSmallBodyDesignationFailuresAreLoud(t *testing.T) {
 func TestSmallBodyDesignationsThatResolve(t *testing.T) {
 	testutil.RequireReachable(t, "ssd.jpl.nasa.gov:443")
 
-	start := atime.Date(2026, 1, 1, 0, 0, 0, 0, atime.LocationUTC)
+	start := time.Date(2026, 1, 1, 0, 0, 0, 0, time.LocationUTC)
 
 	for _, tc := range []struct {
 		des  string

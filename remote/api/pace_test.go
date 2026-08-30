@@ -6,10 +6,10 @@ import (
 	"net/http/httptest"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/remote/api"
+	"github.com/TuSKan/astrogo/time"
 )
 
 // A paced client must actually wait, and must not let concurrent callers
@@ -22,7 +22,7 @@ import (
 func TestMinIntervalPacesAndSerialises(t *testing.T) {
 	var (
 		mu     sync.Mutex
-		starts []time.Time
+		starts []time.GoTime
 	)
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {

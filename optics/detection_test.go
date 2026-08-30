@@ -4,9 +4,9 @@ import (
 	"errors"
 	"math"
 	"testing"
-	"time"
 
 	"github.com/TuSKan/astrogo/optics"
+	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 

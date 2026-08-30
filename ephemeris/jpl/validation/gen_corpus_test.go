@@ -13,9 +13,9 @@ import (
 	"sort"
 	"strings"
 	"testing"
-	gotime "time"
 
 	"github.com/TuSKan/astrogo/plan"
+	"github.com/TuSKan/astrogo/time"
 )
 
 // updateCorpus gates every write to the checked-in corpus.
@@ -266,7 +266,7 @@ func newCorpusManifest(t *testing.T, spans []corpusSpan, sites []corpusSite) cor
 
 	return corpusManifest{
 		SchemaVersion: corpusSchemaVersion,
-		Generated:     gotime.Now().UTC().Format(gotime.RFC3339),
+		Generated:     time.Now().UTC().Format(time.RFC3339),
 		Commit:        gitCommit(t),
 		Reference:     "JPL Horizons (https://ssd.jpl.nasa.gov/api/horizons.api)",
 		ReferenceQuery: "EPHEM_TYPE=OBSERVER CENTER='coord@399' QUANTITIES='1,2,4,20' CAL_FORMAT=JD; " +

@@ -1,8 +1,8 @@
 package remote
 
 import (
+	"github.com/TuSKan/astrogo/time"
 	"os"
-	"time"
 )
 
 // EndpointID names a remote service astrogo can contact. The set below is

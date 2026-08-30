@@ -8,12 +8,12 @@ import (
 	"math"
 	"sort"
 	"testing"
-	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/skybrightness/dataset/dust"
+	"github.com/TuSKan/astrogo/time"
 )
 
 // The local all-sky map reproduces what IRSA answers for the same directions.

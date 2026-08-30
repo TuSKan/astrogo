@@ -4,11 +4,11 @@ import (
 	"context"
 	"math"
 	"testing"
-	gotime "time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
+	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -31,7 +31,7 @@ func eblScene(t *testing.T) *Scene {
 
 	return &Scene{
 		Observer:   loc,
-		Time:       gotime.Date(2026, 8, 20, 23, 16, 0, 0, gotime.UTC),
+		Time:       time.GoDate(2026, 8, 20, 23, 16, 0, 0, time.LocationUTC),
 		Atmosphere: atm,
 	}
 }

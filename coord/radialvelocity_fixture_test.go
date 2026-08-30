@@ -7,7 +7,6 @@ import (
 	"path/filepath"
 	"sort"
 	"testing"
-	gotime "time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
@@ -211,7 +210,7 @@ func TestRVCorrectionAgainstAstropy(t *testing.T) {
 			t.Fatalf("%s: %v", tc.Name, err)
 		}
 
-		parsed, err := gotime.Parse(gotime.RFC3339, tc.EpochUTC+"Z")
+		parsed, err := time.Parse(time.RFC3339, tc.EpochUTC+"Z")
 		if err != nil {
 			t.Fatalf("%s: parsing %q: %v", tc.Name, tc.EpochUTC, err)
 		}

@@ -3,15 +3,14 @@ package plan_test
 import (
 	"math/rand/v2"
 	"testing"
-	gotime "time"
 
 	"github.com/TuSKan/astrogo/plan"
-	astrotime "github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/time"
 )
 
 // base is an arbitrary fixed epoch; the algebra does not care which.
-func base() astrotime.Time {
-	return astrotime.FromGo(gotime.Date(2026, 8, 21, 0, 0, 0, 0, gotime.UTC))
+func base() time.Time {
+	return time.FromGo(time.GoDate(2026, 8, 21, 0, 0, 0, 0, time.LocationUTC))
 }
 
 // win builds a window from two hour offsets.
@@ -19,8 +18,8 @@ func win(fromHours, toHours float64) plan.Window {
 	b := base()
 
 	return plan.Window{
-		Start: b.Add(astrotime.Duration(fromHours * float64(astrotime.Hour))),
-		End:   b.Add(astrotime.Duration(toHours * float64(astrotime.Hour))),
+		Start: b.Add(time.Duration(fromHours * float64(time.Hour))),
+		End:   b.Add(time.Duration(toHours * float64(time.Hour))),
 	}
 }
 
@@ -49,7 +48,7 @@ func randomSet(r *rand.Rand, n int) []plan.Window {
 
 // total is TotalDuration in hours, for readable failure messages.
 func totalHours(ws []plan.Window) float64 {
-	return float64(plan.TotalDuration(ws)) / float64(astrotime.Hour)
+	return float64(plan.TotalDuration(ws)) / float64(time.Hour)
 }
 
 // Union must produce a normalized set: sorted, pairwise disjoint, covering

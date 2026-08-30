@@ -3,12 +3,17 @@ package testutil
 import (
 	"net"
 	"testing"
-	"time"
 )
 
 // ReachableTimeout bounds the pre-check. It is deliberately short: the point
 // is to find out whether a service is there at all, not to wait for a slow one.
-const ReachableTimeout = 5 * time.Second
+//
+// Written in nanoseconds rather than as 5 * time.Second because this package
+// is imported by nearly every test in the repository, including time's own:
+// importing astrogo/time here would close a cycle through
+// time/internal/iers. An untyped constant converts to a Duration wherever it
+// is used, so nothing at the call sites changes.
+const ReachableTimeout = 5_000_000_000
 
 // RequireReachable skips the test unless host is accepting connections.
 //

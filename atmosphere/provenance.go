@@ -1,6 +1,6 @@
 package atmosphere
 
-import "time"
+import "github.com/TuSKan/astrogo/time"
 
 // DatasetVersion identifies a specific, citable version of a dataset or
 // algorithm implementation — a semver string, a DOI-versioned release tag,
@@ -50,7 +50,7 @@ func (f Fidelity) String() string {
 
 // TimeRange is a closed time interval, [Start, End].
 type TimeRange struct {
-	Start, End time.Time
+	Start, End time.GoTime
 }
 
 // SourceRef records the provenance of one dataset that contributed to a
@@ -65,7 +65,7 @@ type SourceRef struct {
 	Name      string
 	Version   DatasetVersion
 	Acquired  TimeRange // the observation period the data represents
-	Retrieved time.Time
+	Retrieved time.GoTime
 	Checksum  string // "sha256:..."
 	Licence   string
 	Endpoint  string // remote.EndpointID as a string; empty for user-supplied data

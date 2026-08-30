@@ -7,7 +7,6 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
-	gotime "time"
 
 	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/remote"
@@ -42,10 +41,10 @@ type GP struct {
 
 // EpochTime parses the GP epoch string into an astrogo Time (UTC).
 func (gp GP) EpochTime() (time.Time, error) {
-	t, err := gotime.Parse("2006-01-02T15:04:05.999999", gp.Epoch)
+	t, err := time.Parse("2006-01-02T15:04:05.999999", gp.Epoch)
 	if err != nil {
 		// Try without fractional seconds.
-		t, err = gotime.Parse("2006-01-02T15:04:05", gp.Epoch)
+		t, err = time.Parse("2006-01-02T15:04:05", gp.Epoch)
 		if err != nil {
 			return time.Time{}, fmt.Errorf("norad: cannot parse epoch %q: %w", gp.Epoch, err)
 		}

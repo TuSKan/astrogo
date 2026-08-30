@@ -7,11 +7,11 @@ import (
 	"strings"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/TuSKan/astrogo/remote/file"
 
 	"github.com/TuSKan/astrogo/internal/testutil"
+	"github.com/TuSKan/astrogo/time"
 )
 
 // TestGetFileConcurrentSameDestNoCorruption is a regression test for a real

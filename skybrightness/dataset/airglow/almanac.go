@@ -5,10 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
-	"time"
 
 	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/remote/api"
+	"github.com/TuSKan/astrogo/time"
 )
 
 // Almanac is what SkyCalc's almanac knows about an instant that an airglow
@@ -79,7 +79,7 @@ type Almanac struct {
 // One small JSON call against a service this package already talks to, and
 // the answer for a past month never changes — but a caller assembling one
 // scene makes this call once, so there is nothing here worth the cache key.
-func AlmanacAt(ctx context.Context, when time.Time, obs Observatory) (Almanac, error) {
+func AlmanacAt(ctx context.Context, when time.GoTime, obs Observatory) (Almanac, error) {
 	if obs == "" {
 		obs = Paranal
 	}

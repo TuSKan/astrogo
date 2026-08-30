@@ -5,8 +5,6 @@ import (
 	"sync"
 	"testing"
 
-	stdtime "time"
-
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
@@ -48,8 +46,8 @@ func TestObservableWindows_Fixed(t *testing.T) {
 	obj := NewStar("T", angle.Hour(18.69), angle.Deg(0))
 
 	start := time.FromJD(2451545.0, time.UTC) // J2000 Noon (Observable)
-	end := start.Add(1 * stdtime.Hour)
-	step := 10 * stdtime.Minute
+	end := start.Add(1 * time.Hour)
+	step := 10 * time.Minute
 
 	t.Run("ContinuousWindow", func(t *testing.T) {
 		// Altitude > 20 deg (It's at ~90 deg)
@@ -115,8 +113,8 @@ func TestObservableWindows_Grouping(t *testing.T) {
 	obj := NewStar("T", angle.Zero(), angle.Zero())
 
 	start := time.NowUTC()
-	step := 1 * stdtime.Minute
-	end := start.Add(5 * stdtime.Minute) // 6 samples: 0, 1, 2, 3, 4, 5
+	step := 1 * time.Minute
+	end := start.Add(5 * time.Minute) // 6 samples: 0, 1, 2, 3, 4, 5
 
 	// flipConstraint:
 	// t=0: count=1, fail
@@ -402,18 +400,18 @@ func TestObservableWindows_StepTooLarge(t *testing.T) {
 	obj := NewStar("T", angle.Zero(), angle.Zero())
 
 	start := time.NowUTC()
-	end := start.Add(6 * stdtime.Hour)
+	end := start.Add(6 * time.Hour)
 
 	// Step > 15min should return an error a caller can match via errors.Is
 	// against the documented public sentinel (R21 regression: these
 	// sentinels were declared and wrapped but never verified reachable).
-	_, err := ObservableWindows(obj, start, end, 30*stdtime.Minute, site, Altitude{Threshold: angle.Deg(30)})
+	_, err := ObservableWindows(obj, start, end, 30*time.Minute, site, Altitude{Threshold: angle.Deg(30)})
 	if !errors.Is(err, ErrStepTooLarge) {
 		t.Errorf("expected ErrStepTooLarge for step > 15 minutes, got %v", err)
 	}
 
 	// Step <= 15min should succeed.
-	_, err = ObservableWindows(obj, start, end, 15*stdtime.Minute, site, Altitude{Threshold: angle.Deg(30)})
+	_, err = ObservableWindows(obj, start, end, 15*time.Minute, site, Altitude{Threshold: angle.Deg(30)})
 	testutil.AssertNoError(t, err)
 }
 
@@ -423,14 +421,14 @@ func TestObservableWindows_StepNotPositive(t *testing.T) {
 	obj := NewStar("T", angle.Zero(), angle.Zero())
 
 	start := time.NowUTC()
-	end := start.Add(6 * stdtime.Hour)
+	end := start.Add(6 * time.Hour)
 
 	_, err := ObservableWindows(obj, start, end, 0, site, Altitude{Threshold: angle.Deg(30)})
 	if !errors.Is(err, ErrStepNotPositive) {
 		t.Errorf("expected ErrStepNotPositive for a zero step, got %v", err)
 	}
 
-	_, err = ObservableWindows(obj, start, end, -stdtime.Minute, site, Altitude{Threshold: angle.Deg(30)})
+	_, err = ObservableWindows(obj, start, end, -time.Minute, site, Altitude{Threshold: angle.Deg(30)})
 	if !errors.Is(err, ErrStepNotPositive) {
 		t.Errorf("expected ErrStepNotPositive for a negative step, got %v", err)
 	}

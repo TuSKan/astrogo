@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"math"
 	"testing"
-	gotime "time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
@@ -12,6 +11,7 @@ import (
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/magnitude"
 	"github.com/TuSKan/astrogo/skybrightness"
+	"github.com/TuSKan/astrogo/time"
 )
 
 // goldenTol is how far a preset's output may move before this test calls it a
@@ -81,7 +81,7 @@ func presetGoldenScene(tb testing.TB, p skybrightness.Preset) *skybrightness.Sce
 
 	return &skybrightness.Scene{
 		Observer:   loc,
-		Time:       gotime.Date(2026, 4, 2, 5, 0, 0, 0, gotime.UTC),
+		Time:       time.GoDate(2026, 4, 2, 5, 0, 0, 0, time.LocationUTC),
 		Atmosphere: atm,
 		Ephemeris:  eph.Default(),
 	}

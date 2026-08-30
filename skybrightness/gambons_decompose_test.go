@@ -6,7 +6,6 @@ import (
 	"context"
 	"math"
 	"testing"
-	gotime "time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
@@ -17,7 +16,7 @@ import (
 	"github.com/TuSKan/astrogo/skybrightness/dataset/airglow"
 	"github.com/TuSKan/astrogo/skybrightness/dataset/dust"
 	"github.com/TuSKan/astrogo/skybrightness/dataset/starlight"
-	astrotime "github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -35,7 +34,7 @@ func TestGAMBONSGapDecomposition(t *testing.T) {
 	testutil.RequireReachable(t, "etimecalret-002.eso.org:443")
 	testutil.RequireReachable(t, "github.com:443")
 
-	ctx, cancel := context.WithTimeout(context.Background(), 15*gotime.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
 	defer cancel()
 
 	enableStarMapDownload(t)
@@ -46,7 +45,7 @@ func TestGAMBONSGapDecomposition(t *testing.T) {
 	zenith := coord.NewAltAz(angle.Deg(89.9), angle.Deg(0))
 
 	// ── where the zenith is pointing ────────────────────────────────────────
-	cc := coord.NewContext(astrotime.FromGo(scene.Time), scene.Observer,
+	cc := coord.NewContext(time.FromGo(scene.Time), scene.Observer,
 		scene.Atmosphere.Refraction())
 
 	icrs, err := cc.AltAzToICRS(zenith)
@@ -55,7 +54,7 @@ func TestGAMBONSGapDecomposition(t *testing.T) {
 	}
 
 	gal := coord.ICRSToGalactic(icrs)
-	ecl := coord.ICRSToEcliptic(icrs, astrotime.FromGo(scene.Time))
+	ecl := coord.ICRSToEcliptic(icrs, time.FromGo(scene.Time))
 
 	t.Logf("zenith: RA %.2f Dec %+.2f | galactic l %.2f b %+.2f | ecliptic lon %.2f lat %+.2f",
 		icrs.RA().Degrees(), icrs.Dec().Degrees(),

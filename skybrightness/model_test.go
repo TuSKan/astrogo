@@ -6,13 +6,13 @@ import (
 	"math"
 	"sync"
 	"testing"
-	gotime "time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/magnitude"
 	"github.com/TuSKan/astrogo/skybrightness"
+	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -79,7 +79,7 @@ func testScene(t *testing.T) *skybrightness.Scene {
 
 	return &skybrightness.Scene{
 		Observer:   loc,
-		Time:       gotime.Date(2026, 8, 14, 3, 0, 0, 0, gotime.UTC),
+		Time:       time.GoDate(2026, 8, 14, 3, 0, 0, 0, time.LocationUTC),
 		Atmosphere: atmosphere.StandardDefault(2635),
 	}
 }
@@ -415,7 +415,7 @@ func TestNumericalStabilityAcrossGeometry(t *testing.T) {
 			est, err := m.Estimate(context.Background(), skybrightness.Query{
 				Scene: &skybrightness.Scene{
 					Observer:   loc,
-					Time:       gotime.Date(2026, 8, 14, 3, 0, 0, 0, gotime.UTC),
+					Time:       time.GoDate(2026, 8, 14, 3, 0, 0, 0, time.LocationUTC),
 					Atmosphere: atmosphere.StandardDefault(s.heightM),
 				},
 				Direction: coord.NewAltAz(angle.Deg(d.alt), angle.Deg(d.az)),

@@ -3,10 +3,9 @@ package ephemeris_test
 import (
 	"math"
 	"testing"
-	gotime "time"
 
 	eph "github.com/TuSKan/astrogo/ephemeris"
-	astrotime "github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/vector"
 )
 
@@ -23,7 +22,7 @@ const lightSpeedAUPerDay = 173.144632674
 // target and nothing else. A real provider retards the observer along with it,
 // because the Earth's own barycentric position is looked up at the same epoch.
 type orbitingProvider struct {
-	epoch astrotime.Time
+	epoch time.Time
 }
 
 // earthAt and marsAt are circular coplanar orbits, which is enough: the
@@ -62,7 +61,7 @@ func marsAt(days float64) (pos, vel vector.Vec3) {
 		vector.V3(-radius*w*s, radius*w*c, 0)
 }
 
-func (p *orbitingProvider) State(_ eph.ID, t astrotime.Time) (eph.State, error) {
+func (p *orbitingProvider) State(_ eph.ID, t time.Time) (eph.State, error) {
 	d := p.days(t)
 
 	mp, mv := marsAt(d)
@@ -76,7 +75,7 @@ func (p *orbitingProvider) Close() error { return nil }
 // days is the offset from the provider's epoch, differenced through the
 // two-part Julian date so a light time of a few hundred seconds is not lost
 // to the representation.
-func (p *orbitingProvider) days(t astrotime.Time) float64 {
+func (p *orbitingProvider) days(t time.Time) float64 {
 	j1, j2 := t.JDParts()
 	b1, b2 := p.epoch.JDParts()
 
@@ -110,7 +109,7 @@ func arcsecBetween(a, b vector.Vec3) float64 {
 func TestApparentStateIsTheApparentPlaceNotTheAstrometricOne(t *testing.T) {
 	t.Parallel()
 
-	epoch := astrotime.FromGo(gotime.Date(2026, 8, 21, 0, 0, 0, 0, gotime.UTC))
+	epoch := time.FromGo(time.GoDate(2026, 8, 21, 0, 0, 0, 0, time.LocationUTC))
 	provider := &orbitingProvider{epoch: epoch}
 
 	got, err := eph.ApparentState(provider, eph.Mars, epoch)
@@ -187,7 +186,7 @@ func TestApparentStateIsTheApparentPlaceNotTheAstrometricOne(t *testing.T) {
 func TestApparentStateWithNoMotionIsGeometric(t *testing.T) {
 	t.Parallel()
 
-	epoch := astrotime.FromGo(gotime.Date(2026, 8, 21, 0, 0, 0, 0, gotime.UTC))
+	epoch := time.FromGo(time.GoDate(2026, 8, 21, 0, 0, 0, 0, time.LocationUTC))
 
 	still := &staticProvider{pos: vector.V3(3.5, -1.2, 0.4)}
 
@@ -203,7 +202,7 @@ func TestApparentStateWithNoMotionIsGeometric(t *testing.T) {
 
 type staticProvider struct{ pos vector.Vec3 }
 
-func (p *staticProvider) State(_ eph.ID, _ astrotime.Time) (eph.State, error) {
+func (p *staticProvider) State(_ eph.ID, _ time.Time) (eph.State, error) {
 	return eph.State{Pos: p.pos, Vel: vector.Zero()}, nil
 }
 

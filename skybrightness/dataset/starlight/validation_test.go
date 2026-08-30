@@ -6,13 +6,13 @@ import (
 	"context"
 	"math"
 	"testing"
-	"time"
 
 	"github.com/TuSKan/astrogo/internal/testutil"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/skybrightness/dataset/starlight"
+	"github.com/TuSKan/astrogo/time"
 )
 
 // The absolute scale of the map, bounded by numbers nobody in this repository

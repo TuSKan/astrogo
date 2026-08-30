@@ -5,11 +5,11 @@ package dust_test
 import (
 	"context"
 	"testing"
-	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/skybrightness/dataset/dust"
+	"github.com/TuSKan/astrogo/time"
 )
 
 // The real service, checked against two numbers that are properties of the

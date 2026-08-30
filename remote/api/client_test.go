@@ -10,10 +10,10 @@ import (
 	"net/url"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/remote/api"
+	"github.com/TuSKan/astrogo/time"
 )
 
 // redirect points an endpoint at a test server for one test. Every method

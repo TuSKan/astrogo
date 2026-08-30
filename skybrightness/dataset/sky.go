@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
@@ -13,6 +12,7 @@ import (
 	"github.com/TuSKan/astrogo/magnitude"
 	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/skybrightness"
+	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -169,7 +169,7 @@ func consentAdvice(p skybrightness.Preset, err error) error {
 // named call the caller makes is better than either, and
 // SurfaceAtAltitude(site.Height()) is not the kind of line anyone gets wrong.
 func (s *Sky) Scene(
-	site *coord.Geodetic, when time.Time, air *atmosphere.Builder,
+	site *coord.Geodetic, when time.GoTime, air *atmosphere.Builder,
 ) (*skybrightness.Scene, error) {
 	if site == nil {
 		return nil, fmt.Errorf("%w: a scene needs a site", ErrSpec)

@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"time"
 
 	"gocloud.dev/gcerrors"
 
 	"github.com/TuSKan/astrogo/remote/file"
+	"github.com/TuSKan/astrogo/time"
 )
 
 // readConfig carries per-GetFile options.

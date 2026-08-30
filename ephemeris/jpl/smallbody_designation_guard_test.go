@@ -12,7 +12,7 @@ import (
 	"github.com/TuSKan/astrogo/ephemeris/jpl"
 	"github.com/TuSKan/astrogo/ephemeris/jpl/spk"
 	"github.com/TuSKan/astrogo/internal/testutil"
-	atime "github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/time"
 )
 
 // TestBareNumberDoesNotReturnADifferentBody covers the quietest failure this
@@ -26,8 +26,8 @@ import (
 func TestBareNumberDoesNotReturnADifferentBody(t *testing.T) {
 	testutil.RequireReachable(t, "ssd.jpl.nasa.gov:443")
 
-	start := atime.FromJD(2460305.5, atime.TDB)
-	stop := atime.FromJD(2460355.5, atime.TDB)
+	start := time.FromJD(2460305.5, time.TDB)
+	stop := time.FromJD(2460355.5, time.TDB)
 
 	p, err := jpl.NewProvider(context.Background(), core.SmallBody, "1",
 		jpl.WithTimeInterval(start, stop))
@@ -52,8 +52,8 @@ func TestBareNumberDoesNotReturnADifferentBody(t *testing.T) {
 func TestSemicolonDesignationLoadsTheRequestedBody(t *testing.T) {
 	testutil.RequireReachable(t, "ssd.jpl.nasa.gov:443")
 
-	start := atime.FromJD(2460305.5, atime.TDB)
-	stop := atime.FromJD(2460355.5, atime.TDB)
+	start := time.FromJD(2460305.5, time.TDB)
+	stop := time.FromJD(2460355.5, time.TDB)
 
 	for _, designation := range []string{"1;", "433;", "433"} {
 		t.Run(designation, func(t *testing.T) {
@@ -80,8 +80,8 @@ func TestSemicolonDesignationLoadsTheRequestedBody(t *testing.T) {
 func TestHorizonsRefusalIsReported(t *testing.T) {
 	testutil.RequireReachable(t, "ssd.jpl.nasa.gov:443")
 
-	start := atime.FromJD(2460305.5, atime.TDB)
-	stop := atime.FromJD(2460355.5, atime.TDB)
+	start := time.FromJD(2460305.5, time.TDB)
+	stop := time.FromJD(2460355.5, time.TDB)
 
 	p, err := jpl.NewProvider(context.Background(), core.SmallBody, "101955;",
 		jpl.WithTimeInterval(start, stop))

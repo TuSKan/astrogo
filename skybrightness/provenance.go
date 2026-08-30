@@ -2,8 +2,8 @@ package skybrightness
 
 import (
 	"fmt"
+	"github.com/TuSKan/astrogo/time"
 	"strings"
-	"time"
 )
 
 // Provenance records the science behind one component: what model, from
@@ -116,7 +116,7 @@ type Reproducibility struct {
 	// AtmosphereTime is the timestamp of that atmospheric state, which may
 	// differ from the observation time when a forecast or an analysis is
 	// used.
-	AtmosphereTime time.Time
+	AtmosphereTime time.GoTime
 
 	// Datasets are every data product involved, with versions.
 	Datasets []DatasetRef

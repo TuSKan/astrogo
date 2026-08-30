@@ -7,11 +7,11 @@ import (
 	"io"
 	"net/url"
 	"sync"
-	"time"
 
 	"resty.dev/v3"
 
 	"github.com/TuSKan/astrogo/remote"
+	"github.com/TuSKan/astrogo/time"
 )
 
 // DefaultTimeout applies to an endpoint whose registered Timeout is zero.
@@ -107,7 +107,7 @@ type Client struct {
 	// minimum interval was asked for, so an ordinary client pays nothing.
 	minInterval time.Duration
 	mu          sync.Mutex
-	last        time.Time
+	last        time.GoTime
 }
 
 // NewClient builds a client configured from endpoint id: its registered

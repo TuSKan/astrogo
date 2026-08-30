@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"math"
 	"sync"
-	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
+	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -91,7 +91,7 @@ func WithEscapeElevation(e angle.Angle) ArtificialOption {
 // but not on the viewing direction.
 type artificialGeometry struct {
 	observer *coord.Geodetic
-	at       time.Time
+	at       time.GoTime
 	grid     unit.SpectralGrid
 
 	sources []artificialSource

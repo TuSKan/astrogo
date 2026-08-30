@@ -11,7 +11,7 @@ import (
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/internal/metrology"
-	atime "github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/vector"
 )
 
@@ -23,12 +23,12 @@ import (
 // state at slightly earlier instants, which linear motion supplies exactly
 // enough for over the milliseconds involved.
 type mockLinearProvider struct {
-	baseTime atime.Time
+	baseTime time.Time
 	pos      vector.Vec3
 	vel      vector.Vec3
 }
 
-func (m *mockLinearProvider) State(_ eph.ID, t atime.Time) (eph.State, error) {
+func (m *mockLinearProvider) State(_ eph.ID, t time.Time) (eph.State, error) {
 	jd1Req, jd2Req := t.JDParts()
 	jd1Base, jd2Base := m.baseTime.JDParts()
 	dtDays := (jd1Req - jd1Base) + (jd2Req - jd2Base)
@@ -142,7 +142,7 @@ func TestScientificStability(t *testing.T) {
 			t.Fatalf("%s: %v", cs.Name, err)
 		}
 
-		obsTime := atime.FromJD(e.EpochJDUT, atime.UTC)
+		obsTime := time.FromJD(e.EpochJDUT, time.UTC)
 
 		mock := &mockLinearProvider{
 			baseTime: obsTime,

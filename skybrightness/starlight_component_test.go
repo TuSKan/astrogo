@@ -5,7 +5,6 @@ import (
 	"errors"
 	"math"
 	"testing"
-	gotime "time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
@@ -13,7 +12,7 @@ import (
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/magnitude"
 	"github.com/TuSKan/astrogo/skybrightness"
-	astrotime "github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -68,7 +67,7 @@ func starlightScene(t *testing.T) *skybrightness.Scene {
 
 	return &skybrightness.Scene{
 		Observer:   loc,
-		Time:       gotime.Date(2024, 6, 21, 4, 0, 0, 0, gotime.UTC),
+		Time:       time.GoDate(2024, 6, 21, 4, 0, 0, 0, time.LocationUTC),
 		Atmosphere: atm,
 		Ephemeris:  eph.Default(),
 	}
@@ -336,7 +335,7 @@ func TestIntegratedStarlightHonoursTheMapFrame(t *testing.T) {
 	}
 
 	frame := coord.NewContext(
-		astrotime.FromGo(scene.Time), scene.Observer, scene.Atmosphere.Refraction())
+		time.FromGo(scene.Time), scene.Observer, scene.Atmosphere.Refraction())
 
 	icrs, err := frame.AltAzToICRS(dir)
 	if err != nil {

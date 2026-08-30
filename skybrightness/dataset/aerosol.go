@@ -3,11 +3,11 @@ package dataset
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/atmosphere/dataset/cams"
 	"github.com/TuSKan/astrogo/coord"
+	"github.com/TuSKan/astrogo/time"
 )
 
 // AerosolPreset is one of [atmosphere]'s OPAC-sourced aerosol constructors —
@@ -57,7 +57,7 @@ type AerosolPreset func(heightM, aod550 float64) *atmosphere.Builder
 func LiveAerosol(
 	ctx context.Context,
 	site *coord.Geodetic,
-	when time.Time,
+	when time.GoTime,
 	preset AerosolPreset,
 ) (*atmosphere.Builder, error) {
 	if site == nil {

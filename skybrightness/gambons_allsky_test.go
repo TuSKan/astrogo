@@ -8,7 +8,6 @@ import (
 	"math"
 	"sort"
 	"testing"
-	gotime "time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
@@ -21,7 +20,7 @@ import (
 	"github.com/TuSKan/astrogo/skybrightness/dataset/airglow"
 	"github.com/TuSKan/astrogo/skybrightness/dataset/dust"
 	"github.com/TuSKan/astrogo/skybrightness/dataset/starlight"
-	astrotime "github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -199,7 +198,7 @@ func runAllSky(t *testing.T) allSkyRun {
 	testutil.RequireReachable(t, "etimecalret-002.eso.org:443")
 	testutil.RequireReachable(t, "github.com:443")
 
-	ctx, cancel := context.WithTimeout(context.Background(), 90*gotime.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Minute)
 	defer cancel()
 
 	enableStarMapDownload(t)
@@ -226,7 +225,7 @@ func runAllSky(t *testing.T) allSkyRun {
 		galactic coord.Galactic
 	}
 
-	cc := coord.NewContext(astrotime.FromGo(scene.Time), scene.Observer,
+	cc := coord.NewContext(time.FromGo(scene.Time), scene.Observer,
 		scene.Atmosphere.Refraction())
 
 	var samples []sample
@@ -258,7 +257,7 @@ func runAllSky(t *testing.T) allSkyRun {
 		dirs = append(dirs, dust.Direction{L: s.galactic.L(), B: s.galactic.B()})
 	}
 
-	fetchStart := gotime.Now()
+	fetchStart := time.Now()
 
 	dustMap := dust.NewMap()
 
@@ -270,14 +269,14 @@ func runAllSky(t *testing.T) allSkyRun {
 			// being asked the remaining several hundred times, and a partial
 			// sky would silently bias every band it did not finish.
 			t.Skipf("IRSA stopped answering after %d of %d sightlines in %v: %v",
-				dustMap.Len(), len(dirs), gotime.Since(fetchStart).Round(gotime.Second), err)
+				dustMap.Len(), len(dirs), time.Since(fetchStart).Round(time.Second), err)
 		}
 
 		t.Logf("  dust: %d of %d sightlines (%v)", end, len(dirs),
-			gotime.Since(fetchStart).Round(gotime.Second))
+			time.Since(fetchStart).Round(time.Second))
 	}
 
-	t.Logf("fetched %d dust cells in %v", dustMap.Len(), gotime.Since(fetchStart).Round(gotime.Second))
+	t.Logf("fetched %d dust cells in %v", dustMap.Len(), time.Since(fetchStart).Round(time.Second))
 
 	// Built from the preset rather than assembled here.
 	//
@@ -304,7 +303,7 @@ func runAllSky(t *testing.T) allSkyRun {
 	// differ by airglow alone, rather than by anything a second model build
 	// might also have changed.
 	results := make([]allSkySample, 0, len(samples))
-	evalStart := gotime.Now()
+	evalStart := time.Now()
 
 	componentShare := make(map[skybrightness.ComponentID]float64)
 
@@ -361,7 +360,7 @@ func runAllSky(t *testing.T) allSkyRun {
 		}
 	}
 
-	t.Logf("evaluated %d directions in %v", len(results), gotime.Since(evalStart).Round(gotime.Second))
+	t.Logf("evaluated %d directions in %v", len(results), time.Since(evalStart).Round(time.Second))
 
 	return allSkyRun{
 		results:        results,

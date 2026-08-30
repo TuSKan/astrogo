@@ -6,7 +6,6 @@ import (
 	"context"
 	"math"
 	"testing"
-	gotime "time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
@@ -19,7 +18,7 @@ import (
 	"github.com/TuSKan/astrogo/skybrightness/dataset/airglow"
 	"github.com/TuSKan/astrogo/skybrightness/dataset/dust"
 	"github.com/TuSKan/astrogo/skybrightness/dataset/starlight"
-	astrotime "github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -56,8 +55,8 @@ func enableStarMapDownload(tb testing.TB) {
 	remote.EnableDownloads(endpoint.ApproxSize, remote.GaiaStarMap)
 }
 
-func gambonsEpoch() gotime.Time {
-	return gotime.Date(2026, 8, 20, 23, 16, 0, 0, gotime.UTC)
+func gambonsEpoch() time.GoTime {
+	return time.GoDate(2026, 8, 20, 23, 16, 0, 0, time.LocationUTC)
 }
 
 // johnsonVTophat approximates the Johnson V response.
@@ -136,7 +135,7 @@ func TestAgainstGAMBONS(t *testing.T) {
 	testutil.RequireReachable(t, "etimecalret-002.eso.org:443")
 	testutil.RequireReachable(t, "github.com:443")
 
-	ctx, cancel := context.WithTimeout(context.Background(), 15*gotime.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
 	defer cancel()
 
 	enableStarMapDownload(t)
@@ -378,7 +377,7 @@ func zenithCap(capDeg float64, samples int) []coord.AltAz {
 func capDustDirections(t *testing.T, scene *skybrightness.Scene, capDeg float64, samples int) []dust.Direction {
 	t.Helper()
 
-	cc := coord.NewContext(astrotime.FromGo(scene.Time), scene.Observer,
+	cc := coord.NewContext(time.FromGo(scene.Time), scene.Observer,
 		scene.Atmosphere.Refraction())
 
 	dirs := zenithCap(capDeg, samples)

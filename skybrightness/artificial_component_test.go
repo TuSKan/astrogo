@@ -5,12 +5,12 @@ import (
 	"errors"
 	"math"
 	"testing"
-	gotime "time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/skybrightness"
+	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -66,7 +66,7 @@ func artificialScene(t *testing.T) *skybrightness.Scene {
 
 	return &skybrightness.Scene{
 		Observer:   loc,
-		Time:       gotime.Date(2026, 3, 3, 5, 0, 0, 0, gotime.UTC),
+		Time:       time.GoDate(2026, 3, 3, 5, 0, 0, 0, time.LocationUTC),
 		Atmosphere: atm,
 	}
 }
@@ -457,7 +457,7 @@ func BenchmarkArtificialSkyglow(b *testing.B) {
 
 	scene := &skybrightness.Scene{
 		Observer:   loc,
-		Time:       gotime.Date(2026, 3, 3, 5, 0, 0, 0, gotime.UTC),
+		Time:       time.GoDate(2026, 3, 3, 5, 0, 0, 0, time.LocationUTC),
 		Atmosphere: atm,
 	}
 
@@ -509,7 +509,7 @@ func TestArtificialSkyglowPhaseWeighting(t *testing.T) {
 
 	scene := &skybrightness.Scene{
 		Observer:   loc,
-		Time:       gotime.Date(2026, 3, 3, 5, 0, 0, 0, gotime.UTC),
+		Time:       time.GoDate(2026, 3, 3, 5, 0, 0, 0, time.LocationUTC),
 		Atmosphere: atm,
 	}
 

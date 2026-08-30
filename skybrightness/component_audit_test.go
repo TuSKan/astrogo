@@ -5,13 +5,13 @@ import (
 	"fmt"
 	"math"
 	"testing"
-	gotime "time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/skybrightness"
+	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -35,7 +35,7 @@ func auditScene(t *testing.T) *skybrightness.Scene {
 
 	return &skybrightness.Scene{
 		Observer:   loc,
-		Time:       gotime.Date(2026, 3, 20, 5, 0, 0, 0, gotime.UTC),
+		Time:       time.GoDate(2026, 3, 20, 5, 0, 0, 0, time.LocationUTC),
 		Atmosphere: atm,
 		Ephemeris:  eph.Default(),
 	}

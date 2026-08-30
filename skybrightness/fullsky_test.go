@@ -4,13 +4,13 @@ import (
 	"context"
 	"math"
 	"testing"
-	gotime "time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/skybrightness"
+	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -23,7 +23,7 @@ func (u uniformDust) IntensityAt(_, _ angle.Angle) (float64, error) { return flo
 // assembleSky builds a Model holding every component the module has, over a
 // scene at Paranal. It is the thing the engine exists to do, and until this
 // existed the components had never been run together.
-func assembleSky(t *testing.T, when gotime.Time) (*skybrightness.Model, *skybrightness.Scene, unit.SpectralGrid) {
+func assembleSky(t *testing.T, when time.GoTime) (*skybrightness.Model, *skybrightness.Scene, unit.SpectralGrid) {
 	t.Helper()
 
 	grid := skybrightness.DefaultOpticalGrid()
@@ -148,7 +148,7 @@ func TestFullSkyAssembles(t *testing.T) {
 	// A new Moon epoch, so the sky is genuinely dark and the natural terms
 	// dominate.
 	when, phase := nearFullMoonUp(t)
-	dark := when.Add(14 * 24 * gotime.Hour)
+	dark := when.Add(14 * 24 * time.Hour)
 
 	model, scene, grid := assembleSky(t, dark)
 
@@ -217,7 +217,7 @@ func TestFullSkyComponentShares(t *testing.T) {
 	t.Parallel()
 
 	when, _ := nearFullMoonUp(t)
-	model, scene, grid := assembleSky(t, when.Add(14*24*gotime.Hour))
+	model, scene, grid := assembleSky(t, when.Add(14*24*time.Hour))
 
 	est, err := model.Estimate(context.Background(), skybrightness.Query{
 		Scene:     scene,
@@ -310,7 +310,7 @@ func TestFullSkyBrightensTowardTheHorizon(t *testing.T) {
 	t.Parallel()
 
 	when, _ := nearFullMoonUp(t)
-	model, scene, grid := assembleSky(t, when.Add(14*24*gotime.Hour))
+	model, scene, grid := assembleSky(t, when.Add(14*24*time.Hour))
 
 	idx := gridIndex(t, grid, 554)
 
@@ -402,7 +402,7 @@ func TestFullSkyProvenance(t *testing.T) {
 func BenchmarkFullSkyEstimate(b *testing.B) {
 	t := &testing.T{}
 
-	when := gotime.Date(2026, 3, 3, 5, 0, 0, 0, gotime.UTC)
+	when := time.GoDate(2026, 3, 3, 5, 0, 0, 0, time.LocationUTC)
 	model, scene, grid := assembleSky(t, when)
 
 	if t.Failed() {

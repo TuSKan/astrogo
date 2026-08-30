@@ -4,25 +4,24 @@ import (
 	"errors"
 	"math"
 	"testing"
-	gotime "time"
 
 	"github.com/TuSKan/astrogo/plan"
-	astrotime "github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/time"
 )
 
 // solverEpoch is an arbitrary fixed start; the algorithms do not care which.
-func solverEpoch() astrotime.Time {
-	return astrotime.FromGo(gotime.Date(2026, 8, 21, 0, 0, 0, 0, gotime.UTC))
+func solverEpoch() time.Time {
+	return time.FromGo(time.GoDate(2026, 8, 21, 0, 0, 0, 0, time.LocationUTC))
 }
 
 // atHours turns a time into hours since solverEpoch, so an evaluator can be
 // written as an ordinary function of a real variable.
-func atHours(t astrotime.Time) float64 {
-	return float64(t.Sub(solverEpoch())) / float64(astrotime.Hour)
+func atHours(t time.Time) float64 {
+	return float64(t.Sub(solverEpoch())) / float64(time.Hour)
 }
 
-func plusHours(h float64) astrotime.Time {
-	return solverEpoch().Add(astrotime.Duration(h * float64(astrotime.Hour)))
+func plusHours(h float64) time.Time {
+	return solverEpoch().Add(time.Duration(h * float64(time.Hour)))
 }
 
 // errEvaluator stands in for whatever an ephemeris lookup can fail with.
@@ -52,7 +51,7 @@ func TestFindRootRefusesAnUnbracketedInterval(t *testing.T) {
 	} {
 		// A straight line through the two endpoint values, so the evaluator
 		// genuinely has those signs everywhere between them.
-		eval := func(at astrotime.Time) (float64, error) {
+		eval := func(at time.Time) (float64, error) {
 			h := atHours(at)
 
 			return c.fa + (c.fb-c.fa)*(h/6), nil
@@ -73,7 +72,7 @@ func TestFindRootRefusesAnUnbracketedInterval(t *testing.T) {
 		{"root at the start", 0, 5},
 		{"root at the end", -5, 0},
 	} {
-		eval := func(at astrotime.Time) (float64, error) {
+		eval := func(at time.Time) (float64, error) {
 			h := atHours(at)
 
 			return c.fa + (c.fb-c.fa)*(h/6), nil
@@ -91,7 +90,7 @@ func TestFindRootRefusesAnUnbracketedInterval(t *testing.T) {
 func TestFindRootLandsOnKnownRoots(t *testing.T) {
 	t.Parallel()
 
-	solver := plan.Solver{Tolerance: astrotime.Second / 1000, MaxIter: 200}
+	solver := plan.Solver{Tolerance: time.Second / 1000, MaxIter: 200}
 
 	for _, c := range []struct {
 		name string
@@ -105,7 +104,7 @@ func TestFindRootLandsOnKnownRoots(t *testing.T) {
 		{"root at the very start", 0, func(h float64) float64 { return h }},
 		{"root at the very end", 12, func(h float64) float64 { return h - 12 }},
 	} {
-		eval := func(at astrotime.Time) (float64, error) { return c.f(atHours(at)), nil }
+		eval := func(at time.Time) (float64, error) { return c.f(atHours(at)), nil }
 
 		got, value, err := solver.FindRoot(eval, solverEpoch(), plusHours(12))
 		if err != nil {
@@ -131,7 +130,7 @@ func TestFindRootPropagatesFailure(t *testing.T) {
 
 	// Failing at the very first evaluation.
 	_, _, err := solver.FindRoot(
-		func(astrotime.Time) (float64, error) { return 0, errEvaluator },
+		func(time.Time) (float64, error) { return 0, errEvaluator },
 		solverEpoch(), plusHours(6))
 	if !errors.Is(err, errEvaluator) {
 		t.Errorf("a failing evaluator gave err = %v, want the evaluator's own error", err)
@@ -142,7 +141,7 @@ func TestFindRootPropagatesFailure(t *testing.T) {
 	// NaN passes convergence tests that a real value would not.
 	for _, bad := range []float64{math.NaN(), math.Inf(1), math.Inf(-1)} {
 		calls := 0
-		eval := func(at astrotime.Time) (float64, error) {
+		eval := func(at time.Time) (float64, error) {
 			calls++
 			if calls > 2 {
 				return bad, nil
@@ -162,7 +161,7 @@ func TestFindRootPropagatesFailure(t *testing.T) {
 func TestFindExtremumLandsOnKnownExtrema(t *testing.T) {
 	t.Parallel()
 
-	solver := plan.Solver{Tolerance: astrotime.Second / 1000, MaxIter: 200}
+	solver := plan.Solver{Tolerance: time.Second / 1000, MaxIter: 200}
 
 	for _, c := range []struct {
 		name  string
@@ -188,7 +187,7 @@ func TestFindExtremumLandsOnKnownExtrema(t *testing.T) {
 			func(h float64) float64 { return 1 - math.Pow(h-4, 4)/100 },
 		},
 	} {
-		eval := func(at astrotime.Time) (float64, error) { return c.f(atHours(at)), nil }
+		eval := func(at time.Time) (float64, error) { return c.f(atHours(at)), nil }
 
 		got, value, err := solver.FindExtremum(eval, solverEpoch(), plusHours(12), c.isMax)
 		if err != nil {

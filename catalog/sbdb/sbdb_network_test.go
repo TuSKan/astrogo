@@ -6,11 +6,11 @@ import (
 	"context"
 	"math"
 	"testing"
-	"time"
 
 	"github.com/TuSKan/astrogo/internal/testutil"
 
 	"github.com/TuSKan/astrogo/catalog/resolve"
+	"github.com/TuSKan/astrogo/time"
 )
 
 // requireSBDB skips the test when the JPL SBDB API is unreachable — per

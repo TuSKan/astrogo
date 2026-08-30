@@ -1,8 +1,6 @@
 package plan
 
 import (
-	stdtime "time"
-
 	"testing"
 
 	"github.com/TuSKan/astrogo/internal/testutil"
@@ -17,8 +15,8 @@ var t0 = time.FromJD(2451545.0, time.UTC) //nolint:gochecknoglobals // test fixt
 // h builds a Window [t0+startH, t0+endH] hours from the fixture base.
 func h(startH, endH float64) Window {
 	return Window{
-		Start: t0.Add(stdtime.Duration(startH * float64(stdtime.Hour))),
-		End:   t0.Add(stdtime.Duration(endH * float64(stdtime.Hour))),
+		Start: t0.Add(time.Duration(startH * float64(time.Hour))),
+		End:   t0.Add(time.Duration(endH * float64(time.Hour))),
 	}
 }
 
@@ -350,21 +348,21 @@ func TestTotalDuration(t *testing.T) {
 
 	t.Run("single window", func(t *testing.T) {
 		got := TotalDuration([]Window{h(0, 2)})
-		if got != 2*stdtime.Hour {
+		if got != 2*time.Hour {
 			t.Errorf("got %v, want 2h", got)
 		}
 	})
 
 	t.Run("disjoint windows sum", func(t *testing.T) {
 		got := TotalDuration([]Window{h(0, 1), h(2, 4)})
-		if got != 3*stdtime.Hour {
+		if got != 3*time.Hour {
 			t.Errorf("got %v, want 3h", got)
 		}
 	})
 
 	t.Run("overlapping windows are not double-counted", func(t *testing.T) {
 		got := TotalDuration([]Window{h(0, 2), h(1, 3)})
-		if got != 3*stdtime.Hour {
+		if got != 3*time.Hour {
 			t.Errorf("got %v, want 3h (union, not 4h)", got)
 		}
 	})
@@ -398,7 +396,7 @@ func TestSubtractIntersectPartitionUnion(t *testing.T) {
 			remaining := TotalDuration(Subtract(c.a, c.b))
 
 			testutil.AssertNear(t, "removed+remaining vs total",
-				float64(removed+remaining), float64(total), float64(stdtime.Microsecond))
+				float64(removed+remaining), float64(total), float64(time.Microsecond))
 		})
 	}
 }

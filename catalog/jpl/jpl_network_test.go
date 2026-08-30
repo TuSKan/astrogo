@@ -5,11 +5,11 @@ package jpl
 import (
 	"context"
 	"testing"
-	"time"
 
 	"github.com/TuSKan/astrogo/internal/testutil"
 
 	"github.com/TuSKan/astrogo/catalog/resolve"
+	"github.com/TuSKan/astrogo/time"
 )
 
 // requireHorizons skips the test when the JPL Horizons API is unreachable —

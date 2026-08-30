@@ -28,7 +28,6 @@ import (
 	"strconv"
 	"strings"
 	"testing"
-	gotime "time"
 
 	"github.com/TuSKan/astrogo/internal/testutil"
 
@@ -141,7 +140,7 @@ func parseNASALunarEclipses(html string) []nasaEclipseRef {
 		if isJulianCal {
 			jdTD = time.DateJulianCal(year, month, day, hour, minute, sec).JD()
 		} else {
-			jdTD = time.Date(year, gotime.Month(month), day, hour, minute, sec, 0, gotime.UTC).JD()
+			jdTD = time.Date(year, time.Month(month), day, hour, minute, sec, 0, time.LocationUTC).JD()
 		}
 
 		eclipses = append(eclipses, nasaEclipseRef{
@@ -242,7 +241,7 @@ func parseNASASolarEclipses(html string) []nasaEclipseRef {
 		if isJulianCal {
 			jdTD = time.DateJulianCal(year, month, day, hour, minute, sec).JD()
 		} else {
-			jdTD = time.Date(year, gotime.Month(month), day, hour, minute, sec, 0, gotime.UTC).JD()
+			jdTD = time.Date(year, time.Month(month), day, hour, minute, sec, 0, time.LocationUTC).JD()
 		}
 
 		eclipses = append(eclipses, nasaEclipseRef{
@@ -280,7 +279,7 @@ func requireNASA(t *testing.T) {
 // finish within. Checking the remaining budget before each expensive step
 // turns a hard mid-request kill (a confusing goroutine-dump failure) into
 // a clean, explained skip.
-func nasaBudgetOK(t *testing.T, margin gotime.Duration) {
+func nasaBudgetOK(t *testing.T, margin time.Duration) {
 	t.Helper()
 
 	deadline, ok := t.Deadline()
@@ -288,7 +287,7 @@ func nasaBudgetOK(t *testing.T, margin gotime.Duration) {
 		return
 	}
 
-	if gotime.Until(deadline) < margin {
+	if time.Until(deadline) < margin {
 		t.Skip("not enough time left before the test binary's -timeout for this step — rerun with a longer -timeout (see this file's package doc) for full coverage")
 	}
 }
