@@ -224,9 +224,9 @@ func NewElements(epoch time.Time, semiMajorAxis, eccentricity float64,
 // registered answers every SOFA-covered body, and each Register call
 // extends it, with no other change to how it's used. Unlike Default(),
 // a fresh NewMovingBodyProvider() has *not* had Pluto registered — call
-// Register(ID for Pluto, plutoElements-equivalent) explicitly, or start
-// from Default() (itself a *kepler.Provider) if Pluto coverage is
-// wanted alongside your own registered bodies. opts configures the
+// Register(Pluto, kepler.PlutoElements) explicitly if it should be a
+// registered body; the default base answers Pluto in any case, so a
+// satellite of Pluto can be placed without it. opts configures the
 // fallback base (default: the internal SOFA source); see WithKeplerBase.
 func NewMovingBodyProvider(opts ...KeplerOption) *kepler.Provider {
 	return kepler.New(opts...)
@@ -352,23 +352,6 @@ func NewProvider(ctx context.Context, source Source, kernel string, opts ...Opti
 
 // ─── Default SOFA Provider ───────────────────────────────────────────────────
 
-// plutoElements are Pluto's classical heliocentric osculating elements at
-// epoch J2000.0, in the J2000 mean ecliptic frame — the T=0 row of E.M.
-// Standish (JPL/Caltech Solar System Dynamics Group), "Keplerian Elements
-// for Approximate Positions of the Major Planets," Table 1 (valid
-// 1800 AD - 2050 AD): a=39.48211675 AU, e=0.24882730, i=17.14001206°,
-// L=238.92903833°, ϖ=224.06891629°, Ω=110.30393684°, giving
-// ω=ϖ-Ω=113.76497945° and M=L-ϖ=14.86012204° at J2000.0.
-var plutoElements = func() Elements {
-	el, err := kepler.NewElements(time.J2000, 39.48211675, 0.24882730,
-		angle.Deg(17.14001206), angle.Deg(110.30393684), angle.Deg(113.76497945), angle.Deg(14.86012204))
-	if err != nil {
-		panic(fmt.Sprintf("ephemeris: built-in Pluto elements are invalid: %v", err))
-	}
-
-	return el
-}()
-
 // Default returns the standard offline ephemeris provider for every
 // named body core.ID defines: the Sun, Moon, Mercury through Neptune,
 // and the Solar System Barycenter via SOFA analytical models (no kernel
@@ -385,12 +368,14 @@ var plutoElements = func() Elements {
 // ephemeris — for that, use a real SPK-kernel-backed provider instead
 // (NewProvider with Planets; de440s and later kernels carry Pluto).
 //
-// The concrete type returned is a *kepler.Provider with Pluto
-// registered — see NewMovingBodyProvider for the same construction
-// starting from an empty (no Pluto) Provider.
+// The concrete type returned is a *kepler.Provider with Pluto registered
+// explicitly. Since kepler's own default base learned to answer Pluto from
+// the same [kepler.PlutoElements], that registration is now belt and braces
+// rather than the only thing closing the gap — it keeps Default's contract
+// visible at the call site instead of resting on a lower layer's behaviour.
 func Default() Provider {
 	p := kepler.New(kepler.WithBase(&sofaProvider{}))
-	if err := p.Register(Pluto, plutoElements); err != nil {
+	if err := p.Register(Pluto, kepler.PlutoElements); err != nil {
 		panic(fmt.Sprintf("ephemeris: failed to register built-in Pluto elements: %v", err))
 	}
 
@@ -424,7 +409,7 @@ func Velocity(p Provider, id ID, t time.Time) (vector.Vec3, error) {
 const earthMeanRadiusKm = 6371.0
 
 // Altitude returns the approximate altitude above the Earth's mean surface
-// in kilometres. For satellites this gives orbital altitude (~400 km for ISS);
+// in kilometers. For satellites this gives orbital altitude (~400 km for ISS);
 // for planets it gives geocentric distance minus Earth radius.
 func Altitude(p Provider, id ID, t time.Time) (float64, error) {
 	st, err := p.State(id, t)

@@ -71,9 +71,13 @@ func TestSystemParameterExceedsBodyParameter(t *testing.T) {
 	}
 }
 
-// TestPlutoIsTheCaseThatMatters pins the doc comment's own example: Charon is
-// massive enough that using the system parameter for a Charon orbit is wrong
-// by more than a tenth.
+// TestPlutoIsTheCaseThatMatters pins the doc comment's own example, and the
+// direction of it, because the comment first had that direction backwards.
+//
+// Charon is massive enough relative to Pluto that the two parameters differ
+// by more than a tenth — and because two-body relative motion is governed by
+// the sum of the masses, it is the *system* parameter that reproduces
+// Charon's published period.
 func TestPlutoIsTheCaseThatMatters(t *testing.T) {
 	sys := constants.DE440.PlutoSystemGravitationalParameter.Value
 	body := constants.DE440.PlutoGravitationalParameter.Value
@@ -81,6 +85,25 @@ func TestPlutoIsTheCaseThatMatters(t *testing.T) {
 	excess := (sys - body) / body
 	if math.Abs(excess-0.122) > 0.005 {
 		t.Errorf("Pluto system exceeds body by %.1f%%, doc comment says 12%%", 100*excess)
+	}
+
+	// Charon's period from each, against the published 6.3872 days.
+	const (
+		aMeters   = 19_596e3
+		published = 6.3872
+	)
+
+	period := func(gm float64) float64 {
+		return 2 * math.Pi * math.Sqrt(aMeters*aMeters*aMeters/gm) / 86400
+	}
+
+	if got := period(sys); math.Abs(got-published) > 0.001 {
+		t.Errorf("system parameter gives Charon %.4f d, published is %.4f", got, published)
+	}
+
+	if got := period(body); math.Abs(got-published) < 0.2 {
+		t.Errorf("body parameter gives Charon %.4f d, which is too close to the published "+
+			"%.4f — the two parameters should disagree here by about six percent", got, published)
 	}
 }
 
