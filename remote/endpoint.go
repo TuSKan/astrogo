@@ -26,6 +26,16 @@ const (
 	// kernel (naif0012.tls, ~5 KB) required by ephemeris/jpl.
 	NAIFLSK EndpointID = "naif.lsk"
 
+	// NAIFPCK is NASA NAIF's generic-kernels directory for planetary
+	// constants kernels — body mass parameters, radii and orientation
+	// poles, as text (.tpc) rather than binary.
+	//
+	// A separate endpoint from NAIFLSK despite sharing a URL root, because
+	// the registry is what a reader consults to see what a package fetches
+	// and why; a leap-second endpoint quietly serving mass parameters
+	// answers that question wrongly.
+	NAIFPCK EndpointID = "naif.pck"
+
 	// JPLHorizons is the JPL Horizons API used for small-body name
 	// resolution (catalog/jpl) — small text responses only. Kernel
 	// generation is a separate endpoint; see JPLHorizonsSPK.
@@ -423,6 +433,18 @@ func defaultEndpoints() map[EndpointID]Endpoint {
 			Subsystem:       "jpl",
 			Description:     "NASA NAIF leap-second kernel (naif0012.tls)",
 			ApproxSize:      6_000,
+			Enabled:         true,
+			DownloadTimeout: 1 * time.Minute,
+			Mutable:         false,
+			Downloadable:    true,
+		},
+		NAIFPCK: {
+			ID:              NAIFPCK,
+			URL:             "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/",
+			Kind:            KindFile,
+			Subsystem:       "jpl",
+			Description:     "NASA NAIF planetary constants kernels (gm_de440.tpc ~12 KB, pck00011.tpc ~130 KB)",
+			ApproxSize:      200_000,
 			Enabled:         true,
 			DownloadTimeout: 1 * time.Minute,
 			Mutable:         false,

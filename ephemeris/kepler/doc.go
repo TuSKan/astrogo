@@ -34,4 +34,33 @@
 // ([github.com/TuSKan/astrogo/constants.IAU2015.ObliquityJ2000]) —
 // deliberately not an epoch-of-date obliquity, which would introduce a
 // drift unrelated to the orbit's own real motion.
+//
+// # Central body
+//
+// The default central body is the Sun. [Elements.WithCentralBody] refers a
+// set to a planet instead, which is what a satellite orbit needs, and
+// [CentralBodyFor] supplies the parent's mass parameter without the caller
+// having to choose between a planet's system and body values — a choice that
+// is wrong by 12% at Pluto.
+//
+// # What a satellite orbit here is not
+//
+// Two things are missing before a planetary satellite computed this way
+// should be believed, and both are real physics rather than plumbing.
+//
+// Published *mean* elements for a satellite are referred to a **Laplace
+// plane** whose pole is tabulated per satellite and precesses, not to the
+// J2000 ecliptic this package reads. Feeding such a set through unmodified
+// propagates the right orbit in the wrong plane, and the error does not
+// announce itself: the period is correct and the position is not.
+//
+// And two-body motion diverges quickly for the satellites most people want.
+// The Galilean moons are locked in the Laplace resonance and Jupiter's J₂
+// drives apsidal precession, so an unperturbed ellipse drifts measurably
+// within weeks.
+//
+// What is here is therefore the correct machinery and the correct constants,
+// not a satellite ephemeris. For real satellite positions use a kernel-backed
+// provider ([github.com/TuSKan/astrogo/ephemeris.NewProvider] with
+// [github.com/TuSKan/astrogo/ephemeris.Moons]).
 package kepler

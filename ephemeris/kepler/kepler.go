@@ -6,6 +6,7 @@ import (
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/constants"
+	"github.com/TuSKan/astrogo/ephemeris/core"
 	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/vector"
 )
@@ -30,6 +31,66 @@ type Elements struct {
 	epoch                                                 time.Time
 	semiMajorAxis, eccentricity                           float64
 	inclination, ascendingNode, argPeriapsis, meanAnomaly angle.Angle
+
+	// central is the body the elements are referred to. The zero value
+	// means the Sun, so an Elements built by NewElements and never given a
+	// central body behaves exactly as it did before one existed.
+	central CentralBody
+}
+
+// CentralBody is the body an element set orbits, and the mass parameter
+// that governs that motion.
+//
+// It carries the identifier as well as the parameter because the two are
+// needed at different stages and getting either wrong is silent: the mass
+// parameter sets the orbital period, and the identifier is what the provider
+// adds the satellite's position to in order to place it in the solar system.
+// A satellite propagated with the right period about the wrong parent is a
+// plausible orbit around nothing.
+type CentralBody struct {
+	// ID is the body the orbit is referred to.
+	ID core.ID
+
+	// GM is that body's mass parameter, in m³/s².
+	//
+	// For a satellite this is the parent's *body* parameter, not its system
+	// parameter — see [CentralBodyFor], and constants.EphemerisSet for why
+	// the difference reaches 12% at Pluto.
+	GM float64
+}
+
+// sunCentre is the default central body: the Sun, with the IAU nominal mass
+// parameter the heliocentric path has always used.
+//
+//nolint:gochecknoglobals // the default central body, read-only
+var sunCentre = CentralBody{ID: core.Sun, GM: constants.IAU.SunGravitationalParameter.Value}
+
+// CentralBodyFor returns the central body for a satellite of the given
+// planet, using that planet's own mass parameter from the current JPL
+// ephemeris vintage.
+//
+// It exists so a caller does not have to choose between the system and body
+// parameters, which is the error this pairing is most exposed to: the system
+// value includes the satellites and is the wrong one for a satellite's own
+// motion, by one part in 4,830 at Jupiter and by 12% at Pluto.
+//
+// Reports false for a body with no satellite system in the table — the Sun,
+// the Moon, Mercury and Venus.
+func CentralBodyFor(id core.ID) (CentralBody, bool) {
+	gm, ok := map[core.ID]float64{
+		core.Earth:   constants.Ephemeris.EarthGravitationalParameter.Value,
+		core.Mars:    constants.Ephemeris.MarsGravitationalParameter.Value,
+		core.Jupiter: constants.Ephemeris.JupiterGravitationalParameter.Value,
+		core.Saturn:  constants.Ephemeris.SaturnGravitationalParameter.Value,
+		core.Uranus:  constants.Ephemeris.UranusGravitationalParameter.Value,
+		core.Neptune: constants.Ephemeris.NeptuneGravitationalParameter.Value,
+		core.Pluto:   constants.Ephemeris.PlutoGravitationalParameter.Value,
+	}[id]
+	if !ok {
+		return CentralBody{}, false
+	}
+
+	return CentralBody{ID: id, GM: gm}, true
 }
 
 // NewElements constructs a validated set of classical heliocentric
@@ -56,6 +117,31 @@ func NewElements(epoch time.Time, semiMajorAxis, eccentricity float64,
 	}
 
 	return el, nil
+}
+
+// CentralBody reports the body these elements are referred to, defaulting to
+// the Sun.
+func (el Elements) CentralBody() CentralBody {
+	if el.central.GM == 0 {
+		return sunCentre
+	}
+
+	return el.central
+}
+
+// WithCentralBody returns a copy of el referred to body instead of the Sun —
+// the form published elements for a planetary satellite take.
+//
+// Only the central body changes. The elements themselves are still read as
+// osculating elements in the J2000 ecliptic frame, which is *not* the frame
+// most published satellite mean elements use: those are referred to a
+// Laplace plane whose pole is tabulated per satellite and precesses. Feeding
+// such a set through here unmodified propagates the right orbit in the wrong
+// plane. See ephemeris/kepler's package doc.
+func (el Elements) WithCentralBody(body CentralBody) Elements {
+	el.central = body
+
+	return el
 }
 
 // Epoch is the osculation epoch MeanAnomaly is given at.
@@ -199,8 +285,8 @@ func (el Elements) StateAt(t time.Time) (pos, vel vector.Vec3, err error) {
 		return vector.Zero(), vector.Zero(), err
 	}
 
-	gm := constants.IAU.SunGravitationalParameter.Value // m^3/s^2
-	auMeters := constants.IAU.AstronomicalUnit.Value    // m
+	gm := el.CentralBody().GM                        // m^3/s^2
+	auMeters := constants.IAU.AstronomicalUnit.Value // m
 	aMeters := el.semiMajorAxis * auMeters
 
 	nRadPerDay := math.Sqrt(gm/(aMeters*aMeters*aMeters)) * constants.Derived.JulianDaySeconds.Value
