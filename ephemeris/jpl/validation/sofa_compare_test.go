@@ -25,19 +25,55 @@ import (
 // contract below was re-rolled against a fresh epoch on every run — see
 // contractFor for why that mattered more than it looks.
 //
-// All three epochs sit inside both reference routines' documented validity
-// windows: Epv00 quotes its accuracy over 1900-2100, Moon98 over 1950-2100.
+// Every epoch sits inside both reference routines' documented validity
+// windows — Epv00 quotes 1900-2100 and Moon98 1950-2100 — and inside the era
+// in which the comparison measures an ephemeris rather than a clock. See
+// [sofaLastYear] and [firstLeapSecondYear].
 type sofaEpoch struct {
 	name string
 	t    time.Time
 }
 
+// sofaLastYear ends the window at both reference routines' own upper limit.
+// Epv00 quotes its accuracy over 1900-2100 and Moon98 over 1950-2100, so
+// sampling past 2100 would measure against a bound neither offers there.
+//
+// The window's lower end is not the routines' claim but the clock's, and is
+// the same for both: [firstLeapSecondYear]. Before it the kernel path and the
+// analytical path reach a TDB instant by different routes and disagree, and
+// that disagreement swamps both routines — the Sun's residual is 7.9 km in
+// 1972 and 302.3 km in 1971. Sampling Epv00 from its documented 1900 measures
+// the leap-second boundary rather than the ephemeris: the first run of this
+// widened window did exactly that and reported a maximum 47x over contract,
+// with every offending sample in 1900. See
+// TestPreLeapSecondEpochsMeasureTheClockNotTheEphemeris.
+const sofaLastYear = 2100
+
+// sofaEpochs samples the window quarterly.
+//
+// It used to be three named instants, which is not enough to say anything
+// about a maximum — and one of the three used to be time.NowUTC(), so the
+// contract's margin was re-rolled on every run and a failure could not be
+// reproduced by the person reading the log. Fixing the wall clock removed the
+// irreproducibility; this removes the sample size, and brings these two rows
+// onto the same footing as the planets in sofa_planets_test.go, which would
+// otherwise sit beside them in the generated table with four hundred times
+// the evidence.
 func sofaEpochs() []sofaEpoch {
-	return []sofaEpoch{
-		{"J2000", time.FromJD(2451545.0, time.TDB)},
-		{"2010-06-21", time.Date(2010, 6, 21, 0, 0, 0, 0, time.LocationUTC)},
-		{"2026-01-01", time.Date(2026, 1, 1, 0, 0, 0, 0, time.LocationUTC)},
+	first, last := firstLeapSecondYear, sofaLastYear
+
+	quarters := []time.Month{time.January, time.April, time.July, time.October}
+
+	out := make([]sofaEpoch, 0, (last-first+1)*len(quarters))
+
+	for y := first; y <= last; y++ {
+		for _, mo := range quarters {
+			at := time.Date(y, mo, 1, 0, 0, 0, 0, time.LocationUTC)
+			out = append(out, sofaEpoch{name: at.Format(isoDate), t: at})
+		}
 	}
+
+	return out
 }
 
 // contractFor is the agreement bound for one body.

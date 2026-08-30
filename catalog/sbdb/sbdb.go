@@ -90,6 +90,13 @@ func (p *Provider) ResolveObject(ctx context.Context, req resolve.ObjectRequest)
 	params.Set("sstr", req.Query)
 	// Request physical parameters to get H, G, M1, k1 for magnitude computation.
 	params.Set("phys-par", "true")
+	// Without this SBDB rounds every orbital element to three significant
+	// figures — Eros comes back with a = 1.46 and e = 0.223, not 1.458243716
+	// and 0.2228779628. That is not a display detail: propagating the rounded
+	// elements two-body puts Eros 690,000 km from its own kernel *at the epoch
+	// of osculation*, where osculating elements are exact by construction and
+	// the error should be nil. See TestSBDBElementsAreFullPrecision.
+	params.Set("full-prec", "true")
 
 	return func(yield func(resolve.Target, error) bool) {
 		var payload struct {

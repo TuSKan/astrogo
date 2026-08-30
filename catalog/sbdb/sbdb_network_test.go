@@ -248,3 +248,86 @@ func TestSBDBNetworkResolveInterstellar(t *testing.T) {
 		t.Errorf("1I/'Oumuamua Kind = %v, want %v", got, resolve.KindInterstellar)
 	}
 }
+
+// roundToSignificant rounds v to sig significant figures.
+func roundToSignificant(v float64, sig int) float64 {
+	if v == 0 {
+		return 0
+	}
+
+	mag := math.Pow(10, float64(sig)-math.Ceil(math.Log10(math.Abs(v))))
+
+	return math.Round(v*mag) / mag
+}
+
+// TestSBDBElementsAreFullPrecision guards the full-prec parameter, whose
+// absence is invisible in every plausible-band check in this file.
+//
+// SBDB rounds orbital elements to three significant figures unless asked not
+// to. Eros then resolves with a = 1.46 and e = 0.223 rather than 1.458243716
+// and 0.2228779628, and every band assertion above still passes — 1.46 is a
+// perfectly plausible semi-major axis for Eros.
+//
+// What it is not is usable. Osculating elements are exact at their epoch of
+// osculation by construction, so a two-body propagation from them should
+// agree with the body's own kernel there almost exactly. With the rounded
+// elements it does not: measured against a Horizons-generated SPK, Eros lands
+// 690,000 km away at dt = 0 and Phaethon 2.5 million km. That is element
+// rounding, not the two-body approximation, and it silently became the error
+// budget of anything built on resolve.Target's elements — plan.NewAsteroid
+// included.
+//
+// The check is on the digits rather than the values, so it does not need
+// updating when JPL refits an orbit: with full precision every element
+// carries detail well past four significant figures, and with the parameter
+// missing none of them does.
+func TestSBDBElementsAreFullPrecision(t *testing.T) {
+	requireSBDB(t)
+
+	prov := New()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	tar, ok := prov.Resolve(ctx, "433")
+	if !ok {
+		t.Skip("SBDB did not resolve 433 Eros")
+	}
+
+	if !tar.HasElements {
+		t.Fatal("HasElements = false, want true for 433 Eros")
+	}
+
+	elements := []struct {
+		name string
+		v    float64
+	}{
+		{"a", tar.SemiMajorAxis},
+		{"e", tar.Eccentricity},
+		{"i", tar.Inclination.Degrees()},
+		{"om", tar.AscendingNode.Degrees()},
+		{"w", tar.ArgPeriapsis.Degrees()},
+		{"ma", tar.MeanAnomaly.Degrees()},
+	}
+
+	var detailed int
+
+	for _, el := range elements {
+		if math.Abs(el.v-roundToSignificant(el.v, 4)) > 1e-9*math.Abs(el.v) {
+			detailed++
+
+			continue
+		}
+
+		t.Logf("%s = %v carries no detail beyond four significant figures", el.name, el.v)
+	}
+
+	// Not all six, because a genuinely round value is possible and this must
+	// not fail on an orbit refit. Four of six cannot happen by chance and
+	// cannot happen at all when SBDB is rounding.
+	if detailed < 4 {
+		t.Errorf("only %d of %d elements carry detail beyond four significant figures; "+
+			"SBDB is rounding, so the full-prec request parameter is missing or ignored",
+			detailed, len(elements))
+	}
+}
