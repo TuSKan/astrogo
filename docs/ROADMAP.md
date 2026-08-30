@@ -355,9 +355,14 @@ asteroids now would ship confidently wrong numbers, so moons stay kernel-only
       and the provider composes a satellite through its parent rather than the Sun.
       Verified against Kepler's third law: 421,800 km about Jupiter gives 1.7699 days,
       which is Io's sidereal period, from a distance and a mass parameter alone
-- [ ] Laplace-plane frame handling for published *mean* moon elements (tabulated pole,
-      secular precession) — these are not osculating J2000-ecliptic elements and can't
-      be fed into the existing propagator unmodified
+- [x] `kepler.LaplacePlane` — frame handling for published *mean* moon elements.
+      `Elements.WithLaplacePlane` reads the angles against the tabulated pole rather than
+      the J2000 ecliptic; without it Io lands 16,500 km out, 4% of its orbital radius and
+      5 arcsec from Earth, with the period still right. Measured against Horizons over ten
+      days, the remaining two-body drift is at most 5,900 km across the four Galilean
+      satellites — concentrated almost entirely in Io and Europa, which are off in period
+      by 0.41% and 0.76% while Ganymede and Callisto agree to one part in 100,000.
+      Secular precession of the pole itself is still not applied
 - [ ] J₂-driven apsidal precession / mean-motion resonance corrections for moons where
       two-body motion diverges within weeks (e.g. the Galilean Laplace resonance)
 - [ ] Offline base-state fallback for parents with no SOFA analytical source (Pluto,

@@ -164,14 +164,30 @@ func TestPeriodFollowsKeplersThirdLaw(t *testing.T) {
 		t.Errorf("period ratio Saturn/Jupiter = %.9f, √(GM_J/GM_S) = %.9f", gotSat/gotJup, wantRatio)
 	}
 
-	// Worth reading: 421,800 km is roughly Io's semi-major axis, and the
-	// period that falls out is 1.7699 days, which is Io's sidereal period.
-	// Nothing here was given that period — only a distance and a mass
-	// parameter — so it is an independent check that both are right.
 	t.Logf("at a = %d km: Jupiter %.4f d, Saturn %.4f d", radiusKM, gotJup, gotSat)
 
-	if math.Abs(gotJup-1.769) > 0.005 {
-		t.Errorf("a = 421,800 km about Jupiter gives %.4f d; Io's sidereal period is 1.769 d", gotJup)
+	// 421,800 km is Io's semi-major axis, so this is the two-body period of
+	// Io's orbit — and it is not Io's period. JPL's mean-element table gives
+	// 1.762732 days; two-body gives 1.769949, ten minutes longer.
+	//
+	// The gap is the point rather than an error. It is Jupiter's J₂ and the
+	// Laplace resonance, the perturbations this package does not model, and
+	// it is why a satellite computed here is machinery rather than an
+	// ephemeris. An earlier version of this test called the two-body figure
+	// "Io's sidereal period", which conflated the two; the published value
+	// settled it.
+	const (
+		twoBody       = 1.769949 // from a and GM alone
+		joviPublished = 1.762732 // JPL satellite mean elements, JUP365
+	)
+
+	if math.Abs(gotJup-twoBody) > 1e-4 {
+		t.Errorf("two-body period = %.6f d, want %.6f", gotJup, twoBody)
+	}
+
+	if rel := math.Abs(gotJup-joviPublished) / joviPublished; rel < 0.003 || rel > 0.005 {
+		t.Errorf("two-body differs from Io's published period by %.3f%%, expected about 0.4%% — "+
+			"if this shrank, something started modelling the perturbations", 100*rel)
 	}
 }
 
