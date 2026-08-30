@@ -22,7 +22,6 @@ import (
 	"strconv"
 	"strings"
 	"testing"
-	gotime "time"
 
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/plan"
@@ -153,7 +152,7 @@ func parseAstroPixelsPage(html string) []apPhaseEvent {
 			if isJulian {
 				tUT = time.DateJulianCal(currentYear, month, day, hour, minute, 0)
 			} else {
-				tUT = time.Date(currentYear, gotime.Month(month), day, hour, minute, 0, 0, gotime.UTC)
+				tUT = time.Date(currentYear, time.Month(month), day, hour, minute, 0, 0, time.LocationUTC)
 			}
 
 			events = append(events, apPhaseEvent{

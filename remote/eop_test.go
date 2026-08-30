@@ -9,7 +9,7 @@ import (
 
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/remote/file"
-	atime "github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/time"
 )
 
 // sampleFinals2000A mimics finals2000A.all format for two consecutive
@@ -56,7 +56,7 @@ func scratchCache(t *testing.T) {
 	t.Cleanup(func() {
 		SetDataDir("")
 		Reset()
-		atime.ResetEOP()
+		time.ResetEOP()
 	})
 }
 
@@ -70,7 +70,7 @@ func TestEOPLoaderFetchesAndParses(t *testing.T) {
 		t.Fatalf("Fetch: %v", err)
 	}
 
-	if _, err := atime.ParseFinals2000A(bytes.NewReader(data.Raw)); err != nil {
+	if _, err := time.ParseFinals2000A(bytes.NewReader(data.Raw)); err != nil {
 		t.Fatalf("fetched bytes do not parse as finals2000A: %v", err)
 	}
 }
@@ -159,8 +159,8 @@ func TestEOPLoaderRejectsCorruptDownload(t *testing.T) {
 		t.Error("a corrupt download must not be cached")
 	}
 
-	if _, ok := atime.GetModel().(atime.ZeroModel); !ok {
-		t.Errorf("model must be unchanged after a rejected download, got %T", atime.GetModel())
+	if _, ok := time.GetModel().(time.ZeroModel); !ok {
+		t.Errorf("model must be unchanged after a rejected download, got %T", time.GetModel())
 	}
 }
 
@@ -199,7 +199,7 @@ func TestEOPLoaderCachedReportsNoDataWhenEmpty(t *testing.T) {
 	scratchCache(t)
 
 	_, err := eopLoader{}.Cached(context.Background())
-	if !errors.Is(err, atime.ErrNoEOPData) {
+	if !errors.Is(err, time.ErrNoEOPData) {
 		t.Fatalf("Cached with an empty cache = %v, want ErrNoEOPData", err)
 	}
 }
@@ -248,9 +248,9 @@ func TestInitRegistersTheLoader(t *testing.T) {
 	// Nothing here registers a loader: if init did not, this reports
 	// ErrNoEOPLoader instead of finding the file above.
 	// MJD 41684 as a JD, on the UTC scale.
-	atime.FromJD(41684+2400000.5, atime.UTC).EOP()
+	time.FromJD(41684+2400000.5, time.UTC).EOP()
 
-	if got := atime.EOPSource(); got != "cache" {
+	if got := time.EOPSource(); got != "cache" {
 		t.Errorf("EOPSource = %q, want %q", got, "cache")
 	}
 }

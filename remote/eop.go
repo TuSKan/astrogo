@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"io"
 
-	atime "github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/time"
 )
 
 // eopLoader supplies IERS finals2000A data to astrogo/time.
@@ -26,29 +26,29 @@ type eopLoader struct{}
 // which a hand-pre-seeded file never has. Reading the cache object
 // directly is what finds a file copied in by hand for an offline or
 // air-gapped deployment.
-func (eopLoader) Cached(ctx context.Context) (atime.EOPData, error) {
+func (eopLoader) Cached(ctx context.Context) (time.EOPData, error) {
 	bucket, prefix, err := CacheDir(ctx, IERSFinals2000A)
 	if err != nil {
-		return atime.EOPData{}, atime.ErrNoEOPData
+		return time.EOPData{}, time.ErrNoEOPData
 	}
 
 	key := prefix + eopCacheName
 
 	attrs, err := bucket.Attributes(ctx, key)
 	if err != nil {
-		return atime.EOPData{}, atime.ErrNoEOPData
+		return time.EOPData{}, time.ErrNoEOPData
 	}
 
 	raw, err := bucket.ReadAll(ctx, key)
 	if err != nil {
-		return atime.EOPData{}, atime.ErrNoEOPData
+		return time.EOPData{}, time.ErrNoEOPData
 	}
 
-	return atime.EOPData{Raw: raw, ModTime: attrs.ModTime}, nil
+	return time.EOPData{Raw: raw, ModTime: attrs.ModTime}, nil
 }
 
 // Fetch downloads finals2000A.all, subject to download consent.
-func (eopLoader) Fetch(ctx context.Context) (atime.EOPData, error) {
+func (eopLoader) Fetch(ctx context.Context) (time.EOPData, error) {
 	// GetFile reuses the cache untouched when the source's current ETag
 	// shows the IERS bulletin has not changed since it was last
 	// downloaded — a content check rather than a wall-clock expiry, since
@@ -58,26 +58,26 @@ func (eopLoader) Fetch(ctx context.Context) (atime.EOPData, error) {
 	bucket, key, err := GetFile(ctx, IERSFinals2000A, "finals2000A.all",
 		WithCacheName(eopCacheName),
 		WithValidate(func(r io.Reader) error {
-			if _, perr := atime.ParseFinals2000A(r); perr != nil {
+			if _, perr := time.ParseFinals2000A(r); perr != nil {
 				return fmt.Errorf("remote: EOP data does not parse: %w", perr)
 			}
 
 			return nil
 		}))
 	if err != nil {
-		return atime.EOPData{}, fmt.Errorf("remote: fetch EOP data: %w", err)
+		return time.EOPData{}, fmt.Errorf("remote: fetch EOP data: %w", err)
 	}
 
 	raw, err := bucket.ReadAll(ctx, key)
 	if err != nil {
-		return atime.EOPData{}, fmt.Errorf("remote: read EOP data: %w", err)
+		return time.EOPData{}, fmt.Errorf("remote: read EOP data: %w", err)
 	}
 
-	return atime.EOPData{Raw: raw}, nil
+	return time.EOPData{Raw: raw}, nil
 }
 
 // eopCacheName is the name finals2000A.all is cached under.
 const eopCacheName = "finals2000A.data"
 
 //nolint:gochecknoinits // the registration this package exists to provide
-func init() { atime.RegisterEOPLoader(eopLoader{}) }
+func init() { time.RegisterEOPLoader(eopLoader{}) }

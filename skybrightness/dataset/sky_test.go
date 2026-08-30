@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"testing"
-	gotime "time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
@@ -14,6 +13,7 @@ import (
 	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/skybrightness"
 	"github.com/TuSKan/astrogo/skybrightness/dataset"
+	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -66,7 +66,7 @@ func TestLiveAerosolRefusesAnIncompleteRequest(t *testing.T) {
 			t.Parallel()
 
 			_, err := dataset.LiveAerosol(context.Background(), c.site,
-				gotime.Date(2023, 1, 1, 3, 0, 0, 0, gotime.UTC), c.preset)
+				time.GoDate(2023, 1, 1, 3, 0, 0, 0, time.LocationUTC), c.preset)
 			if !errors.Is(err, dataset.ErrSpec) {
 				t.Errorf("got %v, want ErrSpec — this must fail on the request rather "+
 					"than by reaching a service", err)
@@ -239,7 +239,7 @@ func TestOneSkyServesManySites(t *testing.T) {
 		t.Fatalf("NewSky: %v", err)
 	}
 
-	when := gotime.Date(2026, 4, 2, 5, 0, 0, 0, gotime.UTC)
+	when := time.GoDate(2026, 4, 2, 5, 0, 0, 0, time.LocationUTC)
 
 	// The same coordinates at two elevations, so the sky above them is
 	// identical and the air between is the only thing that differs.

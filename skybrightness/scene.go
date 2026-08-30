@@ -3,11 +3,11 @@ package skybrightness
 import (
 	"errors"
 	"fmt"
-	"time"
 
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/ephemeris/core"
+	"github.com/TuSKan/astrogo/time"
 )
 
 // Sentinel errors for scene construction. Match with errors.Is.
@@ -42,7 +42,7 @@ type Scene struct {
 	Observer *coord.Geodetic
 
 	// Time is the instant of the observation.
-	Time time.Time
+	Time time.GoTime
 
 	// Atmosphere is the atmospheric state: surface conditions, aerosol,
 	// clouds, ozone, precipitable water, vertical profile, horizon and

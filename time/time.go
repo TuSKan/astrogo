@@ -9,6 +9,9 @@ import (
 	"github.com/TuSKan/astrogo/internal/gofaext"
 )
 
+// GoTime is an alias for the standard library's time.Time.
+type GoTime = time.Time
+
 // Duration is the interface that represents a duration.
 type Duration = time.Duration
 
@@ -67,6 +70,12 @@ const (
 	Minute time.Duration = time.Minute //nolint:revive,nolintlint // Public time unit constant; unit name is intentional.
 	// Hour is one hour.
 	Hour time.Duration = time.Hour //nolint:revive,nolintlint // Public time unit constant; unit name is intentional.
+	// Nanosecond is one nanosecond, the unit Duration counts in.
+	Nanosecond time.Duration = time.Nanosecond //nolint:revive,nolintlint // Public time unit constant; unit name is intentional.
+	// Microsecond is one microsecond.
+	Microsecond time.Duration = time.Microsecond //nolint:revive,nolintlint // Public time unit constant; unit name is intentional.
+	// Millisecond is one millisecond.
+	Millisecond time.Duration = time.Millisecond //nolint:revive,nolintlint // Public time unit constant; unit name is intentional.
 )
 
 // Month constants re-exported from the standard library.
@@ -100,6 +109,16 @@ const (
 // LoadLocation loads a location from the standard library.
 var LoadLocation = time.LoadLocation
 
+// Parse parses a formatted time string, as the standard library does.
+var Parse = time.Parse
+
+// ParseInLocation is Parse with a default location for a layout that carries
+// no zone.
+var ParseInLocation = time.ParseInLocation
+
+// Since returns the duration since the given time.
+var Since = time.Since
+
 // MustLocation loads a location from the standard library, panicking if the
 // location cannot be loaded.
 var MustLocation = func(name string) *time.Location {
@@ -112,7 +131,49 @@ var MustLocation = func(name string) *time.Location {
 }
 
 // LocationUTC is the UTC location.
+//
+// Named for the location rather than aliased as UTC, because [UTC] is this
+// package's coordinated-universal *scale* and the two are different things.
 var LocationUTC = time.UTC
+
+// FixedZone returns a location with a fixed offset from UTC.
+var FixedZone = time.FixedZone
+
+// Unix converts a Unix timestamp to a [GoTime].
+var Unix = time.Unix
+
+// GoDate builds a [GoTime] from calendar fields.
+//
+// Named apart from [Date], which builds this package's own [Time]. Both are
+// needed: astronomy wants the scale-aware type, while ordinary calendar work
+// — a cache key, a filename stamp — wants the standard library's.
+var GoDate = time.Date
+
+// Now returns the current wall-clock instant as a [GoTime].
+//
+// Distinct from [NowUTC], which returns this package's own [Time] on the UTC
+// scale. Reach for NowUTC for anything astronomical; Now is for the ordinary
+// clock work — a cache timestamp, a rate limiter, a generated-at field —
+// that would otherwise be a reason to import the standard library's time
+// package alongside this one.
+var Now = time.Now
+
+// Until returns the duration until the given [GoTime].
+var Until = time.Until
+
+// Sleep pauses the calling goroutine.
+var Sleep = time.Sleep
+
+// After returns a channel that receives after the given duration.
+//
+// Not to be confused with [Time.After], which compares two instants.
+var After = time.After
+
+// NewTimer returns a timer that fires after the given duration.
+var NewTimer = time.NewTimer
+
+// NewTicker returns a ticker that fires repeatedly.
+var NewTicker = time.NewTicker
 
 // J2000 is the standard epoch J2000.0 (JD 2451545.0 TT) — the reference
 // epoch most star catalogs (Gaia excepted, at J2016.0) and orbital-element
@@ -124,6 +185,14 @@ var (
 	RFC1123 = time.RFC1123
 	// RFC3339 is a time format that conforms to RFC 3339.
 	RFC3339 = time.RFC3339
+	// RFC3339Nano is RFC 3339 with nanosecond precision.
+	RFC3339Nano = time.RFC3339Nano
+	// DateOnly is the year-month-day layout.
+	DateOnly = time.DateOnly
+	// DateTime is the year-month-day hour:minute:second layout.
+	DateTime = time.DateTime
+	// TimeOnly is the hour:minute:second layout.
+	TimeOnly = time.TimeOnly
 )
 
 // Scale represents an astronomical time scale.

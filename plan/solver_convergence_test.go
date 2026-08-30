@@ -4,10 +4,9 @@ import (
 	"errors"
 	"math"
 	"testing"
-	gotime "time"
 
 	"github.com/TuSKan/astrogo/plan"
-	atime "github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/time"
 )
 
 // convergenceCase is a solve whose iteration budget decides the outcome.
@@ -42,11 +41,11 @@ func convergenceCases() []convergenceCase {
 func TestFindRootReportsNonConvergence(t *testing.T) {
 	t.Parallel()
 
-	t1 := atime.Date(2026, 1, 1, 0, 0, 0, 0, atime.LocationUTC)
+	t1 := time.Date(2026, 1, 1, 0, 0, 0, 0, time.LocationUTC)
 	t2 := t1.AddDays(1)
 
 	// A straight line crossing zero 7.3 hours in.
-	eval := plan.Evaluator(func(x atime.Time) (float64, error) {
+	eval := plan.Evaluator(func(x time.Time) (float64, error) {
 		return x.JD() - (t1.JD() + 7.3/24), nil
 	})
 
@@ -54,7 +53,7 @@ func TestFindRootReportsNonConvergence(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			s := plan.Solver{Tolerance: gotime.Second, MaxIter: tc.maxIter}
+			s := plan.Solver{Tolerance: time.Second, MaxIter: tc.maxIter}
 
 			got, val, err := s.FindRoot(eval, t1, t2)
 
@@ -93,11 +92,11 @@ func TestFindRootReportsNonConvergence(t *testing.T) {
 func TestFindExtremumReportsNonConvergence(t *testing.T) {
 	t.Parallel()
 
-	t1 := atime.Date(2026, 1, 1, 0, 0, 0, 0, atime.LocationUTC)
+	t1 := time.Date(2026, 1, 1, 0, 0, 0, 0, time.LocationUTC)
 	t3 := t1.AddDays(1)
 
 	// A parabola with its maximum 7.3 hours in.
-	eval := plan.Evaluator(func(x atime.Time) (float64, error) {
+	eval := plan.Evaluator(func(x time.Time) (float64, error) {
 		h := (x.JD() - t1.JD()) * 24
 
 		return -(h - 7.3) * (h - 7.3), nil
@@ -107,7 +106,7 @@ func TestFindExtremumReportsNonConvergence(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			s := plan.Solver{Tolerance: gotime.Second, MaxIter: tc.maxIter}
+			s := plan.Solver{Tolerance: time.Second, MaxIter: tc.maxIter}
 
 			got, val, err := s.FindExtremum(eval, t1, t3, true)
 
@@ -137,10 +136,10 @@ func TestFindExtremumReportsNonConvergence(t *testing.T) {
 func TestNoConvergenceNamesWhatRanOut(t *testing.T) {
 	t.Parallel()
 
-	t1 := atime.Date(2026, 1, 1, 0, 0, 0, 0, atime.LocationUTC)
+	t1 := time.Date(2026, 1, 1, 0, 0, 0, 0, time.LocationUTC)
 
-	s := plan.Solver{Tolerance: gotime.Second, MaxIter: 1}
-	eval := plan.Evaluator(func(x atime.Time) (float64, error) {
+	s := plan.Solver{Tolerance: time.Second, MaxIter: 1}
+	eval := plan.Evaluator(func(x time.Time) (float64, error) {
 		return x.JD() - (t1.JD() + 7.3/24), nil
 	})
 

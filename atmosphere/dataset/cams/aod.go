@@ -5,10 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"time"
 
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/remote"
+	"github.com/TuSKan/astrogo/time"
 )
 
 // ErrAOD reports that an aerosol optical depth could not be resolved.
@@ -79,7 +79,7 @@ const AODVariable = "aod550"
 // must also blank-import remote/s3, which this package deliberately does not
 // — it knows nothing about S3, and pulling the AWS SDK into every build that
 // merely reads a NetCDF file would be the wrong trade.
-func AOD550(ctx context.Context, site *coord.Geodetic, when time.Time) (float64, error) {
+func AOD550(ctx context.Context, site *coord.Geodetic, when time.GoTime) (float64, error) {
 	if site == nil {
 		return 0, fmt.Errorf("%w: needs a site", ErrAOD)
 	}
@@ -128,7 +128,7 @@ func AOD550(ctx context.Context, site *coord.Geodetic, when time.Time) (float64,
 // steps from each. This takes the most recent cycle at or before the instant
 // and the step that lands on it, so any hour resolves to the freshest run
 // that covers it rather than to whichever cycle happens to be nearer.
-func AODKey(when time.Time) string {
+func AODKey(when time.GoTime) string {
 	utc := when.UTC()
 
 	cycleHour := 0
@@ -136,7 +136,7 @@ func AODKey(when time.Time) string {
 		cycleHour = 12
 	}
 
-	cycle := time.Date(utc.Year(), utc.Month(), utc.Day(), cycleHour, 0, 0, 0, time.UTC)
+	cycle := time.GoDate(utc.Year(), utc.Month(), utc.Day(), cycleHour, 0, 0, 0, time.LocationUTC)
 	step := int(utc.Sub(cycle).Hours())
 
 	stamp := cycle.Format("20060102150405")

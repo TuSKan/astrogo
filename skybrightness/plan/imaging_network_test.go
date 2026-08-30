@@ -5,7 +5,6 @@ package plan_test
 import (
 	"context"
 	"testing"
-	gotime "time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
@@ -74,7 +73,7 @@ func TestImagingDepthAgainstARealSky(t *testing.T) {
 		Site:           site,
 		Air:            atmosphere.RuralAerosol(site.Height(), atmosphere.CleanMountainAOD550),
 		Instrument:     inst,
-		Exposure:       300 * gotime.Second,
+		Exposure:       300 * time.Second,
 		AperturePixels: 9,
 		SNR:            5,
 	})
@@ -82,7 +81,7 @@ func TestImagingDepthAgainstARealSky(t *testing.T) {
 		t.Fatalf("NewImaging: %v", err)
 	}
 
-	when := time.Date(2026, gotime.March, 20, 5, 0, 0, 0, time.LocationUTC)
+	when := time.Date(2026, time.March, 20, 5, 0, 0, 0, time.LocationUTC)
 
 	zenith, err := depth.LimitingMagnitudeAt(when, angle.Deg(90), angle.Deg(0))
 	if err != nil {
@@ -149,7 +148,7 @@ func TestImagingSatisfiesThePlanningConstraint(t *testing.T) {
 
 	depth, err := sbplan.NewImaging(sbplan.Spec{
 		Sky: sky, Site: site, Instrument: inst,
-		Exposure: 300 * gotime.Second, AperturePixels: 9, SNR: 5,
+		Exposure: 300 * time.Second, AperturePixels: 9, SNR: 5,
 	})
 	if err != nil {
 		t.Fatalf("NewImaging: %v", err)
@@ -160,7 +159,7 @@ func TestImagingSatisfiesThePlanningConstraint(t *testing.T) {
 		t.Fatalf("NewSite: %v", err)
 	}
 
-	when := time.Date(2026, gotime.March, 20, 5, 0, 0, 0, time.LocationUTC)
+	when := time.Date(2026, time.March, 20, 5, 0, 0, 0, time.LocationUTC)
 
 	// A bright star, which any such instrument reaches, and an absurdly faint
 	// one, which none does. Both are above the horizon at this instant.

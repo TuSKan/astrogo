@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	gotime "time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
@@ -42,7 +41,7 @@ type Spec struct {
 	Instrument optics.Instrument
 
 	// Exposure is one integration.
-	Exposure gotime.Duration
+	Exposure time.Duration
 
 	// AperturePixels is how many pixels the measurement sums over — the
 	// photometric aperture, not the whole sensor.

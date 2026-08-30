@@ -12,7 +12,7 @@ import (
 	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/remote/api"
-	atime "github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/time"
 )
 
 // ErrAPIError indicates a SBDB API error response.
@@ -199,7 +199,7 @@ func (p *Provider) ResolveObject(ctx context.Context, req resolve.ObjectRequest)
 		}
 
 		if hasElements {
-			t.Epoch = atime.FromJD(epochJD, atime.TDB)
+			t.Epoch = time.FromJD(epochJD, time.TDB)
 			t.SemiMajorAxis = semiMajorAxis
 			t.Eccentricity = eccentricity
 			t.Inclination = angle.Deg(incl)
@@ -554,7 +554,7 @@ func (p *Provider) queryBright(ctx context.Context, sbKind, magField string, max
 		}
 
 		if hasElements {
-			t.Epoch = atime.FromJD(epochJD, atime.TDB)
+			t.Epoch = time.FromJD(epochJD, time.TDB)
 			t.SemiMajorAxis = semiMajorAxis
 			t.Eccentricity = eccentricity
 			t.Inclination = angle.Deg(incl)

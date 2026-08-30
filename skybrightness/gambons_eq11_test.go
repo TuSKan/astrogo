@@ -6,7 +6,6 @@ import (
 	"context"
 	"math"
 	"testing"
-	gotime "time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
@@ -15,6 +14,7 @@ import (
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/skybrightness"
 	"github.com/TuSKan/astrogo/skybrightness/dataset/starlight"
+	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -54,7 +54,7 @@ import (
 func TestEq11AgainstTheTable2Ratio(t *testing.T) {
 	testutil.RequireReachable(t, "github.com:443")
 
-	ctx, cancel := context.WithTimeout(context.Background(), 40*gotime.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 40*time.Minute)
 	defer cancel()
 
 	enableStarMapDownload(t)

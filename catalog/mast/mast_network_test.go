@@ -5,11 +5,11 @@ package mast
 import (
 	"context"
 	"testing"
-	"time"
 
 	"github.com/TuSKan/astrogo/internal/testutil"
 
 	"github.com/TuSKan/astrogo/catalog/resolve"
+	"github.com/TuSKan/astrogo/time"
 )
 
 // requireMast skips the test when the MAST API is unreachable — per this

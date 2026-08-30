@@ -2,7 +2,6 @@ package plan
 
 import (
 	"fmt"
-	stdtime "time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
@@ -109,14 +108,14 @@ func VisibleIntervals(
 	obj coord.Object,
 	site *Site,
 	start, end time.Time,
-	step stdtime.Duration,
+	step time.Duration,
 	minAlt angle.Angle,
 ) ([]Interval, error) {
 	if step <= 0 {
-		step = 5 * stdtime.Minute
+		step = 5 * time.Minute
 	}
 
-	if step > 15*stdtime.Minute {
+	if step > 15*time.Minute {
 		return nil, fmt.Errorf("%w: %v", ErrStepTooLarge, step)
 	}
 
@@ -187,7 +186,7 @@ func VisibleIntervals(
 //  1. Coarse 10-min grid scan to bracket the maximum.
 //  2. Brent's minimization (via Solver) within the bracket for sub-second precision.
 func TransitEstimate(obj coord.Object, site *Site, start, end time.Time) (time.Time, angle.Angle, error) {
-	const coarseStep = 10 * stdtime.Minute
+	const coarseStep = 10 * time.Minute
 
 	// Stage 1: coarse scan to locate the bracket [tLeft, tRight] around the peak.
 	type sample struct {
@@ -286,13 +285,13 @@ func Find(
 	site *Site,
 	constraints []Constraint,
 	start, end time.Time,
-	step stdtime.Duration,
+	step time.Duration,
 ) ([]Interval, error) {
 	if step <= 0 {
-		step = 5 * stdtime.Minute
+		step = 5 * time.Minute
 	}
 
-	if step > 15*stdtime.Minute {
+	if step > 15*time.Minute {
 		return nil, fmt.Errorf("%w: %v", ErrStepTooLarge, step)
 	}
 

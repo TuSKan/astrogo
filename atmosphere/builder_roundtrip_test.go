@@ -3,10 +3,10 @@ package atmosphere_test
 import (
 	"math"
 	"testing"
-	gotime "time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
+	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -33,7 +33,7 @@ func (h flatHorizon) AltitudeAt(_ angle.Angle) angle.Angle { return angle.Angle(
 func TestBuilderRoundTripsEveryField(t *testing.T) {
 	t.Parallel()
 
-	issued := gotime.Date(2026, gotime.March, 20, 3, 30, 0, 0, gotime.UTC)
+	issued := time.GoDate(2026, time.March, 20, 3, 30, 0, 0, time.LocationUTC)
 	horizon := flatHorizon(angle.Deg(7.5))
 
 	cloud := atmosphere.CloudLayer{
@@ -64,7 +64,7 @@ func TestBuilderRoundTripsEveryField(t *testing.T) {
 		AddCloud(cloud).
 		Source(source).
 		IssuedAt(issued).
-		LeadTime(90 * gotime.Minute).
+		LeadTime(90 * time.Minute).
 		Build()
 	if err != nil {
 		t.Fatalf("Build: %v", err)
@@ -128,7 +128,7 @@ func TestBuilderRoundTripsEveryField(t *testing.T) {
 	}
 
 	// Age is measured from the issue time, so an hour later is an hour old.
-	if got := air.Age(issued.Add(gotime.Hour)); got != gotime.Hour {
+	if got := air.Age(issued.Add(time.Hour)); got != time.Hour {
 		t.Errorf("age one hour after issue is %v, want 1h", got)
 	}
 }
@@ -195,7 +195,7 @@ func TestUnsetAtmosphereUsesItsDefaults(t *testing.T) {
 			got, atmosphere.DefaultDiffuseKappa)
 	}
 
-	if got := air.Age(gotime.Now()); got != 0 {
+	if got := air.Age(time.Now()); got != 0 {
 		t.Errorf("age with no issue time is %v, want 0", got)
 	}
 

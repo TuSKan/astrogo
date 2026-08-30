@@ -8,7 +8,8 @@ import (
 	"net/url"
 	"strings"
 	"testing"
-	"time"
+
+	"github.com/TuSKan/astrogo/time"
 )
 
 // A KindFile endpoint's URL is a bucket root, and the caller's name

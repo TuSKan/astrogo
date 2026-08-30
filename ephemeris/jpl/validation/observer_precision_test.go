@@ -22,7 +22,7 @@ import (
 	// import higher ones") is about production imports, not test fixtures,
 	// and isn't actually violated here.
 	"github.com/TuSKan/astrogo/plan"
-	atime "github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/time"
 )
 
 // observerPrecisionBody is one Horizons-tracked target in the precision
@@ -191,9 +191,9 @@ func TestObserverPrecisionMatrix(t *testing.T) {
 		numEpochs = 9
 	)
 
-	epochStart := atime.Date(2026, atime.January, 5, 0, 0, 0, 0, atime.LocationUTC)
+	epochStart := time.Date(2026, time.January, 5, 0, 0, 0, 0, time.LocationUTC)
 
-	epochs := make([]atime.Time, numEpochs)
+	epochs := make([]time.Time, numEpochs)
 	for i := range numEpochs {
 		epochs[i] = epochStart.AddDays(float64(i) * 45)
 	}

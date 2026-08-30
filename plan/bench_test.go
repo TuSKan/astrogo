@@ -3,13 +3,12 @@ package plan
 import (
 	"fmt"
 	"testing"
-	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
 
-	atime "github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/time"
 )
 
 // ── Visibility Detection ─────────────────────────────────────────────────────
@@ -18,12 +17,12 @@ type benchMock struct {
 	c coord.ICRS
 }
 
-func (m benchMock) ICRS(_ atime.Time) (coord.ICRS, error) {
+func (m benchMock) ICRS(_ time.Time) (coord.ICRS, error) {
 	return m.c, nil
 }
 
-func (m benchMock) Name() string                              { return "mock" }
-func (m benchMock) Position(_ atime.Time) (coord.ICRS, error) { return m.c, nil }
+func (m benchMock) Name() string                             { return "mock" }
+func (m benchMock) Position(_ time.Time) (coord.ICRS, error) { return m.c, nil }
 func (m benchMock) GetDetails(_ *coord.Context, _ ...string) (*TargetDetails, error) {
 	return &TargetDetails{}, nil
 }
@@ -32,7 +31,7 @@ func BenchmarkVisibleIntervals(b *testing.B) {
 	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(45), 0)
 	site, _ := NewSite("Test", loc)
 	obj := benchMock{c: coord.NewICRS(angle.Deg(0), angle.Deg(45))}
-	start := atime.FromJD(2460000.0, atime.UTC)
+	start := time.FromJD(2460000.0, time.UTC)
 	end := start.AddDays(1.0)
 
 	for b.Loop() {
@@ -44,7 +43,7 @@ func BenchmarkVisibleIntervals_1MinStep(b *testing.B) {
 	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(45), 0)
 	site, _ := NewSite("Test", loc)
 	obj := benchMock{c: coord.NewICRS(angle.Deg(0), angle.Deg(45))}
-	start := atime.FromJD(2460000.0, atime.UTC)
+	start := time.FromJD(2460000.0, time.UTC)
 	end := start.AddDays(1.0)
 
 	for b.Loop() {
@@ -58,9 +57,9 @@ func BenchmarkEventSolver_Visibility(b *testing.B) {
 	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(45), 0)
 	site, _ := NewSite("Test", loc)
 	obj := NewStar("T", angle.Deg(0), angle.Deg(0))
-	start := atime.FromJD(2451545.0, atime.UTC)
-	end := start.Add(24 * atime.Hour)
-	solver := NewEventSolver(30*atime.Minute, 1*atime.Second)
+	start := time.FromJD(2451545.0, time.UTC)
+	end := start.Add(24 * time.Hour)
+	solver := NewEventSolver(30*time.Minute, 1*time.Second)
 	spec := EventSpec{
 		Family:    EventFamilyVisibility,
 		Kind:      EventAnyVisibility,
@@ -80,12 +79,12 @@ func BenchmarkObservableWindows(b *testing.B) {
 	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(45), 0)
 	site, _ := NewSite("Test", loc)
 	obj := NewStar("T", angle.Hour(18.69), angle.Deg(0))
-	start := atime.FromJD(2451545.0, atime.UTC)
-	end := start.Add(12 * atime.Hour)
+	start := time.FromJD(2451545.0, time.UTC)
+	end := start.Add(12 * time.Hour)
 	constraints := []Constraint{Altitude{Threshold: angle.Deg(30)}}
 
 	for b.Loop() {
-		_, _ = ObservableWindows(obj, start, end, 5*atime.Minute, site, constraints...)
+		_, _ = ObservableWindows(obj, start, end, 5*time.Minute, site, constraints...)
 	}
 }
 
@@ -98,7 +97,7 @@ func makeBlocks(n int) []*Block {
 		blocks[i] = &Block{
 			ID:       fmt.Sprintf("B%d", i),
 			Target:   NewStar(fmt.Sprintf("T%d", i), angle.Deg(0), angle.Deg(0)),
-			Duration: 10 * atime.Minute,
+			Duration: 10 * time.Minute,
 			Priority: float64(n - i), // descending priority
 		}
 	}
@@ -115,8 +114,8 @@ func benchScheduler(b *testing.B, n int, strategy Strategy) {
 	tm := &BasicTransitionModel{BaseSetup: 0}
 	blocks := makeBlocks(n)
 
-	start := atime.ZeroTime()
-	window := Window{Start: start, End: start.Add(atime.Duration(n*15) * atime.Minute)}
+	start := time.ZeroTime()
+	window := Window{Start: start, End: start.Add(time.Duration(n*15) * time.Minute)}
 
 	for b.Loop() {
 		_, _ = strategy.Schedule(planner, window, blocks, tm)
@@ -165,7 +164,7 @@ func BenchmarkTransitEstimate(b *testing.B) {
 	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(45), 0)
 	site, _ := NewSite("Test", loc)
 	obj := benchMock{c: coord.NewICRS(angle.Deg(100), angle.Deg(20))}
-	start := atime.FromJD(2460000.0, atime.UTC)
+	start := time.FromJD(2460000.0, time.UTC)
 	end := start.AddDays(0.5)
 
 	for b.Loop() {
@@ -199,7 +198,7 @@ func BenchmarkFortnightEvents(b *testing.B) {
 	}
 
 	provider := eph.Default()
-	start := atime.Date(2026, 7, 20, 0, 0, 0, 0, tz)
+	start := time.Date(2026, 7, 20, 0, 0, 0, 0, tz)
 
 	for b.Loop() {
 		for d := range 14 {

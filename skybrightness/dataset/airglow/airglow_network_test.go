@@ -6,10 +6,10 @@ import (
 	"context"
 	"math"
 	"testing"
-	"time"
 
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/skybrightness/dataset/airglow"
+	"github.com/TuSKan/astrogo/time"
 )
 
 // The whole provider, against the real service.

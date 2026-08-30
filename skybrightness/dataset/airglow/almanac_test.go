@@ -5,7 +5,8 @@ import (
 	"math"
 	"strings"
 	"testing"
-	gotime "time"
+
+	"github.com/TuSKan/astrogo/time"
 )
 
 // The almanac's own "no data" sentinel becomes this package's "unset".
@@ -117,6 +118,6 @@ func TestAlmanacAtRefusesAnUnknownObservatory(t *testing.T) {
 
 // timeFixture is any instant; the refusal under test happens before the date
 // is used.
-func timeFixture() gotime.Time {
-	return gotime.Date(2020, gotime.June, 15, 2, 0, 0, 0, gotime.UTC)
+func timeFixture() time.GoTime {
+	return time.GoDate(2020, time.June, 15, 2, 0, 0, 0, time.LocationUTC)
 }

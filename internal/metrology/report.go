@@ -11,7 +11,8 @@ import (
 	"runtime/debug"
 	"strings"
 	"sync"
-	gotime "time"
+
+	"github.com/TuSKan/astrogo/time"
 )
 
 // SchemaVersion is the version of the result document written by [Suite].
@@ -115,7 +116,7 @@ func (s *Suite) newResult(status Status, reason string, stats Stats) Result {
 		Suite:         s.Name,
 		// UTC and RFC3339, so results from different machines sort and
 		// compare without anyone having to think about time zones.
-		Generated: gotime.Now().UTC().Format(gotime.RFC3339),
+		Generated: time.Now().UTC().Format(time.RFC3339),
 		Commit:    commit,
 		GoVersion: goVersion,
 		Platform:  platform,

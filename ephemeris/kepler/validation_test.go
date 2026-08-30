@@ -16,7 +16,7 @@ import (
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/ephemeris/kepler"
 	"github.com/TuSKan/astrogo/internal/testutil"
-	atime "github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/vector"
 )
 
@@ -171,7 +171,7 @@ func fetchHelioElements(designation string, at atime.Time) (epochJD float64, el 
 	const kmPerAU = 149_597_870.7
 
 	el, err = kepler.NewElements(
-		atime.FromJDParts(jdtdb, 0, atime.TDB), aKm/kmPerAU, ec,
+		time.FromJDParts(jdtdb, 0, time.TDB), aKm/kmPerAU, ec,
 		angle.Deg(incl), angle.Deg(node), angle.Deg(argp), angle.Deg(ma),
 	)
 	if err != nil {
@@ -185,7 +185,7 @@ func fetchHelioElements(designation string, at atime.Time) (epochJD float64, el 
 // position/velocity (EPHEM_TYPE=VECTORS, CENTER='@10', REF_PLANE='FRAME'
 // — the ICRF/J2000 equatorial frame [Elements.StateAt] itself returns,
 // OUT_UNITS='AU-D') at.
-func fetchHelioVector(designation string, at atime.Time) (pos, vel vector.Vec3, err error) {
+func fetchHelioVector(designation string, at time.Time) (pos, vel vector.Vec3, err error) {
 	params := url.Values{}
 	params.Add("format", "text")
 	params.Add("COMMAND", fmt.Sprintf("'%s'", designation))
@@ -265,14 +265,14 @@ func TestElements_StateAt_AgainstHorizons_433Eros(t *testing.T) {
 
 	const designation = "433"
 
-	epochJD, el, err := fetchHelioElements(designation, atime.Date(2026, atime.January, 1, 0, 0, 0, 0, atime.LocationUTC))
+	epochJD, el, err := fetchHelioElements(designation, time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC))
 	testutil.AssertNoError(t, err)
 
 	if el.SemiMajorAxis() < 1.0 || el.SemiMajorAxis() > 2.0 {
 		t.Fatalf("sanity check failed: 433 Eros semi-major axis = %v AU, expected ~1.458 AU", el.SemiMajorAxis())
 	}
 
-	epoch := atime.FromJDParts(epochJD, 0, atime.TDB)
+	epoch := time.FromJDParts(epochJD, 0, time.TDB)
 
 	// 2 arcsec, chosen from real measured data, not picked in advance: a
 	// live run of this exact comparison found the two-body/perturbed

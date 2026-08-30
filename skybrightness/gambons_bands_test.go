@@ -6,7 +6,6 @@ import (
 	"context"
 	"math"
 	"testing"
-	gotime "time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
@@ -16,6 +15,7 @@ import (
 	"github.com/TuSKan/astrogo/skybrightness"
 	"github.com/TuSKan/astrogo/skybrightness/dataset/airglow"
 	"github.com/TuSKan/astrogo/skybrightness/dataset/passband"
+	"github.com/TuSKan/astrogo/time"
 )
 
 // Table 2 across all five Johnson-Cousins bands, on the one ratio that can be
@@ -50,7 +50,7 @@ func TestAgainstGAMBONSTable2AcrossBands(t *testing.T) {
 	testutil.RequireReachable(t, "svo2.cab.inta-csic.es:443")
 	testutil.RequireReachable(t, "etimecalret-002.eso.org:443")
 
-	ctx, cancel := context.WithTimeout(context.Background(), 40*gotime.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 40*time.Minute)
 	defer cancel()
 
 	grid := skybrightness.DefaultOpticalGrid()

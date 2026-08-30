@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	eph "github.com/TuSKan/astrogo/ephemeris"
-	atime "github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/time"
 )
 
 // TestProvidersLabelTheirFrame is the point of the Frame and Center fields.
@@ -23,7 +23,7 @@ import (
 func TestProvidersLabelTheirFrame(t *testing.T) {
 	t.Parallel()
 
-	when := atime.Date(2026, 1, 1, 0, 0, 0, 0, atime.LocationUTC)
+	when := time.Date(2026, 1, 1, 0, 0, 0, 0, time.LocationUTC)
 
 	st, err := eph.Default().State(eph.Mars, when)
 	if err != nil {

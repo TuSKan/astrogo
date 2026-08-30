@@ -9,7 +9,7 @@ import (
 	"github.com/TuSKan/astrogo/ephemeris/core"
 	"github.com/TuSKan/astrogo/ephemeris/jpl"
 	"github.com/TuSKan/astrogo/internal/testutil"
-	atime "github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/time"
 )
 
 // TestLowNumberedAsteroidsLoad covers the bodies that used to be unreachable.
@@ -25,8 +25,8 @@ import (
 func TestLowNumberedAsteroidsLoad(t *testing.T) {
 	testutil.RequireReachable(t, "ssd.jpl.nasa.gov:443")
 
-	start := atime.FromJD(2460305.5, atime.TDB)
-	stop := atime.FromJD(2460355.5, atime.TDB)
+	start := time.FromJD(2460305.5, time.TDB)
+	stop := time.FromJD(2460355.5, time.TDB)
 
 	cases := []struct {
 		number      int

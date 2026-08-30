@@ -3,7 +3,6 @@ package plan
 import (
 	"errors"
 	"fmt"
-	stdtime "time"
 
 	"testing"
 
@@ -23,7 +22,7 @@ func TestDayEventsFindsSunRiseSetTransit(t *testing.T) {
 
 	day := time.FromJD(2451545.0, time.UTC) // any instant on the day in question
 
-	rise, set, transit, err := DayEvents(day, stdtime.UTC, sun, site)
+	rise, set, transit, err := DayEvents(day, time.LocationUTC, sun, site)
 	testutil.AssertNoError(t, err)
 
 	if rise == nil || set == nil || transit == nil {
@@ -47,7 +46,7 @@ func TestDayEventsUsesLocalCalendarDay(t *testing.T) {
 	// already 2000-01-01 19:30 the PREVIOUS day in a UTC-5 zone -- pick an
 	// instant where the local calendar date genuinely differs from UTC's.
 	utcMidnight30 := time.FromJD(2451544.5+0.5/24, time.UTC) // 2000-01-01 00:30 UTC
-	utcMinus5 := stdtime.FixedZone("UTC-5", -5*3600)
+	utcMinus5 := time.FixedZone("UTC-5", -5*3600)
 
 	_, _, _, err := DayEvents(utcMidnight30, utcMinus5, sun, site)
 	testutil.AssertNoError(t, err)
@@ -57,7 +56,7 @@ func TestDayEventsUsesLocalCalendarDay(t *testing.T) {
 	// function itself relies on, so this test would fail loudly if that
 	// assumption were ever wrong.
 	localDate := utcMidnight30.GoTime().In(utcMinus5)
-	utcDate := utcMidnight30.GoTime().In(stdtime.UTC)
+	utcDate := utcMidnight30.GoTime().In(time.LocationUTC)
 
 	if localDate.Day() == utcDate.Day() {
 		t.Fatal("test fixture assumption broken: local and UTC calendar days should differ at this instant")
@@ -74,7 +73,7 @@ func TestDayEventsNilLocDefaultsToUTC(t *testing.T) {
 	withNil, _, _, err := DayEvents(day, nil, sun, site)
 	testutil.AssertNoError(t, err)
 
-	withUTC, _, _, err := DayEvents(day, stdtime.UTC, sun, site)
+	withUTC, _, _, err := DayEvents(day, time.LocationUTC, sun, site)
 	testutil.AssertNoError(t, err)
 
 	if withNil == nil || withUTC == nil {
@@ -82,7 +81,7 @@ func TestDayEventsNilLocDefaultsToUTC(t *testing.T) {
 	}
 
 	if !withNil.Time.Equal(withUTC.Time) {
-		t.Errorf("nil loc should behave exactly like stdtime.UTC; got %v vs %v", withNil.Time, withUTC.Time)
+		t.Errorf("nil loc should behave exactly like time.LocationUTC; got %v vs %v", withNil.Time, withUTC.Time)
 	}
 }
 
@@ -95,7 +94,7 @@ func TestDayEventsPolarNight(t *testing.T) {
 
 	day := time.FromJD(2451727.5, time.UTC) // known midwinter date, per existing TestSunEvents_Polar
 
-	rise, set, _, err := DayEvents(day, stdtime.UTC, sun, site)
+	rise, set, _, err := DayEvents(day, time.LocationUTC, sun, site)
 	testutil.AssertNoError(t, err)
 
 	if rise != nil || set != nil {
@@ -190,7 +189,7 @@ func TestEpisodeExtendsBackwardWhenAlreadyUp(t *testing.T) {
 		t.Fatal("test setup: expected a real sunrise in the wide window")
 	}
 
-	from := realRise.Time.Add(2 * stdtime.Hour)
+	from := realRise.Time.Add(2 * time.Hour)
 	to := from.AddDays(1)
 
 	up, err := isAboveHorizon(sun, site, from)
@@ -251,8 +250,8 @@ func TestEpisodeExtendsForwardPastWindowEnd(t *testing.T) {
 
 	// End the window 1 hour before the real set, so the episode is still
 	// open at `to`.
-	from := realRise.Time.Add(1 * stdtime.Hour)
-	to := realSet.Time.Add(-1 * stdtime.Hour)
+	from := realRise.Time.Add(1 * time.Hour)
+	to := realSet.Time.Add(-1 * time.Hour)
 
 	rise, set, err := Episode(from, to, sun, site)
 	testutil.AssertNoError(t, err)
@@ -370,7 +369,7 @@ func TestDayEventsPropagatesVisibilityError(t *testing.T) {
 
 	day := time.FromJD(2451545.0, time.UTC)
 
-	_, _, _, err := DayEvents(day, stdtime.UTC, errObservable{}, site)
+	_, _, _, err := DayEvents(day, time.LocationUTC, errObservable{}, site)
 	if !errors.Is(err, errAlwaysFails) {
 		t.Fatalf("expected errAlwaysFails, got %v", err)
 	}

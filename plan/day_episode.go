@@ -3,7 +3,6 @@ package plan
 import (
 	"fmt"
 	"slices"
-	stdtime "time"
 
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/time"
@@ -14,7 +13,7 @@ import (
 // there — a target that's circumpolar (never sets) or permanently below
 // the horizon (never rises). A year is comfortably longer than any real
 // periodic visibility cycle this package computes events for.
-const episodeSearchWindow = 366 * 24 * stdtime.Hour
+const episodeSearchWindow = 366 * 24 * time.Hour
 
 // initialSearchStepDays is searchEvent's first probe width. Deliberately
 // small: the overwhelmingly common case is a rise or set within hours to
@@ -42,7 +41,7 @@ const maxEpisodeSearchSteps = 10
 // do for their specific bodies; a caller wanting that runs its own solver
 // with site.SunRiseSetThreshold()/MoonRiseSetThreshold() instead.
 func visibilityEvents(target Observable, site *Site, start, end time.Time) ([]Event, error) {
-	return NewEventSolver(15*stdtime.Minute, 1*stdtime.Second).Find(EventSpec{
+	return NewEventSolver(15*time.Minute, 1*time.Second).Find(EventSpec{
 		Family:    EventFamilyVisibility,
 		Kind:      EventAnyVisibility,
 		Target:    target,
@@ -64,15 +63,15 @@ func visibilityEvents(target Observable, site *Site, start, end time.Time) ([]Ev
 // calendar day is measured in; site's location (via site.Location()) is
 // used for the geometry, and the two need not agree (a caller may
 // legitimately want "Paris's calendar day" applied to "Mauna Kea's sky").
-func DayEvents(day time.Time, loc *stdtime.Location, target Observable, site *Site) (rise, set, transit *Event, err error) {
+func DayEvents(day time.Time, loc *time.Location, target Observable, site *Site) (rise, set, transit *Event, err error) {
 	if loc == nil {
-		loc = stdtime.UTC
+		loc = time.LocationUTC
 	}
 
 	local := day.GoTime().In(loc)
 	y, m, d := local.Date()
 
-	start := time.FromGo(stdtime.Date(y, m, d, 0, 0, 0, 0, loc))
+	start := time.FromGo(time.GoDate(y, m, d, 0, 0, 0, 0, loc))
 	end := start.AddDays(1)
 
 	events, err := visibilityEvents(target, site, start, end)

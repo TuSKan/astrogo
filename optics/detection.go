@@ -4,8 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"time"
 
+	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 

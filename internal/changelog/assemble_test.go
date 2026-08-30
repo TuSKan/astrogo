@@ -7,7 +7,8 @@ import (
 	"strings"
 	"testing"
 	"testing/fstest"
-	"time"
+
+	"github.com/TuSKan/astrogo/time"
 )
 
 //nolint:gochecknoglobals // test flags must be package-level to register

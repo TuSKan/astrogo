@@ -9,12 +9,12 @@ import (
 	"net/url"
 	"path"
 	"strings"
-	"time"
 
 	"github.com/TuSKan/astrogo/constants"
 	"github.com/TuSKan/astrogo/magnitude"
 	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/remote/api"
+	"github.com/TuSKan/astrogo/time"
 )
 
 // Sentinel errors for the Gaia builder.

@@ -5,10 +5,10 @@ package airglow_test
 import (
 	"context"
 	"testing"
-	gotime "time"
 
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/skybrightness/dataset/airglow"
+	"github.com/TuSKan/astrogo/time"
 )
 
 // The almanac's solar flux tracks the real solar cycle.
@@ -29,13 +29,13 @@ func TestAlmanacFluxFollowsTheSolarCycle(t *testing.T) {
 	testutil.RequireReachable(t, "etimecalret-002.eso.org:443")
 
 	quiet, err := airglow.AlmanacAt(context.Background(),
-		gotime.Date(2020, gotime.June, 15, 2, 0, 0, 0, gotime.UTC), airglow.Paranal)
+		time.GoDate(2020, time.June, 15, 2, 0, 0, 0, time.LocationUTC), airglow.Paranal)
 	if err != nil {
 		t.Fatalf("AlmanacAt at solar minimum: %v", err)
 	}
 
 	active, err := airglow.AlmanacAt(context.Background(),
-		gotime.Date(2014, gotime.March, 10, 2, 0, 0, 0, gotime.UTC), airglow.Paranal)
+		time.GoDate(2014, time.March, 10, 2, 0, 0, 0, time.LocationUTC), airglow.Paranal)
 	if err != nil {
 		t.Fatalf("AlmanacAt at solar maximum: %v", err)
 	}
@@ -80,7 +80,7 @@ func TestAlmanacFluxFollowsTheSolarCycle(t *testing.T) {
 func TestAlmanacReportsAnUnpublishedMonthAsUnset(t *testing.T) {
 	testutil.RequireReachable(t, "etimecalret-002.eso.org:443")
 
-	got, err := airglow.AlmanacAt(context.Background(), gotime.Now().UTC(), airglow.Paranal)
+	got, err := airglow.AlmanacAt(context.Background(), time.Now().UTC(), airglow.Paranal)
 	if err != nil {
 		t.Fatalf("AlmanacAt for the current month: %v", err)
 	}

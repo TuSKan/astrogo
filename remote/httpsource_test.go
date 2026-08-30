@@ -10,9 +10,9 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/TuSKan/astrogo/internal/testutil"
+	"github.com/TuSKan/astrogo/time"
 )
 
 var errRejectEverything = errors.New("rejected by test validator")
