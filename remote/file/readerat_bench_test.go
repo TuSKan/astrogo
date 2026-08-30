@@ -63,9 +63,7 @@ func benchPattern(b *testing.B, sizeMB int, read func(off int64) error, n int) {
 	size := int64(sizeMB) << 20
 	offs := spkLikeOffsets(size, n)
 
-	b.ResetTimer()
-
-	for range b.N {
+	for b.Loop() {
 		for _, off := range offs {
 			if err := read(off); err != nil {
 				b.Fatalf("read at %d: %v", off, err)

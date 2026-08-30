@@ -222,9 +222,8 @@ func TestSingleScatteredRadianceRejectsBadInput(t *testing.T) {
 
 func BenchmarkSingleScatteredRadiance(b *testing.B) {
 	b.ReportAllocs()
-	b.ResetTimer()
 
-	for range b.N {
+	for b.Loop() {
 		if _, err := atmosphere.SingleScatteredRadiance(1, 0.1, 0.2, 0.4, 2, 1.5); err != nil {
 			b.Fatal(err)
 		}

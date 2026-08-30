@@ -489,9 +489,8 @@ func TestKocifaj2022Eq2RejectsBadInput(t *testing.T) {
 
 func BenchmarkAllSkyRadiance(b *testing.B) {
 	b.ReportAllocs()
-	b.ResetTimer()
 
-	for range b.N {
+	for b.Loop() {
 		if _, err := skybrightness.AllSkyRadiance(1e-3, 0.1, 0.6, 12, 3, 0.25); err != nil {
 			b.Fatal(err)
 		}

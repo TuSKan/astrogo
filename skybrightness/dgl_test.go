@@ -296,9 +296,8 @@ func BenchmarkDiffuseGalacticLight(b *testing.B) {
 	dst := skybrightness.NewSpectralRadiance(grid)
 
 	b.ReportAllocs()
-	b.ResetTimer()
 
-	for range b.N {
+	for b.Loop() {
 		if _, err := skybrightness.DiffuseGalacticRadiance(dst, grid, 5); err != nil {
 			b.Fatal(err)
 		}
