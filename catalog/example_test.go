@@ -3,14 +3,13 @@ package catalog_test
 import (
 	"context"
 	"testing"
-	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/catalog"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/plan"
-	astrot "github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/time"
 )
 
 // TestIntegration demonstrates how to use the catalog system
@@ -39,7 +38,7 @@ func TestIntegration(t *testing.T) {
 	}
 
 	// We calculate at a specific time (e.g. 2026-04-06 00:00:00 UTC)
-	obsTime := astrot.Date(2026, 4, 6, 0, 0, 0, 0, time.UTC)
+	obsTime := time.Date(2026, 4, 6, 0, 0, 0, 0, time.LocationUTC)
 
 	// Compute target's altitude and azimuth properties from the Observatory at that time
 	ctx := coord.NewContext(obsTime, obs.Location(), atmosphere.StandardRefraction)

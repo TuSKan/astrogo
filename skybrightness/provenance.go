@@ -2,8 +2,9 @@ package skybrightness
 
 import (
 	"fmt"
-	"github.com/TuSKan/astrogo/time"
 	"strings"
+
+	"github.com/TuSKan/astrogo/time"
 )
 
 // Provenance records the science behind one component: what model, from

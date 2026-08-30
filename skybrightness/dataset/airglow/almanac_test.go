@@ -2,10 +2,11 @@ package airglow
 
 import (
 	"errors"
-	"github.com/TuSKan/astrogo/time"
 	"math"
 	"strings"
 	"testing"
+
+	"github.com/TuSKan/astrogo/time"
 )
 
 // The almanac's own "no data" sentinel becomes this package's "unset".

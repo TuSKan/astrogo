@@ -3,8 +3,9 @@
 package jpl_test
 
 import (
-	"github.com/TuSKan/astrogo/time"
 	"testing"
+
+	"github.com/TuSKan/astrogo/time"
 )
 
 // settledMargin is how far behind the present a corpus epoch must sit.

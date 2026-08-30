@@ -6,12 +6,11 @@ import (
 	"errors"
 	"math"
 	"testing"
-	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
-	atime "github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/time"
 )
 
 // EOP needs no explicit load here: the time package pulls finals2000A lazily
@@ -38,7 +37,7 @@ func TestPhase1ObserverPipelineAgainstHorizons(t *testing.T) {
 	tStrStop := "2024-11-01 12:01"
 
 	// Create the AstroGo native time
-	obsTime := atime.Date(2024, 11, 1, 12, 0, 0, 0, time.UTC)
+	obsTime := time.Date(2024, 11, 1, 12, 0, 0, 0, time.LocationUTC)
 
 	// Fetch Topocentric Observer Table for Mars (NAIF ID: 499)
 	marsHorizons, err := fetchObserverTable("499", "Mars", site.Lon().Degrees(), site.Lat().Degrees(), site.Height(), tStrStart, tStrStop)

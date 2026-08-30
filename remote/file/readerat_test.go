@@ -4,13 +4,14 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"github.com/TuSKan/astrogo/time"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"sync"
 	"testing"
+
+	"github.com/TuSKan/astrogo/time"
 )
 
 // payload is deterministic and longer than several chunks at the sizes the

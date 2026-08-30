@@ -99,7 +99,9 @@ func nearFullMoonUp(t *testing.T) (time.GoTime, angle.Angle) {
 	)
 
 	for step := range 30 * 24 {
-		when := start.Add(time.Hour * time.Duration(step)) //nolint:durationcheck // step is a count of hours, not a duration
+		// step is a count of hours, not a duration, so the multiplication is
+		// a scaling and not a duration times a duration.
+		when := start.Add(time.Hour * time.Duration(step))
 		at := time.FromGo(when)
 
 		phase, err := magnitude.PhaseAngle(provider, eph.Moon, at)

@@ -3,12 +3,13 @@ package remote
 import (
 	"bytes"
 	"context"
-	"github.com/TuSKan/astrogo/time"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"strings"
 	"testing"
+
+	"github.com/TuSKan/astrogo/time"
 )
 
 // A KindFile endpoint's URL is a bucket root, and the caller's name

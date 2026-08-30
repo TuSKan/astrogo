@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/TuSKan/astrogo/time"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -12,6 +11,8 @@ import (
 	"runtime/debug"
 	"strings"
 	"sync"
+
+	"github.com/TuSKan/astrogo/time"
 )
 
 // SchemaVersion is the version of the result document written by [Suite].

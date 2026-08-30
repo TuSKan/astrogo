@@ -330,7 +330,9 @@ func table2Epochs(
 		var dark []time.GoTime
 
 		for step := range 48 {
-			when := day.Add(time.Duration(step*30) * time.Minute) //nolint:durationcheck // step*30 is a count of minutes, not a duration
+			// step*30 is a count of minutes, not a duration, so the
+			// multiplication is a scaling and not a duration times a duration.
+			when := day.Add(time.Duration(step*30) * time.Minute)
 
 			cc := coord.NewContext(time.FromGo(when), site, atm.Refraction())
 
