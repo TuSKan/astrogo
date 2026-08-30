@@ -219,6 +219,7 @@ func TestDownloadableEndpointsAreExactlyTheExpectedSet(t *testing.T) {
 		IERSFinals2000A:       true,
 		NAIFSPK:               true,
 		NAIFLSK:               true,
+		NAIFPCK:               true,
 		OpenNGC:               true,
 		JPLHorizonsSPK:        true,
 		WorldAtlas:            true,
