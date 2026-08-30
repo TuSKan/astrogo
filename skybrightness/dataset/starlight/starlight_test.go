@@ -284,9 +284,8 @@ func BenchmarkRadianceAt(b *testing.B) {
 	lon, lat := angle.Deg(123.4), angle.Deg(-42.1)
 
 	b.ReportAllocs()
-	b.ResetTimer()
 
-	for range b.N {
+	for b.Loop() {
 		if _, err := m.RadianceAt("V", lon, lat); err != nil {
 			b.Fatal(err)
 		}

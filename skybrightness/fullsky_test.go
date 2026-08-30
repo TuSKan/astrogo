@@ -418,9 +418,8 @@ func BenchmarkFullSkyEstimate(b *testing.B) {
 	}
 
 	b.ReportAllocs()
-	b.ResetTimer()
 
-	for range b.N {
+	for b.Loop() {
 		if _, err := model.Estimate(context.Background(), q); err != nil {
 			b.Fatal(err)
 		}

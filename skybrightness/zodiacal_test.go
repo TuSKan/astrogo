@@ -408,9 +408,8 @@ func BenchmarkZodiacalLight(b *testing.B) {
 	}
 
 	b.ReportAllocs()
-	b.ResetTimer()
 
-	for range b.N {
+	for b.Loop() {
 		if _, err := skybrightness.ZodiacalRadiance(dst, grid, geom); err != nil {
 			b.Fatal(err)
 		}

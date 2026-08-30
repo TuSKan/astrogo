@@ -62,7 +62,6 @@ func BenchmarkPresetSkyMap(b *testing.B) {
 			}
 
 			b.ReportMetric(float64(len(points)), "directions")
-			b.ResetTimer()
 
 			for b.Loop() {
 				if _, err := model.SkyMap(b.Context(), q, rings); err != nil {

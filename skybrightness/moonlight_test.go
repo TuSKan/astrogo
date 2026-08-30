@@ -554,9 +554,8 @@ func BenchmarkScatteredMoonlight(b *testing.B) {
 	}
 
 	b.ReportAllocs()
-	b.ResetTimer()
 
-	for range b.N {
+	for b.Loop() {
 		if _, err := component.AddRadiance(context.Background(), dst, grid, dir, scene); err != nil {
 			b.Fatal(err)
 		}

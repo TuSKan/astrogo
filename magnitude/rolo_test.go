@@ -443,9 +443,8 @@ func BenchmarkROLOReflectance(b *testing.B) {
 	geom := magnitude.ROLOGeometry{PhaseAngle: angle.Deg(30), SolarLongitude: angle.Deg(-30)}
 
 	b.ReportAllocs()
-	b.ResetTimer()
 
-	for range b.N {
+	for b.Loop() {
 		if err := magnitude.ROLOReflectance(dst, geom); err != nil {
 			b.Fatal(err)
 		}

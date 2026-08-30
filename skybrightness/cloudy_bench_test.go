@@ -22,9 +22,8 @@ func benchCloudy(b *testing.B, c skybrightness.Component, scene *skybrightness.S
 	dir := coord.NewAltAz(angle.Deg(60), angle.Deg(0))
 
 	b.ReportAllocs()
-	b.ResetTimer()
 
-	for range b.N {
+	for b.Loop() {
 		clear(dst)
 
 		if _, err := c.AddRadiance(b.Context(), dst, grid, dir, scene); err != nil {

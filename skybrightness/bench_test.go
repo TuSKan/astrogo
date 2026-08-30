@@ -73,9 +73,8 @@ func BenchmarkEstimateSingleDirection(b *testing.B) {
 	}
 
 	b.ReportAllocs()
-	b.ResetTimer()
 
-	for range b.N {
+	for b.Loop() {
 		if _, err := m.Estimate(context.Background(), q); err != nil {
 			b.Fatalf("Estimate: %v", err)
 		}
@@ -87,9 +86,8 @@ func BenchmarkEstimate100Directions(b *testing.B) {
 	scene := benchScene(b)
 
 	b.ReportAllocs()
-	b.ResetTimer()
 
-	for range b.N {
+	for b.Loop() {
 		for d := range 100 {
 			q := skybrightness.Query{
 				Scene:     scene,
@@ -108,9 +106,8 @@ func BenchmarkSkyMapFullSky(b *testing.B) {
 	q := skybrightness.Query{Scene: benchScene(b)}
 
 	b.ReportAllocs()
-	b.ResetTimer()
 
-	for range b.N {
+	for b.Loop() {
 		if _, err := m.SkyMap(context.Background(), q, 18); err != nil {
 			b.Fatalf("SkyMap: %v", err)
 		}
@@ -144,9 +141,8 @@ func BenchmarkEstimateSpectralResolution(b *testing.B) {
 			}
 
 			b.ReportAllocs()
-			b.ResetTimer()
 
-			for range b.N {
+			for b.Loop() {
 				if _, err := m.Estimate(context.Background(), q); err != nil {
 					b.Fatalf("Estimate: %v", err)
 				}
@@ -188,9 +184,8 @@ func BenchmarkInstrumentProjection(b *testing.B) {
 
 	b.Run("surface-brightness", func(b *testing.B) {
 		b.ReportAllocs()
-		b.ResetTimer()
 
-		for range b.N {
+		for b.Loop() {
 			if _, err := est.SurfaceBrightness(band, magnitude.AB); err != nil {
 				b.Fatalf("SurfaceBrightness: %v", err)
 			}
@@ -199,9 +194,8 @@ func BenchmarkInstrumentProjection(b *testing.B) {
 
 	b.Run("electron-rate", func(b *testing.B) {
 		b.ReportAllocs()
-		b.ResetTimer()
 
-		for range b.N {
+		for b.Loop() {
 			if _, err := est.ElectronRate(inst); err != nil {
 				b.Fatalf("ElectronRate: %v", err)
 			}

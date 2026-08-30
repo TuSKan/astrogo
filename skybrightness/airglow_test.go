@@ -281,9 +281,8 @@ func BenchmarkAirglow(b *testing.B) {
 	dst := skybrightness.NewSpectralRadiance(grid)
 
 	b.ReportAllocs()
-	b.ResetTimer()
 
-	for range b.N {
+	for b.Loop() {
 		if _, err := skybrightness.AirglowRadiance(dst, grid, zenith, angle.Deg(45), 0); err != nil {
 			b.Fatal(err)
 		}
