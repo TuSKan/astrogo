@@ -54,6 +54,25 @@ jobs:
         if: matrix.os != 'ubuntu-latest'
         run: go test -v ./...
 
+      # The default `go test ./...` never compiles a file behind a build
+      # tag, and neither does golangci-lint below, which runs untagged. So
+      # 59 test files — 34 network, 17 validation, 8 integration — are only
+      # ever built by the weekly Validation workflow — off the pull-request
+      # path by design, because those suites query other people's services.
+      #
+      # The consequence is that a tagged file that does not compile reaches
+      # main green. It has happened: #75 rewrote an import in
+      # ephemeris/kepler/validation_test.go and left two references to the old
+      # alias behind, so `go vet -tags=network` did not build that package on
+      # main until #78 rebased onto it and noticed.
+      #
+      # vet type-checks those files without running any of them, so this costs
+      # seconds and makes no external request. It is the compile check, not a
+      # substitute for running the suites.
+      - name: Vet build-tagged files
+        if: matrix.os == 'ubuntu-latest'
+        run: go vet -tags="integration,network,validation" ./...
+
       - name: Run golangci-lint
         if: matrix.os == 'ubuntu-latest'
         uses: golangci/golangci-lint-action@v9
