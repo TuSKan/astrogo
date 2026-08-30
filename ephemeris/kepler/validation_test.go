@@ -95,11 +95,11 @@ func horizonsGet(params url.Values) (string, error) {
 //
 // A Julian Date has no calendar and therefore no scale to lose: JD2461041.5
 // with TIME_TYPE='TDB' means what it says.
-func horizonsEpoch(at atime.Time) string {
+func horizonsEpoch(at time.Time) string {
 	return fmt.Sprintf("'JD%.9f'", at.JD())
 }
 
-func fetchHelioElements(designation string, at atime.Time) (epochJD float64, el kepler.Elements, err error) {
+func fetchHelioElements(designation string, at time.Time) (epochJD float64, el kepler.Elements, err error) {
 	params := url.Values{}
 	params.Add("format", "text")
 	params.Add("COMMAND", fmt.Sprintf("'%s'", designation))

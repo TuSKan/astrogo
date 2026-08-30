@@ -17,7 +17,7 @@ import (
 	"github.com/TuSKan/astrogo/ephemeris/kepler"
 	"github.com/TuSKan/astrogo/internal/metrology"
 	"github.com/TuSKan/astrogo/internal/testutil"
-	atime "github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/vector"
 )
 
@@ -203,7 +203,7 @@ func TestKeplerSmallBodyAgainstSPK(t *testing.T) {
 
 // smallBodyElements resolves one body's published osculating elements.
 func smallBodyElements(t *testing.T, provider *sbdb.Provider, body smallBody) (
-	kepler.Elements, atime.Time, bool,
+	kepler.Elements, time.Time, bool,
 ) {
 	t.Helper()
 
@@ -211,13 +211,13 @@ func smallBodyElements(t *testing.T, provider *sbdb.Provider, body smallBody) (
 	if !ok {
 		t.Skipf("SBDB did not resolve %d (%s)", body.id, body.name)
 
-		return kepler.Elements{}, atime.Time{}, false
+		return kepler.Elements{}, time.Time{}, false
 	}
 
 	if !target.HasElements {
 		t.Skipf("SBDB returned no elements for %s", body.name)
 
-		return kepler.Elements{}, atime.Time{}, false
+		return kepler.Elements{}, time.Time{}, false
 	}
 
 	el, err := kepler.NewElements(target.Epoch, target.SemiMajorAxis, target.Eccentricity,
@@ -225,7 +225,7 @@ func smallBodyElements(t *testing.T, provider *sbdb.Provider, body smallBody) (
 	if err != nil {
 		t.Errorf("%s: NewElements from SBDB: %v", body.name, err)
 
-		return kepler.Elements{}, atime.Time{}, false
+		return kepler.Elements{}, time.Time{}, false
 	}
 
 	return el, target.Epoch, true
