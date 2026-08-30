@@ -5,23 +5,23 @@ import (
 	"testing"
 
 	"github.com/TuSKan/astrogo/internal/metrology"
-	atime "github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/time"
 )
 
 // scaleName pairs a scale with its converter, so the matrix below can be
 // written as a loop rather than as twenty-five hand-written cases.
 type scaleName struct {
 	name string
-	to   func(atime.Time) atime.Time
+	to   func(time.Time) time.Time
 }
 
 func allScales() []scaleName {
 	return []scaleName{
-		{"UTC", atime.Time.UTC},
-		{"TAI", atime.Time.TAI},
-		{"TT", atime.Time.TT},
-		{"TDB", atime.Time.TDB},
-		{"UT1", func(t atime.Time) atime.Time {
+		{"UTC", time.Time.UTC},
+		{"TAI", time.Time.TAI},
+		{"TT", time.Time.TT},
+		{"TDB", time.Time.TDB},
+		{"UT1", func(t time.Time) time.Time {
 			// UT1 needs Earth-orientation data and reports when it cannot
 			// get it; the fallback is what every other caller in the module
 			// gets, so the matrix uses it too rather than skipping the scale.
@@ -39,7 +39,7 @@ func allScales() []scaleName {
 // is in the list.
 type matrixEpoch struct {
 	name string
-	t    atime.Time
+	t    time.Time
 	why  string
 
 	// preUTC marks an epoch before 1972, where UTC is not related to atomic
@@ -56,29 +56,29 @@ type matrixEpoch struct {
 // everywhere between them and wrong at every one.
 func matrixEpochs() []matrixEpoch {
 	return []matrixEpoch{
-		{"2017 leap second, before", atime.Date(2016, 12, 31, 23, 59, 0, 0, atime.LocationUTC),
+		{"2017 leap second, before", time.Date(2016, 12, 31, 23, 59, 0, 0, time.LocationUTC),
 			"the last leap second inserted, and the one ephemeris/jpl/lsk silently dropped", false},
-		{"2017 leap second, after", atime.Date(2017, 1, 1, 0, 1, 0, 0, atime.LocationUTC),
+		{"2017 leap second, after", time.Date(2017, 1, 1, 0, 1, 0, 0, time.LocationUTC),
 			"the other side of the same insertion", false},
-		{"2015 leap second", atime.Date(2015, 7, 1, 0, 0, 30, 0, atime.LocationUTC),
+		{"2015 leap second", time.Date(2015, 7, 1, 0, 0, 30, 0, time.LocationUTC),
 			"an earlier insertion, so the table is exercised at more than its last row", false},
-		{"1972 UTC epoch", atime.Date(1972, 1, 1, 0, 0, 1, 0, atime.LocationUTC),
+		{"1972 UTC epoch", time.Date(1972, 1, 1, 0, 0, 1, 0, time.LocationUTC),
 			"leap seconds begin here; the Delta-T path hands over to Delta-AT", true},
-		{"1971, drift era", atime.Date(1971, 6, 15, 12, 0, 0, 0, atime.LocationUTC),
+		{"1971, drift era", time.Date(1971, 6, 15, 12, 0, 0, 0, time.LocationUTC),
 			"UTC ran at a rubber rate before 1972, so Delta-AT is not integral", true},
-		{"1960, pre-Delta-AT", atime.Date(1960, 1, 1, 0, 0, 0, 0, atime.LocationUTC),
+		{"1960, pre-Delta-AT", time.Date(1960, 1, 1, 0, 0, 0, 0, time.LocationUTC),
 			"SOFA's Dat begins here; before it there is no Delta-AT at all", true},
-		{"J2000", atime.FromJD(2451545.0, atime.TDB),
+		{"J2000", time.FromJD(2451545.0, time.TDB),
 			"the origin every reduction in the library is expressed against", false},
-		{"1900", atime.Date(1900, 1, 1, 0, 0, 0, 0, atime.LocationUTC),
+		{"1900", time.Date(1900, 1, 1, 0, 0, 0, 0, time.LocationUTC),
 			"a century before J2000, well inside the Delta-T polynomial", true},
-		{"1600", atime.Date(1600, 6, 15, 12, 0, 0, 0, atime.LocationUTC),
+		{"1600", time.Date(1600, 6, 15, 12, 0, 0, 0, time.LocationUTC),
 			"historical; Delta-T is about two minutes and the two directions used to disagree by all of it", true},
-		{"AD 33", atime.Date(33, 4, 3, 15, 0, 0, 0, atime.LocationUTC),
+		{"AD 33", time.Date(33, 4, 3, 15, 0, 0, 0, time.LocationUTC),
 			"the era the historical showcases compute in, where Delta-T is hours", true},
-		{"present era", atime.Date(2026, 8, 29, 6, 30, 0, 0, atime.LocationUTC),
+		{"present era", time.Date(2026, 8, 29, 6, 30, 0, 0, time.LocationUTC),
 			"an ordinary modern date with no special property", false},
-		{"2100", atime.Date(2100, 1, 1, 0, 0, 0, 0, atime.LocationUTC),
+		{"2100", time.Date(2100, 1, 1, 0, 0, 0, 0, time.LocationUTC),
 			"past the end of measured Earth-orientation data", false},
 	}
 }
@@ -243,8 +243,8 @@ func TestToGoIsOneInstantWhateverTheScale(t *testing.T) {
 func TestApplyDeltaTReturnsTT(t *testing.T) {
 	t.Parallel()
 
-	got := atime.Date(1600, 6, 15, 12, 0, 0, 0, atime.LocationUTC).ApplyDeltaT()
-	if got.Scale() != atime.TT {
+	got := time.Date(1600, 6, 15, 12, 0, 0, 0, time.LocationUTC).ApplyDeltaT()
+	if got.Scale() != time.TT {
 		t.Errorf("ApplyDeltaT().Scale() = %v, want TT — which is what its own doc comment says",
 			got.Scale())
 	}

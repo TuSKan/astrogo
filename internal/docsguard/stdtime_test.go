@@ -70,16 +70,21 @@ func TestNoStandardLibraryTimeOutsideTimePackage(t *testing.T) {
 			return nil
 		}
 
-		// astrogo/time is the one package allowed to import it — that is
-		// the whole point of the rule.
 		rel, rerr := filepath.Rel(root, path)
 		if rerr != nil {
 			return nil //nolint:nilerr // an unrelatable path is skipped, not fatal
 		}
 
-		if slash := filepath.ToSlash(rel); slash == "time" || strings.HasPrefix(slash, "time/") {
-			return nil
-		}
+		// astrogo/time is the one package allowed to import the standard
+		// library's time — that is the whole point of the rule. It gets no
+		// exemption from the *alias* rule below, though: its own external
+		// tests are `package time_test` and can import it unaliased like
+		// anyone else, and five of them did not. Four carried `atime` and one
+		// carried `astrotime` beside a `gotime`, so the package that exists
+		// to end the two-spellings-of-time problem was the last place still
+		// having it.
+		slash := filepath.ToSlash(rel)
+		inTimePackage := slash == "time" || strings.HasPrefix(slash, "time/")
 
 		src, rerr := os.ReadFile(path)
 		if rerr != nil {
@@ -90,7 +95,7 @@ func TestNoStandardLibraryTimeOutsideTimePackage(t *testing.T) {
 
 		body := string(src)
 
-		if loc := stdTimeImport.FindStringIndex(body); loc != nil {
+		if loc := stdTimeImport.FindStringIndex(body); loc != nil && !inTimePackage {
 			offenders++
 
 			t.Errorf("%s:%d: imports the standard library's time.\n"+
