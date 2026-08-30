@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.18.0] — 2026-08-30
+
+### Added
+- **`internal/docsguard` now checks roadmap checkboxes against the code**, in both directions: an unchecked box whose symbol is already declared, and a tick whose symbol has been deleted, both fail the build. It found `resolve.Target.HasRadialVelocity` sitting unchecked while being declared, populated by `catalog/simbad`, preserved through the multi-provider merge and consumed by `plan` — finished work left looking open, which sends the next contributor to build it twice. (#70)
+- **`constants.DE440` — the JPL ephemeris mass parameters**, the first of the five pieces roadmap item 39 needs for central-body propagation of planetary moons. IAU 2015 B3 publishes nominal mass parameters for only the Sun, Earth and Jupiter, so anything needing Mars or Uranus had nowhere to look. Each planet appears twice, system and body: using one where the other belongs is a silent error the size of the satellite system, which for Pluto and Charon is 12%. Every value is checked against NAIF's own kernel by a network test rather than trusted to transcription. Adds `remote.NAIFPCK`. (#71)
+- **Central-body two-body propagation in `ephemeris/kepler`.** `Elements.WithCentralBody` refers an element set to a planet instead of the Sun, `CentralBodyFor` supplies the parent's *body* mass parameter so the 12%-wrong system value cannot be picked by mistake, and the provider composes a satellite through its parent. Verified against Kepler's third law — 421,800 km about Jupiter gives 1.7699 days, Io's sidereal period, from a distance and a mass parameter alone. This is the machinery and the constants, not a satellite ephemeris: Laplace-plane frames and J₂ precession are still open. (#72)
+- **`kepler.LaplacePlane` — the reference plane published satellite mean elements actually use.** `Elements.WithLaplacePlane` reads the angles against the tabulated pole instead of the J2000 ecliptic; without it Io lands 16,500 km from where it belongs — 4% of its orbital radius, 5 arcsec from Earth against a 1.2 arcsec disc — with the period still correct. Measured against Horizons, the remaining two-body drift is at most 5,900 km over ten days, and it is concentrated in Io and Europa: their periods are off by 0.41% and 0.76% while Ganymede's and Callisto's agree to one part in 100,000. (#73)
+- **Planetary-satellite propagation is complete.** `kepler.PlutoElements` lets the default base answer Pluto, so a Charon orbit can be placed at all — before, it failed at the parent rather than the satellite. `Elements.WithPeriod` and `kepler.SecularPrecession` apply the published anomalistic period and apsidal precession as a pair, recovering the sidereal period (Io: 1.769137 d, from the table's own columns) and cutting the six-month error against Horizons from 125,000 km to 74,000. Applied singly, either is an order of magnitude worse than neither; the tabulated *node* rate is measured and deliberately not applied. (#74)
+- **Measured accuracy for every offline ephemeris.** New metrology suites put SOFA's seven planets and all three Kepler paths — Pluto, small bodies and the Galilean satellites — against DE440 and Horizons-generated SPK kernels, and the Sun and Moon rows grow from 3 samples to 516. (#78)
+
+### Changed
+- **`astrogo/time` is now the module's only import of the standard library's `time`.** A guard test enforces it, and `time` gained `GoTime`, `GoDate`, `LocationUTC`, `Now`, the sub-second units and the timer constructors so no call site has to reach past it. (#75)
+- **Benchmarks use `testing.B.Loop` instead of `b.N`.** 19 loops across 15 files, and the 20 now-dead `b.ResetTimer()` calls that preceded them — `b.Loop` resets the timer on its first call. (#76)
+- **`ephemeris.Default()` now documents what it is worth, per body.** The package doc and README carry the measured per-body accuracy against DE440 beside each body's apparent diameter, and say plainly that it is a planning-grade provider — with Pluto called out as roughly thirty times worse than the worst planet. (#78)
+
+### Fixed
+- **Corrects a documented claim that was backwards.** #71 and #72 said the *system* mass parameter was "wrong by 12% at Pluto" for a satellite orbit. Two-body relative motion is governed by G(M_primary + M_satellite), and Charon is 12% of Pluto — so the system value is the right one there. Charon's published 6.3872-day period comes out at 6.3871 with it and 6.7648 with Pluto's own. (#74)
+- **A validation test was passing because of a bug, and started failing when the bug was fixed.** It rendered a TDB epoch with `Time.Format`, which since #50 correctly produces the *UTC* calendar string, then told Horizons to read it as TDB — a 69.18-second shift, applied to both the elements and the vectors compared against them. Eros's divergence read 4.1 arcsec against a 2.0 tolerance; sending the epoch as a Julian Date restores the 0.04-to-0.56 arcsec the test's own comment describes. (#74)
+- **`catalog/sbdb` returned orbital elements rounded to three significant figures.** SBDB rounds unless asked not to, so Eros resolved with a = 1.46 rather than 1.458243716; two-body propagation from those elements was 690,000 km out at their own epoch of osculation, where they are exact by construction. (#78)
+
 ## [0.17.0] — 2026-08-29
 
 ### Added
@@ -989,7 +1009,8 @@ First observatory-grade release. Validated against USNO, JPL Horizons, and NASA 
 - `VisibleIntervals` creates independent Contexts per grid step (correct; each step is a different epoch)
 - IERS EOP data fetched via `go:generate`, not at runtime
 
-[Unreleased]: https://github.com/TuSKan/astrogo/compare/v0.17.0...HEAD
+[Unreleased]: https://github.com/TuSKan/astrogo/compare/v0.18.0...HEAD
+[0.18.0]: https://github.com/TuSKan/astrogo/compare/v0.17.0...v0.18.0
 [0.17.0]: https://github.com/TuSKan/astrogo/compare/v0.16.0...v0.17.0
 [0.16.0]: https://github.com/TuSKan/astrogo/compare/v0.15.1...v0.16.0
 [0.15.1]: https://github.com/TuSKan/astrogo/compare/v0.15.0...v0.15.1
