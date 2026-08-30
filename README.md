@@ -755,9 +755,36 @@ happens.
 | VIIRS annual nighttime-lights composite (2012-2025, no API key) | `remote.VIIRSAnnual` | ~700 MB-1 GB per year | `viirs.Open(ctx, year)`, for the spatial distribution of artificial emission — CC0, credit lightpollutionmap.info + NASA Black Marble |
 | CAMS global reanalysis NetCDF files (Copernicus EODATA S3) | `remote.CopernicusEODATA` | 1.3 MB (lnsp) – ~180 MB (a 137-level aerosol tracer) | `atmosphere/dataset/cams.Open` — requires Copernicus Data Space S3 credentials (AWS SDK default chain) and a blank import of `remote/s3` |
 
-For an accuracy/offline tradeoff comparison across `ephemeris.Default()` and the
-JPL kernels above, see the [`ephemeris` package doc](ephemeris/doc.go)'s
-"Choosing a Provider" section.
+### What you give up by staying offline
+
+`ephemeris.Default()` needs no kernel and no network, and it is a **planning-grade**
+provider — not an astrometric one. Measured against DE440, quarterly over 1972–2100
+(516 samples per body), worst case:
+
+| | Sun | Mercury | Venus | Moon | Neptune | Mars | Jupiter | Uranus | Saturn | Pluto |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| worst | 0.013″ | 1.5″ | 10.2″ | 10.2″ | 10.7″ | 53.8″ | 52.7″ | 71.9″ | 88.6″ | **197″** |
+| its disc | 1920″ | 5–13″ | 10–66″ | 1865″ | 2.3″ | 4–25″ | 40″ | 3.5″ | 18″ | 0.1″ |
+
+Compare the two rows. Saturn's worst case is five times its own apparent diameter and
+Uranus's is twenty times, so `Default()` will not reliably put a planet inside a narrow
+field. For visibility and scheduling — rise/set, altitude, airmass, twilight, Moon
+separation — it makes no difference at all: 90″ shifts a rise time by about six seconds.
+
+Reach for a JPL kernel (33 mm against Horizons) for astrometry, occultation timing,
+photometric aperture placement, or anything that must land inside a slit.
+
+**Pluto is the outlier**, ~30× worse than the worst planet: SOFA has no Pluto model, so
+it is two-body propagation of Standish elements. At 3′ it gives you the constellation,
+not the object.
+
+Small bodies propagated from published osculating elements hold roughly 1–4″ over a
+month either side of the elements' epoch, degrading as t² beyond that.
+
+Every figure above is generated from the `ephemeris.sofa.*` and `ephemeris.kepler.*`
+suites — see [docs/VALIDATION.md](docs/VALIDATION.md) for the full distributions, the
+contract each is held to, and the commit each was last verified at. The
+[`ephemeris` package doc](ephemeris/doc.go) carries the same table with the reasoning.
 
 Both IERS and OpenNGC skip the download entirely when the upstream content hasn't
 changed since the last fetch — the source ETag recorded at cache time is compared
