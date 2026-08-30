@@ -5,6 +5,7 @@ First off, thank you for considering contributing to `astrogo`! 🌌
 As a high-performance astronomy and observation-planning toolkit, `astrogo` places a high priority on **numerical correctness**, **performance (low allocations)**, and **clean package boundaries**.
 
 Contributions are extremely welcome, particularly in:
+
 - Numerical validation of algorithms
 - Reference comparisons (e.g., cross-checking accuracy against Astropy or JPL Horizons)
 - Performance and allocation-free path improvements
@@ -24,6 +25,7 @@ By participating in this project, you agree to abide by our [Code of Conduct](./
 ## Development Workflow
 
 ### 1. Build and Test
+
 ```bash
 # Get dependencies
 go mod tidy
@@ -36,6 +38,7 @@ go test -race ./...
 ```
 
 ### 2. Linting
+
 We mandate `golangci-lint` to maintain our code quality. **Run it twice** —
 CI lints with no build tags, so a helper used only from a `network`- or
 `validation`-tagged file reads there as a symbol with no consumers, and the
@@ -50,6 +53,7 @@ golangci-lint run --build-tags="integration,network,validation"
 ## Architectural Guidelines
 
 When submitting code, please ensure your architectural choices match the project's design goals:
+
 - **No cyclic dependencies**: We enforce strict, clean unidirectional imports.
 - **Explicit data models**: Use Go structures over magic mappings or empty interfaces.
 - **No hidden state**: Avoid package-level variables and `init()` side effects. Do not introduce implicit unit conversions.
@@ -59,6 +63,7 @@ When submitting code, please ensure your architectural choices match the project
 ## Testing Philosophy
 
 Astronomical calculations require strict numerical tolerances:
+
 - **No silent assumptions**: Fail early instead of silently continuing with partial or ambiguous data.
 - **Explicit tolerances**: Floating-point comparisons must be tested with explicit delta tolerances.
 - **Test edge cases rigorously**: Be sure to consider behavior near poles, the horizon, angle wrapping (0 -> 360), epoch boundaries, and circumpolar/never-rising targets.

@@ -36,6 +36,11 @@ type Elements struct {
 	// means the Sun, so an Elements built by NewElements and never given a
 	// central body behaves exactly as it did before one existed.
 	central CentralBody
+
+	// plane is the reference plane the angles are measured in. Nil means
+	// the J2000 ecliptic, which is what heliocentric elements use and what
+	// this package read before satellites needed anything else.
+	plane *LaplacePlane
 }
 
 // CentralBody is the body an element set orbits, and the mass parameter
@@ -64,6 +69,54 @@ type CentralBody struct {
 //
 //nolint:gochecknoglobals // the default central body, read-only
 var sunCentre = CentralBody{ID: core.Sun, GM: constants.IAU.SunGravitationalParameter.Value}
+
+// LaplacePlane is the reference plane a satellite's published mean elements
+// are referred to, named by the direction of its pole.
+//
+// It is not the ecliptic and not the planet's equator. It is the plane a
+// satellite's orbit precesses about — for a close satellite, forced by the
+// planet's oblateness towards the equator, and for a distant one by the Sun
+// towards the planet's orbital plane. JPL tabulates its pole per satellite,
+// alongside the elements, precisely because it differs from both and from
+// one satellite to the next: at Jupiter it runs from (268.1°, 64.5°) for Io
+// to (268.7°, 64.8°) for Callisto.
+//
+// Elements referred to such a plane and read as though they were ecliptic
+// elements produce the right orbit in the wrong plane. At Jupiter the two are
+// only about 2.2° apart — the planet's obliquity is 3.1°, so they cannot be
+// far — and that is still enough to move Io by 16,500 km, four percent of its
+// orbital radius and about 5 arcseconds seen from Earth, which is four times
+// its own apparent diameter. Nothing about the resulting position looks
+// wrong.
+type LaplacePlane struct {
+	// RA and Dec are the pole's right ascension and declination in the
+	// ICRF equatorial frame, as JPL's satellite mean-element tables give
+	// them.
+	RA, Dec angle.Angle
+}
+
+// Pole returns the plane's pole as a unit vector in the ICRF equatorial
+// frame.
+func (lp LaplacePlane) Pole() vector.Vec3 {
+	cd, sd := math.Cos(lp.Dec.Radians()), math.Sin(lp.Dec.Radians())
+	ca, sa := math.Cos(lp.RA.Radians()), math.Sin(lp.RA.Radians())
+
+	return vector.V3(cd*ca, cd*sa, sd)
+}
+
+// rotateToICRF turns a vector in the Laplace plane's own frame into the ICRF
+// equatorial frame.
+//
+// The plane's frame has its z-axis along the pole and its x-axis along the
+// plane's ascending node on the ICRF equator, which sits 90° ahead of the
+// pole in right ascension. That makes the transformation the standard
+// pole-to-frame pair: tilt by the pole's colatitude, then rotate the node
+// into place.
+func (lp LaplacePlane) rotateToICRF(v vector.Vec3) vector.Vec3 {
+	colat := math.Pi/2 - lp.Dec.Radians()
+
+	return v.RotateX(colat).RotateZ(lp.RA.Radians() + math.Pi/2)
+}
 
 // CentralBodyFor returns the central body for a satellite of the given
 // planet, using that planet's own mass parameter from the current JPL
@@ -127,6 +180,35 @@ func (el Elements) CentralBody() CentralBody {
 	}
 
 	return el.central
+}
+
+// WithLaplacePlane returns a copy of el whose angles are read against the
+// given plane rather than the J2000 ecliptic — the form JPL's satellite
+// mean-element tables publish.
+//
+// This is what makes such a table usable. Without it the inclination, node
+// and argument of periapsis are measured against the wrong plane — 2.2° away
+// at Jupiter, which sounds small and puts Io 16,500 km from where it belongs,
+// about 5 arcseconds seen from Earth against an apparent diameter of 1.2.
+//
+// It does not make the result an ephemeris. The elements are still propagated
+// as unperturbed two-body motion, and the same tables publish the node and
+// apsis precession periods that motion ignores — 137 years and 68 years for
+// Ganymede. See this package's doc comment.
+func (el Elements) WithLaplacePlane(plane LaplacePlane) Elements {
+	el.plane = &plane
+
+	return el
+}
+
+// LaplacePlane reports the plane el's angles are measured against, and
+// whether one was set at all. Without one they are ecliptic elements.
+func (el Elements) LaplacePlane() (LaplacePlane, bool) {
+	if el.plane == nil {
+		return LaplacePlane{}, false
+	}
+
+	return *el.plane, true
 }
 
 // WithCentralBody returns a copy of el referred to body instead of the Sun —
@@ -311,8 +393,14 @@ func (el Elements) StateAt(t time.Time) (pos, vel vector.Vec3, err error) {
 	eDot := nRadPerDay / (1 - e*cosE)
 	velPf := vector.V3(-a*sinE*eDot, a*sqrtOneMinusE2*cosE*eDot, 0)
 
-	posEcl := rotatePerifocalToEcliptic(posPf, el.inclination, el.ascendingNode, el.argPeriapsis)
-	velEcl := rotatePerifocalToEcliptic(velPf, el.inclination, el.ascendingNode, el.argPeriapsis)
+	posRef := rotatePerifocalToEcliptic(posPf, el.inclination, el.ascendingNode, el.argPeriapsis)
+	velRef := rotatePerifocalToEcliptic(velPf, el.inclination, el.ascendingNode, el.argPeriapsis)
 
-	return rotateEclipticToEquatorialJ2000(posEcl), rotateEclipticToEquatorialJ2000(velEcl), nil
+	// Both paths end in the ICRF equatorial frame; they differ only in what
+	// the orbit's angles were measured against.
+	if lp := el.plane; lp != nil {
+		return lp.rotateToICRF(posRef), lp.rotateToICRF(velRef), nil
+	}
+
+	return rotateEclipticToEquatorialJ2000(posRef), rotateEclipticToEquatorialJ2000(velRef), nil
 }

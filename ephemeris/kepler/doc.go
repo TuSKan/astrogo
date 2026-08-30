@@ -49,18 +49,31 @@
 // should be believed, and both are real physics rather than plumbing.
 //
 // Published *mean* elements for a satellite are referred to a **Laplace
-// plane** whose pole is tabulated per satellite and precesses, not to the
-// J2000 ecliptic this package reads. Feeding such a set through unmodified
-// propagates the right orbit in the wrong plane, and the error does not
-// announce itself: the period is correct and the position is not.
+// plane** whose pole is tabulated per satellite, not to the J2000 ecliptic.
+// [Elements.WithLaplacePlane] handles that; without it the angles are read
+// against the wrong plane and, at Jupiter, put Io 16,500 km from where it
+// belongs while the period stays right.
 //
-// And two-body motion diverges quickly for the satellites most people want.
-// The Galilean moons are locked in the Laplace resonance and Jupiter's J₂
-// drives apsidal precession, so an unperturbed ellipse drifts measurably
-// within weeks.
+// What remains unmodelled is the perturbation. The Galilean moons are locked
+// in the Laplace resonance and Jupiter's J₂ drives apsidal precession, so an
+// unperturbed ellipse drifts — measured against Horizons over ten days from
+// the elements' own epoch, by **up to 5,900 km** across the four Galilean
+// satellites, with a median of 2,700 km. That is roughly one percent of Io's
+// orbital radius and grows with the span.
 //
-// What is here is therefore the correct machinery and the correct constants,
-// not a satellite ephemeris. For real satellite positions use a kernel-backed
-// provider ([github.com/TuSKan/astrogo/ephemeris.NewProvider] with
-// [github.com/TuSKan/astrogo/ephemeris.Moons]).
+// The drift is not spread evenly, which is worth knowing before trusting any
+// one satellite. Comparing the two-body period against the published one:
+// Io is off by 0.41% and Europa by 0.76%, while Ganymede and Callisto agree
+// to about one part in 100,000. The inner two are the closest to Jupiter and
+// the deepest in the resonance, and they carry almost all of the error.
+//
+// The tabulated node and apsis precession periods say what is missing:
+// 30 years for Europa's node and 138 for Ganymede's, none of which this
+// package applies.
+//
+// So what is here is the correct machinery, the correct constants and the
+// correct frame — not a satellite ephemeris. Kilometre accuracy needs a
+// kernel-backed provider ([github.com/TuSKan/astrogo/ephemeris.NewProvider]
+// with [github.com/TuSKan/astrogo/ephemeris.Moons]); this is for a finder
+// chart, not an occultation prediction.
 package kepler
