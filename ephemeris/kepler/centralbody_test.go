@@ -599,3 +599,84 @@ func TestSatelliteFailureNamesItsParent(t *testing.T) {
 		t.Errorf("error %q names neither the role nor the parent body", msg)
 	}
 }
+
+// TestCharonNeedsTheSystemParameter is the counter-case
+// [TestCentralBodyForReturnsTheBodyParameter] points at, and the reason this
+// package documents a choice rather than a rule.
+//
+// # Why it exists
+//
+// Because the repository shipped the opposite claim twice. #71 and #72 both
+// stated that the system mass parameter is "wrong by 12% at Pluto" for a
+// satellite orbit. That is backwards. Two-body relative motion is governed by
+// G(M_primary + M_satellite), and Charon is 12% of Pluto — so for Charon the
+// system value, which adds the satellites back, is very nearly exact, and the
+// body value is the one that is wrong.
+//
+// #74 corrected the prose in kepler and constants and cited a test by this
+// name. The test was never written, so the corrected claim sat in three doc
+// comments with nothing checking it — which is how it came to be stated
+// backwards twice in the first place.
+//
+// # What it measures
+//
+// Charon's published sidereal period, 6.3872 days, against the period a
+// two-body propagation gives under each parameter. The two published values
+// bracket it, which is the whole point: neither is "the" right one, and which
+// is closer depends on how heavy the satellite is.
+func TestCharonNeedsTheSystemParameter(t *testing.T) {
+	// Charon's orbit about Pluto: a = 19,595.764 km, and the mutual orbit is
+	// very nearly circular. JPL satellite mean elements, plu058.
+	const (
+		charonAxisKM       = 19_595.764
+		charonPeriodDays   = 6.3872
+		secondsPerDay      = 86_400.0
+		charonEccentricity = 0.0002
+	)
+
+	period := func(gm float64) float64 {
+		a := charonAxisKM * 1e3
+
+		return 2 * math.Pi * math.Sqrt(a*a*a/gm) / secondsPerDay
+	}
+
+	system := period(constants.Ephemeris.PlutoSystemGravitationalParameter.Value)
+	body := period(constants.Ephemeris.PlutoGravitationalParameter.Value)
+
+	t.Logf("Charon at a = %.0f km: system parameter gives %.4f d, body parameter %.4f d, "+
+		"published %.4f d", charonAxisKM, system, body, charonPeriodDays)
+
+	// The system parameter is the one that reproduces the published period.
+	// A tenth of a per cent is far tighter than the gap to the body value and
+	// far looser than the elements' own precision, so this fails on a swapped
+	// constant and not on a refit.
+	if rel := math.Abs(system-charonPeriodDays) / charonPeriodDays; rel > 1e-3 {
+		t.Errorf("the system parameter gives %.4f d against a published %.4f, a relative %.2e; "+
+			"it should reproduce it closely", system, charonPeriodDays, rel)
+	}
+
+	// And the body parameter is not merely less good, it is wrong by a margin
+	// no observer would accept: about 5%, close to nine hours per revolution.
+	relBody := math.Abs(body-charonPeriodDays) / charonPeriodDays
+	if relBody < 0.03 {
+		t.Errorf("the body parameter gives %.4f d, only a relative %.2e from the published "+
+			"%.4f — the two parameters are supposed to bracket it by a wide margin here",
+			body, relBody, charonPeriodDays)
+	}
+
+	// The direction is the claim #71 and #72 got backwards: for Charon the
+	// system value wins. Asserting the ordering, not just the two bounds,
+	// is what makes this test the counter-case it is cited as.
+	if math.Abs(system-charonPeriodDays) >= math.Abs(body-charonPeriodDays) {
+		t.Errorf("the body parameter is at least as close as the system one "+
+			"(%.4f vs %.4f against %.4f); the documented Charon case no longer holds",
+			body, system, charonPeriodDays)
+	}
+
+	// Guard the fixture itself: an eccentricity this small is what lets a
+	// circular-orbit period formula stand in for the real one.
+	if charonEccentricity > 0.01 {
+		t.Fatalf("Charon's eccentricity is quoted as %v; the circular period formula "+
+			"used here needs it near zero", charonEccentricity)
+	}
+}

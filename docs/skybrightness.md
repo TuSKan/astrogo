@@ -294,9 +294,9 @@ imagery.
 
 | Paper | Content | Go function | Validation test |
 | :--- | :--- | :--- | :--- |
-| Eq. 1 | Total scattering phase function `P(g,Θ) = [P_a(g_a,Θ)·ϖ_a·k_a + P_R(Θ)·k_R] / (k_a + k_R)` | `atmosphere.CombinedPhaseFunction` | `TestCombinedPhaseFunctionWeighting`, `TestRayleighPhaseFunctionNormalisation` |
+| Eq. 1 | Total scattering phase function `P(g,Θ) = [P_a(g_a,Θ)·ϖ_a·k_a + P_R(Θ)·k_R] / (k_a + k_R)` | `atmosphere.CombinedPhaseFunction` | `TestCombinedPhaseFunction`, `TestRayleighPhaseFunctionNormalisation` |
 | Eq. 2 | All-sky radiance `L(z,A)` from `L_S`, `P(g,Θ)`, `(1−g)²/(1+g)`, `M(z)`, `M_S`, `t` | `AllSkyRadiance` | `TestKocifaj2022Eq2HorizonLimit`, `…FallsWithDistance`, `…BrightensTowardTheHorizon`, `…SingularityIsSmooth`, `…NearHorizonTurnover` |
-| Eq. 3 | `t = (τ_a/H_a + τ_R/H_R)·D / M_S` for an exponential atmosphere | `OpticalParameterT` | `TestKocifaj2022Eq3ExponentialAtmosphere` |
+| Eq. 3 | `t = (τ_a/H_a + τ_R/H_R)·D / M_S` for an exponential atmosphere | `OpticalParameterT` | `TestKocifaj2022Eq3Structure` |
 | Eq. 4 | `g = c₀ + c₁·g_a + c₂·g_a²` | `AsymmetryParameter` | `TestKocifaj2022Eq4CleanAtmosphereAsymptote`, `…Monotonic` |
 | Eq. 5 | `c₀ = 0.33 + 0.15τ_a`, `c₁ = 0.9τ_a^0.51`, `c₂ = 1.3τ_a^1.85` | `AsymmetryParameter` | `TestKocifaj2022Eq5Coefficients`, `…LeavesPhysicalRange` |
 
@@ -705,7 +705,7 @@ validation.
 | — | `ρ = 0.0148`, giving `(1+3ρ)/(1−ρ) = 1.06` | `atmosphere.RayleighDepolarisation` | `TestRayleighDepolarisationMatchesKS91Coefficient` |
 | Winkler Eq. 10 | `p_M(Θ) = (1−g²)/(4π(1+g²−2g·cosΘ)^{3/2})` (Henyey & Greenstein 1941) | `atmosphere.HenyeyGreensteinPhaseFunction` | `TestHenyeyGreensteinNormalisation`, `…Limits` |
 | Winkler Eq. 12 | `p(Θ) = (τ_R/τ_s)·p_R + (τ_M/τ_s)·p_M` | `atmosphere.CombinedPhaseFunction` | `TestCombinedPhaseFunction` (normalisation plus both pure limits) |
-| Ångström | `τ_a(λ) = τ_a(λ₀)·(λ/λ₀)^−α` | `atmosphere.AerosolOpticalDepth` | `TestAerosolOpticalDepthAngstrom` |
+| Ångström | `τ_a(λ) = τ_a(λ₀)·(λ/λ₀)^−α` | `atmosphere.Aerosol.TauAt` | `TestAerosolTauAtFollowsTheAngstromLaw` |
 
 The `ρ = 0.0148` value is worth noting: it is the depolarisation for which Bucholtz's
 theoretical phase function reproduces the `1.06 + cos²Θ` coefficient Krisciunas & Schaefer
@@ -862,8 +862,9 @@ package read it as V − G and negated it, so the query applied 10^(0.4(V−G)) 
 
 The error is invisible to every internal check. It leaves the map positive, smooth and
 monotonic plane-to-cap; it survived a ±1 mag absolute comparison because it is only 0.53
-mag at solar colour; and the one test that covered the sign, `TestGaiaJohnsonVBrightensRedStars`,
-asserted the inversion as its premise — *"a red star is fainter in G than in V"*, which is
+mag at solar colour; and the one test that covered the sign asserted the inversion as its premise
+(`TestGaiaJohnsonVBrightensRedStars`, since deleted — `TestGaiaGToJohnsonV` now
+covers the same ground with the sign the right way round) — *"a red star is fainter in G than in V"*, which is
 backwards. Gaia's G spans 330–1050 nm against Johnson V's ~500–600 nm, so a star is always
 brighter in G, G − V is negative, and a red star must **lose** flux in V. Because the error
 scales with colour it is worst exactly where the map is brightest: 1.6× at BP−RP = 1.1,
