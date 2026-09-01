@@ -281,11 +281,118 @@ func TestObservedRadialVelocity_RoundTripsWithBarycentricRVCorrection(t *testing
 		for _, target := range targets {
 			rvObserved := ctx.ObservedRadialVelocity(target, rvBarycentric)
 
-			// The defining relation BarycentricRVCorrection documents:
-			// rvBarycentric = rvMeasured + ctx.BarycentricRVCorrection(target).
-			roundTripped := rvObserved + ctx.BarycentricRVCorrection(target)
+			// The two conversions are exact inverses, so this closes to
+			// floating point rather than to a series truncation.
+			roundTripped := ctx.BarycentricRadialVelocity(target, rvObserved)
 
-			testutil.AssertNear(t, "round-tripped barycentric RV", roundTripped, rvBarycentric, 1e-9)
+			testutil.AssertNear(t, "round-tripped barycentric RV", roundTripped, rvBarycentric, 1e-12)
 		}
+	}
+}
+
+// TestBarycentricRadialVelocity_ComposesRedshiftsMultiplicatively checks the
+// conversion against the relation it is derived from, rather than against a
+// restatement of its own arithmetic.
+//
+// A radial velocity is a redshift, and two successive Doppler shifts compose
+// as (1+z) = (1+z1)(1+z2). Writing z = rv/c, the barycentric velocity is
+// therefore c[(1 + rvObserved/c)(1 + corr/c) - 1] exactly. Building the
+// expected value that way — from the product, not from the expanded
+// three-term form the implementation uses — means a sign slip or a dropped
+// term in either expression fails the test.
+//
+// The tolerance is 1e-9 km/s, a micrometre per second, and it is set by the
+// *reference* expression rather than by the code under test. Both velocities
+// are of order 1e-4 c, so the bracket (1+a)(1+b)-1 subtracts two numbers that
+// agree to fifteen digits and c multiplies what survives back up: the product
+// form is good to about 3e-11 km/s and no better. The implementation's
+// expanded form does not perform that subtraction at all, which makes it the
+// more accurate of the two as well as the cheaper. That is why it is written
+// out rather than expressed as the product it comes from.
+func TestBarycentricRadialVelocity_ComposesRedshiftsMultiplicatively(t *testing.T) {
+	site := equatorSite(t)
+	ctx := coord.NewContext(
+		time.Date(2026, time.January, 4, 0, 0, 0, 0, time.LocationUTC), site, noRefraction)
+
+	// Speed of light in km/s, spelled out here so the test does not import
+	// the same constant the implementation does.
+	const c = 299792.458
+
+	targets := []coord.ICRS{
+		coord.NewICRS(angle.Zero(), angle.Zero()),
+		coord.NewICRS(angle.Deg(90), angle.Deg(30)),
+		coord.NewICRS(angle.Deg(200), angle.Deg(-45)),
+	}
+
+	// Spanning a Sun-like star, a thick-disc star and a halo star.
+	for _, rvObserved := range []float64{0, -5.5, 20, 100, -300} {
+		for _, target := range targets {
+			corr := ctx.BarycentricRVCorrection(target)
+			want := c * ((1+rvObserved/c)*(1+corr/c) - 1)
+
+			got := ctx.BarycentricRadialVelocity(target, rvObserved)
+
+			testutil.AssertNear(t, "barycentric RV from the redshift product", got, want, 1e-9)
+		}
+	}
+}
+
+// TestBarycentricRadialVelocity_ExceedsTheAdditiveFormByTheDocumentedAmount
+// measures what the old additive form dropped, because the doc comments now
+// quote those figures and a quoted figure nobody checks is a comment.
+//
+// The gap is rvObserved*corr/c, so it grows with the target's own velocity
+// and vanishes entirely at zero — which is why the 175-case Astropy fixture,
+// whose every target has no radial velocity, could not see this.
+func TestBarycentricRadialVelocity_ExceedsTheAdditiveFormByTheDocumentedAmount(t *testing.T) {
+	site := equatorSite(t)
+
+	// Early January, when Earth is near perihelion and moving fastest, and a
+	// target on the ecliptic at RA 0 — the geometry that maximises the
+	// correction and so the term that scales with it.
+	ctx := coord.NewContext(
+		time.Date(2026, time.January, 4, 0, 0, 0, 0, time.LocationUTC), site, noRefraction)
+	target := coord.NewICRS(angle.Zero(), angle.Zero())
+
+	corr := ctx.BarycentricRVCorrection(target)
+	if math.Abs(corr) < 25 {
+		t.Fatalf("correction is %.3f km/s, expected about 30 near perihelion on the ecliptic; "+
+			"the geometry this test relies on has changed", corr)
+	}
+
+	const c = 299792.458
+
+	cases := []struct {
+		rvObserved float64
+		what       string
+	}{
+		{0, "no radial velocity — the term vanishes, which is the fixture's blind spot"},
+		{-5.5, "Sirius"},
+		{20, "a typical thick-disc star"},
+		{300, "a halo star"},
+	}
+
+	for _, tc := range cases {
+		additive := tc.rvObserved + corr
+		exact := ctx.BarycentricRadialVelocity(target, tc.rvObserved)
+
+		gapMPerS := (exact - additive) * 1e3
+		wantMPerS := tc.rvObserved * corr / c * 1e3
+
+		t.Logf("rv %+7.1f km/s (%s): additive form is off by %+8.2f m/s",
+			tc.rvObserved, tc.what, gapMPerS)
+
+		testutil.AssertNear(t, "gap against the additive form", gapMPerS, wantMPerS, 1e-9)
+	}
+
+	// The claim the doc comments make: at 46.6 km/s the dropped term equals
+	// the 4.66 m/s of relativistic physics this package omits, so beyond it
+	// the composition error dominates the modelling error.
+	const crossover = 46.6
+
+	dropped := math.Abs(crossover*corr/c) * 1e3
+	if dropped < 4.0 || dropped > 5.4 {
+		t.Errorf("at %.1f km/s the dropped term is %.2f m/s; the doc comments claim it reaches "+
+			"the 4.66 m/s of omitted relativistic terms there", crossover, dropped)
 	}
 }

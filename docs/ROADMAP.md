@@ -399,7 +399,7 @@ implementing `MeasuredRadialVelocity` (currently `*Star`).
 - [x] `plan.TargetDetails.RadialVelocity` — a `MeasuredRadialVelocity` capability
       interface (mirroring `StaticMagnitude`) on `*Star`, wired into `computeDetails`
       alongside the magnitude dispatch block; `Context.ObservedRadialVelocity` is the
-      inverse of `BarycentricRVCorrection`, tested to round-trip exactly
+      exact inverse of `BarycentricRadialVelocity`, tested to round-trip exactly
 - [x] `resolve.Target.HasRadialVelocity` — distinguishes a true-zero measured RV from
       "no RV on file", which a zero `RadialVelocity` cannot. Set by `catalog/simbad`,
       preserved through the multi-provider merge in `catalog`, and consumed by
@@ -412,6 +412,13 @@ implementing `MeasuredRadialVelocity` (currently `*Star`).
       needs no Python. Compared like for like against the classical projection, since
       Astropy's barycentric value is relativistic; the 4.66 m/s gap between the two is
       asserted against the 4.649 predicted from the terms astrogo omits
+- [x] `coord.Context.BarycentricRadialVelocity` — composes the correction with the
+      target's own velocity by multiplying redshifts rather than adding velocities,
+      which is the first Wright & Eastman point and the one that was costing the most.
+      The dropped cross-term `rv*corr/c` reaches 4.66 m/s at a target velocity of
+      46.6 km/s — the size of every relativistic term still omitted, combined — and
+      30 m/s for a halo star. It was invisible to the 175-case Astropy fixture because
+      every target in it has no radial velocity
 - [ ] Full Wright & Eastman (2014) treatment for sub-1-m/s precision-RV work
       (gravitational redshift, light-travel-time to barycenter, target proper
       motion/parallax effects on the projection geometry) — the current classical
