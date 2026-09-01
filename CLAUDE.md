@@ -10,7 +10,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 # Quick local checks
 go test ./...                       # all packages, default (unit) tests
 go test ./coord/...                 # single package
-go test -run TestApparentPlace ./coord/...   # single test by name
+go test -run TestApparentToObserved ./coord/...  # single test by name
 go test -race -short -count=1 ./... # race detector (CI runs this)
 
 # Build-tagged test suites (see "Build tags" below)
