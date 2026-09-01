@@ -104,6 +104,18 @@ reordering. A file per entry cannot collide, and carries its own section.
 malformed one fails the pull request that added it rather than the release weeks
 later.
 
+**A missing one fails too.** CI's `changelog-fragment` job requires
+`docs/changelog.d/<this PR number>-*.md` to exist. That check had to live in the
+workflow rather than in `internal/changelog`, because a Go test cannot know
+which pull request is running — and its absence was not hypothetical: #80 and
+#81 both merged without a fragment while this very section asked for one, and
+would have been missing from the release they belong to.
+
+If a change genuinely warrants no entry — pure test coverage for behaviour
+already shipped, or a CI change no user can observe — label the pull request
+`no-changelog`. The label is deliberate and shows up in review; silence did
+not.
+
 Deep forensic detail — root cause, before-and-after numbers, what you refuted —
 belongs in the pull request body or the code's own doc comment. **The changelog
 is an index, not the record.**

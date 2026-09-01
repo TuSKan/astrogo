@@ -90,6 +90,57 @@ jobs:
           files: ./coverage.out
           fail_ci_if_error: false
 
+  # CONTRIBUTING.md's pull request process asks for a changelog fragment, and
+  # docs/PULL_REQUESTS.md section 4 explains why one file per entry rather than
+  # editing CHANGELOG.md. Nothing enforced it, so #80 and #81 both merged
+  # without one and would have been absent from the release they belong to —
+  # discovered by hand, weeks after the fact, which is exactly the drift
+  # internal/docsguard exists to prevent everywhere else.
+  #
+  # `go test ./internal/changelog/` already validates that a fragment parses
+  # and names a real section. It cannot know which pull request is running, so
+  # the existence check has to live here, where the number is.
+  #
+  # Label a pull request `no-changelog` when it genuinely warrants no entry —
+  # pure test coverage for shipped behaviour, or a change to CI that no user
+  # can observe. The label is deliberate and reviewable; silence was not.
+  changelog-fragment:
+    name: Changelog Fragment
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Require a changelog fragment naming this pull request
+        shell: bash
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
+        run: |
+          if [[ ",${PR_LABELS}," == *",no-changelog,"* ]]; then
+            echo "Labelled no-changelog — skipping."
+            exit 0
+          fi
+
+          shopt -s nullglob
+          found=(docs/changelog.d/"${PR_NUMBER}"-*.md)
+
+          if (( ${#found[@]} )); then
+            printf 'Found %d fragment(s):
+' "${#found[@]}"
+            printf '  %s
+' "${found[@]}"
+            exit 0
+          fi
+
+          echo "::error::No changelog fragment for pull request #${PR_NUMBER}."
+          echo "Add docs/changelog.d/${PR_NUMBER}-<short-slug>.md — see docs/changelog.d/README.md"
+          echo "and docs/PULL_REQUESTS.md section 4. If this change warrants no entry,"
+          echo "label the pull request 'no-changelog'."
+          exit 1
+
   race-detection:
     name: Race Detection
     runs-on: ubuntu-latest
