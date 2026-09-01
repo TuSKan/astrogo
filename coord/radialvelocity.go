@@ -19,10 +19,25 @@ import (
 // this is BarycentricVelocity() dotted with the unit vector FROM the
 // observer TO target. If the observer is moving toward target, that dot
 // product is positive, the observer's own motion blueshifts the
-// measured line (makes RV_measured read too low), and adding this
-// correction brings it back up to the true barycentric value:
+// measured line (makes RV_measured read too low), and this correction
+// brings it back up to the true barycentric value.
 //
-//	rvBarycentric = rvMeasured + ctx.BarycentricRVCorrection(target)
+// # Do not add this to a radial velocity
+//
+// Use [Context.BarycentricRadialVelocity], which composes the two
+// correctly. This comment used to say
+//
+//	rvBarycentric = rvMeasured + ctx.BarycentricRVCorrection(target)  // WRONG
+//
+// and that is first-order only: redshifts multiply, so the exact form
+// carries a third term rvMeasured·corr/c. Dropping it costs 4.66 m/s at
+// a target velocity of 46.6 km/s and 30 m/s at 300 — larger, for such a
+// target, than every relativistic term listed below put together.
+//
+// This function remains exported because the raw projection is a real
+// quantity with real uses (its annual sinusoid, its diurnal amplitude,
+// comparing against another implementation's correction). It is the
+// composition that needed fixing, not the value.
 //
 // Accuracy: about 1 m/s, no better. gofaext.Epv00/Apco13's underlying
 // ephemeris is itself accurate to a few cm/s, but this is a classical
@@ -35,19 +50,62 @@ func (ctx *Context) BarycentricRVCorrection(target ICRS) float64 {
 	return ctx.BarycentricVelocity().Dot(target.ToUnitVector())
 }
 
+// lightSpeedKmPerSec is c in the units every radial velocity here is
+// expressed in.
+var lightSpeedKmPerSec = constants.SI2019.SpeedOfLight.Value / 1000.0
+
+// BarycentricRadialVelocity refers a measured (topocentric) radial
+// velocity of target to the solar system barycenter, in km/s.
+//
+// # Why this is not rvObserved plus the correction
+//
+// Because a radial velocity is a redshift, and redshifts compose by
+// multiplication rather than addition. Two successive Doppler shifts
+// give (1+z) = (1+z₁)(1+z₂), so in velocities:
+//
+//	rvBarycentric = rvObserved + corr + rvObserved·corr/c
+//
+// The third term is what adding drops. It is not a refinement: at a
+// correction of 30 km/s it reaches 4.66 m/s — the size of every
+// relativistic term this package documents itself as omitting, combined —
+// once the target's own velocity passes 46.6 km/s, and 30 m/s for a halo
+// star at 300 km/s. For the Sun-like targets most catalogs hold it is
+// well under a metre per second, which is why it can sit unnoticed.
+//
+// It sat unnoticed here. [Context.BarycentricRVCorrection]'s own doc
+// comment gave the additive form as the way to use it, and the 175-case
+// Astropy fixture that validates this file could not see the error,
+// because every target in it has no radial velocity at all — the term
+// vanishes identically when rvObserved is zero. Astropy documents the
+// same three-term formula for the same reason.
+//
+// The correction itself is unchanged and still classical: this fixes how
+// it composes, not what it contains. See [Context.BarycentricRVCorrection]
+// for the terms that remain unimplemented.
+func (ctx *Context) BarycentricRadialVelocity(target ICRS, rvObserved float64) float64 {
+	corr := ctx.BarycentricRVCorrection(target)
+
+	return rvObserved + corr + rvObserved*corr/lightSpeedKmPerSec
+}
+
 // ObservedRadialVelocity returns the topocentric radial velocity, in
 // km/s, an observer at ctx would measure right now for a target whose
-// barycentric RV is rvBarycentric — the inverse of
-// BarycentricRVCorrection, and the direction almost every real use
-// needs: published catalog RVs (SIMBAD's rvz_radvel, for one) are
-// already barycentric, so applying BarycentricRVCorrection to one
-// directly double-corrects by up to ~60 km/s peak-to-peak. Derived
-// directly from BarycentricRVCorrection's own documented sign
-// convention (rvBarycentric = rvMeasured + correction):
+// barycentric RV is rvBarycentric — the exact inverse of
+// [Context.BarycentricRadialVelocity], and the direction almost every
+// real use needs: published catalog RVs (SIMBAD's rvz_radvel, for one)
+// are already barycentric, so applying BarycentricRVCorrection to one
+// directly double-corrects by up to ~60 km/s peak-to-peak.
 //
-//	rvObserved = rvBarycentric - ctx.BarycentricRVCorrection(target)
+// Inverting rvBarycentric = rvObserved·(1 + corr/c) + corr:
+//
+//	rvObserved = (rvBarycentric - corr) / (1 + corr/c)
+//
+// which is exact rather than a series, so the round trip closes to
+// floating-point precision at any radial velocity.
 func (ctx *Context) ObservedRadialVelocity(target ICRS, rvBarycentric float64) float64 {
-	return rvBarycentric - ctx.BarycentricRVCorrection(target)
+	corr := ctx.BarycentricRVCorrection(target)
+
+	return (rvBarycentric - corr) / (1 + corr/lightSpeedKmPerSec)
 }
 
 // HeliocentricRVCorrection is [Context.BarycentricRVCorrection], but

@@ -80,7 +80,10 @@ func main() {
 	}
 
 	fmt.Println()
-	fmt.Println("  rvBarycentric = rvMeasured + BarycentricRVCorrection(target)")
+	fmt.Println("  rvBarycentric = ctx.BarycentricRadialVelocity(target, rvMeasured)")
+	fmt.Println("  Not rvMeasured + the correction: redshifts compose by multiplying,")
+	fmt.Println("  so the exact form carries a third term rvMeasured*corr/c. For Sirius")
+	fmt.Println("  that is 0.55 m/s; for a halo star at 300 km/s it is 30 m/s.")
 	fmt.Println("  This is a classical (non-relativistic) velocity projection, accurate")
 	fmt.Println("  to ~1 m/s — it does not implement gravitational redshift, light-time")
 	fmt.Println("  to the barycenter, or a target's own proper-motion/parallax effects")
