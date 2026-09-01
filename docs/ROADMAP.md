@@ -419,6 +419,69 @@ implementing `MeasuredRadialVelocity` (currently `*Star`).
 
 ---
 
+# 🔬 Known Scientific Limitations
+
+Six gaps in what the library can *claim*, as distinct from features it has not
+built yet. Each is real, documented where it bites, and none is a defect — they
+bound the science rather than break it. **This list is worked before anything in
+the numbered roadmap above**, one item at a time.
+
+They are gathered here because they were scattered: two lived in
+[VALIDATION.md](VALIDATION.md)'s "Known Incomplete Areas", four only in
+[skybrightness.md](skybrightness.md) §16, and one had a checkbox under item 40.
+A limitation nobody can enumerate is a limitation nobody closes.
+
+- [ ] **A. Radial velocity — the Wright & Eastman (2014) terms.** ← *in progress*
+      The classical projection omits gravitational redshift, light-travel time to
+      the barycentre, and the target's own proper motion and parallax in the
+      projection geometry. Measured against Astropy: **4.66 m/s**, against 4.649
+      predicted from exactly those terms. Blocks sub-1-m/s precision-RV work.
+      Tracked in detail under item 40 above; that checkbox and this one are the
+      same work.
+
+- [ ] **B. Cloud reaches only the artificial term.** `scene.Atmosphere.Clouds()`
+      is read in exactly one place, so a deck changes artificial skyglow and
+      nothing else — moonlight, starlight, diffuse galactic light, zodiacal light
+      and airglow all evaluate as clear sky. Three separate models sit behind
+      that sentence: extraterrestrial light *through* a deck (needs a broken-cover
+      ensemble treatment, since a fractional cover returns a sky nobody sees),
+      moonlight *above* a deck (a different geometry, not a factor), and airglow,
+      whose 87 km layer sits above any deck so a cloud blocks rather than scatters
+      it. Until then a cloudy total is internally inconsistent and must not be
+      quoted. See [skybrightness.md](skybrightness.md) §16.
+
+- [ ] **C. Visual limiting magnitude.** Crumey (2014) is in hand, so this is
+      unstarted rather than blocked. Needs a scotopic luminosity function —
+      `unit.LuminanceCdM2` is a type with no producer and `magnitude` carries no
+      V(λ) or V′(λ) — plus coefficient verification, since this project has had
+      three transcription errors of exactly that shape. Blocks a naked-eye or
+      eyepiece depth and `examples/21_meteor_shower_forecast`. See item 28 above.
+
+- [ ] **D. Artificial skyglow has no absolute validation.** Tested on the model's
+      physical claims only. An absolute check needs a per-emitter inventory —
+      flux, spectrum and upward emission function — and satellite radiance can
+      determine only the first, since the same VIIRS pixel is produced by many
+      installations differing in spectrum and in how much they throw sideways.
+
+- [ ] **E. Aerosol optical properties only at 80% relative humidity.** OPAC's
+      properties are hygroscopic and the eight `atmosphere` presets are pinned at
+      the one humidity Hess, Koepke & Schult (1998) tabulate. Blocks reproducing a
+      GAMBONS run exactly, which uses 70%. The data exists; the distribution
+      channel is a 1998 FTP server and an invitation to email the authors. What
+      must **not** happen instead is interpolating between the one published
+      humidity and a guess.
+
+- [ ] **F. Lunar orientation.** No IAU rotation elements and no binary PCK
+      support, so `magnitude.ROLOReflectance` takes the selenographic solar
+      longitude and the libration angles as inputs rather than deriving them.
+      Archinal et al. (2018), or PCK support in `ephemeris/jpl`, would close it.
+
+None of these boxes names a deliverable symbol, so `internal/docsguard`'s
+roadmap check skips them by design — see "Writing a checkbox". They are tracked
+by hand, which is what makes writing them down matter.
+
+---
+
 # 🎯 Strategic Direction
 
 AstroGo positions itself as:
