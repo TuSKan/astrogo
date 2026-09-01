@@ -7,7 +7,7 @@ import (
 
 	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/remote/file"
-	atime "github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/time"
 
 	"github.com/TuSKan/astrogo/internal/testutil"
 )
@@ -49,27 +49,27 @@ func fakeIERSSourceForGateway(t *testing.T, content string) {
 // ResetEOP is what returns to "zero" afterward, not another
 // RegisterModel(ZeroModel{}) call.
 func TestEOPSourceGateway(t *testing.T) {
-	t.Cleanup(atime.ResetEOP)
+	t.Cleanup(time.ResetEOP)
 
-	if got := atime.EOPSource(); got != "zero" {
+	if got := time.EOPSource(); got != "zero" {
 		t.Errorf(`EOPSource() = %q before any RegisterModel call, want "zero"`, got)
 	}
 
-	atime.RegisterModel(atime.ZeroModel{})
+	time.RegisterModel(time.ZeroModel{})
 
-	if got := atime.EOPSource(); got != "explicit" {
+	if got := time.EOPSource(); got != "explicit" {
 		t.Errorf(`EOPSource() = %q after RegisterModel, want "explicit"`, got)
 	}
 
-	atime.ResetEOP()
+	time.ResetEOP()
 
-	if got := atime.EOPSource(); got != "zero" {
+	if got := time.EOPSource(); got != "zero" {
 		t.Errorf(`EOPSource() = %q after ResetEOP, want "zero"`, got)
 	}
 }
 
 func TestParseFinals2000AGateway(t *testing.T) {
-	table, err := atime.ParseFinals2000A(strings.NewReader(sampleFinals2000AForGateway))
+	table, err := time.ParseFinals2000A(strings.NewReader(sampleFinals2000AForGateway))
 	if err != nil {
 		t.Fatalf("ParseFinals2000A: %v", err)
 	}
@@ -87,7 +87,7 @@ func TestParseFinals2000AGateway(t *testing.T) {
 // httptest server below) zero network access.
 func TestEOPLazyLoadFindsPreSeededCacheWithoutConsent(t *testing.T) {
 	t.Cleanup(func() {
-		atime.ResetEOP()
+		time.ResetEOP()
 		remote.Reset()
 	})
 
@@ -108,14 +108,14 @@ func TestEOPLazyLoadFindsPreSeededCacheWithoutConsent(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	tm := atime.FromJD(2441684.5, atime.UTC) // MJD 41684
+	tm := time.FromJD(2441684.5, time.UTC) // MJD 41684
 
 	eop := tm.EOP()
-	if eop == (atime.EOP{}) {
+	if eop == (time.EOP{}) {
 		t.Error("expected non-zero EOP from the pre-seeded cache file")
 	}
 
-	lo, hi, ok := atime.Coverage()
+	lo, hi, ok := time.Coverage()
 	if !ok {
 		t.Fatal("expected a coverage-reporting model after the lazy load")
 	}
@@ -131,15 +131,15 @@ func TestEOPLazyLoadFindsPreSeededCacheWithoutConsent(t *testing.T) {
 // FetchIfStale call needed.
 func TestEOPLazyLoadFetchesWithConsent(t *testing.T) {
 	t.Cleanup(func() {
-		atime.ResetEOP()
+		time.ResetEOP()
 		remote.Reset()
-		atime.SetRetryCooldown(5 * atime.Minute)
+		time.SetRetryCooldown(5 * time.Minute)
 	})
 
 	// Another test in this binary may have made a recent lazy-load attempt
 	// (success or failure); disable the cooldown so this test's own
 	// attempt isn't throttled by that unrelated prior attempt.
-	atime.SetRetryCooldown(0)
+	time.SetRetryCooldown(0)
 
 	fakeIERSSourceForGateway(t, sampleFinals2000AForGateway)
 
@@ -147,14 +147,14 @@ func TestEOPLazyLoadFetchesWithConsent(t *testing.T) {
 	remote.SetDataDir(testutil.FileURL(t, t.TempDir()))
 	t.Cleanup(func() { remote.SetDataDir("") })
 
-	tm := atime.FromJD(2441684.5, atime.UTC) // MJD 41684
+	tm := time.FromJD(2441684.5, time.UTC) // MJD 41684
 
 	eop := tm.EOP()
-	if eop == (atime.EOP{}) {
+	if eop == (time.EOP{}) {
 		t.Error("expected non-zero EOP after the automatic network fetch")
 	}
 
-	if _, _, ok := atime.Coverage(); !ok {
+	if _, _, ok := time.Coverage(); !ok {
 		t.Error("expected a coverage-reporting model after the lazy fetch")
 	}
 }
@@ -165,16 +165,16 @@ func TestEOPLazyLoadFetchesWithConsent(t *testing.T) {
 // erroring.
 func TestEOPLazyLoadDegradesToZeroWithoutCacheOrConsent(t *testing.T) {
 	t.Cleanup(func() {
-		atime.ResetEOP()
+		time.ResetEOP()
 		remote.Reset()
 	})
 
 	remote.SetDataDir(testutil.FileURL(t, t.TempDir()))
 	t.Cleanup(func() { remote.SetDataDir("") })
 
-	tm := atime.FromJD(2441684.5, atime.UTC) // MJD 41684
+	tm := time.FromJD(2441684.5, time.UTC) // MJD 41684
 
-	if eop := tm.EOP(); eop != (atime.EOP{}) {
+	if eop := tm.EOP(); eop != (time.EOP{}) {
 		t.Errorf("expected zero EOP with no cache and no consent, got %+v", eop)
 	}
 }
@@ -182,6 +182,6 @@ func TestEOPLazyLoadDegradesToZeroWithoutCacheOrConsent(t *testing.T) {
 func TestSetRetryCooldownGateway(_ *testing.T) {
 	// Exercises the gateway wrapper only; time/internal/iers's own tests
 	// cover the throttling behavior itself.
-	atime.SetRetryCooldown(0)
-	atime.SetRetryCooldown(5 * atime.Minute) // restore the default
+	time.SetRetryCooldown(0)
+	time.SetRetryCooldown(5 * time.Minute) // restore the default
 }

@@ -97,7 +97,7 @@ The best way to see whether a library's numbers are trustworthy is to point it a
 | [**Equinox & Solstice Almanac**](docs/EQUINOX.md) | A decade of seasons, eclipses, and apsides computed from first principles — no lookup tables, no curve fits, just JPL DE442 and root-finding. | [`examples/17_equinox_prediction/`](examples/17_equinox_prediction/) |
 | **Satellite Tracking** | Predict ISS passes over your location from live NORAD/CelestTrak data — AOS, max elevation, LOS, ground track. | [`examples/12_satellite_tracking/`](examples/12_satellite_tracking/) |
 | **What's Visible Tonight** | What can I actually see in the sky tonight brighter than magnitude X — stars, deep-sky objects, planets, the Moon, even asteroids and comets, all in one query? | [`examples/20_whats_visible_tonight/`](examples/20_whats_visible_tonight/) |
-| **Kepler Propagation, No Kernel** | Six orbital elements and an epoch — no SPK kernel, no network — is enough to place 1 Ceres in the sky and feed it straight into rise/transit/set, exactly like any catalog-resolved target. | [`examples/22_kepler_propagator/`](examples/22_kepler_propagator/) |
+| **Kepler Propagation, No Kernel** | Six orbital elements and an epoch — no SPK kernel, no network — is enough to place 1 Ceres in the sky and feed it straight into rise/transit/set, exactly like any catalog-resolved target. Measured against a Horizons kernel it holds **1–4″ over a month** either side of the elements' epoch ([what you give up](#what-you-give-up-by-staying-offline)). | [`examples/22_kepler_propagator/`](examples/22_kepler_propagator/) |
 | **Radial-Velocity Correction** | Sirius's measured RV swings by ~±25 km/s across the year purely from Earth's own orbital motion — barycentric/heliocentric correction removes it. | [`examples/23_radial_velocity_correction/`](examples/23_radial_velocity_correction/) |
 | **Telescope & Eyepiece Optics** | An 8" f/10 SCT with a wide-field and a planetary eyepiece, a 2x Barlow, and a CMOS sensor — magnification, true field of view, exit pupil, and plate scale, no astrometry involved at all. | [`examples/24_optics/`](examples/24_optics/) |
 
@@ -778,8 +778,11 @@ photometric aperture placement, or anything that must land inside a slit.
 it is two-body propagation of Standish elements. At 3′ it gives you the constellation,
 not the object.
 
-Small bodies propagated from published osculating elements hold roughly 1–4″ over a
-month either side of the elements' epoch, degrading as t² beyond that.
+**The offline path for asteroids and comets is `ephemeris/kepler`** — `NewMovingBodyProvider`
+plus six elements from `catalog/sbdb`, which is what `plan.NewAsteroid` uses when no kernel is
+available. Measured against Horizons-generated SPK kernels, it holds roughly **1–4″ over a
+month** either side of the elements' epoch of osculation, degrading as t² beyond that. That is
+good enough to find the object in a finder and not good enough to measure it.
 
 Every figure above is generated from the `ephemeris.sofa.*` and `ephemeris.kepler.*`
 suites — see [docs/VALIDATION.md](docs/VALIDATION.md) for the full distributions, the
