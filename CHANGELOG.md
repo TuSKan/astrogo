@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.19.0] — 2026-09-02
+
+### Added
+- **CI now requires a changelog fragment naming the pull request.** Both `CONTRIBUTING.md` and `docs/PULL_REQUESTS.md` asked for one and nothing checked, so #80 and #81 merged without and would have been missing from their release. Label a pull request `no-changelog` when it genuinely warrants no entry. (#82)
+- **Radial velocity now works for every target kind.** `plan.RadialVelocity` returns it for a solar-system body, computed from the ephemeris and agreeing with JPL Horizons to under 6 m/s, and `*DeepSkyObject` carries the catalog value SIMBAD publishes for galaxies. Adds `coord.Context.TopocentricRadialVelocity` and `constants.WGS84.AngularVelocity`. (#90)
+- **Radial velocity now carries the observer's own clock.** `coord.Context.ObserverFrameShift` adds the second-order Doppler shift, the Sun's gravitational potential at the observer and Earth's own — about 4.65 m/s. Against Astropy over 175 cases the disagreement falls from **4.66 m/s to 0.5 mm/s**. `BarycentricRadialVelocity` and `ObservedRadialVelocity` now return an error. (#98)
+
+### Changed — BREAKING
+- **`plan.FromCatalog` returns `(Observable, error)`** and refuses a fixed target with no position instead of placing it at RA 0, Dec 0 — a real point in Pisces that rises, sets and schedules without complaint. Returns `plan.ErrNoCoordinates`. (#87)
+- **`coord.Context.ObservedRadialVelocity` returns `(float64, error)`.** It now applies the observer's frame shift, which needs `Epv00` and so can fail — the same reason `HeliocentricRVCorrection` has always returned one. (#98)
+
+### Changed
+- **The `time` package's own tests no longer alias it.** Five external test files carried `atime`, `astrotime` and `gotime` — the package that exists to end the two-spellings-of-time problem was the last place still having it. The guard now applies its alias rule inside `time/` too. (#79)
+- **The six known scientific limitations are gathered into one checklist** in `docs/ROADMAP.md`, with what each blocks and what would unblock it. They were spread across `VALIDATION.md`, `skybrightness.md` §16 and a roadmap checkbox, so answering "what is still open" meant reading three documents. (#80)
+
+### Removed
+- **`assets/old.png`**, the 8.2 MB mascot the hero banner replaced. Nothing referenced it; it remains in git history if it is ever wanted. (#94)
+
+### Fixed
+- **CI never compiled the build-tagged test files.** 59 of them — network, validation and integration — were built only by the weekly Validation workflow, so a tagged file that did not compile reached `main` green, and one did. `go vet` with all three tags now runs on every pull request. (#79)
+- **Radial velocities composed by adding a correction instead of multiplying redshifts.** `coord.Context.BarycentricRadialVelocity` is the correct conversion and `ObservedRadialVelocity` is now its exact inverse; the dropped `rv*corr/c` term reached 4.66 m/s at a target velocity of 46.6 km/s and 30 m/s for a halo star. (#81)
+- **Ten doc comments and documents named tests that do not exist**, including `scatterKernel`'s claim that a named test held its rearrangement to the functions it rearranges — there was no test of the kernel at all. That test and `TestCharonNeedsTheSystemParameter` are written here, the rest repointed, and `internal/docsguard` now fails on a citation that resolves to nothing. (#83)
+- **Roadmap item 39 said "Not Started" with all five boxes ticked** — it shipped in #74. `internal/docsguard` now checks every item's status against its own checkboxes, in both directions; a box beginning "Optional" is excluded so a deliberately untaken extension does not force an item out of Done. (#84)
+- **SIMBAD name resolution returned the wrong object for most deep-sky names.** `Resolve("M87")` gave a source 70° away in Cassiopeia, `Resolve("M31")` a nova inside the galaxy. The substring `LIKE '%name%'` is now an exact match against the spellings SIMBAD stores, and an unknown name returns not-found rather than the least-wrong of ten. (#88)
+- **`Resolve("ISS")` returned the wrong satellite.** CelesTrak's NAME query is a substring match, so it gave UME (ISS) — NORAD 8709 — instead of the station, and a bare catalog number like `25544` found nothing because it was sent as a name. Numbers now use CATNR, and name matches are ranked. (#89)
+- **CI has been failing to start since #82.** The changelog-fragment job's shell carried a literal newline inside a `printf` format string, which ended the YAML block scalar early and made the whole workflow unparseable — so every run since that merge failed before any job began. (#91)
+- **The README banner's alt text still described the old mascot.** It now describes the scene the hero image actually shows, which is what a screen reader or a reader with images disabled gets in its place. (#92)
+- **`coord.Context.TopocentricRadialVelocity` shipped with no offline test.** Its only cover was a `network`-tagged comparison against JPL Horizons, invisible to an ordinary coverage run — it was at 0%, and it is at 100% now, checked against the geometry rather than a service. (#93)
+- **A slow NAIF turned into a red build.** `ephemeris/jpl`'s untagged tests fetch a 32 MB kernel and treated a download timeout as a test failure — four of them sat at 120 s each and took the package past its limit. An upstream failure now skips, as this repository's policy says it must. (#95)
+- **Documents named functions that no longer exist.** `internal/docsguard` now checks every backticked, package-qualified symbol in every document against the code — 174 of them — and `declaredIn` learned to see entries inside grouped `const`/`var`/`type` blocks, which it had been blind to. (#96)
+- **The documentation guards matched symbols with a regular expression**, which could not tell a method from a same-named function, nor `plan` from `skybrightness/plan`. They now read the module with Go's own parser, and both guards share one index. Two more stale citations found and fixed. (#97)
+
 ## [0.18.0] — 2026-08-30
 
 ### Added
@@ -1009,7 +1041,8 @@ First observatory-grade release. Validated against USNO, JPL Horizons, and NASA 
 - `VisibleIntervals` creates independent Contexts per grid step (correct; each step is a different epoch)
 - IERS EOP data fetched via `go:generate`, not at runtime
 
-[Unreleased]: https://github.com/TuSKan/astrogo/compare/v0.18.0...HEAD
+[Unreleased]: https://github.com/TuSKan/astrogo/compare/v0.19.0...HEAD
+[0.19.0]: https://github.com/TuSKan/astrogo/compare/v0.18.0...v0.19.0
 [0.18.0]: https://github.com/TuSKan/astrogo/compare/v0.17.0...v0.18.0
 [0.17.0]: https://github.com/TuSKan/astrogo/compare/v0.16.0...v0.17.0
 [0.16.0]: https://github.com/TuSKan/astrogo/compare/v0.15.1...v0.16.0
