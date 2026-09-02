@@ -205,7 +205,8 @@ func TestGetDetails_RadialVelocity(t *testing.T) {
 		t.Errorf("parsed barycentric = %v, want %v", gotBary, rvBarycentric)
 	}
 
-	wantTopo := ctx.ObservedRadialVelocity(coord.NewICRS(ra, dec), rvBarycentric)
+	wantTopo, err := ctx.ObservedRadialVelocity(coord.NewICRS(ra, dec), rvBarycentric)
+	testutil.AssertNoError(t, err)
 	testutil.AssertNear(t, "topocentric RV", gotTopo, wantTopo, 0.01)
 
 	if s := d.String(); !strings.Contains(s, "Radial velocity:") {
@@ -353,7 +354,8 @@ func TestRadialVelocityDispatchesOnTargetKind(t *testing.T) {
 			t.Fatalf("Position: %v", err)
 		}
 
-		want := ctx.ObservedRadialVelocity(pos, barycentric)
+		want, err := ctx.ObservedRadialVelocity(pos, barycentric)
+		testutil.AssertNoError(t, err)
 		testutil.AssertNear(t, "catalog radial velocity", got, want, 1e-12)
 
 		// And it must differ from the catalog number by roughly Earth's

@@ -456,7 +456,12 @@ func RadialVelocity(obs Observable, ctx *coord.Context) (float64, error) {
 				return 0, fmt.Errorf("radial velocity for %s: %w", obs.Name(), err)
 			}
 
-			return ctx.ObservedRadialVelocity(pos, rvBarycentric), nil
+			rv, err := ctx.ObservedRadialVelocity(pos, rvBarycentric)
+			if err != nil {
+				return 0, fmt.Errorf("radial velocity for %s: %w", obs.Name(), err)
+			}
+
+			return rv, nil
 		}
 	}
 

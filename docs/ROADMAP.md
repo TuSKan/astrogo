@@ -419,10 +419,16 @@ implementing `MeasuredRadialVelocity` (currently `*Star`).
       46.6 km/s — the size of every relativistic term still omitted, combined — and
       30 m/s for a halo star. It was invisible to the 175-case Astropy fixture because
       every target in it has no radial velocity
-- [ ] Full Wright & Eastman (2014) treatment for sub-1-m/s precision-RV work
-      (gravitational redshift, light-travel-time to barycenter, target proper
-      motion/parallax effects on the projection geometry) — the current classical
-      projection is explicitly documented as insufficient for this
+- [x] `coord.Context.ObserverFrameShift` — the three observer-frame terms:
+      second-order Doppler, the Sun's gravitational potential at the observer and
+      Earth's own, about 4.65 m/s together. Measured against Astropy's relativistic
+      barycentric correction over the same 175 cases, the disagreement falls from
+      **4.66 m/s to 0.5 mm/s**
+- [ ] The two target-dependent Wright & Eastman terms: light-travel time to the
+      barycentre, and the target's own proper motion and parallax changing the line
+      of sight over that crossing. Both need the target's distance and epoch, which
+      a bare `coord.ICRS` direction does not carry, so this is an API question
+      before it is a physics one
 
 ---
 
@@ -438,13 +444,15 @@ They are gathered here because they were scattered: two lived in
 [skybrightness.md](skybrightness.md) §16, and one had a checkbox under item 40.
 A limitation nobody can enumerate is a limitation nobody closes.
 
-- [ ] **A. Radial velocity — the Wright & Eastman (2014) terms.** ← *in progress*
-      The classical projection omits gravitational redshift, light-travel time to
-      the barycentre, and the target's own proper motion and parallax in the
-      projection geometry. Measured against Astropy: **4.66 m/s**, against 4.649
-      predicted from exactly those terms. Blocks sub-1-m/s precision-RV work.
-      Tracked in detail under item 40 above; that checkbox and this one are the
-      same work.
+- [ ] **A. Radial velocity — the two target-dependent Wright & Eastman terms.**
+      ← *mostly done*
+      The three observer-frame terms are implemented and the disagreement with
+      Astropy is now **0.5 mm/s**, down from 4.66. What remains is the two terms
+      that depend on the target rather than the observer: light-travel time to the
+      barycentre, and the target's own proper motion and parallax changing the line
+      of sight over that crossing. Both need a distance and an epoch that
+      `coord.ICRS` does not carry, so closing this is an API decision first.
+      Tracked in detail under item 40 above.
 
 - [ ] **B. Cloud reaches only the artificial term.** `scene.Atmosphere.Clouds()`
       is read in exactly one place, so a deck changes artificial skyglow and

@@ -198,6 +198,10 @@ func TestRVCorrectionAgainstAstropy(t *testing.T) {
 
 	relativistic := make([]float64, 0, len(fixture.Cases))
 
+	// The full treatment, compared against the value Astropy actually
+	// publishes rather than against a classical reconstruction of it.
+	full := make([]float64, 0, len(fixture.Cases))
+
 	// Pressure zero disables refraction, which has no bearing on a velocity
 	// projection and would otherwise be one more thing differing between the
 	// two implementations.
@@ -239,6 +243,16 @@ func TestRVCorrectionAgainstAstropy(t *testing.T) {
 		// difference between the two models rather than an error in either.
 		relativistic = append(relativistic, tc.Barycentric-got)
 
+		// A target with no radial velocity of its own, which is what every
+		// case in this fixture is, so this reduces to the correction plus
+		// the observer's own frame shift.
+		gotFull, err := ctx.BarycentricRadialVelocity(target, 0)
+		if err != nil {
+			t.Fatalf("%s: BarycentricRadialVelocity: %v", tc.Name, err)
+		}
+
+		full = append(full, tc.Barycentric-gotFull)
+
 		helio.Add(metrology.Sample{
 			Error:   gotHelio - tc.Heliocentric,
 			Label:   tc.Name,
@@ -248,6 +262,7 @@ func TestRVCorrectionAgainstAstropy(t *testing.T) {
 
 	bary.Report(t)
 	helio.Report(t)
+	reportFullTreatment(t, full)
 
 	// Report the model difference explicitly, and check it is the size the
 	// physics says it should be.
@@ -282,5 +297,30 @@ func TestRVCorrectionAgainstAstropy(t *testing.T) {
 			"%.4f m/s. Either astrogo has acquired a defect the classical comparison above "+
 			"cannot see, or Astropy has changed its model.",
 			median*1e3, predictedRelativistic*1e3)
+	}
+}
+
+// reportFullTreatment measures what the relativistic terms bought.
+func reportFullTreatment(t *testing.T, full []float64) {
+	t.Helper()
+
+	sort.Float64s(full)
+
+	t.Logf("Astropy barycentric minus astrogo full treatment: n=%d p50=%.4f p95=%.4f max=%.4f m/s",
+		len(full), metrology.Quantile(full, 0.5)*1e3,
+		metrology.Quantile(full, 0.95)*1e3, metrology.Quantile(full, 1.0)*1e3)
+
+	// The classical projection sat 4.65 m/s from Astropy and said so. With
+	// the observer's frame shift implemented the two models are the same
+	// model, so what is left is arithmetic rather than physics: a tenth of a
+	// metre per second is loose enough for the terms astrogo still omits —
+	// light-travel time to the barycentre, and the target's own proper
+	// motion over that crossing, neither of which a bare ICRS direction can
+	// supply — and forty times tighter than the gap it replaces.
+	const toleranceKmS = 1e-4
+
+	if worst := math.Max(math.Abs(full[0]), math.Abs(full[len(full)-1])); worst > toleranceKmS {
+		t.Errorf("the full treatment differs from Astropy by up to %.4f m/s, past the %.1f m/s "+
+			"that the terms still omitted can account for", worst*1e3, toleranceKmS*1e3)
 	}
 }
