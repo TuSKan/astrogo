@@ -26,6 +26,17 @@ var (
 	// magnitude depends on the detector, the exposure and the observer.
 	ErrNoSkyDepth = errors.New("limiting magnitude constraint requires a SkyDepth")
 
+	// ErrNoCoordinates indicates a catalog target that resolves to no
+	// position at all, which cannot become a fixed Observable.
+	//
+	// The zero value of a missing coordinate is RA 0, Dec 0 — a real point
+	// in Pisces, and a target built on it will rise, transit, set and
+	// schedule without complaint. FromCatalog used to substitute it
+	// silently; a resolver returning an object with no position now fails
+	// loudly instead, which is the only safe direction for a library that
+	// points telescopes.
+	ErrNoCoordinates = errors.New("catalog target has no coordinates")
+
 	// ErrNotCoordObject indicates the object does not implement coord.Object.
 	//
 	// Deprecated: RankObservable no longer returns this — every Observable

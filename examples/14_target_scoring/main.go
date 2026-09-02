@@ -68,7 +68,14 @@ func main() {
 			continue
 		}
 
-		targets = append(targets, plan.FromCatalog(t, nil))
+		obj, err := plan.FromCatalog(t, nil)
+		if err != nil {
+			log.Printf("skipping %s: %v", t.Name, err)
+
+			continue
+		}
+
+		targets = append(targets, obj)
 	}
 
 	// ── Constraints ──────────────────────────────────────────────────────
