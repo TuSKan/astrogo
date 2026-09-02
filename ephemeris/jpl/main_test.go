@@ -45,10 +45,17 @@ func TestMain(m *testing.M) {
 // skips. Anything else still fails, because a kernel that arrives and cannot
 // be opened is a real defect.
 //
-// The deeper question this does not settle: CLAUDE.md says the default suite
-// is "fast, deterministic, offline", and a 32 MB download is none of those.
-// Whether these belong behind the network tag is a call worth making
-// deliberately rather than inside a build fix.
+// # Why these stay untagged
+//
+// CLAUDE.md describes the default suite as "fast, deterministic, offline",
+// and a 32 MB download is none of those, so the obvious move is to put these
+// behind the network tag. That was considered and rejected: this package is
+// intrinsically a network module — a JPL provider without a kernel is not a
+// reduced version of itself, it is nothing — and tagging its tests would
+// leave the default suite with no cover over the code most likely to break.
+//
+// So the exception is deliberate. The suite stays honest about it by
+// skipping, rather than hanging and failing, when the kernel cannot be had.
 // testKernel is the planetary kernel every test in this package uses: the
 // small DE440 variant, 32 MB against de440's 115, covering 1849-2150. Every
 // case here works well inside that span, so the larger file would only make

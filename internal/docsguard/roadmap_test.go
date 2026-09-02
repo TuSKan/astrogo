@@ -131,13 +131,32 @@ func packageDirs(t *testing.T) map[string][]string {
 }
 
 // declaredIn reports whether leaf is declared in any of dirs, as a function,
-// method, type, var, const or struct field.
+// method, type, var, const, struct field, or an entry in a grouped
+// declaration block.
+//
+// The last of those was missing until TestCitedSymbolsExist ran this against
+// the whole documentation set and reported two dozen names that plainly do
+// exist. Go writes a great many declarations without a keyword on their own
+// line —
+//
+//	const (
+//	    NAIFSPK EndpointID = "naif.spk"
+//	)
+//
+//	type (
+//	    Target = resolve.Target
+//	)
+//
+// — and matching only the keyword-led and field-shaped forms missed every
+// endpoint id, every Kind constant and every type alias in the module.
 func declaredIn(t *testing.T, dirs []string, leaf string) bool {
 	t.Helper()
 
 	decl := regexp.MustCompile(`(?m)^\s*(func\s+(\([^)]*\)\s*)?` + leaf + `\b` +
 		`|(type|var|const)\s+` + leaf + `\b` +
-		`|` + leaf + `\s+(\[\]|\*|map\[)?[A-Za-z][A-Za-z0-9_.\[\]]*\s*(` + "`" + `[^` + "`" + `]*` + "`" + `)?\s*$)`)
+		`|` + leaf + `\s+(\[\]|\*|map\[)?[A-Za-z][A-Za-z0-9_.\[\]]*\s*(` + "`" + `[^` + "`" + `]*` + "`" + `)?\s*$` +
+		`|` + leaf + `\s*=` +
+		`|` + leaf + `\s+(\[\]|\*|map\[)?[A-Za-z][A-Za-z0-9_.\[\]]*\s*=)`)
 
 	for _, dir := range dirs {
 		entries, err := os.ReadDir(dir)
