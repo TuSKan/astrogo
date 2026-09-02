@@ -17,6 +17,15 @@ var (
 		Name: "meter per second", Symbol: "m/s",
 		ScaleFactor: 1, Dimension: unit.Velocity,
 	}
+	// radianPerSecond is rad·s⁻¹ (angular velocity) — WGS84.AngularVelocity.
+	//
+	// A radian is dimensionless, so this carries the dimension of an
+	// inverse time; the symbol is what tells a reader it is a rotation
+	// rate rather than a frequency.
+	radianPerSecond = unit.Unit{
+		Name: "radian per second", Symbol: "rad/s",
+		ScaleFactor: 1, Dimension: unit.Dimension{T: -1},
+	}
 	// squareMeter is m² (area) — ThomsonCrossSection.
 	squareMeter = unit.Unit{
 		Name: "square meter", Symbol: "m²",

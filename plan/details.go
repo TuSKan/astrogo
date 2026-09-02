@@ -156,7 +156,7 @@ func computeDetails(obs Observable, ctx *coord.Context, props ...string) (*Targe
 	}
 
 	// ── Radial velocity via interface dispatch ──
-	fillRadialVelocity(d, obs, pos, ctx)
+	fillRadialVelocity(d, obs, ctx)
 
 	// ── Type-specific catalog properties ──
 	fillTypedProps(d, obs)
@@ -241,30 +241,38 @@ func fillStaticMagnitude(d *TargetDetails, obs Observable) {
 
 // ── Radial velocity ─────────────────────────────────────────────────────────
 
-// fillRadialVelocity computes the topocentric radial velocity an observer
-// at ctx would measure right now for a target with a catalog (barycentric)
-// RV, via coord.Context.ObservedRadialVelocity. Silently skipped (never a
-// hard error) for a target with no MeasuredRadialVelocity, or one that
-// implements the interface but has no RV set — same best-effort
-// convention AngularDiameter/Elongation already use in fillMovingBody.
-// pos is the target's astrometric ICRS position already computed by
-// computeDetails (its own catalog coordinates, not a topocentric-adjusted
-// one — the only type implementing MeasuredRadialVelocity today, *Star,
-// is never a MovingBody, so this is always the right line-of-sight
-// direction regardless of which branch of computeDetails ran first).
-func fillRadialVelocity(d *TargetDetails, obs Observable, pos coord.ICRS, ctx *coord.Context) {
-	mrv, ok := obs.(MeasuredRadialVelocity)
-	if !ok {
+// fillRadialVelocity records the radial velocity an observer at ctx would
+// measure right now, for any target that has one.
+//
+// Silently skipped rather than a hard error when the target has none — the
+// same best-effort convention AngularDiameter and Elongation already use in
+// fillMovingBody.
+//
+// It used to handle only MeasuredRadialVelocity, and so only *Star. That
+// missed both halves of the sky: a galaxy's catalog RV was being fetched and
+// discarded, and a solar-system body — whose radial velocity is the one that
+// actually moves, by tens of km/s in a night — had none at all. [RadialVelocity]
+// dispatches on what the target is.
+func fillRadialVelocity(d *TargetDetails, obs Observable, ctx *coord.Context) {
+	rv, err := RadialVelocity(obs, ctx)
+	if err != nil {
 		return
 	}
 
-	rvBarycentric, has := mrv.MeasuredRadialVelocity()
-	if !has {
-		return
+	// A catalog value is worth showing beside the measurement, because the
+	// two differ by up to ~30 km/s and a reader comparing against a
+	// published number needs to know which they are looking at. A moving
+	// body has no catalog value to show.
+	if mrv, ok := obs.(MeasuredRadialVelocity); ok {
+		if barycentric, has := mrv.MeasuredRadialVelocity(); has {
+			d.RadialVelocity = fmt.Sprintf("%+.2f km/s topocentric (%+.2f km/s barycentric)",
+				rv, barycentric)
+
+			return
+		}
 	}
 
-	rvObserved := ctx.ObservedRadialVelocity(pos, rvBarycentric)
-	d.RadialVelocity = fmt.Sprintf("%+.2f km/s topocentric (%+.2f km/s barycentric)", rvObserved, rvBarycentric)
+	d.RadialVelocity = fmt.Sprintf("%+.2f km/s topocentric", rv)
 }
 
 // ── Type-specific property extraction ───────────────────────────────────────
@@ -402,4 +410,55 @@ func clamp(v, lo, hi float64) float64 {
 	}
 
 	return v
+}
+
+// RadialVelocity returns the radial velocity, in km/s, an observer at ctx
+// measures for obs right now — positive when the target is receding.
+//
+// # One function, two entirely different quantities
+//
+// A fixed target's radial velocity is a measurement somebody made and wrote
+// in a catalog: it is a property of the object, constant on any timescale an
+// observer cares about, and the only work here is referring it from the
+// barycentre to the observer. That is [MeasuredRadialVelocity], carried by
+// *Star and *DeepSkyObject.
+//
+// A solar-system body has no such number, and could not have one. Its radial
+// velocity is a consequence of where it and the observer happen to be, and it
+// swings by tens of km/s over a single night. It is computed from the
+// ephemeris state the provider already returns — see
+// [coord.Context.TopocentricRadialVelocity].
+//
+// Both are radial velocities and a caller wanting "how fast is this
+// separating from me" should not have to know which kind it has, which is why
+// this dispatches rather than exposing two functions.
+//
+// Returns ErrNoRadialVelocity for a target that is neither: a fixed target
+// whose catalog carried no RV, or one of the target kinds with no position
+// model at all.
+func RadialVelocity(obs Observable, ctx *coord.Context) (float64, error) {
+	// Moving body first. A body with an ephemeris always has a radial
+	// velocity, and a catalog value for one would be meaningless — the
+	// ordering matters if a type ever implements both.
+	if mb, ok := obs.(MovingBody); ok {
+		state, err := mb.Provider().State(mb.EphID(), ctx.Time())
+		if err != nil {
+			return 0, fmt.Errorf("radial velocity for %s: %w", mb.Name(), err)
+		}
+
+		return ctx.TopocentricRadialVelocity(state.Pos, state.Vel), nil
+	}
+
+	if mrv, ok := obs.(MeasuredRadialVelocity); ok {
+		if rvBarycentric, has := mrv.MeasuredRadialVelocity(); has {
+			pos, err := obs.Position(ctx.Time())
+			if err != nil {
+				return 0, fmt.Errorf("radial velocity for %s: %w", obs.Name(), err)
+			}
+
+			return ctx.ObservedRadialVelocity(pos, rvBarycentric), nil
+		}
+	}
+
+	return 0, fmt.Errorf("%w: %s", ErrNoRadialVelocity, obs.Name())
 }

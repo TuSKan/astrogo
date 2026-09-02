@@ -146,3 +146,55 @@ func (ctx *Context) HeliocentricRVCorrection(target ICRS) (float64, error) {
 
 	return heliocentricObserverVel.Dot(target.ToUnitVector()), nil
 }
+
+// TopocentricRadialVelocity returns the radial velocity, in km/s, an observer
+// at ctx measures for a body whose geocentric state is posAU and velAUPerDay
+// — the line-of-sight component of the body's motion relative to the
+// observer, positive when the two are separating.
+//
+// # Why a solar-system body needs its own function
+//
+// [Context.BarycentricRVCorrection] and the conversions built on it exist for
+// a target whose radial velocity somebody measured and wrote down: a star, a
+// galaxy, anything far enough away to be a fixed direction with a catalog
+// number beside it. A planet has no such number. Its radial velocity is not a
+// property to be looked up but a consequence of where it and the observer are
+// now, and it changes by tens of km/s over a night — which is exactly why it
+// is worth computing rather than tabulating.
+//
+// # What is subtracted, and why it is not the barycentric velocity
+//
+// The state is geocentric, so the velocity to remove is the observer's own
+// geocentric velocity: the site turning about Earth's axis. Earth's orbital
+// motion is already absent from both sides and must not be subtracted twice.
+//
+// That diurnal term is omega x r for the observer's geocentric position,
+// reaching 0.465 km/s at the equator and falling as the cosine of latitude.
+// Small against a planet's tens of km/s, and not against the Moon's, whose
+// own geocentric radial velocity stays inside about 0.06 km/s — for the Moon
+// the site's rotation is the dominant term, not a correction to it.
+//
+// The line of sight is topocentric, from the observer rather than from the
+// geocentre. For the Moon those differ by up to a degree.
+func (ctx *Context) TopocentricRadialVelocity(posAU, velAUPerDay vector.Vec3) float64 {
+	auKM := constants.IAU.AstronomicalUnit.Value / 1000.0
+	dayS := constants.Derived.JulianDaySeconds.Value
+
+	// Observer's geocentric position, and the velocity that position has by
+	// virtue of Earth turning under it. The rotation axis is the celestial
+	// pole; polar motion is tens of milliarcseconds and cannot matter to a
+	// half-kilometre-per-second term.
+	obsKM := ctx.ObsVec().MulScalar(auKM)
+	omega := vector.V3(0, 0, constants.WGS84.AngularVelocity.Value)
+	siteVel := omega.Cross(obsKM)
+
+	bodyVel := velAUPerDay.MulScalar(auKM / dayS)
+
+	// Topocentric line of sight, from the observer to the body.
+	los := posAU.Sub(ctx.ObsVec())
+	if los.Norm() == 0 {
+		return 0
+	}
+
+	return bodyVel.Sub(siteVel).Dot(los.Unit())
+}
