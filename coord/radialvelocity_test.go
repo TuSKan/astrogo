@@ -396,3 +396,127 @@ func TestBarycentricRadialVelocity_ExceedsTheAdditiveFormByTheDocumentedAmount(t
 			"the 4.66 m/s of omitted relativistic terms there", crossover, dropped)
 	}
 }
+
+// TestTopocentricRadialVelocityIsTheLineOfSightComponent checks the
+// projection against the geometry it is, with no ephemeris involved.
+//
+// Written because the function shipped with only a network test against JPL
+// Horizons. That comparison is worth having and is the wrong thing to rely
+// on: it needs an external service, it is invisible to an untagged coverage
+// run, and when it fails it cannot say whether the projection, the frame or
+// the ephemeris moved. These can.
+func TestTopocentricRadialVelocityIsTheLineOfSightComponent(t *testing.T) {
+	site := equatorSite(t)
+	ctx := coord.NewContext(
+		time.Date(2026, time.March, 15, 0, 0, 0, 0, time.LocationUTC), site, noRefraction)
+
+	// Far enough that the observer's offset from the geocentre does not turn
+	// the line of sight appreciably, so the geometry is the pure projection.
+	const farAU = 100.0
+
+	pos := vector.V3(farAU, 0, 0)
+
+	// Straight away along the line of sight: the whole speed is radial.
+	const auPerDay = 0.01 // ~17.3 km/s
+
+	away := ctx.TopocentricRadialVelocity(pos, vector.V3(auPerDay, 0, 0))
+	toward := ctx.TopocentricRadialVelocity(pos, vector.V3(-auPerDay, 0, 0))
+
+	// The observer's own motion is common to both, so it cancels in the
+	// difference and doubles in the sum. Halving the difference leaves the
+	// body's speed along the line of sight, which for a body this far away
+	// on the x-axis is its whole x-velocity.
+	//
+	// The first version of this test asserted the sum was zero, reasoning
+	// that the site term "cancels". It does not: (v - s) + (-v - s) = -2s.
+	// It came out at 0.125 km/s, which is twice a plausible site component,
+	// and the arithmetic was the thing that was wrong.
+	const kmPerSecPerAUPerDay = 149597870.7 / 86400.0
+
+	radial := (away - toward) / 2
+	testutil.AssertNear(t, "body speed recovered from the difference",
+		radial, auPerDay*kmPerSecPerAUPerDay, 1e-6)
+
+	// And the sum is twice the site's own component, so it is bounded by
+	// twice the equatorial rotation speed.
+	if sum := math.Abs(away + toward); sum > 2*0.4651 {
+		t.Errorf("away plus toward is %.4f km/s, more than twice the site's rotation speed; "+
+			"it should be exactly -2 times the observer's line-of-sight component", sum)
+	}
+
+	if away <= 0 {
+		t.Errorf("a body moving directly away has radial velocity %v; it must be positive", away)
+	}
+
+	// Across the line of sight: nothing radial but the site's own motion, so
+	// the result must be small rather than of order the body's speed.
+	across := ctx.TopocentricRadialVelocity(pos, vector.V3(0, auPerDay, 0))
+	if math.Abs(across) > 0.5 {
+		t.Errorf("a body moving perpendicular to the line of sight has radial velocity "+
+			"%v km/s; only the site's rotation should survive, which is under 0.47", across)
+	}
+}
+
+// TestTopocentricRadialVelocityCarriesTheDiurnalTerm pins the part that is
+// easy to leave out and impossible to notice: a body at rest relative to the
+// geocentre still has a radial velocity, because the observer is moving.
+//
+// It is 0.465 km/s at the equator and nothing at the pole, and for the Moon
+// it is the dominant term rather than a correction — the Moon's own
+// geocentric radial velocity stays inside about 0.06 km/s.
+func TestTopocentricRadialVelocityCarriesTheDiurnalTerm(t *testing.T) {
+	at := time.Date(2026, time.March, 15, 6, 0, 0, 0, time.LocationUTC)
+
+	// A body at rest relative to the geocentre. Whatever radial velocity it
+	// shows is the observer's own.
+	atRest := vector.Zero()
+	pos := vector.V3(100, 0, 0)
+
+	swing := func(latDeg float64) float64 {
+		site, err := coord.NewGeodetic(angle.Zero(), angle.Deg(latDeg), 0)
+		testutil.AssertNoError(t, err)
+
+		lo, hi := math.Inf(1), math.Inf(-1)
+
+		for h := range 24 {
+			ctx := coord.NewContext(at.AddDays(float64(h)/24), site, noRefraction)
+
+			rv := ctx.TopocentricRadialVelocity(pos, atRest)
+			lo, hi = math.Min(lo, rv), math.Max(hi, rv)
+		}
+
+		return hi - lo
+	}
+
+	equator := swing(0)
+
+	// Twice the equatorial rotation speed, since the site swings toward the
+	// body and away from it over a day.
+	const equatorialSpeed = 0.4651
+
+	if equator < 1.5*equatorialSpeed || equator > 2.5*equatorialSpeed {
+		t.Errorf("the diurnal swing at the equator is %.4f km/s, want about %.4f — twice the "+
+			"site's rotation speed", equator, 2*equatorialSpeed)
+	}
+
+	// The term scales as the cosine of latitude, so a pole barely moves.
+	if pole := swing(89.9); pole > 0.05*equator {
+		t.Errorf("the diurnal swing at the pole is %.4f km/s against %.4f at the equator; "+
+			"it should very nearly vanish", pole, equator)
+	}
+}
+
+// TestTopocentricRadialVelocityHandlesAZeroLineOfSight covers the guard, for
+// a body at the observer's own position. The direction is undefined there and
+// a naive unit vector would be NaN, which would propagate silently into a
+// schedule rather than failing.
+func TestTopocentricRadialVelocityHandlesAZeroLineOfSight(t *testing.T) {
+	site := equatorSite(t)
+	ctx := coord.NewContext(
+		time.Date(2026, time.March, 15, 0, 0, 0, 0, time.LocationUTC), site, noRefraction)
+
+	rv := ctx.TopocentricRadialVelocity(ctx.ObsVec(), vector.V3(0.01, 0, 0))
+	if rv != 0 {
+		t.Errorf("a body at the observer's own position gave %v, want 0", rv)
+	}
+}

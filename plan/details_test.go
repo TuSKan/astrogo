@@ -1,14 +1,17 @@
 package plan
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"strings"
 	"testing"
 
 	"github.com/TuSKan/astrogo/angle"
+	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
+	"github.com/TuSKan/astrogo/ephemeris/core"
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/time"
 )
@@ -309,3 +312,116 @@ func TestGetDetails_RadialVelocity_SixMonthSwing(t *testing.T) {
 		t.Errorf("6-month topocentric RV swing = %v km/s, want ~59.6 km/s (2x Earth's orbital speed) within [40, 65]", swing)
 	}
 }
+
+// TestRadialVelocityDispatchesOnTargetKind covers the three answers
+// RadialVelocity can give, none of which the network test reaches.
+//
+// The Horizons comparison in radialvelocity_network_test.go checks the
+// moving-body number against the service that publishes it. It cannot check
+// the dispatch, the catalog path, or the refusal — and being network-tagged,
+// it is invisible to an ordinary coverage run, so those three shipped
+// untested.
+func TestRadialVelocityDispatchesOnTargetKind(t *testing.T) {
+	t.Parallel()
+
+	site, err := coord.NewGeodetic(angle.Zero(), angle.Zero(), 0)
+	if err != nil {
+		t.Fatalf("NewGeodetic: %v", err)
+	}
+
+	ctx := coord.NewContext(
+		time.Date(2026, time.March, 15, 0, 0, 0, 0, time.LocationUTC),
+		site, atmosphere.Refraction{Pressure: 0})
+
+	t.Run("fixed target with a catalog value", func(t *testing.T) {
+		t.Parallel()
+
+		const barycentric = -5.5 // Sirius
+
+		star := NewStar("Sirius-like", angle.Deg(101.287), angle.Deg(-16.716),
+			WithRadialVelocity(barycentric))
+
+		got, err := RadialVelocity(star, ctx)
+		if err != nil {
+			t.Fatalf("RadialVelocity: %v", err)
+		}
+
+		// The catalog path is the barycentric-to-topocentric conversion and
+		// nothing else, so it must agree with that conversion exactly.
+		pos, err := star.Position(ctx.Time())
+		if err != nil {
+			t.Fatalf("Position: %v", err)
+		}
+
+		want := ctx.ObservedRadialVelocity(pos, barycentric)
+		testutil.AssertNear(t, "catalog radial velocity", got, want, 1e-12)
+
+		// And it must differ from the catalog number by roughly Earth's
+		// orbital speed projected on the line of sight — otherwise the
+		// conversion is not happening at all.
+		if math.Abs(got-barycentric) < 1 {
+			t.Errorf("topocentric %v is within 1 km/s of the barycentric %v; the observer's "+
+				"own motion does not appear to have been applied", got, barycentric)
+		}
+	})
+
+	t.Run("deep-sky target with a catalog value", func(t *testing.T) {
+		t.Parallel()
+
+		dso := NewDeepSkyObject("M31-like", angle.Deg(10.6847), angle.Deg(41.2688),
+			WithDSORadialVelocity(-300.0))
+
+		if _, err := RadialVelocity(dso, ctx); err != nil {
+			t.Errorf("a galaxy carrying a catalog RV reported none: %v", err)
+		}
+	})
+
+	t.Run("fixed target with none", func(t *testing.T) {
+		t.Parallel()
+
+		star := NewStar("no RV", angle.Deg(10), angle.Deg(20))
+
+		if _, err := RadialVelocity(star, ctx); !errors.Is(err, ErrNoRadialVelocity) {
+			t.Errorf("err = %v, want ErrNoRadialVelocity", err)
+		}
+	})
+
+	t.Run("moving body", func(t *testing.T) {
+		t.Parallel()
+
+		got, err := RadialVelocity(NewMars(eph.Default()), ctx)
+		if err != nil {
+			t.Fatalf("RadialVelocity: %v", err)
+		}
+
+		// Mars's topocentric radial velocity is tens of km/s at most and
+		// never zero to the precision of a float — a bound loose enough to
+		// survive any epoch and tight enough to catch a unit slip, which
+		// would land in the thousands.
+		if got == 0 || math.Abs(got) > 60 {
+			t.Errorf("Mars radial velocity = %v km/s, outside any physical range", got)
+		}
+	})
+
+	t.Run("moving body whose provider fails", func(t *testing.T) {
+		t.Parallel()
+
+		body := NewPlanet("broken", 499, failingProvider{})
+
+		if _, err := RadialVelocity(body, ctx); err == nil {
+			t.Error("a provider that cannot supply a state reported a radial velocity")
+		}
+	})
+}
+
+// failingProvider is an eph.Provider whose State always errors, for the
+// branch where a moving body cannot supply one.
+type failingProvider struct{}
+
+var errFailingProvider = errors.New("failingProvider: no state")
+
+func (failingProvider) State(eph.ID, time.Time) (core.State, error) {
+	return core.State{}, errFailingProvider
+}
+
+func (failingProvider) Close() error { return nil }
