@@ -7,7 +7,7 @@
 [![GitHub release (latest by date)](https://img.shields.io/github/v/release/TuSKan/astrogo)](https://github.com/TuSKan/astrogo/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
-![AstroGo Mascot](assets/image.png)
+![astrogo — astronomy, computed. A night sky over an observatory ridge, with a target's altitude arc from rise through transit to set, the Moon's phase track, Jupiter and Saturn, a satellite pass, and a sky-brightness scale in mag/arcsec².](assets/image.png)
 
 **Observatory-grade astronomy and observation-planning engine for Go.**
 
