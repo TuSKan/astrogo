@@ -128,10 +128,10 @@ jobs:
           found=(docs/changelog.d/"${PR_NUMBER}"-*.md)
 
           if (( ${#found[@]} )); then
-            printf 'Found %d fragment(s):
-' "${#found[@]}"
-            printf '  %s
-' "${found[@]}"
+            echo "Found ${#found[@]} fragment(s):"
+            for f in "${found[@]}"; do
+              echo "  $f"
+            done
             exit 0
           fi
 
