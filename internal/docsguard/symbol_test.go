@@ -72,8 +72,7 @@ var unbuiltPromise = regexp.MustCompile(`- \[ \]`)
 // track a rename would falsify the record to satisfy a guard.
 func TestCitedSymbolsExist(t *testing.T) {
 	root := filepath.Join("..", "..")
-
-	pkgs := packageDirs(t)
+	idx := moduleSymbols(t)
 
 	var docs []string
 
@@ -99,10 +98,6 @@ func TestCitedSymbolsExist(t *testing.T) {
 	if err != nil {
 		t.Fatalf("walk: %v", err)
 	}
-
-	// Resolving the same name repeatedly across a large document set is the
-	// difference between a fast guard and one people skip.
-	resolved := make(map[string]bool)
 
 	var checked, offenders int
 
@@ -130,26 +125,12 @@ func TestCitedSymbolsExist(t *testing.T) {
 			for _, m := range citedSymbol.FindAllStringSubmatch(line, -1) {
 				pkgPath, symbol := m[1], m[2]
 
-				// The last path element is the package name.
-				name := pkgPath[strings.LastIndex(pkgPath, "/")+1:]
-
-				dirs := pkgs[name]
-				if len(dirs) == 0 {
+				exists, searched := idx.lookup(root, pkgPath, symbol)
+				if len(searched) == 0 {
 					continue // not a package in this module
 				}
 
 				checked++
-
-				key := name + "." + symbol
-
-				exists, seen := resolved[key]
-				if !seen {
-					// A qualified name may be pkg.Type.Method or a struct
-					// field; the leaf is what any of those declares.
-					leaf := symbol[strings.LastIndex(symbol, ".")+1:]
-					exists = declaredIn(t, dirs, leaf)
-					resolved[key] = exists
-				}
 
 				if exists {
 					continue
@@ -160,7 +141,7 @@ func TestCitedSymbolsExist(t *testing.T) {
 				t.Errorf("%s:%d: cites %s.%s, which %v does not declare.\n"+
 					"  Point at what implements this now, or drop the claim. If the name is "+
 					"deliberately historical, say so on the same line — \"since renamed\", "+
-					"\"no longer exists\".", slash, n+1, pkgPath, symbol, dirs)
+					"\"no longer exists\".", slash, n+1, pkgPath, symbol, searched)
 			}
 		}
 	}
