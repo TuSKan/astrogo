@@ -5,6 +5,8 @@ import (
 	"testing"
 
 	"github.com/TuSKan/astrogo/ephemeris/satellite"
+
+	"github.com/TuSKan/astrogo/catalog/resolve"
 )
 
 // issFixture is a representative ISS GP element set in CelestTrak JSON format.
@@ -270,5 +272,92 @@ func TestParseMultiGP(t *testing.T) {
 
 	if gps[1].ObjectName != "CSS (TIANHE)" {
 		t.Errorf("Second object = %q, want CSS", gps[1].ObjectName)
+	}
+}
+
+// TestRankByNamePutsTheSatelliteAskedForFirst covers the ordering Resolve
+// depends on, without a network call.
+//
+// CelesTrak's NAME query is a substring match anywhere in the name, so "ISS"
+// returns eighteen objects. The list below is the real response, in the real
+// order CelesTrak returns it: the Japanese Ionosphere Sounding Satellite
+// first, the station third, and two craft that match through the middle of a
+// word. Taking the first row — which Resolve used to do — tracked UME.
+func TestRankByNamePutsTheSatelliteAskedForFirst(t *testing.T) {
+	t.Parallel()
+
+	// CelesTrak's actual NAME=ISS response order, trimmed to the interesting
+	// rows.
+	targets := []resolve.Target{
+		{ID: "8709", Name: "UME (ISS)"},
+		{ID: "10674", Name: "UME-2 (ISS-B)"},
+		{ID: "25544", Name: "ISS (ZARYA)"},
+		{ID: "25575", Name: "ISS (UNITY)"},
+		{ID: "26400", Name: "ISS (ZVEZDA)"},
+		{ID: "35932", Name: "SWISSCUBE"},
+		{ID: "36797", Name: "AISSAT 1"},
+	}
+
+	rankByName("ISS", targets)
+
+	if got := targets[0].Name; got != "ISS (ZARYA)" {
+		t.Errorf("first result is %q (id %s), want ISS (ZARYA) — the station, not a "+
+			"satellite whose name merely contains ISS", got, targets[0].ID)
+	}
+
+	// The module ordering matters too: ZARYA is the first module launched and
+	// what every ephemeris means by "the ISS". The tie-break is the catalog
+	// number, so UNITY and ZVEZDA must follow it rather than precede it.
+	if targets[1].Name != "ISS (UNITY)" {
+		t.Errorf("second result is %q, want ISS (UNITY) by catalog number", targets[1].Name)
+	}
+
+	// A mid-word match is last, always.
+	last := targets[len(targets)-1].Name
+	if last != "SWISSCUBE" && last != "AISSAT 1" {
+		t.Errorf("last result is %q, want one of the mid-word matches", last)
+	}
+}
+
+// TestRankByNamePrefersAnExactMatch keeps the strongest signal strongest: a
+// name that is exactly the query beats one that merely starts with it.
+func TestRankByNamePrefersAnExactMatch(t *testing.T) {
+	t.Parallel()
+
+	targets := []resolve.Target{
+		{ID: "64562", Name: "HUBBLE 6"},
+		{ID: "20580", Name: "HST"},
+	}
+
+	rankByName("HST", targets)
+
+	if targets[0].Name != "HST" {
+		t.Errorf("first result is %q, want the exact match HST", targets[0].Name)
+	}
+}
+
+// TestIsCatalogNumber pins what routes to CelesTrak's exact CATNR parameter
+// rather than its substring NAME one. "25544" used to find nothing, because
+// the number was sent as a name.
+func TestIsCatalogNumber(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		in   string
+		want bool
+	}{
+		{"25544", true},
+		{"1", true},
+		{"123456789", true},   // CelesTrak documents 1-9 digits
+		{"1234567890", false}, // ten is past it
+		{"ISS", false},
+		{"ISS (ZARYA)", false},
+		{"", false},
+		{"2554a", false},
+		{"-1", false},
+	} {
+		if got := isCatalogNumber(tc.in); got != tc.want {
+			t.Errorf("isCatalogNumber(%q) = %v, want %v", tc.in, got, tc.want)
+		}
 	}
 }
