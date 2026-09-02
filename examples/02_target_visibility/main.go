@@ -36,7 +36,10 @@ func main() {
 		log.Fatalf("Failed to resolve target: %v", err)
 	}
 
-	target := plan.FromCatalog(targetData, nil)
+	target, err := plan.FromCatalog(targetData, nil)
+	if err != nil {
+		log.Fatalf("build target: %v", err)
+	}
 
 	// 4. Set Time to 'tonight at 7 PM' (UTC-3)
 	tz, err := time.LoadLocation("America/Sao_Paulo")

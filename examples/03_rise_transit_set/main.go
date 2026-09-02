@@ -24,7 +24,10 @@ func main() {
 		log.Fatalf("Failed to resolve target: %s", "Sirius")
 	}
 
-	target := plan.FromCatalog(sirius, nil)
+	target, err := plan.FromCatalog(sirius, nil)
+	if err != nil {
+		log.Fatalf("build target: %v", err)
+	}
 
 	// 3. Define the Time interval (next 24 hours starting from 6 PM tonight)
 	tz, err := time.LoadLocation("America/Sao_Paulo")

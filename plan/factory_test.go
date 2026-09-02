@@ -44,7 +44,7 @@ func TestFromCatalog_PlanetaryMoon(t *testing.T) {
 		Kind: resolve.KindPlanetaryMoon,
 	}
 
-	obj := plan.FromCatalog(c, stubMoonProvider{})
+	obj := mustFromCatalog(t, c, stubMoonProvider{})
 
 	moon, ok := obj.(*plan.PlanetaryMoon)
 	if !ok {
@@ -66,7 +66,7 @@ func TestFromCatalog_UnknownPlanetaryMoonFallsThrough(t *testing.T) {
 		Kind: resolve.KindPlanetaryMoon,
 	}
 
-	obj := plan.FromCatalog(c, stubMoonProvider{})
+	obj := mustFromCatalog(t, c, stubMoonProvider{})
 
 	if _, ok := obj.(*plan.GenericBody); !ok {
 		t.Fatalf("FromCatalog: got %T, want *plan.GenericBody", obj)
@@ -103,7 +103,7 @@ func TestFromCatalog_ElementsToAsteroid(t *testing.T) {
 	c := ceresLikeTarget(resolve.KindAsteroid)
 	c.H, c.HasH, c.G = 3.34, true, 0.12
 
-	obj := plan.FromCatalog(c, nil)
+	obj := mustFromCatalog(t, c, nil)
 
 	ast, ok := obj.(*plan.Asteroid)
 	if !ok {
@@ -133,7 +133,7 @@ func TestFromCatalog_ElementsToComet(t *testing.T) {
 	c := ceresLikeTarget(resolve.KindComet)
 	c.M1, c.HasM1, c.K1 = 4.5, true, 8.0
 
-	obj := plan.FromCatalog(c, nil)
+	obj := mustFromCatalog(t, c, nil)
 
 	if _, ok := obj.(*plan.Comet); !ok {
 		t.Fatalf("FromCatalog: got %T, want *plan.Comet", obj)
@@ -144,14 +144,21 @@ func TestFromCatalog_ElementsToComet(t *testing.T) {
 // published eccentricity is >= 1 (which ephemeris/kepler's two-body
 // propagator cannot represent — eph.NewElements rejects it with
 // ErrUnsupportedOrbit) falls straight through to the fixed-target path
-// rather than panicking or silently building a broken Observable, since
-// FromCatalog has no error return.
+// rather than panicking or silently building a broken Observable.
+//
+// The fixture carries a coordinate, which a real interstellar object
+// resolved from SBDB does. It did not before FromCatalog could fail, and the
+// fall-through then produced a *DeepSkyObject at RA 0, Dec 0 — this test
+// passed on it, because it only checked the type. What the fixed-target path
+// does without a position is now TestFromCatalogRefusesATargetWithNoCoordinates'
+// business, and it is an error.
 func TestFromCatalog_ElementsHyperbolicFallsThrough(t *testing.T) {
 	c := ceresLikeTarget(resolve.KindInterstellar)
 	c.Eccentricity = 1.2 // hyperbolic
 	c.H, c.HasH = 22.0, true
+	c.Coord, c.HasCoord = coord.NewICRS(angle.Deg(83.8), angle.Deg(-5.4)), true
 
-	obj := plan.FromCatalog(c, nil)
+	obj := mustFromCatalog(t, c, nil)
 
 	if _, ok := obj.(*plan.DeepSkyObject); !ok {
 		t.Fatalf("FromCatalog: got %T, want the fixed-target fallback *plan.DeepSkyObject", obj)
@@ -165,7 +172,7 @@ func TestFromCatalog_ProviderTakesPrecedenceOverElements(t *testing.T) {
 	c := ceresLikeTarget(resolve.KindAsteroid)
 	c.H, c.HasH, c.G = 3.34, true, 0.12
 
-	obj := plan.FromCatalog(c, stubMoonProvider{})
+	obj := mustFromCatalog(t, c, stubMoonProvider{})
 
 	ast, ok := obj.(*plan.Asteroid)
 	if !ok {
@@ -208,7 +215,7 @@ func TestFromCatalog_StarRadialVelocity(t *testing.T) {
 				RadialVelocity:    c.rv,
 			}
 
-			obj := plan.FromCatalog(tgt, nil)
+			obj := mustFromCatalog(t, tgt, nil)
 
 			star, ok := obj.(*plan.Star)
 			if !ok {
@@ -238,7 +245,7 @@ func TestFromCatalog_AsteroidDiameterAndAlbedo(t *testing.T) {
 		c.H, c.HasH, c.G = 3.34, true, 0.12
 		c.HasDiameter, c.Diameter = true, 16.84 // km, real Eros value
 
-		obj := plan.FromCatalog(c, nil)
+		obj := mustFromCatalog(t, c, nil)
 
 		ast, ok := obj.(*plan.Asteroid)
 		if !ok {
@@ -260,7 +267,7 @@ func TestFromCatalog_AsteroidDiameterAndAlbedo(t *testing.T) {
 		c.H, c.HasH, c.G = 3.34, true, 0.12
 		c.HasAlbedo, c.Albedo = true, 0.25 // real Eros value
 
-		obj := plan.FromCatalog(c, nil)
+		obj := mustFromCatalog(t, c, nil)
 
 		ast, ok := obj.(*plan.Asteroid)
 		if !ok {
@@ -276,4 +283,100 @@ func TestFromCatalog_AsteroidDiameterAndAlbedo(t *testing.T) {
 			t.Errorf("PhysicalRadius() = %v, want a positive H+albedo estimate", metres)
 		}
 	})
+}
+
+// mustFromCatalog fails the test if FromCatalog cannot build the target.
+//
+// FromCatalog gained an error return so a catalog target with no position
+// could be refused rather than placed at RA 0, Dec 0. Every case in this
+// file supplies a real coordinate or a moving body, so that error is never
+// what is under test here — TestFromCatalogRefusesATargetWithNoCoordinates
+// covers it directly.
+func mustFromCatalog(t *testing.T, c catalog.Target, p eph.Provider) plan.Observable {
+	t.Helper()
+
+	obs, err := plan.FromCatalog(c, p)
+	if err != nil {
+		t.Fatalf("FromCatalog(%q): %v", c.Name, err)
+	}
+
+	return obs
+}
+
+// TestFromCatalogRefusesATargetWithNoCoordinates covers the defect the error
+// return exists for.
+//
+// A resolver can return an object with no position — SIMBAD's `vdWG M42 B`
+// is one, and it was reachable through an ordinary Resolve("M42"). FromCatalog
+// used to substitute the zero value, which is RA 0, Dec 0: a real point in
+// Pisces, on the celestial equator, visible from almost everywhere. The
+// resulting target rises, transits, sets, scores against constraints and
+// enters a schedule, and nothing about it looks wrong.
+//
+// This is the same class of defect HasRadialVelocity was introduced to fix —
+// a zero meaning "absent" read as a zero meaning "measured" — except that here
+// the fabricated value is not even plausible, merely unchecked.
+func TestFromCatalogRefusesATargetWithNoCoordinates(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		name string
+		kind resolve.Kind
+	}{
+		{"deep-sky object", resolve.KindGalaxy},
+		{"star", resolve.KindStar},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			obs, err := plan.FromCatalog(catalog.Target{
+				Name:     "no position at all",
+				Kind:     tc.kind,
+				HasCoord: false,
+			}, nil)
+
+			if !errors.Is(err, plan.ErrNoCoordinates) {
+				t.Fatalf("err = %v, want ErrNoCoordinates", err)
+			}
+
+			if obs != nil {
+				t.Errorf("got a %T alongside the error; a refused target must be nil", obs)
+			}
+		})
+	}
+}
+
+// TestFromCatalogKeepsACoordinateAtTheOrigin is the other half: RA 0, Dec 0
+// is a real position, and a target that genuinely carries it must survive.
+//
+// Without this, the obvious way to implement the check above — treating a
+// zero coordinate as missing — would pass its own test while quietly refusing
+// a legitimate object. HasCoord is what distinguishes them, which is why the
+// check reads that field rather than the coordinate.
+func TestFromCatalogKeepsACoordinateAtTheOrigin(t *testing.T) {
+	t.Parallel()
+
+	obs, err := plan.FromCatalog(catalog.Target{
+		Name:     "genuinely at the origin",
+		Kind:     resolve.KindGalaxy,
+		Coord:    coord.NewICRS(angle.Zero(), angle.Zero()),
+		HasCoord: true,
+	}, nil)
+	if err != nil {
+		t.Fatalf("FromCatalog: %v", err)
+	}
+
+	dso, ok := obs.(*plan.DeepSkyObject)
+	if !ok {
+		t.Fatalf("got %T, want *plan.DeepSkyObject", obs)
+	}
+
+	pos, err := dso.Position(time.J2000)
+	if err != nil {
+		t.Fatalf("Position: %v", err)
+	}
+
+	if pos.RA().Degrees() != 0 || pos.Dec().Degrees() != 0 {
+		t.Errorf("position = %v, want the origin it was given", pos)
+	}
 }

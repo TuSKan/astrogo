@@ -474,7 +474,15 @@ func isFixedTarget(obs Observable) bool {
 
 func candidateFromTarget(ctx context.Context, tgt resolve.Target, start, end time.Time, cfg visibleTonightConfig) (Observable, eph.Provider) {
 	if !needsSmallBodyEphemeris(tgt.Kind) {
-		return FromCatalog(tgt, nil), nil
+		// A target the resolver returned with no position at all is
+		// dropped rather than placed at RA 0, Dec 0. Both callers already
+		// treat a nil Observable as "no candidate".
+		obj, err := FromCatalog(tgt, nil)
+		if err != nil {
+			return nil, nil
+		}
+
+		return obj, nil
 	}
 
 	// Kepler first: try FromCatalog's own elements-based construction
@@ -484,7 +492,7 @@ func candidateFromTarget(ctx context.Context, tgt resolve.Target, start, end tim
 	// are hyperbolic/parabolic, or the caller forced kernels via
 	// WithSmallBodyKernels.
 	if !cfg.forceSmallBodyKernels && tgt.HasElements {
-		if obj := FromCatalog(tgt, nil); !isFixedTarget(obj) {
+		if obj, err := FromCatalog(tgt, nil); err == nil && !isFixedTarget(obj) {
 			return obj, nil
 		}
 	}
@@ -495,7 +503,14 @@ func candidateFromTarget(ctx context.Context, tgt resolve.Target, start, end tim
 		return nil, nil
 	}
 
-	return FromCatalog(tgt, minorProvider), minorProvider
+	obj, err := FromCatalog(tgt, minorProvider)
+	if err != nil {
+		_ = minorProvider.Close()
+
+		return nil, nil
+	}
+
+	return obj, minorProvider
 }
 
 // gatherSolarSystemCandidates builds the Moon and every naked-eye planet,

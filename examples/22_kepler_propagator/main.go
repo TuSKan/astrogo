@@ -70,7 +70,10 @@ func main() {
 	// target.HasElements, builds the Kepler-propagated provider itself,
 	// and returns a fully-formed *plan.Asteroid. Everything from here
 	// runs entirely offline.
-	obs := plan.FromCatalog(target, nil)
+	obs, err := plan.FromCatalog(target, nil)
+	if err != nil {
+		log.Fatalf("FromCatalog: %v", err)
+	}
 
 	asteroid, ok := obs.(*plan.Asteroid)
 	if !ok {

@@ -122,7 +122,7 @@ func TestDeepSkyObject(t *testing.T) {
 
 func TestFromCatalog(t *testing.T) {
 	// Star
-	star := FromCatalog(catalog.Target{
+	star := mustFromCatalog(t, catalog.Target{
 		Name: "Sirius", Kind: resolve.KindStar, HasCoord: true,
 		Coord: coord.NewICRS(angle.Deg(10), angle.Deg(20)),
 	}, nil)
@@ -131,7 +131,7 @@ func TestFromCatalog(t *testing.T) {
 	}
 
 	// Planet
-	planet := FromCatalog(catalog.Target{
+	planet := mustFromCatalog(t, catalog.Target{
 		ID: "11", Name: "Sun", Kind: resolve.KindStar,
 	}, eph.Default())
 	if p, ok := planet.(*Planet); !ok {
@@ -146,7 +146,7 @@ func TestFromCatalog(t *testing.T) {
 	// instead of a real, moving *Planet, since the planet-routing switch
 	// only ever ran inside FromCatalog's `if p != nil` block. FromCatalog
 	// must fall back to eph.Default() for a major named body instead.
-	planetNoProvider := FromCatalog(catalog.Target{
+	planetNoProvider := mustFromCatalog(t, catalog.Target{
 		ID: "4", Name: "Mars", Kind: resolve.KindPlanet,
 	}, nil)
 	if p, ok := planetNoProvider.(*Planet); !ok {
@@ -156,7 +156,7 @@ func TestFromCatalog(t *testing.T) {
 	}
 
 	// DSO
-	dso := FromCatalog(catalog.Target{
+	dso := mustFromCatalog(t, catalog.Target{
 		Name: "M31", Kind: resolve.KindGalaxy, HasCoord: true,
 		Coord: coord.NewICRS(angle.Deg(10), angle.Deg(41)),
 	}, nil)
@@ -194,4 +194,17 @@ func TestNewPlanet_NilProviderDefaults(t *testing.T) {
 	if _, err := pluto.Position(epoch); err != nil {
 		t.Errorf("NewPluto(nil).Position(): unexpected error: %v", err)
 	}
+}
+
+// mustFromCatalog is the in-package twin of the helper in factory_test.go;
+// see there for why FromCatalog is fallible.
+func mustFromCatalog(t *testing.T, c catalog.Target, p eph.Provider) Observable {
+	t.Helper()
+
+	obs, err := FromCatalog(c, p)
+	if err != nil {
+		t.Fatalf("FromCatalog(%q): %v", c.Name, err)
+	}
+
+	return obs
 }
