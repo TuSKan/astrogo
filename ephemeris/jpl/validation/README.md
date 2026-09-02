@@ -87,7 +87,7 @@ Its intermediate place is measured but deliberately **not** contracted.
 `eph.ApparentState` retards the whole geocentric vector, carrying light-time
 and annual aberration together, while Horizons' astrometric column has
 light-time only and its apparent column is referred to the true equinox of
-date where `coord.AstrometricToApparent` produces CIRS. Neither published
+date where `coord.Context.AstrometricToApparent` produces CIRS. Neither published
 column is the quantity astrogo computes, so the gap is named and quantified —
 Earth's motion over the light time, up to 21.2 arcsec — rather than hidden
 under a widened tolerance. That test's doc comment has the full account.

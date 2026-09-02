@@ -40,7 +40,8 @@ func TestRoadmapBoxesMatchTheCode(t *testing.T) {
 		t.Fatalf("read %s: %v", roadmapDoc, err)
 	}
 
-	pkgs := packageDirs(t)
+	root := filepath.Join("..", "..")
+	idx := moduleSymbols(t)
 
 	var checked int
 
@@ -52,19 +53,14 @@ func TestRoadmapBoxesMatchTheCode(t *testing.T) {
 
 		done, pkgPath, symbol := m[1] == "x", m[2], m[3]
 
-		// The last path element is the package name; a qualifier this guard
-		// cannot resolve is skipped rather than guessed at.
-		name := pkgPath[strings.LastIndex(pkgPath, "/")+1:]
-
-		dirs := pkgs[name]
+		// A qualifier naming no package in this module is skipped rather
+		// than guessed at.
+		exists, dirs := idx.lookup(root, pkgPath, symbol)
 		if len(dirs) == 0 {
 			continue
 		}
 
 		checked++
-
-		leaf := symbol[strings.LastIndex(symbol, ".")+1:]
-		exists := declaredIn(t, dirs, leaf)
 
 		switch {
 		case !done && exists:
@@ -82,99 +78,4 @@ func TestRoadmapBoxesMatchTheCode(t *testing.T) {
 	}
 
 	t.Logf("%d roadmap boxes checked against the code", checked)
-}
-
-// packageDirs maps a package name to the directories declaring it.
-func packageDirs(t *testing.T) map[string][]string {
-	t.Helper()
-
-	clause := regexp.MustCompile(`(?m)^package ([a-z][A-Za-z0-9_]*)`)
-	out := make(map[string][]string)
-	seen := make(map[string]bool)
-
-	root := filepath.Join("..", "..")
-
-	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
-		if err != nil || info.IsDir() || !strings.HasSuffix(path, ".go") ||
-			strings.HasSuffix(path, "_test.go") {
-			return nil //nolint:nilerr // an unreadable path is skipped, not fatal
-		}
-
-		src, rerr := os.ReadFile(path)
-		if rerr != nil {
-			return nil //nolint:nilerr // a file we cannot read contributes no package, and is not worth failing the walk for
-		}
-
-		m := clause.FindSubmatch(src)
-		if m == nil {
-			return nil
-		}
-
-		name, dir := string(m[1]), filepath.Dir(path)
-
-		key := name + "\x00" + dir
-		if seen[key] {
-			return nil
-		}
-
-		seen[key] = true
-
-		out[name] = append(out[name], dir)
-
-		return nil
-	})
-	if err != nil {
-		t.Fatalf("walk: %v", err)
-	}
-
-	return out
-}
-
-// declaredIn reports whether leaf is declared in any of dirs, as a function,
-// method, type, var, const, struct field, or an entry in a grouped
-// declaration block.
-//
-// The last of those was missing until TestCitedSymbolsExist ran this against
-// the whole documentation set and reported two dozen names that plainly do
-// exist. Go writes a great many declarations without a keyword on their own
-// line —
-//
-//	const (
-//	    NAIFSPK EndpointID = "naif.spk"
-//	)
-//
-//	type (
-//	    Target = resolve.Target
-//	)
-//
-// — and matching only the keyword-led and field-shaped forms missed every
-// endpoint id, every Kind constant and every type alias in the module.
-func declaredIn(t *testing.T, dirs []string, leaf string) bool {
-	t.Helper()
-
-	decl := regexp.MustCompile(`(?m)^\s*(func\s+(\([^)]*\)\s*)?` + leaf + `\b` +
-		`|(type|var|const)\s+` + leaf + `\b` +
-		`|` + leaf + `\s+(\[\]|\*|map\[)?[A-Za-z][A-Za-z0-9_.\[\]]*\s*(` + "`" + `[^` + "`" + `]*` + "`" + `)?\s*$` +
-		`|` + leaf + `\s*=` +
-		`|` + leaf + `\s+(\[\]|\*|map\[)?[A-Za-z][A-Za-z0-9_.\[\]]*\s*=)`)
-
-	for _, dir := range dirs {
-		entries, err := os.ReadDir(dir)
-		if err != nil {
-			continue
-		}
-
-		for _, e := range entries {
-			if e.IsDir() || !strings.HasSuffix(e.Name(), ".go") || strings.HasSuffix(e.Name(), "_test.go") {
-				continue
-			}
-
-			src, rerr := os.ReadFile(filepath.Join(dir, e.Name()))
-			if rerr == nil && decl.Match(src) {
-				return true
-			}
-		}
-	}
-
-	return false
 }

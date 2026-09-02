@@ -392,7 +392,7 @@ implementing `MeasuredRadialVelocity` (currently `*Star`).
 
 - [x] `coord.Context.BarycentricVelocity` — observer's barycentric velocity from `Apco13`'s
       already-computed astrometry, no new SOFA call
-- [x] `coord.BarycentricRVCorrection`/`HeliocentricRVCorrection` — classical velocity
+- [x] `coord.Context.BarycentricRVCorrection`/`HeliocentricRVCorrection` — classical velocity
       projection, sign convention documented and tested explicitly
 - [x] Analytic property tests (bounded magnitude, annual sinusoid, antipodal sign flip,
       diurnal amplitude vs. site latitude)
