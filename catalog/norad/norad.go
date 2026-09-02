@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -273,14 +274,111 @@ func (p *Provider) Capabilities() []resolve.Capability {
 	return []resolve.Capability{resolve.CapObjectResolution}
 }
 
-// Resolve attempts to find a single satellite by name or catalog number.
+// Resolve finds the satellite a name or catalog number refers to.
+//
+// # Why this is not Search's first result
+//
+// It was, and CelesTrak's NAME query is a substring match. Asking for "ISS"
+// returns eighteen objects — UME (ISS), UME-2 (ISS-B), SWISSCUBE, AISSAT 1
+// and the five real station modules among them — with the Japanese
+// Ionosphere Sounding Satellite first and ISS (ZARYA) third. Taking the first
+// row meant tracking the wrong satellite, silently, for the single most
+// common query this provider will ever receive.
+//
+// A catalog number now goes to CelesTrak's CATNR parameter, which is exact:
+// "25544" used to find nothing at all, because the number was being sent as
+// a name.
+//
+// A name is ranked rather than taken in arrival order — see [rankByName].
 func (p *Provider) Resolve(ctx context.Context, query string) (resolve.Target, bool) {
-	targets := p.Search(ctx, query)
-	if len(targets) > 0 {
-		return targets[0], true
+	q := strings.TrimSpace(query)
+	if q == "" {
+		return resolve.Target{}, false
 	}
 
-	return resolve.Target{}, false
+	// A bare catalog number is an exact identifier; nothing to rank.
+	if isCatalogNumber(q) {
+		gps, err := p.Fetch(ctx, QueryCatNr, q)
+		if err != nil || len(gps) == 0 {
+			return resolve.Target{}, false
+		}
+
+		return gpToTarget(gps[0]), true
+	}
+
+	targets := p.Search(ctx, q)
+	if len(targets) == 0 {
+		return resolve.Target{}, false
+	}
+
+	return targets[0], true
+}
+
+// isCatalogNumber reports whether the query is a bare NORAD catalog number.
+// CelesTrak documents CATNR as 1-9 digits.
+func isCatalogNumber(q string) bool {
+	if len(q) == 0 || len(q) > 9 {
+		return false
+	}
+
+	for _, r := range q {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+
+	return true
+}
+
+// rankByName orders a substring match so the satellite actually asked for
+// comes first.
+//
+// CelesTrak matches anywhere in the name, so a short query pulls in
+// unrelated craft: "ISS" reaches SWISSCUBE and AISSAT 1 through the middle of
+// a word. The ordering is, in turn:
+//
+//   - an exact name match, which settles it outright;
+//   - a name whose first word is the query — "ISS (ZARYA)" for "ISS" —
+//     because a designation in parentheses is a component of the thing named
+//     before it;
+//   - a name beginning with the query;
+//   - everything else, which is a mid-word match and almost never meant.
+//
+// Within a tier, the lower catalog number wins. For the station that is
+// ISS (ZARYA), 25544 — the first module launched and the one every ephemeris
+// means by "the ISS".
+func rankByName(query string, targets []resolve.Target) {
+	tier := func(name string) int {
+		upper := strings.ToUpper(strings.TrimSpace(name))
+		q := strings.ToUpper(strings.TrimSpace(query))
+
+		switch {
+		case upper == q:
+			return 0
+		case strings.HasPrefix(upper, q+" ("):
+			return 1
+		case strings.HasPrefix(upper, q):
+			return 2
+		default:
+			return 3
+		}
+	}
+
+	sort.SliceStable(targets, func(i, j int) bool {
+		ti, tj := tier(targets[i].Name), tier(targets[j].Name)
+		if ti != tj {
+			return ti < tj
+		}
+
+		ni, erri := strconv.Atoi(targets[i].ID)
+		nj, errj := strconv.Atoi(targets[j].ID)
+
+		if erri == nil && errj == nil {
+			return ni < nj
+		}
+
+		return targets[i].Name < targets[j].Name
+	})
 }
 
 // Search returns satellites matching the query string.
@@ -296,6 +394,8 @@ func (p *Provider) Search(ctx context.Context, query string) []resolve.Target {
 	for _, gp := range gps {
 		targets = append(targets, gpToTarget(gp))
 	}
+
+	rankByName(query, targets)
 
 	return targets
 }
