@@ -47,10 +47,7 @@ func TestNewProvider_ColdCacheDownloadsDisabled(t *testing.T) {
 // from the cache bucket with zero network involvement, proving the offline
 // path works independently of NewProvider.
 func TestKernelLifecycle(t *testing.T) {
-	seed, err := jpl.NewProvider(context.Background(), core.Planets, "de440s")
-	if err != nil {
-		t.Fatalf("seed provider: %v", err)
-	}
+	seed := mustPlanetProvider(t)
 
 	kernels := seed.LoadedKernels()
 	if len(kernels) != 1 || kernels[0].Key == "" {
