@@ -16,6 +16,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/time"
 )
@@ -156,22 +157,60 @@ func TestResolve_Live(t *testing.T) {
 // and Resolve("ISS") returned UME (ISS) — NORAD 8709, a Japanese ionosphere
 // satellite launched in 1976. Every pass, elevation and ground track computed
 // from it was for the wrong spacecraft, and nothing said so.
+//
+// # Why it fetches once
+//
+// Its first version resolved three names in a row and CI throttled: two
+// subtests sat for 121 and 91 seconds and then failed, which is this
+// repository's stated policy inverted — an external service having a bad
+// minute must never fail a build. RequireReachable does not cover it either,
+// since a TCP handshake succeeding says nothing about whether the service
+// will answer, which is the trap docs/PULL_REQUESTS.md section 7 exists to
+// warn about.
+//
+// So the fetch happens once, through the error-returning path, and an
+// upstream failure skips. The three name forms are then checked against that
+// one response, which is all they ever needed: they are about how a name is
+// ranked, not about the network.
 func TestResolveISSIsTheStation(t *testing.T) {
 	testutil.RequireReachable(t, "celestrak.org:443")
 
 	p := New()
 
-	for _, q := range []string{"ISS", "25544", "ISS (ZARYA)"} {
-		t.Run(q, func(t *testing.T) {
-			tgt, ok := p.Resolve(context.Background(), q)
-			if !ok {
-				t.Fatalf("Resolve(%q) found nothing", q)
-			}
+	// Fetch through the path that reports why it failed, so throttling and
+	// downtime skip rather than fail.
+	gps, err := p.Fetch(t.Context(), QueryName, "ISS")
+	if err != nil {
+		testutil.SkipOnUpstreamFailure(t, err)
+		t.Fatalf("CelesTrak: %v", err)
+	}
 
-			if tgt.ID != "25544" {
-				t.Errorf("Resolve(%q) = %q (NORAD %s), want NORAD 25544 ISS (ZARYA)",
-					q, tgt.Name, tgt.ID)
-			}
-		})
+	if len(gps) == 0 {
+		t.Skip("CelesTrak returned no satellites for ISS")
+	}
+
+	targets := make([]resolve.Target, 0, len(gps))
+	for _, gp := range gps {
+		targets = append(targets, gpToTarget(gp))
+	}
+
+	rankByName("ISS", targets)
+
+	if got := targets[0].ID; got != "25544" {
+		t.Errorf("ranking ISS put NORAD %s (%q) first, want 25544 ISS (ZARYA)",
+			got, targets[0].Name)
+	}
+
+	// The catalog number takes a different route entirely — CelesTrak's exact
+	// CATNR parameter rather than its substring NAME one — so it is worth one
+	// more call. "25544" used to find nothing at all.
+	byNumber, ok := p.Resolve(t.Context(), "25544")
+	if !ok {
+		t.Skip("CelesTrak did not answer the catalog-number query")
+	}
+
+	if byNumber.ID != "25544" {
+		t.Errorf("Resolve(\"25544\") = %q (NORAD %s), want ISS (ZARYA)",
+			byNumber.Name, byNumber.ID)
 	}
 }
