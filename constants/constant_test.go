@@ -83,7 +83,7 @@ func TestSets_Count(t *testing.T) {
 	}
 
 	// SI2019, CODATA2022, CODATA2018, IAU2015, WGS84, Derived, Photometric
-	wantCounts := []int{3, 5, 5, 14, 2, 6, 1}
+	wantCounts := []int{3, 5, 5, 14, 3, 6, 1}
 
 	total := 0
 
@@ -96,8 +96,8 @@ func TestSets_Count(t *testing.T) {
 		}
 	}
 
-	if total != 36 {
-		t.Errorf("total constants across all sets = %d, want 36", total)
+	if total != 37 {
+		t.Errorf("total constants across all sets = %d, want 37", total)
 	}
 }
 

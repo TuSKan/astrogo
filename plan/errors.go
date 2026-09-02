@@ -26,6 +26,12 @@ var (
 	// magnitude depends on the detector, the exposure and the observer.
 	ErrNoSkyDepth = errors.New("limiting magnitude constraint requires a SkyDepth")
 
+	// ErrNoRadialVelocity indicates a target with no radial velocity to
+	// report: a fixed target whose catalog carried none, or a kind with no
+	// position model at all. Distinct from a measured RV of exactly zero,
+	// which MeasuredRadialVelocity reports as a value with ok true.
+	ErrNoRadialVelocity = errors.New("target has no radial velocity")
+
 	// ErrNotCoordObject indicates the object does not implement coord.Object.
 	//
 	// Deprecated: RankObservable no longer returns this — every Observable

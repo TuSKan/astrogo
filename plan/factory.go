@@ -164,6 +164,10 @@ func FromCatalog(c catalog.Target, p eph.Provider) Observable {
 		opts = append(opts, WithDSOMagnitude(c.VMag))
 	}
 
+	if c.HasRadialVelocity {
+		opts = append(opts, WithDSORadialVelocity(c.RadialVelocity))
+	}
+
 	if string(c.Kind) != "" {
 		opts = append(opts, WithDSOKind(string(c.Kind)))
 	}

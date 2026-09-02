@@ -14,6 +14,9 @@ type DeepSkyObject struct {
 	coord   coord.ICRS
 	vMag    float64
 	hasVMag bool
+
+	radialVelocity float64
+	hasRV          bool
 }
 
 // DSOOption configures optional DeepSkyObject fields.
@@ -27,6 +30,17 @@ func WithDSOMagnitude(v float64) DSOOption {
 // WithDSOKind sets the display kind (e.g. "Galaxy", "Nebula").
 func WithDSOKind(kind string) DSOOption {
 	return func(d *DeepSkyObject) { d.kind = kind }
+}
+
+// WithDSORadialVelocity sets the catalog (barycentric) radial velocity in
+// km/s, tracked distinctly from "no RV set" — see [MeasuredRadialVelocity].
+//
+// For an extragalactic object this is the headline measurement: SIMBAD
+// carries it for essentially every galaxy, and it is what a redshift is
+// usually quoted as. It was fetched and discarded until now, because
+// FromCatalog read HasRadialVelocity in the star branch only.
+func WithDSORadialVelocity(kmPerSec float64) DSOOption {
+	return func(d *DeepSkyObject) { d.radialVelocity = kmPerSec; d.hasRV = true }
 }
 
 // WithDSOAliases sets alternative designations.
@@ -45,6 +59,12 @@ func NewDeepSkyObject(name string, ra, dec angle.Angle, opts ...DSOOption) *Deep
 	}
 
 	return d
+}
+
+// MeasuredRadialVelocity returns the catalog barycentric radial velocity and
+// whether one was ever set, implementing [MeasuredRadialVelocity].
+func (d *DeepSkyObject) MeasuredRadialVelocity() (float64, bool) {
+	return d.radialVelocity, d.hasRV
 }
 
 // Name returns the object's display name.

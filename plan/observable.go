@@ -43,10 +43,14 @@ type StaticMagnitude interface {
 	StaticMagnitude() (float64, bool)
 }
 
-// MeasuredRadialVelocity is implemented by targets with a catalog
-// (barycentric) radial velocity — currently *Star, via
-// WithRadialVelocity. ok is false when no RV was ever set, distinct
-// from a genuine measured RV of exactly zero.
+// MeasuredRadialVelocity is implemented by a fixed target carrying a catalog
+// (barycentric) radial velocity: *Star via WithRadialVelocity, and
+// *DeepSkyObject via WithDSORadialVelocity. ok is false when no RV was ever
+// set, distinct from a genuine measured RV of exactly zero.
+//
+// A solar-system body implements none of this. Its radial velocity is not a
+// catalog value but a consequence of the geometry at the moment of asking,
+// computed from the ephemeris — see [RadialVelocity].
 type MeasuredRadialVelocity interface {
 	MeasuredRadialVelocity() (kmPerSec float64, ok bool)
 }
@@ -98,6 +102,7 @@ var (
 	_ StaticMagnitude = (*Satellite)(nil)
 
 	_ MeasuredRadialVelocity = (*Star)(nil)
+	_ MeasuredRadialVelocity = (*DeepSkyObject)(nil)
 
 	_ PhysicalRadius = (*Asteroid)(nil)
 )
