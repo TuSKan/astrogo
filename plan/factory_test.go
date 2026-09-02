@@ -380,3 +380,75 @@ func TestFromCatalogKeepsACoordinateAtTheOrigin(t *testing.T) {
 		t.Errorf("position = %v, want the origin it was given", pos)
 	}
 }
+
+// TestFromCatalogKeepsADeepSkyRadialVelocity covers the half of the catalog
+// that was being discarded.
+//
+// SIMBAD populates rvz_radvel for any object type — M31 at −300.0 km/s, M87
+// at +1256.5 — and for an extragalactic object it is the headline
+// measurement, usually quoted as a redshift. FromCatalog read
+// HasRadialVelocity in the star branch only, so a galaxy's arrived and was
+// dropped on the floor.
+func TestFromCatalogKeepsADeepSkyRadialVelocity(t *testing.T) {
+	t.Parallel()
+
+	obs := mustFromCatalog(t, catalog.Target{
+		Name:              "M31-like",
+		Kind:              resolve.KindGalaxy,
+		Coord:             coord.NewICRS(angle.Deg(10.6847), angle.Deg(41.2688)),
+		HasCoord:          true,
+		RadialVelocity:    -300.0,
+		HasRadialVelocity: true,
+	}, nil)
+
+	mrv, ok := obs.(plan.MeasuredRadialVelocity)
+	if !ok {
+		t.Fatalf("%T does not implement MeasuredRadialVelocity", obs)
+	}
+
+	rv, has := mrv.MeasuredRadialVelocity()
+	if !has {
+		t.Fatal("the catalog radial velocity did not survive FromCatalog")
+	}
+
+	if rv != -300.0 {
+		t.Errorf("radial velocity = %v, want -300.0", rv)
+	}
+}
+
+// TestFromCatalogDistinguishesNoRadialVelocityFromZero keeps the same
+// distinction HasRadialVelocity exists for. A galaxy at rest relative to the
+// barycentre would read 0 km/s, and that is a measurement; a galaxy with no
+// published RV also reads 0, and that is not.
+func TestFromCatalogDistinguishesNoRadialVelocityFromZero(t *testing.T) {
+	t.Parallel()
+
+	base := catalog.Target{
+		Name:     "no RV on file",
+		Kind:     resolve.KindGalaxy,
+		Coord:    coord.NewICRS(angle.Deg(10), angle.Deg(41)),
+		HasCoord: true,
+	}
+
+	absent, ok := mustFromCatalog(t, base, nil).(plan.MeasuredRadialVelocity)
+	if !ok {
+		t.Fatal("a deep-sky object does not implement MeasuredRadialVelocity")
+	}
+
+	if _, has := absent.MeasuredRadialVelocity(); has {
+		t.Error("a target with no published RV reports one")
+	}
+
+	measured := base
+	measured.RadialVelocity, measured.HasRadialVelocity = 0, true
+
+	got, ok := mustFromCatalog(t, measured, nil).(plan.MeasuredRadialVelocity)
+	if !ok {
+		t.Fatal("a deep-sky object does not implement MeasuredRadialVelocity")
+	}
+
+	rv, has := got.MeasuredRadialVelocity()
+	if !has || rv != 0 {
+		t.Errorf("a measured 0 km/s reports (%v, %v), want (0, true)", rv, has)
+	}
+}
