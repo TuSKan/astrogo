@@ -39,13 +39,10 @@ import (
 // comparing against another implementation's correction). It is the
 // composition that needed fixing, not the value.
 //
-// Accuracy: about 1 m/s, no better. gofaext.Epv00/Apco13's underlying
-// ephemeris is itself accurate to a few cm/s, but this is a classical
-// (non-relativistic) velocity projection — it does not implement
-// gravitational redshift, light-travel-time to the barycenter, or the
-// target's own proper motion/parallax effects on the projection
-// geometry (the full treatment in Wright & Eastman 2014). Do not use
-// this for sub-1-m/s precision-RV work.
+// This is the projection alone and is deliberately still classical: no
+// relativity enters here. [Context.ObserverFrameShift] carries the observer's
+// own clock, and [Context.BarycentricRadialVelocity] composes the two, which
+// is the function to reach for unless the raw projection is what is wanted.
 func (ctx *Context) BarycentricRVCorrection(target ICRS) float64 {
 	return ctx.BarycentricVelocity().Dot(target.ToUnitVector())
 }
@@ -82,10 +79,21 @@ var lightSpeedKmPerSec = constants.SI2019.SpeedOfLight.Value / 1000.0
 // The correction itself is unchanged and still classical: this fixes how
 // it composes, not what it contains. See [Context.BarycentricRVCorrection]
 // for the terms that remain unimplemented.
-func (ctx *Context) BarycentricRadialVelocity(target ICRS, rvObserved float64) float64 {
+func (ctx *Context) BarycentricRadialVelocity(target ICRS, rvObserved float64) (float64, error) {
 	corr := ctx.BarycentricRVCorrection(target)
 
-	return rvObserved + corr + rvObserved*corr/lightSpeedKmPerSec
+	shift, err := ctx.ObserverFrameShift()
+	if err != nil {
+		return 0, err
+	}
+
+	// Three shifts compose, so the result is c[(1+z1)(1+z2)(1+z3) - 1] with
+	// z = rv/c. Expanded rather than written as that product, because both
+	// velocities are ~1e-4 c and the bracket would cancel fifteen digits
+	// against 1 before c multiplied the residue back up.
+	classical := rvObserved + corr + rvObserved*corr/lightSpeedKmPerSec
+
+	return classical + shift*(lightSpeedKmPerSec+classical), nil
 }
 
 // ObservedRadialVelocity returns the topocentric radial velocity, in
@@ -102,10 +110,19 @@ func (ctx *Context) BarycentricRadialVelocity(target ICRS, rvObserved float64) f
 //
 // which is exact rather than a series, so the round trip closes to
 // floating-point precision at any radial velocity.
-func (ctx *Context) ObservedRadialVelocity(target ICRS, rvBarycentric float64) float64 {
+func (ctx *Context) ObservedRadialVelocity(target ICRS, rvBarycentric float64) (float64, error) {
 	corr := ctx.BarycentricRVCorrection(target)
 
-	return (rvBarycentric - corr) / (1 + corr/lightSpeedKmPerSec)
+	shift, err := ctx.ObserverFrameShift()
+	if err != nil {
+		return 0, err
+	}
+
+	// Undo the observer's own frame first, then the projection, in the
+	// reverse order BarycentricRadialVelocity applied them.
+	classical := (rvBarycentric - shift*lightSpeedKmPerSec) / (1 + shift)
+
+	return (classical - corr) / (1 + corr/lightSpeedKmPerSec), nil
 }
 
 // HeliocentricRVCorrection is [Context.BarycentricRVCorrection], but
@@ -197,4 +214,72 @@ func (ctx *Context) TopocentricRadialVelocity(posAU, velAUPerDay vector.Vec3) fl
 	}
 
 	return bodyVel.Sub(siteVel).Dot(los.Unit())
+}
+
+// ObserverFrameShift returns the fractional frequency shift between the
+// observer's own clock and one at rest at the solar system barycenter,
+// positive because the observer's clock runs slow.
+//
+// # The three terms Wright & Eastman name
+//
+// A radial velocity is read from a spectral line, so anything that changes
+// the observer's clock rate changes the answer. Three things do, and the
+// classical projection accounts for none of them:
+//
+//   - Second-order Doppler, v²/2c². The observer is moving at about 29.8 km/s
+//     and time dilation slows their clock. Worth 1.48 m/s.
+//   - The Sun's gravitational potential at the observer, GM☉/rc². Worth
+//     2.96 m/s, and the largest of the three.
+//   - Earth's own potential at the observing site, GM⊕/Rc². Worth 0.21 m/s.
+//
+// Together about 4.65 m/s — which this package measured as its disagreement
+// with Astropy's relativistic branch long before implementing them, and
+// documented as the price of staying classical. See
+// coord/radialvelocity_fixture_test.go.
+//
+// # Why it matters less than its size suggests
+//
+// These are very nearly constant. A programme measuring how a star's velocity
+// *changes* — which is what precision radial velocity is — sees them cancel,
+// which is why a classical projection served for so long. They matter for an
+// absolute velocity, and for agreeing with anyone else's absolute velocity.
+//
+// The terms omitted from even this are the ones that depend on the target
+// rather than the observer: the light-travel time to the barycentre, and the
+// target's own proper motion and parallax changing the line of sight over the
+// crossing. Those need the target's distance and epoch, which a bare ICRS
+// direction does not carry.
+func (ctx *Context) ObserverFrameShift() (float64, error) {
+	c := constants.SI2019.SpeedOfLight.Value // m/s
+
+	// The observer's barycentric speed, which BarycentricVelocity already
+	// holds in km/s from Apco13's own astrometry.
+	v := ctx.BarycentricVelocity().Norm() * 1000.0
+
+	tdb := ctx.t.TDB()
+	d1, d2 := tdb.JDParts()
+
+	pvh, _, status := gofaext.Epv00(d1, d2)
+	if status < 0 {
+		return 0, fmt.Errorf("%w: status %d", ErrSofaEpv00Failed, status)
+	}
+
+	auMeters := constants.IAU.AstronomicalUnit.Value
+
+	// Heliocentric distance of the observer: Earth's, plus the observer's own
+	// offset from the geocentre. The offset is four parts in 100,000 of the
+	// distance and changes the solar term by a tenth of a millimetre per
+	// second, but it costs one addition.
+	helio := vector.V3(pvh[0][0], pvh[0][1], pvh[0][2]).Add(ctx.ObsVec()).Norm() * auMeters
+
+	geo := ctx.ObsVec().Norm() * auMeters
+	if geo == 0 || helio == 0 {
+		return 0, nil
+	}
+
+	secondOrderDoppler := v * v / (2 * c * c)
+	solarPotential := constants.Ephemeris.SunGravitationalParameter.Value / (helio * c * c)
+	earthPotential := constants.Ephemeris.EarthGravitationalParameter.Value / (geo * c * c)
+
+	return secondOrderDoppler + solarPotential + earthPotential, nil
 }

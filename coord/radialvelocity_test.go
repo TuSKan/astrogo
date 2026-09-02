@@ -279,11 +279,13 @@ func TestObservedRadialVelocity_RoundTripsWithBarycentricRVCorrection(t *testing
 		ctx := coord.NewContext(tm, site, noRefraction)
 
 		for _, target := range targets {
-			rvObserved := ctx.ObservedRadialVelocity(target, rvBarycentric)
+			rvObserved, err := ctx.ObservedRadialVelocity(target, rvBarycentric)
+			testutil.AssertNoError(t, err)
 
 			// The two conversions are exact inverses, so this closes to
 			// floating point rather than to a series truncation.
-			roundTripped := ctx.BarycentricRadialVelocity(target, rvObserved)
+			roundTripped, err := ctx.BarycentricRadialVelocity(target, rvObserved)
+			testutil.AssertNoError(t, err)
 
 			testutil.AssertNear(t, "round-tripped barycentric RV", roundTripped, rvBarycentric, 1e-12)
 		}
@@ -294,9 +296,10 @@ func TestObservedRadialVelocity_RoundTripsWithBarycentricRVCorrection(t *testing
 // conversion against the relation it is derived from, rather than against a
 // restatement of its own arithmetic.
 //
-// A radial velocity is a redshift, and two successive Doppler shifts compose
-// as (1+z) = (1+z1)(1+z2). Writing z = rv/c, the barycentric velocity is
-// therefore c[(1 + rvObserved/c)(1 + corr/c) - 1] exactly. Building the
+// A radial velocity is a redshift, and successive shifts compose as
+// (1+z) = (1+z1)(1+z2)(1+z3). Two are Doppler — the target moving and the
+// observer moving — and the third is the observer clock rate against a
+// barycentric one, which is Context.ObserverFrameShift. Building the
 // expected value that way — from the product, not from the expanded
 // three-term form the implementation uses — means a sign slip or a dropped
 // term in either expression fails the test.
@@ -328,9 +331,17 @@ func TestBarycentricRadialVelocity_ComposesRedshiftsMultiplicatively(t *testing.
 	for _, rvObserved := range []float64{0, -5.5, 20, 100, -300} {
 		for _, target := range targets {
 			corr := ctx.BarycentricRVCorrection(target)
-			want := c * ((1+rvObserved/c)*(1+corr/c) - 1)
 
-			got := ctx.BarycentricRadialVelocity(target, rvObserved)
+			// Three shifts now, not two: the observer's own clock rate is
+			// the third factor. Built here from the product, as the
+			// definition, while the implementation expands it.
+			shift, serr := ctx.ObserverFrameShift()
+			testutil.AssertNoError(t, serr)
+
+			want := c * ((1+rvObserved/c)*(1+corr/c)*(1+shift) - 1)
+
+			got, err := ctx.BarycentricRadialVelocity(target, rvObserved)
+			testutil.AssertNoError(t, err)
 
 			testutil.AssertNear(t, "barycentric RV from the redshift product", got, want, 1e-9)
 		}
@@ -372,17 +383,35 @@ func TestBarycentricRadialVelocity_ExceedsTheAdditiveFormByTheDocumentedAmount(t
 		{300, "a halo star"},
 	}
 
+	// The observer's own frame shift is now part of the answer too, and it
+	// does not scale with the target's velocity — so it is separated here
+	// rather than folded in, which keeps this test measuring the composition
+	// term it was written for.
+	shift, err := ctx.ObserverFrameShift()
+	testutil.AssertNoError(t, err)
+
 	for _, tc := range cases {
 		additive := tc.rvObserved + corr
-		exact := ctx.BarycentricRadialVelocity(target, tc.rvObserved)
 
-		gapMPerS := (exact - additive) * 1e3
+		exact, eerr := ctx.BarycentricRadialVelocity(target, tc.rvObserved)
+		testutil.AssertNoError(t, eerr)
+
+		// The frame shift acts on the whole classical value, not on c alone,
+		// so subtracting shift*c leaves shift*rv behind — 4.8 mm/s for the
+		// halo star, which is small and is not nothing. Subtracting the exact
+		// contribution keeps this test measuring the composition term it was
+		// written for rather than a mixture.
+		classical := tc.rvObserved + corr + tc.rvObserved*corr/c
+		frameMPerS := shift * (c + classical) * 1e3
+
+		gapMPerS := (exact-additive)*1e3 - frameMPerS
 		wantMPerS := tc.rvObserved * corr / c * 1e3
 
-		t.Logf("rv %+7.1f km/s (%s): additive form is off by %+8.2f m/s",
-			tc.rvObserved, tc.what, gapMPerS)
+		t.Logf("rv %+7.1f km/s (%s): composition term %+8.2f m/s, frame shift %+.2f",
+			tc.rvObserved, tc.what, gapMPerS, frameMPerS)
 
-		testutil.AssertNear(t, "gap against the additive form", gapMPerS, wantMPerS, 1e-9)
+		testutil.AssertNear(t, "composition term against the additive form",
+			gapMPerS, wantMPerS, 1e-9)
 	}
 
 	// The claim the doc comments make: at 46.6 km/s the dropped term equals
