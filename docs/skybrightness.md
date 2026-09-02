@@ -1443,7 +1443,7 @@ of the physics.
 | ~~Legacy-only, explicitly named~~ | **Not carried out, and the record should say so.** The plan was `KS91 → LegacyKS91` with the constant airglow kept as a named climatology fallback. Neither exists. KS91 was deleted outright rather than preserved under a legacy name, because a closed-form V-band fit has no spectrum to project and keeping it would have meant shipping a component that cannot answer the question this module asks; and the constant airglow became a fetched SkyCalc spectrum rather than a fallback, so there is nothing left to fall back *to*. |
 | Deleted | `bortle.go`, `natural.TophatJohnson`, `natural.NewFastEngine`, `mode.go` (replaced by `Fidelity`), `scratch.go`, `atmos.RayleighOnly`, `limitingmag.go`. |
 
-`plan.LimitingMagnitudeConstraint`, `plan.ScoreObservableSky` and examples 18 and 21 were
+`plan.LimitingMagnitudeConstraint`, `plan.ScoreObservable` and examples 18 and 21 were
 removed with it. **Example 18 has returned. The other three have not**, and the condition
 originally written here — "once Phases 2–3 make a defensible limiting magnitude possible" —
 has since been half-met in a way worth stating precisely rather than leaving as a promise

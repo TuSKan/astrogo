@@ -403,7 +403,7 @@ implementing `MeasuredRadialVelocity` (currently `*Star`).
 - [x] `resolve.Target.HasRadialVelocity` — distinguishes a true-zero measured RV from
       "no RV on file", which a zero `RadialVelocity` cannot. Set by `catalog/simbad`,
       preserved through the multi-provider merge in `catalog`, and consumed by
-      `plan.NewStarFromTarget`; a genuine 0 km/s measurement is covered by tests in all
+      `plan.FromCatalog`; a genuine 0 km/s measurement is covered by tests in all
       three packages
 - [x] Cross-implementation fixture test against Astropy's
       `SkyCoord.radial_velocity_correction` — 175 cases (5 named sites × 5 epochs × 7
