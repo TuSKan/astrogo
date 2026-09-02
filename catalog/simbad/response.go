@@ -17,6 +17,11 @@ import (
 // ErrMissingColumn indicates a required column is missing from the SIMBAD response.
 var ErrMissingColumn = errors.New("simbad: missing expected column")
 
+// ErrEmptyQuery marks a resolve request with nothing to match on. An empty
+// name cannot identify an object, and matching it against everything is how
+// the substring query this replaced returned an arbitrary one.
+var ErrEmptyQuery = errors.New("simbad: empty query")
+
 // ParseCSV parses SIMBAD's TAP output in CSV format into resolve.Targets.
 // The expected order from BuildResolveQuery is:
 // oid, main_id, ra, dec, otype, id (matched alias)

@@ -1,9 +1,10 @@
 package plan
 
 import (
+	"fmt"
+
 	"strconv"
 
-	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/catalog"
 	"github.com/TuSKan/astrogo/catalog/resolve"
 	eph "github.com/TuSKan/astrogo/ephemeris"
@@ -25,12 +26,12 @@ import (
 //     preferred over eph.Default() here, which has no data for an arbitrary small body
 //   - Star kind → *Star
 //   - Everything else → *DeepSkyObject
-func FromCatalog(c catalog.Target, p eph.Provider) Observable {
+func FromCatalog(c catalog.Target, p eph.Provider) (Observable, error) {
 	id := parseEphID(c.ID)
 
 	// ── Satellite ──
 	if c.Kind == "Satellite" && p != nil {
-		return NewSatellite(c.Name, id, p)
+		return NewSatellite(c.Name, id, p), nil
 	}
 
 	// ── Sun/Moon/planets — always have a real ephemeris, provider or not ──
@@ -46,7 +47,7 @@ func FromCatalog(c catalog.Target, p eph.Provider) Observable {
 	// be on c.Coord. A caller-supplied provider (a real kernel, for
 	// perturbation-aware accuracy) always takes precedence, unchanged.
 	if (c.Kind == resolve.KindPlanet || c.Kind == resolve.KindMoon || c.Kind == resolve.KindStar) && isPlanetID(id) {
-		return NewPlanet(c.Name, id, p)
+		return NewPlanet(c.Name, id, p), nil
 	}
 
 	// ── Moving body with provider ──
@@ -60,22 +61,22 @@ func FromCatalog(c catalog.Target, p eph.Provider) Observable {
 		// FromCatalog has no error return.
 		if c.Kind == resolve.KindPlanetaryMoon {
 			if m, err := NewPlanetaryMoon(c.Name, p); err == nil {
-				return m
+				return m, nil
 			}
 		}
 
 		// Comet
 		if c.HasM1 {
-			return newCometFromTarget(c, id, p)
+			return newCometFromTarget(c, id, p), nil
 		}
 
 		// Asteroid
 		if c.HasH {
-			return NewAsteroid(c.Name, id, p, asteroidOptsFrom(c)...)
+			return NewAsteroid(c.Name, id, p, asteroidOptsFrom(c)...), nil
 		}
 
 		// Generic moving body (unknown sub-type) — no photometric model.
-		return NewGenericBody(c.Name, id, p)
+		return NewGenericBody(c.Name, id, p), nil
 	}
 
 	// ── Elements-only moving body (no provider supplied) ──
@@ -106,15 +107,24 @@ func FromCatalog(c catalog.Target, p eph.Provider) Observable {
 			if provider, err := eph.NewFromElements(keplerID, el); err == nil {
 				switch {
 				case c.HasM1:
-					return newCometFromTarget(c, keplerID, provider)
+					return newCometFromTarget(c, keplerID, provider), nil
 				case c.HasH:
-					return NewAsteroid(c.Name, keplerID, provider, asteroidOptsFrom(c)...)
+					return NewAsteroid(c.Name, keplerID, provider, asteroidOptsFrom(c)...), nil
 				}
 			}
 		}
 	}
 
 	// ── Fixed targets ──
+
+	// ── Fixed targets need a real position ──
+	//
+	// Everything above this line gets its position from an ephemeris, so a
+	// missing catalog coordinate is irrelevant to it. Everything below is
+	// pinned to c.Coord and cannot be built without one.
+	if !c.HasCoord {
+		return nil, fmt.Errorf("%w: %s", ErrNoCoordinates, c.Name)
+	}
 
 	// Star
 	if c.Kind == resolve.KindStar || c.Kind == resolve.KindDoubleStar {
@@ -139,25 +149,10 @@ func FromCatalog(c catalog.Target, p eph.Provider) Observable {
 			opts = append(opts, WithAliases(c.Aliases...))
 		}
 
-		ra := angle.Rad(0)
-		dec := angle.Rad(0)
-
-		if c.HasCoord {
-			ra = c.Coord.RA()
-			dec = c.Coord.Dec()
-		}
-
-		return NewStar(c.Name, ra, dec, opts...)
+		return NewStar(c.Name, c.Coord.RA(), c.Coord.Dec(), opts...), nil
 	}
 
 	// Deep-sky object (galaxy, nebula, cluster, etc.)
-	ra := angle.Rad(0)
-	dec := angle.Rad(0)
-
-	if c.HasCoord {
-		ra = c.Coord.RA()
-		dec = c.Coord.Dec()
-	}
 
 	var opts []DSOOption
 	if c.HasVMag {
@@ -176,7 +171,7 @@ func FromCatalog(c catalog.Target, p eph.Provider) Observable {
 		opts = append(opts, WithDSOAliases(c.Aliases...))
 	}
 
-	return NewDeepSkyObject(c.Name, ra, dec, opts...)
+	return NewDeepSkyObject(c.Name, c.Coord.RA(), c.Coord.Dec(), opts...), nil
 }
 
 // newCometFromTarget builds a *Comet from c's M1/K1 (and optional M2/K2)

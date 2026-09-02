@@ -42,55 +42,87 @@ func (p *Provider) Capabilities() []resolve.Capability {
 	return []resolve.Capability{resolve.CapObjectResolution, resolve.CapMagnitudeBrowse}
 }
 
-// Resolve matches a single object by returning the most relevant hit.
-// Adheres strictly to resolve.Provider and utilizes AstroGo scoring for precision.
+// Resolve identifies the single object a name refers to.
+//
+// # Identity, not the best of a search
+//
+// This used to be Search's first result after client-side scoring, and the
+// scoring could not save it: the underlying query matched any object holding
+// the name as a substring of any identifier, so for "M31" the ten rows
+// fetched out of 15,843 were Chandra sources inside the galaxy and M31 itself
+// was not among them. Scoring ranks what it is given.
+//
+// It now matches identifiers exactly, against the spellings SIMBAD is known
+// to store — see [identifierVariants]. An unknown name returns false rather
+// than the least-wrong of ten wrong answers, because a caller can act on
+// "not found" and cannot act on a plausible object 70 degrees from the one
+// they asked for.
+//
+// Aliases fan out across rows, so several rows may arrive for one object;
+// they are merged by oid upstream in ResolveObject and the first target is
+// the object.
 func (p *Provider) Resolve(ctx context.Context, query string) (resolve.Target, bool) {
-	targets := p.Search(ctx, query)
+	targets := p.ResolveObjects(ctx, resolve.ObjectRequest{Query: query, Limit: 10})
 	if len(targets) == 0 {
 		return resolve.Target{}, false
 	}
 
-	bestIdx := 0
-	bestScore := -1.0
-
-	for i, t := range targets {
-		s := resolve.Score(query, t.Name)
-		if idScore := resolve.Score(query, t.ID); idScore > s {
-			s = idScore
-		}
-
-		for _, a := range t.Aliases {
-			if aScore := resolve.Score(query, a); aScore > s {
-				s = aScore
-			}
-		}
-
-		if s > bestScore {
-			bestScore = s
-			bestIdx = i
-		}
-	}
-
-	return targets[bestIdx], true
+	return targets[0], true
 }
 
-// Search matches all objects closely matching a freeform query.
-func (p *Provider) Search(ctx context.Context, query string) []resolve.Target {
-	req := resolve.ObjectRequest{Query: query, Limit: 10}
-
-	iter := p.ResolveObject(ctx, req)
+// ResolveObjects drains ResolveObject into a slice, dropping errors after
+// logging them — the shape both Resolve and Search need.
+func (p *Provider) ResolveObjects(ctx context.Context, req resolve.ObjectRequest) []resolve.Target {
+	limit := req.Limit
+	if limit <= 0 {
+		limit = 10
+	}
 
 	var targets []resolve.Target
 
-	iter(func(t resolve.Target, err error) bool {
+	p.ResolveObject(ctx, req)(func(t resolve.Target, err error) bool {
 		if err != nil {
 			log.Printf("SIMBAD ERR: %v", err)
+
 			return false
 		}
 
 		targets = append(targets, t)
-		// Try to read up to 10
-		return len(targets) < 10
+
+		return len(targets) < limit
+	})
+
+	return targets
+}
+
+// Search matches objects whose identifiers begin with a freeform query.
+//
+// Distinct from [Provider.Resolve], and deliberately: several answers are
+// this method's purpose, where for Resolve they are a failure. Anchored at
+// the start rather than wrapped in wildcards, and ordered brightest-first,
+// so the rows are ones a person would recognise and are the same rows on
+// every call — the query this replaces had no ORDER BY, and two identical
+// searches for "M42" returned different objects.
+func (p *Provider) Search(ctx context.Context, query string) []resolve.Target {
+	if strings.TrimSpace(query) == "" {
+		return nil
+	}
+
+	req := resolve.ObjectRequest{Query: query, Limit: 10}
+	adql := BuildSearchQuery(req)
+
+	var targets []resolve.Target
+
+	p.stream(ctx, "search:"+query, adql)(func(tgt resolve.Target, err error) bool {
+		if err != nil {
+			log.Printf("SIMBAD ERR: %v", err)
+
+			return false
+		}
+
+		targets = append(targets, tgt)
+
+		return len(targets) < req.Limit
 	})
 
 	return targets
@@ -155,6 +187,19 @@ func (p *Provider) ResolveObject(ctx context.Context, req resolve.ObjectRequest)
 	}
 
 	adql := BuildResolveQuery(req)
+	if adql == "" {
+		return func(yield func(resolve.Target, error) bool) {
+			yield(resolve.Target{}, ErrEmptyQuery)
+		}
+	}
+
+	return p.stream(ctx, cacheKey, adql)
+}
+
+// stream runs one ADQL query and yields its rows, caching a successful
+// fetch. Shared by the identity and search paths, which differ only in the
+// query they hand it.
+func (p *Provider) stream(ctx context.Context, cacheKey, adql string) resolve.SeqIterator[resolve.Target] {
 	v := TAPRequest(adql)
 
 	return func(yield func(resolve.Target, error) bool) {

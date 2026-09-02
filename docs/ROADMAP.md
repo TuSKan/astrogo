@@ -333,7 +333,7 @@ atmospheric dispersion compensator planning.
 
 ## 39. Central-Body Keplerian Propagation (Planetary Moons)
 
-**Status:** 🔲 Not Started
+**Status:** 🟢 Done
 
 `ephemeris/kepler` propagates asteroids/comets from heliocentric elements around the
 Sun's GM; a planetary moon needs the same two-body machinery around its *parent

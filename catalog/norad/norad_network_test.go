@@ -149,3 +149,29 @@ func TestResolve_Live(t *testing.T) {
 		t.Errorf("Catalog = %q, want %q", target.Catalog, "norad")
 	}
 }
+
+// TestResolveISSIsTheStation is the end-to-end guard on the defect.
+//
+// The README's satellite showcase is "predict ISS passes over your location",
+// and Resolve("ISS") returned UME (ISS) — NORAD 8709, a Japanese ionosphere
+// satellite launched in 1976. Every pass, elevation and ground track computed
+// from it was for the wrong spacecraft, and nothing said so.
+func TestResolveISSIsTheStation(t *testing.T) {
+	testutil.RequireReachable(t, "celestrak.org:443")
+
+	p := New()
+
+	for _, q := range []string{"ISS", "25544", "ISS (ZARYA)"} {
+		t.Run(q, func(t *testing.T) {
+			tgt, ok := p.Resolve(context.Background(), q)
+			if !ok {
+				t.Fatalf("Resolve(%q) found nothing", q)
+			}
+
+			if tgt.ID != "25544" {
+				t.Errorf("Resolve(%q) = %q (NORAD %s), want NORAD 25544 ISS (ZARYA)",
+					q, tgt.Name, tgt.ID)
+			}
+		})
+	}
+}

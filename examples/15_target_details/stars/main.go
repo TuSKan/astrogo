@@ -41,7 +41,10 @@ func main() {
 		log.Fatalf("failed to resolve Sirius: %v", err)
 	}
 
-	sirius := plan.FromCatalog(catTarget, nil)
+	sirius, err := plan.FromCatalog(catTarget, nil)
+	if err != nil {
+		log.Fatalf("build target: %v", err)
+	}
 
 	details, err := sirius.GetDetails(ctx,
 		"Bayer letter", "α CMa",

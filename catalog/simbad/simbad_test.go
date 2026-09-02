@@ -441,3 +441,99 @@ func redirect(t *testing.T, id remote.EndpointID, url string) {
 		t.Fatalf("SetURL(%s): %v", id, err)
 	}
 }
+
+// TestIdentifierVariantsCoversSIMBADPadding pins the spellings the exact
+// match depends on, without a network call.
+//
+// SIMBAD right-justifies a catalogue number in a fixed-width field — "M  31",
+// "HD   3969" — and its ADQL cannot normalise (REPLACE, LOWER, ILIKE and
+// ivo_nocasematch are all rejected by the live parser). So these variants are
+// the whole mechanism: if the padded forms stop being generated, resolution
+// silently reverts to matching only what the user typed.
+func TestIdentifierVariantsCoversSIMBADPadding(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		query string
+		want  []string
+	}{
+		{"M31", []string{"M31", "M 31", "M  31", "M   31", "M    31", "NAME M31"}},
+		{"NGC5128", []string{"NGC5128", "NGC 5128", "NGC  5128", "NAME NGC5128"}},
+		{"Sirius", []string{"Sirius", "NAME Sirius"}},
+	} {
+		t.Run(tc.query, func(t *testing.T) {
+			t.Parallel()
+
+			got := identifierVariants(tc.query)
+
+			have := make(map[string]bool, len(got))
+			for _, g := range got {
+				have[g] = true
+			}
+
+			for _, w := range tc.want {
+				if !have[w] {
+					t.Errorf("variants(%q) is missing %q; got %q", tc.query, w, got)
+				}
+			}
+		})
+	}
+
+	if v := identifierVariants("   "); v != nil {
+		t.Errorf("a blank query produced %q; it must match nothing rather than everything", v)
+	}
+}
+
+// TestBuildResolveQueryIsExactNotSubstring is the guard on the defect itself.
+//
+// The query this replaced was `WHERE ident.id LIKE '%<query>%'`, which for
+// "M31" matched 15,843 rows and returned an unordered ten of them — none of
+// which was M31. A LIKE reappearing in the identity query would restore that
+// silently, since the failure looks like a plausible object rather than an
+// error.
+func TestBuildResolveQueryIsExactNotSubstring(t *testing.T) {
+	t.Parallel()
+
+	q := BuildResolveQuery(resolve.ObjectRequest{Query: "M31", Limit: 10})
+
+	if strings.Contains(q, "LIKE") {
+		t.Errorf("the identity query uses LIKE:\n%s", q)
+	}
+
+	if !strings.Contains(q, "'M  31'") {
+		t.Errorf("the identity query does not offer SIMBAD's own padded spelling:\n%s", q)
+	}
+
+	// The subquery is what preserves the alias fan-out: filtering the joined
+	// ident directly would return only the identifier that matched.
+	if !strings.Contains(q, "SELECT oidref FROM ident WHERE id IN") {
+		t.Errorf("the identity query does not select by oid, so aliases would be lost:\n%s", q)
+	}
+
+	if BuildResolveQuery(resolve.ObjectRequest{Query: "  "}) != "" {
+		t.Error("a blank query produced a query; it must produce none")
+	}
+}
+
+// TestBuildSearchQueryIsAnchoredAndOrdered keeps the fuzzy path honest.
+//
+// Search is allowed to be fuzzy — that is its purpose — but not unbounded and
+// not unordered. Two identical searches for "M42" used to return different
+// objects, because TOP N without ORDER BY is whatever the planner produces.
+func TestBuildSearchQueryIsAnchoredAndOrdered(t *testing.T) {
+	t.Parallel()
+
+	q := BuildSearchQuery(resolve.ObjectRequest{Query: "M42", Limit: 10})
+
+	if strings.Contains(q, "'%M42%'") {
+		t.Errorf("search is still wrapped in wildcards on both sides:\n%s", q)
+	}
+
+	if !strings.Contains(q, "LIKE 'M42%'") {
+		t.Errorf("search is not anchored at the start of the identifier:\n%s", q)
+	}
+
+	if !strings.Contains(q, "ORDER BY") {
+		t.Errorf("search has no ORDER BY, so its results are not reproducible:\n%s", q)
+	}
+}

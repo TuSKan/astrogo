@@ -39,7 +39,10 @@ func main() {
 		}
 	}()
 
-	iss := plan.FromCatalog(catTarget, prov)
+	iss, err := plan.FromCatalog(catTarget, prov)
+	if err != nil {
+		log.Fatalf("build target: %v", err)
+	}
 
 	// Use satellite epoch for calculation (you can use time.Date/Now() as well)
 	t := catTarget.Epoch

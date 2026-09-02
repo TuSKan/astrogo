@@ -41,7 +41,10 @@ func main() {
 		log.Fatalf("failed to resolve M31: %v", err)
 	}
 
-	m31 := plan.FromCatalog(catTarget, nil)
+	m31, err := plan.FromCatalog(catTarget, nil)
+	if err != nil {
+		log.Fatalf("build target: %v", err)
+	}
 
 	details, err := m31.GetDetails(ctx, "Description", "Andromeda Galaxy", "Source", "OpenNGC")
 	if err != nil {
