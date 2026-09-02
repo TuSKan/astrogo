@@ -87,10 +87,7 @@ func TestCheby(t *testing.T) {
 }
 
 func TestJPLUnitsAreAUAndAUPerDay(t *testing.T) {
-	p, err := jpl.NewProvider(context.Background(), core.Planets, "de440s")
-	if err != nil {
-		t.Fatalf("failed to initialize provider: %v", err)
-	}
+	p := mustPlanetProvider(t)
 
 	t.Cleanup(func() {
 		err := p.Close()
@@ -111,10 +108,7 @@ func TestJPLUnitsAreAUAndAUPerDay(t *testing.T) {
 }
 
 func TestJPLUnsupportedBody(t *testing.T) {
-	p, err := jpl.NewProvider(context.Background(), core.Planets, "de440s")
-	if err != nil {
-		t.Fatalf("setup failed: %v", err)
-	}
+	p := mustPlanetProvider(t)
 
 	t.Cleanup(func() {
 		err := p.Close()
@@ -123,17 +117,14 @@ func TestJPLUnsupportedBody(t *testing.T) {
 		}
 	})
 
-	_, err = p.State(core.ID(255), time.NowUTC())
+	_, err := p.State(core.ID(255), time.NowUTC())
 	if err == nil {
 		t.Error("Expected error for unsupported body")
 	}
 }
 
 func TestJPLOutOfCoverageEpoch(t *testing.T) {
-	p, err := jpl.NewProvider(context.Background(), core.Planets, "de440s")
-	if err != nil {
-		t.Fatalf("setup failed: %v", err)
-	}
+	p := mustPlanetProvider(t)
 
 	t.Cleanup(func() {
 		err := p.Close()
@@ -145,17 +136,14 @@ func TestJPLOutOfCoverageEpoch(t *testing.T) {
 	// Year 5000
 	tm := time.FromJD(3545000.0, time.UTC)
 
-	_, err = p.State(core.Sun, tm)
+	_, err := p.State(core.Sun, tm)
 	if err == nil {
 		t.Error("Expected error for out-of-coverage epoch")
 	}
 }
 
 func TestJPLDeterministicRepeatedCalls(t *testing.T) {
-	p, err := jpl.NewProvider(context.Background(), core.Planets, "de440s")
-	if err != nil {
-		t.Fatalf("setup failed: %v", err)
-	}
+	p := mustPlanetProvider(t)
 
 	t.Cleanup(func() {
 		err := p.Close()
@@ -183,10 +171,7 @@ func TestJPLDeterministicRepeatedCalls(t *testing.T) {
 
 func TestSourceSelection(t *testing.T) {
 	t.Run("Planets", func(t *testing.T) {
-		p, err := jpl.NewProvider(context.Background(), core.Planets, "de440s")
-		if err != nil {
-			t.Fatalf("Planets source failed: %v", err)
-		}
+		p := mustPlanetProvider(t)
 
 		if p == nil {
 			t.Fatal("Planets source returned nil provider")
@@ -331,10 +316,7 @@ func TestSmallBodyMultiMatch(t *testing.T) {
 // in this sandbox), but it does exercise the exact interleaving under real
 // CI, and confirms nothing panics or deadlocks under contention.
 func TestProvider_ConcurrentAddKernelAndState(t *testing.T) {
-	p, err := jpl.NewProvider(context.Background(), core.Planets, "de440s")
-	if err != nil {
-		t.Fatalf("setup failed: %v", err)
-	}
+	p := mustPlanetProvider(t)
 
 	t.Cleanup(func() {
 		if err := p.Close(); err != nil {
