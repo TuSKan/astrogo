@@ -18,6 +18,18 @@ const (
 	// motion.
 	IERSFinals2000A EndpointID = "iers.finals2000A"
 
+	// IERSTimescales is the IERS Data Center timescale web service, which
+	// answers ΔAT (TAI−UTC) at a given instant.
+	//
+	// Used only as a validation oracle, never at runtime. It is a point
+	// query rather than a table, so a conversion would cost a network
+	// round-trip and could not work offline — but it is IERS's own answer
+	// rather than a republication, which makes it the one reference that
+	// does not share ancestry with gofa's table, NAIF's kernel and
+	// finals2000A. See internal/metrology's Reference.SharedAncestor for
+	// why that distinction is worth an endpoint.
+	IERSTimescales EndpointID = "iers.timescales"
+
 	// NAIFSPK is NASA NAIF's generic-kernels SPK directory, from which
 	// ephemeris/jpl downloads planetary ephemeris kernels. Sizes vary
 	// widely: de440s ~32 MB, de440/de442 ~115 MB, de441 parts multi-GB.
@@ -414,6 +426,16 @@ func defaultEndpoints() map[EndpointID]Endpoint {
 			DownloadTimeout: 30 * time.Second,
 			Mutable:         true,
 			Downloadable:    true,
+		},
+		IERSTimescales: {
+			ID:          IERSTimescales,
+			URL:         "https://datacenter.iers.org/webservice/REST/timescales/RestController.php",
+			Kind:        KindAPI,
+			Subsystem:   "time",
+			Description: "IERS timescale web service (ΔAT at an instant; validation oracle only)",
+			ApproxSize:  1_000,
+			Enabled:     true,
+			Timeout:     30 * time.Second,
 		},
 		NAIFSPK: {
 			ID:              NAIFSPK,

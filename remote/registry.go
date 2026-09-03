@@ -293,6 +293,8 @@ func constName(id EndpointID) string {
 	switch id {
 	case IERSFinals2000A:
 		return "IERSFinals2000A"
+	case IERSTimescales:
+		return "IERSTimescales"
 	case NAIFSPK:
 		return "NAIFSPK"
 	case NAIFLSK:

@@ -96,6 +96,12 @@ func TestLeapSecondSourcesAgree(t *testing.T) {
 	// Sampled a day after each step so the comparison is unambiguous: both
 	// sources are then well inside the same interval, and a half-open-interval
 	// disagreement at the boundary cannot masquerade as a table mismatch.
+	//
+	// The boundary itself is not skipped, only moved: time's
+	// TestLeapSecondBoundaryConvention asserts it offline against the pinned
+	// record, and TestIERSOracleConfirmsTheBoundaryConvention checks that rule
+	// against IERS. Keeping the two questions in separate tests is what lets
+	// each fail with an unambiguous message.
 	var checked int
 
 	for _, d := range r.DeltaAt {

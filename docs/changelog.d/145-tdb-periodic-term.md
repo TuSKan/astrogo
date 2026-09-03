@@ -1,6 +1,6 @@
 ---
 type: Fixed
-pr: 144
+pr: 145
 ---
 **`lsk.UTCToTDB` returned TT, not TDB.** Its formula omitted the TDB−TT
 periodic term (~1.7 ms amplitude — 1.7 m of lunar motion, 85 m for Mars). The
