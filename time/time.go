@@ -614,11 +614,11 @@ func (t Time) DecimalYear() float64 {
 
 // ApplyDeltaT converts a UTC/UT time to TT by applying the ΔT polynomial
 // (Espenak & Meeus 2006). This is the correct conversion for historical
-// dates where IERS leap-second data (LSK) is not available.
+// dates, before UTC began accumulating whole leap seconds in 1972.
 //
-// For modern dates (post-1972), the standard TT() method using the LSK
-// is preferred. For historical dates (especially pre-1600), this method
-// provides the only reliable UT → TT bridge.
+// For modern dates (post-1972), the standard TT() method is preferred. For
+// historical dates (especially pre-1600), this method provides the only
+// reliable UT → TT bridge.
 //
 // The relationship is: TT = UT + ΔT, where ΔT = TT − UT1 encodes the
 // accumulated drift in Earth's rotation rate due to tidal friction.
@@ -970,12 +970,23 @@ func (t Time) TAI() Time {
 
 // TT returns a new Time converted to the Terrestrial Time scale.
 //
-// For modern dates (post-1972), the conversion uses leap seconds from the
-// NAIF LSK: TT = UTC + ΔAT + 32.184s. For historical dates (pre-1972),
-// where no leap-second data exists, the Espenak & Meeus (2006) ΔT polynomial
-// is used automatically: TT = UT + ΔT. This means .TT() and .TDB() produce
-// correct results for any epoch from -1999 to +3000 without requiring the
-// user to call ApplyDeltaT() explicitly.
+// For modern dates (post-1972), the conversion applies leap seconds:
+// TT = UTC + ΔAT + 32.184s. For historical dates (pre-1972), where leap
+// seconds do not exist, the Espenak & Meeus (2006) ΔT polynomial is used
+// automatically: TT = UT + ΔT. This means .TT() and .TDB() produce correct
+// results for any epoch from -1999 to +3000 without requiring the user to
+// call ApplyDeltaT() explicitly.
+//
+// # Where ΔAT comes from
+//
+// From SOFA's own table, via gofa's Dat — not from a NAIF leap-second kernel.
+// Earlier revisions of this comment said "the NAIF LSK", which was never true
+// of this package: nothing under time/ reads a kernel, and no LSK loader is
+// registered here. The kernel is read only by ephemeris/jpl, which uses it to
+// compute the ET its own SPK segments are indexed by (see lsk.UTCToTDB). The
+// two tables agree — TestLeapSecondSourcesAgree pins that — but they are
+// separate sources, and whether time should consume the kernel instead is an
+// open question rather than the current behaviour.
 func (t Time) TT() Time {
 	if t.scale == TT {
 		return t

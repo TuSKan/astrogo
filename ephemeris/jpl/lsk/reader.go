@@ -132,6 +132,17 @@ func NewReader(r io.ReadCloser) (*Reader, error) {
 		}
 	}
 
+	// A read that failed part-way leaves a *partial* DELTA_AT table, which is
+	// the dangerous shape rather than the obvious one: the emptiness check
+	// below catches a total failure, and nothing catches a table that simply
+	// stops early. That is the same defect a dropped final entry produced —
+	// every epoch after the truncation converting a second short, with the
+	// geocentric Sun about 30 km from where DE440 has it — except arriving
+	// from a short read instead of a parsing slip.
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("lsk: read kernel: %w", err)
+	}
+
 	if len(l.DeltaAt) == 0 {
 		return nil, ErrNoLeapseconds
 	}
@@ -149,6 +160,17 @@ func (r *Reader) Close() error {
 	}
 
 	return nil
+}
+
+// covers reports whether jd falls within the era the DELTA_AT table speaks
+// for — that is, at or after its first entry.
+//
+// The table starts at 1972-01-01 because that is when UTC began accumulating
+// whole leap seconds. An earlier epoch is not a small extrapolation: leap
+// seconds do not apply at all, and the offset between atomic and rotational
+// time is the historical Delta-T, which no leap-second table carries.
+func (r *Reader) covers(jd float64) bool {
+	return len(r.DeltaAt) > 0 && jd >= r.DeltaAt[0].JD
 }
 
 // hasDeltaET reports whether the relativistic constants were all present.
@@ -362,11 +384,25 @@ func UTCToTDB(t time.Time, l *Reader) float64 {
 	d1, d2 := utc.JDParts()
 	jdUTC := d1 + d2
 
-	if l == nil || !l.hasDeltaET() {
-		// No usable kernel. Fall back to astrogo's own model rather than
-		// returning a UTC date mislabelled as TDB — a caller reaching here has
-		// a defective kernel, and a silently wrong epoch is worse than a
-		// slightly different convention.
+	if l == nil || !l.hasDeltaET() || !l.covers(jdUTC) {
+		// Either no usable kernel, or an epoch the kernel cannot speak for.
+		//
+		// The DELTA_AT table begins at 1972-01-01, because that is when UTC
+		// began accumulating whole leap seconds. Before it there are no leap
+		// seconds to add, and TT-UT1 is the historical Delta-T instead —
+		// roughly 10,500 s at year 1, which is not a rounding difference.
+		//
+		// [time.DeltaT] owns that model: the Espenak & Meeus (2006) polynomial
+		// expressions, with the Morrison & Stephenson (2004) base and a secular
+		// acceleration correction. Delegating reaches it rather than
+		// duplicating it — time.Time's own scale conversion switches to DeltaT
+		// below 1972, the same boundary [Reader.covers] uses, so the two agree
+		// by construction rather than by coincidence.
+		//
+		// Measured against time.TDB before this guard existed: -174.9 min at
+		// year 1, -25.5 min at year 1000, +0.6 min at 1900, and exact from
+		// 1972 on. It surfaced as ~180 min errors in the AstroPixels lunar
+		// phase comparison for year 0001.
 		td1, td2 := t.TDB().JDParts()
 
 		return td1 + td2
