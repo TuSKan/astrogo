@@ -14,8 +14,17 @@ import (
 )
 
 func TestLSKReader(t *testing.T) {
-	prov, err := jpl.NewProvider(context.Background(), core.Planets, "de440s")
+	// Bounded, because remote.NAIFSPK registers a 30-minute DownloadTimeout
+	// — right for a caller deliberately fetching a kernel, and longer than
+	// this binary's whole budget. Without a cap a stalled fetch hangs until
+	// the package times out, which is how a bad minute at NAIF turned main
+	// red rather than skipping.
+	fetchCtx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	defer cancel()
+
+	prov, err := jpl.NewProvider(fetchCtx, core.Planets, "de440s")
 	if err != nil {
+		testutil.SkipOnUpstreamFailure(t, err)
 		t.Fatalf("setup failed: %v", err)
 	}
 
