@@ -261,9 +261,20 @@ func (s *Satellite) subSatellitePoint(t time.Time) (*coord.Geodetic, error) {
 	}
 
 	// Compute GAST for ECI → ECEF conversion. Falls back to UTC-derived
-	// GAST (a few hundred ms of error at worst) rather than failing if
-	// IERS EOP data is unavailable, matching this function's existing
-	// no-error-return contract.
+	// GAST rather than failing if IERS EOP data is unavailable, matching
+	// this function's existing no-error-return contract.
+	//
+	// That fallback costs up to 0.9 s of Earth rotation — the bound the
+	// leap-second system enforces on UT1-UTC — which is about 13.5 arcsec
+	// of longitude, or 420 m of sub-satellite position at the equator. The
+	// comment here previously said "a few hundred ms", which understated it
+	// threefold. It is a ground-track error, not an orbit error: the ECI
+	// state is unaffected.
+	//
+	// CGPM Resolution 4 (2022) ends leap seconds by 2035 and with them that
+	// bound, so this degradation is unbounded thereafter. Discarding the
+	// error is deliberate here and stays deliberate, but it is worth knowing
+	// what is being discarded.
 	gast, _ := t.GAST()
 
 	// Rotate ECI → ECEF.

@@ -13,9 +13,20 @@ func (t Time) MJD() float64 {
 
 // GAST returns the Greenwich Apparent Sidereal Time for t (IAU 2006
 // model, SOFA Gst06a). If IERS EOP data doesn't cover t's epoch, GAST
-// falls back to using UTC in place of UT1 (a few hundred ms of error at
-// worst) and returns the lookup error alongside the best-effort result,
-// mirroring UT1<->UTC conversion's own fallback contract.
+// falls back to using UTC in place of UT1 and returns the lookup error
+// alongside the best-effort result, mirroring UT1<->UTC conversion's own
+// fallback contract.
+//
+// The error that fallback costs is bounded only by the leap-second system:
+// UT1-UTC is held inside ±0.9 s, with IERS acting near ±0.7 s in practice.
+// So the worst case is about 0.9 s of Earth rotation — roughly 13.5 arcsec,
+// or 420 m of ground position at the equator — not the "few hundred ms" this
+// comment claimed before the bound was checked.
+//
+// That bound is also temporary. CGPM Resolution 4 (27th CGPM, 2022) ends leap
+// seconds by 2035, after which UT1-UTC grows without limit and this fallback
+// degrades without limit alongside it. Callers that silently discard the
+// returned error will degrade silently with it.
 func (t Time) GAST() (angle.Angle, error) {
 	ut1, err := t.UT1()
 	if err != nil {
