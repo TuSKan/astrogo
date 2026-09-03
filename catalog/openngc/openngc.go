@@ -2,7 +2,7 @@ package openngc
 
 import (
 	"context"
-	"log"
+	"fmt"
 	"sort"
 	"strings"
 
@@ -23,6 +23,16 @@ type Record struct {
 type Provider struct {
 	byKey   map[string]int
 	targets []resolve.Target
+
+	// initErr records a failed catalog load so every query can report it.
+	//
+	// New used to log the failure and hand back an empty provider, which then
+	// answered every lookup with "not found" for the life of the process. A
+	// consent gate that was never granted, or one bad fetch at start-up, made
+	// the whole NGC/IC catalog silently absent while the provider looked
+	// healthy. Construction-time failure is worse than per-query failure for
+	// exactly that reason: it is permanent and it is invisible.
+	initErr error
 }
 
 // New creates a new OpenNGC catalog provider — like every other astrogo
@@ -37,8 +47,10 @@ type Provider struct {
 func New() *Provider {
 	targets, err := fetch(context.Background())
 	if err != nil {
-		log.Printf("openngc: %v", err)
-		return &Provider{byKey: make(map[string]int)}
+		return &Provider{
+			byKey:   make(map[string]int),
+			initErr: fmt.Errorf("openngc: catalog unavailable: %w", err),
+		}
 	}
 
 	p := &Provider{
@@ -92,21 +104,29 @@ func (p *Provider) SearchBright(_ context.Context, req resolve.BrightRequest) re
 // Resolve performs exact-match resolution for a query. ctx is accepted for
 // resolve.Provider conformance only — resolution runs over the in-memory
 // index built once at New(), with no I/O to cancel.
-func (p *Provider) Resolve(_ context.Context, query string) (resolve.Target, bool) {
-	q := resolve.Normalize(query)
-	if idx, ok := p.byKey[q]; ok {
-		return p.targets[idx], true
+func (p *Provider) Resolve(_ context.Context, query string) (resolve.Target, error) {
+	if p.initErr != nil {
+		return resolve.Target{}, p.initErr
 	}
 
-	return resolve.Target{}, false
+	q := resolve.Normalize(query)
+	if idx, ok := p.byKey[q]; ok {
+		return p.targets[idx], nil
+	}
+
+	return resolve.Target{}, fmt.Errorf("%w: %q in OpenNGC", resolve.ErrNotFound, query)
 }
 
 // Search performs fuzzy search across all NGC/IC objects. ctx is accepted
 // for resolve.Provider conformance only — see Resolve.
-func (p *Provider) Search(_ context.Context, query string) []resolve.Target {
+func (p *Provider) Search(_ context.Context, query string) ([]resolve.Target, error) {
+	if p.initErr != nil {
+		return nil, p.initErr
+	}
+
 	q := resolve.Normalize(query)
 	if q == "" {
-		return nil
+		return nil, nil
 	}
 
 	var results []resolve.Target
@@ -126,5 +146,5 @@ func (p *Provider) Search(_ context.Context, query string) []resolve.Target {
 		}
 	}
 
-	return results
+	return results, nil
 }

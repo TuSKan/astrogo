@@ -1,6 +1,7 @@
 package fits
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"math"
@@ -130,24 +131,31 @@ func (p *Provider) Name() string {
 }
 
 // Resolve attempts a precise match of a FITS target natively scanning ID or Name.
-func (p *Provider) Resolve(query string) (resolve.Target, bool) {
+//
+// ctx is accepted for [resolve.Provider] conformance only — the targets were
+// read from the file at construction and there is no I/O here to cancel. The
+// parameter was previously absent entirely, which meant this type could not
+// satisfy the interface it was written against.
+func (p *Provider) Resolve(_ context.Context, query string) (resolve.Target, error) {
 	q := resolve.Normalize(query)
 	for _, t := range p.targets {
 		if resolve.Normalize(t.ID) == q || resolve.Normalize(t.Name) == q {
-			return t, true
+			return t, nil
 		}
 	}
 
-	return resolve.Target{}, false
+	return resolve.Target{}, fmt.Errorf("%w: %q in %s", resolve.ErrNotFound, query, p.name)
 }
 
 // Search attempts substring matching, returning all intersecting records.
-func (p *Provider) Search(query string) []resolve.Target {
+//
+// ctx is accepted for conformance only — see [Provider.Resolve].
+func (p *Provider) Search(_ context.Context, query string) ([]resolve.Target, error) {
 	q := resolve.Normalize(query)
 
 	var matches []resolve.Target
 	if q == "" {
-		return matches
+		return matches, nil
 	}
 
 	for _, t := range p.targets {
@@ -156,5 +164,5 @@ func (p *Provider) Search(query string) []resolve.Target {
 		}
 	}
 
-	return matches
+	return matches, nil
 }

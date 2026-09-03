@@ -51,13 +51,16 @@ func TestProvider(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.query, func(t *testing.T) {
-			got, ok := p.Resolve(context.Background(), tt.query)
-			if ok != tt.found {
-				t.Errorf("Resolve(%q) ok = %v, want %v", tt.query, ok, tt.found)
+			got, err := p.Resolve(context.Background(), tt.query)
+
+			// A miss is now ErrNotFound rather than a false, so the table's
+			// "found" column is checked against the error being nil.
+			if found := err == nil; found != tt.found {
+				t.Errorf("Resolve(%q) found = %v (err %v), want %v", tt.query, found, err, tt.found)
 				return
 			}
 
-			if ok && got.ID != tt.wantID {
+			if err == nil && got.ID != tt.wantID {
 				t.Errorf("Resolve(%q) got ID = %v, want %v", tt.query, got.ID, tt.wantID)
 			}
 		})
@@ -67,7 +70,11 @@ func TestProvider(t *testing.T) {
 func TestSearch(t *testing.T) {
 	p := newTestProvider()
 
-	results := p.Search(context.Background(), "orion")
+	results, err := p.Search(context.Background(), "orion")
+	if err != nil {
+		t.Fatalf("Search: %v", err)
+	}
+
 	if len(results) == 0 {
 		t.Fatalf("Search(%q) returned no results", "orion")
 	}
@@ -90,7 +97,7 @@ func BenchmarkSearch(b *testing.B) {
 	p := newTestProvider()
 
 	for b.Loop() {
-		p.Search(context.Background(), "nebula")
+		_, _ = p.Search(context.Background(), "nebula")
 	}
 }
 

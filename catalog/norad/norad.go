@@ -290,28 +290,39 @@ func (p *Provider) Capabilities() []resolve.Capability {
 // a name.
 //
 // A name is ranked rather than taken in arrival order — see [rankByName].
-func (p *Provider) Resolve(ctx context.Context, query string) (resolve.Target, bool) {
+func (p *Provider) Resolve(ctx context.Context, query string) (resolve.Target, error) {
 	q := strings.TrimSpace(query)
 	if q == "" {
-		return resolve.Target{}, false
+		return resolve.Target{}, fmt.Errorf("%w: empty query", resolve.ErrNotFound)
 	}
 
 	// A bare catalog number is an exact identifier; nothing to rank.
 	if isCatalogNumber(q) {
 		gps, err := p.Fetch(ctx, QueryCatNr, q)
-		if err != nil || len(gps) == 0 {
-			return resolve.Target{}, false
+		if err != nil {
+			// Previously `err != nil || len(gps) == 0` collapsed both arms
+			// into "false", so a CelesTrak outage and an unknown catalog
+			// number were the same answer.
+			return resolve.Target{}, err
 		}
 
-		return gpToTarget(gps[0]), true
+		if len(gps) == 0 {
+			return resolve.Target{}, fmt.Errorf("%w: catalog number %q", resolve.ErrNotFound, q)
+		}
+
+		return gpToTarget(gps[0]), nil
 	}
 
-	targets := p.Search(ctx, q)
+	targets, err := p.Search(ctx, q)
+	if err != nil {
+		return resolve.Target{}, err
+	}
+
 	if len(targets) == 0 {
-		return resolve.Target{}, false
+		return resolve.Target{}, fmt.Errorf("%w: %q in CelesTrak", resolve.ErrNotFound, q)
 	}
 
-	return targets[0], true
+	return targets[0], nil
 }
 
 // isCatalogNumber reports whether the query is a bare NORAD catalog number.
@@ -382,12 +393,16 @@ func rankByName(query string, targets []resolve.Target) {
 }
 
 // Search returns satellites matching the query string.
-func (p *Provider) Search(ctx context.Context, query string) []resolve.Target {
+func (p *Provider) Search(ctx context.Context, query string) ([]resolve.Target, error) {
 	// No local timeout wrapper needed: NewClientFor(remote.CelesTrak) already
 	// bounds the whole request at the endpoint's registered Timeout.
 	gps, err := p.Fetch(ctx, QueryName, query)
-	if err != nil || len(gps) == 0 {
-		return nil
+	if err != nil {
+		return nil, err
+	}
+
+	if len(gps) == 0 {
+		return nil, nil
 	}
 
 	targets := make([]resolve.Target, 0, len(gps))
@@ -397,7 +412,7 @@ func (p *Provider) Search(ctx context.Context, query string) []resolve.Target {
 
 	rankByName(query, targets)
 
-	return targets
+	return targets, nil
 }
 
 // Fetch queries the CelestTrak GP API and returns parsed element sets.

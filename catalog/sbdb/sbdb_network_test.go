@@ -71,8 +71,8 @@ func TestSBDBNetworkResolveOrbitalElements(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	tar, ok := prov.Resolve(ctx, "1")
-	if !ok {
+	tar, err := prov.Resolve(ctx, "1")
+	if err != nil {
 		t.Fatal("failed to resolve 1 Ceres")
 	}
 
@@ -289,8 +289,8 @@ func TestSBDBElementsAreFullPrecision(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	tar, ok := prov.Resolve(ctx, "433")
-	if !ok {
+	tar, err := prov.Resolve(ctx, "433")
+	if err != nil {
 		t.Skip("SBDB did not resolve 433 Eros")
 	}
 

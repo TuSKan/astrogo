@@ -92,6 +92,59 @@ type BrightObjectSearcher interface {
 // SeqIterator is an alias for iter.Seq2 for explicit documentation of expected return type.
 type SeqIterator[T any] iter.Seq2[T, error]
 
+// Drain collects a streaming iterator into a slice, stopping once limit items
+// have been taken, and returns the first error the iterator yields.
+//
+// # Why this exists as one function
+//
+// Four providers — simbad, jpl, mast and sbdb — each carried their own copy of
+// this loop, and every copy discarded the error. Three wrote
+//
+//	if err == nil {
+//		targets = append(targets, t)
+//	}
+//
+// which drops a transport failure without even a log line, and the fourth
+// logged it to the global log package before dropping it. The caller then saw
+// an empty slice and reported "not found". One shape, four copies, one defect.
+//
+// The streaming iterators themselves were always correct; it was this drain
+// step that lost the error. Centralising it means the next provider inherits
+// the fix rather than the bug.
+//
+// # Partial results are discarded with the error
+//
+// Rows taken before the failure are not returned alongside it. A short answer
+// that looks complete is exactly how the original defect produced wrong
+// results instead of visible ones — a caller checking only len() would treat
+// a truncated page as the whole catalog.
+//
+// A limit of zero or less collects everything the iterator offers.
+func Drain[T any](seq SeqIterator[T], limit int) ([]T, error) {
+	var (
+		out     []T
+		failure error
+	)
+
+	seq(func(v T, err error) bool {
+		if err != nil {
+			failure = err
+
+			return false
+		}
+
+		out = append(out, v)
+
+		return limit <= 0 || len(out) < limit
+	})
+
+	if failure != nil {
+		return nil, failure
+	}
+
+	return out, nil
+}
+
 // SliceSeq converts an in-memory slice to a standard SeqIterator.
 func SliceSeq[T any](items []T) SeqIterator[T] {
 	return func(yield func(T, error) bool) {

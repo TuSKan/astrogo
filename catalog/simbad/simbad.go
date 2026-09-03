@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log"
 	"strings"
 
 	"github.com/TuSKan/astrogo/catalog/resolve"
@@ -53,46 +52,50 @@ func (p *Provider) Capabilities() []resolve.Capability {
 // was not among them. Scoring ranks what it is given.
 //
 // It now matches identifiers exactly, against the spellings SIMBAD is known
-// to store — see [identifierVariants]. An unknown name returns false rather
-// than the least-wrong of ten wrong answers, because a caller can act on
-// "not found" and cannot act on a plausible object 70 degrees from the one
-// they asked for.
+// to store — see [identifierVariants]. An unknown name returns
+// [resolve.ErrNotFound] rather than the least-wrong of ten wrong answers,
+// because a caller can act on "not found" and cannot act on a plausible
+// object 70 degrees from the one they asked for.
 //
 // Aliases fan out across rows, so several rows may arrive for one object;
 // they are merged by oid upstream in ResolveObject and the first target is
 // the object.
-func (p *Provider) Resolve(ctx context.Context, query string) (resolve.Target, bool) {
-	targets := p.ResolveObjects(ctx, resolve.ObjectRequest{Query: query, Limit: 10})
-	if len(targets) == 0 {
-		return resolve.Target{}, false
+func (p *Provider) Resolve(ctx context.Context, query string) (resolve.Target, error) {
+	targets, err := p.ResolveObjects(ctx, resolve.ObjectRequest{Query: query, Limit: 10})
+	if err != nil {
+		return resolve.Target{}, err
 	}
 
-	return targets[0], true
+	if len(targets) == 0 {
+		return resolve.Target{}, fmt.Errorf("%w: %q in SIMBAD", resolve.ErrNotFound, query)
+	}
+
+	return targets[0], nil
 }
 
-// ResolveObjects drains ResolveObject into a slice, dropping errors after
-// logging them — the shape both Resolve and Search need.
-func (p *Provider) ResolveObjects(ctx context.Context, req resolve.ObjectRequest) []resolve.Target {
+// ResolveObjects drains ResolveObject into a slice — the shape both Resolve
+// and Search need.
+//
+// It used to swallow errors here: the iterator's error was written to the
+// global log package and the drained slice came back empty, which every caller
+// then read as "not found". A CDS outage, a cancelled context and a genuinely
+// absent object were indistinguishable, and the only trace was a line on
+// whatever writer log.SetOutput last pointed at.
+//
+// The streaming ResolveObject always carried the error correctly. This is the
+// convenience wrapper that used to throw it away.
+func (p *Provider) ResolveObjects(ctx context.Context, req resolve.ObjectRequest) ([]resolve.Target, error) {
 	limit := req.Limit
 	if limit <= 0 {
 		limit = 10
 	}
 
-	var targets []resolve.Target
+	targets, err := resolve.Drain(p.ResolveObject(ctx, req), limit)
+	if err != nil {
+		return nil, fmt.Errorf("resolving %q: %w", req.Query, err)
+	}
 
-	p.ResolveObject(ctx, req)(func(t resolve.Target, err error) bool {
-		if err != nil {
-			log.Printf("SIMBAD ERR: %v", err)
-
-			return false
-		}
-
-		targets = append(targets, t)
-
-		return len(targets) < limit
-	})
-
-	return targets
+	return targets, nil
 }
 
 // Search matches objects whose identifiers begin with a freeform query.
@@ -103,29 +106,23 @@ func (p *Provider) ResolveObjects(ctx context.Context, req resolve.ObjectRequest
 // so the rows are ones a person would recognise and are the same rows on
 // every call — the query this replaces had no ORDER BY, and two identical
 // searches for "M42" returned different objects.
-func (p *Provider) Search(ctx context.Context, query string) []resolve.Target {
+func (p *Provider) Search(ctx context.Context, query string) ([]resolve.Target, error) {
 	if strings.TrimSpace(query) == "" {
-		return nil
+		return nil, nil
 	}
 
 	req := resolve.ObjectRequest{Query: query, Limit: 10}
 	adql := BuildSearchQuery(req)
 
-	var targets []resolve.Target
+	targets, err := resolve.Drain(p.stream(ctx, "search:"+query, adql), req.Limit)
+	if err != nil {
+		return nil, fmt.Errorf("searching for %q: %w", query, err)
+	}
 
-	p.stream(ctx, "search:"+query, adql)(func(tgt resolve.Target, err error) bool {
-		if err != nil {
-			log.Printf("SIMBAD ERR: %v", err)
-
-			return false
-		}
-
-		targets = append(targets, tgt)
-
-		return len(targets) < req.Limit
-	})
-
-	return targets
+	// No error and no rows is a real answer: the query was asked and matched
+	// nothing. Unlike Resolve, that is not ErrNotFound — Search's contract is
+	// "the matches I found", and none is a legitimate count.
+	return targets, nil
 }
 
 // SearchBright returns every SIMBAD object brighter than req.MaxVMag,

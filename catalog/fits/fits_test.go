@@ -1,6 +1,7 @@
 package fits
 
 import (
+	"context"
 	"testing"
 
 	"github.com/TuSKan/astrogo/angle"
@@ -33,8 +34,8 @@ func TestProvider_ResolveAndSearch(t *testing.T) {
 	}
 
 	// Test Resolver (perfect match mapping)
-	tgt, found := provider.Resolve("SIRIUS")
-	if !found {
+	tgt, err := provider.Resolve(context.Background(), "SIRIUS")
+	if err != nil {
 		t.Fatal("expected to find Sirius")
 	}
 
@@ -42,13 +43,17 @@ func TestProvider_ResolveAndSearch(t *testing.T) {
 		t.Errorf("expected ID-1, got %s", tgt.ID)
 	}
 
-	tgt, found = provider.Resolve("unknown")
-	if found {
+	tgt, err = provider.Resolve(context.Background(), "unknown")
+	if err == nil {
 		t.Errorf("expected not to find unknown resolve.Target, got %s", tgt.Name)
 	}
 
 	// Test Search (partial match mapping for substring discovery)
-	results := provider.Search("Siri")
+	results, err := provider.Search(context.Background(), "Siri")
+	if err != nil {
+		t.Fatalf("Search: %v", err)
+	}
+
 	if len(results) != 1 {
 		t.Fatalf("expected 1 search result, got %d", len(results))
 	}
@@ -57,7 +62,11 @@ func TestProvider_ResolveAndSearch(t *testing.T) {
 		t.Errorf("expected Sirius, got %s", results[0].Name)
 	}
 
-	results = provider.Search("ID-")
+	results, err = provider.Search(context.Background(), "ID-")
+	if err != nil {
+		t.Fatalf("Search: %v", err)
+	}
+
 	if len(results) != 2 {
 		t.Fatalf("expected 2 search results discovering common substring ID-, got %d", len(results))
 	}

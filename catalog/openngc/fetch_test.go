@@ -65,9 +65,9 @@ func TestNewFetchesFromNetworkWhenDownloadsEnabled(t *testing.T) {
 
 	p := New()
 
-	got, ok := p.Resolve(context.Background(), "M42")
-	if !ok || got.ID != "NGC1976" {
-		t.Errorf("Resolve(M42) = %+v, %v, want NGC1976, true", got, ok)
+	got, err := p.Resolve(context.Background(), "M42")
+	if err != nil || got.ID != "NGC1976" {
+		t.Errorf("Resolve(M42) = %+v, %v, want NGC1976, true", got, err)
 	}
 
 	// Regression: Epoch used to never be set despite OpenNGC's RA/Dec being
@@ -76,8 +76,9 @@ func TestNewFetchesFromNetworkWhenDownloadsEnabled(t *testing.T) {
 		t.Errorf("Epoch = %v, want time.J2000", got.Epoch)
 	}
 
-	if got, ok := p.Resolve(context.Background(), "M31"); !ok || got.ID != "NGC224" {
-		t.Errorf("Resolve(M31) = %+v, %v, want NGC224, true", got, ok)
+	got, err = p.Resolve(context.Background(), "M31")
+	if err != nil || got.ID != "NGC224" {
+		t.Errorf("Resolve(M31) = %+v, %v, want NGC224, true", got, err)
 	}
 }
 
@@ -140,7 +141,7 @@ func TestNewDefaultDenyIssuesNoRequest(t *testing.T) {
 	// Downloads intentionally left disabled (the default).
 	p := New()
 
-	if _, ok := p.Resolve(context.Background(), "M42"); ok {
+	if _, err := p.Resolve(context.Background(), "M42"); err == nil {
 		t.Error("expected an empty provider when downloads are disabled")
 	}
 

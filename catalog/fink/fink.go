@@ -105,50 +105,90 @@ func (p *Provider) Capabilities() []resolve.Capability {
 
 // Resolve returns the first matching Target for the given query.
 // For numeric queries, uses the fast single-object JSON API.
-func (p *Provider) Resolve(query string) (resolve.Target, bool) {
+//
+// # Three attempts, and why their errors are kept
+//
+// A numeric lookup, then a name lookup, then the bulk table. Falling through
+// on failure is deliberate — a query that is not a number may still be a name
+// — but the reasons were previously discarded, so a FINK outage and an
+// unknown object both ended at a bare false.
+//
+// The attempts are now joined and returned when none succeeds, so a caller can
+// tell "FINK says no such object" from "FINK could not be reached three
+// different ways". Only [resolve.ErrNotFound] is returned when every attempt
+// completed and simply found nothing.
+//
+// ctx was added in the same change: this used to fabricate
+// context.Background() internally because the interface gave it nowhere to
+// take one, so cancellation and deadlines were silently ignored.
+func (p *Provider) Resolve(ctx context.Context, query string) (resolve.Target, error) {
 	q := strings.TrimSpace(query)
+
+	var attempts []error
 
 	// Fast path: numeric lookup via single-object JSON endpoint.
 	if n, err := strconv.ParseInt(q, 10, 64); err == nil {
-		rec, err := p.querySingle(context.Background(), n, "")
-		if err == nil && rec != nil {
-			return p.recordToTarget(rec), true
+		rec, qerr := p.querySingle(ctx, n, "")
+
+		switch {
+		case qerr != nil:
+			attempts = append(attempts, fmt.Errorf("numeric lookup: %w", qerr))
+		case rec != nil:
+			return p.recordToTarget(rec), nil
 		}
 	}
 
 	// Try name-based lookup via single-object JSON.
-	rec, err := p.querySingle(context.Background(), 0, q)
-	if err == nil && rec != nil {
-		return p.recordToTarget(rec), true
+	rec, err := p.querySingle(ctx, 0, q)
+
+	switch {
+	case err != nil:
+		attempts = append(attempts, fmt.Errorf("name lookup: %w", err))
+	case rec != nil:
+		return p.recordToTarget(rec), nil
 	}
 
 	// Fall back to bulk table lookup.
-	if err := p.ensureLoaded(); err != nil {
-		return resolve.Target{}, false
+	if lerr := p.ensureLoaded(ctx); lerr != nil {
+		attempts = append(attempts, fmt.Errorf("bulk table: %w", lerr))
+	} else if rec := p.lookupCached(q); rec != nil {
+		return p.recordToTarget(rec), nil
 	}
 
-	if rec := p.lookupCached(q); rec != nil {
-		return p.recordToTarget(rec), true
+	if len(attempts) > 0 {
+		return resolve.Target{}, errors.Join(attempts...)
 	}
 
-	return resolve.Target{}, false
+	return resolve.Target{}, fmt.Errorf("%w: %q in FINK", resolve.ErrNotFound, q)
 }
 
 // Search resolves a query (IAU number or name) against the SSOFT table.
-func (p *Provider) Search(query string) []resolve.Target {
-	tgt, ok := p.Resolve(query)
-	if !ok {
-		return nil
+func (p *Provider) Search(ctx context.Context, query string) ([]resolve.Target, error) {
+	tgt, err := p.Resolve(ctx, query)
+	if err != nil {
+		if errors.Is(err, resolve.ErrNotFound) {
+			// Search's contract is "the matches I found"; none is a
+			// legitimate count, not a failure.
+			return nil, nil
+		}
+
+		return nil, err
 	}
 
-	return []resolve.Target{tgt}
+	return []resolve.Target{tgt}, nil
 }
 
 // ResolveObject implements resolve.ObjectResolver.
-func (p *Provider) ResolveObject(_ context.Context, req resolve.ObjectRequest) resolve.SeqIterator[resolve.Target] {
-	tgt, ok := p.Resolve(req.Query) //nolint:contextcheck // Resolve is interface-bound; bulk download path uses Background
-	if !ok {
-		return resolve.SliceSeq([]resolve.Target{})
+func (p *Provider) ResolveObject(ctx context.Context, req resolve.ObjectRequest) resolve.SeqIterator[resolve.Target] {
+	tgt, err := p.Resolve(ctx, req.Query)
+	if err != nil {
+		if errors.Is(err, resolve.ErrNotFound) {
+			return resolve.SliceSeq([]resolve.Target{})
+		}
+
+		return func(yield func(resolve.Target, error) bool) {
+			yield(resolve.Target{}, err)
+		}
 	}
 
 	return resolve.SliceSeq([]resolve.Target{tgt})
@@ -386,7 +426,7 @@ func (p *Provider) lookupCached(query string) *ssoRecord {
 }
 
 // ensureLoaded downloads and indexes the SSOFT parquet table on first call.
-func (p *Provider) ensureLoaded() error {
+func (p *Provider) ensureLoaded(ctx context.Context) error {
 	p.mu.RLock()
 
 	if p.loaded {
@@ -410,7 +450,7 @@ func (p *Provider) ensureLoaded() error {
 		return nil
 	}
 
-	records, err := p.downloadSSOFT()
+	records, err := p.downloadSSOFT(ctx)
 	if err != nil {
 		p.loadErr = fmt.Errorf("fink: failed to load SSOFT: %w", err)
 		return p.loadErr
@@ -437,14 +477,14 @@ func (p *Provider) ensureLoaded() error {
 }
 
 // downloadSSOFT fetches the full SSOFT parquet table from the FINK API.
-func (p *Provider) downloadSSOFT() (_ []ssoRecord, err error) {
+func (p *Provider) downloadSSOFT(ctx context.Context) (_ []ssoRecord, err error) {
 	payload := map[string]any{
 		"output-format": "parquet",
 		"version":       p.version,
 		"flavor":        "SHG1G2",
 	}
 
-	body, err := p.client.PostJSON(context.Background(), remote.FINK, "", payload)
+	body, err := p.client.PostJSON(ctx, remote.FINK, "", payload)
 	if err != nil {
 		var httpErr *api.HTTPError
 		if errors.As(err, &httpErr) {
@@ -491,11 +531,11 @@ func (p *Provider) downloadSSOFT() (_ []ssoRecord, err error) {
 		return nil, fmt.Errorf("writing temp parquet: %w", err)
 	}
 
-	return p.readParquet(tmpName)
+	return p.readParquet(ctx, tmpName)
 }
 
 // readParquet extracts ssoRecords from a SSOFT parquet file.
-func (p *Provider) readParquet(path string) (_ []ssoRecord, err error) {
+func (p *Provider) readParquet(ctx context.Context, path string) (_ []ssoRecord, err error) {
 	rdr, err := file.OpenParquetFile(path, false)
 	if err != nil {
 		return nil, fmt.Errorf("opening parquet: %w", err)
@@ -513,7 +553,7 @@ func (p *Provider) readParquet(path string) (_ []ssoRecord, err error) {
 		return nil, fmt.Errorf("creating arrow reader: %w", err)
 	}
 
-	tbl, err := arrowRdr.ReadTable(context.Background())
+	tbl, err := arrowRdr.ReadTable(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("reading table: %w", err)
 	}

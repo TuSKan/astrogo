@@ -208,24 +208,67 @@ type candidate struct {
 
 // Resolve finds a single target matching the query, merged across every
 // provider that resolves it directly.
+//
+// # What an error means here
+//
+// [ErrNotFound] means every provider was asked and answered no. Anything else
+// means at least one could not answer, and the returned error carries their
+// reasons joined together, tagged by provider name.
+//
+// The distinction is the point. This used to return ErrNotFound for a
+// cancelled context, an exceeded deadline, offline mode and a CDS outage
+// alike, because the provider interface had nowhere to put a failure. A
+// pipeline resolving ten thousand names during an outage got ten thousand
+// confident "no such object" answers and no indication anything was wrong.
+//
+// A provider that succeeds wins outright: if any provider resolved the query,
+// the failures of the others are not reported, because the question was
+// answered.
 func (r *Resolver) Resolve(ctx context.Context, query string) (Target, error) {
 	q := resolve.Normalize(query)
 	if q == "" {
 		return Target{}, ErrNotFound
 	}
 
-	var candidates []candidate
+	// Checked before any provider is consulted so a cancelled caller gets
+	// context.Canceled rather than whatever the first provider makes of it.
+	if err := ctx.Err(); err != nil {
+		return Target{}, fmt.Errorf("catalog: %w", err)
+	}
+
+	var (
+		candidates []candidate
+		failures   []error
+	)
 
 	for _, p := range r.providers {
-		if t, ok := p.Resolve(ctx, query); ok {
+		t, err := p.Resolve(ctx, query)
+
+		switch {
+		case err == nil:
 			candidates = append(candidates, candidate{t, p.Name()})
+		case errors.Is(err, resolve.ErrNotFound), errors.Is(err, resolve.ErrUnsupported):
+			// Ordinary answers, not incidents. A cone-search-only provider
+			// declining to resolve a name is not a failure of the query.
+		default:
+			failures = append(failures, fmt.Errorf("%s: %w", p.Name(), err))
 		}
 	}
 
 	if len(candidates) == 0 {
-		results := r.Search(ctx, query)
+		results, err := r.Search(ctx, query)
 		if len(results) > 0 {
 			return results[0], nil
+		}
+
+		if err != nil {
+			failures = append(failures, err)
+		}
+
+		if len(failures) > 0 {
+			// Something could not be asked. Reporting ErrNotFound here would
+			// be asserting an answer nobody gave.
+			return Target{}, fmt.Errorf("catalog: resolving %q: %w", query, errors.Join(failures...))
 		}
 
 		return Target{}, ErrNotFound
@@ -242,22 +285,44 @@ func (r *Resolver) Resolve(ctx context.Context, query string) (Target, error) {
 // Search returns all matching, cross-matched-and-merged targets from every
 // provider, ranked by name/alias/ID match quality and capped at Limit's
 // configured limit (default 10).
-func (r *Resolver) Search(ctx context.Context, query string) []Target {
+// A provider that fails does not suppress the ones that succeed: matches from
+// working providers are returned with a nil error, and the failures are
+// reported only when nothing was found at all. Partial results from a partly
+// degraded set of providers are still useful; silently reporting none is not.
+func (r *Resolver) Search(ctx context.Context, query string) ([]Target, error) {
 	q := resolve.Normalize(query)
 	if q == "" {
-		return nil
+		return nil, nil
 	}
 
-	var candidates []candidate
+	if err := ctx.Err(); err != nil {
+		return nil, fmt.Errorf("catalog: %w", err)
+	}
+
+	var (
+		candidates []candidate
+		failures   []error
+	)
 
 	for _, p := range r.providers {
-		for _, t := range p.Search(ctx, query) {
+		found, err := p.Search(ctx, query)
+		if err != nil && !errors.Is(err, resolve.ErrNotFound) && !errors.Is(err, resolve.ErrUnsupported) {
+			failures = append(failures, fmt.Errorf("%s: %w", p.Name(), err))
+
+			continue
+		}
+
+		for _, t := range found {
 			candidates = append(candidates, candidate{t, p.Name()})
 		}
 	}
 
 	if len(candidates) == 0 {
-		return nil
+		if len(failures) > 0 {
+			return nil, fmt.Errorf("catalog: searching %q: %w", query, errors.Join(failures...))
+		}
+
+		return nil, nil
 	}
 
 	groups := r.reconcile(ctx, candidates)
@@ -295,7 +360,7 @@ func (r *Resolver) Search(ctx context.Context, query string) []Target {
 		final[i] = scored[i].t
 	}
 
-	return final
+	return final, nil
 }
 
 // ── Cross-match + merge pipeline ─────────────────────────────────────────

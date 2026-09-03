@@ -206,17 +206,69 @@ func (t Target) ICRS(_ time.Time) (coord.ICRS, error) {
 }
 
 // Provider defines the interface for astronomical catalogs.
+//
+// # Why these return errors rather than a bool
+//
+// They used to be Resolve(ctx, query) (Target, bool) and
+// Search(ctx, query) []Target, which gave a failure nowhere to go. Every
+// outcome collapsed into "false": an object that genuinely does not exist, a
+// CDS outage, a cancelled context, a deadline, a 429 after retries, a TLS
+// failure, and a provider that does not implement name resolution at all.
+// Measured against the old API, all three of these returned "target not
+// found":
+//
+//	offline mode      -> target not found
+//	cancelled context -> target not found
+//	deadline exceeded -> target not found
+//
+// so errors.Is(err, context.Canceled) could never be true through this
+// package, and a scheduler asking "does NGC 5139 exist?" during an outage got
+// a confident no. The underlying error existed — it was written to the global
+// log package and discarded.
+//
+// # The contract
+//
+// Resolve returns exactly one target, or an error. Search returns the matches
+// it found, which may legitimately be none.
+//
+// An implementation must distinguish three things:
+//
+//   - Success: a target (or targets), nil error.
+//   - An ordinary negative: [ErrNotFound] when the query is well formed and
+//     the object is not in this catalog, or [ErrUnsupported] when the provider
+//     does not offer this operation at all. Both are answers, not incidents.
+//   - Anything else: return it. Transport failures, cancellation, malformed
+//     responses and rate limits are the caller's business, and wrapping them
+//     as "not found" is the defect this interface shape exists to prevent.
+//
+// A provider that reaches an endpoint and gets a well-formed empty answer
+// returns ErrNotFound. A provider that cannot reach the endpoint returns the
+// reason.
 type Provider interface {
 	Name() string
-	Resolve(ctx context.Context, query string) (Target, bool)
-	Search(ctx context.Context, query string) []Target
+	Resolve(ctx context.Context, query string) (Target, error)
+	Search(ctx context.Context, query string) ([]Target, error)
 }
 
 var (
 	// ErrNotFound is returned when no provider can resolve the query.
+	//
+	// It means the query was answered and the answer was no. It must never
+	// stand in for a failure to ask — see [Provider].
 	ErrNotFound = errors.New("target not found")
 	// ErrAmbiguous is returned when a query matches multiple targets.
 	ErrAmbiguous = errors.New("ambiguous target name")
+	// ErrUnsupported is returned by a provider that does not implement the
+	// requested operation.
+	//
+	// Distinct from ErrNotFound, and the distinction is not academic: the Gaia
+	// and VizieR providers are cone-search only, and under the old bool API
+	// their "I do not do name resolution" was indistinguishable from "that
+	// object does not exist". A Resolver could therefore report a real object
+	// as absent because the only provider asked was one that never answers
+	// names. [Provider.Capabilities] describes the same fact ahead of time;
+	// this reports it at the call.
+	ErrUnsupported = errors.New("operation not supported by this provider")
 )
 
 // Normalize converts a query to a canonical form for matching.

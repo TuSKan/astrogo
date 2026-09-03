@@ -263,13 +263,13 @@ func TestProviderInterface(t *testing.T) {
 		t.Errorf("expected CapConeSearch, got %v", caps)
 	}
 
-	_, ok := p.Resolve(context.Background(), "foo")
-	if ok {
-		t.Error("expected Resolve to return false")
+	_, err := p.Resolve(context.Background(), "foo")
+	if !errors.Is(err, resolve.ErrUnsupported) {
+		t.Errorf("Resolve error = %v, want ErrUnsupported — vizier is cone-search only", err)
 	}
 
-	if p.Search(context.Background(), "foo") != nil {
-		t.Error("expected Search to return nil")
+	if got, serr := p.Search(context.Background(), "foo"); got != nil || !errors.Is(serr, resolve.ErrUnsupported) {
+		t.Errorf("Search = %v, %v; want nil, ErrUnsupported", got, serr)
 	}
 
 	// errTransport keeps this default (non-network-tagged) test fully

@@ -197,7 +197,7 @@ func TestProviderInterface(t *testing.T) {
 	redirect(t, "http://127.0.0.1:1")
 
 	_, _ = p.Resolve(context.Background(), "non_existent_body")
-	_ = p.Search(context.Background(), "non_existent_body")
+	_, _ = p.Search(context.Background(), "non_existent_body")
 }
 
 // TestConeSearchNotImplemented confirms ConeSearch surfaces ErrNotImplemented

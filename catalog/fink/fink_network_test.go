@@ -5,6 +5,7 @@
 package fink
 
 import (
+	"context"
 	"testing"
 
 	"github.com/TuSKan/astrogo/internal/testutil"
@@ -25,8 +26,8 @@ func TestFINKProvider_SingleObjectJSON(t *testing.T) {
 	p := New()
 
 	// Fast single-object JSON query.
-	tgt, ok := p.Resolve("8467")
-	if !ok {
+	tgt, err := p.Resolve(context.Background(), "8467")
+	if err != nil {
 		t.Fatal("Resolve(8467) failed")
 	}
 
@@ -80,8 +81,8 @@ func TestFINKProvider_SingleObjectJSON(t *testing.T) {
 	}
 
 	// Cross-check by name.
-	tgt2, ok := p.Resolve("Benoitcarry")
-	if !ok {
+	tgt2, err := p.Resolve(context.Background(), "Benoitcarry")
+	if err != nil {
 		t.Fatal("Resolve by name failed")
 	}
 

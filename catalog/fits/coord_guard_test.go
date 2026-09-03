@@ -1,6 +1,7 @@
 package fits
 
 import (
+	"context"
 	"math"
 	"testing"
 
@@ -72,8 +73,8 @@ func TestTargetWithoutCoordKeepsItsIdentity(t *testing.T) {
 		},
 	}
 
-	got, ok := p.Resolve("Named But Unplaced")
-	if !ok {
+	got, err := p.Resolve(context.Background(), "Named But Unplaced")
+	if err != nil {
 		t.Fatal("a target with no position stopped resolving by name")
 	}
 
@@ -86,8 +87,8 @@ func TestTargetWithoutCoordKeepsItsIdentity(t *testing.T) {
 	}
 
 	// And one that does have a position still carries it.
-	placed, ok := p.Resolve("Named And Placed")
-	if !ok {
+	placed, err := p.Resolve(context.Background(), "Named And Placed")
+	if err != nil {
 		t.Fatal("a target with a position stopped resolving")
 	}
 
@@ -96,7 +97,21 @@ func TestTargetWithoutCoordKeepsItsIdentity(t *testing.T) {
 	}
 
 	// Both are still searchable, so the guard costs no discoverability.
-	if n := len(p.Search("named")); n != 2 {
+	if n := mustSearchLen(t, p, "named"); n != 2 {
 		t.Errorf("a substring search matched %d targets, want 2", n)
 	}
+}
+
+// mustSearchLen is the length of a Search result, failing the test if the
+// provider could not answer at all — the distinction Search gained when the
+// Provider interface started returning errors.
+func mustSearchLen(t *testing.T, p *Provider, query string) int {
+	t.Helper()
+
+	got, err := p.Search(context.Background(), query)
+	if err != nil {
+		t.Fatalf("Search(%q): %v", query, err)
+	}
+
+	return len(got)
 }

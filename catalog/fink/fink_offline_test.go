@@ -120,12 +120,17 @@ func TestResolveViaSingleObjectAPI(t *testing.T) {
 
 	p := New()
 
-	target, ok := p.Resolve("8467")
-	if !ok || target.Name != "Benoitcarry" {
-		t.Fatalf("Resolve(8467) = %+v, %v, want Benoitcarry, true", target, ok)
+	target, err := p.Resolve(context.Background(), "8467")
+	if err != nil || target.Name != "Benoitcarry" {
+		t.Fatalf("Resolve(8467) = %+v, %v, want Benoitcarry, true", target, err)
 	}
 
-	if targets := p.Search("8467"); len(targets) != 1 {
+	targets, err := p.Search(context.Background(), "8467")
+	if err != nil {
+		t.Fatalf("Search(8467): %v", err)
+	}
+
+	if len(targets) != 1 {
 		t.Errorf("Search(8467) = %v, want exactly one target", targets)
 	}
 
