@@ -1,6 +1,6 @@
 ---
 type: Added
-pr: 145
+pr: 148
 ---
 **A tripwire for astrogo's two leap-second sources.**
 `TestLeapSecondSourcesAgree` compares NAIF's kernel against the table compiled

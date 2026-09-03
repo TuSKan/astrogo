@@ -20,8 +20,17 @@ type leapStep struct {
 //
 // Almost everything else this library asserts is a *measurement* with a
 // tolerance. This is not. ΔAT is a finite, immutable administrative record —
-// 28 entries, each fixed by an IERS Bulletin C announcement, none of which can
-// change retroactively. The table only ever grows, and only at its end.
+// the initial 1972 offset plus every leap second IERS has announced since,
+// none of which can change retroactively. The table only ever grows, and only
+// at its end.
+//
+// The first entry is *not* a leap second: 1972-01-01 is where the current
+// system was initialised with ΔAT already at 10 s. Levine, Tavella & Milton
+// (2023) count "27 leap events", and 27 + that baseline is the 28 rows below.
+//
+// The record is also nearly final. CGPM Resolution 4 (2022) commits to ending
+// leap seconds by 2035, so this table will gain at most one or two more rows —
+// possibly including the first negative one — and then stop for good.
 //
 // That makes it the one place where a golden table is genuinely ground truth
 // rather than a snapshot of current behaviour, and where pinning it is
@@ -73,14 +82,24 @@ func TestLeapSecondRecordIsWellFormed(t *testing.T) {
 	}
 
 	for i, s := range leapSecondRecord {
-		// Every announced step is exactly +1 s. There has never been a
-		// negative or multi-second leap second, and the ITU rules do not
-		// permit one.
+		// A step is exactly one second, in either direction.
+		//
+		// Every leap second so far has been positive, and an earlier version
+		// of this test asserted exactly +1 on that basis. That was wrong, and
+		// wrong in the direction that matters: the ITU-R has permitted a
+		// *negative* leap second since 1972 — realised by skipping 23:59:59
+		// and advancing from 23:59:58 straight to 00:00:00 — and Levine,
+		// Tavella & Milton (2023) state plainly that it is "no longer simply
+		// an academic possibility", projecting one by about 2030 if the
+		// current rate of change in UT1-UTC holds.
+		//
+		// An assertion written from 50 years of one-sided history would have
+		// rejected the first correct table to contain one.
 		if i > 0 {
-			if prev := leapSecondRecord[i-1]; s.deltaAT-prev.deltaAT != 1 {
-				t.Errorf("%04d-%02d-%02d: ΔAT steps by %g, but every announced leap "+
-					"second is exactly +1 s",
-					s.year, s.month, s.day, s.deltaAT-prev.deltaAT)
+			if step := s.deltaAT - leapSecondRecord[i-1].deltaAT; math.Abs(step) != 1 {
+				t.Errorf("%04d-%02d-%02d: ΔAT steps by %g, but a leap second is "+
+					"exactly one second — +1 (inserted) or -1 (skipped)",
+					s.year, s.month, s.day, step)
 			}
 		}
 

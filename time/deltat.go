@@ -20,8 +20,9 @@ import "math"
 // by planetary ephemerides) and Universal Time (based on Earth's rotation).
 // For historical dates before 1972, this is the primary mechanism to convert
 // between civil time (UT) and ephemeris time (TT/TDB). For modern dates,
-// the relationship is: ΔT = ΔAT + 32.184s − DUT1, where ΔAT comes from
-// the NAIF leap-second kernel (LSK) and DUT1 from IERS EOP data.
+// the relationship is: ΔT = ΔAT + 32.184s − DUT1, where ΔAT is the
+// leap-second count carried by time (see the pinned record in
+// leapsecond_golden_test.go) and DUT1 comes from IERS EOP data.
 //
 // References:
 //   - https://eclipse.gsfc.nasa.gov/LEcat5/deltatpoly.html

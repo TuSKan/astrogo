@@ -1,6 +1,6 @@
 ---
 type: Added
-pr: 145
+pr: 148
 ---
 **The leap-second table is now validated, not just cross-checked.**
 The complete 28-entry published ΔAT record is pinned and asserted against
