@@ -214,10 +214,30 @@ func parseSpiceDate(s string) (float64, error) {
 //
 // # Why the Reader is no longer used
 //
-// True TDB needs the periodic term, which a leap-second kernel does not carry,
-// so the conversion cannot be driven from the kernel alone. astrogo's own
-// leap-second table and NAIF's agree — leap seconds are a published fact, and
-// [TestFinalLeapSecondIsParsed] pins that agreement.
+// Not because the kernel cannot do this. An earlier version of this comment
+// claimed the periodic term "is not carried by a leap-second kernel", and that
+// is simply wrong: naif0012.tls is a *time-conversion* kernel, not a
+// leap-second table. Alongside DELTA_AT it carries DELTA_T_A, K, EB and M —
+// the constants for
+//
+//	ET − TAI = DELTA_T_A + K·sin(E)
+//
+// with E the eccentric anomaly of the Earth-Moon barycentre's heliocentric
+// orbit. NAIF's own header puts that at "accurate to about 0.000030 seconds".
+// The kernel is a complete UTC→ET converter needing no Earth-orientation data
+// at all, which is exactly why NAIF ships it separately from EOP.
+//
+// The real reasons are layering and accuracy. CLAUDE.md makes time the sole
+// gateway for epoch arithmetic, and a second conversion path inside the JPL
+// provider is the two-contracts defect this file has already produced once.
+// And time's tdbMinusTT carries the Fairhead & Bretagnon series — the same
+// 1.657e-3 principal term the kernel's K holds, plus Venus and Jupiter
+// perturbation terms the kernel's single sinusoid omits — so delegating is
+// also the more accurate of the two.
+//
+// astrogo's leap-second table and NAIF's agree, which
+// [TestLeapSecondSourcesAgree] pins, and the published record itself is
+// validated against IERS in time's own leapsecond_golden_test.go.
 //
 // The parameter is retained so this exported signature does not break inside a
 // patch release. It should be dropped in the next release that already carries
