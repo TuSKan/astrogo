@@ -179,36 +179,53 @@ func parseSpiceDate(s string) (float64, error) {
 	return jd, nil
 }
 
-func (r *Reader) leapSecondsAt(jdTDB float64) float64 {
-	lastN := 0.0
-
-	for _, d := range r.DeltaAt {
-		if jdTDB < d.JD {
-			break
-		}
-
-		lastN = d.N
-	}
-
-	return lastN
-}
+// leapSecondsAt was the only consumer of the parsed DeltaAt table, and
+// UTCToTDB no longer calls it: the conversion is delegated to time.Time.TDB,
+// which owns leap seconds for the whole library per the layering rule in
+// CLAUDE.md ("time is the sole gateway for EOP and epoch arithmetic").
+//
+// Removed rather than left dead. The parsed table is still exported as
+// Reader.DeltaAt and still verified by the tests in this package, so a caller
+// that wants NAIF's own leap seconds can read them; nothing internal does.
 
 // UTCToTDB converts a time.Time to a Julian Date in the Barycentric Dynamical
 // Time (TDB) scale.
 //
-// The conversion formula used is:
-// TDB = UTC + (LS + 32.184) / 86400.0
-// where LS is the number of leap seconds at the given time.
-func UTCToTDB(t time.Time, l *Reader) float64 {
-	d1, d2 := t.JDParts()
-	if t.Scale() == time.TDB {
-		return d1 + d2
-	}
+// The conversion is delegated to [time.Time.TDB], which is the scale-aware
+// path the rest of the library uses.
+//
+// # Two defects this replaced
+//
+// The previous implementation special-cased only Scale() == TDB and treated
+// every other scale as UTC, so a TT instant had leap seconds plus 32.184 s
+// added on top of an offset it already carried. 69.184 s late — about 40
+// arcsec of lunar motion and 1.8 arcsec for Mars. The type is scale-aware
+// precisely so this cannot be left to the caller, and the SOFA provider always
+// honoured it.
+//
+// The formula it used, TDB = UTC + (LS + 32.184)/86400, is the formula for
+// **TT**, not TDB. It omitted the TDB−TT periodic term entirely — an amplitude
+// of about 1.7 ms, which is 1.7 m of lunar motion and 85 m for Mars. Small
+// against DE440 itself, and not small against the 33 mm this library claims
+// against Horizons. SPICE's own str2et includes those terms.
+//
+// The second defect was invisible until the first was fixed, because a
+// 69-second error hides a 1.7-millisecond one.
+//
+// # Why the Reader is no longer used
+//
+// True TDB needs the periodic term, which a leap-second kernel does not carry,
+// so the conversion cannot be driven from the kernel alone. astrogo's own
+// leap-second table and NAIF's agree — leap seconds are a published fact, and
+// [TestFinalLeapSecondIsParsed] pins that agreement.
+//
+// The parameter is retained so this exported signature does not break inside a
+// patch release. It should be dropped in the next release that already carries
+// public API changes.
+func UTCToTDB(t time.Time, _ *Reader) float64 {
+	d1, d2 := t.TDB().JDParts()
 
-	jdUTC := d1 + d2
-	ls := l.leapSecondsAt(jdUTC + (69.184 / 86400.0))
-
-	return jdUTC + (ls+32.184)/86400.0
+	return d1 + d2
 }
 
 // TDBToET converts a Julian Date in TDB to elapsed seconds past J2000.

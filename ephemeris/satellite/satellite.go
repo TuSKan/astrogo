@@ -347,6 +347,17 @@ func temeToGCRS(pos, vel vector.Vec3, t time.Time) (gcrsPos, gcrsVel vector.Vec3
 // Returns integer year/month/day/hour/min/sec and the fractional second
 // remainder for sub-second velocity interpolation.
 func timeToComponents(t time.Time) (year, month, day, hour, minute, second int, fracSec float64) {
+	// SGP4 is defined against UTC, so normalise before reading the calendar
+	// fields. Without this the caller's scale is silently reinterpreted: a TT
+	// instant lands 69.184 s late, which for the ISS at 7.66 km/s is 530 km,
+	// and TAI lands 37 s late for 283 km. The type is scale-aware precisely so
+	// this cannot be left to the caller.
+	//
+	// temeToGCRS in this same file already does the equivalent (t.TT()), and
+	// coord.NewContext opens with t = t.UTC(); this brings SGP4 in line with
+	// both.
+	t = t.UTC()
+
 	// Extract month/day from the Julian Date.
 	jd1, jd2 := t.JDParts()
 	y, m, d, frac, _ := gofaext.JdToDate(jd1, jd2)
