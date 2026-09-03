@@ -22,9 +22,25 @@ var (
 )
 
 // Reader is a reader for the JPL LSK kernel.
+//
+// Despite the name, an LSK is not a leap-second table — it is SPICE's
+// time-conversion kernel. Alongside the DELTA_AT steps it carries the
+// constants of Moyer's (1981) relativistic model, which is what turns UTC into
+// the ET that every SPK segment is indexed by. Both halves are parsed here,
+// because using one without the other would evaluate a JPL kernel at an epoch
+// JPL did not mean.
 type Reader struct {
 	F       io.ReadCloser
 	DeltaAt []LeapData
+
+	// DeltaTA, K, EB, M0 and M1 are DELTET/DELTA_T_A, DELTET/K, DELTET/EB and
+	// the two components of DELTET/M. Together they give
+	//
+	//	ET − TAI = DELTA_T_A + K·sin(E),  E = M + EB·sin(M),  M = M0 + M1·t
+	//
+	// with t in ephemeris seconds past J2000. NAIF's own header puts the
+	// model at "accurate to about 0.000030 seconds".
+	DeltaTA, K, EB, M0, M1 float64
 }
 
 // Cache opens the LSK file named kernel, downloading it first when it is
@@ -57,6 +73,15 @@ func NewReader(r io.ReadCloser) (*Reader, error) {
 
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
+
+		// The relativistic constants are scalars on their own lines, so they
+		// are matched before the DELTA_AT block logic. DELTA_T_A is tested
+		// first because it also contains the substring "DELTA_" that the
+		// block test below looks for.
+		if l.parseDeltaETConstant(line) {
+			continue
+		}
+
 		if strings.Contains(line, "DELTET/DELTA_AT") {
 			inDeltaAt = true
 
@@ -126,6 +151,75 @@ func (r *Reader) Close() error {
 	return nil
 }
 
+// hasDeltaET reports whether the relativistic constants were all present.
+//
+// A kernel missing them is not usable for time conversion, and silently
+// falling back to a different model would reintroduce exactly the mismatch
+// this file exists to avoid.
+func (r *Reader) hasDeltaET() bool {
+	return r.DeltaTA != 0 && r.K != 0 && r.EB != 0 && r.M1 != 0
+}
+
+// parseDeltaETConstant reads one DELTET scalar assignment, reporting whether
+// the line was one.
+//
+// SPICE writes exponents in Fortran style — "1.657D-3" — which Go's parser
+// does not accept, so D is normalised to E before parsing. Getting this wrong
+// would leave the constant at zero and silently disable the periodic term,
+// which is why hasDeltaET checks for exactly that.
+func (r *Reader) parseDeltaETConstant(line string) bool {
+	const prefix = "DELTET/"
+
+	if !strings.HasPrefix(line, prefix) {
+		return false
+	}
+
+	lhs, rhs, ok := strings.Cut(line, "=")
+	if !ok {
+		return false
+	}
+
+	name := strings.TrimSpace(strings.TrimPrefix(lhs, prefix))
+	value := strings.NewReplacer("(", " ", ")", " ", "D", "E", "d", "e").Replace(rhs)
+
+	fields := strings.Fields(value)
+	if len(fields) == 0 {
+		return false
+	}
+
+	nums := make([]float64, 0, len(fields))
+
+	for _, f := range fields {
+		v, err := strconv.ParseFloat(f, 64)
+		if err != nil {
+			return false
+		}
+
+		nums = append(nums, v)
+	}
+
+	switch name {
+	case "DELTA_T_A":
+		r.DeltaTA = nums[0]
+	case "K":
+		r.K = nums[0]
+	case "EB":
+		r.EB = nums[0]
+	case "M":
+		if len(nums) < 2 {
+			return false
+		}
+
+		r.M0, r.M1 = nums[0], nums[1]
+	default:
+		// DELTA_AT, or a constant this reader does not model. Left to the
+		// block parser.
+		return false
+	}
+
+	return true
+}
+
 // LeapData represents a leapsecond correction entry.
 type LeapData struct {
 	JD, N float64
@@ -179,14 +273,26 @@ func parseSpiceDate(s string) (float64, error) {
 	return jd, nil
 }
 
-// leapSecondsAt was the only consumer of the parsed DeltaAt table, and
-// UTCToTDB no longer calls it: the conversion is delegated to time.Time.TDB,
-// which owns leap seconds for the whole library per the layering rule in
-// CLAUDE.md ("time is the sole gateway for EOP and epoch arithmetic").
+// leapSecondsAt returns DELTA_AT — the accumulated leap seconds — at a Julian
+// Date, using the kernel's own table.
 //
-// Removed rather than left dead. The parsed table is still exported as
-// Reader.DeltaAt and still verified by the tests in this package, so a caller
-// that wants NAIF's own leap seconds can read them; nothing internal does.
+// The interval is half-open: an entry takes effect at its own instant and
+// holds until the next. That matches IERS, which reports 36 at
+// 2016-12-31 23:59:60 and 37 at 2017-01-01 00:00:00; time's
+// TestLeapSecondBoundaryConvention pins the same rule for the built-in table.
+func (r *Reader) leapSecondsAt(jdTDB float64) float64 {
+	lastN := 0.0
+
+	for _, d := range r.DeltaAt {
+		if jdTDB < d.JD {
+			break
+		}
+
+		lastN = d.N
+	}
+
+	return lastN
+}
 
 // UTCToTDB converts a time.Time to a Julian Date in the Barycentric Dynamical
 // Time (TDB) scale.
@@ -212,40 +318,69 @@ func parseSpiceDate(s string) (float64, error) {
 // The second defect was invisible until the first was fixed, because a
 // 69-second error hides a 1.7-millisecond one.
 //
-// # Why the Reader is no longer used
+// # Why the kernel drives this and not time.Time.TDB
 //
-// Not because the kernel cannot do this. An earlier version of this comment
-// claimed the periodic term "is not carried by a leap-second kernel", and that
-// is simply wrong: naif0012.tls is a *time-conversion* kernel, not a
-// leap-second table. Alongside DELTA_AT it carries DELTA_T_A, K, EB and M —
-// the constants for
+// Because an SPK segment is indexed by the ET that *its own kernel set*
+// defines, and the LSK is where that definition lives. Evaluating a JPL kernel
+// at an epoch computed by a different model means asking JPL's ephemeris a
+// question JPL did not pose.
+//
+// astrogo's time.tdbMinusTT implements Fairhead & Bretagnon and carries more
+// terms than Moyer's single sinusoid, so it is nominally the more accurate
+// model — and using it here would still be wrong. The two differ by up to
+// about 30 µs, which is roughly 3 cm of lunar motion: the same order as the
+// 33 mm this library claims against Horizons, and Horizons computes ET from
+// the LSK. Matching the reference means adopting its convention, not a better
+// one.
+//
+// This is also why the LSK is a hard requirement of jpl.NewProvider rather
+// than a nicety. SPICE itself refuses to convert a time with no LSK furnished;
+// astrogo failing the same way is the contract, not a wart.
+//
+// # The conversion
+//
+// From the kernel's own header, with constants read out of the file:
 //
 //	ET − TAI = DELTA_T_A + K·sin(E)
+//	E        = M + EB·sin(M)
+//	M        = M0 + M1·t        (t = ephemeris seconds past J2000)
+//	TAI      = UTC + DELTA_AT
 //
-// with E the eccentric anomaly of the Earth-Moon barycentre's heliocentric
-// orbit. NAIF's own header puts that at "accurate to about 0.000030 seconds".
-// The kernel is a complete UTC→ET converter needing no Earth-orientation data
-// at all, which is exactly why NAIF ships it separately from EOP.
+// t is nominally ET, which appears on both sides. Seeding it with TAI instead
+// costs about 10 ns — M1 is 2e-7 rad/s, so the 32.184 s difference moves
+// K·sin(E) by ~1e-8 s — so no iteration is worth the cycles.
 //
-// The real reasons are layering and accuracy. CLAUDE.md makes time the sole
-// gateway for epoch arithmetic, and a second conversion path inside the JPL
-// provider is the two-contracts defect this file has already produced once.
-// And time's tdbMinusTT carries the Fairhead & Bretagnon series — the same
-// 1.657e-3 principal term the kernel's K holds, plus Venus and Jupiter
-// perturbation terms the kernel's single sinusoid omits — so delegating is
-// also the more accurate of the two.
+// # The input is normalised first
 //
-// astrogo's leap-second table and NAIF's agree, which
-// [TestLeapSecondSourcesAgree] pins, and the published record itself is
-// validated against IERS in time's own leapsecond_golden_test.go.
-//
-// The parameter is retained so this exported signature does not break inside a
-// patch release. It should be dropped in the next release that already carries
-// public API changes.
-func UTCToTDB(t time.Time, _ *Reader) float64 {
-	d1, d2 := t.TDB().JDParts()
+// Every scale is converted to UTC before DELTA_AT is applied. Without that the
+// caller's label was silently reinterpreted: a TT instant had leap seconds
+// plus 32.184 s added on top of an offset it already carried, landing 69.184 s
+// late — about 40 arcsec of lunar motion. See
+// ephemeris.TestProviderStateIsScaleInvariant, which pins it.
+func UTCToTDB(t time.Time, l *Reader) float64 {
+	utc := t.UTC()
+	d1, d2 := utc.JDParts()
+	jdUTC := d1 + d2
 
-	return d1 + d2
+	if l == nil || !l.hasDeltaET() {
+		// No usable kernel. Fall back to astrogo's own model rather than
+		// returning a UTC date mislabelled as TDB — a caller reaching here has
+		// a defective kernel, and a silently wrong epoch is worse than a
+		// slightly different convention.
+		td1, td2 := t.TDB().JDParts()
+
+		return td1 + td2
+	}
+
+	tai := jdUTC + l.leapSecondsAt(jdUTC+(69.184/86400.0))/86400.0
+
+	// Ephemeris seconds past J2000, seeded with TAI as described above.
+	secPastJ2000 := (tai - 2451545.0) * 86400.0
+
+	m := l.M0 + l.M1*secPastJ2000
+	e := m + l.EB*math.Sin(m)
+
+	return tai + (l.DeltaTA+l.K*math.Sin(e))/86400.0
 }
 
 // TDBToET converts a Julian Date in TDB to elapsed seconds past J2000.
