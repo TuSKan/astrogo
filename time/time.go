@@ -872,12 +872,12 @@ func (t Time) UTC() Time {
 		// Use TAI JD as initial UTC guess for the leap-second lookup,
 		// then iterate once to handle the leap-second boundary.
 		y, m, d, fd, _ := gofaext.JdToDate(t.jd1, t.jd2)
-		dat, _ := gofaext.Dat(y, m, d, fd)
+		dat := deltaAT(y, m, d, fd)
 		utcJD2 := t.jd2 - dat/86400.0
 		// Re-check: ΔAT may differ at the true UTC epoch (leap-second edge).
 		y2, m2, d2, fd2, _ := gofaext.JdToDate(t.jd1, utcJD2)
 
-		dat2, _ := gofaext.Dat(y2, m2, d2, fd2)
+		dat2 := deltaAT(y2, m2, d2, fd2)
 		if dat2 != dat {
 			utcJD2 = t.jd2 - dat2/86400.0
 		}
@@ -944,7 +944,7 @@ func (t Time) TAI() Time {
 	case UTC:
 		// TAI = UTC + ΔAT
 		y, m, d, fd, _ := gofaext.JdToDate(t.jd1, t.jd2)
-		dat, _ := gofaext.Dat(y, m, d, fd)
+		dat := deltaAT(y, m, d, fd)
 
 		return fromPartsPreserveLoc(t, t.jd1, t.jd2+dat/86400.0, TAI)
 	case TT:
@@ -1007,7 +1007,7 @@ func (t Time) TT() Time {
 			return fromPartsPreserveLoc(t, t.jd1, t.jd2+dt/86400.0, TT)
 		}
 		// Modern date: TT = UTC + ΔAT + 32.184s
-		dat, _ := gofaext.Dat(y, m, d, fd)
+		dat := deltaAT(y, m, d, fd)
 
 		return fromPartsPreserveLoc(t, t.jd1, t.jd2+(dat+32.184)/86400.0, TT)
 	case TAI:
