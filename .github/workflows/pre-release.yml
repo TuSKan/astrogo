@@ -34,7 +34,9 @@ jobs:
         with:
           # Track go.mod rather than a hardcoded version, so this workflow
           # cannot drift onto a different toolchain from ci.yml.
-          go-version-file: go.mod
+          # See the Setup Go step in the lint-and-test job for why this is a
+          # minor-version spec rather than go-version-file: go.mod (#109).
+          go-version: '1.25'
           cache: true
 
       - name: Prepare output directory

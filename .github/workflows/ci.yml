@@ -34,7 +34,23 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v6
         with:
-          go-version-file: go.mod
+          # '1.25' rather than go-version-file: go.mod, deliberately.
+          #
+          # go.mod declares `go 1.25.8` — a patch-level minimum astrogo does
+          # not need and does not set: `go mod tidy` raises the directive to
+          # the maximum any dependency declares, and gocloud-ext's seven
+          # modules declare 1.25.8 (see #109). Reading it here made setup-go
+          # demand that exact patch, and every observed job then logged
+          # "Attempting to download 1.25.8" — so the toolchain was fetched and
+          # extracted before the job could start. On PR #151 that step hung
+          # for 25 minutes without running a single test.
+          #
+          # A minor-version spec resolves to whatever 1.25.x the runner
+          # already has. It cannot silently diverge from go.mod: Go refuses to
+          # build below the declared directive and fetches the required
+          # toolchain itself, so a future bump past 1.25 degrades to today's
+          # behaviour (a download) rather than to a wrong result.
+          go-version: '1.25'
           cache: true
 
       - name: Verify dependencies
@@ -152,7 +168,9 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v6
         with:
-          go-version-file: go.mod
+          # See the Setup Go step in the lint-and-test job for why this is a
+          # minor-version spec rather than go-version-file: go.mod (#109).
+          go-version: '1.25'
           cache: true
 
       - name: Run tests with race detector
@@ -170,7 +188,9 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v6
         with:
-          go-version-file: go.mod
+          # See the Setup Go step in the lint-and-test job for why this is a
+          # minor-version spec rather than go-version-file: go.mod (#109).
+          go-version: '1.25'
           cache: true
 
       - name: Run benchmarks
@@ -203,7 +223,9 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v6
         with:
-          go-version-file: go.mod
+          # See the Setup Go step in the lint-and-test job for why this is a
+          # minor-version spec rather than go-version-file: go.mod (#109).
+          go-version: '1.25'
           cache: true
 
       - name: Run integration tests
