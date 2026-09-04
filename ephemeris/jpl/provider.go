@@ -252,6 +252,19 @@ func NewProvider(ctx context.Context, source core.Source, kernel string, opts ..
 		return nil, fmt.Errorf("jpl: failed to locate/cache LSK: %w", err)
 	}
 
+	// The kernel now drives this provider's epochs, so its DELTA_AT table is
+	// the record in force — publish it to time so UTC↔TAI↔TT agree with the
+	// ET the SPK is evaluated at, rather than following a leap-second table
+	// pinned by go.mod.
+	//
+	// Fatal, for the same reason the LSK load above is: a kernel whose table
+	// contradicts the built-in record is a broken kernel, and continuing means
+	// computing positions from a clock that is a whole second wrong somewhere
+	// without saying where.
+	if err := lsk.RegisterLeapSeconds(p.LSK); err != nil {
+		return nil, fmt.Errorf("jpl: %w", err)
+	}
+
 	return p, nil
 }
 
