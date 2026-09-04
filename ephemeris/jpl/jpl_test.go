@@ -62,7 +62,10 @@ func TestTimeConv(t *testing.T) {
 		t.Errorf("TDB %f should be > UTC %f", tdb, 2459945.5)
 	}
 
-	et := lsk.TDBToET(tdb)
+	// UTCToET rather than TDBToET(tdb): the provider takes the direct route,
+	// and going via a summed Julian Date quantises the result to about 40
+	// microseconds (#150).
+	et := lsk.UTCToET(tm, l)
 	if et < 0 {
 		t.Errorf("ET %f for 2023 should be > 0", et)
 	}

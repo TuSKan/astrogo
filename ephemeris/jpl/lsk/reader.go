@@ -419,7 +419,80 @@ func UTCToTDB(t time.Time, l *Reader) float64 {
 	return tai + (l.DeltaTA+l.K*math.Sin(e))/86400.0
 }
 
+// j2000JD is the Julian Date of the J2000.0 epoch, and secondsPerDay the
+// length of a Julian day.
+const (
+	j2000JD       = 2451545.0
+	secondsPerDay = 86400.0
+)
+
 // TDBToET converts a Julian Date in TDB to elapsed seconds past J2000.
+//
+// Deprecated: use [UTCToET], which keeps the two-part Julian Date the caller's
+// time.Time already holds. A single float64 Julian Date has an ULP of about
+// 40 microseconds at a modern epoch, so a value that has been summed before
+// reaching here has already lost more precision than this conversion can
+// recover. See [UTCToET].
 func TDBToET(jdTDB float64) float64 {
-	return (jdTDB - 2451545.0) * 86400.0
+	return (jdTDB - j2000JD) * secondsPerDay
+}
+
+// UTCToET converts a time directly to ephemeris seconds past J2000 — the
+// argument every SPK segment is indexed by.
+//
+// # Why this exists rather than TDBToET(UTCToTDB(...))
+//
+// That pair sums the two-part Julian Date before subtracting the epoch, and
+// the order matters. A Julian Date at a modern epoch is about 2.46e6, where one
+// ULP of a float64 is
+//
+//	math.Ulp(2460545.0) = 4.657e-10 days = 40.2 microseconds
+//
+// so the ET handed to the evaluator was quantised to 40 µs. That is 4 cm of
+// lunar motion and 31 cm for the ISS — and the Moon figure sits at the level of
+// the 33 mm this library claims against Horizons.
+//
+// It also made comparison meaningless: measuring the kernel's Moyer model
+// against time's Fairhead & Bretagnon series gave readings of exactly 0.0 or
+// exactly 40.2 µs at every epoch, because the two differ by about 30 µs and
+// the API could not represent the difference.
+//
+// Subtracting the epoch first keeps the value small. time.Time stores the day
+// number and the fraction separately for exactly this reason, and JDParts
+// hands both over:
+//
+//	(jd1 - 2451545.0) + jd2     ~1e4      ULP 1.8e-12 days = 0.16 ns
+//	jd1 + jd2                   ~2.46e6   ULP 4.7e-10 days = 40   µs
+//
+// The first subtraction is exact — both operands are whole days — so the
+// fraction keeps every bit it arrived with. SPICE works in ET seconds past
+// J2000 for the same reason.
+//
+// The conversion itself is unchanged; see [UTCToTDB] for the model and for
+// why the kernel drives it.
+func UTCToET(t time.Time, l *Reader) float64 {
+	utc := t.UTC()
+	d1, d2 := utc.JDParts()
+	jdUTC := d1 + d2
+
+	if l == nil || !l.hasDeltaET() || !l.covers(jdUTC) {
+		// Outside the kernel's era, or no usable kernel. Same delegation as
+		// UTCToTDB, in the same two-part form.
+		td1, td2 := t.TDB().JDParts()
+
+		return ((td1 - j2000JD) + td2) * secondsPerDay
+	}
+
+	// Seconds of UTC past J2000, with the epoch removed from the day number
+	// before the fraction is added back.
+	secUTC := ((d1 - j2000JD) + d2) * secondsPerDay
+
+	// The leap-second lookup only needs to land in the right interval, so the
+	// summed Julian Date is precise enough for it.
+	secTAI := secUTC + l.leapSecondsAt(jdUTC+(69.184/secondsPerDay))
+
+	m := l.M0 + l.M1*secTAI
+	e := m + l.EB*math.Sin(m)
+
+	return secTAI + l.DeltaTA + l.K*math.Sin(e)
 }

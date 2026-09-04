@@ -290,8 +290,9 @@ func (p *Provider) State(id core.ID, t time.Time) (core.State, error) {
 		naif = int(id)
 	}
 
-	tdb := lsk.UTCToTDB(t, p.LSK)
-	et := lsk.TDBToET(tdb)
+	// Straight to ET seconds: going via a summed Julian Date quantises the
+	// result to about 40 microseconds, which is 4 cm of lunar motion (#150).
+	et := lsk.UTCToET(t, p.LSK)
 
 	// Get target relative to SSB (0)
 	targetSSB, err := p.evaluateRecursive(int32(naif), et, 0)
