@@ -265,30 +265,91 @@ func (ctx *Context) GeocentricToObserved(v vector.Vec3) AltAz {
 	case ctx.atm.Model != nil:
 		alt += ctx.atm.Model.RefractFromTrue(alt, ctx.atm)
 	case ctx.atm.Pressure > 0:
-		// Use SOFA's own refraction coefficients (Refa, Refb) computed by
-		// Apco13 and stored in the ASTROM context. This is exactly the model
-		// that Atioq uses for the stellar path, ensuring consistency between
-		// the direct geocentric pipeline and the SOFA astrometric pipeline.
-		// Formula: ΔR = Refa·tan(z) + Refb·tan³(z)  (z = π/2 − alt)
-		//
-		// We apply refraction down to alt ≈ −1° (z ≤ 91°), since atmospheric
-		// refraction is physically nonzero slightly below the geometric
-		// horizon. Below −1° the tan(z) series diverges and refraction is
-		// negligible for practical purposes.
-		z := math.Pi/2 - altitude
-
-		const zMax = 91.0 * math.Pi / 180.0 // alt ≈ −1°
-		if z > 0 && z < zMax {
-			tz := math.Tan(z)
-
-			dR := ctx.astrom.Refa*tz + ctx.astrom.Refb*tz*tz*tz
-			if dR > 0 {
-				alt = angle.Rad(altitude + dR)
-			}
-		}
+		alt = refractLikeAtioq(E, N, U, topoVec.Norm(), ctx.astrom.Refa, ctx.astrom.Refb)
 	}
 
 	return NewAltAz(alt, angle.Rad(azimuth))
+}
+
+// Refraction clamps, copied from SOFA's iauAtioq rather than chosen here.
+//
+// selMin bounds sin(altitude) at 0.05 — about 2.87° — so the series is never
+// evaluated where it diverges. celMin bounds cos(altitude) away from zero at
+// the zenith, where the horizontal component vanishes.
+const (
+	selMin = 0.05
+	celMin = 1e-6
+)
+
+// refractLikeAtioq applies refraction to a topocentric ENU direction exactly as
+// SOFA's Atioq does, and returns the refracted altitude.
+//
+// # Why this reproduces Atioq instead of approximating it
+//
+// This branch exists so the vector pipeline agrees with the stellar one, which
+// goes through Atioq. It previously wrote out what looked like the same model —
+//
+//	dR := Refa*tan(z) + Refb*tan³(z)
+//
+// — guarded only by z < 91° and dR > 0, and it was wrong three ways at once.
+//
+// It had no clamp. tan(z) diverges at z = 90°, which is the horizon, not the
+// 91° the guard allowed: at alt −0.076° the cubic term flips sign to about
+// +61 rad and the dR > 0 test waves it straight through. Measured, that
+// returned an altitude of +7028°. The guard meant to reject bad values was
+// admitting only the catastrophic ones, because it rejected the honest
+// negatives.
+//
+// Between about 0° and 2° the cubic term cancels the linear one instead, dR
+// went non-positive, and refraction was dropped entirely — 0.000° where the
+// stellar path applied 0.16°.
+//
+// And the model itself was the uncorrected series. Atioq applies a
+// Newton-Raphson correction, dividing by 1 + (A + 3B·tan²z)/sin²(alt), which
+// the raw form omits even where it converges.
+//
+// Reproducing the routine rather than re-deriving it is what makes the two
+// pipelines agree by construction. TestRefractionMatchesTheStellarPipeline pins that.
+//
+// # A consequence worth stating
+//
+// Because sin(altitude) is clamped, a target below the horizon is refracted as
+// though it were at 2.87°, so this reports about 0.17° of refraction for
+// something that has already set. That is arguable physics and it is precisely
+// what the stellar path does; matching it is the point. A caller wanting
+// geometric altitude should use a Context with no atmosphere.
+func refractLikeAtioq(e, n, u, norm, refa, refb float64) angle.Angle {
+	if norm == 0 {
+		return 0
+	}
+
+	// Atioq works on a unit vector, so the clamps are in units of sine and
+	// cosine of altitude.
+	ue, un, uu := e/norm, n/norm, u/norm
+
+	r := math.Hypot(ue, un)
+	if r <= celMin {
+		r = celMin
+	}
+
+	z := uu
+	if z <= selMin {
+		z = selMin
+	}
+
+	// A·tan(z) + B·tan³(z) with Atioq's Newton-Raphson correction.
+	tz := r / z
+	w := refb * tz * tz
+	del := (refa + w) * tz / (1.0 + (refa+3.0*w)/(z*z))
+
+	// Rotate the direction by del, as Atioq does. The clamped r and z drive
+	// the rotation; the unclamped components are what it rotates.
+	cosdel := 1.0 - del*del/2.0
+	f := cosdel - del*z/r
+	eo, no := ue*f, un*f
+	uo := cosdel*uu + del*r
+
+	return angle.Rad(math.Pi/2 - math.Atan2(math.Hypot(eo, no), uo))
 }
 
 // ICRSToAltAz converts ICRS coordinates to local observed AltAz utilizing the
