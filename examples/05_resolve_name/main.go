@@ -25,8 +25,17 @@ func main() {
 	query := "Andromeda"
 	fmt.Printf("Executing advanced Search for ambiguous query: %q...\n", query)
 
-	// 3. Perform a fuzzy Search combining all endpoints
-	results := resolver.Search(ctx, query)
+	// 3. Perform a fuzzy Search combining all endpoints.
+	//
+	// The error is checked rather than discarded, and that distinction is the
+	// point: an empty result now means the catalogs were asked and matched
+	// nothing, where an error means at least one could not be reached. They
+	// used to be the same answer.
+	results, err := resolver.Search(ctx, query)
+	if err != nil {
+		fmt.Printf("Search failed: %v\n", err)
+		return
+	}
 
 	if len(results) == 0 {
 		fmt.Println("No matches found.")

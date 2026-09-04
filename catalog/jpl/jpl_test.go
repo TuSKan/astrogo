@@ -37,7 +37,7 @@ func newMockProvider(t *testing.T, jsonPayload string) *Provider {
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		fmt.Fprint(w, jsonPayload) //nolint:errcheck // test server, write failure would fail the test via response assertions
+		fmt.Fprint(w, jsonPayload) //nolint:errcheck // test server; a write failure surfaces through the response assertions
 	}))
 	t.Cleanup(server.Close)
 
@@ -232,8 +232,8 @@ func TestJPLResolve_ReturnsRealMatch(t *testing.T) {
 	result := "Target body name: Mars (499)                      {source: mar099}\n"
 	prov := newMockProvider(t, jsonResultPayload(t, result))
 
-	target, ok := prov.Resolve(context.Background(), "Mars")
-	testutil.AssertEqual(t, "Resolve Ok", ok, true)
+	target, err := prov.Resolve(context.Background(), "Mars")
+	testutil.AssertNoError(t, err)
 	testutil.AssertEqual(t, "Resolve Name", target.Name, "Mars")
 }
 
@@ -288,8 +288,8 @@ func TestProviderInterface(t *testing.T) {
 
 	// Fast fail search / resolve without any real network call.
 	// This hits the missing coverage lines.
-	_, ok := p.Resolve(context.Background(), "non_existent_body_to_trigger_miss")
-	if ok {
+	_, err := p.Resolve(context.Background(), "non_existent_body_to_trigger_miss")
+	if err == nil {
 		t.Error("expected Resolve to fail with no transport")
 	}
 }

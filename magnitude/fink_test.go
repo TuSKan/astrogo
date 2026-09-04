@@ -165,8 +165,8 @@ func TestFINK_EndToEndSHG1G2(t *testing.T) {
 	// Step 1: Get fitted parameters from SSOFT via the provider.
 	prov := fink.New()
 
-	tgt, ok := prov.Resolve("8467")
-	if !ok {
+	tgt, err := prov.Resolve(context.Background(), "8467")
+	if err != nil {
 		t.Skipf("FINK provider: Resolve(8467) failed — SSOFT download or parsing error")
 	}
 
@@ -344,8 +344,8 @@ func TestFINK_SpinCorrectionPhysics(t *testing.T) {
 	// Get spin parameters from the provider.
 	prov := fink.New()
 
-	tgt, ok := prov.Resolve("8467")
-	if !ok {
+	tgt, err := prov.Resolve(context.Background(), "8467")
+	if err != nil {
 		t.Skipf("FINK provider: Resolve(8467) failed")
 	}
 

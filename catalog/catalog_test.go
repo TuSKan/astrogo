@@ -3,6 +3,7 @@ package catalog
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/TuSKan/astrogo/angle"
@@ -15,16 +16,35 @@ import (
 type mockProvider struct {
 	targets map[string]Target
 	name    string
+
+	// failWith, when set, is returned by both Resolve and Search instead of
+	// consulting targets — the stand-in for a provider that cannot answer
+	// (an outage, a cancelled context, a rate limit) as opposed to one that
+	// answers "no such object". Keeping those separable is the whole point of
+	// the error-returning Provider interface.
+	failWith error
 }
 
 func (p *mockProvider) Name() string { return p.name }
 
-func (p *mockProvider) Resolve(_ context.Context, query string) (Target, bool) {
+func (p *mockProvider) Resolve(_ context.Context, query string) (Target, error) {
+	if p.failWith != nil {
+		return Target{}, p.failWith
+	}
+
 	t, ok := p.targets[resolve.Normalize(query)]
-	return t, ok
+	if !ok {
+		return Target{}, fmt.Errorf("%w: %q", resolve.ErrNotFound, query)
+	}
+
+	return t, nil
 }
 
-func (p *mockProvider) Search(_ context.Context, query string) []Target {
+func (p *mockProvider) Search(_ context.Context, query string) ([]Target, error) {
+	if p.failWith != nil {
+		return nil, p.failWith
+	}
+
 	var res []Target
 
 	q := resolve.Normalize(query)
@@ -34,7 +54,7 @@ func (p *mockProvider) Search(_ context.Context, query string) []Target {
 		}
 	}
 
-	return res
+	return res, nil
 }
 
 // mockConeSearcher is a resolve.ConeSearcher stub that ignores its request
@@ -560,7 +580,11 @@ func TestResolver_CrossMatchByPosition_SameEpochMerges(t *testing.T) {
 		cfg:       resolverConfig{positionMatchThreshold: defaultPositionMatchThreshold, cap: defaultCap},
 	}
 
-	got := r.Search(context.Background(), "TestObj")
+	got, err := r.Search(context.Background(), "TestObj")
+	if err != nil {
+		t.Fatalf("Search: %v", err)
+	}
+
 	if len(got) != 1 {
 		t.Fatalf("expected positional fallback to merge into 1 target, got %d: %+v", len(got), got)
 	}
@@ -586,7 +610,11 @@ func TestResolver_CrossMatchByPosition_TooFarDoesNotMerge(t *testing.T) {
 		cfg:       resolverConfig{positionMatchThreshold: defaultPositionMatchThreshold, cap: defaultCap},
 	}
 
-	got := r.Search(context.Background(), "TestObj")
+	got, err := r.Search(context.Background(), "TestObj")
+	if err != nil {
+		t.Fatalf("Search: %v", err)
+	}
+
 	if len(got) != 2 {
 		t.Fatalf("expected two distinct targets beyond the match threshold, got %d: %+v", len(got), got)
 	}
@@ -634,7 +662,11 @@ func TestResolver_CrossMatchByPosition_EpochMismatchAppliesPropagation(t *testin
 		cfg:       resolverConfig{positionMatchThreshold: defaultPositionMatchThreshold, cap: defaultCap},
 	}
 
-	got := r.Search(context.Background(), "TestStar")
+	got, err := r.Search(context.Background(), "TestStar")
+	if err != nil {
+		t.Fatalf("Search: %v", err)
+	}
+
 	if len(got) != 1 {
 		t.Fatalf("expected epoch-normalized positional match to merge into 1 target, got %d: %+v", len(got), got)
 	}
@@ -722,7 +754,11 @@ func TestResolver_Search_RespectsCap(t *testing.T) {
 		cfg:       resolverConfig{positionMatchThreshold: defaultPositionMatchThreshold, cap: 2},
 	}
 
-	got := r.Search(context.Background(), "TestObj")
+	got, err := r.Search(context.Background(), "TestObj")
+	if err != nil {
+		t.Fatalf("Search: %v", err)
+	}
+
 	if len(got) != 2 {
 		t.Fatalf("expected Limit(2)'s configured cap to limit results to 2, got %d", len(got))
 	}
@@ -749,12 +785,24 @@ func TestResolver_PositionMatchThreshold_Configurable(t *testing.T) {
 
 	// ~1.08" apart (0.0003 deg * 3600 * cos(-5.39deg)).
 	tight := newResolver(angle.Arcsec(0.5))
-	if got := tight.Search(context.Background(), "TestObj"); len(got) != 2 {
+
+	got, err := tight.Search(context.Background(), "TestObj")
+	if err != nil {
+		t.Fatalf("Search: %v", err)
+	}
+
+	if len(got) != 2 {
 		t.Fatalf("expected a tight 0.5\" threshold to keep candidates separate, got %d results", len(got))
 	}
 
 	loose := newResolver(angle.Arcsec(2))
-	if got := loose.Search(context.Background(), "TestObj"); len(got) != 1 {
+
+	got, err = loose.Search(context.Background(), "TestObj")
+	if err != nil {
+		t.Fatalf("Search: %v", err)
+	}
+
+	if len(got) != 1 {
 		t.Fatalf("expected a loose 2\" threshold to merge the same candidates, got %d results", len(got))
 	}
 }

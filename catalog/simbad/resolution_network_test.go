@@ -48,8 +48,8 @@ func TestResolveReturnsTheObjectAsked(t *testing.T) {
 		t.Run(tc.query, func(t *testing.T) {
 			p := New()
 
-			tgt, ok := p.Resolve(context.Background(), tc.query)
-			if !ok {
+			tgt, err := p.Resolve(context.Background(), tc.query)
+			if err != nil {
 				t.Fatalf("Resolve(%q) found nothing (%s)", tc.query, tc.why)
 			}
 
@@ -78,7 +78,7 @@ func TestResolveFindsNothingRatherThanSomethingWrong(t *testing.T) {
 
 	p := New()
 
-	if tgt, ok := p.Resolve(context.Background(), "NoSuchObjectXYZ123"); ok {
+	if tgt, err := p.Resolve(context.Background(), "NoSuchObjectXYZ123"); err == nil {
 		t.Errorf("Resolve of a nonexistent name returned %q", tgt.Name)
 	}
 }

@@ -53,32 +53,29 @@ func (p *Provider) Capabilities() []resolve.Capability {
 }
 
 // Resolve resolves a query to a target.
-func (p *Provider) Resolve(ctx context.Context, query string) (resolve.Target, bool) {
-	targets := p.Search(ctx, query)
-	if len(targets) > 0 {
-		return targets[0], true
+func (p *Provider) Resolve(ctx context.Context, query string) (resolve.Target, error) {
+	targets, err := p.Search(ctx, query)
+	if err != nil {
+		return resolve.Target{}, err
 	}
 
-	return resolve.Target{}, false
+	if len(targets) == 0 {
+		return resolve.Target{}, fmt.Errorf("%w: %q in mast", resolve.ErrNotFound, query)
+	}
+
+	return targets[0], nil
 }
 
 // Search searches for targets matching the query.
-func (p *Provider) Search(ctx context.Context, query string) []resolve.Target {
+func (p *Provider) Search(ctx context.Context, query string) ([]resolve.Target, error) {
 	req := resolve.ObjectRequest{Query: query, Limit: 10}
 
-	iter := p.ResolveObject(ctx, req)
+	targets, err := resolve.Drain(p.ResolveObject(ctx, req), 10)
+	if err != nil {
+		return nil, fmt.Errorf("searching for %q: %w", query, err)
+	}
 
-	var targets []resolve.Target
-
-	iter(func(t resolve.Target, err error) bool {
-		if err == nil {
-			targets = append(targets, t)
-		}
-
-		return len(targets) < 10
-	})
-
-	return targets
+	return targets, nil
 }
 
 // ResolveObject resolves a query to a target.

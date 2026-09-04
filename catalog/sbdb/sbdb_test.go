@@ -41,8 +41,8 @@ func TestSBDBResolver(t *testing.T) {
 
 	prov := New()
 
-	tar, ok := prov.Resolve(context.Background(), "aten")
-	if !ok {
+	tar, err := prov.Resolve(context.Background(), "aten")
+	if err != nil {
 		t.Fatalf("Failed to resolve Aten")
 	}
 
@@ -110,8 +110,8 @@ func TestSBDBResolver_CometKind(t *testing.T) {
 
 	prov := New()
 
-	tar, ok := prov.Resolve(context.Background(), "halley")
-	if !ok {
+	tar, err := prov.Resolve(context.Background(), "halley")
+	if err != nil {
 		t.Fatalf("Failed to resolve Halley")
 	}
 
@@ -167,8 +167,8 @@ func TestSBDBResolver_OrbitalElements(t *testing.T) {
 
 	prov := New()
 
-	tar, ok := prov.Resolve(context.Background(), "ceres")
-	if !ok {
+	tar, err := prov.Resolve(context.Background(), "ceres")
+	if err != nil {
 		t.Fatalf("Failed to resolve Ceres")
 	}
 
@@ -229,8 +229,8 @@ func TestSBDBResolver_IncompleteElements(t *testing.T) {
 
 	prov := New()
 
-	tar, ok := prov.Resolve(context.Background(), "ceres")
-	if !ok {
+	tar, err := prov.Resolve(context.Background(), "ceres")
+	if err != nil {
 		t.Fatalf("Failed to resolve Ceres")
 	}
 
@@ -276,8 +276,8 @@ func TestSBDBResolver_PhysicalDiameterAlbedo(t *testing.T) {
 
 	prov := New()
 
-	tar, ok := prov.Resolve(context.Background(), "eros")
-	if !ok {
+	tar, err := prov.Resolve(context.Background(), "eros")
+	if err != nil {
 		t.Fatalf("Failed to resolve Eros")
 	}
 
@@ -537,5 +537,5 @@ func TestProviderInterface(t *testing.T) {
 	}
 
 	_, _ = p.Resolve(context.Background(), "non_existent_body")
-	_ = p.Search(context.Background(), "non_existent_body")
+	_, _ = p.Search(context.Background(), "non_existent_body")
 }

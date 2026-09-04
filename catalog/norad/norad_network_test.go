@@ -139,8 +139,8 @@ func TestResolve_Live(t *testing.T) {
 
 	p := New()
 
-	target, ok := p.Resolve(context.Background(), "ISS")
-	if !ok {
+	target, err := p.Resolve(context.Background(), "ISS")
+	if err != nil {
 		t.Fatal("Failed to resolve ISS")
 	}
 
@@ -204,8 +204,8 @@ func TestResolveISSIsTheStation(t *testing.T) {
 	// The catalog number takes a different route entirely — CelesTrak's exact
 	// CATNR parameter rather than its substring NAME one — so it is worth one
 	// more call. "25544" used to find nothing at all.
-	byNumber, ok := p.Resolve(t.Context(), "25544")
-	if !ok {
+	byNumber, err := p.Resolve(t.Context(), "25544")
+	if err != nil {
 		t.Skip("CelesTrak did not answer the catalog-number query")
 	}
 

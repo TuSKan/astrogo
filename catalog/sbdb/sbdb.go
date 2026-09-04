@@ -48,32 +48,29 @@ func (p *Provider) Capabilities() []resolve.Capability {
 }
 
 // Resolve performs exact-match resolution for a query.
-func (p *Provider) Resolve(ctx context.Context, query string) (resolve.Target, bool) {
-	targets := p.Search(ctx, query)
-	if len(targets) > 0 {
-		return targets[0], true
+func (p *Provider) Resolve(ctx context.Context, query string) (resolve.Target, error) {
+	targets, err := p.Search(ctx, query)
+	if err != nil {
+		return resolve.Target{}, err
 	}
 
-	return resolve.Target{}, false
+	if len(targets) == 0 {
+		return resolve.Target{}, fmt.Errorf("%w: %q in sbdb", resolve.ErrNotFound, query)
+	}
+
+	return targets[0], nil
 }
 
 // Search performs fuzzy search across all MPC-registered small bodies.
-func (p *Provider) Search(ctx context.Context, query string) []resolve.Target {
+func (p *Provider) Search(ctx context.Context, query string) ([]resolve.Target, error) {
 	req := resolve.ObjectRequest{Query: query, Limit: 1}
 
-	iter := p.ResolveObject(ctx, req)
+	targets, err := resolve.Drain(p.ResolveObject(ctx, req), 1)
+	if err != nil {
+		return nil, fmt.Errorf("searching for %q: %w", query, err)
+	}
 
-	var targets []resolve.Target
-
-	iter(func(t resolve.Target, err error) bool {
-		if err == nil {
-			targets = append(targets, t)
-		}
-
-		return len(targets) < 1
-	})
-
-	return targets
+	return targets, nil
 }
 
 // ResolveObject performs streaming resolution via the JPL Small-Body Database API.

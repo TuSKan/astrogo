@@ -46,14 +46,18 @@ func TestNewFetchSearchResolve(t *testing.T) {
 		t.Errorf("Capabilities() = %v, want exactly one capability", caps)
 	}
 
-	targets := p.Search(context.Background(), "ISS")
+	targets, err := p.Search(context.Background(), "ISS")
+	if err != nil {
+		t.Fatalf("Search: %v", err)
+	}
+
 	if len(targets) != 1 || targets[0].Name != "ISS (ZARYA)" {
 		t.Fatalf("Search(%q) = %+v, want a single ISS (ZARYA) target", "ISS", targets)
 	}
 
-	target, ok := p.Resolve(context.Background(), "ISS")
-	if !ok || target.Name != "ISS (ZARYA)" {
-		t.Fatalf("Resolve(%q) = %+v, %v, want ISS (ZARYA), true", "ISS", target, ok)
+	target, err := p.Resolve(context.Background(), "ISS")
+	if err != nil || target.Name != "ISS (ZARYA)" {
+		t.Fatalf("Resolve(%q) = %+v, %v, want ISS (ZARYA), true", "ISS", target, err)
 	}
 
 	// Regression: Kind must be the canonical resolve.KindSatellite constant,

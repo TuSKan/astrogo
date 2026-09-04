@@ -89,8 +89,8 @@ func TestResolveMock(t *testing.T) {
 
 	redirect(t, remote.SIMBAD, server.URL)
 
-	tgt, ok := p.Resolve(context.Background(), "m31")
-	if !ok {
+	tgt, err := p.Resolve(context.Background(), "m31")
+	if err != nil {
 		t.Fatalf("failed to resolve target")
 	}
 
@@ -424,7 +424,7 @@ func TestProviderInterface(t *testing.T) {
 
 	// Triggers internal error paths since we didn't mock
 	_, _ = p.Resolve(context.Background(), "non_existent_body")
-	_ = p.Search(context.Background(), "non_existent_body")
+	_, _ = p.Search(context.Background(), "non_existent_body")
 }
 
 // redirect points endpoint id at a test server for the duration of one

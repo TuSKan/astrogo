@@ -207,8 +207,8 @@ func smallBodyElements(t *testing.T, provider *sbdb.Provider, body smallBody) (
 ) {
 	t.Helper()
 
-	target, ok := provider.Resolve(context.Background(), strconv.Itoa(body.id))
-	if !ok {
+	target, err := provider.Resolve(context.Background(), strconv.Itoa(body.id))
+	if err != nil {
 		t.Skipf("SBDB did not resolve %d (%s)", body.id, body.name)
 
 		return kepler.Elements{}, time.Time{}, false
