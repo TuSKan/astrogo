@@ -103,38 +103,16 @@ func TestUTCToETResolvesSubMicrosecondSteps(t *testing.T) {
 	}
 }
 
-// TestUTCToETAgreesWithTheJulianDatePath checks the new conversion against the
-// one it replaces, to the precision the old one had.
+// TestUTCToETDelegatesOutsideTheKernelsEra pins that an epoch the DELTA_AT
+// table cannot speak for still reaches time's historical Delta-T rather than
+// being answered with no offset at all.
 //
-// The two must not differ by more than the old path could represent: anything
-// larger would mean the arithmetic changed rather than just its conditioning.
-// This is what distinguishes "kept more bits" from "computes something else".
-func TestUTCToETAgreesWithTheJulianDatePath(t *testing.T) {
-	r := openKernel(t)
-
-	// The old path's own quantum, measured at 32.8 µs; a little headroom over
-	// it, since that figure varies slightly with epoch.
-	const toleranceSeconds = 100e-6
-
-	for _, year := range []int{1972, 1990, 2010, 2026, 2040} {
-		when := time.Date(year, time.June, 15, 12, 0, 0, 0, time.LocationUTC)
-
-		// The deprecated path is the subject of this comparison.
-		viaJD := lsk.TDBToET(lsk.UTCToTDB(when, r))
-		direct := lsk.UTCToET(when, r)
-
-		if d := math.Abs(direct - viaJD); d > toleranceSeconds {
-			t.Errorf("year %d: UTCToET gives %.9f s and the Julian-date path %.9f s, "+
-				"differing by %.1f microseconds.\n  Removing the epoch earlier should "+
-				"keep more bits of the same value, not compute a different one.",
-				year, direct, viaJD, d*1e6)
-		}
-	}
-}
-
-// TestUTCToETDelegatesOutsideTheKernelsEra is the two-part counterpart of the
-// check on UTCToTDB: an epoch the DELTA_AT table cannot speak for must still
-// reach time's historical Delta-T rather than being answered with no offset.
+// The table begins at 1972-01-01, because that is when UTC began accumulating
+// whole leap seconds. Before it the offset is Delta-T — the Espenak & Meeus
+// (2006) polynomials time.DeltaT implements — which is about 10,500 s at year
+// 1. Driving the conversion from the kernel without checking its era applied
+// no offset at all, and surfaced as ~180 minute errors across the AstroPixels
+// year-0001 lunar phases.
 func TestUTCToETDelegatesOutsideTheKernelsEra(t *testing.T) {
 	r := openKernel(t)
 
@@ -152,4 +130,17 @@ func TestUTCToETDelegatesOutsideTheKernelsEra(t *testing.T) {
 				"consulted.", year, d, d/60)
 		}
 	}
+}
+
+// tdbMinusUTC is TDB − UTC in seconds at t, in the two-part form.
+//
+// The tests below used to compute this as (UTCToTDB(t) - t.JD()) * 86400 — a
+// difference of two numbers near 2.46e6, so catastrophic cancellation on top
+// of the 40 microsecond quantisation that motivated UTCToET in the first
+// place. Subtracting in seconds past J2000 avoids both.
+func tdbMinusUTC(t time.Time, r *lsk.Reader) float64 {
+	d1, d2 := t.UTC().JDParts()
+	secUTC := ((d1 - 2451545.0) + d2) * 86400.0
+
+	return lsk.UTCToET(t, r) - secUTC
 }

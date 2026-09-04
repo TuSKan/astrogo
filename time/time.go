@@ -983,7 +983,7 @@ func (t Time) TAI() Time {
 // Earlier revisions of this comment said "the NAIF LSK", which was never true
 // of this package: nothing under time/ reads a kernel, and no LSK loader is
 // registered here. The kernel is read only by ephemeris/jpl, which uses it to
-// compute the ET its own SPK segments are indexed by (see lsk.UTCToTDB). The
+// compute the ET its own SPK segments are indexed by (see lsk.UTCToET). The
 // two tables agree — TestLeapSecondSourcesAgree pins that — but they are
 // separate sources, and whether time should consume the kernel instead is an
 // open question rather than the current behaviour.

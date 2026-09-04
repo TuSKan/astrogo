@@ -316,11 +316,15 @@ func (r *Reader) leapSecondsAt(jdTDB float64) float64 {
 	return lastN
 }
 
-// UTCToTDB converts a time.Time to a Julian Date in the Barycentric Dynamical
-// Time (TDB) scale.
-//
-// The conversion is delegated to [time.Time.TDB], which is the scale-aware
-// path the rest of the library uses.
+// j2000JD is the Julian Date of the J2000.0 epoch, and secondsPerDay the
+// length of a Julian day.
+const (
+	j2000JD       = 2451545.0
+	secondsPerDay = 86400.0
+)
+
+// UTCToET converts a time directly to ephemeris seconds past J2000 — the
+// argument every SPK segment is indexed by.
 //
 // # Two defects this replaced
 //
@@ -359,88 +363,7 @@ func (r *Reader) leapSecondsAt(jdTDB float64) float64 {
 // than a nicety. SPICE itself refuses to convert a time with no LSK furnished;
 // astrogo failing the same way is the contract, not a wart.
 //
-// # The conversion
-//
-// From the kernel's own header, with constants read out of the file:
-//
-//	ET − TAI = DELTA_T_A + K·sin(E)
-//	E        = M + EB·sin(M)
-//	M        = M0 + M1·t        (t = ephemeris seconds past J2000)
-//	TAI      = UTC + DELTA_AT
-//
-// t is nominally ET, which appears on both sides. Seeding it with TAI instead
-// costs about 10 ns — M1 is 2e-7 rad/s, so the 32.184 s difference moves
-// K·sin(E) by ~1e-8 s — so no iteration is worth the cycles.
-//
-// # The input is normalised first
-//
-// Every scale is converted to UTC before DELTA_AT is applied. Without that the
-// caller's label was silently reinterpreted: a TT instant had leap seconds
-// plus 32.184 s added on top of an offset it already carried, landing 69.184 s
-// late — about 40 arcsec of lunar motion. See
-// ephemeris.TestProviderStateIsScaleInvariant, which pins it.
-func UTCToTDB(t time.Time, l *Reader) float64 {
-	utc := t.UTC()
-	d1, d2 := utc.JDParts()
-	jdUTC := d1 + d2
-
-	if l == nil || !l.hasDeltaET() || !l.covers(jdUTC) {
-		// Either no usable kernel, or an epoch the kernel cannot speak for.
-		//
-		// The DELTA_AT table begins at 1972-01-01, because that is when UTC
-		// began accumulating whole leap seconds. Before it there are no leap
-		// seconds to add, and TT-UT1 is the historical Delta-T instead —
-		// roughly 10,500 s at year 1, which is not a rounding difference.
-		//
-		// [time.DeltaT] owns that model: the Espenak & Meeus (2006) polynomial
-		// expressions, with the Morrison & Stephenson (2004) base and a secular
-		// acceleration correction. Delegating reaches it rather than
-		// duplicating it — time.Time's own scale conversion switches to DeltaT
-		// below 1972, the same boundary [Reader.covers] uses, so the two agree
-		// by construction rather than by coincidence.
-		//
-		// Measured against time.TDB before this guard existed: -174.9 min at
-		// year 1, -25.5 min at year 1000, +0.6 min at 1900, and exact from
-		// 1972 on. It surfaced as ~180 min errors in the AstroPixels lunar
-		// phase comparison for year 0001.
-		td1, td2 := t.TDB().JDParts()
-
-		return td1 + td2
-	}
-
-	tai := jdUTC + l.leapSecondsAt(jdUTC+(69.184/86400.0))/86400.0
-
-	// Ephemeris seconds past J2000, seeded with TAI as described above.
-	secPastJ2000 := (tai - 2451545.0) * 86400.0
-
-	m := l.M0 + l.M1*secPastJ2000
-	e := m + l.EB*math.Sin(m)
-
-	return tai + (l.DeltaTA+l.K*math.Sin(e))/86400.0
-}
-
-// j2000JD is the Julian Date of the J2000.0 epoch, and secondsPerDay the
-// length of a Julian day.
-const (
-	j2000JD       = 2451545.0
-	secondsPerDay = 86400.0
-)
-
-// TDBToET converts a Julian Date in TDB to elapsed seconds past J2000.
-//
-// Deprecated: use [UTCToET], which keeps the two-part Julian Date the caller's
-// time.Time already holds. A single float64 Julian Date has an ULP of about
-// 40 microseconds at a modern epoch, so a value that has been summed before
-// reaching here has already lost more precision than this conversion can
-// recover. See [UTCToET].
-func TDBToET(jdTDB float64) float64 {
-	return (jdTDB - j2000JD) * secondsPerDay
-}
-
-// UTCToET converts a time directly to ephemeris seconds past J2000 — the
-// argument every SPK segment is indexed by.
-//
-// # Why this exists rather than TDBToET(UTCToTDB(...))
+// # Why this returns seconds rather than a Julian Date
 //
 // That pair sums the two-part Julian Date before subtracting the epoch, and
 // the order matters. A Julian Date at a modern epoch is about 2.46e6, where one
@@ -468,16 +391,15 @@ func TDBToET(jdTDB float64) float64 {
 // fraction keeps every bit it arrived with. SPICE works in ET seconds past
 // J2000 for the same reason.
 //
-// The conversion itself is unchanged; see [UTCToTDB] for the model and for
-// why the kernel drives it.
+// The model is Moyer's, read from the kernel; see above.
 func UTCToET(t time.Time, l *Reader) float64 {
 	utc := t.UTC()
 	d1, d2 := utc.JDParts()
 	jdUTC := d1 + d2
 
 	if l == nil || !l.hasDeltaET() || !l.covers(jdUTC) {
-		// Outside the kernel's era, or no usable kernel. Same delegation as
-		// UTCToTDB, in the same two-part form.
+		// Outside the kernel's era, or no usable kernel: time owns the
+		// historical Delta-T, in the same two-part form.
 		td1, td2 := t.TDB().JDParts()
 
 		return ((td1 - j2000JD) + td2) * secondsPerDay

@@ -54,20 +54,26 @@ func TestTimeConv(t *testing.T) {
 
 	// 2023-JAN-1
 	tm := time.FromJD(2459945.5, time.UTC)
-	tdb := lsk.UTCToTDB(tm, l)
-
-	// Pre-calculated approx: UTC + 11s + 32.184s = UTC + 43.184s
-	// 2459945.5 + 43.184/86400 = 2459945.5005
-	if tdb < 2459945.5 {
-		t.Errorf("TDB %f should be > UTC %f", tdb, 2459945.5)
-	}
-
-	// UTCToET rather than TDBToET(tdb): the provider takes the direct route,
-	// and going via a summed Julian Date quantises the result to about 40
-	// microseconds (#150).
+	// ET seconds past J2000, the argument SPK segments are indexed by. The
+	// Julian-date pair this used to go through is gone: summing it quantised
+	// the result to about 40 microseconds (#150).
 	et := lsk.UTCToET(tm, l)
 	if et < 0 {
 		t.Errorf("ET %f for 2023 should be > 0", et)
+	}
+
+	// TDB runs ahead of UTC by the leap seconds plus 32.184 s, so ET must
+	// exceed the same instant counted in plain UTC seconds.
+	d1, d2 := tm.UTC().JDParts()
+	secUTC := ((d1 - 2451545.0) + d2) * 86400.0
+
+	// 37 leap seconds at 2023 plus 32.184 s, so 69.184. The comment this
+	// replaces said "UTC + 11s + 32.184s = 43.184", which has not been right
+	// since 1979 — the assertion beside it only checked TDB > UTC, so a
+	// 26-second error in the stated expectation went unnoticed.
+	if offset := et - secUTC; offset < 69.0 || offset > 69.5 {
+		t.Errorf("TDB-UTC at 2023-01-01 is %.4f s, expected about 69.184 "+
+			"(37 leap seconds + 32.184)", offset)
 	}
 }
 
