@@ -228,6 +228,25 @@ func (s Scale) String() string {
 	}
 }
 
+// uniform reports whether one unit of s is one SI second, everywhere.
+//
+// TAI, TT and TDB are uniform: they run at a constant rate by construction, so
+// advancing a label by d and advancing the physical instant by d are the same
+// operation, and the difference of two labels is elapsed time. Duration
+// arithmetic in these scales needs no conversion at all — which is why the
+// hot paths that use them pay nothing for [Time.Sub] and [Time.AddDays].
+//
+// UTC and UT1 are not. UTC is a step function of TAI: it absorbs a leap second
+// twice a decade, so the difference of two UTC labels is short by every step
+// between them. UT1 tracks Earth's rotation, which is neither constant nor
+// predictable. For these two, duration arithmetic goes through TT.
+//
+// TDB is uniform in its own frame but not synchronous with TT — the periodic
+// term between them varies by ±1.7 ms, so a TDB interval and the TT interval
+// it spans differ by up to a microsecond per hour. Arithmetic in TDB stays in
+// TDB, which is what an ephemeris interpolating in TDB days wants.
+func (s Scale) uniform() bool { return s == TAI || s == TT || s == TDB }
+
 // Time represents a high-precision astronomical timestamp.
 //
 // Internal representation uses a two-part Julian Date (jd1 + jd2) to maintain
@@ -543,15 +562,39 @@ func (t Time) AddDate(years, months, days int) Time {
 	return result
 }
 
-// Add returns a new Time with the duration added.
-// It uses a simple conversion: 1 day = 86400.0 seconds.
+// Add returns a new Time with the duration added to its label.
 // The display location is preserved.
+//
+// See [Time.AddDays] for the one case where this is not the same as advancing
+// by d of physical time.
 func (t Time) Add(d time.Duration) Time {
 	return t.AddDays(d.Seconds() / 86400.0)
 }
 
-// AddDays returns a new Time with d days added.
+// AddDays returns a new Time with d days added to its label.
 // The display location is preserved.
+//
+// # This advances the label, and [Time.Sub] measures physical time
+//
+// In a uniform scale (TAI, TT, TDB) those are the same thing and the two are
+// exact inverses. In UTC they are not: adding 86400 s to a label that spans a
+// leap second advances the clock by 86401 SI seconds, so t.AddDays(1).Sub(t)
+// reports 86401 s — correctly, because that is how much time passed.
+//
+// The asymmetry is deliberate rather than an oversight, and it is bounded:
+//
+//   - Add stays label arithmetic because [Time.Add] must be reversible.
+//     t.Add(d).Add(-d) returns exactly t, which TestAddIsReversible pins.
+//     Physical addition cannot be, because UTC has no label for the leap
+//     second itself (see the 23:59:60 issue) — an instant added *into* a leap
+//     second has nowhere to land and aliases to its neighbour, so the trip
+//     back arrives one second away.
+//   - Sub is physical because it returns a [time.Duration], which is a count
+//     of SI seconds by type.
+//
+// Both cannot hold at once while UTC is not a total representation of the
+// instants it labels. To advance a UTC epoch by physical time, do the
+// arithmetic in a uniform scale: t.TAI().Add(d).UTC().
 func (t Time) AddDays(d float64) Time {
 	result := FromJDParts(t.jd1, t.jd2+d, t.scale)
 	result.loc = t.loc
@@ -751,17 +794,70 @@ func (t Time) IsZero() bool {
 	return t.jd1 == 0 && t.jd2 == 0
 }
 
-// Sub returns the duration t - other.
-// Cross-scale times are automatically unified via TT.
+// Sub returns the physical time elapsed from other to t, in SI seconds.
+//
+// # Not the difference of the calendar labels
+//
+// Both operands are converted to TT first, whatever scale they are in. For two
+// UTC epochs that is the whole point: UTC is not a uniform scale, so the
+// difference of two UTC labels is short by every leap second between them —
+// 27 s across 1972-2026, which is 207 km of ISS track and about 16 arcsec of
+// lunar motion.
+//
+// This used to unify only when the two scales *differed*, which meant mixing
+// scales gave the right answer and being consistent gave the wrong one:
+//
+//	b.Sub(a)             // 1704153600 s — two UTC labels
+//	b.Sub(a.TAI())       // 1704153627 s — mixed, so unified via TT
+//
+// A duration is a count of SI seconds by type, so the second reading was
+// always the one Sub promised.
+//
+// # Range
+//
+// [time.Duration] is an int64 nanosecond count, so it saturates just past ±292
+// years. Beyond that the maximum or minimum Duration is returned rather than a
+// silently wrapped value — the same choice [time.Time.Sub] makes, and it used
+// to wrap here: year 1 to 2026 returned −9223372037 s, a negative span for a
+// positive interval. Use [Time.SubDays] for intervals of astronomical length;
+// it is a float64 day count and does not saturate.
 func (t Time) Sub(other Time) time.Duration {
-	days := t.SubDays(other)
-	return time.Duration(days * 86400.0 * float64(time.Second))
+	const secondsPerDay = 86400.0
+
+	seconds := t.SubDays(other) * secondsPerDay
+
+	// Compare in seconds rather than nanoseconds: the nanosecond product
+	// overflows float64's exact-integer range long before it overflows int64,
+	// so the check has to happen before the multiplication.
+	const maxSeconds = float64(math.MaxInt64) / float64(time.Second)
+
+	switch {
+	case seconds >= maxSeconds:
+		return time.Duration(math.MaxInt64)
+	case seconds <= -maxSeconds:
+		return time.Duration(math.MinInt64)
+	default:
+		// Round rather than truncate. A conversion that lands a part in 1e13
+		// below a whole second — which a scale round-trip routinely does,
+		// since it adds and removes an offset of ~69 s — truncates to one
+		// nanosecond short, so an exactly-ten-minute interval reports
+		// 9m59.999999999s. Truncation also biases every result downward.
+		return time.Duration(math.Round(seconds * float64(time.Second)))
+	}
 }
 
-// SubDays returns the difference t - other in days.
-// Cross-scale times are automatically unified via TT.
+// SubDays returns the physical time elapsed from other to t, in days of 86400
+// SI seconds.
+//
+// See [Time.Sub], which is this in nanoseconds and carries the reasoning.
+// Unlike Sub this does not saturate, so it is the right call for intervals of
+// astronomical length.
 func (t Time) SubDays(other Time) float64 {
-	if t.scale != other.scale {
+	// Two epochs in one uniform scale need no conversion: their labels already
+	// differ by elapsed SI time. Anything else goes through TT — a mismatched
+	// pair because they must be made comparable, and a matched non-uniform
+	// pair (two UTC epochs, two UT1 epochs) because that is the whole bug.
+	if t.scale != other.scale || !t.scale.uniform() {
 		t, other = t.TT(), other.TT()
 	}
 
