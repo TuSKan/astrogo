@@ -130,7 +130,7 @@ func TestSwapOptimizedGapInsertion(t *testing.T) {
 
 // TestScheduleGaps verifies gap computation between scheduled blocks.
 func TestScheduleGaps(t *testing.T) {
-	start := time.ZeroTime()
+	start := scheduleBase()
 	window := Window{Start: start, End: start.Add(1 * time.Hour)}
 
 	blocks := []ScheduledBlock{
@@ -174,7 +174,7 @@ func TestScheduleGaps(t *testing.T) {
 
 // TestEmptyScheduleGaps verifies gap computation on an empty schedule.
 func TestEmptyScheduleGaps(t *testing.T) {
-	start := time.ZeroTime()
+	start := scheduleBase()
 	window := Window{Start: start, End: start.Add(1 * time.Hour)}
 
 	gaps := scheduleGaps(nil, window)
@@ -233,4 +233,21 @@ func TestScoreBlockPlacement(t *testing.T) {
 	if score < 0 {
 		t.Errorf("score should be non-negative, got %.2f", score)
 	}
+}
+
+// scheduleBase is an arbitrary but *real* epoch for schedule arithmetic tests.
+//
+// These used to start from time.ZeroTime(), which is FromJD(0, UTC) — a
+// zero-value sentinel, not a valid UTC epoch. It is Julian Date 0, in the year
+// −4712, where the Espenak & Meeus ΔT polynomial reads 135,943 s and drifts
+// 0.144 s per hour. Since Time.Sub measures physical elapsed time rather than
+// the difference of two calendar labels, an hour-long window based there
+// really does span 59m59.855s, and the assertions below were reading that
+// drift rather than the scheduler.
+//
+// Any ordinary epoch avoids it: ΔAT is piecewise constant, so within a window
+// that crosses no leap second, label arithmetic and physical arithmetic agree
+// exactly.
+func scheduleBase() time.Time {
+	return time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
 }

@@ -104,3 +104,19 @@ func BenchmarkSub_CrossScale(b *testing.B) {
 		_ = t1.Sub(t2)
 	}
 }
+
+// BenchmarkSub_SameScale_Uniform is the counterpart to BenchmarkSub_SameScale,
+// which uses UTC.
+//
+// Sub converts to TT whenever it is handed a non-uniform scale, so two UTC
+// epochs now cost two conversions (measured: 2.0 -> 91.5 ns/op) in exchange for
+// an answer that counts the leap seconds between them. A uniform scale needs no
+// conversion and must stay on the cheap path — this is what pins that.
+func BenchmarkSub_SameScale_Uniform(b *testing.B) {
+	t1 := FromJD(2460001.0, TT)
+	t2 := FromJD(2460000.5, TT)
+
+	for b.Loop() {
+		_ = t1.Sub(t2)
+	}
+}
