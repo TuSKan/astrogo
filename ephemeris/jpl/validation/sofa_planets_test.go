@@ -122,7 +122,7 @@ func (p planetSeries) bound() float64 {
 // DE200 disagreeing with DE440; it was the sampling window reaching back
 // before 1972, where the two sides of the comparison do not agree on what time
 // it is. See [planetEpochs] and
-// TestPreLeapSecondEpochsMeasureTheClockNotTheEphemeris. Restricted to the era
+// TestNoTimekeepingStepAtTheLeapSecondBoundary. Restricted to the era
 // where the time scale is unambiguous, every body passes the undoubled bound
 // with 1.3x to 1.9x in hand, and the contract stays a tight one.
 //
@@ -154,37 +154,47 @@ const isoDate = "2006-01-02"
 // three epochs used to be the wall clock, so its margin was re-rolled on every
 // run and any failure was unreproducible.
 //
-// # Why it starts at 1972 and not at the table's own 1800
+// # Why it once started at 1972, and no longer does
 //
-// Because before 1972 this comparison stops measuring the ephemeris and starts
-// measuring the clock. The two sides reach a TDB instant by different routes —
-// the kernel path through a NAIF leap-second kernel, the analytical path
-// through this module's own delta-T model — and outside the leap-second era
-// those routes disagree. The disagreement is a time offset, and a time offset
-// on the Earth's orbit is a position error of 29.8 km for every second.
+// It used to begin at the leap-second boundary, because before 1972 this
+// comparison stopped measuring the ephemeris and started measuring the clock.
+// The two sides reached a TDB instant by different routes — the kernel path
+// through the leap-second kernel, the analytical path through this module's own
+// delta-T model — and outside the leap-second era those routes disagreed. A
+// time offset on the Earth's orbit is a position error of 29.8 km per second,
+// so the Sun's residual read 302.3 km at 1971 against 7.9 km at 1972, a factor
+// of 38 at exactly that boundary, growing to 1,056 km by 1900.
 //
-// It is not subtle once looked for. The Sun's maximum residual by year:
+// The cause was in the conversion, not the ephemeris: the kernel path applied
+// no offset at all before its DELTA_AT table began, dropping the historical
+// delta-T entirely. It now delegates to time for those epochs, and the term is
+// gone. Measured across the whole widened window, the Sun's residual is 4 to 9
+// km with no step at the boundary — 6.4 km at 1900 where it was 1,056, and 7.3
+// km at 1971 where it was 302.3.
 //
-//	1971   302.3 km
-//	1972     7.9 km
+// So the window is the one the table is actually quoted over. Every body holds
+// its contract across it, with the tightest margin 1.13x for Jupiter and the
+// pre-1972 worst cases comparable to the post-1972 ones rather than
+// systematically larger:
 //
-// One year apart, a factor of 38, at exactly the boundary where UTC became
-// leap-second based. Before it the residual grows smoothly backwards — 1,056 km
-// at 1900 — and after it the whole span to 2100 sits between 3 and 9 km, which
-// is Epv00's published accuracy of 11.2 km and nothing else.
+//	Mercury  1972+ 8.9e-06   1800-1971 7.9e-06   contract 1.6e-05
+//	Jupiter  1972+ 1.2e-03   1800-1971 1.9e-03   contract 2.1e-03
+//	Neptune  1972+ 1.7e-03   1800-1971 1.9e-03   contract 2.3e-03
 //
-// Every planet inherits the same term, because a geocentric planet position is
-// the heliocentric one minus the Earth's. It is negligible against Jupiter's
-// 300,000 km bound and decisive against Mercury's 2,445 km one — which is how
-// it came to be mistaken for the reference ephemeris and nearly cost this suite
-// a doubled bound. See [planetSeries.contract] and
-// TestPreLeapSecondEpochsMeasureTheClockNotTheEphemeris.
+// Every planet inherited that timekeeping term, because a geocentric planet
+// position is the heliocentric one minus the Earth's. It was negligible against
+// Jupiter's bound and decisive against Mercury's — which is how it came to be
+// mistaken for the reference ephemeris and nearly cost this suite a doubled
+// bound. See [planetSeries.contract] and
+// TestNoTimekeepingStepAtTheLeapSecondBoundary, which now guards the boundary
+// from the other side.
 //
 // The window still ends at 2100, the table's own limit: sampling past it would
-// measure against a bound that was never claimed there.
+// measure against a bound that was never claimed there. 1800 is that same
+// limit at the other end.
 func planetEpochs() []time.Time {
 	const (
-		firstYear = firstLeapSecondYear
+		firstYear = 1800
 		lastYear  = 2100
 	)
 
@@ -267,21 +277,38 @@ func TestSOFAPlanetsAgainstDE440(t *testing.T) {
 // first year in which both sides of these comparisons agree on what time it is.
 const firstLeapSecondYear = 1972
 
-// TestPreLeapSecondEpochsMeasureTheClockNotTheEphemeris pins the reason
-// [planetEpochs] starts where it does.
+// TestNoTimekeepingStepAtTheLeapSecondBoundary guards the boundary
+// [planetEpochs] used to stop at.
 //
-// A window is the easiest thing in a validation suite to widen without
-// thinking — it looks like more evidence, and more evidence is usually better.
-// Here it is not: reaching back one year past 1972 replaces an 8 km ephemeris
-// residual with a 302 km timekeeping one, and every statistic in the suite
-// then describes the disagreement between a leap-second kernel and a delta-T
-// model rather than anything about SOFA or DE440.
+// # What this used to assert, and why it changed
 //
-// This test measures the step across that boundary. If it ever vanishes, the
-// two time paths have been reconciled and the window can be widened
-// deliberately — which is a decision worth making on purpose rather than
-// discovering as a mysteriously loose contract.
-func TestPreLeapSecondEpochsMeasureTheClockNotTheEphemeris(t *testing.T) {
+// It used to assert the opposite: that a step existed. Reaching one year past
+// 1972 replaced an 8 km ephemeris residual with a 302 km timekeeping one,
+// because the two sides reached a TDB instant by different routes and the
+// kernel path applied no offset at all before its DELTA_AT table began. The
+// window was restricted to dodge that, and this test held the restriction
+// honest — with the note that if the step ever vanished, the window could be
+// widened deliberately.
+//
+// It vanished. The conversion now delegates to time for epochs the kernel
+// cannot speak for, so the historical delta-T is applied instead of nothing,
+// and the window has been widened to the 1800 the table is quoted over.
+//
+// So the assertion inverts. A step reappearing means a timekeeping term has
+// come back, and every statistic in the suite would then describe the
+// disagreement between two time paths rather than anything about SOFA or
+// DE440.
+//
+// # The threshold
+//
+// Three times, which distinguishes the two things that can produce a step.
+//
+// Epv00 degrades gently outside its quoted 1900-2100: measured, the Sun's
+// worst residual is 7.8 km inside the leap-second era and 11.7 km across
+// 1800-1971, a ratio of 1.5. A timekeeping term is not gentle — the one this
+// replaces was a factor of 38, and one second of Earth orbital motion is
+// 29.8 km against an 8 km signal. Nothing lands between.
+func TestNoTimekeepingStepAtTheLeapSecondBoundary(t *testing.T) {
 	p, err := jpl.NewProvider(context.Background(), core.Planets, "de440")
 	if err != nil {
 		t.Skipf("the JPL provider could not be built: %v", err)
@@ -321,20 +348,31 @@ func TestPreLeapSecondEpochsMeasureTheClockNotTheEphemeris(t *testing.T) {
 	t.Logf("Sun residual: %d %.1f km, %d %.1f km — a factor of %.0f across the boundary",
 		firstLeapSecondYear-1, before, firstLeapSecondYear, after, before/after)
 
-	// Inside the era, the residual must be Epv00's own accuracy. Its
-	// documented maximum against DE405 is 11.2 km; 25 km leaves room for
-	// DE440 without admitting a timekeeping term.
-	if after > 25 {
-		t.Errorf("residual in %d is %.1f km, expected Epv00's own ~8 km — "+
-			"the leap-second era is no longer clean", firstLeapSecondYear, after)
+	// Both sides must be Epv00's own accuracy. Its documented maximum against
+	// DE405 is 11.2 km; 25 km leaves room for DE440 on either side of the
+	// boundary without admitting a timekeeping term.
+	for _, side := range []struct {
+		year     int
+		residual float64
+	}{
+		{firstLeapSecondYear - 1, before},
+		{firstLeapSecondYear, after},
+	} {
+		if side.residual > 25 {
+			t.Errorf("residual in %d is %.1f km, expected Epv00's own ~8 km",
+				side.year, side.residual)
+		}
 	}
 
-	// Outside it, the step must still be there. If this fails the suite could
-	// honestly sample a wider window, which is a change to make deliberately.
-	if before < 10*after {
-		t.Errorf("residual in %d is %.1f km, only %.1fx the %.1f km inside the era; "+
-			"the pre-1972 timekeeping term appears to be gone, so planetEpochs could "+
-			"reach further back — verify and widen it on purpose",
-			firstLeapSecondYear-1, before, before/after, after)
+	// And there must be no step across it. Anything approaching a factor of
+	// three is a time offset rather than a series error: one second of Earth
+	// orbital motion is 29.8 km against an 8 km signal, and the term this
+	// replaces was a factor of 38.
+	if before > 3*after {
+		t.Errorf("residual jumps from %.1f km in %d to %.1f km in %d, a factor of %.1f.\n"+
+			"  That is a timekeeping term returning, not a series error — check that "+
+			"epochs before the DELTA_AT table still delegate to time's historical "+
+			"delta-T rather than being given no offset at all.",
+			after, firstLeapSecondYear, before, firstLeapSecondYear-1, before/after)
 	}
 }

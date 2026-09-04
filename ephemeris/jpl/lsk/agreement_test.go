@@ -32,9 +32,9 @@ const firstLeapSecondYear = 1972
 //   - NAIF's naif0012.tls is a 5 KB data file this package already downloads.
 //     A newly announced leap second reaches it on a cache refresh.
 //
-// Everything in astrogo converts UTC through gofa, including UTCToTDB since it
-// was fixed to delegate to time.Time.TDB — the kernel is currently parsed and
-// not read for this purpose (see the issue linked from that function's doc).
+// Everything in astrogo converts UTC through gofa except the JPL provider,
+// which computes its own ET from the kernel so that an SPK segment is
+// evaluated at the epoch its own kernel set defines (see UTCToET).
 //
 // That is a defensible choice while the two agree, and they do agree today:
 // both tables end at 2017-01-01 with 37 leap seconds, because none has been
@@ -180,7 +180,7 @@ func TestLeapSecondSourcesAgree(t *testing.T) {
 }
 
 // kernelDeltaAT reads the kernel's accumulated leap seconds at a Julian Date,
-// mirroring the lookup UTCToTDB used before it delegated to time.Time.TDB.
+// mirroring the lookup UTCToET performs on the kernel's own table.
 func kernelDeltaAT(r *lsk.Reader, jd float64) float64 {
 	last := 0.0
 

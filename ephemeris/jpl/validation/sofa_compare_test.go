@@ -46,7 +46,7 @@ type sofaEpoch struct {
 // the leap-second boundary rather than the ephemeris: the first run of this
 // widened window did exactly that and reported a maximum 47x over contract,
 // with every offending sample in 1900. See
-// TestPreLeapSecondEpochsMeasureTheClockNotTheEphemeris.
+// TestNoTimekeepingStepAtTheLeapSecondBoundary.
 const sofaLastYear = 2100
 
 // sofaEpochs samples the window quarterly.

@@ -99,7 +99,7 @@ func TestFinalLeapSecondIsParsed(t *testing.T) {
 				{"2020 (37 leap seconds)", 2020, 37 + 32.184},
 			} {
 				utc := time.Date(want.year, 1, 1, 0, 0, 0, 0, time.LocationUTC)
-				got := (lsk.UTCToTDB(utc, r) - utc.JD()) * 86400
+				got := tdbMinusUTC(utc, r)
 
 				// 3 ms, not the 1 ms this once asserted. The old bound
 				// encoded a bug: it required TDB-UTC to be *exactly*
