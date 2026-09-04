@@ -181,7 +181,7 @@ func (c LimitingMagnitudeConstraint) evaluate(
 		return 0, 0, fmt.Errorf("constraint: limiting magnitude position: %w", err)
 	}
 
-	altaz, err := ctx.ICRSToAltAz(pos)
+	altaz, err := observedAltAz(obj, ctx.Time(), ctx, pos)
 	if err != nil {
 		return 0, 0, fmt.Errorf("constraint: limiting magnitude pointing: %w", err)
 	}
