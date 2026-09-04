@@ -101,10 +101,18 @@ func TestFinalLeapSecondIsParsed(t *testing.T) {
 				utc := time.Date(want.year, 1, 1, 0, 0, 0, 0, time.LocationUTC)
 				got := (lsk.UTCToTDB(utc, r) - utc.JD()) * 86400
 
-				// 1 ms: the conversion is exact integer leap seconds, so the
-				// only slack needed is float64 noise in the day-to-second
-				// scaling of a ~2.46e6 Julian date.
-				testutil.AssertNear(t, "TDB-UTC at "+want.label, got, want.offsetS, 1e-3)
+				// 3 ms, not the 1 ms this once asserted. The old bound
+				// encoded a bug: it required TDB-UTC to be *exactly*
+				// leap + 32.184, which is the formula for TT-UTC. True TDB
+				// carries a periodic term of about ±1.7 ms amplitude, so the
+				// old assertion could only pass while the conversion was
+				// silently returning TT.
+				//
+				// Widening does not weaken what this test is for. A dropped
+				// leap-second row moves the answer by a whole second — three
+				// hundred times the slack — so the 2016/2020 pair still
+				// straddles the 2017 entry as tightly as before.
+				testutil.AssertNear(t, "TDB-UTC at "+want.label, got, want.offsetS, 3e-3)
 			}
 		})
 	}

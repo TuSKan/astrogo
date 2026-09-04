@@ -22,9 +22,25 @@ var (
 )
 
 // Reader is a reader for the JPL LSK kernel.
+//
+// Despite the name, an LSK is not a leap-second table — it is SPICE's
+// time-conversion kernel. Alongside the DELTA_AT steps it carries the
+// constants of Moyer's (1981) relativistic model, which is what turns UTC into
+// the ET that every SPK segment is indexed by. Both halves are parsed here,
+// because using one without the other would evaluate a JPL kernel at an epoch
+// JPL did not mean.
 type Reader struct {
 	F       io.ReadCloser
 	DeltaAt []LeapData
+
+	// DeltaTA, K, EB, M0 and M1 are DELTET/DELTA_T_A, DELTET/K, DELTET/EB and
+	// the two components of DELTET/M. Together they give
+	//
+	//	ET − TAI = DELTA_T_A + K·sin(E),  E = M + EB·sin(M),  M = M0 + M1·t
+	//
+	// with t in ephemeris seconds past J2000. NAIF's own header puts the
+	// model at "accurate to about 0.000030 seconds".
+	DeltaTA, K, EB, M0, M1 float64
 }
 
 // Cache opens the LSK file named kernel, downloading it first when it is
@@ -57,6 +73,15 @@ func NewReader(r io.ReadCloser) (*Reader, error) {
 
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
+
+		// The relativistic constants are scalars on their own lines, so they
+		// are matched before the DELTA_AT block logic. DELTA_T_A is tested
+		// first because it also contains the substring "DELTA_" that the
+		// block test below looks for.
+		if l.parseDeltaETConstant(line) {
+			continue
+		}
+
 		if strings.Contains(line, "DELTET/DELTA_AT") {
 			inDeltaAt = true
 
@@ -107,6 +132,17 @@ func NewReader(r io.ReadCloser) (*Reader, error) {
 		}
 	}
 
+	// A read that failed part-way leaves a *partial* DELTA_AT table, which is
+	// the dangerous shape rather than the obvious one: the emptiness check
+	// below catches a total failure, and nothing catches a table that simply
+	// stops early. That is the same defect a dropped final entry produced —
+	// every epoch after the truncation converting a second short, with the
+	// geocentric Sun about 30 km from where DE440 has it — except arriving
+	// from a short read instead of a parsing slip.
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("lsk: read kernel: %w", err)
+	}
+
 	if len(l.DeltaAt) == 0 {
 		return nil, ErrNoLeapseconds
 	}
@@ -124,6 +160,86 @@ func (r *Reader) Close() error {
 	}
 
 	return nil
+}
+
+// covers reports whether jd falls within the era the DELTA_AT table speaks
+// for — that is, at or after its first entry.
+//
+// The table starts at 1972-01-01 because that is when UTC began accumulating
+// whole leap seconds. An earlier epoch is not a small extrapolation: leap
+// seconds do not apply at all, and the offset between atomic and rotational
+// time is the historical Delta-T, which no leap-second table carries.
+func (r *Reader) covers(jd float64) bool {
+	return len(r.DeltaAt) > 0 && jd >= r.DeltaAt[0].JD
+}
+
+// hasDeltaET reports whether the relativistic constants were all present.
+//
+// A kernel missing them is not usable for time conversion, and silently
+// falling back to a different model would reintroduce exactly the mismatch
+// this file exists to avoid.
+func (r *Reader) hasDeltaET() bool {
+	return r.DeltaTA != 0 && r.K != 0 && r.EB != 0 && r.M1 != 0
+}
+
+// parseDeltaETConstant reads one DELTET scalar assignment, reporting whether
+// the line was one.
+//
+// SPICE writes exponents in Fortran style — "1.657D-3" — which Go's parser
+// does not accept, so D is normalised to E before parsing. Getting this wrong
+// would leave the constant at zero and silently disable the periodic term,
+// which is why hasDeltaET checks for exactly that.
+func (r *Reader) parseDeltaETConstant(line string) bool {
+	const prefix = "DELTET/"
+
+	if !strings.HasPrefix(line, prefix) {
+		return false
+	}
+
+	lhs, rhs, ok := strings.Cut(line, "=")
+	if !ok {
+		return false
+	}
+
+	name := strings.TrimSpace(strings.TrimPrefix(lhs, prefix))
+	value := strings.NewReplacer("(", " ", ")", " ", "D", "E", "d", "e").Replace(rhs)
+
+	fields := strings.Fields(value)
+	if len(fields) == 0 {
+		return false
+	}
+
+	nums := make([]float64, 0, len(fields))
+
+	for _, f := range fields {
+		v, err := strconv.ParseFloat(f, 64)
+		if err != nil {
+			return false
+		}
+
+		nums = append(nums, v)
+	}
+
+	switch name {
+	case "DELTA_T_A":
+		r.DeltaTA = nums[0]
+	case "K":
+		r.K = nums[0]
+	case "EB":
+		r.EB = nums[0]
+	case "M":
+		if len(nums) < 2 {
+			return false
+		}
+
+		r.M0, r.M1 = nums[0], nums[1]
+	default:
+		// DELTA_AT, or a constant this reader does not model. Left to the
+		// block parser.
+		return false
+	}
+
+	return true
 }
 
 // LeapData represents a leapsecond correction entry.
@@ -179,6 +295,13 @@ func parseSpiceDate(s string) (float64, error) {
 	return jd, nil
 }
 
+// leapSecondsAt returns DELTA_AT — the accumulated leap seconds — at a Julian
+// Date, using the kernel's own table.
+//
+// The interval is half-open: an entry takes effect at its own instant and
+// holds until the next. That matches IERS, which reports 36 at
+// 2016-12-31 23:59:60 and 37 at 2017-01-01 00:00:00; time's
+// TestLeapSecondBoundaryConvention pins the same rule for the built-in table.
 func (r *Reader) leapSecondsAt(jdTDB float64) float64 {
 	lastN := 0.0
 
@@ -196,19 +319,104 @@ func (r *Reader) leapSecondsAt(jdTDB float64) float64 {
 // UTCToTDB converts a time.Time to a Julian Date in the Barycentric Dynamical
 // Time (TDB) scale.
 //
-// The conversion formula used is:
-// TDB = UTC + (LS + 32.184) / 86400.0
-// where LS is the number of leap seconds at the given time.
+// The conversion is delegated to [time.Time.TDB], which is the scale-aware
+// path the rest of the library uses.
+//
+// # Two defects this replaced
+//
+// The previous implementation special-cased only Scale() == TDB and treated
+// every other scale as UTC, so a TT instant had leap seconds plus 32.184 s
+// added on top of an offset it already carried. 69.184 s late — about 40
+// arcsec of lunar motion and 1.8 arcsec for Mars. The type is scale-aware
+// precisely so this cannot be left to the caller, and the SOFA provider always
+// honoured it.
+//
+// The formula it used, TDB = UTC + (LS + 32.184)/86400, is the formula for
+// **TT**, not TDB. It omitted the TDB−TT periodic term entirely — an amplitude
+// of about 1.7 ms, which is 1.7 m of lunar motion and 85 m for Mars. Small
+// against DE440 itself, and not small against the 33 mm this library claims
+// against Horizons. SPICE's own str2et includes those terms.
+//
+// The second defect was invisible until the first was fixed, because a
+// 69-second error hides a 1.7-millisecond one.
+//
+// # Why the kernel drives this and not time.Time.TDB
+//
+// Because an SPK segment is indexed by the ET that *its own kernel set*
+// defines, and the LSK is where that definition lives. Evaluating a JPL kernel
+// at an epoch computed by a different model means asking JPL's ephemeris a
+// question JPL did not pose.
+//
+// astrogo's time.tdbMinusTT implements Fairhead & Bretagnon and carries more
+// terms than Moyer's single sinusoid, so it is nominally the more accurate
+// model — and using it here would still be wrong. The two differ by up to
+// about 30 µs, which is roughly 3 cm of lunar motion: the same order as the
+// 33 mm this library claims against Horizons, and Horizons computes ET from
+// the LSK. Matching the reference means adopting its convention, not a better
+// one.
+//
+// This is also why the LSK is a hard requirement of jpl.NewProvider rather
+// than a nicety. SPICE itself refuses to convert a time with no LSK furnished;
+// astrogo failing the same way is the contract, not a wart.
+//
+// # The conversion
+//
+// From the kernel's own header, with constants read out of the file:
+//
+//	ET − TAI = DELTA_T_A + K·sin(E)
+//	E        = M + EB·sin(M)
+//	M        = M0 + M1·t        (t = ephemeris seconds past J2000)
+//	TAI      = UTC + DELTA_AT
+//
+// t is nominally ET, which appears on both sides. Seeding it with TAI instead
+// costs about 10 ns — M1 is 2e-7 rad/s, so the 32.184 s difference moves
+// K·sin(E) by ~1e-8 s — so no iteration is worth the cycles.
+//
+// # The input is normalised first
+//
+// Every scale is converted to UTC before DELTA_AT is applied. Without that the
+// caller's label was silently reinterpreted: a TT instant had leap seconds
+// plus 32.184 s added on top of an offset it already carried, landing 69.184 s
+// late — about 40 arcsec of lunar motion. See
+// ephemeris.TestProviderStateIsScaleInvariant, which pins it.
 func UTCToTDB(t time.Time, l *Reader) float64 {
-	d1, d2 := t.JDParts()
-	if t.Scale() == time.TDB {
-		return d1 + d2
+	utc := t.UTC()
+	d1, d2 := utc.JDParts()
+	jdUTC := d1 + d2
+
+	if l == nil || !l.hasDeltaET() || !l.covers(jdUTC) {
+		// Either no usable kernel, or an epoch the kernel cannot speak for.
+		//
+		// The DELTA_AT table begins at 1972-01-01, because that is when UTC
+		// began accumulating whole leap seconds. Before it there are no leap
+		// seconds to add, and TT-UT1 is the historical Delta-T instead —
+		// roughly 10,500 s at year 1, which is not a rounding difference.
+		//
+		// [time.DeltaT] owns that model: the Espenak & Meeus (2006) polynomial
+		// expressions, with the Morrison & Stephenson (2004) base and a secular
+		// acceleration correction. Delegating reaches it rather than
+		// duplicating it — time.Time's own scale conversion switches to DeltaT
+		// below 1972, the same boundary [Reader.covers] uses, so the two agree
+		// by construction rather than by coincidence.
+		//
+		// Measured against time.TDB before this guard existed: -174.9 min at
+		// year 1, -25.5 min at year 1000, +0.6 min at 1900, and exact from
+		// 1972 on. It surfaced as ~180 min errors in the AstroPixels lunar
+		// phase comparison for year 0001.
+		td1, td2 := t.TDB().JDParts()
+
+		return td1 + td2
 	}
 
-	jdUTC := d1 + d2
-	ls := l.leapSecondsAt(jdUTC + (69.184 / 86400.0))
+	tai := jdUTC + l.leapSecondsAt(jdUTC+(69.184/86400.0))/86400.0
 
-	return jdUTC + (ls+32.184)/86400.0
+	// Ephemeris seconds past J2000, seeded with TAI as described above.
+	secPastJ2000 := (tai - 2451545.0) * 86400.0
+
+	m := l.M0 + l.M1*secPastJ2000
+	e := m + l.EB*math.Sin(m)
+
+	return tai + (l.DeltaTA+l.K*math.Sin(e))/86400.0
 }
 
 // TDBToET converts a Julian Date in TDB to elapsed seconds past J2000.
