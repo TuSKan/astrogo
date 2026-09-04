@@ -177,13 +177,19 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	omegaCen := plan.FromCatalog(omegaCenCat, nil)
+	omegaCen, err := plan.FromCatalog(omegaCenCat, nil)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	sgrACat, err := resolver.Resolve(ctx, "Sgr A*")
 	if err != nil {
 		log.Fatal(err)
 	}
-	sgrA := plan.FromCatalog(sgrACat, nil)
+	sgrA, err := plan.FromCatalog(sgrACat, nil)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	// Planets use ephemeris-backed constructors directly.
 	mars := plan.NewMars(eph)
@@ -413,11 +419,11 @@ if err != nil {
 }
 
 // SGP4 provider — implements the same Provider interface as JPL planets.
-prov, err := ephemeris.NewProvider(ephemeris.Satellites, target.Name,
+prov, err := ephemeris.NewProvider(context.Background(), ephemeris.Satellites, target.Name,
+	ephemeris.WithTLE(target.TLELine1, target.TLELine2))
 if err != nil {
 	log.Fatalf("prov: %v", err)
 }
-    ephemeris.WithTLE(target.TLELine1, target.TLELine2))
 defer prov.Close()
 
 epoch := target.Epoch
@@ -432,7 +438,7 @@ observer, err := coord.NewEarthLocation(-23.5505, -46.6333, 760)
 if err != nil {
 	log.Fatalf("observer: %v", err)
 }
-ctx := coord.NewContext(epoch, observer, atmosphere.Atmosphere{})
+ctx := coord.NewContext(epoch, observer, atmosphere.Refraction{})
 altaz, err := plan.LookAngle(prov, 0, ctx)
 if err != nil {
 	log.Fatalf("altaz: %v", err)
@@ -984,7 +990,7 @@ Built-in constraints (`Altitude`, `Airmass`) implement `ConstraintCtx` automatic
 
 **For batch transforms outside the scheduler**, create one `Context` per epoch and reuse it:
 ```go
-ctx := coord.NewContext(epoch, site.Location(), site.Atmosphere())
+ctx := coord.NewContext(epoch, site.Location(), site.Refraction())
 for _, star := range targets {
     altaz, err := ctx.ICRSToAltAz(star.ICRS) // ~325 ns, not ~91 µs
     if err != nil {
