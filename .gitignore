@@ -51,3 +51,7 @@ data/
 
 !**/testdata/
 !**/testdata/**
+
+# Temp packages written by docsguard's README compile check (removed on
+# cleanup; ignored so an interrupted run cannot be committed by accident).
+.readmecheck*/
