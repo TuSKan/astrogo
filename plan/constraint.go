@@ -287,6 +287,63 @@ func (c MoonIllum) CheckCtx(obj Observable, _ time.Time, _ *Site, ctx *coord.Con
 
 // ── Private Sky Helpers ──────────────────────────────────────────────────────
 
+// observedAltAz converts a target to observed alt/az, taking the topocentric
+// path for anything with an ephemeris and the stellar path for everything else.
+//
+// # Why the two paths are not interchangeable
+//
+// [coord.Context.ICRSToAltAz] treats its argument as a direction — a catalog
+// star, infinitely far away — so the observer's offset from the geocentre
+// cannot matter. That is right for a star and wrong for anything nearby: the
+// Moon is 60 Earth radii away, and an observer on the surface sees it up to
+// about **0.95°** from where the geocentre does.
+//
+// Every constraint, score and visibility check in this package used to call
+// ICRSToAltAz on a geocentric position, so the scheduler reasoned about the
+// Moon as though it were a star. Only the events solver and the details
+// builder subtracted the observer vector. Measured before this change, at one
+// site and instant:
+//
+//	Moon 12h  IsObservable.Alt= 18.2958  GetDetails.Alt= 17.3482  delta=+0.9476
+//	Moon 21h  IsObservable.Alt= 16.2017  GetDetails.Alt= 15.2514  delta=+0.9503
+//	Mars 15h  IsObservable.Alt= 70.7487  GetDetails.Alt= 70.7492  delta=-0.0004
+//
+// 0.95° is the Moon's horizontal parallax. An Altitude{Threshold: 0}
+// constraint therefore reported the Moon up about four minutes before
+// MoonEvents said it rose — two public APIs, one library, a degree apart.
+//
+// # Why pos is passed in rather than fetched
+//
+// Every call site already holds it, and the stellar path is what it was
+// computed for. Taking it as an argument keeps this a one-line change at each
+// site and avoids a second ephemeris lookup on the path this exists to keep
+// fast.
+//
+// # Cost
+//
+// None worth measuring. [coord.Context.GeocentricToObserved] reuses the same
+// cached rotation matrix and observer vector the Context already holds, so
+// this is the ~325 ns transform either way — the 91 µs Apco13 computation
+// happens once per epoch and is untouched.
+func observedAltAz(obj any, t time.Time, ctx *coord.Context, pos coord.ICRS) (coord.AltAz, error) {
+	mb, ok := obj.(MovingBody)
+	if !ok {
+		aa, err := ctx.ICRSToAltAz(pos)
+		if err != nil {
+			return coord.AltAz{}, fmt.Errorf("plan: ICRS to AltAz: %w", err)
+		}
+
+		return aa, nil
+	}
+
+	vec, err := mb.GeocentricVec(t)
+	if err != nil {
+		return coord.AltAz{}, fmt.Errorf("plan: geocentric vector: %w", err)
+	}
+
+	return ctx.GeocentricToObserved(vec), nil
+}
+
 // skyAltAzCtx computes alt/az using a pre-built coord.Context.
 func skyAltAzCtx(obj Observable, t time.Time, ctx *coord.Context) (coord.AltAz, error) {
 	pos, err := obj.Position(t)
@@ -294,9 +351,9 @@ func skyAltAzCtx(obj Observable, t time.Time, ctx *coord.Context) (coord.AltAz, 
 		return coord.AltAz{}, fmt.Errorf("constraint: position: %w", err)
 	}
 
-	aa, err := ctx.ICRSToAltAz(pos)
+	aa, err := observedAltAz(obj, t, ctx, pos)
 	if err != nil {
-		return coord.AltAz{}, fmt.Errorf("constraint: ICRS to AltAz: %w", err)
+		return coord.AltAz{}, fmt.Errorf("constraint: %w", err)
 	}
 
 	return aa, nil

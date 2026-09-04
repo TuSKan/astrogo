@@ -122,22 +122,24 @@ func (m *BasicTransitionModel) Overhead(ctx TransitionContext) (time.Duration, e
 			// building two identical ~91µs SOFA transforms for one instant.
 			epochCtx := coord.NewContext(ctx.FromTime, ctx.Site.Location(), ctx.Site.Refraction())
 
-			altAzFrom, err = epochCtx.ICRSToAltAz(posFrom)
+			altAzFrom, err = observedAltAz(ctx.FromBlock.Target, ctx.FromTime, epochCtx, posFrom)
 			if err != nil {
 				return 0, fmt.Errorf("schedule: from AltAz: %w", err)
 			}
 
-			altAzTo, err = epochCtx.ICRSToAltAz(posTo)
+			altAzTo, err = observedAltAz(ctx.ToBlock.Target, ctx.ToTime, epochCtx, posTo)
 			if err != nil {
 				return 0, fmt.Errorf("schedule: to AltAz: %w", err)
 			}
 		} else {
-			altAzFrom, err = coord.NewContext(ctx.FromTime, ctx.Site.Location(), ctx.Site.Refraction()).ICRSToAltAz(posFrom)
+			altAzFrom, err = observedAltAz(ctx.FromBlock.Target, ctx.FromTime,
+				coord.NewContext(ctx.FromTime, ctx.Site.Location(), ctx.Site.Refraction()), posFrom)
 			if err != nil {
 				return 0, fmt.Errorf("schedule: from AltAz: %w", err)
 			}
 
-			altAzTo, err = coord.NewContext(ctx.ToTime, ctx.Site.Location(), ctx.Site.Refraction()).ICRSToAltAz(posTo)
+			altAzTo, err = observedAltAz(ctx.ToBlock.Target, ctx.ToTime,
+				coord.NewContext(ctx.ToTime, ctx.Site.Location(), ctx.Site.Refraction()), posTo)
 			if err != nil {
 				return 0, fmt.Errorf("schedule: to AltAz: %w", err)
 			}

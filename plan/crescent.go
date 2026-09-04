@@ -533,18 +533,21 @@ func NewCrescentParams(t time.Time, loc *coord.Geodetic, prov eph.Provider) (Cre
 		return CrescentParams{}, fmt.Errorf("crescent: moon ICRS: %w", err)
 	}
 
-	// Topocentric AltAz for both bodies
+	// Topocentric AltAz for both bodies.
+	//
+	// The comment said "topocentric" and the code was not: ICRSToAltAz treats
+	// its argument as a direction at infinity, so the observer's offset from
+	// the geocentre was discarded. For the Moon that is up to 0.95° — and this
+	// is a crescent-visibility calculation, where the whole question is the
+	// Moon's altitude a few degrees above the horizon shortly after sunset. An
+	// error comparable to the quantity being measured.
+	//
+	// The vectors are already geocentric, so GeocentricToObserved subtracts
+	// the observer directly; no ICRS round trip is involved.
 	ctx := coord.NewContext(t, loc, atmosphere.Refraction{})
 
-	sunAltAz, err := ctx.ICRSToAltAz(sunICRS)
-	if err != nil {
-		return CrescentParams{}, fmt.Errorf("crescent: sun altaz: %w", err)
-	}
-
-	moonAltAz, err := ctx.ICRSToAltAz(moonICRS)
-	if err != nil {
-		return CrescentParams{}, fmt.Errorf("crescent: moon altaz: %w", err)
-	}
+	sunAltAz := ctx.GeocentricToObserved(sunPos)
+	moonAltAz := ctx.GeocentricToObserved(moonPos)
 
 	sunAlt := sunAltAz.Alt().Degrees()
 	moonAlt := moonAltAz.Alt().Degrees()

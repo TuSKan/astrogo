@@ -348,7 +348,7 @@ func (s EventSolver) solveVisibility(spec EventSpec, start, end time.Time) ([]Ev
 			return 0, fmt.Errorf("events: target position: %w", err)
 		}
 
-		aa, err := ctx.ICRSToAltAz(pos)
+		aa, err := observedAltAz(spec.Target, t, ctx, pos)
 		if err != nil {
 			return 0, fmt.Errorf("events: ICRS to AltAz: %w", err)
 		}
@@ -418,7 +418,7 @@ func (s EventSolver) solveVisibility(spec EventSpec, start, end time.Time) ([]Ev
 						continue
 					}
 
-					aa, err = resCtx.ICRSToAltAz(pos)
+					aa, err = observedAltAz(spec.Target, resTime, resCtx, pos)
 					if err != nil {
 						continue
 					}
@@ -494,7 +494,7 @@ func (s EventSolver) solveVisibility(spec EventSpec, start, end time.Time) ([]Ev
 					continue // Can't populate display fields reliably; skip this event
 				}
 
-				aa, err := resCtx.ICRSToAltAz(pos)
+				aa, err := observedAltAz(spec.Target, resTime, resCtx, pos)
 				if err != nil {
 					continue
 				}
