@@ -33,7 +33,12 @@ func TestRefractionRigorous_KnownValues(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ref := model.RefractFromTrue(angle.Deg(tt.alt), env)
 
-			refArcmin := math.Abs(ref.Degrees() * 60.0)
+			// Signed, deliberately. This used to take math.Abs before
+			// comparing, which made the bracket blind to the sign of every
+			// row: -0.114 arcsec at the zenith passed the [0, 0.01] arcmin
+			// case below, and -34.6 arcsec would have passed the 60-degree
+			// one. Refraction is never negative, so let the bracket say so.
+			refArcmin := ref.Degrees() * 60.0
 			if refArcmin < tt.minRef || refArcmin > tt.maxRef {
 				t.Errorf("altitude=%g°: refraction=%.3f arcmin, want [%.1f, %.1f]",
 					tt.alt, refArcmin, tt.minRef, tt.maxRef)
