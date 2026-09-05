@@ -305,10 +305,59 @@ func isDimensionScale(ds *hdf5.Dataset) bool {
 // nil error) when the attribute is simply absent; a non-nil error means
 // the attribute exists but decoded to something this reader cannot
 // interpret as an integer.
+// attributePresent reports whether ds carries an attribute called name.
+//
+// # Why this exists rather than reading the error from ReadAttribute
+//
+// ReadAttribute returns an error from three different places, and only one of
+// them means the attribute is absent:
+//
+//	attrs, err := d.Attributes()          // 1. a real failure: corrupt header, I/O
+//	if err != nil { return nil, err }
+//	for _, attr := range attrs {
+//	    if attr.Name == name {
+//	        return attr.ReadValue()       // 2. a real failure: present, undecodable
+//	    }
+//	}
+//	return nil, fmt.Errorf("attribute %q not found", name)   // 3. genuine absence
+//
+// All three arrive as a dynamic fmt.Errorf with no sentinel, so errors.Is
+// cannot separate them and matching the message would tie astrogo to another
+// library's wording. Treating every one as absence — which the readers below
+// used to do — means a corrupt file reports every attribute as missing and the
+// reader carries on with defaults, looking exactly like a file that legitimately
+// omits optional ones.
+//
+// Asking which attributes exist first costs a second header read on a
+// per-dataset metadata path, and separates the cases exactly.
+func attributePresent(ds *hdf5.Dataset, name string) (bool, error) {
+	attrs, err := ds.Attributes()
+	if err != nil {
+		return false, fmt.Errorf("cams: read attributes of %q: %w", name, err)
+	}
+
+	for _, a := range attrs {
+		if a.Name == name {
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
+
 func readInt32Attribute(ds *hdf5.Dataset, name string) (value int32, ok bool, err error) {
+	present, err := attributePresent(ds, name)
+	if err != nil {
+		return 0, false, err
+	}
+
+	if !present {
+		return 0, false, nil
+	}
+
 	v, err := ds.ReadAttribute(name)
 	if err != nil {
-		return 0, false, nil //nolint:nilerr // attribute absence is expected, not an error
+		return 0, false, fmt.Errorf("cams: read attribute %q: %w", name, err)
 	}
 
 	switch n := v.(type) {
@@ -329,9 +378,18 @@ func readInt32Attribute(ds *hdf5.Dataset, name string) (value int32, ok bool, er
 // Go types ReadAttribute may return it as. ok is false (nil error) when
 // the attribute is absent.
 func readFloat64Attribute(ds *hdf5.Dataset, name string) (value float64, ok bool, err error) {
+	present, err := attributePresent(ds, name)
+	if err != nil {
+		return 0, false, err
+	}
+
+	if !present {
+		return 0, false, nil
+	}
+
 	v, err := ds.ReadAttribute(name)
 	if err != nil {
-		return 0, false, nil //nolint:nilerr // attribute absence is expected, not an error
+		return 0, false, fmt.Errorf("cams: read attribute %q: %w", name, err)
 	}
 
 	switch n := v.(type) {
@@ -351,9 +409,18 @@ func readFloat64Attribute(ds *hdf5.Dataset, name string) (value float64, ok bool
 // readStringAttribute reads name as a string, returning "" (nil error)
 // when the attribute is absent.
 func readStringAttribute(ds *hdf5.Dataset, name string) (string, error) {
+	present, err := attributePresent(ds, name)
+	if err != nil {
+		return "", err
+	}
+
+	if !present {
+		return "", nil
+	}
+
 	v, err := ds.ReadAttribute(name)
 	if err != nil {
-		return "", nil //nolint:nilerr // attribute absence is expected, not an error
+		return "", fmt.Errorf("cams: read attribute %q: %w", name, err)
 	}
 
 	s, ok := v.(string)

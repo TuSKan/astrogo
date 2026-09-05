@@ -156,7 +156,13 @@ func removeChecksumSidecar(ctx context.Context, bucket *file.Bucket, key string)
 	sumKey := checksumSidecarKey(key)
 
 	if exists, err := bucket.Exists(ctx, sumKey); err != nil || !exists {
-		return nil //nolint:nilerr // a failed existence check just means "nothing to clean up here either"
+		// A failed check means we do not know whether a sidecar is there, not
+		// that there is nothing to remove -- the comment here used to claim
+		// the latter. Left alone either way: this runs after a checksum
+		// mismatch has already been reported, the worst outcome is a stale
+		// sidecar the next run re-checks, and failing the cleanup would
+		// replace a real error with a bookkeeping one.
+		return nil //nolint:nilerr // deliberate: see above
 	}
 
 	if err := bucket.Delete(ctx, sumKey); err != nil {
