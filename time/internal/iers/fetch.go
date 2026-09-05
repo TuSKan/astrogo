@@ -150,8 +150,7 @@ func fetch(ctx context.Context, l Loader) error {
 
 	lo, hi := table.Coverage()
 
-	logging.Logger().InfoContext(ctx, "loaded EOP data",
-		"mjd_lo", lo, "mjd_hi", hi, "records", len(table.records))
+	logging.InfoContext(ctx, "loaded EOP data", "mjd_lo", lo, "mjd_hi", hi, "records", len(table.records))
 
 	return nil
 }

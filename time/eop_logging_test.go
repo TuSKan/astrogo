@@ -49,7 +49,15 @@ func TestEOPWarningIsAWarningNotProgress(t *testing.T) {
 			"would silence the only notice that accuracy degraded.", out)
 	}
 
-	for _, want := range []string{"EOP data unavailable", "mjd=58849"} {
+	// The message is short and fixed; the detail is in attributes. Both are
+	// checked, because a message that carried the detail in prose would still
+	// pass a check for the message alone.
+	for _, want := range []string{
+		`msg="EOP unavailable, using zero DUT1 and polar motion"`,
+		"mjd=58849",
+		"topocentric_error=",
+		"remedy=",
+	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("the message does not carry %q:\n%s", want, out)
 		}

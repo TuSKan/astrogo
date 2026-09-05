@@ -1,13 +1,18 @@
 // Package logging holds the one [slog.Logger] astrogo writes to.
 //
-// astrogo emits very little, and takes no logger parameter anywhere: a library
-// that threads one through every signature makes every caller carry it, and
-// almost none of them want to. One logger for the module, set here, like the
-// endpoint registry and download consent in [github.com/TuSKan/astrogo/remote].
+// It is the only package in astrogo that imports [log/slog]: everything else
+// calls [Info], [Warn] and their context variants, which name no slog type. A
+// caller configuring the destination needs slog to build a logger, and nothing
+// else does.
+//
+// astrogo takes no logger parameter anywhere. A library that threads one
+// through every signature makes every caller carry it, and almost none of them
+// want to; one logger for the module is set here, like the endpoint registry
+// and download consent in [github.com/TuSKan/astrogo/remote].
 //
 // # What astrogo logs
 //
-// Two kinds of line, deliberately not treated alike:
+// Two levels, deliberately not treated alike:
 //
 //   - [slog.LevelInfo] — progress a caller may want and does not need: a kernel
 //     is downloading, an EOP table has loaded. Discarded by default.
@@ -41,7 +46,9 @@ import (
 	"context"
 	"log/slog"
 	"os"
+	"runtime"
 	"sync/atomic"
+	"time"
 )
 
 // current holds the active logger. Atomic rather than mutex-guarded: it is
@@ -54,9 +61,9 @@ func Set(l *slog.Logger) { current.Store(l) }
 
 // Logger returns the logger in force, never nil.
 //
-// Exported because astrogo's own packages are its callers, and because a
-// program that wants to log alongside astrogo can reach the same destination
-// without tracking it separately.
+// [Info] and [Warn] are the normal way in; this is for a level they do not
+// cover, or for a program that wants to log to the same destination astrogo
+// does without tracking it separately.
 func Logger() *slog.Logger {
 	if l := current.Load(); l != nil {
 		return l
@@ -65,16 +72,61 @@ func Logger() *slog.Logger {
 	return defaultLogger
 }
 
+// Info records progress: something took time, or a resource was loaded.
+// Discarded by the default logger.
+func Info(msg string, args ...any) { emit(context.Background(), slog.LevelInfo, msg, args...) }
+
+// InfoContext is [Info] with a context, so a handler can pick up trace
+// identifiers from it. Prefer it wherever a context is already in hand.
+func InfoContext(ctx context.Context, msg string, args ...any) {
+	emit(ctx, slog.LevelInfo, msg, args...)
+}
+
+// Warn records that a result silently degraded — the caller got an answer, and
+// it is less accurate than it looks. Emitted by the default logger.
+func Warn(msg string, args ...any) { emit(context.Background(), slog.LevelWarn, msg, args...) }
+
+// WarnContext is [Warn] with a context.
+func WarnContext(ctx context.Context, msg string, args ...any) {
+	emit(ctx, slog.LevelWarn, msg, args...)
+}
+
+// emit builds the record these wrappers share.
+//
+// It goes through [slog.Handler] rather than calling l.Info/l.Warn, so that the
+// source position a handler records with AddSource is the astrogo line that
+// logged, not this file. slog's own top-level functions do the same thing for
+// the same reason: a wrapper that forwards to the logger's convenience methods
+// makes every record point at the wrapper.
+func emit(ctx context.Context, level slog.Level, msg string, args ...any) {
+	l := Logger()
+	if !l.Enabled(ctx, level) {
+		return // the common case for Info under the default logger
+	}
+
+	// Skip runtime.Callers, emit, and the exported wrapper that called it.
+	var pcs [1]uintptr
+
+	runtime.Callers(3, pcs[:])
+
+	r := slog.NewRecord(time.Now(), level, msg, pcs[0])
+	r.Add(args...)
+
+	// The handler's error is discarded deliberately: a logger that cannot log
+	// has nowhere to report that, and astrogo will not fail an ephemeris
+	// lookup because stderr was closed.
+	_ = l.Handler().Handle(ctx, r)
+}
+
 // defaultLogger is what astrogo writes to when a caller has set nothing.
 //
 // # Why not a discard handler
 //
 // Discarding everything is the tidy answer for a library, and it is wrong for
-// one message here. Of the two kinds astrogo emits — see the package comment —
-// the second is a warning that a result silently degraded, and Time.EOP has no
-// error return to carry it instead. Discarding by default would remove the only
-// signal that the numbers changed, which is the opposite of what quieting a
-// library is for.
+// one message here. Of the two levels astrogo emits — see the package comment —
+// Warn means a result silently degraded, and Time.EOP has no error return to
+// carry that instead. Discarding by default would remove the only signal that
+// the numbers changed, which is the opposite of what quieting a library is for.
 //
 // So the default passes Warn and above and drops the rest. A caller who wants
 // silence, or wants the progress lines, says so in one call.

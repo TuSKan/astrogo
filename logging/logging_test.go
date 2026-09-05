@@ -2,6 +2,7 @@ package logging_test
 
 import (
 	"bytes"
+	"context"
 	"log/slog"
 	"strings"
 	"testing"
@@ -112,3 +113,71 @@ func TestSilenceIsAvailable(t *testing.T) {
 			"cannot fully silence the library")
 	}
 }
+
+// TestSourceIsTheCallerNotThisPackage pins the reason [logging.Info] and
+// friends build a record by hand instead of forwarding to l.Info.
+//
+// A wrapper that calls the logger's convenience method makes every record's
+// source position point at the wrapper. Under the default handler that is
+// invisible, because it does not enable AddSource — so a caller who turns
+// AddSource on would find every astrogo line attributed to logging.go, and
+// nothing else would fail.
+//
+// slog's own top-level functions take the same trouble for the same reason.
+func TestSourceIsTheCallerNotThisPackage(t *testing.T) {
+	defer logging.Set(nil)
+
+	var buf bytes.Buffer
+
+	logging.Set(slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{
+		Level:     slog.LevelInfo,
+		AddSource: true,
+	})))
+
+	logging.Info("from the test")
+
+	out := buf.String()
+
+	if !strings.Contains(out, "logging_test.go") {
+		t.Errorf("the record's source is not this test file:\n%s\n"+
+			"  Info must build the record itself so the caller's line survives.", out)
+	}
+
+	if strings.Contains(out, "source=") && strings.Contains(out, "/logging.go:") {
+		t.Errorf("the record's source points into the logging package:\n%s", out)
+	}
+}
+
+// TestInfoIsSkippedCheaplyWhenDisabled pins the guard that keeps the discarded
+// case from formatting anything.
+//
+// Info is dropped by the default logger, and it sits on the download path where
+// it would otherwise build a record and walk the stack for every fetch.
+func TestInfoIsSkippedCheaplyWhenDisabled(t *testing.T) {
+	defer logging.Set(nil)
+
+	logging.Set(nil)
+
+	var buf bytes.Buffer
+
+	// A handler that would panic if it were ever handed a record.
+	logging.Set(slog.New(refusingHandler{}))
+	logging.Info("must not reach the handler")
+
+	logging.Set(nil)
+
+	if buf.Len() != 0 {
+		t.Error("unexpected output")
+	}
+}
+
+// refusingHandler fails the test if anything reaches it, while reporting every
+// level as disabled.
+type refusingHandler struct{}
+
+func (refusingHandler) Enabled(context.Context, slog.Level) bool { return false }
+func (refusingHandler) Handle(context.Context, slog.Record) error {
+	panic("a disabled handler was handed a record")
+}
+func (h refusingHandler) WithAttrs([]slog.Attr) slog.Handler { return h }
+func (h refusingHandler) WithGroup(string) slog.Handler      { return h }

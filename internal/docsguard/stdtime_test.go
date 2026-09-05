@@ -45,9 +45,10 @@ var aliasedAstroTime = regexp.MustCompile(
 // for the standard library's type, LocationUTC for the location, GoDate
 // beside Date, and the duration, month and layout constants unchanged.
 //
-// The one exception is internal/testutil, which cannot import astrogo/time
-// without closing a cycle through time/internal/iers' own tests. It uses an
-// untyped constant instead and says so.
+// Two packages are exempt, both for the same reason — they sit below
+// astrogo/time and cannot import it without closing a cycle. internal/testutil
+// uses an untyped constant instead and says so; logging needs a wall-clock
+// instant for slog.NewRecord, and astrogo/time writes to logging.
 func TestNoStandardLibraryTimeOutsideTimePackage(t *testing.T) {
 	root := filepath.Join("..", "..")
 
@@ -85,6 +86,15 @@ func TestNoStandardLibraryTimeOutsideTimePackage(t *testing.T) {
 		// having it.
 		slash := filepath.ToSlash(rel)
 		inTimePackage := slash == "time" || strings.HasPrefix(slash, "time/")
+
+		// logging is the second exemption, for the same shape of reason as
+		// internal/testutil: it cannot import astrogo/time without a cycle,
+		// because astrogo/time writes to it. It needs a wall-clock instant for
+		// slog.NewRecord and nothing else, so the alias package would buy
+		// nothing even if it were reachable.
+		if slash == "logging/logging.go" {
+			inTimePackage = true
+		}
 
 		src, rerr := os.ReadFile(path)
 		if rerr != nil {

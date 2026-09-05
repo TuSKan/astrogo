@@ -257,8 +257,7 @@ func fetchInto(ctx context.Context, id EndpointID, ep Endpoint, srcBucket, cache
 
 	offset := resumePoint(ctx, cacheBucket, cacheKey, attrs.ETag)
 
-	logging.Logger().InfoContext(ctx, "downloading",
-		"cache_key", cacheKey, "endpoint", id, "bytes", attrs.Size)
+	logging.InfoContext(ctx, "downloading", "cache_key", cacheKey, "endpoint", id, "bytes", attrs.Size)
 
 	r, err := srcBucket.NewRangeReader(ctx, name, offset, -1, nil)
 	if err != nil {
