@@ -105,7 +105,7 @@ func TestJPLUnitsAreAUAndAUPerDay(t *testing.T) {
 		}
 	})
 
-	state, err := p.State(core.Sun, time.NowUTC())
+	state, err := p.State(core.Sun, fixedEpoch())
 	if err != nil {
 		t.Fatalf("failed to evaluate Sun state: %v", err)
 	}
@@ -126,7 +126,7 @@ func TestJPLUnsupportedBody(t *testing.T) {
 		}
 	})
 
-	_, err := p.State(core.ID(255), time.NowUTC())
+	_, err := p.State(core.ID(255), fixedEpoch())
 	if err == nil {
 		t.Error("Expected error for unsupported body")
 	}
@@ -161,7 +161,7 @@ func TestJPLDeterministicRepeatedCalls(t *testing.T) {
 		}
 	})
 
-	tm := time.NowUTC()
+	tm := fixedEpoch()
 
 	s1, err := p.State(core.Sun, tm)
 	if err != nil {
@@ -333,7 +333,7 @@ func TestProvider_ConcurrentAddKernelAndState(t *testing.T) {
 		}
 	})
 
-	tm := time.NowUTC()
+	tm := fixedEpoch()
 
 	var wg sync.WaitGroup
 

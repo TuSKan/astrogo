@@ -36,7 +36,7 @@ func TestBasicTransitionModel(t *testing.T) {
 	// FromTime/ToTime intentionally share one value here — this is the
 	// common case per TransitionContext.ToTime's doc comment ("approximate,
 	// often FromTime") and exercises the shared-Context path in Overhead.
-	now := time.NowUTC()
+	now := fixedEpoch()
 
 	ctx := TransitionContext{
 		FromBlock: nil,
@@ -94,7 +94,7 @@ func TestBasicTransitionModel_SameEpoch(t *testing.T) {
 	block1 := &Block{Target: NewStar("Target 1", 0, 0)}
 	block2 := &Block{Target: NewStar("Target 2", 1.57079632679, 0)}
 
-	now := time.NowUTC()
+	now := fixedEpoch()
 	later := now.Add(5 * time.Minute)
 
 	sameEpoch := TransitionContext{
