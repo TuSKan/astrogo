@@ -10,6 +10,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/TuSKan/astrogo/constants"
 	"github.com/TuSKan/astrogo/ephemeris/core"
 	"github.com/TuSKan/astrogo/ephemeris/jpl/lsk"
 	"github.com/TuSKan/astrogo/ephemeris/jpl/spk"
@@ -56,8 +57,16 @@ var (
 	ErrWrongSmallBody = errors.New("jpl: horizons returned a different small body")
 )
 
-// KMPerAU is the number of kilometers per astronomical unit.
-const KMPerAU = 149597870.7
+// kmPerAU is the number of kilometres in one Astronomical Unit.
+//
+// Unexported. It was KMPerAU, which let a caller outside this module pin a
+// copy of the value that would not move if constants ever did — the precise
+// hazard routing everything through constants exists to remove. Nothing
+// outside this file ever referenced it.
+//
+// var, not const: constants.IAU.AstronomicalUnit is a struct, and Go does not
+// permit selecting a struct field inside a constant expression.
+var kmPerAU = constants.IAU.AstronomicalUnit.Value / 1e3
 
 // NAIFFor returns the NAIF integer identifier for a body, and whether the
 // body is one this package has a mapping for.
@@ -326,14 +335,14 @@ func (p *Provider) State(id core.ID, t time.Time) (core.State, error) {
 	// Convert to AU and AU/day
 	return core.State{
 		Pos: vector.Vec3{
-			X: relPos.X / KMPerAU,
-			Y: relPos.Y / KMPerAU,
-			Z: relPos.Z / KMPerAU,
+			X: relPos.X / kmPerAU,
+			Y: relPos.Y / kmPerAU,
+			Z: relPos.Z / kmPerAU,
 		},
 		Vel: vector.Vec3{
-			X: relVel.X * 86400 / KMPerAU,
-			Y: relVel.Y * 86400 / KMPerAU,
-			Z: relVel.Z * 86400 / KMPerAU,
+			X: relVel.X * 86400 / kmPerAU,
+			Y: relVel.Y * 86400 / kmPerAU,
+			Z: relVel.Z * 86400 / kmPerAU,
 		},
 		Frame:  core.FrameICRS,
 		Center: core.CenterGeocentre,

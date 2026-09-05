@@ -7,6 +7,7 @@ import (
 	"math"
 
 	"github.com/TuSKan/astrogo/angle"
+	"github.com/TuSKan/astrogo/constants"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/ephemeris/core"
 	"github.com/TuSKan/astrogo/ephemeris/jpl"
@@ -420,6 +421,28 @@ func Altitude(p Provider, id ID, t time.Time) (float64, error) {
 	return st.DistanceKm() - earthMeanRadiusKm, nil
 }
 
+// lightAUPerDay is the speed of light in astronomical units per day, the
+// denominator of the light-time iteration below.
+//
+// Derived rather than written out. It was the literal 173.144632674 in both
+// places it is used — a published value rounded to nine decimals, which is
+// 1.4e-12 low against c and the AU as constants defines them.
+//
+// That rounding changes nothing, and provably so rather than approximately.
+// At Neptune's distance it moves the light time by 21 nanoseconds, which is
+// 2.4e-13 days; one ULP of a Julian Date at a modern epoch is 4.7e-10 days.
+// The correction is about 1900 times smaller than the smallest difference the
+// epoch can represent, so the retarded time below comes out bit-identical.
+// Measured: the apparent position of Mars, Jupiter and Neptune is unchanged to
+// the last bit.
+//
+// So this is a tidying, not a correction — but one that cannot go stale if
+// either input is ever revised, which the two literals could.
+//
+// var, not const: both inputs are struct fields.
+var lightAUPerDay = constants.SI2019.SpeedOfLight.Value *
+	constants.Derived.JulianDaySeconds.Value / constants.IAU.AstronomicalUnit.Value
+
 // ApparentState returns the apparent state of a target: where it is seen from
 // the Earth at obsTime, with both light time and annual aberration included.
 // It iterates the light time by repeatedly polling the Provider at (t - tau).
@@ -447,7 +470,7 @@ func ApparentState(p Provider, target ID, obsTime time.Time) (State, error) {
 		return State{}, fmt.Errorf("ephemeris: apparent state: %w", err)
 	}
 
-	tauDays := st.Pos.Norm() / 173.144632674
+	tauDays := st.Pos.Norm() / lightAUPerDay
 	for range 5 {
 		retardedTime := obsTime.AddDays(-tauDays)
 
@@ -456,7 +479,7 @@ func ApparentState(p Provider, target ID, obsTime time.Time) (State, error) {
 			return State{}, fmt.Errorf("ephemeris: apparent state retarded: %w", err)
 		}
 
-		tauDays = st.Pos.Norm() / 173.144632674
+		tauDays = st.Pos.Norm() / lightAUPerDay
 	}
 
 	return st, nil
