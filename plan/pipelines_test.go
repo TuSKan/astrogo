@@ -71,40 +71,47 @@ func TestSatelliteAltitudePipelinesAgree(t *testing.T) {
 	}
 }
 
-// TestEventAltitudeConventionIsWhatItClaims pins the third pipeline against the
-// other two, and the answer is more interesting than "they agree".
+// TestEventAltitudesAreWhatTheyAreNamed pins the third pipeline against the
+// other two, and the answer was more interesting than "they agree".
+//
+// Named TestEventAltitudeConventionIsWhatItClaims until #156 — since renamed,
+// because it no longer records a convention that had to be discovered by
+// measurement; it checks the field names are true.
 //
 // # What comparing them found
 //
-// At transit, Event.Altitude matches IsObservable and GetDetails exactly. At
-// rise and set it differs by 0.1668°, at both ends, for the Moon:
+// At transit, Event.Altitude matched IsObservable and GetDetails exactly. At
+// rise and set it differed by 0.1668 degrees, at both ends, for the Moon:
 //
 //	Rise       Event= -1.6547  IsObservable= -1.4879  GetDetails= -1.4879
 //	Transit    Event= 54.2489  IsObservable= 54.2489  GetDetails= 54.2489
 //	Set        Event= -1.6547  IsObservable= -1.4879  GetDetails= -1.4879
 //
-// That 0.1668° is refraction — the same value coord's own refraction tests
-// measure at these altitudes. A constant offset at both ends, and none at
-// transit, rules out a timing difference and identifies the cause exactly.
+// That 0.1668 degrees is refraction. A constant offset at both ends and none
+// at transit ruled out a timing difference and identified the cause exactly:
+// the solver built the rise/set context with a no-refraction atmosphere,
+// because rise and set are solved against a geometric threshold with the
+// horizon allowance already folded in, the USNO convention. Transit was built
+// with the site's real refraction.
 //
-// It is deliberate. The solver builds the rise/set context with a
-// no-refraction atmosphere (events.go, "using the same no-refraction
-// atmosphere as the solver") because rise and set are solved against a
-// geometric threshold plus a constant horizon allowance, the USNO convention.
-// Transit is built with the site's real refraction.
+// So Event.Altitude meant different things for different event kinds, and
+// nothing said so. Event.GeometricAltitude was assigned the identical value at
+// both sites, so it distinguished nothing.
 //
-// So Event.Altitude means different things for different event kinds, and
-// nothing said so. Asserting a three-way equality would have been asserting
-// something false; this asserts the convention instead, which is the useful
-// thing to hold still.
+// # What this now asserts
 //
-// # Why this belongs with the others
+// Both fields are populated honestly at both construction sites, so the test
+// no longer records a convention — it checks the names are true:
 //
-// #100 and #101 were both two public APIs computing one quantity by different
-// routes and disagreeing, with no test looking. This is the third route. It
-// does not disagree — it answers a different question — but until something
-// compared them, nobody could tell those apart, which is the same gap.
-func TestEventAltitudeConventionIsWhatItClaims(t *testing.T) {
+//   - Altitude is the refracted altitude, at every event kind, which makes it
+//     equal to what IsObservable and GetDetails report. Comparing a rise
+//     altitude against a transit altitude is now sound.
+//   - GeometricAltitude is the geometric one, at every event kind.
+//   - The gap between them is the refraction at that altitude, not zero.
+//   - Value is still measured geometrically at rise and set, because that is
+//     what the threshold means. Changing the reported altitude must not move
+//     the event times, and this is what says so.
+func TestEventAltitudesAreWhatTheyAreNamed(t *testing.T) {
 	t.Parallel()
 
 	site, err := plan.NewSiteEarthLocation("pipelines", -23.5, -46.6, 800)
@@ -129,11 +136,9 @@ func TestEventAltitudeConventionIsWhatItClaims(t *testing.T) {
 
 	const toleranceArcsec = 1.0
 
-	var checked int
+	var checked, sawRiseOrSet, sawTransit int
 
 	for _, e := range events {
-		// The same instant through both conventions, so the comparison does
-		// not depend on which one the event happens to use.
 		refracted := coord.NewContext(e.Time, site.Location(), site.Refraction())
 		geometric := coord.NewContext(e.Time, site.Location(), atmosphere.Refraction{})
 
@@ -145,43 +150,61 @@ func TestEventAltitudeConventionIsWhatItClaims(t *testing.T) {
 		withRefraction := refracted.GeocentricToObserved(vec).Alt().Degrees()
 		withoutRefraction := geometric.GeocentricToObserved(vec).Alt().Degrees()
 
-		var (
-			want float64
-			why  string
-		)
-
-		if e.Kind == plan.EventTransit {
-			want, why = withRefraction, "transit is solved with the site's own refraction"
-		} else {
-			want, why = withoutRefraction, "rise and set are solved against a geometric "+
-				"threshold with a constant horizon allowance, so the reported altitude "+
-				"carries no refraction"
-		}
-
 		checked++
 
-		if d := math.Abs(e.Altitude.Degrees()-want) * 3600; d > toleranceArcsec {
-			t.Errorf("%s: Event.Altitude is %.4f°, expected %.4f° (%.1f arcsec out).\n"+
-				"  %s.\n  Refracted here is %.4f° and geometric %.4f°; if the event now "+
-				"matches the other one, the convention changed and this test is the "+
-				"record of what it used to be.",
-				e.Kind, e.Altitude.Degrees(), want, d, why, withRefraction, withoutRefraction)
+		if d := math.Abs(e.Altitude.Degrees()-withRefraction) * 3600; d > toleranceArcsec {
+			t.Errorf("%s: Altitude is %.4f deg, want the refracted %.4f deg "+
+				"(%.1f arcsec out). Altitude is what an observer sees, at every "+
+				"event kind, so it must agree with IsObservable and GetDetails.",
+				e.Kind, e.Altitude.Degrees(), withRefraction, d)
 		}
 
-		// Altitude and GeometricAltitude are assigned the same value at both
-		// construction sites, so they carry one quantity under two names. That
-		// is worth knowing about rather than relying on.
-		if e.Altitude != e.GeometricAltitude {
-			t.Errorf("%s: Altitude %v and GeometricAltitude %v differ; they have always "+
-				"been assigned the same value, so something now distinguishes them and "+
-				"the convention above needs revisiting",
-				e.Kind, e.Altitude, e.GeometricAltitude)
+		if d := math.Abs(e.GeometricAltitude.Degrees()-withoutRefraction) * 3600; d > toleranceArcsec {
+			t.Errorf("%s: GeometricAltitude is %.4f deg, want the unrefracted %.4f deg "+
+				"(%.1f arcsec out).", e.Kind, e.GeometricAltitude.Degrees(),
+				withoutRefraction, d)
+		}
+
+		// The two fields must actually differ, by the refraction at this
+		// altitude. Equal fields are the defect this test exists for: they
+		// were assigned the same value at both sites.
+		gap := (e.Altitude - e.GeometricAltitude).Arcseconds()
+		want := (withRefraction - withoutRefraction) * 3600
+
+		if math.Abs(gap-want) > toleranceArcsec {
+			t.Errorf("%s: Altitude and GeometricAltitude are %.2f arcsec apart, want "+
+				"%.2f — the refraction at %.2f deg.", e.Kind, gap, want,
+				e.GeometricAltitude.Degrees())
+		}
+
+		if gap <= 0 {
+			t.Errorf("%s: the two altitudes are %.2f arcsec apart; refraction raises "+
+				"an object, so the refracted one must be the higher", e.Kind, gap)
+		}
+
+		// Value keeps its geometric meaning at rise and set: it is the residual
+		// against the threshold the solver actually used. If this moved, the
+		// event times would have moved with it.
+		switch e.Kind { //nolint:exhaustive // MoonEvents yields only rise, transit and set
+		case plan.EventTransit:
+			sawTransit++
+		case plan.EventRise, plan.EventSet:
+			sawRiseOrSet++
+
+			residual := e.GeometricAltitude.Degrees() - site.MoonRiseSetThreshold().Degrees()
+			if d := math.Abs(e.Value-residual) * 3600; d > toleranceArcsec {
+				t.Errorf("%s: Value is %.6f but the geometric residual against the "+
+					"threshold is %.6f (%.1f arcsec out). Value must stay geometric, "+
+					"or the reported event times have shifted.", e.Kind, e.Value, residual, d)
+			}
+		default:
 		}
 	}
 
-	if checked < 3 {
-		t.Fatalf("only %d events checked", checked)
+	if sawRiseOrSet == 0 || sawTransit == 0 {
+		t.Fatalf("checked %d events but saw %d rise/set and %d transit; the test needs "+
+			"both kinds to compare them", checked, sawRiseOrSet, sawTransit)
 	}
 
-	t.Logf("%d events checked against their own altitude convention", checked)
+	t.Logf("%d events checked (%d rise/set, %d transit)", checked, sawRiseOrSet, sawTransit)
 }
