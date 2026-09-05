@@ -28,6 +28,30 @@ import (
 // extend further down than the two empirical tangent formulas here.
 const lowAltitudeCutoffDeg = -4.0
 
+// zenithArgumentLimit is the other end of the same problem, and the reason all
+// four empirical methods check their tangent argument against 90°.
+//
+// The additive term that keeps each fit stable near the horizon also carries
+// its argument *past* 90° near the zenith: Saemundsson's h + 10.3/(h+5.11) is
+// 90.108° at h = 90°, and Bennett's h + 7.31/(h+4.4) is 90.077°. tan is
+// negative just beyond its asymptote, so both formulas reported negative
+// refraction — measured at −0.114″ and −0.080″ at the zenith, turning negative
+// above 89.8916° and 89.9225° respectively.
+//
+// Refraction is never negative in a normal atmosphere: it raises an object, or
+// at the zenith does nothing, because light arriving along the normal is not
+// bent. Zero is the correct limit, and it is what SOFA returns there.
+//
+// Returning zero at and above the crossing discards at most 0.11″ — the value
+// the formula itself gives just below it — against a fit whose own quoted
+// accuracy is about 0.1 arcmin, i.e. 60 times larger. So this clamp costs
+// nothing measurable and removes a sign error.
+//
+// Expressed as a limit on the argument rather than on the altitude because the
+// two formulas cross at different altitudes, and because the argument is where
+// the problem actually is.
+const zenithArgumentLimit = 90.0
+
 // RefractionModel defines an algorithm that computes the angular refraction shift.
 // It explicitly parses the distinction between forward and reverse tracing.
 type RefractionModel interface {
@@ -135,8 +159,13 @@ func (RefractionApproximate) RefractFromTrue(trueAlt angle.Angle, env Refraction
 		return 0 // Avoid absurd refraction below horizon
 	}
 
+	inner := h + 10.3/(h+5.11)
+	if inner >= zenithArgumentLimit {
+		return 0 // see zenithArgumentLimit
+	}
+
 	// Refraction R in arcminutes
-	R := 1.02 / math.Tan((h+10.3/(h+5.11))*math.Pi/180.0)
+	R := 1.02 / math.Tan(inner*math.Pi/180.0)
 
 	factor := (env.Pressure / 1010.0) * (283.0 / (273.15 + env.Temperature))
 
@@ -150,7 +179,12 @@ func (RefractionApproximate) RefractFromApparent(obsAlt angle.Angle, env Refract
 		return 0
 	}
 
-	R := 1.0 / math.Tan((h+7.31/(h+4.4))*math.Pi/180.0)
+	inner := h + 7.31/(h+4.4)
+	if inner >= zenithArgumentLimit {
+		return 0 // see zenithArgumentLimit
+	}
+
+	R := 1.0 / math.Tan(inner*math.Pi/180.0)
 	factor := (env.Pressure / 1010.0) * (283.0 / (273.15 + env.Temperature))
 
 	return angle.Deg((R * factor) / 60.0)
@@ -241,7 +275,12 @@ func (RefractionRigorous) RefractFromTrue(trueAlt angle.Angle, env Refraction) a
 
 	// Saemundsson (1986) formula in arcminutes for true (geometric) altitude h
 	denom := h + 5.11
+
 	inner := h + (10.3 / denom)
+	if inner >= zenithArgumentLimit {
+		return 0 // see zenithArgumentLimit
+	}
+
 	r0 := 1.02 / math.Tan(inner*math.Pi/180.0)
 
 	correction := (env.Pressure / 1010.0) * (283.0 / (273.15 + env.Temperature))
@@ -268,7 +307,12 @@ func (RefractionRigorous) RefractFromApparent(obsAlt angle.Angle, env Refraction
 
 	// Bennett (1982) formula in arcminutes for observed (apparent) altitude h
 	denom := h + 4.4
+
 	inner := h + (7.31 / denom)
+	if inner >= zenithArgumentLimit {
+		return 0 // see zenithArgumentLimit
+	}
+
 	r0 := 1.0 / math.Tan(inner*math.Pi/180.0)
 
 	correction := (env.Pressure / 1010.0) * (283.0 / (273.15 + env.Temperature))
