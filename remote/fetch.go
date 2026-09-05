@@ -5,10 +5,10 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log"
 
 	"gocloud.dev/gcerrors"
 
+	"github.com/TuSKan/astrogo/internal/logging"
 	"github.com/TuSKan/astrogo/remote/file"
 	"github.com/TuSKan/astrogo/time"
 )
@@ -257,7 +257,8 @@ func fetchInto(ctx context.Context, id EndpointID, ep Endpoint, srcBucket, cache
 
 	offset := resumePoint(ctx, cacheBucket, cacheKey, attrs.ETag)
 
-	log.Printf("remote: downloading %s (endpoint %s, %d bytes)", cacheKey, id, attrs.Size)
+	logging.Get().InfoContext(ctx, "downloading",
+		"cache_key", cacheKey, "endpoint", id, "bytes", attrs.Size)
 
 	r, err := srcBucket.NewRangeReader(ctx, name, offset, -1, nil)
 	if err != nil {
