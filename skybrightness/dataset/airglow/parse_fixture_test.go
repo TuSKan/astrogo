@@ -14,11 +14,13 @@ import (
 
 // ── A minimal FITS binary table writer ───────────────────────────────────────
 //
-// Parse had no positive-path test, because fits.Write is unimplemented and
-// there is no fixture file in the tree — everything that exercised it needed
-// the network. Encoding a table is about forty lines, and having it means the
-// parser's screening can be tested against the malformed responses a service
-// actually returns rather than only against a string that is not FITS at all.
+// Parse had no positive-path test, because the fits package reads and does not
+// write — it carried a Write stub that always failed, since removed, and #127
+// tracks the real writer — and there is no fixture file in the tree, so
+// everything that exercised it needed the network. Encoding a table is about
+// forty lines, and having it means the parser's screening can be tested against
+// the malformed responses a service actually returns rather than only against a
+// string that is not FITS at all.
 
 const fitsBlock = 2880
 

@@ -23,8 +23,6 @@ var (
 	ErrInvalidBlock = errors.New("fits: block size is not 2880 bytes")
 	// ErrNoPrimaryHDU is returned when a primary HDU is not found.
 	ErrNoPrimaryHDU = errors.New("fits: missing primary HDU")
-	// ErrUnimplemented is returned when a feature is not yet implemented.
-	ErrUnimplemented = errors.New("fits: feature not yet implemented")
 )
 
 // File represents a full FITS dataset containing multiple HDUs.
@@ -283,11 +281,6 @@ func ReadBigEndian(r io.Reader, data any) error {
 	}
 
 	return nil
-}
-
-// Write scaffolds writing a basic HDU to a FITS file.
-func Write(_ string, _ []float64) error {
-	return ErrUnimplemented
 }
 
 // isImagePayload reports whether an HDU carries image pixels this package can
