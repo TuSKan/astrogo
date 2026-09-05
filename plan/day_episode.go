@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"slices"
 
+	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/time"
 )
@@ -203,6 +204,13 @@ func searchEvent(target Observable, site *Site, from time.Time, k EventKind, for
 // See DayEvents for the different question ("what happened on this
 // calendar day") this is deliberately not answering.
 func Episode(from, to time.Time, target Observable, site *Site) (rise, set *Event, err error) {
+	// A fixed target whose culminations put it clear of the horizon either way
+	// has no rise to find, and searching 366 days to discover that costs about
+	// 2.9 s. See culminationSkipsSearch.
+	if culminationSkipsSearch(target, site, from) {
+		return nil, nil, nil
+	}
+
 	up, err := isAboveHorizon(target, site, from)
 	if err != nil {
 		return nil, nil, err
@@ -228,4 +236,66 @@ func Episode(from, to time.Time, target Observable, site *Site) (rise, set *Even
 	}
 
 	return rise, set, nil
+}
+
+// episodeClosedFormMargin is how far outside the horizon threshold the
+// closed-form culmination bounds must place a target before [Episode] trusts
+// them and skips its search.
+//
+// One degree, chosen to clear every effect the closed form does not model. It
+// is pure spherical geometry from declination and latitude: no atmospheric
+// refraction (~34' at the horizon), no parallax, no proper motion over the
+// window. A target within that margin of the threshold is one where those
+// terms could decide the answer, so it goes to the search as before.
+//
+// The margin is what makes this an optimisation rather than a second, cruder
+// implementation of the same question. A target one degree clear is not a
+// borderline case: the never-rises test's star sits 75 degrees below its
+// site's horizon.
+const episodeClosedFormMargin = 1.0 // degrees
+
+// culminationSkipsSearch reports whether upper and lower culmination place a
+// fixed target unambiguously outside the range where a rise could be found, so
+// [Episode] can answer without searching.
+//
+// # Why this is worth doing
+//
+// Episode answers "does this ever rise?" by doubling a window out to 366 days,
+// evaluating positions at every step, each paying a coord.NewContext Apco13
+// solve plus an ephemeris lookup. For a target that never rises, every one of
+// those steps finds nothing, and the function only concludes by exhausting the
+// window. Measured at 2.9 s per call.
+//
+// For a fixed target the answer is two arcsine evaluations, because
+// declination does not change: upper culmination is the highest the target
+// ever gets and lower culmination the lowest. [IsNeverUp] and [IsCircumpolar]
+// already compute exactly this and, until now, had no caller in the library at
+// all.
+//
+// # Why only a fixed target
+//
+// A MovingBody's declination changes over the window, so a single pair of
+// culmination altitudes bounds nothing — the Moon moves 28 degrees of
+// declination in a fortnight, and a body below the horizon today may rise next
+// week. Those keep searching.
+func culminationSkipsSearch(target Observable, site *Site, at time.Time) bool {
+	if _, moving := target.(MovingBody); moving {
+		return false
+	}
+
+	pos, err := target.Position(at)
+	if err != nil {
+		// Let the search surface the error, as it did before.
+		return false
+	}
+
+	minAlt, maxAlt := circumpolarExtremes(pos.Dec(), site)
+
+	threshold := site.RiseSetThreshold().Radians()
+	margin := angle.Deg(episodeClosedFormMargin).Radians()
+
+	// Never rises: even at upper culmination it is clear of the threshold.
+	// Never sets: even at lower culmination it stays clear above it.
+	// Either way there is no rise to find, which is what Episode reports.
+	return maxAlt < threshold-margin || minAlt > threshold+margin
 }
