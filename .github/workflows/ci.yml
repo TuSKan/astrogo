@@ -211,6 +211,38 @@ jobs:
           path: bench.txt
           retention-days: 90
 
+  # Runs on push to main, not on a pull request: it is the *base* moving that
+  # invalidates an already-green PR, and nothing re-runs those checks when it
+  # does. See the script for the case that motivated it (#169 merged cleanly
+  # and did not compile).
+  open-prs-still-build:
+    name: Open PRs still build against main
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+        with:
+          # Full history: the job merges other branches into this commit.
+          fetch-depth: 0
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          # See the Setup Go step in the lint-and-test job for why this is a
+          # minor-version spec rather than go-version-file: go.mod (#109).
+          go-version: '1.25'
+          cache: true
+
+      - name: Trial-merge every open PR and build it
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash ./.github/scripts/open-prs-still-build.sh
+
   integration:
     name: Integration Tests (External APIs)
     runs-on: ubuntu-latest
