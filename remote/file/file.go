@@ -35,7 +35,6 @@ import (
 	_ "github.com/TuSKan/gocloud-ext/blob/httpblob" // http://, https://
 )
 
-//nolint:gochecknoglobals // process-wide open-bucket cache; see Open
 var (
 	bucketsMu sync.Mutex
 	buckets   = map[string]*Bucket{}

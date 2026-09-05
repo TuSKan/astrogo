@@ -330,8 +330,6 @@ func (RefractionRigorous) RefractFromApparent(obsAlt angle.Angle, env Refraction
 //
 // Renamed from StandardAtmosphere alongside the Atmosphere→Refraction
 // rename, for consistency between the type and its standard-value var.
-//
-//nolint:gochecknoglobals // ICAO ISA reference profile — immutable physical constant
 var StandardRefraction = Refraction{
 	Pressure:    1013.25,
 	Temperature: 15.0,

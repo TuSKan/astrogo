@@ -49,7 +49,6 @@ type Loader interface {
 	Fetch(ctx context.Context) (Data, error)
 }
 
-//nolint:gochecknoglobals // process-wide loader registration — guarded by loaderMu
 var (
 	loaderMu sync.RWMutex
 	loader   Loader

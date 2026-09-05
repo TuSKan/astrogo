@@ -123,7 +123,6 @@ func Coverage() (mjdMin, mjdMax float64, ok bool) { return iers.Coverage() }
 // Default: 5 minutes.
 func SetRetryCooldown(d Duration) { iers.SetRetryCooldown(d) }
 
-//nolint:gochecknoglobals // one-time-per-process warning guard
 var warnEOPUnavailableOnce sync.Once
 
 // warnEOPUnavailable logs, once per process, that no real EOP data could

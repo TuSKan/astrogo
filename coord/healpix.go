@@ -207,8 +207,6 @@ func (h HEALPix) equatorialPixel(tt, z float64) (face, ix, iy int64) {
 
 // faceRingOffset and facePhiOffset place each of the twelve base faces in
 // the ring/phi grid, per Górski et al. (2005) Fig. 4.
-//
-//nolint:gochecknoglobals // fixed geometry of the base tessellation
 var (
 	faceRingOffset = [12]int64{2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4}
 	facePhiOffset  = [12]int64{1, 3, 5, 7, 0, 2, 4, 6, 1, 3, 5, 7}

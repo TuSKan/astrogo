@@ -17,8 +17,6 @@ const appName = "astrogo"
 
 // dataDirURL is the process-wide base location for everything astrogo
 // stores. Empty means "resolve the default lazily" — see DataDirURL.
-//
-//nolint:gochecknoglobals // process-wide data location is this package's purpose
 var (
 	dataMu     sync.RWMutex
 	dataDirURL string

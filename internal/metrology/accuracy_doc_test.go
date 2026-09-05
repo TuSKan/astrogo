@@ -28,7 +28,7 @@ var updateAccuracy = flag.Bool("update-accuracy", false,
 // the untagged file would leave a symbol with no consumer in a build that
 // compiles neither tag, which is what "golangci-lint run" does and what it
 // reports as unused.
-var ambientOutDir = os.Getenv(metrology.OutDirEnv) //nolint:gochecknoglobals // captured at init because TestMain unsets the variable
+var ambientOutDir = os.Getenv(metrology.OutDirEnv)
 
 // accuracyDoc is the document whose marked region is generated.
 var accuracyDoc = filepath.Join("..", "..", "docs", "VALIDATION.md")

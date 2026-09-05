@@ -114,8 +114,6 @@ const satSource = "JPL natural satellite ephemeris release forms " +
 // meaning is tied to the fit it came from, and the kernel publishes no
 // formal errors for them. They are not [Constant.Exact] either — nothing
 // here is exact by convention, unlike the IAU nominal values.
-//
-//nolint:gochecknoglobals // a published constant table, read-only
 var DE440 = EphemerisSet{
 	Vintage: "DE440",
 
@@ -217,6 +215,4 @@ var DE440 = EphemerisSet{
 // vintage — reference this, not [DE440] directly, unless a specific vintage
 // has to be pinned for reproducibility. When a newer ephemeris is adopted, a
 // new vintage set is added and this single assignment moves.
-//
-//nolint:gochecknoglobals // the current vintage alias, mirroring IAU
 var Ephemeris = DE440

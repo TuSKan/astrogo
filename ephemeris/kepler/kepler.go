@@ -77,8 +77,6 @@ type CentralBody struct {
 
 // sunCentre is the default central body: the Sun, with the IAU nominal mass
 // parameter the heliocentric path has always used.
-//
-//nolint:gochecknoglobals // the default central body, read-only
 var sunCentre = CentralBody{ID: core.Sun, GM: constants.IAU.SunGravitationalParameter.Value}
 
 // LaplacePlane is the reference plane a satellite's published mean elements

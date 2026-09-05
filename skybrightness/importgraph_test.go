@@ -10,8 +10,6 @@ const modulePath = "github.com/TuSKan/astrogo"
 
 // forbidden lists packages the sky-radiance core must not import directly,
 // with the reason, so a failure explains itself.
-//
-//nolint:gochecknoglobals // test fixture table
 var forbidden = map[string]string{
 	modulePath + "/remote":      "the core resolves no data; a provider layer hands it in already resolved",
 	modulePath + "/remote/file": "the core touches no storage",
