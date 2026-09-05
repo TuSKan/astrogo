@@ -173,29 +173,43 @@ func (s *Satellite) StaticMagnitude() (float64, bool) {
 var defaultAtm = atmosphere.Refraction{}
 
 // LookAngle computes the topocentric look angle (altitude, azimuth, distance)
-// from an observer to any celestial body at time t.
+// from an observer to any celestial body at the Context's time.
 //
 // This works for both satellite and planetary providers — any Provider that
-// returns a valid State. Uses the coord.Reducer pipeline which correctly
-// handles both nearby objects (LEO satellites) and distant bodies (planets)
-// by computing the full topocentric vector (geocentric - observer).
+// returns a valid State. The observer's geocentric position is subtracted from
+// the body's, so the range is right for a LEO satellite as well as a planet.
+//
+// # It uses the Context it is given
+//
+// It used to build a coord.Reducer from ctx.Site(), ctx.Time() and
+// ctx.Refraction() and throw the Context itself away. The Reducer then
+// lazily constructed a second Context from those three values, repeating the
+// Apco13 precession-nutation solve — about 150 µs — that the one in hand
+// already held. SatellitePasses builds a Context per 30 s step and called
+// this once per step, so the expensive work happened twice for every sample.
+//
+// Everything the Reducer computed is already on Context: GeocentricToObserved
+// is the refracted alt/az, and ObsVec is the observer vector the topocentric
+// range needs. So there is nothing to rebuild.
+//
+// Using the given Context is also what the signature promises. A caller who
+// derived it with Context.AtTime — the cheap Earth-rotation-only update —
+// previously had that quietly discarded and a full rebuild substituted, which
+// is the opposite of what they asked for.
 func LookAngle(prov eph.Provider, id eph.ID, ctx *coord.Context) (coord.AltAz, error) {
 	st, err := prov.State(id, ctx.Time())
 	if err != nil {
 		return coord.AltAz{}, fmt.Errorf("satellite: look angle state: %w", err)
 	}
 
-	// Use the Reducer pipeline: computes observer GCRS position, subtracts it
-	// from the geocentric state, converts to ENU, then az/el. This gives the
-	// correct topocentric range for nearby objects (satellites).
-	reducer := coord.NewReducer(ctx.Site(), ctx.Time(), ctx.Refraction())
-	reduction := reducer.Reduce(st.Pos)
+	observed := ctx.GeocentricToObserved(st.Pos)
 
-	// The Reducer works in AU — convert topocentric distance to km.
+	// Context works in AU — convert the topocentric distance to km.
 	const kmPerAU = 149597870.7
-	reduction.Observed.SetDist(reduction.Topocentric.Norm() * kmPerAU)
 
-	return reduction.Observed, nil
+	observed.SetDist(st.Pos.Sub(ctx.ObsVec()).Norm() * kmPerAU)
+
+	return observed, nil
 }
 
 // SatellitePass represents a single pass of a satellite over an observer.
@@ -228,6 +242,11 @@ func SatellitePasses(prov eph.Provider, name string, start, end time.Time,
 	refineTol := 1 * time.Second
 
 	// lookAt creates a context and computes look angle at time t.
+	//
+	// Body id 0 is not a placeholder: satellite.Satellite carries one TLE and
+	// its State rejects any other id with ErrUnexpectedID, so 0 is the only
+	// one a satellite provider accepts. The name parameter is a label for the
+	// returned pass, not a lookup key.
 	lookAt := func(t time.Time) (coord.AltAz, error) {
 		ctx := coord.NewContext(t, observer, defaultAtm)
 		return LookAngle(prov, 0, ctx)
