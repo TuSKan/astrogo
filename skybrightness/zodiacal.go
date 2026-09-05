@@ -60,21 +60,15 @@ const (
 
 // zodiacalLongitudes are the differential ecliptic longitudes — the viewing
 // direction's minus the Sun's — indexing the rows of Leinert Table 17.
-//
-//nolint:gochecknoglobals // published table axis
 var zodiacalLongitudes = [19]float64{
 	0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 60, 75, 90, 105, 120, 135, 150, 165, 180,
 }
 
 // zodiacalLatitudes are the ecliptic latitudes indexing the columns.
-//
-//nolint:gochecknoglobals // published table axis
 var zodiacalLatitudes = [10]float64{0, 5, 10, 15, 20, 25, 30, 45, 60, 75}
 
 // zodiacalMissing marks the solar vicinity, within roughly 15 degrees
 // elongation, which Table 17 does not cover.
-//
-//nolint:gochecknoglobals // NaN is not a constant expression in Go
 var zodiacalMissing = math.NaN()
 
 // zodiacalBrightness is Leinert et al. (1998) Table 17: zodiacal light
@@ -83,8 +77,6 @@ var zodiacalMissing = math.NaN()
 // The blank entries are the solar vicinity. They are not zeroes and not
 // interpolable — the brightness there rises by another order of magnitude —
 // so a direction resolving to one is an error rather than a number.
-//
-//nolint:gochecknoglobals // published data table
 var zodiacalBrightness = [19][10]float64{
 	{zodiacalMissing, zodiacalMissing, zodiacalMissing, 3140, 1610, 985, 640, 275, 150, 100},
 	{zodiacalMissing, zodiacalMissing, zodiacalMissing, 2940, 1540, 945, 625, 271, 150, 100},

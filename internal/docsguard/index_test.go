@@ -57,7 +57,6 @@ type symbolIndex struct {
 	varTypes map[string]map[string]string
 }
 
-//nolint:gochecknoglobals // a parse of the whole module, built once per test binary
 var (
 	indexOnce  sync.Once
 	indexValue *symbolIndex

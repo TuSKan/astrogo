@@ -132,7 +132,6 @@ var testLocations = []testLocation{
 // enforced independently of http.Client.Timeout (see usnoGet).
 const usnoRequestTimeout = 30 * time.Second
 
-//nolint:gochecknoglobals // once-per-process reachability cache, see requireUSNO
 var (
 	usnoReachableOnce sync.Once
 	usnoReachableOK   bool

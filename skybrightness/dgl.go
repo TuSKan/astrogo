@@ -86,8 +86,6 @@ type dglCoefficient struct {
 // fitted range, exactly where a quadratic fitted to saturating data should
 // turn. TestDGLTurnoverMatchesTheFittedRange asserts this for every band, so
 // the evidence for the reading is executable rather than a comment.
-//
-//nolint:gochecknoglobals // published coefficient table
 var dglCoefficients = [8]dglCoefficient{
 	{225.0, 3.0, 0.1},
 	{274.0, 3.9, 0.3},

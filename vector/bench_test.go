@@ -7,7 +7,6 @@ import (
 	"github.com/TuSKan/astrogo/vector"
 )
 
-//nolint:gochecknoglobals // benchmark sinks prevent dead-code elimination
 var (
 	sink    float64 // prevents dead-code elimination
 	vecSink vector.Vec3

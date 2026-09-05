@@ -91,7 +91,6 @@ func mustPlanetProvider(t *testing.T) *jpl.Provider {
 // answering, and a fifth of the budget.
 const kernelFetchTimeout = 3 * time.Minute
 
-//nolint:gochecknoglobals // one fetch attempt shared by every test in the package
 var warmOnce sync.Once
 
 // warmKernelCache makes at most one bounded attempt to obtain the kernel, and
@@ -128,5 +127,4 @@ func warmKernelCache(t *testing.T) {
 	}
 }
 
-//nolint:gochecknoglobals // written once under warmOnce, read after
 var errWarm error

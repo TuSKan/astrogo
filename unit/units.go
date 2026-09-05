@@ -83,8 +83,6 @@ func (u Unit) String() string {
 // ── Built-in Units ─────────────────────────────────────────────────────────────
 
 // SI and astronomical measurement units — immutable physical constants.
-//
-//nolint:gochecknoglobals // SI/IAU units are inherently package-level constants
 var (
 	// Meter is the SI base unit of length.
 	Meter = Unit{Dimension: Length, ScaleFactor: 1.0, Name: "meter", Symbol: "m"}

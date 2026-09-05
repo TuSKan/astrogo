@@ -5,8 +5,6 @@ package unit
 // provenance serialization, and boundary parsing — never for the numeric
 // hot path, where skybrightness uses its own bespoke float64 types
 // instead. See the package doc's "Radiometric type safety" section for why.
-//
-//nolint:gochecknoglobals // package-level unit vars, matching units.go's own convention
 var (
 	// Watt is W = kg·m²·s⁻³ (power).
 	Watt = Unit{Dimension: Power, ScaleFactor: 1, Name: "watt", Symbol: "W"}
@@ -47,8 +45,6 @@ var (
 // composite unit in this codebase uses (see constants/units.go), so a
 // wrong exponent is a compile-time-visible composition error, not a
 // hand-typed literal.
-//
-//nolint:gochecknoglobals // composed from the vars above; same convention
 var (
 	// IrradianceUnit is W·m⁻².
 	IrradianceUnit = Watt.Div(Meter.PowInt(2))

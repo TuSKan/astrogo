@@ -9,7 +9,6 @@ import (
 	"time"
 )
 
-//nolint:gochecknoglobals // fetch rate-limiter state — guarded by sync.Mutex
 var (
 	fetchMu       sync.Mutex
 	lastAttempt   time.Time         // wall-clock of last fetch attempt (success or failure)

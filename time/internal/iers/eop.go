@@ -39,7 +39,6 @@ const (
 	SourceNetwork  = "network"
 )
 
-//nolint:gochecknoglobals // singleton EOP model with RWMutex guard
 var (
 	modelMu     sync.RWMutex
 	globalModel Model = ZeroModel{}

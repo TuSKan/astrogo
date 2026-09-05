@@ -10,8 +10,6 @@ import (
 // registry holds the process-wide endpoint configuration. It is statically
 // initialized (no init() computation) and guarded by a single RWMutex; every
 // exported accessor below is safe for concurrent use.
-//
-//nolint:gochecknoglobals // process-wide endpoint configuration is this package's purpose
 var (
 	regMu     sync.RWMutex
 	endpoints = defaultEndpoints()

@@ -22,8 +22,6 @@ import (
 // Earth's entry is the WGS 84 semi-major axis, not an IAU2015 member —
 // it is exact to the WGS84 standard and consistent with IAU 2015 B3's
 // own Earth value.
-//
-//nolint:gochecknoglobals // fixed reference data, same convention as plan.planetaryMoons/knownSites
 var bodyEquatorialRadiusM = map[eph.ID]float64{
 	eph.Sun:     constants.IAU.SunEquatorialRadius.Value,
 	eph.Moon:    constants.IAU.MoonEquatorialRadius.Value,

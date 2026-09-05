@@ -37,8 +37,6 @@ var (
 // SectionOrder is the order sections appear in a release, following Keep a
 // Changelog with this project's "Changed — BREAKING" variant kept alongside
 // plain Changed.
-//
-//nolint:gochecknoglobals // the canonical section order, read-only
 var SectionOrder = []string{
 	"Added",
 	"Changed — BREAKING",

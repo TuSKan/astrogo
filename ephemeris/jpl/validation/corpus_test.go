@@ -36,8 +36,6 @@ import (
 // Here rather than in main_test.go because the validation- and network-tagged
 // suites both need it and cannot see each other's files, and main_test.go has
 // to stay untagged so TestMain always compiles.
-//
-//nolint:gochecknoglobals // a derived constant, same convention as the rest of this repo's reference data
 var kmPerAU = constants.IAU.AstronomicalUnit.Value / 1e3
 
 // corpusSchemaVersion is the version of the document below.
@@ -48,7 +46,7 @@ var kmPerAU = constants.IAU.AstronomicalUnit.Value / 1e3
 const corpusSchemaVersion = 1
 
 // corpusPath is where the document lives, relative to this package.
-var corpusPath = filepath.Join("corpus", "horizons.json") //nolint:gochecknoglobals // a fixed path, same convention as the rest of this repository's reference data
+var corpusPath = filepath.Join("corpus", "horizons.json")
 
 // Errors from reading the corpus.
 var (
