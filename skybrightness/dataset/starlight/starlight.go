@@ -175,7 +175,11 @@ func (m *Map) RadianceAt(band string, lon, lat angle.Angle) (float64, error) {
 
 	pixel := m.grid.PixelOf(lon, lat)
 	if pixel < 0 || pixel >= int64(len(values)) {
-		return 0, fmt.Errorf("%w: %d", ErrPixelRange, pixel)
+		// Wrapped with both sentinels: ErrPixelRange for a caller of this
+		// package, and skybrightness.ErrNoCoverage so IntegratedStarlight can
+		// tell "this map has nothing here" from "this map failed", which it
+		// previously could not — see that sentinel's own comment.
+		return 0, fmt.Errorf("%w: %w: %d", skybrightness.ErrNoCoverage, ErrPixelRange, pixel)
 	}
 
 	return values[pixel], nil

@@ -206,6 +206,21 @@ var planetConstructors = []func(eph.Provider) *Planet{
 // propagation can't represent; see WithSmallBodyKernels to force the
 // kernel path unconditionally. A candidate whose ephemeris (either path)
 // can't be obtained is skipped, not treated as fatal.
+//
+// # The result can be silently incomplete
+//
+// That skip covers a network failure as well as a missing orbit. A kernel
+// fetch that times out, or JPL being unreachable, removes that body's moons or
+// that small body from the result and reports nothing — so an empty or short
+// list means "nothing qualified, as far as could be determined", never
+// "nothing qualified".
+//
+// This is deliberate: a partial sky is more useful than an error for a
+// planning query, and one unreachable kernel should not cost the caller the
+// other forty candidates. But it is worth knowing before treating the result
+// as exhaustive. A caller who needs certainty should pre-seed the kernels it
+// depends on, or check reachability first; remote.SetOffline(true) makes the
+// degradation deterministic rather than dependent on the network.
 func VisibleTonight(
 	ctx context.Context,
 	site *Site,

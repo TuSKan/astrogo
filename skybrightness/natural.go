@@ -730,6 +730,26 @@ func (a *Airglow) Provenance() Provenance {
 // ErrNoStarMap is returned when a starlight component is built without one.
 var ErrNoStarMap = errors.New("skybrightness: integrated starlight needs a sky map")
 
+// ErrNoCoverage marks a direction a map has no data for, as distinct from a
+// map that failed to answer.
+//
+// A [StarMap] may signal a gap two ways, and both are treated alike: a zero or
+// negative radiance, or an error wrapping this. The first is what a sparse map
+// does — starlight's fetch-on-demand maps are full-length slices with zero for
+// every pixel nobody has asked about, so "not covered" and "read as zero" are
+// the same thing there. The second exists for an implementation that can tell
+// the difference and wants to say so.
+//
+// Any *other* error is a failure: the band was not in the map, the file was
+// unreadable, the request was malformed.
+//
+// The two used to be indistinguishable here. [IntegratedStarlight] read
+// `if err != nil || value <= 0` and reported both as an uncovered direction,
+// so a misconfigured band — asking a V map for R — came back as a quiet gap in
+// the sky rather than as the mistake it is. That is the shape of #102, where a
+// swallowed error turned a CDS outage into "target not found".
+var ErrNoCoverage = errors.New("skybrightness: direction not covered by the map")
+
 // StarMap samples extra-atmospheric starlight radiance by direction.
 //
 // The values are outside the atmosphere: attenuating them is the component's
@@ -742,6 +762,11 @@ type StarMap interface {
 	// is the one handed to [NewIntegratedStarlight]; a map built for one
 	// band and read against another is a silent error this interface
 	// cannot catch.
+	//
+	// A direction the map does not cover is an error wrapping
+	// [ErrNoCoverage], not a zero value: zero is a legitimate radiance and
+	// carries no information about whether the map was asked something it
+	// could answer. Any other error is treated as a failure and propagated.
 	RadianceAt(lon, lat angle.Angle) (float64, error)
 
 	// Galactic reports whether the map is indexed in galactic coordinates.
@@ -881,8 +906,16 @@ func (s *IntegratedStarlight) AddRadiance(
 	}
 
 	value, err := s.sky.RadianceAt(lon, lat)
-	if err != nil || value <= 0 {
-		return UnknownCloud, nil //nolint:nilerr // absence of map coverage is not a failure
+
+	switch {
+	case errors.Is(err, ErrNoCoverage):
+		// The map answered: it has nothing here. Flagged, not failed.
+		return UnknownCloud, nil
+	case err != nil:
+		return 0, fmt.Errorf("skybrightness: starlight: radiance: %w", err)
+	case value <= 0:
+		// Covered, but no measurable starlight in this direction.
+		return UnknownCloud, nil
 	}
 
 	airmass, err := atmosphere.Airmass(dir.Alt())

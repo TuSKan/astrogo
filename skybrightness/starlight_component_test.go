@@ -3,6 +3,7 @@ package skybrightness_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math"
 	"testing"
 
@@ -594,5 +595,100 @@ func TestDiffuseGalacticLightUncoveredSightlineIsNotCappedToZero(t *testing.T) {
 
 	if flags&skybrightness.UnknownCloud == 0 {
 		t.Error("an uncappable sightline must be flagged")
+	}
+}
+
+// failingSky answers every direction with a failure that is not a coverage
+// gap — the shape of a misconfigured band, or an unreadable map.
+type failingSky struct{}
+
+func (failingSky) Galactic() bool { return false }
+func (failingSky) RadianceAt(_, _ angle.Angle) (float64, error) {
+	return 0, errSkyUnavailable
+}
+
+var errSkyUnavailable = errors.New("starlight_component_test: the map could not answer")
+
+// uncoveredSky answers with a coverage gap, the way a real map reports a
+// direction outside its pixel array.
+type uncoveredSky struct{}
+
+func (uncoveredSky) Galactic() bool { return false }
+func (uncoveredSky) RadianceAt(_, _ angle.Angle) (float64, error) {
+	return 0, fmt.Errorf("%w: pixel out of range", skybrightness.ErrNoCoverage)
+}
+
+// TestIntegratedStarlightSeparatesFailureFromMissingCoverage is the fix for
+// #172.
+//
+// The component read `if err != nil || value <= 0` and reported both as an
+// uncovered direction. So a map that could not answer at all — the band was
+// not in it, the file was unreadable — came back as a quiet gap in the sky
+// rather than as the mistake it is, which is the shape of #102 where a
+// swallowed error turned a CDS outage into "target not found".
+//
+// The two cases are now told apart by ErrNoCoverage, and this asserts both
+// directions: a gap is still flagged rather than failed, and a failure is
+// propagated rather than flagged.
+func TestIntegratedStarlightSeparatesFailureFromMissingCoverage(t *testing.T) {
+	t.Parallel()
+
+	grid := skybrightness.DefaultOpticalGrid()
+	dir := coord.NewAltAz(angle.Deg(60), angle.Deg(0))
+
+	for _, tc := range []struct {
+		name      string
+		sky       skybrightness.StarMap
+		wantErr   error
+		wantFlags skybrightness.Flag
+	}{
+		{
+			name:      "a coverage gap is flagged, not failed",
+			sky:       uncoveredSky{},
+			wantFlags: skybrightness.UnknownCloud,
+		},
+		{
+			name:    "a map that cannot answer is a failure",
+			sky:     failingSky{},
+			wantErr: errSkyUnavailable,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			isl, err := skybrightness.NewIntegratedStarlight(tc.sky, solarShape(grid), grid, testBand())
+			if err != nil {
+				t.Fatalf("NewIntegratedStarlight: %v", err)
+			}
+
+			dst := skybrightness.NewSpectralRadiance(grid)
+
+			flags, err := isl.AddRadiance(context.Background(), dst, grid, dir, starlightScene(t))
+
+			if tc.wantErr != nil {
+				if !errors.Is(err, tc.wantErr) {
+					t.Fatalf("AddRadiance returned %v, want it to wrap %v.\n"+
+						"  A map that failed is not a map with nothing there; reporting "+
+						"it as an uncovered direction loses the only sign of the "+
+						"misconfiguration.", err, tc.wantErr)
+				}
+
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("AddRadiance: %v", err)
+			}
+
+			if flags&tc.wantFlags == 0 {
+				t.Errorf("flags = %v, want %v", flags, tc.wantFlags)
+			}
+
+			for i, v := range dst {
+				if v != 0 {
+					t.Fatalf("an uncovered direction wrote %v at index %d", v, i)
+				}
+			}
+		})
 	}
 }
