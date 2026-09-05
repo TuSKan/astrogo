@@ -11,7 +11,6 @@ import (
 	"github.com/TuSKan/astrogo/time"
 )
 
-//nolint:gochecknoglobals // test flags must be package-level to register
 var (
 	update  = flag.Bool("update", false, "assemble docs/changelog.d into CHANGELOG.md and delete the consumed fragments")
 	version = flag.String("release-version", "", "version to assemble under, e.g. 0.17.0")

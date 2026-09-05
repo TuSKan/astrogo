@@ -67,8 +67,6 @@ func (d Dimension) PowInt(p int) Dimension {
 // ── Common Dimensions ────────────────────────────────────────────────────────
 
 // SI base and derived dimensions — immutable physical constants.
-//
-//nolint:gochecknoglobals // SI dimensions are inherently package-level constants
 var (
 	Dimensionless = Dimension{}
 	Length        = Dimension{L: 1}

@@ -67,7 +67,7 @@ type Result struct {
 
 // commitOnce caches the revision lookup: every suite in a run stamps the same
 // commit, and shelling out once per suite would be waste for a constant.
-var commitOnce = sync.OnceValue(resolveCommit) //nolint:gochecknoglobals // a memoised constant, not mutable state
+var commitOnce = sync.OnceValue(resolveCommit)
 
 // resolveCommit finds the astrogo revision a result was produced at.
 //

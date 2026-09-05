@@ -72,8 +72,6 @@ const (
 )
 
 // flagNames pairs each flag with its name, in declaration order.
-//
-//nolint:gochecknoglobals // lookup table for String
 var flagNames = []struct {
 	flag Flag
 	name string

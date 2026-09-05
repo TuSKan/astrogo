@@ -163,8 +163,6 @@ func (p *Provider) Close() error { return nil }
 // SOFA has no analytical Pluto, and without one a satellite registered about
 // Pluto — Charon — cannot be placed at all, since the provider composes a
 // satellite through its parent.
-//
-//nolint:gochecknoglobals // a published element set, read-only
 var PlutoElements = func() Elements {
 	el, err := NewElements(time.J2000, 39.48211675, 0.24882730,
 		angle.Deg(17.14001206), angle.Deg(110.30393684),

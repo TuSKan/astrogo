@@ -114,8 +114,6 @@ func MeteorShowerNames() []string {
 // Deprecated: use [MeteorShowerNames] to enumerate and [NewMeteorShower] to
 // resolve. An exported map is process-wide mutable state; see
 // [KnownSiteNames].
-//
-//nolint:gochecknoglobals // fixed reference data, same convention as plan.PlanetaryMoons/KnownSites
 var MeteorShowers = map[string]MeteorShower{
 	"quadrantids": {
 		Name: "Quadrantids", Code: "QUA", ParentBody: "2003 EH1",

@@ -21,8 +21,6 @@ var qualifier = regexp.MustCompile(`\b([a-z][a-z0-9]*)\.[A-Z]`)
 // import paths. Deliberately a short allowlist rather than a resolver: a
 // sample reaching for something outside it is a sample that has grown past
 // what a README should carry.
-//
-//nolint:gochecknoglobals // a lookup table, not state
 var stdlibForREADME = map[string]string{
 	"fmt":     "fmt",
 	"log":     "log",

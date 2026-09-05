@@ -44,8 +44,6 @@ var (
 // querying an unregistered table returns ErrUnknownTable rather than
 // assuming generic column names that may not exist for that table. Adding
 // a table here is a data change, not an API change.
-//
-//nolint:gochecknoglobals // read-only registry, populated once at init
 var tableSchemas = map[string]tableSchema{
 	// 2MASS Point Source Catalog — the package's original hardcoded table.
 	defaultTable: {RACol: "raj2000", DecCol: "dej2000", DesigCol: `"2MASS"`, Kind: resolve.KindStar, Epoch: epoch2MASS},
