@@ -85,29 +85,35 @@ func (r *Reducer) Reduce(v vector.Vec3) *Reduction {
 	}
 }
 
-// Disperse computes wavelength-dependent refraction for a set of target wavelengths,
-// returning the reduction evaluated differentially for each wavelength.
+// Disperse computes wavelength-dependent refraction for a set of target
+// wavelengths, returning the reduction evaluated differentially for each.
+//
+// # Why there is no nil-model shortcut here any more
+//
+// This used to return [Reduction.Observed] unchanged for every wavelength when
+// atmos.Model was nil — zero dispersion. But a nil Model does not mean no
+// refraction: with a pressure set it means SOFA's, which is exactly what
+// [Reducer.Reduce] applied a few lines earlier when it filled in Observed. So
+// the two halves of one reduction disagreed about whether there was an
+// atmosphere, and the half that said there wasn't is the one a caller asking
+// for dispersion cares about.
+//
+// Resolving through [atmosphere.Refraction.EffectiveModel] removes the
+// disagreement by construction: a zero-pressure environment still yields no
+// dispersion, because the model it resolves to returns zero.
 func (r *Reducer) Disperse(v vector.Vec3, wavelengths []float64) *Reduction {
 	res := r.Reduce(v)
-	res.Dispersion = make(map[float64]AltAz)
-
-	if r.atmos.Model == nil {
-		// No refraction model; dispersion is identical across all wavelengths
-		for _, wl := range wavelengths {
-			res.Dispersion[wl] = res.Observed
-		}
-
-		return res
-	}
+	res.Dispersion = make(map[float64]AltAz, len(wavelengths))
 
 	for _, wl := range wavelengths {
-		// Clone and substitute the specific environment wavelength dynamically
+		// Clone and substitute the specific environment wavelength dynamically.
+		// The clone is what makes this dispersion rather than one refraction
+		// repeated: SOFA's A and B are derived per wavelength.
 		wlAtmos := r.atmos
 		wlAtmos.Wavelength = wl
 
-		shift := wlAtmos.Model.RefractFromTrue(res.Geometric.Alt(), wlAtmos)
-		dispersedAltAz := NewAltAz(res.Geometric.Alt().Add(shift), res.Geometric.Az())
-		res.Dispersion[wl] = dispersedAltAz
+		shift := wlAtmos.RefractFromTrue(res.Geometric.Alt())
+		res.Dispersion[wl] = NewAltAz(res.Geometric.Alt().Add(shift), res.Geometric.Az())
 	}
 
 	return res

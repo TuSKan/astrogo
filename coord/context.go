@@ -236,8 +236,14 @@ func (ctx *Context) AstrometricToObserved(c Astrometric) AltAz {
 //
 // Atmospheric refraction is applied using the Context's refraction model.
 // When no explicit model is set (Model == nil) but atmospheric pressure is
-// nonzero, the Saemundsson (1986) rigorous formula is used as a fallback,
-// matching the behaviour of SOFA's internal refraction in the stellar path.
+// nonzero, refractLikeAtioq applies SOFA's own two-term series from the Refa
+// and Refb constants Apco13 already cached — the same resolution
+// [atmosphere.Refraction.EffectiveModel] makes, reached by a faster route.
+//
+// atmosphere.RefractionSOFA is that model in portable form, recomputing the
+// constants per call rather than reusing the cache. The two are pinned against
+// each other by TestNilModelMatchesExplicitSOFAModel, which measures agreement
+// to 0.012 arcsec above 3 degrees and 0.7 milliarcsecond above 5 degrees.
 func (ctx *Context) GeocentricToObserved(v vector.Vec3) AltAz {
 	// Topocentric vector in ICRS frame.
 	topoVec := v.Sub(ctx.obsVec)

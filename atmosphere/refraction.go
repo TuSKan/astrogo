@@ -5,6 +5,7 @@ import (
 	"math"
 
 	"github.com/TuSKan/astrogo/angle"
+	"github.com/TuSKan/astrogo/internal/gofaext"
 )
 
 // lowAltitudeCutoffDeg is the true/apparent altitude below which
@@ -64,6 +65,50 @@ type Refraction struct {
 	Wavelength  float64
 }
 
+// EffectiveModel returns the model this environment actually refracts with,
+// which is never nil.
+//
+// # Why a nil Model is not an error
+//
+// Refraction is a freely-literal-constructed value type, and the constructors
+// deliberately leave Model nil — [AtAltitude] says so in as many words. A nil
+// Model means "no opinion, use the default", not "no refraction": with a
+// pressure set it resolves to [RefractionSOFA], and only a zero pressure means
+// a vacuum.
+//
+// That convention used to live in coord, which read Model == nil and reached
+// for SOFA's constants itself. atmosphere had no such default, so the meaning
+// of a zero value depended on which package consumed it, and anyone following
+// the documented pluggable-model API into env.Model.RefractFromTrue got a nil
+// dereference. The convention belongs here, with the type it describes.
+func (r Refraction) EffectiveModel() RefractionModel {
+	switch {
+	case r.Model != nil:
+		return r.Model
+	case r.Pressure > 0:
+		return RefractionSOFA{}
+	default:
+		return RefractionNone{}
+	}
+}
+
+// RefractFromTrue is the refraction that carries a true geometric altitude to
+// the observed one, using [Refraction.EffectiveModel].
+//
+// Positive: refraction raises an object, so observed = true + this. Prefer it
+// over reaching into Model directly, which is nil under every constructor.
+func (r Refraction) RefractFromTrue(trueAlt angle.Angle) angle.Angle {
+	return r.EffectiveModel().RefractFromTrue(trueAlt, r)
+}
+
+// RefractFromApparent is the refraction to remove from an observed altitude to
+// recover the true geometric one, using [Refraction.EffectiveModel].
+//
+// Positive, like [Refraction.RefractFromTrue], so true = observed − this.
+func (r Refraction) RefractFromApparent(obsAlt angle.Angle) angle.Angle {
+	return r.EffectiveModel().RefractFromApparent(obsAlt, r)
+}
+
 // ── Models ────────────────────────────────────────────────────────────────────
 
 // RefractionNone entirely disables refraction.
@@ -109,6 +154,74 @@ func (RefractionApproximate) RefractFromApparent(obsAlt angle.Angle, env Refract
 	factor := (env.Pressure / 1010.0) * (283.0 / (273.15 + env.Temperature))
 
 	return angle.Deg((R * factor) / 60.0)
+}
+
+// RefractionSOFA is the refraction model SOFA itself uses: the two-term series
+// dz = A·tan z + B·tan³ z, with A and B derived from the pressure,
+// temperature, humidity and wavelength in the [Refraction] passed to it.
+//
+// This is the model a nil [Refraction.Model] resolves to when a pressure is
+// set — see [Refraction.EffectiveModel]. It exists so that "nil means SOFA"
+// is a statement atmosphere can act on, rather than a convention each consumer
+// has to reimplement.
+//
+// Unlike the Saemundsson and Bennett formulas beside it, the constants are not
+// a fixed empirical fit rescaled by a pressure ratio: gofa's Refco integrates
+// the refractive index of moist air for the specific conditions given, so the
+// wavelength dependence is real dispersion rather than the linear 0.005/µm
+// approximation [RefractionRigorous] applies.
+type RefractionSOFA struct{}
+
+// Refraction clamps, copied from SOFA's iauAtioq rather than chosen here.
+//
+// selMin bounds sin(altitude) at 0.05 — about 2.87° — so the tangent series is
+// never evaluated where it diverges. celMin bounds cos(altitude) away from
+// zero at the zenith, where the horizontal component vanishes.
+//
+// coord/context.go carries the same two constants for its own vector-form copy
+// of Atioq. They are duplicated rather than shared because they belong to the
+// algorithm, not to either package, and neither should import the other.
+const (
+	selMin = 0.05
+	celMin = 1e-6
+)
+
+// RefractFromTrue applies Atioq's Newton-corrected form of the series, which is
+// the direction SOFA uses when going from a true topocentric direction to the
+// observed one.
+func (RefractionSOFA) RefractFromTrue(trueAlt angle.Angle, env Refraction) angle.Angle {
+	if env.Pressure <= 0 {
+		return 0
+	}
+
+	refa, refb := gofaext.Refco(env.Pressure, env.Temperature, env.Humidity, env.Wavelength)
+
+	// In units of sine and cosine of altitude, as Atioq works on a unit vector.
+	z := math.Max(math.Sin(trueAlt.Radians()), selMin)
+	r := math.Max(math.Cos(trueAlt.Radians()), celMin)
+
+	tz := r / z
+	w := refb * tz * tz
+
+	return angle.Rad((refa + w) * tz / (1.0 + (refa+3.0*w)/(z*z)))
+}
+
+// RefractFromApparent applies the series in its defining form, where the
+// zenith distance is the observed one — which is how gofa's Refco documents A
+// and B, so no correction term belongs here.
+func (RefractionSOFA) RefractFromApparent(obsAlt angle.Angle, env Refraction) angle.Angle {
+	if env.Pressure <= 0 {
+		return 0
+	}
+
+	refa, refb := gofaext.Refco(env.Pressure, env.Temperature, env.Humidity, env.Wavelength)
+
+	z := math.Max(math.Sin(obsAlt.Radians()), selMin)
+	r := math.Max(math.Cos(obsAlt.Radians()), celMin)
+
+	tz := r / z
+
+	return angle.Rad(refa*tz + refb*tz*tz*tz)
 }
 
 // RefractionRigorous explicitly represents the analytical integration model derived from physical meteorological parameters.
@@ -252,7 +365,10 @@ func HorizonDip(h float64) angle.Angle {
 //   - M  = 0.0289644 kg/mol (molar mass of dry air)
 //   - R* = 8.31447 J/(mol·K) (universal gas constant)
 //
-// The refraction model and wavelength are inherited from [StandardRefraction].
+// Humidity and wavelength are inherited from [StandardRefraction]; the model
+// is deliberately left nil, which [Refraction.EffectiveModel] resolves to
+// [RefractionSOFA]. StandardRefraction's own RefractionRigorous is *not*
+// inherited, which this comment used to claim.
 func AtAltitude(h float64) Refraction {
 	if h <= 0 {
 		// Sea level: use standard ISA values but let SOFA handle refraction
