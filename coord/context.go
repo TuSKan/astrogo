@@ -105,15 +105,25 @@ func (ctx *Context) Clone() *Context {
 	return &c
 }
 
+// kmPerAU is the number of kilometres in one Astronomical Unit.
+//
+// var, not const: constants.IAU.AstronomicalUnit is a struct, and Go does not
+// permit selecting a struct field inside a constant expression.
+var kmPerAU = constants.IAU.AstronomicalUnit.Value / 1e3
+
 // tirsVec returns the observer's geocentric position in the TIRS frame
 // (AU) from site trigonometry and height — pure site geometry, independent
 // of time, shared by NewContext and AtTime.
 func tirsVec(sinLat, cosLat, sinLon, cosLon, heightM float64) vector.Vec3 {
+	// rEq and f are WGS84 reference-ellipsoid parameters, which belong to the
+	// geodesy here rather than to constants. au is a unit conversion with a
+	// canonical home, so it comes from there — see kmPerAU.
 	const (
-		au  = 149597870.7
 		rEq = 6378.137
 		f   = 1.0 / 298.257223563
 	)
+
+	au := kmPerAU
 
 	cEarth := 1.0 / math.Sqrt(cosLat*cosLat+(1.0-f)*(1.0-f)*sinLat*sinLat)
 	sEarth := (1.0 - f) * (1.0 - f) * cEarth
