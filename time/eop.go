@@ -2,9 +2,9 @@ package time
 
 import (
 	"io"
-	"log"
 	"sync"
 
+	"github.com/TuSKan/astrogo/logging"
 	"github.com/TuSKan/astrogo/time/internal/iers"
 )
 
@@ -130,9 +130,31 @@ var warnEOPUnavailableOnce sync.Once
 // silent-degrade path (Time.UT1() itself still propagates the error
 // instead of calling this).
 func warnEOPUnavailable(mjd float64) {
-	warnEOPUnavailableOnce.Do(func() {
-		log.Printf("astrogo/time: IERS EOP data unavailable (MJD %.1f): using zero DUT1/polar motion/UT1-UTC. Topocentric accuracy degraded to ~1 arcsec; UT1 ≈ UTC (max error ≈ 0.9s). Call remote.EnableDownloads(..., remote.IERSFinals2000A) or pre-seed finals2000A.data for full accuracy.", mjd)
-	})
+	warnEOPUnavailableOnce.Do(func() { logEOPUnavailable(mjd) })
+}
+
+// logEOPUnavailable writes the warning, separately from the [sync.Once] that
+// rations it.
+//
+// Split out so the message and its level can be tested. Behind the Once it
+// fires exactly once per process, and whichever test happened to run first
+// would spend it — so a test asserting the warning reaches an installed logger
+// would pass or fail on test ordering rather than on the code.
+func logEOPUnavailable(mjd float64) {
+	// Warn, not Info, and so still emitted by the default logger: this is the
+	// only notice a caller gets that the numbers changed. Time.EOP has no
+	// error return, and the UT1<->UTC degrade path has already decided not to
+	// fail. See the logging package.
+	//
+	// A short, fixed message with the detail in attributes, rather than three
+	// sentences of prose: that is what slog is for, it keeps the line greppable
+	// when a caller ships JSON, and the default text handler still prints every
+	// attribute.
+	logging.Warn("EOP unavailable, using zero DUT1 and polar motion",
+		"mjd", mjd,
+		"topocentric_error", "~1 arcsec",
+		"ut1_error", "~0.9 s",
+		"remedy", "remote.EnableDownloads(0, remote.IERSFinals2000A) or pre-seed finals2000A.data")
 }
 
 // lookupEOP is the single place that attempts an automatic lazy load

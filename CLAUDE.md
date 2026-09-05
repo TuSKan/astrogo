@@ -82,7 +82,7 @@ Strictly layered, unidirectional imports (no cycles). Lower layers never import 
 plan, catalog, fits/plan                                ← orchestration (observability, scheduling, events, resolvers, FITS↔plan bridge)
 ephemeris, coord, atmosphere, fits, skybrightness        ← scientific engines
 skybrightness/dataset/...                                ← sky-brightness IO tier (dataset providers; the only tier allowed I/O)
-time, angle, vector, unit, constants, remote, optics     ← primitives
+time, angle, vector, unit, constants, remote, optics, logging  ← primitives
 ```
 
 - **`time`** is the sole gateway for Earth Orientation Parameters and epoch arithmetic. `time/internal/iers` (unexported — nothing outside `time/` can import it) fetches/parses IERS EOP data; `time` re-exports what's needed (`time.EOP`, `time.RegisterModel`/`GetModel`/`Coverage`/`SetRetryCooldown`) and adds `Time.EOP()`, `Time.MJD()`, `Time.GAST()`, `Time.JulianEpochYear()`, `Time.DayOfYear()`. EOP data loads automatically and lazily the first time `Time.EOP()`/`Time.UTC()`/`Time.UT1()` needs it — a pre-seeded on-disk cache file, then (if `remote.EnableDownloads(remote.IERSFinals2000A, ...)` was called) a network fetch, then a zero-EOP-plus-one-time-warning degradation — no explicit populate call needed. `coord` and every other package get EOP/epoch values through these `time` APIs — never by hand-rolling MJD/GAST arithmetic or importing EOP internals directly.
@@ -93,6 +93,7 @@ time, angle, vector, unit, constants, remote, optics     ← primitives
 - **`catalog`** + `catalog/resolve` expose unified `resolve.Provider` interfaces over SIMBAD/MAST/Gaia/VizieR/JPL/SBDB/OpenNGC/NORAD/FINK, with Apache Arrow columnar caching. All network access goes through `remote/api.Client`.
 - **`internal/gofaext`** wraps [github.com/hebl/gofa](https://github.com/hebl/gofa) (SOFA-derived algorithms). All low-level SOFA calls go through here to keep public APIs clean and the backend swappable.
 - **`internal/testutil`** holds float/error test helpers used across packages.
+- **`logging`** holds the one `*slog.Logger` astrogo writes to, and imports nothing from astrogo so every layer can reach it — including `time`, which `remote` depends on and which therefore cannot depend on `remote`. `logging.Set(nil)` restores a default that passes `Warn` and above and drops `Info`: progress lines (a kernel downloading) are a library's business only if asked for, while the EOP-unavailable warning is the only notice a caller gets that accuracy silently degraded, since `Time.EOP` has no error return. No astrogo API takes a logger parameter, and no library file imports the standard `log` — `TestNoLibraryCodeWritesToTheGlobalLog` enforces the latter.
 - **`optics`** is pure equipment-optics arithmetic (magnification, field of view, exit pupil, resolving power, pixel scale) for a `Telescope`/`Eyepiece`/`Sensor` combination — no astrometry, no ephemeris, no network access. A top-level primitive, not a `plan` subpackage.
 
 ## Conventions for this codebase
