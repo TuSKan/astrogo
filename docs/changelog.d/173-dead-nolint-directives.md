@@ -1,6 +1,6 @@
 ---
 type: Removed
-pr: 172
+pr: 173
 ---
 **42 `//nolint:gochecknoglobals` directives suppressed a linter `.golangci.yml`
 disables** — 29% of every suppression in the tree, each carrying a documented
