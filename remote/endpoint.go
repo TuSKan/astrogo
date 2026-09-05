@@ -386,6 +386,22 @@ type Endpoint struct {
 	// A token is an optimisation, never a requirement: every endpoint that
 	// declares one must still work without it.
 	TokenEnv string
+
+	// InsecureReason explains why this endpoint is addressed over cleartext
+	// http:// rather than https://, and must be non-empty whenever it is.
+	//
+	// Cleartext is a real exposure for a library like this one, in both
+	// directions: what is requested reveals what is being observed, and what
+	// comes back is a physical constant or a catalogue position that anything
+	// on the path can rewrite. So it is never a default and never an
+	// oversight — TestNoUndeclaredCleartextEndpoints refuses any http:// URL
+	// that does not record a reason here.
+	//
+	// The reason belongs in the registry rather than a comment because it is
+	// a property of the endpoint that a test can check, and because it should
+	// be re-examined: an upstream that gains TLS makes its exemption stale,
+	// and there is no way to notice that if the justification is prose.
+	InsecureReason string
 }
 
 // SizeVaries marks an endpoint whose per-fetch size cannot be usefully
@@ -516,7 +532,7 @@ func defaultEndpoints() map[EndpointID]Endpoint {
 		},
 		SIMBAD: {
 			ID:          SIMBAD,
-			URL:         "http://simbad.cds.unistra.fr/simbad/sim-tap/sync",
+			URL:         "https://simbad.cds.unistra.fr/simbad/sim-tap/sync",
 			Kind:        KindAPI,
 			Subsystem:   "catalog/simbad",
 			Description: "CDS SIMBAD TAP service",
@@ -526,7 +542,7 @@ func defaultEndpoints() map[EndpointID]Endpoint {
 		},
 		VizieR: {
 			ID:          VizieR,
-			URL:         "http://tapvizier.u-strasbg.fr/TAPVizieR/tap/sync",
+			URL:         "https://tapvizier.u-strasbg.fr/TAPVizieR/tap/sync",
 			Kind:        KindAPI,
 			Subsystem:   "catalog/vizier",
 			Description: "CDS VizieR TAP service",
@@ -674,8 +690,15 @@ func defaultEndpoints() map[EndpointID]Endpoint {
 		},
 
 		CVRLLuminosity: {
-			ID:        CVRLLuminosity,
-			URL:       "http://www.cvrl.org/database/data/lum/",
+			ID:  CVRLLuminosity,
+			URL: "http://www.cvrl.org/database/data/lum/",
+			InsecureReason: "www.cvrl.org serves no TLS at all: port 443 refuses " +
+				"the connection while port 80 answers, and the bare cvrl.org name " +
+				"does not resolve. Verified 2026-09-05. Not a certificate problem " +
+				"that could be waved through — there is no listener. Re-check when " +
+				"UCL modernises the host; the two CSVs here are CIE luminous " +
+				"efficiency functions, fixed published tables, so the exposure is " +
+				"tampering rather than disclosure.",
 			Kind:      KindFile,
 			Subsystem: "skybrightness/dataset/luminosity",
 			Description: "CVRL (UCL Institute of Ophthalmology) CIE luminous efficiency " +
