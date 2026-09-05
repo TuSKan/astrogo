@@ -2,7 +2,6 @@ package fits
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"os"
 	"testing"
@@ -162,11 +161,6 @@ func TestReadBigEndian(t *testing.T) {
 
 	if val != 42 {
 		t.Errorf("expected 42, got %d", val)
-	}
-
-	err = Write("dummy", nil)
-	if !errors.Is(err, ErrUnimplemented) {
-		t.Errorf("expected ErrUnimplemented, got %v", err)
 	}
 }
 

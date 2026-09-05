@@ -726,7 +726,7 @@ flowchart TD
 | `magnitude` | Apparent magnitude (planets, asteroids, comets, satellites, stars) | ✅ Stable |
 | `constellation` | IAU constellation lookup from an ICRS position (official 1930 boundaries), `List`/`Centroid` enumeration | ✅ Stable |
 | `optics` | Equipment-optics arithmetic (`Telescope`/`Eyepiece`/`Sensor`) — magnification, FOV, exit pupil, Dawes limit, pixel scale | ✅ Stable |
-| `fits` | FITS I/O, WCS (TAN projection), mmap, Arrow export | ✅ Stable |
+| `fits` | FITS **reading**, WCS (TAN projection), mmap, Arrow export | ✅ Stable (read-only — no writer yet, see [#127](https://github.com/TuSKan/astrogo/issues/127)) |
 | `fits/plan` | FITS↔plan bridge (`SiteFromFITS`, `TargetFromFITS`) | ✅ Stable |
 | `plan` | Observability, constraints, events, scheduling, satellite passes | ✅ Stable |
 | `skybrightness` | Spectral all-sky radiance engine (`Scene`/`Component`/`Model`/`Estimate`, all-sky ops, uncertainty, provenance) — seven components | ✅ Phases 0–5 (natural sky validated to 0.05 mag against GAMBONS) |
