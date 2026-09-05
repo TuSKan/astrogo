@@ -8,7 +8,7 @@ import (
 
 	"gocloud.dev/gcerrors"
 
-	"github.com/TuSKan/astrogo/internal/logging"
+	"github.com/TuSKan/astrogo/logging"
 	"github.com/TuSKan/astrogo/remote/file"
 	"github.com/TuSKan/astrogo/time"
 )
@@ -257,7 +257,7 @@ func fetchInto(ctx context.Context, id EndpointID, ep Endpoint, srcBucket, cache
 
 	offset := resumePoint(ctx, cacheBucket, cacheKey, attrs.ETag)
 
-	logging.Get().InfoContext(ctx, "downloading",
+	logging.Logger().InfoContext(ctx, "downloading",
 		"cache_key", cacheKey, "endpoint", id, "bytes", attrs.Size)
 
 	r, err := srcBucket.NewRangeReader(ctx, name, offset, -1, nil)

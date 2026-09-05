@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/TuSKan/astrogo/internal/logging"
+	"github.com/TuSKan/astrogo/logging"
 )
 
 //nolint:gochecknoglobals // fetch rate-limiter state — guarded by sync.Mutex
@@ -150,7 +150,7 @@ func fetch(ctx context.Context, l Loader) error {
 
 	lo, hi := table.Coverage()
 
-	logging.Get().InfoContext(ctx, "loaded EOP data",
+	logging.Logger().InfoContext(ctx, "loaded EOP data",
 		"mjd_lo", lo, "mjd_hi", hi, "records", len(table.records))
 
 	return nil

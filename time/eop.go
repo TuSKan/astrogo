@@ -4,7 +4,7 @@ import (
 	"io"
 	"sync"
 
-	"github.com/TuSKan/astrogo/internal/logging"
+	"github.com/TuSKan/astrogo/logging"
 	"github.com/TuSKan/astrogo/time/internal/iers"
 )
 
@@ -146,7 +146,7 @@ func logEOPUnavailable(mjd float64) {
 	// only notice a caller gets that the numbers changed. Time.EOP has no
 	// error return, and the UT1<->UTC degrade path has already decided not to
 	// fail. See remote.SetLogger.
-	logging.Get().Warn("IERS EOP data unavailable: using zero DUT1/polar motion/UT1-UTC. "+
+	logging.Logger().Warn("IERS EOP data unavailable: using zero DUT1/polar motion/UT1-UTC. "+
 		"Topocentric accuracy degraded to ~1 arcsec; UT1 ~ UTC (max error ~0.9 s). "+
 		"Call remote.EnableDownloads(..., remote.IERSFinals2000A) or pre-seed "+
 		"finals2000A.data for full accuracy.",

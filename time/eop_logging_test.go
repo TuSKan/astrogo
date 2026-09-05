@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/TuSKan/astrogo/internal/logging"
+	"github.com/TuSKan/astrogo/logging"
 )
 
 // TestEOPWarningIsAWarningNotProgress pins the level, which is the whole
@@ -67,7 +67,7 @@ func TestEOPWarningReachesTheDefaultLogger(t *testing.T) {
 
 	logging.Set(nil)
 
-	if !logging.Get().Enabled(t.Context(), slog.LevelWarn) {
+	if !logging.Logger().Enabled(t.Context(), slog.LevelWarn) {
 		t.Error("the default logger drops WARN, so an unconfigured caller would " +
 			"never learn that EOP were unavailable")
 	}

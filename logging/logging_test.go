@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/TuSKan/astrogo/internal/logging"
+	"github.com/TuSKan/astrogo/logging"
 )
 
 // TestDefaultKeepsWarningsAndDropsProgress pins the one decision in this
@@ -30,7 +30,7 @@ func TestDefaultKeepsWarningsAndDropsProgress(t *testing.T) {
 
 	logging.Set(nil) // start from the default
 
-	got := logging.Get()
+	got := logging.Logger()
 
 	if got == nil {
 		t.Fatal("Get returned nil, which it never may")
@@ -67,8 +67,8 @@ func TestSetRedirectsEverything(t *testing.T) {
 		Level: slog.LevelInfo,
 	})))
 
-	logging.Get().Info("downloading", "bytes", 42)
-	logging.Get().Warn("degraded", "mjd", 60000.0)
+	logging.Logger().Info("downloading", "bytes", 42)
+	logging.Logger().Warn("degraded", "mjd", 60000.0)
 
 	out := buf.String()
 
@@ -88,13 +88,13 @@ func TestSetNilRestoresTheDefault(t *testing.T) {
 
 	logging.Set(slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug})))
 
-	if !logging.Get().Enabled(t.Context(), slog.LevelInfo) {
+	if !logging.Logger().Enabled(t.Context(), slog.LevelInfo) {
 		t.Fatal("precondition: the installed logger should pass Info")
 	}
 
 	logging.Set(nil)
 
-	if logging.Get().Enabled(t.Context(), slog.LevelInfo) {
+	if logging.Logger().Enabled(t.Context(), slog.LevelInfo) {
 		t.Error("Set(nil) did not restore the default, which drops Info")
 	}
 }
@@ -107,7 +107,7 @@ func TestSilenceIsAvailable(t *testing.T) {
 
 	logging.Set(slog.New(slog.DiscardHandler))
 
-	if logging.Get().Enabled(t.Context(), slog.LevelError) {
+	if logging.Logger().Enabled(t.Context(), slog.LevelError) {
 		t.Error("a discard logger still reports Error as enabled; a caller " +
 			"cannot fully silence the library")
 	}
