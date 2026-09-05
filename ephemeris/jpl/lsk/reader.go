@@ -284,9 +284,19 @@ func parseSpiceDate(s string) (float64, error) {
 		return 0, fmt.Errorf("%w: %s", ErrInvalidMonth, monthStr)
 	}
 
-	// Simple JD calculation for 12:00:00 (standard for leapsecond dates in LSK)
-	// JD = 367*Y - (7*(Y + (M+9)/12))/4 + (275*M)/9 + D + 1721013.5
-	// This is valid for Gregorian calendar (post-1582).
+	// Julian Date at 00:00:00 UTC on the given calendar day, which is when a
+	// leap second takes effect and so what every DELTA_AT entry means.
+	//
+	// The trailing -32045.5 rather than -32045 is what does that: the standard
+	// formula yields the integer Julian Day Number, which is noon, and the
+	// half-day subtracts back to the preceding midnight. 1972-01-01 comes out
+	// 2441317.5, the canonical value naif0012.tls quotes in its own header.
+	//
+	// This comment used to say 12:00:00, which is what the formula gives
+	// *without* the half — the code has always computed midnight. leapTable
+	// depends on that, and TestLeapTableReadsMidnightAsTheDayItStarts pins it.
+	//
+	// Valid for the Gregorian calendar (post-1582).
 	a := (14 - month) / 12
 	y := year + 4800 - a
 	m := month + 12*a - 3
