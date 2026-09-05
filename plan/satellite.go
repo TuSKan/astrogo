@@ -7,6 +7,7 @@ import (
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
+	"github.com/TuSKan/astrogo/constants"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	mag "github.com/TuSKan/astrogo/magnitude"
@@ -169,6 +170,12 @@ func (s *Satellite) StaticMagnitude() (float64, bool) {
 	return s.stdMag, s.hasStdMag
 }
 
+// kmPerAU is the number of kilometres in one Astronomical Unit.
+//
+// var, not const: constants.IAU.AstronomicalUnit is a struct, and Go does not
+// permit selecting a struct field inside a constant expression.
+var kmPerAU = constants.IAU.AstronomicalUnit.Value / 1e3
+
 // defaultAtm is used for satellite pass prediction when no atmosphere is specified.
 var defaultAtm = atmosphere.Refraction{}
 
@@ -192,7 +199,6 @@ func LookAngle(prov eph.Provider, id eph.ID, ctx *coord.Context) (coord.AltAz, e
 	reduction := reducer.Reduce(st.Pos)
 
 	// The Reducer works in AU — convert topocentric distance to km.
-	const kmPerAU = 149597870.7
 	reduction.Observed.SetDist(reduction.Topocentric.Norm() * kmPerAU)
 
 	return reduction.Observed, nil

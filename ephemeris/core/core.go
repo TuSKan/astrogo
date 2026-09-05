@@ -14,6 +14,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/TuSKan/astrogo/constants"
 	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/vector"
 )
@@ -155,7 +156,11 @@ func (s State) Require(frame Frame, center Center) error {
 	return nil
 }
 
-const kmPerAU = 149597870.7
+// kmPerAU is the number of kilometres in one Astronomical Unit.
+//
+// var, not const: constants.IAU.AstronomicalUnit is a struct, and Go does not
+// permit selecting a struct field inside a constant expression.
+var kmPerAU = constants.IAU.AstronomicalUnit.Value / 1e3
 
 // Distance returns the geocentric distance in AU.
 func (s State) Distance() float64 { return s.Pos.Norm() }
