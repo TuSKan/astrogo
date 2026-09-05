@@ -38,7 +38,7 @@ func TestIsVisible(t *testing.T) {
 		t.Fatalf("Failed to create observatory: %v", err)
 	}
 
-	tm := time.NowUTC()
+	tm := fixedEpoch()
 
 	// Object at zenith (same Dec as Lat, Hour Angle 0)
 	// For simplicity, we'll just test the method exists and calls through.
