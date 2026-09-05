@@ -23,7 +23,7 @@ func TestPlanner(t *testing.T) {
 	planner, err := NewPlanner(site, constraints)
 	testutil.AssertNoError(t, err)
 
-	tm := time.NowUTC()
+	tm := fixedEpoch()
 
 	objs := []Observable{
 		NewStar("High", angle.Deg(0), angle.Deg(45)),
@@ -112,7 +112,7 @@ func TestObservableWindows_Grouping(t *testing.T) {
 	site, _ := NewSite("Test", loc)
 	obj := NewStar("T", angle.Zero(), angle.Zero())
 
-	start := time.NowUTC()
+	start := fixedEpoch()
 	step := 1 * time.Minute
 	end := start.Add(5 * time.Minute) // 6 samples: 0, 1, 2, 3, 4, 5
 
@@ -399,7 +399,7 @@ func TestObservableWindows_StepTooLarge(t *testing.T) {
 	site, _ := NewSite("Test", loc)
 	obj := NewStar("T", angle.Zero(), angle.Zero())
 
-	start := time.NowUTC()
+	start := fixedEpoch()
 	end := start.Add(6 * time.Hour)
 
 	// Step > 15min should return an error a caller can match via errors.Is
@@ -420,7 +420,7 @@ func TestObservableWindows_StepNotPositive(t *testing.T) {
 	site, _ := NewSite("Test", loc)
 	obj := NewStar("T", angle.Zero(), angle.Zero())
 
-	start := time.NowUTC()
+	start := fixedEpoch()
 	end := start.Add(6 * time.Hour)
 
 	_, err := ObservableWindows(obj, start, end, 0, site, Altitude{Threshold: angle.Deg(30)})

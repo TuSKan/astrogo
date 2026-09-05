@@ -308,7 +308,7 @@ func TestLegacyEquatorialHorizontalConsistency(t *testing.T) {
 
 func TestTransformNearPole(t *testing.T) {
 	// Observatory at North Pole
-	tm := time.NowUTC()
+	tm := fixedEpoch()
 
 	// Star at zenith from North Pole
 	locN, err := coord.NewGeodetic(angle.Deg(0), angle.Deg(90), 0)
@@ -344,7 +344,7 @@ func TestTransformBoundaryRA(t *testing.T) {
 		t.Fatalf("Failed to create geodetic site: %v", err)
 	}
 
-	tm := time.NowUTC()
+	tm := fixedEpoch()
 	ctx := coord.NewContext(tm, loc, atmosphere.StandardRefraction)
 
 	// Test RA 359.999 vs 0.001 should yield very similar results
@@ -372,7 +372,7 @@ func TestNegativeLongitude(t *testing.T) {
 		t.Fatalf("Failed to create geodetic site: %v", err)
 	}
 
-	tm := time.NowUTC()
+	tm := fixedEpoch()
 	star := coord.NewICRS(angle.Deg(0), angle.Deg(0))
 
 	ctx1 := coord.NewContext(tm, loc1, atmosphere.StandardRefraction)

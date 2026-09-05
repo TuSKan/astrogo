@@ -50,7 +50,7 @@ func assertFinite(t *testing.T, val float64, name string) {
 
 func TestReducer_Group1_GeometricConsistency(t *testing.T) {
 	site, _ := coord.NewGeodetic(angle.Deg(-70), angle.Deg(40), 100)
-	obsTime := time.NowUTC()
+	obsTime := fixedEpoch()
 	atmZero := atmosphere.Refraction{Pressure: 0}
 
 	vec := getTargetAtAltitude(site, obsTime, 40, 80)
@@ -70,7 +70,7 @@ func TestReducer_Group1_SiteDependence(t *testing.T) {
 	site2, _ := coord.NewGeodetic(angle.Deg(10), angle.Deg(0), 0) // Moved East
 	site3, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(10), 0) // Moved North
 
-	obsTime := time.NowUTC()
+	obsTime := fixedEpoch()
 	vec := getTargetAtAltitude(site1, obsTime, 40, 80)
 
 	r1 := coord.NewReducer(site1, obsTime, atmosphere.Refraction{Pressure: 0}).Reduce(vec)
@@ -85,7 +85,7 @@ func TestReducer_Group1_SiteDependence(t *testing.T) {
 
 func TestReducer_Group1_TimeDependence(t *testing.T) {
 	site, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(45), 0)
-	obsTime1 := time.NowUTC()
+	obsTime1 := fixedEpoch()
 	obsTime2 := obsTime1.Add(time.Hour)
 
 	vec := getTargetAtAltitude(site, obsTime1, 40, 80)
@@ -104,7 +104,7 @@ func TestReducer_Group1_TimeDependence(t *testing.T) {
 
 func TestReducer_Group2_ZeroPressure(t *testing.T) {
 	site, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(45), 0)
-	obsTime := time.NowUTC()
+	obsTime := fixedEpoch()
 
 	atmStandard := atmosphere.StandardRefraction
 	atmZero := atmosphere.StandardRefraction
@@ -128,7 +128,7 @@ func TestReducer_Group2_ZeroPressure(t *testing.T) {
 
 func TestReducer_Group2_RefractionRaisesAltitude(t *testing.T) {
 	site, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(45), 0)
-	obsTime := time.NowUTC()
+	obsTime := fixedEpoch()
 	atm := atmosphere.StandardRefraction
 
 	vec := getTargetAtAltitude(site, obsTime, 2, 10)
@@ -142,7 +142,7 @@ func TestReducer_Group2_RefractionRaisesAltitude(t *testing.T) {
 
 func TestReducer_Group2_RefractionWeakensAtZenith(t *testing.T) {
 	site, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(45), 0)
-	obsTime := time.NowUTC()
+	obsTime := fixedEpoch()
 	atm := atmosphere.StandardRefraction
 
 	reducer := coord.NewReducer(site, obsTime, atm)
@@ -186,7 +186,7 @@ func TestReducer_Group2_LowAltitudeGuard(t *testing.T) {
 
 func TestReducer_Group3_Dispersion(t *testing.T) {
 	site, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(45), 0)
-	obsTime := time.NowUTC()
+	obsTime := fixedEpoch()
 	atm := atmosphere.StandardRefraction
 
 	reducer := coord.NewReducer(site, obsTime, atm)
@@ -230,7 +230,7 @@ func TestReducer_Group3_Dispersion(t *testing.T) {
 func TestReducer_Group4_Semantics(t *testing.T) {
 	site, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(45), 0)
 	atm := atmosphere.StandardRefraction
-	obsTime := time.NowUTC()
+	obsTime := fixedEpoch()
 
 	vec := getTargetAtAltitude(site, obsTime, 2, 10)
 	pipeline := coord.NewReducer(site, obsTime, atm)
