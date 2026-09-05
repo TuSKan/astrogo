@@ -399,38 +399,23 @@ func (s EventSolver) solveVisibility(spec EventSpec, start, end time.Time) ([]Ev
 					return nil, err
 				}
 
-				// Calculate geometric altitude at the refined event time,
-				// using the same no-refraction atmosphere as the solver.
-				resCtx := coord.NewContext(resTime, spec.Observer.Location(), geomAtm)
-
-				var aa coord.AltAz
-
-				if mb, ok := spec.Target.(MovingBody); ok {
-					vec, err := mb.GeocentricVec(resTime)
-					if err != nil {
-						continue // Can't populate display fields reliably; skip this event
-					}
-
-					aa = resCtx.GeocentricToObserved(vec)
-				} else {
-					pos, err := spec.Target.Position(resTime)
-					if err != nil {
-						continue
-					}
-
-					aa, err = observedAltAz(spec.Target, resTime, resCtx, pos)
-					if err != nil {
-						continue
-					}
+				// Both altitudes, so the two fields mean what they are named.
+				// The solver works geometrically here — refraction is already
+				// baked into the threshold, per the USNO convention — so the
+				// geometric one is what Value is measured against, while
+				// Altitude reports what an observer would actually see.
+				geom, refr, ok := altitudesAt(spec, resTime, geomAtm)
+				if !ok {
+					continue // Can't populate display fields reliably; skip this event
 				}
 
 				events = append(events, Event{
 					Kind:              kind,
 					Time:              resTime,
-					Altitude:          aa.Alt(),
-					GeometricAltitude: aa.Alt(),
-					Azimuth:           aa.Az(),
-					Value:             aa.Alt().Degrees() - spec.Threshold.Degrees(),
+					Altitude:          refr.Alt(),
+					GeometricAltitude: geom.Alt(),
+					Azimuth:           geom.Az(),
+					Value:             geom.Alt().Degrees() - spec.Threshold.Degrees(),
 				})
 			}
 		}
@@ -487,25 +472,18 @@ func (s EventSolver) solveVisibility(spec EventSpec, start, end time.Time) ([]Ev
 					continue // Skip if solver fails
 				}
 
-				resCtx := coord.NewContext(resTime, spec.Observer.Location(), spec.Observer.Refraction())
-
-				pos, err := spec.Target.Position(resTime)
-				if err != nil {
+				geom, refr, ok := altitudesAt(spec, resTime, geomAtm)
+				if !ok {
 					continue // Can't populate display fields reliably; skip this event
-				}
-
-				aa, err := observedAltAz(spec.Target, resTime, resCtx, pos)
-				if err != nil {
-					continue
 				}
 
 				events = append(events, Event{
 					Kind:              EventTransit,
 					Time:              resTime,
-					Altitude:          aa.Alt(),
-					GeometricAltitude: aa.Alt(),
-					Azimuth:           aa.Az(),
-					Value:             aa.Alt().Degrees(),
+					Altitude:          refr.Alt(),
+					GeometricAltitude: geom.Alt(),
+					Azimuth:           refr.Az(),
+					Value:             refr.Alt().Degrees(),
 				})
 			}
 		}
@@ -684,13 +662,37 @@ func (s EventSolver) solveGeometry(spec EventSpec, start, end time.Time) ([]Even
 
 // Event represents a specific occurrence of a celestial target in the coord.
 type Event struct {
-	Time              time.Time
-	Kind              EventKind
-	Altitude          angle.Angle
+	Time time.Time
+	Kind EventKind
+
+	// Altitude is the refracted altitude — what an observer would see — at
+	// every event kind. It agrees with [IsObservable] and [GetDetails] for the
+	// same instant, so altitudes may be compared across event kinds.
+	//
+	// It was geometric at rise and set and refracted at transit until #156,
+	// with nothing in the type saying so, which made a rise altitude and a
+	// transit altitude two different quantities under one name.
+	Altitude angle.Angle
+
+	// GeometricAltitude is the unrefracted altitude, at every event kind.
+	//
+	// This is the quantity rise and set are solved against: their thresholds
+	// already fold in a constant horizon allowance for refraction, the USNO
+	// convention, so applying refraction again would double-count it. Value
+	// carries the residual against that threshold and is geometric for the
+	// same reason.
 	GeometricAltitude angle.Angle
-	Azimuth           angle.Angle
-	Value             float64
-	Observable        bool
+
+	// Azimuth is the same under both conventions — refraction changes an
+	// object's altitude, not its bearing.
+	Azimuth angle.Angle
+
+	// Value is the quantity the solver drove to zero: the geometric altitude
+	// less the threshold for rise, set and twilight; the refracted altitude
+	// for a transit; a separation in degrees for geometry events.
+	Value float64
+
+	Observable bool
 }
 
 func (e Event) String() string {
@@ -1299,4 +1301,66 @@ func NextFullMoon(start time.Time, provider eph.Provider) (*Event, error) {
 	}
 
 	return &events[0], nil
+}
+
+// altitudesAt evaluates a target at t under both atmospheres, returning the
+// geometric altitude and the refracted one.
+//
+// # Why an Event carries both
+//
+// Event.Altitude and Event.GeometricAltitude used to be assigned the same
+// value at both construction sites, so one told a caller nothing the other
+// did. Worse, which quantity that shared value held depended on the event
+// kind: rise and set were evaluated under a no-refraction atmosphere, because
+// the solver works against a geometric threshold with refraction already baked
+// in per the USNO convention, while transit used the observer's real
+// refraction. Measured for the Moon, that made Event.Altitude 0.167 degrees
+// lower than IsObservable and GetDetails reported at rise and set, and exactly
+// equal at transit — so comparing a rise altitude against a transit altitude
+// was comparing two different quantities, with nothing in the type saying so.
+//
+// Computing both here costs a second coord.NewContext per event. Events are
+// refined candidates rather than samples — a handful per target per day, well
+// outside the solver loop — so the Apco13 solve is paid a few times, not per
+// bisection step.
+//
+// ok is false when the target cannot be evaluated at t, which the callers
+// treat as "skip this event" rather than failing the whole solve.
+func altitudesAt(spec EventSpec, t time.Time, geomAtm atmosphere.Refraction) (geom, refr coord.AltAz, ok bool) {
+	at := func(atm atmosphere.Refraction) (coord.AltAz, bool) {
+		ctx := coord.NewContext(t, spec.Observer.Location(), atm)
+
+		if mb, isMoving := spec.Target.(MovingBody); isMoving {
+			vec, err := mb.GeocentricVec(t)
+			if err != nil {
+				return coord.AltAz{}, false
+			}
+
+			return ctx.GeocentricToObserved(vec), true
+		}
+
+		pos, err := spec.Target.Position(t)
+		if err != nil {
+			return coord.AltAz{}, false
+		}
+
+		aa, err := observedAltAz(spec.Target, t, ctx, pos)
+		if err != nil {
+			return coord.AltAz{}, false
+		}
+
+		return aa, true
+	}
+
+	geom, ok = at(geomAtm)
+	if !ok {
+		return coord.AltAz{}, coord.AltAz{}, false
+	}
+
+	refr, ok = at(spec.Observer.Refraction())
+	if !ok {
+		return coord.AltAz{}, coord.AltAz{}, false
+	}
+
+	return geom, refr, true
 }
