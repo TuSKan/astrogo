@@ -74,4 +74,48 @@
 // changes for a caller that wants EOP data. A program that imports neither
 // degrades to zero EOP and links no storage backend at all, which is the
 // difference between a 2.5 MB binary and a 19.4 MB one.
+//
+// # The clock you are given
+//
+// [NowUTC] and [Now] read the host's clock, and around a leap second that clock
+// may be deliberately wrong by up to 0.5 s for up to 24 hours. Nothing in this
+// package, or in any library, can detect it.
+//
+// The cause is leap smearing: rather than repeat or skip a second, an NTP
+// provider spreads the step over hours by running the clock slightly fast or
+// slow. Every major provider does it differently (Levine, Tavella & Milton
+// 2023, Metrologia 60 014001, table 2):
+//
+//	Google      frequency adjustment for the 24 h before the leap second
+//	Facebook    frequency adjustment for the 18 h after
+//	Alibaba     symmetric, 12 h either side
+//	Microsoft   frequency halved for the second before
+//
+// All of them, in that paper's words, "have an error on the order of ±0.5 s
+// during the adjustment period", and providers "generally do not indicate which
+// method is being used". So a smeared timestamp is not merely offset — it is
+// offset by an amount that depends on whose NTP server the host happened to be
+// using, and the host cannot say which.
+//
+// For this library 0.5 s is not a rounding error. It is 0.3 arcsec of lunar
+// motion, 7.5 arcsec of Earth rotation, and 3.8 km of ISS ground track: far
+// above the accuracy the rest of this package works to, and far below the
+// threshold at which anything looks wrong. The result is a plausible epoch,
+// silently off, on the days around a leap second.
+//
+// What to do about it, in order of preference:
+//
+//   - Pass an explicit epoch. A [Time] built from [Date] or [FromJD] never
+//     touches the host clock and so is never smeared. Anything meant to be
+//     reproducible should be doing this regardless.
+//   - Take time from PTP (IEEE 1588) rather than NTP. PTP distributes TAI plus
+//     the current UTC offset, so there is no step to smear.
+//   - If neither is possible and the work spans a leap second, treat epochs
+//     from that window as good to 0.5 s rather than to the microsecond, and
+//     say so in whatever the results feed.
+//
+// This is not a defect this package can fix — the host clock is the host's —
+// and it is worth knowing rather than discovering. The window is also
+// shrinking: the most recent leap second was 2016-12-31, none is currently
+// scheduled, and the 2022 CGPM resolution abandons them by 2035.
 package time
