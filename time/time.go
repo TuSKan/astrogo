@@ -673,7 +673,17 @@ func (t Time) AddDays(d float64) Time {
 // proleptic Gregorian calendar including negative (astronomical) years.
 // Year 0 = 1 BC, year -1 = 2 BC, etc.
 // The timezone location is preserved for display purposes.
+//
+// A second of 60 — the label UTC gives an inserted leap second — cannot be
+// represented and is normalised onto the following midnight, one second later
+// than the instant asked for. That is reported through [logging] rather than
+// returned, since this constructor has no error to return; see
+// leapsecond_alias.go for why the type cannot hold it.
 func Date(year int, month time.Month, day, hour, minute, second, nanosecond int, loc *time.Location) Time {
+	if second >= 60 {
+		warnLeapSecondAliased(year, month, day, hour, minute, second, loc)
+	}
+
 	// For years within Go's time.Time range, delegate to FromGo which
 	// handles timezone offsets exactly.
 	if year >= 1 && year <= 9999 {
