@@ -146,9 +146,12 @@ What ships now:
 - [x] Four named presets carrying their own radiative transfer, so a model cannot be
       silently evaluated under another's transport
 - [x] A dataset tier (`skybrightness/dataset`) that is the only part permitted to do I/O
-- [ ] **Limiting magnitude returns when Phases 2–3 make a defensible one possible.** It was
-      removed rather than kept, because a limiting magnitude derived from a wrong spectrum
-      is a confident number rather than a useful one
+- [x] **Limiting magnitude has returned, defensibly.** It was removed rather than kept,
+      because one derived from a wrong spectrum is a confident number rather than a useful
+      one. `skybrightness/plan.Imaging` now implements `plan.SkyDepth` over the spectral
+      engine, and needs no photometric zero point: the same estimate yields a surface
+      brightness and a detector background from the same stored spectrum through the same
+      instrument, and that pair *is* the calibration
 
 **Inspiration:** GAMBONS (Masana et al. 2021, 2024), Kocifaj's skyglow series,
 Kieffer & Stone (2005), Leinert et al. (1998), ESO SkyCalc.

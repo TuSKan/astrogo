@@ -7,4 +7,4 @@ pr: 188
 `plan/events.go` credited SOFA for a rise/set threshold that hardcodes the conventional
 34′; `.golangci.yml` still described a go-cloud fork `replace` that `go.mod` has not
 carried since the remote rebuild; and the `cams`, `kepler` and `xmatch` package synopses
-were paragraphs, so pkg.go.dev rendered their directory listings as walls.
+were paragraphs, so pkg.go.dev rendered their directory listings as walls. The ROADMAP also still listed limiting magnitude as unbuilt while `skybrightness/plan.Imaging` implements it.
