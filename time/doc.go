@@ -69,6 +69,17 @@
 // [EOPSource]. [Time.UT1] is the exception and reports the failure instead of
 // degrading.
 //
+// That 0.9 s is borrowed, not intrinsic. It is the bound leap seconds keep
+// |UT1−UTC| inside, and CGPM Resolution 4 (2022) commits to abandoning leap
+// seconds by 2035; after that UT1−UTC grows without bound, and the zero-EOP
+// degradation grows with it. Levine, Tavella & Milton (2023) estimate that a
+// tolerance of one minute would mean an adjustment roughly once a century.
+//
+// The data path is unaffected: this package reads full UT1−UTC from
+// finals2000A, not the 0.1 s-resolution DUT1 a time signal broadcasts, so it
+// has no 0.9 s assumption of its own to unlearn. Only the stated bound goes
+// stale, and only for the caller who has no EOP data at all.
+//
 // Where those bytes come from is supplied by a registered [EOPLoader], not
 // reached for by this package. Importing astrogo/remote registers one — as
 // any program granting download consent necessarily does — so nothing
