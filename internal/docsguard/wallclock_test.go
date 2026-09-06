@@ -30,6 +30,7 @@ var wallClockAllowed = map[string]string{
 	"skybrightness/gambons_allsky_test.go":                  "measures elapsed time for its own report",
 	"time/internal/iers/fetch_test.go":                      "the fetch cooldown is defined relative to now",
 	"time/time_test.go":                                     "TestNowUTC tests NowUTC",
+	"time/reexport_test.go":                                 "Since, Until and Sleep are defined relative to now; the present is the subject",
 }
 
 // TestNoUndeclaredWallClockTests keeps tests from quietly depending on when
