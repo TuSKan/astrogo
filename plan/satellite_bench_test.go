@@ -54,7 +54,10 @@ func BenchmarkLookAngle(b *testing.B) {
 // 30-second sampling across a six-hour window, which is 720 look angles plus
 // the root-finding refinement on each crossing.
 //
-// At one Apco13 solve per sample this is the floor; it used to be two.
+// It used to be two Apco13 solves per sample, then one (#111/#165), and is now
+// six for the whole window — one per hour of ctxRefresh. Measured on an
+// i9-11980HK: 201 ms before the Context cache, 96 ms after. What is left is
+// SGP4 propagation, which is the work this function exists to do.
 func BenchmarkSatellitePasses_6h(b *testing.B) {
 	sat, site := benchISS(b)
 
