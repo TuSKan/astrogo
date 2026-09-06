@@ -130,4 +130,32 @@
 // and it is worth knowing rather than discovering. The window is also
 // shrinking: the most recent leap second was 2016-12-31, none is currently
 // scheduled, and the 2022 CGPM resolution abandons them by 2035.
+//
+// # The second you cannot express
+//
+// [Date] is the escape from a smeared clock, and it has a boundary of its own.
+// A [Time] holds a two-part Julian Date whose day is 86400 seconds long, so
+// there is no room in it for the second UTC labels 23:59:60. Asked for one,
+// [Date] normalises it onto the following midnight:
+//
+//	Date(2016, 12, 31, 23, 59, 60, 0, UTC) == Date(2017, 1, 1, 0, 0, 0, 0, UTC)
+//
+// The inserted second is one second wide in reality and zero seconds wide in
+// this type. That is not only a labelling problem, because ΔAT differs across
+// the boundary — IERS and gofa both give the inserted second the *old* value,
+// 36 rather than 37 — so an aliased instant is converted with the wrong offset
+// and lands a full second away.
+//
+// Twenty-seven such seconds exist in all of history, and none since 2016. What
+// makes them worth a paragraph is not their number but that the loss used to
+// be silent: a plausible epoch, one second wrong, with nothing reported.
+// [Date] now emits a [logging] warning for any second of 60 or more, saying
+// whether the day in question carried a real leap second or whether the
+// timestamp names an instant that never existed at all.
+//
+// If you have data with real 23:59:60 timestamps in it, hold those instants in
+// TAI, which has no leap seconds to label and no ambiguity across the step.
+// SOFA's own answer is different — iauDtf2d lets the UTC day run to 86401
+// seconds — and adopting it here would touch every conversion in this package.
+// That has not been done; see https://github.com/TuSKan/astrogo/issues/144.
 package time
