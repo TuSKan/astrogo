@@ -303,12 +303,65 @@ func parseTLENumerics(line1, line2 string) (meanMotion float64, epoch time.Time,
 			return 0, time.Time{}, fmt.Errorf("%w: %s is %q, which is not a number", ErrMalformedTLE, f.name, f.value)
 		}
 
-		if f.name == "mean motion" {
+		switch f.name {
+		case "mean motion":
 			meanMotion = v
+		case "epoch day":
+			if err := checkEpochDay(line1, v); err != nil {
+				return 0, time.Time{}, err
+			}
 		}
 	}
 
 	return meanMotion, tleEpoch(line1), nil
+}
+
+// checkEpochDay refuses a day-of-year the backend would walk off the end of.
+//
+// days2mdhms subtracts month lengths from the day of year to find the calendar
+// date, and its loop is guarded by `i < 22` against a twelve-element array:
+//
+//	lmonth := [12]int{31, 28, 31, ...}
+//	for dayofyr > inttemp+float64(lmonth[int(i-1)]) && i < 22 {
+//
+// Once the year is used up, i reaches 13 and lmonth[12] panics. Any day of year
+// past the end of the year does it -- found by FuzzValidateTLE within two
+// seconds, on an element set that is 69 columns, checksum-valid, and numeric in
+// every field, so nothing else in this package had reason to turn it away. The
+// crasher is committed under testdata/fuzz.
+//
+// This is the second crash path in the same dependency that astrogo has had to
+// guard rather than use: see ValidateTLE's note on log.Fatal. Both are recorded
+// on #120, which asks whether to keep it.
+//
+// The bound mirrors the backend's own leap-year test (year%4 == 0) rather than
+// the Gregorian rule, because the point is to predict what that code will do.
+// Within a TLE's two-digit year window -- 1957 to 2056 -- the two agree anyway,
+// since 1900 and 2100 are both out of range.
+func checkEpochDay(line1 string, doy float64) error {
+	yy, err := strconv.Atoi(strings.TrimSpace(line1[18:20]))
+	if err != nil {
+		return fmt.Errorf("%w: epoch year is %q, which is not an integer", ErrMalformedTLE, line1[18:20])
+	}
+
+	year := 2000 + yy
+	if yy >= 57 {
+		year = 1900 + yy
+	}
+
+	lastDay := 365.0
+	if year%4 == 0 {
+		lastDay = 366.0
+	}
+
+	// days2mdhms floors the value first, so a fractional day within the last
+	// day of the year is fine; 1.0 is midnight on January 1st.
+	if day := math.Floor(doy); day < 1 || day > lastDay {
+		return fmt.Errorf("%w: epoch day %g is not a day of %d, which has %g",
+			ErrMalformedTLE, doy, year, lastDay)
+	}
+
+	return nil
 }
 
 // tleEpoch reconstructs the element set's epoch from line 1's two-digit year

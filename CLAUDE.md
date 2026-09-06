@@ -36,15 +36,30 @@ Tests are partitioned by build tag — the default `go test ./...` runs only fas
 
 ## Fuzzing
 
-`ephemeris/jpl/spk/fuzz_test.go` fuzzes the hand-rolled DAF/SPK binary parser against corrupted, truncated, and adversarial kernel bytes — the property under test is "never panics or hangs on attacker-influenceable input," not correctness (that's covered elsewhere by `TestSPKReader`/`TestEvaluateType21`). Its seed corpus (`f.Add(...)` literals only — no checked-in binary fixtures) runs as an ordinary test under `go test ./...`, so it's part of every CI run for free. Extended fuzzing beyond the seed corpus is a manual, periodic step, not a CI gate — run it locally when touching `ephemeris/jpl/spk/reader.go`:
+Every parser that eats bytes from someone else's server or a user's disk is fuzzed. The property under test is "never panics or hangs on attacker-influenceable input," not correctness (that's covered by ordinary tests elsewhere). Seed corpora are `f.Add(...)` literals only — no checked-in binary fixtures — so they run as ordinary tests under `go test ./...` and are part of every CI run for free. Extended fuzzing beyond the seed corpus is a manual, periodic step, not a CI gate — run it when touching a parser.
+
+Six packages carry targets:
+
+| package | targets | what the bytes are |
+| --- | --- | --- |
+| `ephemeris/jpl/spk` | `FuzzNewReaderReadSummaries`, `FuzzEvaluateSegment`, `FuzzReadDoubles` | downloaded SPK kernels |
+| `fits` | `FuzzParseCard`, `FuzzReadHeader`, `FuzzRead` | **arbitrary user files** — the only place astrogo opens one |
+| `ephemeris/satellite` | `FuzzValidateTLE`, `FuzzNewFromTLE` | CelesTrak or user-supplied element sets |
+| `catalog/norad` | `FuzzGPToTLE` | CelesTrak JSON, through `ToTLE` into SGP4 |
+| `internal/votable` | `FuzzRead` | SIMBAD / VizieR / Gaia / MAST TAP responses |
+| `time/internal/iers` | `FuzzParseFinals2000A` | the IERS bulletin |
+
+**Always pass `-fuzzminimizetime`.** Its default is 60s *per interesting input*, and minimization executions are not counted in `execs`, so a target with expensive executions appears to freeze at a constant count while the engine is in fact busy. On `fits.ReadHeader` the difference measured 5,966 executions in 76s against 121,274 in 60s — twenty times the coverage from one flag. This cost #140 a long investigation; do not omit it.
 
 ```bash
-go test -run=^$ -fuzz=FuzzNewReaderReadSummaries -fuzztime=60s ./ephemeris/jpl/spk/
-go test -run=^$ -fuzz=FuzzEvaluateSegment -fuzztime=60s ./ephemeris/jpl/spk/
-go test -run=^$ -fuzz=FuzzReadDoubles -fuzztime=60s ./ephemeris/jpl/spk/
+go test -run=^$ -fuzz=FuzzNewReaderReadSummaries -fuzztime=60s -fuzzminimizetime=5s ./ephemeris/jpl/spk/
+go test -run=^$ -fuzz=FuzzReadHeader            -fuzztime=60s -fuzzminimizetime=5s ./fits/
+go test -run=^$ -fuzz=FuzzValidateTLE           -fuzztime=60s -fuzzminimizetime=5s ./ephemeris/satellite/
 ```
 
-Any crasher Go writes to `testdata/fuzz/` should be committed — that's the one place a small binary fixture is legitimate here, since it's a regression test for a bug the fuzzer found, not a data source.
+Throughput varies by three orders of magnitude across these targets — `internal/votable` runs at ~456,000 exec/s, `fits.Read` at ~4 — so judge a run by executions, not by wall time. The `fits` figure is the allocation amplification in #185, not a slow parser.
+
+Any crasher Go writes to `testdata/fuzz/` should be committed — that's the one place a small binary fixture is legitimate here, since it's a regression test for a bug the fuzzer found, not a data source. Two are checked in: an out-of-range TLE epoch day that panicked inside the SGP4 backend, and a VOTable with rows but no field declarations.
 
 ## Embedded data
 
