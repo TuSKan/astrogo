@@ -36,6 +36,7 @@ type config struct {
 	minInterval time.Duration
 	authScheme  string
 	authToken   string
+	retryPolicy RetryPolicy
 }
 
 // Option customizes a NewClient call.
@@ -103,6 +104,12 @@ func WithMinInterval(d time.Duration) Option {
 type Client struct {
 	rc *resty.Client
 
+	// retryPolicy is consulted twice: by resty, to decide whether to retry,
+	// and by body, to decide whether a final failure is worth reporting as
+	// one that was retried. Holding it here keeps those two answers the same
+	// policy rather than two copies of a rule.
+	retryPolicy RetryPolicy
+
 	// mu serialises paced requests and guards last. Both are unused when no
 	// minimum interval was asked for, so an ordinary client pays nothing.
 	minInterval time.Duration
@@ -120,7 +127,12 @@ func NewClient(id remote.EndpointID, opts ...Option) (*Client, error) {
 		return nil, fmt.Errorf("%w: %q", remote.ErrUnknownEndpoint, id)
 	}
 
-	cfg := config{timeout: ep.Timeout, retries: defaultRetries, userAgent: defaultUserAgent}
+	cfg := config{
+		timeout:     ep.Timeout,
+		retries:     defaultRetries,
+		userAgent:   defaultUserAgent,
+		retryPolicy: DefaultRetryPolicy,
+	}
 	for _, opt := range opts {
 		opt(&cfg)
 	}
@@ -130,26 +142,22 @@ func NewClient(id remote.EndpointID, opts ...Option) (*Client, error) {
 	}
 
 	// resty's "default conditions" cover only transport, header and URL
-	// errors — status-based retrying is opt-in, so the three conditions
-	// astrogo wants are added explicitly, using resty's own predicates
-	// rather than a hand-rolled copy: a rate limit, any 5xx other than
-	// 501 Not Implemented, and a status of zero (no response at all). A
-	// 4xx is the caller's own request and is never retried.
+	// errors — status-based retrying is opt-in, so the condition has to be
+	// added explicitly. One condition, delegating to the client's
+	// [RetryPolicy]; [DefaultRetryPolicy] is the rule that used to live here
+	// as three of resty's own predicates, and states the same thing in terms
+	// a caller can read, override and defer to.
 	rc := resty.New().
 		SetTimeout(cfg.timeout).
 		SetRetryCount(cfg.retries).
 		SetHeader("User-Agent", cfg.userAgent).
-		AddRetryConditions(
-			resty.RetryConditionStatusTooManyRequests,
-			resty.RetryConditionStatus5XX,
-			resty.RetryConditionStatusZero,
-		)
+		AddRetryConditions(retryCondition(cfg.retryPolicy))
 
 	if cfg.authToken != "" {
 		rc = rc.SetAuthScheme(cfg.authScheme).SetAuthToken(cfg.authToken)
 	}
 
-	return &Client{rc: rc, minInterval: cfg.minInterval}, nil
+	return &Client{rc: rc, minInterval: cfg.minInterval, retryPolicy: cfg.retryPolicy}, nil
 }
 
 // Close releases the client's idle connections. A Client is usually held
@@ -183,7 +191,7 @@ func (c *Client) Get(ctx context.Context, id remote.EndpointID, path string, que
 		SetResponseDoNotParse(true).
 		Get(full)
 
-	return body(resp, err)
+	return c.body(resp, err)
 }
 
 // GetJSON issues a GET and decodes the JSON response into out, closing the
@@ -225,7 +233,7 @@ func (c *Client) PostForm(ctx context.Context, id remote.EndpointID, path string
 		SetResponseDoNotParse(true).
 		Post(full)
 
-	return body(resp, err)
+	return c.body(resp, err)
 }
 
 // PostJSON marshals payload as the JSON request body and returns the raw
@@ -254,7 +262,7 @@ func (c *Client) PostJSON(ctx context.Context, id remote.EndpointID, path string
 		SetResponseDoNotParse(true).
 		Post(full)
 
-	return body(resp, err)
+	return c.body(resp, err)
 }
 
 // pace blocks until this client is allowed to make its next request.
@@ -319,7 +327,7 @@ func requestURL(id remote.EndpointID, path string) (string, error) {
 // body turns a resty exchange into the (stream, error) pair every method
 // here returns. A non-2xx becomes an *HTTPError carrying the body, since
 // these services describe their failures in it.
-func body(resp *resty.Response, err error) (io.ReadCloser, error) {
+func (c *Client) body(resp *resty.Response, err error) (io.ReadCloser, error) {
 	if err != nil {
 		if resp != nil && resp.Body != nil {
 			_ = resp.Body.Close()
@@ -332,8 +340,22 @@ func body(resp *resty.Response, err error) (io.ReadCloser, error) {
 		defer func() { _ = resp.Body.Close() }()
 
 		detail, _ := io.ReadAll(io.LimitReader(resp.Body, maxErrorBody))
+		httpErr := &HTTPError{StatusCode: resp.StatusCode(), Body: string(detail)}
 
-		return nil, &HTTPError{StatusCode: resp.StatusCode(), Body: string(detail)}
+		// A final status the policy would have retried means the retries ran
+		// out — or were disabled — rather than that the request was wrong.
+		// Marking it lets a caller tell "the service was busy and we gave up"
+		// from "you asked for something that is not there", which are both
+		// non-2xx and only one of which is worth trying again later.
+		//
+		// The wrapping goes ErrRetriable first so errors.As still finds the
+		// *HTTPError underneath, and every existing caller that type-asserts
+		// for the status keeps working.
+		if c.retryPolicy != nil && c.retryPolicy(attemptOf(resp, nil)) {
+			return nil, fmt.Errorf("%w: %w", remote.ErrRetriable, httpErr)
+		}
+
+		return nil, httpErr
 	}
 
 	return resp.Body, nil
