@@ -150,10 +150,17 @@ func logEOPUnavailable(mjd float64) {
 	// sentences of prose: that is what slog is for, it keeps the line greppable
 	// when a caller ships JSON, and the default text handler still prints every
 	// attribute.
+	// The 0.9 s is not a property of this code. It is the bound leap seconds
+	// keep |UT1-UTC| inside, and CGPM Resolution 4 (2022) commits to abandoning
+	// leap seconds by 2035 -- after which UT1-UTC grows without bound and this
+	// figure goes stale. Levine, Tavella & Milton (2023) estimate that a
+	// 1-minute tolerance would mean an adjustment roughly once a century, so
+	// the degradation this warning describes gets slowly and permanently worse
+	// from 2035 rather than staying at 0.9 s. See #147.
 	logging.Warn("EOP unavailable, using zero DUT1 and polar motion",
 		"mjd", mjd,
 		"topocentric_error", "~1 arcsec",
-		"ut1_error", "~0.9 s",
+		"ut1_error", "~0.9 s until leap seconds end in 2035, unbounded after",
 		"remedy", "remote.EnableDownloads(0, remote.IERSFinals2000A) or pre-seed finals2000A.data")
 }
 
