@@ -62,13 +62,13 @@ linters:
       disabled-checks:
         - captLocal   # IAU photometric notation (H, G, R, M1, M2)
     gomoddirectives:
-      # remote/file is deliberately built against the user's own go-cloud
-      # fork (github.com/TuSKan/go-cloud), which carries SFTP/multipart
-      # upload/HTTP-driver work not yet merged upstream — this replace
-      # directive is the whole point of that architecture, not a
-      # workaround to remove.
-      replace-allow-list:
-        - gocloud.dev
+      # No replace directives, and none allowed. The go-cloud fork this used to
+      # permit was dropped when remote was rebuilt over gocloud-ext's published
+      # modules; go.mod has carried no replace since. Leaving gocloud.dev on the
+      # allow-list would quietly re-permit a fork the architecture no longer
+      # needs, so the list is empty rather than absent — an empty list still
+      # refuses everything, and says so on purpose.
+      replace-allow-list: []
     gomodguard_v2:
       local-replace-directives: true
 

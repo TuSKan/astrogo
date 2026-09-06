@@ -1,8 +1,10 @@
-// Package kepler provides a lightweight, network-free alternative to
-// SPK-kernel-backed ephemerides: propagating a position and velocity
-// directly from classical heliocentric osculating orbital elements
-// (semi-major axis, eccentricity, inclination, ascending node, argument
-// of periapsis, mean anomaly) via analytic two-body Keplerian motion.
+// Package kepler propagates a position and velocity from classical orbital
+// elements, with no kernel and no network.
+//
+// It is the lightweight alternative to SPK-kernel-backed ephemerides: analytic
+// two-body Keplerian motion from a body's own heliocentric osculating elements
+// (semi-major axis, eccentricity, inclination, ascending node, argument of
+// periapsis, mean anomaly).
 //
 // [Provider] satisfies [github.com/TuSKan/astrogo/ephemeris/core.Provider]
 // exactly like the SPK-kernel-backed providers in ephemeris/jpl, so a
