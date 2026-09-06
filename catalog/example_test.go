@@ -2,53 +2,76 @@ package catalog_test
 
 import (
 	"context"
-	"testing"
+	"errors"
+	"fmt"
+	"log"
 
-	"github.com/TuSKan/astrogo/angle"
-	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/catalog"
-	"github.com/TuSKan/astrogo/coord"
-	"github.com/TuSKan/astrogo/plan"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/catalog/resolve"
 )
 
-// TestIntegration demonstrates how to use the catalog system
-// to resolve a celestial target from a remote provider and seamlessly
-// pass its coordinates into observing planner capabilities.
-func TestIntegration(t *testing.T) {
-	// 2. Perform a live query to resolve the target mathematically
-	// We'll search for the Andromeda Galaxy (M31)
+// The task this package exists for: turn a name someone typed into a target
+// with coordinates, by asking the catalogues that might know.
+//
+// The three-way switch below is the part worth copying. Resolve returning a
+// typed sentinel rather than a bare error is what lets a caller tell "the
+// catalogues answered, and the answer is no" from "the catalogues could not be
+// reached" — and treating the second as the first turns an outage into a
+// silently empty sky.
+//
+// The query here is one no catalogue can resolve, which keeps the example
+// offline and therefore executable. A real one — "M31" — takes exactly the same
+// path.
+func Example() {
 	resolver := catalog.NewResolver(catalog.SIMBAD)
 
-	andromeda, err := resolver.Resolve(context.Background(), "M31")
-	if err != nil {
-		t.Skipf("Skipping integration test — cannot reach SIMBAD: %v", err)
+	target, err := resolver.Resolve(context.Background(), "")
+
+	switch {
+	case errors.Is(err, resolve.ErrNotFound):
+		// Answered, and the answer is no. An ordinary negative.
+		fmt.Println("no such object")
+
+	case errors.Is(err, resolve.ErrAmbiguous):
+		// Answered, and the answer is "which one?". Narrow the query.
+		fmt.Println("name matches several objects")
+
+	case err != nil:
+		// NOT an answer. Unreachable service, malformed response, cancelled
+		// context. This is the branch that must not be folded into the first.
+		fmt.Println("could not ask:", err)
+
+	default:
+		fmt.Printf("%s at RA %.4f°, Dec %.4f°\n",
+			target.Name, target.Coord.RA().Degrees(), target.Coord.Dec().Degrees())
 	}
 
-	t.Logf("Resolved Target: %s via %s", andromeda.Name, andromeda.Catalog)
-	t.Logf("Coordinates (ICRS): %s\n", andromeda.Coord)
+	// Output:
+	// no such object
+}
 
-	// 3. Integrate resolved catalog data into observational computations
-	// Let's create an Observatory on Earth (e.g. at Mauna Kea)
-	loc, _ := coord.NewGeodetic(angle.Deg(-155.4681), angle.Deg(19.8206), 4205.0)
-
-	obs, err := plan.NewSite("Mauna Kea", loc)
+// What a provider can do beyond resolving a name is an optional interface
+// rather than a method on [catalog.Provider], so asking is a type assertion.
+// That is how a caller finds out up front instead of by way of ErrUnsupported.
+//
+// Constructing a provider and interrogating its interfaces is entirely local,
+// so this runs offline too; only the queries themselves need a network.
+func ExampleNewProvider() {
+	provider, err := catalog.NewProvider(catalog.SIMBAD)
 	if err != nil {
-		t.Fatalf("Failed to create site: %v", err)
+		log.Fatalf("NewProvider: %v", err)
 	}
 
-	// We calculate at a specific time (e.g. 2026-04-06 00:00:00 UTC)
-	obsTime := time.Date(2026, 4, 6, 0, 0, 0, 0, time.LocationUTC)
+	fmt.Println("provider:", provider.Name())
 
-	// Compute target's altitude and azimuth properties from the Observatory at that time
-	ctx := coord.NewContext(obsTime, obs.Location(), atmosphere.StandardRefraction)
+	_, cone := provider.(resolve.ConeSearcher)
+	_, bright := provider.(resolve.BrightObjectSearcher)
 
-	altaz, err := ctx.ICRSToAltAz(andromeda.Coord)
-	if err != nil {
-		t.Fatalf("Transform error: %v", err)
-	}
+	fmt.Println("cone search:  ", cone)
+	fmt.Println("bright browse:", bright)
 
-	t.Logf("At %v (UTC), from %s:", obsTime, obs.Name())
-	t.Logf("M31 Altitude: %.4f°", altaz.Alt().Degrees())
-	t.Logf("M31 Azimuth:  %.4f°", altaz.Az().Degrees())
+	// Output:
+	// provider: simbad
+	// cone search:   false
+	// bright browse: true
 }

@@ -43,11 +43,27 @@ const (
 	NORAD
 )
 
+// Sentinels, aliased from resolve rather than redeclared.
+//
+// They used to be separate errors.New values carrying the same text, which
+// made errors.Is(err, resolve.ErrNotFound) false for an error this package
+// returned — while printing "target not found" either way, so nothing about
+// the message gave it away.
+//
+// That matters because [Provider] is itself an alias for [resolve.Provider],
+// and that interface's documentation is written entirely in terms of
+// resolve.ErrNotFound: a caller who reads the contract and follows it lands in
+// their "the catalogues could not be reached" branch for an object that simply
+// does not exist. Inverting #102 exactly — an ordinary negative read as an
+// outage instead of the other way round.
+//
+// Sharing the values makes errors.Is true against either spelling, so existing
+// code using catalog.ErrNotFound keeps working.
 var (
 	// ErrNotFound is returned when no catalog provider can resolve a query.
-	ErrNotFound = errors.New("target not found")
+	ErrNotFound = resolve.ErrNotFound
 	// ErrAmbiguous is returned when a query matches multiple targets.
-	ErrAmbiguous = errors.New("ambiguous target name")
+	ErrAmbiguous = resolve.ErrAmbiguous
 )
 
 // Target and related types are re-exported from the resolve package.
