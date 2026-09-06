@@ -163,6 +163,7 @@ func TestDurationHelpersDelegate(t *testing.T) {
 	// Real but negligible: enough to prove the call reaches the standard
 	// library, short enough not to slow the suite.
 	start := time.Now()
+
 	time.Sleep(time.Millisecond)
 
 	if elapsed := time.Since(start); elapsed <= 0 {
