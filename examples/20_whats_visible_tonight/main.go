@@ -36,6 +36,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -140,8 +141,17 @@ func main() {
 	fmt.Println("does real network queries (SIMBAD/OpenNGC/SBDB) and, for any")
 	fmt.Println("qualifying minor body, a real JPL Horizons ephemeris fetch...")
 
+	// A partial answer is still an answer: VisibleTonight skips a candidate
+	// whose ephemeris it cannot fetch rather than failing the night, and
+	// reports what it skipped as an ErrIncomplete. Everything else it can
+	// return is fatal and comes with no results, so this example prints the
+	// warning and carries on with the sky it did get.
 	results, err := plan.VisibleTonight(ctx, site, night, magLimit, sources, planetProvider)
-	if err != nil {
+
+	switch {
+	case errors.Is(err, plan.ErrIncomplete):
+		fmt.Println("\n" + colorize(ansiYellow, fmt.Sprintf("Note: this list is not exhaustive — %v", err)))
+	case err != nil:
 		log.Fatalf("VisibleTonight: %v", err)
 	}
 

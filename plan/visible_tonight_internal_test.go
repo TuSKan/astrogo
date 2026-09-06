@@ -51,7 +51,7 @@ func TestGatherPlanetaryMoonsSkipsWithoutDownloadConsent(t *testing.T) {
 	remote.DisableDownloads(remote.NAIFSPK)
 	remote.SetDataDir(testutil.FileURL(t, t.TempDir()))
 
-	candidates, providers := gatherPlanetaryMoons(context.Background(), time.Date(2026, time.August, 1, 0, 0, 0, 0, time.LocationUTC), 30)
+	candidates, providers := gatherPlanetaryMoons(context.Background(), time.Date(2026, time.August, 1, 0, 0, 0, 0, time.LocationUTC), 30, &skips{})
 
 	if len(candidates) != 0 {
 		t.Errorf("expected no candidates without download consent, got %d", len(candidates))
@@ -129,7 +129,11 @@ func TestCandidateFromTarget_ElementsBearingTargetIsOffline(t *testing.T) {
 	start := tgt.Epoch
 	end := start.AddDays(1)
 
-	obj, closer := candidateFromTarget(context.Background(), tgt, start, end, visibleTonightConfig{})
+	obj, closer, err := candidateFromTarget(context.Background(), tgt, start, end, visibleTonightConfig{})
+	if err != nil {
+		t.Fatalf("candidateFromTarget: %v", err)
+	}
+
 	if obj == nil {
 		t.Fatal("expected a non-nil Observable from the offline Kepler path, got nil")
 	}
@@ -150,7 +154,11 @@ func TestCandidateFromTarget_ElementsBearingTargetIsOffline(t *testing.T) {
 	var forcedCfg visibleTonightConfig
 	WithSmallBodyKernels()(&forcedCfg)
 
-	obj2, _ := candidateFromTarget(context.Background(), tgt, start, end, forcedCfg)
+	obj2, _, err2 := candidateFromTarget(context.Background(), tgt, start, end, forcedCfg)
+	if err2 == nil {
+		t.Error("the forced kernel path failed offline but reported no reason")
+	}
+
 	if obj2 != nil {
 		t.Errorf("expected WithSmallBodyKernels to force the (here, offline-failing) kernel path, got a non-nil %T", obj2)
 	}
@@ -198,7 +206,7 @@ func TestGatherCandidates_SmallBodyPathOffline(t *testing.T) {
 	start := epoch
 	end := start.AddDays(1)
 
-	candidates := gatherCandidates(context.Background(), targets, start, end, visibleTonightConfig{})
+	candidates := gatherCandidates(context.Background(), targets, start, end, visibleTonightConfig{}, &skips{})
 
 	if len(candidates) != 2 {
 		t.Fatalf("len(candidates) = %d, want 2", len(candidates))

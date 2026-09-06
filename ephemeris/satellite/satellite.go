@@ -41,15 +41,19 @@ var ErrPropagation = errors.New("satellite: sgp4 propagation failed")
 var ErrUnexpectedID = errors.New("satellite: state queried for an id other than the tracked satellite (use core.ID(0))")
 
 // ErrMalformedTLE indicates a two-line element set that is not well formed:
-// the wrong length, the wrong line numbers, a failed checksum, or two lines
-// describing different satellites.
+// the wrong length, the wrong line numbers, a failed checksum, two lines
+// describing different satellites, or a field that is not the number the
+// format says it is.
 //
 // SGP4 will initialise happily from a corrupted element set and propagate it
-// for ever, because every field it reads is still a number. A single digit
+// for ever, as long as every field it reads is still a number. A single digit
 // altered in transmission or truncated in a copy moves an inclination or a
 // mean motion to another plausible value and puts the satellite somewhere it
 // has never been. The last character of each line exists to catch exactly
 // that, and is worth checking before trusting the rest.
+//
+// When a field is NOT still a number, the underlying SGP4 implementation does
+// something worse than propagate wrongly: see [ValidateTLE].
 var ErrMalformedTLE = errors.New("satellite: malformed TLE")
 
 // tleLineLength is the fixed width of a TLE line, checksum included.
@@ -68,7 +72,15 @@ type Satellite struct {
 // [ErrMalformedTLE] for why, since SGP4 itself will accept a corrupted set
 // and propagate it without complaint.
 func NewFromTLE(name, line1, line2 string) (*Satellite, error) {
-	if err := ValidateTLE(line1, line2); err != nil {
+	if err := validateTLEStructure(line1, line2); err != nil {
+		return nil, err
+	}
+
+	// Both the guard against TLEToSat's os.Exit and the source of MeanMotion:
+	// one parse, so the value this reports can never disagree with the one
+	// SGP4 propagates from.
+	mm, err := parseTLENumerics(line1, line2)
+	if err != nil {
 		return nil, err
 	}
 
@@ -76,8 +88,6 @@ func NewFromTLE(name, line1, line2 string) (*Satellite, error) {
 	if sat.Error != 0 {
 		return nil, fmt.Errorf("%w: sgp4 init error %d: %s", ErrPropagation, sat.Error, sat.ErrorStr)
 	}
-
-	mm := parseMeanMotion(line2)
 
 	return &Satellite{
 		Name:       name,
@@ -140,26 +150,9 @@ func (s *Satellite) Altitude(t time.Time) (float64, error) {
 	return geo.Height() / 1e3, nil // metres → km
 }
 
-// parseMeanMotion extracts mean motion (rev/day) from TLE line 2,
-// columns 53–63 (0-indexed).
-func parseMeanMotion(line2 string) float64 {
-	if len(line2) < 63 {
-		return 0
-	}
-
-	s := strings.TrimSpace(line2[52:63])
-
-	mm, err := strconv.ParseFloat(s, 64)
-	if err != nil {
-		return 0
-	}
-
-	return mm
-}
-
 // ValidateTLE reports whether the two lines form a well-formed element set.
 //
-// Four things are checked, in the order a corrupted set is most likely to fail
+// Five things are checked, in the order a corrupted set is most likely to fail
 // them:
 //
 //   - each line is the standard 69 characters;
@@ -168,11 +161,46 @@ func parseMeanMotion(line2 string) float64 {
 //   - the two carry the same satellite number, which catches line 1 of one
 //     object pasted against line 2 of another - a substitution no checksum can
 //     see, since each line is individually intact;
-//   - each line's modulo-10 checksum matches its own last character.
+//   - each line's modulo-10 checksum matches its own last character;
+//   - every field the SGP4 backend will read as a number parses as one.
 //
 // None of this validates the orbit. It establishes that the element set
 // arrived as it was sent, which is the part SGP4 cannot tell for itself.
+//
+// # Why the numeric check is not merely tidiness
+//
+// The backend (joshuaferrara/go-satellite) parses the twelve numeric fields
+// through helpers that call log.Fatal on a parse error - os.Exit(1), from
+// inside a library, taking the caller's whole process with it. No error is
+// returned, no panic is raised, and there is nothing to recover: a program
+// that fed one bad element set into a batch of ten thousand simply stops.
+// Confirmed by running it, not inferred from reading it.
+//
+// A checksum does not close this. It is a modulo-10 sum in which letters,
+// spaces and punctuation all count for nothing, so a field can be replaced
+// with text - a truncated feed, a hand-built set, an "N/A" placeholder, a
+// generator that pads with spaces - and still carry a correct checksum.
+//
+// So this parses each field exactly as the backend will, using the same
+// column slices and the same two-space Replace (a field with three spaces
+// where the backend removes two is one the backend would die on, and is
+// therefore refused here rather than accepted as close enough), and reports
+// [ErrMalformedTLE] naming the field. NewFromTLE runs this before SGP4 sees
+// anything, which is the only place the guard is any use.
 func ValidateTLE(line1, line2 string) error {
+	if err := validateTLEStructure(line1, line2); err != nil {
+		return err
+	}
+
+	_, err := parseTLENumerics(line1, line2)
+
+	return err
+}
+
+// validateTLEStructure is ValidateTLE's length/ordering/checksum half, split
+// out so NewFromTLE can run it before parseTLENumerics without paying for the
+// numeric parse twice - it needs the mean motion that parse produces.
+func validateTLEStructure(line1, line2 string) error {
 	for i, line := range [2]string{line1, line2} {
 		want := byte('1' + i)
 
@@ -203,6 +231,70 @@ func ValidateTLE(line1, line2 string) error {
 	}
 
 	return nil
+}
+
+// parseTLENumerics parses every field the SGP4 backend will parse, from the
+// same columns and with the same string surgery, and returns the mean motion
+// (rev/day, line 2 columns 53-63) as the one value this package keeps.
+//
+// The transformations are copied from the backend's ParseTLE rather than
+// written afresh, deliberately: the contract is not "these look like numbers"
+// but "these are the exact strings that function will hand to strconv", and
+// only an identical construction can promise that. Notably ecco is prefixed
+// with "." (a TLE stores eccentricity with an assumed leading decimal point)
+// and nddot/bstar are reassembled from three slices into a mantissa-exponent
+// form, so neither field parses as a number in its raw column form at all.
+//
+// The two-space Replace count is copied too, and matters: a field carrying
+// three spaces would leave one behind, and " 15.72" does not parse. Using -1
+// here would accept a set the backend then dies on, which is worse than not
+// checking, because the guard would read as if it worked.
+//
+// Callers must have established the 69-character length first
+// (validateTLEStructure) - every slice below indexes fixed columns.
+func parseTLENumerics(line1, line2 string) (meanMotion float64, err error) {
+	ints := [...]struct {
+		name  string
+		value string
+	}{
+		{"satellite number", strings.TrimSpace(line1[2:7])},
+		{"epoch year", line1[18:20]},
+	}
+
+	for _, f := range ints {
+		if _, err := strconv.ParseInt(f.value, 10, 0); err != nil {
+			return 0, fmt.Errorf("%w: %s is %q, which is not an integer", ErrMalformedTLE, f.name, f.value)
+		}
+	}
+
+	floats := [...]struct {
+		name  string
+		value string
+	}{
+		{"epoch day", line1[20:32]},
+		{"first derivative of mean motion", strings.Replace(line1[33:43], " ", "", 2)},
+		{"second derivative of mean motion", strings.Replace(line1[44:45]+"."+line1[45:50]+"e"+line1[50:52], " ", "", 2)},
+		{"B* drag term", strings.Replace(line1[53:54]+"."+line1[54:59]+"e"+line1[59:61], " ", "", 2)},
+		{"inclination", strings.Replace(line2[8:16], " ", "", 2)},
+		{"right ascension of the ascending node", strings.Replace(line2[17:25], " ", "", 2)},
+		{"eccentricity", "." + line2[26:33]},
+		{"argument of perigee", strings.Replace(line2[34:42], " ", "", 2)},
+		{"mean anomaly", strings.Replace(line2[43:51], " ", "", 2)},
+		{"mean motion", strings.Replace(line2[52:63], " ", "", 2)},
+	}
+
+	for _, f := range floats {
+		v, err := strconv.ParseFloat(f.value, 64)
+		if err != nil {
+			return 0, fmt.Errorf("%w: %s is %q, which is not a number", ErrMalformedTLE, f.name, f.value)
+		}
+
+		if f.name == "mean motion" {
+			meanMotion = v
+		}
+	}
+
+	return meanMotion, nil
 }
 
 // tleChecksum is the modulo-10 sum a TLE line's last character records: every

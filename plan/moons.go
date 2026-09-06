@@ -150,7 +150,7 @@ var moonSpecs = map[string]moonSpec{
 // moons finishes evaluating would break the others still using it. The
 // caller must Close every returned provider once ALL candidates (not just
 // these) have finished evaluating.
-func gatherPlanetaryMoons(ctx context.Context, at time.Time, magLimit float64) ([]visibleCandidate, []eph.Provider) {
+func gatherPlanetaryMoons(ctx context.Context, at time.Time, magLimit float64, dropped *skips) ([]visibleCandidate, []eph.Provider) {
 	byKernel := make(map[string][]moonSpec)
 
 	var kernels []string
@@ -167,11 +167,17 @@ func gatherPlanetaryMoons(ctx context.Context, at time.Time, magLimit float64) (
 	// kernel fetch yields a nil provider (kept in the slice, filtered
 	// below) rather than a hard error, matching gatherCandidates' own
 	// skip-on-fetch-failure convention -- this kernel's moons are simply
-	// unavailable tonight, not fatal to the others.
+	// unavailable tonight, not fatal to the others. The reason is not
+	// dropped, though: it goes to the caller's collector, so a night
+	// missing all eight Saturnian moons says why. It cannot travel as
+	// parallel.Map's error, which is errgroup's -- first one wins, rest
+	// cancelled -- exactly the wrong shape for a per-item skip.
 	providers, _ := parallel.Map(kernels, 0, func(_ int, kernel string) (eph.Provider, error) {
 		p, err := eph.NewProvider(ctx, eph.Moons, kernel)
 		if err != nil {
-			return nil, nil //nolint:nilerr,nilnil // see comment above: a failed kernel fetch is a documented skip, not an error
+			dropped.add("moon kernel", kernel, err)
+
+			return nil, nil //nolint:nilnil // see comment above: a failed kernel fetch is a recorded skip, not an error
 		}
 
 		return p, nil

@@ -23,6 +23,26 @@ func (failingConstraint) Check(_ Observable, _ time.Time, _ *Site) (Result, erro
 	return Result{}, errConstraintUnavailable
 }
 
+var errPositionUnavailable = errors.New("predicate_errors_test: position could not be computed")
+
+// unreachableTarget is an Observable whose position lookup always fails — a
+// target whose ephemeris provider is down.
+//
+// evaluateCandidate builds its own constraint (Altitude) internally rather
+// than taking the caller's, so failingConstraint cannot reach it; failing at
+// the Observable is the way in, and is the more realistic failure anyway.
+type unreachableTarget struct{}
+
+func (unreachableTarget) Name() string { return "Unreachable" }
+
+func (unreachableTarget) Position(_ time.Time) (coord.ICRS, error) {
+	return coord.ICRS{}, errPositionUnavailable
+}
+
+func (unreachableTarget) GetDetails(_ *coord.Context, _ ...string) (*TargetDetails, error) {
+	return nil, errPositionUnavailable
+}
+
 // predicateSite builds the site these tests share.
 func predicateSite(t *testing.T) *Site {
 	t.Helper()
@@ -144,12 +164,13 @@ func TestObservableWindowsReportsAFailureDuringRefinement(t *testing.T) {
 //
 // VisibleTonight's contract is to skip a candidate it cannot evaluate rather
 // than fail the whole query — one unreachable kernel should not cost the caller
-// the other forty, and its doc comment says so. But every skip returned the
-// same bare false as "too faint" or "never rises", so a night's list could come
-// back short because a provider was down and nothing said which it was.
+// the other forty. But every skip returned the same bare false as "too faint"
+// or "never rises", so a night's list could come back short because a provider
+// was down and nothing said which it was.
 //
-// The skip stays; it is now reported at Warn, which is the level for a result
-// that is quietly less complete than it looks.
+// The skip stays. What changed is that the reason now leaves the function: a
+// Warn line for a human, and an error a program can test with errors.Is. A log
+// line is not a signal a caller can act on.
 func TestVisibleTonightReportsWhyACandidateWasSkipped(t *testing.T) {
 	// Not parallel: it installs the process-wide logger.
 	defer logging.Set(nil)
@@ -161,17 +182,24 @@ func TestVisibleTonightReportsWhyACandidateWasSkipped(t *testing.T) {
 	site := predicateSite(t)
 	start := fixedEpoch()
 
-	// A candidate whose constraint evaluation fails, driven through the same
-	// helper VisibleTonight uses per candidate.
-	cfg := visibleTonightConfig{step: 30 * time.Minute, minAltitude: angle.Deg(10)}
+	// A candidate whose position cannot be computed — the shape of a target
+	// backed by an ephemeris provider that could not be reached. The step is
+	// a legal one (ObservableWindows rejects anything over 15m outright), so
+	// the only thing that can fail here is the lookup itself.
+	cfg := visibleTonightConfig{step: 10 * time.Minute, minAltitude: angle.Deg(10)}
 
-	_, ok := evaluateCandidate(
+	_, ok, why := evaluateCandidate(
 		t.Context(),
-		visibleCandidate{obj: NewStar("Unreachable", angle.Zero(), angle.Zero())},
+		visibleCandidate{obj: unreachableTarget{}},
 		start, start.Add(2*time.Hour), site, nil, 6.0, cfg,
 	)
 	if ok {
 		t.Fatal("precondition: this candidate should not evaluate cleanly")
+	}
+
+	if !errors.Is(why, errPositionUnavailable) {
+		t.Errorf("evaluateCandidate returned reason %v, want it to wrap the lookup's error.\n"+
+			"  Without it the caller cannot tell an unreachable provider from a target that is simply not up.", why)
 	}
 
 	out := buf.String()

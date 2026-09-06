@@ -196,7 +196,13 @@ func (cf *File) index() error {
 			return
 		}
 
-		if !isDimensionScale(ds) {
+		isDim, err := isDimensionScale(ds)
+		if err != nil {
+			walkErr = fmt.Errorf("cams: %s: %s: %w", cf.key, ds.Name(), err)
+			return
+		}
+
+		if !isDim {
 			cf.vars[ds.Name()] = ds
 			return
 		}
@@ -287,24 +293,35 @@ func (cf *File) newVar(name string, ds *hdf5.Dataset) (*Var, error) {
 
 // isDimensionScale reports whether ds is a NetCDF-4 dimension-scale
 // dataset (CLASS == "DIMENSION_SCALE") rather than a data variable. An
-// absent CLASS attribute (the common case for a data variable) simply
-// means false — never treated as a decode failure.
-func isDimensionScale(ds *hdf5.Dataset) bool {
+// absent CLASS attribute is the common case for a data variable and means
+// false, with a nil error.
+//
+// A header that cannot be read is an error, not a false. Answering false
+// there files the dataset as a data variable, so an axis silently vanishes
+// from cf.dims and the file indexes with a shape it does not have — the
+// failure then surfaces much later as a confusing "dimension not found" on a
+// variable whose dimensions are in fact present. See attributePresent for why
+// the underlying library's error cannot be classified after the fact.
+func isDimensionScale(ds *hdf5.Dataset) (bool, error) {
+	present, err := attributePresent(ds, "CLASS")
+	if err != nil {
+		return false, err
+	}
+
+	if !present {
+		return false, nil
+	}
+
 	v, err := ds.ReadAttribute("CLASS")
 	if err != nil {
-		return false
+		return false, fmt.Errorf("cams: read attribute %q: %w", "CLASS", err)
 	}
 
 	s, ok := v.(string)
 
-	return ok && s == "DIMENSION_SCALE"
+	return ok && s == "DIMENSION_SCALE", nil
 }
 
-// readInt32Attribute reads name as an int32, tolerating the small set of
-// numeric Go types ReadAttribute may return it as. ok is false (with a
-// nil error) when the attribute is simply absent; a non-nil error means
-// the attribute exists but decoded to something this reader cannot
-// interpret as an integer.
 // attributePresent reports whether ds carries an attribute called name.
 //
 // # Why this exists rather than reading the error from ReadAttribute
@@ -345,6 +362,11 @@ func attributePresent(ds *hdf5.Dataset, name string) (bool, error) {
 	return false, nil
 }
 
+// readInt32Attribute reads name as an int32, tolerating the small set of
+// numeric Go types ReadAttribute may return it as. ok is false (with a
+// nil error) when the attribute is simply absent; a non-nil error means
+// the attribute exists but decoded to something this reader cannot
+// interpret as an integer.
 func readInt32Attribute(ds *hdf5.Dataset, name string) (value int32, ok bool, err error) {
 	present, err := attributePresent(ds, name)
 	if err != nil {

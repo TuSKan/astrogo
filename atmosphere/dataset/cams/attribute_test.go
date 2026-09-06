@@ -62,6 +62,12 @@ func TestAttributeReadersSeparateAbsenceFromFailure(t *testing.T) {
 		t.Errorf("readFloat64Attribute(absent) = ok %v, err %v; want false, nil", ok, err)
 	}
 
+	// A data variable carries no CLASS attribute at all, which is an ordinary
+	// false rather than a failure -- the case that makes the whole index work.
+	if isDim, err := isDimensionScale(ds); err != nil || isDim {
+		t.Errorf("isDimensionScale(data variable) = %v, %v; want false, nil", isDim, err)
+	}
+
 	// Now make the header unreadable. Every reader must report a failure, not
 	// absence — this is the assertion the old code fails.
 	if err := f.Close(); err != nil {
@@ -80,5 +86,14 @@ func TestAttributeReadersSeparateAbsenceFromFailure(t *testing.T) {
 
 	if _, ok, err := readFloat64Attribute(ds, "units"); err == nil {
 		t.Errorf("readFloat64Attribute reported an unreadable header as absence (ok=%v)", ok)
+	}
+
+	// isDimensionScale was left behind by #172 and is the worst of the four to
+	// get wrong: answering false files a dimension scale as a data variable, so
+	// an axis vanishes from cf.dims and the file indexes with a shape it does
+	// not have. The failure then surfaces much later, on a variable whose
+	// dimensions are in fact all present.
+	if isDim, err := isDimensionScale(ds); err == nil {
+		t.Errorf("isDimensionScale reported an unreadable header as %v rather than an error", isDim)
 	}
 }
