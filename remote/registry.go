@@ -337,8 +337,6 @@ func constName(id EndpointID) string {
 		return "CelesTrak"
 	case FINK:
 		return "FINK"
-	case LightPollution:
-		return "LightPollution"
 	case OpenNGC:
 		return "OpenNGC"
 	case Nominatim:
@@ -347,8 +345,6 @@ func constName(id EndpointID) string {
 		return "OpenElevation"
 	case CALSPEC:
 		return "CALSPEC"
-	case WorldAtlas:
-		return "WorldAtlas"
 	case VIIRSAnnual:
 		return "VIIRSAnnual"
 	case CopernicusEODATA:
