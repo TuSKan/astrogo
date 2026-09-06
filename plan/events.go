@@ -290,41 +290,18 @@ func (s EventSolver) solveVisibility(spec EventSpec, start, end time.Time) ([]Ev
 	// series would introduce in the root-finder.
 	geomAtm := atmosphere.Refraction{Pressure: 0} // zero pressure → no refraction
 
-	// eventCtxRefresh bounds how far a coord.Context.AtTime derivation may
-	// drift from its last full coord.NewContext rebuild. AtTime's documented
-	// accuracy is ≲0.1″/hour (holding precession-nutation and aberration
-	// fixed); at 1h that's <0.01s of rise/set-time bias — a >100x margin
-	// against the solver's ~1s Tolerance and this package's minute-level
-	// USNO/NASA reference tolerances, while still turning the large majority
-	// of per-sample and per-bisection-iteration NewContext calls (~91µs
-	// each) into O(1) AtTime derivations.
-	const eventCtxRefresh = 1 * time.Hour
-
-	// contextCache returns a closure that rebuilds a full coord.NewContext
-	// only when t has drifted more than eventCtxRefresh from the last
-	// rebuild, deriving every other call cheaply via AtTime. evalVal and
-	// evalHA use independent caches since they evaluate under different
-	// atmospheres (geomAtm vs. spec.Observer.Refraction()).
-	contextCache := func(atm atmosphere.Refraction) func(t time.Time) *coord.Context {
-		var base *coord.Context
-
-		return func(t time.Time) *coord.Context {
-			if base == nil || t.Sub(base.Time()).Abs() > eventCtxRefresh {
-				base = coord.NewContext(t, spec.Observer.Location(), atm)
-			}
-
-			return base.AtTime(t)
-		}
-	}
-
 	// evalCtx backs evalVal (rise/set/twilight, geometric no-refraction
 	// atmosphere); evalHACtx backs the transit search's evalHA closure
 	// (defined further below, inside the event loop, since it's only
 	// needed once a transit candidate is found) — both declared here so a
 	// single cache persists across every sample and bisection iteration,
 	// and across multiple transit candidates, within this solveVisibility call.
-	evalCtx := contextCache(geomAtm)
-	evalHACtx := contextCache(spec.Observer.Refraction())
+	//
+	// Two caches rather than one because they evaluate under different
+	// atmospheres, and a Context carries the one it was built with — see
+	// newContextCache.
+	evalCtx := newContextCache(spec.Observer.Location(), geomAtm)
+	evalHACtx := newContextCache(spec.Observer.Location(), spec.Observer.Refraction())
 
 	evalVal := func(t time.Time) (float64, error) {
 		ctx := evalCtx(t)

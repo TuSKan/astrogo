@@ -246,15 +246,24 @@ func SatellitePasses(prov eph.Provider, name string, start, end time.Time,
 	step := 30 * time.Second // 30s steps for LEO
 	refineTol := 1 * time.Second
 
-	// lookAt creates a context and computes look angle at time t.
+	// lookAt computes the look angle at t.
+	//
+	// The Context comes from a cache rather than a fresh coord.NewContext per
+	// call. Decomposed on the ISS at Paranal, a rebuild is 145.5 µs against
+	// 94.8 µs for the SGP4 propagation and 24 ns for the transform itself, so
+	// 61% of every 30-second sample went on rebuilding state that barely
+	// changes. The reuse window's ≲0.1″ is three to four orders of magnitude
+	// inside SGP4's own kilometre-scale along-track error, which at a few
+	// hundred km of range is minutes of arc — see newContextCache and #166.
 	//
 	// Body id 0 is not a placeholder: satellite.Satellite carries one TLE and
 	// its State rejects any other id with ErrUnexpectedID, so 0 is the only
 	// one a satellite provider accepts. The name parameter is a label for the
 	// returned pass, not a lookup key.
+	ctxAt := newContextCache(observer, defaultAtm)
+
 	lookAt := func(t time.Time) (coord.AltAz, error) {
-		ctx := coord.NewContext(t, observer, defaultAtm)
-		return LookAngle(prov, 0, ctx)
+		return LookAngle(prov, 0, ctxAt(t))
 	}
 
 	// Elevation evaluation function.
