@@ -199,18 +199,50 @@ func payloadSize(h *Header) int64 {
 	return bytes
 }
 
-// ReadHeader reads a FITS header from a block reader.
-// It reads up to 10000 blocks (28MB) to find the END card.
-// This is a safety measure to prevent infinite loops in case of corrupted files.
+// Two failsafes bound [ReadHeader] against a file with no END card, or with an
+// END card an absurd distance in.
+//
+// They count different things on purpose. maxHeaderBlocks bounds what is read
+// and thrown away — blank padding is skipped, so a stream of it costs one
+// 2880-byte buffer no matter how long it runs. maxHeaderCards bounds what is
+// kept, and that is the quantity that actually grows: every non-blank card is
+// retained as three strings plus an entry in the header's keyword map.
+//
+// Bounding only the blocks, which is what this did, bounds the cheap thing.
+// 10,000 blocks is 360,000 cards, and 360,000 distinct cards — which is what
+// random or hostile bytes look like — was measured at 144 MB resident from a
+// 28.8 MB input, a fivefold amplification on a file astrogo did not produce.
+// See #185.
+const (
+	// maxHeaderBlocks caps the header at 28.8 MB of input.
+	maxHeaderBlocks = 10000
+
+	// maxHeaderCards caps the header at 20,000 retained cards, which is about
+	// 7 MB and 556 blocks of input.
+	//
+	// The number is a policy choice, so here is where it comes from: a
+	// conforming primary header is a few dozen cards, and the largest thing a
+	// real pipeline produces is a long HISTORY block, which this clears by
+	// orders of magnitude. It is eighteen times below the ceiling the block
+	// limit implies. If a legitimate file ever trips it, this constant is the
+	// thing to raise — the cost is linear and about 320 bytes a card.
+	maxHeaderCards = 20000
+)
+
+// ReadHeader reads a FITS header from a block reader, up to the END card.
+//
+// A header that reaches neither an END card nor the end of the stream within
+// [maxHeaderBlocks] of input or [maxHeaderCards] of retained cards fails with
+// [ErrNoEndCard], naming which of the two it exceeded. Both exist because this
+// is the one package in astrogo that opens a file astrogo did not write.
 func ReadHeader(br *BlockReader) (*Header, error) {
 	h := NewHeader()
 	buf := make([]byte, BlockSize)
-	maxBlocks := 10000 // 28MB max header size failsafe
 	blocksRead := 0
 
 	for {
-		if blocksRead > maxBlocks {
-			return nil, fmt.Errorf("%w: exceeded %d blocks", ErrNoEndCard, maxBlocks)
+		if blocksRead > maxHeaderBlocks {
+			return nil, fmt.Errorf("%w: exceeded %d blocks", ErrNoEndCard, maxHeaderBlocks)
 		}
 
 		err := br.ReadBlock(buf)
@@ -230,6 +262,12 @@ func ReadHeader(br *BlockReader) (*Header, error) {
 
 			// Exclude completely blank cards
 			if len(c.Keyword) > 0 || len(c.Value) > 0 || len(c.Comment) > 0 {
+				// Checked before the append rather than after, so the limit is
+				// the number of cards that can be held and not one more.
+				if len(h.Cards) >= maxHeaderCards {
+					return nil, fmt.Errorf("%w: exceeded %d cards", ErrNoEndCard, maxHeaderCards)
+				}
+
 				h.Append(c)
 			}
 		}
