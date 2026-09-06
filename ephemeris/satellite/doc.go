@@ -48,11 +48,30 @@
 // and none of the eight that fail, which is how an implementation with this
 // defect passes its own verification.
 //
-// Nothing here reports which regime a given element set falls in — a position
-// for a decaying rocket body comes back looking exactly like one for the ISS.
-// Until that changes, treat a result for a low-perigee, deep-space or decaying
-// object as unvalidated. See ephemeris/satellite/sgp4_vallado_validation_test.go,
-// which measures all of the above on every run of the validation tier, and
+// [Satellite.Verified] reports which side of that a given element set falls on,
+// so a position for a decaying rocket body no longer comes back looking exactly
+// like one for the ISS:
+//
+//	if ok, why := sat.Verified(); !ok {
+//		log.Printf("%s: %s", sat.Name, why)
+//	}
+//
+// It tests one thing — whether perigee is below the 220 km at which SGP4
+// switches to its simplified drag model — because that is what the measurement
+// supports. Every large divergence in the suite lives there. Deep space, the
+// obvious second condition, is deliberately absent: of roughly eighteen
+// deep-space cases only four diverge and all four already have a low perigee,
+// so adding it would raise fifteen false alarms for nothing. Both claims are
+// asserted against the fixtures, so neither can rot quietly.
+//
+// Measured over the thirty readable cases, it flags ten, seven of which
+// diverge, and misses one — a decaying object with a 282 km perigee that is out
+// by 0.62 km, the smallest divergence in the set. So it is conservative near
+// the boundary and silent about slow decay; see [Satellite.Verified] for the
+// full shape of that.
+//
+// See ephemeris/satellite/sgp4_vallado_validation_test.go, which measures all
+// of the above on every run of the validation tier, and
 // https://github.com/TuSKan/astrogo/issues/120.
 //
 // # Usage

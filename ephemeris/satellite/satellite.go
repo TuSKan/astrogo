@@ -71,6 +71,13 @@ type Satellite struct {
 	// sub-second correction from this rather than from zero -- see there.
 	epoch        time.Time
 	epochFracSec float64
+
+	// ecc and inclRad are kept for [Satellite.Verified], which reproduces
+	// SGP4's own perigee to decide which side of its simplified-drag branch
+	// this element set falls on. They come from the same parse as MeanMotion,
+	// so the three cannot disagree about the orbit they describe.
+	ecc     float64
+	inclRad float64
 }
 
 // NewFromTLE creates a Satellite from raw TLE lines.
@@ -86,7 +93,7 @@ func NewFromTLE(name, line1, line2 string) (*Satellite, error) {
 	// Both the guard against TLEToSat's os.Exit and the source of MeanMotion:
 	// one parse, so the value this reports can never disagree with the one
 	// SGP4 propagates from.
-	mm, epoch, err := parseTLENumerics(line1, line2)
+	el, err := parseTLENumerics(line1, line2)
 	if err != nil {
 		return nil, err
 	}
@@ -94,7 +101,7 @@ func NewFromTLE(name, line1, line2 string) (*Satellite, error) {
 	// The same conversion propagateECI applies to a query time, so the two
 	// fractional seconds are on identical footing and cancel exactly when the
 	// query lands a whole number of seconds after the epoch.
-	_, _, _, _, _, _, epochFracSec := timeToComponents(epoch)
+	_, _, _, _, _, _, epochFracSec := timeToComponents(el.epoch)
 
 	sat := gosatellite.TLEToSat(line1, line2, gosatellite.GravityWGS84)
 	if sat.Error != 0 {
@@ -103,10 +110,12 @@ func NewFromTLE(name, line1, line2 string) (*Satellite, error) {
 
 	return &Satellite{
 		Name:         name,
-		MeanMotion:   mm,
+		MeanMotion:   el.meanMotion,
 		sat:          sat,
-		epoch:        epoch,
+		epoch:        el.epoch,
 		epochFracSec: epochFracSec,
+		ecc:          el.ecc,
+		inclRad:      el.inclRad,
 	}, nil
 }
 
@@ -206,7 +215,7 @@ func ValidateTLE(line1, line2 string) error {
 		return err
 	}
 
-	_, _, err := parseTLENumerics(line1, line2)
+	_, err := parseTLENumerics(line1, line2)
 
 	return err
 }
@@ -247,6 +256,19 @@ func validateTLEStructure(line1, line2 string) error {
 	return nil
 }
 
+// elements are the orbital values this package keeps from a TLE, parsed once.
+//
+// Kept together rather than returned as four values because they describe one
+// orbit: MeanMotion, the epoch propagateECI measures from, and the pair
+// [Satellite.Verified] needs to reproduce SGP4's own perigee. Parsing them in
+// one pass is what stops any of them disagreeing about the element set.
+type elements struct {
+	meanMotion float64 // revolutions per day
+	ecc        float64
+	inclRad    float64
+	epoch      time.Time
+}
+
 // parseTLENumerics parses every field the SGP4 backend will parse, from the
 // same columns and with the same string surgery, and returns the mean motion
 // (rev/day, line 2 columns 53-63) as the one value this package keeps.
@@ -266,7 +288,9 @@ func validateTLEStructure(line1, line2 string) error {
 //
 // Callers must have established the 69-character length first
 // (validateTLEStructure) - every slice below indexes fixed columns.
-func parseTLENumerics(line1, line2 string) (meanMotion float64, epoch time.Time, err error) {
+func parseTLENumerics(line1, line2 string) (elements, error) {
+	var el elements
+
 	ints := [...]struct {
 		name  string
 		value string
@@ -277,7 +301,7 @@ func parseTLENumerics(line1, line2 string) (meanMotion float64, epoch time.Time,
 
 	for _, f := range ints {
 		if _, err := strconv.ParseInt(f.value, 10, 0); err != nil {
-			return 0, time.Time{}, fmt.Errorf("%w: %s is %q, which is not an integer", ErrMalformedTLE, f.name, f.value)
+			return elements{}, fmt.Errorf("%w: %s is %q, which is not an integer", ErrMalformedTLE, f.name, f.value)
 		}
 	}
 
@@ -300,20 +324,26 @@ func parseTLENumerics(line1, line2 string) (meanMotion float64, epoch time.Time,
 	for _, f := range floats {
 		v, err := strconv.ParseFloat(f.value, 64)
 		if err != nil {
-			return 0, time.Time{}, fmt.Errorf("%w: %s is %q, which is not a number", ErrMalformedTLE, f.name, f.value)
+			return elements{}, fmt.Errorf("%w: %s is %q, which is not a number", ErrMalformedTLE, f.name, f.value)
 		}
 
 		switch f.name {
 		case "mean motion":
-			meanMotion = v
+			el.meanMotion = v
+		case "eccentricity":
+			el.ecc = v
+		case "inclination":
+			el.inclRad = v * math.Pi / 180
 		case "epoch day":
 			if err := checkEpochDay(line1, v); err != nil {
-				return 0, time.Time{}, err
+				return elements{}, err
 			}
 		}
 	}
 
-	return meanMotion, tleEpoch(line1), nil
+	el.epoch = tleEpoch(line1)
+
+	return el, nil
 }
 
 // checkEpochDay refuses a day-of-year the backend would walk off the end of.
