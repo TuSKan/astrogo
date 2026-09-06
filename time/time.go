@@ -107,21 +107,31 @@ const (
 )
 
 // LoadLocation loads a location from the standard library.
-var LoadLocation = time.LoadLocation
+// caller already handles as the standard library's, for a function that adds nothing
+// of its own to fail at.
+//
+//nolint:wrapcheck // a transparent re-export: wrapping would change the error a
+func LoadLocation(name string) (*Location, error) { return time.LoadLocation(name) }
 
 // Parse parses a formatted time string, as the standard library does.
-var Parse = time.Parse
+//
+//nolint:wrapcheck // transparent re-export; callers type-assert *time.ParseError.
+func Parse(layout, value string) (GoTime, error) { return time.Parse(layout, value) }
 
 // ParseInLocation is Parse with a default location for a layout that carries
 // no zone.
-var ParseInLocation = time.ParseInLocation
+//
+//nolint:wrapcheck // transparent re-export; callers type-assert *time.ParseError.
+func ParseInLocation(layout, value string, loc *Location) (GoTime, error) {
+	return time.ParseInLocation(layout, value, loc)
+}
 
 // Since returns the duration since the given time.
-var Since = time.Since
+func Since(t GoTime) Duration { return time.Since(t) }
 
 // MustLocation loads a location from the standard library, panicking if the
 // location cannot be loaded.
-var MustLocation = func(name string) *time.Location {
+func MustLocation(name string) *Location {
 	loc, err := time.LoadLocation(name)
 	if err != nil {
 		panic(err)
@@ -134,20 +144,28 @@ var MustLocation = func(name string) *time.Location {
 //
 // Named for the location rather than aliased as UTC, because [UTC] is this
 // package's coordinated-universal *scale* and the two are different things.
+//
+// One of only two exported vars this package has left, and the one it cannot
+// improve on: the standard library declares `var UTC *Location = &utcLoc`, so
+// the mutability is Go's own. Hiding it behind a function would hand back the
+// same reassignable pointer and remove nothing, at the cost of churning every
+// call site. See TestTimeExportsNoMutableFunctionValues.
 var LocationUTC = time.UTC
 
 // FixedZone returns a location with a fixed offset from UTC.
-var FixedZone = time.FixedZone
+func FixedZone(name string, offset int) *Location { return time.FixedZone(name, offset) }
 
 // Unix converts a Unix timestamp to a [GoTime].
-var Unix = time.Unix
+func Unix(sec, nsec int64) GoTime { return time.Unix(sec, nsec) }
 
 // GoDate builds a [GoTime] from calendar fields.
 //
 // Named apart from [Date], which builds this package's own [Time]. Both are
 // needed: astronomy wants the scale-aware type, while ordinary calendar work
 // — a cache key, a filename stamp — wants the standard library's.
-var GoDate = time.Date
+func GoDate(year int, month Month, day, hour, minute, sec, nsec int, loc *Location) GoTime {
+	return time.Date(year, month, day, hour, minute, sec, nsec, loc)
+}
 
 // Now returns the current wall-clock instant as a [GoTime].
 //
@@ -156,31 +174,40 @@ var GoDate = time.Date
 // clock work — a cache timestamp, a rate limiter, a generated-at field —
 // that would otherwise be a reason to import the standard library's time
 // package alongside this one.
-var Now = time.Now
+func Now() GoTime { return time.Now() }
 
 // Until returns the duration until the given [GoTime].
-var Until = time.Until
+func Until(t GoTime) Duration { return time.Until(t) }
 
 // Sleep pauses the calling goroutine.
-var Sleep = time.Sleep
+func Sleep(d Duration) { time.Sleep(d) }
 
 // After returns a channel that receives after the given duration.
 //
 // Not to be confused with [Time.After], which compares two instants.
-var After = time.After
+func After(d Duration) <-chan GoTime { return time.After(d) }
 
 // NewTimer returns a timer that fires after the given duration.
-var NewTimer = time.NewTimer
+func NewTimer(d Duration) *time.Timer { return time.NewTimer(d) }
 
 // NewTicker returns a ticker that fires repeatedly.
-var NewTicker = time.NewTicker
+func NewTicker(d Duration) *time.Ticker { return time.NewTicker(d) }
 
 // J2000 is the standard epoch J2000.0 (JD 2451545.0 TT) — the reference
 // epoch most star catalogs (Gaia excepted, at J2016.0) and orbital-element
 // sources assume when they don't report their own epoch explicitly.
+//
+// The second and last exported var, and unlike [LocationUTC] this one is
+// astrogo's own: any importer can reassign the standard epoch process-wide.
+// Go offers no way to declare a struct value immutable, so making it safe
+// means turning it into a function and breaking every caller, which is a
+// decision rather than a cleanup. Recorded in #113 rather than done quietly.
 var J2000 = FromJD(2451545.0, TT)
 
-var (
+// Layout strings, const rather than var so that nothing can reassign a format
+// string process-wide -- and untyped, exactly as the standard library declares
+// them, so they still satisfy a parameter of any string type.
+const (
 	// RFC1123 is a time format that conforms to RFC 1123.
 	RFC1123 = time.RFC1123
 	// RFC3339 is a time format that conforms to RFC 3339.

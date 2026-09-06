@@ -82,7 +82,9 @@ Existing astronomy tools are powerful, but often:
 - **Astroplan-style observation workflows**
 - **Go-level performance and control**
 
-Designed from the ground up for Go: no dynamic magic, no hidden global state, zero-allocation hot paths.
+Designed from the ground up for Go: no dynamic magic, no *hidden* global state, zero-allocation hot paths.
+
+Process-wide state exists and is deliberate — download consent and offline mode (`remote.EnableDownloads`, `remote.SetOffline`), the logger (`logging.Set`), the EOP and leap-second registries (`time.RegisterModel`, `time.RegisterLeapSeconds`). All of it is set by an explicitly named call and none of it is established by an `init()` or by importing a package. Nothing else is reassignable: `time` exports no mutable function values, and its layout strings are constants.
 
 ---
 
