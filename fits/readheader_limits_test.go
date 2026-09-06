@@ -133,3 +133,31 @@ func TestReadHeaderAllocationDoesNotScaleWithInput(t *testing.T) {
 		t.Errorf("ReadHeader allocated %.1f MB for a 28.8 MB hostile header; the card limit should hold it near 8 MB", large)
 	}
 }
+
+// blankStream is an endless source of blank cards — the corrupt file the block
+// failsafe exists for, where nothing is ever retained and nothing ever says
+// END. A generator rather than 28.8 MB of materialised spaces, since the point
+// is that the stream has no end for ReadHeader to reach.
+type blankStream struct{}
+
+func (blankStream) Read(p []byte) (int, error) {
+	for i := range p {
+		p[i] = ' '
+	}
+
+	return len(p), nil
+}
+
+// TestBlockFailsafeStopsAnEndlessStream is the other failsafe, and the case
+// the card limit cannot cover: blank cards are skipped, so this stream retains
+// nothing and would otherwise be read for ever.
+func TestBlockFailsafeStopsAnEndlessStream(t *testing.T) {
+	_, err := ReadHeader(NewBlockReader(blankStream{}))
+	if !errors.Is(err, ErrNoEndCard) {
+		t.Fatalf("err = %v, want ErrNoEndCard", err)
+	}
+
+	if !strings.Contains(err.Error(), "blocks") {
+		t.Errorf("an endless blank stream should trip the block failsafe, not the card one: %v", err)
+	}
+}
