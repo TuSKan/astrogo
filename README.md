@@ -708,32 +708,39 @@ flowchart TD
 
 ---
 
-## Implementation Status
+## Package Map
 
-| Package | Purpose | Status |
-| :--- | :--- | :--- |
-| `remote` | Centralized endpoint registry, HTTP client (retry/backoff), consent-gated downloads, configurable data storage | ✅ Stable |
-| `constants` | Typed, versioned constant sets (SI 2019, CODATA, IAU 2015, WGS 84, derived) | ✅ Stable |
-| `angle` | Angular types, HMS/DMS parsing | ✅ Stable |
-| `vector` | 3D geometry primitives | ✅ Stable |
-| `time` | Astronomical time scales (JD-based, UTC/TAI/TT/TDB/UT1), Earth Orientation Parameters (DUT1, polar motion), epoch arithmetic (MJD, GAST, Julian epoch year, day-of-year) | ✅ Stable |
-| `atmosphere` | Refraction models, airmass, dispersion | ✅ Stable |
-| `coord` | Coordinate types, transforms, topocentric reduction | ✅ Stable |
-| `ephemeris` | Solar system ephemerides (SOFA + JPL SPK) | ✅ Stable |
-| `ephemeris/satellite` | SGP4 propagation, TEME→GCRS, look angles, ground track | ✅ Stable |
-| `catalog/resolve` | Provider interface, HTTP client, Arrow cache | ✅ Stable |
-| `catalog/{simbad,mast,gaia,sbdb,openngc,norad,fink}` | Fully-implemented catalog providers | ✅ Stable |
-| `catalog/vizier` | ConeSearch against any registered VizieR table (2MASS, Hipparcos, Gaia DR3; extensible via `tables.go`) | ✅ Stable |
-| `catalog/jpl` | Horizons name resolution — ambiguous major/small-body match tables and unambiguous exact matches | ✅ Stable |
-| `magnitude` | Apparent magnitude (planets, asteroids, comets, satellites, stars) | ✅ Stable |
-| `constellation` | IAU constellation lookup from an ICRS position (official 1930 boundaries), `List`/`Centroid` enumeration | ✅ Stable |
-| `optics` | Equipment-optics arithmetic (`Telescope`/`Eyepiece`/`Sensor`) — magnification, FOV, exit pupil, Dawes limit, pixel scale | ✅ Stable |
-| `fits` | FITS **reading**, WCS (TAN projection), mmap, Arrow export | ✅ Stable (read-only — no writer yet, see [#127](https://github.com/TuSKan/astrogo/issues/127)) |
-| `fits/plan` | FITS↔plan bridge (`SiteFromFITS`, `TargetFromFITS`) | ✅ Stable |
-| `plan` | Observability, constraints, events, scheduling, satellite passes | ✅ Stable |
-| `skybrightness` | Spectral all-sky radiance engine (`Scene`/`Component`/`Model`/`Estimate`, all-sky ops, uncertainty, provenance) — seven components | ✅ Phases 0–5 (natural sky validated to 0.05 mag against GAMBONS) |
-| `skybrightness/dataset` | The only tier that performs I/O: star map, dust map, airglow spectrum, passband, solar spectrum and ground-emitter inventory, assembled by `dataset.Open` into a ready-to-evaluate `Sky` | ✅ Stable |
-| `unit` | Physical unit and quantity system | ✅ Stable |
+Every package below is implemented and used by the others. What none of them is, is
+frozen: `astrogo` is pre-1.0, and the CHANGELOG records twelve `Changed — BREAKING`
+sections and six `Removed` sections across twenty-six releases since 0.1.0. A column
+marking each package "Stable" used to sit here and said the opposite of that on every row.
+Read the [CHANGELOG](CHANGELOG.md) for what has actually moved; expect a minor release to
+be able to break an API until 1.0 says otherwise.
+
+| Package | Purpose |
+| :--- | :--- |
+| `remote` | Centralized endpoint registry, HTTP client (retry/backoff), consent-gated downloads, configurable data storage |
+| `constants` | Typed, versioned constant sets (SI 2019, CODATA, IAU 2015, WGS 84, derived) |
+| `angle` | Angular types, HMS/DMS parsing |
+| `vector` | 3D geometry primitives |
+| `time` | Astronomical time scales (JD-based, UTC/TAI/TT/TDB/UT1), Earth Orientation Parameters (DUT1, polar motion), epoch arithmetic (MJD, GAST, Julian epoch year, day-of-year) |
+| `atmosphere` | Refraction models, airmass, dispersion |
+| `coord` | Coordinate types, transforms, topocentric reduction |
+| `ephemeris` | Solar system ephemerides (SOFA + JPL SPK) |
+| `ephemeris/satellite` | SGP4 propagation, TEME→GCRS, look angles, ground track |
+| `catalog/resolve` | Provider interface, HTTP client, Arrow cache |
+| `catalog/{simbad,mast,gaia,sbdb,openngc,norad,fink}` | Fully-implemented catalog providers |
+| `catalog/vizier` | ConeSearch against any registered VizieR table (2MASS, Hipparcos, Gaia DR3; extensible via `tables.go`) |
+| `catalog/jpl` | Horizons name resolution — ambiguous major/small-body match tables and unambiguous exact matches |
+| `magnitude` | Apparent magnitude (planets, asteroids, comets, satellites, stars) |
+| `constellation` | IAU constellation lookup from an ICRS position (official 1930 boundaries), `List`/`Centroid` enumeration |
+| `optics` | Equipment-optics arithmetic (`Telescope`/`Eyepiece`/`Sensor`) — magnification, FOV, exit pupil, Dawes limit, pixel scale |
+| `fits` | FITS **reading**, WCS (TAN projection), mmap, Arrow export — read-only, no writer yet ([#127](https://github.com/TuSKan/astrogo/issues/127)) |
+| `fits/plan` | FITS↔plan bridge (`SiteFromFITS`, `TargetFromFITS`) |
+| `plan` | Observability, constraints, events, scheduling, satellite passes |
+| `skybrightness` | Spectral all-sky radiance engine (`Scene`/`Component`/`Model`/`Estimate`, all-sky ops, uncertainty, provenance) — seven components, Phases 0–5, natural sky validated to 0.05 mag against GAMBONS |
+| `skybrightness/dataset` | The only tier that performs I/O: star map, dust map, airglow spectrum, passband, solar spectrum and ground-emitter inventory, assembled by `dataset.Open` into a ready-to-evaluate `Sky` |
+| `unit` | Physical unit and quantity system |
 
 See [`skybrightness.md`](docs/skybrightness.md) for the sky-brightness engine — it is the single source for that module and carries what no other file does: the scientific baseline with a primary reference per model, the equation→function→test maps, the validation record, the phase roadmap, the unresolved dependencies and the open scientific questions. Everything said about `skybrightness` elsewhere in this README is a summary of it. See [`VALIDATION.md`](docs/VALIDATION.md) for scientific validation status, [`USNO.md`](docs/USNO.md) for the U.S. Naval Observatory accuracy report (41/41 tests passing, ≤0.6 min rise/set accuracy across 3 continents + polar/equatorial/8849m edge cases), and the FINK/ZTF sHG1G2 validation (100% match at 0.025 mag against the phunk production pipeline).
 
@@ -759,7 +766,6 @@ happens.
 | Planetary satellite SPK (Io, Titan, Triton, ...) | `remote.NAIFSPK` | ~64 MB (Mars) – ~1.1 GB (Jupiter), ~2.4 GB for all 6 kernels | `eph.NewProvider(eph.Moons, "sat441")`, or `plan.VisibleTonight(..., plan.WithPlanetaryMoons())` |
 | IERS Earth-orientation data | `remote.IERSFinals2000A` | ~3.7 MB | automatic on first `Time.EOP()`/`.UTC()`/`.UT1()` query needing it |
 | OpenNGC catalog CSVs | `remote.OpenNGC` | ~2 MB combined | `catalog.NewResolver(catalog.OpenNGC, ...)` |
-| World Atlas 2015 light-pollution GeoTIFF (Falchi et al. 2016) | `remote.WorldAtlas` | ~653 MB zip, ~2.8 GB extracted | nothing fetches it — deprecated, and a propagated model output rather than a measurement, so it cannot validate this module either; **CC BY-NC 4.0, non-commercial use only** |
 | VIIRS annual nighttime-lights composite (2012-2025, no API key) | `remote.VIIRSAnnual` | ~700 MB-1 GB per year | `viirs.Open(ctx, year)`, for the spatial distribution of artificial emission — CC0, credit lightpollutionmap.info + NASA Black Marble |
 | CAMS global reanalysis NetCDF files (Copernicus EODATA S3) | `remote.CopernicusEODATA` | 1.3 MB (lnsp) – ~180 MB (a 137-level aerosol tracer) | `atmosphere/dataset/cams.Open` — requires Copernicus Data Space S3 credentials (AWS SDK default chain) and a blank import of `remote/s3` |
 
@@ -848,7 +854,7 @@ Omit the endpoint list to grant consent for every download-gated endpoint at onc
 ```go
 remote.EnableDownloads(200 << 20) // every Downloadable endpoint at once (NAIFSPK, NAIFLSK,
                                   // IERSFinals2000A, OpenNGC, JPLHorizonsSPK, VIIRSAnnual,
-                                  // WorldAtlas, CopernicusEODATA, ...)
+                                  // CopernicusEODATA, ...)
 ```
 
 `JPLHorizonsSPK` is included even though it's an API endpoint, not a file endpoint — its

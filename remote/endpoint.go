@@ -98,20 +98,6 @@ const (
 	// FINK is the FINK broker's ZTF SSOFT API (catalog/fink).
 	FINK EndpointID = "fink.ssoft"
 
-	// LightPollution is the lightpollutionmap.info raster query API
-	// (requires an API key).
-	//
-	// Deprecated: nothing reads it, and nothing should. The service returns
-	// VIIRS-derived raster values, and reading satellite radiance as sky
-	// brightness is on this module's prohibited list — it is an upward
-	// measurement standing in for a downward prediction, which is the
-	// substitution skybrightness exists to avoid. It also needs an API key
-	// astrogo has no way to supply. Model the sky with
-	// [github.com/TuSKan/astrogo/skybrightness.ArtificialSkyglow] over a
-	// ground-emitter inventory instead. This will be removed once it has
-	// survived the two minor releases the deprecation policy requires.
-	LightPollution EndpointID = "lightpollutionmap"
-
 	// OpenNGC is the OpenNGC catalog source CSVs on GitHub, pinned to a
 	// fixed commit so catalog/openngc's fetch is reproducible.
 	OpenNGC EndpointID = "openngc.github"
@@ -137,28 +123,6 @@ const (
 	// "Jurij Stare, www.lightpollutionmap.info" and to "NASA's Black
 	// Marble nighttime lights product".
 	VIIRSAnnual EndpointID = "lightpollutionmap.viirs"
-
-	// WorldAtlas is GFZ Data Services' hosting of Falchi et al. 2016's
-	// World Atlas 2015 of artificial night sky brightness
-	// (World_Atlas_2015.zip, ~653 MB, frozen 2019-11-18 under DOI
-	// 10.5880/GFZ.1.4.2016.001).
-	//
-	// LICENSE: CC BY-NC 4.0, non-commercial only. Attribute Falchi, C.C.M.,
-	// et al. (2016), "The new world atlas of artificial night sky
-	// brightness", Science Advances 2, e1600377.
-	//
-	// Deprecated: the skybrightness/atlas package that read this was removed
-	// in the V2 rewrite and nothing replaced it. The Atlas is a propagated
-	// model output rather than a measurement — [FidelityModelPropagated] in
-	// atmosphere's own vocabulary — so it can neither validate this module
-	// (docs/skybrightness.md §13) nor be served as its answer without
-	// presenting somebody else's model as this one's prediction. Its
-	// non-commercial licence also makes it an awkward thing for a library to
-	// fetch on a caller's behalf. It remains a reasonable thing to compare
-	// against by hand, and a poor thing to depend on. This will be removed
-	// once it has survived the two minor releases the deprecation policy
-	// requires.
-	WorldAtlas EndpointID = "gfz.worldatlas"
 
 	// CALSPEC is STScI's composite stellar and solar flux standards, the
 	// absolute-flux reference the HST calibration chain is built on. The
@@ -600,16 +564,6 @@ func defaultEndpoints() map[EndpointID]Endpoint {
 			Enabled:     true,
 			Timeout:     120 * time.Second,
 		},
-		LightPollution: {
-			ID:          LightPollution,
-			URL:         "https://www.lightpollutionmap.info/QueryRaster/",
-			Kind:        KindAPI,
-			Subsystem:   "lightpollution",
-			Description: "lightpollutionmap.info raster query (World Atlas 2015)",
-			ApproxSize:  1_000,
-			Enabled:     true,
-			Timeout:     30 * time.Second,
-		},
 		OpenNGC: {
 			ID:              OpenNGC,
 			URL:             "https://raw.githubusercontent.com/mattiaverga/OpenNGC/36cb178a0f69dba8bfc03a99c10512831edf1c6b/database_files/",
@@ -793,21 +747,6 @@ func defaultEndpoints() map[EndpointID]Endpoint {
 			Mutable:         false, // versioned in the filename
 			Downloadable:    true,
 			Files:           []string{"sun_reference_stis_002.fits"},
-		},
-		WorldAtlas: {
-			ID:        WorldAtlas,
-			URL:       "https://datapub.gfz.de/download/10.5880.GFZ.1.4.2016.001/",
-			Kind:      KindFile,
-			Subsystem: "atlas",
-			Description: "Falchi et al. 2016 World Atlas 2015 of artificial night sky brightness " +
-				"(GFZ Data Services, DOI 10.5880/GFZ.1.4.2016.001). LICENSE: CC BY-NC 4.0, " +
-				"non-commercial; attribute Falchi et al. (2016), Sci. Adv. 2, e1600377.",
-			ApproxSize:      684_266_450, // World_Atlas_2015.zip, measured Content-Length
-			Enabled:         true,
-			DownloadTimeout: 60 * time.Minute,
-			Mutable:         false, // DOI-versioned, frozen since 2019-11-18
-			Downloadable:    true,
-			Files:           []string{"World_Atlas_2015.zip"},
 		},
 		CopernicusEODATA: {
 			ID:        CopernicusEODATA,
