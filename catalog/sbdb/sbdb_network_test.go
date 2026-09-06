@@ -72,8 +72,11 @@ func TestSBDBNetworkResolveOrbitalElements(t *testing.T) {
 	defer cancel()
 
 	tar, err := prov.Resolve(ctx, "1")
+
+	testutil.SkipOnUpstreamFailure(t, err)
+
 	if err != nil {
-		t.Fatal("failed to resolve 1 Ceres")
+		t.Fatalf("Resolve(1 Ceres): %v", err)
 	}
 
 	if !tar.HasElements {

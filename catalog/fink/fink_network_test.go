@@ -27,8 +27,11 @@ func TestFINKProvider_SingleObjectJSON(t *testing.T) {
 
 	// Fast single-object JSON query.
 	tgt, err := p.Resolve(context.Background(), "8467")
+
+	testutil.SkipOnUpstreamFailure(t, err)
+
 	if err != nil {
-		t.Fatal("Resolve(8467) failed")
+		t.Fatalf("Resolve(8467): %v", err)
 	}
 
 	t.Logf("8467 %s:", tgt.Name)
@@ -82,8 +85,11 @@ func TestFINKProvider_SingleObjectJSON(t *testing.T) {
 
 	// Cross-check by name.
 	tgt2, err := p.Resolve(context.Background(), "Benoitcarry")
+
+	testutil.SkipOnUpstreamFailure(t, err)
+
 	if err != nil {
-		t.Fatal("Resolve by name failed")
+		t.Fatalf("Resolve(Benoitcarry): %v", err)
 	}
 
 	if tgt2.H != tgt.H {

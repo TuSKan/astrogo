@@ -140,8 +140,16 @@ func TestResolve_Live(t *testing.T) {
 	p := New()
 
 	target, err := p.Resolve(context.Background(), "ISS")
+
+	// The health check in requireCelestrak is a sync.Once taken before this
+	// test ran, so it says nothing about a throttle arriving on this request.
+	// Checked here too, and the error is carried into the failure either way:
+	// "Failed to resolve ISS" on its own cannot distinguish a rate limit from
+	// CelesTrak genuinely not knowing what the ISS is.
+	testutil.SkipOnUpstreamFailure(t, err)
+
 	if err != nil {
-		t.Fatal("Failed to resolve ISS")
+		t.Fatalf("Resolve(ISS): %v", err)
 	}
 
 	t.Logf("Resolved: %s (ID=%s, Catalog=%s)", target.Name, target.ID, target.Catalog)
