@@ -1,0 +1,2 @@
+go test fuzz v1
+string("<TABLEDATA><TR>0</A>")

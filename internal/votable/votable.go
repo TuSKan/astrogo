@@ -43,6 +43,28 @@ import (
 // between "this field holds no sources" and "your ADQL does not parse".
 var ErrQueryFailed = errors.New("votable: the service reported a query error")
 
+// ErrNoFields reports rows parsed from a document that declares no columns.
+//
+// A VOTable's TABLEDATA cells align to its FIELD declarations by position, so
+// a table with rows and no fields has nothing any caller can address: every
+// [Table.Value] returns empty, and a consumer building targets from it produces
+// none. That is indistinguishable from a query that legitimately matched
+// nothing, which is the wrong answer to give about a response that was not a
+// VOTable at all.
+//
+// The parser is a flat token walk and does not require TABLEDATA to sit inside
+// a TABLE, and it runs with Strict = false so that unmatched end tags do not
+// stop it -- both deliberate, because services vary and a partly-odd document
+// that still carries the results is worth reading. The cost is that markup with
+// no field declarations reaches the row loop, which FuzzRead found in about a
+// second with the input `<TABLEDATA><TR>0</A>`.
+//
+// This package has been caught by content confusion once already: the Gaia
+// path requested CSV, the endpoint answered VOTable regardless, and every
+// tagged test failed on an XML document handed to a CSV reader. Returning an
+// error here is what makes the reverse visible.
+var ErrNoFields = errors.New("votable: rows were parsed but the document declares no fields")
+
 // Table is one result table: the field names in order, and the rows beneath
 // them.
 type Table struct {
@@ -207,6 +229,12 @@ func finish(t *Table, status, detail string) (*Table, error) {
 
 	case "OVERFLOW":
 		t.Truncated = true
+	}
+
+	// Rows with no columns to align to are not a result. A table with neither
+	// is: an empty answer, or a metadata-only resource, both ordinary.
+	if len(t.Rows) > 0 && len(t.Fields) == 0 {
+		return nil, fmt.Errorf("%w: %d row(s)", ErrNoFields, len(t.Rows))
 	}
 
 	return t, nil
