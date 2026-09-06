@@ -229,3 +229,123 @@ func TestSwapAndInsertPassesReportAConstraintFailure(t *testing.T) {
 		t.Errorf("insertPass returned %v, want it to wrap the constraint's error", err)
 	}
 }
+
+// seedStrategy returns a canned schedule without evaluating any constraint,
+// standing in for SwapOptimizedStrategy's greedy seed.
+//
+// It exists because the seed and the passes share one constraint set: an
+// always-failing constraint kills the greedy seed before a swap is attempted,
+// so the error forwarding inside SwapOptimizedStrategy.Schedule is
+// unreachable through the public entry point. Replacing the seed reaches it.
+type seedStrategy struct{ sched *Schedule }
+
+func (s seedStrategy) Schedule(_ *Planner, _ Window, _ []*Block, _ TransitionModel) (*Schedule, error) {
+	return s.sched, nil
+}
+
+// TestSwapOptimizedScheduleForwardsAPassFailure covers the two error forwards
+// in SwapOptimizedStrategy.Schedule.
+//
+// Two cases, because the passes run in order and the first to fail hides the
+// second: with two adjacent blocks a swap is considered and swapPass fails;
+// with one block no swap is possible, swapPass returns cleanly, and insertPass
+// fails on the unscheduled block instead.
+func TestSwapOptimizedScheduleForwardsAPassFailure(t *testing.T) {
+	t.Parallel()
+
+	site := predicateSite(t)
+
+	planner, err := NewPlanner(site, []Constraint{failingConstraint{}})
+	if err != nil {
+		t.Fatalf("NewPlanner: %v", err)
+	}
+
+	start := fixedEpoch()
+	window := Window{Start: start, End: start.Add(2 * time.Hour)}
+
+	b1 := &Block{ID: "B1", Target: NewStar("A", angle.Zero(), angle.Zero()), Duration: 10 * time.Minute}
+	b2 := &Block{ID: "B2", Target: NewStar("B", angle.Zero(), angle.Zero()), Duration: 10 * time.Minute}
+
+	placed := func(b *Block, offset time.Duration) ScheduledBlock {
+		return ScheduledBlock{
+			Block:  b,
+			Window: Window{Start: start.Add(offset), End: start.Add(offset + 10*time.Minute)},
+		}
+	}
+
+	for _, tc := range []struct {
+		name  string
+		sched *Schedule
+	}{
+		{
+			name: "swapPass fails",
+			sched: &Schedule{
+				Window: window,
+				Blocks: []ScheduledBlock{placed(b1, 0), placed(b2, 10*time.Minute)},
+			},
+		},
+		{
+			name: "insertPass fails",
+			sched: &Schedule{
+				Window:      window,
+				Blocks:      []ScheduledBlock{placed(b1, 0)},
+				Unscheduled: []UnscheduledBlock{{Block: b2}},
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			strategy := &SwapOptimizedStrategy{Base: seedStrategy{sched: tc.sched}, Step: time.Minute}
+
+			_, err := strategy.Schedule(planner, window, []*Block{b1, b2}, &BasicTransitionModel{BaseSetup: 0})
+			if !errors.Is(err, errConstraintUnavailable) {
+				t.Errorf("Schedule returned %v, want it to wrap the constraint's error", err)
+			}
+		})
+	}
+}
+
+// endOnlyFailingConstraint fails at one exact instant and passes everywhere
+// else.
+type endOnlyFailingConstraint struct{ at time.Time }
+
+func (c endOnlyFailingConstraint) Check(_ Observable, t time.Time, _ *Site) (Result, error) {
+	if t.Equal(c.at) {
+		return Result{}, errConstraintUnavailable
+	}
+
+	return Result{Pass: true}, nil
+}
+
+// TestConstraintFailureAtTheExactEndIsReported covers the interval check's
+// last step.
+//
+// checkConstraintsIntervalCtx samples from start to end and then, if the two
+// differ, checks the exact end instant separately — because a step that does
+// not divide the interval leaves the endpoint unsampled, and a block whose
+// last moment violates a constraint is not schedulable.
+//
+// That extra check has its own error path, and only a constraint that fails
+// exactly there reaches it: an always-failing one returns from the loop's
+// first step instead.
+func TestConstraintFailureAtTheExactEndIsReported(t *testing.T) {
+	t.Parallel()
+
+	site := predicateSite(t)
+	start := fixedEpoch()
+
+	// A step that does not divide the interval, so the loop never lands on end.
+	end := start.Add(25 * time.Minute)
+
+	_, ok, err := checkConstraintsIntervalCtx(
+		NewStar("A", angle.Zero(), angle.Zero()),
+		start, end, 10*time.Minute, site,
+		endOnlyFailingConstraint{at: end},
+	)
+
+	if !errors.Is(err, errConstraintUnavailable) {
+		t.Errorf("returned ok=%v err=%v, want the constraint's error from the "+
+			"exact-end check", ok, err)
+	}
+}
