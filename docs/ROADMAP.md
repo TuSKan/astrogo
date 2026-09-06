@@ -123,9 +123,14 @@ entirely wrong spectrum and every instrument projection would be wrong; it took 
 light-pollution floor as an input rather than propagating light from sources; and its Moon
 was a closed-form V-band fit with no spectrum to project at all.
 
-Nothing from the original checklist survives by name — `Floor`, `SQMGrid`,
-`FloorFromBortle`, `CompositeModel`, `VisualLimitingMag`, `ScoreObservableSky` and
-`LimitingMagnitudeConstraint` are all gone. See the CHANGELOG's `### Removed` entries.
+`Floor`, `SQMGrid`, `FloorFromBortle`, `CompositeModel`, `VisualLimitingMag` and
+`ScoreObservableSky` are gone. See the CHANGELOG's `### Removed` entries.
+
+One name came back, differently shaped: [`plan.LimitingMagnitudeConstraint`](../plan/skybrightness.go)
+exists today. The v0.2.0 version took a light-pollution floor as an input and gated on it;
+this one takes a `SkyDepth` — anything that can answer "how faint can I see at this
+pointing, at this instant" — and by default scores on a soft ramp rather than rejecting.
+The constraint is the same question asked of a real radiance model instead of a constant.
 
 What ships now:
 

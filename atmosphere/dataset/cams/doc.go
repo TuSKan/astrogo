@@ -1,12 +1,13 @@
-// Package cams is a minimal, read-only NetCDF-4/HDF5 reader for CAMS
-// (Copernicus Atmosphere Monitoring Service) global analysis files —
-// the Sky Brightness V2 Phase 3/7 building block docs/skybrightness.md
-// §8's "CAMS aerosol data" notes describe, and the reader
-// atmosphere.Atmosphere's future live, geographically-resolved aerosol
-// tier is meant to sit on top of (the OPAC-sourced
-// atmosphere.RuralAerosol/UrbanAerosol/DesertAerosol/MaritimeAerosol
-// presets remain the offline, zero-dependency default; this package is
-// the operational counterpart, not a replacement).
+// Package cams is a minimal, read-only NetCDF-4/HDF5 reader for CAMS files.
+//
+// CAMS is the Copernicus Atmosphere Monitoring Service, and its global
+// analysis files are the Sky Brightness V2 Phase 3/7 building block that
+// docs/skybrightness.md §8's "CAMS aerosol data" notes describe — the reader
+// atmosphere.Atmosphere's future live, geographically-resolved aerosol tier is
+// meant to sit on top of. The OPAC-sourced
+// atmosphere.RuralAerosol/UrbanAerosol/DesertAerosol/MaritimeAerosol presets
+// remain the offline, zero-dependency default; this package is the operational
+// counterpart, not a replacement.
 //
 // # Access
 //

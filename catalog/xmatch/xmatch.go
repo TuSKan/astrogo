@@ -1,7 +1,8 @@
-// Package xmatch cross-matches astronomical catalog entries — identifying
-// resolve.Target values from independently-obtained sources that describe
-// the same physical object — as a standalone, directly-testable primitive
-// operating on plain resolve.Target slices.
+// Package xmatch cross-matches astronomical catalog entries.
+//
+// It identifies resolve.Target values from independently-obtained sources that
+// describe the same physical object, as a standalone, directly-testable
+// primitive operating on plain resolve.Target slices.
 //
 // catalog.Resolver already has its own cross-match logic
 // (catalog/catalog.go's unionFind/unionByAlias/unionByPosition/mergeGroup),

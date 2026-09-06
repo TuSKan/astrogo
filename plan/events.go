@@ -784,10 +784,17 @@ type TwilightEvent struct {
 
 // ── Sun/Moon/Twilight Helpers ──────────────────────────────────────────────────
 
-// NOTE: Horizon altitude constants were removed in favor of SOFA-native
-// refraction. Use Site.SunRiseSetThreshold(), Site.MoonRiseSetThreshold(),
-// and Site.RiseSetThreshold() which account for SOFA's rigorous refraction
-// model and only add body-specific corrections (semi-diameter, parallax).
+// Rise and set thresholds come from the Site: SunRiseSetThreshold,
+// MoonRiseSetThreshold and RiseSetThreshold.
+//
+// Each is the conventional sum of a standard refraction of 34', the body's
+// semi-diameter, and the geometric horizon dip for the site's elevation. The
+// 34' is a fixed convention, not a SOFA computation -- USNO and the Astronomical
+// Almanac define rise and set the same way, so that two implementations agree on
+// an instant that is otherwise sensitive to the air on the night. SOFA's
+// rigorous refraction is used where refraction is being modelled rather than
+// conventionally defined: coord.Context's apparent-place transform, and
+// atmosphere's refraction models.
 
 // SunEvents returns all rise, set, and transit events for the Sun in the given interval.
 // The threshold accounts for atmospheric refraction (34'), solar semi-diameter (16'),
