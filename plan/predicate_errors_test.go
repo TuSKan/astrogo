@@ -181,3 +181,51 @@ func TestVisibleTonightReportsWhyACandidateWasSkipped(t *testing.T) {
 			"short list with no way to tell why.", out)
 	}
 }
+
+// TestSwapAndInsertPassesReportAConstraintFailure reaches the two passes
+// directly.
+//
+// Going through Schedule cannot: SwapOptimizedStrategy seeds with a greedy
+// pass, so a constraint that errors kills the seed before a swap is ever
+// attempted, and the forwarding branches inside swapPass and insertPass stay
+// unexecuted. Calling them with a schedule built by hand is the only way to
+// exercise the paths this change added, and they are unexported, so an
+// in-package test can.
+func TestSwapAndInsertPassesReportAConstraintFailure(t *testing.T) {
+	t.Parallel()
+
+	site := predicateSite(t)
+
+	planner, err := NewPlanner(site, []Constraint{failingConstraint{}})
+	if err != nil {
+		t.Fatalf("NewPlanner: %v", err)
+	}
+
+	start := fixedEpoch()
+	window := Window{Start: start, End: start.Add(2 * time.Hour)}
+
+	b1 := &Block{ID: "B1", Target: NewStar("A", angle.Zero(), angle.Zero()), Duration: 10 * time.Minute}
+	b2 := &Block{ID: "B2", Target: NewStar("B", angle.Zero(), angle.Zero()), Duration: 10 * time.Minute}
+
+	strategy := &SwapOptimizedStrategy{}
+	transition := &BasicTransitionModel{BaseSetup: 0}
+
+	// Two adjacent scheduled blocks, so a swap is actually considered, plus one
+	// unscheduled so the insert pass has something to place.
+	sched := &Schedule{
+		Window: window,
+		Blocks: []ScheduledBlock{
+			{Block: b1, Window: Window{Start: start, End: start.Add(10 * time.Minute)}},
+			{Block: b2, Window: Window{Start: start.Add(10 * time.Minute), End: start.Add(20 * time.Minute)}},
+		},
+		Unscheduled: []UnscheduledBlock{{Block: b1}},
+	}
+
+	if _, err := strategy.swapPass(sched, planner, transition, time.Minute, newTabuList(2), 0); !errors.Is(err, errConstraintUnavailable) {
+		t.Errorf("swapPass returned %v, want it to wrap the constraint's error", err)
+	}
+
+	if _, err := strategy.insertPass(sched, planner, window, transition, time.Minute); !errors.Is(err, errConstraintUnavailable) {
+		t.Errorf("insertPass returned %v, want it to wrap the constraint's error", err)
+	}
+}
