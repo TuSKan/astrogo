@@ -63,7 +63,7 @@ Any crasher Go writes to `testdata/fuzz/` should be committed — that's the one
 
 ## Embedded data
 
-There is no `go:generate` step in this codebase — it was removed deliberately. No package uses `go:embed` either — every data source is obtained at runtime through `remote.GetFile`, either explicitly (`catalog/openngc`, see [catalog/openngc/openngc.go](catalog/openngc/openngc.go)) or via a lazy, on-first-query load (`time`'s Earth Orientation Parameters, see [time/eop.go](time/eop.go) and the unexported `time/internal/iers`).
+There is no `go:generate` step in this codebase — it was removed deliberately. No package uses `go:embed` either — every data source is obtained at runtime through `remote.GetFile`, on a lazy, on-first-query load: `catalog/openngc`'s two CSVs (see [catalog/openngc/openngc.go](catalog/openngc/openngc.go)) and `time`'s Earth Orientation Parameters (see [time/eop.go](time/eop.go) and the unexported `time/internal/iers`). A constructor performs no I/O; the first query that needs the data fetches it under that caller's context.
 
 Never reintroduce a `go:generate`/download-tooling step, and never add `go:embed` to a new catalog provider — fetch through `remote` instead (see the caching primitives below).
 

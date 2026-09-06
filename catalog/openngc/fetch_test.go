@@ -55,6 +55,19 @@ func fakeSources(t *testing.T) *file.Bucket {
 	return bucket
 }
 
+// loadNow builds a provider and drives its catalog load to completion.
+//
+// New performs no I/O — the fetch happens on the first query that needs the
+// catalog — so a test about fetch/cache behaviour has to ask a question to
+// provoke one.
+func loadNow(t *testing.T) {
+	t.Helper()
+
+	if _, err := New().Resolve(context.Background(), "M42"); err != nil {
+		t.Fatalf("Resolve(M42): %v", err)
+	}
+}
+
 func TestNewFetchesFromNetworkWhenDownloadsEnabled(t *testing.T) {
 	t.Cleanup(remote.Capture().Restore)
 
@@ -82,7 +95,7 @@ func TestNewFetchesFromNetworkWhenDownloadsEnabled(t *testing.T) {
 	}
 }
 
-func TestNewSkipsBodyWhenUnchanged(t *testing.T) {
+func TestLoadSkipsBodyWhenUnchanged(t *testing.T) {
 	t.Cleanup(remote.Capture().Restore)
 
 	fakeSources(t)
@@ -90,7 +103,7 @@ func TestNewSkipsBodyWhenUnchanged(t *testing.T) {
 	remote.EnableDownloads(0, remote.OpenNGC)
 	remote.SetDataDir(testutil.FileURL(t, t.TempDir()))
 
-	_ = New()
+	loadNow(t)
 
 	bucket, prefix, err := remote.CacheDir(context.Background(), remote.OpenNGC)
 	if err != nil {
@@ -107,11 +120,11 @@ func TestNewSkipsBodyWhenUnchanged(t *testing.T) {
 		t.Fatalf("Attributes(addendum.csv): %v", err)
 	}
 
-	// Second New() call: the source is untouched (same mtime/size, so the
-	// same fileblob-derived ETag), so both cache files must be reused
-	// untouched — proved by their own ModTime staying identical, which
-	// only happens if fetchInto's promote step never ran a second time.
-	_ = New()
+	// Second load: the source is untouched (same mtime/size, so the same
+	// fileblob-derived ETag), so both cache files must be reused untouched —
+	// proved by their own ModTime staying identical, which only happens if
+	// fetchInto's promote step never ran a second time.
+	loadNow(t)
 
 	ngcAttrsAfter, err := bucket.Attributes(context.Background(), prefix+"NGC.csv")
 	if err != nil {
@@ -152,14 +165,14 @@ func TestNewDefaultDenyIssuesNoRequest(t *testing.T) {
 
 	// A failed existence check is not "exists".
 	if exists, _ := bucket.Exists(context.Background(), prefix+"NGC.csv"); exists {
-		t.Error("New() must not create a cache file when downloads aren't enabled")
+		t.Error("a denied query must not create a cache file")
 	}
 }
 
-// TestNewDoesNotAccumulateCacheFiles is a regression test: repeated New()
-// calls must reuse a single cache file per source name, never leave stale
-// versions behind (the concern that originally motivated fetchSource).
-func TestNewDoesNotAccumulateCacheFiles(t *testing.T) {
+// TestLoadDoesNotAccumulateCacheFiles is a regression test: repeated loads
+// must reuse a single cache file per source name, never leave stale versions
+// behind (the concern that originally motivated fetchSource).
+func TestLoadDoesNotAccumulateCacheFiles(t *testing.T) {
 	t.Cleanup(remote.Capture().Restore)
 
 	fakeSources(t)
@@ -167,8 +180,10 @@ func TestNewDoesNotAccumulateCacheFiles(t *testing.T) {
 	remote.EnableDownloads(0, remote.OpenNGC)
 	remote.SetDataDir(testutil.FileURL(t, t.TempDir()))
 
+	// Three separate providers, each loading for itself: the guard against
+	// accumulation has to be the cache, not one provider's own memo.
 	for range 3 {
-		_ = New()
+		loadNow(t)
 	}
 
 	bucket, prefix, err := remote.CacheDir(context.Background(), remote.OpenNGC)

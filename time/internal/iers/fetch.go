@@ -19,7 +19,7 @@ var (
 
 // EnsureLoaded makes a best-effort, at-most-one-attempt-per-cooldown-window
 // attempt to populate the global EOP model before a lookup for mjd —
-// mirroring the openngc.New()/jpl.NewProvider lazy-load contract used
+// mirroring the catalog/openngc first-query lazy-load contract used
 // elsewhere in this codebase. It never logs; callers (time.lookupEOP)
 // decide whether to warn-and-degrade or propagate the returned error.
 //

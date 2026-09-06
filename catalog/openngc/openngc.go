@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"sync"
 
 	"github.com/TuSKan/astrogo/catalog/resolve"
 )
@@ -21,55 +22,38 @@ type Record struct {
 
 // Provider implements the resolve.Provider interface for OpenNGC.
 type Provider struct {
+	// mu guards the load and everything it fills in. It is held across the
+	// fetch, so concurrent first queries make one request between them rather
+	// than one each.
+	mu      sync.Mutex
+	loaded  bool
 	byKey   map[string]int
 	targets []resolve.Target
-
-	// initErr records a failed catalog load so every query can report it.
-	//
-	// New used to log the failure and hand back an empty provider, which then
-	// answered every lookup with "not found" for the life of the process. A
-	// consent gate that was never granted, or one bad fetch at start-up, made
-	// the whole NGC/IC catalog silently absent while the provider looked
-	// healthy. Construction-time failure is worse than per-query failure for
-	// exactly that reason: it is permanent and it is invisible.
-	initErr error
 }
 
-// New creates a new OpenNGC catalog provider — like every other astrogo
-// catalog provider, it does its own network access rather than reading
-// build-time embedded data. It fetches and merges the two upstream source
-// CSVs if remote.EnableDownloads(..., remote.OpenNGC) has been called,
-// reusing a local cache untouched when a HEAD probe shows nothing changed
-// upstream. If downloads aren't enabled, or the fetch fails for any other
-// reason, New returns an empty, warning-logged provider — the same
-// degraded behavior as any other catalog provider whose backing source is
-// unreachable.
-func New() *Provider {
-	targets, err := fetch(context.Background())
-	if err != nil {
-		return &Provider{
-			byKey:   make(map[string]int),
-			initErr: fmt.Errorf("openngc: catalog unavailable: %w", err),
-		}
-	}
-
-	p := &Provider{
-		targets: targets,
-		byKey:   make(map[string]int),
-	}
-	for i, t := range targets {
-		p.byKey[resolve.Normalize(t.ID)] = i
-		if t.Name != "" {
-			p.byKey[resolve.Normalize(t.Name)] = i
-		}
-
-		for _, a := range t.Aliases {
-			p.byKey[resolve.Normalize(a)] = i
-		}
-	}
-
-	return p
-}
+// New creates an OpenNGC catalog provider. It performs no I/O.
+//
+// The catalog — two upstream CSVs, about 7 MB — is fetched on the first query
+// that needs it, using that caller's context, and kept for the life of the
+// provider.
+//
+// # Why not at construction
+//
+// It used to be. New called fetch with context.Background(), which meant a
+// constructor that looked pure blocked for as long as the endpoint took: two
+// seconds against a warm cache, and a full timeout against an unreachable one,
+// with no way for the caller to cancel it or set a deadline. catalog.NewResolver
+// takes no context either, so a request-scoped deadline above it had no effect
+// on the network call below it. Every other network entry point in astrogo takes
+// a ctx first, and this one took none.
+//
+// A failed load is also no longer permanent. It used to be recorded once and
+// replayed at every query for the life of the process, so a consent gate not yet
+// granted, or one bad fetch at start-up, made the whole NGC/IC catalog silently
+// absent while the provider looked healthy. That is worse than a per-query
+// failure precisely because it is invisible and cannot recover; a later query
+// now tries again.
+func New() *Provider { return &Provider{} }
 
 // Name returns the provider identifier.
 func (p *Provider) Name() string { return "openngc" }
@@ -80,10 +64,17 @@ func (p *Provider) Capabilities() []resolve.Capability {
 }
 
 // SearchBright returns every OpenNGC object brighter than req.MaxVMag,
-// brightest-first — a plain in-memory filter over the catalog already
-// loaded at New() time, since (unlike SIMBAD/SBDB) there's no remote query
-// to make.
-func (p *Provider) SearchBright(_ context.Context, req resolve.BrightRequest) resolve.SeqIterator[resolve.Target] {
+// brightest-first — a plain in-memory filter over the loaded catalog, since
+// (unlike SIMBAD/SBDB) there's no remote query to make. ctx carries the
+// catalog fetch if this is the first query to need it.
+func (p *Provider) SearchBright(ctx context.Context, req resolve.BrightRequest) resolve.SeqIterator[resolve.Target] {
+	if err := p.load(ctx); err != nil {
+		// The iterator is the only channel this signature has, so the failure
+		// goes down it. Yielding nothing instead would report an unreachable
+		// catalog as a sky with no bright objects in it.
+		return func(yield func(resolve.Target, error) bool) { yield(resolve.Target{}, err) }
+	}
+
 	var matches []resolve.Target
 
 	for _, t := range p.targets {
@@ -101,12 +92,14 @@ func (p *Provider) SearchBright(_ context.Context, req resolve.BrightRequest) re
 	return resolve.SliceSeq(matches)
 }
 
-// Resolve performs exact-match resolution for a query. ctx is accepted for
-// resolve.Provider conformance only — resolution runs over the in-memory
-// index built once at New(), with no I/O to cancel.
-func (p *Provider) Resolve(_ context.Context, query string) (resolve.Target, error) {
-	if p.initErr != nil {
-		return resolve.Target{}, p.initErr
+// Resolve performs exact-match resolution for a query.
+//
+// ctx is used: the first query to reach a provider fetches the catalog under
+// it. After that the lookup is an in-memory index and there is nothing left to
+// cancel.
+func (p *Provider) Resolve(ctx context.Context, query string) (resolve.Target, error) {
+	if err := p.load(ctx); err != nil {
+		return resolve.Target{}, err
 	}
 
 	q := resolve.Normalize(query)
@@ -117,11 +110,11 @@ func (p *Provider) Resolve(_ context.Context, query string) (resolve.Target, err
 	return resolve.Target{}, fmt.Errorf("%w: %q in OpenNGC", resolve.ErrNotFound, query)
 }
 
-// Search performs fuzzy search across all NGC/IC objects. ctx is accepted
-// for resolve.Provider conformance only — see Resolve.
-func (p *Provider) Search(_ context.Context, query string) ([]resolve.Target, error) {
-	if p.initErr != nil {
-		return nil, p.initErr
+// Search performs fuzzy search across all NGC/IC objects. ctx carries the
+// first query's catalog fetch — see Resolve.
+func (p *Provider) Search(ctx context.Context, query string) ([]resolve.Target, error) {
+	if err := p.load(ctx); err != nil {
+		return nil, err
 	}
 
 	q := resolve.Normalize(query)
@@ -147,4 +140,41 @@ func (p *Provider) Search(_ context.Context, query string) ([]resolve.Target, er
 	}
 
 	return results, nil
+}
+
+// load fetches and indexes the catalog once, under the caller's context.
+//
+// A failure is deliberately not cached: the next query retries. The cost of
+// that is a second attempt against an endpoint that is still down; the cost of
+// caching it is a provider that answers "not found" for ever because of one
+// cancelled context at start-up.
+func (p *Provider) load(ctx context.Context) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	if p.loaded {
+		return nil
+	}
+
+	targets, err := fetch(ctx)
+	if err != nil {
+		return fmt.Errorf("openngc: catalog unavailable: %w", err)
+	}
+
+	byKey := make(map[string]int, len(targets)*2)
+
+	for i, t := range targets {
+		byKey[resolve.Normalize(t.ID)] = i
+		if t.Name != "" {
+			byKey[resolve.Normalize(t.Name)] = i
+		}
+
+		for _, a := range t.Aliases {
+			byKey[resolve.Normalize(a)] = i
+		}
+	}
+
+	p.targets, p.byKey, p.loaded = targets, byKey, true
+
+	return nil
 }
