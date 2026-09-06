@@ -16,8 +16,10 @@ var (
 	// ErrDatasumMismatch indicates a DATASUM verification failure.
 	ErrDatasumMismatch = errors.New("fits: DATASUM mismatch")
 
-	// ErrNoEndCard indicates the header exceeded maximum blocks without an END card.
-	ErrNoEndCard = errors.New("fits: header exceeded max blocks without END card")
+	// ErrNoEndCard indicates the header ran past one of ReadHeader's two
+	// failsafes without an END card — too many blocks read, or too many cards
+	// retained. The wrapped message says which.
+	ErrNoEndCard = errors.New("fits: header exceeded its size limit without an END card")
 	// ErrInvalidBitpix indicates an unsupported BITPIX value.
 	ErrInvalidBitpix = errors.New("fits: invalid BITPIX value")
 	// ErrEmptyHeader indicates a FITS file with an empty header.
