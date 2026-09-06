@@ -64,6 +64,13 @@ type Satellite struct {
 	Name       string
 	sat        gosatellite.Satellite
 	MeanMotion float64
+
+	// epoch is the element set's own epoch, and epochFracSec the fractional
+	// second within it. The backend truncates the epoch to a whole second
+	// when it builds jdsatepoch, so propagateECI has to measure its
+	// sub-second correction from this rather than from zero -- see there.
+	epoch        time.Time
+	epochFracSec float64
 }
 
 // NewFromTLE creates a Satellite from raw TLE lines.
@@ -79,10 +86,15 @@ func NewFromTLE(name, line1, line2 string) (*Satellite, error) {
 	// Both the guard against TLEToSat's os.Exit and the source of MeanMotion:
 	// one parse, so the value this reports can never disagree with the one
 	// SGP4 propagates from.
-	mm, err := parseTLENumerics(line1, line2)
+	mm, epoch, err := parseTLENumerics(line1, line2)
 	if err != nil {
 		return nil, err
 	}
+
+	// The same conversion propagateECI applies to a query time, so the two
+	// fractional seconds are on identical footing and cancel exactly when the
+	// query lands a whole number of seconds after the epoch.
+	_, _, _, _, _, _, epochFracSec := timeToComponents(epoch)
 
 	sat := gosatellite.TLEToSat(line1, line2, gosatellite.GravityWGS84)
 	if sat.Error != 0 {
@@ -90,9 +102,11 @@ func NewFromTLE(name, line1, line2 string) (*Satellite, error) {
 	}
 
 	return &Satellite{
-		Name:       name,
-		MeanMotion: mm,
-		sat:        sat,
+		Name:         name,
+		MeanMotion:   mm,
+		sat:          sat,
+		epoch:        epoch,
+		epochFracSec: epochFracSec,
 	}, nil
 }
 
@@ -192,7 +206,7 @@ func ValidateTLE(line1, line2 string) error {
 		return err
 	}
 
-	_, err := parseTLENumerics(line1, line2)
+	_, _, err := parseTLENumerics(line1, line2)
 
 	return err
 }
@@ -252,7 +266,7 @@ func validateTLEStructure(line1, line2 string) error {
 //
 // Callers must have established the 69-character length first
 // (validateTLEStructure) - every slice below indexes fixed columns.
-func parseTLENumerics(line1, line2 string) (meanMotion float64, err error) {
+func parseTLENumerics(line1, line2 string) (meanMotion float64, epoch time.Time, err error) {
 	ints := [...]struct {
 		name  string
 		value string
@@ -263,7 +277,7 @@ func parseTLENumerics(line1, line2 string) (meanMotion float64, err error) {
 
 	for _, f := range ints {
 		if _, err := strconv.ParseInt(f.value, 10, 0); err != nil {
-			return 0, fmt.Errorf("%w: %s is %q, which is not an integer", ErrMalformedTLE, f.name, f.value)
+			return 0, time.Time{}, fmt.Errorf("%w: %s is %q, which is not an integer", ErrMalformedTLE, f.name, f.value)
 		}
 	}
 
@@ -286,7 +300,7 @@ func parseTLENumerics(line1, line2 string) (meanMotion float64, err error) {
 	for _, f := range floats {
 		v, err := strconv.ParseFloat(f.value, 64)
 		if err != nil {
-			return 0, fmt.Errorf("%w: %s is %q, which is not a number", ErrMalformedTLE, f.name, f.value)
+			return 0, time.Time{}, fmt.Errorf("%w: %s is %q, which is not a number", ErrMalformedTLE, f.name, f.value)
 		}
 
 		if f.name == "mean motion" {
@@ -294,7 +308,32 @@ func parseTLENumerics(line1, line2 string) (meanMotion float64, err error) {
 		}
 	}
 
-	return meanMotion, nil
+	return meanMotion, tleEpoch(line1), nil
+}
+
+// tleEpoch reconstructs the element set's epoch from line 1's two-digit year
+// (columns 19-20) and fractional day of year (21-32).
+//
+// The two-digit year follows the NORAD convention the backend also uses: 57
+// and above is 19xx, below is 20xx. It is not a Y2K bug to be fixed here --
+// the format has no other year, so the window is the format's, and changing it
+// would disagree with the propagator being driven.
+//
+// Both fields are already known to parse; this runs after the loop above.
+func tleEpoch(line1 string) time.Time {
+	yy, _ := strconv.Atoi(strings.TrimSpace(line1[18:20]))
+
+	year := 2000 + yy
+	if yy >= 57 {
+		year = 1900 + yy
+	}
+
+	// Day of year is 1-based: day 1.0 is midnight on January 1st.
+	doy, _ := strconv.ParseFloat(strings.TrimSpace(line1[20:32]), 64)
+
+	jan1 := time.Date(year, 1, 1, 0, 0, 0, 0, time.LocationUTC)
+
+	return jan1.Add(time.Duration((doy - 1) * float64(24*time.Hour)))
 }
 
 // tleChecksum is the modulo-10 sum a TLE line's last character records: every
@@ -317,10 +356,35 @@ func tleChecksum(line string) int {
 }
 
 // propagateECI returns the TEME position and velocity (km, km/s) at time t.
-// The go-satellite Propagate API accepts integer seconds, so we propagate
-// to the truncated second and linearly interpolate position for the
-// sub-second remainder using the velocity vector. This reduces the
-// position error from up to ~7.7 km (at LEO velocity) to < 1 m.
+//
+// # The sub-second correction, and why it is measured from the epoch
+//
+// The go-satellite Propagate API accepts integer seconds only, so it can be
+// asked for a state at the truncated second and the sub-second remainder has
+// to be recovered by a linear step along the velocity vector.
+//
+// The subtle part is what the remainder is measured from. Propagate computes
+// its own time argument as
+//
+//	tsince = (JDay(truncated query) - sat.jdsatepoch) * 1440
+//
+// and `jdsatepoch` is itself built with `JDay(..., int(sec))` — the element
+// set's epoch is truncated to a whole second exactly like the query is. Both
+// ends of the subtraction lose their fraction, so what Propagate actually
+// evaluates is offset from the intended instant by
+//
+//	frac(t) - frac(epoch)
+//
+// not by frac(t). Correcting by frac(t) alone — which this function did until
+// the Vallado verification suite was run against it — leaves a residual of
+// vel * frac(epoch): a fixed offset per element set, up to one second of
+// motion, which is 7.5 km for a low Earth orbit and was measured at 5.94 km
+// for Vallado's own satellite 5. It is worst at the epoch itself, where the
+// answer should be exact, and it does not average out, because frac(epoch) is
+// a property of the element set rather than of the query.
+//
+// See TestSGP4AgreesWithValladoReferenceVectors, which measures this end to
+// end and would fail again at kilometre scale if the origin were dropped.
 func (s *Satellite) propagateECI(t time.Time) (pos, vel vector.Vec3, err error) {
 	year, month, day, hour, minute, second, fracSec := timeToComponents(t)
 	eciPos, eciVel := gosatellite.Propagate(s.sat, year, month, day, hour, minute, second)
@@ -333,12 +397,12 @@ func (s *Satellite) propagateECI(t time.Time) (pos, vel vector.Vec3, err error) 
 
 	vel = vector.V3(eciVel.X, eciVel.Y, eciVel.Z)
 
-	// Linear interpolation for sub-second fraction:
-	// pos_corrected = pos_truncated + vel * fracSec
+	// pos_corrected = pos_truncated + vel * (frac(t) - frac(epoch))
+	dt := fracSec - s.epochFracSec
 	pos = vector.V3(
-		eciPos.X+eciVel.X*fracSec,
-		eciPos.Y+eciVel.Y*fracSec,
-		eciPos.Z+eciVel.Z*fracSec,
+		eciPos.X+eciVel.X*dt,
+		eciPos.Y+eciVel.Y*dt,
+		eciPos.Z+eciVel.Z*dt,
 	)
 
 	return pos, vel, nil
