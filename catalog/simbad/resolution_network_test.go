@@ -49,8 +49,15 @@ func TestResolveReturnsTheObjectAsked(t *testing.T) {
 			p := New()
 
 			tgt, err := p.Resolve(context.Background(), tc.query)
+
+			// "found nothing" was the whole message, which asserts the one
+			// reading the error may not support: SIMBAD being unreachable is
+			// not SIMBAD saying no. That inversion is #102's defect, here in
+			// the test rather than the library.
+			testutil.SkipOnUpstreamFailure(t, err)
+
 			if err != nil {
-				t.Fatalf("Resolve(%q) found nothing (%s)", tc.query, tc.why)
+				t.Fatalf("Resolve(%q) failed (%s): %v", tc.query, tc.why, err)
 			}
 
 			if !tgt.HasCoord {
