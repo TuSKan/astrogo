@@ -191,6 +191,15 @@ The following areas are not yet considered scientifically complete:
 - **Radial-velocity correction is now cross-checked against Astropy** (175 cases, 0.7 mm/s), which closes the gap this list previously recorded. What remains open is narrower: astrogo is a classical projection and does not implement the Wright & Eastman (2014) terms — gravitational redshift, light-travel time to the barycentre, and the effect of the target's own proper motion and parallax on the projection geometry. Measured, those amount to 4.66 m/s against Astropy's relativistic value, so sub-1-m/s precision-RV work needs the full treatment and this does not provide it.
 - **Artificial skyglow in clear air** is tested on the model's physical claims rather than against a measured sky. An absolute check needs a per-emitter inventory — flux, spectrum and upward emission function — and satellite radiance alone can determine only the first: the same VIIRS pixel is produced by many real installations differing in spectrum and in how much light they throw sideways rather than up.
 - **Cloud reaches only the artificial term.** A cloud deck in the scene's atmosphere changes artificial skyglow and nothing else; moonlight, integrated starlight, diffuse galactic light, zodiacal light and airglow are all evaluated as though the sky were clear. Three separate models are missing behind that one sentence, not one.
+- **Every figure on this page assumes the host clock is UTC.** Around a leap second it
+  may not be: NTP providers smear the step over as much as 24 hours, each differently and
+  without announcing which method they use, so a clock read during that window is off by
+  up to 0.5 s and says nothing about it (Levine, Tavella & Milton 2023, Metrologia 60
+  014001, table 2). That is 0.3″ of lunar motion, 7.5″ of Earth rotation and 3.8 km of ISS
+  track — above everything tabulated above and below anything that looks wrong. No library
+  can detect it. Work that must be reproducible passes an explicit epoch, which never
+  touches the clock; see the `time` package doc's "The clock you are given". Tracked as
+  [#146](https://github.com/TuSKan/astrogo/issues/146).
 - **The Illumina-v2 comparison at Observatorio del Teide** is a Level-3 target whose published numbers are already transcribed. It is blocked on Tenerife's lighting inventory rather than on the numbers.
 - **SGP4 is wrong by hundreds to thousands of kilometres for low-perigee, deep-space and decaying orbits.** Not a
   missing feature but a measured defect in the propagator astrogo depends on
