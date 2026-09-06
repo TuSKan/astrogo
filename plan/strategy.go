@@ -84,9 +84,16 @@ func (s *SwapOptimizedStrategy) Schedule(
 	idlePasses := 0
 
 	for pass := range maxPasses {
-		swapped := s.swapPass(sched, planner, transition, step, tabu, pass)
+		swapped, err := s.swapPass(sched, planner, transition, step, tabu, pass)
+		if err != nil {
+			return nil, err
+		}
 
-		inserted := s.insertPass(sched, planner, window, transition, step)
+		inserted, err := s.insertPass(sched, planner, window, transition, step)
+		if err != nil {
+			return nil, err
+		}
+
 		if swapped || inserted {
 			idlePasses = 0
 		} else {
@@ -113,7 +120,7 @@ func (s *SwapOptimizedStrategy) swapPass(
 	step time.Duration,
 	tabu *tabuList,
 	passNum int,
-) bool {
+) (bool, error) {
 	improved := false
 	n := len(sched.Blocks)
 
@@ -134,7 +141,11 @@ func (s *SwapOptimizedStrategy) swapPass(
 		newJEnd := newJStart.Add(bj.Block.Duration)
 
 		// Validate bj's constraints at the new time.
-		midCtxJ, okJ := checkConstraintsIntervalCtx(bj.Block.Target, newJStart, newJEnd, step, planner.Site, mergedC[bj.Block.ID]...)
+		midCtxJ, okJ, err := checkConstraintsIntervalCtx(bj.Block.Target, newJStart, newJEnd, step, planner.Site, mergedC[bj.Block.ID]...)
+		if err != nil {
+			return false, fmt.Errorf("plan: swap: block %s: %w", bj.Block.ID, err)
+		}
+
 		if !okJ {
 			continue
 		}
@@ -172,7 +183,11 @@ func (s *SwapOptimizedStrategy) swapPass(
 		}
 
 		// Validate bi's constraints at the new time.
-		midCtxI, okI := checkConstraintsIntervalCtx(bi.Block.Target, newIStart, newIEnd, step, planner.Site, mergedC[bi.Block.ID]...)
+		midCtxI, okI, err := checkConstraintsIntervalCtx(bi.Block.Target, newIStart, newIEnd, step, planner.Site, mergedC[bi.Block.ID]...)
+		if err != nil {
+			return false, fmt.Errorf("plan: swap: block %s: %w", bi.Block.ID, err)
+		}
+
 		if !okI {
 			continue
 		}
@@ -210,7 +225,7 @@ func (s *SwapOptimizedStrategy) swapPass(
 		}
 	}
 
-	return improved
+	return improved, nil
 }
 
 // insertPass tries to insert each unscheduled block into a gap in the schedule.
@@ -226,9 +241,9 @@ func (s *SwapOptimizedStrategy) insertPass(
 	window Window,
 	transition TransitionModel,
 	step time.Duration,
-) bool {
+) (bool, error) {
 	if len(sched.Unscheduled) == 0 {
-		return false
+		return false, nil
 	}
 
 	improved := false
@@ -287,7 +302,12 @@ func (s *SwapOptimizedStrategy) insertPass(
 				continue
 			}
 
-			if midCtx, ok := checkConstraintsIntervalCtx(ub.Block.Target, startTime, endTime, step, planner.Site, mergedC[ub.Block.ID]...); ok {
+			midCtx, ok, err := checkConstraintsIntervalCtx(ub.Block.Target, startTime, endTime, step, planner.Site, mergedC[ub.Block.ID]...)
+			if err != nil {
+				return false, fmt.Errorf("plan: insert: block %s: %w", ub.Block.ID, err)
+			}
+
+			if ok {
 				score := scoreBlockPlacement(ub.Block, startTime, endTime, planner, midCtx)
 				sched.Blocks = append(sched.Blocks, ScheduledBlock{
 					Block:     ub.Block,
@@ -320,7 +340,7 @@ func (s *SwapOptimizedStrategy) insertPass(
 		return sched.Blocks[i].Window.Start.Before(sched.Blocks[j].Window.Start)
 	})
 
-	return improved
+	return improved, nil
 }
 
 // ── Scheduling Helpers ───────────────────────────────────────────────────────

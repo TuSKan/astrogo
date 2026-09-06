@@ -230,12 +230,26 @@ const defaultStep = 1 * time.Minute
 // Performance: creates a single coord.Context per time step and shares it
 // across all constraints that implement ConstraintCtx, avoiding redundant
 // SOFA matrix computations.
-func checkConstraintsIntervalCtx(target Observable, start, end time.Time, step time.Duration, site *Site, constraints ...Constraint) (*coord.Context, bool) {
+//
+// # A constraint that fails to evaluate is an error, not a "no"
+//
+// This used to read `if err != nil || !res.Pass { return false }`, so a
+// constraint that could not be evaluated — an ephemeris lookup that failed, a
+// provider that could not be reached — was indistinguishable from a constraint
+// the target genuinely failed. The block was then dropped and the caller got a
+// schedule that looked complete.
+//
+// Constraint.Check returns an error precisely because a check can fail rather
+// than merely be false, and discarding that at the last step is the shape of
+// #102, where a swallowed error turned a CDS outage into "target not found".
+// The error now propagates: a caller who cannot evaluate their constraints
+// should hear about it rather than receive a quietly shorter plan.
+func checkConstraintsIntervalCtx(target Observable, start, end time.Time, step time.Duration, site *Site, constraints ...Constraint) (*coord.Context, bool, error) {
 	mid := start.Add(end.Sub(start) / 2)
 
 	var midCtx *coord.Context
 
-	check := func(t time.Time) bool {
+	check := func(t time.Time) (bool, error) {
 		ctx := coord.NewContext(t, site.Location(), site.Refraction())
 		// Capture the context closest to the midpoint for reuse by scoring.
 		if midCtx == nil || absDur(t.Sub(mid)) <= absDur(midCtx.Time().Sub(mid)) {
@@ -253,18 +267,28 @@ func checkConstraintsIntervalCtx(target Observable, start, end time.Time, step t
 				res, err = c.Check(target, t, site)
 			}
 
-			if err != nil || !res.Pass {
-				return false
+			if err != nil {
+				return false, fmt.Errorf("plan: constraint at %s: %w",
+					t.Format(time.RFC3339), err)
+			}
+
+			if !res.Pass {
+				return false, nil
 			}
 		}
 
-		return true
+		return true, nil
 	}
 
 	t := start
 	for t.Before(end) || t.Equal(end) {
-		if !check(t) {
-			return nil, false
+		ok, err := check(t)
+		if err != nil {
+			return nil, false, err
+		}
+
+		if !ok {
+			return nil, false, nil
 		}
 
 		t = t.Add(step)
@@ -272,12 +296,17 @@ func checkConstraintsIntervalCtx(target Observable, start, end time.Time, step t
 
 	// Always check the exact end time as well.
 	if !start.Equal(end) {
-		if !check(end) {
-			return nil, false
+		ok, err := check(end)
+		if err != nil {
+			return nil, false, err
+		}
+
+		if !ok {
+			return nil, false, nil
 		}
 	}
 
-	return midCtx, true
+	return midCtx, true, nil
 }
 
 // absDur returns the absolute value of a time.Duration.
@@ -374,7 +403,12 @@ func (s *GreedyStrategy) Schedule(planner *Planner, window Window, blocks []*Blo
 			allConstraints = append(allConstraints, b.Constraints...)
 
 			// Check observability over the full duration
-			if midCtx, ok := checkConstraintsIntervalCtx(b.Target, startTime, endTime, step, planner.Site, allConstraints...); ok {
+			midCtx, ok, err := checkConstraintsIntervalCtx(b.Target, startTime, endTime, step, planner.Site, allConstraints...)
+			if err != nil {
+				return nil, fmt.Errorf("plan: greedy: block %s: %w", b.ID, err)
+			}
+
+			if ok {
 				score := scoreBlockPlacement(b, startTime, endTime, planner, midCtx)
 				sched.Blocks = append(sched.Blocks, ScheduledBlock{
 					Block:     b,

@@ -13,6 +13,7 @@ import (
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/internal/parallel"
+	"github.com/TuSKan/astrogo/logging"
 	"github.com/TuSKan/astrogo/magnitude"
 	"github.com/TuSKan/astrogo/time"
 )
@@ -207,20 +208,36 @@ var planetConstructors = []func(eph.Provider) *Planet{
 // kernel path unconditionally. A candidate whose ephemeris (either path)
 // can't be obtained is skipped, not treated as fatal.
 //
-// # The result can be silently incomplete
+// # The result can be incomplete, and says so
 //
 // That skip covers a network failure as well as a missing orbit. A kernel
 // fetch that times out, or JPL being unreachable, removes that body's moons or
-// that small body from the result and reports nothing — so an empty or short
-// list means "nothing qualified, as far as could be determined", never
-// "nothing qualified".
+// that small body from the result — so a short list can mean "nothing
+// qualified" or "not everything could be checked", and those are different
+// answers.
 //
-// This is deliberate: a partial sky is more useful than an error for a
+// Skipping is deliberate: a partial sky is more useful than an error for a
 // planning query, and one unreachable kernel should not cost the caller the
-// other forty candidates. But it is worth knowing before treating the result
-// as exhaustive. A caller who needs certainty should pre-seed the kernels it
-// depends on, or check reachability first; remote.SetOffline(true) makes the
-// degradation deterministic rather than dependent on the network.
+// other forty candidates. Staying quiet about it was not. So both values are
+// returned together: the candidates that did qualify, and an error wrapping
+// [ErrIncomplete] naming everything that could not be evaluated and why.
+//
+//	objects, err := plan.VisibleTonight(...)
+//	if errors.Is(err, plan.ErrIncomplete) {
+//		// objects is usable but not exhaustive; err says what is missing.
+//	} else if err != nil {
+//		return err
+//	}
+//
+// A caller who wants the old behaviour ignores an [ErrIncomplete] error; one
+// who needs certainty treats it as fatal. Both are now possible, which is the
+// point — a Warn log line, which is all this used to emit, is not something a
+// program can branch on. Every other error return is fatal and comes with no
+// results, so ignoring [ErrIncomplete] specifically is safe.
+//
+// To avoid the situation rather than detect it, pre-seed the kernels the query
+// depends on; remote.SetOffline(true) makes the degradation deterministic
+// rather than dependent on the network.
 func VisibleTonight(
 	ctx context.Context,
 	site *Site,
@@ -276,11 +293,15 @@ func VisibleTonight(
 	start, end := dusk.Time, dawn.Time
 	mid := start.Add(end.Sub(start) / 2)
 
-	candidates := gatherCandidates(ctx, gatherBrightTargets(ctx, brightSources, magLimit), start, end, cfg)
+	// Everything dropped because it could not be evaluated, rather than because
+	// it was evaluated and rejected. See ErrIncomplete.
+	var dropped skips
+
+	candidates := gatherCandidates(ctx, gatherBrightTargets(ctx, brightSources, magLimit, &dropped), start, end, cfg, &dropped)
 	candidates = append(candidates, gatherSolarSystemCandidates(planetProvider, mid, magLimit)...)
 
 	if cfg.includeMoons {
-		moonCandidates, moonProviders := gatherPlanetaryMoons(ctx, mid, magLimit)
+		moonCandidates, moonProviders := gatherPlanetaryMoons(ctx, mid, magLimit, &dropped)
 		candidates = append(candidates, moonCandidates...)
 
 		defer func() {
@@ -298,20 +319,23 @@ func VisibleTonight(
 	// considerate of here, so this uses every core rather than a small
 	// fixed bound.
 	type evalResult struct {
-		vo VisibleObject
-		ok bool
+		vo   VisibleObject
+		name string
+		ok   bool
+		err  error
 	}
 
-	// evaluateCandidate reports failure via ok, not an error, so
-	// parallel.Map's own error return is never non-nil here.
+	// The skip reason travels in the result rather than through parallel.Map's
+	// own error return: that is an errgroup, so it keeps only the first error
+	// and cancels the rest, and one candidate failing must not stop the others.
 	evaluated, _ := parallel.Map(candidates, 0, func(_ int, c visibleCandidate) (evalResult, error) {
-		vo, ok := evaluateCandidate(c, start, end, site, planetProvider, magLimit, cfg)
+		vo, ok, err := evaluateCandidate(ctx, c, start, end, site, planetProvider, magLimit, cfg)
 
 		if c.closer != nil {
 			_ = c.closer.Close()
 		}
 
-		return evalResult{vo: vo, ok: ok}, nil
+		return evalResult{vo: vo, name: c.obj.Name(), ok: ok, err: err}, nil
 	})
 
 	results := make([]VisibleObject, 0, len(candidates))
@@ -320,11 +344,13 @@ func VisibleTonight(
 		if r.ok {
 			results = append(results, r.vo)
 		}
+
+		dropped.add("candidate", r.name, r.err)
 	}
 
 	sort.Slice(results, func(i, j int) bool { return results[i].ApparentMag < results[j].ApparentMag })
 
-	return results, nil
+	return results, dropped.err()
 }
 
 // gatherBrightTargets calls SearchBright on every source concurrently and
@@ -334,7 +360,7 @@ func VisibleTonight(
 // caller registers) are otherwise independent network round trips with no
 // reason to wait on each other; each source writes into its own slice
 // index, so no mutex is needed to combine them afterward.
-func gatherBrightTargets(ctx context.Context, sources []resolve.BrightObjectSearcher, magLimit float64) []resolve.Target {
+func gatherBrightTargets(ctx context.Context, sources []resolve.BrightObjectSearcher, magLimit float64, dropped *skips) []resolve.Target {
 	// A source's own query error is handled per-item below (skipped, not
 	// propagated), so parallel.Map's own error return is never non-nil.
 	perSource, _ := parallel.Map(sources, 0, func(_ int, src resolve.BrightObjectSearcher) ([]resolve.Target, error) {
@@ -342,9 +368,15 @@ func gatherBrightTargets(ctx context.Context, sources []resolve.BrightObjectSear
 
 		iter := src.SearchBright(ctx, resolve.BrightRequest{MaxVMag: magLimit})
 		iter(func(tgt resolve.Target, err error) bool {
-			if err == nil {
-				targets = append(targets, tgt)
+			if err != nil {
+				// One bad row does not end the source, but the caller is told
+				// their list is short by however many of these there were.
+				dropped.add("bright source", fmt.Sprintf("%T", src), err)
+
+				return true
 			}
+
+			targets = append(targets, tgt)
 
 			return true
 		})
@@ -396,14 +428,17 @@ const coverageMargin = 24 * time.Hour
 // ("no coverage for target at requested epoch"), making the entire
 // category permanently absent from every result regardless of real
 // brightness.
-func gatherCandidates(ctx context.Context, targets []resolve.Target, start, end time.Time, cfg visibleTonightConfig) []visibleCandidate {
+func gatherCandidates(ctx context.Context, targets []resolve.Target, start, end time.Time, cfg visibleTonightConfig, dropped *skips) []visibleCandidate {
 	slots := make([]visibleCandidate, len(targets))
 
 	var smallBodyIdx []int
 
 	for i, tgt := range targets {
 		if !needsSmallBodyEphemeris(tgt.Kind) {
-			if obj, closer := candidateFromTarget(ctx, tgt, start, end, cfg); obj != nil {
+			obj, closer, err := candidateFromTarget(ctx, tgt, start, end, cfg)
+			dropped.add("target", tgt.Name, err)
+
+			if obj != nil {
 				slots[i] = visibleCandidate{obj: obj, target: tgt, closer: closer}
 			}
 
@@ -417,12 +452,15 @@ func gatherCandidates(ctx context.Context, targets []resolve.Target, start, end 
 	// maxConcurrentEphemerisFetches — the fast local candidates above need
 	// no such cap and stay fully synchronous, avoiding goroutine dispatch
 	// overhead for the common case. A candidate's own fetch failure is a
-	// skip, not a group-wide failure — candidateFromTarget already reports
-	// that by returning a nil Observable rather than an error, so Map's
-	// own error return is never non-nil here.
+	// skip, not a group-wide failure, so it goes to dropped rather than out
+	// through Map's error return — that is an errgroup's, which would cancel
+	// the other seven fetches over one unreachable body.
 	results, _ := parallel.Map(smallBodyIdx, maxConcurrentEphemerisFetches, func(_ int, idx int) (visibleCandidate, error) {
 		tgt := targets[idx]
-		if obj, closer := candidateFromTarget(ctx, tgt, start, end, cfg); obj != nil {
+		obj, closer, err := candidateFromTarget(ctx, tgt, start, end, cfg)
+		dropped.add("small body", tgt.Name, err)
+
+		if obj != nil {
 			return visibleCandidate{obj: obj, target: tgt, closer: closer}, nil
 		}
 
@@ -444,19 +482,6 @@ func gatherCandidates(ctx context.Context, targets []resolve.Target, start, end 
 	return candidates
 }
 
-// candidateFromTarget converts one bright-search result into an Observable.
-// Stars/deep-sky objects (FromCatalog's fixed-target path) need no
-// ephemeris and are always converted, with a nil closer. Asteroids/comets
-// need a real per-body SPK kernel fetched first — Stage 2 of the
-// two-stage minor-body design (see catalog/sbdb.SearchBright's doc
-// comment for Stage 1) — covering [start-coverageMargin, end+coverageMargin]
-// so the fetched kernel actually spans the night being evaluated; a
-// candidate whose kernel can't be fetched here returns a nil Observable,
-// skipped rather than failing the whole night's query. The returned
-// eph.Provider is the caller's to Close once this candidate has been
-// evaluated — FromCatalog's Comet/Asteroid wrapper holds it for the
-// lifetime of the evaluation, but the underlying SPK/LSK file handles must
-// not outlive that.
 // needsSmallBodyEphemeris reports whether kind requires a real per-body
 // Horizons-generated SPK ephemeris fetch (Stage 2) rather than the plain
 // FromCatalog(tgt, nil) path — asteroids, comets, dwarf planets, and
@@ -487,17 +512,36 @@ func isFixedTarget(obs Observable) bool {
 	}
 }
 
-func candidateFromTarget(ctx context.Context, tgt resolve.Target, start, end time.Time, cfg visibleTonightConfig) (Observable, eph.Provider) {
+// candidateFromTarget converts one bright-search result into an Observable.
+// Stars/deep-sky objects (FromCatalog's fixed-target path) need no
+// ephemeris and are always converted, with a nil closer. Asteroids/comets
+// need a real per-body SPK kernel fetched first — Stage 2 of the
+// two-stage minor-body design (see catalog/sbdb.SearchBright's doc
+// comment for Stage 1) — covering [start-coverageMargin, end+coverageMargin]
+// so the fetched kernel actually spans the night being evaluated; a
+// candidate whose kernel can't be fetched here returns a nil Observable,
+// skipped rather than failing the whole night's query. The returned
+// eph.Provider is the caller's to Close once this candidate has been
+// evaluated — FromCatalog's Comet/Asteroid wrapper holds it for the
+// lifetime of the evaluation, but the underlying SPK/LSK file handles must
+// not outlive that.
+//
+// The error says why no candidate came back, so a caller can tell a target
+// that could not be fetched from one that simply has no ephemeris to fetch.
+// A nil Observable with a nil error is the latter: FromCatalog produced a
+// fixed target where a small body was expected, which is a property of the
+// catalogue row, not a failure.
+func candidateFromTarget(ctx context.Context, tgt resolve.Target, start, end time.Time, cfg visibleTonightConfig) (Observable, eph.Provider, error) {
 	if !needsSmallBodyEphemeris(tgt.Kind) {
 		// A target the resolver returned with no position at all is
 		// dropped rather than placed at RA 0, Dec 0. Both callers already
 		// treat a nil Observable as "no candidate".
 		obj, err := FromCatalog(tgt, nil)
 		if err != nil {
-			return nil, nil
+			return nil, nil, err
 		}
 
-		return obj, nil
+		return obj, nil, nil
 	}
 
 	// Kepler first: try FromCatalog's own elements-based construction
@@ -508,24 +552,24 @@ func candidateFromTarget(ctx context.Context, tgt resolve.Target, start, end tim
 	// WithSmallBodyKernels.
 	if !cfg.forceSmallBodyKernels && tgt.HasElements {
 		if obj, err := FromCatalog(tgt, nil); err == nil && !isFixedTarget(obj) {
-			return obj, nil
+			return obj, nil, nil
 		}
 	}
 
 	minorProvider, err := eph.NewProvider(ctx, eph.SmallBody, tgt.SPKID,
 		eph.WithTimeInterval(start.Add(-coverageMargin), end.Add(coverageMargin)))
 	if err != nil {
-		return nil, nil
+		return nil, nil, fmt.Errorf("plan: small-body ephemeris for %q: %w", tgt.Name, err)
 	}
 
 	obj, err := FromCatalog(tgt, minorProvider)
 	if err != nil {
 		_ = minorProvider.Close()
 
-		return nil, nil
+		return nil, nil, err
 	}
 
-	return obj, minorProvider
+	return obj, minorProvider, nil
 }
 
 // gatherSolarSystemCandidates builds the Moon and every naked-eye planet,
@@ -604,17 +648,39 @@ func (o observableObject) ICRS(t time.Time) (coord.ICRS, error) { return o.Posit
 // on purpose — see its doc comment), so this check, against the real
 // computed-and-extinguished magnitude, is the only place that bound is
 // enforced for real.
-func evaluateCandidate(c visibleCandidate, start, end time.Time, site *Site, planetProvider eph.Provider, magLimit float64, cfg visibleTonightConfig) (VisibleObject, bool) {
+func evaluateCandidate(ctx context.Context, c visibleCandidate, start, end time.Time, site *Site, planetProvider eph.Provider, magLimit float64, cfg visibleTonightConfig) (VisibleObject, bool, error) {
 	obj := c.obj
 
+	// skipped reports a candidate dropped because it could not be evaluated,
+	// as distinct from one evaluated and found wanting.
+	//
+	// VisibleTonight's contract is to skip rather than fail — one unreachable
+	// kernel should not cost the caller the other forty candidates, and its
+	// doc comment says so. But every one of these used to return the same
+	// bare false as "too faint" or "never rises", so a night's list could come
+	// back short because JPL was down and nothing said which it was.
+	//
+	// Warn, not Info: the result is quietly less complete than it looks, which
+	// is exactly what that level is for. See the logging package.
+	skipped := func(stage string, err error) (VisibleObject, bool, error) {
+		logging.WarnContext(ctx, "candidate skipped: could not evaluate",
+			"target", obj.Name(), "stage", stage, "err", err)
+
+		return VisibleObject{}, false, fmt.Errorf("%s: %w", stage, err)
+	}
+
 	windows, err := ObservableWindows(obj, start, end, cfg.step, site, Altitude{Threshold: cfg.minAltitude})
-	if err != nil || len(windows) == 0 {
-		return VisibleObject{}, false
+	if err != nil {
+		return skipped("observable windows", err)
+	}
+
+	if len(windows) == 0 {
+		return VisibleObject{}, false, nil // evaluated: never clears the horizon
 	}
 
 	events, err := VisibilityEvents(start, end, obj, site)
 	if err != nil {
-		return VisibleObject{}, false
+		return skipped("visibility events", err)
 	}
 
 	vo := VisibleObject{Target: c.target, Windows: windows}
@@ -646,20 +712,24 @@ func evaluateCandidate(c visibleCandidate, start, end time.Time, site *Site, pla
 	w := windows[0]
 
 	peakTime, _, err := TransitEstimate(observableObject{obj}, site, w.Start, w.End)
-	if err != nil || peakTime.IsZero() {
-		return VisibleObject{}, false
+	if err != nil {
+		return skipped("transit estimate", err)
+	}
+
+	if peakTime.IsZero() {
+		return VisibleObject{}, false, nil // evaluated: no maximum inside the window
 	}
 
 	pos, err := obj.Position(peakTime)
 	if err != nil {
-		return VisibleObject{}, false
+		return skipped("position at peak", err)
 	}
 
 	astroCtx := coord.NewContext(peakTime, site.Location(), site.Refraction())
 
 	aa, err := observedAltAz(obj, peakTime, astroCtx, pos)
 	if err != nil {
-		return VisibleObject{}, false
+		return skipped("observed alt/az", err)
 	}
 
 	vo.PeakTime = peakTime
@@ -667,19 +737,23 @@ func evaluateCandidate(c visibleCandidate, start, end time.Time, site *Site, pla
 	vo.PeakAzimuth = aa.Az()
 	vo.Direction = coord.CompassDirection(aa.Az())
 
-	rawMag, ok := rawMagnitude(obj, peakTime)
+	rawMag, ok, err := rawMagnitude(obj, peakTime)
+	if err != nil {
+		return skipped("apparent magnitude", err)
+	}
+
 	if !ok {
-		return VisibleObject{}, false
+		return VisibleObject{}, false, nil // evaluated: no published magnitude
 	}
 
 	airmass, err := atmosphere.Airmass(aa.Alt())
 	if err != nil {
-		return VisibleObject{}, false
+		return skipped("airmass", err)
 	}
 
 	vo.ApparentMag = magnitude.StarApparent(rawMag, airmass)
 	if vo.ApparentMag >= magLimit {
-		return VisibleObject{}, false
+		return VisibleObject{}, false, nil
 	}
 
 	if full, abbr, err := constellation.Lookup(pos); err == nil {
@@ -690,28 +764,36 @@ func evaluateCandidate(c visibleCandidate, start, end time.Time, site *Site, pla
 		vo.SkyNote = moonNote(planetProvider, peakTime, pos)
 	}
 
-	return vo, true
+	return vo, true, nil
 }
 
 // rawMagnitude returns obj's magnitude before atmospheric extinction —
 // via MagnitudeComputer (Planet/Asteroid/Comet, dynamic photometry) or
-// StaticMagnitude (Star/DeepSkyObject, fixed catalog VMag). ok is false if
-// obj exposes neither (no known magnitude).
-func rawMagnitude(obj Observable, t time.Time) (mag float64, ok bool) {
+// StaticMagnitude (Star/DeepSkyObject, fixed catalog VMag).
+//
+// The three outcomes are distinct and stay distinct: a magnitude; ok false
+// with a nil error, meaning obj publishes none (it exposes neither interface,
+// or its catalog row carried no VMag); and a non-nil error, meaning it has one
+// but the photometry could not be computed — an ephemeris lookup that failed
+// under it. Returning that last case as a bare false would drop the object
+// exactly like one too faint to make the cut, which is how it read before.
+func rawMagnitude(obj Observable, t time.Time) (mag float64, ok bool, err error) {
 	if mc, isMC := obj.(MagnitudeComputer); isMC {
 		m, err := mc.ApparentMagnitude(t)
 		if err != nil {
-			return 0, false
+			return 0, false, fmt.Errorf("plan: apparent magnitude of %q: %w", obj.Name(), err)
 		}
 
-		return m, true
+		return m, true, nil
 	}
 
 	if sm, isSM := obj.(StaticMagnitude); isSM {
-		return sm.StaticMagnitude()
+		m, has := sm.StaticMagnitude()
+
+		return m, has, nil
 	}
 
-	return 0, false
+	return 0, false, nil
 }
 
 // moonNote returns a Moon-proximity advisory when the Moon is a
