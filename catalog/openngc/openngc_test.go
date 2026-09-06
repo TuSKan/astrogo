@@ -17,7 +17,9 @@ func newTestProvider() *Provider {
 		{ID: "NGC9999", Name: "Faint Test Object", Kind: resolve.KindNebula, Catalog: "openngc"},
 	}
 
-	p := &Provider{targets: targets, byKey: make(map[string]int)}
+	// loaded: true stands in for a completed load — these tests exercise the
+	// index, not the fetch, and without it every query would try the network.
+	p := &Provider{loaded: true, targets: targets, byKey: make(map[string]int)}
 
 	for i, t := range targets {
 		p.byKey[resolve.Normalize(t.ID)] = i
