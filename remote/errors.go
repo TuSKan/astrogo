@@ -1,9 +1,6 @@
 package remote
 
-import (
-	"errors"
-	"fmt"
-)
+import "errors"
 
 // Sentinel errors returned by the registry gate and download pipeline.
 // Match with errors.Is.
@@ -65,27 +62,3 @@ var (
 	// WithCacheName are empty, leaving no cache filename to resolve.
 	ErrCacheNameRequired = errors.New("remote: name or WithCacheName required")
 )
-
-// HTTPError represents a non-2xx response from an external API endpoint
-// that is not retried (or exhausted its retries). The response body is
-// captured to aid debugging service-specific error payloads.
-//
-// Deprecated: use [github.com/TuSKan/astrogo/remote/api.HTTPError], which is
-// the one every HTTP path in the module actually returns.
-//
-// This is a leftover from before remote was split into a policy layer and the
-// remote/api transport that moves the bytes. The HTTP exchange went with the
-// split and this type did not, so the module has carried two identically named,
-// identically shaped errors ever since — one live, one referenced by nothing.
-// That is a trap rather than merely dead weight: a caller who reaches for the
-// obvious one gets a type nothing ever returns, and errors.As against it fails
-// silently on an error whose message is indistinguishable.
-type HTTPError struct {
-	Body       string
-	StatusCode int
-}
-
-// Error returns a human-readable string describing the HTTP error.
-func (e *HTTPError) Error() string {
-	return fmt.Sprintf("remote: http %d - %s", e.StatusCode, e.Body)
-}
