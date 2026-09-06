@@ -22,11 +22,12 @@
 // The conversion graph is:
 //
 //	UTC ←→ TAI ←→ TT ←→ TDB
-//	 ↕
-//	UT1
+//	 ↕     ↕
+//	UT1   GPST
 //
 // Conversion status:
 //   - UTC ↔ TAI: Complete (via SOFA leap-second table)
+//   - TAI ↔ GPST: Complete (GPST = TAI − 19 s, exact by definition)
 //   - TAI ↔ TT:  Complete (TT = TAI + 32.184s, exact by definition)
 //   - TT  ↔ TDB: Complete (Fairhead & Bretagnon 1990 single-term, amplitude 1.657 ms)
 //   - UTC ↔ UT1: Complete when IERS EOP data is loaded; returns error when unavailable.

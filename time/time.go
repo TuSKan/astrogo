@@ -236,7 +236,44 @@ const (
 	UT1
 	// TDB is Barycentric Dynamical Time.
 	TDB
+
+	// GPST is GPS system time, and the scale a satellite user most often
+	// actually holds.
+	//
+	// # Why it is a scale rather than an offset a caller applies
+	//
+	// GNSS system times were synchronised to UTC once and then told to ignore
+	// leap seconds, so each has drifted from UTC by a whole number of seconds
+	// that grows at every leap event. GPS was set to UTC on 1980-01-06, when
+	// TAI−UTC was 19 s, and has run at the TAI rate since:
+	//
+	//	TAI − GPST = 19 s, exactly and for ever
+	//	GPST − UTC = ΔAT − 19 s, which is 18 s today
+	//
+	// A caller with a receiver timestamp previously had no way to say what it
+	// was. The only expressible option was to call it UTC, and that is wrong
+	// by 18 s — 138 km of ISS ground track, in the package that also fixed a
+	// 69.184 s scale error worth 530 km (#133). Satellite work is exactly the
+	// population holding GNSS timestamps, which is what made this the most
+	// likely remaining instance of that defect class.
+	//
+	// Galileo System Time shares this scale: it is also TAI − 19 s, and agrees
+	// with GPST to within nanoseconds by design. BeiDou does not — BDT is
+	// TAI − 33 s — and GLONASS needs no scale here at all, being UTC plus three
+	// hours with leap seconds applied. Neither is expressible today; see #145.
+	//
+	// Reference: Levine, Tavella & Milton (2023), "Towards a consensus on a
+	// continuous coordinated universal time", Metrologia 60 014001, table 1.
+	GPST
 )
+
+// gpstMinusTAI is the fixed offset that defines GPS time.
+//
+// Negative because GPST runs behind TAI: TAI = GPST + 19 s. It is the value of
+// TAI−UTC at the 1980-01-06 synchronisation, frozen, and it is a constant of
+// the system rather than a table lookup — which is what makes this scale cheap
+// to support correctly.
+const gpstMinusTAI = -19.0
 
 func (s Scale) String() string {
 	switch s {
@@ -250,6 +287,8 @@ func (s Scale) String() string {
 		return "UT1"
 	case TDB:
 		return "TDB"
+	case GPST:
+		return "GPST"
 	default:
 		return "UNKNOWN"
 	}
@@ -272,7 +311,7 @@ func (s Scale) String() string {
 // term between them varies by ±1.7 ms, so a TDB interval and the TT interval
 // it spans differ by up to a microsecond per hour. Arithmetic in TDB stays in
 // TDB, which is what an ephemeris interpolating in TDB days wants.
-func (s Scale) uniform() bool { return s == TAI || s == TT || s == TDB }
+func (s Scale) uniform() bool { return s == TAI || s == TT || s == TDB || s == GPST }
 
 // Time represents a high-precision astronomical timestamp.
 //
@@ -1052,6 +1091,11 @@ func (t Time) UTC() Time {
 		// UTC = UT1 − DUT1. Since |DUT1| < 0.9s, UT1 ≈ UTC for lookup.
 		dut1 := dut1OrFallback(t.jd1, t.jd2)
 		return fromPartsPreserveLoc(t, t.jd1, t.jd2-dut1/86400.0, UTC)
+	case GPST:
+		// GPST → TAI → UTC. The first step is a constant and the second is
+		// the leap-second table, which is where the 18 s a GNSS user is
+		// missing actually comes from.
+		return t.TAI().UTC()
 	}
 
 	return t // unreachable with current scales
@@ -1084,9 +1128,19 @@ func (t Time) TAI() Time {
 		// Delta-T at that epoch, applied on the way home and never on the way
 		// out. Measured by TestScaleRoundTripMatrix.
 		return t.TT().TAI()
+	case GPST:
+		// TAI = GPST + 19 s, exactly. No table, no epoch dependence: the
+		// offset was frozen at the 1980-01-06 synchronisation and GPS time
+		// has ignored leap seconds ever since.
+		return fromPartsPreserveLoc(t, t.jd1, t.jd2-gpstMinusTAI/86400.0, TAI)
 	default:
 		// UT1 → UTC → TAI. UT1 genuinely has to go this way: DUT1 is defined
 		// against UTC, so there is no arithmetic path.
+		//
+		// Only UT1 reaches here. Every other scale has a case above, and it
+		// must stay that way: a scale that falls through to this branch is
+		// converted as though it were UT1, and one that UTC() also does not
+		// know would recurse between the two.
 		return t.UTC().TAI()
 	}
 }
@@ -1143,9 +1197,35 @@ func (t Time) TT() Time {
 	case UT1:
 		// UT1 → UTC (with fallback) → TT
 		return t.UTC().TT()
+	case GPST:
+		// GPST → TAI → TT, both steps constant.
+		return t.TAI().TT()
 	}
 
 	return t // unreachable
+}
+
+// GPST returns a new Time converted to GPS system time.
+//
+// GPS time is TAI − 19 s exactly, so this conversion is arithmetic and cannot
+// fail: the offset was fixed at the 1980-01-06 synchronisation and GPS has
+// ignored leap seconds since. Against UTC the gap therefore grows at every leap
+// event, and is 18 s today.
+//
+// The direction that matters most is the other one. A receiver hands a caller
+// GPS time; building it with [FromJD] or [Date] and this scale, rather than
+// calling it UTC, is what stops those 18 seconds becoming 138 km of ISS track.
+//
+// Galileo System Time is the same scale to within nanoseconds. BeiDou is not
+// (BDT is TAI − 33 s) and is not expressible here — see [GPST]'s own note.
+func (t Time) GPST() Time {
+	if t.scale == GPST {
+		return t
+	}
+
+	tai := t.TAI()
+
+	return fromPartsPreserveLoc(t, tai.jd1, tai.jd2+gpstMinusTAI/86400.0, GPST)
 }
 
 // TDB returns a new Time converted to the Barycentric Dynamical Time scale.
