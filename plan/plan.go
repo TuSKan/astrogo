@@ -545,13 +545,19 @@ func ObservableWindows(
 	}
 
 	// Observability check function for bisection refinement.
-	checkObs := func(t time.Time) bool {
+	// The sampling loop below propagates IsObservable's error directly. This
+	// closure exists for refineBisect, and used to swallow it — so a check
+	// that failed mid-bisection did not drop the window, it moved the refined
+	// boundary, and the caller got a rise or set time that was quietly wrong
+	// rather than absent.
+	checkObs := func(t time.Time) (bool, error) {
 		eval, err := IsObservable(obj, t, site, constraints...)
 		if err != nil {
-			return false
+			return false, fmt.Errorf("plan: observability at %s: %w",
+				t.Format(time.RFC3339), err)
 		}
 
-		return eval.Observable
+		return eval.Observable, nil
 	}
 
 	var windows []Window
@@ -575,14 +581,21 @@ func ObservableWindows(
 
 		if eval.Observable && !inWindow {
 			if hasPrev {
-				windowStart = refineBisect(prevT, t, prevOK, checkObs)
+				windowStart, err = refineBisect(prevT, t, prevOK, checkObs)
+				if err != nil {
+					return nil, err
+				}
 			} else {
 				windowStart = t
 			}
 
 			inWindow = true
 		} else if !eval.Observable && inWindow {
-			windowEnd := refineBisect(prevT, t, prevOK, checkObs)
+			windowEnd, err := refineBisect(prevT, t, prevOK, checkObs)
+			if err != nil {
+				return nil, err
+			}
+
 			windows = append(windows, Window{
 				Start: windowStart,
 				End:   windowEnd,

@@ -13,6 +13,7 @@ import (
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/internal/parallel"
+	"github.com/TuSKan/astrogo/logging"
 	"github.com/TuSKan/astrogo/magnitude"
 	"github.com/TuSKan/astrogo/time"
 )
@@ -305,7 +306,7 @@ func VisibleTonight(
 	// evaluateCandidate reports failure via ok, not an error, so
 	// parallel.Map's own error return is never non-nil here.
 	evaluated, _ := parallel.Map(candidates, 0, func(_ int, c visibleCandidate) (evalResult, error) {
-		vo, ok := evaluateCandidate(c, start, end, site, planetProvider, magLimit, cfg)
+		vo, ok := evaluateCandidate(ctx, c, start, end, site, planetProvider, magLimit, cfg)
 
 		if c.closer != nil {
 			_ = c.closer.Close()
@@ -604,17 +605,39 @@ func (o observableObject) ICRS(t time.Time) (coord.ICRS, error) { return o.Posit
 // on purpose — see its doc comment), so this check, against the real
 // computed-and-extinguished magnitude, is the only place that bound is
 // enforced for real.
-func evaluateCandidate(c visibleCandidate, start, end time.Time, site *Site, planetProvider eph.Provider, magLimit float64, cfg visibleTonightConfig) (VisibleObject, bool) {
+func evaluateCandidate(ctx context.Context, c visibleCandidate, start, end time.Time, site *Site, planetProvider eph.Provider, magLimit float64, cfg visibleTonightConfig) (VisibleObject, bool) {
 	obj := c.obj
 
-	windows, err := ObservableWindows(obj, start, end, cfg.step, site, Altitude{Threshold: cfg.minAltitude})
-	if err != nil || len(windows) == 0 {
+	// skipped reports a candidate dropped because it could not be evaluated,
+	// as distinct from one evaluated and found wanting.
+	//
+	// VisibleTonight's contract is to skip rather than fail — one unreachable
+	// kernel should not cost the caller the other forty candidates, and its
+	// doc comment says so. But every one of these used to return the same
+	// bare false as "too faint" or "never rises", so a night's list could come
+	// back short because JPL was down and nothing said which it was.
+	//
+	// Warn, not Info: the result is quietly less complete than it looks, which
+	// is exactly what that level is for. See the logging package.
+	skipped := func(stage string, err error) (VisibleObject, bool) {
+		logging.WarnContext(ctx, "candidate skipped: could not evaluate",
+			"target", obj.Name(), "stage", stage, "err", err)
+
 		return VisibleObject{}, false
+	}
+
+	windows, err := ObservableWindows(obj, start, end, cfg.step, site, Altitude{Threshold: cfg.minAltitude})
+	if err != nil {
+		return skipped("observable windows", err)
+	}
+
+	if len(windows) == 0 {
+		return VisibleObject{}, false // evaluated: never clears the horizon
 	}
 
 	events, err := VisibilityEvents(start, end, obj, site)
 	if err != nil {
-		return VisibleObject{}, false
+		return skipped("visibility events", err)
 	}
 
 	vo := VisibleObject{Target: c.target, Windows: windows}
@@ -646,20 +669,24 @@ func evaluateCandidate(c visibleCandidate, start, end time.Time, site *Site, pla
 	w := windows[0]
 
 	peakTime, _, err := TransitEstimate(observableObject{obj}, site, w.Start, w.End)
-	if err != nil || peakTime.IsZero() {
-		return VisibleObject{}, false
+	if err != nil {
+		return skipped("transit estimate", err)
+	}
+
+	if peakTime.IsZero() {
+		return VisibleObject{}, false // evaluated: no maximum inside the window
 	}
 
 	pos, err := obj.Position(peakTime)
 	if err != nil {
-		return VisibleObject{}, false
+		return skipped("position at peak", err)
 	}
 
 	astroCtx := coord.NewContext(peakTime, site.Location(), site.Refraction())
 
 	aa, err := observedAltAz(obj, peakTime, astroCtx, pos)
 	if err != nil {
-		return VisibleObject{}, false
+		return skipped("observed alt/az", err)
 	}
 
 	vo.PeakTime = peakTime
@@ -674,7 +701,7 @@ func evaluateCandidate(c visibleCandidate, start, end time.Time, site *Site, pla
 
 	airmass, err := atmosphere.Airmass(aa.Alt())
 	if err != nil {
-		return VisibleObject{}, false
+		return skipped("airmass", err)
 	}
 
 	vo.ApparentMag = magnitude.StarApparent(rawMag, airmass)

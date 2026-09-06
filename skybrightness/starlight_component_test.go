@@ -692,3 +692,57 @@ func TestIntegratedStarlightSeparatesFailureFromMissingCoverage(t *testing.T) {
 		})
 	}
 }
+
+// TestDiffuseGalacticLightSeparatesFailureFromMissingCoverage is the DGL half
+// of #177, and the same defect the starlight component had in #172.
+//
+// capFactor read `if err != nil || starlight <= 0` and returned an uncapped
+// result with UnknownCloud. So a star map that could not answer — a band it
+// does not carry — read as a sightline with no starlight to scatter, and the
+// Toller cap was quietly not applied. The component then reported a diffuse
+// galactic light it had explicitly been given the means to bound.
+//
+// It was left out of #172 only because capFactor returned (float64, Flag) with
+// nowhere to put an error. It now returns one, and AddRadiance propagates it.
+func TestDiffuseGalacticLightSeparatesFailureFromMissingCoverage(t *testing.T) {
+	t.Parallel()
+
+	grid := skybrightness.DefaultOpticalGrid()
+	dir := coord.NewAltAz(angle.Deg(60), angle.Deg(0))
+
+	for _, tc := range []struct {
+		name    string
+		sky     skybrightness.StarMap
+		wantErr error
+	}{
+		{"a coverage gap leaves the cap unapplied, not failed", uncoveredSky{}, nil},
+		{"a map that cannot answer is a failure", failingSky{}, errSkyUnavailable},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			dgl, err := skybrightness.NewDiffuseGalacticLight(uniformDust(3.0), tc.sky, testBand())
+			if err != nil {
+				t.Fatalf("NewDiffuseGalacticLight: %v", err)
+			}
+
+			dst := skybrightness.NewSpectralRadiance(grid)
+
+			_, err = dgl.AddRadiance(context.Background(), dst, grid, dir, starlightScene(t))
+
+			if tc.wantErr != nil {
+				if !errors.Is(err, tc.wantErr) {
+					t.Fatalf("AddRadiance returned %v, want it to wrap %v.\n"+
+						"  A star map that failed is not a sightline with no starlight; "+
+						"treating it as one silently drops the Toller cap.", err, tc.wantErr)
+				}
+
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("AddRadiance: %v", err)
+			}
+		})
+	}
+}

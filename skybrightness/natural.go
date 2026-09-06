@@ -285,7 +285,11 @@ func (d *DiffuseGalacticLight) AddRadiance(
 		// than there is starlight to scatter, which is what the flag says.
 		flags |= ExtrapolatedModel
 	} else {
-		capScale, capFlags := d.capFactor(scratch, grid, icrs, galactic)
+		capScale, capFlags, err := d.capFactor(scratch, grid, icrs, galactic)
+		if err != nil {
+			return flags, err
+		}
+
 		scale, flags = capScale, flags|capFlags
 	}
 
@@ -369,30 +373,43 @@ func (d *DiffuseGalacticLight) capFactor(
 	grid unit.SpectralGrid,
 	icrs coord.ICRS,
 	galactic coord.Galactic,
-) (scale float64, flags Flag) {
+) (scale float64, flags Flag, err error) {
 	lon, lat := icrs.RA(), icrs.Dec()
 	if d.sky.Galactic() {
 		lon, lat = galactic.L(), galactic.B()
 	}
 
 	starlight, err := d.sky.RadianceAt(lon, lat)
-	if err != nil || starlight <= 0 {
-		return 1, UnknownCloud
+
+	switch {
+	case errors.Is(err, ErrNoCoverage):
+		// The map answered: it has nothing here, so the cap cannot be applied.
+		return 1, UnknownCloud, nil
+	case err != nil:
+		return 0, 0, fmt.Errorf("skybrightness: diffuse galactic light: starlight cap: %w", err)
+	case starlight <= 0:
+		// Covered, but no starlight to scatter along this sightline.
+		return 1, UnknownCloud, nil
 	}
 
 	mean, err := magnitude.MeanFluxDensity(dgl, grid, d.band, 0)
-	if err != nil || mean <= 0 {
-		return 1, 0
+	if err != nil {
+		return 0, 0, fmt.Errorf("skybrightness: diffuse galactic light: mean flux density: %w", err)
+	}
+
+	if mean <= 0 {
+		// Nothing to cap: the component contributed no light in this band.
+		return 1, 0, nil
 	}
 
 	limit := MaxDGLToStarlightRatio * starlight
 	if mean <= limit {
-		return 1, 0
+		return 1, 0, nil
 	}
 
 	// Hitting the cap means the correlation was extrapolated past where it
 	// describes anything, so the result is bounded rather than trusted.
-	return limit / mean, ExtrapolatedModel
+	return limit / mean, ExtrapolatedModel, nil
 }
 
 // ── Zodiacal light ──────────────────────────────────────────────────────────

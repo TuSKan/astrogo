@@ -80,18 +80,25 @@ func refineVisibility(
 // This is used for constraint-based observability where the underlying
 // function may be discontinuous (unlike altitude, which is continuous
 // and uses Chandrupatla root-finding via refineVisibility).
-func refineBisect(a, b time.Time, aState bool, check func(time.Time) bool) time.Time {
+func refineBisect(a, b time.Time, aState bool, check func(time.Time) (bool, error)) (time.Time, error) {
 	const maxBisect = 20
+
 	for range maxBisect {
 		mid := a.Add(b.Sub(a) / 2)
-		if check(mid) == aState {
+
+		state, err := check(mid)
+		if err != nil {
+			return time.Time{}, err
+		}
+
+		if state == aState {
 			a = mid
 		} else {
 			b = mid
 		}
 	}
 
-	return a.Add(b.Sub(a) / 2)
+	return a.Add(b.Sub(a) / 2), nil
 }
 
 // ── Visibility Finders ───────────────────────────────────────────────────────
@@ -301,15 +308,20 @@ func Find(
 	}
 
 	// Constraint check function for bisection refinement.
-	checkObs := func(t time.Time) bool {
+	checkObs := func(t time.Time) (bool, error) {
 		for _, c := range constraints {
 			res, err := c.Check(obs, t, site)
-			if err != nil || !res.Pass {
-				return false
+			if err != nil {
+				return false, fmt.Errorf("plan: constraint at %s: %w",
+					t.Format(time.RFC3339), err)
+			}
+
+			if !res.Pass {
+				return false, nil
 			}
 		}
 
-		return true
+		return true, nil
 	}
 
 	intervals := make([]Interval, 0, 4)
@@ -325,18 +337,28 @@ func Find(
 
 	t := start
 	for t.Before(end) || t.Equal(end) {
-		allOK := checkObs(t)
+		allOK, err := checkObs(t)
+		if err != nil {
+			return nil, err
+		}
 
 		if allOK && !inWindow {
 			if hasPrev {
-				winStart = refineBisect(prevT, t, prevOK, checkObs)
+				winStart, err = refineBisect(prevT, t, prevOK, checkObs)
+				if err != nil {
+					return nil, err
+				}
 			} else {
 				winStart = t
 			}
 
 			inWindow = true
 		} else if !allOK && inWindow {
-			winEnd := refineBisect(prevT, t, prevOK, checkObs)
+			winEnd, err := refineBisect(prevT, t, prevOK, checkObs)
+			if err != nil {
+				return nil, err
+			}
+
 			intervals = append(intervals, Interval{
 				Object: obj,
 				Window: Window{Start: winStart, End: winEnd},
