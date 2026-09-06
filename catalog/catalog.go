@@ -240,6 +240,17 @@ type candidate struct {
 // A provider that succeeds wins outright: if any provider resolved the query,
 // the failures of the others are not reported, because the question was
 // answered.
+//
+// # Every provider is asked, all at once
+//
+// Merging is the point of this type, so there is no short-circuit: a hit from
+// a local catalogue does not mean SIMBAD has nothing to add to it, and
+// stopping early would quietly turn Resolve into "ask whichever provider was
+// registered first". The providers are queried concurrently instead, so the
+// cost is the slowest one rather than the sum — see askAll.
+//
+// The order they were registered in still decides which group comes back,
+// unchanged by the concurrency.
 func (r *Resolver) Resolve(ctx context.Context, query string) (Target, error) {
 	q := resolve.Normalize(query)
 	if q == "" {
@@ -257,17 +268,19 @@ func (r *Resolver) Resolve(ctx context.Context, query string) (Target, error) {
 		failures   []error
 	)
 
-	for _, p := range r.providers {
-		t, err := p.Resolve(ctx, query)
+	asked := askAll(ctx, r.providers, func(ctx context.Context, p Provider) (Target, error) {
+		return p.Resolve(ctx, query)
+	})
 
+	for _, a := range asked {
 		switch {
-		case err == nil:
-			candidates = append(candidates, candidate{t, p.Name()})
-		case errors.Is(err, resolve.ErrNotFound), errors.Is(err, resolve.ErrUnsupported):
+		case a.err == nil:
+			candidates = append(candidates, candidate{a.val, a.name})
+		case errors.Is(a.err, resolve.ErrNotFound), errors.Is(a.err, resolve.ErrUnsupported):
 			// Ordinary answers, not incidents. A cone-search-only provider
 			// declining to resolve a name is not a failure of the query.
 		default:
-			failures = append(failures, fmt.Errorf("%s: %w", p.Name(), err))
+			failures = append(failures, fmt.Errorf("%s: %w", a.name, a.err))
 		}
 	}
 
@@ -320,16 +333,19 @@ func (r *Resolver) Search(ctx context.Context, query string) ([]Target, error) {
 		failures   []error
 	)
 
-	for _, p := range r.providers {
-		found, err := p.Search(ctx, query)
-		if err != nil && !errors.Is(err, resolve.ErrNotFound) && !errors.Is(err, resolve.ErrUnsupported) {
-			failures = append(failures, fmt.Errorf("%s: %w", p.Name(), err))
+	asked := askAll(ctx, r.providers, func(ctx context.Context, p Provider) ([]Target, error) {
+		return p.Search(ctx, query)
+	})
+
+	for _, a := range asked {
+		if a.err != nil && !errors.Is(a.err, resolve.ErrNotFound) && !errors.Is(a.err, resolve.ErrUnsupported) {
+			failures = append(failures, fmt.Errorf("%s: %w", a.name, a.err))
 
 			continue
 		}
 
-		for _, t := range found {
-			candidates = append(candidates, candidate{t, p.Name()})
+		for _, t := range a.val {
+			candidates = append(candidates, candidate{t, a.name})
 		}
 	}
 
