@@ -164,6 +164,7 @@ measured distribution, follow the Evidence link to the generated table.
 | Asteroid magnitude (HG) | ✅ validated | `magnitude/magnitude_test.go` | Bowell (1989) / Muinonen (2010) | 0.01 mag | H,G + H,G₁,G₂ + H,G₁₂* phase functions, spline knot validation at α=30°,60°,90° |
 | Asteroid magnitude (sHG1G2) | ✅ validated | `magnitude/fink_test.go` | [FINK/ZTF phunk pipeline](https://api.ztf.fink-portal.org) | 0.025 mag | Carry et al. (2024) 7-parameter spin-geometry model, validated against 186 r-band observations of 8467 Benoitcarry: mean Δ=0.011, RMS=0.013, 100% within 0.025 mag |
 | Comet magnitude | ✅ validated | `magnitude/magnitude_test.go` | IAU standard | 0.1 mag | M₁/k₁ total + M₂/k₂ nuclear models |
+| SGP4 satellite propagation | ⚠️ **22 of 30 cases** | `ephemeris/satellite/sgp4_vallado_validation_test.go` | [Vallado et al. (2006) AIAA 2006-6753](https://celestrak.org/publications/AIAA/2006-6753/) | see notes | The reference suite every SGP4 implementation is measured by, 588 states across 30 element sets. **22 cases agree to p50 35 m, p99 264 m, max 289 m.** Eight do not, by 0.6 km to **3440 km**, and they are exactly the paths Vallado built the suite to exercise: the low-perigee s4 modification, the deep-space SDP4 branch, and satellites in the last stage of decay. Each is exact at the epoch and grows quadratically — a wrong secular drag term in the backend, not a time-handling error here. The backend's own suite covers 6 of the 33 cases and none of the 8 that fail, which is how the defect survives its own verification. The remaining 3 cases carry bad checksums in the published fixture and are refused before propagation. Tracked as [#120](https://github.com/TuSKan/astrogo/issues/120) |
 | Satellite magnitude | ✅ validated | `magnitude/magnitude_test.go` | McCants/Molczan | 0.1 mag | Sphere/cylinder phase functions, range scaling |
 | Star extinction | ✅ validated | `atmosphere/transfer_test.go` | Bouguer law | 0.01 mag | Altitude-dependent k(λ), Gaia G→V transformation |
 | FINK SSOFT provider | ✅ validated | `catalog/fink/fink_test.go` | [FINK REST API v2.5](https://api.ztf.fink-portal.org/swagger.json) | exact schema | Single-object JSON + bulk parquet, r-band preference, fit/status filtering, version pinning (v2025.04) |
@@ -191,6 +192,13 @@ The following areas are not yet considered scientifically complete:
 - **Artificial skyglow in clear air** is tested on the model's physical claims rather than against a measured sky. An absolute check needs a per-emitter inventory — flux, spectrum and upward emission function — and satellite radiance alone can determine only the first: the same VIIRS pixel is produced by many real installations differing in spectrum and in how much light they throw sideways rather than up.
 - **Cloud reaches only the artificial term.** A cloud deck in the scene's atmosphere changes artificial skyglow and nothing else; moonlight, integrated starlight, diffuse galactic light, zodiacal light and airglow are all evaluated as though the sky were clear. Three separate models are missing behind that one sentence, not one.
 - **The Illumina-v2 comparison at Observatorio del Teide** is a Level-3 target whose published numbers are already transcribed. It is blocked on Tenerife's lighting inventory rather than on the numbers.
+- **SGP4 is wrong by hundreds to thousands of kilometres for low-perigee, deep-space and decaying orbits.** Not a
+  missing feature but a measured defect in the propagator astrogo depends on
+  (`joshuaferrara/go-satellite`), found by running Vallado's reference suite against it for the first time. Ordinary
+  orbits — the ISS, Sun-synchronous imaging satellites, GPS — are unaffected and agree to a few hundred metres. A
+  satellite whose perigee is below about 220 km, one propagated through the deep-space branch, or one in its final
+  days is not. There is currently **no runtime signal** distinguishing the two, which is the part that most needs
+  deciding; see [#120](https://github.com/TuSKan/astrogo/issues/120).
 
 All three are recorded with their unblocking conditions in [`docs/skybrightness.md`](skybrightness.md) §16.
 
