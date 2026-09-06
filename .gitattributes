@@ -19,3 +19,10 @@
 *.bat text eol=crlf
 *.cmd text eol=crlf
 *.ps1 text eol=crlf
+# Third-party reference fixtures are stored exactly as published.
+#
+# `* text=auto eol=lf` above would normalise SGP4-VER.TLE's CRLF endings, which
+# silently changes the bytes and invalidates the SHA-256 its README publishes.
+# A verification fixture the VCS rewrites is not the fixture that was verified.
+ephemeris/satellite/testdata/vallado/SGP4-VER.TLE -text
+ephemeris/satellite/testdata/vallado/tcppver.out  -text
