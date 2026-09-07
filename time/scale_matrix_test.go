@@ -21,6 +21,12 @@ func allScales() []scaleName {
 		{"TAI", time.Time.TAI},
 		{"TT", time.Time.TT},
 		{"TDB", time.Time.TDB},
+		// The two GNSS system times. Both are TAI plus a frozen constant, so
+		// they belong in the matrix for the same reason TAI does — and neither
+		// was in it before, which left the scales a satellite user most often
+		// holds outside the only test that converts everything to everything.
+		{"GPST", time.Time.GPST},
+		{"BDT", time.Time.BDT},
 		{"UT1", func(t time.Time) time.Time {
 			// UT1 needs Earth-orientation data and reports when it cannot
 			// get it; the fallback is what every other caller in the module

@@ -25,9 +25,9 @@
 //	t := time.FromJD(gpsJD, time.GPST)   // not time.UTC
 //	state, err := sat.State(0, t)
 //
-// BeiDou is a different offset again (TAI − 33 s) and is not expressible yet;
-// GLONASS is UTC plus three hours with leap seconds applied, so it needs no
-// scale of its own.
+// BeiDou is a different offset again — TAI − 33 s, so BDT − UTC is 4 s today —
+// and has [github.com/TuSKan/astrogo/time.BDT]. GLONASS is UTC plus three hours
+// with leap seconds applied, so it needs no scale of its own.
 //
 // # Accuracy, and where it does not hold
 //
