@@ -99,9 +99,10 @@ func TestWorkflowGoVersionTracksTheModuleDirective(t *testing.T) {
 	}
 
 	// A pin that stops matching is worse than a mismatched one: the guard
-	// keeps passing while guarding nothing. Six is the count today, and a
-	// seventh workflow step should arrive with this number updated.
-	const wantPins = 6
+	// keeps passing while guarding nothing. Seven is the count today — it went
+	// from six when the Validation workflow split its network tier into its own
+	// job (#123) — and the eighth should arrive with this number updated.
+	const wantPins = 7
 
 	if found != wantPins {
 		t.Errorf("found %d Go version pins across %v, want %d.\n"+
