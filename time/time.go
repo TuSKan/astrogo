@@ -676,12 +676,22 @@ func (t Time) AddDays(d float64) Time {
 //
 // A second of 60 — the label UTC gives an inserted leap second — cannot be
 // represented and is normalised onto the following midnight, one second later
-// than the instant asked for. That is reported through [logging] rather than
-// returned, since this constructor has no error to return; see
-// leapsecond_alias.go for why the type cannot hold it.
+// than the instant asked for. 23:59:59 on the day of a negative leap second is
+// the mirror problem: a second UTC never labelled, which this returns anyway.
+// Both are reported through [logging] rather than returned, since this
+// constructor has no error to return; see leapsecond_alias.go for why the type
+// can hold neither.
 func Date(year int, month time.Month, day, hour, minute, second, nanosecond int, loc *time.Location) Time {
-	if second >= 60 {
+	switch {
+	case second >= 60:
 		warnLeapSecondAliased(year, month, day, hour, minute, second, loc)
+
+	// Only the last second of a UTC day can be one a negative leap second
+	// removed. Which second that is depends on the caller's zone, so the hour
+	// and minute are checked after converting rather than here — see
+	// warnIfSecondRemoved.
+	case second == 59:
+		warnIfSecondRemoved(year, month, day, hour, minute, loc)
 	}
 
 	// For years within Go's time.Time range, delegate to FromGo which

@@ -143,3 +143,75 @@ func nextDay(y, m, d int) (int, int, int, float64) {
 func isoSecond(y, m, d, hour, minute, second int) string {
 	return fmt.Sprintf("%04d-%02d-%02dT%02d:%02d:%02dZ", y, m, d, hour, minute, second)
 }
+
+// The mirror image, which has never happened and is now expected to.
+//
+// A negative leap second removes the last second of a UTC day: 23:59:58 is
+// followed directly by 00:00:00, and 23:59:59 is an instant that did not occur.
+// The ITU-R has permitted one since 1972 and none has ever been announced, so
+// fifty years of one-sided history sit behind every assumption here — Levine,
+// Tavella & Milton (2023) project one "by about the year 2030" and warn that
+// because they "have never happened ... it is almost a certainty that there
+// will be widespread errors in realizing the event".
+//
+// [Time] cannot say a civil second is absent any more than it can say one is
+// present, so the answer is the same as for the positive case: report it. See
+// #147, and #144 for the representation question both share.
+
+var warnSecondRemovedOnce sync.Once
+
+// warnIfSecondRemoved reports, once per process, that an instant named the
+// second a negative leap second took out of the record. Called for any second
+// of 59; it decides the rest.
+//
+// The decision runs on the UTC components, not on the ones the caller wrote.
+// The removal happens at the end of a UTC day, so in UTC+13 the same instant is
+// 12:59:59 on the following date — a gate on the caller's own hour and minute
+// would never fire there, and would then look at the wrong day anyway. Found by
+// the test for it, after a first version gated in Date on the local clock.
+//
+// The order is deliberate, and the cost is worth stating rather than calling
+// cheap. Measured on Date, i9-11980HK, ns/op:
+//
+//	ordinary second                    19.6
+//	second 59, UTC                     22.1   the branch and a no-op conversion
+//	second 59, UTC+13                  54.0   a real zone conversion
+//	23:59:59 UTC                      209.7   plus the two ΔAT lookups
+//
+// So one timestamp in sixty pays a few nanoseconds, one in 86400 pays the
+// lookups, and today none reaches the classifier's true branch at all, because
+// no negative leap second has ever been announced.
+func warnIfSecondRemoved(year int, month time.Month, day, hour, minute int, loc *time.Location) {
+	y, m, d, hh, mm := utcComponents(year, month, day, hour, minute, loc)
+
+	if hh != 23 || mm != 59 {
+		return
+	}
+
+	if !negativeLeapSecondEndsDay(y, int(m), d) {
+		return
+	}
+
+	warnSecondRemovedOnce.Do(func() { logSecondRemoved(y, int(m), d, hh, mm) })
+}
+
+// logSecondRemoved writes the warning, split from its [sync.Once] for the same
+// reason as [logLeapSecondAliased].
+func logSecondRemoved(y, m, d, hour, minute int) {
+	logging.Warn("second removed by a negative leap second, instant did not occur",
+		"utc", isoSecond(y, m, d, hour, minute, 59),
+		"reason", "this UTC day ended at 23:59:58; the next instant was the following midnight",
+		"delta_at_before", deltaAT(y, m, d, 0.5),
+		"delta_at_after", deltaAT(nextDay(y, m, d)),
+		"remedy", "check the source of this timestamp; UTC never labelled this second")
+}
+
+// negativeLeapSecondEndsDay reports whether the last second of the UTC day
+// (y, m, d) was removed — that is, whether 23:59:59 never happened on it.
+//
+// The mirror of [leapSecondEndsDay], and a whole second in the other
+// direction for the same reason: pre-1972 ΔAT drifts by microseconds across
+// every day, so only a step of exactly −1 is a leap second at all.
+func negativeLeapSecondEndsDay(y, m, d int) bool {
+	return math.Abs(deltaAT(nextDay(y, m, d))-deltaAT(y, m, d, 0.0)+1.0) < 1e-9
+}
