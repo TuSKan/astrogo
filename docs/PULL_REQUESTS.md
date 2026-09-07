@@ -116,6 +116,20 @@ already shipped, or a CI change no user can observe — label the pull request
 `no-changelog`. The label is deliberate and shows up in review; silence did
 not.
 
+**And a break has to say it is one.** CI's `api-diff` job runs `apidiff` between
+this pull request's head and its base and fails when the exported API changes
+incompatibly with no fragment declaring `Changed — BREAKING` or `Removed`. Until
+it existed, a `Changed — BREAKING` entry meant a break had happened because
+somebody wrote it down, and a break with no entry meant nothing at all.
+
+The rule is one-directional on purpose: an undeclared break fails, a declared
+one passes whatever `apidiff` sees. A fragment claiming a break the tool cannot
+see is usually a behavioural break rather than a signature one, and CI has no
+business calling that a mistake.
+
+The failure message lists the changed symbols, which is the migration note
+somebody would otherwise reconstruct from a downstream build failure.
+
 Deep forensic detail — root cause, before-and-after numbers, what you refuted —
 belongs in the pull request body or the code's own doc comment. **The changelog
 is an index, not the record.**

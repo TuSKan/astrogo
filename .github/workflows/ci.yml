@@ -157,6 +157,48 @@ jobs:
           echo "label the pull request 'no-changelog'."
           exit 1
 
+  # A break in the exported API must be declared, not discovered downstream.
+  #
+  # The job above checks a fragment exists; it cannot check the fragment is
+  # true. apidiff can: it compares this pull request's head against its base and
+  # fails only when the exported API changes incompatibly and no fragment says
+  # so. That is what turns "a human wrote it down" into something CI knows.
+  #
+  # See .github/scripts/api-diff.sh for why the comparison is against the base
+  # rather than the last release tag, and why the rule is one-directional.
+  api-diff:
+    name: API Diff
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+        with:
+          # The script reads the base commit out of this clone, so the history
+          # has to be here. A shallow clone leaves it with nothing to compare
+          # against.
+          fetch-depth: 0
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: '1.25'
+          cache: true
+
+      # Pinned, not @latest, for two reasons. x/exp raises its own go directive
+      # freely — the August 2026 snapshot needs Go 1.26 and this job runs
+      # GOTOOLCHAIN=local on go.mod's toolchain (#109), so @latest failed on the
+      # very commit that added this job. And a tool version that can change
+      # under CI breaks builds for reasons unrelated to the change being
+      # reviewed, which is the opposite of what this job is for.
+      - name: Install apidiff
+        run: go install golang.org/x/exp/cmd/apidiff@v0.0.0-20250718183923-645b1fa84792
+
+      - name: Compare the exported API against the base
+        shell: bash
+        run: bash ./.github/scripts/api-diff.sh "${{ github.event.pull_request.base.sha }}" "${{ github.event.pull_request.number }}"
+
   race-detection:
     name: Race Detection
     runs-on: ubuntu-latest

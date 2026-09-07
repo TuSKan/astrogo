@@ -99,10 +99,21 @@ func TestWorkflowGoVersionTracksTheModuleDirective(t *testing.T) {
 	}
 
 	// A pin that stops matching is worse than a mismatched one: the guard
-	// keeps passing while guarding nothing. Seven is the count today — it went
-	// from six when the Validation workflow split its network tier into its own
-	// job (#123) — and the eighth should arrive with this number updated.
-	const wantPins = 7
+	// keeps passing while guarding nothing. Eight is the count today, and the
+	// ninth should arrive with this number updated.
+	//
+	// It went from six to seven twice, in parallel and independently: once when
+	// the Validation workflow split its network tier into its own job (#123),
+	// once when ci.yml gained the API-diff job (#121). Each branch was correct
+	// against the main it was written on and wrong against the other.
+	//
+	// That is worth keeping, because it is the guard working at a level it was
+	// not designed for. A boolean "the pins are checked" could not have
+	// conflicted on merge: it would have combined cleanly into a state where
+	// eight pins were asserted as seven, and gone on passing while guarding one
+	// fewer than it claimed. Counting is what made two independently correct
+	// edits visibly incompatible.
+	const wantPins = 8
 
 	if found != wantPins {
 		t.Errorf("found %d Go version pins across %v, want %d.\n"+
