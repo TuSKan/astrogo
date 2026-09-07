@@ -153,6 +153,17 @@
 // whether the day in question carried a real leap second or whether the
 // timestamp names an instant that never existed at all.
 //
+// The mirror case has never happened and is now expected to. A negative leap
+// second removes the last second of a day — 23:59:58 is followed directly by
+// 00:00:00 — and [Time] can no more say a civil second is absent than it can
+// say one is present. The ITU-R has permitted one since 1972 and none has been
+// announced; Levine, Tavella & Milton (2023) project one by about 2030 and
+// warn that because they "have never happened ... it is almost a certainty
+// that there will be widespread errors in realizing the event". [Date] reports
+// a 23:59:59 that a registered ΔAT record says was removed, on the same terms
+// as the positive case. Nothing in the published record triggers it today,
+// which is exactly why it is written now rather than then.
+//
 // If you have data with real 23:59:60 timestamps in it, hold those instants in
 // TAI, which has no leap seconds to label and no ambiguity across the step.
 // SOFA's own answer is different — iauDtf2d lets the UTC day run to 86401
