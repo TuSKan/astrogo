@@ -148,18 +148,26 @@ func (p *Provider) Resolve(ctx context.Context, query string) (resolve.Target, e
 		return p.recordToTarget(rec), nil
 	}
 
-	// Fall back to bulk table lookup.
+	// Fall back to the bulk table, which is the complete catalogue.
 	if lerr := p.ensureLoaded(ctx); lerr != nil {
 		attempts = append(attempts, fmt.Errorf("bulk table: %w", lerr))
-	} else if rec := p.lookupCached(q); rec != nil {
-		return p.recordToTarget(rec), nil
+	} else {
+		if rec := p.lookupCached(q); rec != nil {
+			return p.recordToTarget(rec), nil
+		}
+
+		// SSOFT loaded and does not have it, so the object is absent — whatever
+		// the single-object endpoint said on the way here.
+		//
+		// That distinction is the point. FINK answers an unknown identifier with
+		// a RemoteException, which reads as a failure, and joining it would make
+		// every object FINK has never heard of look like an outage: the #102
+		// inversion, with an ordinary negative reported as something nobody
+		// could ask. The complete table answering "no" is what settles it.
+		return resolve.Target{}, fmt.Errorf("%w: %q in FINK", resolve.ErrNotFound, q)
 	}
 
-	if len(attempts) > 0 {
-		return resolve.Target{}, errors.Join(attempts...)
-	}
-
-	return resolve.Target{}, fmt.Errorf("%w: %q in FINK", resolve.ErrNotFound, q)
+	return resolve.Target{}, errors.Join(attempts...)
 }
 
 // Search resolves a query (IAU number or name) against the SSOFT table.
@@ -267,8 +275,13 @@ func (p *Provider) querySingle(ctx context.Context, number int64, name string) (
 	}
 
 	// Check for error responses.
+	//
+	// The message is carried rather than dropped: it is the only thing
+	// separating "sso_number not found", which FINK says for an object it does
+	// not have, from a genuine service error. Both arrive as a RemoteException
+	// and the sentinel alone cannot tell them apart.
 	if _, hasErr := obj["RemoteException"]; hasErr {
-		return nil, ErrRemoteException
+		return nil, fmt.Errorf("%w: %s", ErrRemoteException, jsonStr(obj, "RemoteException"))
 	}
 
 	rec := &ssoRecord{
