@@ -164,7 +164,7 @@ func TestREADMECodeBlocksCompile(t *testing.T) {
 	// site.Atmosphere() survived. Pinning the count stops that surface growing
 	// unnoticed; lowering it means making a block self-contained, which also
 	// makes it copy-pasteable.
-	const maxUnrooted = 60
+	const maxUnrooted = 25
 
 	if unrooted > maxUnrooted {
 		t.Errorf("%d undefined identifiers across the README fragments, above the %d "+
