@@ -186,8 +186,14 @@ jobs:
           go-version: '1.25'
           cache: true
 
+      # Pinned, not @latest, for two reasons. x/exp raises its own go directive
+      # freely — the August 2026 snapshot needs Go 1.26 and this job runs
+      # GOTOOLCHAIN=local on go.mod's toolchain (#109), so @latest failed on the
+      # very commit that added this job. And a tool version that can change
+      # under CI breaks builds for reasons unrelated to the change being
+      # reviewed, which is the opposite of what this job is for.
       - name: Install apidiff
-        run: go install golang.org/x/exp/cmd/apidiff@latest
+        run: go install golang.org/x/exp/cmd/apidiff@v0.0.0-20250718183923-645b1fa84792
 
       - name: Compare the exported API against the base
         shell: bash
