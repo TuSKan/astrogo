@@ -1007,6 +1007,20 @@ for _, star := range targets {
 }
 ```
 
+### Epochs From a Smeared System Clock
+
+Around a leap second, a host clock disciplined by NTP may be **deliberately wrong by up to 0.5 s for up to 24 hours**, and no library can detect it. Rather than repeat or skip a second, providers spread the step over hours: Google adjusts frequency for the 24 h before, Facebook for the 18 h after, Alibaba symmetrically 12 h either side, Microsoft for the second before — and they "generally do not indicate which method is being used" (Levine, Tavella & Milton 2023, *Metrologia* **60** 014001, table 2).
+
+For this library 0.5 s is 0.3 arcsec of lunar motion, 7.5 arcsec of Earth rotation and 3.8 km of ISS ground track: far above the accuracy the rest of astrogo works to, and far below the threshold at which anything looks wrong.
+
+This is the host's clock, not astrogo's, so there is nothing to fix — only something to know:
+
+- An epoch built with `time.Date` or `time.FromJD` never touches a clock and is never smeared. Anything meant to be reproducible should be doing this regardless.
+- PTP (IEEE 1588) distributes TAI plus the current UTC offset, so there is no step to smear. NTP distributes UTC and may.
+- `Time.LeapSmearWindow` reports whether an epoch falls within a day of a leap second and names the step, so a caller can treat those as good to 0.5 s rather than to the microsecond. It is false for every instant since 2016-12-31.
+
+See [`time`'s package documentation](https://pkg.go.dev/github.com/TuSKan/astrogo/time) for the full account.
+
 ### Scheduler Optimality
 
 `SwapOptimizedStrategy` is a **local search heuristic**, not a global optimizer. It improves on greedy/priority strategies via adjacent swaps and gap insertion, with monotonic score guarantees — but it does not find the globally optimal schedule.
