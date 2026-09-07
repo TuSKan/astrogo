@@ -124,7 +124,11 @@
 //     the current UTC offset, so there is no step to smear.
 //   - If neither is possible and the work spans a leap second, treat epochs
 //     from that window as good to 0.5 s rather than to the microsecond, and
-//     say so in whatever the results feed.
+//     say so in whatever the results feed. [Time.LeapSmearWindow] is how a
+//     caller finds out which epochs those are: it reports whether an instant
+//     falls within a day of a leap second, and names the step. It cannot say
+//     whether a particular host smeared — nothing can — only that this is an
+//     epoch where the question arises.
 //
 // This is not a defect this package can fix — the host clock is the host's —
 // and it is worth knowing rather than discovering. The window is also
