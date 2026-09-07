@@ -50,11 +50,20 @@ func TestUpstreamFailureClassification(t *testing.T) {
 		{"network timeout", timeout, true},
 		{"wrapped 500", fmt.Errorf("norad: fetch failed: %w", &httpStatusError{500}), true},
 
+		// A service declining to serve a request that carried no credential.
+		// CelesTrak answers a burst this way — an IIS "Forbidden: Access is
+		// denied" page — and serves the same query normally a minute later.
+		{"403 forbidden", &httpStatusError{403}, true},
+		{"wrapped 403", fmt.Errorf("norad: fetch failed: %w", &httpStatusError{403}), true},
+
 		// We sent a bad request: exactly what these tests exist to catch.
 		{"400 bad request", &httpStatusError{400}, false},
 		{"404 not found", &httpStatusError{404}, false},
+		// 401 is the opposite of the 403 above and not a near-duplicate of it.
+		// It says the service wants authentication, which for an endpoint
+		// astrogo believes is public means astrogo's model of that endpoint is
+		// wrong — the URL moved, or the service grew an auth requirement.
 		{"401 unauthorized", &httpStatusError{401}, false},
-		{"403 forbidden", &httpStatusError{403}, false},
 		{"parse failure", errStaticParse, false},
 		{"connection refused", &net.DNSError{}, false},
 	}

@@ -103,3 +103,77 @@ func TestDefaultEndpointsCacheDirsMatchOnDiskLayout(t *testing.T) {
 		}
 	}
 }
+
+// TestNoAPIEndpointRequiresACredential is what internal/testutil's
+// SkipOnUpstreamFailure treats a 403 as the upstream's problem on the strength
+// of.
+//
+// # The argument it holds up
+//
+// A 403 says "I know who you are and I decline". To a caller that sent no
+// credential there is nothing about the request to correct, so it is the
+// service's policy rather than astrogo's defect — CelesTrak answers a burst
+// that way and serves the same query normally a minute later (#206). A 401 is
+// the opposite and stays a failure: it says the service wants authentication,
+// which for an endpoint astrogo believes is public means the endpoint moved or
+// grew a requirement.
+//
+// That reasoning is only sound while astrogo never sends a credential the
+// service demands. TokenEnv's own contract says so — "a token is an
+// optimisation, never a requirement: every endpoint that declares one must
+// still work without it" — and this is where the contract stops being prose.
+//
+// # Why the list rather than a flag
+//
+// An inventory, not an exclusion list: adding an entry means writing down why
+// the endpoint needs a token and confirming it still answers without one. A
+// boolean would be set without either.
+//
+// The KindAPI restriction is the other half. Credentials also reach
+// CopernicusEODATA, through the AWS SDK's default chain, and a 403 from there
+// is a real configuration error a developer needs to see. It never reaches the
+// classifier: SkipOnUpstreamFailure matches errors carrying an HTTPStatus, and
+// only remote/api's HTTPError has one — a blob-backed endpoint's failures come
+// from gocloud and the AWS SDK instead. So the invariant is specifically that
+// no *KindAPI* endpoint requires a credential.
+func TestNoAPIEndpointRequiresACredential(t *testing.T) {
+	// Every KindAPI endpoint that declares a token, and why it is optional
+	// there. Gaia@AIP serves the same DR3 tables unauthenticated; the token
+	// only raises the row limit and the queue priority.
+	optional := map[EndpointID]string{
+		GaiaAIP:      "Gaia@AIP serves the same DR3 tables anonymously; a token raises row limits and queue priority",
+		GaiaAIPAsync: "the same mirror's async job endpoint, and the same token, with the same anonymous fallback",
+	}
+
+	for _, ep := range Endpoints() {
+		if ep.TokenEnv == "" {
+			continue
+		}
+
+		if ep.Kind != KindAPI {
+			continue
+		}
+
+		if _, ok := optional[ep.ID]; !ok {
+			t.Errorf("endpoint %s declares TokenEnv %q and is not in this test's inventory.\n"+
+				"  If the token is optional, add it with the reason. If the service now *requires*\n"+
+				"  one, internal/testutil.SkipOnUpstreamFailure must stop treating 403 as the\n"+
+				"  upstream's problem — it would hide a real authorization failure.",
+				ep.ID, ep.TokenEnv)
+		}
+	}
+
+	// The inventory must not outlive its entries either, or it stops being a
+	// record of anything.
+	for id := range optional {
+		ep, ok := Lookup(id)
+		if !ok {
+			t.Errorf("inventory names %s, which is not a registered endpoint", id)
+			continue
+		}
+
+		if ep.TokenEnv == "" {
+			t.Errorf("inventory names %s as token-carrying, but it declares no TokenEnv", id)
+		}
+	}
+}

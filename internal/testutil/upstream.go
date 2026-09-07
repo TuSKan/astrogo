@@ -19,11 +19,31 @@ import (
 // outage at CelesTrak or JPL is reported as a defect in this repository — and
 // it blocks pull requests that never touched the package.
 //
-// The classification is deliberately narrow. A 5xx, a 429, a 408, a request
-// that never completed and a connection dropped mid-transfer are the
+// The classification is deliberately narrow. A 5xx, a 429, a 408, a 403, a
+// request that never completed and a connection dropped mid-transfer are the
 // upstream's problem. Every other 4xx is not: a 400 or a 404 means astrogo
 // built a request the service rejected, which is exactly the defect these
 // tests exist to catch, and it stays a failure.
+//
+// # Why 403 is on the upstream's side and 401 is not
+//
+// They look like the same case and are opposite ones. A 401 says "you must
+// authenticate", which for an endpoint astrogo believes is public means
+// astrogo's model of that endpoint is wrong — the URL moved, or the service
+// grew an auth requirement — and that is a defect to see. A 403 says "I know
+// who you are and I decline", and to a caller that sent no credential there is
+// nothing to get right: it is the service's policy, not our request.
+//
+// That reasoning holds only while astrogo sends no credential the service
+// requires, which remote.TokenEnv's contract states ("a token is an
+// optimisation, never a requirement") and remote's
+// TestNoAPIEndpointRequiresACredential enforces. Break that invariant and this
+// arm starts hiding a real authorization failure — which is why the test that
+// keeps it true names this function.
+//
+// Observed rather than assumed: CelesTrak answers a burst of requests with an
+// IIS "403 - Forbidden: Access is denied" page and serves the same query
+// normally a minute later. See #206.
 func SkipOnUpstreamFailure(tb testing.TB, err error) {
 	tb.Helper()
 
@@ -51,8 +71,13 @@ func upstreamFailure(err error) (string, bool) {
 			return "rate limited", true
 		case code == http.StatusRequestTimeout:
 			return "request timeout", true
+		case code == http.StatusForbidden:
+			// The service declined to serve a request that carried no
+			// credential, so there is nothing about the request to correct.
+			// See this function's doc comment for why 401 is not here.
+			return "refused by the service", true
 		default:
-			// 4xx other than the two above means we sent a bad request.
+			// 4xx other than those above means we sent a bad request.
 			return "", false
 		}
 	}
