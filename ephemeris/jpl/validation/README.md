@@ -18,8 +18,11 @@ go test -tags=validation ./ephemeris/jpl/validation/
 go test -tags=network    ./ephemeris/jpl/validation/
 ```
 
-Neither runs in ordinary CI. The scheduled `Validation` workflow runs both
-weekly, and uploads each suite's result document as an artifact.
+Neither runs in ordinary CI. The scheduled `Validation` workflow runs the
+`network` tier nightly and the `validation` tier weekly, and uploads each
+suite's result document as an artifact. The split is deliberate: only the
+network tier notices a response-format change upstream, and only it goes stale
+in a day.
 
 ## The corpus
 

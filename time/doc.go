@@ -23,11 +23,12 @@
 //
 //	UTC ←→ TAI ←→ TT ←→ TDB
 //	 ↕     ↕
-//	UT1   GPST
+//	UT1   GPST, BDT
 //
 // Conversion status:
 //   - UTC ↔ TAI: Complete (via SOFA leap-second table)
 //   - TAI ↔ GPST: Complete (GPST = TAI − 19 s, exact by definition)
+//   - TAI ↔ BDT:  Complete (BDT = TAI − 33 s, exact by definition)
 //   - TAI ↔ TT:  Complete (TT = TAI + 32.184s, exact by definition)
 //   - TT  ↔ TDB: Complete (Fairhead & Bretagnon 1990 single-term, amplitude 1.657 ms)
 //   - UTC ↔ UT1: Complete when IERS EOP data is loaded; returns error when unavailable.
@@ -124,7 +125,11 @@
 //     the current UTC offset, so there is no step to smear.
 //   - If neither is possible and the work spans a leap second, treat epochs
 //     from that window as good to 0.5 s rather than to the microsecond, and
-//     say so in whatever the results feed.
+//     say so in whatever the results feed. [Time.LeapSmearWindow] is how a
+//     caller finds out which epochs those are: it reports whether an instant
+//     falls within a day of a leap second, and names the step. It cannot say
+//     whether a particular host smeared — nothing can — only that this is an
+//     epoch where the question arises.
 //
 // This is not a defect this package can fix — the host clock is the host's —
 // and it is worth knowing rather than discovering. The window is also
@@ -152,6 +157,17 @@
 // [Date] now emits a [logging] warning for any second of 60 or more, saying
 // whether the day in question carried a real leap second or whether the
 // timestamp names an instant that never existed at all.
+//
+// The mirror case has never happened and is now expected to. A negative leap
+// second removes the last second of a day — 23:59:58 is followed directly by
+// 00:00:00 — and [Time] can no more say a civil second is absent than it can
+// say one is present. The ITU-R has permitted one since 1972 and none has been
+// announced; Levine, Tavella & Milton (2023) project one by about 2030 and
+// warn that because they "have never happened ... it is almost a certainty
+// that there will be widespread errors in realizing the event". [Date] reports
+// a 23:59:59 that a registered ΔAT record says was removed, on the same terms
+// as the positive case. Nothing in the published record triggers it today,
+// which is exactly why it is written now rather than then.
 //
 // If you have data with real 23:59:60 timestamps in it, hold those instants in
 // TAI, which has no leap seconds to label and no ambiguity across the step.

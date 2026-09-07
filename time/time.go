@@ -258,13 +258,31 @@ const (
 	// likely remaining instance of that defect class.
 	//
 	// Galileo System Time shares this scale: it is also TAI − 19 s, and agrees
-	// with GPST to within nanoseconds by design. BeiDou does not — BDT is
-	// TAI − 33 s — and GLONASS needs no scale here at all, being UTC plus three
-	// hours with leap seconds applied. Neither is expressible today; see #145.
+	// with GPST to within nanoseconds by design. BeiDou does not, and has
+	// [BDT]. GLONASS needs no scale here at all, being UTC plus three hours
+	// with leap seconds applied — a caller holding one applies a fixed zone
+	// offset and is already in UTC.
 	//
 	// Reference: Levine, Tavella & Milton (2023), "Towards a consensus on a
 	// continuous coordinated universal time", Metrologia 60 014001, table 1.
 	GPST
+
+	// BDT is BeiDou Navigation Satellite System time.
+	//
+	// The same construction as [GPST] with a different constant, because the
+	// constellation was synchronised later: BDT was set to UTC on 2006-01-01,
+	// when TAI−UTC was 33 s, and has run at the TAI rate since.
+	//
+	//	TAI − BDT = 33 s, exactly and for ever
+	//	BDT − UTC = ΔAT − 33 s, which is 4 s today
+	//	GPST − BDT = 14 s, and will stay 14 s
+	//
+	// Four seconds is small enough to look like nothing and is 30 km of ISS
+	// ground track. It is also the offset most easily mistaken for a rounding
+	// difference, which is the argument for expressing it rather than leaving a
+	// caller to subtract it: GPST and BDT differ by a constant that neither
+	// timestamp carries.
+	BDT
 )
 
 // gpstMinusTAI is the fixed offset that defines GPS time.
@@ -274,6 +292,10 @@ const (
 // the system rather than a table lookup — which is what makes this scale cheap
 // to support correctly.
 const gpstMinusTAI = -19.0
+
+// bdtMinusTAI is the fixed offset that defines BeiDou time — the value of
+// TAI−UTC at BeiDou's 2006-01-01 synchronisation, frozen. See [BDT].
+const bdtMinusTAI = -33.0
 
 func (s Scale) String() string {
 	switch s {
@@ -289,6 +311,8 @@ func (s Scale) String() string {
 		return "TDB"
 	case GPST:
 		return "GPST"
+	case BDT:
+		return "BDT"
 	default:
 		return "UNKNOWN"
 	}
@@ -311,7 +335,9 @@ func (s Scale) String() string {
 // term between them varies by ±1.7 ms, so a TDB interval and the TT interval
 // it spans differ by up to a microsecond per hour. Arithmetic in TDB stays in
 // TDB, which is what an ephemeris interpolating in TDB days wants.
-func (s Scale) uniform() bool { return s == TAI || s == TT || s == TDB || s == GPST }
+func (s Scale) uniform() bool {
+	return s == TAI || s == TT || s == TDB || s == GPST || s == BDT
+}
 
 // Time represents a high-precision astronomical timestamp.
 //
@@ -676,12 +702,22 @@ func (t Time) AddDays(d float64) Time {
 //
 // A second of 60 — the label UTC gives an inserted leap second — cannot be
 // represented and is normalised onto the following midnight, one second later
-// than the instant asked for. That is reported through [logging] rather than
-// returned, since this constructor has no error to return; see
-// leapsecond_alias.go for why the type cannot hold it.
+// than the instant asked for. 23:59:59 on the day of a negative leap second is
+// the mirror problem: a second UTC never labelled, which this returns anyway.
+// Both are reported through [logging] rather than returned, since this
+// constructor has no error to return; see leapsecond_alias.go for why the type
+// can hold neither.
 func Date(year int, month time.Month, day, hour, minute, second, nanosecond int, loc *time.Location) Time {
-	if second >= 60 {
+	switch {
+	case second >= 60:
 		warnLeapSecondAliased(year, month, day, hour, minute, second, loc)
+
+	// Only the last second of a UTC day can be one a negative leap second
+	// removed. Which second that is depends on the caller's zone, so the hour
+	// and minute are checked after converting rather than here — see
+	// warnIfSecondRemoved.
+	case second == 59:
+		warnIfSecondRemoved(year, month, day, hour, minute, loc)
 	}
 
 	// For years within Go's time.Time range, delegate to FromGo which
@@ -1101,10 +1137,10 @@ func (t Time) UTC() Time {
 		// UTC = UT1 − DUT1. Since |DUT1| < 0.9s, UT1 ≈ UTC for lookup.
 		dut1 := dut1OrFallback(t.jd1, t.jd2)
 		return fromPartsPreserveLoc(t, t.jd1, t.jd2-dut1/86400.0, UTC)
-	case GPST:
-		// GPST → TAI → UTC. The first step is a constant and the second is
-		// the leap-second table, which is where the 18 s a GNSS user is
-		// missing actually comes from.
+	case GPST, BDT:
+		// GNSS → TAI → UTC. The first step is a constant and the second is
+		// the leap-second table, which is where the seconds a GNSS user is
+		// missing actually come from.
 		return t.TAI().UTC()
 	}
 
@@ -1143,6 +1179,10 @@ func (t Time) TAI() Time {
 		// offset was frozen at the 1980-01-06 synchronisation and GPS time
 		// has ignored leap seconds ever since.
 		return fromPartsPreserveLoc(t, t.jd1, t.jd2-gpstMinusTAI/86400.0, TAI)
+	case BDT:
+		// TAI = BDT + 33 s, exactly, frozen at BeiDou's 2006-01-01
+		// synchronisation for the same reason.
+		return fromPartsPreserveLoc(t, t.jd1, t.jd2-bdtMinusTAI/86400.0, TAI)
 	default:
 		// UT1 → UTC → TAI. UT1 genuinely has to go this way: DUT1 is defined
 		// against UTC, so there is no arithmetic path.
@@ -1207,8 +1247,8 @@ func (t Time) TT() Time {
 	case UT1:
 		// UT1 → UTC (with fallback) → TT
 		return t.UTC().TT()
-	case GPST:
-		// GPST → TAI → TT, both steps constant.
+	case GPST, BDT:
+		// GNSS → TAI → TT, both steps constant.
 		return t.TAI().TT()
 	}
 
@@ -1226,8 +1266,8 @@ func (t Time) TT() Time {
 // GPS time; building it with [FromJD] or [Date] and this scale, rather than
 // calling it UTC, is what stops those 18 seconds becoming 138 km of ISS track.
 //
-// Galileo System Time is the same scale to within nanoseconds. BeiDou is not
-// (BDT is TAI − 33 s) and is not expressible here — see [GPST]'s own note.
+// Galileo System Time is the same scale to within nanoseconds. BeiDou is not:
+// see [Time.BDT].
 func (t Time) GPST() Time {
 	if t.scale == GPST {
 		return t
@@ -1236,6 +1276,27 @@ func (t Time) GPST() Time {
 	tai := t.TAI()
 
 	return fromPartsPreserveLoc(t, tai.jd1, tai.jd2+gpstMinusTAI/86400.0, GPST)
+}
+
+// BDT returns a new Time converted to BeiDou system time.
+//
+// TAI − 33 s exactly, so like [Time.GPST] this is arithmetic and cannot fail.
+// Against UTC the gap is 4 s today and grows at every leap event; against GPST
+// it is a flat 14 s that will never change, since both were frozen against TAI.
+//
+// The direction that matters is the other one: a receiver on a BeiDou-capable
+// device hands out BDT, and building that instant with this scale rather than
+// calling it UTC is what stops four seconds becoming 30 km of ISS track. Four
+// seconds is small enough to read as a rounding difference, which is exactly
+// why it needs a name.
+func (t Time) BDT() Time {
+	if t.scale == BDT {
+		return t
+	}
+
+	tai := t.TAI()
+
+	return fromPartsPreserveLoc(t, tai.jd1, tai.jd2+bdtMinusTAI/86400.0, BDT)
 }
 
 // TDB returns a new Time converted to the Barycentric Dynamical Time scale.
