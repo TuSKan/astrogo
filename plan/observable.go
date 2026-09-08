@@ -14,7 +14,7 @@ type Observable interface {
 	// Position returns the ICRS coordinates at the given time.
 	Position(t time.Time) (coord.ICRS, error)
 	// GetDetails retrieves comprehensive properties at the given context.
-	GetDetails(ctx *coord.Context, props ...string) (*TargetDetails, error)
+	GetDetails(ctx *coord.Context, over DetailOverrides) (*TargetDetails, error)
 }
 
 // MovingBody is implemented by targets with ephemeris providers

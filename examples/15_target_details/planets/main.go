@@ -44,7 +44,7 @@ func main() {
 
 	mars := plan.NewMars(prov)
 
-	details, err := mars.GetDetails(ctx, "Description", "The Red Planet", "Source", "JPL DE442")
+	details, err := mars.GetDetails(ctx, plan.DetailOverrides{Description: "The Red Planet", Source: "JPL DE442"})
 	if err != nil {
 		log.Fatalf("failed to get details: %v", err)
 	}

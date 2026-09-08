@@ -22,7 +22,7 @@ func (m mockObject) ICRS(_ time.Time) (coord.ICRS, error) {
 
 func (m mockObject) Name() string                             { return "mock" }
 func (m mockObject) Position(_ time.Time) (coord.ICRS, error) { return m.pos, nil }
-func (m mockObject) GetDetails(_ *coord.Context, _ ...string) (*TargetDetails, error) {
+func (m mockObject) GetDetails(_ *coord.Context, _ DetailOverrides) (*TargetDetails, error) {
 	return &TargetDetails{}, nil
 }
 

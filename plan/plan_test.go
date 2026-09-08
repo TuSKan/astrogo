@@ -2,6 +2,7 @@ package plan
 
 import (
 	"errors"
+	"math"
 	"sync"
 	"testing"
 
@@ -204,7 +205,7 @@ func TestIsObservable(t *testing.T) {
 	})
 }
 
-func TestScoreObservable(t *testing.T) {
+func TestScorer(t *testing.T) {
 	loc, _ := coord.NewGeodetic(angle.Zero(), angle.Zero(), 0)
 	site, _ := NewSite("Test", loc)
 	tm := time.FromJD(2451545.0, time.UTC) // J2000 Noon (LST ~18.69h)
@@ -215,8 +216,8 @@ func TestScoreObservable(t *testing.T) {
 		// Target 2: Lower (Alt ~45)
 		obj2 := NewStar("T", angle.Hour(18.69), angle.Deg(45))
 
-		s1, _ := ScoreObservable(obj1, tm, site, nil, nil)
-		s2, _ := ScoreObservable(obj2, tm, site, nil, nil)
+		s1, _ := Scorer{Site: site}.Score(obj1, tm)
+		s2, _ := Scorer{Site: site}.Score(obj2, tm)
 
 		if s1 <= s2 {
 			t.Errorf("Expected higher altitude to have higher score: %f <= %f", s1, s2)
@@ -228,7 +229,7 @@ func TestScoreObservable(t *testing.T) {
 		// Force fail with extreme altitude threshold
 		c := Altitude{Threshold: angle.Deg(95)}
 
-		s, err := ScoreObservable(obj, tm, site, nil, nil, c)
+		s, err := Scorer{Site: site, Constraints: []Constraint{c}}.Score(obj, tm)
 		testutil.AssertNoError(t, err)
 
 		if s != 0 {
@@ -243,8 +244,8 @@ func TestScoreObservable(t *testing.T) {
 
 		obj := NewStar("T", angle.Hour(18.69), angle.Deg(0))
 
-		sAlt, _ := ScoreObservable(obj, tm, site, altOnly, nil)
-		sUrg, _ := ScoreObservable(obj, tm, site, urgOnly, nil)
+		sAlt, _ := Scorer{Site: site, Config: *altOnly}.Score(obj, tm)
+		sUrg, _ := Scorer{Site: site, Config: *urgOnly}.Score(obj, tm)
 
 		// Both should be positive for a visible target
 		if sAlt <= 0 {
@@ -258,7 +259,7 @@ func TestScoreObservable(t *testing.T) {
 
 	t.Run("CompositeHigherThanZero", func(t *testing.T) {
 		obj := NewStar("T", angle.Hour(18.69), angle.Deg(0))
-		s, err := ScoreObservable(obj, tm, site, nil, nil) // Default config
+		s, err := Scorer{Site: site}.Score(obj, tm) // Default config
 		testutil.AssertNoError(t, err)
 
 		if s <= 0 {
@@ -366,7 +367,7 @@ func (erroringCoordObject) Position(time.Time) (coord.ICRS, error) {
 	return coord.ICRS{}, errCoordObjectICRS
 }
 
-func (erroringCoordObject) GetDetails(*coord.Context, ...string) (*TargetDetails, error) {
+func (erroringCoordObject) GetDetails(*coord.Context, DetailOverrides) (*TargetDetails, error) {
 	return nil, errCoordObjectICRS
 }
 
@@ -482,5 +483,215 @@ func TestScoreConfig_Defaults(t *testing.T) {
 	total := wA + wU + wM
 	if total < 0.999 || total > 1.001 {
 		t.Errorf("Expected normalized weights to sum to 1.0, got %f", total)
+	}
+}
+
+// TestScorerConfigIsUsed pins that Scorer.Config actually reaches the merit
+// weighting, rather than the default being applied unconditionally.
+//
+// The existing UrgencyBoost subtest passes a custom config but only asserts
+// the result is positive, which a Scorer that ignored Config entirely would
+// also satisfy. This asserts the exact number instead: with AltitudeWeight
+// alone, normalize() makes wAlt 1.0, so the composite is altMerit — and the
+// ×90 rescaling turns that back into the altitude in degrees. A weighting
+// this test can predict end to end is the only kind that proves the weights
+// were read.
+func TestScorerConfigIsUsed(t *testing.T) {
+	t.Parallel()
+
+	loc, err := coord.NewGeodetic(angle.Zero(), angle.Zero(), 0)
+	testutil.AssertNoError(t, err)
+
+	site, err := NewSite("Test", loc)
+	testutil.AssertNoError(t, err)
+
+	tm := time.FromJD(2451545.0, time.UTC) // J2000 noon, LST ~18.69h
+	obj := NewStar("T", angle.Hour(18.69), angle.Deg(0))
+
+	eval, err := IsObservable(obj, tm, site)
+	testutil.AssertNoError(t, err)
+
+	altDeg := eval.AltAz.Alt().Degrees()
+
+	altOnly, err := Scorer{Site: site, Config: ScoreConfig{AltitudeWeight: 1}}.Score(obj, tm)
+	testutil.AssertNoError(t, err)
+	testutil.AssertNear(t, "altitude-only score", altOnly, altDeg, 1e-9)
+
+	// And it must not coincide with the default weighting, or the assertion
+	// above would hold for a Scorer that ignored Config.
+	dflt, err := Scorer{Site: site}.Score(obj, tm)
+	testutil.AssertNoError(t, err)
+
+	if math.Abs(dflt-altOnly) < 1.0 {
+		t.Errorf("default score %.6f is indistinguishable from the "+
+			"altitude-only score %.6f; Config may be ignored", dflt, altOnly)
+	}
+}
+
+// TestScorerContextIsReusedAndFixesTheEpoch covers both halves of the Context
+// field's contract.
+//
+// Reused: a Context built at the scoring epoch must give the same answer as
+// the one Score builds itself — a caller passing one is asking to skip the
+// ~91 µs Apco13 solve, not to change the result.
+//
+// Fixes the epoch: a Context built at a *different* instant is used as given,
+// not silently rebuilt for t. That is the trap in the field, so it is worth a
+// test rather than only a doc comment: six hours of Earth rotation moves this
+// equatorial target from the zenith to roughly 45°, and a Scorer that quietly
+// rebuilt the context would hide the mistake instead of reporting it.
+func TestScorerContextIsReusedAndFixesTheEpoch(t *testing.T) {
+	t.Parallel()
+
+	loc, err := coord.NewGeodetic(angle.Zero(), angle.Zero(), 0)
+	testutil.AssertNoError(t, err)
+
+	site, err := NewSite("Test", loc)
+	testutil.AssertNoError(t, err)
+
+	tm := time.FromJD(2451545.0, time.UTC)
+	obj := NewStar("T", angle.Hour(18.69), angle.Deg(0))
+
+	fresh, err := Scorer{Site: site}.Score(obj, tm)
+	testutil.AssertNoError(t, err)
+
+	atEpoch, err := Scorer{
+		Site:    site,
+		Context: coord.NewContext(tm, loc, site.Refraction()),
+	}.Score(obj, tm)
+	testutil.AssertNoError(t, err)
+	testutil.AssertNear(t, "score with a Context at the scoring epoch", atEpoch, fresh, 1e-9)
+
+	sixHoursEarlier, err := Scorer{
+		Site:    site,
+		Context: coord.NewContext(tm.AddDays(-0.25), loc, site.Refraction()),
+	}.Score(obj, tm)
+	testutil.AssertNoError(t, err)
+
+	if math.Abs(sixHoursEarlier-fresh) < 10.0 {
+		t.Errorf("score with a six-hour-stale Context (%.6f) is within 10 of "+
+			"the fresh score (%.6f); the supplied Context is not being used",
+			sixHoursEarlier, fresh)
+	}
+}
+
+// TestScorerMeritTerms pins the three parts of the composite that a caller can
+// reach only indirectly, each with a number the test can predict from the
+// documented formula rather than from a previous run.
+//
+// All three predate the Scorer struct and none was asserted before; they are
+// covered here because the rewrite moved them, and a merit term nothing checks
+// is one a refactor can drop silently.
+func TestScorerMeritTerms(t *testing.T) {
+	t.Parallel()
+
+	loc, err := coord.NewGeodetic(angle.Zero(), angle.Zero(), 0)
+	testutil.AssertNoError(t, err)
+
+	site, err := NewSite("Test", loc)
+	testutil.AssertNoError(t, err)
+
+	tm := time.FromJD(2451545.0, time.UTC)
+
+	t.Run("priority multiplies the composite", func(t *testing.T) {
+		t.Parallel()
+
+		base := NewStar("T", angle.Hour(18.69), angle.Deg(45))
+
+		plain, err := Scorer{Site: site}.Score(base, tm)
+		testutil.AssertNoError(t, err)
+
+		ranked, err := Scorer{Site: site}.Score(
+			prioritizedTarget{Observable: base, priority: 3.0}, tm)
+		testutil.AssertNoError(t, err)
+
+		testutil.AssertNear(t, "priority-3 score", ranked, 3.0*plain, 1e-9)
+	})
+
+	t.Run("a target below the horizon scores zero, not negative", func(t *testing.T) {
+		t.Parallel()
+
+		// No constraints, so nothing rejects this target: Evaluation.Observable
+		// stays true and the altitude merit is what has to stay in range. A
+		// negative score would sort *below* a rejected target, inverting the
+		// meaning of the zero that a failed constraint returns.
+		below := NewStar("below", angle.Hour(6.69), angle.Deg(0))
+
+		eval, err := IsObservable(below, tm, site)
+		testutil.AssertNoError(t, err)
+
+		if eval.AltAz.Alt().Degrees() >= 0 {
+			t.Fatalf("fixture is above the horizon at %.3f°; it no longer "+
+				"tests the clamp", eval.AltAz.Alt().Degrees())
+		}
+
+		score, err := Scorer{Site: site, Config: ScoreConfig{AltitudeWeight: 1}}.Score(below, tm)
+		testutil.AssertNoError(t, err)
+
+		if score < 0 {
+			t.Errorf("score = %.6f for a target %.3f° below the horizon; the "+
+				"altitude merit must clamp at zero", score, eval.AltAz.Alt().Degrees())
+		}
+	})
+
+	t.Run("a zero MoonFullPenaltyDeg falls back to 30 degrees", func(t *testing.T) {
+		t.Parallel()
+
+		// ScoreConfig{MoonWeight: 1} is a natural thing to write, and without
+		// the fallback its threshold would be zero: sep/0 is +Inf, min(+Inf, 1)
+		// is 1, and every target would score a perfect Moon merit — the Moon
+		// itself included.
+		moon, err := getMoonPosition(tm)
+		testutil.AssertNoError(t, err)
+
+		// 15° away along the meridian is half the default 30° threshold, so
+		// the merit is 0.5 and the ×90 rescaling makes the score exactly 45.
+		near := NewStar("near the Moon", moon.RA(), moon.Dec()+angle.Deg(15))
+
+		const wantHalfMerit = 45.0
+
+		explicit, err := Scorer{
+			Site:   site,
+			Config: ScoreConfig{MoonWeight: 1, MoonFullPenaltyDeg: 30},
+		}.Score(near, tm)
+		testutil.AssertNoError(t, err)
+		testutil.AssertNear(t, "score with an explicit 30° threshold", explicit, wantHalfMerit, 1e-6)
+
+		fallback, err := Scorer{Site: site, Config: ScoreConfig{MoonWeight: 1}}.Score(near, tm)
+		testutil.AssertNoError(t, err)
+		testutil.AssertNear(t, "score with a zero threshold", fallback, wantHalfMerit, 1e-6)
+	})
+}
+
+// TestScorerReportsFailureRatherThanZero is the error-vs-absence check for
+// Score: a target that cannot be evaluated must not come back as a score of
+// zero with a nil error.
+//
+// Zero is already a meaningful answer here — FailingConstraint above asserts
+// it is what a rejected target gets — so a swallowed error would place a
+// broken target at the bottom of a ranking instead of stopping the run, and
+// a scheduler would go on to plan a night around the remaining targets as
+// though nothing had gone wrong.
+func TestScorerReportsFailureRatherThanZero(t *testing.T) {
+	t.Parallel()
+
+	loc, err := coord.NewGeodetic(angle.Zero(), angle.Zero(), 0)
+	testutil.AssertNoError(t, err)
+
+	site, err := NewSite("Test", loc)
+	testutil.AssertNoError(t, err)
+
+	score, err := Scorer{Site: site}.Score(errObservable{}, fixedEpoch())
+	if err == nil {
+		t.Fatalf("Score returned (%v, nil) for a target whose Position fails; "+
+			"a failure must not be indistinguishable from a rejected target", score)
+	}
+
+	if !errors.Is(err, errAlwaysFails) {
+		t.Errorf("error = %v, want it to wrap the target's own failure", err)
+	}
+
+	if score != 0 {
+		t.Errorf("score = %v alongside an error, want 0", score)
 	}
 }

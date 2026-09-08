@@ -87,8 +87,8 @@ func (s *Star) Position(_ time.Time) (coord.ICRS, error) {
 }
 
 // GetDetails returns the target details.
-func (s *Star) GetDetails(ctx *coord.Context, props ...string) (*TargetDetails, error) {
-	return computeDetails(s, ctx, props...)
+func (s *Star) GetDetails(ctx *coord.Context, over DetailOverrides) (*TargetDetails, error) {
+	return computeDetails(s, ctx, over)
 }
 
 // StaticMagnitude returns the catalog V-band magnitude if set.

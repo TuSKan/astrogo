@@ -88,8 +88,8 @@ func (s *Satellite) GeocentricVec(t time.Time) (vector.Vec3, error) {
 }
 
 // GetDetails computes the position and visual magnitude of the satellite.
-func (s *Satellite) GetDetails(ctx *coord.Context, props ...string) (*TargetDetails, error) {
-	return computeDetails(s, ctx, props...)
+func (s *Satellite) GetDetails(ctx *coord.Context, over DetailOverrides) (*TargetDetails, error) {
+	return computeDetails(s, ctx, over)
 }
 
 // errNoObserverCtx is returned when satellite magnitude is called without a context.

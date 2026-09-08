@@ -63,7 +63,7 @@ func TestNewConstellation_GetDetailsAndWindows(t *testing.T) {
 		t.Fatalf("NewConstellation: %v", err)
 	}
 
-	d, err := c.GetDetails(testContext(t))
+	d, err := c.GetDetails(testContext(t), DetailOverrides{})
 	if err != nil {
 		t.Fatalf("GetDetails: %v", err)
 	}

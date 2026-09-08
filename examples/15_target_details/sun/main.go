@@ -44,7 +44,7 @@ func main() {
 
 	sun := plan.NewSun(prov)
 
-	details, err := sun.GetDetails(ctx, "Description", "Our local star", "Source", "JPL DE442")
+	details, err := sun.GetDetails(ctx, plan.DetailOverrides{Description: "Our local star", Source: "JPL DE442"})
 	if err != nil {
 		log.Fatalf("failed to get details: %v", err)
 	}

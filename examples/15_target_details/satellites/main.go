@@ -48,7 +48,7 @@ func main() {
 	t := catTarget.Epoch
 	ctx := coord.NewContext(t, loc, atmosphere.StandardRefraction)
 
-	details, err := iss.GetDetails(ctx, "Description", "International Space Station", "Source", "NORAD TLE")
+	details, err := iss.GetDetails(ctx, plan.DetailOverrides{Description: "International Space Station", Source: "NORAD TLE"})
 	if err != nil {
 		log.Fatal(err)
 	}

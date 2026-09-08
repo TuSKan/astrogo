@@ -57,6 +57,6 @@ func (c *Constellation) Position(_ time.Time) (coord.ICRS, error) {
 }
 
 // GetDetails computes observational details using the given coordinate context.
-func (c *Constellation) GetDetails(ctx *coord.Context, props ...string) (*TargetDetails, error) {
-	return computeDetails(c, ctx, props...)
+func (c *Constellation) GetDetails(ctx *coord.Context, over DetailOverrides) (*TargetDetails, error) {
+	return computeDetails(c, ctx, over)
 }

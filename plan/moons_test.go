@@ -165,7 +165,7 @@ func TestPlanetaryMoon_GetDetails(t *testing.T) {
 		t.Fatalf("NewPlanetaryMoon: %v", err)
 	}
 
-	d, err := moon.GetDetails(testContext(t))
+	d, err := moon.GetDetails(testContext(t), DetailOverrides{})
 	if err != nil {
 		t.Fatalf("GetDetails: %v", err)
 	}

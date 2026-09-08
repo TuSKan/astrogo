@@ -46,19 +46,7 @@ func main() {
 		log.Fatalf("build target: %v", err)
 	}
 
-	details, err := sirius.GetDetails(ctx,
-		"Bayer letter", "α CMa",
-		"Flamsteed number", "9 CMa",
-		"FK5 number", "FK5 257",
-		"BSC5 number", "HR 2491",
-		"Hipparcos number", "HIP 32349",
-		"Tycho-2 number", "TYC 5949-02777-1",
-		"Designation for variable", "NSV 17173",
-		"TDSC number", "TDSC 16356",
-		"WDS number", "WDS 06451-1643",
-		"Spectral type", "A1",
-		"Luminosity class", "V - dwarfs/main sequence",
-	)
+	details, err := sirius.GetDetails(ctx, plan.DetailOverrides{Extra: map[string]string{"Bayer letter": "α CMa", "Flamsteed number": "9 CMa", "FK5 number": "FK5 257", "BSC5 number": "HR 2491", "Hipparcos number": "HIP 32349", "Tycho-2 number": "TYC 5949-02777-1", "Designation for variable": "NSV 17173", "TDSC number": "TDSC 16356", "WDS number": "WDS 06451-1643", "Spectral type": "A1", "Luminosity class": "V - dwarfs/main sequence"}})
 	if err != nil {
 		log.Fatal(err)
 	}

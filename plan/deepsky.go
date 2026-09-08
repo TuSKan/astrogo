@@ -76,8 +76,8 @@ func (d *DeepSkyObject) Position(_ time.Time) (coord.ICRS, error) {
 }
 
 // GetDetails computes observational details using the given coordinate context.
-func (d *DeepSkyObject) GetDetails(ctx *coord.Context, props ...string) (*TargetDetails, error) {
-	return computeDetails(d, ctx, props...)
+func (d *DeepSkyObject) GetDetails(ctx *coord.Context, over DetailOverrides) (*TargetDetails, error) {
+	return computeDetails(d, ctx, over)
 }
 
 // StaticMagnitude returns the catalog V-band magnitude if set.

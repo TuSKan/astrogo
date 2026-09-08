@@ -81,8 +81,8 @@ func (c *Comet) GeocentricVec(t time.Time) (vector.Vec3, error) {
 }
 
 // GetDetails returns the target details for the comet.
-func (c *Comet) GetDetails(ctx *coord.Context, props ...string) (*TargetDetails, error) {
-	return computeDetails(c, ctx, props...)
+func (c *Comet) GetDetails(ctx *coord.Context, over DetailOverrides) (*TargetDetails, error) {
+	return computeDetails(c, ctx, over)
 }
 
 // ApparentMagnitude computes total apparent magnitude using M1/k1.

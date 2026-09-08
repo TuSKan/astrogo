@@ -19,7 +19,7 @@ import (
 // TestGetDetails_Star exercises computeDetails' non-MovingBody path
 // (fillStaticMagnitude, the direct ICRSToAltAz branch), fillTypedProps'
 // Star case (parallax → Distance, proper motion → ExtraProps),
-// fillAliasProps (Messier number extraction), and applyProps overrides.
+// fillAliasProps (Messier number extraction), and DetailOverrides.
 // None of this was previously exercised by any test — every mock Observable
 // elsewhere in this package implements its own trivial GetDetails stub.
 func TestGetDetails_Star(t *testing.T) {
@@ -39,7 +39,7 @@ func TestGetDetails_Star(t *testing.T) {
 		WithAliases("M 45", "HR 7001"),
 	)
 
-	d, err := star.GetDetails(ctx, "Description", "A bright star in Lyra")
+	d, err := star.GetDetails(ctx, DetailOverrides{Description: "A bright star in Lyra"})
 	testutil.AssertNoError(t, err)
 
 	if d.Name != "Vega" {
@@ -70,7 +70,7 @@ func TestGetDetails_Star(t *testing.T) {
 	}
 
 	if d.Description != "A bright star in Lyra" {
-		t.Errorf("Description = %q, want override applied via applyProps", d.Description)
+		t.Errorf("Description = %q, want the DetailOverrides value", d.Description)
 	}
 
 	// Altitude/Azimuth must have been populated by the non-MovingBody
@@ -97,7 +97,7 @@ func TestGetDetails_DeepSkyObject(t *testing.T) {
 		WithDSOAliases("NGC 224", "M31"),
 	)
 
-	d, err := dso.GetDetails(ctx)
+	d, err := dso.GetDetails(ctx, DetailOverrides{})
 	testutil.AssertNoError(t, err)
 
 	if got := d.ExtraProps["NGC/IC number"]; got != "NGC 224" {
@@ -120,7 +120,7 @@ func TestGetDetails_MovingBody(t *testing.T) {
 
 	mars := NewMars(eph.Default())
 
-	d, err := mars.GetDetails(ctx)
+	d, err := mars.GetDetails(ctx, DetailOverrides{})
 	testutil.AssertNoError(t, err)
 
 	if d.Name != "Mars" {
@@ -158,7 +158,7 @@ func TestGetDetails_String(t *testing.T) {
 
 	star := NewStar("Sirius", angle.Hour(6.75), angle.Deg(-16.72), WithStarMagnitude(-1.46))
 
-	d, err := star.GetDetails(ctx)
+	d, err := star.GetDetails(ctx, DetailOverrides{})
 	testutil.AssertNoError(t, err)
 
 	s := d.String()
@@ -189,7 +189,7 @@ func TestGetDetails_RadialVelocity(t *testing.T) {
 
 	star := NewStar("Sirius", ra, dec, WithRadialVelocity(rvBarycentric))
 
-	d, err := star.GetDetails(ctx)
+	d, err := star.GetDetails(ctx, DetailOverrides{})
 	testutil.AssertNoError(t, err)
 
 	if d.RadialVelocity == "" {
@@ -230,7 +230,7 @@ func TestGetDetails_RadialVelocity_NotSet(t *testing.T) {
 
 	star := NewStar("Vega", angle.Hour(18.615), angle.Deg(38.78))
 
-	d, err := star.GetDetails(ctx)
+	d, err := star.GetDetails(ctx, DetailOverrides{})
 	testutil.AssertNoError(t, err)
 
 	if d.RadialVelocity != "" {
@@ -239,7 +239,7 @@ func TestGetDetails_RadialVelocity_NotSet(t *testing.T) {
 
 	dso := NewDeepSkyObject("M31", angle.Hour(0.712), angle.Deg(41.269))
 
-	d2, err := dso.GetDetails(ctx)
+	d2, err := dso.GetDetails(ctx, DetailOverrides{})
 	testutil.AssertNoError(t, err)
 
 	if d2.RadialVelocity != "" {
@@ -247,9 +247,9 @@ func TestGetDetails_RadialVelocity_NotSet(t *testing.T) {
 	}
 }
 
-// TestGetDetails_RadialVelocity_PropOverride confirms an injected
-// "RadialVelocity" prop wins over the computed value, matching every
-// other applyProps-overridable field.
+// TestGetDetails_RadialVelocity_PropOverride confirms
+// DetailOverrides.RadialVelocity wins over the computed value.
+// TestDetailOverridesAppliesEveryField covers the other fields.
 func TestGetDetails_RadialVelocity_PropOverride(t *testing.T) {
 	loc, err := coord.NewGeodetic(angle.Zero(), angle.Zero(), 0)
 	testutil.AssertNoError(t, err)
@@ -262,7 +262,7 @@ func TestGetDetails_RadialVelocity_PropOverride(t *testing.T) {
 
 	star := NewStar("Sirius", angle.Hour(6.7525), angle.Deg(-16.7161), WithRadialVelocity(-5.5))
 
-	d, err := star.GetDetails(ctx, "RadialVelocity", "custom override")
+	d, err := star.GetDetails(ctx, DetailOverrides{RadialVelocity: "custom override"})
 	testutil.AssertNoError(t, err)
 
 	if d.RadialVelocity != "custom override" {
@@ -294,7 +294,7 @@ func TestGetDetails_RadialVelocity_SixMonthSwing(t *testing.T) {
 	parseTopo := func(tm time.Time) float64 {
 		ctx := coord.NewContext(tm, loc, site.Refraction())
 
-		d, err := star.GetDetails(ctx)
+		d, err := star.GetDetails(ctx, DetailOverrides{})
 		testutil.AssertNoError(t, err)
 
 		var topo, bary float64
@@ -427,3 +427,147 @@ func (failingProvider) State(eph.ID, time.Time) (core.State, error) {
 }
 
 func (failingProvider) Close() error { return nil }
+
+// TestDetailOverridesAppliesEveryField walks every field of DetailOverrides
+// one at a time and confirms it reaches the matching TargetDetails field.
+//
+// One field per subtest, not all six at once: a single combined assertion
+// passes as long as *some* field lands, so a struct that silently ignored
+// Source would go unnoticed. Two of these fields — Source and Magnitude —
+// were in exactly that position before this test existed.
+//
+// `computed` marks the fields this package fills on its own, where the
+// override has to win against a real value rather than fill a blank. Only
+// three do: Description and Source have no computed counterpart at all, and
+// Extra is by definition open-ended.
+func TestDetailOverridesAppliesEveryField(t *testing.T) {
+	t.Parallel()
+
+	star := NewStar("Vega", angle.Hour(18.615), angle.Deg(38.78),
+		WithStarMagnitude(0.03),
+		WithParallax(angle.Arcsec(0.130)),
+		WithRadialVelocity(-13.9),
+	)
+
+	// AngularSize is only ever computed for a MovingBody with a known
+	// physical radius, so the precedence check for it needs a planet.
+	mars := NewMars(eph.Default())
+
+	for _, tc := range []struct {
+		name     string
+		target   Observable
+		over     DetailOverrides
+		get      func(*TargetDetails) string
+		want     string
+		computed bool
+	}{
+		{
+			name: "Description", target: star,
+			over: DetailOverrides{Description: "in Lyra"},
+			get:  func(d *TargetDetails) string { return d.Description },
+			want: "in Lyra",
+		},
+		{
+			name: "Source", target: star,
+			over: DetailOverrides{Source: "Hipparcos"},
+			get:  func(d *TargetDetails) string { return d.Source },
+			want: "Hipparcos",
+		},
+		{
+			name: "Magnitude", target: star,
+			over: DetailOverrides{Magnitude: "0.03 (V)"},
+			get:  func(d *TargetDetails) string { return d.Magnitude },
+			want: "0.03 (V)", computed: true,
+		},
+		{
+			name: "RadialVelocity", target: star,
+			over: DetailOverrides{RadialVelocity: "-13.9 km/s"},
+			get:  func(d *TargetDetails) string { return d.RadialVelocity },
+			want: "-13.9 km/s", computed: true,
+		},
+		{
+			name: "AngularSize", target: mars,
+			over: DetailOverrides{AngularSize: "5.7 arcsec"},
+			get:  func(d *TargetDetails) string { return d.AngularSize },
+			want: "5.7 arcsec", computed: true,
+		},
+		{
+			name: "Extra", target: star,
+			over: DetailOverrides{Extra: map[string]string{"Spectral type": "A0Va"}},
+			get:  func(d *TargetDetails) string { return d.ExtraProps["Spectral type"] },
+			want: "A0Va",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			loc, err := coord.NewGeodetic(angle.Zero(), angle.Zero(), 0)
+			testutil.AssertNoError(t, err)
+
+			site, err := NewSite("Test", loc)
+			testutil.AssertNoError(t, err)
+
+			ctx := coord.NewContext(time.FromJD(2451545.0, time.UTC), loc, site.Refraction())
+
+			base, err := tc.target.GetDetails(ctx, DetailOverrides{})
+			testutil.AssertNoError(t, err)
+
+			d, err := tc.target.GetDetails(ctx, tc.over)
+			testutil.AssertNoError(t, err)
+
+			if got := tc.get(d); got != tc.want {
+				t.Errorf("%s = %q, want the override %q", tc.name, got, tc.want)
+			}
+
+			// An override that only ever fills a blank proves nothing about
+			// precedence, so assert the computed value was really there.
+			if tc.computed && tc.get(base) == "" {
+				t.Errorf("%s had no computed value to override; the fixture "+
+					"no longer tests precedence", tc.name)
+			}
+		})
+	}
+}
+
+// TestDetailOverridesZeroValueOverridesNothing pins the documented contract of
+// the zero value, which is what nearly every call site passes.
+//
+// An empty string means "I have nothing to add", never "blank this field".
+// Getting that backwards would erase the computed magnitude and radial
+// velocity of every target described through a plain DetailOverrides{} —
+// silently, since a blank field renders as a missing line rather than an
+// error.
+func TestDetailOverridesZeroValueOverridesNothing(t *testing.T) {
+	t.Parallel()
+
+	loc, err := coord.NewGeodetic(angle.Zero(), angle.Zero(), 0)
+	testutil.AssertNoError(t, err)
+
+	site, err := NewSite("Test", loc)
+	testutil.AssertNoError(t, err)
+
+	ctx := coord.NewContext(time.FromJD(2451545.0, time.UTC), loc, site.Refraction())
+
+	star := NewStar("Vega", angle.Hour(18.615), angle.Deg(38.78),
+		WithStarMagnitude(0.03),
+		WithParallax(angle.Arcsec(0.130)),
+		WithRadialVelocity(-13.9),
+	)
+
+	d, err := star.GetDetails(ctx, DetailOverrides{})
+	testutil.AssertNoError(t, err)
+
+	for _, f := range []struct {
+		name string
+		got  string
+	}{
+		{"Magnitude", d.Magnitude},
+		{"RadialVelocity", d.RadialVelocity},
+		{"Name", d.Name},
+	} {
+		if f.got == "" {
+			t.Errorf("%s was blanked by a zero DetailOverrides; the zero "+
+				"value must override nothing", f.name)
+		}
+	}
+}
