@@ -21,8 +21,8 @@ func TestExtractWCS(t *testing.T) {
 	wcs, err := ExtractWCS(h)
 	testutil.AssertNoError(t, err)
 
-	if wcs.GetCRVAL()[0] != 10.0 || wcs.GetCRVAL()[1] != 20.0 {
-		t.Errorf("expected CRVAL 10.0, 20.0, got %v", wcs.GetCRVAL())
+	if wcs.CRVAL()[0] != 10.0 || wcs.CRVAL()[1] != 20.0 {
+		t.Errorf("expected CRVAL 10.0, 20.0, got %v", wcs.CRVAL())
 	}
 
 	h2 := NewHeader()
@@ -69,7 +69,7 @@ func TestExtractWCS_CDMatrix(t *testing.T) {
 	testutil.AssertNear(t, "DEC at CRPIX", res[1], 2.0, 1e-10)
 
 	// CDELT should have been extracted from the CD matrix
-	cdelt := wcs.GetCDELT()
+	cdelt := wcs.CDELT()
 	testutil.AssertNear(t, "CDELT1 magnitude", math.Abs(cdelt[0]), scale, 1e-20)
 	testutil.AssertNear(t, "CDELT2 magnitude", math.Abs(cdelt[1]), scale, 1e-20)
 

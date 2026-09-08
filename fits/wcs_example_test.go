@@ -50,18 +50,36 @@ func ExampleExtractWCS() {
 	// WCS Extracted Successfully
 }
 
+// mustSet applies WCS setters and fails on the first refusal.
+//
+// The setters report a length that does not match the WCS's axis count, and a
+// fixture that gets that wrong is a test bug rather than something to ignore —
+// which is the whole reason they stopped accepting it silently. Arguments
+// evaluate before the call, so every setter runs and the first complaint wins.
+func mustSet(t *testing.T, errs ...error) {
+	t.Helper()
+
+	for _, err := range errs {
+		if err != nil {
+			t.Fatalf("building the WCS fixture: %v", err)
+		}
+	}
+}
+
 func TestPixelToWorld_TAN(t *testing.T) {
 	w := fits.NewWCS(2)
-	w.SetCTYPE([]string{"RA---TAN", "DEC--TAN"})
+	mustSet(t,
+		w.SetCTYPE([]string{"RA---TAN", "DEC--TAN"}),
 
-	// Set reference pixel (center of image typically)
-	w.SetCRPIX([]float64{50.0, 50.0})
+		// Set reference pixel (center of image typically)
+		w.SetCRPIX([]float64{50.0, 50.0}),
 
-	// Coordinate at reference pixel (RA, DEC)
-	w.SetCRVAL([]float64{10.0, 45.0})
+		// Coordinate at reference pixel (RA, DEC)
+		w.SetCRVAL([]float64{10.0, 45.0}),
 
-	// Pixel scale (CDELT) in degrees per pixel
-	w.SetCDELT([]float64{-0.01, 0.01})
+		// Pixel scale (CDELT) in degrees per pixel
+		w.SetCDELT([]float64{-0.01, 0.01}),
+	)
 
 	// At reference pixel it must equal CRVAL perfectly
 	res, err := w.PixelToWorld([]float64{50.0, 50.0})
@@ -88,9 +106,11 @@ func TestPixelToWorld_TAN(t *testing.T) {
 func TestPixelToWorld_LinearFallback(t *testing.T) {
 	// 3D cube lacking explicit spherical metrics natively falls back to direct linear CDELT sums
 	w := fits.NewWCS(3)
-	w.SetCRVAL([]float64{0.0, 0.0, 1420.0}) // e.g. 1.4 GHz baseline
-	w.SetCRPIX([]float64{10.0, 10.0, 1.0})
-	w.SetCDELT([]float64{1.0, 1.0, 0.5})
+	_ = w.SetCRVAL([]float64{0.0, 0.0, 1420.0}) // e.g. 1.4 GHz baseline
+	mustSet(t,
+		w.SetCRPIX([]float64{10.0, 10.0, 1.0}),
+		w.SetCDELT([]float64{1.0, 1.0, 0.5}),
+	)
 
 	res, err := w.PixelToWorld([]float64{15.0, 10.0, 3.0})
 	if err != nil {
@@ -112,12 +132,16 @@ func TestPixelToWorld_LinearFallback(t *testing.T) {
 
 // makeWCS builds a minimal 2D WCS for a given projection centered at (ra0, dec0) degrees
 // with the given pixel scale (degrees/pixel).
-func makeWCS(proj string, ra0, dec0, scale float64) *fits.WCS {
+func makeWCS(t *testing.T, proj string, ra0, dec0, scale float64) *fits.WCS {
+	t.Helper()
+
 	w := fits.NewWCS(2)
-	w.SetCTYPE([]string{"RA---" + proj, "DEC--" + proj})
-	w.SetCRPIX([]float64{512.0, 512.0})
-	w.SetCRVAL([]float64{ra0, dec0})
-	w.SetCDELT([]float64{-scale, scale})
+	mustSet(t,
+		w.SetCTYPE([]string{"RA---" + proj, "DEC--" + proj}),
+		w.SetCRPIX([]float64{512.0, 512.0}),
+		w.SetCRVAL([]float64{ra0, dec0}),
+		w.SetCDELT([]float64{-scale, scale}),
+	)
 
 	return w
 }
@@ -128,7 +152,7 @@ func TestProjectionRoundTrip_ReferencePixel(t *testing.T) {
 	projs := []string{"TAN", "SIN", "ARC", "STG", "AIT"}
 	for _, proj := range projs {
 		t.Run(proj, func(t *testing.T) {
-			w := makeWCS(proj, 83.633, 22.0145, 0.001) // near Orion Nebula
+			w := makeWCS(t, proj, 83.633, 22.0145, 0.001) // near Orion Nebula
 
 			res, err := w.PixelToWorld([]float64{512.0, 512.0})
 			if err != nil {
@@ -173,9 +197,9 @@ func TestProjectionRoundTrip_Grid(t *testing.T) {
 	for _, tc := range cases {
 		name := fmt.Sprintf("%s_ra%.0f_dec%.0f", tc.proj, tc.ra0, tc.dec0)
 		t.Run(name, func(t *testing.T) {
-			w := makeWCS(tc.proj, tc.ra0, tc.dec0, tc.scale)
+			w := makeWCS(t, tc.proj, tc.ra0, tc.dec0, tc.scale)
 
-			crpix := w.GetCRPIX()
+			crpix := w.CRPIX()
 
 			step := tc.fieldPix / 4
 			if step < 1 {
@@ -232,7 +256,7 @@ func TestProjectionForward_Symmetry(t *testing.T) {
 	projs := []string{"TAN", "SIN", "ARC", "STG"}
 	for _, proj := range projs {
 		t.Run(proj, func(t *testing.T) {
-			w := makeWCS(proj, 180.0, 45.0, 0.001)
+			w := makeWCS(t, proj, 180.0, 45.0, 0.001)
 
 			// Symmetric pixel offsets should produce symmetric Dec offsets
 			wPlus, _ := w.PixelToWorld([]float64{512.0, 522.0})  // +10 pix in Y
@@ -256,7 +280,7 @@ func TestProjectionRoundTrip_RAWrap(t *testing.T) {
 		t.Run(proj, func(t *testing.T) {
 			// Reference at RA=359.99, 0.001 deg/pix
 			// 15 pixels offset in -X → RA increases by ~0.015° → crosses 360
-			w := makeWCS(proj, 359.99, 30.0, 0.001)
+			w := makeWCS(t, proj, 359.99, 30.0, 0.001)
 
 			px := 512.0 - 15.0
 			py := 512.0
@@ -286,7 +310,7 @@ func TestProjectionRoundTrip_RAWrap(t *testing.T) {
 
 // TestProjection_SIN_OutOfBounds verifies the SIN projection rejects r²>1.
 func TestProjection_SIN_OutOfBounds(t *testing.T) {
-	w := makeWCS("SIN", 180.0, 45.0, 1.0) // 1 deg/pixel → huge field
+	w := makeWCS(t, "SIN", 180.0, 45.0, 1.0) // 1 deg/pixel → huge field
 
 	_, err := w.PixelToWorld([]float64{512.0 + 100, 512.0})
 	if err == nil {
@@ -296,7 +320,7 @@ func TestProjection_SIN_OutOfBounds(t *testing.T) {
 
 // TestProjection_AIT_OutOfBounds verifies the AIT projection rejects invalid regions.
 func TestProjection_AIT_OutOfBounds(t *testing.T) {
-	w := makeWCS("AIT", 0.0, 0.0, 1.0)
+	w := makeWCS(t, "AIT", 0.0, 0.0, 1.0)
 
 	_, err := w.PixelToWorld([]float64{512.0 + 500, 512.0})
 	if err == nil {
@@ -308,10 +332,12 @@ func TestProjection_AIT_OutOfBounds(t *testing.T) {
 // silently fall back to linear mapping (no spherical deprojection).
 func TestProjection_UnknownFallsBackToLinear(t *testing.T) {
 	w := fits.NewWCS(2)
-	w.SetCTYPE([]string{"RA---ZZZ", "DEC--ZZZ"})
-	w.SetCRPIX([]float64{50.0, 50.0})
-	w.SetCRVAL([]float64{10.0, 20.0})
-	w.SetCDELT([]float64{-0.01, 0.01})
+	mustSet(t,
+		w.SetCTYPE([]string{"RA---ZZZ", "DEC--ZZZ"}),
+		w.SetCRPIX([]float64{50.0, 50.0}),
+		w.SetCRVAL([]float64{10.0, 20.0}),
+		w.SetCDELT([]float64{-0.01, 0.01}),
+	)
 
 	// With unknown projection, extractProjection returns "" → linear fallback.
 	// 5 pixels offset * 0.01 scale = 0.05 degrees
@@ -338,17 +364,21 @@ func TestProjection_UnknownFallsBackToLinear(t *testing.T) {
 func TestProjection_SwappedAxes(t *testing.T) {
 	// Standard layout: CTYPE1=RA, CTYPE2=DEC
 	std := fits.NewWCS(2)
-	std.SetCTYPE([]string{"RA---TAN", "DEC--TAN"})
-	std.SetCRPIX([]float64{512.5, 512.5})
-	std.SetCRVAL([]float64{150.0, 45.0})
-	std.SetCDELT([]float64{-0.001, 0.001})
+	mustSet(t,
+		std.SetCTYPE([]string{"RA---TAN", "DEC--TAN"}),
+		std.SetCRPIX([]float64{512.5, 512.5}),
+		std.SetCRVAL([]float64{150.0, 45.0}),
+		std.SetCDELT([]float64{-0.001, 0.001}),
+	)
 
 	// Swapped layout: CTYPE1=DEC, CTYPE2=RA
 	swp := fits.NewWCS(2)
-	swp.SetCTYPE([]string{"DEC--TAN", "RA---TAN"})
-	swp.SetCRPIX([]float64{512.5, 512.5})
-	swp.SetCRVAL([]float64{45.0, 150.0}) // Dec in slot 0, RA in slot 1
-	swp.SetCDELT([]float64{0.001, -0.001})
+	mustSet(t,
+		swp.SetCTYPE([]string{"DEC--TAN", "RA---TAN"}),
+		swp.SetCRPIX([]float64{512.5, 512.5}),
+	)
+	_ = swp.SetCRVAL([]float64{45.0, 150.0}) // Dec in slot 0, RA in slot 1
+	_ = swp.SetCDELT([]float64{0.001, -0.001})
 
 	// Standard pixel (530,520): dx=+17.5 on RA (axis 0), dy=+7.5 on Dec (axis 1).
 	// For swapped WCS to see the same field offset:
@@ -402,12 +432,14 @@ func TestSIPDistortion(t *testing.T) {
 	// Set up a standard TAN WCS for a 2048×2048 detector.
 	// CRPIX at center, 0.25 arcsec/pixel scale (typical HST/WFC3-like).
 	w := fits.NewWCS(2)
-	w.SetCTYPE([]string{"RA---TAN-SIP", "DEC--TAN-SIP"})
-	w.SetCRPIX([]float64{1024.5, 1024.5})
-	w.SetCRVAL([]float64{150.0, 45.0})
+	mustSet(t,
+		w.SetCTYPE([]string{"RA---TAN-SIP", "DEC--TAN-SIP"}),
+		w.SetCRPIX([]float64{1024.5, 1024.5}),
+		w.SetCRVAL([]float64{150.0, 45.0}),
+	)
 
 	scale := 0.25 / 3600.0 // 0.25 arcsec in degrees
-	w.SetCDELT([]float64{-scale, scale})
+	_ = w.SetCDELT([]float64{-scale, scale})
 
 	// SIP forward distortion coefficients (order 3).
 	// These are representative of a moderately distorted survey camera.
@@ -448,10 +480,12 @@ func TestSIPDistortion(t *testing.T) {
 
 	// Also set up a pure TAN WCS (no SIP) for comparison.
 	wNoSIP := fits.NewWCS(2)
-	wNoSIP.SetCTYPE([]string{"RA---TAN", "DEC--TAN"})
-	wNoSIP.SetCRPIX([]float64{1024.5, 1024.5})
-	wNoSIP.SetCRVAL([]float64{150.0, 45.0})
-	wNoSIP.SetCDELT([]float64{-scale, scale})
+	mustSet(t,
+		wNoSIP.SetCTYPE([]string{"RA---TAN", "DEC--TAN"}),
+		wNoSIP.SetCRPIX([]float64{1024.5, 1024.5}),
+		wNoSIP.SetCRVAL([]float64{150.0, 45.0}),
+		wNoSIP.SetCDELT([]float64{-scale, scale}),
+	)
 
 	// Test 1: At reference pixel, SIP should produce zero distortion.
 	refWorld, err := w.PixelToWorld([]float64{1024.5, 1024.5})
@@ -525,12 +559,14 @@ func TestTPVDistortion(t *testing.T) {
 	// Set up a TAN-TPV WCS for a 4096×4096 detector.
 	// 0.25 arcsec/pixel scale — typical ground-based wide-field imager.
 	w := fits.NewWCS(2)
-	w.SetCTYPE([]string{"RA---TAN-TPV", "DEC--TAN-TPV"})
-	w.SetCRPIX([]float64{2048.5, 2048.5})
-	w.SetCRVAL([]float64{150.0, 45.0})
+	mustSet(t,
+		w.SetCTYPE([]string{"RA---TAN-TPV", "DEC--TAN-TPV"}),
+		w.SetCRPIX([]float64{2048.5, 2048.5}),
+		w.SetCRVAL([]float64{150.0, 45.0}),
+	)
 
 	scale := 0.25 / 3600.0 // 0.25 arcsec in degrees
-	w.SetCDELT([]float64{-scale, scale})
+	_ = w.SetCDELT([]float64{-scale, scale})
 
 	// TPV distortion coefficients (representative of SCAMP astrometric solution).
 	// PV1 affects the longitude axis, PV2 affects the latitude axis.
@@ -554,10 +590,12 @@ func TestTPVDistortion(t *testing.T) {
 
 	// Pure TAN for comparison.
 	wNoTPV := fits.NewWCS(2)
-	wNoTPV.SetCTYPE([]string{"RA---TAN", "DEC--TAN"})
-	wNoTPV.SetCRPIX([]float64{2048.5, 2048.5})
-	wNoTPV.SetCRVAL([]float64{150.0, 45.0})
-	wNoTPV.SetCDELT([]float64{-scale, scale})
+	mustSet(t,
+		wNoTPV.SetCTYPE([]string{"RA---TAN", "DEC--TAN"}),
+		wNoTPV.SetCRPIX([]float64{2048.5, 2048.5}),
+		wNoTPV.SetCRVAL([]float64{150.0, 45.0}),
+		wNoTPV.SetCDELT([]float64{-scale, scale}),
+	)
 
 	// Test 1: At reference pixel, TPV should produce zero distortion.
 	refWorld, err := w.PixelToWorld([]float64{2048.5, 2048.5})
