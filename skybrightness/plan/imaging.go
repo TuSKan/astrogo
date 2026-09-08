@@ -10,14 +10,42 @@ import (
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/constants"
 	"github.com/TuSKan/astrogo/coord"
+	"github.com/TuSKan/astrogo/magnitude"
 	"github.com/TuSKan/astrogo/optics"
 	"github.com/TuSKan/astrogo/plan"
-	"github.com/TuSKan/astrogo/skybrightness/dataset"
+	"github.com/TuSKan/astrogo/skybrightness"
 	"github.com/TuSKan/astrogo/time"
 )
 
 // ErrSpec is returned for a request this package cannot honestly answer.
 var ErrSpec = errors.New("skybrightness/plan: unusable request")
+
+// Sky is the part of a sky model this package needs: an evaluation in one
+// direction, and the surface brightness that comes out of it.
+//
+// Four methods of [github.com/TuSKan/astrogo/skybrightness/dataset.Sky]'s eleven, named here rather than taken whole
+// for the ordinary reason — a package should ask for what it uses. What that
+// buys in particular is that this one becomes testable: [github.com/TuSKan/astrogo/skybrightness/dataset.Sky]'s only
+// constructor gathers its own data, deliberately, so a package that named the
+// concrete type could not evaluate a depth without a network and 145 MB of
+// reference data, and its one real method went uncovered on every commit.
+//
+// [github.com/TuSKan/astrogo/skybrightness/dataset.Sky] satisfies this, which is the only implementation anyone should
+// need. The interface is a narrowing, not an extension point.
+type Sky interface {
+	// Scene fixes the observer, the instant and the air.
+	Scene(site *coord.Geodetic, when time.GoTime, air *atmosphere.Builder) (*skybrightness.Scene, error)
+
+	// Direction evaluates one pointing within that scene.
+	Direction(ctx context.Context, scene *skybrightness.Scene, alt, az angle.Angle) (*skybrightness.Estimate, error)
+
+	// SurfaceBrightness projects an estimate onto the model's own band, in
+	// mag/arcsec².
+	SurfaceBrightness(est *skybrightness.Estimate) (float64, error)
+
+	// Band names that band.
+	Band() magnitude.Passband
+}
 
 // Spec describes an imaging setup completely enough to say how faint it can
 // see.
@@ -27,13 +55,14 @@ var ErrSpec = errors.New("skybrightness/plan: unusable request")
 // that guessed an exposure or a detection threshold would be answering a
 // different question from the one asked.
 type Spec struct {
-	// Sky is the assembled sky-brightness model.
-	Sky *dataset.Sky
+	// Sky is the assembled sky-brightness model — a [github.com/TuSKan/astrogo/skybrightness/dataset.Sky] in every
+	// real use; see [Sky] for why the field names an interface.
+	Sky Sky
 
 	// Site is where the instrument stands.
 	Site *coord.Geodetic
 
-	// Air is the atmosphere to evaluate under, as [dataset.Sky.Scene] takes
+	// Air is the atmosphere to evaluate under, as [github.com/TuSKan/astrogo/skybrightness/dataset.Sky.Scene] takes
 	// it. Nil means a clear atmosphere at the site's own elevation.
 	Air *atmosphere.Builder
 
