@@ -15,7 +15,9 @@
 //   - Site & observatory setup — [NewSite], [Site], [NewSiteEarthLocation]
 //     (plain lat/lon/height, no [github.com/TuSKan/astrogo/coord] import
 //     needed), [NewSiteEarthAddress] (geocoded from a free-text address);
-//     well-known sites — [KnownSites], [NewKnownSite]
+//     well-known sites — [KnownSiteNames], [NewKnownSite]; the IAU Minor
+//     Planet Center's ~2,700 observatory codes — [NewMPCSite],
+//     [MPCObservatories]
 //   - Targets to observe — [Planet] (via [NewSun]...[NewPluto], [NewPlanet]),
 //     [Star] (via [NewStar]), [Asteroid] (via [NewAsteroid]), [Comet] (via
 //     [NewComet]), [DeepSkyObject] (via [NewDeepSkyObject]), [Satellite] (via

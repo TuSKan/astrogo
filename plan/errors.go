@@ -105,4 +105,20 @@ var (
 	// ErrGeocodeNoResult indicates NewSiteEarthAddress's geocoding query
 	// matched no location.
 	ErrGeocodeNoResult = errors.New("plan: geocoding found no match for address")
+
+	// ErrSiteNotOnEarth indicates NewMPCSite was given a real MPC
+	// observatory code that has no position on the ground — a space
+	// telescope, the geocentre, or a roving-observer placeholder. Distinct
+	// from ErrUnknownSite on purpose: the code is valid and the caller's
+	// spelling is not the problem.
+	ErrSiteNotOnEarth = errors.New("plan: MPC code has no position on Earth")
+
+	// ErrNoMPCObservatories indicates the MPC observatory-code list parsed
+	// cleanly and contained no rows, which is what a truncated or
+	// redirected fetch looks like — never a real state of the register.
+	ErrNoMPCObservatories = errors.New("plan: MPC observatory list is empty")
+
+	// ErrMalformedMPCRow indicates a row of the MPC observatory-code list
+	// carried a longitude or parallax constant that is not a number.
+	ErrMalformedMPCRow = errors.New("plan: malformed MPC observatory row")
 )

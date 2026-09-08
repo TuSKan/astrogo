@@ -339,6 +339,8 @@ func constName(id EndpointID) string {
 		return "FINK"
 	case OpenNGC:
 		return "OpenNGC"
+	case MPCObsCodes:
+		return "MPCObsCodes"
 	case Nominatim:
 		return "Nominatim"
 	case OpenElevation:
