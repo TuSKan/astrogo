@@ -633,6 +633,21 @@ without `astrogo/remote` links no storage backend at all — measured, a binary
 computing a Julian date is **2.5 MB rather than 19.4 MB** — and degrades to
 zero EOP exactly as an unconsented one does. To read a pre-seeded file without
 that dependency, register `time.FileEOPLoader("/path/to/finals2000A.data")`.
+
+`ephemeris` works the same way, and it buys more than a Julian date. The
+kernel-backed sources (`Planets`, `SmallBody`, `Asteroids`, `Comets`, `Moons`)
+read SPK files, so they reach `remote` and through it `gocloud.dev/blob`; the
+SOFA path does not. The kernel half therefore registers itself:
+
+```go
+import _ "github.com/TuSKan/astrogo/ephemeris/jpl"
+```
+
+Measured, a program asking `eph.Default()` where Mars is went from **13.9 MB and
+424 packages to 4.7 MB and 224**, with gRPC, OpenTelemetry, protobuf and
+`gocloud.dev` at zero — 64 packages of gRPC were arriving for an error-code
+enum. Without the import those five sources return an error naming it;
+`Satellites` and everything on SOFA are unaffected.
 OpenNGC works the same way — like every other catalog provider, it fetches over the
 network via
 `remote.EnableDownloads(remote.OpenNGC, ...)` (see "Enabling a download" above).

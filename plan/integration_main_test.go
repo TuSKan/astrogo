@@ -7,6 +7,13 @@ import (
 	"testing"
 
 	"github.com/TuSKan/astrogo/remote"
+
+	// The kernel-backed sources reach their backend through a registration
+	// rather than an import, so a build that wants them says so (#112). This
+	// suite constructs real DE441/DE442 providers, so it wants them; a
+	// production plan build that never asks for a kernel does not, which is
+	// the point of the split.
+	_ "github.com/TuSKan/astrogo/ephemeris/jpl"
 )
 
 // TestMain grants download consent for this package's integration-tagged

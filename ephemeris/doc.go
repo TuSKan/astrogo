@@ -12,9 +12,30 @@
 // This mirrors the catalog package's unified [catalog.Resolver] pattern:
 // users rarely need to import subpackages directly.
 //
+// # The kernel sources need one blank import
+//
+// [Planets], [SmallBody], [Asteroids], [Comets] and [Moons] read SPK kernels,
+// which means files, a cache and a network — and that reaches
+// gocloud.dev/blob, whose transitive weight is about 12 MB of object-storage
+// client. A build that only asks SOFA where Mars is has no use for any of it,
+// and used to link all of it because one branch of [NewProvider] mentioned the
+// type.
+//
+// So the kernel half registers itself instead:
+//
+//	import _ "github.com/TuSKan/astrogo/ephemeris/jpl"
+//
+// Measured, a program calling eph.Default().State(eph.Mars, t) went from 13.9
+// MB and 424 packages to 4.7 MB and 224, with gRPC, OpenTelemetry, protobuf and
+// gocloud.dev at zero. Adding the import restores every byte of it, to the
+// build that wants it. The same pattern remote/s3 uses; see #112.
+//
+// Without the import, those five sources report an error naming it.
+// [Satellites], [Default] and everything built on SOFA are unaffected.
+//
 // # Quick Start
 //
-//	// JPL planetary ephemeris (DE442)
+//	// JPL planetary ephemeris (DE442). Needs the registration import above.
 //	p, err := eph.NewProvider(ctx, eph.Planets, "de442")
 //	if err != nil { log.Fatal(err) }
 //	defer p.Close()

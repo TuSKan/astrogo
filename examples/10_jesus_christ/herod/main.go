@@ -19,6 +19,10 @@ import (
 	"github.com/TuSKan/astrogo/plan"
 	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/time"
+
+	// The kernel-backed sources register their backend rather than being
+	// imported by the root package, so a build that wants them says so (#112).
+	_ "github.com/TuSKan/astrogo/ephemeris/jpl"
 )
 
 func main() {
