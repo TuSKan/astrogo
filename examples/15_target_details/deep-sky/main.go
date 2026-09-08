@@ -46,7 +46,7 @@ func main() {
 		log.Fatalf("build target: %v", err)
 	}
 
-	details, err := m31.GetDetails(ctx, "Description", "Andromeda Galaxy", "Source", "OpenNGC")
+	details, err := m31.GetDetails(ctx, plan.DetailOverrides{Description: "Andromeda Galaxy", Source: "OpenNGC"})
 	if err != nil {
 		log.Fatal(err)
 	}

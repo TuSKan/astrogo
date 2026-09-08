@@ -2,6 +2,7 @@ package plan
 
 import (
 	"fmt"
+	"maps"
 	"math"
 	"strings"
 
@@ -116,7 +117,7 @@ func (d TargetDetails) String() string {
 
 // ── computeDetails ──────────────────────────────────────────────────────────
 
-func computeDetails(obs Observable, ctx *coord.Context, props ...string) (*TargetDetails, error) {
+func computeDetails(obs Observable, ctx *coord.Context, over DetailOverrides) (*TargetDetails, error) {
 	d := &TargetDetails{
 		Name:       obs.Name(),
 		ExtraProps: make(map[string]string),
@@ -161,8 +162,8 @@ func computeDetails(obs Observable, ctx *coord.Context, props ...string) (*Targe
 	// ── Type-specific catalog properties ──
 	fillTypedProps(d, obs)
 
-	// ── Custom props (override anything above) ──
-	applyProps(d, props)
+	// ── Caller overrides (replace anything above) ──
+	over.apply(d)
 
 	// ── Rise/Set/Transit events ──
 	fillRiseSetTransit(d, obs, ctx)
@@ -208,9 +209,8 @@ func fillMovingBody(d *TargetDetails, mb MovingBody, t time.Time, ctx *coord.Con
 
 	// Apparent/angular diameter — silently skipped for bodies with no
 	// known physical radius (asteroids, comets), same best-effort
-	// pattern as Elongation below. A caller-injected "AngularSize" prop
-	// (applyProps, called after computeDetails' fillMovingBody) still
-	// overrides this.
+	// pattern as Elongation below. DetailOverrides.AngularSize, applied
+	// after computeDetails' fillMovingBody, still overrides this.
 	if diam, err := AngularDiameter(mb, t, ctx); err == nil {
 		d.AngularSize = formatAngularSize(diam)
 	}
@@ -316,27 +316,70 @@ func fillAliasProps(d *TargetDetails, aliases []string) {
 
 // ── Custom property overrides ───────────────────────────────────────────────
 
-// applyProps processes key/value pairs that override auto-computed fields.
-func applyProps(d *TargetDetails, props []string) {
-	for i := 0; i < len(props)-1; i += 2 {
-		key := props[i]
-		val := props[i+1]
+// DetailOverrides carries what this package cannot compute — a human
+// description, where the numbers came from — and replaces what it can, for a
+// caller who has a better answer.
+//
+// # Why a struct and not the key/value pairs it replaces
+//
+// GetDetails used to take `props ...string` read two at a time. Three ways to
+// get that wrong, all silent:
+//
+//   - An odd count dropped the last argument, because the loop ran to
+//     len(props)-1.
+//   - A misspelled key did not fail; it landed in ExtraProps, and the field it
+//     meant to override kept its computed value. A key one letter away from
+//     "Description" was just as valid, with an entirely different effect.
+//   - A key and a value could be swapped with nothing to notice.
+//
+// The zero value overrides nothing, which is the common case and what a caller
+// with nothing to add should pass.
+type DetailOverrides struct {
+	// Description is prose about the target — what it is, why it is on the
+	// list. Nothing computes this.
+	Description string
 
-		switch key {
-		case "Description":
-			d.Description = val
-		case "Source":
-			d.Source = val
-		case "Magnitude":
-			d.Magnitude = val
-		case "RadialVelocity":
-			d.RadialVelocity = val
-		case "AngularSize":
-			d.AngularSize = val
-		default:
-			d.ExtraProps[key] = val
-		}
+	// Source records where the target's data came from: a catalogue name, a
+	// kernel, an element set.
+	Source string
+
+	// Magnitude, RadialVelocity and AngularSize replace the computed strings
+	// when a caller holds a better value than this package can derive. Empty
+	// leaves the computed one.
+	Magnitude      string
+	RadialVelocity string
+	AngularSize    string
+
+	// Extra is anything else, verbatim, in TargetDetails.ExtraProps. This is
+	// where a genuinely open-ended key belongs — and it being a separate field
+	// is what makes a typo in one of the named ones a compile error rather
+	// than a silent demotion to here.
+	Extra map[string]string
+}
+
+// apply writes the non-empty overrides onto d.
+func (o DetailOverrides) apply(d *TargetDetails) {
+	if o.Description != "" {
+		d.Description = o.Description
 	}
+
+	if o.Source != "" {
+		d.Source = o.Source
+	}
+
+	if o.Magnitude != "" {
+		d.Magnitude = o.Magnitude
+	}
+
+	if o.RadialVelocity != "" {
+		d.RadialVelocity = o.RadialVelocity
+	}
+
+	if o.AngularSize != "" {
+		d.AngularSize = o.AngularSize
+	}
+
+	maps.Copy(d.ExtraProps, o.Extra)
 }
 
 // ── Rise/Set/Transit events ─────────────────────────────────────────────────

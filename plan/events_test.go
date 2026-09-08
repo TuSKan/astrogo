@@ -505,7 +505,7 @@ func (m *mockLinearTarget) Constraints() []Constraint { return nil }
 func (m *mockLinearTarget) Catalog() string           { return "MOCK" }
 func (m *mockLinearTarget) ID() string                { return "Linear" }
 func (m *mockLinearTarget) Name() string              { return "LinearName" }
-func (m *mockLinearTarget) GetDetails(_ *coord.Context, _ ...string) (*TargetDetails, error) {
+func (m *mockLinearTarget) GetDetails(_ *coord.Context, _ DetailOverrides) (*TargetDetails, error) {
 	return &TargetDetails{}, nil
 }
 
@@ -613,7 +613,7 @@ func (m *mockParabolicTarget) Constraints() []Constraint { return nil }
 func (m *mockParabolicTarget) Catalog() string           { return "MOCK" }
 func (m *mockParabolicTarget) ID() string                { return "Para" }
 func (m *mockParabolicTarget) Name() string              { return "ParaName" }
-func (m *mockParabolicTarget) GetDetails(_ *coord.Context, _ ...string) (*TargetDetails, error) {
+func (m *mockParabolicTarget) GetDetails(_ *coord.Context, _ DetailOverrides) (*TargetDetails, error) {
 	return &TargetDetails{}, nil
 }
 
@@ -667,6 +667,6 @@ func (m *mockDynamicTarget) Constraints() []Constraint                { return n
 func (m *mockDynamicTarget) Catalog() string                          { return "DYN" }
 func (m *mockDynamicTarget) ID() string                               { return "Dyn" }
 func (m *mockDynamicTarget) Name() string                             { return "DynName" }
-func (m *mockDynamicTarget) GetDetails(_ *coord.Context, _ ...string) (*TargetDetails, error) {
+func (m *mockDynamicTarget) GetDetails(_ *coord.Context, _ DetailOverrides) (*TargetDetails, error) {
 	return &TargetDetails{}, nil
 }

@@ -330,7 +330,7 @@ func (errObservable) Position(time.Time) (coord.ICRS, error) {
 	return coord.ICRS{}, errAlwaysFails
 }
 
-func (errObservable) GetDetails(*coord.Context, ...string) (*TargetDetails, error) {
+func (errObservable) GetDetails(*coord.Context, DetailOverrides) (*TargetDetails, error) {
 	return nil, errAlwaysFails
 }
 

@@ -161,8 +161,8 @@ func (a *Asteroid) GeocentricVec(t time.Time) (vector.Vec3, error) {
 }
 
 // GetDetails computes observational details using the given coordinate context.
-func (a *Asteroid) GetDetails(ctx *coord.Context, props ...string) (*TargetDetails, error) {
-	return computeDetails(a, ctx, props...)
+func (a *Asteroid) GetDetails(ctx *coord.Context, over DetailOverrides) (*TargetDetails, error) {
+	return computeDetails(a, ctx, over)
 }
 
 // ApparentMagnitude computes the apparent magnitude using the best available

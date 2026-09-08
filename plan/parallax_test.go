@@ -15,7 +15,7 @@ import (
 // detailer is the subset of Observable this file needs; every concrete target
 // type implements it.
 type detailer interface {
-	GetDetails(ctx *coord.Context, props ...string) (*plan.TargetDetails, error)
+	GetDetails(ctx *coord.Context, props plan.DetailOverrides) (*plan.TargetDetails, error)
 }
 
 // TestConstraintAndDetailsAgreeOnAltitude is the guard the diurnal-parallax
@@ -101,7 +101,7 @@ func TestConstraintAndDetailsAgreeOnAltitude(t *testing.T) {
 					t.Fatalf("%02dh IsObservable: %v", hour, err)
 				}
 
-				details, err := d.GetDetails(ctx)
+				details, err := d.GetDetails(ctx, plan.DetailOverrides{})
 				if err != nil {
 					t.Fatalf("%02dh GetDetails: %v", hour, err)
 				}

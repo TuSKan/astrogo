@@ -164,7 +164,7 @@ func TestAngularDiameter_DetailsAutoPopulateAndOverride(t *testing.T) {
 	prov := &fixedVecProvider{vec: vector.Vec3{X: 1.0}}
 	sun := NewSun(prov)
 
-	d, err := sun.GetDetails(ctx)
+	d, err := sun.GetDetails(ctx, DetailOverrides{})
 	if err != nil {
 		t.Fatalf("GetDetails: %v", err)
 	}
@@ -173,7 +173,7 @@ func TestAngularDiameter_DetailsAutoPopulateAndOverride(t *testing.T) {
 		t.Error("GetDetails: AngularSize was not auto-populated for the Sun")
 	}
 
-	dOverride, err := sun.GetDetails(ctx, "AngularSize", "OVERRIDDEN")
+	dOverride, err := sun.GetDetails(ctx, DetailOverrides{AngularSize: "OVERRIDDEN"})
 	if err != nil {
 		t.Fatalf("GetDetails with override: %v", err)
 	}

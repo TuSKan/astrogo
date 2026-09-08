@@ -23,7 +23,7 @@ func (m benchMock) ICRS(_ time.Time) (coord.ICRS, error) {
 
 func (m benchMock) Name() string                             { return "mock" }
 func (m benchMock) Position(_ time.Time) (coord.ICRS, error) { return m.c, nil }
-func (m benchMock) GetDetails(_ *coord.Context, _ ...string) (*TargetDetails, error) {
+func (m benchMock) GetDetails(_ *coord.Context, _ DetailOverrides) (*TargetDetails, error) {
 	return &TargetDetails{}, nil
 }
 

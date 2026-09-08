@@ -263,7 +263,7 @@ tables you can check against published references.
 - **Sub-second boundary refinement** — Chandrupatla (continuous altitude) + bisection (discrete constraints)
 - Observable windows with constraint evaluation
 - Altitude/airmass/separation constraints
-- Target scoring and ranking (`ScoreObservable` at midpoint altitude × priority)
+- Target scoring and ranking (`Scorer` at midpoint altitude × priority)
 - **Production Scheduling Engine**:
   - `Block` and `Configuration` abstractions for observing requests
   - `TransitionModel` for slew and instrument setup time

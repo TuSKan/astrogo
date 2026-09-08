@@ -356,14 +356,18 @@ func mergeConstraints(a, b []Constraint) []Constraint {
 }
 
 // scoreBlockPlacement evaluates how desirable a block placement is by
-// scoring the target at the observation midpoint using ScoreObservable.
+// scoring the target at the observation midpoint.
 //
-// If ctx is non-nil it is reused; otherwise ScoreObservable creates one.
+// If ctx is non-nil it is reused; otherwise the Scorer builds one.
 // Falls back to static block priority if scoring fails.
 func scoreBlockPlacement(block *Block, start, end time.Time, planner *Planner, ctx *coord.Context) float64 {
 	mid := start.Add(end.Sub(start) / 2)
 
-	score, err := ScoreObservable(block.Target, mid, planner.Site, nil, ctx, planner.Constraints...)
+	score, err := Scorer{
+		Site:        planner.Site,
+		Context:     ctx,
+		Constraints: planner.Constraints,
+	}.Score(block.Target, mid)
 	if err != nil {
 		return block.Priority
 	}

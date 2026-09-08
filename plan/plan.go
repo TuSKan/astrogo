@@ -221,7 +221,7 @@ type Prioritized interface {
 }
 
 // ScoreConfig controls the weights of the composite merit function used by
-// ScoreObservable. All weights are normalized internally; they do not need
+// Scorer. All weights are normalized internally; they do not need
 // to sum to 1.0.
 type ScoreConfig struct {
 	// AltitudeWeight controls the contribution of the target's current
@@ -275,7 +275,7 @@ func (sc ScoreConfig) normalize() (wAlt, wUrg, wMoon float64) {
 }
 
 // moonPosCacheSize bounds the number of distinct epochs moonSepCache holds
-// at once. Rank and ScoreObservable evaluate many targets concurrently
+// at once. Rank and Scorer evaluate many targets concurrently
 // (errgroup), each potentially at its own epoch (e.g. a per-object peak-time
 // search) — a single-entry cache thrashes to a ~0% hit rate under that
 // access pattern, since every concurrent lookup at a different epoch evicts
@@ -398,8 +398,40 @@ func estimateHoursUntilSet(obj Observable, t time.Time, site *Site, currentAlt f
 	return math.Inf(1)
 }
 
-// ScoreObservable calculates a composite desirability score for a target at a
-// given time and site using a configurable merit function.
+// Scorer ranks targets by a configurable merit function.
+//
+// A zero Config uses DefaultScoreConfig().
+//
+// # Why a struct rather than six parameters
+//
+// This was ScoreObservable(obj, t, site, cfg, ctx, constraints...), and the two
+// pointers in the middle were nil at nearly every call site — including the
+// README's. Positional nils say nothing about what they are declining, and two
+// adjacent ones of different types can be transposed without the compiler
+// noticing. Named fields say which is which, and the ones a caller does not set
+// are the ones they did not have to think about.
+//
+// A Scorer is safe to reuse across targets and times; Score holds no state.
+type Scorer struct {
+	// Site is where the observing happens. Required.
+	Site *Site
+
+	// Config is the merit weighting. The zero value means
+	// DefaultScoreConfig().
+	Config ScoreConfig
+
+	// Context, when set, is reused instead of building one per call — the
+	// ~91 µs Apco13 solve. It fixes the epoch, so a Scorer carrying one is
+	// only valid for scoring at that instant; leave it nil to score across
+	// times.
+	Context *coord.Context
+
+	// Constraints are the requirements a target must satisfy to score above
+	// zero.
+	Constraints []Constraint
+}
+
+// Score calculates a composite desirability score for a target at a given time.
 //
 // The composite score combines three factors:
 //
@@ -410,18 +442,10 @@ func estimateHoursUntilSet(obj Observable, t time.Time, site *Site, currentAlt f
 //     Targets far from the Moon score higher.
 //
 // The weighted composite is multiplied by the target's priority if it
-// implements the Prioritized interface.
-//
-// If cfg is nil, DefaultScoreConfig() is used.
-func ScoreObservable(
-	obj Observable,
-	t time.Time,
-	site *Site,
-	cfg *ScoreConfig,
-	ctx *coord.Context,
-	constraints ...Constraint,
-) (float64, error) {
-	eval, err := isObservableCtx(obj, t, site, ctx, constraints...)
+// implements the Prioritized interface. A target failing any constraint scores
+// zero.
+func (s Scorer) Score(obj Observable, t time.Time) (float64, error) {
+	eval, err := isObservableCtx(obj, t, s.Site, s.Context, s.Constraints...)
 	if err != nil {
 		return 0, err
 	}
@@ -430,9 +454,9 @@ func ScoreObservable(
 		return 0, nil
 	}
 
-	sc := DefaultScoreConfig()
-	if cfg != nil {
-		sc = *cfg
+	sc := s.Config
+	if sc == (ScoreConfig{}) {
+		sc = DefaultScoreConfig()
 	}
 
 	wAlt, wUrg, wMoon := sc.normalize()
@@ -445,7 +469,7 @@ func ScoreObservable(
 	var urgMerit float64
 
 	if wUrg > 0 {
-		hoursLeft := estimateHoursUntilSet(obj, t, site, altDeg)
+		hoursLeft := estimateHoursUntilSet(obj, t, s.Site, altDeg)
 		urgMerit = math.Min(1.0/(math.Max(hoursLeft, 0.5)), 1.0)
 	}
 
@@ -491,7 +515,7 @@ func RankObservables(
 	constraints ...Constraint,
 ) ([]ScoredTarget, error) {
 	scores, err := parallel.Map(objs, 0, func(_ int, obj Observable) (float64, error) {
-		return ScoreObservable(obj, t, site, nil, nil, constraints...)
+		return Scorer{Site: site, Constraints: constraints}.Score(obj, t)
 	})
 	if err != nil {
 		return nil, fmt.Errorf("plan: score: %w", err)

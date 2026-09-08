@@ -57,7 +57,7 @@ func TestSatelliteAltitudePipelinesAgree(t *testing.T) {
 			t.Fatalf("+%dmin IsObservable: %v", minute, err)
 		}
 
-		details, err := iss.GetDetails(ctx)
+		details, err := iss.GetDetails(ctx, plan.DetailOverrides{})
 		if err != nil {
 			t.Fatalf("+%dmin GetDetails: %v", minute, err)
 		}

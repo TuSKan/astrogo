@@ -44,7 +44,7 @@ func main() {
 
 	moon := plan.NewMoon(prov)
 
-	details, err := moon.GetDetails(ctx, "Description", "Earth's natural satellite", "Source", "JPL DE442")
+	details, err := moon.GetDetails(ctx, plan.DetailOverrides{Description: "Earth's natural satellite", Source: "JPL DE442"})
 	if err != nil {
 		log.Fatalf("failed to get details: %v", err)
 	}

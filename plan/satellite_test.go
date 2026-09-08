@@ -79,7 +79,7 @@ func TestPlanSatellite_PositionAndDetails(t *testing.T) {
 
 	ctx := coord.NewContext(tm, site.Location(), site.Refraction())
 
-	d, err := sat.GetDetails(ctx)
+	d, err := sat.GetDetails(ctx, DetailOverrides{})
 	if err != nil {
 		t.Fatalf("GetDetails: %v", err)
 	}
