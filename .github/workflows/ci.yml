@@ -98,6 +98,44 @@ jobs:
           version: v2.13
           args: --timeout=5m
 
+      # examples/ is its own module (#124), so nothing above compiles it:
+      # `go build ./...`, `go vet ./...` and golangci-lint all stop at the
+      # module boundary. Without these steps the 32 example programs would
+      # build only when someone ran them by hand, and the README's claim that
+      # every sample in it was actually compiled would decay silently.
+      #
+      # They reach the library through `replace ../`, so they build against
+      # this commit's working tree — an API change that breaks an example
+      # fails here, which is the whole reason they are still verified rather
+      # than merely shipped.
+      - name: Build the examples module
+        shell: bash
+        working-directory: examples
+        run: |
+          go build ./...
+          go vet ./...
+
+      - name: Check go mod tidy (examples)
+        if: matrix.os == 'ubuntu-latest'
+        shell: bash
+        working-directory: examples
+        run: |
+          go mod tidy
+          git diff --exit-code -- go.mod go.sum
+
+      # Run from examples/ but pointed at the root config, deliberately: with
+      # --config ../.golangci.yml the reported paths stay relative to the
+      # repository root, so .golangci.yml's `path: "examples/"` exclusions
+      # still match. A copied config in examples/ would drift; one run from
+      # the wrong directory would silently stop excluding.
+      - name: Run golangci-lint (examples)
+        if: matrix.os == 'ubuntu-latest'
+        uses: golangci/golangci-lint-action@v9
+        with:
+          version: v2.13
+          working-directory: examples
+          args: --timeout=5m --config ../.golangci.yml
+
       - name: Upload coverage to Codecov
         if: matrix.os == 'ubuntu-latest'
         uses: codecov/codecov-action@v6

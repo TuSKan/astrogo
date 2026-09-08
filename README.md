@@ -121,8 +121,13 @@ go get github.com/TuSKan/astrogo
 
 ## Examples
 
-Every one is a runnable `main` package. `go run ./examples/<name>` — the ones marked
+Every one is a runnable `main` package. `go -C examples run ./<name>` — the ones marked
 offline need no network and no downloads.
+
+`examples/` is [its own module](examples/go.mod), which is why the command carries
+`-C examples` rather than a path. It keeps 32 demo programs out of the library's
+package listing while still building against the working tree, so an API change that
+breaks an example fails CI.
 
 | | What it answers | Offline |
 | :--- | :--- | :---: |

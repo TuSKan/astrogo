@@ -50,6 +50,27 @@ golangci-lint run
 golangci-lint run --build-tags="integration,network,validation"
 ```
 
+### 3. The examples module
+
+`examples/` is a separate module, so nothing above touches it — `go build ./...`,
+`go vet ./...` and `golangci-lint` all stop at the module boundary. Anything that
+changes the public API has to be checked there too:
+
+```bash
+go -C examples build ./...
+go -C examples vet ./...
+cd examples && golangci-lint run --config ../.golangci.yml
+```
+
+Run the linter from `examples/` pointed at the root config, not a copy: with
+`--config ../.golangci.yml` the reported paths stay relative to the repository
+root, so `.golangci.yml`'s `path: "examples/"` exclusions still match.
+
+The module reaches the library through `replace ../`, so it builds against your
+working tree rather than the last release — that is what makes it a check and
+not just a shipping directory. `go run` from the repository root needs the same
+`-C`: `go -C examples run ./01_where_is_mars`.
+
 ## Architectural Guidelines
 
 When submitting code, please ensure your architectural choices match the project's design goals:
