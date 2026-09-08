@@ -20,6 +20,16 @@ func restoreBackend(t *testing.T) {
 	t.Cleanup(func() { kernelBackend.Store(prev) })
 }
 
+// Sentinels for the failures these tests inject, declared here because a
+// dynamic errors.New inside a test is the same footgun it is anywhere else:
+// errors.Is against it works only by identity, and an inline one cannot be
+// referred to twice.
+var (
+	errKernelGone = errors.New("de440.bsp: no such file")
+	errFirst      = errors.New("first backend")
+	errSecond     = errors.New("second backend")
+)
+
 // stubProvider is the smallest thing satisfying Provider.
 type stubProvider struct{}
 
@@ -101,14 +111,12 @@ func TestRequestCrossesTheBoundaryIntact(t *testing.T) {
 func TestBackendErrorReachesTheCaller(t *testing.T) {
 	restoreBackend(t)
 
-	kernelGone := errors.New("de440.bsp: no such file")
-
 	RegisterKernelBackend(func(context.Context, KernelRequest) (Provider, error) {
-		return nil, kernelGone
+		return nil, errKernelGone
 	})
 
 	_, err := KernelProvider(context.Background(), KernelRequest{Source: Planets, Kernel: "de440"})
-	if !errors.Is(err, kernelGone) {
+	if !errors.Is(err, errKernelGone) {
 		t.Fatalf("err = %v, want the backend's own error", err)
 	}
 
@@ -123,18 +131,15 @@ func TestBackendErrorReachesTheCaller(t *testing.T) {
 func TestRegisterReplaces(t *testing.T) {
 	restoreBackend(t)
 
-	first := errors.New("first")
-	second := errors.New("second")
-
 	RegisterKernelBackend(func(context.Context, KernelRequest) (Provider, error) {
-		return nil, first
+		return nil, errFirst
 	})
 	RegisterKernelBackend(func(context.Context, KernelRequest) (Provider, error) {
-		return nil, second
+		return nil, errSecond
 	})
 
 	_, err := KernelProvider(context.Background(), KernelRequest{})
-	if !errors.Is(err, second) {
+	if !errors.Is(err, errSecond) {
 		t.Errorf("err = %v, want the second registration to win", err)
 	}
 
