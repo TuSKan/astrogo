@@ -343,6 +343,8 @@ func constName(id EndpointID) string {
 		return "Nominatim"
 	case OpenElevation:
 		return "OpenElevation"
+	case MPCORB:
+		return "MPCORB"
 	case CALSPEC:
 		return "CALSPEC"
 	case VIIRSAnnual:
