@@ -221,6 +221,7 @@ func TestDownloadableEndpointsAreExactlyTheExpectedSet(t *testing.T) {
 		NAIFLSK:               true,
 		NAIFPCK:               true,
 		OpenNGC:               true,
+		MPCObsCodes:           true,
 		MPCORB:                true,
 		JPLHorizonsSPK:        true,
 		VIIRSAnnual:           true,

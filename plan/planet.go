@@ -134,8 +134,8 @@ func (p *Planet) GeocentricVec(t time.Time) (vector.Vec3, error) {
 }
 
 // GetDetails returns the target details.
-func (p *Planet) GetDetails(ctx *coord.Context, props ...string) (*TargetDetails, error) {
-	return computeDetails(p, ctx, props...)
+func (p *Planet) GetDetails(ctx *coord.Context, over DetailOverrides) (*TargetDetails, error) {
+	return computeDetails(p, ctx, over)
 }
 
 // ApparentMagnitude returns the Mallama & Hilton (2018) apparent magnitude.

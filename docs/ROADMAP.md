@@ -219,8 +219,8 @@ when lunar phase / sky brightness from moonlight is too high.
       always passes for the Moon itself. Implements `ConstraintCtx` (added to the
       compile-time assertion block alongside `MoonSep`).
 - [ ] Optional coupling with `MoonSep` (separation × illumination scoring)
-- [x] Integration with `ScoreObservable` — `MoonIllum` composes as an ordinary
-      `Constraint`/`ConstraintCtx`, same as every other constraint `ScoreObservable`
+- [x] Integration with `Scorer` — `MoonIllum` composes as an ordinary
+      `Constraint`/`ConstraintCtx`, same as every other constraint `Scorer`
       accepts.
 
 **Inspiration:** astroplan `MoonIlluminationConstraint`.

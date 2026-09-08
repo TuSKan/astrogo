@@ -236,7 +236,7 @@ func main() {
 	atm := atmosphere.AtAltitude(835.05)
 	ctx := coord.NewContext(now, loc, atm)
 
-	details, err := moonTarget.GetDetails(ctx)
+	details, err := moonTarget.GetDetails(ctx, plan.DetailOverrides{})
 	if err != nil {
 		log.Fatalf("moon details: %v", err)
 	}

@@ -61,6 +61,6 @@ func (g *GenericBody) GeocentricVec(t time.Time) (vector.Vec3, error) {
 }
 
 // GetDetails returns the target details.
-func (g *GenericBody) GetDetails(ctx *coord.Context, props ...string) (*TargetDetails, error) {
-	return computeDetails(g, ctx, props...)
+func (g *GenericBody) GetDetails(ctx *coord.Context, over DetailOverrides) (*TargetDetails, error) {
+	return computeDetails(g, ctx, over)
 }

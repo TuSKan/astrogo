@@ -102,6 +102,10 @@ const (
 	// fixed commit so catalog/openngc's fetch is reproducible.
 	OpenNGC EndpointID = "openngc.github"
 
+	// MPCObsCodes is the IAU Minor Planet Center's observatory-code list,
+	// used by plan.NewMPCSite to resolve a code to an observing site.
+	MPCObsCodes EndpointID = "mpc.obscodes"
+
 	// Nominatim is OpenStreetMap's Nominatim geocoding API, used by
 	// plan.NewSiteEarthAddress to resolve an address to coordinates.
 	Nominatim EndpointID = "osm.nominatim"
@@ -584,6 +588,26 @@ func defaultEndpoints() map[EndpointID]Endpoint {
 			Mutable:         true,
 			Downloadable:    true,
 			Files:           []string{"NGC.csv", "addendum.csv"},
+		},
+		MPCObsCodes: {
+			ID:        MPCObsCodes,
+			URL:       "https://www.minorplanetcenter.net/iau/lists/",
+			Kind:      KindFile,
+			Subsystem: "plan",
+			Description: "IAU Minor Planet Center observatory-code list — code, longitude " +
+				"and the two parallax constants for ~2,700 sites",
+			ApproxSize:      200_000,
+			Enabled:         true,
+			DownloadTimeout: 2 * time.Minute,
+			// New codes are assigned continuously and existing rows are
+			// revised as sites are resurveyed, so a cached copy is
+			// revalidated rather than reused on existence alone.
+			Mutable:      true,
+			Downloadable: true,
+			// ObsCodes.html is the plain list; the .html suffix is the MPC's
+			// name for it, not a description of the content — the body is a
+			// fixed-width table inside a single <pre> element.
+			Files: []string{"ObsCodes.html"},
 		},
 		Nominatim: {
 			ID:          Nominatim,

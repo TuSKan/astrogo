@@ -261,7 +261,7 @@ All computations in this document are reproduced by the example program:
 **Program:** [`examples/16_planet_parade/`](../examples/16_planet_parade/)
 
 ```sh
-go run ./examples/16_planet_parade/
+go -C examples run ./16_planet_parade/
 ```
 
 ### What the program computes:

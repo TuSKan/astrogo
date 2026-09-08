@@ -226,7 +226,7 @@ func TestAsteroid_PositionAndGetDetails(t *testing.T) {
 		t.Errorf("GeocentricVec norm = %v, want 1.77 AU", vec.Norm())
 	}
 
-	d, err := a.GetDetails(testContext(t))
+	d, err := a.GetDetails(testContext(t), DetailOverrides{})
 	if err != nil {
 		t.Fatalf("GetDetails: %v", err)
 	}
@@ -291,7 +291,7 @@ func TestNewAsteroid_KeplerBackedProvider(t *testing.T) {
 		t.Errorf("GeocentricVec norm = %v AU, outside plausible band [%v, %v]", vec.Norm(), minPlausible, maxPlausible)
 	}
 
-	d, err := a.GetDetails(testContext(t))
+	d, err := a.GetDetails(testContext(t), DetailOverrides{})
 	if err != nil {
 		t.Fatalf("GetDetails: %v", err)
 	}
@@ -363,7 +363,7 @@ func TestComet_ApparentMagnitudeAndDetails(t *testing.T) {
 		t.Errorf("GeocentricVec norm = %v, want 1.77 AU", vec.Norm())
 	}
 
-	d, err := c.GetDetails(testContext(t))
+	d, err := c.GetDetails(testContext(t), DetailOverrides{})
 	if err != nil {
 		t.Fatalf("GetDetails: %v", err)
 	}
@@ -413,7 +413,7 @@ func TestGenericBody_PositionAndDetails(t *testing.T) {
 
 	// GenericBody deliberately does NOT implement MagnitudeComputer — confirm
 	// GetDetails doesn't report a spurious magnitude for it.
-	d, err := g.GetDetails(testContext(t))
+	d, err := g.GetDetails(testContext(t), DetailOverrides{})
 	if err != nil {
 		t.Fatalf("GetDetails: %v", err)
 	}

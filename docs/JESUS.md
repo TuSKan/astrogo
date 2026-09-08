@@ -471,7 +471,7 @@ following steps:
 5. Check the **day of the week**
 
 ```sh
-go run ./examples/10_jesus_christ/crux/
+go -C examples run ./10_jesus_christ/crux/
 ```
 
 The full output scans all 11 years and every new moon near each equinox. The Friday
@@ -797,7 +797,7 @@ Computes Jupiter-Saturn triple conjunctions of 7 BC and the Jupiter-Venus conjun
 of June 2 BC, with angular separation at each event.
 
 ```sh
-go run ./examples/10_jesus_christ/born/
+go -C examples run ./10_jesus_christ/born/
 ```
 
 ---
@@ -810,7 +810,7 @@ Searches for all lunar eclipses between 5 BC and AD 1, classifying each by type
 (penumbral, partial, total) and flagging candidates for the eclipse mentioned by Josephus.
 
 ```sh
-go run ./examples/10_jesus_christ/herod/
+go -C examples run ./10_jesus_christ/herod/
 ```
 
 ---
@@ -824,7 +824,7 @@ new moons, estimates crescent visibility at Jerusalem sunset, and checks whether
 Nisan 14 falls on a Friday.
 
 ```sh
-go run ./examples/10_jesus_christ/crux/
+go -C examples run ./10_jesus_christ/crux/
 ```
 
 ---
@@ -838,7 +838,7 @@ sunset, moonrise, lunar eclipse timing, moon illumination fraction, plus a scan 
 all lunar eclipses during the entire Pilate window to demonstrate AD 33's uniqueness.
 
 ```sh
-go run ./examples/10_jesus_christ/eclipse/
+go -C examples run ./10_jesus_christ/eclipse/
 ```
 
 ---

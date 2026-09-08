@@ -121,8 +121,13 @@ go get github.com/TuSKan/astrogo
 
 ## Examples
 
-Every one is a runnable `main` package. `go run ./examples/<name>` — the ones marked
+Every one is a runnable `main` package. `go -C examples run ./<name>` — the ones marked
 offline need no network and no downloads.
+
+`examples/` is [its own module](examples/go.mod), which is why the command carries
+`-C examples` rather than a path. It keeps 32 demo programs out of the library's
+package listing while still building against the working tree, so an API change that
+breaks an example fails CI.
 
 | | What it answers | Offline |
 | :--- | :--- | :---: |
@@ -264,7 +269,7 @@ tables you can check against published references.
 - **Sub-second boundary refinement** — Chandrupatla (continuous altitude) + bisection (discrete constraints)
 - Observable windows with constraint evaluation
 - Altitude/airmass/separation constraints
-- Target scoring and ranking (`ScoreObservable` at midpoint altitude × priority)
+- Target scoring and ranking (`Scorer` at midpoint altitude × priority)
 - **Production Scheduling Engine**:
   - `Block` and `Configuration` abstractions for observing requests
   - `TransitionModel` for slew and instrument setup time
@@ -448,6 +453,7 @@ happens.
 | Planetary satellite SPK (Io, Titan, Triton, ...) | `remote.NAIFSPK` | ~64 MB (Mars) – ~1.1 GB (Jupiter), ~2.4 GB for all 6 kernels | `eph.NewProvider(eph.Moons, "sat441")`, or `plan.VisibleTonight(..., plan.WithPlanetaryMoons())` |
 | IERS Earth-orientation data | `remote.IERSFinals2000A` | ~3.7 MB | automatic on first `Time.EOP()`/`.UTC()`/`.UT1()` query needing it |
 | OpenNGC catalog CSVs | `remote.OpenNGC` | ~2 MB combined | `catalog.NewResolver(catalog.OpenNGC, ...)` |
+| MPC observatory-code list | `remote.MPCObsCodes` | ~150 KB | `plan.NewMPCSite(ctx, "568")` / `plan.MPCObservatories(ctx)` |
 | MPC orbital elements (MPCORB format) | `remote.MPCORB` | 0.5 MB (`PHA.txt`) – 317 MB (`MPCORB.DAT`, 94 MB gzipped) | `mpcorb.Open(ctx, "NEA.txt")` — streamed, so a caller filtering 500 objects never holds the other million and a half |
 | VIIRS annual nighttime-lights composite (2012-2025, no API key) | `remote.VIIRSAnnual` | ~700 MB-1 GB per year | `viirs.Open(ctx, year)`, for the spatial distribution of artificial emission — CC0, credit lightpollutionmap.info + NASA Black Marble |
 | CAMS global reanalysis NetCDF files (Copernicus EODATA S3) | `remote.CopernicusEODATA` | 1.3 MB (lnsp) – ~180 MB (a 137-level aerosol tracer) | `atmosphere/dataset/cams.Open` — requires Copernicus Data Space S3 credentials (AWS SDK default chain) and a blank import of `remote/s3` |

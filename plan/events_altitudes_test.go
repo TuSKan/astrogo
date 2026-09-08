@@ -24,7 +24,7 @@ func (errMovingBody) Position(time.Time) (coord.ICRS, error) {
 	return coord.ICRS{}, nil
 }
 
-func (errMovingBody) GetDetails(*coord.Context, ...string) (*TargetDetails, error) {
+func (errMovingBody) GetDetails(*coord.Context, DetailOverrides) (*TargetDetails, error) {
 	return nil, errMovingBodyFails
 }
 

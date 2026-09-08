@@ -19,7 +19,7 @@ ephemerides — no lookup tables, no analytical approximations, no curve fits.
 **Run it yourself:**
 
 ```sh
-go run ./examples/17_equinox_prediction/
+go -C examples run ./17_equinox_prediction/
 ```
 
 ---

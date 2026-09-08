@@ -1,6 +1,6 @@
 // Example: Composite target scoring with configurable weights.
 //
-// This demonstrates the plan.ScoreObservable merit function that combines
+// This demonstrates the plan.Scorer merit function that combines
 // altitude, urgency (time until set), and Moon separation into a single
 // score for observation prioritization.
 //
@@ -122,7 +122,11 @@ func main() {
 		var results []result
 
 		for _, obj := range targets {
-			score, err := plan.ScoreObservable(obj, tm, site, profile.cfg, nil, constraints...)
+			score, err := plan.Scorer{
+				Site:        site,
+				Config:      *profile.cfg,
+				Constraints: constraints,
+			}.Score(obj, tm)
 			if err != nil {
 				fmt.Printf("  %-14s  error: %v\n", obj.Name(), err)
 				continue

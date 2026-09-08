@@ -39,7 +39,7 @@ func (unreachableTarget) Position(_ time.Time) (coord.ICRS, error) {
 	return coord.ICRS{}, errPositionUnavailable
 }
 
-func (unreachableTarget) GetDetails(_ *coord.Context, _ ...string) (*TargetDetails, error) {
+func (unreachableTarget) GetDetails(_ *coord.Context, _ DetailOverrides) (*TargetDetails, error) {
 	return nil, errPositionUnavailable
 }
 
