@@ -1,7 +1,9 @@
 package plan
 
 import (
+	"errors"
 	"math"
+	"strings"
 	"testing"
 
 	"github.com/TuSKan/astrogo/angle"
@@ -350,5 +352,112 @@ func TestEveryEphemerisBackedTargetIsApparent(t *testing.T) {
 				t.Errorf("Position and GeocentricVec disagree by %g\"", sep)
 			}
 		})
+	}
+}
+
+// zeroProvider reports a body at the geocentre, which is not a direction.
+//
+// It is the one input eph.ToICRS refuses: a zero vector has no right ascension
+// and no declination, and returning RA 0 Dec 0 for it would put a target in
+// Pisces with complete confidence.
+type zeroProvider struct{}
+
+func (zeroProvider) State(eph.ID, time.Time) (eph.State, error) {
+	return eph.State{Frame: eph.FrameICRS, Center: eph.CenterGeocentre}, nil
+}
+
+func (zeroProvider) Close() error { return nil }
+
+// TestApparentFailuresNameTheTargetThatFailed covers the error path of all four
+// types, which is the half of this change a caller only meets when something
+// has gone wrong.
+//
+// Each wrapper exists to add the body's own name to the error, and that is the
+// whole reason they are not one shared function: a scheduler evaluating two
+// hundred targets and reporting "ephemeris: apparent state: ..." tells whoever
+// reads the log nothing about which target to look at. An error that loses the
+// name is as good as no error for that purpose, and nothing else would catch
+// it — the message is not what any other assertion reads.
+func TestApparentFailuresNameTheTargetThatFailed(t *testing.T) {
+	t.Parallel()
+
+	prov := failingProvider{}
+	when := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
+
+	for _, tc := range []struct {
+		name string
+		obj  Observable
+	}{
+		{"Vesta", NewAsteroid("Vesta", eph.ID(2000004), prov)},
+		{"Halley", NewComet("Halley", eph.ID(1000036), prov, 5.5, 8)},
+		{"Chiron", NewGenericBody("Chiron", eph.ID(2002060), prov)},
+		{"Neptune", NewPlanet("Neptune", eph.Neptune, prov)},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			mb, ok := tc.obj.(MovingBody)
+			if !ok {
+				t.Fatalf("%s is not a MovingBody", tc.name)
+			}
+
+			_, posErr := tc.obj.Position(when)
+			_, vecErr := mb.GeocentricVec(when)
+
+			for _, got := range []struct {
+				label string
+				err   error
+			}{
+				{"Position", posErr},
+				{"GeocentricVec", vecErr},
+			} {
+				switch {
+				case got.err == nil:
+					t.Errorf("%s: a provider that cannot supply a state reported a position", got.label)
+				case !errors.Is(got.err, errFailingProvider):
+					t.Errorf("%s: err = %v, want the provider's own failure to survive wrapping",
+						got.label, got.err)
+				case !strings.Contains(got.err.Error(), tc.name):
+					t.Errorf("%s: err = %v, want the target's name in it — a scheduler running "+
+						"two hundred targets cannot act on a failure that does not say which one",
+						got.label, got.err)
+				}
+			}
+		})
+	}
+}
+
+// TestApparentDirectionRefusesTheGeocentre covers apparentICRS's second
+// failure, which is not a provider failure at all.
+//
+// A body reported at the geocentre has a state and no direction. eph.ToICRS
+// refuses it rather than answering RA 0 Dec 0 — a real point in Pisces that a
+// target would rise, transit and set from — and this keeps that refusal from
+// being flattened into a success on the way through.
+func TestApparentDirectionRefusesTheGeocentre(t *testing.T) {
+	t.Parallel()
+
+	body := NewPlanet("AtTheCentre", eph.Mars, zeroProvider{})
+	when := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
+
+	// The vector itself is fine: zero is a state, just not a direction.
+	vec, err := body.GeocentricVec(when)
+	testutil.AssertNoError(t, err)
+
+	if vec != (vector.Vec3{}) {
+		t.Fatalf("GeocentricVec = %v, want the zero vector the provider reported", vec)
+	}
+
+	_, err = body.Position(when)
+	if err == nil {
+		t.Fatal("Position answered a direction for a body at the geocentre")
+	}
+
+	if !errors.Is(err, eph.ErrZeroVector) {
+		t.Errorf("err = %v, want eph.ErrZeroVector", err)
+	}
+
+	if !strings.Contains(err.Error(), "AtTheCentre") {
+		t.Errorf("err = %v, want the target's name in it", err)
 	}
 }
