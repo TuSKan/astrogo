@@ -108,26 +108,26 @@ func (p *Planet) EphID() eph.ID {
 	return p.id
 }
 
-// Position returns the planet's position.
+// Position returns where the planet is seen on the sky at t — the apparent
+// place, with light time and aberration in it. See [apparentVec] for how far
+// that is from the geometric direction and why it is the one this package
+// wants.
 func (p *Planet) Position(t time.Time) (coord.ICRS, error) {
-	pos, err := eph.Position(p.provider, p.id, t)
+	icrs, err := apparentICRS(p.provider, p.id, t)
 	if err != nil {
-		return coord.ICRS{}, fmt.Errorf("planet: ephemeris error for %s: %w", p.name, err)
-	}
-
-	icrs, err := eph.ToICRS(pos)
-	if err != nil {
-		return coord.ICRS{}, fmt.Errorf("planet: coordinate conversion error for %s: %w", p.name, err)
+		return coord.ICRS{}, fmt.Errorf("planet %s: %w", p.name, err)
 	}
 
 	return icrs, nil
 }
 
-// GeocentricVec returns the planet's geocentric position.
+// GeocentricVec returns the planet's apparent geocentric position vector,
+// which is what [coord.Context.GeocentricToObserved] expects — see
+// [apparentVec].
 func (p *Planet) GeocentricVec(t time.Time) (vector.Vec3, error) {
-	v, err := eph.Position(p.provider, p.id, t)
+	v, err := apparentVec(p.provider, p.id, t)
 	if err != nil {
-		return vector.Vec3{}, fmt.Errorf("planet: geocentric: %w", err)
+		return vector.Vec3{}, fmt.Errorf("planet %s: %w", p.name, err)
 	}
 
 	return v, nil

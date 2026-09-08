@@ -55,26 +55,23 @@ func (c *Comet) Provider() eph.Provider { return c.provider }
 // EphID returns the ephemeris ID.
 func (c *Comet) EphID() eph.ID { return c.id }
 
-// Position returns the ICRS position of the comet.
+// Position returns the apparent ICRS position of the comet — see
+// [apparentVec].
 func (c *Comet) Position(t time.Time) (coord.ICRS, error) {
-	pos, err := eph.Position(c.provider, c.id, t)
+	icrs, err := apparentICRS(c.provider, c.id, t)
 	if err != nil {
-		return coord.ICRS{}, fmt.Errorf("comet: ephemeris error for %s: %w", c.name, err)
-	}
-
-	icrs, err := eph.ToICRS(pos)
-	if err != nil {
-		return coord.ICRS{}, fmt.Errorf("comet: coordinate conversion error for %s: %w", c.name, err)
+		return coord.ICRS{}, fmt.Errorf("comet %s: %w", c.name, err)
 	}
 
 	return icrs, nil
 }
 
-// GeocentricVec returns the geocentric vector of the comet.
+// GeocentricVec returns the apparent geocentric vector of the comet — see
+// [apparentVec].
 func (c *Comet) GeocentricVec(t time.Time) (vector.Vec3, error) {
-	v, err := eph.Position(c.provider, c.id, t)
+	v, err := apparentVec(c.provider, c.id, t)
 	if err != nil {
-		return vector.Vec3{}, fmt.Errorf("comet: geocentric: %w", err)
+		return vector.Vec3{}, fmt.Errorf("comet %s: %w", c.name, err)
 	}
 
 	return v, nil
