@@ -2,6 +2,7 @@ package fits
 
 import (
 	"fmt"
+	"maps"
 	"math"
 	"strings"
 )
@@ -43,44 +44,117 @@ func NewWCS(naxis int) *WCS {
 	}
 }
 
+// The accessors copy in both directions, and the ones with a length invariant
+// enforce it.
+//
+// # Why copying
+//
+// They used to store and return the caller's slice. Either direction is a way
+// to rewrite a WCS without going through a setter: a caller holding the slice
+// they passed to SetCRVAL could change the reference position afterwards, and
+// a caller mutating what CRVAL returned did the same from the other side. For a
+// value describing where an image is on the sky, that is state changing under
+// whoever is transforming coordinates through it.
+//
+// # Why the length is an error rather than a comment
+//
+// PixelToWorld indexes crpix, crval and cdelt from 0 to nAxis, so a slice
+// shorter than nAxis is a panic reachable from a public method — and one longer
+// is a silent misunderstanding about how many axes this WCS has. Both used to
+// be accepted without a word. The map-valued setters carry no such invariant
+// and return nothing.
+
 // SetCRPIX sets the reference pixel coordinate array (1-based FITS indexing).
-func (w *WCS) SetCRPIX(crpix []float64) {
-	w.crpix = crpix
+//
+// Returns [ErrWCSDimension] unless len(crpix) is the WCS's axis count.
+func (w *WCS) SetCRPIX(crpix []float64) error {
+	if len(crpix) != w.nAxis {
+		return fmt.Errorf("%w: CRPIX has %d values, want %d", ErrWCSDimension, len(crpix), w.nAxis)
+	}
+
+	w.crpix = append([]float64(nil), crpix...)
+
+	return nil
 }
 
 // SetCRVAL sets the world coordinate values at the reference pixel.
-func (w *WCS) SetCRVAL(crval []float64) {
-	w.crval = crval
+//
+// Returns [ErrWCSDimension] unless len(crval) is the WCS's axis count.
+func (w *WCS) SetCRVAL(crval []float64) error {
+	if len(crval) != w.nAxis {
+		return fmt.Errorf("%w: CRVAL has %d values, want %d", ErrWCSDimension, len(crval), w.nAxis)
+	}
+
+	w.crval = append([]float64(nil), crval...)
+
+	return nil
 }
 
 // SetCDELT sets the pixel scale (degrees per pixel) along each axis.
-func (w *WCS) SetCDELT(cdelt []float64) {
-	w.cdelt = cdelt
+//
+// Returns [ErrWCSDimension] unless len(cdelt) is the WCS's axis count.
+func (w *WCS) SetCDELT(cdelt []float64) error {
+	if len(cdelt) != w.nAxis {
+		return fmt.Errorf("%w: CDELT has %d values, want %d", ErrWCSDimension, len(cdelt), w.nAxis)
+	}
+
+	w.cdelt = append([]float64(nil), cdelt...)
+
+	return nil
 }
 
 // SetCTYPE sets the coordinate axis type identifiers (e.g., "RA---TAN", "DEC--TAN").
-func (w *WCS) SetCTYPE(ctype []string) {
-	w.ctype = ctype
+//
+// Returns [ErrWCSDimension] unless len(ctype) is the WCS's axis count.
+func (w *WCS) SetCTYPE(ctype []string) error {
+	if len(ctype) != w.nAxis {
+		return fmt.Errorf("%w: CTYPE has %d values, want %d", ErrWCSDimension, len(ctype), w.nAxis)
+	}
+
+	w.ctype = append([]string(nil), ctype...)
+
+	return nil
 }
 
 // SetPC sets the linear transformation (rotation/skew) matrix.
-func (w *WCS) SetPC(pc [][]float64) {
-	w.pc = pc
+//
+// Returns [ErrWCSDimension] unless pc is square with the WCS's axis count —
+// a ragged matrix is checked row by row, since one short row is enough to make
+// the transform index past its end.
+func (w *WCS) SetPC(pc [][]float64) error {
+	if len(pc) != w.nAxis {
+		return fmt.Errorf("%w: PC has %d rows, want %d", ErrWCSDimension, len(pc), w.nAxis)
+	}
+
+	out := make([][]float64, w.nAxis)
+
+	for i, row := range pc {
+		if len(row) != w.nAxis {
+			return fmt.Errorf("%w: PC row %d has %d values, want %d",
+				ErrWCSDimension, i, len(row), w.nAxis)
+		}
+
+		out[i] = append([]float64(nil), row...)
+	}
+
+	w.pc = out
+
+	return nil
 }
 
 // SetSIP sets the forward SIP distortion polynomial coefficients.
 // Each map key [2]int{p, q} represents the exponent pair for u^p * v^q.
 // The maps may be nil to disable SIP distortion.
 func (w *WCS) SetSIP(a, b map[[2]int]float64) {
-	w.sipA = a
-	w.sipB = b
+	w.sipA = cloneCoeffs(a)
+	w.sipB = cloneCoeffs(b)
 }
 
 // SetSIPInverse sets the inverse SIP polynomial coefficients (AP, BP).
 // These are used in WorldToPixel to compute a direct inverse without iteration.
 func (w *WCS) SetSIPInverse(ap, bp map[[2]int]float64) {
-	w.sipAP = ap
-	w.sipBP = bp
+	w.sipAP = cloneCoeffs(ap)
+	w.sipBP = cloneCoeffs(bp)
 }
 
 // SetTPV sets the TPV distortion polynomial coefficients.
@@ -88,34 +162,61 @@ func (w *WCS) SetSIPInverse(ap, bp map[[2]int]float64) {
 // pv1 corrects the longitude intermediate coordinate;
 // pv2 corrects the latitude intermediate coordinate.
 func (w *WCS) SetTPV(pv1, pv2 map[int]float64) {
-	w.tpv1 = pv1
-	w.tpv2 = pv2
+	w.tpv1 = cloneTPV(pv1)
+	w.tpv2 = cloneTPV(pv2)
 }
 
-// GetCRPIX returns the reference pixel coordinate array.
-func (w *WCS) GetCRPIX() []float64 {
-	return w.crpix
+// cloneCoeffs copies a SIP coefficient map, preserving nil — a nil map means
+// "no distortion" and an empty one would too, but only nil says it was never
+// set.
+func cloneCoeffs(m map[[2]int]float64) map[[2]int]float64 {
+	if m == nil {
+		return nil
+	}
+
+	out := make(map[[2]int]float64, len(m))
+	maps.Copy(out, m)
+
+	return out
 }
 
-// GetCRVAL returns the world coordinate values at the reference pixel.
-func (w *WCS) GetCRVAL() []float64 {
-	return w.crval
+// cloneTPV is cloneCoeffs for the TPV term maps.
+func cloneTPV(m map[int]float64) map[int]float64 {
+	if m == nil {
+		return nil
+	}
+
+	out := make(map[int]float64, len(m))
+	maps.Copy(out, m)
+
+	return out
 }
 
-// GetCDELT returns the pixel scale along each axis.
-func (w *WCS) GetCDELT() []float64 {
-	return w.cdelt
+// CRPIX returns the reference pixel coordinate array.
+func (w *WCS) CRPIX() []float64 { return append([]float64(nil), w.crpix...) }
+
+// CRVAL returns the world coordinate values at the reference pixel.
+func (w *WCS) CRVAL() []float64 { return append([]float64(nil), w.crval...) }
+
+// CDELT returns the pixel scale along each axis.
+func (w *WCS) CDELT() []float64 { return append([]float64(nil), w.cdelt...) }
+
+// CTYPE returns the coordinate axis type identifiers.
+func (w *WCS) CTYPE() []string { return append([]string(nil), w.ctype...) }
+
+// PC returns the linear transformation matrix.
+func (w *WCS) PC() [][]float64 {
+	out := make([][]float64, len(w.pc))
+	for i, row := range w.pc {
+		out[i] = append([]float64(nil), row...)
+	}
+
+	return out
 }
 
-// GetCTYPE returns the coordinate axis type identifiers.
-func (w *WCS) GetCTYPE() []string {
-	return w.ctype
-}
-
-// GetPC returns the linear transformation matrix.
-func (w *WCS) GetPC() [][]float64 {
-	return w.pc
-}
+// NAxis returns how many axes this WCS describes, which is every setter's
+// length invariant and PixelToWorld's expected input length.
+func (w *WCS) NAxis() int { return w.nAxis }
 
 const (
 	deg2rad = math.Pi / 180.0
@@ -782,11 +883,23 @@ func ExtractWCS(h *Header) (*WCS, error) {
 	}
 
 	w := NewWCS(naxis)
-	w.SetCTYPE(ctype)
-	w.SetCRVAL(crval)
-	w.SetCRPIX(crpix)
-	w.SetCDELT(cdelt)
-	w.SetPC(pc)
+
+	// Every array above was built at length naxis, so a refusal here means the
+	// construction above disagrees with itself rather than that the header is
+	// odd — the setters are the only thing that would notice. Reported rather
+	// than dropped: the alternative is a WCS silently holding NewWCS's zeros,
+	// which transforms every pixel to the same place.
+	for _, err := range []error{
+		w.SetCTYPE(ctype),
+		w.SetCRVAL(crval),
+		w.SetCRPIX(crpix),
+		w.SetCDELT(cdelt),
+		w.SetPC(pc),
+	} {
+		if err != nil {
+			return nil, fmt.Errorf("fits: building WCS from header: %w", err)
+		}
+	}
 
 	// Extract SIP distortion coefficients if present.
 	sipA := parseSIPPoly(h, "A")
