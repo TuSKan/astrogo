@@ -36,12 +36,12 @@ type Site struct {
 // increasing eastward, matching this package's existing azimuth
 // convention.
 //
-// This is purely additive data plumbing today: no production call site
-// consumes it yet (RiseSetThreshold and friends use HorizonDip, the
-// atmospheric dip from elevation, not this) — a future Horizon
-// constraint gating visibility per-azimuth (see docs/ROADMAP.md #29)
-// would be the natural consumer. Set it via WithHorizonProfile;
-// Site.HorizonAt falls back to the scalar Horizon() when none is set.
+// [Horizon] is the constraint that consumes it, gating visibility per
+// azimuth — the case a scalar threshold cannot express. RiseSetThreshold and
+// friends still use HorizonDip, the atmospheric dip from elevation, which is a
+// different quantity. Set a profile via WithHorizonProfile; Site.HorizonAt
+// falls back to the scalar Horizon() when none is set, so a site nobody has
+// surveyed still answers.
 type HorizonProfile func(azimuth angle.Angle) angle.Angle
 
 // KnownSiteNames returns the display names of every entry in the built-in
