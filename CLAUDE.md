@@ -49,7 +49,17 @@ Six packages carry targets:
 | `internal/votable` | `FuzzRead` | SIMBAD / VizieR / Gaia / MAST TAP responses |
 | `time/internal/iers` | `FuzzParseFinals2000A` | the IERS bulletin |
 
-**Always pass `-fuzzminimizetime`.** Its default is 60s *per interesting input*, and minimization executions are not counted in `execs`, so a target with expensive executions appears to freeze at a constant count while the engine is in fact busy. On `fits.ReadHeader` the difference measured 5,966 executions in 76s against 121,274 in 60s — twenty times the coverage from one flag. This cost #140 a long investigation; do not omit it.
+**Always pass `-fuzzminimizetime`.** Its default is 60s *per interesting input*, and minimization executions are not counted in `execs`, so a target with expensive executions appears to freeze at a constant count while the engine is in fact busy. This cost #140 a long investigation; do not omit it.
+
+How much it decides, measured on `fits`'s `FuzzReadHeader` with a fresh corpus and the same 60s budget each time:
+
+| `-fuzzminimizetime` | executions | new interesting |
+| ---: | ---: | ---: |
+| 1s | 1,794,997 | 258 |
+| 5s | 22,491 | 106 |
+| 15s | 11,106 | 33 |
+
+**160x, from one flag, on one target.** Which is also the reason not to read `execs` as a throughput figure: it is executions *minus* whatever minimization consumed, and minimization cost is set by that flag times how often the target finds something interesting.
 
 ```bash
 go test -run=^$ -fuzz=FuzzNewReaderReadSummaries -fuzztime=60s -fuzzminimizetime=5s ./ephemeris/jpl/spk/
@@ -57,7 +67,26 @@ go test -run=^$ -fuzz=FuzzReadHeader            -fuzztime=60s -fuzzminimizetime=
 go test -run=^$ -fuzz=FuzzValidateTLE           -fuzztime=60s -fuzzminimizetime=5s ./ephemeris/satellite/
 ```
 
-Throughput varies by three orders of magnitude across these targets — `internal/votable` runs at ~456,000 exec/s, `fits.Read` at ~4 — so judge a run by executions, not by wall time. The `fits` figure is the allocation amplification in #185, not a slow parser.
+Executions vary by three orders of magnitude across these targets. Corpus-controlled — a fresh `-test.fuzzcachedir` per run, so each starts from the seed corpus only — at `-fuzztime=60s -fuzzminimizetime=5s`, two runs each:
+
+| target | executions | spread |
+| --- | ---: | ---: |
+| `internal/votable` `FuzzRead` | 21.7M – 24.0M | 10% |
+| `ephemeris/satellite` `FuzzValidateTLE` | 4.68M – 4.70M | 0.5% |
+| `catalog/norad` `FuzzGPToTLE` | 4.22M – 4.26M | 0.9% |
+| `fits` `FuzzParseCard` | 3.38M – 3.67M | 8% |
+| `ephemeris/jpl/spk` `FuzzNewReaderReadSummaries` | 1.82M – 2.39M | 27% |
+| `time/internal/iers` `FuzzParseFinals2000A` | 1.27M – 1.76M | 33% |
+| `fits` `FuzzRead` | 48k – 54k | 11% |
+| `fits` `FuzzReadHeader` | 22k – 35k | 43% |
+
+Two things follow, and both matter more than the numbers.
+
+**Never compare two runs that shared a corpus.** `go test -fuzz` carries interesting inputs forward in the build cache, so a second run starts deeper and spends its budget differently. Measured while investigating #199, the same command minutes apart gave 163,582 and 967,292 executions with no code change between them — a six-fold difference from corpus state alone. Use `-test.fuzzcachedir` pointed at a fresh directory (it goes *after* the package path).
+
+**A single run is not a measurement.** Even corpus-controlled, the run-to-run spread reaches 43%. Read these as an order of magnitude, not a benchmark.
+
+The low `fits` figures are minimization, not a slow parser: those two targets find ~110 interesting inputs from a fresh corpus and pay up to 5s minimizing each. `fits`'s `FuzzRead` measures ~800 exec/s here, against the "~4" this table claimed before it was measured this way — that figure was the default 60s minimize time, not the parser.
 
 Any crasher Go writes to `testdata/fuzz/` should be committed — that's the one place a small binary fixture is legitimate here, since it's a regression test for a bug the fuzzer found, not a data source. Two are checked in: an out-of-range TLE epoch day that panicked inside the SGP4 backend, and a VOTable with rows but no field declarations.
 
