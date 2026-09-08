@@ -73,6 +73,46 @@ run() {
 run "$work/all.txt" apidiff -m "$work/base.api" "$module"
 run "$work/incompatible.txt" apidiff -m -incompatible "$work/base.api" "$module"
 
+# apidiff counts `main` packages as API. They are not: nothing can import one,
+# so nothing downstream can break when one moves, is renamed, or goes away.
+#
+# It matters because this repository has 32 of them. Moving examples/ into its
+# own module (#124) removed every one from this module and apidiff reported 32
+# incompatible removals, which would have forced a `Changed — BREAKING`
+# changelog entry announcing a break no caller could observe — the gate
+# demanding a false statement to stay green.
+#
+# The list comes from `go list` at the base commit rather than from a path
+# pattern: a package is a command because its clause says `package main`, and
+# guessing that from a directory name is how the next reorganisation slips
+# through. Filtering the base's set is also the conservative direction — a
+# package that is a command only at the head is still checked.
+( cd "$work/base" && go list -f '{{if eq .Name "main"}}{{.ImportPath}}{{end}}' ./... ) \
+	> "$work/commands.txt" 2>/dev/null || : > "$work/commands.txt"
+
+if [ -s "$work/commands.txt" ]; then
+	for listing in "$work/all.txt" "$work/incompatible.txt"; do
+		grep -vFf <(sed 's/$/:/; s/^/package /' "$work/commands.txt") \
+			"$listing" > "$listing.api" || true
+
+		# Filtering every entry out of a section leaves apidiff's heading
+		# standing over nothing, which reads as a finding with the detail
+		# missing rather than as no finding. Drop a heading with no bullet
+		# under it, so an emptied listing is genuinely empty and the
+		# "None."/"No incompatible changes." branches below still fire.
+		awk '
+			/^- / {
+				if (heading != "") { print heading; heading = "" }
+				print
+				next
+			}
+			/^[[:space:]]*$/ { next }
+			/:$/             { heading = $0; next }
+			                 { print }
+		' "$listing.api" > "$listing"
+	done
+fi
+
 echo "## Exported API changes against the base"
 echo
 

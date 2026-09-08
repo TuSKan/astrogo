@@ -83,6 +83,15 @@ linters:
         linters:
           - testpackage
           - gosec
+      # examples/ is a separate module (#124) and reaches the library through
+      # `replace ../`, which is how a nested example module builds against the
+      # working tree instead of the last release — an API break in the library
+      # has to break the examples, or they are not verifying anything. That is
+      # the opposite of the fork replace the empty replace-allow-list above
+      # exists to refuse, and it lives in a module that exports no API.
+      - path: "examples/go\\.mod"
+        linters:
+          - gomoddirectives
       # Examples use fmt.Print for demo output
       - path: "examples/"
         linters:
