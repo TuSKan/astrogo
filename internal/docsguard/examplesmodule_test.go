@@ -105,4 +105,27 @@ func TestExamplesModuleIsVerifiedAgainstTheWorkingTree(t *testing.T) {
 				"without a step of its own the examples are shipped, not verified.")
 		}
 	})
+
+	t.Run("the trial-merge job compiles it too", func(t *testing.T) {
+		t.Parallel()
+
+		// open-prs-still-build.sh answers a question the pull-request checks
+		// cannot: whether an already-green PR still builds now that main has
+		// moved. Its `go build ./...` stops at the module boundary like every
+		// other, so an API change that breaks an example would merge and the
+		// job would report every open PR as fine.
+		script := filepath.Join(root, ".github", "scripts", "open-prs-still-build.sh")
+
+		sh, err := os.ReadFile(script)
+		if err != nil {
+			t.Fatalf("read open-prs-still-build.sh: %v", err)
+		}
+
+		if !strings.Contains(string(sh), "go -C examples build") {
+			t.Error("open-prs-still-build.sh does not build the examples module.\n" +
+				"  It trial-merges each open pull request and runs `go build ./...`, which " +
+				"no longer reaches examples/. Without `go -C examples build ./...` the job " +
+				"reports a PR as building against main when an example it broke does not.")
+		}
+	})
 }

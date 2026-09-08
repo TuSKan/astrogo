@@ -77,7 +77,18 @@ while IFS=$'\t' read -r number head cross; do
 
   checked=$((checked + 1))
 
-  if out="$(go build ./... 2>&1 && go vet ./... 2>&1)"; then
+  # examples/ is a separate module (#124), so `./...` stops before it. It is
+  # built here for the same reason the root module is: it reaches the library
+  # through `replace ../`, which means a merged API change breaks it exactly
+  # like any other consumer — and this job exists to find the consumer that
+  # was green against an older main. Skipped when the trial-merged tree has no
+  # examples module, so this script still works against a base predating it.
+  examples_build=(true)
+  if [ -f examples/go.mod ]; then
+    examples_build=(go -C examples build ./...)
+  fi
+
+  if out="$(go build ./... 2>&1 && go vet ./... 2>&1 && "${examples_build[@]}" 2>&1)"; then
     echo "   builds against main"
   else
     echo "   DOES NOT BUILD against main:"
