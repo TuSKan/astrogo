@@ -10,8 +10,6 @@ import (
 	"github.com/TuSKan/astrogo/constants"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/ephemeris/core"
-	"github.com/TuSKan/astrogo/ephemeris/jpl"
-	"github.com/TuSKan/astrogo/ephemeris/jpl/spk"
 	"github.com/TuSKan/astrogo/ephemeris/kepler"
 	"github.com/TuSKan/astrogo/ephemeris/satellite"
 	"github.com/TuSKan/astrogo/internal/gofaext"
@@ -174,9 +172,6 @@ var (
 // Satellite is the SGP4 orbit propagator for NORAD TLE data.
 type Satellite = satellite.Satellite
 
-// JPL is the JPL DE4xx numerical ephemeris provider.
-type JPL = jpl.Provider
-
 // ─── Kepler two-body propagator ───────────────────────────────────────────────
 
 // Elements are classical heliocentric osculating orbital elements for
@@ -304,27 +299,23 @@ func NewProvider(ctx context.Context, source Source, kernel string, opts ...Opti
 
 	switch source {
 	case Planets, SmallBody, Asteroids, Comets, Moons:
-		var jplOpts []jpl.Option
-
-		if !cfg.Start.IsZero() && !cfg.End.IsZero() {
-			jplOpts = append(jplOpts, jpl.WithTimeInterval(cfg.Start, cfg.End))
-		}
-
-		p, err := jpl.NewProvider(ctx, source, kernel, jplOpts...)
+		// Through the registered backend rather than by importing one. This
+		// package knows SOFA and a source vocabulary; the kernel half reaches
+		// remote and gocloud.dev/blob, and a build that never asks for a kernel
+		// should not link it. See ephemeris/core/kernel.go and #112.
+		p, err := core.KernelProvider(ctx, core.KernelRequest{
+			Source:       source,
+			Kernel:       kernel,
+			Start:        cfg.Start,
+			End:          cfg.End,
+			ExtraKernels: cfg.ExtraKernels,
+		})
 		if err != nil {
-			return nil, fmt.Errorf("ephemeris: new provider: %w", err)
-		}
-
-		for _, extra := range cfg.ExtraKernels {
-			k, err := spk.CacheDownload(ctx, "planets/"+extra+".bsp")
-			if err != nil {
-				return nil, fmt.Errorf("ephemeris: cache kernel %s: %w", extra, err)
-			}
-
-			err = p.AddKernel(k)
-			if err != nil {
-				return nil, fmt.Errorf("ephemeris: add kernel: %w", err)
-			}
+			// Wrapped, not replaced: errors.Is against core.ErrNoKernelBackend
+			// is how a caller distinguishes "this build has no kernel support"
+			// from "that kernel could not be read", and the message already
+			// names the import to add.
+			return nil, fmt.Errorf("ephemeris: %w", err)
 		}
 
 		return p, nil
