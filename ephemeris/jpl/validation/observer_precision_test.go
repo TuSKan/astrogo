@@ -160,27 +160,24 @@ func (b observerPrecisionBody) command() string { return strconv.Itoa(b.naifID) 
 // rather than planets (#253) and USNO tabulating Venus and Mars at the centre
 // of the illuminated disc rather than the geometric centre.
 //
-// So the +0.662" is not Earth rotation and not declination. What remains is
-// apparent right ascension — an offset in RA with declination clean is the
-// signature of an origin problem, the equinox-versus-CIO distinction and the
-// equation of the origins that bridges them — or an artefact of how the USNO
-// comparison itself computes GHA. That comparison derives right ascension as
-// ri - eo from SOFA's Atci13 in the test rather than through an astrogo API,
-// so it is not yet established which side the 0.662" belongs to (#256).
+// The +0.662" turned out not to be astrogo's at all. Against Horizons at
+// full precision, astrogo's geocentric apparent place agrees to +0.049" in
+// right ascension and -0.0003" in declination, and its Greenwich apparent
+// sidereal time to +0.050" — so astrogo's own hour angle matches Horizons to
+// about a milliarcsecond. celnav is a navigation product: the Nautical
+// Almanac tabulates GHA to 0.1 arcminutes, six arcseconds, and 0.662" is ten
+// times inside that. It measures USNO's difference from Horizons, not
+// astrogo's from either.
 //
-// Polar motion is excluded, and this is the controlled version of the
-// hypothesis the parallactic-angle paragraph above could only address
-// observationally. Re-running this very matrix with the pole pinned to zero,
-// holding UT1 unchanged, makes agreement *worse* rather than better:
+// So every geocentric stage is now clean to 0.05" or better — ephemeris,
+// light time, apparent right ascension, apparent declination, Earth rotation
+// — and polar motion is reducing the residual rather than causing it. None of
+// them accounts for the ~0.5" seen here.
 //
-//	                       with polar motion   pole zeroed
-//	crossTrack signed mean        -0.523"        -0.643"
-//	crossTrack range          [-1.96, +0.47]  [-2.56, +0.81]
-//	separation signed mean        +0.738"        +0.913"
-//
-// So polar motion is being applied correctly and is reducing the residual,
-// not causing it. Removing a term that helps is the cleanest way to show it
-// is not the culprit.
+// What that leaves is the topocentric step itself: the observer's position on
+// a rotating Earth and the CIRS-to-observed transform that uses it, or a
+// convention difference in Horizons' own Azi/Elev columns. That is one stage
+// rather than the whole pipeline, which is the useful part (#256).
 //
 // Two Earth-orientation explanations were tested along the way and both are
 // refuted. An EOP-vintage difference: astrogo holds *measured* EOP for the
