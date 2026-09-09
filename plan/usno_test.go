@@ -16,7 +16,6 @@ import (
 	"fmt"
 	"io"
 	"math"
-	"net"
 	"net/http"
 	"strings"
 	"sync"
@@ -25,6 +24,7 @@ import (
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
+	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/plan"
 	"github.com/TuSKan/astrogo/time"
 )
@@ -132,42 +132,75 @@ var testLocations = []testLocation{
 // enforced independently of http.Client.Timeout (see usnoGet).
 const usnoRequestTimeout = 30 * time.Second
 
+// usnoHost is the address the pre-check probes and the API this file queries.
+const usnoHost = "aa.usno.navy.mil:443"
+
 var (
-	usnoReachableOnce sync.Once
-	usnoReachableOK   bool
+	// usnoReachableMu guards usnoReachableOK. Only a *success* is recorded:
+	// see requireUSNO for why a cached failure is the dangerous direction.
+	usnoReachableMu sync.Mutex
+	usnoReachableOK bool
 )
 
-// requireUSNO skips the calling test immediately if the USNO API is
-// unreachable, checked once per process via a cheap TCP dial (mirroring
-// this project's network-test convention of a fast reachability pre-check
-// rather than paying each call site's own timeout). Call it as the first
-// line of every top-level USNO test function — t.Skip halts that
+// requireUSNO skips the calling test if the USNO API is unreachable. Call it
+// as the first line of every top-level USNO test function — t.Skip halts that
 // function immediately, so no subtest beneath it runs either.
 //
-// Without this, a full USNO outage previously cost each of this file's
-// ~30 usnoGet call sites its own usnoRequestTimeout (30s) run
-// sequentially, summing past the CI job's own 10-minute test binary
-// timeout before the last few calls ever got a chance to skip
-// gracefully themselves — killing the whole package's test run instead
-// of skipping fast.
+// The pre-check exists because a full USNO outage otherwise costs each of this
+// file's ~30 usnoGet call sites its own usnoRequestTimeout (30s) run
+// sequentially, summing past the CI job's own 10-minute binary timeout before
+// the last few ever get a chance to skip gracefully — killing the package's
+// test run instead of skipping fast.
+//
+// # Only a success is remembered
+//
+// This used to hold both answers in a sync.Once, and one unlucky probe
+// therefore disabled all eleven TestUSNO_* functions for the rest of the
+// binary — reported as SKIP, which reads as a pass in every summary that
+// exists. Measured on a developer machine while the host was answering curl in
+// 2.2s: net.DialTimeout with a 5s budget overran to 17.3s and failed, and the
+// immediately following dial connected in 140ms. aa.usno.navy.mil resolves to
+// a single address and drops or delays SYNs intermittently, so a single-shot
+// probe is a coin toss that decides the whole suite.
+//
+// USNO is one of the four references the README's headline accuracy claim
+// names, the integration job is continue-on-error, and a skipped suite is
+// invisible. Caching only the positive costs one extra probe per top-level
+// test during a genuine outage — eleven times testutil.ReachableTimeout,
+// under a minute — and removes the failure mode where a moment of packet loss
+// silently retires the reference.
+//
+// testutil.Reachable rather than a dial of our own, because it already carries
+// the IPv4 retry that was added for exactly this class of bug: a probe that
+// declares a service absent because of the resolver's opinion of its address
+// family, on a service that is there.
 func requireUSNO(t *testing.T) {
 	t.Helper()
 
-	usnoReachableOnce.Do(func() {
-		//nolint:noctx // a liveness probe, not a request that should carry a deadline
-		conn, err := net.DialTimeout("tcp", "aa.usno.navy.mil:443", 5*time.Second)
-		if err != nil {
-			return
-		}
-
-		usnoReachableOK = true
-
-		_ = conn.Close()
-	})
-
-	if !usnoReachableOK {
-		t.Skip("USNO API unreachable, skipping")
+	if usnoReachable(func() bool { return testutil.Reachable(usnoHost) }) {
+		return
 	}
+
+	t.Skipf("%s did not answer within %v", usnoHost, testutil.ReachableTimeout*time.Nanosecond)
+}
+
+// usnoReachable is requireUSNO's memo, separated from the probe so the one
+// thing that went wrong here can be tested without a network: a failure must
+// not be remembered.
+//
+// Returns true once probe has succeeded, and calls probe again every time it
+// has not. See requireUSNO for why that asymmetry is the whole fix.
+func usnoReachable(probe func() bool) bool {
+	usnoReachableMu.Lock()
+	defer usnoReachableMu.Unlock()
+
+	if usnoReachableOK {
+		return true
+	}
+
+	usnoReachableOK = probe()
+
+	return usnoReachableOK
 }
 
 // usnoResult carries a completed request's outcome across the goroutine
@@ -1934,5 +1967,64 @@ func compareSunMoonEvents(t *testing.T, body string, usnoPhenomena []usnoPhenome
 
 			break
 		}
+	}
+}
+
+// TestUSNOReachabilityDoesNotRememberAFailure pins the defect this file's
+// pre-check used to have, without needing a network.
+//
+// Both answers used to live in a sync.Once, so one unlucky probe skipped all
+// fourteen TestUSNO_* functions for the rest of the binary — reported as SKIP,
+// which reads as a pass. The host resolves to a single address and drops SYNs
+// intermittently: measured while it answered curl in 2.2s, a 5s dial overran
+// to 17.3s and failed, and the very next one connected in 140ms (#225).
+//
+// So a failure has to be retried and a success may be kept. Asserting both
+// directions, because remembering nothing would be correct but would pay a
+// probe per call forever, and remembering everything is the bug.
+func TestUSNOReachabilityDoesNotRememberAFailure(t *testing.T) {
+	usnoReachableMu.Lock()
+	saved := usnoReachableOK
+	usnoReachableOK = false
+	usnoReachableMu.Unlock()
+
+	t.Cleanup(func() {
+		usnoReachableMu.Lock()
+		usnoReachableOK = saved
+		usnoReachableMu.Unlock()
+	})
+
+	calls := 0
+	answer := false
+	probe := func() bool { calls++; return answer }
+
+	if usnoReachable(probe) {
+		t.Fatal("reported reachable while the probe was failing")
+	}
+
+	if usnoReachable(probe) {
+		t.Fatal("reported reachable while the probe was failing")
+	}
+
+	if calls != 2 {
+		t.Errorf("probe ran %d times across two failures, want 2 — a cached failure "+
+			"is what retired the whole suite on one dropped packet", calls)
+	}
+
+	// The host comes back, as it did 140 ms later.
+	answer = true
+
+	if !usnoReachable(probe) {
+		t.Fatal("a recovered host was still reported unreachable")
+	}
+
+	if calls != 3 {
+		t.Errorf("probe ran %d times, want 3", calls)
+	}
+
+	// And a success is kept, so a real outage costs one probe per top-level
+	// test rather than one per usnoGet call site.
+	if !usnoReachable(probe) || calls != 3 {
+		t.Errorf("probe ran %d times after succeeding, want it remembered at 3", calls)
 	}
 }
