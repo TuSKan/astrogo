@@ -281,15 +281,28 @@ func mapHorizonsStatus(err error) error {
 		return fmt.Errorf("jpl: horizons request: %w", err)
 	}
 
+	// Each sentinel keeps the HTTP error rather than replacing it.
+	//
+	// Returning the sentinel alone discarded the status, which broke a rule
+	// this repository states elsewhere: a network-tagged test skips on
+	// external downtime rather than failing CI, and
+	// internal/testutil.SkipOnUpstreamFailure decides that by looking for an
+	// error carrying HTTPStatus() int. *api.HTTPError has one; a bare
+	// sentinel does not, so a Horizons 503 — downtime by definition — failed
+	// tests that were written to tolerate exactly that (#244).
+	//
+	// testutil matches through the interface rather than importing this
+	// package, so wrapping is all that is needed here and nothing has to
+	// learn about Horizons in particular.
 	switch httpErr.StatusCode {
 	case http.StatusBadRequest:
-		return ErrHorizonsBadRequest
+		return fmt.Errorf("%w: %w", ErrHorizonsBadRequest, httpErr)
 	case http.StatusMethodNotAllowed:
-		return ErrHorizonsMethodNA
+		return fmt.Errorf("%w: %w", ErrHorizonsMethodNA, httpErr)
 	case http.StatusInternalServerError:
-		return ErrHorizonsServerError
+		return fmt.Errorf("%w: %w", ErrHorizonsServerError, httpErr)
 	case http.StatusServiceUnavailable:
-		return ErrHorizonsUnavailable
+		return fmt.Errorf("%w: %w", ErrHorizonsUnavailable, httpErr)
 	default:
 		return fmt.Errorf("%w: %d", ErrHorizonsUnexpected, httpErr.StatusCode)
 	}
