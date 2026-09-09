@@ -85,9 +85,10 @@ What `astrogo` is: **the only SOFA-rigorous astronomy engine that deploys like s
 One static binary, no Python runtime, no C FFI, an explicit and consent-gated I/O boundary,
 an event solver, an observation scheduler, and a spectral sky-brightness engine.
 
-What it is not, and the honest list matters more than the flattering one: it has no FK4/FK5
-or B1950 frames, no FITS writer, and no general frame graph. If you need those today,
-astropy has them and this does not — see [Known Limitations & Scope](#known-limitations--scope)
+What it is not, and the honest list matters more than the flattering one: it has no FITS
+writer, no general frame graph, and of the frames astropy carries only FK4/B1950 has
+arrived — no ITRS, HCRS, TETE, LSR or Galactocentric. If you need those today, astropy
+has them and this does not — see [Known Limitations & Scope](#known-limitations--scope)
 and the [open issues](https://github.com/TuSKan/astrogo/issues).
 
 Designed from the ground up for Go: no dynamic magic, no *hidden* global state, zero-allocation hot paths.
