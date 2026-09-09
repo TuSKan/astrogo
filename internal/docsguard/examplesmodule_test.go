@@ -4,11 +4,12 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 	"testing"
 )
 
-// examplesModule guards the three properties that make examples/ a separate
+// examplesModule guards the four properties that make examples/ a separate
 // module (#124) worth having rather than a place for code to rot.
 //
 // # Why a guard at all
@@ -16,7 +17,7 @@ import (
 // Before the split, `go build ./...` compiled the 32 example programs along
 // with everything else, so an API change that broke one failed immediately and
 // nobody had to remember anything. A module boundary ends that: `./...` stops
-// at it, and the examples are now verified only because three things stay
+// at it, and the examples are now verified only because several things stay
 // true at once. Each of them is one careless edit from being false, and none
 // of them fails loudly on its own.
 //
@@ -32,13 +33,85 @@ import (
 //  3. CI actually builds it. A perfectly correct module nothing compiles is
 //     the same as no module.
 //
+//  4. The versions the two modules share stay equal. examples/ requires only
+//     astrogo, so every other line in its require block is an indirect copy of
+//     one of the root's — a hand-maintained duplicate that drifts the moment a
+//     dependency is bumped in one file and not the other, and then refuses to
+//     build at all.
+//
 // The README's claim that every sample in it was compiled and run rests on
-// the same three facts, which is the other reason to assert them here rather
+// the same facts, which is the other reason to assert them here rather
 // than trust the workflow file to keep saying what it says today.
 var (
 	goDirectiveLine = regexp.MustCompile(`(?m)^go (\d+\.\d+(?:\.\d+)?)\s*$`)
 	localReplace    = regexp.MustCompile(`(?m)^replace\s+github\.com/TuSKan/astrogo\s+=>\s+\.\./\s*$`)
+
+	// A requirement in either of go.mod's two spellings: a tab-indented line
+	// inside a `require (…)` block, or a standalone `require path version`.
+	// Both forms appear in this repository — examples/go.mod states its one
+	// direct requirement on a single line — and matching only the block form
+	// would skip a requirement silently rather than report it, which is the
+	// failure mode a guard must not have.
+	//
+	// Comment-only lines and the block delimiters do not match, which is what
+	// keeps the gocloud pin's explanatory comment from being read as a
+	// requirement.
+	requireLine = regexp.MustCompile(`(?m)^(?:\t|require +)([^\s/][^\s]*) +(v[^\s]+)(?: +//.*)?$`)
 )
+
+// requires maps module path to version for every require line in a go.mod.
+func requires(mod []byte) map[string]string {
+	out := make(map[string]string)
+
+	for _, m := range requireLine.FindAllSubmatch(mod, -1) {
+		out[string(m[1])] = string(m[2])
+	}
+
+	return out
+}
+
+// TestRequiresReadsBothSpellings pins the parser the drift check is built on.
+// Its dangerous failure is not a wrong version but a missed line: a
+// requirement the regexp skips is a requirement the drift check reports as
+// absent rather than as unequal, and the guard passes while the two modules
+// disagree.
+func TestRequiresReadsBothSpellings(t *testing.T) {
+	t.Parallel()
+
+	const mod = "module example.com/m\n" +
+		"\n" +
+		"go 1.27\n" +
+		"\n" +
+		"require standalone.example/a v1.2.3\n" +
+		"\n" +
+		"require (\n" +
+		"\t// A comment inside the block, naming v9.9.9, is not a requirement.\n" +
+		"\tblocked.example/b v0.4.0\n" +
+		"\tindirect.example/c v1.0.0 // indirect\n" +
+		")\n" +
+		"\n" +
+		"replace replaced.example/d => ../d\n"
+
+	want := map[string]string{
+		"standalone.example/a": "v1.2.3",
+		"blocked.example/b":    "v0.4.0",
+		"indirect.example/c":   "v1.0.0",
+	}
+
+	got := requires([]byte(mod))
+
+	for path, ver := range want {
+		if got[path] != ver {
+			t.Errorf("requires()[%q] = %q, want %q", path, got[path], ver)
+		}
+	}
+
+	for path := range got {
+		if _, expected := want[path]; !expected {
+			t.Errorf("requires() reported %q = %q, which is not a requirement", path, got[path])
+		}
+	}
+}
 
 func TestExamplesModuleIsVerifiedAgainstTheWorkingTree(t *testing.T) {
 	t.Parallel()
@@ -84,6 +157,39 @@ func TestExamplesModuleIsVerifiedAgainstTheWorkingTree(t *testing.T) {
 			t.Errorf("examples/go.mod declares go %s, go.mod declares go %s.\n"+
 				"  Two modules in one repository on different toolchain minimums build "+
 				"differently depending on who ran them.", got[1], want[1])
+		}
+	})
+
+	t.Run("shared dependency versions have not drifted", func(t *testing.T) {
+		t.Parallel()
+
+		// examples/ requires astrogo and nothing else, so with the `replace`
+		// above its build list is the root's build list. Every other entry in
+		// its require block is therefore a copy, and a copy can go stale: a
+		// dependency bump in the root leaves examples/go.mod naming the old
+		// version, and `go build ./...` inside examples/ then refuses with
+		// "updates to go.mod needed" rather than building against the wrong
+		// one. CI's own `go mod tidy` check catches that, but only after a
+		// push; this catches it in `go test ./...`.
+		//
+		// The fix is always the same and is the missing half of any dependency
+		// bump here: `go mod tidy` in the root, then `go mod tidy` in
+		// examples/.
+		root := requires(rootMod)
+
+		var stale []string
+
+		for path, exVer := range requires(exMod) {
+			if rootVer, shared := root[path]; shared && rootVer != exVer {
+				stale = append(stale, path+": examples has "+exVer+", go.mod has "+rootVer)
+			}
+		}
+
+		sort.Strings(stale)
+
+		for _, s := range stale {
+			t.Errorf("examples/go.mod is behind the root module — %s.\n"+
+				"  Run `go mod tidy` in examples/ after every dependency bump.", s)
 		}
 	})
 
