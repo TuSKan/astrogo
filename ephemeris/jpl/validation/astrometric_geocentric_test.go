@@ -58,9 +58,13 @@ import (
 func TestAstrometricAgreesWithHorizonsGeocentric(t *testing.T) {
 	testutil.RequireReachable(t, "ssd.jpl.nasa.gov:443")
 
-	provider, err := jpl.NewProvider(context.Background(), core.Planets, "de440")
+	// DE441, the ephemeris Horizons itself reports for these queries, rather
+	// than the de440 its neighbours in this package use. Part 2 is the half
+	// covering the modern era; part 1 is the ancient one and is not needed
+	// for 2026.
+	provider, err := jpl.NewProvider(context.Background(), core.Planets, "de441_part-2")
 	if err != nil {
-		t.Fatalf("de440 provider: %v", err)
+		t.Fatalf("de441_part-2 provider: %v", err)
 	}
 
 	defer func() { _ = provider.Close() }()
@@ -70,17 +74,17 @@ func TestAstrometricAgreesWithHorizonsGeocentric(t *testing.T) {
 	// is tens of minutes rather than seconds.
 	//
 	// Jupiter and Saturn are asked for as '5' and '6' — the system
-	// barycentres — not '599' and '699', the body centres. That is what
-	// de440 contains for the giant planets: their satellite systems are in
-	// separate kernels, so a planetary-kernel provider necessarily returns
-	// the barycentre.
+	// barycentres — not '599' and '699', the body centres. That is what a DE
+	// planetary kernel contains for the giant planets: their satellite
+	// systems live in separate kernels, so a planetary-kernel provider
+	// necessarily returns the barycentre.
 	//
-	// It is not a detail. Asking Horizons for '599' against the same de440
-	// provider gives Jupiter p50 0.0324" / max 0.0617" and Saturn p50 0.0288"
-	// / max 0.0448", while Sun, Venus and Mars sit at exactly zero — the
-	// offset between a giant planet and the barycentre it shares with its
-	// moons, about 100 km at Jupiter and 200 km at Saturn. Comparing against
-	// the wrong centre reads as an astrogo error and is not one.
+	// It is not a detail. Asking Horizons for the body centres instead gives
+	// Uranus p50 0.0497", Jupiter 0.0324", Saturn 0.0288" and Neptune
+	// 0.0093", while Sun, Venus and Mars sit at exactly zero — the offset
+	// between a giant planet and the barycentre it shares with its moons,
+	// about 100 km at Jupiter and 200 km at Saturn. Comparing against the
+	// wrong centre reads as an astrogo error and is not one (#253).
 	bodies := []struct {
 		command string
 		name    string
@@ -94,19 +98,29 @@ func TestAstrometricAgreesWithHorizonsGeocentric(t *testing.T) {
 	}
 
 	// The reference records what it shares with astrogo as well as what it
-	// is. Horizons reports {source: DE441} and astrogo reads DE440 — separate
-	// files, one JPL solution family — so this cannot be evidence that the DE
-	// ephemeris is right. What it does establish is that astrogo's light-time
-	// iteration, frame handling and interpolation reproduce JPL's own
-	// pipeline, and SharedAncestor is what makes a generated report say so
-	// instead of leaving a reader to already know.
+	// is, and here it shares everything: Horizons reports {source: DE441} and
+	// this provider reads DE441. That is deliberate. The ephemeris is not
+	// what is being tested — astrogo's light-time iteration, frame handling
+	// and interpolation are — so holding it identical on both sides removes
+	// it as a variable instead of leaving a small unknown in the residual.
+	//
+	// It also makes the row's honesty non-negotiable: with the same
+	// ephemeris on both sides this is *no* evidence whatever about DE, and
+	// SharedAncestor is the field that makes a generated report say so rather
+	// than leaving a reader to infer it from the version string.
+	//
+	// Measured, the choice costs nothing either way: the same comparison
+	// against a de440 provider gives p50 1.492e-06 and max 3.137e-06
+	// arcseconds against DE441's 1.496e-06 and 3.147e-06 — the two agree to
+	// about a hundredth of a microarcsecond over 2026, which is what fitting
+	// them together over the modern era is supposed to achieve.
 	reference := metrology.Reference{
 		Kind:           metrology.KindHorizons,
 		Name:           "JPL Horizons",
 		Version:        "quantity 1 (astrometric), DE441",
 		Source:         "https://ssd.jpl.nasa.gov/api/horizons.api",
 		Dataset:        "CENTER='500@399', ANG_FORMAT='DEG', EXTRA_PREC='YES'",
-		SharedAncestor: "JPL DE — astrogo reads DE440, Horizons reports DE441",
+		SharedAncestor: "JPL DE441 — both sides read the same ephemeris, by design",
 	}
 
 	suite := metrology.NewSuite("ephemeris.astrometric.geocentric", reference,
@@ -115,8 +129,8 @@ func TestAstrometricAgreesWithHorizonsGeocentric(t *testing.T) {
 				"milliarcseconds does not fail this, and fifty times below the ~0.5 arcsec "+
 				"topocentric bias the comparison exists to locate — which is the only "+
 				"property that makes it evidence",
-			"measured: 5 bodies x 13 epochs across 2026, every separation 0.0000 arcsec at "+
-				"the ~3.6 microarcsecond precision Horizons prints"))
+			"measured: 5 bodies x 13 epochs across 2026, max 3.1e-06 arcsec, which is the "+
+				"~3.6 microarcsecond precision Horizons prints with EXTRA_PREC"))
 
 	var (
 		separations []float64
