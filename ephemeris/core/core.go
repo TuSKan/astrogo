@@ -265,6 +265,13 @@ const smallBodySpan = 1000000
 //
 // Returns 0 for an n outside NAIF's small-body block, which is not a valid
 // body identifier and will fail to resolve rather than aliasing another body.
+//
+// That zero means "n is not a small-body number", not "body 0", and the two
+// are only interchangeable when the result is about to be resolved. Check it
+// before comparing: a comparison against it answers no for every body, so it
+// turns "the question could not be asked" into "the answer is different from
+// what you wanted" — which is how a Horizons comet SPK-ID, well outside this
+// block, was reported as the wrong object having loaded correctly.
 func SmallBodyID(n int) ID {
 	if n <= 0 || n >= smallBodySpan {
 		return 0
