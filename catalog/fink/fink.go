@@ -240,8 +240,7 @@ func (p *Provider) querySingle(ctx context.Context, number int64, name string) (
 
 	body, err := p.client.PostJSON(ctx, remote.FINK, "", payload)
 	if err != nil {
-		var httpErr *api.HTTPError
-		if errors.As(err, &httpErr) {
+		if httpErr, ok := errors.AsType[*api.HTTPError](err); ok {
 			return nil, fmt.Errorf("%w: %d: %s", ErrHTTPStatus, httpErr.StatusCode, httpErr.Body[:min(200, len(httpErr.Body))])
 		}
 
@@ -499,8 +498,7 @@ func (p *Provider) downloadSSOFT(ctx context.Context) (_ []ssoRecord, err error)
 
 	body, err := p.client.PostJSON(ctx, remote.FINK, "", payload)
 	if err != nil {
-		var httpErr *api.HTTPError
-		if errors.As(err, &httpErr) {
+		if httpErr, ok := errors.AsType[*api.HTTPError](err); ok {
 			return nil, fmt.Errorf("%w: %d: %s", ErrHTTPStatus, httpErr.StatusCode, httpErr.Body[:min(200, len(httpErr.Body))])
 		}
 

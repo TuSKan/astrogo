@@ -88,7 +88,7 @@ func ReadImage(h *Header, r io.Reader) (*ImageHDU, error) {
 	}
 
 	hdu := &ImageHDU{
-		basicHDU: basicHDU{header: h, hType: HDUTypeImage},
+		header: h, hType: HDUTypeImage,
 		Bitpix:   bitpix,
 		Axes:     axes,
 		BScale:   bscale,

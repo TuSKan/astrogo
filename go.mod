@@ -1,14 +1,17 @@
 module github.com/TuSKan/astrogo
 
-go 1.25.8
+go 1.27
 
 require (
 	github.com/TuSKan/gocloud-ext/blob/httpblob v0.1.1
+	github.com/apache/arrow-go/v18 v18.6.0
 	github.com/hebl/gofa v1.19.1
 	github.com/joshuaferrara/go-satellite v0.0.0-20220611180459-512638c64e5b
 	github.com/klauspost/pgzip v1.2.6
 	github.com/scigolib/hdf5 v0.14.0
 	gocloud.dev v0.46.1-0.20260810195832-b5401c07b5f1
+	golang.org/x/exp v0.0.0-20260410095643-746e56fc9e2f
+	golang.org/x/sync v0.22.0
 	resty.dev/v3 v3.0.0-rc.3
 )
 
@@ -38,6 +41,8 @@ require (
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/go-logr/logr v1.4.4 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
+	github.com/goccy/go-json v0.10.6 // indirect
+	github.com/google/flatbuffers v25.12.19+incompatible // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/google/wire v0.7.0 // indirect
 	github.com/googleapis/gax-go/v2 v2.23.0 // indirect
@@ -53,6 +58,7 @@ require (
 	go.opentelemetry.io/otel/sdk/metric v1.44.0 // indirect
 	go.opentelemetry.io/otel/trace v1.44.0 // indirect
 	golang.org/x/net v0.57.0 // indirect
+	golang.org/x/sys v0.47.0 // indirect
 	golang.org/x/text v0.40.0 // indirect
 	golang.org/x/xerrors v0.0.0-20240903120638-7835f813f4da // indirect
 	google.golang.org/api v0.290.0 // indirect
@@ -60,13 +66,4 @@ require (
 	google.golang.org/grpc v1.82.1 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
 	gopkg.in/yaml.v2 v2.2.4 // indirect
-)
-
-require (
-	github.com/apache/arrow-go/v18 v18.6.0
-	github.com/goccy/go-json v0.10.6 // indirect
-	github.com/google/flatbuffers v25.12.19+incompatible // indirect
-	golang.org/x/exp v0.0.0-20260410095643-746e56fc9e2f
-	golang.org/x/sync v0.22.0
-	golang.org/x/sys v0.47.0 // indirect
 )
