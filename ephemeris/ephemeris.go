@@ -636,3 +636,106 @@ func (s *sofaProvider) State(id ID, t time.Time) (State, error) {
 }
 
 func (s *sofaProvider) Close() error { return nil }
+
+// AstrometricState returns the astrometric state of a target: the target
+// retarded by light time, with the observer left where it is.
+//
+// # Why this is a separate function and not ApparentState
+//
+// The two differ by exactly the annual aberration, and which one a consumer
+// wants is decided by whether that consumer applies aberration itself:
+//
+//	astrometric = target(t - tau) - earth(t)
+//	apparent    = target(t - tau) - earth(t - tau)
+//
+// [ApparentState] returns the second, because a Provider's geocentric state
+// at the retarded epoch moves the observer back along with the target — see
+// its doc comment for the derivation. That is the right input for
+// [coord.Context.GeocentricToObserved], which applies no aberration of its
+// own. It is the wrong input for [coord.Context.AstrometricToObserved] and
+// [coord.Context.ICRSToAltAz], which run the whole apparent-place chain
+// themselves and would count the aberration twice.
+//
+// It is also the quantity every reference publishes as "astrometric": JPL
+// Horizons' quantity 1, and the column an almanac compares against. Until
+// this existed astrogo could not be measured against that column at all —
+// only against the observed alt/az at the far end of the pipeline, which
+// folds in Earth orientation and cannot say which stage a residual came from.
+//
+// # How the Earth is put back
+//
+// The retarded state already has the Earth at the wrong epoch, so the
+// correction is the Earth's own barycentric displacement over the light time,
+// from SOFA's Epv00. That is v_earth * tau to first order — about 20.5
+// arcseconds of direction at one astronomical unit, the constant of
+// aberration — and it is applied exactly rather than to first order, since
+// the two positions are both available.
+//
+// The light time is iterated on the *astrometric* range rather than the
+// geocentric one, because that is the distance the light actually travelled.
+// The difference is second order and under a microarcsecond, but it costs one
+// subtraction to be right.
+func AstrometricState(p Provider, target ID, obsTime time.Time) (State, error) {
+	st, err := p.State(target, obsTime)
+	if err != nil {
+		return State{}, fmt.Errorf("ephemeris: astrometric state: %w", err)
+	}
+
+	earthNow, err := earthBarycentric(obsTime)
+	if err != nil {
+		return State{}, err
+	}
+
+	tauDays := st.Pos.Norm() / lightAUPerDay
+
+	var pos vector.Vec3
+
+	for range lightTimeMaxIter {
+		retardedTime := obsTime.AddDays(-tauDays)
+
+		st, err = p.State(target, retardedTime)
+		if err != nil {
+			return State{}, fmt.Errorf("ephemeris: astrometric state retarded: %w", err)
+		}
+
+		earthThen, err := earthBarycentric(retardedTime)
+		if err != nil {
+			return State{}, err
+		}
+
+		// target(t-tau) - earth(t), written as the retarded geocentric vector
+		// minus the Earth's own travel over the light time.
+		pos = st.Pos.Sub(earthNow.Sub(earthThen))
+
+		next := pos.Norm() / lightAUPerDay
+		settled := math.Abs(next-tauDays) < lightTimeTolDays
+		tauDays = next
+
+		if settled {
+			break
+		}
+	}
+
+	st.Pos = pos
+
+	return st, nil
+}
+
+// earthBarycentric returns the Earth's barycentric position in AU at t, from
+// SOFA's Epv00.
+//
+// Epv00 is an analytical model rather than the JPL integration the target may
+// have come from, which is fine here and would not be if this were the answer
+// rather than a correction: it is accurate to about 100 m over 1900-2100, and
+// only the *difference* over a light time is used — at most a few hundred
+// seconds of Earth's travel, where the model's own error very largely cancels.
+func earthBarycentric(t time.Time) (vector.Vec3, error) {
+	d1, d2 := t.TDB().JDParts()
+
+	_, pvb, status := gofaext.Epv00(d1, d2)
+	if status < 0 {
+		return vector.Vec3{}, ErrSofaEpv00
+	}
+
+	return vector.V3(pvb[0][0], pvb[0][1], pvb[0][2]), nil
+}
