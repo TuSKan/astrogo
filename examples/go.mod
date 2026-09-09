@@ -54,7 +54,7 @@ require (
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260724162435-b2f20204f0df // indirect
 	google.golang.org/grpc v1.82.1 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
-	resty.dev/v3 v3.0.0-rc.3 // indirect
+	resty.dev/v3 v3.0.0-rc.4 // indirect
 )
 
 replace github.com/TuSKan/astrogo => ../

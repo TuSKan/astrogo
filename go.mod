@@ -9,10 +9,14 @@ require (
 	github.com/joshuaferrara/go-satellite v0.0.0-20220611180459-512638c64e5b
 	github.com/klauspost/pgzip v1.2.6
 	github.com/scigolib/hdf5 v0.14.0
+	// Pinned past v0.46.0 because gocloud-ext's httpblob driver implements
+	// blob/driver.DeleteOptions, which was added after that tag. Forcing the
+	// tag fails to build: "undefined: driver.DeleteOptions". It can move to a
+	// release as soon as gocloud.dev cuts one containing that type (#120).
 	gocloud.dev v0.46.1-0.20260810195832-b5401c07b5f1
 	golang.org/x/exp v0.0.0-20260410095643-746e56fc9e2f
 	golang.org/x/sync v0.22.0
-	resty.dev/v3 v3.0.0-rc.3
+	resty.dev/v3 v3.0.0-rc.4
 )
 
 require (
