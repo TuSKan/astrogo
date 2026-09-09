@@ -143,7 +143,7 @@ func TestGeocentricToObservedAppliesDiurnalAberration(t *testing.T) {
 
 			got := ctx.GeocentricToObserved(far)
 
-			if sep := altAzOffsetArcsec(got, sofa); sep > worstAgainstSOFA {
+			if sep := horizonSeparationArcsec(got, sofa); sep > worstAgainstSOFA {
 				worstAgainstSOFA = sep
 			}
 
@@ -158,7 +158,7 @@ func TestGeocentricToObservedAppliesDiurnalAberration(t *testing.T) {
 			// The pre-fix answer: the same rotation with no aberration. The
 			// difference between the two is the term this test exists for.
 			before := rotateOnly(t, ctx, far)
-			shift := altAzOffsetArcsec(got, before)
+			shift := horizonSeparationArcsec(got, before)
 
 			if shift > worstShift {
 				worstShift = shift
@@ -168,10 +168,10 @@ func TestGeocentricToObservedAppliesDiurnalAberration(t *testing.T) {
 			// is what makes this a check on the physics: a maximum over a
 			// sparse sweep never quite reaches the constant and would have to
 			// be compared loosely, while sin(theta) is exact at every point.
-			// coord.Separation, not altAzOffsetArcsec: theta runs to 180
-			// degrees and that helper is a small-angle formula. It reads a
-			// (longitude, latitude) pair through ICRS's constructor, and the
-			// spherical geometry underneath is frame-agnostic.
+			// coord.Separation directly rather than through
+			// horizonSeparationArcsec, only to skip the round trip through
+			// arcseconds: theta runs to 180 degrees, where that figure is a
+			// large and unhelpful number.
 			theta := coord.Separation(
 				coord.NewICRS(before.Az(), before.Alt()),
 				coord.NewICRS(east.Az(), east.Alt()),
@@ -192,33 +192,6 @@ func TestGeocentricToObservedAppliesDiurnalAberration(t *testing.T) {
 		t.Logf("%-18s lat %+7.3f  |v|/c = %.4f arcsec, largest shift over the sweep %.4f, "+
 			"vs SOFA %.2g", s.name, s.lat, diurabArcsec, worstShift, worstAgainstSOFA)
 	}
-}
-
-// altAzOffsetArcsec is the angular offset between two horizon directions, in
-// arcseconds, formed from the component differences rather than from an
-// inverse cosine.
-//
-// The choice matters at both ends of this test. For two directions a
-// microarcsecond apart, acos of the dot product is 1 − eps²/2, and float64
-// stops resolving eps somewhere around a milliarcsecond — so the neighbouring
-// altAzSeparationArcsec would report clean agreement for a defect a thousand
-// times the bound asserted here. Projecting the azimuth difference by
-// cos(elevation) is what makes it an angle on the sky rather than a coordinate
-// difference, which near the zenith is most of the number.
-func altAzOffsetArcsec(a, b coord.AltAz) float64 {
-	dAz := a.Az().Degrees() - b.Az().Degrees()
-	for dAz > 180 {
-		dAz -= 360
-	}
-
-	for dAz <= -180 {
-		dAz += 360
-	}
-
-	cross := dAz * math.Cos(b.Alt().Radians())
-	along := a.Alt().Degrees() - b.Alt().Degrees()
-
-	return math.Hypot(cross, along) * 3600
 }
 
 // icrsFromCIRS rotates a CIRS direction into ICRS: p_ICRS = rc2iᵀ · p_CIRS.
