@@ -462,7 +462,8 @@ func ApparentState(p Provider, target ID, obsTime time.Time) (State, error) {
 	}
 
 	tauDays := st.Pos.Norm() / lightAUPerDay
-	for range 5 {
+
+	for range lightTimeMaxIter {
 		retardedTime := obsTime.AddDays(-tauDays)
 
 		st, err = p.State(target, retardedTime)
@@ -470,11 +471,54 @@ func ApparentState(p Provider, target ID, obsTime time.Time) (State, error) {
 			return State{}, fmt.Errorf("ephemeris: apparent state retarded: %w", err)
 		}
 
-		tauDays = st.Pos.Norm() / lightAUPerDay
+		next := st.Pos.Norm() / lightAUPerDay
+		settled := math.Abs(next-tauDays) < lightTimeTolDays
+		tauDays = next
+
+		if settled {
+			break
+		}
 	}
 
 	return st, nil
 }
+
+// Light-time iteration limits.
+//
+// This used to run a flat five iterations. It converges geometrically with
+// ratio v/c ~ 1e-4, so each pass buys four decimal digits and the fifth was
+// refining a number that had stopped changing in double precision two passes
+// earlier. Measured over 2026 — how far each iteration moves the answer, at
+// worst, for the bodies with the fastest relative motion:
+//
+//	body      pass 1     pass 2      pass 3        pass 4+
+//	Moon      0.759"     0.00000"    0"            0"
+//	Sun      20.837"     0.00003"    0"            0"
+//	Venus    44.762"     0.00121"    0.0000001"    0"
+//	Mars     38.733"     0.00087"    0.0000000"    0"
+//	Jupiter  29.008"     0.00208"    0.0000002"    0"
+//	Neptune  24.346"     0.00214"    0.0000002"    0"
+//
+// That would justify a flat three, but a convergence test is both cheaper and
+// self-explaining: the Moon settles after one pass and says so, where a fixed
+// count cannot. The ceiling stays at five so a pathological provider still
+// terminates.
+//
+// It matters because plan now takes this path for every ephemeris-backed
+// target at every time step (see plan/apparent.go), where it used to call the
+// provider once.
+const (
+	// lightTimeTolDays is ~0.9 microseconds. At 30 km/s — faster than
+	// anything in the solar system moves relative to Earth — that is 0.03 m
+	// of travel, which subtends under a microarcsecond at any distance a
+	// solar-system body is ever at.
+	lightTimeTolDays = 1e-11
+
+	// lightTimeMaxIter caps the loop. Nothing measured needs more than three
+	// passes; this is the guard against a provider whose state is not a
+	// continuous function of time.
+	lightTimeMaxIter = 5
+)
 
 // ToICRS converts a geocentric Cartesian vector (in AU) to spherical ICRS coordinates.
 func ToICRS(pos vector.Vec3) (coord.ICRS, error) {

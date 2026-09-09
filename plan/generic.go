@@ -35,26 +35,23 @@ func (g *GenericBody) Provider() eph.Provider { return g.provider }
 // EphID returns the NAIF ephemeris identifier.
 func (g *GenericBody) EphID() eph.ID { return g.id }
 
-// Position returns the ICRS coordinates at the given time.
+// Position returns the apparent ICRS coordinates at the given time — see
+// [apparentVec].
 func (g *GenericBody) Position(t time.Time) (coord.ICRS, error) {
-	pos, err := eph.Position(g.provider, g.id, t)
+	icrs, err := apparentICRS(g.provider, g.id, t)
 	if err != nil {
-		return coord.ICRS{}, fmt.Errorf("generic body: ephemeris error for %s: %w", g.name, err)
-	}
-
-	icrs, err := eph.ToICRS(pos)
-	if err != nil {
-		return coord.ICRS{}, fmt.Errorf("generic body: coordinate conversion error for %s: %w", g.name, err)
+		return coord.ICRS{}, fmt.Errorf("generic body %s: %w", g.name, err)
 	}
 
 	return icrs, nil
 }
 
-// GeocentricVec returns the geocentric position vector.
+// GeocentricVec returns the apparent geocentric position vector — see
+// [apparentVec].
 func (g *GenericBody) GeocentricVec(t time.Time) (vector.Vec3, error) {
-	v, err := eph.Position(g.provider, g.id, t)
+	v, err := apparentVec(g.provider, g.id, t)
 	if err != nil {
-		return vector.Vec3{}, fmt.Errorf("generic body: geocentric: %w", err)
+		return vector.Vec3{}, fmt.Errorf("generic body %s: %w", g.name, err)
 	}
 
 	return v, nil

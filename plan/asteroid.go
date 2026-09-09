@@ -135,26 +135,23 @@ func (a *Asteroid) PhysicalRadius() (metres float64, ok bool) {
 	return 0, false
 }
 
-// Position returns the ICRS sky position at time t.
+// Position returns the apparent ICRS sky position at time t — see
+// [apparentVec].
 func (a *Asteroid) Position(t time.Time) (coord.ICRS, error) {
-	pos, err := eph.Position(a.provider, a.id, t)
+	icrs, err := apparentICRS(a.provider, a.id, t)
 	if err != nil {
-		return coord.ICRS{}, fmt.Errorf("asteroid: ephemeris error for %s: %w", a.name, err)
-	}
-
-	icrs, err := eph.ToICRS(pos)
-	if err != nil {
-		return coord.ICRS{}, fmt.Errorf("asteroid: coordinate conversion error for %s: %w", a.name, err)
+		return coord.ICRS{}, fmt.Errorf("asteroid %s: %w", a.name, err)
 	}
 
 	return icrs, nil
 }
 
-// GeocentricVec returns the geocentric position vector at time t.
+// GeocentricVec returns the apparent geocentric position vector at time t —
+// see [apparentVec].
 func (a *Asteroid) GeocentricVec(t time.Time) (vector.Vec3, error) {
-	v, err := eph.Position(a.provider, a.id, t)
+	v, err := apparentVec(a.provider, a.id, t)
 	if err != nil {
-		return vector.Vec3{}, fmt.Errorf("asteroid: geocentric: %w", err)
+		return vector.Vec3{}, fmt.Errorf("asteroid %s: %w", a.name, err)
 	}
 
 	return v, nil
