@@ -18,6 +18,7 @@ import (
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/ephemeris/core"
 	"github.com/TuSKan/astrogo/ephemeris/jpl"
+	"github.com/TuSKan/astrogo/internal/metrology"
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/time"
 )
@@ -92,6 +93,31 @@ func TestAstrometricAgreesWithHorizonsGeocentric(t *testing.T) {
 		{"6", "Saturn", core.Saturn},
 	}
 
+	// The reference records what it shares with astrogo as well as what it
+	// is. Horizons reports {source: DE441} and astrogo reads DE440 — separate
+	// files, one JPL solution family — so this cannot be evidence that the DE
+	// ephemeris is right. What it does establish is that astrogo's light-time
+	// iteration, frame handling and interpolation reproduce JPL's own
+	// pipeline, and SharedAncestor is what makes a generated report say so
+	// instead of leaving a reader to already know.
+	reference := metrology.Reference{
+		Kind:           metrology.KindHorizons,
+		Name:           "JPL Horizons",
+		Version:        "quantity 1 (astrometric), DE441",
+		Source:         "https://ssd.jpl.nasa.gov/api/horizons.api",
+		Dataset:        "CENTER='500@399', ANG_FORMAT='DEG', EXTRA_PREC='YES'",
+		SharedAncestor: "JPL DE — astrogo reads DE440, Horizons reports DE441",
+	}
+
+	suite := metrology.NewSuite("ephemeris.astrometric.geocentric", reference,
+		metrology.MustContract(0.01, "arcsec",
+			"far above the measured zero so a DE revision moving the residual by "+
+				"milliarcseconds does not fail this, and fifty times below the ~0.5 arcsec "+
+				"topocentric bias the comparison exists to locate — which is the only "+
+				"property that makes it evidence",
+			"measured: 5 bodies x 13 epochs across 2026, every separation 0.0000 arcsec at "+
+				"the ~3.6 microarcsecond precision Horizons prints"))
+
 	var (
 		separations []float64
 		dRACosDec   []float64
@@ -134,6 +160,12 @@ func TestAstrometricAgreesWithHorizonsGeocentric(t *testing.T) {
 			dD := gotDec - row.decDeg
 
 			sep := math.Hypot(dRA, dD) * 3600
+
+			suite.Add(metrology.Sample{
+				Error:   sep,
+				Label:   body.name,
+				Context: fmt.Sprintf("JD %.5f UT, geocentric astrometric", row.jdUT),
+			})
 
 			dRACosDec = append(dRACosDec, dRA*3600)
 			dDec = append(dDec, dD*3600)
@@ -184,20 +216,11 @@ func TestAstrometricAgreesWithHorizonsGeocentric(t *testing.T) {
 	t.Logf("separation      p50 %8.4f\"  p95 %8.4f\"  max %8.4f\"  (n=%d)",
 		p50, p95, worst, len(separations))
 
-	// Measured: every body, every epoch, 0.0000" to the precision Horizons
-	// prints — nine decimal degrees, about 3.6 microarcseconds.
-	//
-	// The bound is far above that, because it is guarding a conclusion rather
-	// than pinning a number: a DE kernel revision or a Horizons-side change
-	// may move the residual by milliarcseconds and should not fail this. What
-	// must not happen is a residual anywhere near the ~0.5 arcsecond effect
-	// the comparison was built to locate, and 0.01" is fifty times below it.
-	const maxSeparationArcsec = 0.01
-
-	if worst > maxSeparationArcsec {
-		t.Errorf("worst geocentric astrometric separation %.4f arcsec, want under %.3f",
-			worst, maxSeparationArcsec)
-	}
+	// The contract is checked and the row emitted by the framework, so this
+	// appears in the generated accuracy table with its reference, its shared
+	// ancestry and its measured distribution rather than as a claim typed
+	// into a document by hand.
+	suite.Report(t)
 
 	// The signed means are the point of the whole exercise.
 	//
