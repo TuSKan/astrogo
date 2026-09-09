@@ -39,7 +39,7 @@ func requireJPL(t *testing.T) {
 func TestVisibleTonight_MinorBodiesRespectMagLimit(t *testing.T) {
 	requireJPL(t)
 
-	t.Cleanup(remote.Reset)
+	t.Cleanup(remote.Capture(remote.NAIFSPK, remote.NAIFLSK, remote.JPLHorizonsSPK).Restore)
 	remote.SetDataDir(testutil.FileURL(t, t.TempDir()))
 	remote.EnableDownloads(0, remote.NAIFSPK)
 	remote.EnableDownloads(0, remote.NAIFLSK)
@@ -112,7 +112,7 @@ func TestVisibleTonight_MinorBodiesRespectMagLimit(t *testing.T) {
 func TestVisibleTonight_PlanetaryMoons(t *testing.T) {
 	requireJPL(t)
 
-	t.Cleanup(remote.Reset)
+	t.Cleanup(remote.Capture(remote.NAIFSPK, remote.NAIFLSK).Restore)
 	remote.SetDataDir(testutil.FileURL(t, t.TempDir()))
 	remote.EnableDownloads(110<<20, remote.NAIFSPK)
 	remote.EnableDownloads(0, remote.NAIFLSK)

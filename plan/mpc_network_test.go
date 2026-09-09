@@ -21,7 +21,7 @@ func requireMPCList(t *testing.T) []MPCObservatory {
 
 	testutil.RequireReachable(t, "www.minorplanetcenter.net:443")
 
-	t.Cleanup(remote.Reset)
+	t.Cleanup(remote.Capture(remote.MPCObsCodes).Restore)
 	remote.EnableDownloads(0, remote.MPCObsCodes)
 
 	list, err := MPCObservatories(context.Background())
@@ -210,8 +210,16 @@ func TestNewMPCSiteRejectsCodesWithNoGroundPosition(t *testing.T) {
 func TestMPCObservatoriesNeedsDownloadConsent(t *testing.T) {
 	testutil.RequireReachable(t, "www.minorplanetcenter.net:443")
 
-	t.Cleanup(remote.Reset)
-	remote.Reset() // no EnableDownloads
+	// Scoped to this one endpoint rather than remote.Reset, which restores
+	// the process default — no consent — and so revokes what
+	// integration_main_test.go's TestMain granted for the whole binary.
+	// Reset also leaves the data directory alone, so the empty bucket below
+	// would stay pointed there afterwards: a later test would find neither
+	// consent nor cache. That combination failed three unrelated eclipse and
+	// moon-phase tests (#239), which is the second time the same three have
+	// been broken this way — see visible_tonight_internal_test.go's note.
+	t.Cleanup(remote.Capture(remote.MPCObsCodes).Restore)
+	remote.DisableDownloads(remote.MPCObsCodes)
 
 	remote.SetDataDir("file:///" + filepath.ToSlash(t.TempDir()) + "?create_dir=true")
 
