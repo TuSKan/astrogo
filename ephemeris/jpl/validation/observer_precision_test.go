@@ -132,13 +132,41 @@ func (b observerPrecisionBody) command() string { return strconv.Itoa(b.naifID) 
 // with both signed means at zero, and that figure is the reference's own
 // printing precision rather than astrogo's error (#254).
 //
-// The apparent-place chain is excluded. USNO's celnav publishes geocentric
+// Apparent declination is excluded. USNO's celnav publishes geocentric
 // apparent declination and Greenwich Hour Angle, and declination is measured
 // from the equator so Earth rotation cannot touch it. Over seven epochs in
-// 2026 for Sun, Jupiter and Saturn, declination has a signed mean of
-// -0.027" while GHA has +0.662" — so precession-nutation, aberration and
-// deflection are clean and the residual enters at Earth rotation. 0.662" is
-// 44 milliseconds of UT1.
+// 2026 for Sun, Jupiter and Saturn, declination has a signed mean of -0.027"
+// while GHA has +0.662" — so precession-nutation, aberration and deflection
+// are clean in declination at least.
+//
+// Earth rotation is excluded too, which took a second measurement and
+// overturned the first reading of the one above. A +0.662" hour-angle
+// residual looks like 44 milliseconds of UT1, and sidereal time is directly
+// checkable: Horizons publishes local apparent sidereal time to 0.0001 s.
+// Compared like for like — at longitude AND latitude zero, where the
+// polar-motion shift of the local meridian vanishes and local apparent
+// sidereal time is the Greenwich value astrogo's Time.GAST returns —
+// astrogo agrees over six epochs across 2026 to a signed mean of +0.050"
+// and a worst case of 0.086". That is 3.3 milliseconds of UT1, ten times
+// smaller than the residual being explained.
+//
+// Getting that comparison wrong first is worth recording, because it is the
+// third convention mismatch this investigation has produced. Run at latitude
+// 51.5 instead, astrogo appears to lag Horizons by 0.44" — and that offset
+// tracks yp*tan(latitude) to within 0.006" across four of six epochs, which
+// is the local meridian moving with the pole. Greenwich apparent sidereal
+// time is a global quantity and does not carry it; Horizons' *local* value
+// does. The other two mismatches were the giant planets being barycentres
+// rather than planets (#253) and USNO tabulating Venus and Mars at the centre
+// of the illuminated disc rather than the geometric centre.
+//
+// So the +0.662" is not Earth rotation and not declination. What remains is
+// apparent right ascension — an offset in RA with declination clean is the
+// signature of an origin problem, the equinox-versus-CIO distinction and the
+// equation of the origins that bridges them — or an artefact of how the USNO
+// comparison itself computes GHA. That comparison derives right ascension as
+// ri - eo from SOFA's Atci13 in the test rather than through an astrogo API,
+// so it is not yet established which side the 0.662" belongs to (#256).
 //
 // Polar motion is excluded, and this is the controlled version of the
 // hypothesis the parallactic-angle paragraph above could only address
@@ -154,13 +182,12 @@ func (b observerPrecisionBody) command() string { return strconv.Itoa(b.naifID) 
 // not causing it. Removing a term that helps is the cleanest way to show it
 // is not the culprit.
 //
-// What has not been settled is whether the 44 ms of UT1 is astrogo's or a
-// difference in Earth-orientation values. An EOP-vintage explanation was the
-// obvious candidate and is refuted: astrogo holds *measured* EOP for the
+// Two Earth-orientation explanations were tested along the way and both are
+// refuted. An EOP-vintage difference: astrogo holds *measured* EOP for the
 // epochs carrying the largest residual, and Horizons' own header agrees they
-// are data-based. The coupling is exact — coord/eopsensitivity_test.go shows
-// hour angle tracking UT1 at 15.041069 arcsec/s — so the 44 ms is a statement
-// about the values, and celnav does not publish the UT1 it assumed.
+// are data-based. A fault in the coupling between EOP and rotation:
+// coord/eopsensitivity_test.go shows hour angle tracking UT1 at 15.041069
+// arcsec/s exactly, and the observer vector rotating with it linearly.
 // See toleranceArcsec's comment, the escalation-path comment at the
 // bottom of this file, and docs/VALIDATION.md for the full writeup.
 //
