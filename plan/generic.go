@@ -35,10 +35,11 @@ func (g *GenericBody) Provider() eph.Provider { return g.provider }
 // EphID returns the NAIF ephemeris identifier.
 func (g *GenericBody) EphID() eph.ID { return g.id }
 
-// Position returns the apparent ICRS coordinates at the given time — see
-// [apparentVec].
+// Position returns the geometric ICRS direction at the given time — see
+// [apparentVec] for why this is not the apparent place that
+// [GenericBody.GeocentricVec] gives.
 func (g *GenericBody) Position(t time.Time) (coord.ICRS, error) {
-	icrs, err := apparentICRS(g.provider, g.id, t)
+	icrs, err := geometricICRS(g.provider, g.id, t)
 	if err != nil {
 		return coord.ICRS{}, fmt.Errorf("generic body %s: %w", g.name, err)
 	}

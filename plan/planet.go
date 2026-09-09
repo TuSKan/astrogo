@@ -108,12 +108,13 @@ func (p *Planet) EphID() eph.ID {
 	return p.id
 }
 
-// Position returns where the planet is seen on the sky at t — the apparent
-// place, with light time and aberration in it. See [apparentVec] for how far
-// that is from the geometric direction and why it is the one this package
-// wants.
+// Position returns the planet's geometric direction at t.
+//
+// Geometric, not apparent, and deliberately so — see [apparentVec] for the
+// asymmetry with [Planet.GeocentricVec] and why the two must not be made to
+// agree.
 func (p *Planet) Position(t time.Time) (coord.ICRS, error) {
-	icrs, err := apparentICRS(p.provider, p.id, t)
+	icrs, err := geometricICRS(p.provider, p.id, t)
 	if err != nil {
 		return coord.ICRS{}, fmt.Errorf("planet %s: %w", p.name, err)
 	}

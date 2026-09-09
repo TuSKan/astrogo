@@ -135,10 +135,10 @@ func (a *Asteroid) PhysicalRadius() (metres float64, ok bool) {
 	return 0, false
 }
 
-// Position returns the apparent ICRS sky position at time t — see
-// [apparentVec].
+// Position returns the geometric ICRS direction at time t — see [apparentVec]
+// for why this is not the apparent place that [Asteroid.GeocentricVec] gives.
 func (a *Asteroid) Position(t time.Time) (coord.ICRS, error) {
-	icrs, err := apparentICRS(a.provider, a.id, t)
+	icrs, err := geometricICRS(a.provider, a.id, t)
 	if err != nil {
 		return coord.ICRS{}, fmt.Errorf("asteroid %s: %w", a.name, err)
 	}

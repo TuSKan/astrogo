@@ -55,10 +55,10 @@ func (c *Comet) Provider() eph.Provider { return c.provider }
 // EphID returns the ephemeris ID.
 func (c *Comet) EphID() eph.ID { return c.id }
 
-// Position returns the apparent ICRS position of the comet — see
-// [apparentVec].
+// Position returns the comet's geometric ICRS direction — see [apparentVec]
+// for why this is not the apparent place that [Comet.GeocentricVec] gives.
 func (c *Comet) Position(t time.Time) (coord.ICRS, error) {
-	icrs, err := apparentICRS(c.provider, c.id, t)
+	icrs, err := geometricICRS(c.provider, c.id, t)
 	if err != nil {
 		return coord.ICRS{}, fmt.Errorf("comet %s: %w", c.name, err)
 	}

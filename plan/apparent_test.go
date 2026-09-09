@@ -41,7 +41,11 @@ func TestApparentSunIsDisplacedByTheConstantOfAberration(t *testing.T) {
 	t.Parallel()
 
 	prov := eph.Default()
-	sun := NewSun(prov)
+
+	sun, ok := any(NewSun(prov)).(MovingBody)
+	if !ok {
+		t.Fatal("the Sun is not a MovingBody; it would not reach the path this checks")
+	}
 
 	var (
 		minSep = math.Inf(1)
@@ -54,7 +58,13 @@ func TestApparentSunIsDisplacedByTheConstantOfAberration(t *testing.T) {
 	for d := range 365 {
 		tm := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC).AddDays(float64(d))
 
-		apparent, err := sun.Position(tm)
+		// GeocentricVec, not Position: GeocentricVec is the accessor that
+		// carries the apparent place, because its consumer applies no
+		// aberration of its own. See geometricICRS for the asymmetry.
+		vec, err := sun.GeocentricVec(tm)
+		testutil.AssertNoError(t, err)
+
+		apparent, err := eph.ToICRS(vec)
 		testutil.AssertNoError(t, err)
 
 		geometric, err := eph.Position(prov, eph.Sun, tm)
@@ -152,14 +162,20 @@ func TestApparentPositionReachesTheAltAzPath(t *testing.T) {
 	}
 }
 
-// TestPositionAndGeocentricVecAgree pins the invariant that made this worth
-// fixing in one place rather than two.
+// TestPositionAndGeocentricVecDeliberatelyDiffer pins the asymmetry that the
+// first version of this change got backwards.
 //
-// The two answers feed different consumers — separations and details read
-// Position, altitude reads GeocentricVec — and a target whose altitude is
-// apparent while its Moon separation is geometric is wrong in a way no single
-// test would catch, because each answer is defensible on its own.
-func TestPositionAndGeocentricVecAgree(t *testing.T) {
+// The two accessors feed pipelines with opposite conventions —
+// GeocentricToObserved applies no aberration, ICRSToAltAz applies it itself —
+// so each must hand its own consumer the place that consumer expects. An
+// invariant that they agree is what was written here first, and it is exactly
+// wrong: it drove Position to the apparent place, which doubled the aberration
+// for every caller that goes on to ICRSToAltAz.
+//
+// The size of the difference is the check. Aberration is ~20" and nothing else
+// in this path is, so a few arcseconds would mean something has quietly become
+// half-corrected.
+func TestPositionAndGeocentricVecDeliberatelyDiffer(t *testing.T) {
 	t.Parallel()
 
 	prov := eph.Default()
@@ -167,22 +183,38 @@ func TestPositionAndGeocentricVecAgree(t *testing.T) {
 	for _, tc := range []struct {
 		name string
 		obj  Observable
+		// Bounds on the year's *maximum*, not its minimum. Light time and
+		// aberration displace a body in directions that partly cancel at
+		// some geometries, so the minimum is near zero for an outer planet
+		// and says nothing: measured over 2026, Mars ranges 2.71" to 38.70"
+		// and Jupiter 1.01" to 29.01".
+		//
+		// The Moon is the exception in both directions — 0.7" and nearly
+		// constant — because light time to it is 1.3 s and it shares
+		// Earth's orbital motion, so the aberration that dominates
+		// everything else cancels between observer and target.
+		minPeak, maxPeak float64
 	}{
-		{"Mars", NewMars(prov)},
-		{"Sun", NewSun(prov)},
-		{"Moon", NewMoon(prov)},
-		{"Jupiter", NewJupiter(prov)},
+		{"Mars", NewMars(prov), 30, 45},
+		{"Sun", NewSun(prov), 15, 25},
+		{"Jupiter", NewJupiter(prov), 22, 35},
+		{"Moon", NewMoon(prov), 0.5, 1.0},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
 			mb, ok := tc.obj.(MovingBody)
 			if !ok {
-				t.Fatalf("%s is not a MovingBody; it would not reach the path this fixes", tc.name)
+				t.Fatalf("%s is not a MovingBody", tc.name)
 			}
 
+			var worst, least float64
+
+			least = math.Inf(1)
+
 			for d := 0; d < 365; d += 11 {
-				tm := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC).AddDays(float64(d))
+				tm := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC).
+					AddDays(float64(d))
 
 				pos, err := tc.obj.Position(tm)
 				testutil.AssertNoError(t, err)
@@ -193,12 +225,19 @@ func TestPositionAndGeocentricVecAgree(t *testing.T) {
 				fromVec, err := eph.ToICRS(vec)
 				testutil.AssertNoError(t, err)
 
-				// Same quantity by two routes, so this is exact to rounding,
-				// not to a physical tolerance.
-				if sep := coord.Separation(pos, fromVec).Arcseconds(); sep > 1e-6 {
-					t.Fatalf("%s at %v: Position and GeocentricVec disagree by %g\"",
-						tc.name, tm, sep)
-				}
+				sep := coord.Separation(pos, fromVec).Arcseconds()
+				worst = math.Max(worst, sep)
+				least = math.Min(least, sep)
+			}
+
+			t.Logf("%s: Position and GeocentricVec differ by %.2f\" to %.2f\"", tc.name, least, worst)
+
+			if worst < tc.minPeak || worst > tc.maxPeak {
+				t.Errorf("the year's largest difference is %.2f\", want inside "+
+					"[%.2f\", %.2f\"] — these two are supposed to differ by the "+
+					"aberration their consumers do or do not apply, and a peak outside "+
+					"that band means one of them has drifted toward the other",
+					worst, tc.minPeak, tc.maxPeak)
 			}
 		})
 	}
@@ -341,16 +380,14 @@ func TestEveryEphemerisBackedTargetIsApparent(t *testing.T) {
 					"*was* when the light left, which is behind its motion", got.Y)
 			}
 
-			// And Position must be the same place seen as a direction.
+			// And Position must NOT have moved: it feeds a consumer that
+			// applies aberration itself, so it stays geometric. Asserted
+			// here rather than left implicit, because making the two agree
+			// is the mistake this file exists to prevent.
 			pos, err := tc.obj.Position(epoch)
 			testutil.AssertNoError(t, err)
 
-			fromVec, err := eph.ToICRS(got)
-			testutil.AssertNoError(t, err)
-
-			if sep := coord.Separation(pos, fromVec).Arcseconds(); sep > 1e-6 {
-				t.Errorf("Position and GeocentricVec disagree by %g\"", sep)
-			}
+			testutil.AssertNear(t, "Position y (unretarded)", pos.Dec().Degrees(), 0, 1e-9)
 		})
 	}
 }
