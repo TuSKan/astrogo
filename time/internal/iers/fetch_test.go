@@ -98,6 +98,7 @@ func clearCooldown() {
 	defer fetchMu.Unlock()
 
 	lastAttempt = time.Time{}
+	lastCacheRead = time.Time{}
 	errLastFetch = nil
 }
 

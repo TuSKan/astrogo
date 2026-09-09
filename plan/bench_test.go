@@ -114,7 +114,18 @@ func benchScheduler(b *testing.B, n int, strategy Strategy) {
 	tm := &BasicTransitionModel{BaseSetup: 0}
 	blocks := makeBlocks(n)
 
-	start := time.ZeroTime()
+	// A real epoch, inside the EOP bulletin's coverage, rather than
+	// time.ZeroTime.
+	//
+	// ZeroTime is FromJD(0) — 4713 BC — where no Earth Orientation
+	// Parameters exist, and every constraint evaluation therefore took the
+	// out-of-coverage path. A heap profile put 99.88% of this benchmark's
+	// allocated bytes in time.Time.EOP rather than anywhere in scheduling,
+	// so what it reported was the cost of missing EOP data (#246).
+	//
+	// Fixed epoch, not time.NowUTC: a benchmark whose result depends on the
+	// day it is run cannot be compared with the one before it.
+	start := time.Date(2026, time.March, 20, 0, 0, 0, 0, time.LocationUTC)
 	window := Window{Start: start, End: start.Add(time.Duration(n*15) * time.Minute)}
 
 	for b.Loop() {
