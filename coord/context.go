@@ -39,6 +39,18 @@ type Context struct {
 	// Cached site trigonometry (computed once).
 	sinLat, cosLat float64
 	sinLon, cosLon float64
+
+	// diurab is the magnitude of the diurnal aberration vector, in units of
+	// c: the observer's eastward rotation speed divided by the speed of
+	// light, 0.32 arcsec at the equator falling as cos(latitude).
+	//
+	// It is not read from ASTROM, which holds zero. Apco13 zeroes it
+	// deliberately, because on the stellar path the observer's rotation
+	// velocity is already inside ASTROM.V and Atciq applies it there; Atioq
+	// must not apply it a second time. The vector path has no Atciq step, so
+	// it is the one place the term has to be supplied — see
+	// [Context.GeocentricToObserved].
+	diurab float64
 }
 
 // NewContext prepares the astrometry parameters for a specific observer time and site.
@@ -82,6 +94,15 @@ func NewContext(t time.Time, site *Geodetic, atm atmosphere.Refraction) *Context
 	tirs := tirsVec(sinLat, cosLat, sinLon, cosLon, site.Height())
 	obsVec := icrsFromTIRS(mat, tirs)
 
+	// Diurnal aberration, derived exactly as iauApio does: the horizontal
+	// part of the observer's velocity in the celestial intermediate system,
+	// over c. sp and era0 are already in hand, so this costs one Pvtob.
+	pvob := gofaext.Pvtob(
+		site.Lon().Radians(), site.Lat().Radians(), site.Height(),
+		eop.XP, eop.YP, sp, era0,
+	)
+	diurab := math.Hypot(pvob[1][0], pvob[1][1]) / constants.SI2019.SpeedOfLight.Value
+
 	return &Context{
 		t:      t,
 		site:   site,
@@ -94,6 +115,7 @@ func NewContext(t time.Time, site *Geodetic, atm atmosphere.Refraction) *Context
 		rpom:   rpom,
 		sinLat: sinLat, cosLat: cosLat,
 		sinLon: sinLon, cosLon: cosLon,
+		diurab: diurab,
 	}
 }
 
@@ -244,6 +266,15 @@ func (ctx *Context) AstrometricToObserved(c Astrometric) AltAz {
 // This avoids the per-call overhead of re-fetching IERS data, recomputing TT,
 // and rebuilding the full rotation matrix that a fresh Reducer would incur.
 //
+// Three things happen to the input: the observer vector is subtracted, which is
+// diurnal parallax; the result is rotated into the local horizon; and diurnal
+// aberration and refraction are applied to the direction. Annual aberration and
+// light deflection are not — they belong to the geocentric place, so a caller
+// passes an *apparent* geocentric vector, which is what
+// [github.com/TuSKan/astrogo/ephemeris] produces. Passing a vector that already
+// carries the observer's own rotation velocity would double-count it; nothing
+// in astrogo produces one.
+//
 // Atmospheric refraction is applied using the Context's refraction model.
 // When no explicit model is set (Model == nil) but atmospheric pressure is
 // nonzero, refractLikeAtioq applies SOFA's own two-term series from the Refa
@@ -268,12 +299,16 @@ func (ctx *Context) GeocentricToObserved(v vector.Vec3) AltAz {
 	N := -ctx.sinLat*ctx.cosLon*tx - ctx.sinLat*ctx.sinLon*ty + ctx.cosLat*tz
 	U := ctx.cosLat*ctx.cosLon*tx + ctx.cosLat*ctx.sinLon*ty + ctx.sinLat*tz
 
+	E, N, U = ctx.aberrateDiurnal(E, N, U, topoVec.Norm())
+
 	azimuth := math.Atan2(E, N)
 	if azimuth < 0 {
 		azimuth += 2 * math.Pi
 	}
 
-	altitude := math.Asin(U / topoVec.Norm())
+	// Atan2 rather than Asin(U): after the aberration the triple is no longer
+	// exactly a unit vector, and Atioq itself takes the altitude this way.
+	altitude := math.Atan2(U, math.Hypot(E, N))
 
 	alt := angle.Rad(altitude)
 
@@ -281,7 +316,7 @@ func (ctx *Context) GeocentricToObserved(v vector.Vec3) AltAz {
 	case ctx.atm.Model != nil:
 		alt += ctx.atm.Model.RefractFromTrue(alt, ctx.atm)
 	case ctx.atm.Pressure > 0:
-		alt = refractLikeAtioq(E, N, U, topoVec.Norm(), ctx.astrom.Refa, ctx.astrom.Refb)
+		alt = refractLikeAtioq(E, N, U, 1, ctx.astrom.Refa, ctx.astrom.Refb)
 	}
 
 	return NewAltAz(alt, angle.Rad(azimuth))
@@ -433,4 +468,52 @@ func (ctx *Context) BarycentricVelocity() vector.Vec3 {
 	kmPerSec := constants.SI2019.SpeedOfLight.Value / 1000.0
 
 	return vector.V3(ctx.astrom.V[0], ctx.astrom.V[1], ctx.astrom.V[2]).MulScalar(kmPerSec)
+}
+
+// aberrateDiurnal applies diurnal aberration to a topocentric ENU direction,
+// returning the shifted components as a near-unit vector.
+//
+// # Why the vector path needs this and the stellar path does not
+//
+// Diurnal aberration is the observer's own rotation velocity — 465 m/s
+// eastward at the equator, 0.32 arcseconds of displacement, falling as
+// cos(latitude). It has to enter somewhere, and SOFA lets it enter at either
+// of two places depending on which route a caller takes.
+//
+// On the stellar route, Apco13 puts the observer's *full* barycentric
+// velocity into ASTROM.V — orbital motion and rotation together — so Atciq's
+// aberration step already carries the diurnal part. Apco13 therefore sets
+// ASTROM.Diurab to zero, and Atioq adds nothing. Apio13, which serves a
+// CIRS-to-observed call with no Atciq before it, does the opposite: it sets
+// Diurab and lets Atioq apply it.
+//
+// [Context.GeocentricToObserved] is the second case. It receives a geocentric
+// place and reduces it by rotation and translation alone, with no Atciq step
+// anywhere, so nothing on that path had applied the term. Until #261 it was
+// simply absent, and the two routes disagreed by up to 0.32 arcseconds for
+// the same target — measured at 0.3150" at the equator, 0.1966" at Greenwich
+// and 0.0647" at 78N, tracking 0.32"·cos(latitude) to within 2%.
+//
+// # The arithmetic
+//
+// Taken from iauAtioq rather than re-derived, in the same form. Atioq works
+// in a Cartesian -HA/Dec frame whose y axis is local east, and reaches the
+// horizon frame by a rotation about that same axis, so the shift is identical
+// expressed in ENU: y there is E here.
+//
+//	f = 1 - diurab*E
+//	E' = f*(E + diurab),  N' = f*N,  U' = f*U
+//
+// The result is not renormalised, again as Atioq leaves it — the magnitude
+// differs from one by about 1.5e-6, and the callers here take an atan2.
+func (ctx *Context) aberrateDiurnal(e, n, u, norm float64) (float64, float64, float64) {
+	if norm == 0 {
+		return e, n, u
+	}
+
+	e, n, u = e/norm, n/norm, u/norm
+
+	f := 1.0 - ctx.diurab*e
+
+	return f * (e + ctx.diurab), f * n, f * u
 }

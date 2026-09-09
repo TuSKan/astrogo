@@ -455,3 +455,23 @@ func Hfk5z(rh, dh, date1, date2 float64) (r5, d5, dr5, dd5 float64) {
 
 	return r5, d5, dr5, dd5
 }
+
+// Pvtob returns the observer's position and velocity with respect to the
+// celestial intermediate reference system, in metres and metres per second.
+//
+// It is the routine iauApio uses to derive the diurnal aberration magnitude.
+// iauApco13 sets that magnitude to zero instead, because on its path the
+// observer's rotation velocity is already inside ASTROM.V and Atciq applies
+// it — so a caller reducing a position vector by rotation alone, with no
+// Atciq step, has to obtain it here.
+//
+// Arguments are geodetic longitude, latitude (radians) and height (metres),
+// polar motion xp, yp (radians), the TIO locator sp (radians) and the Earth
+// rotation angle theta (radians).
+func Pvtob(elong, phi, hm, xp, yp, sp, theta float64) [2][3]float64 {
+	var pv [2][3]float64
+
+	gofa.Pvtob(elong, phi, hm, xp, yp, sp, theta, &pv)
+
+	return pv
+}
