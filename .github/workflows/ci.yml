@@ -261,10 +261,28 @@ jobs:
       - name: Run tests with race detector
         run: go test -race -short -count=1 ./...
 
+  # These numbers are recorded and compared, but nothing here fails a build.
+  #
+  # ns/op on a shared runner is too noisy to gate on, and a noisy gate gets
+  # muted — this repository already had one job failing every run for an
+  # unrelated reason, which is how it went unread (#238). The hard guarantees
+  # live in the allocation contracts (coord/allocs_test.go and its siblings):
+  # deterministic, and in the ordinary test job where they block a merge.
+  #
+  # What this job owes its reader is a delta, on the run page. Before #248 it
+  # uploaded an artifact nothing opened, so it faithfully recorded
+  # "BenchmarkSwapOptimized_100 ... 149427883656 B/op" — 149 GB per operation —
+  # on every merge for months while #246 was live, and reported nothing.
   benchmarks:
     name: Benchmarks
     runs-on: ubuntu-latest
     if: github.event_name == 'push'
+
+    permissions:
+      contents: read
+      # Listing this workflow's earlier runs and downloading their artifacts,
+      # which is what the comparison below is built on.
+      actions: read
 
     steps:
       - name: Checkout code
@@ -278,16 +296,73 @@ jobs:
           go-version: '1.27'
           cache: true
 
+      - name: Install benchstat
+        # Pinned, like apidiff above: a comparison tool that moves under you
+        # turns a real delta and a tooling change into the same diff.
+        run: go install golang.org/x/perf/cmd/benchstat@v0.0.0-20260908200009-22c9c6c9d4da
+
       - name: Run benchmarks
+        # ./... on its own, deliberately. This used to name ./... *and* five
+        # packages, which reads as "just these five" while in fact benchmarking
+        # the whole module, since ./... already covers them. The whole module
+        # is the right scope: remote/file's ReadAt strategy benchmark is one
+        # CLAUDE.md explicitly says not to lose.
+        #
+        # -count=6 rather than 3, so benchstat has the samples to say anything
+        # other than "~". Affordable now: fixing #246 took the worst plan
+        # benchmark from ~68 s to ~1.5 s.
         run: |
           go test ./... \
             -run=^$ \
             -bench=. \
             -benchmem \
-            -count=3 \
+            -count=6 \
             -timeout=30m \
-            ./coord/... ./plan/... ./magnitude/... ./time/... ./atmosphere/... \
             | tee bench.txt
+
+      - name: Compare against the previous run on this branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          summary() { cat >> "$GITHUB_STEP_SUMMARY"; }
+
+          previous=$(gh run list \
+            --workflow ci.yml \
+            --branch "$GITHUB_REF_NAME" \
+            --status success \
+            --limit 20 \
+            --json databaseId,headSha \
+            --jq "[.[] | select(.headSha != \"$GITHUB_SHA\")][0].databaseId // empty")
+
+          if [ -z "$previous" ]; then
+            echo '_No earlier successful run on this branch to compare against._' | summary
+            exit 0
+          fi
+
+          # A missing artifact is the ordinary case once retention lapses, so
+          # this reports and moves on rather than failing the job.
+          if ! gh run download "$previous" --dir previous 2>/dev/null; then
+            echo "_Run $previous kept no downloadable benchmark artifact (90-day retention)._" | summary
+            exit 0
+          fi
+
+          baseline=$(find previous -name bench.txt -print -quit)
+          if [ -z "$baseline" ]; then
+            echo "_Run $previous uploaded no bench.txt._" | summary
+            exit 0
+          fi
+
+          {
+            echo "## Benchmark delta"
+            echo
+            echo "Against run [$previous](https://github.com/$GITHUB_REPOSITORY/actions/runs/$previous)."
+            echo
+            echo '```'
+            benchstat "$baseline" bench.txt || echo 'benchstat failed; the raw results are attached as an artifact.'
+            echo '```'
+          } | summary
 
       - name: Upload benchmark results
         uses: actions/upload-artifact@v6
