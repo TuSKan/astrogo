@@ -222,6 +222,7 @@ func TestDownloadableEndpointsAreExactlyTheExpectedSet(t *testing.T) {
 		NAIFPCK:               true,
 		OpenNGC:               true,
 		MPCObsCodes:           true,
+		MPCORB:                true,
 		JPLHorizonsSPK:        true,
 		VIIRSAnnual:           true,
 		CopernicusEODATA:      true,

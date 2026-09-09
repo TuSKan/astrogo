@@ -115,6 +115,14 @@ const (
 	// sea level.
 	OpenElevation EndpointID = "open-elevation"
 
+	// MPCORB is the IAU Minor Planet Center's orbital-element directory
+	// (catalog/mpcorb). The caller names the file, because the useful
+	// choice is not the same for everyone: MPCORB.DAT is every numbered
+	// and multi-opposition object at 317 MB (94 MB as MPCORB.DAT.gz),
+	// while NEA.txt, Distant.txt, PHA.txt and Unusual.txt are
+	// single-digit-megabyte cuts of it.
+	MPCORB EndpointID = "mpc.orb"
+
 	// VIIRSAnnual is lightpollutionmap.info's unauthenticated mirror of
 	// NASA's VIIRS annual nighttime-lights composites (Black Marble
 	// VNP46A4/VJ146A4, "AllAngle_Composite_Snow_Free"), one raw
@@ -620,6 +628,27 @@ func defaultEndpoints() map[EndpointID]Endpoint {
 			ApproxSize:  2_000,
 			Enabled:     true,
 			Timeout:     30 * time.Second,
+		},
+		MPCORB: {
+			ID:        MPCORB,
+			URL:       "https://www.minorplanetcenter.net/iau/MPCORB/",
+			Kind:      KindFile,
+			Subsystem: "mpcorb",
+			Description: "IAU Minor Planet Center orbital elements in MPCORB export format " +
+				"(MPCORB.DAT 317 MB, 94 MB gzipped; NEA.txt, Distant.txt, PHA.txt, " +
+				"Unusual.txt 0.5-8.6 MB each)",
+			// Two orders of magnitude between the whole catalogue and the
+			// subsets, and the caller picks. A single figure here would either
+			// refuse a 0.5 MB fetch under a small grant or wave a 317 MB one
+			// through under it; SizeVaries makes the caller state a budget.
+			ApproxSize:      SizeVaries,
+			Enabled:         true,
+			DownloadTimeout: 30 * time.Minute,
+			// Regenerated daily as new observations arrive, so a cached copy
+			// is revalidated against the source ETag rather than reused on
+			// existence alone.
+			Mutable:      true,
+			Downloadable: true,
 		},
 		VIIRSAnnual: {
 			ID:        VIIRSAnnual,
