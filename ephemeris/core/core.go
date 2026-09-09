@@ -209,30 +209,72 @@ const (
 // ─── Body ID ─────────────────────────────────────────────────────────────────
 
 // ID identifies a major Solar System body or a generic celestial object.
+//
+// # For the outer planets this is the system barycentre, not the planet
+//
+// A planetary kernel — de440, de441 — contains barycentres for the giant
+// planets, because their satellite systems live in separate kernels
+// (jup365, sat441, ura184, nep097). So a provider backed by one resolves
+// [Mars], [Jupiter], [Saturn], [Uranus] and [Neptune] to NAIF 4, 5, 6, 7 and
+// 8: the barycentre of the planet and its moons. [Mercury], [Venus] and
+// [Earth] resolve to 199, 299 and 399, the body centres, because a planet
+// with no significant moons *is* its own barycentre.
+//
+// One identifier space therefore holds two kinds of point, and which one you
+// get depends on the body. The difference is small and not negligible —
+// measured against JPL Horizons' body-centre commands over 2026:
+//
+//	Uranus    0.0497 arcsec
+//	Jupiter   0.0324 arcsec
+//	Saturn    0.0288 arcsec
+//	Neptune   0.0093 arcsec
+//	Mars      0.0000 arcsec   (Phobos and Deimos displace it by centimetres)
+//
+// That is far inside every tolerance astrogo publishes, and far outside what
+// someone checking Jupiter against Horizons' default `599` would expect: it
+// reads as an astrogo error and is not one. Ask Horizons for `5` to compare
+// like for like (#253).
+//
+// Getting the body centre needs the satellite kernel loaded, which is a
+// different provider and a multi-gigabyte download; see
+// [github.com/TuSKan/astrogo/ephemeris.Moons].
 type ID uint32
 
 const (
-	// Mercury is the identifier for Mercury.
+	// Mercury is the identifier for Mercury. Body centre, NAIF 199 — Mercury
+	// has no moons, so its barycentre is itself.
 	Mercury ID = iota + 1
-	// Venus is the identifier for Venus.
+	// Venus is the identifier for Venus. Body centre, NAIF 299, for the same
+	// reason as Mercury.
 	Venus
-	// Earth is the identifier for Earth.
+	// Earth is the identifier for Earth. Body centre, NAIF 399 — distinct
+	// from the Earth-Moon barycentre, which is 4,671 km away.
 	Earth
-	// Mars is the identifier for Mars.
+	// Mars is the identifier for the Mars system barycentre, NAIF 4. Phobos
+	// and Deimos displace it from the planet by centimetres, so the
+	// distinction is unobservable here.
 	Mars
-	// Jupiter is the identifier for Jupiter.
+	// Jupiter is the identifier for the Jupiter system barycentre, NAIF 5 —
+	// about 0.03 arcsec from the planet as seen from Earth. See [ID].
 	Jupiter
-	// Saturn is the identifier for Saturn.
+	// Saturn is the identifier for the Saturn system barycentre, NAIF 6 —
+	// about 0.03 arcsec from the planet as seen from Earth. See [ID].
 	Saturn
-	// Uranus is the identifier for Uranus.
+	// Uranus is the identifier for the Uranus system barycentre, NAIF 7 —
+	// about 0.05 arcsec from the planet as seen from Earth. See [ID].
 	Uranus
-	// Neptune is the identifier for Neptune.
+	// Neptune is the identifier for the Neptune system barycentre, NAIF 8 —
+	// about 0.01 arcsec from the planet as seen from Earth. See [ID].
 	Neptune
-	// Pluto is the identifier for Pluto.
+	// Pluto is the identifier for Pluto. Unlike every other body here it has
+	// no NAIF mapping in the JPL provider at all — NAIFFor reports false —
+	// so a kernel-backed provider cannot serve it and eph.Default answers
+	// with a Kepler two-body propagation instead, worth 0.138 AU at worst.
+	// See docs/VALIDATION.md's `ephemeris.kepler.pluto` row.
 	Pluto
-	// Moon is the identifier for the Moon.
+	// Moon is the identifier for the Moon. Body centre, NAIF 301.
 	Moon
-	// Sun is the identifier for the Sun.
+	// Sun is the identifier for the Sun. Body centre, NAIF 10.
 	Sun
 	// SolarSystemBarycenter is the identifier for the solar system barycenter.
 	SolarSystemBarycenter

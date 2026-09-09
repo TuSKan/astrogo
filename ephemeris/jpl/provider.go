@@ -75,6 +75,24 @@ var kmPerAU = constants.IAU.AstronomicalUnit.Value / 1e3
 // exported map. A caller that assigns to BodyIDToNAIF changes which SPK
 // segment every other caller in the binary resolves to — silently, and with
 // no way for a later reader to see it happened.
+//
+// # The mapping mixes body centres and system barycentres
+//
+// 199, 299 and 399 are body centres; 4, 5, 6, 7 and 8 are system
+// barycentres. That is not an inconsistency to fix but what a planetary
+// kernel contains — the giant planets' satellite systems live in separate
+// kernels, so de440 and de441 can only offer the barycentre, while Mercury
+// and Venus have no moons and so *are* their own barycentres.
+//
+// It does mean two kinds of point share one identifier space. Measured
+// against Horizons' body-centre commands over 2026, the gap is 0.0497 arcsec
+// at Uranus, 0.0324 at Jupiter, 0.0288 at Saturn, 0.0093 at Neptune and zero
+// at Mars. Small, systematic, and easy to mistake for an astrogo error when
+// comparing against a reference that defaults to the body centre — see
+// [github.com/TuSKan/astrogo/ephemeris/core.ID] (#253).
+//
+// core.Pluto is deliberately absent: there is no NAIF mapping for it here,
+// so this reports false and a kernel-backed provider cannot serve it.
 func NAIFFor(id core.ID) (int, bool) {
 	naif, ok := BodyIDToNAIF[id]
 
