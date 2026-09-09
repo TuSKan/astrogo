@@ -54,6 +54,31 @@ import (
 // comparison is not: astrogo reads JPL DE and Horizons *is* JPL. USNO's
 // almanac is computed with NOVAS.
 //
+// # What this can and cannot resolve
+//
+// celnav is a navigation product. The Nautical Almanac tabulates Greenwich
+// Hour Angle and declination to 0.1 arcminutes — six arcseconds — because that
+// is what a sextant sight needs, and the API returning six decimal degrees
+// does not make the underlying computation finer than the product it serves.
+//
+// So residuals here are bounded below by celnav's own precision, and measured
+// they sit well inside it: +0.662 arcsec in GHA and -0.027 in declination are
+// 0.011 and 0.0005 arcminutes. Both are *ten to a thousand times inside* what
+// the almanac publishes to.
+//
+// That matters for reading the numbers. Against Horizons at full precision,
+// astrogo's geocentric apparent place agrees to +0.049 arcsec in right
+// ascension and -0.0003 in declination, and its Greenwich apparent sidereal
+// time to +0.050 arcsec — so astrogo's own GHA matches Horizons to about a
+// milliarcsecond. The 0.662 arcsec measured here is therefore USNO's
+// difference from Horizons, not astrogo's from either (#256).
+//
+// The test is still worth running, for the reason it was written: declination
+// and GHA nest, so a *large* fault in one and not the other would still be
+// localised, and USNO is the only independent implementation available. What
+// it cannot do is resolve a half-arcsecond effect, and the bounds below are
+// set accordingly rather than to celnav's returned digits.
+//
 // # Two things this has to get right to mean anything
 //
 // The origin. astrogo's apparent place is CIRS, measured from the Celestial

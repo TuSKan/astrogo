@@ -120,6 +120,93 @@ func (b observerPrecisionBody) command() string { return strconv.Itoa(b.naifID) 
 // separation, bounded — see max above) — a genuine, reproducible result,
 // even without a single identified root cause for the smaller azimuth
 // residual within it.
+//
+// # Since then, the residual has been localised
+//
+// Three later comparisons narrowed it by removing one stage at a time,
+// which the single end-to-end number here cannot do (#256).
+//
+// The ephemeris and the light-time solution are excluded. A geocentric
+// astrometric comparison against Horizons' quantity 1 — no site vector, no
+// Earth rotation, no aberration, no deflection — agrees to 3.1 microarcseconds
+// with both signed means at zero, and that figure is the reference's own
+// printing precision rather than astrogo's error (#254).
+//
+// Apparent declination is excluded. USNO's celnav publishes geocentric
+// apparent declination and Greenwich Hour Angle, and declination is measured
+// from the equator so Earth rotation cannot touch it. Over seven epochs in
+// 2026 for Sun, Jupiter and Saturn, declination has a signed mean of -0.027"
+// while GHA has +0.662" — so precession-nutation, aberration and deflection
+// are clean in declination at least.
+//
+// Earth rotation is excluded too, which took a second measurement and
+// overturned the first reading of the one above. A +0.662" hour-angle
+// residual looks like 44 milliseconds of UT1, and sidereal time is directly
+// checkable: Horizons publishes local apparent sidereal time to 0.0001 s.
+// Compared like for like — at longitude AND latitude zero, where the
+// polar-motion shift of the local meridian vanishes and local apparent
+// sidereal time is the Greenwich value astrogo's Time.GAST returns —
+// astrogo agrees over six epochs across 2026 to a signed mean of +0.050"
+// and a worst case of 0.086". That is 3.3 milliseconds of UT1, ten times
+// smaller than the residual being explained.
+//
+// Getting that comparison wrong first is worth recording, because it is the
+// third convention mismatch this investigation has produced. Run at latitude
+// 51.5 instead, astrogo appears to lag Horizons by 0.44" — and that offset
+// tracks yp*tan(latitude) to within 0.006" across four of six epochs, which
+// is the local meridian moving with the pole. Greenwich apparent sidereal
+// time is a global quantity and does not carry it; Horizons' *local* value
+// does. The other two mismatches were the giant planets being barycentres
+// rather than planets (#253) and USNO tabulating Venus and Mars at the centre
+// of the illuminated disc rather than the geometric centre.
+//
+// The +0.662" turned out not to be astrogo's at all. Against Horizons at
+// full precision, astrogo's geocentric apparent place agrees to +0.049" in
+// right ascension and -0.0003" in declination, and its Greenwich apparent
+// sidereal time to +0.050" — so astrogo's own hour angle matches Horizons to
+// about a milliarcsecond. celnav is a navigation product: the Nautical
+// Almanac tabulates GHA to 0.1 arcminutes, six arcseconds, and 0.662" is ten
+// times inside that. It measures USNO's difference from Horizons, not
+// astrogo's from either.
+//
+// So every geocentric stage is now clean to 0.05" or better — ephemeris,
+// light time, apparent right ascension, apparent declination, Earth rotation
+// — and polar motion is reducing the residual rather than causing it. None of
+// them accounts for the ~0.5" seen here.
+//
+// The topocentric step is excluded as well, and that is what closes it.
+// astrogo's reduction is SOFA's iauAtco13 with the three calls written out —
+// Apco13 once per epoch, then Atciq and Atioq — so the two can be run side by
+// side on identical inputs. Over 210 combinations of six sites, seven
+// directions and five epochs, coord/sofareference_test.go measures the
+// difference at 0.000 arcseconds: not a mean, a maximum, and sensitive enough
+// to catch a 100-nanosecond change in UT1 (1.5 microarcseconds). Against
+// Horizons over three real observatories, two planets and a year of epochs,
+// astrogo and Atco13 differ from it by the same amount to four decimal places.
+//
+// Which localises the residual precisely, because a rotation preserves
+// great-circle separation. Both sides are given the same topocentric
+// astrometric place, and their apparent right ascension and declination agree
+// to 0.049" — but their horizon-frame separation is 0.380". The extra 0.33"
+// enters in the rotation from the equator to the horizon and nowhere else.
+// Horizons performs that rotation through SPICE's ITRF93 frame, which its own
+// response header states ("Center pole/equ : ITRF93"); astrogo performs it
+// through the IAU 2006/2000A CIO chain on IERS finals2000A. Switching polar
+// motion off on the SOFA side takes Paranal to 0.012" and Mauna Kea to 0.142"
+// but leaves Greenwich at 0.452", so it is a realisation difference and not a
+// single dropped term.
+//
+// So the residual measured here is the gap between two Earth-orientation
+// realisations, not an astrogo defect. That is also why the contract below
+// stays where it is: it bounds a disagreement between reference frames, which
+// is what it always said it did (#256).
+//
+// Two Earth-orientation explanations were tested along the way and both are
+// refuted. An EOP-vintage difference: astrogo holds *measured* EOP for the
+// epochs carrying the largest residual, and Horizons' own header agrees they
+// are data-based. A fault in the coupling between EOP and rotation:
+// coord/eopsensitivity_test.go shows hour angle tracking UT1 at 15.041069
+// arcsec/s exactly, and the observer vector rotating with it linearly.
 // See toleranceArcsec's comment, the escalation-path comment at the
 // bottom of this file, and docs/VALIDATION.md for the full writeup.
 //
