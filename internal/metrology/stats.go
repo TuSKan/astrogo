@@ -2,7 +2,7 @@ package metrology
 
 import (
 	"math"
-	"sort"
+	"slices"
 )
 
 // Sample is one comparison against a reference.
@@ -153,7 +153,7 @@ func (s *Suite) Stats() Stats {
 	out.MeanSigned = sumSigned / n
 	out.RMS = math.Sqrt(sumSq / n)
 
-	sort.Float64s(abs)
+	slices.Sort(abs)
 
 	out.P50 = Quantile(abs, 0.50)
 	out.P90 = Quantile(abs, 0.90)

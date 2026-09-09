@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"math"
 	"net/url"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -61,7 +61,7 @@ func KnownSiteNames() []string {
 		out = append(out, s.name)
 	}
 
-	sort.Strings(out)
+	slices.Sort(out)
 
 	return out
 }

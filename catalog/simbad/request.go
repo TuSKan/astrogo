@@ -3,7 +3,7 @@ package simbad
 import (
 	"fmt"
 	"net/url"
-	"sort"
+	"slices"
 	"strings"
 
 	"github.com/TuSKan/astrogo/catalog/resolve"
@@ -53,7 +53,7 @@ func identifierVariants(query string) []string {
 		out = append(out, v)
 	}
 
-	sort.Strings(out) // deterministic, so the query is reproducible and cacheable
+	slices.Sort(out) // deterministic, so the query is reproducible and cacheable
 
 	return out
 }

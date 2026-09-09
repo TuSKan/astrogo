@@ -1,13 +1,14 @@
 package openngc
 
 import (
+	"cmp"
 	"context"
 	"encoding/csv"
 	"errors"
 	"fmt"
 	"io"
 	"math"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -54,7 +55,7 @@ func fetch(ctx context.Context) ([]resolve.Target, error) {
 		records = append(records, recs...)
 	}
 
-	sort.Slice(records, func(i, j int) bool { return records[i].ID < records[j].ID })
+	slices.SortFunc(records, func(a, b targetRecord) int { return cmp.Compare(a.ID, b.ID) })
 
 	return toTargets(records), nil
 }
@@ -209,7 +210,12 @@ func parseOpenNGC(input io.Reader) ([]targetRecord, error) {
 		displayName := name
 
 		if commonNames != "" {
-			first := strings.TrimSpace(strings.Split(commonNames, ",")[0])
+			// Cut rather than Split(...)[0]: this runs on every one of the
+			// ~14,000 catalogue rows, and Split allocates the whole list to
+			// reach its first element.
+			head, _, _ := strings.Cut(commonNames, ",")
+
+			first := strings.TrimSpace(head)
 			if first != "" {
 				displayName = first
 			}

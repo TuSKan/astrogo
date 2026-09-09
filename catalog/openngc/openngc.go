@@ -1,9 +1,10 @@
 package openngc
 
 import (
+	"cmp"
 	"context"
 	"fmt"
-	"sort"
+	"slices"
 	"strings"
 	"sync"
 
@@ -83,7 +84,7 @@ func (p *Provider) SearchBright(ctx context.Context, req resolve.BrightRequest) 
 		}
 	}
 
-	sort.Slice(matches, func(i, j int) bool { return matches[i].VMag < matches[j].VMag })
+	slices.SortFunc(matches, func(a, b resolve.Target) int { return cmp.Compare(a.VMag, b.VMag) })
 
 	if req.Limit > 0 && len(matches) > req.Limit {
 		matches = matches[:req.Limit]

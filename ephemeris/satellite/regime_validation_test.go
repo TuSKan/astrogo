@@ -4,7 +4,7 @@ package satellite
 
 import (
 	"math"
-	"sort"
+	"slices"
 	"testing"
 )
 
@@ -129,8 +129,8 @@ func TestVerifiedMatchesTheMeasuredDivergence(t *testing.T) {
 		}
 	}
 
-	sort.Strings(flagged)
-	sort.Strings(missed)
+	slices.Sort(flagged)
+	slices.Sort(missed)
 
 	t.Logf("flagged %d (%d of them divergent); missed %d; cleared %d",
 		len(flagged), flaggedBad, len(missed), verifiedGood)

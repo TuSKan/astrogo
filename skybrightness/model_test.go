@@ -346,11 +346,9 @@ func TestConcurrentEstimatesAreSafe(t *testing.T) {
 	var wg sync.WaitGroup
 
 	for i := range 16 {
-		wg.Add(1)
+		alt := float64(i*5) + 5
 
-		go func(alt float64) {
-			defer wg.Done()
-
+		wg.Go(func() {
 			est, err := m.Estimate(context.Background(), skybrightness.Query{
 				Scene:     scene,
 				Direction: coord.NewAltAz(angle.Deg(alt), angle.Deg(alt*3)),
@@ -364,7 +362,7 @@ func TestConcurrentEstimatesAreSafe(t *testing.T) {
 			if got := est.SpectralRadiance()[0]; math.Abs(got-3e-9) > 1e-21 {
 				t.Errorf("Estimate(alt=%v) = %v, want 3e-9", alt, got)
 			}
-		}(float64(i*5) + 5)
+		})
 	}
 
 	wg.Wait()

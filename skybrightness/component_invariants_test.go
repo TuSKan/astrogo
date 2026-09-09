@@ -53,11 +53,7 @@ func TestComponentsAreConcurrencySafe(t *testing.T) {
 
 		for range 8 {
 			for i, d := range dirs {
-				wg.Add(1)
-
-				go func(i int, d coord.AltAz) {
-					defer wg.Done()
-
+				wg.Go(func() {
 					dst := skybrightness.NewSpectralRadiance(grid)
 					if _, err := c.AddRadiance(context.Background(), dst, grid, d, scene); err != nil {
 						return
@@ -73,7 +69,7 @@ func TestComponentsAreConcurrencySafe(t *testing.T) {
 							return
 						}
 					}
-				}(i, d)
+				})
 			}
 		}
 

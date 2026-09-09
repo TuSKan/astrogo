@@ -2,11 +2,12 @@ package plan
 
 import (
 	"bufio"
+	"cmp"
 	"context"
 	"fmt"
 	"io"
 	"math"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -287,7 +288,7 @@ func parseMPCObsCodes(r io.Reader) ([]MPCObservatory, error) {
 		return nil, ErrNoMPCObservatories
 	}
 
-	sort.Slice(out, func(i, j int) bool { return out[i].Code < out[j].Code })
+	slices.SortFunc(out, func(a, b MPCObservatory) int { return cmp.Compare(a.Code, b.Code) })
 
 	return out, nil
 }

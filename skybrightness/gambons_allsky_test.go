@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"slices"
 	"sort"
 	"testing"
 
@@ -446,7 +447,7 @@ func TestAgainstGAMBONSAllSky(t *testing.T) {
 			}
 		}
 
-		sort.Float64s(on)
+		slices.Sort(on)
 
 		med := metrology.Quantile(on, 0.5)
 		diff := med - b.median
@@ -479,7 +480,7 @@ func TestAgainstGAMBONSAllSky(t *testing.T) {
 			}
 		}
 
-		sort.Float64s(off)
+		slices.Sort(off)
 
 		med := metrology.Quantile(off, 0.5)
 
@@ -575,8 +576,8 @@ func TestAgainstGAMBONSAllSky(t *testing.T) {
 			}
 		}
 
-		sort.Float64s(on)
-		sort.Float64s(off)
+		slices.Sort(on)
+		slices.Sort(off)
 
 		medians[bi] = metrology.Quantile(on, 0.5)
 		mediansOff[bi] = metrology.Quantile(off, 0.5)
@@ -692,7 +693,7 @@ func TestGAMBONSAllSkyWithAirglowMatched(t *testing.T) {
 			}
 		}
 
-		sort.Float64s(ours)
+		slices.Sort(ours)
 
 		ourTop = metrology.Quantile(ours, 0.5)
 
@@ -715,7 +716,7 @@ func TestGAMBONSAllSkyWithAirglowMatched(t *testing.T) {
 			}
 		}
 
-		sort.Float64s(off)
+		slices.Sort(off)
 
 		ourOffTop = metrology.Quantile(off, 0.5)
 		theirOffTop = math.Pow(10, -0.4*gambonsAltitudeBands[topBand].medianNoAirglow)
@@ -740,7 +741,7 @@ func TestGAMBONSAllSkyWithAirglowMatched(t *testing.T) {
 			}
 		}
 
-		sort.Float64s(scaled)
+		slices.Sort(scaled)
 
 		med := metrology.Quantile(scaled, 0.5)
 		diff := med - b.median
@@ -793,7 +794,7 @@ func TestGAMBONSAllSkyWithAirglowMatched(t *testing.T) {
 			}
 		}
 
-		sort.Float64s(ours)
+		slices.Sort(ours)
 
 		ourFlux := metrology.Quantile(ours, 0.5)
 
@@ -909,8 +910,8 @@ func bandMedians(results []allSkySample) (medians, mediansOff []float64) {
 			}
 		}
 
-		sort.Float64s(on)
-		sort.Float64s(off)
+		slices.Sort(on)
+		slices.Sort(off)
 
 		medians[bi] = metrology.Quantile(on, 0.5)
 		mediansOff[bi] = metrology.Quantile(off, 0.5)

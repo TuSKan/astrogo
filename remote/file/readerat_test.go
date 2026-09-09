@@ -127,11 +127,9 @@ func TestReaderAtConcurrentReads(t *testing.T) {
 	var wg sync.WaitGroup
 
 	for i := range 8 {
-		wg.Add(1)
+		off := i
 
-		go func(off int) {
-			defer wg.Done()
-
+		wg.Go(func() {
 			for range 50 {
 				buf := make([]byte, chunk)
 				if _, err := ra.ReadAt(buf, int64(off*chunk)); err != nil {
@@ -146,7 +144,7 @@ func TestReaderAtConcurrentReads(t *testing.T) {
 					return
 				}
 			}
-		}(i)
+		})
 	}
 
 	wg.Wait()
