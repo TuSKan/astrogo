@@ -71,6 +71,21 @@ func DataDirURL() string {
 // a cache directory that does not exist yet. It is built through url.URL
 // rather than concatenation: a '#' in the path would silently truncate it
 // and swallow the query, and a stray '%' would make it unparseable.
+//
+// It carries no_tmp_dir=1 for two reasons, both about where a write is
+// staged before it is renamed into place. Without it fileblob stages in the
+// shared os.TempDir under a name built from the key's basename and the
+// current time, so two goroutines caching the same kernel name — which is
+// what plan's small-body fan-out does on every query — compute the same
+// staging path even in different buckets. The comment behind that naming
+// says nanosecond precision makes a conflict unlikely; on Windows,
+// time.Now().UnixNano returned a single distinct value across 2000
+// consecutive reads, and 8 goroutines writing one key failed 49 times in
+// 320. With this parameter, 0 (#241).
+//
+// The second reason holds on every platform: os.TempDir is often on a
+// different volume from the cache, and a cross-volume rename is a whole
+// second copy of a multi-gigabyte kernel.
 func defaultDataDirURL() string {
 	base, err := os.UserCacheDir()
 	if err != nil {
@@ -82,7 +97,7 @@ func defaultDataDirURL() string {
 		slash = "/" + slash // Windows drive-letter paths are not "/"-rooted
 	}
 
-	u := url.URL{Scheme: "file", Path: slash, RawQuery: "create_dir=true"}
+	u := url.URL{Scheme: "file", Path: slash, RawQuery: "create_dir=true&no_tmp_dir=1"}
 
 	return u.String()
 }

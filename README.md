@@ -576,9 +576,16 @@ It is a **bucket URL, not a filesystem path** — nothing in astrogo assumes the
 local disk:
 
 ```go
-remote.SetDataDir("file:///data/astrogo-cache?create_dir=true")
+remote.SetDataDir("file:///data/astrogo-cache?create_dir=true&no_tmp_dir=1")
 remote.SetDataDir("s3://my-cache-bucket") // needs: import _ "github.com/TuSKan/astrogo/remote/s3"
 ```
+
+For a `file://` cache, pass **`no_tmp_dir=1`** as shown. Without it every write is staged in
+the shared `os.TempDir()` under a name derived from the key's basename, so two goroutines
+caching the same kernel name collide on one staging path (measured on Windows: 49 failures
+in 320 concurrent writes, 0 with the parameter), and a cache on a different volume from
+`os.TempDir` pays a full extra copy of every multi-gigabyte kernel. astrogo's own default
+cache URL carries it; a URL you supply is used exactly as written.
 
 The `ASTROGO_CACHE_DIR` environment variable sets the same thing, and also takes a URL.
 `remote.CacheDir(ctx, id)` reports the bucket and key prefix an endpoint caches under, and

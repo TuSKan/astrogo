@@ -16,6 +16,13 @@ import (
 // exist yet. It is built through url.URL so a temp path containing '#' or a
 // stray '%' — which t.TempDir can produce from a test name — encodes
 // correctly instead of silently truncating.
+//
+// It also carries no_tmp_dir=1, matching remote's default cache URL. Without
+// it fileblob stages writes in the shared os.TempDir under a name built from
+// the key's basename and the current time, so parallel tests writing the same
+// key into their own t.TempDir buckets still collide on one staging path.
+// That is not hypothetical: it failed a different one of spk's three
+// TestDiscardIfCorrupt tests on each run, each of which passed alone (#241).
 func FileURL(tb testing.TB, dir string) string {
 	tb.Helper()
 
@@ -29,7 +36,7 @@ func FileURL(tb testing.TB, dir string) string {
 		slash = "/" + slash // Windows drive-letter paths are not "/"-rooted
 	}
 
-	u := url.URL{Scheme: "file", Path: slash, RawQuery: "create_dir=true"}
+	u := url.URL{Scheme: "file", Path: slash, RawQuery: "create_dir=true&no_tmp_dir=1"}
 
 	return u.String()
 }
