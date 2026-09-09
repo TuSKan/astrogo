@@ -174,10 +174,32 @@ func (b observerPrecisionBody) command() string { return strconv.Itoa(b.naifID) 
 // — and polar motion is reducing the residual rather than causing it. None of
 // them accounts for the ~0.5" seen here.
 //
-// What that leaves is the topocentric step itself: the observer's position on
-// a rotating Earth and the CIRS-to-observed transform that uses it, or a
-// convention difference in Horizons' own Azi/Elev columns. That is one stage
-// rather than the whole pipeline, which is the useful part (#256).
+// The topocentric step is excluded as well, and that is what closes it.
+// astrogo's reduction is SOFA's iauAtco13 with the three calls written out —
+// Apco13 once per epoch, then Atciq and Atioq — so the two can be run side by
+// side on identical inputs. Over 210 combinations of six sites, seven
+// directions and five epochs, coord/sofareference_test.go measures the
+// difference at 0.000 arcseconds: not a mean, a maximum, and sensitive enough
+// to catch a 100-nanosecond change in UT1 (1.5 microarcseconds). Against
+// Horizons over three real observatories, two planets and a year of epochs,
+// astrogo and Atco13 differ from it by the same amount to four decimal places.
+//
+// Which localises the residual precisely, because a rotation preserves
+// great-circle separation. Both sides are given the same topocentric
+// astrometric place, and their apparent right ascension and declination agree
+// to 0.049" — but their horizon-frame separation is 0.380". The extra 0.33"
+// enters in the rotation from the equator to the horizon and nowhere else.
+// Horizons performs that rotation through SPICE's ITRF93 frame, which its own
+// response header states ("Center pole/equ : ITRF93"); astrogo performs it
+// through the IAU 2006/2000A CIO chain on IERS finals2000A. Switching polar
+// motion off on the SOFA side takes Paranal to 0.012" and Mauna Kea to 0.142"
+// but leaves Greenwich at 0.452", so it is a realisation difference and not a
+// single dropped term.
+//
+// So the residual measured here is the gap between two Earth-orientation
+// realisations, not an astrogo defect. That is also why the contract below
+// stays where it is: it bounds a disagreement between reference frames, which
+// is what it always said it did (#256).
 //
 // Two Earth-orientation explanations were tested along the way and both are
 // refuted. An EOP-vintage difference: astrogo holds *measured* EOP for the
