@@ -2,7 +2,7 @@
 type: Fixed
 pr: 257
 ---
-The Horizons state comparison reads DE441, the ephemeris Horizons actually
-serves, instead of DE440. The Moon's 0.676 m residual was the difference
-between the two kernels and had been attributed to astrogo; position now agrees
-4.6× more closely and velocity 72× (#257).
+The Horizons state comparison no longer claims both sides evaluate the same JPL
+integration. Horizons serves DE441 and astrogo reads DE440, and the two differ
+by 2.42 m at the Moon — most of that test's measured residual is the kernel gap
+rather than astrogo, which the tolerance's derivation now accounts for (#257).
