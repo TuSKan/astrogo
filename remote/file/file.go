@@ -50,12 +50,19 @@ type Bucket = blob.Bucket
 // verbatim; an unregistered scheme surfaces as that call's own error.
 //
 // One Bucket is opened per distinct URL and reused for the life of the
-// process. *blob.Bucket is safe for concurrent use, so sharing is free,
-// and reuse is what makes fileblob's IfNotExist precondition meaningful
-// within a process: that driver guards it with a per-Bucket mutex, so
-// separate Bucket values over the same directory would not exclude each
-// other. Buckets are never closed, matching their process-lifetime role as
-// astrogo's cache and source handles.
+// process. *blob.Bucket is safe for concurrent use, so sharing is free, and
+// one handle per URL avoids reopening a bucket on every fetch. Buckets are
+// never closed, matching their process-lifetime role as astrogo's cache and
+// source handles.
+//
+// This used to claim more: that sharing "is what makes fileblob's
+// IfNotExist precondition meaningful within a process", because "that
+// driver guards it with a per-Bucket mutex". It does not. In the pinned
+// driver fileblob's bucket struct holds no mutex, and the one that exists is
+// built per writer inside NewTypedWriter, so contenders never exclude each
+// other however many Buckets they share. Measured, 8 goroutines on one
+// Bucket over 200 rounds produced 51 rounds with two or more simultaneous
+// lock holders. remote.acquireLock now owns that exclusion itself (#245).
 func Open(ctx context.Context, bucketURL string) (*Bucket, error) {
 	bucketsMu.Lock()
 	defer bucketsMu.Unlock()
