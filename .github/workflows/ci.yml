@@ -34,23 +34,28 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v6
         with:
-          # '1.25' rather than go-version-file: go.mod, deliberately.
+          # '1.27' rather than go-version-file: go.mod, still deliberately —
+          # though the reason is now insurance rather than a live problem.
           #
-          # go.mod declares `go 1.25.8` — a patch-level minimum astrogo does
-          # not need and does not set: `go mod tidy` raises the directive to
-          # the maximum any dependency declares, and gocloud-ext's seven
-          # modules declare 1.25.8 (see #109). Reading it here made setup-go
-          # demand that exact patch, and every observed job then logged
-          # "Attempting to download 1.25.8" — so the toolchain was fetched and
-          # extracted before the job could start. On PR #151 that step hung
-          # for 25 minutes without running a single test.
+          # go.mod used to declare `go 1.25.8`, a patch-level minimum astrogo
+          # never asked for: `go mod tidy` raises the directive to the maximum
+          # any dependency declares, and gocloud-ext's seven modules declare
+          # 1.25.8 (#109). Reading it here made setup-go demand that exact
+          # patch, and every observed job logged "Attempting to download
+          # 1.25.8" — the toolchain fetched and extracted before the job could
+          # start. On PR #151 that step hung for 25 minutes without running a
+          # single test.
           #
-          # A minor-version spec resolves to whatever 1.25.x the runner
-          # already has. It cannot silently diverge from go.mod: Go refuses to
-          # build below the declared directive and fetches the required
-          # toolchain itself, so a future bump past 1.25 degrades to today's
-          # behaviour (a download) rather than to a wrong result.
-          go-version: '1.25'
+          # The directive is now `go 1.27`, so that hazard is gone at its
+          # source and go-version-file would be safe today. The explicit pin
+          # stays because the hazard can come back the same way it arrived —
+          # one dependency declaring a patch-level version above ours and one
+          # `go mod tidy` — and it would come back silently. A minor-version
+          # spec cannot: Go refuses to build below the declared directive and
+          # fetches what it needs, so a divergence degrades to a download
+          # rather than to a wrong result, and internal/docsguard fails if
+          # these pins and go.mod ever disagree on the minor version.
+          go-version: '1.27'
           cache: true
 
       - name: Verify dependencies
@@ -221,7 +226,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v6
         with:
-          go-version: '1.25'
+          go-version: '1.27'
           cache: true
 
       # Pinned, not @latest, for two reasons. x/exp raises its own go directive
@@ -250,7 +255,7 @@ jobs:
         with:
           # See the Setup Go step in the lint-and-test job for why this is a
           # minor-version spec rather than go-version-file: go.mod (#109).
-          go-version: '1.25'
+          go-version: '1.27'
           cache: true
 
       - name: Run tests with race detector
@@ -270,7 +275,7 @@ jobs:
         with:
           # See the Setup Go step in the lint-and-test job for why this is a
           # minor-version spec rather than go-version-file: go.mod (#109).
-          go-version: '1.25'
+          go-version: '1.27'
           cache: true
 
       - name: Run benchmarks
@@ -315,7 +320,7 @@ jobs:
         with:
           # See the Setup Go step in the lint-and-test job for why this is a
           # minor-version spec rather than go-version-file: go.mod (#109).
-          go-version: '1.25'
+          go-version: '1.27'
           cache: true
 
       - name: Trial-merge every open PR and build it
@@ -337,7 +342,7 @@ jobs:
         with:
           # See the Setup Go step in the lint-and-test job for why this is a
           # minor-version spec rather than go-version-file: go.mod (#109).
-          go-version: '1.25'
+          go-version: '1.27'
           cache: true
 
       - name: Run integration tests

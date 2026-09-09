@@ -175,10 +175,10 @@ func ReadBintable(h *Header, r io.Reader) (*BintableHDU, error) {
 	rowSize, _ := h.GetInt("NAXIS1")
 
 	hdu := &BintableHDU{
-		basicHDU: basicHDU{header: h, hType: HDUTypeBinary},
-		Rows:     rows,
-		Cols:     tfields,
-		RowSize:  rowSize,
+		header: h, hType: HDUTypeBinary,
+		Rows:    rows,
+		Cols:    tfields,
+		RowSize: rowSize,
 	}
 
 	if rows == 0 || tfields == 0 {

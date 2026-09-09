@@ -81,8 +81,7 @@ func TestParseRoundTripsAndReportsFailure(t *testing.T) {
 		t.Fatal("Parse accepted a value that is not a time")
 	}
 
-	var perr *gotime.ParseError
-	if !errors.As(err, &perr) {
+	if _, ok := errors.AsType[*gotime.ParseError](err); !ok {
 		t.Errorf("Parse returned %T; a caller can no longer type-assert *time.ParseError.\n"+
 			"  That is what the //nolint:wrapcheck on this re-export exists to preserve.", err)
 	}

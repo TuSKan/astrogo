@@ -56,7 +56,7 @@ jobs:
           # cannot drift onto a different toolchain from ci.yml.
           # See the Setup Go step in the lint-and-test job for why this is a
           # minor-version spec rather than go-version-file: go.mod (#109).
-          go-version: '1.25'
+          go-version: '1.27'
           cache: true
 
       - name: Prepare output directory
@@ -88,7 +88,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v6
         with:
-          go-version: '1.25'
+          go-version: '1.27'
           cache: true
 
       - name: Prepare output directory

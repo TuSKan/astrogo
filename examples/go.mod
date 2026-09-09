@@ -11,7 +11,7 @@
 // directly, where a replace directive is ignored.
 module github.com/TuSKan/astrogo/examples
 
-go 1.25.8
+go 1.27
 
 require github.com/TuSKan/astrogo v0.19.0
 

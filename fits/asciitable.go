@@ -27,10 +27,10 @@ func ReadASCIITable(h *Header, r io.Reader) (*ASCIITableHDU, error) {
 	rowSize, _ := h.GetInt("NAXIS1")
 
 	hdu := &ASCIITableHDU{
-		basicHDU: basicHDU{header: h, hType: HDUTypeASCII},
-		Rows:     rows,
-		Cols:     tfields,
-		RowSize:  rowSize,
+		header: h, hType: HDUTypeASCII,
+		Rows:    rows,
+		Cols:    tfields,
+		RowSize: rowSize,
 	}
 
 	if rows == 0 || tfields == 0 {
