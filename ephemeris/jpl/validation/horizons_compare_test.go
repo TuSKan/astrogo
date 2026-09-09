@@ -73,11 +73,14 @@ func loadCases(t *testing.T) []*StateVector {
 
 // horizonsStateReference is what this compares against.
 //
-// Horizons serves DE441 and the local provider reads DE440, so both sides are
-// JPL ephemerides. That makes this a consistency check on astrogo's SPK
-// evaluation and time-scale handling rather than independent validation of
-// the ephemeris, and the shared ancestry is recorded so the generated table
-// says so.
+// Horizons serves DE441 and the local provider reads DE440. Both are JPL
+// ephemerides, so this is a consistency check on astrogo's SPK evaluation and
+// time-scale handling rather than independent validation of the ephemeris —
+// and they are not even the same JPL ephemeris, which is worth more than the
+// usual shared-ancestry note: the two kernels differ by 2.42 m at the Moon,
+// so part of what this measures is the gap between them rather than anything
+// astrogo does. SharedAncestor records both facts so the generated table
+// states them instead of leaving a reader to infer either.
 func horizonsStateReference() metrology.Reference {
 	return metrology.Reference{
 		Kind:           metrology.KindHorizons,
@@ -85,7 +88,7 @@ func horizonsStateReference() metrology.Reference {
 		Version:        "VECTORS, geocentric, ICRF",
 		Source:         "https://ssd.jpl.nasa.gov/api/horizons.api",
 		Dataset:        "DE441 (Horizons) against DE440 (local)",
-		SharedAncestor: "JPL DE",
+		SharedAncestor: "JPL DE — and not the same kernel: DE440/DE441 differ by 2.42 m at the Moon",
 	}
 }
 
@@ -94,36 +97,73 @@ func horizonsStateReference() metrology.Reference {
 //
 // # Why the tolerances moved by five orders of magnitude
 //
-// They were 1e-7 AU and 1e-8 AU/day, with no stated reason. Measured, the two
-// agree to 5.5e-14 AU for the Sun and Mars and 4.5e-12 AU for the Moon — the
-// old bound was about two million times the largest real residual, which is a
-// bound that cannot fail for the reason it exists. docs/VALIDATION.md
-// published those two numbers as the achieved accuracy of astrogo's
-// ephemerides, which they never were.
+// They were 1e-7 AU and 1e-8 AU/day, with no stated reason — about a hundred
+// thousand times the largest real residual, which is a bound that cannot fail
+// for the reason it exists. docs/VALIDATION.md published the measured figures
+// as the achieved accuracy of astrogo's ephemerides, which they never were.
 //
-// The bound below is derived from the smallest fault worth catching rather
-// than from what was measured. Both sides evaluate the same JPL integration —
-// DE441 and DE440 share it over this span — so a real disagreement is not an
-// ephemeris difference but a fault in kernel selection, segment choice or
-// time scale. The cheapest such fault to make is a one-second time-scale
-// error, which this repository had until recently in its leap-second parsing;
-// one second moves the Moon about a kilometre, or 6.7e-9 AU. A bound of
-// 1e-9 AU sits below that and two hundred times above the worst residual
-// actually observed, so it catches the fault class without tracking the noise.
+// # The two sides do not read the same kernel, and the bound accounts for it
+//
+// This comment used to say "both sides evaluate the same JPL integration —
+// DE441 and DE440 share it over this span", and derived the bound from that.
+// It is not true. Horizons reports {source: DE441} for these queries while
+// this test reads de440, and measured directly, geocentric positions from the
+// two kernels differ by 2.94 cm for the Sun, Mars and Jupiter and by 2.42 m
+// for the Moon — at J2000.0 and across 2026 alike (#255).
+//
+// So the residual has three terms, not two, and they separate cleanly by size:
+//
+//	astrogo's SPK evaluation and time scales   what this test is for
+//	the DE440/DE441 difference                 1.6e-11 AU at the Moon
+//	the cheapest fault worth catching          6.7e-9 AU, one second of UT
+//
+// The bound of 1e-9 AU sits above the kernel difference by sixty times and
+// below the fault threshold by seven, which is what makes it a usable
+// discriminator rather than a number pinned to a measurement. A one-second
+// time-scale error — which this repository had until recently in its
+// leap-second parsing — moves the Moon about a kilometre and cannot hide
+// under it.
+//
+// Most of the Moon's measured residual is therefore the kernel difference and
+// not astrogo. That is stated here, and in docs/VALIDATION.md, so the figure
+// is not read as astrogo's achieved accuracy — which is exactly the error the
+// old tolerances were fixed for.
+//
+// # Why de440 rather than the ephemeris Horizons serves
+//
+// Measured, switching to de441_part-2 takes the position from max 4.52e-12 AU
+// (0.676 m, worst body the Moon) to 9.80e-13 AU (0.147 m, worst body Mars),
+// and the velocity from 1.006e-12 to 1.405e-14 AU/day — 4.6 and 72 times
+// closer, with the Moon's excess gone. It would make the residual
+// attributable to astrogo alone.
+//
+// It is not worth what it costs. de441_part-2 is 1580 MB against de440's 114
+// MB, this package's TestMain grants unlimited NAIFSPK consent, and
+// pre-release.yml's network job runs on a clean runner — setup-go's cache
+// covers Go modules, not astrogo's data directory. Every scheduled run would
+// pull 1.58 GB from naif.jpl.nasa.gov rather than 114 MB. These suites already
+// lean on JPL, USNO, NASA and ESO, and courtesy to other people's servers is
+// part of the contract here.
+//
+// Nothing about the test's purpose is lost by the choice: the bound exists to
+// catch a kernel, segment or time-scale fault, and it clears the kernel
+// difference by sixty times either way. What is lost is attribution, and that
+// is recovered by writing the number down instead of paying for it every week.
 func TestJPLStateAgainstHorizons(t *testing.T) {
 	position := metrology.NewSuite("ephemeris.jpl.horizons.position", horizonsStateReference(),
 		metrology.MustContract(1e-9, "AU",
-			"one second of time-scale error moves the Moon about a kilometre (6.7e-09 AU), and "+
-				"both sides evaluate the same JPL integration, so anything above this is a kernel, "+
-				"segment or time-scale fault rather than a difference between ephemerides",
-			"Moon geocentric speed ~1 km/s; DE440 and DE441 share their integration over this span"))
+			"sits sixty times above the DE440/DE441 kernel difference (1.6e-11 AU at the Moon) "+
+				"and seven times below one second of time-scale error (6.7e-09 AU), so it "+
+				"discriminates a kernel, segment or time-scale fault from the ephemeris gap "+
+				"the two sides genuinely have",
+			"Moon geocentric speed ~1 km/s; DE440 vs DE441 measured at 1.6e-11 AU (2.42 m)"))
 
 	velocity := metrology.NewSuite("ephemeris.jpl.horizons.velocity", horizonsStateReference(),
 		metrology.MustContract(1e-10, "AU/day",
-			"0.17 mm/s, far below any physical disagreement between two evaluations of one "+
-				"integration and far above the Chebyshev round-off actually measured; the velocity "+
-				"is the derivative of the same polynomials, so it fails to the same causes",
-			"same reasoning as the position bound on this comparison"))
+			"0.17 mm/s, far below any physical disagreement between two JPL integrations and "+
+				"far above the Chebyshev round-off actually measured; the velocity is the "+
+				"derivative of the same polynomials, so it fails to the same causes",
+			"same reasoning as the position bound on this comparison, kernel gap included"))
 
 	if !testutil.Reachable(horizonsHost) {
 		metrology.NotVerified(t, "JPL Horizons is unreachable", position, velocity)
