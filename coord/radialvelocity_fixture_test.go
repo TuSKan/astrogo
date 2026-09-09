@@ -5,7 +5,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
-	"sort"
+	"slices"
 	"testing"
 
 	"github.com/TuSKan/astrogo/angle"
@@ -274,7 +274,7 @@ func TestRVCorrectionAgainstAstropy(t *testing.T) {
 	// Asserting the size of a known difference is worth more than ignoring
 	// it: if the two implementations ever diverge for some *other* reason,
 	// this number moves and says so.
-	sort.Float64s(relativistic)
+	slices.Sort(relativistic)
 
 	const (
 		predictedRelativistic = 4.649e-3 // km/s
@@ -304,7 +304,7 @@ func TestRVCorrectionAgainstAstropy(t *testing.T) {
 func reportFullTreatment(t *testing.T, full []float64) {
 	t.Helper()
 
-	sort.Float64s(full)
+	slices.Sort(full)
 
 	t.Logf("Astropy barycentric minus astrogo full treatment: n=%d p50=%.4f p95=%.4f max=%.4f m/s",
 		len(full), metrology.Quantile(full, 0.5)*1e3,

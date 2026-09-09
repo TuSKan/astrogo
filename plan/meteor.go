@@ -3,7 +3,7 @@ package plan
 import (
 	"fmt"
 	"math"
-	"sort"
+	"slices"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
@@ -77,7 +77,7 @@ func MeteorShowerNames() []string {
 		out = append(out, s.Name)
 	}
 
-	sort.Strings(out)
+	slices.Sort(out)
 
 	return out
 }

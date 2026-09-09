@@ -6,7 +6,7 @@ import (
 	"context"
 	"fmt"
 	"math"
-	"sort"
+	"slices"
 	"testing"
 
 	"github.com/TuSKan/astrogo/angle"
@@ -82,7 +82,7 @@ func TestSFDMatchesIRSA(t *testing.T) {
 		t.Fatal("nothing to compare")
 	}
 
-	sort.Float64s(ratios)
+	slices.Sort(ratios)
 
 	median := ratios[len(ratios)/2]
 	p05, p95 := ratios[len(ratios)*5/100], ratios[len(ratios)*95/100]

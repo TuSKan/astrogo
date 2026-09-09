@@ -3,7 +3,7 @@
 package jpl_test
 
 import (
-	"sort"
+	"slices"
 	"testing"
 
 	"github.com/TuSKan/astrogo/angle"
@@ -199,7 +199,7 @@ func TestScientificStability(t *testing.T) {
 	t.Logf("%d of %d entries are below the horizon in Horizons' own answer and are compared "+
 		"astrometrically only", belowHorizon, len(c.Entries))
 
-	sort.Float64s(aberrationGap)
+	slices.Sort(aberrationGap)
 
 	t.Logf("apparent-place gap against Horizons' astrometric column (measured, not contracted): "+
 		"n=%d p50=%.3f p95=%.3f max=%.3f arcsec — this is Earth's motion over the light time, "+

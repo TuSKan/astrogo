@@ -673,11 +673,9 @@ func (r *Resolver) bridgeConeSearch(ctx context.Context, groups []group) []group
 
 	for _, j := range jobs {
 		for _, cp := range r.coneSearchers {
-			wg.Add(1)
+			groupIdx, anchor := j.groupIdx, j.anchor
 
-			go func(groupIdx int, anchor coord.ICRS, cp coneProvider) {
-				defer wg.Done()
-
+			wg.Go(func() {
 				req := resolve.ConeRequest{Center: anchor, Radius: radius, Limit: 20}
 
 				var found []candidate
@@ -700,7 +698,7 @@ func (r *Resolver) bridgeConeSearch(ctx context.Context, groups []group) []group
 				extra[groupIdx] = append(extra[groupIdx], found...)
 
 				mu.Unlock()
-			}(j.groupIdx, j.anchor, cp)
+			})
 		}
 	}
 

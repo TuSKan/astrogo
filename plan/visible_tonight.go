@@ -1,10 +1,11 @@
 package plan
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
-	"sort"
+	"slices"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
@@ -348,7 +349,9 @@ func VisibleTonight(
 		dropped.add("candidate", r.name, r.err)
 	}
 
-	sort.Slice(results, func(i, j int) bool { return results[i].ApparentMag < results[j].ApparentMag })
+	slices.SortFunc(results, func(a, b VisibleObject) int {
+		return cmp.Compare(a.ApparentMag, b.ApparentMag)
+	})
 
 	return results, dropped.err()
 }

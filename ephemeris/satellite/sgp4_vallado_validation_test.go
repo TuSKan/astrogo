@@ -16,6 +16,7 @@ import (
 	"bufio"
 	"math"
 	"os"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -347,8 +348,8 @@ func TestSGP4AgreesWithValladoReferenceVectors(t *testing.T) {
 			rejected, len(checksumInvalid))
 	}
 
-	sort.Float64s(verifiedPos)
-	sort.Float64s(verifiedVel)
+	slices.Sort(verifiedPos)
+	slices.Sort(verifiedVel)
 
 	if p99 := quantile(verifiedPos, 0.99); p99 > verifiedP99Km {
 		t.Errorf("verified-set p99 position error is %.4f km, regression detector is %.2f km.\n"+

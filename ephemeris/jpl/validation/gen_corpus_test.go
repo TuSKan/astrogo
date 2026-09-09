@@ -10,7 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"sort"
+	"slices"
 	"strings"
 	"testing"
 
@@ -333,9 +333,9 @@ func diffCorpus(old, fresh *corpus) string {
 		}
 	}
 
-	sort.Strings(added)
-	sort.Strings(removed)
-	sort.Strings(changed)
+	slices.Sort(added)
+	slices.Sort(removed)
+	slices.Sort(changed)
 
 	var b strings.Builder
 

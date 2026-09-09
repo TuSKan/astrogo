@@ -107,16 +107,14 @@ func MapChunked[W any](n, workers int, newWorker func() W, f func(w W, i int)) {
 	for start := 0; start < n; start += chunkSize {
 		end := min(start+chunkSize, n)
 
-		wg.Add(1)
+		lo, hi := start, end
 
-		go func(lo, hi int) {
-			defer wg.Done()
-
+		wg.Go(func() {
 			w := newWorker()
 			for i := lo; i < hi; i++ {
 				f(w, i)
 			}
-		}(start, end)
+		})
 	}
 
 	wg.Wait()
