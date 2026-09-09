@@ -4,6 +4,7 @@ package plan_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/TuSKan/astrogo/catalog/resolve"
@@ -53,6 +54,13 @@ func TestVisibleTonight_MinorBodiesRespectMagLimit(t *testing.T) {
 
 	tight, err := plan.VisibleTonight(ctx, site, testNight, 2, sources, ephemeris.Default())
 	if err != nil {
+		// A skipped candidate is reported, not swallowed — that is what
+		// ErrIncomplete is for — so an unreachable or overloaded Horizons
+		// arrives here rather than as a missing row. CLAUDE.md's rule for
+		// this tier is to skip on external downtime and never fail CI for
+		// it; the TCP pre-check in requireJPL cannot see a 503, which
+		// happens one layer deeper (#244).
+		testutil.SkipOnUpstreamFailure(t, err)
 		t.Fatalf("VisibleTonight (magLimit=2): %v", err)
 	}
 
@@ -64,6 +72,7 @@ func TestVisibleTonight_MinorBodiesRespectMagLimit(t *testing.T) {
 
 	loose, err := plan.VisibleTonight(ctx, site, testNight, 5, sources, ephemeris.Default())
 	if err != nil {
+		testutil.SkipOnUpstreamFailure(t, err)
 		t.Fatalf("VisibleTonight (magLimit=5): %v", err)
 	}
 
@@ -96,10 +105,18 @@ func TestVisibleTonight_MinorBodiesRespectMagLimit(t *testing.T) {
 // (~32 MB), the full planetaryMoons set spans six kernels totaling ~2.4 GB
 // (Jupiter's alone is ~1.1 GB), which would make this an unreasonably
 // expensive test to run routinely. Denied-by-cap kernels are skipped by
-// gatherPlanetaryMoons exactly like a denied-by-policy one — not a test
-// failure — so this still exercises the real fetch-and-compute path for
-// Phobos/Deimos/Triton without paying for Jupiter/Saturn/Uranus/Pluto's
-// far larger kernels every run.
+// gatherPlanetaryMoons exactly like a denied-by-policy one, so this still
+// exercises the real fetch-and-compute path for Phobos/Deimos/Triton
+// without paying for Jupiter/Saturn/Uranus/Pluto's far larger kernels every
+// run.
+//
+// Those skips are reported, though. This comment used to add "not a test
+// failure", and that stopped being true when VisibleTonight began returning
+// ErrIncomplete for anything it dropped — correctly, since a caller who
+// cannot tell a short list from a short list plus an unreachable JPL is the
+// defect ErrIncomplete exists to fix. So this test induces four denials on
+// purpose and then has to accept the report of them, while still failing on
+// any reason that is not the cap it set itself (#244).
 //
 // magLimit=16 is loose enough for Triton (~mag 13.5) and Phobos/Deimos
 // (~mag 11-13 from Earth, effectively never actually visible at Mars's
@@ -124,7 +141,22 @@ func TestVisibleTonight_PlanetaryMoons(t *testing.T) {
 
 	results, err := plan.VisibleTonight(ctx, site, testNight, 16, nil, ephemeris.Default(), plan.WithPlanetaryMoons())
 	if err != nil {
-		t.Fatalf("VisibleTonight with WithPlanetaryMoons: %v", err)
+		testutil.SkipOnUpstreamFailure(t, err)
+
+		if !errors.Is(err, plan.ErrIncomplete) {
+			t.Fatalf("VisibleTonight with WithPlanetaryMoons: %v", err)
+		}
+
+		// Every reason has to be the cap this test set. A kernel that failed
+		// to parse, or a site that could not be resolved, is precisely what
+		// this test would otherwise stop reporting.
+		for _, reason := range flattenReasons(err) {
+			if !errors.Is(reason, remote.ErrDownloadDenied) {
+				t.Fatalf("VisibleTonight reported a skip this test did not cause: %v", reason)
+			}
+		}
+
+		t.Logf("expected incompleteness from this test's own download cap: %v", err)
 	}
 
 	for _, r := range results {

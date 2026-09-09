@@ -90,6 +90,34 @@ func TestMapHorizonsStatus(t *testing.T) {
 		}
 	}
 
+	// The status has to survive the mapping, not just the sentinel.
+	//
+	// internal/testutil.SkipOnUpstreamFailure decides "this is the remote end
+	// failing, skip rather than fail CI" by looking for an error carrying
+	// HTTPStatus() int. When these sentinels replaced the HTTP error instead
+	// of wrapping it, a Horizons 503 could not be recognised as downtime and
+	// failed tests written to tolerate it (#244).
+	for _, status := range []int{
+		http.StatusBadRequest,
+		http.StatusMethodNotAllowed,
+		http.StatusInternalServerError,
+		http.StatusServiceUnavailable,
+	} {
+		mapped := mapHorizonsStatus(&api.HTTPError{StatusCode: status})
+
+		var carrier interface{ HTTPStatus() int }
+		if !errors.As(mapped, &carrier) {
+			t.Errorf("mapHorizonsStatus(%d) = %v, which carries no HTTP status; "+
+				"upstream downtime becomes indistinguishable from a bad request", status, mapped)
+
+			continue
+		}
+
+		if got := carrier.HTTPStatus(); got != status {
+			t.Errorf("mapHorizonsStatus(%d) carries status %d", status, got)
+		}
+	}
+
 	unexpected := mapHorizonsStatus(&api.HTTPError{StatusCode: http.StatusTeapot})
 	if unexpected == nil {
 		t.Error("mapHorizonsStatus(teapot) = nil, want ErrHorizonsUnexpected-wrapped error")
