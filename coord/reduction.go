@@ -66,12 +66,21 @@ func (r *Reducer) Reduce(v vector.Vec3) *Reduction {
 	N := -ctx.sinLat*ctx.cosLon*tx - ctx.sinLat*ctx.sinLon*ty + ctx.cosLat*tz
 	U := ctx.cosLat*ctx.cosLon*tx + ctx.cosLat*ctx.sinLon*ty + ctx.sinLat*tz
 
+	// Diurnal aberration, the same term Context.GeocentricToObserved applies
+	// below. Geometric here means "Observed without refraction" rather than
+	// "before every correction" — the field pair exists so a caller can see
+	// what the atmosphere did, and TestReducer_Group1_GeometricConsistency
+	// pins the two as equal in a vacuum. Aberration is not refraction, so
+	// leaving it out of this one would break that equality and make the pair
+	// answer a question nobody asked (#261).
+	E, N, U = ctx.aberrateDiurnal(E, N, U, topoVec.Norm())
+
 	azimuth := math.Atan2(E, N)
 	if azimuth < 0 {
 		azimuth += 2 * math.Pi
 	}
 
-	altitude := math.Asin(U / topoVec.Norm())
+	altitude := math.Atan2(U, math.Hypot(E, N))
 	geomAltAz := NewAltAz(angle.Rad(altitude), angle.Rad(azimuth))
 
 	// Observed (refracted) AltAz via Context's full pipeline.
