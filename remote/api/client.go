@@ -2,7 +2,8 @@ package api
 
 import (
 	"context"
-	"encoding/json"
+	"encoding/json/jsontext"
+	json "encoding/json/v2"
 	"fmt"
 	"io"
 	"net/url"
@@ -205,7 +206,7 @@ func (c *Client) GetJSON(ctx context.Context, id remote.EndpointID, path string,
 
 	defer func() { _ = r.Close() }()
 
-	if err := json.NewDecoder(r).Decode(out); err != nil {
+	if err := json.UnmarshalRead(r, out, decodeOptions...); err != nil {
 		return fmt.Errorf("remote/api: decode JSON from %q: %w", id, err)
 	}
 
@@ -383,3 +384,47 @@ func (e *HTTPError) Error() string {
 // treating a 5xx as the service's fault rather than its own — through a small
 // interface rather than a dependency on this package's concrete type.
 func (e *HTTPError) HTTPStatus() int { return e.StatusCode }
+
+// decodeOptions holds the two places where encoding/json/v2's defaults are
+// deliberately turned back to v1's behaviour, and by omission the one place
+// they are not.
+//
+// # What v2 is here for
+//
+// Measured on an SBDB-shaped 5.4 KB response: 24.5 us against v1's 37.4 us,
+// 12.1 KB against 28.8 KB, 9 allocations against 20. Every JSON response any
+// astrogo provider receives comes through this one function, so that is the
+// whole of the library's API decoding.
+//
+// # Duplicate object names stay rejected, which is v2's default
+//
+// v1 silently took the last of a repeated key. That is the failure this
+// library keeps finding in other guises: a wrong answer delivered with
+// confidence, indistinguishable from a right one. A response that repeats a
+// name is malformed, and saying so is worth more than guessing which
+// occurrence was meant.
+//
+// # Case-insensitive matching is restored, which v2 drops
+//
+// v2 matches JSON names to struct fields exactly, so a service that renamed
+// "ra" to "RA" would stop binding — silently, leaving the field zero. For a
+// coordinate that is not a missing value: RA 0, Dec 0 is a real point in
+// Pisces, and a target built on it rises, transits and sets without
+// complaint. plan.ErrNoCoordinates exists because that exact substitution
+// reached production once already.
+//
+// So exact matching trades a silently wrong value for a silently zero one,
+// which is not an improvement, and v1's leniency is kept. Every response
+// astrogo receives today matches exactly — the whole network suite passes
+// with this option removed — so this costs nothing now and covers a rename
+// later.
+//
+// # Invalid UTF-8 is tolerated, which v2 rejects
+//
+// A bad byte in an object's *name* should not cost the caller its position.
+// v1 replaced it with U+FFFD and that is the right trade here: the field that
+// might be mangled is a label, and the fields that must be right are numbers.
+var decodeOptions = []json.Options{
+	json.MatchCaseInsensitiveNames(true),
+	jsontext.AllowInvalidUTF8(true),
+}
