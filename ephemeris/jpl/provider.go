@@ -570,16 +570,26 @@ func (p *Provider) loadSmallBodyKernels(readers []*spk.Reader) error {
 	return p.verifyRequestedBodyLoaded(after)
 }
 
-// numberedAsteroid reports the asteroid number a designation names, and
-// whether it names one at all. "433" and "433;" both name 433; a provisional
+// numberedAsteroid reports the body a designation names, and whether it names
+// a predictable one at all. "433" and "433;" both name Eros; a provisional
 // designation or a comet fragment names nothing predictable.
-func numberedAsteroid(designation string) (int, bool) {
+//
+// A bare integer is not enough to make it an asteroid number. Horizons'
+// comet index issues SPK-IDs that are also bare integers — 1000390 for
+// C/2002 J5 (LINEAR) — and they sit outside NAIF's numbered-asteroid
+// allocation entirely. [core.SmallBodyID] is the authority on that bound and
+// reports 0 for anything beyond it, so it is asked rather than having its
+// constant copied here, where the two could drift apart without either side
+// noticing.
+func numberedAsteroid(designation string) (core.ID, bool) {
 	n, err := strconv.Atoi(strings.TrimSuffix(designation, ";"))
-	if err != nil || n <= 0 {
+	if err != nil {
 		return 0, false
 	}
 
-	return n, true
+	id := core.SmallBodyID(n)
+
+	return id, id != 0
 }
 
 // verifyRequestedBodyLoaded checks that the body loaded is the body asked
@@ -594,16 +604,23 @@ func numberedAsteroid(designation string) (int, bool) {
 //
 // A numbered asteroid has a knowable identifier, so this is checkable rather
 // than a matter of trusting the syntax: asteroid n must arrive as
-// [core.SmallBodyID](n). A designation that is not a bare number — a comet
-// fragment, a provisional designation — names nothing this can predict and
-// is left alone.
+// [core.SmallBodyID](n). A designation that does not name one — a comet
+// fragment, a provisional designation, or a Horizons SPK-ID from the comet
+// index — names nothing this can predict and is left alone.
+//
+// That last case is why the check asks [numberedAsteroid] for a body rather
+// than for a number. Composing the two by hand read as
+// slices.Contains(loaded, core.SmallBodyID(n)), which for a comet SPK-ID
+// compares against SmallBodyID's out-of-range zero: the body genuinely
+// requested is present, ID 0 is not, and the guard reported the loudest wrong
+// answer it has — that Horizons substituted a different object — for a load
+// that was entirely correct.
 func (p *Provider) verifyRequestedBodyLoaded(loaded []core.ID) error {
-	n, ok := numberedAsteroid(p.kernel)
+	want, ok := numberedAsteroid(p.kernel)
 	if !ok {
 		return nil
 	}
 
-	want := core.SmallBodyID(n)
 	if slices.Contains(loaded, want) {
 		return nil
 	}
