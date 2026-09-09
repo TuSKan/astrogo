@@ -2,79 +2,94 @@ package leakcheck_test
 
 import (
 	"strings"
+	"sync"
 	"testing"
 
-	"github.com/TuSKan/astrogo/time"
-
 	"github.com/TuSKan/astrogo/internal/leakcheck"
+	"github.com/TuSKan/astrogo/time"
 )
 
-// TestLeakedGoroutinesFindsOne is the check that makes the guard worth having.
+// settle is how long these tests will wait for a goroutine to park.
+//
+// The runtime proves a leak by unreachability, but only for a goroutine that
+// has actually blocked — one that has been spawned and not yet scheduled is
+// merely runnable, and correctly not a leak. Measured here, a single
+// runtime.Gosched was enough; this is generous because a loaded CI runner is
+// not this machine.
+//
+// It is a bound on patience, not a settle window of the kind the earlier
+// version of this package needed: nothing here concludes anything from the
+// time elapsing.
+const (
+	settle = 2 * time.Second
+	poll   = 5 * time.Millisecond
+)
+
+// TestLeakedProvesTheShapesItClaims is the check that makes this guard worth
+// having, and the reason it is not simply trusted.
 //
 // A leak detector that has never caught anything is indistinguishable from one
-// that cannot, and this one is installed as a TestMain — where a false negative
-// is completely silent, because the package simply passes. So it is pointed at
-// a goroutine that will never return.
+// that cannot, and this one runs from TestMain — where a false negative is
+// completely silent, because the package just passes.
 //
-// The leaked goroutine is deliberately not cleaned up: there is no way to stop
-// a `select {}` and nothing to gain from one, since the test binary is about to
-// exit anyway. It is a handful of bytes for the rest of the run.
-func TestLeakedGoroutinesFindsOne(t *testing.T) {
-	// Not parallel: it reads every goroutine in the process, so a sibling
-	// test's workers would show up as its subject.
-	started := make(chan struct{})
+// The shapes are the ones the doc comment claims, asserted rather than
+// described. The leaked goroutines are deliberately never released: there is
+// no way to release a goroutine blocked on an unreachable channel, which is
+// the definition being tested.
+func TestLeakedProvesTheShapesItClaims(t *testing.T) {
+	// Not parallel: the profile is process-wide, so a sibling test's
+	// goroutines would appear in this one's result.
+	before := countLeaks(t, mustLeaked(t))
 
-	go func() {
-		close(started)
+	// Blocked forever on a channel that goes out of scope with it.
+	func() {
+		ch := make(chan int)
 
-		select {} // never returns, which is the point
+		go func() { <-ch }()
 	}()
 
-	<-started
+	// Blocked on a WaitGroup nothing will ever mark done.
+	func() {
+		var wg sync.WaitGroup
 
-	got := leakcheck.LeakedGoroutines(200 * time.Millisecond)
-	if got == "" {
-		t.Fatal("a goroutine blocked forever was not reported; a leak check that " +
-			"cannot fail is a package that only looks clean")
+		wg.Add(1)
+
+		go func() { wg.Wait() }()
+	}()
+
+	after, report := waitForLeaks(t, before+2)
+	if after < before+2 {
+		t.Fatalf("two goroutines blocked on unreachable synchronisation were reported "+
+			"as %d leaks, want at least %d; a leak check that cannot fail is a package "+
+			"that only looks clean\n%s", after, before+2, report)
 	}
 
-	// The report has to name something a reader can act on. "select (no
-	// cases)" is what the runtime calls a goroutine parked forever.
-	if !strings.Contains(got, "goroutine") {
-		t.Errorf("report does not name a goroutine:\n%s", got)
-	}
-}
-
-// TestLeakedGoroutinesIgnoresTheTestRunner pins the other half: the check must
-// not report the goroutine running the tests, or every package fails always
-// and the guard is turned off within a day.
-//
-// This runs in the same binary as the test above, so it cannot assert a clean
-// result outright — that one's leak is still parked. What it can assert is
-// that the runner and the check's own frames are not in the report, which is
-// the part that would break every package rather than one.
-func TestLeakedGoroutinesIgnoresTheTestRunner(t *testing.T) {
-	got := leakcheck.LeakedGoroutines(50 * time.Millisecond)
-
-	for _, unwanted := range []string{
-		"testing.(*M).Run",
-		"leakcheck.LeakedGoroutines",
-		"leakcheck.survivingGoroutines",
-	} {
-		if strings.Contains(got, unwanted) {
-			t.Errorf("report includes %q, which is the framework rather than a leak:\n%s",
-				unwanted, got)
-		}
+	// The report has to name somewhere a reader can go.
+	if !strings.Contains(report, "leakcheck_test") {
+		t.Errorf("the report does not name the code that leaked:\n%s", report)
 	}
 }
 
-// TestLeakedGoroutinesWaitsForStragglers covers the settle window.
+// TestLeakedIgnoresAGoroutineThatWillWake is the half an earlier version of
+// this package could not get right.
 //
-// A goroutine on its way out is not a leak, and the difference is only visible
-// in time. Without the wait this check would fail on any test whose last
-// worker had not yet been scheduled to return — a flake that would look like a
-// real finding and would be chased for hours.
-func TestLeakedGoroutinesWaitsForStragglers(t *testing.T) {
+// That version counted every goroutine still running when the tests ended, so
+// it needed a settle window and a guess at how long stragglers take — which
+// makes a slow worker indistinguishable from a leak in both directions. The
+// runtime's definition has no such ambiguity: a sleeping goroutine is blocked
+// on a timer that will fire, so it is not leaked, however long it sleeps.
+//
+// The count is re-read repeatedly rather than once, so that the sleeper is
+// given every chance to be miscounted rather than merely being too young to
+// notice.
+func TestLeakedIgnoresAGoroutineThatWillWake(t *testing.T) {
+	before := countLeaks(t, mustLeaked(t))
+
+	// An hour is far longer than any test run, so if duration mattered this
+	// would be reported.
+	go func() { time.Sleep(time.Hour) }()
+
+	// And one that is merely slow rather than stuck.
 	done := make(chan struct{})
 
 	go func() {
@@ -82,12 +97,84 @@ func TestLeakedGoroutinesWaitsForStragglers(t *testing.T) {
 		close(done)
 	}()
 
-	// Long enough to outlast the sleeper, so it must not be reported.
-	got := leakcheck.LeakedGoroutines(2 * time.Second)
+	for range 20 {
+		report := mustLeaked(t)
+		if got := countLeaks(t, report); got != before {
+			t.Fatalf("a goroutine that will wake was reported as leaked: %d, want %d\n%s",
+				got, before, report)
+		}
+
+		time.Sleep(poll)
+	}
 
 	<-done
+}
 
-	if strings.Contains(got, "TestLeakedGoroutinesWaitsForStragglers") {
-		t.Errorf("a goroutine that finished within the settle window was reported:\n%s", got)
+// mustLeaked reads the profile, failing the test rather than the package if it
+// is unavailable.
+func mustLeaked(t *testing.T) string {
+	t.Helper()
+
+	report, err := leakcheck.Leaked()
+	if err != nil {
+		t.Fatalf("Leaked: %v", err)
 	}
+
+	return report
+}
+
+// waitForLeaks polls until the profile reports at least want leaks, and
+// returns what it last saw either way.
+//
+// Polling is for the goroutines to park, not for a leak to develop: a parked
+// goroutine's unreachability is decided by the GC cycle the profile runs, and
+// that answer does not change with more waiting.
+func waitForLeaks(t *testing.T, want int) (int, string) {
+	t.Helper()
+
+	var (
+		report string
+		got    int
+	)
+
+	for waited := time.Duration(0); waited < settle; waited += poll {
+		report = mustLeaked(t)
+
+		if got = countLeaks(t, report); got >= want {
+			return got, report
+		}
+
+		time.Sleep(poll)
+	}
+
+	return got, report
+}
+
+// countLeaks reads the count off the profile header, or 0 when the profile is
+// empty.
+func countLeaks(t *testing.T, profile string) int {
+	t.Helper()
+
+	if profile == "" {
+		return 0
+	}
+
+	head, _, _ := strings.Cut(profile, "\n")
+
+	_, total, ok := strings.Cut(head, "total ")
+	if !ok {
+		t.Fatalf("profile header has no total: %q", head)
+	}
+
+	n := 0
+
+	for _, c := range strings.TrimSpace(total) {
+		if c < '0' || c > '9' {
+			break
+		}
+
+		n = n*10 + int(c-'0')
+	}
+
+	return n
 }
