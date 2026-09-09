@@ -452,9 +452,23 @@ var lightAUPerDay = constants.SI2019.SpeedOfLight.Value *
 // the result — it is already there, and doubling it puts a planet at
 // opposition some twenty arcseconds from where it is.
 //
+// Gravitational light deflection by the Sun is applied too, which is the other
+// half of what "apparent" means and was missing until #263. Measured over
+// 2026 it is a few hundredths of an arcsecond at ordinary elongations and a
+// couple of tenths in the tail — small, and the same size as astrogo's own
+// measured agreement with JPL Horizons, which is the argument for having it.
+// [AstrometricState] deliberately does not apply it: the astrometric place is
+// light time and nothing else, which is what Horizons publishes as quantity 1
+// and what astrogo agrees with there to three microarcseconds.
+//
+// Only the position is deflected. Deflection bends a light ray, so it is a
+// statement about a direction; the returned velocity is the target's, un-bent,
+// and differentiating the deflected position would not reproduce it.
+//
 // [coord.Context.GeocentricToObserved] is the matching consumer: it adds
-// diurnal parallax, the rotation into the local horizon and refraction, and
-// deliberately does not touch aberration.
+// diurnal parallax, the rotation into the local horizon, diurnal aberration
+// and refraction, and deliberately does not touch annual aberration or
+// deflection.
 func ApparentState(p Provider, target ID, obsTime time.Time) (State, error) {
 	st, err := p.State(target, obsTime)
 	if err != nil {
@@ -480,7 +494,108 @@ func ApparentState(p Provider, target ID, obsTime time.Time) (State, error) {
 		}
 	}
 
+	deflected, err := deflectBySun(p, st.Pos, target, obsTime, obsTime.AddDays(-tauDays))
+	if err != nil {
+		return State{}, err
+	}
+
+	st.Pos = deflected
+
 	return st, nil
+}
+
+// deflectBySun bends a geocentric direction by the Sun's gravity, returning
+// the position with its direction corrected and its length unchanged.
+//
+// # Why it is here and not in coord
+//
+// Deflection happens on the way from the target to the Earth, so it belongs to
+// the geocentric place. By the time [coord.Context.GeocentricToObserved] has
+// the vector, that place is an input; correcting it there would mean coord
+// re-deriving the Sun's position to fix something that should have arrived
+// correct.
+//
+// # The geometry
+//
+// SOFA's iauLd, which needs three directions and one distance:
+//
+//	p    observer to source        - the geocentric vector, normalised
+//	q    Sun to source             - that vector less the Sun's own geocentric
+//	                                 position, both at the retarded epoch where
+//	                                 the light was
+//	e    Sun to observer           - the reverse of the Sun's geocentric
+//	                                 position at the observing epoch
+//	em   Sun to observer, in au    - and its magnitude
+//
+// The Sun comes from the same Provider as the target rather than from Epv00,
+// which [earthBarycentric] uses for the aberration correction. The reason is
+// self-consistency: one ephemeris, one Sun, and a synthetic Provider used in a
+// test gets the geometry it declares rather than the real Sun's. Every
+// Provider in this library answers for the Sun already, because elongation and
+// apparent magnitude need it — see [WithKeplerBase], which exists to guarantee
+// exactly that for a Kepler propagator.
+//
+// The observer is taken at obsTime rather than at the retarded epoch, which is
+// what SOFA's own Atciq does. Over a light time the Earth moves at most a few
+// thousandths of an au, worth a per cent of a term that is itself a few
+// hundredths of an arcsecond - three or four microarcseconds, well below what
+// anything downstream can see.
+//
+// The deflection limiter is SOFA's own expression from iauLdsun: phi^2/2 with
+// phi about five arcminutes at one au, so it engages only well inside the
+// solar disc, where nothing is observable anyway and the unlimited formula
+// would diverge.
+//
+// The Sun itself is returned untouched. Its own geocentric position is the one
+// being subtracted, so q would have no direction, and a body does not deflect
+// its own light.
+func deflectBySun(p Provider, pos vector.Vec3, target ID, obsTime, retardedTime time.Time) (vector.Vec3, error) {
+	if target == core.Sun {
+		return pos, nil
+	}
+
+	sunNow, err := p.State(core.Sun, obsTime)
+	if err != nil {
+		return vector.Vec3{}, fmt.Errorf("ephemeris: apparent state: sun for light deflection: %w", err)
+	}
+
+	sunThen, err := p.State(core.Sun, retardedTime)
+	if err != nil {
+		return vector.Vec3{}, fmt.Errorf("ephemeris: apparent state: retarded sun for light deflection: %w", err)
+	}
+
+	// Sun to observer is the reverse of the Sun's geocentric position.
+	sunToObserver := sunNow.Pos.MulScalar(-1)
+	sunToSource := pos.Sub(sunThen.Pos)
+
+	norm := pos.Norm()
+	em := sunToObserver.Norm()
+
+	if norm == 0 || sunToSource.Norm() == 0 || em == 0 {
+		return pos, nil
+	}
+
+	// iauLdsun's limiter, verbatim: 1e-6 over the squared distance, floored so
+	// an observer inside one au does not get a larger limit than one at Earth.
+	em2 := math.Max(em*em, 1.0)
+
+	deflected := gofaext.Ld(1.0,
+		unitArray(pos), unitArray(sunToSource), unitArray(sunToObserver),
+		em, 1e-6/em2)
+
+	// Ld returns a vector that is not exactly unit - SOFA says the departure is
+	// always negligible - so the range is restored from the input rather than
+	// carried through, keeping Distance() exactly what light time made it.
+	out := vector.V3(deflected[0], deflected[1], deflected[2])
+
+	return out.Unit().MulScalar(norm), nil
+}
+
+// unitArray is the [3]float64 form gofa's vector routines take.
+func unitArray(v vector.Vec3) [3]float64 {
+	u := v.Unit()
+
+	return [3]float64{u.X, u.Y, u.Z}
 }
 
 // Light-time iteration limits.

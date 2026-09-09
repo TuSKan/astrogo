@@ -46,14 +46,17 @@ func ExampleApparentState() {
 		panic(err)
 	}
 
-	// The difference is where Mars moved to while its light was in transit.
+	// The difference is almost entirely where Mars moved to while its light was
+	// in transit. About 29 km of it is the Sun bending that light on the way
+	// (#263), which at this elongation is 0.017 arcsec — real, and two orders
+	// of magnitude below the term it sits inside.
 	moved := apparent.Pos.Sub(geometric).Norm()
 
 	// 2.31 AU is 1154 s of light time, and Mars and Earth move at up to ~55
 	// km/s relative to one another, so tens of thousands of kilometres is the
 	// size to expect here rather than a rounding artefact.
-	fmt.Printf("light time carries it %.0f km\n", moved*1.495978707e8)
+	fmt.Printf("geometric to apparent is %.0f km\n", moved*1.495978707e8)
 
 	// Output:
-	// light time carries it 63461 km
+	// geometric to apparent is 63490 km
 }

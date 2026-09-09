@@ -139,7 +139,7 @@ func TestAstrometricAgreesWithHorizonsGeocentric(t *testing.T) {
 	)
 
 	for _, body := range bodies {
-		rows, err := fetchGeocentricSeries(body.command, body.name,
+		rows, err := fetchGeocentricSeries(body.command, body.name, "1",
 			"2026-01-01", "2026-12-27", "30d")
 		if err != nil {
 			testutil.SkipOnUpstreamFailure(t, err)
@@ -297,7 +297,7 @@ type astrometricRow struct {
 // microarcseconds, which is below anything this comparison could care about.
 // The lesson is worth keeping: agreement measured against a rounded reference
 // is a measurement of the rounding.
-func fetchGeocentricSeries(command, bodyName, startStr, stopStr, stepStr string) ([]astrometricRow, error) {
+func fetchGeocentricSeries(command, bodyName, quantity, startStr, stopStr, stepStr string) ([]astrometricRow, error) {
 	_ = bodyName
 
 	params := url.Values{}
@@ -309,7 +309,8 @@ func fetchGeocentricSeries(command, bodyName, startStr, stopStr, stepStr string)
 	params.Add("START_TIME", fmt.Sprintf("'%s'", startStr))
 	params.Add("STOP_TIME", fmt.Sprintf("'%s'", stopStr))
 	params.Add("STEP_SIZE", fmt.Sprintf("'%s'", stepStr))
-	params.Add("QUANTITIES", "'1'")
+	params.Add("QUANTITIES", "'"+quantity+"'")
+	params.Add("APPARENT", "'AIRLESS'")
 	params.Add("CAL_FORMAT", "'JD'")
 	params.Add("ANG_FORMAT", "'DEG'")
 	params.Add("EXTRA_PREC", "'YES'")

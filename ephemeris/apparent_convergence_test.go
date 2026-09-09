@@ -56,10 +56,18 @@ func TestApparentStateHasConverged(t *testing.T) {
 				// answer implies and ask again.
 				tau := settled.Pos.Norm() / lightAUPerDay(t)
 
-				again, err := prov.State(body.id, tm.AddDays(-tau))
+				raw, err := prov.State(body.id, tm.AddDays(-tau))
 				testutil.AssertNoError(t, err)
 
-				moved := again.Pos.Sub(settled.Pos).Norm() / settled.Pos.Norm()
+				// Deflected the same way ApparentState deflects, because it
+				// applies that after the loop and this comparison has to be
+				// like for like. Without it the residual measured here is
+				// solar light deflection — up to 0.6 arcsec near conjunction —
+				// reported as failed convergence (#263).
+				againPos, err := eph.DeflectBySun(prov, raw.Pos, body.id, tm, tm.AddDays(-tau))
+				testutil.AssertNoError(t, err)
+
+				moved := againPos.Sub(settled.Pos).Norm() / settled.Pos.Norm()
 				worst = math.Max(worst, moved*180/math.Pi*3600)
 			}
 
