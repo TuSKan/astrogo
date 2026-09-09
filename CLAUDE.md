@@ -90,6 +90,30 @@ The low `fits` figures are minimization, not a slow parser: those two targets fi
 
 Any crasher Go writes to `testdata/fuzz/` should be committed — that's the one place a small binary fixture is legitimate here, since it's a regression test for a bug the fuzzer found, not a data source. Two are checked in: an out-of-range TLE epoch day that panicked inside the SGP4 backend, and a VOTable with rows but no field declarations.
 
+## Performance
+
+Three layers, and only one of them can fail a build. That split is deliberate.
+
+**Allocation contracts are the gate** (`coord/allocs_test.go`, `time/allocs_test.go`, `atmosphere/allocs_test.go`). Plain `testing.AllocsPerRun` assertions on paths where zero-allocation is a design claim: a cached `Context` transform, an EOP-free scale conversion, a refraction evaluation. They assert exact `0` where zero is the claim and a bound where a bound is the honest statement — `NewContext` allocates 1 and is contracted at ≤ 8, because the risk is not that it costs one allocation but that it quietly starts costing many.
+
+They are ordinary untagged tests, so they run in every CI job and block a merge. `allocs/op` is what makes that safe: it is deterministic across machines and — measured, not assumed — **unchanged under `-race`**, so no build tag and no short-mode skip are needed. `ns/op` on a shared runner is not, which is why nothing here gates on time.
+
+Add a contract when you can state *why* a path must not allocate, not merely that it currently doesn't.
+
+**The Benchmarks CI job reports, and never fails.** It runs on push to main and posts a `benchstat` delta against the previous successful run into the job summary. `-count=6`, not 3: with three samples benchstat cannot compute a confidence interval and prints `± ∞` for every row.
+
+**Profiling is a manual, periodic step, not a CI gate** — the same rule as extended fuzzing above, for the same reason. A flame graph cannot be usefully diffed by a machine, and the finding that motivated all of this came from *reading* `pprof -top` and noticing that `io.ReadAll` had no business appearing in a scheduler. What automates is the scalar assertion you write afterwards, once you know what the number should be.
+
+```bash
+go test -run=^$ -bench=. -benchmem -cpuprofile=cpu.out -memprofile=mem.out -o pkg.test ./plan/
+go tool pprof -top -nodecount=15 pkg.test cpu.out
+go tool pprof -sample_index=alloc_space -top -nodecount=15 pkg.test mem.out
+```
+
+**Two ways to read a benchmark wrong, both of which happened here.** A low `-benchtime` charges a one-time lazy load to every iteration: at `-benchtime=1x`, `BenchmarkUTCToUT1` reported 8.6 ms and 15.6 MB for a conversion that actually costs 67 ns and allocates nothing — that was the EOP file loading once. The same illusion appears on any path that touches the network once. Before believing a per-op cost, raise the iteration count and check the *total* stays proportional; if total time is flat while ns/op falls, it is a fixed cost, not a per-call one.
+
+And a benchmark's epoch is part of its subject. `plan`'s scheduler benchmarks ran at `time.ZeroTime()` — JD 0, 4713 BC — where no Earth Orientation Parameters exist, so 99.88% of their allocated bytes were EOP handling rather than scheduling (#246). Benchmark a realistic epoch, and a fixed one: a result that depends on the day it was run cannot be compared with the one before it.
+
 ## Embedded data
 
 There is no `go:generate` step in this codebase — it was removed deliberately. No package uses `go:embed` either — every data source is obtained at runtime through `remote.GetFile`, on a lazy, on-first-query load: `catalog/openngc`'s two CSVs (see [catalog/openngc/openngc.go](catalog/openngc/openngc.go)) and `time`'s Earth Orientation Parameters (see [time/eop.go](time/eop.go) and the unexported `time/internal/iers`). A constructor performs no I/O; the first query that needs the data fetches it under that caller's context.
