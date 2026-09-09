@@ -91,10 +91,7 @@ func CacheDownload(ctx context.Context, kernel string) (*Reader, error) {
 
 	r, err := NewReader(ra)
 	if err != nil {
-		closeErr := ra.Close()
-		removeErr := bucket.Delete(ctx, key)
-
-		return nil, errors.Join(err, closeErr, removeErr)
+		return nil, discardIfCorrupt(ctx, bucket, key, ra.Close, err)
 	}
 
 	// Validate physical file size against DAF logical file length
@@ -122,10 +119,7 @@ func CacheDownload(ctx context.Context, kernel string) (*Reader, error) {
 
 	// Verify file integrity immediately to auto-heal CI pipelines
 	if _, err := r.ReadSummaries(); err != nil {
-		closeErr := r.Close()
-		removeErr := bucket.Delete(ctx, key)
-
-		return nil, errors.Join(fmt.Errorf("jpl: corrupt SPK file gracefully deleted: %w", err), closeErr, removeErr)
+		return nil, discardIfCorrupt(ctx, bucket, key, r.Close, err)
 	}
 
 	// ReadSummaries only parses the DAF directory/summary records, a small
@@ -136,11 +130,12 @@ func CacheDownload(ctx context.Context, kernel string) (*Reader, error) {
 	// against it on every later open of the same cached path. Hashing reads
 	// through the already-open ra handle instead of opening the file again.
 	if err := verifyOrBootstrapChecksum(ctx, bucket, key, ra, size); err != nil {
-		closeErr := r.Close()
-		removeErr := bucket.Delete(ctx, key)
-		sumRemoveErr := removeChecksumSidecar(ctx, bucket, key)
-
-		return nil, errors.Join(fmt.Errorf("jpl: corrupt SPK file gracefully deleted: %w", err), closeErr, removeErr, sumRemoveErr)
+		// The sidecar goes with the kernel: keeping a checksum for a file
+		// that is no longer there would make the next download's bootstrap
+		// compare against a recording of the corrupt one.
+		return nil, discardIfCorrupt(ctx, bucket, key, r.Close, err, func() error {
+			return removeChecksumSidecar(ctx, bucket, key)
+		})
 	}
 
 	return r, nil
@@ -211,6 +206,17 @@ func verifyOrBootstrapChecksum(ctx context.Context, bucket *file.Bucket, key str
 func NewReader(f ReadAtCloser) (*Reader, error) {
 	buf := make([]byte, RecordSize)
 	if _, err := f.ReadAt(buf, 0); err != nil {
+		// A short read at offset zero is the file being smaller than an
+		// SPK's own file record, which no valid kernel can be — that is a
+		// statement about the content, so it carries ErrCorruptSPK and a
+		// cached copy is discarded. Any other read failure is the storage
+		// misbehaving and says nothing about the bytes; see
+		// discardIfCorrupt for why the difference decides whether a shared
+		// 32 MB kernel gets deleted.
+		if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
+			return nil, fmt.Errorf("%w: file shorter than the %d-byte file record", ErrCorruptSPK, RecordSize)
+		}
+
 		return nil, fmt.Errorf("spk: read file record: %w", err)
 	}
 
@@ -780,4 +786,58 @@ func EvalChebyshev(coeffs []float64, tau, radius float64, calcDeriv bool) (p, v 
 	}
 
 	return p, v
+}
+
+// discardIfCorrupt is the one place that decides whether a kernel that failed
+// to open should be deleted from the cache.
+//
+// # Why it is a decision and not a cleanup
+//
+// Opening a cached kernel can fail for two entirely different reasons, and
+// they want opposite responses:
+//
+//   - The bytes are wrong — a checksum that computed cleanly and did not
+//     match, a DAF structure that parsed and was invalid, a file shorter than
+//     its own header says it is. The cached copy is worthless and deleting it
+//     is what makes the next run heal itself. Every one of these wraps
+//     [ErrCorruptSPK].
+//   - The bytes could not be read — "Access is denied" because another
+//     process holds the handle, a short read, a cancelled context, a full
+//     disk. The file is very likely fine and the condition is transient.
+//
+// These used to be the same branch, so the second deleted the file. That is
+// worse than merely wrong, because the cache is shared: `go test ./...` runs
+// packages as separate processes against one cache directory, and one of them
+// losing a race deleted the 32 MB kernel out from under the others, which then
+// spent three minutes each failing to find a file that had been there. It is
+// the observed cause of intermittent Windows CI failures on main, and a user
+// running a scheduler alongside an analysis script hits the same thing with a
+// 3 GB DE441 part.
+//
+// So an I/O failure now returns and leaves the file alone. The next open tries
+// again, which is exactly what a transient condition wants. Only a proven
+// content failure is destructive.
+//
+// The handle is closed either way. extra runs only when the file is deleted —
+// it is for artefacts that describe the kernel and must not outlive it.
+func discardIfCorrupt(ctx context.Context, bucket *file.Bucket, key string,
+	closeFile func() error, cause error, extra ...func() error,
+) error {
+	closeErr := closeFile()
+
+	if !errors.Is(cause, ErrCorruptSPK) {
+		return errors.Join(fmt.Errorf("jpl: open SPK %s: %w", key, cause), closeErr)
+	}
+
+	errs := []error{
+		fmt.Errorf("jpl: corrupt SPK file gracefully deleted: %w", cause),
+		closeErr,
+		bucket.Delete(ctx, key),
+	}
+
+	for _, fn := range extra {
+		errs = append(errs, fn())
+	}
+
+	return errors.Join(errs...)
 }
