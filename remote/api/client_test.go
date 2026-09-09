@@ -302,3 +302,97 @@ func TestRequestURLPreservesExistingQuery(t *testing.T) {
 		t.Errorf("token = %q, want the endpoint URL's own query preserved", gotToken)
 	}
 }
+
+// serveJSON stands up a server that answers every request with body, and
+// points id at it.
+func serveJSON(t *testing.T, id remote.EndpointID, body string) {
+	t.Helper()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, body)
+	}))
+
+	t.Cleanup(srv.Close)
+	redirect(t, id, srv.URL)
+}
+
+// TestGetJSONRejectsDuplicateNames is the correctness this decoder moved to
+// encoding/json/v2 for.
+//
+// v1 silently took the last occurrence of a repeated key, which is a wrong
+// answer delivered with confidence and indistinguishable from a right one. A
+// response that repeats a name is malformed; saying so is worth more than
+// guessing which occurrence was meant.
+func TestGetJSONRejectsDuplicateNames(t *testing.T) {
+	serveJSON(t, remote.JPLSBDB, `{"ra":10.5,"dec":41.2,"ra":359.9}`)
+
+	var out struct {
+		RA  float64 `json:"ra"`
+		Dec float64 `json:"dec"`
+	}
+
+	err := newClient(t, remote.JPLSBDB).GetJSON(context.Background(), remote.JPLSBDB, "", nil, &out)
+	if err == nil {
+		t.Fatalf("a response repeating \"ra\" decoded without complaint, to RA %v — "+
+			"under the old decoder the second occurrence silently won", out.RA)
+	}
+
+	if !strings.Contains(err.Error(), "remote/api: decode JSON") {
+		t.Errorf("err = %v, want it wrapped with the decode context", err)
+	}
+}
+
+// TestGetJSONStillMatchesNamesCaseInsensitively pins a v2 default that is
+// deliberately turned back off.
+//
+// Exact matching would leave a renamed field at its zero value, and for a
+// coordinate that is not a missing value: RA 0, Dec 0 is a real point in
+// Pisces, and a target built on it rises, transits and sets without
+// complaint. plan.ErrNoCoordinates exists because that substitution reached
+// production once already — so exact matching would trade a silently wrong
+// value for a silently zero one, which is not an improvement.
+func TestGetJSONStillMatchesNamesCaseInsensitively(t *testing.T) {
+	serveJSON(t, remote.JPLSBDB, `{"RA":10.5,"Dec":41.2}`)
+
+	var out struct {
+		RA  float64 `json:"ra"`
+		Dec float64 `json:"dec"`
+	}
+
+	if err := newClient(t, remote.JPLSBDB).GetJSON(context.Background(), remote.JPLSBDB, "", nil, &out); err != nil {
+		t.Fatalf("GetJSON: %v", err)
+	}
+
+	if out.RA != 10.5 || out.Dec != 41.2 {
+		t.Errorf("decoded %+v, want {10.5 41.2} — a service renaming \"ra\" to \"RA\" "+
+			"must not silently leave the position at the origin", out)
+	}
+}
+
+// TestGetJSONToleratesInvalidUTF8InAName pins the other restored default.
+//
+// v2 rejects invalid UTF-8 outright. The field that might carry a bad byte
+// here is a label; the fields that have to be right are numbers. Losing a
+// whole position because an object's name is mis-encoded is the wrong trade.
+func TestGetJSONToleratesInvalidUTF8InAName(t *testing.T) {
+	// 0xFF is not valid UTF-8 in any position.
+	serveJSON(t, remote.JPLSBDB, "{\"name\":\"Ceres\xff\",\"ra\":10.5}")
+
+	var out struct {
+		Name string  `json:"name"`
+		RA   float64 `json:"ra"`
+	}
+
+	if err := newClient(t, remote.JPLSBDB).GetJSON(context.Background(), remote.JPLSBDB, "", nil, &out); err != nil {
+		t.Fatalf("GetJSON: %v — a bad byte in a name must not cost the caller its position", err)
+	}
+
+	if out.RA != 10.5 {
+		t.Errorf("RA = %v, want 10.5", out.RA)
+	}
+
+	if !strings.HasPrefix(out.Name, "Ceres") {
+		t.Errorf("Name = %q, want it to start with Ceres", out.Name)
+	}
+}
