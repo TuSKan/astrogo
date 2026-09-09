@@ -380,3 +380,78 @@ func Rxp(r [3][3]float64, p [3]float64) [3]float64 {
 
 	return rp
 }
+
+// Fk425 converts B1950.0 FK4 star data to J2000.0 FK5, with the full
+// six-element transformation: the E-terms of aberration are removed and FK4's
+// fictitious proper motion — the drift of its non-inertial equinox — is
+// subtracted. Proper motions are radians per Julian year, parallax in arcsec,
+// radial velocity in km/s.
+func Fk425(r1950, d1950, dr1950, dd1950, p1950, v1950 float64) (r2000, d2000, dr2000, dd2000, p2000, v2000 float64) {
+	gofa.Fk425(r1950, d1950, dr1950, dd1950, p1950, v1950,
+		&r2000, &d2000, &dr2000, &dd2000, &p2000, &v2000)
+
+	return r2000, d2000, dr2000, dd2000, p2000, v2000
+}
+
+// Fk524 is the inverse of [Fk425]: J2000.0 FK5 to B1950.0 FK4.
+func Fk524(r2000, d2000, dr2000, dd2000, p2000, v2000 float64) (r1950, d1950, dr1950, dd1950, p1950, v1950 float64) {
+	gofa.Fk524(r2000, d2000, dr2000, dd2000, p2000, v2000,
+		&r1950, &d1950, &dr1950, &dd1950, &p1950, &v1950)
+
+	return r1950, d1950, dr1950, dd1950, p1950, v1950
+}
+
+// Fk45z converts a B1950.0 FK4 position with *no* proper motion to J2000.0
+// FK5, given the Besselian epoch the FK4 position was determined at.
+//
+// Not the same as [Fk425] with zero proper motion, and the difference is not
+// small: a star at rest in FK4 is moving in FK5, because FK4's equinox drifts.
+// This routine supplies that fictitious motion; passing zero to Fk425 asserts
+// the star really has none in the inertial sense, which is a different claim.
+func Fk45z(r1950, d1950, bepoch float64) (r2000, d2000 float64) {
+	gofa.Fk45z(r1950, d1950, bepoch, &r2000, &d2000)
+
+	return r2000, d2000
+}
+
+// Fk54z is the inverse of [Fk45z]: a J2000.0 FK5 position with no proper
+// motion to B1950.0 FK4 at the given Besselian epoch. It returns the
+// fictitious proper motion the FK4 position acquires.
+func Fk54z(r2000, d2000, bepoch float64) (r1950, d1950, dr1950, dd1950 float64) {
+	gofa.Fk54z(r2000, d2000, bepoch, &r1950, &d1950, &dr1950, &dd1950)
+
+	return r1950, d1950, dr1950, dd1950
+}
+
+// Fk52h converts J2000.0 FK5 star data to the Hipparcos frame, which is the
+// ICRS as realised by the Hipparcos catalogue.
+func Fk52h(r5, d5, dr5, dd5, px5, rv5 float64) (rh, dh, drh, ddh, pxh, rvh float64) {
+	gofa.Fk52h(r5, d5, dr5, dd5, px5, rv5, &rh, &dh, &drh, &ddh, &pxh, &rvh)
+
+	return rh, dh, drh, ddh, pxh, rvh
+}
+
+// H2fk5 is the inverse of [Fk52h]: Hipparcos (ICRS) star data to J2000.0 FK5.
+func H2fk5(rh, dh, drh, ddh, pxh, rvh float64) (r5, d5, dr5, dd5, px5, rv5 float64) {
+	gofa.H2fk5(rh, dh, drh, ddh, pxh, rvh, &r5, &d5, &dr5, &dd5, &px5, &rv5)
+
+	return r5, d5, dr5, dd5, px5, rv5
+}
+
+// Fk5hz converts a J2000.0 FK5 position with no proper motion to Hipparcos
+// (ICRS), at the TT epoch given by the two-part Julian date. The frames differ
+// by a small rotation *and* a spin, so the epoch matters.
+func Fk5hz(r5, d5, date1, date2 float64) (rh, dh float64) {
+	gofa.Fk5hz(r5, d5, date1, date2, &rh, &dh)
+
+	return rh, dh
+}
+
+// Hfk5z is the inverse of [Fk5hz]: a Hipparcos (ICRS) position with no proper
+// motion to J2000.0 FK5, returning the proper motion the FK5 position acquires
+// from the frame spin.
+func Hfk5z(rh, dh, date1, date2 float64) (r5, d5, dr5, dd5 float64) {
+	gofa.Hfk5z(rh, dh, date1, date2, &r5, &d5, &dr5, &dd5)
+
+	return r5, d5, dr5, dd5
+}
