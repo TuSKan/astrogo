@@ -320,3 +320,93 @@ func TestICRSToFK4RestoresTheFictitiousProperMotion(t *testing.T) {
 		}
 	}
 }
+
+// TestFK4RoundTripWithKinematicsCloses exercises the six-element inverse,
+// which the position-only round trip never reaches.
+//
+// ICRSToFK4 has two branches and they do different work: a position with no
+// kinematics goes through Hfk5z/Fk54z, and one carrying proper motion, parallax
+// and radial velocity goes through H2fk5/Fk524. Only the first was covered, so
+// half the function — the half that restores the E-terms of aberration and the
+// fictitious proper motion for a *moving* star — was never run.
+//
+// Closure over all six elements is the assertion. Position closing alone would
+// pass with the proper motion mangled, and a star whose position is right today
+// and whose motion is wrong is a star that drifts away.
+func TestFK4RoundTripWithKinematicsCloses(t *testing.T) {
+	t.Parallel()
+
+	// SOFA's own Fk425 input vector: a real star's worth of proper motion,
+	// parallax and radial velocity rather than round numbers, so a term that
+	// happens to vanish for a tidy input cannot hide.
+	start := coord.NewFK4WithProperMotion(
+		angle.Rad(0.07626899753879587532), angle.Rad(-1.137405378399605780),
+		angle.Rad(0.1973749217849087460e-4), angle.Rad(0.5659714913272723189e-5),
+		angle.Arcsec(0.134), 8.7,
+	)
+
+	icrs := coord.FK4ToICRS(start)
+	back := coord.ICRSToFK4(icrs, coord.B1950)
+
+	sep := coord.Separation(
+		coord.NewICRS(start.RA(), start.Dec()),
+		coord.NewICRS(back.RA(), back.Dec()),
+	).Arcseconds()
+
+	t.Logf("six-element round trip closes to %.6f\" in position", sep)
+
+	if sep > 1e-3 {
+		t.Errorf("position closes to only %.6f\", want under 0.001\"", sep)
+	}
+
+	startPmRA, startPmDec, ok := start.ProperMotion()
+	if !ok {
+		t.Fatal("the fixture reports no recorded proper motion")
+	}
+
+	backPmRA, backPmDec, ok := back.ProperMotion()
+	if !ok {
+		t.Fatal("the six-element inverse dropped the proper motion")
+	}
+
+	// Proper motions in milliarcseconds per year, where a microarcsecond per
+	// year is a thousandth of the tolerance and the values themselves are of
+	// order 4000 and 1200 mas/yr.
+	testutil.AssertNear(t, "pmRA (mas/yr)",
+		backPmRA.Arcseconds()*1000, startPmRA.Arcseconds()*1000, 1e-3)
+	testutil.AssertNear(t, "pmDec (mas/yr)",
+		backPmDec.Arcseconds()*1000, startPmDec.Arcseconds()*1000, 1e-3)
+
+	// Parallax and radial velocity round-trip through both stages too. They
+	// are perturbed on the way out — Fk425 changes the parallax in its fourth
+	// decimal and the RV in its second — so closure here is a real constraint
+	// rather than two untouched values coming back.
+	testutil.AssertNear(t, "parallax (arcsec)", back.Parallax().Arcseconds(), 0.134, 1e-9)
+	testutil.AssertNear(t, "radial velocity (km/s)", back.RV(), 8.7, 1e-6)
+}
+
+// TestFK4CarriesTheKinematicsItWasGiven covers the accessors that carry the
+// two elements the position-only path leaves at zero, so a caller reading an
+// FK4 back gets what the catalogue recorded rather than what survived a
+// conversion.
+func TestFK4CarriesTheKinematicsItWasGiven(t *testing.T) {
+	t.Parallel()
+
+	c := coord.NewFK4WithProperMotion(
+		angle.Hour(6), angle.Deg(-16),
+		angle.Arcsec(-0.546), angle.Arcsec(-1.223),
+		angle.Arcsec(0.379), -7.6,
+	)
+
+	testutil.AssertNear(t, "parallax (arcsec)", c.Parallax().Arcseconds(), 0.379, 1e-12)
+	testutil.AssertNear(t, "radial velocity (km/s)", c.RV(), -7.6, 1e-12)
+
+	// And a position-only FK4 reports neither, rather than a plausible zero
+	// that a caller could mistake for a measurement of zero.
+	empty := coord.NewFK4(angle.Hour(6), angle.Deg(-16), coord.B1950)
+
+	if empty.Parallax() != angle.Zero() || empty.RV() != 0 {
+		t.Errorf("a position-only FK4 reports parallax %v and RV %v; it was given neither",
+			empty.Parallax(), empty.RV())
+	}
+}
