@@ -120,6 +120,47 @@ func (b observerPrecisionBody) command() string { return strconv.Itoa(b.naifID) 
 // separation, bounded — see max above) — a genuine, reproducible result,
 // even without a single identified root cause for the smaller azimuth
 // residual within it.
+//
+// # Since then, the residual has been localised
+//
+// Three later comparisons narrowed it by removing one stage at a time,
+// which the single end-to-end number here cannot do (#256).
+//
+// The ephemeris and the light-time solution are excluded. A geocentric
+// astrometric comparison against Horizons' quantity 1 — no site vector, no
+// Earth rotation, no aberration, no deflection — agrees to 3.1 microarcseconds
+// with both signed means at zero, and that figure is the reference's own
+// printing precision rather than astrogo's error (#254).
+//
+// The apparent-place chain is excluded. USNO's celnav publishes geocentric
+// apparent declination and Greenwich Hour Angle, and declination is measured
+// from the equator so Earth rotation cannot touch it. Over seven epochs in
+// 2026 for Sun, Jupiter and Saturn, declination has a signed mean of
+// -0.027" while GHA has +0.662" — so precession-nutation, aberration and
+// deflection are clean and the residual enters at Earth rotation. 0.662" is
+// 44 milliseconds of UT1.
+//
+// Polar motion is excluded, and this is the controlled version of the
+// hypothesis the parallactic-angle paragraph above could only address
+// observationally. Re-running this very matrix with the pole pinned to zero,
+// holding UT1 unchanged, makes agreement *worse* rather than better:
+//
+//	                       with polar motion   pole zeroed
+//	crossTrack signed mean        -0.523"        -0.643"
+//	crossTrack range          [-1.96, +0.47]  [-2.56, +0.81]
+//	separation signed mean        +0.738"        +0.913"
+//
+// So polar motion is being applied correctly and is reducing the residual,
+// not causing it. Removing a term that helps is the cleanest way to show it
+// is not the culprit.
+//
+// What has not been settled is whether the 44 ms of UT1 is astrogo's or a
+// difference in Earth-orientation values. An EOP-vintage explanation was the
+// obvious candidate and is refuted: astrogo holds *measured* EOP for the
+// epochs carrying the largest residual, and Horizons' own header agrees they
+// are data-based. The coupling is exact — coord/eopsensitivity_test.go shows
+// hour angle tracking UT1 at 15.041069 arcsec/s — so the 44 ms is a statement
+// about the values, and celnav does not publish the UT1 it assumed.
 // See toleranceArcsec's comment, the escalation-path comment at the
 // bottom of this file, and docs/VALIDATION.md for the full writeup.
 //
