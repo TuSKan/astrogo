@@ -475,3 +475,20 @@ func Pvtob(elong, phi, hm, xp, yp, sp, theta float64) [2][3]float64 {
 
 	return pv
 }
+
+// Ld applies light deflection by one gravitating body, returning the deflected
+// direction from the observer to the source.
+//
+// bm is the body's mass in solar masses; p is the observer-to-source unit
+// vector, q the body-to-source unit vector, e the body-to-observer unit
+// vector, em their separation in AU, and dlim the deflection limiter phi^2/2.
+//
+// The returned vector is not exactly unit — SOFA states the departure is
+// always negligible — so a caller needing a length should restore it.
+func Ld(bm float64, p, q, e [3]float64, em, dlim float64) [3]float64 {
+	var p1 [3]float64
+
+	gofa.Ld(bm, p, q, e, em, dlim, &p1)
+
+	return p1
+}

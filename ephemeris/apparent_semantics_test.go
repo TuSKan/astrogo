@@ -61,11 +61,21 @@ func marsAt(days float64) (pos, vel vector.Vec3) {
 		vector.V3(-radius*w*s, radius*w*c, 0)
 }
 
-func (p *orbitingProvider) State(_ eph.ID, t time.Time) (eph.State, error) {
+func (p *orbitingProvider) State(id eph.ID, t time.Time) (eph.State, error) {
 	d := p.days(t)
 
-	mp, mv := marsAt(d)
 	ep, ev := earthAt(d)
+
+	// The Sun sits at the origin these orbits are drawn about, so its
+	// geocentric place is the reverse of the Earth's. Answering for it matters:
+	// [eph.ApparentState] asks for the Sun to compute light deflection, and a
+	// mock that returned Mars for every id would put the two on top of each
+	// other and silently remove the term.
+	if id == eph.Sun {
+		return eph.State{Pos: ep.MulScalar(-1), Vel: ev.MulScalar(-1)}, nil
+	}
+
+	mp, mv := marsAt(d)
 
 	return eph.State{Pos: mp.Sub(ep), Vel: mv.Sub(ev)}, nil
 }
@@ -182,27 +192,70 @@ func TestApparentStateIsTheApparentPlaceNotTheAstrometricOne(t *testing.T) {
 }
 
 // A body that does not move has no light-time correction and no aberration to
-// apply, so the apparent place is the geometric one whatever the range.
-func TestApparentStateWithNoMotionIsGeometric(t *testing.T) {
+// apply, so the only thing separating its apparent place from its geometric one
+// is solar light deflection — which is not a motion effect and applies to a
+// body standing perfectly still (#263).
+func TestApparentStateWithNoMotionIsGeometricApartFromDeflection(t *testing.T) {
 	t.Parallel()
 
 	epoch := time.FromGo(time.GoDate(2026, 8, 21, 0, 0, 0, 0, time.LocationUTC))
 
-	still := &staticProvider{pos: vector.V3(3.5, -1.2, 0.4)}
+	// The Sun set square to the target's direction, one au out, so the
+	// elongation is about ninety degrees — where the deflection is a few
+	// thousandths of an arcsecond rather than the vanishing value it takes at
+	// opposition or the diverging one it takes at conjunction.
+	still := &staticProvider{
+		pos: vector.V3(3.5, -1.2, 0.4),
+		sun: vector.V3(0.322, 0.940, 0),
+	}
 
 	got, err := eph.ApparentState(still, eph.Jupiter, epoch)
 	if err != nil {
 		t.Fatalf("ApparentState: %v", err)
 	}
 
-	if d := got.Pos.Sub(still.pos).Norm(); d > 1e-15 {
-		t.Errorf("a motionless body moved by %g AU under the light-time reduction", d)
+	// The light time the loop settles on, which for a motionless body is
+	// exactly the range over c on the first pass.
+	tau := still.pos.Norm() / lightSpeedAUPerDay
+
+	want, err := eph.DeflectBySun(still, still.pos, eph.Jupiter, epoch, epoch.AddDays(-tau))
+	if err != nil {
+		t.Fatalf("DeflectBySun: %v", err)
 	}
+
+	if d := got.Pos.Sub(want).Norm(); d > 1e-15 {
+		t.Errorf("a motionless body moved by %g AU beyond the deflection, so something in the "+
+			"light-time reduction is responding to a target that is not moving", d)
+	}
+
+	// And the deflection itself has to be there and be the right size: present,
+	// so this test cannot pass by the term being quietly dropped, and small, so
+	// it cannot pass by the term being wrong by orders of magnitude.
+	deflectionArcsec := want.Sub(still.pos).Norm() / still.pos.Norm() * 180 / math.Pi * 3600
+
+	if deflectionArcsec < 1e-4 || deflectionArcsec > 0.1 {
+		t.Errorf("solar deflection moved the place by %g arcsec, which is outside the "+
+			"thousandths of an arcsecond a ninety-degree elongation should produce", deflectionArcsec)
+	}
+
+	t.Logf("solar deflection at ~90 degrees elongation: %.5f arcsec", deflectionArcsec)
 }
 
-type staticProvider struct{ pos vector.Vec3 }
+// staticProvider holds one body perfectly still, and answers for the Sun
+// because [eph.ApparentState] needs it for light deflection. A mock that
+// returned the target's own position for every id would put the Sun on top of
+// the target, which is a geometry with no deflection in it at all — and the
+// test would then pass by measuring nothing.
+type staticProvider struct {
+	pos vector.Vec3
+	sun vector.Vec3
+}
 
-func (p *staticProvider) State(_ eph.ID, _ time.Time) (eph.State, error) {
+func (p *staticProvider) State(id eph.ID, _ time.Time) (eph.State, error) {
+	if id == eph.Sun {
+		return eph.State{Pos: p.sun, Vel: vector.Zero()}, nil
+	}
+
 	return eph.State{Pos: p.pos, Vel: vector.Zero()}, nil
 }
 

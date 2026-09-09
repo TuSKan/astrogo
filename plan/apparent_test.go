@@ -267,7 +267,21 @@ type linearProvider struct {
 	vel   vector.Vec3 // AU/day
 }
 
-func (p linearProvider) State(_ eph.ID, t time.Time) (eph.State, error) {
+func (p linearProvider) State(id eph.ID, t time.Time) (eph.State, error) {
+	// The Sun is answered separately, and where it is matters. eph.ApparentState
+	// asks for it to apply light deflection, and a mock that returned the moving
+	// target for every id would place the Sun on top of the target: a geometry
+	// with no deflection in it, so the term would be silently absent from every
+	// number below rather than small. One au along -x puts it roughly opposite
+	// the target at +2x, which is where the deflection is genuinely smallest.
+	if id == eph.Sun {
+		return eph.State{
+			Pos:    vector.V3(-1, 0, 0),
+			Frame:  eph.FrameICRS,
+			Center: eph.CenterGeocentre,
+		}, nil
+	}
+
 	dt := t.SubDays(p.epoch)
 
 	return eph.State{
