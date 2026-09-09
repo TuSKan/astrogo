@@ -13,6 +13,7 @@ import (
 var (
 	fetchMu       sync.Mutex
 	lastAttempt   time.Time         // wall-clock of last fetch attempt (success or failure)
+	lastCacheRead time.Time         // wall-clock of last Loader.Cached read
 	errLastFetch  error             // non-nil if the most recent attempt failed
 	retryCooldown = 5 * time.Minute // minimum interval between fetch attempts
 )
@@ -74,13 +75,34 @@ func EnsureLoaded(mjd float64) error {
 
 	ctx := context.Background()
 
-	if data, err := l.Cached(ctx); err == nil {
-		if lastAttempt.IsZero() {
-			lastAttempt = data.ModTime
-		}
+	// Reading the cache is throttled by the same window as fetching it.
+	//
+	// Without this, an epoch the bulletin does not cover re-read and
+	// re-parsed the whole file on *every* lookup, because covered(mjd) is
+	// the only fast path and no amount of loading makes finals2000A cover
+	// 1970 or 2035. Measured, Time.EOP was 71 ns for a covered epoch and
+	// 11 ms allocating 15.6 MB for one just outside — a 150,000x cliff that
+	// nothing reported, on two entirely ordinary requests: scheduling more
+	// than a year ahead, and historical work before 1973 (#246).
+	//
+	// The cooldown below already existed and already said "at most one
+	// attempt per cooldown window" in this function's own doc comment. It
+	// simply sat under the read rather than over it, so it throttled the
+	// network and not the local storm.
+	//
+	// Re-reading at all is what picks up a bulletin an operator dropped in
+	// by hand, so this bounds that rather than removing it.
+	if lastCacheRead.IsZero() || time.Since(lastCacheRead) >= retryCooldown {
+		lastCacheRead = time.Now()
 
-		if _, perr := parseAndRegister(data.Raw, SourceCache); perr == nil && covered(mjd) {
-			return nil
+		if data, err := l.Cached(ctx); err == nil {
+			if lastAttempt.IsZero() {
+				lastAttempt = data.ModTime
+			}
+
+			if _, perr := parseAndRegister(data.Raw, SourceCache); perr == nil && covered(mjd) {
+				return nil
+			}
 		}
 	}
 
@@ -93,6 +115,28 @@ func EnsureLoaded(mjd float64) error {
 	errLastFetch = fetch(ctx, l)
 
 	return errLastFetch
+}
+
+// forgetCacheRead lets the next EnsureLoaded read the cached bulletin
+// again rather than waiting out the cooldown.
+//
+// [Reset] calls it because it promises a caller can "start over", and that
+// promise is kept by the cached read: without this, a Reset followed by a
+// lookup would find the throttle still closed and silently keep the zero
+// model for up to a cooldown window.
+//
+// It deliberately leaves lastAttempt and errLastFetch alone, so Reset
+// still does not license an immediate network fetch — exactly as before
+// the read was throttled.
+//
+// Takes fetchMu on its own rather than being called with modelMu held:
+// EnsureLoaded holds fetchMu and then reads the model through covered, so
+// acquiring them the other way round would invert the order.
+func forgetCacheRead() {
+	fetchMu.Lock()
+	defer fetchMu.Unlock()
+
+	lastCacheRead = time.Time{}
 }
 
 // SetRetryCooldown sets the minimum interval EnsureLoaded waits between

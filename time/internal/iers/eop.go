@@ -102,6 +102,11 @@ func registerModelInternal(m Model, source string) {
 // role in that package: primarily for tests, but not test-only — any
 // caller that wants a clean slate can use it.
 func Reset() {
+	// Before taking modelMu: starting over means the next lookup may read
+	// the cached bulletin again, which the read cooldown would otherwise
+	// hold closed.
+	forgetCacheRead()
+
 	modelMu.Lock()
 	defer modelMu.Unlock()
 
