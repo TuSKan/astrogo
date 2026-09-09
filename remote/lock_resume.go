@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"sync"
 
 	"gocloud.dev/blob"
 	"gocloud.dev/gcerrors"
@@ -33,20 +34,101 @@ const (
 	lockRetryDelayMax     = 2 * time.Second
 )
 
+// inProcess serialises lock acquisition within this process, one key at a
+// time.
+//
+// This used to be delegated to fileblob, and both this function and
+// [github.com/TuSKan/astrogo/remote/file.Open] documented that the driver
+// "guards it with a per-Bucket mutex" — which is why file.Open shares one
+// Bucket per URL for the life of the process.
+//
+// That is not true of the pinned driver and may never have been. fileblob's
+// bucket struct holds no mutex at all, and the mutex that does appear is
+// constructed per *writer*, inside NewTypedWriter, so each contender locks
+// its own. What IfNotExist actually performs is an os.Stat followed by an
+// os.Rename, with a window in between.
+//
+// Measured before this existed — 8 goroutines sharing one Bucket, 200
+// rounds: 51 rounds in which two or more contenders each believed they held
+// the lock, and 2 in which three did (#245).
+var inProcess = keyedSemaphore{held: make(map[string]chan struct{})}
+
+// keyedSemaphore hands out exclusive access per key, honouring a context
+// while waiting.
+//
+// A plain sync.Mutex would do the exclusion but not the waiting: a caller
+// blocked in Lock cannot notice its own deadline, and the thing being
+// waited for here is a download that may legitimately run for minutes.
+//
+// Entries are never removed. The keys are cache keys — a few dozen kernels
+// and bulletins across a process's life — so the map is bounded by what the
+// process actually fetches, and reclaiming entries would need reference
+// counting to no measurable end.
+type keyedSemaphore struct {
+	mu   sync.Mutex
+	held map[string]chan struct{}
+}
+
+// acquire blocks until key is free or ctx is done, returning the release
+// for the caller to run exactly once.
+func (k *keyedSemaphore) acquire(ctx context.Context, key string) (release func(), err error) {
+	k.mu.Lock()
+
+	ch, ok := k.held[key]
+	if !ok {
+		ch = make(chan struct{}, 1)
+		k.held[key] = ch
+	}
+
+	k.mu.Unlock()
+
+	select {
+	case ch <- struct{}{}:
+		return func() { <-ch }, nil
+	case <-ctx.Done():
+		return nil, fmt.Errorf("remote: wait for in-process lock %s: %w", key, ctx.Err())
+	}
+}
+
 // acquireLock blocks until it holds an exclusive lock on cacheKey within
 // bucket, or ctx is done. Call the returned release exactly once — defer
 // it immediately, including on the caller's own error paths.
 //
-// It is built on WriterOptions.IfNotExist, the create-if-absent primitive
-// every Bucket exposes, so there is no backend-specific code here. On S3
-// that is a genuinely atomic conditional PUT. fileblob implements it as
-// Stat-then-Rename under a per-Bucket mutex, which is why remote/file.Open
-// returns one shared Bucket per URL: that makes the lock exclusive within
-// a process. Across processes on a local cache it remains best-effort,
-// bounded by the double-check GetFile performs after acquiring.
+// Exclusion is in two layers, because one of them is not reliable.
+//
+// Within this process it is [inProcess], an ordinary semaphore this package
+// owns and can therefore trust. Across processes it is
+// WriterOptions.IfNotExist, the create-if-absent primitive every Bucket
+// exposes, so there is no backend-specific code here: on S3 a genuinely
+// atomic conditional PUT, on fileblob a Stat-then-Rename that is best-effort
+// and can admit a second holder. That residual race is bounded by the
+// double-check GetFile performs after acquiring, and its consequences are
+// what #241 tracks.
+//
+// The layering matters for a reason beyond belt-and-braces: `go test ./...`
+// runs each package as its own process and several of them want the same JPL
+// kernel, so the cross-process case is the common one and the in-process case
+// is the one that used to be claimed and was not delivered.
 func acquireLock(ctx context.Context, bucket *file.Bucket, cacheKey string) (release func(), err error) {
 	lockKey := cacheKey + ".lock"
 	delay := lockRetryDelayInitial
+
+	// Not re-wrapped: acquire already names the key and what was being
+	// waited for, and a second layer saying the same thing makes the
+	// message longer without making it more specific.
+	releaseInProcess, err := inProcess.acquire(ctx, lockKey)
+	if err != nil {
+		return nil, err
+	}
+
+	// Every path out of the loop below that is not a successful acquire has
+	// to hand the in-process slot back, or the next caller for this key
+	// waits on a holder that no longer exists.
+	defer func() {
+		if err != nil {
+			releaseInProcess()
+		}
+	}()
 
 	// gcerrors.Unknown counts as contention alongside FailedPrecondition:
 	// a losing writer on Windows surfaces a raw "Access is denied", which
@@ -68,7 +150,16 @@ func acquireLock(ctx context.Context, bucket *file.Bucket, cacheKey string) (rel
 				// release runs from the caller's defer, possibly after ctx
 				// was cancelled, and must still delete the lock — otherwise
 				// it leaks until staleLockAge lets someone steal it.
-				return func() { _ = bucket.Delete(context.WithoutCancel(ctx), lockKey) }, nil
+				//
+				// The in-process slot is handed back after the object is
+				// gone, not before: releasing it first would let the next
+				// goroutine in this process reach IfNotExist while the lock
+				// object is still there, and spin until it is deleted.
+				return func() {
+					_ = bucket.Delete(context.WithoutCancel(ctx), lockKey)
+
+					releaseInProcess()
+				}, nil
 			case isContention(gcerrors.Code(closeErr)):
 				// Someone won the race between NewWriter and Close.
 			default:
