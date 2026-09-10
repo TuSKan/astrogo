@@ -10,14 +10,62 @@ import (
 	"github.com/TuSKan/astrogo/vector"
 )
 
-// Reduction represents the calculated outcomes of an apparent-place reduction sequence.
-// It exposes the intermediate geometries from the transformation pipeline.
+// Reduction is one geocentric place carried through to an observed one, with
+// the intermediate stages kept so a caller can see what each of them did.
+//
+// # The fields are not four views of one direction
+//
+// Two are positions and two are directions, and the pair of directions is a
+// stage further along than the pair of positions. Reading the four as
+// successive refinements of the same vector is the mistake this comment exists
+// to prevent.
+//
+//   - Geocentric is the input, unchanged: the place as seen from the centre of
+//     the Earth.
+//   - Topocentric is Geocentric less the observer's own geocentric position,
+//     which is diurnal parallax — about a degree for the Moon and under two
+//     arcseconds for Jupiter. Still a position, still in ICRS, and still purely
+//     geometric.
+//   - Geometric is where that direction appears in the local horizon frame,
+//     after the rotation into it and after diurnal aberration.
+//   - Observed is Geometric with refraction applied. In a vacuum the two are
+//     equal, and TestReducer_Group1_GeometricConsistency pins that.
+//
+// # Why Geometric is not simply the direction of Topocentric
+//
+// Because of the aberration, which is worth up to 0.32 arcseconds and is a
+// property of the observer's motion rather than of the geometry. Converting
+// Topocentric to an altitude and azimuth by hand — rotating it into the horizon
+// frame and stopping there — gives an answer that differs from Geometric by
+// that much, with the difference largest at the equator and falling as the
+// cosine of the latitude.
+//
+// That is not a discrepancy to reconcile: it is the difference between where
+// the body is and where its light appears to come from. Both are useful, which
+// is why both are here, and TestGeometricLeadsTopocentricByTheAberration
+// measures the gap rather than leaving a reader to discover it.
+//
+// "Geometric" is therefore a slight misnomer — it means "Observed without
+// refraction", which is the question the pair is there to answer. Renaming it
+// would break every caller for a word.
 type Reduction struct {
-	Dispersion  map[float64]AltAz
-	Geocentric  vector.Vec3
+	// Dispersion is the refracted direction per wavelength, populated only by
+	// [Reducer.Disperse]. Nil after a plain [Reducer.Reduce].
+	Dispersion map[float64]AltAz
+
+	// Geocentric is the input vector, as given (ICRS, AU).
+	Geocentric vector.Vec3
+
+	// Topocentric is Geocentric less the observer's geocentric position
+	// (ICRS, AU) — diurnal parallax and nothing else.
 	Topocentric vector.Vec3
-	Geometric   AltAz
-	Observed    AltAz
+
+	// Geometric is the local horizon direction with diurnal aberration
+	// applied and no refraction.
+	Geometric AltAz
+
+	// Observed is Geometric with the Context's refraction model applied.
+	Observed AltAz
 }
 
 // Reducer defines the explicit apparent-place reduction pipeline, converting
