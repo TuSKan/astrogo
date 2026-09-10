@@ -30,9 +30,11 @@
 //	handler := jpl.NewProvider(ctx, core.Planets, "de440", jpl.WithClient(serving))
 //	warmer  := jpl.NewProvider(ctx, core.Planets, "de440", jpl.WithClient(prefetch))
 //
-// Each consuming package takes the client as an option — [jpl.WithClient],
-// [resolve.WithClient] for the catalog providers, [cams.WithClient],
-// [api.WithRemote]. Omit it and you get [Default].
+// Each consuming package takes the client as an option of its own —
+// jpl.WithClient, simbad.WithClient, cams.WithClient, api.WithRemote. The
+// option lives in the package a caller already imports rather than in a shared
+// one, so configuring a provider needs no second import. Omit it and you get
+// [Default].
 //
 // One thing this does not reach: the Earth-orientation data [time] loads
 // lazily. [time.Time.EOP] has no context and no error return by design, so

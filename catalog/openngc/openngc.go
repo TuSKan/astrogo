@@ -34,6 +34,34 @@ type Provider struct {
 	targets []resolve.Target
 }
 
+// Option configures this package's fetching at the call site.
+type Option func(*options)
+
+type options struct{ remote *remote.Client }
+
+// WithClient fetches under c's policy instead of [remote.Default]'s — its
+// download consent, offline flag and endpoint overrides.
+//
+// It lives here rather than in a shared package because a caller already
+// imports this one and should need nothing else. catalog/resolve is plumbing
+// that catalog re-exports; making a user import it to pass one argument would
+// be the wrong door.
+func WithClient(c *remote.Client) Option {
+	return func(o *options) { o.remote = c }
+}
+
+// clientOf is the client opts selected, or nil for none; the provider falls
+// back to [remote.Default] at use.
+func clientOf(opts []Option) *remote.Client {
+	var o options
+
+	for _, opt := range opts {
+		opt(&o)
+	}
+
+	return o.remote
+}
+
 // New creates an OpenNGC catalog provider. It performs no I/O.
 //
 // The catalog — two upstream CSVs, about 7 MB — is fetched on the first query
@@ -56,8 +84,8 @@ type Provider struct {
 // absent while the provider looked healthy. That is worse than a per-query
 // failure precisely because it is invisible and cannot recover; a later query
 // now tries again.
-func New(opts ...resolve.Option) *Provider {
-	return &Provider{remote: resolve.ClientOf(opts)}
+func New(opts ...Option) *Provider {
+	return &Provider{remote: clientOf(opts)}
 }
 
 // Name returns the provider identifier.

@@ -44,17 +44,45 @@ type Provider struct {
 // see TestArchivesAgree.
 const DefaultEndpoint = remote.GaiaAIP
 
+// Option configures a Provider at construction.
+type Option func(*options)
+
+type options struct{ remote *remote.Client }
+
+// WithClient binds this provider to one [remote.Client]'s policy instead of
+// [remote.Default] — its offline flag, endpoint overrides and enabled set.
+//
+// It lives here rather than in a shared package because a caller configuring
+// this provider already imports this package and should need nothing else.
+// catalog/resolve is plumbing that catalog re-exports; making a user import it
+// to pass one argument would be the wrong door.
+func WithClient(c *remote.Client) Option {
+	return func(o *options) { o.remote = c }
+}
+
+// clientOf is the client opts selected, or nil for none — which is what
+// [api.WithRemote] wants, since it treats nil as [remote.Default].
+func clientOf(opts []Option) *remote.Client {
+	var o options
+
+	for _, opt := range opts {
+		opt(&o)
+	}
+
+	return o.remote
+}
+
 // New creates a Gaia DR3 catalog provider against one archive.
 //
 // The zero endpoint selects [DefaultEndpoint]. Naming one explicitly is how a
 // caller reaches a specific archive - ESA's, for instance, when the point is
 // to compare the two rather than to get an answer.
-func New(endpoint remote.EndpointID, opts ...resolve.Option) (*Provider, error) {
+func New(endpoint remote.EndpointID, opts ...Option) (*Provider, error) {
 	if endpoint == "" {
 		endpoint = DefaultEndpoint
 	}
 
-	client, err := api.NewClient(endpoint, api.WithRemote(resolve.ClientOf(opts)))
+	client, err := api.NewClient(endpoint, api.WithRemote(clientOf(opts)))
 	if err != nil {
 		return nil, fmt.Errorf("gaia: %w", err)
 	}

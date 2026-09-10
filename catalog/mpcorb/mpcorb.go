@@ -66,7 +66,7 @@ import (
 // file is opened when iteration starts and closed when it ends, including on
 // an early break, so a caller taking the first fifty rows of the 317 MB file
 // pays for fifty rows.
-func Open(ctx context.Context, name string, opts ...resolve.Option) (iter.Seq2[resolve.Target, error], error) {
+func Open(ctx context.Context, name string, opts ...Option) (iter.Seq2[resolve.Target, error], error) {
 	bucket, key, err := clientOf(opts).GetFile(ctx, remote.MPCORB, name)
 	if err != nil {
 		return nil, fmt.Errorf("mpcorb: fetch %s: %w", name, err)
@@ -355,14 +355,34 @@ func unpackDigit(c byte) (int, error) {
 	}
 }
 
-// clientOf is the client opts selected, or the process default.
+// Option configures this package's fetching at the call site.
+type Option func(*options)
+
+type options struct{ remote *remote.Client }
+
+// WithClient fetches under c's policy instead of [remote.Default]'s — its
+// download consent, offline flag and endpoint overrides.
 //
-// [resolve.ClientOf] returns nil for "none", which is what [api.WithRemote]
-// wants; this path calls GetFile directly and needs a receiver.
-func clientOf(opts []resolve.Option) *remote.Client {
-	if c := resolve.ClientOf(opts); c != nil {
-		return c
+// It lives here rather than in a shared package because a caller already
+// imports this one and should need nothing else. catalog/resolve is plumbing
+// that catalog re-exports; making a user import it to pass one argument would
+// be the wrong door.
+func WithClient(c *remote.Client) Option {
+	return func(o *options) { o.remote = c }
+}
+
+// clientOf is the client opts selected, or the process default. This path calls
+// GetFile directly and so needs a receiver rather than nil.
+func clientOf(opts []Option) *remote.Client {
+	var o options
+
+	for _, opt := range opts {
+		opt(&o)
 	}
 
-	return remote.Default()
+	if o.remote == nil {
+		return remote.Default()
+	}
+
+	return o.remote
 }
