@@ -1,6 +1,9 @@
 package file
 
-import "sync"
+import (
+	"path"
+	"sync"
+)
 
 // writeLock serialises writes to one key within this process, returning the
 // function that releases it.
@@ -49,11 +52,21 @@ import "sync"
 //
 // Reference-counted rather than a bare map of mutexes, so a process that
 // writes many distinct keys does not accumulate one mutex per key for the rest
-// of its life. Keyed by the bucket pointer as well as the key, since two
-// buckets are two directories and a name in one cannot collide with a name in
-// the other once staging is inside them.
-func writeLock(bucket *Bucket, key string) (unlock func()) {
-	id := lockID{bucket: bucket, key: key}
+// of its life.
+//
+// Keyed by the key's BASENAME, because that is the collision domain and
+// nothing narrower is. fileblob names its staging file
+// os.TempDir()/<basename>.<clock>.tmp, which contains no part of the bucket, so
+// two writers of "de440s.bsp" collide even when their buckets are different
+// directories on different volumes. Keying by bucket and key — which this did
+// briefly — leaves exactly that case unserialised, and it is the case three
+// t.Parallel tests in ephemeris/jpl/spk hit on every run.
+//
+// The cost is that two genuinely unrelated files sharing a name are serialised
+// against each other. They are writes to a cache, they are I/O-bound, and the
+// alternative is a lock that does not cover what it exists to cover.
+func writeLock(_ *Bucket, key string) (unlock func()) {
+	id := lockID{base: path.Base(key)}
 
 	writeLocksMu.Lock()
 
@@ -83,11 +96,8 @@ func writeLock(bucket *Bucket, key string) (unlock func()) {
 	}
 }
 
-// lockID identifies one key in one bucket.
-type lockID struct {
-	bucket *Bucket
-	key    string
-}
+// lockID identifies one staging path, which is one basename anywhere.
+type lockID struct{ base string }
 
 // writeLockEntry is one key's mutex plus the count of goroutines holding or
 // waiting for it, which is what lets the entry be removed when the last one
