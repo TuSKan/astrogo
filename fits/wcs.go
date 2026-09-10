@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"maps"
 	"math"
+	"slices"
 	"strings"
 )
 
@@ -19,6 +20,7 @@ type WCS struct {
 	cdelt   []float64
 	pc      [][]float64
 	ctype   []string
+	cunit   []string
 	crval   []float64
 	crpix   []float64
 	latAxis int
@@ -40,6 +42,7 @@ func NewWCS(naxis int) *WCS {
 		crval: make([]float64, naxis),
 		cdelt: make([]float64, naxis),
 		ctype: make([]string, naxis),
+		cunit: make([]string, naxis),
 		pc:    pc,
 	}
 }
@@ -266,12 +269,76 @@ func sipEval(coeffs map[[2]int]float64, u, v float64) float64 {
 	return sum
 }
 
+// CUnit returns the physical unit declared for each axis by the header's
+// CUNITi keywords, as written and with no interpretation, or an empty string
+// for an axis whose header did not declare one.
+//
+// # Why it is here and why it is a string
+//
+// Because [WCS.PixelToWorld] returns a bare float per axis, and for a
+// non-celestial axis nothing else in this package says what that number is.
+// A spectral axis may be metres, Hertz or Angstrom; a time axis seconds or
+// days. The value astrogo returns is correct in the header's unit, and until
+// now the header's unit was not reachable through the API at all — a caller
+// had to parse the card themselves to interpret a number this package handed
+// them.
+//
+// It is not parsed into a typed quantity because FITS units are a small
+// language of their own (Paper I §4.3: prefixes, powers, products, and forms
+// like "10**(-20) erg/s/cm**2/Angstrom"), and a partial parser that silently
+// mishandled the rest would be worse than the string. Interpreting it is #178
+// and #130's decision; making it visible is not, and it is a precondition for
+// either.
+//
+// Celestial axes are the exception that needs no interpretation: WCS Paper II
+// requires degrees, which is what this package assumes and what
+// [WCS.PixelToWorld] documents.
+func (w *WCS) CUnit() []string { return slices.Clone(w.cunit) }
+
+// SetCUnit records the physical unit of each axis. Like the other setters
+// carrying a length invariant, it refuses a slice that disagrees with
+// [WCS.NAxis] rather than accepting a quiet disagreement about axis count.
+//
+// astrogo never acts on these values — see [WCS.CUnit] — so setting them wrong
+// changes no result. It changes what a caller reading them back is told, which
+// is the entire purpose of the field.
+func (w *WCS) SetCUnit(cunit []string) error {
+	if len(cunit) != w.nAxis {
+		return fmt.Errorf("%w: expected %d", ErrWCSDimension, w.nAxis)
+	}
+
+	w.cunit = slices.Clone(cunit)
+
+	return nil
+}
+
 // PixelToWorld transforms a continuous FITS 1-indexed pixel coordinate
 // slice mapping it against spherical Sky metrics.
 //
 // Supported projections: TAN (Gnomonic), SIN (Orthographic),
 // ARC (Zenithal equidistant), STG (Stereographic), AIT (Hammer-Aitoff).
 // SIP distortion is applied when CTYPE contains the "-SIP" suffix.
+//
+// # What the numbers are
+//
+// The return is one value per axis, and the unit is not the same for all of
+// them. Saying so is the point of this section: the signature is a bare
+// []float64 both ways, so nothing but this comment distinguishes a right
+// ascension in degrees from a wavelength in Angstrom (#178).
+//
+//   - Celestial axes — the pair CTYPE names as longitude and latitude — come
+//     back in DEGREES, right ascension normalised to [0, 360). Degrees rather
+//     than radians because WCS Paper II requires celestial CRVAL and CDELT to
+//     be in degrees, so it is the header's unit and not a choice made here.
+//   - Every other axis comes back in the unit its own CUNITi declares, because
+//     the value is CRVAL plus a linear offset and astrogo does not convert it.
+//     A spectral axis is metres, Hertz or Angstrom as the header says; a time
+//     axis seconds or days. [WCS.CUnit] is how a caller finds out which.
+//   - When no celestial pair is present, every axis is the linear case above.
+//
+// A caller mixing the two — passing a spectral value to something expecting an
+// angle — is not stopped by anything here. That is the shape question #178 and
+// #130 exist to settle; this is what the shape does today.
 func (w *WCS) PixelToWorld(pixels []float64) ([]float64, error) {
 	if len(pixels) != w.nAxis {
 		return nil, fmt.Errorf("%w: expected %d", ErrWCSDimension, w.nAxis)
@@ -359,6 +426,12 @@ func (w *WCS) PixelToWorld(pixels []float64) ([]float64, error) {
 }
 
 // WorldToPixel converts world coordinates back to FITS 1-indexed pixel coordinates.
+//
+// world takes the units [WCS.PixelToWorld] returns — degrees for celestial
+// axes, each other axis in its own CUNITi — and the two are exact inverses
+// only when given the same convention. Passing radians produces a pixel
+// coordinate that is wrong without being obviously wrong, which is why the
+// unit is stated rather than implied.
 //
 // For recognized spherical projections (TAN, SIN, ARC, STG, AIT), the initial
 // guess is computed analytically via the forward projection, then refined with
@@ -801,6 +874,7 @@ func ExtractWCS(h *Header) (*WCS, error) {
 	crval := make([]float64, naxis)
 	cdelt := make([]float64, naxis)
 	ctype := make([]string, naxis)
+	cunit := make([]string, naxis)
 	pc := make([][]float64, naxis)
 
 	for i := 1; i <= naxis; i++ {
@@ -808,6 +882,13 @@ func ExtractWCS(h *Header) (*WCS, error) {
 
 		c, _ := h.GetString(fmt.Sprintf("CTYPE%d", i))
 		ctype[idx] = strings.TrimSpace(c)
+
+		// CUNIT is optional and frequently absent. An empty string is
+		// recorded as-is rather than defaulted, because "the header did not
+		// say" and "the header said degrees" are different facts and only the
+		// caller knows whether the difference matters. See [WCS.CUnit].
+		u, _ := h.GetString(fmt.Sprintf("CUNIT%d", i))
+		cunit[idx] = strings.TrimSpace(u)
 
 		if v, err := h.GetFloat(fmt.Sprintf("CRVAL%d", i)); err == nil {
 			crval[idx] = v
@@ -891,6 +972,7 @@ func ExtractWCS(h *Header) (*WCS, error) {
 	// which transforms every pixel to the same place.
 	for _, err := range []error{
 		w.SetCTYPE(ctype),
+		w.SetCUnit(cunit),
 		w.SetCRVAL(crval),
 		w.SetCRPIX(crpix),
 		w.SetCDELT(cdelt),
