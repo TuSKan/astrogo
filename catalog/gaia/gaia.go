@@ -54,7 +54,7 @@ func New(endpoint remote.EndpointID, opts ...resolve.Option) (*Provider, error) 
 		endpoint = DefaultEndpoint
 	}
 
-	client, err := api.NewClient(endpoint, resolve.Apply(opts).APIOptions()...)
+	client, err := api.NewClient(endpoint, api.WithRemote(resolve.ClientOf(opts)))
 	if err != nil {
 		return nil, fmt.Errorf("gaia: %w", err)
 	}

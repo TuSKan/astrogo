@@ -57,7 +57,7 @@ type Provider struct {
 // failure precisely because it is invisible and cannot recover; a later query
 // now tries again.
 func New(opts ...resolve.Option) *Provider {
-	return &Provider{remote: resolve.Apply(opts).Remote}
+	return &Provider{remote: resolve.ClientOf(opts)}
 }
 
 // Name returns the provider identifier.

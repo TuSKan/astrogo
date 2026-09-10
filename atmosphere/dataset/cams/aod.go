@@ -84,7 +84,7 @@ func AOD550(ctx context.Context, site *coord.Geodetic, when time.GoTime, opts ..
 		return 0, fmt.Errorf("%w: needs a site", ErrAOD)
 	}
 
-	bucket, key, err := apply(opts).GetFile(ctx, remote.CopernicusEODATA, AODKey(when))
+	bucket, key, err := clientFrom(opts).GetFile(ctx, remote.CopernicusEODATA, AODKey(when))
 	if err != nil {
 		return 0, fmt.Errorf("%w: %w\n\n%s", ErrAOD, err, RegistrationAdvice)
 	}

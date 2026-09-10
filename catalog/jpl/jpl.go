@@ -33,7 +33,7 @@ type Provider struct {
 
 // New creates a new JPL Horizons catalog provider.
 func New(opts ...resolve.Option) *Provider {
-	client, err := api.NewClient(remote.JPLHorizons, resolve.Apply(opts).APIOptions()...)
+	client, err := api.NewClient(remote.JPLHorizons, api.WithRemote(resolve.ClientOf(opts)))
 	if err != nil {
 		panic(err) // unregistered endpoint would be a programmer error
 	}

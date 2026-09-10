@@ -2,7 +2,6 @@ package resolve
 
 import (
 	"github.com/TuSKan/astrogo/remote"
-	"github.com/TuSKan/astrogo/remote/api"
 )
 
 // Option configures a catalog provider at construction.
@@ -18,17 +17,11 @@ import (
 // simbad.WithClient. That is the right trade at this size: the alternative
 // reads marginally better at each call site and adds seven exported types to a
 // library that is about to freeze its shape.
-type Option func(*Config)
+type Option func(*config)
 
-// Config is what the options build. A provider reads it once in its
-// constructor; it is exported only because the providers are separate
-// packages.
-type Config struct {
-	// Remote is the policy endpoint resolution goes through. Nil means
-	// [remote.Default], which is what every caller who has not asked for
-	// anything else gets.
-	Remote *remote.Client
-}
+// config is what the options build. Unexported: it is plumbing, and a caller
+// has no reason to construct one.
+type config struct{ remote *remote.Client }
 
 // WithClient binds a provider to one [remote.Client]'s policy instead of
 // [remote.Default] — its offline flag, endpoint overrides and enabled set.
@@ -38,43 +31,23 @@ type Config struct {
 //
 //	sim := simbad.New(resolve.WithClient(offlineOnly))
 func WithClient(c *remote.Client) Option {
-	return func(cfg *Config) { cfg.Remote = c }
+	return func(cfg *config) { cfg.remote = c }
 }
 
-// Apply builds a Config from opts. Providers call it as the first line of
-// their constructor.
-func Apply(opts []Option) Config {
-	var cfg Config
+// ClientOf is the client opts selected, or nil for none.
+//
+// Nil rather than [remote.Default] on purpose: every consumer passes the result
+// straight to [api.WithRemote], which already treats nil as the default, so
+// resolving it here would be a second place that decides the same thing. One
+// accessor, one meaning.
+//
+//	api.NewClient(remote.SIMBAD, api.WithRemote(resolve.ClientOf(opts)))
+func ClientOf(opts []Option) *remote.Client {
+	var cfg config
 
 	for _, opt := range opts {
 		opt(&cfg)
 	}
 
-	return cfg
-}
-
-// APIOptions translates a Config into the options [api.NewClient] takes.
-//
-// It returns nil for a Config that asked for nothing, so a provider built
-// without options constructs exactly the API client it did before — the
-// default policy, reached by the default path, with no branch of its own.
-func (c Config) APIOptions() []api.Option {
-	if c.Remote == nil {
-		return nil
-	}
-
-	return []api.Option{api.WithRemote(c.Remote)}
-}
-
-// RemoteOrDefault is the client a provider should fetch through.
-//
-// For providers that call [remote.Client.GetFile] rather than going through
-// an API client, where there is no options slice to pass along and a nil
-// receiver would panic rather than fall back.
-func (c Config) RemoteOrDefault() *remote.Client {
-	if c.Remote == nil {
-		return remote.Default()
-	}
-
-	return c.Remote
+	return cfg.remote
 }

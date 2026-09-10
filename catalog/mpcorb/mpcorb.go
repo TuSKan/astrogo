@@ -67,7 +67,7 @@ import (
 // an early break, so a caller taking the first fifty rows of the 317 MB file
 // pays for fifty rows.
 func Open(ctx context.Context, name string, opts ...resolve.Option) (iter.Seq2[resolve.Target, error], error) {
-	bucket, key, err := resolve.Apply(opts).RemoteOrDefault().GetFile(ctx, remote.MPCORB, name)
+	bucket, key, err := clientOf(opts).GetFile(ctx, remote.MPCORB, name)
 	if err != nil {
 		return nil, fmt.Errorf("mpcorb: fetch %s: %w", name, err)
 	}
@@ -353,4 +353,16 @@ func unpackDigit(c byte) (int, error) {
 	default:
 		return 0, fmt.Errorf("%q is not 1-9 or A-Z", string(c)) //nolint:err113 // wrapped by ParseEpoch, which owns the sentinel
 	}
+}
+
+// clientOf is the client opts selected, or the process default.
+//
+// [resolve.ClientOf] returns nil for "none", which is what [api.WithRemote]
+// wants; this path calls GetFile directly and needs a receiver.
+func clientOf(opts []resolve.Option) *remote.Client {
+	if c := resolve.ClientOf(opts); c != nil {
+		return c
+	}
+
+	return remote.Default()
 }

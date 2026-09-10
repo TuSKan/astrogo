@@ -106,7 +106,7 @@ func CacheAPI(ctx context.Context, bucket *file.Bucket, prefix, kernel string, s
 	// download in effect (KB–MB delivered base64-encoded inside the JSON
 	// response), so it requires the same explicit consent as any other
 	// kernel download: remote.EnableDownloads(maxSize, remote.JPLHorizonsSPK).
-	if err := apply(opts).CheckDownload(remote.JPLHorizonsSPK, spkFile, remote.SizeVaries); err != nil {
+	if err := clientFrom(opts).CheckDownload(remote.JPLHorizonsSPK, spkFile, remote.SizeVaries); err != nil {
 		return nil, fmt.Errorf("jpl: SPK kernel %s: %w", kernel, err)
 	}
 

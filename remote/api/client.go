@@ -50,6 +50,9 @@ type Option func(*config)
 // It is an option here rather than a method on [remote.Client] because
 // remote/api imports remote, so the reverse would be an import cycle. That is
 // the only reason: a method there would read better.
+//
+// A nil client selects [remote.Default], so a caller forwarding an optional
+// choice — resolve.ClientOf's result, say — needs no branch of its own.
 func WithRemote(c *remote.Client) Option {
 	return func(cfg *config) { cfg.remote = c }
 }

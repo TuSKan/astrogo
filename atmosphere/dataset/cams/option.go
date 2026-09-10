@@ -22,9 +22,9 @@ func WithClient(c *remote.Client) Option {
 	return func(cfg *config) { cfg.remote = c }
 }
 
-// apply resolves opts to the client to fetch through, defaulting to
+// clientFrom resolves opts to the client to fetch through, defaulting to
 // [remote.Default].
-func apply(opts []Option) *remote.Client {
+func clientFrom(opts []Option) *remote.Client {
 	var cfg config
 
 	for _, opt := range opts {

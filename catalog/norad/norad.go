@@ -255,7 +255,7 @@ type Provider struct {
 
 // New returns a Provider configured with sensible defaults.
 func New(opts ...resolve.Option) *Provider {
-	client, err := api.NewClient(remote.CelesTrak, resolve.Apply(opts).APIOptions()...)
+	client, err := api.NewClient(remote.CelesTrak, api.WithRemote(resolve.ClientOf(opts)))
 	if err != nil {
 		panic(err) // unregistered endpoint would be a programmer error
 	}
