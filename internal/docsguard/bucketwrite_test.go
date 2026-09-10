@@ -22,7 +22,9 @@ var bucketWrite = regexp.MustCompile(`\.(WriteAll|NewWriter)\(`)
 // remote/file/file.go is the funnel — Save takes the staging lock. remote's
 // lock and resume path writes with WriterOptions that Save has no parameter
 // for (IfNotExist for the lock object, source-ETag metadata for the staged
-// download) and takes the lock itself where it matters.
+// download), and needs no lock of its own: every one of those writes runs
+// holding acquireLock, which #245 made exclusive within the process as well as
+// across them.
 var bucketWriteAllowed = map[string]bool{
 	filepath.Join("remote", "file", "file.go"): true,
 	filepath.Join("remote", "lock_resume.go"):  true,
@@ -37,7 +39,7 @@ var bucketWriteAllowed = map[string]bool{
 // basename and a nanosecond clock, and on Windows that clock does not move —
 // 2000 consecutive reads returned one distinct value. Two writers of one file
 // name therefore agree on the staging path, and one renames it out from under
-// the other. [file.LockStaging] serialises them, and [file.Save] holds it.
+// the other. The write lock [file.Save] holds serialises them.
 //
 // A new caller reaching for bucket.WriteAll instead gets code that works
 // everywhere its author runs it and fails one time in seven on Windows,
@@ -111,7 +113,7 @@ func TestBucketWritesGoThroughTheStagingLock(t *testing.T) {
 			"  Use file.Save, which holds the staging lock. fileblob names its temp file "+
 			"from the key's basename and a clock that does not move on Windows, so two "+
 			"writers of one name rename it out from under each other (#241). If this file "+
-			"genuinely needs WriterOptions, add it to bucketWriteAllowed and take "+
-			"file.LockStaging itself.", o)
+			"genuinely needs WriterOptions, add it to bucketWriteAllowed and say there "+
+			"what serialises it.", o)
 	}
 }

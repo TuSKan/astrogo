@@ -2,7 +2,7 @@ package file
 
 import "sync"
 
-// WriteLock serialises writes to one key within this process, returning the
+// writeLock serialises writes to one key within this process, returning the
 // function that releases it.
 //
 // # Why a lock exists at all
@@ -52,7 +52,7 @@ import "sync"
 // of its life. Keyed by the bucket pointer as well as the key, since two
 // buckets are two directories and a name in one cannot collide with a name in
 // the other once staging is inside them.
-func WriteLock(bucket *Bucket, key string) (unlock func()) {
+func writeLock(bucket *Bucket, key string) (unlock func()) {
 	id := lockID{bucket: bucket, key: key}
 
 	writeLocksMu.Lock()

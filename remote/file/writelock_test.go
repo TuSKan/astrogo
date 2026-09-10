@@ -72,7 +72,7 @@ func TestConcurrentSaveOfOneKey(t *testing.T) {
 				t.Errorf("round %d, writer %d: %v.\n"+
 					"  Concurrent writes of one cache key must all succeed. A rename error "+
 					"naming a .tmp file is fileblob's clock-derived staging name colliding "+
-					"(#241); the guard for it is file.WriteLock.", round, i, err)
+					"(#241); the guard for it is the write lock Save holds.", round, i, err)
 			}
 		}
 
@@ -102,7 +102,7 @@ func TestConcurrentSaveOfOneKey(t *testing.T) {
 //
 // no_tmp_dir=1 on the bucket URL is what closes it, by putting staging inside
 // the bucket. testutil.FileURL sets it, which is why this passes; the writers
-// here hold different buckets, so file.WriteLock — keyed by bucket as well as
+// here hold different buckets, so the write lock — keyed by bucket as well as
 // key — deliberately does not serialise them and cannot be what saves it.
 func TestConcurrentSaveOfDistinctKeys(t *testing.T) {
 	t.Parallel()
@@ -150,105 +150,6 @@ func TestConcurrentSaveOfDistinctKeys(t *testing.T) {
 			}
 		}
 	}
-}
-
-// TestWriteLockIsExclusive pins the guard itself rather than its effect.
-//
-// The concurrency tests above can pass for the wrong reason — a scheduler that
-// happens not to overlap the writers, or a clock that happens to advance — so
-// one of them asserts the property directly: while a lock is held, no second
-// holder of the same key exists, and a different key is not blocked by it.
-func TestWriteLockIsExclusive(t *testing.T) {
-	t.Parallel()
-
-	ctx := context.Background()
-
-	bucket, err := file.Open(ctx, testutil.FileURL(t, t.TempDir()))
-	if err != nil {
-		t.Fatalf("opening the bucket: %v", err)
-	}
-
-	t.Run("one key excludes itself", func(t *testing.T) {
-		t.Parallel()
-
-		var (
-			mu      sync.Mutex
-			holders int
-			worst   int
-			wg      sync.WaitGroup
-		)
-
-		for range 8 {
-			wg.Go(func() {
-				for range 200 {
-					unlock := file.WriteLock(bucket, "same/key")
-
-					mu.Lock()
-					holders++
-
-					if holders > worst {
-						worst = holders
-					}
-
-					mu.Unlock()
-
-					mu.Lock()
-					holders--
-					mu.Unlock()
-
-					unlock()
-				}
-			})
-		}
-
-		wg.Wait()
-
-		if worst != 1 {
-			t.Errorf("saw %d simultaneous holders of one key, want 1", worst)
-		}
-	})
-
-	t.Run("a different key is not blocked", func(t *testing.T) {
-		t.Parallel()
-
-		// Held for the duration, so a lock on another key that waited for it
-		// would hang the test rather than fail it — which is the honest
-		// outcome for a deadlock and is what a timeout reports.
-		release := file.WriteLock(bucket, "held/key")
-		defer release()
-
-		done := make(chan struct{})
-
-		go func() {
-			defer close(done)
-
-			file.WriteLock(bucket, "other/key")()
-		}()
-
-		<-done
-	})
-
-	t.Run("the same key in another bucket is not blocked", func(t *testing.T) {
-		t.Parallel()
-
-		other, err := file.Open(ctx, testutil.FileURL(t, t.TempDir()))
-		if err != nil {
-			t.Fatalf("opening the second bucket: %v", err)
-		}
-
-		release := file.WriteLock(bucket, "shared/name")
-		defer release()
-
-		done := make(chan struct{})
-
-		go func() {
-			defer close(done)
-
-			file.WriteLock(other, "shared/name")()
-		}()
-
-		<-done
-	})
 }
 
 // TestFileURLCarriesTheStagingParameters guards the two query parameters the

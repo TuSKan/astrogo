@@ -93,7 +93,7 @@ func Save(ctx context.Context, bucket *Bucket, key string, r io.Reader) error {
 	// Serialised against any other writer of this key in this process, because
 	// fileblob's staging file is named from a clock that does not advance on
 	// Windows. See [WriteLock].
-	defer WriteLock(bucket, key)()
+	defer writeLock(bucket, key)()
 
 	w, err := bucket.NewWriter(ctx, key, nil)
 	if err != nil {
