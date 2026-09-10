@@ -166,7 +166,7 @@ measured distribution, follow the Evidence link to the generated table.
 | Asteroid magnitude (HG) | ✅ validated | `magnitude/magnitude_test.go` | Bowell (1989) / Muinonen (2010) | 0.01 mag | H,G + H,G₁,G₂ + H,G₁₂* phase functions, spline knot validation at α=30°,60°,90° |
 | Asteroid magnitude (sHG1G2) | ✅ validated | `magnitude/fink_test.go` | [FINK/ZTF phunk pipeline](https://api.ztf.fink-portal.org) | 0.025 mag | Carry et al. (2024) 7-parameter spin-geometry model, validated against 186 r-band observations of 8467 Benoitcarry: mean Δ=0.011, RMS=0.013, 100% within 0.025 mag |
 | Comet magnitude | ✅ validated | `magnitude/magnitude_test.go` | IAU standard | 0.1 mag | M₁/k₁ total + M₂/k₂ nuclear models |
-| SGP4 satellite propagation | ⚠️ **22 of 30 cases** | `ephemeris/satellite/sgp4_vallado_validation_test.go` | [Vallado et al. (2006) AIAA 2006-6753](https://celestrak.org/publications/AIAA/2006-6753/) | see notes | The reference suite every SGP4 implementation is measured by, 588 states across 30 element sets. **22 cases agree to p50 35 m, p99 264 m, max 289 m.** Eight do not, by 0.6 km to **3440 km**, and they are exactly the paths Vallado built the suite to exercise: the low-perigee s4 modification, the deep-space SDP4 branch, and satellites in the last stage of decay. Each is exact at the epoch and grows quadratically — a wrong secular drag term in the backend, not a time-handling error here. The backend's own suite covers 6 of the 33 cases and none of the 8 that fail, which is how the defect survives its own verification. The remaining 3 cases carry bad checksums in the published fixture and are refused before propagation. Tracked as [#120](https://github.com/TuSKan/astrogo/issues/120) |
+| SGP4 satellite propagation | ⚠️ **22 of 30 cases** | `ephemeris/satellite/sgp4_vallado_validation_test.go` | [Vallado et al. (2006) AIAA 2006-6753](https://celestrak.org/publications/AIAA/2006-6753/) | see notes | The reference suite every SGP4 implementation is measured by, 588 states across 30 element sets. **22 cases agree to p50 35 m, p99 264 m, max 289 m.** Eight do not, by 0.6 km to **3440 km**, and they are exactly the paths Vallado built the suite to exercise: the low-perigee s4 modification, the deep-space SDP4 branch, and satellites in the last stage of decay. Each is exact at the epoch and grows quadratically — a wrong secular drag term in the backend, not a time-handling error here. The backend's own suite covers 6 of the 33 cases and none of the 8 that fail, which is how the defect survives its own verification. The remaining 3 cases carry bad checksums in the published fixture and are refused before propagation. **`satellite.Satellite.Verified` reports which side of this a given element set falls on** (#182), so a position that may be 3440 km out no longer looks like one for the ISS. Tracked as [#120](https://github.com/TuSKan/astrogo/issues/120) |
 | Satellite magnitude | ✅ validated | `magnitude/magnitude_test.go` | McCants/Molczan | 0.1 mag | Sphere/cylinder phase functions, range scaling |
 | Star extinction | ✅ validated | `atmosphere/transfer_test.go` | Bouguer law | 0.01 mag | Altitude-dependent k(λ), Gaia G→V transformation |
 | FINK SSOFT provider | ✅ validated | `catalog/fink/fink_test.go` | [FINK REST API v2.5](https://api.ztf.fink-portal.org/swagger.json) | exact schema | Single-object JSON + bulk parquet, r-band preference, fit/status filtering, version pinning (v2025.04) |
@@ -209,17 +209,29 @@ The following areas are not yet considered scientifically complete:
   up to 0.5 s and says nothing about it (Levine, Tavella & Milton 2023, Metrologia 60
   014001, table 2). That is 0.3″ of lunar motion, 7.5″ of Earth rotation and 3.8 km of ISS
   track — above everything tabulated above and below anything that looks wrong. No library
-  can detect it. Work that must be reproducible passes an explicit epoch, which never
-  touches the clock; see the `time` package doc's "The clock you are given". Tracked as
-  [#146](https://github.com/TuSKan/astrogo/issues/146).
+  can detect whether a given host smeared, and none claims to. What astrogo offers is
+  `time.Time.LeapSmearWindow`, which reports whether an instant falls within a day of a leap
+  second and names the step — not whether this clock was smeared, but whether the question
+  arises at all. Work that must be reproducible passes an explicit epoch, which never touches
+  the clock; see the `time` package doc's "The clock you are given". Documented and closed as
+  [#146](https://github.com/TuSKan/astrogo/issues/146); the limitation is the host's and remains.
 - **The Illumina-v2 comparison at Observatorio del Teide** is a Level-3 target whose published numbers are already transcribed. It is blocked on Tenerife's lighting inventory rather than on the numbers.
 - **SGP4 is wrong by hundreds to thousands of kilometres for low-perigee, deep-space and decaying orbits.** Not a
   missing feature but a measured defect in the propagator astrogo depends on
   (`joshuaferrara/go-satellite`), found by running Vallado's reference suite against it for the first time. Ordinary
   orbits — the ISS, Sun-synchronous imaging satellites, GPS — are unaffected and agree to a few hundred metres. A
   satellite whose perigee is below about 220 km, one propagated through the deep-space branch, or one in its final
-  days is not. There is currently **no runtime signal** distinguishing the two, which is the part that most needs
-  deciding; see [#120](https://github.com/TuSKan/astrogo/issues/120).
+  days is not. **A runtime signal now separates the two**: `satellite.Satellite.Verified` reports which side of the
+  measurement a given element set falls on and says why when it does not, testing perigee against SGP4's own
+  220 km simplified-drag branch. Measured against the thirty reference cases it flags ten, of which seven
+  diverge; the three false alarms sit at 180-212 km and agree to 9-75 m, and the one miss is a decaying object
+  at 282 km perigee that diverges by 0.62 km, the smallest divergence in the set. So it is conservative near
+  the boundary and silent about slow decay, which is stated rather than hidden because a caller deciding what
+  to trust needs the shape of the error and not a bare boolean. Deep space is deliberately not a condition:
+  of roughly eighteen deep-space cases only four diverge and all four already have a perigee under 220 km, so
+  adding it would raise about fourteen false alarms and catch nothing. What remains open is the propagator
+  itself, not the ability to tell — see [#120](https://github.com/TuSKan/astrogo/issues/120), and
+  [#182](https://github.com/TuSKan/astrogo/issues/182) for the signal.
 
 All three are recorded with their unblocking conditions in [`docs/skybrightness.md`](skybrightness.md) §16.
 
