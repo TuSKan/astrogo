@@ -219,8 +219,14 @@ func asteroidOptsFrom(c catalog.Target) []AsteroidOption {
 }
 
 // parseEphID converts a string ID to an eph.ID, returning 0 on failure.
+//
+// Bounded to 31 bits, not 32. eph.ID is unsigned and a NAIF id is signed
+// 32-bit, so anything above MaxInt32 is not an id at all — and converting one
+// wraps it to a negative value, which NAIF uses for spacecraft. Parsing it as
+// a failure keeps a garbage designation from arriving downstream as a
+// plausible different body.
 func parseEphID(id string) eph.ID {
-	n, err := strconv.ParseUint(id, 10, 32)
+	n, err := strconv.ParseUint(id, 10, 31)
 	if err != nil {
 		return 0
 	}
