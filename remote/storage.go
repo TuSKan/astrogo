@@ -60,61 +60,6 @@ func DataDirURL() string {
 	return defaultDataDirURL()
 }
 
-// dataDirBucketURL is [DataDirURL] with fileblob's staging parameter applied.
-//
-// The two are separate on purpose. DataDirURL is what a caller configured,
-// returned verbatim, which is what makes it worth reading and logging; this is
-// what astrogo opens. Rewriting DataDirURL itself would mean a caller could not
-// get their own string back out of the package they put it into.
-func dataDirBucketURL() string { return withStagingInBucket(DataDirURL()) }
-
-// withStagingInBucket adds no_tmp_dir=1 to a file:// URL that does not already
-// carry it, and returns anything else untouched.
-//
-// # Why a caller's URL is adjusted at all
-//
-// Because the alternative is a fix that only works for people who did not
-// configure anything. [defaultDataDirURL] carries the parameter, so the
-// out-of-the-box cache is safe; a caller who set [SetDataDir] or DataDirEnv —
-// which is the documented way to relocate the cache, and the one an
-// application in production is most likely to have used — would silently get
-// the collisions #241 is about, and there is nothing in the symptom that points
-// back at their URL.
-//
-// # Why only file://
-//
-// The parameter is fileblob's. gocloud's URL openers reject query parameters
-// they do not recognise, so adding it to an s3:// or gs:// URL would turn a
-// working configuration into an open error. Those drivers do not stage through
-// os.TempDir either, so there is nothing to fix there.
-//
-// A malformed URL is returned unchanged rather than repaired: file.Open is
-// where a bad URL should be reported, with the caller's own string in the
-// message, and quietly rewriting one here would only move the error somewhere
-// less useful.
-func withStagingInBucket(bucketURL string) string {
-	u, parseErr := url.Parse(bucketURL)
-	if parseErr != nil || u.Scheme != "file" {
-		return bucketURL
-	}
-
-	// ParseQuery rather than u.Query(), which reports no error and silently
-	// drops any pair it cannot decode. Re-encoding after that would hand back
-	// a URL missing whatever it could not read — a different broken URL,
-	// which is precisely what the paragraph above says this must not do.
-	// Measured before it was written this way: "?%zz" came back as
-	// "?no_tmp_dir=1".
-	q, err := url.ParseQuery(u.RawQuery)
-	if err != nil || q.Has("no_tmp_dir") {
-		return bucketURL
-	}
-
-	q.Set("no_tmp_dir", "1")
-	u.RawQuery = q.Encode()
-
-	return u.String()
-}
-
 // defaultDataDirURL is the one place in astrogo that converts an OS
 // filesystem path into a URL. It exists because the default location can
 // only come from os.UserCacheDir; every other path into this package is a
@@ -127,23 +72,14 @@ func withStagingInBucket(bucketURL string) string {
 // rather than concatenation: a '#' in the path would silently truncate it
 // and swallow the query, and a stray '%' would make it unparseable.
 //
-// It also carries no_tmp_dir=1. fileblob stages every write through a
-// temporary file named from the clock, and by default puts that file in
-// os.TempDir rather than in the bucket — so two buckets writing the same
-// object name collide there even though they share nothing else. On Windows
-// the clock does not advance between the writes (measured: one distinct
-// UnixNano across 2000 consecutive reads), so the names are identical and one
-// writer renames the other's staging file away. Measured, eight writers over
-// 40 rounds: 59 failures in 320 with the default, 0 with this (#241).
-//
-// It is the better default independently of the race. os.TempDir is often on a
-// different volume from the cache directory, and a cross-volume rename is a
-// full copy — a second write of a multi-gigabyte kernel. fileblob's own doc
-// comment raises exactly this.
-//
-// Writers of one key inside one process are a different case and need a
-// different guard, since staging inside the bucket makes them share the key's
-// own path as a name; see file.WriteLock.
+// A caller who needs staging inside the bucket — to avoid a cross-volume
+// rename of a multi-gigabyte kernel, which os.TempDir on a different volume
+// turns into a second full copy — can add no_tmp_dir=1 to their own cache URL.
+// astrogo does not add it, because on Windows it makes concurrent writers of
+// one name collide inside the bucket instead of in os.TempDir, and there they
+// cannot fall back: measured, CI failed every test in ephemeris/jpl for three
+// minutes on a staging name the frozen clock would not let it retry past
+// (#241).
 func defaultDataDirURL() string {
 	base, err := os.UserCacheDir()
 	if err != nil {
@@ -155,7 +91,7 @@ func defaultDataDirURL() string {
 		slash = "/" + slash // Windows drive-letter paths are not "/"-rooted
 	}
 
-	u := url.URL{Scheme: "file", Path: slash, RawQuery: "create_dir=true&no_tmp_dir=1"}
+	u := url.URL{Scheme: "file", Path: slash, RawQuery: "create_dir=true"}
 
 	return u.String()
 }
@@ -163,7 +99,7 @@ func defaultDataDirURL() string {
 // DataDir opens DataDirURL as a Bucket rooted at astrogo's base data
 // location.
 func DataDir(ctx context.Context) (*file.Bucket, error) {
-	b, err := file.Open(ctx, dataDirBucketURL())
+	b, err := file.Open(ctx, DataDirURL())
 	if err != nil {
 		return nil, fmt.Errorf("remote: open data dir: %w", err)
 	}

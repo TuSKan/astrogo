@@ -19,7 +19,8 @@ import (
 // The concurrency tests above can pass for the wrong reason — a scheduler that
 // happens not to overlap the writers, or a clock that happens to advance — so
 // one of them asserts the property directly: while a lock is held, no second
-// holder of the same key exists, and a different key is not blocked by it.
+// holder of the same staging path exists, that a genuinely different name is not
+// blocked by it, and that the same name in another bucket IS.
 func TestWriteLockIsExclusive(t *testing.T) {
 	t.Parallel()
 
@@ -70,13 +71,15 @@ func TestWriteLockIsExclusive(t *testing.T) {
 		}
 	})
 
-	t.Run("a different key is not blocked", func(t *testing.T) {
+	t.Run("a different name is not blocked", func(t *testing.T) {
 		t.Parallel()
 
-		// Held for the duration, so a lock on another key that waited for it
-		// would hang the test rather than fail it — which is the honest
-		// outcome for a deadlock and is what a timeout reports.
-		release := writeLock(bucket, "held/key")
+		// Different BASENAMES, which is the distinction that matters. This
+		// used to say "held/key" and "other/key" — different keys, one
+		// basename, and therefore one staging path. Under the current key they
+		// deadlock, correctly, and the test that named them "different" was
+		// describing a property the collision domain does not have.
+		release := writeLock(bucket, "held/de440s.bsp")
 		defer release()
 
 		done := make(chan struct{})
@@ -84,13 +87,13 @@ func TestWriteLockIsExclusive(t *testing.T) {
 		go func() {
 			defer close(done)
 
-			writeLock(bucket, "other/key")()
+			writeLock(bucket, "other/de441.bsp")()
 		}()
 
 		<-done
 	})
 
-	t.Run("the same key in another bucket is not blocked", func(t *testing.T) {
+	t.Run("the same name in another bucket IS blocked", func(t *testing.T) {
 		t.Parallel()
 
 		other, err := Open(ctx, testutil.FileURL(t, t.TempDir()))
@@ -98,17 +101,30 @@ func TestWriteLockIsExclusive(t *testing.T) {
 			t.Fatalf("opening the second bucket: %v", err)
 		}
 
-		release := writeLock(bucket, "shared/name")
-		defer release()
+		// The reverse of what this asserted while the lock was keyed by
+		// bucket and key. Two buckets are two directories and it is tempting
+		// to conclude they cannot collide; the staging path says otherwise,
+		// because it is built from the basename alone and lives in neither
+		// bucket. Three t.Parallel tests in ephemeris/jpl/spk are the case.
+		release := writeLock(bucket, "one/de440s.bsp")
 
-		done := make(chan struct{})
+		blocked := make(chan struct{})
 
 		go func() {
-			defer close(done)
+			defer close(blocked)
 
-			writeLock(other, "shared/name")()
+			writeLock(other, "another/de440s.bsp")()
 		}()
 
-		<-done
+		select {
+		case <-blocked:
+			t.Error("two buckets took the lock for one file name at once.\n" +
+				"  Their fileblob staging paths are the same file in os.TempDir, so the " +
+				"lock has to exclude them however different the buckets look (#241).")
+		default:
+		}
+
+		release()
+		<-blocked
 	})
 }
