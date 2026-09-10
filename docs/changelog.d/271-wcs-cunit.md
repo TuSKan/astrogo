@@ -1,6 +1,6 @@
 ---
 type: Added
-pr: 270
+pr: 271
 ---
 **`fits.WCS.CUnit` exposes the axis units the header declares**, which astrogo
 did not read at all. `PixelToWorld` returns CRVAL plus a linear offset for any
