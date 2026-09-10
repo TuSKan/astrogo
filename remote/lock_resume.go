@@ -274,6 +274,10 @@ func writeStaged(ctx context.Context, bucket *file.Bucket, writeKey string,
 ) error {
 	opts := &blob.WriterOptions{Metadata: map[string]string{sourceETagKey: sourceETag}}
 
+	// Held for the whole staged write, not just the open: fileblob commits by
+	// renaming its own temp file on Close, and that name is what collides.
+	defer file.LockStaging(writeKey)()
+
 	w, err := bucket.NewWriter(ctx, writeKey, opts)
 	if err != nil {
 		if existing != nil {
