@@ -250,8 +250,8 @@ func stageAndPromote(ctx context.Context, bucket *file.Bucket, cacheKey string,
 		}
 	}
 
-	if err := bucket.Copy(ctx, cacheKey, writeKey, nil); err != nil {
-		return fmt.Errorf("remote: promote %s: %w", cacheKey, err)
+	if err := promote(ctx, bucket, cacheKey, writeKey); err != nil {
+		return err
 	}
 
 	discardStaging(ctx, bucket, writeKey, pKey)
@@ -273,6 +273,11 @@ func writeStaged(ctx context.Context, bucket *file.Bucket, writeKey string,
 	src io.Reader, existing io.ReadCloser, sourceETag string,
 ) error {
 	opts := &blob.WriterOptions{Metadata: map[string]string{sourceETagKey: sourceETag}}
+
+	// Serialised against any other writer of this staging key in this process:
+	// fileblob names its own staging file from a clock that does not advance on
+	// Windows, so two writers of one key pick the same name. See file.WriteLock.
+	defer file.WriteLock(bucket, writeKey)()
 
 	w, err := bucket.NewWriter(ctx, writeKey, opts)
 	if err != nil {
@@ -319,4 +324,19 @@ func discardStaging(ctx context.Context, bucket *file.Bucket, writeKey, pKey str
 	if writeKey != pKey {
 		_ = bucket.Delete(ctx, pKey)
 	}
+}
+
+// promote renames the staged object onto the cache key.
+//
+// A separate function only so the write lock's scope is the copy and nothing
+// else: fileblob's Copy stages through the same clock-named temporary file
+// every other write does, so it needs the same exclusion. See file.WriteLock.
+func promote(ctx context.Context, bucket *file.Bucket, cacheKey, writeKey string) error {
+	defer file.WriteLock(bucket, cacheKey)()
+
+	if err := bucket.Copy(ctx, cacheKey, writeKey, nil); err != nil {
+		return fmt.Errorf("remote: promote %s: %w", cacheKey, err)
+	}
+
+	return nil
 }
