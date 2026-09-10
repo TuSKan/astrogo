@@ -27,7 +27,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"path"
 	"sync"
 
 	"gocloud.dev/blob"
@@ -39,76 +38,7 @@ import (
 var (
 	bucketsMu sync.Mutex
 	buckets   = map[string]*Bucket{}
-
-	stagingMu    sync.Mutex
-	stagingLocks = map[string]*sync.Mutex{}
 )
-
-// LockStaging serialises writers whose staging files would collide, returning
-// the function that releases it.
-//
-//	defer file.LockStaging(key)()
-//
-// # The collision
-//
-// fileblob does not write an object in place. It stages the bytes in a temp
-// file and renames that over the key on Close, and it names the temp file
-//
-//	os.TempDir()/<basename of key>.<time.Now().UnixNano() in hex>.tmp
-//
-// on the stated reasoning that "nanosecond changes enough between each
-// iteration to make a conflict unlikely". On Windows it does not change at
-// all: the clock granularity is about 15.6 ms, and 2000 consecutive
-// UnixNano reads on this machine returned **one** distinct value. Two writers
-// therefore agree on the staging path, and the O_EXCL retry loop re-reads the
-// same frozen clock and retries into the same name. One of them renames the
-// file out from under the other, which surfaces as a bare "The system cannot
-// find the file specified" against a key that was never touched.
-//
-// # Why the lock is keyed on the basename
-//
-// Because the staging path is. It contains no part of the bucket, so two
-// writers of the same file name collide even when their buckets are different
-// directories — which is what made this reproduce in parallel tests that each
-// had their own [testing.T.TempDir]. Keying on the full key, or on
-// bucket-and-key, would leave that case failing.
-//
-// Measured on Windows 11 / Go 1.27, 8 writers x 40 rounds of the same key:
-//
-//	                                     failures / 320
-//	separate buckets, as today                 31-69
-//	shared bucket, as today                    36-38
-//	shared bucket, ?no_tmp_dir=1               53-76   <- worse
-//	either, with this lock                         0
-//
-// The bucket-URL knob is in that table because it is the obvious fix and it is
-// the wrong one: it moves staging into the bucket directory, which does fix
-// separate buckets and makes the shared-bucket case — astrogo's actual cache —
-// measurably worse. This lock fixes both and changes no URL.
-//
-// # What it does not cover
-//
-// Another process. The staging path is machine-wide, so two astrogo processes
-// writing one file name still race, and what keeps them apart is the
-// cross-process download lock in the parent package, whose own exclusivity is
-// #245. This is the in-process half.
-func LockStaging(key string) func() {
-	base := path.Base(key)
-
-	stagingMu.Lock()
-
-	mu, ok := stagingLocks[base]
-	if !ok {
-		mu = &sync.Mutex{}
-		stagingLocks[base] = mu
-	}
-
-	stagingMu.Unlock()
-
-	mu.Lock()
-
-	return mu.Unlock
-}
 
 // Bucket is *blob.Bucket, re-exported under astrogo's own name so consumer
 // packages never import gocloud.dev/blob directly.
@@ -160,7 +90,10 @@ func Open(ctx context.Context, bucketURL string) (*Bucket, error) {
 // a truncated one. Skipping Close leaves key exactly as it was, at the
 // cost of leaking the writer's temp resource on that rare path.
 func Save(ctx context.Context, bucket *Bucket, key string, r io.Reader) error {
-	defer LockStaging(key)()
+	// Serialised against any other writer of this key in this process, because
+	// fileblob's staging file is named from a clock that does not advance on
+	// Windows. See [WriteLock].
+	defer WriteLock(bucket, key)()
 
 	w, err := bucket.NewWriter(ctx, key, nil)
 	if err != nil {

@@ -71,6 +71,24 @@ func DataDirURL() string {
 // a cache directory that does not exist yet. It is built through url.URL
 // rather than concatenation: a '#' in the path would silently truncate it
 // and swallow the query, and a stray '%' would make it unparseable.
+//
+// It also carries no_tmp_dir=1. fileblob stages every write through a
+// temporary file named from the clock, and by default puts that file in
+// os.TempDir rather than in the bucket — so two buckets writing the same
+// object name collide there even though they share nothing else. On Windows
+// the clock does not advance between the writes (measured: one distinct
+// UnixNano across 2000 consecutive reads), so the names are identical and one
+// writer renames the other's staging file away. Measured, eight writers over
+// 40 rounds: 59 failures in 320 with the default, 0 with this (#241).
+//
+// It is the better default independently of the race. os.TempDir is often on a
+// different volume from the cache directory, and a cross-volume rename is a
+// full copy — a second write of a multi-gigabyte kernel. fileblob's own doc
+// comment raises exactly this.
+//
+// Writers of one key inside one process are a different case and need a
+// different guard, since staging inside the bucket makes them share the key's
+// own path as a name; see file.WriteLock.
 func defaultDataDirURL() string {
 	base, err := os.UserCacheDir()
 	if err != nil {
@@ -82,7 +100,7 @@ func defaultDataDirURL() string {
 		slash = "/" + slash // Windows drive-letter paths are not "/"-rooted
 	}
 
-	u := url.URL{Scheme: "file", Path: slash, RawQuery: "create_dir=true"}
+	u := url.URL{Scheme: "file", Path: slash, RawQuery: "create_dir=true&no_tmp_dir=1"}
 
 	return u.String()
 }

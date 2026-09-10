@@ -2,9 +2,10 @@
 type: Fixed
 pr: 266
 ---
-**Concurrent cache writes of one file name collided on Windows.** `fileblob`
-stages every write in `os.TempDir` under a name built from the key's basename
-and a nanosecond clock that does not move there — 2000 consecutive reads
-returned one distinct value — so writers renamed the staging file out from
-under each other, 31 to 69 times in 320. `file.Save` now holds a lock keyed on
-that basename (#241).
+**Concurrent cache writes of one object name collided on Windows.** `fileblob`
+stages every write through a temp file named from a clock that does not advance
+there — 2000 consecutive `UnixNano` reads returned one distinct value — and puts
+it in `os.TempDir`, so writers renamed each other's staging file away, 59 times
+in 320. Cache buckets now stage inside themselves, which also avoids re-copying
+a multi-gigabyte kernel across volumes, and `file.WriteLock` serialises writers
+of one key (#241).
