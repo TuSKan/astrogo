@@ -50,20 +50,28 @@ func DataDirURL() string {
 	dataMu.RUnlock()
 
 	if d != "" {
-		return withStagingInBucket(d)
+		return d
 	}
 
 	if env := os.Getenv(DataDirEnv); env != "" {
-		return withStagingInBucket(env)
+		return env
 	}
 
 	return defaultDataDirURL()
 }
 
-// withStagingInBucket adds no_tmp_dir=1 to a caller-supplied file:// URL that
-// does not already carry it, and returns anything else untouched.
+// dataDirBucketURL is [DataDirURL] with fileblob's staging parameter applied.
 //
-// # Why a caller's URL is rewritten at all
+// The two are separate on purpose. DataDirURL is what a caller configured,
+// returned verbatim, which is what makes it worth reading and logging; this is
+// what astrogo opens. Rewriting DataDirURL itself would mean a caller could not
+// get their own string back out of the package they put it into.
+func dataDirBucketURL() string { return withStagingInBucket(DataDirURL()) }
+
+// withStagingInBucket adds no_tmp_dir=1 to a file:// URL that does not already
+// carry it, and returns anything else untouched.
+//
+// # Why a caller's URL is adjusted at all
 //
 // Because the alternative is a fix that only works for people who did not
 // configure anything. [defaultDataDirURL] carries the parameter, so the
@@ -155,7 +163,7 @@ func defaultDataDirURL() string {
 // DataDir opens DataDirURL as a Bucket rooted at astrogo's base data
 // location.
 func DataDir(ctx context.Context) (*file.Bucket, error) {
-	b, err := file.Open(ctx, DataDirURL())
+	b, err := file.Open(ctx, dataDirBucketURL())
 	if err != nil {
 		return nil, fmt.Errorf("remote: open data dir: %w", err)
 	}

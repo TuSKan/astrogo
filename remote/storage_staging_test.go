@@ -1,13 +1,11 @@
-package remote_test
+package remote
 
 import (
 	"net/url"
 	"testing"
-
-	"github.com/TuSKan/astrogo/remote"
 )
 
-// TestDataDirURLAlwaysStagesInBucket covers the half of #241 that a caller who
+// TestDataDirBucketURLAlwaysStagesInBucket covers the half of #241 that a caller who
 // configured anything would otherwise not get.
 //
 // The default cache URL carries no_tmp_dir=1 because defaultDataDirURL builds
@@ -19,9 +17,14 @@ import (
 // That is the worst shape a fix can have: correct for whoever did not
 // configure anything, silently absent for whoever did, with a symptom that
 // points at a rename in os.TempDir rather than at their own setting.
-func TestDataDirURLAlwaysStagesInBucket(t *testing.T) {
+//
+// It is dataDirBucketURL rather than DataDirURL that is asserted, because that
+// is the split: DataDirURL hands back what the caller configured, verbatim —
+// which is what makes it worth reading and logging — and this is the URL
+// astrogo actually opens. TestDataDirEnvOverride pins the other half.
+func TestDataDirBucketURLAlwaysStagesInBucket(t *testing.T) {
 	// Not parallel: SetDataDir and the environment are process-wide.
-	t.Cleanup(func() { remote.SetDataDir("") })
+	t.Cleanup(func() { SetDataDir("") })
 
 	cases := []struct {
 		name  string
@@ -60,17 +63,17 @@ func TestDataDirURLAlwaysStagesInBucket(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			remote.SetDataDir(tc.set)
+			SetDataDir(tc.set)
 
-			got := remote.DataDirURL()
+			got := dataDirBucketURL()
 
 			u, err := url.Parse(got)
 			if err != nil {
-				t.Fatalf("DataDirURL() = %q, which does not parse: %v", got, err)
+				t.Fatalf("dataDirBucketURL() = %q, which does not parse: %v", got, err)
 			}
 
 			if v := u.Query().Get("no_tmp_dir"); v != tc.want {
-				t.Errorf("DataDirURL() = %q, no_tmp_dir = %q, want %q.\n"+
+				t.Errorf("dataDirBucketURL() = %q, no_tmp_dir = %q, want %q.\n"+
 					"  fileblob stages every write through a temp file named from a clock "+
 					"that does not advance on Windows; putting that file in the bucket rather "+
 					"than os.TempDir is what stops two buckets colliding over one object "+
@@ -79,7 +82,7 @@ func TestDataDirURLAlwaysStagesInBucket(t *testing.T) {
 
 			for k, want := range tc.other {
 				if v := u.Query().Get(k); v != want {
-					t.Errorf("DataDirURL() = %q dropped %s=%s.\n"+
+					t.Errorf("dataDirBucketURL() = %q dropped %s=%s.\n"+
 						"  Rewriting the URL must preserve every parameter the caller set; "+
 						"create_dir in particular is what lets a first run open a cache "+
 						"directory that does not exist yet.", got, k, want)
@@ -89,23 +92,23 @@ func TestDataDirURLAlwaysStagesInBucket(t *testing.T) {
 	}
 }
 
-// TestDataDirURLLeavesAMalformedURLAlone checks that the rewrite does not
+// TestDataDirBucketURLLeavesAMalformedURLAlone checks that the rewrite does not
 // become the place a bad URL is reported.
 //
 // file.Open is where that belongs, with the caller's own string in the
 // message. Repairing or rejecting it here would move the error somewhere the
 // caller has no reason to look, and a URL this package cannot parse is one it
 // has no business editing.
-func TestDataDirURLLeavesAMalformedURLAlone(t *testing.T) {
+func TestDataDirBucketURLLeavesAMalformedURLAlone(t *testing.T) {
 	// Not parallel: SetDataDir is process-wide.
-	t.Cleanup(func() { remote.SetDataDir("") })
+	t.Cleanup(func() { SetDataDir("") })
 
 	const malformed = "file:///tmp/astrogo?%zz"
 
-	remote.SetDataDir(malformed)
+	SetDataDir(malformed)
 
-	if got := remote.DataDirURL(); got != malformed {
-		t.Errorf("DataDirURL() = %q, want %q unchanged.\n"+
+	if got := dataDirBucketURL(); got != malformed {
+		t.Errorf("dataDirBucketURL() = %q, want %q unchanged.\n"+
 			"  A URL that does not parse is passed through so file.Open reports it, "+
 			"rather than being silently rewritten into a different broken URL.", got, malformed)
 	}
