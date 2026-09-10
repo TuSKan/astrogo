@@ -58,8 +58,8 @@ func WithProgress(f func(downloaded, total int64)) ReadOption {
 // Mutable one is revalidated against the source's current ETag first. A
 // miss downloads, which requires consent (ErrDownloadDenied otherwise) and
 // is serialized against other processes doing the same.
-func GetFile(ctx context.Context, id EndpointID, name string, opts ...ReadOption) (bucket *file.Bucket, key string, err error) {
-	ep, ok := Lookup(id)
+func (c *Client) GetFile(ctx context.Context, id EndpointID, name string, opts ...ReadOption) (bucket *file.Bucket, key string, err error) {
+	ep, ok := c.Lookup(id)
 	if !ok {
 		return nil, "", fmt.Errorf("%w: %q", ErrUnknownEndpoint, id)
 	}
@@ -67,7 +67,7 @@ func GetFile(ctx context.Context, id EndpointID, name string, opts ...ReadOption
 	// URL is the offline/Disable gate. It runs first so a blocked endpoint
 	// fails before any cache directory is resolved or lock taken, and so
 	// the source below is never opened for a URL the caller may not reach.
-	if _, err := URL(id); err != nil {
+	if _, err := c.URL(id); err != nil {
 		return nil, "", err
 	}
 
@@ -113,7 +113,7 @@ func GetFile(ctx context.Context, id EndpointID, name string, opts ...ReadOption
 		// and reporting it consistently matches the documented contract.
 		// Routed through CheckDownload so a custom Policy still decides.
 		// A caller who did grant consent sees the real error.
-		if cerr := CheckDownload(id, name, ep.ApproxSize); cerr != nil {
+		if cerr := c.CheckDownload(id, name, ep.ApproxSize); cerr != nil {
 			return nil, "", cerr
 		}
 
@@ -143,7 +143,7 @@ func GetFile(ctx context.Context, id EndpointID, name string, opts ...ReadOption
 
 	timeout := cmp.Or(cfg.timeout, ep.DownloadTimeout, DefaultDownloadTimeout)
 
-	if err := fetchInto(ctx, id, ep, srcBucket, cacheBucket, name, cacheKey, timeout, cfg); err != nil {
+	if err := c.fetchInto(ctx, id, ep, srcBucket, cacheBucket, name, cacheKey, timeout, cfg); err != nil {
 		return nil, "", fmt.Errorf("remote: fetch %s: %w", name, err)
 	}
 
@@ -158,13 +158,13 @@ func GetFile(ctx context.Context, id EndpointID, name string, opts ...ReadOption
 // A missing object is (false, nil): the source answered and it is not
 // there. Any other failure returns an error, so "missing" is never
 // confused with "could not tell".
-func Exists(ctx context.Context, id EndpointID, name string) (bool, error) {
-	ep, ok := Lookup(id)
+func (c *Client) Exists(ctx context.Context, id EndpointID, name string) (bool, error) {
+	ep, ok := c.Lookup(id)
 	if !ok {
 		return false, fmt.Errorf("%w: %q", ErrUnknownEndpoint, id)
 	}
 
-	if _, err := URL(id); err != nil {
+	if _, err := c.URL(id); err != nil {
 		return false, err
 	}
 
@@ -234,12 +234,12 @@ func unchanged(ctx context.Context, srcBucket, cacheBucket *file.Bucket, name, c
 // cacheBucket/cacheKey. It owns all policy — consent, timeout, progress,
 // resume, validation — for every backend uniformly; buckets only move
 // bytes.
-func fetchInto(ctx context.Context, id EndpointID, ep Endpoint, srcBucket, cacheBucket *file.Bucket,
+func (c *Client) fetchInto(ctx context.Context, id EndpointID, ep Endpoint, srcBucket, cacheBucket *file.Bucket,
 	name, cacheKey string, timeout time.Duration, cfg readConfig,
 ) error {
 	// Consent is checked twice: once on the registered estimate before any
 	// request, and again below on the size the source actually reports.
-	if err := CheckDownload(id, name, ep.ApproxSize); err != nil {
+	if err := c.CheckDownload(id, name, ep.ApproxSize); err != nil {
 		return err
 	}
 
@@ -251,7 +251,7 @@ func fetchInto(ctx context.Context, id EndpointID, ep Endpoint, srcBucket, cache
 		return fmt.Errorf("%w: %s: %w", ErrDownloadFailed, name, err)
 	}
 
-	if err := CheckDownload(id, name, attrs.Size); err != nil {
+	if err := c.CheckDownload(id, name, attrs.Size); err != nil {
 		return err
 	}
 
@@ -292,4 +292,17 @@ func (p *progressReader) Read(b []byte) (int, error) {
 
 	//nolint:wrapcheck // must forward io.EOF unwrapped: io.Copy identity-checks it
 	return n, err
+}
+
+// GetFile fetches through [Default]. See [Client.GetFile].
+func GetFile(ctx context.Context, id EndpointID, name string, opts ...ReadOption) (
+	bucket *file.Bucket, key string, err error,
+) {
+	return Default().GetFile(ctx, id, name, opts...)
+}
+
+// Exists reports whether the object is present through [Default].
+// See [Client.Exists].
+func Exists(ctx context.Context, id EndpointID, name string) (bool, error) {
+	return Default().Exists(ctx, id, name)
 }

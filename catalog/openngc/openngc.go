@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	"github.com/TuSKan/astrogo/catalog/resolve"
+	"github.com/TuSKan/astrogo/remote"
 )
 
 // Record represents a raw entry in the OpenNGC dataset.
@@ -27,6 +28,7 @@ type Provider struct {
 	// fetch, so concurrent first queries make one request between them rather
 	// than one each.
 	mu      sync.Mutex
+	remote  *remote.Client
 	loaded  bool
 	byKey   map[string]int
 	targets []resolve.Target
@@ -54,7 +56,9 @@ type Provider struct {
 // absent while the provider looked healthy. That is worse than a per-query
 // failure precisely because it is invisible and cannot recover; a later query
 // now tries again.
-func New() *Provider { return &Provider{} }
+func New(opts ...resolve.Option) *Provider {
+	return &Provider{remote: resolve.Apply(opts).Remote}
+}
 
 // Name returns the provider identifier.
 func (p *Provider) Name() string { return "openngc" }
@@ -157,7 +161,7 @@ func (p *Provider) load(ctx context.Context) error {
 		return nil
 	}
 
-	targets, err := fetch(ctx)
+	targets, err := fetch(ctx, p.client())
 	if err != nil {
 		return fmt.Errorf("openngc: catalog unavailable: %w", err)
 	}
@@ -178,4 +182,15 @@ func (p *Provider) load(ctx context.Context) error {
 	p.targets, p.byKey, p.loaded = targets, byKey, true
 
 	return nil
+}
+
+// client is the policy this provider fetches under: its own if [WithClient]
+// gave it one, otherwise the process default. Resolved per call rather than at
+// construction so a provider built before [remote.SetDataDir] still sees it.
+func (p *Provider) client() *remote.Client {
+	if p.remote == nil {
+		return remote.Default()
+	}
+
+	return p.remote
 }

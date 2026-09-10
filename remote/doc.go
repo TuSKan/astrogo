@@ -13,6 +13,33 @@
 //     whose returned document depends on the query. SIMBAD, VizieR, Gaia,
 //     MAST, CelesTrak, FINK, JPL SBDB and Horizons.
 //
+// # One policy, or several
+//
+// Every function in this package operates on [Default], exactly as
+// [net/http.Get] operates on [net/http.DefaultClient]. A program with one
+// policy configures it with [EnableDownloads], [SetOffline] and [SetDataDir]
+// and never mentions a [Client].
+//
+// A program with two builds them. An HTTP handler that must never block on a
+// download and a background prefetcher whose whole job is to download are one
+// binary with two policies, and each gets its own:
+//
+//	serving  := remote.NewClient(remote.WithOffline(true))
+//	prefetch := remote.NewClient(remote.WithDownloads(2<<30, remote.NAIFSPK))
+//
+//	handler := jpl.NewProvider(ctx, core.Planets, "de440", jpl.WithClient(serving))
+//	warmer  := jpl.NewProvider(ctx, core.Planets, "de440", jpl.WithClient(prefetch))
+//
+// Each consuming package takes the client as an option — [jpl.WithClient],
+// [resolve.WithClient] for the catalog providers, [cams.WithClient],
+// [api.WithRemote]. Omit it and you get [Default].
+//
+// One thing this does not reach: the Earth-orientation data [time] loads
+// lazily. [time.Time.EOP] has no context and no error return by design, so
+// there is nowhere for a per-component policy to enter, and that fetch always
+// uses [Default]. A caller who needs different behaviour there registers their
+// own model with time.RegisterModel.
+//
 // # Endpoints
 //
 // Every service astrogo can contact is an [EndpointID] — there are no

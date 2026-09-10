@@ -66,8 +66,8 @@ import (
 // file is opened when iteration starts and closed when it ends, including on
 // an early break, so a caller taking the first fifty rows of the 317 MB file
 // pays for fifty rows.
-func Open(ctx context.Context, name string) (iter.Seq2[resolve.Target, error], error) {
-	bucket, key, err := remote.GetFile(ctx, remote.MPCORB, name)
+func Open(ctx context.Context, name string, opts ...resolve.Option) (iter.Seq2[resolve.Target, error], error) {
+	bucket, key, err := resolve.Apply(opts).RemoteOrDefault().GetFile(ctx, remote.MPCORB, name)
 	if err != nil {
 		return nil, fmt.Errorf("mpcorb: fetch %s: %w", name, err)
 	}

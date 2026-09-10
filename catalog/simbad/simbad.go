@@ -19,8 +19,8 @@ type Provider struct {
 }
 
 // New creates a new SIMBAD ObjectResolver.
-func New() *Provider {
-	client, err := api.NewClient(remote.SIMBAD)
+func New(opts ...resolve.Option) *Provider {
+	client, err := api.NewClient(remote.SIMBAD, resolve.Apply(opts).APIOptions()...)
 	if err != nil {
 		panic(err) // unregistered endpoint would be a programmer error
 	}

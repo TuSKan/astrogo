@@ -167,12 +167,33 @@ type Provider struct {
 	ByTargetCoverage map[int32]TargetCoverage
 	source           core.Source
 	kernel           string
-	Kernels          []*Kernel
-	Index            []SegmentRef
+
+	// remote is the policy every kernel fetch goes through. Nil means
+	// remote.Default, so a provider built without WithClient behaves exactly
+	// as it did before that option existed.
+	remote  *remote.Client
+	Kernels []*Kernel
+	Index   []SegmentRef
 }
 
 // Option configures a Provider.
 type Option func(*Provider)
+
+// WithClient fetches kernels under c's policy instead of [remote.Default]'s —
+// its download consent, offline flag and endpoint overrides.
+//
+// This is the option #114 was filed for. A provider serving requests can be
+// built against a client that may not download, beside a prefetcher built
+// against one that may, in the same process:
+//
+//	serving  := remote.NewClient(remote.WithOffline(true))
+//	prefetch := remote.NewClient(remote.WithDownloads(2<<30, remote.NAIFSPK))
+//
+// It is also the narrower scope the consent gate lacked in tests: a test grants
+// downloads on its own client rather than on the whole binary's.
+func WithClient(c *remote.Client) Option {
+	return func(p *Provider) { p.remote = c }
+}
 
 // WithTimeInterval sets the time interval for which the provider is valid.
 func WithTimeInterval(start, end time.Time) Option {
@@ -207,7 +228,7 @@ func NewProvider(ctx context.Context, source core.Source, kernel string, opts ..
 
 		spkKey := "planets/" + p.kernel + ".bsp"
 
-		k, err := spk.CacheDownload(ctx, spkKey)
+		k, err := spk.CacheDownload(ctx, spkKey, p.spkOpts()...)
 		if err != nil {
 			return nil, fmt.Errorf("jpl: failed to load planetary kernel: %w", err)
 		}
@@ -219,7 +240,7 @@ func NewProvider(ctx context.Context, source core.Source, kernel string, opts ..
 		// Always load a minimal planetary kernel for recursion (center resolution)
 		const baseKey = "planets/de440s.bsp"
 
-		pk, err := spk.CacheDownload(ctx, baseKey)
+		pk, err := spk.CacheDownload(ctx, baseKey, p.spkOpts()...)
 		if err != nil {
 			return nil, fmt.Errorf("jpl: failed to load planetary base kernel: %w", err)
 		}
@@ -236,7 +257,7 @@ func NewProvider(ctx context.Context, source core.Source, kernel string, opts ..
 			return nil, fmt.Errorf("jpl: resolve kernel cache: %w", err)
 		}
 
-		spkReaders, err := spk.CacheAPI(ctx, cacheBucket, prefix+string(p.source)+"/", p.kernel, p.startTime, p.endTime)
+		spkReaders, err := spk.CacheAPI(ctx, cacheBucket, prefix+string(p.source)+"/", p.kernel, p.startTime, p.endTime, p.spkOpts()...)
 		if err != nil {
 			return nil, fmt.Errorf("jpl: failed to get SPK files: %w", err)
 		}
@@ -258,7 +279,7 @@ func NewProvider(ctx context.Context, source core.Source, kernel string, opts ..
 
 		spkKey := "satellites/" + p.kernel + ".bsp"
 
-		k, err := spk.CacheDownload(ctx, spkKey)
+		k, err := spk.CacheDownload(ctx, spkKey, p.spkOpts()...)
 		if err != nil {
 			return nil, fmt.Errorf("jpl: failed to load satellite kernel: %w", err)
 		}
@@ -274,7 +295,7 @@ func NewProvider(ctx context.Context, source core.Source, kernel string, opts ..
 		return nil, fmt.Errorf("%w: %s", ErrUnknownSource, p.source)
 	}
 
-	p.LSK, err = lsk.Cache(ctx, "lsk/naif0012.tls")
+	p.LSK, err = lsk.Cache(ctx, "lsk/naif0012.tls", p.lskOpts()...)
 	if err != nil {
 		return nil, fmt.Errorf("jpl: failed to locate/cache LSK: %w", err)
 	}
@@ -799,4 +820,27 @@ func (p *Provider) findSegmentLocked(target int32, et float64) (*SegmentRef, err
 // must already hold p.mu (see findSegmentLocked's comment).
 func (p *Provider) segmentLocked(ref SegmentRef) *spk.Segment {
 	return &p.Kernels[ref.KernelIndex].Segments[ref.SegmentIndex]
+}
+
+// spkOpts and lskOpts carry this provider's policy into a kernel fetch.
+//
+// They return nil when no client was set, so the fetch takes exactly the code
+// path it did before [WithClient] existed rather than one that resolves the
+// default and passes it along. The two are separate because spk and lsk have
+// their own Option types — lsk cannot borrow spk's without inverting their
+// dependency.
+func (p *Provider) spkOpts() []spk.Option {
+	if p.remote == nil {
+		return nil
+	}
+
+	return []spk.Option{spk.WithClient(p.remote)}
+}
+
+func (p *Provider) lskOpts() []lsk.Option {
+	if p.remote == nil {
+		return nil
+	}
+
+	return []lsk.Option{lsk.WithClient(p.remote)}
 }

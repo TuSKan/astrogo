@@ -78,13 +78,13 @@ type Provider struct {
 }
 
 // New returns a Provider with the default SSOFT version.
-func New() *Provider {
-	return NewWithVersion(defaultVersion)
+func New(opts ...resolve.Option) *Provider {
+	return NewWithVersion(defaultVersion, opts...)
 }
 
 // NewWithVersion returns a Provider targeting a specific SSOFT release (e.g. "2025.04").
-func NewWithVersion(version string) *Provider {
-	client, err := api.NewClient(remote.FINK)
+func NewWithVersion(version string, opts ...resolve.Option) *Provider {
+	client, err := api.NewClient(remote.FINK, resolve.Apply(opts).APIOptions()...)
 	if err != nil {
 		panic(err) // unregistered endpoint would be a programmer error
 	}

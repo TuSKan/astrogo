@@ -49,12 +49,12 @@ const DefaultEndpoint = remote.GaiaAIP
 // The zero endpoint selects [DefaultEndpoint]. Naming one explicitly is how a
 // caller reaches a specific archive - ESA's, for instance, when the point is
 // to compare the two rather than to get an answer.
-func New(endpoint remote.EndpointID) (*Provider, error) {
+func New(endpoint remote.EndpointID, opts ...resolve.Option) (*Provider, error) {
 	if endpoint == "" {
 		endpoint = DefaultEndpoint
 	}
 
-	client, err := api.NewClient(endpoint)
+	client, err := api.NewClient(endpoint, resolve.Apply(opts).APIOptions()...)
 	if err != nil {
 		return nil, fmt.Errorf("gaia: %w", err)
 	}

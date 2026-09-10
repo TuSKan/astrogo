@@ -78,8 +78,8 @@ type Reader struct {
 //  1. Closes the file handle.
 //  2. Removes the corrupt file from the filesystem.
 //  3. Returns the error wrapped with a descriptive message.
-func CacheDownload(ctx context.Context, kernel string) (*Reader, error) {
-	bucket, key, err := remote.GetFile(ctx, remote.NAIFSPK, kernel, remote.WithCacheName(kernel))
+func CacheDownload(ctx context.Context, kernel string, opts ...Option) (*Reader, error) {
+	bucket, key, err := apply(opts).GetFile(ctx, remote.NAIFSPK, kernel, remote.WithCacheName(kernel))
 	if err != nil {
 		return nil, fmt.Errorf("jpl: SPK kernel %s: %w", kernel, err)
 	}

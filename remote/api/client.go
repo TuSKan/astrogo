@@ -31,6 +31,7 @@ const defaultRetries = 3
 
 // config carries NewClient's options.
 type config struct {
+	remote      *remote.Client
 	timeout     time.Duration
 	retries     int
 	userAgent   string
@@ -42,6 +43,16 @@ type config struct {
 
 // Option customizes a NewClient call.
 type Option func(*config)
+
+// WithRemote binds the client to one [remote.Client]'s policy — its offline
+// flag, endpoint overrides and enabled set — instead of [remote.Default].
+//
+// It is an option here rather than a method on [remote.Client] because
+// remote/api imports remote, so the reverse would be an import cycle. That is
+// the only reason: a method there would read better.
+func WithRemote(c *remote.Client) Option {
+	return func(cfg *config) { cfg.remote = c }
+}
 
 // WithTimeout overrides the endpoint's registered Timeout.
 func WithTimeout(d time.Duration) Option {
@@ -105,6 +116,11 @@ func WithMinInterval(d time.Duration) Option {
 type Client struct {
 	rc *resty.Client
 
+	// remote is the policy this client resolves endpoint URLs through, so
+	// offline mode and an endpoint override are decided per client rather
+	// than per process.
+	remote *remote.Client
+
 	// retryPolicy is consulted twice: by resty, to decide whether to retry,
 	// and by body, to decide whether a final failure is worth reporting as
 	// one that was retried. Holding it here keeps those two answers the same
@@ -123,19 +139,28 @@ type Client struct {
 // timeout the registry already states. Returns ErrUnknownEndpoint for an
 // unregistered id.
 func NewClient(id remote.EndpointID, opts ...Option) (*Client, error) {
-	ep, ok := remote.Lookup(id)
-	if !ok {
-		return nil, fmt.Errorf("%w: %q", remote.ErrUnknownEndpoint, id)
-	}
-
+	// The policy is read before the endpoint, because WithRemote decides
+	// which table the endpoint is looked up in.
 	cfg := config{
-		timeout:     ep.Timeout,
 		retries:     defaultRetries,
 		userAgent:   defaultUserAgent,
 		retryPolicy: DefaultRetryPolicy,
 	}
 	for _, opt := range opts {
 		opt(&cfg)
+	}
+
+	if cfg.remote == nil {
+		cfg.remote = remote.Default()
+	}
+
+	ep, ok := cfg.remote.Lookup(id)
+	if !ok {
+		return nil, fmt.Errorf("%w: %q", remote.ErrUnknownEndpoint, id)
+	}
+
+	if cfg.timeout == 0 {
+		cfg.timeout = ep.Timeout
 	}
 
 	if cfg.timeout == 0 {
@@ -158,7 +183,7 @@ func NewClient(id remote.EndpointID, opts ...Option) (*Client, error) {
 		rc = rc.SetAuthScheme(cfg.authScheme).SetAuthToken(cfg.authToken)
 	}
 
-	return &Client{rc: rc, minInterval: cfg.minInterval, retryPolicy: cfg.retryPolicy}, nil
+	return &Client{rc: rc, remote: cfg.remote, minInterval: cfg.minInterval, retryPolicy: cfg.retryPolicy}, nil
 }
 
 // Close releases the client's idle connections. A Client is usually held
@@ -175,7 +200,7 @@ func (c *Client) Close() error {
 // caller closes it. A non-2xx response is returned as an *HTTPError
 // instead of a body, so a caller never parses an error page as data.
 func (c *Client) Get(ctx context.Context, id remote.EndpointID, path string, query url.Values) (io.ReadCloser, error) {
-	full, err := requestURL(id, path)
+	full, err := c.requestURL(id, path)
 	if err != nil {
 		return nil, err
 	}
@@ -217,7 +242,7 @@ func (c *Client) GetJSON(ctx context.Context, id remote.EndpointID, path string,
 // and returns the raw response body — the shape TAP-ADQL services and any
 // endpoint whose response format must be sniffed need.
 func (c *Client) PostForm(ctx context.Context, id remote.EndpointID, path string, form url.Values) (io.ReadCloser, error) {
-	full, err := requestURL(id, path)
+	full, err := c.requestURL(id, path)
 	if err != nil {
 		return nil, err
 	}
@@ -240,7 +265,7 @@ func (c *Client) PostForm(ctx context.Context, id remote.EndpointID, path string
 // PostJSON marshals payload as the JSON request body and returns the raw
 // response body.
 func (c *Client) PostJSON(ctx context.Context, id remote.EndpointID, path string, payload any) (io.ReadCloser, error) {
-	full, err := requestURL(id, path)
+	full, err := c.requestURL(id, path)
 	if err != nil {
 		return nil, err
 	}
@@ -305,8 +330,8 @@ func (c *Client) pace(ctx context.Context) (release func(), err error) {
 // whose registered URL already carries a query (a mirror with a token)
 // would otherwise have path spliced in after it, producing a URL that
 // silently addresses the wrong thing.
-func requestURL(id remote.EndpointID, path string) (string, error) {
-	base, err := remote.URL(id)
+func (c *Client) requestURL(id remote.EndpointID, path string) (string, error) {
+	base, err := c.remote.URL(id)
 	if err != nil {
 		// Wrapped with %w, so a caller's errors.Is against ErrOffline or
 		// ErrEndpointDisabled still matches.

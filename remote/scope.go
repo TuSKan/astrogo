@@ -31,25 +31,22 @@ type Scope struct {
 // TestMain) has already granted consent this call must not disturb. The
 // global fields (offline, policy, and the data directory) are always
 // captured, regardless of ids.
-func Capture(ids ...EndpointID) Scope {
-	regMu.RLock()
-	defer regMu.RUnlock()
-
-	dataMu.RLock()
-	defer dataMu.RUnlock()
+func (c *Client) Capture(ids ...EndpointID) Scope {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 
 	var snapshot map[EndpointID]Endpoint
 
 	if len(ids) == 0 {
-		snapshot = make(map[EndpointID]Endpoint, len(endpoints))
-		for id, ep := range endpoints {
+		snapshot = make(map[EndpointID]Endpoint, len(c.endpoints))
+		for id, ep := range c.endpoints {
 			snapshot[id] = cloneEndpoint(ep)
 		}
 	} else {
 		snapshot = make(map[EndpointID]Endpoint, len(ids))
 
 		for _, id := range ids {
-			if ep, ok := endpoints[id]; ok {
+			if ep, ok := c.endpoints[id]; ok {
 				snapshot[id] = cloneEndpoint(ep)
 			}
 		}
@@ -57,9 +54,9 @@ func Capture(ids ...EndpointID) Scope {
 
 	return Scope{
 		endpoints:  snapshot,
-		offline:    offline,
-		policy:     policy,
-		dataDirURL: dataDirURL,
+		offline:    c.offline,
+		policy:     c.policy,
+		dataDirURL: c.dataDir,
 	}
 }
 
@@ -76,25 +73,32 @@ func Capture(ids ...EndpointID) Scope {
 // registry (SetURL, EnableDownloads, SetOffline, ...) — the same caveat
 // that already applies to Reset, and why remote-touching tests in this
 // module don't run under t.Parallel.
-func (s Scope) Restore() {
-	regMu.Lock()
-	defer regMu.Unlock()
+func (s Scope) Restore() { s.RestoreOn(Default()) }
 
-	dataMu.Lock()
-	defer dataMu.Unlock()
+// RestoreOn puts the captured values back on c rather than on [Default].
+func (s Scope) RestoreOn(c *Client) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 
-	maps.Copy(endpoints, s.endpoints)
+	maps.Copy(c.endpoints, s.endpoints)
 
-	offline = s.offline
-	policy = s.policy
-	dataDirURL = s.dataDirURL
+	c.offline = s.offline
+	c.policy = s.policy
+	c.dataDir = s.dataDirURL
 }
+
+// Capture records [Default]'s configuration. See [Client.Capture].
+func Capture(ids ...EndpointID) Scope { return Default().Capture(ids...) }
 
 // WithScope captures the current configuration, runs fn, and restores the
 // captured configuration afterward — even if fn panics.
-func WithScope(fn func()) {
-	s := Capture()
-	defer s.Restore()
+func WithScope(fn func()) { Default().WithScope(fn) }
+
+// WithScope captures c's configuration, runs fn, and restores it afterward —
+// even if fn panics.
+func (c *Client) WithScope(fn func()) {
+	s := c.Capture()
+	defer s.RestoreOn(c)
 
 	fn()
 }

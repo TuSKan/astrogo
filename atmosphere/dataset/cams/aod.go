@@ -79,12 +79,12 @@ const AODVariable = "aod550"
 // must also blank-import remote/s3, which this package deliberately does not
 // — it knows nothing about S3, and pulling the AWS SDK into every build that
 // merely reads a NetCDF file would be the wrong trade.
-func AOD550(ctx context.Context, site *coord.Geodetic, when time.GoTime) (float64, error) {
+func AOD550(ctx context.Context, site *coord.Geodetic, when time.GoTime, opts ...Option) (float64, error) {
 	if site == nil {
 		return 0, fmt.Errorf("%w: needs a site", ErrAOD)
 	}
 
-	bucket, key, err := remote.GetFile(ctx, remote.CopernicusEODATA, AODKey(when))
+	bucket, key, err := apply(opts).GetFile(ctx, remote.CopernicusEODATA, AODKey(when))
 	if err != nil {
 		return 0, fmt.Errorf("%w: %w\n\n%s", ErrAOD, err, RegistrationAdvice)
 	}

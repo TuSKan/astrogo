@@ -25,8 +25,8 @@ type Provider struct {
 }
 
 // New creates a new SBDB catalog provider.
-func New() *Provider {
-	client, err := api.NewClient(remote.JPLSBDB)
+func New(opts ...resolve.Option) *Provider {
+	client, err := api.NewClient(remote.JPLSBDB, resolve.Apply(opts).APIOptions()...)
 	if err != nil {
 		panic(err) // unregistered endpoint would be a programmer error
 	}

@@ -6,7 +6,6 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"sync"
 
 	"github.com/TuSKan/astrogo/remote/file"
 )
@@ -14,13 +13,6 @@ import (
 // appName is the directory name under the OS user cache dir holding all
 // astrogo data by default.
 const appName = "astrogo"
-
-// dataDirURL is the process-wide base location for everything astrogo
-// stores. Empty means "resolve the default lazily" — see DataDirURL.
-var (
-	dataMu     sync.RWMutex
-	dataDirURL string
-)
 
 // DataDirEnv overrides the default data location when SetDataDir has not
 // been called. Its value is a bucket URL, not an OS path — see DataDirURL.
@@ -30,11 +22,11 @@ const DataDirEnv = "ASTROGO_CACHE_DIR"
 // URL remote/file can open: "file:///home/u/.cache/astrogo?create_dir=true",
 // "s3://my-cache-bucket", "sftp://host/path". Nothing astrogo caches is
 // assumed to live on local disk.
-func SetDataDir(bucketURL string) {
-	dataMu.Lock()
-	defer dataMu.Unlock()
+func (c *Client) SetDataDir(bucketURL string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 
-	dataDirURL = bucketURL
+	c.dataDir = bucketURL
 }
 
 // DataDirURL returns the bucket URL astrogo stores all its data under,
@@ -42,12 +34,12 @@ func SetDataDir(bucketURL string) {
 // the OS user cache directory — ~/.cache/astrogo on Linux,
 // %LocalAppData%\astrogo on Windows, ~/Library/Caches/astrogo on macOS.
 // Re-resolved per call, so a changed environment takes effect immediately.
-func DataDirURL() string {
-	dataMu.RLock()
+func (c *Client) DataDirURL() string {
+	c.mu.RLock()
 
-	d := dataDirURL
+	d := c.dataDir
 
-	dataMu.RUnlock()
+	c.mu.RUnlock()
 
 	if d != "" {
 		return d
@@ -89,8 +81,8 @@ func defaultDataDirURL() string {
 
 // DataDir opens DataDirURL as a Bucket rooted at astrogo's base data
 // location.
-func DataDir(ctx context.Context) (*file.Bucket, error) {
-	b, err := file.Open(ctx, DataDirURL())
+func (c *Client) DataDir(ctx context.Context) (*file.Bucket, error) {
+	b, err := file.Open(ctx, c.DataDirURL())
 	if err != nil {
 		return nil, fmt.Errorf("remote: open data dir: %w", err)
 	}
@@ -129,3 +121,12 @@ func CacheDir(ctx context.Context, id EndpointID) (bucket *file.Bucket, prefix s
 
 	return bucket, ep.Subsystem + "/", nil
 }
+
+// SetDataDir sets [Default]'s base data location. See [Client.SetDataDir].
+func SetDataDir(bucketURL string) { Default().SetDataDir(bucketURL) }
+
+// DataDirURL returns [Default]'s base data location. See [Client.DataDirURL].
+func DataDirURL() string { return Default().DataDirURL() }
+
+// DataDir opens [Default]'s base data location. See [Client.DataDir].
+func DataDir(ctx context.Context) (*file.Bucket, error) { return Default().DataDir(ctx) }

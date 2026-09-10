@@ -38,8 +38,8 @@ var (
 // Returns remote.ErrDownloadDenied unless
 // remote.EnableDownloads(maxSize, remote.OpenNGC) has been called; it
 // still respects remote.SetOffline and remote.Disable(remote.OpenNGC).
-func fetch(ctx context.Context) ([]resolve.Target, error) {
-	ep, ok := remote.Lookup(remote.OpenNGC)
+func fetch(ctx context.Context, rc *remote.Client) ([]resolve.Target, error) {
+	ep, ok := rc.Lookup(remote.OpenNGC)
 	if !ok {
 		return nil, fmt.Errorf("%w: %q", remote.ErrUnknownEndpoint, remote.OpenNGC)
 	}
@@ -47,7 +47,7 @@ func fetch(ctx context.Context) ([]resolve.Target, error) {
 	var records []targetRecord
 
 	for _, sourceFile := range ep.Files {
-		recs, err := fetchSource(ctx, sourceFile)
+		recs, err := fetchSource(ctx, rc, sourceFile)
 		if err != nil {
 			return nil, err
 		}
@@ -62,8 +62,8 @@ func fetch(ctx context.Context) ([]resolve.Target, error) {
 
 // fetchSource downloads and parses one OpenNGC source CSV, reusing the
 // on-disk cache when remote.GetFile's HEAD probe shows it's still current.
-func fetchSource(ctx context.Context, sourceFile string) ([]targetRecord, error) {
-	bucket, key, err := remote.GetFile(ctx, remote.OpenNGC, sourceFile)
+func fetchSource(ctx context.Context, rc *remote.Client, sourceFile string) ([]targetRecord, error) {
+	bucket, key, err := rc.GetFile(ctx, remote.OpenNGC, sourceFile)
 	if err != nil {
 		return nil, fmt.Errorf("openngc: %s: %w", sourceFile, err)
 	}

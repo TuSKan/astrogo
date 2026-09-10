@@ -86,7 +86,7 @@ func commandCandidates(kernel string) []string {
 // Storage is a bucket and key prefix, never a directory path: a generated
 // kernel lands wherever remote's cache lives, which need not be local
 // disk.
-func CacheAPI(ctx context.Context, bucket *file.Bucket, prefix, kernel string, startTime, endTime time.Time) ([]*Reader, error) {
+func CacheAPI(ctx context.Context, bucket *file.Bucket, prefix, kernel string, startTime, endTime time.Time, opts ...Option) ([]*Reader, error) {
 	var readers []*Reader
 
 	spkFile := prefix + kernel + ".bsp"
@@ -106,7 +106,7 @@ func CacheAPI(ctx context.Context, bucket *file.Bucket, prefix, kernel string, s
 	// download in effect (KB–MB delivered base64-encoded inside the JSON
 	// response), so it requires the same explicit consent as any other
 	// kernel download: remote.EnableDownloads(maxSize, remote.JPLHorizonsSPK).
-	if err := remote.CheckDownload(remote.JPLHorizonsSPK, spkFile, remote.SizeVaries); err != nil {
+	if err := apply(opts).CheckDownload(remote.JPLHorizonsSPK, spkFile, remote.SizeVaries); err != nil {
 		return nil, fmt.Errorf("jpl: SPK kernel %s: %w", kernel, err)
 	}
 

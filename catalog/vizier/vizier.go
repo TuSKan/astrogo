@@ -36,8 +36,8 @@ type Provider struct {
 }
 
 // New creates a new VizieR catalog provider.
-func New() *Provider {
-	client, err := api.NewClient(remote.VizieR)
+func New(opts ...resolve.Option) *Provider {
+	client, err := api.NewClient(remote.VizieR, resolve.Apply(opts).APIOptions()...)
 	if err != nil {
 		panic(err) // unregistered endpoint would be a programmer error
 	}

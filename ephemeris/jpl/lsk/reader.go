@@ -51,8 +51,8 @@ type Reader struct {
 //
 // It provides an auto-healing mechanism for CI environments by automatically
 // removing corrupt or truncated files.
-func Cache(ctx context.Context, kernel string) (*Reader, error) {
-	bucket, key, err := remote.GetFile(ctx, remote.NAIFLSK, kernel, remote.WithCacheName(kernel))
+func Cache(ctx context.Context, kernel string, opts ...Option) (*Reader, error) {
+	bucket, key, err := apply(opts).GetFile(ctx, remote.NAIFLSK, kernel, remote.WithCacheName(kernel))
 	if err != nil {
 		return nil, fmt.Errorf("jpl: LSK %s: %w", kernel, err)
 	}
