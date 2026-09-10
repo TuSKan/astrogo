@@ -50,14 +50,61 @@ func DataDirURL() string {
 	dataMu.RUnlock()
 
 	if d != "" {
-		return d
+		return withStagingInBucket(d)
 	}
 
 	if env := os.Getenv(DataDirEnv); env != "" {
-		return env
+		return withStagingInBucket(env)
 	}
 
 	return defaultDataDirURL()
+}
+
+// withStagingInBucket adds no_tmp_dir=1 to a caller-supplied file:// URL that
+// does not already carry it, and returns anything else untouched.
+//
+// # Why a caller's URL is rewritten at all
+//
+// Because the alternative is a fix that only works for people who did not
+// configure anything. [defaultDataDirURL] carries the parameter, so the
+// out-of-the-box cache is safe; a caller who set [SetDataDir] or DataDirEnv —
+// which is the documented way to relocate the cache, and the one an
+// application in production is most likely to have used — would silently get
+// the collisions #241 is about, and there is nothing in the symptom that points
+// back at their URL.
+//
+// # Why only file://
+//
+// The parameter is fileblob's. gocloud's URL openers reject query parameters
+// they do not recognise, so adding it to an s3:// or gs:// URL would turn a
+// working configuration into an open error. Those drivers do not stage through
+// os.TempDir either, so there is nothing to fix there.
+//
+// A malformed URL is returned unchanged rather than repaired: file.Open is
+// where a bad URL should be reported, with the caller's own string in the
+// message, and quietly rewriting one here would only move the error somewhere
+// less useful.
+func withStagingInBucket(bucketURL string) string {
+	u, parseErr := url.Parse(bucketURL)
+	if parseErr != nil || u.Scheme != "file" {
+		return bucketURL
+	}
+
+	// ParseQuery rather than u.Query(), which reports no error and silently
+	// drops any pair it cannot decode. Re-encoding after that would hand back
+	// a URL missing whatever it could not read — a different broken URL,
+	// which is precisely what the paragraph above says this must not do.
+	// Measured before it was written this way: "?%zz" came back as
+	// "?no_tmp_dir=1".
+	q, err := url.ParseQuery(u.RawQuery)
+	if err != nil || q.Has("no_tmp_dir") {
+		return bucketURL
+	}
+
+	q.Set("no_tmp_dir", "1")
+	u.RawQuery = q.Encode()
+
+	return u.String()
 }
 
 // defaultDataDirURL is the one place in astrogo that converts an OS
