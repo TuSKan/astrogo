@@ -90,6 +90,11 @@ func Open(ctx context.Context, bucketURL string) (*Bucket, error) {
 // a truncated one. Skipping Close leaves key exactly as it was, at the
 // cost of leaking the writer's temp resource on that rare path.
 func Save(ctx context.Context, bucket *Bucket, key string, r io.Reader) error {
+	// Serialised against any other writer of this key in this process, because
+	// fileblob's staging file is named from a clock that does not advance on
+	// Windows. See [WriteLock].
+	defer writeLock(bucket, key)()
+
 	w, err := bucket.NewWriter(ctx, key, nil)
 	if err != nil {
 		return fmt.Errorf("remote/file: open writer %s: %w", key, err)

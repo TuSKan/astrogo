@@ -3,6 +3,7 @@ package spk
 import (
 	"errors"
 	"io"
+	"strings"
 	"testing"
 
 	"github.com/TuSKan/astrogo/internal/testutil"
@@ -23,7 +24,12 @@ func seedKernel(t *testing.T) (*file.Bucket, string) {
 
 	const key = "jpl/planets/de440s.bsp"
 
-	if err := bucket.WriteAll(t.Context(), key, []byte("kernel bytes"), nil); err != nil {
+	// file.Save rather than bucket.WriteAll: these tests are t.Parallel and
+	// each has its own t.TempDir bucket, but fileblob stages every write in
+	// os.TempDir under a name built from the key's basename and a Windows
+	// clock that does not move — so separate buckets writing "de440s.bsp"
+	// still collide. Save holds the staging lock that prevents it (#241).
+	if err := file.Save(t.Context(), bucket, key, strings.NewReader("kernel bytes")); err != nil {
 		t.Fatalf("seed kernel: %v", err)
 	}
 

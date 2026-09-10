@@ -274,6 +274,13 @@ func writeStaged(ctx context.Context, bucket *file.Bucket, writeKey string,
 ) error {
 	opts := &blob.WriterOptions{Metadata: map[string]string{sourceETagKey: sourceETag}}
 
+	// No staging lock here, and that is a conclusion rather than an omission.
+	// Everything below runs holding acquireLock, which #245 made exclusive
+	// within the process as well as across them, so no second goroutine is in
+	// this function for this key. Two different keys stage under two different
+	// names now that the bucket URL carries no_tmp_dir=1, and two buckets are
+	// two directories. See file.Save for the case that is not covered by any of
+	// that.
 	w, err := bucket.NewWriter(ctx, writeKey, opts)
 	if err != nil {
 		if existing != nil {
