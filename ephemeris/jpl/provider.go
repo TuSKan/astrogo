@@ -26,6 +26,7 @@ var (
 	ErrUnknownSource         = errors.New("jpl: unknown source")
 	ErrRecursionDepth        = errors.New("jpl: recursion depth exceeded")
 	ErrNilKernel             = errors.New("jpl: kernel is nil")
+	ErrBodyIDOutOfRange      = errors.New("jpl: body id outside the signed 32-bit NAIF range")
 	ErrKernelIndexOutOfRange = errors.New("jpl: kernel index out of range")
 
 	// ErrNoSmallBodyKernel indicates Horizons matched no small body for the
@@ -327,6 +328,19 @@ func (p *Provider) State(id core.ID, t time.Time) (core.State, error) {
 
 	naif, ok := NAIFFor(id)
 	if !ok {
+		// core.ID is uint32; a NAIF id is signed 32-bit. The top half of the
+		// unsigned range therefore has no meaning as an id, and converting it
+		// does not merely lose information — it wraps to a NEGATIVE id, which
+		// is meaningful, because that is how NAIF numbers spacecraft. Cassini
+		// is -82. So core.ID(4294967295) would quietly be looked up as -1
+		// rather than refused, and the answer would be a real body's state
+		// under a caller's typo.
+		//
+		// Reported rather than clamped: there is no id here to fall back to.
+		if id > math.MaxInt32 {
+			return core.State{}, fmt.Errorf("%w: %d", ErrBodyIDOutOfRange, id)
+		}
+
 		naif = int(id)
 	}
 
