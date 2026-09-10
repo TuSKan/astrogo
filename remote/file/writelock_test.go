@@ -100,10 +100,14 @@ func TestConcurrentSaveOfOneKey(t *testing.T) {
 // contended over one file in a third place entirely. Measured, eight writers
 // into eight separate buckets: 59 failures in 320.
 //
-// no_tmp_dir=1 on the bucket URL is what closes it, by putting staging inside
-// the bucket. testutil.FileURL sets it, which is why this passes; the writers
-// here hold different buckets, so the write lock — keyed by bucket as well as
-// key — deliberately does not serialise them and cannot be what saves it.
+// The write lock is what closes it, and only because it is keyed by the key's
+// basename rather than by bucket and key. The writers here hold different
+// buckets; a lock that took the bucket into account would decide they cannot
+// collide and let them, which is what the staging path's shape makes untrue.
+//
+// Putting staging inside the bucket (no_tmp_dir=1) also closes this case and is
+// not what astrogo does, because across processes it closes it by making the
+// collision worse — see defaultDataDirURL.
 func TestConcurrentSaveOfDistinctKeys(t *testing.T) {
 	t.Parallel()
 
@@ -144,29 +148,26 @@ func TestConcurrentSaveOfDistinctKeys(t *testing.T) {
 		for i, err := range errs {
 			if err != nil {
 				t.Errorf("round %d, writer %d: %v.\n"+
-					"  Separate buckets writing the same key must not interfere. If the error "+
-					"names a path under the system temp directory, the bucket URL has lost "+
-					"no_tmp_dir=1 (#241).", round, i, err)
+					"  Separate buckets writing the same key must not interfere: their "+
+					"staging paths are the same file in os.TempDir, so the write lock has to "+
+					"be keyed by basename to see it (#241).", round, i, err)
 			}
 		}
 	}
 }
 
-// TestFileURLCarriesTheStagingParameters guards the two query parameters the
-// concurrency above depends on, in the one place tests get a bucket URL.
+// TestFileURLCarriesCreateDir guards the one query parameter tests depend on,
+// in the one place they get a bucket URL.
 //
-// They are easy to drop and nothing else notices: a URL without create_dir
-// fails loudly on a first run, but a URL without no_tmp_dir keeps working and
-// merely goes back to colliding one time in six, on Windows, under
-// parallelism — which is how this arrived as three unrelated flaky tests.
-func TestFileURLCarriesTheStagingParameters(t *testing.T) {
+// It used to also require no_tmp_dir=1. That parameter is gone: it fixed the
+// case above and broke a worse one, since staging inside the bucket puts two
+// *processes* on one path they cannot retry past — see defaultDataDirURL.
+func TestFileURLCarriesCreateDir(t *testing.T) {
 	t.Parallel()
 
 	got := testutil.FileURL(t, t.TempDir())
 
-	for _, want := range []string{"create_dir=true", "no_tmp_dir=1"} {
-		if !strings.Contains(got, want) {
-			t.Errorf("testutil.FileURL produced %q, which is missing %q (#241)", got, want)
-		}
+	if !strings.Contains(got, "create_dir=true") {
+		t.Errorf("testutil.FileURL produced %q, which is missing create_dir=true", got)
 	}
 }
