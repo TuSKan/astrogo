@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"io"
 
-	"gocloud.dev/gcerrors"
-
 	"github.com/TuSKan/astrogo/logging"
 	"github.com/TuSKan/astrogo/remote/file"
 	"github.com/TuSKan/astrogo/time"
@@ -52,14 +50,22 @@ func WithProgress(f func(downloaded, total int64)) ReadOption {
 
 // GetFile ensures endpoint id's object named name is present and current
 // in the cache, returning the cache Bucket and the key within it. The
-// caller reads it however it needs — ReadAll, NewReader, file.NewReaderAt.
+// caller reads it however it needs — ReadAll, NewReader, [NewReaderAt].
 //
 // An immutable endpoint's cache entry is reused on existence alone; a
 // Mutable one is revalidated against the source's current ETag first. A
 // miss downloads, which requires consent (ErrDownloadDenied otherwise) and
 // is serialized against other processes doing the same.
-func GetFile(ctx context.Context, id EndpointID, name string, opts ...ReadOption) (bucket *file.Bucket, key string, err error) {
-	ep, ok := Lookup(id)
+func GetFile(ctx context.Context, id EndpointID, name string, opts ...ReadOption) (bucket *Bucket, key string, err error) {
+	return Default().GetFile(ctx, id, name, opts...)
+}
+
+// GetFile ensures endpoint id's object named name is present and current in
+// this client's cache, returning that cache Bucket and the key within it. See
+// the package-level [GetFile]; the consent, offline and URL decisions it makes
+// are this client's, and the cache it fills is this client's.
+func (c *Client) GetFile(ctx context.Context, id EndpointID, name string, opts ...ReadOption) (bucket *Bucket, key string, err error) {
+	ep, ok := c.Lookup(id)
 	if !ok {
 		return nil, "", fmt.Errorf("%w: %q", ErrUnknownEndpoint, id)
 	}
@@ -67,7 +73,7 @@ func GetFile(ctx context.Context, id EndpointID, name string, opts ...ReadOption
 	// URL is the offline/Disable gate. It runs first so a blocked endpoint
 	// fails before any cache directory is resolved or lock taken, and so
 	// the source below is never opened for a URL the caller may not reach.
-	if _, err := URL(id); err != nil {
+	if _, err := c.URL(id); err != nil {
 		return nil, "", err
 	}
 
@@ -89,7 +95,7 @@ func GetFile(ctx context.Context, id EndpointID, name string, opts ...ReadOption
 		return nil, "", fmt.Errorf("%w: endpoint %q", ErrCacheNameRequired, id)
 	}
 
-	cacheBucket, prefix, err := CacheDir(ctx, id)
+	cacheBucket, prefix, err := c.CacheDir(ctx, id)
 	if err != nil {
 		return nil, "", err
 	}
@@ -113,7 +119,7 @@ func GetFile(ctx context.Context, id EndpointID, name string, opts ...ReadOption
 		// and reporting it consistently matches the documented contract.
 		// Routed through CheckDownload so a custom Policy still decides.
 		// A caller who did grant consent sees the real error.
-		if cerr := CheckDownload(id, name, ep.ApproxSize); cerr != nil {
+		if cerr := c.CheckDownload(id, name, ep.ApproxSize); cerr != nil {
 			return nil, "", cerr
 		}
 
@@ -129,8 +135,9 @@ func GetFile(ctx context.Context, id EndpointID, name string, opts ...ReadOption
 	// write. go test runs each package as its own process and several
 	// share one JPL kernel, so this is a cross-process race that no
 	// in-process mutex can fix.
-	release, err := acquireLock(ctx, cacheBucket, cacheKey)
+	release, err := file.AcquireLock(ctx, cacheBucket, cacheKey)
 	if err != nil {
+		//nolint:wrapcheck // pure delegation to remote/file, internal to this package; its errors are already prefixed
 		return nil, "", err
 	}
 
@@ -143,7 +150,29 @@ func GetFile(ctx context.Context, id EndpointID, name string, opts ...ReadOption
 
 	timeout := cmp.Or(cfg.timeout, ep.DownloadTimeout, DefaultDownloadTimeout)
 
-	if err := fetchInto(ctx, id, ep, srcBucket, cacheBucket, name, cacheKey, timeout, cfg); err != nil {
+	if err := c.fetchInto(ctx, id, ep, srcBucket, cacheBucket, name, cacheKey, timeout, cfg); err != nil {
+		// A failed fetch is not the same as a missing file, and the difference
+		// is a whole class of CI failure. The lock above is exclusive within
+		// this process and only mostly exclusive across processes — fileblob's
+		// IfNotExist is a Stat followed by a Rename with a window in between —
+		// so two processes can both reach here for one key. The loser's
+		// staging rename then fails with "Access is denied" on Windows while
+		// the winner's download completes perfectly.
+		//
+		// Measured in CI on this branch: `go test ./...` runs ephemeris/jpl and
+		// time as separate processes against one cache, both fetch de440s.bsp,
+		// and one died on exactly that rename while the other wrote a complete
+		// kernel (#241).
+		//
+		// So ask the question the caller actually asked — is the object there
+		// and current — before reporting a failure. This is not a retry and
+		// swallows nothing: it re-runs the same freshness check the cache hit
+		// above uses, and a fetch that failed for any reason other than losing
+		// this race still finds nothing and still fails.
+		if fresh, freshErr := freshInCache(ctx, ep, srcBucket, cacheBucket, name, cacheKey); freshErr == nil && fresh {
+			return cacheBucket, cacheKey, nil
+		}
+
 		return nil, "", fmt.Errorf("remote: fetch %s: %w", name, err)
 	}
 
@@ -159,12 +188,18 @@ func GetFile(ctx context.Context, id EndpointID, name string, opts ...ReadOption
 // there. Any other failure returns an error, so "missing" is never
 // confused with "could not tell".
 func Exists(ctx context.Context, id EndpointID, name string) (bool, error) {
-	ep, ok := Lookup(id)
+	return Default().Exists(ctx, id, name)
+}
+
+// Exists reports whether endpoint id currently serves an object at name, as
+// this client may see it. See the package-level [Exists].
+func (c *Client) Exists(ctx context.Context, id EndpointID, name string) (bool, error) {
+	ep, ok := c.Lookup(id)
 	if !ok {
 		return false, fmt.Errorf("%w: %q", ErrUnknownEndpoint, id)
 	}
 
-	if _, err := URL(id); err != nil {
+	if _, err := c.URL(id); err != nil {
 		return false, err
 	}
 
@@ -174,7 +209,7 @@ func Exists(ctx context.Context, id EndpointID, name string) (bool, error) {
 	}
 
 	if _, err := srcBucket.Attributes(ctx, name); err != nil {
-		if gcerrors.Code(err) == gcerrors.NotFound {
+		if file.IsNotFound(err) {
 			return false, nil
 		}
 
@@ -186,7 +221,7 @@ func Exists(ctx context.Context, id EndpointID, name string) (bool, error) {
 
 // freshInCache reports whether cacheKey already holds current content for
 // ep+name, so GetFile can skip the transfer entirely.
-func freshInCache(ctx context.Context, ep Endpoint, srcBucket, cacheBucket *file.Bucket, name, cacheKey string) (bool, error) {
+func freshInCache(ctx context.Context, ep Endpoint, srcBucket, cacheBucket *Bucket, name, cacheKey string) (bool, error) {
 	exists, err := cacheBucket.Exists(ctx, cacheKey)
 	if err != nil {
 		return false, fmt.Errorf("remote: check cache %s: %w", cacheKey, err)
@@ -212,7 +247,7 @@ func freshInCache(ctx context.Context, ep Endpoint, srcBucket, cacheBucket *file
 // local cache, fileblob derives ETag from the file's (ModTime, Size),
 // which has nothing to do with the source's, so that comparison would
 // never match and every reuse check would degrade into a full re-download.
-func unchanged(ctx context.Context, srcBucket, cacheBucket *file.Bucket, name, cacheKey string) bool {
+func unchanged(ctx context.Context, srcBucket, cacheBucket *Bucket, name, cacheKey string) bool {
 	want, err := cacheBucket.Attributes(ctx, cacheKey)
 	if err != nil {
 		return false
@@ -223,7 +258,7 @@ func unchanged(ctx context.Context, srcBucket, cacheBucket *file.Bucket, name, c
 		return false
 	}
 
-	if recorded := want.Metadata[sourceETagKey]; recorded != "" && got.ETag != "" {
+	if recorded := want.Metadata[file.SourceETagKey]; recorded != "" && got.ETag != "" {
 		return recorded == got.ETag
 	}
 
@@ -234,12 +269,12 @@ func unchanged(ctx context.Context, srcBucket, cacheBucket *file.Bucket, name, c
 // cacheBucket/cacheKey. It owns all policy — consent, timeout, progress,
 // resume, validation — for every backend uniformly; buckets only move
 // bytes.
-func fetchInto(ctx context.Context, id EndpointID, ep Endpoint, srcBucket, cacheBucket *file.Bucket,
+func (c *Client) fetchInto(ctx context.Context, id EndpointID, ep Endpoint, srcBucket, cacheBucket *Bucket,
 	name, cacheKey string, timeout time.Duration, cfg readConfig,
 ) error {
 	// Consent is checked twice: once on the registered estimate before any
 	// request, and again below on the size the source actually reports.
-	if err := CheckDownload(id, name, ep.ApproxSize); err != nil {
+	if err := c.CheckDownload(id, name, ep.ApproxSize); err != nil {
 		return err
 	}
 
@@ -251,11 +286,11 @@ func fetchInto(ctx context.Context, id EndpointID, ep Endpoint, srcBucket, cache
 		return fmt.Errorf("%w: %s: %w", ErrDownloadFailed, name, err)
 	}
 
-	if err := CheckDownload(id, name, attrs.Size); err != nil {
+	if err := c.CheckDownload(id, name, attrs.Size); err != nil {
 		return err
 	}
 
-	offset := resumePoint(ctx, cacheBucket, cacheKey, attrs.ETag)
+	offset := file.ResumePoint(ctx, cacheBucket, cacheKey, attrs.ETag)
 
 	logging.InfoContext(ctx, "downloading", "cache_key", cacheKey, "endpoint", id, "bytes", attrs.Size)
 
@@ -271,7 +306,8 @@ func fetchInto(ctx context.Context, id EndpointID, ep Endpoint, srcBucket, cache
 		body = &progressReader{r: r, total: offset + r.Size(), read: offset, onProgress: cfg.progress}
 	}
 
-	return stageAndPromote(ctx, cacheBucket, cacheKey, body, offset, attrs.ETag, cfg.validate)
+	//nolint:wrapcheck // pure delegation to remote/file, internal to this package; its errors are already prefixed
+	return file.StageAndPromote(ctx, cacheBucket, cacheKey, body, offset, attrs.ETag, cfg.validate)
 }
 
 // progressReader reports the running byte count after every Read that

@@ -9,7 +9,6 @@ import (
 
 	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/remote"
-	"github.com/TuSKan/astrogo/remote/api"
 )
 
 // ErrAPIError indicates a JPL Horizons API error response.
@@ -27,16 +26,13 @@ var ErrNotImplemented = errors.New("jpl: Horizons result parsing not implemented
 
 // Provider implements resolve.Provider for major bodies via JPL Horizons.
 type Provider struct {
-	client *api.Client
+	client *remote.Client
 	cache  resolve.Cache
 }
 
 // New creates a new JPL Horizons catalog provider.
 func New() *Provider {
-	client, err := api.NewClient(remote.JPLHorizons)
-	if err != nil {
-		panic(err) // unregistered endpoint would be a programmer error
-	}
+	client := remote.Default()
 
 	return &Provider{
 		client: client,

@@ -31,7 +31,6 @@ import (
 	"math"
 
 	"github.com/TuSKan/astrogo/remote"
-	"github.com/TuSKan/astrogo/remote/file"
 	"github.com/TuSKan/astrogo/skybrightness/dataset/raster"
 	"github.com/TuSKan/astrogo/unit"
 )
@@ -192,7 +191,7 @@ func Open(ctx context.Context, year int) (*Raster, io.Closer, error) {
 		return nil, nil, err
 	}
 
-	at, err := file.NewReaderAt(ctx, bucket, tiffKey)
+	at, err := remote.NewReaderAt(ctx, bucket, tiffKey)
 	if err != nil {
 		return nil, nil, fmt.Errorf("viirs: open %s: %w", tiffKey, err)
 	}

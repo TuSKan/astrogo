@@ -5,7 +5,7 @@ import (
 
 	"gocloud.dev/blob"
 
-	_ "github.com/TuSKan/astrogo/remote/s3"
+	_ "github.com/TuSKan/astrogo/remote/file/s3"
 )
 
 // The whole contract of this package is "blank-importing it makes s3://

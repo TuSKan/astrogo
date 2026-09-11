@@ -8,7 +8,6 @@ import (
 
 	"github.com/TuSKan/astrogo/ephemeris/jpl/spk"
 	"github.com/TuSKan/astrogo/remote"
-	"github.com/TuSKan/astrogo/remote/file"
 
 	"github.com/TuSKan/astrogo/internal/testutil"
 )
@@ -54,7 +53,7 @@ func TestCacheDownloadDetectsChecksumCorruption(t *testing.T) {
 
 	srcURL := testutil.FileURL(t, srcDir)
 
-	srcBucket, err := file.Open(context.Background(), srcURL)
+	srcBucket, err := remote.OpenBucket(context.Background(), srcURL)
 	if err != nil {
 		t.Fatalf("Open source: %v", err)
 	}

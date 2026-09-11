@@ -6,7 +6,6 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"sync"
 
 	"github.com/TuSKan/astrogo/remote/file"
 )
@@ -14,13 +13,6 @@ import (
 // appName is the directory name under the OS user cache dir holding all
 // astrogo data by default.
 const appName = "astrogo"
-
-// dataDirURL is the process-wide base location for everything astrogo
-// stores. Empty means "resolve the default lazily" — see DataDirURL.
-var (
-	dataMu     sync.RWMutex
-	dataDirURL string
-)
 
 // DataDirEnv overrides the default data location when SetDataDir has not
 // been called. Its value is a bucket URL, not an OS path — see DataDirURL.
@@ -30,11 +22,15 @@ const DataDirEnv = "ASTROGO_CACHE_DIR"
 // URL remote/file can open: "file:///home/u/.cache/astrogo?create_dir=true",
 // "s3://my-cache-bucket", "sftp://host/path". Nothing astrogo caches is
 // assumed to live on local disk.
-func SetDataDir(bucketURL string) {
-	dataMu.Lock()
-	defer dataMu.Unlock()
+func SetDataDir(bucketURL string) { Default().SetDataDir(bucketURL) }
 
-	dataDirURL = bucketURL
+// SetDataDir sets the base location for everything this client stores. See the
+// package-level [SetDataDir].
+func (c *Client) SetDataDir(bucketURL string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.dataDirURL = bucketURL
 }
 
 // DataDirURL returns the bucket URL astrogo stores all its data under,
@@ -42,12 +38,18 @@ func SetDataDir(bucketURL string) {
 // the OS user cache directory — ~/.cache/astrogo on Linux,
 // %LocalAppData%\astrogo on Windows, ~/Library/Caches/astrogo on macOS.
 // Re-resolved per call, so a changed environment takes effect immediately.
-func DataDirURL() string {
-	dataMu.RLock()
+func DataDirURL() string { return Default().DataDirURL() }
 
-	d := dataDirURL
+// DataDirURL returns the bucket URL this client stores its data under,
+// resolved in order: an explicit SetDataDir call on this client, then
+// DataDirEnv, then the OS user cache directory. Re-resolved per call, so a
+// changed environment takes effect immediately.
+func (c *Client) DataDirURL() string {
+	c.mu.RLock()
 
-	dataMu.RUnlock()
+	d := c.dataDirURL
+
+	c.mu.RUnlock()
 
 	if d != "" {
 		return d
@@ -98,8 +100,11 @@ func defaultDataDirURL() string {
 
 // DataDir opens DataDirURL as a Bucket rooted at astrogo's base data
 // location.
-func DataDir(ctx context.Context) (*file.Bucket, error) {
-	b, err := file.Open(ctx, DataDirURL())
+func DataDir(ctx context.Context) (*Bucket, error) { return Default().DataDir(ctx) }
+
+// DataDir opens this client's [Client.DataDirURL] as a Bucket.
+func (c *Client) DataDir(ctx context.Context) (*Bucket, error) {
+	b, err := file.Open(ctx, c.DataDirURL())
 	if err != nil {
 		return nil, fmt.Errorf("remote: open data dir: %w", err)
 	}
@@ -125,13 +130,19 @@ func DataDir(ctx context.Context) (*file.Bucket, error) {
 // "cache directory was available" branch that could never be taken, so the
 // aggregation restarted from nothing every time. Nothing reported it, because
 // a cache that cannot be reached is indistinguishable from a cold one.
-func CacheDir(ctx context.Context, id EndpointID) (bucket *file.Bucket, prefix string, err error) {
-	ep, ok := Lookup(id)
+func CacheDir(ctx context.Context, id EndpointID) (bucket *Bucket, prefix string, err error) {
+	return Default().CacheDir(ctx, id)
+}
+
+// CacheDir returns the Bucket and key prefix an endpoint caches under for this
+// client. See the package-level [CacheDir].
+func (c *Client) CacheDir(ctx context.Context, id EndpointID) (bucket *Bucket, prefix string, err error) {
+	ep, ok := c.Lookup(id)
 	if !ok {
 		return nil, "", fmt.Errorf("%w: %q", ErrUnknownEndpoint, id)
 	}
 
-	bucket, err = DataDir(ctx)
+	bucket, err = c.DataDir(ctx)
 	if err != nil {
 		return nil, "", err
 	}

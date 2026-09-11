@@ -14,7 +14,6 @@ import (
 	"github.com/TuSKan/astrogo/ephemeris/jpl/spk"
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/remote"
-	"github.com/TuSKan/astrogo/remote/file"
 	"github.com/TuSKan/astrogo/time"
 )
 
@@ -67,7 +66,7 @@ func TestSPKReader(t *testing.T) {
 	bucket, prefix, err := remote.CacheDir(ctx, remote.NAIFSPK)
 	testutil.AssertNoError(t, err)
 
-	ra, err := file.NewReaderAt(ctx, bucket, prefix+"planets/de440s.bsp")
+	ra, err := remote.NewReaderAt(ctx, bucket, prefix+"planets/de440s.bsp")
 	testutil.AssertNoError(t, err)
 
 	r, err := spk.NewReader(ra)
@@ -225,7 +224,7 @@ func TestReaderAtManySmallScatteredReads(t *testing.T) {
 
 	url := testutil.FileURL(t, t.TempDir())
 
-	bucket, err := file.Open(ctx, url)
+	bucket, err := remote.OpenBucket(ctx, url)
 	testutil.AssertNoError(t, err)
 
 	const key = "test.bsp"
@@ -239,7 +238,7 @@ func TestReaderAtManySmallScatteredReads(t *testing.T) {
 
 	testutil.AssertNoError(t, bucket.WriteAll(ctx, key, data, nil))
 
-	ra, err := file.NewReaderAt(ctx, bucket, key)
+	ra, err := remote.NewReaderAt(ctx, bucket, key)
 	testutil.AssertNoError(t, err)
 
 	t.Cleanup(func() { _ = ra.Close() })

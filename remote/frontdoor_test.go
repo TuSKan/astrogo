@@ -1,0 +1,352 @@
+package remote
+
+import (
+	"errors"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"testing"
+
+	"github.com/TuSKan/astrogo/time"
+)
+
+// The APIClient tests below are the ones that used to live in remote/api, and
+// they moved for a reason worth stating once: that package no longer knows
+// what an endpoint is. It takes a base URL per call and does what it is told.
+// Resolving an id into that URL — refusing it while offline, refusing it while
+// disabled, honouring an override — is this package's job and is only
+// observable here.
+
+// TestAPIClientGatesEveryRequest is the property the wrapper exists for.
+//
+// A client is not a licence to reach a service. It resolves per call, so
+// SetOffline and Disable stop an API request exactly as they stop a file
+// fetch, on a client that was built while the endpoint was perfectly
+// reachable. Building the client first and only then closing the gate is the
+// whole point of the arrangement — a resolution done once at construction
+// would pass this test's setup and fail its intent.
+func TestAPIClientGatesEveryRequest(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte("reached the server"))
+	}))
+	defer srv.Close()
+
+	scope := Capture(SIMBAD)
+	t.Cleanup(scope.Restore)
+
+	if err := SetURL(SIMBAD, srv.URL); err != nil {
+		t.Fatalf("SetURL: %v", err)
+	}
+
+	client := Default()
+
+	// Reachable first, so a later refusal is the gate rather than a broken
+	// fixture.
+	body, err := client.Get(t.Context(), SIMBAD, "", nil)
+	if err != nil {
+		t.Fatalf("Get before the gate closed: %v", err)
+	}
+
+	_ = body.Close()
+
+	t.Run("offline", func(t *testing.T) {
+		SetOffline(true)
+		t.Cleanup(func() { SetOffline(false) })
+
+		if _, err := client.Get(t.Context(), SIMBAD, "", nil); !errors.Is(err, ErrOffline) {
+			t.Errorf("Get while offline = %v, want ErrOffline.\n"+
+				"  The client was built while online; resolution has to happen per "+
+				"request or offline mode means nothing to an existing client.", err)
+		}
+	})
+
+	t.Run("disabled", func(t *testing.T) {
+		Disable(SIMBAD)
+		t.Cleanup(func() { Enable(SIMBAD) })
+
+		if _, err := client.Get(t.Context(), SIMBAD, "", nil); !errors.Is(err, ErrEndpointDisabled) {
+			t.Errorf("Get on a disabled endpoint = %v, want ErrEndpointDisabled", err)
+		}
+	})
+
+	t.Run("unknown endpoint", func(t *testing.T) {
+		if _, err := client.Get(t.Context(), EndpointID("nope.not.registered"), "", nil); !errors.Is(err, ErrUnknownEndpoint) {
+			t.Errorf("Get on an unregistered id = %v, want ErrUnknownEndpoint", err)
+		}
+	})
+}
+
+// TestAPIClientGatesEveryVerb keeps the three quieter methods honest.
+//
+// Get is the one every reader checks. PostForm carries TAP-ADQL queries and
+// PostJSON carries Horizons kernel requests, and a gate that covered only the
+// method with a test would let both straight past while looking correct.
+func TestAPIClientGatesEveryVerb(t *testing.T) {
+	scope := Capture(SIMBAD)
+	t.Cleanup(scope.Restore)
+
+	client := Default()
+
+	SetOffline(true)
+	t.Cleanup(func() { SetOffline(false) })
+
+	var out struct{}
+
+	for _, tc := range []struct {
+		call func() error
+		name string
+	}{
+		{name: "Get", call: func() error {
+			_, err := client.Get(t.Context(), SIMBAD, "", nil)
+
+			return err
+		}},
+		{name: "GetJSON", call: func() error {
+			return client.GetJSON(t.Context(), SIMBAD, "", nil, &out)
+		}},
+		{name: "PostForm", call: func() error {
+			_, err := client.PostForm(t.Context(), SIMBAD, "", nil)
+
+			return err
+		}},
+		{name: "PostJSON", call: func() error {
+			_, err := client.PostJSON(t.Context(), SIMBAD, "", map[string]string{"k": "v"})
+
+			return err
+		}},
+	} {
+		if err := tc.call(); !errors.Is(err, ErrOffline) {
+			t.Errorf("%s while offline = %v, want ErrOffline", tc.name, err)
+		}
+	}
+}
+
+// TestNewAPIClientTakesNoEndpointAndCannotFail states what construction is now
+// for, because the shape changed and the old one is the intuitive guess.
+//
+// A client is not built for an endpoint. It contacts nothing, validates
+// nothing, and every question about an endpoint — does it exist, may we reach
+// it, how long may it take — is answered at the request that names it. That is
+// what removed sixteen unreachable error branches from this module's call
+// sites: an id passed as a constant could never fail the lookup they were
+// checking.
+func TestNewAPIClientTakesNoEndpointAndCannotFail(t *testing.T) {
+	t.Parallel()
+
+	client := Default()
+
+	_, err := client.Get(t.Context(), EndpointID("nope.not.registered"), "", nil)
+	if !errors.Is(err, ErrUnknownEndpoint) {
+		t.Errorf("Get on an unregistered id = %v, want ErrUnknownEndpoint", err)
+	}
+}
+
+// TestNewAPIClientSucceedsWhileOffline states the order deliberately, because
+// the opposite is a defensible design and this is not it.
+//
+// Constructing a client is not asking to reach the network; a provider is
+// built once, often at process start, and used much later. Refusing here would
+// make offline mode a property of when a program happened to construct its
+// providers rather than of when it tried to use them.
+func TestNewAPIClientSucceedsWhileOffline(t *testing.T) {
+	scope := Capture(SIMBAD)
+	t.Cleanup(scope.Restore)
+
+	SetOffline(true)
+	t.Cleanup(func() { SetOffline(false) })
+
+	client := Default()
+
+	if _, err := client.Get(t.Context(), SIMBAD, "", nil); !errors.Is(err, ErrOffline) {
+		t.Errorf("Get = %v, want ErrOffline — the refusal belongs to the request", err)
+	}
+}
+
+// TestAPIClientReachesTheResolvedURL proves the wrapper forwards to the URL the
+// registry gave rather than to one it kept from construction.
+//
+// SetURL after the client exists is the sharpest version of that: a test
+// server stood up second must still receive the request.
+func TestAPIClientReachesTheResolvedURL(t *testing.T) {
+	scope := Capture(JPLSBDB)
+	t.Cleanup(scope.Restore)
+
+	client := Default()
+
+	var gotPath string
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"name":"Ceres"}`))
+	}))
+	defer srv.Close()
+
+	if err := SetURL(JPLSBDB, srv.URL+"/api"); err != nil {
+		t.Fatalf("SetURL: %v", err)
+	}
+
+	var out struct {
+		Name string `json:"name"`
+	}
+
+	if err := client.GetJSON(t.Context(), JPLSBDB, "lookup", nil, &out); err != nil {
+		t.Fatalf("GetJSON: %v", err)
+	}
+
+	if out.Name != "Ceres" {
+		t.Errorf("decoded name = %q, want Ceres", out.Name)
+	}
+
+	if gotPath != "/api/lookup" {
+		t.Errorf("server saw path %q, want /api/lookup — the override's own path must survive the join", gotPath)
+	}
+}
+
+// TestAPIErrorsAreReachableFromThisPackage keeps the front door's promise that
+// a caller never learns remote/api exists.
+//
+// The type and the sentinel are declared down there; if either stopped being
+// re-exported, a caller inspecting a failed request would have to import the
+// subpackage to name what they caught, which is precisely the import this
+// arrangement forbids.
+func TestAPIErrorsAreReachableFromThisPackage(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		http.Error(w, "no such object", http.StatusNotFound)
+	}))
+	defer srv.Close()
+
+	scope := Capture(SIMBAD)
+	t.Cleanup(scope.Restore)
+
+	if err := SetURL(SIMBAD, srv.URL); err != nil {
+		t.Fatalf("SetURL: %v", err)
+	}
+
+	client := Default()
+
+	_, err := client.Get(t.Context(), SIMBAD, "", nil)
+
+	var httpErr *HTTPError
+	if !errors.As(err, &httpErr) {
+		t.Fatalf("Get = %v, want a *remote.HTTPError", err)
+	}
+
+	if httpErr.StatusCode != http.StatusNotFound {
+		t.Errorf("StatusCode = %d, want 404", httpErr.StatusCode)
+	}
+
+	if !strings.Contains(httpErr.Body, "no such object") {
+		t.Errorf("Body = %q, want the service's own explanation", httpErr.Body)
+	}
+}
+
+// deadAddr is a closed port on the loopback interface: a request to it fails at
+// connect, immediately and without leaving the machine. The tests below need a
+// request to be *attempted* (that is what builds a transport) and must not
+// contact the real service to do it.
+const deadAddr = "http://127.0.0.1:1"
+
+// TestEachEndpointGetsItsOwnRegisteredTimeout is the defect the endpoint-less
+// constructor fixes.
+//
+// One client used against two endpoints used to carry a single transport whose
+// timeout came from whichever id was passed at construction. catalog/sbdb does
+// exactly that — one client for JPLSBDB and JPLSBDBQuery — so raising one of
+// those timeouts would have had no effect on the endpoint it was raised for.
+// The two are 30s apart from each other today, which is the only reason nothing
+// was visibly wrong.
+//
+// A timeout belongs to the service that has to answer within it, so a transport
+// is built per endpoint and takes that endpoint's registered value.
+func TestEachEndpointGetsItsOwnRegisteredTimeout(t *testing.T) {
+	t.Parallel()
+
+	// Two registered endpoints whose timeouts genuinely differ: FINK is 120s
+	// and SIMBAD is 30s.
+	fink, ok := Lookup(FINK)
+	if !ok {
+		t.Fatal("FINK is not registered")
+	}
+
+	simbad, ok := Lookup(SIMBAD)
+	if !ok {
+		t.Fatal("SIMBAD is not registered")
+	}
+
+	if fink.Timeout == simbad.Timeout {
+		t.Skip("FINK and SIMBAD now register the same timeout; this test needs two that differ")
+	}
+
+	// A clone, not Default: this inspects and then closes the client's
+	// transports, and Default's are shared with everything else in the
+	// process — including whatever else is running in parallel.
+	client := Default().Clone()
+
+	t.Cleanup(func() { _ = client.Close() })
+
+	// Reaching an endpoint is what builds its transport, and both point at a
+	// closed local port so the attempt fails at connect instead of reaching
+	// the real SIMBAD and FINK. An untagged test does no network.
+	for _, id := range []EndpointID{FINK, SIMBAD} {
+		if err := client.SetURL(id, deadAddr); err != nil {
+			t.Fatalf("SetURL(%s): %v", id, err)
+		}
+
+		if _, err := client.Get(t.Context(), id, "", nil); errors.Is(err, ErrOffline) ||
+			errors.Is(err, ErrEndpointDisabled) || errors.Is(err, ErrUnknownEndpoint) {
+			t.Fatalf("%s was refused at the gate (%v), so no transport was built for it", id, err)
+		}
+	}
+
+	client.mu.Lock()
+	defer client.mu.Unlock()
+
+	if len(client.transports) != 2 {
+		t.Fatalf("client holds %d transports after using two endpoints, want 2", len(client.transports))
+	}
+
+	if got := client.transports[FINK].Timeout(); got != fink.Timeout {
+		t.Errorf("FINK transport timeout = %v, want its registered %v", got, fink.Timeout)
+	}
+
+	if got := client.transports[SIMBAD].Timeout(); got != simbad.Timeout {
+		t.Errorf("SIMBAD transport timeout = %v, want its registered %v", got, simbad.Timeout)
+	}
+}
+
+// TestAnExplicitTimeoutOverridesEveryEndpoint keeps WithTimeout meaning what it
+// says once transports are per endpoint.
+//
+// A caller that names a timeout is overriding the registry on purpose — the
+// starlight aggregation client does this, because a whole-sky query needs far
+// longer than the endpoint's registered value — so it has to apply wherever the
+// client is used, not be replaced by each endpoint's own.
+func TestAnExplicitTimeoutOverridesEveryEndpoint(t *testing.T) {
+	t.Parallel()
+
+	const override = 7 * time.Second
+
+	client := Default().Clone()
+	client.SetAPIOptions(WithTimeout(override))
+
+	t.Cleanup(func() { _ = client.Close() })
+
+	for _, id := range []EndpointID{FINK, SIMBAD} {
+		if err := client.SetURL(id, deadAddr); err != nil {
+			t.Fatalf("SetURL(%s): %v", id, err)
+		}
+
+		_, _ = client.Get(t.Context(), id, "", nil)
+	}
+
+	client.mu.Lock()
+	defer client.mu.Unlock()
+
+	for id, inner := range client.transports {
+		if got := inner.Timeout(); got != override {
+			t.Errorf("%s transport timeout = %v, want the caller's %v", id, got, override)
+		}
+	}
+}

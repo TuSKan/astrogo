@@ -1,4 +1,4 @@
-package remote
+package file
 
 import (
 	"context"
@@ -16,7 +16,7 @@ import (
 // check-then-act window inside fileblob is never opened. Simultaneous
 // contenders are the case that failed, and nothing exercised it.
 //
-// acquireLock delegated exclusion to WriterOptions.IfNotExist, which this
+// AcquireLock delegated exclusion to WriterOptions.IfNotExist, which this
 // package and remote/file both documented as being guarded by a per-Bucket
 // mutex. It is not: fileblob's bucket struct holds no mutex, and the mutex
 // that exists is constructed per writer, so IfNotExist is a bare os.Stat
@@ -25,7 +25,7 @@ import (
 // three (#245).
 //
 // The assertion is on overlap rather than on a winner count, because
-// acquireLock is not a try-lock — every contender is supposed to get the
+// AcquireLock is not a try-lock — every contender is supposed to get the
 // lock eventually. What must never happen is two of them holding it at the
 // same moment.
 func TestAcquireLockAdmitsOneHolderAtATime(t *testing.T) {
@@ -51,9 +51,9 @@ func TestAcquireLockAdmitsOneHolderAtATime(t *testing.T) {
 
 		for range contenders {
 			wg.Go(func() {
-				release, err := acquireLock(ctx, bucket, cacheKey)
+				release, err := AcquireLock(ctx, bucket, cacheKey)
 				if err != nil {
-					t.Errorf("acquireLock: %v", err)
+					t.Errorf("AcquireLock: %v", err)
 
 					return
 				}
@@ -87,7 +87,7 @@ func TestAcquireLockAdmitsOneHolderAtATime(t *testing.T) {
 
 	if got := overlap.Load(); got != 0 {
 		t.Errorf("%d of %d acquisitions found another holder already inside the lock "+
-			"(peak %d simultaneous); acquireLock is not excluding anyone",
+			"(peak %d simultaneous); AcquireLock is not excluding anyone",
 			got, contenders*rounds, peak.Load())
 	}
 }
@@ -110,7 +110,7 @@ func TestAcquireLockReleasesTheInProcessSlotOnFailure(t *testing.T) {
 	// process takes the in-process slot, finds the object already there,
 	// and gives up on its own deadline — so the slot has to come back.
 	//
-	// Holding it with acquireLock instead would not do: the second caller
+	// Holding it with AcquireLock instead would not do: the second caller
 	// would block on the semaphore and fail before ever taking the slot,
 	// which exercises nothing. That is exactly how this test first passed
 	// against a build that leaked the slot.
@@ -121,8 +121,8 @@ func TestAcquireLockReleasesTheInProcessSlotOnFailure(t *testing.T) {
 	blocked, cancel := context.WithTimeout(context.Background(), 150*time.Millisecond)
 	defer cancel()
 
-	if _, err := acquireLock(blocked, bucket, cacheKey); err == nil {
-		t.Fatal("acquireLock succeeded while another holder's lock object was present")
+	if _, err := AcquireLock(blocked, bucket, cacheKey); err == nil {
+		t.Fatal("AcquireLock succeeded while another holder's lock object was present")
 	}
 
 	if err := bucket.Delete(context.Background(), cacheKey+".lock"); err != nil {
@@ -136,9 +136,9 @@ func TestAcquireLockReleasesTheInProcessSlotOnFailure(t *testing.T) {
 	go func() {
 		defer close(done)
 
-		r, err := acquireLock(context.Background(), bucket, cacheKey)
+		r, err := AcquireLock(context.Background(), bucket, cacheKey)
 		if err != nil {
-			t.Errorf("third acquireLock: %v", err)
+			t.Errorf("third AcquireLock: %v", err)
 
 			return
 		}
@@ -149,7 +149,7 @@ func TestAcquireLockReleasesTheInProcessSlotOnFailure(t *testing.T) {
 	select {
 	case <-done:
 	case <-time.After(10 * time.Second):
-		t.Fatal("acquireLock blocked after an earlier attempt failed; the in-process " +
+		t.Fatal("AcquireLock blocked after an earlier attempt failed; the in-process " +
 			"slot was not handed back")
 	}
 }
@@ -162,9 +162,9 @@ func TestAcquireLockReleasesTheInProcessSlotOnFailure(t *testing.T) {
 func TestAcquireLockDoesNotSerialiseDifferentKeys(t *testing.T) {
 	bucket, _ := openLocalBucket(t)
 
-	first, err := acquireLock(context.Background(), bucket, "kernel-a.bin")
+	first, err := AcquireLock(context.Background(), bucket, "kernel-a.bin")
 	if err != nil {
-		t.Fatalf("acquireLock a: %v", err)
+		t.Fatalf("AcquireLock a: %v", err)
 	}
 
 	defer first()
@@ -172,7 +172,7 @@ func TestAcquireLockDoesNotSerialiseDifferentKeys(t *testing.T) {
 	done := make(chan error, 1)
 
 	go func() {
-		release, err := acquireLock(context.Background(), bucket, "kernel-b.bin")
+		release, err := AcquireLock(context.Background(), bucket, "kernel-b.bin")
 		if err == nil {
 			release()
 		}
@@ -183,7 +183,7 @@ func TestAcquireLockDoesNotSerialiseDifferentKeys(t *testing.T) {
 	select {
 	case err := <-done:
 		if err != nil {
-			t.Fatalf("acquireLock b: %v", err)
+			t.Fatalf("AcquireLock b: %v", err)
 		}
 	case <-time.After(5 * time.Second):
 		t.Fatal("a lock on one key blocked a lock on another; the exclusion is not keyed")

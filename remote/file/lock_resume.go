@@ -1,4 +1,4 @@
-package remote
+package file
 
 import (
 	"cmp"
@@ -11,22 +11,21 @@ import (
 	"gocloud.dev/blob"
 	"gocloud.dev/gcerrors"
 
-	"github.com/TuSKan/astrogo/remote/file"
 	"github.com/TuSKan/astrogo/time"
 )
 
-// sourceETagKey is the blob metadata entry recording the source ETag a
+// SourceETagKey is the blob metadata entry recording the source ETag a
 // cached or partially-downloaded object was fetched under. It rides as
 // object metadata, which every driver supports, rather than a sidecar
 // object keyed by string suffix.
-const sourceETagKey = "source-etag"
+const SourceETagKey = "source-etag"
 
 // staleLockAge bounds how long a lock is honored before a new acquirer
 // treats it as abandoned by a crashed holder. Generous relative to any
 // single download in this registry.
 const staleLockAge = 30 * time.Minute
 
-// acquireLock's polling interval starts low so a short download is noticed
+// AcquireLock's polling interval starts low so a short download is noticed
 // almost immediately, and backs off so a multi-minute kernel transfer is
 // not probed every 50ms for its whole duration.
 const (
@@ -90,7 +89,7 @@ func (k *keyedSemaphore) acquire(ctx context.Context, key string) (release func(
 	}
 }
 
-// acquireLock blocks until it holds an exclusive lock on cacheKey within
+// AcquireLock blocks until it holds an exclusive lock on cacheKey within
 // bucket, or ctx is done. Call the returned release exactly once — defer
 // it immediately, including on the caller's own error paths.
 //
@@ -109,7 +108,7 @@ func (k *keyedSemaphore) acquire(ctx context.Context, key string) (release func(
 // runs each package as its own process and several of them want the same JPL
 // kernel, so the cross-process case is the common one and the in-process case
 // is the one that used to be claimed and was not delivered.
-func acquireLock(ctx context.Context, bucket *file.Bucket, cacheKey string) (release func(), err error) {
+func AcquireLock(ctx context.Context, bucket *Bucket, cacheKey string) (release func(), err error) {
 	lockKey := cacheKey + ".lock"
 	delay := lockRetryDelayInitial
 
@@ -185,23 +184,23 @@ func acquireLock(ctx context.Context, bucket *file.Bucket, cacheKey string) (rel
 	}
 }
 
-// partialKey names the in-progress body for cacheKey.
-func partialKey(cacheKey string) string { return cacheKey + ".part" }
+// PartialKey names the in-progress body for cacheKey.
+func PartialKey(cacheKey string) string { return cacheKey + ".part" }
 
-// resumePoint reports how many bytes of cacheKey a previous attempt
+// ResumePoint reports how many bytes of cacheKey a previous attempt
 // already fetched and can be safely reused, given the source's current
 // ETag. It returns 0 — discarding any unusable leftover on the way — when
 // there is no partial, the partial is empty, it recorded no ETag, or the
 // source has changed since it was written.
-func resumePoint(ctx context.Context, bucket *file.Bucket, cacheKey, sourceETag string) int64 {
-	pKey := partialKey(cacheKey)
+func ResumePoint(ctx context.Context, bucket *Bucket, cacheKey, sourceETag string) int64 {
+	pKey := PartialKey(cacheKey)
 
 	attrs, err := bucket.Attributes(ctx, pKey)
 	if err != nil || attrs.Size <= 0 {
 		return 0
 	}
 
-	if recorded := attrs.Metadata[sourceETagKey]; recorded == "" || recorded != sourceETag {
+	if recorded := attrs.Metadata[SourceETagKey]; recorded == "" || recorded != sourceETag {
 		_ = bucket.Delete(ctx, pKey)
 
 		return 0
@@ -210,7 +209,7 @@ func resumePoint(ctx context.Context, bucket *file.Bucket, cacheKey, sourceETag 
 	return attrs.Size
 }
 
-// stageAndPromote writes body into a staging object, validates it, and
+// StageAndPromote writes body into a staging object, validates it, and
 // only then promotes it to cacheKey. Nothing a reader can observe at
 // cacheKey is ever partial or unvalidated, and a transfer interrupted
 // partway leaves a partial the next attempt can resume from.
@@ -218,10 +217,10 @@ func resumePoint(ctx context.Context, bucket *file.Bucket, cacheKey, sourceETag 
 // offset > 0 means body continues an existing partial: the two are
 // concatenated into a separate staging key rather than written back over
 // the partial while it is still open for reading, which Windows forbids.
-func stageAndPromote(ctx context.Context, bucket *file.Bucket, cacheKey string,
+func StageAndPromote(ctx context.Context, bucket *Bucket, cacheKey string,
 	body io.Reader, offset int64, sourceETag string, validate func(io.Reader) error,
 ) error {
-	pKey := partialKey(cacheKey)
+	pKey := PartialKey(cacheKey)
 	writeKey := pKey
 	src := body
 
@@ -269,13 +268,13 @@ func stageAndPromote(ctx context.Context, bucket *file.Bucket, cacheKey string,
 // key that only the next attempt reads. On a resume, writeKey is the
 // separate ".resume" key, so a truncated commit there is inert: the
 // untouched partial is what the next attempt resumes from.
-func writeStaged(ctx context.Context, bucket *file.Bucket, writeKey string,
+func writeStaged(ctx context.Context, bucket *Bucket, writeKey string,
 	src io.Reader, existing io.ReadCloser, sourceETag string,
 ) error {
-	opts := &blob.WriterOptions{Metadata: map[string]string{sourceETagKey: sourceETag}}
+	opts := &blob.WriterOptions{Metadata: map[string]string{SourceETagKey: sourceETag}}
 
 	// No staging lock here, and that is a conclusion rather than an omission.
-	// Everything below runs holding acquireLock, which #245 made exclusive
+	// Everything below runs holding AcquireLock, which #245 made exclusive
 	// within the process as well as across them, so no second goroutine is in
 	// this function for this key. Two different keys stage under two different
 	// names now that the bucket URL carries no_tmp_dir=1, and two buckets are
@@ -306,7 +305,7 @@ func writeStaged(ctx context.Context, bucket *file.Bucket, writeKey string,
 
 // validateStaged runs validate over the staged object's bytes, streaming
 // rather than buffering so a multi-GB kernel needs no memory to check.
-func validateStaged(ctx context.Context, bucket *file.Bucket, writeKey string, validate func(io.Reader) error) error {
+func validateStaged(ctx context.Context, bucket *Bucket, writeKey string, validate func(io.Reader) error) error {
 	r, err := bucket.NewReader(ctx, writeKey, nil)
 	if err != nil {
 		return fmt.Errorf("read staging %s: %w", writeKey, err)
@@ -320,7 +319,7 @@ func validateStaged(ctx context.Context, bucket *file.Bucket, writeKey string, v
 
 // discardStaging removes the staging objects. Failures are ignored: a
 // leftover is inert and the next successful attempt overwrites it.
-func discardStaging(ctx context.Context, bucket *file.Bucket, writeKey, pKey string) {
+func discardStaging(ctx context.Context, bucket *Bucket, writeKey, pKey string) {
 	_ = bucket.Delete(ctx, writeKey)
 
 	if writeKey != pKey {

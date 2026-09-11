@@ -305,7 +305,8 @@ type Endpoint struct {
 	//
 	// The "key" form is how to point an endpoint at a single file, since a
 	// bare single-object URL has no room for the caller's name and simply
-	// fails to resolve. See TestSetURLToSingleObjectViaKeyParam.
+	// fails to resolve. See TestKeyParamServesOneObjectUnderAnyName and
+	// TestWithoutKeyParamANameResolvesUnderneath in remote/file.
 	URL string
 	// Kind is KindAPI or KindFile.
 	Kind Kind

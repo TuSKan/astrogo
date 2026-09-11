@@ -11,7 +11,6 @@ import (
 
 	"resty.dev/v3"
 
-	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/time"
 )
 
@@ -96,14 +95,24 @@ func WithMinInterval(d time.Duration) Option {
 	return func(c *config) { c.minInterval = d }
 }
 
-// Client talks to one or more registered API endpoints. It is built for a
-// specific endpoint — that is where its timeout comes from — but each
-// method takes an EndpointID so a provider covering two endpoints of the
-// same service (JPL's SBDB identify and query APIs) needs only one client.
+// Client issues paced, retried requests against a base URL given per call.
+//
+// It holds no endpoint and no URL. Which service a request goes to is decided
+// by the caller, one call at a time, which is what keeps this package free of
+// any notion of an endpoint — [github.com/TuSKan/astrogo/remote] owns that,
+// and owns offline mode, Disable and per-endpoint overrides with it. Two
+// consequences worth stating: a provider covering two endpoints of one service
+// (JPL's SBDB identify and query APIs) needs a single client, and a policy
+// change lands on the next request rather than the next client, because there
+// is nothing cached here to go stale.
 //
 // Safe for concurrent use.
 type Client struct {
 	rc *resty.Client
+
+	// timeout is the per-request deadline this client was built with, kept so
+	// [Client.Timeout] can report it.
+	timeout time.Duration
 
 	// retryPolicy is consulted twice: by resty, to decide whether to retry,
 	// and by body, to decide whether a final failure is worth reporting as
@@ -111,25 +120,22 @@ type Client struct {
 	// policy rather than two copies of a rule.
 	retryPolicy RetryPolicy
 
-	// mu serialises paced requests and guards last. Both are unused when no
+	// mu serializes paced requests and guards last. Both are unused when no
 	// minimum interval was asked for, so an ordinary client pays nothing.
 	minInterval time.Duration
 	mu          sync.Mutex
 	last        time.GoTime
 }
 
-// NewClient builds a client configured from endpoint id: its registered
-// Timeout, or DefaultTimeout when that is zero, so no caller hand-copies a
-// timeout the registry already states. Returns ErrUnknownEndpoint for an
-// unregistered id.
-func NewClient(id remote.EndpointID, opts ...Option) (*Client, error) {
-	ep, ok := remote.Lookup(id)
-	if !ok {
-		return nil, fmt.Errorf("%w: %q", remote.ErrUnknownEndpoint, id)
-	}
-
+// NewClient builds a client with timeout as its per-request deadline; zero
+// means [DefaultTimeout].
+//
+// There is no error to return, because there is nothing left to get wrong: a
+// caller with an endpoint's registered timeout passes it, and every other
+// decision arrives as an [Option] that cannot fail either.
+func NewClient(timeout time.Duration, opts ...Option) *Client {
 	cfg := config{
-		timeout:     ep.Timeout,
+		timeout:     timeout,
 		retries:     defaultRetries,
 		userAgent:   defaultUserAgent,
 		retryPolicy: DefaultRetryPolicy,
@@ -158,8 +164,21 @@ func NewClient(id remote.EndpointID, opts ...Option) (*Client, error) {
 		rc = rc.SetAuthScheme(cfg.authScheme).SetAuthToken(cfg.authToken)
 	}
 
-	return &Client{rc: rc, minInterval: cfg.minInterval, retryPolicy: cfg.retryPolicy}, nil
+	return &Client{
+		rc:          rc,
+		timeout:     cfg.timeout,
+		minInterval: cfg.minInterval,
+		retryPolicy: cfg.retryPolicy,
+	}
 }
+
+// Timeout reports the per-request timeout this client was built with.
+//
+// It exists so the parent package can assert that a transport was built for the
+// endpoint it is used against: one client per endpoint, each carrying that
+// endpoint's registered timeout, is the arrangement that replaced a single
+// transport whose timeout came from whichever endpoint was named first.
+func (c *Client) Timeout() time.Duration { return c.timeout }
 
 // Close releases the client's idle connections. A Client is usually held
 // for the life of a provider, so this is optional.
@@ -171,11 +190,11 @@ func (c *Client) Close() error {
 	return nil
 }
 
-// Get issues a GET against endpoint id and returns the response body. The
+// Get issues a GET against baseURL/path and returns the response body. The
 // caller closes it. A non-2xx response is returned as an *HTTPError
 // instead of a body, so a caller never parses an error page as data.
-func (c *Client) Get(ctx context.Context, id remote.EndpointID, path string, query url.Values) (io.ReadCloser, error) {
-	full, err := requestURL(id, path)
+func (c *Client) Get(ctx context.Context, baseURL string, path string, query url.Values) (io.ReadCloser, error) {
+	full, err := requestURL(baseURL, path)
 	if err != nil {
 		return nil, err
 	}
@@ -198,8 +217,8 @@ func (c *Client) Get(ctx context.Context, id remote.EndpointID, path string, que
 // GetJSON issues a GET and decodes the JSON response into out, closing the
 // body. For endpoints that always answer JSON; a provider that must sniff
 // the format from raw bytes uses Get instead.
-func (c *Client) GetJSON(ctx context.Context, id remote.EndpointID, path string, query url.Values, out any) error {
-	r, err := c.Get(ctx, id, path, query)
+func (c *Client) GetJSON(ctx context.Context, baseURL string, path string, query url.Values, out any) error {
+	r, err := c.Get(ctx, baseURL, path, query)
 	if err != nil {
 		return err
 	}
@@ -207,7 +226,7 @@ func (c *Client) GetJSON(ctx context.Context, id remote.EndpointID, path string,
 	defer func() { _ = r.Close() }()
 
 	if err := json.UnmarshalRead(r, out, decodeOptions...); err != nil {
-		return fmt.Errorf("remote/api: decode JSON from %q: %w", id, err)
+		return fmt.Errorf("remote/api: decode JSON from %q: %w", baseURL, err)
 	}
 
 	return nil
@@ -216,8 +235,8 @@ func (c *Client) GetJSON(ctx context.Context, id remote.EndpointID, path string,
 // PostForm issues a POST with an application/x-www-form-urlencoded body
 // and returns the raw response body — the shape TAP-ADQL services and any
 // endpoint whose response format must be sniffed need.
-func (c *Client) PostForm(ctx context.Context, id remote.EndpointID, path string, form url.Values) (io.ReadCloser, error) {
-	full, err := requestURL(id, path)
+func (c *Client) PostForm(ctx context.Context, baseURL string, path string, form url.Values) (io.ReadCloser, error) {
+	full, err := requestURL(baseURL, path)
 	if err != nil {
 		return nil, err
 	}
@@ -239,8 +258,8 @@ func (c *Client) PostForm(ctx context.Context, id remote.EndpointID, path string
 
 // PostJSON marshals payload as the JSON request body and returns the raw
 // response body.
-func (c *Client) PostJSON(ctx context.Context, id remote.EndpointID, path string, payload any) (io.ReadCloser, error) {
-	full, err := requestURL(id, path)
+func (c *Client) PostJSON(ctx context.Context, baseURL string, path string, payload any) (io.ReadCloser, error) {
+	full, err := requestURL(baseURL, path)
 	if err != nil {
 		return nil, err
 	}
@@ -298,28 +317,20 @@ func (c *Client) pace(ctx context.Context) (release func(), err error) {
 	}, nil
 }
 
-// requestURL resolves id through the registry gate — the single place
-// offline mode, Disable and SetURL are enforced — and appends path.
+// requestURL appends path to baseURL.
 //
-// The join goes through net/url rather than string arithmetic: an endpoint
-// whose registered URL already carries a query (a mirror with a token)
-// would otherwise have path spliced in after it, producing a URL that
-// silently addresses the wrong thing.
-func requestURL(id remote.EndpointID, path string) (string, error) {
-	base, err := remote.URL(id)
-	if err != nil {
-		// Wrapped with %w, so a caller's errors.Is against ErrOffline or
-		// ErrEndpointDisabled still matches.
-		return "", fmt.Errorf("remote/api: %w", err)
-	}
-
+// The join goes through net/url rather than string arithmetic: a base URL that
+// already carries a query — a mirror with a token in it — would otherwise have
+// path spliced in after the query, producing a URL that silently addresses the
+// wrong thing.
+func requestURL(baseURL string, path string) (string, error) {
 	if path == "" {
-		return base, nil
+		return baseURL, nil
 	}
 
-	u, err := url.Parse(base)
+	u, err := url.Parse(baseURL)
 	if err != nil {
-		return "", fmt.Errorf("remote/api: endpoint %q has an unparseable URL %q: %w", id, base, err)
+		return "", fmt.Errorf("remote/api: unparseable base URL %q: %w", baseURL, err)
 	}
 
 	return u.JoinPath(path).String(), nil
@@ -353,7 +364,7 @@ func (c *Client) body(resp *resty.Response, err error) (io.ReadCloser, error) {
 		// *HTTPError underneath, and every existing caller that type-asserts
 		// for the status keeps working.
 		if c.retryPolicy != nil && c.retryPolicy(attemptOf(resp, nil)) {
-			return nil, fmt.Errorf("%w: %w", remote.ErrRetriable, httpErr)
+			return nil, fmt.Errorf("%w: %w", ErrRetriable, httpErr)
 		}
 
 		return nil, httpErr

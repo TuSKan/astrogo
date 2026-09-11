@@ -13,8 +13,6 @@ import (
 	"strings"
 
 	"github.com/TuSKan/astrogo/remote"
-	"github.com/TuSKan/astrogo/remote/api"
-	"github.com/TuSKan/astrogo/remote/file"
 	"github.com/TuSKan/astrogo/time"
 )
 
@@ -86,7 +84,7 @@ func commandCandidates(kernel string) []string {
 // Storage is a bucket and key prefix, never a directory path: a generated
 // kernel lands wherever remote's cache lives, which need not be local
 // disk.
-func CacheAPI(ctx context.Context, bucket *file.Bucket, prefix, kernel string, startTime, endTime time.Time) ([]*Reader, error) {
+func CacheAPI(ctx context.Context, bucket *remote.Bucket, prefix, kernel string, startTime, endTime time.Time) ([]*Reader, error) {
 	var readers []*Reader
 
 	spkFile := prefix + kernel + ".bsp"
@@ -187,7 +185,7 @@ func CacheAPI(ctx context.Context, bucket *file.Bucket, prefix, kernel string, s
 			return nil, fmt.Errorf("jpl: failed to decode SPK data: %w", err)
 		}
 
-		if err := file.Save(ctx, bucket, spkFile, bytes.NewReader(spkData)); err != nil {
+		if err := remote.Save(ctx, bucket, spkFile, bytes.NewReader(spkData)); err != nil {
 			return nil, fmt.Errorf("jpl: failed to save SPK %s: %w", spkFile, err)
 		}
 
@@ -259,10 +257,7 @@ func apiHorizonsRequest(ctx context.Context, command string, startTime, endTime 
 	params.Set("START_TIME", "'"+startTime.Format("2006-01-02 15:04:05.000")+"'")
 	params.Set("STOP_TIME", "'"+endTime.Format("2006-01-02 15:04:05.000")+"'")
 
-	client, err := api.NewClient(remote.JPLHorizonsSPK)
-	if err != nil {
-		return nil, fmt.Errorf("jpl: horizons client: %w", err)
-	}
+	client := remote.Default()
 
 	var resp HorizonsResponse
 	if err := client.GetJSON(ctx, remote.JPLHorizonsSPK, "", params, &resp); err != nil {
@@ -276,7 +271,7 @@ func apiHorizonsRequest(ctx context.Context, command string, startTime, endTime 
 // package's documented Horizons sentinels. Non-HTTP errors (registry gate,
 // network failures) pass through wrapped.
 func mapHorizonsStatus(err error) error {
-	var httpErr *api.HTTPError
+	var httpErr *remote.HTTPError
 	if !errors.As(err, &httpErr) {
 		return fmt.Errorf("jpl: horizons request: %w", err)
 	}
@@ -287,7 +282,7 @@ func mapHorizonsStatus(err error) error {
 	// this repository states elsewhere: a network-tagged test skips on
 	// external downtime rather than failing CI, and
 	// internal/testutil.SkipOnUpstreamFailure decides that by looking for an
-	// error carrying HTTPStatus() int. *api.HTTPError has one; a bare
+	// error carrying HTTPStatus() int. *remote.HTTPError has one; a bare
 	// sentinel does not, so a Horizons 503 — downtime by definition — failed
 	// tests that were written to tolerate exactly that (#244).
 	//
@@ -384,8 +379,8 @@ func safeSubstr(s string, start, length int) string {
 // openKernel builds a Reader over bucket/key with random access served by
 // remote/file's chunk-caching reader — the same path for a local cache, an
 // S3 bucket, or anything else a driver serves.
-func openKernel(ctx context.Context, bucket *file.Bucket, key string) (*Reader, error) {
-	ra, err := file.NewReaderAt(ctx, bucket, key)
+func openKernel(ctx context.Context, bucket *remote.Bucket, key string) (*Reader, error) {
+	ra, err := remote.NewReaderAt(ctx, bucket, key)
 	if err != nil {
 		return nil, fmt.Errorf("jpl: open SPK %s: %w", key, err)
 	}

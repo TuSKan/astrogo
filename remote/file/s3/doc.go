@@ -1,7 +1,7 @@
-// Package s3 registers the "s3://" scheme for remote/file. Blank-import it
+// Package s3 registers the "s3://" scheme. Blank-import it
 // from a build that opens an s3:// endpoint:
 //
-//	import _ "github.com/TuSKan/astrogo/remote/s3"
+//	import _ "github.com/TuSKan/astrogo/remote/file/s3"
 //
 // It is a separate package purely so the AWS SDK stays out of every build
 // that doesn't talk to S3; it exports nothing and has no init() of its own

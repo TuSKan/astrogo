@@ -12,7 +12,7 @@ import (
 
 	"github.com/scigolib/hdf5"
 
-	"github.com/TuSKan/astrogo/remote/file"
+	"github.com/TuSKan/astrogo/remote"
 )
 
 // File is an open CAMS NetCDF-4/HDF5 file. See the package doc comment
@@ -50,7 +50,7 @@ type File struct {
 // remote/file backend). Every dimension-scale dataset (longitude,
 // latitude, level if present, time) is read eagerly; data variables are
 // indexed by name but not read until Var.ReadPlane/Var.At is called.
-func Open(ctx context.Context, bucket *file.Bucket, key string) (*File, error) {
+func Open(ctx context.Context, bucket *remote.Bucket, key string) (*File, error) {
 	r, err := bucket.NewReader(ctx, key, nil)
 	if err != nil {
 		return nil, fmt.Errorf("cams: open %s: %w", key, err)

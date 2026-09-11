@@ -15,7 +15,6 @@ import (
 	"github.com/TuSKan/astrogo/ephemeris/jpl/lsk"
 	"github.com/TuSKan/astrogo/ephemeris/jpl/spk"
 	"github.com/TuSKan/astrogo/remote"
-	"github.com/TuSKan/astrogo/remote/file"
 	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/vector"
 )
@@ -396,8 +395,8 @@ func (p *Provider) AddKernel(k *spk.Reader) error {
 // AddKernelFrom opens the SPK object at bucket/key and adds it to the
 // provider index, recording key for LoadedKernels/RemoveKernel. No network
 // access and no download consent: the object must already be there.
-func (p *Provider) AddKernelFrom(ctx context.Context, bucket *file.Bucket, key string) error {
-	ra, err := file.NewReaderAt(ctx, bucket, key)
+func (p *Provider) AddKernelFrom(ctx context.Context, bucket *remote.Bucket, key string) error {
+	ra, err := remote.NewReaderAt(ctx, bucket, key)
 	if err != nil {
 		return fmt.Errorf("jpl: open kernel %s: %w", key, err)
 	}
@@ -499,7 +498,7 @@ func (p *Provider) LoadedKernels() []KernelInfo {
 // the objects yourself (files a prior consented run cached, or copied into
 // a deployment image) and open them by key. bucket may be backed by
 // anything remote/file can open, not just local disk.
-func Open(ctx context.Context, bucket *file.Bucket, lskKey string, spkKeys ...string) (*Provider, error) {
+func Open(ctx context.Context, bucket *remote.Bucket, lskKey string, spkKeys ...string) (*Provider, error) {
 	p := &Provider{
 		ByTarget:         make(map[int32][]SegmentRef),
 		ByTargetCoverage: make(map[int32]TargetCoverage),

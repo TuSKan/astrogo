@@ -14,8 +14,6 @@ import (
 
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/remote"
-	"github.com/TuSKan/astrogo/remote/api"
-	"github.com/TuSKan/astrogo/remote/file"
 )
 
 // ErrFetchSpec is returned when a fetch is described incompletely.
@@ -97,10 +95,7 @@ func Fetch(ctx context.Context, spec GaiaBuild, directions ...coord.ICRS) (*Map,
 		return assembleFetch(spec, values, counts, band)
 	}
 
-	client, err := aggregationClient(remote.GaiaTAP)
-	if err != nil {
-		return nil, err
-	}
+	client := aggregationClient(remote.GaiaTAP)
 
 	solidAngle := 4 * math.Pi / float64(npix)
 
@@ -173,7 +168,7 @@ func wantedPixels(grid coord.HEALPix, directions []coord.ICRS, have []float64) [
 // fetchPixels runs one query for a set of pixels and accumulates it.
 func (g GaiaBuild) fetchPixels(
 	ctx context.Context,
-	client *api.Client,
+	client *remote.Client,
 	pixels []int64,
 	values []float64,
 	counts []int64,
@@ -247,7 +242,7 @@ func (g GaiaBuild) cacheKey() string {
 // It tolerates gaps, which is what separates it from [Load]: a published map
 // missing a pixel is malformed, while a cache missing a pixel simply has not
 // been asked about it yet.
-func readCache(ctx context.Context, bucket *file.Bucket, key string, values []float64, counts []int64) error {
+func readCache(ctx context.Context, bucket *remote.Bucket, key string, values []float64, counts []int64) error {
 	r, err := bucket.NewReader(ctx, key, nil)
 	if err != nil {
 		return err //nolint:wrapcheck // the caller treats any failure as a cold cache
@@ -302,7 +297,7 @@ func parseCache(r io.Reader, values []float64, counts []int64) error {
 }
 
 // writeCache stores every pixel held so far.
-func writeCache(ctx context.Context, bucket *file.Bucket, key, band string, values []float64, counts []int64) error {
+func writeCache(ctx context.Context, bucket *remote.Bucket, key, band string, values []float64, counts []int64) error {
 	var buf strings.Builder
 
 	fmt.Fprintf(&buf, "# bands: %s\n# partial map, fetched on demand\n", band)
@@ -322,7 +317,7 @@ func writeCache(ctx context.Context, bucket *file.Bucket, key, band string, valu
 		}
 	}
 
-	if err := file.Save(ctx, bucket, key, strings.NewReader(buf.String())); err != nil {
+	if err := remote.Save(ctx, bucket, key, strings.NewReader(buf.String())); err != nil {
 		return fmt.Errorf("starlight: write cache %s: %w", key, err)
 	}
 

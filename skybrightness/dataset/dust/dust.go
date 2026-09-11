@@ -36,8 +36,6 @@ import (
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/remote"
-	"github.com/TuSKan/astrogo/remote/api"
-	"github.com/TuSKan/astrogo/remote/file"
 	"github.com/TuSKan/astrogo/time"
 )
 
@@ -169,7 +167,7 @@ func Fetch(ctx context.Context, into *Map, directions ...Direction) (*Map, error
 	}
 
 	var (
-		client  *api.Client
+		client  *remote.Client
 		fetched bool
 	)
 
@@ -202,12 +200,10 @@ func Fetch(ctx context.Context, into *Map, directions ...Direction) (*Map, error
 		// The client is built on the first sightline that actually needs
 		// asking, so a fully cached call makes no connection at all.
 		if client == nil {
-			c, err := api.NewClient(remote.IRSADust,
-				api.WithMinInterval(queryPace),
-				api.WithTimeout(90*time.Second))
-			if err != nil {
-				return nil, fmt.Errorf("dust: client: %w", err)
-			}
+			c := remote.Default().Clone()
+			c.SetAPIOptions(
+				remote.WithMinInterval(queryPace),
+				remote.WithTimeout(90*time.Second))
 
 			client = c
 		}
@@ -248,7 +244,7 @@ const cacheFile = "i100.txt"
 // Any failure is a cold cache: the file may not exist yet, and a truncated or
 // malformed line costs the sightline on it rather than the whole file, since
 // the worst case is asking IRSA again for that one direction.
-func readCache(ctx context.Context, bucket *file.Bucket, key string) map[cell]float64 {
+func readCache(ctx context.Context, bucket *remote.Bucket, key string) map[cell]float64 {
 	out := map[cell]float64{}
 
 	r, err := bucket.NewReader(ctx, key, nil)
@@ -287,14 +283,14 @@ func readCache(ctx context.Context, bucket *file.Bucket, key string) map[cell]fl
 // The whole map each time rather than an append: the file is a few tens of
 // bytes per sightline, and rewriting it keeps one reader implementation
 // instead of one for the file and another for its tail.
-func writeCache(ctx context.Context, bucket *file.Bucket, key string, held map[cell]float64) error {
+func writeCache(ctx context.Context, bucket *remote.Bucket, key string, held map[cell]float64) error {
 	var buf strings.Builder
 
 	for c, v := range held {
 		fmt.Fprintf(&buf, "%d %d %.6e\n", c.l, c.b, v)
 	}
 
-	if err := file.Save(ctx, bucket, key, strings.NewReader(buf.String())); err != nil {
+	if err := remote.Save(ctx, bucket, key, strings.NewReader(buf.String())); err != nil {
 		return fmt.Errorf("dust: write cache %s: %w", key, err)
 	}
 
@@ -313,7 +309,7 @@ var hundredMicron = regexp.MustCompile(
 	`(?s)100 Micron Emission.*?<refPixelValue>\s*([0-9.eE+-]+)\s*\(MJy/sr\)`)
 
 // query asks the service for one direction.
-func query(ctx context.Context, client *api.Client, d Direction) (float64, error) {
+func query(ctx context.Context, client *remote.Client, d Direction) (float64, error) {
 	params := url.Values{}
 	params.Set("locstr", fmt.Sprintf("%.6f %.6f gal", d.L.Degrees(), d.B.Degrees()))
 	params.Set("regSize", "2.0")

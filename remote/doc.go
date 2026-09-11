@@ -2,16 +2,41 @@
 // endpoint the library can reach, a consent gate no bulk download bypasses,
 // and the cache all fetched data lands in.
 //
-// It owns policy. Moving bytes belongs to its two subpackages, split by
-// what is being addressed rather than by protocol:
+// It owns policy, and it is the only package a caller imports. Moving bytes
+// belongs to two subpackages internal to it, split by what is being
+// addressed rather than by protocol:
 //
-//   - [github.com/TuSKan/astrogo/remote/file] — byte-addressable resources
-//     with a stable identity, a size, and range semantics. SPK kernels,
-//     IERS bulletins, catalog CSVs, GeoTIFF bundles. A file on http is a
-//     file with an http backend, not an API.
-//   - [github.com/TuSKan/astrogo/remote/api] — request/response services
-//     whose returned document depends on the query. SIMBAD, VizieR, Gaia,
-//     MAST, CelesTrak, FINK, JPL SBDB and Horizons.
+//   - remote/file — byte-addressable resources with a stable identity, a
+//     size, and range semantics. SPK kernels, IERS bulletins, catalog CSVs,
+//     GeoTIFF bundles. A file on http is a file with an http backend, not
+//     an API.
+//   - remote/api — request/response services whose returned document
+//     depends on the query. SIMBAD, VizieR, Gaia, MAST, CelesTrak, FINK,
+//     JPL SBDB and Horizons.
+//
+// Neither is importable from outside remote/, and that is a test rather
+// than a convention. Everything they do is here: [Bucket], [OpenBucket],
+// [Save], [NewReaderAt], [IsNotFound], [APIClient] and [NewAPIClient]. A
+// caller reaching a subpackage directly would be going around the gate
+// below, which is not a shortcut — it is a program that ignores
+// [SetOffline] at one call site and reports nothing.
+//
+// # One policy, or one per component
+//
+// Everything below — offline mode, download consent, endpoint overrides, the
+// cache location — is a policy, and [Client] is that policy as a value. The
+// package-level functions operate on [Default], the way net/http's
+// package-level Get operates on http.DefaultClient, so a program with a single
+// policy writes exactly what it always wrote. A binary whose components want
+// different ones builds them:
+//
+//	prefetch := remote.NewClient()
+//	prefetch.EnableDownloads(200<<20, remote.NAIFSPK)
+//
+//	serve := remote.NewClient()
+//	serve.SetOffline(true)
+//
+// Every function documented below has a [Client] method of the same name.
 //
 // # Endpoints
 //
@@ -51,7 +76,7 @@
 // os.UserCacheDir()/astrogo. It is a bucket URL, not a filesystem path:
 //
 //	remote.SetDataDir("file:///data/astrogo?create_dir=true")
-//	remote.SetDataDir("s3://my-cache-bucket") // needs a blank import of remote/s3
+//	remote.SetDataDir("s3://my-cache-bucket") // needs a blank import of remote/file/s3
 //
 // Nothing in astrogo assumes the cache is local disk. [CacheDir] returns a
 // bucket and a key prefix; [GetFile] returns a bucket and a key. There is

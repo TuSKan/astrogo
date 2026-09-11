@@ -9,7 +9,7 @@ import (
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
-	"github.com/TuSKan/astrogo/remote/file"
+	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/skybrightness"
 	"github.com/TuSKan/astrogo/unit"
 )
@@ -245,14 +245,14 @@ func emitterFor(at *coord.Geodetic, radiance float64, scale []float64, region Re
 // extractTIFF unpacks the single GeoTIFF entry from a downloaded archive
 // into the same bucket, and returns its key. An already-extracted object is
 // reused.
-func extractTIFF(ctx context.Context, bucket *file.Bucket, archiveKey string, year int) (string, error) {
+func extractTIFF(ctx context.Context, bucket *remote.Bucket, archiveKey string, year int) (string, error) {
 	tiffKey := entryName(year)
 
 	if ok, err := bucket.Exists(ctx, tiffKey); err == nil && ok {
 		return tiffKey, nil
 	}
 
-	at, err := file.NewReaderAt(ctx, bucket, archiveKey)
+	at, err := remote.NewReaderAt(ctx, bucket, archiveKey)
 	if err != nil {
 		return "", fmt.Errorf("viirs: open archive: %w", err)
 	}
@@ -264,7 +264,7 @@ func extractTIFF(ctx context.Context, bucket *file.Bucket, archiveKey string, ye
 	}
 	defer closeEntry()
 
-	if err := file.Save(ctx, bucket, tiffKey, entry); err != nil {
+	if err := remote.Save(ctx, bucket, tiffKey, entry); err != nil {
 		return "", fmt.Errorf("viirs: extract %s: %w", tiffKey, err)
 	}
 

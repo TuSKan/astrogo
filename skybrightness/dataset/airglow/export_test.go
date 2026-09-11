@@ -3,7 +3,7 @@ package airglow
 import (
 	"context"
 
-	"github.com/TuSKan/astrogo/remote/file"
+	"github.com/TuSKan/astrogo/remote"
 )
 
 // CacheLocation exposes where a Spec's skytable is kept, so that a test can
@@ -13,7 +13,7 @@ import (
 // is deliberate but does mean nothing outside this package can compute it —
 // and a cache nobody can prove is being used is a cache that quietly stops
 // being used.
-func CacheLocation(ctx context.Context, spec Spec) (*file.Bucket, string, error) {
+func CacheLocation(ctx context.Context, spec Spec) (*remote.Bucket, string, error) {
 	req, err := spec.request()
 	if err != nil {
 		return nil, "", err

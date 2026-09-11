@@ -10,7 +10,6 @@ import (
 	"strings"
 
 	"github.com/TuSKan/astrogo/remote"
-	"github.com/TuSKan/astrogo/remote/api"
 	"github.com/TuSKan/astrogo/time"
 )
 
@@ -50,7 +49,7 @@ const asyncPhaseCap = 45 * time.Minute
 // chunks. Asynchronously it is one query.
 //
 // The returned stream is the caller's to close.
-func runAsync(ctx context.Context, client *api.Client, id remote.EndpointID, adql string) (io.ReadCloser, error) {
+func runAsync(ctx context.Context, client *remote.Client, id remote.EndpointID, adql string) (io.ReadCloser, error) {
 	v := url.Values{}
 	v.Set("REQUEST", "doQuery")
 	v.Set("LANG", "ADQL")
@@ -157,7 +156,7 @@ func jobIDOf(doc []byte) (string, error) {
 }
 
 // awaitPhase polls a job until it settles, and reports what it settled as.
-func awaitPhase(ctx context.Context, client *api.Client, id remote.EndpointID, jobID string) error {
+func awaitPhase(ctx context.Context, client *remote.Client, id remote.EndpointID, jobID string) error {
 	deadline := time.Now().Add(asyncPhaseCap)
 
 	for {
@@ -194,7 +193,7 @@ func awaitPhase(ctx context.Context, client *api.Client, id remote.EndpointID, j
 }
 
 // phaseOf reads a job's current phase.
-func phaseOf(ctx context.Context, client *api.Client, id remote.EndpointID, jobID string) (string, error) {
+func phaseOf(ctx context.Context, client *remote.Client, id remote.EndpointID, jobID string) (string, error) {
 	body, err := client.Get(ctx, id, jobID+"/phase", nil)
 	if err != nil {
 		return "", fmt.Errorf("%w %s: phase: %w", ErrAsyncJob, jobID, err)
@@ -215,7 +214,7 @@ func phaseOf(ctx context.Context, client *api.Client, id remote.EndpointID, jobI
 // Best effort: a job that failed and whose error document cannot be read is
 // still a failed job, and the phase already says so. This only turns "ERROR"
 // into something a reader can act on.
-func errorSummary(ctx context.Context, client *api.Client, id remote.EndpointID, jobID string) string {
+func errorSummary(ctx context.Context, client *remote.Client, id remote.EndpointID, jobID string) string {
 	body, err := client.Get(ctx, id, jobID+"/error", nil)
 	if err != nil {
 		return "no error document"

@@ -13,7 +13,6 @@ import (
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/remote"
-	"github.com/TuSKan/astrogo/remote/api"
 	"github.com/TuSKan/astrogo/time"
 )
 
@@ -125,12 +124,10 @@ func FetchBrightStars(ctx context.Context, faintestV float64, radius angle.Angle
 // transformation, which is what makes these stars immune to the transformation
 // error this package carried for so long.
 func fetchHipparcos(ctx context.Context, faintestV float64) ([]BrightStar, []float64, []float64, error) {
-	client, err := api.NewClient(remote.VizieR,
-		api.WithTimeout(3*time.Minute),
-		api.WithMinInterval(aggregationPace))
-	if err != nil {
-		return nil, nil, nil, fmt.Errorf("starlight: vizier client: %w", err)
-	}
+	client := remote.Default().Clone()
+	client.SetAPIOptions(
+		remote.WithTimeout(3*time.Minute),
+		remote.WithMinInterval(aggregationPace))
 
 	defer func() { _ = client.Close() }()
 
@@ -243,10 +240,7 @@ func hipparcosPosition(index map[string]int, row []string) (ra, dec angle.Angle,
 // nothing to the map, so for the question being asked — is this star's light
 // already counted? — it is not a counterpart.
 func fetchGaiaBright(ctx context.Context, faintestG float64) ([]angle.Angle, []angle.Angle, error) {
-	client, err := aggregationClient(remote.GaiaTAP)
-	if err != nil {
-		return nil, nil, err
-	}
+	client := aggregationClient(remote.GaiaTAP)
 
 	defer func() { _ = client.Close() }()
 
@@ -451,12 +445,10 @@ func AddCousinsR(ctx context.Context, stars []BrightStar) (matched int, err erro
 		return 0, nil
 	}
 
-	client, err := api.NewClient(remote.VizieR,
-		api.WithTimeout(aggregationTimeout),
-		api.WithMinInterval(aggregationPace))
-	if err != nil {
-		return 0, fmt.Errorf("starlight: vizier client: %w", err)
-	}
+	client := remote.Default().Clone()
+	client.SetAPIOptions(
+		remote.WithTimeout(aggregationTimeout),
+		remote.WithMinInterval(aggregationPace))
 
 	defer func() { _ = client.Close() }()
 

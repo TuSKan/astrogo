@@ -15,14 +15,13 @@ import (
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/internal/votable"
 	"github.com/TuSKan/astrogo/remote"
-	"github.com/TuSKan/astrogo/remote/api"
 	"github.com/TuSKan/astrogo/time"
 )
 
 // Provider implements resolve.Provider and resolve.ConeSearcher
 // explicitly pointing at Gaia DR3 to extract astrometric parameters.
 type Provider struct {
-	client   *api.Client
+	client   *remote.Client
 	cache    resolve.Cache
 	endpoint remote.EndpointID
 }
@@ -54,10 +53,7 @@ func New(endpoint remote.EndpointID) (*Provider, error) {
 		endpoint = DefaultEndpoint
 	}
 
-	client, err := api.NewClient(endpoint)
-	if err != nil {
-		return nil, fmt.Errorf("gaia: %w", err)
-	}
+	client := remote.Default()
 
 	return &Provider{
 		client:   client,

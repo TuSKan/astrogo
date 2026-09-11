@@ -7,17 +7,17 @@ import (
 	"testing"
 
 	"github.com/TuSKan/astrogo/internal/testutil"
-	"github.com/TuSKan/astrogo/remote/file"
+	"github.com/TuSKan/astrogo/remote"
 )
 
 var errStorageMisbehaved = errors.New("discard_test: open kernel: Access is denied")
 
 // seedKernel writes a byte into a fresh bucket and returns it with its key, so
 // a test can ask whether the file survived a decision.
-func seedKernel(t *testing.T) (*file.Bucket, string) {
+func seedKernel(t *testing.T) (*remote.Bucket, string) {
 	t.Helper()
 
-	bucket, err := file.Open(t.Context(), testutil.FileURL(t, t.TempDir()))
+	bucket, err := remote.OpenBucket(t.Context(), testutil.FileURL(t, t.TempDir()))
 	if err != nil {
 		t.Fatalf("open bucket: %v", err)
 	}
@@ -29,14 +29,14 @@ func seedKernel(t *testing.T) (*file.Bucket, string) {
 	// os.TempDir under a name built from the key's basename and a Windows
 	// clock that does not move — so separate buckets writing "de440s.bsp"
 	// still collide. Save holds the staging lock that prevents it (#241).
-	if err := file.Save(t.Context(), bucket, key, strings.NewReader("kernel bytes")); err != nil {
+	if err := remote.Save(t.Context(), bucket, key, strings.NewReader("kernel bytes")); err != nil {
 		t.Fatalf("seed kernel: %v", err)
 	}
 
 	return bucket, key
 }
 
-func exists(t *testing.T, bucket *file.Bucket, key string) bool {
+func exists(t *testing.T, bucket *remote.Bucket, key string) bool {
 	t.Helper()
 
 	ok, err := bucket.Exists(t.Context(), key)

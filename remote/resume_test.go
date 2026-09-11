@@ -6,8 +6,6 @@ import (
 	"strings"
 	"testing"
 
-	"gocloud.dev/blob"
-
 	"github.com/TuSKan/astrogo/remote/file"
 
 	"github.com/TuSKan/astrogo/internal/testutil"
@@ -18,11 +16,11 @@ import (
 // for its first N.
 const resumeBody = "0123456789abcdefghijABCDEFGHIJ"
 
-// fakeSource opens a fresh temp directory as a *file.Bucket, points id's
+// fakeSource opens a fresh temp directory as a *Bucket, points id's
 // endpoint URL at it (SetURL), and writes content at name — a local
 // stand-in for an HTTP source now that GetFile can't reach an http://
 // URL at all (no httpblob driver registered yet; see remote/file's
-// package doc). fetchInto/freshInCache/unchanged/resumePoint/
+// package doc). fetchInto/freshInCache/unchanged/ResumePoint/
 // writeResumable are all fully generic over any Bucket, so exercising
 // them against a real local Bucket here tests the exact same policy
 // code an HTTP-backed endpoint will take once that driver exists — only
@@ -30,7 +28,7 @@ const resumeBody = "0123456789abcdefghijABCDEFGHIJ"
 // fileblob's own Attributes derives a real, content-sensitive ETag from
 // (ModTime, Size), so the unchanged()/resume validator-comparison logic
 // gets genuine, non-trivial coverage, not a stub.
-func fakeSource(t *testing.T, id EndpointID, name, content string) *file.Bucket {
+func fakeSource(t *testing.T, id EndpointID, name, content string) *Bucket {
 	t.Helper()
 
 	dir := t.TempDir()
@@ -54,7 +52,7 @@ func fakeSource(t *testing.T, id EndpointID, name, content string) *file.Bucket 
 }
 
 // seedPartial writes a partial body (and, when validator != "", the
-// "source-etag" Metadata resumePoint reads back) into cacheKey's ".part"
+// "source-etag" Metadata ResumePoint reads back) into cacheKey's ".part"
 // key under NAIFSPK's cache directory, simulating a download that was
 // interrupted partway.
 func seedPartial(t *testing.T, content, validator string) {
@@ -67,14 +65,9 @@ func seedPartial(t *testing.T, content, validator string) {
 		t.Fatalf("CacheDir: %v", err)
 	}
 
-	pKey := partialKey(prefix + name)
+	pKey := file.PartialKey(prefix + name)
 
-	var opts *blob.WriterOptions
-	if validator != "" {
-		opts = &blob.WriterOptions{Metadata: map[string]string{sourceETagKey: validator}}
-	}
-
-	if err := bucket.WriteAll(context.Background(), pKey, []byte(content), opts); err != nil {
+	if err := file.SavePartial(context.Background(), bucket, pKey, strings.NewReader(content), validator); err != nil {
 		t.Fatalf("seed partial: %v", err)
 	}
 }
@@ -216,10 +209,10 @@ func TestGetFileResumeRespectsConsentSize(t *testing.T) {
 // assertPartialCleared verifies a completed download leaves no sidecar —
 // the resume validator rides as Metadata on the partial key itself, so a
 // single Exists check on that key covers both.
-func assertPartialCleared(t *testing.T, bucket *file.Bucket, cacheKey string) {
+func assertPartialCleared(t *testing.T, bucket *Bucket, cacheKey string) {
 	t.Helper()
 
-	pKey := partialKey(cacheKey)
+	pKey := file.PartialKey(cacheKey)
 	// A failed existence check is not "exists".
 	if exists, _ := bucket.Exists(context.Background(), pKey); exists {
 		t.Errorf("partial %s survived a completed download", pKey)

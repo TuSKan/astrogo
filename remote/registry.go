@@ -4,26 +4,28 @@ import (
 	"fmt"
 	"slices"
 	"sort"
-	"sync"
 )
 
-// registry holds the process-wide endpoint configuration. It is statically
-// initialized (no init() computation) and guarded by a single RWMutex; every
-// exported accessor below is safe for concurrent use.
-var (
-	regMu     sync.RWMutex
-	endpoints = defaultEndpoints()
-	offline   bool
-	policy    Policy
-)
+// Every exported function in this file is a thin call onto [Default]. The
+// state they used to own — the endpoint map, the offline flag, the download
+// policy — belongs to a [Client] now, because one policy per process is the
+// wrong shape for a binary whose components want different ones (#114). The
+// functions stay because a program with a single policy should not have to say
+// so.
 
-// Endpoints returns a snapshot of every registered endpoint, sorted by ID.
-func Endpoints() []Endpoint {
-	regMu.RLock()
-	defer regMu.RUnlock()
+// Endpoints returns a snapshot of every registered endpoint, sorted by ID, as
+// [Default] sees it.
+func Endpoints() []Endpoint { return Default().Endpoints() }
 
-	out := make([]Endpoint, 0, len(endpoints))
-	for _, ep := range endpoints {
+// Endpoints returns a snapshot of every registered endpoint, sorted by ID, with
+// this client's own decisions applied — its URL overrides, its disables, its
+// download grants, and no other client's.
+func (c *Client) Endpoints() []Endpoint {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	out := make([]Endpoint, 0, len(c.endpoints))
+	for _, ep := range c.endpoints {
 		out = append(out, cloneEndpoint(ep))
 	}
 
@@ -42,71 +44,89 @@ func cloneEndpoint(ep Endpoint) Endpoint {
 	return ep
 }
 
-// Lookup returns the endpoint registered under id.
-func Lookup(id EndpointID) (Endpoint, bool) {
-	regMu.RLock()
-	defer regMu.RUnlock()
+// Lookup returns the endpoint registered under id, as [Default] sees it.
+func Lookup(id EndpointID) (Endpoint, bool) { return Default().Lookup(id) }
 
-	ep, ok := endpoints[id]
+// Lookup returns the endpoint registered under id, with this client's own
+// decisions applied.
+func (c *Client) Lookup(id EndpointID) (Endpoint, bool) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	ep, ok := c.endpoints[id]
 
 	return cloneEndpoint(ep), ok
 }
 
 // Enable re-enables access to the given endpoints (the default state).
-func Enable(ids ...EndpointID) {
-	setEnabled(true, ids)
-}
+func Enable(ids ...EndpointID) { Default().Enable(ids...) }
+
+// Enable re-enables this client's access to the given endpoints.
+func (c *Client) Enable(ids ...EndpointID) { c.setEnabled(true, ids) }
 
 // Disable blocks all access to the given endpoints: any request against
 // them fails with ErrEndpointDisabled until re-enabled.
-func Disable(ids ...EndpointID) {
-	setEnabled(false, ids)
-}
+func Disable(ids ...EndpointID) { Default().Disable(ids...) }
 
-func setEnabled(enabled bool, ids []EndpointID) {
-	regMu.Lock()
-	defer regMu.Unlock()
+// Disable blocks this client's access to the given endpoints. Another client
+// holding the same endpoints is unaffected.
+func (c *Client) Disable(ids ...EndpointID) { c.setEnabled(false, ids) }
+
+func (c *Client) setEnabled(enabled bool, ids []EndpointID) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 
 	for _, id := range ids {
-		if ep, ok := endpoints[id]; ok {
+		if ep, ok := c.endpoints[id]; ok {
 			ep.Enabled = enabled
-			endpoints[id] = ep
+			c.endpoints[id] = ep
 		}
 	}
 }
 
 // SetURL overrides an endpoint's base URL, e.g. to point at a mirror or an
 // internal proxy. Returns ErrUnknownEndpoint for an unregistered id.
-func SetURL(id EndpointID, url string) error {
-	regMu.Lock()
-	defer regMu.Unlock()
+func SetURL(id EndpointID, url string) error { return Default().SetURL(id, url) }
 
-	ep, ok := endpoints[id]
+// SetURL overrides an endpoint's base URL for this client only. Returns
+// ErrUnknownEndpoint for an unregistered id.
+func (c *Client) SetURL(id EndpointID, url string) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	ep, ok := c.endpoints[id]
 	if !ok {
 		return fmt.Errorf("%w: %q", ErrUnknownEndpoint, id)
 	}
 
 	ep.URL = url
-	endpoints[id] = ep
+	c.endpoints[id] = ep
 
 	return nil
 }
 
 // SetOffline toggles global offline mode. While offline, every endpoint
 // access — API call or download — fails with ErrOffline.
-func SetOffline(off bool) {
-	regMu.Lock()
-	defer regMu.Unlock()
+func SetOffline(off bool) { Default().SetOffline(off) }
 
-	offline = off
+// SetOffline toggles offline mode for this client. While offline, every
+// endpoint access through it — API call or download — fails with ErrOffline.
+func (c *Client) SetOffline(off bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.offline = off
 }
 
 // Offline reports whether global offline mode is active.
-func Offline() bool {
-	regMu.RLock()
-	defer regMu.RUnlock()
+func Offline() bool { return Default().Offline() }
 
-	return offline
+// Offline reports whether this client is in offline mode.
+func (c *Client) Offline() bool {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	return c.offline
 }
 
 // Reset restores the default registry state: every endpoint at its
@@ -116,28 +136,37 @@ func Offline() bool {
 // Reset discards consent a broader scope — a package TestMain — granted
 // for the whole binary, so a test using it can break tests that run
 // after. Prefer Capture/Restore or WithScope for scoped setup.
-func Reset() {
-	regMu.Lock()
-	defer regMu.Unlock()
+func Reset() { Default().Reset() }
 
-	endpoints = defaultEndpoints()
-	offline = false
-	policy = nil
+// Reset restores this client to the state [NewClient] returns.
+func (c *Client) Reset() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.endpoints = defaultEndpoints()
+	c.offline = false
+	c.policy = nil
 }
 
 // URL is the single gate every network call site goes through: it returns
 // the endpoint's (possibly overridden) base URL, or an error explaining why
 // the endpoint may not be contacted — ErrOffline, ErrEndpointDisabled, or
 // ErrUnknownEndpoint.
-func URL(id EndpointID) (string, error) {
-	regMu.RLock()
-	defer regMu.RUnlock()
+func URL(id EndpointID) (string, error) { return Default().URL(id) }
 
-	if offline {
+// URL is the single gate every call site goes through, for this client: it
+// returns the endpoint's (possibly overridden) base URL, or an error explaining
+// why this client may not contact it — ErrOffline, ErrEndpointDisabled, or
+// ErrUnknownEndpoint.
+func (c *Client) URL(id EndpointID) (string, error) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	if c.offline {
 		return "", fmt.Errorf("%w (endpoint %q)", ErrOffline, id)
 	}
 
-	ep, ok := endpoints[id]
+	ep, ok := c.endpoints[id]
 	if !ok {
 		return "", fmt.Errorf("%w: %q", ErrUnknownEndpoint, id)
 	}
@@ -160,49 +189,63 @@ func URL(id EndpointID) (string, error) {
 // Naming an endpoint that cannot download (SIMBAD, VizieR, ...) does
 // nothing: it has no consent gate to open.
 func EnableDownloads(maxSize int64, ids ...EndpointID) {
-	setConsent(true, maxSize, ids)
+	Default().EnableDownloads(maxSize, ids...)
+}
+
+// EnableDownloads grants this client file-download consent, capping a single
+// download at maxSize bytes (0 means unlimited). Consent granted here reaches
+// no other client.
+func (c *Client) EnableDownloads(maxSize int64, ids ...EndpointID) {
+	c.setConsent(true, maxSize, ids)
 }
 
 // DisableDownloads revokes file-download consent — for every Downloadable
 // endpoint with no ids, or only the ones named. This is the default state.
-func DisableDownloads(ids ...EndpointID) {
-	setConsent(false, 0, ids)
-}
+func DisableDownloads(ids ...EndpointID) { Default().DisableDownloads(ids...) }
+
+// DisableDownloads revokes this client's file-download consent.
+func (c *Client) DisableDownloads(ids ...EndpointID) { c.setConsent(false, 0, ids) }
 
 // setConsent applies a consent decision. An empty ids means every
 // Downloadable endpoint; naming ids explicitly still skips those with no
 // download path at all, so consent is never recorded against an endpoint
 // that would never consult it.
-func setConsent(ok bool, maxSize int64, ids []EndpointID) {
-	regMu.Lock()
-	defer regMu.Unlock()
+func (c *Client) setConsent(ok bool, maxSize int64, ids []EndpointID) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 
 	if len(ids) == 0 {
-		ids = make([]EndpointID, 0, len(endpoints))
-		for id := range endpoints {
+		ids = make([]EndpointID, 0, len(c.endpoints))
+		for id := range c.endpoints {
 			ids = append(ids, id)
 		}
 	}
 
 	for _, id := range ids {
-		ep, found := endpoints[id]
+		ep, found := c.endpoints[id]
 		if !found || !ep.Downloadable {
 			continue
 		}
 
 		ep.DownloadsOK = ok
 		ep.MaxDownloadSize = maxSize
-		endpoints[id] = ep
+		c.endpoints[id] = ep
 	}
 }
 
 // DownloadsEnabled reports whether downloads are enabled for id and the
 // configured per-download size cap (0 = unlimited).
 func DownloadsEnabled(id EndpointID) (ok bool, maxSize int64) {
-	regMu.RLock()
-	defer regMu.RUnlock()
+	return Default().DownloadsEnabled(id)
+}
 
-	ep, found := endpoints[id]
+// DownloadsEnabled reports whether this client may download id, and its
+// per-download size cap (0 = unlimited).
+func (c *Client) DownloadsEnabled(id EndpointID) (ok bool, maxSize int64) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	ep, found := c.endpoints[id]
 	if !found {
 		return false, 0
 	}
@@ -219,11 +262,15 @@ type Policy func(ep Endpoint, size int64) error
 // SetPolicy installs a custom download-consent policy that replaces the
 // per-endpoint EnableDownloads checks entirely. Pass nil to restore the
 // default per-endpoint consent behavior.
-func SetPolicy(p Policy) {
-	regMu.Lock()
-	defer regMu.Unlock()
+func SetPolicy(p Policy) { Default().SetPolicy(p) }
 
-	policy = p
+// SetPolicy installs a custom download-consent policy on this client. Pass nil
+// to restore the default per-endpoint consent behaviour.
+func (c *Client) SetPolicy(p Policy) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.policy = p
 }
 
 // CheckDownload applies the consent configuration to a prospective
@@ -232,12 +279,18 @@ func SetPolicy(p Policy) {
 // file-producing paths that bypass GetFile — JPLHorizonsSPK generation,
 // whose kernel arrives base64-encoded inside a JSON response.
 func CheckDownload(id EndpointID, name string, size int64) error {
-	regMu.RLock()
+	return Default().CheckDownload(id, name, size)
+}
 
-	ep, ok := endpoints[id]
-	pol := policy
+// CheckDownload applies this client's consent configuration to a prospective
+// download. See the package-level [CheckDownload].
+func (c *Client) CheckDownload(id EndpointID, name string, size int64) error {
+	c.mu.RLock()
 
-	regMu.RUnlock()
+	ep, ok := c.endpoints[id]
+	pol := c.policy
+
+	c.mu.RUnlock()
 
 	if !ok {
 		return fmt.Errorf("%w: %q", ErrUnknownEndpoint, id)

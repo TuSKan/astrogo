@@ -16,7 +16,6 @@ import (
 
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/remote"
-	"github.com/TuSKan/astrogo/remote/api"
 )
 
 // iersReply is the timescale service's JSON answer.
@@ -60,10 +59,7 @@ type iersReply struct {
 // service is a PHP controller with no published rate limit, so this stays in
 // the validation tier that runs on a schedule, never per-PR.
 func TestIERSOracleMatchesTheRecord(t *testing.T) {
-	client, err := api.NewClient(remote.IERSTimescales)
-	if err != nil {
-		t.Fatalf("build the IERS client: %v", err)
-	}
+	client := remote.Default()
 
 	ctx := t.Context()
 
@@ -101,10 +97,7 @@ func TestIERSOracleMatchesTheRecord(t *testing.T) {
 // definition rather than of any particular entry, and this is somebody else's
 // server.
 func TestIERSOracleConfirmsTheBoundaryConvention(t *testing.T) {
-	client, err := api.NewClient(remote.IERSTimescales)
-	if err != nil {
-		t.Fatalf("build the IERS client: %v", err)
-	}
+	client := remote.Default()
 
 	ctx := t.Context()
 
@@ -151,7 +144,7 @@ func TestIERSOracleConfirmsTheBoundaryConvention(t *testing.T) {
 // coverage — so the body is checked before it is decoded. Feeding those to a
 // JSON decoder and reporting a decode failure would hide what actually
 // happened.
-func deltaAT(ctx context.Context, c *api.Client, at string) (float64, error) {
+func deltaAT(ctx context.Context, c *remote.Client, at string) (float64, error) {
 	q := url.Values{}
 	q.Set("param", "leapseconds")
 	q.Set("datetime", at)

@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/TuSKan/astrogo/internal/testutil"
+	"github.com/TuSKan/astrogo/remote/file"
 	"github.com/TuSKan/astrogo/time"
 )
 
@@ -122,7 +123,7 @@ func TestValidateFailureLeavesNothingCached(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	for _, key := range []string{prefix + "naif0012.tls", partialKey(prefix + "naif0012.tls")} {
+	for _, key := range []string{prefix + "naif0012.tls", file.PartialKey(prefix + "naif0012.tls")} {
 		if exists, _ := bucket.Exists(context.Background(), key); exists {
 			t.Errorf("%s survived a failed validation", key)
 		}

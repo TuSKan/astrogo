@@ -1,4 +1,4 @@
-package remote
+package eop
 
 import (
 	"bytes"
@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/TuSKan/astrogo/internal/testutil"
+	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/remote/file"
 	"github.com/TuSKan/astrogo/time"
 )
@@ -24,7 +25,7 @@ const sampleFinals2000A = `73 1 2 41684.00 I  0.120733 0.009786  0.136966 0.0159
 // exercise, and iers keeps only the tests about its own logic.
 
 // fakeIERSSource opens a fresh temp directory as a bucket, points
-// IERSFinals2000A's URL at it, and writes content at the source object
+// remote.IERSFinals2000A's URL at it, and writes content at the source object
 // name the loader reads. A local stand-in for HTTP, since remote/file has
 // no https driver registered in this build.
 func fakeIERSSource(t *testing.T, content string) {
@@ -32,7 +33,7 @@ func fakeIERSSource(t *testing.T, content string) {
 
 	url := testutil.FileURL(t, t.TempDir())
 
-	if err := SetURL(IERSFinals2000A, url); err != nil {
+	if err := remote.SetURL(remote.IERSFinals2000A, url); err != nil {
 		t.Fatal(err)
 	}
 
@@ -51,11 +52,11 @@ func fakeIERSSource(t *testing.T, content string) {
 func scratchCache(t *testing.T) {
 	t.Helper()
 
-	SetDataDir(testutil.FileURL(t, t.TempDir()))
+	remote.SetDataDir(testutil.FileURL(t, t.TempDir()))
 
 	t.Cleanup(func() {
-		SetDataDir("")
-		Reset()
+		remote.SetDataDir("")
+		remote.Reset()
 		time.ResetEOP()
 	})
 }
@@ -63,7 +64,7 @@ func scratchCache(t *testing.T) {
 func TestEOPLoaderFetchesAndParses(t *testing.T) {
 	scratchCache(t)
 	fakeIERSSource(t, sampleFinals2000A)
-	EnableDownloads(0, IERSFinals2000A)
+	remote.EnableDownloads(0, remote.IERSFinals2000A)
 
 	data, err := eopLoader{}.Fetch(context.Background())
 	if err != nil {
@@ -76,19 +77,19 @@ func TestEOPLoaderFetchesAndParses(t *testing.T) {
 }
 
 // TestEOPLoaderDefaultDenyWritesNoCache is the consent contract: without
-// EnableDownloads the fetch is refused, and nothing is written.
+// remote.EnableDownloads the fetch is refused, and nothing is written.
 func TestEOPLoaderDefaultDenyWritesNoCache(t *testing.T) {
 	scratchCache(t)
 	fakeIERSSource(t, sampleFinals2000A)
 
 	_, err := eopLoader{}.Fetch(context.Background())
-	if !errors.Is(err, ErrDownloadDenied) {
-		t.Fatalf("Fetch without EnableDownloads = %v, want ErrDownloadDenied", err)
+	if !errors.Is(err, remote.ErrDownloadDenied) {
+		t.Fatalf("Fetch without remote.EnableDownloads = %v, want remote.ErrDownloadDenied", err)
 	}
 
-	bucket, prefix, err := CacheDir(context.Background(), IERSFinals2000A)
+	bucket, prefix, err := remote.CacheDir(context.Background(), remote.IERSFinals2000A)
 	if err != nil {
-		t.Fatalf("CacheDir: %v", err)
+		t.Fatalf("remote.CacheDir: %v", err)
 	}
 
 	if exists, _ := bucket.Exists(context.Background(), prefix+eopCacheName); exists {
@@ -102,7 +103,7 @@ func TestEOPLoaderDefaultDenyWritesNoCache(t *testing.T) {
 func TestEOPLoaderSkipsBodyWhenETagUnchanged(t *testing.T) {
 	scratchCache(t)
 	fakeIERSSource(t, sampleFinals2000A)
-	EnableDownloads(0, IERSFinals2000A)
+	remote.EnableDownloads(0, remote.IERSFinals2000A)
 
 	ctx := context.Background()
 
@@ -110,9 +111,9 @@ func TestEOPLoaderSkipsBodyWhenETagUnchanged(t *testing.T) {
 		t.Fatalf("first Fetch: %v", err)
 	}
 
-	bucket, prefix, err := CacheDir(ctx, IERSFinals2000A)
+	bucket, prefix, err := remote.CacheDir(ctx, remote.IERSFinals2000A)
 	if err != nil {
-		t.Fatalf("CacheDir: %v", err)
+		t.Fatalf("remote.CacheDir: %v", err)
 	}
 
 	before, err := bucket.Attributes(ctx, prefix+eopCacheName)
@@ -134,7 +135,7 @@ func TestEOPLoaderSkipsBodyWhenETagUnchanged(t *testing.T) {
 	}
 }
 
-// TestEOPLoaderRejectsCorruptDownload keeps WithValidate honest: a
+// TestEOPLoaderRejectsCorruptDownload keeps remote.WithValidate honest: a
 // response that does not parse must never be trusted as the new cache.
 func TestEOPLoaderRejectsCorruptDownload(t *testing.T) {
 	scratchCache(t)
@@ -144,15 +145,15 @@ func TestEOPLoaderRejectsCorruptDownload(t *testing.T) {
 	// a truncated or garbled response. Short garbage will not do: it parses
 	// cleanly into an empty table.
 	fakeIERSSource(t, strings.Repeat("x", 70*1024))
-	EnableDownloads(0, IERSFinals2000A)
+	remote.EnableDownloads(0, remote.IERSFinals2000A)
 
 	if _, err := (eopLoader{}).Fetch(context.Background()); err == nil {
 		t.Fatal("Fetch accepted a corrupt download")
 	}
 
-	bucket, prefix, err := CacheDir(context.Background(), IERSFinals2000A)
+	bucket, prefix, err := remote.CacheDir(context.Background(), remote.IERSFinals2000A)
 	if err != nil {
-		t.Fatalf("CacheDir: %v", err)
+		t.Fatalf("remote.CacheDir: %v", err)
 	}
 
 	if exists, _ := bucket.Exists(context.Background(), prefix+eopCacheName); exists {
@@ -165,16 +166,16 @@ func TestEOPLoaderRejectsCorruptDownload(t *testing.T) {
 }
 
 // TestEOPLoaderCachedReadsAPreSeededFile covers the offline deployment:
-// a file copied in by hand has no recorded ETag, so GetFile's cache-hit
+// a file copied in by hand has no recorded ETag, so remote.GetFile's cache-hit
 // path cannot find it and Cached must read the object directly.
 func TestEOPLoaderCachedReadsAPreSeededFile(t *testing.T) {
 	scratchCache(t)
 
 	ctx := context.Background()
 
-	bucket, prefix, err := CacheDir(ctx, IERSFinals2000A)
+	bucket, prefix, err := remote.CacheDir(ctx, remote.IERSFinals2000A)
 	if err != nil {
-		t.Fatalf("CacheDir: %v", err)
+		t.Fatalf("remote.CacheDir: %v", err)
 	}
 
 	if err := bucket.WriteAll(ctx, prefix+eopCacheName, []byte(sampleFinals2000A), nil); err != nil {
@@ -209,7 +210,7 @@ func TestEOPLoaderCachedReportsNoDataWhenEmpty(t *testing.T) {
 func TestEOPLoaderDoesNotAccumulateCacheFiles(t *testing.T) {
 	scratchCache(t)
 	fakeIERSSource(t, sampleFinals2000A)
-	EnableDownloads(0, IERSFinals2000A)
+	remote.EnableDownloads(0, remote.IERSFinals2000A)
 
 	for range 3 {
 		if _, err := (eopLoader{}).Fetch(context.Background()); err != nil {
@@ -217,7 +218,7 @@ func TestEOPLoaderDoesNotAccumulateCacheFiles(t *testing.T) {
 		}
 	}
 
-	bucket, prefix, err := CacheDir(context.Background(), IERSFinals2000A)
+	bucket, prefix, err := remote.CacheDir(context.Background(), remote.IERSFinals2000A)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -236,9 +237,9 @@ func TestInitRegistersTheLoader(t *testing.T) {
 
 	ctx := context.Background()
 
-	bucket, prefix, err := CacheDir(ctx, IERSFinals2000A)
+	bucket, prefix, err := remote.CacheDir(ctx, remote.IERSFinals2000A)
 	if err != nil {
-		t.Fatalf("CacheDir: %v", err)
+		t.Fatalf("remote.CacheDir: %v", err)
 	}
 
 	if err := bucket.WriteAll(ctx, prefix+eopCacheName, []byte(sampleFinals2000A), nil); err != nil {
@@ -252,5 +253,25 @@ func TestInitRegistersTheLoader(t *testing.T) {
 
 	if got := time.EOPSource(); got != "cache" {
 		t.Errorf("EOPSource = %q, want %q", got, "cache")
+	}
+}
+
+// TestCachedDegradesWhenTheCacheCannotBeOpened covers the branch an air-gapped
+// deployment hits when its cache location is wrong.
+//
+// Every failure here answers ErrNoEOPData rather than the underlying error, on
+// purpose: Time.EOP has no error return, so a caller cannot be told anything
+// richer than "no data", and time's own one-time warning is the notice that
+// accuracy degraded. Returning a different error would only push a value that
+// nothing can read further up.
+func TestCachedDegradesWhenTheCacheCannotBeOpened(t *testing.T) {
+	scope := remote.Capture(remote.IERSFinals2000A)
+	t.Cleanup(scope.Restore)
+
+	// A scheme no driver registers, so opening the cache bucket fails.
+	remote.SetDataDir("no-such-scheme://example.invalid/cache")
+
+	if _, err := (eopLoader{}).Cached(t.Context()); !errors.Is(err, time.ErrNoEOPData) {
+		t.Errorf("Cached with an unopenable cache = %v, want ErrNoEOPData", err)
 	}
 }

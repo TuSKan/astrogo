@@ -9,9 +9,8 @@ import (
 
 	"github.com/scigolib/hdf5"
 
-	"github.com/TuSKan/astrogo/remote/file"
-
 	"github.com/TuSKan/astrogo/internal/testutil"
+	"github.com/TuSKan/astrogo/remote"
 )
 
 // fillValue mirrors the real CAMS/NetCDF default double fill value
@@ -52,10 +51,10 @@ const fillValue = 9.969209968386687e+36
 // + lon (lnsp), so ReadPlane/At results are checkable by direct formula
 // rather than a second fixture-specific table.
 //
-// Returns a *file.Bucket rooted at the temp dir the fixture was written
+// Returns a *remote.Bucket rooted at the temp dir the fixture was written
 // into, plus its key within that bucket — the same (bucket, key) shape
 // Open takes, so a test caller never touches a raw OS path.
-func synthFixture(t *testing.T) (*file.Bucket, string) {
+func synthFixture(t *testing.T) (*remote.Bucket, string) {
 	t.Helper()
 
 	const key = "synthetic.nc"
@@ -144,7 +143,7 @@ func synthFixture(t *testing.T) (*file.Bucket, string) {
 
 	url := testutil.FileURL(t, dir)
 
-	bucket, err := file.Open(context.Background(), url)
+	bucket, err := remote.OpenBucket(context.Background(), url)
 	if err != nil {
 		t.Fatalf("Open fixture bucket: %v", err)
 	}
@@ -505,7 +504,7 @@ func TestAtIndexOutOfRange(t *testing.T) {
 func TestOpenSurfacesOpenReaderError(t *testing.T) {
 	url := testutil.FileURL(t, t.TempDir())
 
-	bucket, err := file.Open(context.Background(), url)
+	bucket, err := remote.OpenBucket(context.Background(), url)
 	if err != nil {
 		t.Fatalf("Open bucket: %v", err)
 	}

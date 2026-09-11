@@ -31,8 +31,6 @@ import (
 	"github.com/TuSKan/astrogo/constants"
 	"github.com/TuSKan/astrogo/fits"
 	"github.com/TuSKan/astrogo/remote"
-	"github.com/TuSKan/astrogo/remote/api"
-	"github.com/TuSKan/astrogo/remote/file"
 	"github.com/TuSKan/astrogo/skybrightness"
 	"github.com/TuSKan/astrogo/unit"
 )
@@ -353,7 +351,7 @@ func fetchRequest(ctx context.Context, req skycalcRequest) (*Spectrum, error) {
 
 	if cacheErr == nil {
 		// A cache write that fails costs a request next time and nothing else.
-		_ = file.Save(ctx, bucket, key, bytes.NewReader(raw))
+		_ = remote.Save(ctx, bucket, key, bytes.NewReader(raw))
 	}
 
 	return spectrum, nil
@@ -367,7 +365,7 @@ func fetchRequest(ctx context.Context, req skycalcRequest) (*Spectrum, error) {
 // actually sent is the only key that cannot silently collide — and a
 // parameter added later changes it without anyone having to remember this
 // function exists.
-func cacheLocation(ctx context.Context, req skycalcRequest) (*file.Bucket, string, error) {
+func cacheLocation(ctx context.Context, req skycalcRequest) (*remote.Bucket, string, error) {
 	bucket, prefix, err := remote.CacheDir(ctx, remote.ESOSkyCalc)
 	if err != nil {
 		return nil, "", fmt.Errorf("%w: cache: %w", ErrService, err)
@@ -387,7 +385,7 @@ func cacheLocation(ctx context.Context, req skycalcRequest) (*file.Bucket, strin
 
 // cached reads a previously fetched skytable, reporting whether it was there
 // and usable.
-func cached(ctx context.Context, bucket *file.Bucket, key string) (*Spectrum, bool) {
+func cached(ctx context.Context, bucket *remote.Bucket, key string) (*Spectrum, bool) {
 	r, err := bucket.NewReader(ctx, key, nil)
 	if err != nil {
 		return nil, false
@@ -411,10 +409,7 @@ func cached(ctx context.Context, bucket *file.Bucket, key string) (*Spectrum, bo
 // [Parse] is this package's own reader and re-running it on a cached file is
 // cheap, while re-running the request is three round trips to Garching.
 func fetchSkytable(ctx context.Context, req skycalcRequest) ([]byte, error) {
-	client, err := api.NewClient(remote.ESOSkyCalc)
-	if err != nil {
-		return nil, fmt.Errorf("airglow: client: %w", err)
-	}
+	client := remote.Default()
 
 	defer func() { _ = client.Close() }()
 
@@ -740,7 +735,7 @@ func (s Spec) describe() string {
 // Failure is ignored deliberately. The caller wanted a spectrum, and losing one
 // because the cleanup call was refused would be the wrong trade; the request
 // still went out, which is the part that matters to ESO.
-func releaseTmpDir(ctx context.Context, client *api.Client, tmpdir string) {
+func releaseTmpDir(ctx context.Context, client *remote.Client, tmpdir string) {
 	body, err := client.Get(ctx, remote.ESOSkyCalc, "api/rmtmp", url.Values{"d": {tmpdir}})
 	if err != nil {
 		return

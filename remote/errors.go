@@ -1,6 +1,10 @@
 package remote
 
-import "errors"
+import (
+	"errors"
+
+	"github.com/TuSKan/astrogo/remote/api"
+)
 
 // Sentinel errors returned by the registry gate and download pipeline.
 // Match with errors.Is.
@@ -52,7 +56,11 @@ var (
 	// Which statuses qualify is [github.com/TuSKan/astrogo/remote/api.RetryPolicy]'s
 	// decision; [github.com/TuSKan/astrogo/remote/api.DefaultRetryPolicy] is the
 	// answer without one.
-	ErrRetriable = errors.New("remote: retriable failure, retries exhausted")
+	//
+	// The value is remote/api's own, so errors.Is matches whichever name a
+	// caller reached for: the wrapping happens down there and the documented
+	// name is up here.
+	ErrRetriable = api.ErrRetriable
 
 	// ErrNotFileEndpoint is returned by GetFile for an endpoint
 	// registered as KindAPI, which has no cache directory or download path.

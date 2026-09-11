@@ -14,7 +14,6 @@ import (
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/remote"
-	"github.com/TuSKan/astrogo/remote/file"
 )
 
 // response renders a service document carrying one 100 micron intensity,
@@ -285,7 +284,7 @@ func TestReadCacheSkipsUnusableLines(t *testing.T) {
 		"101 200 2.5e+03", // good
 	}, "\n") + "\n"
 
-	if err := file.Save(ctx, bucket, key, strings.NewReader(body)); err != nil {
+	if err := remote.Save(ctx, bucket, key, strings.NewReader(body)); err != nil {
 		t.Fatalf("seed cache: %v", err)
 	}
 

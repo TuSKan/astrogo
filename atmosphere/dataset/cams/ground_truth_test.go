@@ -21,9 +21,8 @@ import (
 	"math"
 	"testing"
 
-	"github.com/TuSKan/astrogo/remote/file"
-
 	"github.com/TuSKan/astrogo/internal/testutil"
+	"github.com/TuSKan/astrogo/remote"
 )
 
 // credentialsDir is where these real files live in this session's local
@@ -31,14 +30,14 @@ import (
 // per the CAMS EODATA plan's own stated intent), not per-test.
 const credentialsDir = `../../../remote/credentials`
 
-// credentialsBucket opens credentialsDir as a *file.Bucket, once per test
+// credentialsBucket opens credentialsDir as a *remote.Bucket, once per test
 // process — real files live directly as keys within it.
-func credentialsBucket(t *testing.T) *file.Bucket {
+func credentialsBucket(t *testing.T) *remote.Bucket {
 	t.Helper()
 
 	url := testutil.FileURL(t, credentialsDir)
 
-	bucket, err := file.Open(context.Background(), url)
+	bucket, err := remote.OpenBucket(context.Background(), url)
 	if err != nil {
 		t.Fatalf("Open credentials bucket: %v", err)
 	}
@@ -46,7 +45,7 @@ func credentialsBucket(t *testing.T) *file.Bucket {
 	return bucket
 }
 
-func lnspFixture(t *testing.T) (*file.Bucket, string) {
+func lnspFixture(t *testing.T) (*remote.Bucket, string) {
 	t.Helper()
 
 	const key = "z_cams_c_ecmf_20230101000000_prod_an_ml_000_lnsp.nc"
@@ -60,7 +59,7 @@ func lnspFixture(t *testing.T) (*file.Bucket, string) {
 	return bucket, key
 }
 
-func aermr01Fixture(t *testing.T) (*file.Bucket, string) {
+func aermr01Fixture(t *testing.T) (*remote.Bucket, string) {
 	t.Helper()
 
 	const key = "z_cams_c_ecmf_20230101000000_prod_an_ml_000_aermr01.nc"
