@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -272,5 +273,79 @@ func TestDefaultAPITimeoutIsTheSameValue(t *testing.T) {
 
 	if DefaultAPITimeout != api.DefaultTimeout {
 		t.Errorf("DefaultAPITimeout = %v, want api.DefaultTimeout (%v)", DefaultAPITimeout, api.DefaultTimeout)
+	}
+}
+
+// TestPostVerbsReachTheServerThroughTheFrontDoor covers the two methods whose
+// success path nothing else here exercises.
+//
+// PostForm carries TAP-ADQL queries and PostJSON carries Horizons kernel
+// requests, so between them they are most of astrogo's write traffic. The
+// offline test above only ever reaches their refusal branch, which leaves the
+// forwarding itself — the body, the content type, the resolved URL — unchecked.
+func TestPostVerbsReachTheServerThroughTheFrontDoor(t *testing.T) {
+	var (
+		gotContentType string
+		gotBody        string
+		gotPath        string
+	)
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotContentType = r.Header.Get("Content-Type")
+		gotPath = r.URL.Path
+
+		raw, _ := io.ReadAll(r.Body)
+		gotBody = string(raw)
+
+		_, _ = w.Write([]byte("ok"))
+	}))
+	defer srv.Close()
+
+	scope := Capture(VizieR)
+	t.Cleanup(scope.Restore)
+
+	if err := SetURL(VizieR, srv.URL+"/tap"); err != nil {
+		t.Fatalf("SetURL: %v", err)
+	}
+
+	client, err := NewAPIClient(VizieR)
+	if err != nil {
+		t.Fatalf("NewAPIClient: %v", err)
+	}
+
+	t.Cleanup(func() { _ = client.Close() })
+
+	form, err := client.PostForm(t.Context(), VizieR, "sync", url.Values{"QUERY": {"SELECT 1"}})
+	if err != nil {
+		t.Fatalf("PostForm: %v", err)
+	}
+
+	_ = form.Close()
+
+	if !strings.HasPrefix(gotContentType, "application/x-www-form-urlencoded") {
+		t.Errorf("PostForm Content-Type = %q", gotContentType)
+	}
+
+	if gotBody != "QUERY=SELECT+1" {
+		t.Errorf("PostForm body = %q, want the form it was given", gotBody)
+	}
+
+	if gotPath != "/tap/sync" {
+		t.Errorf("PostForm path = %q, want the endpoint URL joined with the request path", gotPath)
+	}
+
+	resp, err := client.PostJSON(t.Context(), VizieR, "sync", map[string]string{"k": "v"})
+	if err != nil {
+		t.Fatalf("PostJSON: %v", err)
+	}
+
+	_ = resp.Close()
+
+	if !strings.HasPrefix(gotContentType, "application/json") {
+		t.Errorf("PostJSON Content-Type = %q", gotContentType)
+	}
+
+	if gotBody != `{"k":"v"}` {
+		t.Errorf("PostJSON body = %q, want the payload it was given", gotBody)
 	}
 }
