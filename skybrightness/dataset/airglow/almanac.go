@@ -7,7 +7,6 @@ import (
 	"math"
 
 	"github.com/TuSKan/astrogo/remote"
-	"github.com/TuSKan/astrogo/remote/api"
 	"github.com/TuSKan/astrogo/time"
 )
 
@@ -105,7 +104,7 @@ func AlmanacAt(ctx context.Context, when time.GoTime, obs Observatory) (Almanac,
 		Observatory: string(obs),
 	}
 
-	client, err := api.NewClient(remote.ESOSkyCalc)
+	client, err := remote.NewAPIClient(remote.ESOSkyCalc)
 	if err != nil {
 		return Almanac{}, fmt.Errorf("airglow: almanac client: %w", err)
 	}

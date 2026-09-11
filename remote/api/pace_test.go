@@ -7,7 +7,6 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/remote/api"
 	"github.com/TuSKan/astrogo/time"
 )
@@ -36,13 +35,11 @@ func TestMinIntervalPacesAndSerialises(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	const id = remote.SIMBAD
-
-	redirect(t, id, srv.URL+"/")
+	base := srv.URL + "/"
 
 	const gap = 120 * time.Millisecond
 
-	client := newClient(t, id, api.WithMinInterval(gap))
+	client := newClient(t, api.WithMinInterval(gap))
 
 	// Four requests fired at once: the pacing has to hold them apart even
 	// though nothing else does.
@@ -50,7 +47,7 @@ func TestMinIntervalPacesAndSerialises(t *testing.T) {
 
 	for range 4 {
 		wg.Go(func() {
-			r, err := client.Get(context.Background(), id, "", nil)
+			r, err := client.Get(context.Background(), base, "", nil)
 			if err != nil {
 				t.Errorf("Get: %v", err)
 
@@ -84,16 +81,14 @@ func TestWithoutMinIntervalThereIsNoDelay(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	const id = remote.SIMBAD
+	base := srv.URL + "/"
 
-	redirect(t, id, srv.URL+"/")
-
-	client := newClient(t, id)
+	client := newClient(t)
 
 	start := time.Now()
 
 	for range 5 {
-		r, err := client.Get(context.Background(), id, "", nil)
+		r, err := client.Get(context.Background(), base, "", nil)
 		if err != nil {
 			t.Fatalf("Get: %v", err)
 		}
@@ -114,14 +109,12 @@ func TestPacingRespectsContext(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	const id = remote.SIMBAD
+	base := srv.URL + "/"
 
-	redirect(t, id, srv.URL+"/")
-
-	client := newClient(t, id, api.WithMinInterval(10*time.Second))
+	client := newClient(t, api.WithMinInterval(10*time.Second))
 
 	// The first request sets the clock; the second must wait ten seconds.
-	r, err := client.Get(context.Background(), id, "", nil)
+	r, err := client.Get(context.Background(), base, "", nil)
 	if err != nil {
 		t.Fatalf("first Get: %v", err)
 	}
@@ -131,7 +124,7 @@ func TestPacingRespectsContext(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 	defer cancel()
 
-	if _, err := client.Get(ctx, id, "", nil); err == nil {
+	if _, err := client.Get(ctx, base, "", nil); err == nil {
 		t.Error("a cancelled wait must not proceed to the request")
 	}
 }

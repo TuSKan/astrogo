@@ -13,7 +13,6 @@ import (
 	"github.com/TuSKan/astrogo/constants"
 	"github.com/TuSKan/astrogo/magnitude"
 	"github.com/TuSKan/astrogo/remote"
-	"github.com/TuSKan/astrogo/remote/api"
 	"github.com/TuSKan/astrogo/time"
 )
 
@@ -578,10 +577,10 @@ func (g GaiaBuild) chunkIsCached(values []float64, first, last int64) bool {
 }
 
 // aggregationClient builds the TAP client this package's queries go through.
-func aggregationClient(id remote.EndpointID) (*api.Client, error) {
-	opts := []api.Option{
-		api.WithTimeout(aggregationTimeout),
-		api.WithMinInterval(aggregationPace),
+func aggregationClient(id remote.EndpointID) (*remote.APIClient, error) {
+	opts := []remote.APIOption{
+		remote.WithTimeout(aggregationTimeout),
+		remote.WithMinInterval(aggregationPace),
 	}
 
 	// An identified caller gets a far larger budget than an anonymous one —
@@ -592,10 +591,10 @@ func aggregationClient(id remote.EndpointID) (*api.Client, error) {
 	// query string so it stays out of logs and out of the service's own
 	// request records.
 	if token := remote.Token(id); token != "" {
-		opts = append(opts, api.WithAuthToken("Token", token))
+		opts = append(opts, remote.WithAuthToken("Token", token))
 	}
 
-	client, err := api.NewClient(id, opts...)
+	client, err := remote.NewAPIClient(id, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("starlight: gaia client: %w", err)
 	}
@@ -617,7 +616,7 @@ func aggregationClient(id remote.EndpointID) (*api.Client, error) {
 // wrong; a caller that wants to see the stumbles can wrap the client.
 func (g GaiaBuild) fetchChunkWithRetry(
 	ctx context.Context,
-	client *api.Client,
+	client *remote.APIClient,
 	first, last int64,
 	bands map[string][]float64,
 	counts []int64,
@@ -662,7 +661,7 @@ func (g GaiaBuild) fetchChunkWithRetry(
 // fetchChunk runs one chunk's query and accumulates it.
 func (g GaiaBuild) fetchChunk(
 	ctx context.Context,
-	client *api.Client,
+	client *remote.APIClient,
 	first, last int64,
 	bands map[string][]float64,
 	counts []int64,
@@ -687,7 +686,7 @@ func (g GaiaBuild) fetchChunk(
 // failure needs to know which part of the sky it was about.
 func (g GaiaBuild) runQuery(
 	ctx context.Context,
-	client *api.Client,
+	client *remote.APIClient,
 	adql string,
 	bands map[string][]float64,
 	counts []int64,

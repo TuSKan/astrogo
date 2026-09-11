@@ -8,19 +8,18 @@ import (
 
 	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/remote"
-	"github.com/TuSKan/astrogo/remote/api"
 )
 
 // Provider implements the resolve.Provider and resolve.ObjectResolver
 // interfaces interacting with SIMBAD's Table Access Protocol endpoint.
 type Provider struct {
-	client *api.Client
+	client *remote.APIClient
 	cache  resolve.Cache
 }
 
 // New creates a new SIMBAD ObjectResolver.
 func New() *Provider {
-	client, err := api.NewClient(remote.SIMBAD)
+	client, err := remote.NewAPIClient(remote.SIMBAD)
 	if err != nil {
 		panic(err) // unregistered endpoint would be a programmer error
 	}

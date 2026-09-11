@@ -13,7 +13,6 @@ import (
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/remote"
-	"github.com/TuSKan/astrogo/remote/api"
 	"github.com/TuSKan/astrogo/time"
 )
 
@@ -125,9 +124,9 @@ func FetchBrightStars(ctx context.Context, faintestV float64, radius angle.Angle
 // transformation, which is what makes these stars immune to the transformation
 // error this package carried for so long.
 func fetchHipparcos(ctx context.Context, faintestV float64) ([]BrightStar, []float64, []float64, error) {
-	client, err := api.NewClient(remote.VizieR,
-		api.WithTimeout(3*time.Minute),
-		api.WithMinInterval(aggregationPace))
+	client, err := remote.NewAPIClient(remote.VizieR,
+		remote.WithTimeout(3*time.Minute),
+		remote.WithMinInterval(aggregationPace))
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("starlight: vizier client: %w", err)
 	}
@@ -451,9 +450,9 @@ func AddCousinsR(ctx context.Context, stars []BrightStar) (matched int, err erro
 		return 0, nil
 	}
 
-	client, err := api.NewClient(remote.VizieR,
-		api.WithTimeout(aggregationTimeout),
-		api.WithMinInterval(aggregationPace))
+	client, err := remote.NewAPIClient(remote.VizieR,
+		remote.WithTimeout(aggregationTimeout),
+		remote.WithMinInterval(aggregationPace))
 	if err != nil {
 		return 0, fmt.Errorf("starlight: vizier client: %w", err)
 	}

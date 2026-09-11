@@ -24,7 +24,7 @@ var wallClockAllowed = map[string]string{
 		"manifest, which is the provenance record",
 	"internal/changelog/assemble_test.go":                   "release dating",
 	"remote/api/pace_test.go":                               "rate limiting; elapsed time is the subject",
-	"remote/lock_test.go":                                   "lock acquisition timing is the subject",
+	"remote/file/lock_test.go":                              "lock acquisition timing is the subject",
 	"skybrightness/dataset/airglow/almanac_network_test.go": "queries a live service for the current sky",
 	"skybrightness/dataset/starlight/gaia_network_test.go":  "measures elapsed time to show the cache works",
 	"skybrightness/gambons_allsky_test.go":                  "measures elapsed time for its own report",

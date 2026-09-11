@@ -14,7 +14,6 @@ import (
 	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/remote"
-	"github.com/TuSKan/astrogo/remote/api"
 	"github.com/TuSKan/astrogo/time"
 )
 
@@ -27,13 +26,13 @@ var ErrNotImplemented = errors.New("mast: not implemented")
 
 // Provider implements the resolve.Provider interface for the MAST catalog.
 type Provider struct {
-	client *api.Client
+	client *remote.APIClient
 	cache  resolve.Cache
 }
 
 // New creates a new MAST provider.
 func New() *Provider {
-	client, err := api.NewClient(remote.MAST)
+	client, err := remote.NewAPIClient(remote.MAST)
 	if err != nil {
 		panic(err) // unregistered endpoint would be a programmer error
 	}

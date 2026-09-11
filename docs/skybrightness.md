@@ -87,7 +87,7 @@ module does not grow a private copy of atmospheric physics or photometry.
 | Spectral quantity types, the shared wavelength axis | `unit` | `SpectralRadiance`, `WavelengthNM`, `SpectralGrid` and friends. Must sit below both `magnitude` and `skybrightness`. |
 | Physical constants | `constants` | `PhotonEnergyJ`, `ToPhoton`/`ToEnergy`, `ArcsecondSquaredToSteradian`, `SI2019`. |
 | Geometry, Sun/Moon, time scales | `coord`, `ephemeris`, `time` | No astronomy is re-implemented here. |
-| Dataset acquisition | `remote`, `remote/file` | Consent-gated bucket/key layer. |
+| Dataset acquisition | `remote` | Consent-gated bucket/key layer. |
 
 **`skybrightness` therefore owns only radiance transport**: `Scene`, `Component`, `Model`,
 `Query`, `Estimate`, uncertainty, quality, provenance, and all-sky operations. Files, not
@@ -1196,7 +1196,7 @@ cross-sections, molecular spectra, lunar coefficients, VIIRS rasters, DEM data, 
 fields, RT lookup tables.
 
 The numeric API is decoupled from storage and assumes nothing about a local POSIX
-filesystem — `remote/file` addresses everything as a bucket plus key.
+filesystem — `remote` addresses everything as a bucket plus key.
 
 **No hidden network dependency.** `Model.Estimate` is deterministic for a given scene and
 dataset version and performs no acquisition. This is enforced behaviourally:

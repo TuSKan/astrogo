@@ -11,7 +11,6 @@ import (
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/remote"
-	"github.com/TuSKan/astrogo/remote/api"
 	"github.com/TuSKan/astrogo/time"
 )
 
@@ -20,13 +19,13 @@ var ErrAPIError = errors.New("sbdb: API error")
 
 // Provider implements resolve.Provider and resolve.ObjectResolver for SBDB.
 type Provider struct {
-	client *api.Client
+	client *remote.APIClient
 	cache  resolve.Cache
 }
 
 // New creates a new SBDB catalog provider.
 func New() *Provider {
-	client, err := api.NewClient(remote.JPLSBDB)
+	client, err := remote.NewAPIClient(remote.JPLSBDB)
 	if err != nil {
 		panic(err) // unregistered endpoint would be a programmer error
 	}

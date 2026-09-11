@@ -2,16 +2,11 @@ package remote
 
 import (
 	"context"
-	"os"
-	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
 
 	"github.com/TuSKan/astrogo/remote/file"
-
-	"github.com/TuSKan/astrogo/internal/testutil"
-	"github.com/TuSKan/astrogo/time"
 )
 
 // TestGetFileConcurrentSameDestNoCorruption is a regression test for a real
@@ -24,12 +19,12 @@ import (
 // kernel of a DIFFERENT size on every run.
 //
 // This test only exercises the intra-process (goroutine) half of the fix —
-// acquireLock's own doc comment explains why the mechanism has to be
+// AcquireLock's own doc comment explains why the mechanism has to be
 // cross-process safe, not just intra-process, and that half is inherently
 // untestable from a single `go test` binary.
 //
 // Each goroutine retries GetFile a bounded number of times on a transient
-// Windows contention error, matching acquireLock's own doc comment: on
+// Windows contention error, matching AcquireLock's own doc comment: on
 // Windows, os.Rename's MOVEFILE_REPLACE_EXISTING semantics mean fileblob's
 // Stat-then-Rename IfNotExist can, in a narrow window, let a losing
 // goroutine's own rename either silently overwrite the winner's lock
@@ -119,7 +114,7 @@ func TestGetFileConcurrentSameDestNoCorruption(t *testing.T) {
 
 	// A request-count assertion ("the lock serialized every caller onto
 	// the SAME download") lived here under the old httptest-based fake —
-	// no longer expressible without wrapping the Bucket, since a local
+	// no longer expressible without wrapping the file.Bucket, since a local
 	// fake source has no request counter to inspect (see fakeSource's own
 	// doc comment for why httptest isn't reachable here at all anymore).
 	// The property that actually matters — no corruption under
@@ -130,87 +125,4 @@ func TestGetFileConcurrentSameDestNoCorruption(t *testing.T) {
 	// identically regardless of what backs the source.
 }
 
-// openLocalBucket opens t.TempDir() as a *file.Bucket, for acquireLock
-// tests that need a real local Bucket.
-func openLocalBucket(t *testing.T) (bucket *file.Bucket, dir string) {
-	t.Helper()
-
-	dir = t.TempDir()
-
-	url := testutil.FileURL(t, dir)
-
-	bucket, err := file.Open(context.Background(), url)
-	if err != nil {
-		t.Fatalf("Open: %v", err)
-	}
-
-	return bucket, dir
-}
-
-// TestAcquireLockSerializesAndReleases verifies acquireLock's own contract
-// directly: a second acquire for the same cacheKey blocks until the first
-// releases, and succeeds immediately afterward.
-func TestAcquireLockSerializesAndReleases(t *testing.T) {
-	bucket, _ := openLocalBucket(t)
-
-	const cacheKey = "lockfile-test.bin"
-
-	release1, err := acquireLock(context.Background(), bucket, cacheKey)
-	if err != nil {
-		t.Fatalf("first acquireLock: %v", err)
-	}
-
-	acquired := make(chan struct{})
-
-	go func() {
-		release2, err := acquireLock(context.Background(), bucket, cacheKey)
-		if err != nil {
-			t.Errorf("second acquireLock: %v", err)
-
-			return
-		}
-
-		release2()
-
-		close(acquired)
-	}()
-
-	select {
-	case <-acquired:
-		t.Fatal("second acquireLock returned before the first was released")
-	default:
-	}
-
-	release1()
-
-	<-acquired // must complete now that the lock is free
-}
-
-// TestAcquireLockStealsAbandonedLock verifies a lock file older than
-// staleLockAge is treated as abandoned rather than honored forever — the
-// safety net for a holder that crashed mid-download.
-func TestAcquireLockStealsAbandonedLock(t *testing.T) {
-	bucket, dir := openLocalBucket(t)
-
-	const cacheKey = "stale-lock-test.bin"
-
-	if err := bucket.WriteAll(context.Background(), cacheKey+".lock", []byte("locked"), nil); err != nil {
-		t.Fatalf("seed lock file: %v", err)
-	}
-
-	// Back-date it past staleLockAge instead of waiting 30 real minutes.
-	// fileblob has no metadata setter for mtime through the Bucket API, so
-	// this drops to the raw OS path exactly as acquireLock's own
-	// Attributes(ctx, lockKey).ModTime check does under the hood.
-	stale := time.Now().Add(-(staleLockAge + time.Minute))
-	if err := os.Chtimes(filepath.Join(dir, cacheKey+".lock"), stale, stale); err != nil {
-		t.Fatalf("backdate lock file: %v", err)
-	}
-
-	release, err := acquireLock(context.Background(), bucket, cacheKey)
-	if err != nil {
-		t.Fatalf("acquireLock over a stale lock: %v", err)
-	}
-
-	release()
-}
+// openLocalBucket opens t.TempDir() as a *file.Bucket, for AcquireLock

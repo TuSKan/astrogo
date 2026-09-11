@@ -12,7 +12,7 @@ import (
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/remote"
-	_ "github.com/TuSKan/astrogo/remote/s3"
+	_ "github.com/TuSKan/astrogo/remote/file/s3"
 	"github.com/TuSKan/astrogo/time"
 )
 

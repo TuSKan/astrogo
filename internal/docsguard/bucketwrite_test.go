@@ -19,15 +19,15 @@ var bucketWrite = regexp.MustCompile(`\.(WriteAll|NewWriter)\(`)
 
 // bucketWriteAllowed are the files that may write to a bucket directly.
 //
-// remote/file/file.go is the funnel — Save takes the staging lock. remote's
-// lock and resume path writes with WriterOptions that Save has no parameter
+// remote/file/file.go is the funnel — Save takes the staging lock. The lock and
+// resume path beside it writes with WriterOptions that Save has no parameter
 // for (IfNotExist for the lock object, source-ETag metadata for the staged
 // download), and needs no lock of its own: every one of those writes runs
-// holding acquireLock, which #245 made exclusive within the process as well as
+// holding AcquireLock, which #245 made exclusive within the process as well as
 // across them.
 var bucketWriteAllowed = map[string]bool{
-	filepath.Join("remote", "file", "file.go"): true,
-	filepath.Join("remote", "lock_resume.go"):  true,
+	filepath.Join("remote", "file", "file.go"):        true,
+	filepath.Join("remote", "file", "lock_resume.go"): true,
 }
 
 // TestBucketWritesGoThroughTheStagingLock keeps #241 from coming back by the

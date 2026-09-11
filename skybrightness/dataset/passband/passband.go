@@ -39,8 +39,6 @@ import (
 
 	"github.com/TuSKan/astrogo/magnitude"
 	"github.com/TuSKan/astrogo/remote"
-	"github.com/TuSKan/astrogo/remote/api"
-	"github.com/TuSKan/astrogo/remote/file"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -74,7 +72,7 @@ func Fetch(ctx context.Context, id string) (magnitude.Passband, error) {
 		}
 	}
 
-	client, err := api.NewClient(remote.SVOFilterProfile)
+	client, err := remote.NewAPIClient(remote.SVOFilterProfile)
 	if err != nil {
 		return magnitude.Passband{}, fmt.Errorf("%w: %w", ErrService, err)
 	}
@@ -98,14 +96,14 @@ func Fetch(ctx context.Context, id string) (magnitude.Passband, error) {
 
 	if cacheErr == nil {
 		// A cache write that fails costs a request next time and nothing else.
-		_ = file.Save(ctx, bucket, key, strings.NewReader(string(raw)))
+		_ = remote.Save(ctx, bucket, key, strings.NewReader(string(raw)))
 	}
 
 	return band, nil
 }
 
 // cacheLocation resolves where a filter's profile is kept.
-func cacheLocation(ctx context.Context, id string) (*file.Bucket, string, error) {
+func cacheLocation(ctx context.Context, id string) (*remote.Bucket, string, error) {
 	bucket, prefix, err := remote.CacheDir(ctx, remote.SVOFilterProfile)
 	if err != nil {
 		return nil, "", fmt.Errorf("%w: cache: %w", ErrService, err)

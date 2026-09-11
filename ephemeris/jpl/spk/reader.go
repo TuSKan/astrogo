@@ -13,10 +13,7 @@ import (
 	"sort"
 	"strings"
 
-	"gocloud.dev/gcerrors"
-
 	"github.com/TuSKan/astrogo/remote"
-	"github.com/TuSKan/astrogo/remote/file"
 	"github.com/TuSKan/astrogo/vector"
 )
 
@@ -84,7 +81,7 @@ func CacheDownload(ctx context.Context, kernel string) (*Reader, error) {
 		return nil, fmt.Errorf("jpl: SPK kernel %s: %w", kernel, err)
 	}
 
-	ra, err := file.NewReaderAt(ctx, bucket, key)
+	ra, err := remote.NewReaderAt(ctx, bucket, key)
 	if err != nil {
 		return nil, fmt.Errorf("jpl: open SPK %s: %w", key, err)
 	}
@@ -147,7 +144,7 @@ func checksumSidecarKey(key string) string { return key + ".sha256" }
 
 // removeChecksumSidecar deletes a kernel's checksum sidecar, ignoring a
 // missing one (nothing to clean up).
-func removeChecksumSidecar(ctx context.Context, bucket *file.Bucket, key string) error {
+func removeChecksumSidecar(ctx context.Context, bucket *remote.Bucket, key string) error {
 	sumKey := checksumSidecarKey(key)
 
 	if exists, err := bucket.Exists(ctx, sumKey); err != nil || !exists {
@@ -173,7 +170,7 @@ func removeChecksumSidecar(ctx context.Context, bucket *file.Bucket, key string)
 // current hash is trusted and recorded for future opens instead of failing.
 // Hashing reads through the already-open ra (a SectionReader over its
 // io.ReaderAt) instead of opening the kernel a second time.
-func verifyOrBootstrapChecksum(ctx context.Context, bucket *file.Bucket, key string, ra io.ReaderAt, size int64) error {
+func verifyOrBootstrapChecksum(ctx context.Context, bucket *remote.Bucket, key string, ra io.ReaderAt, size int64) error {
 	h := sha256.New()
 	if _, err := io.Copy(h, io.NewSectionReader(ra, 0, size)); err != nil {
 		return fmt.Errorf("jpl: checksum: read: %w", err)
@@ -184,8 +181,8 @@ func verifyOrBootstrapChecksum(ctx context.Context, bucket *file.Bucket, key str
 
 	existing, err := bucket.ReadAll(ctx, sumKey)
 	if err != nil {
-		if gcerrors.Code(err) == gcerrors.NotFound {
-			if err := file.Save(ctx, bucket, sumKey, strings.NewReader(sum)); err != nil {
+		if remote.IsNotFound(err) {
+			if err := remote.Save(ctx, bucket, sumKey, strings.NewReader(sum)); err != nil {
 				return fmt.Errorf("jpl: checksum: write sidecar: %w", err)
 			}
 
@@ -820,7 +817,7 @@ func EvalChebyshev(coeffs []float64, tau, radius float64, calcDeriv bool) (p, v 
 //
 // The handle is closed either way. extra runs only when the file is deleted —
 // it is for artefacts that describe the kernel and must not outlive it.
-func discardIfCorrupt(ctx context.Context, bucket *file.Bucket, key string,
+func discardIfCorrupt(ctx context.Context, bucket *remote.Bucket, key string,
 	closeFile func() error, cause error, extra ...func() error,
 ) error {
 	closeErr := closeFile()

@@ -13,7 +13,6 @@ import (
 
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/remote"
-	"github.com/TuSKan/astrogo/remote/file"
 )
 
 // The real hemispheres are 64 MB each and live behind a Dataverse download, so
@@ -130,7 +129,7 @@ func serveSFD(t *testing.T, north, south []byte) {
 		t.Fatalf("SetURL: %v", err)
 	}
 
-	bucket, err := file.Open(ctx, src)
+	bucket, err := remote.OpenBucket(ctx, src)
 	if err != nil {
 		t.Fatalf("open source bucket: %v", err)
 	}

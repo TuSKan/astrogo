@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/TuSKan/astrogo/remote"
-	"github.com/TuSKan/astrogo/remote/file"
 	"github.com/TuSKan/astrogo/time"
 
 	"github.com/TuSKan/astrogo/internal/testutil"
@@ -20,7 +19,7 @@ NGC0224;G;00:42:44.3;+41:16:09;31;Andromeda Galaxy;;3.4;4.4
 `
 )
 
-// fakeSources opens a fresh temp directory as a *file.Bucket, points
+// fakeSources opens a fresh temp directory as a *remote.Bucket, points
 // remote.OpenNGC's URL at it (SetURL), and writes both real OpenNGC
 // source files (NGC.csv/addendum.csv) into it — a local stand-in for an
 // HTTP source now that GetFile can't reach an http:// URL at all (no
@@ -28,7 +27,7 @@ NGC0224;G;00:42:44.3;+41:16:09;31;Andromeda Galaxy;;3.4;4.4
 // fetchSource/New's own consent/caching policy is fully generic over any
 // Bucket, so exercising it here tests the exact same code path an
 // HTTP-backed endpoint will take once that driver exists.
-func fakeSources(t *testing.T) *file.Bucket {
+func fakeSources(t *testing.T) *remote.Bucket {
 	t.Helper()
 
 	dir := t.TempDir()
@@ -39,7 +38,7 @@ func fakeSources(t *testing.T) *file.Bucket {
 		t.Fatal(err)
 	}
 
-	bucket, err := file.Open(context.Background(), url)
+	bucket, err := remote.OpenBucket(context.Background(), url)
 	if err != nil {
 		t.Fatalf("Open fake source: %v", err)
 	}

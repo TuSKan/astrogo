@@ -9,7 +9,6 @@ import (
 
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/remote"
-	"github.com/TuSKan/astrogo/remote/file"
 	"github.com/TuSKan/astrogo/skybrightness/dataset/airglow"
 )
 
@@ -56,7 +55,7 @@ func TestFetchServesACachedSkytableOffline(t *testing.T) {
 		[][]float64{lam, ael, arc, unity(len(lam))},
 	)
 
-	if err := file.Save(t.Context(), bucket, key, bytes.NewReader(seeded)); err != nil {
+	if err := remote.Save(t.Context(), bucket, key, bytes.NewReader(seeded)); err != nil {
 		t.Fatalf("seeding the cache: %v", err)
 	}
 
@@ -169,7 +168,7 @@ func TestScaleMultipliesAndIsNotInTheCacheKey(t *testing.T) {
 		[][]float64{lam, {1e3, 2e3, 3e3, 4e3}, {5e2, 5e2, 5e2, 5e2}, unity(len(lam))},
 	)
 
-	if err := file.Save(t.Context(), bucket, key, bytes.NewReader(seeded)); err != nil {
+	if err := remote.Save(t.Context(), bucket, key, bytes.NewReader(seeded)); err != nil {
 		t.Fatalf("seeding the cache: %v", err)
 	}
 

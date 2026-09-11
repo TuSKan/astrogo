@@ -11,32 +11,25 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/remote/api"
 	"github.com/TuSKan/astrogo/time"
 )
 
-// redirect points an endpoint at a test server for one test. Every method
-// resolves its URL through remote.URL(id), so the registry is the seam —
-// there is no transport to inject, by design.
-func redirect(t *testing.T, id remote.EndpointID, serverURL string) {
+// Every test here stands up an httptest server and hands its URL to the
+// method under test, because that is the whole of this package's contract: a
+// base URL in, a body out. There is no registry to stub and no transport to
+// inject — resolving which URL an endpoint has belongs to
+// github.com/TuSKan/astrogo/remote, and is tested there against the gate
+// itself rather than through a client that would only be carrying the answer.
+
+// newClient builds a client for one test, closed on cleanup.
+//
+// The zero timeout means [api.DefaultTimeout]; a test that cares passes
+// api.WithTimeout.
+func newClient(t *testing.T, opts ...api.Option) *api.Client {
 	t.Helper()
 
-	scope := remote.Capture(id)
-	t.Cleanup(scope.Restore)
-
-	if err := remote.SetURL(id, serverURL); err != nil {
-		t.Fatalf("SetURL: %v", err)
-	}
-}
-
-func newClient(t *testing.T, id remote.EndpointID, opts ...api.Option) *api.Client {
-	t.Helper()
-
-	c, err := api.NewClient(id, opts...)
-	if err != nil {
-		t.Fatalf("NewClient: %v", err)
-	}
+	c := api.NewClient(0, opts...)
 
 	t.Cleanup(func() { _ = c.Close() })
 
@@ -49,9 +42,9 @@ func TestGetReturnsBodyStream(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	redirect(t, remote.SIMBAD, srv.URL)
+	base := srv.URL
 
-	body, err := newClient(t, remote.SIMBAD).Get(context.Background(), remote.SIMBAD, "", url.Values{"q": {"M31"}})
+	body, err := newClient(t).Get(context.Background(), base, "", url.Values{"q": {"M31"}})
 	if err != nil {
 		t.Fatalf("Get: %v", err)
 	}
@@ -75,14 +68,14 @@ func TestGetJSONDecodes(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	redirect(t, remote.JPLSBDB, srv.URL)
+	base := srv.URL
 
 	var out struct {
 		Name string `json:"name"`
 		ID   int    `json:"id"`
 	}
 
-	if err := newClient(t, remote.JPLSBDB).GetJSON(context.Background(), remote.JPLSBDB, "", nil, &out); err != nil {
+	if err := newClient(t).GetJSON(context.Background(), base, "", nil, &out); err != nil {
 		t.Fatalf("GetJSON: %v", err)
 	}
 
@@ -107,11 +100,11 @@ func TestPostFormAndPostJSON(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	redirect(t, remote.VizieR, srv.URL)
+	base := srv.URL
 
-	client := newClient(t, remote.VizieR)
+	client := newClient(t)
 
-	form, err := client.PostForm(context.Background(), remote.VizieR, "", url.Values{"QUERY": {"SELECT 1"}})
+	form, err := client.PostForm(context.Background(), base, "", url.Values{"QUERY": {"SELECT 1"}})
 	if err != nil {
 		t.Fatalf("PostForm: %v", err)
 	}
@@ -126,7 +119,7 @@ func TestPostFormAndPostJSON(t *testing.T) {
 		t.Errorf("PostForm body = %q", gotBody)
 	}
 
-	jsonResp, err := client.PostJSON(context.Background(), remote.VizieR, "", map[string]string{"k": "v"})
+	jsonResp, err := client.PostJSON(context.Background(), base, "", map[string]string{"k": "v"})
 	if err != nil {
 		t.Fatalf("PostJSON: %v", err)
 	}
@@ -150,9 +143,9 @@ func TestNon2xxBecomesHTTPError(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	redirect(t, remote.SIMBAD, srv.URL)
+	base := srv.URL
 
-	_, err := newClient(t, remote.SIMBAD).Get(context.Background(), remote.SIMBAD, "", nil)
+	_, err := newClient(t).Get(context.Background(), base, "", nil)
 
 	var httpErr *api.HTTPError
 	if !errors.As(err, &httpErr) {
@@ -183,9 +176,9 @@ func TestRetriesServerErrorThenSucceeds(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	redirect(t, remote.SIMBAD, srv.URL)
+	base := srv.URL
 
-	body, err := newClient(t, remote.SIMBAD).Get(context.Background(), remote.SIMBAD, "", nil)
+	body, err := newClient(t).Get(context.Background(), base, "", nil)
 	if err != nil {
 		t.Fatalf("Get: %v", err)
 	}
@@ -209,9 +202,9 @@ func TestDoesNotRetryClientError(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	redirect(t, remote.SIMBAD, srv.URL)
+	base := srv.URL
 
-	if _, err := newClient(t, remote.SIMBAD).Get(context.Background(), remote.SIMBAD, "", nil); err == nil {
+	if _, err := newClient(t).Get(context.Background(), base, "", nil); err == nil {
 		t.Fatal("expected an error for a 400")
 	}
 
@@ -220,58 +213,23 @@ func TestDoesNotRetryClientError(t *testing.T) {
 	}
 }
 
-// Every method gates on the registry, so offline mode and Disable stop an
-// API call exactly as they stop a file fetch.
-func TestRegistryGateApplies(t *testing.T) {
-	client := newClient(t, remote.SIMBAD)
-
-	t.Run("disabled", func(t *testing.T) {
-		scope := remote.Capture(remote.SIMBAD)
-		t.Cleanup(scope.Restore)
-		remote.Disable(remote.SIMBAD)
-
-		_, err := client.Get(context.Background(), remote.SIMBAD, "", nil)
-		if !errors.Is(err, remote.ErrEndpointDisabled) {
-			t.Errorf("Get on a disabled endpoint = %v, want ErrEndpointDisabled", err)
-		}
-	})
-
-	t.Run("offline", func(t *testing.T) {
-		remote.SetOffline(true)
-		t.Cleanup(func() { remote.SetOffline(false) })
-
-		_, err := client.Get(context.Background(), remote.SIMBAD, "", nil)
-		if !errors.Is(err, remote.ErrOffline) {
-			t.Errorf("Get while offline = %v, want ErrOffline", err)
-		}
-	})
-}
-
-func TestNewClientUsesEndpointTimeout(t *testing.T) {
-	// FINK's registered timeout is 120s and SIMBAD's is 30s; a client must
-	// take the endpoint's own value rather than one hand-copied per caller.
+func TestWithTimeoutOverridesTheConstructorsTimeout(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		time.Sleep(50 * time.Millisecond)
 		fmt.Fprint(w, "late") //nolint:errcheck // this response is expected to be abandoned
 	}))
 	defer srv.Close()
 
-	redirect(t, remote.SIMBAD, srv.URL)
+	base := srv.URL
 
-	_, err := newClient(t, remote.SIMBAD, api.WithTimeout(time.Millisecond), api.WithRetries(0)).
-		Get(context.Background(), remote.SIMBAD, "", nil)
+	_, err := newClient(t, api.WithTimeout(time.Millisecond), api.WithRetries(0)).
+		Get(context.Background(), base, "", nil)
 	if err == nil {
 		t.Fatal("expected a timeout error with WithTimeout(1ms)")
 	}
 }
 
-func TestNewClientUnknownEndpoint(t *testing.T) {
-	if _, err := api.NewClient("nope.not.registered"); !errors.Is(err, remote.ErrUnknownEndpoint) {
-		t.Errorf("NewClient(unknown) = %v, want ErrUnknownEndpoint", err)
-	}
-}
-
-// An endpoint URL that already carries a query must keep it when a path is
+// A base URL that already carries a query must keep it when a path is
 // appended — string concatenation would splice the path in after the query
 // and silently address the wrong thing.
 func TestRequestURLPreservesExistingQuery(t *testing.T) {
@@ -285,9 +243,9 @@ func TestRequestURLPreservesExistingQuery(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	redirect(t, remote.SIMBAD, srv.URL+"/base?token=secret")
+	base := srv.URL + "/base?token=secret"
 
-	body, err := newClient(t, remote.SIMBAD).Get(context.Background(), remote.SIMBAD, "sync", nil)
+	body, err := newClient(t).Get(context.Background(), base, "sync", nil)
 	if err != nil {
 		t.Fatalf("Get: %v", err)
 	}
@@ -303,9 +261,9 @@ func TestRequestURLPreservesExistingQuery(t *testing.T) {
 	}
 }
 
-// serveJSON stands up a server that answers every request with body, and
-// points id at it.
-func serveJSON(t *testing.T, id remote.EndpointID, body string) {
+// serveJSON stands up a server answering every request with body, and returns
+// its base URL.
+func serveJSON(t *testing.T, body string) string {
 	t.Helper()
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -314,7 +272,8 @@ func serveJSON(t *testing.T, id remote.EndpointID, body string) {
 	}))
 
 	t.Cleanup(srv.Close)
-	redirect(t, id, srv.URL)
+
+	return srv.URL
 }
 
 // TestGetJSONRejectsDuplicateNames is the correctness this decoder moved to
@@ -325,14 +284,14 @@ func serveJSON(t *testing.T, id remote.EndpointID, body string) {
 // response that repeats a name is malformed; saying so is worth more than
 // guessing which occurrence was meant.
 func TestGetJSONRejectsDuplicateNames(t *testing.T) {
-	serveJSON(t, remote.JPLSBDB, `{"ra":10.5,"dec":41.2,"ra":359.9}`)
+	base := serveJSON(t, `{"ra":10.5,"dec":41.2,"ra":359.9}`)
 
 	var out struct {
 		RA  float64 `json:"ra"`
 		Dec float64 `json:"dec"`
 	}
 
-	err := newClient(t, remote.JPLSBDB).GetJSON(context.Background(), remote.JPLSBDB, "", nil, &out)
+	err := newClient(t).GetJSON(context.Background(), base, "", nil, &out)
 	if err == nil {
 		t.Fatalf("a response repeating \"ra\" decoded without complaint, to RA %v — "+
 			"under the old decoder the second occurrence silently won", out.RA)
@@ -353,14 +312,14 @@ func TestGetJSONRejectsDuplicateNames(t *testing.T) {
 // production once already — so exact matching would trade a silently wrong
 // value for a silently zero one, which is not an improvement.
 func TestGetJSONStillMatchesNamesCaseInsensitively(t *testing.T) {
-	serveJSON(t, remote.JPLSBDB, `{"RA":10.5,"Dec":41.2}`)
+	base := serveJSON(t, `{"RA":10.5,"Dec":41.2}`)
 
 	var out struct {
 		RA  float64 `json:"ra"`
 		Dec float64 `json:"dec"`
 	}
 
-	if err := newClient(t, remote.JPLSBDB).GetJSON(context.Background(), remote.JPLSBDB, "", nil, &out); err != nil {
+	if err := newClient(t).GetJSON(context.Background(), base, "", nil, &out); err != nil {
 		t.Fatalf("GetJSON: %v", err)
 	}
 
@@ -377,14 +336,14 @@ func TestGetJSONStillMatchesNamesCaseInsensitively(t *testing.T) {
 // whole position because an object's name is mis-encoded is the wrong trade.
 func TestGetJSONToleratesInvalidUTF8InAName(t *testing.T) {
 	// 0xFF is not valid UTF-8 in any position.
-	serveJSON(t, remote.JPLSBDB, "{\"name\":\"Ceres\xff\",\"ra\":10.5}")
+	base := serveJSON(t, "{\"name\":\"Ceres\xff\",\"ra\":10.5}")
 
 	var out struct {
 		Name string  `json:"name"`
 		RA   float64 `json:"ra"`
 	}
 
-	if err := newClient(t, remote.JPLSBDB).GetJSON(context.Background(), remote.JPLSBDB, "", nil, &out); err != nil {
+	if err := newClient(t).GetJSON(context.Background(), base, "", nil, &out); err != nil {
 		t.Fatalf("GetJSON: %v — a bad byte in a name must not cost the caller its position", err)
 	}
 

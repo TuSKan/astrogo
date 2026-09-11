@@ -12,7 +12,7 @@
 // # Access
 //
 // Files are fetched via remote.GetFile against remote.CopernicusEODATA,
-// using remote/s3 as the transport (see that package's doc comment for
+// using remote/file/s3 as the transport (see that package's doc comment for
 // the credential contract — this package never reads a credential file
 // or an S3 key itself, and knows nothing about S3 at all). Open reads
 // bucket/key through bucket.NewReader rather than assuming a particular

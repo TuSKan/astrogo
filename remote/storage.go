@@ -98,7 +98,7 @@ func defaultDataDirURL() string {
 
 // DataDir opens DataDirURL as a Bucket rooted at astrogo's base data
 // location.
-func DataDir(ctx context.Context) (*file.Bucket, error) {
+func DataDir(ctx context.Context) (*Bucket, error) {
 	b, err := file.Open(ctx, DataDirURL())
 	if err != nil {
 		return nil, fmt.Errorf("remote: open data dir: %w", err)
@@ -125,7 +125,7 @@ func DataDir(ctx context.Context) (*file.Bucket, error) {
 // "cache directory was available" branch that could never be taken, so the
 // aggregation restarted from nothing every time. Nothing reported it, because
 // a cache that cannot be reached is indistinguishable from a cold one.
-func CacheDir(ctx context.Context, id EndpointID) (bucket *file.Bucket, prefix string, err error) {
+func CacheDir(ctx context.Context, id EndpointID) (bucket *Bucket, prefix string, err error) {
 	ep, ok := Lookup(id)
 	if !ok {
 		return nil, "", fmt.Errorf("%w: %q", ErrUnknownEndpoint, id)

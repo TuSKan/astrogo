@@ -8,7 +8,6 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/remote/api"
 )
 
@@ -74,11 +73,11 @@ func TestDefaultRetryPolicyDecides(t *testing.T) {
 func TestClientRetriesAccordingToTheDefaultPolicy(t *testing.T) {
 	// Not parallel: redirects a process-wide endpoint URL.
 	srv, hits := countingServer(t, http.StatusServiceUnavailable, 2)
-	redirect(t, remote.SIMBAD, srv.URL)
+	base := srv.URL
 
-	c := newClient(t, remote.SIMBAD, api.WithRetries(3))
+	c := newClient(t, api.WithRetries(3))
 
-	r, err := c.Get(context.Background(), remote.SIMBAD, "", nil)
+	r, err := c.Get(context.Background(), base, "", nil)
 	if err != nil {
 		t.Fatalf("Get: %v", err)
 	}
@@ -95,11 +94,11 @@ func TestClientRetriesAccordingToTheDefaultPolicy(t *testing.T) {
 // that matters more: retrying a 404 wastes a service's time and the caller's.
 func TestClientDoesNotRetryAStatusThePolicyRejects(t *testing.T) {
 	srv, hits := countingServer(t, http.StatusNotFound, 10)
-	redirect(t, remote.SIMBAD, srv.URL)
+	base := srv.URL
 
-	c := newClient(t, remote.SIMBAD, api.WithRetries(3))
+	c := newClient(t, api.WithRetries(3))
 
-	if _, err := c.Get(context.Background(), remote.SIMBAD, "", nil); err == nil {
+	if _, err := c.Get(context.Background(), base, "", nil); err == nil {
 		t.Fatal("Get accepted a 404")
 	}
 
@@ -117,16 +116,16 @@ func TestClientDoesNotRetryAStatusThePolicyRejects(t *testing.T) {
 func TestWithRetryPolicyReplacesTheDefault(t *testing.T) {
 	t.Run("retries what the default would not", func(t *testing.T) {
 		srv, hits := countingServer(t, http.StatusConflict, 1)
-		redirect(t, remote.SIMBAD, srv.URL)
+		base := srv.URL
 
-		c := newClient(t, remote.SIMBAD,
+		c := newClient(t,
 			api.WithRetries(3),
 			api.WithRetryPolicy(func(a api.Attempt) bool {
 				return a.StatusCode == http.StatusConflict
 			}),
 		)
 
-		r, err := c.Get(context.Background(), remote.SIMBAD, "", nil)
+		r, err := c.Get(context.Background(), base, "", nil)
 		if err != nil {
 			t.Fatalf("Get: %v", err)
 		}
@@ -140,14 +139,14 @@ func TestWithRetryPolicyReplacesTheDefault(t *testing.T) {
 
 	t.Run("refuses what the default would retry", func(t *testing.T) {
 		srv, hits := countingServer(t, http.StatusServiceUnavailable, 10)
-		redirect(t, remote.SIMBAD, srv.URL)
+		base := srv.URL
 
-		c := newClient(t, remote.SIMBAD,
+		c := newClient(t,
 			api.WithRetries(3),
 			api.WithRetryPolicy(func(api.Attempt) bool { return false }),
 		)
 
-		if _, err := c.Get(context.Background(), remote.SIMBAD, "", nil); err == nil {
+		if _, err := c.Get(context.Background(), base, "", nil); err == nil {
 			t.Fatal("Get accepted a 503")
 		}
 
@@ -161,11 +160,11 @@ func TestWithRetryPolicyReplacesTheDefault(t *testing.T) {
 // is written around, and the one that is read off resty rather than computed.
 func TestRetryPolicySeesTheAttemptNumber(t *testing.T) {
 	srv, hits := countingServer(t, http.StatusServiceUnavailable, 10)
-	redirect(t, remote.SIMBAD, srv.URL)
+	base := srv.URL
 
 	var seen []int
 
-	c := newClient(t, remote.SIMBAD,
+	c := newClient(t,
 		api.WithRetries(5),
 		api.WithRetryPolicy(func(a api.Attempt) bool {
 			seen = append(seen, a.Number)
@@ -175,7 +174,7 @@ func TestRetryPolicySeesTheAttemptNumber(t *testing.T) {
 		}),
 	)
 
-	if _, err := c.Get(context.Background(), remote.SIMBAD, "", nil); err == nil {
+	if _, err := c.Get(context.Background(), base, "", nil); err == nil {
 		t.Fatal("Get accepted a 503")
 	}
 
@@ -206,16 +205,16 @@ func TestRetryPolicySeesTheAttemptNumber(t *testing.T) {
 func TestExhaustedRetriesReportErrRetriable(t *testing.T) {
 	t.Run("a retried failure is marked", func(t *testing.T) {
 		srv, _ := countingServer(t, http.StatusServiceUnavailable, 10)
-		redirect(t, remote.SIMBAD, srv.URL)
+		base := srv.URL
 
-		c := newClient(t, remote.SIMBAD, api.WithRetries(1))
+		c := newClient(t, api.WithRetries(1))
 
-		_, err := c.Get(context.Background(), remote.SIMBAD, "", nil)
+		_, err := c.Get(context.Background(), base, "", nil)
 		if err == nil {
 			t.Fatal("Get accepted a 503")
 		}
 
-		if !errors.Is(err, remote.ErrRetriable) {
+		if !errors.Is(err, api.ErrRetriable) {
 			t.Errorf("err = %v, want it to wrap ErrRetriable.\n"+
 				"  Without it a caller cannot tell an exhausted retry from a request that "+
 				"was simply wrong, and will not know to try again later.", err)
@@ -239,16 +238,16 @@ func TestExhaustedRetriesReportErrRetriable(t *testing.T) {
 
 	t.Run("a hard failure is not marked", func(t *testing.T) {
 		srv, _ := countingServer(t, http.StatusNotFound, 10)
-		redirect(t, remote.SIMBAD, srv.URL)
+		base := srv.URL
 
-		c := newClient(t, remote.SIMBAD, api.WithRetries(3))
+		c := newClient(t, api.WithRetries(3))
 
-		_, err := c.Get(context.Background(), remote.SIMBAD, "", nil)
+		_, err := c.Get(context.Background(), base, "", nil)
 		if err == nil {
 			t.Fatal("Get accepted a 404")
 		}
 
-		if errors.Is(err, remote.ErrRetriable) {
+		if errors.Is(err, api.ErrRetriable) {
 			t.Errorf("a 404 was reported as retriable: %v.\n"+
 				"  A signal that fires for every failure distinguishes nothing.", err)
 		}
@@ -261,20 +260,20 @@ func TestExhaustedRetriesReportErrRetriable(t *testing.T) {
 
 	t.Run("a custom policy decides what counts", func(t *testing.T) {
 		srv, _ := countingServer(t, http.StatusNotFound, 10)
-		redirect(t, remote.SIMBAD, srv.URL)
+		base := srv.URL
 
 		// This service means "ask again" by 404. Absurd, and real services do
 		// stranger; the point is that the mark follows the policy rather than
 		// a second hard-coded list that could disagree with it.
-		c := newClient(t, remote.SIMBAD,
+		c := newClient(t,
 			api.WithRetries(0),
 			api.WithRetryPolicy(func(a api.Attempt) bool {
 				return a.StatusCode == http.StatusNotFound
 			}),
 		)
 
-		_, err := c.Get(context.Background(), remote.SIMBAD, "", nil)
-		if !errors.Is(err, remote.ErrRetriable) {
+		_, err := c.Get(context.Background(), base, "", nil)
+		if !errors.Is(err, api.ErrRetriable) {
 			t.Errorf("err = %v, want ErrRetriable — the installed policy calls a 404 retriable, "+
 				"and the mark must follow the policy rather than a fixed list", err)
 		}
@@ -289,11 +288,11 @@ func TestExhaustedRetriesReportErrRetriable(t *testing.T) {
 // looks like a hard failure. Disabling retries has its own spelling.
 func TestWithRetryPolicyIgnoresNil(t *testing.T) {
 	srv, hits := countingServer(t, http.StatusServiceUnavailable, 2)
-	redirect(t, remote.SIMBAD, srv.URL)
+	base := srv.URL
 
-	c := newClient(t, remote.SIMBAD, api.WithRetries(3), api.WithRetryPolicy(nil))
+	c := newClient(t, api.WithRetries(3), api.WithRetryPolicy(nil))
 
-	r, err := c.Get(context.Background(), remote.SIMBAD, "", nil)
+	r, err := c.Get(context.Background(), base, "", nil)
 	if err != nil {
 		t.Fatalf("Get: %v", err)
 	}

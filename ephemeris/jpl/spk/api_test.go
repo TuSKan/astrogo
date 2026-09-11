@@ -12,8 +12,6 @@ import (
 
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/remote"
-	"github.com/TuSKan/astrogo/remote/api"
-	"github.com/TuSKan/astrogo/remote/file"
 	"github.com/TuSKan/astrogo/time"
 )
 
@@ -84,7 +82,7 @@ func TestMapHorizonsStatus(t *testing.T) {
 	}
 
 	for _, tt := range cases {
-		httpErr := &api.HTTPError{StatusCode: tt.status}
+		httpErr := &remote.HTTPError{StatusCode: tt.status}
 		if got := mapHorizonsStatus(httpErr); !errors.Is(got, tt.want) {
 			t.Errorf("mapHorizonsStatus(%d) = %v, want %v", tt.status, got, tt.want)
 		}
@@ -103,7 +101,7 @@ func TestMapHorizonsStatus(t *testing.T) {
 		http.StatusInternalServerError,
 		http.StatusServiceUnavailable,
 	} {
-		mapped := mapHorizonsStatus(&api.HTTPError{StatusCode: status})
+		mapped := mapHorizonsStatus(&remote.HTTPError{StatusCode: status})
 
 		var carrier interface{ HTTPStatus() int }
 		if !errors.As(mapped, &carrier) {
@@ -118,7 +116,7 @@ func TestMapHorizonsStatus(t *testing.T) {
 		}
 	}
 
-	unexpected := mapHorizonsStatus(&api.HTTPError{StatusCode: http.StatusTeapot})
+	unexpected := mapHorizonsStatus(&remote.HTTPError{StatusCode: http.StatusTeapot})
 	if unexpected == nil {
 		t.Error("mapHorizonsStatus(teapot) = nil, want ErrHorizonsUnexpected-wrapped error")
 	}
@@ -381,10 +379,10 @@ func TestCommandCandidates(t *testing.T) {
 }
 
 // tempBucket is a throwaway local bucket standing in for remote's cache.
-func tempBucket(t *testing.T) *file.Bucket {
+func tempBucket(t *testing.T) *remote.Bucket {
 	t.Helper()
 
-	b, err := file.Open(context.Background(), testutil.FileURL(t, t.TempDir()))
+	b, err := remote.OpenBucket(context.Background(), testutil.FileURL(t, t.TempDir()))
 	if err != nil {
 		t.Fatalf("open bucket: %v", err)
 	}

@@ -452,12 +452,12 @@ happens.
 | Planetary constants kernel (gm_de440.tpc) | `remote.NAIFPCK` | ~12 KB | validating `constants.DE440` against NAIF |
 | Small-body SPK (Horizons-generated) | `remote.JPLHorizonsSPK` | KB–few MB | `eph.NewProvider(eph.SmallBody, "433", ...)` |
 | Planetary satellite SPK (Io, Titan, Triton, ...) | `remote.NAIFSPK` | ~64 MB (Mars) – ~1.1 GB (Jupiter), ~2.4 GB for all 6 kernels | `eph.NewProvider(eph.Moons, "sat441")`, or `plan.VisibleTonight(..., plan.WithPlanetaryMoons())` |
-| IERS Earth-orientation data | `remote.IERSFinals2000A` | ~3.7 MB | automatic on first `Time.EOP()`/`.UTC()`/`.UT1()` query needing it |
+| IERS Earth-orientation data | `remote.IERSFinals2000A` | ~3.7 MB | blank-import `remote/eop`, then automatic on the first `Time.EOP()`/`.UTC()`/`.UT1()` query needing it |
 | OpenNGC catalog CSVs | `remote.OpenNGC` | ~2 MB combined | `catalog.NewResolver(catalog.OpenNGC, ...)` |
 | MPC observatory-code list | `remote.MPCObsCodes` | ~150 KB | `plan.NewMPCSite(ctx, "568")` / `plan.MPCObservatories(ctx)` |
 | MPC orbital elements (MPCORB format) | `remote.MPCORB` | 0.5 MB (`PHA.txt`) – 317 MB (`MPCORB.DAT`, 94 MB gzipped) | `mpcorb.Open(ctx, "NEA.txt")` — streamed, so a caller filtering 500 objects never holds the other million and a half |
 | VIIRS annual nighttime-lights composite (2012-2025, no API key) | `remote.VIIRSAnnual` | ~700 MB-1 GB per year | `viirs.Open(ctx, year)`, for the spatial distribution of artificial emission — CC0, credit lightpollutionmap.info + NASA Black Marble |
-| CAMS global reanalysis NetCDF files (Copernicus EODATA S3) | `remote.CopernicusEODATA` | 1.3 MB (lnsp) – ~180 MB (a 137-level aerosol tracer) | `atmosphere/dataset/cams.Open` — requires Copernicus Data Space S3 credentials (AWS SDK default chain) and a blank import of `remote/s3` |
+| CAMS global reanalysis NetCDF files (Copernicus EODATA S3) | `remote.CopernicusEODATA` | 1.3 MB (lnsp) – ~180 MB (a 137-level aerosol tracer) | `atmosphere/dataset/cams.Open` — requires Copernicus Data Space S3 credentials (AWS SDK default chain) and a blank import of `remote/file/s3` |
 
 ### What you give up by staying offline
 
@@ -577,7 +577,7 @@ local disk:
 
 ```go
 remote.SetDataDir("file:///data/astrogo-cache?create_dir=true")
-remote.SetDataDir("s3://my-cache-bucket") // needs: import _ "github.com/TuSKan/astrogo/remote/s3"
+remote.SetDataDir("s3://my-cache-bucket") // needs: import _ "github.com/TuSKan/astrogo/remote/file/s3"
 ```
 
 The `ASTROGO_CACHE_DIR` environment variable sets the same thing, and also takes a URL.
@@ -601,7 +601,8 @@ p, err := eph.NewProvider(ctx, eph.Planets, "de442") // finds the pre-seeded ker
 Every downloader checks the cache before the network, so a pre-seeded deployment never
 dials out even without `SetOffline` — `remote` is the only thing that resolves or opens
 these files, there is no separate local-only constructor to bypass it with. IERS EOP data
-follows the same rule: put `finals2000A.data` at key `iers/finals2000A.data` and the first
+follows the same rule: blank-import `remote/eop`, put `finals2000A.data` at key
+`iers/finals2000A.data`, and the first
 `Time.EOP()`/`.UTC()`/`.UT1()` call finds it automatically — no explicit loader call
 needed.
 
@@ -631,17 +632,27 @@ revocation `remote.Reset()` causes when consent was granted at a wider scope.
 ### Building from source
 
 No package in astrogo embeds data at build time. IERS EOP data is obtained exclusively
-at runtime, automatically and lazily the first time it's needed: a pre-seeded
+at runtime, lazily the first time it's needed: a pre-seeded
 finals2000A file on disk, then (consent-gated via `remote.EnableDownloads`) a network
 fetch — there is no `iers/data/` directory or `go:embed` to populate before building.
 
-That fetch is supplied by `remote`, not reached for by `time`: importing
-`astrogo/remote` registers the loader, which any program calling
-`remote.EnableDownloads` already does. A program that imports `astrogo/time`
-without `astrogo/remote` links no storage backend at all — measured, a binary
-computing a Julian date is **2.5 MB rather than 19.4 MB** — and degrades to
-zero EOP exactly as an unconsented one does. To read a pre-seeded file without
-that dependency, register `time.FileEOPLoader("/path/to/finals2000A.data")`.
+That fetch is supplied by `remote/eop`, not reached for by `time`, and it is one
+blank import:
+
+```go
+import _ "github.com/TuSKan/astrogo/remote/eop"
+```
+
+It is a package of its own rather than part of `remote` for a plain reason: the
+loader needs `remote.GetFile`, so it has to sit one import *below* `remote`,
+which cannot then import it back. Naming it is what turns EOP on.
+
+A program that imports `astrogo/time` without it links no storage backend at
+all — measured, a binary computing a Julian date is **2.5 MB rather than
+19.4 MB** — and degrades to zero EOP with a one-time warning, which costs about
+an arcsecond of topocentric position. To read a pre-seeded file without any
+`remote` dependency at all, register
+`time.FileEOPLoader("/path/to/finals2000A.data")` instead.
 
 `ephemeris` works the same way, and it buys more than a Julian date. The
 kernel-backed sources (`Planets`, `SmallBody`, `Asteroids`, `Comets`, `Moons`)
@@ -742,7 +753,7 @@ Sub-arcsecond topocentric accuracy and sub-second UT1 timing require IERS EOP da
 | Topocentric alt/az | <0.01″ | ~1″ |
 | Rise/set timing | ≤0.6 min vs USNO | ≤0.7 min vs USNO |
 
-The library logs a one-time warning when EOP data is unavailable (users who redirect or suppress logs won't see it — call `time.Coverage()` to check proactively). IERS data loads automatically and lazily the first time it's needed — a pre-seeded snapshot on disk, then a consent-gated network fetch — see [Data downloads & offline usage](#data-downloads--offline-usage).
+The library logs a one-time warning when EOP data is unavailable (users who redirect or suppress logs won't see it — call `time.Coverage()` to check proactively). Blank-import `remote/eop` to turn EOP on; it then loads lazily the first time it's needed — a pre-seeded snapshot on disk, then a consent-gated network fetch — see [Data downloads & offline usage](#data-downloads--offline-usage).
 
 ### TDB Precision
 
