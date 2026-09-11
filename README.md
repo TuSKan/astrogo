@@ -411,7 +411,7 @@ be able to break an API until 1.0 says otherwise.
 | `constants` | Typed, versioned constant sets (SI 2019, CODATA, IAU 2015, WGS 84, derived) |
 | `angle` | Angular types, HMS/DMS parsing |
 | `vector` | 3D geometry primitives |
-| `time` | Astronomical time scales (JD-based, UTC/TAI/TT/TDB/UT1), Earth Orientation Parameters (DUT1, polar motion), epoch arithmetic (MJD, GAST, Julian epoch year, day-of-year) |
+| `time` | Astronomical time scales (JD-based: UTC/TAI/TT/TDB/UT1, the GNSS system times GPST/BDT, and the coordinate times TCG/TCB), Earth Orientation Parameters (DUT1, polar motion), epoch arithmetic (MJD, GAST, Julian epoch year, day-of-year) |
 | `atmosphere` | Refraction models, airmass, dispersion |
 | `coord` | Coordinate types, transforms, topocentric reduction |
 | `ephemeris` | Solar system ephemerides (SOFA + JPL SPK) |

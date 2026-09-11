@@ -27,6 +27,13 @@ func allScales() []scaleName {
 		// holds outside the only test that converts everything to everything.
 		{"GPST", time.Time.GPST},
 		{"BDT", time.Time.BDT},
+		// The two coordinate times. Each is one rate scaling away from the
+		// scale it belongs to — TCG from TT, TCB from TDB — so a mistake in
+		// either direction shows up here as a round trip that does not close,
+		// and the scaling is large enough that it would: L_B alone is half a
+		// second per year.
+		{"TCG", time.Time.TCG},
+		{"TCB", time.Time.TCB},
 		{"UT1", func(t time.Time) time.Time {
 			// UT1 needs Earth-orientation data and reports when it cannot
 			// get it; the fallback is what every other caller in the module

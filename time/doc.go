@@ -6,7 +6,8 @@
 // In contrast, `atime` is designed for:
 //   - Precision across millennia: Uses a two-part Julian Date representation
 //     to maintain sub-millisecond precision over long time scales.
-//   - Multiple Time Scales: Supports UTC, TAI, TT, UT1, and TDB with a
+//   - Multiple Time Scales: Supports UTC, TAI, TT, UT1, TDB, the GNSS
+//     system times GPST and BDT, and the coordinate times TCG and TCB, with a
 //     complete bidirectional conversion graph.
 //   - Numerical correctness: Facilitates precise propagation of planet
 //     positions and telescope pointing.
@@ -48,7 +49,9 @@
 // The current implementation supports:
 //   - Construction from JD, Go time, and current UTC.
 //   - Basic arithmetic (AddDays/SubDays).
-//   - Full bidirectional scale conversion graph (UTC, TAI, TT, TDB, UT1).
+//   - Full bidirectional scale conversion graph (UTC, TAI, TT, TDB, UT1,
+//     GPST, BDT, TCG, TCB), every pair round-tripped by
+//     TestScaleRoundTripMatrix.
 //   - Scale-safe cross-scale comparison and arithmetic.
 //   - Dynamic UT1/UTC derivations via the IERS EOP data model.
 //
