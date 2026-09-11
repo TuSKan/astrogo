@@ -25,6 +25,23 @@ var (
 	// ErrEmptyHeader indicates a FITS file with an empty header.
 	ErrEmptyHeader = errors.New("fits verify: empty header")
 
+	// ErrCardTooLong indicates a header card that does not fit the 80-byte
+	// record: an over-long keyword, or a value and comment that together
+	// overflow. It is an error rather than a truncation because the 80-byte
+	// grid is the only thing separating one card from the next, so an
+	// overflowing card shifts every card after it.
+	ErrCardTooLong = errors.New("fits: header card exceeds 80 characters")
+
+	// ErrCardNotPrintable indicates a header card carrying a byte outside
+	// ASCII 32-126, which FITS does not permit in a header. A newline in a
+	// comment corrupts the record grid rather than one card.
+	ErrCardNotPrintable = errors.New("fits: header card contains a non-printable byte")
+
+	// ErrNotWritable indicates an HDU this package cannot encode: an HDU kind
+	// with no writer, a binary table asked to be the primary HDU, or an image
+	// whose declared axes disagree with the data it carries.
+	ErrNotWritable = errors.New("fits: HDU cannot be written")
+
 	// ErrInvalidWhence indicates an invalid whence argument to Seek.
 	ErrInvalidWhence = errors.New("mmapSeeker: invalid whence")
 	// ErrNegativeOffset indicates a negative offset in Seek.

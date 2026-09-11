@@ -36,6 +36,18 @@ type basicHDU struct {
 	PayloadSize int64
 }
 
-func (h *basicHDU) Header() *Header          { return h.header }
+// Header returns the HDU's header, creating an empty one on first use.
+//
+// The lazy creation is what makes a zero-valued HDU usable for writing. An
+// image built in memory — the whole point of having a writer — starts with no
+// header, and a caller reaching for one to set OBJECT or a WCS would otherwise
+// be handed nil and find out by panic.
+func (h *basicHDU) Header() *Header {
+	if h.header == nil {
+		h.header = NewHeader()
+	}
+
+	return h.header
+}
 func (h *basicHDU) Type() HDUType            { return h.hType }
 func (h *basicHDU) Load(_ io.ReaderAt) error { return nil } // Stub
