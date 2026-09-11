@@ -95,10 +95,7 @@ func Fetch(ctx context.Context, spec GaiaBuild, directions ...coord.ICRS) (*Map,
 		return assembleFetch(spec, values, counts, band)
 	}
 
-	client, err := aggregationClient(remote.GaiaTAP)
-	if err != nil {
-		return nil, err
-	}
+	client := aggregationClient(remote.GaiaTAP)
 
 	solidAngle := 4 * math.Pi / float64(npix)
 
@@ -171,7 +168,7 @@ func wantedPixels(grid coord.HEALPix, directions []coord.ICRS, have []float64) [
 // fetchPixels runs one query for a set of pixels and accumulates it.
 func (g GaiaBuild) fetchPixels(
 	ctx context.Context,
-	client *remote.APIClient,
+	client *remote.Client,
 	pixels []int64,
 	values []float64,
 	counts []int64,

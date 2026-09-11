@@ -21,7 +21,7 @@ import (
 // Provider implements resolve.Provider and resolve.ConeSearcher
 // explicitly pointing at Gaia DR3 to extract astrometric parameters.
 type Provider struct {
-	client   *remote.APIClient
+	client   *remote.Client
 	cache    resolve.Cache
 	endpoint remote.EndpointID
 }
@@ -53,10 +53,7 @@ func New(endpoint remote.EndpointID) (*Provider, error) {
 		endpoint = DefaultEndpoint
 	}
 
-	client, err := remote.NewAPIClient(endpoint)
-	if err != nil {
-		return nil, fmt.Errorf("gaia: %w", err)
-	}
+	client := remote.Default()
 
 	return &Provider{
 		client:   client,

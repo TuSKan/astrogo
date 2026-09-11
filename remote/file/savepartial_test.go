@@ -106,3 +106,47 @@ func TestSavePartialWithoutAnETagWritesNoMetadata(t *testing.T) {
 		t.Errorf("recorded a source ETag of %q for a write that had none", got)
 	}
 }
+
+// errReadFailed stands for a source that stops mid-stream.
+var errReadFailed = errors.New("the source stopped answering")
+
+// failingReader fails after handing over some bytes, the way a connection
+// dropped mid-transfer does.
+type failingReader struct{ n int }
+
+func (r *failingReader) Read(p []byte) (int, error) {
+	if r.n <= 0 {
+		return 0, errReadFailed
+	}
+
+	n := min(len(p), r.n)
+	r.n -= n
+
+	for i := range n {
+		p[i] = 'x'
+	}
+
+	return n, nil
+}
+
+// TestSavePartialReportsAFailedReadAndWritesNothing covers the case this
+// function exists to survive: the body it is given stops partway.
+//
+// The failure has to surface rather than be recorded as a shorter partial,
+// because a partial's length is exactly what ResumePoint later trusts to decide
+// where the next attempt continues from.
+func TestSavePartialReportsAFailedReadAndWritesNothing(t *testing.T) {
+	t.Parallel()
+
+	bucket := newBucket(t)
+
+	err := file.SavePartial(t.Context(), bucket, "k.part", &failingReader{n: 512}, `"etag"`)
+	if !errors.Is(err, errReadFailed) {
+		t.Fatalf("SavePartial = %v, want the reader's own error", err)
+	}
+
+	if exists, _ := bucket.Exists(t.Context(), "k.part"); exists {
+		t.Error("a partial was recorded for a body that failed to read; its length " +
+			"would later be trusted as a resume offset")
+	}
+}

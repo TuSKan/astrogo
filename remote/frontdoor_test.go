@@ -6,6 +6,8 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/TuSKan/astrogo/time"
 )
 
 // The APIClient tests below are the ones that used to live in remote/api, and
@@ -36,12 +38,7 @@ func TestAPIClientGatesEveryRequest(t *testing.T) {
 		t.Fatalf("SetURL: %v", err)
 	}
 
-	client, err := NewAPIClient(SIMBAD)
-	if err != nil {
-		t.Fatalf("NewAPIClient: %v", err)
-	}
-
-	t.Cleanup(func() { _ = client.Close() })
+	client := Default()
 
 	// Reachable first, so a later refusal is the gate rather than a broken
 	// fixture.
@@ -88,12 +85,7 @@ func TestAPIClientGatesEveryVerb(t *testing.T) {
 	scope := Capture(SIMBAD)
 	t.Cleanup(scope.Restore)
 
-	client, err := NewAPIClient(SIMBAD)
-	if err != nil {
-		t.Fatalf("NewAPIClient: %v", err)
-	}
-
-	t.Cleanup(func() { _ = client.Close() })
+	client := Default()
 
 	SetOffline(true)
 	t.Cleanup(func() { SetOffline(false) })
@@ -129,18 +121,23 @@ func TestAPIClientGatesEveryVerb(t *testing.T) {
 	}
 }
 
-// TestNewAPIClientRefusesAnUnregisteredEndpoint pins the one thing the
-// constructor still checks.
+// TestNewAPIClientTakesNoEndpointAndCannotFail states what construction is now
+// for, because the shape changed and the old one is the intuitive guess.
 //
-// It looks the endpoint up for its timeout, so an id that is not in the
-// registry has no timeout to take and is a caller mistake rather than a
-// transient refusal. Saying so at construction beats returning a client whose
-// every request fails.
-func TestNewAPIClientRefusesAnUnregisteredEndpoint(t *testing.T) {
+// A client is not built for an endpoint. It contacts nothing, validates
+// nothing, and every question about an endpoint — does it exist, may we reach
+// it, how long may it take — is answered at the request that names it. That is
+// what removed sixteen unreachable error branches from this module's call
+// sites: an id passed as a constant could never fail the lookup they were
+// checking.
+func TestNewAPIClientTakesNoEndpointAndCannotFail(t *testing.T) {
 	t.Parallel()
 
-	if _, err := NewAPIClient("nope.not.registered"); !errors.Is(err, ErrUnknownEndpoint) {
-		t.Errorf("NewAPIClient(unknown) = %v, want ErrUnknownEndpoint", err)
+	client := Default()
+
+	_, err := client.Get(t.Context(), EndpointID("nope.not.registered"), "", nil)
+	if !errors.Is(err, ErrUnknownEndpoint) {
+		t.Errorf("Get on an unregistered id = %v, want ErrUnknownEndpoint", err)
 	}
 }
 
@@ -158,12 +155,7 @@ func TestNewAPIClientSucceedsWhileOffline(t *testing.T) {
 	SetOffline(true)
 	t.Cleanup(func() { SetOffline(false) })
 
-	client, err := NewAPIClient(SIMBAD)
-	if err != nil {
-		t.Fatalf("NewAPIClient while offline = %v, want a client that fails on use instead", err)
-	}
-
-	t.Cleanup(func() { _ = client.Close() })
+	client := Default()
 
 	if _, err := client.Get(t.Context(), SIMBAD, "", nil); !errors.Is(err, ErrOffline) {
 		t.Errorf("Get = %v, want ErrOffline — the refusal belongs to the request", err)
@@ -179,12 +171,7 @@ func TestAPIClientReachesTheResolvedURL(t *testing.T) {
 	scope := Capture(JPLSBDB)
 	t.Cleanup(scope.Restore)
 
-	client, err := NewAPIClient(JPLSBDB)
-	if err != nil {
-		t.Fatalf("NewAPIClient: %v", err)
-	}
-
-	t.Cleanup(func() { _ = client.Close() })
+	client := Default()
 
 	var gotPath string
 
@@ -237,14 +224,9 @@ func TestAPIErrorsAreReachableFromThisPackage(t *testing.T) {
 		t.Fatalf("SetURL: %v", err)
 	}
 
-	client, err := NewAPIClient(SIMBAD)
-	if err != nil {
-		t.Fatalf("NewAPIClient: %v", err)
-	}
+	client := Default()
 
-	t.Cleanup(func() { _ = client.Close() })
-
-	_, err = client.Get(t.Context(), SIMBAD, "", nil)
+	_, err := client.Get(t.Context(), SIMBAD, "", nil)
 
 	var httpErr *HTTPError
 	if !errors.As(err, &httpErr) {
@@ -257,5 +239,114 @@ func TestAPIErrorsAreReachableFromThisPackage(t *testing.T) {
 
 	if !strings.Contains(httpErr.Body, "no such object") {
 		t.Errorf("Body = %q, want the service's own explanation", httpErr.Body)
+	}
+}
+
+// deadAddr is a closed port on the loopback interface: a request to it fails at
+// connect, immediately and without leaving the machine. The tests below need a
+// request to be *attempted* (that is what builds a transport) and must not
+// contact the real service to do it.
+const deadAddr = "http://127.0.0.1:1"
+
+// TestEachEndpointGetsItsOwnRegisteredTimeout is the defect the endpoint-less
+// constructor fixes.
+//
+// One client used against two endpoints used to carry a single transport whose
+// timeout came from whichever id was passed at construction. catalog/sbdb does
+// exactly that — one client for JPLSBDB and JPLSBDBQuery — so raising one of
+// those timeouts would have had no effect on the endpoint it was raised for.
+// The two are 30s apart from each other today, which is the only reason nothing
+// was visibly wrong.
+//
+// A timeout belongs to the service that has to answer within it, so a transport
+// is built per endpoint and takes that endpoint's registered value.
+func TestEachEndpointGetsItsOwnRegisteredTimeout(t *testing.T) {
+	t.Parallel()
+
+	// Two registered endpoints whose timeouts genuinely differ: FINK is 120s
+	// and SIMBAD is 30s.
+	fink, ok := Lookup(FINK)
+	if !ok {
+		t.Fatal("FINK is not registered")
+	}
+
+	simbad, ok := Lookup(SIMBAD)
+	if !ok {
+		t.Fatal("SIMBAD is not registered")
+	}
+
+	if fink.Timeout == simbad.Timeout {
+		t.Skip("FINK and SIMBAD now register the same timeout; this test needs two that differ")
+	}
+
+	// A clone, not Default: this inspects and then closes the client's
+	// transports, and Default's are shared with everything else in the
+	// process — including whatever else is running in parallel.
+	client := Default().Clone()
+
+	t.Cleanup(func() { _ = client.Close() })
+
+	// Reaching an endpoint is what builds its transport, and both point at a
+	// closed local port so the attempt fails at connect instead of reaching
+	// the real SIMBAD and FINK. An untagged test does no network.
+	for _, id := range []EndpointID{FINK, SIMBAD} {
+		if err := client.SetURL(id, deadAddr); err != nil {
+			t.Fatalf("SetURL(%s): %v", id, err)
+		}
+
+		if _, err := client.Get(t.Context(), id, "", nil); errors.Is(err, ErrOffline) ||
+			errors.Is(err, ErrEndpointDisabled) || errors.Is(err, ErrUnknownEndpoint) {
+			t.Fatalf("%s was refused at the gate (%v), so no transport was built for it", id, err)
+		}
+	}
+
+	client.mu.Lock()
+	defer client.mu.Unlock()
+
+	if len(client.transports) != 2 {
+		t.Fatalf("client holds %d transports after using two endpoints, want 2", len(client.transports))
+	}
+
+	if got := client.transports[FINK].Timeout(); got != fink.Timeout {
+		t.Errorf("FINK transport timeout = %v, want its registered %v", got, fink.Timeout)
+	}
+
+	if got := client.transports[SIMBAD].Timeout(); got != simbad.Timeout {
+		t.Errorf("SIMBAD transport timeout = %v, want its registered %v", got, simbad.Timeout)
+	}
+}
+
+// TestAnExplicitTimeoutOverridesEveryEndpoint keeps WithTimeout meaning what it
+// says once transports are per endpoint.
+//
+// A caller that names a timeout is overriding the registry on purpose — the
+// starlight aggregation client does this, because a whole-sky query needs far
+// longer than the endpoint's registered value — so it has to apply wherever the
+// client is used, not be replaced by each endpoint's own.
+func TestAnExplicitTimeoutOverridesEveryEndpoint(t *testing.T) {
+	t.Parallel()
+
+	const override = 7 * time.Second
+
+	client := Default().Clone()
+	client.SetAPIOptions(WithTimeout(override))
+
+	t.Cleanup(func() { _ = client.Close() })
+
+	for _, id := range []EndpointID{FINK, SIMBAD} {
+		if err := client.SetURL(id, deadAddr); err != nil {
+			t.Fatalf("SetURL(%s): %v", id, err)
+		}
+
+		_, _ = client.Get(t.Context(), id, "", nil)
+	}
+
+	client.mu.Lock()
+	defer client.mu.Unlock()
+
+	for id, inner := range client.transports {
+		if got := inner.Timeout(); got != override {
+			t.Errorf("%s transport timeout = %v, want the caller's %v", id, got, override)
+		}
 	}
 }

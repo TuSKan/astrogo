@@ -336,10 +336,7 @@ func NewSiteEarthAddress(ctx context.Context, name, address string, opts ...Site
 // geocodeAddress resolves address to decimal-degree latitude/longitude via
 // the Nominatim API (remote.Nominatim).
 func geocodeAddress(ctx context.Context, address string) (lat, lon float64, err error) {
-	client, err := remote.NewAPIClient(remote.Nominatim)
-	if err != nil {
-		return 0, 0, fmt.Errorf("plan: geocode client: %w", err)
-	}
+	client := remote.Default()
 
 	q := url.Values{}
 	q.Set("q", address)
@@ -371,10 +368,7 @@ func geocodeAddress(ctx context.Context, address string) (lat, lon float64, err 
 // lookupElevation resolves a latitude/longitude to a height above sea
 // level (meters) via the Open-Elevation API (remote.OpenElevation).
 func lookupElevation(ctx context.Context, lat, lon float64) (float64, error) {
-	client, err := remote.NewAPIClient(remote.OpenElevation)
-	if err != nil {
-		return 0, fmt.Errorf("plan: elevation client: %w", err)
-	}
+	client := remote.Default()
 
 	q := url.Values{}
 	q.Set("locations", fmt.Sprintf("%.6f,%.6f", lat, lon))

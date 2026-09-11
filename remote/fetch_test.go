@@ -433,3 +433,43 @@ func TestGetFileReturnsUsableBucketForAllReadModes(t *testing.T) {
 		t.Errorf("NewRangeReader content = %q, want %q", buf, payload)
 	}
 }
+
+// TestUnreachableSourceStillReportsConsentFirst pins a deliberate ordering that
+// reads like a bug until you know why.
+//
+// When the source cannot even be opened, a caller who never granted consent is
+// told about consent rather than about the source. That is not hiding the real
+// error: consent is the blocker they can actually act on, it is what the
+// documented contract promises, and reporting the source failure instead would
+// make the message depend on whether the service happened to be up.
+//
+// A caller who did grant consent sees the real error, which is the other half
+// and the reason this is an ordering rather than a suppression.
+func TestUnreachableSourceStillReportsConsentFirst(t *testing.T) {
+	scope := Capture(NAIFSPK)
+	t.Cleanup(scope.Restore)
+
+	// A scheme no driver registers: opening the source fails before any
+	// request is made.
+	if err := SetURL(NAIFSPK, "no-such-scheme://example.invalid/kernels/"); err != nil {
+		t.Fatalf("SetURL: %v", err)
+	}
+
+	_, _, err := GetFile(context.Background(), NAIFSPK, "de440s.bsp")
+	if !errors.Is(err, ErrDownloadDenied) {
+		t.Errorf("GetFile without consent against an unopenable source = %v, want ErrDownloadDenied.\n"+
+			"  Consent is the actionable blocker, and which error a caller sees must not "+
+			"depend on whether the service was reachable.", err)
+	}
+
+	EnableDownloads(0, NAIFSPK)
+
+	_, _, err = GetFile(context.Background(), NAIFSPK, "de440s.bsp")
+	if errors.Is(err, ErrDownloadDenied) {
+		t.Errorf("GetFile with consent = %v, want the source's own error", err)
+	}
+
+	if err == nil {
+		t.Fatal("expected an error opening an unregistered scheme")
+	}
+}

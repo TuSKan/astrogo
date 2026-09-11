@@ -104,10 +104,7 @@ func AlmanacAt(ctx context.Context, when time.GoTime, obs Observatory) (Almanac,
 		Observatory: string(obs),
 	}
 
-	client, err := remote.NewAPIClient(remote.ESOSkyCalc)
-	if err != nil {
-		return Almanac{}, fmt.Errorf("airglow: almanac client: %w", err)
-	}
+	client := remote.Default()
 
 	defer func() { _ = client.Close() }()
 

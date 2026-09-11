@@ -389,3 +389,21 @@ func tempBucket(t *testing.T) *remote.Bucket {
 
 	return b
 }
+
+// TestOpenKernelReportsAMissingObject covers the failure a caller actually
+// hits: a cache key that is not there.
+//
+// It matters that this is an error and not a zero Reader, because the next
+// thing that happens to a Reader is a segment lookup, and a segment table read
+// from nothing is empty rather than wrong — which would surface much later as
+// "this body has no ephemeris" instead of "that kernel is missing".
+func TestOpenKernelReportsAMissingObject(t *testing.T) {
+	bucket, err := remote.OpenBucket(t.Context(), testutil.FileURL(t, t.TempDir()))
+	if err != nil {
+		t.Fatalf("OpenBucket: %v", err)
+	}
+
+	if _, err := openKernel(t.Context(), bucket, "planets/absent.bsp"); err == nil {
+		t.Fatal("opening a key that was never written succeeded")
+	}
+}

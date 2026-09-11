@@ -191,10 +191,7 @@ func TestAPIClientAnswersToTheClientThatBuiltIt(t *testing.T) {
 		t.Fatalf("SetURL: %v", err)
 	}
 
-	api, err := c.NewAPIClient(SIMBAD)
-	if err != nil {
-		t.Fatalf("NewAPIClient: %v", err)
-	}
+	api := c
 
 	t.Cleanup(func() { _ = api.Close() })
 

@@ -400,10 +400,7 @@ func BuildFromGaia(ctx context.Context, build GaiaBuild) (*Map, []int64, error) 
 
 	counts := make([]int64, npix)
 
-	client, err := aggregationClient(build.Endpoint)
-	if err != nil {
-		return nil, nil, err
-	}
+	client := aggregationClient(build.Endpoint)
 
 	// The build checkpoints into the same accumulating cache Fetch uses, so a
 	// run that dies partway keeps what it had. Before this, a throttle at
@@ -492,10 +489,7 @@ func RunChunk(ctx context.Context, build GaiaBuild, first, last int64) (*Map, []
 
 	counts := make([]int64, npix)
 
-	client, err := aggregationClient(build.Endpoint)
-	if err != nil {
-		return nil, nil, err
-	}
+	client := aggregationClient(build.Endpoint)
 
 	if err := build.fetchChunk(ctx, client, first, last, bands, counts, solidAngle); err != nil {
 		return nil, nil, err
@@ -577,7 +571,7 @@ func (g GaiaBuild) chunkIsCached(values []float64, first, last int64) bool {
 }
 
 // aggregationClient builds the TAP client this package's queries go through.
-func aggregationClient(id remote.EndpointID) (*remote.APIClient, error) {
+func aggregationClient(id remote.EndpointID) *remote.Client {
 	opts := []remote.APIOption{
 		remote.WithTimeout(aggregationTimeout),
 		remote.WithMinInterval(aggregationPace),
@@ -594,12 +588,10 @@ func aggregationClient(id remote.EndpointID) (*remote.APIClient, error) {
 		opts = append(opts, remote.WithAuthToken("Token", token))
 	}
 
-	client, err := remote.NewAPIClient(id, opts...)
-	if err != nil {
-		return nil, fmt.Errorf("starlight: gaia client: %w", err)
-	}
+	client := remote.Default().Clone()
+	client.SetAPIOptions(opts...)
 
-	return client, nil
+	return client
 }
 
 // fetchChunkWithRetry runs one chunk, re-attempting a transient failure.
@@ -616,7 +608,7 @@ func aggregationClient(id remote.EndpointID) (*remote.APIClient, error) {
 // wrong; a caller that wants to see the stumbles can wrap the client.
 func (g GaiaBuild) fetchChunkWithRetry(
 	ctx context.Context,
-	client *remote.APIClient,
+	client *remote.Client,
 	first, last int64,
 	bands map[string][]float64,
 	counts []int64,
@@ -661,7 +653,7 @@ func (g GaiaBuild) fetchChunkWithRetry(
 // fetchChunk runs one chunk's query and accumulates it.
 func (g GaiaBuild) fetchChunk(
 	ctx context.Context,
-	client *remote.APIClient,
+	client *remote.Client,
 	first, last int64,
 	bands map[string][]float64,
 	counts []int64,
@@ -686,7 +678,7 @@ func (g GaiaBuild) fetchChunk(
 // failure needs to know which part of the sky it was about.
 func (g GaiaBuild) runQuery(
 	ctx context.Context,
-	client *remote.APIClient,
+	client *remote.Client,
 	adql string,
 	bands map[string][]float64,
 	counts []int64,

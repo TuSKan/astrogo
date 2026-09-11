@@ -167,7 +167,7 @@ func Fetch(ctx context.Context, into *Map, directions ...Direction) (*Map, error
 	}
 
 	var (
-		client  *remote.APIClient
+		client  *remote.Client
 		fetched bool
 	)
 
@@ -200,12 +200,10 @@ func Fetch(ctx context.Context, into *Map, directions ...Direction) (*Map, error
 		// The client is built on the first sightline that actually needs
 		// asking, so a fully cached call makes no connection at all.
 		if client == nil {
-			c, err := remote.NewAPIClient(remote.IRSADust,
+			c := remote.Default().Clone()
+			c.SetAPIOptions(
 				remote.WithMinInterval(queryPace),
 				remote.WithTimeout(90*time.Second))
-			if err != nil {
-				return nil, fmt.Errorf("dust: client: %w", err)
-			}
 
 			client = c
 		}
@@ -311,7 +309,7 @@ var hundredMicron = regexp.MustCompile(
 	`(?s)100 Micron Emission.*?<refPixelValue>\s*([0-9.eE+-]+)\s*\(MJy/sr\)`)
 
 // query asks the service for one direction.
-func query(ctx context.Context, client *remote.APIClient, d Direction) (float64, error) {
+func query(ctx context.Context, client *remote.Client, d Direction) (float64, error) {
 	params := url.Values{}
 	params.Set("locstr", fmt.Sprintf("%.6f %.6f gal", d.L.Degrees(), d.B.Degrees()))
 	params.Set("regSize", "2.0")

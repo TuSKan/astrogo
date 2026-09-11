@@ -26,16 +26,13 @@ var ErrNotImplemented = errors.New("jpl: Horizons result parsing not implemented
 
 // Provider implements resolve.Provider for major bodies via JPL Horizons.
 type Provider struct {
-	client *remote.APIClient
+	client *remote.Client
 	cache  resolve.Cache
 }
 
 // New creates a new JPL Horizons catalog provider.
 func New() *Provider {
-	client, err := remote.NewAPIClient(remote.JPLHorizons)
-	if err != nil {
-		panic(err) // unregistered endpoint would be a programmer error
-	}
+	client := remote.Default()
 
 	return &Provider{
 		client: client,

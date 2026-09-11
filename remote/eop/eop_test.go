@@ -255,3 +255,23 @@ func TestInitRegistersTheLoader(t *testing.T) {
 		t.Errorf("EOPSource = %q, want %q", got, "cache")
 	}
 }
+
+// TestCachedDegradesWhenTheCacheCannotBeOpened covers the branch an air-gapped
+// deployment hits when its cache location is wrong.
+//
+// Every failure here answers ErrNoEOPData rather than the underlying error, on
+// purpose: Time.EOP has no error return, so a caller cannot be told anything
+// richer than "no data", and time's own one-time warning is the notice that
+// accuracy degraded. Returning a different error would only push a value that
+// nothing can read further up.
+func TestCachedDegradesWhenTheCacheCannotBeOpened(t *testing.T) {
+	scope := remote.Capture(remote.IERSFinals2000A)
+	t.Cleanup(scope.Restore)
+
+	// A scheme no driver registers, so opening the cache bucket fails.
+	remote.SetDataDir("no-such-scheme://example.invalid/cache")
+
+	if _, err := (eopLoader{}).Cached(t.Context()); !errors.Is(err, time.ErrNoEOPData) {
+		t.Errorf("Cached with an unopenable cache = %v, want ErrNoEOPData", err)
+	}
+}

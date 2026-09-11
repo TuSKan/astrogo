@@ -248,16 +248,13 @@ const (
 
 // Provider implements resolve.Provider for NORAD satellite catalog lookups.
 type Provider struct {
-	client *remote.APIClient
+	client *remote.Client
 	cache  resolve.Cache
 }
 
 // New returns a Provider configured with sensible defaults.
 func New() *Provider {
-	client, err := remote.NewAPIClient(remote.CelesTrak)
-	if err != nil {
-		panic(err) // unregistered endpoint would be a programmer error
-	}
+	client := remote.Default()
 
 	return &Provider{
 		client: client,

@@ -257,10 +257,7 @@ func apiHorizonsRequest(ctx context.Context, command string, startTime, endTime 
 	params.Set("START_TIME", "'"+startTime.Format("2006-01-02 15:04:05.000")+"'")
 	params.Set("STOP_TIME", "'"+endTime.Format("2006-01-02 15:04:05.000")+"'")
 
-	client, err := remote.NewAPIClient(remote.JPLHorizonsSPK)
-	if err != nil {
-		return nil, fmt.Errorf("jpl: horizons client: %w", err)
-	}
+	client := remote.Default()
 
 	var resp HorizonsResponse
 	if err := client.GetJSON(ctx, remote.JPLHorizonsSPK, "", params, &resp); err != nil {

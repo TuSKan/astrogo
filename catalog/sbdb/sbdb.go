@@ -19,16 +19,13 @@ var ErrAPIError = errors.New("sbdb: API error")
 
 // Provider implements resolve.Provider and resolve.ObjectResolver for SBDB.
 type Provider struct {
-	client *remote.APIClient
+	client *remote.Client
 	cache  resolve.Cache
 }
 
 // New creates a new SBDB catalog provider.
 func New() *Provider {
-	client, err := remote.NewAPIClient(remote.JPLSBDB)
-	if err != nil {
-		panic(err) // unregistered endpoint would be a programmer error
-	}
+	client := remote.Default()
 
 	return &Provider{
 		client: client,

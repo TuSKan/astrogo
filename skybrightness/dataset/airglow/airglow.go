@@ -409,10 +409,7 @@ func cached(ctx context.Context, bucket *remote.Bucket, key string) (*Spectrum, 
 // [Parse] is this package's own reader and re-running it on a cached file is
 // cheap, while re-running the request is three round trips to Garching.
 func fetchSkytable(ctx context.Context, req skycalcRequest) ([]byte, error) {
-	client, err := remote.NewAPIClient(remote.ESOSkyCalc)
-	if err != nil {
-		return nil, fmt.Errorf("airglow: client: %w", err)
-	}
+	client := remote.Default()
 
 	defer func() { _ = client.Close() }()
 
@@ -738,7 +735,7 @@ func (s Spec) describe() string {
 // Failure is ignored deliberately. The caller wanted a spectrum, and losing one
 // because the cleanup call was refused would be the wrong trade; the request
 // still went out, which is the part that matters to ESO.
-func releaseTmpDir(ctx context.Context, client *remote.APIClient, tmpdir string) {
+func releaseTmpDir(ctx context.Context, client *remote.Client, tmpdir string) {
 	body, err := client.Get(ctx, remote.ESOSkyCalc, "api/rmtmp", url.Values{"d": {tmpdir}})
 	if err != nil {
 		return

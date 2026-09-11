@@ -1,6 +1,7 @@
 package testutil
 
 import (
+	"errors"
 	"io/fs"
 	"path"
 	"strings"
@@ -38,8 +39,12 @@ func BucketKeys(tb testing.TB, bucket fs.FS, prefix string) []string {
 		if err != nil {
 			// A prefix nothing has been written under is an empty result,
 			// not a failure — that is the state most of these assertions
-			// start from.
-			if p == root {
+			// start from. Anything else is a store that could not answer,
+			// which must not read as an empty cache: these callers are
+			// checking what a cache contains, and a swallowed failure would
+			// make "the listing broke" indistinguishable from "nothing is
+			// there" — passing the assertion for the wrong reason.
+			if p == root && errors.Is(err, fs.ErrNotExist) {
 				return fs.SkipAll
 			}
 

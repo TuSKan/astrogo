@@ -26,16 +26,13 @@ var ErrNotImplemented = errors.New("mast: not implemented")
 
 // Provider implements the resolve.Provider interface for the MAST catalog.
 type Provider struct {
-	client *remote.APIClient
+	client *remote.Client
 	cache  resolve.Cache
 }
 
 // New creates a new MAST provider.
 func New() *Provider {
-	client, err := remote.NewAPIClient(remote.MAST)
-	if err != nil {
-		panic(err) // unregistered endpoint would be a programmer error
-	}
+	client := remote.Default()
 
 	return &Provider{
 		client: client,

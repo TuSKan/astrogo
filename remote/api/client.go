@@ -110,6 +110,10 @@ func WithMinInterval(d time.Duration) Option {
 type Client struct {
 	rc *resty.Client
 
+	// timeout is the per-request deadline this client was built with, kept so
+	// [Client.Timeout] can report it.
+	timeout time.Duration
+
 	// retryPolicy is consulted twice: by resty, to decide whether to retry,
 	// and by body, to decide whether a final failure is worth reporting as
 	// one that was retried. Holding it here keeps those two answers the same
@@ -162,10 +166,19 @@ func NewClient(timeout time.Duration, opts ...Option) *Client {
 
 	return &Client{
 		rc:          rc,
+		timeout:     cfg.timeout,
 		minInterval: cfg.minInterval,
 		retryPolicy: cfg.retryPolicy,
 	}
 }
+
+// Timeout reports the per-request timeout this client was built with.
+//
+// It exists so the parent package can assert that a transport was built for the
+// endpoint it is used against: one client per endpoint, each carrying that
+// endpoint's registered timeout, is the arrangement that replaced a single
+// transport whose timeout came from whichever endpoint was named first.
+func (c *Client) Timeout() time.Duration { return c.timeout }
 
 // Close releases the client's idle connections. A Client is usually held
 // for the life of a provider, so this is optional.

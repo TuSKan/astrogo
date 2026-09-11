@@ -355,3 +355,65 @@ func TestGetJSONToleratesInvalidUTF8InAName(t *testing.T) {
 		t.Errorf("Name = %q, want it to start with Ceres", out.Name)
 	}
 }
+
+// TestUnparseableBaseURLIsRefused covers the join's own failure.
+//
+// A base URL arrives here already resolved by remote, so a malformed one means
+// an override was set to something that is not a URL. Reporting it as such
+// beats letting net/url's zero value produce a request against a path relative
+// to nothing.
+func TestUnparseableBaseURLIsRefused(t *testing.T) {
+	t.Parallel()
+
+	_, err := newClient(t).Get(context.Background(), "://not-a-url", "sync", nil)
+	if err == nil {
+		t.Fatal("a malformed base URL was accepted")
+	}
+
+	if !strings.Contains(err.Error(), "unparseable base URL") {
+		t.Errorf("err = %v, want it to name the unparseable base URL", err)
+	}
+}
+
+// TestAuthTokenTravelsInAHeader covers the option and the reason for its shape.
+//
+// The scheme is a parameter because services disagree silently: Gaia@AIP
+// accepts "Token" and ignores "Bearer", and an unrecognised scheme is not
+// rejected — the request simply proceeds anonymously, so getting it wrong looks
+// like unexplained rate limiting rather than an auth failure.
+//
+// The token must also never reach the query string: URLs are logged by proxies
+// and by the service itself as a matter of course.
+func TestAuthTokenTravelsInAHeader(t *testing.T) {
+	t.Parallel()
+
+	var (
+		gotAuth string
+		gotURL  string
+	)
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotAuth = r.Header.Get("Authorization")
+		gotURL = r.URL.String()
+
+		_, _ = w.Write([]byte("ok"))
+	}))
+	defer srv.Close()
+
+	body, err := newClient(t, api.WithAuthToken("Token", "s3cret")).
+		Get(context.Background(), srv.URL, "", url.Values{"q": {"M31"}})
+	if err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+
+	_ = body.Close()
+
+	if gotAuth != "Token s3cret" {
+		t.Errorf("Authorization = %q, want the scheme and token as given", gotAuth)
+	}
+
+	if strings.Contains(gotURL, "s3cret") {
+		t.Errorf("the token appeared in the URL (%q); it must stay in the header, "+
+			"out of proxy and server logs", gotURL)
+	}
+}

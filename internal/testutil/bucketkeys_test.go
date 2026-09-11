@@ -1,6 +1,8 @@
 package testutil_test
 
 import (
+	"errors"
+	"io/fs"
 	"slices"
 	"testing"
 	"testing/fstest"
@@ -99,3 +101,59 @@ func TestBucketKeysOnAnEmptyBucketIsEmpty(t *testing.T) {
 		t.Errorf("BucketKeys on an empty bucket = %v, want none", got)
 	}
 }
+
+// TestBucketKeysReportsAWalkFailureRatherThanAnEmptyList is the case that makes
+// this helper safe to assert on.
+//
+// Its callers check what a cache contains, and "the listing broke" and "the
+// cache is empty" are the same value if a failure is swallowed — so a broken
+// walk would read as a passing emptiness check. It fails the test instead.
+func TestBucketKeysReportsAWalkFailureRatherThanAnEmptyList(t *testing.T) {
+	t.Parallel()
+
+	fake := &fatalTB{TB: t}
+
+	testutil.BucketKeys(fake, brokenFS{}, "jpl/")
+
+	if !fake.failed {
+		t.Error("a failing walk returned an empty list instead of failing the test")
+	}
+}
+
+// brokenFS is a filesystem whose root lists one entry and then refuses to say
+// anything more about it — the shape of a store that answers a listing and then
+// drops the connection.
+type brokenFS struct{}
+
+func (brokenFS) Open(string) (fs.File, error) { return nil, errUnreadable }
+
+func (brokenFS) ReadDir(name string) ([]fs.DirEntry, error) {
+	if name == "jpl" {
+		return []fs.DirEntry{brokenEntry{}}, nil
+	}
+
+	return nil, errUnreadable
+}
+
+// brokenEntry claims to be a directory, so the walk descends into it and hits
+// the ReadDir failure above.
+type brokenEntry struct{}
+
+func (brokenEntry) Name() string               { return "sub" }
+func (brokenEntry) IsDir() bool                { return true }
+func (brokenEntry) Type() fs.FileMode          { return fs.ModeDir }
+func (brokenEntry) Info() (fs.FileInfo, error) { return nil, errUnreadable }
+
+// errUnreadable stands for a store that cannot answer.
+var errUnreadable = errors.New("the store cannot be read")
+
+// fatalTB records a Fatalf instead of ending the test that is checking for it.
+type fatalTB struct {
+	testing.TB
+
+	failed bool
+}
+
+func (f *fatalTB) Helper() {}
+
+func (f *fatalTB) Fatalf(string, ...any) { f.failed = true }

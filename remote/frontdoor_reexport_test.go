@@ -150,20 +150,18 @@ func TestAPIOptionsReachTheRequest(t *testing.T) {
 		t.Fatalf("SetURL: %v", err)
 	}
 
-	client, err := NewAPIClient(SIMBAD,
+	client := Default()
+	client.SetAPIOptions(
 		WithUserAgent("astrogo-test/1.0"),
 		WithAuthToken("Token", "s3cret"),
 		WithRetries(2),
 		WithMinInterval(time.Millisecond),
 		WithTimeout(10*time.Second),
 	)
-	if err != nil {
-		t.Fatalf("NewAPIClient: %v", err)
-	}
 
 	t.Cleanup(func() { _ = client.Close() })
 
-	_, err = client.Get(t.Context(), SIMBAD, "", nil)
+	_, err := client.Get(t.Context(), SIMBAD, "", nil)
 	if err == nil {
 		t.Fatal("expected the 503 to surface as an error")
 	}
@@ -217,13 +215,11 @@ func TestWithRetryPolicyReachesTheClient(t *testing.T) {
 		t.Fatalf("SetURL: %v", err)
 	}
 
-	client, err := NewAPIClient(SIMBAD,
+	client := Default()
+	client.SetAPIOptions(
 		WithRetries(3),
 		WithRetryPolicy(func(Attempt) bool { return false }),
 	)
-	if err != nil {
-		t.Fatalf("NewAPIClient: %v", err)
-	}
 
 	t.Cleanup(func() { _ = client.Close() })
 
@@ -308,12 +304,7 @@ func TestPostVerbsReachTheServerThroughTheFrontDoor(t *testing.T) {
 		t.Fatalf("SetURL: %v", err)
 	}
 
-	client, err := NewAPIClient(VizieR)
-	if err != nil {
-		t.Fatalf("NewAPIClient: %v", err)
-	}
-
-	t.Cleanup(func() { _ = client.Close() })
+	client := Default()
 
 	form, err := client.PostForm(t.Context(), VizieR, "sync", url.Values{"QUERY": {"SELECT 1"}})
 	if err != nil {

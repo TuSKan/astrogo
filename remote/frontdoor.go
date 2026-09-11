@@ -2,6 +2,7 @@ package remote
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/url"
@@ -96,113 +97,145 @@ func WithCachedChunks(n int) ReaderAtOption { return file.WithCachedChunks(n) }
 // closed.
 var ErrReaderAtClosed = file.ErrReaderAtClosed
 
-// APIClient issues requests against a request/response service — SIMBAD,
-// VizieR, Gaia, MAST, CelesTrak, FINK, JPL's SBDB and Horizons.
+// The request/response half of this package's surface: SIMBAD, VizieR, Gaia,
+// MAST, CelesTrak, FINK, JPL's SBDB and Horizons.
 //
-// Every method resolves id through [URL] and then makes the request, so
-// offline mode, [Disable] and a URL override apply per call rather than per
-// client: a client built while an endpoint was reachable starts failing the
-// moment it is not, and starts working again when [SetURL] points it somewhere
-// that is. A non-2xx response arrives as an [HTTPError] instead of a body, so
-// a caller never parses an error page as data.
+// These are methods on [Client] rather than on a client of their own. There was
+// a separate APIClient, and keeping it meant every caller held two objects that
+// each answered half a question — one deciding whether a service may be
+// reached, the other reaching it — and named the endpoint to both. Now that a
+// policy is a value a component owns, the connections belong on it: a component
+// with its own rules for talking to a service already has somewhere to put
+// them.
 //
-// # Why four two-line methods and not an alias
-//
-// The client underneath takes a base URL per call and knows nothing about
-// endpoints — that is what broke the import cycle and let this package become
-// the only door. Aliasing it would hand callers the base-URL parameter and the
-// job of resolving it, which is the one job this package exists to do; every
-// call site would then be free to skip the gate, and [EndpointID] would stop
-// meaning anything.
-//
-// So the resolution below is the whole point of the wrapper, not overhead
-// around it.
-type APIClient struct {
-	c *api.Client
+// Every method resolves id through [Client.URL] first, so offline mode,
+// [Client.Disable] and a URL override apply per call rather than per client. A
+// non-2xx response arrives as an [HTTPError] instead of a body, so a caller
+// never parses an error page as data.
 
-	// owner is the policy each request resolves against. Held rather than
-	// looked up so a client built from a scoped [Client] keeps answering to
-	// that one, not to whatever [Default] has become since.
-	owner *Client
-}
-
-// NewAPIClient builds a client for endpoint id, taking its registered timeout.
+// transportFor applies the policy gate to id and returns the transport for it,
+// along with the base URL the request goes to.
 //
-// The lookup here is for that timeout and to reject an id that is not in the
-// registry at all. It is not the policy gate — that runs per request, so an
-// endpoint disabled or an offline mode set after construction takes effect on
-// the next call rather than the next client. A client may therefore be built
-// successfully while offline and fail on use, which is the intended order:
-// construction is not the moment a caller is asking to reach the network.
-func NewAPIClient(id EndpointID, opts ...APIOption) (*APIClient, error) {
-	return Default().NewAPIClient(id, opts...)
-}
-
-// NewAPIClient builds a client for endpoint id whose every request resolves
-// against this client's policy. See the package-level [NewAPIClient].
-func (c *Client) NewAPIClient(id EndpointID, opts ...APIOption) (*APIClient, error) {
-	ep, ok := c.Lookup(id)
-	if !ok {
-		return nil, fmt.Errorf("%w: %q", ErrUnknownEndpoint, id)
+// The gate runs first, so an endpoint this client may not reach never causes a
+// transport to be built for it.
+func (c *Client) transportFor(id EndpointID) (*api.Client, string, error) {
+	base, err := c.URL(id)
+	if err != nil {
+		return nil, "", err
 	}
 
-	return &APIClient{c: api.NewClient(ep.Timeout, opts...), owner: c}, nil
+	// URL succeeded, so the endpoint is registered; a zero Timeout means it
+	// registers none and api falls back to its own default.
+	ep, _ := c.Lookup(id)
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if inner, ok := c.transports[id]; ok {
+		return inner, base, nil
+	}
+
+	inner := api.NewClient(ep.Timeout, c.apiOpts...)
+	c.transports[id] = inner
+
+	return inner, base, nil
 }
 
 // Get issues a GET against endpoint id and returns the response body, which
 // the caller closes.
-func (c *APIClient) Get(ctx context.Context, id EndpointID, path string, query url.Values) (io.ReadCloser, error) {
-	base, err := c.owner.URL(id)
+func Get(ctx context.Context, id EndpointID, path string, query url.Values) (io.ReadCloser, error) {
+	return Default().Get(ctx, id, path, query)
+}
+
+// Get issues a GET against endpoint id and returns the response body, which
+// the caller closes.
+func (c *Client) Get(ctx context.Context, id EndpointID, path string, query url.Values) (io.ReadCloser, error) {
+	inner, base, err := c.transportFor(id)
 	if err != nil {
 		return nil, err
 	}
 
 	//nolint:wrapcheck // pure delegation to remote/api, internal to this package; its errors are already prefixed
-	return c.c.Get(ctx, base, path, query)
+	return inner.Get(ctx, base, path, query)
 }
 
 // GetJSON issues a GET against endpoint id and decodes the response into out.
-func (c *APIClient) GetJSON(ctx context.Context, id EndpointID, path string, query url.Values, out any) error {
-	base, err := c.owner.URL(id)
+func GetJSON(ctx context.Context, id EndpointID, path string, query url.Values, out any) error {
+	return Default().GetJSON(ctx, id, path, query, out)
+}
+
+// GetJSON issues a GET against endpoint id and decodes the response into out.
+func (c *Client) GetJSON(ctx context.Context, id EndpointID, path string, query url.Values, out any) error {
+	inner, base, err := c.transportFor(id)
 	if err != nil {
 		return err
 	}
 
 	//nolint:wrapcheck // pure delegation to remote/api, internal to this package; its errors are already prefixed
-	return c.c.GetJSON(ctx, base, path, query, out)
+	return inner.GetJSON(ctx, base, path, query, out)
 }
 
 // PostForm posts form to endpoint id and returns the response body, which the
 // caller closes.
-func (c *APIClient) PostForm(ctx context.Context, id EndpointID, path string, form url.Values) (io.ReadCloser, error) {
-	base, err := c.owner.URL(id)
+func PostForm(ctx context.Context, id EndpointID, path string, form url.Values) (io.ReadCloser, error) {
+	return Default().PostForm(ctx, id, path, form)
+}
+
+// PostForm posts form to endpoint id and returns the response body, which the
+// caller closes.
+func (c *Client) PostForm(ctx context.Context, id EndpointID, path string, form url.Values) (io.ReadCloser, error) {
+	inner, base, err := c.transportFor(id)
 	if err != nil {
 		return nil, err
 	}
 
 	//nolint:wrapcheck // pure delegation to remote/api, internal to this package; its errors are already prefixed
-	return c.c.PostForm(ctx, base, path, form)
+	return inner.PostForm(ctx, base, path, form)
 }
 
 // PostJSON posts payload as JSON to endpoint id and returns the response body,
 // which the caller closes.
-func (c *APIClient) PostJSON(ctx context.Context, id EndpointID, path string, payload any) (io.ReadCloser, error) {
-	base, err := c.owner.URL(id)
+func PostJSON(ctx context.Context, id EndpointID, path string, payload any) (io.ReadCloser, error) {
+	return Default().PostJSON(ctx, id, path, payload)
+}
+
+// PostJSON posts payload as JSON to endpoint id and returns the response body,
+// which the caller closes.
+func (c *Client) PostJSON(ctx context.Context, id EndpointID, path string, payload any) (io.ReadCloser, error) {
+	inner, base, err := c.transportFor(id)
 	if err != nil {
 		return nil, err
 	}
 
 	//nolint:wrapcheck // pure delegation to remote/api, internal to this package; its errors are already prefixed
-	return c.c.PostJSON(ctx, base, path, payload)
+	return inner.PostJSON(ctx, base, path, payload)
 }
 
-// Close releases the client's idle connections. A client is usually held for
-// the life of a provider, so this is optional.
+// Close releases the idle connections of every transport this client opened.
 //
-//nolint:wrapcheck // pure delegation to remote/api, internal to this package; its errors are already prefixed
-func (c *APIClient) Close() error { return c.c.Close() }
+// Optional, and usually wrong to call on [Default]: its connections are shared
+// by everything in the process that has not built a client of its own, and
+// they are reused rather than leaked. A component holding a [Client.Clone] owns
+// its connections and may close them when it is done.
+func (c *Client) Close() error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 
-// APIOption configures an [APIClient].
+	var errs []error
+
+	for id, inner := range c.transports {
+		if err := inner.Close(); err != nil {
+			errs = append(errs, fmt.Errorf("remote: close %s: %w", id, err))
+		}
+	}
+
+	clear(c.transports)
+
+	return errors.Join(errs...)
+}
+
+// APIOption configures the transports a [Client] builds; see
+// [Client.SetAPIOptions].
 type APIOption = api.Option
 
 // HTTPError is a non-2xx response, carrying its status and body.

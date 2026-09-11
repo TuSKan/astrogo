@@ -68,7 +68,7 @@ type ssoRecord struct {
 //   - Full-table parquet download for bulk indexing (lazy, cached in memory)
 type Provider struct {
 	loadErr  error
-	client   *remote.APIClient
+	client   *remote.Client
 	byNumber map[int64]*ssoRecord
 	byName   map[string]*ssoRecord
 	version  string
@@ -83,10 +83,7 @@ func New() *Provider {
 
 // NewWithVersion returns a Provider targeting a specific SSOFT release (e.g. "2025.04").
 func NewWithVersion(version string) *Provider {
-	client, err := remote.NewAPIClient(remote.FINK)
-	if err != nil {
-		panic(err) // unregistered endpoint would be a programmer error
-	}
+	client := remote.Default()
 
 	return &Provider{
 		client:  client,

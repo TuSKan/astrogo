@@ -13,16 +13,13 @@ import (
 // Provider implements the resolve.Provider and resolve.ObjectResolver
 // interfaces interacting with SIMBAD's Table Access Protocol endpoint.
 type Provider struct {
-	client *remote.APIClient
+	client *remote.Client
 	cache  resolve.Cache
 }
 
 // New creates a new SIMBAD ObjectResolver.
 func New() *Provider {
-	client, err := remote.NewAPIClient(remote.SIMBAD)
-	if err != nil {
-		panic(err) // unregistered endpoint would be a programmer error
-	}
+	client := remote.Default()
 
 	return &Provider{
 		client: client,

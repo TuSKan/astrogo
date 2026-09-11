@@ -30,16 +30,13 @@ var ErrUnknownTable = errors.New("vizier: unknown table")
 // Provider implements resolve.Provider and resolve.ConeSearcher
 // for querying tables hosted on VizieR via TAP ADQL.
 type Provider struct {
-	client *remote.APIClient
+	client *remote.Client
 	cache  resolve.Cache
 }
 
 // New creates a new VizieR catalog provider.
 func New() *Provider {
-	client, err := remote.NewAPIClient(remote.VizieR)
-	if err != nil {
-		panic(err) // unregistered endpoint would be a programmer error
-	}
+	client := remote.Default()
 
 	return &Provider{
 		client: client,

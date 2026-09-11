@@ -1,7 +1,10 @@
 package remote
 
 import (
+	"slices"
 	"sync"
+
+	"github.com/TuSKan/astrogo/remote/api"
 )
 
 // Client is one component's I/O policy: which endpoints it may reach, where
@@ -65,6 +68,21 @@ type Client struct {
 	// call and so must not be resolved once at construction.
 	dataDirURL string
 
+	// transports is one HTTP client per endpoint this client has issued a
+	// request to, each built with that endpoint's registered timeout and this
+	// client's apiOpts.
+	//
+	// Per endpoint because the two things a transport carries are properties
+	// of the service rather than of the caller: a timeout belongs to whoever
+	// has to answer within it, and pacing exists to be polite to a particular
+	// service. Built lazily, so a client that never calls an API opens
+	// nothing.
+	transports map[EndpointID]*api.Client
+
+	// apiOpts configure every transport this client builds. See
+	// [Client.SetAPIOptions].
+	apiOpts []APIOption
+
 	// offline cuts every endpoint access at the gate.
 	offline bool
 
@@ -81,7 +99,66 @@ type Client struct {
 // surprising of the two: the reason to build a second client is that the first
 // one's policy is not yours.
 func NewClient() *Client {
-	return &Client{endpoints: defaultEndpoints()}
+	return &Client{
+		endpoints:  defaultEndpoints(),
+		transports: make(map[EndpointID]*api.Client),
+	}
+}
+
+// Clone returns a client holding a copy of this one's policy and its own
+// connections.
+//
+// It is how a component takes the program's configuration without taking its
+// connections or imposing its own settings back on it: the copy starts offline
+// if this client is offline and with whatever consent it has been granted, and
+// then diverges. Changing either afterwards leaves the other alone.
+//
+// The alternative — [NewClient] — starts from the built-in defaults instead,
+// which for a component running inside a configured program means silently
+// ignoring that configuration, including its offline mode.
+func (c *Client) Clone() *Client {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	endpoints := make(map[EndpointID]Endpoint, len(c.endpoints))
+	for id, ep := range c.endpoints {
+		endpoints[id] = cloneEndpoint(ep)
+	}
+
+	return &Client{
+		endpoints:  endpoints,
+		transports: make(map[EndpointID]*api.Client),
+		apiOpts:    slices.Clone(c.apiOpts),
+		policy:     c.policy,
+		dataDirURL: c.dataDirURL,
+		offline:    c.offline,
+	}
+}
+
+// SetAPIOptions configures every transport this client builds from now on:
+// timeouts, retry policy, pacing, a bearer token.
+//
+// It replaces rather than appends, and it discards any transport already
+// built, so the next request opens a fresh one under the new settings. A
+// caller that set an option would otherwise have to guess which of its
+// requests had already established a connection.
+//
+// These are per client rather than per call because they describe a
+// relationship with a service — how long to wait for it, how hard to press it,
+// who we are to it — and a program that needs two such relationships builds
+// two clients. [Client.Clone] is how to get the second one without reinventing
+// the first one's policy.
+func (c *Client) SetAPIOptions(opts ...APIOption) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	for _, inner := range c.transports {
+		_ = inner.Close()
+	}
+
+	clear(c.transports)
+
+	c.apiOpts = slices.Clone(opts)
 }
 
 // defaultClient backs every package-level function in this package.

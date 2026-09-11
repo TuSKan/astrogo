@@ -72,10 +72,7 @@ func Fetch(ctx context.Context, id string) (magnitude.Passband, error) {
 		}
 	}
 
-	client, err := remote.NewAPIClient(remote.SVOFilterProfile)
-	if err != nil {
-		return magnitude.Passband{}, fmt.Errorf("%w: %w", ErrService, err)
-	}
+	client := remote.Default()
 
 	body, err := client.Get(ctx, remote.SVOFilterProfile, "", url.Values{"ID": {id}})
 	if err != nil {
