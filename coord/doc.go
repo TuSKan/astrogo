@@ -26,6 +26,17 @@
 // Pure frame rotations ([ICRSToGalactic], [ICRSToEcliptic]) are available as
 // standalone functions.
 //
+// # Catalogue frames
+//
+// [FK4] (B1950.0) and [FK5] (J2000.0) are the fundamental catalogues the IAU
+// used before the ICRS, and are what most archival positions are actually in:
+// [FK4ToFK5] is the classic B1950 → J2000 conversion, and [FK4ToICRS] carries
+// it the rest of the way. Neither is a rotation — FK4's E-terms of aberration
+// and both catalogues' non-inertial drift mean a star at rest in one is moving
+// in the next — so each has two constructors, one for a recorded proper motion
+// and one for a catalogue that recorded none. Confusing FK5 J2000 with ICRS
+// costs about 20 mas; confusing FK4 B1950 with either costs about 0.7°.
+//
 // The [Reducer] provides a lightweight topocentric reduction pipeline that
 // also handles chromatic atmospheric dispersion.
 //
