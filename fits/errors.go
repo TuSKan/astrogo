@@ -37,6 +37,11 @@ var (
 	// comment corrupts the record grid rather than one card.
 	ErrCardNotPrintable = errors.New("fits: header card contains a non-printable byte")
 
+	// ErrCardNotFinite indicates a header value of NaN or infinity. A FITS
+	// header has no representation for either, so writing one would produce a
+	// card claiming to hold a number that no reader can parse.
+	ErrCardNotFinite = errors.New("fits: header value is not finite")
+
 	// ErrNotWritable indicates an HDU this package cannot encode: an HDU kind
 	// with no writer, a binary table asked to be the primary HDU, or an image
 	// whose declared axes disagree with the data it carries.

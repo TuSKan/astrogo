@@ -31,7 +31,7 @@ func Write(w io.Writer, f *File) error {
 	}
 
 	for i, hdu := range f.HDUs {
-		if err := writeHDU(w, hdu, i == 0); err != nil {
+		if err := writeHDU(w, hdu, i == 0, len(f.HDUs) > 1); err != nil {
 			return fmt.Errorf("fits: write HDU %d: %w", i, err)
 		}
 	}
@@ -40,8 +40,8 @@ func Write(w io.Writer, f *File) error {
 }
 
 // writeHDU writes one header and its payload, each padded to a block boundary.
-func writeHDU(w io.Writer, hdu HDU, primary bool) error {
-	header, payload, err := encodeHDU(hdu, primary)
+func writeHDU(w io.Writer, hdu HDU, primary, extensions bool) error {
+	header, payload, err := encodeHDU(hdu, primary, extensions)
 	if err != nil {
 		return err
 	}
@@ -50,7 +50,7 @@ func writeHDU(w io.Writer, hdu HDU, primary bool) error {
 		return err
 	}
 
-	return writePayload(w, payload, hdu.Type())
+	return writePayload(w, payload)
 }
 
 // encodeHDU produces the header an HDU should carry and the bytes of its
@@ -65,10 +65,10 @@ func writeHDU(w io.Writer, hdu HDU, primary bool) error {
 //
 // Everything that is not structural — WCS, provenance, the caller's own
 // keywords — is carried over untouched.
-func encodeHDU(hdu HDU, primary bool) (*Header, []byte, error) {
+func encodeHDU(hdu HDU, primary, extensions bool) (*Header, []byte, error) {
 	switch h := hdu.(type) {
 	case *ImageHDU:
-		return encodeImage(h, primary)
+		return encodeImage(h, primary, extensions)
 	case *BintableHDU:
 		if primary {
 			return nil, nil, fmt.Errorf("%w: a binary table cannot be the primary HDU", ErrNotWritable)
@@ -117,13 +117,14 @@ func writeHeader(w io.Writer, h *Header) error {
 	return nil
 }
 
-// writePayload writes a data payload padded to a block boundary.
+// writePayload writes a data payload padded to a block boundary with zeros.
 //
-// The padding byte is not the same for every HDU kind: the standard fills an
-// ASCII table's last block with spaces and everything else with zeros. A zero
-// byte inside an ASCII table's padding is not blank text, and readers that
-// take the remainder of the block as a row have been seen to notice.
-func writePayload(w io.Writer, payload []byte, kind HDUType) error {
+// Zeros because the two kinds this package writes — images and binary tables —
+// are both padded that way. An ASCII table is not: the standard fills its last
+// block with spaces, since a zero byte there is not blank text and a reader
+// taking the remainder of the block as a row would see it. Whoever adds ASCII
+// table writing has to pass the fill byte in here.
+func writePayload(w io.Writer, payload []byte) error {
 	if len(payload) == 0 {
 		return nil
 	}
@@ -132,12 +133,7 @@ func writePayload(w io.Writer, payload []byte, kind HDUType) error {
 
 	buf.Write(payload)
 
-	fill := byte(0)
-	if kind == HDUTypeASCII {
-		fill = ' '
-	}
-
-	pad(&buf, fill)
+	pad(&buf, 0)
 
 	if _, err := w.Write(buf.Bytes()); err != nil {
 		return fmt.Errorf("fits: write payload: %w", err)

@@ -580,3 +580,105 @@ func findCard(t *testing.T, header []byte, keyword string) string {
 
 	return ""
 }
+
+// TestExtendIsWrittenOnlyWhenExtensionsFollow covers the keyword that tells a
+// reader to look past the primary HDU.
+//
+// It is not decoration: without it a reader is entitled to stop at the primary
+// HDU, so the failure mode is a file carrying a table nobody finds. astropy and
+// cfitsio both write it, and the standard puts it immediately after the last
+// NAXISn.
+//
+// The absent case matters too — a single-HDU file that advertises extensions it
+// does not have is equally wrong.
+func TestExtendIsWrittenOnlyWhenExtensionsFollow(t *testing.T) {
+	t.Parallel()
+
+	batch := catalogBatch(t)
+
+	// Cleanup rather than defer: the parent returns before its parallel
+	// subtests run, so a deferred Release frees the batch out from under them.
+	t.Cleanup(batch.Release)
+
+	for _, tc := range []struct {
+		name string
+		hdus []fits.HDU
+		want bool
+	}{
+		{
+			name: "primary alone",
+			hdus: []fits.HDU{float32Image(t, 2, 2, []float32{1, 2, 3, 4})},
+			want: false,
+		},
+		{
+			name: "primary with a table extension",
+			hdus: []fits.HDU{float32Image(t, 2, 2, []float32{1, 2, 3, 4}), &fits.BintableHDU{Batch: batch}},
+			want: true,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			var buf bytes.Buffer
+			if err := fits.Write(&buf, &fits.File{HDUs: tc.hdus}); err != nil {
+				t.Fatalf("Write: %v", err)
+			}
+
+			header := buf.Bytes()[:fits.BlockSize]
+			got := bytes.Contains(header, []byte("EXTEND  ="))
+
+			if got != tc.want {
+				t.Errorf("EXTEND present = %v, want %v", got, tc.want)
+			}
+
+			if !tc.want {
+				return
+			}
+
+			// The standard fixes its position: immediately after the last
+			// NAXISn, before anything else.
+			if want := pad80("EXTEND  =                    T / file contains extensions"); findCard(t, header, "EXTEND") != want {
+				t.Errorf("EXTEND card\n got %q\nwant %q", findCard(t, header, "EXTEND"), want)
+			}
+
+			naxis2 := bytes.Index(header, []byte("NAXIS2  ="))
+			extend := bytes.Index(header, []byte("EXTEND  ="))
+
+			if extend != naxis2+fits.CardSize {
+				t.Errorf("EXTEND is %d bytes after NAXIS2, want %d — the standard "+
+					"puts it immediately after the last NAXISn", extend-naxis2, fits.CardSize)
+			}
+		})
+	}
+}
+
+// TestWriteRefusesANonFiniteHeaderValue covers the values FITS cannot express.
+//
+// Go renders these as "NaN" and "+Inf", which in a card claiming to hold a
+// number is text no reader can parse. A BSCALE that arrived as NaN is a
+// caller's bug worth reporting rather than one to encode into a file that then
+// fails somewhere else, for someone else.
+func TestWriteRefusesANonFiniteHeaderValue(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		apply func(*fits.ImageHDU)
+		name  string
+	}{
+		{name: "BSCALE NaN", apply: func(h *fits.ImageHDU) { h.BScale = math.NaN() }},
+		{name: "BSCALE +Inf", apply: func(h *fits.ImageHDU) { h.BScale = math.Inf(1) }},
+		{name: "BZERO -Inf", apply: func(h *fits.ImageHDU) { h.BZero = math.Inf(-1) }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			src := float32Image(t, 2, 2, []float32{1, 2, 3, 4})
+			tc.apply(src)
+
+			var buf bytes.Buffer
+			if err := fits.Write(&buf, &fits.File{HDUs: []fits.HDU{src}}); !errors.Is(err, fits.ErrCardNotFinite) {
+				t.Errorf("Write = %v, want ErrCardNotFinite", err)
+			}
+		})
+	}
+}

@@ -3,23 +3,26 @@ package fits
 import (
 	"encoding/binary"
 	"fmt"
+	"math"
 	"strconv"
 
 	"github.com/apache/arrow-go/v18/arrow"
 )
 
 // encodeImage builds an image HDU's header and payload.
-func encodeImage(h *ImageHDU, primary bool) (*Header, []byte, error) {
+func encodeImage(h *ImageHDU, primary, extensions bool) (*Header, []byte, error) {
 	bitpix, pixelBytes, err := bitpixOf(h)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	mandatory := imageKeywords(h, bitpix, primary)
+	mandatory := imageKeywords(h, bitpix, primary, extensions)
 
 	header := orderedHeader(h.Header(), mandatory)
 
-	appendScaling(header, h)
+	if err := appendScaling(header, h); err != nil {
+		return nil, nil, err
+	}
 
 	payload, err := imagePayload(h, pixelBytes)
 	if err != nil {
@@ -30,7 +33,7 @@ func encodeImage(h *ImageHDU, primary bool) (*Header, []byte, error) {
 }
 
 // imageKeywords builds the structural cards, in the order the standard fixes.
-func imageKeywords(h *ImageHDU, bitpix int, primary bool) []Card {
+func imageKeywords(h *ImageHDU, bitpix int, primary, extensions bool) []Card {
 	naxis := len(h.Axes)
 
 	first := Card{Keyword: "SIMPLE", Value: "T", Comment: "conforms to FITS standard"}
@@ -56,6 +59,17 @@ func imageKeywords(h *ImageHDU, bitpix int, primary bool) []Card {
 		})
 	}
 
+	// EXTEND announces that extensions follow, and the standard puts it
+	// immediately after the last NAXISn in the primary header. It is not
+	// decoration: a reader is entitled to stop at the primary HDU without it,
+	// so a file carrying a table nobody can find is the failure mode. astropy
+	// and cfitsio both write it.
+	if primary && extensions {
+		cards = append(cards, Card{
+			Keyword: "EXTEND", Value: "T", Comment: "file contains extensions",
+		})
+	}
+
 	// An extension declares its group structure; the primary HDU does not.
 	// Both are fixed for an image: no random-group parameters, one group.
 	if !primary {
@@ -76,18 +90,30 @@ func imageKeywords(h *ImageHDU, bitpix int, primary bool) []Card {
 // when the HDU actually carries one, because BLANK declares a pixel value to
 // be read as undefined, and inventing one would reinterpret whatever pixels
 // happen to hold that value.
-func appendScaling(header *Header, h *ImageHDU) {
+func appendScaling(header *Header, h *ImageHDU) error {
 	if h.BScale != 0 && h.BScale != 1 {
-		setCard(header, "BSCALE", formatFloat(h.BScale), "linear scaling factor")
+		v, err := formatFloat(h.BScale)
+		if err != nil {
+			return fmt.Errorf("BSCALE: %w", err)
+		}
+
+		setCard(header, "BSCALE", v, "linear scaling factor")
 	}
 
 	if h.BZero != 0 {
-		setCard(header, "BZERO", formatFloat(h.BZero), "zero point of scaling")
+		v, err := formatFloat(h.BZero)
+		if err != nil {
+			return fmt.Errorf("BZERO: %w", err)
+		}
+
+		setCard(header, "BZERO", v, "zero point of scaling")
 	}
 
 	if h.HasBlank {
 		setCard(header, "BLANK", strconv.FormatInt(h.Blank, 10), "undefined pixel value")
 	}
+
+	return nil
 }
 
 // bitpixOf returns the BITPIX to write and the width of one pixel.
@@ -225,6 +251,16 @@ func swapNativeToBigEndian(buf []byte, bytesPerPixel int) {
 // 'G' with -1 precision gives the shortest representation that reads back as
 // the same float64, which is what keeps a value written and re-read from
 // drifting. FITS accepts E or D exponents; Go writes E, which is legal.
-func formatFloat(v float64) string {
-	return strconv.FormatFloat(v, 'G', -1, 64)
+//
+// NaN and the infinities are refused. A FITS header has no representation for
+// them, and Go would render them as "NaN" and "+Inf" — text no reader can
+// parse as a number, in a card that claims to be one. A BSCALE that arrived as
+// NaN is a caller's bug worth reporting, not one to encode into a file that
+// then fails somewhere else.
+func formatFloat(v float64) (string, error) {
+	if math.IsNaN(v) || math.IsInf(v, 0) {
+		return "", fmt.Errorf("%w: %v has no FITS representation", ErrCardNotFinite, v)
+	}
+
+	return strconv.FormatFloat(v, 'G', -1, 64), nil
 }
