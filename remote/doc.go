@@ -21,6 +21,23 @@
 // below, which is not a shortcut — it is a program that ignores
 // [SetOffline] at one call site and reports nothing.
 //
+// # One policy, or one per component
+//
+// Everything below — offline mode, download consent, endpoint overrides, the
+// cache location — is a policy, and [Client] is that policy as a value. The
+// package-level functions operate on [Default], the way net/http's
+// package-level Get operates on http.DefaultClient, so a program with a single
+// policy writes exactly what it always wrote. A binary whose components want
+// different ones builds them:
+//
+//	prefetch := remote.NewClient()
+//	prefetch.EnableDownloads(200<<20, remote.NAIFSPK)
+//
+//	serve := remote.NewClient()
+//	serve.SetOffline(true)
+//
+// Every function documented below has a [Client] method of the same name.
+//
 // # Endpoints
 //
 // Every service astrogo can contact is an [EndpointID] — there are no

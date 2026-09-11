@@ -117,7 +117,14 @@ var ErrReaderAtClosed = file.ErrReaderAtClosed
 //
 // So the resolution below is the whole point of the wrapper, not overhead
 // around it.
-type APIClient struct{ c *api.Client }
+type APIClient struct {
+	c *api.Client
+
+	// owner is the policy each request resolves against. Held rather than
+	// looked up so a client built from a scoped [Client] keeps answering to
+	// that one, not to whatever [Default] has become since.
+	owner *Client
+}
 
 // NewAPIClient builds a client for endpoint id, taking its registered timeout.
 //
@@ -128,18 +135,24 @@ type APIClient struct{ c *api.Client }
 // successfully while offline and fail on use, which is the intended order:
 // construction is not the moment a caller is asking to reach the network.
 func NewAPIClient(id EndpointID, opts ...APIOption) (*APIClient, error) {
-	ep, ok := Lookup(id)
+	return Default().NewAPIClient(id, opts...)
+}
+
+// NewAPIClient builds a client for endpoint id whose every request resolves
+// against this client's policy. See the package-level [NewAPIClient].
+func (c *Client) NewAPIClient(id EndpointID, opts ...APIOption) (*APIClient, error) {
+	ep, ok := c.Lookup(id)
 	if !ok {
 		return nil, fmt.Errorf("%w: %q", ErrUnknownEndpoint, id)
 	}
 
-	return &APIClient{c: api.NewClient(ep.Timeout, opts...)}, nil
+	return &APIClient{c: api.NewClient(ep.Timeout, opts...), owner: c}, nil
 }
 
 // Get issues a GET against endpoint id and returns the response body, which
 // the caller closes.
 func (c *APIClient) Get(ctx context.Context, id EndpointID, path string, query url.Values) (io.ReadCloser, error) {
-	base, err := URL(id)
+	base, err := c.owner.URL(id)
 	if err != nil {
 		return nil, err
 	}
@@ -150,7 +163,7 @@ func (c *APIClient) Get(ctx context.Context, id EndpointID, path string, query u
 
 // GetJSON issues a GET against endpoint id and decodes the response into out.
 func (c *APIClient) GetJSON(ctx context.Context, id EndpointID, path string, query url.Values, out any) error {
-	base, err := URL(id)
+	base, err := c.owner.URL(id)
 	if err != nil {
 		return err
 	}
@@ -162,7 +175,7 @@ func (c *APIClient) GetJSON(ctx context.Context, id EndpointID, path string, que
 // PostForm posts form to endpoint id and returns the response body, which the
 // caller closes.
 func (c *APIClient) PostForm(ctx context.Context, id EndpointID, path string, form url.Values) (io.ReadCloser, error) {
-	base, err := URL(id)
+	base, err := c.owner.URL(id)
 	if err != nil {
 		return nil, err
 	}
@@ -174,7 +187,7 @@ func (c *APIClient) PostForm(ctx context.Context, id EndpointID, path string, fo
 // PostJSON posts payload as JSON to endpoint id and returns the response body,
 // which the caller closes.
 func (c *APIClient) PostJSON(ctx context.Context, id EndpointID, path string, payload any) (io.ReadCloser, error) {
-	base, err := URL(id)
+	base, err := c.owner.URL(id)
 	if err != nil {
 		return nil, err
 	}

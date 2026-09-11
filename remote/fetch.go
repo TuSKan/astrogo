@@ -57,7 +57,15 @@ func WithProgress(f func(downloaded, total int64)) ReadOption {
 // miss downloads, which requires consent (ErrDownloadDenied otherwise) and
 // is serialized against other processes doing the same.
 func GetFile(ctx context.Context, id EndpointID, name string, opts ...ReadOption) (bucket *Bucket, key string, err error) {
-	ep, ok := Lookup(id)
+	return Default().GetFile(ctx, id, name, opts...)
+}
+
+// GetFile ensures endpoint id's object named name is present and current in
+// this client's cache, returning that cache Bucket and the key within it. See
+// the package-level [GetFile]; the consent, offline and URL decisions it makes
+// are this client's, and the cache it fills is this client's.
+func (c *Client) GetFile(ctx context.Context, id EndpointID, name string, opts ...ReadOption) (bucket *Bucket, key string, err error) {
+	ep, ok := c.Lookup(id)
 	if !ok {
 		return nil, "", fmt.Errorf("%w: %q", ErrUnknownEndpoint, id)
 	}
@@ -65,7 +73,7 @@ func GetFile(ctx context.Context, id EndpointID, name string, opts ...ReadOption
 	// URL is the offline/Disable gate. It runs first so a blocked endpoint
 	// fails before any cache directory is resolved or lock taken, and so
 	// the source below is never opened for a URL the caller may not reach.
-	if _, err := URL(id); err != nil {
+	if _, err := c.URL(id); err != nil {
 		return nil, "", err
 	}
 
@@ -87,7 +95,7 @@ func GetFile(ctx context.Context, id EndpointID, name string, opts ...ReadOption
 		return nil, "", fmt.Errorf("%w: endpoint %q", ErrCacheNameRequired, id)
 	}
 
-	cacheBucket, prefix, err := CacheDir(ctx, id)
+	cacheBucket, prefix, err := c.CacheDir(ctx, id)
 	if err != nil {
 		return nil, "", err
 	}
@@ -111,7 +119,7 @@ func GetFile(ctx context.Context, id EndpointID, name string, opts ...ReadOption
 		// and reporting it consistently matches the documented contract.
 		// Routed through CheckDownload so a custom Policy still decides.
 		// A caller who did grant consent sees the real error.
-		if cerr := CheckDownload(id, name, ep.ApproxSize); cerr != nil {
+		if cerr := c.CheckDownload(id, name, ep.ApproxSize); cerr != nil {
 			return nil, "", cerr
 		}
 
@@ -142,7 +150,7 @@ func GetFile(ctx context.Context, id EndpointID, name string, opts ...ReadOption
 
 	timeout := cmp.Or(cfg.timeout, ep.DownloadTimeout, DefaultDownloadTimeout)
 
-	if err := fetchInto(ctx, id, ep, srcBucket, cacheBucket, name, cacheKey, timeout, cfg); err != nil {
+	if err := c.fetchInto(ctx, id, ep, srcBucket, cacheBucket, name, cacheKey, timeout, cfg); err != nil {
 		return nil, "", fmt.Errorf("remote: fetch %s: %w", name, err)
 	}
 
@@ -158,12 +166,18 @@ func GetFile(ctx context.Context, id EndpointID, name string, opts ...ReadOption
 // there. Any other failure returns an error, so "missing" is never
 // confused with "could not tell".
 func Exists(ctx context.Context, id EndpointID, name string) (bool, error) {
-	ep, ok := Lookup(id)
+	return Default().Exists(ctx, id, name)
+}
+
+// Exists reports whether endpoint id currently serves an object at name, as
+// this client may see it. See the package-level [Exists].
+func (c *Client) Exists(ctx context.Context, id EndpointID, name string) (bool, error) {
+	ep, ok := c.Lookup(id)
 	if !ok {
 		return false, fmt.Errorf("%w: %q", ErrUnknownEndpoint, id)
 	}
 
-	if _, err := URL(id); err != nil {
+	if _, err := c.URL(id); err != nil {
 		return false, err
 	}
 
@@ -233,12 +247,12 @@ func unchanged(ctx context.Context, srcBucket, cacheBucket *Bucket, name, cacheK
 // cacheBucket/cacheKey. It owns all policy — consent, timeout, progress,
 // resume, validation — for every backend uniformly; buckets only move
 // bytes.
-func fetchInto(ctx context.Context, id EndpointID, ep Endpoint, srcBucket, cacheBucket *Bucket,
+func (c *Client) fetchInto(ctx context.Context, id EndpointID, ep Endpoint, srcBucket, cacheBucket *Bucket,
 	name, cacheKey string, timeout time.Duration, cfg readConfig,
 ) error {
 	// Consent is checked twice: once on the registered estimate before any
 	// request, and again below on the size the source actually reports.
-	if err := CheckDownload(id, name, ep.ApproxSize); err != nil {
+	if err := c.CheckDownload(id, name, ep.ApproxSize); err != nil {
 		return err
 	}
 
@@ -250,7 +264,7 @@ func fetchInto(ctx context.Context, id EndpointID, ep Endpoint, srcBucket, cache
 		return fmt.Errorf("%w: %s: %w", ErrDownloadFailed, name, err)
 	}
 
-	if err := CheckDownload(id, name, attrs.Size); err != nil {
+	if err := c.CheckDownload(id, name, attrs.Size); err != nil {
 		return err
 	}
 
