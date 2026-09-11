@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io"
 	"strings"
+
+	"github.com/TuSKan/astrogo/time"
 )
 
 // Write encodes f as a FITS stream.
@@ -40,17 +42,68 @@ func Write(w io.Writer, f *File) error {
 }
 
 // writeHDU writes one header and its payload, each padded to a block boundary.
+//
+// The two are rendered before either is written, because the integrity
+// keywords cover both: DATASUM is the data's checksum and CHECKSUM covers the
+// header that carries it, so neither can be known until the other exists.
 func writeHDU(w io.Writer, hdu HDU, primary, extensions bool) error {
 	header, payload, err := encodeHDU(hdu, primary, extensions)
 	if err != nil {
 		return err
 	}
 
-	if err := writeHeader(w, header); err != nil {
+	data := padded(payload, 0)
+
+	// DATASUM goes in before the header is rendered, since CHECKSUM covers it.
+	setCard(header, "DATASUM", datasumValue(CalcChecksum(data)),
+		"1's complement checksum of the data")
+	setCard(header, "CHECKSUM", checksumPlaceholder,
+		"HDU checksum updated "+checksumStamp())
+
+	rendered, err := renderHeader(header)
+	if err != nil {
 		return err
 	}
 
-	return writePayload(w, payload)
+	applyChecksum(rendered, data)
+
+	if _, err := w.Write(rendered); err != nil {
+		return fmt.Errorf("fits: write header: %w", err)
+	}
+
+	if len(data) == 0 {
+		return nil
+	}
+
+	if _, err := w.Write(data); err != nil {
+		return fmt.Errorf("fits: write payload: %w", err)
+	}
+
+	return nil
+}
+
+// checksumStamp is the time a checksum was computed, as the convention's
+// example cards carry it.
+//
+// UTC and second resolution, which is what cfitsio writes. It is provenance
+// rather than data: nothing reads it back, and it exists so someone looking at
+// a file can tell when its integrity was last established.
+func checksumStamp() string {
+	return time.Now().UTC().Format("2006-01-02T15:04:05")
+}
+
+// padded returns payload extended to a block boundary with fill.
+func padded(payload []byte, fill byte) []byte {
+	if len(payload) == 0 {
+		return nil
+	}
+
+	var buf bytes.Buffer
+
+	buf.Write(payload)
+	pad(&buf, fill)
+
+	return buf.Bytes()
 }
 
 // encodeHDU produces the header an HDU should carry and the bytes of its
@@ -80,9 +133,11 @@ func encodeHDU(hdu HDU, primary, extensions bool) (*Header, []byte, error) {
 	}
 }
 
-// writeHeader renders every card, appends END, and pads to a block boundary
-// with blanks.
-func writeHeader(w io.Writer, h *Header) error {
+// renderHeader renders every card, appends END, and pads to a block boundary
+// with blanks, returning the bytes so the checksum can be taken over them.
+func renderHeader(h *Header) ([]byte, error) {
+	announceLongStrings(h)
+
 	var buf bytes.Buffer
 
 	for _, c := range h.Cards {
@@ -92,54 +147,26 @@ func writeHeader(w io.Writer, h *Header) error {
 			continue
 		}
 
-		card, err := formatCard(c)
+		cards, err := formatCards(c)
 		if err != nil {
-			return err
+			return nil, err
 		}
 
-		buf.Write(card)
+		for _, card := range cards {
+			buf.Write(card)
+		}
 	}
 
-	end, err := formatCard(Card{Keyword: "END"})
+	end, err := formatCards(Card{Keyword: "END"})
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	buf.Write(end)
+	buf.Write(end[0])
 
 	pad(&buf, ' ')
 
-	_, err = w.Write(buf.Bytes())
-	if err != nil {
-		return fmt.Errorf("fits: write header: %w", err)
-	}
-
-	return nil
-}
-
-// writePayload writes a data payload padded to a block boundary with zeros.
-//
-// Zeros because the two kinds this package writes — images and binary tables —
-// are both padded that way. An ASCII table is not: the standard fills its last
-// block with spaces, since a zero byte there is not blank text and a reader
-// taking the remainder of the block as a row would see it. Whoever adds ASCII
-// table writing has to pass the fill byte in here.
-func writePayload(w io.Writer, payload []byte) error {
-	if len(payload) == 0 {
-		return nil
-	}
-
-	var buf bytes.Buffer
-
-	buf.Write(payload)
-
-	pad(&buf, 0)
-
-	if _, err := w.Write(buf.Bytes()); err != nil {
-		return fmt.Errorf("fits: write payload: %w", err)
-	}
-
-	return nil
+	return buf.Bytes(), nil
 }
 
 // pad extends buf to the next block boundary. A buffer already on one is left
@@ -195,4 +222,27 @@ func orderedHeader(src *Header, mandatory []Card) *Header {
 	}
 
 	return out
+}
+
+// announceLongStrings adds LONGSTRN when the header holds a value that will be
+// written across CONTINUE cards.
+//
+// The convention asks for it, and the reason is a reader that does not
+// implement CONTINUE: LONGSTRN is the one thing such a reader can detect, so
+// it knows the value it just read ends at an "&" rather than being complete.
+// Without it the truncation is silent, which is the failure the whole
+// convention exists to avoid.
+func announceLongStrings(h *Header) {
+	for _, c := range h.Cards {
+		if !isQuoted(c.Value) {
+			continue
+		}
+
+		cards, err := formatCards(c)
+		if err == nil && len(cards) > 1 {
+			setCard(h, "LONGSTRN", longStringMarker, "the OGIP long-string convention is in use")
+
+			return
+		}
+	}
 }

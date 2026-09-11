@@ -11,7 +11,7 @@ import (
 
 // encodeImage builds an image HDU's header and payload.
 func encodeImage(h *ImageHDU, primary, extensions bool) (*Header, []byte, error) {
-	bitpix, pixelBytes, err := bitpixOf(h)
+	bitpix, pixelBytes, bzero, err := bitpixOf(h)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -20,11 +20,11 @@ func encodeImage(h *ImageHDU, primary, extensions bool) (*Header, []byte, error)
 
 	header := orderedHeader(h.Header(), mandatory)
 
-	if err := appendScaling(header, h); err != nil {
+	if err := appendScaling(header, h, bzero); err != nil {
 		return nil, nil, err
 	}
 
-	payload, err := imagePayload(h, pixelBytes)
+	payload, err := imagePayload(h, pixelBytes, bzero)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -90,7 +90,21 @@ func imageKeywords(h *ImageHDU, bitpix int, primary, extensions bool) []Card {
 // when the HDU actually carries one, because BLANK declares a pixel value to
 // be read as undefined, and inventing one would reinterpret whatever pixels
 // happen to hold that value.
-func appendScaling(header *Header, h *ImageHDU) error {
+func appendScaling(header *Header, h *ImageHDU, unsignedOffset float64) error {
+	// An unsigned image's BZERO is not a calibration the caller chose; it is
+	// how the data is stored at all, so it overrides whatever the HDU carries.
+	if unsignedOffset != 0 {
+		v, err := formatFloat(unsignedOffset)
+		if err != nil {
+			return fmt.Errorf("BZERO: %w", err)
+		}
+
+		setCard(header, "BZERO", v, "offset for unsigned integer data")
+		setCard(header, "BSCALE", "1", "linear scaling factor")
+
+		return nil
+	}
+
 	if h.BScale != 0 && h.BScale != 1 {
 		v, err := formatFloat(h.BScale)
 		if err != nil {
@@ -123,13 +137,20 @@ func appendScaling(header *Header, h *ImageHDU) error {
 // — a tensor built in memory rather than read from a file — it is derived from
 // the tensor's element type, so the common case of constructing an image from
 // Arrow data needs no FITS knowledge at the call site.
-func bitpixOf(h *ImageHDU) (bitpix, pixelBytes int, err error) {
+func bitpixOf(h *ImageHDU) (bitpix, pixelBytes int, bzero float64, err error) {
 	bitpix = h.Bitpix
 
+	// The tensor decides for unsigned data whatever the HDU says, because
+	// BITPIX alone cannot express it: uint16 and int16 are both BITPIX 16 and
+	// differ only by the BZERO that accompanies them.
+	if h.Tensor != nil && isUnsignedArrow(h.Tensor.DataType()) {
+		return unsignedFromTensor(h.Tensor.DataType())
+	}
+
 	if bitpix == 0 && h.Tensor != nil {
-		bitpix, err = bitpixForType(h.Tensor.DataType())
+		bitpix, _, err = bitpixForType(h.Tensor.DataType())
 		if err != nil {
-			return 0, 0, err
+			return 0, 0, 0, err
 		}
 	}
 
@@ -142,47 +163,121 @@ func bitpixOf(h *ImageHDU) (bitpix, pixelBytes int, err error) {
 		}
 	}
 
+	width, err := pixelWidth(bitpix)
+	if err != nil {
+		return 0, 0, 0, err
+	}
+
+	return bitpix, width, 0, nil
+}
+
+// pixelWidth is the stored width of one pixel of the given BITPIX.
+func pixelWidth(bitpix int) (int, error) {
 	switch bitpix {
 	case BitpixUint8:
-		return bitpix, 1, nil
+		return 1, nil
 	case BitpixInt16:
-		return bitpix, 2, nil
+		return 2, nil
 	case BitpixInt32, BitpixFloat32:
-		return bitpix, 4, nil
+		return 4, nil
 	case BitpixInt64, BitpixFloat64:
-		return bitpix, 8, nil
+		return 8, nil
 	default:
-		return 0, 0, fmt.Errorf("%w: %d", ErrInvalidBitpix, bitpix)
+		return 0, fmt.Errorf("%w: %d", ErrInvalidBitpix, bitpix)
 	}
 }
 
-// bitpixForType maps an Arrow element type to its FITS BITPIX.
+// isUnsignedArrow reports whether an Arrow type is an unsigned integer wider
+// than a byte, which is what FITS cannot store directly.
+func isUnsignedArrow(dt arrow.DataType) bool {
+	switch dt.ID() { //nolint:exhaustive // only the three widths FITS offsets
+	case arrow.UINT16, arrow.UINT32, arrow.UINT64:
+		return true
+	default:
+		return false
+	}
+}
+
+// unsignedFromTensor resolves the BITPIX, pixel width and BZERO for an
+// unsigned tensor.
+func unsignedFromTensor(dt arrow.DataType) (bitpix, pixelBytes int, bzero float64, err error) {
+	bitpix, bzero, err = bitpixForType(dt)
+	if err != nil {
+		return 0, 0, 0, err
+	}
+
+	pixelBytes, err = pixelWidth(bitpix)
+	if err != nil {
+		return 0, 0, 0, err
+	}
+
+	return bitpix, pixelBytes, bzero, nil
+}
+
+// bitpixForType maps an Arrow element type to its FITS BITPIX, and the BZERO
+// that goes with it.
 //
-// FITS has no unsigned integer types beyond 8-bit; a uint16 image is written
-// as int16 with BZERO 32768, which this does not do silently — a caller with
-// unsigned data has to say what they meant, because guessing would write
-// values that read back as negative.
+// FITS has no unsigned integer type above 8 bits. The standard's answer, and
+// every other library's, is to store the signed type of the same width and
+// offset it with BZERO — so a uint16 is written as int16 with BZERO 32768, and
+// a reader adds the offset back. [unsignedBZero] is where the offsets live.
 //
 // The default rejects every Arrow type FITS has no BITPIX for; listing the
 // forty it cannot store would say the same thing at much greater length.
 //
 //nolint:exhaustive // the default covers every unlisted type, as above
-func bitpixForType(dt arrow.DataType) (int, error) {
+func bitpixForType(dt arrow.DataType) (bitpix int, bzero float64, err error) {
 	switch dt.ID() {
 	case arrow.UINT8:
-		return BitpixUint8, nil
+		return BitpixUint8, 0, nil
 	case arrow.INT16:
-		return BitpixInt16, nil
+		return BitpixInt16, 0, nil
 	case arrow.INT32:
-		return BitpixInt32, nil
+		return BitpixInt32, 0, nil
 	case arrow.INT64:
-		return BitpixInt64, nil
+		return BitpixInt64, 0, nil
 	case arrow.FLOAT32:
-		return BitpixFloat32, nil
+		return BitpixFloat32, 0, nil
 	case arrow.FLOAT64:
-		return BitpixFloat64, nil
+		return BitpixFloat64, 0, nil
+	case arrow.UINT16:
+		return BitpixInt16, unsignedBZero(BitpixInt16), nil
+	case arrow.UINT32:
+		return BitpixInt32, unsignedBZero(BitpixInt32), nil
+	case arrow.UINT64:
+		return BitpixInt64, unsignedBZero(BitpixInt64), nil
 	default:
-		return 0, fmt.Errorf("%w: no BITPIX for Arrow type %s", ErrNotWritable, dt)
+		return 0, 0, fmt.Errorf("%w: no BITPIX for Arrow type %s", ErrNotWritable, dt)
+	}
+}
+
+// unsignedBZero is the offset that turns a signed stored value back into the
+// unsigned one a caller meant: 2^(n-1) for an n-bit type.
+//
+//	uint16 -> BITPIX 16, BZERO 32768
+//	uint32 -> BITPIX 32, BZERO 2147483648
+//	uint64 -> BITPIX 64, BZERO 9223372036854775808
+//
+// These are the values FITS 4.0 §5.2.5 names and the ones every reader
+// recognises, which is what makes the convention interoperable rather than a
+// private encoding.
+func unsignedBZero(bitpix int) float64 {
+	return math.Pow(2, float64(bitpix-1))
+}
+
+// isUnsignedOffset reports whether bzero is the offset that marks stored data
+// as unsigned for this BITPIX.
+//
+// Compared exactly because these are the only values the convention uses and
+// all three are exactly representable in float64 — a BZERO of 32768.0001 is a
+// genuine calibration offset, not an unsigned image, and must not be read as
+// one.
+func isUnsignedOffset(bitpix int, bzero float64) bool {
+	switch bitpix {
+	case BitpixInt16, BitpixInt32, BitpixInt64:
+		return bzero == unsignedBZero(bitpix)
+	default:
+		return false
 	}
 }
 
@@ -191,7 +286,7 @@ func bitpixForType(dt arrow.DataType) (int, error) {
 // The tensor's buffer is copied rather than swapped in place: it belongs to
 // the caller, who did not ask for their image to be byte-reversed as a side
 // effect of writing it.
-func imagePayload(h *ImageHDU, pixelBytes int) ([]byte, error) {
+func imagePayload(h *ImageHDU, pixelBytes int, unsignedOffset float64) ([]byte, error) {
 	if h.Tensor == nil {
 		return nil, nil
 	}
@@ -219,9 +314,40 @@ func imagePayload(h *ImageHDU, pixelBytes int) ([]byte, error) {
 	out := make([]byte, want*int64(pixelBytes))
 	copy(out, raw)
 
+	// Unsigned data is stored as the signed type of the same width, offset by
+	// BZERO. Subtracting it here is exactly what the reader adds back, and the
+	// arithmetic wraps by design: 0 becomes the most negative signed value and
+	// 65535 becomes the most positive, which is the whole of the convention.
+	if unsignedOffset != 0 {
+		offsetToSigned(out, pixelBytes)
+	}
+
 	swapNativeToBigEndian(out, pixelBytes)
 
 	return out, nil
+}
+
+// offsetToSigned subtracts the unsigned BZERO in place, in native byte order,
+// before the buffer is swapped to FITS order.
+//
+// Implemented as an XOR of the sign bit rather than an arithmetic subtraction
+// because they are the same operation for these offsets — 2^(n-1) — and the
+// XOR cannot overflow or depend on Go's conversion rules.
+func offsetToSigned(buf []byte, pixelBytes int) {
+	switch pixelBytes {
+	case 2:
+		for i := 0; i+2 <= len(buf); i += 2 {
+			binary.NativeEndian.PutUint16(buf[i:], binary.NativeEndian.Uint16(buf[i:])^0x8000)
+		}
+	case 4:
+		for i := 0; i+4 <= len(buf); i += 4 {
+			binary.NativeEndian.PutUint32(buf[i:], binary.NativeEndian.Uint32(buf[i:])^0x80000000)
+		}
+	case 8:
+		for i := 0; i+8 <= len(buf); i += 8 {
+			binary.NativeEndian.PutUint64(buf[i:], binary.NativeEndian.Uint64(buf[i:])^0x8000000000000000)
+		}
+	}
 }
 
 // swapNativeToBigEndian converts a buffer from native to FITS byte order in

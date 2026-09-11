@@ -19,24 +19,31 @@
 // or replaces an image's pixels. A file whose header describes something it
 // does not contain is unreadable in a way no reader can diagnose.
 //
+// # Conventions
+//
+// Both registered conventions that let a header carry what the 80-byte record
+// cannot are implemented, in both directions:
+//
+//   - **HIERARCH** for keywords over eight characters, which ESO instruments
+//     emit by the dozen per header.
+//   - **CONTINUE** for string values over sixty-eight, announced by LONGSTRN,
+//     as FITS 4.0 §4.2.1.2 and OGIP 100 define it.
+//
+// Unsigned integer images are stored as the signed type of the same width
+// offset by BZERO = 2^(n-1) (FITS 4.0 §5.2.5), so a uint16 frame written here
+// is a uint16 frame when read back, here or anywhere else.
+//
+// Every HDU carries DATASUM and CHECKSUM. The sum over a complete HDU comes out
+// all ones, which is the property cfitsio's fits_verify_chksum and astropy's
+// checksum verification apply, so a file written here verifies there.
+//
 // # What the writer does not do
 //
 // The output is standard FITS and interoperable — the card layout is the fixed
 // format of FITS 4.0 §4.1.2, EXTEND announces extensions, and every structure
-// is block-aligned — but it is a smaller writer than astropy's, and these are
-// the differences worth knowing before reaching for one:
+// is block-aligned — but it remains a smaller writer than astropy's, and these
+// are the differences worth knowing:
 //
-//   - **No CONTINUE long strings and no HIERARCH.** A keyword over eight
-//     characters, or a value and comment that together overflow the 80-byte
-//     record, is [ErrCardTooLong] rather than a convention-encoded card.
-//     Both conventions are legal and widely read; neither is implemented, so
-//     a long instrument keyword has nowhere to go.
-//   - **No unsigned integer images.** FITS expresses uint16 as int16 with
-//     BZERO 32768, and this refuses rather than doing it silently, because
-//     the values would otherwise read back negative anywhere the BZERO is
-//     ignored.
-//   - **No CHECKSUM or DATASUM.** The functions exist ([CalcChecksum],
-//     [ValidateDatasum]) and the writer does not call them.
 //   - **No TNULLn.** A null in a table column is written as the type's zero.
 //     FITS has no null bitmap, and inventing a TNULLn would reserve a value
 //     that might be real data.
@@ -46,14 +53,4 @@
 //     them either.
 //   - **No ASCII table writing.** BINTABLE is what modern pipelines use; an
 //     ASCII table read in cannot be written back out.
-//
-// # World Coordinate System
-//
-// The [WCS] type encodes the FITS standard pixel-to-sky mapping defined by
-// CRPIX, CRVAL, CDELT, CTYPE, and the PC rotation matrix.
-//
-//   - [NewWCS] constructs an identity-mapped N-dimensional coordinate system.
-//   - [WCS.PixelToWorld] implements the TAN (Gnomonic) spherical projection
-//     and falls back to linear mapping for non-spherical axes.
-//   - [ExtractWCS] populates a WCS directly from a FITS [Header].
 package fits

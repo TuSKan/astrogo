@@ -434,13 +434,18 @@ func TestWriteRefusesACardThatWillNotFit(t *testing.T) {
 		want error
 	}{
 		{
-			name: "keyword over eight characters",
-			card: fits.Card{Keyword: "TOOLONGKEYWORD", Value: "1"},
+			// A long keyword is no longer refused — it becomes a HIERARCH
+			// card — but one so long that even HIERARCH cannot hold it still
+			// has nowhere to go.
+			name: "keyword too long even for HIERARCH",
+			card: fits.Card{Keyword: strings.Repeat("K", 80), Value: "1"},
 			want: fits.ErrCardTooLong,
 		},
 		{
-			name: "comment overflows the record",
-			card: fits.Card{Keyword: "OBJECT", Value: "'M31'", Comment: strings.Repeat("x", 80)},
+			// A numeric value cannot be continued: the CONTINUE convention is
+			// defined for character values only.
+			name: "comment on a numeric card overflows the record",
+			card: fits.Card{Keyword: "EXPTIME", Value: "120.5", Comment: strings.Repeat("x", 80)},
 			want: fits.ErrCardTooLong,
 		},
 		{
@@ -515,13 +520,15 @@ func TestWrittenHeaderMatchesTheStandardLayoutByte(t *testing.T) {
 		t.Fatalf("Write: %v", err)
 	}
 
+	// The mandatory cards, in the order the standard fixes them. What follows
+	// — the integrity keywords, then END — is checked separately, since their
+	// content is not fixed text.
 	want := []string{
 		"SIMPLE  =                    T / conforms to FITS standard",
 		"BITPIX  =                  -32 / bits per data pixel",
 		"NAXIS   =                    2 / number of data axes",
 		"NAXIS1  =                    2 / length of data axis 1",
 		"NAXIS2  =                    2 / length of data axis 2",
-		"END",
 	}
 
 	header := buf.Bytes()
@@ -533,6 +540,10 @@ func TestWrittenHeaderMatchesTheStandardLayoutByte(t *testing.T) {
 		if got != pad80(w) {
 			t.Errorf("card %d\n got %q\nwant %q", i, got, pad80(w))
 		}
+	}
+
+	if !bytes.Contains(header[:fits.BlockSize], []byte(pad80("END"))) {
+		t.Error("no END card in the header")
 	}
 }
 

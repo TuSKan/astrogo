@@ -260,6 +260,16 @@ func ReadHeader(br *BlockReader) (*Header, error) {
 				return h, nil
 			}
 
+			// A CONTINUE card is not a card of its own: it carries the next
+			// segment of the string the previous card began. Joining it here
+			// is what makes a long value arrive whole rather than truncated
+			// at the "&" that marks the split.
+			if c.Keyword == continueKeyword && len(h.Cards) > 0 {
+				if joinContinuation(&h.Cards[len(h.Cards)-1], c) {
+					continue
+				}
+			}
+
 			// Exclude completely blank cards
 			if len(c.Keyword) > 0 || len(c.Value) > 0 || len(c.Comment) > 0 {
 				// Checked before the append rather than after, so the limit is
