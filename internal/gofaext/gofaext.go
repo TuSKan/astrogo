@@ -492,3 +492,43 @@ func Ld(bm float64, p, q, e [3]float64, em, dlim float64) [3]float64 {
 
 	return p1
 }
+
+// TTToTCG converts Terrestrial Time to Geocentric Coordinate Time.
+//
+// TCG is the coordinate time of the geocentric reference system: TT is TCG
+// rescaled so that it ticks at the rate of a clock on the rotating geoid, which
+// is what makes TT the scale a terrestrial observation is timed in and TCG the
+// one a geocentric equation of motion is integrated in. The two differ by a
+// secular rate of L_G = 6.969290134e-10, about 22 ms per year, zero at
+// 1977-01-01 by definition.
+func TTToTCG(tt1, tt2 float64) (tcg1, tcg2 float64, status int) {
+	status = gofa.Tttcg(tt1, tt2, &tcg1, &tcg2)
+
+	return tcg1, tcg2, status
+}
+
+// TCGToTT converts Geocentric Coordinate Time to Terrestrial Time.
+func TCGToTT(tcg1, tcg2 float64) (tt1, tt2 float64, status int) {
+	status = gofa.Tcgtt(tcg1, tcg2, &tt1, &tt2)
+
+	return tt1, tt2, status
+}
+
+// TDBToTCB converts Barycentric Dynamical Time to Barycentric Coordinate Time.
+//
+// TCB is to TDB what TCG is to TT: the unscaled coordinate time of the
+// barycentric system. The rate difference is L_B = 1.550519768e-8, about
+// half a second per year, which is why an ephemeris argument is TDB and not
+// TCB — TDB was defined to stay close to TT.
+func TDBToTCB(tdb1, tdb2 float64) (tcb1, tcb2 float64, status int) {
+	status = gofa.Tdbtcb(tdb1, tdb2, &tcb1, &tcb2)
+
+	return tcb1, tcb2, status
+}
+
+// TCBToTDB converts Barycentric Coordinate Time to Barycentric Dynamical Time.
+func TCBToTDB(tcb1, tcb2 float64) (tdb1, tdb2 float64, status int) {
+	status = gofa.Tcbtdb(tcb1, tcb2, &tdb1, &tdb2)
+
+	return tdb1, tdb2, status
+}

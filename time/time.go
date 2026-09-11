@@ -283,6 +283,51 @@ const (
 	// caller to subtract it: GPST and BDT differ by a constant that neither
 	// timestamp carries.
 	BDT
+
+	// TCG is Geocentric Coordinate Time, the coordinate time of the
+	// geocentric celestial reference system.
+	//
+	// # What it is, against TT
+	//
+	// TT and TCG measure the same thing at different rates. TCG is the
+	// coordinate time of the geocentric frame; TT is TCG rescaled to tick at
+	// the rate of an ideal clock on the rotating geoid, which is the rate a
+	// clock in an observatory actually keeps. The ratio is fixed by the IAU:
+	//
+	//	TCG − TT = L_G / (1 − L_G) × (JD − 2443144.5003725) × 86400 s
+	//	L_G = 6.969290134e-10, exactly, by IAU 2000 Resolution B1.9
+	//
+	// That is about 22 ms per year, zero at 1977-01-01 TAI where the two were
+	// set equal, and roughly 1.1 s today.
+	//
+	// # When a caller needs it
+	//
+	// Relativistic geodesy and satellite-orbit work integrate equations of
+	// motion in the geocentric frame, whose time argument is TCG rather than
+	// TT. Pulsar timing quotes TCB (see [Time.TCB]) for the same reason one
+	// frame up. A terrestrial observation is timed in TT and stays there.
+	TCG
+
+	// TCB is Barycentric Coordinate Time, the coordinate time of the
+	// barycentric celestial reference system.
+	//
+	// # What it is, against TDB
+	//
+	// The same relationship TCG has to TT, one frame out: TCB is the
+	// unscaled coordinate time of the solar-system barycentric frame, and TDB
+	// is TCB rescaled so it stays close to TT rather than drifting away from
+	// it.
+	//
+	//	TCB − TDB ≈ L_B × (JD − 2443144.5003725) × 86400 s + TDB0
+	//	L_B = 1.550519768e-8, by IAU 2006 Resolution B3
+	//
+	// That is about 0.49 s per year — half a minute since 1977 — which is why
+	// a planetary ephemeris is argued in TDB and not in TCB: TDB was defined
+	// to keep the difference from TT bounded at milliseconds.
+	//
+	// A caller holding a pulsar timing solution or a barycentric dynamical
+	// model quoted in TCB has, until now, had no way to say so.
+	TCB
 )
 
 // gpstMinusTAI is the fixed offset that defines GPS time.
@@ -313,6 +358,10 @@ func (s Scale) String() string {
 		return "GPST"
 	case BDT:
 		return "BDT"
+	case TCG:
+		return "TCG"
+	case TCB:
+		return "TCB"
 	default:
 		return "UNKNOWN"
 	}
@@ -336,7 +385,8 @@ func (s Scale) String() string {
 // it spans differ by up to a microsecond per hour. Arithmetic in TDB stays in
 // TDB, which is what an ephemeris interpolating in TDB days wants.
 func (s Scale) uniform() bool {
-	return s == TAI || s == TT || s == TDB || s == GPST || s == BDT
+	return s == TAI || s == TT || s == TDB || s == GPST || s == BDT ||
+		s == TCG || s == TCB
 }
 
 // Time represents a high-precision astronomical timestamp.
@@ -1142,6 +1192,10 @@ func (t Time) UTC() Time {
 		// the leap-second table, which is where the seconds a GNSS user is
 		// missing actually come from.
 		return t.TAI().UTC()
+	case TCG:
+		return t.TT().UTC()
+	case TCB:
+		return t.TDB().UTC()
 	}
 
 	return t // unreachable with current scales
@@ -1174,6 +1228,16 @@ func (t Time) TAI() Time {
 		// Delta-T at that epoch, applied on the way home and never on the way
 		// out. Measured by TestScaleRoundTripMatrix.
 		return t.TT().TAI()
+	case TCG:
+		// TCG → TT → TAI. Without this the switch below falls through to
+		// "return t", and the caller then reads a TCG date as though it were
+		// TAI — which is the defect TestScaleRoundTripMatrix reported as
+		// BDT->TCG->BDT losing 34.95 s at 1900, that being TCG−TAI at the
+		// epoch.
+		return t.TT().TAI()
+	case TCB:
+		// TCB → TDB → TT → TAI, for the same reason.
+		return t.TDB().TAI()
 	case GPST:
 		// TAI = GPST + 19 s, exactly. No table, no epoch dependence: the
 		// offset was frozen at the 1980-01-06 synchronisation and GPS time
@@ -1250,6 +1314,17 @@ func (t Time) TT() Time {
 	case GPST, BDT:
 		// GNSS → TAI → TT, both steps constant.
 		return t.TAI().TT()
+	case TCG:
+		// TCG → TT is the defining rate scaling, and the only edge TCG has:
+		// it is TT's coordinate time, so every other scale is reached through
+		// TT rather than by a second formula that could disagree with this
+		// one.
+		tt1, tt2, _ := gofaext.TCGToTT(t.jd1, t.jd2)
+
+		return fromPartsPreserveLoc(t, tt1, tt2, TT)
+	case TCB:
+		// TCB → TDB → TT. TCB's only edge is to TDB, for the same reason.
+		return t.TDB().TT()
 	}
 
 	return t // unreachable
@@ -1308,10 +1383,59 @@ func (t Time) TDB() Time {
 		return t
 	}
 
+	// TCB is TDB's own coordinate time, so the two are one rate scaling
+	// apart. Routing that through TT instead would go out through the
+	// periodic TDB−TT term and back again, which is not symmetric.
+	if t.scale == TCB {
+		tdb1, tdb2, _ := gofaext.TCBToTDB(t.jd1, t.jd2)
+
+		return fromPartsPreserveLoc(t, tdb1, tdb2, TDB)
+	}
+
 	tt := t.TT()
 	correction := tdbMinusTT(tt.jd1, tt.jd2) / 86400.0
 
 	return fromPartsPreserveLoc(t, tt.jd1, tt.jd2+correction, TDB)
+}
+
+// TCG returns a new Time converted to Geocentric Coordinate Time.
+//
+// The conversion is a rate scaling against TT and nothing else — no table, no
+// Earth orientation, no epoch-dependent lookup — so it is exact in both
+// directions and cannot fail. Every other scale reaches TCG through TT, which
+// is what keeps one definition of the TT↔TCG rate rather than several that
+// could drift apart.
+//
+// See [TCG] for what the scale is and when a caller wants it.
+func (t Time) TCG() Time {
+	if t.scale == TCG {
+		return t
+	}
+
+	tt := t.TT()
+
+	tcg1, tcg2, _ := gofaext.TTToTCG(tt.jd1, tt.jd2)
+
+	return fromPartsPreserveLoc(t, tcg1, tcg2, TCG)
+}
+
+// TCB returns a new Time converted to Barycentric Coordinate Time.
+//
+// As [Time.TCG] is to TT, this is to TDB: a rate scaling, exact both ways,
+// reached from every other scale through TDB.
+//
+// See [TCB] for what the scale is and why an ephemeris is argued in TDB
+// instead.
+func (t Time) TCB() Time {
+	if t.scale == TCB {
+		return t
+	}
+
+	tdb := t.TDB()
+
+	tcb1, tcb2, _ := gofaext.TDBToTCB(tdb.jd1, tdb.jd2)
+
+	return fromPartsPreserveLoc(t, tcb1, tcb2, TCB)
 }
 
 // UT1 returns a new Time converted to the Universal Time (UT1) scale.
