@@ -6,7 +6,10 @@ import (
 	"errors"
 	"io"
 	"log"
+	"net/http"
+	"net/http/httptest"
 	"path"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -471,5 +474,96 @@ func TestUnreachableSourceStillReportsConsentFirst(t *testing.T) {
 
 	if err == nil {
 		t.Fatal("expected an error opening an unregistered scheme")
+	}
+}
+
+// TestAFetchThatLostTheRaceStillReturnsTheObject is the CI failure this branch
+// hit on Windows, reduced to one process.
+//
+// The lock is exclusive within a process and only mostly exclusive across them,
+// so two processes can both reach the download for one key; the loser's staging
+// rename fails while the winner writes a complete file. Reporting that as a
+// fetch failure fails a caller who has, in fact, got exactly what they asked
+// for.
+//
+// The ordering is what makes this a real test of the recovery rather than of
+// the ordinary cache hit: the cache is empty when GetFile starts, the winner's
+// object appears while the download is in flight, and only then does the
+// download fail. Seeding the cache up front instead would be answered by the
+// cache check before the fetch and would exercise nothing.
+func TestAFetchThatLostTheRaceStillReturnsTheObject(t *testing.T) {
+	const (
+		name    = "planets/de440s.bsp"
+		payload = "a complete kernel written by the winner"
+	)
+
+	scope := Capture(NAIFSPK)
+	t.Cleanup(scope.Restore)
+
+	SetDataDir(testutil.FileURL(t, t.TempDir()))
+	EnableDownloads(0, NAIFSPK)
+
+	cacheBucket, prefix, err := CacheDir(context.Background(), NAIFSPK)
+	if err != nil {
+		t.Fatalf("CacheDir: %v", err)
+	}
+
+	// The source answers metadata, then — on the body request — plays the
+	// winner finishing its download before this one dies on the staging
+	// rename.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Length", strconv.Itoa(len(payload)))
+
+		if r.Method == http.MethodHead {
+			return
+		}
+
+		if err := Save(r.Context(), cacheBucket, prefix+name, strings.NewReader(payload)); err != nil {
+			t.Errorf("seed the winner's object: %v", err)
+		}
+
+		http.Error(w, "the other process is mid-rename", http.StatusInternalServerError)
+	}))
+	defer srv.Close()
+
+	if err := SetURL(NAIFSPK, srv.URL); err != nil {
+		t.Fatalf("SetURL: %v", err)
+	}
+
+	bucket, key, err := GetFile(context.Background(), NAIFSPK, name)
+	if err != nil {
+		t.Fatalf("GetFile after losing the race = %v, want the object the winner wrote", err)
+	}
+
+	got, err := bucket.ReadAll(context.Background(), key)
+	if err != nil {
+		t.Fatalf("ReadAll: %v", err)
+	}
+
+	if string(got) != payload {
+		t.Errorf("content = %q, want the winner's %q", got, payload)
+	}
+}
+
+// The other half: a fetch that fails for any other reason still fails, so the
+// recovery above cannot turn a broken download into a silent success.
+func TestAFailedFetchWithNothingCachedStillFails(t *testing.T) {
+	scope := Capture(NAIFSPK)
+	t.Cleanup(scope.Restore)
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		http.Error(w, "no", http.StatusInternalServerError)
+	}))
+	defer srv.Close()
+
+	if err := SetURL(NAIFSPK, srv.URL); err != nil {
+		t.Fatalf("SetURL: %v", err)
+	}
+
+	SetDataDir(testutil.FileURL(t, t.TempDir()))
+	EnableDownloads(0, NAIFSPK)
+
+	if _, _, err := GetFile(context.Background(), NAIFSPK, "planets/absent.bsp"); err == nil {
+		t.Fatal("a failed download with nothing in the cache reported success")
 	}
 }

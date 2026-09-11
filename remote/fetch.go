@@ -151,6 +151,28 @@ func (c *Client) GetFile(ctx context.Context, id EndpointID, name string, opts .
 	timeout := cmp.Or(cfg.timeout, ep.DownloadTimeout, DefaultDownloadTimeout)
 
 	if err := c.fetchInto(ctx, id, ep, srcBucket, cacheBucket, name, cacheKey, timeout, cfg); err != nil {
+		// A failed fetch is not the same as a missing file, and the difference
+		// is a whole class of CI failure. The lock above is exclusive within
+		// this process and only mostly exclusive across processes — fileblob's
+		// IfNotExist is a Stat followed by a Rename with a window in between —
+		// so two processes can both reach here for one key. The loser's
+		// staging rename then fails with "Access is denied" on Windows while
+		// the winner's download completes perfectly.
+		//
+		// Measured in CI on this branch: `go test ./...` runs ephemeris/jpl and
+		// time as separate processes against one cache, both fetch de440s.bsp,
+		// and one died on exactly that rename while the other wrote a complete
+		// kernel (#241).
+		//
+		// So ask the question the caller actually asked — is the object there
+		// and current — before reporting a failure. This is not a retry and
+		// swallows nothing: it re-runs the same freshness check the cache hit
+		// above uses, and a fetch that failed for any reason other than losing
+		// this race still finds nothing and still fails.
+		if fresh, freshErr := freshInCache(ctx, ep, srcBucket, cacheBucket, name, cacheKey); freshErr == nil && fresh {
+			return cacheBucket, cacheKey, nil
+		}
+
 		return nil, "", fmt.Errorf("remote: fetch %s: %w", name, err)
 	}
 

@@ -2,7 +2,7 @@
 type: Changed — BREAKING
 pr: 274
 ---
-**`remote.APIClient` is gone; `remote.Client` carries the request methods.** `Get`, `GetJSON`,
+**`remote.APIClient` no longer exists; `remote.Client` carries the request methods.** `Get`, `GetJSON`,
 `PostForm` and `PostJSON` are methods on the policy that decides whether the request may happen
 at all, so a caller holds one object instead of two that each answered half the question.
 `remote.Default()` is the process-wide one; a component wanting its own timeout, pacing or token
