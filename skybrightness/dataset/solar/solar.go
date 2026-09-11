@@ -238,10 +238,19 @@ func floatColumn(table *fits.BintableHDU, name string) []float64 {
 		return nil
 	}
 
+	// A null reads as NaN rather than as the zero Arrow leaves in the buffer.
+	// Zero is a measurement — an irradiance of nothing — and the screening in
+	// Parse drops NaN precisely so an absent sample never becomes a real one.
 	switch col := table.Batch.Column(index).(type) {
 	case *array.Float64:
 		out := make([]float64, col.Len())
 		for i := range out {
+			if col.IsNull(i) {
+				out[i] = math.NaN()
+
+				continue
+			}
+
 			out[i] = col.Value(i)
 		}
 
@@ -249,6 +258,12 @@ func floatColumn(table *fits.BintableHDU, name string) []float64 {
 	case *array.Float32:
 		out := make([]float64, col.Len())
 		for i := range out {
+			if col.IsNull(i) {
+				out[i] = math.NaN()
+
+				continue
+			}
+
 			out[i] = float64(col.Value(i))
 		}
 

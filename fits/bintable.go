@@ -25,6 +25,12 @@ type BintableHDU struct {
 
 // tformField is one parsed TFORMn: a repeat count and a FITS data-type code.
 type tformField struct {
+	// null is the column's TNULLn: the stored value that means "undefined".
+	// hasNull distinguishes a declared sentinel of zero from no declaration,
+	// which are different things.
+	null    int64
+	hasNull bool
+
 	repeat int
 	code   byte
 }
@@ -87,20 +93,40 @@ func (f tformField) size() int {
 
 // arrowType maps the field to the Arrow type its values are decoded into.
 //
-// Only scalar columns are decoded — a repeat count above one on a numeric
-// type is a vector per row, which has no scalar equivalent. Those columns
-// keep their place in the schema as nulls so the column indices still line
-// up with the file, and reading one returns zeros rather than another
-// column's values.
+// A repeat count above one is a vector per row — a spectrum, a covariance row,
+// a per-filter magnitude set — and becomes a fixed-size list of the element
+// type. Those columns used to decode as nulls, which discarded the data of
+// every table that uses them, and BINTABLEs use them constantly.
+//
+// A character column is the exception: its repeat count is a width in bytes,
+// not a count of values, so "20A" is one twenty-character string rather than
+// twenty characters.
 func (f tformField) arrowType() arrow.DataType {
 	if f.code == 'A' {
 		return arrow.BinaryTypes.String
 	}
 
 	if f.repeat != 1 {
+		elem := f.elementType()
+
+		// A TFORM repeat is bounded by the row width the header declares, so
+		// it cannot exceed what an int32 holds; the check is here because that
+		// bound lives in the file rather than in the type.
+		if elem != arrow.Null && f.repeat > 0 && f.repeat <= math.MaxInt32 {
+			n := int32(f.repeat)
+
+			return arrow.FixedSizeListOf(n, elem)
+		}
+
 		return arrow.Null
 	}
 
+	return f.elementType()
+}
+
+// elementType is the Arrow type of one value of this field, ignoring the
+// repeat count.
+func (f tformField) elementType() arrow.DataType {
 	switch f.code {
 	case 'L':
 		return arrow.FixedWidthTypes.Boolean
@@ -126,9 +152,32 @@ func (f tformField) arrowType() arrow.DataType {
 // FITS binary tables are big-endian regardless of the host, which is why the
 // bytes are assembled explicitly rather than cast.
 func (f tformField) appendValue(bldr array.Builder, row []byte) {
+	// A cell holding the column's declared undefined value is a null, not the
+	// number it happens to be stored as. Without this a TNULL of -32768 reads
+	// back as the temperature -32768.
+	if f.hasNull {
+		if v, ok := f.storedInt(row); ok && v == f.null {
+			bldr.AppendNull()
+
+			return
+		}
+	}
+
 	switch b := bldr.(type) {
 	case *array.NullBuilder:
 		b.AppendNull()
+	case *array.FixedSizeListBuilder:
+		// A vector cell is its elements laid end to end, each at the element
+		// width, so the same decoder runs once per element into the list's
+		// value builder.
+		b.Append(true)
+
+		width := f.width()
+		elem := tformField{repeat: 1, code: f.code, null: f.null, hasNull: f.hasNull}
+
+		for i := range f.repeat {
+			elem.appendValue(b.ValueBuilder(), row[i*width:(i+1)*width])
+		}
 	case *array.StringBuilder:
 		b.Append(strings.TrimRightFunc(string(row[:f.repeat]), func(r rune) bool {
 			return r == ' ' || r == 0
@@ -146,11 +195,40 @@ func (f tformField) appendValue(bldr array.Builder, row []byte) {
 	case *array.Int64Builder:
 		b.Append(int64(binary.BigEndian.Uint64(row))) //nolint:gosec // two's-complement reinterpretation
 	case *array.Float32Builder:
-		b.Append(math.Float32frombits(binary.BigEndian.Uint32(row)))
+		// NaN is how a FITS floating-point column says "no value" — it needs
+		// no TNULLn because the representation already has room for it. A
+		// reader that passed it through would hand a caller a NaN to notice
+		// for themselves, in a column where every other absence is a null.
+		if v := math.Float32frombits(binary.BigEndian.Uint32(row)); math.IsNaN(float64(v)) {
+			b.AppendNull()
+		} else {
+			b.Append(v)
+		}
 	case *array.Float64Builder:
-		b.Append(math.Float64frombits(binary.BigEndian.Uint64(row)))
+		if v := math.Float64frombits(binary.BigEndian.Uint64(row)); math.IsNaN(v) {
+			b.AppendNull()
+		} else {
+			b.Append(v)
+		}
 	default:
 		bldr.AppendNull()
+	}
+}
+
+// storedInt reads an integer cell at this field's width, for comparison
+// against TNULLn. ok is false for a field that is not an integer one.
+func (f tformField) storedInt(row []byte) (int64, bool) {
+	switch f.code {
+	case 'B':
+		return int64(row[0]), true
+	case 'I':
+		return int64(int16(binary.BigEndian.Uint16(row))), true //nolint:gosec // two's-complement reinterpretation
+	case 'J':
+		return int64(int32(binary.BigEndian.Uint32(row))), true //nolint:gosec // two's-complement reinterpretation
+	case 'K':
+		return int64(binary.BigEndian.Uint64(row)), true //nolint:gosec // two's-complement reinterpretation
+	default:
+		return 0, false
 	}
 }
 
@@ -210,6 +288,10 @@ func ReadBintable(h *Header, r io.Reader) (*BintableHDU, error) {
 		parsed[i] = field
 		offsets[i] = offset
 		fields[i] = arrow.Field{Name: name, Type: field.arrowType(), Nullable: true}
+
+		if v, ok := tnullFor(h, i); ok {
+			parsed[i].null, parsed[i].hasNull = v, true
+		}
 
 		offset += field.size()
 	}
@@ -330,7 +412,15 @@ func (hdu *BintableHDU) GetFloatColumn(colName string) ([]float64, error) {
 	res := make([]float64, rows)
 
 	for i := range rows {
+		// A null is NaN, not zero. Zero is a measurement — a flux of nothing,
+		// a magnitude of nothing — and returning it for an absent value is how
+		// a missing sample becomes a real one that nothing downstream can
+		// identify. NaN is what the float world means by "no value", it is
+		// what FITS stores for an undefined float, and every consumer of this
+		// already screens for it.
 		if arr.IsNull(i) {
+			res[i] = math.NaN()
+
 			continue
 		}
 
@@ -346,9 +436,17 @@ func (hdu *BintableHDU) GetFloatColumn(colName string) ([]float64, error) {
 		case *array.String:
 			if val, err := strconv.ParseFloat(a.Value(i), 64); err == nil {
 				res[i] = val
+			} else {
+				res[i] = math.NaN()
 			}
+		default:
+			res[i] = math.NaN()
 		}
 	}
 
 	return res, nil
 }
+
+// Type reports that this is a binary table HDU. See [ImageHDU.Type] for why it
+// is declared here rather than left to the embedded basicHDU.
+func (*BintableHDU) Type() HDUType { return HDUTypeBinary }

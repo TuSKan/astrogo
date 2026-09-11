@@ -61,12 +61,10 @@ func (h *Header) GetString(keyword string) (string, error) {
 		return "", err
 	}
 
-	val := strings.TrimSpace(card.Value)
-	if len(val) >= 2 && val[0] == '\'' && val[len(val)-1] == '\'' {
-		val = val[1 : len(val)-1]
-	}
-	// Also trim trailing spaces that might be inside the quoted string if it was padded
-	return strings.TrimRight(val, " "), nil
+	// unquote also collapses the doubled quote FITS uses to escape a literal
+	// one, so a value written as 'O''Brien' reads back as O'Brien rather than
+	// as the text a writer would have to double again.
+	return unquote(strings.TrimSpace(card.Value)), nil
 }
 
 // GetInt returns the value of a keyword as an integer.
@@ -104,50 +102,66 @@ func (h *Header) GetFloat(keyword string) (float64, error) {
 }
 
 // ParseCard extracts the value and comment string from a raw 80-byte FITS card.
+//
+// Three card shapes are recognised, which is every shape a header actually
+// contains:
+//
+//   - A value card: keyword in columns 1-8, "= " in 9-10, then the value and
+//     an optional " / comment".
+//   - A HIERARCH card, whose keyword is longer than eight characters and runs
+//     up to the first "=" — see [github.com/TuSKan/astrogo/fits] on the
+//     conventions.
+//   - A commentary card (COMMENT, HISTORY, or a blank keyword), whose whole
+//     remainder is text.
+//
+// The value is returned as written, quotes included, so a card read here and
+// written back by [Write] is the same card.
 func ParseCard(raw []byte) Card {
 	s := string(raw)
-	if len(s) > 80 {
-		s = s[:80]
+	if len(s) > CardSize {
+		s = s[:CardSize]
+	}
+
+	// A HIERARCH keyword is longer than the eight-column field, so it has to
+	// be recognised before the columns are trusted.
+	if kw, rest, ok := parseHierarch(s); ok {
+		value, comment := splitValueComment(rest)
+
+		return Card{Keyword: kw, Value: value, Comment: comment}
 	}
 
 	card := Card{}
 
-	if len(s) < 8 {
+	if len(s) < keywordWidth {
 		card.Keyword = strings.TrimSpace(s)
+
 		return card
 	}
 
-	card.Keyword = strings.TrimSpace(s[0:8])
+	card.Keyword = strings.TrimSpace(s[0:keywordWidth])
 
-	if len(s) == 8 || len(strings.TrimSpace(s[8:])) == 0 {
+	if len(s) == keywordWidth || strings.TrimSpace(s[keywordWidth:]) == "" {
 		return card
 	}
 
-	rest := s[8:]
-	if strings.HasPrefix(rest, "= ") {
-		rest = rest[2:]
+	rest := s[keywordWidth:]
 
-		// Find the true value and comment split considering string literals
-		inQuote := false
-		valEnd := len(rest)
+	// CONTINUE carries a bare string in the value field with no "= ", and is
+	// joined onto the preceding card by ReadHeader.
+	if card.Keyword == continueKeyword {
+		card.Value, card.Comment = splitValueComment(rest)
 
-		for i := range len(rest) {
-			if rest[i] == '\'' {
-				inQuote = !inQuote
-			} else if rest[i] == '/' && !inQuote {
-				valEnd = i
-				break
-			}
-		}
+		return card
+	}
 
-		card.Value = strings.TrimSpace(rest[:valEnd])
-		if valEnd < len(rest) {
-			card.Comment = strings.TrimSpace(rest[valEnd+1:])
-		}
-	} else {
-		// Not a standard assignment card (such as HISTORY or COMMENT)
+	if !strings.HasPrefix(rest, valueIndicator) {
+		// Not an assignment: COMMENT, HISTORY, or a blank keyword.
 		card.Comment = strings.TrimSpace(rest)
+
+		return card
 	}
+
+	card.Value, card.Comment = splitValueComment(rest[len(valueIndicator):])
 
 	return card
 }
