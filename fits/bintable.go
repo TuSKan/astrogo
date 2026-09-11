@@ -446,3 +446,7 @@ func (hdu *BintableHDU) GetFloatColumn(colName string) ([]float64, error) {
 
 	return res, nil
 }
+
+// Type reports that this is a binary table HDU. See [ImageHDU.Type] for why it
+// is declared here rather than left to the embedded basicHDU.
+func (*BintableHDU) Type() HDUType { return HDUTypeBinary }

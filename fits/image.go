@@ -253,3 +253,12 @@ func offsetToUnsigned(buf []byte, pixelBytes int) {
 		}
 	}
 }
+
+// Type reports that this is an image HDU.
+//
+// Declared on the concrete type rather than left to the embedded basicHDU,
+// whose field is only filled in by the reader. An HDU a caller constructed —
+// which is the whole point of having a writer — would otherwise report the
+// zero value, and the zero value happens to be HDUTypeImage, so the mistake is
+// invisible until the one kind it is wrong for.
+func (*ImageHDU) Type() HDUType { return HDUTypeImage }

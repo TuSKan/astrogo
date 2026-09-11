@@ -52,7 +52,15 @@ func writeHDU(w io.Writer, hdu HDU, primary, extensions bool) error {
 		return err
 	}
 
-	data := padded(payload, 0)
+	// An ASCII table's last block is filled with spaces: a zero byte there is
+	// not blank text, and a reader taking the remainder of the block as a row
+	// would see it. Everything else pads with zeros.
+	fill := byte(0)
+	if hdu.Type() == HDUTypeASCII {
+		fill = ' '
+	}
+
+	data := padded(payload, fill)
 
 	// DATASUM goes in before the header is rendered, since CHECKSUM covers it.
 	setCard(header, "DATASUM", datasumValue(CalcChecksum(data)),
@@ -128,6 +136,12 @@ func encodeHDU(hdu HDU, primary, extensions bool) (*Header, []byte, error) {
 		}
 
 		return encodeBintable(h)
+	case *ASCIITableHDU:
+		if primary {
+			return nil, nil, fmt.Errorf("%w: an ASCII table cannot be the primary HDU", ErrNotWritable)
+		}
+
+		return encodeASCIITable(h)
 	default:
 		return nil, nil, fmt.Errorf("%w: %T", ErrNotWritable, hdu)
 	}

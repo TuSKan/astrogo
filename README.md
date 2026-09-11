@@ -423,7 +423,7 @@ be able to break an API until 1.0 says otherwise.
 | `magnitude` | Apparent magnitude (planets, asteroids, comets, satellites, stars) |
 | `constellation` | IAU constellation lookup from an ICRS position (official 1930 boundaries), `List`/`Centroid` enumeration |
 | `optics` | Equipment-optics arithmetic (`Telescope`/`Eyepiece`/`Sensor`) — magnification, FOV, exit pupil, Dawes limit, pixel scale |
-| `fits` | FITS **reading and writing**, WCS (TAN projection), mmap, Arrow export. Writes images (every BITPIX) and binary tables from Arrow batches via `fits.Write` |
+| `fits` | FITS **reading and writing**, WCS (TAN projection), mmap, Arrow export. `fits.Write` produces images (every BITPIX, signed and unsigned), binary tables and ASCII tables from Arrow batches, with HIERARCH, CONTINUE long strings, TNULL, vector columns and CHECKSUM/DATASUM |
 | `fits/plan` | FITS↔plan bridge (`SiteFromFITS`, `TargetFromFITS`) |
 | `plan` | Observability, constraints, events, scheduling, satellite passes |
 | `skybrightness` | Spectral all-sky radiance engine (`Scene`/`Component`/`Model`/`Estimate`, all-sky ops, uncertainty, provenance) — seven components, Phases 0–5, natural sky validated to 0.05 mag against GAMBONS |
