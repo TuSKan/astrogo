@@ -410,3 +410,147 @@ func TestFK4CarriesTheKinematicsItWasGiven(t *testing.T) {
 			empty.Parallax(), empty.RV())
 	}
 }
+
+// TestFK4ToFK5MatchesSOFAExactly is the intermediate step
+// [TestFK4ToICRSAgreesWithSOFAsPublishedVector] could only bound.
+//
+// That test compares an ICRS result against SOFA's FK5 answer and therefore
+// has to allow the ~25 mas the second stage adds. This one stops where SOFA
+// stops, so it can assert SOFA's published Fk425 vector outright — every one
+// of the six elements, at SOFA's own tolerances.
+func TestFK4ToFK5MatchesSOFAExactly(t *testing.T) {
+	t.Parallel()
+
+	// SOFA's Fk425 test vector from t_sofa_c.c, in radians, radians/year,
+	// arcseconds and km/s.
+	src := coord.NewFK4WithProperMotion(
+		angle.Rad(0.07626899753879587532), angle.Rad(-1.137405378399605780),
+		angle.Rad(0.1973749217849087460e-4), angle.Rad(0.5659714913272723189e-5),
+		angle.Arcsec(0.134), 8.7,
+	)
+
+	got := coord.FK4ToFK5(src)
+
+	pmRA, pmDec, ok := got.ProperMotion()
+	if !ok {
+		t.Fatal("the six-element conversion came back with no recorded proper motion")
+	}
+
+	testutil.AssertNear(t, "RA (rad)", got.RA().Radians(), 0.08757989933556446040, 1e-14)
+	testutil.AssertNear(t, "Dec (rad)", got.Dec().Radians(), -1.132279113042091895, 1e-12)
+	testutil.AssertNear(t, "pmRA (rad/yr)", pmRA.Radians(), 0.1953670614474396139e-4, 1e-17)
+	testutil.AssertNear(t, "pmDec (rad/yr)", pmDec.Radians(), 0.5637686678659640164e-5, 1e-18)
+	testutil.AssertNear(t, "parallax (arcsec)", got.Parallax().Arcseconds(), 0.1339919950582767871, 1e-13)
+	testutil.AssertNear(t, "radial velocity (km/s)", got.RV(), 8.736999669183529069, 1e-12)
+
+	if got.Epoch() != coord.J2000Epoch {
+		t.Errorf("epoch = %v, want J2000.0 — Fk425 produces J2000 data by definition", got.Epoch())
+	}
+}
+
+// TestFK4ToFK5PositionOnlyMatchesSOFA is the other route, against SOFA's
+// Fk45z vector, at a Besselian epoch that is deliberately not B1950 — the
+// epoch is the only thing distinguishing this routine from a fixed rotation.
+func TestFK4ToFK5PositionOnlyMatchesSOFA(t *testing.T) {
+	t.Parallel()
+
+	src := coord.NewFK4(
+		angle.Rad(0.01602284975382960982), angle.Rad(-0.1164347929099906024),
+		1954.677617625256806,
+	)
+
+	got := coord.FK4ToFK5(src)
+
+	testutil.AssertNear(t, "RA (rad)", got.RA().Radians(), 0.02719295911606862303, 1e-15)
+	testutil.AssertNear(t, "Dec (rad)", got.Dec().Radians(), -0.1115766001565926892, 1e-13)
+
+	// Fk45z reports where the star is and not how fast FK5 sees it move, so
+	// the result carries no recorded motion. Claiming a measured zero here
+	// would send the next conversion down the wrong branch.
+	if _, _, ok := got.ProperMotion(); ok {
+		t.Error("the position-only route reported a recorded proper motion; " +
+			"Fk45z returns a position and nothing else")
+	}
+}
+
+// TestFK5ToFK4MatchesSOFAExactly is the inverse, against SOFA's Fk524 vector.
+func TestFK5ToFK4MatchesSOFAExactly(t *testing.T) {
+	t.Parallel()
+
+	src := coord.NewFK5WithProperMotion(
+		angle.Rad(0.8723503576487275595), angle.Rad(-0.7517076365138887672),
+		angle.Rad(0.2019447755430472323e-4), angle.Rad(0.3541563940505160433e-5),
+		angle.Arcsec(0.1559), 86.87,
+	)
+
+	got := coord.FK5ToFK4(src, coord.B1950)
+
+	pmRA, pmDec, ok := got.ProperMotion()
+	if !ok {
+		t.Fatal("the six-element conversion came back with no recorded proper motion")
+	}
+
+	testutil.AssertNear(t, "RA (rad)", got.RA().Radians(), 0.8636359659799603487, 1e-13)
+	testutil.AssertNear(t, "Dec (rad)", got.Dec().Radians(), -0.7550281733160843059, 1e-13)
+	testutil.AssertNear(t, "pmRA (rad/yr)", pmRA.Radians(), 0.2023628192747172486e-4, 1e-17)
+	testutil.AssertNear(t, "pmDec (rad/yr)", pmDec.Radians(), 0.3624459754935334718e-5, 1e-18)
+	testutil.AssertNear(t, "parallax (arcsec)", got.Parallax().Arcseconds(), 0.1560079963299390241, 1e-13)
+	testutil.AssertNear(t, "radial velocity (km/s)", got.RV(), 86.79606353469163751, 1e-11)
+}
+
+// TestFK5ToFK4PositionOnlyMatchesSOFA checks the direction that does hand back
+// a motion, against SOFA's Fk54z vector.
+//
+// The two proper-motion components are the whole point: they are the motion
+// FK4's drifting equinox gives a star that is not moving in FK5, and they are
+// of order 1e-8 rad/yr — about 2 milliarcseconds a year, or a fifth of an
+// arcsecond over the century between the two catalogues.
+func TestFK5ToFK4PositionOnlyMatchesSOFA(t *testing.T) {
+	t.Parallel()
+
+	src := coord.NewFK5(
+		angle.Rad(0.02719026625066316119), angle.Rad(-0.1115815170738754813),
+		coord.J2000Epoch,
+	)
+
+	got := coord.FK5ToFK4(src, 1954.677308160316374)
+
+	pmRA, pmDec, ok := got.ProperMotion()
+	if !ok {
+		t.Fatal("the fictitious proper motion was not supplied")
+	}
+
+	testutil.AssertNear(t, "RA (rad)", got.RA().Radians(), 0.01602015588390065476, 1e-14)
+	testutil.AssertNear(t, "Dec (rad)", got.Dec().Radians(), -0.1164397101110765346, 1e-13)
+	testutil.AssertNear(t, "pmRA (rad/yr)", pmRA.Radians(), -0.1175712648471090704e-7, 1e-20)
+	testutil.AssertNear(t, "pmDec (rad/yr)", pmDec.Radians(), 0.2108109051316431056e-7, 1e-20)
+
+	if got.Epoch() != 1954.677308160316374 {
+		t.Errorf("epoch = %v, want the one it was converted to", got.Epoch())
+	}
+}
+
+// TestFK4ToICRSIsItsTwoLegs states the relationship the doc comments claim, so
+// that splitting the conversion in two cannot quietly stop being equivalent to
+// doing it in one.
+func TestFK4ToICRSIsItsTwoLegs(t *testing.T) {
+	t.Parallel()
+
+	for _, src := range []coord.FK4{
+		coord.NewFK4(angle.Deg(101.2871), angle.Deg(-16.7161), coord.B1950),
+		coord.NewFK4(angle.Deg(359.999), angle.Deg(-89.5), 1954.6776),
+		coord.NewFK4WithProperMotion(
+			angle.Rad(0.07626899753879587532), angle.Rad(-1.137405378399605780),
+			angle.Rad(0.1973749217849087460e-4), angle.Rad(0.5659714913272723189e-5),
+			angle.Arcsec(0.134), 8.7),
+	} {
+		direct := coord.FK4ToICRS(src)
+		legs := coord.FK5ToICRS(coord.FK4ToFK5(src))
+
+		if direct.RA() != legs.RA() || direct.Dec() != legs.Dec() ||
+			direct.PmRA() != legs.PmRA() || direct.PmDec() != legs.PmDec() ||
+			direct.Parallax() != legs.Parallax() || direct.RV() != legs.RV() {
+			t.Errorf("%s:\n  FK4ToICRS       = %+v\n  FK5ToICRS∘FK4ToFK5 = %+v", src, direct, legs)
+		}
+	}
+}
