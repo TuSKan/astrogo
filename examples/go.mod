@@ -35,7 +35,7 @@ require (
 	github.com/klauspost/pgzip v1.2.6 // indirect
 	github.com/pierrec/lz4/v4 v4.1.26 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
-	github.com/scigolib/hdf5 v0.14.0 // indirect
+	github.com/scigolib/hdf5 v0.14.1 // indirect
 	github.com/zeebo/xxh3 v1.1.0 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/otel v1.44.0 // indirect
