@@ -40,6 +40,16 @@
 // The [Reducer] provides a lightweight topocentric reduction pipeline that
 // also handles chromatic atmospheric dispersion.
 //
+// # Offsets from a target
+//
+// [SkyOffset] is a frame centred on a chosen position, so nearby objects are
+// described by how far they are from it rather than by absolute coordinates —
+// dither and mosaic patterns, offset guide stars, slit layouts, finder charts.
+// It is a rotation of the sphere rather than a projection onto a plane, which
+// is what separates it from subtracting coordinates: at δ = 80° a point one
+// degree due east of a target differs from it by 5.7° of right ascension and
+// by three arcminutes of declination.
+//
 // # Earth Orientation
 //
 // Both [Context] and [Reducer] query the global IERS EOP model for DUT1 and
