@@ -9,7 +9,7 @@ require (
 	github.com/hebl/gofa v1.19.1
 	github.com/joshuaferrara/go-satellite v0.0.0-20220611180459-512638c64e5b
 	github.com/klauspost/pgzip v1.2.6
-	github.com/scigolib/hdf5 v0.14.0
+	github.com/scigolib/hdf5 v0.14.1
 	// Pinned past v0.46.0 because gocloud-ext's httpblob driver implements
 	// blob/driver.DeleteOptions, which was added after that tag. Forcing the
 	// tag fails to build: "undefined: driver.DeleteOptions". It can move to a
