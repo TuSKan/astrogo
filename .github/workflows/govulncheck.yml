@@ -1,0 +1,81 @@
+name: Go Vulnerability Scan
+
+on:
+  # No path filters: every PR must report the check if it becomes required.
+  pull_request:
+  schedule:
+    # Monday at 09:23 UTC (06:23 in Sao Paulo), away from the hourly peak.
+    - cron: '23 9 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: govulncheck-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  govulncheck:
+    # Keep this name stable for the main-protection required status check.
+    name: Go Vulnerability Scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Setup Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version: '1.27'
+          check-latest: true
+          cache: true
+          cache-dependency-path: |
+            go.sum
+            examples/go.sum
+
+      - name: Install govulncheck
+        # Build the scanner for the runner before setting cross-target GOOS.
+        run: go install golang.org/x/vuln/cmd/govulncheck@v1.8.0
+
+      - name: Scan both modules for supported platforms
+        shell: bash
+        env:
+          GOFLAGS: -mod=readonly
+          # Scan astrogo's pure-Go build, including platform-specific files.
+          CGO_ENABLED: '0'
+        run: |
+          set -euo pipefail
+          scanner="$(go env GOPATH)/bin/govulncheck"
+          status=0
+          {
+            echo '## Go vulnerability scan'
+            echo
+            echo 'Production packages, default build tags, CGO disabled.'
+            echo
+            echo '| Module | Target | Result |'
+            echo '| --- | --- | --- |'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          for target in linux/amd64 windows/amd64 darwin/arm64; do
+            for module in . examples; do
+              echo "::group::Scan $module ($target)"
+              # Text output preserves the nonzero exit code for reachable
+              # vulnerabilities. JSON/SARIF output alone would not fail CI.
+              # Keep scanning after a failure so all six results are visible.
+              if (cd "$module" && GOOS="${target%/*}" GOARCH="${target#*/}" "$scanner" -show traces ./...); then
+                result=Passed
+              else
+                result=Failed
+                status=1
+                echo "::error::govulncheck failed for $module ($target); inspect the log for findings or scan errors."
+              fi
+              echo "| $module | $target | $result |" >> "$GITHUB_STEP_SUMMARY"
+              echo '::endgroup::'
+            done
+          done
+          exit "$status"
