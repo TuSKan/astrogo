@@ -104,7 +104,11 @@ type Target struct {
 	Parallax angle.Angle
 	// PmDec is the proper motion in declination of the target.
 	PmDec angle.Angle
-	// PmRA is the proper motion in right ascension of the target.
+	// PmRA is the proper motion in right ascension of the target, as the
+	// provider published it: mu_alpha* = dRA/dt * cos(dec), the on-sky rate.
+	// That is the pmra column in Gaia, SIMBAD and Hipparcos alike, and it is
+	// what coord.NewICRSWithKinematics takes, so it travels from a catalogue
+	// row to a position without conversion at any layer between.
 	PmRA angle.Angle
 	// Oblateness is the oblateness of the target.
 	Oblateness float64
