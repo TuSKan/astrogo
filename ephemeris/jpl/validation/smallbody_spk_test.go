@@ -4,7 +4,6 @@ package jpl_test
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"testing"
 
@@ -166,12 +165,11 @@ func TestSmallBodySPKAgainstHorizons(t *testing.T) {
 			p, err := jpl.NewProvider(context.Background(), core.SmallBody, body.designation,
 				jpl.WithTimeInterval(start, stop))
 			if err != nil {
-				// Horizons can return a syntactically valid but empty SPK
-				// for a request it otherwise accepts — an external anomaly
-				// this repository already detects and names rather than
-				// caching a broken kernel.
-				if errors.Is(err, spk.ErrHorizonsEmptyKernel) {
-					t.Skipf("Horizons returned an unusable SPK for %s: %v", body.name, err)
+				// Horizons answers 200 and is still unable to serve the
+				// kernel in two live-confirmed ways, both self-resolving —
+				// see spk.TransientHorizonsFault. A real refusal stays fatal.
+				if spk.TransientHorizonsFault(err) {
+					t.Skipf("Horizons could not serve an SPK for %s: %v (external, not astrogo)", body.name, err)
 				}
 
 				t.Fatalf("provider for %s (%s): %v", body.name, body.designation, err)

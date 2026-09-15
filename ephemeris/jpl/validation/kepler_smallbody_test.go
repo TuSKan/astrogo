@@ -4,7 +4,6 @@ package jpl_test
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"math"
 	"strconv"
@@ -154,8 +153,8 @@ func TestKeplerSmallBodyAgainstSPK(t *testing.T) {
 			p, err := jpl.NewProvider(context.Background(), core.SmallBody, body.designation,
 				jpl.WithTimeInterval(start, stop))
 			if err != nil {
-				if errors.Is(err, spk.ErrHorizonsEmptyKernel) {
-					t.Skipf("Horizons returned an unusable SPK for %s: %v", body.name, err)
+				if spk.TransientHorizonsFault(err) {
+					t.Skipf("Horizons could not serve an SPK for %s: %v (external, not astrogo)", body.name, err)
 				}
 
 				t.Skipf("provider for %s: %v", body.name, err)
