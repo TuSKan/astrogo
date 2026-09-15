@@ -273,13 +273,14 @@ func writeStaged(ctx context.Context, bucket *Bucket, writeKey string,
 ) error {
 	opts := &blob.WriterOptions{Metadata: map[string]string{SourceETagKey: sourceETag}}
 
-	// No staging lock here, and that is a conclusion rather than an omission.
-	// Everything below runs holding AcquireLock, which #245 made exclusive
-	// within the process as well as across them, so no second goroutine is in
-	// this function for this key. Two different keys stage under two different
-	// names now that the bucket URL carries no_tmp_dir=1, and two buckets are
-	// two directories. See file.Save for the case that is not covered by any of
-	// that.
+	// AcquireLock protects one cache key, but fileblob's temporary filename
+	// contains only the basename and a clock value. Different cache keys and
+	// buckets can therefore collide on Windows, including with SavePartial.
+	// Use the same basename lock as Save and SavePartial until Close commits
+	// the staging object. This leaves the download's resume semantics intact.
+	unlock := writeLock(bucket, writeKey)
+	defer unlock()
+
 	w, err := bucket.NewWriter(ctx, writeKey, opts)
 	if err != nil {
 		if existing != nil {
