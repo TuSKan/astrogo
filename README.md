@@ -85,12 +85,15 @@ What `astrogo` is: **the only SOFA-rigorous astronomy engine that deploys like s
 One static binary, no Python runtime, no C FFI, an explicit and consent-gated I/O boundary,
 an event solver, an observation scheduler, and a spectral sky-brightness engine.
 
-What it is not, and the honest list matters more than the flattering one: it has no general
-frame graph — transforms are point-to-point functions, so each new frame costs its own
-implementation — and of the frames astropy carries only FK4/B1950 and FK5/J2000 have
-arrived, with no ITRS, HCRS, TETE, LSR or Galactocentric. If you need those today, astropy
-has them and this does not — see [Known Limitations & Scope](#known-limitations--scope)
-and the [open issues](https://github.com/TuSKan/astrogo/issues).
+What it is not, and the honest list matters more than the flattering one: it has **no general
+frame graph**. Transforms are point-to-point functions, so every frame costs its own
+implementation and there is no way to ask for a route between two that were never wired
+together directly. Of the frames astropy carries, FK4/B1950, FK5/J2000, ITRS, TETE, HCRS,
+LSR and Supergalactic have arrived; **Galactocentric has not**, and neither has the
+kinematic LSRK, whose apex is published in the B1900 equinox that `coord.FK4` cannot yet
+express. If you need those today, astropy has them and this does not — see
+[Known Limitations & Scope](#known-limitations--scope) and the
+[open issues](https://github.com/TuSKan/astrogo/issues).
 
 Designed from the ground up for Go: no dynamic magic, no *hidden* global state, zero-allocation hot paths.
 
@@ -414,7 +417,7 @@ be able to break an API until 1.0 says otherwise.
 | `vector` | 3D geometry primitives |
 | `time` | Astronomical time scales (JD-based: UTC/TAI/TT/TDB/UT1, the GNSS system times GPST/BDT, and the coordinate times TCG/TCB), Earth Orientation Parameters (DUT1, polar motion), epoch arithmetic (MJD, GAST, Julian epoch year, day-of-year) |
 | `atmosphere` | Refraction models, airmass, dispersion |
-| `coord` | Coordinate types, transforms, topocentric reduction |
+| `coord` | Coordinate frames (ICRS, AltAz, Galactic, Ecliptic, FK4/B1950, FK5/J2000, CIRS and TETE apparent places, ITRS, HCRS, Supergalactic, and `SkyOffset` centred on a target), topocentric reduction, Local Standard of Rest radial velocities |
 | `ephemeris` | Solar system ephemerides (SOFA + JPL SPK) |
 | `ephemeris/satellite` | SGP4 propagation, TEME→GCRS, look angles, ground track |
 | `catalog/resolve` | Provider interface, HTTP client, Arrow cache |

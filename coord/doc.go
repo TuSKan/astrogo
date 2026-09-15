@@ -34,6 +34,9 @@
 // Pure frame rotations ([ICRSToGalactic], [ICRSToEcliptic]) are available as
 // standalone functions.
 //
+// The [Reducer] provides a lightweight topocentric reduction pipeline that
+// also handles chromatic atmospheric dispersion.
+//
 // # Catalogue frames
 //
 // [FK4] (B1950.0) and [FK5] (J2000.0) are the fundamental catalogues the IAU
@@ -45,17 +48,22 @@
 // and one for a catalogue that recorded none. Confusing FK5 J2000 with ICRS
 // costs about 20 mas; confusing FK4 B1950 with either costs about 0.7°.
 //
-// # The Local Standard of Rest
+// # The Earth-fixed frame
 //
-// [Context.BarycentricRadialVelocity] removes the observer's own motion and
-// leaves a velocity measured against the solar system barycentre, which is the
-// wrong frame for anything Galactic: the Sun is itself moving at about 18 km/s
-// through its neighbourhood. [LSRCorrection] removes that too, and takes an
-// [LSRKind] because the published conventions disagree by 2.1 km/s and a v_LSR
-// quoted without one carries that ambiguity.
+// [Context.ICRSToITRS] and [Context.ITRSToICRS] expose the rotation between
+// the celestial frame and the rotating Earth — the frame a station's
+// coordinates are published in and a ground track is computed in. It is the
+// same matrix every horizon transform already goes through, so an Earth-fixed
+// position costs a matrix multiply rather than a fresh [NewContext], and the
+// two paths cannot disagree about where the Earth is pointing.
 //
-// The [Reducer] provides a lightweight topocentric reduction pipeline that
-// also handles chromatic atmospheric dispersion.
+// # Extragalactic structure
+//
+// [Supergalactic] puts the flattened sheet of nearby bright galaxies — the
+// Local Supercluster, with the Virgo cluster near its centre — on the equator,
+// the way Galactic coordinates put the Milky Way's disc on theirs. It is a
+// fixed rotation with no epoch, since the plane is defined by where galaxies
+// are rather than by where the Earth is pointing.
 //
 // # Moving the origin to the Sun
 //
@@ -77,28 +85,20 @@
 // degree due east of a target differs from it by 5.7° of right ascension and
 // by three arcminutes of declination.
 //
-// # Extragalactic structure
+// # The Local Standard of Rest
 //
-// [Supergalactic] puts the flattened sheet of nearby bright galaxies — the
-// Local Supercluster, with the Virgo cluster near its centre — on the equator,
-// the way Galactic coordinates put the Milky Way's disc on theirs. It is a
-// fixed rotation with no epoch, since the plane is defined by where galaxies
-// are rather than by where the Earth is pointing.
+// [Context.BarycentricRadialVelocity] removes the observer's own motion and
+// leaves a velocity measured against the solar system barycentre, which is the
+// wrong frame for anything Galactic: the Sun is itself moving at about 18 km/s
+// through its neighbourhood. [LSRCorrection] removes that too, and takes an
+// [LSRKind] because the published conventions disagree by 2.1 km/s and a v_LSR
+// quoted without one carries that ambiguity.
 //
 // # Earth Orientation
 //
 // Both [Context] and [Reducer] query the global IERS EOP model for DUT1 and
 // polar motion (XP/YP). If IERS data is unavailable, a one-time log warning
 // is emitted and zero corrections are applied (UT1 ≈ UTC, ~0.9 s worst case).
-//
-// # The Earth-fixed frame
-//
-// [Context.ICRSToITRS] and [Context.ITRSToICRS] expose the rotation between
-// the celestial frame and the rotating Earth — the frame a station's
-// coordinates are published in and a ground track is computed in. It is the
-// same matrix every horizon transform already goes through, so an Earth-fixed
-// position costs a matrix multiply rather than a fresh [NewContext], and the
-// two paths cannot disagree about where the Earth is pointing.
 //
 // # Concurrency
 //
