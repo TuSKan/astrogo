@@ -55,7 +55,18 @@ type Astrometric struct {
 	rv       float64     // Radial Velocity
 }
 
-// Apparent represents the true geocentric position of an object
+// Apparent is the geocentric place of an object with aberration, light
+// deflection, precession and nutation applied — referred to the true equator
+// of date, with right ascension measured from the **Celestial Intermediate
+// Origin**. It is the CIRS place, which is what
+// [Context.AstrometricToApparent] produces and what
+// [Context.ApparentToObserved] consumes.
+//
+// This is not the "apparent RA" an almanac prints. That one measures right
+// ascension from the true equinox, and the two origins are apart by the
+// equation of the origins — about 20 arcminutes in 2026, growing by 46
+// arcseconds a year. Declination is the same in both. See [TETE], and
+// [Context.ApparentToTETE] to convert.
 type Apparent struct {
 	ra  angle.Angle
 	dec angle.Angle

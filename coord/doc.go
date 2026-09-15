@@ -23,6 +23,14 @@
 //
 //	Geometric → Astrometric → Apparent → Observed (Alt/Az)
 //
+// [Apparent] in that chain is the **CIRS** place — right ascension measured
+// from the Celestial Intermediate Origin, which is what the IAU 2000/2006
+// resolutions put at the centre of the transformation. It is not the apparent
+// right ascension an almanac prints, which is measured from the true equinox;
+// the two are apart by the equation of the origins, about 20 arcminutes in
+// 2026 and growing by 46 arcseconds a year. [TETE] is the equinox-based place
+// and [Context.ApparentToTETE] converts.
+//
 // Pure frame rotations ([ICRSToGalactic], [ICRSToEcliptic]) are available as
 // standalone functions.
 //
