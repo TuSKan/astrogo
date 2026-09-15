@@ -51,6 +51,12 @@ type Context struct {
 	// it is the one place the term has to be supplied — see
 	// [Context.GeocentricToObserved].
 	diurab float64
+
+	// eo is the equation of the origins at this epoch, in radians:
+	// ERA minus GST, which is the precession in right ascension since
+	// J2000.0 plus the equation of the equinoxes. About -0.33 degrees in
+	// 2026 and growing by 46 arcseconds a year. See [Context.ApparentToTETE].
+	eo float64
 }
 
 // NewContext prepares the astrometry parameters for a specific observer time and site.
@@ -68,7 +74,12 @@ func NewContext(t time.Time, site *Geodetic, atm atmosphere.Refraction) *Context
 		p = 0.0 // Custom model overrides internal SOFA refraction
 	}
 
-	astrom, _ := gofaext.Apco13(
+	// Apco13's second return is the equation of the origins, the angle
+	// between the true equinox and the CIO. It is what separates the CIRS
+	// place this Context computes from the equinox-based apparent place an
+	// almanac quotes, and discarding it used to leave that conversion
+	// unreachable. See [Context.ApparentToTETE].
+	astrom, eo := gofaext.Apco13(
 		jd1, jd2, eop.DUT1,
 		site.Lon().Radians(), site.Lat().Radians(), site.Height(),
 		eop.XP, eop.YP,
@@ -116,6 +127,7 @@ func NewContext(t time.Time, site *Geodetic, atm atmosphere.Refraction) *Context
 		sinLat: sinLat, cosLat: cosLat,
 		sinLon: sinLon, cosLon: cosLon,
 		diurab: diurab,
+		eo:     eo,
 	}
 }
 
