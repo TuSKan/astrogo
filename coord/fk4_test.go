@@ -27,7 +27,8 @@ func TestFK4ToICRSAgreesWithSOFAsPublishedVector(t *testing.T) {
 
 	fk4 := coord.NewFK4WithProperMotion(
 		angle.Rad(0.07626899753879587532), angle.Rad(-1.137405378399605780),
-		angle.Rad(0.1973749217849087460e-4), angle.Rad(0.5659714913272723189e-5),
+		angle.Rad(sofaPM(0.1973749217849087460e-4, -1.137405378399605780)),
+		angle.Rad(0.5659714913272723189e-5),
 		angle.Arcsec(0.134), 8.7,
 	)
 
@@ -425,7 +426,8 @@ func TestFK4ToFK5MatchesSOFAExactly(t *testing.T) {
 	// arcseconds and km/s.
 	src := coord.NewFK4WithProperMotion(
 		angle.Rad(0.07626899753879587532), angle.Rad(-1.137405378399605780),
-		angle.Rad(0.1973749217849087460e-4), angle.Rad(0.5659714913272723189e-5),
+		angle.Rad(sofaPM(0.1973749217849087460e-4, -1.137405378399605780)),
+		angle.Rad(0.5659714913272723189e-5),
 		angle.Arcsec(0.134), 8.7,
 	)
 
@@ -438,7 +440,8 @@ func TestFK4ToFK5MatchesSOFAExactly(t *testing.T) {
 
 	testutil.AssertNear(t, "RA (rad)", got.RA().Radians(), 0.08757989933556446040, 1e-14)
 	testutil.AssertNear(t, "Dec (rad)", got.Dec().Radians(), -1.132279113042091895, 1e-12)
-	testutil.AssertNear(t, "pmRA (rad/yr)", pmRA.Radians(), 0.1953670614474396139e-4, 1e-17)
+	testutil.AssertNear(t, "pmRA (rad/yr)", pmRA.Radians(),
+		sofaPM(0.1953670614474396139e-4, -1.132279113042091895), 1e-17)
 	testutil.AssertNear(t, "pmDec (rad/yr)", pmDec.Radians(), 0.5637686678659640164e-5, 1e-18)
 	testutil.AssertNear(t, "parallax (arcsec)", got.Parallax().Arcseconds(), 0.1339919950582767871, 1e-13)
 	testutil.AssertNear(t, "radial velocity (km/s)", got.RV(), 8.736999669183529069, 1e-12)
@@ -479,7 +482,8 @@ func TestFK5ToFK4MatchesSOFAExactly(t *testing.T) {
 
 	src := coord.NewFK5WithProperMotion(
 		angle.Rad(0.8723503576487275595), angle.Rad(-0.7517076365138887672),
-		angle.Rad(0.2019447755430472323e-4), angle.Rad(0.3541563940505160433e-5),
+		angle.Rad(sofaPM(0.2019447755430472323e-4, -0.7517076365138887672)),
+		angle.Rad(0.3541563940505160433e-5),
 		angle.Arcsec(0.1559), 86.87,
 	)
 
@@ -492,7 +496,8 @@ func TestFK5ToFK4MatchesSOFAExactly(t *testing.T) {
 
 	testutil.AssertNear(t, "RA (rad)", got.RA().Radians(), 0.8636359659799603487, 1e-13)
 	testutil.AssertNear(t, "Dec (rad)", got.Dec().Radians(), -0.7550281733160843059, 1e-13)
-	testutil.AssertNear(t, "pmRA (rad/yr)", pmRA.Radians(), 0.2023628192747172486e-4, 1e-17)
+	testutil.AssertNear(t, "pmRA (rad/yr)", pmRA.Radians(),
+		sofaPM(0.2023628192747172486e-4, -0.7550281733160843059), 1e-17)
 	testutil.AssertNear(t, "pmDec (rad/yr)", pmDec.Radians(), 0.3624459754935334718e-5, 1e-18)
 	testutil.AssertNear(t, "parallax (arcsec)", got.Parallax().Arcseconds(), 0.1560079963299390241, 1e-13)
 	testutil.AssertNear(t, "radial velocity (km/s)", got.RV(), 86.79606353469163751, 1e-11)
@@ -522,7 +527,8 @@ func TestFK5ToFK4PositionOnlyMatchesSOFA(t *testing.T) {
 
 	testutil.AssertNear(t, "RA (rad)", got.RA().Radians(), 0.01602015588390065476, 1e-14)
 	testutil.AssertNear(t, "Dec (rad)", got.Dec().Radians(), -0.1164397101110765346, 1e-13)
-	testutil.AssertNear(t, "pmRA (rad/yr)", pmRA.Radians(), -0.1175712648471090704e-7, 1e-20)
+	testutil.AssertNear(t, "pmRA (rad/yr)", pmRA.Radians(),
+		sofaPM(-0.1175712648471090704e-7, -0.1164397101110765346), 1e-20)
 	testutil.AssertNear(t, "pmDec (rad/yr)", pmDec.Radians(), 0.2108109051316431056e-7, 1e-20)
 
 	if got.Epoch() != 1954.677308160316374 {

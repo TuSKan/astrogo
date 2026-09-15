@@ -24,7 +24,11 @@ type Star struct {
 // StarOption configures optional Star fields.
 type StarOption func(*Star)
 
-// WithProperMotion sets proper motion in RA and Dec.
+// WithProperMotion sets proper motion in RA and Dec, per Julian year.
+//
+// pmRA is the on-sky rate, mu_alpha* = dRA/dt * cos(dec) — the pmra column
+// a catalogue publishes, passed straight through. See
+// coord.NewICRSWithKinematics for why the distinction matters.
 func WithProperMotion(pmRA, pmDec angle.Angle) StarOption {
 	return func(s *Star) { s.pmRA = pmRA; s.pmDec = pmDec }
 }

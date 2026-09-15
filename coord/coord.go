@@ -49,7 +49,7 @@ type ObserversLocation struct {
 type Astrometric struct {
 	ra       angle.Angle // Right Ascension
 	dec      angle.Angle // Declination
-	pmRA     angle.Angle // Proper Motion in Right Ascension
+	pmRA     angle.Angle // mu_alpha* = dRA/dt * cos(dec), per Julian year
 	pmDec    angle.Angle // Proper Motion in Declination
 	parallax angle.Angle // Parallax
 	rv       float64     // Radial Velocity
@@ -79,7 +79,7 @@ type ICRS struct {
 	ra       angle.Angle
 	dec      angle.Angle
 	dist     float64
-	pmRA     angle.Angle // Proper motion in RA (dRA/dt × cos δ), per Julian year
+	pmRA     angle.Angle // mu_alpha* = dRA/dt * cos(dec), per Julian year
 	pmDec    angle.Angle // Proper motion in Dec, per Julian year
 	parallax angle.Angle // Stellar parallax
 	rv       float64     // Radial velocity (km/s)
@@ -114,6 +114,16 @@ func NewICRS(ra, dec angle.Angle) ICRS { return ICRS{ra: ra, dec: dec} }
 // NewICRSWithKinematics creates an ICRS direction with stellar kinematics attached.
 // SOFA uses these to compute rigorous space-motion propagation, annual parallax,
 // and aberration coupling internally via Atcoq/Atciq.
+//
+// pmRA is mu_alpha* = dRA/dt · cos(dec) — the rate the star moves across the
+// sky, which is the pmra column Gaia, SIMBAD and Hipparcos all publish and
+// what astropy calls pm_ra_cosdec. Pass a catalogue's value straight in.
+//
+// SOFA's own routines want the other one, dRA/dt, which near a pole is huge
+// for a star that is barely moving; converting to it is this package's job
+// and happens at the one boundary where SOFA is called. Handing a catalogue
+// value to SOFA directly is what #281 was: it lost a factor of cos(dec),
+// which is 30% at δ = 45° and 83% at δ = 80°.
 func NewICRSWithKinematics(ra, dec, pmRA, pmDec, parallax angle.Angle, rv float64) ICRS {
 	return ICRS{ra: ra, dec: dec, pmRA: pmRA, pmDec: pmDec, parallax: parallax, rv: rv}
 }
@@ -159,7 +169,8 @@ func (c ICRS) Dec() angle.Angle { return c.dec }
 // Dist returns the distance of the ICRS coordinate.
 func (c ICRS) Dist() float64 { return c.dist }
 
-// PmRA returns the proper motion in right ascension of the ICRS coordinate.
+// PmRA returns the proper motion in right ascension — μα* = dRA/dt · cos(dec),
+// the on-sky rate every catalogue publishes. See [NewICRSWithKinematics].
 func (c ICRS) PmRA() angle.Angle { return c.pmRA }
 
 // PmDec returns the proper motion in declination of the ICRS coordinate.
@@ -287,7 +298,8 @@ func (c Astrometric) RA() angle.Angle { return c.ra }
 // Dec returns the declination of the Astrometric coordinate.
 func (c Astrometric) Dec() angle.Angle { return c.dec }
 
-// PmRA returns the proper motion in right ascension of the Astrometric coordinate.
+// PmRA returns the proper motion in right ascension — μα* = dRA/dt · cos(dec),
+// the on-sky rate every catalogue publishes. See [NewICRSWithKinematics].
 func (c Astrometric) PmRA() angle.Angle { return c.pmRA }
 
 // PmDec returns the proper motion in declination of the Astrometric coordinate.
@@ -631,7 +643,7 @@ func PropagateEpoch(c ICRS, fromEpoch, toEpoch time.Time) (ICRS, error) {
 
 	ra2, dec2, pmr2, pmd2, px2, rv2, status := gofaext.Pmsafe(
 		c.RA().Radians(), c.Dec().Radians(),
-		c.PmRA().Radians(), c.PmDec().Radians(),
+		dRAdt(c.PmRA(), c.Dec()), c.PmDec().Radians(),
 		c.Parallax().Arcseconds(), c.RV(),
 		ep1a, ep1b, ep2a, ep2b,
 	)
@@ -639,7 +651,13 @@ func PropagateEpoch(c ICRS, fromEpoch, toEpoch time.Time) (ICRS, error) {
 		return ICRS{}, fmt.Errorf("%w: status %d", ErrPropagationFailed, status)
 	}
 
-	out := NewICRSWithKinematics(angle.Rad(ra2), angle.Rad(dec2), angle.Rad(pmr2), angle.Rad(pmd2), angle.Arcsec(px2), rv2)
+	// Pmsafe returns dRA/dt at the new declination; store it back as the
+	// on-sky rate, against that declination and not the old one.
+	out := NewICRSWithKinematics(
+		angle.Rad(ra2), angle.Rad(dec2),
+		pmRACosDec(pmr2, angle.Rad(dec2)), angle.Rad(pmd2),
+		angle.Arcsec(px2), rv2,
+	)
 	out.SetDist(c.Dist())
 
 	return out, nil

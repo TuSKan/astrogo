@@ -27,7 +27,7 @@ func TestFK5ToICRSMatchesSOFAWithKinematics(t *testing.T) {
 	src := coord.NewFK5WithProperMotion(
 		angle.Rad(1.76779433),
 		angle.Rad(-0.2917517103),
-		angle.Rad(-1.91851572e-7),
+		angle.Rad(sofaPM(-1.91851572e-7, -0.2917517103)),
 		angle.Rad(-5.8468475e-6),
 		angle.Arcsec(0.379210),
 		-7.6,
@@ -41,7 +41,8 @@ func TestFK5ToICRSMatchesSOFAWithKinematics(t *testing.T) {
 
 	// The kinematics come through too, or a caller loses the space motion the
 	// catalogue recorded.
-	assertClose(t, got.PmRA().Radians(), -0.1961874125605721270e-6, 1e-18, "pmRA")
+	assertClose(t, got.PmRA().Radians(),
+		sofaPM(-0.1961874125605721270e-6, -0.2917516070530391757), 1e-18, "pmRA")
 	assertClose(t, got.PmDec().Radians(), -0.58459905176693911e-5, 1e-18, "pmDec")
 	assertClose(t, got.Parallax().Arcseconds(), 0.37921, 1e-12, "parallax")
 
@@ -133,7 +134,7 @@ func TestICRSToFK5MatchesSOFAWithKinematics(t *testing.T) {
 	src := coord.NewICRSWithKinematics(
 		angle.Rad(1.767794352),
 		angle.Rad(-0.2917512594),
-		angle.Rad(-2.76413026e-6),
+		angle.Rad(sofaPM(-2.76413026e-6, -0.2917512594)),
 		angle.Rad(-5.92994449e-6),
 		angle.Arcsec(0.379210),
 		-7.6,
@@ -150,7 +151,8 @@ func TestICRSToFK5MatchesSOFAWithKinematics(t *testing.T) {
 	assertRadians(t, got.RA().Radians(), 1.767794455700065506, "RA")
 	assertRadians(t, got.Dec().Radians(), -0.2917513626469638890, "Dec")
 
-	assertClose(t, pmRA.Radians(), -0.27597945024511204e-5, 1e-18, "pmRA")
+	assertClose(t, pmRA.Radians(),
+		sofaPM(-0.27597945024511204e-5, -0.2917513626469638890), 1e-18, "pmRA")
 	assertClose(t, pmDec.Radians(), -0.59308014093262838e-5, 1e-18, "pmDec")
 	assertClose(t, got.Parallax().Arcseconds(), 0.37921, 1e-13, "parallax")
 	assertClose(t, got.RV(), -7.6000001309071126, 1e-11, "RV")
@@ -183,7 +185,8 @@ func TestICRSToFK5SuppliesTheSpinMotion(t *testing.T) {
 	// The spin, in full. About 0.9 mas/yr in RA here — small, and an order of
 	// magnitude larger than the 0.1 mas this library's other tests resolve, so
 	// "too small to matter" is not available as an excuse for dropping it.
-	assertClose(t, pmRA.Radians(), 0.4335890983539243029e-8, 1e-22, "pmRA")
+	assertClose(t, pmRA.Radians(),
+		sofaPM(0.4335890983539243029e-8, -0.2917513695320114258), 1e-22, "pmRA")
 	assertClose(t, pmDec.Radians(), -0.8569648841237745902e-9, 1e-23, "pmDec")
 
 	if pmRA == angle.Zero() && pmDec == angle.Zero() {
@@ -208,6 +211,17 @@ func TestFK5StringNamesTheFrameAndEpoch(t *testing.T) {
 		}
 	}
 }
+
+// sofaPM converts one of SOFA's published proper motions into the quantity
+// this package stores.
+//
+// SOFA's routines speak dRA/dt; coord's accessors carry mu_alpha* — the on-sky
+// rate, dRA/dt times cos(dec), which is what every catalogue publishes and what
+// #281 was about. The factor is stated here rather than folded into the
+// expected numbers so the published constants stay literal in the tests that
+// cite them, and so a reader can see which declination each conversion uses:
+// the input's on the way in, the output's on the way back.
+func sofaPM(dRAdt, decRad float64) float64 { return dRAdt * math.Cos(decRad) }
 
 // assertRadians compares two angles to a tenth of a milliarcsecond.
 func assertRadians(t *testing.T, got, want float64, what string) {
