@@ -5,15 +5,22 @@ import (
 	"math"
 )
 
-// WGS84 constants, matching the gravity model NewFromTLE hands the propagator.
+// WGS-72 constants, matching the gravity model NewFromTLE hands the propagator.
 //
 // Copied from the backend's own getGravConst rather than from a table, because
 // the point of the arithmetic below is to reproduce a branch that code takes,
 // and a constant that differs in the last digit reproduces a different branch.
+//
+// These were WGS-84 until the propagator itself was corrected to WGS-72, which
+// is what TLEs are fitted with. The cost of the mismatch in *this* file was
+// small — measured across the whole Vallado suite it moves perigee by 4 m for
+// every near-Earth case, and no case changes which side of the 220 km branch it
+// falls on — but a comment claiming the constants match the propagator has to
+// be true, or the next reader inherits a promise nobody is keeping.
 const (
-	earthRadiusKM = 6378.137
-	muKM3S2       = 398600.5
-	j2            = 0.00108262998905
+	earthRadiusKM = 6378.135
+	muKM3S2       = 398600.8
+	j2            = 0.001082616
 )
 
 // xke is sqrt(GM) in earth radii^1.5 per minute — SGP4's time and length units.
@@ -72,9 +79,9 @@ func perigeeAltitudeKM(meanMotionRevPerDay, ecc, inclRad float64) float64 {
 // # What the answer means
 //
 // astrogo measures its propagation against Vallado's reference suite (AIAA
-// 2006-6753) on every run of the validation tier. Twenty-two of the thirty
-// cases it can read agree to a median of 35 m; eight do not, by 0.6 km to
-// 3440 km. This reports which side of that a given element set is likely to
+// 2006-6753) on every run of the validation tier. Twenty-three of the thirty
+// cases it can read agree to a median of 4 cm; seven do not, by 0.2 km to
+// 3439 km. This reports which side of that a given element set is likely to
 // fall on, so a caller is not left reading a number that looks like every
 // other number.
 //
@@ -89,24 +96,30 @@ func perigeeAltitudeKM(meanMotionRevPerDay, ecc, inclRad float64) float64 {
 // 100 km have perigees of 80 to 152 km.
 //
 // The obvious second condition, deep space, is deliberately absent. It looked
-// right and the data refuted it: of roughly eighteen deep-space cases in the
-// suite only four diverge, and all four ALSO have a perigee under 220 km, so
-// they are already caught. Flagging deep space would add about fourteen false
-// alarms — every geostationary and Molniya case, all of which agree to metres
-// — for nothing, and a signal that cries wolf is one people switch off.
+// right and the data refuted it: of the twenty deep-space cases in the suite
+// only four diverge, and all four ALSO have a perigee under 220 km, so they are
+// already caught. Flagging deep space would add fifteen false alarms — every
+// geostationary and Molniya case, all of which agree to centimetres — for
+// nothing, and a signal that cries wolf is one people switch off.
 //
 // # What it costs and misses, measured
 //
 // Against the thirty cases: it flags ten, of which seven diverge. The three it
-// flags wrongly have perigees of 180, 201 and 212 km, at the top of the band,
-// and they agree to 9 m, 52 m and 75 m. It misses one, satellite 29141, a
-// decaying object with a 282 km perigee that diverges by 0.62 km — the
-// smallest divergence in the set.
+// flags wrongly have perigees of 182, 198 and 212 km, at the top of the band,
+// and they agree to 0.27, 0.21 and 0.21 metres. It misses nothing.
 //
-// So it is conservative near the boundary and silent about slow decay. Both are
-// stated because a caller deciding what to trust needs the shape of the error,
-// not a bare boolean. TestVerifiedMatchesTheMeasuredDivergence asserts every
-// number in this comment against the checked-in fixtures.
+// It used to miss one — satellite 29141, a decaying object with a 279 km
+// perigee — and that turned out to say more about the propagator than about
+// this predicate: 29141 diverged by 0.62 km only because the propagator was
+// being run with WGS-84 constants against WGS-72 elements. With that corrected
+// it agrees to 0.2 m and the blind spot went with it. Worth keeping on the
+// record, because "the predicate misses slow decay" was a plausible and wrong
+// explanation that survived until the real cause was found.
+//
+// So it is conservative near the boundary. That is stated because a caller
+// deciding what to trust needs the shape of the error, not a bare boolean.
+// TestVerifiedMatchesTheMeasuredDivergence asserts every number in this comment
+// against the checked-in fixtures.
 func (s *Satellite) Verified() (bool, string) {
 	perigee := perigeeAltitudeKM(s.MeanMotion, s.ecc, s.inclRad)
 
