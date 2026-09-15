@@ -171,38 +171,44 @@ func AcquireLock(ctx context.Context, bucket *Bucket, cacheKey string) (release 
 		unlockStaging := writeLock(bucket, lockKey)
 
 		w, werr := bucket.NewWriter(ctx, lockKey, &blob.WriterOptions{IfNotExist: true})
+
+		var writeErr, closeErr error
 		if werr == nil {
-			_, writeErr := io.WriteString(w, "locked")
-			closeErr := w.Close()
+			_, writeErr = io.WriteString(w, "locked")
+			closeErr = w.Close()
+		}
 
-			unlockStaging()
+		// One call site, on every path through the attempt. Releasing it from
+		// inside each branch instead left the one that handles a failed
+		// NewWriter unreachable in tests, which is a poor place for the only
+		// copy of a lock release to live.
+		unlockStaging()
 
-			switch {
-			case writeErr == nil && closeErr == nil:
-				// release runs from the caller's defer, possibly after ctx
-				// was cancelled, and must still delete the lock — otherwise
-				// it leaks until staleLockAge lets someone steal it.
-				//
-				// The in-process slot is handed back after the object is
-				// gone, not before: releasing it first would let the next
-				// goroutine in this process reach IfNotExist while the lock
-				// object is still there, and spin until it is deleted.
-				return func() {
-					_ = bucket.Delete(context.WithoutCancel(ctx), lockKey)
+		// One switch over all three ways the attempt can end, rather than a
+		// separate arm for a failed NewWriter. fileblob defers almost all of
+		// its work to Close, so that arm was close to unreachable and held a
+		// duplicate of this error return.
+		failure := cmp.Or(werr, writeErr, closeErr)
 
-					releaseInProcess()
-				}, nil
-			case isContention(gcerrors.Code(closeErr)):
-				// Someone won the race between NewWriter and Close.
-			default:
-				return nil, fmt.Errorf("remote: create lock %s: %w", lockKey, cmp.Or(writeErr, closeErr))
-			}
-		} else {
-			unlockStaging()
+		switch {
+		case failure == nil:
+			// release runs from the caller's defer, possibly after ctx was
+			// cancelled, and must still delete the lock — otherwise it leaks
+			// until staleLockAge lets someone steal it.
+			//
+			// The in-process slot is handed back after the object is gone,
+			// not before: releasing it first would let the next goroutine in
+			// this process reach IfNotExist while the lock object is still
+			// there, and spin until it is deleted.
+			return func() {
+				_ = bucket.Delete(context.WithoutCancel(ctx), lockKey)
 
-			if !isContention(gcerrors.Code(werr)) {
-				return nil, fmt.Errorf("remote: create lock %s: %w", lockKey, werr)
-			}
+				releaseInProcess()
+			}, nil
+		case isContention(gcerrors.Code(failure)):
+			// Someone else got there first; wait below and try again.
+		default:
+			return nil, fmt.Errorf("remote: create lock %s: %w", lockKey, failure)
 		}
 
 		if attrs, aerr := bucket.Attributes(ctx, lockKey); aerr == nil && time.Since(attrs.ModTime) > staleLockAge {
