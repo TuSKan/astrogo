@@ -103,7 +103,24 @@ func NewFromTLE(name, line1, line2 string) (*Satellite, error) {
 	// query lands a whole number of seconds after the epoch.
 	_, _, _, _, _, _, epochFracSec := timeToComponents(el.epoch)
 
-	sat := gosatellite.TLEToSat(line1, line2, gosatellite.GravityWGS84)
+	// WGS-72, not WGS-84, and the distinction is not cosmetic.
+	//
+	// A TLE does not carry a position. It carries *mean elements*, which are
+	// the output of fitting observations through SGP4 itself — and the fit is
+	// performed by Space-Track using the WGS-72 constants. Feeding those
+	// elements back through a propagator configured for WGS-84 asks a
+	// different model to interpret numbers produced by this one, and the
+	// elements simply do not mean the same thing to it.
+	//
+	// Vallado's own verification suite measures the cost, since tcppver.out is
+	// generated with WGS-72. Same code, same data, this constant alone:
+	//
+	//	WGS-84  p50 0.0346  p90 0.2522  p99 0.2636  max 0.2889 km
+	//	WGS-72  p50 0.0000  p90 0.0002  p99 0.0009  max 0.0031 km
+	//
+	// Ninety-three times the error, in every satellite position this package
+	// produces — 289 metres where there should be three.
+	sat := gosatellite.TLEToSat(line1, line2, gosatellite.GravityWGS72)
 	if sat.Error != 0 {
 		return nil, fmt.Errorf("%w: sgp4 init error %d: %s", ErrPropagation, sat.Error, sat.ErrorStr)
 	}

@@ -41,23 +41,50 @@ import (
 const verifiedMaxKm = 1.0
 
 // verifiedP99Km is a regression detector rather than a contract: it has no
-// physical justification, only a measured one. p99 was 0.289 km when this was
-// written, so this fails if the typical case degrades by ~40% while still
-// passing verifiedMaxKm. Raise it only alongside an explanation of what got
-// worse and why that is acceptable.
-const verifiedP99Km = 0.4
-
-// residualFloorKm is why the contract is not tighter still.
+// physical justification, only a measured one. Raise it only alongside an
+// explanation of what got worse and why that is acceptable.
 //
-// The backend exposes propagation only as Propagate(sat, y, m, d, h, min, sec)
-// — whole seconds — and builds its own jdsatepoch with JDay(..., int(sec)),
-// truncating the element epoch to a whole second as well. propagateECI corrects
-// the resulting offset to first order along the velocity vector, which leaves
-// the second-order term (about 5 m for a low Earth orbit over half a second)
-// plus whatever the truncated epoch does to sgp4init's derived quantities.
-// Measured, that residual is tens of metres. It is a property of the API the
-// backend offers, not of SGP4.
-const residualFloorKm = 0.005
+// It was 0.4 km, against a measured p99 of 0.289 — and that gap is exactly
+// how astrogo shipped for as long as it did with the wrong gravity model.
+// TLEs are fitted by Space-Track through SGP4 with WGS-72 constants, and this
+// package asked for WGS-84, so every position was ninety-three times further
+// from Vallado's reference than it needed to be:
+//
+//	WGS-84  p50 0.0346  p90 0.2522  p99 0.2636  max 0.2889 km
+//	WGS-72  p50 0.0000  p90 0.0002  p99 0.0009  max 0.0031 km
+//
+// Both sets passed the 1 km contract. Only the detector could have caught it,
+// and at 0.4 km it had ten times more slack than the fault it was watching
+// for.
+//
+// 0.01 km now: ten metres, eleven times the measured p99 of 0.0009 so
+// platform float differences do not trip it, and twenty-six times below the
+// 0.2636 that a return to WGS-84 would produce. A regression detector has to
+// sit below the failure it exists to detect, which is the thing the old value
+// got wrong.
+const verifiedP99Km = 0.01
+
+// residualFloorKm exists to catch a comparison that has stopped comparing —
+// a fixture read as zeros, a loop that never ran — by failing when agreement
+// becomes better than the arithmetic allows.
+//
+// It was 0.005 km, on the reasoning that the whole-second backend API leaves a
+// second-order residual of "tens of metres". That number was measured, and it
+// was measuring the wrong thing: with the gravity model mismatched, p50 was
+// 0.0346 km and the sub-second term was nowhere near the dominant error. It
+// could not be seen, so it was estimated, and the estimate was three orders of
+// magnitude high.
+//
+// With WGS-72 the real floor is visible: **p50 = 4.3e-05 km**, four
+// centimetres. That is the second-order term of the linear velocity step
+// propagateECI uses to recover the sub-second remainder — half the
+// acceleration times the square of the fraction, which for a low Earth orbit
+// and a typical fraction is centimetres, not metres.
+//
+// So the guard is re-armed an order of magnitude under what is actually
+// achieved rather than under a guess: it fires below 1e-7 km, which no real
+// comparison reaches and an all-zeros one does.
+const residualFloorKm = 1e-6
 
 // divergent records the cases where astrogo does NOT reproduce the reference,
 // with the magnitude measured on 2026-09-05 and Vallado's own label for what
@@ -90,8 +117,7 @@ var divergent = map[string]struct {
 	"11801": {782.18, "the original Spacetrack Report #3 deep-space (SDP4) case"},
 	"28623": {486.20, "H-2 R/B — deep space AND perigee 136 km, both s4 paths at once"},
 	"28872": {7.73, "perigee is negative (−51 km); Vallado notes it is lost within 50 minutes"},
-	"23333": {3.11, "WIND — Vallado notes the STR#3 Kepler solver fails past about 200 minutes"},
-	"29141": {0.62, "SL-14 DEB in the last stage of decay, lost inside 420 minutes"},
+	"23333": {0.2175, "WIND — Vallado notes the STR#3 Kepler solver fails past about 200 minutes"},
 }
 
 // checksumInvalid are the three cases astrogo refuses before propagating.
