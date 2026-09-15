@@ -1,0 +1,29 @@
+version: 2
+
+# One scheduled PR combines both Go modules and GitHub Actions.
+# Security updates remain independent of this version-update schedule.
+multi-ecosystem-groups:
+  weekly-dependencies:
+    schedule:
+      interval: weekly
+      day: monday
+    commit-message:
+      prefix: chore
+      include: scope
+    labels:
+      - dependencies
+
+updates:
+  - package-ecosystem: gomod
+    directories:
+      - "/"
+      - "/examples"
+    patterns:
+      - "*"
+    multi-ecosystem-group: weekly-dependencies
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    patterns:
+      - "*"
+    multi-ecosystem-group: weekly-dependencies
