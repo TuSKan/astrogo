@@ -65,6 +65,24 @@ var ErrQueryFailed = errors.New("votable: the service reported a query error")
 // error here is what makes the reverse visible.
 var ErrNoFields = errors.New("votable: rows were parsed but the document declares no fields")
 
+// ErrNotVOTable reports that the service answered with a web page rather than
+// a VOTable.
+//
+// Archives serve HTML for their own failures — a maintenance notice, a load
+// shedder, a login wall — and they serve it with a 200, so nothing before the
+// parser can tell. What reaches [Read] is a document whose first element is
+// <html>, and what came out of it before this existed was "XML syntax error on
+// line 161: unexpected end element </div>", which reads as a corrupt result
+// set rather than as an archive that is down.
+//
+// The distinction is the one this package already draws twice: [ErrQueryFailed]
+// separates a rejected query from an empty field, and the tagged suites skip
+// rather than fail when a front end accepts a connection and stops answering.
+// A web page is that same condition wearing different clothes, and a caller
+// that cannot see it either reports somebody else's outage as astrogo's bug or
+// fails a build over it.
+var ErrNotVOTable = errors.New("votable: the service answered with a web page, not a VOTable")
+
 // Table is one result table: the field names in order, and the rows beneath
 // them.
 type Table struct {
@@ -122,6 +140,7 @@ func Read(r io.Reader) (*Table, error) {
 
 	var (
 		inData   bool
+		sawStart bool
 		inTD     bool
 		gotRows  bool
 		row      []string
@@ -142,7 +161,22 @@ func Read(r io.Reader) (*Table, error) {
 
 		switch t := tok.(type) {
 		case xml.StartElement:
-			switch local(t.Name.Local) {
+			name := local(t.Name.Local)
+
+			if !sawStart {
+				sawStart = true
+
+				// Checked on the first element only, and against the one
+				// name that cannot appear at a VOTable's root. Walking
+				// further is pointless: the rest of the document is a web
+				// page, and whatever it eventually fails on says nothing
+				// about the query.
+				if name == "html" {
+					return nil, ErrNotVOTable
+				}
+			}
+
+			switch name {
 			case "info":
 				// QUERY_STATUS carries the outcome in an attribute and the
 				// detail, when there is one, in the element's own text.

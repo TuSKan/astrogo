@@ -211,3 +211,69 @@ func TestColumnReportsAbsence(t *testing.T) {
 		t.Errorf("a missing column yielded %q, want empty", got)
 	}
 }
+
+// TestAWebPageIsNotACorruptVOTable covers the failure archives actually
+// produce, which is not a malformed VOTable but a different document entirely.
+//
+// ESA's Gaia archive answered a cone search with an HTML page during a tagged
+// run and the suite failed on "XML syntax error on line 161: unexpected end
+// element </div>" — a message that sends the reader looking for a parser bug.
+// The condition is somebody else's outage, and it has to be legible as one.
+func TestAWebPageIsNotACorruptVOTable(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		name string
+		body string
+	}{
+		{
+			name: "a maintenance page",
+			body: `<!DOCTYPE html>
+<html lang="en"><head><title>Service unavailable</title></head>
+<body><div class="notice"><p>The archive is down for maintenance.</div></body></html>`,
+		},
+		{
+			name: "a page with no doctype",
+			body: `<html><body><h1>502 Bad Gateway</h1></body></html>`,
+		},
+		{
+			name: "an XHTML page, namespaced",
+			body: `<html xmlns="http://www.w3.org/1999/xhtml"><body><p>Nope</p></body></html>`,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			_, err := votable.Read(strings.NewReader(tc.body))
+
+			if !errors.Is(err, votable.ErrNotVOTable) {
+				t.Errorf("Read(%s) = %v, want ErrNotVOTable — an archive's own error "+
+					"page must not read as a corrupt result set", tc.name, err)
+			}
+		})
+	}
+}
+
+// TestARealVOTableIsStillRead is the other half: the check looks at one
+// element and must not reject anything that is actually a VOTable.
+func TestARealVOTableIsStillRead(t *testing.T) {
+	t.Parallel()
+
+	const doc = `<?xml version="1.0"?>
+<VOTABLE version="1.3"><RESOURCE><TABLE>
+<FIELD name="ra"/><FIELD name="dec"/>
+<DATA><TABLEDATA>
+<TR><TD>10.5</TD><TD>-20.25</TD></TR>
+</TABLEDATA></DATA>
+</TABLE></RESOURCE></VOTABLE>`
+
+	table, err := votable.Read(strings.NewReader(doc))
+	if err != nil {
+		t.Fatalf("Read: %v", err)
+	}
+
+	if len(table.Rows) != 1 || table.Value(table.Rows[0], "ra") != "10.5" {
+		t.Errorf("parsed %d rows, first ra %q; want one row with ra 10.5",
+			len(table.Rows), table.Value(table.Rows[0], "ra"))
+	}
+}
