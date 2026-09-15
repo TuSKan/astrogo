@@ -27,6 +27,34 @@ var (
 	// left the caller to guess at designation syntax that was never wrong.
 	ErrHorizonsRefused = errors.New("jpl: horizons declined to generate an SPK")
 
+	// ErrHorizonsInternalFault is a refusal that is not about the request.
+	//
+	// It wraps ErrHorizonsRefused as well, so every existing caller keeps
+	// working; what it adds is the distinction between Horizons deciding it
+	// will not answer and Horizons being unable to. Those look identical on
+	// the wire — HTTP 200, a well-formed JSON body, an explanation in the
+	// "error" field — and they mean opposite things to a caller. One is a
+	// permanent property of what was asked for and should be reported. The
+	// other is somebody else's outage and will fix itself.
+	//
+	// Observed 2026-09-15, for both 433 Eros and Apophis, in astrogo's own CI:
+	//
+	//	wldini(): missing required file LTKERNL; ;
+	//	ERROR in VLRDC: Var not declared: IP_ADDR
+	//
+	// LTKERNL is a leap-second kernel on Horizons' server and IP_ADDR is one
+	// of its internal variables. Nothing a caller can send produces that, and
+	// the same two requests succeeded again within the hour.
+	//
+	// # On matching a third party's error text
+	//
+	// It is fragile, and it is the only signal available: the status is 200
+	// and the JSON shape is identical either way. It is kept safe by being
+	// deliberately narrow rather than clever — see horizonsInternalFault. A
+	// fault mode this does not recognize stays an ordinary refusal and fails
+	// loudly, which is the right default for a signal nobody has seen before.
+	ErrHorizonsInternalFault = errors.New("jpl: horizons could not generate an SPK because of a fault on its own server")
+
 	// ErrCorruptSPK indicates a malformed SPK binary kernel.
 	ErrCorruptSPK = errors.New("jpl/spk: corrupt file")
 	// ErrInvalidWordBounds indicates invalid double-precision word boundaries in an SPK record.
@@ -55,3 +83,24 @@ var (
 	// succeeding with a kernel that covers nothing.
 	ErrHorizonsEmptyKernel = errors.New("jpl: horizons returned an SPK with no segment summaries")
 )
+
+// TransientHorizonsFault reports whether err is a Horizons-side failure that
+// will resolve itself — as opposed to a permanent fact about what was asked
+// for.
+//
+// The distinction is not visible in the transport. Both arrive as HTTP 200
+// with a well-formed body, and astrogo has now seen two separate ways for
+// Horizons to answer successfully while being unable to do the work:
+// ErrHorizonsEmptyKernel (a syntactically valid SPK containing nothing) and
+// ErrHorizonsInternalFault (a refusal naming a fault on its own server). Both
+// were live-confirmed, and both recovered on their own.
+//
+// A caller deciding whether to retry wants exactly this question answered, and
+// so does a test deciding whether to skip or fail: astrogo's own untagged,
+// live-network tests must never turn somebody else's outage into a red build,
+// while a real refusal — "SPK creation is not available for pre-computed
+// objects in the major body index" — has to stay loud, because it means the
+// request will never work and the caller needs to know.
+func TransientHorizonsFault(err error) bool {
+	return errors.Is(err, ErrHorizonsEmptyKernel) || errors.Is(err, ErrHorizonsInternalFault)
+}

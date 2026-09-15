@@ -167,7 +167,17 @@ func CacheAPI(ctx context.Context, bucket *remote.Bucket, prefix, kernel string,
 	// returning an empty list with a nil error, which reads as success and
 	// surfaces much later as a body that is simply missing.
 	if refusal != "" && (resp == nil || resp.Spk == "") {
-		return nil, fmt.Errorf("%w: %s (kernel %q)", ErrHorizonsRefused, collapseWhitespace(refusal), kernel)
+		explanation := collapseWhitespace(refusal)
+
+		// A fault on Horizons' own server is also a refusal — it wraps both
+		// sentinels — but a caller that can tell them apart can retry one and
+		// not the other. See ErrHorizonsInternalFault.
+		if horizonsInternalFault(explanation) {
+			return nil, fmt.Errorf("%w: %w: %s (kernel %q)",
+				ErrHorizonsRefused, ErrHorizonsInternalFault, explanation, kernel)
+		}
+
+		return nil, fmt.Errorf("%w: %s (kernel %q)", ErrHorizonsRefused, explanation, kernel)
 	}
 
 	if resp.SpkFileID != "" && resp.Spk != "" {
@@ -400,4 +410,39 @@ func openKernel(ctx context.Context, bucket *remote.Bucket, key string) (*Reader
 // several failures rather than one.
 func collapseWhitespace(s string) string {
 	return strings.Join(strings.Fields(s), " ")
+}
+
+// horizonsServerFaultMarkers are phrases that can only describe the state of
+// Horizons' own server, never the request that reached it.
+//
+// That is the whole selection rule, and it is what keeps this from becoming a
+// list of every error string anyone has seen. "missing required file" names a
+// file on JPL's disk; "Var not declared" names a variable in JPL's code. A
+// caller cannot cause either by asking for the wrong body, spelling a
+// designation badly, or requesting an epoch outside coverage.
+//
+// Deliberately absent: "ERROR in ", which prefixes the SPICE-convention
+// routine name in the same message. It is the obvious third marker and it is
+// too generic — Horizons could reasonably use it for a complaint about the
+// request, and a marker that might match a real refusal would turn a permanent
+// problem into a skipped test.
+var horizonsServerFaultMarkers = [...]string{
+	"missing required file",
+	"Var not declared",
+}
+
+// horizonsInternalFault reports whether Horizons' explanation describes a fault
+// on its own server rather than a decision about the request.
+//
+// Conservative by construction: an explanation it does not recognize is an
+// ordinary refusal, which fails loudly. See ErrHorizonsInternalFault for why
+// text matching is the only signal available here.
+func horizonsInternalFault(explanation string) bool {
+	for _, marker := range horizonsServerFaultMarkers {
+		if strings.Contains(explanation, marker) {
+			return true
+		}
+	}
+
+	return false
 }
