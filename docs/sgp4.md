@@ -341,9 +341,9 @@ escaped it. Two things are true at once, and they pull in opposite directions.
 **`constants` is genuinely missing WGS 72**, and says so itself —
 `constants/wgs84.go`'s doc comment reads *"if a second ellipsoid standard is ever
 needed (GRS80, WGS72, ...), add it as its own set at that point."* That point has
-arrived, so `constants.WGS72` is added as its own set (a, 1/f, GM), alongside the
-`GeocentricGravitationalConstant` that `WGS84Set` names in a comment but does not
-carry.
+arrived, and a WGS 72 set is added there (a, 1/f, GM, ω) alongside the geocentric
+gravitational constant that `WGS84Set` names in a comment but does not carry.
+That is its own change, independent of this one, and lands separately.
 
 **But SGP4 must not read from it.** SGP4's table is not a description of the
 Earth; it is part of the model's definition. Vallado's `wgs84` entry uses
@@ -358,13 +358,12 @@ precisely the failure mode astrogo just measured on the WGS-72/WGS-84 mix-up
 So `gravity.go` holds its own frozen table, and a **test asserts the
 relationship** rather than leaving it to a comment:
 
-- `WGS72.RadiusKM * 1000` equals `constants.WGS72.SemiMajorAxis.Value`, and
-  `WGS72.MuKM3S2` equals `constants.WGS72.GeocentricGravitationalConstant`
-  converted — they agree, and a typo in either is caught.
-- `WGS84.MuKM3S2` **deliberately does not** equal
-  `constants.WGS84.GeocentricGravitationalConstant`, and the test asserts the
-  difference is the expected 0.0582 km³/s² with the reason attached, so that a
-  future reader who notices the mismatch finds an answer instead of a bug report.
+- The package's WGS 72 radius and μ **agree** with the WGS 72 set in
+  `constants`, converted — so a typo in either is caught by the other.
+- The package's WGS 84 μ **deliberately disagrees** with the WGS 84 set in
+  `constants` by 0.0582 km³/s², and the test asserts that gap with the reason
+  attached, so that a future reader who notices the mismatch finds an answer
+  instead of filing a bug.
 
 This also closes the duplication the question came from: `ephemeris/satellite/regime.go`
 currently carries a third private copy of these constants, and §6.8 deletes it
