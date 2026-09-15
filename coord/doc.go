@@ -40,6 +40,16 @@
 // The [Reducer] provides a lightweight topocentric reduction pipeline that
 // also handles chromatic atmospheric dispersion.
 //
+// # Moving the origin to the Sun
+//
+// [BarycentricToHeliocentric] and [HeliocentricToBarycentric] translate a
+// position vector between the solar system barycentre and the centre of the
+// Sun — the HCRS frame, which keeps the ICRS axes and moves only the origin.
+// Because it is a translation rather than a rotation, it needs a position
+// rather than a direction, and how much it matters depends entirely on
+// distance: [SunBarycentric] runs to 0.009 AU, which is half a degree seen
+// from one AU and nine milliarcseconds seen from a parsec.
+//
 // # Offsets from a target
 //
 // [SkyOffset] is a frame centred on a chosen position, so nearby objects are
