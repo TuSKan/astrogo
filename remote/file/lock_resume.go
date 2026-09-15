@@ -129,20 +129,53 @@ func AcquireLock(ctx context.Context, bucket *Bucket, cacheKey string) (release 
 		}
 	}()
 
-	// gcerrors.Unknown counts as contention alongside FailedPrecondition:
-	// a losing writer on Windows surfaces a raw "Access is denied", which
-	// fileblob maps to Unknown. A genuinely unrelated write failure (disk
-	// full, permissions) then surfaces as a ctx deadline rather than
-	// immediately, but is never silently swallowed.
+	// A losing writer announces itself in three different ways, and only the
+	// first is the one the API documents.
+	//
+	//   - FailedPrecondition, which is IfNotExist reporting the object is
+	//     already there. The intended signal.
+	//   - Unknown, from a raw "Access is denied": on Windows the destination
+	//     is held open by the winner while the loser tries to rename over it.
+	//   - NotFound, from "The system cannot find the file specified" — the
+	//     loser's own *staging* file, which the winner renamed away because
+	//     both picked the same name from a clock that does not advance. That
+	//     is the collision writeLock now prevents inside one process; across
+	//     processes nothing can, so it is classified here instead.
+	//
+	// The cost is the same one the first two already carry: a genuinely
+	// unrelated write failure (disk full, permissions, a bucket directory
+	// that does not exist) surfaces as a ctx deadline rather than
+	// immediately. It is never silently swallowed.
 	isContention := func(code gcerrors.ErrorCode) bool {
-		return code == gcerrors.FailedPrecondition || code == gcerrors.Unknown
+		return code == gcerrors.FailedPrecondition ||
+			code == gcerrors.Unknown ||
+			code == gcerrors.NotFound
 	}
 
 	for {
+		// Serialised against any other writer of this basename in this
+		// process, for the same reason Save is: fileblob stages through
+		// os.TempDir()/<basename>.<clock>.tmp and that clock does not advance
+		// on Windows, so two writers of one lock key pick the same staging
+		// file. One renames it into place and the other's rename finds its own
+		// source gone.
+		//
+		// The lock this function exists to provide was itself unprotected
+		// against that, which is how TestStagingAndPartialWritesAcrossBuckets
+		// failed on every run: "create lock writer-3/shared.bsp.lock ...
+		// The system cannot find the file specified".
+		//
+		// Held only across the attempt, never across the retry delay below —
+		// a contender that slept holding it would serialise every other
+		// goroutine's retry behind its own.
+		unlockStaging := writeLock(bucket, lockKey)
+
 		w, werr := bucket.NewWriter(ctx, lockKey, &blob.WriterOptions{IfNotExist: true})
 		if werr == nil {
 			_, writeErr := io.WriteString(w, "locked")
 			closeErr := w.Close()
+
+			unlockStaging()
 
 			switch {
 			case writeErr == nil && closeErr == nil:
@@ -164,8 +197,12 @@ func AcquireLock(ctx context.Context, bucket *Bucket, cacheKey string) (release 
 			default:
 				return nil, fmt.Errorf("remote: create lock %s: %w", lockKey, cmp.Or(writeErr, closeErr))
 			}
-		} else if !isContention(gcerrors.Code(werr)) {
-			return nil, fmt.Errorf("remote: create lock %s: %w", lockKey, werr)
+		} else {
+			unlockStaging()
+
+			if !isContention(gcerrors.Code(werr)) {
+				return nil, fmt.Errorf("remote: create lock %s: %w", lockKey, werr)
+			}
 		}
 
 		if attrs, aerr := bucket.Attributes(ctx, lockKey); aerr == nil && time.Since(attrs.ModTime) > staleLockAge {
