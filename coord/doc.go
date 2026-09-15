@@ -65,6 +65,15 @@
 // polar motion (XP/YP). If IERS data is unavailable, a one-time log warning
 // is emitted and zero corrections are applied (UT1 ≈ UTC, ~0.9 s worst case).
 //
+// # The Earth-fixed frame
+//
+// [Context.ICRSToITRS] and [Context.ITRSToICRS] expose the rotation between
+// the celestial frame and the rotating Earth — the frame a station's
+// coordinates are published in and a ground track is computed in. It is the
+// same matrix every horizon transform already goes through, so an Earth-fixed
+// position costs a matrix multiply rather than a fresh [NewContext], and the
+// two paths cannot disagree about where the Earth is pointing.
+//
 // # Concurrency
 //
 // A [Context] is read-only once built: no method assigns to its fields, and

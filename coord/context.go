@@ -27,7 +27,7 @@ type Context struct {
 
 	// Precomputed geocentric reduction fields (for GeocentricToObserved).
 	// These avoid rebuilding the C2t06a matrix + observer vector per call.
-	mat    [3][3]float64 // ICRS → TIRS rotation matrix
+	mat    [3][3]float64 // ICRS → ITRS rotation matrix; see [Context.ICRSToITRS]
 	obsVec vector.Vec3   // observer position in ICRS frame (AU)
 
 	// rc2i (precession-nutation) and rpom (polar motion) are the slow
