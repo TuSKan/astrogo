@@ -9,9 +9,21 @@ import (
 
 // Mode selects between the two operational conventions Vallado's code offers.
 //
-// They differ in how sidereal time at epoch is computed, and in deep space in
-// how the lunisolar periodics are applied. The difference is small and it is
-// not noise: output generated in one mode is reproduced only by the same mode.
+// # It has no effect on a near-Earth orbit
+//
+// The two modes differ in exactly two places: how sidereal time at epoch is
+// computed, and how the node is normalised inside dpper's Lyddane branch. Both
+// are deep space. Sidereal time reaches the model only through dscom, dsinit
+// and dspace, and the near-Earth path never reads it — so for a period under
+// 225 minutes the two modes are bit-identical, and this option is inert.
+//
+// Worth stating rather than leaving to be discovered: a caller who sets it on a
+// low Earth orbit expecting a different answer will not get one, and that is
+// correct rather than a bug. TestAFSPCModeIsADifferentAnswer asserts both
+// halves — identical below the threshold, different above it.
+//
+// Where it does apply, the difference is a convention and not noise: output
+// generated in one mode is reproduced only by the same mode.
 type Mode int
 
 const (
