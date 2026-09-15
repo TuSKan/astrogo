@@ -69,19 +69,23 @@ var (
 	// passes without reaching its tolerance.
 	//
 	// This has no counterpart in the reference, which gives up in silence and
-	// uses whatever it has. That silence is not harmless: it is the whole of
-	// astrogo's measured divergence on satellite 23333, where Vallado's own
-	// note says the Spacetrack Report #3 solver stops converging past about 200
-	// minutes. Reporting it changes no number and turns an unexplained
-	// disagreement into a message.
+	// uses whatever it has. Reporting it changes no number; it turns a silent
+	// approximation into something a caller can see.
+	//
+	// It does not fire anywhere in Vallado's verification suite — measured, over
+	// all 33 cases and 666 states, including satellite 23333 at an eccentricity
+	// of 0.973. That is worth recording because the opposite was assumed here
+	// first: Vallado annotates 23333 as the case where the Spacetrack Report #3
+	// solver stops converging, and it was natural to expect this to be where
+	// that showed up. It is not. The iteration converges, and 23333's residual
+	// against the reference has a different cause (see TestAgreesWithVallado).
+	//
+	// So this exists for inputs the suite does not contain, which is the honest
+	// description of it, rather than as an explanation of a known divergence.
 	ErrKeplerNotConverged = errors.New("sgp4: the Kepler iteration did not converge")
 
-	// ErrDeepSpace indicates an element set whose period reaches SGP4's
-	// 225-minute deep-space threshold, where the model hands over to SDP4.
-	//
-	// Temporary. The deep-space path is the next step of the build described in
-	// docs/sgp4.md, and this sentinel goes away with it — it exists so that a
-	// caller who hits the gap gets something they can match on rather than a
-	// bare string.
-	ErrDeepSpace = errors.New("sgp4: deep-space (SDP4) propagation is not implemented yet")
+	// ErrPerturbedEccentricity indicates that the lunisolar long-period
+	// periodics moved the eccentricity outside [0, 1]. Vallado's error 3, and
+	// reachable only in deep space, since only there are those terms applied.
+	ErrPerturbedEccentricity = errors.New("sgp4: perturbed eccentricity is outside [0, 1]")
 )

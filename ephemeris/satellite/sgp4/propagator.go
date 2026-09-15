@@ -96,6 +96,11 @@ type Propagator struct {
 	xlcof, aycof               float64
 	delmo, sinmao              float64
 	x1mth2, x7thm1             float64
+
+	// Deep space. Both are zero for a near-Earth element set and neither is
+	// read on that path.
+	ds deepSpaceTerms
+	rz resonanceTerms
 }
 
 // New initialises a propagator for el.
@@ -134,8 +139,7 @@ func New(el Elements, opts ...Option) (*Propagator, error) {
 	p.initNearEarth()
 
 	if p.deep {
-		return nil, fmt.Errorf("%w: period is %.1f minutes, at or above the %.0f-minute "+
-			"deep-space threshold", ErrDeepSpace, twoPi/p.noUnkozai, deepSpaceMinutes)
+		p.initDeepSpace(epoch1950)
 	}
 
 	return p, nil
@@ -163,7 +167,7 @@ func New(el Elements, opts ...Option) (*Propagator, error) {
 // — a caller who wants to look at a decayed satellite's position has to ask for
 // it deliberately.
 func (p *Propagator) At(tsince float64) (pos, vel vector.Vec3, err error) {
-	return p.nearEarth(tsince)
+	return p.evaluate(tsince)
 }
 
 // AtTime is [Propagator.At] for an absolute instant.
