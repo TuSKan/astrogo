@@ -37,6 +37,15 @@
 // and one for a catalogue that recorded none. Confusing FK5 J2000 with ICRS
 // costs about 20 mas; confusing FK4 B1950 with either costs about 0.7°.
 //
+// # The Local Standard of Rest
+//
+// [Context.BarycentricRadialVelocity] removes the observer's own motion and
+// leaves a velocity measured against the solar system barycentre, which is the
+// wrong frame for anything Galactic: the Sun is itself moving at about 18 km/s
+// through its neighbourhood. [LSRCorrection] removes that too, and takes an
+// [LSRKind] because the published conventions disagree by 2.1 km/s and a v_LSR
+// quoted without one carries that ambiguity.
+//
 // The [Reducer] provides a lightweight topocentric reduction pipeline that
 // also handles chromatic atmospheric dispersion.
 //
