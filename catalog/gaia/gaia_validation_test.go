@@ -13,6 +13,7 @@ import (
 	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/internal/testutil"
+	"github.com/TuSKan/astrogo/internal/votable"
 	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/time"
 )
@@ -84,6 +85,14 @@ func TestArchivesAgree(t *testing.T) {
 			if errors.Is(iterErr, context.DeadlineExceeded) ||
 				(errors.As(iterErr, &netErr) && netErr.Timeout()) {
 				t.Skipf("%s accepted the connection but did not answer: %v", id, iterErr)
+			}
+
+			// And an archive that answers with its own error page is the same
+			// condition wearing different clothes: a 200 carrying HTML, which
+			// used to surface here as "XML syntax error ... unexpected end
+			// element </div>" and fail the build over somebody else's outage.
+			if errors.Is(iterErr, votable.ErrNotVOTable) {
+				t.Skipf("%s answered with a web page rather than a VOTable: %v", id, iterErr)
 			}
 
 			t.Fatalf("%s: cone search: %v", id, iterErr)
