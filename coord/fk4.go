@@ -37,7 +37,7 @@ import (
 // [NewFK4WithProperMotion].
 type FK4 struct {
 	ra, dec         angle.Angle
-	pmRA, pmDec     angle.Angle // per Julian year; zero when hasPM is false
+	pmRA, pmDec     angle.Angle // mu_alpha* and mu_dec per Julian year; zero when hasPM is false
 	parallax        angle.Angle
 	rv              float64 // km/s
 	bepoch          float64 // Besselian epoch of observation, e.g. 1950.0
@@ -127,15 +127,17 @@ func FK4ToFK5(c FK4) FK5 {
 		return NewFK5(angle.Rad(r5).Wrap360(), angle.Rad(d5), J2000Epoch)
 	}
 
+	// SOFA's routines speak dRA/dt in and out; these types carry the
+	// catalogue's on-sky rate, so each crossing converts. See [dRAdt].
 	r5, d5, dr5, dd5, px5, rv5 := gofaext.Fk425(
 		c.ra.Radians(), c.dec.Radians(),
-		c.pmRA.Radians(), c.pmDec.Radians(),
+		dRAdt(c.pmRA, c.dec), c.pmDec.Radians(),
 		c.parallax.Arcseconds(), c.rv,
 	)
 
 	return NewFK5WithProperMotion(
 		angle.Rad(r5).Wrap360(), angle.Rad(d5),
-		angle.Rad(dr5), angle.Rad(dd5),
+		pmRACosDec(dr5, angle.Rad(d5)), angle.Rad(dd5),
 		angle.Arcsec(px5), rv5,
 	)
 }
@@ -153,7 +155,7 @@ func FK5ToFK4(c FK5, bepoch float64) FK4 {
 
 		return FK4{
 			ra: angle.Rad(r1950).Wrap360(), dec: angle.Rad(d1950),
-			pmRA: angle.Rad(dr1950), pmDec: angle.Rad(dd1950),
+			pmRA: pmRACosDec(dr1950, angle.Rad(d1950)), pmDec: angle.Rad(dd1950),
 			bepoch:          bepoch,
 			hasProperMotion: true,
 		}
@@ -161,13 +163,13 @@ func FK5ToFK4(c FK5, bepoch float64) FK4 {
 
 	r1950, d1950, dr1950, dd1950, px1950, rv1950 := gofaext.Fk524(
 		c.ra.Radians(), c.dec.Radians(),
-		c.pmRA.Radians(), c.pmDec.Radians(),
+		dRAdt(c.pmRA, c.dec), c.pmDec.Radians(),
 		c.parallax.Arcseconds(), c.rv,
 	)
 
 	return FK4{
 		ra: angle.Rad(r1950).Wrap360(), dec: angle.Rad(d1950),
-		pmRA: angle.Rad(dr1950), pmDec: angle.Rad(dd1950),
+		pmRA: pmRACosDec(dr1950, angle.Rad(d1950)), pmDec: angle.Rad(dd1950),
 		parallax:        angle.Arcsec(px1950),
 		rv:              rv1950,
 		bepoch:          bepoch,
@@ -220,7 +222,7 @@ func ICRSToFK4(c ICRS, bepoch float64) FK4 {
 
 		return FK4{
 			ra: angle.Rad(r1950).Wrap360(), dec: angle.Rad(d1950),
-			pmRA: angle.Rad(dr1950), pmDec: angle.Rad(dd1950),
+			pmRA: pmRACosDec(dr1950, angle.Rad(d1950)), pmDec: angle.Rad(dd1950),
 			bepoch:          bepoch,
 			hasProperMotion: true,
 		}
@@ -228,15 +230,17 @@ func ICRSToFK4(c ICRS, bepoch float64) FK4 {
 
 	r5, d5, dr5, dd5, px5, rv5 := gofaext.H2fk5(
 		c.RA().Radians(), c.Dec().Radians(),
-		c.PmRA().Radians(), c.PmDec().Radians(),
+		dRAdt(c.PmRA(), c.Dec()), c.PmDec().Radians(),
 		c.Parallax().Arcseconds(), c.RV(),
 	)
 
+	// dr5 stays in SOFA's convention across this hand-off: both sides of
+	// it are SOFA routines, so it is converted once, at the end.
 	r1950, d1950, dr1950, dd1950, px1950, rv1950 := gofaext.Fk524(r5, d5, dr5, dd5, px5, rv5)
 
 	return FK4{
 		ra: angle.Rad(r1950).Wrap360(), dec: angle.Rad(d1950),
-		pmRA: angle.Rad(dr1950), pmDec: angle.Rad(dd1950),
+		pmRA: pmRACosDec(dr1950, angle.Rad(d1950)), pmDec: angle.Rad(dd1950),
 		parallax:        angle.Arcsec(px1950),
 		rv:              rv1950,
 		bepoch:          bepoch,

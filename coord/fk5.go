@@ -38,7 +38,7 @@ import (
 // away. See [NewFK5] and [NewFK5WithProperMotion].
 type FK5 struct {
 	ra, dec         angle.Angle
-	pmRA, pmDec     angle.Angle // per Julian year; zero when hasProperMotion is false
+	pmRA, pmDec     angle.Angle // mu_alpha* and mu_dec per Julian year; zero when hasProperMotion is false
 	parallax        angle.Angle
 	rv              float64 // km/s
 	jepoch          float64 // Julian epoch of observation, e.g. 2000.0
@@ -134,15 +134,17 @@ func FK5ToICRS(c FK5) ICRS {
 		return NewICRS(angle.Rad(rh).Wrap360(), angle.Rad(dh))
 	}
 
+	// SOFA speaks dRA/dt in and out; these types carry the catalogue's
+	// on-sky rate, so each crossing converts. See [dRAdt].
 	rh, dh, drh, ddh, pxh, rvh := gofaext.Fk52h(
 		c.ra.Radians(), c.dec.Radians(),
-		c.pmRA.Radians(), c.pmDec.Radians(),
+		dRAdt(c.pmRA, c.dec), c.pmDec.Radians(),
 		c.parallax.Arcseconds(), c.rv,
 	)
 
 	return NewICRSWithKinematics(
 		angle.Rad(rh).Wrap360(), angle.Rad(dh),
-		angle.Rad(drh), angle.Rad(ddh),
+		pmRACosDec(drh, angle.Rad(dh)), angle.Rad(ddh),
 		angle.Arcsec(pxh), rvh,
 	)
 }
@@ -161,7 +163,7 @@ func ICRSToFK5(c ICRS, jepoch float64) FK5 {
 
 		return FK5{
 			ra: angle.Rad(r5).Wrap360(), dec: angle.Rad(d5),
-			pmRA: angle.Rad(dr5), pmDec: angle.Rad(dd5),
+			pmRA: pmRACosDec(dr5, angle.Rad(d5)), pmDec: angle.Rad(dd5),
 			jepoch:          jepoch,
 			hasProperMotion: true,
 		}
@@ -169,13 +171,13 @@ func ICRSToFK5(c ICRS, jepoch float64) FK5 {
 
 	r5, d5, dr5, dd5, px5, rv5 := gofaext.H2fk5(
 		c.RA().Radians(), c.Dec().Radians(),
-		c.PmRA().Radians(), c.PmDec().Radians(),
+		dRAdt(c.PmRA(), c.Dec()), c.PmDec().Radians(),
 		c.Parallax().Arcseconds(), c.RV(),
 	)
 
 	return FK5{
 		ra: angle.Rad(r5).Wrap360(), dec: angle.Rad(d5),
-		pmRA: angle.Rad(dr5), pmDec: angle.Rad(dd5),
+		pmRA: pmRACosDec(dr5, angle.Rad(d5)), pmDec: angle.Rad(dd5),
 		parallax: angle.Arcsec(px5), rv: rv5,
 		jepoch:          jepoch,
 		hasProperMotion: true,

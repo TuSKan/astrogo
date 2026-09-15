@@ -233,7 +233,9 @@ func (ctx *Context) ObsVec() vector.Vec3 { return ctx.obsVec }
 func (ctx *Context) AstrometricToApparent(c Astrometric) Apparent {
 	ri, di := gofaext.Atciq(
 		c.RA().Radians(), c.Dec().Radians(),
-		c.PmRA().Radians(), c.PmDec().Radians(), c.Parallax().Radians(), c.RV(),
+		// SOFA wants dRA/dt; this package stores the catalogue's on-sky
+		// rate. See [dRAdt].
+		dRAdt(c.PmRA(), c.Dec()), c.PmDec().Radians(), c.Parallax().Radians(), c.RV(),
 		&ctx.astrom,
 	)
 
@@ -261,7 +263,9 @@ func (ctx *Context) ApparentToObserved(c Apparent) AltAz {
 func (ctx *Context) AstrometricToObserved(c Astrometric) AltAz {
 	az, zd, _, _, _ := gofaext.Atcoq(
 		c.RA().Radians(), c.Dec().Radians(),
-		c.PmRA().Radians(), c.PmDec().Radians(), c.Parallax().Radians(), c.RV(),
+		// SOFA wants dRA/dt; this package stores the catalogue's on-sky
+		// rate. See [dRAdt].
+		dRAdt(c.PmRA(), c.Dec()), c.PmDec().Radians(), c.Parallax().Radians(), c.RV(),
 		&ctx.astrom,
 	)
 
@@ -432,7 +436,9 @@ func (ctx *Context) ICRSToAltAz(c ICRS) (AltAz, error) {
 func (ctx *Context) ICRSToHourAngle(c ICRS) (angle.Angle, error) {
 	_, _, ha, _, _ := gofaext.Atcoq(
 		c.RA().Radians(), c.Dec().Radians(),
-		c.PmRA().Radians(), c.PmDec().Radians(), c.Parallax().Radians(), c.RV(),
+		// SOFA wants dRA/dt; this package stores the catalogue's on-sky
+		// rate. See [dRAdt].
+		dRAdt(c.PmRA(), c.Dec()), c.PmDec().Radians(), c.Parallax().Radians(), c.RV(),
 		&ctx.astrom,
 	)
 
