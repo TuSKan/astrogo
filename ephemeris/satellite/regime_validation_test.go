@@ -13,17 +13,24 @@ import (
 // the data that established the regimes in the first place. These run against
 // the checked-in Vallado suite for exactly that reason.
 
-// divergence is the maximum position error #181 measured per satellite, in km,
-// for the eight cases astrogo could not reproduce.
+// divergence is the maximum position error measured per satellite, in km, for
+// the seven cases astrogo could not reproduce.
+//
+// Re-measured after the propagator was corrected to WGS-72, which is what
+// dropped the count from eight: satellite 29141's 0.62 km was the gravity-model
+// mismatch and not a propagator defect at all, and it now agrees to 0.2 m.
+// 23333 fell from 3.11 km to 0.22 km for the same reason. The five large ones
+// moved by less than a part in a thousand, which is itself informative — those
+// are the s4 and deep-space defects, and they do not care which Earth radius
+// they are computed with.
 var divergence = map[string]float64{
-	"28350": 3440.27,
-	"22312": 1830.30,
-	"16925": 1329.38,
-	"11801": 782.18,
-	"28623": 486.20,
-	"28872": 7.73,
-	"23333": 3.11,
-	"29141": 0.62,
+	"28350": 3438.51,
+	"22312": 1828.92,
+	"16925": 1328.37,
+	"11801": 781.71,
+	"28623": 485.94,
+	"28872": 7.78,
+	"23333": 0.2175,
 }
 
 // TestPerigeeReproducesValladosOwnFigures is the check that the arithmetic is
@@ -143,9 +150,14 @@ func TestVerifiedMatchesTheMeasuredDivergence(t *testing.T) {
 		t.Errorf("%d of the flagged cases actually diverge, want 7", flaggedBad)
 	}
 
-	// The one it misses, named, so that a change in either direction is loud.
-	if len(missed) != 1 || missed[0] != "29141" {
-		t.Errorf("missed %v, want exactly [29141] — the decaying case with a 282 km perigee", missed)
+	// It misses nothing, and that is asserted rather than left implied: this
+	// used to be `want exactly [29141]`, and 29141 stopped diverging the moment
+	// the propagator was given the WGS-72 constants TLEs are fitted with. A
+	// blind spot that disappears when an unrelated bug is fixed was never a
+	// blind spot, and if one reappears the predicate needs revisiting.
+	if len(missed) != 0 {
+		t.Errorf("Verified cleared %v, which the suite says diverge — every divergent case "+
+			"should be flagged", missed)
 	}
 }
 

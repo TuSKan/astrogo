@@ -87,8 +87,8 @@ const verifiedP99Km = 0.01
 const residualFloorKm = 1e-6
 
 // divergent records the cases where astrogo does NOT reproduce the reference,
-// with the magnitude measured on 2026-09-05 and Vallado's own label for what
-// the case is testing.
+// with the magnitude measured on 2026-09-15 — after the propagator was
+// corrected to WGS-72 — and Vallado's own label for what the case is testing.
 //
 // # These are not tolerances. They are a defect, written down.
 //
@@ -99,24 +99,26 @@ const residualFloorKm = 1e-6
 // the deep-space SDP4 branch, and satellites in the last stage of decay.
 //
 // The backend's own test suite covers six of these 33 cases (5, 4632, 6251,
-// 88888, 24208, 23599) and not one of the eight below, which is how a port
+// 88888, 24208, 23599) and not one of the seven below, which is how a port
 // with this defect passes its own verification.
 //
 // Each bound is checked from BOTH sides. The upper bound catches the defect
 // getting worse. The lower bound matters just as much: if the propagator is
 // ever fixed or replaced, the case stops diverging, this test fails, and
 // whoever did it is told to move the satellite into the verified set rather
-// than leaving a stale exclusion behind.
+// than leaving a stale exclusion behind. That is not hypothetical — it is
+// exactly what happened to satellite 29141 when the gravity model was
+// corrected, and the lower bound is what said so.
 var divergent = map[string]struct {
 	maxKm  float64
 	reason string
 }{
-	"28350": {3440.27, "near-Earth, perigee 127 km — the low-perigee s4 modification"},
-	"22312": {1830.30, "SL-6 R/B(2), the last element set before it decayed in 2006"},
-	"16925": {1329.38, "the s4 > 20 modification"},
-	"11801": {782.18, "the original Spacetrack Report #3 deep-space (SDP4) case"},
-	"28623": {486.20, "H-2 R/B — deep space AND perigee 136 km, both s4 paths at once"},
-	"28872": {7.73, "perigee is negative (−51 km); Vallado notes it is lost within 50 minutes"},
+	"28350": {3438.51, "near-Earth, perigee 127 km — the low-perigee s4 modification"},
+	"22312": {1828.92, "SL-6 R/B(2), the last element set before it decayed in 2006"},
+	"16925": {1328.37, "the s4 > 20 modification"},
+	"11801": {781.71, "the original Spacetrack Report #3 deep-space (SDP4) case"},
+	"28623": {485.94, "H-2 R/B — deep space AND perigee 136 km, both s4 paths at once"},
+	"28872": {7.78, "perigee is negative (−51 km); Vallado notes it is lost within 50 minutes"},
 	"23333": {0.2175, "WIND — Vallado notes the STR#3 Kepler solver fails past about 200 minutes"},
 }
 
@@ -402,16 +404,25 @@ func TestSGP4AgreesWithValladoReferenceVectors(t *testing.T) {
 		km  float64
 	}
 
-	worst := make([]reported, 0, len(divergent))
+	// Every case, not only the divergent ones. Satellite.Verified's doc comment
+	// quotes per-satellite figures for the cases it flags conservatively, and
+	// those figures have to come from somewhere a reader can re-run.
+	worst := make([]reported, 0, len(worstOf))
 
-	for num := range divergent {
-		worst = append(worst, reported{num, worstOf[num]})
+	for num, km := range worstOf {
+		worst = append(worst, reported{num, km})
 	}
 
 	sort.Slice(worst, func(i, j int) bool { return worst[i].km > worst[j].km })
 
 	for _, w := range worst {
-		t.Logf("DIVERGENT sat %-6s max %10.2f km  (%s)", w.num, w.km, divergent[w.num].reason)
+		if d, ok := divergent[w.num]; ok {
+			t.Logf("DIVERGENT sat %-6s max %12.6g km  (%s)", w.num, w.km, d.reason)
+
+			continue
+		}
+
+		t.Logf("verified  sat %-6s max %12.6g km", w.num, w.km)
 	}
 }
 
