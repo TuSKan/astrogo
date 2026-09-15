@@ -129,43 +129,86 @@ func AcquireLock(ctx context.Context, bucket *Bucket, cacheKey string) (release 
 		}
 	}()
 
-	// gcerrors.Unknown counts as contention alongside FailedPrecondition:
-	// a losing writer on Windows surfaces a raw "Access is denied", which
-	// fileblob maps to Unknown. A genuinely unrelated write failure (disk
-	// full, permissions) then surfaces as a ctx deadline rather than
-	// immediately, but is never silently swallowed.
+	// A losing writer announces itself in three different ways, and only the
+	// first is the one the API documents.
+	//
+	//   - FailedPrecondition, which is IfNotExist reporting the object is
+	//     already there. The intended signal.
+	//   - Unknown, from a raw "Access is denied": on Windows the destination
+	//     is held open by the winner while the loser tries to rename over it.
+	//   - NotFound, from "The system cannot find the file specified" — the
+	//     loser's own *staging* file, which the winner renamed away because
+	//     both picked the same name from a clock that does not advance. That
+	//     is the collision writeLock now prevents inside one process; across
+	//     processes nothing can, so it is classified here instead.
+	//
+	// The cost is the same one the first two already carry: a genuinely
+	// unrelated write failure (disk full, permissions, a bucket directory
+	// that does not exist) surfaces as a ctx deadline rather than
+	// immediately. It is never silently swallowed.
 	isContention := func(code gcerrors.ErrorCode) bool {
-		return code == gcerrors.FailedPrecondition || code == gcerrors.Unknown
+		return code == gcerrors.FailedPrecondition ||
+			code == gcerrors.Unknown ||
+			code == gcerrors.NotFound
 	}
 
 	for {
+		// Serialised against any other writer of this basename in this
+		// process, for the same reason Save is: fileblob stages through
+		// os.TempDir()/<basename>.<clock>.tmp and that clock does not advance
+		// on Windows, so two writers of one lock key pick the same staging
+		// file. One renames it into place and the other's rename finds its own
+		// source gone.
+		//
+		// The lock this function exists to provide was itself unprotected
+		// against that, which is how TestStagingAndPartialWritesAcrossBuckets
+		// failed on every run: "create lock writer-3/shared.bsp.lock ...
+		// The system cannot find the file specified".
+		//
+		// Held only across the attempt, never across the retry delay below —
+		// a contender that slept holding it would serialise every other
+		// goroutine's retry behind its own.
+		unlockStaging := writeLock(bucket, lockKey)
+
 		w, werr := bucket.NewWriter(ctx, lockKey, &blob.WriterOptions{IfNotExist: true})
+
+		var writeErr, closeErr error
 		if werr == nil {
-			_, writeErr := io.WriteString(w, "locked")
-			closeErr := w.Close()
+			_, writeErr = io.WriteString(w, "locked")
+			closeErr = w.Close()
+		}
 
-			switch {
-			case writeErr == nil && closeErr == nil:
-				// release runs from the caller's defer, possibly after ctx
-				// was cancelled, and must still delete the lock — otherwise
-				// it leaks until staleLockAge lets someone steal it.
-				//
-				// The in-process slot is handed back after the object is
-				// gone, not before: releasing it first would let the next
-				// goroutine in this process reach IfNotExist while the lock
-				// object is still there, and spin until it is deleted.
-				return func() {
-					_ = bucket.Delete(context.WithoutCancel(ctx), lockKey)
+		// One call site, on every path through the attempt. Releasing it from
+		// inside each branch instead left the one that handles a failed
+		// NewWriter unreachable in tests, which is a poor place for the only
+		// copy of a lock release to live.
+		unlockStaging()
 
-					releaseInProcess()
-				}, nil
-			case isContention(gcerrors.Code(closeErr)):
-				// Someone won the race between NewWriter and Close.
-			default:
-				return nil, fmt.Errorf("remote: create lock %s: %w", lockKey, cmp.Or(writeErr, closeErr))
-			}
-		} else if !isContention(gcerrors.Code(werr)) {
-			return nil, fmt.Errorf("remote: create lock %s: %w", lockKey, werr)
+		// One switch over all three ways the attempt can end, rather than a
+		// separate arm for a failed NewWriter. fileblob defers almost all of
+		// its work to Close, so that arm was close to unreachable and held a
+		// duplicate of this error return.
+		failure := cmp.Or(werr, writeErr, closeErr)
+
+		switch {
+		case failure == nil:
+			// release runs from the caller's defer, possibly after ctx was
+			// cancelled, and must still delete the lock — otherwise it leaks
+			// until staleLockAge lets someone steal it.
+			//
+			// The in-process slot is handed back after the object is gone,
+			// not before: releasing it first would let the next goroutine in
+			// this process reach IfNotExist while the lock object is still
+			// there, and spin until it is deleted.
+			return func() {
+				_ = bucket.Delete(context.WithoutCancel(ctx), lockKey)
+
+				releaseInProcess()
+			}, nil
+		case isContention(gcerrors.Code(failure)):
+			// Someone else got there first; wait below and try again.
+		default:
+			return nil, fmt.Errorf("remote: create lock %s: %w", lockKey, failure)
 		}
 
 		if attrs, aerr := bucket.Attributes(ctx, lockKey); aerr == nil && time.Since(attrs.ModTime) > staleLockAge {
