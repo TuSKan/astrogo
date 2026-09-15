@@ -170,7 +170,16 @@ func TestFINK_EndToEndSHG1G2(t *testing.T) {
 		t.Skipf("FINK provider: Resolve(8467) failed — SSOFT download or parsing error")
 	}
 
-	t.Logf("SSOFT loaded: %d objects", prov.Count())
+	// Resolve has a fast path — a single-object JSON lookup — that never
+	// downloads the SSOFT table, so Count() is legitimately zero here. Logging
+	// it bare read as "loaded nothing, yet somehow has the parameters", which
+	// is a contradiction a reader has to go into catalog/fink to resolve.
+	if prov.Loaded() {
+		t.Logf("SSOFT loaded: %d objects", prov.Count())
+	} else {
+		t.Log("SSOFT not loaded; 8467 came from the single-object endpoint")
+	}
+
 	t.Logf("8467 %s fitted params:", tgt.Name)
 	t.Logf("  H       = %.4f (r-band)", tgt.H)
 	t.Logf("  G1      = %.4f", tgt.G1)
@@ -190,29 +199,39 @@ func TestFINK_EndToEndSHG1G2(t *testing.T) {
 	}
 
 	// Step 3 & 4: Compute our model and compare residuals.
+	// Counted separately so a failure can say which of the two things went
+	// wrong. "No usable observations" has two causes that want opposite
+	// outcomes: FINK holding no r-band data for this object right now is
+	// absence and the comparison simply cannot be made, while FINK renaming a
+	// column is a schema change astrogo has to notice. Both used to arrive as
+	// the same sentence, and neither was actionable.
 	var (
 		nValid    int
-		nR2       int // observations in r-band (fid=2)
+		nRBand    int // records in r-band (fid=2)
+		nDropped  int // r-band records missing a column this needs
+		absent    = map[string]int{}
 		sumDiff   float64
 		sumDiffSq float64
 		maxDiff   float64
-		nMatch    int // |diff| < 0.01 mag
+		nMatch    int // |diff| < 0.025 mag
 	)
+
+	// Every column this comparison reads, named once so the failure message
+	// and the loop cannot drift apart.
+	fields := []string{"residuals_shg1g2", "i:magpsf_red", "Phase", "Dhelio", "Dobs", "RA", "DEC"}
 
 	spinRA := angle.Deg(tgt.SpinRA)
 	spinDec := angle.Deg(tgt.SpinDec)
 
 	for _, r := range records {
-		finkRes, okRes := getFloat(r, "residuals_shg1g2")
-		redMag, okMag := getFloat(r, "i:magpsf_red")
-		phase, okPha := getFloat(r, "Phase")
-		dhelio, okDh := getFloat(r, "Dhelio")
-		dobs, okDo := getFloat(r, "Dobs")
-		raVal, okRA := getFloat(r, "RA")
-		decVal, okDec := getFloat(r, "DEC")
+		// The band selector is read first, and its absence counted as a
+		// missing column rather than as a non-r-band record: a record with no
+		// i:fid is not evidence about which filter it came from.
 		fid, okFid := getFloat(r, "i:fid")
+		if !okFid {
+			absent["i:fid"]++
+			nDropped++
 
-		if !okRes || !okMag || !okPha || !okDh || !okDo || !okRA || !okDec || !okFid {
 			continue
 		}
 
@@ -221,11 +240,33 @@ func TestFINK_EndToEndSHG1G2(t *testing.T) {
 			continue
 		}
 
-		nR2++
+		nRBand++
 
-		alpha := angle.Deg(phase)
-		ra := angle.Deg(raVal)
-		dec := angle.Deg(decVal)
+		vals := make(map[string]float64, len(fields))
+
+		for _, key := range fields {
+			v, ok := getFloat(r, key)
+			if !ok {
+				absent[key]++
+
+				continue
+			}
+
+			vals[key] = v
+		}
+
+		if len(vals) != len(fields) {
+			nDropped++
+
+			continue
+		}
+
+		finkRes, redMag := vals["residuals_shg1g2"], vals["i:magpsf_red"]
+		dhelio, dobs := vals["Dhelio"], vals["Dobs"]
+
+		alpha := angle.Deg(vals["Phase"])
+		ra := angle.Deg(vals["RA"])
+		dec := angle.Deg(vals["DEC"])
 
 		// Compute our model: reduced magnitude at r=Δ=1 equivalent.
 		// reduced_mag = H - 2.5·log₁₀(G₁Φ₁+G₂Φ₂+G₃Φ₃) + SpinCorrection
@@ -263,14 +304,28 @@ func TestFINK_EndToEndSHG1G2(t *testing.T) {
 	}
 
 	if nValid == 0 {
-		t.Fatal("no valid r-band observations for comparison")
+		// A column FINK no longer serves means astrogo is reading the wrong
+		// names, and has to fail loudly however few records arrived.
+		if len(absent) > 0 {
+			t.Fatalf("none of FINK's %d observations for 8467 could be used: %d were "+
+				"dropped for missing columns %v. FINK serves these under different "+
+				"names than this comparison reads, which is a schema change rather "+
+				"than an outage", len(records), nDropped, absent)
+		}
+
+		// Whereas an object with no r-band photometry right now is absence:
+		// nothing is wrong and there is nothing to compare.
+		t.Skipf("FINK returned %d observations for 8467, none of them in r-band "+
+			"(i:fid == 2), and the fitted H/G1/G2 this validates against are r-band. "+
+			"Nothing to compare rather than anything wrong", len(records))
 	}
 
 	meanDiff := sumDiff / float64(nValid)
 	rmsDiff := math.Sqrt(sumDiffSq / float64(nValid))
 	matchPct := float64(nMatch) / float64(nValid) * 100
 
-	t.Logf("\nValidation results (r-band, n=%d of %d total):", nValid, nR2)
+	t.Logf("\nValidation results: %d usable of %d r-band, from %d observations",
+		nValid, nRBand, len(records))
 	t.Logf("  Mean |our_res − fink_res| = %.4f mag", meanDiff)
 	t.Logf("  RMS  |our_res − fink_res| = %.4f mag", rmsDiff)
 	t.Logf("  Max  |our_res − fink_res| = %.4f mag", maxDiff)
