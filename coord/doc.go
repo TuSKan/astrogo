@@ -67,6 +67,14 @@
 // degree due east of a target differs from it by 5.7° of right ascension and
 // by three arcminutes of declination.
 //
+// # Extragalactic structure
+//
+// [Supergalactic] puts the flattened sheet of nearby bright galaxies — the
+// Local Supercluster, with the Virgo cluster near its centre — on the equator,
+// the way Galactic coordinates put the Milky Way's disc on theirs. It is a
+// fixed rotation with no epoch, since the plane is defined by where galaxies
+// are rather than by where the Earth is pointing.
+//
 // # Earth Orientation
 //
 // Both [Context] and [Reducer] query the global IERS EOP model for DUT1 and
