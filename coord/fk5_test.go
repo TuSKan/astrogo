@@ -2,6 +2,7 @@ package coord_test
 
 import (
 	"math"
+	"strings"
 	"testing"
 
 	"github.com/TuSKan/astrogo/angle"
@@ -188,6 +189,23 @@ func TestICRSToFK5SuppliesTheSpinMotion(t *testing.T) {
 	if pmRA == angle.Zero() && pmDec == angle.Zero() {
 		t.Error("the supplied proper motion is exactly zero, which is the answer " +
 			"a transformation that did nothing would give")
+	}
+}
+
+// TestFK5StringNamesTheFrameAndEpoch keeps the rendering honest about which
+// frame it is. "RA 05h30m00.00s Dec -05d24m00.0s" is the same text an ICRS, an
+// FK4 or an apparent place would print, and those are different places — 20
+// milliarcseconds apart for ICRS and most of a degree for FK4 — so the frame
+// and its epoch have to be in the string a log line carries.
+func TestFK5StringNamesTheFrameAndEpoch(t *testing.T) {
+	t.Parallel()
+
+	s := coord.NewFK5(angle.Hour(5.5), angle.Deg(-5.4), coord.J2000Epoch).String()
+
+	for _, want := range []string{"FK5", "J2000"} {
+		if !strings.Contains(s, want) {
+			t.Errorf("String() = %q, want it to contain %q", s, want)
+		}
 	}
 }
 
