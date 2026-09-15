@@ -21,6 +21,26 @@ func TestWGS72_GM(t *testing.T) {
 	testutil.AssertExact(t, "WGS72 GM", constants.WGS72.GeocentricGravitationalConstant.Value, 3.986_008e14)
 }
 
+func TestWGS72_J2(t *testing.T) {
+	testutil.AssertExact(t, "WGS72 J2", constants.WGS72.DynamicalFormFactor.Value, 1.082_616e-3)
+}
+
+// TestWGS72_J2IsTheValueSGP4Branches asserts the member ephemeris/satellite
+// reads, in the spelling Vallado's getgravconst publishes it in.
+//
+// It is a duplicate of the assertion above by value and not by intent: that one
+// says the standard is transcribed correctly, this one says the consumer will
+// get the number its own arithmetic was validated against. If WGS 72 were ever
+// restated in a different normalization, the first would follow the standard
+// and the second would have to fail.
+func TestWGS72_J2IsTheValueSGP4Branches(t *testing.T) {
+	if got := constants.WGS72.DynamicalFormFactor.Value; got != 0.001082616 {
+		t.Errorf("J2 = %.10g, want 0.001082616 — the literal in Vallado's "+
+			"getgravconst(wgs72), which ephemeris/satellite reproduces a branch from",
+			got)
+	}
+}
+
 func TestWGS72_Units(t *testing.T) {
 	if constants.WGS72.SemiMajorAxis.Unit != unit.Meter {
 		t.Errorf("SemiMajorAxis.Unit = %v, want unit.Meter", constants.WGS72.SemiMajorAxis.Unit)

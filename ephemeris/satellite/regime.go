@@ -3,24 +3,32 @@ package satellite
 import (
 	"fmt"
 	"math"
+
+	"github.com/TuSKan/astrogo/constants"
 )
 
-// WGS-72 constants, matching the gravity model NewFromTLE hands the propagator.
+// The WGS-72 constants the propagator is configured with, read from the one
+// place that publishes them.
 //
-// Copied from the backend's own getGravConst rather than from a table, because
-// the point of the arithmetic below is to reproduce a branch that code takes,
-// and a constant that differs in the last digit reproduces a different branch.
+// The arithmetic below exists to reproduce a branch SGP4 itself takes, so a
+// constant differing in the last digit reproduces a different branch. That used
+// to read as an argument for keeping a private copy — and a private copy is
+// precisely how this file came to hold WGS-84's values while the propagator
+// beside it needed WGS-72's, which no amount of care in the arithmetic would
+// have caught.
 //
-// These were WGS-84 until the propagator itself was corrected to WGS-72, which
-// is what TLEs are fitted with. The cost of the mismatch in *this* file was
-// small — measured across the whole Vallado suite it moves perigee by 4 m for
-// every near-Earth case, and no case changes which side of the 220 km branch it
-// falls on — but a comment claiming the constants match the propagator has to
-// be true, or the next reader inherits a promise nobody is keeping.
-const (
-	earthRadiusKM = 6378.135
-	muKM3S2       = 398600.8
-	j2            = 0.001082616
+// Reading them live is safe here because WGS 72 is a closed standard: superseded
+// in 1984, it will never gain a new realization, so nothing can move underneath
+// this. That is not true of WGS 84, whose GM in [constants] has already moved
+// past the value SGP4's own table calls "wgs84" — see [constants.WGS72]'s doc
+// comment for where that line falls.
+//
+// var, not const: a Constant's Value is a struct field, and Go will not admit
+// one to a constant expression. Same reason as kmPerAU in satellite.go.
+var (
+	earthRadiusKM = constants.WGS72.SemiMajorAxis.Value / 1e3                   // 6378.135 km
+	muKM3S2       = constants.WGS72.GeocentricGravitationalConstant.Value / 1e9 // 398600.8 km³/s²
+	j2            = constants.WGS72.DynamicalFormFactor.Value                   // 0.001082616
 )
 
 // xke is sqrt(GM) in earth radii^1.5 per minute — SGP4's time and length units.
