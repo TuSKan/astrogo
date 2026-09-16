@@ -5,6 +5,7 @@ import (
 	"math"
 
 	"github.com/TuSKan/astrogo/angle"
+	"github.com/TuSKan/astrogo/internal/gofaext"
 	"github.com/TuSKan/astrogo/vector"
 )
 
@@ -60,6 +61,20 @@ const (
 	// LSRDelhaye is the historical dynamical LSR of Delhaye (1965), still the
 	// frame a good deal of older literature is quoted in.
 	LSRDelhaye
+
+	// LSRKinematic is the kinematic Local Standard of Rest, the average of
+	// the velocities of the bright stars near the Sun rather than a
+	// dynamical construction. It is what radio spectroscopy means by "LSR",
+	// and what a spectral line's velocity is quoted against unless the paper
+	// says otherwise.
+	//
+	// It is published differently from the other two, which is why it arrived
+	// later (#295): they are Galactic Cartesian components, and this is an
+	// apex — 20 km/s toward RA 270°, Dec +30°, referred to the B1900 equinox
+	// (Gordon 1975, Methods of Experimental Physics vol. 12C §6.1.5). See
+	// [kinematicApexICRS] for how that direction is brought to ICRS and what
+	// it costs.
+	LSRKinematic
 )
 
 // String names the convention.
@@ -69,6 +84,8 @@ func (k LSRKind) String() string {
 		return "LSR (Schönrich+ 2010)"
 	case LSRDelhaye:
 		return "LSRD (Delhaye 1965)"
+	case LSRKinematic:
+		return "LSRK (Gordon 1975)"
 	default:
 		return fmt.Sprintf("LSRKind(%d)", int(k))
 	}
@@ -92,12 +109,32 @@ func (k LSRKind) String() string {
 // The second element of each is the one to look at: V is the asymmetric drift,
 // and it is the component that a new survey moves. That is why the convention
 // is named at the call site rather than folded into a single constant.
+// solarMotion returns the Sun's velocity with respect to the given LSR, as
+// the Galactic Cartesian components its authors published.
+//
+// [LSRKinematic] is not here and must not reach this: it is published as an
+// apex rather than as components, and there is no (u, v, w) triple of
+// Gordon's to return. [solarMotionICRS] routes it elsewhere before this is
+// called.
 func (k LSRKind) solarMotion() (u, v, w float64) {
 	switch k {
 	case LSRDynamical:
 		return 11.1, 12.24, 7.25
 	case LSRDelhaye:
 		return 9, 12, 7
+	case LSRKinematic:
+		// Unreachable: solarMotionICRS sends LSRK to kinematicApexICRS before
+		// this is called, because Gordon publishes an apex and not components,
+		// so there is no triple of his to return.
+		//
+		// Listed rather than left to the default so the compiler's exhaustive
+		// check covers it, and so a reader sees that the omission is deliberate
+		// rather than forgotten. If the routing above were ever removed, this
+		// would quietly answer with Schonrich's numbers — which is why
+		// TestLSRKinematicIsDistinctFromTheDynamicalOnes asserts that LSRK's
+		// apex is degrees away from both dynamical ones, and fails the moment
+		// it is not.
+		fallthrough
 	default:
 		// A kind this package does not know is a caller's mistake, and there
 		// is no error return to report it through. Falling back to the modern
@@ -117,6 +154,10 @@ func (k LSRKind) solarMotion() (u, v, w float64) {
 // depend on somebody else's arithmetic instead of on the values their paper
 // actually states.
 func solarMotionICRS(kind LSRKind) vector.Vec3 {
+	if kind == LSRKinematic {
+		return kinematicApexICRS()
+	}
+
 	u, v, w := kind.solarMotion()
 
 	speed := math.Sqrt(u*u + v*v + w*w)
@@ -167,4 +208,81 @@ func LSRApex(kind LSRKind) (ICRS, float64) {
 	c.FromUnitVector(v)
 
 	return c, v.Norm()
+}
+
+// The kinematic LSR apex, as Gordon (1975) publishes it.
+//
+// Methods of Experimental Physics vol. 12C §6.1.5: 20 km/s toward
+// RA 270°, Dec +30°, referred to the **B1900 equinox**. The equinox is the
+// part that matters and the part most citations drop.
+const (
+	lsrkSpeed       = 20.0  // km/s
+	lsrkApexRADeg   = 270.0 // B1900 equinox
+	lsrkApexDecDeg  = 30.0
+	lsrkApexEquinox = 1900.0
+)
+
+// kinematicApexICRS brings Gordon's B1900 apex to ICRS.
+//
+// # Why this is derived rather than written down
+//
+// Astropy checks the converted vector in as a literal, and copying it would
+// make astrogo's answer depend on somebody else's arithmetic rather than on the
+// value Gordon's paper states — the same reason [solarMotionICRS] rotates the
+// dynamical triples here instead of storing rotated copies.
+//
+// # The approximation, measured
+//
+// The apex is referred to the B1900 equinox and the route to ICRS runs through
+// FK4, whose equinox is B1950, so the direction must be precessed across fifty
+// years of FK4-era equinox. The correct model for that is Newcomb's, which
+// SOFA does not provide; [gofaext.Prec76Matrix] is IAU 1976, and using it here
+// is an approximation.
+//
+// Its size is the difference between the two precession constants, about
+// 1.1 arcsec per century, and it was measured rather than assumed. Against
+// Astropy's V_OFFSET_LSRK — which comes from the same Gordon apex through a
+// full FK4-with-equinox implementation, and is therefore an independent
+// realisation of the same definition:
+//
+//	astrogo  [ 0.290050549357874, -17.317263640487756, 10.001412434484337]
+//	astropy  [ 0.289997068390346, -17.317264789717928, 10.001411995469470]
+//
+//	difference   5.35e-05 km/s   (5.4 cm/s)
+//	direction    0.55 arcsec
+//
+// 0.55 arcsec over half a century is 1.1 arcsec per century, so the residual is
+// the model difference and nothing else. 5.4 cm/s is twenty times below the
+// best radial-velocity precision anyone achieves and some two thousand times
+// below what spectral-line work quotes, on a convention whose own definition is
+// uncertain by far more. TestLSRKMatchesAstropysRealisation pins it.
+//
+// If [coord.FK4] ever learns a real equinox and Newcomb precession (#295's
+// option A), this becomes exact and the test tightens.
+func kinematicApexICRS() vector.Vec3 {
+	from1, from2 := gofaext.Epb2jd(lsrkApexEquinox)
+	to1, to2 := gofaext.Epb2jd(B1950)
+
+	ra := angle.Deg(lsrkApexRADeg).Radians()
+	dec := angle.Deg(lsrkApexDecDeg).Radians()
+
+	sra, cra := math.Sincos(ra)
+	sdec, cdec := math.Sincos(dec)
+
+	// The direction as a unit vector in the B1900 frame, precessed to B1950.
+	// Built by hand rather than through an ICRS value, because it is not one:
+	// calling it ICRS before the conversion would be the type saying something
+	// untrue.
+	p := gofaext.Rxp(
+		gofaext.Prec76Matrix(from1, from2, to1, to2),
+		[3]float64{cra * cdec, sra * cdec, sdec},
+	)
+
+	b1950 := NewFK4(
+		angle.Rad(math.Atan2(p[1], p[0])).Wrap360(),
+		angle.Rad(math.Atan2(p[2], math.Hypot(p[0], p[1]))),
+		B1950,
+	)
+
+	return FK4ToICRS(b1950).ToUnitVector().MulScalar(lsrkSpeed)
 }
