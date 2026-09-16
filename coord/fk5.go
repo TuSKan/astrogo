@@ -155,9 +155,13 @@ func FK5ToICRS(c FK5) ICRS {
 // The inverse of [FK5ToICRS]. A position with no kinematics attached comes
 // back carrying the proper motion FK5's spin gives it, which is the honest
 // answer: a star at rest in ICRS is not at rest in FK5.
+//
+// Which branch runs depends on whether the caller recorded kinematics, not on
+// whether they happen to be zero — see ICRS.hasKinematics and #278. Both return
+// the spin motion here; the difference is that the six-element route also
+// carries parallax and radial velocity through.
 func ICRSToFK5(c ICRS, jepoch float64) FK5 {
-	if c.PmRA() == angle.Zero() && c.PmDec() == angle.Zero() &&
-		c.Parallax() == angle.Zero() && c.RV() == 0 {
+	if !c.hasKinematics {
 		jd1, jd2 := ttAtJulianEpoch(jepoch)
 		r5, d5, dr5, dd5 := gofaext.Hfk5z(c.RA().Radians(), c.Dec().Radians(), jd1, jd2)
 

@@ -560,3 +560,72 @@ func TestFK4ToICRSIsItsTwoLegs(t *testing.T) {
 		}
 	}
 }
+
+// TestICRSKinematicsRecordedVersusAbsent is the regression test for #278, and
+// the one the existing round-trip test could not be.
+//
+// TestFK4RoundTripCloses starts from FK4 and compares positions, so it never
+// looked at the proper motion the ICRS → FK4 direction invents. The defect
+// lived under it: the branch chose its route by testing every kinematic field
+// for zero, which cannot tell "no proper motion recorded" from "measured as
+// zero". Those are different claims about a star and convert differently, and
+// the first answer was given to both.
+//
+// The constraint needs no external reference. A star *declared* at rest in ICRS,
+// converted to FK4 and back, must still be at rest. Measured before the fix it
+// came back with 0.6 to 0.9 mas/yr out of nothing, while the position closed to
+// 19 microarcseconds — which is what made it invisible.
+func TestICRSKinematicsRecordedVersusAbsent(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		name    string
+		ra, dec angle.Angle
+	}{
+		{"equator", angle.Deg(0), angle.Deg(0)},
+		{"mid-north", angle.Deg(88.79), angle.Deg(7.41)},
+		{"deep south", angle.Deg(201.3), angle.Deg(-43.1)},
+		{"near the pole", angle.Deg(45), angle.Deg(78)},
+		{"near the RA wrap", angle.Deg(359.9), angle.Deg(10)},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			// Recorded as at rest in ICRS: the zeros are a measurement, so the
+			// conversion must preserve them.
+			atRest := coord.NewICRSWithKinematics(tc.ra, tc.dec, angle.Zero(), angle.Zero(),
+				angle.Zero(), 0)
+			back := coord.FK4ToICRS(coord.ICRSToFK4(atRest, coord.B1950))
+
+			pmRA := back.PmRA().Arcseconds() * 1000
+			pmDec := back.PmDec().Arcseconds() * 1000
+
+			t.Logf("%s: declared at rest, round trip returns (%+.4f, %+.4f) mas/yr",
+				tc.name, pmRA, pmDec)
+
+			// 0.05 mas/yr: an order of magnitude above the E-term residual the
+			// conversion genuinely carries, and an order below the 0.6-0.9 the
+			// dropped spin term produced. Nothing legitimate sits between.
+			const tol = 0.05
+
+			if math.Abs(pmRA) > tol || math.Abs(pmDec) > tol {
+				t.Errorf("a star declared at rest in ICRS came back moving at "+
+					"(%+.4f, %+.4f) mas/yr, want under %.2f", pmRA, pmDec, tol)
+			}
+
+			if sep := coord.Separation(atRest, back).Arcseconds(); sep > 1e-3 {
+				t.Errorf("position round trip is off by %.6f\", want under 0.001\"", sep)
+			}
+
+			// Not recorded: the catalogue said nothing about motion, so the
+			// conversion takes SOFA's matched z-routines and the position — the
+			// only thing such a catalogue actually asserts — survives intact.
+			absent := coord.NewICRS(tc.ra, tc.dec)
+			backAbsent := coord.FK4ToICRS(coord.ICRSToFK4(absent, coord.B1950))
+
+			if sep := coord.Separation(absent, backAbsent).Arcseconds(); sep > 1e-3 {
+				t.Errorf("position-only round trip is off by %.6f\", want under 0.001\"", sep)
+			}
+		})
+	}
+}

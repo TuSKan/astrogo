@@ -200,22 +200,26 @@ func FK4ToICRS(c FK4) ICRS {
 // FK4's drifting equinox gives it, which is the honest answer — a star at rest
 // in ICRS is not at rest in FK4.
 //
-// # Why this is not simply [FK5ToFK4] after [ICRSToFK5]
+// # Which route depends on what the caller recorded, not on the values
 //
-// [FK4ToICRS] is written as its two legs and this one is not, which looks like
-// an oversight and is not. For a position with no kinematics the two routes
-// genuinely differ: composing would hand the FK5 spin motion that [ICRSToFK5]
-// supplies to SOFA's six-element routine, along with the zero parallax and
-// zero radial velocity that are absences rather than measurements. The direct
-// route uses Fk54z, which is SOFA's routine for exactly this input, and is
-// what astropy's FK5 → FK4 does for a coordinate carrying no differentials.
+// A position built with [NewICRS] has no kinematics recorded, and takes SOFA's
+// Fk54z — the routine for exactly this input, and the matched inverse of the
+// Fk45z that [FK4ToICRS] uses, which is why an archival position survives a
+// round trip.
 //
-// The price is that Fk54z assumes the star is at rest in FK5 while the caller
-// said it is at rest in ICRS; those differ by FK5's spin, about 0.3 mas/yr in
-// the *returned proper motion* and nothing at all in the returned position.
+// A position built with [NewICRSWithKinematics] has them recorded even if they
+// are zero, and takes the six-element route. Zero there is a claim: the star is
+// at rest in ICRS. It is not at rest in FK5, because FK5 rotates slowly with
+// respect to ICRS, so the returned FK4 proper motion carries that spin.
+//
+// The two were indistinguishable before #278, because the branch tested every
+// kinematic field for zero rather than asking whether any had been recorded. A
+// star declared at rest in ICRS therefore took the first route, which answers
+// for a star at rest in FK5, and came back from ICRS → FK4 → ICRS carrying
+// 0.6 to 0.9 mas/yr of proper motion it never had — while its position closed
+// to 19 microarcseconds, which is what kept it invisible.
 func ICRSToFK4(c ICRS, bepoch float64) FK4 {
-	if c.PmRA() == angle.Zero() && c.PmDec() == angle.Zero() &&
-		c.Parallax() == angle.Zero() && c.RV() == 0 {
+	if !c.hasKinematics {
 		jd1, jd2 := ttAtJulianEpoch(J2000Epoch)
 		r5, d5, _, _ := gofaext.Hfk5z(c.RA().Radians(), c.Dec().Radians(), jd1, jd2)
 		r1950, d1950, dr1950, dd1950 := gofaext.Fk54z(r5, d5, bepoch)
