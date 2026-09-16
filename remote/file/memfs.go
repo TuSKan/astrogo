@@ -2,6 +2,7 @@ package file
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"io/fs"
@@ -34,6 +35,8 @@ func init() { Register("mem", openMem) }
 // same cache, or deliberately different ones, without a package-level global.
 type memFS struct {
 	store *memStore
+	// ctx is the context WithContext bound, or nil.
+	ctx context.Context //nolint:containedctx // the io/fs contract has nowhere else to put it
 }
 
 // memStore is the shared state behind one mem:// host.
@@ -67,8 +70,23 @@ func openMem(u *url.URL) (fs.FS, error) {
 	return &memFS{store: store}, nil
 }
 
+// WithContext implements [ContextFS]. Nothing here blocks, so what is honoured
+// is the context's state when each operation begins — see [localFS.WithContext]
+// for why a backend with nothing to cancel implements this rather than leaving
+// RequireContext with an exception.
+func (m *memFS) WithContext(ctx context.Context) fs.FS {
+	clone := *m
+	clone.ctx = ctx
+
+	return &clone
+}
+
 // Open implements [fs.FS].
 func (m *memFS) Open(name string) (fs.File, error) {
+	if err := m.check("open", name); err != nil {
+		return nil, err
+	}
+
 	if !fs.ValidPath(name) {
 		return nil, &fs.PathError{Op: "open", Path: name, Err: fs.ErrInvalid}
 	}
@@ -95,6 +113,10 @@ func (m *memFS) Open(name string) (fs.File, error) {
 
 // Stat implements [fs.StatFS].
 func (m *memFS) Stat(name string) (fs.FileInfo, error) {
+	if err := m.check("stat", name); err != nil {
+		return nil, err
+	}
+
 	f, err := m.Open(name)
 	if err != nil {
 		return nil, err
@@ -107,6 +129,10 @@ func (m *memFS) Stat(name string) (fs.FileInfo, error) {
 
 // ReadDir implements [fs.ReadDirFS].
 func (m *memFS) ReadDir(name string) ([]fs.DirEntry, error) {
+	if err := m.check("readdir", name); err != nil {
+		return nil, err
+	}
+
 	if !fs.ValidPath(name) {
 		return nil, &fs.PathError{Op: "readdir", Path: name, Err: fs.ErrInvalid}
 	}
@@ -158,6 +184,10 @@ func (m *memFS) ReadDir(name string) ([]fs.DirEntry, error) {
 // Create implements [CreateFS]. The object appears only on Close, matching the
 // local backend, so a reader never sees half a write.
 func (m *memFS) Create(name string) (io.WriteCloser, error) {
+	if err := m.check("create", name); err != nil {
+		return nil, err
+	}
+
 	if !fs.ValidPath(name) {
 		return nil, &fs.PathError{Op: "create", Path: name, Err: fs.ErrInvalid}
 	}
@@ -165,8 +195,71 @@ func (m *memFS) Create(name string) (io.WriteCloser, error) {
 	return &memWrite{fsys: m, name: name}, nil
 }
 
+// CreateExcl implements [CreateExclFS].
+//
+// The object is reserved empty under the store's lock and the write appends to
+// it, rather than appearing on Close the way [memFS.Create] does. That is the
+// same choice the local backend makes and for the same reason: a lock that
+// became visible only when the holder finished writing would not exclude
+// anybody. See [localFS.CreateExcl].
+func (m *memFS) CreateExcl(name string) (io.WriteCloser, error) {
+	if err := m.check("createexcl", name); err != nil {
+		return nil, err
+	}
+
+	if !fs.ValidPath(name) {
+		return nil, &fs.PathError{Op: "createexcl", Path: name, Err: fs.ErrInvalid}
+	}
+
+	m.store.mu.Lock()
+	defer m.store.mu.Unlock()
+
+	if _, ok := m.store.objects[name]; ok {
+		return nil, &fs.PathError{Op: "createexcl", Path: name, Err: fs.ErrExist}
+	}
+
+	m.store.objects[name] = memObject{modTime: time.Now()}
+
+	return &memAppend{fsys: m, name: name}, nil
+}
+
+// memAppend writes into an object that already exists, in place.
+type memAppend struct {
+	fsys *memFS
+	name string
+}
+
+func (w *memAppend) Write(p []byte) (int, error) {
+	w.fsys.store.mu.Lock()
+	defer w.fsys.store.mu.Unlock()
+
+	obj := w.fsys.store.objects[w.name]
+	obj.data = append(obj.data, p...)
+	obj.modTime = time.Now()
+	w.fsys.store.objects[w.name] = obj
+
+	return len(p), nil
+}
+
+func (w *memAppend) Close() error { return nil }
+
+// Abort implements [AbortWriter]: remove the object the exclusive create
+// reserved, so an abandoned lock attempt leaves nothing behind.
+func (w *memAppend) Abort() error {
+	w.fsys.store.mu.Lock()
+	defer w.fsys.store.mu.Unlock()
+
+	delete(w.fsys.store.objects, w.name)
+
+	return nil
+}
+
 // Remove implements [RemoveFS].
 func (m *memFS) Remove(name string) error {
+	if err := m.check("remove", name); err != nil {
+		return err
+	}
+
 	if !fs.ValidPath(name) {
 		return &fs.PathError{Op: "remove", Path: name, Err: fs.ErrInvalid}
 	}
@@ -179,6 +272,19 @@ func (m *memFS) Remove(name string) error {
 	}
 
 	delete(m.store.objects, name)
+
+	return nil
+}
+
+// check reports the bound context's error, if it has one.
+func (m *memFS) check(op, name string) error {
+	if m.ctx == nil {
+		return nil
+	}
+
+	if err := m.ctx.Err(); err != nil {
+		return &fs.PathError{Op: op, Path: name, Err: err}
+	}
 
 	return nil
 }
@@ -207,6 +313,13 @@ func (w *memWrite) Write(p []byte) (int, error) {
 	}
 
 	return n, nil
+}
+
+// Abort implements [AbortWriter]: drop the buffer, publish nothing.
+func (w *memWrite) Abort() error {
+	w.buf.Reset()
+
+	return nil
 }
 
 func (w *memWrite) Close() error {

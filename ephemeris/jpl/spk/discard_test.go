@@ -3,6 +3,7 @@ package spk
 import (
 	"errors"
 	"io"
+	"io/fs"
 	"strings"
 	"testing"
 
@@ -12,39 +13,43 @@ import (
 
 var errStorageMisbehaved = errors.New("discard_test: open kernel: Access is denied")
 
-// seedKernel writes a byte into a fresh bucket and returns it with its key, so
+// seedKernel writes a byte into a fresh fsys and returns it with its key, so
 // a test can ask whether the file survived a decision.
-func seedKernel(t *testing.T) (*remote.Bucket, string) {
+func seedKernel(t *testing.T) (remote.FS, string) {
 	t.Helper()
 
-	bucket, err := remote.OpenBucket(t.Context(), testutil.FileURL(t, t.TempDir()))
+	fsys, err := remote.OpenFS(t.Context(), testutil.FileURL(t, t.TempDir()))
 	if err != nil {
 		t.Fatalf("open bucket: %v", err)
 	}
 
 	const key = "jpl/planets/de440s.bsp"
 
-	// file.Save rather than bucket.WriteAll: these tests are t.Parallel and
-	// each has its own t.TempDir bucket, but fileblob stages every write in
+	// file.Save rather than fsys.WriteAll: these tests are t.Parallel and
+	// each has its own t.TempDir fsys, but fileblob stages every write in
 	// os.TempDir under a name built from the key's basename and a Windows
 	// clock that does not move — so separate buckets writing "de440s.bsp"
 	// still collide. Save holds the staging lock that prevents it (#241).
-	if err := remote.Save(t.Context(), bucket, key, strings.NewReader("kernel bytes")); err != nil {
+	if err := remote.WriteFile(t.Context(), fsys, key, strings.NewReader("kernel bytes")); err != nil {
 		t.Fatalf("seed kernel: %v", err)
 	}
 
-	return bucket, key
+	return fsys, key
 }
 
-func exists(t *testing.T, bucket *remote.Bucket, key string) bool {
+func exists(t *testing.T, fsys remote.FS, key string) bool {
 	t.Helper()
 
-	ok, err := bucket.Exists(t.Context(), key)
-	if err != nil {
-		t.Fatalf("exists %s: %v", key, err)
+	_, err := fs.Stat(fsys, key)
+	if err == nil {
+		return true
 	}
 
-	return ok
+	if !errors.Is(err, fs.ErrNotExist) {
+		t.Fatalf("stat %s: %v", key, err)
+	}
+
+	return false
 }
 
 // TestDiscardIfCorruptKeepsAKernelItMerelyCouldNotRead is the whole point of
@@ -60,10 +65,10 @@ func exists(t *testing.T, bucket *remote.Bucket, key string) bool {
 func TestDiscardIfCorruptKeepsAKernelItMerelyCouldNotRead(t *testing.T) {
 	t.Parallel()
 
-	bucket, key := seedKernel(t)
+	fsys, key := seedKernel(t)
 
 	closed := false
-	err := discardIfCorrupt(t.Context(), bucket, key,
+	err := discardIfCorrupt(t.Context(), fsys, key,
 		func() error { closed = true; return nil },
 		errStorageMisbehaved)
 
@@ -75,7 +80,7 @@ func TestDiscardIfCorruptKeepsAKernelItMerelyCouldNotRead(t *testing.T) {
 		t.Error("the file handle was not closed; it is closed on both paths")
 	}
 
-	if !exists(t, bucket, key) {
+	if !exists(t, fsys, key) {
 		t.Error("the kernel was deleted after a read failure that says nothing " +
 			"about its content; the next open should have found it and tried again")
 	}
@@ -91,21 +96,21 @@ func TestDiscardIfCorruptKeepsAKernelItMerelyCouldNotRead(t *testing.T) {
 func TestDiscardIfCorruptDeletesAKernelThatIsWrong(t *testing.T) {
 	t.Parallel()
 
-	bucket, key := seedKernel(t)
+	fsys, key := seedKernel(t)
 
 	const sidecar = "jpl/planets/de440s.bsp.sha256"
 
-	if err := bucket.WriteAll(t.Context(), sidecar, []byte("deadbeef"), nil); err != nil {
+	if err := remote.WriteFile(t.Context(), fsys, sidecar, strings.NewReader("deadbeef")); err != nil {
 		t.Fatalf("seed sidecar: %v", err)
 	}
 
 	cause := errors.New("sha256 mismatch") //nolint:err113 // a stand-in for the real message, wrapped below
 
 	closed := false
-	err := discardIfCorrupt(t.Context(), bucket, key,
+	err := discardIfCorrupt(t.Context(), fsys, key,
 		func() error { closed = true; return nil },
 		errors.Join(ErrCorruptSPK, cause),
-		func() error { return bucket.Delete(t.Context(), sidecar) })
+		func() error { return remote.RemoveFile(t.Context(), fsys, sidecar) })
 
 	if !errors.Is(err, ErrCorruptSPK) {
 		t.Errorf("err = %v, want it to keep reporting ErrCorruptSPK", err)
@@ -115,14 +120,14 @@ func TestDiscardIfCorruptDeletesAKernelThatIsWrong(t *testing.T) {
 		t.Error("the file handle was not closed")
 	}
 
-	if exists(t, bucket, key) {
+	if exists(t, fsys, key) {
 		t.Error("a kernel whose checksum did not match was left in the cache; " +
 			"the next run would keep failing on the same bytes")
 	}
 
 	// The sidecar describes the kernel and must not outlive it, or the next
 	// download's bootstrap compares against a recording of the corrupt one.
-	if exists(t, bucket, sidecar) {
+	if exists(t, fsys, sidecar) {
 		t.Error("the checksum sidecar outlived the kernel it describes")
 	}
 }
@@ -137,19 +142,19 @@ func TestDiscardIfCorruptDeletesAKernelThatIsWrong(t *testing.T) {
 func TestDiscardIfCorruptRunsExtrasOnlyWhenItDeletes(t *testing.T) {
 	t.Parallel()
 
-	bucket, key := seedKernel(t)
+	fsys, key := seedKernel(t)
 
 	ran := 0
 	extra := func() error { ran++; return nil }
 
-	_ = discardIfCorrupt(t.Context(), bucket, key, func() error { return nil },
+	_ = discardIfCorrupt(t.Context(), fsys, key, func() error { return nil },
 		errStorageMisbehaved, extra)
 
 	if ran != 0 {
 		t.Errorf("extra cleanup ran %d times after a read failure, want 0", ran)
 	}
 
-	_ = discardIfCorrupt(t.Context(), bucket, key, func() error { return nil },
+	_ = discardIfCorrupt(t.Context(), fsys, key, func() error { return nil },
 		ErrCorruptSPK, extra)
 
 	if ran != 1 {
@@ -164,7 +169,7 @@ func TestDiscardIfCorruptReportsACloseFailure(t *testing.T) {
 
 	closeFailed := errors.New("discard_test: close failed") //nolint:err113 // a stand-in, joined below
 
-	bucket, key := seedKernel(t)
+	fsys, key := seedKernel(t)
 
 	for _, tc := range []struct {
 		name  string
@@ -176,7 +181,7 @@ func TestDiscardIfCorruptReportsACloseFailure(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			err := discardIfCorrupt(t.Context(), bucket, key,
+			err := discardIfCorrupt(t.Context(), fsys, key,
 				func() error { return closeFailed }, tc.cause)
 
 			if !errors.Is(err, closeFailed) {

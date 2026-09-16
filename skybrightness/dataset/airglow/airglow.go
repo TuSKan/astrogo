@@ -332,9 +332,9 @@ func Fetch(ctx context.Context, spec Spec) (*Spectrum, error) {
 // already makes with SVO, and clearing the cache directory is the way out of
 // it.
 func fetchRequest(ctx context.Context, req skycalcRequest) (*Spectrum, error) {
-	bucket, key, cacheErr := cacheLocation(ctx, req)
+	fsys, key, cacheErr := cacheLocation(ctx, req)
 	if cacheErr == nil {
-		if spectrum, ok := cached(ctx, bucket, key); ok {
+		if spectrum, ok := cached(ctx, fsys, key); ok {
 			return spectrum, nil
 		}
 	}
@@ -351,7 +351,7 @@ func fetchRequest(ctx context.Context, req skycalcRequest) (*Spectrum, error) {
 
 	if cacheErr == nil {
 		// A cache write that fails costs a request next time and nothing else.
-		_ = remote.Save(ctx, bucket, key, bytes.NewReader(raw))
+		_ = remote.WriteFile(ctx, fsys, key, bytes.NewReader(raw))
 	}
 
 	return spectrum, nil
@@ -365,8 +365,8 @@ func fetchRequest(ctx context.Context, req skycalcRequest) (*Spectrum, error) {
 // actually sent is the only key that cannot silently collide — and a
 // parameter added later changes it without anyone having to remember this
 // function exists.
-func cacheLocation(ctx context.Context, req skycalcRequest) (*remote.Bucket, string, error) {
-	bucket, prefix, err := remote.CacheDir(ctx, remote.ESOSkyCalc)
+func cacheLocation(ctx context.Context, req skycalcRequest) (remote.FS, string, error) {
+	fsys, prefix, err := remote.CacheDir(ctx, remote.ESOSkyCalc)
 	if err != nil {
 		return nil, "", fmt.Errorf("%w: cache: %w", ErrService, err)
 	}
@@ -380,13 +380,13 @@ func cacheLocation(ctx context.Context, req skycalcRequest) (*remote.Bucket, str
 
 	sum := sha256.Sum256(body)
 
-	return bucket, path.Join(prefix, "skytable-"+hex.EncodeToString(sum[:])+".fits"), nil
+	return fsys, path.Join(prefix, "skytable-"+hex.EncodeToString(sum[:])+".fits"), nil
 }
 
 // cached reads a previously fetched skytable, reporting whether it was there
 // and usable.
-func cached(ctx context.Context, bucket *remote.Bucket, key string) (*Spectrum, bool) {
-	r, err := bucket.NewReader(ctx, key, nil)
+func cached(_ context.Context, fsys remote.FS, key string) (*Spectrum, bool) {
+	r, err := fsys.Open(key)
 	if err != nil {
 		return nil, false
 	}

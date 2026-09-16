@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"io/fs"
 	"log"
 	"net/http"
 	"net/http/httptest"
@@ -32,7 +33,7 @@ func cleanRemoteState(t *testing.T) {
 
 // writeFakeSource is fakeSource (see resume_test.go) minus the return
 // value — used by tests here that never need to inspect/mutate the
-// source bucket directly after seeding it.
+// source fsys directly after seeding it.
 func writeFakeSource(t *testing.T, id EndpointID, name, content string) {
 	t.Helper()
 
@@ -52,25 +53,25 @@ func TestGetFileImmutableExistenceOnly(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	srcBucket, err := file.Open(context.Background(), url)
+	srcFS, err := file.OpenFS(url)
 	if err != nil {
-		t.Fatalf("Open: %v", err)
+		t.Fatalf("OpenFS: %v", err)
 	}
 
-	if err := srcBucket.WriteAll(context.Background(), "planets/de440s.bsp", []byte(payload), nil); err != nil {
+	if err := WriteFile(context.Background(), srcFS, "planets/de440s.bsp", bytes.NewReader([]byte(payload))); err != nil {
 		t.Fatalf("seed source: %v", err)
 	}
 
 	EnableDownloads(0, NAIFSPK)
 
-	bucket, key, err := GetFile(context.Background(), NAIFSPK, "planets/de440s.bsp")
+	fsys, key, err := GetFile(context.Background(), NAIFSPK, "planets/de440s.bsp")
 	if err != nil {
 		t.Fatalf("GetFile: %v", err)
 	}
 
 	// Content correctness is asserted by the check below; the read itself
 	// is not expected to fail here.
-	data, _ := bucket.ReadAll(context.Background(), key)
+	data, _ := fs.ReadFile(fsys, key)
 	if string(data) != payload {
 		t.Fatalf("unexpected content %q", data)
 	}
@@ -81,7 +82,7 @@ func TestGetFileImmutableExistenceOnly(t *testing.T) {
 	// existence alone) by deleting the source out from under it: a
 	// re-fetch attempt would now fail outright, so a second success here
 	// is only possible via the cache.
-	if err := srcBucket.Delete(context.Background(), "planets/de440s.bsp"); err != nil {
+	if err := RemoveFile(context.Background(), srcFS, "planets/de440s.bsp"); err != nil {
 		t.Fatalf("delete source: %v", err)
 	}
 
@@ -99,19 +100,19 @@ func TestGetFileMutableHeadProbeReuse(t *testing.T) {
 
 	EnableDownloads(0, OpenNGC)
 
-	bucket, key, err := GetFile(context.Background(), OpenNGC, "NGC.csv")
+	fsys, key, err := GetFile(context.Background(), OpenNGC, "NGC.csv")
 	if err != nil {
 		t.Fatalf("GetFile: %v", err)
 	}
 
 	// Content correctness is asserted by the check below; the read itself
 	// is not expected to fail here.
-	data, _ := bucket.ReadAll(context.Background(), key)
+	data, _ := fs.ReadFile(fsys, key)
 	if string(data) != payload {
 		t.Fatalf("unexpected content %q", data)
 	}
 
-	cachedAttrsBefore, err := bucket.Attributes(context.Background(), key)
+	cachedAttrsBefore, err := fs.Stat(fsys, key)
 	if err != nil {
 		t.Fatalf("Attributes: %v", err)
 	}
@@ -125,20 +126,20 @@ func TestGetFileMutableHeadProbeReuse(t *testing.T) {
 		t.Fatalf("GetFile (reuse): %v", err)
 	}
 
-	cachedAttrsAfter, err := bucket.Attributes(context.Background(), key)
+	cachedAttrsAfter, err := fs.Stat(fsys, key)
 	if err != nil {
 		t.Fatalf("Attributes (after): %v", err)
 	}
 
-	if !cachedAttrsAfter.ModTime.Equal(cachedAttrsBefore.ModTime) {
-		t.Errorf("cache object was rewritten on an unchanged-source GetFile: ModTime %v -> %v", cachedAttrsBefore.ModTime, cachedAttrsAfter.ModTime)
+	if !cachedAttrsAfter.ModTime().Equal(cachedAttrsBefore.ModTime()) {
+		t.Errorf("cache object was rewritten on an unchanged-source GetFile: ModTime %v -> %v", cachedAttrsBefore.ModTime(), cachedAttrsAfter.ModTime())
 	}
 }
 
 func TestGetFileMutableHeadProbeChanged(t *testing.T) {
 	cleanRemoteState(t)
 
-	srcBucket := fakeSource(t, OpenNGC, "NGC.csv", "ngc-catalog-v1")
+	srcFS := fakeSource(t, OpenNGC, "NGC.csv", "ngc-catalog-v1")
 
 	EnableDownloads(0, OpenNGC)
 
@@ -163,18 +164,18 @@ func TestGetFileMutableHeadProbeChanged(t *testing.T) {
 	// merely untested here but untestable through this backend; against the
 	// real Mutable endpoints the ETag is server-supplied and content-based,
 	// which is the case that matters.
-	if err := srcBucket.WriteAll(context.Background(), "NGC.csv", []byte("ngc-catalog-version-2"), nil); err != nil {
+	if err := WriteFile(context.Background(), srcFS, "NGC.csv", bytes.NewReader([]byte("ngc-catalog-version-2"))); err != nil {
 		t.Fatalf("update source: %v", err)
 	}
 
-	bucket, key, err := GetFile(context.Background(), OpenNGC, "NGC.csv")
+	fsys, key, err := GetFile(context.Background(), OpenNGC, "NGC.csv")
 	if err != nil {
 		t.Fatalf("GetFile (changed): %v", err)
 	}
 
 	// Content correctness is asserted by the check below; the read itself
 	// is not expected to fail here.
-	data, _ := bucket.ReadAll(context.Background(), key)
+	data, _ := fs.ReadFile(fsys, key)
 	if string(data) != "ngc-catalog-version-2" {
 		t.Errorf("cache not refreshed after upstream change: got %q", data)
 	}
@@ -195,8 +196,8 @@ func TestGetFileWithValidateRejectsCorruptDownload(t *testing.T) {
 
 	// The CacheDir/Exists errors here are not the thing under test; a
 	// failed existence check is not "exists" either way.
-	bucket, prefix, _ := CacheDir(context.Background(), NAIFLSK)
-	if exists, _ := bucket.Exists(context.Background(), prefix+"naif0012.tls"); exists {
+	fsys, prefix, _ := CacheDir(context.Background(), NAIFLSK)
+	if _, err := fs.Stat(fsys, prefix+"naif0012.tls"); err == nil {
 		t.Error("a validate failure must not leave a cache file behind")
 	}
 }
@@ -208,7 +209,7 @@ func TestGetFileWithCacheNameDiffersFromPath(t *testing.T) {
 	// call): the fetched name and the on-disk cache name legitimately
 	// differ. IERSFinals2000A's own real usage additionally passes name=""
 	// (its URL alone names the whole HTTP resource) — untestable against a
-	// local fake source, since a bucket always needs a real, non-empty key
+	// local fake source, since a fsys always needs a real, non-empty key
 	// unlike an HTTP URL that can BE the whole resource on its own; this
 	// still exercises WithCacheName's actual differing-name behavior.
 	writeFakeSource(t, OpenNGC, "raw-source-name.csv", "ngc-data")
@@ -335,8 +336,8 @@ func TestGetFileDownloadDeniedWithoutConsent(t *testing.T) {
 
 	// The CacheDir/Exists errors here are not the thing under test; a
 	// failed existence check is not "exists" either way.
-	bucket, prefix, _ := CacheDir(context.Background(), NAIFSPK)
-	if exists, _ := bucket.Exists(context.Background(), prefix+"de442.bsp"); exists {
+	fsys, prefix, _ := CacheDir(context.Background(), NAIFSPK)
+	if _, err := fs.Stat(fsys, prefix+"de442.bsp"); err == nil {
 		t.Error("denied download must not create a cache file")
 	}
 }
@@ -378,7 +379,7 @@ func TestGetFileWithDownloadTimeoutOverridesEndpointDefault(t *testing.T) {
 	// and a local Attributes call can win — the test failed about one run in
 	// fifteen. A non-positive duration is different in kind, not degree:
 	// context.WithDeadline cancels immediately when the deadline has already
-	// passed, so the context handed to srcBucket.Attributes/NewRangeReader
+	// passed, so the context handed to srcFS.Attributes/NewRangeReader
 	// inside fetchInto is done before either call is made.
 	//
 	// Note this reaches fetchInto at all only because a negative duration
@@ -399,16 +400,16 @@ func TestGetFileReturnsUsableBucketForAllReadModes(t *testing.T) {
 
 	EnableDownloads(0, NAIFSPK)
 
-	bucket, key, err := GetFile(context.Background(), NAIFSPK, "planets/de440s.bsp")
+	fsys, key, err := GetFile(context.Background(), NAIFSPK, "planets/de440s.bsp")
 	if err != nil {
 		t.Fatalf("GetFile: %v", err)
 	}
 
-	if all, err := bucket.ReadAll(context.Background(), key); err != nil || string(all) != payload {
+	if all, err := fs.ReadFile(fsys, key); err != nil || string(all) != payload {
 		t.Errorf("ReadAll = %q, %v; want %q, nil", all, err, payload)
 	}
 
-	r, err := bucket.NewReader(context.Background(), key, nil)
+	r, err := fsys.Open(key)
 	if err != nil {
 		t.Fatalf("NewReader: %v", err)
 	}
@@ -421,15 +422,18 @@ func TestGetFileReturnsUsableBucketForAllReadModes(t *testing.T) {
 		t.Errorf("NewReader content = %q, want %q", seqData, payload)
 	}
 
-	rr, err := bucket.NewRangeReader(context.Background(), key, 0, int64(len(payload)), nil)
+	// The ranged read is now ReadAt on the open file rather than a separate
+	// range-reader handle, which is the whole shape change: one File that can
+	// be read sequentially and randomly, instead of two ways to open an object.
+	rr, err := Open(context.Background(), fsys, key)
 	if err != nil {
-		t.Fatalf("NewRangeReader: %v", err)
+		t.Fatalf("Open: %v", err)
 	}
 	defer rr.Close() //nolint:errcheck // test
 
 	buf := make([]byte, len(payload))
-	if _, err := io.ReadFull(rr, buf); err != nil {
-		t.Fatalf("ReadFull: %v", err)
+	if _, err := rr.ReadAt(buf, 0); err != nil {
+		t.Fatalf("ReadAt: %v", err)
 	}
 
 	if string(buf) != payload {
@@ -503,7 +507,7 @@ func TestAFetchThatLostTheRaceStillReturnsTheObject(t *testing.T) {
 	SetDataDir(testutil.FileURL(t, t.TempDir()))
 	EnableDownloads(0, NAIFSPK)
 
-	cacheBucket, prefix, err := CacheDir(context.Background(), NAIFSPK)
+	cacheFS, prefix, err := CacheDir(context.Background(), NAIFSPK)
 	if err != nil {
 		t.Fatalf("CacheDir: %v", err)
 	}
@@ -518,7 +522,7 @@ func TestAFetchThatLostTheRaceStillReturnsTheObject(t *testing.T) {
 			return
 		}
 
-		if err := Save(r.Context(), cacheBucket, prefix+name, strings.NewReader(payload)); err != nil {
+		if err := WriteFile(r.Context(), cacheFS, prefix+name, strings.NewReader(payload)); err != nil {
 			t.Errorf("seed the winner's object: %v", err)
 		}
 
@@ -530,12 +534,12 @@ func TestAFetchThatLostTheRaceStillReturnsTheObject(t *testing.T) {
 		t.Fatalf("SetURL: %v", err)
 	}
 
-	bucket, key, err := GetFile(context.Background(), NAIFSPK, name)
+	fsys, key, err := GetFile(context.Background(), NAIFSPK, name)
 	if err != nil {
 		t.Fatalf("GetFile after losing the race = %v, want the object the winner wrote", err)
 	}
 
-	got, err := bucket.ReadAll(context.Background(), key)
+	got, err := fs.ReadFile(fsys, key)
 	if err != nil {
 		t.Fatalf("ReadAll: %v", err)
 	}

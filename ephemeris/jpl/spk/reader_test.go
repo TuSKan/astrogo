@@ -66,7 +66,7 @@ func TestSPKReader(t *testing.T) {
 	bucket, prefix, err := remote.CacheDir(ctx, remote.NAIFSPK)
 	testutil.AssertNoError(t, err)
 
-	ra, err := remote.NewReaderAt(ctx, bucket, prefix+"planets/de440s.bsp")
+	ra, err := remote.Open(ctx, bucket, prefix+"planets/de440s.bsp")
 	testutil.AssertNoError(t, err)
 
 	r, err := spk.NewReader(ra)
@@ -224,7 +224,7 @@ func TestReaderAtManySmallScatteredReads(t *testing.T) {
 
 	url := testutil.FileURL(t, t.TempDir())
 
-	bucket, err := remote.OpenBucket(ctx, url)
+	bucket, err := remote.OpenFS(ctx, url)
 	testutil.AssertNoError(t, err)
 
 	const key = "test.bsp"
@@ -236,9 +236,9 @@ func TestReaderAtManySmallScatteredReads(t *testing.T) {
 		data[i] = byte(i)
 	}
 
-	testutil.AssertNoError(t, bucket.WriteAll(ctx, key, data, nil))
+	testutil.AssertNoError(t, remote.WriteFile(ctx, bucket, key, bytes.NewReader(data)))
 
-	ra, err := remote.NewReaderAt(ctx, bucket, key)
+	ra, err := remote.Open(ctx, bucket, key)
 	testutil.AssertNoError(t, err)
 
 	t.Cleanup(func() { _ = ra.Close() })

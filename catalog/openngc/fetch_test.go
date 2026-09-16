@@ -2,6 +2,8 @@ package openngc
 
 import (
 	"context"
+	"io/fs"
+	"strings"
 	"testing"
 
 	"github.com/TuSKan/astrogo/remote"
@@ -19,7 +21,7 @@ NGC0224;G;00:42:44.3;+41:16:09;31;Andromeda Galaxy;;3.4;4.4
 `
 )
 
-// fakeSources opens a fresh temp directory as a *remote.Bucket, points
+// fakeSources opens a fresh temp directory as a remote.FS, points
 // remote.OpenNGC's URL at it (SetURL), and writes both real OpenNGC
 // source files (NGC.csv/addendum.csv) into it — a local stand-in for an
 // HTTP source now that GetFile can't reach an http:// URL at all (no
@@ -27,7 +29,7 @@ NGC0224;G;00:42:44.3;+41:16:09;31;Andromeda Galaxy;;3.4;4.4
 // fetchSource/New's own consent/caching policy is fully generic over any
 // Bucket, so exercising it here tests the exact same code path an
 // HTTP-backed endpoint will take once that driver exists.
-func fakeSources(t *testing.T) *remote.Bucket {
+func fakeSources(t *testing.T) remote.FS {
 	t.Helper()
 
 	dir := t.TempDir()
@@ -38,20 +40,20 @@ func fakeSources(t *testing.T) *remote.Bucket {
 		t.Fatal(err)
 	}
 
-	bucket, err := remote.OpenBucket(context.Background(), url)
+	fsys, err := remote.OpenFS(context.Background(), url)
 	if err != nil {
 		t.Fatalf("Open fake source: %v", err)
 	}
 
-	if err := bucket.WriteAll(context.Background(), "NGC.csv", []byte(sampleNGCCSV), nil); err != nil {
+	if err := remote.WriteFile(context.Background(), fsys, "NGC.csv", strings.NewReader(sampleNGCCSV)); err != nil {
 		t.Fatalf("seed NGC.csv: %v", err)
 	}
 
-	if err := bucket.WriteAll(context.Background(), "addendum.csv", []byte(sampleAddendumCSV), nil); err != nil {
+	if err := remote.WriteFile(context.Background(), fsys, "addendum.csv", strings.NewReader(sampleAddendumCSV)); err != nil {
 		t.Fatalf("seed addendum.csv: %v", err)
 	}
 
-	return bucket
+	return fsys
 }
 
 // loadNow builds a provider and drives its catalog load to completion.
@@ -104,17 +106,17 @@ func TestLoadSkipsBodyWhenUnchanged(t *testing.T) {
 
 	loadNow(t)
 
-	bucket, prefix, err := remote.CacheDir(context.Background(), remote.OpenNGC)
+	fsys, prefix, err := remote.CacheDir(context.Background(), remote.OpenNGC)
 	if err != nil {
 		t.Fatalf("CacheDir: %v", err)
 	}
 
-	ngcAttrsBefore, err := bucket.Attributes(context.Background(), prefix+"NGC.csv")
+	ngcAttrsBefore, err := fs.Stat(fsys, prefix+"NGC.csv")
 	if err != nil {
 		t.Fatalf("Attributes(NGC.csv): %v", err)
 	}
 
-	addendumAttrsBefore, err := bucket.Attributes(context.Background(), prefix+"addendum.csv")
+	addendumAttrsBefore, err := fs.Stat(fsys, prefix+"addendum.csv")
 	if err != nil {
 		t.Fatalf("Attributes(addendum.csv): %v", err)
 	}
@@ -125,22 +127,22 @@ func TestLoadSkipsBodyWhenUnchanged(t *testing.T) {
 	// fetchInto's promote step never ran a second time.
 	loadNow(t)
 
-	ngcAttrsAfter, err := bucket.Attributes(context.Background(), prefix+"NGC.csv")
+	ngcAttrsAfter, err := fs.Stat(fsys, prefix+"NGC.csv")
 	if err != nil {
 		t.Fatalf("Attributes(NGC.csv) after: %v", err)
 	}
 
-	addendumAttrsAfter, err := bucket.Attributes(context.Background(), prefix+"addendum.csv")
+	addendumAttrsAfter, err := fs.Stat(fsys, prefix+"addendum.csv")
 	if err != nil {
 		t.Fatalf("Attributes(addendum.csv) after: %v", err)
 	}
 
-	if !ngcAttrsAfter.ModTime.Equal(ngcAttrsBefore.ModTime) {
-		t.Errorf("NGC.csv was rewritten on an unchanged-source New(): ModTime %v -> %v", ngcAttrsBefore.ModTime, ngcAttrsAfter.ModTime)
+	if !ngcAttrsAfter.ModTime().Equal(ngcAttrsBefore.ModTime()) {
+		t.Errorf("NGC.csv was rewritten on an unchanged-source New(): ModTime %v -> %v", ngcAttrsBefore.ModTime(), ngcAttrsAfter.ModTime())
 	}
 
-	if !addendumAttrsAfter.ModTime.Equal(addendumAttrsBefore.ModTime) {
-		t.Errorf("addendum.csv was rewritten on an unchanged-source New(): ModTime %v -> %v", addendumAttrsBefore.ModTime, addendumAttrsAfter.ModTime)
+	if !addendumAttrsAfter.ModTime().Equal(addendumAttrsBefore.ModTime()) {
+		t.Errorf("addendum.csv was rewritten on an unchanged-source New(): ModTime %v -> %v", addendumAttrsBefore.ModTime(), addendumAttrsAfter.ModTime())
 	}
 }
 
@@ -157,13 +159,13 @@ func TestNewDefaultDenyIssuesNoRequest(t *testing.T) {
 		t.Error("expected an empty provider when downloads are disabled")
 	}
 
-	bucket, prefix, err := remote.CacheDir(context.Background(), remote.OpenNGC)
+	fsys, prefix, err := remote.CacheDir(context.Background(), remote.OpenNGC)
 	if err != nil {
 		t.Fatalf("CacheDir: %v", err)
 	}
 
-	// A failed existence check is not "exists".
-	if exists, _ := bucket.Exists(context.Background(), prefix+"NGC.csv"); exists {
+	// A failed stat is not "exists".
+	if _, err := fs.Stat(fsys, prefix+"NGC.csv"); err == nil {
 		t.Error("a denied query must not create a cache file")
 	}
 }
@@ -185,13 +187,23 @@ func TestLoadDoesNotAccumulateCacheFiles(t *testing.T) {
 		loadNow(t)
 	}
 
-	bucket, prefix, err := remote.CacheDir(context.Background(), remote.OpenNGC)
+	fsys, prefix, err := remote.CacheDir(context.Background(), remote.OpenNGC)
 	if err != nil {
 		t.Fatalf("CacheDir: %v", err)
 	}
 
-	wantNames := map[string]bool{"NGC.csv": true, "addendum.csv": true}
-	got := testutil.BucketKeys(t, bucket, prefix)
+	// OpenNGC is Mutable, so each cached CSV keeps an ETag sidecar recording
+	// what the source said when it was fetched — that is what lets a reload
+	// reuse the cache instead of re-downloading. A sidecar is bookkeeping, not
+	// accumulation: the count stays fixed no matter how many times Load runs,
+	// which is the property this test is actually about.
+	wantNames := map[string]bool{
+		"NGC.csv":           true,
+		"NGC.csv.etag":      true,
+		"addendum.csv":      true,
+		"addendum.csv.etag": true,
+	}
+	got := testutil.BucketKeys(t, fsys, prefix)
 
 	for _, key := range got {
 		if !wantNames[key] {

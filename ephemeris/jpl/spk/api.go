@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"io/fs"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -76,23 +77,23 @@ func commandCandidates(kernel string) []string {
 }
 
 // CacheAPI returns readers for kernel, generating it through JPL Horizons
-// and storing it under prefix in bucket when it is not already there.
+// and storing it under prefix in fsys when it is not already there.
 // Horizons delivers a small-body kernel base64-encoded inside its JSON
 // response, so this is a real download and is gated by
 // remote.JPLHorizonsSPK's consent exactly like any other.
 //
-// Storage is a bucket and key prefix, never a directory path: a generated
+// Storage is a fsys and key prefix, never a directory path: a generated
 // kernel lands wherever remote's cache lives, which need not be local
 // disk.
-func CacheAPI(ctx context.Context, bucket *remote.Bucket, prefix, kernel string, startTime, endTime time.Time) ([]*Reader, error) {
+func CacheAPI(ctx context.Context, fsys remote.FS, prefix, kernel string, startTime, endTime time.Time) ([]*Reader, error) {
 	var readers []*Reader
 
 	spkFile := prefix + kernel + ".bsp"
 
 	// A failed existence check just falls through to the fetch path below,
 	// same as a real miss.
-	if exists, _ := bucket.Exists(ctx, spkFile); exists {
-		reader, err := openKernel(ctx, bucket, spkFile)
+	if _, err := fs.Stat(fsys, spkFile); err == nil {
+		reader, err := openKernel(ctx, fsys, spkFile)
 		if err != nil {
 			return nil, err
 		}
@@ -195,11 +196,11 @@ func CacheAPI(ctx context.Context, bucket *remote.Bucket, prefix, kernel string,
 			return nil, fmt.Errorf("jpl: failed to decode SPK data: %w", err)
 		}
 
-		if err := remote.Save(ctx, bucket, spkFile, bytes.NewReader(spkData)); err != nil {
+		if err := remote.WriteFile(ctx, fsys, spkFile, bytes.NewReader(spkData)); err != nil {
 			return nil, fmt.Errorf("jpl: failed to save SPK %s: %w", spkFile, err)
 		}
 
-		reader, err := openKernel(ctx, bucket, spkFile)
+		reader, err := openKernel(ctx, fsys, spkFile)
 		if err != nil {
 			return nil, err
 		}
@@ -224,14 +225,14 @@ func CacheAPI(ctx context.Context, bucket *remote.Bucket, prefix, kernel string,
 			summaries, err := reader.ReadSummaries()
 			if err != nil {
 				_ = reader.Close()
-				_ = bucket.Delete(ctx, spkFile)
+				_ = remote.RemoveFile(ctx, fsys, spkFile)
 
 				return nil, fmt.Errorf("jpl: validate SPK %s: %w", spkFile, err)
 			}
 
 			if len(summaries) == 0 {
 				_ = reader.Close()
-				_ = bucket.Delete(ctx, spkFile)
+				_ = remote.RemoveFile(ctx, fsys, spkFile)
 
 				return nil, fmt.Errorf("%w: %s (kernel %s)", ErrHorizonsEmptyKernel, spkFile, kernel)
 			}
@@ -245,7 +246,7 @@ func CacheAPI(ctx context.Context, bucket *remote.Bucket, prefix, kernel string,
 		}
 
 		for _, r := range hRes {
-			sub, err := CacheAPI(ctx, bucket, prefix, r.ID, startTime, endTime)
+			sub, err := CacheAPI(ctx, fsys, prefix, r.ID, startTime, endTime)
 			if err != nil {
 				return nil, fmt.Errorf("jpl: failed to get SPK %s: %w", kernel, err)
 			}
@@ -388,9 +389,9 @@ func safeSubstr(s string, start, length int) string {
 
 // openKernel builds a Reader over bucket/key with random access served by
 // remote/file's chunk-caching reader — the same path for a local cache, an
-// S3 bucket, or anything else a driver serves.
-func openKernel(ctx context.Context, bucket *remote.Bucket, key string) (*Reader, error) {
-	ra, err := remote.NewReaderAt(ctx, bucket, key)
+// S3 fsys, or anything else a driver serves.
+func openKernel(ctx context.Context, fsys remote.FS, key string) (*Reader, error) {
+	ra, err := remote.Open(ctx, fsys, key)
 	if err != nil {
 		return nil, fmt.Errorf("jpl: open SPK %s: %w", key, err)
 	}

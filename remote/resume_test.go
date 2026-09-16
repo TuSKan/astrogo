@@ -3,6 +3,7 @@ package remote
 import (
 	"context"
 	"errors"
+	"io/fs"
 	"strings"
 	"testing"
 
@@ -16,7 +17,7 @@ import (
 // for its first N.
 const resumeBody = "0123456789abcdefghijABCDEFGHIJ"
 
-// fakeSource opens a fresh temp directory as a *Bucket, points id's
+// fakeSource opens a fresh temp directory as a FS, points id's
 // endpoint URL at it (SetURL), and writes content at name — a local
 // stand-in for an HTTP source now that GetFile can't reach an http://
 // URL at all (no httpblob driver registered yet; see remote/file's
@@ -28,7 +29,7 @@ const resumeBody = "0123456789abcdefghijABCDEFGHIJ"
 // fileblob's own Attributes derives a real, content-sensitive ETag from
 // (ModTime, Size), so the unchanged()/resume validator-comparison logic
 // gets genuine, non-trivial coverage, not a stub.
-func fakeSource(t *testing.T, id EndpointID, name, content string) *Bucket {
+func fakeSource(t *testing.T, id EndpointID, name, content string) FS {
 	t.Helper()
 
 	dir := t.TempDir()
@@ -39,16 +40,16 @@ func fakeSource(t *testing.T, id EndpointID, name, content string) *Bucket {
 		t.Fatal(err)
 	}
 
-	bucket, err := file.Open(context.Background(), url)
+	fsys, err := file.OpenFS(url)
 	if err != nil {
 		t.Fatalf("Open fake source: %v", err)
 	}
 
-	if err := bucket.WriteAll(context.Background(), name, []byte(content), nil); err != nil {
+	if err := WriteFile(context.Background(), fsys, name, strings.NewReader(content)); err != nil {
 		t.Fatalf("seed fake source: %v", err)
 	}
 
-	return bucket
+	return fsys
 }
 
 // seedPartial writes a partial body (and, when validator != "", the
@@ -60,15 +61,26 @@ func seedPartial(t *testing.T, content, validator string) {
 
 	const name = "kernel.bsp"
 
-	bucket, prefix, err := CacheDir(context.Background(), NAIFSPK)
+	fsys, prefix, err := CacheDir(context.Background(), NAIFSPK)
 	if err != nil {
 		t.Fatalf("CacheDir: %v", err)
 	}
 
 	pKey := file.PartialKey(prefix + name)
 
-	if err := file.SavePartial(context.Background(), bucket, pKey, strings.NewReader(content), validator); err != nil {
+	// The partial body and the ETag sidecar that records which source it came
+	// from — two ordinary writes, where file.SavePartial used to carry the ETag
+	// as gocloud object metadata. io/fs has no metadata; see
+	// file.SourceETagSuffix.
+	if err := WriteFile(context.Background(), fsys, pKey, strings.NewReader(content)); err != nil {
 		t.Fatalf("seed partial: %v", err)
+	}
+
+	if validator != "" {
+		if err := WriteFile(context.Background(), fsys, pKey+file.SourceETagSuffix,
+			strings.NewReader(validator)); err != nil {
+			t.Fatalf("seed partial etag: %v", err)
+		}
 	}
 }
 
@@ -88,24 +100,24 @@ func TestGetFileResumesFromPartial(t *testing.T) {
 
 	const done = 10
 
-	srcBucket := fakeSource(t, NAIFSPK, "kernel.bsp", resumeBody)
+	srcFS := fakeSource(t, NAIFSPK, "kernel.bsp", resumeBody)
 
-	attrs, err := srcBucket.Attributes(context.Background(), "kernel.bsp")
+	info, err := fs.Stat(srcFS, "kernel.bsp")
 	if err != nil {
-		t.Fatalf("Attributes: %v", err)
+		t.Fatalf("Stat: %v", err)
 	}
 
 	EnableDownloads(0, NAIFSPK)
 
 	seededPrefix := strings.Repeat("X", done)
-	seedPartial(t, seededPrefix, attrs.ETag)
+	seedPartial(t, seededPrefix, file.ETag(info))
 
-	bucket, key, err := GetFile(context.Background(), NAIFSPK, "kernel.bsp")
+	fsys, key, err := GetFile(context.Background(), NAIFSPK, "kernel.bsp")
 	if err != nil {
 		t.Fatalf("GetFile: %v", err)
 	}
 
-	got, err := bucket.ReadAll(context.Background(), key)
+	got, err := fs.ReadFile(fsys, key)
 	if err != nil {
 		t.Fatalf("ReadAll: %v", err)
 	}
@@ -117,7 +129,7 @@ func TestGetFileResumesFromPartial(t *testing.T) {
 		t.Errorf("resumed file = %q, want %q (seeded prefix preserved + genuine remainder)", got, want)
 	}
 
-	assertPartialCleared(t, bucket, key)
+	assertPartialCleared(t, fsys, key)
 }
 
 // TestGetFileRestartsWhenValidatorStale verifies the validator safety net:
@@ -132,12 +144,12 @@ func TestGetFileRestartsWhenValidatorStale(t *testing.T) {
 	EnableDownloads(0, NAIFSPK)
 	seedPartial(t, "STALE-BYTES", `"stale-etag-does-not-match-anything"`)
 
-	bucket, key, err := GetFile(context.Background(), NAIFSPK, "kernel.bsp")
+	fsys, key, err := GetFile(context.Background(), NAIFSPK, "kernel.bsp")
 	if err != nil {
 		t.Fatalf("GetFile: %v", err)
 	}
 
-	got, err := bucket.ReadAll(context.Background(), key)
+	got, err := fs.ReadFile(fsys, key)
 	if err != nil {
 		t.Fatalf("ReadAll: %v", err)
 	}
@@ -150,7 +162,7 @@ func TestGetFileRestartsWhenValidatorStale(t *testing.T) {
 		t.Error("stale partial bytes survived into the final file")
 	}
 
-	assertPartialCleared(t, bucket, key)
+	assertPartialCleared(t, fsys, key)
 }
 
 // TestGetFileIgnoresPartialWithoutValidator verifies a partial with no
@@ -164,12 +176,12 @@ func TestGetFileIgnoresPartialWithoutValidator(t *testing.T) {
 	EnableDownloads(0, NAIFSPK)
 	seedPartial(t, strings.Repeat("X", 10), "") // wrong-prefix body, no validator
 
-	bucket, key, err := GetFile(context.Background(), NAIFSPK, "kernel.bsp")
+	fsys, key, err := GetFile(context.Background(), NAIFSPK, "kernel.bsp")
 	if err != nil {
 		t.Fatalf("GetFile: %v", err)
 	}
 
-	got, err := bucket.ReadAll(context.Background(), key)
+	got, err := fs.ReadFile(fsys, key)
 	if err != nil {
 		t.Fatalf("ReadAll: %v", err)
 	}
@@ -178,7 +190,7 @@ func TestGetFileIgnoresPartialWithoutValidator(t *testing.T) {
 		t.Errorf("file = %q, want %q — a validator-less partial must not be resumed", got, resumeBody)
 	}
 
-	assertPartialCleared(t, bucket, key)
+	assertPartialCleared(t, fsys, key)
 }
 
 // TestGetFileResumeRespectsConsentSize verifies the consent gate is applied
@@ -189,16 +201,16 @@ func TestGetFileResumeRespectsConsentSize(t *testing.T) {
 
 	const done = 25 // only 5 bytes remain, but the file is 30
 
-	srcBucket := fakeSource(t, NAIFSPK, "kernel.bsp", resumeBody)
+	srcFS := fakeSource(t, NAIFSPK, "kernel.bsp", resumeBody)
 
-	attrs, err := srcBucket.Attributes(context.Background(), "kernel.bsp")
+	info, err := fs.Stat(srcFS, "kernel.bsp")
 	if err != nil {
-		t.Fatalf("Attributes: %v", err)
+		t.Fatalf("Stat: %v", err)
 	}
 
 	// Cap below the full size but above the remaining bytes.
 	EnableDownloads(10, NAIFSPK)
-	seedPartial(t, resumeBody[:done], attrs.ETag)
+	seedPartial(t, resumeBody[:done], file.ETag(info))
 
 	_, _, err = GetFile(context.Background(), NAIFSPK, "kernel.bsp")
 	if !errors.Is(err, ErrDownloadDenied) {
@@ -206,15 +218,21 @@ func TestGetFileResumeRespectsConsentSize(t *testing.T) {
 	}
 }
 
-// assertPartialCleared verifies a completed download leaves no sidecar —
-// the resume validator rides as Metadata on the partial key itself, so a
-// single Exists check on that key covers both.
-func assertPartialCleared(t *testing.T, bucket *Bucket, cacheKey string) {
+// assertPartialCleared verifies a completed download leaves nothing behind.
+//
+// Two objects now rather than one: the ETag used to ride as gocloud metadata on
+// the partial key, so a single check covered both. It is a sidecar now, and a
+// sidecar that outlives its partial is exactly the leftover this asserts
+// against — ResumePoint would read it, find no body, and start over, but the
+// file would sit in the cache forever.
+func assertPartialCleared(t *testing.T, fsys FS, cacheKey string) {
 	t.Helper()
 
 	pKey := file.PartialKey(cacheKey)
-	// A failed existence check is not "exists".
-	if exists, _ := bucket.Exists(context.Background(), pKey); exists {
-		t.Errorf("partial %s survived a completed download", pKey)
+
+	for _, key := range []string{pKey, pKey + file.SourceETagSuffix} {
+		if _, err := fs.Stat(fsys, key); err == nil {
+			t.Errorf("%s survived a completed download", key)
+		}
 	}
 }

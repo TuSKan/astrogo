@@ -2,78 +2,101 @@ package file
 
 import (
 	"bytes"
-	"context"
+	"errors"
 	"io"
+	"io/fs"
+	"slices"
 	"strings"
 	"testing"
-
-	"gocloud.dev/blob"
 
 	"github.com/TuSKan/astrogo/internal/testutil"
 )
 
-// Open must hand back the same *Bucket for the same URL: fileblob guards
-// its IfNotExist precondition with a per-Bucket mutex, so remote's
-// download lock is only exclusive within a process if every caller shares
-// one Bucket per directory.
-func TestOpenReusesOneBucketPerURL(t *testing.T) {
+// OpenFS must hand back the same filesystem for the same URL.
+//
+// The reason has changed and is worth recording, because the old one was
+// wrong. This used to be load-bearing for correctness: fileblob was believed to
+// guard its IfNotExist precondition with a per-Bucket mutex, so the download
+// lock was only exclusive within a process if every caller shared one Bucket
+// per directory. It had no such mutex. The lock is now O_CREATE|O_EXCL, which
+// needs no sharing to be exclusive.
+//
+// What remains is ordinary: one handle per URL avoids re-resolving a backend on
+// every fetch, and the filesystems here are safe for concurrent use so sharing
+// is free.
+func TestOpenFSReusesOneFilesystemPerURL(t *testing.T) {
 	urlA := mustLocalURL(t, t.TempDir())
 	urlB := mustLocalURL(t, t.TempDir())
 
-	first, err := Open(context.Background(), urlA)
+	first, err := OpenFS(urlA)
 	if err != nil {
-		t.Fatalf("Open: %v", err)
+		t.Fatalf("OpenFS: %v", err)
 	}
 
-	again, err := Open(context.Background(), urlA)
+	again, err := OpenFS(urlA)
 	if err != nil {
-		t.Fatalf("Open (second): %v", err)
+		t.Fatalf("OpenFS (second): %v", err)
 	}
 
 	if first != again {
-		t.Error("Open returned a different Bucket for the same URL")
+		t.Error("OpenFS returned a different filesystem for the same URL")
 	}
 
-	other, err := Open(context.Background(), urlB)
+	other, err := OpenFS(urlB)
 	if err != nil {
-		t.Fatalf("Open other: %v", err)
+		t.Fatalf("OpenFS other: %v", err)
 	}
 
 	if other == first {
-		t.Error("Open returned the same Bucket for two different URLs")
+		t.Error("OpenFS returned the same filesystem for two different URLs")
 	}
 }
 
-func TestOpenUnregisteredScheme(t *testing.T) {
-	if _, err := Open(context.Background(), "nosuchscheme://bucket"); err == nil {
+// An unregistered scheme must say which ones are registered, because the answer
+// is almost always a missing blank import and a bare "unknown scheme" does not
+// suggest that.
+func TestOpenUnregisteredSchemeNamesTheRegisteredOnes(t *testing.T) {
+	_, err := OpenFS("nosuchscheme://bucket")
+	if err == nil {
 		t.Fatal("expected an error for an unregistered scheme")
 	}
+
+	if !errors.Is(err, ErrNoScheme) {
+		t.Errorf("error is %v, want it to wrap ErrNoScheme", err)
+	}
+
+	if !strings.Contains(err.Error(), "file") {
+		t.Errorf("the error does not list the registered schemes, so it does not hint at "+
+			"the missing import that usually causes it: %v", err)
+	}
 }
 
-// The two schemes every astrogo build must carry without an opt-in import.
+// The schemes every astrogo build must carry without an opt-in import.
 func TestDefaultSchemesRegistered(t *testing.T) {
-	for _, scheme := range []string{"file", "http", "https"} {
-		if !blob.DefaultURLMux().ValidBucketScheme(scheme) {
-			t.Errorf("scheme %q not registered; available: %v", scheme, blob.DefaultURLMux().BucketSchemes())
+	got := Schemes()
+
+	for _, scheme := range []string{"file", "http", "https", "mem"} {
+		if !slices.Contains(got, scheme) {
+			t.Errorf("scheme %q not registered; available: %v", scheme, got)
 		}
 	}
 }
 
-func TestSaveWritesFullContent(t *testing.T) {
-	bucket, err := Open(context.Background(), mustLocalURL(t, t.TempDir()))
+func TestWriteFileWritesFullContent(t *testing.T) {
+	fsys, err := OpenFS(mustLocalURL(t, t.TempDir()))
 	if err != nil {
-		t.Fatalf("Open: %v", err)
+		t.Fatalf("OpenFS: %v", err)
 	}
 
 	const want = "the quick brown fox jumps over the lazy dog"
 
-	if err := Save(context.Background(), bucket, "fox.txt", strings.NewReader(want)); err != nil {
-		t.Fatalf("Save: %v", err)
+	if err := WriteFile(t.Context(), fsys, "fox.txt", strings.NewReader(want)); err != nil {
+		t.Fatalf("WriteFile: %v", err)
 	}
 
-	got, err := bucket.ReadAll(context.Background(), "fox.txt")
+	got, err := fs.ReadFile(fsys, "fox.txt")
 	if err != nil {
-		t.Fatalf("ReadAll: %v", err)
+		t.Fatalf("ReadFile: %v", err)
 	}
 
 	if string(got) != want {
@@ -81,32 +104,74 @@ func TestSaveWritesFullContent(t *testing.T) {
 	}
 }
 
-func TestSaveFailedWriteLeavesPriorObjectUntouched(t *testing.T) {
-	// driver.Bucket.NewTypedWriter's contract guarantees a failed write
-	// never clobbers whatever was previously at key — the property Save's
-	// own doc comment relies on instead of a temp-file-then-rename dance.
-	// Exercise it with a reader that fails partway through.
-	bucket, err := Open(context.Background(), mustLocalURL(t, t.TempDir()))
+// A write that fails partway must leave whatever was at the name alone.
+//
+// This used to rest on gocloud's driver contract. It now rests on this
+// package's own staging: the local backend writes to a uniquely named file
+// beside the target and renames it into place only on a clean Close, so a
+// failed copy never reaches the name at all.
+func TestWriteFileFailedWriteLeavesPriorObjectUntouched(t *testing.T) {
+	fsys, err := OpenFS(mustLocalURL(t, t.TempDir()))
 	if err != nil {
-		t.Fatalf("Open: %v", err)
+		t.Fatalf("OpenFS: %v", err)
 	}
 
-	if err := Save(context.Background(), bucket, "k", strings.NewReader("original")); err != nil {
-		t.Fatalf("Save (seed): %v", err)
+	if err := WriteFile(t.Context(), fsys, "k", strings.NewReader("original")); err != nil {
+		t.Fatalf("WriteFile (seed): %v", err)
 	}
 
 	failing := io.MultiReader(strings.NewReader("partial-"), &errAfterReader{})
-	if err := Save(context.Background(), bucket, "k", failing); err == nil {
-		t.Fatal("expected Save to fail for a reader that errors mid-stream")
+	if err := WriteFile(t.Context(), fsys, "k", failing); err == nil {
+		t.Fatal("expected WriteFile to fail for a reader that errors mid-stream")
 	}
 
-	got, err := bucket.ReadAll(context.Background(), "k")
+	got, err := fs.ReadFile(fsys, "k")
 	if err != nil {
-		t.Fatalf("ReadAll after failed Save: %v", err)
+		t.Fatalf("ReadFile after failed WriteFile: %v", err)
 	}
 
 	if string(got) != "original" {
 		t.Errorf("content after failed overwrite = %q, want unchanged %q", got, "original")
+	}
+}
+
+// A read-only backend must refuse a write with ErrReadOnly rather than
+// panicking on a type assertion or failing with something less specific.
+func TestWriteFileRefusesAReadOnlyFilesystem(t *testing.T) {
+	fsys, err := OpenFS("https://example.invalid/pub/")
+	if err != nil {
+		t.Fatalf("OpenFS: %v", err)
+	}
+
+	err = WriteFile(t.Context(), fsys, "k", strings.NewReader("x"))
+	if !errors.Is(err, ErrReadOnly) {
+		t.Errorf("writing to an HTTP filesystem returned %v, want ErrReadOnly", err)
+	}
+}
+
+// Exists must separate a miss from a failure, which is the distinction every
+// cache-hit path in the module depends on.
+func TestExistsSeparatesAMissFromAFailure(t *testing.T) {
+	fsys, err := OpenFS(mustLocalURL(t, t.TempDir()))
+	if err != nil {
+		t.Fatalf("OpenFS: %v", err)
+	}
+
+	ok, err := Exists(t.Context(), fsys, "not-there.txt")
+	if err != nil {
+		t.Errorf("a missing object reported an error (%v); a miss is (false, nil)", err)
+	}
+
+	if ok {
+		t.Error("a missing object reported as present")
+	}
+
+	if err := WriteFile(t.Context(), fsys, "there.txt", strings.NewReader("x")); err != nil {
+		t.Fatal(err)
+	}
+
+	if ok, err := Exists(t.Context(), fsys, "there.txt"); err != nil || !ok {
+		t.Errorf("Exists on a present object = (%v, %v), want (true, nil)", ok, err)
 	}
 }
 

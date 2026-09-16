@@ -394,3 +394,92 @@ func TestMemFSHostsAreSeparateStores(t *testing.T) {
 		t.Errorf("a different mem:// host can see it (%v); the hosts are one store", err)
 	}
 }
+
+// TestHTTPObjectMetadata pins what an HTTP object reports about itself.
+//
+// Each of these is a decision rather than an accident. Mode is 0444 and IsDir
+// is always false because this filesystem serves objects and an HTTP server's
+// directory listing is HTML, which io/fs cannot describe. Name is the base of
+// the requested name, not the URL's last segment, so a ?key= wrapper serving
+// one object under many names reports the name the caller asked for. ModTime
+// comes from Last-Modified and is the zero time when the server does not say,
+// which fs.FileInfo permits and which is honest.
+func TestHTTPObjectMetadata(t *testing.T) {
+	t.Parallel()
+
+	const lastModified = "Wed, 21 Oct 2026 07:28:00 GMT"
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Last-Modified", lastModified)
+		w.Header().Set("Content-Length", "1234")
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	fsys, err := file.OpenFS(srv.URL + "/pub/naif/")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	info, err := fs.Stat(fsys, "kernels/de440s.bsp")
+	if err != nil {
+		t.Fatalf("Stat: %v", err)
+	}
+
+	if got := info.Name(); got != "de440s.bsp" {
+		t.Errorf("Name() = %q, want the base of the requested name", got)
+	}
+
+	if got := info.Size(); got != 1234 {
+		t.Errorf("Size() = %d, want 1234", got)
+	}
+
+	if got := info.Mode(); got != 0o444 {
+		t.Errorf("Mode() = %v, want 0444 — an HTTP object is read-only", got)
+	}
+
+	if info.IsDir() {
+		t.Error("IsDir() = true; this backend serves objects, never directories")
+	}
+
+	want, perr := http.ParseTime(lastModified)
+	if perr != nil {
+		t.Fatal(perr)
+	}
+
+	if !info.ModTime().Equal(want) {
+		t.Errorf("ModTime() = %v, want the Last-Modified %v", info.ModTime(), want)
+	}
+}
+
+// TestHTTPObjectWithoutALastModifiedReportsTheZeroTime covers the other branch,
+// which matters because a zero ModTime is what makes [file.ETag] report "cannot
+// tell" rather than synthesising a validator that would match itself for ever.
+func TestHTTPObjectWithoutALastModifiedReportsTheZeroTime(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Length", "7")
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	fsys, err := file.OpenFS(srv.URL + "/")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	info, err := fs.Stat(fsys, "obj.dat")
+	if err != nil {
+		t.Fatalf("Stat: %v", err)
+	}
+
+	if !info.ModTime().IsZero() {
+		t.Errorf("ModTime() = %v for a server that sent no Last-Modified, want the zero time",
+			info.ModTime())
+	}
+
+	if got := file.ETag(info); got != "" {
+		t.Errorf("ETag = %q with neither an ETag header nor a modification time, want \"\"", got)
+	}
+}

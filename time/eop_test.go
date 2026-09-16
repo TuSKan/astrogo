@@ -1,6 +1,7 @@
 package time_test
 
 import (
+	"bytes"
 	"context"
 	"strings"
 	"testing"
@@ -15,7 +16,7 @@ import (
 const sampleFinals2000AForGateway = `73 1 2 41684.00 I  0.120733 0.009786  0.136966 0.015902  I 0.8084178 0.0002710  0.0000 0.1916  P    -0.766    0.199    -0.720    0.300   .143000   .137000   .8075000   -18.637    -3.667
 73 1 3 41685.00 I  0.118980 0.011039  0.135656 0.013616  I 0.8056163 0.0002710  3.5563 0.1916  P    -0.751    0.199    -0.701    0.300   .141000   .134000   .8044000   -18.636    -3.571  `
 
-// fakeIERSSourceForGateway opens a fresh temp directory as a *remote.Bucket,
+// fakeIERSSourceForGateway opens a fresh temp directory as a remote.FS,
 // points remote.IERSFinals2000A's URL at it, and writes content at
 // "finals2000A.all" — the real source object name time/internal/iers's
 // fetch.go reads — a local stand-in for an HTTP source now that GetFile
@@ -32,12 +33,12 @@ func fakeIERSSourceForGateway(t *testing.T, content string) {
 		t.Fatal(err)
 	}
 
-	bucket, err := remote.OpenBucket(context.Background(), url)
+	bucket, err := remote.OpenFS(context.Background(), url)
 	if err != nil {
 		t.Fatalf("Open fake source: %v", err)
 	}
 
-	if err := bucket.WriteAll(context.Background(), "finals2000A.all", []byte(content), nil); err != nil {
+	if err := remote.WriteFile(context.Background(), bucket, "finals2000A.all", bytes.NewReader([]byte(content))); err != nil {
 		t.Fatalf("seed fake source: %v", err)
 	}
 }
@@ -104,7 +105,7 @@ func TestEOPLazyLoadFindsPreSeededCacheWithoutConsent(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := bucket.WriteAll(context.Background(), prefix+"finals2000A.data", []byte(sampleFinals2000AForGateway), nil); err != nil {
+	if err := remote.WriteFile(context.Background(), bucket, prefix+"finals2000A.data", bytes.NewReader([]byte(sampleFinals2000AForGateway))); err != nil {
 		t.Fatal(err)
 	}
 

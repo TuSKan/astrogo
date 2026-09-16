@@ -66,12 +66,12 @@ const TotalStarlightMap = "starmap-o8-BVRI-total.txt.gz"
 // [remote.EnableDownloads] with [remote.GaiaStarMap] first, or this fails with
 // [remote.ErrDownloadDenied].
 func Open(ctx context.Context) (*Map, error) {
-	bucket, key, err := remote.GetFile(ctx, remote.GaiaStarMap, TotalStarlightMap)
+	fsys, key, err := remote.GetFile(ctx, remote.GaiaStarMap, TotalStarlightMap)
 	if err != nil {
 		return nil, fmt.Errorf("starlight: fetch %s: %w", TotalStarlightMap, err)
 	}
 
-	r, err := bucket.NewReader(ctx, key, nil)
+	r, err := fsys.Open(key)
 	if err != nil {
 		return nil, fmt.Errorf("starlight: open %s: %w", key, err)
 	}

@@ -1,10 +1,12 @@
 package spk
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/binary"
 	"errors"
+	"io/fs"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -127,16 +129,16 @@ func TestMapHorizonsStatus(t *testing.T) {
 }
 
 func TestCacheAPIReusesExistingFile(t *testing.T) {
-	bucket := tempBucket(t)
+	fsys := tempBucket(t)
 
-	if err := bucket.WriteAll(context.Background(), "433.bsp", testDAFHeader(), nil); err != nil {
+	if err := remote.WriteFile(context.Background(), fsys, "433.bsp", bytes.NewReader(testDAFHeader())); err != nil {
 		t.Fatalf("seed kernel object: %v", err)
 	}
 
 	start := time.FromJD(2451545.0, time.UTC)
 	end := time.FromJD(2451546.0, time.UTC)
 
-	readers, err := CacheAPI(context.Background(), bucket, "", "433", start, end)
+	readers, err := CacheAPI(context.Background(), fsys, "", "433", start, end)
 	if err != nil {
 		t.Fatalf("CacheAPI: %v", err)
 	}
@@ -158,7 +160,7 @@ func TestCacheAPIGeneratesFromHorizons(t *testing.T) {
 
 	t.Cleanup(func() { _ = remote.SetURL(remote.JPLHorizonsSPK, origEndpoint.URL) })
 
-	bucket := tempBucket(t)
+	fsys := tempBucket(t)
 
 	spkB64 := base64.StdEncoding.EncodeToString(testDAFHeader())
 
@@ -177,7 +179,7 @@ func TestCacheAPIGeneratesFromHorizons(t *testing.T) {
 	start := time.FromJD(2451545.0, time.UTC)
 	end := time.FromJD(2451546.0, time.UTC)
 
-	readers, err := CacheAPI(context.Background(), bucket, "", "433", start, end)
+	readers, err := CacheAPI(context.Background(), fsys, "", "433", start, end)
 	if err != nil {
 		t.Fatalf("CacheAPI: %v", err)
 	}
@@ -190,7 +192,7 @@ func TestCacheAPIGeneratesFromHorizons(t *testing.T) {
 		t.Errorf("close: %v", err)
 	}
 
-	if exists, _ := bucket.Exists(context.Background(), "generated433.bsp"); !exists {
+	if _, err := fs.Stat(fsys, "generated433.bsp"); err != nil {
 		t.Error("expected the generated SPK object to be stored in the bucket")
 	}
 }
@@ -218,7 +220,7 @@ func TestCacheAPIEscalatesToDESForOutOfRangeIDs(t *testing.T) {
 
 	t.Cleanup(func() { _ = remote.SetURL(remote.JPLHorizonsSPK, origEndpoint.URL) })
 
-	bucket := tempBucket(t)
+	fsys := tempBucket(t)
 	spkB64 := base64.StdEncoding.EncodeToString(testDAFHeader())
 
 	var commands []string
@@ -251,7 +253,7 @@ func TestCacheAPIEscalatesToDESForOutOfRangeIDs(t *testing.T) {
 	start := time.FromJD(2451545.0, time.UTC)
 	end := time.FromJD(2451546.0, time.UTC)
 
-	readers, err := CacheAPI(context.Background(), bucket, "", "20000004", start, end)
+	readers, err := CacheAPI(context.Background(), fsys, "", "20000004", start, end)
 	if err != nil {
 		t.Fatalf("CacheAPI: %v", err)
 	}
@@ -289,7 +291,7 @@ func TestCacheAPIRetriesWithCAPForComets(t *testing.T) {
 
 	t.Cleanup(func() { _ = remote.SetURL(remote.JPLHorizonsSPK, origEndpoint.URL) })
 
-	bucket := tempBucket(t)
+	fsys := tempBucket(t)
 	spkB64 := base64.StdEncoding.EncodeToString(testDAFHeader())
 
 	var commands []string
@@ -318,7 +320,7 @@ func TestCacheAPIRetriesWithCAPForComets(t *testing.T) {
 	start := time.FromJD(2451545.0, time.UTC)
 	end := time.FromJD(2451546.0, time.UTC)
 
-	readers, err := CacheAPI(context.Background(), bucket, "", "1000036", start, end)
+	readers, err := CacheAPI(context.Background(), fsys, "", "1000036", start, end)
 	if err != nil {
 		t.Fatalf("CacheAPI: %v", err)
 	}
@@ -378,11 +380,11 @@ func TestCommandCandidates(t *testing.T) {
 	}
 }
 
-// tempBucket is a throwaway local bucket standing in for remote's cache.
-func tempBucket(t *testing.T) *remote.Bucket {
+// tempBucket is a throwaway local fsys standing in for remote's cache.
+func tempBucket(t *testing.T) remote.FS {
 	t.Helper()
 
-	b, err := remote.OpenBucket(context.Background(), testutil.FileURL(t, t.TempDir()))
+	b, err := remote.OpenFS(context.Background(), testutil.FileURL(t, t.TempDir()))
 	if err != nil {
 		t.Fatalf("open bucket: %v", err)
 	}
@@ -398,12 +400,12 @@ func tempBucket(t *testing.T) *remote.Bucket {
 // from nothing is empty rather than wrong — which would surface much later as
 // "this body has no ephemeris" instead of "that kernel is missing".
 func TestOpenKernelReportsAMissingObject(t *testing.T) {
-	bucket, err := remote.OpenBucket(t.Context(), testutil.FileURL(t, t.TempDir()))
+	fsys, err := remote.OpenFS(t.Context(), testutil.FileURL(t, t.TempDir()))
 	if err != nil {
 		t.Fatalf("OpenBucket: %v", err)
 	}
 
-	if _, err := openKernel(t.Context(), bucket, "planets/absent.bsp"); err == nil {
+	if _, err := openKernel(t.Context(), fsys, "planets/absent.bsp"); err == nil {
 		t.Fatal("opening a key that was never written succeeded")
 	}
 }

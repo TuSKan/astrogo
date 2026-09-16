@@ -395,8 +395,8 @@ func (p *Provider) AddKernel(k *spk.Reader) error {
 // AddKernelFrom opens the SPK object at bucket/key and adds it to the
 // provider index, recording key for LoadedKernels/RemoveKernel. No network
 // access and no download consent: the object must already be there.
-func (p *Provider) AddKernelFrom(ctx context.Context, bucket *remote.Bucket, key string) error {
-	ra, err := remote.NewReaderAt(ctx, bucket, key)
+func (p *Provider) AddKernelFrom(ctx context.Context, fsys remote.FS, key string) error {
+	ra, err := remote.Open(ctx, fsys, key)
 	if err != nil {
 		return fmt.Errorf("jpl: open kernel %s: %w", key, err)
 	}
@@ -459,7 +459,7 @@ func (p *Provider) UnloadAll() error {
 // KernelInfo summarizes one loaded kernel for inspection — e.g. a setup
 // UI or diagnostic log listing what a Provider currently has loaded.
 type KernelInfo struct {
-	// Key is the bucket key the kernel was loaded from.
+	// Key is the fsys key the kernel was loaded from.
 	Key      string
 	Segments int
 	StartET  float64
@@ -493,24 +493,24 @@ func (p *Provider) LoadedKernels() []KernelInfo {
 	return infos
 }
 
-// Open constructs a Provider from kernels already present in bucket — no
+// Open constructs a Provider from kernels already present in fsys — no
 // network access, no download consent. This is the offline path: pre-seed
 // the objects yourself (files a prior consented run cached, or copied into
-// a deployment image) and open them by key. bucket may be backed by
+// a deployment image) and open them by key. fsys may be backed by
 // anything remote/file can open, not just local disk.
-func Open(ctx context.Context, bucket *remote.Bucket, lskKey string, spkKeys ...string) (*Provider, error) {
+func Open(ctx context.Context, fsys remote.FS, lskKey string, spkKeys ...string) (*Provider, error) {
 	p := &Provider{
 		ByTarget:         make(map[int32][]SegmentRef),
 		ByTargetCoverage: make(map[int32]TargetCoverage),
 	}
 
 	for _, key := range spkKeys {
-		if err := p.AddKernelFrom(ctx, bucket, key); err != nil {
+		if err := p.AddKernelFrom(ctx, fsys, key); err != nil {
 			return nil, fmt.Errorf("jpl: open: %w", err)
 		}
 	}
 
-	f, err := bucket.NewReader(ctx, lskKey, nil)
+	f, err := fsys.Open(lskKey)
 	if err != nil {
 		return nil, fmt.Errorf("jpl: open LSK %s: %w", lskKey, err)
 	}

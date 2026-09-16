@@ -80,14 +80,14 @@ func Fetch(ctx context.Context, spec GaiaBuild, directions ...coord.ICRS) (*Map,
 	values := make([]float64, npix)
 	counts := make([]int64, npix)
 
-	bucket, prefix, cacheErr := remote.CacheDir(ctx, remote.GaiaTAP)
+	fsys, prefix, cacheErr := remote.CacheDir(ctx, remote.GaiaTAP)
 
 	key := ""
 	if cacheErr == nil {
 		key = path.Join(prefix, spec.cacheKey())
 		// A cache that cannot be read is not a failure: it means fetching
 		// what it would have supplied.
-		_ = readCache(ctx, bucket, key, values, counts)
+		_ = readCache(ctx, fsys, key, values, counts)
 	}
 
 	wanted := wantedPixels(grid, directions, values)
@@ -114,7 +114,7 @@ func Fetch(ctx context.Context, spec GaiaBuild, directions ...coord.ICRS) (*Map,
 	if cacheErr == nil {
 		// A cache that cannot be written costs the next call its time, not
 		// this one its answer.
-		_ = writeCache(ctx, bucket, key, band, values, counts)
+		_ = writeCache(ctx, fsys, key, band, values, counts)
 	}
 
 	return assembleFetch(spec, values, counts, band)
@@ -242,8 +242,8 @@ func (g GaiaBuild) cacheKey() string {
 // It tolerates gaps, which is what separates it from [Load]: a published map
 // missing a pixel is malformed, while a cache missing a pixel simply has not
 // been asked about it yet.
-func readCache(ctx context.Context, bucket *remote.Bucket, key string, values []float64, counts []int64) error {
-	r, err := bucket.NewReader(ctx, key, nil)
+func readCache(ctx context.Context, fsys remote.FS, key string, values []float64, counts []int64) error {
+	r, err := remote.Open(ctx, fsys, key)
 	if err != nil {
 		return err //nolint:wrapcheck // the caller treats any failure as a cold cache
 	}
@@ -297,7 +297,7 @@ func parseCache(r io.Reader, values []float64, counts []int64) error {
 }
 
 // writeCache stores every pixel held so far.
-func writeCache(ctx context.Context, bucket *remote.Bucket, key, band string, values []float64, counts []int64) error {
+func writeCache(ctx context.Context, fsys remote.FS, key, band string, values []float64, counts []int64) error {
 	var buf strings.Builder
 
 	fmt.Fprintf(&buf, "# bands: %s\n# partial map, fetched on demand\n", band)
@@ -317,7 +317,7 @@ func writeCache(ctx context.Context, bucket *remote.Bucket, key, band string, va
 		}
 	}
 
-	if err := remote.Save(ctx, bucket, key, strings.NewReader(buf.String())); err != nil {
+	if err := remote.WriteFile(ctx, fsys, key, strings.NewReader(buf.String())); err != nil {
 		return fmt.Errorf("starlight: write cache %s: %w", key, err)
 	}
 

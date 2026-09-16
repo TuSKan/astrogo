@@ -75,12 +75,12 @@ type Spectrum struct {
 // [remote.EnableDownloads] with [remote.CALSPEC] first, or this fails with
 // [remote.ErrDownloadDenied]. The file is a few megabytes.
 func Open(ctx context.Context) (*Spectrum, error) {
-	bucket, key, err := remote.GetFile(ctx, remote.CALSPEC, CALSPECSolarReference)
+	fsys, key, err := remote.GetFile(ctx, remote.CALSPEC, CALSPECSolarReference)
 	if err != nil {
 		return nil, fmt.Errorf("solar: fetch %s: %w", CALSPECSolarReference, err)
 	}
 
-	r, err := bucket.NewReader(ctx, key, nil)
+	r, err := fsys.Open(key)
 	if err != nil {
 		return nil, fmt.Errorf("solar: open %s: %w", key, err)
 	}

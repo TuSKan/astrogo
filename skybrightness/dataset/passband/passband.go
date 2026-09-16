@@ -59,9 +59,9 @@ func Fetch(ctx context.Context, id string) (magnitude.Passband, error) {
 		return magnitude.Passband{}, fmt.Errorf("%w: no filter identifier", ErrService)
 	}
 
-	bucket, key, cacheErr := cacheLocation(ctx, id)
+	fsys, key, cacheErr := cacheLocation(ctx, id)
 	if cacheErr == nil {
-		if r, err := bucket.NewReader(ctx, key, nil); err == nil {
+		if r, err := fsys.Open(key); err == nil {
 			defer func() { _ = r.Close() }()
 
 			// A cached profile that will not parse is not worth failing over:
@@ -93,15 +93,15 @@ func Fetch(ctx context.Context, id string) (magnitude.Passband, error) {
 
 	if cacheErr == nil {
 		// A cache write that fails costs a request next time and nothing else.
-		_ = remote.Save(ctx, bucket, key, strings.NewReader(string(raw)))
+		_ = remote.WriteFile(ctx, fsys, key, strings.NewReader(string(raw)))
 	}
 
 	return band, nil
 }
 
 // cacheLocation resolves where a filter's profile is kept.
-func cacheLocation(ctx context.Context, id string) (*remote.Bucket, string, error) {
-	bucket, prefix, err := remote.CacheDir(ctx, remote.SVOFilterProfile)
+func cacheLocation(ctx context.Context, id string) (remote.FS, string, error) {
+	fsys, prefix, err := remote.CacheDir(ctx, remote.SVOFilterProfile)
 	if err != nil {
 		return nil, "", fmt.Errorf("%w: cache: %w", ErrService, err)
 	}
@@ -111,7 +111,7 @@ func cacheLocation(ctx context.Context, id string) (*remote.Bucket, string, erro
 	// directory deep per photometric system.
 	safe := strings.NewReplacer("/", "_", "\\", "_", " ", "_").Replace(id)
 
-	return bucket, path.Join(prefix, safe+".xml"), nil
+	return fsys, path.Join(prefix, safe+".xml"), nil
 }
 
 // Parse reads a VOTable filter profile.

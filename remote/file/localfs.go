@@ -1,6 +1,7 @@
 package file
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -46,6 +47,8 @@ type localFS struct {
 	// staged counts staging files this process has created, so two writers in
 	// one process cannot pick the same name. See [localFS.Create].
 	staged *atomic.Uint64
+	// ctx is the context WithContext bound, or nil. See [localFS.WithContext].
+	ctx context.Context //nolint:containedctx // the io/fs contract has nowhere else to put it
 }
 
 // openLocal builds a local filesystem from a file:// URL.
@@ -76,6 +79,29 @@ func openLocal(u *url.URL) (fs.FS, error) {
 	}
 
 	return &localFS{dir: dir, staged: new(atomic.Uint64)}, nil
+}
+
+// WithContext implements [ContextFS].
+//
+// # Why a local filesystem implements this at all
+//
+// Because the alternative is an unenforceable rule. A Downloadable endpoint's
+// backend must be cancellable — a multi-gigabyte fetch a caller cannot abandon
+// is a defect — and [RequireContext] is where that is checked. If the local
+// backend does not implement this, the check has to be skipped for it, and a
+// check with an exception is a check nobody can rely on.
+//
+// So the cancellation here is real rather than a no-op that would make
+// RequireContext lie. A local operation cannot be interrupted once the syscall
+// is in flight, and none of them blocks for long enough to matter; what is
+// honoured is the context's state at the moment each operation begins. That
+// means a caller who cancels sees the next operation fail rather than a
+// transfer that runs to completion, which is the property the rule exists for.
+func (l *localFS) WithContext(ctx context.Context) fs.FS {
+	clone := *l
+	clone.ctx = ctx
+
+	return &clone
 }
 
 // localPath turns a file:// URL into an OS path.
@@ -179,6 +205,10 @@ func localName(dir, name string) (string, error) {
 // So: confinement everywhere, and one documented filter for a Windows
 // directory-metadata artifact that is not astrogo's to fix.
 func (l *localFS) Open(name string) (fs.File, error) {
+	if err := l.check("open", name); err != nil {
+		return nil, err
+	}
+
 	if _, err := localName(l.dir, name); err != nil {
 		return nil, &fs.PathError{Op: "open", Path: name, Err: err}
 	}
@@ -201,6 +231,10 @@ func (l *localFS) Open(name string) (fs.File, error) {
 // Stat implements [fs.StatFS], so a caller need not open an object to learn it
 // exists — the cache-hit check, which happens far more often than a read.
 func (l *localFS) Stat(name string) (fs.FileInfo, error) {
+	if err := l.check("stat", name); err != nil {
+		return nil, err
+	}
+
 	full, err := localName(l.dir, name)
 	if err != nil {
 		return nil, &fs.PathError{Op: "stat", Path: name, Err: err}
@@ -227,6 +261,10 @@ func (l *localFS) Stat(name string) (fs.FileInfo, error) {
 // only as conformant as the optional interfaces it implements, because every
 // one it omits sends callers down a fallback path it never tested.
 func (l *localFS) ReadDir(name string) ([]fs.DirEntry, error) {
+	if err := l.check("readdir", name); err != nil {
+		return nil, err
+	}
+
 	full, err := localName(l.dir, name)
 	if err != nil {
 		return nil, &fs.PathError{Op: "readdir", Path: name, Err: err}
@@ -242,6 +280,10 @@ func (l *localFS) ReadDir(name string) ([]fs.DirEntry, error) {
 
 // ReadFile implements [fs.ReadFileFS].
 func (l *localFS) ReadFile(name string) ([]byte, error) {
+	if err := l.check("readfile", name); err != nil {
+		return nil, err
+	}
+
 	full, err := localName(l.dir, name)
 	if err != nil {
 		return nil, &fs.PathError{Op: "readfile", Path: name, Err: err}
@@ -259,6 +301,10 @@ func (l *localFS) ReadFile(name string) ([]byte, error) {
 // implements. See ReadDir for why the interface set is the thing that decides
 // conformance rather than the method bodies.
 func (l *localFS) Lstat(name string) (fs.FileInfo, error) {
+	if err := l.check("lstat", name); err != nil {
+		return nil, err
+	}
+
 	full, err := localName(l.dir, name)
 	if err != nil {
 		return nil, &fs.PathError{Op: "lstat", Path: name, Err: err}
@@ -274,6 +320,10 @@ func (l *localFS) Lstat(name string) (fs.FileInfo, error) {
 
 // ReadLink implements [fs.ReadLinkFS].
 func (l *localFS) ReadLink(name string) (string, error) {
+	if err := l.check("readlink", name); err != nil {
+		return "", err
+	}
+
 	full, err := localName(l.dir, name)
 	if err != nil {
 		return "", &fs.PathError{Op: "readlink", Path: name, Err: err}
@@ -289,6 +339,10 @@ func (l *localFS) ReadLink(name string) (string, error) {
 
 // Remove implements [RemoveFS].
 func (l *localFS) Remove(name string) error {
+	if err := l.check("remove", name); err != nil {
+		return err
+	}
+
 	if _, err := localName(l.dir, name); err != nil {
 		return &fs.PathError{Op: "remove", Path: name, Err: err}
 	}
@@ -334,6 +388,10 @@ func (l *localFS) Remove(name string) error {
 // half of #315: a cross-device rename is not atomic, and the temp directory is
 // frequently on a different volume from the cache.
 func (l *localFS) Create(name string) (io.WriteCloser, error) {
+	if err := l.check("create", name); err != nil {
+		return nil, err
+	}
+
 	if _, err := localName(l.dir, name); err != nil {
 		return nil, &fs.PathError{Op: "create", Path: name, Err: err}
 	}
@@ -364,6 +422,111 @@ func (l *localFS) Create(name string) (io.WriteCloser, error) {
 	// This root outlives the call: the writer needs it for the rename on
 	// Close, and closes it there.
 	return &stagedWrite{root: root, f: f, staging: staging, final: name}, nil
+}
+
+// CreateExcl implements [CreateExclFS].
+//
+// Unlike [localFS.Create] this does not stage. Staging exists so a reader never
+// sees a half-written object, and it is exactly wrong here: the point of an
+// exclusive create is that the name appears at the instant it is claimed, so a
+// second caller's attempt fails. A write that became visible only on Close
+// would leave a window in which two callers both believed they held the lock.
+//
+// The atomicity is the kernel's. O_CREATE|O_EXCL either creates the file or
+// reports EEXIST, with no gap a second process can enter, on every platform
+// astrogo supports — which is the guarantee gocloud's fileblob could not give
+// and #241 exists because of.
+func (l *localFS) CreateExcl(name string) (io.WriteCloser, error) {
+	if err := l.check("createexcl", name); err != nil {
+		return nil, err
+	}
+
+	if _, err := localName(l.dir, name); err != nil {
+		return nil, &fs.PathError{Op: "createexcl", Path: name, Err: err}
+	}
+
+	root, err := l.root()
+	if err != nil {
+		return nil, &fs.PathError{Op: "createexcl", Path: name, Err: err}
+	}
+
+	if dir := path.Dir(name); dir != "." {
+		if err := mkdirAll(root, dir); err != nil {
+			_ = root.Close()
+
+			return nil, &fs.PathError{Op: "createexcl", Path: name, Err: err}
+		}
+	}
+
+	f, err := root.OpenFile(name, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644)
+	if err != nil {
+		_ = root.Close()
+
+		return nil, err //nolint:wrapcheck // already a *fs.PathError, and fs.ErrExist is the signal
+	}
+
+	return &rootedWrite{root: root, f: f, name: name}, nil
+}
+
+// check reports the bound context's error, if it has one.
+func (l *localFS) check(op, name string) error {
+	if l.ctx == nil {
+		return nil
+	}
+
+	if err := l.ctx.Err(); err != nil {
+		return &fs.PathError{Op: op, Path: name, Err: err}
+	}
+
+	return nil
+}
+
+// rootedWrite is a direct write that closes its root with it. There is no
+// promotion step: see [localFS.CreateExcl] for why that is the point.
+type rootedWrite struct {
+	root *os.Root
+	f    *os.File
+	name string
+}
+
+func (w *rootedWrite) Write(p []byte) (int, error) {
+	n, err := w.f.Write(p)
+	if err != nil {
+		return n, fmt.Errorf("remote/file: write: %w", err)
+	}
+
+	return n, nil
+}
+
+// Abort implements [AbortWriter]. An exclusive create has claimed the name, so
+// throwing the write away means removing it — otherwise a failed lock attempt
+// would leave a lock nobody holds.
+func (w *rootedWrite) Abort() error {
+	defer func() { _ = w.root.Close() }()
+
+	closeErr := w.f.Close()
+	removeErr := w.root.Remove(w.name)
+
+	if closeErr != nil {
+		return fmt.Errorf("remote/file: abort: %w", closeErr)
+	}
+
+	if removeErr != nil && !errors.Is(removeErr, fs.ErrNotExist) {
+		return fmt.Errorf("remote/file: abort: %w", removeErr)
+	}
+
+	return nil
+}
+
+func (w *rootedWrite) Close() error {
+	err := w.f.Close()
+	_ = w.root.Close()
+
+	if err != nil {
+		return fmt.Errorf("remote/file: close: %w", err)
+	}
+
+	return nil
 }
 
 // stagingName builds a name unique to this process and this call.
@@ -438,6 +601,25 @@ func (w *stagedWrite) Write(p []byte) (int, error) {
 	}
 
 	return n, err //nolint:wrapcheck // already a *fs.PathError
+}
+
+// Abort implements [AbortWriter]: throw the staged file away and leave the
+// destination as it was.
+func (w *stagedWrite) Abort() error {
+	defer func() { _ = w.root.Close() }()
+
+	closeErr := w.f.Close()
+	removeErr := w.root.Remove(w.staging)
+
+	if closeErr != nil {
+		return fmt.Errorf("remote/file: abort %s: %w", w.final, closeErr)
+	}
+
+	if removeErr != nil && !errors.Is(removeErr, fs.ErrNotExist) {
+		return fmt.Errorf("remote/file: abort %s: %w", w.final, removeErr)
+	}
+
+	return nil
 }
 
 // Close promotes the staged file, or discards it if any write failed.

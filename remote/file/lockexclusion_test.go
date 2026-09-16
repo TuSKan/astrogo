@@ -2,6 +2,7 @@ package file
 
 import (
 	"context"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -17,7 +18,7 @@ import (
 //
 // AcquireLock delegated exclusion to WriterOptions.IfNotExist, which this
 // package and remote/file both documented as being guarded by a per-Bucket
-// mutex. It is not: fileblob's bucket struct holds no mutex, and the mutex
+// mutex. It is not: fileblob's fsys struct holds no mutex, and the mutex
 // that exists is constructed per writer, so IfNotExist is a bare os.Stat
 // followed by an os.Rename. Measured before the fix, 8 goroutines sharing
 // one Bucket over 200 rounds: 51 rounds with two or more holders, 2 with
@@ -28,7 +29,7 @@ import (
 // lock eventually. What must never happen is two of them holding it at the
 // same moment.
 func TestAcquireLockAdmitsOneHolderAtATime(t *testing.T) {
-	bucket, _ := openLocalBucket(t)
+	fsys, _ := openLocalFS(t)
 
 	const (
 		cacheKey   = "exclusion-test.bin"
@@ -50,7 +51,7 @@ func TestAcquireLockAdmitsOneHolderAtATime(t *testing.T) {
 
 		for range contenders {
 			wg.Go(func() {
-				release, err := AcquireLock(ctx, bucket, cacheKey)
+				release, err := AcquireLock(ctx, fsys, cacheKey)
 				if err != nil {
 					t.Errorf("AcquireLock: %v", err)
 
@@ -100,7 +101,7 @@ func TestAcquireLockAdmitsOneHolderAtATime(t *testing.T) {
 // a holder that no longer exists — and waits silently, which is the worst
 // version of it.
 func TestAcquireLockReleasesTheInProcessSlotOnFailure(t *testing.T) {
-	bucket, _ := openLocalBucket(t)
+	fsys, _ := openLocalFS(t)
 
 	const cacheKey = "cancelled-acquire-test.bin"
 
@@ -113,18 +114,18 @@ func TestAcquireLockReleasesTheInProcessSlotOnFailure(t *testing.T) {
 	// would block on the semaphore and fail before ever taking the slot,
 	// which exercises nothing. That is exactly how this test first passed
 	// against a build that leaked the slot.
-	if err := bucket.WriteAll(context.Background(), cacheKey+".lock", []byte("locked"), nil); err != nil {
+	if err := WriteFile(t.Context(), fsys, cacheKey+".lock", strings.NewReader("locked")); err != nil {
 		t.Fatalf("seed lock object: %v", err)
 	}
 
 	blocked, cancel := context.WithTimeout(context.Background(), 150*time.Millisecond)
 	defer cancel()
 
-	if _, err := AcquireLock(blocked, bucket, cacheKey); err == nil {
+	if _, err := AcquireLock(blocked, fsys, cacheKey); err == nil {
 		t.Fatal("AcquireLock succeeded while another holder's lock object was present")
 	}
 
-	if err := bucket.Delete(context.Background(), cacheKey+".lock"); err != nil {
+	if err := Remove(t.Context(), fsys, cacheKey+".lock"); err != nil {
 		t.Fatalf("clear lock object: %v", err)
 	}
 
@@ -135,7 +136,7 @@ func TestAcquireLockReleasesTheInProcessSlotOnFailure(t *testing.T) {
 	go func() {
 		defer close(done)
 
-		r, err := AcquireLock(context.Background(), bucket, cacheKey)
+		r, err := AcquireLock(context.Background(), fsys, cacheKey)
 		if err != nil {
 			t.Errorf("third AcquireLock: %v", err)
 
@@ -159,9 +160,9 @@ func TestAcquireLockReleasesTheInProcessSlotOnFailure(t *testing.T) {
 // every other test here while making a multi-gigabyte kernel download block
 // an unrelated bulletin fetch behind it for minutes.
 func TestAcquireLockDoesNotSerialiseDifferentKeys(t *testing.T) {
-	bucket, _ := openLocalBucket(t)
+	fsys, _ := openLocalFS(t)
 
-	first, err := AcquireLock(context.Background(), bucket, "kernel-a.bin")
+	first, err := AcquireLock(context.Background(), fsys, "kernel-a.bin")
 	if err != nil {
 		t.Fatalf("AcquireLock a: %v", err)
 	}
@@ -171,7 +172,7 @@ func TestAcquireLockDoesNotSerialiseDifferentKeys(t *testing.T) {
 	done := make(chan error, 1)
 
 	go func() {
-		release, err := AcquireLock(context.Background(), bucket, "kernel-b.bin")
+		release, err := AcquireLock(context.Background(), fsys, "kernel-b.bin")
 		if err == nil {
 			release()
 		}

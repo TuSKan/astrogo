@@ -70,11 +70,11 @@ func TestKernelHasNothingWeIgnore(t *testing.T) {
 
 	ctx := context.Background()
 
-	bucket, prefix, err := remote.CacheDir(ctx, remote.NAIFLSK)
+	fsys, prefix, err := remote.CacheDir(ctx, remote.NAIFLSK)
 	testutil.AssertNoError(t, err)
 
 	// ── Direction 1: nothing in the data block is unmodelled ────────────────
-	raw, err := bucket.NewReader(ctx, prefix+"lsk/naif0012.tls", nil)
+	raw, err := fsys.Open(prefix + "lsk/naif0012.tls")
 	if err != nil {
 		t.Fatalf("open cached LSK: %v", err)
 	}
@@ -129,7 +129,7 @@ func TestKernelHasNothingWeIgnore(t *testing.T) {
 	}
 
 	// ── Direction 2: everything we model was actually populated ─────────────
-	f, err := bucket.NewReader(ctx, prefix+"lsk/naif0012.tls", nil)
+	f, err := fsys.Open(prefix + "lsk/naif0012.tls")
 	if err != nil {
 		t.Fatalf("reopen cached LSK: %v", err)
 	}

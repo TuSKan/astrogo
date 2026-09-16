@@ -6,35 +6,40 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"sync"
 )
 
-// Defaults for NewReaderAt: 64 KiB chunks, 16 resident, so a reader holds
-// at most 1 MiB no matter how large the object is — a 3 GB kernel and a
-// 5 KB one cost the same.
+// Defaults for [Open]: 64 KiB chunks, 16 resident, so a reader holds at most
+// 1 MiB no matter how large the object is — a 3 GB kernel and a 5 KB one cost
+// the same.
 //
-// Measured against the access pattern that motivates this type (SPK
-// segment evaluation: thousands of ~100-byte reads clustered in a few
-// regions), over a 64 MB object on local fileblob, 2000 reads:
+// Measured against the access pattern that motivates this type (SPK segment
+// evaluation: thousands of ~100-byte reads clustered in a few regions), over a
+// 64 MiB object, 2000 reads. The first column is the backend's own ReadAt with
+// no cache in front of it; see BenchmarkReadAtStrategies and the table in
+// fsys_bench_test.go.
 //
-//	one range read per ReadAt   256 ms
-//	4 KiB chunks                6.9 ms
-//	64 KiB chunks               0.32 ms   <- default
-//	1 MiB chunks                0.37 ms   (16x the memory, no faster)
+//	                  uncached      4 KiB    64 KiB     1 MiB
+//	file://             4.5 ms     6.9 ms   0.053 ms   0.056 ms
+//	http             11,400 ms          —          —          —
 //
-// See BenchmarkReadAtStrategies.
+// 64 KiB is the default because 1 MiB costs sixteen times the memory and is not
+// faster. The http row has one entry because the uncached figure — 2000 ranged
+// GETs against a server on localhost — settles the question without needing the
+// others.
 const (
 	defaultChunkSize    = 64 << 10
 	defaultCachedChunks = 16
 )
 
-// readerAtConfig carries NewReaderAt's options.
+// readerAtConfig carries [Open]'s options.
 type readerAtConfig struct {
 	chunkSize    int64
 	cachedChunks int
 }
 
-// ReaderAtOption customizes a NewReaderAt call.
+// ReaderAtOption customizes an [Open] call.
 type ReaderAtOption func(*readerAtConfig)
 
 // WithChunkSize sets the read granularity in bytes. A reader holds at most
@@ -57,26 +62,34 @@ func WithCachedChunks(n int) ReaderAtOption {
 	}
 }
 
-// ReaderAt is a random-access view of one object, satisfying io.ReaderAt
-// and io.Closer. It reads whole aligned chunks through the bucket's range
-// reader and keeps the most recently used ones, so a burst of small reads
-// within a region costs one transfer rather than one per call.
+// ReaderAt is a chunk-caching view of one open object. It is what [Open]
+// returns, and it implements [File], so a caller sees an ordinary open file.
 //
-// Memory is bounded by chunk size times resident chunks — 1 MiB by
-// default — and never scales with the object. Chunks are evicted
-// least-recently-used; the object is not buffered.
+// # Why the cache is inside Open rather than beside it
 //
-// This matters on every backend, not just remote ones: fileblob opens a
-// fresh OS file handle on each NewRangeReader, so an uncached ReadAt is
-// nowhere near the cost of a pread, and over HTTP or S3 it is one request
-// per read. Chunking fixes that generically, with no per-driver
-// reach-through and no local-only fast path.
+// Every backend here already implements io.ReaderAt, so a caller could use one
+// directly and the type would be unnecessary. Measured, it is not: over HTTP an
+// uncached ReadAt is one ranged GET per call, which for SPK-shaped access is
+// 2000 requests and eleven seconds against a server on localhost. Locally it is
+// a pread — 48x cheaper than the gocloud path it replaces, and still 84x slower
+// than serving the same bytes from a resident chunk.
+//
+// So the cache is not an optimisation a caller opts into and forgets; it is the
+// difference between the layer working and not. Making Open the only door means
+// no call site can get it wrong, which is the same reason remote is the only
+// door to this package.
+//
+// Reads of whole aligned chunks are cached and evicted least-recently-used.
+// Memory is bounded by chunk size times resident chunks and never scales with
+// the object; the object is not buffered. Sequential Read and Seek pass through
+// to the underlying file untouched, so a whole-object download stays one
+// request rather than being reassembled from chunks.
 //
 // Safe for concurrent use.
 type ReaderAt struct {
-	bucket *Bucket
-	key    string
-	size   int64
+	src  File
+	name string
+	size int64
 
 	chunkSize int64
 	maxChunks int
@@ -98,24 +111,44 @@ var (
 	ErrNegativeOffset = errors.New("remote/file: negative offset")
 )
 
-// NewReaderAt opens bucket/key for random access. The object's size is
-// read once here; a ReaderAt therefore observes the object as it was at
-// this moment and is not meant to outlive a rewrite of that key.
-func NewReaderAt(ctx context.Context, bucket *Bucket, key string, opts ...ReaderAtOption) (*ReaderAt, error) {
+// Open opens name on fsys for reading, with the chunk cache described on
+// [ReaderAt] in front of it.
+//
+// The object's size is read once here, so a File observes the object as it was
+// at this moment and is not meant to outlive a rewrite of that name.
+//
+// A filesystem implementing [ContextFS] is bound to ctx first, so a read that
+// blocks on somebody else's network can be cancelled. One that does not — the
+// local backend, which has nothing to cancel — is used as it is.
+func Open(ctx context.Context, fsys fs.FS, name string, opts ...ReaderAtOption) (File, error) {
 	cfg := readerAtConfig{chunkSize: defaultChunkSize, cachedChunks: defaultCachedChunks}
 	for _, opt := range opts {
 		opt(&cfg)
 	}
 
-	attrs, err := bucket.Attributes(ctx, key)
+	f, err := WithContext(ctx, fsys).Open(name)
 	if err != nil {
-		return nil, fmt.Errorf("remote/file: attributes %s: %w", key, err)
+		return nil, fmt.Errorf("remote/file: open %s: %w", name, err)
+	}
+
+	src, ok := f.(File)
+	if !ok {
+		_ = f.Close()
+
+		return nil, fmt.Errorf("remote/file: open %s: %w", name, ErrNotSeekable)
+	}
+
+	info, err := f.Stat()
+	if err != nil {
+		_ = f.Close()
+
+		return nil, fmt.Errorf("remote/file: stat %s: %w", name, err)
 	}
 
 	return &ReaderAt{
-		bucket:    bucket,
-		key:       key,
-		size:      attrs.Size,
+		src:       src,
+		name:      name,
+		size:      info.Size(),
 		chunkSize: cfg.chunkSize,
 		maxChunks: cfg.cachedChunks,
 		chunks:    make(map[int64][]byte, cfg.cachedChunks),
@@ -127,11 +160,31 @@ func NewReaderAt(ctx context.Context, bucket *Bucket, key string, opts ...Reader
 // Size reports the object's size in bytes as observed at open time.
 func (r *ReaderAt) Size() int64 { return r.size }
 
+// Stat implements [fs.File].
+func (r *ReaderAt) Stat() (fs.FileInfo, error) {
+	return r.src.Stat() //nolint:wrapcheck // the backend's own *fs.PathError is the better message
+}
+
+// Read implements [io.Reader], passing straight through to the underlying file.
+//
+// Deliberately not served from the chunk cache. The cache exists for scattered
+// small reads; a sequential read is the download path, where the HTTP backend
+// holds one body open across calls and reassembling it from ranged chunks would
+// turn one request into hundreds.
+func (r *ReaderAt) Read(p []byte) (int, error) {
+	return r.src.Read(p) //nolint:wrapcheck // io.EOF must reach the caller unwrapped
+}
+
+// Seek implements [io.Seeker], passing through for the same reason Read does.
+func (r *ReaderAt) Seek(offset int64, whence int) (int64, error) {
+	return r.src.Seek(offset, whence) //nolint:wrapcheck // already a *fs.PathError
+}
+
 // ReadAt implements io.ReaderAt: it fills p entirely or returns a non-nil
 // error, and reports io.EOF when it stops short at the end of the object.
 func (r *ReaderAt) ReadAt(p []byte, off int64) (int, error) {
 	if off < 0 {
-		return 0, fmt.Errorf("%w: read %s at %d", ErrNegativeOffset, r.key, off)
+		return 0, fmt.Errorf("%w: read %s at %d", ErrNegativeOffset, r.name, off)
 	}
 
 	if len(p) == 0 {
@@ -163,8 +216,12 @@ func (r *ReaderAt) ReadAt(p []byte, off int64) (int, error) {
 	return n, nil
 }
 
-// Close releases the cached chunks. The underlying Bucket is shared and
-// process-lived, so it is deliberately left open.
+// Close releases the cached chunks and closes the underlying file.
+//
+// Unlike the gocloud implementation this replaces, the underlying handle is
+// this reader's own rather than a process-lived shared Bucket, so closing it
+// here is both correct and necessary — an unclosed one is a leaked descriptor
+// or a held HTTP connection.
 func (r *ReaderAt) Close() error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -173,6 +230,10 @@ func (r *ReaderAt) Close() error {
 	r.chunks = nil
 	r.elems = nil
 	r.lru = list.New()
+
+	if err := r.src.Close(); err != nil {
+		return fmt.Errorf("remote/file: close %s: %w", r.name, err)
+	}
 
 	return nil
 }
@@ -199,21 +260,13 @@ func (r *ReaderAt) chunk(idx int64) ([]byte, error) {
 		length = rest
 	}
 
-	// Background context, not a caller-supplied one: io.ReaderAt has no
-	// ctx parameter, and a ReaderAt is handed to parsers (spk.Reader) that
-	// hold it well past the call that opened it.
-	rc, err := r.bucket.NewRangeReader(context.Background(), r.key, offset, length, nil)
-	if err != nil {
-		return nil, fmt.Errorf("remote/file: range read %s at %d: %w", r.key, offset, err)
-	}
-
 	buf := make([]byte, length)
 
-	_, err = io.ReadFull(rc, buf)
-	closeErr := rc.Close()
-
-	if err != nil || closeErr != nil {
-		return nil, fmt.Errorf("remote/file: range read %s at %d: %w", r.key, offset, errors.Join(err, closeErr))
+	// The underlying ReadAt, not Read: io.ReaderAt is contractually safe for
+	// concurrent use and moves no cursor, which is what lets this type be safe
+	// for concurrent use while Read and Seek pass through to the same file.
+	if _, err := r.src.ReadAt(buf, offset); err != nil && !errors.Is(err, io.EOF) {
+		return nil, fmt.Errorf("remote/file: read %s at %d: %w", r.name, offset, err)
 	}
 
 	r.chunks[idx] = buf

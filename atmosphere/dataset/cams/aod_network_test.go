@@ -5,6 +5,7 @@ package cams_test
 import (
 	"context"
 	"math"
+	"slices"
 	"testing"
 
 	"github.com/TuSKan/astrogo/angle"
@@ -12,9 +13,27 @@ import (
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/remote"
-	_ "github.com/TuSKan/astrogo/remote/file/s3"
 	"github.com/TuSKan/astrogo/time"
 )
+
+// These tests need the s3:// scheme, which is being rebuilt on the AWS SDK
+// after gocloud.dev was removed and is not registered yet — see PR 5 of the
+// plan in docs/storage.md. Until it lands they skip rather than fail, which is
+// the same thing they do for an unreachable endpoint, and the skip names the
+// reason so nobody reads it as a passing test.
+//
+// The blank import of remote/file/s3 that used to sit above is what restores
+// them; it goes back when that package does.
+func requireS3(tb testing.TB) {
+	tb.Helper()
+
+	if slices.Contains(remote.Schemes(), "s3") {
+		return
+	}
+
+	tb.Skip("the s3:// backend is not registered: it is being rebuilt on the AWS SDK " +
+		"after gocloud.dev's removal (docs/storage.md, PR 5)")
+}
 
 // A date the archive is known to hold, used by every test here so they share
 // one cached file rather than fetching one each.
@@ -22,6 +41,7 @@ var aodEpoch = time.GoDate(2023, 1, 1, 3, 0, 0, 0, time.LocationUTC)
 
 func siteAt(tb testing.TB, lonDeg, latDeg float64) *coord.Geodetic {
 	tb.Helper()
+	requireS3(tb)
 
 	g, err := coord.NewGeodetic(angle.Deg(lonDeg), angle.Deg(latDeg), 0)
 	if err != nil {

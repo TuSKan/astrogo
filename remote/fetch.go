@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"io/fs"
 
 	"github.com/TuSKan/astrogo/logging"
 	"github.com/TuSKan/astrogo/remote/file"
@@ -49,22 +50,23 @@ func WithProgress(f func(downloaded, total int64)) ReadOption {
 }
 
 // GetFile ensures endpoint id's object named name is present and current
-// in the cache, returning the cache Bucket and the key within it. The
-// caller reads it however it needs — ReadAll, NewReader, [NewReaderAt].
+// in the cache, returning the cache [FS] and the key within it. The caller
+// reads it however it needs — [Open], fs.ReadFile, or anything else written
+// against fs.FS.
 //
 // An immutable endpoint's cache entry is reused on existence alone; a
 // Mutable one is revalidated against the source's current ETag first. A
 // miss downloads, which requires consent (ErrDownloadDenied otherwise) and
 // is serialized against other processes doing the same.
-func GetFile(ctx context.Context, id EndpointID, name string, opts ...ReadOption) (bucket *Bucket, key string, err error) {
+func GetFile(ctx context.Context, id EndpointID, name string, opts ...ReadOption) (fsys FS, key string, err error) {
 	return Default().GetFile(ctx, id, name, opts...)
 }
 
 // GetFile ensures endpoint id's object named name is present and current in
-// this client's cache, returning that cache Bucket and the key within it. See
+// this client's cache, returning that cache [FS] and the key within it. See
 // the package-level [GetFile]; the consent, offline and URL decisions it makes
 // are this client's, and the cache it fills is this client's.
-func (c *Client) GetFile(ctx context.Context, id EndpointID, name string, opts ...ReadOption) (bucket *Bucket, key string, err error) {
+func (c *Client) GetFile(ctx context.Context, id EndpointID, name string, opts ...ReadOption) (fsys FS, key string, err error) {
 	ep, ok := c.Lookup(id)
 	if !ok {
 		return nil, "", fmt.Errorf("%w: %q", ErrUnknownEndpoint, id)
@@ -95,7 +97,7 @@ func (c *Client) GetFile(ctx context.Context, id EndpointID, name string, opts .
 		return nil, "", fmt.Errorf("%w: endpoint %q", ErrCacheNameRequired, id)
 	}
 
-	cacheBucket, prefix, err := c.CacheDir(ctx, id)
+	cacheFS, prefix, err := c.CacheDir(ctx, id)
 	if err != nil {
 		return nil, "", err
 	}
@@ -106,12 +108,12 @@ func (c *Client) GetFile(ctx context.Context, id EndpointID, name string, opts .
 	// ever resolved, so a fully-cached kernel stays readable even when its
 	// source is unreachable — no network, no credentials, no driver.
 	if !ep.Mutable {
-		if exists, existsErr := cacheBucket.Exists(ctx, cacheKey); existsErr == nil && exists {
-			return cacheBucket, cacheKey, nil
+		if exists, existsErr := file.Exists(ctx, cacheFS, cacheKey); existsErr == nil && exists {
+			return cacheFS, cacheKey, nil
 		}
 	}
 
-	srcBucket, err := file.Open(ctx, ep.URL)
+	srcFS, err := OpenFS(ctx, ep.URL)
 	if err != nil {
 		// A caller who never granted consent gets ErrDownloadDenied rather
 		// than this source error even when the source is genuinely
@@ -126,8 +128,8 @@ func (c *Client) GetFile(ctx context.Context, id EndpointID, name string, opts .
 		return nil, "", fmt.Errorf("remote: open source %s: %w", ep.URL, err)
 	}
 
-	if fresh, freshErr := freshInCache(ctx, ep, srcBucket, cacheBucket, name, cacheKey); freshErr == nil && fresh {
-		return cacheBucket, cacheKey, nil
+	if fresh, freshErr := freshInCache(ctx, ep, srcFS, cacheFS, name, cacheKey); freshErr == nil && fresh {
+		return cacheFS, cacheKey, nil
 	}
 
 	// The lock spans the "still missing? then download" decision, not just
@@ -135,7 +137,7 @@ func (c *Client) GetFile(ctx context.Context, id EndpointID, name string, opts .
 	// write. go test runs each package as its own process and several
 	// share one JPL kernel, so this is a cross-process race that no
 	// in-process mutex can fix.
-	release, err := file.AcquireLock(ctx, cacheBucket, cacheKey)
+	release, err := file.AcquireLock(ctx, cacheFS, cacheKey)
 	if err != nil {
 		//nolint:wrapcheck // pure delegation to remote/file, internal to this package; its errors are already prefixed
 		return nil, "", err
@@ -144,39 +146,43 @@ func (c *Client) GetFile(ctx context.Context, id EndpointID, name string, opts .
 	defer release()
 
 	// Whoever held the lock before us may have filled the entry already.
-	if fresh, freshErr := freshInCache(ctx, ep, srcBucket, cacheBucket, name, cacheKey); freshErr == nil && fresh {
-		return cacheBucket, cacheKey, nil
+	if fresh, freshErr := freshInCache(ctx, ep, srcFS, cacheFS, name, cacheKey); freshErr == nil && fresh {
+		return cacheFS, cacheKey, nil
 	}
 
 	timeout := cmp.Or(cfg.timeout, ep.DownloadTimeout, DefaultDownloadTimeout)
 
-	if err := c.fetchInto(ctx, id, ep, srcBucket, cacheBucket, name, cacheKey, timeout, cfg); err != nil {
+	if err := c.fetchInto(ctx, id, ep, srcFS, cacheFS, name, cacheKey, timeout, cfg); err != nil {
 		// A failed fetch is not the same as a missing file, and the difference
-		// is a whole class of CI failure. The lock above is exclusive within
-		// this process and only mostly exclusive across processes — fileblob's
-		// IfNotExist is a Stat followed by a Rename with a window in between —
-		// so two processes can both reach here for one key. The loser's
-		// staging rename then fails with "Access is denied" on Windows while
-		// the winner's download completes perfectly.
+		// used to be a whole class of CI failure.
 		//
-		// Measured in CI on this branch: `go test ./...` runs ephemeris/jpl and
-		// time as separate processes against one cache, both fetch de440s.bsp,
-		// and one died on exactly that rename while the other wrote a complete
-		// kernel (#241).
+		// This check was added because the lock above was exclusive within this
+		// process and only mostly exclusive across processes: fileblob's
+		// IfNotExist was a Stat followed by a Rename with a window in between,
+		// so two processes could both reach here for one key, and the loser's
+		// staging rename failed with "Access is denied" on Windows while the
+		// winner's download completed perfectly. Measured in CI at the time:
+		// `go test ./...` ran ephemeris/jpl and time as separate processes
+		// against one cache, both fetched de440s.bsp, and one died on exactly
+		// that rename while the other wrote a complete kernel (#241).
 		//
-		// So ask the question the caller actually asked — is the object there
-		// and current — before reporting a failure. This is not a retry and
-		// swallows nothing: it re-runs the same freshness check the cache hit
-		// above uses, and a fetch that failed for any reason other than losing
-		// this race still finds nothing and still fails.
-		if fresh, freshErr := freshInCache(ctx, ep, srcBucket, cacheBucket, name, cacheKey); freshErr == nil && fresh {
-			return cacheBucket, cacheKey, nil
+		// Both halves of that are now gone — staging is named from the process
+		// id rather than a clock, and the lock is O_CREATE|O_EXCL rather than
+		// Stat-then-Rename — so this should no longer be reachable for that
+		// reason. It is kept because it is not a workaround: it asks the
+		// question the caller actually asked, is the object there and current,
+		// and costs one Stat on a path that is already failing. It re-runs the
+		// same freshness check the cache hit above uses and swallows nothing —
+		// a fetch that failed for any other reason still finds nothing and
+		// still fails.
+		if fresh, freshErr := freshInCache(ctx, ep, srcFS, cacheFS, name, cacheKey); freshErr == nil && fresh {
+			return cacheFS, cacheKey, nil
 		}
 
 		return nil, "", fmt.Errorf("remote: fetch %s: %w", name, err)
 	}
 
-	return cacheBucket, cacheKey, nil
+	return cacheFS, cacheKey, nil
 }
 
 // Exists reports whether endpoint id currently serves an object at name.
@@ -203,26 +209,19 @@ func (c *Client) Exists(ctx context.Context, id EndpointID, name string) (bool, 
 		return false, err
 	}
 
-	srcBucket, err := file.Open(ctx, ep.URL)
+	srcFS, err := OpenFS(ctx, ep.URL)
 	if err != nil {
 		return false, fmt.Errorf("remote: open source %s: %w", ep.URL, err)
 	}
 
-	if _, err := srcBucket.Attributes(ctx, name); err != nil {
-		if file.IsNotFound(err) {
-			return false, nil
-		}
-
-		return false, fmt.Errorf("remote: probe %s: %w", name, err)
-	}
-
-	return true, nil
+	//nolint:wrapcheck // pure delegation to remote/file, internal to this package; its errors are already prefixed
+	return file.Exists(ctx, srcFS, name)
 }
 
 // freshInCache reports whether cacheKey already holds current content for
 // ep+name, so GetFile can skip the transfer entirely.
-func freshInCache(ctx context.Context, ep Endpoint, srcBucket, cacheBucket *Bucket, name, cacheKey string) (bool, error) {
-	exists, err := cacheBucket.Exists(ctx, cacheKey)
+func freshInCache(ctx context.Context, ep Endpoint, srcFS, cacheFS FS, name, cacheKey string) (bool, error) {
+	exists, err := file.Exists(ctx, cacheFS, cacheKey)
 	if err != nil {
 		return false, fmt.Errorf("remote: check cache %s: %w", cacheKey, err)
 	}
@@ -235,41 +234,50 @@ func freshInCache(ctx context.Context, ep Endpoint, srcBucket, cacheBucket *Buck
 		return true, nil
 	}
 
-	return unchanged(ctx, srcBucket, cacheBucket, name, cacheKey), nil
+	return unchanged(ctx, srcFS, cacheFS, name, cacheKey), nil
 }
 
-// unchanged compares the source ETag recorded on the cached object at
+// unchanged compares the source ETag recorded beside the cached object at
 // fetch time against the source's current one. Any failure — an erroring
 // probe, offline mode — reports "changed", so GetFile falls through to its
 // normal download path.
 //
-// The recorded ETag is deliberately not the cached object's own: for a
-// local cache, fileblob derives ETag from the file's (ModTime, Size),
-// which has nothing to do with the source's, so that comparison would
-// never match and every reuse check would degrade into a full re-download.
-func unchanged(ctx context.Context, srcBucket, cacheBucket *Bucket, name, cacheKey string) bool {
-	want, err := cacheBucket.Attributes(ctx, cacheKey)
+// The recorded ETag is deliberately not the cached object's own, and the reason
+// survived the move off gocloud even though its mechanism did not. fileblob
+// derived an object's ETag from its (ModTime, Size), which has nothing to do
+// with the source's, so comparing those would never match and every reuse check
+// would degrade into a full re-download. There is now no local ETag at all —
+// [io/fs.FileInfo] has no such field — which makes the same point structurally:
+// what is compared is what the source said, written down when the object was
+// fetched. See file.SourceETagSuffix for where it is written down.
+//
+// When neither side offers an ETag the fallback is size equality. That is
+// weaker and is meant to be: it is the difference between re-downloading the
+// IERS bulletin every process start and re-downloading it when it actually
+// grows, and an endpoint whose content changes without changing size is one
+// astrogo would need a checksum for regardless.
+func unchanged(ctx context.Context, srcFS, cacheFS FS, name, cacheKey string) bool {
+	want, err := fs.Stat(cacheFS, cacheKey)
 	if err != nil {
 		return false
 	}
 
-	got, err := srcBucket.Attributes(ctx, name)
+	got, err := fs.Stat(file.WithContext(ctx, srcFS), name)
 	if err != nil {
 		return false
 	}
 
-	if recorded := want.Metadata[file.SourceETagKey]; recorded != "" && got.ETag != "" {
-		return recorded == got.ETag
+	if recorded, current := file.RecordedETag(ctx, cacheFS, cacheKey), file.ETag(got); recorded != "" && current != "" {
+		return recorded == current
 	}
 
-	return want.Size > 0 && want.Size == got.Size
+	return want.Size() > 0 && want.Size() == got.Size()
 }
 
-// fetchInto performs the transfer from srcBucket/name into
-// cacheBucket/cacheKey. It owns all policy — consent, timeout, progress,
-// resume, validation — for every backend uniformly; buckets only move
-// bytes.
-func (c *Client) fetchInto(ctx context.Context, id EndpointID, ep Endpoint, srcBucket, cacheBucket *Bucket,
+// fetchInto performs the transfer from srcFS/name into cacheFS/cacheKey. It
+// owns all policy — consent, timeout, progress, resume, validation — for every
+// backend uniformly; a filesystem only moves bytes.
+func (c *Client) fetchInto(ctx context.Context, id EndpointID, ep Endpoint, srcFS, cacheFS FS,
 	name, cacheKey string, timeout time.Duration, cfg readConfig,
 ) error {
 	// Consent is checked twice: once on the registered estimate before any
@@ -281,33 +289,73 @@ func (c *Client) fetchInto(ctx context.Context, id EndpointID, ep Endpoint, srcB
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	attrs, err := srcBucket.Attributes(ctx, name)
+	// A Downloadable endpoint's backend must be cancellable, because a
+	// multi-gigabyte fetch a caller cannot abandon is a defect rather than an
+	// inconvenience. This is the check the storage plan requires, and it fails
+	// here — before any byte moves — rather than at ctrl-C.
+	bound, err := file.RequireContext(ctx, srcFS)
 	if err != nil {
 		return fmt.Errorf("%w: %s: %w", ErrDownloadFailed, name, err)
 	}
 
-	if err := c.CheckDownload(id, name, attrs.Size); err != nil {
+	info, err := fs.Stat(bound, name)
+	if err != nil {
+		return fmt.Errorf("%w: %s: %w", ErrDownloadFailed, name, err)
+	}
+
+	sourceETag := file.ETag(info)
+
+	if err := c.CheckDownload(id, name, info.Size()); err != nil {
 		return err
 	}
 
-	offset := file.ResumePoint(ctx, cacheBucket, cacheKey, attrs.ETag)
+	offset := file.ResumePoint(ctx, cacheFS, cacheKey, sourceETag)
 
-	logging.InfoContext(ctx, "downloading", "cache_key", cacheKey, "endpoint", id, "bytes", attrs.Size)
+	logging.InfoContext(ctx, "downloading", "cache_key", cacheKey, "endpoint", id, "bytes", info.Size())
 
-	r, err := srcBucket.NewRangeReader(ctx, name, offset, -1, nil)
+	f, err := bound.Open(name)
 	if err != nil {
 		return fmt.Errorf("%w: %s: %w", ErrDownloadFailed, name, err)
 	}
 
-	defer func() { _ = r.Close() }()
+	defer func() { _ = f.Close() }()
 
-	var body io.Reader = r
+	// Resuming means starting the body where the partial stopped. Seek rather
+	// than a range parameter: every backend here returns a File, and the HTTP
+	// one turns a seek into exactly the ranged GET the old NewRangeReader call
+	// issued — so the request on the wire is unchanged and the local backend
+	// gets a plain lseek instead of a second open.
+	if offset > 0 {
+		seeker, ok := f.(io.Seeker)
+		if !ok {
+			return fmt.Errorf("%w: %s: cannot resume, source is not seekable", ErrDownloadFailed, name)
+		}
+
+		if _, err := seeker.Seek(offset, io.SeekStart); err != nil {
+			return fmt.Errorf("%w: %s: %w", ErrDownloadFailed, name, err)
+		}
+	}
+
+	var body io.Reader = f
 	if cfg.progress != nil {
-		body = &progressReader{r: r, total: offset + r.Size(), read: offset, onProgress: cfg.progress}
+		body = &progressReader{r: f, total: info.Size(), read: offset, onProgress: cfg.progress}
+	}
+
+	if err := file.StageAndPromote(ctx, cacheFS, cacheKey, body, offset, sourceETag, cfg.validate); err != nil {
+		//nolint:wrapcheck // pure delegation to remote/file, internal to this package; its errors are already prefixed
+		return err
+	}
+
+	// Only a Mutable endpoint keeps its ETag. unchanged() is the sole reader of
+	// one, and it runs only for those — so an immutable kernel, which is the
+	// multi-gigabyte case and the one a user is most likely to go looking at in
+	// their cache directory, gets the object and nothing beside it.
+	if !ep.Mutable {
+		return nil
 	}
 
 	//nolint:wrapcheck // pure delegation to remote/file, internal to this package; its errors are already prefixed
-	return file.StageAndPromote(ctx, cacheBucket, cacheKey, body, offset, attrs.ETag, cfg.validate)
+	return file.WriteETag(ctx, cacheFS, cacheKey, sourceETag)
 }
 
 // progressReader reports the running byte count after every Read that

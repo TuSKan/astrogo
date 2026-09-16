@@ -129,13 +129,13 @@ func serveSFD(t *testing.T, north, south []byte) {
 		t.Fatalf("SetURL: %v", err)
 	}
 
-	bucket, err := remote.OpenBucket(ctx, src)
+	bucket, err := remote.OpenFS(ctx, src)
 	if err != nil {
 		t.Fatalf("open source bucket: %v", err)
 	}
 
 	for name, body := range map[string][]byte{northFile: north, southFile: south} {
-		if err := bucket.WriteAll(ctx, name, body, nil); err != nil {
+		if err := remote.WriteFile(ctx, bucket, name, bytes.NewReader(body)); err != nil {
 			t.Fatalf("seed %s: %v", name, err)
 		}
 	}

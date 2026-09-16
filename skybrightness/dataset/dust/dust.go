@@ -155,7 +155,7 @@ func Fetch(ctx context.Context, into *Map, directions ...Direction) (*Map, error
 	// for good; the alternative is asking a shared facility the same question
 	// every run, which is how this package spent twenty-five minutes of IRSA's
 	// time answering a question it had already answered.
-	bucket, prefix, cacheErr := remote.CacheDir(ctx, remote.IRSADust)
+	fsys, prefix, cacheErr := remote.CacheDir(ctx, remote.IRSADust)
 
 	key := ""
 	held := map[cell]float64{}
@@ -163,7 +163,7 @@ func Fetch(ctx context.Context, into *Map, directions ...Direction) (*Map, error
 	if cacheErr == nil {
 		key = path.Join(prefix, cacheFile)
 		// A cache that cannot be read is a cold cache, not a failure.
-		held = readCache(ctx, bucket, key)
+		held = readCache(ctx, fsys, key)
 	}
 
 	var (
@@ -214,7 +214,7 @@ func Fetch(ctx context.Context, into *Map, directions ...Direction) (*Map, error
 			// through a long list should cost the remaining sightlines, not
 			// the ones already paid for.
 			if fetched && key != "" {
-				_ = writeCache(ctx, bucket, key, held)
+				_ = writeCache(ctx, fsys, key, held)
 			}
 
 			return nil, err
@@ -229,7 +229,7 @@ func Fetch(ctx context.Context, into *Map, directions ...Direction) (*Map, error
 	if fetched && key != "" {
 		// A cache that cannot be written costs the next run its time, not
 		// this one its answer.
-		_ = writeCache(ctx, bucket, key, held)
+		_ = writeCache(ctx, fsys, key, held)
 	}
 
 	return into, nil
@@ -244,10 +244,10 @@ const cacheFile = "i100.txt"
 // Any failure is a cold cache: the file may not exist yet, and a truncated or
 // malformed line costs the sightline on it rather than the whole file, since
 // the worst case is asking IRSA again for that one direction.
-func readCache(ctx context.Context, bucket *remote.Bucket, key string) map[cell]float64 {
+func readCache(_ context.Context, fsys remote.FS, key string) map[cell]float64 {
 	out := map[cell]float64{}
 
-	r, err := bucket.NewReader(ctx, key, nil)
+	r, err := fsys.Open(key)
 	if err != nil {
 		return out
 	}
@@ -283,14 +283,14 @@ func readCache(ctx context.Context, bucket *remote.Bucket, key string) map[cell]
 // The whole map each time rather than an append: the file is a few tens of
 // bytes per sightline, and rewriting it keeps one reader implementation
 // instead of one for the file and another for its tail.
-func writeCache(ctx context.Context, bucket *remote.Bucket, key string, held map[cell]float64) error {
+func writeCache(ctx context.Context, fsys remote.FS, key string, held map[cell]float64) error {
 	var buf strings.Builder
 
 	for c, v := range held {
 		fmt.Fprintf(&buf, "%d %d %.6e\n", c.l, c.b, v)
 	}
 
-	if err := remote.Save(ctx, bucket, key, strings.NewReader(buf.String())); err != nil {
+	if err := remote.WriteFile(ctx, fsys, key, strings.NewReader(buf.String())); err != nil {
 		return fmt.Errorf("dust: write cache %s: %w", key, err)
 	}
 
@@ -365,12 +365,12 @@ type Cached struct {
 // A cache that cannot be read is an empty result rather than an error — a cold
 // cache is a normal state, not a failure.
 func CachedDirections(ctx context.Context) ([]Cached, error) {
-	bucket, prefix, err := remote.CacheDir(ctx, remote.IRSADust)
+	fsys, prefix, err := remote.CacheDir(ctx, remote.IRSADust)
 	if err != nil {
 		return nil, fmt.Errorf("dust: cache: %w", err)
 	}
 
-	held := readCache(ctx, bucket, path.Join(prefix, cacheFile))
+	held := readCache(ctx, fsys, path.Join(prefix, cacheFile))
 
 	out := make([]Cached, 0, len(held))
 	for c, v := range held {

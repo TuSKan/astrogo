@@ -100,7 +100,12 @@ func (h *httpFS) Open(name string) (fs.File, error) {
 	return &httpFile{
 		fsys: h,
 		url:  objURL,
-		info: httpInfo{name: path.Base(name), size: size, modTime: lastModified(header)},
+		info: httpInfo{
+			name:    path.Base(name),
+			size:    size,
+			modTime: lastModified(header),
+			header:  header,
+		},
 	}, nil
 }
 
@@ -117,7 +122,12 @@ func (h *httpFS) Stat(name string) (fs.FileInfo, error) {
 		return nil, &fs.PathError{Op: "stat", Path: name, Err: err}
 	}
 
-	return httpInfo{name: path.Base(name), size: size, modTime: lastModified(header)}, nil
+	return httpInfo{
+		name:    path.Base(name),
+		size:    size,
+		modTime: lastModified(header),
+		header:  header,
+	}, nil
 }
 
 // context returns the bound context, or a background one.

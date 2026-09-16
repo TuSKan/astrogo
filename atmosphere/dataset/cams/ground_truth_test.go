@@ -18,6 +18,7 @@ package cams
 
 import (
 	"context"
+	"io/fs"
 	"math"
 	"testing"
 
@@ -30,56 +31,56 @@ import (
 // per the CAMS EODATA plan's own stated intent), not per-test.
 const credentialsDir = `../../../remote/credentials`
 
-// credentialsBucket opens credentialsDir as a *remote.Bucket, once per test
+// credentialsBucket opens credentialsDir as a remote.FS, once per test
 // process — real files live directly as keys within it.
-func credentialsBucket(t *testing.T) *remote.Bucket {
+func credentialsBucket(t *testing.T) remote.FS {
 	t.Helper()
 
 	url := testutil.FileURL(t, credentialsDir)
 
-	bucket, err := remote.OpenBucket(context.Background(), url)
+	fsys, err := remote.OpenFS(context.Background(), url)
 	if err != nil {
 		t.Fatalf("Open credentials bucket: %v", err)
 	}
 
-	return bucket
+	return fsys
 }
 
-func lnspFixture(t *testing.T) (*remote.Bucket, string) {
+func lnspFixture(t *testing.T) (remote.FS, string) {
 	t.Helper()
 
 	const key = "z_cams_c_ecmf_20230101000000_prod_an_ml_000_lnsp.nc"
 
-	bucket := credentialsBucket(t)
+	fsys := credentialsBucket(t)
 
-	if exists, _ := bucket.Exists(context.Background(), key); !exists {
+	if _, err := fs.Stat(fsys, key); err != nil {
 		t.Skipf("real CAMS file not present at %s/%s -- skipping ground-truth test", credentialsDir, key)
 	}
 
-	return bucket, key
+	return fsys, key
 }
 
-func aermr01Fixture(t *testing.T) (*remote.Bucket, string) {
+func aermr01Fixture(t *testing.T) (remote.FS, string) {
 	t.Helper()
 
 	const key = "z_cams_c_ecmf_20230101000000_prod_an_ml_000_aermr01.nc"
 
-	bucket := credentialsBucket(t)
+	fsys := credentialsBucket(t)
 
-	if exists, _ := bucket.Exists(context.Background(), key); !exists {
+	if _, err := fs.Stat(fsys, key); err != nil {
 		t.Skipf("real CAMS file not present at %s/%s -- skipping ground-truth test", credentialsDir, key)
 	}
 
-	return bucket, key
+	return fsys, key
 }
 
 // TestGroundTruthLnspGrid cross-checks File.Dims and the dimension-scale
 // values against ncdump -v longitude,latitude,time output for the real
 // lnsp file -- ncdump -v longitude/latitude, this file's own header.
 func TestGroundTruthLnspGrid(t *testing.T) {
-	bucket, key := lnspFixture(t)
+	fsys, key := lnspFixture(t)
 
-	f, err := Open(context.Background(), bucket, key)
+	f, err := Open(context.Background(), fsys, key)
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
@@ -111,9 +112,9 @@ func TestGroundTruthLnspGrid(t *testing.T) {
 //	  lnsp[time=0,lat=225,lon=450] = 11.5226371884346   (flat index 202950)
 //	  lnsp[time=0,lat=450,lon=899] = 11.1248897910118   (flat index 405899, the last value)
 func TestGroundTruthLnspValues(t *testing.T) {
-	bucket, key := lnspFixture(t)
+	fsys, key := lnspFixture(t)
 
-	f, err := Open(context.Background(), bucket, key)
+	f, err := Open(context.Background(), fsys, key)
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
@@ -162,9 +163,9 @@ func TestGroundTruthLnspValues(t *testing.T) {
 //	    aermr01:long_name = "Sea Salt Aerosol (0.03 - 0.5 um) Mixing Ratio" ;
 //	  level = 1..137 (137 values, confirmed via ncdump -v level)
 func TestGroundTruthAermr01Shape(t *testing.T) {
-	bucket, key := aermr01Fixture(t)
+	fsys, key := aermr01Fixture(t)
 
-	f, err := Open(context.Background(), bucket, key)
+	f, err := Open(context.Background(), fsys, key)
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
@@ -221,9 +222,9 @@ func TestGroundTruthAermr01Shape(t *testing.T) {
 // path against the actual 182 MB file, checking ReadPlane's and At's two
 // independent code paths never disagree.
 func TestGroundTruthAermrInternalConsistency(t *testing.T) {
-	bucket, key := aermr01Fixture(t)
+	fsys, key := aermr01Fixture(t)
 
-	f, err := Open(context.Background(), bucket, key)
+	f, err := Open(context.Background(), fsys, key)
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}

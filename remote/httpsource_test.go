@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -53,12 +54,12 @@ func TestGetFileFromHTTPSource(t *testing.T) {
 
 	EnableDownloads(0, NAIFLSK)
 
-	bucket, key, err := GetFile(context.Background(), NAIFLSK, "naif0012.tls")
+	fsys, key, err := GetFile(context.Background(), NAIFLSK, "naif0012.tls")
 	if err != nil {
 		t.Fatalf("GetFile: %v", err)
 	}
 
-	got, err := bucket.ReadAll(context.Background(), key)
+	got, err := fs.ReadFile(fsys, key)
 	if err != nil {
 		t.Fatalf("ReadAll: %v", err)
 	}
@@ -118,13 +119,13 @@ func TestValidateFailureLeavesNothingCached(t *testing.T) {
 		t.Fatalf("GetFile = %v, want the validator's own error", err)
 	}
 
-	bucket, prefix, err := CacheDir(context.Background(), NAIFLSK)
+	fsys, prefix, err := CacheDir(context.Background(), NAIFLSK)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	for _, key := range []string{prefix + "naif0012.tls", file.PartialKey(prefix + "naif0012.tls")} {
-		if exists, _ := bucket.Exists(context.Background(), key); exists {
+		if _, err := fs.Stat(fsys, key); err == nil {
 			t.Errorf("%s survived a failed validation", key)
 		}
 	}
@@ -145,7 +146,7 @@ func TestValidateSeesFullStagedContent(t *testing.T) {
 
 	var seen int64
 
-	bucket, key, err := GetFile(context.Background(), IERSFinals2000A, "finals2000A.all",
+	fsys, key, err := GetFile(context.Background(), IERSFinals2000A, "finals2000A.all",
 		WithCacheName("finals2000A.data"),
 		WithValidate(func(r io.Reader) error {
 			n, err := io.Copy(io.Discard, r)
@@ -169,7 +170,7 @@ func TestValidateSeesFullStagedContent(t *testing.T) {
 		t.Errorf("cache key = %q, want the WithCacheName override", key)
 	}
 
-	got, err := bucket.ReadAll(context.Background(), key)
+	got, err := fs.ReadFile(fsys, key)
 	if err != nil {
 		t.Fatalf("ReadAll: %v", err)
 	}
@@ -222,7 +223,7 @@ func TestDataDirCanBeAnyBucketURL(t *testing.T) {
 	})
 
 	// Nothing about the cache assumes local disk: pointing the data
-	// directory at a different bucket URL is the whole configuration step.
+	// directory at a different fsys URL is the whole configuration step.
 	url := testutil.FileURL(t, t.TempDir())
 	SetDataDir(url)
 
