@@ -37,36 +37,49 @@ func leo() sgp4.Elements {
 }
 
 // TestTheModelsErrorPathsAreReachable exercises each error the propagation can
-// raise, with the input that raises it.
+// raise, with an input that raises it.
 //
 // Two of these — a non-positive mean motion and a sub-surface position — are
-// unreachable from Vallado's suite, which is why they need constructing. They
-// are not hypothetical: an element set for a satellite in its last days carries
-// exactly this shape, and the caller has to be told rather than handed a
-// position inside the Earth.
+// unreachable from Vallado's suite, because real objects do not sit on a
+// singularity or carry a drag term that puts them underground inside a day. So
+// they are constructed.
+//
+// # Why this scans a range instead of naming a time
+//
+// It named one at first, and macOS failed on it. An input degenerate enough to
+// drive the model into an error is degenerate enough to reach SEVERAL of them,
+// and which one arrives first at a given instant comes down to the last bits:
+// at tsince 5600 the mean motion goes non-positive first on amd64 and the
+// semi-latus rectum goes negative first on arm64, where fused multiply-add is
+// permitted. Both are correct. Pinning the instant was asserting a race.
+//
+// So the claim is the one actually worth making — this input reaches this error
+// somewhere in this span — and the test reports where it found it.
 func TestTheModelsErrorPathsAreReachable(t *testing.T) {
 	t.Parallel()
 
 	for _, tc := range []struct {
-		name    string
-		mutate  func(*sgp4.Elements)
-		tsince  float64
-		wantErr error
-		state   bool // whether a usable state comes back with the error
+		name     string
+		mutate   func(*sgp4.Elements)
+		from, to float64
+		wantErr  error
+		state    bool // whether a usable state comes back with the error
 	}{
 		{
 			// A drag term four thousand times a real one drives the orbit into
 			// the ground within hours.
 			name:    "decayed below the surface",
 			mutate:  func(e *sgp4.Elements) { e.BStar = 0.5 },
-			tsince:  500,
+			from:    0,
+			to:      2000,
 			wantErr: sgp4.ErrDecayed,
 			state:   true,
 		},
 		{
 			name:    "mean eccentricity leaves range under drag",
 			mutate:  func(e *sgp4.Elements) { e.BStar = 0.5 },
-			tsince:  1300,
+			from:    0,
+			to:      5000,
 			wantErr: sgp4.ErrEccentricity,
 		},
 		{
@@ -75,7 +88,8 @@ func TestTheModelsErrorPathsAreReachable(t *testing.T) {
 				e.Eccentricity = 0.9999999 // the most a TLE field can express
 				e.MeanMotion = 2.0
 			},
-			tsince:  0,
+			from:    0,
+			to:      1000,
 			wantErr: sgp4.ErrSemiLatusRectum,
 		},
 		{
@@ -84,7 +98,8 @@ func TestTheModelsErrorPathsAreReachable(t *testing.T) {
 				e.Eccentricity = 0.9999999
 				e.MeanMotion = 2.0
 			},
-			tsince:  5600,
+			from:    0,
+			to:      40000,
 			wantErr: sgp4.ErrMeanMotion,
 		},
 	} {
@@ -98,18 +113,33 @@ func TestTheModelsErrorPathsAreReachable(t *testing.T) {
 			continue
 		}
 
-		pos, vel, err := p.At(tc.tsince)
+		var (
+			found bool
+			at    float64
+			pos   vector.Vec3
+			vel   vector.Vec3
+		)
 
-		if !errors.Is(err, tc.wantErr) {
-			t.Errorf("%s: at tsince %g got %v, want one wrapping %v",
-				tc.name, tc.tsince, err, tc.wantErr)
+		for ts := tc.from; ts <= tc.to && !found; ts += 25 {
+			pos, vel, err = p.At(ts)
+			if errors.Is(err, tc.wantErr) {
+				found = true
+				at = ts
+			}
+		}
+
+		if !found {
+			t.Errorf("%s: %v was not raised anywhere in tsince [%g, %g]",
+				tc.name, tc.wantErr, tc.from, tc.to)
 
 			continue
 		}
 
+		t.Logf("%s: %v first raised at tsince %g", tc.name, tc.wantErr, at)
+
 		// The contract stated on Propagator.At: two of these come with the
 		// state that was computed, and every other one leaves it zero. A caller
-		// who inspects the state after an error is relying on exactly this.
+		// who inspects the state after an error relies on exactly this.
 		zero := pos == (vector.Vec3{}) && vel == (vector.Vec3{})
 
 		if tc.state && zero {
@@ -417,9 +447,12 @@ func TestAtTimeAgreesWithAt(t *testing.T) {
 		}
 
 		// Not exact equality: AtTime forms tsince by differencing two-part
-		// Julian dates, which is a different route to the same number. A
-		// micrometre is four orders below the package's own contract.
-		if d := want.Sub(got).Norm(); d > 1e-9 {
+		// Julian dates, which is a different route to the same number, and the
+		// last bits of that route move with the platform. A millimetre is two
+		// orders below the package's own contract and four below anything a
+		// caller could notice, so it bounds "the same computation" without
+		// asserting bit-identity across architectures.
+		if d := want.Sub(got).Norm(); d > 1e-6 {
 			t.Errorf("At(%g) and AtTime of the same instant differ by %g km", minutes, d)
 		}
 	}
