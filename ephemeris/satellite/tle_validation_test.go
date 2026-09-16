@@ -84,6 +84,45 @@ func TestValidateTLERejectsASingleAlteredDigit(t *testing.T) {
 	}
 }
 
+// TestValidateTLEAcceptsTrailingWhitespace records a behaviour change, because
+// a test used to assert the opposite.
+//
+// ValidateTLE refused a line with a trailing space, and that was a side effect
+// rather than a decision: the old implementation checked len(line) == 69
+// exactly, so anything appended failed. The test listed it alongside genuine
+// corruptions, which is how a side effect becomes a documented promise.
+//
+// It is not a corruption. Feeds emit CRLF and trailing blanks constantly, and
+// Vallado's own verification file appends three propagation parameters to every
+// line 2 — refusing that made the reference suite unreadable through this door.
+// sgp4 trims and requires at least 69 columns, which catches truncation, the
+// failure that actually loses data, while accepting padding that does not.
+func TestValidateTLEAcceptsTrailingWhitespace(t *testing.T) {
+	t.Parallel()
+
+	for _, c := range []struct {
+		name         string
+		line1, line2 string
+	}{
+		{"trailing space", valladoLine1 + " ", valladoLine2},
+		{"CRLF", valladoLine1 + "\r\n", valladoLine2 + "\r\n"},
+		{"fields appended past column 69", valladoLine1, valladoLine2 + "   0.0  1440.0  120.0"},
+	} {
+		if err := satellite.ValidateTLE(c.line1, c.line2); err != nil {
+			t.Errorf("%s: %v — this is padding, not corruption", c.name, err)
+		}
+
+		if _, err := satellite.NewFromTLE("test", c.line1, c.line2); err != nil {
+			t.Errorf("%s: NewFromTLE refused it: %v", c.name, err)
+		}
+	}
+
+	// Truncation is the failure that does lose data, and is still refused.
+	if err := satellite.ValidateTLE(valladoLine1[:68], valladoLine2); err == nil {
+		t.Error("a 68-character line was accepted; short is not the same as padded")
+	}
+}
+
 // The malformations a checksum cannot see, and the ones it can.
 func TestValidateTLERejectsMalformedInput(t *testing.T) {
 	t.Parallel()
@@ -100,7 +139,6 @@ func TestValidateTLERejectsMalformedInput(t *testing.T) {
 		{"empty", "", ""},
 		{"line 1 truncated", valladoLine1[:60], valladoLine2},
 		{"line 2 truncated", valladoLine1, valladoLine2[:68]},
-		{"line 1 with trailing space", valladoLine1 + " ", valladoLine2},
 		{"the two lines swapped", valladoLine2, valladoLine1},
 		{"line 1 given twice", valladoLine1, valladoLine1},
 		{"line 2 given twice", valladoLine2, valladoLine2},

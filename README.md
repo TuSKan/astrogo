@@ -225,7 +225,7 @@ tables you can check against published references.
 ### Ephemerides
 - Sun and Moon positions
 - Planetary positions (Mercury → Neptune)
-- **SGP4 satellite propagation** — TEME→GCRS conversion, sub-satellite ground track, topocentric look angles
+- **SGP4/SDP4 satellite propagation** — written from Vallado et al. (2006) with no third-party propagator, reproducing all 33 of his reference cases to a maximum of 4.1e-06 km; TEME→GCRS conversion, sub-satellite ground track, topocentric look angles
 - **High-performance JPL SPK provider**:
     - Multi-kernel architecture (load planets and small-bodies simultaneously)
     - On-demand asteroid/comet fetching via **JPL Horizons API**
@@ -420,6 +420,7 @@ be able to break an API until 1.0 says otherwise.
 | `coord` | Coordinate frames (ICRS, AltAz, Galactic, Ecliptic, FK4/B1950, FK5/J2000, CIRS and TETE apparent places, ITRS, HCRS, Supergalactic, and `SkyOffset` centred on a target), topocentric reduction, Local Standard of Rest radial velocities |
 | `ephemeris` | Solar system ephemerides (SOFA + JPL SPK) |
 | `ephemeris/satellite` | SGP4 propagation, TEME→GCRS, look angles, ground track |
+| `ephemeris/satellite/sgp4` | The SGP4/SDP4 model itself — element sets, TLE parsing, TEME states |
 | `catalog/resolve` | Provider interface, HTTP client, Arrow cache |
 | `catalog/{simbad,mast,gaia,sbdb,openngc,norad,fink}` | Fully-implemented catalog providers |
 | `catalog/vizier` | ConeSearch against any registered VizieR table (2MASS, Hipparcos, Gaia DR3; extensible via `tables.go`) |

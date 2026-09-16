@@ -1,143 +1,47 @@
 package satellite
 
-import (
-	"fmt"
-	"math"
-
-	"github.com/TuSKan/astrogo/constants"
-)
-
-// The WGS-72 constants the propagator is configured with, read from the one
-// place that publishes them.
-//
-// The arithmetic below exists to reproduce a branch SGP4 itself takes, so a
-// constant differing in the last digit reproduces a different branch. That used
-// to read as an argument for keeping a private copy — and a private copy is
-// precisely how this file came to hold WGS-84's values while the propagator
-// beside it needed WGS-72's, which no amount of care in the arithmetic would
-// have caught.
-//
-// Reading them live is safe here because WGS 72 is a closed standard: superseded
-// in 1984, it will never gain a new realization, so nothing can move underneath
-// this. That is not true of WGS 84, whose GM in [constants] has already moved
-// past the value SGP4's own table calls "wgs84" — see [constants.WGS72]'s doc
-// comment for where that line falls.
-//
-// var, not const: a Constant's Value is a struct field, and Go will not admit
-// one to a constant expression. Same reason as kmPerAU in satellite.go.
-var (
-	earthRadiusKM = constants.WGS72.SemiMajorAxis.Value / 1e3                   // 6378.135 km
-	muKM3S2       = constants.WGS72.GeocentricGravitationalConstant.Value / 1e9 // 398600.8 km³/s²
-	j2            = constants.WGS72.DynamicalFormFactor.Value                   // 0.001082616
-)
-
-// xke is sqrt(GM) in earth radii^1.5 per minute — SGP4's time and length units.
-var xke = 60.0 / math.Sqrt(earthRadiusKM*earthRadiusKM*earthRadiusKM/muKM3S2)
-
-// simplifiedDragPerigeeKM is where SGP4 switches to its simplified drag model.
-//
-// Not a threshold chosen here. It is the backend's own branch, spelled in its
-// own units as `rp < 220.0/radiusearthkm + 1.0`, which is a perigee altitude of
-// 220 km. Everything in Vallado's verification suite that astrogo could not
-// reproduce lives below it — see [Satellite.Verified].
-const simplifiedDragPerigeeKM = 220.0
-
-// perigeeAltitudeKM returns the perigee altitude SGP4 itself computes, in km.
-//
-// # Why this is not (mu/n^2)^(1/3) * (1-e) - R
-//
-// Because that is the two-body value and SGP4 does not use it. A TLE's mean
-// motion is a Kozai mean element, and initl converts it to the Brouwer form
-// before deriving a semi-major axis — a correction worth about 1.4 km of
-// perigee for a low orbit, which is the difference between reproducing the
-// backend's branch and merely being near it. The sequence below is initl's,
-// term for term.
-//
-// Confirmed against the figures Vallado wrote into his own test file: it
-// returns 127.20 km where he says "perigee = 127.20", 135.75 where he says
-// 135.75, and a negative perigee for the case he annotates "(perigee = -51km)".
-func perigeeAltitudeKM(meanMotionRevPerDay, ecc, inclRad float64) float64 {
-	// no: mean motion in radians per minute, the unit SGP4 works in.
-	no := meanMotionRevPerDay * 2 * math.Pi / 1440
-
-	eccsq := ecc * ecc
-	omeosq := 1.0 - eccsq
-	rteosq := math.Sqrt(omeosq)
-	cosio := math.Cos(inclRad)
-	cosio2 := cosio * cosio
-
-	const twoThirds = 2.0 / 3.0
-
-	ak := math.Pow(xke/no, twoThirds)
-	d1 := 0.75 * j2 * (3.0*cosio2 - 1.0) / (rteosq * omeosq)
-	del := d1 / (ak * ak)
-	adel := ak * (1.0 - del*del - del*(1.0/3.0+134.0*del*del/81.0))
-	del = d1 / (adel * adel)
-
-	// The un-Kozai'd mean motion, and the semi-major axis that follows.
-	ao := math.Pow(xke/(no/(1.0+del)), twoThirds)
-
-	// rp is in earth radii; 1.0 is the surface.
-	return (ao*(1.0-ecc) - 1.0) * earthRadiusKM
-}
-
 // Verified reports whether this element set sits inside the regime astrogo's
 // SGP4 verification actually covers, and says why when it does not.
 //
-// # What the answer means
+// Deprecated: it now returns true for every element set that can be
+// constructed, because the regime it warned about no longer exists. See below
+// before removing a call to it; there may be nothing to replace it with.
 //
-// astrogo measures its propagation against Vallado's reference suite (AIAA
-// 2006-6753) on every run of the validation tier. Twenty-three of the thirty
-// cases it can read agree to a median of 4 cm; seven do not, by 0.2 km to
-// 3439 km. This reports which side of that a given element set is likely to
-// fall on, so a caller is not left reading a number that looks like every
-// other number.
+// # What it used to mean, and what happened to that
 //
-// False is not "this result is wrong". It is "nothing here has been shown to
-// be right", which is a different and more honest claim.
+// astrogo's propagation was measured against Vallado's reference suite (AIAA
+// 2006-6753) and seven of the thirty readable cases did not reproduce it, by
+// 0.22 km to 3438 km. Every large one sat below a perigee of 220 km, where
+// SGP4 switches to its simplified drag model, so this predicate reproduced the
+// model's own branch and warned a caller off that band. Against the thirty
+// cases it flagged ten, seven of which diverged.
 //
-// # Why perigee, and only perigee
+// The divergences were not a property of SGP4. They were one digit in the Go
+// implementation astrogo depended on — 128 where the algorithm says 120, in
+// the s⁴ atmospheric-density coefficient that feeds the secular drag term
+// (#309). With the model written from Vallado's published algorithm instead,
+// all thirty-three cases agree to a maximum of 4.1e-06 km, the low-perigee
+// band included: 28350 went from 3438.51 km to 6.3e-09 km.
 //
-// Because that is what the measurement says. Below 220 km SGP4 switches to a
-// simplified drag model — the backend's own `isimp` branch — and every large
-// divergence in the suite lives there: the five cases that miss by more than
-// 100 km have perigees of 80 to 152 km.
+// So there is no longer a regime to flag. Returning false for a low-perigee
+// orbit would now be false: those are among the best-agreeing cases in the
+// suite.
 //
-// The obvious second condition, deep space, is deliberately absent. It looked
-// right and the data refuted it: of the twenty deep-space cases in the suite
-// only four diverge, and all four ALSO have a perigee under 220 km, so they are
-// already caught. Flagging deep space would add fifteen false alarms — every
-// geostationary and Molniya case, all of which agree to centimetres — for
-// nothing, and a signal that cries wolf is one people switch off.
+// # Why it returns true rather than being deleted
 //
-// # What it costs and misses, measured
+// Because "this element set is outside what has been verified" is a question
+// worth being able to ask, and a caller asking it should get an answer rather
+// than a compile error while the replacement is decided. It is marked
+// deprecated under this repository's policy — two minor releases before
+// removal — and if a real regime is ever identified again it comes back with a
+// measurement behind it rather than as a guess.
 //
-// Against the thirty cases: it flags ten, of which seven diverge. The three it
-// flags wrongly have perigees of 182, 198 and 212 km, at the top of the band,
-// and they agree to 0.27, 0.21 and 0.21 metres. It misses nothing.
-//
-// It used to miss one — satellite 29141, a decaying object with a 279 km
-// perigee — and that turned out to say more about the propagator than about
-// this predicate: 29141 diverged by 0.62 km only because the propagator was
-// being run with WGS-84 constants against WGS-72 elements. With that corrected
-// it agrees to 0.2 m and the blind spot went with it. Worth keeping on the
-// record, because "the predicate misses slow decay" was a plausible and wrong
-// explanation that survived until the real cause was found.
-//
-// So it is conservative near the boundary. That is stated because a caller
-// deciding what to trust needs the shape of the error, not a bare boolean.
-// TestVerifiedMatchesTheMeasuredDivergence asserts every number in this comment
-// against the checked-in fixtures.
-func (s *Satellite) Verified() (bool, string) {
-	perigee := perigeeAltitudeKM(s.MeanMotion, s.ecc, s.inclRad)
-
-	if perigee >= simplifiedDragPerigeeKM {
-		return true, ""
-	}
-
-	return false, fmt.Sprintf(
-		"perigee %.0f km is below %.0f km, where SGP4 uses its simplified drag model; "+
-			"astrogo's verification could not reproduce Vallado's reference vectors in that "+
-			"regime, by as much as 3440 km",
-		perigee, simplifiedDragPerigeeKM)
-}
+// A caller who wants the model's own branch predicates, rather than a verdict
+// about astrogo, should use the propagator directly:
+// [Satellite.Propagator] exposes
+// [github.com/TuSKan/astrogo/ephemeris/satellite/sgp4.Propagator.SimplifiedDrag],
+// [github.com/TuSKan/astrogo/ephemeris/satellite/sgp4.Propagator.DeepSpace] and
+// [github.com/TuSKan/astrogo/ephemeris/satellite/sgp4.Propagator.PerigeeAltitude].
+// Those describe the orbit, which is a durable question, where this described
+// astrogo's own coverage, which was not.
+func (s *Satellite) Verified() (bool, string) { return true, "" }
