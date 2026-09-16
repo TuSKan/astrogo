@@ -3,8 +3,14 @@
 A plan for replacing `gocloud.dev/blob` with the standard library's own
 filesystem abstraction, and deleting the dependency.
 
-This document is the design. It is meant to be argued with before any of it is
+This document is the design. It was meant to be argued with before any of it was
 built.
+
+**Status.** PRs 1-4 have landed: the `io/fs` core, the `file://`, `http`,
+`https` and `mem://` backends, and the switchover that removed `gocloud.dev`
+and `gocloud-ext` from `go.mod`. The §1 table is re-measured below. PR 5 --
+`s3`, `gcs`, `azblob` and `sftp` on their own SDKs -- is outstanding, so those
+schemes are unregistered in the meantime.
 
 ---
 
@@ -20,6 +26,21 @@ actually contains:
 | `astrogo/ephemeris` | 105 | 0 | 0 | 0 |
 | **`astrogo/remote`** | **406** | **64** | **34** | **9** |
 | **`astrogo/plan`** | **433** | **64** | **34** | **9** |
+
+And after, measured the same way on the same machine once PR 4 landed:
+
+| import | total | gRPC | OpenTelemetry | gocloud |
+| :--- | ---: | ---: | ---: | ---: |
+| `astrogo/time` | 93 | 0 | 0 | 0 |
+| `astrogo/coord` | 100 | 0 | 0 | 0 |
+| `astrogo/ephemeris` | 105 | 0 | 0 | 0 |
+| **`astrogo/remote`** | **219** | **0** | **0** | **0** |
+| **`astrogo/plan`** | **246** | **0** | **0** | **0** |
+
+The scientific packages are unchanged, which is the point: they never carried
+any of it, and the tripling only ever happened at `remote`. That tripling is
+gone — 187 packages off `remote` and 187 off `plan`, including all 98 gRPC and
+OpenTelemetry ones.
 
 The scientific packages carry nothing. The moment a consumer reaches `remote` —
 and `plan` does, for EOP and JPL kernels — the graph triples.
@@ -56,9 +77,9 @@ type File interface {
 }
 ```
 
-That is the whole read model. `remote.ReaderAt`'s chunked LRU — 64 KiB × 16,
-1 MiB resident for any object — becomes a decorator over `io.ReaderAt` rather
-than a bespoke type, and keeps its benchmark.
+That is the whole read model. The exported `remote.ReaderAt` no longer exists;
+its chunked LRU — 64 KiB × 16, 1 MiB resident for any object — became a
+decorator over `io.ReaderAt` inside `remote.Open`, and kept its benchmark.
 
 ### 2.2 What `io/fs` does not have, and the three interfaces that answer it
 
@@ -200,20 +221,20 @@ Estimated, to be measured rather than claimed:
 
 ## 6. The public API changes, and that is the point
 
-This is not a swap behind a stable façade. `remote.Bucket` is a gocloud concept
-and it goes.
+This is not a swap behind a stable façade. `remote.Bucket` no longer exists: it
+was a gocloud concept and it went.
 
 | today | after |
 | :--- | :--- |
-| `remote.Bucket` | `fs.FS` (+ the three interfaces of §2.2) |
+| `remote.Bucket` (no longer exists) | `fs.FS` (+ the three interfaces of §2.2) |
 | `remote.OpenBucket(ctx, url) (*Bucket, error)` | `remote.OpenFS(ctx, url) (fs.FS, error)` |
 | `remote.NewReaderAt(ctx, bucket, key)` | `remote.Open(ctx, fsys, name) (File, error)` |
 | `remote.Save(ctx, bucket, key, r)` | `remote.WriteFile(ctx, fsys, name, r)` |
 | `remote.GetFile(ctx, id, name, …) (*Bucket, string, error)` | `(fs.FS, string, error)` |
 | `remote.IsNotFound(err)` | `errors.Is(err, fs.ErrNotExist)` |
 
-That last row is the one worth pausing on. `remote.IsNotFound` exists because
-gocloud has its own error codes; with `io/fs` the answer is
+That last row is the one worth pausing on. `remote.IsNotFound` no longer exists.
+It existed because gocloud had its own error codes; with `io/fs` the answer is
 `errors.Is(err, fs.ErrNotExist)`, which every Go programmer already knows and
 which works across `os`, `embed`, `zip` and every backend here. The function is
 deleted rather than kept as a wrapper.
@@ -228,16 +249,16 @@ different model is how the model leaks anyway.
 Each step green and independently reviewable, branched from `main` once its
 predecessor merges.
 
-| PR | contents | how it is judged |
-| :-- | :--- | :--- |
-| **1** | This document. | Is the plan right? |
+| PR | contents | how it is judged | |
+| :-- | :--- | :--- | :-- |
+| **1** | This document. | Is the plan right? | landed |
 | **2** | `remote/file`: the `File` type, the three interfaces, the scheme registry, and the `file://` backend on `os.Root`. Alongside gocloud, not replacing it. | #315's two-process reproduction fails before and passes after. `fstest.TestFS` passes against the backend. |
-| **3** | `http`/`https` and `mem://`. | Range behaviour matches today's; `BenchmarkReadAtStrategies` re-run and recorded, not assumed. |
-| **4** | Switch `remote` over, delete the gocloud path, drop `gocloud.dev` from `go.mod`, and reshape the public API per §6. | The §1 table re-measured. Every consuming package's tests unchanged except where §6 renames a call. |
-| **5** | `s3` (on `s3iofs` + the context adapter), then `gcs`, `azblob`, `sftp`. | Each exports nothing, registers by blank import, and refuses to serve a `Downloadable` endpoint unless it implements `ContextFS`. |
+| **3** | `http`/`https` and `mem://`. | Range behaviour matches today's; `BenchmarkReadAtStrategies` re-run and recorded, not assumed. | landed |
+| **4** | Switch `remote` over, delete the gocloud path, drop `gocloud.dev` from `go.mod`, and reshape the public API per §6. | The §1 table re-measured. Every consuming package's tests unchanged except where §6 renames a call. | landed |
+| **5** | `s3` (on `s3iofs` + the context adapter), then `gcs`, `azblob`, `sftp`. | Each exports nothing, registers by blank import, and refuses to serve a `Downloadable` endpoint unless it implements `ContextFS`. | pending |
 
-PR 2 carries #315 deliberately: it is the clearest evidence that this layer
-should be astrogo's, and fixing it first means the rest is measured against a
+PR 2 carried #315 deliberately: it is the clearest evidence that this layer
+should be astrogo's, and fixing it first meant the rest was measured against a
 defect already closed.
 
 ---
