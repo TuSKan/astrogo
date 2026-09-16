@@ -9,7 +9,6 @@ import (
 	"net/http/httptest"
 	"syscall"
 	"testing"
-	"time"
 
 	"github.com/TuSKan/astrogo/internal/testutil"
 )
@@ -102,7 +101,14 @@ func TestUnreachableAgainstARealSocket(t *testing.T) {
 		addr := l.Addr().String()
 		_ = l.Close()
 
-		dialer := net.Dialer{Timeout: time.Second}
+		// One second, in nanoseconds: this package sits below astrogo/time and
+		// cannot import it without closing a cycle, and the standard library's
+		// time is barred everywhere outside it — see
+		// TestNoStandardLibraryTimeOutsideTimePackage and the same reasoning on
+		// ReachableTimeout. An untyped constant converts to a Duration here.
+		const oneSecond = 1_000_000_000
+
+		dialer := net.Dialer{Timeout: oneSecond}
 
 		_, derr := dialer.DialContext(t.Context(), "tcp", addr)
 		if derr == nil {
