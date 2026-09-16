@@ -1,6 +1,6 @@
 ---
 type: Changed — BREAKING
-pr: 0
+pr: 328
 ---
 **`coord.Apparent` no longer exists — it is `coord.CIRS` now, with its
 transforms.** The name said the one thing the type is not: "apparent place" has meant the equinox-based
