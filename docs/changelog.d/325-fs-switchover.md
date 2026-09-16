@@ -1,6 +1,6 @@
 ---
 type: Changed — BREAKING
-pr: 0
+pr: 325
 ---
 **`remote` is built on `io/fs`, and `gocloud.dev` is gone.** A storage container
 is now an `fs.FS` and an open object a `remote.File` (`fs.File` + `io.ReaderAt` +

@@ -1,6 +1,6 @@
 ---
 type: Fixed
-pr: 0
+pr: 325
 ---
 **The cross-process download lock is now exact.** It was gocloud's
 `WriterOptions.IfNotExist`, which under `fileblob` was a Stat followed by a
