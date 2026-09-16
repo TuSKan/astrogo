@@ -1,6 +1,6 @@
 ---
 type: Fixed
-pr: 0
+pr: 329
 ---
 **`ICRSToFK4` no longer invents proper motion for a star declared at rest.**
 It chose its conversion route by testing every kinematic field for zero, which
