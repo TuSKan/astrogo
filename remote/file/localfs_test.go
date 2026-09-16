@@ -572,3 +572,113 @@ func TestLocalFSConfinesToItsRoot(t *testing.T) {
 		t.Error("a symlink out of the root was followed; os.Root is not confining")
 	}
 }
+
+// TestLstatAndReadLinkSeeTheLinkItself covers [fs.ReadLinkFS], which the local
+// backend implements and nothing else here does.
+//
+// The distinction is the whole point of the interface: Stat follows a symlink
+// and reports the target, Lstat reports the link. A cache that cannot tell them
+// apart cannot notice that one of its entries has been replaced by a pointer
+// somewhere else — which is the same threat os.Root confinement addresses from
+// the other side, and why both exist.
+func TestLstatAndReadLinkSeeTheLinkItself(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+
+	const (
+		target  = "kernel.bsp"
+		link    = "latest.bsp"
+		content = "de440s bytes"
+	)
+
+	if err := os.WriteFile(filepath.Join(dir, target), []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	// Not every platform lets an unprivileged process create a symlink —
+	// Windows without developer mode — so a failure to set it up is a skip
+	// rather than a pass.
+	if err := os.Symlink(filepath.Join(dir, target), filepath.Join(dir, link)); err != nil {
+		t.Skipf("cannot create a symlink here: %v", err)
+	}
+
+	fsys, err := file.OpenFS(localURL(t, dir))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rlFS, ok := fsys.(fs.ReadLinkFS)
+	if !ok {
+		t.Fatal("the local backend does not implement fs.ReadLinkFS")
+	}
+
+	got, err := rlFS.ReadLink(link)
+	if err != nil {
+		t.Fatalf("ReadLink: %v", err)
+	}
+
+	if filepath.Base(got) != target {
+		t.Errorf("ReadLink(%q) = %q, want it to point at %q", link, got, target)
+	}
+
+	// Lstat describes the link.
+	li, err := rlFS.Lstat(link)
+	if err != nil {
+		t.Fatalf("Lstat: %v", err)
+	}
+
+	if li.Mode()&fs.ModeSymlink == 0 {
+		t.Errorf("Lstat(%q).Mode() = %v, want the symlink bit set", link, li.Mode())
+	}
+
+	// Stat follows it, so it describes the target and the two disagree.
+	si, err := fs.Stat(fsys, link)
+	if err != nil {
+		t.Fatalf("Stat: %v", err)
+	}
+
+	if si.Mode()&fs.ModeSymlink != 0 {
+		t.Errorf("Stat(%q) reports a symlink; it should have followed the link", link)
+	}
+
+	if si.Size() != int64(len(content)) {
+		t.Errorf("Stat(%q).Size() = %d, want the target's %d", link, si.Size(), len(content))
+	}
+}
+
+// TestReadLinkRefusesWhatIsNotALink pins the error, because "not a link" and
+// "not there" are different answers and a caller walking a cache has to tell
+// them apart.
+func TestReadLinkRefusesWhatIsNotALink(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+
+	if err := os.WriteFile(filepath.Join(dir, "plain.txt"), []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	fsys, err := file.OpenFS(localURL(t, dir))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rlFS, ok := fsys.(fs.ReadLinkFS)
+	if !ok {
+		t.Fatal("the local backend does not implement fs.ReadLinkFS")
+	}
+
+	if _, err := rlFS.ReadLink("plain.txt"); err == nil {
+		t.Error("ReadLink on an ordinary file succeeded")
+	}
+
+	if _, err := rlFS.ReadLink("not-there.txt"); !errors.Is(err, fs.ErrNotExist) {
+		t.Errorf("ReadLink on a missing name gave %v, want fs.ErrNotExist", err)
+	}
+
+	// And an unrepresentable name is refused before it reaches the OS.
+	if _, err := rlFS.ReadLink("../escape"); !errors.Is(err, fs.ErrInvalid) {
+		t.Errorf("ReadLink(%q) gave %v, want fs.ErrInvalid", "../escape", err)
+	}
+}
