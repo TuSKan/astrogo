@@ -65,6 +65,27 @@
 // fixed rotation with no epoch, since the plane is defined by where galaxies
 // are rather than by where the Earth is pointing.
 //
+// # Galactic structure
+//
+// [GalactocentricFrame] moves the origin from the observer to the centre of
+// the Galaxy, giving the Cartesian [Galactocentric] position in parsecs that
+// Galactic structure is actually written in — a rotation curve as a function
+// of cylindrical radius, a disc profile as a spread in height.
+//
+// It is the one frame here that cannot take a direction alone. Rotating a
+// direction needs no distance; moving the origin eight kiloparsecs needs one,
+// so [GalactocentricFrame.FromICRS] takes it as an argument in parsecs rather
+// than reading [ICRS.Dist], whose unit depends on which subsystem filled it
+// in. [ParallaxDistance] is the usual way to obtain it.
+//
+// It is also the one frame with measured parameters rather than a frozen
+// convention: the Sun's distance from the centre and its height above the
+// midplane are numbers that move as they are re-measured, so they are
+// arguments to [NewGalactocentricFrame] and the values astrogo cites are in
+// [DefaultGalactocentricFrame]. The axes are not parameters — they are the
+// IAU Galactic frame's, so there is one definition of which way the Galaxy
+// points rather than two that could drift apart.
+//
 // # Moving the origin to the Sun
 //
 // [BarycentricToHeliocentric] and [HeliocentricToBarycentric] translate a
