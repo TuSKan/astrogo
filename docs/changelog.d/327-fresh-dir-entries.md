@@ -1,6 +1,6 @@
 ---
 type: Fixed
-pr: 0
+pr: 327
 ---
 **A directory listing's entry metadata now matches a stat of the same name.**
 On Windows a directory entry's cached `LastWriteTime` lags the child's own,
