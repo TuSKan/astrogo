@@ -1,6 +1,6 @@
 ---
 type: Removed
-pr: 0
+pr: 326
 ---
 **The `s3://`, `gs://`, `azblob://` and `sftp://` schemes no longer resolve.**
 They were gocloud.dev drivers and went with it; replacements were built,
