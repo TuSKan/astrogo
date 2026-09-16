@@ -257,7 +257,7 @@ func TestSetters(t *testing.T) {
 	testutil.AssertNear(t, "Astrometric RV", am.RV(), 10.0, 1e-10)
 
 	// Apparent
-	ap := coord.NewApparent(angle.Deg(10), angle.Deg(20))
+	ap := coord.NewCIRS(angle.Deg(10), angle.Deg(20))
 	ap.SetRA(angle.Deg(30))
 	ap.SetDec(angle.Deg(40))
 	testutil.AssertNear(t, "Apparent RA", ap.RA().Degrees(), 30.0, 1e-10)
@@ -275,7 +275,7 @@ func TestSetters(t *testing.T) {
 
 func TestNames(t *testing.T) {
 	testutil.AssertEqual(t, "Name", coord.NewAstrometric(angle.Deg(0), angle.Deg(0)).Name(), "Astrometric")
-	testutil.AssertEqual(t, "Name", coord.NewApparent(angle.Deg(0), angle.Deg(0)).Name(), "Apparent")
+	testutil.AssertEqual(t, "Name", coord.NewCIRS(angle.Deg(0), angle.Deg(0)).Name(), "CIRS")
 	testutil.AssertEqual(t, "Name", coord.NewICRS(angle.Deg(0), angle.Deg(0)).Name(), "ICRS")
 	testutil.AssertEqual(t, "Name", coord.NewAltAz(angle.Deg(0), angle.Deg(0)).Name(), "AltAz")
 	testutil.AssertEqual(t, "Name", coord.NewGalactic(angle.Deg(0), angle.Deg(0)).Name(), "Galactic")
@@ -287,7 +287,7 @@ func TestValidations(t *testing.T) {
 	err := coord.NewAstrometric(angle.Deg(0), angle.Deg(95)).Validate()
 	testutil.AssertError(t, err)
 
-	err = coord.NewApparent(angle.Deg(0), angle.Deg(95)).Validate()
+	err = coord.NewCIRS(angle.Deg(0), angle.Deg(95)).Validate()
 	testutil.AssertError(t, err)
 
 	err = coord.NewGalactic(angle.Deg(0), angle.Deg(95)).Validate()
@@ -316,9 +316,9 @@ func TestMoreEqual(t *testing.T) {
 		t.Error("different Astrometric should not be equal")
 	}
 
-	appA := coord.NewApparent(angle.Deg(1), angle.Deg(2))
+	appA := coord.NewCIRS(angle.Deg(1), angle.Deg(2))
 
-	appB := coord.NewApparent(angle.Deg(1), angle.Deg(2))
+	appB := coord.NewCIRS(angle.Deg(1), angle.Deg(2))
 	if !appA.Equal(appB) {
 		t.Error("identical Apparent should be equal")
 	}
@@ -340,8 +340,8 @@ func TestStrings(t *testing.T) {
 	ast := coord.NewAstrometric(angle.Deg(15), angle.Deg(30))
 	testutil.AssertEqual(t, "Astrometric string", ast.String(), "Astrometric RA=01h00m00.00s Dec=+30°00'00.00\"")
 
-	app := coord.NewApparent(angle.Deg(15), angle.Deg(30))
-	testutil.AssertEqual(t, "Apparent string", app.String(), "Apparent RA=01h00m00.00s Dec=+30°00'00.00\"")
+	app := coord.NewCIRS(angle.Deg(15), angle.Deg(30))
+	testutil.AssertEqual(t, "CIRS string", app.String(), "CIRS RA=01h00m00.00s Dec=+30°00'00.00\"")
 
 	aa := coord.NewAltAz(angle.Deg(30), angle.Deg(15))
 	testutil.AssertEqual(t, "AltAz string", aa.String(), "AltAz Alt=+30°00'00.00\" Az=+15°00'00.00\"")
@@ -421,9 +421,9 @@ func TestMoreRoundTrips(t *testing.T) {
 	ast2.FromUnitVector(v)
 	testutil.AssertNear(t, "astronomical roundtrip", ast2.RA().Degrees(), 45.0, 1e-10)
 
-	app := coord.NewApparent(angle.Deg(45), angle.Deg(45))
+	app := coord.NewCIRS(angle.Deg(45), angle.Deg(45))
 	v = app.ToUnitVector()
-	app2 := coord.NewApparent(angle.Deg(0), angle.Deg(0))
+	app2 := coord.NewCIRS(angle.Deg(0), angle.Deg(0))
 	app2.FromUnitVector(v)
 	testutil.AssertNear(t, "apparent roundtrip", app2.RA().Degrees(), 45.0, 1e-10)
 

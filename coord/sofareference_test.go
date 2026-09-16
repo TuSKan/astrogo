@@ -163,7 +163,7 @@ func TestTopocentricPathIsSOFAsAtco13(t *testing.T) {
 			"azimuth wrap astrogo adds — a few units in the last place of a radian, ~2e-11 "+
 			"arcsec. 1 microarcsecond is five orders of magnitude of headroom for cross-platform "+
 			"FMA differences and still far below any physical effect",
-		"SOFA iauAtco13; astrogo coord/context.go NewContext, AstrometricToApparent, ApparentToObserved")
+		"SOFA iauAtco13; astrogo coord/context.go NewContext, AstrometricToCIRS, CIRSToObserved")
 
 	// Two suites because they exercise two public entry points. The
 	// step-by-step path is what a caller reusing a Context per epoch takes;
@@ -186,7 +186,7 @@ func TestTopocentricPathIsSOFAsAtco13(t *testing.T) {
 				ra, dec := angle.Hour(tg.raHr), angle.Deg(tg.decD)
 				astrometric := coord.NewAstrometric(ra, dec)
 
-				got := ctx.ApparentToObserved(ctx.AstrometricToApparent(astrometric))
+				got := ctx.CIRSToObserved(ctx.AstrometricToCIRS(astrometric))
 				oneShot := ctx.AstrometricToObserved(astrometric)
 
 				aob, zob, _, _, _, _, status := gofaext.Atco13(

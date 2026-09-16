@@ -168,7 +168,7 @@ tables you can check against published references.
 | | |
 |---|---|
 | **Time** | Full `UTC↔TAI↔TT↔TDB↔UT1` graph, Fairhead & Bretagnon TDB (±3 µs), explicit IERS UT1 error propagation |
-| **Coordinates** | ICRS/Galactic/Ecliptic/AltAz/Geodetic, full Geometric→Astrometric→Apparent→Observed pipeline, `Context` caching (91 µs → 325 ns/transform) |
+| **Coordinates** | ICRS/Galactic/Ecliptic/AltAz/Geodetic, full Geometric→Astrometric→CIRS→Observed pipeline, `Context` caching (91 µs → 325 ns/transform) |
 | **Atmosphere** | SOFA-rigorous refraction by default at all altitudes, Pickering (2002) airmass down to 0°, pluggable `RefractionModel` |
 | **Ephemerides** | Sun/Moon/planets (SOFA), multi-kernel JPL SPK with on-demand Horizons fetching, SGP4 satellite propagation |
 | **Magnitude** | Planets (Mallama & Hilton 2018), asteroids (HG/HG1G2/**sHG1G2**), comets, satellites, stars — validated 100% within 0.025 mag against the FINK/ZTF production pipeline |
@@ -199,7 +199,7 @@ tables you can check against published references.
 - Geodesic
 
 ### Transformations
-- Full mapping: Geometric ↔ Astrometric ↔ Apparent ↔ Observed
+- Full mapping: Geometric ↔ Astrometric ↔ CIRS ↔ Observed
 - Frame-to-frame (Galactic, Ecliptic, ICRS, CIRS)
 - Dynamic DUT1 tracking and Polar Motion (XP/YP) caching via IERS EOP rapid data
 - One-time log warning when IERS data is unavailable (UT1 ≈ UTC fallback)

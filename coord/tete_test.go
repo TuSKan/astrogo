@@ -44,8 +44,8 @@ func TestEquationOfOriginsIsEraMinusGST(t *testing.T) {
 	ctx := teteContext(t)
 
 	// The shift the conversion actually applies, recovered from it.
-	place := coord.NewApparent(angle.Deg(100), angle.Deg(20))
-	applied := place.RA().Sub(ctx.ApparentToTETE(place).RA()).Wrap180()
+	place := coord.NewCIRS(angle.Deg(100), angle.Deg(20))
+	applied := place.RA().Sub(ctx.CIRSToTETE(place).RA()).Wrap180()
 
 	// The same quantity from its definition.
 	eop := ctx.Time().EOP()
@@ -80,13 +80,18 @@ func TestEquationOfOriginsIsEraMinusGST(t *testing.T) {
 // equation of the origins is the precession in right ascension accumulated
 // since J2000.0, so it grows without bound: a fifth of a degree by 2026, and
 // half a degree by 2040.
+//
+// The type is named CIRS rather than Apparent for exactly this reason (#298),
+// which removes the trap from every call site instead of only from the doc
+// comment a reader may not reach. The number below is what the name was
+// hiding, so it is still worth stating.
 func TestTETEDiffersFromCIRSByTwentyArcminutes(t *testing.T) {
 	t.Parallel()
 
 	ctx := teteContext(t)
 
-	place := coord.NewApparent(angle.Deg(83.8), angle.Deg(-5.4))
-	tete := ctx.ApparentToTETE(place)
+	place := coord.NewCIRS(angle.Deg(83.8), angle.Deg(-5.4))
+	tete := ctx.CIRSToTETE(place)
 
 	shift := tete.RA().Sub(place.RA()).Wrap180()
 
@@ -128,8 +133,8 @@ func TestTETERoundTripsThroughCIRS(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			src := coord.NewApparent(angle.Deg(tc.ra), angle.Deg(tc.dec))
-			back := ctx.TETEToApparent(ctx.ApparentToTETE(src))
+			src := coord.NewCIRS(angle.Deg(tc.ra), angle.Deg(tc.dec))
+			back := ctx.TETEToCIRS(ctx.CIRSToTETE(src))
 
 			// Compared as directions: a place near the wrap comes back on the
 			// other side of it and is the same place.
@@ -154,7 +159,7 @@ func TestTETEStaysInRange(t *testing.T) {
 	ctx := teteContext(t)
 
 	for _, raDeg := range []float64{0, 0.01, 0.2, 359.99, 180} {
-		got := ctx.ApparentToTETE(coord.NewApparent(angle.Deg(raDeg), 0)).RA().Degrees()
+		got := ctx.CIRSToTETE(coord.NewCIRS(angle.Deg(raDeg), 0)).RA().Degrees()
 
 		if got < 0 || got >= 360 {
 			t.Errorf("CIRS RA %g deg converted to %g deg, want [0, 360)", raDeg, got)
@@ -184,18 +189,18 @@ func TestTETEAccessorsCarryWhatTheyWereGiven(t *testing.T) {
 	testutil.AssertNear(t, "Dec (deg)", c.Dec().Degrees(), -5.4, 1e-12)
 }
 
-func BenchmarkApparentToTETE(b *testing.B) {
+func BenchmarkCIRSToTETE(b *testing.B) {
 	ctx := coord.NewContext(
 		teteEpoch,
 		coord.MustGeodetic(angle.Deg(-70.40417), angle.Deg(-24.62722), 2635),
 		atmosphere.Refraction{},
 	)
 
-	c := coord.NewApparent(angle.Deg(83.8), angle.Deg(-5.4))
+	c := coord.NewCIRS(angle.Deg(83.8), angle.Deg(-5.4))
 
 	b.ReportAllocs()
 
 	for range b.N {
-		_ = ctx.ApparentToTETE(c)
+		_ = ctx.CIRSToTETE(c)
 	}
 }

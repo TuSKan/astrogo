@@ -55,19 +55,19 @@ type Astrometric struct {
 	rv       float64     // Radial Velocity
 }
 
-// Apparent is the geocentric place of an object with aberration, light
+// CIRS is the geocentric place of an object with aberration, light
 // deflection, precession and nutation applied — referred to the true equator
 // of date, with right ascension measured from the **Celestial Intermediate
 // Origin**. It is the CIRS place, which is what
-// [Context.AstrometricToApparent] produces and what
-// [Context.ApparentToObserved] consumes.
+// [Context.AstrometricToCIRS] produces and what
+// [Context.CIRSToObserved] consumes.
 //
 // This is not the "apparent RA" an almanac prints. That one measures right
 // ascension from the true equinox, and the two origins are apart by the
 // equation of the origins — about 20 arcminutes in 2026, growing by 46
 // arcseconds a year. Declination is the same in both. See [TETE], and
-// [Context.ApparentToTETE] to convert.
-type Apparent struct {
+// [Context.CIRSToTETE] to convert.
+type CIRS struct {
 	ra  angle.Angle
 	dec angle.Angle
 }
@@ -148,9 +148,9 @@ func NewAstrometric(ra, dec angle.Angle) Astrometric {
 	return Astrometric{ra: ra, dec: dec}
 }
 
-// NewApparent creates a new Apparent coordinate.
-func NewApparent(ra, dec angle.Angle) Apparent {
-	return Apparent{ra: ra, dec: dec}
+// NewCIRS creates a new CIRS coordinate.
+func NewCIRS(ra, dec angle.Angle) CIRS {
+	return CIRS{ra: ra, dec: dec}
 }
 
 // NewObserversLocation creates a new ObserversLocation.
@@ -326,17 +326,17 @@ func (c *Astrometric) SetParallax(a angle.Angle) { c.parallax = a }
 // SetRV sets the radial velocity of the Astrometric coordinate.
 func (c *Astrometric) SetRV(v float64) { c.rv = v }
 
-// RA returns the right ascension of the Apparent coordinate.
-func (c Apparent) RA() angle.Angle { return c.ra }
+// RA returns the right ascension of the CIRS coordinate.
+func (c CIRS) RA() angle.Angle { return c.ra }
 
-// Dec returns the declination of the Apparent coordinate.
-func (c Apparent) Dec() angle.Angle { return c.dec }
+// Dec returns the declination of the CIRS coordinate.
+func (c CIRS) Dec() angle.Angle { return c.dec }
 
-// SetRA sets the right ascension of the Apparent coordinate.
-func (c *Apparent) SetRA(a angle.Angle) { c.ra = a }
+// SetRA sets the right ascension of the CIRS coordinate.
+func (c *CIRS) SetRA(a angle.Angle) { c.ra = a }
 
-// SetDec sets the declination of the Apparent coordinate.
-func (c *Apparent) SetDec(a angle.Angle) { c.dec = a }
+// SetDec sets the declination of the CIRS coordinate.
+func (c *CIRS) SetDec(a angle.Angle) { c.dec = a }
 
 // Lon returns the longitude of the ObserversLocation coordinate.
 func (c ObserversLocation) Lon() angle.Angle { return c.lon }
@@ -361,8 +361,8 @@ func (c *ObserversLocation) SetHeight(h float64) { c.height = h }
 // Name returns the name of the Astrometric coordinate.
 func (c Astrometric) Name() string { return "Astrometric" }
 
-// Name returns the name of the Apparent coordinate.
-func (c Apparent) Name() string { return "Apparent" }
+// Name returns the name of the CIRS coordinate.
+func (c CIRS) Name() string { return "CIRS" }
 
 // Name returns the name of the ICRS coordinate.
 func (c ICRS) Name() string { return "ICRS" }
@@ -385,7 +385,7 @@ func (c ObserversLocation) Name() string { return "ObserversLocation" }
 func (c Astrometric) Validate() error { return validateLat(c.dec) }
 
 // Validate checks if the coordinate is valid.
-func (c Apparent) Validate() error { return validateLat(c.dec) }
+func (c CIRS) Validate() error { return validateLat(c.dec) }
 
 // Validate checks if the coordinate is valid.
 func (c ICRS) Validate() error { return validateLat(c.dec) }
@@ -447,7 +447,7 @@ func (c Astrometric) ToUnitVector() vector.Vec3 {
 }
 
 // ToUnitVector converts the coordinate to a unit vector.
-func (c Apparent) ToUnitVector() vector.Vec3 {
+func (c CIRS) ToUnitVector() vector.Vec3 {
 	return vector.FromSpherical(c.ra.Radians(), c.dec.Radians())
 }
 
@@ -466,7 +466,7 @@ func (c *Astrometric) FromUnitVector(v vector.Vec3) {
 }
 
 // FromUnitVector converts the unit vector to the coordinate.
-func (c *Apparent) FromUnitVector(v vector.Vec3) {
+func (c *CIRS) FromUnitVector(v vector.Vec3) {
 	lon, lat := v.ToSpherical()
 	c.ra = angle.Rad(lon)
 	c.dec = angle.Rad(lat)
@@ -542,7 +542,7 @@ func (c Astrometric) Equal(other Astrometric) bool {
 }
 
 // Equal checks if the coordinate is equal to the other coordinate.
-func (c Apparent) Equal(other Apparent) bool {
+func (c CIRS) Equal(other CIRS) bool {
 	return math.Abs(c.ra.Radians()-other.ra.Radians()) < coordTol &&
 		math.Abs(c.dec.Radians()-other.dec.Radians()) < coordTol
 }
@@ -560,8 +560,8 @@ func (c Astrometric) String() string {
 	return fmt.Sprintf("Astrometric RA=%s Dec=%s", c.ra.Wrap360().HMSString(2), c.dec.DMSString(2))
 }
 
-func (c Apparent) String() string {
-	return fmt.Sprintf("Apparent RA=%s Dec=%s", c.ra.Wrap360().HMSString(2), c.dec.DMSString(2))
+func (c CIRS) String() string {
+	return fmt.Sprintf("CIRS RA=%s Dec=%s", c.ra.Wrap360().HMSString(2), c.dec.DMSString(2))
 }
 
 func (c ICRS) String() string {

@@ -79,7 +79,7 @@ func (m *mockLinearProvider) Close() error { return nil }
 //     aberration constant — which is measured below at up to 21.2 arcsec
 //     against a predicted 20.8 at perihelion.
 //   - Horizons' apparent column would carry aberration but is referred to
-//     the true equinox of date, while coord.AstrometricToApparent produces
+//     the true equinox of date, while coord.AstrometricToCIRS produces
 //     CIRS. Those differ by the equation of the origins, which is degrees.
 //
 // So neither published column is the quantity astrogo computes here.

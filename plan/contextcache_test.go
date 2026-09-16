@@ -171,8 +171,8 @@ func TestContextCacheRebuildsPastItsWindow(t *testing.T) {
 	// The Crab, as an ordinary catalogue position; any fixed direction does.
 	fixed := coord.NewAstrometric(angle.Deg(83.633), angle.Deg(22.014))
 
-	fresh := rebuilt.AstrometricToApparent(fixed)
-	drifted := stale.AstrometricToApparent(fixed)
+	fresh := rebuilt.AstrometricToCIRS(fixed)
+	drifted := stale.AstrometricToCIRS(fixed)
 
 	sep := coord.Separation(
 		coord.NewICRS(fresh.RA(), fresh.Dec()),
@@ -216,8 +216,8 @@ func TestContextCacheHandlesBackwardsSteps(t *testing.T) {
 
 	fixed := coord.NewAstrometric(angle.Deg(83.633), angle.Deg(22.014))
 
-	got := ctxAt(back).AstrometricToApparent(fixed)
-	want := coord.NewContext(back, site, defaultAtm).AstrometricToApparent(fixed)
+	got := ctxAt(back).AstrometricToCIRS(fixed)
+	want := coord.NewContext(back, site, defaultAtm).AstrometricToCIRS(fixed)
 
 	sep := coord.Separation(
 		coord.NewICRS(got.RA(), got.Dec()),

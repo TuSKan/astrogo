@@ -55,7 +55,7 @@ type Context struct {
 	// eo is the equation of the origins at this epoch, in radians:
 	// ERA minus GST, which is the precession in right ascension since
 	// J2000.0 plus the equation of the equinoxes. About -0.33 degrees in
-	// 2026 and growing by 46 arcseconds a year. See [Context.ApparentToTETE].
+	// 2026 and growing by 46 arcseconds a year. See [Context.CIRSToTETE].
 	eo float64
 }
 
@@ -78,7 +78,7 @@ func NewContext(t time.Time, site *Geodetic, atm atmosphere.Refraction) *Context
 	// between the true equinox and the CIO. It is what separates the CIRS
 	// place this Context computes from the equinox-based apparent place an
 	// almanac quotes, and discarding it used to leave that conversion
-	// unreachable. See [Context.ApparentToTETE].
+	// unreachable. See [Context.CIRSToTETE].
 	astrom, eo := gofaext.Apco13(
 		jd1, jd2, eop.DUT1,
 		site.Lon().Radians(), site.Lat().Radians(), site.Height(),
@@ -228,9 +228,9 @@ func (ctx *Context) Refraction() atmosphere.Refraction { return ctx.atm }
 // ~23″ for Mars at opposition).
 func (ctx *Context) ObsVec() vector.Vec3 { return ctx.obsVec }
 
-// AstrometricToApparent computes the Celestial Intermediate Reference System (CIRS) apparent
+// AstrometricToCIRS computes the Celestial Intermediate Reference System (CIRS) apparent
 // position of an object from its Astrometric (catalog ICRS) coordinates.
-func (ctx *Context) AstrometricToApparent(c Astrometric) Apparent {
+func (ctx *Context) AstrometricToCIRS(c Astrometric) CIRS {
 	ri, di := gofaext.Atciq(
 		c.RA().Radians(), c.Dec().Radians(),
 		// SOFA wants dRA/dt; this package stores the catalogue's on-sky
@@ -239,12 +239,12 @@ func (ctx *Context) AstrometricToApparent(c Astrometric) Apparent {
 		&ctx.astrom,
 	)
 
-	return NewApparent(angle.Rad(ri).Wrap360(), angle.Rad(di))
+	return NewCIRS(angle.Rad(ri).Wrap360(), angle.Rad(di))
 }
 
-// ApparentToObserved converts geocentric CIRS Apparent coordinates to local Observed AltAz
+// CIRSToObserved converts geocentric CIRS coordinates to local Observed AltAz
 // taking into account Earth rotation, polar motion, and atmospheric refraction.
-func (ctx *Context) ApparentToObserved(c Apparent) AltAz {
+func (ctx *Context) CIRSToObserved(c CIRS) AltAz {
 	az, zd, _, _, _ := gofaext.Atioq(
 		c.RA().Radians(), c.Dec().Radians(),
 		&ctx.astrom,

@@ -10,9 +10,9 @@ import (
 // date — the system almanacs, ephemerides and telescope control systems have
 // quoted "apparent RA and Dec" in for two centuries.
 //
-// # Why this exists next to [Apparent]
+// # Why this exists next to [CIRS]
 //
-// [Apparent] is **not** this. It is the CIRS place: the same true equator, but
+// [CIRS] is **not** this. It is the CIRS place: the same true equator, but
 // right ascension measured from the Celestial Intermediate Origin rather than
 // from the true equinox. Declination is identical in the two systems and right
 // ascension is not.
@@ -25,7 +25,7 @@ import (
 //
 // Both are correct answers to different questions. CIRS is what the IAU 2000/2006
 // resolutions put at the centre of the transformation chain, and it is what
-// [Context.ApparentToObserved] consumes. The equinox-based place is what a
+// [Context.CIRSToObserved] consumes. The equinox-based place is what a
 // printed almanac, a FITS header written by older software, and most telescope
 // control systems mean by "apparent".
 //
@@ -34,7 +34,7 @@ import (
 // Not a different equator, not a different epoch, and not a different physical
 // model: aberration, light deflection, precession and nutation have all already
 // been applied by the time either place exists. The two differ by the origin of
-// right ascension and nothing else, which is why [Context.ApparentToTETE] shifts
+// right ascension and nothing else, which is why [Context.CIRSToTETE] shifts
 // one coordinate and passes the other through untouched.
 type TETE struct {
 	ra  angle.Angle
@@ -51,7 +51,7 @@ func NewTETE(ra, dec angle.Angle) TETE {
 func (c TETE) RA() angle.Angle { return c.ra }
 
 // Dec returns the apparent declination, referred to the true equator of date.
-// It is the same value [Apparent] carries.
+// It is the same value [CIRS] carries.
 func (c TETE) Dec() angle.Angle { return c.dec }
 
 // String renders the place for logs and errors, naming the system — because
@@ -61,7 +61,7 @@ func (c TETE) String() string {
 	return fmt.Sprintf("TETE RA %s Dec %s", c.ra.HMSString(2), c.dec.DMSString(1))
 }
 
-// ApparentToTETE converts a CIRS apparent place to the equinox-based one, at
+// CIRSToTETE converts a CIRS apparent place to the equinox-based one, at
 // this Context's epoch.
 //
 // SOFA states the conversion as RA = RI − EO, the equation of the origins
@@ -79,17 +79,17 @@ func (c TETE) String() string {
 // method's documented error budget. A Context stepped far enough for
 // precession to matter has the same problem here and the same remedy — build
 // a fresh [NewContext].
-func (ctx *Context) ApparentToTETE(c Apparent) TETE {
+func (ctx *Context) CIRSToTETE(c CIRS) TETE {
 	return TETE{
 		ra:  c.RA().Sub(angle.Rad(ctx.eo)).Wrap360(),
 		dec: c.Dec(),
 	}
 }
 
-// TETEToApparent converts an equinox-based apparent place to the CIRS one.
-// The inverse of [Context.ApparentToTETE].
-func (ctx *Context) TETEToApparent(c TETE) Apparent {
-	return Apparent{
+// TETEToCIRS converts an equinox-based apparent place to the CIRS one.
+// The inverse of [Context.CIRSToTETE].
+func (ctx *Context) TETEToCIRS(c TETE) CIRS {
+	return CIRS{
 		ra:  c.RA().Add(angle.Rad(ctx.eo)).Wrap360(),
 		dec: c.Dec(),
 	}
