@@ -160,6 +160,22 @@ func FK5ToICRS(c FK5) ICRS {
 // whether they happen to be zero — see ICRS.hasKinematics and #278. Both return
 // the spin motion here; the difference is that the six-element route also
 // carries parallax and radial velocity through.
+//
+// # jepoch applies to the first route only
+//
+// SOFA's Hfk5z takes a date, because the FK5 and ICRS axes are not merely
+// rotated but spinning with respect to each other, so a star with no recorded
+// motion acquires a proper motion that depends on when it is asked about.
+//
+// Its six-element counterpart H2fk5 takes no date. With a real proper motion in
+// hand the spin is folded into the velocity instead, and the state is stated at
+// J2000.0. So the six-element route answers at J2000.0 whatever jepoch says,
+// and [FK5.Epoch] reports [J2000Epoch] rather than echoing the argument.
+//
+// This is the same limitation [ICRSToFK4] has at B1950.0, for the same reason,
+// and #330 recorded it only for FK4 — it is here too. Use [PropagateEpoch] to
+// move a star to another epoch, which is a different operation from a frame
+// conversion and is kept separate on purpose.
 func ICRSToFK5(c ICRS, jepoch float64) FK5 {
 	if !c.hasKinematics {
 		jd1, jd2 := ttAtJulianEpoch(jepoch)
@@ -183,7 +199,10 @@ func ICRSToFK5(c ICRS, jepoch float64) FK5 {
 		ra: angle.Rad(r5).Wrap360(), dec: angle.Rad(d5),
 		pmRA: pmRACosDec(dr5, angle.Rad(d5)), pmDec: angle.Rad(dd5),
 		parallax: angle.Arcsec(px5), rv: rv5,
-		jepoch:          jepoch,
+		// J2000Epoch rather than jepoch: H2fk5 answers at the catalogue equinox
+		// and takes no date, so echoing the caller's would label these numbers
+		// with an epoch they are not at. See this function's doc comment.
+		jepoch:          J2000Epoch,
 		hasProperMotion: true,
 	}
 }
