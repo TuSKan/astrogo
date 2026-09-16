@@ -196,6 +196,88 @@ func TestParseTLERejectsMalformedInput(t *testing.T) {
 	}
 }
 
+// TestEveryFieldReportsItselfByName covers the parser's error branches one
+// field at a time.
+//
+// These are the messages somebody debugging a feed at two in the morning reads,
+// and "malformed TLE" alone does not tell them which of twenty columns to look
+// at. The assertion is therefore on the text as well as the sentinel: each
+// failure has to name its own field.
+func TestEveryFieldReportsItselfByName(t *testing.T) {
+	t.Parallel()
+
+	replaceAt := func(line string, at int, with string) string {
+		return line[:at] + with + line[at+len(with):]
+	}
+
+	for _, tc := range []struct {
+		name   string
+		line1  string
+		line2  string
+		expect string
+	}{
+		{"satellite number on line 2", issLine1, replaceAt(issLine2, 2, "XXXXX"), "satellite number on line 2"},
+		{"first derivative", replaceAt(issLine1, 33, "nonsense10"), issLine2, "first derivative"},
+		{"element set number", replaceAt(issLine1, 64, "XXXX"), issLine2, "element set number"},
+		{"revolution number", issLine1, replaceAt(issLine2, 63, "XXXXX"), "revolution number"},
+		{"right ascension", issLine1, replaceAt(issLine2, 17, "XXX.XXXX"), "right ascension"},
+		{"argument of perigee", issLine1, replaceAt(issLine2, 34, "XXX.XXXX"), "argument of perigee"},
+		{"mean anomaly", issLine1, replaceAt(issLine2, 43, "XXX.XXXX"), "mean anomaly"},
+		{"eccentricity", issLine1, replaceAt(issLine2, 26, "XXXXXXX"), "eccentricity"},
+		{"B* drag term", replaceAt(issLine1, 53, "!1234-4"), issLine2, "B* drag term"},
+		{"second derivative", replaceAt(issLine1, 44, "!1234-4"), issLine2, "second derivative"},
+		{
+			// The assumed-exponent fields reassemble their pieces, so a digit
+			// that is not a digit fails at ParseFloat rather than at the sign.
+			name:   "B* mantissa that is not a number",
+			line1:  replaceAt(issLine1, 54, "XXXXX"),
+			line2:  issLine2,
+			expect: "B* drag term",
+		},
+	} {
+		_, err := sgp4.ParseTLE(tc.line1, tc.line2)
+		if err == nil {
+			t.Errorf("%s: parsed without error", tc.name)
+
+			continue
+		}
+
+		if !errors.Is(err, sgp4.ErrMalformedTLE) {
+			t.Errorf("%s: %v does not wrap ErrMalformedTLE", tc.name, err)
+		}
+
+		if !strings.Contains(err.Error(), tc.expect) {
+			t.Errorf("%s: error is %q, which does not name the field (%q)", tc.name, err, tc.expect)
+		}
+	}
+}
+
+// TestVerifyTLEChecksumsRefusesANonDigit covers the one branch that is about
+// the check digit's own shape rather than its value: column 69 holding
+// something that is not a digit at all.
+func TestVerifyTLEChecksumsRefusesANonDigit(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		name         string
+		line1, line2 string
+	}{
+		{"line 1", issLine1[:68] + "X", issLine2},
+		{"line 2", issLine1, issLine2[:68] + "X"},
+	} {
+		err := sgp4.VerifyTLEChecksums(tc.line1, tc.line2)
+		if !errors.Is(err, sgp4.ErrChecksum) {
+			t.Errorf("%s: %v, want one wrapping ErrChecksum", tc.name, err)
+		}
+	}
+
+	// And a structurally broken line is reported as malformed rather than as a
+	// checksum failure: there is no check digit to compare yet.
+	if err := sgp4.VerifyTLEChecksums("too short", issLine2); !errors.Is(err, sgp4.ErrMalformedTLE) {
+		t.Errorf("a short line reported %v, want one wrapping ErrMalformedTLE", err)
+	}
+}
+
 // TestTheEccentricityFieldCannotExpressAnEscapeOrbit records a property of the
 // format that a test tried to assert the opposite of.
 //
