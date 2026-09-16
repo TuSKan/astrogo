@@ -96,7 +96,8 @@ func (k LSRKind) String() string {
 // U toward the Galactic centre, V toward Galactic rotation, W toward the north
 // Galactic pole.
 //
-// Both are the published values, entered as their authors give them:
+// Both dynamical conventions are the published values, entered as their
+// authors give them:
 //
 //   - Schönrich, Binney & Dehnen (2010), MNRAS 403, 1829, table 3, whose
 //     (11.1, 12.24, 7.25) is the modern determination from SDSS/Geneva-
@@ -109,8 +110,6 @@ func (k LSRKind) String() string {
 // The second element of each is the one to look at: V is the asymmetric drift,
 // and it is the component that a new survey moves. That is why the convention
 // is named at the call site rather than folded into a single constant.
-// solarMotion returns the Sun's velocity with respect to the given LSR, as
-// the Galactic Cartesian components its authors published.
 //
 // [LSRKinematic] is not here and must not reach this: it is published as an
 // apex rather than as components, and there is no (u, v, w) triple of
