@@ -141,11 +141,11 @@ func localName(dir, name string) (string, error) {
 
 // Open implements [fs.FS].
 //
-// # Reads do not go through os.Root, and that is measured rather than assumed
+// # Every path goes through os.Root, including this one
 //
-// Writes below do. Reads deliberately take the same route os.DirFS takes —
-// validate the name, join it, open it — because an os.Root-backed filesystem
-// does not pass fstest.TestFS on Windows and os.DirFS does.
+// An earlier version of this did not. Reads took the same route os.DirFS takes
+// — validate the name, join it, open it — because an os.Root-backed filesystem
+// appeared not to pass fstest.TestFS on Windows while os.DirFS did.
 //
 // Measured, twenty freshly created identical trees, three filesystems over each:
 //
@@ -160,26 +160,37 @@ func localName(dir, name string) (string, error) {
 // fstest.TestFS performs; the cause is somewhere in how Windows serves
 // directory metadata through a relative-open handle, and it is not astrogo's
 // logic — the middle row differs from the first only in when the handle is
-// opened, and both fail identically.
+// opened, and both fail identically. That is #323 and it is still open.
 //
-// Conformance wins here because it is the whole reason for building on io/fs: a
-// filesystem that behaves like every other one in Go is what makes fs.WalkDir,
-// fs.Glob and everybody else's tooling work against it. What is given up is
-// kernel-level confinement on the read path, and the threat it defends against
-// — a symlink planted inside astrogo's own cache directory, pointing out — is
-// one an attacker could only plant by already having write access to that
-// directory, where they could simply alter the cached file instead.
+// What was wrong was the conclusion, not the measurement. Giving up confinement
+// on the read path bought nothing, because the Windows complaint is about
+// *directory metadata* and is already filtered narrowly and platform-gated in
+// TestLocalFSSatisfiesTestFS — the filter compares the two FileInfos with their
+// timestamps removed and passes the complaint through unless they are otherwise
+// identical. With os.Root restored, that filter absorbs 22 complaints across 20
+// runs on Windows and the conformance suite is otherwise clean, on every
+// platform.
 //
-// The write path keeps os.Root, where the same reasoning runs the other way:
-// writing outside the cache is a materially worse outcome than reading a file
-// the attacker already controls, and no conformance test covers Create.
+// And the cost was real rather than theoretical: TestLocalFSConfinesToItsRoot
+// skips on Windows, because creating a symlink needs a privilege CI does not
+// have there, so the regression only showed up on Linux — where a symlink
+// planted in the cache directory and pointing out of it was followed.
+//
+// So: confinement everywhere, and one documented filter for a Windows
+// directory-metadata artifact that is not astrogo's to fix.
 func (l *localFS) Open(name string) (fs.File, error) {
-	full, err := localName(l.dir, name)
+	if _, err := localName(l.dir, name); err != nil {
+		return nil, &fs.PathError{Op: "open", Path: name, Err: err}
+	}
+
+	root, err := l.root()
 	if err != nil {
 		return nil, &fs.PathError{Op: "open", Path: name, Err: err}
 	}
 
-	f, err := os.Open(full)
+	defer func() { _ = root.Close() }()
+
+	f, err := root.Open(name)
 	if err != nil {
 		return nil, err //nolint:wrapcheck // already a *fs.PathError with the right Op and Path
 	}
