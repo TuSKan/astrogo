@@ -11,6 +11,7 @@ import (
 	"github.com/TuSKan/astrogo/ephemeris/jpl"
 	"github.com/TuSKan/astrogo/ephemeris/jpl/lsk"
 	"github.com/TuSKan/astrogo/ephemeris/jpl/spk"
+	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/time"
 )
 
@@ -221,13 +222,29 @@ func TestSmallBodyEros(t *testing.T) {
 		jpl.WithTimeInterval(start, end),
 	)
 	if err != nil {
-		// Two live-confirmed ways for Horizons to answer 200 and still be
-		// unable to serve this kernel, both of which recovered on their own —
-		// see spk.TransientHorizonsFault. This test is untagged and hits the
-		// live network, so it must not turn JPL's downtime into a red build.
-		// Anything else is a real refusal and stays fatal.
+		// This test is untagged and hits the live network, so it must not turn
+		// somebody else's downtime into a red build. Two conditions qualify,
+		// and for a while only the first was covered.
+		//
+		// Horizons answering 200 and still being unable to serve the kernel —
+		// two live-confirmed ways, both of which recovered on their own; see
+		// spk.TransientHorizonsFault.
+		//
+		// And the endpoint not being reachable at all. That is the one this
+		// missed: the planetary base kernel comes from NAIF's static file
+		// server rather than Horizons, and a CI run timed out dialling it after
+		// thirty seconds — "dial tcp 137.79.133.14:443: i/o timeout" — which
+		// the Horizons predicate has no reason to recognise. The build went red
+		// for an outage in Pasadena.
+		//
+		// Anything else is a real refusal from a service that answered, and
+		// stays fatal.
 		if spk.TransientHorizonsFault(err) {
 			t.Skipf("Horizons could not serve an SPK for Eros: %v (external, not astrogo)", err)
+		}
+
+		if testutil.Unreachable(err) {
+			t.Skipf("JPL is unreachable: %v (external, not astrogo)", err)
 		}
 
 		t.Fatalf("Failed to create smallbody provider: %v", err)
@@ -285,9 +302,13 @@ func TestSmallBodyMultiMatch(t *testing.T) {
 		jpl.WithTimeInterval(start, end),
 	)
 	if err != nil {
-		// See TestSmallBodyEros's identical skip.
+		// See TestSmallBodyEros's identical skips.
 		if spk.TransientHorizonsFault(err) {
 			t.Skipf("Horizons could not serve an SPK for Apophis: %v (external, not astrogo)", err)
+		}
+
+		if testutil.Unreachable(err) {
+			t.Skipf("JPL is unreachable: %v (external, not astrogo)", err)
 		}
 
 		// If it's ambiguous, spk.CacheAPI should have handled it or returned error
