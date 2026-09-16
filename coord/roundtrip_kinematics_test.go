@@ -115,15 +115,17 @@ var motionGrid = []struct {
 	},
 }
 
-// A parallax of zero is deliberately absent from this grid.
+// A parallax of zero is deliberately absent from this grid, and is covered on
+// its own instead.
 //
-// The six-element conversions go through a space-motion pv-vector, which needs
-// a finite distance, and SOFA clamps any parallax below 1e-7 arcsec. Neither
-// proper motion nor radial velocity survives a round trip below that clamp —
-// and it is not only the motion that is affected: a star declared *at rest*
-// with no parallax comes back with several mas/yr it never had. That is a
-// limitation of the representation rather than a property to assert here, so it
-// is pinned by TestSixElementConversionsNeedAParallax.
+// SOFA's six-element conversions go through a space-motion pv-vector, which
+// needs a finite distance, so a parallax too small to invert used to destroy
+// the proper motion and to invent one for a star declared at rest. gofaext now
+// takes a distance-free path in that regime, and the two cases are asserted by
+// TestProperMotionSurvivesWithoutAParallax and
+// TestAtRestWithoutParallaxStaysAtRest — separately from this grid, because
+// what they check is which path was taken rather than how well a round trip
+// closes.
 
 // kinematicGrid is the cross product, built once.
 func kinematicGrid() []kinematicStar {
@@ -373,24 +375,25 @@ func TestFK4FK5RoundTripsAllSixElements(t *testing.T) {
 	}
 }
 
-// TestSixElementConversionsNeedAParallax pins a limitation rather than a
-// contract, because it is a trap and silence about it is worse than the trap.
+// TestProperMotionSurvivesWithoutAParallax is the contract that replaced the
+// limitation #331 recorded.
 //
 // SOFA's six-element conversions go through a space-motion pv-vector, which
-// needs a distance. Starpv clamps any parallax below PXMIN = 1e-7 arcsec to
-// that value — about 10 Mpc — and then caps the resulting speed at VMAX = 0.5c.
-// A star with a real proper motion and no recorded parallax exceeds that cap by
-// orders of magnitude: 150 mas/yr at 10 Mpc is some 24c. The velocity is
-// clamped, and the proper motion does not survive.
+// needs a distance. iauStarpv clamps any parallax below PXMIN = 1e-7 arcsec to
+// that value — about 10 Mpc — and then, if the resulting speed exceeds
+// VMAX = 0.5c, sets the space velocity to zero. A star with a real proper
+// motion and no recorded parallax exceeds that cap by orders of magnitude:
+// 150 mas/yr at 10 Mpc is some 24c. So the motion was zeroed, and because
+// iauH2fk5 is void and discards iauStarpv's status, nothing said so.
 //
-// SOFA reports this: Starpv returns a status. iauH2fk5 is void and discards it,
-// so nothing downstream can see it either, which is why the loss is silent.
+// gofaext now takes a distance-free path in exactly that case, and the motion
+// is carried through unchanged at every parallax including none at all. The
+// row at parallax 0 is the one this test exists for; before the fix it read
+// (0.0, 0.0).
 //
 // This matters because catalogues of exactly this shape exist — proper motion
-// measured, parallax not — and a caller converting one frame to another would
-// find the motion gone with nothing said. Measured here so the threshold is
-// known: see #331.
-func TestSixElementConversionsNeedAParallax(t *testing.T) {
+// measured, parallax not — and they describe most of the pre-Hipparcos ones.
+func TestProperMotionSurvivesWithoutAParallax(t *testing.T) {
 	t.Parallel()
 
 	const (
@@ -398,70 +401,49 @@ func TestSixElementConversionsNeedAParallax(t *testing.T) {
 		pmDecIn = 220.0
 	)
 
-	for _, tc := range []struct {
-		parallax  float64 // arcsec
-		preserved bool
-	}{
-		{0, false},
-		{1e-9, false},
-		{1e-7, false}, // exactly PXMIN, still far too distant for this motion
-		{1e-6, false},
-		{1e-4, true},
-		{1e-2, true},
-	} {
+	// Every parallax, from none at all to a nearby star, must now preserve the
+	// motion. The small ones cross gofaext's distance-free path and the large
+	// ones stay on SOFA's; the contract is that a caller cannot tell.
+	for _, parallax := range []float64{0, 1e-9, 1e-7, 1e-6, 1e-4, 1e-2} {
 		start := coord.NewICRSWithKinematics(
 			angle.Deg(123.4), angle.Deg(0),
 			angle.Arcsec(pmRAIn/1000), angle.Arcsec(pmDecIn/1000),
-			angle.Arcsec(tc.parallax), 0)
+			angle.Arcsec(parallax), 0)
 
 		back := coord.FK5ToICRS(coord.ICRSToFK5(start, coord.J2000Epoch))
 
 		gotRA := back.PmRA().Arcseconds() * 1000
 		gotDec := back.PmDec().Arcseconds() * 1000
 
-		survived := math.Abs(gotRA-pmRAIn) < 1 && math.Abs(gotDec-pmDecIn) < 1
-
-		t.Logf("parallax %-8g -> proper motion (%7.1f, %7.1f) mas/yr, survived=%v",
-			tc.parallax, gotRA, gotDec, survived)
-
-		if survived != tc.preserved {
-			t.Errorf("parallax %g: proper motion survived=%v, want %v — the threshold "+
-				"this test pins has moved, which means SOFA's clamp changed or a guard "+
-				"was added; update the documentation with it",
-				tc.parallax, survived, tc.preserved)
+		// A hundredth of a mas/yr. The round trip's own residual is orders
+		// below this; the failure it guards against was the whole motion.
+		if math.Abs(gotRA-pmRAIn) > 1e-2 || math.Abs(gotDec-pmDecIn) > 1e-2 {
+			t.Errorf("parallax %g: proper motion came back (%.4f, %.4f) mas/yr, want (%.1f, %.1f)",
+				parallax, gotRA, gotDec, pmRAIn, pmDecIn)
 		}
 	}
 }
 
-// TestAtRestWithoutParallaxGainsMotion is the other half of the same
-// limitation, and the more surprising one.
+// TestAtRestWithoutParallaxStaysAtRest is the other half of #331, and was the
+// more surprising one: a star declared at rest in FK4 with no parallax did not
+// merely come back *without* its motion, it came back with 2.4 mas/yr in each
+// component that it never had, and 0.34 km/s of radial velocity.
 //
-// A star declared at rest in FK4 with no parallax is not merely *left* without
-// motion by the six-element round trip — it comes back with several
-// milliarcseconds a year it never had. The clamp that makes the pv-vector
-// representable puts the star at 10 Mpc, where FK4's fictitious proper motion
-// no longer inverts, so the motion removed on the way out is not the motion
-// restored on the way back.
+// The mechanism was the same clamp. At the overridden distance of 10 Mpc,
+// FK4's fictitious proper motion no longer inverts, so what was removed on the
+// way out was not what was restored on the way back — an error that looks like
+// a measurement.
 //
-// A caller reading an old proper-motion catalogue — measured motion, no
-// parallax, which describes a great many of them — is exactly who hits this.
-// See #331.
-func TestAtRestWithoutParallaxGainsMotion(t *testing.T) {
+// Now it stays at rest at every parallax. The zero row is the one that used to
+// read (-2.387, -2.517).
+func TestAtRestWithoutParallaxStaysAtRest(t *testing.T) {
 	t.Parallel()
 
-	for _, tc := range []struct {
-		parallax float64 // arcsec
-		clean    bool
-	}{
-		{0, false},
-		{1e-7, false},
-		{1e-3, true},
-		{2e-2, true},
-	} {
+	for _, parallax := range []float64{0, 1e-7, 1e-4, 1e-3, 2e-2} {
 		start := coord.NewFK4WithProperMotion(
 			angle.Deg(123.4), angle.Deg(0),
 			angle.Zero(), angle.Zero(),
-			angle.Arcsec(tc.parallax), 0)
+			angle.Arcsec(parallax), 0)
 
 		back := coord.ICRSToFK4(coord.FK4ToICRS(start), coord.B1950)
 
@@ -469,17 +451,33 @@ func TestAtRestWithoutParallaxGainsMotion(t *testing.T) {
 		gotRA := pmRA.Arcseconds() * 1000
 		gotDec := pmDec.Arcseconds() * 1000
 
-		// A hundredth of a mas/yr: far above the round trip's own residual for
-		// a representable parallax, far below the whole mas/yr the clamp
-		// produces.
-		clean := math.Abs(gotRA) < 1e-2 && math.Abs(gotDec) < 1e-2
+		// A hundredth of a mas/yr: far above the round trip's own residual,
+		// far below the 2.4 mas/yr the clamp used to invent.
+		if math.Abs(gotRA) > 1e-2 || math.Abs(gotDec) > 1e-2 {
+			t.Errorf("parallax %g: a star at rest came back at (%+.4f, %+.4f) mas/yr, want (0, 0)",
+				parallax, gotRA, gotDec)
+		}
 
-		t.Logf("parallax %-8g -> a star at rest comes back at (%+7.3f, %+7.3f) mas/yr, clean=%v",
-			tc.parallax, gotRA, gotDec, clean)
+		// Radial velocity closes too, but only down to a parallax a real
+		// catalogue could contain — and the exception is a different defect,
+		// not a remnant of this one.
+		//
+		// Below about 1e-5 arcsec the residual is iauFk524's own: it recovers
+		// a radial velocity as rd/(px·VF), so the frame artifact FK4 gives a
+		// star at rest is divided by the parallax and grows without bound.
+		// Measured on this case, it is exactly proportional to 1/px —
+		// 3.9e-5 km/s at 1e-3, 3.9e-4 at 1e-4, 0.39 at 1e-7, 39 at 1e-9 —
+		// which is a property of the FK4 routines rather than of the pv path
+		// #331 was about, and is why the proper motion above is clean at every
+		// row while this is not. Tracked separately.
+		//
+		// 1e-5 arcsec is 100 kpc. Nothing with an FK4 position is out there.
+		if parallax != 0 && parallax < 1e-4 {
+			continue
+		}
 
-		if clean != tc.clean {
-			t.Errorf("parallax %g: round trip clean=%v, want %v — the threshold this test "+
-				"pins has moved", tc.parallax, clean, tc.clean)
+		if rv := back.RV(); math.Abs(rv) > 1e-3 {
+			t.Errorf("parallax %g: a star at rest came back at %+.6f km/s, want 0", parallax, rv)
 		}
 	}
 }
