@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -21,10 +22,10 @@ import (
 // These take a URL and nothing else, so they can be asked what they do.
 
 // seedDir writes a small tree and returns its file:// URL.
-func seedDir(t *testing.T, files map[string]string) (dir, fsURL string) {
+func seedDir(t *testing.T, files map[string]string) string {
 	t.Helper()
 
-	dir = t.TempDir()
+	dir := t.TempDir()
 
 	for name, body := range files {
 		full := filepath.Join(dir, filepath.FromSlash(name))
@@ -38,7 +39,7 @@ func seedDir(t *testing.T, files map[string]string) (dir, fsURL string) {
 		}
 	}
 
-	return dir, testutil.FileURL(t, dir)
+	return testutil.FileURL(t, dir)
 }
 
 // TestSchemesListsWhatIsRegistered covers the answer to the question an
@@ -57,7 +58,7 @@ func TestSchemesListsWhatIsRegistered(t *testing.T) {
 	}
 
 	for _, want := range []string{"file"} {
-		if !slicesContains(got, want) {
+		if !slices.Contains(got, want) {
 			t.Errorf("Schemes() = %v, missing %q", got, want)
 		}
 	}
@@ -70,16 +71,6 @@ func TestSchemesListsWhatIsRegistered(t *testing.T) {
 			break
 		}
 	}
-}
-
-func slicesContains(haystack []string, needle string) bool {
-	for _, s := range haystack {
-		if s == needle {
-			return true
-		}
-	}
-
-	return false
 }
 
 // TestUnregisteredSchemeSaysWhichAreRegistered pins the error's content, not
@@ -140,7 +131,7 @@ func TestOpenFSDoesNotLeakCredentials(t *testing.T) {
 func TestPrefixScopesTheFilesystem(t *testing.T) {
 	t.Parallel()
 
-	_, fsURL := seedDir(t, map[string]string{
+	fsURL := seedDir(t, map[string]string{
 		"pub/naif/de440s.bsp": "kernel bytes",
 		"decoy.txt":           "not this one",
 	})
@@ -185,7 +176,7 @@ func TestPrefixScopesTheFilesystem(t *testing.T) {
 func TestKeyServesOneObjectUnderAnyName(t *testing.T) {
 	t.Parallel()
 
-	_, fsURL := seedDir(t, map[string]string{
+	fsURL := seedDir(t, map[string]string{
 		"eop/finals2000A.all": "MJD DUT1 ...",
 	})
 
@@ -215,7 +206,7 @@ func TestKeyServesOneObjectUnderAnyName(t *testing.T) {
 func TestOpenFSCachesOneFilesystemPerURL(t *testing.T) {
 	t.Parallel()
 
-	_, fsURL := seedDir(t, map[string]string{"a/b.txt": "x"})
+	fsURL := seedDir(t, map[string]string{"a/b.txt": "x"})
 
 	// A trailing parameter rather than a leading one: testutil.FileURL already
 	// sets create_dir, so "?prefix=" here would make the second "?" part of the
@@ -288,7 +279,7 @@ func (c cancellable) Open(name string) (fs.File, error) {
 func TestWithContextBindsWhatItCanAndLeavesTheRest(t *testing.T) {
 	t.Parallel()
 
-	_, fsURL := seedDir(t, map[string]string{"k.bsp": "bytes"})
+	fsURL := seedDir(t, map[string]string{"k.bsp": "bytes"})
 
 	fsys, err := file.OpenFS(fsURL)
 	if err != nil {
