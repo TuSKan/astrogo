@@ -10,8 +10,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
-
-	"github.com/TuSKan/astrogo/time"
+	"time"
 )
 
 // payload is deterministic and longer than several chunks at the sizes the
@@ -157,7 +156,7 @@ func TestReaderAtOverHTTPBucket(t *testing.T) {
 	data := payload(1000)
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		http.ServeContent(w, r, "obj", time.GoTime{}, bytes.NewReader(data))
+		http.ServeContent(w, r, "obj", time.Time{}, bytes.NewReader(data))
 	}))
 	defer srv.Close()
 

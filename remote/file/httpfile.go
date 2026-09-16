@@ -7,8 +7,7 @@ import (
 	"io/fs"
 	"net/http"
 	"sync"
-
-	"github.com/TuSKan/astrogo/time"
+	"time"
 )
 
 // httpFile is one object, read by range requests.
@@ -191,12 +190,12 @@ func (f *httpFile) closeBody() error {
 type httpInfo struct {
 	name    string
 	size    int64
-	modTime time.GoTime
+	modTime time.Time
 }
 
-func (i httpInfo) Name() string         { return i.name }
-func (i httpInfo) Size() int64          { return i.size }
-func (i httpInfo) Mode() fs.FileMode    { return 0o444 }
-func (i httpInfo) ModTime() time.GoTime { return i.modTime }
-func (i httpInfo) IsDir() bool          { return false }
-func (i httpInfo) Sys() any             { return nil }
+func (i httpInfo) Name() string       { return i.name }
+func (i httpInfo) Size() int64        { return i.size }
+func (i httpInfo) Mode() fs.FileMode  { return 0o444 }
+func (i httpInfo) ModTime() time.Time { return i.modTime }
+func (i httpInfo) IsDir() bool        { return false }
+func (i httpInfo) Sys() any           { return nil }

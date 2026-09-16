@@ -7,11 +7,10 @@ import (
 	"fmt"
 	"io"
 	"sync"
+	"time"
 
 	"gocloud.dev/blob"
 	"gocloud.dev/gcerrors"
-
-	"github.com/TuSKan/astrogo/time"
 )
 
 // SourceETagKey is the blob metadata entry recording the source ETag a

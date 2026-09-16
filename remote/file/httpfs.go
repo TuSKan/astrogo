@@ -11,8 +11,7 @@ import (
 	"path"
 	"strconv"
 	"strings"
-
-	"github.com/TuSKan/astrogo/time"
+	"time"
 )
 
 // Registered from init — see the note on localFS's registration.
@@ -310,14 +309,14 @@ func contentRangeTotal(v string) (int64, bool) {
 // lastModified parses the header, returning the zero time when absent or
 // unparseable — which fs.FileInfo permits and which is honest about a server
 // that did not say.
-func lastModified(header http.Header) time.GoTime {
+func lastModified(header http.Header) time.Time {
 	if header == nil {
-		return time.GoTime{}
+		return time.Time{}
 	}
 
 	t, err := http.ParseTime(header.Get("Last-Modified"))
 	if err != nil {
-		return time.GoTime{}
+		return time.Time{}
 	}
 
 	return t
