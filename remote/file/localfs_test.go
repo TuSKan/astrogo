@@ -682,3 +682,141 @@ func TestReadLinkRefusesWhatIsNotALink(t *testing.T) {
 		t.Errorf("ReadLink(%q) gave %v, want fs.ErrInvalid", "../escape", err)
 	}
 }
+
+// TestAbortThrowsTheWriteAway covers [file.AbortWriter], which exists because
+// an io.WriteCloser's Close cannot tell a finished write from an abandoned one.
+//
+// Two writers, two different obligations:
+//
+//   - A staged write (Create) commits on Close. Abort must leave whatever was
+//     at the name untouched and remove the staging file, so a failed download
+//     never replaces a good kernel with a truncated one.
+//   - An exclusive create (CreateExcl) has already claimed the name at the
+//     instant it succeeded. Abort must remove it, or an abandoned lock attempt
+//     leaves a lock nobody holds and every later acquirer waits out staleLockAge.
+//
+// Both also have to release their handles. That is not decorative: skipping
+// Close was the old way to avoid committing a partial write, and on Windows the
+// resulting unclosed handle keeps the directory undeletable — which is how this
+// surfaced, as a t.TempDir cleanup failure rather than as a wrong answer.
+func TestAbortThrowsTheWriteAway(t *testing.T) {
+	t.Parallel()
+
+	t.Run("a staged write leaves the object alone", func(t *testing.T) {
+		t.Parallel()
+
+		dir := t.TempDir()
+
+		fsys, err := file.OpenFS(localURL(t, dir))
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if err := file.WriteFile(t.Context(), fsys, "kernel.bsp",
+			strings.NewReader("original")); err != nil {
+			t.Fatal(err)
+		}
+
+		cfs, ok := fsys.(file.CreateFS)
+		if !ok {
+			t.Fatal("the local backend does not implement CreateFS")
+		}
+
+		w, err := cfs.Create("kernel.bsp")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		aw, ok := w.(file.AbortWriter)
+		if !ok {
+			t.Fatalf("%T does not implement AbortWriter, so a failed copy must leak to "+
+				"avoid corrupting the object", w)
+		}
+
+		if _, err := io.WriteString(w, "half a new kernel"); err != nil {
+			t.Fatal(err)
+		}
+
+		if err := aw.Abort(); err != nil {
+			t.Fatalf("Abort: %v", err)
+		}
+
+		got, err := fs.ReadFile(fsys, "kernel.bsp")
+		if err != nil {
+			t.Fatalf("ReadFile after Abort: %v", err)
+		}
+
+		if string(got) != "original" {
+			t.Errorf("after Abort the object is %q, want the untouched %q", got, "original")
+		}
+
+		// And nothing is left beside it. A staging file that outlived its
+		// writer would be both a leaked handle and a puzzle in the user's cache.
+		entries, err := fs.ReadDir(fsys, ".")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if len(entries) != 1 {
+			names := make([]string, 0, len(entries))
+			for _, e := range entries {
+				names = append(names, e.Name())
+			}
+
+			t.Errorf("after Abort the directory holds %v, want only the object", names)
+		}
+	})
+
+	t.Run("an exclusive create gives the name back", func(t *testing.T) {
+		t.Parallel()
+
+		fsys, err := file.OpenFS(localURL(t, t.TempDir()))
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		xfs, ok := fsys.(file.CreateExclFS)
+		if !ok {
+			t.Fatal("the local backend does not implement CreateExclFS")
+		}
+
+		w, err := xfs.CreateExcl("cache.lock")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// While it is held, a second attempt must lose — that is the whole
+		// guarantee, and the reason the name has to come back on Abort.
+		if _, err := xfs.CreateExcl("cache.lock"); !errors.Is(err, fs.ErrExist) {
+			t.Errorf("a second CreateExcl gave %v, want fs.ErrExist", err)
+		}
+
+		if _, err := io.WriteString(w, "locked"); err != nil {
+			t.Fatal(err)
+		}
+
+		aw, ok := w.(file.AbortWriter)
+		if !ok {
+			t.Fatalf("%T does not implement AbortWriter", w)
+		}
+
+		if err := aw.Abort(); err != nil {
+			t.Fatalf("Abort: %v", err)
+		}
+
+		if _, err := fs.Stat(fsys, "cache.lock"); !errors.Is(err, fs.ErrNotExist) {
+			t.Errorf("after Abort the lock is still there (%v); a crashed acquirer would "+
+				"block everyone until staleLockAge", err)
+		}
+
+		// So the name is free again.
+		again, err := xfs.CreateExcl("cache.lock")
+		if err != nil {
+			t.Fatalf("CreateExcl after Abort: %v", err)
+		}
+
+		if err := again.Close(); err != nil {
+			t.Fatal(err)
+		}
+	})
+}
