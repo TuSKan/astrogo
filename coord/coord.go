@@ -83,6 +83,22 @@ type ICRS struct {
 	pmDec    angle.Angle // Proper motion in Dec, per Julian year
 	parallax angle.Angle // Stellar parallax
 	rv       float64     // Radial velocity (km/s)
+
+	// hasKinematics records whether a caller supplied kinematics, as distinct
+	// from their happening to be zero.
+	//
+	// "No proper motion recorded" and "proper motion measured as zero" are
+	// different claims about a star, and they convert differently: the first
+	// is a catalogue position with no motion information, the second asserts
+	// the star is genuinely at rest in ICRS. [ICRSToFK4] and [ICRSToFK5] used
+	// to tell them apart by testing every kinematic field for zero, which
+	// cannot distinguish them and silently answered the first question when
+	// asked the second — see #278, where a star declared at rest in ICRS came
+	// back from a round trip with 0.6 to 0.9 mas/yr it never had.
+	//
+	// FK4 has carried this distinction from the start, through [NewFK4] versus
+	// [NewFK4WithProperMotion]. This is the same thing for ICRS.
+	hasKinematics bool
 }
 
 // AltAz represents a direction and optional distance in the local horizontal frame.
@@ -125,7 +141,12 @@ func NewICRS(ra, dec angle.Angle) ICRS { return ICRS{ra: ra, dec: dec} }
 // value to SOFA directly is what #281 was: it lost a factor of cos(dec),
 // which is 30% at δ = 45° and 83% at δ = 80°.
 func NewICRSWithKinematics(ra, dec, pmRA, pmDec, parallax angle.Angle, rv float64) ICRS {
-	return ICRS{ra: ra, dec: dec, pmRA: pmRA, pmDec: pmDec, parallax: parallax, rv: rv}
+	return ICRS{
+		ra: ra, dec: dec,
+		pmRA: pmRA, pmDec: pmDec,
+		parallax: parallax, rv: rv,
+		hasKinematics: true,
+	}
 }
 
 // NewAltAz creates a new AltAz coordinate.
