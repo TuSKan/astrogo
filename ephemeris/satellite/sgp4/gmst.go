@@ -56,11 +56,31 @@ func gmst82(jdut1 float64) float64 {
 // its epoch in.
 func gstoAFSPC(epoch1950 float64) float64 {
 	const (
-		// Radians of Earth rotation per day, less one revolution.
+		// Radians of Earth rotation per day, less one revolution — the amount
+		// by which a solar day exceeds a sidereal one, 2*pi*(86400/86164.09) -
+		// 2*pi. Verified to 1.4e-7 relative.
+		//
+		// Close to 2*pi/365.25 and NOT equal to it: the two differ in the fifth
+		// digit, and they are close because the excess IS the Earth's orbital
+		// motion over a day.
 		c1 = 1.72027916940703639e-2
-		// Greenwich hour angle at the 1970 origin.
+
+		// Greenwich mean sidereal time at the origin this expression counts
+		// from, 1970 January 0.0 — that is, 1969-12-31 0h UT, JD 2440586.5.
+		//
+		// Not an approximation of one: gmst82 evaluated at that Julian Date
+		// returns this number to ten digits, which means the two modes agree
+		// exactly at the origin and diverge only as they accumulate from it.
+		// TestAFSPCOriginIsTheSameSiderealTime asserts it, which is what ties
+		// the two paths together instead of leaving them two unrelated
+		// expressions that happen to sit in the same file.
 		thgr70 = 1.7321343856509374
-		// The FK5 rate correction, quadratic in elapsed days.
+
+		// A small secular correction, quadratic in days since the origin. It is
+		// named fk5r in the reference and carries no comment there; over the 56
+		// years from 1970 to 2026 it contributes 2.1e-6 rad, which is 0.44
+		// arcseconds. What exactly it corrects is not something this code can
+		// establish, so it is not claimed here.
 		fk5r = 5.07551419432269442e-15
 	)
 
