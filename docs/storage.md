@@ -1,208 +1,229 @@
-# Removing gocloud.dev
+# Storage: `io/fs` instead of gocloud.dev
 
-A plan for replacing `gocloud.dev/blob` with an astrogo-native storage layer
-inside `remote/file`.
+A plan for replacing `gocloud.dev/blob` with the standard library's own
+filesystem abstraction, and deleting the dependency.
 
 This document is the design. It is meant to be argued with before any of it is
 built.
 
 ---
 
-## 1. What it costs, measured
+## 1. What it costs today, measured
 
-`gocloud.dev/blob` is 2,711 lines of astrogo's `remote/file` talking to a
-library that brings 141 packages of other people's telemetry with it.
-
-Counting linked packages — `go list -deps`, so what a consumer's binary
+Counting *linked* packages — `go list -deps`, so what a consumer's binary
 actually contains:
 
-| import | total packages | gRPC | OpenTelemetry | gocloud | Arrow |
-| :--- | ---: | ---: | ---: | ---: | ---: |
-| `astrogo/time` | 93 | 0 | 0 | 0 | 0 |
-| `astrogo/coord` | 100 | 0 | 0 | 0 | 0 |
-| `astrogo/ephemeris` | 105 | 0 | 0 | 0 | 0 |
-| **`astrogo/remote`** | **406** | **64** | **34** | **9** | 0 |
-| **`astrogo/plan`** | **433** | **64** | **34** | **9** | 0 |
+| import | total | gRPC | OpenTelemetry | gocloud |
+| :--- | ---: | ---: | ---: | ---: |
+| `astrogo/time` | 93 | 0 | 0 | 0 |
+| `astrogo/coord` | 100 | 0 | 0 | 0 |
+| `astrogo/ephemeris` | 105 | 0 | 0 | 0 |
+| **`astrogo/remote`** | **406** | **64** | **34** | **9** |
+| **`astrogo/plan`** | **433** | **64** | **34** | **9** |
 
 The scientific packages carry nothing. The moment a consumer reaches `remote` —
 and `plan` does, for EOP and JPL kernels — the graph triples.
 
-### 1.1 Where it comes from, and it is not the drivers
-
-The obvious hypothesis is that the cloud drivers are the weight, and they are
-already opt-in subpackages (`remote/file/s3` and friends export nothing at all,
-they are blank imports). That hypothesis is wrong:
-
-| package | total | heavy |
-| :--- | ---: | ---: |
-| `gocloud.dev/blob` alone | 388 | 141 |
-| `+ gocloud.dev/blob/fileblob` | 390 | 141 |
-| `+ gocloud-ext/blob/httpblob` | 392 | 141 |
-
-The core `blob` package carries all of it; the two drivers astrogo links by
-default add four packages between them. `blob.go` imports
-`gocloud.dev/internal/otel`, which imports `go.opentelemetry.io/otel/sdk/metric`
-unconditionally — that shim alone is 385 packages, 141 of them heavy.
-
-So astrogo links the OpenTelemetry SDK, and gRPC and protobuf behind it, **so
-that `gocloud.dev/blob` can emit traces and metrics nobody consumes.** Nothing
-in astrogo configures an exporter, and nothing reads them.
-
-### 1.2 There is no upstream escape
-
-- v0.46.0 is the latest release; astrogo is already on a pseudo-version past it
-  (pinned because `gocloud-ext`'s httpblob implements `driver.DeleteOptions`,
-  added after that tag).
-- The telemetry shim is not behind a build tag. `blob.go` imports it
-  unconditionally.
-- It is not `gocloud-ext`'s doing either — that was worth checking, since it is
-  ours to fix. `httpblob` does import `googleapis/gax-go/v2`, but removing that
-  would save two packages.
-
-### 1.3 The second reason, which is not about weight
-
-[#315](https://github.com/TuSKan/astrogo/issues/315) is open and unfixed: two
-processes writing one cache key collide in `os.TempDir`, because `fileblob`
-names its staging file from `time.Now().UnixNano()` and **the Windows clock does
-not advance** — measured, one distinct value across 2000 consecutive reads. Both
-writers pick the same path and one renames the other's file away.
-
-astrogo has worked around this twice ([#241](https://github.com/TuSKan/astrogo/issues/241),
-[#307](https://github.com/TuSKan/astrogo/pull/307)) with an in-process lock keyed
-by basename, and `writelock.go`'s own doc comment states the boundary it cannot
-reach: two processes. The staging strategy belongs to the driver, and while the
-driver is someone else's, the fix is someone else's.
+It is not the cloud drivers, which are already opt-in subpackages exporting
+nothing. `gocloud.dev/blob` **alone** is 388 packages, 141 of them heavy;
+`fileblob` and `httpblob` add four between them. `blob.go` imports
+`gocloud.dev/internal/otel` unconditionally, and that shim is the weight: 385
+packages so that a library can emit traces astrogo never configures an exporter
+for. There is no upstream escape — v0.46.0 is the latest release, the shim is
+not behind a build tag, and it is not `gocloud-ext`'s doing either.
 
 ---
 
-## 2. What astrogo actually uses
+## 2. The shape: `fs.FS`, and three interfaces astrogo defines
 
-Small enough to write down completely. Every gocloud symbol in the tree:
+`io/fs` is the standard library's answer to exactly this problem, and the
+reason to prefer it over any third-party abstraction is not weight. It is that
+**a great deal of Go already speaks it**: `os.DirFS`, `embed.FS`,
+`archive/zip`, `testing/fstest`, `fs.WalkDir`, `fs.Glob`, `fs.Sub`,
+`fs.ReadFile`. An abstraction nobody else implements buys nothing; this one is
+already implemented by everything.
 
-```
-blob.OpenBucket        blob.Bucket        blob.WriterOptions   blob.DefaultURLMux
-gcerrors.Code          gcerrors.NotFound  gcerrors.Unknown     gcerrors.FailedPrecondition
-driver.Bucket          driver.Writer
-```
-
-And every `Bucket` method called:
-
-| method | why |
-| :--- | :--- |
-| `NewReader`, `NewRangeReader` | `remote.NewReaderAt`'s chunked LRU, SPK kernels |
-| `NewWriter`, `WriteAll` | `remote.Save`, the download staging |
-| `ReadAll` | small objects — sidecars, manifests |
-| `Exists`, `Attributes` | cache hits, ETag checks for `Mutable` endpoints |
-| `Delete`, `Copy` | staging promotion and cleanup |
-| `Close` | |
-| `As` | the `IfNotExist` staging lock reaches through to `driver.Writer` |
-
-Eleven methods and four error codes. That is the contract to reproduce — not
-gocloud's API, which is much larger, but the part astrogo depends on.
-
----
-
-## 3. What the replacement must preserve
-
-These are not implementation details; they are decisions CLAUDE.md records with
-reasons, and a replacement that quietly drops one is a regression even if every
-test passes.
-
-- **No scheme is ever hardcoded in `remote` or `remote/file`.** Dispatch is a
-  registry populated by blank imports. No `Backend`/`Transport` interface with a
-  `switch` on scheme, no per-scheme branch in the fetch path.
-- **`Endpoint.URL` is the exact string handed to the opener.** Scheme-specific
-  connection detail rides in the URL query string — `remote.CopernicusEODATA`
-  carries `region`, `endpoint`, `hostname_immutable` and `use_path_style` that
-  way, which is why reaching a non-AWS S3 service needs no astrogo API and no
-  AWS type in any signature.
-- **Two portable query wrappers work on every scheme**: `?prefix=sub/dir/` scopes
-  a bucket, `?key=exact/object.dat` serves one object under any name. Both come
-  free from gocloud today and would have to be implemented once, centrally.
-- **No API takes an OS filesystem path.** Bucket keys are `/`-separated;
-  `path.Join`, never `filepath.Join`. The single OS-path contact point stays the
-  unexported default-cache-dir resolver.
-- **The opt-in subpackages export nothing.** `remote/file/s3` is four lines and
-  zero exported symbols. That shape is the point and it must survive.
-- **`remote.GetFile`'s semantics**: cached-on-existence for `Mutable: false`,
-  ETag-checked for `Mutable: true`, download under a cross-process `IfNotExist`
-  lock, `WithValidate` running against the *staged* object before promotion so a
-  multi-GB kernel never has to fit in memory.
-- **`remote.NewReaderAt`'s measured behaviour**: 64 KiB × 16 aligned chunks,
-  1 MiB resident for any object. `BenchmarkReadAtStrategies` records why —
-  263 ms against 0.33 ms for 2000 SPK-shaped reads — and must be re-run, not
-  assumed.
-
----
-
-## 4. The shape
-
-**An astrogo-native driver interface inside `remote/file`, and adapters for the
-schemes that need a cloud SDK.**
+### 2.1 The public type
 
 ```go
-// remote/file, unexported except where the front door re-exports it.
-type driver interface {
-    Reader(ctx context.Context, key string, offset, length int64) (io.ReadCloser, error)
-    Writer(ctx context.Context, key string, opts writeOptions) (io.WriteCloser, error)
-    Attributes(ctx context.Context, key string) (Attributes, error)
-    Delete(ctx context.Context, key string) error
-    Close() error
+// remote.File is an open object. fs.File gives Read, Stat and Close; the two
+// additions are what a caller needs to seek inside a 3 GB SPK kernel without
+// reading the first 2.9 GB of it.
+type File interface {
+    fs.File
+    io.ReaderAt
+    io.Seeker
 }
 ```
 
-Five methods. `Exists` is `Attributes` with a `NotFound`; `ReadAll`/`WriteAll`
-are helpers over the two streams; `Copy` is a read into a write, which is what
-the cloud drivers do anyway for anything astrogo copies.
+That is the whole read model. `remote.ReaderAt`'s chunked LRU — 64 KiB × 16,
+1 MiB resident for any object — becomes a decorator over `io.ReaderAt` rather
+than a bespoke type, and keeps its benchmark.
 
-Three backends ship in core, and they are the ones with no SDK behind them:
+### 2.2 What `io/fs` does not have, and the three interfaces that answer it
 
-| scheme | backend | what it is |
-| :--- | :--- | :--- |
-| `file://` | `os` + a staging rename | the cache, and astrogo's own default |
-| `http://`, `https://` | `remote/api`'s client | range requests; already astrogo's own code in `gocloud-ext/httpblob` |
-| `mem://` | a map | tests |
+`io/fs` is read-only and has no context. Both gaps are filled the way the
+standard library fills its own — small optional interfaces, tested for with a
+type assertion — which is also how [`s3iofs`](https://github.com/wolfeidau/s3iofs)
+does it (`RemoveFS`, `WriteFileFS`).
 
-`s3`, `gcs`, `azure` and `sftp` become adapters in the same opt-in subpackages
-they already live in, over each vendor's own SDK — which is where those SDKs
-belong, since only a caller who blank-imports one pays for it. They are not
-core's problem and never were; what made them core's problem is that
-`gocloud.dev/blob` sits underneath all of them.
+```go
+// CreateFS is a filesystem that can be written to, one stream at a time.
+//
+// Streaming, not WriteFile([]byte): a DE440 kernel is 3 GB and astrogo's whole
+// download path exists so that it never has to fit in memory. s3iofs offers
+// WriteFile and astrogo cannot use it for this.
+type CreateFS interface {
+    fs.FS
+    Create(name string) (io.WriteCloser, error)
+}
 
-### 4.1 Why not a lighter third-party blob library
+// RemoveFS deletes. Same signature as s3iofs's, deliberately.
+type RemoveFS interface {
+    fs.FS
+    Remove(name string) error
+}
 
-Because the surface in §2 is eleven methods, three of the backends have no SDK
-at all, and the recurring lesson of the SGP4 work is that a dependency's *test
-suite* is not evidence about the paths your code takes. The s⁴ constant was
-wrong for years behind a suite that passed at full marks, and #315 is an
-unfixable-by-us defect in a staging strategy we did not choose. Owning five
-methods is less exposure than owning a seam to somebody else's five hundred.
+// ContextFS binds a filesystem to a context, returning one whose operations
+// honour it.
+type ContextFS interface {
+    fs.FS
+    WithContext(ctx context.Context) fs.FS
+}
+```
 
-The cloud adapters are the exception and stay third-party: reimplementing S3
-request signing would be exactly the kind of thing this reasoning argues
-against.
+`fs.StatFS`, `fs.ReadDirFS` and `fs.SubFS` come from the standard library and
+need nothing from astrogo.
+
+### 2.3 The context problem, which is the real design question
+
+`fs.FS.Open(name string)` takes no context. That is fine for a local disk and
+not fine for a 3 GB download over a network, and CLAUDE.md is emphatic that
+every astrogo entry point takes `ctx` first.
+
+**Measured, this is not hypothetical**: `s3iofs` calls `context.TODO()` and
+`context.Background()` in nine places. Used as published, every S3 request it
+makes is uncancellable.
+
+The answer is that **the filesystem value carries the context**, constructed per
+operation, which is why `ContextFS` exists. astrogo's own API is unchanged —
+`GetFile(ctx, …)` still takes it first — and internally:
+
+```go
+fsys := reg.open(endpoint.URL)
+if cfs, ok := fsys.(ContextFS); ok {
+    fsys = cfs.WithContext(ctx)
+}
+```
+
+For `s3iofs` specifically the seam is its exported `S3API` interface and
+`NewWithClient`: astrogo supplies a client that substitutes the caller's context
+for the one it is handed. Roughly fifteen lines, and it makes an uncancellable
+library cancellable without forking it.
+
+**A backend that does not implement `ContextFS` is refused for any
+`Downloadable` endpoint**, and that is a check rather than a convention. A
+multi-gigabyte fetch that cannot be cancelled is not something to discover at
+runtime.
+
+### 2.4 Paths
+
+`fs.ValidPath` requires unrooted, `/`-separated, no `.` or `..` elements — which
+is *exactly* the key rule CLAUDE.md already mandates and `path.Join` already
+produces. The standard library starts enforcing a rule astrogo has been keeping
+by hand.
 
 ---
 
-## 5. What this is expected to buy
+## 3. The backends
 
-Estimated, and to be measured rather than claimed:
+| scheme | implementation | SDK |
+| :--- | :--- | :--- |
+| `file://` | `os.Root` (Go 1.24+) + staging rename | none |
+| `http://`, `https://` | `remote/api`'s client, range requests | none |
+| `mem://` | `fstest.MapFS` + a write shim | none |
+| `s3://` | `s3iofs` + the context adapter of §2.3 | AWS |
+| `gs://`, `azblob://`, `sftp://` | the same shape, per vendor | each |
+
+Three of the five that ship in core have no SDK behind them at all. The cloud
+ones stay third-party and stay in the opt-in subpackages they already live in,
+exporting nothing and registering by blank import — reimplementing S3 request
+signing is exactly what the rest of this reasoning argues against.
+
+`os.Root` is worth taking for the local backend: it confines every operation
+beneath a directory at the OS level, which is a stronger guarantee than the
+path checks astrogo does today, and it is the reason the `file` backend can be
+short.
+
+---
+
+## 4. What this deletes
+
+Beyond the dependency:
+
+- **The scheme registry shrinks to a map of `func(*url.URL) (fs.FS, error)`.**
+  No `URLMux`, no `BucketSchemes`, no `ValidBucketScheme`.
+- **`?prefix=` becomes `fs.Sub`**, which is in the standard library.
+- **The memory bucket becomes `fstest.MapFS`.** Tests that build a fake bucket
+  today are three lines.
+- **`Copy`, `Exists`, `ReadAll`, `WriteAll` stop being methods** and become
+  `fs.ReadFile` and small helpers, because that is what they are.
+
+And one thing it fixes rather than deletes:
+[#315](https://github.com/TuSKan/astrogo/issues/315), the two-process staging
+collision, is unfixable while the staging strategy is `fileblob`'s. `fileblob`
+names its staging file from `time.Now().UnixNano()` and the Windows clock does
+not advance — measured, one distinct value across 2000 consecutive reads.
+astrogo has worked around it twice (#241, #307) and `writelock.go`'s own comment
+states the boundary it cannot reach. Owning the local backend makes the fix
+ordinary: stage under a name containing the process id and a counter, which is
+what every other implementation does.
+
+---
+
+## 5. What it is expected to buy
+
+Estimated, to be measured rather than claimed:
 
 - `astrogo/plan` from **433 linked packages to roughly 283** — a third of the
-  graph.
-- gRPC, protobuf and OpenTelemetry gone from every consumer that does not
-  import `catalog/fink`, which pulls Arrow and its own gRPC independently. That
-  distinction matters: **this refactor does not remove gRPC from a FINK user**,
-  and saying so up front stops the claim being overstated later.
-- `go.mod`'s 100 requires and the 334-module graph fall substantially.
+  graph — for a consumer that does not import `catalog/fink`.
+- **This does not remove gRPC from a FINK user**: Arrow pulls its own,
+  independently. Stating that here stops the headline overstating itself later.
 - [#109](https://github.com/TuSKan/astrogo/issues/109) — astrogo inherits a
   patch-level `go` directive from `gocloud-ext`, forcing a toolchain download in
-  every CI job — is resolved by the same change.
-- #315 becomes fixable, because the staging strategy becomes astrogo's.
+  every CI job — resolved by the same change.
+- `gocloud-ext` stops being load-bearing for astrogo. Its `httpblob` becomes an
+  `fs.FS` inside astrogo; whether the repo keeps a life of its own is then a
+  free choice rather than a dependency.
 
 ---
 
-## 6. Delivery
+## 6. The public API changes, and that is the point
+
+This is not a swap behind a stable façade. `remote.Bucket` is a gocloud concept
+and it goes.
+
+| today | after |
+| :--- | :--- |
+| `remote.Bucket` | `fs.FS` (+ the three interfaces of §2.2) |
+| `remote.OpenBucket(ctx, url) (*Bucket, error)` | `remote.OpenFS(ctx, url) (fs.FS, error)` |
+| `remote.NewReaderAt(ctx, bucket, key)` | `remote.Open(ctx, fsys, name) (File, error)` |
+| `remote.Save(ctx, bucket, key, r)` | `remote.WriteFile(ctx, fsys, name, r)` |
+| `remote.GetFile(ctx, id, name, …) (*Bucket, string, error)` | `(fs.FS, string, error)` |
+| `remote.IsNotFound(err)` | `errors.Is(err, fs.ErrNotExist)` |
+
+That last row is the one worth pausing on. `remote.IsNotFound` exists because
+gocloud has its own error codes; with `io/fs` the answer is
+`errors.Is(err, fs.ErrNotExist)`, which every Go programmer already knows and
+which works across `os`, `embed`, `zip` and every backend here. The function is
+deleted rather than kept as a wrapper.
+
+No deprecations and no compatibility shims: pre-1.0, and a façade over a
+different model is how the model leaks anyway.
+
+---
+
+## 7. Delivery
 
 Each step green and independently reviewable, branched from `main` once its
 predecessor merges.
@@ -210,45 +231,47 @@ predecessor merges.
 | PR | contents | how it is judged |
 | :-- | :--- | :--- |
 | **1** | This document. | Is the plan right? |
-| **2** | The `driver` interface, the scheme registry, and the `file://` backend, alongside gocloud rather than replacing it. Staging under astrogo's control, with #315's two-process case as an explicit test. | The existing `remote/file` suite passes against the new backend behind a flag; #315's reproduction fails before and passes after. |
-| **3** | `http`/`https` and `mem`. | The HTTP range behaviour matches `httpblob`'s, `BenchmarkReadAtStrategies` re-run and recorded. |
-| **4** | Switch `remote/file` over; delete the gocloud path; `gocloud.dev` out of `go.mod`. | The package-count table in §1 re-measured. Every `remote` test unchanged. |
-| **5** | `s3`, `gcs`, `azure`, `sftp` as SDK adapters. | Each still exports nothing; each still registers by blank import; the live tests for each still pass. |
+| **2** | `remote/file`: the `File` type, the three interfaces, the scheme registry, and the `file://` backend on `os.Root`. Alongside gocloud, not replacing it. | #315's two-process reproduction fails before and passes after. `fstest.TestFS` passes against the backend. |
+| **3** | `http`/`https` and `mem://`. | Range behaviour matches today's; `BenchmarkReadAtStrategies` re-run and recorded, not assumed. |
+| **4** | Switch `remote` over, delete the gocloud path, drop `gocloud.dev` from `go.mod`, and reshape the public API per §6. | The §1 table re-measured. Every consuming package's tests unchanged except where §6 renames a call. |
+| **5** | `s3` (on `s3iofs` + the context adapter), then `gcs`, `azblob`, `sftp`. | Each exports nothing, registers by blank import, and refuses to serve a `Downloadable` endpoint unless it implements `ContextFS`. |
 
-PR 2 is deliberately the one that carries #315: the two-process staging
-collision is the clearest evidence that this layer should be astrogo's, and
-fixing it first means the rest of the work is measured against a defect already
-closed rather than one still open.
-
----
-
-## 7. Risks
-
-**The cloud adapters are the real work.** Three core backends are
-straightforward; four SDK adapters are not, and each has live tests against a
-real service. PR 5 is sequenced last so that a problem there cannot block the
-weight reduction, which is what the change is for.
-
-**`As` reaches through to the driver.** The `IfNotExist` staging lock uses
-gocloud's escape hatch to get at `driver.Writer`. An astrogo-native driver makes
-that a normal method rather than a reach-through, which is simpler — but the
-lock's semantics are subtle and #241/#307 are its history. It gets tests before
-it gets a rewrite.
-
-**Nothing here changes `remote`'s public API.** `Bucket`, `OpenBucket`, `Save`,
-`GetFile`, `ReaderAt`, `IsNotFound` and the endpoint registry are the front door
-and stay exactly as they are. If a step needs to change one, that is a signal
-the design is wrong, not a licence.
+PR 2 carries #315 deliberately: it is the clearest evidence that this layer
+should be astrogo's, and fixing it first means the rest is measured against a
+defect already closed.
 
 ---
 
-## 8. Explicitly not in scope
+## 8. Risks
 
-- **Reimplementing S3/GCS/Azure request signing.** The adapters use each
-  vendor's SDK.
-- **A general-purpose blob abstraction for anyone else to use.** This is
-  `remote/file`'s internals; the public surface is `remote`'s and does not grow.
+**`fstest.TestFS` is the acceptance test, and it is strict.** It checks
+`ValidPath` handling, `ReadDir` ordering, `Sub`, `Glob`, `Stat` consistency and
+more. Every backend must pass it. That is a much stronger bar than the current
+suite and is the main reason to expect this to take longer than it looks.
+
+**`s3iofs` is a small dependency with an uncancellable core.** §2.3's adapter
+handles it, but it is worth being clear that astrogo would be relying on a
+library whose published behaviour needs working around. The alternative — an
+astrogo S3 filesystem over the AWS SDK directly — is maybe 200 lines and
+removes the workaround. That is a decision for PR 5, and the plan does not
+pre-commit to it.
+
+**Writes are not local-only today.** `SetDataDir` documents
+`s3://my-cache-bucket` and `sftp://host/path` as valid cache locations, so the
+write path must work over every scheme, not just `file://`. If that capability
+is not actually wanted, saying so would simplify PR 5 considerably — the cloud
+backends would become read-only, and `CreateFS` would be needed on `file://`
+alone.
+
+---
+
+## 9. Explicitly not in scope
+
 - **Removing Apache Arrow.** It is `catalog`'s columnar cache, it earns its
-  place, and it is a separate question from this one.
+  place, and it is a separate question.
+- **Reimplementing S3/GCS/Azure request signing.**
+- **A general-purpose storage abstraction for other projects.** The public
+  surface is `remote`'s, and `fs.FS` is the standard library's — astrogo adds
+  three interfaces and no more.
 - **Telemetry of astrogo's own.** The point is not to replace gocloud's traces
   with ours. `logging` is the one logger and that is enough.
