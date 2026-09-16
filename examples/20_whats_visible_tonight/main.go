@@ -211,7 +211,7 @@ func colorize(code, s string) string {
 // system bodies, stars, and deep-sky objects each get a distinct color
 // family, mirroring how a planetarium app color-codes its object list.
 func kindColor(k resolve.Kind) string {
-	switch k { //nolint:exhaustive // KindSatellite/KindOther intentionally fall to the default gray
+	switch k {
 	case resolve.KindMoon:
 		return ansiBold + ansiWhite
 	case resolve.KindPlanet, resolve.KindDwarfPlanet:
@@ -225,6 +225,15 @@ func kindColor(k resolve.Kind) string {
 		return ansiBlue
 	case resolve.KindAsteroid, resolve.KindComet:
 		return ansiGreen
+
+	// Named rather than left to the default, so the switch is exhaustive
+	// without a //nolint. The directive that used to be here was unused under
+	// one golangci-lint version and required under another, which is a bad
+	// trade for a list this short: these kinds are deliberately gray.
+	case resolve.KindPlanetaryMoon, resolve.KindInterstellar, resolve.KindSatellite,
+		resolve.KindConstellation, resolve.KindMeteorShower, resolve.KindOther:
+		return ansiGray
+
 	default:
 		return ansiGray
 	}
