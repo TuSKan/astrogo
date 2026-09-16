@@ -373,6 +373,33 @@ func Pmat76(date1, date2 float64) [3][3]float64 {
 	return rmatp
 }
 
+// Prec76Matrix returns the IAU 1976 precession rotation matrix between two
+// arbitrary TT epochs, each given as a two-part Julian date.
+//
+// [Pmat76] is anchored at J2000.0, which is what SOFA's iauPmat76 provides and
+// what almost every caller wants. This is the general form, built from
+// iauPrec76's Euler angles by the same composition iauPmat76 uses — Rz(-zeta),
+// Ry(theta), Rz(-z) — for the case where neither end is J2000.
+//
+// The model is IAU 1976, so both epochs should belong to that era. Using it
+// across an FK4-era equinox is an approximation whose size is the difference
+// between Newcomb's precession constant and Lieske's, about 1.1 arcsec per
+// century; a caller doing that should measure it rather than assume it.
+func Prec76Matrix(from1, from2, to1, to2 float64) [3][3]float64 {
+	var zeta, z, theta float64
+
+	gofa.Prec76(from1, from2, to1, to2, &zeta, &z, &theta)
+
+	var r [3][3]float64
+
+	gofa.Ir(&r)
+	gofa.Rz(-zeta, &r)
+	gofa.Ry(theta, &r)
+	gofa.Rz(-z, &r)
+
+	return r
+}
+
 // Rxp rotates the vector p by the matrix r, returning r·p.
 func Rxp(r [3][3]float64, p [3]float64) [3]float64 {
 	var rp [3]float64

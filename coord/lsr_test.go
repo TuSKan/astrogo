@@ -261,3 +261,102 @@ func BenchmarkLSRCorrection(b *testing.B) {
 		_ = coord.LSRCorrection(c, coord.LSRDynamical)
 	}
 }
+
+// TestLSRKMatchesAstropysRealisation is the check that makes the derived
+// kinematic apex trustworthy, and the record of what it costs.
+//
+// Gordon (1975) publishes LSRK as an apex referred to the B1900 equinox.
+// astrogo derives the ICRS vector from that statement; Astropy derives it from
+// the same statement through a full FK4-with-equinox implementation and checks
+// the result in as a literal. Two independent realisations of one definition,
+// so agreement is evidence and disagreement is a bug in one of them.
+//
+// They do not agree exactly, and the residual is explained rather than
+// tolerated. astrogo has no Newcomb precession — SOFA does not provide one —
+// so it precesses B1900 to B1950 with the IAU 1976 model. The two differ by
+// about 1.1 arcsec per century in the precession constant, and half a century
+// of that is what the test measures.
+func TestLSRKMatchesAstropysRealisation(t *testing.T) {
+	t.Parallel()
+
+	// astropy.coordinates.builtin_frames.galactic_transforms, V_OFFSET_LSRK.
+	astropy := vector.Vec3{
+		X: 0.28999706839034606,
+		Y: -17.317264789717928,
+		Z: 10.00141199546947,
+	}
+
+	apex, speed := coord.LSRApex(coord.LSRKinematic)
+	got := apex.ToUnitVector().MulScalar(speed)
+
+	diff := math.Sqrt(
+		(got.X-astropy.X)*(got.X-astropy.X) +
+			(got.Y-astropy.Y)*(got.Y-astropy.Y) +
+			(got.Z-astropy.Z)*(got.Z-astropy.Z))
+
+	sepArcsec := 2 * math.Asin(diff/2/speed) * 206264.806
+
+	t.Logf("astrogo [%+.15f, %+.15f, %+.15f] km/s", got.X, got.Y, got.Z)
+	t.Logf("astropy [%+.15f, %+.15f, %+.15f] km/s", astropy.X, astropy.Y, astropy.Z)
+	t.Logf("difference %.3e km/s (%.1f cm/s), direction %.4f arcsec",
+		diff, diff*100000, sepArcsec)
+
+	// The speed is Gordon's own number and is not approximated by anything, so
+	// it must be exact to float precision.
+	if math.Abs(speed-20.0) > 1e-12 {
+		t.Errorf("apex speed is %.15f km/s, want exactly 20", speed)
+	}
+
+	// A quarter of an arcsecond either side of the 0.55 the model difference
+	// predicts. Tight enough that a wrong rotation, a wrong equinox or a
+	// dropped E-term shows immediately — each of those is degrees or tens of
+	// arcseconds — and loose enough not to trip on the residual itself.
+	const wantArcsec, tolArcsec = 0.55, 0.25
+
+	if math.Abs(sepArcsec-wantArcsec) > tolArcsec {
+		t.Errorf("astrogo and astropy differ by %.4f arcsec, want %.2f ± %.2f — "+
+			"the residual should be half a century of the Newcomb/IAU-1976 precession "+
+			"constant difference and nothing else",
+			sepArcsec, wantArcsec, tolArcsec)
+	}
+
+	// And the velocity error that residual amounts to, which is the number a
+	// caller actually cares about.
+	if diff > 1e-4 {
+		t.Errorf("the apex differs from Astropy's by %.3e km/s, want under 1e-4", diff)
+	}
+}
+
+// TestLSRKinematicIsDistinctFromTheDynamicalOnes guards against the kind
+// silently falling through to a dynamical answer, which is what the default
+// branch of solarMotion does for an unknown value.
+func TestLSRKinematicIsDistinctFromTheDynamicalOnes(t *testing.T) {
+	t.Parallel()
+
+	kinematic, _ := coord.LSRApex(coord.LSRKinematic)
+	dynamical, _ := coord.LSRApex(coord.LSRDynamical)
+	delhaye, _ := coord.LSRApex(coord.LSRDelhaye)
+
+	for _, other := range []struct {
+		name string
+		apex coord.ICRS
+	}{
+		{"LSRD (Schönrich 2010)", dynamical},
+		{"LSRD (Delhaye 1965)", delhaye},
+	} {
+		sep := coord.Separation(kinematic, other.apex).Degrees()
+
+		t.Logf("LSRK is %.1f° from %s", sep, other.name)
+
+		// The kinematic and dynamical standards genuinely point tens of degrees
+		// apart; anything under a degree would mean the switch fell through.
+		if sep < 1 {
+			t.Errorf("LSRK is only %.4f° from %s, which means it is not being "+
+				"computed separately", sep, other.name)
+		}
+	}
+
+	if got := coord.LSRKinematic.String(); got != "LSRK (Gordon 1975)" {
+		t.Errorf("String() = %q, want it to name the kind and its source", got)
+	}
+}
