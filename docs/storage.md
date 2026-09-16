@@ -6,11 +6,16 @@ filesystem abstraction, and deleting the dependency.
 This document is the design. It was meant to be argued with before any of it was
 built.
 
-**Status.** PRs 1-4 have landed: the `io/fs` core, the `file://`, `http`,
-`https` and `mem://` backends, and the switchover that removed `gocloud.dev`
-and `gocloud-ext` from `go.mod`. The §1 table is re-measured below. PR 5 --
-`s3`, `gcs`, `azblob` and `sftp` on their own SDKs -- is outstanding, so those
-schemes are unregistered in the meantime.
+**Status: done, and narrower than planned.** PRs 1-4 landed -- the `io/fs` core,
+the `file://`, `http`, `https` and `mem://` backends, and the switchover that
+removed `gocloud.dev` and `gocloud-ext` from `go.mod`. The §1 table is
+re-measured below.
+
+**PR 5 was dropped.** `s3://`, `gs://`, `azblob://` and `sftp://` are not
+implemented and no longer resolve. One registered endpoint uses one of them --
+`remote.CopernicusEODATA`, for CAMS aerosol data -- and it stays registered and
+unreachable rather than being deleted, because its URL and key layout are still
+right. §10 records why, and what the work is when somebody wants it.
 
 ---
 
@@ -163,8 +168,7 @@ by hand.
 | `file://` | `os.Root` (Go 1.24+) + staging rename | none |
 | `http://`, `https://` | `remote/api`'s client, range requests | none |
 | `mem://` | `fstest.MapFS` + a write shim | none |
-| `s3://` | `s3iofs` + the context adapter of §2.3 | AWS |
-| `gs://`, `azblob://`, `sftp://` | the same shape, per vendor | each |
+| `s3://`, `gs://`, `azblob://`, `sftp://` | *not implemented* — see §10 | — |
 
 Three of the five that ship in core have no SDK behind them at all. The cloud
 ones stay third-party and stay in the opt-in subpackages they already live in,
@@ -255,7 +259,7 @@ predecessor merges.
 | **2** | `remote/file`: the `File` type, the three interfaces, the scheme registry, and the `file://` backend on `os.Root`. Alongside gocloud, not replacing it. | #315's two-process reproduction fails before and passes after. `fstest.TestFS` passes against the backend. |
 | **3** | `http`/`https` and `mem://`. | Range behaviour matches today's; `BenchmarkReadAtStrategies` re-run and recorded, not assumed. | landed |
 | **4** | Switch `remote` over, delete the gocloud path, drop `gocloud.dev` from `go.mod`, and reshape the public API per §6. | The §1 table re-measured. Every consuming package's tests unchanged except where §6 renames a call. | landed |
-| **5** | `s3` (on `s3iofs` + the context adapter), then `gcs`, `azblob`, `sftp`. | Each exports nothing, registers by blank import, and refuses to serve a `Downloadable` endpoint unless it implements `ContextFS`. | pending |
+| **5** | `s3`, `gcs`, `azblob`, `sftp`. | **Dropped — see §10.** | not done |
 
 PR 2 carried #315 deliberately: it is the clearest evidence that this layer
 should be astrogo's, and fixing it first meant the rest was measured against a
@@ -277,6 +281,9 @@ astrogo S3 filesystem over the AWS SDK directly — is maybe 200 lines and
 removes the workaround. That is a decision for PR 5, and the plan does not
 pre-commit to it.
 
+> **Answered, by building it.** Both halves turned out worse than estimated and
+> the conclusion was to build neither. §10 has the measurement.
+
 **Writes are not local-only today.** `SetDataDir` documents
 `s3://my-cache-bucket` and `sftp://host/path` as valid cache locations, so the
 write path must work over every scheme, not just `file://`. If that capability
@@ -296,3 +303,77 @@ alone.
   three interfaces and no more.
 - **Telemetry of astrogo's own.** The point is not to replace gocloud's traces
   with ours. `logging` is the one logger and that is enough.
+
+---
+
+## 10. Why the cloud backends were dropped
+
+PR 5 was written, measured and abandoned. The reasoning is worth keeping,
+because the obvious next step for anybody who wants `s3://` is to reach for the
+same library this did.
+
+### `s3iofs` was tried first, and has two silent-wrong-answer defects
+
+It is the natural choice: it implements `fs.FS`, `fs.StatFS` and `fs.ReadDirFS`
+over S3, and exposes an `S3API` seam that makes it testable and — as §2.3
+predicted — cancellable. Reading what it does turned up two defects, both of
+which produce a wrong answer with no error, which is the worst kind for a cache:
+
+- **`ReadAt` reports a truncated read as success.** When a ranged response is
+  shorter than requested but ends below the object's size, it returns
+  `(n < len(p), nil)`. `io.ReaderAt` requires a non-nil error there, and
+  astrogo's chunked reader allocates a full-size buffer and trusts a nil error
+  — so a cut transfer becomes a zero-padded chunk handed to the SPK parser as
+  kernel data. Demonstrated against a server that halves every ranged response:
+  `ReadAt` asked for 1000 bytes, got `n=500`, `err=nil`.
+- **`ReadDir` does not paginate.** One `ListObjectsV2` call, with `IsTruncated`
+  and `NextContinuationToken` ignored. S3 returns at most 1000 keys, so a prefix
+  with more silently lists the first 1000 — reachable on `CopernicusEODATA`,
+  which is a multi-product bucket shared by Sentinel, CLMS and CAMS.
+
+It also discards the caller's context in eight places, which §2.3 already knew
+and had an answer for.
+
+### Writing it directly was tried next, and the arithmetic did not hold
+
+The honest response to the above is to write the backend on the AWS SDK, which
+§8 estimated at "maybe 200 lines". Built, it came to roughly 350 of
+implementation plus a 400-line fake S3 service — because testing it against a
+fake *client* would only prove the glue calls what it thinks it calls, and what
+is actually at risk lives between the SDK and the service: path-style
+addressing, signing against a non-AWS endpoint, whether a range reaches the
+wire, whether `If-None-Match` yields 412, whether the multipart sequence
+completes.
+
+That is a reasonable amount of code for a capability the module needs. It is not
+a reasonable amount for **one optional endpoint**: `CopernicusEODATA` is the
+only registered `s3://` URL in astrogo, it is not required by any default path,
+and the CAMS reader it serves works perfectly well against a file already in the
+cache or one a caller hands to `cams.Open`.
+
+Against that, the cost is 69 AWS packages and a pre-1.0 transfer-manager
+dependency, for every build that imports the backend.
+
+### What is true now
+
+`file://`, `http://`, `https://` and `mem://` resolve. Nothing else does, and an
+unregistered scheme fails at `OpenFS` with an error naming the schemes that are
+registered rather than somewhere deeper and later.
+
+`remote.CopernicusEODATA` stays in the registry, unreachable. Deleting it would
+throw away a correct URL and a correct key layout for no gain; leaving it means
+the endpoint works the day a backend lands, and until then the failure is early
+and says what is wrong. `cams.RegistrationAdvice` says so too, rather than
+telling a user to blank-import a package that does not exist.
+
+### If somebody wants it
+
+The shape is settled and the tests exist for the equivalent HTTP backend, which
+is the same design: probe for size, hold one body for sequential `Read`, one
+ranged request per `ReadAt`, drop the body on `Seek`. Add `CreateFS` over the
+SDK's transfer manager, `CreateExclFS` over a conditional `PUT` — which since
+2024 makes the download lock exact on S3, as exact as `O_CREATE|O_EXCL` is
+locally — and `RemoveFS` with an explicit existence check, since S3's `DELETE`
+is idempotent and cannot otherwise tell "removed" from "was not there".
+
+The two defects above are the regression tests to write first.

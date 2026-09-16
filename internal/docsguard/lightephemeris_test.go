@@ -25,11 +25,26 @@ import (
 // A binary's size moves with the toolchain, the platform and the linker's mood;
 // its import graph does not. Byte thresholds either drift into meaninglessness
 // or fail on somebody's machine for a reason nobody can act on. "Does this
-// package reach gocloud.dev" has one answer, the same everywhere, and it is the
+// package reach remote" has one answer, the same everywhere, and it is the
 // thing that actually decides the size.
 //
+// # What it forbids, and why that changed
+//
+// It used to name gocloud.dev, gRPC, OpenTelemetry and protobuf: the four
+// groups that arrived through the storage layer. gocloud.dev is gone from the
+// module, so all four are now permanently absent from every package's graph and
+// a check for them could never fail again. A test that cannot fail is worse
+// than no test, because it reads as cover.
+//
+// What survives the library change is the structural rule: ephemeris must not
+// reach astrogo/remote at all. That is what #112 was about — the heavy packages
+// were the symptom, the import was the cause — and it stays true whatever
+// remote is built on next. The former four are kept alongside it as named
+// regressions, so a future dependency that reintroduces them is caught by name
+// rather than only by the import that brought them.
+//
 // A regression here is one accidental import away and would be invisible:
-// everything keeps working, the binary is simply nine megabytes bigger.
+// everything keeps working, the binary is simply megabytes bigger.
 func TestEphemerisDoesNotLinkTheStorageClient(t *testing.T) {
 	// The whole transitive graph of the root package, as the toolchain sees it.
 	out, err := exec.CommandContext(t.Context(),
@@ -40,13 +55,15 @@ func TestEphemerisDoesNotLinkTheStorageClient(t *testing.T) {
 
 	deps := strings.Split(string(out), "\n")
 
-	// Each of these arrives only through remote's storage layer, and none of
-	// them has anything to do with computing an ephemeris.
+	// The first entry is the rule; the rest are the heavyweights that used to
+	// arrive through it, kept so a reintroduction is named rather than merely
+	// implied. None has anything to do with computing an ephemeris.
 	forbidden := map[string]string{
-		"gocloud.dev":                "the object-storage client, via remote",
-		"google.golang.org/grpc":     "gRPC, which gocloud.dev/gcerrors pulls for an error-code enum",
-		"go.opentelemetry.io":        "OpenTelemetry, which gocloud.dev/blob instruments with unconditionally",
-		"google.golang.org/protobuf": "protobuf, via gRPC",
+		"github.com/TuSKan/astrogo/remote": "astrogo's I/O boundary; the kernel half registers itself instead",
+		"gocloud.dev":                      "the object-storage client this module no longer uses at all",
+		"google.golang.org/grpc":           "gRPC, which gocloud.dev/gcerrors pulled for an error-code enum",
+		"go.opentelemetry.io":              "OpenTelemetry, which gocloud.dev/blob instrumented unconditionally",
+		"google.golang.org/protobuf":       "protobuf, via gRPC",
 	}
 
 	counts := map[string]int{}

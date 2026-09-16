@@ -28,7 +28,7 @@ func TestRegistrationAdviceNamesWhatIsNeeded(t *testing.T) {
 	for _, want := range []string{
 		"https://dataspace.copernicus.eu",
 		"AWS_ACCESS_KEY_ID",
-		"remote/file/s3",
+		"no s3:// backend",
 		"EnableDownloads",
 	} {
 		if !strings.Contains(advice, want) {

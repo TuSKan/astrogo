@@ -11,11 +11,12 @@
 //
 // # Access
 //
-// Files are fetched via remote.GetFile against remote.CopernicusEODATA,
-// using remote/file/s3 as the transport (see that package's doc comment for
-// the credential contract — this package never reads a credential file
-// or an S3 key itself, and knows nothing about S3 at all). Open reads
-// bucket/key through bucket.NewReader rather than assuming a particular
+// Files are fetched via remote.GetFile against remote.CopernicusEODATA, which
+// is an s3:// URL. astrogo registers no s3:// backend at present, so that
+// fetch does not currently resolve — see AOD550 and docs/storage.md. This
+// package never reads a credential file or an S3 key itself and knows nothing
+// about S3 either way. Open reads
+// bucket/key through the filesystem it is given rather than assuming a particular
 // backend: bucket is normally the local cache remote.GetFile already
 // produced, but this package never special-cases that — the same Open
 // call works for any *file.Bucket (local, S3, ...), since scigolib/hdf5's

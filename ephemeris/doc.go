@@ -28,7 +28,7 @@
 // Measured, a program calling eph.Default().State(eph.Mars, t) went from 13.9
 // MB and 424 packages to 4.7 MB and 224, with gRPC, OpenTelemetry, protobuf and
 // gocloud.dev at zero. Adding the import restores every byte of it, to the
-// build that wants it. The same pattern remote/s3 uses; see #112.
+// build that wants it. The same pattern remote/eop uses; see #112.
 //
 // Without the import, those five sources report an error naming it.
 // [Satellites], [Default] and everything built on SOFA are unaffected.

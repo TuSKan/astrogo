@@ -27,8 +27,10 @@ const RegistrationAdvice = "Reaching Copernicus needs your own credentials, whic
 	"  2. create S3 credentials in the dashboard\n" +
 	"  3. export them as AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY, which the\n" +
 	"     AWS default chain resolves; astrogo reads no credential file of its own\n" +
-	"  4. blank-import github.com/TuSKan/astrogo/remote/file/s3, and grant\n" +
-	"     remote.EnableDownloads for remote.CopernicusEODATA"
+	"  4. grant remote.EnableDownloads for remote.CopernicusEODATA\n" +
+	"\n" +
+	"Note: astrogo has no s3:// backend at present, so this endpoint cannot be\n" +
+	"reached yet however the credentials are set. See docs/storage.md."
 
 // AODVariable is the CAMS variable this reads: "Total Aerosol Optical Depth
 // at 550nm", summed over every aerosol species the model carries.
@@ -75,10 +77,20 @@ const AODVariable = "aod550"
 //
 // One file of about 1.5 MB per hour, fetched through [remote.GetFile] and
 // cached. It is a download, so it is gated: grant
-// [remote.EnableDownloads] for [remote.CopernicusEODATA] first. The caller
-// must also blank-import remote/file/s3, which this package deliberately does not
-// — it knows nothing about S3, and pulling the AWS SDK into every build that
-// merely reads a NetCDF file would be the wrong trade.
+// [remote.EnableDownloads] for [remote.CopernicusEODATA] first.
+//
+// # This endpoint is not reachable at present
+//
+// [remote.CopernicusEODATA] is an s3:// URL and astrogo registers no s3://
+// backend, so the fetch fails at scheme resolution with an error naming the
+// schemes that are registered. Everything else here — the reader, the
+// interpolation, the variable mapping — works against a file already in the
+// cache or any other filesystem a caller hands [Open].
+//
+// The backend went with gocloud.dev; see docs/storage.md for why it has not
+// been replaced yet and what replacing it involves. This package knows nothing
+// about S3 either way, which is the point: pulling the AWS SDK into every build
+// that merely reads a NetCDF file would be the wrong trade.
 func AOD550(ctx context.Context, site *coord.Geodetic, when time.GoTime) (float64, error) {
 	if site == nil {
 		return 0, fmt.Errorf("%w: needs a site", ErrAOD)

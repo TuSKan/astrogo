@@ -21,7 +21,7 @@ import (
 // network, no file — paid for all of it because one branch of one factory
 // mentioned the type.
 //
-// The same pattern remote/s3 already uses: a subpackage that is nothing but a
+// The same pattern remote/eop uses: a subpackage that is nothing but a
 // registration, blank-imported by a build that needs the capability. See #112.
 //
 // # What it costs

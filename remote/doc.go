@@ -76,7 +76,7 @@
 // os.UserCacheDir()/astrogo. It is a bucket URL, not a filesystem path:
 //
 //	remote.SetDataDir("file:///data/astrogo?create_dir=true")
-//	remote.SetDataDir("s3://my-cache-bucket") // needs a blank import of remote/file/s3
+//	remote.SetDataDir("mem://scratch")       // for a test, or a cache that never lands
 //
 // Nothing in astrogo assumes the cache is local disk. [CacheDir] returns a
 // bucket and a key prefix; [GetFile] returns a bucket and a key. There is
