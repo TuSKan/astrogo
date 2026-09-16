@@ -1,6 +1,6 @@
 ---
 type: Added
-pr: 0
+pr: 333
 ---
 `coord.LSRKinematic` is the kinematic Local Standard of Rest — what radio
 spectroscopy means by "LSR", and what a spectral line's velocity is quoted
