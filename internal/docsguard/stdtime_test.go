@@ -45,10 +45,28 @@ var aliasedAstroTime = regexp.MustCompile(
 // for the standard library's type, LocationUTC for the location, GoDate
 // beside Date, and the duration, month and layout constants unchanged.
 //
-// Two packages are exempt, both for the same reason — they sit below
-// astrogo/time and cannot import it without closing a cycle. internal/testutil
-// uses an untyped constant instead and says so; logging needs a wall-clock
-// instant for slog.NewRecord, and astrogo/time writes to logging.
+// Two packages are exempt because they sit below astrogo/time and cannot import
+// it without closing a cycle. internal/testutil uses an untyped constant
+// instead and says so; logging needs a wall-clock instant for slog.NewRecord,
+// and astrogo/time writes to logging.
+//
+// # remote is exempt for a different reason
+//
+// Not a cycle — remote can import astrogo/time and remote/eop does. The reason
+// is that nothing in remote's storage layer holds an astrogo/time value. It
+// deals in fs.FileInfo.ModTime, http.ParseTime and a handful of retry
+// durations, all of which are the standard library's types arriving from the
+// standard library, and writing them as time.GoTime says nothing a reader did
+// not already know while making every signature differ from the io/fs one it
+// implements.
+//
+// The hazard the rule exists for does not follow. It is a package holding both
+// spellings, where a field declared `Time time.Time` says nothing about which
+// one it is — and that cannot arise here, because a package importing both
+// would have to alias one of them, and the alias check below still applies
+// everywhere. So each package under remote picks a spelling and keeps it:
+// remote/file uses the standard library's, remote/eop uses astrogo/time
+// because it deals in EOPData and ParseFinals2000A.
 func TestNoStandardLibraryTimeOutsideTimePackage(t *testing.T) {
 	root := filepath.Join("..", "..")
 
@@ -93,6 +111,13 @@ func TestNoStandardLibraryTimeOutsideTimePackage(t *testing.T) {
 		// slog.NewRecord and nothing else, so the alias package would buy
 		// nothing even if it were reachable.
 		if slash == "logging/logging.go" {
+			inTimePackage = true
+		}
+
+		// remote and everything under it, for the reason in this function's
+		// doc comment: its storage layer holds no astrogo/time value, and the
+		// two-spellings hazard is still prevented by the alias check below.
+		if slash == "remote" || strings.HasPrefix(slash, "remote/") {
 			inTimePackage = true
 		}
 
