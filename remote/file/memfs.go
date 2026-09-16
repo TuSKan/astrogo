@@ -11,8 +11,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
-
-	"github.com/TuSKan/astrogo/time"
+	"time"
 )
 
 // Registered from init — see the note on localFS's registration.
@@ -48,7 +47,7 @@ type memStore struct {
 
 type memObject struct {
 	data    []byte
-	modTime time.GoTime
+	modTime time.Time
 }
 
 var (
@@ -413,7 +412,7 @@ func (d *memDir) ReadDir(n int) ([]fs.DirEntry, error) {
 type memInfo struct {
 	name    string
 	size    int64
-	modTime time.GoTime
+	modTime time.Time
 	dir     bool
 }
 
@@ -428,7 +427,7 @@ func (i memInfo) Mode() fs.FileMode {
 	return 0o444
 }
 
-func (i memInfo) ModTime() time.GoTime       { return i.modTime }
+func (i memInfo) ModTime() time.Time         { return i.modTime }
 func (i memInfo) IsDir() bool                { return i.dir }
 func (i memInfo) Sys() any                   { return nil }
 func (i memInfo) Type() fs.FileMode          { return i.Mode().Type() }

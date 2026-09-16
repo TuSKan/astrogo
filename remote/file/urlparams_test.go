@@ -8,9 +8,9 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/remote/file"
-	"github.com/TuSKan/astrogo/time"
 )
 
 // The portable bucket-URL wrappers, tested where they apply.

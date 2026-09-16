@@ -9,9 +9,9 @@ import (
 	"net/http/httptest"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
-
-	"github.com/TuSKan/astrogo/time"
+	"time"
 )
 
 // payload is deterministic and longer than several chunks at the sizes the
@@ -157,7 +157,7 @@ func TestReaderAtOverHTTPBucket(t *testing.T) {
 	data := payload(1000)
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		http.ServeContent(w, r, "obj", time.GoTime{}, bytes.NewReader(data))
+		http.ServeContent(w, r, "obj", time.Time{}, bytes.NewReader(data))
 	}))
 	defer srv.Close()
 
@@ -219,4 +219,79 @@ func sizeOf(t *testing.T, f File) int64 {
 	}
 
 	return info.Size()
+}
+
+// TestOpenPassesSequentialReadsThrough is the other half of [Open]'s contract,
+// and the half a chunk cache makes easy to get wrong.
+//
+// ReadAt is served from cached chunks; Read and Seek are not. Serving a
+// sequential read from the cache would turn one request into one per chunk —
+// for a 3 GB kernel at 64 KiB, about fifty thousand — which is the opposite of
+// what the cache is for. So the assertion is on the request count, not the
+// bytes: the bytes are right either way.
+func TestOpenPassesSequentialReadsThrough(t *testing.T) {
+	data := payload(16 << 10)
+
+	var gets atomic.Int32
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gets.Add(1)
+		http.ServeContent(w, r, "obj", time.Time{}, bytes.NewReader(data))
+	}))
+	defer srv.Close()
+
+	fsys, err := OpenFS(srv.URL + "/")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// A chunk size far smaller than the object, so a cache-served read would
+	// be unmistakable in the count.
+	f, err := Open(t.Context(), fsys, "obj", WithChunkSize(512), WithCachedChunks(2))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defer func() { _ = f.Close() }()
+
+	gets.Store(0)
+
+	got, err := io.ReadAll(f)
+	if err != nil {
+		t.Fatalf("ReadAll: %v", err)
+	}
+
+	if !bytes.Equal(got, data) {
+		t.Errorf("sequential read returned %d bytes, want %d", len(got), len(data))
+	}
+
+	if n := gets.Load(); n != 1 {
+		t.Errorf("reading the object took %d requests, want 1 — Read is being served from "+
+			"the chunk cache instead of passing through", n)
+	}
+
+	// Seek passes through too, and the read after it resumes from there.
+	if _, err := f.Seek(1000, io.SeekStart); err != nil {
+		t.Fatalf("Seek: %v", err)
+	}
+
+	tail := make([]byte, 100)
+	if _, err := io.ReadFull(f, tail); err != nil {
+		t.Fatalf("ReadFull after Seek: %v", err)
+	}
+
+	if !bytes.Equal(tail, data[1000:1100]) {
+		t.Error("the read after a Seek returned the wrong bytes")
+	}
+
+	// And Size reports what Stat said at open time, which is what a caller
+	// building an io.SectionReader over this needs.
+	ra, ok := f.(*ReaderAt)
+	if !ok {
+		t.Fatalf("Open returned %T, not *ReaderAt", f)
+	}
+
+	if ra.Size() != int64(len(data)) {
+		t.Errorf("Size() = %d, want %d", ra.Size(), len(data))
+	}
 }

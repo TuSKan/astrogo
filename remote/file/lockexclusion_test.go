@@ -6,8 +6,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
-
-	"github.com/TuSKan/astrogo/time"
+	"time"
 )
 
 // TestAcquireLockAdmitsOneHolderAtATime is the regression.

@@ -11,8 +11,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-
-	"github.com/TuSKan/astrogo/time"
+	"time"
 )
 
 // SourceETagSuffix names the sidecar recording the source ETag a partially
