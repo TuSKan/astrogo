@@ -34,6 +34,14 @@ var (
 	// ErrDiscarded indicates a staged write thrown away because an earlier
 	// Write failed. The object it would have replaced is untouched.
 	ErrDiscarded = errors.New("remote/file: staged write discarded after a failed write")
+
+	// ErrHTTPStatus indicates an HTTP response astrogo cannot interpret.
+	//
+	// The statuses that mean something specific are translated instead: 404
+	// and 410 become fs.ErrNotExist, 401 and 403 become fs.ErrPermission, so a
+	// caller uses errors.Is with the standard values rather than learning a
+	// second vocabulary.
+	ErrHTTPStatus = errors.New("remote/file: unexpected HTTP status")
 )
 
 // Opener builds a filesystem from a parsed URL.
