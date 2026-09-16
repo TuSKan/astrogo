@@ -450,21 +450,6 @@ func Fk54z(r2000, d2000, bepoch float64) (r1950, d1950, dr1950, dd1950 float64) 
 	return r1950, d1950, dr1950, dd1950
 }
 
-// Fk52h converts J2000.0 FK5 star data to the Hipparcos frame, which is the
-// ICRS as realised by the Hipparcos catalogue.
-func Fk52h(r5, d5, dr5, dd5, px5, rv5 float64) (rh, dh, drh, ddh, pxh, rvh float64) {
-	gofa.Fk52h(r5, d5, dr5, dd5, px5, rv5, &rh, &dh, &drh, &ddh, &pxh, &rvh)
-
-	return rh, dh, drh, ddh, pxh, rvh
-}
-
-// H2fk5 is the inverse of [Fk52h]: Hipparcos (ICRS) star data to J2000.0 FK5.
-func H2fk5(rh, dh, drh, ddh, pxh, rvh float64) (r5, d5, dr5, dd5, px5, rv5 float64) {
-	gofa.H2fk5(rh, dh, drh, ddh, pxh, rvh, &r5, &d5, &dr5, &dd5, &px5, &rv5)
-
-	return r5, d5, dr5, dd5, px5, rv5
-}
-
 // Fk5hz converts a J2000.0 FK5 position with no proper motion to Hipparcos
 // (ICRS), at the TT epoch given by the two-part Julian date. The frames differ
 // by a small rotation *and* a spin, so the epoch matters.
