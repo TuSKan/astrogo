@@ -254,8 +254,14 @@ const (
 	//
 	// Access needs Copernicus Data Space credentials (free registration,
 	// then S3 keys from the user's own dashboard), resolved through AWS
-	// SDK v2's standard chain. astrogo reads no credential file of its
-	// own. A build using this endpoint must blank-import remote/s3.
+	// SDK v2's standard chain. astrogo reads no credential file of its own.
+	//
+	// It is registered but NOT currently reachable: this is an s3:// URL and
+	// astrogo has no s3:// backend, so resolving it fails with an error naming
+	// the schemes that are registered. The entry stays because the URL and the
+	// key layout are still right and the endpoint works the day a backend
+	// lands; removing it would lose that and tell a reader less. See
+	// docs/storage.md.
 	CopernicusEODATA EndpointID = "copernicus.eodata"
 )
 

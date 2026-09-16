@@ -462,7 +462,7 @@ happens.
 | MPC observatory-code list | `remote.MPCObsCodes` | ~150 KB | `plan.NewMPCSite(ctx, "568")` / `plan.MPCObservatories(ctx)` |
 | MPC orbital elements (MPCORB format) | `remote.MPCORB` | 0.5 MB (`PHA.txt`) – 317 MB (`MPCORB.DAT`, 94 MB gzipped) | `mpcorb.Open(ctx, "NEA.txt")` — streamed, so a caller filtering 500 objects never holds the other million and a half |
 | VIIRS annual nighttime-lights composite (2012-2025, no API key) | `remote.VIIRSAnnual` | ~700 MB-1 GB per year | `viirs.Open(ctx, year)`, for the spatial distribution of artificial emission — CC0, credit lightpollutionmap.info + NASA Black Marble |
-| CAMS global reanalysis NetCDF files (Copernicus EODATA S3) | `remote.CopernicusEODATA` | 1.3 MB (lnsp) – ~180 MB (a 137-level aerosol tracer) | `atmosphere/dataset/cams.Open` — requires Copernicus Data Space S3 credentials (AWS SDK default chain) and a blank import of `remote/file/s3` |
+| CAMS global reanalysis NetCDF files (Copernicus EODATA S3) | `remote.CopernicusEODATA` | 1.3 MB (lnsp) – ~180 MB (a 137-level aerosol tracer) | `atmosphere/dataset/cams.Open` — **not currently reachable**: this endpoint is an `s3://` URL and astrogo registers no `s3://` backend (see `docs/storage.md`). The reader works against a cached or caller-supplied file. |
 
 ### What you give up by staying offline
 
@@ -582,7 +582,7 @@ local disk:
 
 ```go
 remote.SetDataDir("file:///data/astrogo-cache?create_dir=true")
-remote.SetDataDir("s3://my-cache-bucket") // needs: import _ "github.com/TuSKan/astrogo/remote/file/s3"
+remote.SetDataDir("mem://scratch")       // in-memory, for tests
 ```
 
 The `ASTROGO_CACHE_DIR` environment variable sets the same thing, and also takes a URL.
