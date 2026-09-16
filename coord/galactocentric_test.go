@@ -375,3 +375,100 @@ func TestParallaxDistanceFeedsTheFrame(t *testing.T) {
 
 	testutil.AssertRelNear(t, "radius", got.Radius(), f.SunDistance()-1000, 1e-3)
 }
+
+// TestAPositionEnteredByHandIsIndistinguishableFromAComputedOne exercises
+// [coord.NewGalactocentric], which is what makes [coord.GalactocentricFrame.ToICRS]
+// reachable at all for a position astrogo did not compute itself.
+//
+// That is the constructor's whole reason to exist: catalogues of Galactic
+// structure publish Cartesian X, Y, Z directly — globular cluster compilations
+// and stream tracks among them — and without a way to enter one, the inverse
+// transform could only ever be handed output from the forward one.
+//
+// So the property asserted is that the two origins are interchangeable: a
+// position rebuilt from its own components converts back to the same sky
+// direction and distance as the original.
+func TestAPositionEnteredByHandIsIndistinguishableFromAComputedOne(t *testing.T) {
+	t.Parallel()
+
+	f := coord.DefaultGalactocentricFrame()
+
+	star := coord.GalacticToICRS(coord.NewGalactic(angle.Deg(45), angle.Deg(-20)))
+	computed := f.FromICRS(star, 3000)
+
+	rebuilt := coord.NewGalactocentric(computed.X(), computed.Y(), computed.Z())
+
+	if rebuilt != computed {
+		t.Errorf("rebuilt %s differs from computed %s", rebuilt, computed)
+	}
+
+	// And it converts back the same way, which is the use the constructor is
+	// for — entering somebody else's X, Y, Z and asking where on the sky it is.
+	wantDir, wantDist := f.ToICRS(computed)
+	gotDir, gotDist := f.ToICRS(rebuilt)
+
+	if sep := coord.Separation(gotDir, wantDir).Arcseconds(); sep > 1e-9 {
+		t.Errorf("direction differs by %.3g arcsec", sep)
+	}
+
+	testutil.AssertNear(t, "distance", gotDist, wantDist, 1e-9)
+	testutil.AssertNear(t, "round trip distance", gotDist, 3000, 1e-9)
+}
+
+// TestTheAccessorsAllReadTheSameVector checks that [coord.Galactocentric.Vector]
+// and the three component accessors cannot disagree, and that the two radii are
+// derived from that same vector rather than kept alongside it.
+//
+// Worth asserting because the type stores one vector and exposes five views of
+// it: a future change that cached a radius, or that returned a copy from
+// Vector while the components read the original, would be invisible to every
+// other test here.
+func TestTheAccessorsAllReadTheSameVector(t *testing.T) {
+	t.Parallel()
+
+	// A deliberately asymmetric position, so a swapped pair of components
+	// cannot pass.
+	c := coord.NewGalactocentric(-1234.5, 678.25, -90.125)
+
+	v := c.Vector()
+
+	testutil.AssertExact(t, "Vector X against X()", v.X, c.X())
+	testutil.AssertExact(t, "Vector Y against Y()", v.Y, c.Y())
+	testutil.AssertExact(t, "Vector Z against Z()", v.Z, c.Z())
+
+	testutil.AssertExact(t, "Distance against the vector's norm", c.Distance(), v.Norm())
+	testutil.AssertNear(t, "Radius against the in-plane hypotenuse",
+		c.Radius(), math.Hypot(v.X, v.Y), 1e-12)
+
+	// Radius ignores Z and Distance does not, which is the distinction the two
+	// doc comments turn on.
+	if c.Radius() >= c.Distance() {
+		t.Errorf("Radius %.4f is not less than Distance %.4f for a position off the midplane",
+			c.Radius(), c.Distance())
+	}
+}
+
+// TestStringNamesItsUnits pins the rendering, and specifically that it says
+// "pc".
+//
+// A bare Cartesian triple with no unit attached is the exact failure this type
+// exists to prevent — it is why [coord.GalactocentricFrame.FromICRS] takes its
+// distance as a named argument instead of reading [coord.ICRS.Dist]. A String
+// that dropped the unit would put that ambiguity straight back into every log
+// line and error message.
+func TestStringNamesItsUnits(t *testing.T) {
+	t.Parallel()
+
+	got := coord.NewGalactocentric(-8177.9735, 0, 20.8).String()
+
+	const want = "Galactocentric X -8177.974 Y 0.000 Z 20.800 pc"
+	if got != want {
+		t.Errorf("String() = %q, want %q", got, want)
+	}
+
+	// The Sun renders through the same path, so a frame built from the cited
+	// parameters is legible without a debugger.
+	if sun := coord.DefaultGalactocentricFrame().SunPosition().String(); sun != want {
+		t.Errorf("the default frame's Sun renders as %q, want %q", sun, want)
+	}
+}
