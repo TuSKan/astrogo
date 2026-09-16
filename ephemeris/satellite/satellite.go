@@ -4,17 +4,14 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"strconv"
-	"strings"
 
 	"github.com/TuSKan/astrogo/constants"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/ephemeris/core"
+	"github.com/TuSKan/astrogo/ephemeris/satellite/sgp4"
 	"github.com/TuSKan/astrogo/internal/gofaext"
 	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/vector"
-
-	gosatellite "github.com/joshuaferrara/go-satellite"
 )
 
 // kmPerAU is the number of kilometres in one Astronomical Unit.
@@ -52,89 +49,79 @@ var ErrUnexpectedID = errors.New("satellite: state queried for an id other than 
 // has never been. The last character of each line exists to catch exactly
 // that, and is worth checking before trusting the rest.
 //
-// When a field is NOT still a number, the underlying SGP4 implementation does
-// something worse than propagate wrongly: see [ValidateTLE].
+// Both halves of that check now live in
+// [github.com/TuSKan/astrogo/ephemeris/satellite/sgp4], which separates them:
+// [sgp4.VerifyTLEChecksums] asks whether the text arrived intact and
+// [sgp4.ParseTLE] asks whether the elements make sense. This error wraps
+// either, so an existing caller matching on it is unaffected.
 var ErrMalformedTLE = errors.New("satellite: malformed TLE")
-
-// tleLineLength is the fixed width of a TLE line, checksum included.
-const tleLineLength = 69
 
 // Satellite wraps a NORAD TLE element set with SGP4 propagation state.
 type Satellite struct {
-	Name       string
-	sat        gosatellite.Satellite
+	Name string
+
+	// MeanMotion is the element set's own, in revolutions per day. Public
+	// since before this type held a propagator, and kept.
 	MeanMotion float64
 
-	// epoch is the element set's own epoch, and epochFracSec the fractional
-	// second within it. The backend truncates the epoch to a whole second
-	// when it builds jdsatepoch, so propagateECI has to measure its
-	// sub-second correction from this rather than from zero -- see there.
-	epoch        time.Time
-	epochFracSec float64
+	// prop holds the initialised model. It is immutable, so a *Satellite is
+	// as safe to share across goroutines as the propagator inside it.
+	prop *sgp4.Propagator
 
-	// ecc and inclRad are kept for [Satellite.Verified], which reproduces
-	// SGP4's own perigee to decide which side of its simplified-drag branch
-	// this element set falls on. They come from the same parse as MeanMotion,
-	// so the three cannot disagree about the orbit they describe.
-	ecc     float64
-	inclRad float64
+	// epoch is the element set's own epoch. Read straight from prop's
+	// elements, so the two cannot disagree.
+	epoch time.Time
 }
 
 // NewFromTLE creates a Satellite from raw TLE lines.
 //
-// The element set is checked for well-formedness before SGP4 sees it: see
-// [ErrMalformedTLE] for why, since SGP4 itself will accept a corrupted set
-// and propagate it without complaint.
+// The element set is checked for well-formedness before SGP4 sees it — see
+// [ErrMalformedTLE] — because SGP4 itself will accept a corrupted set and
+// propagate it without complaint.
+//
+// WGS-72 is used, which is [sgp4]'s default and is the gravity model TLEs are
+// fitted with. Choosing otherwise is a model mismatch rather than a
+// refinement; see [sgp4.Gravity].
 func NewFromTLE(name, line1, line2 string) (*Satellite, error) {
-	if err := validateTLEStructure(line1, line2); err != nil {
-		return nil, err
+	// Not ValidateTLE, although the two ask the same questions: that would
+	// parse the element set and throw the result away, then parse it again
+	// here. Parsing one input twice is how two places come to disagree about
+	// what it says, which is a defect this package has already had once.
+	if err := sgp4.VerifyTLEChecksums(line1, line2); err != nil {
+		return nil, fmt.Errorf("%w: %w", ErrMalformedTLE, err)
 	}
 
-	// Both the guard against TLEToSat's os.Exit and the source of MeanMotion:
-	// one parse, so the value this reports can never disagree with the one
-	// SGP4 propagates from.
-	el, err := parseTLENumerics(line1, line2)
+	el, err := sgp4.ParseTLEName(name, line1, line2)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%w: %w", ErrMalformedTLE, err)
 	}
 
-	// The same conversion propagateECI applies to a query time, so the two
-	// fractional seconds are on identical footing and cancel exactly when the
-	// query lands a whole number of seconds after the epoch.
-	_, _, _, _, _, _, epochFracSec := timeToComponents(el.epoch)
-
-	// WGS-72, not WGS-84, and the distinction is not cosmetic.
-	//
-	// A TLE does not carry a position. It carries *mean elements*, which are
-	// the output of fitting observations through SGP4 itself — and the fit is
-	// performed by Space-Track using the WGS-72 constants. Feeding those
-	// elements back through a propagator configured for WGS-84 asks a
-	// different model to interpret numbers produced by this one, and the
-	// elements simply do not mean the same thing to it.
-	//
-	// Vallado's own verification suite measures the cost, since tcppver.out is
-	// generated with WGS-72. Same code, same data, this constant alone:
-	//
-	//	WGS-84  p50 0.0346  p90 0.2522  p99 0.2636  max 0.2889 km
-	//	WGS-72  p50 0.0000  p90 0.0002  p99 0.0009  max 0.0031 km
-	//
-	// Ninety-three times the error, in every satellite position this package
-	// produces — 289 metres where there should be three.
-	sat := gosatellite.TLEToSat(line1, line2, gosatellite.GravityWGS72)
-	if sat.Error != 0 {
-		return nil, fmt.Errorf("%w: sgp4 init error %d: %s", ErrPropagation, sat.Error, sat.ErrorStr)
+	// sgp4.New re-runs Elements.Validate, which ParseTLEName has already
+	// passed, so with the default options there is no input that reaches this
+	// branch today. It is wrapped rather than ignored because the failure it
+	// would report is a propagation one, not a parse one, and a caller
+	// matching on ErrPropagation should not have to care that the distinction
+	// is currently theoretical.
+	prop, err := sgp4.New(el)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", ErrPropagation, err)
 	}
 
 	return &Satellite{
-		Name:         name,
-		MeanMotion:   el.meanMotion,
-		sat:          sat,
-		epoch:        el.epoch,
-		epochFracSec: epochFracSec,
-		ecc:          el.ecc,
-		inclRad:      el.inclRad,
+		Name:       el.Name,
+		MeanMotion: el.MeanMotion,
+		prop:       prop,
+		epoch:      el.Epoch,
 	}, nil
 }
+
+// Propagator returns the underlying SGP4 model.
+//
+// Exposed because this type is an ephemeris provider — it answers in GCRS
+// astronomical units, which is the wrong shape for a caller who wants raw TEME
+// kilometres, the element set as parsed, or the model's own branch predicates.
+// Those callers should not have to reach for a second parse of the same text.
+func (s *Satellite) Propagator() *sgp4.Propagator { return s.prop }
 
 // State returns the geocentric position/velocity in GCRS (AU, AU/day),
 // implementing the [core.Provider] interface contract.
@@ -192,318 +179,71 @@ func (s *Satellite) Altitude(t time.Time) (float64, error) {
 
 // ValidateTLE reports whether the two lines form a well-formed element set.
 //
-// Five things are checked, in the order a corrupted set is most likely to fail
+// Four things are checked, in the order a corrupted set is most likely to fail
 // them:
 //
-//   - each line is the standard 69 characters;
-//   - the first begins with "1" and the second with "2", which catches them
-//     being supplied in the wrong order;
-//   - the two carry the same satellite number, which catches line 1 of one
-//     object pasted against line 2 of another - a substitution no checksum can
-//     see, since each line is individually intact;
+//   - each line carries at least the standard 69 columns and begins with its
+//     own line number, which catches truncation and catches the two being
+//     supplied in the wrong order. Trailing whitespace and anything appended
+//     past column 69 are accepted rather than refused: feeds emit CRLF and
+//     padding constantly, Vallado's own verification file appends three fields
+//     to every line 2, and neither loses data. A line SHORTER than 69 does, and
+//     is refused;
 //   - each line's modulo-10 checksum matches its own last character;
-//   - every field the SGP4 backend will read as a number parses as one.
+//   - the two carry the same satellite number, which catches line 1 of one
+//     object pasted against line 2 of another — a substitution no checksum can
+//     see, since each line is individually intact;
+//   - every field parses as the number the format says it is, and the
+//     resulting elements are physically possible.
 //
 // None of this validates the orbit. It establishes that the element set
 // arrived as it was sent, which is the part SGP4 cannot tell for itself.
 //
-// # Why the numeric check is not merely tidiness
+// # What this used to be
 //
-// The backend (joshuaferrara/go-satellite) parses the twelve numeric fields
-// through helpers that call log.Fatal on a parse error - os.Exit(1), from
-// inside a library, taking the caller's whole process with it. No error is
-// returned, no panic is raised, and there is nothing to recover: a program
-// that fed one bad element set into a batch of ten thousand simply stops.
-// Confirmed by running it, not inferred from reading it.
+// Eighty lines reproducing the old backend's own column slices and string
+// surgery, field for field, because that backend parsed them through helpers
+// that called log.Fatal on a parse error — os.Exit(1), from inside a library,
+// taking the caller's whole process with it. A program that fed one bad
+// element set into a batch of ten thousand simply stopped. Another forty lines
+// predicted a panic in its day-of-year arithmetic, which a fuzzer found in
+// about two seconds.
 //
-// A checksum does not close this. It is a modulo-10 sum in which letters,
-// spaces and punctuation all count for nothing, so a field can be replaced
-// with text - a truncated feed, a hand-built set, an "N/A" placeholder, a
-// generator that pads with spaces - and still carry a correct checksum.
-//
-// So this parses each field exactly as the backend will, using the same
-// column slices and the same two-space Replace (a field with three spaces
-// where the backend removes two is one the backend would die on, and is
-// therefore refused here rather than accepted as close enough), and reports
-// [ErrMalformedTLE] naming the field. NewFromTLE runs this before SGP4 sees
-// anything, which is the only place the guard is any use.
+// None of that is needed now. [sgp4.ParseTLE] returns errors, names the field
+// that failed, and cannot exit anybody's process, so this is the two calls it
+// takes to ask both questions — and the reason it is still one function is
+// that "did this arrive intact" is exactly the question a caller reading a
+// network feed wants answered in one place.
 func ValidateTLE(line1, line2 string) error {
-	if err := validateTLEStructure(line1, line2); err != nil {
-		return err
+	if err := sgp4.VerifyTLEChecksums(line1, line2); err != nil {
+		return fmt.Errorf("%w: %w", ErrMalformedTLE, err)
 	}
 
-	_, err := parseTLENumerics(line1, line2)
-
-	return err
-}
-
-// validateTLEStructure is ValidateTLE's length/ordering/checksum half, split
-// out so NewFromTLE can run it before parseTLENumerics without paying for the
-// numeric parse twice - it needs the mean motion that parse produces.
-func validateTLEStructure(line1, line2 string) error {
-	for i, line := range [2]string{line1, line2} {
-		want := byte('1' + i)
-
-		if len(line) != tleLineLength {
-			return fmt.Errorf("%w: line %d is %d characters, want %d",
-				ErrMalformedTLE, i+1, len(line), tleLineLength)
-		}
-
-		if line[0] != want {
-			return fmt.Errorf("%w: line %d begins with %q, want %q - are the two lines swapped?",
-				ErrMalformedTLE, i+1, line[0], want)
-		}
-
-		// Compared as a digit rather than by converting the sum to a byte, so
-		// that a checksum character which is not a digit at all is refused
-		// here rather than wrapping into some other digit's value.
-		got := line[tleLineLength-1]
-		if sum := tleChecksum(line[:tleLineLength-1]); got < '0' || got > '9' || int(got-'0') != sum {
-			return fmt.Errorf("%w: line %d checksum is %q, computed %d - a character has been altered or lost",
-				ErrMalformedTLE, i+1, got, sum)
-		}
-	}
-
-	// Columns 3-7 carry the satellite catalogue number on both lines.
-	if a, b := line1[2:7], line2[2:7]; a != b {
-		return fmt.Errorf("%w: line 1 is satellite %q and line 2 is satellite %q",
-			ErrMalformedTLE, strings.TrimSpace(a), strings.TrimSpace(b))
+	if _, err := sgp4.ParseTLE(line1, line2); err != nil {
+		return fmt.Errorf("%w: %w", ErrMalformedTLE, err)
 	}
 
 	return nil
-}
-
-// elements are the orbital values this package keeps from a TLE, parsed once.
-//
-// Kept together rather than returned as four values because they describe one
-// orbit: MeanMotion, the epoch propagateECI measures from, and the pair
-// [Satellite.Verified] needs to reproduce SGP4's own perigee. Parsing them in
-// one pass is what stops any of them disagreeing about the element set.
-type elements struct {
-	meanMotion float64 // revolutions per day
-	ecc        float64
-	inclRad    float64
-	epoch      time.Time
-}
-
-// parseTLENumerics parses every field the SGP4 backend will parse, from the
-// same columns and with the same string surgery, and returns the mean motion
-// (rev/day, line 2 columns 53-63) as the one value this package keeps.
-//
-// The transformations are copied from the backend's ParseTLE rather than
-// written afresh, deliberately: the contract is not "these look like numbers"
-// but "these are the exact strings that function will hand to strconv", and
-// only an identical construction can promise that. Notably ecco is prefixed
-// with "." (a TLE stores eccentricity with an assumed leading decimal point)
-// and nddot/bstar are reassembled from three slices into a mantissa-exponent
-// form, so neither field parses as a number in its raw column form at all.
-//
-// The two-space Replace count is copied too, and matters: a field carrying
-// three spaces would leave one behind, and " 15.72" does not parse. Using -1
-// here would accept a set the backend then dies on, which is worse than not
-// checking, because the guard would read as if it worked.
-//
-// Callers must have established the 69-character length first
-// (validateTLEStructure) - every slice below indexes fixed columns.
-func parseTLENumerics(line1, line2 string) (elements, error) {
-	var el elements
-
-	ints := [...]struct {
-		name  string
-		value string
-	}{
-		{"satellite number", strings.TrimSpace(line1[2:7])},
-		{"epoch year", line1[18:20]},
-	}
-
-	for _, f := range ints {
-		if _, err := strconv.ParseInt(f.value, 10, 0); err != nil {
-			return elements{}, fmt.Errorf("%w: %s is %q, which is not an integer", ErrMalformedTLE, f.name, f.value)
-		}
-	}
-
-	floats := [...]struct {
-		name  string
-		value string
-	}{
-		{"epoch day", line1[20:32]},
-		{"first derivative of mean motion", strings.Replace(line1[33:43], " ", "", 2)},
-		{"second derivative of mean motion", strings.Replace(line1[44:45]+"."+line1[45:50]+"e"+line1[50:52], " ", "", 2)},
-		{"B* drag term", strings.Replace(line1[53:54]+"."+line1[54:59]+"e"+line1[59:61], " ", "", 2)},
-		{"inclination", strings.Replace(line2[8:16], " ", "", 2)},
-		{"right ascension of the ascending node", strings.Replace(line2[17:25], " ", "", 2)},
-		{"eccentricity", "." + line2[26:33]},
-		{"argument of perigee", strings.Replace(line2[34:42], " ", "", 2)},
-		{"mean anomaly", strings.Replace(line2[43:51], " ", "", 2)},
-		{"mean motion", strings.Replace(line2[52:63], " ", "", 2)},
-	}
-
-	for _, f := range floats {
-		v, err := strconv.ParseFloat(f.value, 64)
-		if err != nil {
-			return elements{}, fmt.Errorf("%w: %s is %q, which is not a number", ErrMalformedTLE, f.name, f.value)
-		}
-
-		switch f.name {
-		case "mean motion":
-			el.meanMotion = v
-		case "eccentricity":
-			el.ecc = v
-		case "inclination":
-			el.inclRad = v * math.Pi / 180
-		case "epoch day":
-			if err := checkEpochDay(line1, v); err != nil {
-				return elements{}, err
-			}
-		}
-	}
-
-	el.epoch = tleEpoch(line1)
-
-	return el, nil
-}
-
-// checkEpochDay refuses a day-of-year the backend would walk off the end of.
-//
-// days2mdhms subtracts month lengths from the day of year to find the calendar
-// date, and its loop is guarded by `i < 22` against a twelve-element array:
-//
-//	lmonth := [12]int{31, 28, 31, ...}
-//	for dayofyr > inttemp+float64(lmonth[int(i-1)]) && i < 22 {
-//
-// Once the year is used up, i reaches 13 and lmonth[12] panics. Any day of year
-// past the end of the year does it -- found by FuzzValidateTLE within two
-// seconds, on an element set that is 69 columns, checksum-valid, and numeric in
-// every field, so nothing else in this package had reason to turn it away. The
-// crasher is committed under testdata/fuzz.
-//
-// This is the second crash path in the same dependency that astrogo has had to
-// guard rather than use: see ValidateTLE's note on log.Fatal. Both are recorded
-// on #120, which asks whether to keep it.
-//
-// The bound mirrors the backend's own leap-year test (year%4 == 0) rather than
-// the Gregorian rule, because the point is to predict what that code will do.
-// Within a TLE's two-digit year window -- 1957 to 2056 -- the two agree anyway,
-// since 1900 and 2100 are both out of range.
-func checkEpochDay(line1 string, doy float64) error {
-	yy, err := strconv.Atoi(strings.TrimSpace(line1[18:20]))
-	if err != nil {
-		return fmt.Errorf("%w: epoch year is %q, which is not an integer", ErrMalformedTLE, line1[18:20])
-	}
-
-	year := 2000 + yy
-	if yy >= 57 {
-		year = 1900 + yy
-	}
-
-	lastDay := 365.0
-	if year%4 == 0 {
-		lastDay = 366.0
-	}
-
-	// days2mdhms floors the value first, so a fractional day within the last
-	// day of the year is fine; 1.0 is midnight on January 1st.
-	if day := math.Floor(doy); day < 1 || day > lastDay {
-		return fmt.Errorf("%w: epoch day %g is not a day of %d, which has %g",
-			ErrMalformedTLE, doy, year, lastDay)
-	}
-
-	return nil
-}
-
-// tleEpoch reconstructs the element set's epoch from line 1's two-digit year
-// (columns 19-20) and fractional day of year (21-32).
-//
-// The two-digit year follows the NORAD convention the backend also uses: 57
-// and above is 19xx, below is 20xx. It is not a Y2K bug to be fixed here --
-// the format has no other year, so the window is the format's, and changing it
-// would disagree with the propagator being driven.
-//
-// Both fields are already known to parse; this runs after the loop above.
-func tleEpoch(line1 string) time.Time {
-	yy, _ := strconv.Atoi(strings.TrimSpace(line1[18:20]))
-
-	year := 2000 + yy
-	if yy >= 57 {
-		year = 1900 + yy
-	}
-
-	// Day of year is 1-based: day 1.0 is midnight on January 1st.
-	doy, _ := strconv.ParseFloat(strings.TrimSpace(line1[20:32]), 64)
-
-	jan1 := time.Date(year, 1, 1, 0, 0, 0, 0, time.LocationUTC)
-
-	return jan1.Add(time.Duration((doy - 1) * float64(24*time.Hour)))
-}
-
-// tleChecksum is the modulo-10 sum a TLE line's last character records: every
-// digit counts for its value and every minus sign for one, with everything
-// else - letters, spaces, decimal points and plus signs - counting for
-// nothing.
-func tleChecksum(line string) int {
-	sum := 0
-
-	for _, c := range line {
-		switch {
-		case c >= '0' && c <= '9':
-			sum += int(c - '0')
-		case c == '-':
-			sum++
-		}
-	}
-
-	return sum % 10
 }
 
 // propagateECI returns the TEME position and velocity (km, km/s) at time t.
 //
-// # The sub-second correction, and why it is measured from the epoch
+// # What used to be here
 //
-// The go-satellite Propagate API accepts integer seconds only, so it can be
-// asked for a state at the truncated second and the sub-second remainder has
-// to be recovered by a linear step along the velocity vector.
+// Forty lines correcting for an API that accepted whole seconds only. The old
+// backend's Propagate took integer year/month/day/hour/minute/second, and
+// built its own jdsatepoch the same way, so the correction was not frac(t) but
+// frac(t) − frac(epoch) — a subtlety that left a fixed per-element-set offset
+// of up to one second of motion, 7.5 km for a low Earth orbit, and was worst
+// at the epoch itself where the answer should be exact. It measured 5.94 km on
+// Vallado's satellite 5 before the reference suite caught it.
 //
-// The subtle part is what the remainder is measured from. Propagate computes
-// its own time argument as
-//
-//	tsince = (JDay(truncated query) - sat.jdsatepoch) * 1440
-//
-// and `jdsatepoch` is itself built with `JDay(..., int(sec))` — the element
-// set's epoch is truncated to a whole second exactly like the query is. Both
-// ends of the subtraction lose their fraction, so what Propagate actually
-// evaluates is offset from the intended instant by
-//
-//	frac(t) - frac(epoch)
-//
-// not by frac(t). Correcting by frac(t) alone — which this function did until
-// the Vallado verification suite was run against it — leaves a residual of
-// vel * frac(epoch): a fixed offset per element set, up to one second of
-// motion, which is 7.5 km for a low Earth orbit and was measured at 5.94 km
-// for Vallado's own satellite 5. It is worst at the epoch itself, where the
-// answer should be exact, and it does not average out, because frac(epoch) is
-// a property of the element set rather than of the query.
-//
-// See TestSGP4AgreesWithValladoReferenceVectors, which measures this end to
-// end and would fail again at kilometre scale if the origin were dropped.
+// [sgp4.Propagator.AtTime] takes the instant. There is nothing to correct.
 func (s *Satellite) propagateECI(t time.Time) (pos, vel vector.Vec3, err error) {
-	year, month, day, hour, minute, second, fracSec := timeToComponents(t)
-	eciPos, eciVel := gosatellite.Propagate(s.sat, year, month, day, hour, minute, second)
-
-	// Check for propagation failure (NaN or zero position).
-	if math.IsNaN(eciPos.X) || math.IsNaN(eciPos.Y) || math.IsNaN(eciPos.Z) {
-		return vector.Vec3{}, vector.Vec3{}, fmt.Errorf(
-			"%w: NaN position at %s", ErrPropagation, t)
+	pos, vel, err = s.prop.AtTime(t)
+	if err != nil {
+		return vector.Vec3{}, vector.Vec3{}, fmt.Errorf("%w: %w", ErrPropagation, err)
 	}
-
-	vel = vector.V3(eciVel.X, eciVel.Y, eciVel.Z)
-
-	// pos_corrected = pos_truncated + vel * (frac(t) - frac(epoch))
-	dt := fracSec - s.epochFracSec
-	pos = vector.V3(
-		eciPos.X+eciVel.X*dt,
-		eciPos.Y+eciVel.Y*dt,
-		eciPos.Z+eciVel.Z*dt,
-	)
 
 	return pos, vel, nil
 }
@@ -608,38 +348,4 @@ func temeToGCRS(pos, vel vector.Vec3, t time.Time) (gcrsPos, gcrsVel vector.Vec3
 	)
 
 	return gcrsPos, gcrsVel
-}
-
-// timeToComponents extracts calendar components from an astrogo time for SGP4.
-// Returns integer year/month/day/hour/min/sec and the fractional second
-// remainder for sub-second velocity interpolation.
-func timeToComponents(t time.Time) (year, month, day, hour, minute, second int, fracSec float64) {
-	// SGP4 is defined against UTC, so normalise before reading the calendar
-	// fields. Without this the caller's scale is silently reinterpreted: a TT
-	// instant lands 69.184 s late, which for the ISS at 7.66 km/s is 530 km,
-	// and TAI lands 37 s late for 283 km. The type is scale-aware precisely so
-	// this cannot be left to the caller.
-	//
-	// temeToGCRS in this same file already does the equivalent (t.TT()), and
-	// coord.NewContext opens with t = t.UTC(); this brings SGP4 in line with
-	// both.
-	t = t.UTC()
-
-	// Extract month/day from the Julian Date.
-	jd1, jd2 := t.JDParts()
-	y, m, d, frac, _ := gofaext.JdToDate(jd1, jd2)
-	year = y
-	month = m
-	day = d
-
-	// Convert fractional day to h/m/s.
-	totalSec := frac * secPerDay
-	hour = int(totalSec / 3600)
-	totalSec -= float64(hour) * 3600
-	minute = int(totalSec / 60)
-	totalSec -= float64(minute) * 60
-	second = int(totalSec)
-	fracSec = totalSec - float64(second)
-
-	return year, month, day, hour, minute, second, fracSec
 }
