@@ -209,7 +209,8 @@ func (l *localFS) Open(name string) (fs.File, error) {
 		return nil, err
 	}
 
-	if _, err := localName(l.dir, name); err != nil {
+	full, err := localName(l.dir, name)
+	if err != nil {
 		return nil, &fs.PathError{Op: "open", Path: name, Err: err}
 	}
 
@@ -225,7 +226,34 @@ func (l *localFS) Open(name string) (fs.File, error) {
 		return nil, err //nolint:wrapcheck // already a *fs.PathError with the right Op and Path
 	}
 
-	return f, nil
+	// Wrapped unconditionally rather than only for directories, because
+	// deciding would cost a Stat and ReadDir on a regular file fails either
+	// way. See [localDir.ReadDir] and [freshEntry].
+	return &localDir{File: f, dir: full}, nil
+}
+
+// localDir is an open file whose ReadDir reports fresh entry metadata.
+//
+// Embedding *os.File keeps Read, ReadAt, Seek, Stat and Close, so this
+// satisfies [File] exactly as the bare handle did.
+type localDir struct {
+	*os.File
+
+	dir string
+}
+
+// ReadDir implements [fs.ReadDirFile], re-wrapping what the handle returns.
+//
+// This is the second of the two places entries come from, and missing it is why
+// a first attempt at #323 did not work: fstest.TestFS takes the entries it
+// checks from the *opened directory*, not from fs.ReadDir. See [freshEntry].
+func (d *localDir) ReadDir(n int) ([]fs.DirEntry, error) {
+	// The error is forwarded unwrapped because io.EOF is part of the contract:
+	// fs.ReadDirFile reports it when a paginating read is exhausted, and a
+	// caller looping until EOF identity-checks it.
+	entries, err := d.File.ReadDir(n)
+
+	return freshEntries(d.dir, entries), err
 }
 
 // Stat implements [fs.StatFS], so a caller need not open an object to learn it
@@ -275,7 +303,51 @@ func (l *localFS) ReadDir(name string) ([]fs.DirEntry, error) {
 		return nil, err //nolint:wrapcheck // already a *fs.PathError
 	}
 
-	return entries, nil
+	return freshEntries(full, entries), nil
+}
+
+// freshEntries re-wraps a directory scan's entries so each reports its own
+// metadata when asked. See [freshEntry].
+func freshEntries(dir string, entries []fs.DirEntry) []fs.DirEntry {
+	out := make([]fs.DirEntry, 0, len(entries))
+	for _, e := range entries {
+		out = append(out, freshEntry{DirEntry: e, path: filepath.Join(dir, e.Name())})
+	}
+
+	return out
+}
+
+// freshEntry is a [fs.DirEntry] whose Info is read when asked rather than taken
+// from the directory scan that produced it.
+//
+// # Why, and what it fixes
+//
+// This is #323. On Windows a directory entry's cached LastWriteTime lags the
+// child's own metadata: measured over forty freshly built trees, the ModTime
+// from os.ReadDir disagreed with a direct stat 15 times, while os.Stat,
+// os.Open+Stat and os.Root.Open+Stat agreed with each other every time. So the
+// staleness is in the directory scan, and every stat route is consistent.
+//
+// Any filesystem that hands back those cached entries while serving Stat from a
+// real stat therefore disagrees with itself, which is exactly what
+// fstest.TestFS checks. os.DirFS has the same defect — measured at 15 failures
+// in 40, not the 0 in 40 the issue originally recorded — so this is the standard
+// library's behaviour on Windows rather than anything astrogo does.
+//
+// Reading the metadata on demand costs one Lstat per entry whose Info is
+// actually asked for, and makes the answer both self-consistent and more
+// accurate. fs.DirEntry.Info's own documentation contemplates exactly this: it
+// says Info may report ErrNotExist if the file was removed after the directory
+// was read, which only makes sense for an implementation that reads it later.
+type freshEntry struct {
+	fs.DirEntry
+
+	path string
+}
+
+func (e freshEntry) Info() (fs.FileInfo, error) {
+	//nolint:wrapcheck // already a *fs.PathError with the right Op and Path
+	return os.Lstat(e.path)
 }
 
 // ReadFile implements [fs.ReadFileFS].
