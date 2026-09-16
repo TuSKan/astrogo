@@ -7,8 +7,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
-	"runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -70,134 +68,18 @@ func TestLocalFSSatisfiesTestFS(t *testing.T) {
 		names = append(names, n)
 	}
 
-	assertTestFS(t, fsys, names...)
-}
-
-// assertTestFS runs fstest.TestFS and fails on every complaint except one
-// specific, measured, unexplained Windows discrepancy.
-//
-// # What is filtered, and why that is stated rather than hidden
-//
-// On Windows, fstest.TestFS intermittently reports that a directory's ModTime
-// from its parent's directory entry disagrees with the same directory's ModTime
-// from Stat, by a few hundred microseconds:
-//
-//	kernels: mismatch:
-//		entry.Info() = kernels IsDir=true ... ModTime=03:11:17.1132383
-//		file.Stat()  = kernels IsDir=true ... ModTime=03:11:17.1137791
-//
-// This has not been root-caused, and the measurements do not support blaming
-// the obvious suspects. Over forty freshly created identical trees:
-//
-//	os.DirFS                                   0 failures / 40
-//	an fs.FS whose Open is os.Open(filepath.Join(...))   11 / 40
-//	this package's localFS                     ~18 / 40
-//	an os.Root-backed FS, handle held or reopened  20 / 20
-//
-// The second row is the informative one: a filesystem whose only method is an
-// Open indistinguishable from os.dirFS's still fails, so it is not os.Root, not
-// this package's extra methods, and not anything astrogo does to the directory
-// beforehand — measured, touching it with MkdirAll or OpenRoot first moves the
-// rate but does not create it. Implementing fs.ReadDirFS roughly halved it;
-// fs.ReadLinkFS did not move it. The difference appears to live in which
-// optional interfaces an implementation provides and therefore which fallback
-// paths fstest takes, but that is a hypothesis and not a finding.
-//
-// So this filter is an admission rather than an explanation. It is kept narrow
-// — only "mismatch" complaints, and only when the two sides differ solely in
-// ModTime — so that any other conformance failure, including a ModTime
-// disagreement on a FILE rather than a directory, still fails the test. Tracked
-// as an issue rather than left in a comment.
-func assertTestFS(t *testing.T, fsys fs.FS, names ...string) {
-	t.Helper()
-
-	err := fstest.TestFS(fsys, names...)
-	if err == nil {
-		return
-	}
-
-	var remaining []string
-
-	for _, complaint := range splitComplaints(err) {
-		if isDirModTimeMismatch(complaint) {
-			t.Logf("filtered, known and unexplained (see this function's doc):\n%s", complaint)
-
-			continue
-		}
-
-		remaining = append(remaining, complaint)
-	}
-
-	for _, c := range remaining {
-		t.Errorf("fstest.TestFS: %s", c)
+	// fstest.TestFS directly, with nothing filtered.
+	//
+	// This used to run behind a filter that let one complaint through: a
+	// Windows discrepancy between a directory's ModTime as the parent's
+	// directory scan reported it and as a stat reported it. That was #323, and
+	// it is fixed at the source rather than tolerated — see [freshEntry] in
+	// localfs.go. Measured before and after over forty freshly built trees:
+	// 15 failures in 40 before, 0 in 40 after.
+	if err := fstest.TestFS(fsys, names...); err != nil {
+		t.Errorf("fstest.TestFS: %v", err)
 	}
 }
-
-// splitComplaints breaks fstest's error into one string per complaint, keeping
-// the indented continuation lines with the line they belong to.
-func splitComplaints(err error) []string {
-	var (
-		out     []string
-		current strings.Builder
-	)
-
-	flush := func() {
-		if current.Len() > 0 {
-			out = append(out, current.String())
-			current.Reset()
-		}
-	}
-
-	for line := range strings.SplitSeq(err.Error(), "\n") {
-		if line == "" || line == "TestFS found errors:" {
-			continue
-		}
-
-		if !strings.HasPrefix(line, "	") && !strings.HasPrefix(line, "  ") {
-			flush()
-		}
-
-		if current.Len() > 0 {
-			current.WriteString("\n")
-		}
-
-		current.WriteString(line)
-	}
-
-	flush()
-
-	return out
-}
-
-// isDirModTimeMismatch reports whether a complaint is the known Windows
-// discrepancy: a directory whose two FileInfos differ in nothing but ModTime.
-//
-// Deliberately narrow. IsDir must be true on both sides, the two lines must be
-// identical once ModTime is removed, and anything else — a size, a mode, a
-// file rather than a directory — is not filtered.
-func isDirModTimeMismatch(complaint string) bool {
-	if runtime.GOOS != "windows" || !strings.Contains(complaint, "mismatch:") {
-		return false
-	}
-
-	var infos []string
-
-	for line := range strings.SplitSeq(complaint, "\n") {
-		line = strings.TrimSpace(line)
-		if i := strings.Index(line, " = "); i >= 0 {
-			infos = append(infos, line[i+3:])
-		}
-	}
-
-	if len(infos) != 2 || !strings.Contains(infos[0], "IsDir=true") {
-		return false
-	}
-
-	return modTime.ReplaceAllString(infos[0], "") == modTime.ReplaceAllString(infos[1], "")
-}
-
-// modTime matches the timestamp fstest prints.
-var modTime = regexp.MustCompile(`ModTime=\S+ \S+ \S+ \S+`)
 
 // TestLocalFSWriteRoundTrip covers the three interfaces astrogo adds to io/fs.
 func TestLocalFSWriteRoundTrip(t *testing.T) {
