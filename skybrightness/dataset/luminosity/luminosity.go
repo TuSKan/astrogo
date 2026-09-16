@@ -118,12 +118,12 @@ func Open(ctx context.Context, v Vision) (magnitude.Passband, error) {
 		return magnitude.Passband{}, err
 	}
 
-	bucket, key, err := remote.GetFile(ctx, remote.CVRLLuminosity, name)
+	fsys, key, err := remote.GetFile(ctx, remote.CVRLLuminosity, name)
 	if err != nil {
 		return magnitude.Passband{}, fmt.Errorf("%w: fetch %s: %w", ErrCurve, name, err)
 	}
 
-	r, err := bucket.NewReader(ctx, key, nil)
+	r, err := fsys.Open(key)
 	if err != nil {
 		return magnitude.Passband{}, fmt.Errorf("%w: open %s: %w", ErrCurve, key, err)
 	}

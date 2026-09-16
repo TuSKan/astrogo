@@ -1,24 +1,37 @@
 package file
 
 import (
-	"cmp"
 	"context"
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
+	"net/http"
+	"path"
+	"strconv"
+	"strings"
 	"sync"
-
-	"gocloud.dev/blob"
-	"gocloud.dev/gcerrors"
 
 	"github.com/TuSKan/astrogo/time"
 )
 
-// SourceETagKey is the blob metadata entry recording the source ETag a
-// cached or partially-downloaded object was fetched under. It rides as
-// object metadata, which every driver supports, rather than a sidecar
-// object keyed by string suffix.
-const SourceETagKey = "source-etag"
+// SourceETagSuffix names the sidecar recording the source ETag a partially
+// downloaded object was fetched under.
+//
+// # A sidecar, where this used to be object metadata
+//
+// gocloud gave every driver a metadata map, and the ETag rode in it. io/fs has
+// no such thing, and inventing one would mean an extension interface every
+// backend had to implement to be usable as a cache — for a single string that
+// only the resume path reads.
+//
+// A sidecar object costs one extra write on the partial-download path and
+// nothing anywhere else, works on every backend including ones not written yet,
+// and is inspectable: a user wondering why a resume was refused can read the
+// file. The failure mode is a sidecar that outlives its partial, which
+// [ResumePoint] handles the same way it handles a missing one — by starting
+// over, which is what it would do anyway.
+const SourceETagSuffix = ".etag"
 
 // staleLockAge bounds how long a lock is honored before a new acquirer
 // treats it as abandoned by a crashed holder. Generous relative to any
@@ -33,31 +46,35 @@ const (
 	lockRetryDelayMax     = 2 * time.Second
 )
 
+// ErrNoExclusiveCreate reports a filesystem that cannot create a name only when
+// it is absent, and so cannot host the download lock.
+var ErrNoExclusiveCreate = errors.New("remote/file: filesystem cannot create exclusively")
+
 // inProcess serialises lock acquisition within this process, one key at a
 // time.
 //
-// This used to be delegated to fileblob, and both this function and
-// [github.com/TuSKan/astrogo/remote/file.Open] documented that the driver
-// "guards it with a per-Bucket mutex" — which is why file.Open shares one
-// Bucket per URL for the life of the process.
+// Kept even though the cross-process primitive is now exact, because it is
+// doing something the exclusive create is not: honouring a context while
+// waiting. A goroutine blocked on a lock held by another goroutine in the same
+// process would otherwise have to discover the release by polling, and the
+// thing being waited for is a download that may legitimately run for minutes.
 //
-// That is not true of the pinned driver and may never have been. fileblob's
-// bucket struct holds no mutex at all, and the mutex that does appear is
-// constructed per *writer*, inside NewTypedWriter, so each contender locks
-// its own. What IfNotExist actually performs is an os.Stat followed by an
-// os.Rename, with a window in between.
-//
-// Measured before this existed — 8 goroutines sharing one Bucket, 200
-// rounds: 51 rounds in which two or more contenders each believed they held
-// the lock, and 2 in which three did (#245).
+// It also used to be load-bearing for correctness rather than only efficiency.
+// Both this function and the old file.Open documented that fileblob "guards it
+// with a per-Bucket mutex", which was why one Bucket was shared per URL for the
+// life of the process. That was not true of the pinned driver and may never
+// have been: fileblob's bucket struct held no mutex, and the one that existed
+// was built per writer inside NewTypedWriter, so contenders each locked their
+// own. Measured — 8 goroutines sharing one Bucket, 200 rounds — 51 rounds had
+// two or more contenders each believing they held the lock, and 2 had three
+// (#245).
 var inProcess = keyedSemaphore{held: make(map[string]chan struct{})}
 
 // keyedSemaphore hands out exclusive access per key, honouring a context
 // while waiting.
 //
 // A plain sync.Mutex would do the exclusion but not the waiting: a caller
-// blocked in Lock cannot notice its own deadline, and the thing being
-// waited for here is a download that may legitimately run for minutes.
+// blocked in Lock cannot notice its own deadline.
 //
 // Entries are never removed. The keys are cache keys — a few dozen kernels
 // and bulletins across a process's life — so the map is bounded by what the
@@ -89,28 +106,44 @@ func (k *keyedSemaphore) acquire(ctx context.Context, key string) (release func(
 	}
 }
 
-// AcquireLock blocks until it holds an exclusive lock on cacheKey within
-// bucket, or ctx is done. Call the returned release exactly once — defer
-// it immediately, including on the caller's own error paths.
+// AcquireLock blocks until it holds an exclusive lock on cacheKey within fsys,
+// or ctx is done. Call the returned release exactly once — defer it
+// immediately, including on the caller's own error paths.
 //
-// Exclusion is in two layers, because one of them is not reliable.
+// Exclusion is in two layers. Within this process it is [inProcess], which
+// makes waiting cancellable. Across processes it is [CreateExclFS], which
+// astrogo's local backend implements with O_CREATE|O_EXCL inside an [os.Root].
 //
-// Within this process it is [inProcess], an ordinary semaphore this package
-// owns and can therefore trust. Across processes it is
-// WriterOptions.IfNotExist, the create-if-absent primitive every Bucket
-// exposes, so there is no backend-specific code here: on S3 a genuinely
-// atomic conditional PUT, on fileblob a Stat-then-Rename that is best-effort
-// and can admit a second holder. That residual race is bounded by the
-// double-check GetFile performs after acquiring, and its consequences are
-// what #241 tracks.
+// # This is the part that got stronger
 //
-// The layering matters for a reason beyond belt-and-braces: `go test ./...`
-// runs each package as its own process and several of them want the same JPL
-// kernel, so the cross-process case is the common one and the in-process case
-// is the one that used to be claimed and was not delivered.
-func AcquireLock(ctx context.Context, bucket *Bucket, cacheKey string) (release func(), err error) {
+// The cross-process layer used to be gocloud's WriterOptions.IfNotExist, which
+// this code described as "on S3 a genuinely atomic conditional PUT, on fileblob
+// a Stat-then-Rename that is best-effort and can admit a second holder". The
+// gap was real and tracked as #241, and it forced a losing writer to be
+// recognised by three different error codes — FailedPrecondition, the intended
+// signal; Unknown, from a Windows "Access is denied" when the winner held the
+// destination open; and NotFound, from the loser's own staging file being
+// renamed away because both had picked the same name from a clock that does not
+// advance on Windows.
+//
+// None of that survives. O_CREATE|O_EXCL is indivisible in the kernel, so there
+// is exactly one way to lose and it is [fs.ErrExist]. The classifier, the
+// staging lock this function had to take around its own lock write, and the
+// residual race the caller double-checked for are all gone with it.
+//
+// The layering still matters for a reason beyond belt-and-braces: `go test
+// ./...` runs each package as its own process and several of them want the same
+// JPL kernel, so the cross-process case is the common one.
+func AcquireLock(ctx context.Context, fsys fs.FS, cacheKey string) (release func(), err error) {
 	lockKey := cacheKey + ".lock"
 	delay := lockRetryDelayInitial
+
+	bound := WithContext(ctx, fsys)
+
+	xfs, ok := bound.(CreateExclFS)
+	if !ok {
+		return nil, fmt.Errorf("remote: lock %s: %w", lockKey, ErrNoExclusiveCreate)
+	}
 
 	// Not re-wrapped: acquire already names the key and what was being
 	// waited for, and a second layer saying the same thing makes the
@@ -129,90 +162,54 @@ func AcquireLock(ctx context.Context, bucket *Bucket, cacheKey string) (release 
 		}
 	}()
 
-	// A losing writer announces itself in three different ways, and only the
-	// first is the one the API documents.
-	//
-	//   - FailedPrecondition, which is IfNotExist reporting the object is
-	//     already there. The intended signal.
-	//   - Unknown, from a raw "Access is denied": on Windows the destination
-	//     is held open by the winner while the loser tries to rename over it.
-	//   - NotFound, from "The system cannot find the file specified" — the
-	//     loser's own *staging* file, which the winner renamed away because
-	//     both picked the same name from a clock that does not advance. That
-	//     is the collision writeLock now prevents inside one process; across
-	//     processes nothing can, so it is classified here instead.
-	//
-	// The cost is the same one the first two already carry: a genuinely
-	// unrelated write failure (disk full, permissions, a bucket directory
-	// that does not exist) surfaces as a ctx deadline rather than
-	// immediately. It is never silently swallowed.
-	isContention := func(code gcerrors.ErrorCode) bool {
-		return code == gcerrors.FailedPrecondition ||
-			code == gcerrors.Unknown ||
-			code == gcerrors.NotFound
-	}
-
 	for {
-		// Serialised against any other writer of this basename in this
-		// process, for the same reason Save is: fileblob stages through
-		// os.TempDir()/<basename>.<clock>.tmp and that clock does not advance
-		// on Windows, so two writers of one lock key pick the same staging
-		// file. One renames it into place and the other's rename finds its own
-		// source gone.
+		// Checked here as well as in the backend, because this loop is where a
+		// cancelled caller must stop and the backend is not obliged to be the
+		// one that notices. Every backend in this package does — see
+		// [localFS.WithContext] — but a lock handed to a caller who has gone is
+		// bad enough to be worth one comparison per attempt.
 		//
-		// The lock this function exists to provide was itself unprotected
-		// against that, which is how TestStagingAndPartialWritesAcrossBuckets
-		// failed on every run: "create lock writer-3/shared.bsp.lock ...
-		// The system cannot find the file specified".
-		//
-		// Held only across the attempt, never across the retry delay below —
-		// a contender that slept holding it would serialise every other
-		// goroutine's retry behind its own.
-		unlockStaging := writeLock(bucket, lockKey)
-
-		w, werr := bucket.NewWriter(ctx, lockKey, &blob.WriterOptions{IfNotExist: true})
-
-		var writeErr, closeErr error
-		if werr == nil {
-			_, writeErr = io.WriteString(w, "locked")
-			closeErr = w.Close()
+		// The gocloud implementation got this for free, since every write took a
+		// ctx, which is exactly why it is easy to lose in the move and why the
+		// test for it exists.
+		if err := ctx.Err(); err != nil {
+			return nil, fmt.Errorf("remote: wait for lock %s: %w", lockKey, err)
 		}
 
-		// One call site, on every path through the attempt. Releasing it from
-		// inside each branch instead left the one that handles a failed
-		// NewWriter unreachable in tests, which is a poor place for the only
-		// copy of a lock release to live.
-		unlockStaging()
-
-		// One switch over all three ways the attempt can end, rather than a
-		// separate arm for a failed NewWriter. fileblob defers almost all of
-		// its work to Close, so that arm was close to unreachable and held a
-		// duplicate of this error return.
-		failure := cmp.Or(werr, writeErr, closeErr)
+		w, cerr := xfs.CreateExcl(lockKey)
 
 		switch {
-		case failure == nil:
+		case cerr == nil:
+			closeErr := w.Close()
+			if closeErr != nil {
+				return nil, fmt.Errorf("remote: create lock %s: %w", lockKey, closeErr)
+			}
+
 			// release runs from the caller's defer, possibly after ctx was
 			// cancelled, and must still delete the lock — otherwise it leaks
 			// until staleLockAge lets someone steal it.
 			//
-			// The in-process slot is handed back after the object is gone,
-			// not before: releasing it first would let the next goroutine in
-			// this process reach IfNotExist while the lock object is still
-			// there, and spin until it is deleted.
+			// The in-process slot is handed back after the object is gone, not
+			// before: releasing it first would let the next goroutine in this
+			// process reach CreateExcl while the lock object is still there,
+			// and spin until it is deleted.
 			return func() {
-				_ = bucket.Delete(context.WithoutCancel(ctx), lockKey)
+				_ = Remove(context.WithoutCancel(ctx), fsys, lockKey)
 
 				releaseInProcess()
 			}, nil
-		case isContention(gcerrors.Code(failure)):
+
+		case errors.Is(cerr, fs.ErrExist):
 			// Someone else got there first; wait below and try again.
+
 		default:
-			return nil, fmt.Errorf("remote: create lock %s: %w", lockKey, failure)
+			return nil, fmt.Errorf("remote: create lock %s: %w", lockKey, cerr)
 		}
 
-		if attrs, aerr := bucket.Attributes(ctx, lockKey); aerr == nil && time.Since(attrs.ModTime) > staleLockAge {
-			_ = bucket.Delete(ctx, lockKey) // abandoned by a crashed holder; steal it next loop
+		if info, serr := fs.Stat(bound, lockKey); serr == nil &&
+			time.Since(info.ModTime()) > staleLockAge {
+			// Abandoned by a crashed holder; steal it next loop.
+			_ = Remove(ctx, fsys, lockKey)
 		}
 
 		select {
@@ -235,21 +232,95 @@ func PartialKey(cacheKey string) string { return cacheKey + ".part" }
 // ETag. It returns 0 — discarding any unusable leftover on the way — when
 // there is no partial, the partial is empty, it recorded no ETag, or the
 // source has changed since it was written.
-func ResumePoint(ctx context.Context, bucket *Bucket, cacheKey, sourceETag string) int64 {
+func ResumePoint(ctx context.Context, fsys fs.FS, cacheKey, sourceETag string) int64 {
+	bound := WithContext(ctx, fsys)
 	pKey := PartialKey(cacheKey)
 
-	attrs, err := bucket.Attributes(ctx, pKey)
-	if err != nil || attrs.Size <= 0 {
+	info, err := fs.Stat(bound, pKey)
+	if err != nil || info.Size() <= 0 {
 		return 0
 	}
 
-	if recorded := attrs.Metadata[SourceETagKey]; recorded == "" || recorded != sourceETag {
-		_ = bucket.Delete(ctx, pKey)
+	if recorded := readETag(bound, pKey); recorded == "" || recorded != sourceETag {
+		discardStaging(ctx, fsys, pKey, pKey)
 
 		return 0
 	}
 
-	return attrs.Size
+	return info.Size()
+}
+
+// RecordedETag returns the source ETag recorded beside key when it was
+// fetched, or "" when there is none.
+//
+// remote's cache-freshness check needs it, which is why this is exported where
+// the rest of the sidecar handling is not.
+func RecordedETag(ctx context.Context, fsys fs.FS, key string) string {
+	return readETag(WithContext(ctx, fsys), key)
+}
+
+// ETag returns a validator for an object: a token that changes when the object
+// does, used to decide whether a cached copy is still current and whether a
+// partial download can be resumed onto.
+//
+// Two sources, in order.
+//
+// The server's own ETag, when there is one. [fs.FileInfo] has no such field and
+// should not grow one — it is an HTTP concept that means nothing on a local
+// disk — so the HTTP backend puts its response header in Sys, which is the
+// standard library's own escape hatch for exactly this.
+//
+// Otherwise a weak validator synthesised from size and modification time. That
+// is not a fallback invented here: it is precisely what gocloud's fileblob did
+// for every local object, and it is what makes a file:// source resumable at
+// all. It is weaker than a real ETag and says so in its shape — a file replaced
+// with different content of the same length in the same nanosecond would not be
+// noticed — which is why the strong one is preferred whenever offered.
+//
+// When there is neither, "" — meaning "cannot tell", which every caller here
+// treats as "assume changed" rather than as "unchanged". A zero modification
+// time is the case that produces it: a backend that reports no time at all has
+// told us nothing, and a validator built from nothing would match itself
+// forever.
+func ETag(info fs.FileInfo) string {
+	if header, ok := info.Sys().(http.Header); ok {
+		if tag := strings.Trim(header.Get("ETag"), `"`); tag != "" {
+			return tag
+		}
+	}
+
+	mod := info.ModTime()
+	if mod.IsZero() {
+		return ""
+	}
+
+	return "W/" + strconv.FormatInt(info.Size(), 10) + "-" + strconv.FormatInt(mod.UnixNano(), 10)
+}
+
+// readETag returns the ETag recorded beside a staged object, or "".
+func readETag(fsys fs.FS, key string) string {
+	b, err := fs.ReadFile(fsys, key+SourceETagSuffix)
+	if err != nil {
+		return ""
+	}
+
+	return strings.TrimSpace(string(b))
+}
+
+// WriteETag records sourceETag beside key, where [RecordedETag] reads it back.
+// An empty ETag writes nothing, which reads back as "cannot tell".
+//
+// Exported because whether a cached object keeps its ETag is a policy question
+// and policy lives in remote: only a Mutable endpoint's freshness check ever
+// reads one, so an immutable kernel — the multi-gigabyte case — gets no sidecar
+// at all. Inside this package it is used for the partial download, where resume
+// needs it whatever the endpoint is.
+func WriteETag(ctx context.Context, fsys fs.FS, key, sourceETag string) error {
+	if sourceETag == "" {
+		return nil
+	}
+
+	return WriteFile(ctx, fsys, key+SourceETagSuffix, strings.NewReader(sourceETag))
 }
 
 // StageAndPromote writes body into a staging object, validates it, and
@@ -260,9 +331,10 @@ func ResumePoint(ctx context.Context, bucket *Bucket, cacheKey, sourceETag strin
 // offset > 0 means body continues an existing partial: the two are
 // concatenated into a separate staging key rather than written back over
 // the partial while it is still open for reading, which Windows forbids.
-func StageAndPromote(ctx context.Context, bucket *Bucket, cacheKey string,
+func StageAndPromote(ctx context.Context, fsys fs.FS, cacheKey string,
 	body io.Reader, offset int64, sourceETag string, validate func(io.Reader) error,
 ) error {
+	bound := WithContext(ctx, fsys)
 	pKey := PartialKey(cacheKey)
 	writeKey := pKey
 	src := body
@@ -270,7 +342,7 @@ func StageAndPromote(ctx context.Context, bucket *Bucket, cacheKey string,
 	var existing io.ReadCloser
 
 	if offset > 0 {
-		r, err := bucket.NewReader(ctx, pKey, nil)
+		r, err := bound.Open(pKey)
 		if err != nil {
 			return fmt.Errorf("remote: read partial %s: %w", pKey, err)
 		}
@@ -280,51 +352,76 @@ func StageAndPromote(ctx context.Context, bucket *Bucket, cacheKey string,
 		writeKey = cacheKey + ".resume"
 	}
 
-	if err := writeStaged(ctx, bucket, writeKey, src, existing, sourceETag); err != nil {
+	if err := writeStaged(ctx, fsys, writeKey, src, existing, sourceETag); err != nil {
 		return err
 	}
 
 	if validate != nil {
-		if err := validateStaged(ctx, bucket, writeKey, validate); err != nil {
-			discardStaging(ctx, bucket, writeKey, pKey)
+		if err := validateStaged(ctx, fsys, writeKey, validate); err != nil {
+			discardStaging(ctx, fsys, writeKey, pKey)
 
 			return fmt.Errorf("remote: validate %s: %w", cacheKey, err)
 		}
 	}
 
-	if err := bucket.Copy(ctx, cacheKey, writeKey, nil); err != nil {
-		return fmt.Errorf("remote: promote %s: %w", cacheKey, err)
+	if err := promote(ctx, fsys, cacheKey, writeKey); err != nil {
+		return err
 	}
 
-	discardStaging(ctx, bucket, writeKey, pKey)
+	discardStaging(ctx, fsys, writeKey, pKey)
 
 	return nil
 }
 
-// writeStaged copies src into writeKey, recording sourceETag as metadata,
-// and closes existing (the partial being resumed, if any) before
-// returning so the caller can delete or rename it on Windows.
+// promote copies the staged object to cacheKey.
 //
-// Close is called even when the copy failed. driver.Writer is only an
-// io.WriteCloser and fileblob's Close commits whatever arrived — which is
-// exactly what a partial checkpoint needs, since writeKey is a staging
-// key that only the next attempt reads. On a resume, writeKey is the
-// separate ".resume" key, so a truncated commit there is inert: the
-// untouched partial is what the next attempt resumes from.
-func writeStaged(ctx context.Context, bucket *Bucket, writeKey string,
+// A copy rather than a rename because io/fs has no rename and astrogo's
+// backends deliberately do not add one: the local backend's Create already
+// renames its own staging file into place atomically, so this copy lands
+// through that same promotion and a reader never sees a partial cacheKey. On a
+// store with no rename at all — an object store — a copy is what a rename would
+// have been anyway.
+func promote(ctx context.Context, fsys fs.FS, cacheKey, writeKey string) error {
+	r, err := WithContext(ctx, fsys).Open(writeKey)
+	if err != nil {
+		return fmt.Errorf("remote: read staging %s: %w", writeKey, err)
+	}
+
+	defer func() { _ = r.Close() }()
+
+	if err := WriteFile(ctx, fsys, cacheKey, r); err != nil {
+		return fmt.Errorf("remote: promote %s: %w", cacheKey, err)
+	}
+
+	return nil
+}
+
+// writeStaged copies src into writeKey, recording sourceETag beside it, and
+// closes existing (the partial being resumed, if any) before returning so the
+// caller can delete or rename it on Windows.
+//
+// # Why a failed copy still commits here
+//
+// [WriteFile] deliberately skips Close after a failed copy, so that a good
+// object is never replaced by a truncated one. This path wants the opposite,
+// and the distinction is what makes resuming possible: writeKey is a staging
+// key that only the next attempt reads, and committing whatever arrived is
+// exactly what a partial checkpoint is. On a resume writeKey is the separate
+// ".resume" key, so a truncated commit there is inert — the untouched partial
+// is what the next attempt resumes from.
+func writeStaged(ctx context.Context, fsys fs.FS, writeKey string,
 	src io.Reader, existing io.ReadCloser, sourceETag string,
 ) error {
-	opts := &blob.WriterOptions{Metadata: map[string]string{SourceETagKey: sourceETag}}
+	cfs, ok := WithContext(ctx, fsys).(CreateFS)
+	if !ok {
+		if existing != nil {
+			_ = existing.Close()
+		}
 
-	// AcquireLock protects one cache key, but fileblob's temporary filename
-	// contains only the basename and a clock value. Different cache keys and
-	// buckets can therefore collide on Windows, including with SavePartial.
-	// Use the same basename lock as Save and SavePartial until Close commits
-	// the staging object. This leaves the download's resume semantics intact.
-	unlock := writeLock(bucket, writeKey)
-	defer unlock()
+		return fmt.Errorf("remote: open staging %s: %w", writeKey, ErrReadOnly)
+	}
 
-	w, err := bucket.NewWriter(ctx, writeKey, opts)
+	w, err := cfs.Create(writeKey)
 	if err != nil {
 		if existing != nil {
 			_ = existing.Close()
@@ -344,13 +441,17 @@ func writeStaged(ctx context.Context, bucket *Bucket, writeKey string,
 		return fmt.Errorf("remote: write staging %s: %w", writeKey, errors.Join(copyErr, closeErr))
 	}
 
+	if err := WriteETag(ctx, fsys, writeKey, sourceETag); err != nil {
+		return fmt.Errorf("remote: record etag for %s: %w", writeKey, err)
+	}
+
 	return nil
 }
 
 // validateStaged runs validate over the staged object's bytes, streaming
 // rather than buffering so a multi-GB kernel needs no memory to check.
-func validateStaged(ctx context.Context, bucket *Bucket, writeKey string, validate func(io.Reader) error) error {
-	r, err := bucket.NewReader(ctx, writeKey, nil)
+func validateStaged(ctx context.Context, fsys fs.FS, writeKey string, validate func(io.Reader) error) error {
+	r, err := WithContext(ctx, fsys).Open(writeKey)
 	if err != nil {
 		return fmt.Errorf("read staging %s: %w", writeKey, err)
 	}
@@ -361,12 +462,37 @@ func validateStaged(ctx context.Context, bucket *Bucket, writeKey string, valida
 	return errors.Join(verr, closeErr)
 }
 
-// discardStaging removes the staging objects. Failures are ignored: a
-// leftover is inert and the next successful attempt overwrites it.
-func discardStaging(ctx context.Context, bucket *Bucket, writeKey, pKey string) {
-	_ = bucket.Delete(ctx, writeKey)
+// discardStaging removes the staging objects and their ETag sidecars. Failures
+// are ignored: a leftover is inert and the next successful attempt overwrites
+// it.
+func discardStaging(ctx context.Context, fsys fs.FS, writeKey, pKey string) {
+	drop := func(key string) {
+		_ = Remove(ctx, fsys, key)
+		_ = Remove(ctx, fsys, key+SourceETagSuffix)
+	}
+
+	drop(writeKey)
 
 	if writeKey != pKey {
-		_ = bucket.Delete(ctx, pKey)
+		drop(pKey)
 	}
+}
+
+// StagingSuffixes are the name suffixes this package appends to a cache key for
+// its own bookkeeping. Exported so remote can recognise and skip them when it
+// walks a cache directory; nothing else should need it.
+var StagingSuffixes = []string{".lock", ".part", ".resume", SourceETagSuffix}
+
+// IsStagingName reports whether name is one of this package's bookkeeping
+// objects rather than a cached object in its own right.
+func IsStagingName(name string) bool {
+	base := path.Base(name)
+
+	for _, suffix := range StagingSuffixes {
+		if strings.HasSuffix(base, suffix) {
+			return true
+		}
+	}
+
+	return false
 }

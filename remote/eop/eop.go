@@ -39,6 +39,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"io/fs"
 
 	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/time"
@@ -55,24 +56,24 @@ type eopLoader struct{}
 // directly is what finds a file copied in by hand for an offline or
 // air-gapped deployment.
 func (eopLoader) Cached(ctx context.Context) (time.EOPData, error) {
-	bucket, prefix, err := remote.CacheDir(ctx, remote.IERSFinals2000A)
+	fsys, prefix, err := remote.CacheDir(ctx, remote.IERSFinals2000A)
 	if err != nil {
 		return time.EOPData{}, time.ErrNoEOPData
 	}
 
 	key := prefix + eopCacheName
 
-	attrs, err := bucket.Attributes(ctx, key)
+	info, err := fs.Stat(fsys, key)
 	if err != nil {
 		return time.EOPData{}, time.ErrNoEOPData
 	}
 
-	raw, err := bucket.ReadAll(ctx, key)
+	raw, err := fs.ReadFile(fsys, key)
 	if err != nil {
 		return time.EOPData{}, time.ErrNoEOPData
 	}
 
-	return time.EOPData{Raw: raw, ModTime: attrs.ModTime}, nil
+	return time.EOPData{Raw: raw, ModTime: info.ModTime()}, nil
 }
 
 // Fetch downloads finals2000A.all, subject to download consent.
@@ -83,7 +84,7 @@ func (eopLoader) Fetch(ctx context.Context) (time.EOPData, error) {
 	// finals2000A is updated on IERS's schedule, not ours. remote.WithValidate
 	// parses a fresh download before it is cached, so a corrupt response
 	// is never trusted as the new cache.
-	bucket, key, err := remote.GetFile(ctx, remote.IERSFinals2000A, "finals2000A.all",
+	fsys, key, err := remote.GetFile(ctx, remote.IERSFinals2000A, "finals2000A.all",
 		remote.WithCacheName(eopCacheName),
 		remote.WithValidate(func(r io.Reader) error {
 			if _, perr := time.ParseFinals2000A(r); perr != nil {
@@ -96,7 +97,7 @@ func (eopLoader) Fetch(ctx context.Context) (time.EOPData, error) {
 		return time.EOPData{}, fmt.Errorf("remote: fetch EOP data: %w", err)
 	}
 
-	raw, err := bucket.ReadAll(ctx, key)
+	raw, err := fs.ReadFile(fsys, key)
 	if err != nil {
 		return time.EOPData{}, fmt.Errorf("remote: read EOP data: %w", err)
 	}

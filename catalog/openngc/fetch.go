@@ -63,12 +63,12 @@ func fetch(ctx context.Context) ([]resolve.Target, error) {
 // fetchSource downloads and parses one OpenNGC source CSV, reusing the
 // on-disk cache when remote.GetFile's HEAD probe shows it's still current.
 func fetchSource(ctx context.Context, sourceFile string) ([]targetRecord, error) {
-	bucket, key, err := remote.GetFile(ctx, remote.OpenNGC, sourceFile)
+	fsys, key, err := remote.GetFile(ctx, remote.OpenNGC, sourceFile)
 	if err != nil {
 		return nil, fmt.Errorf("openngc: %s: %w", sourceFile, err)
 	}
 
-	r, err := bucket.NewReader(ctx, key, nil)
+	r, err := fsys.Open(key)
 	if err != nil {
 		return nil, fmt.Errorf("openngc: open %s: %w", sourceFile, err)
 	}

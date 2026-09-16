@@ -35,6 +35,11 @@ var (
 	// Write failed. The object it would have replaced is untouched.
 	ErrDiscarded = errors.New("remote/file: staged write discarded after a failed write")
 
+	// ErrNotSeekable indicates a backend whose open file is not byte
+	// addressable, so it cannot satisfy [File]. No backend in this package is
+	// such a thing; the error exists so a future one says so plainly.
+	ErrNotSeekable = errors.New("remote/file: open file is not seekable")
+
 	// ErrHTTPStatus indicates an HTTP response astrogo cannot interpret.
 	//
 	// The statuses that mean something specific are translated instead: 404

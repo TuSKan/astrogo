@@ -192,6 +192,10 @@ type httpInfo struct {
 	name    string
 	size    int64
 	modTime time.GoTime
+	// header is the response the size was probed from, exposed through Sys so
+	// [ETag] can reach it. fs.FileInfo has no ETag and should not grow one —
+	// Sys is the standard library's own escape hatch for exactly this.
+	header http.Header
 }
 
 func (i httpInfo) Name() string         { return i.name }
@@ -199,4 +203,4 @@ func (i httpInfo) Size() int64          { return i.size }
 func (i httpInfo) Mode() fs.FileMode    { return 0o444 }
 func (i httpInfo) ModTime() time.GoTime { return i.modTime }
 func (i httpInfo) IsDir() bool          { return false }
-func (i httpInfo) Sys() any             { return nil }
+func (i httpInfo) Sys() any             { return i.header }

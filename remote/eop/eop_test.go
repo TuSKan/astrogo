@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"io/fs"
+	"slices"
 	"strings"
 	"testing"
 
@@ -24,7 +26,7 @@ const sampleFinals2000A = `73 1 2 41684.00 I  0.120733 0.009786  0.136966 0.0159
 // no business knowing about any of it. They now sit next to the code they
 // exercise, and iers keeps only the tests about its own logic.
 
-// fakeIERSSource opens a fresh temp directory as a bucket, points
+// fakeIERSSource opens a fresh temp directory as a fsys, points
 // remote.IERSFinals2000A's URL at it, and writes content at the source object
 // name the loader reads. A local stand-in for HTTP, since remote/file has
 // no https driver registered in this build.
@@ -37,12 +39,12 @@ func fakeIERSSource(t *testing.T, content string) {
 		t.Fatal(err)
 	}
 
-	bucket, err := file.Open(context.Background(), url)
+	fsys, err := file.OpenFS(url)
 	if err != nil {
 		t.Fatalf("open fake source: %v", err)
 	}
 
-	if err := bucket.WriteAll(context.Background(), "finals2000A.all", []byte(content), nil); err != nil {
+	if err := remote.WriteFile(context.Background(), fsys, "finals2000A.all", strings.NewReader(content)); err != nil {
 		t.Fatalf("seed fake source: %v", err)
 	}
 }
@@ -87,12 +89,12 @@ func TestEOPLoaderDefaultDenyWritesNoCache(t *testing.T) {
 		t.Fatalf("Fetch without remote.EnableDownloads = %v, want remote.ErrDownloadDenied", err)
 	}
 
-	bucket, prefix, err := remote.CacheDir(context.Background(), remote.IERSFinals2000A)
+	fsys, prefix, err := remote.CacheDir(context.Background(), remote.IERSFinals2000A)
 	if err != nil {
 		t.Fatalf("remote.CacheDir: %v", err)
 	}
 
-	if exists, _ := bucket.Exists(context.Background(), prefix+eopCacheName); exists {
+	if _, err := fs.Stat(fsys, prefix+eopCacheName); err == nil {
 		t.Error("a denied fetch must not write a cache file")
 	}
 }
@@ -111,12 +113,12 @@ func TestEOPLoaderSkipsBodyWhenETagUnchanged(t *testing.T) {
 		t.Fatalf("first Fetch: %v", err)
 	}
 
-	bucket, prefix, err := remote.CacheDir(ctx, remote.IERSFinals2000A)
+	fsys, prefix, err := remote.CacheDir(ctx, remote.IERSFinals2000A)
 	if err != nil {
 		t.Fatalf("remote.CacheDir: %v", err)
 	}
 
-	before, err := bucket.Attributes(ctx, prefix+eopCacheName)
+	before, err := fs.Stat(fsys, prefix+eopCacheName)
 	if err != nil {
 		t.Fatalf("Attributes: %v", err)
 	}
@@ -125,13 +127,13 @@ func TestEOPLoaderSkipsBodyWhenETagUnchanged(t *testing.T) {
 		t.Fatalf("second Fetch: %v", err)
 	}
 
-	after, err := bucket.Attributes(ctx, prefix+eopCacheName)
+	after, err := fs.Stat(fsys, prefix+eopCacheName)
 	if err != nil {
 		t.Fatalf("Attributes (after): %v", err)
 	}
 
-	if !after.ModTime.Equal(before.ModTime) {
-		t.Errorf("cache rewritten against an unchanged source: ModTime %v -> %v", before.ModTime, after.ModTime)
+	if !after.ModTime().Equal(before.ModTime()) {
+		t.Errorf("cache rewritten against an unchanged source: ModTime %v -> %v", before.ModTime(), after.ModTime())
 	}
 }
 
@@ -151,12 +153,12 @@ func TestEOPLoaderRejectsCorruptDownload(t *testing.T) {
 		t.Fatal("Fetch accepted a corrupt download")
 	}
 
-	bucket, prefix, err := remote.CacheDir(context.Background(), remote.IERSFinals2000A)
+	fsys, prefix, err := remote.CacheDir(context.Background(), remote.IERSFinals2000A)
 	if err != nil {
 		t.Fatalf("remote.CacheDir: %v", err)
 	}
 
-	if exists, _ := bucket.Exists(context.Background(), prefix+eopCacheName); exists {
+	if _, err := fs.Stat(fsys, prefix+eopCacheName); err == nil {
 		t.Error("a corrupt download must not be cached")
 	}
 
@@ -173,12 +175,12 @@ func TestEOPLoaderCachedReadsAPreSeededFile(t *testing.T) {
 
 	ctx := context.Background()
 
-	bucket, prefix, err := remote.CacheDir(ctx, remote.IERSFinals2000A)
+	fsys, prefix, err := remote.CacheDir(ctx, remote.IERSFinals2000A)
 	if err != nil {
 		t.Fatalf("remote.CacheDir: %v", err)
 	}
 
-	if err := bucket.WriteAll(ctx, prefix+eopCacheName, []byte(sampleFinals2000A), nil); err != nil {
+	if err := remote.WriteFile(ctx, fsys, prefix+eopCacheName, strings.NewReader(sampleFinals2000A)); err != nil {
 		t.Fatalf("pre-seed: %v", err)
 	}
 
@@ -218,14 +220,20 @@ func TestEOPLoaderDoesNotAccumulateCacheFiles(t *testing.T) {
 		}
 	}
 
-	bucket, prefix, err := remote.CacheDir(context.Background(), remote.IERSFinals2000A)
+	fsys, prefix, err := remote.CacheDir(context.Background(), remote.IERSFinals2000A)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	got := testutil.BucketKeys(t, bucket, prefix)
-	if len(got) != 1 || got[0] != eopCacheName {
-		t.Errorf("expected exactly one %s cache object, got %v", eopCacheName, got)
+	// The bulletin plus its ETag sidecar. IERS is Mutable, so the ETag the
+	// bulletin was fetched under is kept beside it — that is what lets the next
+	// process reuse the cache rather than re-download. Two objects, and it stays
+	// two however many times Fetch runs, which is the accumulation this guards.
+	want := []string{eopCacheName, eopCacheName + ".etag"}
+
+	got := testutil.BucketKeys(t, fsys, prefix)
+	if !slices.Equal(got, want) {
+		t.Errorf("cache holds %v, want exactly %v", got, want)
 	}
 }
 
@@ -237,12 +245,12 @@ func TestInitRegistersTheLoader(t *testing.T) {
 
 	ctx := context.Background()
 
-	bucket, prefix, err := remote.CacheDir(ctx, remote.IERSFinals2000A)
+	fsys, prefix, err := remote.CacheDir(ctx, remote.IERSFinals2000A)
 	if err != nil {
 		t.Fatalf("remote.CacheDir: %v", err)
 	}
 
-	if err := bucket.WriteAll(ctx, prefix+eopCacheName, []byte(sampleFinals2000A), nil); err != nil {
+	if err := remote.WriteFile(ctx, fsys, prefix+eopCacheName, strings.NewReader(sampleFinals2000A)); err != nil {
 		t.Fatalf("pre-seed: %v", err)
 	}
 
@@ -268,7 +276,7 @@ func TestCachedDegradesWhenTheCacheCannotBeOpened(t *testing.T) {
 	scope := remote.Capture(remote.IERSFinals2000A)
 	t.Cleanup(scope.Restore)
 
-	// A scheme no driver registers, so opening the cache bucket fails.
+	// A scheme no driver registers, so opening the cache fsys fails.
 	remote.SetDataDir("no-such-scheme://example.invalid/cache")
 
 	if _, err := (eopLoader{}).Cached(t.Context()); !errors.Is(err, time.ErrNoEOPData) {

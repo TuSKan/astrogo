@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"math"
 	"slices"
 	"sort"
@@ -76,37 +77,37 @@ type Reader struct {
 //  2. Removes the corrupt file from the filesystem.
 //  3. Returns the error wrapped with a descriptive message.
 func CacheDownload(ctx context.Context, kernel string) (*Reader, error) {
-	bucket, key, err := remote.GetFile(ctx, remote.NAIFSPK, kernel, remote.WithCacheName(kernel))
+	fsys, key, err := remote.GetFile(ctx, remote.NAIFSPK, kernel, remote.WithCacheName(kernel))
 	if err != nil {
 		return nil, fmt.Errorf("jpl: SPK kernel %s: %w", kernel, err)
 	}
 
-	ra, err := remote.NewReaderAt(ctx, bucket, key)
+	ra, err := remote.Open(ctx, fsys, key)
 	if err != nil {
 		return nil, fmt.Errorf("jpl: open SPK %s: %w", key, err)
 	}
 
 	r, err := NewReader(ra)
 	if err != nil {
-		return nil, discardIfCorrupt(ctx, bucket, key, ra.Close, err)
+		return nil, discardIfCorrupt(ctx, fsys, key, ra.Close, err)
 	}
 
 	// Validate physical file size against DAF logical file length
 	// FREE is the 1-based index of the first free double precision word.
 	// Therefore, (FREE - 1) words * 8 bytes is the absolute minimum byte length.
-	attrs, err := bucket.Attributes(ctx, key)
+	info, err := fs.Stat(fsys, key)
 	if err != nil {
 		closeErr := r.Close()
 
 		return nil, errors.Join(fmt.Errorf("jpl: stat SPK %s: %w", key, err), closeErr)
 	}
 
-	size := attrs.Size
+	size := info.Size()
 	expectedMinSize := int64(r.FileRec.FREE-1) * 8
 
 	if size < expectedMinSize {
 		closeErr := r.Close()
-		removeErr := bucket.Delete(ctx, key)
+		removeErr := remote.RemoveFile(ctx, fsys, key)
 
 		return nil, errors.Join(
 			fmt.Errorf("%w: truncated %d bytes, expected min %d bytes", ErrCorruptSPK, size, expectedMinSize),
@@ -116,7 +117,7 @@ func CacheDownload(ctx context.Context, kernel string) (*Reader, error) {
 
 	// Verify file integrity immediately to auto-heal CI pipelines
 	if _, err := r.ReadSummaries(); err != nil {
-		return nil, discardIfCorrupt(ctx, bucket, key, r.Close, err)
+		return nil, discardIfCorrupt(ctx, fsys, key, r.Close, err)
 	}
 
 	// ReadSummaries only parses the DAF directory/summary records, a small
@@ -126,12 +127,12 @@ func CacheDownload(ctx context.Context, kernel string) (*Reader, error) {
 	// record our own SHA-256 the first time a kernel is trusted and compare
 	// against it on every later open of the same cached path. Hashing reads
 	// through the already-open ra handle instead of opening the file again.
-	if err := verifyOrBootstrapChecksum(ctx, bucket, key, ra, size); err != nil {
+	if err := verifyOrBootstrapChecksum(ctx, fsys, key, ra, size); err != nil {
 		// The sidecar goes with the kernel: keeping a checksum for a file
 		// that is no longer there would make the next download's bootstrap
 		// compare against a recording of the corrupt one.
-		return nil, discardIfCorrupt(ctx, bucket, key, r.Close, err, func() error {
-			return removeChecksumSidecar(ctx, bucket, key)
+		return nil, discardIfCorrupt(ctx, fsys, key, r.Close, err, func() error {
+			return removeChecksumSidecar(ctx, fsys, key)
 		})
 	}
 
@@ -144,10 +145,10 @@ func checksumSidecarKey(key string) string { return key + ".sha256" }
 
 // removeChecksumSidecar deletes a kernel's checksum sidecar, ignoring a
 // missing one (nothing to clean up).
-func removeChecksumSidecar(ctx context.Context, bucket *remote.Bucket, key string) error {
+func removeChecksumSidecar(ctx context.Context, fsys remote.FS, key string) error {
 	sumKey := checksumSidecarKey(key)
 
-	if exists, err := bucket.Exists(ctx, sumKey); err != nil || !exists {
+	if _, err := fs.Stat(fsys, sumKey); err != nil {
 		// A failed check means we do not know whether a sidecar is there, not
 		// that there is nothing to remove -- the comment here used to claim
 		// the latter. Left alone either way: this runs after a checksum
@@ -157,7 +158,7 @@ func removeChecksumSidecar(ctx context.Context, bucket *remote.Bucket, key strin
 		return nil //nolint:nilerr // deliberate: see above
 	}
 
-	if err := bucket.Delete(ctx, sumKey); err != nil {
+	if err := remote.RemoveFile(ctx, fsys, sumKey); err != nil {
 		return fmt.Errorf("jpl: checksum: remove sidecar: %w", err)
 	}
 
@@ -170,7 +171,7 @@ func removeChecksumSidecar(ctx context.Context, bucket *remote.Bucket, key strin
 // current hash is trusted and recorded for future opens instead of failing.
 // Hashing reads through the already-open ra (a SectionReader over its
 // io.ReaderAt) instead of opening the kernel a second time.
-func verifyOrBootstrapChecksum(ctx context.Context, bucket *remote.Bucket, key string, ra io.ReaderAt, size int64) error {
+func verifyOrBootstrapChecksum(ctx context.Context, fsys remote.FS, key string, ra io.ReaderAt, size int64) error {
 	h := sha256.New()
 	if _, err := io.Copy(h, io.NewSectionReader(ra, 0, size)); err != nil {
 		return fmt.Errorf("jpl: checksum: read: %w", err)
@@ -179,10 +180,10 @@ func verifyOrBootstrapChecksum(ctx context.Context, bucket *remote.Bucket, key s
 	sum := hex.EncodeToString(h.Sum(nil))
 	sumKey := checksumSidecarKey(key)
 
-	existing, err := bucket.ReadAll(ctx, sumKey)
+	existing, err := fs.ReadFile(fsys, sumKey)
 	if err != nil {
-		if remote.IsNotFound(err) {
-			if err := remote.Save(ctx, bucket, sumKey, strings.NewReader(sum)); err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			if err := remote.WriteFile(ctx, fsys, sumKey, strings.NewReader(sum)); err != nil {
 				return fmt.Errorf("jpl: checksum: write sidecar: %w", err)
 			}
 
@@ -817,7 +818,7 @@ func EvalChebyshev(coeffs []float64, tau, radius float64, calcDeriv bool) (p, v 
 //
 // The handle is closed either way. extra runs only when the file is deleted —
 // it is for artefacts that describe the kernel and must not outlive it.
-func discardIfCorrupt(ctx context.Context, bucket *remote.Bucket, key string,
+func discardIfCorrupt(ctx context.Context, fsys remote.FS, key string,
 	closeFile func() error, cause error, extra ...func() error,
 ) error {
 	closeErr := closeFile()
@@ -829,7 +830,7 @@ func discardIfCorrupt(ctx context.Context, bucket *remote.Bucket, key string,
 	errs := []error{
 		fmt.Errorf("jpl: corrupt SPK file gracefully deleted: %w", cause),
 		closeErr,
-		bucket.Delete(ctx, key),
+		remote.RemoveFile(ctx, fsys, key),
 	}
 
 	for _, fn := range extra {

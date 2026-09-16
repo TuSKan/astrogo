@@ -2,39 +2,39 @@ package file
 
 import (
 	"context"
+	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/time"
 )
 
-// tests that need a real local Bucket.
-func openLocalBucket(t *testing.T) (bucket *Bucket, dir string) {
+// tests that need a real local filesystem.
+func openLocalFS(t *testing.T) (fsys fs.FS, dir string) {
 	t.Helper()
 
 	dir = t.TempDir()
 
-	url := testutil.FileURL(t, dir)
-
-	bucket, err := Open(context.Background(), url)
+	fsys, err := OpenFS(testutil.FileURL(t, dir))
 	if err != nil {
-		t.Fatalf("Open: %v", err)
+		t.Fatalf("OpenFS: %v", err)
 	}
 
-	return bucket, dir
+	return fsys, dir
 }
 
 // TestAcquireLockSerializesAndReleases verifies AcquireLock's own contract
 // directly: a second acquire for the same cacheKey blocks until the first
 // releases, and succeeds immediately afterward.
 func TestAcquireLockSerializesAndReleases(t *testing.T) {
-	bucket, _ := openLocalBucket(t)
+	fsys, _ := openLocalFS(t)
 
 	const cacheKey = "lockfile-test.bin"
 
-	release1, err := AcquireLock(context.Background(), bucket, cacheKey)
+	release1, err := AcquireLock(context.Background(), fsys, cacheKey)
 	if err != nil {
 		t.Fatalf("first AcquireLock: %v", err)
 	}
@@ -42,7 +42,7 @@ func TestAcquireLockSerializesAndReleases(t *testing.T) {
 	acquired := make(chan struct{})
 
 	go func() {
-		release2, err := AcquireLock(context.Background(), bucket, cacheKey)
+		release2, err := AcquireLock(context.Background(), fsys, cacheKey)
 		if err != nil {
 			t.Errorf("second AcquireLock: %v", err)
 
@@ -69,11 +69,11 @@ func TestAcquireLockSerializesAndReleases(t *testing.T) {
 // staleLockAge is treated as abandoned rather than honored forever — the
 // safety net for a holder that crashed mid-download.
 func TestAcquireLockStealsAbandonedLock(t *testing.T) {
-	bucket, dir := openLocalBucket(t)
+	fsys, dir := openLocalFS(t)
 
 	const cacheKey = "stale-lock-test.bin"
 
-	if err := bucket.WriteAll(context.Background(), cacheKey+".lock", []byte("locked"), nil); err != nil {
+	if err := WriteFile(t.Context(), fsys, cacheKey+".lock", strings.NewReader("locked")); err != nil {
 		t.Fatalf("seed lock file: %v", err)
 	}
 
@@ -86,7 +86,7 @@ func TestAcquireLockStealsAbandonedLock(t *testing.T) {
 		t.Fatalf("backdate lock file: %v", err)
 	}
 
-	release, err := AcquireLock(context.Background(), bucket, cacheKey)
+	release, err := AcquireLock(context.Background(), fsys, cacheKey)
 	if err != nil {
 		t.Fatalf("AcquireLock over a stale lock: %v", err)
 	}

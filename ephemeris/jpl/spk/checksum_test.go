@@ -1,9 +1,11 @@
 package spk_test
 
 import (
+	"bytes"
 	"context"
 	"encoding/binary"
 	"errors"
+	"io/fs"
 	"testing"
 
 	"github.com/TuSKan/astrogo/ephemeris/jpl/spk"
@@ -45,7 +47,7 @@ func TestCacheDownloadDetectsChecksumCorruption(t *testing.T) {
 
 	header := fakeDAFHeader()
 
-	// A local file:// bucket stands in for the source now that GetFile
+	// A local file:// fsys stands in for the source now that GetFile
 	// can't reach an http:// URL at all (no httpblob driver registered
 	// yet; see remote/file's package doc) — see remote/resume_test.go's
 	// fakeSource for the same pattern in package remote itself.
@@ -53,12 +55,12 @@ func TestCacheDownloadDetectsChecksumCorruption(t *testing.T) {
 
 	srcURL := testutil.FileURL(t, srcDir)
 
-	srcBucket, err := remote.OpenBucket(context.Background(), srcURL)
+	srcFS, err := remote.OpenFS(context.Background(), srcURL)
 	if err != nil {
 		t.Fatalf("Open source: %v", err)
 	}
 
-	if err := srcBucket.WriteAll(context.Background(), "checksum-test.bsp", header, nil); err != nil {
+	if err := remote.WriteFile(context.Background(), srcFS, "checksum-test.bsp", bytes.NewReader(header)); err != nil {
 		t.Fatalf("seed source: %v", err)
 	}
 
@@ -81,7 +83,7 @@ func TestCacheDownloadDetectsChecksumCorruption(t *testing.T) {
 		t.Fatalf("close: %v", err)
 	}
 
-	cacheBucket, prefix, err := remote.CacheDir(context.Background(), remote.NAIFSPK)
+	cacheFS, prefix, err := remote.CacheDir(context.Background(), remote.NAIFSPK)
 	if err != nil {
 		t.Fatalf("CacheDir: %v", err)
 	}
@@ -90,11 +92,11 @@ func TestCacheDownloadDetectsChecksumCorruption(t *testing.T) {
 	sumKey := prefix + kernel + ".sha256"
 
 	// A failed existence check just means "not found" for this assertion.
-	if exists, _ := cacheBucket.Exists(context.Background(), sumKey); !exists {
+	if _, err := fs.Stat(cacheFS, sumKey); err != nil {
 		t.Fatal("expected a checksum sidecar to be bootstrapped after the first CacheDownload")
 	}
 
-	if err := cacheBucket.WriteAll(context.Background(), sumKey, []byte("0000000000000000000000000000000000000000000000000000000000000000"), nil); err != nil {
+	if err := remote.WriteFile(context.Background(), cacheFS, sumKey, bytes.NewReader([]byte("0000000000000000000000000000000000000000000000000000000000000000"))); err != nil {
 		t.Fatalf("corrupt sidecar: %v", err)
 	}
 
@@ -104,11 +106,11 @@ func TestCacheDownloadDetectsChecksumCorruption(t *testing.T) {
 	}
 
 	// A failed existence check is not "exists".
-	if exists, _ := cacheBucket.Exists(context.Background(), kernelKey); exists {
+	if _, err := fs.Stat(cacheFS, kernelKey); err == nil {
 		t.Error("a checksum-mismatch kernel should have been auto-removed")
 	}
 
-	if exists, _ := cacheBucket.Exists(context.Background(), sumKey); exists {
+	if _, err := fs.Stat(cacheFS, sumKey); err == nil {
 		t.Error("a checksum-mismatch kernel's sidecar should have been auto-removed")
 	}
 }

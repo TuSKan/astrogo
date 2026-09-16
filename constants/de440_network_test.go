@@ -5,6 +5,7 @@ package constants_test
 import (
 	"bufio"
 	"context"
+	"io/fs"
 	"regexp"
 	"strconv"
 	"strings"
@@ -51,7 +52,7 @@ func TestDE440MatchesNAIF(t *testing.T) {
 		t.Fatalf("fetch gm_de440.tpc: %v", err)
 	}
 
-	raw, err := bucket.ReadAll(ctx, key)
+	raw, err := fs.ReadFile(bucket, key)
 	if err != nil {
 		t.Fatalf("read gm_de440.tpc: %v", err)
 	}
@@ -130,7 +131,7 @@ func TestDE440SystemExceedsBody(t *testing.T) {
 		t.Fatalf("fetch gm_de440.tpc: %v", err)
 	}
 
-	raw, err := bucket.ReadAll(ctx, key)
+	raw, err := fs.ReadFile(bucket, key)
 	if err != nil {
 		t.Fatalf("read gm_de440.tpc: %v", err)
 	}

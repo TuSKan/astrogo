@@ -45,7 +45,7 @@ func Ozone(ctx context.Context) (atmosphere.CrossSection, error) {
 	// The atlas is fetched with a validator, so a response that parses but is
 	// not an ozone cross section is rejected before it is promoted into the
 	// cache rather than after — the same shape iers uses for the EOP bulletin.
-	bucket, key, err := remote.GetFile(ctx, remote.MPIMainzCrossSections, remote.OzoneSerdyuchenko223K,
+	fsys, key, err := remote.GetFile(ctx, remote.MPIMainzCrossSections, remote.OzoneSerdyuchenko223K,
 		remote.WithValidate(func(r io.Reader) error {
 			xs, err := Parse(r, "O3", Nanometre)
 			if err != nil {
@@ -58,7 +58,7 @@ func Ozone(ctx context.Context) (atmosphere.CrossSection, error) {
 		return atmosphere.CrossSection{}, fmt.Errorf("crosssection: fetch ozone: %w", err)
 	}
 
-	r, err := bucket.NewReader(ctx, key, nil)
+	r, err := fsys.Open(key)
 	if err != nil {
 		return atmosphere.CrossSection{}, fmt.Errorf("crosssection: open %s: %w", key, err)
 	}

@@ -3,6 +3,7 @@ package remote
 import (
 	"errors"
 	"io"
+	"io/fs"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -21,40 +22,55 @@ import (
 // thing, or drops an argument on the way. Neither shows up in a build, and a
 // caller who can no longer reach a subpackage to check has nothing to compare
 // against. So each test below asserts the name arrived somewhere observable —
-// a header on the wire, a request count, a real object in a real bucket —
+// a header on the wire, a request count, a real object in a real filesystem —
 // rather than that it returned a non-nil value.
 
-// TestBucketRoundTripThroughTheFrontDoor covers OpenBucket, Save and
-// IsNotFound together, because separately none of them proves much.
-func TestBucketRoundTripThroughTheFrontDoor(t *testing.T) {
-	bucket, err := OpenBucket(t.Context(), testutil.FileURL(t, t.TempDir()))
+// TestFilesystemRoundTripThroughTheFrontDoor covers OpenFS and WriteFile
+// together, because separately neither proves much.
+//
+// It also pins the replacement for remote.IsNotFound. That function is gone:
+// with io/fs the answer is errors.Is(err, fs.ErrNotExist), which every Go
+// programmer already knows and which works identically against os, embed, zip
+// and every backend here. Asserting it at this layer is what makes the deletion
+// a real simplification rather than a moved problem.
+func TestFilesystemRoundTripThroughTheFrontDoor(t *testing.T) {
+	fsys, err := OpenFS(t.Context(), testutil.FileURL(t, t.TempDir()))
 	if err != nil {
-		t.Fatalf("OpenBucket: %v", err)
+		t.Fatalf("OpenFS: %v", err)
 	}
 
-	// A key nothing has written is a miss, not a broken store. Every
+	// A name nothing has written is a miss, not a broken store. Every
 	// cache-before-fetch path in the module turns on telling those apart.
-	if _, err := bucket.ReadAll(t.Context(), "absent.dat"); !IsNotFound(err) {
-		t.Errorf("IsNotFound(%v) = false, want true for a key never written", err)
+	if _, err := fs.ReadFile(fsys, "absent.dat"); !errors.Is(err, fs.ErrNotExist) {
+		t.Errorf("reading an absent name gave %v, want it to match fs.ErrNotExist", err)
 	}
 
 	const payload = "kernel bytes"
 
-	if err := Save(t.Context(), bucket, "planets/de440s.bsp", strings.NewReader(payload)); err != nil {
-		t.Fatalf("Save: %v", err)
+	if err := WriteFile(t.Context(), fsys, "planets/de440s.bsp", strings.NewReader(payload)); err != nil {
+		t.Fatalf("WriteFile: %v", err)
 	}
 
-	got, err := bucket.ReadAll(t.Context(), "planets/de440s.bsp")
+	got, err := fs.ReadFile(fsys, "planets/de440s.bsp")
 	if err != nil {
-		t.Fatalf("ReadAll after Save: %v", err)
+		t.Fatalf("ReadFile after WriteFile: %v", err)
 	}
 
 	if string(got) != payload {
 		t.Errorf("read back %q, want %q", got, payload)
 	}
 
-	if IsNotFound(err) {
-		t.Error("IsNotFound reported true for a key that was just written")
+	if errors.Is(err, fs.ErrNotExist) {
+		t.Error("a name that was just written matched fs.ErrNotExist")
+	}
+
+	// And the removal half of the surface.
+	if err := RemoveFile(t.Context(), fsys, "planets/de440s.bsp"); err != nil {
+		t.Fatalf("RemoveFile: %v", err)
+	}
+
+	if _, err := fs.Stat(fsys, "planets/de440s.bsp"); !errors.Is(err, fs.ErrNotExist) {
+		t.Errorf("after RemoveFile the name still stats as %v", err)
 	}
 }
 
@@ -84,15 +100,15 @@ func TestReaderAtOptionsReachTheReader(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	bucket, err := OpenBucket(t.Context(), srv.URL)
+	fsys, err := OpenFS(t.Context(), srv.URL)
 	if err != nil {
-		t.Fatalf("OpenBucket: %v", err)
+		t.Fatalf("OpenFS: %v", err)
 	}
 
-	ra, err := NewReaderAt(t.Context(), bucket, "object.dat",
+	ra, err := Open(t.Context(), fsys, "object.dat",
 		WithChunkSize(chunkSize), WithCachedChunks(1))
 	if err != nil {
-		t.Fatalf("NewReaderAt: %v", err)
+		t.Fatalf("Open: %v", err)
 	}
 
 	before := requests.Load()

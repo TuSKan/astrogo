@@ -1,6 +1,7 @@
 package file_test
 
 import (
+	"io/fs"
 	"strings"
 	"sync"
 	"testing"
@@ -59,7 +60,7 @@ func TestConcurrentWritersOfOneKeyAllSucceed(t *testing.T) {
 		payloads[i] = strings.Repeat(string(rune('A'+i)), size)
 	}
 
-	bucket := newBucket(t)
+	fsys := newFS(t)
 
 	var (
 		mu     sync.Mutex
@@ -71,7 +72,7 @@ func TestConcurrentWritersOfOneKeyAllSucceed(t *testing.T) {
 
 	for i := range concurrency {
 		wg.Go(func() {
-			release, err := file.AcquireLock(t.Context(), bucket, key)
+			release, err := file.AcquireLock(t.Context(), fsys, key)
 			if err != nil {
 				mu.Lock()
 
@@ -81,7 +82,7 @@ func TestConcurrentWritersOfOneKeyAllSucceed(t *testing.T) {
 				return
 			}
 
-			err = file.StageAndPromote(t.Context(), bucket, key,
+			err = file.StageAndPromote(t.Context(), fsys, key,
 				strings.NewReader(payloads[i]), 0, `"etag"`, nil)
 
 			// Read while the lock is still held, so what comes back is what
@@ -90,7 +91,7 @@ func TestConcurrentWritersOfOneKeyAllSucceed(t *testing.T) {
 			// correct run look like a mixture.
 			var got []byte
 			if err == nil {
-				got, err = bucket.ReadAll(t.Context(), key)
+				got, err = fs.ReadFile(fsys, key)
 			}
 
 			release()

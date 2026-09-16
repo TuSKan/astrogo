@@ -3,8 +3,10 @@ package viirs
 import (
 	"archive/zip"
 	"context"
+	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"path"
 
 	"github.com/TuSKan/astrogo/angle"
@@ -243,28 +245,38 @@ func emitterFor(at *coord.Geodetic, radiance float64, scale []float64, region Re
 }
 
 // extractTIFF unpacks the single GeoTIFF entry from a downloaded archive
-// into the same bucket, and returns its key. An already-extracted object is
+// into the same fsys, and returns its key. An already-extracted object is
 // reused.
-func extractTIFF(ctx context.Context, bucket *remote.Bucket, archiveKey string, year int) (string, error) {
+func extractTIFF(ctx context.Context, fsys remote.FS, archiveKey string, year int) (string, error) {
 	tiffKey := entryName(year)
 
-	if ok, err := bucket.Exists(ctx, tiffKey); err == nil && ok {
+	// fs.ErrNotExist rather than a remote-specific predicate: this is the
+	// standard library's own vocabulary and works identically against every
+	// backend, which is what replaced remote.IsNotFound.
+	if _, err := fs.Stat(fsys, tiffKey); err == nil {
 		return tiffKey, nil
+	} else if !errors.Is(err, fs.ErrNotExist) {
+		return "", fmt.Errorf("viirs: check for %s: %w", tiffKey, err)
 	}
 
-	at, err := remote.NewReaderAt(ctx, bucket, archiveKey)
+	at, err := remote.Open(ctx, fsys, archiveKey)
 	if err != nil {
 		return "", fmt.Errorf("viirs: open archive: %w", err)
 	}
 	defer closeQuietly(at)
 
-	entry, closeEntry, err := openZIPEntry(at, at.Size(), tiffKey)
+	info, err := at.Stat()
+	if err != nil {
+		return "", fmt.Errorf("viirs: stat archive: %w", err)
+	}
+
+	entry, closeEntry, err := openZIPEntry(at, info.Size(), tiffKey)
 	if err != nil {
 		return "", err
 	}
 	defer closeEntry()
 
-	if err := remote.Save(ctx, bucket, tiffKey, entry); err != nil {
+	if err := remote.WriteFile(ctx, fsys, tiffKey, entry); err != nil {
 		return "", fmt.Errorf("viirs: extract %s: %w", tiffKey, err)
 	}
 

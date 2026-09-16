@@ -40,7 +40,7 @@ func TestLSKReader(t *testing.T) {
 	bucket, prefix, err := remote.CacheDir(ctx, remote.NAIFLSK)
 	testutil.AssertNoError(t, err)
 
-	f, err := bucket.NewReader(ctx, prefix+"lsk/naif0012.tls", nil)
+	f, err := bucket.Open(prefix + "lsk/naif0012.tls")
 	if err != nil {
 		t.Fatalf("open cached LSK: %v", err)
 	}

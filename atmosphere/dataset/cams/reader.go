@@ -20,7 +20,7 @@ import (
 type File struct {
 	mu  sync.Mutex // guards every call into hf; see the package doc comment's concurrency note
 	hf  *hdf5.File
-	key string // the bucket key Open was given, kept only for error messages
+	key string // the fsys key Open was given, kept only for error messages
 
 	// scratchPath is the temp file Open staged bucket/key's content into
 	// (see Open's doc comment for why); removed by Close.
@@ -45,13 +45,13 @@ type File struct {
 
 // Open opens bucket/key — e.g. the result of remote.GetFile against
 // remote.CopernicusEODATA — as a CAMS NetCDF-4/HDF5 file, reading its
-// content through bucket.NewReader rather than assuming it's backed by
-// the local filesystem (bucket may be local, S3, or any other
+// content through remote.Open rather than assuming it's backed by
+// the local filesystem (fsys may be local, S3, or any other
 // remote/file backend). Every dimension-scale dataset (longitude,
 // latitude, level if present, time) is read eagerly; data variables are
 // indexed by name but not read until Var.ReadPlane/Var.At is called.
-func Open(ctx context.Context, bucket *remote.Bucket, key string) (*File, error) {
-	r, err := bucket.NewReader(ctx, key, nil)
+func Open(ctx context.Context, fsys remote.FS, key string) (*File, error) {
+	r, err := remote.Open(ctx, fsys, key)
 	if err != nil {
 		return nil, fmt.Errorf("cams: open %s: %w", key, err)
 	}
@@ -61,11 +61,11 @@ func Open(ctx context.Context, bucket *remote.Bucket, key string) (*File, error)
 	// no io.Reader/io.ReaderAt constructor exists in this dependency, and
 	// HDF5's own on-disk format needs true random access (B-tree chunk
 	// index traversal) a plain io.Reader cannot support anyway. Staging
-	// through a scratch temp file, read via bucket's own NewReader rather
-	// than assuming the bucket is already local, is this package's
+	// through a scratch temp file, read via remote.Open rather
+	// than assuming the fsys is already local, is this package's
 	// equivalent of catalog/fink's os.CreateTemp exception (CLAUDE.md) --
 	// a narrow, documented workaround for a third-party library that
-	// needs a real OS path, not a way to special-case a local bucket.
+	// needs a real OS path, not a way to special-case a local fsys.
 	tmp, err := os.CreateTemp("", "cams-*.nc")
 	if err != nil {
 		return nil, fmt.Errorf("cams: %s: create scratch file: %w", key, err)

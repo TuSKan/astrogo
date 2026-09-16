@@ -28,28 +28,41 @@ import (
 //	                                        time/op    allocs/op
 //	gocloud NewRangeReader per ReadAt      216 ms       94,067
 //	gocloud chunked, 64 KiB × 16            53 µs            0
-//	this package, file:// (*os.File)       4.5 ms            0
-//	this package, mem:// (bytes.Reader)     11 µs            0
-//	this package, http (per-call GET)   11,400 ms      181,749
+//	this package, file:// uncached         4.5 ms            0
+//	this package, mem:// uncached           10 µs            0
+//	this package, http uncached         10,780 ms      181,422
+//	this package, chunked  4 KiB × 16      220 µs          142
+//	this package, chunked 64 KiB × 16     48.5 µs            0   <- default
+//	this package, chunked  1 MiB × 16     48.9 µs            0
 //
-// Two conclusions, both load-bearing for the migration.
+// The gocloud rows are what BenchmarkReadAtStrategies measured before that
+// stack was removed; the generator and the shape of the work are unchanged, so
+// they are comparable with the rest.
+//
+// Three conclusions, all load-bearing.
 //
 // Dropping gocloud makes an uncached local ReadAt 48× cheaper and removes every
 // allocation, because [localFS.Open] returns an *os.File and ReadAt is one
 // positional read — where gocloud's NewRangeReader opened the file again per
-// call. That is a real gain and it is not the whole story.
+// call.
 //
-// The chunk cache still earns its keep. Locally it is a further 84×; over HTTP
-// it is the difference between working and not, since a per-call ranged GET is
-// 2000 requests for 2000 reads and takes 11 seconds against a server on
-// localhost — a real endpoint adds a round trip to each one. So [file.ReaderAt]
-// survives the migration and is reshaped to wrap an fs.File rather than deleted.
-// CLAUDE.md's instruction not to simplify it away without re-running the
+// The chunk cache still earns its keep, so [Open] puts one in front of every
+// file rather than offering it as an option. Locally it is a further 92×; over
+// HTTP it is the difference between working and not, since a per-call ranged
+// GET is 2000 requests for 2000 reads and takes eleven seconds against a server
+// on localhost — a real endpoint adds a round trip to each one.
+//
+// 64 KiB stays the default chunk size. 1 MiB costs sixteen times the memory and
+// is not faster, and 4 KiB is 4.5× slower and allocates, because a 104-byte
+// read that straddles a boundary needs two chunks often enough to matter.
+//
+// CLAUDE.md's instruction not to simplify this away without re-running the
 // benchmark stands; this is that re-run.
 
 // spkPattern is the access pattern SPK segment evaluation produces: many small
 // reads, clustered inside a segment, jumping between segments. It is the same
-// generator BenchmarkReadAtStrategies uses, so the two are comparable.
+// generator the pre-migration BenchmarkReadAtStrategies used, so its recorded
+// numbers in the table above are comparable with these.
 func spkPattern(size int64, n int) []int64 {
 	offs := make([]int64, 0, n)
 	regions := []int64{0, size / 3, (size * 2) / 3}
@@ -68,11 +81,16 @@ func spkPattern(size int64, n int) []int64 {
 	return offs
 }
 
+// benchReads is the number of reads every benchmark here performs, matching
+// what the pre-migration BenchmarkReadAtStrategies used so the recorded figures
+// stay comparable.
+const benchReads = 2000
+
 // benchReadAt runs the pattern against one open file.
-func benchReadAt(b *testing.B, f file.File, size int64, reads int) {
+func benchReadAt(b *testing.B, f file.File, size int64) {
 	b.Helper()
 
-	offs := spkPattern(size, reads)
+	offs := spkPattern(size, benchReads)
 	buf := make([]byte, 104)
 
 	b.ResetTimer()
@@ -142,7 +160,7 @@ func BenchmarkLocalReadAt(b *testing.B) {
 		b.Fatalf("OpenFS: %v", err)
 	}
 
-	benchReadAt(b, openOne(b, fsys, name), int64(len(data)), 2000)
+	benchReadAt(b, openOne(b, fsys, name), int64(len(data)))
 }
 
 // BenchmarkHTTPReadAt measures the HTTP backend, where every ReadAt is its own
@@ -178,7 +196,7 @@ func BenchmarkHTTPReadAt(b *testing.B) {
 	f := openOne(b, fsys, "kernel.bsp")
 
 	gets.Store(0)
-	benchReadAt(b, f, int64(len(data)), 2000)
+	benchReadAt(b, f, int64(len(data)))
 	b.ReportMetric(float64(gets.Load())/float64(b.N), "requests/op")
 }
 
@@ -227,7 +245,7 @@ func BenchmarkMemReadAt(b *testing.B) {
 		b.Fatal(err)
 	}
 
-	benchReadAt(b, openOne(b, fsys, "kernel.bsp"), int64(len(data)), 2000)
+	benchReadAt(b, openOne(b, fsys, "kernel.bsp"), int64(len(data)))
 }
 
 // BenchmarkSequentialRead covers the other access pattern — a whole-object read,
@@ -281,4 +299,46 @@ func BenchmarkSequentialRead(b *testing.B) {
 	// One probe plus one body per iteration is the design; more means Read
 	// stopped reusing its body.
 	b.ReportMetric(float64(gets.Load())/float64(b.N), "requests/op")
+}
+
+// BenchmarkChunkedReadAt is the other half of the comparison: the same pattern
+// through [file.Open], which puts the chunk cache in front of the backend.
+//
+// Together with BenchmarkLocalReadAt and BenchmarkHTTPReadAt this is what
+// BenchmarkReadAtStrategies used to measure before gocloud went. It is kept
+// because CLAUDE.md requires the chunked reader not be simplified away without
+// re-running it, and a benchmark against a deleted stack cannot answer that.
+func BenchmarkChunkedReadAt(b *testing.B) {
+	dir := b.TempDir()
+
+	const name = "kernel.bsp"
+
+	data := benchObject(benchSizeMB)
+	if err := os.WriteFile(filepath.Join(dir, name), data, 0o600); err != nil {
+		b.Fatal(err)
+	}
+
+	slash := filepath.ToSlash(dir)
+	if !strings.HasPrefix(slash, "/") {
+		slash = "/" + slash
+	}
+
+	fsys, err := file.OpenFS((&url.URL{Scheme: "file", Path: slash}).String())
+	if err != nil {
+		b.Fatalf("OpenFS: %v", err)
+	}
+
+	for _, chunk := range []int64{4 << 10, 64 << 10, 1 << 20} {
+		b.Run(fmt.Sprintf("%dKiB", chunk>>10), func(b *testing.B) {
+			f, oerr := file.Open(b.Context(), fsys, name,
+				file.WithChunkSize(chunk), file.WithCachedChunks(16))
+			if oerr != nil {
+				b.Fatal(oerr)
+			}
+
+			b.Cleanup(func() { _ = f.Close() })
+			b.ReportMetric(float64(chunk*16)/(1<<20), "MiB-resident")
+			benchReadAt(b, f, int64(len(data)))
+		})
+	}
 }

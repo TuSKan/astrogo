@@ -99,12 +99,12 @@ const (
 
 // openHemisphere fetches and decodes one hemisphere.
 func openHemisphere(ctx context.Context, name string) (*hemisphere, error) {
-	bucket, key, err := remote.GetFile(ctx, remote.SFDDustMap, name)
+	fsys, key, err := remote.GetFile(ctx, remote.SFDDustMap, name)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %s: %w", ErrSFD, name, err)
 	}
 
-	r, err := bucket.NewReader(ctx, key, nil)
+	r, err := fsys.Open(key)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %s: %w", ErrSFD, name, err)
 	}

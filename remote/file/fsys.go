@@ -57,12 +57,60 @@ type (
 		Create(name string) (io.WriteCloser, error)
 	}
 
+	// CreateExclFS is a filesystem that can create a name only when nothing is
+	// there, as one indivisible step, reporting [fs.ErrExist] when something
+	// is. It is the primitive astrogo's cross-process download lock is built
+	// on, and the reason it is a separate interface from [CreateFS] is that
+	// exclusivity is a real capability a backend either has or has not.
+	//
+	// # This is stronger than what it replaces
+	//
+	// The lock used to be gocloud's WriterOptions.IfNotExist, described in
+	// astrogo's own code as "on S3 a genuinely atomic conditional PUT, on
+	// fileblob a Stat-then-Rename that is best-effort and can admit a second
+	// holder". The residual race was tracked as #241 and papered over by a
+	// double-check after acquiring.
+	//
+	// There is no need to concede it. O_CREATE|O_EXCL is atomic in the kernel
+	// on every platform astrogo supports, and [os.Root] provides it inside a
+	// confined tree, so the local backend's implementation is exact rather than
+	// best-effort. A backend that cannot offer the guarantee does not implement
+	// this interface and is refused the lock, instead of appearing to hold one.
+	CreateExclFS interface {
+		fs.FS
+		CreateExcl(name string) (io.WriteCloser, error)
+	}
+
 	// RemoveFS is a filesystem that can delete. The signature matches
 	// s3iofs's deliberately, so an implementation written for one satisfies
 	// the other.
 	RemoveFS interface {
 		fs.FS
 		Remove(name string) error
+	}
+
+	// AbortWriter is a write that can be thrown away instead of committed.
+	//
+	// # Why Close is not enough
+	//
+	// Because an io.WriteCloser's Close cannot tell a finished write from an
+	// abandoned one. A staged write commits on Close, which is what makes a
+	// reader never see half an object — and it is exactly wrong when the copy
+	// feeding it failed partway, because committing then replaces a good object
+	// with a truncated one.
+	//
+	// The old answer was to skip Close, which the gocloud implementation did
+	// and documented as leaking "the writer's temp resource on that rare path".
+	// On Windows that leak is not benign: the unclosed handle keeps the
+	// directory undeletable, which is how this surfaced.
+	//
+	// So a writer says which one it means. Abort releases everything Close
+	// would and leaves the destination exactly as it was. Every writer this
+	// package returns implements it; [WriteFile] falls back to skipping Close
+	// for one that does not, accepting the leak rather than the corruption.
+	AbortWriter interface {
+		io.WriteCloser
+		Abort() error
 	}
 
 	// ContextFS is a filesystem whose operations can be cancelled.

@@ -67,13 +67,13 @@ import (
 // an early break, so a caller taking the first fifty rows of the 317 MB file
 // pays for fifty rows.
 func Open(ctx context.Context, name string) (iter.Seq2[resolve.Target, error], error) {
-	bucket, key, err := remote.GetFile(ctx, remote.MPCORB, name)
+	fsys, key, err := remote.GetFile(ctx, remote.MPCORB, name)
 	if err != nil {
 		return nil, fmt.Errorf("mpcorb: fetch %s: %w", name, err)
 	}
 
 	return func(yield func(resolve.Target, error) bool) {
-		r, err := bucket.NewReader(ctx, key, nil)
+		r, err := fsys.Open(key)
 		if err != nil {
 			yield(resolve.Target{}, fmt.Errorf("mpcorb: open %s: %w", name, err))
 

@@ -181,17 +181,17 @@ func Open(ctx context.Context, year int) (*Raster, io.Closer, error) {
 	// NewestYear useless the moment upstream published past the compiled-in
 	// constant. A year upstream does not carry surfaces as a fetch error,
 	// which is accurate and self-updating.
-	bucket, key, err := remote.GetFile(ctx, remote.VIIRSAnnual, archiveName(year))
+	fsys, key, err := remote.GetFile(ctx, remote.VIIRSAnnual, archiveName(year))
 	if err != nil {
 		return nil, nil, fmt.Errorf("viirs: fetch %d composite: %w", year, err)
 	}
 
-	tiffKey, err := extractTIFF(ctx, bucket, key, year)
+	tiffKey, err := extractTIFF(ctx, fsys, key, year)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	at, err := remote.NewReaderAt(ctx, bucket, tiffKey)
+	at, err := remote.Open(ctx, fsys, tiffKey)
 	if err != nil {
 		return nil, nil, fmt.Errorf("viirs: open %s: %w", tiffKey, err)
 	}

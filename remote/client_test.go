@@ -2,6 +2,7 @@ package remote
 
 import (
 	"errors"
+	"io/fs"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -148,7 +149,7 @@ func TestClientGetFileUsesItsOwnCacheAndConsent(t *testing.T) {
 		t.Fatalf("GetFile: %v", err)
 	}
 
-	got, err := bucket.ReadAll(t.Context(), key)
+	got, err := fs.ReadFile(bucket, key)
 	if err != nil {
 		t.Fatalf("ReadAll: %v", err)
 	}
@@ -164,7 +165,7 @@ func TestClientGetFileUsesItsOwnCacheAndConsent(t *testing.T) {
 		t.Fatalf("DataDir: %v", err)
 	}
 
-	if exists, _ := own.Exists(t.Context(), key); !exists {
+	if _, err := fs.Stat(own, key); err != nil {
 		t.Errorf("key %q is not in the client's own cache at %s", key, cacheURL)
 	}
 }

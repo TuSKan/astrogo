@@ -2,6 +2,7 @@ package file_test
 
 import (
 	"bytes"
+	"io/fs"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -14,13 +15,17 @@ import (
 
 // The portable bucket-URL wrappers, tested where they apply.
 //
-// These are gocloud's own, handled by blob.OpenBucket before any driver sees
-// the URL, so they work on every scheme at once and this package needs no code
-// for either. They are tested anyway because remote's endpoint registry
-// documents them as the supported way to point an endpoint at a nested mirror
-// or one exact object — a claim about a dependency's behaviour is still a
-// claim, and this is the layer that would have to change if it stopped being
-// true.
+// These used to be gocloud's own, handled by blob.OpenBucket before any driver
+// saw the URL, so they worked on every scheme at once and this package needed no
+// code for either. They are now this package's: OpenFS applies ?prefix= through
+// fs.Sub and ?key= through a single-object wrapper, after the backend is built
+// and still before it reaches a caller, so the "every scheme at once" property
+// is preserved by construction rather than inherited.
+//
+// remote's endpoint registry documents them as the supported way to point an
+// endpoint at a nested mirror or one exact object, which is why they are tested
+// at this layer: it is the one that would have to change if they stopped
+// working.
 //
 // They used to be tested through SetURL and GetFile, which reached this
 // behaviour through the registry, the consent gate and the download path. Every
@@ -48,7 +53,7 @@ func serveRecording(t *testing.T, body string) (baseURL string, lastPath *string
 // TestKeyParamServesOneObjectUnderAnyName covers the wrapper an endpoint uses
 // when its source publishes one file under a name astrogo would never ask for.
 //
-// "?key=" makes every key in the bucket resolve to that one object, which is
+// "?key=" makes every key in the fsys resolve to that one object, which is
 // what lets a caller keep asking for "finals2000A.all" while the server holds
 // "/archive/2026-08/dump.dat".
 func TestKeyParamServesOneObjectUnderAnyName(t *testing.T) {
@@ -65,12 +70,12 @@ func TestKeyParamServesOneObjectUnderAnyName(t *testing.T) {
 
 	u.RawQuery = url.Values{"key": {"dump.dat"}}.Encode()
 
-	bucket, err := file.Open(t.Context(), u.String())
+	fsys, err := file.OpenFS(u.String())
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
 
-	got, err := bucket.ReadAll(t.Context(), "a-name-the-server-never-heard-of")
+	got, err := fs.ReadFile(fsys, "a-name-the-server-never-heard-of")
 	if err != nil {
 		t.Fatalf("ReadAll: %v", err)
 	}
@@ -104,13 +109,13 @@ func TestWithoutKeyParamANameResolvesUnderneath(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	bucket, err := file.Open(t.Context(), srv.URL+"/archive/dump.dat")
+	fsys, err := file.OpenFS(srv.URL + "/archive/dump.dat")
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
 
-	if _, err := bucket.ReadAll(t.Context(), "finals2000A.all"); err == nil {
-		t.Fatal("expected a clean failure when the bucket URL names one exact object")
+	if _, err := fs.ReadFile(fsys, "finals2000A.all"); err == nil {
+		t.Fatal("expected a clean failure when the fsys URL names one exact object")
 	}
 }
 
@@ -129,12 +134,12 @@ func TestPrefixParamScopesTheBucket(t *testing.T) {
 
 	u.RawQuery = url.Values{"prefix": {"mirror/openngc/"}}.Encode()
 
-	bucket, err := file.Open(t.Context(), u.String())
+	fsys, err := file.OpenFS(u.String())
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
 
-	if _, err := bucket.ReadAll(t.Context(), "NGC.csv"); err != nil {
+	if _, err := fs.ReadFile(fsys, "NGC.csv"); err != nil {
 		t.Fatalf("ReadAll: %v", err)
 	}
 

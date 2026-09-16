@@ -6,8 +6,6 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-
-	"github.com/TuSKan/astrogo/remote/file"
 )
 
 // appName is the directory name under the OS user cache dir holding all
@@ -98,30 +96,30 @@ func defaultDataDirURL() string {
 	return u.String()
 }
 
-// DataDir opens DataDirURL as a Bucket rooted at astrogo's base data
+// DataDir opens DataDirURL as an [FS] rooted at astrogo's base data
 // location.
-func DataDir(ctx context.Context) (*Bucket, error) { return Default().DataDir(ctx) }
+func DataDir(ctx context.Context) (FS, error) { return Default().DataDir(ctx) }
 
-// DataDir opens this client's [Client.DataDirURL] as a Bucket.
-func (c *Client) DataDir(ctx context.Context) (*Bucket, error) {
-	b, err := file.Open(ctx, c.DataDirURL())
+// DataDir opens this client's [Client.DataDirURL] as an [FS].
+func (c *Client) DataDir(ctx context.Context) (FS, error) {
+	fsys, err := OpenFS(ctx, c.DataDirURL())
 	if err != nil {
 		return nil, fmt.Errorf("remote: open data dir: %w", err)
 	}
 
-	return b, nil
+	return fsys, nil
 }
 
-// CacheDir returns the Bucket and key prefix an endpoint caches under. It
-// creates nothing: a bucket "directory" is only a key prefix, so the first
+// CacheDir returns the [FS] and key prefix an endpoint caches under. It
+// creates nothing: a "directory" is only a key prefix, so the first
 // write under it is all the backend needs. Returns ErrUnknownEndpoint for an
 // unregistered id.
 //
 // Every registered endpoint has one, KindAPI included. A cache directory is
 // somewhere to put bytes, which is a different question from whether GetFile
-// can fetch them: GetFile needs a bucket URL and a name and so still requires
+// can fetch them: GetFile needs a filesystem URL and a name and so still requires
 // KindFile, but a decoded API payload is content this module is expected to
-// keep - file.Save exists for exactly that - and it needs a place to go.
+// keep - [WriteFile] exists for exactly that - and it needs a place to go.
 //
 // This used to refuse KindAPI, which made that impossible and quietly
 // disabled the callers that had already been written for it. starlight asks
@@ -130,22 +128,22 @@ func (c *Client) DataDir(ctx context.Context) (*Bucket, error) {
 // "cache directory was available" branch that could never be taken, so the
 // aggregation restarted from nothing every time. Nothing reported it, because
 // a cache that cannot be reached is indistinguishable from a cold one.
-func CacheDir(ctx context.Context, id EndpointID) (bucket *Bucket, prefix string, err error) {
+func CacheDir(ctx context.Context, id EndpointID) (fsys FS, prefix string, err error) {
 	return Default().CacheDir(ctx, id)
 }
 
-// CacheDir returns the Bucket and key prefix an endpoint caches under for this
+// CacheDir returns the [FS] and key prefix an endpoint caches under for this
 // client. See the package-level [CacheDir].
-func (c *Client) CacheDir(ctx context.Context, id EndpointID) (bucket *Bucket, prefix string, err error) {
+func (c *Client) CacheDir(ctx context.Context, id EndpointID) (fsys FS, prefix string, err error) {
 	ep, ok := c.Lookup(id)
 	if !ok {
 		return nil, "", fmt.Errorf("%w: %q", ErrUnknownEndpoint, id)
 	}
 
-	bucket, err = c.DataDir(ctx)
+	fsys, err = c.DataDir(ctx)
 	if err != nil {
 		return nil, "", err
 	}
 
-	return bucket, ep.Subsystem + "/", nil
+	return fsys, ep.Subsystem + "/", nil
 }

@@ -15,7 +15,7 @@ import (
 // nothing leaves both of them passing while checking nothing at all.
 //
 // fstest.MapFS stands in for a bucket here. The helper takes an fs.FS precisely
-// so it need not know what is behind it — a *remote.Bucket satisfies the same
+// so it need not know what is behind it — a remote.FS satisfies the same
 // interface — and using the standard library's own implementation keeps this
 // test free of the storage layer it would otherwise have to import.
 

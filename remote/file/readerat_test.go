@@ -2,9 +2,9 @@ package file
 
 import (
 	"bytes"
-	"context"
 	"errors"
 	"io"
+	"io/fs"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -26,35 +26,35 @@ func payload(n int) []byte {
 	return b
 }
 
-func seedBucket(t *testing.T, key string, data []byte) *Bucket {
+func seedFS(t *testing.T, key string, data []byte) fs.FS {
 	t.Helper()
 
-	bucket, err := Open(context.Background(), mustLocalURL(t, t.TempDir()))
+	fsys, err := OpenFS(mustLocalURL(t, t.TempDir()))
 	if err != nil {
-		t.Fatalf("Open: %v", err)
+		t.Fatalf("OpenFS: %v", err)
 	}
 
-	if err := Save(context.Background(), bucket, key, bytes.NewReader(data)); err != nil {
-		t.Fatalf("Save: %v", err)
+	if err := WriteFile(t.Context(), fsys, key, bytes.NewReader(data)); err != nil {
+		t.Fatalf("WriteFile: %v", err)
 	}
 
-	return bucket
+	return fsys
 }
 
 func TestReaderAtMatchesBytesReaderAcrossChunkBoundaries(t *testing.T) {
 	const chunk = 64
 
 	data := payload(chunk*4 + 7) // deliberately not a whole number of chunks
-	bucket := seedBucket(t, "obj", data)
+	fsys := seedFS(t, "obj", data)
 
-	ra, err := NewReaderAt(context.Background(), bucket, "obj", WithChunkSize(chunk), WithCachedChunks(2))
+	ra, err := Open(t.Context(), fsys, "obj", WithChunkSize(chunk), WithCachedChunks(2))
 	if err != nil {
 		t.Fatalf("NewReaderAt: %v", err)
 	}
 	defer func() { _ = ra.Close() }()
 
-	if ra.Size() != int64(len(data)) {
-		t.Fatalf("Size() = %d, want %d", ra.Size(), len(data))
+	if got := sizeOf(t, ra); got != int64(len(data)) {
+		t.Fatalf("Stat().Size() = %d, want %d", got, len(data))
 	}
 
 	want := bytes.NewReader(data)
@@ -82,9 +82,9 @@ func TestReaderAtMatchesBytesReaderAcrossChunkBoundaries(t *testing.T) {
 
 func TestReaderAtEdgeCases(t *testing.T) {
 	data := payload(100)
-	bucket := seedBucket(t, "obj", data)
+	fsys := seedFS(t, "obj", data)
 
-	ra, err := NewReaderAt(context.Background(), bucket, "obj", WithChunkSize(32))
+	ra, err := Open(t.Context(), fsys, "obj", WithChunkSize(32))
 	if err != nil {
 		t.Fatalf("NewReaderAt: %v", err)
 	}
@@ -114,11 +114,11 @@ func TestReaderAtConcurrentReads(t *testing.T) {
 	const chunk = 16
 
 	data := payload(chunk * 8)
-	bucket := seedBucket(t, "obj", data)
+	fsys := seedFS(t, "obj", data)
 
 	// Two resident chunks against eight, so readers race on eviction too,
 	// not just on a warm cache.
-	ra, err := NewReaderAt(context.Background(), bucket, "obj", WithChunkSize(chunk), WithCachedChunks(2))
+	ra, err := Open(t.Context(), fsys, "obj", WithChunkSize(chunk), WithCachedChunks(2))
 	if err != nil {
 		t.Fatalf("NewReaderAt: %v", err)
 	}
@@ -152,7 +152,7 @@ func TestReaderAtConcurrentReads(t *testing.T) {
 
 // The point of this package's design: random access works over a source
 // that has no OS path at all. httpblob is registered by default, so an
-// http:// bucket needs no opt-in import.
+// http:// fsys needs no opt-in import.
 func TestReaderAtOverHTTPBucket(t *testing.T) {
 	data := payload(1000)
 
@@ -161,19 +161,19 @@ func TestReaderAtOverHTTPBucket(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	bucket, err := Open(context.Background(), srv.URL+"/")
+	fsys, err := OpenFS(srv.URL + "/")
 	if err != nil {
-		t.Fatalf("Open http bucket: %v", err)
+		t.Fatalf("OpenFS http: %v", err)
 	}
 
-	ra, err := NewReaderAt(context.Background(), bucket, "obj", WithChunkSize(128))
+	ra, err := Open(t.Context(), fsys, "obj", WithChunkSize(128))
 	if err != nil {
-		t.Fatalf("NewReaderAt: %v", err)
+		t.Fatalf("Open: %v", err)
 	}
 	defer func() { _ = ra.Close() }()
 
-	if ra.Size() != int64(len(data)) {
-		t.Fatalf("Size() = %d, want %d", ra.Size(), len(data))
+	if got := sizeOf(t, ra); got != int64(len(data)) {
+		t.Fatalf("Stat().Size() = %d, want %d", got, len(data))
 	}
 
 	got := make([]byte, 300)
@@ -182,22 +182,41 @@ func TestReaderAtOverHTTPBucket(t *testing.T) {
 	}
 
 	if !bytes.Equal(got, data[500:800]) {
-		t.Error("ReadAt over an http:// bucket returned wrong bytes")
+		t.Error("ReadAt over an http:// fsys returned wrong bytes")
 	}
 }
 
-func TestSaveThenReadAllOverHTTPBucketIsReadOnly(t *testing.T) {
+func TestWriteOverHTTPIsRefusedAsReadOnly(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		http.Error(w, "read-only", http.StatusMethodNotAllowed)
 	}))
 	defer srv.Close()
 
-	bucket, err := Open(context.Background(), srv.URL+"/")
+	fsys, err := OpenFS(srv.URL + "/")
 	if err != nil {
-		t.Fatalf("Open http bucket: %v", err)
+		t.Fatalf("OpenFS http: %v", err)
 	}
 
-	if err := Save(context.Background(), bucket, "k", strings.NewReader("x")); err == nil {
-		t.Error("expected writing to an http:// bucket to fail")
+	// The refusal is now structural rather than a server's answer: the HTTP
+	// backend does not implement CreateFS, so the write never leaves the
+	// process. That is a better failure than a 405, and it is the same one on
+	// every server including those that would have accepted a PUT.
+	err = WriteFile(t.Context(), fsys, "k", strings.NewReader("x"))
+	if !errors.Is(err, ErrReadOnly) {
+		t.Errorf("writing to an http:// filesystem returned %v, want ErrReadOnly", err)
 	}
+}
+
+// sizeOf reads an open file's size through Stat, which is where fs.File puts
+// it. The concrete *ReaderAt also has Size(), but the interface callers hold is
+// File and Stat is what they have.
+func sizeOf(t *testing.T, f File) int64 {
+	t.Helper()
+
+	info, err := f.Stat()
+	if err != nil {
+		t.Fatalf("Stat: %v", err)
+	}
+
+	return info.Size()
 }

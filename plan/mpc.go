@@ -142,12 +142,12 @@ func MPCObservatories(ctx context.Context) ([]MPCObservatory, error) {
 		return mpcCache.list, nil
 	}
 
-	bucket, key, err := remote.GetFile(ctx, remote.MPCObsCodes, mpcObsCodesFile)
+	fsys, key, err := remote.GetFile(ctx, remote.MPCObsCodes, mpcObsCodesFile)
 	if err != nil {
 		return nil, fmt.Errorf("plan: fetch MPC observatory codes: %w", err)
 	}
 
-	r, err := bucket.NewReader(ctx, key, nil)
+	r, err := fsys.Open(key)
 	if err != nil {
 		return nil, fmt.Errorf("plan: open MPC observatory codes: %w", err)
 	}

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -13,11 +14,23 @@ import (
 	"github.com/TuSKan/astrogo/remote/file"
 )
 
-// TestStagingAndPartialWritesAcrossBuckets exercises the basename collision
-// seen in the Windows dependency-update CI. AcquireLock sees different cache
-// keys here, while fileblob stages both writes as shared.bsp.part in os.TempDir.
-// SavePartial and StageAndPromote must share the same write exclusion.
-func TestStagingAndPartialWritesAcrossBuckets(t *testing.T) {
+// TestStagingAndPartialWritesAcrossFilesystems is a regression test for a
+// defect that no longer has a mechanism, kept because the property it asserts
+// is the one that matters.
+//
+// It was written for the basename collision seen in the Windows
+// dependency-update CI: AcquireLock saw different cache keys here, while
+// fileblob staged every write as shared.bsp.<clock>.tmp in os.TempDir — one
+// name, because that clock does not advance on Windows — so eight writers of
+// eight different keys in eight different buckets fought over one file. The fix
+// at the time was a process-wide lock keyed on the basename.
+//
+// Both the collision and that lock are gone. Staging is now named from the
+// process id and an atomic counter and happens inside the tree, so two writers
+// cannot pick one name however their keys are spelled. What is left is the
+// assertion: concurrent staged writes to distinct filesystems all succeed, and
+// a validator's rejection reaches the caller rather than a name conflict.
+func TestStagingAndPartialWritesAcrossFilesystems(t *testing.T) {
 	t.Parallel()
 
 	const (
@@ -28,9 +41,9 @@ func TestStagingAndPartialWritesAcrossBuckets(t *testing.T) {
 	payload := strings.Repeat("staged kernel bytes ", 32_000)
 
 	for round := range rounds {
-		buckets := make([]*file.Bucket, writers)
+		filesystems := make([]fs.FS, writers)
 		for i := range writers {
-			buckets[i] = newBucket(t)
+			filesystems[i] = newFS(t)
 		}
 
 		errs := make([]error, writers)
@@ -44,13 +57,13 @@ func TestStagingAndPartialWritesAcrossBuckets(t *testing.T) {
 
 				key := fmt.Sprintf("writer-%d/shared.bsp", i)
 				if i%2 == 0 {
-					errs[i] = file.SavePartial(t.Context(), buckets[i],
-						file.PartialKey(key), strings.NewReader(payload), "etag")
+					errs[i] = file.WriteFile(t.Context(), filesystems[i],
+						file.PartialKey(key), strings.NewReader(payload))
 
 					return
 				}
 
-				release, err := file.AcquireLock(t.Context(), buckets[i], key)
+				release, err := file.AcquireLock(t.Context(), filesystems[i], key)
 				if err != nil {
 					errs[i] = err
 
@@ -59,7 +72,7 @@ func TestStagingAndPartialWritesAcrossBuckets(t *testing.T) {
 
 				defer release()
 
-				err = file.StageAndPromote(t.Context(), buckets[i], key,
+				err = file.StageAndPromote(t.Context(), filesystems[i], key,
 					strings.NewReader(payload), 0, "etag",
 					func(_ io.Reader) error { return errValidationFailed })
 				if !errors.Is(err, errValidationFailed) {
@@ -91,7 +104,7 @@ func TestStagingAndPartialWritesAcrossBuckets(t *testing.T) {
 func TestAcquireLockReportsACancelledContext(t *testing.T) {
 	t.Parallel()
 
-	bucket, err := file.Open(t.Context(), "file:///"+filepath.ToSlash(t.TempDir())+"?create_dir=true")
+	fsys, err := file.OpenFS("file:///" + filepath.ToSlash(t.TempDir()) + "?create_dir=true")
 	if err != nil {
 		t.Fatalf("open bucket: %v", err)
 	}
@@ -99,7 +112,7 @@ func TestAcquireLockReportsACancelledContext(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 
-	release, err := file.AcquireLock(ctx, bucket, "cancelled.bsp")
+	release, err := file.AcquireLock(ctx, fsys, "cancelled.bsp")
 	if release != nil {
 		release()
 	}

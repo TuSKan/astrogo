@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"net/url"
 
 	"github.com/TuSKan/astrogo/remote/api"
@@ -32,70 +33,109 @@ import (
 // fails on any such import. The names below are the supported way to reach
 // everything they do.
 
-// Bucket is a storage container addressed by URL — a local directory, an HTTP
-// prefix, an S3 bucket — with keys inside it.
-type Bucket = file.Bucket
-
-// OpenBucket resolves a bucket URL to a [Bucket], reusing one handle per
-// distinct URL for the life of the process.
+// FS is a storage container addressed by URL — a local directory, an HTTP
+// prefix, an S3 bucket — with names inside it.
 //
-// The scheme decides the backend and nothing here does: file://, http:// and
-// https:// are always available, and s3:// becomes available by blank-importing
-// [github.com/TuSKan/astrogo/remote/file/s3]. An unregistered scheme surfaces
-// as that call's own error rather than as a list this package would have to
-// keep in step.
-func OpenBucket(ctx context.Context, bucketURL string) (*Bucket, error) {
-	//nolint:wrapcheck // pure delegation to remote/file, internal to this package; its errors are already prefixed
-	return file.Open(ctx, bucketURL)
+// It is [io/fs.FS], the standard library's own read interface, so a caller
+// already knows it: fs.Stat, fs.ReadFile, fs.WalkDir, fs.Sub and
+// errors.Is(err, fs.ErrNotExist) all work, and so does anything else written
+// against fs.FS. Writing is the extension interfaces this package's storage
+// layer defines, reached through [WriteFile] and [RemoveFile] rather than by
+// type-asserting.
+type FS = fs.FS
+
+// File is an open object: [io/fs.File] plus io.ReaderAt and io.Seeker.
+//
+// The two additions are what reaching into the middle of a three-gigabyte SPK
+// kernel needs, and they are why astrogo names the interface at all rather than
+// handing back fs.File.
+type File = file.File
+
+// OpenFS resolves a filesystem URL to an [FS], reusing one handle per distinct
+// URL for the life of the process.
+//
+// The scheme decides the backend and nothing here does: file://, http://,
+// https:// and mem:// are always available, and a further scheme becomes
+// available by blank-importing its subpackage. An unregistered scheme surfaces
+// as [ErrUnknownScheme] naming the schemes that are registered, rather than as
+// a list this package would have to keep in step.
+func OpenFS(ctx context.Context, fsURL string) (FS, error) {
+	fsys, err := file.OpenFS(fsURL)
+	if err != nil {
+		//nolint:wrapcheck // pure delegation to remote/file, internal to this package; its errors are already prefixed
+		return nil, err
+	}
+
+	return file.WithContext(ctx, fsys), nil
 }
 
-// Save streams r into bucket at key.
+// Open opens name on fsys for random access, returning a [File].
 //
-// Concurrent writers of one file name are serialised, because the driver
-// underneath stages every write through a temporary file named from a clock
-// that does not advance on Windows. See #241; a caller needs to know only that
-// this is safe and a raw bucket write is not.
-func Save(ctx context.Context, bucket *Bucket, key string, r io.Reader) error {
+// # Why this is not fsys.Open
+//
+// Because the obvious implementation is quadratically wrong, and measurably so.
+// Every backend's own ReadAt is a single operation — a pread on a local file, a
+// ranged GET over HTTP — and for astrogo's access pattern that is the wrong
+// granularity: SPK segment evaluation makes thousands of hundred-byte reads
+// clustered in a few regions. Measured over 2000 such reads of a 64 MiB object,
+// the backend's own ReadAt costs 4.5 ms locally and 11 seconds over HTTP
+// against a server on localhost, where the same reads served from resident
+// chunks cost 53 µs.
+//
+// So this returns a File that keeps a bounded number of aligned chunks — 1 MiB
+// for an object of any size, a 3 GB kernel included — and never buffers the
+// object. Sequential Read and Seek pass through untouched, so a whole-object
+// download is still one request.
+func Open(ctx context.Context, fsys FS, name string, opts ...ReaderAtOption) (File, error) {
 	//nolint:wrapcheck // pure delegation to remote/file, internal to this package; its errors are already prefixed
-	return file.Save(ctx, bucket, key, r)
+	return file.Open(ctx, fsys, name, opts...)
 }
 
-// IsNotFound reports whether err says the object does not exist.
+// WriteFile streams r into fsys at name.
 //
-// A cache miss and a broken store are both errors and only one of them is
-// normal, so every path that reads before it writes has to tell them apart.
-// This is how, and it is the reason no package outside remote needs the
-// storage driver's own error package.
-func IsNotFound(err error) bool { return file.IsNotFound(err) }
+// A read-only filesystem — the HTTP backend, and any source endpoint — is
+// refused with [ErrReadOnly] rather than failing somewhere less obvious.
+func WriteFile(ctx context.Context, fsys FS, name string, r io.Reader) error {
+	//nolint:wrapcheck // pure delegation to remote/file, internal to this package; its errors are already prefixed
+	return file.WriteFile(ctx, fsys, name, r)
+}
 
-// ReaderAt is a random-access reader over one object that keeps a bounded
-// number of chunks resident — 1 MiB for an object of any size, a 3 GB kernel
-// included.
+// RemoveFile deletes name from fsys.
 //
-// It exists because the obvious implementation is quadratically wrong: a range
-// request per ReadAt costs one file open under file:// and one HTTP request
-// over http:// or S3, measured at 263 ms against 0.33 ms for 2000 SPK-shaped
-// reads.
-type ReaderAt = file.ReaderAt
+// Named RemoveFile rather than Remove because remote's surface is about files
+// and a bare Remove beside [WriteFile] would read as removing a filesystem.
+func RemoveFile(ctx context.Context, fsys FS, name string) error {
+	//nolint:wrapcheck // pure delegation to remote/file, internal to this package; its errors are already prefixed
+	return file.Remove(ctx, fsys, name)
+}
 
-// ReaderAtOption configures a [ReaderAt].
+// Schemes lists the URL schemes a backend has registered, sorted.
+//
+// A caller reaching for this is almost always answering "why did my s3:// URL
+// fail" — the answer being a missing blank import — which is also what
+// [ErrUnknownScheme]'s message says. It is exported because a test cannot
+// import remote/file to ask, and because a program that accepts a URL from its
+// own user may want to check before it gets that far.
+func Schemes() []string { return file.Schemes() }
+
+// ReaderAtOption configures the chunk cache [Open] puts in front of a file.
 type ReaderAtOption = file.ReaderAtOption
 
-// NewReaderAt opens bucket/key for random access. See [ReaderAt].
-func NewReaderAt(ctx context.Context, bucket *Bucket, key string, opts ...ReaderAtOption) (*ReaderAt, error) {
-	//nolint:wrapcheck // pure delegation to remote/file, internal to this package; its errors are already prefixed
-	return file.NewReaderAt(ctx, bucket, key, opts...)
-}
-
-// WithChunkSize sets the size of each chunk a [ReaderAt] fetches and caches.
+// WithChunkSize sets the size of each chunk [Open] fetches and caches.
 func WithChunkSize(n int64) ReaderAtOption { return file.WithChunkSize(n) }
 
-// WithCachedChunks sets how many chunks a [ReaderAt] keeps resident.
+// WithCachedChunks sets how many chunks [Open] keeps resident.
 func WithCachedChunks(n int) ReaderAtOption { return file.WithCachedChunks(n) }
 
-// ErrReaderAtClosed reports a read through a [ReaderAt] that was already
-// closed.
+// ErrReaderAtClosed reports a read through a [File] that was already closed.
 var ErrReaderAtClosed = file.ErrReaderAtClosed
+
+// ErrReadOnly reports a write to a filesystem that cannot accept one.
+var ErrReadOnly = file.ErrReadOnly
+
+// ErrUnknownScheme reports a URL whose scheme has no registered backend,
+// usually a missing blank import.
+var ErrUnknownScheme = file.ErrNoScheme
 
 // The request/response half of this package's surface: SIMBAD, VizieR, Gaia,
 // MAST, CelesTrak, FINK, JPL's SBDB and Horizons.

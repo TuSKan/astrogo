@@ -13,7 +13,7 @@ import (
 // is deliberate but does mean nothing outside this package can compute it —
 // and a cache nobody can prove is being used is a cache that quietly stops
 // being used.
-func CacheLocation(ctx context.Context, spec Spec) (*remote.Bucket, string, error) {
+func CacheLocation(ctx context.Context, spec Spec) (remote.FS, string, error) {
 	req, err := spec.request()
 	if err != nil {
 		return nil, "", err
