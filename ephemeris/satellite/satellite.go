@@ -83,8 +83,12 @@ type Satellite struct {
 // fitted with. Choosing otherwise is a model mismatch rather than a
 // refinement; see [sgp4.Gravity].
 func NewFromTLE(name, line1, line2 string) (*Satellite, error) {
-	if err := ValidateTLE(line1, line2); err != nil {
-		return nil, err
+	// Not ValidateTLE, although the two ask the same questions: that would
+	// parse the element set and throw the result away, then parse it again
+	// here. Parsing one input twice is how two places come to disagree about
+	// what it says, which is a defect this package has already had once.
+	if err := sgp4.VerifyTLEChecksums(line1, line2); err != nil {
+		return nil, fmt.Errorf("%w: %w", ErrMalformedTLE, err)
 	}
 
 	el, err := sgp4.ParseTLEName(name, line1, line2)
@@ -92,6 +96,12 @@ func NewFromTLE(name, line1, line2 string) (*Satellite, error) {
 		return nil, fmt.Errorf("%w: %w", ErrMalformedTLE, err)
 	}
 
+	// sgp4.New re-runs Elements.Validate, which ParseTLEName has already
+	// passed, so with the default options there is no input that reaches this
+	// branch today. It is wrapped rather than ignored because the failure it
+	// would report is a propagation one, not a parse one, and a caller
+	// matching on ErrPropagation should not have to care that the distinction
+	// is currently theoretical.
 	prop, err := sgp4.New(el)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrPropagation, err)
