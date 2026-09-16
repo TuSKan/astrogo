@@ -62,20 +62,39 @@ func (g Gravity) valid() bool { return g == WGS72 || g == WGS84 || g == WGS72Old
 
 // gravityModel is one row of Vallado's getgravconst, in SGP4's own units.
 //
-// # Why these are literals and not references to the constants package
+// # Why these are literals, when regime.go reads the same numbers from constants
 //
-// [github.com/TuSKan/astrogo/constants] publishes the best current value of a
-// constant and tracks new realizations as they are adopted. That is the right
-// contract for a package describing the Earth, and the wrong one for a table
-// that defines a model: if mu here changed, every TLE ever fitted would be
-// being propagated by a model that no longer matches the one that produced it,
-// and nothing would say so. The WGS84 row above is the case in point — its mu
-// has already been superseded twice and must not move.
+// A fair question, because the two files hold identical values and resolve it
+// differently. The answer is not the same for all three rows, and stating it
+// row by row is the point:
 //
-// The relationship is asserted instead of assumed: TestGravityAgreesWithThe-
-// ConstantsPackage checks that the WGS-72 row matches constants.WGS72 where
-// the two describe the same thing, and that the WGS-84 row deliberately does
-// not.
+//   - The WGS84 row MUST be frozen. Its mu is 398600.5, where
+//     constants.WGS84 carries the standard's 398600.4418 and DE440 measures
+//     398600.4355. The model means the 1984 vintage, because that is what the
+//     elements were fitted through. Reading a live value there would silently
+//     re-propagate every TLE ever fitted through a model that no longer matches
+//     the one that produced it.
+//
+//   - The WGS72 row need not be. WGS 72 is a closed standard — superseded in
+//     1984, never to gain a new realization — so nothing can move underneath it,
+//     which is exactly why ephemeris/satellite/regime.go does read it live.
+//
+// So for the WGS-72 row this is a choice, and the reason is legibility rather
+// than safety. CLAUDE.md: "Do not abstract constants out of published formulas;
+// keep algorithms readable against their reference paper." getgravconst is the
+// reference, and a table that reads like it is checkable against it line by
+// line. Reading live would also only get three of the five values — constants
+// publishes a, GM and J2, correctly not J3 and J4, which are gravity-model
+// terms rather than defining parameters — so the row would become three from
+// one place, two from another and one derived, which is harder to verify than
+// five literals, not easier.
+//
+// regime.go faces the opposite arithmetic: it needs exactly the three constants
+// publishes, and it is not transcribing a table, so there the live read wins.
+//
+// Either way the duplication is guarded rather than trusted:
+// TestGravityAgreesWithTheConstantsPackage requires the WGS-72 row to equal
+// constants.WGS72 exactly, and requires the WGS-84 row NOT to.
 type gravityModel struct {
 	// radiusKM is Earth's equatorial radius, SGP4's unit of length.
 	radiusKM float64

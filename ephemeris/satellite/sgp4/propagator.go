@@ -9,9 +9,27 @@ import (
 
 // Mode selects between the two operational conventions Vallado's code offers.
 //
-// They differ in how sidereal time at epoch is computed, and in deep space in
-// how the lunisolar periodics are applied. The difference is small and it is
-// not noise: output generated in one mode is reproduced only by the same mode.
+// # It has no effect on a near-Earth orbit
+//
+// The two modes differ in exactly two places: how sidereal time at epoch is
+// computed, and how the node is normalised inside dpper's Lyddane branch. Both
+// are deep space. Sidereal time reaches the model only through dscom, dsinit
+// and dspace, and the near-Earth path never reads it — so for a period under
+// 225 minutes the two modes are bit-identical, and this option is inert.
+//
+// Worth stating rather than leaving to be discovered: a caller who sets it on a
+// low Earth orbit expecting a different answer will not get one, and that is
+// correct rather than a bug. TestAFSPCModeIsADifferentAnswer asserts both
+// halves — identical below the threshold, different above it.
+//
+// # And where it does apply, it is small
+//
+// Measured, the two sidereal-time expressions track each other to 3.2e-10 rad
+// — a ten-thousandth of an arcsecond — across the ninety years from 1970, and
+// the resulting position difference for a deep-space orbit is around 1.6e-10
+// km. So this is not an accuracy choice in either direction. It exists so that
+// output generated in one convention can be reproduced exactly, which is the
+// only thing that distinguishes them.
 type Mode int
 
 const (
@@ -96,6 +114,11 @@ type Propagator struct {
 	xlcof, aycof               float64
 	delmo, sinmao              float64
 	x1mth2, x7thm1             float64
+
+	// Deep space. Both are zero for a near-Earth element set and neither is
+	// read on that path.
+	ds deepSpaceTerms
+	rz resonanceTerms
 }
 
 // New initialises a propagator for el.
@@ -134,8 +157,7 @@ func New(el Elements, opts ...Option) (*Propagator, error) {
 	p.initNearEarth()
 
 	if p.deep {
-		return nil, fmt.Errorf("%w: period is %.1f minutes, at or above the %.0f-minute "+
-			"deep-space threshold", ErrDeepSpace, twoPi/p.noUnkozai, deepSpaceMinutes)
+		p.initDeepSpace(epoch1950)
 	}
 
 	return p, nil
@@ -163,7 +185,7 @@ func New(el Elements, opts ...Option) (*Propagator, error) {
 // — a caller who wants to look at a decayed satellite's position has to ask for
 // it deliberately.
 func (p *Propagator) At(tsince float64) (pos, vel vector.Vec3, err error) {
-	return p.nearEarth(tsince)
+	return p.evaluate(tsince)
 }
 
 // AtTime is [Propagator.At] for an absolute instant.

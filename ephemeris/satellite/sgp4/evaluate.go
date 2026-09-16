@@ -20,24 +20,27 @@ import (
 //
 // Replacing it with a solver that converges would stop reproducing the
 // reference, which is the one thing this package must do. What this
-// implementation adds instead is that it SAYS so — see [ErrKeplerNotConverged].
-// The reference proceeds in silence, and that silence is the whole of the
-// 23333 divergence.
+// implementation adds instead is that it SAYS so — see [ErrKeplerNotConverged],
+// which also records the measurement: the iteration converges on every one of
+// the suite's 666 states, 23333 included, so the limitation is real but this
+// suite does not reach it.
 const (
 	keplerMaxIterations = 10
 	keplerTolerance     = 1.0e-12
 	keplerMaxCorrection = 0.95
 )
 
-// nearEarth evaluates the near-Earth SGP4 path at tsince minutes from epoch.
+// evaluate runs the model at tsince minutes from epoch, through whichever of
+// the two branches the element set takes.
 //
 // It returns the TEME position in km and velocity in km/s. A non-nil error with
 // a populated state means the state exists and should not be trusted; see the
 // error sentinels.
 //
-// Pure: every quantity below is a local, so a *Propagator is safe to evaluate
-// from any number of goroutines at once.
-func (p *Propagator) nearEarth(tsince float64) (pos, vel vector.Vec3, err error) {
+// Pure: every quantity below is a local, including the five coefficients the
+// reference recomputes into its satrec on each deep-space evaluation, so a
+// *Propagator is safe to evaluate from any number of goroutines at once.
+func (p *Propagator) evaluate(tsince float64) (pos, vel vector.Vec3, err error) {
 	g := p.grav
 	vkmpersec := g.radiusKM * g.xke / 60.0
 
@@ -77,6 +80,13 @@ func (p *Propagator) nearEarth(tsince float64) (pos, vel vector.Vec3, err error)
 	em := p.el.Eccentricity
 	inclm := p.el.Inclination.Radians()
 
+	if p.deep {
+		de, _ := p.dspace(tsince, deepElements{
+			em: em, argpm: argpm, inclm: inclm, mm: mm, nodem: nodem, nm: nm,
+		})
+		em, argpm, inclm, mm, nodem, nm = de.em, de.argpm, de.inclm, de.mm, de.nodem, de.nm
+	}
+
 	if nm <= 0.0 {
 		return vector.Vec3{}, vector.Vec3{},
 			fmt.Errorf("%w: %g radians per minute at tsince %g", ErrMeanMotion, nm, tsince)
@@ -110,7 +120,7 @@ func (p *Propagator) nearEarth(tsince float64) (pos, vel vector.Vec3, err error)
 	xlm = math.Mod(xlm, twoPi)
 	mm = math.Mod(xlm-argpm-nodem, twoPi)
 
-	// ---- long period periodics ----
+	// ---- lunisolar periodics, then long period periodics ----
 	ep := em
 	xincp := inclm
 	argpp := argpm
@@ -119,10 +129,49 @@ func (p *Propagator) nearEarth(tsince float64) (pos, vel vector.Vec3, err error)
 	sinip := math.Sin(inclm)
 	cosip := math.Cos(inclm)
 
+	// con41, x1mth2, x7thm1, aycof and xlcof are read below. In the near-Earth
+	// case they are the initialised values; in deep space the model recomputes
+	// them from the perturbed inclination on every call. The reference does
+	// that by writing back into its satrec, which is what makes it unsafe to
+	// share; these are locals for the same reason.
+	con41, x1mth2, x7thm1 := p.con41, p.x1mth2, p.x7thm1
+	aycof, xlcof := p.aycof, p.xlcof
+
+	if p.deep {
+		pert := p.dpper(tsince, perturbed{
+			ep: ep, xincp: xincp, nodep: nodep, argpp: argpp, mp: mp,
+		})
+		ep, xincp, nodep, argpp, mp = pert.ep, pert.xincp, pert.nodep, pert.argpp, pert.mp
+
+		// A negative perturbed inclination is a reflection, not an error: the
+		// orbit is the same one measured from the other side of the equator.
+		if xincp < 0.0 {
+			xincp = -xincp
+			nodep += math.Pi
+			argpp -= math.Pi
+		}
+
+		if ep < 0.0 || ep > 1.0 {
+			return vector.Vec3{}, vector.Vec3{},
+				fmt.Errorf("%w: %g at tsince %g", ErrPerturbedEccentricity, ep, tsince)
+		}
+
+		sinip = math.Sin(xincp)
+		cosip = math.Cos(xincp)
+
+		aycof = -0.5 * p.grav.j3oj2 * sinip
+
+		if math.Abs(cosip+1.0) > inclinationSingularityGuard {
+			xlcof = -0.25 * p.grav.j3oj2 * sinip * (3.0 + 5.0*cosip) / (1.0 + cosip)
+		} else {
+			xlcof = -0.25 * p.grav.j3oj2 * sinip * (3.0 + 5.0*cosip) / inclinationSingularityGuard
+		}
+	}
+
 	axnl := ep * math.Cos(argpp)
 	temp := 1.0 / (am * (1.0 - ep*ep))
-	aynl := ep*math.Sin(argpp) + temp*p.aycof
-	xl := mp + argpp + nodep + temp*p.xlcof*axnl
+	aynl := ep*math.Sin(argpp) + temp*aycof
+	xl := mp + argpp + nodep + temp*xlcof*axnl
 
 	// ---- solve kepler's equation ----
 	u := math.Mod(xl-nodep, twoPi)
@@ -180,12 +229,19 @@ func (p *Propagator) nearEarth(tsince float64) (pos, vel vector.Vec3, err error)
 	temp2 := temp1 * temp
 
 	// ---- update for short period periodics ----
-	mrt := rl*(1.0-1.5*temp2*betal*p.con41) + 0.5*temp1*p.x1mth2*cos2u
-	su -= 0.25 * temp2 * p.x7thm1 * sin2u
+	if p.deep {
+		cosisq := cosip * cosip
+		con41 = 3.0*cosisq - 1.0
+		x1mth2 = 1.0 - cosisq
+		x7thm1 = 7.0*cosisq - 1.0
+	}
+
+	mrt := rl*(1.0-1.5*temp2*betal*con41) + 0.5*temp1*x1mth2*cos2u
+	su -= 0.25 * temp2 * x7thm1 * sin2u
 	xnode := nodep + 1.5*temp2*cosip*sin2u
 	xinc := xincp + 1.5*temp2*cosip*sinip*cos2u
-	mvt := rdotl - nm*temp1*p.x1mth2*sin2u/g.xke
-	rvdot := rvdotl + nm*temp1*(p.x1mth2*cos2u+1.5*p.con41)/g.xke
+	mvt := rdotl - nm*temp1*x1mth2*sin2u/g.xke
+	rvdot := rvdotl + nm*temp1*(x1mth2*cos2u+1.5*con41)/g.xke
 
 	// ---- orientation vectors ----
 	sinsu := math.Sin(su)

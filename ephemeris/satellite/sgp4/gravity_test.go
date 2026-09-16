@@ -141,6 +141,15 @@ func TestGravityAgreesWithTheConstantsPackage(t *testing.T) {
 		t.Errorf("WGS-72 mu here is %.17g m³/s², constants.WGS72 says %.17g", got, want)
 	}
 
+	if got, want := m72.j2, constants.WGS72.DynamicalFormFactor.Value; got != want {
+		t.Errorf("WGS-72 J2 here is %.17g, constants.WGS72 says %.17g", got, want)
+	}
+
+	// J3 and J4 have no counterpart to check against, deliberately: they are
+	// terms of a gravity model rather than defining parameters of the reference
+	// system, and constants publishes no Earth gravity model. If they ever
+	// appear there, this is where the cross-check belongs.
+
 	// The WGS-84 row deliberately does NOT agree, and by how much is recorded
 	// so that a reader who notices the mismatch finds an answer rather than
 	// filing a bug. constants.WGS84 carries the standard's 398600.4418 km³/s²;
