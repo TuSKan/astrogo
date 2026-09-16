@@ -11,7 +11,7 @@ import (
 
 // Two systems both called "apparent", twenty arcminutes apart. The pipeline
 // produces the CIRS one; an almanac prints the other.
-func ExampleContext_ApparentToTETE() {
+func ExampleContext_CIRSToTETE() {
 	ctx := coord.NewContext(
 		time.Date(2026, 4, 15, 22, 0, 0, 0, time.LocationUTC),
 		coord.MustGeodetic(angle.Deg(-70.40417), angle.Deg(-24.62722), 2635),
@@ -19,12 +19,12 @@ func ExampleContext_ApparentToTETE() {
 	)
 
 	// Where the pipeline leaves a target: a CIRS place.
-	cirs := ctx.AstrometricToApparent(
+	cirs := ctx.AstrometricToCIRS(
 		coord.NewAstrometric(angle.Deg(83.8221), angle.Deg(-5.3911)),
 	)
 
 	// The same place, with right ascension measured from the true equinox.
-	tete := ctx.ApparentToTETE(cirs)
+	tete := ctx.CIRSToTETE(cirs)
 
 	fmt.Printf("CIRS  RA %s Dec %s\n", cirs.RA().HMSString(2), cirs.Dec().DMSString(1))
 	fmt.Printf("TETE  RA %s Dec %s\n", tete.RA().HMSString(2), tete.Dec().DMSString(1))

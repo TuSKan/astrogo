@@ -224,7 +224,7 @@ func TestRefractionModes(t *testing.T) {
 	}
 }
 
-func TestAstrometricToApparent(t *testing.T) {
+func TestAstrometricToCIRS(t *testing.T) {
 	// A mock star at epoch J2000.0 with extreme proper motion and parallax
 	astro := coord.NewAstrometric(angle.Deg(150.0), angle.Deg(-30.0))
 	astro.SetProperMotion(angle.Arcsec(1.5), angle.Arcsec(-0.5))
@@ -236,7 +236,7 @@ func TestAstrometricToApparent(t *testing.T) {
 
 	site, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(0), 0)
 	ctx := coord.NewContext(obsTime, site, atmosphere.StandardRefraction)
-	apparent := ctx.AstrometricToApparent(astro)
+	apparent := ctx.AstrometricToCIRS(astro)
 
 	// Basic sanity bounds checking — it should be a completely valid number
 	// and visibly shifted from its geometric ICRS start.
@@ -255,7 +255,7 @@ func TestAstrometricToApparent(t *testing.T) {
 	}
 }
 
-func TestApparentToObserved(t *testing.T) {
+func TestCIRSToObserved(t *testing.T) {
 	// Zenith star in CIRS right on local meridian (Hour Angle = 0)
 	// At observer's latitude, if Declination == Latitude and LST == RA, star is exactly at Zenith.
 	site, err := coord.NewGeodetic(angle.Deg(45.0), angle.Deg(-90.0), 100.0)
@@ -265,13 +265,13 @@ func TestApparentToObserved(t *testing.T) {
 
 	obsTime := time.Date(2023, 5, 1, 6, 0, 0, 0, time.LocationUTC)
 
-	apparent := coord.NewApparent(angle.Deg(10.0), angle.Deg(45.0))
+	apparent := coord.NewCIRS(angle.Deg(10.0), angle.Deg(45.0))
 
 	// Standard atmosphere
 	atm := atmosphere.StandardRefraction
 
 	ctx := coord.NewContext(obsTime, site, atm)
-	observed := ctx.ApparentToObserved(apparent)
+	observed := ctx.CIRSToObserved(apparent)
 
 	// Result should be valid coordinates
 	if observed.Alt().Degrees() < -90 || observed.Alt().Degrees() > 90 {

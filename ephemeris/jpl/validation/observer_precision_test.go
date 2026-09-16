@@ -401,8 +401,8 @@ func TestObserverPrecisionMatrix(t *testing.T) {
 				astro := coord.NewICRS(angle.Deg(hp.AstroRA), angle.Deg(hp.AstroDec))
 
 				ctx := coord.NewContext(obsTime, loc, atmNoRef)
-				apparent := ctx.AstrometricToApparent(coord.NewAstrometric(astro.RA(), astro.Dec()))
-				observed := ctx.ApparentToObserved(apparent)
+				apparent := ctx.AstrometricToCIRS(coord.NewAstrometric(astro.RA(), astro.Dec()))
+				observed := ctx.CIRSToObserved(apparent)
 
 				azDiffDeg := observed.Az().Degrees() - hp.Azimuth
 				if azDiffDeg > 180 {

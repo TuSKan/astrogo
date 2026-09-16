@@ -91,7 +91,7 @@ import (
 // The centre. USNO's GHA and declination are geocentric; the navigator
 // applies parallax separately, which is why the response carries it as its
 // own correction. astrogo's [coord.Context] is built for a site, so
-// AstrometricToApparent through it is *topocentric* — up to 8.8 arcseconds
+// AstrometricToCIRS through it is *topocentric* — up to 8.8 arcseconds
 // of diurnal parallax for the Sun, again far above the effect being measured.
 // Atci13 is the geocentric transformation and is what this uses.
 func TestUSNODecomposesTheTopocentricBias(t *testing.T) {

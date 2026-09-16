@@ -65,7 +65,7 @@ func TestPhase1ObserverPipelineAgainstHorizons(t *testing.T) {
 
 	// 2. Map through to Apparent!
 	ctx := coord.NewContext(obsTime, site, atmosphere.StandardRefraction)
-	apparent := ctx.AstrometricToApparent(coord.NewAstrometric(astro.RA(), astro.Dec()))
+	apparent := ctx.AstrometricToCIRS(coord.NewAstrometric(astro.RA(), astro.Dec()))
 
 	// AstroGo uses CIRS (Celestial Intermediate Reference System) for Apparent coords.
 	// Horizons uses classical True Equator and Equinox of Date.
@@ -98,7 +98,7 @@ func TestPhase1ObserverPipelineAgainstHorizons(t *testing.T) {
 	atmNoRef.Model = atmosphere.RefractionNone{}
 
 	ctxNoRef := coord.NewContext(obsTime, site, atmNoRef)
-	observed := ctxNoRef.ApparentToObserved(apparent)
+	observed := ctxNoRef.CIRSToObserved(apparent)
 
 	t.Logf("AstroGo  Geometric Observer  : Azimuth=%v, Elevation=%v", observed.Az().Degrees(), observed.Alt().Degrees())
 

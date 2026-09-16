@@ -251,9 +251,9 @@ func TestReducer_Group4_Semantics(t *testing.T) {
 	astrometric := coord.NewAstrometric(angle.Zero(), angle.Zero()) // Placeholder Astrometric
 	ctxTest := coord.NewContext(obsTime, site, atm)
 
-	app := ctxTest.AstrometricToApparent(astrometric)
+	app := ctxTest.AstrometricToCIRS(astrometric)
 	if app.RA().Radians() == 0 && app.Dec().Radians() == 0 {
-		t.Error("AstrometricToApparent returned uninitialized zero coordinates")
+		t.Error("AstrometricToCIRS returned uninitialized zero coordinates")
 	}
 }
 
