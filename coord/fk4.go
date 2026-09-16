@@ -149,6 +149,11 @@ func FK4ToFK5(c FK4) FK5 {
 // fictitious proper motion is restored. A position with no recorded motion
 // comes back carrying the one FK4's drifting equinox gives it, which is the
 // honest answer — a star at rest in FK5 is not at rest in FK4.
+//
+// As in [ICRSToFK4], bepoch applies to the position-only route only: a position
+// with recorded kinematics comes back at B1950.0 and labelled [B1950], because
+// SOFA's six-element Fk524 takes no epoch. That doc comment has the reasoning
+// and names [PropagateEpoch] as the operation to use instead.
 func FK5ToFK4(c FK5, bepoch float64) FK4 {
 	if !c.hasProperMotion {
 		r1950, d1950, dr1950, dd1950 := gofaext.Fk54z(c.ra.Radians(), c.dec.Radians(), bepoch)
@@ -170,9 +175,11 @@ func FK5ToFK4(c FK5, bepoch float64) FK4 {
 	return FK4{
 		ra: angle.Rad(r1950).Wrap360(), dec: angle.Rad(d1950),
 		pmRA: pmRACosDec(dr1950, angle.Rad(d1950)), pmDec: angle.Rad(dd1950),
-		parallax:        angle.Arcsec(px1950),
-		rv:              rv1950,
-		bepoch:          bepoch,
+		parallax: angle.Arcsec(px1950),
+		rv:       rv1950,
+		// B1950, not bepoch — see [ICRSToFK4]'s doc comment, which records why
+		// the six-element route cannot honour an epoch and what to use instead.
+		bepoch:          B1950,
 		hasProperMotion: true,
 	}
 }
@@ -218,6 +225,36 @@ func FK4ToICRS(c FK4) ICRS {
 // for a star at rest in FK5, and came back from ICRS → FK4 → ICRS carrying
 // 0.6 to 0.9 mas/yr of proper motion it never had — while its position closed
 // to 19 microarcseconds, which is what kept it invisible.
+//
+// # bepoch applies to the first route only
+//
+// The six-element route answers at B1950.0 whatever bepoch says, and the FK4 it
+// returns reports [FK4.Epoch] as [B1950] rather than echoing the argument. Pass
+// anything else and the value is not used.
+//
+// That is a real limitation and not a tidy one, so it is worth saying why it is
+// the honest answer rather than a gap. SOFA's Fk54z, which the first route
+// uses, carries a position to bepoch by evaluating the E-terms of aberration
+// *at* bepoch and then propagating along the fictitious proper motion the frame
+// gives it. Its six-element counterpart Fk524 takes no epoch at all, by design:
+// with a real proper motion in hand the star's state is stated at the catalogue
+// equinox and moving it is the caller's business.
+//
+// Propagating it here anyway would mean inventing an epoch convention SOFA does
+// not define — and getting it wrong in a specific way, since the E-terms would
+// be evaluated at B1950 on this route and at bepoch on the other, so the two
+// branches would disagree about the same star for reasons no caller could see.
+//
+// Before #330 the argument was stored without being used, so ICRSToFK4(star,
+// 1975) returned B1950 numbers labelled 1975. The numbers were right and the
+// label was wrong, which is the worse of the two failures: a wrong label
+// propagates into [FK4ToFK5]'s position-only route and into anything reading
+// [FK4.Epoch].
+//
+// To place a star at another epoch, use [PropagateEpoch], which applies
+// rigorous space motion through SOFA's Pmsafe — including parallax and the
+// light-time term — and then convert. That is a different operation from a
+// frame conversion, and separating them is the point.
 func ICRSToFK4(c ICRS, bepoch float64) FK4 {
 	if !c.hasKinematics {
 		jd1, jd2 := ttAtJulianEpoch(J2000Epoch)
@@ -245,9 +282,13 @@ func ICRSToFK4(c ICRS, bepoch float64) FK4 {
 	return FK4{
 		ra: angle.Rad(r1950).Wrap360(), dec: angle.Rad(d1950),
 		pmRA: pmRACosDec(dr1950, angle.Rad(d1950)), pmDec: angle.Rad(dd1950),
-		parallax:        angle.Arcsec(px1950),
-		rv:              rv1950,
-		bepoch:          bepoch,
+		parallax: angle.Arcsec(px1950),
+		rv:       rv1950,
+		// B1950 rather than bepoch, and deliberately: see the note on the
+		// six-element route in this function's doc comment. Fk524 answers at
+		// the catalogue equinox and takes no epoch, so labelling its output
+		// with the caller's would be a false claim about the numbers beside it.
+		bepoch:          B1950,
 		hasProperMotion: true,
 	}
 }
