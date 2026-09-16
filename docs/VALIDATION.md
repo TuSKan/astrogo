@@ -166,7 +166,7 @@ measured distribution, follow the Evidence link to the generated table.
 | Asteroid magnitude (HG) | ✅ validated | `magnitude/magnitude_test.go` | Bowell (1989) / Muinonen (2010) | 0.01 mag | H,G + H,G₁,G₂ + H,G₁₂* phase functions, spline knot validation at α=30°,60°,90° |
 | Asteroid magnitude (sHG1G2) | ✅ validated | `magnitude/fink_test.go` | [FINK/ZTF phunk pipeline](https://api.ztf.fink-portal.org) | 0.025 mag | Carry et al. (2024) 7-parameter spin-geometry model, validated against 186 r-band observations of 8467 Benoitcarry: mean Δ=0.011, RMS=0.013, 100% within 0.025 mag |
 | Comet magnitude | ✅ validated | `magnitude/magnitude_test.go` | IAU standard | 0.1 mag | M₁/k₁ total + M₂/k₂ nuclear models |
-| SGP4 satellite propagation | ✅ **33 of 33 cases** | `ephemeris/satellite/sgp4/vallado_test.go` | [Vallado et al. (2006) AIAA 2006-6753](https://celestrak.org/publications/AIAA/2006-6753/) | 1e-4 km | The reference suite every SGP4 implementation is measured by, now reproduced in full: **666 states, p50 5.4e-09 km, p99 9.8e-07 km, max 4.1e-06 km**. astrogo previously reproduced 22 of 30 cases, with eight missing by 0.6 km to 3440 km. Those were not a property of SGP4: six were one digit in the Go dependency astrogo used — 128 where the algorithm says 120, in the s⁴ atmospheric-density coefficient that feeds the secular drag term ([#309](https://github.com/TuSKan/astrogo/issues/309)) — and the seventh went with them when the model was written from Vallado's published algorithm instead ([#319](https://github.com/TuSKan/astrogo/pull/319)). 28350 went from 3438.51 km to 6.3e-09 km. The three cases the fixture gives bad check digits are now propagated too, since checksum verification is a separate call from parsing, which is what makes Vallado's error-return cases testable. The residual on the two largest cases is perigee conditioning at high eccentricity, not accumulation: both are worst at the epoch and improve with time. `satellite.Satellite.Verified` is deprecated — there is no longer a regime to flag. |
+| SGP4 satellite propagation | ✅ **33 of 33 cases** | `ephemeris/satellite/sgp4/vallado_test.go` | [Vallado et al. (2006) AIAA 2006-6753](https://celestrak.org/publications/AIAA/2006-6753/) | 1e-4 km | The reference suite every SGP4 implementation is measured by, reproduced in full: **666 states, p50 5.4e-09 km, p99 9.8e-07 km, max 4.1e-06 km**. Written from the published algorithm with no third-party propagator. All 33 element sets propagate, the three the fixture gives unmaintained check digits included — checksum verification is a separate call from parsing, which is what makes Vallado's own error-return cases testable. The residual on the two largest cases is eccentric-anomaly conditioning near perigee, not accumulation: both are worst at the epoch and improve with time. |
 | Satellite magnitude | ✅ validated | `magnitude/magnitude_test.go` | McCants/Molczan | 0.1 mag | Sphere/cylinder phase functions, range scaling |
 | Star extinction | ✅ validated | `atmosphere/transfer_test.go` | Bouguer law | 0.01 mag | Altitude-dependent k(λ), Gaia G→V transformation |
 | FINK SSOFT provider | ✅ validated | `catalog/fink/fink_test.go` | [FINK REST API v2.5](https://api.ztf.fink-portal.org/swagger.json) | exact schema | Single-object JSON + bulk parquet, r-band preference, fit/status filtering, version pinning (v2025.04) |
@@ -216,20 +216,7 @@ The following areas are not yet considered scientifically complete:
   the clock; see the `time` package doc's "The clock you are given". Documented and closed as
   [#146](https://github.com/TuSKan/astrogo/issues/146); the limitation is the host's and remains.
 - **The Illumina-v2 comparison at Observatorio del Teide** is a Level-3 target whose published numbers are already transcribed. It is blocked on Tenerife's lighting inventory rather than on the numbers.
-- ~~**SGP4 is wrong by hundreds to thousands of kilometres for low-perigee, deep-space and decaying
-  orbits.**~~ **Closed.** It was a measured defect, found by running Vallado's reference suite against the
-  propagator astrogo depended on for the first time — and it turned out not to be a property of SGP4 at all.
-  Six of the seven divergent cases were one digit in that Go implementation, `128` where the algorithm says
-  `120`, in the s⁴ atmospheric-density coefficient that feeds the secular drag term
-  ([#309](https://github.com/TuSKan/astrogo/issues/309)); the seventh went with them once the model was
-  written from Vallado's published algorithm instead. All 33 reference cases now agree to a maximum of
-  4.1e-06 km, the low-perigee band included: satellite 28350 went from 3438.51 km to 6.3e-09 km. The
-  dependency is gone, `satellite.Satellite.Verified` is deprecated because there is no regime left for it to
-  flag, and what replaced the runtime signal is the propagator's own branch predicates, which describe the
-  orbit rather than astrogo's coverage. See [#310](https://github.com/TuSKan/astrogo/pull/310) for the design
-  and [`docs/sgp4.md`](sgp4.md) for what it commits to.
-
-The remaining two are recorded with their unblocking conditions in [`docs/skybrightness.md`](skybrightness.md) §16.
+Both are recorded with their unblocking conditions in [`docs/skybrightness.md`](skybrightness.md) §16.
 
 ---
 
