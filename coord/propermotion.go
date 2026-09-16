@@ -74,3 +74,41 @@ func dRAdt(pmRACosDec, dec angle.Angle) float64 {
 func pmRACosDec(dRAdtRad float64, dec angle.Angle) angle.Angle {
 	return angle.Rad(dRAdtRad * math.Cos(dec.Radians()))
 }
+
+// ParallaxDistance returns the distance, in parsecs, of a target whose annual
+// parallax is p.
+//
+// The parsec is defined as the distance at which one astronomical unit
+// subtends one arcsecond, so this is d = 1/p with p in arcseconds, exactly —
+// there is no constant here to get wrong, only a unit. It exists because the
+// unit is the thing that does get got wrong: catalogues publish parallax in
+// milliarcseconds, and 1/p_mas is a distance in kiloparsecs, which is a
+// factor of a thousand that looks entirely reasonable in a table.
+//
+// It is the companion to [GalactocentricFrame.FromICRS], which needs a
+// distance in parsecs and cannot take one from [ICRS.Dist] because that field
+// has no unit of its own.
+//
+// A zero parallax returns +Inf, which is the limit and is true: a target with
+// no measurable parallax is at an unmeasurably large distance. A negative one
+// returns a negative number, for the reason below.
+//
+// # This inverts a parallax; it does not estimate a distance
+//
+// For a parallax known to a few per cent the two are the same thing. For one
+// that is not, they are not, and the difference is not a refinement.
+//
+// A measured parallax is a true parallax plus noise, so a distant star's can
+// come out small, zero, or negative — Gaia publishes hundreds of thousands of
+// negative parallaxes, and they are not errors in the catalogue. Inverting the
+// measurement transforms a symmetric error bar into a wildly asymmetric one
+// and turns the small-parallax tail into a tail of implausibly distant stars,
+// biasing any sample selected on distance. Bailer-Jones (2015), PASP 127, 994
+// and Luri et al. (2018), A&A 616, A9 set out what to do instead, which is to
+// infer the distance with a prior rather than to compute it.
+//
+// This function is the arithmetic, not the inference. Use it when the parallax
+// is precise, and a published distance catalogue when it is not.
+func ParallaxDistance(p angle.Angle) float64 {
+	return 1 / p.Arcseconds()
+}
