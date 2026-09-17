@@ -5,6 +5,7 @@ import (
 	"math"
 
 	"github.com/TuSKan/astrogo/angle"
+	"github.com/TuSKan/astrogo/internal/gofaext"
 	"github.com/TuSKan/astrogo/vector"
 )
 
@@ -32,15 +33,32 @@ import (
 // It also means the frame needs a real distance to be entered at all. A
 // direction alone cannot be placed in it — see [GalactocentricFrame.FromICRS].
 //
-// # Positions only, for now
+// # A velocity, when the target has one
 //
-// astrogo has no space-velocity type, so this carries no velocity. The
-// companion frame that does — converting proper motion, parallax and radial
-// velocity into a Galactocentric velocity, against the Sun's own motion in that
-// frame — is tracked separately and is not what this type is.
+// [GalactocentricFrame.FromICRS] attaches a velocity in km/s whenever the
+// target's kinematics can supply one, and [Galactocentric.Velocity] reports
+// whether it did. The two are carried together because they are one state: an
+// orbit needs both, and a position that silently lost its velocity on the way
+// back through [GalactocentricFrame.ToICRS] would be an inverse in name only.
+//
+// A velocity needs more than a position does — a parallax able to turn an
+// angular rate into km/s, which a distance passed by the caller cannot
+// substitute for. [SpaceVelocity] documents why, and why that is not the same
+// requirement a frame conversion has.
 type Galactocentric struct {
 	// v holds (X, Y, Z) in parsecs.
 	v vector.Vec3
+
+	// vel holds the velocity in km/s on the same axes, and hasVelocity whether
+	// there is one.
+	//
+	// A position always exists; a velocity does not. It needs the target's
+	// kinematics and a parallax able to turn an angular rate into km/s, which
+	// is the requirement [SpaceVelocity] documents and refuses without. The
+	// flag keeps "no velocity available" distinct from "velocity is zero" —
+	// the same distinction [ICRS.hasKinematics] draws, for the same reason.
+	vel         vector.Vec3
+	hasVelocity bool
 }
 
 // The two measured parameters of the default frame.
@@ -119,8 +137,9 @@ const (
 // coordinate system. If you need Sgr A* itself rather than Galactic l = 0,
 // convert its ICRS position like any other target.
 type GalactocentricFrame struct {
-	sunDistance float64 // R₀, parsecs.
-	sunHeight   float64 // z☉, parsecs.
+	sunDistance float64     // R₀, parsecs.
+	sunHeight   float64     // z☉, parsecs.
+	sunVelocity vector.Vec3 // The Sun's velocity in this frame, km/s.
 }
 
 // NewGalactocentricFrame returns the frame in which the Galactic centre lies
@@ -135,16 +154,28 @@ type GalactocentricFrame struct {
 // centred on the Sun, and a sunHeight larger than sunDistance is clamped to a
 // quarter turn; both are nonsense that a caller can construct, and neither
 // produces a NaN that would propagate silently into a catalogue.
-func NewGalactocentricFrame(sunDistance, sunHeight float64) GalactocentricFrame {
-	return GalactocentricFrame{sunDistance: sunDistance, sunHeight: sunHeight}
+func NewGalactocentricFrame(sunDistance, sunHeight float64, sunVelocity vector.Vec3) GalactocentricFrame {
+	return GalactocentricFrame{
+		sunDistance: sunDistance,
+		sunHeight:   sunHeight,
+		sunVelocity: sunVelocity,
+	}
 }
 
 // DefaultGalactocentricFrame returns the frame built from the values this
 // package cites: R₀ = 8178 pc (GRAVITY Collaboration 2019) and z☉ = 20.8 pc
 // (Bennett & Bovy 2019).
 func DefaultGalactocentricFrame() GalactocentricFrame {
-	return NewGalactocentricFrame(sunGalacticDistancePc, sunMidplaneHeightPc)
+	return NewGalactocentricFrame(
+		sunGalacticDistancePc,
+		sunMidplaneHeightPc,
+		SolarVelocityFromSgrA(sunGalacticDistancePc),
+	)
 }
+
+// SunVelocity returns the Sun's velocity in this frame, in km/s, on the
+// Galactic axes the caller supplied it on — see [SolarVelocityFromSgrA].
+func (f GalactocentricFrame) SunVelocity() vector.Vec3 { return f.sunVelocity }
 
 // SunDistance returns R₀, the Sun-to-Galactic-centre distance in parsecs.
 func (f GalactocentricFrame) SunDistance() float64 { return f.sunDistance }
@@ -160,8 +191,17 @@ func (f GalactocentricFrame) SunHeight() float64 { return f.sunHeight }
 // The difference is 0.03 pc at the default parameters — far too small to matter
 // and far too easy to get backwards, which is why it is computed rather than
 // assumed.
+// It also carries the Sun's velocity, which is the frame parameter itself
+// tilted onto the frame's axes. That cannot come from [FromICRS], because the
+// Sun has no parallax and no proper motion of its own to measure — its motion
+// in this frame is the thing the frame is told, not a thing derived.
 func (f GalactocentricFrame) SunPosition() Galactocentric {
-	return f.FromICRS(ICRS{}, 0)
+	out := f.FromICRS(ICRS{}, 0)
+
+	out.vel = f.sunVelocity.RotateY(f.tilt())
+	out.hasVelocity = true
+
+	return out
 }
 
 // FromICRS places a target at the given distance, in parsecs, into the frame.
@@ -185,7 +225,21 @@ func (f GalactocentricFrame) FromICRS(c ICRS, distance float64) Galactocentric {
 	// Move the origin to the Galactic centre, which lies R₀ away along +X, and
 	// then tilt so the midplane passes through the centre with the Sun above
 	// it rather than in it.
-	return Galactocentric{v: vector.V3(v.X-f.sunDistance, v.Y, v.Z).RotateY(f.tilt())}
+	out := Galactocentric{v: vector.V3(v.X-f.sunDistance, v.Y, v.Z).RotateY(f.tilt())}
+
+	// The velocity, when the target carries enough to have one.
+	//
+	// Unlike the position it is not translated — an origin has no velocity —
+	// but the frames are in relative motion, so the Sun's own velocity is
+	// added. That is the whole of the transformation: rotate onto the Galactic
+	// axes, tilt with the frame, and add the velocity the Sun itself has.
+	if bary, ok := SpaceVelocity(c); ok {
+		out.vel = galacticBasis.toGalactic(bary).RotateY(f.tilt()).
+			Add(f.sunVelocity.RotateY(f.tilt()))
+		out.hasVelocity = true
+	}
+
+	return out
 }
 
 // ToICRS returns the ICRS direction of g as seen from the Sun, and its distance
@@ -201,8 +255,63 @@ func (f GalactocentricFrame) ToICRS(g Galactocentric) (c ICRS, distance float64)
 
 	lon, lat := v.ToSpherical()
 
-	return GalacticToICRS(NewGalactic(angle.Rad(lon).Wrap360(), angle.Rad(lat))), v.Norm()
+	out := GalacticToICRS(NewGalactic(angle.Rad(lon).Wrap360(), angle.Rad(lat)))
+	distance = v.Norm()
+
+	// A velocity, if there is one, comes back as catalogue kinematics: the
+	// reverse of what [GalactocentricFrame.FromICRS] did, then SOFA's Pvstar
+	// to split a Cartesian velocity back into a proper motion, a parallax and
+	// a radial velocity.
+	if vel, ok := g.Velocity(); ok {
+		if kin, ok := icrsFromBarycentricVelocity(out, distance,
+			galacticBasis.toICRS(vel.Sub(f.sunVelocity.RotateY(f.tilt())).RotateY(-f.tilt())),
+		); ok {
+			return kin, distance
+		}
+	}
+
+	return out, distance
 }
+
+// icrsFromBarycentricVelocity rebuilds catalogue kinematics from a direction, a
+// distance in parsecs and a barycentric velocity in km/s on the ICRS axes.
+//
+// It is the inverse of [SpaceVelocity], and exists so that
+// [GalactocentricFrame.ToICRS] is a real inverse of FromICRS rather than one
+// that quietly drops the velocity — which is the asymmetry that turns into a
+// bug the first time somebody round-trips a catalogue through the frame.
+//
+// The bool is false when SOFA declines the pv-vector: a speed at or past c, or
+// a zero-length position — which is a target at the Sun, where there is no
+// direction and so no proper motion to report. Both mean the caller built
+// something no star is, and both are left to Pvstar's own status rather than
+// pre-checked here, since a distance of zero produces exactly the null position
+// vector it already refuses.
+func icrsFromBarycentricVelocity(dir ICRS, distancePc float64, velocity vector.Vec3) (ICRS, bool) {
+	position := dir.ToUnitVector().MulScalar(distancePc * auPerParsec)
+	perDay := velocity.MulScalar(secondsPerDay / kmPerAU)
+
+	ra, dec, pmr, pmd, px, rv, status := gofaext.Pvstar([2][3]float64{
+		{position.X, position.Y, position.Z},
+		{perDay.X, perDay.Y, perDay.Z},
+	})
+	if status != 0 {
+		return ICRS{}, false
+	}
+
+	return NewICRSWithKinematics(
+		angle.Rad(ra).Wrap360(), angle.Rad(dec),
+		pmRACosDec(pmr, angle.Rad(dec)), angle.Rad(pmd),
+		angle.Arcsec(px), rv,
+	), true
+}
+
+// auPerParsec is the number of astronomical units in a parsec.
+//
+// It is the definition of the parsec rather than a measurement — the distance
+// at which one au subtends one arcsecond — so it is exactly 648000/π and is
+// written that way instead of as a decimal somebody has to check.
+const auPerParsec = 648000 / math.Pi
 
 // tilt returns the angle the frame is rotated about the Y axis to lift the Sun
 // z☉ above the midplane, in radians.
@@ -227,6 +336,21 @@ func (f GalactocentricFrame) tilt() float64 {
 func NewGalactocentric(x, y, z float64) Galactocentric {
 	return Galactocentric{v: vector.V3(x, y, z)}
 }
+
+// NewGalactocentricWithVelocity builds a position carrying a velocity, the
+// position in parsecs and the velocity in km/s on the same axes.
+func NewGalactocentricWithVelocity(x, y, z float64, velocity vector.Vec3) Galactocentric {
+	return Galactocentric{v: vector.V3(x, y, z), vel: velocity, hasVelocity: true}
+}
+
+// Velocity returns the velocity in km/s on this frame's axes, and whether there
+// is one.
+//
+// It is false when the target it came from recorded no kinematics, or recorded
+// them without a parallax able to scale an angular rate into km/s — see
+// [SpaceVelocity], which makes the same distinction and explains why a frame
+// conversion can manage without a distance while this cannot.
+func (c Galactocentric) Velocity() (vector.Vec3, bool) { return c.vel, c.hasVelocity }
 
 // X returns the component toward the Galactic centre, in parsecs. The Sun is at
 // negative X.

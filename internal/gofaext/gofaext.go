@@ -565,3 +565,23 @@ func Starpv(ra, dec, pmr, pmd, px, rv float64) (pv [2][3]float64, status int) {
 
 	return pv, status
 }
+
+// Pvstar is the inverse of [Starpv]: a barycentric position/velocity pv-vector,
+// in au and au per day, back to star catalogue data.
+//
+// The status is SOFA's own:
+//
+//	 0  no warnings
+//	-1  superluminal speed: the velocity is at or past c
+//	-2  null position vector, so there is no direction to report
+//
+// Both failures are inputs no star has, and both leave the returned values
+// meaningless rather than merely imprecise, so a caller must check.
+//
+// Note the order, which is the opposite of the intuitive one and is asserted by
+// [TestPvstarReportsTheInputsItCannotUse] for that reason.
+func Pvstar(pv [2][3]float64) (ra, dec, pmr, pmd, px, rv float64, status int) {
+	status = gofa.Pvstar(pv, &ra, &dec, &pmr, &pmd, &px, &rv)
+
+	return ra, dec, pmr, pmd, px, rv, status
+}
