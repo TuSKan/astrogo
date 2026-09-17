@@ -544,3 +544,24 @@ func TCBToTDB(tcb1, tcb2 float64) (tdb1, tdb2 float64, status int) {
 
 	return tdb1, tdb2, status
 }
+
+// Starpv converts star catalogue data into the barycentric position/velocity
+// pv-vector SOFA's astrometry routines work in: pv[0] is the position in au
+// and pv[1] the velocity in au per day.
+//
+// The status is SOFA's own, and is returned rather than discarded because it
+// is the only way to learn that the answer was invented:
+//
+//	0  no warnings
+//	1  the distance was overridden, because the parallax is below PXMIN
+//	2  the speed was set to zero, because it exceeded VMAX = 0.5c
+//	4  the relativistic iteration did not converge
+//
+// and the binary OR of those. Every value other than zero means some part of
+// the pv-vector is not what the caller's data implies. See fk5hip.go, whose
+// commentary explains what SOFA's own wrappers lose by dropping this.
+func Starpv(ra, dec, pmr, pmd, px, rv float64) (pv [2][3]float64, status int) {
+	status = gofa.Starpv(ra, dec, pmr, pmd, px, rv, &pv)
+
+	return pv, status
+}
