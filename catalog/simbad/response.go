@@ -1,6 +1,7 @@
 package simbad
 
 import (
+	"bufio"
 	"encoding/csv"
 	"errors"
 	"fmt"
@@ -11,8 +12,34 @@ import (
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/coord"
+	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/time"
 )
+
+// csvBody prepares a CSV response for parsing, refusing one that is a web page.
+//
+// An archive serves its own failures as HTML with a 200, and encoding/csv does
+// not obviously reject that: a web page is lines of text, some with commas in
+// them, so whether it errors depends on the page. Measured against SIMBAD's
+// parsers it did error, but on the header check -- "missing expected column:
+// main_id" -- which reads as the service having changed its schema rather than
+// as the service being down. That is the same misdiagnosis #301 fixed on the
+// VOTable side, and it is why the check is here rather than left to luck.
+//
+// The body is peeked, not consumed, so the reader handed back is still whole.
+func csvBody(r io.Reader) (*bufio.Reader, error) {
+	br := bufio.NewReader(r)
+
+	// Enough to clear a byte order mark and any leading blank lines. A
+	// document that has not declared itself HTML by then is not HTML.
+	head, _ := br.Peek(512)
+
+	if remote.LooksLikeHTML(head) {
+		return nil, fmt.Errorf("simbad: %w", remote.ErrNotServingData)
+	}
+
+	return br, nil
+}
 
 // ErrMissingColumn indicates a required column is missing from the SIMBAD response.
 var ErrMissingColumn = errors.New("simbad: missing expected column")
@@ -26,12 +53,17 @@ var ErrEmptyQuery = errors.New("simbad: empty query")
 // The expected order from BuildResolveQuery is:
 // oid, main_id, ra, dec, otype, id (matched alias)
 func ParseCSV(r io.Reader) ([]resolve.Target, error) {
-	reader := csv.NewReader(r)
+	body, err := csvBody(r)
+	if err != nil {
+		return nil, err
+	}
+
+	reader := csv.NewReader(body)
 
 	// Read header and build column index map
 	header, err := reader.Read()
 	if err != nil {
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			return nil, nil
 		}
 
@@ -174,11 +206,16 @@ func ParseCSV(r io.Reader) ([]resolve.Target, error) {
 // result slice rather than through a map (whose iteration order is
 // unspecified).
 func ParseBrightCSV(r io.Reader) ([]resolve.Target, error) {
-	reader := csv.NewReader(r)
+	body, err := csvBody(r)
+	if err != nil {
+		return nil, err
+	}
+
+	reader := csv.NewReader(body)
 
 	header, err := reader.Read()
 	if err != nil {
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			return nil, nil
 		}
 

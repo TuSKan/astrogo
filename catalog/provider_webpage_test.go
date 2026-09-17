@@ -1,0 +1,128 @@
+package catalog_test
+
+import (
+	"errors"
+	"io"
+	"strings"
+	"testing"
+
+	"github.com/TuSKan/astrogo/catalog/resolve"
+	"github.com/TuSKan/astrogo/catalog/simbad"
+	"github.com/TuSKan/astrogo/remote"
+)
+
+// maintenancePage is the shape an archive actually serves when it is down: a
+// human-readable notice, with a 200, in place of the result set. The commas
+// are deliberate — they are what makes such a page survive a CSV reader far
+// enough to be mistaken for data.
+const maintenancePage = `<!DOCTYPE html>
+<html lang="en">
+<head><title>Service unavailable</title></head>
+<body>
+<h1>The archive is temporarily unavailable</h1>
+<p>Scheduled maintenance. Status, updates, and contact details below.</p>
+<ul>
+<li>Mirrors: CDS, Harvard, Beijing</li>
+</ul>
+</body>
+</html>
+`
+
+// TestAProviderReportsDowntimeAsDowntime is #300: a caller must be able to tell
+// "the archive is down" from "the archive sent nonsense", because the two want
+// opposite handling — back off and retry, versus stop, because retrying will
+// not help.
+//
+// Before this, both arrived as an opaque error string and the honest options
+// were to retry everything or to retry nothing.
+//
+// # What was measured, and what it changed
+//
+// The issue suspected the CSV providers were the worse case, on the reasoning
+// that a web page handed to encoding/csv is lines of text with commas in them
+// and might yield rows rather than an error. Measured, that is not what
+// happens: SIMBAD's parsers stop, because they look up columns by name and a
+// web page has none. So no fabricated target ever reached a caller.
+//
+// What they reported was `missing expected column: "main_id"`, which is the
+// service-changed-its-schema answer to a service-is-down question — the same
+// misdiagnosis #301 fixed on the VOTable side, where an HTML page surfaced as
+// `XML syntax error on line 161: unexpected end element </div>` and pointed at
+// a parser bug that does not exist.
+//
+// So the fix is legibility rather than safety, which is worth saying plainly:
+// nothing was returning wrong data, and something was sending every reader
+// after the wrong problem.
+func TestAProviderReportsDowntimeAsDowntime(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		name  string
+		parse func(r io.Reader) ([]resolve.Target, error)
+	}{
+		{"ParseCSV", simbad.ParseCSV},
+		{"ParseBrightCSV", simbad.ParseBrightCSV},
+	} {
+		_, err := tc.parse(strings.NewReader(maintenancePage))
+		if err == nil {
+			t.Errorf("%s: a web page parsed without error", tc.name)
+			continue
+		}
+
+		if !errors.Is(err, remote.ErrNotServingData) {
+			t.Errorf("%s: err = %v, which does not match remote.ErrNotServingData — "+
+				"a caller cannot tell downtime from corruption", tc.name, err)
+		}
+	}
+}
+
+// TestRealDataStillParses is the other half, and the one that would hurt: a
+// guard that rejected good responses would turn every successful query into a
+// reported outage.
+func TestRealDataStillParses(t *testing.T) {
+	t.Parallel()
+
+	const rows = "oid,main_id,ra,dec,otype,id\n" +
+		"1,M  31,10.6847083,41.2687500,G,M 31\n" +
+		"2,M  33,23.4620417,30.6602222,G,M 33\n"
+
+	out, err := simbad.ParseCSV(strings.NewReader(rows))
+	if err != nil {
+		t.Fatalf("a valid CSV response failed to parse: %v", err)
+	}
+
+	if len(out) != 2 {
+		t.Errorf("got %d targets, want 2", len(out))
+	}
+
+	if errors.Is(err, remote.ErrNotServingData) {
+		t.Error("a valid response was reported as the service not serving data")
+	}
+}
+
+// TestAMalformedResponseIsNotReportedAsDowntime keeps the distinction pointing
+// both ways. A genuinely broken payload must not claim the archive is down,
+// since a caller reading that would retry forever against a service that is
+// working fine.
+func TestAMalformedResponseIsNotReportedAsDowntime(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		name string
+		body string
+	}{
+		{"headers the provider does not recognise", "alpha,beta,gamma\n1,2,3\n"},
+		{"a truncated row", "oid,main_id,ra,dec,otype,id\n1,M  31\n"},
+		{"not tabular at all", "{\"error\": \"nope\"}\n"},
+	} {
+		_, err := simbad.ParseCSV(strings.NewReader(tc.body))
+		if err == nil {
+			continue // Tolerated by the parser; not this test's subject.
+		}
+
+		if errors.Is(err, remote.ErrNotServingData) {
+			t.Errorf("%s: reported as the service not serving data, but the service did "+
+				"serve something — retrying will not fix this: %v", tc.name, err)
+		}
+	}
+}

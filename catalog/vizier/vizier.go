@@ -1,6 +1,7 @@
 package vizier
 
 import (
+	"bufio"
 	"context"
 	"encoding/csv"
 	"errors"
@@ -149,7 +150,19 @@ func (p *Provider) ConeSearch(ctx context.Context, req resolve.ConeRequest) reso
 // are located by header name rather than assumed position, so the parser
 // stays correct if the SELECT clause in ConeSearch is reordered.
 func parseCSV(body io.Reader, schema tableSchema) ([]resolve.Target, error) {
-	reader := csv.NewReader(body)
+	// An archive serves its own failures as HTML with a 200, and encoding/csv
+	// does not obviously reject that -- a web page is lines of text, some with
+	// commas in them. Measured, this parser did stop, but on the column check
+	// below, reporting a missing "designation" column: the schema-changed
+	// answer to a service-is-down question. Peeked rather than consumed, so
+	// the reader is still whole underneath.
+	buffered := bufio.NewReader(body)
+
+	if head, _ := buffered.Peek(512); remote.LooksLikeHTML(head) {
+		return nil, fmt.Errorf("vizier: %w", remote.ErrNotServingData)
+	}
+
+	reader := csv.NewReader(buffered)
 
 	header, err := reader.Read()
 	if err != nil {
