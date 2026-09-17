@@ -227,8 +227,8 @@ func TestFromCatalog_StarRadialVelocity(t *testing.T) {
 				t.Errorf("MeasuredRadialVelocity() has = %v, want %v", gotHas, c.wantHas)
 			}
 
-			if gotHas && gotRV != c.rv {
-				t.Errorf("MeasuredRadialVelocity() rv = %v, want %v", gotRV, c.rv)
+			if gotHas && gotRV.KmPerSec() != c.rv {
+				t.Errorf("MeasuredRadialVelocity() rv = %v km/s, want %v", gotRV.KmPerSec(), c.rv)
 			}
 		})
 	}
@@ -252,13 +252,14 @@ func TestFromCatalog_AsteroidDiameterAndAlbedo(t *testing.T) {
 			t.Fatalf("FromCatalog: got %T, want *plan.Asteroid", obj)
 		}
 
-		metres, ok := ast.PhysicalRadius()
+		radius, ok := ast.PhysicalRadius()
 		if !ok {
 			t.Fatal("PhysicalRadius: ok = false, want true (measured diameter present)")
 		}
 
-		if want := 16.84 * 1000 / 2; metres != want {
-			t.Errorf("PhysicalRadius() = %v, want %v (16.84 km diameter -> radius in metres)", metres, want)
+		if want := 16.84 * 1000 / 2; radius.Meters() != want {
+			t.Errorf("PhysicalRadius() = %v m, want %v (16.84 km diameter -> radius in meters)",
+				radius.Meters(), want)
 		}
 	})
 
@@ -411,8 +412,8 @@ func TestFromCatalogKeepsADeepSkyRadialVelocity(t *testing.T) {
 		t.Fatal("the catalog radial velocity did not survive FromCatalog")
 	}
 
-	if rv != -300.0 {
-		t.Errorf("radial velocity = %v, want -300.0", rv)
+	if rv.KmPerSec() != -300.0 {
+		t.Errorf("radial velocity = %v km/s, want -300.0", rv.KmPerSec())
 	}
 }
 

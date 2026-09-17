@@ -182,6 +182,6 @@ func main() {
 	}
 
 	for _, a := range apsides {
-		fmt.Printf("  %s: %s  (%.6f AU)\n", a.Apsis, a.Time.Format(time.RFC3339), a.Distance)
+		fmt.Printf("  %s: %s  (%.6f AU)\n", a.Apsis, a.Time.Format(time.RFC3339), a.Distance.AU())
 	}
 }

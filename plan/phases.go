@@ -8,6 +8,7 @@ import (
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // ── Moon Phases ──────────────────────────────────────────────────────────────
@@ -430,7 +431,7 @@ func (a Apsis) String() string {
 type ApsisEvent struct {
 	Time     time.Time
 	Apsis    Apsis
-	Distance float64
+	Distance unit.Length
 }
 
 // Apsides computes the perihelion and aphelion of the Earth for a given year.
@@ -466,7 +467,7 @@ func Apsides(year int, prov eph.Provider) ([]ApsisEvent, error) {
 		return nil, fmt.Errorf("apsides: perihelion: %w", err)
 	}
 
-	events = append(events, ApsisEvent{Apsis: ApsisPerihelion, Time: periTime, Distance: periDist})
+	events = append(events, ApsisEvent{Apsis: ApsisPerihelion, Time: periTime, Distance: unit.AU(periDist)})
 
 	// Aphelion: maximum distance, typically early July
 	// Search window: May 15 → Aug 15
@@ -478,7 +479,7 @@ func Apsides(year int, prov eph.Provider) ([]ApsisEvent, error) {
 		return nil, fmt.Errorf("apsides: aphelion: %w", err)
 	}
 
-	events = append(events, ApsisEvent{Apsis: ApsisAphelion, Time: apTime, Distance: apDist})
+	events = append(events, ApsisEvent{Apsis: ApsisAphelion, Time: apTime, Distance: unit.AU(apDist)})
 
 	return events, nil
 }

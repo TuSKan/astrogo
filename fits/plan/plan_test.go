@@ -31,8 +31,8 @@ func TestSiteFromFITS(t *testing.T) {
 		t.Errorf("expected latitude -31.2770, got: %v", site.Latitude().Degrees())
 	}
 
-	if site.HeightMeters() != 1165.0 {
-		t.Errorf("expected elevation 1165.0, got: %v", site.HeightMeters())
+	if site.Height().Meters() != 1165.0 {
+		t.Errorf("expected elevation 1165.0 m, got: %v", site.Height().Meters())
 	}
 }
 

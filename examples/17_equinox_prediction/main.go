@@ -131,10 +131,11 @@ func main() {
 
 	for _, a := range apsides {
 		fmt.Printf("  %-12s %s  (%.6f AU)\n",
-			a.Apsis, a.Time.In(brtz).Format("Jan 02 15:04:05 MST"), a.Distance)
+			a.Apsis, a.Time.In(brtz).Format("Jan 02 15:04:05 MST"), a.Distance.AU())
 	}
 
-	eccentricity := (apsides[1].Distance - apsides[0].Distance) / (apsides[1].Distance + apsides[0].Distance)
+	aph, peri := apsides[1].Distance.AU(), apsides[0].Distance.AU()
+	eccentricity := (aph - peri) / (aph + peri)
 	fmt.Printf("\n  Orbital eccentricity: e = %.6f\n", eccentricity)
 
 	// ── Part 4: 2026 Moon Phases (first 3 months) ───────────────────────────

@@ -56,7 +56,7 @@ func TestGetDetails_Star(t *testing.T) {
 	}
 
 	// parallax 0.130" -> distance = 1/0.130 ≈ 7.69 pc
-	testutil.AssertNear(t, "Distance from parallax", d.Distance, 1.0/0.130, 0.01)
+	testutil.AssertNear(t, "Distance from parallax", d.Distance.Pc(), 1.0/0.130, 0.01)
 
 	if _, ok := d.ExtraProps["Proper motion (RA)"]; !ok {
 		t.Error("expected Proper motion (RA) in ExtraProps (fillTypedProps Star case)")
@@ -188,7 +188,7 @@ func TestGetDetails_RadialVelocity(t *testing.T) {
 
 	ra, dec := angle.Hour(6.7525), angle.Deg(-16.7161)
 
-	star := NewStar("Sirius", ra, dec, WithRadialVelocity(rvBarycentric))
+	star := NewStar("Sirius", ra, dec, WithRadialVelocity(unit.KmPerSec(rvBarycentric)))
 
 	d, err := star.GetDetails(ctx, DetailOverrides{})
 	testutil.AssertNoError(t, err)
@@ -261,7 +261,7 @@ func TestGetDetails_RadialVelocity_PropOverride(t *testing.T) {
 	tm := time.FromJD(2451545.0, time.UTC)
 	ctx := coord.NewContext(tm, loc, site.Refraction())
 
-	star := NewStar("Sirius", angle.Hour(6.7525), angle.Deg(-16.7161), WithRadialVelocity(-5.5))
+	star := NewStar("Sirius", angle.Hour(6.7525), angle.Deg(-16.7161), WithRadialVelocity(unit.KmPerSec(-5.5)))
 
 	d, err := star.GetDetails(ctx, DetailOverrides{RadialVelocity: "custom override"})
 	testutil.AssertNoError(t, err)
@@ -341,7 +341,7 @@ func TestRadialVelocityDispatchesOnTargetKind(t *testing.T) {
 		const barycentric = -5.5 // Sirius
 
 		star := NewStar("Sirius-like", angle.Deg(101.287), angle.Deg(-16.716),
-			WithRadialVelocity(barycentric))
+			WithRadialVelocity(unit.KmPerSec(barycentric)))
 
 		got, err := RadialVelocity(star, ctx)
 		if err != nil {
@@ -357,14 +357,14 @@ func TestRadialVelocityDispatchesOnTargetKind(t *testing.T) {
 
 		want, err := ctx.ObservedRadialVelocity(pos, unit.KmPerSec(barycentric))
 		testutil.AssertNoError(t, err)
-		testutil.AssertNear(t, "catalog radial velocity", got, want.KmPerSec(), 1e-12)
+		testutil.AssertNear(t, "catalog radial velocity", got.KmPerSec(), want.KmPerSec(), 1e-12)
 
 		// And it must differ from the catalog number by roughly Earth's
 		// orbital speed projected on the line of sight — otherwise the
 		// conversion is not happening at all.
-		if math.Abs(got-barycentric) < 1 {
+		if math.Abs(got.KmPerSec()-barycentric) < 1 {
 			t.Errorf("topocentric %v is within 1 km/s of the barycentric %v; the observer's "+
-				"own motion does not appear to have been applied", got, barycentric)
+				"own motion does not appear to have been applied", got.KmPerSec(), barycentric)
 		}
 	})
 
@@ -372,7 +372,7 @@ func TestRadialVelocityDispatchesOnTargetKind(t *testing.T) {
 		t.Parallel()
 
 		dso := NewDeepSkyObject("M31-like", angle.Deg(10.6847), angle.Deg(41.2688),
-			WithDSORadialVelocity(-300.0))
+			WithDSORadialVelocity(unit.KmPerSec(-300.0)))
 
 		if _, err := RadialVelocity(dso, ctx); err != nil {
 			t.Errorf("a galaxy carrying a catalog RV reported none: %v", err)
@@ -401,8 +401,8 @@ func TestRadialVelocityDispatchesOnTargetKind(t *testing.T) {
 		// never zero to the precision of a float — a bound loose enough to
 		// survive any epoch and tight enough to catch a unit slip, which
 		// would land in the thousands.
-		if got == 0 || math.Abs(got) > 60 {
-			t.Errorf("Mars radial velocity = %v km/s, outside any physical range", got)
+		if kmPerSec := got.KmPerSec(); kmPerSec == 0 || math.Abs(kmPerSec) > 60 {
+			t.Errorf("Mars radial velocity = %v km/s, outside any physical range", kmPerSec)
 		}
 	})
 
@@ -447,7 +447,7 @@ func TestDetailOverridesAppliesEveryField(t *testing.T) {
 	star := NewStar("Vega", angle.Hour(18.615), angle.Deg(38.78),
 		WithStarMagnitude(0.03),
 		WithParallax(angle.Arcsec(0.130)),
-		WithRadialVelocity(-13.9),
+		WithRadialVelocity(unit.KmPerSec(-13.9)),
 	)
 
 	// AngularSize is only ever computed for a MovingBody with a known
@@ -552,7 +552,7 @@ func TestDetailOverridesZeroValueOverridesNothing(t *testing.T) {
 	star := NewStar("Vega", angle.Hour(18.615), angle.Deg(38.78),
 		WithStarMagnitude(0.03),
 		WithParallax(angle.Arcsec(0.130)),
-		WithRadialVelocity(-13.9),
+		WithRadialVelocity(unit.KmPerSec(-13.9)),
 	)
 
 	d, err := star.GetDetails(ctx, DetailOverrides{})

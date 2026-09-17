@@ -25,14 +25,29 @@ type TargetDetails struct {
 	Magnitude      string
 	RadialVelocity string
 	Name           string
-	DistanceUnit   string
-	Distance       float64
-	Azimuth        angle.Angle
-	RiseAzimuth    angle.Angle
-	Altitude       angle.Angle
-	MaxElevation   angle.Angle
-	SetAzimuth     angle.Angle
-	Elongation     angle.Angle
+
+	// DistanceUnit names the unit [TargetDetails.String] renders Distance in:
+	// "pc" for a fixed target placed by its parallax, "a.u." for a
+	// solar-system body, "km" for a satellite.
+	//
+	// It is a rendering choice, not the unit Distance is in. It used to be
+	// both — Distance was a bare float64 and this string was the only record
+	// of what its number meant, so a caller reading Distance without reading
+	// this alongside it got parsecs, au or kilometres depending on the target
+	// and no way to tell. Distance now carries its own unit and this only
+	// decides which one to print.
+	DistanceUnit string
+
+	// Distance is the target's distance: from the observer for a
+	// solar-system body or satellite, from the Sun for a fixed target
+	// placed by its parallax. Zero when nothing supplied one.
+	Distance     unit.Length
+	Azimuth      angle.Angle
+	RiseAzimuth  angle.Angle
+	Altitude     angle.Angle
+	MaxElevation angle.Angle
+	SetAzimuth   angle.Angle
+	Elongation   angle.Angle
 
 	// RA is the astrometric topocentric right ascension in the ICRS frame (J2000).
 	// For moving bodies this includes diurnal parallax correction but does NOT
@@ -70,7 +85,7 @@ func (d TargetDetails) String() string {
 	fmt.Fprintf(&b, "Dec (ICRS):\t%s\n", d.Dec.DMSString(0))
 	fmt.Fprintf(&b, "Altitude:\t%s\n", d.Altitude.DMSString(0))
 	fmt.Fprintf(&b, "Azimuth:\t%s\n", d.Azimuth.DMSString(0))
-	fmt.Fprintf(&b, "Distance:\t%.4f %s\n", d.Distance, d.DistanceUnit)
+	fmt.Fprintf(&b, "Distance:\t%.4f %s\n", d.distanceInItsUnit(), d.DistanceUnit)
 
 	if d.AngularSize != "" {
 		fmt.Fprintf(&b, "Angular size(s):\t%s\n", d.AngularSize)
@@ -114,6 +129,25 @@ func (d TargetDetails) String() string {
 	}
 
 	return b.String()
+}
+
+// distanceInItsUnit renders Distance in whatever [TargetDetails.DistanceUnit]
+// names, so the printed number and the printed unit cannot disagree.
+//
+// An unrecognised DistanceUnit falls back to meters rather than guessing,
+// which is the one answer that is never silently wrong by a factor: it is what
+// [unit.Length] stores, so the number is the value itself.
+func (d TargetDetails) distanceInItsUnit() float64 {
+	switch d.DistanceUnit {
+	case "pc":
+		return d.Distance.Pc()
+	case "a.u.":
+		return d.Distance.AU()
+	case "km":
+		return d.Distance.Km()
+	default:
+		return d.Distance.Meters()
+	}
 }
 
 // ── computeDetails ──────────────────────────────────────────────────────────
@@ -197,12 +231,13 @@ func fillMovingBody(d *TargetDetails, mb MovingBody, t time.Time, ctx *coord.Con
 	altaz := ctx.GeocentricToObserved(vec)
 	d.Altitude = altaz.Alt()
 	d.Azimuth = altaz.Az()
-	d.Distance = topoDist
+	d.Distance = unit.AU(topoDist)
 	d.DistanceUnit = "a.u."
 
-	// Satellite distances are in km from the Reducer pipeline.
+	// A satellite's distance comes from the Reducer pipeline rather than the
+	// geocentric subtraction above, and is conventionally read in km.
 	if _, isSat := mb.(*Satellite); isSat {
-		d.Distance = altaz.Dist().Km()
+		d.Distance = altaz.Dist()
 		d.DistanceUnit = "km"
 
 		return
@@ -267,13 +302,13 @@ func fillRadialVelocity(d *TargetDetails, obs Observable, ctx *coord.Context) {
 	if mrv, ok := obs.(MeasuredRadialVelocity); ok {
 		if barycentric, has := mrv.MeasuredRadialVelocity(); has {
 			d.RadialVelocity = fmt.Sprintf("%+.2f km/s topocentric (%+.2f km/s barycentric)",
-				rv, barycentric)
+				rv.KmPerSec(), barycentric.KmPerSec())
 
 			return
 		}
 	}
 
-	d.RadialVelocity = fmt.Sprintf("%+.2f km/s topocentric", rv)
+	d.RadialVelocity = fmt.Sprintf("%+.2f km/s topocentric", rv.KmPerSec())
 }
 
 // ── Type-specific property extraction ───────────────────────────────────────
@@ -283,7 +318,7 @@ func fillTypedProps(d *TargetDetails, obs Observable) {
 	switch v := obs.(type) {
 	case *Star:
 		if v.parallax.Radians() > 0 {
-			d.Distance = 1.0 / v.parallax.Arcseconds()
+			d.Distance = coord.ParallaxDistance(v.parallax)
 		}
 
 		if v.pmRA.Radians() != 0 {
@@ -480,7 +515,7 @@ func clamp(v, lo, hi float64) float64 {
 // Returns ErrNoRadialVelocity for a target that is neither: a fixed target
 // whose catalog carried no RV, or one of the target kinds with no position
 // model at all.
-func RadialVelocity(obs Observable, ctx *coord.Context) (float64, error) {
+func RadialVelocity(obs Observable, ctx *coord.Context) (unit.Velocity, error) {
 	// Moving body first. A body with an ephemeris always has a radial
 	// velocity, and a catalog value for one would be meaningless — the
 	// ordering matters if a type ever implements both.
@@ -490,7 +525,7 @@ func RadialVelocity(obs Observable, ctx *coord.Context) (float64, error) {
 			return 0, fmt.Errorf("radial velocity for %s: %w", mb.Name(), err)
 		}
 
-		return ctx.TopocentricRadialVelocity(state.Pos, state.Vel).KmPerSec(), nil
+		return ctx.TopocentricRadialVelocity(state.Pos, state.Vel), nil
 	}
 
 	if mrv, ok := obs.(MeasuredRadialVelocity); ok {
@@ -500,12 +535,12 @@ func RadialVelocity(obs Observable, ctx *coord.Context) (float64, error) {
 				return 0, fmt.Errorf("radial velocity for %s: %w", obs.Name(), err)
 			}
 
-			rv, err := ctx.ObservedRadialVelocity(pos, unit.KmPerSec(rvBarycentric))
+			rv, err := ctx.ObservedRadialVelocity(pos, rvBarycentric)
 			if err != nil {
 				return 0, fmt.Errorf("radial velocity for %s: %w", obs.Name(), err)
 			}
 
-			return rv.KmPerSec(), nil
+			return rv, nil
 		}
 	}
 

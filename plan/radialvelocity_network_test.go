@@ -140,11 +140,14 @@ func TestMovingBodyRadialVelocityAgainstHorizons(t *testing.T) {
 		{"Jupiter", "599", plan.NewJupiter(e), 0.0246},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			got, err := plan.RadialVelocity(tc.obs, ctx)
+			rv, err := plan.RadialVelocity(tc.obs, ctx)
 			if err != nil {
 				t.Fatalf("RadialVelocity: %v", err)
 			}
 
+			// Horizons publishes its range rate in km/s, which is what the
+			// tolerances below are stated in.
+			got := rv.KmPerSec()
 			want := horizonsRangeRate(t, tc.command, tlistJD)
 
 			t.Logf("%s: astrogo %+.4f km/s, Horizons %+.4f, difference %+.1f m/s",

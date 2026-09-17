@@ -38,7 +38,7 @@ func TestNewSiteEarthAddress_Live(t *testing.T) {
 		t.Errorf("Longitude = %.4f, want ~0 (Greenwich)", lon)
 	}
 
-	if h := site.HeightMeters(); h < 0 || h > 120 {
-		t.Errorf("HeightMeters = %.1f, want ~45 (Greenwich Observatory)", h)
+	if h := site.Height().Meters(); h < 0 || h > 120 {
+		t.Errorf("Height = %.1f m, want ~45 (Greenwich Observatory)", h)
 	}
 }

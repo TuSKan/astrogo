@@ -14,6 +14,7 @@ import (
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // Site represents a physical observing location.
@@ -285,6 +286,12 @@ func NewSite(name string, loc *coord.Geodetic, opts ...SiteOption) (*Site, error
 // latitude/longitude and a height in meters — a thin convenience over
 // coord.NewEarthLocation + NewSite so a caller building a site from plain
 // numbers doesn't need to import coord just for that one call.
+//
+// It keeps plain float64 parameters for the same reason
+// [coord.NewEarthLocation] does: the numbers it exists to accept are copied
+// off a GPS or a mapping service, where they are always degrees and meters,
+// and the parameter names say so. Everywhere else in this package a length is
+// a [unit.Length] — [Site.Height] returns one.
 func NewSiteEarthLocation(name string, latDeg, lonDeg, heightMeters float64, opts ...SiteOption) (*Site, error) {
 	loc, err := coord.NewEarthLocation(latDeg, lonDeg, heightMeters)
 	if err != nil {
@@ -441,7 +448,16 @@ func (s *Site) Longitude() angle.Angle { return s.location.Lon() }
 // Latitude returns the site's geodetic latitude.
 func (s *Site) Latitude() angle.Angle { return s.location.Lat() }
 
-// HeightMeters returns the site's height above the reference ellipsoid in meters.
+// Height returns the site's height above the reference ellipsoid.
+func (s *Site) Height() unit.Length { return s.location.Height() }
+
+// HeightMeters returns the site's height above the reference ellipsoid in
+// meters.
+//
+// Deprecated: use [Site.Height], which carries its own unit. Kept because the
+// name is correct about what it returns and a caller who wants the number in
+// meters loses nothing; it is the signature that no longer matches the rest of
+// this package.
 func (s *Site) HeightMeters() float64 { return s.location.Height().Meters() }
 
 // Refraction returns a refraction profile adjusted for the site's elevation

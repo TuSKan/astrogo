@@ -29,7 +29,7 @@ func TestNewSite(t *testing.T) {
 	testutil.AssertEqual(t, "Name", site.Name(), "My Observatory")
 	testutil.AssertEqual(t, "Longitude", site.Longitude().Degrees(), 10.0)
 	testutil.AssertEqual(t, "Latitude", site.Latitude().Degrees(), 45.0)
-	testutil.AssertEqual(t, "Height", site.HeightMeters(), 500.0)
+	testutil.AssertEqual(t, "Height", site.Height().Meters(), 500.0)
 	testutil.AssertEqual(t, "Horizon", site.Horizon().Degrees(), 20.0)
 	testutil.AssertEqual(t, "TimeZone", site.TimeZone().String(), "Europe/Rome")
 }
@@ -45,7 +45,7 @@ func TestNewSiteEarthLocation(t *testing.T) {
 	testutil.AssertEqual(t, "Name", site.Name(), "Quinta Calixto")
 	testutil.AssertEqual(t, "Latitude", site.Latitude().Degrees(), -22.528478)
 	testutil.AssertEqual(t, "Longitude", site.Longitude().Degrees(), -46.473002)
-	testutil.AssertEqual(t, "Height", site.HeightMeters(), 835.05)
+	testutil.AssertEqual(t, "Height", site.Height().Meters(), 835.05)
 }
 
 // TestNewSiteEarthLocation_InvalidLatitude confirms the underlying
@@ -113,7 +113,7 @@ func TestNewSiteEarthAddress_Success(t *testing.T) {
 	testutil.AssertEqual(t, "Name", site.Name(), "Quinta Calixto")
 	testutil.AssertEqual(t, "Latitude", site.Latitude().Degrees(), -22.528478)
 	testutil.AssertEqual(t, "Longitude", site.Longitude().Degrees(), -46.473002)
-	testutil.AssertEqual(t, "Height", site.HeightMeters(), 835.05)
+	testutil.AssertEqual(t, "Height", site.Height().Meters(), 835.05)
 }
 
 // TestNewSiteEarthAddress_NoResult confirms ErrGeocodeNoResult surfaces
@@ -427,8 +427,8 @@ func TestKnownSitesTableIntegrity(t *testing.T) {
 			t.Errorf("%s: Longitude=%v out of range [-180,180]", s.Name(), lon)
 		}
 
-		if h := s.HeightMeters(); h < 0 || h > 6000 {
-			t.Errorf("%s: HeightMeters=%v outside a plausible ground-observatory range", s.Name(), h)
+		if h := s.Height().Meters(); h < 0 || h > 6000 {
+			t.Errorf("%s: Height=%v m outside a plausible ground-observatory range", s.Name(), h)
 		}
 	}
 }
@@ -470,8 +470,8 @@ func TestKnownSiteElevationSpotChecks(t *testing.T) {
 			t.Fatalf("NewKnownSite(%q): %v", name, err)
 		}
 
-		if math.Abs(s.HeightMeters()-wantM) > 1 {
-			t.Errorf("%s: HeightMeters() = %v, want %v", name, s.HeightMeters(), wantM)
+		if math.Abs(s.Height().Meters()-wantM) > 1 {
+			t.Errorf("%s: Height() = %v m, want %v", name, s.Height().Meters(), wantM)
 		}
 	}
 }
