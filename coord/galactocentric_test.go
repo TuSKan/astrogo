@@ -7,6 +7,7 @@ import (
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/internal/testutil"
+	"github.com/TuSKan/astrogo/vector"
 )
 
 // galacticCentre is the ICRS direction the frame is built around: Galactic
@@ -267,7 +268,8 @@ func TestAstropysDefaultFrameIsReproducible(t *testing.T) {
 	}
 
 	// With astropy's parameters, the Sun lands where astropy puts it.
-	sun := coord.NewGalactocentricFrame(astropyDistancePc, astropyZSunPc).SunPosition()
+	sun := coord.NewGalactocentricFrame(astropyDistancePc, astropyZSunPc,
+		coord.SolarVelocityFromSgrA(astropyDistancePc)).SunPosition()
 
 	testutil.AssertNear(t, "astropy-frame Sun X", sun.X(),
 		-math.Sqrt(astropyDistancePc*astropyDistancePc-astropyZSunPc*astropyZSunPc), 1e-9)
@@ -284,7 +286,7 @@ func TestTheSunsHeightIsNotCosmetic(t *testing.T) {
 	t.Parallel()
 
 	withHeight := coord.DefaultGalactocentricFrame()
-	flat := coord.NewGalactocentricFrame(withHeight.SunDistance(), 0)
+	flat := coord.NewGalactocentricFrame(withHeight.SunDistance(), 0, withHeight.SunVelocity())
 
 	// A target in the Galactic plane on the far side of the centre, twice as
 	// far away as the centre is.
@@ -324,7 +326,7 @@ func TestDegenerateFramesDoNotProduceNaN(t *testing.T) {
 		{"the Sun further from the plane than from the centre", 100, 500},
 		{"a negative height", 8178, -20.8},
 	} {
-		got := coord.NewGalactocentricFrame(tc.distance, tc.height).FromICRS(target, 1000)
+		got := coord.NewGalactocentricFrame(tc.distance, tc.height, vector.Zero()).FromICRS(target, 1000)
 
 		if math.IsNaN(got.X()) || math.IsNaN(got.Y()) || math.IsNaN(got.Z()) {
 			t.Errorf("%s: produced %s", tc.name, got)
