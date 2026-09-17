@@ -1,0 +1,84 @@
+name: Changelog
+
+# Separate from ci.yml because of the trigger, not because of the work.
+#
+# This check can be satisfied by adding a label, and a label change is not a
+# `synchronize` — the default `pull_request` types are opened, synchronize and
+# reopened, so `labeled` fires nothing. Re-running the job does not help either:
+# GitHub replays the original event payload, so `github.event.pull_request.labels`
+# is still whatever it was when the run was created. Measured on #336 — labelled
+# `no-changelog`, job re-run, still red with the same error.
+#
+# The only ways through were to push a commit to a pull request whose whole
+# point was that it needed no further change, or to close and reopen it, which
+# nothing tells anyone to do. Both for a check whose own error message says to
+# add the label.
+#
+# So the types are named here, and `unlabeled` matters as much as `labeled`:
+# removing `no-changelog` from a pull request that does need an entry must turn
+# the check red again rather than leaving it green until the next push.
+#
+# Widening the trigger in ci.yml instead would have applied it to every job in
+# that file, so adding a triage label would re-run the whole matrix, Race
+# Detection and the external-API suite included. A metadata check belongs on a
+# metadata trigger; the build does not. See #337.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+permissions:
+  contents: read
+
+jobs:
+  # CONTRIBUTING.md's pull request process asks for a changelog fragment, and
+  # docs/PULL_REQUESTS.md section 4 explains why one file per entry rather than
+  # editing CHANGELOG.md. Nothing enforced it, so #80 and #81 both merged
+  # without one and would have been absent from the release they belong to —
+  # discovered by hand, weeks after the fact, which is exactly the drift
+  # internal/docsguard exists to prevent everywhere else.
+  #
+  # `go test ./internal/changelog/` already validates that a fragment parses
+  # and names a real section. It cannot know which pull request is running, so
+  # the existence check has to live here, where the number is.
+  #
+  # Label a pull request `no-changelog` when it genuinely warrants no entry —
+  # pure test coverage for shipped behaviour, or a change to CI that no user
+  # can observe. The label is deliberate and reviewable; silence was not.
+  #
+  # The job name is unchanged from when this lived in ci.yml, so the required
+  # check keeps matching.
+  changelog-fragment:
+    name: Changelog Fragment
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Require a changelog fragment naming this pull request
+        shell: bash
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
+        run: |
+          if [[ ",${PR_LABELS}," == *",no-changelog,"* ]]; then
+            echo "Labelled no-changelog — skipping."
+            exit 0
+          fi
+
+          shopt -s nullglob
+          found=(docs/changelog.d/"${PR_NUMBER}"-*.md)
+
+          if (( ${#found[@]} )); then
+            echo "Found ${#found[@]} fragment(s):"
+            for f in "${found[@]}"; do
+              echo "  $f"
+            done
+            exit 0
+          fi
+
+          echo "::error::No changelog fragment for pull request #${PR_NUMBER}."
+          echo "Add docs/changelog.d/${PR_NUMBER}-<short-slug>.md — see docs/changelog.d/README.md"
+          echo "and docs/PULL_REQUESTS.md section 4. If this change warrants no entry,"
+          echo "label the pull request 'no-changelog' — which now re-runs this check by itself."
+          exit 1
