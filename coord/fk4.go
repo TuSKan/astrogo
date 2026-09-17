@@ -42,6 +42,28 @@ type FK4 struct {
 	rv              float64 // km/s
 	bepoch          float64 // Besselian epoch of observation, e.g. 1950.0
 	hasProperMotion bool
+
+	// fictitiousMotion records that the proper motion above came from the
+	// frame rather than from a catalogue.
+	//
+	// A star with no measured motion still moves in FK4, because FK4's equinox
+	// drifts, and [FK5ToFK4] and [ICRSToFK4] hand that motion back rather than
+	// pretending the star is at rest. It is a real number and worth returning —
+	// but it is not a measurement, and the two convert differently.
+	//
+	// Specifically: SOFA's Fk45z is the matched inverse of the Fk54z that
+	// produced this motion, and it takes the epoch, so the position may be
+	// stated at any bepoch. Its six-element counterpart Fk425 takes no epoch
+	// and assumes B1950. Dispatching on hasProperMotion alone sent a
+	// frame-induced motion down the Fk425 branch, where a position at bepoch
+	// was read as one at B1950 — which cost 4.7 mas per year of offset from
+	// B1950 on a round trip, while closing exactly at B1950 itself (#341).
+	//
+	// This is the same distinction [ICRS.hasKinematics] draws after #278, for
+	// the same reason: what is known about a star's motion changes how it
+	// converts, and "none recorded" is a third state beside "measured" and
+	// "measured as zero".
+	fictitiousMotion bool
 }
 
 // B1950 is the Besselian epoch of the FK4 equinox, and the default epoch of
@@ -84,11 +106,20 @@ func (c FK4) RA() angle.Angle { return c.ra }
 // Dec returns the FK4 declination.
 func (c FK4) Dec() angle.Angle { return c.dec }
 
-// ProperMotion returns the recorded proper motion per Julian year, and whether
-// the catalogue recorded one at all.
+// ProperMotion returns the proper motion per Julian year, and whether there is
+// one at all.
 //
-// The bool is what separates a star with no measurement from one measured at
-// zero — see [NewFK4] for why those are different positions after conversion.
+// The bool separates a star carrying no motion from one carrying zero — see
+// [NewFK4] for why those are different positions after conversion.
+//
+// It does not say where the motion came from. A value built by
+// [NewFK4WithProperMotion] carries a catalogue's measurement; one returned by
+// [FK5ToFK4] or [ICRSToFK4] for a position-only input carries the fictitious
+// motion FK4's drifting equinox gives it, which is a real rate and not a
+// measurement. The type keeps that distinction internally because the two
+// convert through different SOFA routines (see FK4.fictitiousMotion and #341),
+// and re-declaring one as the other through [NewFK4WithProperMotion] is
+// therefore a different claim about the star, not a copy of it.
 func (c FK4) ProperMotion() (pmRA, pmDec angle.Angle, ok bool) {
 	return c.pmRA, c.pmDec, c.hasProperMotion
 }
@@ -107,6 +138,11 @@ func (c FK4) String() string {
 	return fmt.Sprintf("FK4 B%.1f RA %s Dec %s", c.bepoch, c.ra, c.dec)
 }
 
+// hasRecordedMotion reports whether a catalogue measured this star's proper
+// motion, as opposed to there being none or it having been supplied by a frame
+// conversion. It is what the six-element routes must dispatch on.
+func (c FK4) hasRecordedMotion() bool { return c.hasProperMotion && !c.fictitiousMotion }
+
 // FK4ToFK5 converts an FK4 (B1950.0) position to FK5 (J2000.0).
 //
 // This is the classic B1950 → J2000 conversion, and the one most published
@@ -121,7 +157,7 @@ func (c FK4) String() string {
 // how fast the new frame sees it moving — [FK5ToFK4] is the direction that
 // hands back a motion.
 func FK4ToFK5(c FK4) FK5 {
-	if !c.hasProperMotion {
+	if !c.hasRecordedMotion() {
 		r5, d5 := gofaext.Fk45z(c.ra.Radians(), c.dec.Radians(), c.bepoch)
 
 		return NewFK5(angle.Rad(r5).Wrap360(), angle.Rad(d5), J2000Epoch)
@@ -155,7 +191,7 @@ func FK4ToFK5(c FK4) FK5 {
 // SOFA's six-element Fk524 takes no epoch. That doc comment has the reasoning
 // and names [PropagateEpoch] as the operation to use instead.
 func FK5ToFK4(c FK5, bepoch float64) FK4 {
-	if !c.hasProperMotion {
+	if !c.hasRecordedMotion() {
 		r1950, d1950, dr1950, dd1950 := gofaext.Fk54z(c.ra.Radians(), c.dec.Radians(), bepoch)
 
 		return FK4{
@@ -163,6 +199,10 @@ func FK5ToFK4(c FK5, bepoch float64) FK4 {
 			pmRA: pmRACosDec(dr1950, angle.Rad(d1950)), pmDec: angle.Rad(dd1950),
 			bepoch:          bepoch,
 			hasProperMotion: true,
+			// Fk54z's motion is the frame's, not the star's. Saying so is what
+			// keeps the inverse on Fk45z, which takes this bepoch, rather than
+			// on Fk425, which would read the position as being at B1950.
+			fictitiousMotion: true,
 		}
 	}
 
@@ -266,6 +306,10 @@ func ICRSToFK4(c ICRS, bepoch float64) FK4 {
 			pmRA: pmRACosDec(dr1950, angle.Rad(d1950)), pmDec: angle.Rad(dd1950),
 			bepoch:          bepoch,
 			hasProperMotion: true,
+			// Fk54z's motion is the frame's, not the star's. Saying so is what
+			// keeps the inverse on Fk45z, which takes this bepoch, rather than
+			// on Fk425, which would read the position as being at B1950.
+			fictitiousMotion: true,
 		}
 	}
 

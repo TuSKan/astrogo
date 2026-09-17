@@ -43,6 +43,18 @@ type FK5 struct {
 	rv              float64 // km/s
 	jepoch          float64 // Julian epoch of observation, e.g. 2000.0
 	hasProperMotion bool
+
+	// fictitiousMotion records that the proper motion above came from the
+	// frame rather than from a catalogue — here, from the slow spin of FK5
+	// with respect to the ICRS, which [ICRSToFK5] hands back for a star with
+	// no recorded motion of its own. See [FK4.fictitiousMotion], which carries
+	// the same meaning and the fuller explanation.
+	//
+	// The FK5 case is smaller and was found the same way: dispatching on
+	// hasProperMotion alone sent this motion down the six-element Fk52h
+	// branch, which assumes J2000.0, so an ICRS → FK5 → ICRS round trip lost
+	// 0.96 mas per year of offset from J2000 (#341).
+	fictitiousMotion bool
 }
 
 // J2000Epoch is the Julian epoch of the FK5 equinox, and the epoch of
@@ -90,11 +102,15 @@ func (c FK5) RA() angle.Angle { return c.ra }
 // Dec returns the FK5 declination.
 func (c FK5) Dec() angle.Angle { return c.dec }
 
-// ProperMotion returns the recorded proper motion per Julian year, and whether
-// the catalogue recorded one at all.
+// ProperMotion returns the proper motion per Julian year, and whether there is
+// one at all.
 //
-// The bool is what separates a star with no measurement from one measured at
-// zero — see [NewFK5] for why those are different positions after conversion.
+// The bool separates a star carrying no motion from one carrying zero — see
+// [NewFK5] for why those are different positions after conversion.
+//
+// As with [FK4.ProperMotion] it does not say where the motion came from: one
+// returned by [ICRSToFK5] for a position-only input is the frame's own spin
+// rather than the star's, and the two convert through different SOFA routines.
 func (c FK5) ProperMotion() (pmRA, pmDec angle.Angle, ok bool) {
 	return c.pmRA, c.pmDec, c.hasProperMotion
 }
@@ -113,6 +129,11 @@ func (c FK5) String() string {
 	return fmt.Sprintf("FK5 J%.1f RA %s Dec %s", c.jepoch, c.ra, c.dec)
 }
 
+// hasRecordedMotion reports whether a catalogue measured this star's proper
+// motion, as opposed to there being none or it having been supplied by a frame
+// conversion. It is what the six-element routes must dispatch on.
+func (c FK5) hasRecordedMotion() bool { return c.hasProperMotion && !c.fictitiousMotion }
+
 // FK5ToICRS converts an FK5 position to ICRS.
 //
 // ICRS is realised here by the Hipparcos frame, which is what defines it and
@@ -127,7 +148,7 @@ func (c FK5) String() string {
 // returned ICRS carries proper motion, parallax and radial velocity, and
 // [Context.ICRSToAltAz] will use them for rigorous space-motion propagation.
 func FK5ToICRS(c FK5) ICRS {
-	if !c.hasProperMotion {
+	if !c.hasRecordedMotion() {
 		jd1, jd2 := ttAtJulianEpoch(c.jepoch)
 		rh, dh := gofaext.Fk5hz(c.ra.Radians(), c.dec.Radians(), jd1, jd2)
 
@@ -186,6 +207,9 @@ func ICRSToFK5(c ICRS, jepoch float64) FK5 {
 			pmRA: pmRACosDec(dr5, angle.Rad(d5)), pmDec: angle.Rad(dd5),
 			jepoch:          jepoch,
 			hasProperMotion: true,
+			// Hfk5z's motion comes from the FK5/ICRS spin, not from the star.
+			// Saying so keeps the inverse on Fk5hz, which takes this jepoch.
+			fictitiousMotion: true,
 		}
 	}
 

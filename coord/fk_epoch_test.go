@@ -180,36 +180,20 @@ func TestPropagateEpochIsWhatTheEpochArgumentCannotDo(t *testing.T) {
 // but "nothing reads it" is exactly the kind of claim that stops being true, so
 // it is asserted rather than assumed.
 //
-// # Why the position-only route is only checked at B1950
-//
-// Away from B1950 it does not close, and by an amount that grows linearly with
-// the distance from it — 0.118 arcsec at 1975, 0.237 at 2000, 0.474 at 2050.
-// That is not this change and not SOFA: the raw Fk54z → Fk45z pair closes to
-// 0.000023 arcsec at every one of those epochs. It is astrogo's own wrapping,
-// which marks the fictitious proper motion as recorded and so sends the
-// inverse down the six-element Fk425 branch, where the position is assumed to
-// be at B1950 while it is in fact at bepoch.
-//
-// Filed separately rather than fixed here: #330 is about the label being
-// false, and this is about the numbers being wrong, which needs the same
-// recorded-versus-fictitious distinction #329 gave ICRS.
+// Both routes are checked at every epoch. The position-only one used to close
+// only at B1950 — see TestTheRoundTripClosesAtEveryEpoch, which is #341 and
+// has the numbers.
 func TestTheRoundTripStillClosesAfterTheRelabelling(t *testing.T) {
 	t.Parallel()
 
 	for _, tc := range []struct {
-		name   string
-		star   coord.ICRS
-		epochs []float64
+		name string
+		star coord.ICRS
 	}{
-		// The six-element route ignores the epoch entirely, so every epoch
-		// must close — and does.
-		{"with recorded kinematics", kinematicStarForEpoch(), []float64{coord.B1950, 1900, 1975, 2000, 2050}},
-
-		// The position-only route closes at the catalogue equinox only; see
-		// above.
-		{"position only", positionOnlyStarForEpoch(), []float64{coord.B1950}},
+		{"with recorded kinematics", kinematicStarForEpoch()},
+		{"position only", positionOnlyStarForEpoch()},
 	} {
-		for _, epoch := range tc.epochs {
+		for _, epoch := range []float64{coord.B1950, 1900, 1975, 2000, 2050} {
 			back := coord.FK4ToICRS(coord.ICRSToFK4(tc.star, epoch))
 
 			sep := coord.Separation(tc.star, back).Arcseconds()
