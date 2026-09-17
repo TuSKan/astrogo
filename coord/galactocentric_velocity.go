@@ -43,7 +43,7 @@ import (
 //
 // It also makes the comparison with astropy exact rather than approximate.
 // Astropy's Galactocentric defaults to galcen_v_sun = (12.9, 245.6, 7.78) km/s,
-// citing Drimmel & Poggio (2018) — and 4.740470446 × 6.379 × 8.122 = 245.60,
+// citing Drimmel & Poggio (2018) — and 4.7404705 × 6.379 × 8.122 = 245.60,
 // which is their rotational component to every digit they publish. Their V is
 // this same derivation at their own R₀ of 8122 pc. [TestTheDerivationReproducesAstropysRotationalComponent]
 // is that check.
@@ -78,12 +78,33 @@ const sgrAProperMotionMasPerYear = 6.379
 
 // auPerYearInKmPerSec is one astronomical unit per Julian year expressed in
 // km/s, the constant that turns an angular rate at a distance into a speed:
-// a proper motion of μ arcsec/yr at d parsecs is 4.740470446·μ·d km/s.
+// a proper motion of μ arcsec/yr at d parsecs is 4.7404705·μ·d km/s.
 //
-// It is not an independent constant. It is the au divided by the Julian year,
-// and it is written out here because every line that uses it is checkable
-// against a textbook in that form.
-const auPerYearInKmPerSec = 4.740470446
+// It is not an independent constant, and it is now *computed* rather than
+// written down, because writing it down is how it came to be wrong.
+//
+// It shipped as the literal 4.740470446, which is the decimal repeated in a
+// great deal of literature and is not the au divided by the Julian year. That
+// quotient is 4.740470463533: 149597870700 m over 365.25 x 86400 s, both exact
+// by definition since IAU 2012 Resolution B2. The doc comment beside the
+// literal asserted the derivation the literal did not satisfy — which is
+// exactly the failure "never fabricate a coefficient" is meant to prevent, and
+// it went unnoticed because coord's own test encoded the same wrong decimal.
+//
+// The error was 3.7e-09 relative, so nothing observable moved: the Sun's
+// rotational velocity in [SolarVelocityFromSgrA] shifts by 9.2e-07 km/s. It is
+// corrected because a constant whose documentation describes a different number
+// than the constant holds is a trap for whoever reads it next, not because the
+// answer was wrong by anything a measurement could see.
+//
+// Deriving it from [constants] means it cannot drift from the au again, and
+// removes the only place a reader had to trust a decimal.
+var auPerYearInKmPerSec = kmPerAU / julianYearSeconds
+
+// julianYearSeconds is the Julian year, which is 365.25 days of 86400 seconds
+// exactly — a definition rather than a measurement, which is why it is a
+// literal here and the au is not.
+const julianYearSeconds = 365.25 * 86400
 
 // SolarVelocityFromSgrA returns the Sun's velocity in the Galactocentric frame,
 // in km/s, for a Galactic-centre distance of sunDistance parsecs.
