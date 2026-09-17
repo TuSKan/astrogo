@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/TuSKan/astrogo/internal/votable"
+	"github.com/TuSKan/astrogo/remote"
 
 	"github.com/apache/arrow-go/v18/arrow"
 	"github.com/apache/arrow-go/v18/arrow/array"
@@ -322,6 +323,14 @@ type voTableRows struct {
 func newVOTableRows(r io.Reader) (*voTableRows, error) {
 	table, err := votable.Read(r)
 	if err != nil {
+		// Both sentinels, deliberately. ErrGaiaResponse is what this package
+		// has always reported and callers already match; remote's says which
+		// kind of unreadable it is, so "the archive is down" can be retried
+		// and "the document is broken" cannot.
+		if errors.Is(err, votable.ErrNotVOTable) {
+			return nil, fmt.Errorf("%w: %w: %w", ErrGaiaResponse, remote.ErrNotServingData, err)
+		}
+
 		return nil, fmt.Errorf("%w: %w", ErrGaiaResponse, err)
 	}
 

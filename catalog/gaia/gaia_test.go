@@ -6,12 +6,14 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/internal/testutil"
+	"github.com/TuSKan/astrogo/internal/votable"
 
 	"github.com/TuSKan/astrogo/remote"
 )
@@ -161,5 +163,59 @@ func redirect(t *testing.T, url string) {
 
 	if err := remote.SetURL(DefaultEndpoint, url); err != nil {
 		t.Fatalf("SetURL(%s): %v", DefaultEndpoint, err)
+	}
+}
+
+// TestParseVOTableReportsAWebPageAsDowntime is #300 on the VOTable side.
+//
+// #301 made the message legible — "the service answered with a web page, not a
+// VOTable" instead of an XML syntax error pointing at a parser bug that does
+// not exist — but the sentinel carrying that distinction lives in
+// internal/votable, which no program outside this module can import. So a
+// caller could read the sentence and not branch on it.
+//
+// remote.ErrNotServingData is what it can branch on, and the two cases want
+// opposite handling: an archive serving its maintenance page should be retried
+// later, a malformed VOTable should not be retried at all.
+func TestParseVOTableReportsAWebPageAsDowntime(t *testing.T) {
+	t.Parallel()
+
+	const page = `<!DOCTYPE html>
+<html lang="en"><head><title>Gaia archive</title></head>
+<body><h1>The archive is undergoing maintenance</h1></body></html>
+`
+
+	_, err := parseVOTable(strings.NewReader(page))
+	if err == nil {
+		t.Fatal("a web page parsed as a VOTable without error")
+	}
+
+	if !errors.Is(err, remote.ErrNotServingData) {
+		t.Errorf("err = %v, which does not match remote.ErrNotServingData", err)
+	}
+
+	// The underlying sentence survives the wrap, so a log line still says what
+	// was actually seen rather than only that something was not data.
+	if !errors.Is(err, votable.ErrNotVOTable) {
+		t.Errorf("err = %v, which no longer matches votable.ErrNotVOTable", err)
+	}
+}
+
+// TestParseVOTableDoesNotBlameTheServiceForABadDocument keeps the distinction
+// pointing both ways: a genuinely malformed VOTable must not claim the archive
+// is down, or a caller reads it as transient and retries forever.
+func TestParseVOTableDoesNotBlameTheServiceForABadDocument(t *testing.T) {
+	t.Parallel()
+
+	// Well-formed XML, recognisably a VOTable, and truncated mid-table.
+	const broken = `<?xml version="1.0"?><VOTABLE><RESOURCE><TABLE><DATA><TABLEDATA><TR><TD>1`
+
+	_, err := parseVOTable(strings.NewReader(broken))
+	if err == nil {
+		t.Skip("this document parsed cleanly; it is not a useful negative case")
+	}
+
+	if errors.Is(err, remote.ErrNotServingData) {
+		t.Errorf("a malformed VOTable was reported as the service not serving data: %v", err)
 	}
 }

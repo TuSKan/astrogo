@@ -192,6 +192,13 @@ func parseResult(body io.Reader) ([]resolve.Target, error) {
 func parseVOTable(body io.Reader) ([]resolve.Target, error) {
 	table, err := votable.Read(body)
 	if err != nil {
+		// A web page is the archive being down, not a malformed result, and
+		// a caller has to be able to tell those apart to know whether
+		// retrying is worth anything. votable spots it; remote names it.
+		if errors.Is(err, votable.ErrNotVOTable) {
+			return nil, fmt.Errorf("gaia: %w: %w", remote.ErrNotServingData, err)
+		}
+
 		return nil, fmt.Errorf("gaia: %w", err)
 	}
 
