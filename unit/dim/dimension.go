@@ -1,4 +1,19 @@
-package unit
+// Package dim holds the physical dimensions a [unit.Unit] is expressed in, and
+// the algebra for composing them.
+//
+// # Why a package of its own
+//
+// Because the names are better without a prefix, and a package is how Go
+// namespaces. These values are used compositionally — constants/units.go builds
+// a gravitational parameter as Volume divided by Mass divided by Time squared —
+// and inside unit they collided with the quantity types callers actually pass:
+// a Dimension named Length shadows [unit.Length], which is the one a signature
+// wants. Prefixing them read as DimVolume.Div(DimMass).Div(DimTime.PowInt(2)),
+// and DimDimensionless stuttered.
+//
+// Dimensions are also the more primitive of the two ideas: a unit is a scale on
+// a dimension, so unit imports this and not the other way round.
+package dim
 
 // Dimension represents the physical dimensions of a quantity using SI base unit
 // exponents.
@@ -67,6 +82,11 @@ func (d Dimension) PowInt(p int) Dimension {
 // ── Common Dimensions ────────────────────────────────────────────────────────
 
 // SI base and derived dimensions — immutable physical constants.
+// SI base and derived dimensions — immutable physical constants.
+//
+// Unprefixed, which is the reason this package exists: unit.Length is the
+// quantity type a caller passes and dim.Length is the dimension it has, and
+// neither has to be spelled awkwardly to avoid the other.
 var (
 	Dimensionless = Dimension{}
 	Length        = Dimension{L: 1}

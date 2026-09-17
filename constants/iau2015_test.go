@@ -5,6 +5,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/TuSKan/astrogo/unit/dim"
+
 	"github.com/TuSKan/astrogo/constants"
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/unit"
@@ -151,7 +153,7 @@ func TestIAU2015_SunGravitationalParameter(t *testing.T) {
 		t.Errorf("SunGravitationalParameter.Exact = false, want true")
 	}
 
-	if c.Unit.Dimension != unit.Volume.Div(unit.Time.PowInt(2)) {
+	if c.Unit.Dimension != dim.Volume.Div(dim.Time.PowInt(2)) {
 		t.Errorf("SunGravitationalParameter.Unit.Dimension = %v, want m^3/s^2", c.Unit.Dimension)
 	}
 }

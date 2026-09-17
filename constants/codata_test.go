@@ -4,6 +4,8 @@ import (
 	"math"
 	"testing"
 
+	"github.com/TuSKan/astrogo/unit/dim"
+
 	"github.com/TuSKan/astrogo/constants"
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/unit"
@@ -67,11 +69,11 @@ func TestCODATA_Dimensions(t *testing.T) {
 		t.Errorf("ThomsonCrossSection.Unit not compatible with m^2")
 	}
 
-	if s.FineStructureConstant.Unit.Dimension != unit.Dimensionless {
+	if s.FineStructureConstant.Unit.Dimension != dim.Dimensionless {
 		t.Errorf("FineStructureConstant.Unit.Dimension = %+v, want Dimensionless", s.FineStructureConstant.Unit.Dimension)
 	}
 
-	wantG := unit.Volume.Div(unit.Mass).Div(unit.Time.PowInt(2))
+	wantG := dim.Volume.Div(dim.Mass).Div(dim.Time.PowInt(2))
 	if got := s.GravitationalConstant.Unit.Dimension; got != wantG {
 		t.Errorf("GravitationalConstant.Unit.Dimension = %+v, want %+v", got, wantG)
 	}
