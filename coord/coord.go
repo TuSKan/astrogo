@@ -193,7 +193,7 @@ func (c ICRS) Dec() angle.Angle { return c.dec }
 //
 // It is a [unit.Length] rather than a bare number because it did not used to
 // be: the same field held astronomical units on an ephemeris path and
-// kilometres on a satellite one, and nothing in the signature said which had
+// kilometers on a satellite one, and nothing in the signature said which had
 // arrived. A caller now asks for the unit it wants and the conversion is the
 // type's, not the reader's.
 //

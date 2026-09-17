@@ -75,7 +75,7 @@ func MustGeodetic(lon, lat angle.Angle, height unit.Length) *Geodetic {
 //
 // It keeps plain float64 parameters on purpose, where [NewGeodetic] takes
 // typed ones: the numbers it exists to accept are copied straight off such a
-// service, where they are always degrees and metres, and the parameter names
+// service, where they are always degrees and meters, and the parameter names
 // say so. Elsewhere in astrogo a length is a [unit.Length].
 //
 // Example:
