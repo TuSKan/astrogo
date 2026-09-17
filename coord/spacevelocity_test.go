@@ -109,8 +109,14 @@ func TestTheRadialComponentIsTheRadialVelocity(t *testing.T) {
 func TestTheTransverseComponentMatchesTheClassicalIdentity(t *testing.T) {
 	t.Parallel()
 
-	// One au per Julian year, in km/s.
-	const auPerYearInKmPerSec = 4.740470446
+	// One au per Julian year in km/s: 149597870700 m over 365.25 x 86400 s,
+	// both exact by definition. Written as the decimal rather than the
+	// division on purpose, so that it is an independent check on the constant
+	// coord computes rather than the same arithmetic run twice.
+	//
+	// This test previously held 4.740470446, the same wrong decimal the
+	// constant did, and so could not have caught it.
+	const auPerYearInKmPerSec = 4.740470463533348
 
 	for _, tc := range []struct {
 		name    string
