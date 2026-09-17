@@ -67,7 +67,7 @@ func TestCODATA_Dimensions(t *testing.T) {
 		t.Errorf("ThomsonCrossSection.Unit not compatible with m^2")
 	}
 
-	if s.FineStructureConstant.Unit.Dimension != unit.DimDimensionless {
+	if s.FineStructureConstant.Unit.Dimension != unit.Dimensionless {
 		t.Errorf("FineStructureConstant.Unit.Dimension = %+v, want Dimensionless", s.FineStructureConstant.Unit.Dimension)
 	}
 

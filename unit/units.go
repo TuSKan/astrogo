@@ -116,15 +116,15 @@ var (
 	// the fine-structure constant, a radians-per-degree scale factor) that
 	// are not angles despite also being dimensionless — Compatible with
 	// Radian by dimension, but conceptually distinct, hence its own symbol.
-	One = Unit{Dimension: DimDimensionless, ScaleFactor: 1.0, Name: "one", Symbol: "1"}
+	One = Unit{Dimension: Dimensionless, ScaleFactor: 1.0, Name: "one", Symbol: "1"}
 	// Radian is the SI unit of angle (dimensionless).
-	Radian = Unit{Dimension: DimDimensionless, ScaleFactor: 1.0, Name: "radian", Symbol: "rad"}
+	Radian = Unit{Dimension: Dimensionless, ScaleFactor: 1.0, Name: "radian", Symbol: "rad"}
 	// Degree is π/180 radians.
-	Degree = Unit{Dimension: DimDimensionless, ScaleFactor: math.Pi / 180.0, Name: "degree", Symbol: "deg"}
+	Degree = Unit{Dimension: Dimensionless, ScaleFactor: math.Pi / 180.0, Name: "degree", Symbol: "deg"}
 	// Arcminute is 1/60 of a degree.
-	Arcminute = Unit{Dimension: DimDimensionless, ScaleFactor: math.Pi / (180.0 * 60.0), Name: "arcminute", Symbol: "arcmin"}
+	Arcminute = Unit{Dimension: Dimensionless, ScaleFactor: math.Pi / (180.0 * 60.0), Name: "arcminute", Symbol: "arcmin"}
 	// Arcsecond is 1/3600 of a degree.
-	Arcsecond = Unit{Dimension: DimDimensionless, ScaleFactor: math.Pi / (180.0 * 3600.0), Name: "arcsecond", Symbol: "arcsec"}
+	Arcsecond = Unit{Dimension: Dimensionless, ScaleFactor: math.Pi / (180.0 * 3600.0), Name: "arcsecond", Symbol: "arcsec"}
 
 	// Kelvin is the SI base unit of thermodynamic temperature.
 	Kelvin = Unit{Dimension: DimTemperature, ScaleFactor: 1.0, Name: "kelvin", Symbol: "K"}

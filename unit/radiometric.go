@@ -32,7 +32,7 @@ var (
 	// irradiance; that protection lives in skybrightness's own named
 	// scalar types, not here. Do not rely on Compatible/ConversionFactor
 	// to catch a Steradian-vs-One mix-up — it can't.
-	Steradian = Unit{Dimension: DimDimensionless, ScaleFactor: 1, Name: "steradian", Symbol: "sr"}
+	Steradian = Unit{Dimension: Dimensionless, ScaleFactor: 1, Name: "steradian", Symbol: "sr"}
 )
 
 // Composed radiometric units (unit.Unit values, for documentation,

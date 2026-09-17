@@ -67,15 +67,25 @@ func (d Dimension) PowInt(p int) Dimension {
 // ── Common Dimensions ────────────────────────────────────────────────────────
 
 // SI base and derived dimensions — immutable physical constants.
+// The Dim prefix disambiguates a dimension from a quantity type of the same
+// name: [Length] and [Velocity] are values a caller passes, and a Dimension
+// named Length would shadow the one they mean. Every dimension carries it,
+// including the ones with no quantity type yet, so adding [Mass] or
+// [Temperature] later is a new type rather than a rename of an old value.
+//
+// Dimensionless is the exception, and not an oversight. It cannot acquire a
+// quantity type to be confused with, because a dimensionless quantity is a
+// float64 and always will be — so Dimensionless would stutter for a
+// disambiguation nothing needs.
 var (
-	DimDimensionless = Dimension{}
-	DimLength        = Dimension{L: 1}
-	DimMass          = Dimension{M: 1}
-	DimTime          = Dimension{T: 1}
-	DimCurrent       = Dimension{I: 1}
-	DimTemperature   = Dimension{Theta: 1}
-	DimAmount        = Dimension{N: 1}
-	DimLuminosity    = Dimension{J: 1}
+	Dimensionless  = Dimension{}
+	DimLength      = Dimension{L: 1}
+	DimMass        = Dimension{M: 1}
+	DimTime        = Dimension{T: 1}
+	DimCurrent     = Dimension{I: 1}
+	DimTemperature = Dimension{Theta: 1}
+	DimAmount      = Dimension{N: 1}
+	DimLuminosity  = Dimension{J: 1}
 
 	DimArea         = Dimension{L: 2}
 	DimVolume       = Dimension{L: 3}
