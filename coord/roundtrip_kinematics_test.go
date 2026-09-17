@@ -6,6 +6,7 @@ import (
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // Round trips over all six elements, for every conversion between the three
@@ -161,7 +162,7 @@ func icrsElements(c coord.ICRS) elements {
 	return elements{
 		ra: c.RA(), dec: c.Dec(),
 		pmRA: c.PmRA(), pmDec: c.PmDec(),
-		parallax: c.Parallax(), rv: c.RV(),
+		parallax: c.Parallax(), rv: c.RV().KmPerSec(),
 	}
 }
 
@@ -171,7 +172,7 @@ func fk5Elements(c coord.FK5) elements {
 	return elements{
 		ra: c.RA(), dec: c.Dec(),
 		pmRA: pmRA, pmDec: pmDec,
-		parallax: c.Parallax(), rv: c.RV(),
+		parallax: c.Parallax(), rv: c.RV().KmPerSec(),
 	}
 }
 
@@ -181,7 +182,7 @@ func fk4Elements(c coord.FK4) elements {
 	return elements{
 		ra: c.RA(), dec: c.Dec(),
 		pmRA: pmRA, pmDec: pmDec,
-		parallax: c.Parallax(), rv: c.RV(),
+		parallax: c.Parallax(), rv: c.RV().KmPerSec(),
 	}
 }
 
@@ -265,7 +266,7 @@ func TestICRSFK5RoundTripsAllSixElements(t *testing.T) {
 			t.Parallel()
 
 			start := coord.NewICRSWithKinematics(
-				star.ra, star.dec, star.pmRA, star.pmDec, star.parallax, star.rv)
+				star.ra, star.dec, star.pmRA, star.pmDec, star.parallax, unit.KmPerSec(star.rv))
 
 			back := coord.FK5ToICRS(coord.ICRSToFK5(start, coord.J2000Epoch))
 
@@ -286,7 +287,7 @@ func TestFK5ICRSRoundTripsAllSixElements(t *testing.T) {
 			t.Parallel()
 
 			start := coord.NewFK5WithProperMotion(
-				star.ra, star.dec, star.pmRA, star.pmDec, star.parallax, star.rv)
+				star.ra, star.dec, star.pmRA, star.pmDec, star.parallax, unit.KmPerSec(star.rv))
 
 			back := coord.ICRSToFK5(coord.FK5ToICRS(start), coord.J2000Epoch)
 
@@ -306,7 +307,7 @@ func TestICRSFK4RoundTripsAllSixElements(t *testing.T) {
 			t.Parallel()
 
 			start := coord.NewICRSWithKinematics(
-				star.ra, star.dec, star.pmRA, star.pmDec, star.parallax, star.rv)
+				star.ra, star.dec, star.pmRA, star.pmDec, star.parallax, unit.KmPerSec(star.rv))
 
 			back := coord.FK4ToICRS(coord.ICRSToFK4(start, coord.B1950))
 
@@ -326,7 +327,7 @@ func TestFK4ICRSRoundTripsAllSixElements(t *testing.T) {
 			t.Parallel()
 
 			start := coord.NewFK4WithProperMotion(
-				star.ra, star.dec, star.pmRA, star.pmDec, star.parallax, star.rv)
+				star.ra, star.dec, star.pmRA, star.pmDec, star.parallax, unit.KmPerSec(star.rv))
 
 			back := coord.ICRSToFK4(coord.FK4ToICRS(start), coord.B1950)
 
@@ -346,7 +347,7 @@ func TestFK5FK4RoundTripsAllSixElements(t *testing.T) {
 			t.Parallel()
 
 			start := coord.NewFK5WithProperMotion(
-				star.ra, star.dec, star.pmRA, star.pmDec, star.parallax, star.rv)
+				star.ra, star.dec, star.pmRA, star.pmDec, star.parallax, unit.KmPerSec(star.rv))
 
 			back := coord.FK4ToFK5(coord.FK5ToFK4(start, coord.B1950))
 
@@ -365,7 +366,7 @@ func TestFK4FK5RoundTripsAllSixElements(t *testing.T) {
 			t.Parallel()
 
 			start := coord.NewFK4WithProperMotion(
-				star.ra, star.dec, star.pmRA, star.pmDec, star.parallax, star.rv)
+				star.ra, star.dec, star.pmRA, star.pmDec, star.parallax, unit.KmPerSec(star.rv))
 
 			back := coord.FK5ToFK4(coord.FK4ToFK5(start), coord.B1950)
 
@@ -476,7 +477,7 @@ func TestAtRestWithoutParallaxStaysAtRest(t *testing.T) {
 			continue
 		}
 
-		if rv := back.RV(); math.Abs(rv) > 1e-3 {
+		if rv := back.RV().KmPerSec(); math.Abs(rv) > 1e-3 {
 			t.Errorf("parallax %g: a star at rest came back at %+.6f km/s, want 0", parallax, rv)
 		}
 	}

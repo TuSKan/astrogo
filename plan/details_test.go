@@ -14,6 +14,7 @@ import (
 	"github.com/TuSKan/astrogo/ephemeris/core"
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // TestGetDetails_Star exercises computeDetails' non-MovingBody path
@@ -205,9 +206,9 @@ func TestGetDetails_RadialVelocity(t *testing.T) {
 		t.Errorf("parsed barycentric = %v, want %v", gotBary, rvBarycentric)
 	}
 
-	wantTopo, err := ctx.ObservedRadialVelocity(coord.NewICRS(ra, dec), rvBarycentric)
+	wantTopo, err := ctx.ObservedRadialVelocity(coord.NewICRS(ra, dec), unit.KmPerSec(rvBarycentric))
 	testutil.AssertNoError(t, err)
-	testutil.AssertNear(t, "topocentric RV", gotTopo, wantTopo, 0.01)
+	testutil.AssertNear(t, "topocentric RV", gotTopo, wantTopo.KmPerSec(), 0.01)
 
 	if s := d.String(); !strings.Contains(s, "Radial velocity:") {
 		t.Errorf("String() output missing the Radial velocity line: %q", s)
@@ -354,9 +355,9 @@ func TestRadialVelocityDispatchesOnTargetKind(t *testing.T) {
 			t.Fatalf("Position: %v", err)
 		}
 
-		want, err := ctx.ObservedRadialVelocity(pos, barycentric)
+		want, err := ctx.ObservedRadialVelocity(pos, unit.KmPerSec(barycentric))
 		testutil.AssertNoError(t, err)
-		testutil.AssertNear(t, "catalog radial velocity", got, want, 1e-12)
+		testutil.AssertNear(t, "catalog radial velocity", got, want.KmPerSec(), 1e-12)
 
 		// And it must differ from the catalog number by roughly Earth's
 		// orbital speed projected on the line of sight — otherwise the

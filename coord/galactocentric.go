@@ -6,11 +6,12 @@ import (
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/internal/gofaext"
+	"github.com/TuSKan/astrogo/unit"
 	"github.com/TuSKan/astrogo/vector"
 )
 
 // Galactocentric is a position in a right-handed Cartesian frame whose origin
-// is the centre of the Galaxy, in parsecs.
+// is the centre of the Galaxy.
 //
 //	+X points from the Sun toward the Galactic centre
 //	+Y points in the direction of Galactic rotation (roughly Galactic l = 90°)
@@ -46,7 +47,14 @@ import (
 // substitute for. [SpaceVelocity] documents why, and why that is not the same
 // requirement a frame conversion has.
 type Galactocentric struct {
-	// v holds (X, Y, Z) in parsecs.
+	// v holds (X, Y, Z) in meters, the base unit of [unit.Length].
+	//
+	// Meters rather than the parsecs this frame is read in, so that the
+	// accessors and [NewGalactocentric] are exact inverses: a Vec3 cannot be
+	// typed, so the unit has to be fixed here, and any other choice would put
+	// a multiply-then-divide by the parsec between a component read out and
+	// the same component entered back in. [TestAccessorsAreExactlyInvertedByTheConstructor]
+	// is that property.
 	v vector.Vec3
 
 	// vel holds the velocity in km/s on the same axes, and hasVelocity whether
@@ -137,14 +145,14 @@ const (
 // coordinate system. If you need Sgr A* itself rather than Galactic l = 0,
 // convert its ICRS position like any other target.
 type GalactocentricFrame struct {
-	sunDistance float64     // R₀, parsecs.
-	sunHeight   float64     // z☉, parsecs.
+	sunDistance unit.Length // R₀.
+	sunHeight   unit.Length // z☉.
 	sunVelocity vector.Vec3 // The Sun's velocity in this frame, km/s.
 }
 
 // NewGalactocentricFrame returns the frame in which the Galactic centre lies
-// sunDistance parsecs from the Sun and the Sun lies sunHeight parsecs above the
-// Galactic midplane.
+// sunDistance from the Sun and the Sun lies sunHeight above the Galactic
+// midplane.
 //
 // Use it to reproduce a result computed in some other frame — a paper's R₀, or
 // astropy's 8122 pc default. For ordinary work call
@@ -154,7 +162,7 @@ type GalactocentricFrame struct {
 // centred on the Sun, and a sunHeight larger than sunDistance is clamped to a
 // quarter turn; both are nonsense that a caller can construct, and neither
 // produces a NaN that would propagate silently into a catalogue.
-func NewGalactocentricFrame(sunDistance, sunHeight float64, sunVelocity vector.Vec3) GalactocentricFrame {
+func NewGalactocentricFrame(sunDistance, sunHeight unit.Length, sunVelocity vector.Vec3) GalactocentricFrame {
 	return GalactocentricFrame{
 		sunDistance: sunDistance,
 		sunHeight:   sunHeight,
@@ -167,9 +175,9 @@ func NewGalactocentricFrame(sunDistance, sunHeight float64, sunVelocity vector.V
 // (Bennett & Bovy 2019).
 func DefaultGalactocentricFrame() GalactocentricFrame {
 	return NewGalactocentricFrame(
-		sunGalacticDistancePc,
-		sunMidplaneHeightPc,
-		SolarVelocityFromSgrA(sunGalacticDistancePc),
+		unit.Pc(sunGalacticDistancePc),
+		unit.Pc(sunMidplaneHeightPc),
+		SolarVelocityFromSgrA(unit.Pc(sunGalacticDistancePc)),
 	)
 }
 
@@ -177,11 +185,11 @@ func DefaultGalactocentricFrame() GalactocentricFrame {
 // Galactic axes the caller supplied it on — see [SolarVelocityFromSgrA].
 func (f GalactocentricFrame) SunVelocity() vector.Vec3 { return f.sunVelocity }
 
-// SunDistance returns R₀, the Sun-to-Galactic-centre distance in parsecs.
-func (f GalactocentricFrame) SunDistance() float64 { return f.sunDistance }
+// SunDistance returns R₀, the Sun-to-Galactic-centre distance.
+func (f GalactocentricFrame) SunDistance() unit.Length { return f.sunDistance }
 
-// SunHeight returns z☉, the Sun's height above the Galactic midplane in parsecs.
-func (f GalactocentricFrame) SunHeight() float64 { return f.sunHeight }
+// SunHeight returns z☉, the Sun's height above the Galactic midplane.
+func (f GalactocentricFrame) SunHeight() unit.Length { return f.sunHeight }
 
 // SunPosition returns where the Sun sits in this frame.
 //
@@ -204,28 +212,30 @@ func (f GalactocentricFrame) SunPosition() Galactocentric {
 	return out
 }
 
-// FromICRS places a target at the given distance, in parsecs, into the frame.
+// FromICRS places a target at the given distance into the frame.
 //
-// The distance is a separate argument rather than being read from c.Dist()
-// because [ICRS.Dist] carries no unit of its own — it holds astronomical units
-// on an ephemeris path and kilometres on a satellite one — and a frame measured
-// in parsecs cannot be handed a number whose unit depends on where it came
-// from. Naming it at the call site is the whole guard against that.
+// The distance is a separate argument rather than being read from c.Dist(),
+// because [ICRS.Dist] is optional: most of the ways an ICRS position is built
+// leave it zero, and zero is a real place in this frame — the Sun. Reading it
+// silently would put every direction-only target at the observer instead of
+// refusing to place it, which is the one error this frame cannot detect
+// afterwards. Naming the distance at the call site is the whole guard.
 //
 // For a target with a measured parallax, the distance is
 // [ParallaxDistance](c.Parallax()).
 //
-// Only the direction of c is used. Any kinematics it carries are ignored, since
-// this frame holds no velocity — see [Galactocentric].
-func (f GalactocentricFrame) FromICRS(c ICRS, distance float64) Galactocentric {
+// The direction and the distance fix the position. A velocity is attached as
+// well when c carries kinematics that can supply one — see [Galactocentric] and
+// [SpaceVelocity] for what that needs and why it can be absent.
+func (f GalactocentricFrame) FromICRS(c ICRS, distance unit.Length) Galactocentric {
 	// Heliocentric Galactic Cartesian: the direction in the Galactic frame,
 	// scaled out to the distance given.
-	v := ICRSToGalactic(c).ToUnitVector().MulScalar(distance)
+	v := ICRSToGalactic(c).ToUnitVector().MulScalar(distance.Meters())
 
 	// Move the origin to the Galactic centre, which lies R₀ away along +X, and
 	// then tilt so the midplane passes through the centre with the Sun above
 	// it rather than in it.
-	out := Galactocentric{v: vector.V3(v.X-f.sunDistance, v.Y, v.Z).RotateY(f.tilt())}
+	out := Galactocentric{v: vector.V3(v.X-f.sunDistance.Meters(), v.Y, v.Z).RotateY(f.tilt())}
 
 	// The velocity, when the target carries enough to have one.
 	//
@@ -242,21 +252,21 @@ func (f GalactocentricFrame) FromICRS(c ICRS, distance float64) Galactocentric {
 	return out
 }
 
-// ToICRS returns the ICRS direction of g as seen from the Sun, and its distance
-// in parsecs. It is the exact inverse of [GalactocentricFrame.FromICRS].
+// ToICRS returns the ICRS direction of g as seen from the Sun, and its
+// distance. It is the exact inverse of [GalactocentricFrame.FromICRS].
 //
 // The Sun's own position returns a zero distance and an arbitrary direction:
 // there is no direction from a point to itself, and [vector.Vec3.ToSpherical]
 // answers (0, 0) rather than a NaN.
-func (f GalactocentricFrame) ToICRS(g Galactocentric) (c ICRS, distance float64) {
+func (f GalactocentricFrame) ToICRS(g Galactocentric) (c ICRS, distance unit.Length) {
 	// Undo the tilt, then put the origin back on the Sun.
 	v := g.v.RotateY(-f.tilt())
-	v = vector.V3(v.X+f.sunDistance, v.Y, v.Z)
+	v = vector.V3(v.X+f.sunDistance.Meters(), v.Y, v.Z)
 
 	lon, lat := v.ToSpherical()
 
 	out := GalacticToICRS(NewGalactic(angle.Rad(lon).Wrap360(), angle.Rad(lat)))
-	distance = v.Norm()
+	distance = unit.Meters(v.Norm())
 
 	// A velocity, if there is one, comes back as catalogue kinematics: the
 	// reverse of what [GalactocentricFrame.FromICRS] did, then SOFA's Pvstar
@@ -274,7 +284,7 @@ func (f GalactocentricFrame) ToICRS(g Galactocentric) (c ICRS, distance float64)
 }
 
 // icrsFromBarycentricVelocity rebuilds catalogue kinematics from a direction, a
-// distance in parsecs and a barycentric velocity in km/s on the ICRS axes.
+// distance and a barycentric velocity in km/s on the ICRS axes.
 //
 // It is the inverse of [SpaceVelocity], and exists so that
 // [GalactocentricFrame.ToICRS] is a real inverse of FromICRS rather than one
@@ -287,8 +297,8 @@ func (f GalactocentricFrame) ToICRS(g Galactocentric) (c ICRS, distance float64)
 // something no star is, and both are left to Pvstar's own status rather than
 // pre-checked here, since a distance of zero produces exactly the null position
 // vector it already refuses.
-func icrsFromBarycentricVelocity(dir ICRS, distancePc float64, velocity vector.Vec3) (ICRS, bool) {
-	position := dir.ToUnitVector().MulScalar(distancePc * auPerParsec)
+func icrsFromBarycentricVelocity(dir ICRS, distance unit.Length, velocity vector.Vec3) (ICRS, bool) {
+	position := dir.ToUnitVector().MulScalar(distance.AU())
 	perDay := velocity.MulScalar(secondsPerDay / kmPerAU)
 
 	ra, dec, pmr, pmd, px, rv, status := gofaext.Pvstar([2][3]float64{
@@ -302,16 +312,9 @@ func icrsFromBarycentricVelocity(dir ICRS, distancePc float64, velocity vector.V
 	return NewICRSWithKinematics(
 		angle.Rad(ra).Wrap360(), angle.Rad(dec),
 		pmRACosDec(pmr, angle.Rad(dec)), angle.Rad(pmd),
-		angle.Arcsec(px), rv,
+		angle.Arcsec(px), unit.KmPerSec(rv),
 	), true
 }
-
-// auPerParsec is the number of astronomical units in a parsec.
-//
-// It is the definition of the parsec rather than a measurement — the distance
-// at which one au subtends one arcsecond — so it is exactly 648000/π and is
-// written that way instead of as a decimal somebody has to check.
-const auPerParsec = 648000 / math.Pi
 
 // tilt returns the angle the frame is rotated about the Y axis to lift the Sun
 // z☉ above the midplane, in radians.
@@ -325,22 +328,32 @@ const auPerParsec = 648000 / math.Pi
 // frames a caller can nonetheless construct, and a NaN here would spread into
 // every coordinate computed from it without ever raising an error.
 func (f GalactocentricFrame) tilt() float64 {
-	if f.sunDistance == 0 {
+	if f.sunDistance.IsZero() {
 		return 0
 	}
 
-	return math.Asin(min(1, max(-1, f.sunHeight/f.sunDistance)))
+	// A ratio of two lengths is dimensionless, so it is taken on the raw
+	// values rather than through a unit accessor: converting both to parsecs
+	// first would divide and then multiply by the same scale factor, which is
+	// two roundings where none is needed.
+	ratio := float64(f.sunHeight) / float64(f.sunDistance)
+
+	return math.Asin(min(1, max(-1, ratio)))
 }
 
-// NewGalactocentric builds a position from its Cartesian components, in parsecs.
-func NewGalactocentric(x, y, z float64) Galactocentric {
-	return Galactocentric{v: vector.V3(x, y, z)}
+// NewGalactocentric builds a position from its Cartesian components.
+func NewGalactocentric(x, y, z unit.Length) Galactocentric {
+	return Galactocentric{v: vector.V3(x.Meters(), y.Meters(), z.Meters())}
 }
 
-// NewGalactocentricWithVelocity builds a position carrying a velocity, the
-// position in parsecs and the velocity in km/s on the same axes.
-func NewGalactocentricWithVelocity(x, y, z float64, velocity vector.Vec3) Galactocentric {
-	return Galactocentric{v: vector.V3(x, y, z), vel: velocity, hasVelocity: true}
+// NewGalactocentricWithVelocity builds a position carrying a velocity, on the
+// same axes, in km/s.
+func NewGalactocentricWithVelocity(x, y, z unit.Length, velocity vector.Vec3) Galactocentric {
+	return Galactocentric{
+		v:           vector.V3(x.Meters(), y.Meters(), z.Meters()),
+		vel:         velocity,
+		hasVelocity: true,
+	}
 }
 
 // Velocity returns the velocity in km/s on this frame's axes, and whether there
@@ -352,39 +365,43 @@ func NewGalactocentricWithVelocity(x, y, z float64, velocity vector.Vec3) Galact
 // conversion can manage without a distance while this cannot.
 func (c Galactocentric) Velocity() (vector.Vec3, bool) { return c.vel, c.hasVelocity }
 
-// X returns the component toward the Galactic centre, in parsecs. The Sun is at
-// negative X.
-func (c Galactocentric) X() float64 { return c.v.X }
+// X returns the component toward the Galactic centre. The Sun is at negative X.
+func (c Galactocentric) X() unit.Length { return unit.Meters(c.v.X) }
 
-// Y returns the component along Galactic rotation, in parsecs.
-func (c Galactocentric) Y() float64 { return c.v.Y }
+// Y returns the component along Galactic rotation.
+func (c Galactocentric) Y() unit.Length { return unit.Meters(c.v.Y) }
 
-// Z returns the component toward the north Galactic pole, in parsecs. This is
-// height above the midplane.
-func (c Galactocentric) Z() float64 { return c.v.Z }
+// Z returns the component toward the north Galactic pole — height above the
+// midplane.
+func (c Galactocentric) Z() unit.Length { return unit.Meters(c.v.Z) }
 
-// Vector returns the position as a vector, in parsecs.
+// Vector returns the position as a vector, in meters — the base unit of
+// [unit.Length], since a [vector.Vec3] cannot carry a unit of its own.
+//
+// Read a component through [Galactocentric.X], [Galactocentric.Y] or
+// [Galactocentric.Z] to get it as a [unit.Length] and choose the unit there.
 func (c Galactocentric) Vector() vector.Vec3 { return c.v }
 
-// Distance returns the straight-line distance from the Galactic centre, in
-// parsecs — the length of the full three-dimensional vector.
+// Distance returns the straight-line distance from the Galactic centre — the
+// length of the full three-dimensional vector.
 //
 // For anything in or near the disc this is the wrong quantity to reach for and
 // [Galactocentric.Radius] is the right one; they differ by less than a part in
 // 10⁴ at the Sun, and by a great deal for a halo star. The distinction matters
 // because the Galaxy is flat: its dynamics are organised by cylindrical radius
 // and height separately, not by spherical radius.
-func (c Galactocentric) Distance() float64 { return c.v.Norm() }
+func (c Galactocentric) Distance() unit.Length { return unit.Meters(c.v.Norm()) }
 
-// Radius returns the cylindrical galactocentric radius √(X² + Y²), in parsecs:
-// the distance from the Galaxy's rotation axis, measured in the midplane.
+// Radius returns the cylindrical galactocentric radius √(X² + Y²): the
+// distance from the Galaxy's rotation axis, measured in the midplane.
 //
 // This is the R of a rotation curve, of a disc surface-density profile, and of
 // a metallicity gradient. The Sun's is √(R₀² − z☉²) rather than R₀ — see
 // [GalactocentricFrame.SunPosition].
-func (c Galactocentric) Radius() float64 { return math.Hypot(c.v.X, c.v.Y) }
+func (c Galactocentric) Radius() unit.Length { return unit.Meters(math.Hypot(c.v.X, c.v.Y)) }
 
 // String renders the position for logs and errors.
 func (c Galactocentric) String() string {
-	return fmt.Sprintf("Galactocentric X %.3f Y %.3f Z %.3f pc", c.v.X, c.v.Y, c.v.Z)
+	return fmt.Sprintf("Galactocentric X %.3f Y %.3f Z %.3f pc",
+		c.X().Pc(), c.Y().Pc(), c.Z().Pc())
 }

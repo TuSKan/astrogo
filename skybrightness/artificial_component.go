@@ -411,7 +411,7 @@ func (a *ArtificialSkyglow) resolveSource(
 		aer := unit.OpticalDepth(aerosol.TauAt(lambda))
 
 		t, err := OpticalParameterT(aer, unit.OpticalDepth(aerosolScaleHeight),
-			rayleigh, unit.OpticalDepth(molecularScaleHeight), separation, airmassSource)
+			rayleigh, unit.OpticalDepth(molecularScaleHeight), separation.Meters(), airmassSource)
 		if err != nil {
 			return zero, 0, fmt.Errorf("skybrightness: artificial: %w", err)
 		}

@@ -5,11 +5,12 @@ import (
 
 	"github.com/TuSKan/astrogo/constants"
 	"github.com/TuSKan/astrogo/internal/gofaext"
+	"github.com/TuSKan/astrogo/unit"
 	"github.com/TuSKan/astrogo/vector"
 )
 
-// BarycentricRVCorrection returns the correction, in km/s, to ADD to a
-// measured (topocentric) radial velocity of target in order to refer it
+// BarycentricRVCorrection returns the correction to ADD to a measured
+// (topocentric) radial velocity of target in order to refer it
 // to the solar system barycenter — i.e. it removes the component of the
 // observer's own barycentric motion (Earth's orbit plus the site's
 // diurnal rotation) along the line of sight to target.
@@ -43,8 +44,8 @@ import (
 // relativity enters here. [Context.ObserverFrameShift] carries the observer's
 // own clock, and [Context.BarycentricRadialVelocity] composes the two, which
 // is the function to reach for unless the raw projection is what is wanted.
-func (ctx *Context) BarycentricRVCorrection(target ICRS) float64 {
-	return ctx.BarycentricVelocity().Dot(target.ToUnitVector())
+func (ctx *Context) BarycentricRVCorrection(target ICRS) unit.Velocity {
+	return unit.KmPerSec(ctx.BarycentricVelocity().Dot(target.ToUnitVector()))
 }
 
 // lightSpeedKmPerSec is c in the units every radial velocity here is
@@ -52,7 +53,7 @@ func (ctx *Context) BarycentricRVCorrection(target ICRS) float64 {
 var lightSpeedKmPerSec = constants.SI2019.SpeedOfLight.Value / 1000.0
 
 // BarycentricRadialVelocity refers a measured (topocentric) radial
-// velocity of target to the solar system barycenter, in km/s.
+// velocity of target to the solar system barycenter.
 //
 // # Why this is not rvObserved plus the correction
 //
@@ -79,8 +80,9 @@ var lightSpeedKmPerSec = constants.SI2019.SpeedOfLight.Value / 1000.0
 // The correction itself is unchanged and still classical: this fixes how
 // it composes, not what it contains. See [Context.BarycentricRVCorrection]
 // for the terms that remain unimplemented.
-func (ctx *Context) BarycentricRadialVelocity(target ICRS, rvObserved float64) (float64, error) {
-	corr := ctx.BarycentricRVCorrection(target)
+func (ctx *Context) BarycentricRadialVelocity(target ICRS, rvObserved unit.Velocity) (unit.Velocity, error) {
+	corr := ctx.BarycentricRVCorrection(target).KmPerSec()
+	observed := rvObserved.KmPerSec()
 
 	shift, err := ctx.ObserverFrameShift()
 	if err != nil {
@@ -91,13 +93,13 @@ func (ctx *Context) BarycentricRadialVelocity(target ICRS, rvObserved float64) (
 	// z = rv/c. Expanded rather than written as that product, because both
 	// velocities are ~1e-4 c and the bracket would cancel fifteen digits
 	// against 1 before c multiplied the residue back up.
-	classical := rvObserved + corr + rvObserved*corr/lightSpeedKmPerSec
+	classical := observed + corr + observed*corr/lightSpeedKmPerSec
 
-	return classical + shift*(lightSpeedKmPerSec+classical), nil
+	return unit.KmPerSec(classical + shift*(lightSpeedKmPerSec+classical)), nil
 }
 
-// ObservedRadialVelocity returns the topocentric radial velocity, in
-// km/s, an observer at ctx would measure right now for a target whose
+// ObservedRadialVelocity returns the topocentric radial velocity an
+// observer at ctx would measure right now for a target whose
 // barycentric RV is rvBarycentric — the exact inverse of
 // [Context.BarycentricRadialVelocity], and the direction almost every
 // real use needs: published catalog RVs (SIMBAD's rvz_radvel, for one)
@@ -110,8 +112,8 @@ func (ctx *Context) BarycentricRadialVelocity(target ICRS, rvObserved float64) (
 //
 // which is exact rather than a series, so the round trip closes to
 // floating-point precision at any radial velocity.
-func (ctx *Context) ObservedRadialVelocity(target ICRS, rvBarycentric float64) (float64, error) {
-	corr := ctx.BarycentricRVCorrection(target)
+func (ctx *Context) ObservedRadialVelocity(target ICRS, rvBarycentric unit.Velocity) (unit.Velocity, error) {
+	corr := ctx.BarycentricRVCorrection(target).KmPerSec()
 
 	shift, err := ctx.ObserverFrameShift()
 	if err != nil {
@@ -120,9 +122,9 @@ func (ctx *Context) ObservedRadialVelocity(target ICRS, rvBarycentric float64) (
 
 	// Undo the observer's own frame first, then the projection, in the
 	// reverse order BarycentricRadialVelocity applied them.
-	classical := (rvBarycentric - shift*lightSpeedKmPerSec) / (1 + shift)
+	classical := (rvBarycentric.KmPerSec() - shift*lightSpeedKmPerSec) / (1 + shift)
 
-	return (classical - corr) / (1 + corr/lightSpeedKmPerSec), nil
+	return unit.KmPerSec((classical - corr) / (1 + corr/lightSpeedKmPerSec)), nil
 }
 
 // HeliocentricRVCorrection is [Context.BarycentricRVCorrection], but
@@ -138,7 +140,7 @@ func (ctx *Context) ObservedRadialVelocity(target ICRS, rvBarycentric float64) (
 // silently stale across those epoch changes. Epv00 is microseconds;
 // this is not a hot path. Returns ErrSofaEpv00Failed if the underlying
 // SOFA computation reports a failure status.
-func (ctx *Context) HeliocentricRVCorrection(target ICRS) (float64, error) {
+func (ctx *Context) HeliocentricRVCorrection(target ICRS) (unit.Velocity, error) {
 	tdb := ctx.t.TDB()
 	d1, d2 := tdb.JDParts()
 
@@ -161,11 +163,11 @@ func (ctx *Context) HeliocentricRVCorrection(target ICRS) (float64, error) {
 
 	heliocentricObserverVel := ctx.BarycentricVelocity().Sub(sunBarycentricVel)
 
-	return heliocentricObserverVel.Dot(target.ToUnitVector()), nil
+	return unit.KmPerSec(heliocentricObserverVel.Dot(target.ToUnitVector())), nil
 }
 
-// TopocentricRadialVelocity returns the radial velocity, in km/s, an observer
-// at ctx measures for a body whose geocentric state is posAU and velAUPerDay
+// TopocentricRadialVelocity returns the radial velocity an observer at ctx
+// measures for a body whose geocentric state is posAU and velAUPerDay
 // — the line-of-sight component of the body's motion relative to the
 // observer, positive when the two are separating.
 //
@@ -193,7 +195,7 @@ func (ctx *Context) HeliocentricRVCorrection(target ICRS) (float64, error) {
 //
 // The line of sight is topocentric, from the observer rather than from the
 // geocentre. For the Moon those differ by up to a degree.
-func (ctx *Context) TopocentricRadialVelocity(posAU, velAUPerDay vector.Vec3) float64 {
+func (ctx *Context) TopocentricRadialVelocity(posAU, velAUPerDay vector.Vec3) unit.Velocity {
 	auKM := constants.IAU.AstronomicalUnit.Value / 1000.0
 	dayS := constants.Derived.JulianDaySeconds.Value
 
@@ -213,7 +215,7 @@ func (ctx *Context) TopocentricRadialVelocity(posAU, velAUPerDay vector.Vec3) fl
 		return 0
 	}
 
-	return bodyVel.Sub(siteVel).Dot(los.Unit())
+	return unit.KmPerSec(bodyVel.Sub(siteVel).Dot(los.Unit()))
 }
 
 // ObserverFrameShift returns the fractional frequency shift between the

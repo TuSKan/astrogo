@@ -7,6 +7,7 @@ import (
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // FK5 and ICRS agree to about 20 milliarcseconds, which is why they are easy
@@ -30,7 +31,7 @@ func TestFK5ToICRSMatchesSOFAWithKinematics(t *testing.T) {
 		angle.Rad(sofaPM(-1.91851572e-7, -0.2917517103)),
 		angle.Rad(-5.8468475e-6),
 		angle.Arcsec(0.379210),
-		-7.6,
+		unit.KmPerSec(-7.6),
 	)
 
 	got := coord.FK5ToICRS(src)
@@ -51,7 +52,7 @@ func TestFK5ToICRSMatchesSOFAWithKinematics(t *testing.T) {
 	// component; SOFA publishes -7.6000000940000254 for exactly that reason.
 	// Asserting the input here would have passed for a transformation that
 	// copied the field across and skipped the rotation.
-	assertClose(t, got.RV(), -7.6000000940000254, 1e-11, "RV")
+	assertClose(t, got.RV().KmPerSec(), -7.6000000940000254, 1e-11, "RV")
 }
 
 // TestFK5ToICRSMatchesSOFAPositionOnly is the other constructor, against
@@ -109,7 +110,7 @@ func TestFK5RoundTripsThroughICRS(t *testing.T) {
 	src := coord.NewFK5WithProperMotion(
 		angle.Deg(101.2871), angle.Deg(-16.7161),
 		angle.Arcsec(-0.5460), angle.Arcsec(-1.2231),
-		angle.Arcsec(0.37921), -5.5,
+		angle.Arcsec(0.37921), unit.KmPerSec(-5.5),
 	)
 
 	back := coord.ICRSToFK5(coord.FK5ToICRS(src), coord.J2000Epoch)
@@ -137,7 +138,7 @@ func TestICRSToFK5MatchesSOFAWithKinematics(t *testing.T) {
 		angle.Rad(sofaPM(-2.76413026e-6, -0.2917512594)),
 		angle.Rad(-5.92994449e-6),
 		angle.Arcsec(0.379210),
-		-7.6,
+		unit.KmPerSec(-7.6),
 	)
 
 	got := coord.ICRSToFK5(src, coord.J2000Epoch)
@@ -155,7 +156,7 @@ func TestICRSToFK5MatchesSOFAWithKinematics(t *testing.T) {
 		sofaPM(-0.27597945024511204e-5, -0.2917513626469638890), 1e-18, "pmRA")
 	assertClose(t, pmDec.Radians(), -0.59308014093262838e-5, 1e-18, "pmDec")
 	assertClose(t, got.Parallax().Arcseconds(), 0.37921, 1e-13, "parallax")
-	assertClose(t, got.RV(), -7.6000001309071126, 1e-11, "RV")
+	assertClose(t, got.RV().KmPerSec(), -7.6000001309071126, 1e-11, "RV")
 }
 
 // TestICRSToFK5SuppliesTheSpinMotion pins the claim [NewFK5] makes: a star at

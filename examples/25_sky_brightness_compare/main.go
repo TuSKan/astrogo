@@ -66,7 +66,7 @@ func main() {
 // little it buys at the zenith.
 func comparePresets(ctx context.Context, when time.GoTime) {
 	site := siteAt(heightM)
-	air := atmosphere.RuralAerosol(site.Height(), atmosphere.CleanMountainAOD550)
+	air := atmosphere.RuralAerosol(site.Height().Meters(), atmosphere.CleanMountainAOD550)
 
 	fmt.Printf("\nOne site, one night, three models of the same natural sky\n")
 	fmt.Printf("Cerro Paranal, %s UTC, clean mountain air\n\n", when.Format("2006-01-02 15:04"))
@@ -211,7 +211,7 @@ func whatObservatoryAdds(ctx context.Context) {
 	}
 
 	scene, err := sky.Scene(site, when,
-		atmosphere.RuralAerosol(site.Height(), atmosphere.CleanMountainAOD550))
+		atmosphere.RuralAerosol(site.Height().Meters(), atmosphere.CleanMountainAOD550))
 	if err != nil {
 		log.Fatalf("scene: %v", err)
 	}
@@ -345,7 +345,7 @@ func brightness(
 
 // siteAt is the fixed coordinates at a chosen elevation.
 func siteAt(h float64) *coord.Geodetic {
-	site, err := coord.NewGeodetic(angle.Deg(lonDeg), angle.Deg(latDeg), h)
+	site, err := coord.NewGeodetic(angle.Deg(lonDeg), angle.Deg(latDeg), unit.Meters(h))
 	if err != nil {
 		log.Fatalf("site: %v", err)
 	}

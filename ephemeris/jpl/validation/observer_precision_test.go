@@ -359,7 +359,7 @@ func TestObserverPrecisionMatrix(t *testing.T) {
 			loc := ns.site.Location()
 
 			points, err := fetchObserverSeries(body.command(), body.name,
-				loc.Lon().Degrees(), loc.Lat().Degrees(), loc.Height(),
+				loc.Lon().Degrees(), loc.Lat().Degrees(), loc.Height().Meters(),
 				startTime, stopTime, stepSize)
 			if err != nil {
 				// Not this test's own bug: live-confirmed this session

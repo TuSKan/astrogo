@@ -13,6 +13,7 @@ import (
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/internal/metrology"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // rvFixturePath is the checked-in Astropy reference table.
@@ -209,7 +210,7 @@ func TestRVCorrectionAgainstAstropy(t *testing.T) {
 
 	for _, tc := range fixture.Cases {
 		site, err := coord.NewGeodetic(
-			angle.Deg(tc.Site.Lon), angle.Deg(tc.Site.Lat), tc.Site.HeightM)
+			angle.Deg(tc.Site.Lon), angle.Deg(tc.Site.Lat), unit.Meters(tc.Site.HeightM))
 		if err != nil {
 			t.Fatalf("%s: %v", tc.Name, err)
 		}
@@ -234,14 +235,14 @@ func TestRVCorrectionAgainstAstropy(t *testing.T) {
 		got := ctx.BarycentricRVCorrection(target)
 
 		bary.Add(metrology.Sample{
-			Error:   got - tc.BarycentricClassical,
+			Error:   got.KmPerSec() - tc.BarycentricClassical,
 			Label:   tc.Name,
 			Context: context,
 		})
 
 		// The relativistic gap is recorded, not asserted: it is a stated
 		// difference between the two models rather than an error in either.
-		relativistic = append(relativistic, tc.Barycentric-got)
+		relativistic = append(relativistic, tc.Barycentric-got.KmPerSec())
 
 		// A target with no radial velocity of its own, which is what every
 		// case in this fixture is, so this reduces to the correction plus
@@ -251,10 +252,10 @@ func TestRVCorrectionAgainstAstropy(t *testing.T) {
 			t.Fatalf("%s: BarycentricRadialVelocity: %v", tc.Name, err)
 		}
 
-		full = append(full, tc.Barycentric-gotFull)
+		full = append(full, tc.Barycentric-gotFull.KmPerSec())
 
 		helio.Add(metrology.Sample{
-			Error:   gotHelio - tc.Heliocentric,
+			Error:   gotHelio.KmPerSec() - tc.Heliocentric,
 			Label:   tc.Name,
 			Context: context,
 		})

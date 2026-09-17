@@ -5,6 +5,7 @@ import (
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/internal/gofaext"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // FK4 is a position in the FK4 system, the pre-1984 fundamental catalogue
@@ -39,7 +40,7 @@ type FK4 struct {
 	ra, dec         angle.Angle
 	pmRA, pmDec     angle.Angle // mu_alpha* and mu_dec per Julian year; zero when hasPM is false
 	parallax        angle.Angle
-	rv              float64 // km/s
+	rv              unit.Velocity
 	bepoch          float64 // Besselian epoch of observation, e.g. 1950.0
 	hasProperMotion bool
 
@@ -90,7 +91,7 @@ func NewFK4(ra, dec angle.Angle, bepoch float64) FK4 {
 // and radial velocity in km/s.
 //
 // Use this only for a genuinely measured proper motion. See [NewFK4].
-func NewFK4WithProperMotion(ra, dec, pmRA, pmDec, parallax angle.Angle, rv float64) FK4 {
+func NewFK4WithProperMotion(ra, dec, pmRA, pmDec, parallax angle.Angle, rv unit.Velocity) FK4 {
 	return FK4{
 		ra: ra, dec: dec,
 		pmRA: pmRA, pmDec: pmDec,
@@ -127,8 +128,8 @@ func (c FK4) ProperMotion() (pmRA, pmDec angle.Angle, ok bool) {
 // Parallax returns the recorded annual parallax.
 func (c FK4) Parallax() angle.Angle { return c.parallax }
 
-// RV returns the recorded radial velocity in km/s.
-func (c FK4) RV() float64 { return c.rv }
+// RV returns the recorded radial velocity.
+func (c FK4) RV() unit.Velocity { return c.rv }
 
 // Epoch returns the Besselian epoch of observation.
 func (c FK4) Epoch() float64 { return c.bepoch }
@@ -168,13 +169,13 @@ func FK4ToFK5(c FK4) FK5 {
 	r5, d5, dr5, dd5, px5, rv5 := gofaext.Fk425(
 		c.ra.Radians(), c.dec.Radians(),
 		dRAdt(c.pmRA, c.dec), c.pmDec.Radians(),
-		c.parallax.Arcseconds(), c.rv,
+		c.parallax.Arcseconds(), c.rv.KmPerSec(),
 	)
 
 	return NewFK5WithProperMotion(
 		angle.Rad(r5).Wrap360(), angle.Rad(d5),
 		pmRACosDec(dr5, angle.Rad(d5)), angle.Rad(dd5),
-		angle.Arcsec(px5), rv5,
+		angle.Arcsec(px5), unit.KmPerSec(rv5),
 	)
 }
 
@@ -209,14 +210,14 @@ func FK5ToFK4(c FK5, bepoch float64) FK4 {
 	r1950, d1950, dr1950, dd1950, px1950, rv1950 := gofaext.Fk524(
 		c.ra.Radians(), c.dec.Radians(),
 		dRAdt(c.pmRA, c.dec), c.pmDec.Radians(),
-		c.parallax.Arcseconds(), c.rv,
+		c.parallax.Arcseconds(), c.rv.KmPerSec(),
 	)
 
 	return FK4{
 		ra: angle.Rad(r1950).Wrap360(), dec: angle.Rad(d1950),
 		pmRA: pmRACosDec(dr1950, angle.Rad(d1950)), pmDec: angle.Rad(dd1950),
 		parallax: angle.Arcsec(px1950),
-		rv:       rv1950,
+		rv:       unit.KmPerSec(rv1950),
 		// B1950, not bepoch — see [ICRSToFK4]'s doc comment, which records why
 		// the six-element route cannot honour an epoch and what to use instead.
 		bepoch:          B1950,
@@ -316,7 +317,7 @@ func ICRSToFK4(c ICRS, bepoch float64) FK4 {
 	r5, d5, dr5, dd5, px5, rv5 := gofaext.H2fk5(
 		c.RA().Radians(), c.Dec().Radians(),
 		dRAdt(c.PmRA(), c.Dec()), c.PmDec().Radians(),
-		c.Parallax().Arcseconds(), c.RV(),
+		c.Parallax().Arcseconds(), c.RV().KmPerSec(),
 	)
 
 	// dr5 stays in SOFA's convention across this hand-off: both sides of
@@ -327,7 +328,7 @@ func ICRSToFK4(c ICRS, bepoch float64) FK4 {
 		ra: angle.Rad(r1950).Wrap360(), dec: angle.Rad(d1950),
 		pmRA: pmRACosDec(dr1950, angle.Rad(d1950)), pmDec: angle.Rad(dd1950),
 		parallax: angle.Arcsec(px1950),
-		rv:       rv1950,
+		rv:       unit.KmPerSec(rv1950),
 		// B1950 rather than bepoch, and deliberately: see the note on the
 		// six-element route in this function's doc comment. Fk524 answers at
 		// the catalogue equinox and takes no epoch, so labelling its output

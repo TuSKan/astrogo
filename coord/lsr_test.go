@@ -44,26 +44,26 @@ func TestLSRDelhayeMatchesAstropysOwnVector(t *testing.T) {
 
 	apex, speed := coord.LSRApex(coord.LSRDelhaye)
 
-	got := apex.ToUnitVector().MulScalar(speed)
+	got := apex.ToUnitVector().MulScalar(speed.KmPerSec())
 
 	wantSpeed := math.Sqrt(9*9 + 12*12 + 7*7)
 	astropySpeed := math.Sqrt(astropyLSRD[0]*astropyLSRD[0] +
 		astropyLSRD[1]*astropyLSRD[1] + astropyLSRD[2]*astropyLSRD[2])
 
-	testutil.AssertNear(t, "speed (km/s)", speed, wantSpeed, 1e-12)
+	testutil.AssertNear(t, "speed (km/s)", speed.KmPerSec(), wantSpeed, 1e-12)
 	testutil.AssertNear(t, "Astropy's own speed (km/s)", astropySpeed, wantSpeed, 1e-12)
 
 	// The angle between the two directions, which is where the whole
 	// disagreement lives.
 	dot := (got.X*astropyLSRD[0] + got.Y*astropyLSRD[1] + got.Z*astropyLSRD[2]) /
-		(speed * astropySpeed)
+		(speed.KmPerSec() * astropySpeed)
 
 	sep := math.Acos(math.Min(1, dot)) * 180 / math.Pi * 3600
 
 	t.Logf("astrogo [%.12f %.12f %.12f]", got.X, got.Y, got.Z)
 	t.Logf("astropy [%.12f %.12f %.12f]", astropyLSRD[0], astropyLSRD[1], astropyLSRD[2])
 	t.Logf("directions differ by %.4f arcsec (%.3f mm/s at this speed)",
-		sep, sep/206264.8*speed*1e6)
+		sep, sep/206264.8*speed.KmPerSec()*1e6)
 
 	if sep > 0.05 {
 		t.Errorf("the two directions differ by %.4f arcsec, want under 0.05 — "+
@@ -97,7 +97,7 @@ func TestLSRApexMatchesTheLiterature(t *testing.T) {
 
 	_, dynamicalSpeed := coord.LSRApex(coord.LSRDynamical)
 
-	testutil.AssertNear(t, "Schönrich+ total solar motion (km/s)", dynamicalSpeed, 18.0, 0.05)
+	testutil.AssertNear(t, "Schönrich+ total solar motion (km/s)", dynamicalSpeed.KmPerSec(), 18.0, 0.05)
 }
 
 // TestLSRCorrectionIsTheProjection pins the three values a projection has to
@@ -113,12 +113,12 @@ func TestLSRCorrectionIsTheProjection(t *testing.T) {
 
 			// At the apex the Sun is moving straight at the target, so the
 			// correction is the whole solar motion and positive.
-			testutil.AssertNear(t, "at the apex", coord.LSRCorrection(apex, kind), speed, 1e-12)
+			testutil.AssertNear(t, "at the apex", coord.LSRCorrection(apex, kind).KmPerSec(), speed.KmPerSec(), 1e-12)
 
 			// At the antapex it is the whole thing, negated.
 			antapex := coord.NewICRS(apex.RA().Add(angle.Deg(180)).Wrap360(), apex.Dec().MulScalar(-1))
 
-			testutil.AssertNear(t, "at the antapex", coord.LSRCorrection(antapex, kind), -speed, 1e-12)
+			testutil.AssertNear(t, "at the antapex", coord.LSRCorrection(antapex, kind).KmPerSec(), -speed.KmPerSec(), 1e-12)
 
 			// And 90° away there is no radial component at all. Built as a
 			// cross product with the apex rather than written down, so it is
@@ -133,7 +133,7 @@ func TestLSRCorrectionIsTheProjection(t *testing.T) {
 			var side coord.ICRS
 			side.FromUnitVector(a.Cross(ref).Unit())
 
-			testutil.AssertNear(t, "90 degrees from the apex", coord.LSRCorrection(side, kind), 0, 1e-12)
+			testutil.AssertNear(t, "90 degrees from the apex", coord.LSRCorrection(side, kind).KmPerSec(), 0, 1e-12)
 		})
 	}
 }
@@ -153,20 +153,20 @@ func TestLSRCorrectionNeverExceedsTheSolarMotion(t *testing.T) {
 			corr := coord.LSRCorrection(
 				coord.NewICRS(angle.Deg(ra), angle.Deg(dec)), coord.LSRDynamical)
 
-			if math.Abs(corr) > speed+1e-12 {
+			if math.Abs(corr.KmPerSec()) > speed.KmPerSec()+1e-12 {
 				t.Fatalf("correction %g km/s at RA %g Dec %g exceeds the solar motion %g",
-					corr, ra, dec, speed)
+					corr.KmPerSec(), ra, dec, speed.KmPerSec())
 			}
 
-			maxSeen = math.Max(maxSeen, math.Abs(corr))
+			maxSeen = math.Max(maxSeen, math.Abs(corr.KmPerSec()))
 		}
 	}
 
 	// The sweep has to come close to the full value somewhere, or it is
 	// wandering over a sky the apex is not in.
-	if maxSeen < 0.99*speed {
+	if maxSeen < 0.99*speed.KmPerSec() {
 		t.Errorf("the largest correction found over the whole sky was %g km/s, "+
-			"against a solar motion of %g — the apex was missed", maxSeen, speed)
+			"against a solar motion of %g — the apex was missed", maxSeen, speed.KmPerSec())
 	}
 }
 
@@ -189,8 +189,8 @@ func TestLSRKindsDisagreeByTwoKilometresPerSecond(t *testing.T) {
 		for dec := -89.0; dec <= 89; dec += 2 {
 			c := coord.NewICRS(angle.Deg(ra), angle.Deg(dec))
 
-			diff := math.Abs(coord.LSRCorrection(c, coord.LSRDynamical) -
-				coord.LSRCorrection(c, coord.LSRDelhaye))
+			diff := math.Abs(coord.LSRCorrection(c, coord.LSRDynamical).KmPerSec() -
+				coord.LSRCorrection(c, coord.LSRDelhaye).KmPerSec())
 
 			maxDiff = math.Max(maxDiff, diff)
 		}
@@ -249,7 +249,7 @@ func TestUnknownLSRKindFallsBackRatherThanReturningZero(t *testing.T) {
 			"solar motion")
 	}
 
-	testutil.AssertNear(t, "unknown kind", got, want, 1e-12)
+	testutil.AssertNear(t, "unknown kind", got.KmPerSec(), want.KmPerSec(), 1e-12)
 }
 
 func BenchmarkLSRCorrection(b *testing.B) {
@@ -287,14 +287,14 @@ func TestLSRKMatchesAstropysRealisation(t *testing.T) {
 	}
 
 	apex, speed := coord.LSRApex(coord.LSRKinematic)
-	got := apex.ToUnitVector().MulScalar(speed)
+	got := apex.ToUnitVector().MulScalar(speed.KmPerSec())
 
 	diff := math.Sqrt(
 		(got.X-astropy.X)*(got.X-astropy.X) +
 			(got.Y-astropy.Y)*(got.Y-astropy.Y) +
 			(got.Z-astropy.Z)*(got.Z-astropy.Z))
 
-	sepArcsec := 2 * math.Asin(diff/2/speed) * 206264.806
+	sepArcsec := 2 * math.Asin(diff/2/speed.KmPerSec()) * 206264.806
 
 	t.Logf("astrogo [%+.15f, %+.15f, %+.15f] km/s", got.X, got.Y, got.Z)
 	t.Logf("astropy [%+.15f, %+.15f, %+.15f] km/s", astropy.X, astropy.Y, astropy.Z)
@@ -303,8 +303,8 @@ func TestLSRKMatchesAstropysRealisation(t *testing.T) {
 
 	// The speed is Gordon's own number and is not approximated by anything, so
 	// it must be exact to float precision.
-	if math.Abs(speed-20.0) > 1e-12 {
-		t.Errorf("apex speed is %.15f km/s, want exactly 20", speed)
+	if math.Abs(speed.KmPerSec()-20.0) > 1e-12 {
+		t.Errorf("apex speed is %.15f km/s, want exactly 20", speed.KmPerSec())
 	}
 
 	// A quarter of an arcsecond either side of the 0.55 the model difference

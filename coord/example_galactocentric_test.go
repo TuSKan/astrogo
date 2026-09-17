@@ -5,6 +5,7 @@ import (
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // The frame is where Galactic structure is written down: a target's distance
@@ -23,13 +24,13 @@ func ExampleGalactocentricFrame_FromICRS() {
 		{"toward the pole", 0, 90},
 	} {
 		icrs := coord.GalacticToICRS(coord.NewGalactic(angle.Deg(tc.l), angle.Deg(tc.b)))
-		g := f.FromICRS(icrs, 1000)
+		g := f.FromICRS(icrs, unit.Pc(1000))
 
-		fmt.Printf("%-19s R = %7.1f pc   Z = %+7.1f pc\n", tc.name, g.Radius(), g.Z())
+		fmt.Printf("%-19s R = %7.1f pc   Z = %+7.1f pc\n", tc.name, g.Radius().Pc(), g.Z().Pc())
 	}
 
 	sun := f.SunPosition()
-	fmt.Printf("%-19s R = %7.1f pc   Z = %+7.1f pc\n", "the Sun", sun.Radius(), sun.Z())
+	fmt.Printf("%-19s R = %7.1f pc   Z = %+7.1f pc\n", "the Sun", sun.Radius().Pc(), sun.Z().Pc())
 
 	// A kiloparsec of travel buys a full kiloparsec of R toward the centre and
 	// only 61 pc of it along the rotation, which is why a rotation curve is a
@@ -55,9 +56,9 @@ func ExampleParallaxDistance() {
 	d := coord.ParallaxDistance(angle.Arcsec(0.002))
 	g := coord.DefaultGalactocentricFrame().FromICRS(star, d)
 
-	fmt.Printf("distance from the Sun:    %.1f pc\n", d)
-	fmt.Printf("distance from the centre: %.1f pc\n", g.Distance())
-	fmt.Printf("height above the plane:   %+.1f pc\n", g.Z())
+	fmt.Printf("distance from the Sun:    %.1f pc\n", d.Pc())
+	fmt.Printf("distance from the centre: %.1f pc\n", g.Distance().Pc())
+	fmt.Printf("height above the plane:   %+.1f pc\n", g.Z().Pc())
 
 	// The 150.8 pc is the star's own 129.4 pc above the Sun (500·sin 15°) plus
 	// the Sun's 20.8, plus 0.6 pc of the frame's tilt.

@@ -6,6 +6,7 @@ import (
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/internal/gofaext"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // TestTheRoundTripClosesAtEveryEpoch is #341.
@@ -127,7 +128,7 @@ func TestARecordedMotionStillTakesTheSixElementRoute(t *testing.T) {
 	star := coord.NewICRSWithKinematics(
 		angle.Deg(123.4), angle.Deg(-35.6),
 		angle.Arcsec(pmRAIn/1000), angle.Arcsec(pmDecIn/1000),
-		angle.Arcsec(pxIn), rvIn,
+		angle.Arcsec(pxIn), unit.KmPerSec(rvIn),
 	)
 
 	back := coord.FK4ToICRS(coord.ICRSToFK4(star, coord.B1950))
@@ -149,7 +150,7 @@ func TestARecordedMotionStillTakesTheSixElementRoute(t *testing.T) {
 		t.Errorf("parallax came back %.8f arcsec, want %.3f", got, pxIn)
 	}
 
-	if got := back.RV(); got < rvIn-1e-4 || got > rvIn+1e-4 {
+	if got := back.RV().KmPerSec(); got < rvIn-1e-4 || got > rvIn+1e-4 {
 		t.Errorf("radial velocity came back %.6f km/s, want %.1f", got, rvIn)
 	}
 }

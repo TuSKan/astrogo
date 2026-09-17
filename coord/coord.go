@@ -8,6 +8,7 @@ import (
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/internal/gofaext"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 	"github.com/TuSKan/astrogo/vector"
 )
 
@@ -42,7 +43,7 @@ type Object interface {
 type ObserversLocation struct {
 	lon    angle.Angle
 	lat    angle.Angle
-	height float64 // Meters
+	height unit.Length
 }
 
 // Astrometric represents a stellar position with kinematics in the ICRS frame.
@@ -52,7 +53,7 @@ type Astrometric struct {
 	pmRA     angle.Angle // mu_alpha* = dRA/dt * cos(dec), per Julian year
 	pmDec    angle.Angle // Proper Motion in Declination
 	parallax angle.Angle // Parallax
-	rv       float64     // Radial Velocity
+	rv       unit.Velocity
 }
 
 // CIRS is the geocentric place of an object with aberration, light
@@ -78,11 +79,11 @@ type CIRS struct {
 type ICRS struct {
 	ra       angle.Angle
 	dec      angle.Angle
-	dist     float64
+	dist     unit.Length
 	pmRA     angle.Angle // mu_alpha* = dRA/dt * cos(dec), per Julian year
 	pmDec    angle.Angle // Proper motion in Dec, per Julian year
 	parallax angle.Angle // Stellar parallax
-	rv       float64     // Radial velocity (km/s)
+	rv       unit.Velocity
 
 	// hasKinematics records whether a caller supplied kinematics, as distinct
 	// from their happening to be zero.
@@ -105,21 +106,21 @@ type ICRS struct {
 type AltAz struct {
 	alt  angle.Angle
 	az   angle.Angle
-	dist float64
+	dist unit.Length
 }
 
 // Galactic represents a direction and optional distance in the Galactic coordinate system.
 type Galactic struct {
 	l    angle.Angle
 	b    angle.Angle
-	dist float64
+	dist unit.Length
 }
 
 // Ecliptic represents a direction and optional distance in the Geocentric Mean Ecliptic
 type Ecliptic struct {
 	lon  angle.Angle
 	lat  angle.Angle
-	dist float64
+	dist unit.Length
 }
 
 // ── Constructors ──────────────────────────────────────────────────────────────
@@ -140,7 +141,7 @@ func NewICRS(ra, dec angle.Angle) ICRS { return ICRS{ra: ra, dec: dec} }
 // and happens at the one boundary where SOFA is called. Handing a catalogue
 // value to SOFA directly is what #281 was: it lost a factor of cos(dec),
 // which is 30% at δ = 45° and 83% at δ = 80°.
-func NewICRSWithKinematics(ra, dec, pmRA, pmDec, parallax angle.Angle, rv float64) ICRS {
+func NewICRSWithKinematics(ra, dec, pmRA, pmDec, parallax angle.Angle, rv unit.Velocity) ICRS {
 	return ICRS{
 		ra: ra, dec: dec,
 		pmRA: pmRA, pmDec: pmDec,
@@ -175,7 +176,7 @@ func NewCIRS(ra, dec angle.Angle) CIRS {
 }
 
 // NewObserversLocation creates a new ObserversLocation.
-func NewObserversLocation(lon, lat angle.Angle, height float64) ObserversLocation {
+func NewObserversLocation(lon, lat angle.Angle, height unit.Length) ObserversLocation {
 	return ObserversLocation{lon: lon, lat: lat, height: height}
 }
 
@@ -187,8 +188,21 @@ func (c ICRS) RA() angle.Angle { return c.ra }
 // Dec returns the declination of the ICRS coordinate.
 func (c ICRS) Dec() angle.Angle { return c.dec }
 
-// Dist returns the distance of the ICRS coordinate.
-func (c ICRS) Dist() float64 { return c.dist }
+// Dist returns the distance of the ICRS coordinate, and zero when none was
+// set — which most of the ways an ICRS is built leave it.
+//
+// It is a [unit.Length] rather than a bare number because it did not used to
+// be: the same field held astronomical units on an ephemeris path and
+// kilometers on a satellite one, and nothing in the signature said which had
+// arrived. A caller now asks for the unit it wants and the conversion is the
+// type's, not the reader's.
+//
+// Zero is still ambiguous, and deliberately so — it means "not set" and it
+// means "at the observer", and the type cannot tell them apart. Anything that
+// must know carries its own flag, the way [ICRS.ProperMotion] does; anything
+// that must not guess takes the distance as its own parameter, the way
+// [GalactocentricFrame.FromICRS] does.
+func (c ICRS) Dist() unit.Length { return c.dist }
 
 // PmRA returns the proper motion in right ascension — μα* = dRA/dt · cos(dec),
 // the on-sky rate every catalogue publishes. See [NewICRSWithKinematics].
@@ -201,7 +215,7 @@ func (c ICRS) PmDec() angle.Angle { return c.pmDec }
 func (c ICRS) Parallax() angle.Angle { return c.parallax }
 
 // RV returns the radial velocity of the ICRS coordinate.
-func (c ICRS) RV() float64 { return c.rv }
+func (c ICRS) RV() unit.Velocity { return c.rv }
 
 // SetRA sets the right ascension of the ICRS coordinate.
 func (c *ICRS) SetRA(a angle.Angle) { c.ra = a }
@@ -210,7 +224,7 @@ func (c *ICRS) SetRA(a angle.Angle) { c.ra = a }
 func (c *ICRS) SetDec(a angle.Angle) { c.dec = a }
 
 // SetDist sets the distance of the ICRS coordinate.
-func (c *ICRS) SetDist(d float64) { c.dist = d }
+func (c *ICRS) SetDist(d unit.Length) { c.dist = d }
 
 // SetProperMotion sets the proper motion of the ICRS coordinate.
 func (c *ICRS) SetProperMotion(pmRA, pmDec angle.Angle) { c.pmRA = pmRA; c.pmDec = pmDec }
@@ -219,7 +233,7 @@ func (c *ICRS) SetProperMotion(pmRA, pmDec angle.Angle) { c.pmRA = pmRA; c.pmDec
 func (c *ICRS) SetParallax(a angle.Angle) { c.parallax = a }
 
 // SetRV sets the radial velocity of the ICRS coordinate.
-func (c *ICRS) SetRV(rv float64) { c.rv = rv }
+func (c *ICRS) SetRV(rv unit.Velocity) { c.rv = rv }
 
 // IsZero reports whether this ICRS is the zero value (no coordinates set).
 func (c ICRS) IsZero() bool { return c.ra == 0 && c.dec == 0 && c.dist == 0 }
@@ -240,8 +254,10 @@ func (c AltAz) Alt() angle.Angle { return c.alt }
 // Az returns the azimuth of the AltAz coordinate.
 func (c AltAz) Az() angle.Angle { return c.az }
 
-// Dist returns the distance of the AltAz coordinate.
-func (c AltAz) Dist() float64 { return c.dist }
+// Dist returns the distance of the AltAz coordinate, carried through the
+// transform from the ICRS position it came from. See [ICRS.Dist] for what the
+// type does and does not settle.
+func (c AltAz) Dist() unit.Length { return c.dist }
 
 // compassPoints are the 16 standard compass points, each spanning 22.5°,
 // centered on multiples of 22.5° starting from true north (0°).
@@ -275,7 +291,7 @@ func (c *AltAz) SetAlt(a angle.Angle) { c.alt = a }
 func (c *AltAz) SetAz(a angle.Angle) { c.az = a }
 
 // SetDist sets the distance of the AltAz coordinate.
-func (c *AltAz) SetDist(d float64) { c.dist = d }
+func (c *AltAz) SetDist(d unit.Length) { c.dist = d }
 
 // L returns the longitude of the Galactic coordinate.
 func (c Galactic) L() angle.Angle { return c.l }
@@ -284,7 +300,7 @@ func (c Galactic) L() angle.Angle { return c.l }
 func (c Galactic) B() angle.Angle { return c.b }
 
 // Dist returns the distance of the Galactic coordinate.
-func (c Galactic) Dist() float64 { return c.dist }
+func (c Galactic) Dist() unit.Length { return c.dist }
 
 // SetL sets the longitude of the Galactic coordinate.
 func (c *Galactic) SetL(a angle.Angle) { c.l = a }
@@ -293,7 +309,7 @@ func (c *Galactic) SetL(a angle.Angle) { c.l = a }
 func (c *Galactic) SetB(a angle.Angle) { c.b = a }
 
 // SetDist sets the distance of the Galactic coordinate.
-func (c *Galactic) SetDist(d float64) { c.dist = d }
+func (c *Galactic) SetDist(d unit.Length) { c.dist = d }
 
 // Lon returns the longitude of the Ecliptic coordinate.
 func (c Ecliptic) Lon() angle.Angle { return c.lon }
@@ -302,7 +318,7 @@ func (c Ecliptic) Lon() angle.Angle { return c.lon }
 func (c Ecliptic) Lat() angle.Angle { return c.lat }
 
 // Dist returns the distance of the Ecliptic coordinate.
-func (c Ecliptic) Dist() float64 { return c.dist }
+func (c Ecliptic) Dist() unit.Length { return c.dist }
 
 // SetLon sets the longitude of the Ecliptic coordinate.
 func (c *Ecliptic) SetLon(a angle.Angle) { c.lon = a }
@@ -311,7 +327,7 @@ func (c *Ecliptic) SetLon(a angle.Angle) { c.lon = a }
 func (c *Ecliptic) SetLat(a angle.Angle) { c.lat = a }
 
 // SetDist sets the distance of the Ecliptic coordinate.
-func (c *Ecliptic) SetDist(d float64) { c.dist = d }
+func (c *Ecliptic) SetDist(d unit.Length) { c.dist = d }
 
 // RA returns the right ascension of the Astrometric coordinate.
 func (c Astrometric) RA() angle.Angle { return c.ra }
@@ -330,7 +346,7 @@ func (c Astrometric) PmDec() angle.Angle { return c.pmDec }
 func (c Astrometric) Parallax() angle.Angle { return c.parallax }
 
 // RV returns the radial velocity of the Astrometric coordinate.
-func (c Astrometric) RV() float64 { return c.rv }
+func (c Astrometric) RV() unit.Velocity { return c.rv }
 
 // SetRA sets the right ascension of the Astrometric coordinate.
 func (c *Astrometric) SetRA(a angle.Angle) { c.ra = a }
@@ -345,7 +361,7 @@ func (c *Astrometric) SetProperMotion(pmRA, pmDec angle.Angle) { c.pmRA = pmRA; 
 func (c *Astrometric) SetParallax(a angle.Angle) { c.parallax = a }
 
 // SetRV sets the radial velocity of the Astrometric coordinate.
-func (c *Astrometric) SetRV(v float64) { c.rv = v }
+func (c *Astrometric) SetRV(v unit.Velocity) { c.rv = v }
 
 // RA returns the right ascension of the CIRS coordinate.
 func (c CIRS) RA() angle.Angle { return c.ra }
@@ -366,7 +382,7 @@ func (c ObserversLocation) Lon() angle.Angle { return c.lon }
 func (c ObserversLocation) Lat() angle.Angle { return c.lat }
 
 // Height returns the height of the ObserversLocation coordinate.
-func (c ObserversLocation) Height() float64 { return c.height }
+func (c ObserversLocation) Height() unit.Length { return c.height }
 
 // SetLon sets the longitude of the ObserversLocation coordinate.
 func (c *ObserversLocation) SetLon(a angle.Angle) { c.lon = a }
@@ -375,7 +391,7 @@ func (c *ObserversLocation) SetLon(a angle.Angle) { c.lon = a }
 func (c *ObserversLocation) SetLat(a angle.Angle) { c.lat = a }
 
 // SetHeight sets the height of the ObserversLocation coordinate.
-func (c *ObserversLocation) SetHeight(h float64) { c.height = h }
+func (c *ObserversLocation) SetHeight(h unit.Length) { c.height = h }
 
 // ── Names ─────────────────────────────────────────────────────────────────────
 
@@ -572,7 +588,7 @@ func (c CIRS) Equal(other CIRS) bool {
 func (c ObserversLocation) Equal(other ObserversLocation) bool {
 	return math.Abs(c.lon.Radians()-other.lon.Radians()) < coordTol &&
 		math.Abs(c.lat.Radians()-other.lat.Radians()) < coordTol &&
-		math.Abs(c.height-other.height) < coordTol
+		math.Abs(c.height.Meters()-other.height.Meters()) < coordTol
 }
 
 // ── Formatting ────────────────────────────────────────────────────────────────
@@ -665,7 +681,7 @@ func PropagateEpoch(c ICRS, fromEpoch, toEpoch time.Time) (ICRS, error) {
 	ra2, dec2, pmr2, pmd2, px2, rv2, status := gofaext.Pmsafe(
 		c.RA().Radians(), c.Dec().Radians(),
 		dRAdt(c.PmRA(), c.Dec()), c.PmDec().Radians(),
-		c.Parallax().Arcseconds(), c.RV(),
+		c.Parallax().Arcseconds(), c.RV().KmPerSec(),
 		ep1a, ep1b, ep2a, ep2b,
 	)
 	if status < 0 {
@@ -677,7 +693,7 @@ func PropagateEpoch(c ICRS, fromEpoch, toEpoch time.Time) (ICRS, error) {
 	out := NewICRSWithKinematics(
 		angle.Rad(ra2), angle.Rad(dec2),
 		pmRACosDec(pmr2, angle.Rad(dec2)), angle.Rad(pmd2),
-		angle.Arcsec(px2), rv2,
+		angle.Arcsec(px2), unit.KmPerSec(rv2),
 	)
 	out.SetDist(c.Dist())
 

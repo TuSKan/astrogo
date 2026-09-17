@@ -125,7 +125,7 @@ func TestMPCObservatoriesParsesTheWholeRegister(t *testing.T) {
 		lo := deepest - slack*obs.ResolutionM
 		hi := highest + slack*obs.ResolutionM
 
-		if h := obs.Location.Height(); h < lo || h > hi {
+		if h := obs.Location.Height().Meters(); h < lo || h > hi {
 			t.Errorf("%s %s: height %.0f m outside [%.0f, %.0f] — %.0f m of sea-level "+
 				"band plus %gx this row's own +/-%.0f m resolution",
 				obs.Code, obs.Name, h, lo, hi, highest-deepest, slack, obs.ResolutionM)

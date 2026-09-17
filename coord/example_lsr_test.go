@@ -20,11 +20,11 @@ func ExampleLSRCorrection() {
 	// Both measured at rest against the barycentre.
 	const rvBarycentric = 0.0
 
-	fmt.Printf("solar motion:       %.2f km/s\n", speed)
+	fmt.Printf("solar motion:       %.2f km/s\n", speed.KmPerSec())
 	fmt.Printf("toward the apex:    %+.2f km/s\n",
-		rvBarycentric+coord.LSRCorrection(toward, coord.LSRDynamical))
+		rvBarycentric+coord.LSRCorrection(toward, coord.LSRDynamical).KmPerSec())
 	fmt.Printf("away from it:       %+.2f km/s\n",
-		rvBarycentric+coord.LSRCorrection(away, coord.LSRDynamical))
+		rvBarycentric+coord.LSRCorrection(away, coord.LSRDynamical).KmPerSec())
 
 	// Output:
 	// solar motion:       18.04 km/s
@@ -38,7 +38,7 @@ func ExampleLSRCorrection_conventions() {
 	target := coord.NewICRS(angle.Deg(266.4), angle.Deg(-29.0)) // the Galactic centre
 
 	for _, kind := range []coord.LSRKind{coord.LSRDynamical, coord.LSRDelhaye} {
-		fmt.Printf("%-22s %+.3f km/s\n", kind, coord.LSRCorrection(target, kind))
+		fmt.Printf("%-22s %+.3f km/s\n", kind, coord.LSRCorrection(target, kind).KmPerSec())
 	}
 
 	// This direction is the one where the answer can be read straight off the

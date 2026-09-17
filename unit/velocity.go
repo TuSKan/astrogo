@@ -40,6 +40,13 @@ var (
 // velocity stays a Vec3 with its unit documented. What this types is every
 // place a single number crosses an API boundary — a radial velocity, a speed,
 // a correction to add to one — which is where the confusion actually was.
+//
+// # What this does not catch
+//
+// The same gap [Length] documents, and it bites harder here, because the unit
+// a caller writes a radial velocity in is never the stored one: `rv: -7.6`
+// compiles and means −7.6 m/s, not the −7.6 km/s every catalogue publishes.
+// Write [KmPerSec] around a literal.
 type Velocity float64
 
 // MetersPerSec builds a Velocity from a value in meters per second.

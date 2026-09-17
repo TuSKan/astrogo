@@ -10,6 +10,7 @@ import (
 	"github.com/TuSKan/astrogo/internal/gofaext"
 	"github.com/TuSKan/astrogo/internal/metrology"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // TestTopocentricPathIsSOFAsAtco13 pins astrogo's two-step topocentric
@@ -173,7 +174,7 @@ func TestTopocentricPathIsSOFAsAtco13(t *testing.T) {
 	collapsed := metrology.NewSuite("coord.topocentric.vs_sofa.collapsed", ref, contract)
 
 	for _, s := range sites {
-		site, err := coord.NewGeodetic(angle.Deg(s.lon), angle.Deg(s.lat), s.heightM)
+		site, err := coord.NewGeodetic(angle.Deg(s.lon), angle.Deg(s.lat), unit.Meters(s.heightM))
 		if err != nil {
 			t.Fatalf("%s: NewGeodetic: %v", s.name, err)
 		}
@@ -193,7 +194,7 @@ func TestTopocentricPathIsSOFAsAtco13(t *testing.T) {
 					ra.Radians(), dec.Radians(),
 					0, 0, 0, 0,
 					utc1, utc2, dut1Seconds,
-					site.Lon().Radians(), site.Lat().Radians(), site.Height(),
+					site.Lon().Radians(), site.Lat().Radians(), site.Height().Meters(),
 					angle.Arcsec(xpArcsec).Radians(), angle.Arcsec(ypArcsec).Radians(),
 					0, atm.Temperature, atm.Humidity, atm.Wavelength,
 				)

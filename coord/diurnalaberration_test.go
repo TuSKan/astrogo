@@ -10,6 +10,7 @@ import (
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/internal/gofaext"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 	"github.com/TuSKan/astrogo/vector"
 )
 
@@ -113,13 +114,13 @@ func TestGeocentricToObservedAppliesDiurnalAberration(t *testing.T) {
 	east := coord.NewAltAz(angle.Zero(), angle.Deg(90))
 
 	for _, s := range diurnalSites {
-		site, err := coord.NewGeodetic(angle.Deg(s.lon), angle.Deg(s.lat), s.heightM)
+		site, err := coord.NewGeodetic(angle.Deg(s.lon), angle.Deg(s.lat), unit.Meters(s.heightM))
 		if err != nil {
 			t.Fatalf("%s: NewGeodetic: %v", s.name, err)
 		}
 
 		ctx := coord.NewContext(diurnalEpoch, site, atm)
-		diurabArcsec := expectedDiurnalArcsec(site.Lat().Radians(), site.Height())
+		diurabArcsec := expectedDiurnalArcsec(site.Lat().Radians(), site.Height().Meters())
 
 		var worstAgainstSOFA, worstShift float64
 
@@ -129,7 +130,7 @@ func TestGeocentricToObservedAppliesDiurnalAberration(t *testing.T) {
 			aob, zob, _, _, _ := gofaext.Atio13(
 				ri, di,
 				utc1, utc2, dut1Seconds,
-				site.Lon().Radians(), site.Lat().Radians(), site.Height(),
+				site.Lon().Radians(), site.Lat().Radians(), site.Height().Meters(),
 				xp, yp,
 				0, atm.Temperature, atm.Humidity, atm.Wavelength,
 			)

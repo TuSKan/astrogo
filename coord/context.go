@@ -81,7 +81,7 @@ func NewContext(t time.Time, site *Geodetic, atm atmosphere.Refraction) *Context
 	// unreachable. See [Context.CIRSToTETE].
 	astrom, eo := gofaext.Apco13(
 		jd1, jd2, eop.DUT1,
-		site.Lon().Radians(), site.Lat().Radians(), site.Height(),
+		site.Lon().Radians(), site.Lat().Radians(), site.Height().Meters(),
 		eop.XP, eop.YP,
 		p, atm.Temperature, atm.Humidity, atm.Wavelength,
 	)
@@ -102,14 +102,14 @@ func NewContext(t time.Time, site *Geodetic, atm atmosphere.Refraction) *Context
 	sinLat, cosLat := math.Sincos(site.Lat().Radians())
 	sinLon, cosLon := math.Sincos(site.Lon().Radians())
 
-	tirs := tirsVec(sinLat, cosLat, sinLon, cosLon, site.Height())
+	tirs := tirsVec(sinLat, cosLat, sinLon, cosLon, site.Height().Meters())
 	obsVec := icrsFromTIRS(mat, tirs)
 
 	// Diurnal aberration, derived exactly as iauApio does: the horizontal
 	// part of the observer's velocity in the celestial intermediate system,
 	// over c. sp and era0 are already in hand, so this costs one Pvtob.
 	pvob := gofaext.Pvtob(
-		site.Lon().Radians(), site.Lat().Radians(), site.Height(),
+		site.Lon().Radians(), site.Lat().Radians(), site.Height().Meters(),
 		eop.XP, eop.YP, sp, era0,
 	)
 	diurab := math.Hypot(pvob[1][0], pvob[1][1]) / constants.SI2019.SpeedOfLight.Value
@@ -205,7 +205,7 @@ func (ctx *Context) AtTime(t time.Time) *Context {
 	c.t = t
 	gofaext.Aper(era, &c.astrom)
 	c.mat = gofaext.C2tcio(c.rc2i, era, c.rpom)
-	c.obsVec = icrsFromTIRS(c.mat, tirsVec(c.sinLat, c.cosLat, c.sinLon, c.cosLon, c.site.Height()))
+	c.obsVec = icrsFromTIRS(c.mat, tirsVec(c.sinLat, c.cosLat, c.sinLon, c.cosLon, c.site.Height().Meters()))
 
 	return c
 }
@@ -235,7 +235,7 @@ func (ctx *Context) AstrometricToCIRS(c Astrometric) CIRS {
 		c.RA().Radians(), c.Dec().Radians(),
 		// SOFA wants dRA/dt; this package stores the catalogue's on-sky
 		// rate. See [dRAdt].
-		dRAdt(c.PmRA(), c.Dec()), c.PmDec().Radians(), c.Parallax().Radians(), c.RV(),
+		dRAdt(c.PmRA(), c.Dec()), c.PmDec().Radians(), c.Parallax().Radians(), c.RV().KmPerSec(),
 		&ctx.astrom,
 	)
 
@@ -265,7 +265,7 @@ func (ctx *Context) AstrometricToObserved(c Astrometric) AltAz {
 		c.RA().Radians(), c.Dec().Radians(),
 		// SOFA wants dRA/dt; this package stores the catalogue's on-sky
 		// rate. See [dRAdt].
-		dRAdt(c.PmRA(), c.Dec()), c.PmDec().Radians(), c.Parallax().Radians(), c.RV(),
+		dRAdt(c.PmRA(), c.Dec()), c.PmDec().Radians(), c.Parallax().Radians(), c.RV().KmPerSec(),
 		&ctx.astrom,
 	)
 
@@ -438,7 +438,7 @@ func (ctx *Context) ICRSToHourAngle(c ICRS) (angle.Angle, error) {
 		c.RA().Radians(), c.Dec().Radians(),
 		// SOFA wants dRA/dt; this package stores the catalogue's on-sky
 		// rate. See [dRAdt].
-		dRAdt(c.PmRA(), c.Dec()), c.PmDec().Radians(), c.Parallax().Radians(), c.RV(),
+		dRAdt(c.PmRA(), c.Dec()), c.PmDec().Radians(), c.Parallax().Radians(), c.RV().KmPerSec(),
 		&ctx.astrom,
 	)
 
@@ -464,7 +464,7 @@ func (ctx *Context) AltAzToICRS(c AltAz) (ICRS, error) {
 		"A",
 		c.Az().Radians(), math.Pi/2-geomAlt.Radians(),
 		jd1, jd2, ctx.eop.DUT1,
-		ctx.site.Lon().Radians(), ctx.site.Lat().Radians(), ctx.site.Height(),
+		ctx.site.Lon().Radians(), ctx.site.Lat().Radians(), ctx.site.Height().Meters(),
 		ctx.eop.XP, ctx.eop.YP,
 		p, ctx.atm.Temperature, ctx.atm.Humidity, ctx.atm.Wavelength,
 	)

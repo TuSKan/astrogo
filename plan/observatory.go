@@ -442,7 +442,7 @@ func (s *Site) Longitude() angle.Angle { return s.location.Lon() }
 func (s *Site) Latitude() angle.Angle { return s.location.Lat() }
 
 // HeightMeters returns the site's height above the reference ellipsoid in meters.
-func (s *Site) HeightMeters() float64 { return s.location.Height() }
+func (s *Site) HeightMeters() float64 { return s.location.Height().Meters() }
 
 // Refraction returns a refraction profile adjusted for the site's elevation
 // using the ICAO International Standard Atmosphere barometric formula.
@@ -454,13 +454,13 @@ func (s *Site) HeightMeters() float64 { return s.location.Height() }
 // refraction-input struct, never the package's richer atmospheric-state
 // type, so the new name matches what it actually returns.
 func (s *Site) Refraction() atmosphere.Refraction {
-	return atmosphere.AtAltitude(s.location.Height())
+	return atmosphere.AtAltitude(s.location.Height().Meters())
 }
 
 // HorizonDip returns the geometric dip angle of the visible horizon at this
 // site's elevation. At sea level the dip is zero; at 786 m it is ≈ 0.90°.
 func (s *Site) HorizonDip() angle.Angle {
-	return atmosphere.HorizonDip(s.location.Height())
+	return atmosphere.HorizonDip(s.location.Height().Meters())
 }
 
 // RiseSetThreshold returns the standard rise/set altitude threshold for a
@@ -550,7 +550,7 @@ func (s *Site) Equal(other *Site) bool {
 	return s.name == other.name &&
 		math.Abs(s.location.Lon().Radians()-other.location.Lon().Radians()) < eps &&
 		math.Abs(s.location.Lat().Radians()-other.location.Lat().Radians()) < eps &&
-		math.Abs(s.location.Height()-other.location.Height()) < eps &&
+		math.Abs(s.location.Height().Meters()-other.location.Height().Meters()) < eps &&
 		math.Abs(s.horizon.Radians()-other.horizon.Radians()) < eps &&
 		tzEqual
 }

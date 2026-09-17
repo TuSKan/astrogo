@@ -5,6 +5,7 @@ import (
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // Proper motion is an angular rate and radial velocity is a linear one, so
@@ -16,7 +17,7 @@ func ExampleSpaceVelocity() {
 	star := coord.NewICRSWithKinematics(
 		angle.Deg(269.452), angle.Deg(4.693),
 		angle.Arcsec(-0.79847), angle.Arcsec(10.33777),
-		angle.Arcsec(0.54698), -110.6,
+		angle.Arcsec(0.54698), unit.KmPerSec(-110.6),
 	)
 
 	v, ok := coord.SpaceVelocity(star)
@@ -51,7 +52,7 @@ func ExampleSpaceVelocity_withoutAParallax() {
 	// of the pre-Hipparcos ones.
 	star := coord.NewICRSWithKinematics(
 		angle.Deg(123.4), angle.Deg(-35.6),
-		angle.Arcsec(0.150), angle.Arcsec(0.220), 0, -22.4,
+		angle.Arcsec(0.150), angle.Arcsec(0.220), 0, unit.KmPerSec(-22.4),
 	)
 
 	if _, ok := coord.SpaceVelocity(star); !ok {

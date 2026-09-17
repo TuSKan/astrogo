@@ -8,6 +8,7 @@ import (
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 func TestValidation(t *testing.T) {
@@ -210,37 +211,37 @@ func TestSetters(t *testing.T) {
 	ic := coord.NewICRS(angle.Deg(10), angle.Deg(20))
 	ic.SetRA(angle.Deg(30))
 	ic.SetDec(angle.Deg(40))
-	ic.SetDist(5.0)
+	ic.SetDist(unit.AU(5.0))
 	testutil.AssertNear(t, "ICRS RA", ic.RA().Degrees(), 30.0, 1e-10)
 	testutil.AssertNear(t, "ICRS Dec", ic.Dec().Degrees(), 40.0, 1e-10)
-	testutil.AssertNear(t, "ICRS Dist", ic.Dist(), 5.0, 1e-10)
+	testutil.AssertNear(t, "ICRS Dist", ic.Dist().AU(), 5.0, 1e-10)
 
 	// AltAz
 	aa := coord.NewAltAz(angle.Deg(10), angle.Deg(20))
 	aa.SetAlt(angle.Deg(30))
 	aa.SetAz(angle.Deg(40))
-	aa.SetDist(6.0)
+	aa.SetDist(unit.AU(6.0))
 	testutil.AssertNear(t, "AltAz Alt", aa.Alt().Degrees(), 30.0, 1e-10)
 	testutil.AssertNear(t, "AltAz Az", aa.Az().Degrees(), 40.0, 1e-10)
-	testutil.AssertNear(t, "AltAz Dist", aa.Dist(), 6.0, 1e-10)
+	testutil.AssertNear(t, "AltAz Dist", aa.Dist().AU(), 6.0, 1e-10)
 
 	// Galactic
 	gc := coord.NewGalactic(angle.Deg(10), angle.Deg(20))
 	gc.SetL(angle.Deg(30))
 	gc.SetB(angle.Deg(40))
-	gc.SetDist(7.0)
+	gc.SetDist(unit.AU(7.0))
 	testutil.AssertNear(t, "Galactic L", gc.L().Degrees(), 30.0, 1e-10)
 	testutil.AssertNear(t, "Galactic B", gc.B().Degrees(), 40.0, 1e-10)
-	testutil.AssertNear(t, "Galactic Dist", gc.Dist(), 7.0, 1e-10)
+	testutil.AssertNear(t, "Galactic Dist", gc.Dist().AU(), 7.0, 1e-10)
 
 	// Ecliptic
 	ec := coord.NewEcliptic(angle.Deg(10), angle.Deg(20))
 	ec.SetLon(angle.Deg(30))
 	ec.SetLat(angle.Deg(40))
-	ec.SetDist(8.0)
+	ec.SetDist(unit.AU(8.0))
 	testutil.AssertNear(t, "Ecliptic Lon", ec.Lon().Degrees(), 30.0, 1e-10)
 	testutil.AssertNear(t, "Ecliptic Lat", ec.Lat().Degrees(), 40.0, 1e-10)
-	testutil.AssertNear(t, "Ecliptic Dist", ec.Dist(), 8.0, 1e-10)
+	testutil.AssertNear(t, "Ecliptic Dist", ec.Dist().AU(), 8.0, 1e-10)
 
 	// Astrometric
 	am := coord.NewAstrometric(angle.Deg(10), angle.Deg(20))
@@ -248,13 +249,13 @@ func TestSetters(t *testing.T) {
 	am.SetDec(angle.Deg(40))
 	am.SetProperMotion(angle.Deg(1), angle.Deg(2))
 	am.SetParallax(angle.Deg(0.5))
-	am.SetRV(10.0)
+	am.SetRV(unit.KmPerSec(10.0))
 	testutil.AssertNear(t, "Astrometric RA", am.RA().Degrees(), 30.0, 1e-10)
 	testutil.AssertNear(t, "Astrometric Dec", am.Dec().Degrees(), 40.0, 1e-10)
 	testutil.AssertNear(t, "Astrometric PmRA", am.PmRA().Degrees(), 1.0, 1e-10)
 	testutil.AssertNear(t, "Astrometric PmDec", am.PmDec().Degrees(), 2.0, 1e-10)
 	testutil.AssertNear(t, "Astrometric Parallax", am.Parallax().Degrees(), 0.5, 1e-10)
-	testutil.AssertNear(t, "Astrometric RV", am.RV(), 10.0, 1e-10)
+	testutil.AssertNear(t, "Astrometric RV", am.RV().KmPerSec(), 10.0, 1e-10)
 
 	// Apparent
 	ap := coord.NewCIRS(angle.Deg(10), angle.Deg(20))
@@ -264,13 +265,13 @@ func TestSetters(t *testing.T) {
 	testutil.AssertNear(t, "Apparent Dec", ap.Dec().Degrees(), 40.0, 1e-10)
 
 	// ObserversLocation
-	ol := coord.NewObserversLocation(angle.Deg(10), angle.Deg(20), 100)
+	ol := coord.NewObserversLocation(angle.Deg(10), angle.Deg(20), unit.Meters(100))
 	ol.SetLon(angle.Deg(30))
 	ol.SetLat(angle.Deg(40))
-	ol.SetHeight(200)
+	ol.SetHeight(unit.Meters(200))
 	testutil.AssertNear(t, "ObserversLocation Lon", ol.Lon().Degrees(), 30.0, 1e-10)
 	testutil.AssertNear(t, "ObserversLocation Lat", ol.Lat().Degrees(), 40.0, 1e-10)
-	testutil.AssertNear(t, "ObserversLocation Height", ol.Height(), 200.0, 1e-10)
+	testutil.AssertNear(t, "ObserversLocation Height", ol.Height().Meters(), 200.0, 1e-10)
 }
 
 func TestNames(t *testing.T) {

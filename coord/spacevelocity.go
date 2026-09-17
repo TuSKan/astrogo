@@ -2,6 +2,7 @@ package coord
 
 import (
 	"github.com/TuSKan/astrogo/internal/gofaext"
+	"github.com/TuSKan/astrogo/unit"
 	"github.com/TuSKan/astrogo/vector"
 )
 
@@ -65,7 +66,7 @@ func SpaceVelocity(c ICRS) (v vector.Vec3, ok bool) {
 	pv, status := gofaext.Starpv(
 		c.ra.Radians(), c.dec.Radians(),
 		dRAdt(c.pmRA, c.dec), c.pmDec.Radians(),
-		c.parallax.Arcseconds(), c.rv,
+		c.parallax.Arcseconds(), c.rv.KmPerSec(),
 	)
 	if status != 0 {
 		return vector.Zero(), false
@@ -79,19 +80,19 @@ func SpaceVelocity(c ICRS) (v vector.Vec3, ok bool) {
 // of the Julian day SOFA's velocities are per.
 const secondsPerDay = 86400.0
 
-// SpaceSpeed returns the magnitude of [SpaceVelocity], in km/s, with the same
-// meaning for the bool.
+// SpaceSpeed returns the magnitude of [SpaceVelocity], with the same meaning
+// for the bool.
 //
 // It exists because the magnitude is the quantity most often wanted — a halo
 // star is identified by a few hundred km/s and a disc star by a few tens —
 // and because taking it from the vector by hand invites the mistake of adding
 // the radial velocity to it in quadrature a second time, which double-counts
 // the component already inside.
-func SpaceSpeed(c ICRS) (float64, bool) {
+func SpaceSpeed(c ICRS) (unit.Velocity, bool) {
 	v, ok := SpaceVelocity(c)
 	if !ok {
 		return 0, false
 	}
 
-	return v.Norm(), true
+	return unit.KmPerSec(v.Norm()), true
 }

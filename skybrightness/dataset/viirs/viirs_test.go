@@ -212,10 +212,12 @@ func TestEmittersPlacement(t *testing.T) {
 	}
 
 	for i, e := range emitters {
-		d, err := coord.GroundDistance(site, e.Location())
+		dist, err := coord.GroundDistance(site, e.Location())
 		if err != nil {
 			t.Fatalf("GroundDistance: %v", err)
 		}
+
+		d := dist.Meters()
 
 		if d < inner || d > outer {
 			t.Errorf("emitter %d at %.0f m is outside [%v, %v]", i, d, inner, outer)

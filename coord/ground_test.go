@@ -7,6 +7,7 @@ import (
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 func geo(t *testing.T, lonDeg, latDeg float64) *coord.Geodetic {
@@ -33,8 +34,8 @@ func TestGroundDistanceOneDegreeLatitude(t *testing.T) {
 
 	const want = 111195.0 // metres, pi/180 * mean radius
 
-	if rel := math.Abs(d-want) / want; rel > 1e-3 {
-		t.Errorf("one degree of latitude = %.1f m, want ~%.0f m", d, want)
+	if rel := math.Abs(d.Meters()-want) / want; rel > 1e-3 {
+		t.Errorf("one degree of latitude = %.1f m, want ~%.0f m", d.Meters(), want)
 	}
 }
 
@@ -50,8 +51,8 @@ func TestGroundDistancePoleToEquator(t *testing.T) {
 
 	want := math.Pi / 2 * 6371008.8
 
-	if rel := math.Abs(d-want) / want; rel > 1e-9 {
-		t.Errorf("pole to equator = %.1f m, want %.1f m", d, want)
+	if rel := math.Abs(d.Meters()-want) / want; rel > 1e-9 {
+		t.Errorf("pole to equator = %.1f m, want %.1f m", d.Meters(), want)
 	}
 }
 
@@ -70,8 +71,9 @@ func TestGroundDistanceAcrossDateLine(t *testing.T) {
 		t.Fatalf("GroundDistance: %v", err)
 	}
 
-	if rel := math.Abs(across-same) / same; rel > 1e-9 {
-		t.Errorf("one degree across the date line = %.1f m, want the same as elsewhere %.1f m", across, same)
+	if rel := math.Abs(across.Meters()-same.Meters()) / same.Meters(); rel > 1e-9 {
+		t.Errorf("one degree across the date line = %.1f m, want the same as elsewhere %.1f m",
+			across.Meters(), same.Meters())
 	}
 }
 
@@ -89,8 +91,8 @@ func TestGroundDistanceShortBaseline(t *testing.T) {
 
 	want := 1e-5 * math.Pi / 180 * 6371008.8
 
-	if rel := math.Abs(d-want) / want; rel > 1e-6 {
-		t.Errorf("short baseline = %.6f m, want %.6f m", d, want)
+	if rel := math.Abs(d.Meters()-want) / want; rel > 1e-6 {
+		t.Errorf("short baseline = %.6f m, want %.6f m", d.Meters(), want)
 	}
 }
 
@@ -109,7 +111,7 @@ func TestGroundDistanceIsSymmetricAndZero(t *testing.T) {
 		t.Fatalf("GroundDistance: %v", err)
 	}
 
-	if math.Abs(ab-ba) > 1e-9 {
+	if math.Abs(ab.Meters()-ba.Meters()) > 1e-9 {
 		t.Errorf("distance is not symmetric: %v vs %v", ab, ba)
 	}
 
@@ -183,7 +185,7 @@ func TestOffsetRoundTrip(t *testing.T) {
 	}{
 		{0, 1000}, {90, 50_000}, {180, 250_000}, {270, 10}, {45, 1_000_000},
 	} {
-		end, err := coord.Offset(start, angle.Deg(tc.bearing), tc.distance)
+		end, err := coord.Offset(start, angle.Deg(tc.bearing), unit.Meters(tc.distance))
 		if err != nil {
 			t.Fatalf("Offset(%v deg, %v m): %v", tc.bearing, tc.distance, err)
 		}
@@ -193,8 +195,8 @@ func TestOffsetRoundTrip(t *testing.T) {
 			t.Fatalf("GroundDistance: %v", err)
 		}
 
-		if rel := math.Abs(d-tc.distance) / tc.distance; rel > 1e-9 {
-			t.Errorf("bearing %v: travelled %.4f m, want %.4f", tc.bearing, d, tc.distance)
+		if rel := math.Abs(d.Meters()-tc.distance) / tc.distance; rel > 1e-9 {
+			t.Errorf("bearing %v: travelled %.4f m, want %.4f", tc.bearing, d.Meters(), tc.distance)
 		}
 
 		b, err := coord.InitialBearing(start, end)
@@ -254,8 +256,8 @@ func TestOffsetWrapsDateLine(t *testing.T) {
 		t.Fatalf("GroundDistance: %v", err)
 	}
 
-	if math.Abs(d-50_000) > 1 {
-		t.Errorf("distance across the date line = %v m, want 50000", d)
+	if math.Abs(d.Meters()-50_000) > 1 {
+		t.Errorf("distance across the date line = %v m, want 50000", d.Meters())
 	}
 }
 

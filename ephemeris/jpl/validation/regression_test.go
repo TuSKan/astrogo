@@ -12,6 +12,7 @@ import (
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/internal/metrology"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 	"github.com/TuSKan/astrogo/vector"
 )
 
@@ -137,7 +138,7 @@ func TestScientificStability(t *testing.T) {
 			t.Fatalf("%s: %v", e.key(), err)
 		}
 
-		site, err := coord.NewGeodetic(angle.Deg(cs.Lon), angle.Deg(cs.Lat), cs.Height)
+		site, err := coord.NewGeodetic(angle.Deg(cs.Lon), angle.Deg(cs.Lat), unit.Meters(cs.Height))
 		if err != nil {
 			t.Fatalf("%s: %v", cs.Name, err)
 		}

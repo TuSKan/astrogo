@@ -8,6 +8,7 @@ import (
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/ephemeris/satellite"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // TestLookAngleUsesTheContextItIsGiven pins that the Context parameter is the
@@ -72,16 +73,16 @@ func TestLookAngleUsesTheContextItIsGiven(t *testing.T) {
 		const kmPerAU = 149597870.7
 
 		wantDist := st.Pos.Sub(derived.ObsVec()).Norm() * kmPerAU
-		if math.Abs(got.Dist()-wantDist) > 1e-9 {
+		if math.Abs(got.Dist().Km()-wantDist) > 1e-9 {
 			t.Errorf("dt=%v: range %.6f km, want %.6f km from this Context's "+
-				"observer vector", dt, got.Dist(), wantDist)
+				"observer vector", dt, got.Dist().Km(), wantDist)
 		}
 
 		// And it is a plausible ISS range, so the test is not comparing two
 		// identically-wrong numbers.
-		if got.Dist() < 300 || got.Dist() > 45000 {
+		if km := got.Dist().Km(); km < 300 || km > 45000 {
 			t.Errorf("dt=%v: range %.1f km is not a plausible ISS topocentric "+
-				"distance", dt, got.Dist())
+				"distance", dt, km)
 		}
 	}
 }
@@ -115,7 +116,7 @@ func TestLookAngleMatchesTheReducerItReplaced(t *testing.T) {
 		}
 
 		reduction := coord.NewReducer(site, at, defaultAtm).Reduce(st.Pos)
-		reduction.Observed.SetDist(reduction.Topocentric.Norm() * kmPerAU)
+		reduction.Observed.SetDist(unit.Km(reduction.Topocentric.Norm() * kmPerAU))
 
 		got, err := LookAngle(sat, 0, ctx)
 		if err != nil {
@@ -129,9 +130,9 @@ func TestLookAngleMatchesTheReducerItReplaced(t *testing.T) {
 				(got.Az() - reduction.Observed.Az()).Arcseconds())
 		}
 
-		if math.Abs(got.Dist()-reduction.Observed.Dist()) > 1e-9 {
+		if (got.Dist() - reduction.Observed.Dist()).Abs() > unit.Meters(1e-6) {
 			t.Errorf("%02d:00 — range drifted: %.9f km", hour,
-				got.Dist()-reduction.Observed.Dist())
+				got.Dist().Km()-reduction.Observed.Dist().Km())
 		}
 	}
 }

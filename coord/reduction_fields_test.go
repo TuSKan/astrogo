@@ -9,6 +9,7 @@ import (
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/internal/gofaext"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 	"github.com/TuSKan/astrogo/vector"
 )
 
@@ -71,14 +72,14 @@ func TestGeometricLeadsTopocentricByTheAberration(t *testing.T) {
 	east := coord.NewAltAz(angle.Zero(), angle.Deg(90))
 
 	for _, s := range diurnalSites {
-		site, err := coord.NewGeodetic(angle.Deg(s.lon), angle.Deg(s.lat), s.heightM)
+		site, err := coord.NewGeodetic(angle.Deg(s.lon), angle.Deg(s.lat), unit.Meters(s.heightM))
 		if err != nil {
 			t.Fatalf("%s: NewGeodetic: %v", s.name, err)
 		}
 
 		ctx := coord.NewContext(epoch, site, atm)
 		reducer := coord.NewReducer(site, epoch, atm)
-		diurabArcsec := expectedDiurnalArcsec(site.Lat().Radians(), site.Height())
+		diurabArcsec := expectedDiurnalArcsec(site.Lat().Radians(), site.Height().Meters())
 
 		var worst float64
 

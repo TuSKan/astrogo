@@ -55,7 +55,7 @@ func corpusSites(t *testing.T) []corpusSite {
 			Name:       site.Name(),
 			Lon:        loc.Lon().Degrees(),
 			Lat:        loc.Lat().Degrees(),
-			Height:     loc.Height(),
+			Height:     loc.Height().Meters(),
 			Provenance: "plan.KnownSites; published coordinates cross-checked against the IAU MPC observatory code list",
 		})
 	}

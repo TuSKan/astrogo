@@ -8,6 +8,7 @@ import (
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/internal/testutil"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // TestFK4ToICRSAgreesWithSOFAsPublishedVector is the end-to-end check against
@@ -29,7 +30,7 @@ func TestFK4ToICRSAgreesWithSOFAsPublishedVector(t *testing.T) {
 		angle.Rad(0.07626899753879587532), angle.Rad(-1.137405378399605780),
 		angle.Rad(sofaPM(0.1973749217849087460e-4, -1.137405378399605780)),
 		angle.Rad(0.5659714913272723189e-5),
-		angle.Arcsec(0.134), 8.7,
+		angle.Arcsec(0.134), unit.KmPerSec(8.7),
 	)
 
 	got := coord.FK4ToICRS(fk4)
@@ -64,7 +65,7 @@ func TestFK4ToICRSAgreesWithSOFAsPublishedVector(t *testing.T) {
 	// perturbs the radial velocity in the sixth decimal (SOFA's own Fk52h
 	// vector takes -7.6 to -7.6000000940000254), and leaves parallax alone.
 	testutil.AssertNear(t, "parallax (arcsec)", got.Parallax().Arcseconds(), 0.1339919950582767871, 1e-9)
-	testutil.AssertNear(t, "radial velocity (km/s)", got.RV(), 8.736999669183529069, 1e-5)
+	testutil.AssertNear(t, "radial velocity (km/s)", got.RV().KmPerSec(), 8.736999669183529069, 1e-5)
 }
 
 // TestFK4ToICRSMovesByPrecession pins the magnitude anyone would notice if
@@ -210,7 +211,7 @@ func TestFK4ProperMotionReportsWhetherItWasRecorded(t *testing.T) {
 
 	pmRA, pmDec, ok := coord.NewFK4WithProperMotion(
 		angle.Hour(1), angle.Deg(2),
-		angle.Arcsec(0.5), angle.Arcsec(-0.25), angle.Arcsec(0.01), 12,
+		angle.Arcsec(0.5), angle.Arcsec(-0.25), angle.Arcsec(0.01), unit.KmPerSec(12),
 	).ProperMotion()
 
 	if !ok {
@@ -343,7 +344,7 @@ func TestFK4RoundTripWithKinematicsCloses(t *testing.T) {
 	start := coord.NewFK4WithProperMotion(
 		angle.Rad(0.07626899753879587532), angle.Rad(-1.137405378399605780),
 		angle.Rad(0.1973749217849087460e-4), angle.Rad(0.5659714913272723189e-5),
-		angle.Arcsec(0.134), 8.7,
+		angle.Arcsec(0.134), unit.KmPerSec(8.7),
 	)
 
 	icrs := coord.FK4ToICRS(start)
@@ -383,7 +384,7 @@ func TestFK4RoundTripWithKinematicsCloses(t *testing.T) {
 	// decimal and the RV in its second — so closure here is a real constraint
 	// rather than two untouched values coming back.
 	testutil.AssertNear(t, "parallax (arcsec)", back.Parallax().Arcseconds(), 0.134, 1e-9)
-	testutil.AssertNear(t, "radial velocity (km/s)", back.RV(), 8.7, 1e-6)
+	testutil.AssertNear(t, "radial velocity (km/s)", back.RV().KmPerSec(), 8.7, 1e-6)
 }
 
 // TestFK4CarriesTheKinematicsItWasGiven covers the accessors that carry the
@@ -396,11 +397,11 @@ func TestFK4CarriesTheKinematicsItWasGiven(t *testing.T) {
 	c := coord.NewFK4WithProperMotion(
 		angle.Hour(6), angle.Deg(-16),
 		angle.Arcsec(-0.546), angle.Arcsec(-1.223),
-		angle.Arcsec(0.379), -7.6,
+		angle.Arcsec(0.379), unit.KmPerSec(-7.6),
 	)
 
 	testutil.AssertNear(t, "parallax (arcsec)", c.Parallax().Arcseconds(), 0.379, 1e-12)
-	testutil.AssertNear(t, "radial velocity (km/s)", c.RV(), -7.6, 1e-12)
+	testutil.AssertNear(t, "radial velocity (km/s)", c.RV().KmPerSec(), -7.6, 1e-12)
 
 	// And a position-only FK4 reports neither, rather than a plausible zero
 	// that a caller could mistake for a measurement of zero.
@@ -428,7 +429,7 @@ func TestFK4ToFK5MatchesSOFAExactly(t *testing.T) {
 		angle.Rad(0.07626899753879587532), angle.Rad(-1.137405378399605780),
 		angle.Rad(sofaPM(0.1973749217849087460e-4, -1.137405378399605780)),
 		angle.Rad(0.5659714913272723189e-5),
-		angle.Arcsec(0.134), 8.7,
+		angle.Arcsec(0.134), unit.KmPerSec(8.7),
 	)
 
 	got := coord.FK4ToFK5(src)
@@ -444,7 +445,7 @@ func TestFK4ToFK5MatchesSOFAExactly(t *testing.T) {
 		sofaPM(0.1953670614474396139e-4, -1.132279113042091895), 1e-17)
 	testutil.AssertNear(t, "pmDec (rad/yr)", pmDec.Radians(), 0.5637686678659640164e-5, 1e-18)
 	testutil.AssertNear(t, "parallax (arcsec)", got.Parallax().Arcseconds(), 0.1339919950582767871, 1e-13)
-	testutil.AssertNear(t, "radial velocity (km/s)", got.RV(), 8.736999669183529069, 1e-12)
+	testutil.AssertNear(t, "radial velocity (km/s)", got.RV().KmPerSec(), 8.736999669183529069, 1e-12)
 
 	if got.Epoch() != coord.J2000Epoch {
 		t.Errorf("epoch = %v, want J2000.0 — Fk425 produces J2000 data by definition", got.Epoch())
@@ -484,7 +485,7 @@ func TestFK5ToFK4MatchesSOFAExactly(t *testing.T) {
 		angle.Rad(0.8723503576487275595), angle.Rad(-0.7517076365138887672),
 		angle.Rad(sofaPM(0.2019447755430472323e-4, -0.7517076365138887672)),
 		angle.Rad(0.3541563940505160433e-5),
-		angle.Arcsec(0.1559), 86.87,
+		angle.Arcsec(0.1559), unit.KmPerSec(86.87),
 	)
 
 	got := coord.FK5ToFK4(src, coord.B1950)
@@ -500,7 +501,7 @@ func TestFK5ToFK4MatchesSOFAExactly(t *testing.T) {
 		sofaPM(0.2023628192747172486e-4, -0.7550281733160843059), 1e-17)
 	testutil.AssertNear(t, "pmDec (rad/yr)", pmDec.Radians(), 0.3624459754935334718e-5, 1e-18)
 	testutil.AssertNear(t, "parallax (arcsec)", got.Parallax().Arcseconds(), 0.1560079963299390241, 1e-13)
-	testutil.AssertNear(t, "radial velocity (km/s)", got.RV(), 86.79606353469163751, 1e-11)
+	testutil.AssertNear(t, "radial velocity (km/s)", got.RV().KmPerSec(), 86.79606353469163751, 1e-11)
 }
 
 // TestFK5ToFK4PositionOnlyMatchesSOFA checks the direction that does hand back
@@ -548,7 +549,7 @@ func TestFK4ToICRSIsItsTwoLegs(t *testing.T) {
 		coord.NewFK4WithProperMotion(
 			angle.Rad(0.07626899753879587532), angle.Rad(-1.137405378399605780),
 			angle.Rad(0.1973749217849087460e-4), angle.Rad(0.5659714913272723189e-5),
-			angle.Arcsec(0.134), 8.7),
+			angle.Arcsec(0.134), unit.KmPerSec(8.7)),
 	} {
 		direct := coord.FK4ToICRS(src)
 		legs := coord.FK5ToICRS(coord.FK4ToFK5(src))

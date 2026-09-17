@@ -11,6 +11,7 @@ import (
 	"github.com/TuSKan/astrogo/ephemeris/satellite/sgp4"
 	"github.com/TuSKan/astrogo/internal/gofaext"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 	"github.com/TuSKan/astrogo/vector"
 )
 
@@ -166,15 +167,15 @@ func (s *Satellite) OrbitalPeriod() float64 {
 	return 1440.0 / s.MeanMotion // minutes
 }
 
-// Altitude returns the precise altitude above the WGS84 ellipsoid at time t, in kilometres.
+// Altitude returns the precise altitude above the WGS84 ellipsoid at time t.
 // This uses the sub-satellite geodetic computation for WGS84-precise values.
-func (s *Satellite) Altitude(t time.Time) (float64, error) {
+func (s *Satellite) Altitude(t time.Time) (unit.Length, error) {
 	geo, err := s.subSatellitePoint(t)
 	if err != nil {
 		return 0, err
 	}
 
-	return geo.Height() / 1e3, nil // metres → km
+	return geo.Height(), nil
 }
 
 // ValidateTLE reports whether the two lines form a well-formed element set.

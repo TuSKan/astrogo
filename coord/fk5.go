@@ -6,6 +6,7 @@ import (
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/internal/gofaext"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // FK5 is a position in the FK5 system, the fundamental catalogue the IAU used
@@ -40,7 +41,7 @@ type FK5 struct {
 	ra, dec         angle.Angle
 	pmRA, pmDec     angle.Angle // mu_alpha* and mu_dec per Julian year; zero when hasProperMotion is false
 	parallax        angle.Angle
-	rv              float64 // km/s
+	rv              unit.Velocity
 	jepoch          float64 // Julian epoch of observation, e.g. 2000.0
 	hasProperMotion bool
 
@@ -86,7 +87,7 @@ func NewFK5(ra, dec angle.Angle, jepoch float64) FK5 {
 // else to go on — see [NewFK5].
 //
 // Use this only for a genuinely measured proper motion. See [NewFK5].
-func NewFK5WithProperMotion(ra, dec, pmRA, pmDec, parallax angle.Angle, rv float64) FK5 {
+func NewFK5WithProperMotion(ra, dec, pmRA, pmDec, parallax angle.Angle, rv unit.Velocity) FK5 {
 	return FK5{
 		ra: ra, dec: dec,
 		pmRA: pmRA, pmDec: pmDec,
@@ -118,8 +119,8 @@ func (c FK5) ProperMotion() (pmRA, pmDec angle.Angle, ok bool) {
 // Parallax returns the recorded annual parallax.
 func (c FK5) Parallax() angle.Angle { return c.parallax }
 
-// RV returns the recorded radial velocity in km/s.
-func (c FK5) RV() float64 { return c.rv }
+// RV returns the recorded radial velocity.
+func (c FK5) RV() unit.Velocity { return c.rv }
 
 // Epoch returns the Julian epoch of observation.
 func (c FK5) Epoch() float64 { return c.jepoch }
@@ -160,13 +161,13 @@ func FK5ToICRS(c FK5) ICRS {
 	rh, dh, drh, ddh, pxh, rvh := gofaext.Fk52h(
 		c.ra.Radians(), c.dec.Radians(),
 		dRAdt(c.pmRA, c.dec), c.pmDec.Radians(),
-		c.parallax.Arcseconds(), c.rv,
+		c.parallax.Arcseconds(), c.rv.KmPerSec(),
 	)
 
 	return NewICRSWithKinematics(
 		angle.Rad(rh).Wrap360(), angle.Rad(dh),
 		pmRACosDec(drh, angle.Rad(dh)), angle.Rad(ddh),
-		angle.Arcsec(pxh), rvh,
+		angle.Arcsec(pxh), unit.KmPerSec(rvh),
 	)
 }
 
@@ -216,13 +217,13 @@ func ICRSToFK5(c ICRS, jepoch float64) FK5 {
 	r5, d5, dr5, dd5, px5, rv5 := gofaext.H2fk5(
 		c.RA().Radians(), c.Dec().Radians(),
 		dRAdt(c.PmRA(), c.Dec()), c.PmDec().Radians(),
-		c.Parallax().Arcseconds(), c.RV(),
+		c.Parallax().Arcseconds(), c.RV().KmPerSec(),
 	)
 
 	return FK5{
 		ra: angle.Rad(r5).Wrap360(), dec: angle.Rad(d5),
 		pmRA: pmRACosDec(dr5, angle.Rad(d5)), pmDec: angle.Rad(dd5),
-		parallax: angle.Arcsec(px5), rv: rv5,
+		parallax: angle.Arcsec(px5), rv: unit.KmPerSec(rv5),
 		// J2000Epoch rather than jepoch: H2fk5 answers at the catalogue equinox
 		// and takes no date, so echoing the caller's would label these numbers
 		// with an epoch they are not at. See this function's doc comment.

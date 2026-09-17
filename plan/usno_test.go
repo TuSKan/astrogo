@@ -27,6 +27,7 @@ import (
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/plan"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // ── USNO API Types ───────────────────────────────────────────────────────────
@@ -399,7 +400,7 @@ func TestUSNO_SunMoonOneDay(t *testing.T) {
 					t.Fatalf("Failed to load timezone: %v", err)
 				}
 
-				geodetic, err := coord.NewGeodetic(angle.Deg(loc.Lon), angle.Deg(loc.Lat), loc.Height)
+				geodetic, err := coord.NewGeodetic(angle.Deg(loc.Lon), angle.Deg(loc.Lat), unit.Meters(loc.Height))
 				if err != nil {
 					t.Fatalf("Failed to create geodetic: %v", err)
 				}
@@ -624,7 +625,7 @@ func TestUSNO_CelNav(t *testing.T) {
 				angle.Arcsec(-0.54601),
 				angle.Arcsec(-1.22307),
 				angle.Arcsec(0.37921),
-				-5.5,
+				unit.KmPerSec(-5.5),
 			)
 			aa, _ := ctx.ICRSToAltAz(sirius)
 
@@ -1099,7 +1100,7 @@ func TestUSNO_PolarSun(t *testing.T) {
 
 			// Even for locations with a named timezone, we use UTC for the
 			// computation interval to match the USNO query (tz=0).
-			geodetic, err := coord.NewGeodetic(angle.Deg(loc.Lon), angle.Deg(loc.Lat), loc.Height)
+			geodetic, err := coord.NewGeodetic(angle.Deg(loc.Lon), angle.Deg(loc.Lat), unit.Meters(loc.Height))
 			if err != nil {
 				t.Fatalf("Failed to create geodetic: %v", err)
 			}
@@ -1242,7 +1243,7 @@ func TestUSNO_HighAltitude(t *testing.T) {
 			geodetic0, _ := coord.NewGeodetic(angle.Deg(loc.Lon), angle.Deg(loc.Lat), 0)
 			site0, _ := plan.NewSite(loc.Name+" (0m)", geodetic0, plan.WithTimeZone(tz))
 
-			geodetic, _ := coord.NewGeodetic(angle.Deg(loc.Lon), angle.Deg(loc.Lat), loc.Height)
+			geodetic, _ := coord.NewGeodetic(angle.Deg(loc.Lon), angle.Deg(loc.Lat), unit.Meters(loc.Height))
 			site, _ := plan.NewSite(loc.Name+" (8849m)", geodetic, plan.WithTimeZone(tz))
 
 			t.Logf("Horizon dip (8849m): %.4f°", site.HorizonDip().Degrees())
@@ -1458,7 +1459,7 @@ func TestUSNO_Equator(t *testing.T) {
 				t.Fatalf("parsing the fixture date: %v", err)
 			}
 
-			geodetic, err := coord.NewGeodetic(angle.Deg(loc.Lon), angle.Deg(loc.Lat), loc.Height)
+			geodetic, err := coord.NewGeodetic(angle.Deg(loc.Lon), angle.Deg(loc.Lat), unit.Meters(loc.Height))
 			if err != nil {
 				t.Fatalf("Failed to create geodetic: %v", err)
 			}
@@ -1654,7 +1655,7 @@ func TestUSNO_PolarMoon(t *testing.T) {
 				}
 			}
 
-			geodetic, err := coord.NewGeodetic(angle.Deg(loc.Lon), angle.Deg(loc.Lat), loc.Height)
+			geodetic, err := coord.NewGeodetic(angle.Deg(loc.Lon), angle.Deg(loc.Lat), unit.Meters(loc.Height))
 			if err != nil {
 				t.Fatalf("Failed to create geodetic: %v", err)
 			}
@@ -1806,7 +1807,7 @@ func TestUSNO_CelNav_EdgeCases(t *testing.T) {
 			}
 
 			tm := time.Date(y, time.Month(mo), d, h, m, s, 0, time.LocationUTC)
-			geodetic, _ := coord.NewGeodetic(angle.Deg(tc.lon), angle.Deg(tc.lat), tc.height)
+			geodetic, _ := coord.NewGeodetic(angle.Deg(tc.lon), angle.Deg(tc.lat), unit.Meters(tc.height))
 			site, _ := plan.NewSite("test", geodetic, plan.WithTimeZone(time.LocationUTC))
 			ctx := coord.NewContext(tm, site.Location(), site.Refraction())
 
@@ -1904,7 +1905,7 @@ func TestUSNO_AltitudeShift(t *testing.T) {
 
 	for _, ac := range altCases {
 		t.Run(ac.name, func(t *testing.T) {
-			geodetic, err := coord.NewGeodetic(angle.Deg(86.925), angle.Deg(27.9881), ac.height)
+			geodetic, err := coord.NewGeodetic(angle.Deg(86.925), angle.Deg(27.9881), unit.Meters(ac.height))
 			if err != nil {
 				t.Fatalf("Failed to create geodetic: %v", err)
 			}

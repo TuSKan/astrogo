@@ -8,6 +8,7 @@ import (
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // kinematicStarForEpoch is an ordinary catalogue entry with everything
@@ -16,7 +17,7 @@ func kinematicStarForEpoch() coord.ICRS {
 	return coord.NewICRSWithKinematics(
 		angle.Deg(123.4), angle.Deg(-35.6),
 		angle.Arcsec(0.150), angle.Arcsec(0.220),
-		angle.Arcsec(0.020), -22.4,
+		angle.Arcsec(0.020), unit.KmPerSec(-22.4),
 	)
 }
 
