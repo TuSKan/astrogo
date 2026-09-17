@@ -286,7 +286,7 @@ func TestObservedRadialVelocity_RoundTripsWithBarycentricRVCorrection(t *testing
 
 			// The two conversions are exact inverses, so this closes to
 			// floating point rather than to a series truncation.
-			roundTripped, err := ctx.BarycentricRadialVelocity(target, unit.KmPerSec(rvObserved.KmPerSec()))
+			roundTripped, err := ctx.BarycentricRadialVelocity(target, rvObserved)
 			testutil.AssertNoError(t, err)
 
 			testutil.AssertNear(t, "round-tripped barycentric RV", roundTripped.KmPerSec(), rvBarycentric, 1e-12)

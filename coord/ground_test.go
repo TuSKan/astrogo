@@ -256,8 +256,8 @@ func TestOffsetWrapsDateLine(t *testing.T) {
 		t.Fatalf("GroundDistance: %v", err)
 	}
 
-	if math.Abs((d - 50_000).Meters()) > 1 {
-		t.Errorf("distance across the date line = %v m, want 50000", d)
+	if math.Abs(d.Meters()-50_000) > 1 {
+		t.Errorf("distance across the date line = %v m, want 50000", d.Meters())
 	}
 }
 

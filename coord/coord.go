@@ -588,7 +588,7 @@ func (c CIRS) Equal(other CIRS) bool {
 func (c ObserversLocation) Equal(other ObserversLocation) bool {
 	return math.Abs(c.lon.Radians()-other.lon.Radians()) < coordTol &&
 		math.Abs(c.lat.Radians()-other.lat.Radians()) < coordTol &&
-		math.Abs((c.height-other.height).Meters()) < coordTol
+		math.Abs(c.height.Meters()-other.height.Meters()) < coordTol
 }
 
 // ── Formatting ────────────────────────────────────────────────────────────────

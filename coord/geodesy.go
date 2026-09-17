@@ -149,7 +149,7 @@ func (g *Geodetic) Equal(other *Geodetic) bool {
 
 	return math.Abs(g.lon.Radians()-other.lon.Radians()) < 1e-12 &&
 		math.Abs(g.lat.Radians()-other.lat.Radians()) < 1e-12 &&
-		(g.height-other.height).Abs() < unit.Millimeters(1e-3)
+		(g.height-other.height).Abs() < unit.Meters(1e-6)
 }
 
 // ── Transformations ──────────────────────────────────────────────────────────
