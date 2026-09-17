@@ -302,11 +302,46 @@ func deltaMinutes(usnoMin, astroMin float64) float64 {
 	return d
 }
 
+// newEph builds the DE442 provider these USNO comparisons need, or says why it
+// could not.
+//
+// # The fallback is kept, but not for an unreachable NAIF
+//
+// Falling back to the analytic default when a kernel will not load is right for
+// a test that needs *an* ephemeris. It is wrong for one that measures astrogo
+// against a published almanac to a fraction of an arcsecond, because the
+// analytic default is not accurate to a fraction of an arcsecond and was never
+// meant to be.
+//
+// That is not hypothetical. In the run recorded on #348, NAIF was unreachable,
+// this helper quietly substituted the analytic provider, and
+// TestUSNODecomposesTheTopocentricBias then compared it against USNO and
+// reported:
+//
+//	declination bias -0.456 arcsec exceeds 0.2; declination cannot see Earth
+//	rotation, so this is the apparent-place chain -- precession-nutation,
+//	aberration or deflection
+//
+// Every word of which is a correct reading of the numbers and a wrong
+// conclusion about the cause. A reader following it would go looking for a
+// defect in the apparent-place chain that is not there, because the real
+// difference was the ephemeris underneath. A red build is a nuisance; a red
+// build that names an innocent subsystem costs somebody an afternoon.
+//
+// So a network failure skips, and everything else still falls back: a kernel
+// that is absent for any reason the network is not -- consent withheld, a bad
+// local cache -- leaves the old behaviour untouched.
 func newEph(t *testing.T) eph.Provider {
 	t.Helper()
 
 	p, err := eph.NewProvider(context.Background(), eph.Planets, "de442")
 	if err != nil {
+		if testutil.Unreachable(err) {
+			t.Skipf("NAIF is unreachable, so DE442 could not be fetched: %v "+
+				"(external, not astrogo -- and the analytic fallback is not accurate "+
+				"enough to compare against USNO)", err)
+		}
+
 		t.Logf("DE442 unavailable (%v), falling back to default", err)
 
 		def := eph.Default()

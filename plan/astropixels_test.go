@@ -211,9 +211,8 @@ func fetchAstroPixelsPage(t *testing.T, startYear int) string {
 func TestAstroPixels_MoonPhases(t *testing.T) {
 	// Load both DE441 parts for full coverage: part-1 (deep historical) + part-2 (modern/future)
 	prov, err := eph.NewProvider(context.Background(), eph.Planets, "de441_part-1", eph.WithKernel("de441_part-2"))
-	if err != nil {
-		t.Fatalf("Failed to create DE441 provider: %v", err)
-	}
+	requireKernel(t, "DE441 provider", err)
+
 	defer func() { _ = prov.Close() }()
 
 	// Century start years to test — spans the full catalog

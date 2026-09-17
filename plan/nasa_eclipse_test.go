@@ -337,9 +337,8 @@ func TestNASA_LunarEclipses_Historical(t *testing.T) {
 	nasaBudgetOK(t, 6*time.Minute)
 
 	prov, err := eph.NewProvider(context.Background(), eph.Planets, "de441_part-1", eph.WithKernel("de441_part-2"))
-	if err != nil {
-		t.Fatalf("Failed to create DE441 provider: %v", err)
-	}
+	requireKernel(t, "DE441 provider", err)
+
 	defer func() { _ = prov.Close() }()
 
 	// Century ranges matching NASA catalog URLs
@@ -471,9 +470,8 @@ func TestNASA_SolarEclipses_Historical(t *testing.T) {
 	nasaBudgetOK(t, 6*time.Minute)
 
 	prov, err := eph.NewProvider(context.Background(), eph.Planets, "de441_part-1", eph.WithKernel("de441_part-2"))
-	if err != nil {
-		t.Fatalf("Failed to create DE441 provider: %v", err)
-	}
+	requireKernel(t, "DE441 provider", err)
+
 	defer func() { _ = prov.Close() }()
 
 	centuries := []struct {
