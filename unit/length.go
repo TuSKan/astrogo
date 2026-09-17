@@ -5,14 +5,14 @@ import (
 	"math"
 )
 
-// Length is a distance, stored in metres.
+// Length is a distance, stored in meters.
 //
 // # Why a named float64 and not a [Quantity]
 //
 // Because the mistake this prevents is not a dimensional one. Nobody passes a
 // duration where a distance goes; what astrogo's API got wrong was units
 // *within* a dimension — [coord.ICRS]'s distance held astronomical units on an
-// ephemeris path and kilometres on a satellite one, with nothing in the
+// ephemeris path and kilometers on a satellite one, with nothing in the
 // signature saying which, and a caller could not tell them apart.
 //
 // A Quantity would catch that and more, and costs more than it needs to: it is
@@ -28,16 +28,16 @@ import (
 // This is the pattern [angle.Angle] already uses, in the same hot paths, under
 // the same contracts. Length and [Velocity] finish what that started.
 //
-// # Why metres
+// # Why meters
 //
 // Not a preference: [Meter] is declared here with ScaleFactor 1.0 and every
 // other unit's ScaleFactor is expressed against it, so this package has treated
-// metres as canonical since it was written. Storing anything else would mean
+// meters as canonical since it was written. Storing anything else would mean
 // Length and Quantity disagreed about what 1.0 means inside one package.
 //
-// Metres are not a precision compromise either. float64 carries about 16
+// Meters are not a precision compromise either. float64 carries about 16
 // significant digits *relative* to the magnitude, so a galactic distance held
-// in metres and the same distance held in parsecs are equally precise — 8178 pc
+// in meters and the same distance held in parsecs are equally precise — 8178 pc
 // is 2.52e20 m with a 66 km ulp, which is the same 2.2e-16 relative step as
 // 1.8e-12 pc is at 8178. What costs precision is cancellation, and that is
 // relative too.
@@ -51,13 +51,13 @@ import (
 // equivalent, because the table is one hot cache line.
 type Length float64
 
-// Metres builds a Length from a value in metres.
-func Metres(v float64) Length { return Length(v) }
+// Meters builds a Length from a value in meters.
+func Meters(v float64) Length { return Length(v) }
 
-// Millimetres builds a Length from a value in millimetres.
-func Millimetres(v float64) Length { return Length(v * Millimeter.ScaleFactor) }
+// Millimeters builds a Length from a value in millimeters.
+func Millimeters(v float64) Length { return Length(v * Millimeter.ScaleFactor) }
 
-// Km builds a Length from a value in kilometres.
+// Km builds a Length from a value in kilometers.
 func Km(v float64) Length { return Length(v * Kilometer.ScaleFactor) }
 
 // AU builds a Length from a value in astronomical units.
@@ -69,13 +69,13 @@ func Pc(v float64) Length { return Length(v * Parsec.ScaleFactor) }
 // LightYears builds a Length from a value in light-years.
 func LightYears(v float64) Length { return Length(v * LightYear.ScaleFactor) }
 
-// Metres returns the length in metres, which is how it is stored.
-func (l Length) Metres() float64 { return float64(l) }
+// Meters returns the length in meters, which is how it is stored.
+func (l Length) Meters() float64 { return float64(l) }
 
-// Millimetres returns the length in millimetres.
-func (l Length) Millimetres() float64 { return float64(l) / Millimeter.ScaleFactor }
+// Millimeters returns the length in millimeters.
+func (l Length) Millimeters() float64 { return float64(l) / Millimeter.ScaleFactor }
 
-// Km returns the length in kilometres.
+// Km returns the length in kilometers.
 func (l Length) Km() float64 { return float64(l) / Kilometer.ScaleFactor }
 
 // AU returns the length in astronomical units.
@@ -102,7 +102,7 @@ func (l Length) IsZero() bool { return l == 0 }
 // rather than a guard against a mistake.
 func (l Length) Abs() Length { return Length(math.Abs(float64(l))) }
 
-// Quantity returns the same length as a dimensioned [Quantity] in metres.
+// Quantity returns the same length as a dimensioned [Quantity] in meters.
 //
 // The bridge between the two representations, and the reason they cannot
 // drift: both read the same [Unit] table, so a Length converted to a Quantity
@@ -133,8 +133,8 @@ func LengthFrom(q Quantity) (Length, error) {
 // is the same number in the words the subject is discussed in. The thresholds
 // are where each unit stops being the natural one:
 //
-//	< 1 km          metres      a site height, an aperture
-//	< 0.1 AU        kilometres  a satellite range, a lunar distance
+//	< 1 km          meters      a site height, an aperture
+//	< 0.1 AU        kilometers  a satellite range, a lunar distance
 //	< 0.5 pc        AU          solar system distances
 //	otherwise       parsecs     stellar and galactic distances
 //
@@ -143,7 +143,7 @@ func LengthFrom(q Quantity) (Length, error) {
 func (l Length) String() string {
 	switch m := math.Abs(float64(l)); {
 	case m < Kilometer.ScaleFactor:
-		return fmt.Sprintf("%.6g m", l.Metres())
+		return fmt.Sprintf("%.6g m", l.Meters())
 	case m < 0.1*AstronomicalUnit.ScaleFactor:
 		return fmt.Sprintf("%.6g km", l.Km())
 	case m < 0.5*Parsec.ScaleFactor:

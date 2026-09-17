@@ -19,7 +19,7 @@ var (
 	AstronomicalUnitPerDay = AstronomicalUnit.Div(Day)
 )
 
-// Velocity is a speed, stored in metres per second.
+// Velocity is a speed, stored in meters per second.
 //
 // The companion to [Length], for the same reason and at the same cost: a named
 // float64 is indistinguishable from the float64 it replaces, while the unit it
@@ -30,7 +30,7 @@ var (
 // which one a given signature meant was recorded — where it was recorded at all
 // — in prose beside it.
 //
-// Metres per second for the same reason [Length] is metres: [Second] and
+// Meters per second for the same reason [Length] is meters: [Second] and
 // [Meter] both have ScaleFactor 1.0 here, so SI is what this package's own
 // table is expressed against.
 //
@@ -42,20 +42,20 @@ var (
 // a correction to add to one — which is where the confusion actually was.
 type Velocity float64
 
-// MetresPerSec builds a Velocity from a value in metres per second.
-func MetresPerSec(v float64) Velocity { return Velocity(v) }
+// MetersPerSec builds a Velocity from a value in meters per second.
+func MetersPerSec(v float64) Velocity { return Velocity(v) }
 
-// KmPerSec builds a Velocity from a value in kilometres per second.
+// KmPerSec builds a Velocity from a value in kilometers per second.
 func KmPerSec(v float64) Velocity { return Velocity(v * KilometerPerSecond.ScaleFactor) }
 
 // AUPerDay builds a Velocity from a value in astronomical units per day.
 func AUPerDay(v float64) Velocity { return Velocity(v * AstronomicalUnitPerDay.ScaleFactor) }
 
-// MetresPerSec returns the velocity in metres per second, which is how it is
+// MetersPerSec returns the velocity in meters per second, which is how it is
 // stored.
-func (v Velocity) MetresPerSec() float64 { return float64(v) }
+func (v Velocity) MetersPerSec() float64 { return float64(v) }
 
-// KmPerSec returns the velocity in kilometres per second.
+// KmPerSec returns the velocity in kilometers per second.
 func (v Velocity) KmPerSec() float64 { return float64(v) / KilometerPerSecond.ScaleFactor }
 
 // AUPerDay returns the velocity in astronomical units per day.
@@ -92,12 +92,12 @@ func VelocityFrom(q Quantity) (Velocity, error) {
 
 // String renders the velocity in the unit a reader of that magnitude expects.
 //
-// Below a kilometre per second the interesting figures are small — a solar
-// apex is 18 km/s but a perspective term is metres per second — so the
+// Below a kilometer per second the interesting figures are small — a solar
+// apex is 18 km/s but a perspective term is meters per second — so the
 // threshold is where km/s stops reading naturally.
 func (v Velocity) String() string {
 	if math.Abs(float64(v)) < KilometerPerSecond.ScaleFactor {
-		return fmt.Sprintf("%.6g m/s", v.MetresPerSec())
+		return fmt.Sprintf("%.6g m/s", v.MetersPerSec())
 	}
 
 	return fmt.Sprintf("%.6g km/s", v.KmPerSec())

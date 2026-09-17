@@ -13,7 +13,7 @@ import (
 // value that went in.
 //
 // Exactness is asserted where it is achievable and a relative tolerance where
-// it is not. Metres round-trip exactly because they are the storage; the rest
+// it is not. Meters round-trip exactly because they are the storage; the rest
 // are a multiply and a divide by the same scale factor, which is correct to a
 // unit in the last place and not further.
 func TestLengthRoundTripsThroughEveryUnit(t *testing.T) {
@@ -24,9 +24,9 @@ func TestLengthRoundTripsThroughEveryUnit(t *testing.T) {
 		make func(float64) unit.Length
 		read func(unit.Length) float64
 	}{
-		{"metres", unit.Metres, unit.Length.Metres},
-		{"millimetres", unit.Millimetres, unit.Length.Millimetres},
-		{"kilometres", unit.Km, unit.Length.Km},
+		{"meters", unit.Meters, unit.Length.Meters},
+		{"millimeters", unit.Millimeters, unit.Length.Millimeters},
+		{"kilometers", unit.Km, unit.Length.Km},
 		{"astronomical units", unit.AU, unit.Length.AU},
 		{"parsecs", unit.Pc, unit.Length.Pc},
 		{"light-years", unit.LightYears, unit.Length.LightYears},
@@ -65,18 +65,18 @@ func TestLengthConversionsAgreeWithTheKnownValues(t *testing.T) {
 	}{
 		// IAU 2012 Resolution B2: the au is exactly 149 597 870 700 m.
 		{"1 AU in km", unit.AU(1).Km(), 149597870.7, 1e-15},
-		{"1 AU in metres", unit.AU(1).Metres(), 1.495978707e11, 1e-15},
+		{"1 AU in meters", unit.AU(1).Meters(), 1.495978707e11, 1e-15},
 
 		// The parsec is the distance at which 1 au subtends 1 arcsec, so it is
 		// exactly 648000/pi au.
 		{"1 pc in AU", unit.Pc(1).AU(), 648000 / math.Pi, 1e-15},
 
 		// A light-year is c times a Julian year, both exact by definition.
-		{"1 ly in metres", unit.LightYears(1).Metres(), 9.4607304725808e15, 1e-15},
+		{"1 ly in meters", unit.LightYears(1).Meters(), 9.4607304725808e15, 1e-15},
 
 		// And the mixed direction, which is what a caller actually does.
-		{"1 km in metres", unit.Km(1).Metres(), 1000, 1e-15},
-		{"1 mm in metres", unit.Millimetres(1).Metres(), 1e-3, 1e-15},
+		{"1 km in meters", unit.Km(1).Meters(), 1000, 1e-15},
+		{"1 mm in meters", unit.Millimeters(1).Meters(), 1e-3, 1e-15},
 	} {
 		if rel := math.Abs(tc.got-tc.want) / math.Abs(tc.want); rel > tc.rel {
 			t.Errorf("%s = %.17g, want %.17g (relative %.3g)", tc.name, tc.got, tc.want, rel)
@@ -104,8 +104,8 @@ func TestLengthAndQuantityCannotDisagree(t *testing.T) {
 		u    unit.Unit
 		read func(unit.Length) float64
 	}{
-		{"metres", unit.Metres(2635), unit.Meter, unit.Length.Metres},
-		{"kilometres", unit.Km(384400), unit.Kilometer, unit.Length.Km},
+		{"meters", unit.Meters(2635), unit.Meter, unit.Length.Meters},
+		{"kilometers", unit.Km(384400), unit.Kilometer, unit.Length.Km},
 		{"astronomical units", unit.AU(1.5), unit.AstronomicalUnit, unit.Length.AU},
 		{"parsecs", unit.Pc(8178), unit.Parsec, unit.Length.Pc},
 		{"light-years", unit.LightYears(4.2), unit.LightYear, unit.Length.LightYears},
@@ -149,7 +149,7 @@ func TestLengthFromRejectsWhatIsNotALength(t *testing.T) {
 	}
 
 	// A time, which must not. Nothing sensible can be done with it, and
-	// silently treating the number as metres is the failure this prevents.
+	// silently treating the number as meters is the failure this prevents.
 	if _, err := unit.LengthFrom(unit.New(60, unit.Second)); err == nil {
 		t.Error("a duration was accepted as a length")
 	} else if !errors.As(err, &unit.IncompatibleUnitError{}) {
@@ -167,14 +167,14 @@ func TestLengthStringPicksTheUnitAReaderExpects(t *testing.T) {
 		l    unit.Length
 		want string
 	}{
-		{"a telescope aperture", unit.Metres(8.2), "8.2 m"},
-		{"a site height", unit.Metres(2635), "2.635 km"},
+		{"a telescope aperture", unit.Meters(8.2), "8.2 m"},
+		{"a site height", unit.Meters(2635), "2.635 km"},
 		{"a satellite range", unit.Km(408), "408 km"},
 		{"the Moon", unit.Km(384400), "384400 km"},
 		{"a solar system distance", unit.AU(30.1), "30.1 AU"},
 		{"a nearby star", unit.Pc(1.3), "1.3 pc"},
-		{"the Galactic centre", unit.Pc(8178), "8178 pc"},
-		{"zero", unit.Metres(0), "0 m"},
+		{"the Galactic center", unit.Pc(8178), "8178 pc"},
+		{"zero", unit.Meters(0), "0 m"},
 		{"negative, which a Cartesian component is", unit.Pc(-8178), "-8178 pc"},
 	} {
 		if got := tc.l.String(); got != tc.want {
@@ -187,11 +187,11 @@ func TestLengthStringPicksTheUnitAReaderExpects(t *testing.T) {
 func TestLengthHelpers(t *testing.T) {
 	t.Parallel()
 
-	if !unit.Metres(0).IsZero() {
+	if !unit.Meters(0).IsZero() {
 		t.Error("zero is not reported as zero")
 	}
 
-	if unit.Metres(1e-300).IsZero() {
+	if unit.Meters(1e-300).IsZero() {
 		t.Error("a very small length is reported as zero; IsZero is exact by design")
 	}
 

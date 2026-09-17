@@ -39,11 +39,11 @@ func TestLengthDoesNotAllocate(t *testing.T) {
 		name string
 		f    func()
 	}{
-		{"construct from metres", func() { sink = unit.Metres(2635) }},
+		{"construct from meters", func() { sink = unit.Meters(2635) }},
 		{"construct from km", func() { sink = unit.Km(384400) }},
 		{"construct from AU", func() { sink = unit.AU(1.5) }},
 		{"construct from parsecs", func() { sink = unit.Pc(8178) }},
-		{"read as metres", func() { read = unit.AU(1.5).Metres() }},
+		{"read as meters", func() { read = unit.AU(1.5).Meters() }},
 		{"read as km", func() { read = unit.AU(1.5).Km() }},
 		{"read as AU", func() { read = unit.Pc(8178).AU() }},
 		{"read as parsecs", func() { read = unit.Pc(8178).Pc() }},
@@ -72,10 +72,10 @@ func TestVelocityDoesNotAllocate(t *testing.T) {
 		name string
 		f    func()
 	}{
-		{"construct from m/s", func() { sink = unit.MetresPerSec(343) }},
+		{"construct from m/s", func() { sink = unit.MetersPerSec(343) }},
 		{"construct from km/s", func() { sink = unit.KmPerSec(-110.6) }},
 		{"construct from au/day", func() { sink = unit.AUPerDay(0.0172) }},
-		{"read as m/s", func() { read = unit.KmPerSec(-110.6).MetresPerSec() }},
+		{"read as m/s", func() { read = unit.KmPerSec(-110.6).MetersPerSec() }},
 		{"read as km/s", func() { read = unit.KmPerSec(-110.6).KmPerSec() }},
 		{"read as au/day", func() { read = unit.KmPerSec(-110.6).AUPerDay() }},
 		{"addition, which is what LSRCorrection composes", func() {

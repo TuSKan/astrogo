@@ -3,6 +3,8 @@ package constants_test
 import (
 	"testing"
 
+	"github.com/TuSKan/astrogo/unit/dim"
+
 	"github.com/TuSKan/astrogo/constants"
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/unit"
@@ -34,7 +36,7 @@ func TestWGS84_Units(t *testing.T) {
 		t.Errorf("SemiMajorAxis.Unit = %v, want unit.Meter", constants.WGS84.SemiMajorAxis.Unit)
 	}
 
-	if constants.WGS84.InverseFlattening.Unit.Dimension != unit.Dimensionless {
+	if constants.WGS84.InverseFlattening.Unit.Dimension != dim.Dimensionless {
 		t.Errorf("InverseFlattening.Unit.Dimension = %+v, want Dimensionless", constants.WGS84.InverseFlattening.Unit.Dimension)
 	}
 }

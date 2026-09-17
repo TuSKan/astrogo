@@ -4,6 +4,8 @@ import (
 	"math"
 	"testing"
 
+	"github.com/TuSKan/astrogo/unit/dim"
+
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -17,8 +19,8 @@ func TestVelocityRoundTripsThroughEveryUnit(t *testing.T) {
 		make func(float64) unit.Velocity
 		read func(unit.Velocity) float64
 	}{
-		{"metres per second", unit.MetresPerSec, unit.Velocity.MetresPerSec},
-		{"kilometres per second", unit.KmPerSec, unit.Velocity.KmPerSec},
+		{"meters per second", unit.MetersPerSec, unit.Velocity.MetersPerSec},
+		{"kilometers per second", unit.KmPerSec, unit.Velocity.KmPerSec},
 		{"astronomical units per day", unit.AUPerDay, unit.Velocity.AUPerDay},
 	} {
 		for _, v := range []float64{0, 1, -110.6, 29.78, 18.04, 247.3, 1e-6} {
@@ -55,7 +57,7 @@ func TestVelocityConversionsAgreeWithTheKnownValues(t *testing.T) {
 		got  float64
 		want float64
 	}{
-		{"1 km/s in m/s", unit.KmPerSec(1).MetresPerSec(), 1000},
+		{"1 km/s in m/s", unit.KmPerSec(1).MetersPerSec(), 1000},
 		{"1 au/day in km/s", unit.AUPerDay(1).KmPerSec(), auPerDayInKmPerSec},
 
 		// The classical identity the coord tests use: one au per Julian year,
@@ -84,8 +86,8 @@ func TestVelocityAndQuantityCannotDisagree(t *testing.T) {
 		u    unit.Unit
 		read func(unit.Velocity) float64
 	}{
-		{"metres per second", unit.MetresPerSec(343), unit.MeterPerSecond, unit.Velocity.MetresPerSec},
-		{"kilometres per second", unit.KmPerSec(-110.6), unit.KilometerPerSecond, unit.Velocity.KmPerSec},
+		{"meters per second", unit.MetersPerSec(343), unit.MeterPerSecond, unit.Velocity.MetersPerSec},
+		{"kilometers per second", unit.KmPerSec(-110.6), unit.KilometerPerSecond, unit.Velocity.KmPerSec},
 		{"au per day", unit.AUPerDay(0.0172), unit.AstronomicalUnitPerDay, unit.Velocity.AUPerDay},
 	} {
 		q, err := tc.v.Quantity().In(tc.u)
@@ -114,7 +116,7 @@ func TestVelocityAndQuantityCannotDisagree(t *testing.T) {
 // TestVelocityUnitsCarryTheRightDimension checks the derivation itself.
 //
 // MeterPerSecond and its siblings are built with Unit.Div rather than declared,
-// so this asserts the dimension that came out is the one the [unit.DimVelocity]
+// so this asserts the dimension that came out is the one the [dim.Velocity]
 // table names — L¹T⁻¹. A Div that subtracted the wrong exponent would still
 // produce a usable-looking Unit whose conversions were all wrong together.
 func TestVelocityUnitsCarryTheRightDimension(t *testing.T) {
@@ -128,9 +130,9 @@ func TestVelocityUnitsCarryTheRightDimension(t *testing.T) {
 		{"KilometerPerSecond", unit.KilometerPerSecond},
 		{"AstronomicalUnitPerDay", unit.AstronomicalUnitPerDay},
 	} {
-		if tc.u.Dimension != unit.DimVelocity {
-			t.Errorf("%s has dimension %+v, want DimVelocity %+v",
-				tc.name, tc.u.Dimension, unit.DimVelocity)
+		if tc.u.Dimension != dim.Velocity {
+			t.Errorf("%s has dimension %+v, want dim.Velocity %+v",
+				tc.name, tc.u.Dimension, dim.Velocity)
 		}
 
 		// And it must not be compatible with a plain length, which is the
@@ -168,11 +170,11 @@ func TestVelocityStringPicksTheUnitAReaderExpects(t *testing.T) {
 		v    unit.Velocity
 		want string
 	}{
-		{"a perspective term", unit.MetresPerSec(7.5), "7.5 m/s"},
+		{"a perspective term", unit.MetersPerSec(7.5), "7.5 m/s"},
 		{"the solar apex", unit.KmPerSec(18.04), "18.04 km/s"},
 		{"Barnard's Star, approaching", unit.KmPerSec(-110.6), "-110.6 km/s"},
 		{"the Sun around the Galaxy", unit.KmPerSec(247.3), "247.3 km/s"},
-		{"zero", unit.MetresPerSec(0), "0 m/s"},
+		{"zero", unit.MetersPerSec(0), "0 m/s"},
 	} {
 		if got := tc.v.String(); got != tc.want {
 			t.Errorf("%s: String() = %q, want %q", tc.name, got, tc.want)

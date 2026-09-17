@@ -1,4 +1,19 @@
-package unit
+// Package dim holds the physical dimensions a [unit.Unit] is expressed in, and
+// the algebra for composing them.
+//
+// # Why a package of its own
+//
+// Because the names are better without a prefix, and a package is how Go
+// namespaces. These values are used compositionally — constants/units.go builds
+// a gravitational parameter as Volume divided by Mass divided by Time squared —
+// and inside unit they collided with the quantity types callers actually pass:
+// a Dimension named Length shadows [unit.Length], which is the one a signature
+// wants. Prefixing them read as DimVolume.Div(DimMass).Div(DimTime.PowInt(2)),
+// and DimDimensionless stuttered.
+//
+// Dimensions are also the more primitive of the two ideas: a unit is a scale on
+// a dimension, so unit imports this and not the other way round.
+package dim
 
 // Dimension represents the physical dimensions of a quantity using SI base unit
 // exponents.
@@ -67,33 +82,28 @@ func (d Dimension) PowInt(p int) Dimension {
 // ── Common Dimensions ────────────────────────────────────────────────────────
 
 // SI base and derived dimensions — immutable physical constants.
-// The Dim prefix disambiguates a dimension from a quantity type of the same
-// name: [Length] and [Velocity] are values a caller passes, and a Dimension
-// named Length would shadow the one they mean. Every dimension carries it,
-// including the ones with no quantity type yet, so adding [Mass] or
-// [Temperature] later is a new type rather than a rename of an old value.
+// SI base and derived dimensions — immutable physical constants.
 //
-// Dimensionless is the exception, and not an oversight. It cannot acquire a
-// quantity type to be confused with, because a dimensionless quantity is a
-// float64 and always will be — so Dimensionless would stutter for a
-// disambiguation nothing needs.
+// Unprefixed, which is the reason this package exists: unit.Length is the
+// quantity type a caller passes and dim.Length is the dimension it has, and
+// neither has to be spelled awkwardly to avoid the other.
 var (
-	Dimensionless  = Dimension{}
-	DimLength      = Dimension{L: 1}
-	DimMass        = Dimension{M: 1}
-	DimTime        = Dimension{T: 1}
-	DimCurrent     = Dimension{I: 1}
-	DimTemperature = Dimension{Theta: 1}
-	DimAmount      = Dimension{N: 1}
-	DimLuminosity  = Dimension{J: 1}
+	Dimensionless = Dimension{}
+	Length        = Dimension{L: 1}
+	Mass          = Dimension{M: 1}
+	Time          = Dimension{T: 1}
+	Current       = Dimension{I: 1}
+	Temperature   = Dimension{Theta: 1}
+	Amount        = Dimension{N: 1}
+	Luminosity    = Dimension{J: 1}
 
-	DimArea         = Dimension{L: 2}
-	DimVolume       = Dimension{L: 3}
-	DimVelocity     = Dimension{L: 1, T: -1}
-	DimAccel        = Dimension{L: 1, T: -2}
-	DimForce        = Dimension{L: 1, M: 1, T: -2}
-	DimPressure     = Dimension{L: -1, M: 1, T: -2}
-	DimEnergy       = Dimension{L: 2, M: 1, T: -2}
-	DimPower        = Dimension{L: 2, M: 1, T: -3}
-	DimSpectralFlux = Dimension{M: 1, T: -2} // W/(m²·Hz) base: kg·s⁻²
+	Area         = Dimension{L: 2}
+	Volume       = Dimension{L: 3}
+	Velocity     = Dimension{L: 1, T: -1}
+	Accel        = Dimension{L: 1, T: -2}
+	Force        = Dimension{L: 1, M: 1, T: -2}
+	Pressure     = Dimension{L: -1, M: 1, T: -2}
+	Energy       = Dimension{L: 2, M: 1, T: -2}
+	Power        = Dimension{L: 2, M: 1, T: -3}
+	SpectralFlux = Dimension{M: 1, T: -2} // W/(m²·Hz) base: kg·s⁻²
 )

@@ -24,7 +24,7 @@
 // # Radiometric type safety
 //
 // [Steradian] is dimensionally identical to [One], exactly as [Radian] is —
-// [Dimension] has only the seven SI base exponents and no tag distinguishing
+// [dim.Dimension] has only the seven SI base exponents and no tag distinguishing
 // a solid angle from a bare dimensionless ratio, so [RadianceUnit] and
 // [IrradianceUnit] (the unit.Unit VALUES, used for documentation and
 // provenance serialization) compare Compatible and even Equals in dimension

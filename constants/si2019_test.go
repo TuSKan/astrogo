@@ -3,6 +3,8 @@ package constants_test
 import (
 	"testing"
 
+	"github.com/TuSKan/astrogo/unit/dim"
+
 	"github.com/TuSKan/astrogo/constants"
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/unit"
@@ -36,12 +38,12 @@ func TestSI2019_Dimensions(t *testing.T) {
 		t.Errorf("SpeedOfLight.Unit should not be compatible with a bare length")
 	}
 
-	wantAction := unit.DimEnergy.Mul(unit.DimTime)
+	wantAction := dim.Energy.Mul(dim.Time)
 	if got := constants.SI2019.PlanckConstant.Unit.Dimension; got != wantAction {
 		t.Errorf("PlanckConstant.Unit.Dimension = %+v, want %+v (J·s)", got, wantAction)
 	}
 
-	wantEntropy := unit.DimEnergy.Div(unit.DimTemperature)
+	wantEntropy := dim.Energy.Div(dim.Temperature)
 	if got := constants.SI2019.BoltzmannConstant.Unit.Dimension; got != wantEntropy {
 		t.Errorf("BoltzmannConstant.Unit.Dimension = %+v, want %+v (J/K)", got, wantEntropy)
 	}

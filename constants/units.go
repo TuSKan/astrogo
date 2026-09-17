@@ -1,6 +1,9 @@
 package constants
 
-import "github.com/TuSKan/astrogo/unit"
+import (
+	"github.com/TuSKan/astrogo/unit"
+	"github.com/TuSKan/astrogo/unit/dim"
+)
 
 // Composite SI units the constants in this package are expressed in. Each
 // has ScaleFactor 1, so every Constant.Value is an SI base-unit value; the
@@ -15,7 +18,7 @@ var (
 	// meterPerSecond is m·s⁻¹ (velocity) — SpeedOfLight.
 	meterPerSecond = unit.Unit{
 		Name: "meter per second", Symbol: "m/s",
-		ScaleFactor: 1, Dimension: unit.DimVelocity,
+		ScaleFactor: 1, Dimension: dim.Velocity,
 	}
 	// radianPerSecond is rad·s⁻¹ (angular velocity) — WGS84.AngularVelocity.
 	//
@@ -24,44 +27,44 @@ var (
 	// rate rather than a frequency.
 	radianPerSecond = unit.Unit{
 		Name: "radian per second", Symbol: "rad/s",
-		ScaleFactor: 1, Dimension: unit.Dimension{T: -1},
+		ScaleFactor: 1, Dimension: dim.Dimension{T: -1},
 	}
 	// squareMeter is m² (area) — ThomsonCrossSection.
 	squareMeter = unit.Unit{
 		Name: "square meter", Symbol: "m²",
-		ScaleFactor: 1, Dimension: unit.DimArea,
+		ScaleFactor: 1, Dimension: dim.Area,
 	}
 	// jouleSecond is J·s = kg·m²·s⁻¹ (action) — PlanckConstant.
 	jouleSecond = unit.Unit{
 		Name: "joule second", Symbol: "J·s",
-		ScaleFactor: 1, Dimension: unit.DimEnergy.Mul(unit.DimTime),
+		ScaleFactor: 1, Dimension: dim.Energy.Mul(dim.Time),
 	}
 	// joulePerKelvin is J·K⁻¹ = kg·m²·s⁻²·K⁻¹ (entropy) — BoltzmannConstant.
 	joulePerKelvin = unit.Unit{
 		Name: "joule per kelvin", Symbol: "J/K",
-		ScaleFactor: 1, Dimension: unit.DimEnergy.Div(unit.DimTemperature),
+		ScaleFactor: 1, Dimension: dim.Energy.Div(dim.Temperature),
 	}
 	// cubicMeterPerKilogramSecondSquared is m³·kg⁻¹·s⁻² — GravitationalConstant.
 	cubicMeterPerKilogramSecondSquared = unit.Unit{
 		Name: "cubic meter per kilogram second squared", Symbol: "m³/(kg·s²)",
-		ScaleFactor: 1, Dimension: unit.DimVolume.Div(unit.DimMass).Div(unit.DimTime.PowInt(2)),
+		ScaleFactor: 1, Dimension: dim.Volume.Div(dim.Mass).Div(dim.Time.PowInt(2)),
 	}
 	// cubicMeterPerSecondSquared is m³·s⁻² — a standard gravitational
 	// parameter GM (mass already folded in, unlike G alone) —
 	// SunGravitationalParameter.
 	cubicMeterPerSecondSquared = unit.Unit{
 		Name: "cubic meter per second squared", Symbol: "m³/s²",
-		ScaleFactor: 1, Dimension: unit.DimVolume.Div(unit.DimTime.PowInt(2)),
+		ScaleFactor: 1, Dimension: dim.Volume.Div(dim.Time.PowInt(2)),
 	}
 	// wattPerSquareMeterHertz is W·m⁻²·Hz⁻¹ (spectral flux density, SI
 	// base of the jansky) — PhotometricSet.ABZeroPoint.
 	wattPerSquareMeterHertz = unit.Unit{
 		Name: "watt per square meter hertz", Symbol: "W/(m²·Hz)",
-		ScaleFactor: 1, Dimension: unit.DimSpectralFlux,
+		ScaleFactor: 1, Dimension: dim.SpectralFlux,
 	}
 	// wattPerSquareMeterKelvin4 is W·m⁻²·K⁻⁴ — StefanBoltzmannConstant.
 	wattPerSquareMeterKelvin4 = unit.Unit{
 		Name: "watt per square meter kelvin4", Symbol: "W/(m²·K⁴)",
-		ScaleFactor: 1, Dimension: unit.DimPower.Div(unit.DimArea).Div(unit.DimTemperature.PowInt(4)),
+		ScaleFactor: 1, Dimension: dim.Power.Div(dim.Area).Div(dim.Temperature.PowInt(4)),
 	}
 )
