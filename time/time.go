@@ -197,12 +197,22 @@ func NewTicker(d Duration) *time.Ticker { return time.NewTicker(d) }
 // epoch most star catalogs (Gaia excepted, at J2016.0) and orbital-element
 // sources assume when they don't report their own epoch explicitly.
 //
-// The second and last exported var, and unlike [LocationUTC] this one is
-// astrogo's own: any importer can reassign the standard epoch process-wide.
-// Go offers no way to declare a struct value immutable, so making it safe
-// means turning it into a function and breaking every caller, which is a
-// decision rather than a cleanup. Recorded in #113 rather than done quietly.
-var J2000 = FromJD(2451545.0, TT)
+// A function rather than a var, and that is the whole of #113's remainder.
+//
+// It used to be `var J2000 = FromJD(...)`, which any importer could reassign,
+// shifting the standard epoch for every other package in the process. Go
+// offers no way to declare a struct value immutable, so a function returning a
+// copy is the only construction that removes the footgun. The stored value is
+// computed once; the call is a copy of a small struct and costs nothing.
+//
+// [LocationUTC] is the one exported var left, and it stays: the standard
+// library declares `var UTC *Location = &utcLoc`, so wrapping it would hand
+// back the same reassignable pointer and remove nothing.
+func J2000() Time { return j2000 }
+
+// j2000 backs [J2000]. Unexported, so nothing outside this package can reach
+// it, and computed once rather than on every call.
+var j2000 = FromJD(2451545.0, TT)
 
 // Layout strings, const rather than var so that nothing can reassign a format
 // string process-wide -- and untyped, exactly as the standard library declares

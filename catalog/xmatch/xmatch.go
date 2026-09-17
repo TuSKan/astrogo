@@ -47,7 +47,7 @@ type Option func(*config)
 const defaultPositionMatchThresholdArcsec = 2.0
 
 // WithPositionMatchThreshold sets the maximum angular separation (after
-// epoch normalization to time.J2000 via coord.PropagateEpoch) at which two
+// epoch normalization to time.J2000() via coord.PropagateEpoch) at which two
 // Targets sharing no alias or ID are still considered the same object.
 // Default: 2 arcsec.
 func WithPositionMatchThreshold(threshold angle.Angle) Option {
@@ -78,7 +78,7 @@ type item struct {
 //  1. Alias-graph: any Target in a and any Target in b sharing a
 //     resolve.Normalize-d ID or Aliases entry are matched.
 //  2. Positional fallback: any Target left unmatched (a singleton) after
-//     pass 1 is epoch-normalized (via coord.PropagateEpoch to time.J2000;
+//     pass 1 is epoch-normalized (via coord.PropagateEpoch to time.J2000();
 //     skipped entirely for a Target with !HasCoord or an all-zero Coord)
 //     and unioned with any still-unmatched candidate in the other slice
 //     within WithPositionMatchThreshold.
@@ -170,7 +170,7 @@ func singletonIndices(items []item, uf *unionFind) []int {
 }
 
 // unionByPosition epoch-normalizes every still-singleton, trustworthy-coord
-// item to time.J2000 and unions any cross-origin pair within threshold —
+// item to time.J2000() and unions any cross-origin pair within threshold —
 // each item is unioned with at most its single nearest cross-origin match.
 // O(M²) over the remaining singletons M: appropriate at the scale this
 // package targets (two candidate lists from a handful of catalogs, not a
@@ -192,7 +192,7 @@ func unionByPosition(items []item, uf *unionFind, threshold angle.Angle) {
 			continue
 		}
 
-		propagated, err := coord.PropagateEpoch(t.Coord, t.Epoch, time.J2000)
+		propagated, err := coord.PropagateEpoch(t.Coord, t.Epoch, time.J2000())
 		if err != nil {
 			continue
 		}

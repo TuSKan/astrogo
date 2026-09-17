@@ -48,7 +48,7 @@ func jovianBare(t *testing.T, i int) kepler.Elements {
 		t.Fatal("no central body for Jupiter")
 	}
 
-	el, err := kepler.NewElements(time.J2000, kmToAU(s.aKM), s.e,
+	el, err := kepler.NewElements(time.J2000(), kmToAU(s.aKM), s.e,
 		angle.Deg(s.incl), angle.Deg(s.node), angle.Deg(s.argp), angle.Deg(s.meanAnom))
 	if err != nil {
 		t.Fatalf("%s: NewElements: %v", s.name, err)
@@ -68,7 +68,7 @@ func jovianElements(t *testing.T, i int) kepler.Elements {
 		t.Fatal("no central body for Jupiter")
 	}
 
-	el, err := kepler.NewElements(time.J2000, kmToAU(s.aKM), s.e,
+	el, err := kepler.NewElements(time.J2000(), kmToAU(s.aKM), s.e,
 		angle.Deg(s.incl), angle.Deg(s.node), angle.Deg(s.argp), angle.Deg(s.meanAnom))
 	if err != nil {
 		t.Fatalf("%s: NewElements: %v", s.name, err)
@@ -90,7 +90,7 @@ func jovianElements(t *testing.T, i int) kepler.Elements {
 func TestOrbitInThePlaneHasThePlanesPole(t *testing.T) {
 	el := jovianElements(t, 0) // Io: i = 0, node = 0
 
-	pos, vel, err := el.StateAt(time.J2000)
+	pos, vel, err := el.StateAt(time.J2000())
 	if err != nil {
 		t.Fatalf("StateAt: %v", err)
 	}
@@ -117,7 +117,7 @@ func TestInclinedOrbitTiltsFromThePole(t *testing.T) {
 		t.Run(s.name, func(t *testing.T) {
 			el := jovianElements(t, i)
 
-			pos, vel, err := el.StateAt(time.J2000)
+			pos, vel, err := el.StateAt(time.J2000())
 			if err != nil {
 				t.Fatalf("StateAt: %v", err)
 			}
@@ -143,7 +143,7 @@ func TestReadingLaplaceElementsAsEclipticIsBadlyWrong(t *testing.T) {
 
 	jupiter, _ := kepler.CentralBodyFor(core.Jupiter)
 
-	base, err := kepler.NewElements(time.J2000, kmToAU(s.aKM), s.e,
+	base, err := kepler.NewElements(time.J2000(), kmToAU(s.aKM), s.e,
 		angle.Deg(s.incl), angle.Deg(s.node), angle.Deg(s.argp), angle.Deg(s.meanAnom))
 	if err != nil {
 		t.Fatalf("NewElements: %v", err)
@@ -154,12 +154,12 @@ func TestReadingLaplaceElementsAsEclipticIsBadlyWrong(t *testing.T) {
 		RA: angle.Deg(s.poleRA), Dec: angle.Deg(s.poleDec),
 	})
 
-	pe, _, err := ecliptic.StateAt(time.J2000)
+	pe, _, err := ecliptic.StateAt(time.J2000())
 	if err != nil {
 		t.Fatalf("StateAt(ecliptic): %v", err)
 	}
 
-	pl, _, err := laplace.StateAt(time.J2000)
+	pl, _, err := laplace.StateAt(time.J2000())
 	if err != nil {
 		t.Fatalf("StateAt(laplace): %v", err)
 	}
@@ -186,7 +186,7 @@ func TestReadingLaplaceElementsAsEclipticIsBadlyWrong(t *testing.T) {
 // TestNoPlaneStillMeansEcliptic keeps the heliocentric path untouched: an
 // Elements that never names a plane must behave exactly as before.
 func TestNoPlaneStillMeansEcliptic(t *testing.T) {
-	el, err := kepler.NewElements(time.J2000, 2.7658, 0.07839,
+	el, err := kepler.NewElements(time.J2000(), 2.7658, 0.07839,
 		angle.Deg(10.587), angle.Deg(80.393), angle.Deg(73.597), angle.Deg(77.372))
 	if err != nil {
 		t.Fatalf("NewElements: %v", err)
@@ -323,7 +323,7 @@ func TestEitherCorrectionAloneIsWorseThanNeither(t *testing.T) {
 	apsisOnly := bare.WithSecularPrecession(kepler.SecularPrecession{ApsisPeriod: s.apsisYears})
 
 	// Ten days on: how far each has rotated away from the fully corrected one.
-	at := time.J2000.AddDays(10)
+	at := time.J2000().AddDays(10)
 
 	ref, _, err := both.StateAt(at)
 	if err != nil {

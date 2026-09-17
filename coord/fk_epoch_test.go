@@ -141,9 +141,9 @@ func TestPropagateEpochIsWhatTheEpochArgumentCannotDo(t *testing.T) {
 	star := kinematicStarForEpoch()
 
 	// Twenty-five Julian years after J2000.
-	later := time.J2000.Add((25 * 365.25 * 24) * time.Hour)
+	later := time.J2000().Add((25 * 365.25 * 24) * time.Hour)
 
-	moved, err := coord.PropagateEpoch(star, time.J2000, later)
+	moved, err := coord.PropagateEpoch(star, time.J2000(), later)
 	testutil.AssertNoError(t, err)
 
 	atEquinox := coord.ICRSToFK4(star, coord.B1950)

@@ -178,7 +178,7 @@ func TestResolver_ProviderPriority(t *testing.T) {
 		"target": {
 			ID: "gaia-1", Aliases: []string{"shared"},
 			Coord: coord.NewICRS(angle.Deg(101.287155), angle.Deg(-16.716116)), HasCoord: true,
-			Epoch: time.J2000,
+			Epoch: time.J2000(),
 			PmRA:  angle.Arcsec(-0.379), PmDec: angle.Arcsec(-1.303), Parallax: angle.Arcsec(0.379),
 		},
 	}}
@@ -260,7 +260,7 @@ func TestResolver_MergePreservesOrbitalElements(t *testing.T) {
 	}}
 	p2 := &mockProvider{name: "simbad", targets: map[string]Target{
 		"target": {
-			ID: "simbad-1", Aliases: []string{"shared"}, Epoch: time.J2000, // a different, unrelated epoch — must not win
+			ID: "simbad-1", Aliases: []string{"shared"}, Epoch: time.J2000(), // a different, unrelated epoch — must not win
 		},
 	}}
 
@@ -534,7 +534,7 @@ func TestResolver_CrossMatchByAlias(t *testing.T) {
 	p1 := &mockProvider{name: "gaia", targets: map[string]Target{
 		"sirius": {
 			ID: "gaia-1", Coord: coord.NewICRS(angle.Deg(101.28), angle.Deg(-16.71)),
-			HasCoord: true, Epoch: time.J2000,
+			HasCoord: true, Epoch: time.J2000(),
 		},
 	}}
 	p2 := &mockProvider{name: "simbad", targets: map[string]Target{
@@ -569,10 +569,10 @@ func TestResolver_CrossMatchByAlias(t *testing.T) {
 // the same epoch, merge via the positional fallback.
 func TestResolver_CrossMatchByPosition_SameEpochMerges(t *testing.T) {
 	p1 := &mockProvider{name: "p1", targets: map[string]Target{
-		"a": {ID: "A1", Name: "TestObj", Coord: coord.NewICRS(angle.Deg(83.822), angle.Deg(-5.391)), HasCoord: true, Epoch: time.J2000},
+		"a": {ID: "A1", Name: "TestObj", Coord: coord.NewICRS(angle.Deg(83.822), angle.Deg(-5.391)), HasCoord: true, Epoch: time.J2000()},
 	}}
 	p2 := &mockProvider{name: "p2", targets: map[string]Target{
-		"b": {ID: "B2", Name: "TestObj", Coord: coord.NewICRS(angle.Deg(83.8221), angle.Deg(-5.3911)), HasCoord: true, Epoch: time.J2000},
+		"b": {ID: "B2", Name: "TestObj", Coord: coord.NewICRS(angle.Deg(83.8221), angle.Deg(-5.3911)), HasCoord: true, Epoch: time.J2000()},
 	}}
 
 	r := &Resolver{
@@ -599,10 +599,10 @@ func TestResolver_CrossMatchByPosition_SameEpochMerges(t *testing.T) {
 // Targets, not be forced together.
 func TestResolver_CrossMatchByPosition_TooFarDoesNotMerge(t *testing.T) {
 	p1 := &mockProvider{name: "p1", targets: map[string]Target{
-		"a": {ID: "A1", Name: "TestObj", Coord: coord.NewICRS(angle.Deg(83.80), angle.Deg(-5.39)), HasCoord: true, Epoch: time.J2000},
+		"a": {ID: "A1", Name: "TestObj", Coord: coord.NewICRS(angle.Deg(83.80), angle.Deg(-5.39)), HasCoord: true, Epoch: time.J2000()},
 	}}
 	p2 := &mockProvider{name: "p2", targets: map[string]Target{
-		"b": {ID: "B2", Name: "TestObj", Coord: coord.NewICRS(angle.Deg(83.82), angle.Deg(-5.39)), HasCoord: true, Epoch: time.J2000},
+		"b": {ID: "B2", Name: "TestObj", Coord: coord.NewICRS(angle.Deg(83.82), angle.Deg(-5.39)), HasCoord: true, Epoch: time.J2000()},
 	}}
 
 	r := &Resolver{
@@ -634,11 +634,11 @@ func TestResolver_CrossMatchByPosition_EpochMismatchAppliesPropagation(t *testin
 	pmRA, pmDec := angle.Arcsec(1.0), angle.Arcsec(0)
 	parallax := angle.Arcsec(0.01)
 
-	laterEpoch := time.J2000.Add((50 * 365.25 * 24) * time.Hour)
+	laterEpoch := time.J2000().Add((50 * 365.25 * 24) * time.Hour)
 
 	base := coord.NewICRSWithKinematics(baseRA, baseDec, pmRA, pmDec, parallax, 0)
 
-	laterCoord, err := coord.PropagateEpoch(base, time.J2000, laterEpoch)
+	laterCoord, err := coord.PropagateEpoch(base, time.J2000(), laterEpoch)
 	if err != nil {
 		t.Fatalf("test setup: PropagateEpoch: %v", err)
 	}
@@ -648,7 +648,7 @@ func TestResolver_CrossMatchByPosition_EpochMismatchAppliesPropagation(t *testin
 	}
 
 	p1 := &mockProvider{name: "p1", targets: map[string]Target{
-		"a": {ID: "P1", Name: "TestStar", Coord: base, HasCoord: true, Epoch: time.J2000},
+		"a": {ID: "P1", Name: "TestStar", Coord: base, HasCoord: true, Epoch: time.J2000()},
 	}}
 	p2 := &mockProvider{name: "p2", targets: map[string]Target{
 		"b": {
@@ -681,11 +681,11 @@ func TestResolver_ConeSearchBridge_FoldsInAstrometry(t *testing.T) {
 	coneCoord := coord.NewICRS(angle.Deg(50.0001), angle.Deg(10.0001)) // ~0.5" from anchor
 
 	p1 := &mockProvider{name: "simbad", targets: map[string]Target{
-		"star": {ID: "S1", Name: "Star", Coord: anchor, HasCoord: true, Epoch: time.J2000},
+		"star": {ID: "S1", Name: "Star", Coord: anchor, HasCoord: true, Epoch: time.J2000()},
 	}}
 
 	cs := &mockConeSearcher{targets: []Target{
-		{ID: "GAIA123", Coord: coneCoord, HasCoord: true, Epoch: time.J2000, Parallax: angle.Arcsec(5)},
+		{ID: "GAIA123", Coord: coneCoord, HasCoord: true, Epoch: time.J2000(), Parallax: angle.Arcsec(5)},
 	}}
 
 	r := &Resolver{
@@ -771,10 +771,10 @@ func TestResolver_Search_RespectsCap(t *testing.T) {
 func TestResolver_PositionMatchThreshold_Configurable(t *testing.T) {
 	newResolver := func(threshold angle.Angle) *Resolver {
 		p1 := &mockProvider{name: "p1", targets: map[string]Target{
-			"a": {ID: "A1", Name: "TestObj", Coord: coord.NewICRS(angle.Deg(83.80), angle.Deg(-5.39)), HasCoord: true, Epoch: time.J2000},
+			"a": {ID: "A1", Name: "TestObj", Coord: coord.NewICRS(angle.Deg(83.80), angle.Deg(-5.39)), HasCoord: true, Epoch: time.J2000()},
 		}}
 		p2 := &mockProvider{name: "p2", targets: map[string]Target{
-			"b": {ID: "B2", Name: "TestObj", Coord: coord.NewICRS(angle.Deg(83.8003), angle.Deg(-5.39)), HasCoord: true, Epoch: time.J2000},
+			"b": {ID: "B2", Name: "TestObj", Coord: coord.NewICRS(angle.Deg(83.8003), angle.Deg(-5.39)), HasCoord: true, Epoch: time.J2000()},
 		}}
 
 		return &Resolver{

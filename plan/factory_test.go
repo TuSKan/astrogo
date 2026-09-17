@@ -371,7 +371,7 @@ func TestFromCatalogKeepsACoordinateAtTheOrigin(t *testing.T) {
 		t.Fatalf("got %T, want *plan.DeepSkyObject", obs)
 	}
 
-	pos, err := dso.Position(time.J2000)
+	pos, err := dso.Position(time.J2000())
 	if err != nil {
 		t.Fatalf("Position: %v", err)
 	}

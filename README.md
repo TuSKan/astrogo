@@ -98,7 +98,7 @@ catalogue's proper motion, parallax and radial velocity into km/s on the ICRS ax
 
 Designed from the ground up for Go: no dynamic magic, no *hidden* global state, zero-allocation hot paths.
 
-Process-wide state exists and is deliberate — download consent and offline mode (`remote.EnableDownloads`, `remote.SetOffline`), the logger (`logging.Set`), the EOP and leap-second registries (`time.RegisterModel`, `time.RegisterLeapSeconds`). All of it is set by an explicitly named call and none of it is established by an `init()` or by importing a package. Nothing else is reassignable: `time` exports no mutable function values, and its layout strings are constants.
+Process-wide state exists and is deliberate — download consent and offline mode (`remote.EnableDownloads`, `remote.SetOffline`), the logger (`logging.Set`), the EOP and leap-second registries (`time.RegisterModel`, `time.RegisterLeapSeconds`). All of it is set by an explicitly named call and none of it is established by an `init()` or by importing a package. Nothing else astrogo owns is reassignable: `time` exports no mutable function values, its layout strings are constants, and `time.J2000()` is a function precisely so the standard epoch cannot be moved process-wide. The one exception is `time.LocationUTC`, and it is Go's own — the standard library declares `var UTC *Location`, so wrapping it would hand back the same reassignable pointer and remove nothing. `internal/docsguard` keeps an inventory of every remaining `var`, each with the reason Go offers no alternative, so the next one has to be argued for rather than added.
 
 ---
 

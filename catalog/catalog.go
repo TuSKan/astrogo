@@ -569,7 +569,7 @@ func unionByPosition(candidates []candidate, uf *unionFind, threshold angle.Angl
 			continue
 		}
 
-		propagated, err := coord.PropagateEpoch(cand.target.Coord, cand.target.Epoch, time.J2000)
+		propagated, err := coord.PropagateEpoch(cand.target.Coord, cand.target.Epoch, time.J2000())
 		if err != nil {
 			continue
 		}
@@ -630,7 +630,7 @@ func anchorCoord(g group) (coord.ICRS, bool) {
 			continue
 		}
 
-		propagated, err := coord.PropagateEpoch(c.target.Coord, c.target.Epoch, time.J2000)
+		propagated, err := coord.PropagateEpoch(c.target.Coord, c.target.Epoch, time.J2000())
 		if err != nil {
 			continue
 		}
@@ -730,7 +730,7 @@ func foldConeSearchResults(g group, newCandidates []candidate, threshold angle.A
 			continue
 		}
 
-		propagated, err := coord.PropagateEpoch(nc.target.Coord, nc.target.Epoch, time.J2000)
+		propagated, err := coord.PropagateEpoch(nc.target.Coord, nc.target.Epoch, time.J2000())
 		if err != nil {
 			continue
 		}

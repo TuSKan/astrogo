@@ -86,8 +86,8 @@ func TestNewFetchesFromNetworkWhenDownloadsEnabled(t *testing.T) {
 
 	// Regression: Epoch used to never be set despite OpenNGC's RA/Dec being
 	// implicitly J2000 by the catalog's own convention.
-	if !got.Epoch.Equal(time.J2000) {
-		t.Errorf("Epoch = %v, want time.J2000", got.Epoch)
+	if !got.Epoch.Equal(time.J2000()) {
+		t.Errorf("Epoch = %v, want time.J2000()", got.Epoch)
 	}
 
 	got, err = p.Resolve(context.Background(), "M31")

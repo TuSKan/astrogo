@@ -14,7 +14,7 @@ func star(id, name string, aliases []string, ra, dec float64, hasCoord bool) res
 	if hasCoord {
 		t.Coord = coord.NewICRS(angle.Deg(ra), angle.Deg(dec))
 		t.HasCoord = true
-		t.Epoch = time.J2000
+		t.Epoch = time.J2000()
 	}
 
 	return t

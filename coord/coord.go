@@ -638,7 +638,7 @@ func PositionAngle(from, to ICRS) angle.Angle {
 // proper motion, parallax, or radial velocity, the position is returned
 // unchanged — propagation over any interval is a no-op for a motionless
 // point. A zero fromEpoch or toEpoch (time.Time{}) is treated as
-// time.J2000, matching the epoch convention most catalogs cross-matched
+// time.J2000(), matching the epoch convention most catalogs cross-matched
 // against assume when they don't report one explicitly.
 //
 // This is rigorous relativistic space-motion propagation (good to
@@ -648,11 +648,11 @@ func PositionAngle(from, to ICRS) angle.Angle {
 // not a star's own kinematics.
 func PropagateEpoch(c ICRS, fromEpoch, toEpoch time.Time) (ICRS, error) {
 	if fromEpoch.IsZero() {
-		fromEpoch = time.J2000
+		fromEpoch = time.J2000()
 	}
 
 	if toEpoch.IsZero() {
-		toEpoch = time.J2000
+		toEpoch = time.J2000()
 	}
 
 	if fromEpoch.Equal(toEpoch) {
