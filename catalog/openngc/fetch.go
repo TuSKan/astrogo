@@ -109,7 +109,7 @@ func toTargets(records []targetRecord) []resolve.Target {
 			HasCoord: true,
 			Catalog:  "openngc",
 			Aliases:  rec.Aliases,
-			Epoch:    time.J2000, // OpenNGC's RA/Dec are J2000 by catalog convention
+			Epoch:    time.J2000(), // OpenNGC's RA/Dec are J2000 by catalog convention
 		}
 
 		if v, err := strconv.ParseFloat(rec.VMag, 64); err == nil {

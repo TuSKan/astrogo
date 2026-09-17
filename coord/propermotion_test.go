@@ -36,7 +36,7 @@ func TestACataloguesProperMotionMovesAStarByWhatItSays(t *testing.T) {
 		wantArcsec     = pmRAMasPerYear / 1000 * years
 	)
 
-	from := time.J2000
+	from := time.J2000()
 	to := from.AddDays(years * 365.25)
 
 	for _, dec := range []float64{0, 30, 45, 60, 80, -70} {
@@ -120,7 +120,7 @@ func TestProperMotionAtThePoleDoesNotExplode(t *testing.T) {
 			angle.Arcsec(1), angle.Arcsec(1), 0, 0,
 		)
 
-		got, err := coord.PropagateEpoch(src, time.J2000, time.J2000.AddDays(3652.5))
+		got, err := coord.PropagateEpoch(src, time.J2000(), time.J2000().AddDays(3652.5))
 		if err != nil {
 			t.Fatalf("PropagateEpoch at the pole: %v", err)
 		}

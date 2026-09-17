@@ -369,9 +369,9 @@ func TestSeparationAndPositionAngle(t *testing.T) {
 func TestPropagateEpoch_NoKinematicsIsNoOp(t *testing.T) {
 	c := coord.NewICRS(angle.Deg(10), angle.Deg(20))
 
-	later := time.J2000.Add((50 * 365.25 * 24) * time.Hour)
+	later := time.J2000().Add((50 * 365.25 * 24) * time.Hour)
 
-	out, err := coord.PropagateEpoch(c, time.J2000, later)
+	out, err := coord.PropagateEpoch(c, time.J2000(), later)
 	testutil.AssertNoError(t, err)
 	testutil.AssertNear(t, "RA unchanged with no kinematics", out.RA().Degrees(), c.RA().Degrees(), 1e-12)
 	testutil.AssertNear(t, "Dec unchanged with no kinematics", out.Dec().Degrees(), c.Dec().Degrees(), 1e-12)
@@ -380,7 +380,7 @@ func TestPropagateEpoch_NoKinematicsIsNoOp(t *testing.T) {
 func TestPropagateEpoch_SameEpochIsNoOp(t *testing.T) {
 	c := coord.NewICRSWithKinematics(angle.Deg(10), angle.Deg(0), angle.Arcsec(1), angle.Arcsec(0), angle.Arcsec(0.1), 0)
 
-	out, err := coord.PropagateEpoch(c, time.J2000, time.J2000)
+	out, err := coord.PropagateEpoch(c, time.J2000(), time.J2000())
 	testutil.AssertNoError(t, err)
 	testutil.AssertNear(t, "RA unchanged at same epoch", out.RA().Degrees(), c.RA().Degrees(), 1e-15)
 }
@@ -391,9 +391,9 @@ func TestPropagateEpoch_AppliesProperMotion(t *testing.T) {
 	// the relativistic/parallax correction Pmsafe also applies.
 	c := coord.NewICRSWithKinematics(angle.Deg(10), angle.Deg(0), angle.Arcsec(1), angle.Arcsec(0), angle.Arcsec(0.1), 0)
 
-	later := time.J2000.Add((10 * 365.25 * 24) * time.Hour)
+	later := time.J2000().Add((10 * 365.25 * 24) * time.Hour)
 
-	out, err := coord.PropagateEpoch(c, time.J2000, later)
+	out, err := coord.PropagateEpoch(c, time.J2000(), later)
 	testutil.AssertNoError(t, err)
 
 	shiftArcsec := (out.RA().Degrees() - c.RA().Degrees()) * 3600
@@ -403,9 +403,9 @@ func TestPropagateEpoch_AppliesProperMotion(t *testing.T) {
 func TestPropagateEpoch_ZeroEpochDefaultsToJ2000(t *testing.T) {
 	c := coord.NewICRSWithKinematics(angle.Deg(10), angle.Deg(0), angle.Arcsec(1), angle.Arcsec(0), angle.Arcsec(0.1), 0)
 
-	later := time.J2000.Add((10 * 365.25 * 24) * time.Hour)
+	later := time.J2000().Add((10 * 365.25 * 24) * time.Hour)
 
-	explicit, err := coord.PropagateEpoch(c, time.J2000, later)
+	explicit, err := coord.PropagateEpoch(c, time.J2000(), later)
 	testutil.AssertNoError(t, err)
 
 	implicit, err := coord.PropagateEpoch(c, time.Time{}, later)

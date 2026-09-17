@@ -33,7 +33,7 @@ const defaultTable = "II/246/out"
 // Standard reference epochs for the tables below, expressed as two-part
 // Julian dates matching each survey's own documented catalog epoch.
 var (
-	epoch2MASS     = time.J2000                         // "raj2000"/"dej2000" column names state this explicitly
+	epoch2MASS     = time.J2000()                       // "raj2000"/"dej2000" column names state this explicitly
 	epochHipparcos = time.FromJD(2448349.0625, time.TT) // J1991.25, the Hipparcos catalog's own reference epoch
 	epochGaiaDR3   = time.FromJD(2457388.5, time.TT)    // J2016.0, Gaia DR3's reference epoch
 )

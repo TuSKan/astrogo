@@ -192,7 +192,7 @@ func (p *Provider) ResolveObject(ctx context.Context, req resolve.ObjectRequest)
 // Catalog keeps one consistent meaning ("which provider produced this row")
 // across the whole package.
 //
-// Epoch defaults to time.J2000 as a best-effort assumption: the API doesn't
+// Epoch defaults to time.J2000() as a best-effort assumption: the API doesn't
 // report which sub-resolver's native epoch actually answered, but
 // SIMBAD/NED name-lookup responses are conventionally J2000.
 func newMASTTarget(canonicalName, resolver string, ra, dec *float64) resolve.Target {
@@ -200,7 +200,7 @@ func newMASTTarget(canonicalName, resolver string, ra, dec *float64) resolve.Tar
 		ID:      canonicalName,
 		Name:    canonicalName,
 		Catalog: "mast",
-		Epoch:   time.J2000,
+		Epoch:   time.J2000(),
 	}
 
 	if resolver != "" {

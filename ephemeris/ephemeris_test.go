@@ -55,7 +55,7 @@ func (s *stubProvider) Close() error {
 func vec(a [3]float64) vector.Vec3 { return vector.Vec3{X: a[0], Y: a[1], Z: a[2]} }
 
 func TestNewElementsRejectsWhatTwoBodyCannotRepresent(t *testing.T) {
-	epoch := time.J2000
+	epoch := time.J2000()
 
 	cases := []struct {
 		name string
@@ -92,7 +92,7 @@ func TestNewElementsRejectsWhatTwoBodyCannotRepresent(t *testing.T) {
 }
 
 func TestNewFromElementsAnswersTheRegisteredBody(t *testing.T) {
-	el, err := NewElements(time.J2000, 2.7658, 0.07839,
+	el, err := NewElements(time.J2000(), 2.7658, 0.07839,
 		angle.Deg(10.587), angle.Deg(80.393), angle.Deg(73.597), angle.Deg(77.372))
 	if err != nil {
 		t.Fatalf("NewElements: %v", err)
@@ -107,7 +107,7 @@ func TestNewFromElementsAnswersTheRegisteredBody(t *testing.T) {
 
 	defer func() { _ = p.Close() }()
 
-	st, err := p.State(ceres, time.J2000)
+	st, err := p.State(ceres, time.J2000())
 	if err != nil {
 		t.Fatalf("State(registered body): %v", err)
 	}
@@ -122,7 +122,7 @@ func TestNewFromElementsAnswersTheRegisteredBody(t *testing.T) {
 	// A body it does not propagate must still be answerable, through the
 	// default SOFA base — that is what makes the returned Provider a drop-in
 	// for a kernel-backed one.
-	if _, err := p.State(core.Sun, time.J2000); err != nil {
+	if _, err := p.State(core.Sun, time.J2000()); err != nil {
 		t.Errorf("State(Sun) through the default base: %v", err)
 	}
 }
@@ -142,7 +142,7 @@ func TestWithKeplerBaseIsUsed(t *testing.T) {
 
 	p := NewMovingBodyProvider(WithKeplerBase(base))
 
-	st, err := p.State(core.Sun, time.J2000)
+	st, err := p.State(core.Sun, time.J2000())
 	if err != nil {
 		t.Fatalf("State(Sun): %v", err)
 	}
@@ -167,7 +167,7 @@ func TestWithKeplerBaseIsUsed(t *testing.T) {
 func TestFreshMovingBodyProviderAnswersPluto(t *testing.T) {
 	p := NewMovingBodyProvider()
 
-	st, err := p.State(core.Pluto, time.J2000)
+	st, err := p.State(core.Pluto, time.J2000())
 	if err != nil {
 		t.Fatalf("State(Pluto): %v", err)
 	}
@@ -180,7 +180,7 @@ func TestFreshMovingBodyProviderAnswersPluto(t *testing.T) {
 	}
 
 	// Every SOFA-covered body still works, which is the other half.
-	if _, err := p.State(core.Mars, time.J2000); err != nil {
+	if _, err := p.State(core.Mars, time.J2000()); err != nil {
 		t.Errorf("State(Mars): %v", err)
 	}
 }
@@ -202,7 +202,7 @@ func TestDefaultAnswersEveryNamedBody(t *testing.T) {
 	}
 
 	for _, id := range named {
-		st, err := p.State(id, time.J2000)
+		st, err := p.State(id, time.J2000())
 		if err != nil {
 			t.Errorf("Default().State(%s) = %v; the doc comment says every named body is answerable", id, err)
 
@@ -322,17 +322,17 @@ func TestPositionAndVelocityAgreeWithState(t *testing.T) {
 
 	defer func() { _ = p.Close() }()
 
-	st, err := p.State(core.Mars, time.J2000)
+	st, err := p.State(core.Mars, time.J2000())
 	if err != nil {
 		t.Fatalf("State: %v", err)
 	}
 
-	pos, err := Position(p, core.Mars, time.J2000)
+	pos, err := Position(p, core.Mars, time.J2000())
 	if err != nil {
 		t.Fatalf("Position: %v", err)
 	}
 
-	vel, err := Velocity(p, core.Mars, time.J2000)
+	vel, err := Velocity(p, core.Mars, time.J2000())
 	if err != nil {
 		t.Fatalf("Velocity: %v", err)
 	}
@@ -354,15 +354,15 @@ func TestHelpersPropagateTheProviderError(t *testing.T) {
 
 	const absent = core.ID(999999)
 
-	if _, err := Position(p, absent, time.J2000); err == nil {
+	if _, err := Position(p, absent, time.J2000()); err == nil {
 		t.Error("Position returned nil error for an unsupported body")
 	}
 
-	if _, err := Velocity(p, absent, time.J2000); err == nil {
+	if _, err := Velocity(p, absent, time.J2000()); err == nil {
 		t.Error("Velocity returned nil error for an unsupported body")
 	}
 
-	if _, err := Altitude(p, absent, time.J2000); err == nil {
+	if _, err := Altitude(p, absent, time.J2000()); err == nil {
 		t.Error("Altitude returned nil error for an unsupported body")
 	}
 }

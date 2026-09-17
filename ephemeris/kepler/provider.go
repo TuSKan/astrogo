@@ -164,7 +164,7 @@ func (p *Provider) Close() error { return nil }
 // Pluto — Charon — cannot be placed at all, since the provider composes a
 // satellite through its parent.
 var PlutoElements = func() Elements {
-	el, err := NewElements(time.J2000, 39.48211675, 0.24882730,
+	el, err := NewElements(time.J2000(), 39.48211675, 0.24882730,
 		angle.Deg(17.14001206), angle.Deg(110.30393684),
 		angle.Deg(113.76497945), angle.Deg(14.86012204))
 	if err != nil {

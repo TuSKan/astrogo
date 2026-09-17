@@ -33,12 +33,12 @@ var allowedTimeVars = map[string]string{
 	// The standard library declares `var UTC *Location = &utcLoc`, so a
 	// function would hand back the same reassignable pointer and remove
 	// nothing, at the cost of churning every call site.
+	//
+	// The last var on this list that is not a sentinel error, and the only one
+	// astrogo could not have avoided. J2000 was the other, and #113 turned it
+	// into a function: a struct value cannot be const, but a function that
+	// returns a copy of an unexported one cannot be reassigned either.
 	"LocationUTC": "wraps the standard library's own mutable time.UTC",
-
-	// A struct value, which Go cannot declare immutable. Making it safe means
-	// turning it into a function and breaking every caller — a decision, not
-	// a cleanup, and left open on #113.
-	"J2000": "struct value; Go has no immutable struct, see #113",
 }
 
 // TestTimeExportsNoMutableFunctionValues keeps the package that underpins
