@@ -147,3 +147,71 @@ func TestUnreachableAgainstARealSocket(t *testing.T) {
 		}
 	})
 }
+
+// TestANetworkFailureWinsOverAnAccompanyingDeadline is #348.
+//
+// A download runs under a context carrying the endpoint's timeout, so a host
+// that stops answering can leave both the dial failure and
+// context.DeadlineExceeded in one error chain. Excluding the context errors
+// before everything else swallowed that pair and reported a genuinely
+// unreachable host as reachable — which is how ephemeris/jpl's kernel tests
+// failed on NAIF's downtime with their skip guard in place and not firing.
+//
+// The distinction the exclusion exists to protect is still asserted below: a
+// deadline on its own, with no network signal anywhere in the chain, is still
+// not the network's doing.
+func TestANetworkFailureWinsOverAnAccompanyingDeadline(t *testing.T) {
+	t.Parallel()
+
+	dial := &net.OpError{Op: "dial", Net: "tcp", Err: timeoutError{}}
+
+	for _, tc := range []struct {
+		name string
+		err  error
+		want bool
+	}{
+		{
+			name: "a dial failure and the download's deadline, joined",
+			err:  fmt.Errorf("remote: fetch de440s.bsp: %w: %w", context.DeadlineExceeded, dial),
+			want: true,
+		},
+		{
+			name: "the same pair the other way round",
+			err:  fmt.Errorf("remote: fetch: %w: %w", dial, context.DeadlineExceeded),
+			want: true,
+		},
+		{
+			name: "DNS failed and the deadline fired while it did",
+			err: fmt.Errorf("fetch: %w: %w", context.DeadlineExceeded,
+				&net.DNSError{Err: "no such host", Name: "naif.jpl.nasa.gov"}),
+			want: true,
+		},
+		{
+			name: "connection refused under a cancelled context",
+			err:  fmt.Errorf("get: %w: %w", context.Canceled, syscall.ECONNREFUSED),
+			want: true,
+		},
+
+		// The exclusion still does its job when nothing says the network was
+		// involved. These are the cases that made it necessary.
+		{
+			name: "a deadline alone is still the caller's own",
+			err:  fmt.Errorf("compute: %w", context.DeadlineExceeded),
+			want: false,
+		},
+		{
+			name: "cancellation alone is still the caller's own",
+			err:  fmt.Errorf("fetch: %w", context.Canceled),
+			want: false,
+		},
+		{
+			name: "a deadline wrapping a served response is not the network",
+			err:  fmt.Errorf("remote: %w: %w", context.DeadlineExceeded, errServed),
+			want: false,
+		},
+	} {
+		if got := testutil.Unreachable(tc.err); got != tc.want {
+			t.Errorf("%s: Unreachable = %v, want %v\n  err: %v", tc.name, got, tc.want, tc.err)
+		}
+	}
+}
