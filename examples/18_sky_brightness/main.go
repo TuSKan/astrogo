@@ -78,7 +78,7 @@ func main() {
 	// for a high dry site; dataset.LiveAerosol fetches the real figure for a
 	// place and an hour from Copernicus, which is the same call with the
 	// guess taken out.
-	air := atmosphere.RuralAerosol(site.Height().Meters(), atmosphere.CleanMountainAOD550)
+	air := atmosphere.RuralAerosol(site.Height(), atmosphere.CleanMountainAOD550)
 
 	scene, err := sky.Scene(site, when, air)
 	if err != nil {

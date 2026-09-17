@@ -1,6 +1,10 @@
 package atmosphere
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/TuSKan/astrogo/unit"
+)
 
 // TestAerosolPresets_BuildClean confirms every named preset builds
 // without error for a physically reasonable AOD and reproduces the
@@ -10,7 +14,7 @@ import "testing"
 func TestAerosolPresets_BuildClean(t *testing.T) {
 	cases := []struct {
 		name       string
-		build      func(heightM, aod550 float64) *Builder
+		build      func(height unit.Length, aod550 float64) *Builder
 		wantSSA    float64
 		wantAsymm  float64
 		wantAngstr float64
@@ -162,13 +166,13 @@ func TestAerosolPresetsCarryTheirOPACScaleHeight(t *testing.T) {
 
 	for _, c := range []struct {
 		name  string
-		build func(heightM, aod550 float64) *Builder
-		wantM float64
+		build func(height unit.Length, aod550 float64) *Builder
+		wantM unit.Length
 	}{
-		{"rural", RuralAerosol, ContinentalScaleHeightM},
-		{"urban", UrbanAerosol, ContinentalScaleHeightM},
-		{"desert", DesertAerosol, DesertScaleHeightM},
-		{"maritime", MaritimeAerosol, MaritimeScaleHeightM},
+		{"rural", RuralAerosol, ContinentalScaleHeight},
+		{"urban", UrbanAerosol, ContinentalScaleHeight},
+		{"desert", DesertAerosol, DesertScaleHeight},
+		{"maritime", MaritimeAerosol, MaritimeScaleHeight},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			t.Parallel()
@@ -178,10 +182,9 @@ func TestAerosolPresetsCarryTheirOPACScaleHeight(t *testing.T) {
 				t.Fatalf("Build: %v", err)
 			}
 
-			got := float64(air.Aerosol().ScaleHeight)
-
+			got := air.Aerosol().ScaleHeight
 			if got != c.wantM {
-				t.Errorf("scale height is %g m, want %g", got, c.wantM)
+				t.Errorf("scale height is %g m, want %g", got.Meters(), c.wantM.Meters())
 			}
 
 			// Zero is the specific failure this guards: it builds cleanly and
@@ -196,15 +199,16 @@ func TestAerosolPresetsCarryTheirOPACScaleHeight(t *testing.T) {
 	// rather than as a subtly wrong sky.
 	for _, c := range []struct {
 		name   string
-		gotM   float64
+		got    unit.Length
 		wantKM float64
 	}{
-		{"continental and urban", ContinentalScaleHeightM, 8},
-		{"desert", DesertScaleHeightM, 2},
-		{"maritime", MaritimeScaleHeightM, 1},
+		{"continental and urban", ContinentalScaleHeight, 8},
+		{"desert", DesertScaleHeight, 2},
+		{"maritime", MaritimeScaleHeight, 1},
 	} {
-		if c.gotM != c.wantKM*1000 {
-			t.Errorf("%s: %g m, and OPAC Table 5 gives Z = %g km", c.name, c.gotM, c.wantKM)
+		if c.got != unit.Km(c.wantKM) {
+			t.Errorf("%s: %g m, and OPAC Table 5 gives Z = %g km",
+				c.name, c.got.Meters(), c.wantKM)
 		}
 	}
 }
@@ -345,21 +349,21 @@ func TestAerosolPresets_AddedTypesCarryTheirScaleHeight(t *testing.T) {
 
 	for _, c := range []struct {
 		name  string
-		build func(heightM, aod550 float64) *Builder
-		want  float64
+		build func(height unit.Length, aod550 float64) *Builder
+		want  unit.Length
 	}{
-		{"ContinentalCleanAerosol", ContinentalCleanAerosol, ContinentalScaleHeightM},
-		{"ContinentalPollutedAerosol", ContinentalPollutedAerosol, ContinentalScaleHeightM},
-		{"MaritimePollutedAerosol", MaritimePollutedAerosol, MaritimeScaleHeightM},
-		{"MaritimeTropicalAerosol", MaritimeTropicalAerosol, MaritimeScaleHeightM},
+		{"ContinentalCleanAerosol", ContinentalCleanAerosol, ContinentalScaleHeight},
+		{"ContinentalPollutedAerosol", ContinentalPollutedAerosol, ContinentalScaleHeight},
+		{"MaritimePollutedAerosol", MaritimePollutedAerosol, MaritimeScaleHeight},
+		{"MaritimeTropicalAerosol", MaritimeTropicalAerosol, MaritimeScaleHeight},
 	} {
 		air, err := c.build(0, 0.1).Build()
 		if err != nil {
 			t.Fatalf("%s: %v", c.name, err)
 		}
 
-		if got := float64(air.Aerosol().ScaleHeight); got != c.want {
-			t.Errorf("%s scale height is %g m, want %g", c.name, got, c.want)
+		if got := air.Aerosol().ScaleHeight; got != c.want {
+			t.Errorf("%s scale height is %g m, want %g", c.name, got.Meters(), c.want.Meters())
 		}
 
 		if src := air.Provenance().Source.Name; src == "" {

@@ -167,7 +167,7 @@ func consentAdvice(p skybrightness.Preset, err error) error {
 // level from one who never thought about it. Guessing between them would mean
 // silently overriding an explicit choice, or silently keeping a wrong one. A
 // named call the caller makes is better than either, and
-// SurfaceAtAltitude(site.Height().Meters()) is not the kind of line anyone gets wrong.
+// SurfaceAtAltitude(site.Height()) is not the kind of line anyone gets wrong.
 func (s *Sky) Scene(
 	site *coord.Geodetic, when time.GoTime, air *atmosphere.Builder,
 ) (*skybrightness.Scene, error) {
@@ -179,7 +179,7 @@ func (s *Sky) Scene(
 		// Nil is unambiguous: the caller has expressed no atmosphere at all,
 		// so a clear one at the right elevation is a default rather than an
 		// override.
-		air = atmosphere.NewBuilder().SurfaceAtAltitude(site.Height().Meters())
+		air = atmosphere.NewBuilder().SurfaceAtAltitude(site.Height())
 	}
 
 	air, err := s.preset.Transfer(air)

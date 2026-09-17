@@ -124,12 +124,12 @@ const (
 // has a lapse rate, so this overstates the scale height of the lowest few
 // kilometres slightly. For the horizontal-path optical depths it feeds, that
 // is well inside the uncertainty on the aerosol term beside it.
-func MolecularScaleHeight(t unit.TemperatureK) (float64, error) {
+func MolecularScaleHeight(t unit.TemperatureK) (unit.Length, error) {
 	if !positiveFinite(float64(t)) {
 		return 0, fmt.Errorf("%w: got %g K", ErrTemperature, float64(t))
 	}
 
-	return DryAirGasConstant * float64(t) / StandardGravity, nil
+	return unit.Meters(DryAirGasConstant * float64(t) / StandardGravity), nil
 }
 
 // Gushchin (1988) airmass constants, as used by Kocifaj & Bará (2019) Eq. 3.
@@ -198,15 +198,15 @@ const (
 	// uses, in kilometres.
 	VanRhijnEarthRadiusKM = 6378.0
 
-	// AirglowLayerHeightM is the height of the emitting layer adopted by
-	// Masana et al. (2021) after Hart (2019), in metres.
+	// AirglowLayerHeight is the height of the emitting layer adopted by
+	// Masana et al. (2021) after Hart (2019).
 	//
 	// The choice only matters near the horizon, and it is a simplification:
 	// the OH, O2 and Na emissions arise near 90 km while the OI 630 nm lines
 	// come from 200 to 300 km, so no single height describes the whole
 	// spectrum. A line-dominated band evaluated at this height is wrong at
 	// large zenith angles.
-	AirglowLayerHeightM = 87_000.0
+	AirglowLayerHeight unit.Length = 87_000.0
 )
 
 // VanRhijn returns the brightness of a thin, uniformly emitting atmospheric
@@ -228,13 +228,14 @@ const (
 //
 // For h = 100 km the maximum is 5.7 at the horizon (Roach & Meinel 1955),
 // which TestVanRhijnAgainstRoachAndMeinel checks.
-func VanRhijn(z angle.Angle, layerHeightM float64) (float64, error) {
-	if layerHeightM <= 0 || math.IsNaN(layerHeightM) || math.IsInf(layerHeightM, 0) {
-		return 0, fmt.Errorf("%w: layer height %g m", ErrScaleHeightRange, layerHeightM)
+func VanRhijn(z angle.Angle, layerHeight unit.Length) (float64, error) {
+	h := layerHeight.Meters()
+	if h <= 0 || math.IsNaN(h) || math.IsInf(h, 0) {
+		return 0, fmt.Errorf("%w: layer height %g m", ErrScaleHeightRange, h)
 	}
 
 	radius := VanRhijnEarthRadiusKM * 1000
-	ratio := radius / (radius + layerHeightM)
+	ratio := radius / (radius + h)
 
 	sinZ := z.Sin()
 
@@ -249,6 +250,14 @@ func VanRhijn(z angle.Angle, layerHeightM float64) (float64, error) {
 
 // Scale heights and the default effective-depth factor for extended sources,
 // from Masana et al. (2021) Section 7.
+//
+// The two scale heights keep their unit in their names and stay bare float64,
+// where [ContinentalScaleHeight] and its siblings became [unit.Length]. They
+// are not the same kind of constant: the preset scale heights cross the API
+// into [Builder.AerosolScaleHeight], so typing them removes a conversion at
+// every call site, while these two appear only inside
+// [ExtendedSourceOpticalDepth]'s own arithmetic and are named after the
+// symbols in the paper it implements.
 const (
 	// MolecularScaleHeightM is the exponential scale height of the molecular
 	// atmosphere, Masana et al. (2021) Eq. 25.
@@ -295,7 +304,7 @@ const (
 func ExtendedSourceOpticalDepth(
 	rayleigh, aerosol unit.OpticalDepth,
 	molecularAirmass, aerosolAirmass float64,
-	observerHeightM, kappa float64,
+	observerHeight unit.Length, kappa float64,
 ) (unit.OpticalDepth, error) {
 	switch {
 	case rayleigh < 0 || math.IsNaN(float64(rayleigh)) || math.IsInf(float64(rayleigh), 0):
@@ -305,14 +314,15 @@ func ExtendedSourceOpticalDepth(
 	case molecularAirmass < 1 || aerosolAirmass < 1:
 		return 0, fmt.Errorf("%w: airmass %g/%g is below one",
 			ErrAirmassRange, molecularAirmass, aerosolAirmass)
-	case observerHeightM < 0 || math.IsNaN(observerHeightM):
-		return 0, fmt.Errorf("%w: observer height %g m", ErrOpticalDepth, observerHeightM)
+	case observerHeight < 0 || math.IsNaN(observerHeight.Meters()):
+		return 0, fmt.Errorf("%w: observer height %g m", ErrOpticalDepth, observerHeight.Meters())
 	case kappa <= 0 || kappa > 1:
 		return 0, fmt.Errorf("%w: kappa %g is outside (0, 1]", ErrOpticalDepth, kappa)
 	}
 
-	molecular := float64(rayleigh) * molecularAirmass * math.Exp(-observerHeightM/MolecularScaleHeightM)
-	particulate := float64(aerosol) * aerosolAirmass * math.Exp(-observerHeightM/AerosolScaleHeightM)
+	h := observerHeight.Meters()
+	molecular := float64(rayleigh) * molecularAirmass * math.Exp(-h/MolecularScaleHeightM)
+	particulate := float64(aerosol) * aerosolAirmass * math.Exp(-h/AerosolScaleHeightM)
 
 	return unit.OpticalDepth(kappa * (molecular + particulate)), nil
 }

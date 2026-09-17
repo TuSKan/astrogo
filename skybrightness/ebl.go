@@ -134,7 +134,7 @@ func (e *ExtragalacticBackground) AddRadiance(
 
 	pressure, _ := scene.Atmosphere.Surface()
 	aerosol := scene.Atmosphere.Aerosol()
-	height := scene.Observer.Height().Meters()
+	height := scene.Observer.Height()
 	kappa := scene.Atmosphere.DiffuseKappa()
 
 	flags := Flag(0)

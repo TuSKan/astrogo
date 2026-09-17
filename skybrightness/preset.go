@@ -311,7 +311,7 @@ func NewPreset(p Preset, in PresetInputs) (*Model, error) {
 
 	// The emitting layer at 87 km, which both presets take from Hart (2019a)
 	// by way of Masana et al. (2021) Section 6.
-	glow, err := NewAirglow(in.AirglowZenith, in.Grid, atmosphere.AirglowLayerHeightM, in.AirglowMeasured)
+	glow, err := NewAirglow(in.AirglowZenith, in.Grid, atmosphere.AirglowLayerHeight, in.AirglowMeasured)
 	if err != nil {
 		return nil, fmt.Errorf("%w %q: %w", ErrPreset, p, err)
 	}

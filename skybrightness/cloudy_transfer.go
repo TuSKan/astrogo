@@ -52,7 +52,7 @@ func newSkyglowOptics(grid unit.SpectralGrid, scene *Scene) (*skyglowOptics, err
 	o := &skyglowOptics{
 		molecular:       make([]unit.OpticalDepth, n),
 		aerosol:         make([]unit.OpticalDepth, n),
-		molecularScaleM: molecularScale,
+		molecularScaleM: molecularScale.Meters(),
 		aerosolScaleM:   aerosolScale,
 		aerosolAlbedo:   float64(aer.SingleScatteringAlbedo),
 		asymmetry:       float64(aer.Asymmetry),

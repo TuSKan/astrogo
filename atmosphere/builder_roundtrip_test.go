@@ -253,7 +253,7 @@ func TestSurfaceAtAltitudeThinsTheAir(t *testing.T) {
 	lastP, lastT := math.Inf(1), math.Inf(1)
 
 	for _, h := range []float64{0, 1000, 2635, 4200} {
-		air, err := atmosphere.NewBuilder().SurfaceAtAltitude(h).Build()
+		air, err := atmosphere.NewBuilder().SurfaceAtAltitude(unit.Meters(h)).Build()
 		if err != nil {
 			t.Fatalf("Build at %g m: %v", h, err)
 		}

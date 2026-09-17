@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/TuSKan/astrogo/angle"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // ── Refraction Correctness ───────────────────────────────────────────────────
@@ -221,7 +222,7 @@ func TestAtAltitude_SeaLevel(t *testing.T) {
 func TestAtAltitude_Pressure_Decreases(t *testing.T) {
 	prev := AtAltitude(0).Pressure
 	for _, h := range []float64{500, 1000, 2000, 3000, 5000, 8000} {
-		atm := AtAltitude(h)
+		atm := AtAltitude(unit.Meters(h))
 		if atm.Pressure >= prev {
 			t.Errorf("pressure not decreasing: P(%.0fm)=%.2f >= P(prev)=%.2f", h, atm.Pressure, prev)
 		}
@@ -244,7 +245,7 @@ func TestAtAltitude_Everest(t *testing.T) {
 
 func TestAtAltitude_ModelAlwaysNil(t *testing.T) {
 	for _, h := range []float64{-100, 0, 100, 2000, 5000} {
-		atm := AtAltitude(h)
+		atm := AtAltitude(unit.Meters(h))
 		if atm.Model != nil {
 			t.Errorf("AtAltitude(%.0f): Model should be nil, got %T", h, atm.Model)
 		}
@@ -270,7 +271,7 @@ func TestHorizonDip(t *testing.T) {
 	prev := 0.0
 
 	for _, h := range []float64{10, 50, 100, 500, 1000, 5000} {
-		d := HorizonDip(h).Degrees()
+		d := HorizonDip(unit.Meters(h)).Degrees()
 		if d <= prev {
 			t.Errorf("dip not increasing: HorizonDip(%.0fm)=%.4f° <= prev=%.4f°", h, d, prev)
 		}

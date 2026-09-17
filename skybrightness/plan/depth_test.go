@@ -118,7 +118,7 @@ func (s *localSky) Scene(
 	}
 
 	if air == nil {
-		air = atmosphere.NewBuilder().SurfaceAtAltitude(site.Height().Meters())
+		air = atmosphere.NewBuilder().SurfaceAtAltitude(site.Height())
 	}
 
 	built, err := air.Build()

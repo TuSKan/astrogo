@@ -90,7 +90,7 @@ type CloudUncertainty struct {
 // compiler.
 type CloudLayer struct {
 	Fraction        unit.CloudFraction
-	BaseAlt, TopAlt unit.AltitudeM
+	BaseAlt, TopAlt unit.Length
 	OpticalDepth    unit.CloudOpticalDepth
 	Phase           CloudPhase
 	EffRadius       unit.EffectiveRadiusUM
@@ -111,7 +111,7 @@ type Aerosol struct {
 	AngstromExp            unit.AngstromExponent
 	SingleScatteringAlbedo unit.SingleScatteringAlbedo
 	Asymmetry              unit.AsymmetryParameter
-	ScaleHeight            unit.AltitudeM
+	ScaleHeight            unit.Length
 }
 
 // TauAt returns the aerosol optical depth at wavelength lambda, via the
@@ -418,8 +418,8 @@ func (b *Builder) Ozone(du float64) *Builder {
 // It is a default, not a measurement, and [Surface] still overrides it. A site
 // with a real barometer should use one — ISA is a standard profile, not the
 // weather, and a passing front moves surface pressure by a couple of per cent.
-func (b *Builder) SurfaceAtAltitude(heightM float64) *Builder {
-	isa := AtAltitude(heightM)
+func (b *Builder) SurfaceAtAltitude(height unit.Length) *Builder {
+	isa := AtAltitude(height)
 
 	// AtAltitude reports Celsius, as every Refraction does; Surface takes
 	// Kelvin, as every skybrightness-native unit does. The conversion belongs
@@ -435,7 +435,7 @@ func (b *Builder) PrecipitableWater(mm float64) *Builder {
 }
 
 // AerosolScaleHeight sets the height over which aerosol extinction falls by a
-// factor of e, in metres.
+// factor of e.
 //
 // # Why this is not the boundary-layer height
 //
@@ -453,8 +453,8 @@ func (b *Builder) PrecipitableWater(mm float64) *Builder {
 // in was right by the name and wrong by the model, changing the answer
 // materially with nothing to say so. The name now states which quantity it
 // is.
-func (b *Builder) AerosolScaleHeight(m float64) *Builder {
-	b.s.aerosol.ScaleHeight = unit.AltitudeM(m)
+func (b *Builder) AerosolScaleHeight(h unit.Length) *Builder {
+	b.s.aerosol.ScaleHeight = h
 	return b
 }
 
@@ -526,15 +526,15 @@ func (b *Builder) Build() (*Atmosphere, error) {
 
 // StandardDefault returns a deterministic, offline, site-elevation-aware
 // default Atmosphere: no aerosol, no clouds, pressure/temperature from the
-// ICAO ISA barometric profile (AtAltitude) at heightM, zero surface
+// ICAO ISA barometric profile (AtAltitude) at height, zero surface
 // albedo. Its zero aerosol is exact, not approximate — this is the
 // Rayleigh-only reference case, the Atmosphere counterpart to
 // atmos.RayleighOnly's transmission model. For a real, named aerosol
 // regime instead of the zero-aerosol baseline, see RuralAerosol/
 // UrbanAerosol/DesertAerosol/MaritimeAerosol.
-func StandardDefault(heightM float64) *Atmosphere {
+func StandardDefault(height unit.Length) *Atmosphere {
 	s := Atmosphere{
-		surface: AtAltitude(heightM),
+		surface: AtAltitude(height),
 		provenance: Provenance{
 			Source: SourceRef{
 				Name:     "ICAO ISA barometric profile (standard default)",

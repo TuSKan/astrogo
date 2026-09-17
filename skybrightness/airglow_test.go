@@ -34,7 +34,7 @@ func TestVanRhijnZenith(t *testing.T) {
 	t.Parallel()
 
 	for _, h := range []float64{80_000, 87_000, 100_000, 300_000} {
-		got, err := atmosphere.VanRhijn(0, h)
+		got, err := atmosphere.VanRhijn(0, unit.Meters(h))
 		if err != nil {
 			t.Fatalf("VanRhijn(0, %v): %v", h, err)
 		}
@@ -54,7 +54,7 @@ func TestVanRhijnGrowsTowardTheHorizon(t *testing.T) {
 	prev := 0.0
 
 	for _, z := range []float64{0, 20, 40, 60, 75, 85, 89} {
-		got, err := atmosphere.VanRhijn(angle.Deg(z), atmosphere.AirglowLayerHeightM)
+		got, err := atmosphere.VanRhijn(angle.Deg(z), atmosphere.AirglowLayerHeight)
 		if err != nil {
 			t.Fatalf("VanRhijn(%v): %v", z, err)
 		}
@@ -85,7 +85,7 @@ func TestVanRhijnRejectsBadHeight(t *testing.T) {
 	t.Parallel()
 
 	for _, h := range []float64{0, -1, math.NaN(), math.Inf(1)} {
-		if _, err := atmosphere.VanRhijn(angle.Deg(45), h); !errors.Is(err, atmosphere.ErrScaleHeightRange) {
+		if _, err := atmosphere.VanRhijn(angle.Deg(45), unit.Meters(h)); !errors.Is(err, atmosphere.ErrScaleHeightRange) {
 			t.Errorf("h = %v: err = %v, want ErrScaleHeightRange", h, err)
 		}
 	}
@@ -123,7 +123,7 @@ func TestAirglowScalesTheZenithSpectrum(t *testing.T) {
 		t.Fatalf("AirglowRadiance: %v", err)
 	}
 
-	want, err := atmosphere.VanRhijn(angle.Deg(z), atmosphere.AirglowLayerHeightM)
+	want, err := atmosphere.VanRhijn(angle.Deg(z), atmosphere.AirglowLayerHeight)
 	if err != nil {
 		t.Fatalf("VanRhijn: %v", err)
 	}

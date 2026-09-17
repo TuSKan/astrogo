@@ -3,6 +3,8 @@ package atmosphere
 import (
 	"math"
 	"testing"
+
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // ── Composition: Atmosphere embeds Refraction as its surface field ─────────
@@ -81,8 +83,8 @@ func TestBuilder_RefractionDefaultsToNoModel(t *testing.T) {
 // behavior-preserving versus the old manual Celsius/Kelvin conversion.
 func TestStandardDefault_MatchesAtAltitude(t *testing.T) {
 	for _, h := range []float64{0, 500, 2635, 8849} {
-		want := AtAltitude(h)
-		got := StandardDefault(h).Refraction()
+		want := AtAltitude(unit.Meters(h))
+		got := StandardDefault(unit.Meters(h)).Refraction()
 
 		if got != want {
 			t.Errorf("StandardDefault(%v).Refraction() = %+v, want %+v", h, got, want)

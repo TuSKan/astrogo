@@ -35,12 +35,12 @@ func TestExponentialDepthIntegratesItsExtinction(t *testing.T) {
 	step := top / steps
 
 	for i := range steps {
-		lo, err := atmosphere.ExponentialExtinction(unit.AltitudeM(float64(i)*step), column, scaleHeight)
+		lo, err := atmosphere.ExponentialExtinction(unit.Meters(float64(i)*step), column, scaleHeight)
 		if err != nil {
 			t.Fatalf("ExponentialExtinction: %v", err)
 		}
 
-		hi, err := atmosphere.ExponentialExtinction(unit.AltitudeM(float64(i+1)*step), column, scaleHeight)
+		hi, err := atmosphere.ExponentialExtinction(unit.Meters(float64(i+1)*step), column, scaleHeight)
 		if err != nil {
 			t.Fatalf("ExponentialExtinction: %v", err)
 		}
@@ -114,7 +114,7 @@ func TestExponentialExtinctionDecaysByE(t *testing.T) {
 		t.Errorf("ground extinction %.9g, want %.9g", ground, want)
 	}
 
-	up, err := atmosphere.ExponentialExtinction(unit.AltitudeM(scaleHeight), column, scaleHeight)
+	up, err := atmosphere.ExponentialExtinction(scaleHeight, column, scaleHeight)
 	if err != nil {
 		t.Fatalf("ExponentialExtinction: %v", err)
 	}
@@ -130,7 +130,7 @@ func TestProfileRejectsBadArguments(t *testing.T) {
 
 	cases := []struct {
 		name        string
-		alt         unit.AltitudeM
+		alt         unit.Length
 		column      unit.OpticalDepth
 		scaleHeight float64
 		want        error
@@ -147,11 +147,11 @@ func TestProfileRejectsBadArguments(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			t.Parallel()
 
-			if _, err := atmosphere.ExponentialExtinction(c.alt, c.column, c.scaleHeight); !errors.Is(err, c.want) {
+			if _, err := atmosphere.ExponentialExtinction(c.alt, c.column, unit.Meters(c.scaleHeight)); !errors.Is(err, c.want) {
 				t.Errorf("ExponentialExtinction: got %v, want %v", err, c.want)
 			}
 
-			if _, err := atmosphere.ExponentialDepth(c.alt, c.column, c.scaleHeight); !errors.Is(err, c.want) {
+			if _, err := atmosphere.ExponentialDepth(c.alt, c.column, unit.Meters(c.scaleHeight)); !errors.Is(err, c.want) {
 				t.Errorf("ExponentialDepth: got %v, want %v", err, c.want)
 			}
 		})

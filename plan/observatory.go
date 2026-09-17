@@ -470,13 +470,13 @@ func (s *Site) HeightMeters() float64 { return s.location.Height().Meters() }
 // refraction-input struct, never the package's richer atmospheric-state
 // type, so the new name matches what it actually returns.
 func (s *Site) Refraction() atmosphere.Refraction {
-	return atmosphere.AtAltitude(s.location.Height().Meters())
+	return atmosphere.AtAltitude(s.location.Height())
 }
 
 // HorizonDip returns the geometric dip angle of the visible horizon at this
 // site's elevation. At sea level the dip is zero; at 786 m it is ≈ 0.90°.
 func (s *Site) HorizonDip() angle.Angle {
-	return atmosphere.HorizonDip(s.location.Height().Meters())
+	return atmosphere.HorizonDip(s.location.Height())
 }
 
 // RiseSetThreshold returns the standard rise/set altitude threshold for a

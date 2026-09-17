@@ -167,28 +167,32 @@ func AllSkyRadiance(
 // Distances and scale heights must share units; the paper works in
 // kilometres.
 func OpticalParameterT(
-	aerosolOpticalDepth, aerosolScaleHeight unit.OpticalDepth,
-	molecularOpticalDepth, molecularScaleHeight unit.OpticalDepth,
-	separation, airmassSource float64,
+	aerosolOpticalDepth unit.OpticalDepth, aerosolScaleHeight unit.Length,
+	molecularOpticalDepth unit.OpticalDepth, molecularScaleHeight unit.Length,
+	separation unit.Length, airmassSource float64,
 ) (float64, error) {
+	aerosolScaleM := aerosolScaleHeight.Meters()
+	molecularScaleM := molecularScaleHeight.Meters()
+	separationM := separation.Meters()
+
 	switch {
-	case !positiveFinite(float64(aerosolScaleHeight)):
-		return 0, fmt.Errorf("%w: aerosol %g", ErrScaleHeight, float64(aerosolScaleHeight))
-	case !positiveFinite(float64(molecularScaleHeight)):
-		return 0, fmt.Errorf("%w: molecular %g", ErrScaleHeight, float64(molecularScaleHeight))
+	case !positiveFinite(aerosolScaleM):
+		return 0, fmt.Errorf("%w: aerosol %g m", ErrScaleHeight, aerosolScaleM)
+	case !positiveFinite(molecularScaleM):
+		return 0, fmt.Errorf("%w: molecular %g m", ErrScaleHeight, molecularScaleM)
 	case !positiveFinite(airmassSource):
 		return 0, fmt.Errorf("%w: source airmass %g", ErrAirmass, airmassSource)
-	case separation < 0 || math.IsNaN(separation) || math.IsInf(separation, 0):
-		return 0, fmt.Errorf("%w: got %g", ErrSeparation, separation)
+	case separationM < 0 || math.IsNaN(separationM) || math.IsInf(separationM, 0):
+		return 0, fmt.Errorf("%w: got %g m", ErrSeparation, separationM)
 	case aerosolOpticalDepth < 0 || molecularOpticalDepth < 0:
 		return 0, fmt.Errorf("%w: aerosol %g, molecular %g", ErrOpticalDepth,
 			float64(aerosolOpticalDepth), float64(molecularOpticalDepth))
 	}
 
-	extinctionPerLength := float64(aerosolOpticalDepth)/float64(aerosolScaleHeight) +
-		float64(molecularOpticalDepth)/float64(molecularScaleHeight)
+	extinctionPerLength := float64(aerosolOpticalDepth)/aerosolScaleM +
+		float64(molecularOpticalDepth)/molecularScaleM
 
-	return extinctionPerLength * separation / airmassSource, nil
+	return extinctionPerLength * separationM / airmassSource, nil
 }
 
 // positiveFinite reports whether v is positive and finite.

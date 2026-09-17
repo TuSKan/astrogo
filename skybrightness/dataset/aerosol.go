@@ -8,6 +8,7 @@ import (
 	"github.com/TuSKan/astrogo/atmosphere/dataset/cams"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // AerosolPreset is one of [atmosphere]'s OPAC-sourced aerosol constructors —
@@ -18,7 +19,7 @@ import (
 // constructor added there works here without being added twice, and so that
 // the choice reads as the thing it is: which published aerosol type describes
 // the air over this site.
-type AerosolPreset func(heightM, aod550 float64) *atmosphere.Builder
+type AerosolPreset func(height unit.Length, aod550 float64) *atmosphere.Builder
 
 // LiveAerosol builds an aerosol description using the optical depth actually
 // measured over a site at an instant.
@@ -76,5 +77,5 @@ func LiveAerosol(
 
 	// The site's own elevation, which is what the OPAC constructors take:
 	// they set surface conditions from the standard profile at that height.
-	return preset(site.Height().Meters(), aod), nil
+	return preset(site.Height(), aod), nil
 }

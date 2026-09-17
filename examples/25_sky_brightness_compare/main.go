@@ -66,7 +66,7 @@ func main() {
 // little it buys at the zenith.
 func comparePresets(ctx context.Context, when time.GoTime) {
 	site := siteAt(heightM)
-	air := atmosphere.RuralAerosol(site.Height().Meters(), atmosphere.CleanMountainAOD550)
+	air := atmosphere.RuralAerosol(site.Height(), atmosphere.CleanMountainAOD550)
 
 	fmt.Printf("\nOne site, one night, three models of the same natural sky\n")
 	fmt.Printf("Cerro Paranal, %s UTC, clean mountain air\n\n", when.Format("2006-01-02 15:04"))
@@ -144,7 +144,7 @@ func compareAir(ctx context.Context, when time.GoTime) {
 	for _, row := range []struct {
 		name    string
 		heightM float64
-		build   func(heightM, aod550 float64) *atmosphere.Builder
+		build   func(height unit.Length, aod550 float64) *atmosphere.Builder
 		aod550  float64
 	}{
 		{"mountain, clean", 2635, atmosphere.RuralAerosol, atmosphere.CleanMountainAOD550},
@@ -153,7 +153,7 @@ func compareAir(ctx context.Context, when time.GoTime) {
 	} {
 		site := siteAt(row.heightM)
 
-		scene, err := sky.Scene(site, when, row.build(row.heightM, row.aod550))
+		scene, err := sky.Scene(site, when, row.build(unit.Meters(row.heightM), row.aod550))
 		if err != nil {
 			log.Fatalf("scene for %s: %v", row.name, err)
 		}
@@ -211,7 +211,7 @@ func whatObservatoryAdds(ctx context.Context) {
 	}
 
 	scene, err := sky.Scene(site, when,
-		atmosphere.RuralAerosol(site.Height().Meters(), atmosphere.CleanMountainAOD550))
+		atmosphere.RuralAerosol(site.Height(), atmosphere.CleanMountainAOD550))
 	if err != nil {
 		log.Fatalf("scene: %v", err)
 	}

@@ -27,7 +27,7 @@ func TestMolecularScaleHeightIsTheFamiliar8400m(t *testing.T) {
 		t.Fatalf("MolecularScaleHeight: %v", err)
 	}
 
-	if math.Abs(got-8435) > 5 {
+	if math.Abs((got - 8435).Meters()) > 5 {
 		t.Errorf("at 288.15 K the scale height is %.1f m, want about 8435", got)
 	}
 
@@ -38,7 +38,7 @@ func TestMolecularScaleHeightIsTheFamiliar8400m(t *testing.T) {
 		t.Fatalf("MolecularScaleHeight: %v", err)
 	}
 
-	if rel := math.Abs(cold/got - 0.5); rel > 1e-12 {
+	if rel := math.Abs((cold/got - 0.5).Meters()); rel > 1e-12 {
 		t.Errorf("half the temperature gives %.4f× the scale height, want exactly half",
 			cold/got)
 	}
@@ -193,7 +193,7 @@ func TestExtendedSourceOpticalDepthRefusesImpossibleInputs(t *testing.T) {
 			t.Parallel()
 
 			_, err := atmosphere.ExtendedSourceOpticalDepth(
-				c.rayleigh, c.aerosol, c.molecularAirmass, c.aerosolAirmass, c.height, c.kap)
+				c.rayleigh, c.aerosol, c.molecularAirmass, c.aerosolAirmass, unit.Meters(c.height), c.kap)
 
 			if !errors.Is(err, c.want) {
 				t.Errorf("got %v, want %v", err, c.want)
