@@ -151,7 +151,7 @@ func TestIAU2015_SunGravitationalParameter(t *testing.T) {
 		t.Errorf("SunGravitationalParameter.Exact = false, want true")
 	}
 
-	if c.Unit.Dimension != unit.Volume.Div(unit.Time.PowInt(2)) {
+	if c.Unit.Dimension != unit.DimVolume.Div(unit.DimTime.PowInt(2)) {
 		t.Errorf("SunGravitationalParameter.Unit.Dimension = %v, want m^3/s^2", c.Unit.Dimension)
 	}
 }

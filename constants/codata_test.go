@@ -67,11 +67,11 @@ func TestCODATA_Dimensions(t *testing.T) {
 		t.Errorf("ThomsonCrossSection.Unit not compatible with m^2")
 	}
 
-	if s.FineStructureConstant.Unit.Dimension != unit.Dimensionless {
+	if s.FineStructureConstant.Unit.Dimension != unit.DimDimensionless {
 		t.Errorf("FineStructureConstant.Unit.Dimension = %+v, want Dimensionless", s.FineStructureConstant.Unit.Dimension)
 	}
 
-	wantG := unit.Volume.Div(unit.Mass).Div(unit.Time.PowInt(2))
+	wantG := unit.DimVolume.Div(unit.DimMass).Div(unit.DimTime.PowInt(2))
 	if got := s.GravitationalConstant.Unit.Dimension; got != wantG {
 		t.Errorf("GravitationalConstant.Unit.Dimension = %+v, want %+v", got, wantG)
 	}

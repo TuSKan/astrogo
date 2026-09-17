@@ -7,20 +7,20 @@ package unit
 // instead. See the package doc's "Radiometric type safety" section for why.
 var (
 	// Watt is W = kg·m²·s⁻³ (power).
-	Watt = Unit{Dimension: Power, ScaleFactor: 1, Name: "watt", Symbol: "W"}
+	Watt = Unit{Dimension: DimPower, ScaleFactor: 1, Name: "watt", Symbol: "W"}
 
 	// Joule is J = kg·m²·s⁻² (energy).
-	Joule = Unit{Dimension: Energy, ScaleFactor: 1, Name: "joule", Symbol: "J"}
+	Joule = Unit{Dimension: DimEnergy, ScaleFactor: 1, Name: "joule", Symbol: "J"}
 
 	// Hertz is Hz = s⁻¹ (frequency).
-	Hertz = Unit{Dimension: Time.PowInt(-1), ScaleFactor: 1, Name: "hertz", Symbol: "Hz"}
+	Hertz = Unit{Dimension: DimTime.PowInt(-1), ScaleFactor: 1, Name: "hertz", Symbol: "Hz"}
 
 	// Nanometre is nm = 1e-9 m — the wavelength unit spectral radiance is
 	// expressed per.
-	Nanometre = Unit{Dimension: Length, ScaleFactor: 1e-9, Name: "nanometre", Symbol: "nm"}
+	Nanometre = Unit{Dimension: DimLength, ScaleFactor: 1e-9, Name: "nanometre", Symbol: "nm"}
 
 	// Candela is cd (luminous intensity) — the base for Luminance below.
-	Candela = Unit{Dimension: Luminosity, ScaleFactor: 1, Name: "candela", Symbol: "cd"}
+	Candela = Unit{Dimension: DimLuminosity, ScaleFactor: 1, Name: "candela", Symbol: "cd"}
 
 	// Steradian is sr (solid angle).
 	//
@@ -32,7 +32,7 @@ var (
 	// irradiance; that protection lives in skybrightness's own named
 	// scalar types, not here. Do not rely on Compatible/ConversionFactor
 	// to catch a Steradian-vs-One mix-up — it can't.
-	Steradian = Unit{Dimension: Dimensionless, ScaleFactor: 1, Name: "steradian", Symbol: "sr"}
+	Steradian = Unit{Dimension: DimDimensionless, ScaleFactor: 1, Name: "steradian", Symbol: "sr"}
 )
 
 // Composed radiometric units (unit.Unit values, for documentation,

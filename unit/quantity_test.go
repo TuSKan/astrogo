@@ -59,14 +59,14 @@ func TestDerivedArithmetic(t *testing.T) {
 	side := unit.New(10, unit.Meter)
 	area := side.Mul(side)
 	testutil.AssertNear(t, "10m * 10m", area.Value, 100, 1e-15)
-	testutil.AssertEqual(t, "Area dimension", area.Unit.Dimension, unit.Area)
+	testutil.AssertEqual(t, "Area dimension", area.Unit.Dimension, unit.DimArea)
 
 	// m / s = Velocity
 	dist := unit.New(100, unit.Meter)
 	time := unit.New(10, unit.Second)
 	vel := dist.Div(time)
 	testutil.AssertNear(t, "100m / 10s", vel.Value, 10, 1e-15)
-	testutil.AssertEqual(t, "Velocity dimension", vel.Unit.Dimension, unit.Velocity)
+	testutil.AssertEqual(t, "Velocity dimension", vel.Unit.Dimension, unit.DimVelocity)
 }
 
 func TestString(t *testing.T) {

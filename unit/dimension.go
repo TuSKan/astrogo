@@ -68,22 +68,22 @@ func (d Dimension) PowInt(p int) Dimension {
 
 // SI base and derived dimensions — immutable physical constants.
 var (
-	Dimensionless = Dimension{}
-	Length        = Dimension{L: 1}
-	Mass          = Dimension{M: 1}
-	Time          = Dimension{T: 1}
-	Current       = Dimension{I: 1}
-	Temperature   = Dimension{Theta: 1}
-	Amount        = Dimension{N: 1}
-	Luminosity    = Dimension{J: 1}
+	DimDimensionless = Dimension{}
+	DimLength        = Dimension{L: 1}
+	DimMass          = Dimension{M: 1}
+	DimTime          = Dimension{T: 1}
+	DimCurrent       = Dimension{I: 1}
+	DimTemperature   = Dimension{Theta: 1}
+	DimAmount        = Dimension{N: 1}
+	DimLuminosity    = Dimension{J: 1}
 
-	Area         = Dimension{L: 2}
-	Volume       = Dimension{L: 3}
-	Velocity     = Dimension{L: 1, T: -1}
-	Accel        = Dimension{L: 1, T: -2}
-	Force        = Dimension{L: 1, M: 1, T: -2}
-	Pressure     = Dimension{L: -1, M: 1, T: -2}
-	Energy       = Dimension{L: 2, M: 1, T: -2}
-	Power        = Dimension{L: 2, M: 1, T: -3}
-	SpectralFlux = Dimension{M: 1, T: -2} // W/(m²·Hz) base: kg·s⁻²
+	DimArea         = Dimension{L: 2}
+	DimVolume       = Dimension{L: 3}
+	DimVelocity     = Dimension{L: 1, T: -1}
+	DimAccel        = Dimension{L: 1, T: -2}
+	DimForce        = Dimension{L: 1, M: 1, T: -2}
+	DimPressure     = Dimension{L: -1, M: 1, T: -2}
+	DimEnergy       = Dimension{L: 2, M: 1, T: -2}
+	DimPower        = Dimension{L: 2, M: 1, T: -3}
+	DimSpectralFlux = Dimension{M: 1, T: -2} // W/(m²·Hz) base: kg·s⁻²
 )

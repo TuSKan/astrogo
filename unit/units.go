@@ -85,50 +85,50 @@ func (u Unit) String() string {
 // SI and astronomical measurement units — immutable physical constants.
 var (
 	// Meter is the SI base unit of length.
-	Meter = Unit{Dimension: Length, ScaleFactor: 1.0, Name: "meter", Symbol: "m"}
+	Meter = Unit{Dimension: DimLength, ScaleFactor: 1.0, Name: "meter", Symbol: "m"}
 	// Kilometer is 1000 metres.
-	Kilometer = Unit{Dimension: Length, ScaleFactor: 1000.0, Name: "kilometer", Symbol: "km"}
+	Kilometer = Unit{Dimension: DimLength, ScaleFactor: 1000.0, Name: "kilometer", Symbol: "km"}
 	// Millimeter is 0.001 metres.
-	Millimeter = Unit{Dimension: Length, ScaleFactor: 1e-3, Name: "millimeter", Symbol: "mm"}
+	Millimeter = Unit{Dimension: DimLength, ScaleFactor: 1e-3, Name: "millimeter", Symbol: "mm"}
 
 	// AstronomicalUnit is 1 AU = 1.495978707e11 m (IAU 2012 nominal).
-	AstronomicalUnit = Unit{Dimension: Length, ScaleFactor: 1.495978707e11, Name: "astronomical unit", Symbol: "AU"}
+	AstronomicalUnit = Unit{Dimension: DimLength, ScaleFactor: 1.495978707e11, Name: "astronomical unit", Symbol: "AU"}
 	// Parsec is 1 pc = 648000/π AU.
-	Parsec = Unit{Dimension: Length, ScaleFactor: 3.085677581491367e16, Name: "parsec", Symbol: "pc"}
+	Parsec = Unit{Dimension: DimLength, ScaleFactor: 3.085677581491367e16, Name: "parsec", Symbol: "pc"}
 	// LightYear is 1 ly = 9.4607304725808e15 m.
-	LightYear = Unit{Dimension: Length, ScaleFactor: 9.4607304725808e15, Name: "light-year", Symbol: "ly"}
+	LightYear = Unit{Dimension: DimLength, ScaleFactor: 9.4607304725808e15, Name: "light-year", Symbol: "ly"}
 
 	// Gram is 0.001 kilograms.
-	Gram = Unit{Dimension: Mass, ScaleFactor: 1e-3, Name: "gram", Symbol: "g"}
+	Gram = Unit{Dimension: DimMass, ScaleFactor: 1e-3, Name: "gram", Symbol: "g"}
 	// Kilogram is the SI base unit of mass.
-	Kilogram = Unit{Dimension: Mass, ScaleFactor: 1.0, Name: "kilogram", Symbol: "kg"}
+	Kilogram = Unit{Dimension: DimMass, ScaleFactor: 1.0, Name: "kilogram", Symbol: "kg"}
 
 	// Second is the SI base unit of time.
-	Second = Unit{Dimension: Time, ScaleFactor: 1.0, Name: "second", Symbol: "s"}
+	Second = Unit{Dimension: DimTime, ScaleFactor: 1.0, Name: "second", Symbol: "s"}
 	// Minute is 60 seconds.
-	Minute = Unit{Dimension: Time, ScaleFactor: 60.0, Name: "minute", Symbol: "min"}
+	Minute = Unit{Dimension: DimTime, ScaleFactor: 60.0, Name: "minute", Symbol: "min"}
 	// Hour is 3600 seconds.
-	Hour = Unit{Dimension: Time, ScaleFactor: 3600.0, Name: "hour", Symbol: "h"}
+	Hour = Unit{Dimension: DimTime, ScaleFactor: 3600.0, Name: "hour", Symbol: "h"}
 	// Day is 86400 seconds.
-	Day = Unit{Dimension: Time, ScaleFactor: 86400.0, Name: "day", Symbol: "d"}
+	Day = Unit{Dimension: DimTime, ScaleFactor: 86400.0, Name: "day", Symbol: "d"}
 
 	// One is the dimensionless unity unit, for pure ratios (a flattening,
 	// the fine-structure constant, a radians-per-degree scale factor) that
 	// are not angles despite also being dimensionless — Compatible with
 	// Radian by dimension, but conceptually distinct, hence its own symbol.
-	One = Unit{Dimension: Dimensionless, ScaleFactor: 1.0, Name: "one", Symbol: "1"}
+	One = Unit{Dimension: DimDimensionless, ScaleFactor: 1.0, Name: "one", Symbol: "1"}
 	// Radian is the SI unit of angle (dimensionless).
-	Radian = Unit{Dimension: Dimensionless, ScaleFactor: 1.0, Name: "radian", Symbol: "rad"}
+	Radian = Unit{Dimension: DimDimensionless, ScaleFactor: 1.0, Name: "radian", Symbol: "rad"}
 	// Degree is π/180 radians.
-	Degree = Unit{Dimension: Dimensionless, ScaleFactor: math.Pi / 180.0, Name: "degree", Symbol: "deg"}
+	Degree = Unit{Dimension: DimDimensionless, ScaleFactor: math.Pi / 180.0, Name: "degree", Symbol: "deg"}
 	// Arcminute is 1/60 of a degree.
-	Arcminute = Unit{Dimension: Dimensionless, ScaleFactor: math.Pi / (180.0 * 60.0), Name: "arcminute", Symbol: "arcmin"}
+	Arcminute = Unit{Dimension: DimDimensionless, ScaleFactor: math.Pi / (180.0 * 60.0), Name: "arcminute", Symbol: "arcmin"}
 	// Arcsecond is 1/3600 of a degree.
-	Arcsecond = Unit{Dimension: Dimensionless, ScaleFactor: math.Pi / (180.0 * 3600.0), Name: "arcsecond", Symbol: "arcsec"}
+	Arcsecond = Unit{Dimension: DimDimensionless, ScaleFactor: math.Pi / (180.0 * 3600.0), Name: "arcsecond", Symbol: "arcsec"}
 
 	// Kelvin is the SI base unit of thermodynamic temperature.
-	Kelvin = Unit{Dimension: Temperature, ScaleFactor: 1.0, Name: "kelvin", Symbol: "K"}
+	Kelvin = Unit{Dimension: DimTemperature, ScaleFactor: 1.0, Name: "kelvin", Symbol: "K"}
 
 	// Jansky is 1e-26 W/(m²·Hz), the standard unit of spectral flux density.
-	Jansky = Unit{Dimension: SpectralFlux, ScaleFactor: 1e-26, Name: "jansky", Symbol: "Jy"}
+	Jansky = Unit{Dimension: DimSpectralFlux, ScaleFactor: 1e-26, Name: "jansky", Symbol: "Jy"}
 )

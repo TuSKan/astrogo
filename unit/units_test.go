@@ -10,19 +10,19 @@ import (
 
 func TestDimensionAlgebra(t *testing.T) {
 	// L * L = L^2
-	areaDim := unit.Length.Mul(unit.Length)
-	testutil.AssertEqual(t, "Length*Length == Area", areaDim, unit.Area)
+	areaDim := unit.DimLength.Mul(unit.DimLength)
+	testutil.AssertEqual(t, "Length*Length == Area", areaDim, unit.DimArea)
 
 	// L / T = Velocity
-	velDim := unit.Length.Div(unit.Time)
-	testutil.AssertEqual(t, "Length/Time == Velocity", velDim, unit.Velocity)
+	velDim := unit.DimLength.Div(unit.DimTime)
+	testutil.AssertEqual(t, "Length/Time == Velocity", velDim, unit.DimVelocity)
 
 	// L^3 = Volume
-	volDim := unit.Length.PowInt(3)
-	testutil.AssertEqual(t, "Length^3 == Volume", volDim, unit.Volume)
+	volDim := unit.DimLength.PowInt(3)
+	testutil.AssertEqual(t, "Length^3 == Volume", volDim, unit.DimVolume)
 
 	// Inquality
-	if unit.Length.Equals(unit.Mass) {
+	if unit.DimLength.Equals(unit.DimMass) {
 		t.Error("Length should not equal Mass")
 	}
 }
@@ -67,23 +67,23 @@ func TestIncompatibleConversion(t *testing.T) {
 func TestDerivedUnits(t *testing.T) {
 	// m/s^2 (Acceleration)
 	accel := unit.Meter.Div(unit.Second.PowInt(2))
-	testutil.AssertEqual(t, "m/s^2 dimension", accel.Dimension, unit.Accel)
+	testutil.AssertEqual(t, "m/s^2 dimension", accel.Dimension, unit.DimAccel)
 	testutil.AssertNear(t, "m/s^2 scale", accel.ScaleFactor, 1.0, 1e-15)
 
 	// km/h (Velocity)
 	kmph := unit.Kilometer.Div(unit.Hour)
-	testutil.AssertEqual(t, "km/h dimension", kmph.Dimension, unit.Velocity)
+	testutil.AssertEqual(t, "km/h dimension", kmph.Dimension, unit.DimVelocity)
 	// 1000 m / 3600 s = 1/3.6 m/s
 	testutil.AssertNear(t, "km/h scale", kmph.ScaleFactor, 1000.0/3600.0, 1e-15)
 }
 
 func TestUnitAlgebra(t *testing.T) {
 	m2 := unit.Meter.Mul(unit.Meter)
-	testutil.AssertEqual(t, "m*m dimension", m2.Dimension, unit.Area)
+	testutil.AssertEqual(t, "m*m dimension", m2.Dimension, unit.DimArea)
 	testutil.AssertNear(t, "m*m scale", m2.ScaleFactor, 1.0, 1e-15)
 
 	newton := unit.Kilogram.Mul(unit.Meter).Div(unit.Second.PowInt(2))
-	testutil.AssertEqual(t, "Newton dimension", newton.Dimension, unit.Force)
+	testutil.AssertEqual(t, "Newton dimension", newton.Dimension, unit.DimForce)
 }
 
 func TestAstronomicalUnits(t *testing.T) {
@@ -109,7 +109,7 @@ func TestAstronomicalUnits(t *testing.T) {
 
 func TestJansky(t *testing.T) {
 	// Jansky should have SpectralFlux dimension
-	testutil.AssertEqual(t, "Jansky dimension", unit.Jansky.Dimension, unit.SpectralFlux)
+	testutil.AssertEqual(t, "Jansky dimension", unit.Jansky.Dimension, unit.DimSpectralFlux)
 	testutil.AssertNear(t, "Jansky scale", unit.Jansky.ScaleFactor, 1e-26, 1e-40)
 
 	// Jy is not compatible with length
