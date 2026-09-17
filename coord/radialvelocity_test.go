@@ -9,6 +9,7 @@ import (
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 	"github.com/TuSKan/astrogo/vector"
 )
 
@@ -54,7 +55,7 @@ func TestBarycentricRVCorrection_BoundedByEarthPlusSiteSpeed(t *testing.T) {
 		ctx := coord.NewContext(tm, site, noRefraction)
 
 		for _, target := range targets {
-			corr := ctx.BarycentricRVCorrection(target)
+			corr := ctx.BarycentricRVCorrection(target).KmPerSec()
 			if math.Abs(corr) > maxPlausibleKmS {
 				t.Errorf("day %d: |BarycentricRVCorrection| = %v km/s, exceeds plausible bound %v",
 					day, corr, maxPlausibleKmS)
@@ -63,7 +64,7 @@ func TestBarycentricRVCorrection_BoundedByEarthPlusSiteSpeed(t *testing.T) {
 			helioCorr, err := ctx.HeliocentricRVCorrection(target)
 			testutil.AssertNoError(t, err)
 
-			if math.Abs(helioCorr) > maxPlausibleKmS {
+			if math.Abs(helioCorr.KmPerSec()) > maxPlausibleKmS {
 				t.Errorf("day %d: |HeliocentricRVCorrection| = %v km/s, exceeds plausible bound %v",
 					day, helioCorr, maxPlausibleKmS)
 			}
@@ -93,7 +94,7 @@ func TestBarycentricRVCorrection_AnnualSinusoid(t *testing.T) {
 		tm := base.AddDays(float64(day))
 		ctx := coord.NewContext(tm, site, noRefraction)
 
-		corr := ctx.BarycentricRVCorrection(target)
+		corr := ctx.BarycentricRVCorrection(target).KmPerSec()
 
 		if corr < lo {
 			lo = corr
@@ -146,7 +147,7 @@ func TestBarycentricRVCorrection_PerpendicularTargetIsZero(t *testing.T) {
 	var target coord.ICRS
 	target.FromUnitVector(perp)
 
-	corr := ctx.BarycentricRVCorrection(target)
+	corr := ctx.BarycentricRVCorrection(target).KmPerSec()
 	testutil.AssertNear(t, "perpendicular-target correction", corr, 0, 1e-9)
 }
 
@@ -165,8 +166,8 @@ func TestBarycentricRVCorrection_AntipodalTargetsFlipSign(t *testing.T) {
 	var antipodal coord.ICRS
 	antipodal.FromUnitVector(target.ToUnitVector().MulScalar(-1))
 
-	corr := ctx.BarycentricRVCorrection(target)
-	antipodalCorr := ctx.BarycentricRVCorrection(antipodal)
+	corr := ctx.BarycentricRVCorrection(target).KmPerSec()
+	antipodalCorr := ctx.BarycentricRVCorrection(antipodal).KmPerSec()
 
 	testutil.AssertNear(t, "antipodal correction", antipodalCorr, -corr, 1e-9)
 }
@@ -191,7 +192,7 @@ func TestBarycentricRVCorrection_DiurnalAmplitudeScalesWithLatitude(t *testing.T
 			tm := base.AddDays(float64(h) / 24.0)
 			ctx := coord.NewContext(tm, site, noRefraction)
 
-			corr := ctx.BarycentricRVCorrection(target)
+			corr := ctx.BarycentricRVCorrection(target).KmPerSec()
 			if corr < lo {
 				lo = corr
 			}
@@ -233,20 +234,21 @@ func TestHeliocentricRVCorrection_DiffersFromBarycentric(t *testing.T) {
 
 	target := coord.NewICRS(angle.Deg(200), angle.Deg(30))
 
-	bary := ctx.BarycentricRVCorrection(target)
+	bary := ctx.BarycentricRVCorrection(target).KmPerSec()
 
 	helio, err := ctx.HeliocentricRVCorrection(target)
 	testutil.AssertNoError(t, err)
 
-	if bary == helio {
+	if bary == helio.KmPerSec() {
 		t.Error("HeliocentricRVCorrection exactly equals BarycentricRVCorrection — the Sun's own barycentric motion isn't being applied")
 	}
 
 	// The Sun's barycentric speed is a few tens of m/s at most (Jupiter
 	// is the dominant perturber) — the two corrections should be close,
 	// not wildly different.
-	if math.Abs(bary-helio) > 0.1 {
-		t.Errorf("|bary - helio| = %v km/s, expected a small (<0.1 km/s) difference from the Sun's own barycentric motion", math.Abs(bary-helio))
+	if math.Abs(bary-helio.KmPerSec()) > 0.1 {
+		t.Errorf("|bary - helio| = %v km/s, expected a small (<0.1 km/s) difference "+
+			"from the Sun's own barycentric motion", math.Abs(bary-helio.KmPerSec()))
 	}
 }
 
@@ -279,15 +281,15 @@ func TestObservedRadialVelocity_RoundTripsWithBarycentricRVCorrection(t *testing
 		ctx := coord.NewContext(tm, site, noRefraction)
 
 		for _, target := range targets {
-			rvObserved, err := ctx.ObservedRadialVelocity(target, rvBarycentric)
+			rvObserved, err := ctx.ObservedRadialVelocity(target, unit.KmPerSec(rvBarycentric))
 			testutil.AssertNoError(t, err)
 
 			// The two conversions are exact inverses, so this closes to
 			// floating point rather than to a series truncation.
-			roundTripped, err := ctx.BarycentricRadialVelocity(target, rvObserved)
+			roundTripped, err := ctx.BarycentricRadialVelocity(target, unit.KmPerSec(rvObserved.KmPerSec()))
 			testutil.AssertNoError(t, err)
 
-			testutil.AssertNear(t, "round-tripped barycentric RV", roundTripped, rvBarycentric, 1e-12)
+			testutil.AssertNear(t, "round-tripped barycentric RV", roundTripped.KmPerSec(), rvBarycentric, 1e-12)
 		}
 	}
 }
@@ -330,7 +332,7 @@ func TestBarycentricRadialVelocity_ComposesRedshiftsMultiplicatively(t *testing.
 	// Spanning a Sun-like star, a thick-disc star and a halo star.
 	for _, rvObserved := range []float64{0, -5.5, 20, 100, -300} {
 		for _, target := range targets {
-			corr := ctx.BarycentricRVCorrection(target)
+			corr := ctx.BarycentricRVCorrection(target).KmPerSec()
 
 			// Three shifts now, not two: the observer's own clock rate is
 			// the third factor. Built here from the product, as the
@@ -340,10 +342,10 @@ func TestBarycentricRadialVelocity_ComposesRedshiftsMultiplicatively(t *testing.
 
 			want := c * ((1+rvObserved/c)*(1+corr/c)*(1+shift) - 1)
 
-			got, err := ctx.BarycentricRadialVelocity(target, rvObserved)
+			got, err := ctx.BarycentricRadialVelocity(target, unit.KmPerSec(rvObserved))
 			testutil.AssertNoError(t, err)
 
-			testutil.AssertNear(t, "barycentric RV from the redshift product", got, want, 1e-9)
+			testutil.AssertNear(t, "barycentric RV from the redshift product", got.KmPerSec(), want, 1e-9)
 		}
 	}
 }
@@ -365,7 +367,7 @@ func TestBarycentricRadialVelocity_ExceedsTheAdditiveFormByTheDocumentedAmount(t
 		time.Date(2026, time.January, 4, 0, 0, 0, 0, time.LocationUTC), site, noRefraction)
 	target := coord.NewICRS(angle.Zero(), angle.Zero())
 
-	corr := ctx.BarycentricRVCorrection(target)
+	corr := ctx.BarycentricRVCorrection(target).KmPerSec()
 	if math.Abs(corr) < 25 {
 		t.Fatalf("correction is %.3f km/s, expected about 30 near perihelion on the ecliptic; "+
 			"the geometry this test relies on has changed", corr)
@@ -393,7 +395,7 @@ func TestBarycentricRadialVelocity_ExceedsTheAdditiveFormByTheDocumentedAmount(t
 	for _, tc := range cases {
 		additive := tc.rvObserved + corr
 
-		exact, eerr := ctx.BarycentricRadialVelocity(target, tc.rvObserved)
+		exact, eerr := ctx.BarycentricRadialVelocity(target, unit.KmPerSec(tc.rvObserved))
 		testutil.AssertNoError(t, eerr)
 
 		// The frame shift acts on the whole classical value, not on c alone,
@@ -404,7 +406,7 @@ func TestBarycentricRadialVelocity_ExceedsTheAdditiveFormByTheDocumentedAmount(t
 		classical := tc.rvObserved + corr + tc.rvObserved*corr/c
 		frameMPerS := shift * (c + classical) * 1e3
 
-		gapMPerS := (exact-additive)*1e3 - frameMPerS
+		gapMPerS := (exact.KmPerSec()-additive)*1e3 - frameMPerS
 		wantMPerS := tc.rvObserved * corr / c * 1e3
 
 		t.Logf("rv %+7.1f km/s (%s): composition term %+8.2f m/s, frame shift %+.2f",
@@ -448,8 +450,8 @@ func TestTopocentricRadialVelocityIsTheLineOfSightComponent(t *testing.T) {
 	// Straight away along the line of sight: the whole speed is radial.
 	const auPerDay = 0.01 // ~17.3 km/s
 
-	away := ctx.TopocentricRadialVelocity(pos, vector.V3(auPerDay, 0, 0))
-	toward := ctx.TopocentricRadialVelocity(pos, vector.V3(-auPerDay, 0, 0))
+	away := ctx.TopocentricRadialVelocity(pos, vector.V3(auPerDay, 0, 0)).KmPerSec()
+	toward := ctx.TopocentricRadialVelocity(pos, vector.V3(-auPerDay, 0, 0)).KmPerSec()
 
 	// The observer's own motion is common to both, so it cancels in the
 	// difference and doubles in the sum. Halving the difference leaves the
@@ -479,7 +481,7 @@ func TestTopocentricRadialVelocityIsTheLineOfSightComponent(t *testing.T) {
 
 	// Across the line of sight: nothing radial but the site's own motion, so
 	// the result must be small rather than of order the body's speed.
-	across := ctx.TopocentricRadialVelocity(pos, vector.V3(0, auPerDay, 0))
+	across := ctx.TopocentricRadialVelocity(pos, vector.V3(0, auPerDay, 0)).KmPerSec()
 	if math.Abs(across) > 0.5 {
 		t.Errorf("a body moving perpendicular to the line of sight has radial velocity "+
 			"%v km/s; only the site's rotation should survive, which is under 0.47", across)
@@ -510,7 +512,7 @@ func TestTopocentricRadialVelocityCarriesTheDiurnalTerm(t *testing.T) {
 		for h := range 24 {
 			ctx := coord.NewContext(at.AddDays(float64(h)/24), site, noRefraction)
 
-			rv := ctx.TopocentricRadialVelocity(pos, atRest)
+			rv := ctx.TopocentricRadialVelocity(pos, atRest).KmPerSec()
 			lo, hi = math.Min(lo, rv), math.Max(hi, rv)
 		}
 
@@ -544,7 +546,7 @@ func TestTopocentricRadialVelocityHandlesAZeroLineOfSight(t *testing.T) {
 	ctx := coord.NewContext(
 		time.Date(2026, time.March, 15, 0, 0, 0, 0, time.LocationUTC), site, noRefraction)
 
-	rv := ctx.TopocentricRadialVelocity(ctx.ObsVec(), vector.V3(0.01, 0, 0))
+	rv := ctx.TopocentricRadialVelocity(ctx.ObsVec(), vector.V3(0.01, 0, 0)).KmPerSec()
 	if rv != 0 {
 		t.Errorf("a body at the observer's own position gave %v, want 0", rv)
 	}

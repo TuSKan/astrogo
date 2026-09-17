@@ -76,5 +76,5 @@ func LiveAerosol(
 
 	// The site's own elevation, which is what the OPAC constructors take:
 	// they set surface conditions from the standard profile at that height.
-	return preset(site.Height(), aod), nil
+	return preset(site.Height().Meters(), aod), nil
 }

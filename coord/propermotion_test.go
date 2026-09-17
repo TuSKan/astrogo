@@ -8,6 +8,7 @@ import (
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // TestACataloguesProperMotionMovesAStarByWhatItSays is the regression test for
@@ -78,7 +79,7 @@ func TestProperMotionSurvivesAFrameConversion(t *testing.T) {
 	for _, dec := range []float64{0, -65, 75} {
 		src := coord.NewICRSWithKinematics(
 			angle.Deg(200), angle.Deg(dec),
-			angle.Arcsec(pmRAArcsec), angle.Arcsec(0.1), angle.Arcsec(0.05), 10,
+			angle.Arcsec(pmRAArcsec), angle.Arcsec(0.1), angle.Arcsec(0.05), unit.KmPerSec(10),
 		)
 
 		for _, tc := range []struct {

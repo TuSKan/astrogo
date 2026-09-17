@@ -6,6 +6,7 @@ import (
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/internal/gofaext"
+	"github.com/TuSKan/astrogo/unit"
 	"github.com/TuSKan/astrogo/vector"
 )
 
@@ -190,23 +191,23 @@ func solarMotionICRS(kind LSRKind) vector.Vec3 {
 // The size is at most the speed of the solar motion itself — 18.0 km/s for
 // [LSRDynamical], 16.6 km/s for [LSRDelhaye] — reached at the apex, zero on
 // the great circle 90° from it, and negated at the antapex.
-func LSRCorrection(target ICRS, kind LSRKind) float64 {
-	return solarMotionICRS(kind).Dot(target.ToUnitVector())
+func LSRCorrection(target ICRS, kind LSRKind) unit.Velocity {
+	return unit.KmPerSec(solarMotionICRS(kind).Dot(target.ToUnitVector()))
 }
 
 // LSRApex returns the direction of the Sun's motion with respect to the given
-// Local Standard of Rest, and its speed in km/s.
+// Local Standard of Rest, and its speed.
 //
 // The apex is where [LSRCorrection] is largest and positive, and it is how the
 // solar motion is stated in most of the literature that does not give
 // Cartesian components — so this is the value to compare a paper against.
-func LSRApex(kind LSRKind) (ICRS, float64) {
+func LSRApex(kind LSRKind) (ICRS, unit.Velocity) {
 	v := solarMotionICRS(kind)
 
 	var c ICRS
 	c.FromUnitVector(v)
 
-	return c, v.Norm()
+	return c, unit.KmPerSec(v.Norm())
 }
 
 // The kinematic LSR apex, as Gordon (1975) publishes it.

@@ -307,7 +307,7 @@ func (d *DiffuseGalacticLight) AddRadiance(
 
 	pressure, _ := scene.Atmosphere.Surface()
 	aerosol := scene.Atmosphere.Aerosol()
-	height := scene.Observer.Height()
+	height := scene.Observer.Height().Meters()
 	kappa := scene.Atmosphere.DiffuseKappa()
 
 	for i := range dst {
@@ -511,7 +511,7 @@ func (z *ZodiacalLight) AddRadiance(
 
 	pressure, _ := scene.Atmosphere.Surface()
 	aerosol := scene.Atmosphere.Aerosol()
-	height := scene.Observer.Height()
+	height := scene.Observer.Height().Meters()
 	kappa := scene.Atmosphere.DiffuseKappa()
 
 	for i := range dst {
@@ -682,7 +682,7 @@ func (a *Airglow) AddRadiance(
 
 	pressure, _ := scene.Atmosphere.Surface()
 	aerosol := scene.Atmosphere.Aerosol()
-	height := scene.Observer.Height()
+	height := scene.Observer.Height().Meters()
 	kappa := scene.Atmosphere.DiffuseKappa()
 
 	for i := range dst {
@@ -947,7 +947,7 @@ func (s *IntegratedStarlight) AddRadiance(
 
 	pressure, _ := scene.Atmosphere.Surface()
 	aerosol := scene.Atmosphere.Aerosol()
-	height := scene.Observer.Height()
+	height := scene.Observer.Height().Meters()
 	kappa := scene.Atmosphere.DiffuseKappa()
 
 	// The shape already averages to one across the band, so scaling it by

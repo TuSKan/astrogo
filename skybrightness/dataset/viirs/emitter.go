@@ -186,7 +186,7 @@ func (r *Raster) Emitters(region Region) ([]skybrightness.GroundEmitter, error) 
 			continue
 		}
 
-		at, err := coord.Offset(region.Site, bearing, weighted/total)
+		at, err := coord.Offset(region.Site, bearing, unit.Meters(weighted/total))
 		if err != nil {
 			return nil, fmt.Errorf("viirs: sector %d: %w", sector, err)
 		}
@@ -204,7 +204,7 @@ func (r *Raster) walkAzimuth(region Region, bearing angle.Angle, step float64) (
 	for i := range region.RadialSamples {
 		distance := region.InnerM + (float64(i)+0.5)*step
 
-		at, err := coord.Offset(region.Site, bearing, distance)
+		at, err := coord.Offset(region.Site, bearing, unit.Meters(distance))
 		if err != nil {
 			return 0, 0, fmt.Errorf("viirs: sample at %.0f m: %w", distance, err)
 		}

@@ -112,7 +112,7 @@ func main() {
 
 	fmt.Printf("  Azimuth:    %s (%.2f°)\n", altaz.Az(), altaz.Az().Degrees())
 	fmt.Printf("  Elevation:  %s (%.2f°)\n", altaz.Alt(), altaz.Alt().Degrees())
-	fmt.Printf("  Range:      %.1f km\n", altaz.Dist())
+	fmt.Printf("  Range:      %.1f km\n", altaz.Dist().Km())
 
 	if altaz.Alt().Degrees() > 0 {
 		fmt.Printf("  Status:     ☀ ABOVE HORIZON\n")

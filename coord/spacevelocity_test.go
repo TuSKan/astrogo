@@ -7,6 +7,7 @@ import (
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/internal/testutil"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // barnardsStar is the canonical test case for a space velocity: the largest
@@ -19,7 +20,7 @@ func barnardsStar() coord.ICRS {
 	return coord.NewICRSWithKinematics(
 		angle.Deg(269.452), angle.Deg(4.693),
 		angle.Arcsec(-0.79847), angle.Arcsec(10.33777),
-		angle.Arcsec(0.54698), -110.6,
+		angle.Arcsec(0.54698), unit.KmPerSec(-110.6),
 	)
 }
 
@@ -42,7 +43,7 @@ func TestSpaceSpeedOfBarnardsStar(t *testing.T) {
 	// enough for the small differences between catalogue versions and far too
 	// tight for a factor-of-86400 or factor-of-au unit error, which is the
 	// class of mistake this is guarding.
-	testutil.AssertRelNear(t, "Barnard's Star space speed", speed, 142.5, 0.01)
+	testutil.AssertRelNear(t, "Barnard's Star space speed", speed.KmPerSec(), 142.5, 0.01)
 }
 
 // TestTheRadialComponentIsTheRadialVelocity is the strongest internal check
@@ -72,7 +73,7 @@ func TestTheRadialComponentIsTheRadialVelocity(t *testing.T) {
 		star := coord.NewICRSWithKinematics(
 			angle.Deg(tc.ra), angle.Deg(tc.dec),
 			angle.Arcsec(tc.pmRA), angle.Arcsec(tc.pmDec),
-			angle.Arcsec(tc.px), tc.rv,
+			angle.Arcsec(tc.px), unit.KmPerSec(tc.rv),
 		)
 
 		v, ok := coord.SpaceVelocity(star)
@@ -133,7 +134,7 @@ func TestTheTransverseComponentMatchesTheClassicalIdentity(t *testing.T) {
 		star := coord.NewICRSWithKinematics(
 			angle.Deg(tc.ra), angle.Deg(tc.dec),
 			angle.Arcsec(tc.pmRA), angle.Arcsec(tc.pmDec),
-			angle.Arcsec(tc.px), tc.rv,
+			angle.Arcsec(tc.px), unit.KmPerSec(tc.rv),
 		)
 
 		v, ok := coord.SpaceVelocity(star)
@@ -142,12 +143,13 @@ func TestTheTransverseComponentMatchesTheClassicalIdentity(t *testing.T) {
 			continue
 		}
 
-		// Remove the radial part and measure what is left.
-		unit := star.ToUnitVector()
-		transverse := v.Sub(unit.MulScalar(v.Dot(unit))).Norm()
+		// Remove the radial part and measure what is left. The local is not
+		// called "unit" because this file now imports the package of that name.
+		los := star.ToUnitVector()
+		transverse := v.Sub(los.MulScalar(v.Dot(los))).Norm()
 
 		totalPM := math.Hypot(tc.pmRA, tc.pmDec)
-		distancePc := coord.ParallaxDistance(angle.Arcsec(tc.px))
+		distancePc := coord.ParallaxDistance(angle.Arcsec(tc.px)).Pc()
 		want := auPerYearInKmPerSec * totalPM * distancePc
 
 		// A part in a thousand. The residual is the relativistic and
@@ -183,13 +185,13 @@ func TestSpaceVelocityRefusesWhatItCannotAnswer(t *testing.T) {
 			name: "kinematics recorded, but no parallax to scale them",
 			star: coord.NewICRSWithKinematics(
 				angle.Deg(123.4), angle.Deg(-35.6),
-				angle.Arcsec(0.150), angle.Arcsec(0.220), 0, -22.4),
+				angle.Arcsec(0.150), angle.Arcsec(0.220), 0, unit.KmPerSec(-22.4)),
 		},
 		{
 			name: "a parallax below SOFA's floor is the same as none",
 			star: coord.NewICRSWithKinematics(
 				angle.Deg(123.4), angle.Deg(-35.6),
-				angle.Arcsec(0.150), angle.Arcsec(0.220), angle.Arcsec(1e-9), -22.4),
+				angle.Arcsec(0.150), angle.Arcsec(0.220), angle.Arcsec(1e-9), unit.KmPerSec(-22.4)),
 		},
 	} {
 		if v, ok := coord.SpaceVelocity(tc.star); ok {
@@ -230,5 +232,5 @@ func TestSpaceSpeedAgreesWithTheVectorItSummarises(t *testing.T) {
 		t.Fatalf("SpaceVelocity ok=%v but SpaceSpeed ok=%v", okV, okS)
 	}
 
-	testutil.AssertExact(t, "SpaceSpeed against the vector's norm", speed, v.Norm())
+	testutil.AssertExact(t, "SpaceSpeed against the vector's norm", speed.KmPerSec(), v.Norm())
 }

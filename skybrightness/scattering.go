@@ -302,7 +302,7 @@ func deExtinction(scene *Scene, dir coord.AltAz, grid unit.SpectralGrid) ([]floa
 
 	pressure, _ := scene.Atmosphere.Surface()
 	aerosol := scene.Atmosphere.Aerosol()
-	height := scene.Observer.Height()
+	height := scene.Observer.Height().Meters()
 	kappa := scene.Atmosphere.DiffuseKappa()
 
 	out := make([]float64, grid.Len())

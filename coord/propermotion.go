@@ -4,6 +4,7 @@ import (
 	"math"
 
 	"github.com/TuSKan/astrogo/angle"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // Proper motion in right ascension comes in two flavours, and the difference
@@ -75,8 +76,8 @@ func pmRACosDec(dRAdtRad float64, dec angle.Angle) angle.Angle {
 	return angle.Rad(dRAdtRad * math.Cos(dec.Radians()))
 }
 
-// ParallaxDistance returns the distance, in parsecs, of a target whose annual
-// parallax is p.
+// ParallaxDistance returns the distance of a target whose annual parallax
+// is p.
 //
 // The parsec is defined as the distance at which one astronomical unit
 // subtends one arcsecond, so this is d = 1/p with p in arcseconds, exactly —
@@ -109,6 +110,6 @@ func pmRACosDec(dRAdtRad float64, dec angle.Angle) angle.Angle {
 //
 // This function is the arithmetic, not the inference. Use it when the parallax
 // is precise, and a published distance catalogue when it is not.
-func ParallaxDistance(p angle.Angle) float64 {
-	return 1 / p.Arcseconds()
+func ParallaxDistance(p angle.Angle) unit.Length {
+	return unit.Pc(1 / p.Arcseconds())
 }

@@ -12,6 +12,7 @@ import (
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	mag "github.com/TuSKan/astrogo/magnitude"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 	"github.com/TuSKan/astrogo/vector"
 )
 
@@ -125,7 +126,7 @@ func (s *Satellite) ApparentMagnitudeCtx(t time.Time, ctx *coord.Context) (float
 		return 0, fmt.Errorf("satellite magnitude: look angle: %w", err)
 	}
 
-	rangeKm := altaz.Dist()
+	rangeKm := altaz.Dist().Km()
 
 	// Compute phase angle: Sun–Satellite–Observer.
 	// The Sun's position always comes from the analytic SOFA provider, not
@@ -211,8 +212,10 @@ func LookAngle(prov eph.Provider, id eph.ID, ctx *coord.Context) (coord.AltAz, e
 
 	observed := ctx.GeocentricToObserved(st.Pos)
 
-	// Context works in AU — convert the topocentric distance to km.
-	observed.SetDist(st.Pos.Sub(ctx.ObsVec()).Norm() * kmPerAU)
+	// Context works in AU; the distance is stored as a typed length, so the
+	// unit it is read back in is the reader's choice rather than a convention
+	// this line has to be remembered for.
+	observed.SetDist(unit.Km(st.Pos.Sub(ctx.ObsVec()).Norm() * kmPerAU))
 
 	return observed, nil
 }
@@ -284,7 +287,7 @@ func SatellitePasses(prov eph.Provider, name string, start, end time.Time,
 			Time:      t,
 			Azimuth:   altaz.Az(),
 			Elevation: altaz.Alt(),
-			Range:     altaz.Dist(),
+			Range:     altaz.Dist().Km(),
 		}
 	}
 
@@ -423,6 +426,6 @@ func findCulmination(prov eph.Provider, observer *coord.Geodetic,
 		Time:      bestTime,
 		Azimuth:   altaz.Az(),
 		Elevation: altaz.Alt(),
-		Range:     altaz.Dist(),
+		Range:     altaz.Dist().Km(),
 	}, nil
 }

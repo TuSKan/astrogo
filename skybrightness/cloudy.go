@@ -381,7 +381,7 @@ func (c *CloudySkyglow) addEmitter(
 	}
 
 	geom := skyglowGeometry{
-		horizontalM: horizontal,
+		horizontalM: horizontal.Meters(),
 		// The azimuth of the source measured at the observer, against the
 		// azimuth being looked at: only their difference enters Eq. 10.
 		deltaAzimuth: dir.Az().Radians() - toSource.Radians(),

@@ -9,6 +9,7 @@ import (
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 	"github.com/TuSKan/astrogo/vector"
 )
 
@@ -229,7 +230,7 @@ func TestAstrometricToCIRS(t *testing.T) {
 	astro := coord.NewAstrometric(angle.Deg(150.0), angle.Deg(-30.0))
 	astro.SetProperMotion(angle.Arcsec(1.5), angle.Arcsec(-0.5))
 	astro.SetParallax(angle.Arcsec(0.2))
-	astro.SetRV(50.0) // km/s
+	astro.SetRV(unit.KmPerSec(50.0)) // km/s
 
 	// Calculate apparent position 10 years later (2010.0)
 	obsTime := time.Date(2010, 1, 1, 12, 0, 0, 0, time.LocationUTC)

@@ -7,6 +7,7 @@ import (
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/internal/testutil"
+	"github.com/TuSKan/astrogo/unit"
 	"github.com/TuSKan/astrogo/vector"
 )
 
@@ -35,7 +36,7 @@ func TestTheDerivationReproducesAstropysRotationalComponent(t *testing.T) {
 		astropyVKmPerS    = 245.6
 	)
 
-	got := coord.SolarVelocityFromSgrA(astropyDistancePc)
+	got := coord.SolarVelocityFromSgrA(unit.Pc(astropyDistancePc))
 
 	// Astropy publishes four significant figures, so agreement is asserted at
 	// the precision they state and no further.
@@ -58,8 +59,8 @@ func TestTheDerivationReproducesAstropysRotationalComponent(t *testing.T) {
 func TestTheRotationalComponentScalesWithTheDistance(t *testing.T) {
 	t.Parallel()
 
-	base := coord.SolarVelocityFromSgrA(8000)
-	twice := coord.SolarVelocityFromSgrA(16000)
+	base := coord.SolarVelocityFromSgrA(unit.Pc(8000))
+	twice := coord.SolarVelocityFromSgrA(unit.Pc(16000))
 
 	testutil.AssertRelNear(t, "rotational component doubles with R0", twice.Y, 2*base.Y, 1e-12)
 
@@ -141,7 +142,7 @@ func TestTheVelocityRoundTripsThroughTheFrame(t *testing.T) {
 		star := coord.NewICRSWithKinematics(
 			angle.Deg(tc.ra), angle.Deg(tc.dec),
 			angle.Arcsec(tc.pmRA), angle.Arcsec(tc.pmDec),
-			angle.Arcsec(tc.px), tc.rv,
+			angle.Arcsec(tc.px), unit.KmPerSec(tc.rv),
 		)
 
 		distance := coord.ParallaxDistance(angle.Arcsec(tc.px))
@@ -158,7 +159,7 @@ func TestTheVelocityRoundTripsThroughTheFrame(t *testing.T) {
 			t.Errorf("%s: direction moved %.3g arcsec", tc.name, sep)
 		}
 
-		testutil.AssertRelNear(t, tc.name+" distance", backDistance, distance, 1e-9)
+		testutil.AssertRelNear(t, tc.name+" distance", backDistance.Pc(), distance.Pc(), 1e-9)
 
 		// The kinematics are the point: all four must come back, since the
 		// velocity carries them jointly and a defect in the reconstruction
@@ -170,8 +171,9 @@ func TestTheVelocityRoundTripsThroughTheFrame(t *testing.T) {
 		testutil.AssertRelNear(t, tc.name+" parallax",
 			back.Parallax().Arcseconds(), tc.px, 1e-9)
 
-		if math.Abs(back.RV()-tc.rv) > 1e-6 {
-			t.Errorf("%s: radial velocity came back %.9f km/s, want %.4f", tc.name, back.RV(), tc.rv)
+		if math.Abs(back.RV().KmPerSec()-tc.rv) > 1e-6 {
+			t.Errorf("%s: radial velocity came back %.9f km/s, want %.4f",
+				tc.name, back.RV().KmPerSec(), tc.rv)
 		}
 	}
 }
@@ -196,15 +198,15 @@ func TestNoParallaxMeansAPositionWithoutAVelocity(t *testing.T) {
 			name: "proper motion but no parallax to scale it",
 			star: coord.NewICRSWithKinematics(
 				angle.Deg(123.4), angle.Deg(-35.6),
-				angle.Arcsec(0.150), angle.Arcsec(0.220), 0, -22.4),
+				angle.Arcsec(0.150), angle.Arcsec(0.220), 0, unit.KmPerSec(-22.4)),
 		},
 	} {
-		g := f.FromICRS(tc.star, 1000)
+		g := f.FromICRS(tc.star, unit.Pc(1000))
 
 		// The position is unaffected, because it needs the distance the caller
 		// passed and not a parallax. Compared against the same direction with
 		// nothing recorded at all, which is the position-only path.
-		wantPos := f.FromICRS(coord.NewICRS(tc.star.RA(), tc.star.Dec()), 1000)
+		wantPos := f.FromICRS(coord.NewICRS(tc.star.RA(), tc.star.Dec()), unit.Pc(1000))
 
 		if g.Vector() != wantPos.Vector() {
 			t.Errorf("%s: position is %s, want the position-only answer %s", tc.name, g, wantPos)
@@ -234,7 +236,7 @@ func TestNewGalactocentricWithVelocityIsIndistinguishableFromAComputedOne(t *tes
 	star := coord.NewICRSWithKinematics(
 		angle.Deg(269.452), angle.Deg(4.693),
 		angle.Arcsec(-0.79847), angle.Arcsec(10.33777),
-		angle.Arcsec(0.54698), -110.6)
+		angle.Arcsec(0.54698), unit.KmPerSec(-110.6))
 
 	computed := f.FromICRS(star, coord.ParallaxDistance(angle.Arcsec(0.54698)))
 
@@ -252,7 +254,7 @@ func TestNewGalactocentricWithVelocityIsIndistinguishableFromAComputedOne(t *tes
 
 	// A position built without a velocity says so, rather than carrying a zero
 	// that reads as "not moving".
-	if _, ok := coord.NewGalactocentric(1, 2, 3).Velocity(); ok {
+	if _, ok := coord.NewGalactocentric(unit.Pc(1), unit.Pc(2), unit.Pc(3)).Velocity(); ok {
 		t.Error("NewGalactocentric produced a position claiming to have a velocity")
 	}
 }
@@ -273,7 +275,7 @@ func TestBarnardsStarGalactocentricVelocityIsPlausible(t *testing.T) {
 	star := coord.NewICRSWithKinematics(
 		angle.Deg(269.452), angle.Deg(4.693),
 		angle.Arcsec(-0.79847), angle.Arcsec(10.33777),
-		angle.Arcsec(0.54698), -110.6)
+		angle.Arcsec(0.54698), unit.KmPerSec(-110.6))
 
 	g := f.FromICRS(star, coord.ParallaxDistance(angle.Arcsec(0.54698)))
 
@@ -334,7 +336,7 @@ func TestTheGalacticBasisIsOrthonormal(t *testing.T) {
 		star := coord.NewICRSWithKinematics(
 			angle.Deg(tc.ra), angle.Deg(tc.dec),
 			angle.Arcsec(tc.pmRA), angle.Arcsec(tc.pmDec),
-			angle.Arcsec(tc.px), tc.rv)
+			angle.Arcsec(tc.px), unit.KmPerSec(tc.rv))
 
 		bary, ok := coord.SpaceVelocity(star)
 		if !ok {
@@ -393,8 +395,9 @@ func TestToICRSDeclinesAVelocityItCannotSplit(t *testing.T) {
 		// rotation and a translation, so it lands within a femtoparsec of the
 		// origin rather than on it. What matters is that nothing blows up and
 		// the distance is recognisably nothing.
-		if distance > 1e-9 {
-			t.Errorf("the Sun's own position came back at distance %g pc, want essentially 0", distance)
+		if distance.Pc() > 1e-9 {
+			t.Errorf("the Sun's own position came back at distance %g pc, want essentially 0",
+				distance.Pc())
 		}
 	})
 

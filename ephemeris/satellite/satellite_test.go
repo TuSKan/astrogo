@@ -143,11 +143,11 @@ func TestAltitude(t *testing.T) {
 		t.Fatalf("Altitude failed: %v", err)
 	}
 
-	t.Logf("Altitude: %.1f km", alt)
+	t.Logf("Altitude: %.1f km", alt.Km())
 
 	// Altitude should be ~410-420 km.
-	if alt < 300 || alt > 500 {
-		t.Errorf("Altitude = %.1f km, expected ~410 km for ISS", alt)
+	if km := alt.Km(); km < 300 || km > 500 {
+		t.Errorf("Altitude = %.1f km, expected ~410 km for ISS", km)
 	}
 }
 

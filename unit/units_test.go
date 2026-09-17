@@ -125,3 +125,39 @@ func TestUnitString(t *testing.T) {
 	testutil.AssertEqual(t, "AU symbol", unit.AstronomicalUnit.String(), "AU")
 	testutil.AssertEqual(t, "Jansky symbol", unit.Jansky.String(), "Jy")
 }
+
+// TestTheParsecIsItsDefinitionAndNotARoundedDecimal checks the one length
+// scale in this table that is a definition rather than a measurement.
+//
+// A parsec is the distance at which one astronomical unit subtends one
+// arcsecond, so it is exactly 648000/π au — no measurement enters, and the
+// decimal in [unit.Parsec] is that quotient written out.
+//
+// It is worth pinning because the decimal is what every conversion actually
+// uses. coord/galactocentric.go used to carry its own `648000 / math.Pi`
+// alongside it, computed rather than transcribed; that constant is gone now
+// that [unit.Length] does the converting, and this test is what replaced the
+// guarantee it gave for free.
+//
+// Two ulp, not exact equality: the decimal is the correctly-rounded value of
+// the product, and recomputing it here goes through a different order of
+// operations.
+func TestTheParsecIsItsDefinitionAndNotARoundedDecimal(t *testing.T) {
+	t.Parallel()
+
+	want := 648000 / math.Pi * unit.AstronomicalUnit.ScaleFactor
+
+	if rel := math.Abs(unit.Parsec.ScaleFactor-want) / want; rel > 2*eps {
+		t.Errorf("Parsec.ScaleFactor = %.17g, want 648000/π au = %.17g (relative %g)",
+			unit.Parsec.ScaleFactor, want, rel)
+	}
+
+	// And the round trip a caller actually writes.
+	if got := unit.Pc(1).AU(); math.Abs(got-648000/math.Pi) > 1e-6 {
+		t.Errorf("one parsec is %.9f au, want 648000/π = %.9f", got, 648000/math.Pi)
+	}
+}
+
+// eps is the float64 machine epsilon, spelled out rather than imported so the
+// tolerance above reads as what it is.
+const eps = 2.220446049250313e-16

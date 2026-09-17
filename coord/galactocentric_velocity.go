@@ -2,6 +2,7 @@ package coord
 
 import (
 	"github.com/TuSKan/astrogo/angle"
+	"github.com/TuSKan/astrogo/unit"
 	"github.com/TuSKan/astrogo/vector"
 )
 
@@ -107,7 +108,7 @@ var auPerYearInKmPerSec = kmPerAU / julianYearSeconds
 const julianYearSeconds = 365.25 * 86400
 
 // SolarVelocityFromSgrA returns the Sun's velocity in the Galactocentric frame,
-// in km/s, for a Galactic-centre distance of sunDistance parsecs.
+// in km/s, for a Galactic-centre distance of sunDistance.
 //
 // The components are (toward the centre, along rotation, toward the north
 // Galactic pole), on the axes of the Galactic frame — [GalactocentricFrame]
@@ -120,9 +121,9 @@ const julianYearSeconds = 365.25 * 86400
 //
 // Pass the same distance to this and to [NewGalactocentricFrame], or use
 // [DefaultGalactocentricFrame], which does.
-func SolarVelocityFromSgrA(sunDistance float64) vector.Vec3 {
+func SolarVelocityFromSgrA(sunDistance unit.Length) vector.Vec3 {
 	// μ in arcsec/yr times distance in parsecs, times one au per year in km/s.
-	rotation := auPerYearInKmPerSec * (sgrAProperMotionMasPerYear / 1000) * sunDistance
+	rotation := auPerYearInKmPerSec * (sgrAProperMotionMasPerYear / 1000) * sunDistance.Pc()
 
 	return vector.V3(sunPeculiarUKmPerS, rotation, sunPeculiarWKmPerS)
 }

@@ -7,6 +7,7 @@ import (
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/internal/testutil"
+	"github.com/TuSKan/astrogo/unit"
 	"github.com/TuSKan/astrogo/vector"
 )
 
@@ -31,18 +32,18 @@ func TestSunSitsWhereTheFrameParametersPutIt(t *testing.T) {
 	f := coord.DefaultGalactocentricFrame()
 	sun := f.SunPosition()
 
-	r0, z0 := f.SunDistance(), f.SunHeight()
+	r0, z0 := f.SunDistance().Pc(), f.SunHeight().Pc()
 	wantX := -math.Sqrt(r0*r0 - z0*z0)
 
-	testutil.AssertNear(t, "Sun X", sun.X(), wantX, 1e-9)
-	testutil.AssertNear(t, "Sun Y", sun.Y(), 0, 1e-9)
-	testutil.AssertNear(t, "Sun Z", sun.Z(), z0, 1e-9)
+	testutil.AssertNear(t, "Sun X", sun.X().Pc(), wantX, 1e-9)
+	testutil.AssertNear(t, "Sun Y", sun.Y().Pc(), 0, 1e-9)
+	testutil.AssertNear(t, "Sun Z", sun.Z().Pc(), z0, 1e-9)
 
 	// The two derived radii differ, and by the amount the frame says.
-	testutil.AssertNear(t, "Sun distance from the centre", sun.Distance(), r0, 1e-9)
-	testutil.AssertNear(t, "Sun cylindrical radius", sun.Radius(), -wantX, 1e-9)
+	testutil.AssertNear(t, "Sun distance from the centre", sun.Distance().Pc(), r0, 1e-9)
+	testutil.AssertNear(t, "Sun cylindrical radius", sun.Radius().Pc(), -wantX, 1e-9)
 
-	if gap := r0 - sun.Radius(); gap < 0.02 || gap > 0.04 {
+	if gap := r0 - sun.Radius().Pc(); gap < 0.02 || gap > 0.04 {
 		t.Errorf("R₀ − cylindrical radius = %.6f pc, expected the 0.026 pc the geometry implies", gap)
 	}
 }
@@ -61,10 +62,10 @@ func TestGalacticCentreIsTheOrigin(t *testing.T) {
 	// cancellation rather than a tolerance on the physics.
 	const tol = 1e-8
 
-	testutil.AssertNear(t, "centre X", gc.X(), 0, tol)
-	testutil.AssertNear(t, "centre Y", gc.Y(), 0, tol)
-	testutil.AssertNear(t, "centre Z", gc.Z(), 0, tol)
-	testutil.AssertNear(t, "centre distance", gc.Distance(), 0, tol)
+	testutil.AssertNear(t, "centre X", gc.X().Pc(), 0, tol)
+	testutil.AssertNear(t, "centre Y", gc.Y().Pc(), 0, tol)
+	testutil.AssertNear(t, "centre Z", gc.Z().Pc(), 0, tol)
+	testutil.AssertNear(t, "centre distance", gc.Distance().Pc(), 0, tol)
 }
 
 // TestAxesPointWhereTheDocumentationSays pins the handedness and the axis
@@ -94,7 +95,7 @@ func TestAxesPointWhereTheDocumentationSays(t *testing.T) {
 	const d = 1000 // parsecs
 
 	// The tilt's own leakage between X and Z, plus a little room.
-	tilt := math.Asin(f.SunHeight() / f.SunDistance())
+	tilt := math.Asin(f.SunHeight().Pc() / f.SunDistance().Pc())
 	offAxis := d*math.Sin(tilt) + 0.01
 
 	for _, tc := range []struct {
@@ -133,9 +134,11 @@ func TestAxesPointWhereTheDocumentationSays(t *testing.T) {
 		},
 	} {
 		icrs := coord.GalacticToICRS(coord.NewGalactic(angle.Deg(tc.l), angle.Deg(tc.b)))
-		got := f.FromICRS(icrs, d)
+		got := f.FromICRS(icrs, unit.Pc(d))
 
-		dx, dy, dz := got.X()-sun.X(), got.Y()-sun.Y(), got.Z()-sun.Z()
+		dx := (got.X() - sun.X()).Pc()
+		dy := (got.Y() - sun.Y()).Pc()
+		dz := (got.Z() - sun.Z()).Pc()
 
 		// The named axis carries the whole displacement, to within the cosine
 		// of the tilt — a part in 3×10⁶ of d, so 0.01 pc is generous.
@@ -196,9 +199,9 @@ func TestRoundTripThroughTheFrame(t *testing.T) {
 			in := coord.NewICRS(angle.Deg(ra), angle.Deg(dec))
 
 			for _, d := range distances {
-				out, back := f.ToICRS(f.FromICRS(in, d))
+				out, back := f.ToICRS(f.FromICRS(in, unit.Pc(d)))
 
-				if gap := math.Abs(back - d); gap > 1e-9 {
+				if gap := math.Abs(back.Pc() - d); gap > 1e-9 {
 					t.Errorf("ra=%g dec=%g d=%g: round trip moved the distance by %.3g pc",
 						ra, dec, d, gap)
 				}
@@ -268,12 +271,12 @@ func TestAstropysDefaultFrameIsReproducible(t *testing.T) {
 	}
 
 	// With astropy's parameters, the Sun lands where astropy puts it.
-	sun := coord.NewGalactocentricFrame(astropyDistancePc, astropyZSunPc,
-		coord.SolarVelocityFromSgrA(astropyDistancePc)).SunPosition()
+	sun := coord.NewGalactocentricFrame(unit.Pc(astropyDistancePc), unit.Pc(astropyZSunPc),
+		coord.SolarVelocityFromSgrA(unit.Pc(astropyDistancePc))).SunPosition()
 
-	testutil.AssertNear(t, "astropy-frame Sun X", sun.X(),
+	testutil.AssertNear(t, "astropy-frame Sun X", sun.X().Pc(),
 		-math.Sqrt(astropyDistancePc*astropyDistancePc-astropyZSunPc*astropyZSunPc), 1e-9)
-	testutil.AssertNear(t, "astropy-frame Sun Z", sun.Z(), astropyZSunPc, 1e-9)
+	testutil.AssertNear(t, "astropy-frame Sun Z", sun.Z().Pc(), astropyZSunPc, 1e-9)
 }
 
 // TestTheSunsHeightIsNotCosmetic measures the claim made in the doc comment on
@@ -295,15 +298,16 @@ func TestTheSunsHeightIsNotCosmetic(t *testing.T) {
 
 	tilted, untilted := withHeight.FromICRS(target, d), flat.FromICRS(target, d)
 
-	gap := math.Abs(tilted.Z() - untilted.Z())
-	if !testutil.InRelTol(gap, withHeight.SunHeight(), 1e-6) {
+	gap := math.Abs(tilted.Z().Pc() - untilted.Z().Pc())
+	if !testutil.InRelTol(gap, withHeight.SunHeight().Pc(), 1e-6) {
 		t.Errorf("Z differs by %.4f pc at the far side of the disc, expected z☉ = %.4f pc",
-			gap, withHeight.SunHeight())
+			gap, withHeight.SunHeight().Pc())
 	}
 
 	// And at the Sun the two frames differ by z☉ as well, in the other
 	// direction — so the error is not a constant offset that cancels.
-	if s := math.Abs(withHeight.SunPosition().Z() - flat.SunPosition().Z()); !testutil.InRelTol(s, withHeight.SunHeight(), 1e-9) {
+	s := math.Abs(withHeight.SunPosition().Z().Pc() - flat.SunPosition().Z().Pc())
+	if !testutil.InRelTol(s, withHeight.SunHeight().Pc(), 1e-9) {
 		t.Errorf("the Sun's Z differs by %.4f pc between the frames, expected z☉", s)
 	}
 }
@@ -326,9 +330,10 @@ func TestDegenerateFramesDoNotProduceNaN(t *testing.T) {
 		{"the Sun further from the plane than from the centre", 100, 500},
 		{"a negative height", 8178, -20.8},
 	} {
-		got := coord.NewGalactocentricFrame(tc.distance, tc.height, vector.Zero()).FromICRS(target, 1000)
+		got := coord.NewGalactocentricFrame(unit.Pc(tc.distance), unit.Pc(tc.height), vector.Zero()).
+			FromICRS(target, unit.Pc(1000))
 
-		if math.IsNaN(got.X()) || math.IsNaN(got.Y()) || math.IsNaN(got.Z()) {
+		if math.IsNaN(got.X().Pc()) || math.IsNaN(got.Y().Pc()) || math.IsNaN(got.Z().Pc()) {
 			t.Errorf("%s: produced %s", tc.name, got)
 		}
 	}
@@ -341,17 +346,17 @@ func TestParallaxDistanceIsTheReciprocal(t *testing.T) {
 	t.Parallel()
 
 	// One arcsecond is one parsec — the definition of the unit.
-	testutil.AssertNear(t, "1 arcsec", coord.ParallaxDistance(angle.Arcsec(1)), 1, 1e-12)
+	testutil.AssertNear(t, "1 arcsec", coord.ParallaxDistance(angle.Arcsec(1)).Pc(), 1, 1e-12)
 
 	// Proxima Centauri: 768.07 mas (Gaia DR3), so a little over 1.3 pc.
-	testutil.AssertRelNear(t, "Proxima", coord.ParallaxDistance(angle.Arcsec(0.76807)), 1.30197, 1e-5)
+	testutil.AssertRelNear(t, "Proxima", coord.ParallaxDistance(angle.Arcsec(0.76807)).Pc(), 1.30197, 1e-5)
 
 	// A milliarcsecond is a kiloparsec, which is the unit trap stated as a test.
-	testutil.AssertRelNear(t, "1 mas", coord.ParallaxDistance(angle.Arcsec(0.001)), 1000, 1e-12)
+	testutil.AssertRelNear(t, "1 mas", coord.ParallaxDistance(angle.Arcsec(0.001)).Pc(), 1000, 1e-12)
 
 	// A zero parallax is an unmeasurably large distance, and says so rather
 	// than returning a NaN or an error nobody checks.
-	if d := coord.ParallaxDistance(0); !math.IsInf(d, 1) {
+	if d := coord.ParallaxDistance(0); !math.IsInf(d.Pc(), 1) {
 		t.Errorf("ParallaxDistance(0) = %v, want +Inf", d)
 	}
 
@@ -375,7 +380,7 @@ func TestParallaxDistanceFeedsTheFrame(t *testing.T) {
 
 	got := f.FromICRS(star, coord.ParallaxDistance(angle.Arcsec(0.001)))
 
-	testutil.AssertRelNear(t, "radius", got.Radius(), f.SunDistance()-1000, 1e-3)
+	testutil.AssertRelNear(t, "radius", got.Radius().Pc(), f.SunDistance().Pc()-1000, 1e-3)
 }
 
 // TestAPositionEnteredByHandIsIndistinguishableFromAComputedOne exercises
@@ -396,7 +401,7 @@ func TestAPositionEnteredByHandIsIndistinguishableFromAComputedOne(t *testing.T)
 	f := coord.DefaultGalactocentricFrame()
 
 	star := coord.GalacticToICRS(coord.NewGalactic(angle.Deg(45), angle.Deg(-20)))
-	computed := f.FromICRS(star, 3000)
+	computed := f.FromICRS(star, unit.Pc(3000))
 
 	rebuilt := coord.NewGalactocentric(computed.X(), computed.Y(), computed.Z())
 
@@ -413,8 +418,8 @@ func TestAPositionEnteredByHandIsIndistinguishableFromAComputedOne(t *testing.T)
 		t.Errorf("direction differs by %.3g arcsec", sep)
 	}
 
-	testutil.AssertNear(t, "distance", gotDist, wantDist, 1e-9)
-	testutil.AssertNear(t, "round trip distance", gotDist, 3000, 1e-9)
+	testutil.AssertNear(t, "distance", gotDist.Pc(), wantDist.Pc(), 1e-9)
+	testutil.AssertNear(t, "round trip distance", gotDist.Pc(), 3000, 1e-9)
 }
 
 // TestTheAccessorsAllReadTheSameVector checks that [coord.Galactocentric.Vector]
@@ -430,23 +435,23 @@ func TestTheAccessorsAllReadTheSameVector(t *testing.T) {
 
 	// A deliberately asymmetric position, so a swapped pair of components
 	// cannot pass.
-	c := coord.NewGalactocentric(-1234.5, 678.25, -90.125)
+	c := coord.NewGalactocentric(unit.Pc(-1234.5), unit.Pc(678.25), unit.Pc(-90.125))
 
 	v := c.Vector()
 
-	testutil.AssertExact(t, "Vector X against X()", v.X, c.X())
-	testutil.AssertExact(t, "Vector Y against Y()", v.Y, c.Y())
-	testutil.AssertExact(t, "Vector Z against Z()", v.Z, c.Z())
+	testutil.AssertExact(t, "Vector X against X()", v.X, c.X().Meters())
+	testutil.AssertExact(t, "Vector Y against Y()", v.Y, c.Y().Meters())
+	testutil.AssertExact(t, "Vector Z against Z()", v.Z, c.Z().Meters())
 
-	testutil.AssertExact(t, "Distance against the vector's norm", c.Distance(), v.Norm())
+	testutil.AssertExact(t, "Distance against the vector's norm", c.Distance().Meters(), v.Norm())
 	testutil.AssertNear(t, "Radius against the in-plane hypotenuse",
-		c.Radius(), math.Hypot(v.X, v.Y), 1e-12)
+		c.Radius().Meters(), math.Hypot(v.X, v.Y), 1e-3)
 
 	// Radius ignores Z and Distance does not, which is the distinction the two
 	// doc comments turn on.
 	if c.Radius() >= c.Distance() {
 		t.Errorf("Radius %.4f is not less than Distance %.4f for a position off the midplane",
-			c.Radius(), c.Distance())
+			c.Radius().Pc(), c.Distance().Pc())
 	}
 }
 
@@ -461,7 +466,7 @@ func TestTheAccessorsAllReadTheSameVector(t *testing.T) {
 func TestStringNamesItsUnits(t *testing.T) {
 	t.Parallel()
 
-	got := coord.NewGalactocentric(-8177.9735, 0, 20.8).String()
+	got := coord.NewGalactocentric(unit.Pc(-8177.9735), 0, unit.Pc(20.8)).String()
 
 	const want = "Galactocentric X -8177.974 Y 0.000 Z 20.800 pc"
 	if got != want {
@@ -472,5 +477,52 @@ func TestStringNamesItsUnits(t *testing.T) {
 	// parameters is legible without a debugger.
 	if sun := coord.DefaultGalactocentricFrame().SunPosition().String(); sun != want {
 		t.Errorf("the default frame's Sun renders as %q, want %q", sun, want)
+	}
+}
+
+// TestAccessorsAreExactlyInvertedByTheConstructor pins the choice of unit for
+// the vector [coord.Galactocentric] stores.
+//
+// A [vector.Vec3] cannot carry a unit, so the one it is in has to be fixed in
+// the type. It is meters — the base unit of [unit.Length] — rather than the
+// parsecs the frame is read in, which makes [coord.NewGalactocentric] and the
+// three component accessors exact inverses of each other. Storing parsecs
+// would put a multiply and a divide by 3.086e16 between a component read out
+// and the same component entered back in, and the round trip would land a few
+// ulp away.
+//
+// A few ulp is nothing in parsecs and is not nothing for a struct comparison:
+// [TestAPositionEnteredByHandIsIndistinguishableFromAComputedOne] asserts
+// equality of the whole value, which is the property that makes entering
+// somebody else's X, Y, Z equivalent to computing them here.
+func TestAccessorsAreExactlyInvertedByTheConstructor(t *testing.T) {
+	t.Parallel()
+
+	// Values that are not representable in binary and are far from 1, so a
+	// scale factor applied and removed would show.
+	for _, tc := range []struct{ x, y, z float64 }{
+		{-8177.9735, 0.1, 20.8},
+		{1e-3, -1.0 / 3, 1e5},
+		{-6187.2013579, 1993.3892468, -1010.3271357},
+	} {
+		in := coord.NewGalactocentric(unit.Pc(tc.x), unit.Pc(tc.y), unit.Pc(tc.z))
+
+		out := coord.NewGalactocentric(in.X(), in.Y(), in.Z())
+		if out != in {
+			t.Errorf("(%g, %g, %g) pc: reading the components out and back gave %s, want %s",
+				tc.x, tc.y, tc.z, out, in)
+		}
+
+		// And the same for the velocity-carrying constructor, which shares
+		// the conversion and so could only diverge by being written twice.
+		withVel := coord.NewGalactocentricWithVelocity(
+			unit.Pc(tc.x), unit.Pc(tc.y), unit.Pc(tc.z), vector.V3(10, 250, 5))
+
+		back := coord.NewGalactocentricWithVelocity(
+			withVel.X(), withVel.Y(), withVel.Z(), vector.V3(10, 250, 5))
+		if back != withVel {
+			t.Errorf("(%g, %g, %g) pc with a velocity: round trip gave %s, want %s",
+				tc.x, tc.y, tc.z, back, withVel)
+		}
 	}
 }

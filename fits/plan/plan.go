@@ -7,6 +7,7 @@ import (
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/fits"
 	"github.com/TuSKan/astrogo/plan"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // SiteFromFITS extracts observatory location metadata from standard FITS keywords
@@ -24,7 +25,8 @@ func SiteFromFITS(h *fits.Header) (*plan.Site, error) {
 		elev = 0 // Assume sea level if elevation is absent
 	}
 
-	geodetic, errGeo := coord.NewGeodetic(angle.Deg(lon), angle.Deg(lat), elev)
+	// SITEELEV is metres above mean sea level, by the FITS convention.
+	geodetic, errGeo := coord.NewGeodetic(angle.Deg(lon), angle.Deg(lat), unit.Meters(elev))
 	if errGeo != nil {
 		return nil, fmt.Errorf("%w: %w", ErrInvalidGeodetic, errGeo)
 	}

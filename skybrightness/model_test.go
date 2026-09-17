@@ -405,7 +405,7 @@ func TestNumericalStabilityAcrossGeometry(t *testing.T) {
 
 	for _, s := range sites {
 		for _, d := range directions {
-			loc, err := coord.NewGeodetic(angle.Deg(s.lon), angle.Deg(s.lat), s.heightM)
+			loc, err := coord.NewGeodetic(angle.Deg(s.lon), angle.Deg(s.lat), unit.Meters(s.heightM))
 			if err != nil {
 				t.Fatalf("NewGeodetic(%s): %v", s.name, err)
 			}

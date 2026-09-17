@@ -188,7 +188,7 @@ func TestTheObserverRotatesOntoItsOwnSite(t *testing.T) {
 
 	testutil.AssertNear(t, "longitude (deg)", got.Lon().Degrees(), site.Lon().Degrees(), masDeg)
 	testutil.AssertNear(t, "latitude (deg)", got.Lat().Degrees(), site.Lat().Degrees(), masDeg)
-	testutil.AssertNear(t, "height (m)", got.Height(), site.Height(), 0.01)
+	testutil.AssertNear(t, "height (m)", got.Height().Meters(), site.Height().Meters(), 0.01)
 }
 
 func BenchmarkICRSToITRS(b *testing.B) {

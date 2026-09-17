@@ -154,7 +154,7 @@ func TestParseMPCObsCodesRecoversKnownPositions(t *testing.T) {
 			}
 
 			testutil.AssertNear(t, "latitude", got.Lat().Degrees(), ref.Lat().Degrees(), tc.latTolD)
-			testutil.AssertNear(t, "height", got.Height(), ref.Height(), tc.hTolM)
+			testutil.AssertNear(t, "height", got.Height().Meters(), ref.Height().Meters(), tc.hTolM)
 		})
 	}
 }

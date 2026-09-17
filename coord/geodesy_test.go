@@ -7,6 +7,7 @@ import (
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/internal/testutil"
+	"github.com/TuSKan/astrogo/unit"
 	"github.com/TuSKan/astrogo/vector"
 )
 
@@ -33,14 +34,14 @@ func TestECEF_EquatorAndPoles(t *testing.T) {
 	// Equator, Lon 0
 	g1, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(0), 0)
 	v1 := g1.ToECEF(wgs84)
-	testutil.AssertNear(t, "Equator X", v1.X, wgs84.A, 1e-1)
+	testutil.AssertNear(t, "Equator X", v1.X, wgs84.A.Meters(), 1e-1)
 	testutil.AssertNear(t, "Equator Y", v1.Y, 0, 1e-1)
 	testutil.AssertNear(t, "Equator Z", v1.Z, 0, 1e-1)
 
 	// North Pole
 	g2, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(90), 0)
 	v2 := g2.ToECEF(wgs84)
-	b := wgs84.A * (1 - wgs84.F)
+	b := wgs84.A.Meters() * (1 - wgs84.F)
 
 	testutil.AssertNear(t, "Pole X", v2.X, 0, 1e-1)
 	testutil.AssertNear(t, "Pole Y", v2.Y, 0, 1e-1)
@@ -61,7 +62,7 @@ func TestECEFRoundTrip(t *testing.T) {
 	}
 
 	for i, c := range cases {
-		g, _ := coord.NewGeodetic(c.lon, c.lat, c.h)
+		g, _ := coord.NewGeodetic(c.lon, c.lat, unit.Meters(c.h))
 		v := g.ToECEF(wgs84)
 		g2, err := coord.FromECEF(v, wgs84)
 
@@ -70,7 +71,7 @@ func TestECEFRoundTrip(t *testing.T) {
 		testutil.AssertNoError(t, err)
 		testutil.AssertNear(t, label+" Lon", g2.Lon().Degrees(), g.Lon().Degrees(), 1e-9)
 		testutil.AssertNear(t, label+" Lat", g2.Lat().Degrees(), g.Lat().Degrees(), 1e-9)
-		testutil.AssertNear(t, label+" Height", g2.Height(), g.Height(), 1e-4)
+		testutil.AssertNear(t, label+" Height", g2.Height().Meters(), g.Height().Meters(), 1e-4)
 	}
 }
 

@@ -10,6 +10,7 @@ import (
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // TargetDetails holds descriptive and ephemeris properties of an Observable.
@@ -201,7 +202,7 @@ func fillMovingBody(d *TargetDetails, mb MovingBody, t time.Time, ctx *coord.Con
 
 	// Satellite distances are in km from the Reducer pipeline.
 	if _, isSat := mb.(*Satellite); isSat {
-		d.Distance = altaz.Dist()
+		d.Distance = altaz.Dist().Km()
 		d.DistanceUnit = "km"
 
 		return
@@ -489,7 +490,7 @@ func RadialVelocity(obs Observable, ctx *coord.Context) (float64, error) {
 			return 0, fmt.Errorf("radial velocity for %s: %w", mb.Name(), err)
 		}
 
-		return ctx.TopocentricRadialVelocity(state.Pos, state.Vel), nil
+		return ctx.TopocentricRadialVelocity(state.Pos, state.Vel).KmPerSec(), nil
 	}
 
 	if mrv, ok := obs.(MeasuredRadialVelocity); ok {
@@ -499,12 +500,12 @@ func RadialVelocity(obs Observable, ctx *coord.Context) (float64, error) {
 				return 0, fmt.Errorf("radial velocity for %s: %w", obs.Name(), err)
 			}
 
-			rv, err := ctx.ObservedRadialVelocity(pos, rvBarycentric)
+			rv, err := ctx.ObservedRadialVelocity(pos, unit.KmPerSec(rvBarycentric))
 			if err != nil {
 				return 0, fmt.Errorf("radial velocity for %s: %w", obs.Name(), err)
 			}
 
-			return rv, nil
+			return rv.KmPerSec(), nil
 		}
 	}
 

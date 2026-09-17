@@ -141,9 +141,9 @@ func TestLookAngle_ISS(t *testing.T) {
 	// from ~400 km (directly overhead) to ~13000 km (satellite on the far
 	// side of Earth). The bound here just needs to rule out a unit mismatch
 	// (e.g. AU instead of km, ~1e8 km) rather than pin an exact geometry.
-	if altaz.Dist() < 300 || altaz.Dist() > 14000 {
+	if km := altaz.Dist().Km(); km < 300 || km > 14000 {
 		t.Errorf("LookAngle range = %.0f km, want a plausible geocentric-scale slant range (300-14000 km)",
-			altaz.Dist())
+			km)
 	}
 }
 

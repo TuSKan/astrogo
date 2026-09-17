@@ -49,6 +49,20 @@ import (
 // Length and a Quantity can never disagree about how long an AU is. Measured,
 // the indirection is free: 1.08 ns against 1.13 ns for a constant-folded
 // equivalent, because the table is one hot cache line.
+//
+// # What this does not catch
+//
+// An untyped constant converts silently, so `NewGeodetic(lon, lat, 2635)`
+// compiles and means 2635 meters. That is the right answer there, and it is
+// the wrong one wherever the number was written in some other unit: a literal
+// `1000` handed to a parsec-scale API is a kilometer, not a kiloparsec, and
+// nothing complains.
+//
+// Converting the existing call sites found exactly this — several literals
+// that had been correct as bare float64 became wrong the moment the parameter
+// was typed, in tests that then failed by a factor of 1000. The type protects
+// a value that came *from* somewhere; a number written down at the call site
+// still has to say its unit, so write [Km], [AU] or [Pc] around it.
 type Length float64
 
 // Meters builds a Length from a value in meters.

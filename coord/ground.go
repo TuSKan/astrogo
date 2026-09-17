@@ -6,6 +6,7 @@ import (
 	"math"
 
 	"github.com/TuSKan/astrogo/angle"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // ErrNilGeodetic is returned when a ground calculation is given a nil
@@ -18,7 +19,7 @@ var ErrNilGeodetic = errors.New("coord: geodetic location must not be nil")
 const meanEarthRadiusM = 6371008.8
 
 // GroundDistance returns the great-circle distance along the Earth's
-// surface between two geodetic locations, in metres.
+// surface between two geodetic locations.
 //
 // This is a spherical calculation on the IUGG mean radius, not a geodesic
 // on the ellipsoid. The difference reaches roughly 0.3 per cent at
@@ -32,7 +33,7 @@ const meanEarthRadiusM = 6371008.8
 // because the latter loses precision for short distances, where
 // cos(d/R) approaches 1 — and short distances are exactly the case for a
 // nearby light source.
-func GroundDistance(a, b *Geodetic) (float64, error) {
+func GroundDistance(a, b *Geodetic) (unit.Length, error) {
 	if a == nil || b == nil {
 		return 0, ErrNilGeodetic
 	}
@@ -47,7 +48,7 @@ func GroundDistance(a, b *Geodetic) (float64, error) {
 
 	h := sinLat*sinLat + math.Cos(lat1)*math.Cos(lat2)*sinLon*sinLon
 
-	return 2 * meanEarthRadiusM * math.Asin(math.Sqrt(math.Min(1, h))), nil
+	return unit.Meters(2 * meanEarthRadiusM * math.Asin(math.Sqrt(math.Min(1, h)))), nil
 }
 
 // InitialBearing returns the initial great-circle bearing from a to b,
@@ -75,8 +76,8 @@ func InitialBearing(a, b *Geodetic) (angle.Angle, error) {
 	return angle.Deg(math.Mod(deg+360, 360)), nil
 }
 
-// Offset returns the point reached from a start by travelling distanceM
-// metres along a great circle on the initial bearing.
+// Offset returns the point reached from a start by travelling the given
+// distance along a great circle on the initial bearing.
 //
 // It is the direct problem to [GroundDistance] and [InitialBearing]'s
 // inverse one, on the same IUGG mean sphere, so the three are mutually
@@ -89,11 +90,12 @@ func InitialBearing(a, b *Geodetic) (angle.Angle, error) {
 // with d the angular distance. The returned longitude is wrapped to
 // (-180, 180]; height is carried over from the start unchanged, since a
 // great-circle offset says nothing about terrain.
-func Offset(from *Geodetic, bearing angle.Angle, distanceM float64) (*Geodetic, error) {
+func Offset(from *Geodetic, bearing angle.Angle, distance unit.Length) (*Geodetic, error) {
 	if from == nil {
 		return nil, ErrNilGeodetic
 	}
 
+	distanceM := distance.Meters()
 	if math.IsNaN(distanceM) || math.IsInf(distanceM, 0) {
 		return nil, fmt.Errorf("%w: distance %g m", ErrNilGeodetic, distanceM)
 	}

@@ -6,13 +6,14 @@ import (
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/constants"
+	"github.com/TuSKan/astrogo/unit"
 	"github.com/TuSKan/astrogo/vector"
 )
 
 // Ellipsoid represents a reference ellipsoid for the Earth.
 type Ellipsoid struct {
-	A float64 // Semi-major axis (meters)
-	F float64 // Flattening
+	A unit.Length // Semi-major axis
+	F float64     // Flattening
 }
 
 // WGS84 returns the WGS84 reference ellipsoid.
@@ -24,7 +25,7 @@ type Ellipsoid struct {
 // from.
 func WGS84() Ellipsoid {
 	return Ellipsoid{
-		A: constants.WGS84.SemiMajorAxis.Value,
+		A: unit.Meters(constants.WGS84.SemiMajorAxis.Value),
 		F: constants.Derived.WGS84Flattening.Value,
 	}
 }
@@ -35,15 +36,16 @@ func WGS84() Ellipsoid {
 type Geodetic struct {
 	lon    angle.Angle // Longitude
 	lat    angle.Angle // Latitude
-	height float64     // Height above the ellipsoid (meters)
+	height unit.Length // Height above the ellipsoid
 }
 
 // NewGeodetic creates a new Geodetic coordinate with validation.
 // Latitude must be in [-90, 90] degrees. All values must be finite.
-func NewGeodetic(lon, lat angle.Angle, height float64) (*Geodetic, error) {
+func NewGeodetic(lon, lat angle.Angle, height unit.Length) (*Geodetic, error) {
+	h := height.Meters()
 	if math.IsNaN(lon.Radians()) || math.IsInf(lon.Radians(), 0) ||
 		math.IsNaN(lat.Radians()) || math.IsInf(lat.Radians(), 0) ||
-		math.IsNaN(height) || math.IsInf(height, 0) {
+		math.IsNaN(h) || math.IsInf(h, 0) {
 		return nil, fmt.Errorf("geodetic: %w", ErrNotFinite)
 	}
 
@@ -55,7 +57,7 @@ func NewGeodetic(lon, lat angle.Angle, height float64) (*Geodetic, error) {
 }
 
 // MustGeodetic creates a Geodetic coordinate, panicking if parameters are out of range.
-func MustGeodetic(lon, lat angle.Angle, height float64) *Geodetic {
+func MustGeodetic(lon, lat angle.Angle, height unit.Length) *Geodetic {
 	g, err := NewGeodetic(lon, lat, height)
 	if err != nil {
 		panic(err)
@@ -71,11 +73,16 @@ func MustGeodetic(lon, lat angle.Angle, height float64) *Geodetic {
 // float64 values in the natural (lat, lon) order used by GPS receivers
 // and mapping services (Google Maps, OpenStreetMap, etc.).
 //
+// It keeps plain float64 parameters on purpose, where [NewGeodetic] takes
+// typed ones: the numbers it exists to accept are copied straight off such a
+// service, where they are always degrees and metres, and the parameter names
+// say so. Elsewhere in astrogo a length is a [unit.Length].
+//
 // Example:
 //
 //	loc, _ := coord.NewEarthLocation(-23.5505, -46.6333, 760) // São Paulo
 func NewEarthLocation(latDeg, lonDeg, heightMeters float64) (*Geodetic, error) {
-	return NewGeodetic(angle.Deg(lonDeg), angle.Deg(latDeg), heightMeters)
+	return NewGeodetic(angle.Deg(lonDeg), angle.Deg(latDeg), unit.Meters(heightMeters))
 }
 
 // Lon returns the longitude of the geodetic coordinate.
@@ -89,7 +96,7 @@ func (g *Geodetic) Lat() angle.Angle {
 }
 
 // Height returns the height above the ellipsoid.
-func (g *Geodetic) Height() float64 {
+func (g *Geodetic) Height() unit.Length {
 	return g.height
 }
 
@@ -142,7 +149,7 @@ func (g *Geodetic) Equal(other *Geodetic) bool {
 
 	return math.Abs(g.lon.Radians()-other.lon.Radians()) < 1e-12 &&
 		math.Abs(g.lat.Radians()-other.lat.Radians()) < 1e-12 &&
-		math.Abs(g.height-other.height) < 1e-6
+		(g.height-other.height).Abs() < unit.Millimeters(1e-3)
 }
 
 // ── Transformations ──────────────────────────────────────────────────────────
@@ -152,7 +159,7 @@ func (g *Geodetic) Equal(other *Geodetic) bool {
 func (g Geodetic) ToECEF(e Ellipsoid) vector.Vec3 {
 	phi := g.lat.Radians()
 	lam := g.lon.Radians()
-	h := g.height
+	h := g.height.Meters()
 
 	sinPhi := math.Sin(phi)
 	cosPhi := math.Cos(phi)
@@ -162,7 +169,7 @@ func (g Geodetic) ToECEF(e Ellipsoid) vector.Vec3 {
 	// Eccentricity squared: e2 = 2f - f^2
 	e2 := 2*e.F - e.F*e.F
 	// Prime vertical radius of curvature
-	n := e.A / math.Sqrt(1-e2*sinPhi*sinPhi)
+	n := e.A.Meters() / math.Sqrt(1-e2*sinPhi*sinPhi)
 
 	x := (n + h) * cosPhi * cosLam
 	y := (n + h) * cosPhi * sinLam
@@ -181,7 +188,7 @@ func FromECEF(v vector.Vec3, e Ellipsoid) (*Geodetic, error) {
 		return nil, fmt.Errorf("ECEF: %w", ErrNotFinite)
 	}
 
-	a := e.A
+	a := e.A.Meters()
 	f := e.F
 	e2 := 2*f - f*f
 	b := a * (1 - f)
@@ -190,7 +197,7 @@ func FromECEF(v vector.Vec3, e Ellipsoid) (*Geodetic, error) {
 	p := math.Hypot(x, y)
 	if p == 0 {
 		if z == 0 {
-			return NewGeodetic(angle.Rad(0), angle.Rad(0), -a)
+			return NewGeodetic(angle.Rad(0), angle.Rad(0), unit.Meters(-a))
 		}
 
 		lat := math.Pi / 2
@@ -198,7 +205,7 @@ func FromECEF(v vector.Vec3, e Ellipsoid) (*Geodetic, error) {
 			lat = -math.Pi / 2
 		}
 
-		return NewGeodetic(angle.Rad(0), angle.Rad(lat), math.Abs(z)-b)
+		return NewGeodetic(angle.Rad(0), angle.Rad(lat), unit.Meters(math.Abs(z)-b))
 	}
 
 	theta := math.Atan2(z*a, p*b)
@@ -213,7 +220,7 @@ func FromECEF(v vector.Vec3, e Ellipsoid) (*Geodetic, error) {
 	n := a / math.Sqrt(1-e2*sinLat*sinLat)
 	h := p/math.Cos(lat) - n
 
-	return NewGeodetic(angle.Rad(lon).WrapPi(), angle.Rad(lat), h)
+	return NewGeodetic(angle.Rad(lon).WrapPi(), angle.Rad(lat), unit.Meters(h))
 }
 
 // String returns a DMS representation of the geodetic coordinate.

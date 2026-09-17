@@ -4,6 +4,7 @@ import (
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // Star represents a fixed sidereal target with optional proper motion,
@@ -83,7 +84,7 @@ func (s *Star) Position(_ time.Time) (coord.ICRS, error) {
 		return coord.NewICRSWithKinematics(
 			s.coord.RA(), s.coord.Dec(),
 			s.pmRA, s.pmDec,
-			s.parallax, s.radialVelocity,
+			s.parallax, unit.KmPerSec(s.radialVelocity),
 		), nil
 	}
 
