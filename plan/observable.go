@@ -4,6 +4,7 @@ import (
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 	"github.com/TuSKan/astrogo/vector"
 )
 
@@ -52,7 +53,7 @@ type StaticMagnitude interface {
 // catalog value but a consequence of the geometry at the moment of asking,
 // computed from the ephemeris — see [RadialVelocity].
 type MeasuredRadialVelocity interface {
-	MeasuredRadialVelocity() (kmPerSec float64, ok bool)
+	MeasuredRadialVelocity() (unit.Velocity, bool)
 }
 
 // PhysicalRadius is implemented by targets with a known or estimated
@@ -62,7 +63,7 @@ type MeasuredRadialVelocity interface {
 // as its fallback when BodyEquatorialRadius has no entry for the target's
 // EphID. ok is false when neither option was ever set.
 type PhysicalRadius interface {
-	PhysicalRadius() (metres float64, ok bool)
+	PhysicalRadius() (unit.Length, bool)
 }
 
 // Compile-time assertions that every concrete target type implements the

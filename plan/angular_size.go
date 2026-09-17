@@ -8,12 +8,13 @@ import (
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 )
 
-// bodyEquatorialRadiusM maps each Solar System body this package can
+// bodyEquatorialRadius maps each Solar System body this package can
 // compute a real ephemeris position for to its published equatorial
-// radius, in metres — see constants/iau2015.go for the values and their
-// per-body IAU sourcing. The eph.ID-keyed map itself lives here rather
+// radius — see constants/iau2015.go for the values and their per-body
+// IAU sourcing. The eph.ID-keyed map itself lives here rather
 // than in constants: constants sits below ephemeris in this codebase's
 // layering (see CLAUDE.md's Architecture section) and imports nothing
 // but unit, so it can only publish the radii as bare constants.Constant
@@ -22,27 +23,27 @@ import (
 // Earth's entry is the WGS 84 semi-major axis, not an IAU2015 member —
 // it is exact to the WGS84 standard and consistent with IAU 2015 B3's
 // own Earth value.
-var bodyEquatorialRadiusM = map[eph.ID]float64{
-	eph.Sun:     constants.IAU.SunEquatorialRadius.Value,
-	eph.Moon:    constants.IAU.MoonEquatorialRadius.Value,
-	eph.Mercury: constants.IAU.MercuryEquatorialRadius.Value,
-	eph.Venus:   constants.IAU.VenusEquatorialRadius.Value,
-	eph.Earth:   constants.WGS84.SemiMajorAxis.Value,
-	eph.Mars:    constants.IAU.MarsEquatorialRadius.Value,
-	eph.Jupiter: constants.IAU.JupiterEquatorialRadius.Value,
-	eph.Saturn:  constants.IAU.SaturnEquatorialRadius.Value,
-	eph.Uranus:  constants.IAU.UranusEquatorialRadius.Value,
-	eph.Neptune: constants.IAU.NeptuneEquatorialRadius.Value,
-	eph.Pluto:   constants.IAU.PlutoEquatorialRadius.Value,
+var bodyEquatorialRadius = map[eph.ID]unit.Length{
+	eph.Sun:     unit.Meters(constants.IAU.SunEquatorialRadius.Value),
+	eph.Moon:    unit.Meters(constants.IAU.MoonEquatorialRadius.Value),
+	eph.Mercury: unit.Meters(constants.IAU.MercuryEquatorialRadius.Value),
+	eph.Venus:   unit.Meters(constants.IAU.VenusEquatorialRadius.Value),
+	eph.Earth:   unit.Meters(constants.WGS84.SemiMajorAxis.Value),
+	eph.Mars:    unit.Meters(constants.IAU.MarsEquatorialRadius.Value),
+	eph.Jupiter: unit.Meters(constants.IAU.JupiterEquatorialRadius.Value),
+	eph.Saturn:  unit.Meters(constants.IAU.SaturnEquatorialRadius.Value),
+	eph.Uranus:  unit.Meters(constants.IAU.UranusEquatorialRadius.Value),
+	eph.Neptune: unit.Meters(constants.IAU.NeptuneEquatorialRadius.Value),
+	eph.Pluto:   unit.Meters(constants.IAU.PlutoEquatorialRadius.Value),
 }
 
-// BodyEquatorialRadius returns id's published equatorial radius in
-// metres, and whether one is known. Only the Sun, Moon, and the eight
-// planets (plus Pluto) have one — asteroids, comets, and satellites
-// report ok=false, since this library has no general-purpose physical-size
-// catalog for them (see AngularDiameter's doc comment for that case).
-func BodyEquatorialRadius(id eph.ID) (metres float64, ok bool) {
-	r, ok := bodyEquatorialRadiusM[id]
+// BodyEquatorialRadius returns id's published equatorial radius, and whether
+// one is known. Only the Sun, Moon, and the eight planets (plus Pluto) have
+// one — asteroids, comets, and satellites report ok=false, since this library
+// has no general-purpose physical-size catalog for them (see
+// AngularDiameter's doc comment for that case).
+func BodyEquatorialRadius(id eph.ID) (unit.Length, bool) {
+	r, ok := bodyEquatorialRadius[id]
 
 	return r, ok
 }
@@ -64,10 +65,10 @@ func BodyEquatorialRadius(id eph.ID) (metres float64, ok bool) {
 // satellite, for instance, since this library has no general-purpose
 // physical-size catalog for either.
 func AngularDiameter(mb MovingBody, t time.Time, ctx *coord.Context) (angle.Angle, error) {
-	radiusM, ok := BodyEquatorialRadius(mb.EphID())
+	radius, ok := BodyEquatorialRadius(mb.EphID())
 	if !ok {
 		if pr, isPR := mb.(PhysicalRadius); isPR {
-			radiusM, ok = pr.PhysicalRadius()
+			radius, ok = pr.PhysicalRadius()
 		}
 
 		if !ok {
@@ -80,12 +81,12 @@ func AngularDiameter(mb MovingBody, t time.Time, ctx *coord.Context) (angle.Angl
 		return angle.Zero(), fmt.Errorf("plan: angular diameter: %w", err)
 	}
 
-	topoDistAU := vec.Sub(ctx.ObsVec()).Norm()
-	if topoDistAU <= 0 {
+	topoDist := unit.AU(vec.Sub(ctx.ObsVec()).Norm())
+	if topoDist <= 0 {
 		return angle.Zero(), fmt.Errorf("plan: angular diameter: %w", ErrZeroDistance)
 	}
 
-	radiusOverDist := radiusM / (topoDistAU * constants.IAU.AstronomicalUnit.Value)
+	radiusOverDist := radius.Meters() / topoDist.Meters()
 	if radiusOverDist > 1 {
 		// Only reachable for a synthetic/broken distance placing the
 		// observer inside the body — clamp rather than let asin produce

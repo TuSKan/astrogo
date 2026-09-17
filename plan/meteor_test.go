@@ -46,8 +46,8 @@ func TestMeteorShowersTableIntegrity(t *testing.T) {
 		// 11 km/s ~ Earth's escape velocity, the slowest physically
 		// possible meteor; ~72 km/s ~ Earth's orbital velocity plus a
 		// parabolic comet's approach speed, the real theoretical maximum.
-		if m.VelocityKmS < 11 || m.VelocityKmS > 72 {
-			t.Errorf("%s: VelocityKmS = %v, outside the physically plausible [11,72] range", m.Name, m.VelocityKmS)
+		if v := m.Velocity.KmPerSec(); v < 11 || v > 72 {
+			t.Errorf("%s: Velocity = %v km/s, outside the physically plausible [11,72] range", m.Name, v)
 		}
 	}
 }

@@ -234,7 +234,7 @@ type PassEvent struct {
 	Time      time.Time
 	Azimuth   angle.Angle
 	Elevation angle.Angle
-	Range     float64 // km
+	Range     unit.Length
 }
 
 // SatellitePasses computes all passes of a satellite over an observer site
@@ -287,7 +287,7 @@ func SatellitePasses(prov eph.Provider, name string, start, end time.Time,
 			Time:      t,
 			Azimuth:   altaz.Az(),
 			Elevation: altaz.Alt(),
-			Range:     altaz.Dist().Km(),
+			Range:     altaz.Dist(),
 		}
 	}
 
@@ -426,6 +426,6 @@ func findCulmination(prov eph.Provider, observer *coord.Geodetic,
 		Time:      bestTime,
 		Azimuth:   altaz.Az(),
 		Elevation: altaz.Alt(),
-		Range:     altaz.Dist().Km(),
+		Range:     altaz.Dist(),
 	}, nil
 }

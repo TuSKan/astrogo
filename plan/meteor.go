@@ -9,6 +9,7 @@ import (
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // meanSolarLongitudeDegPerDay is the Sun's mean apparent motion along the
@@ -62,8 +63,8 @@ type MeteorShower struct {
 	// showers fall in the 2.0-3.2 range (lower = relatively more bright
 	// meteors).
 	PopulationIndex float64
-	// VelocityKmS is the shower's geocentric entry velocity, informational.
-	VelocityKmS float64
+	// Velocity is the shower's geocentric entry velocity, informational.
+	Velocity unit.Velocity
 }
 
 // MeteorShowerNames returns the names of every built-in shower, sorted.
@@ -120,63 +121,63 @@ var MeteorShowers = map[string]MeteorShower{
 		RadiantRA: angle.Deg(230), RadiantDec: angle.Deg(49),
 		DriftRAPerDay: angle.Deg(0.6), DriftDecPerDay: angle.Deg(-0.2),
 		PeakSolarLongitude: 283, ActiveStartSolarLon: 283 - 2*meanSolarLongitudeDegPerDay, ActiveEndSolarLon: 283 + 2*meanSolarLongitudeDegPerDay,
-		ZHR: 120, PopulationIndex: 2.1, VelocityKmS: 41,
+		ZHR: 120, PopulationIndex: 2.1, Velocity: unit.KmPerSec(41),
 	},
 	"lyrids": {
 		Name: "Lyrids", Code: "LYR", ParentBody: "C/1861 G1 (Thatcher)",
 		RadiantRA: angle.Deg(271), RadiantDec: angle.Deg(34),
 		DriftRAPerDay: angle.Deg(1.0), DriftDecPerDay: angle.Deg(0.0),
 		PeakSolarLongitude: 32, ActiveStartSolarLon: 32 - 6*meanSolarLongitudeDegPerDay, ActiveEndSolarLon: 32 + 3*meanSolarLongitudeDegPerDay,
-		ZHR: 18, PopulationIndex: 2.1, VelocityKmS: 49,
+		ZHR: 18, PopulationIndex: 2.1, Velocity: unit.KmPerSec(49),
 	},
 	"eta_aquariids": {
 		Name: "Eta Aquariids", Code: "ETA", ParentBody: "1P/Halley",
 		RadiantRA: angle.Deg(338), RadiantDec: angle.Deg(-1),
 		DriftRAPerDay: angle.Deg(0.8), DriftDecPerDay: angle.Deg(0.4),
 		PeakSolarLongitude: 45, ActiveStartSolarLon: 45 - 17*meanSolarLongitudeDegPerDay, ActiveEndSolarLon: 45 + 22*meanSolarLongitudeDegPerDay,
-		ZHR: 60, PopulationIndex: 2.4, VelocityKmS: 66,
+		ZHR: 60, PopulationIndex: 2.4, Velocity: unit.KmPerSec(66),
 	},
 	"southern_delta_aquariids": {
 		Name: "Southern Delta Aquariids", Code: "SDA", ParentBody: "96P/Machholz (disputed)",
 		RadiantRA: angle.Deg(339), RadiantDec: angle.Deg(-16),
 		DriftRAPerDay: angle.Deg(1.0), DriftDecPerDay: angle.Deg(0.4),
 		PeakSolarLongitude: 125, ActiveStartSolarLon: 125 - 16*meanSolarLongitudeDegPerDay, ActiveEndSolarLon: 125 + 22*meanSolarLongitudeDegPerDay,
-		ZHR: 20, PopulationIndex: 3.2, VelocityKmS: 41,
+		ZHR: 20, PopulationIndex: 3.2, Velocity: unit.KmPerSec(41),
 	},
 	"perseids": {
 		Name: "Perseids", Code: "PER", ParentBody: "109P/Swift-Tuttle",
 		RadiantRA: angle.Deg(46), RadiantDec: angle.Deg(58),
 		DriftRAPerDay: angle.Deg(1.3), DriftDecPerDay: angle.Deg(0.15),
 		PeakSolarLongitude: 140, ActiveStartSolarLon: 140 - 26*meanSolarLongitudeDegPerDay, ActiveEndSolarLon: 140 + 12*meanSolarLongitudeDegPerDay,
-		ZHR: 100, PopulationIndex: 2.6, VelocityKmS: 59,
+		ZHR: 100, PopulationIndex: 2.6, Velocity: unit.KmPerSec(59),
 	},
 	"orionids": {
 		Name: "Orionids", Code: "ORI", ParentBody: "1P/Halley",
 		RadiantRA: angle.Deg(95), RadiantDec: angle.Deg(16),
 		DriftRAPerDay: angle.Deg(0.65), DriftDecPerDay: angle.Deg(0.05),
 		PeakSolarLongitude: 208, ActiveStartSolarLon: 208 - 19*meanSolarLongitudeDegPerDay, ActiveEndSolarLon: 208 + 17*meanSolarLongitudeDegPerDay,
-		ZHR: 23, PopulationIndex: 2.5, VelocityKmS: 66,
+		ZHR: 23, PopulationIndex: 2.5, Velocity: unit.KmPerSec(66),
 	},
 	"leonids": {
 		Name: "Leonids", Code: "LEO", ParentBody: "55P/Tempel-Tuttle",
 		RadiantRA: angle.Deg(153), RadiantDec: angle.Deg(22),
 		DriftRAPerDay: angle.Deg(0.6), DriftDecPerDay: angle.Deg(-0.4),
 		PeakSolarLongitude: 235, ActiveStartSolarLon: 235 - 5*meanSolarLongitudeDegPerDay, ActiveEndSolarLon: 235 + 2*meanSolarLongitudeDegPerDay,
-		ZHR: 15, PopulationIndex: 2.5, VelocityKmS: 71,
+		ZHR: 15, PopulationIndex: 2.5, Velocity: unit.KmPerSec(71),
 	},
 	"geminids": {
 		Name: "Geminids", Code: "GEM", ParentBody: "3200 Phaethon",
 		RadiantRA: angle.Deg(112), RadiantDec: angle.Deg(33),
 		DriftRAPerDay: angle.Deg(1.0), DriftDecPerDay: angle.Deg(-0.1),
 		PeakSolarLongitude: 262, ActiveStartSolarLon: 262 - 7*meanSolarLongitudeDegPerDay, ActiveEndSolarLon: 262 + 3*meanSolarLongitudeDegPerDay,
-		ZHR: 120, PopulationIndex: 2.6, VelocityKmS: 35,
+		ZHR: 120, PopulationIndex: 2.6, Velocity: unit.KmPerSec(35),
 	},
 	"ursids": {
 		Name: "Ursids", Code: "URS", ParentBody: "8P/Tuttle",
 		RadiantRA: angle.Deg(217), RadiantDec: angle.Deg(76),
 		DriftRAPerDay: angle.Zero(), DriftDecPerDay: angle.Zero(),
 		PeakSolarLongitude: 270, ActiveStartSolarLon: 270 - 5*meanSolarLongitudeDegPerDay, ActiveEndSolarLon: 270 + 4*meanSolarLongitudeDegPerDay,
-		ZHR: 10, PopulationIndex: 3.0, VelocityKmS: 33,
+		ZHR: 10, PopulationIndex: 3.0, Velocity: unit.KmPerSec(33),
 	},
 }
 

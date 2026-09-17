@@ -9,6 +9,7 @@ import (
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	mag "github.com/TuSKan/astrogo/magnitude"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 	"github.com/TuSKan/astrogo/vector"
 )
 
@@ -30,7 +31,7 @@ type Asteroid struct {
 	oblat       float64
 	id          eph.ID
 	hasG1G2     bool
-	diameterKm  float64
+	diameter    unit.Length
 	hasDiameter bool
 	albedo      float64
 	hasAlbedo   bool
@@ -44,12 +45,15 @@ func WithHG(absH, slopeG float64) AsteroidOption {
 	return func(a *Asteroid) { a.H = absH; a.G = slopeG }
 }
 
-// WithDiameter sets a measured physical diameter, in kilometres (e.g.
-// SBDB's "diameter" phys_par entry — real occultation/thermal/radar
-// measurement). PhysicalRadius prefers this over the H+albedo estimate
-// WithAlbedo enables, when both are set.
-func WithDiameter(km float64) AsteroidOption {
-	return func(a *Asteroid) { a.diameterKm = km; a.hasDiameter = true }
+// WithDiameter sets a measured physical diameter (e.g. SBDB's "diameter"
+// phys_par entry — a real occultation/thermal/radar measurement).
+// PhysicalRadius prefers this over the H+albedo estimate WithAlbedo
+// enables, when both are set.
+//
+// SBDB publishes it in kilometres, so a value taken from there is
+// [unit.Km](d).
+func WithDiameter(d unit.Length) AsteroidOption {
+	return func(a *Asteroid) { a.diameter = d; a.hasDiameter = true }
 }
 
 // WithAlbedo sets the geometric albedo (SBDB's "albedo" phys_par entry),
@@ -118,9 +122,9 @@ func (a *Asteroid) EphID() eph.ID { return a.id }
 // WithAlbedo-enabled H+albedo estimate when both are set, since a real
 // occultation/thermal/radar measurement is strictly better than a
 // magnitude-derived one. ok is false when neither was ever set.
-func (a *Asteroid) PhysicalRadius() (metres float64, ok bool) {
+func (a *Asteroid) PhysicalRadius() (unit.Length, bool) {
 	if a.hasDiameter {
-		return a.diameterKm * 1000 / 2, true
+		return a.diameter / 2, true
 	}
 
 	if a.hasAlbedo {
@@ -129,7 +133,7 @@ func (a *Asteroid) PhysicalRadius() (metres float64, ok bool) {
 		// as adopted by the Minor Planet Center).
 		diameterKm := 1329 / math.Sqrt(a.albedo) * math.Pow(10, -0.2*a.H)
 
-		return diameterKm * 1000 / 2, true
+		return unit.Km(diameterKm) / 2, true
 	}
 
 	return 0, false

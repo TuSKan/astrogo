@@ -174,7 +174,7 @@ func printPassEvent(label string, ev plan.PassEvent, loc *time.Location) {
 		fmtTime(ev.Time, loc),
 		ev.Azimuth.Degrees(),
 		ev.Elevation.Degrees(),
-		ev.Range,
+		ev.Range.Km(),
 	)
 }
 

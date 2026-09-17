@@ -16,7 +16,7 @@ type Star struct {
 	pmRA           angle.Angle
 	pmDec          angle.Angle
 	parallax       angle.Angle
-	radialVelocity float64
+	radialVelocity unit.Velocity
 	vMag           float64
 	hasVMag        bool
 	hasRV          bool
@@ -40,10 +40,14 @@ func WithParallax(p angle.Angle) StarOption {
 }
 
 // WithRadialVelocity sets the star's measured (catalog, barycentric) radial
-// velocity in km/s. A true-zero RV is physically legitimate (a target
-// with no measurable motion along the line of sight) and is tracked
-// distinctly from "no RV set" — see MeasuredRadialVelocity.
-func WithRadialVelocity(rv float64) StarOption {
+// velocity. A true-zero RV is physically legitimate (a target with no
+// measurable motion along the line of sight) and is tracked distinctly from
+// "no RV set" — see MeasuredRadialVelocity.
+//
+// Catalogues publish this in km/s, so the value a caller has in hand is
+// almost always [unit.KmPerSec](v). Writing a bare number here would mean
+// metres per second, which is what nothing publishes.
+func WithRadialVelocity(rv unit.Velocity) StarOption {
 	return func(s *Star) { s.radialVelocity = rv; s.hasRV = true }
 }
 
@@ -84,7 +88,7 @@ func (s *Star) Position(_ time.Time) (coord.ICRS, error) {
 		return coord.NewICRSWithKinematics(
 			s.coord.RA(), s.coord.Dec(),
 			s.pmRA, s.pmDec,
-			s.parallax, unit.KmPerSec(s.radialVelocity),
+			s.parallax, s.radialVelocity,
 		), nil
 	}
 
@@ -99,6 +103,8 @@ func (s *Star) GetDetails(ctx *coord.Context, over DetailOverrides) (*TargetDeta
 // StaticMagnitude returns the catalog V-band magnitude if set.
 func (s *Star) StaticMagnitude() (float64, bool) { return s.vMag, s.hasVMag }
 
-// MeasuredRadialVelocity returns the star's measured (catalog,
-// barycentric) radial velocity in km/s if WithRadialVelocity was set.
-func (s *Star) MeasuredRadialVelocity() (float64, bool) { return s.radialVelocity, s.hasRV }
+// MeasuredRadialVelocity returns the star's measured (catalog, barycentric)
+// radial velocity if WithRadialVelocity was set.
+func (s *Star) MeasuredRadialVelocity() (unit.Velocity, bool) {
+	return s.radialVelocity, s.hasRV
+}

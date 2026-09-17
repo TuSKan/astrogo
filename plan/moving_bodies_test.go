@@ -10,6 +10,7 @@ import (
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 	"github.com/TuSKan/astrogo/vector"
 )
 
@@ -130,7 +131,7 @@ func TestAsteroid_PhysicalRadius(t *testing.T) {
 	t.Run("albedo-only estimate", func(t *testing.T) {
 		a := NewAsteroid("Eros", 2000433, prov, WithHG(10.40, 0.46), WithAlbedo(0.25))
 
-		gotM, ok := a.PhysicalRadius()
+		got, ok := a.PhysicalRadius()
 		if !ok {
 			t.Fatal("expected ok=true with WithAlbedo set")
 		}
@@ -138,6 +139,7 @@ func TestAsteroid_PhysicalRadius(t *testing.T) {
 		wantDiameterKm := 1329 / math.Sqrt(0.25) * math.Pow(10, -0.2*10.40)
 		wantM := wantDiameterKm * 1000 / 2
 
+		gotM := got.Meters()
 		if math.Abs(gotM-wantM) > 1 {
 			t.Errorf("PhysicalRadius = %.1f m, want %.1f m (H+albedo estimate)", gotM, wantM)
 		}
@@ -153,12 +155,15 @@ func TestAsteroid_PhysicalRadius(t *testing.T) {
 	t.Run("measured diameter wins over albedo estimate", func(t *testing.T) {
 		const measuredDiameterKm = 16.84 // real SBDB value
 
-		a := NewAsteroid("Eros", 2000433, prov, WithHG(10.40, 0.46), WithAlbedo(0.25), WithDiameter(measuredDiameterKm))
+		a := NewAsteroid("Eros", 2000433, prov,
+			WithHG(10.40, 0.46), WithAlbedo(0.25), WithDiameter(unit.Km(measuredDiameterKm)))
 
-		gotM, ok := a.PhysicalRadius()
+		got, ok := a.PhysicalRadius()
 		if !ok {
 			t.Fatal("expected ok=true with WithDiameter set")
 		}
+
+		gotM := got.Meters()
 
 		wantM := measuredDiameterKm * 1000 / 2
 		if gotM != wantM {

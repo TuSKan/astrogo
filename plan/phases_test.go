@@ -120,16 +120,17 @@ func TestApsides_KnownYear(t *testing.T) {
 	}
 
 	// Earth's orbit: perihelion ~0.983 AU (early Jan), aphelion ~1.017 AU (early Jul).
-	if peri.Distance < 0.98 || peri.Distance > 0.99 {
-		t.Errorf("perihelion distance = %.4f AU, want ~0.983", peri.Distance)
+	if periAU := peri.Distance.AU(); periAU < 0.98 || periAU > 0.99 {
+		t.Errorf("perihelion distance = %.4f AU, want ~0.983", periAU)
 	}
 
-	if aph.Distance < 1.01 || aph.Distance > 1.02 {
-		t.Errorf("aphelion distance = %.4f AU, want ~1.017", aph.Distance)
+	if aphAU := aph.Distance.AU(); aphAU < 1.01 || aphAU > 1.02 {
+		t.Errorf("aphelion distance = %.4f AU, want ~1.017", aphAU)
 	}
 
 	if aph.Distance <= peri.Distance {
-		t.Errorf("aphelion (%.4f) should exceed perihelion (%.4f)", aph.Distance, peri.Distance)
+		t.Errorf("aphelion (%.4f AU) should exceed perihelion (%.4f AU)",
+			aph.Distance.AU(), peri.Distance.AU())
 	}
 }
 
