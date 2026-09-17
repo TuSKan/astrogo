@@ -116,6 +116,16 @@ already shipped, or a CI change no user can observe — label the pull request
 `no-changelog`. The label is deliberate and shows up in review; silence did
 not.
 
+Applying it re-runs the check on its own. That is why the job lives in
+`changelog.yml` rather than in `ci.yml`: a label change is not a `synchronize`,
+so the default `pull_request` types would not fire, and *re-running* the job
+does not help either — GitHub replays the original event payload, so the run
+still cannot see the new label. Until #337 the only ways through were to push a
+commit to a pull request that needed no further change, or to close and reopen
+it. Widening the trigger in `ci.yml` instead would have re-run the whole matrix
+on every triage label, so the metadata check got its own workflow and the build
+kept its own trigger.
+
 **And a break has to say it is one.** CI's `api-diff` job runs `apidiff` between
 this pull request's head and its base and fails when the exported API changes
 incompatibly with no fragment declaring `Changed — BREAKING` or `Removed`. Until
