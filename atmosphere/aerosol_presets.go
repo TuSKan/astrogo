@@ -1,5 +1,7 @@
 package atmosphere
 
+import "github.com/TuSKan/astrogo/unit"
+
 // Aerosol-type reference optical properties from Hess, M., P. Koepke, and
 // I. Schult (1998), "Optical Properties of Aerosols and Clouds: The
 // Software Package OPAC," Bull. Amer. Meteor. Soc., 79, 831-844, Table 3
@@ -100,15 +102,15 @@ const (
 // troposphere carries Z = 8 km as well and the profile is continuous across
 // the boundary.
 const (
-	// ContinentalScaleHeightM is OPAC's Z for the three continental types
+	// ContinentalScaleHeight is OPAC's Z for the three continental types
 	// and for Urban: 8 km, the molecular scale height.
-	ContinentalScaleHeightM = 8000
+	ContinentalScaleHeight unit.Length = 8000
 
-	// DesertScaleHeightM is OPAC's Z for Desert: 2 km.
-	DesertScaleHeightM = 2000
+	// DesertScaleHeight is OPAC's Z for Desert: 2 km.
+	DesertScaleHeight unit.Length = 2000
 
-	// MaritimeScaleHeightM is OPAC's Z for the three maritime types: 1 km.
-	MaritimeScaleHeightM = 1000
+	// MaritimeScaleHeight is OPAC's Z for the three maritime types: 1 km.
+	MaritimeScaleHeight unit.Length = 1000
 )
 
 // Indicative aerosol optical depths at 550 nm, one per broad regime.
@@ -158,10 +160,10 @@ const (
 // asymmetry parameter, and Angstrom exponent come from the published
 // model (see the package-level doc comment above for the 80% RH
 // caveat). Surface pressure/temperature come from the ICAO ISA profile
-// at heightM, matching StandardDefault. Chain further Builder calls
+// at height, matching StandardDefault. Chain further Builder calls
 // (PrecipitableWater, SurfaceAlbedo, Source, ...) before Build().
-func RuralAerosol(heightM, aod550 float64) *Builder {
-	return aerosolBuilder(heightM, aod550, continentalAverageSSA, continentalAverageAsymm, continentalAverageAngstrom, ContinentalScaleHeightM,
+func RuralAerosol(height unit.Length, aod550 float64) *Builder {
+	return aerosolBuilder(height, aod550, continentalAverageSSA, continentalAverageAsymm, continentalAverageAngstrom, ContinentalScaleHeight,
 		"OPAC Continental average aerosol (Hess, Koepke & Schult 1998)")
 }
 
@@ -171,8 +173,8 @@ func RuralAerosol(heightM, aod550 float64) *Builder {
 // single-scattering albedo) of the four presets in this file. See
 // RuralAerosol's doc comment for parameter/caveat details shared by all
 // four constructors.
-func UrbanAerosol(heightM, aod550 float64) *Builder {
-	return aerosolBuilder(heightM, aod550, urbanSSA, urbanAsymm, urbanAngstrom, ContinentalScaleHeightM,
+func UrbanAerosol(height unit.Length, aod550 float64) *Builder {
+	return aerosolBuilder(height, aod550, urbanSSA, urbanAsymm, urbanAngstrom, ContinentalScaleHeight,
 		"OPAC Urban aerosol (Hess, Koepke & Schult 1998)")
 }
 
@@ -182,8 +184,8 @@ func UrbanAerosol(heightM, aod550 float64) *Builder {
 // spectral extinction, characteristic of large particles) than
 // Rural/Urban aerosol. See RuralAerosol's doc comment for parameter/
 // caveat details shared by all four constructors.
-func DesertAerosol(heightM, aod550 float64) *Builder {
-	return aerosolBuilder(heightM, aod550, desertSSA, desertAsymm, desertAngstrom, DesertScaleHeightM,
+func DesertAerosol(height unit.Length, aod550 float64) *Builder {
+	return aerosolBuilder(height, aod550, desertSSA, desertAsymm, desertAngstrom, DesertScaleHeight,
 		"OPAC Desert aerosol (Hess, Koepke & Schult 1998)")
 }
 
@@ -196,8 +198,8 @@ func DesertAerosol(heightM, aod550 float64) *Builder {
 // [MaritimeTropicalAerosol]; this constructor is the clean-air baseline.
 // See RuralAerosol's doc comment for parameter/caveat details shared by
 // all eight constructors.
-func MaritimeAerosol(heightM, aod550 float64) *Builder {
-	return aerosolBuilder(heightM, aod550, maritimeCleanSSA, maritimeCleanAsymm, maritimeCleanAngstrom, MaritimeScaleHeightM,
+func MaritimeAerosol(height unit.Length, aod550 float64) *Builder {
+	return aerosolBuilder(height, aod550, maritimeCleanSSA, maritimeCleanAsymm, maritimeCleanAngstrom, MaritimeScaleHeight,
 		"OPAC Maritime clean aerosol (Hess, Koepke & Schult 1998)")
 }
 
@@ -209,8 +211,8 @@ func MaritimeAerosol(heightM, aod550 float64) *Builder {
 // natural companion to [RuralAerosol], which is OPAC's Continental average
 // and does contain soot. See RuralAerosol's doc comment for parameter/
 // caveat details shared by all eight constructors.
-func ContinentalCleanAerosol(heightM, aod550 float64) *Builder {
-	return aerosolBuilder(heightM, aod550, continentalCleanSSA, continentalCleanAsymm, continentalCleanAngstrom, ContinentalScaleHeightM,
+func ContinentalCleanAerosol(height unit.Length, aod550 float64) *Builder {
+	return aerosolBuilder(height, aod550, continentalCleanSSA, continentalCleanAsymm, continentalCleanAngstrom, ContinentalScaleHeight,
 		"OPAC Continental clean aerosol (Hess, Koepke & Schult 1998)")
 }
 
@@ -220,8 +222,8 @@ func ContinentalCleanAerosol(heightM, aod550 float64) *Builder {
 // twice the water-soluble mass of Continental average. It sits between
 // [RuralAerosol] and [UrbanAerosol] in absorption. See RuralAerosol's doc
 // comment for parameter/caveat details shared by all eight constructors.
-func ContinentalPollutedAerosol(heightM, aod550 float64) *Builder {
-	return aerosolBuilder(heightM, aod550, continentalPollutedSSA, continentalPollutedAsymm, continentalPollutedAngstrom, ContinentalScaleHeightM,
+func ContinentalPollutedAerosol(height unit.Length, aod550 float64) *Builder {
+	return aerosolBuilder(height, aod550, continentalPollutedSSA, continentalPollutedAsymm, continentalPollutedAngstrom, ContinentalScaleHeight,
 		"OPAC Continental polluted aerosol (Hess, Koepke & Schult 1998)")
 }
 
@@ -232,8 +234,8 @@ func ContinentalPollutedAerosol(heightM, aod550 float64) *Builder {
 // pollution contributing particles far smaller than sea salt. See
 // RuralAerosol's doc comment for parameter/caveat details shared by all
 // eight constructors.
-func MaritimePollutedAerosol(heightM, aod550 float64) *Builder {
-	return aerosolBuilder(heightM, aod550, maritimePollutedSSA, maritimePollutedAsymm, maritimePollutedAngstrom, MaritimeScaleHeightM,
+func MaritimePollutedAerosol(height unit.Length, aod550 float64) *Builder {
+	return aerosolBuilder(height, aod550, maritimePollutedSSA, maritimePollutedAsymm, maritimePollutedAngstrom, MaritimeScaleHeight,
 		"OPAC Maritime polluted aerosol (Hess, Koepke & Schult 1998)")
 }
 
@@ -244,21 +246,24 @@ func MaritimePollutedAerosol(heightM, aod550 float64) *Builder {
 // salt is large enough that extinction barely varies across the visible.
 // See RuralAerosol's doc comment for parameter/caveat details shared by
 // all eight constructors.
-func MaritimeTropicalAerosol(heightM, aod550 float64) *Builder {
-	return aerosolBuilder(heightM, aod550, maritimeTropicalSSA, maritimeTropicalAsymm, maritimeTropicalAngstrom, MaritimeScaleHeightM,
+func MaritimeTropicalAerosol(height unit.Length, aod550 float64) *Builder {
+	return aerosolBuilder(height, aod550, maritimeTropicalSSA, maritimeTropicalAsymm, maritimeTropicalAngstrom, MaritimeScaleHeight,
 		"OPAC Maritime tropical aerosol (Hess, Koepke & Schult 1998)")
 }
 
 // aerosolBuilder is the shared construction path for the eight named
-// aerosol-type presets above: ISA surface conditions at heightM
+// aerosol-type presets above: ISA surface conditions at height
 // (mirroring StandardDefault), the given aerosol optical properties at
 // aod550/550nm, and a Source provenance record naming the OPAC type.
 // FidelityPrior matches StandardDefault's own choice — a cited
 // reference/climatological value, not a live site measurement.
-func aerosolBuilder(heightM, aod550, ssa, g, angstrom, scaleHeightM float64, sourceName string) *Builder {
-	b := &Builder{s: Atmosphere{surface: AtAltitude(heightM)}}
+func aerosolBuilder(
+	height unit.Length, aod550, ssa, g, angstrom float64,
+	scaleHeight unit.Length, sourceName string,
+) *Builder {
+	b := &Builder{s: Atmosphere{surface: AtAltitude(height)}}
 	b.Aerosol(aod550, aerosolRefWavelengthNM, angstrom, ssa, g)
-	b.AerosolScaleHeight(scaleHeightM)
+	b.AerosolScaleHeight(scaleHeight)
 	b.s.provenance.Source = SourceRef{Name: sourceName, Fidelity: FidelityPrior}
 
 	return b

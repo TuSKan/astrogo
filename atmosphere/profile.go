@@ -45,13 +45,15 @@ var (
 // profile is a different capability, not a refinement of this one, and
 // [VerticalProfile] is where it will go.
 func ExponentialExtinction(
-	altitudeM unit.AltitudeM, column unit.OpticalDepth, scaleHeightM float64,
+	altitude unit.Length, column unit.OpticalDepth, scaleHeight unit.Length,
 ) (float64, error) {
-	if err := checkProfile(altitudeM, column, scaleHeightM); err != nil {
+	if err := checkProfile(altitude, column, scaleHeight); err != nil {
 		return 0, err
 	}
 
-	return float64(column) / scaleHeightM * math.Exp(-float64(altitudeM)/scaleHeightM), nil
+	h, scale := altitude.Meters(), scaleHeight.Meters()
+
+	return float64(column) / scale * math.Exp(-h/scale), nil
 }
 
 // ExponentialDepth returns the vertical optical depth between the ground and
@@ -65,26 +67,30 @@ func ExponentialExtinction(
 // another. It tends to tau_0 as h grows, so the whole column is recovered at
 // the top rather than approached from above.
 func ExponentialDepth(
-	altitudeM unit.AltitudeM, column unit.OpticalDepth, scaleHeightM float64,
+	altitude unit.Length, column unit.OpticalDepth, scaleHeight unit.Length,
 ) (unit.OpticalDepth, error) {
-	if err := checkProfile(altitudeM, column, scaleHeightM); err != nil {
+	if err := checkProfile(altitude, column, scaleHeight); err != nil {
 		return 0, err
 	}
 
-	return column * unit.OpticalDepth(1-math.Exp(-float64(altitudeM)/scaleHeightM)), nil
+	ratio := altitude.Meters() / scaleHeight.Meters()
+
+	return column * unit.OpticalDepth(1-math.Exp(-ratio)), nil
 }
 
 // checkProfile validates the arguments both profile functions share.
-func checkProfile(altitudeM unit.AltitudeM, column unit.OpticalDepth, scaleHeightM float64) error {
+func checkProfile(altitude unit.Length, column unit.OpticalDepth, scaleHeight unit.Length) error {
+	h, scale := altitude.Meters(), scaleHeight.Meters()
+
 	switch {
-	case scaleHeightM <= 0 || math.IsInf(scaleHeightM, 0) || math.IsNaN(scaleHeightM):
-		return fmt.Errorf("%w: got %g m", ErrScaleHeight, scaleHeightM)
+	case scale <= 0 || math.IsInf(scale, 0) || math.IsNaN(scale):
+		return fmt.Errorf("%w: got %g m", ErrScaleHeight, scale)
 
 	case column < 0 || math.IsInf(float64(column), 0) || math.IsNaN(float64(column)):
 		return fmt.Errorf("%w: got %g", ErrColumnDepth, float64(column))
 
-	case altitudeM < 0 || math.IsInf(float64(altitudeM), 0) || math.IsNaN(float64(altitudeM)):
-		return fmt.Errorf("%w: got %g m", ErrAltitude, float64(altitudeM))
+	case h < 0 || math.IsInf(h, 0) || math.IsNaN(h):
+		return fmt.Errorf("%w: got %g m", ErrAltitude, h)
 	}
 
 	return nil

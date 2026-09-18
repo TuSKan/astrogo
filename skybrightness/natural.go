@@ -307,7 +307,7 @@ func (d *DiffuseGalacticLight) AddRadiance(
 
 	pressure, _ := scene.Atmosphere.Surface()
 	aerosol := scene.Atmosphere.Aerosol()
-	height := scene.Observer.Height().Meters()
+	height := scene.Observer.Height()
 	kappa := scene.Atmosphere.DiffuseKappa()
 
 	for i := range dst {
@@ -511,7 +511,7 @@ func (z *ZodiacalLight) AddRadiance(
 
 	pressure, _ := scene.Atmosphere.Surface()
 	aerosol := scene.Atmosphere.Aerosol()
-	height := scene.Observer.Height().Meters()
+	height := scene.Observer.Height()
 	kappa := scene.Atmosphere.DiffuseKappa()
 
 	for i := range dst {
@@ -581,10 +581,10 @@ func (z *ZodiacalLight) Provenance() Provenance {
 // A value is safe for concurrent use and holds no per-scene state, since the
 // van Rhijn factor depends only on the zenith angle.
 type Airglow struct {
-	zenith       SpectralRadiance
-	grid         unit.SpectralGrid
-	layerHeightM float64
-	measured     bool
+	zenith      SpectralRadiance
+	grid        unit.SpectralGrid
+	layerHeight unit.Length
+	measured    bool
 
 	// scratch holds the unattenuated spectrum while the atmosphere is
 	// applied to it, the same reason ZodiacalLight carries one.
@@ -593,20 +593,22 @@ type Airglow struct {
 
 // NewAirglow builds the component from a zenith spectrum on a given grid.
 //
-// layerHeightM defaults to [github.com/TuSKan/astrogo/atmosphere.AirglowLayerHeightM]
+// layerHeight defaults to [github.com/TuSKan/astrogo/atmosphere.AirglowLayerHeight]
 // when zero. Set measured when the spectrum comes from an observation of the
 // night being modelled rather than from a reference, which changes the quality
 // flag the component reports.
-func NewAirglow(zenith SpectralRadiance, grid unit.SpectralGrid, layerHeightM float64, measured bool) (*Airglow, error) {
+func NewAirglow(
+	zenith SpectralRadiance, grid unit.SpectralGrid, layerHeight unit.Length, measured bool,
+) (*Airglow, error) {
 	if len(zenith) != grid.Len() {
 		return nil, fmt.Errorf("%w: %d values, grid has %d", ErrAirglowSpectrum, len(zenith), grid.Len())
 	}
 
 	return &Airglow{
-		zenith:       append(SpectralRadiance(nil), zenith...),
-		grid:         grid,
-		layerHeightM: layerHeightM,
-		measured:     measured,
+		zenith:      append(SpectralRadiance(nil), zenith...),
+		grid:        grid,
+		layerHeight: layerHeight,
+		measured:    measured,
 	}, nil
 }
 
@@ -641,7 +643,7 @@ func (a *Airglow) AddRadiance(
 	clear(scratch)
 	defer a.scratch.Put(scratch) //nolint:staticcheck // a slice header, deliberately pooled
 
-	flags, err := AirglowRadiance(scratch, grid, a.zenith, angle.Deg(90)-dir.Alt(), a.layerHeightM)
+	flags, err := AirglowRadiance(scratch, grid, a.zenith, angle.Deg(90)-dir.Alt(), a.layerHeight)
 	if err != nil {
 		return 0, err
 	}
@@ -682,7 +684,7 @@ func (a *Airglow) AddRadiance(
 
 	pressure, _ := scene.Atmosphere.Surface()
 	aerosol := scene.Atmosphere.Aerosol()
-	height := scene.Observer.Height().Meters()
+	height := scene.Observer.Height()
 	kappa := scene.Atmosphere.DiffuseKappa()
 
 	for i := range dst {
@@ -947,7 +949,7 @@ func (s *IntegratedStarlight) AddRadiance(
 
 	pressure, _ := scene.Atmosphere.Surface()
 	aerosol := scene.Atmosphere.Aerosol()
-	height := scene.Observer.Height().Meters()
+	height := scene.Observer.Height()
 	kappa := scene.Atmosphere.DiffuseKappa()
 
 	// The shape already averages to one across the band, so scaling it by

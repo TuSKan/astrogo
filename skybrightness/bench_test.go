@@ -208,5 +208,5 @@ func BenchmarkInstrumentProjection(b *testing.B) {
 var benchTime = time.GoDate(2026, 8, 14, 3, 0, 0, 0, time.LocationUTC)
 
 func benchAtmosphere(heightM float64) *atmosphere.Atmosphere {
-	return atmosphere.StandardDefault(heightM)
+	return atmosphere.StandardDefault(unit.Meters(heightM))
 }

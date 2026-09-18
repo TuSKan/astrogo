@@ -414,7 +414,7 @@ func TestNumericalStabilityAcrossGeometry(t *testing.T) {
 				Scene: &skybrightness.Scene{
 					Observer:   loc,
 					Time:       time.GoDate(2026, 8, 14, 3, 0, 0, 0, time.LocationUTC),
-					Atmosphere: atmosphere.StandardDefault(s.heightM),
+					Atmosphere: atmosphere.StandardDefault(unit.Meters(s.heightM)),
 				},
 				Direction: coord.NewAltAz(angle.Deg(d.alt), angle.Deg(d.az)),
 			})

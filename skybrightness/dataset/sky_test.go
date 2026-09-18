@@ -122,7 +122,7 @@ func TestSceneCarriesThePresetTransfer(t *testing.T) {
 
 			// Built through Preset.Transfer, which is precisely what Sky.Scene
 			// applies; a Sky itself needs a network to exist.
-			builder, err := p.Transfer(atmosphere.RuralAerosol(site.Height().Meters(), 0.03))
+			builder, err := p.Transfer(atmosphere.RuralAerosol(unit.Meters(site.Height().Meters()), 0.03))
 			if err != nil {
 				t.Fatalf("Transfer: %v", err)
 			}
@@ -252,7 +252,7 @@ func TestOneSkyServesManySites(t *testing.T) {
 		}
 
 		scene, err := sky.Scene(site, when,
-			atmosphere.RuralAerosol(heightM, atmosphere.CleanMountainAOD550))
+			atmosphere.RuralAerosol(unit.Meters(heightM), atmosphere.CleanMountainAOD550))
 		if err != nil {
 			t.Fatalf("Scene at %g m: %v", heightM, err)
 		}

@@ -19,7 +19,7 @@ var ErrAirglowSpectrum = errors.New("skybrightness: airglow zenith spectrum must
 //   - Model: Leinert et al. (1998) Eq. 13, the van Rhijn function, applied to
 //     a caller-supplied zenith spectrum exactly as Masana et al. (2021)
 //     Eq. 19-20 does.
-//   - Emitting layer: [atmosphere.AirglowLayerHeightM] by default.
+//   - Emitting layer: [atmosphere.AirglowLayerHeight] by default.
 //
 // # The spectrum is an input, not a prediction
 //
@@ -45,7 +45,7 @@ func AirglowRadiance(
 	grid unit.SpectralGrid,
 	zenith SpectralRadiance,
 	zenithAngle angle.Angle,
-	layerHeightM float64,
+	layerHeight unit.Length,
 ) (Flag, error) {
 	if len(dst) != grid.Len() {
 		return 0, fmt.Errorf("%w: %d destination slots, grid has %d",
@@ -56,8 +56,8 @@ func AirglowRadiance(
 		return 0, fmt.Errorf("%w: %d values, grid has %d", ErrAirglowSpectrum, len(zenith), grid.Len())
 	}
 
-	if layerHeightM <= 0 {
-		layerHeightM = atmosphere.AirglowLayerHeightM
+	if layerHeight <= 0 {
+		layerHeight = atmosphere.AirglowLayerHeight
 	}
 
 	// Below the horizon there is no layer in the line of sight.
@@ -65,7 +65,7 @@ func AirglowRadiance(
 		return ClimatologicalAirglow, nil
 	}
 
-	enhancement, err := atmosphere.VanRhijn(zenithAngle, layerHeightM)
+	enhancement, err := atmosphere.VanRhijn(zenithAngle, layerHeight)
 	if err != nil {
 		return 0, fmt.Errorf("skybrightness: airglow: %w", err)
 	}

@@ -46,8 +46,8 @@ func cloudyScene(tb testing.TB, baseM, albedo float64) *skybrightness.Scene {
 	if baseM > 0 {
 		b = b.AddCloud(atmosphere.CloudLayer{
 			Fraction:     1,
-			BaseAlt:      unit.AltitudeM(baseM),
-			TopAlt:       unit.AltitudeM(baseM + 500),
+			BaseAlt:      unit.Meters(baseM),
+			TopAlt:       unit.Meters(baseM + 500),
 			Albedo:       unit.SpectralAlbedo(albedo),
 			OpticalDepth: 20,
 		})
@@ -348,8 +348,8 @@ func withCloudFraction(tb testing.TB, baseM, albedo, fraction float64) *atmosphe
 		AerosolScaleHeight(1538).
 		AddCloud(atmosphere.CloudLayer{
 			Fraction:     unit.CloudFraction(fraction),
-			BaseAlt:      unit.AltitudeM(baseM),
-			TopAlt:       unit.AltitudeM(baseM + 500),
+			BaseAlt:      unit.Meters(baseM),
+			TopAlt:       unit.Meters(baseM + 500),
 			Albedo:       unit.SpectralAlbedo(albedo),
 			OpticalDepth: 20,
 		}).

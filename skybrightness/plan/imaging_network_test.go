@@ -71,7 +71,7 @@ func TestImagingDepthAgainstARealSky(t *testing.T) {
 	depth, err := sbplan.NewImaging(sbplan.Spec{
 		Sky:            sky,
 		Site:           site,
-		Air:            atmosphere.RuralAerosol(site.Height().Meters(), atmosphere.CleanMountainAOD550),
+		Air:            atmosphere.RuralAerosol(site.Height(), atmosphere.CleanMountainAOD550),
 		Instrument:     inst,
 		Exposure:       300 * time.Second,
 		AperturePixels: 9,

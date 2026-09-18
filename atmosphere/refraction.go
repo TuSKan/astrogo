@@ -6,6 +6,7 @@ import (
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/internal/gofaext"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // lowAltitudeCutoffDeg is the true/apparent altitude below which
@@ -381,12 +382,12 @@ func Airmass(alt angle.Angle) (float64, error) {
 // This is the standard navigational/astronomical formula that accounts for the
 // atmospheric refraction coefficient k ≈ 0.13 (light bending reduces the geometric
 // dip by roughly 1/7). At sea level (h=0), dip = 0. At 786m, dip ≈ 0.82°.
-func HorizonDip(h float64) angle.Angle {
+func HorizonDip(h unit.Length) angle.Angle {
 	if h <= 0 {
 		return angle.Zero()
 	}
 	// 1.76 arcminutes per sqrt(meter), converted to degrees
-	dipArcmin := 1.76 * math.Sqrt(h)
+	dipArcmin := 1.76 * math.Sqrt(h.Meters())
 
 	return angle.Deg(dipArcmin / 60.0)
 }
@@ -411,8 +412,8 @@ func HorizonDip(h float64) angle.Angle {
 // is deliberately left nil, which [Refraction.EffectiveModel] resolves to
 // [RefractionSOFA]. StandardRefraction's own RefractionRigorous is *not*
 // inherited, which this comment used to claim.
-func AtAltitude(h float64) Refraction {
-	if h <= 0 {
+func AtAltitude(height unit.Length) Refraction {
+	if height <= 0 {
 		// Sea level: use standard ISA values but let SOFA handle refraction
 		// (Model: nil) for consistency with all other altitudes.
 		return Refraction{
@@ -433,6 +434,8 @@ func AtAltitude(h float64) Refraction {
 		Rstar    = 8.31447             // Universal gas constant (J/(mol·K))
 		exponent = g * M / (Rstar * L) // ≈ 5.25588
 	)
+
+	h := height.Meters()
 
 	pressure := P0 * math.Pow(1.0-L*h/T0, exponent)
 	temperature := (T0 - L*h) - 273.15 // Convert to Celsius

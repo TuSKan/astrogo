@@ -271,7 +271,7 @@ func TestVanRhijnDomain(t *testing.T) {
 	// A layer height that is not a height must be refused, not turned into a
 	// silent enhancement.
 	for _, h := range []float64{0, -1, math.NaN(), math.Inf(1)} {
-		if _, err := atmosphere.VanRhijn(angle.Deg(30), h); err == nil {
+		if _, err := atmosphere.VanRhijn(angle.Deg(30), unit.Meters(h)); err == nil {
 			t.Errorf("layer height %v was accepted", h)
 		}
 	}

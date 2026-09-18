@@ -601,7 +601,7 @@ func (s *Spectrum) Resample(grid unit.SpectralGrid) skybrightness.SpectralRadian
 
 // NewAirglow fetches a zenith spectrum and builds the component over it.
 //
-// layerHeightM is the emitting layer's height for the van Rhijn geometry the
+// layerHeight is the emitting layer's height for the van Rhijn geometry the
 // component applies; the OH layer sits near 87 km.
 //
 // The result is flagged [github.com/TuSKan/astrogo/skybrightness.SolarAdjustedAirglow]
@@ -611,7 +611,7 @@ func NewAirglow(
 	ctx context.Context,
 	spec Spec,
 	grid unit.SpectralGrid,
-	layerHeightM float64,
+	layerHeight unit.Length,
 ) (*skybrightness.Airglow, error) {
 	if spec.MinNM == 0 && spec.MaxNM == 0 && grid.Len() > 0 {
 		// Ask for exactly the grid being evaluated, plus a nanometre either
@@ -625,7 +625,7 @@ func NewAirglow(
 		return nil, err
 	}
 
-	component, err := skybrightness.NewAirglow(spectrum.Resample(grid), grid, layerHeightM, false)
+	component, err := skybrightness.NewAirglow(spectrum.Resample(grid), grid, layerHeight, false)
 	if err != nil {
 		return nil, fmt.Errorf("airglow: building the component: %w", err)
 	}

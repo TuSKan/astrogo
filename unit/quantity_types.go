@@ -109,9 +109,6 @@ type (
 	// TemperatureK is temperature, in kelvin.
 	TemperatureK float64
 
-	// AltitudeM is geometric height above the WGS84 ellipsoid, in metres.
-	AltitudeM float64
-
 	// SpectralAlbedo is a surface reflectance, in [0,1].
 	SpectralAlbedo float64
 

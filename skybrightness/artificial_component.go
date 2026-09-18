@@ -353,7 +353,7 @@ func (a *ArtificialSkyglow) resolveSource(
 	emitter GroundEmitter,
 	scene *Scene,
 	grid unit.SpectralGrid,
-	airmassSource, molecularScaleHeight float64,
+	airmassSource float64, molecularScaleHeight unit.Length,
 ) (artificialSource, Flag, error) {
 	var zero artificialSource
 
@@ -394,7 +394,7 @@ func (a *ArtificialSkyglow) resolveSource(
 	pressure, _ := scene.Atmosphere.Surface()
 	aerosol := scene.Atmosphere.Aerosol()
 
-	aerosolScaleHeight := float64(aerosol.ScaleHeight)
+	aerosolScaleHeight := aerosol.ScaleHeight
 	if aerosolScaleHeight <= 0 {
 		return zero, 0, fmt.Errorf("%w: the atmosphere has no aerosol scale height",
 			ErrScaleHeight)
@@ -410,8 +410,8 @@ func (a *ArtificialSkyglow) resolveSource(
 
 		aer := unit.OpticalDepth(aerosol.TauAt(lambda))
 
-		t, err := OpticalParameterT(aer, unit.OpticalDepth(aerosolScaleHeight),
-			rayleigh, unit.OpticalDepth(molecularScaleHeight), separation.Meters(), airmassSource)
+		t, err := OpticalParameterT(aer, aerosolScaleHeight,
+			rayleigh, molecularScaleHeight, separation, airmassSource)
 		if err != nil {
 			return zero, 0, fmt.Errorf("skybrightness: artificial: %w", err)
 		}
