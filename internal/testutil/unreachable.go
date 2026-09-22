@@ -85,6 +85,15 @@ func Unreachable(err error) bool {
 		return true
 	}
 
+	// A TLS handshake that failed on the service's own certificate. The
+	// connection opened and nothing was exchanged, so the request was never
+	// carried — the same thing the checks around this one report, arriving one
+	// layer up. A context error cannot produce it either, so it belongs in
+	// this block. certificateFailure says which certificate errors count.
+	if _, ok := certificateFailure(err); ok {
+		return true
+	}
+
 	// A dial that failed for any reason reached no service at all, whatever the
 	// platform called the failure. This is the portable form of the errno list
 	// below: Windows reports a refused connection as WSAECONNREFUSED, which is

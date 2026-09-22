@@ -82,6 +82,14 @@ func upstreamFailure(err error) (string, bool) {
 		}
 	}
 
+	// Before the network checks below, because a handshake failure is not a
+	// timeout and would otherwise fall through all of them. See
+	// certificateFailure for which certificate errors count and which stay
+	// fatal.
+	if reason, ok := certificateFailure(err); ok {
+		return reason, true
+	}
+
 	if errors.Is(err, context.DeadlineExceeded) {
 		return "deadline exceeded", true
 	}
