@@ -126,7 +126,7 @@ func (s *Satellite) ApparentMagnitudeCtx(t time.Time, ctx *coord.Context) (float
 		return 0, fmt.Errorf("satellite magnitude: look angle: %w", err)
 	}
 
-	rangeKm := altaz.Dist().Km()
+	observerRange := altaz.Dist()
 
 	// Compute phase angle: Sun–Satellite–Observer.
 	// The Sun's position always comes from the analytic SOFA provider, not
@@ -163,7 +163,7 @@ func (s *Satellite) ApparentMagnitudeCtx(t time.Time, ctx *coord.Context) (float
 	cosAlpha := math.Max(-1, math.Min(1, dot/(norm1*norm2)))
 	alpha := angle.Rad(math.Acos(cosAlpha))
 
-	return mag.SatelliteApparent(s.stdMag, s.convention, rangeKm, alpha, s.phaseModel), nil
+	return mag.SatelliteApparent(s.stdMag, s.convention, observerRange, alpha, s.phaseModel), nil
 }
 
 // StaticMagnitude returns the catalog standard magnitude if set.

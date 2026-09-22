@@ -4,6 +4,7 @@ import (
 	"math"
 
 	"github.com/TuSKan/astrogo/angle"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // ── Satellite Magnitude ──────────────────────────────────────────────────────
@@ -46,6 +47,12 @@ const (
 //     definitional (non-geometric) difference
 const molczanOffset = 1.45 // 2.5·log₁₀(2) + 0.7
 
+// satelliteReferenceRange is the range a standard magnitude is quoted at:
+// 1000 km, for both the McCants and Molczan conventions. The distance modulus
+// is relative to it, so it is the one length in this formula that is a
+// definition rather than an observation.
+const satelliteReferenceRange unit.Length = 1_000_000
+
 // SatelliteApparent computes the apparent visual magnitude of an artificial satellite.
 //
 //	m_obs = m_std − 15.75 + 2.5·log₁₀(range²) − 2.5·log₁₀(Ψ(α))
@@ -57,11 +64,14 @@ const molczanOffset = 1.45 // 2.5·log₁₀(2) + 0.7
 // Parameters:
 //   - stdMag: standard magnitude from catalog (McCants or Molczan convention)
 //   - conv: which convention stdMag uses (affects phase reference interpretation)
-//   - rangeKm: observer–satellite range in kilometres
+//   - observerRange: observer–satellite range
 //   - alpha: phase angle (Sun–satellite–observer)
 //   - shape: phase function model (sphere or cylinder)
-func SatelliteApparent(stdMag float64, conv StdMagConvention, rangeKm float64, alpha angle.Angle, shape SatPhaseModel) float64 {
-	if rangeKm <= 0 {
+func SatelliteApparent(
+	stdMag float64, conv StdMagConvention, observerRange unit.Length,
+	alpha angle.Angle, shape SatPhaseModel,
+) float64 {
+	if observerRange <= 0 {
 		return stdMag
 	}
 
@@ -73,8 +83,9 @@ func SatelliteApparent(stdMag float64, conv StdMagConvention, rangeKm float64, a
 		m -= molczanOffset
 	}
 
-	// Distance modulus relative to 1000 km reference.
-	distMod := 5 * math.Log10(rangeKm/1000)
+	// Distance modulus relative to the 1000 km reference. A ratio of two
+	// lengths is dimensionless, so it is taken on the raw values.
+	distMod := 5 * math.Log10(float64(observerRange)/float64(satelliteReferenceRange))
 
 	// Phase function.
 	psi := satPhaseFunction(alpha.Radians(), shape)

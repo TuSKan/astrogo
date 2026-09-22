@@ -212,7 +212,7 @@ func TestBackgroundRateScalesWithAreaAndPixel(t *testing.T) {
 func TestNewInstrumentGeometry(t *testing.T) {
 	t.Parallel()
 
-	scope, err := optics.NewTelescope(200, 2000) // 200 mm aperture
+	scope, err := optics.NewTelescope(unit.Millimeters(200), unit.Millimeters(2000)) // 200 mm aperture
 	if err != nil {
 		t.Fatalf("NewTelescope: %v", err)
 	}
@@ -249,7 +249,7 @@ func TestNewInstrumentGeometry(t *testing.T) {
 func TestNewInstrumentRejectsBadGeometry(t *testing.T) {
 	t.Parallel()
 
-	scope, err := optics.NewTelescope(200, 2000)
+	scope, err := optics.NewTelescope(unit.Millimeters(200), unit.Millimeters(2000))
 	if err != nil {
 		t.Fatalf("NewTelescope: %v", err)
 	}

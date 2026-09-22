@@ -16,6 +16,7 @@ import (
 	"github.com/TuSKan/astrogo/skybrightness/dataset"
 	sbplan "github.com/TuSKan/astrogo/skybrightness/plan"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // The whole chain, against a real modelled sky.
@@ -55,7 +56,7 @@ func TestImagingDepthAgainstARealSky(t *testing.T) {
 	// prediction, and the zenith-to-ten-degrees difference is smaller than
 	// the V-band sky difference for the reason LimitingMagnitudeAt sets out
 	// — broadband electrons against a V-band magnitude scale.
-	scope, err := optics.NewTelescope(200, 1000)
+	scope, err := optics.NewTelescope(unit.Millimeters(200), unit.Millimeters(1000))
 	if err != nil {
 		t.Fatalf("NewTelescope: %v", err)
 	}
@@ -134,7 +135,7 @@ func TestImagingSatisfiesThePlanningConstraint(t *testing.T) {
 		t.Skipf("no sky available: %v", err)
 	}
 
-	scope, err := optics.NewTelescope(200, 1000)
+	scope, err := optics.NewTelescope(unit.Millimeters(200), unit.Millimeters(1000))
 	if err != nil {
 		t.Fatalf("NewTelescope: %v", err)
 	}

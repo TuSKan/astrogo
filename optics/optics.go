@@ -5,6 +5,7 @@ import (
 	"math"
 
 	"github.com/TuSKan/astrogo/angle"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // positiveFinite reports whether v is a positive, finite number — the
@@ -23,30 +24,38 @@ func positiveFinite(v float64) bool {
 // through the validating constructor NewTelescope; a zero-value
 // Telescope{} would silently divide by zero.
 type Telescope struct {
-	apertureMM    float64
-	focalLengthMM float64
+	aperture    unit.Length
+	focalLength unit.Length
 }
 
-// NewTelescope constructs a Telescope from its aperture and focal length,
-// both in millimetres. Returns ErrNonPositiveDimension if either is not a
-// positive, finite number.
-func NewTelescope(apertureMM, focalLengthMM float64) (Telescope, error) {
-	if !positiveFinite(apertureMM) || !positiveFinite(focalLengthMM) {
-		return Telescope{}, fmt.Errorf("optics: telescope aperture=%v focalLength=%v: %w", apertureMM, focalLengthMM, ErrNonPositiveDimension)
+// NewTelescope constructs a Telescope from its aperture and focal length.
+// Returns ErrNonPositiveDimension if either is not a positive, finite number.
+//
+// Equipment is specified in millimeters, so both arguments are almost always
+// [unit.Millimeters](x). A bare number would be meters, which no manufacturer
+// or catalog quotes.
+func NewTelescope(aperture, focalLength unit.Length) (Telescope, error) {
+	if !positiveFinite(aperture.Meters()) || !positiveFinite(focalLength.Meters()) {
+		return Telescope{}, fmt.Errorf("optics: telescope aperture=%v focalLength=%v: %w",
+			aperture, focalLength, ErrNonPositiveDimension)
 	}
 
-	return Telescope{apertureMM: apertureMM, focalLengthMM: focalLengthMM}, nil
+	return Telescope{aperture: aperture, focalLength: focalLength}, nil
 }
 
-// ApertureMM returns the telescope's aperture in millimetres.
-func (t Telescope) ApertureMM() float64 { return t.apertureMM }
+// Aperture returns the telescope's aperture.
+func (t Telescope) Aperture() unit.Length { return t.aperture }
 
-// FocalLengthMM returns the telescope's focal length in millimetres.
-func (t Telescope) FocalLengthMM() float64 { return t.focalLengthMM }
+// FocalLength returns the telescope's focal length.
+func (t Telescope) FocalLength() unit.Length { return t.focalLength }
 
 // FocalRatio returns the telescope's focal ratio (f-number): focal length
 // divided by aperture — e.g. 10 for an "f/10" telescope.
-func (t Telescope) FocalRatio() float64 { return t.focalLengthMM / t.apertureMM }
+//
+// A ratio of two lengths is dimensionless, so it is taken on the stored values
+// rather than through an accessor: converting both to millimeters first would
+// divide and then multiply by the same scale factor.
+func (t Telescope) FocalRatio() float64 { return float64(t.focalLength) / float64(t.aperture) }
 
 // WithBarlow returns a new Telescope with its focal length scaled by
 // factor — a Barlow lens (factor > 1) increases the effective focal
@@ -59,7 +68,7 @@ func (t Telescope) WithBarlow(factor float64) (Telescope, error) {
 		return Telescope{}, fmt.Errorf("optics: barlow factor=%v: %w", factor, ErrInvalidBarlowFactor)
 	}
 
-	return Telescope{apertureMM: t.apertureMM, focalLengthMM: t.focalLengthMM * factor}, nil
+	return Telescope{aperture: t.aperture, focalLength: t.focalLength * unit.Length(factor)}, nil
 }
 
 // ── Eyepiece ──────────────────────────────────────────────────────────────────
@@ -69,67 +78,73 @@ func (t Telescope) WithBarlow(factor float64) (Telescope, error) {
 // true-field-of-view computation. Fields are unexported and only reachable
 // through the validating constructor NewEyepiece.
 type Eyepiece struct {
-	afov          angle.Angle
-	focalLengthMM float64
-	fieldStopMM   float64
-	hasFieldStop  bool
+	afov         angle.Angle
+	focalLength  unit.Length
+	fieldStop    unit.Length
+	hasFieldStop bool
 }
 
 // EyepieceOption configures an Eyepiece at construction time.
 type EyepieceOption func(*Eyepiece)
 
-// WithFieldStop sets the eyepiece's field-stop diameter in millimetres —
-// when known (typically from the manufacturer's spec), Telescope.TrueFOV
-// uses it for an exact true-field-of-view computation instead of the
+// WithFieldStop sets the eyepiece's field-stop diameter — when known
+// (typically from the manufacturer's spec), Telescope.TrueFOV uses it for an
+// exact true-field-of-view computation instead of the
 // apparent-field/magnification approximation.
-func WithFieldStop(diameterMM float64) EyepieceOption {
+func WithFieldStop(diameter unit.Length) EyepieceOption {
 	return func(e *Eyepiece) {
-		e.fieldStopMM = diameterMM
+		e.fieldStop = diameter
 		e.hasFieldStop = true
 	}
 }
 
-// NewEyepiece constructs an Eyepiece from its focal length (millimetres)
-// and apparent field of view. Returns ErrNonPositiveDimension if
-// focalLengthMM or apparentFOV is not positive, or if a field stop
-// supplied via WithFieldStop is not positive.
-func NewEyepiece(focalLengthMM float64, apparentFOV angle.Angle, opts ...EyepieceOption) (Eyepiece, error) {
-	if !positiveFinite(focalLengthMM) {
-		return Eyepiece{}, fmt.Errorf("optics: eyepiece focalLength=%v: %w", focalLengthMM, ErrNonPositiveDimension)
+// NewEyepiece constructs an Eyepiece from its focal length and apparent field
+// of view. Returns ErrNonPositiveDimension if focalLength or apparentFOV is
+// not positive, or if a field stop supplied via WithFieldStop is not positive.
+//
+// As with [NewTelescope], eyepieces are specified in millimeters, so the focal
+// length is almost always [unit.Millimeters](x).
+func NewEyepiece(
+	focalLength unit.Length, apparentFOV angle.Angle, opts ...EyepieceOption,
+) (Eyepiece, error) {
+	if !positiveFinite(focalLength.Meters()) {
+		return Eyepiece{}, fmt.Errorf("optics: eyepiece focalLength=%v: %w",
+			focalLength, ErrNonPositiveDimension)
 	}
 
 	if !positiveFinite(apparentFOV.Degrees()) {
 		return Eyepiece{}, fmt.Errorf("optics: eyepiece apparentFOV=%v: %w", apparentFOV, ErrNonPositiveDimension)
 	}
 
-	e := Eyepiece{focalLengthMM: focalLengthMM, afov: apparentFOV}
+	e := Eyepiece{focalLength: focalLength, afov: apparentFOV}
 	for _, opt := range opts {
 		opt(&e)
 	}
 
-	if e.hasFieldStop && !positiveFinite(e.fieldStopMM) {
-		return Eyepiece{}, fmt.Errorf("optics: eyepiece fieldStop=%v: %w", e.fieldStopMM, ErrNonPositiveDimension)
+	if e.hasFieldStop && !positiveFinite(e.fieldStop.Meters()) {
+		return Eyepiece{}, fmt.Errorf("optics: eyepiece fieldStop=%v: %w",
+			e.fieldStop, ErrNonPositiveDimension)
 	}
 
 	return e, nil
 }
 
-// FocalLengthMM returns the eyepiece's focal length in millimetres.
-func (e Eyepiece) FocalLengthMM() float64 { return e.focalLengthMM }
+// FocalLength returns the eyepiece's focal length.
+func (e Eyepiece) FocalLength() unit.Length { return e.focalLength }
 
 // ApparentFOV returns the eyepiece's apparent field of view.
 func (e Eyepiece) ApparentFOV() angle.Angle { return e.afov }
 
-// FieldStopMM returns the eyepiece's field-stop diameter in millimetres,
-// and whether one was supplied via WithFieldStop.
-func (e Eyepiece) FieldStopMM() (mm float64, ok bool) { return e.fieldStopMM, e.hasFieldStop }
+// FieldStop returns the eyepiece's field-stop diameter, and whether one was
+// supplied via WithFieldStop.
+func (e Eyepiece) FieldStop() (unit.Length, bool) { return e.fieldStop, e.hasFieldStop }
 
 // ── Telescope × Eyepiece ────────────────────────────────────────────────────
 
 // Magnification returns the telescope's magnifying power with eyepiece e:
 // telescope focal length divided by eyepiece focal length.
 func (t Telescope) Magnification(e Eyepiece) float64 {
-	return t.focalLengthMM / e.focalLengthMM
+	return float64(t.focalLength) / float64(e.focalLength)
 }
 
 // TrueFOV returns the actual angular field of view visible through
@@ -143,19 +158,19 @@ func (t Telescope) Magnification(e Eyepiece) float64 {
 // figure — the doc comment on the returned value's precision follows from
 // which branch was used, not stated separately here.
 func (t Telescope) TrueFOV(e Eyepiece) angle.Angle {
-	if fieldStopMM, ok := e.FieldStopMM(); ok {
-		return angle.Rad(fieldStopMM / t.focalLengthMM)
+	if fieldStop, ok := e.FieldStop(); ok {
+		return angle.Rad(float64(fieldStop) / float64(t.focalLength))
 	}
 
 	return e.afov.DivScalar(t.Magnification(e))
 }
 
-// ExitPupil returns the exit pupil diameter in millimetres for eyepiece
-// e: telescope aperture divided by magnification. A dark-adapted human
-// eye's pupil is typically 5-7mm; an exit pupil larger than the
-// observer's own pupil wastes gathered light.
-func (t Telescope) ExitPupil(e Eyepiece) float64 {
-	return t.apertureMM / t.Magnification(e)
+// ExitPupil returns the exit pupil diameter for eyepiece e: telescope aperture
+// divided by magnification. A dark-adapted human eye's pupil is typically
+// 5-7mm; an exit pupil larger than the observer's own pupil wastes gathered
+// light.
+func (t Telescope) ExitPupil(e Eyepiece) unit.Length {
+	return t.aperture / unit.Length(t.Magnification(e))
 }
 
 // ── Telescope-only figures ──────────────────────────────────────────────────
@@ -167,7 +182,7 @@ func (t Telescope) ExitPupil(e Eyepiece) float64 {
 // not a hard physical limit: excellent optics and steady seeing can push
 // somewhat higher, and poor seeing often caps well below it.
 func (t Telescope) MaxUsefulMagnification() float64 {
-	return 2 * t.apertureMM
+	return 2 * t.aperture.Millimeters()
 }
 
 // DawesLimit returns the telescope's Dawes limit — the classical
@@ -175,7 +190,7 @@ func (t Telescope) MaxUsefulMagnification() float64 {
 // 116″/aperture(mm) (William Rutter Dawes, 1867, from his own empirical
 // double-star observations at ~550nm).
 func (t Telescope) DawesLimit() angle.Angle {
-	return angle.Arcsec(116 / t.apertureMM)
+	return angle.Arcsec(116 / t.aperture.Millimeters())
 }
 
 // LimitingMagnitude returns the telescope's approximate visual limiting
@@ -186,7 +201,7 @@ func (t Telescope) DawesLimit() angle.Angle {
 // light pollution, atmospheric transparency, optical quality/collimation,
 // and observer experience.
 func (t Telescope) LimitingMagnitude() float64 {
-	apertureCM := t.apertureMM / 10
+	apertureCM := t.aperture.Millimeters() / 10
 
 	return 7.5 + 5*math.Log10(apertureCM)
 }
@@ -201,21 +216,25 @@ func (t Telescope) LimitingMagnitude() float64 {
 // (not NaN/Inf) result back, since every field appears only in the
 // numerator of these formulas.
 type Sensor struct {
-	// WidthMM is the sensor's physical width in millimetres.
-	WidthMM float64
-	// HeightMM is the sensor's physical height in millimetres.
-	HeightMM float64
-	// PixelMicrons is the pixel pitch (centre-to-centre spacing) in
-	// micrometres.
-	PixelMicrons float64
+	// Width is the sensor's physical width.
+	Width unit.Length
+	// Height is the sensor's physical height.
+	Height unit.Length
+	// PixelPitch is the centre-to-centre pixel spacing. Datasheets quote it
+	// in micrometres, so it is usually [unit.Millimeters](microns / 1000).
+	PixelPitch unit.Length
 }
 
-// PixelScale returns the angular size of one pixel of sensor s at
-// telescope t's focal plane — the standard "arcsec per pixel" plate-scale
-// figure: 206.265·pixelPitch(µm)/focalLength(mm) (206265 is the number of
-// arcseconds in a radian, the small-angle plate-scale constant).
+// PixelScale returns the angular size of one pixel of sensor s at telescope
+// t's focal plane — the standard "arcsec per pixel" plate-scale figure.
+//
+// The classical form is 206.265·pixelPitch(µm)/focalLength(mm), where 206265
+// is the number of arcseconds in a radian and the 1000 converts microns to
+// millimeters. Both factors existed only to reconcile two units; between two
+// [unit.Length] values the small-angle relation is the ratio itself, and
+// [angle.Angle] renders it in arcseconds on request.
 func (t Telescope) PixelScale(s Sensor) angle.Angle {
-	return angle.Arcsec(206_265 * s.PixelMicrons / 1000 / t.focalLengthMM)
+	return angle.Rad(float64(s.PixelPitch) / float64(t.focalLength))
 }
 
 // SensorFOV returns sensor s's angular field of view (width, height) at
@@ -223,5 +242,6 @@ func (t Telescope) PixelScale(s Sensor) angle.Angle {
 // through the same small-angle relation TrueFOV's field-stop case uses:
 // angle ≈ dimension/focalLength (radians).
 func (t Telescope) SensorFOV(s Sensor) (w, h angle.Angle) {
-	return angle.Rad(s.WidthMM / t.focalLengthMM), angle.Rad(s.HeightMM / t.focalLengthMM)
+	return angle.Rad(float64(s.Width) / float64(t.focalLength)),
+		angle.Rad(float64(s.Height) / float64(t.focalLength))
 }
