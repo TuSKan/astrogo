@@ -8,6 +8,7 @@ import (
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/plan"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 func main() {
@@ -58,7 +59,7 @@ func main() {
 	}
 
 	start := time.Date(2026, 4, 6, 19, 0, 0, 0, tz)
-	window := plan.Window{Start: start, End: start.Add(6 * time.Hour)}
+	window := plan.Window{Start: start, End: start.Add(unit.Hours(6))}
 
 	schedule, err := scheduler.BuildSchedule(window, blocks)
 	if err != nil {

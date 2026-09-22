@@ -51,7 +51,7 @@ func TestBarycentricRVCorrection_BoundedByEarthPlusSiteSpeed(t *testing.T) {
 	base := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
 
 	for day := 0; day < 366; day += 15 {
-		tm := base.AddDays(float64(day))
+		tm := base.Add(unit.Days(float64(day)))
 		ctx := coord.NewContext(tm, site, noRefraction)
 
 		for _, target := range targets {
@@ -91,7 +91,7 @@ func TestBarycentricRVCorrection_AnnualSinusoid(t *testing.T) {
 	)
 
 	for day := 0; day < 366; day += 5 {
-		tm := base.AddDays(float64(day))
+		tm := base.Add(unit.Days(float64(day)))
 		ctx := coord.NewContext(tm, site, noRefraction)
 
 		corr := ctx.BarycentricRVCorrection(target).KmPerSec()
@@ -189,7 +189,7 @@ func TestBarycentricRVCorrection_DiurnalAmplitudeScalesWithLatitude(t *testing.T
 		lo, hi := math.Inf(1), math.Inf(-1)
 
 		for h := range 24 {
-			tm := base.AddDays(float64(h) / 24.0)
+			tm := base.Add(unit.Days(float64(h) / 24.0))
 			ctx := coord.NewContext(tm, site, noRefraction)
 
 			corr := ctx.BarycentricRVCorrection(target).KmPerSec()
@@ -510,7 +510,7 @@ func TestTopocentricRadialVelocityCarriesTheDiurnalTerm(t *testing.T) {
 		lo, hi := math.Inf(1), math.Inf(-1)
 
 		for h := range 24 {
-			ctx := coord.NewContext(at.AddDays(float64(h)/24), site, noRefraction)
+			ctx := coord.NewContext(at.Add(unit.Days(float64(h)/24)), site, noRefraction)
 
 			rv := ctx.TopocentricRadialVelocity(pos, atRest).KmPerSec()
 			lo, hi = math.Min(lo, rv), math.Max(hi, rv)

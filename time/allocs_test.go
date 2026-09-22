@@ -1,6 +1,10 @@
 package time
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/TuSKan/astrogo/unit"
+)
 
 // TestScaleConversionsDoNotAllocate pins the zero-allocation claim on the
 // conversions that carry no Earth Orientation Parameters.
@@ -69,7 +73,7 @@ func TestEpochArithmeticDoesNotAllocate(t *testing.T) {
 		{"Sub same scale", func() { _ = b.Sub(a) }},
 		{"Sub cross scale", func() { _ = b.Sub(tt) }},
 		{"Equal same scale", func() { _ = a.Equal(b) }},
-		{"Add", func() { _ = a.Add(Hour) }},
+		{"Add", func() { _ = a.Add(unit.Hours(1)) }},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			if got := testing.AllocsPerRun(1000, tc.f); got != 0 {

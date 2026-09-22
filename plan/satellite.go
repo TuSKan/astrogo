@@ -246,8 +246,8 @@ type PassEvent struct {
 func SatellitePasses(prov eph.Provider, name string, start, end time.Time,
 	observer *coord.Geodetic, minElevation angle.Angle,
 ) ([]SatellitePass, error) {
-	step := 30 * time.Second // 30s steps for LEO
-	refineTol := 1 * time.Second
+	step := unit.Seconds(30) // 30s steps for LEO
+	refineTol := unit.Seconds(1)
 
 	// lookAt computes the look angle at t.
 	//
@@ -351,7 +351,7 @@ func SatellitePasses(prov eph.Provider, name string, start, end time.Time,
 			}
 
 			currentPass.Set = passEvent(setTime)
-			currentPass.Duration = setTime.Sub(currentPass.Rise.Time)
+			currentPass.Duration, _ = time.ToGoDuration(setTime.Sub(currentPass.Rise.Time))
 
 			// Find culmination (max elevation) between rise and set.
 			culm, err := findCulmination(prov, observer, currentPass.Rise.Time, setTime)
@@ -372,7 +372,7 @@ func SatellitePasses(prov eph.Provider, name string, start, end time.Time,
 func findCulmination(prov eph.Provider, observer *coord.Geodetic,
 	start, end time.Time,
 ) (PassEvent, error) {
-	step := 5 * time.Second
+	step := unit.Seconds(5)
 	bestTime := start
 	bestEl := -90.0
 
@@ -401,7 +401,7 @@ func findCulmination(prov eph.Provider, observer *coord.Geodetic,
 		refineEnd = end
 	}
 
-	for t := refineStart; !t.After(refineEnd); t = t.Add(1 * time.Second) {
+	for t := refineStart; !t.After(refineEnd); t = t.Add(unit.Seconds(1)) {
 		ctx := coord.NewContext(t, observer, defaultAtm)
 
 		altaz, err := LookAngle(prov, 0, ctx)

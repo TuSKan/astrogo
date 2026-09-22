@@ -411,7 +411,7 @@ func TestUSNO_SunMoonOneDay(t *testing.T) {
 				}
 
 				start := time.Date(y, time.Month(mo), d, 0, 0, 0, 0, tz)
-				end := start.Add(24 * time.Hour)
+				end := start.Add(unit.Hours(24))
 
 				// Compare Sun events
 				sunEvents, err := plan.SunEvents(start, end, site, prov)
@@ -1111,7 +1111,7 @@ func TestUSNO_PolarSun(t *testing.T) {
 			}
 
 			start := time.Date(y, time.Month(mo), d, 0, 0, 0, 0, time.LocationUTC)
-			end := start.Add(24 * time.Hour)
+			end := start.Add(unit.Hours(24))
 
 			sunEvents, err := plan.SunEvents(start, end, site, eph)
 			if err != nil {
@@ -1251,7 +1251,7 @@ func TestUSNO_HighAltitude(t *testing.T) {
 			t.Logf("Sun threshold (8849m): %.4f°", site.SunRiseSetThreshold().Degrees())
 
 			start := time.Date(y, time.Month(mo), d, 0, 0, 0, 0, tz)
-			end := start.Add(24 * time.Hour)
+			end := start.Add(unit.Hours(24))
 
 			sunEvents0, err := plan.SunEvents(start, end, site0, eph)
 			if err != nil {
@@ -1470,7 +1470,7 @@ func TestUSNO_Equator(t *testing.T) {
 			}
 
 			start := time.Date(y, time.Month(mo), d, 0, 0, 0, 0, time.LocationUTC)
-			end := start.Add(24 * time.Hour)
+			end := start.Add(unit.Hours(24))
 
 			// Sun events
 			sunEvents, err := plan.SunEvents(start, end, site, eph)
@@ -1666,7 +1666,7 @@ func TestUSNO_PolarMoon(t *testing.T) {
 			}
 
 			start := time.Date(y, time.Month(mo), d, 0, 0, 0, 0, tz)
-			end := start.Add(24 * time.Hour)
+			end := start.Add(unit.Hours(24))
 
 			moonEvents, err := plan.MoonEvents(start, end, site, eph)
 			if err != nil {
@@ -1921,7 +1921,7 @@ func TestUSNO_AltitudeShift(t *testing.T) {
 				ac.height, site.HorizonDip().Degrees(), site.SunRiseSetThreshold().Degrees())
 
 			start := time.Date(2026, time.March, 20, 0, 0, 0, 0, tz)
-			end := start.Add(24 * time.Hour)
+			end := start.Add(unit.Hours(24))
 
 			sunEvents, err := plan.SunEvents(start, end, site, eph)
 			if err != nil {

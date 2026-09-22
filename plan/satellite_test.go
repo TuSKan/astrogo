@@ -9,6 +9,7 @@ import (
 	"github.com/TuSKan/astrogo/ephemeris/satellite"
 	"github.com/TuSKan/astrogo/magnitude"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // R29 regression: plan/satellite.go had zero coverage under default
@@ -156,7 +157,7 @@ func TestSatellitePasses_ISS(t *testing.T) {
 	}
 
 	start := time.Date(2026, 4, 19, 0, 0, 0, 0, time.LocationUTC)
-	end := start.Add(24 * time.Hour)
+	end := start.Add(unit.Hours(24))
 
 	passes, err := SatellitePasses(prov, "ISS", start, end, loc, angle.Deg(10))
 	if err != nil {

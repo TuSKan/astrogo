@@ -7,6 +7,7 @@ import (
 
 	"github.com/TuSKan/astrogo/plan"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // solverEpoch is an arbitrary fixed start; the algorithms do not care which.
@@ -17,11 +18,11 @@ func solverEpoch() time.Time {
 // atHours turns a time into hours since solverEpoch, so an evaluator can be
 // written as an ordinary function of a real variable.
 func atHours(t time.Time) float64 {
-	return float64(t.Sub(solverEpoch())) / float64(time.Hour)
+	return t.Sub(solverEpoch()).Hours()
 }
 
 func plusHours(h float64) time.Time {
-	return solverEpoch().Add(time.Duration(h * float64(time.Hour)))
+	return solverEpoch().Add(unit.Hours(h))
 }
 
 // errEvaluator stands in for whatever an ephemeris lookup can fail with.
@@ -90,7 +91,7 @@ func TestFindRootRefusesAnUnbracketedInterval(t *testing.T) {
 func TestFindRootLandsOnKnownRoots(t *testing.T) {
 	t.Parallel()
 
-	solver := plan.Solver{Tolerance: time.Second / 1000, MaxIter: 200}
+	solver := plan.Solver{Tolerance: unit.Seconds(1e-3), MaxIter: 200}
 
 	for _, c := range []struct {
 		name string
@@ -161,7 +162,7 @@ func TestFindRootPropagatesFailure(t *testing.T) {
 func TestFindExtremumLandsOnKnownExtrema(t *testing.T) {
 	t.Parallel()
 
-	solver := plan.Solver{Tolerance: time.Second / 1000, MaxIter: 200}
+	solver := plan.Solver{Tolerance: unit.Seconds(1e-3), MaxIter: 200}
 
 	for _, c := range []struct {
 		name  string

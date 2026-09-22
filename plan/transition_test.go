@@ -6,6 +6,7 @@ import (
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 func TestBasicTransitionModel(t *testing.T) {
@@ -95,7 +96,7 @@ func TestBasicTransitionModel_SameEpoch(t *testing.T) {
 	block2 := &Block{Target: NewStar("Target 2", 1.57079632679, 0)}
 
 	now := fixedEpoch()
-	later := now.Add(5 * time.Minute)
+	later := now.Add(unit.Minutes(5))
 
 	sameEpoch := TransitionContext{
 		FromBlock: block1, ToBlock: block2,

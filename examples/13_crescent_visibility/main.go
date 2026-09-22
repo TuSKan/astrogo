@@ -18,6 +18,7 @@ import (
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/plan"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 func main() {
@@ -48,7 +49,7 @@ func main() {
 	// The crescent is typically first visible on the evening following
 	// the astronomical New Moon (conjunction).
 	evening := newMoon.Time
-	nextDay := evening.AddDays(1)
+	nextDay := evening.Add(unit.Days(1))
 
 	_, sunset, err := plan.SunriseSunset(evening, nextDay, site, prov)
 	if err != nil {
@@ -61,7 +62,7 @@ func main() {
 	// Best-practice observation window: 15–30 min after sunset, when the
 	// sky is dark enough to see a thin crescent but the Moon is still
 	// above the horizon.
-	obsTime := sunset.Time.Add(20 * time.Minute)
+	obsTime := sunset.Time.Add(unit.Minutes(20))
 	fmt.Printf("  Observation time:   %s (sunset + 20 min)\n\n", obsTime)
 
 	params, err := plan.NewCrescentParams(obsTime, site.Location(), prov)

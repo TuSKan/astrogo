@@ -113,6 +113,11 @@ var (
 	Hour = Unit{Dimension: dim.Time, ScaleFactor: 3600.0, Name: "hour", Symbol: "h"}
 	// Day is 86400 seconds.
 	Day = Unit{Dimension: dim.Time, ScaleFactor: 86400.0, Name: "day", Symbol: "d"}
+	// JulianYear is 365.25 days of 86400 seconds, exactly — a definition
+	// rather than a measurement, and the year every astronomical rate in this
+	// library is per. Not the tropical or sidereal year, which are measured
+	// and are not this.
+	JulianYear = Unit{Dimension: dim.Time, ScaleFactor: 365.25 * 86400.0, Name: "Julian year", Symbol: "a"}
 
 	// One is the dimensionless unity unit, for pure ratios (a flattening,
 	// the fine-structure constant, a radians-per-degree scale factor) that

@@ -7,6 +7,7 @@ import (
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // TestApparentStateHasConverged checks the loop's exit condition against the
@@ -46,8 +47,7 @@ func TestApparentStateHasConverged(t *testing.T) {
 			var worst float64
 
 			for d := 0; d < 365; d += 7 {
-				tm := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC).
-					AddDays(float64(d))
+				tm := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC).Add(unit.Days(float64(d)))
 
 				settled, err := eph.ApparentState(prov, body.id, tm)
 				testutil.AssertNoError(t, err)
@@ -56,7 +56,7 @@ func TestApparentStateHasConverged(t *testing.T) {
 				// answer implies and ask again.
 				tau := settled.Pos.Norm() / lightAUPerDay(t)
 
-				raw, err := prov.State(body.id, tm.AddDays(-tau))
+				raw, err := prov.State(body.id, tm.Add(unit.Days(-tau)))
 				testutil.AssertNoError(t, err)
 
 				// Deflected the same way ApparentState deflects, because it
@@ -64,7 +64,7 @@ func TestApparentStateHasConverged(t *testing.T) {
 				// like for like. Without it the residual measured here is
 				// solar light deflection — up to 0.6 arcsec near conjunction —
 				// reported as failed convergence (#263).
-				againPos, err := eph.DeflectBySun(prov, raw.Pos, body.id, tm, tm.AddDays(-tau))
+				againPos, err := eph.DeflectBySun(prov, raw.Pos, body.id, tm, tm.Add(unit.Days(-tau)))
 				testutil.AssertNoError(t, err)
 
 				moved := againPos.Sub(settled.Pos).Norm() / settled.Pos.Norm()

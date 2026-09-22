@@ -9,6 +9,7 @@ import (
 	"github.com/TuSKan/astrogo/catalog"
 	"github.com/TuSKan/astrogo/plan"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 func main() {
@@ -36,7 +37,7 @@ func main() {
 	}
 
 	start := time.Date(2026, 4, 6, 18, 0, 0, 0, tz)
-	end := start.Add(24 * time.Hour)
+	end := start.Add(unit.Hours(24))
 
 	// 4. Find Rise/Set/Transit events.
 	// The threshold is computed automatically from the site's elevation,

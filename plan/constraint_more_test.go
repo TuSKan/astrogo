@@ -8,6 +8,7 @@ import (
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 func moreSite(t *testing.T) *Site {
@@ -158,17 +159,17 @@ func TestTimeWindow(t *testing.T) {
 		win  TimeWindow
 		pass bool
 	}{
-		{"inside", open.Add(2 * time.Hour), TimeWindow{From: open, To: shut}, true},
+		{"inside", open.Add(unit.Hours(2)), TimeWindow{From: open, To: shut}, true},
 		{"on the opening edge", open, TimeWindow{From: open, To: shut}, true},
 		{"on the closing edge", shut, TimeWindow{From: open, To: shut}, true},
-		{"before it opens", open.Add(-time.Hour), TimeWindow{From: open, To: shut}, false},
-		{"after it closes", shut.Add(time.Hour), TimeWindow{From: open, To: shut}, false},
+		{"before it opens", open.Add(unit.Hours(-1)), TimeWindow{From: open, To: shut}, false},
+		{"after it closes", shut.Add(unit.Hours(1)), TimeWindow{From: open, To: shut}, false},
 
 		// One-sided: a deadline with no start, and a start with no deadline.
 		{"deadline, in time", open, TimeWindow{To: shut}, true},
-		{"deadline, too late", shut.Add(time.Minute), TimeWindow{To: shut}, false},
+		{"deadline, too late", shut.Add(unit.Minutes(1)), TimeWindow{To: shut}, false},
 		{"not before, and it is", shut, TimeWindow{From: open}, true},
-		{"not before, and it is not", open.Add(-time.Minute), TimeWindow{From: open}, false},
+		{"not before, and it is not", open.Add(unit.Minutes(-1)), TimeWindow{From: open}, false},
 
 		// Unbounded both ways constrains nothing, which is what a zero value
 		// of this type has to mean: a constraint nobody configured must not
@@ -208,9 +209,9 @@ func TestTimeWindowValueRanksByHeadroom(t *testing.T) {
 		return res.Value
 	}
 
-	middle := value(open.Add(2 * time.Hour))
-	nearlyShut := value(shut.Add(-2 * time.Minute))
-	closed := value(shut.Add(time.Hour))
+	middle := value(open.Add(unit.Hours(2)))
+	nearlyShut := value(shut.Add(unit.Minutes(-2)))
+	closed := value(shut.Add(unit.Hours(1)))
 
 	if !(middle > nearlyShut) {
 		t.Errorf("mid-window scores %.3f and nearly-closed %.3f; more headroom must score higher",

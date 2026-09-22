@@ -7,6 +7,7 @@ import (
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // TestCulminationSkipsSearchIsNeverAFalsePositive is the safety property.
@@ -58,7 +59,7 @@ func TestCulminationSkipsSearchIsNeverAFalsePositive(t *testing.T) {
 		times := make([]time.Time, sweepSteps)
 
 		for i := range ctxs {
-			times[i] = base.Add(time.Duration(i*dayMinutes/sweepSteps) * time.Minute)
+			times[i] = base.Add(unit.Minutes(float64(i * dayMinutes / sweepSteps)))
 			ctxs[i] = coord.NewContext(times[i], site.Location(), site.Refraction())
 		}
 
@@ -223,7 +224,7 @@ func TestEpisodeDoesNotShortCircuitAMovingBody(t *testing.T) {
 
 	// And the Moon really does rise, so short-circuiting here would be wrong
 	// rather than merely unjustified.
-	rise, _, err := Episode(base, base.AddDays(1), moon, site)
+	rise, _, err := Episode(base, base.Add(unit.Days(1)), moon, site)
 	if err != nil {
 		t.Fatalf("Episode: %v", err)
 	}
@@ -252,7 +253,7 @@ func BenchmarkEpisodeNeverRises(b *testing.B) {
 
 	star := NewStar("NeverUp", angle.Deg(0), angle.Deg(-85))
 	from := time.FromJD(2451544.5, time.UTC)
-	to := from.AddDays(1)
+	to := from.Add(unit.Days(1))
 
 	b.ResetTimer()
 

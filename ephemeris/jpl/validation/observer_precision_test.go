@@ -23,6 +23,7 @@ import (
 	// and isn't actually violated here.
 	"github.com/TuSKan/astrogo/plan"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // observerPrecisionBody is one Horizons-tracked target in the precision
@@ -282,7 +283,7 @@ func TestObserverPrecisionMatrix(t *testing.T) {
 
 	epochs := make([]time.Time, numEpochs)
 	for i := range numEpochs {
-		epochs[i] = epochStart.AddDays(float64(i) * 45)
+		epochs[i] = epochStart.Add(unit.Days(float64(i) * 45))
 	}
 
 	atmNoRef := atmosphere.StandardRefraction

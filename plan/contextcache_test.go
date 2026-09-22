@@ -8,6 +8,7 @@ import (
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/ephemeris/satellite"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // testISS builds the provider and site the context-reuse tests share — the
@@ -50,7 +51,7 @@ func TestContextCacheStaysInsideItsStatedBound(t *testing.T) {
 	)
 
 	for i := range 6 * 60 * 2 { // six hours at 30 s
-		at := start.Add(time.Duration(i) * 30 * time.Second)
+		at := start.Add(unit.Seconds(float64(i) * 30))
 
 		cached, err := LookAngle(sat, 0, ctxAt(at))
 		if err != nil {
@@ -107,7 +108,7 @@ func TestSatellitePassEventsSurviveAFullRebuild(t *testing.T) {
 	sat, site := testISS(t)
 
 	start := time.Date(2026, time.April, 20, 0, 0, 0, 0, time.LocationUTC)
-	end := start.Add(6 * time.Hour)
+	end := start.Add(unit.Hours(6))
 	minEl := angle.Deg(10)
 
 	passes, err := SatellitePasses(sat, "ISS", start, end, site, minEl)
@@ -160,7 +161,7 @@ func TestContextCacheRebuildsPastItsWindow(t *testing.T) {
 	_, site := testISS(t)
 
 	start := time.Date(2026, time.April, 20, 0, 0, 0, 0, time.LocationUTC)
-	past := start.Add(ctxRefresh + time.Minute)
+	past := start.Add(time.FromGoDuration(ctxRefresh) + unit.Minutes(1))
 
 	ctxAt := newContextCache(site, defaultAtm)
 
@@ -208,11 +209,11 @@ func TestContextCacheHandlesBackwardsSteps(t *testing.T) {
 	// Sweep forward far enough to move the base several windows on, the way a
 	// six-hour sample loop does.
 	for h := range 6 {
-		ctxAt(start.Add(time.Duration(h) * time.Hour))
+		ctxAt(start.Add(unit.Hours(float64(h))))
 	}
 
 	// Now refine a crossing back near the beginning.
-	back := start.Add(10 * time.Minute)
+	back := start.Add(unit.Minutes(10))
 
 	fixed := coord.NewAstrometric(angle.Deg(83.633), angle.Deg(22.014))
 

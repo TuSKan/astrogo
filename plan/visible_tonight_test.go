@@ -10,6 +10,7 @@ import (
 	"github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/plan"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // mockBrightSource is a resolve.BrightObjectSearcher test double that
@@ -173,7 +174,7 @@ func TestVisibleTonight_PeakConsistentWithTransit(t *testing.T) {
 		diff = -diff
 	}
 
-	if diff > time.Minute {
+	if diff > unit.Minutes(1) {
 		t.Errorf("PeakTime (%v) and TransitTime (%v) differ by %v, want <1 min when both are populated",
 			got.PeakTime, got.TransitTime, diff)
 	}

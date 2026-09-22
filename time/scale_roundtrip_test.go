@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // epochs spans the range a catalogue or an ephemeris is likely to be asked
@@ -152,8 +153,8 @@ func TestAddIsReversible(t *testing.T) {
 	for _, when := range epochs() {
 		start := time.FromGo(when)
 
-		for _, d := range []time.Duration{
-			time.Second, time.Minute, time.Hour, 24 * time.Hour, 365 * 24 * time.Hour,
+		for _, d := range []unit.Duration{
+			unit.Seconds(1), unit.Minutes(1), unit.Hours(1), unit.Hours(24), unit.Days(365),
 		} {
 			back := start.Add(d).Add(-d)
 			if moved := math.Abs(back.JD()-start.JD()) * 86400; moved > 1e-6 {
@@ -163,7 +164,7 @@ func TestAddIsReversible(t *testing.T) {
 		}
 
 		for _, days := range []float64{0.5, 1, 30, 365.25} {
-			back := start.AddDays(days).AddDays(-days)
+			back := start.Add(unit.Days(days)).Add(unit.Days(-days))
 			if moved := math.Abs(back.JD()-start.JD()) * 86400; moved > 1e-6 {
 				t.Errorf("%s: +%v days then back moved by %.3g seconds",
 					when.Format(time.RFC3339), days, moved)

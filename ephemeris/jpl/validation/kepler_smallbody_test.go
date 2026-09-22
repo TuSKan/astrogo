@@ -17,6 +17,7 @@ import (
 	"github.com/TuSKan/astrogo/internal/metrology"
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 	"github.com/TuSKan/astrogo/vector"
 )
 
@@ -147,8 +148,8 @@ func TestKeplerSmallBodyAgainstSPK(t *testing.T) {
 			// requested epoch".
 			const marginDays = 5
 
-			start := epoch.AddDays(-keplerSmallBodySpanDays - marginDays)
-			stop := epoch.AddDays(keplerSmallBodySpanDays + marginDays)
+			start := epoch.Add(unit.Days(-keplerSmallBodySpanDays - marginDays))
+			stop := epoch.Add(unit.Days(keplerSmallBodySpanDays + marginDays))
 
 			p, err := jpl.NewProvider(context.Background(), core.SmallBody, body.designation,
 				jpl.WithTimeInterval(start, stop))
@@ -163,7 +164,7 @@ func TestKeplerSmallBodyAgainstSPK(t *testing.T) {
 			defer func() { _ = p.Close() }()
 
 			for dt := -keplerSmallBodySpanDays; dt <= keplerSmallBodySpanDays; dt += 5 {
-				at := epoch.AddDays(float64(dt))
+				at := epoch.Add(unit.Days(float64(dt)))
 
 				want, werr := p.State(core.SmallBodyID(body.id), at)
 				if werr != nil {
@@ -273,7 +274,7 @@ func TestSmallBodyElementsCarryTheObliquityRotation(t *testing.T) {
 		}
 
 		for dt := -keplerSmallBodySpanDays; dt <= keplerSmallBodySpanDays; dt += 5 {
-			pos, _, err := el.StateAt(epoch.AddDays(float64(dt)))
+			pos, _, err := el.StateAt(epoch.Add(unit.Days(float64(dt))))
 			if err != nil {
 				t.Errorf("%s: StateAt: %v", body.name, err)
 

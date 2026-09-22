@@ -9,6 +9,7 @@ import (
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // TestMeteorShowersTableIntegrity guards the fixed MeteorShowers data
@@ -63,7 +64,7 @@ func findSolarLongitudeInstant(t *testing.T, target float64, prov eph.Provider, 
 	start := time.Date(year, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
 	end := time.Date(year+1, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
 
-	const step = 24 * time.Hour
+	step := unit.Hours(24)
 
 	eval := seasonEvaluator(target, prov)
 
@@ -186,7 +187,7 @@ func TestMeteorShower_IsActive(t *testing.T) {
 		t.Error("IsActive at the shower's own peak instant = false, want true")
 	}
 
-	farOff := peakTime.Add(180 * 24 * time.Hour)
+	farOff := peakTime.Add(unit.Days(180))
 
 	active, err = m.IsActive(farOff, prov)
 	if err != nil {

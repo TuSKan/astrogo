@@ -75,7 +75,7 @@ func periodDays(t *testing.T, el kepler.Elements, guessDays float64) float64 {
 	var swept, prev float64
 
 	for i := 1; i <= steps; i++ {
-		when := el.Epoch().AddDays(float64(i) * step)
+		when := el.Epoch().Add(unit.Days(float64(i) * step))
 
 		r, _, serr := el.StateAt(when)
 		if serr != nil {
@@ -322,7 +322,7 @@ func TestSatelliteMovesWithItsParent(t *testing.T) {
 	var maxSep, minSep float64 = 0, math.MaxFloat64
 
 	for day := range 40 {
-		when := time.J2000().AddDays(float64(day))
+		when := time.J2000().Add(unit.Days(float64(day)))
 
 		moon, err := p.State(moonID, when)
 		if err != nil {
@@ -396,7 +396,7 @@ func TestPeriodOverridesTheDerivedMeanMotion(t *testing.T) {
 		t.Fatalf("StateAt(epoch): %v", err)
 	}
 
-	after := time.J2000().AddDays(ioPeriodDays)
+	after := time.J2000().Add(unit.Days(ioPeriodDays))
 
 	closed, _, err := tabulated.StateAt(after)
 	if err != nil {
@@ -435,7 +435,7 @@ func TestPeriodZeroRestoresTheDerivedMeanMotion(t *testing.T) {
 		t.Errorf("Period() = %v after WithPeriod(0), want 0", p)
 	}
 
-	at := time.J2000().AddDays(9.5)
+	at := time.J2000().Add(unit.Days(9.5))
 
 	want, _, err := derived.StateAt(at)
 	if err != nil {
@@ -493,7 +493,7 @@ func TestSecularPrecessionTurnsTheApsisBackwards(t *testing.T) {
 
 	const dtDays = 10
 
-	at := time.J2000().AddDays(dtDays)
+	at := time.J2000().Add(unit.Days(dtDays))
 
 	// The documented rate, rebuilt here rather than read from the package.
 	const daysPerJulianYear = 365.25
@@ -543,7 +543,7 @@ func TestSecularPrecessionZeroIsNoDrift(t *testing.T) {
 	base := circular(t, jupiter, 421_800)
 	zeroed := base.WithSecularPrecession(kepler.SecularPrecession{})
 
-	at := time.J2000().AddDays(40)
+	at := time.J2000().Add(unit.Days(40))
 
 	want, _, err := base.StateAt(at)
 	if err != nil {

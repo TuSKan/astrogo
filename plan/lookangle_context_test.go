@@ -44,7 +44,7 @@ func TestLookAngleUsesTheContextItIsGiven(t *testing.T) {
 
 	base := time.Date(2026, time.April, 20, 0, 0, 0, 0, time.LocationUTC)
 
-	for _, dt := range []time.Duration{time.Hour, 6 * time.Hour, 12 * time.Hour} {
+	for _, dt := range []unit.Duration{unit.Hours(1), unit.Hours(6), unit.Hours(12)} {
 		at := base.Add(dt)
 		derived := coord.NewContext(base, site, defaultAtm).AtTime(at)
 

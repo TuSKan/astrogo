@@ -128,7 +128,7 @@ func TestCandidateFromTarget_ElementsBearingTargetIsOffline(t *testing.T) {
 	}
 
 	start := tgt.Epoch
-	end := start.AddDays(1)
+	end := start.Add(unit.Days(1))
 
 	obj, closer, err := candidateFromTarget(context.Background(), tgt, start, end, visibleTonightConfig{})
 	if err != nil {
@@ -205,7 +205,7 @@ func TestGatherCandidates_SmallBodyPathOffline(t *testing.T) {
 	}
 
 	start := epoch
-	end := start.AddDays(1)
+	end := start.Add(unit.Days(1))
 
 	candidates := gatherCandidates(context.Background(), targets, start, end, visibleTonightConfig{}, &skips{})
 

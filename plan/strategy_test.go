@@ -6,6 +6,7 @@ import (
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // TestSwapOptimizedStrategy verifies that the SwapOptimizedStrategy
@@ -23,7 +24,7 @@ func TestSwapOptimizedStrategy(t *testing.T) {
 	tm := &BasicTransitionModel{BaseSetup: 0}
 
 	start := time.ZeroTime()
-	window := Window{Start: start, End: start.Add(1 * time.Hour)}
+	window := Window{Start: start, End: start.Add(unit.Hours(1))}
 
 	b1 := &Block{ID: "B1", Target: NewStar("T1", angle.Zero(), angle.Zero()), Duration: 20 * time.Minute, Priority: 1.0}
 	b2 := &Block{ID: "B2", Target: NewStar("T2", angle.Zero(), angle.Zero()), Duration: 20 * time.Minute, Priority: 5.0}
@@ -92,7 +93,7 @@ func TestSwapOptimizedGapInsertion(t *testing.T) {
 	tm := &BasicTransitionModel{BaseSetup: 0}
 
 	start := time.ZeroTime()
-	window := Window{Start: start, End: start.Add(1 * time.Hour)}
+	window := Window{Start: start, End: start.Add(unit.Hours(1))}
 
 	// B1 always fails constraints → will be unscheduled by greedy
 	b1 := &Block{
@@ -131,16 +132,16 @@ func TestSwapOptimizedGapInsertion(t *testing.T) {
 // TestScheduleGaps verifies gap computation between scheduled blocks.
 func TestScheduleGaps(t *testing.T) {
 	start := scheduleBase()
-	window := Window{Start: start, End: start.Add(1 * time.Hour)}
+	window := Window{Start: start, End: start.Add(unit.Hours(1))}
 
 	blocks := []ScheduledBlock{
 		{
 			Block:  &Block{ID: "A"},
-			Window: Window{Start: start.Add(10 * time.Minute), End: start.Add(20 * time.Minute)},
+			Window: Window{Start: start.Add(unit.Minutes(10)), End: start.Add(unit.Minutes(20))},
 		},
 		{
 			Block:  &Block{ID: "B"},
-			Window: Window{Start: start.Add(30 * time.Minute), End: start.Add(40 * time.Minute)},
+			Window: Window{Start: start.Add(unit.Minutes(30)), End: start.Add(unit.Minutes(40))},
 		},
 	}
 
@@ -175,7 +176,7 @@ func TestScheduleGaps(t *testing.T) {
 // TestEmptyScheduleGaps verifies gap computation on an empty schedule.
 func TestEmptyScheduleGaps(t *testing.T) {
 	start := scheduleBase()
-	window := Window{Start: start, End: start.Add(1 * time.Hour)}
+	window := Window{Start: start, End: start.Add(unit.Hours(1))}
 
 	gaps := scheduleGaps(nil, window)
 	if len(gaps) != 1 {
@@ -196,7 +197,7 @@ func TestSwapOptimizedWithNilBase(t *testing.T) {
 	tm := &BasicTransitionModel{BaseSetup: 0}
 
 	start := time.ZeroTime()
-	window := Window{Start: start, End: start.Add(1 * time.Hour)}
+	window := Window{Start: start, End: start.Add(unit.Hours(1))}
 
 	b1 := &Block{ID: "B1", Target: NewStar("T1", angle.Zero(), angle.Zero()), Duration: 20 * time.Minute, Priority: 1.0}
 
@@ -226,7 +227,7 @@ func TestScoreBlockPlacement(t *testing.T) {
 	}
 
 	start := time.ZeroTime()
-	score := scoreBlockPlacement(b, start, start.Add(20*time.Minute), planner, nil)
+	score := scoreBlockPlacement(b, start, start.Add(unit.Minutes(20)), planner, nil)
 	t.Logf("Score for mock block: %.2f", score)
 
 	// Score should be non-negative

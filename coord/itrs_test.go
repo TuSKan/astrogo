@@ -11,6 +11,7 @@ import (
 	"github.com/TuSKan/astrogo/internal/gofaext"
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 	"github.com/TuSKan/astrogo/vector"
 )
 
@@ -126,7 +127,7 @@ func TestITRSTurnsAtTheSiderealRate(t *testing.T) {
 	t.Parallel()
 
 	ctx := itrsContext(t)
-	later := ctx.AtTime(ctx.Time().AddDays(1.0 / 24))
+	later := ctx.AtTime(ctx.Time().Add(unit.Days(1.0 / 24)))
 
 	star := coord.NewICRS(angle.Deg(101.2871), angle.Deg(-16.7161)).ToUnitVector()
 

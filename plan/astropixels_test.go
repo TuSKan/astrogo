@@ -28,6 +28,7 @@ import (
 	"github.com/TuSKan/astrogo/time"
 
 	"github.com/TuSKan/astrogo/internal/testutil"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // ── AstroPixels Reference Types ──────────────────────────────────────────────
@@ -259,8 +260,8 @@ func TestAstroPixels_MoonPhases(t *testing.T) {
 				// Use TDB scale for TD reference time (TDB ≈ TT to ~1.7ms)
 				// This avoids the LSK adding 32.184s on top of the already-corrected TD JD
 				refTime := time.FromJD(ref.JDtd, time.TDB)
-				searchStart := refTime.Add(-2 * 24 * time.Hour)
-				searchEnd := refTime.Add(2 * 24 * time.Hour)
+				searchStart := refTime.Add(unit.Days(-2))
+				searchEnd := refTime.Add(unit.Days(2))
 
 				phases, err := plan.MoonPhases(searchStart, searchEnd, prov)
 				if err != nil {

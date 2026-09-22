@@ -635,7 +635,7 @@ func TestResolver_CrossMatchByPosition_EpochMismatchAppliesPropagation(t *testin
 	pmRA, pmDec := angle.Arcsec(1.0), angle.Arcsec(0)
 	parallax := angle.Arcsec(0.01)
 
-	laterEpoch := time.J2000().Add((50 * 365.25 * 24) * time.Hour)
+	laterEpoch := time.J2000().Add(unit.JulianYears(50))
 
 	base := coord.NewICRSWithKinematics(baseRA, baseDec, pmRA, pmDec, parallax, 0)
 

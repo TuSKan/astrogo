@@ -8,6 +8,7 @@ import (
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/ephemeris/satellite"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 const (
@@ -106,7 +107,7 @@ func TestStateForwardOrbit(t *testing.T) {
 
 	// Propagate 90 minutes forward (approximately one orbit).
 	t0 := time.Date(2026, 4, 19, 11, 45, 32, 0, time.LocationUTC)
-	t1 := t0.AddDays(90.0 / 1440.0)
+	t1 := t0.Add(unit.Days(90.0 / 1440.0))
 
 	s0, err := sat.State(0, t0)
 	if err != nil {

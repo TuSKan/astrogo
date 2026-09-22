@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/TuSKan/astrogo/internal/gofaext"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // GoTime is an alias for the standard library's time.Time.
@@ -383,7 +384,7 @@ func (s Scale) String() string {
 // advancing a label by d and advancing the physical instant by d are the same
 // operation, and the difference of two labels is elapsed time. Duration
 // arithmetic in these scales needs no conversion at all — which is why the
-// hot paths that use them pay nothing for [Time.Sub] and [Time.AddDays].
+// hot paths that use them pay nothing for [Time.Add] and [Time.Sub].
 //
 // UTC and UT1 are not. UTC is a step function of TAI: it absorbs a leap second
 // twice a decade, so the difference of two UTC labels is short by every step
@@ -676,7 +677,7 @@ func (t Time) AddDate(years, months, days int) Time {
 	if years == 0 && months == 0 {
 		// Pure day offset — just add via JD arithmetic (most efficient,
 		// and avoids Dtf2d day-overflow issues).
-		return t.AddDays(float64(days))
+		return t.Add(unit.Days(float64(days)))
 	}
 
 	y, m, _, frac, _ := gofaext.JdToDate(t.jd1, t.jd2)
@@ -708,7 +709,7 @@ func (t Time) AddDate(years, months, days int) Time {
 	// the original day-of-month - 1 + extra days via JD arithmetic.
 	jd1, jd2, _ := gofaext.Dtf2d(t.scale.String(), y, m, 1, hour, minute, second)
 	result := FromJDParts(jd1, jd2, t.scale)
-	result = result.AddDays(float64(origDay - 1 + days))
+	result = result.Add(unit.Days(float64(origDay - 1 + days)))
 	result.loc = t.loc
 
 	return result
@@ -717,20 +718,17 @@ func (t Time) AddDate(years, months, days int) Time {
 // Add returns a new Time with the duration added to its label.
 // The display location is preserved.
 //
-// See [Time.AddDays] for the one case where this is not the same as advancing
-// by d of physical time.
-func (t Time) Add(d time.Duration) Time {
-	return t.AddDays(d.Seconds() / 86400.0)
-}
-
-// AddDays returns a new Time with d days added to its label.
-// The display location is preserved.
+// It takes a [unit.Duration] rather than the standard library's: an epoch here
+// can sit in 4713 BC, and an int64 nanosecond count saturates past ±292 years.
+// This used to be two methods for that reason — Add over a time.Duration and
+// AddDays over a bare float64 — and the float64 was the one that carried its
+// unit in the method name instead of the type.
 //
 // # This advances the label, and [Time.Sub] measures physical time
 //
 // In a uniform scale (TAI, TT, TDB) those are the same thing and the two are
 // exact inverses. In UTC they are not: adding 86400 s to a label that spans a
-// leap second advances the clock by 86401 SI seconds, so t.AddDays(1).Sub(t)
+// leap second advances the clock by 86401 SI seconds, so t.Add(unit.Days(1)).Sub(t)
 // reports 86401 s — correctly, because that is how much time passed.
 //
 // The asymmetry is deliberate rather than an oversight, and it is bounded:
@@ -741,14 +739,14 @@ func (t Time) Add(d time.Duration) Time {
 //     second itself (see the 23:59:60 issue) — an instant added *into* a leap
 //     second has nowhere to land and aliases to its neighbour, so the trip
 //     back arrives one second away.
-//   - Sub is physical because it returns a [time.Duration], which is a count
+//   - Sub is physical because it returns a [unit.Duration], which is a count
 //     of SI seconds by type.
 //
 // Both cannot hold at once while UTC is not a total representation of the
 // instants it labels. To advance a UTC epoch by physical time, do the
 // arithmetic in a uniform scale: t.TAI().Add(d).UTC().
-func (t Time) AddDays(d float64) Time {
-	result := FromJDParts(t.jd1, t.jd2+d, t.scale)
+func (t Time) Add(d unit.Duration) Time {
+	result := FromJDParts(t.jd1, t.jd2+d.Days(), t.scale)
 	result.loc = t.loc
 
 	return result
@@ -966,6 +964,45 @@ func (t Time) IsZero() bool {
 	return t.jd1 == 0 && t.jd2 == 0
 }
 
+// ToGoDuration converts an astrogo duration to the standard library's, for a
+// timeout, a ticker, or anything else that measures wall-clock time.
+//
+// It saturates at ±292 years rather than wrapping, because [time.Duration] is
+// an int64 nanosecond count and cannot hold more. That ceiling is why
+// [Time.Sub] returns a [unit.Duration] and not this: an epoch here can sit in
+// 4713 BC, and Sub used to report year 1 to 2026 as a negative span.
+//
+// The second return says whether the value fit. A caller converting a
+// scheduling interval can ignore it; one converting an epoch difference should
+// not.
+func ToGoDuration(d unit.Duration) (Duration, bool) {
+	const maxSeconds = float64(math.MaxInt64) / float64(time.Second)
+
+	switch s := d.Seconds(); {
+	case s >= maxSeconds:
+		return Duration(math.MaxInt64), false
+	case s <= -maxSeconds:
+		return Duration(math.MinInt64), false
+	default:
+		// Round rather than truncate. A conversion that lands a part in 1e13
+		// below a whole second — which a scale round-trip routinely does,
+		// since it adds and removes an offset of ~69 s — truncates to one
+		// nanosecond short, so an exactly-ten-minute interval reports
+		// 9m59.999999999s. Truncation also biases every result downward.
+		return Duration(math.Round(s * float64(time.Second))), true
+	}
+}
+
+// FromGoDuration converts a standard-library duration to an astrogo one.
+//
+// Exact in every case: an int64 nanosecond count is at most 19 digits and
+// float64 seconds carries 15 significant ones, so a duration long enough to
+// lose a nanosecond here is already longer than any wall-clock interval the
+// standard library is used for.
+func FromGoDuration(d Duration) unit.Duration {
+	return unit.Seconds(d.Seconds())
+}
+
 // Sub returns the physical time elapsed from other to t, in SI seconds.
 //
 // # Not the difference of the calendar labels
@@ -987,53 +1024,18 @@ func (t Time) IsZero() bool {
 //
 // # Range
 //
-// [time.Duration] is an int64 nanosecond count, so it saturates just past ±292
-// years. Beyond that the maximum or minimum Duration is returned rather than a
-// silently wrapped value — the same choice [time.Time.Sub] makes, and it used
-// to wrap here: year 1 to 2026 returned −9223372037 s, a negative span for a
-// positive interval. Use [Time.SubDays] for intervals of astronomical length;
-// it is a float64 day count and does not saturate.
-func (t Time) Sub(other Time) time.Duration {
-	const secondsPerDay = 86400.0
-
-	seconds := t.SubDays(other) * secondsPerDay
-
-	// Compare in seconds rather than nanoseconds: the nanosecond product
-	// overflows float64's exact-integer range long before it overflows int64,
-	// so the check has to happen before the multiplication.
-	const maxSeconds = float64(math.MaxInt64) / float64(time.Second)
-
-	switch {
-	case seconds >= maxSeconds:
-		return time.Duration(math.MaxInt64)
-	case seconds <= -maxSeconds:
-		return time.Duration(math.MinInt64)
-	default:
-		// Round rather than truncate. A conversion that lands a part in 1e13
-		// below a whole second — which a scale round-trip routinely does,
-		// since it adds and removes an offset of ~69 s — truncates to one
-		// nanosecond short, so an exactly-ten-minute interval reports
-		// 9m59.999999999s. Truncation also biases every result downward.
-		return time.Duration(math.Round(seconds * float64(time.Second)))
-	}
-}
-
-// SubDays returns the physical time elapsed from other to t, in days of 86400
-// SI seconds.
+// It does not saturate, which is the reason it returns a [unit.Duration]
+// rather than the standard library's. time.Duration is an int64 nanosecond
+// count and stops just past ±292 years; this used to return one and *wrapped*
+// there, reporting year 1 to 2026 as −9223372037 s — a negative span for a
+// positive interval. Saturating instead of wrapping fixed the sign and left a
+// second method, SubDays, as the only way to measure an interval astrogo
+// routinely spans. There is now one method and no ceiling.
 //
-// See [Time.Sub], which is this in nanoseconds and carries the reasoning.
-// Unlike Sub this does not saturate, so it is the right call for intervals of
-// astronomical length.
-func (t Time) SubDays(other Time) float64 {
-	// Two epochs in one uniform scale need no conversion: their labels already
-	// differ by elapsed SI time. Anything else goes through TT — a mismatched
-	// pair because they must be made comparable, and a matched non-uniform
-	// pair (two UTC epochs, two UT1 epochs) because that is the whole bug.
-	if t.scale != other.scale || !t.scale.uniform() {
-		t, other = t.TT(), other.TT()
-	}
-
-	return (t.jd1 - other.jd1) + (t.jd2 - other.jd2)
+// A caller who needs the standard library's type — for a timeout, a ticker —
+// converts explicitly with [ToGoDuration], which saturates and says so.
+func (t Time) Sub(other Time) unit.Duration {
+	return unit.Days(t.subDays(other))
 }
 
 // ── Scale Conversion Helpers ─────────────────────────────────────────────────
@@ -1492,4 +1494,22 @@ func (t *Time) normalize() {
 	extraDays = math.Floor(t.jd2)
 	t.jd1 += extraDays
 	t.jd2 -= extraDays
+}
+
+// subDays returns the physical time elapsed from other to t, in days of 86400
+// SI seconds.
+//
+// It is the primitive [Time.Sub] is expressed in, kept in days because that is
+// what the two-part Julian date it reads is stored in: converting to seconds
+// before the subtraction would round the larger part away.
+func (t Time) subDays(other Time) float64 {
+	// Two epochs in one uniform scale need no conversion: their labels already
+	// differ by elapsed SI time. Anything else goes through TT — a mismatched
+	// pair because they must be made comparable, and a matched non-uniform
+	// pair (two UTC epochs, two UT1 epochs) because that is the whole bug.
+	if t.scale != other.scale || !t.scale.uniform() {
+		t, other = t.TT(), other.TT()
+	}
+
+	return (t.jd1 - other.jd1) + (t.jd2 - other.jd2)
 }

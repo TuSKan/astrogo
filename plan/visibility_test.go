@@ -9,6 +9,7 @@ import (
 	"github.com/TuSKan/astrogo/internal/testutil"
 
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // mockObject implements coord.Object for testing.
@@ -58,7 +59,7 @@ func TestVisibleIntervals(t *testing.T) {
 	site, _ := NewSite("Test", loc)
 
 	start := time.FromJD(2460000.5, time.UTC)
-	end := start.AddDays(1)
+	end := start.Add(unit.Days(1))
 
 	// Circumpolar-like object (very high dec)
 	obj := mockObject{pos: coord.NewICRS(angle.Deg(0), angle.Deg(89))}
@@ -76,7 +77,7 @@ func TestVisibleIntervals_StepTooLarge(t *testing.T) {
 	site, _ := NewSite("Test", loc)
 
 	start := time.FromJD(2460000.5, time.UTC)
-	end := start.AddDays(1)
+	end := start.Add(unit.Days(1))
 
 	obj := mockObject{pos: coord.NewICRS(angle.Deg(0), angle.Deg(45))}
 
@@ -93,7 +94,7 @@ func TestNeverVisible(t *testing.T) {
 	site, _ := NewSite("Test", loc)
 
 	start := time.FromJD(2460000.5, time.UTC)
-	end := start.AddDays(1)
+	end := start.Add(unit.Days(1))
 
 	// Object far below horizon (antipode)
 	obj := mockObject{pos: coord.NewICRS(angle.Deg(0), angle.Deg(-89))}
@@ -111,7 +112,7 @@ func TestTransitEstimate(t *testing.T) {
 	site, _ := NewSite("Test", loc)
 
 	start := time.FromJD(2460000.0, time.UTC)
-	end := start.AddDays(0.5)
+	end := start.Add(unit.Days(0.5))
 
 	obj := mockObject{pos: coord.NewICRS(angle.Deg(100), angle.Deg(20))}
 
@@ -135,7 +136,7 @@ func TestFind(t *testing.T) {
 	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(45), 0)
 	site, _ := NewSite("Test", loc)
 	start := time.FromJD(2460000.0, time.UTC)
-	end := start.AddDays(1)
+	end := start.Add(unit.Days(1))
 	obj := mockObject{pos: coord.NewICRS(angle.Deg(100), angle.Deg(20))}
 
 	intervals, err := Find(obj, site, nil, start, end, 15*time.Minute)
@@ -153,7 +154,7 @@ func TestFind(t *testing.T) {
 
 func TestDuration(t *testing.T) {
 	start := time.FromJD(2460000.0, time.UTC)
-	end := start.AddDays(1)
+	end := start.Add(unit.Days(1))
 	win := Window{Start: start, End: end}
 
 	dur := win.Duration()

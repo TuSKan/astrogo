@@ -27,6 +27,7 @@ import (
 	// The kernel-backed sources register their backend rather than being
 	// imported by the root package, so a build that wants them says so (#112).
 	_ "github.com/TuSKan/astrogo/ephemeris/jpl"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 type planetDef struct {
@@ -84,7 +85,7 @@ func main() {
 	fmt.Println("\n── Solar Events (February 28, 2025 BRT) ──────────────────────")
 
 	day := time.Date(2025, time.February, 28, 0, 0, 0, 0, brtz)
-	next := day.Add(24 * time.Hour)
+	next := day.Add(unit.Hours(24))
 
 	_, sunset, err := plan.SunriseSunset(day, next, site, prov)
 	if err != nil {
@@ -173,7 +174,7 @@ func main() {
 
 	tStart := sunset.Time
 	for i := range 76 {
-		t := tStart.Add(time.Duration(int64(i) * 1 * int64(time.Minute)))
+		t := tStart.Add(unit.Minutes(float64(i)))
 		c := coord.NewContext(t, loc, atm)
 
 		fmt.Printf("  %s │", t.In(brtz).Format("15:04"))

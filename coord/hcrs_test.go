@@ -8,6 +8,7 @@ import (
 	"github.com/TuSKan/astrogo/internal/gofaext"
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 	"github.com/TuSKan/astrogo/vector"
 )
 
@@ -90,12 +91,12 @@ func TestTheSunsBarycentricPositionAndVelocityAgree(t *testing.T) {
 
 	mid := time.Date(epochYear, 6, 1, 12, 0, 0, 0, time.LocationUTC)
 
-	before, err := coord.SunBarycentric(mid.AddDays(-hDays))
+	before, err := coord.SunBarycentric(mid.Add(unit.Days(-hDays)))
 	if err != nil {
 		t.Fatalf("SunBarycentric: %v", err)
 	}
 
-	after, err := coord.SunBarycentric(mid.AddDays(hDays))
+	after, err := coord.SunBarycentric(mid.Add(unit.Days(hDays)))
 	if err != nil {
 		t.Fatalf("SunBarycentric: %v", err)
 	}

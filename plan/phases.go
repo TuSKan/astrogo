@@ -106,7 +106,7 @@ func MoonPhases(start, end time.Time, prov eph.Provider) ([]MoonPhaseEvent, erro
 		prov = eph.Default()
 	}
 
-	const step = 6 * time.Hour // ~4 samples per day → won't miss any phase
+	step := unit.Hours(6) // ~4 samples per day → won't miss any phase
 
 	solver := DefaultSolver()
 
@@ -265,7 +265,7 @@ func Seasons(year int, prov eph.Provider) ([]SeasonEvent, error) {
 	start := time.Date(year, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
 	end := time.Date(year+1, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
 
-	const step = 24 * time.Hour // Daily sampling for ~1°/day Sun
+	step := unit.Hours(24) // Daily sampling for ~1°/day Sun
 
 	solver := DefaultSolver()
 
@@ -632,8 +632,8 @@ func LunarEclipses(start, end time.Time, prov eph.Provider) ([]EclipseEvent, err
 		if absLat <= penumbralLimit {
 			// Refine: minimize Moon–anti-Sun angular separation in a ±30 min
 			// window around the syzygy. This finds the "time of greatest eclipse".
-			tMin := phase.Time.Add(-30 * time.Minute)
-			tMax := phase.Time.Add(30 * time.Minute)
+			tMin := phase.Time.Add(unit.Minutes(-30))
+			tMax := phase.Time.Add(unit.Minutes(30))
 
 			eclTime, _, err := solver.FindExtremum(func(t time.Time) (float64, error) {
 				return moonAntiSunSeparation(t, prov)
@@ -700,8 +700,8 @@ func SolarEclipses(start, end time.Time, prov eph.Provider) ([]EclipseEvent, err
 		if absLat <= partialLimit {
 			// Refine: minimize Moon–Sun angular separation in a ±30 min
 			// window around the syzygy. This finds the "time of greatest eclipse".
-			tMin := phase.Time.Add(-30 * time.Minute)
-			tMax := phase.Time.Add(30 * time.Minute)
+			tMin := phase.Time.Add(unit.Minutes(-30))
+			tMax := phase.Time.Add(unit.Minutes(30))
 
 			eclTime, _, err := solver.FindExtremum(func(t time.Time) (float64, error) {
 				return moonSunSeparation(t, prov)

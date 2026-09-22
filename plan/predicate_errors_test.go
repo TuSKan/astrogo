@@ -11,6 +11,7 @@ import (
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/logging"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 var errConstraintUnavailable = errors.New("predicate_errors_test: constraint could not be evaluated")
@@ -86,7 +87,7 @@ func TestSchedulerReportsAConstraintThatCannotBeEvaluated(t *testing.T) {
 	}
 
 	start := fixedEpoch()
-	window := Window{Start: start, End: start.Add(1 * time.Hour)}
+	window := Window{Start: start, End: start.Add(unit.Hours(1))}
 	block := &Block{ID: "B1", Target: NewStar("T", angle.Zero(), angle.Zero()), Duration: 10 * time.Minute}
 
 	for _, tc := range []struct {
@@ -127,7 +128,7 @@ func TestFindReportsAConstraintThatCannotBeEvaluated(t *testing.T) {
 		mockObject{pos: coord.NewICRS(angle.Zero(), angle.Zero())},
 		site,
 		[]Constraint{failingConstraint{}},
-		start, start.Add(2*time.Hour), 10*time.Minute,
+		start, start.Add(unit.Hours(2)), 10*time.Minute,
 	)
 
 	if !errors.Is(err, errConstraintUnavailable) {
@@ -149,7 +150,7 @@ func TestObservableWindowsReportsAFailureDuringRefinement(t *testing.T) {
 
 	_, err := ObservableWindows(
 		NewStar("T", angle.Zero(), angle.Zero()),
-		start, start.Add(2*time.Hour), 10*time.Minute,
+		start, start.Add(unit.Hours(2)), unit.Minutes(10),
 		site,
 		failingConstraint{},
 	)
@@ -186,12 +187,12 @@ func TestVisibleTonightReportsWhyACandidateWasSkipped(t *testing.T) {
 	// backed by an ephemeris provider that could not be reached. The step is
 	// a legal one (ObservableWindows rejects anything over 15m outright), so
 	// the only thing that can fail here is the lookup itself.
-	cfg := visibleTonightConfig{step: 10 * time.Minute, minAltitude: angle.Deg(10)}
+	cfg := visibleTonightConfig{step: unit.Minutes(10), minAltitude: angle.Deg(10)}
 
 	_, ok, why := evaluateCandidate(
 		t.Context(),
 		visibleCandidate{obj: unreachableTarget{}},
-		start, start.Add(2*time.Hour), site, nil, 6.0, cfg,
+		start, start.Add(unit.Hours(2)), site, nil, 6.0, cfg,
 	)
 	if ok {
 		t.Fatal("precondition: this candidate should not evaluate cleanly")
@@ -230,7 +231,7 @@ func TestSwapAndInsertPassesReportAConstraintFailure(t *testing.T) {
 	}
 
 	start := fixedEpoch()
-	window := Window{Start: start, End: start.Add(2 * time.Hour)}
+	window := Window{Start: start, End: start.Add(unit.Hours(2))}
 
 	b1 := &Block{ID: "B1", Target: NewStar("A", angle.Zero(), angle.Zero()), Duration: 10 * time.Minute}
 	b2 := &Block{ID: "B2", Target: NewStar("B", angle.Zero(), angle.Zero()), Duration: 10 * time.Minute}
@@ -243,8 +244,8 @@ func TestSwapAndInsertPassesReportAConstraintFailure(t *testing.T) {
 	sched := &Schedule{
 		Window: window,
 		Blocks: []ScheduledBlock{
-			{Block: b1, Window: Window{Start: start, End: start.Add(10 * time.Minute)}},
-			{Block: b2, Window: Window{Start: start.Add(10 * time.Minute), End: start.Add(20 * time.Minute)}},
+			{Block: b1, Window: Window{Start: start, End: start.Add(unit.Minutes(10))}},
+			{Block: b2, Window: Window{Start: start.Add(unit.Minutes(10)), End: start.Add(unit.Minutes(20))}},
 		},
 		Unscheduled: []UnscheduledBlock{{Block: b1}},
 	}
@@ -289,15 +290,18 @@ func TestSwapOptimizedScheduleForwardsAPassFailure(t *testing.T) {
 	}
 
 	start := fixedEpoch()
-	window := Window{Start: start, End: start.Add(2 * time.Hour)}
+	window := Window{Start: start, End: start.Add(unit.Hours(2))}
 
 	b1 := &Block{ID: "B1", Target: NewStar("A", angle.Zero(), angle.Zero()), Duration: 10 * time.Minute}
 	b2 := &Block{ID: "B2", Target: NewStar("B", angle.Zero(), angle.Zero()), Duration: 10 * time.Minute}
 
 	placed := func(b *Block, offset time.Duration) ScheduledBlock {
 		return ScheduledBlock{
-			Block:  b,
-			Window: Window{Start: start.Add(offset), End: start.Add(offset + 10*time.Minute)},
+			Block: b,
+			Window: Window{
+				Start: start.Add(time.FromGoDuration(offset)),
+				End:   start.Add(time.FromGoDuration(offset) + unit.Minutes(10)),
+			},
 		}
 	}
 
@@ -364,7 +368,7 @@ func TestConstraintFailureAtTheExactEndIsReported(t *testing.T) {
 	start := fixedEpoch()
 
 	// A step that does not divide the interval, so the loop never lands on end.
-	end := start.Add(25 * time.Minute)
+	end := start.Add(unit.Minutes(25))
 
 	_, ok, err := checkConstraintsIntervalCtx(
 		NewStar("A", angle.Zero(), angle.Zero()),

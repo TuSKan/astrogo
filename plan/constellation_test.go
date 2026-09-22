@@ -8,6 +8,7 @@ import (
 	"github.com/TuSKan/astrogo/constellation"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // TestNewConstellation_NameAndAbbreviationResolveIdentically confirms
@@ -83,9 +84,9 @@ func TestNewConstellation_GetDetailsAndWindows(t *testing.T) {
 	}
 
 	start := time.FromJD(2451545.0, time.UTC)
-	end := start.Add(24 * time.Hour)
+	end := start.Add(unit.Hours(24))
 
-	if _, err := ObservableWindows(c, start, end, 10*time.Minute, site); err != nil {
+	if _, err := ObservableWindows(c, start, end, unit.Minutes(10), site); err != nil {
 		t.Fatalf("ObservableWindows: %v", err)
 	}
 }

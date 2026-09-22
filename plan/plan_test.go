@@ -11,6 +11,7 @@ import (
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 func TestPlanner(t *testing.T) {
@@ -47,8 +48,8 @@ func TestObservableWindows_Fixed(t *testing.T) {
 	obj := NewStar("T", angle.Hour(18.69), angle.Deg(0))
 
 	start := time.FromJD(2451545.0, time.UTC) // J2000 Noon (Observable)
-	end := start.Add(1 * time.Hour)
-	step := 10 * time.Minute
+	end := start.Add(unit.Hours(1))
+	step := unit.Minutes(10)
 
 	t.Run("ContinuousWindow", func(t *testing.T) {
 		// Altitude > 20 deg (It's at ~90 deg)
@@ -80,8 +81,8 @@ func TestObservableWindows_Moving(t *testing.T) {
 	// Start at Noon J2000 (Sun high)
 	start := time.FromJD(2451545.0, time.UTC)
 	// End 24 hours later
-	end := start.Add(24 * time.Hour)
-	step := 15 * time.Minute // ≤ 15min max
+	end := start.Add(unit.Hours(24))
+	step := unit.Minutes(15) // ≤ 15min max
 
 	t.Run("SunDaylight", func(t *testing.T) {
 		// Sun altitude > 0 (Daylight)
@@ -114,8 +115,8 @@ func TestObservableWindows_Grouping(t *testing.T) {
 	obj := NewStar("T", angle.Zero(), angle.Zero())
 
 	start := fixedEpoch()
-	step := 1 * time.Minute
-	end := start.Add(5 * time.Minute) // 6 samples: 0, 1, 2, 3, 4, 5
+	step := unit.Minutes(1)
+	end := start.Add(unit.Minutes(5)) // 6 samples: 0, 1, 2, 3, 4, 5
 
 	// flipConstraint:
 	// t=0: count=1, fail
@@ -328,7 +329,7 @@ func TestPlannerRankObservable(t *testing.T) {
 	testutil.AssertNoError(t, err)
 
 	start := time.FromJD(2451545.0, time.UTC)
-	end := start.AddDays(1)
+	end := start.Add(unit.Days(1))
 
 	objs := []Observable{
 		NewStar("High", angle.Hour(12), angle.Deg(80)),
@@ -383,7 +384,7 @@ func TestPlannerRankObservable_DirectCoordObjectAndTransitError(t *testing.T) {
 	testutil.AssertNoError(t, err)
 
 	start := time.FromJD(2451545.0, time.UTC)
-	end := start.AddDays(1)
+	end := start.Add(unit.Days(1))
 
 	_, err = p.RankObservable([]Observable{erroringCoordObject{}}, start, end)
 	if err == nil {
@@ -401,18 +402,18 @@ func TestObservableWindows_StepTooLarge(t *testing.T) {
 	obj := NewStar("T", angle.Zero(), angle.Zero())
 
 	start := fixedEpoch()
-	end := start.Add(6 * time.Hour)
+	end := start.Add(unit.Hours(6))
 
 	// Step > 15min should return an error a caller can match via errors.Is
 	// against the documented public sentinel (R21 regression: these
 	// sentinels were declared and wrapped but never verified reachable).
-	_, err := ObservableWindows(obj, start, end, 30*time.Minute, site, Altitude{Threshold: angle.Deg(30)})
+	_, err := ObservableWindows(obj, start, end, unit.Minutes(30), site, Altitude{Threshold: angle.Deg(30)})
 	if !errors.Is(err, ErrStepTooLarge) {
 		t.Errorf("expected ErrStepTooLarge for step > 15 minutes, got %v", err)
 	}
 
 	// Step <= 15min should succeed.
-	_, err = ObservableWindows(obj, start, end, 15*time.Minute, site, Altitude{Threshold: angle.Deg(30)})
+	_, err = ObservableWindows(obj, start, end, unit.Minutes(15), site, Altitude{Threshold: angle.Deg(30)})
 	testutil.AssertNoError(t, err)
 }
 
@@ -422,14 +423,14 @@ func TestObservableWindows_StepNotPositive(t *testing.T) {
 	obj := NewStar("T", angle.Zero(), angle.Zero())
 
 	start := fixedEpoch()
-	end := start.Add(6 * time.Hour)
+	end := start.Add(unit.Hours(6))
 
 	_, err := ObservableWindows(obj, start, end, 0, site, Altitude{Threshold: angle.Deg(30)})
 	if !errors.Is(err, ErrStepNotPositive) {
 		t.Errorf("expected ErrStepNotPositive for a zero step, got %v", err)
 	}
 
-	_, err = ObservableWindows(obj, start, end, -time.Minute, site, Altitude{Threshold: angle.Deg(30)})
+	_, err = ObservableWindows(obj, start, end, unit.Minutes(-1), site, Altitude{Threshold: angle.Deg(30)})
 	if !errors.Is(err, ErrStepNotPositive) {
 		t.Errorf("expected ErrStepNotPositive for a negative step, got %v", err)
 	}
@@ -564,7 +565,7 @@ func TestScorerContextIsReusedAndFixesTheEpoch(t *testing.T) {
 
 	sixHoursEarlier, err := Scorer{
 		Site:    site,
-		Context: coord.NewContext(tm.AddDays(-0.25), loc, site.Refraction()),
+		Context: coord.NewContext(tm.Add(unit.Days(-0.25)), loc, site.Refraction()),
 	}.Score(obj, tm)
 	testutil.AssertNoError(t, err)
 

@@ -138,7 +138,7 @@ func (s *SwapOptimizedStrategy) swapPass(
 
 		// Try placing bj at bi's start time.
 		newJStart := bi.Window.Start
-		newJEnd := newJStart.Add(bj.Block.Duration)
+		newJEnd := newJStart.Add(time.FromGoDuration(bj.Block.Duration))
 
 		// Validate bj's constraints at the new time.
 		midCtxJ, okJ, err := checkConstraintsIntervalCtx(bj.Block.Target, newJStart, newJEnd, step, planner.Site, mergedC[bj.Block.ID]...)
@@ -170,8 +170,8 @@ func (s *SwapOptimizedStrategy) swapPass(
 			overhead = oh
 		}
 
-		newIStart := newJEnd.Add(overhead)
-		newIEnd := newIStart.Add(bi.Block.Duration)
+		newIStart := newJEnd.Add(time.FromGoDuration(overhead))
+		newIEnd := newIStart.Add(time.FromGoDuration(bi.Block.Duration))
 
 		// Check collision with the next block after the pair.
 		if i+2 < n && newIEnd.After(sched.Blocks[i+2].Window.Start) {
@@ -295,8 +295,8 @@ func (s *SwapOptimizedStrategy) insertPass(
 				overhead = oh
 			}
 
-			startTime := gap.window.Start.Add(overhead)
-			endTime := startTime.Add(ub.Block.Duration)
+			startTime := gap.window.Start.Add(time.FromGoDuration(overhead))
+			endTime := startTime.Add(time.FromGoDuration(ub.Block.Duration))
 
 			if endTime.After(gap.window.End) {
 				continue

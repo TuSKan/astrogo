@@ -166,7 +166,7 @@ func TestElements_StateAt_KnownGeometry_Inclination0(t *testing.T) {
 	epoch := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
 	el := testElements(t, epoch, a, 0, angle.Zero(), angle.Zero(), angle.Deg(90), angle.Deg(0))
 
-	quarterPeriod := epoch.AddDays(keplerPeriodDays(a) / 4)
+	quarterPeriod := epoch.Add(unit.Days(keplerPeriodDays(a) / 4))
 
 	pos, _, err := el.StateAt(quarterPeriod)
 	testutil.AssertNoError(t, err)
@@ -192,7 +192,7 @@ func TestElements_StateAt_KnownGeometry_Inclination90(t *testing.T) {
 	epoch := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
 	el := testElements(t, epoch, a, 0, angle.Deg(90), angle.Zero(), angle.Zero(), angle.Deg(0))
 
-	quarterPeriod := epoch.AddDays(keplerPeriodDays(a) / 4)
+	quarterPeriod := epoch.Add(unit.Days(keplerPeriodDays(a) / 4))
 
 	pos, _, err := el.StateAt(quarterPeriod)
 	testutil.AssertNoError(t, err)
@@ -211,7 +211,7 @@ func TestElements_StateAt_OnePeriodClosure(t *testing.T) {
 	pos0, vel0, err := el.StateAt(epoch)
 	testutil.AssertNoError(t, err)
 
-	pos1, vel1, err := el.StateAt(epoch.AddDays(keplerPeriodDays(el.SemiMajorAxis().AU())))
+	pos1, vel1, err := el.StateAt(epoch.Add(unit.Days(keplerPeriodDays(el.SemiMajorAxis().AU()))))
 	testutil.AssertNoError(t, err)
 
 	testutil.AssertNear(t, "x", pos1.X, pos0.X, 1e-6)
@@ -235,7 +235,7 @@ func TestElements_StateAt_EnergyConservation(t *testing.T) {
 	aM := el.SemiMajorAxis().AU() * auM
 
 	for _, dtDays := range []float64{0, 10, 50, 123.4, 400} {
-		pos, vel, err := el.StateAt(epoch.AddDays(dtDays))
+		pos, vel, err := el.StateAt(epoch.Add(unit.Days(dtDays)))
 		testutil.AssertNoError(t, err)
 
 		rM := pos.Norm() * auM
@@ -261,7 +261,7 @@ func TestElements_StateAt_AngularMomentumConservation(t *testing.T) {
 	want := math.Sqrt(gm * aM * (1 - el.Eccentricity()*el.Eccentricity()))
 
 	for _, dtDays := range []float64{0, 5, 77, 300} {
-		pos, vel, err := el.StateAt(epoch.AddDays(dtDays))
+		pos, vel, err := el.StateAt(epoch.Add(unit.Days(dtDays)))
 		testutil.AssertNoError(t, err)
 
 		rM := pos.MulScalar(auM)
@@ -282,15 +282,15 @@ func TestElements_StateAt_VelocityMatchesFiniteDifference(t *testing.T) {
 	const h = 1e-3 // days
 
 	for _, dtDays := range []float64{0, 30, 150, 500} {
-		mid := epoch.AddDays(dtDays)
+		mid := epoch.Add(unit.Days(dtDays))
 
 		_, vel, err := el.StateAt(mid)
 		testutil.AssertNoError(t, err)
 
-		posBefore, _, err := el.StateAt(mid.AddDays(-h))
+		posBefore, _, err := el.StateAt(mid.Add(unit.Days(-h)))
 		testutil.AssertNoError(t, err)
 
-		posAfter, _, err := el.StateAt(mid.AddDays(h))
+		posAfter, _, err := el.StateAt(mid.Add(unit.Days(h)))
 		testutil.AssertNoError(t, err)
 
 		fd := posAfter.Sub(posBefore).DivScalar(2 * h)

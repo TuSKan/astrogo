@@ -12,9 +12,15 @@ type Window struct {
 	End   time.Time
 }
 
-// Duration returns the duration of the window as a standard time.Duration.
+// Duration returns the length of the window as a standard time.Duration.
+//
+// An observing window is hours, and a caller prints it or compares it against
+// an exposure time, so it stays the type the standard library formats. The
+// conversion saturates past ±292 years, which no window reaches.
 func (w Window) Duration() time.Duration {
-	return w.End.Sub(w.Start)
+	d, _ := time.ToGoDuration(w.End.Sub(w.Start))
+
+	return d
 }
 
 // Overlaps reports whether w and o share any instant, including a shared

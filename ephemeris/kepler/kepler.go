@@ -493,7 +493,7 @@ func (el Elements) StateAt(t time.Time) (pos, vel vector.Vec3, err error) {
 		nRadPerDay = 2 * math.Pi / el.periodDays
 	}
 
-	dtDays := t.SubDays(el.epoch)
+	dtDays := t.Sub(el.epoch).Days()
 	m := el.meanAnomaly.Radians() + nRadPerDay*dtDays
 
 	ea, err := SolveKepler(angle.Rad(m), el.eccentricity)

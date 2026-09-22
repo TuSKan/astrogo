@@ -8,6 +8,7 @@ import (
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 	"github.com/TuSKan/astrogo/vector"
 )
 
@@ -86,7 +87,7 @@ func TestReducer_Group1_SiteDependence(t *testing.T) {
 func TestReducer_Group1_TimeDependence(t *testing.T) {
 	site, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(45), 0)
 	obsTime1 := fixedEpoch()
-	obsTime2 := obsTime1.Add(time.Hour)
+	obsTime2 := obsTime1.Add(unit.Hours(1))
 
 	vec := getTargetAtAltitude(site, obsTime1, 40, 80)
 

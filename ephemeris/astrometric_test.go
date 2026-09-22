@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 	"github.com/TuSKan/astrogo/vector"
 )
 
@@ -72,8 +73,7 @@ func TestAstrometricDiffersFromApparentByAberration(t *testing.T) {
 		n := 0
 
 		for day := range 73 {
-			epoch := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC).
-				AddDays(float64(day * 5))
+			epoch := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC).Add(unit.Days(float64(day * 5)))
 
 			sep := separationOfPlaces(t, p, Sun, epoch)
 
@@ -102,8 +102,7 @@ func TestAstrometricDiffersFromApparentByAberration(t *testing.T) {
 			var maxSep float64
 
 			for day := range 73 {
-				epoch := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC).
-					AddDays(float64(day * 5))
+				epoch := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC).Add(unit.Days(float64(day * 5)))
 
 				sep := separationOfPlaces(t, p, id, epoch)
 

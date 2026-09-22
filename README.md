@@ -35,6 +35,7 @@ import (
 	"github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/plan"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 func main() {
@@ -49,7 +50,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("eval: %v", err)
 	}
-	events, err := plan.VisibilityEvents(tonight, tonight.AddDays(1), mars, site)
+	events, err := plan.VisibilityEvents(tonight, tonight.Add(unit.Days(1)), mars, site)
 	if err != nil {
 		log.Fatalf("events: %v", err)
 	}

@@ -28,6 +28,7 @@ import (
 	// The kernel-backed sources register their backend rather than being
 	// imported by the root package, so a build that wants them says so (#112).
 	_ "github.com/TuSKan/astrogo/ephemeris/jpl"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 func main() {
@@ -108,7 +109,7 @@ func main() {
 	totalDays := 0.0
 
 	for _, d := range durations {
-		days := d.end.SubDays(d.start)
+		days := d.end.Sub(d.start).Days()
 		totalDays += days
 		hours := (days - float64(int(days))) * 24
 		fmt.Printf("  %-8s %6.2f days  (%dd %02dh)\n", d.name, days, int(days), int(hours))
@@ -254,7 +255,7 @@ func main() {
 
 	// Moon rise/set on equinox day
 	eqDay := time.Date(2026, time.March, 20, 0, 0, 0, 0, time.LocationUTC)
-	eqNext := eqDay.Add(24 * time.Hour)
+	eqNext := eqDay.Add(unit.Hours(24))
 
 	moonrise, moonset, err := plan.MoonriseMoonset(eqDay, eqNext, site, prov)
 	if err != nil {

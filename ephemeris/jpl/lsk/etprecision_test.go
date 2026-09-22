@@ -11,6 +11,7 @@ import (
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // openKernel is the shared setup for the tests in this file.
@@ -88,7 +89,7 @@ func TestUTCToETResolvesSubMicrosecondSteps(t *testing.T) {
 	base := time.Date(2026, time.June, 15, 12, 0, 0, 0, time.LocationUTC)
 	baseET := lsk.UTCToET(base, r)
 
-	const wantResolvable = time.Duration(1000) // 1 µs in nanoseconds
+	wantResolvable := unit.Seconds(1e-6) // one microsecond
 
 	shifted := lsk.UTCToET(base.Add(wantResolvable), r)
 	if shifted == baseET {
