@@ -5,13 +5,13 @@ pr: 364
 **Five exported names lose their British spelling**, which is the whole
 exported surface that had one:
 
-| before | after |
-| --- | --- |
-| `CenterGeocentre` | `CenterGeocenter` |
-| `CenterBarycentre` | `CenterBarycenter` |
-| `CenterHeliocentre` | `CenterHeliocenter` |
-| `magnitude.JohnsonCousinsColourTerm` | `JohnsonCousinsColorTerm` |
-| `skybrightness.ZodiacalColourCorrection` | `ZodiacalColorCorrection` |
+| package | before | after |
+| --- | --- | --- |
+| `ephemeris`, `ephemeris/core` | `CenterGeocentre` | `CenterGeocenter` |
+| `ephemeris`, `ephemeris/core` | `CenterBarycentre` | `CenterBarycenter` |
+| `ephemeris`, `ephemeris/core` | `CenterHeliocentre` | `CenterHeliocenter` |
+| `magnitude` | `JohnsonCousinsColourTerm` | `JohnsonCousinsColorTerm` |
+| `skybrightness` | `ZodiacalColourCorrection` | `ZodiacalColorCorrection` |
 
 The three `Center` constants spelled it both ways inside one identifier — an
 American prefix on a British suffix. astrogo's convention is American and is
