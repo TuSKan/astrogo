@@ -7,6 +7,7 @@ import (
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/magnitude"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // reflectanceAt is a small helper: the whole 32-band vector for one geometry.
@@ -374,7 +375,7 @@ func TestROLOIrradiance(t *testing.T) {
 	)
 
 	dst := make([]float64, 1)
-	if err := magnitude.ROLOIrradiance(dst, []float64{refl}, []float64{solar}, 1, magnitude.ROLOStandardDistanceKM); err != nil {
+	if err := magnitude.ROLOIrradiance(dst, []float64{refl}, []float64{solar}, unit.AU(1), magnitude.ROLOStandardDistance); err != nil {
 		t.Fatalf("ROLOIrradiance: %v", err)
 	}
 
@@ -386,7 +387,7 @@ func TestROLOIrradiance(t *testing.T) {
 
 	// Twice the distance to the Moon is a quarter of the irradiance.
 	far := make([]float64, 1)
-	if err := magnitude.ROLOIrradiance(far, []float64{refl}, []float64{solar}, 1, 2*magnitude.ROLOStandardDistanceKM); err != nil {
+	if err := magnitude.ROLOIrradiance(far, []float64{refl}, []float64{solar}, unit.AU(1), 2*magnitude.ROLOStandardDistance); err != nil {
 		t.Fatalf("ROLOIrradiance: %v", err)
 	}
 
@@ -396,7 +397,7 @@ func TestROLOIrradiance(t *testing.T) {
 
 	// And the Sun-Moon leg scales the same way.
 	aphelion := make([]float64, 1)
-	if err := magnitude.ROLOIrradiance(aphelion, []float64{refl}, []float64{solar}, 2, magnitude.ROLOStandardDistanceKM); err != nil {
+	if err := magnitude.ROLOIrradiance(aphelion, []float64{refl}, []float64{solar}, unit.AU(2), magnitude.ROLOStandardDistance); err != nil {
 		t.Fatalf("ROLOIrradiance: %v", err)
 	}
 
@@ -410,11 +411,16 @@ func TestROLOIrradianceRejectsBadInput(t *testing.T) {
 
 	one := []float64{1}
 
-	if err := magnitude.ROLOIrradiance(make([]float64, 2), one, one, 1, 1); !errors.Is(err, magnitude.ErrROLOBandCount) {
+	if err := magnitude.ROLOIrradiance(make([]float64, 2), one, one, unit.AU(1), unit.AU(1)); !errors.Is(err, magnitude.ErrROLOBandCount) {
 		t.Errorf("mismatched lengths: err = %v, want ErrROLOBandCount", err)
 	}
 
-	for _, d := range [][2]float64{{0, 1}, {1, 0}, {-1, 1}, {1, -1}} {
+	for _, d := range [][2]unit.Length{
+		{0, unit.AU(1)},
+		{unit.AU(1), 0},
+		{unit.AU(-1), unit.AU(1)},
+		{unit.AU(1), unit.AU(-1)},
+	} {
 		if err := magnitude.ROLOIrradiance(one, one, one, d[0], d[1]); !errors.Is(err, magnitude.ErrROLODistance) {
 			t.Errorf("distances %v: err = %v, want ErrROLODistance", d, err)
 		}
@@ -428,7 +434,7 @@ func TestROLOIrradianceAliases(t *testing.T) {
 	buf := []float64{0.12, 0.13}
 	solar := []float64{1500, 1600}
 
-	if err := magnitude.ROLOIrradiance(buf, buf, solar, 1, magnitude.ROLOStandardDistanceKM); err != nil {
+	if err := magnitude.ROLOIrradiance(buf, buf, solar, unit.AU(1), magnitude.ROLOStandardDistance); err != nil {
 		t.Fatalf("ROLOIrradiance: %v", err)
 	}
 

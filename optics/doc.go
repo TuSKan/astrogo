@@ -19,8 +19,13 @@
 //
 // Typical use:
 //
-//	scope, _ := optics.NewTelescope(200, 2000)               // 200mm f/10
-//	eyepiece, _ := optics.NewEyepiece(25, angle.Deg(68))      // 25mm, 68° AFOV
-//	mag := scope.Magnification(eyepiece)                      // 80x
-//	tfov := scope.TrueFOV(eyepiece)                            // 0.85°
+//	scope, _ := optics.NewTelescope(unit.Millimeters(200), unit.Millimeters(2000)) // f/10
+//	eyepiece, _ := optics.NewEyepiece(unit.Millimeters(25), angle.Deg(68))         // 68° AFOV
+//	mag := scope.Magnification(eyepiece)                                           // 80x
+//	tfov := scope.TrueFOV(eyepiece)                                                // 0.85°
+//
+// Lengths are [unit.Length], so the unit is named at the call site rather than
+// carried in a parameter name. Equipment is specified in millimeters and
+// [unit.Length] stores meters, so a bare number here would be a thousand times
+// too large.
 package optics

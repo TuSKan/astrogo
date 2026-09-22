@@ -8,6 +8,7 @@ import (
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/magnitude"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 func defaultProvider() eph.Provider {
@@ -408,22 +409,22 @@ func TestSatelliteApparent_RangeScaling(t *testing.T) {
 	alpha := angle.Deg(90)
 
 	// At reference range (1000 km) and reference phase (90°): should equal stdMag.
-	m1000 := magnitude.SatelliteApparent(stdMag, magnitude.ConventionMcCants, 1000, alpha, magnitude.PhaseSphere)
+	m1000 := magnitude.SatelliteApparent(stdMag, magnitude.ConventionMcCants, unit.Km(1000), alpha, magnitude.PhaseSphere)
 	assertNear(t, "sat 1000 km", m1000, stdMag, 0.01)
 
 	// At 2000 km: +5·log₁₀(2) ≈ +1.505 mag.
-	m2000 := magnitude.SatelliteApparent(stdMag, magnitude.ConventionMcCants, 2000, alpha, magnitude.PhaseSphere)
+	m2000 := magnitude.SatelliteApparent(stdMag, magnitude.ConventionMcCants, unit.Km(2000), alpha, magnitude.PhaseSphere)
 	expected := stdMag + 5*math.Log10(2.0)
 	assertNear(t, "sat 2000 km", m2000, expected, 0.01)
 }
 
 func TestSatelliteApparent_PhaseMonotonicity(t *testing.T) {
 	stdMag := 2.0
-	rangeKm := 500.0
+	observerRange := unit.Km(500)
 
-	m0 := magnitude.SatelliteApparent(stdMag, magnitude.ConventionMcCants, rangeKm, angle.Deg(0), magnitude.PhaseSphere)
-	m90 := magnitude.SatelliteApparent(stdMag, magnitude.ConventionMcCants, rangeKm, angle.Deg(90), magnitude.PhaseSphere)
-	m150 := magnitude.SatelliteApparent(stdMag, magnitude.ConventionMcCants, rangeKm, angle.Deg(150), magnitude.PhaseSphere)
+	m0 := magnitude.SatelliteApparent(stdMag, magnitude.ConventionMcCants, observerRange, angle.Deg(0), magnitude.PhaseSphere)
+	m90 := magnitude.SatelliteApparent(stdMag, magnitude.ConventionMcCants, observerRange, angle.Deg(90), magnitude.PhaseSphere)
+	m150 := magnitude.SatelliteApparent(stdMag, magnitude.ConventionMcCants, observerRange, angle.Deg(150), magnitude.PhaseSphere)
 
 	if m90 <= m0 || m150 <= m90 {
 		t.Errorf("sat phase not monotonic: α=0°:%.2f, 90°:%.2f, 150°:%.2f", m0, m90, m150)
@@ -434,10 +435,10 @@ func TestSatelliteApparent_PhaseMonotonicity(t *testing.T) {
 
 func TestSatelliteApparent_CylinderVsSphere(t *testing.T) {
 	stdMag := 3.0
-	rangeKm := 1000.0
+	observerRange := unit.Km(1000)
 
-	mSphere := magnitude.SatelliteApparent(stdMag, magnitude.ConventionMcCants, rangeKm, angle.Deg(45), magnitude.PhaseSphere)
-	mCyl := magnitude.SatelliteApparent(stdMag, magnitude.ConventionMcCants, rangeKm, angle.Deg(45), magnitude.PhaseCylinder)
+	mSphere := magnitude.SatelliteApparent(stdMag, magnitude.ConventionMcCants, observerRange, angle.Deg(45), magnitude.PhaseSphere)
+	mCyl := magnitude.SatelliteApparent(stdMag, magnitude.ConventionMcCants, observerRange, angle.Deg(45), magnitude.PhaseCylinder)
 
 	if mSphere == mCyl {
 		t.Error("sphere and cylinder should give different results")
@@ -448,11 +449,11 @@ func TestSatelliteApparent_CylinderVsSphere(t *testing.T) {
 
 func TestSatelliteApparent_MolczanConvention(t *testing.T) {
 	stdMag := 3.0
-	rangeKm := 1000.0
+	observerRange := unit.Km(1000)
 	alpha := angle.Deg(90)
 
-	mMcCants := magnitude.SatelliteApparent(stdMag, magnitude.ConventionMcCants, rangeKm, alpha, magnitude.PhaseSphere)
-	mMolczan := magnitude.SatelliteApparent(stdMag, magnitude.ConventionMolczan, rangeKm, alpha, magnitude.PhaseSphere)
+	mMcCants := magnitude.SatelliteApparent(stdMag, magnitude.ConventionMcCants, observerRange, alpha, magnitude.PhaseSphere)
+	mMolczan := magnitude.SatelliteApparent(stdMag, magnitude.ConventionMolczan, observerRange, alpha, magnitude.PhaseSphere)
 
 	// The Molczan and McCants standard-magnitude conventions differ by ~1.4 mag
 	// in total (mmccants.org/tles/intrmagdef.html): ~0.75 mag from the

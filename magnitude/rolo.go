@@ -42,9 +42,9 @@ const (
 	// standard Moon-observer distance, in steradians.
 	ROLOSolidAngleSR = 6.4177e-5
 
-	// ROLOStandardDistanceKM is the Moon-observer distance the model
-	// normalises to, in kilometres.
-	ROLOStandardDistanceKM = 384400.0
+	// ROLOStandardDistance is the Moon-observer distance the model
+	// normalises to: 384400 km.
+	ROLOStandardDistance unit.Length = 384_400_000
 
 	// ROLOMinPhaseDeg and ROLOMaxPhaseDeg bound the absolute phase angle
 	// over which the model was fitted. Below the minimum the Moon is inside
@@ -269,24 +269,30 @@ func ROLOReflectance(dst []float64, geom ROLOGeometry) error {
 //	E = A E_sun Omega_M / pi
 //
 // at the standard distances, scaled by (1 AU / d_sun)^2 for the Sun-Moon leg
-// and ([ROLOStandardDistanceKM] / d_moon)^2 for the Moon-observer leg.
+// and ([ROLOStandardDistance] / d_moon)^2 for the Moon-observer leg.
 //
 // The solar spectrum is a parameter rather than a table because this package
 // ships none: the ROLO model's own absolute scale depends on which solar
 // irradiance reference it is paired with, and quietly picking one would hide
 // a choice that belongs to the caller. dst may alias reflectance.
-func ROLOIrradiance(dst, reflectance, solar []float64, sunDistanceAU, moonDistanceKM float64) error {
+func ROLOIrradiance(dst, reflectance, solar []float64, sunDistance, moonDistance unit.Length) error {
 	if len(dst) != len(reflectance) || len(dst) != len(solar) {
 		return fmt.Errorf("%w: %d destination, %d reflectance, %d solar",
 			ErrROLOBandCount, len(dst), len(reflectance), len(solar))
 	}
 
-	if sunDistanceAU <= 0 || moonDistanceKM <= 0 || math.IsNaN(sunDistanceAU) || math.IsNaN(moonDistanceKM) {
-		return fmt.Errorf("%w: sun %g AU, moon %g km", ErrROLODistance, sunDistanceAU, moonDistanceKM)
+	sunAU, moonM := sunDistance.AU(), moonDistance.Meters()
+	if sunAU <= 0 || moonM <= 0 || math.IsNaN(sunAU) || math.IsNaN(moonM) {
+		return fmt.Errorf("%w: sun %g AU, moon %g km",
+			ErrROLODistance, sunAU, moonDistance.Km())
 	}
 
-	sunScale := 1 / (sunDistanceAU * sunDistanceAU)
-	moonScale := (ROLOStandardDistanceKM / moonDistanceKM) * (ROLOStandardDistanceKM / moonDistanceKM)
+	// Both legs are ratios against a reference distance, so both are
+	// dimensionless: the Sun's against one au, the Moon's against
+	// ROLOStandardDistance.
+	sunScale := 1 / (sunAU * sunAU)
+	moonRatio := float64(ROLOStandardDistance) / float64(moonDistance)
+	moonScale := moonRatio * moonRatio
 	factor := ROLOSolidAngleSR / math.Pi * sunScale * moonScale
 
 	for i := range dst {

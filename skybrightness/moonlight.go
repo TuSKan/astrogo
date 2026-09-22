@@ -9,7 +9,6 @@ import (
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
-	"github.com/TuSKan/astrogo/constants"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/magnitude"
@@ -380,12 +379,14 @@ func (m *ScatteredMoonlight) computeGeometry(scene *Scene) (*moonGeometry, error
 	// overhead is that much closer to it than the Earth's centre is. The
 	// correction is one subtraction because coord.Context already computes the
 	// observer's geocentric position in ICRS to do its own parallax work.
-	kmPerAU := constants.IAU.AstronomicalUnit.Value / 1e3
-
-	topocentric := moon.Pos.Sub(ctx.ObsVec())
+	//
+	// Both vectors are in au, which is the frame ephemeris positions come in;
+	// naming that here is what the typed argument then carries.
+	sunMoon := unit.AU(moon.Pos.Sub(sun.Pos).Norm())
+	topocentric := unit.AU(moon.Pos.Sub(ctx.ObsVec()).Norm())
 
 	if err := magnitude.ROLOIrradiance(geom.irradiance, reflectance, m.solar,
-		moon.Pos.Sub(sun.Pos).Norm(), topocentric.Norm()*kmPerAU); err != nil {
+		sunMoon, topocentric); err != nil {
 		return nil, fmt.Errorf("skybrightness: moonlight: %w", err)
 	}
 

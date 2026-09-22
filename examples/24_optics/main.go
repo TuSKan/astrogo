@@ -19,10 +19,11 @@ import (
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/optics"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 func main() {
-	scope, err := optics.NewTelescope(203, 2032) // 8" f/10 SCT
+	scope, err := optics.NewTelescope(unit.Millimeters(203), unit.Millimeters(2032)) // 8" f/10 SCT
 	if err != nil {
 		log.Fatalf("telescope: %v", err)
 	}
@@ -32,15 +33,15 @@ func main() {
 	fmt.Println("  AstroGo | optics.Telescope/Eyepiece/Sensor")
 	fmt.Println("═══════════════════════════════════════════════════════════════════")
 	fmt.Println()
-	fmt.Printf("  Aperture           %.0f mm\n", scope.ApertureMM())
-	fmt.Printf("  Focal length       %.0f mm\n", scope.FocalLengthMM())
+	fmt.Printf("  Aperture           %.0f mm\n", scope.Aperture().Millimeters())
+	fmt.Printf("  Focal length       %.0f mm\n", scope.FocalLength().Millimeters())
 	fmt.Printf("  Focal ratio        f/%.0f\n", scope.FocalRatio())
 	fmt.Printf("  Dawes limit        %.2f\"\n", scope.DawesLimit().Arcseconds())
 	fmt.Printf("  Max useful mag.    %.0fx\n", scope.MaxUsefulMagnification())
 	fmt.Printf("  Limiting mag.      %.1f\n", scope.LimitingMagnitude())
 
 	// ── Wide-field eyepiece, exact TrueFOV via a known field stop ──────────
-	wideField, err := optics.NewEyepiece(32, angle.Deg(52), optics.WithFieldStop(27.4))
+	wideField, err := optics.NewEyepiece(unit.Millimeters(32), angle.Deg(52), optics.WithFieldStop(unit.Millimeters(27.4)))
 	if err != nil {
 		log.Fatalf("wide-field eyepiece: %v", err)
 	}
@@ -48,7 +49,7 @@ func main() {
 	printEyepiece(scope, "32mm / 52° (27.4mm field stop)", wideField)
 
 	// ── Planetary eyepiece, no field stop → AFOV/magnification fallback ────
-	planetary, err := optics.NewEyepiece(9, angle.Deg(52))
+	planetary, err := optics.NewEyepiece(unit.Millimeters(9), angle.Deg(52))
 	if err != nil {
 		log.Fatalf("planetary eyepiece: %v", err)
 	}
@@ -64,7 +65,11 @@ func main() {
 	printEyepiece(barlowed, "9mm / 52°, behind a 2x Barlow", planetary)
 
 	// ── Imaging: CMOS sensor field of view and plate scale ─────────────────
-	sensor := optics.Sensor{WidthMM: 23.5, HeightMM: 15.6, PixelMicrons: 3.76}
+	sensor := optics.Sensor{
+		Width:      unit.Millimeters(23.5),
+		Height:     unit.Millimeters(15.6),
+		PixelPitch: unit.Millimeters(3.76 / 1000), // 3.76 µm
+	}
 
 	w, h := scope.SensorFOV(sensor)
 
@@ -83,5 +88,5 @@ func printEyepiece(scope optics.Telescope, label string, eyepiece optics.Eyepiec
 	fmt.Println()
 	fmt.Printf("  Magnification      %.0fx\n", scope.Magnification(eyepiece))
 	fmt.Printf("  True field of view %.2f°\n", scope.TrueFOV(eyepiece).Degrees())
-	fmt.Printf("  Exit pupil         %.2f mm\n", scope.ExitPupil(eyepiece))
+	fmt.Printf("  Exit pupil         %.2f mm\n", scope.ExitPupil(eyepiece).Millimeters())
 }

@@ -164,7 +164,7 @@ func NewInstrument(
 		return Instrument{}, fmt.Errorf("%w: obstruction fraction %g", ErrNonPositiveDimension, obstructionFraction)
 	}
 
-	radiusM := t.ApertureMM() / 2 * 1e-3
+	radiusM := t.Aperture().Meters() / 2
 	area := math.Pi * radiusM * radiusM * (1 - obstructionFraction)
 
 	// A pixel's solid angle is its angular width squared in the small-angle
