@@ -44,6 +44,10 @@ func TestOpenNamesTheConsentItNeeds(t *testing.T) {
 	// network: Inputs resolves the passband from an API first, and only then
 	// reaches the star map, which is the first thing consent applies to.
 	if !errors.Is(err, remote.ErrDownloadDenied) {
+		// Inside the branch: the refusal this test is about must never be
+		// mistaken for an outage. Only some other error gets classified, and
+		// the passband API this reaches first is a real thing that can be down.
+		testutil.SkipOnUpstreamFailure(t, err)
 		t.Fatalf("got %v, want ErrDownloadDenied", err)
 	}
 

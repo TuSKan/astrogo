@@ -52,6 +52,7 @@ func TestJPLNetworkResolve(t *testing.T) {
 	})
 
 	if gotErr != nil {
+		testutil.SkipOnUpstreamFailure(t, gotErr)
 		t.Fatalf("expected a resolved response, got error: %v", gotErr)
 	}
 
@@ -103,6 +104,7 @@ func TestJPLNetworkResolveExact(t *testing.T) {
 	})
 
 	if gotErr != nil {
+		testutil.SkipOnUpstreamFailure(t, gotErr)
 		t.Fatalf("expected a resolved response, got error: %v", gotErr)
 	}
 

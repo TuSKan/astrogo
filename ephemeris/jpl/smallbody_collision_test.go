@@ -44,6 +44,7 @@ func TestLowNumberedAsteroidsLoad(t *testing.T) {
 			p, err := jpl.NewProvider(context.Background(), core.SmallBody, c.designation,
 				jpl.WithTimeInterval(start, stop))
 			if err != nil {
+				testutil.SkipOnUpstreamFailure(t, err)
 				t.Fatalf("%s (%s): %v", c.name, c.designation, err)
 			}
 

@@ -60,6 +60,7 @@ func TestGaiaMapMatchesThePublishedSurfaceBrightness(t *testing.T) {
 	// than the bound below, not fainter, so the test would say so.
 	m, counts, err := starlight.RunChunk(ctx, build, 0, 63)
 	if err != nil {
+		testutil.SkipOnUpstreamFailure(t, err)
 		t.Fatalf("RunChunk: %v", err)
 	}
 
@@ -182,6 +183,7 @@ func TestGaiaMapPutsTheMilkyWayInThePlane(t *testing.T) {
 	sample := func(first int64) float64 {
 		m, _, err := starlight.RunChunk(ctx, build, first, first+run-1)
 		if err != nil {
+			testutil.SkipOnUpstreamFailure(t, err)
 			t.Fatalf("RunChunk(%d): %v", first, err)
 		}
 

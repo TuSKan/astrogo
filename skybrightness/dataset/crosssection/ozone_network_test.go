@@ -33,6 +33,7 @@ func TestOzoneMatchesItsKnownBands(t *testing.T) {
 
 	xs, err := crosssection.Ozone(ctx)
 	if err != nil {
+		testutil.SkipOnUpstreamFailure(t, err)
 		t.Fatalf("Ozone: %v", err)
 	}
 

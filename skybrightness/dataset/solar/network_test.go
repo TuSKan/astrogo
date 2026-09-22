@@ -43,6 +43,7 @@ func TestNewScatteredMoonlightFromCALSPEC(t *testing.T) {
 
 	m, err := solar.NewScatteredMoonlight(ctx)
 	if err != nil {
+		testutil.SkipOnUpstreamFailure(t, err)
 		t.Fatalf("NewScatteredMoonlight: %v", err)
 	}
 
@@ -69,6 +70,7 @@ func TestSolarSpectrumCoversTheROLOBands(t *testing.T) {
 
 	spectrum, err := solar.Open(ctx)
 	if err != nil {
+		testutil.SkipOnUpstreamFailure(t, err)
 		t.Fatalf("Open: %v", err)
 	}
 

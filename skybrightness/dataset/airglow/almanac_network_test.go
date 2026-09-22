@@ -31,12 +31,14 @@ func TestAlmanacFluxFollowsTheSolarCycle(t *testing.T) {
 	quiet, err := airglow.AlmanacAt(context.Background(),
 		time.GoDate(2020, time.June, 15, 2, 0, 0, 0, time.LocationUTC), airglow.Paranal)
 	if err != nil {
+		testutil.SkipOnUpstreamFailure(t, err)
 		t.Fatalf("AlmanacAt at solar minimum: %v", err)
 	}
 
 	active, err := airglow.AlmanacAt(context.Background(),
 		time.GoDate(2014, time.March, 10, 2, 0, 0, 0, time.LocationUTC), airglow.Paranal)
 	if err != nil {
+		testutil.SkipOnUpstreamFailure(t, err)
 		t.Fatalf("AlmanacAt at solar maximum: %v", err)
 	}
 
@@ -82,6 +84,7 @@ func TestAlmanacReportsAnUnpublishedMonthAsUnset(t *testing.T) {
 
 	got, err := airglow.AlmanacAt(context.Background(), time.Now().UTC(), airglow.Paranal)
 	if err != nil {
+		testutil.SkipOnUpstreamFailure(t, err)
 		t.Fatalf("AlmanacAt for the current month: %v", err)
 	}
 
