@@ -1,6 +1,6 @@
 ---
 type: Changed — BREAKING
-pr: 359
+pr: 361
 ---
 **`optics` and `magnitude` now carry lengths as `unit.Length`**, finishing the
 mechanical half of #130 after `coord` (#355), `plan` (#357) and `atmosphere`
