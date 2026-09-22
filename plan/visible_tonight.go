@@ -17,6 +17,7 @@ import (
 	"github.com/TuSKan/astrogo/logging"
 	"github.com/TuSKan/astrogo/magnitude"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // ErrNoTwilight is returned when site/night never reaches astronomical
@@ -88,7 +89,7 @@ type VisibleObject struct {
 
 type visibleTonightConfig struct {
 	minAltitude           angle.Angle
-	step                  time.Duration
+	step                  unit.Duration
 	includeMoons          bool
 	forceSmallBodyKernels bool
 }
@@ -106,7 +107,7 @@ func WithMinAltitude(alt angle.Angle) VisibleTonightOption {
 
 // WithStep overrides the sampling cadence ObservableWindows uses to find
 // horizon-clearing intervals. Default: 10 minutes.
-func WithStep(d time.Duration) VisibleTonightOption {
+func WithStep(d unit.Duration) VisibleTonightOption {
 	return func(c *visibleTonightConfig) { c.step = d }
 }
 
@@ -254,7 +255,7 @@ func VisibleTonight(
 
 	cfg := visibleTonightConfig{
 		minAltitude: site.RiseSetThreshold(),
-		step:        10 * time.Minute,
+		step:        unit.Minutes(10),
 	}
 
 	for _, opt := range opts {
@@ -410,7 +411,7 @@ const maxConcurrentEphemerisFetches = 8
 // event solver's bisection refinement can evaluate an instant just outside
 // the nominal window while converging on a boundary rise/set, and this
 // keeps that from tripping "no coverage for target at requested epoch".
-const coverageMargin = 24 * time.Hour
+var coverageMargin = unit.Hours(24)
 
 // gatherCandidates converts every bright-search target into a
 // visibleCandidate. Star/deep-sky targets need no I/O and are converted

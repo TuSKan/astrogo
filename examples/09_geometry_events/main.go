@@ -15,13 +15,14 @@ import (
 	// The kernel-backed sources register their backend rather than being
 	// imported by the root package, so a build that wants them says so (#112).
 	_ "github.com/TuSKan/astrogo/ephemeris/jpl"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 func main() {
 	fmt.Println("=== AstroGo Geometry Event Solver Demonstration ===")
 
 	start := time.NowUTC()
-	end := start.AddDays(365) // Scan over an entire year
+	end := start.Add(unit.Days(365)) // Scan over an entire year
 
 	// JPL kernel downloads are opt-in — see README "Data downloads &
 	// offline usage". de442 is ~115 MB; naif0012.tls (leap seconds) ~5 KB.
@@ -91,7 +92,7 @@ func main() {
 	// ----------------------------------------------------
 	// Jupiter and Saturn Conjunction (The Great Conjunction)
 	// We might need to scan further into the future to find one, but let's check!
-	jupSatEnd := start.AddDays(365 * 20)
+	jupSatEnd := start.Add(unit.Days(365 * 20))
 
 	fmt.Println("\nLooking for Conjunctions between Jupiter and Saturn (Next 20 Years):")
 

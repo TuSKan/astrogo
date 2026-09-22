@@ -290,7 +290,7 @@ func TestGetDetails_RadialVelocity_SixMonthSwing(t *testing.T) {
 	star := NewStar("EclipticTarget", ra, dec, WithRadialVelocity(0))
 
 	t1 := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
-	t2 := t1.AddDays(182)
+	t2 := t1.Add(unit.Days(182))
 
 	parseTopo := func(tm time.Time) float64 {
 		ctx := coord.NewContext(tm, loc, site.Refraction())

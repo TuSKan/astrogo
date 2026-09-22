@@ -6,6 +6,7 @@ import (
 
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // R30 regression: plan/phases.go had no dedicated unit test file — it was
@@ -18,7 +19,7 @@ func TestMoonPhases_KnownYear(t *testing.T) {
 	prov := eph.Default()
 
 	start := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
-	end := start.AddDays(365)
+	end := start.Add(unit.Days(365))
 
 	events, err := MoonPhases(start, end, prov)
 	if err != nil {
@@ -138,7 +139,7 @@ func TestMoonIllumination_NewAndFull(t *testing.T) {
 	prov := eph.Default()
 
 	start := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
-	end := start.AddDays(60)
+	end := start.Add(unit.Days(60))
 
 	phases, err := MoonPhases(start, end, prov)
 	if err != nil {
@@ -184,7 +185,7 @@ func TestMoonIllumination_NewAndFull(t *testing.T) {
 // against the NASA Eclipse Catalog, each within its own Gamma/latitude limit.
 func TestEclipses_KnownYear(t *testing.T) {
 	start := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
-	end := start.AddDays(365)
+	end := start.Add(unit.Days(365))
 
 	cases := []struct {
 		name       string
@@ -248,7 +249,7 @@ func TestEclipseType_StringUnknown(t *testing.T) {
 // in this file).
 func TestPhasesFunctions_NilProviderDefaults(t *testing.T) {
 	start := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
-	end := start.AddDays(35)
+	end := start.Add(unit.Days(35))
 
 	if _, err := MoonPhases(start, end, nil); err != nil {
 		t.Errorf("MoonPhases(nil): unexpected error: %v", err)

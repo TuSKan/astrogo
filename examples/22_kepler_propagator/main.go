@@ -36,6 +36,7 @@ import (
 	// The kernel-backed sources register their backend rather than being
 	// imported by the root package, so a build that wants them says so (#112).
 	_ "github.com/TuSKan/astrogo/ephemeris/jpl"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 func main() {
@@ -94,7 +95,7 @@ func main() {
 	fmt.Println("  ──────────    ───────────    ──────────    ──────   ────")
 
 	for m := range 12 {
-		t := epoch.AddDays(float64(m) * 30)
+		t := epoch.Add(unit.Days(float64(m) * 30))
 
 		pos, err := asteroid.Position(t)
 		if err != nil {
@@ -135,7 +136,7 @@ func main() {
 		log.Fatalf("site: %v", err)
 	}
 
-	events, err := plan.VisibilityEvents(epoch, epoch.AddDays(1), asteroid, site)
+	events, err := plan.VisibilityEvents(epoch, epoch.Add(unit.Days(1)), asteroid, site)
 	if err != nil {
 		log.Fatalf("visibility events: %v", err)
 	}

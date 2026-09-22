@@ -42,7 +42,7 @@ func newContextCache(site *coord.Geodetic, atm atmosphere.Refraction) func(time.
 	var base *coord.Context
 
 	return func(t time.Time) *coord.Context {
-		if base == nil || t.Sub(base.Time()).Abs() > ctxRefresh {
+		if base == nil || t.Sub(base.Time()).Abs() > time.FromGoDuration(ctxRefresh) {
 			base = coord.NewContext(t, site, atm)
 		}
 

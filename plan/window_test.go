@@ -5,6 +5,7 @@ import (
 
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // t0 is an arbitrary fixed base instant every test below builds windows
@@ -15,8 +16,8 @@ var t0 = time.FromJD(2451545.0, time.UTC)
 // h builds a Window [t0+startH, t0+endH] hours from the fixture base.
 func h(startH, endH float64) Window {
 	return Window{
-		Start: t0.Add(time.Duration(startH * float64(time.Hour))),
-		End:   t0.Add(time.Duration(endH * float64(time.Hour))),
+		Start: t0.Add(unit.Hours(startH)),
+		End:   t0.Add(unit.Hours(endH)),
 	}
 }
 

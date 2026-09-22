@@ -8,6 +8,7 @@ import (
 	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/time/internal/iers"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 func TestFromJD(t *testing.T) {
@@ -59,12 +60,12 @@ func TestArithmetic(t *testing.T) {
 	tm := time.FromJD(2450000.0, time.TT)
 
 	// AddDays
-	tm2 := tm.AddDays(1.5)
+	tm2 := tm.Add(unit.Days(1.5))
 	testutil.AssertNear(t, "Add 1.5 days", tm2.JD(), 2450001.5, 1e-15)
 	testutil.AssertEqual(t, "Scale preserved", tm2.Scale(), time.TT)
 
 	// SubDays
-	diff := tm2.SubDays(tm)
+	diff := tm2.Sub(tm).Days()
 	testutil.AssertNear(t, "SubDays diff", diff, 1.5, 1e-15)
 }
 
@@ -165,11 +166,11 @@ func TestTimeStdInterop(t *testing.T) {
 		t.Errorf("Format failed, got %q", fstr)
 	}
 
-	t3 := t1.Add(24 * time.Hour)
+	t3 := t1.Add(unit.Hours(24))
 	testutil.AssertNear(t, "Add 24h", t3.JD(), 2451546.0, 1e-10)
 
 	dur := t3.Sub(t1)
-	if dur != 24*time.Hour {
+	if dur != unit.Hours(24) {
 		t.Errorf("Sub duration failed, expected 24h got %v", dur)
 	}
 }
@@ -312,13 +313,13 @@ func TestTime_LocationPropagation(t *testing.T) {
 	tm := time.Date(2026, 4, 14, 22, 0, 0, 0, brt)
 
 	// AddDays preserves location
-	tm2 := tm.AddDays(1)
+	tm2 := tm.Add(unit.Days(1))
 	if tm2.Location().String() != "BRT" {
 		t.Errorf("AddDays lost location: %s", tm2.Location())
 	}
 
 	// Add preserves location
-	tm3 := tm.Add(24 * time.Hour)
+	tm3 := tm.Add(unit.Hours(24))
 	if tm3.Location().String() != "BRT" {
 		t.Errorf("Add lost location: %s", tm3.Location())
 	}
@@ -524,7 +525,7 @@ func TestCrossScaleComparison(t *testing.T) {
 	}
 
 	// Different instants across scales
-	utc2 := utc.AddDays(1) // 1 day later, still UTC
+	utc2 := utc.Add(unit.Days(1)) // 1 day later, still UTC
 	if !utc.Before(utc2.TT()) {
 		t.Error("Earlier UTC should be Before later TT")
 	}
@@ -534,7 +535,7 @@ func TestCrossScaleComparison(t *testing.T) {
 	}
 
 	// SubDays cross-scale
-	daysDiff := utc2.TDB().SubDays(utc)
+	daysDiff := utc2.TDB().Sub(utc).Days()
 	testutil.AssertNear(t, "Cross-scale SubDays", daysDiff, 1.0, 1e-8)
 }
 
@@ -544,7 +545,7 @@ func TestCrossScaleSub(t *testing.T) {
 	b := time.FromJD(2451546.0, time.TT)
 
 	dur := b.Sub(a)
-	if dur != 24*time.Hour {
+	if dur != unit.Hours(24) {
 		t.Errorf("Same-scale Sub: got %v, want 24h", dur)
 	}
 

@@ -13,6 +13,7 @@ import (
 	"github.com/TuSKan/astrogo/internal/parallel"
 
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // Planner evaluates coord.Objects against a set of Constraints at a given Site.
@@ -388,7 +389,7 @@ func estimateHoursUntilSet(obj Observable, t time.Time, site *Site, currentAlt f
 	}
 
 	for _, offset := range probeOffsets {
-		ft := t.Add(offset)
+		ft := t.Add(time.FromGoDuration(offset))
 
 		pos, err := obj.Position(ft)
 		if err != nil {
@@ -569,7 +570,7 @@ func RankObservables(
 // maxObservableStep is the maximum step size allowed for sampled observability
 // searches. Steps larger than this risk silently missing short visibility
 // windows and produce unreliable results.
-const maxObservableStep = 15 * time.Minute
+var maxObservableStep = unit.Minutes(15)
 
 // ObservableWindows computes the time intervals where the target satisfies all
 // provided constraints by sampling the range [start, end] at the given cadence.
@@ -582,7 +583,7 @@ const maxObservableStep = 15 * time.Minute
 func ObservableWindows(
 	obj Observable,
 	start, end time.Time,
-	step time.Duration,
+	step unit.Duration,
 	site *Site,
 	constraints ...Constraint,
 ) ([]Window, error) {

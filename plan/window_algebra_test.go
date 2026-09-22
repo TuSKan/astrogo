@@ -6,6 +6,7 @@ import (
 
 	"github.com/TuSKan/astrogo/plan"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // base is an arbitrary fixed epoch; the algebra does not care which.
@@ -18,8 +19,8 @@ func win(fromHours, toHours float64) plan.Window {
 	b := base()
 
 	return plan.Window{
-		Start: b.Add(time.Duration(fromHours * float64(time.Hour))),
-		End:   b.Add(time.Duration(toHours * float64(time.Hour))),
+		Start: b.Add(unit.Hours(fromHours)),
+		End:   b.Add(unit.Hours(toHours)),
 	}
 }
 

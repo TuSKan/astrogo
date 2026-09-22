@@ -370,7 +370,7 @@ func TestSeparationAndPositionAngle(t *testing.T) {
 func TestPropagateEpoch_NoKinematicsIsNoOp(t *testing.T) {
 	c := coord.NewICRS(angle.Deg(10), angle.Deg(20))
 
-	later := time.J2000().Add((50 * 365.25 * 24) * time.Hour)
+	later := time.J2000().Add(unit.JulianYears(50))
 
 	out, err := coord.PropagateEpoch(c, time.J2000(), later)
 	testutil.AssertNoError(t, err)
@@ -392,7 +392,7 @@ func TestPropagateEpoch_AppliesProperMotion(t *testing.T) {
 	// the relativistic/parallax correction Pmsafe also applies.
 	c := coord.NewICRSWithKinematics(angle.Deg(10), angle.Deg(0), angle.Arcsec(1), angle.Arcsec(0), angle.Arcsec(0.1), 0)
 
-	later := time.J2000().Add((10 * 365.25 * 24) * time.Hour)
+	later := time.J2000().Add(unit.JulianYears(10))
 
 	out, err := coord.PropagateEpoch(c, time.J2000(), later)
 	testutil.AssertNoError(t, err)
@@ -404,7 +404,7 @@ func TestPropagateEpoch_AppliesProperMotion(t *testing.T) {
 func TestPropagateEpoch_ZeroEpochDefaultsToJ2000(t *testing.T) {
 	c := coord.NewICRSWithKinematics(angle.Deg(10), angle.Deg(0), angle.Arcsec(1), angle.Arcsec(0), angle.Arcsec(0.1), 0)
 
-	later := time.J2000().Add((10 * 365.25 * 24) * time.Hour)
+	later := time.J2000().Add(unit.JulianYears(10))
 
 	explicit, err := coord.PropagateEpoch(c, time.J2000(), later)
 	testutil.AssertNoError(t, err)

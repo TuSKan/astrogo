@@ -5,6 +5,7 @@ import (
 
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // Three exported symbols in this package had no reference anywhere in the
@@ -29,12 +30,12 @@ func TestEventAnyPhaseFindsAllFour(t *testing.T) {
 	t.Parallel()
 
 	moon := NewMoon(eph.Default())
-	solver := NewEventSolver(6*time.Hour, time.Second)
+	solver := NewEventSolver(unit.Hours(6), unit.Seconds(1))
 
 	// One full lunation is 29.53 days, so 40 days contains all four phases
 	// with room for the window to start anywhere within a cycle.
 	start := time.Date(2026, 3, 1, 0, 0, 0, 0, time.LocationUTC)
-	end := start.AddDays(40)
+	end := start.Add(unit.Days(40))
 
 	events, err := solver.Find(EventSpec{
 		Family: EventFamilyIllumination,
@@ -157,9 +158,9 @@ func TestWithStepSetsTheSamplingCadence(t *testing.T) {
 		t.Fatalf("precondition: a zero config has step %v, want 0", cfg.step)
 	}
 
-	WithStep(5 * time.Minute)(&cfg)
+	WithStep(unit.Minutes(5))(&cfg)
 
-	if cfg.step != 5*time.Minute {
+	if cfg.step != unit.Minutes(5) {
 		t.Errorf("WithStep(5m) set step to %v", cfg.step)
 	}
 
@@ -173,9 +174,9 @@ func TestWithStepSetsTheSamplingCadence(t *testing.T) {
 	// and order must not matter.
 	cfg = visibleTonightConfig{}
 	WithPlanetaryMoons()(&cfg)
-	WithStep(30 * time.Second)(&cfg)
+	WithStep(unit.Seconds(30))(&cfg)
 
-	if !cfg.includeMoons || cfg.step != 30*time.Second {
+	if !cfg.includeMoons || cfg.step != unit.Seconds(30) {
 		t.Errorf("options do not compose: %+v", cfg)
 	}
 }

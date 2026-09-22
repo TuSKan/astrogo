@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/TuSKan/astrogo/ephemeris/satellite/sgp4"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // This file used to be 530 lines comparing astrogo's propagation against
@@ -76,7 +77,7 @@ func TestTheWrapperDoesNotCorruptTheModel(t *testing.T) {
 
 		for _, row := range blk.rows {
 			// The reference's own argument, converted the way a caller would.
-			pos, _, perr := sat.propagateECI(sat.epoch.AddDays(row[0] / 1440.0))
+			pos, _, perr := sat.propagateECI(sat.epoch.Add(unit.Days(row[0] / 1440.0)))
 			if perr != nil {
 				// An advisory error still carries a state and a hard one is the
 				// model's business, not the wrapper's.

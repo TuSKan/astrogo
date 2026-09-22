@@ -479,7 +479,7 @@ func ApparentState(p Provider, target ID, obsTime time.Time) (State, error) {
 	tauDays := st.Pos.Norm() / lightAUPerDay
 
 	for range lightTimeMaxIter {
-		retardedTime := obsTime.AddDays(-tauDays)
+		retardedTime := obsTime.Add(unit.Days(-tauDays))
 
 		st, err = p.State(target, retardedTime)
 		if err != nil {
@@ -495,7 +495,7 @@ func ApparentState(p Provider, target ID, obsTime time.Time) (State, error) {
 		}
 	}
 
-	deflected, err := deflectBySun(p, st.Pos, target, obsTime, obsTime.AddDays(-tauDays))
+	deflected, err := deflectBySun(p, st.Pos, target, obsTime, obsTime.Add(unit.Days(-tauDays)))
 	if err != nil {
 		return State{}, err
 	}
@@ -807,7 +807,7 @@ func AstrometricState(p Provider, target ID, obsTime time.Time) (State, error) {
 	var pos vector.Vec3
 
 	for range lightTimeMaxIter {
-		retardedTime := obsTime.AddDays(-tauDays)
+		retardedTime := obsTime.Add(unit.Days(-tauDays))
 
 		st, err = p.State(target, retardedTime)
 		if err != nil {

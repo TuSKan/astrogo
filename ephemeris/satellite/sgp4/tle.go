@@ -7,6 +7,7 @@ import (
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // LineLength is the fixed width of a TLE line, check digit included.
@@ -267,10 +268,10 @@ func parseEpoch(l1 string) (time.Time, error) {
 
 	jan1 := time.Date(year, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
 
-	// AddDays, not Add(Duration): Duration quantises to nanoseconds via a
-	// float64 product that exceeds 2^53 ns for a late-year epoch, and AddDays
-	// advances the calendar label — which is what a day-of-year is.
-	return jan1.AddDays(doy - 1.0), nil
+	// unit.Days, not the standard library's Duration: that type quantises to
+	// nanoseconds via a float64 product that exceeds 2^53 ns for a late-year
+	// epoch. Add advances the calendar label — which is what a day-of-year is.
+	return jan1.Add(unit.Days(doy - 1.0)), nil
 }
 
 // isLeap is the Gregorian rule.

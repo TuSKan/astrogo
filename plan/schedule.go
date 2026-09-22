@@ -252,7 +252,7 @@ func checkConstraintsIntervalCtx(target Observable, start, end time.Time, step t
 	check := func(t time.Time) (bool, error) {
 		ctx := coord.NewContext(t, site.Location(), site.Refraction())
 		// Capture the context closest to the midpoint for reuse by scoring.
-		if midCtx == nil || absDur(t.Sub(mid)) <= absDur(midCtx.Time().Sub(mid)) {
+		if midCtx == nil || t.Sub(mid).Abs() <= midCtx.Time().Sub(mid).Abs() {
 			midCtx = ctx
 		}
 
@@ -291,7 +291,7 @@ func checkConstraintsIntervalCtx(target Observable, start, end time.Time, step t
 			return nil, false, nil
 		}
 
-		t = t.Add(step)
+		t = t.Add(time.FromGoDuration(step))
 	}
 
 	// Always check the exact end time as well.
@@ -307,15 +307,6 @@ func checkConstraintsIntervalCtx(target Observable, start, end time.Time, step t
 	}
 
 	return midCtx, true, nil
-}
-
-// absDur returns the absolute value of a time.Duration.
-func absDur(d time.Duration) time.Duration {
-	if d < 0 {
-		return -d
-	}
-
-	return d
 }
 
 // GreedyStrategy traverses time forward and schedules the first block in the list
@@ -388,11 +379,11 @@ func (s *GreedyStrategy) Schedule(planner *Planner, window Window, blocks []*Blo
 			}
 
 			// Refine Transition Overhead with better approximation of destination time
-			ctx.ToTime = currentTime.Add(overhead)
+			ctx.ToTime = currentTime.Add(time.FromGoDuration(overhead))
 			overhead, _ = transition.Overhead(ctx)
 
-			startTime := currentTime.Add(overhead)
-			endTime := startTime.Add(b.Duration)
+			startTime := currentTime.Add(time.FromGoDuration(overhead))
+			endTime := startTime.Add(time.FromGoDuration(b.Duration))
 
 			if endTime.After(window.End) {
 				continue // Block execution exceeds the scheduling window
@@ -423,7 +414,7 @@ func (s *GreedyStrategy) Schedule(planner *Planner, window Window, blocks []*Blo
 				if item.rem > 0 {
 					item.rem--
 					// Next observation can start after MinInterval passes
-					item.available = endTime.Add(b.Cadence.MinInterval)
+					item.available = endTime.Add(time.FromGoDuration(b.Cadence.MinInterval))
 				} else {
 					unassigned = append(unassigned[:i], unassigned[i+1:]...)
 				}
@@ -455,7 +446,7 @@ func (s *GreedyStrategy) Schedule(planner *Planner, window Window, blocks []*Blo
 			if allWaiting && earliestAvailable.After(currentTime) {
 				currentTime = earliestAvailable
 			} else {
-				currentTime = currentTime.Add(step)
+				currentTime = currentTime.Add(time.FromGoDuration(step))
 			}
 		}
 	}

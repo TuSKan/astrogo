@@ -6,6 +6,7 @@ import (
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // mockConstraint always passes or fails based on its field
@@ -30,7 +31,7 @@ func TestSchedulerAndStrategies(t *testing.T) {
 	tm := &BasicTransitionModel{BaseSetup: 0} // Simplify time math by zeroing base setup
 
 	start := time.ZeroTime()
-	window := Window{Start: start, End: start.Add(1 * time.Hour)}
+	window := Window{Start: start, End: start.Add(unit.Hours(1))}
 
 	b1 := &Block{ID: "B1", Target: NewStar("T", angle.Zero(), angle.Zero()), Duration: 10 * time.Minute}
 	b2 := &Block{ID: "B2", Target: NewStar("T", angle.Zero(), angle.Zero()), Duration: 20 * time.Minute, Priority: 5.0}

@@ -432,10 +432,10 @@ func fillRiseSetTransit(d *TargetDetails, obs Observable, ctx *coord.Context) {
 
 	t := ctx.Time()
 
-	start := t.Add(-12 * time.Hour)
-	end := t.Add(24 * time.Hour)
+	start := t.Add(unit.Hours(-12))
+	end := t.Add(unit.Hours(24))
 
-	solver := NewEventSolver(15*time.Minute, 1*time.Second)
+	solver := NewEventSolver(unit.Minutes(15), unit.Seconds(1))
 
 	spec := EventSpec{
 		Family:    EventFamilyVisibility,

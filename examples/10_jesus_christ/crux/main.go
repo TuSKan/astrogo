@@ -27,6 +27,7 @@ import (
 	// The kernel-backed sources register their backend rather than being
 	// imported by the root package, so a build that wants them says so (#112).
 	_ "github.com/TuSKan/astrogo/ephemeris/jpl"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // fridayCandidate stores metadata for a Friday Nisan 14 occurrence.
@@ -94,8 +95,8 @@ func main() {
 		}
 
 		// 2. Find new moons within a window around the equinox
-		searchStart := equinox.Add(-45 * 24 * time.Hour)
-		searchEnd := equinox.Add(45 * 24 * time.Hour)
+		searchStart := equinox.Add(unit.Days(-45))
+		searchEnd := equinox.Add(unit.Days(45))
 
 		phases, err := plan.MoonPhases(searchStart, searchEnd, prov)
 		if err != nil {

@@ -23,6 +23,7 @@ import (
 	// The kernel-backed sources register their backend rather than being
 	// imported by the root package, so a build that wants them says so (#112).
 	_ "github.com/TuSKan/astrogo/ephemeris/jpl"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 func main() {
@@ -95,7 +96,7 @@ func main() {
 
 		// Check Jerusalem visibility:
 		// Is the Sun below and Moon above the horizon at eclipse maximum?
-		window := 12 * time.Hour
+		window := unit.Hours(12)
 		dayStart := e.Time.Add(-window)
 		dayEnd := e.Time.Add(window)
 

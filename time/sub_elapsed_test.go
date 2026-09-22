@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // TestSubBetweenTwoUTCEpochsIsElapsedSITime is the headline defect.
@@ -104,7 +105,7 @@ func TestSubInAUniformScaleIsUnchanged(t *testing.T) {
 			// periodic term is near its extremes at this separation.
 			const days = 182.5
 
-			end := tc.start.AddDays(days)
+			end := tc.start.Add(unit.Days(days))
 
 			j1, j2 := tc.start.JDParts()
 			k1, k2 := end.JDParts()
@@ -119,61 +120,73 @@ func TestSubInAUniformScaleIsUnchanged(t *testing.T) {
 	}
 }
 
-// TestSubSaturatesRatherThanWrapping covers a defect found while fixing the
-// one above, and arguably the worse of the two because it flips the sign.
+// TestSubHasNoCeiling is the third version of this test, and the first that
+// asks for the right thing.
 //
-// time.Duration is an int64 nanosecond count, so it runs out just past ±292
-// years — well inside the range this library supports, which reaches year 1.
-// The old conversion wrapped silently: year 1 to 2026 returned −9223372037 s,
-// a negative span for an interval that plainly runs forwards.
+// The history is the argument for the type. Sub returned an int64 nanosecond
+// count, which runs out just past ±292 years — well inside the range this
+// library supports, which reaches year 1. It *wrapped*: year 1 to 2026 came
+// back as −9223372037 s, a negative span for an interval that plainly runs
+// forwards. The fix was to saturate, which this test then pinned, and a second
+// method — SubDays — existed alongside solely because a saturated maximum is
+// not an answer.
 //
-// Saturating is what time.Time.Sub does, and a pinned maximum is at least
-// recognisable as one.
-func TestSubSaturatesRatherThanWrapping(t *testing.T) {
+// Sub now returns a [unit.Duration], which is float64 seconds. There is no
+// ceiling to saturate at, so there is one method and the span is simply
+// reported.
+func TestSubHasNoCeiling(t *testing.T) {
 	year1 := time.Date(1, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
 	modern := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
 
+	// 2025 Julian years is a little over 739,000 days.
 	forward := modern.Sub(year1)
-	if forward != math.MaxInt64 {
-		t.Errorf("a 2025-year span returned %v, want the saturated maximum", forward)
+	if got := forward.Days(); got < 739_000 || got > 740_000 {
+		t.Errorf("a 2025-year span = %.1f days, want about 739,616", got)
 	}
 
-	if forward < 0 {
-		t.Errorf("a forward interval produced a negative duration (%v) — the int64 "+
-			"nanosecond count wrapped", forward)
+	if forward <= 0 {
+		t.Errorf("a forward interval produced %v — the old int64 count wrapped here", forward)
 	}
 
-	if backward := year1.Sub(modern); backward != math.MinInt64 {
-		t.Errorf("the reversed span returned %v, want the saturated minimum", backward)
+	// Symmetric, which the wrapping version was not.
+	if backward := year1.Sub(modern); backward != -forward {
+		t.Errorf("the reversed span is %v, want exactly %v", backward, -forward)
 	}
 
-	// SubDays is the API that survives the range, and must not saturate.
-	// 2025 years is a little over 739,000 days.
-	if got := modern.SubDays(year1); got < 739_000 || got > 740_000 {
-		t.Errorf("SubDays over the same span = %.1f days, want about 739,616 — "+
-			"it must not saturate", got)
+	// And the standard library's type is still what cannot hold it, which is
+	// the whole reason Sub does not return one.
+	if _, ok := time.ToGoDuration(forward); ok {
+		t.Error("ToGoDuration reported that a 2025-year span fits in an int64 " +
+			"nanosecond count; it does not, and saying so is the point of the bool")
 	}
 }
 
-// TestSubRoundsToTheNearestNanosecond pins the conversion from a float day
-// count to an integer nanosecond count.
+// TestAddThenSubReturnsTheInterval pins the round trip, and the size of the
+// residue it is allowed to leave.
 //
-// A scale round-trip adds and removes an offset of about 69 s, which lands the
-// result a part in 1e13 below a whole second. Truncating toward zero then
-// reports a ten-minute interval as 9m59.999999999s — and biases every duration
-// downward, never up.
-func TestSubRoundsToTheNearestNanosecond(t *testing.T) {
+// This used to assert *exact* equality, and got it, because Sub returned an
+// integer nanosecond count that quantised the residue away. A scale round trip
+// adds and removes an offset of about 69 s, which lands the result a part in
+// 1e13 below a whole second; rounding to the nearest nanosecond hid that, and
+// truncating instead — which an earlier version did — reported a ten-minute
+// interval as 9m59.999999999s and biased every duration downward.
+//
+// A float64 second count neither hides nor biases it. The residue is what two
+// Julian-date sums actually leave, a few picoseconds at these magnitudes, so
+// the assertion is a bound rather than an equality.
+func TestAddThenSubReturnsTheInterval(t *testing.T) {
 	start := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
 
-	for _, want := range []time.Duration{
-		time.Duration(10) * time.Minute,
-		time.Duration(1) * time.Hour,
-		time.Duration(1) * time.Second,
-		time.Duration(24) * time.Hour,
+	for _, want := range []unit.Duration{
+		unit.Minutes(10),
+		unit.Hours(1),
+		unit.Seconds(1),
+		unit.Hours(24),
 	} {
-		if got := start.Add(want).Sub(start); got != want {
-			t.Errorf("Add(%v) then Sub = %v, want exactly %v (off by %v)",
-				want, got, want, got-want)
+		got := start.Add(want).Sub(start)
+		if off := (got - want).Abs(); off > unit.Seconds(1e-9) {
+			t.Errorf("Add(%v) then Sub = %v, off by %v — more than a nanosecond",
+				want, got, got-want)
 		}
 	}
 }
@@ -192,7 +205,7 @@ func TestSubRoundsToTheNearestNanosecond(t *testing.T) {
 func TestAddAdvancesTheLabelAndSubMeasuresTheClock(t *testing.T) {
 	start := time.Date(2016, time.December, 31, 12, 0, 0, 0, time.LocationUTC)
 
-	const day = time.Duration(24) * time.Hour
+	day := unit.Hours(24)
 
 	// The label lands on the same clock time the next day.
 	if got := start.Add(day).Format(time.RFC3339); got != "2017-01-01T12:00:00Z" {

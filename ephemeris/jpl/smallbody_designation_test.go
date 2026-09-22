@@ -12,6 +12,7 @@ import (
 	"github.com/TuSKan/astrogo/ephemeris/jpl/spk"
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // A small-body provider that loaded nothing used to be indistinguishable
@@ -51,7 +52,7 @@ func TestSmallBodyDesignationFailuresAreLoud(t *testing.T) {
 	} {
 		t.Run(tc.des, func(t *testing.T) {
 			_, err := jpl.NewProvider(context.Background(), core.SmallBody, tc.des,
-				jpl.WithTimeInterval(start.AddDays(-5), start.AddDays(5)))
+				jpl.WithTimeInterval(start.Add(unit.Days(-5)), start.Add(unit.Days(5))))
 
 			if !errors.Is(err, tc.want) {
 				t.Fatalf("NewProvider(%q) error = %v, want %v (%s)", tc.des, err, tc.want, tc.why)
@@ -76,7 +77,7 @@ func TestSmallBodyDesignationsThatResolve(t *testing.T) {
 	} {
 		t.Run(tc.des, func(t *testing.T) {
 			p, err := jpl.NewProvider(context.Background(), core.SmallBody, tc.des,
-				jpl.WithTimeInterval(start.AddDays(-5), start.AddDays(5)))
+				jpl.WithTimeInterval(start.Add(unit.Days(-5)), start.Add(unit.Days(5))))
 			if err != nil {
 				t.Fatalf("NewProvider(%q): %v", tc.des, err)
 			}

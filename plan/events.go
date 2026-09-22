@@ -11,6 +11,7 @@ import (
 	eph "github.com/TuSKan/astrogo/ephemeris"
 
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // EventFamily classifies the broad category of an astronomical event.
@@ -212,18 +213,22 @@ type evaluator func(t time.Time) (float64, error)
 
 // EventSolver searches for astronomical events based on an EventSpec over a time interval.
 type EventSolver struct {
-	Step   time.Duration
+	Step   unit.Duration
 	Solver Solver
 }
 
 // NewEventSolver creates a numerical solver for finding events.
-func NewEventSolver(step, tol time.Duration) EventSolver {
+//
+// Both arguments are search intervals over an ephemeris rather than wall-clock
+// quantities, so they are [unit.Duration] — the same type [Solver.Tolerance]
+// takes, which is where tol ends up.
+func NewEventSolver(step, tol unit.Duration) EventSolver {
 	if step <= 0 {
-		step = 15 * time.Minute
+		step = unit.Minutes(15)
 	}
 
 	if tol <= 0 {
-		tol = 1 * time.Second
+		tol = unit.Seconds(1)
 	}
 
 	return EventSolver{
@@ -778,7 +783,7 @@ type TwilightEvent struct {
 // and geometric horizon dip from the site's elevation.
 func SunEvents(start, end time.Time, site *Site, provider eph.Provider) ([]Event, error) {
 	sun := NewSun(provider)
-	solver := NewEventSolver(15*time.Minute, 1*time.Second)
+	solver := NewEventSolver(unit.Minutes(15), unit.Seconds(1))
 	spec := EventSpec{
 		Family:    EventFamilyVisibility,
 		Kind:      EventAnyVisibility,
@@ -818,7 +823,7 @@ func SunriseSunset(start, end time.Time, site *Site, prov eph.Provider) (rise, s
 // horizontal parallax, and geometric horizon dip from the site's elevation.
 func MoonEvents(start, end time.Time, site *Site, provider eph.Provider) ([]Event, error) {
 	moon := NewMoon(provider)
-	solver := NewEventSolver(15*time.Minute, 1*time.Second)
+	solver := NewEventSolver(unit.Minutes(15), unit.Seconds(1))
 	spec := EventSpec{
 		Family:    EventFamilyVisibility,
 		Kind:      EventAnyVisibility,
@@ -876,7 +881,7 @@ func TwilightEvents(start, end time.Time, site *Site, prov eph.Provider, kind Tw
 	}
 
 	sun := NewSun(prov)
-	solver := NewEventSolver(15*time.Minute, 1*time.Second)
+	solver := NewEventSolver(unit.Minutes(15), unit.Seconds(1))
 	spec := EventSpec{
 		Family:    EventFamilyVisibility,
 		Kind:      EventAnyVisibility,
@@ -952,7 +957,7 @@ func AstronomicalDawnDusk(start, end time.Time, site *Site, prov eph.Provider) (
 func getTwilightPair(start, end time.Time, site *Site, prov eph.Provider, kind TwilightKind) (dawn, dusk *Event, err error) {
 	threshold, _ := TwilightThreshold(kind)
 	sun := NewSun(prov)
-	solver := NewEventSolver(15*time.Minute, 1*time.Second)
+	solver := NewEventSolver(unit.Minutes(15), unit.Seconds(1))
 	spec := EventSpec{
 		Family:    EventFamilyVisibility,
 		Kind:      EventAnyVisibility,
@@ -985,7 +990,7 @@ func getTwilightPair(start, end time.Time, site *Site, prov eph.Provider, kind T
 
 // Conjunctions returns all conjunction events (same RA, ΔRA = 0) between target and other.
 func Conjunctions(start, end time.Time, target, other Observable) ([]Event, error) {
-	solver := NewEventSolver(6*time.Hour, 1*time.Second)
+	solver := NewEventSolver(unit.Hours(6), unit.Seconds(1))
 	spec := EventSpec{
 		Family: EventFamilyRelativeGeometry,
 		Kind:   EventConjunction,
@@ -999,7 +1004,7 @@ func Conjunctions(start, end time.Time, target, other Observable) ([]Event, erro
 // ConjunctionsEcliptic returns all ecliptic longitude conjunction events (Δλ = 0).
 // This is the classical definition used in most historical astronomical literature.
 func ConjunctionsEcliptic(start, end time.Time, target, other Observable) ([]Event, error) {
-	solver := NewEventSolver(6*time.Hour, 1*time.Second)
+	solver := NewEventSolver(unit.Hours(6), unit.Seconds(1))
 	spec := EventSpec{
 		Family: EventFamilyRelativeGeometry,
 		Kind:   EventConjunctionEcliptic,
@@ -1013,7 +1018,7 @@ func ConjunctionsEcliptic(start, end time.Time, target, other Observable) ([]Eve
 // Appulses returns all moments of minimum angular separation between target and other.
 // The returned Event.Value contains the minimum separation in degrees.
 func Appulses(start, end time.Time, target, other Observable) ([]Event, error) {
-	solver := NewEventSolver(6*time.Hour, 1*time.Second)
+	solver := NewEventSolver(unit.Hours(6), unit.Seconds(1))
 	spec := EventSpec{
 		Family: EventFamilyRelativeGeometry,
 		Kind:   EventAppulse,
@@ -1026,7 +1031,7 @@ func Appulses(start, end time.Time, target, other Observable) ([]Event, error) {
 
 // Oppositions returns all opposition events between target and other in the given interval.
 func Oppositions(start, end time.Time, target, other Observable) ([]Event, error) {
-	solver := NewEventSolver(6*time.Hour, 1*time.Second)
+	solver := NewEventSolver(unit.Hours(6), unit.Seconds(1))
 	spec := EventSpec{
 		Family: EventFamilyRelativeGeometry,
 		Kind:   EventOpposition,
@@ -1039,7 +1044,7 @@ func Oppositions(start, end time.Time, target, other Observable) ([]Event, error
 
 // GreatestElongations returns all Greatest Elongation events (both East and West) for a planet relative to the Sun.
 func GreatestElongations(start, end time.Time, target, sun Observable) ([]Event, error) {
-	solver := NewEventSolver(6*time.Hour, 1*time.Second)
+	solver := NewEventSolver(unit.Hours(6), unit.Seconds(1))
 
 	specEast := EventSpec{
 		Family: EventFamilyRelativeGeometry,
@@ -1085,7 +1090,7 @@ func FullMoonOppositions(start, end time.Time, provider eph.Provider) ([]Event, 
 	moon := NewMoon(provider)
 
 	// Moon moves very fast, so we use a higher resolution solver
-	solver := NewEventSolver(6*time.Hour, 1*time.Second)
+	solver := NewEventSolver(unit.Hours(6), unit.Seconds(1))
 	spec := EventSpec{
 		Family: EventFamilyRelativeGeometry,
 		Kind:   EventOpposition,
@@ -1100,7 +1105,7 @@ func FullMoonOppositions(start, end time.Time, provider eph.Provider) ([]Event, 
 // The rise/set threshold is automatically computed from the site's elevation, accounting
 // for standard atmospheric refraction (34') and geometric horizon dip.
 func VisibilityEvents(start, end time.Time, target Observable, site *Site) ([]Event, error) {
-	solver := NewEventSolver(15*time.Minute, 1*time.Second)
+	solver := NewEventSolver(unit.Minutes(15), unit.Seconds(1))
 	spec := EventSpec{
 		Family:    EventFamilyVisibility,
 		Kind:      EventAnyVisibility,
@@ -1242,9 +1247,9 @@ func (s EventSolver) solveIllumination(spec EventSpec, start, end time.Time) ([]
 // NextNewMoon returns the first New Moon event after the given start time.
 // Searches up to 35 days ahead (slightly more than one synodic month).
 func NextNewMoon(start time.Time, provider eph.Provider) (*Event, error) {
-	end := start.AddDays(35)
+	end := start.Add(unit.Days(35))
 	moon := NewMoon(provider)
-	solver := NewEventSolver(6*time.Hour, 1*time.Second)
+	solver := NewEventSolver(unit.Hours(6), unit.Seconds(1))
 	spec := EventSpec{
 		Family: EventFamilyIllumination,
 		Kind:   EventNewMoon,
@@ -1266,9 +1271,9 @@ func NextNewMoon(start time.Time, provider eph.Provider) (*Event, error) {
 // NextFullMoon returns the first Full Moon event after the given start time.
 // Searches up to 35 days ahead (slightly more than one synodic month).
 func NextFullMoon(start time.Time, provider eph.Provider) (*Event, error) {
-	end := start.AddDays(35)
+	end := start.Add(unit.Days(35))
 	moon := NewMoon(provider)
-	solver := NewEventSolver(6*time.Hour, 1*time.Second)
+	solver := NewEventSolver(unit.Hours(6), unit.Seconds(1))
 	spec := EventSpec{
 		Family: EventFamilyIllumination,
 		Kind:   EventFullMoon,

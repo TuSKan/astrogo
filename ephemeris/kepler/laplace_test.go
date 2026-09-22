@@ -324,7 +324,7 @@ func TestEitherCorrectionAloneIsWorseThanNeither(t *testing.T) {
 	apsisOnly := bare.WithSecularPrecession(kepler.SecularPrecession{ApsisPeriod: s.apsisYears})
 
 	// Ten days on: how far each has rotated away from the fully corrected one.
-	at := time.J2000().AddDays(10)
+	at := time.J2000().Add(unit.Days(10))
 
 	ref, _, err := both.StateAt(at)
 	if err != nil {

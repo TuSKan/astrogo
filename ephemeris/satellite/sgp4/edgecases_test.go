@@ -8,6 +8,7 @@ import (
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/ephemeris/satellite/sgp4"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 	"github.com/TuSKan/astrogo/vector"
 )
 
@@ -439,7 +440,7 @@ func TestAtTimeAgreesWithAt(t *testing.T) {
 			t.Fatalf("At(%g): %v", minutes, werr)
 		}
 
-		at := el.Epoch.AddDays(minutes / 1440.0)
+		at := el.Epoch.Add(unit.Days(minutes / 1440.0))
 
 		got, _, gerr := p.AtTime(at)
 		if gerr != nil {
@@ -459,7 +460,7 @@ func TestAtTimeAgreesWithAt(t *testing.T) {
 
 	// The scale conversion. The same instant labelled TT is 69.184 s later than
 	// the UTC label, and AtTime must resolve that rather than take the label.
-	utc := el.Epoch.AddDays(1)
+	utc := el.Epoch.Add(unit.Days(1))
 
 	fromUTC, _, err := p.AtTime(utc)
 	if err != nil {

@@ -8,6 +8,7 @@ import (
 	"github.com/TuSKan/astrogo/ephemeris/core"
 	"github.com/TuSKan/astrogo/ephemeris/satellite"
 	"github.com/TuSKan/astrogo/ephemeris/satellite/sgp4"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // The error paths through the wrapper, and the type contract they carry.
@@ -67,7 +68,7 @@ func TestPropagationFailureIsTypedAsSuch(t *testing.T) {
 	epoch := sat.Propagator().Elements().Epoch
 
 	// Far enough past epoch that the model has put it under the surface.
-	at := epoch.AddDays(2)
+	at := epoch.Add(unit.Days(2))
 
 	t.Run("State", func(t *testing.T) {
 		t.Parallel()

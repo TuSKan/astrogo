@@ -6,6 +6,7 @@ import (
 
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 	"github.com/TuSKan/astrogo/vector"
 )
 
@@ -218,7 +219,7 @@ func TestApparentStateWithNoMotionIsGeometricApartFromDeflection(t *testing.T) {
 	// exactly the range over c on the first pass.
 	tau := still.pos.Norm() / lightSpeedAUPerDay
 
-	want, err := eph.DeflectBySun(still, still.pos, eph.Jupiter, epoch, epoch.AddDays(-tau))
+	want, err := eph.DeflectBySun(still, still.pos, eph.Jupiter, epoch, epoch.Add(unit.Days(-tau)))
 	if err != nil {
 		t.Fatalf("DeflectBySun: %v", err)
 	}

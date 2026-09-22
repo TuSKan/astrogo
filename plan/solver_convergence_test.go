@@ -7,6 +7,7 @@ import (
 
 	"github.com/TuSKan/astrogo/plan"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // convergenceCase is a solve whose iteration budget decides the outcome.
@@ -42,7 +43,7 @@ func TestFindRootReportsNonConvergence(t *testing.T) {
 	t.Parallel()
 
 	t1 := time.Date(2026, 1, 1, 0, 0, 0, 0, time.LocationUTC)
-	t2 := t1.AddDays(1)
+	t2 := t1.Add(unit.Days(1))
 
 	// A straight line crossing zero 7.3 hours in.
 	eval := plan.Evaluator(func(x time.Time) (float64, error) {
@@ -53,7 +54,7 @@ func TestFindRootReportsNonConvergence(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			s := plan.Solver{Tolerance: time.Second, MaxIter: tc.maxIter}
+			s := plan.Solver{Tolerance: unit.Seconds(1), MaxIter: tc.maxIter}
 
 			got, val, err := s.FindRoot(eval, t1, t2)
 
@@ -93,7 +94,7 @@ func TestFindExtremumReportsNonConvergence(t *testing.T) {
 	t.Parallel()
 
 	t1 := time.Date(2026, 1, 1, 0, 0, 0, 0, time.LocationUTC)
-	t3 := t1.AddDays(1)
+	t3 := t1.Add(unit.Days(1))
 
 	// A parabola with its maximum 7.3 hours in.
 	eval := plan.Evaluator(func(x time.Time) (float64, error) {
@@ -106,7 +107,7 @@ func TestFindExtremumReportsNonConvergence(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			s := plan.Solver{Tolerance: time.Second, MaxIter: tc.maxIter}
+			s := plan.Solver{Tolerance: unit.Seconds(1), MaxIter: tc.maxIter}
 
 			got, val, err := s.FindExtremum(eval, t1, t3, true)
 
@@ -138,17 +139,19 @@ func TestNoConvergenceNamesWhatRanOut(t *testing.T) {
 
 	t1 := time.Date(2026, 1, 1, 0, 0, 0, 0, time.LocationUTC)
 
-	s := plan.Solver{Tolerance: time.Second, MaxIter: 1}
+	s := plan.Solver{Tolerance: unit.Seconds(1), MaxIter: 1}
 	eval := plan.Evaluator(func(x time.Time) (float64, error) {
 		return x.JD() - (t1.JD() + 7.3/24), nil
 	})
 
-	_, _, err := s.FindRoot(eval, t1, t1.AddDays(1))
+	_, _, err := s.FindRoot(eval, t1, t1.Add(unit.Days(1)))
 	if err == nil {
 		t.Fatal("expected ErrNoConvergence")
 	}
 
-	for _, want := range []string{"1 iterations", "tolerance 1s", "bracket"} {
+	// "1 s", not "1s": the tolerance is a unit.Duration now, and this package's
+	// types put a space before the symbol the way unit.Length does.
+	for _, want := range []string{"1 iterations", "tolerance 1 s", "bracket"} {
 		if !contains(err.Error(), want) {
 			t.Errorf("message %q is missing %q", err, want)
 		}

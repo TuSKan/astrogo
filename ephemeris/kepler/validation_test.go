@@ -108,7 +108,7 @@ func fetchHelioElements(designation string, at time.Time) (epochJD float64, el k
 	params.Add("MAKE_EPHEM", "'YES'")
 	params.Add("EPHEM_TYPE", "'ELEMENTS'")
 	params.Add("START_TIME", horizonsEpoch(at))
-	params.Add("STOP_TIME", horizonsEpoch(at.AddDays(1.0/1440)))
+	params.Add("STOP_TIME", horizonsEpoch(at.Add(unit.Days(1.0/1440))))
 	params.Add("STEP_SIZE", "'1m'")
 	params.Add("TIME_TYPE", "'TDB'")
 	params.Add("CAL_FORMAT", "'JD'")
@@ -194,7 +194,7 @@ func fetchHelioVector(designation string, at time.Time) (pos, vel vector.Vec3, e
 	params.Add("MAKE_EPHEM", "'YES'")
 	params.Add("EPHEM_TYPE", "'VECTORS'")
 	params.Add("START_TIME", horizonsEpoch(at))
-	params.Add("STOP_TIME", horizonsEpoch(at.AddDays(1.0/1440)))
+	params.Add("STOP_TIME", horizonsEpoch(at.Add(unit.Days(1.0/1440))))
 	params.Add("STEP_SIZE", "'1m'")
 	params.Add("TIME_TYPE", "'TDB'")
 	params.Add("OUT_UNITS", "'AU-D'")
@@ -286,7 +286,7 @@ func TestElements_StateAt_AgainstHorizons_433Eros(t *testing.T) {
 	var maxSepArcsec float64
 
 	for _, dtDays := range []float64{-30, -20, -10, -5, 0, 5, 10, 20, 30} {
-		at := epoch.AddDays(dtDays)
+		at := epoch.Add(unit.Days(dtDays))
 
 		wantPos, _, err := fetchHelioVector(designation, at)
 		if err != nil {

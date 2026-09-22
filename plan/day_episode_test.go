@@ -11,6 +11,7 @@ import (
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // ── DayEvents ────────────────────────────────────────────────────────────
@@ -114,7 +115,7 @@ func TestEpisodeWithinWindowMatchesDirectSearch(t *testing.T) {
 	sun := NewSun(eph.Default())
 
 	from := time.FromJD(2451544.5, time.UTC) // local midday-ish, target below horizon
-	to := from.AddDays(1)
+	to := from.Add(unit.Days(1))
 
 	rise, set, err := Episode(from, to, sun, site)
 	testutil.AssertNoError(t, err)
@@ -172,7 +173,7 @@ func TestEpisodeExtendsBackwardWhenAlreadyUp(t *testing.T) {
 	// First locate a real sunrise, then start the Episode window 2 hours
 	// AFTER it -- guaranteeing "already up at from".
 	wideFrom := time.FromJD(2451544.5, time.UTC)
-	wideEvents, err := visibilityEvents(sun, site, wideFrom, wideFrom.AddDays(1))
+	wideEvents, err := visibilityEvents(sun, site, wideFrom, wideFrom.Add(unit.Days(1)))
 	testutil.AssertNoError(t, err)
 
 	var realRise *Event
@@ -189,8 +190,8 @@ func TestEpisodeExtendsBackwardWhenAlreadyUp(t *testing.T) {
 		t.Fatal("test setup: expected a real sunrise in the wide window")
 	}
 
-	from := realRise.Time.Add(2 * time.Hour)
-	to := from.AddDays(1)
+	from := realRise.Time.Add(unit.Hours(2))
+	to := from.Add(unit.Days(1))
 
 	up, err := isAboveHorizon(sun, site, from)
 	testutil.AssertNoError(t, err)
@@ -226,7 +227,7 @@ func TestEpisodeExtendsForwardPastWindowEnd(t *testing.T) {
 	sun := NewSun(eph.Default())
 
 	wideFrom := time.FromJD(2451544.5, time.UTC)
-	wideEvents, err := visibilityEvents(sun, site, wideFrom, wideFrom.AddDays(1))
+	wideEvents, err := visibilityEvents(sun, site, wideFrom, wideFrom.Add(unit.Days(1)))
 	testutil.AssertNoError(t, err)
 
 	var realRise, realSet *Event
@@ -250,8 +251,8 @@ func TestEpisodeExtendsForwardPastWindowEnd(t *testing.T) {
 
 	// End the window 1 hour before the real set, so the episode is still
 	// open at `to`.
-	from := realRise.Time.Add(1 * time.Hour)
-	to := realSet.Time.Add(-1 * time.Hour)
+	from := realRise.Time.Add(unit.Hours(1))
+	to := realSet.Time.Add(unit.Hours(-1))
 
 	rise, set, err := Episode(from, to, sun, site)
 	testutil.AssertNoError(t, err)
@@ -283,7 +284,7 @@ func TestEpisodeCircumpolarReturnsNilNil(t *testing.T) {
 	star := NewStar("Circumpolar", angle.Deg(0), angle.Deg(85)) // dec=85, always up from 80N
 
 	from := time.FromJD(2451544.5, time.UTC)
-	to := from.AddDays(1)
+	to := from.Add(unit.Days(1))
 
 	rise, set, err := Episode(from, to, star, site)
 	testutil.AssertNoError(t, err)
@@ -301,7 +302,7 @@ func TestEpisodeNeverRisesReturnsNilNil(t *testing.T) {
 	star := NewStar("NeverUp", angle.Deg(0), angle.Deg(-85)) // dec=-85, always down from 80N
 
 	from := time.FromJD(2451544.5, time.UTC)
-	to := from.AddDays(1)
+	to := from.Add(unit.Days(1))
 
 	rise, set, err := Episode(from, to, star, site)
 	testutil.AssertNoError(t, err)
@@ -402,7 +403,7 @@ func TestEpisodePropagatesIsAboveHorizonError(t *testing.T) {
 	site, _ := NewSite("Test", loc)
 
 	from := time.FromJD(2451544.5, time.UTC)
-	to := from.AddDays(1)
+	to := from.Add(unit.Days(1))
 
 	_, _, err := Episode(from, to, errObservable{}, site)
 	if !errors.Is(err, errAlwaysFails) {
@@ -420,9 +421,9 @@ func TestEpisodeWidensSpanBeyondDefaultWindow(t *testing.T) {
 	sun := NewSun(eph.Default())
 
 	from := time.FromJD(2451544.5, time.UTC)
-	to := from.AddDays(400) // > episodeSearchWindow's 366 days
+	to := from.Add(unit.Days(400)) // > episodeSearchWindow's 366 days
 
-	if span := to.Sub(from); span <= episodeSearchWindow {
+	if span := to.Sub(from); span <= time.FromGoDuration(episodeSearchWindow) {
 		t.Fatal("test setup: span must exceed episodeSearchWindow to exercise the widen branch")
 	}
 
@@ -448,7 +449,7 @@ func TestEpisodeRiseSearchErrorPropagates(t *testing.T) {
 	sun := NewSun(eph.Default())
 
 	from := time.FromJD(2451544.5, time.UTC)
-	to := from.AddDays(1)
+	to := from.Add(unit.Days(1))
 
 	calls := 0
 	failing := countingObservable{Observable: sun, calls: &calls, failAfter: 1}
@@ -494,7 +495,7 @@ func TestEpisodeSetSearchErrorPropagates(t *testing.T) {
 	// the set search's own first Position call is the first to fail.
 	failing := countingObservable{Observable: sun, calls: new(int), failAfter: calls}
 
-	_, _, err = Episode(from, from.AddDays(1), failing, site)
+	_, _, err = Episode(from, from.Add(unit.Days(1)), failing, site)
 	if !errors.Is(err, errCountingObservable) {
 		t.Fatalf("expected errCountingObservable, got %v", err)
 	}

@@ -26,6 +26,7 @@ import (
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/plan"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 func main() {
@@ -64,7 +65,7 @@ func main() {
 	epoch := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
 
 	for m := range 12 {
-		t := epoch.AddDays(float64(m) * 30)
+		t := epoch.Add(unit.Days(float64(m) * 30))
 
 		ctx := coord.NewContext(t, site.Location(), atmosphere.StandardRefraction)
 

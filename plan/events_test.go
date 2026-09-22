@@ -10,6 +10,7 @@ import (
 	"github.com/TuSKan/astrogo/internal/testutil"
 
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // ── Generic Event Finder Tests ──────────────────────────────────────────────
@@ -20,9 +21,9 @@ func TestEventSolver_Visibility_Fixed(t *testing.T) {
 	obj := NewStar("T", angle.Deg(0), angle.Deg(0))
 
 	start := time.FromJD(2451545.0, time.UTC)
-	end := start.Add(24 * time.Hour)
+	end := start.Add(unit.Hours(24))
 
-	solver := NewEventSolver(30*time.Minute, 1*time.Second)
+	solver := NewEventSolver(unit.Minutes(30), unit.Seconds(1))
 	events, err := solver.Find(EventSpec{
 		Family:    EventFamilyVisibility,
 		Kind:      EventAnyVisibility,
@@ -57,9 +58,9 @@ func TestEventSolver_Visibility_Circumpolar(t *testing.T) {
 	obj := NewStar("T", angle.Deg(0), angle.Deg(80))
 
 	start := time.FromJD(2451545.0, time.UTC)
-	end := start.Add(24 * time.Hour)
+	end := start.Add(unit.Hours(24))
 
-	solver := NewEventSolver(30*time.Minute, 10*time.Second)
+	solver := NewEventSolver(unit.Minutes(30), unit.Seconds(10))
 	events, err := solver.Find(EventSpec{
 		Family:    EventFamilyVisibility,
 		Kind:      EventAnyVisibility,
@@ -82,9 +83,9 @@ func TestEventSolver_Visibility_NeverVisible(t *testing.T) {
 	obj := NewStar("T", angle.Deg(0), angle.Deg(-80))
 
 	start := time.FromJD(2451545.0, time.UTC)
-	end := start.Add(24 * time.Hour)
+	end := start.Add(unit.Hours(24))
 
-	solver := NewEventSolver(30*time.Minute, 10*time.Second)
+	solver := NewEventSolver(unit.Minutes(30), unit.Seconds(10))
 	events, err := solver.Find(EventSpec{
 		Family:    EventFamilyVisibility,
 		Kind:      EventAnyVisibility,
@@ -109,7 +110,7 @@ func TestSunEvents(t *testing.T) {
 	eph := eph.Default()
 
 	start := time.FromJD(2451544.5, time.UTC)
-	end := start.Add(24 * time.Hour)
+	end := start.Add(unit.Hours(24))
 
 	events, err := SunEvents(start, end, site, eph)
 	testutil.AssertNoError(t, err)
@@ -142,7 +143,7 @@ func TestSunEvents_Polar(t *testing.T) {
 	eph := eph.Default()
 
 	start := time.FromJD(2451727.5, time.UTC)
-	end := start.Add(24 * time.Hour)
+	end := start.Add(unit.Hours(24))
 
 	events, err := SunEvents(start, end, site, eph)
 	testutil.AssertNoError(t, err)
@@ -160,7 +161,7 @@ func TestMoonEvents(t *testing.T) {
 	eph := eph.Default()
 
 	start := time.FromJD(2451545.0, time.UTC)
-	end := start.Add(24 * time.Hour)
+	end := start.Add(unit.Hours(24))
 
 	events, err := MoonEvents(start, end, site, eph)
 	testutil.AssertNoError(t, err)
@@ -178,7 +179,7 @@ func TestSunriseSunset(t *testing.T) {
 	eph := eph.Default()
 
 	start := time.FromJD(2451544.5, time.UTC)
-	end := start.Add(24 * time.Hour)
+	end := start.Add(unit.Hours(24))
 
 	rise, set, err := SunriseSunset(start, end, site, eph)
 	testutil.AssertNoError(t, err)
@@ -196,7 +197,7 @@ func TestTwilightEvents(t *testing.T) {
 	eph := eph.Default()
 
 	start := time.FromJD(2451544.5, time.UTC)
-	end := start.Add(24 * time.Hour)
+	end := start.Add(unit.Hours(24))
 
 	kinds := []TwilightKind{
 		CivilTwilight,
@@ -241,7 +242,7 @@ func TestTwilightEventsGroupsDuskWithFollowingDawn(t *testing.T) {
 	// full dusk-to-dawn astronomical-twilight span, with margin on both
 	// ends so neither edge is truncated.
 	start := time.FromJD(2451544.5, time.UTC) // local midday-ish
-	end := start.Add(36 * time.Hour)
+	end := start.Add(unit.Hours(36))
 
 	events, err := TwilightEvents(start, end, site, eph, AstronomicalTwilight)
 	testutil.AssertNoError(t, err)
@@ -281,7 +282,7 @@ func TestTwilightEventsEdgeEventsLeftHalfNil(t *testing.T) {
 	// strictly between them -- guaranteeing the leading result in the
 	// narrowed window is Dawn-only (its dusk fell before the new start).
 	wide := time.FromJD(2451544.5, time.UTC)
-	events, err := TwilightEvents(wide, wide.Add(36*time.Hour), site, eph, AstronomicalTwilight)
+	events, err := TwilightEvents(wide, wide.Add(unit.Hours(36)), site, eph, AstronomicalTwilight)
 	testutil.AssertNoError(t, err)
 
 	var pair *TwilightEvent
@@ -300,7 +301,7 @@ func TestTwilightEventsEdgeEventsLeftHalfNil(t *testing.T) {
 
 	mid := pair.Dusk.Time.Add(pair.Dawn.Time.Sub(pair.Dusk.Time) / 2)
 
-	narrowed, err := TwilightEvents(mid, wide.Add(36*time.Hour), site, eph, AstronomicalTwilight)
+	narrowed, err := TwilightEvents(mid, wide.Add(unit.Hours(36)), site, eph, AstronomicalTwilight)
 	testutil.AssertNoError(t, err)
 
 	if len(narrowed) == 0 {
@@ -321,10 +322,10 @@ func TestTwilightEventsEdgeEventsLeftHalfNil(t *testing.T) {
 func TestGroupTwilightEvents(t *testing.T) {
 	t0 := time.FromJD(2451544.5, time.UTC)
 	dusk := func(h float64) Event {
-		return Event{Kind: EventSet, Time: t0.Add(time.Duration(h * float64(time.Hour)))}
+		return Event{Kind: EventSet, Time: t0.Add(unit.Hours(h))}
 	}
 	dawn := func(h float64) Event {
-		return Event{Kind: EventRise, Time: t0.Add(time.Duration(h * float64(time.Hour)))}
+		return Event{Kind: EventRise, Time: t0.Add(unit.Hours(h))}
 	}
 
 	t.Run("empty input", func(t *testing.T) {
@@ -407,7 +408,7 @@ func TestTwilight_Sequence(t *testing.T) {
 	eph := eph.Default()
 
 	start := time.FromJD(2451544.5, time.UTC)
-	end := start.Add(24 * time.Hour)
+	end := start.Add(unit.Hours(24))
 
 	aDawn, aDusk, _ := AstronomicalDawnDusk(start, end, site, eph)
 	nDawn, nDusk, _ := NauticalDawnDusk(start, end, site, eph)
@@ -445,7 +446,7 @@ func TestTwilight_HighLat(t *testing.T) {
 	eph := eph.Default()
 
 	start := time.FromJD(2451727.5, time.UTC)
-	end := start.Add(24 * time.Hour)
+	end := start.Add(unit.Hours(24))
 
 	aDawn, aDusk, err := AstronomicalDawnDusk(start, end, site, eph)
 	testutil.AssertNoError(t, err)
@@ -462,8 +463,8 @@ func BenchmarkEventSolver(b *testing.B) {
 	site, _ := NewSite("Test", loc)
 	obj := NewStar("T", angle.Deg(0), angle.Deg(0))
 	start := time.FromJD(2451545.0, time.UTC)
-	end := start.Add(24 * time.Hour)
-	solver := NewEventSolver(30*time.Minute, 1*time.Second)
+	end := start.Add(unit.Hours(24))
+	solver := NewEventSolver(unit.Minutes(30), unit.Seconds(1))
 	spec := EventSpec{
 		Family:    EventFamilyVisibility,
 		Kind:      EventAnyVisibility,
@@ -521,9 +522,9 @@ func TestEventSolver_Find_UnimplementedFamily(t *testing.T) {
 	t2 := &mockLinearTarget{raRate: 0.5, startRA: 15, dec: 0.0}
 
 	start := time.FromJD(2451545.0, time.UTC)
-	end := start.Add(24 * time.Hour)
+	end := start.Add(unit.Hours(24))
 
-	solver := NewEventSolver(1*time.Hour, 1*time.Second)
+	solver := NewEventSolver(unit.Hours(1), unit.Seconds(1))
 
 	_, err := solver.Find(EventSpec{
 		Family: EventFamilyOverlap,
@@ -541,9 +542,9 @@ func TestSolveGeometry_Conjunction(t *testing.T) {
 	t2 := &mockLinearTarget{raRate: 0.5, startRA: 15, dec: 0.0}
 
 	start := time.FromJD(2451545.0, time.UTC)
-	end := start.Add(24 * time.Hour)
+	end := start.Add(unit.Hours(24))
 
-	solver := NewEventSolver(1*time.Hour, 1*time.Second)
+	solver := NewEventSolver(unit.Hours(1), unit.Seconds(1))
 
 	spec := EventSpec{
 		Family: EventFamilyRelativeGeometry,
@@ -573,9 +574,9 @@ func TestSolveGeometry_Opposition(t *testing.T) {
 	t2 := &mockLinearTarget{raRate: 0.0, startRA: 0, dec: 0.0}
 
 	start := time.FromJD(2451545.0, time.UTC)
-	end := start.Add(10 * time.Hour)
+	end := start.Add(unit.Hours(10))
 
-	solver := NewEventSolver(1*time.Hour, 1*time.Second)
+	solver := NewEventSolver(unit.Hours(1), unit.Seconds(1))
 
 	spec := EventSpec{
 		Family: EventFamilyRelativeGeometry,
@@ -636,9 +637,9 @@ func TestSolveGeometry_GreatestElongation(t *testing.T) {
 	wrapper := &mockDynamicTarget{f: t1Pos}
 
 	start := time.FromJD(2451545.0, time.UTC)
-	end := start.Add(12 * time.Hour)
+	end := start.Add(unit.Hours(12))
 
-	solver := NewEventSolver(1*time.Hour, 1*time.Second)
+	solver := NewEventSolver(unit.Hours(1), unit.Seconds(1))
 
 	spec := EventSpec{
 		Family: EventFamilyRelativeGeometry,

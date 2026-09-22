@@ -34,6 +34,7 @@ import (
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/plan"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // ── NASA Eclipse Reference Types ─────────────────────────────────────────────
@@ -383,8 +384,8 @@ func TestNASA_LunarEclipses_Historical(t *testing.T) {
 
 				// Use TDB scale for TD reference time (TDB ≈ TT to ~1.7ms)
 				refTime := time.FromJD(ref.JDtd, time.TDB)
-				searchStart := refTime.Add(-30 * 24 * time.Hour)
-				searchEnd := refTime.Add(30 * 24 * time.Hour)
+				searchStart := refTime.Add(unit.Days(-30))
+				searchEnd := refTime.Add(unit.Days(30))
 
 				eclipses, err := plan.LunarEclipses(searchStart, searchEnd, prov)
 				if err != nil {
@@ -514,8 +515,8 @@ func TestNASA_SolarEclipses_Historical(t *testing.T) {
 				totalRef++
 
 				refTime := time.FromJD(ref.JDtd, time.TDB)
-				searchStart := refTime.Add(-30 * 24 * time.Hour)
-				searchEnd := refTime.Add(30 * 24 * time.Hour)
+				searchStart := refTime.Add(unit.Days(-30))
+				searchEnd := refTime.Add(unit.Days(30))
 
 				eclipses, err := plan.SolarEclipses(searchStart, searchEnd, prov)
 				if err != nil {

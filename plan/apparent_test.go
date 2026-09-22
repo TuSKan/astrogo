@@ -12,6 +12,7 @@ import (
 	"github.com/TuSKan/astrogo/ephemeris/satellite"
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 	"github.com/TuSKan/astrogo/vector"
 )
 
@@ -52,7 +53,7 @@ func TestApparentSunIsDisplacedByTheConstantOfAberration(t *testing.T) {
 	// A full year, so the ±1.7% from Earth's eccentricity is exercised at both
 	// ends rather than sampled at one phase of the orbit.
 	for d := range 365 {
-		tm := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC).AddDays(float64(d))
+		tm := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC).Add(unit.Days(float64(d)))
 
 		apparent, err := sun.Position(tm)
 		testutil.AssertNoError(t, err)
@@ -113,8 +114,7 @@ func TestApparentPositionReachesTheAltAzPath(t *testing.T) {
 	)
 
 	for step := range 365 * 4 {
-		tm := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC).
-			AddDays(float64(step) * 0.25)
+		tm := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC).Add(unit.Days(float64(step) * 0.25))
 
 		ctx := coord.NewContext(tm, loc, site.Refraction())
 
@@ -182,7 +182,7 @@ func TestPositionAndGeocentricVecAgree(t *testing.T) {
 			}
 
 			for d := 0; d < 365; d += 11 {
-				tm := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC).AddDays(float64(d))
+				tm := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC).Add(unit.Days(float64(d)))
 
 				pos, err := tc.obj.Position(tm)
 				testutil.AssertNoError(t, err)
@@ -282,7 +282,7 @@ func (p linearProvider) State(id eph.ID, t time.Time) (eph.State, error) {
 		}, nil
 	}
 
-	dt := t.SubDays(p.epoch)
+	dt := t.Sub(p.epoch).Days()
 
 	return eph.State{
 		Pos:    p.pos0.Add(p.vel.MulScalar(dt)),

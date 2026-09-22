@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // Every example here uses a fixed epoch rather than the clock. That is the
@@ -50,7 +51,7 @@ func ExampleTime_TAI() {
 	fmt.Printf("TT  label - TAI label = %.3f s\n", (tt.JD()-tai.JD())*secondsPerDay)
 
 	// Output:
-	// tai.Sub(utc) = 0s
+	// tai.Sub(utc) = 0 s
 	// TAI label - UTC label = 37.000 s
 	// TT  label - TAI label = 32.184 s
 }
@@ -65,10 +66,13 @@ func ExampleTime_Sub() {
 	fmt.Printf("equal across scales: %v\n", tt.Equal(utc))
 
 	// An hour later, still measured across scales.
-	later := utc.Add(time.Hour)
+	later := utc.Add(unit.Hours(1))
+	// An hour, rendered in minutes: the scale conversion leaves the interval a
+	// few picoseconds under 3600 s, and unit.Duration picks its unit from the
+	// value it holds rather than the one it rounds to.
 	fmt.Printf("later - tt = %v\n", later.Sub(tt))
 
 	// Output:
 	// equal across scales: true
-	// later - tt = 1h0m0s
+	// later - tt = 60 min
 }

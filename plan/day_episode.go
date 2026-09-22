@@ -7,6 +7,7 @@ import (
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // episodeSearchWindow bounds how far Episode looks outside its own [from,
@@ -42,7 +43,7 @@ const maxEpisodeSearchSteps = 10
 // do for their specific bodies; a caller wanting that runs its own solver
 // with site.SunRiseSetThreshold()/MoonRiseSetThreshold() instead.
 func visibilityEvents(target Observable, site *Site, start, end time.Time) ([]Event, error) {
-	return NewEventSolver(15*time.Minute, 1*time.Second).Find(EventSpec{
+	return NewEventSolver(unit.Minutes(15), unit.Seconds(1)).Find(EventSpec{
 		Family:    EventFamilyVisibility,
 		Kind:      EventAnyVisibility,
 		Target:    target,
@@ -73,7 +74,7 @@ func DayEvents(day time.Time, loc *time.Location, target Observable, site *Site)
 	y, m, d := local.Date()
 
 	start := time.FromGo(time.GoDate(y, m, d, 0, 0, 0, 0, loc))
-	end := start.AddDays(1)
+	end := start.Add(unit.Days(1))
 
 	events, err := visibilityEvents(target, site, start, end)
 	if err != nil {
@@ -139,9 +140,9 @@ func searchEvent(target Observable, site *Site, from time.Time, k EventKind, for
 		var start, end time.Time
 
 		if forward {
-			start, end = edge, edge.AddDays(step)
+			start, end = edge, edge.Add(unit.Days(step))
 		} else {
-			start, end = edge.AddDays(-step), edge
+			start, end = edge.Add(unit.Days(-step)), edge
 		}
 
 		events, err := visibilityEvents(target, site, start, end)
@@ -217,8 +218,8 @@ func Episode(from, to time.Time, target Observable, site *Site) (rise, set *Even
 	}
 
 	maxSpanDays := episodeSearchWindow.Hours() / 24
-	if span := to.Sub(from); span > episodeSearchWindow {
-		maxSpanDays = span.Hours() / 24
+	if span := to.Sub(from); span > time.FromGoDuration(episodeSearchWindow) {
+		maxSpanDays = span.Days()
 	}
 
 	rise, err = searchEvent(target, site, from, EventRise, !up, maxSpanDays)

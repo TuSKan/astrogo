@@ -6,6 +6,7 @@ import (
 
 	"github.com/TuSKan/astrogo/plan"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -24,13 +25,13 @@ func timeFunc(f func(float64) float64) plan.Evaluator {
 
 // after returns epoch + d seconds.
 func after(seconds float64) time.Time {
-	return epoch.Add(time.Duration(seconds * float64(time.Second)))
+	return epoch.Add(unit.Seconds(seconds))
 }
 
 // tightSolver returns a solver with microsecond tolerance for analytical tests.
 func tightSolver() plan.Solver {
 	return plan.Solver{
-		Tolerance: time.Second / 1e6, // 1 µs
+		Tolerance: unit.Seconds(1e-6), // 1 µs
 		MaxIter:   100,
 	}
 }
@@ -348,7 +349,7 @@ func TestFindRoot_ConvergenceCount(t *testing.T) {
 	// With Chandrupatla's IQI, this should converge in well under 20 iterations
 	// for microsecond tolerance from a [0, 10] bracket.
 	count := 0
-	s := plan.Solver{Tolerance: time.Second / 1e6, MaxIter: 100} // 1 µs
+	s := plan.Solver{Tolerance: unit.Seconds(1e-6), MaxIter: 100} // 1 µs
 
 	root, _, err := s.FindRoot(func(t time.Time) (float64, error) {
 		x := t.Sub(epoch).Seconds()
@@ -376,7 +377,7 @@ func TestFindRoot_ConvergenceCount(t *testing.T) {
 
 func TestDefaultSolver(t *testing.T) {
 	s := plan.DefaultSolver()
-	if s.Tolerance != time.Second {
+	if s.Tolerance != unit.Seconds(1) {
 		t.Errorf("Tolerance=%v, want 1s", s.Tolerance)
 	}
 

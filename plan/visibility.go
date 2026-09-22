@@ -7,6 +7,7 @@ import (
 	"github.com/TuSKan/astrogo/coord"
 
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // Interval is a continuous window during which an object is observable.
@@ -173,7 +174,7 @@ func VisibleIntervals(
 
 		prevT = t
 		hasPrev = true
-		t = t.Add(step)
+		t = t.Add(time.FromGoDuration(step))
 	}
 
 	if inWindow {
@@ -193,7 +194,7 @@ func VisibleIntervals(
 //  1. Coarse 10-min grid scan to bracket the maximum.
 //  2. Brent's minimization (via Solver) within the bracket for sub-second precision.
 func TransitEstimate(obj coord.Object, site *Site, start, end time.Time) (time.Time, angle.Angle, error) {
-	const coarseStep = 10 * time.Minute
+	coarseStep := unit.Minutes(10)
 
 	// Stage 1: coarse scan to locate the bracket [tLeft, tRight] around the peak.
 	type sample struct {
@@ -369,7 +370,7 @@ func Find(
 		prevT = t
 		prevOK = allOK
 		hasPrev = true
-		t = t.Add(step)
+		t = t.Add(time.FromGoDuration(step))
 	}
 
 	if inWindow {

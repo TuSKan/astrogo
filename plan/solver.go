@@ -5,6 +5,7 @@ import (
 	"math"
 
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // Solver provides production-grade numerical root-finding and extremum-finding
@@ -30,7 +31,7 @@ import (
 type Solver struct {
 	// Tolerance is the convergence criterion in time units.
 	// The solver stops when the bracket width is smaller than this.
-	Tolerance time.Duration
+	Tolerance unit.Duration
 
 	// MaxIter is the maximum number of iterations before the solver returns
 	// with the best approximation found so far. Typical values: 50–100.
@@ -41,7 +42,7 @@ type Solver struct {
 // 1-second tolerance, 64 iterations (sufficient for ~6h bracket → sub-nanosecond).
 func DefaultSolver() Solver {
 	return Solver{
-		Tolerance: 1 * time.Second,
+		Tolerance: unit.Seconds(1),
 		MaxIter:   64,
 	}
 }
@@ -90,16 +91,18 @@ func sameSign(a, b float64) bool {
 // points would produce a well-conditioned step. If not, bisection is used.
 // The bracket is guaranteed to shrink on every iteration.
 func (s Solver) FindRoot(eval Evaluator, t1, t2 time.Time) (time.Time, float64, error) {
-	// Work in float64 seconds offset from origin to avoid time.Duration precision limits.
+	// Work in seconds offset from origin. This used to be a workaround for
+	// time.Duration's int64 nanoseconds; unit.Duration is float64 seconds, so
+	// the offset is now just the algorithm's own variable.
 	origin := t1
-	tolSec := float64(s.Tolerance) / float64(time.Second)
+	tolSec := s.Tolerance.Seconds()
 
 	timeAt := func(sec float64) time.Time {
-		return origin.Add(time.Duration(sec * float64(time.Second)))
+		return origin.Add(unit.Seconds(sec))
 	}
 
 	xa := 0.0
-	xb := float64(t2.Sub(t1)) / float64(time.Second)
+	xb := t2.Sub(t1).Seconds()
 
 	fa, err := eval(timeAt(xa))
 	if err != nil {
@@ -229,7 +232,7 @@ func (s Solver) FindRoot(eval Evaluator, t1, t2 time.Time) (time.Time, float64, 
 	if !converged {
 		return timeAt(xb), fb, fmt.Errorf("%w: %d iterations, bracket %v, tolerance %v",
 			ErrNoConvergence, s.MaxIter,
-			time.Duration(math.Abs(xb-xa)*float64(time.Second)), s.Tolerance)
+			unit.Seconds(math.Abs(xb-xa)), s.Tolerance)
 	}
 
 	return timeAt(xb), fb, nil
@@ -249,7 +252,7 @@ func (s Solver) FindExtremum(eval Evaluator, t1, t3 time.Time, isMax bool) (time
 	const goldenRatio = 0.3819660112501051 // (3 - sqrt(5)) / 2
 
 	a, b := t1, t3
-	x := a.Add(time.Duration(float64(b.Sub(a)) * 0.5))
+	x := a.Add(b.Sub(a) * 0.5)
 
 	fx, err := eval(x)
 	if err != nil {
@@ -266,18 +269,18 @@ func (s Solver) FindExtremum(eval Evaluator, t1, t3 time.Time, isMax bool) (time
 
 	w, v := x, x
 	fw, fv := fx, fx
-	e := time.Duration(0) // Distance moved on the step before last
-	d := time.Duration(0) // Distance moved on the last step
+	e := unit.Duration(0) // Distance moved on the step before last
+	d := unit.Duration(0) // Distance moved on the last step
 
 	converged := false
 
 	for i := range s.MaxIter {
-		midpoint := a.Add(time.Duration(float64(b.Sub(a)) * 0.5))
-		tol1 := float64(s.Tolerance)
+		midpoint := a.Add(b.Sub(a) * 0.5)
+		tol1 := s.Tolerance.Seconds()
 		tol2 := 2.0 * tol1
 
 		// Convergence check
-		if math.Abs(float64(x.Sub(midpoint)))+float64(b.Sub(a))/2.0 <= tol2 {
+		if math.Abs(x.Sub(midpoint).Seconds())+b.Sub(a).Seconds()/2.0 <= tol2 {
 			converged = true
 
 			break
@@ -285,10 +288,10 @@ func (s Solver) FindExtremum(eval Evaluator, t1, t3 time.Time, isMax bool) (time
 
 		useParabolic := false
 
-		if math.Abs(float64(e)) > tol1 {
+		if math.Abs(e.Seconds()) > tol1 {
 			// Fit parabola through x, v, w
-			xw := float64(x.Sub(w))
-			xv := float64(x.Sub(v))
+			xw := x.Sub(w).Seconds()
+			xv := x.Sub(v).Seconds()
 			r := xw * (fx - fv)
 			q := xv * (fx - fw)
 			p := xv*q - xw*r
@@ -302,15 +305,15 @@ func (s Solver) FindExtremum(eval Evaluator, t1, t3 time.Time, isMax bool) (time
 
 			// Accept parabolic step if within bracket and reducing distance.
 			// step is checked finite before use — a degenerate fit (q≈0)
-			// can otherwise produce an Inf/NaN p/q that would convert to
-			// time.Duration with implementation-defined behavior.
+			// can otherwise produce an Inf/NaN p/q, and a non-finite duration
+			// poisons every epoch derived from it.
 			step := p / q
 			if finite(step) &&
-				math.Abs(p) < math.Abs(0.5*q*float64(e)) &&
-				p > q*float64(a.Sub(x)) &&
-				p < q*float64(b.Sub(x)) {
+				math.Abs(p) < math.Abs(0.5*q*e.Seconds()) &&
+				p > q*a.Sub(x).Seconds() &&
+				p < q*b.Sub(x).Seconds() {
 				e = d
-				d = time.Duration(step)
+				d = unit.Seconds(step)
 				useParabolic = true
 			}
 		}
@@ -323,8 +326,8 @@ func (s Solver) FindExtremum(eval Evaluator, t1, t3 time.Time, isMax bool) (time
 				e = b.Sub(x)
 			}
 
-			d = time.Duration(float64(e) * goldenRatio)
-			if !finite(float64(d)) {
+			d = e * goldenRatio
+			if !finite(d.Seconds()) {
 				return time.Time{}, 0, fmt.Errorf("solver: extremum non-finite step at iter %d: %w", i, ErrNonFiniteEvaluation)
 			}
 		}
@@ -333,12 +336,12 @@ func (s Solver) FindExtremum(eval Evaluator, t1, t3 time.Time, isMax bool) (time
 		var u time.Time
 
 		switch {
-		case math.Abs(float64(d)) >= tol1:
+		case math.Abs(d.Seconds()) >= tol1:
 			u = x.Add(d)
-		case float64(d) > 0:
-			u = x.Add(time.Duration(tol1))
+		case d.Seconds() > 0:
+			u = x.Add(unit.Seconds(tol1))
 		default:
-			u = x.Add(time.Duration(-tol1))
+			u = x.Add(unit.Seconds(-tol1))
 		}
 
 		fu, err := eval(u)

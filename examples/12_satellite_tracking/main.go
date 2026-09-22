@@ -14,6 +14,7 @@ import (
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/plan"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // This example demonstrates astrogo's unified Provider API for satellite tracking:
@@ -124,7 +125,7 @@ func main() {
 	// 5. Pass Prediction
 	// ═══════════════════════════════════════════════════════════════════════
 	start := epoch
-	end := epoch.AddDays(1.0)
+	end := epoch.Add(unit.Days(1.0))
 	minEl := angle.Deg(20.0)
 
 	loc, err := time.LoadLocation("America/Sao_Paulo")

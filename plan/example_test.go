@@ -8,6 +8,7 @@ import (
 	"github.com/TuSKan/astrogo/coord"
 
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 func ExamplePlanner_Observable() {
@@ -48,8 +49,8 @@ func ExampleObservableWindows() {
 	obj := NewStar("ZenithTarget", angle.Hour(18.69), angle.Zero())
 
 	start := time.FromJD(2451545.0, time.UTC) // J2000 Noon
-	end := start.Add(6 * time.Hour)
-	step := 10 * time.Minute // ≤ 15min
+	end := start.Add(unit.Hours(6))
+	step := unit.Minutes(10) // ≤ 15min
 
 	// Constraint: Altitude > 30 degrees
 	constraints := []Constraint{

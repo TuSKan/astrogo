@@ -7,6 +7,7 @@ import (
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // An Earth-fixed position is a rotation away from a celestial one, and the
@@ -54,7 +55,7 @@ func ExampleContext_ICRSToITRS_earthRotation() {
 	star := coord.NewICRS(angle.Deg(101.2871), angle.Deg(-16.7161)).ToUnitVector() // Sirius
 
 	for _, hours := range []float64{0, 6, 12} {
-		at := ctx.AtTime(ctx.Time().AddDays(hours / 24))
+		at := ctx.AtTime(ctx.Time().Add(unit.Days(hours / 24)))
 
 		lon, lat := at.ICRSToITRS(star).ToSpherical()
 

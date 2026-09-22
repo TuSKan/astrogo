@@ -7,6 +7,7 @@ import (
 
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // TestMoonElongationAgainstRealPhaseEvents cross-checks MoonElongation (and
@@ -18,7 +19,7 @@ func TestMoonElongationAgainstRealPhaseEvents(t *testing.T) {
 	prov := eph.Default()
 
 	start := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
-	end := start.AddDays(365)
+	end := start.Add(unit.Days(365))
 
 	events, err := MoonPhases(start, end, prov)
 	if err != nil {
@@ -76,7 +77,7 @@ func TestMoonPhaseFractionRange(t *testing.T) {
 	start := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
 
 	for i := range 60 {
-		tm := start.AddDays(float64(i))
+		tm := start.Add(unit.Days(float64(i)))
 
 		frac, err := MoonPhaseFraction(tm, prov)
 		if err != nil {
@@ -98,7 +99,7 @@ func TestMoonElongationDistinguishesWaxingFromWaning(t *testing.T) {
 
 	start := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
 
-	events, err := MoonPhases(start, start.AddDays(35), prov)
+	events, err := MoonPhases(start, start.Add(unit.Days(35)), prov)
 	if err != nil {
 		t.Fatalf("MoonPhases: %v", err)
 	}
@@ -117,8 +118,8 @@ func TestMoonElongationDistinguishesWaxingFromWaning(t *testing.T) {
 		t.Fatal("no full moon found in the test window")
 	}
 
-	before := fullMoon.AddDays(-3)
-	after := fullMoon.AddDays(3)
+	before := fullMoon.Add(unit.Days(-3))
+	after := fullMoon.Add(unit.Days(3))
 
 	// The concrete symmetry MoonElongation exists to break: MoonIllumination's
 	// phaseAngle is close to identical on both sides (both close to full),

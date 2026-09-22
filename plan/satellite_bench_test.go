@@ -7,6 +7,7 @@ import (
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/ephemeris/satellite"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // benchISS builds the provider and site the satellite benchmarks share.
@@ -62,7 +63,7 @@ func BenchmarkSatellitePasses_6h(b *testing.B) {
 	sat, site := benchISS(b)
 
 	start := time.Date(2026, time.April, 20, 0, 0, 0, 0, time.LocationUTC)
-	end := start.Add(6 * time.Hour)
+	end := start.Add(unit.Hours(6))
 
 	b.ResetTimer()
 

@@ -8,6 +8,7 @@ import (
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 	"github.com/TuSKan/astrogo/vector"
 )
 
@@ -79,7 +80,7 @@ func TestContextAtTime_DriftStaysWithinDocumentedBound(t *testing.T) {
 	// the same pointing error yields a smaller Alt error) — only the
 	// bound matters here.
 	for _, hours := range []float64{1, 6, 24} {
-		later := base.Add(time.Duration(hours * float64(time.Hour)))
+		later := base.Add(unit.Hours(hours))
 
 		want, err := coord.NewContext(later, site, atm).ICRSToAltAz(star)
 		testutil.AssertNoError(t, err)
@@ -116,7 +117,7 @@ func TestContextAtTime_AdvancesEarthRotation(t *testing.T) {
 	ha0, err := ctx.AtTime(base).ICRSToHourAngle(star)
 	testutil.AssertNoError(t, err)
 
-	oneHourLater := base.Add(time.Hour)
+	oneHourLater := base.Add(unit.Hours(1))
 
 	ha1, err := ctx.AtTime(oneHourLater).ICRSToHourAngle(star)
 	testutil.AssertNoError(t, err)

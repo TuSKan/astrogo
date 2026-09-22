@@ -41,14 +41,14 @@
 // # Cross-Scale Operations
 //
 // Comparison methods ([Time.Before], [Time.After], [Time.Equal]) and arithmetic
-// methods ([Time.Sub], [Time.SubDays]) automatically convert operands to a
+// methods ([Time.Add], [Time.Sub]) automatically convert operands to a
 // common scale (TT) when they differ. Same-scale operations have zero overhead.
 //
 // # Status
 //
 // The current implementation supports:
 //   - Construction from JD, Go time, and current UTC.
-//   - Basic arithmetic (AddDays/SubDays).
+//   - Basic arithmetic ([Time.Add]/[Time.Sub], over a [unit.Duration]).
 //   - Full bidirectional scale conversion graph (UTC, TAI, TT, TDB, UT1,
 //     GPST, BDT, TCG, TCB), every pair round-tripped by
 //     TestScaleRoundTripMatrix.
