@@ -865,7 +865,7 @@ const GaiaGZeroPoint = 25.6874
 // nothing to show it.
 const johnsonVZeroFlux = 3.63e-11
 
-// JohnsonCousinsColourTerm returns the published Gaia G-to-band polynomial for
+// JohnsonCousinsColorTerm returns the published Gaia G-to-band polynomial for
 // one of the Johnson-Cousins bands B, V, R or I.
 //
 // The coefficients are the Gaia DR3 photometric documentation, Section 5.5.1,
@@ -878,7 +878,7 @@ const johnsonVZeroFlux = 3.63e-11
 // Table 5.9 publishes no G-to-U relation, because Gaia does not constrain the
 // Balmer jump well enough to support one. A four-band map is what this
 // catalogue can produce.
-func JohnsonCousinsColourTerm(band string) ([]float64, error) {
+func JohnsonCousinsColorTerm(band string) ([]float64, error) {
 	switch band {
 	case "B":
 		return []float64{0.01448, -0.6874, -0.3604, 0.06718, -0.006061}, nil
@@ -937,7 +937,7 @@ func VegaZeroFlux(band magnitude.Passband) (float64, error) {
 //
 // One constructor rather than a GaiaJohnsonB/V/R/I apiece: the band differs
 // only in its colour polynomial and its zero point, and the first comes from
-// [JohnsonCousinsColourTerm] while the second comes from the passband the
+// [JohnsonCousinsColorTerm] while the second comes from the passband the
 // caller already has. A caller resolves that passband from
 // [github.com/TuSKan/astrogo/skybrightness/dataset/passband], so the curve,
 // the detector convention and the zero point all arrive together from one
@@ -946,7 +946,7 @@ func VegaZeroFlux(band magnitude.Passband) (float64, error) {
 // name selects the published relation and labels the band in the map; it is
 // one of "B", "V", "R", "I".
 func GaiaJohnsonCousins(name string, band magnitude.Passband) (GaiaBand, error) {
-	colour, err := JohnsonCousinsColourTerm(name)
+	colour, err := JohnsonCousinsColorTerm(name)
 	if err != nil {
 		return GaiaBand{}, err
 	}

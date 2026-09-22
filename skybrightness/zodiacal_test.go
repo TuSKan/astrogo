@@ -209,28 +209,28 @@ func TestZodiacalIsSymmetric(t *testing.T) {
 // 500 nm and above 1 redward, with the reddening stronger at small
 // elongations. That is the paper's own words, so it is the right thing to
 // assert rather than the coefficients themselves.
-func TestZodiacalColourCorrectionSign(t *testing.T) {
+func TestZodiacalColorCorrectionSign(t *testing.T) {
 	t.Parallel()
 
 	for _, elongation := range []float64{15, 30, 60, 90, 150} {
 		e := angle.Deg(elongation)
 
-		if got := skybrightness.ZodiacalColourCorrection(500, e); math.Abs(got-1) > 1e-12 {
+		if got := skybrightness.ZodiacalColorCorrection(500, e); math.Abs(got-1) > 1e-12 {
 			t.Errorf("at %v deg, 500 nm gives %v, want exactly 1", elongation, got)
 		}
 
-		if got := skybrightness.ZodiacalColourCorrection(400, e); got >= 1 {
+		if got := skybrightness.ZodiacalColorCorrection(400, e); got >= 1 {
 			t.Errorf("at %v deg, 400 nm gives %v, want below 1", elongation, got)
 		}
 
-		if got := skybrightness.ZodiacalColourCorrection(800, e); got <= 1 {
+		if got := skybrightness.ZodiacalColorCorrection(800, e); got <= 1 {
 			t.Errorf("at %v deg, 800 nm gives %v, want above 1", elongation, got)
 		}
 	}
 
 	// Reddening is stronger at small elongations.
-	near := skybrightness.ZodiacalColourCorrection(1000, angle.Deg(30))
-	far := skybrightness.ZodiacalColourCorrection(1000, angle.Deg(90))
+	near := skybrightness.ZodiacalColorCorrection(1000, angle.Deg(30))
+	far := skybrightness.ZodiacalColorCorrection(1000, angle.Deg(90))
 
 	if near <= far {
 		t.Errorf("30 deg gives %v at 1000 nm, want more reddening than 90 deg's %v", near, far)

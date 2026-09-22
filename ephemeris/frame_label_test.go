@@ -34,7 +34,7 @@ func TestProvidersLabelTheirFrame(t *testing.T) {
 		t.Errorf("the analytical provider labels its frame %s, want ICRS", st.Frame)
 	}
 
-	if st.Center != eph.CenterGeocentre {
+	if st.Center != eph.CenterGeocenter {
 		t.Errorf("the analytical provider labels its origin %s, want geocentre", st.Center)
 	}
 }
@@ -43,21 +43,21 @@ func TestProvidersLabelTheirFrame(t *testing.T) {
 func TestRequireCatchesAFrameMismatch(t *testing.T) {
 	t.Parallel()
 
-	icrs := eph.State{Frame: eph.FrameICRS, Center: eph.CenterGeocentre}
-	gcrs := eph.State{Frame: eph.FrameGCRS, Center: eph.CenterGeocentre}
+	icrs := eph.State{Frame: eph.FrameICRS, Center: eph.CenterGeocenter}
+	gcrs := eph.State{Frame: eph.FrameGCRS, Center: eph.CenterGeocenter}
 
-	if err := icrs.Require(eph.FrameICRS, eph.CenterGeocentre); err != nil {
+	if err := icrs.Require(eph.FrameICRS, eph.CenterGeocenter); err != nil {
 		t.Errorf("a matching state was refused: %v", err)
 	}
 
 	// The case that used to be invisible: a satellite state where a planetary
 	// one was meant.
-	err := gcrs.Require(eph.FrameICRS, eph.CenterGeocentre)
+	err := gcrs.Require(eph.FrameICRS, eph.CenterGeocenter)
 	if !errors.Is(err, eph.ErrWrongFrame) {
 		t.Errorf("GCRS passed as ICRS: err = %v, want ErrWrongFrame", err)
 	}
 
-	if err := icrs.Require(eph.FrameICRS, eph.CenterBarycentre); !errors.Is(err, eph.ErrWrongCenter) {
+	if err := icrs.Require(eph.FrameICRS, eph.CenterBarycenter); !errors.Is(err, eph.ErrWrongCenter) {
 		t.Errorf("geocentric passed as barycentric: err = %v, want ErrWrongCenter", err)
 	}
 }
@@ -74,12 +74,12 @@ func TestRequireAcceptsAnUnlabelledState(t *testing.T) {
 
 	var unlabelled eph.State
 
-	if err := unlabelled.Require(eph.FrameICRS, eph.CenterBarycentre); err != nil {
+	if err := unlabelled.Require(eph.FrameICRS, eph.CenterBarycenter); err != nil {
 		t.Errorf("an unlabelled state was refused: %v", err)
 	}
 
 	// And a labelled state is not constrained by a caller who does not care.
-	gcrs := eph.State{Frame: eph.FrameGCRS, Center: eph.CenterGeocentre}
+	gcrs := eph.State{Frame: eph.FrameGCRS, Center: eph.CenterGeocenter}
 	if err := gcrs.Require(eph.FrameUnspecified, eph.CenterUnspecified); err != nil {
 		t.Errorf("a caller with no requirement got an error: %v", err)
 	}
@@ -96,9 +96,9 @@ func TestFrameAndCenterStrings(t *testing.T) {
 		eph.FrameTEME.String():         "TEME",
 		eph.FrameITRS.String():         "ITRS",
 		eph.CenterUnspecified.String(): "unspecified",
-		eph.CenterGeocentre.String():   "geocentre",
-		eph.CenterBarycentre.String():  "barycentre",
-		eph.CenterHeliocentre.String(): "heliocentre",
+		eph.CenterGeocenter.String():   "geocenter",
+		eph.CenterBarycenter.String():  "barycenter",
+		eph.CenterHeliocenter.String(): "heliocenter",
 	} {
 		if got != want {
 			t.Errorf("String() = %q, want %q", got, want)

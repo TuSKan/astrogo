@@ -301,7 +301,7 @@ func TestProviderPlacesASatelliteBesideItsParent(t *testing.T) {
 	// composed against the wrong body would sit an astronomical unit away,
 	// which the separation check above already rules out at 0.0028 AU.
 
-	if moon.Frame != core.FrameICRS || moon.Center != core.CenterGeocentre {
+	if moon.Frame != core.FrameICRS || moon.Center != core.CenterGeocenter {
 		t.Errorf("satellite state is %v/%v, want ICRS/geocentric", moon.Frame, moon.Center)
 	}
 }

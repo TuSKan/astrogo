@@ -292,7 +292,7 @@ func bracketZodiacalLatitude(lat float64) (int, float64) {
 	return bracketAxis(zodiacalLatitudes[:], lat)
 }
 
-// ZodiacalColourCorrection returns Leinert et al. (1998) Eq. 22's factor
+// ZodiacalColorCorrection returns Leinert et al. (1998) Eq. 22's factor
 // f_co: the ratio of the zodiacal light's spectrum to the Sun's, normalised
 // to 1 at 500 nm.
 //
@@ -306,14 +306,14 @@ func bracketZodiacalLatitude(lat float64) (int, float64) {
 // The zodiacal spectrum is close to the Sun's but reddened, and reddened more
 // strongly at small elongations. Leinert et al. state the sign convention
 // outright — f_co below 1 blueward of 500 nm, above 1 redward — which is what
-// these coefficients reproduce and what TestZodiacalColourCorrectionSign
+// these coefficients reproduce and what TestZodiacalColorCorrectionSign
 // checks.
 //
 // They give the relation over 220 nm to 2.5 um and caution that f_co "cannot
 // be very accurate". Outside that span the nearest end is held rather than
 // extrapolated, since the relation is a straight line in log wavelength and
 // would eventually cross zero.
-func ZodiacalColourCorrection(lambda unit.WavelengthNM, elongation angle.Angle) float64 {
+func ZodiacalColorCorrection(lambda unit.WavelengthNM, elongation angle.Angle) float64 {
 	nm := math.Min(math.Max(float64(lambda), zodiacalColourMinNM), zodiacalColourMaxNM)
 	ratio := math.Log10(nm / ZodiacalReferenceNM)
 
@@ -348,7 +348,7 @@ func ZodiacalColourCorrection(lambda unit.WavelengthNM, elongation angle.Angle) 
 // The tabulated 500 nm map is carried to other wavelengths and epochs by
 // three factors, following Masana et al. (2021) Eq. 18:
 //
-//   - [ZodiacalColourCorrection], the spectrum's departure from the Sun's;
+//   - [ZodiacalColorCorrection], the spectrum's departure from the Sun's;
 //   - R^-2.3 for the observer's heliocentric distance (Leinert et al. 1980);
 //   - 1 + 0.1*sin(lambda_Earth - 96 deg) above 60 degrees of ecliptic
 //     latitude, where the Earth's excursion out of the dust cloud's plane of
@@ -384,7 +384,7 @@ func ZodiacalRadiance(dst SpectralRadiance, grid unit.SpectralGrid, geom Zodiaca
 			flags |= ExtrapolatedModel
 		}
 
-		v := reference * scale * ZodiacalColourCorrection(lambda, elongation)
+		v := reference * scale * ZodiacalColorCorrection(lambda, elongation)
 		if v < 0 {
 			flags |= ExtrapolatedModel
 
