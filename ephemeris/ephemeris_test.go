@@ -43,7 +43,7 @@ func (s *stubProvider) State(id core.ID, _ time.Time) (State, error) {
 	return State{
 		Pos:    vec(s.pos),
 		Frame:  core.FrameICRS,
-		Center: core.CenterGeocentre,
+		Center: core.CenterGeocenter,
 	}, nil
 }
 

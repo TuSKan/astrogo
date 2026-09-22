@@ -151,7 +151,7 @@ func (s *Satellite) State(id core.ID, t time.Time) (core.State, error) {
 		Pos:    gcrsPos.MulScalar(1.0 / kmPerAU),
 		Vel:    gcrsVel.MulScalar(secPerDay / kmPerAU),
 		Frame:  core.FrameGCRS,
-		Center: core.CenterGeocentre,
+		Center: core.CenterGeocenter,
 	}, nil
 }
 

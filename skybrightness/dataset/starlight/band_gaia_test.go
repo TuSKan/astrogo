@@ -85,7 +85,7 @@ func TestJohnsonCousinsColourTermHasNoU(t *testing.T) {
 	t.Parallel()
 
 	for _, name := range []string{"B", "V", "R", "I"} {
-		got, err := starlight.JohnsonCousinsColourTerm(name)
+		got, err := starlight.JohnsonCousinsColorTerm(name)
 		if err != nil {
 			t.Errorf("%s: %v", name, err)
 
@@ -99,7 +99,7 @@ func TestJohnsonCousinsColourTermHasNoU(t *testing.T) {
 	}
 
 	for _, name := range []string{"U", "u", "g", "K", ""} {
-		if _, err := starlight.JohnsonCousinsColourTerm(name); !errors.Is(err, starlight.ErrGaiaBand) {
+		if _, err := starlight.JohnsonCousinsColorTerm(name); !errors.Is(err, starlight.ErrGaiaBand) {
 			t.Errorf("%q: err = %v, want ErrGaiaBand", name, err)
 		}
 	}

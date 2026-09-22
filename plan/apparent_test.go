@@ -278,7 +278,7 @@ func (p linearProvider) State(id eph.ID, t time.Time) (eph.State, error) {
 		return eph.State{
 			Pos:    vector.V3(-1, 0, 0),
 			Frame:  eph.FrameICRS,
-			Center: eph.CenterGeocentre,
+			Center: eph.CenterGeocenter,
 		}, nil
 	}
 
@@ -288,7 +288,7 @@ func (p linearProvider) State(id eph.ID, t time.Time) (eph.State, error) {
 		Pos:    p.pos0.Add(p.vel.MulScalar(dt)),
 		Vel:    p.vel,
 		Frame:  eph.FrameICRS,
-		Center: eph.CenterGeocentre,
+		Center: eph.CenterGeocenter,
 	}, nil
 }
 
@@ -377,7 +377,7 @@ func TestEveryEphemerisBackedTargetIsApparent(t *testing.T) {
 type zeroProvider struct{}
 
 func (zeroProvider) State(eph.ID, time.Time) (eph.State, error) {
-	return eph.State{Frame: eph.FrameICRS, Center: eph.CenterGeocentre}, nil
+	return eph.State{Frame: eph.FrameICRS, Center: eph.CenterGeocenter}, nil
 }
 
 func (zeroProvider) Close() error { return nil }

@@ -127,7 +127,7 @@ func (p *Provider) State(id core.ID, t time.Time) (core.State, error) {
 			Pos:    parent.Pos.Add(relPos),
 			Vel:    parent.Vel.Add(relVel),
 			Frame:  core.FrameICRS,
-			Center: core.CenterGeocentre,
+			Center: core.CenterGeocenter,
 		}, nil
 	}
 
@@ -146,7 +146,7 @@ func (p *Provider) State(id core.ID, t time.Time) (core.State, error) {
 		Pos:    heloPos.Sub(earthPos),
 		Vel:    heloVel.Sub(earthVel),
 		Frame:  core.FrameICRS,
-		Center: core.CenterGeocentre,
+		Center: core.CenterGeocenter,
 	}, nil
 }
 
@@ -206,7 +206,7 @@ func (s *sofaBase) State(id core.ID, t time.Time) (core.State, error) {
 			Pos:    vector.V3(-pvh[0][0], -pvh[0][1], -pvh[0][2]),
 			Vel:    vector.V3(-pvh[1][0], -pvh[1][1], -pvh[1][2]),
 			Frame:  core.FrameICRS,
-			Center: core.CenterGeocentre,
+			Center: core.CenterGeocenter,
 		}, nil
 
 	case core.Moon:
@@ -216,7 +216,7 @@ func (s *sofaBase) State(id core.ID, t time.Time) (core.State, error) {
 			Pos:    vector.V3(pv[0][0], pv[0][1], pv[0][2]),
 			Vel:    vector.V3(pv[1][0], pv[1][1], pv[1][2]),
 			Frame:  core.FrameICRS,
-			Center: core.CenterGeocentre,
+			Center: core.CenterGeocenter,
 		}, nil
 
 	case core.SolarSystemBarycenter:
@@ -231,7 +231,7 @@ func (s *sofaBase) State(id core.ID, t time.Time) (core.State, error) {
 			Pos:    vector.V3(-pvb[0][0], -pvb[0][1], -pvb[0][2]),
 			Vel:    vector.V3(-pvb[1][0], -pvb[1][1], -pvb[1][2]),
 			Frame:  core.FrameICRS,
-			Center: core.CenterGeocentre,
+			Center: core.CenterGeocenter,
 		}, nil
 
 	case core.Mercury, core.Venus, core.Earth, core.Mars,
@@ -255,7 +255,7 @@ func (s *sofaBase) State(id core.ID, t time.Time) (core.State, error) {
 			Pos:    vector.V3(pv[0][0]-pvh[0][0], pv[0][1]-pvh[0][1], pv[0][2]-pvh[0][2]),
 			Vel:    vector.V3(pv[1][0]-pvh[1][0], pv[1][1]-pvh[1][1], pv[1][2]-pvh[1][2]),
 			Frame:  core.FrameICRS,
-			Center: core.CenterGeocentre,
+			Center: core.CenterGeocenter,
 		}, nil
 
 	case core.Pluto:
@@ -278,7 +278,7 @@ func (s *sofaBase) State(id core.ID, t time.Time) (core.State, error) {
 			Pos:    pos.Sub(vector.V3(pvh[0][0], pvh[0][1], pvh[0][2])),
 			Vel:    vel.Sub(vector.V3(pvh[1][0], pvh[1][1], pvh[1][2])),
 			Frame:  core.FrameICRS,
-			Center: core.CenterGeocentre,
+			Center: core.CenterGeocenter,
 		}, nil
 
 	default:

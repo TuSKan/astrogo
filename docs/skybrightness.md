@@ -531,7 +531,7 @@ seasonal factor applied as Masana et al. (2021) Eq. 18 does.
 | Piece | Go function | Validation test |
 | :--- | :--- | :--- |
 | Table 17 map | `ZodiacalBrightnessAt` | `TestZodiacalPoleMatchesKnownBrightness`, `…TableCorners` |
-| Eq. 22 colour | `ZodiacalColourCorrection` | `TestZodiacalColourCorrectionSign` |
+| Eq. 22 colour | `ZodiacalColorCorrection` | `TestZodiacalColorCorrectionSign` |
 | Full component | `ZodiacalLight` | `…HeliocentricScaling`, `…SeasonalTerm` |
 
 **The external anchor:** the ecliptic pole comes out at **23.26 mag/arcsec² in V**. A dark

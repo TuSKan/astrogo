@@ -364,7 +364,7 @@ func TestFourBandQueryIsOnePass(t *testing.T) {
 	bands := make([]starlight.GaiaBand, 0, 4)
 
 	for _, name := range []string{"B", "V", "R", "I"} {
-		colour, err := starlight.JohnsonCousinsColourTerm(name)
+		colour, err := starlight.JohnsonCousinsColorTerm(name)
 		if err != nil {
 			t.Fatalf("%s: %v", name, err)
 		}

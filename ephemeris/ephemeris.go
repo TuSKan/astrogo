@@ -52,9 +52,9 @@ const (
 	FrameTEME        = core.FrameTEME
 
 	CenterUnspecified = core.CenterUnspecified
-	CenterGeocentre   = core.CenterGeocentre
-	CenterBarycentre  = core.CenterBarycentre
-	CenterHeliocentre = core.CenterHeliocentre
+	CenterGeocenter   = core.CenterGeocenter
+	CenterBarycenter  = core.CenterBarycenter
+	CenterHeliocenter = core.CenterHeliocenter
 )
 
 // Errors reported by [State.Require].
@@ -671,7 +671,7 @@ func (s *sofaProvider) State(id ID, t time.Time) (State, error) {
 			Pos:    vector.Vec3{X: -ph[0], Y: -ph[1], Z: -ph[2]},
 			Vel:    vector.Vec3{X: -vh[0], Y: -vh[1], Z: -vh[2]},
 			Frame:  FrameICRS,
-			Center: CenterGeocentre,
+			Center: CenterGeocenter,
 		}, nil
 
 	case Moon:
@@ -681,7 +681,7 @@ func (s *sofaProvider) State(id ID, t time.Time) (State, error) {
 			Pos:    vector.Vec3{X: pv[0][0], Y: pv[0][1], Z: pv[0][2]},
 			Vel:    vector.Vec3{X: pv[1][0], Y: pv[1][1], Z: pv[1][2]},
 			Frame:  FrameICRS,
-			Center: CenterGeocentre,
+			Center: CenterGeocenter,
 		}, nil
 
 	case SolarSystemBarycenter:
@@ -696,7 +696,7 @@ func (s *sofaProvider) State(id ID, t time.Time) (State, error) {
 			Pos:    vector.Vec3{X: -pvb[0][0], Y: -pvb[0][1], Z: -pvb[0][2]},
 			Vel:    vector.Vec3{X: -pvb[1][0], Y: -pvb[1][1], Z: -pvb[1][2]},
 			Frame:  FrameICRS,
-			Center: CenterGeocentre,
+			Center: CenterGeocenter,
 		}, nil
 
 	case Mercury, Venus, Earth, Mars, Jupiter, Saturn, Uranus, Neptune:
@@ -743,7 +743,7 @@ func (s *sofaProvider) State(id ID, t time.Time) (State, error) {
 				Z: pv[1][2] - pvh[1][2],
 			},
 			Frame:  FrameICRS,
-			Center: CenterGeocentre,
+			Center: CenterGeocenter,
 		}, nil
 
 	default:

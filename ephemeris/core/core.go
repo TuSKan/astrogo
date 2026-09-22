@@ -94,26 +94,26 @@ const (
 	// [FrameUnspecified] for why that is not the same as assuming a default.
 	CenterUnspecified Center = iota
 
-	// CenterGeocentre is the centre of the Earth.
-	CenterGeocentre
+	// CenterGeocenter is the center of the Earth.
+	CenterGeocenter
 
-	// CenterBarycentre is the solar system barycentre.
-	CenterBarycentre
+	// CenterBarycenter is the solar system barycenter.
+	CenterBarycenter
 
-	// CenterHeliocentre is the centre of the Sun.
-	CenterHeliocentre
+	// CenterHeliocenter is the center of the Sun.
+	CenterHeliocenter
 )
 
 func (c Center) String() string {
 	switch c {
 	case CenterUnspecified:
 		return "unspecified"
-	case CenterGeocentre:
-		return "geocentre"
-	case CenterBarycentre:
-		return "barycentre"
-	case CenterHeliocentre:
-		return "heliocentre"
+	case CenterGeocenter:
+		return "geocenter"
+	case CenterBarycenter:
+		return "barycenter"
+	case CenterHeliocenter:
+		return "heliocenter"
 	default:
 		return fmt.Sprintf("Center(%d)", uint8(c))
 	}
