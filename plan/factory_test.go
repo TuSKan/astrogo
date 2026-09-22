@@ -11,6 +11,7 @@ import (
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/plan"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // errStubMoonProviderState is returned by stubMoonProvider's State — this
@@ -84,7 +85,7 @@ func ceresLikeTarget(kind resolve.Kind) catalog.Target {
 		Kind:          kind,
 		HasElements:   true,
 		Epoch:         time.Date(2026, time.June, 9, 0, 0, 0, 0, time.LocationUTC),
-		SemiMajorAxis: 2.77,
+		SemiMajorAxis: unit.AU(2.77),
 		Eccentricity:  0.0797,
 		Inclination:   angle.Deg(10.6),
 		AscendingNode: angle.Deg(80.2),
@@ -196,10 +197,10 @@ func TestFromCatalog_StarRadialVelocity(t *testing.T) {
 	cases := []struct {
 		name    string
 		hasRV   bool
-		rv      float64
+		rv      unit.Velocity
 		wantHas bool
 	}{
-		{"measured negative", true, -5.5, true},
+		{"measured negative", true, unit.KmPerSec(-5.5), true},
 		{"measured true zero", true, 0, true},
 		{"unset", false, 0, false},
 	}
@@ -227,8 +228,8 @@ func TestFromCatalog_StarRadialVelocity(t *testing.T) {
 				t.Errorf("MeasuredRadialVelocity() has = %v, want %v", gotHas, c.wantHas)
 			}
 
-			if gotHas && gotRV.KmPerSec() != c.rv {
-				t.Errorf("MeasuredRadialVelocity() rv = %v km/s, want %v", gotRV.KmPerSec(), c.rv)
+			if gotHas && gotRV != c.rv {
+				t.Errorf("MeasuredRadialVelocity() rv = %v, want %v", gotRV, c.rv)
 			}
 		})
 	}
@@ -243,7 +244,7 @@ func TestFromCatalog_AsteroidDiameterAndAlbedo(t *testing.T) {
 	t.Run("measured diameter", func(t *testing.T) {
 		c := ceresLikeTarget(resolve.KindAsteroid)
 		c.H, c.HasH, c.G = 3.34, true, 0.12
-		c.HasDiameter, c.Diameter = true, 16.84 // km, real Eros value
+		c.HasDiameter, c.Diameter = true, unit.Km(16.84) // real Eros value
 
 		obj := mustFromCatalog(t, c, nil)
 
@@ -398,7 +399,7 @@ func TestFromCatalogKeepsADeepSkyRadialVelocity(t *testing.T) {
 		Kind:              resolve.KindGalaxy,
 		Coord:             coord.NewICRS(angle.Deg(10.6847), angle.Deg(41.2688)),
 		HasCoord:          true,
-		RadialVelocity:    -300.0,
+		RadialVelocity:    unit.KmPerSec(-300.0),
 		HasRadialVelocity: true,
 	}, nil)
 

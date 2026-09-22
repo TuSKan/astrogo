@@ -11,6 +11,7 @@ import (
 	"github.com/TuSKan/astrogo/time"
 
 	"github.com/TuSKan/astrogo/internal/testutil"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // TestPlanetConstructorsIncludesPluto is a regression test: Pluto has its
@@ -194,7 +195,7 @@ func TestGatherCandidates_SmallBodyPathOffline(t *testing.T) {
 			H:             3.34,
 			G:             0.12,
 			Epoch:         epoch,
-			SemiMajorAxis: 2.77,
+			SemiMajorAxis: unit.AU(2.77),
 			Eccentricity:  0.0797,
 			Inclination:   angle.Deg(10.6),
 			AscendingNode: angle.Deg(80.2),

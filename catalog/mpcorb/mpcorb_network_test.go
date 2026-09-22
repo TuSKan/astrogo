@@ -120,8 +120,8 @@ func TestOpenParsesTheWholeSubsetFile(t *testing.T) {
 			t.Errorf("%s (%s): semi-major axis %v", tgt.ID, tgt.Name, tgt.SemiMajorAxis)
 		}
 
-		minA = math.Min(minA, tgt.SemiMajorAxis)
-		maxA = math.Max(maxA, tgt.SemiMajorAxis)
+		minA = math.Min(minA, tgt.SemiMajorAxis.AU())
+		maxA = math.Max(maxA, tgt.SemiMajorAxis.AU())
 
 		if incl := tgt.Inclination.Degrees(); incl < 0 || incl > 180 {
 			t.Errorf("%s (%s): inclination %v deg", tgt.ID, tgt.Name, incl)
@@ -182,8 +182,9 @@ func TestEveryParsedObjectPropagates(t *testing.T) {
 		// StateAt returns astronomical units.
 		r := pos.Norm()
 
-		lo := tgt.SemiMajorAxis * (1 - tgt.Eccentricity)
-		hi := tgt.SemiMajorAxis * (1 + tgt.Eccentricity)
+		a := tgt.SemiMajorAxis.AU()
+		lo := a * (1 - tgt.Eccentricity)
+		hi := a * (1 + tgt.Eccentricity)
 
 		if r < lo-1e-6 || r > hi+1e-6 {
 			t.Fatalf("%s (%s): %.6f AU outside [%.6f, %.6f], which its own a and e forbid",

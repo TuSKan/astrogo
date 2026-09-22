@@ -9,6 +9,7 @@ import (
 	"github.com/TuSKan/astrogo/ephemeris/kepler"
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // wrappedDiff returns the smallest signed angular difference a-b, in
@@ -89,7 +90,7 @@ func keplerPeriodDays(a float64) float64 {
 func testElements(t *testing.T, epoch time.Time, a, e float64, incl, node, argp, m0 angle.Angle) kepler.Elements {
 	t.Helper()
 
-	el, err := kepler.NewElements(epoch, a, e, incl, node, argp, m0)
+	el, err := kepler.NewElements(epoch, unit.AU(a), e, incl, node, argp, m0)
 	testutil.AssertNoError(t, err)
 
 	return el
@@ -122,7 +123,7 @@ func TestNewElements_RejectsBadInputs(t *testing.T) {
 
 	for _, tt := range cases {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := kepler.NewElements(epoch, tt.a, tt.e, tt.incl, tt.node, tt.argp, tt.m0)
+			_, err := kepler.NewElements(epoch, unit.AU(tt.a), tt.e, tt.incl, tt.node, tt.argp, tt.m0)
 			testutil.AssertErrorIs(t, err, tt.want)
 		})
 	}
@@ -130,7 +131,8 @@ func TestNewElements_RejectsBadInputs(t *testing.T) {
 
 func TestNewElements_AcceptsGoodInputs(t *testing.T) {
 	epoch := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
-	el, err := kepler.NewElements(epoch, 2.7, 0.15, angle.Deg(10), angle.Deg(80), angle.Deg(73), angle.Deg(20))
+	el, err := kepler.NewElements(epoch, unit.AU(2.7), 0.15,
+		angle.Deg(10), angle.Deg(80), angle.Deg(73), angle.Deg(20))
 	testutil.AssertNoError(t, err)
 
 	// Every accessor must round-trip the value passed to NewElements.
@@ -138,7 +140,7 @@ func TestNewElements_AcceptsGoodInputs(t *testing.T) {
 		t.Errorf("Epoch() = %v, want %v", el.Epoch(), epoch)
 	}
 
-	testutil.AssertNear(t, "SemiMajorAxis", el.SemiMajorAxis(), 2.7, 1e-12)
+	testutil.AssertNear(t, "SemiMajorAxis", el.SemiMajorAxis().AU(), 2.7, 1e-12)
 	testutil.AssertNear(t, "Eccentricity", el.Eccentricity(), 0.15, 1e-12)
 	testutil.AssertNear(t, "Inclination", el.Inclination().Degrees(), 10, 1e-9)
 	testutil.AssertNear(t, "AscendingNode", el.AscendingNode().Degrees(), 80, 1e-9)
@@ -209,7 +211,7 @@ func TestElements_StateAt_OnePeriodClosure(t *testing.T) {
 	pos0, vel0, err := el.StateAt(epoch)
 	testutil.AssertNoError(t, err)
 
-	pos1, vel1, err := el.StateAt(epoch.AddDays(keplerPeriodDays(el.SemiMajorAxis())))
+	pos1, vel1, err := el.StateAt(epoch.AddDays(keplerPeriodDays(el.SemiMajorAxis().AU())))
 	testutil.AssertNoError(t, err)
 
 	testutil.AssertNear(t, "x", pos1.X, pos0.X, 1e-6)
@@ -230,7 +232,7 @@ func TestElements_StateAt_EnergyConservation(t *testing.T) {
 	gm := constants.IAU.SunGravitationalParameter.Value
 	auM := constants.IAU.AstronomicalUnit.Value
 	dayS := constants.Derived.JulianDaySeconds.Value
-	aM := el.SemiMajorAxis() * auM
+	aM := el.SemiMajorAxis().AU() * auM
 
 	for _, dtDays := range []float64{0, 10, 50, 123.4, 400} {
 		pos, vel, err := el.StateAt(epoch.AddDays(dtDays))
@@ -254,7 +256,7 @@ func TestElements_StateAt_AngularMomentumConservation(t *testing.T) {
 	gm := constants.IAU.SunGravitationalParameter.Value
 	auM := constants.IAU.AstronomicalUnit.Value
 	dayS := constants.Derived.JulianDaySeconds.Value
-	aM := el.SemiMajorAxis() * auM
+	aM := el.SemiMajorAxis().AU() * auM
 
 	want := math.Sqrt(gm * aM * (1 - el.Eccentricity()*el.Eccentricity()))
 

@@ -8,6 +8,7 @@ import (
 	"github.com/TuSKan/astrogo/constants"
 	"github.com/TuSKan/astrogo/ephemeris/core"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 	"github.com/TuSKan/astrogo/vector"
 )
 
@@ -29,7 +30,8 @@ func finite(v float64) bool { return !math.IsNaN(v) && !math.IsInf(v, 0) }
 // haven't already passed Validate.
 type Elements struct {
 	epoch                                                 time.Time
-	semiMajorAxis, eccentricity                           float64
+	semiMajorAxis                                         unit.Length
+	eccentricity                                          float64
 	inclination, ascendingNode, argPeriapsis, meanAnomaly angle.Angle
 
 	// central is the body the elements are referred to. The zero value
@@ -224,8 +226,8 @@ func CentralBodyFor(id core.ID) (CentralBody, bool) {
 
 // NewElements constructs a validated set of classical heliocentric
 // osculating orbital elements, referred to the J2000 ecliptic frame —
-// epoch is the osculation epoch meanAnomaly is given at; semiMajorAxis
-// is in astronomical units; eccentricity must satisfy 0 <= e < 1;
+// epoch is the osculation epoch meanAnomaly is given at; eccentricity must
+// satisfy 0 <= e < 1;
 // inclination/ascendingNode/argPeriapsis are the orbit's orientation
 // angles in the J2000 ecliptic frame. Returns ErrInvalidElements/
 // ErrUnsupportedOrbit immediately rather than deferring the failure to
@@ -233,7 +235,9 @@ func CentralBodyFor(id core.ID) (CentralBody, bool) {
 // external data (a resolve.Target's HasElements fields, a hand-typed
 // literal) gets a construction-time error instead of a silently-broken
 // propagator.
-func NewElements(epoch time.Time, semiMajorAxis, eccentricity float64,
+// Orbital elements are published with the semi-major axis in astronomical
+// units, so it is almost always [unit.AU](a) here.
+func NewElements(epoch time.Time, semiMajorAxis unit.Length, eccentricity float64,
 	inclination, ascendingNode, argPeriapsis, meanAnomaly angle.Angle,
 ) (Elements, error) {
 	el := Elements{
@@ -342,8 +346,8 @@ func (el Elements) WithCentralBody(body CentralBody) Elements {
 // Epoch is the osculation epoch MeanAnomaly is given at.
 func (el Elements) Epoch() time.Time { return el.epoch }
 
-// SemiMajorAxis is in astronomical units.
-func (el Elements) SemiMajorAxis() float64 { return el.semiMajorAxis }
+// SemiMajorAxis is the orbit's semi-major axis.
+func (el Elements) SemiMajorAxis() unit.Length { return el.semiMajorAxis }
 
 // Eccentricity satisfies 0 <= e < 1.
 func (el Elements) Eccentricity() float64 { return el.eccentricity }
@@ -368,8 +372,9 @@ func (el Elements) MeanAnomaly() angle.Angle { return el.meanAnomaly }
 // StateAt's own defense-in-depth and for anything within this package
 // that constructs an Elements value via a bare struct literal (tests).
 func (el Elements) Validate() error {
-	if !finite(el.semiMajorAxis) || el.semiMajorAxis <= 0 {
-		return fmt.Errorf("%w: semi-major axis %v must be finite and positive", ErrInvalidElements, el.semiMajorAxis)
+	if !finite(el.semiMajorAxis.AU()) || el.semiMajorAxis <= 0 {
+		return fmt.Errorf("%w: semi-major axis %v must be finite and positive",
+			ErrInvalidElements, el.semiMajorAxis)
 	}
 
 	if !finite(el.eccentricity) || el.eccentricity < 0 || el.eccentricity >= 1 {
@@ -480,9 +485,8 @@ func (el Elements) StateAt(t time.Time) (pos, vel vector.Vec3, err error) {
 		return vector.Zero(), vector.Zero(), err
 	}
 
-	gm := el.CentralBody().GM                        // m^3/s^2
-	auMeters := constants.IAU.AstronomicalUnit.Value // m
-	aMeters := el.semiMajorAxis * auMeters
+	gm := el.CentralBody().GM // m^3/s^2
+	aMeters := el.semiMajorAxis.Meters()
 
 	nRadPerDay := math.Sqrt(gm/(aMeters*aMeters*aMeters)) * constants.Derived.JulianDaySeconds.Value
 	if el.periodDays != 0 {
@@ -500,7 +504,7 @@ func (el Elements) StateAt(t time.Time) (pos, vel vector.Vec3, err error) {
 	e := el.eccentricity
 	cosE, sinE := ea.Cos(), ea.Sin()
 	sqrtOneMinusE2 := math.Sqrt(1 - e*e)
-	a := el.semiMajorAxis
+	a := el.semiMajorAxis.AU()
 
 	posPf := vector.V3(a*(cosE-e), a*sqrtOneMinusE2*sinE, 0)
 

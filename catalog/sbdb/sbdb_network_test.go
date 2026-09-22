@@ -83,8 +83,8 @@ func TestSBDBNetworkResolveOrbitalElements(t *testing.T) {
 		t.Fatal("HasElements = false, want true for a well-numbered asteroid")
 	}
 
-	if tar.SemiMajorAxis < 2.5 || tar.SemiMajorAxis > 3.0 {
-		t.Errorf("SemiMajorAxis = %v AU, outside plausible band for 1 Ceres (~2.77 AU)", tar.SemiMajorAxis)
+	if a := tar.SemiMajorAxis.AU(); a < 2.5 || a > 3.0 {
+		t.Errorf("SemiMajorAxis = %v AU, outside plausible band for 1 Ceres (~2.77 AU)", a)
 	}
 
 	if tar.Eccentricity < 0 || tar.Eccentricity > 0.2 {
@@ -185,7 +185,7 @@ func TestSBDBNetworkSearchBright(t *testing.T) {
 		if tgt.HasElements {
 			sawElements = true
 
-			if tgt.SemiMajorAxis == 0 || math.IsNaN(tgt.SemiMajorAxis) || math.IsInf(tgt.SemiMajorAxis, 0) {
+			if tgt.SemiMajorAxis == 0 || math.IsNaN(tgt.SemiMajorAxis.AU()) || math.IsInf(tgt.SemiMajorAxis.AU(), 0) {
 				t.Errorf("%s: SemiMajorAxis = %v, expected a finite nonzero value", tgt.Name, tgt.SemiMajorAxis)
 			}
 
@@ -305,7 +305,7 @@ func TestSBDBElementsAreFullPrecision(t *testing.T) {
 		name string
 		v    float64
 	}{
-		{"a", tar.SemiMajorAxis},
+		{"a", tar.SemiMajorAxis.AU()},
 		{"e", tar.Eccentricity},
 		{"i", tar.Inclination.Degrees()},
 		{"om", tar.AscendingNode.Degrees()},

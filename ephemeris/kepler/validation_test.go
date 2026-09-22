@@ -17,6 +17,7 @@ import (
 	"github.com/TuSKan/astrogo/ephemeris/kepler"
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 	"github.com/TuSKan/astrogo/vector"
 )
 
@@ -171,7 +172,7 @@ func fetchHelioElements(designation string, at time.Time) (epochJD float64, el k
 	const kmPerAU = 149_597_870.7
 
 	el, err = kepler.NewElements(
-		time.FromJDParts(jdtdb, 0, time.TDB), aKm/kmPerAU, ec,
+		time.FromJDParts(jdtdb, 0, time.TDB), unit.AU((aKm / kmPerAU)), ec,
 		angle.Deg(incl), angle.Deg(node), angle.Deg(argp), angle.Deg(ma),
 	)
 	if err != nil {
@@ -268,8 +269,8 @@ func TestElements_StateAt_AgainstHorizons_433Eros(t *testing.T) {
 	epochJD, el, err := fetchHelioElements(designation, time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC))
 	testutil.AssertNoError(t, err)
 
-	if el.SemiMajorAxis() < 1.0 || el.SemiMajorAxis() > 2.0 {
-		t.Fatalf("sanity check failed: 433 Eros semi-major axis = %v AU, expected ~1.458 AU", el.SemiMajorAxis())
+	if a := el.SemiMajorAxis().AU(); a < 1.0 || a > 2.0 {
+		t.Fatalf("sanity check failed: 433 Eros semi-major axis = %v AU, expected ~1.458 AU", a)
 	}
 
 	epoch := time.FromJDParts(epochJD, 0, time.TDB)

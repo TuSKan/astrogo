@@ -12,6 +12,7 @@ import (
 	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // ErrAPIError indicates a SBDB API error response.
@@ -200,7 +201,7 @@ func (p *Provider) ResolveObject(ctx context.Context, req resolve.ObjectRequest)
 
 		if hasElements {
 			t.Epoch = time.FromJD(epochJD, time.TDB)
-			t.SemiMajorAxis = semiMajorAxis
+			t.SemiMajorAxis = unit.AU(semiMajorAxis)
 			t.Eccentricity = eccentricity
 			t.Inclination = angle.Deg(incl)
 			t.AscendingNode = angle.Deg(node)
@@ -239,7 +240,8 @@ func (p *Provider) ResolveObject(ctx context.Context, req resolve.ObjectRequest)
 				}
 			case "diameter":
 				if v, err := parseFloat(pp.Value); err == nil {
-					t.Diameter = v
+					// SBDB publishes phys_par diameters in kilometres.
+					t.Diameter = unit.Km(v)
 					t.HasDiameter = true
 				}
 			case "albedo":
@@ -555,7 +557,7 @@ func (p *Provider) queryBright(ctx context.Context, sbKind, magField string, max
 
 		if hasElements {
 			t.Epoch = time.FromJD(epochJD, time.TDB)
-			t.SemiMajorAxis = semiMajorAxis
+			t.SemiMajorAxis = unit.AU(semiMajorAxis)
 			t.Eccentricity = eccentricity
 			t.Inclination = angle.Deg(incl)
 			t.AscendingNode = angle.Deg(node)

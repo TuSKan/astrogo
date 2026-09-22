@@ -8,7 +8,6 @@ import (
 	"github.com/TuSKan/astrogo/catalog"
 	"github.com/TuSKan/astrogo/catalog/resolve"
 	eph "github.com/TuSKan/astrogo/ephemeris"
-	"github.com/TuSKan/astrogo/unit"
 )
 
 // FromCatalog converts a catalog.Target (wire format from resolvers) and an
@@ -139,8 +138,7 @@ func FromCatalog(c catalog.Target, p eph.Provider) (Observable, error) {
 		}
 
 		if c.HasRadialVelocity {
-			// resolve.Target.RadialVelocity is km/s, per its doc comment.
-			opts = append(opts, WithRadialVelocity(unit.KmPerSec(c.RadialVelocity)))
+			opts = append(opts, WithRadialVelocity(c.RadialVelocity))
 		}
 
 		if c.HasVMag {
@@ -162,7 +160,7 @@ func FromCatalog(c catalog.Target, p eph.Provider) (Observable, error) {
 	}
 
 	if c.HasRadialVelocity {
-		opts = append(opts, WithDSORadialVelocity(unit.KmPerSec(c.RadialVelocity)))
+		opts = append(opts, WithDSORadialVelocity(c.RadialVelocity))
 	}
 
 	if string(c.Kind) != "" {
@@ -210,8 +208,7 @@ func asteroidOptsFrom(c catalog.Target) []AsteroidOption {
 	}
 
 	if c.HasDiameter {
-		// resolve.Target.Diameter is kilometres, per its doc comment.
-		opts = append(opts, WithDiameter(unit.Km(c.Diameter)))
+		opts = append(opts, WithDiameter(c.Diameter))
 	}
 
 	if c.HasAlbedo {

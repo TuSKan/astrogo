@@ -9,6 +9,7 @@ import (
 	"github.com/TuSKan/astrogo/ephemeris/kepler"
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // testElementsForProvider is a small, valid osculating-elements fixture
@@ -22,7 +23,7 @@ func testElementsForProvider(t *testing.T) kepler.Elements {
 
 	el, err := kepler.NewElements(
 		time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC),
-		2.5, 0.1, angle.Deg(5), angle.Deg(30), angle.Deg(60), angle.Deg(0),
+		unit.AU(2.5), 0.1, angle.Deg(5), angle.Deg(30), angle.Deg(60), angle.Deg(0),
 	)
 	testutil.AssertNoError(t, err)
 
@@ -46,7 +47,7 @@ func TestRegister_RejectsInvalidElements(t *testing.T) {
 	// Register never trusts an Elements value blindly).
 	_, err := kepler.NewElements(
 		time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC),
-		2.5, 1.5, angle.Deg(5), angle.Deg(30), angle.Deg(60), angle.Deg(0), // e=1.5, hyperbolic
+		unit.AU(2.5), 1.5, angle.Deg(5), angle.Deg(30), angle.Deg(60), angle.Deg(0), // e=1.5, hyperbolic
 	)
 	testutil.AssertErrorIs(t, err, kepler.ErrUnsupportedOrbit)
 }

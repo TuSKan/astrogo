@@ -9,6 +9,7 @@ import (
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/ephemeris/core"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 	"github.com/TuSKan/astrogo/vector"
 )
 
@@ -77,7 +78,7 @@ func TestNewElementsRejectsWhatTwoBodyCannotRepresent(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			_, err := NewElements(epoch, c.a, c.e,
+			_, err := NewElements(epoch, unit.AU(c.a), c.e,
 				angle.Deg(10), angle.Deg(80), angle.Deg(73), angle.Deg(274))
 
 			if c.ok && err != nil {
@@ -92,7 +93,7 @@ func TestNewElementsRejectsWhatTwoBodyCannotRepresent(t *testing.T) {
 }
 
 func TestNewFromElementsAnswersTheRegisteredBody(t *testing.T) {
-	el, err := NewElements(time.J2000(), 2.7658, 0.07839,
+	el, err := NewElements(time.J2000(), unit.AU(2.7658), 0.07839,
 		angle.Deg(10.587), angle.Deg(80.393), angle.Deg(73.597), angle.Deg(77.372))
 	if err != nil {
 		t.Fatalf("NewElements: %v", err)

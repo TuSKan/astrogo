@@ -11,6 +11,7 @@ import (
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 type mockProvider struct {
@@ -250,7 +251,7 @@ func TestResolver_MergePreservesOrbitalElements(t *testing.T) {
 		"target": {
 			ID: "20000001", Name: "1 Ceres", Aliases: []string{"shared"}, HasElements: true,
 			Epoch:         elementsEpoch,
-			SemiMajorAxis: 2.77,
+			SemiMajorAxis: unit.AU(2.77),
 			Eccentricity:  0.0797,
 			Inclination:   angle.Deg(10.6),
 			AscendingNode: angle.Deg(80.2),
@@ -282,7 +283,7 @@ func TestResolver_MergePreservesOrbitalElements(t *testing.T) {
 		t.Errorf("expected OrbitalElements provenance = sbdb, got %q", got.Provenance["OrbitalElements"])
 	}
 
-	testutil.AssertNear(t, "merged SemiMajorAxis", got.SemiMajorAxis, 2.77, 1e-9)
+	testutil.AssertNear(t, "merged SemiMajorAxis", got.SemiMajorAxis.AU(), 2.77, 1e-9)
 	testutil.AssertNear(t, "merged Eccentricity", got.Eccentricity, 0.0797, 1e-9)
 	testutil.AssertNear(t, "merged Inclination", got.Inclination.Degrees(), 10.6, 1e-9)
 	testutil.AssertNear(t, "merged AscendingNode", got.AscendingNode.Degrees(), 80.2, 1e-9)
@@ -501,7 +502,7 @@ func TestMergeGroup_PhysicalParamsClusterIncludesDiameterAndAlbedo(t *testing.T)
 	g := group{candidates: []candidate{
 		{provider: "sbdb", target: Target{
 			H: 10.40, G: 0.46, HasH: true,
-			Diameter: 16.84, HasDiameter: true,
+			Diameter: unit.Km(16.84), HasDiameter: true,
 			Albedo: 0.25, HasAlbedo: true,
 		}},
 	}}
@@ -512,8 +513,8 @@ func TestMergeGroup_PhysicalParamsClusterIncludesDiameterAndAlbedo(t *testing.T)
 		t.Errorf("H = %v (has=%v), want 10.40 (has=true)", got.H, got.HasH)
 	}
 
-	if !got.HasDiameter || got.Diameter != 16.84 {
-		t.Errorf("Diameter = %v (has=%v), want 16.84 (has=true)", got.Diameter, got.HasDiameter)
+	if !got.HasDiameter || got.Diameter != unit.Km(16.84) {
+		t.Errorf("Diameter = %v (has=%v), want 16.84 km (has=true)", got.Diameter, got.HasDiameter)
 	}
 
 	if !got.HasAlbedo || got.Albedo != 0.25 {

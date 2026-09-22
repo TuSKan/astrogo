@@ -11,6 +11,7 @@ import (
 	"github.com/TuSKan/astrogo/ephemeris/core"
 	"github.com/TuSKan/astrogo/ephemeris/kepler"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 	"github.com/TuSKan/astrogo/vector"
 )
 
@@ -32,7 +33,7 @@ func kmToAU(km float64) float64 { return km * 1e3 / auMeters }
 func circular(t *testing.T, body kepler.CentralBody, radiusKM float64) kepler.Elements {
 	t.Helper()
 
-	el, err := kepler.NewElements(time.J2000(), kmToAU(radiusKM), 0,
+	el, err := kepler.NewElements(time.J2000(), unit.AU(kmToAU(radiusKM)), 0,
 		angle.Deg(0), angle.Deg(0), angle.Deg(0), angle.Deg(0))
 	if err != nil {
 		t.Fatalf("NewElements: %v", err)
@@ -112,7 +113,7 @@ func periodDays(t *testing.T, el kepler.Elements, guessDays float64) float64 {
 // heliocentric path: an Elements that never names a central body must
 // propagate exactly as it did before one could be named.
 func TestCentralBodyDefaultsToTheSun(t *testing.T) {
-	el, err := kepler.NewElements(time.J2000(), 2.7658, 0.07839,
+	el, err := kepler.NewElements(time.J2000(), unit.AU(2.7658), 0.07839,
 		angle.Deg(10.587), angle.Deg(80.393), angle.Deg(73.597), angle.Deg(77.372))
 	if err != nil {
 		t.Fatalf("NewElements: %v", err)
@@ -198,7 +199,7 @@ func TestPeriodFollowsKeplersThirdLaw(t *testing.T) {
 // for the case that already worked.
 func TestSunCentredIsUnchangedByTheRefactor(t *testing.T) {
 	// One astronomical unit about the Sun is a year, by construction.
-	el, err := kepler.NewElements(time.J2000(), 1.0, 0,
+	el, err := kepler.NewElements(time.J2000(), unit.AU(1.0), 0,
 		angle.Deg(0), angle.Deg(0), angle.Deg(0), angle.Deg(0))
 	if err != nil {
 		t.Fatalf("NewElements: %v", err)
@@ -471,7 +472,7 @@ func TestSecularPrecessionTurnsTheApsisBackwards(t *testing.T) {
 		argpDeg    = 49.1
 	)
 
-	base, err := kepler.NewElements(time.J2000(), kmToAU(421_800), 0.004,
+	base, err := kepler.NewElements(time.J2000(), unit.AU(kmToAU(421_800)), 0.004,
 		angle.Deg(2), angle.Deg(0), angle.Deg(argpDeg), angle.Deg(330.9))
 	if err != nil {
 		t.Fatalf("NewElements: %v", err)
@@ -499,7 +500,7 @@ func TestSecularPrecessionTurnsTheApsisBackwards(t *testing.T) {
 
 	turned := angle.Deg(argpDeg).Radians() - 2*math.Pi*dtDays/(apsisYears*daysPerJulianYear)
 
-	hand, err := kepler.NewElements(time.J2000(), kmToAU(421_800), 0.004,
+	hand, err := kepler.NewElements(time.J2000(), unit.AU(kmToAU(421_800)), 0.004,
 		angle.Deg(2), angle.Deg(0), angle.Rad(turned), angle.Deg(330.9))
 	if err != nil {
 		t.Fatalf("NewElements(hand): %v", err)
