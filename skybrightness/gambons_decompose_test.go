@@ -89,7 +89,8 @@ func TestGAMBONSGapDecomposition(t *testing.T) {
 	// ── the star map, above the atmosphere ──────────────────────────────────
 	skyMap, err := starlight.Open(ctx)
 	if err != nil {
-		t.Skipf("star map: %v", err)
+		testutil.SkipOnUpstreamFailure(t, err)
+		t.Fatalf("starlight.Open: %v", err)
 	}
 
 	stars, err := skyMap.Band("V")
@@ -149,7 +150,8 @@ func TestGAMBONSGapDecomposition(t *testing.T) {
 	// ── the dust the DGL rests on ───────────────────────────────────────────
 	dustMap, err := dust.Fetch(ctx, nil, dust.Direction{L: gal.L(), B: gal.B()})
 	if err != nil {
-		t.Skipf("IRSA: %v", err)
+		testutil.SkipOnUpstreamFailure(t, err)
+		t.Fatalf("dust.Fetch: %v", err)
 	}
 
 	i100, err := dustMap.IntensityAt(gal.L(), gal.B())
@@ -178,7 +180,8 @@ func TestGAMBONSGapDecomposition(t *testing.T) {
 		StepNM:       0.1,
 	}, grid, 87_000)
 	if err != nil {
-		t.Skipf("SkyCalc: %v", err)
+		testutil.SkipOnUpstreamFailure(t, err)
+		t.Fatalf("airglow.NewAirglow: %v", err)
 	}
 
 	model, err := skybrightness.NewModel("decompose",

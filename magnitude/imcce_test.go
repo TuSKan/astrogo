@@ -17,6 +17,7 @@ import (
 	"testing"
 
 	"github.com/TuSKan/astrogo/angle"
+	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/magnitude"
 )
 
@@ -58,13 +59,36 @@ func fetchIMCCE(t *testing.T, name string) (H, G float64) {
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		t.Skipf("IMCCE network unavailable: %v", err)
+		// A transport failure, so both predicates are needed: Unreachable knows
+		// a refused dial and a DNS failure, SkipOnUpstreamFailure a timeout or
+		// a connection dropped mid-transfer. Neither covers the other, and
+		// anything they both decline is a request this test built wrong.
+		if testutil.Unreachable(err) {
+			t.Skipf("IMCCE is unreachable: %v", err)
+		}
+
+		testutil.SkipOnUpstreamFailure(t, err)
+		t.Fatalf("IMCCE request for %s: %v", name, err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
+	// Checked before the body is decoded, because an error page decodes as
+	// badly as a changed schema and the two are not the same news.
+	if resp.StatusCode != http.StatusOK {
+		if resp.StatusCode >= http.StatusInternalServerError ||
+			resp.StatusCode == http.StatusTooManyRequests {
+			t.Skipf("IMCCE answered %d for %s", resp.StatusCode, name)
+		}
+
+		t.Fatalf("IMCCE answered %d for %s", resp.StatusCode, name)
+	}
+
+	// Fatal, not a skip. This decodes IMCCE's document into a struct declared
+	// in this repository: a failure here is a schema that moved or a struct
+	// that was always wrong, and skipping it made that permanently invisible.
 	var card imcceCard
 	if err := json.NewDecoder(resp.Body).Decode(&card); err != nil {
-		t.Skipf("IMCCE JSON decode error: %v", err)
+		t.Fatalf("decoding the IMCCE card for %s: %v", name, err)
 	}
 
 	if card.Params.Physical.AbsMag == nil {

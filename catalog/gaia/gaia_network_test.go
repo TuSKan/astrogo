@@ -33,7 +33,8 @@ func requireGaia(t *testing.T) {
 
 	u, err := url.Parse(raw)
 	if err != nil {
-		t.Skipf("%s has an unusable URL: %v", DefaultEndpoint, err)
+		testutil.SkipOnUpstreamFailure(t, err)
+		t.Fatalf("%s resolves to %q, which does not parse: %v", DefaultEndpoint, raw, err)
 	}
 
 	port := u.Port()

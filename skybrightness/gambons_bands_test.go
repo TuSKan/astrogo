@@ -86,7 +86,8 @@ func TestAgainstGAMBONSTable2AcrossBands(t *testing.T) {
 		StepNM:       0.1,
 	}, grid, 87_000)
 	if err != nil {
-		t.Skipf("SkyCalc did not answer: %v", err)
+		testutil.SkipOnUpstreamFailure(t, err)
+		t.Fatalf("airglow.NewAirglow: %v", err)
 	}
 
 	model, err := skybrightness.NewModel("gambons-bands",

@@ -37,9 +37,15 @@ func TestSFDMatchesIRSA(t *testing.T) {
 	// Two hemispheres of 64 MB, consent-gated like every other bulk fetch.
 	remote.EnableDownloads(160<<20, remote.SFDDustMap)
 
+	// Fatal, not a skip, and the old message was the giveaway. CachedDirections
+	// returns an error only when the cache location cannot be resolved —
+	// readCache treats an absent file as an empty result — so "no cached IRSA
+	// answers" was never what this branch meant. That case is the length check
+	// below, which is a real precondition and stays a skip.
 	cached, err := dust.CachedDirections(ctx)
 	if err != nil {
-		t.Skipf("no cached IRSA answers to compare against: %v", err)
+		testutil.SkipOnUpstreamFailure(t, err)
+		t.Fatalf("dust.CachedDirections: %v", err)
 	}
 
 	if len(cached) < 100 {
@@ -48,7 +54,8 @@ func TestSFDMatchesIRSA(t *testing.T) {
 
 	sfd, err := dust.Open(ctx)
 	if err != nil {
-		t.Skipf("could not open the SFD map: %v", err)
+		testutil.SkipOnUpstreamFailure(t, err)
+		t.Fatalf("dust.Open: %v", err)
 	}
 
 	var (

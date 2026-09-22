@@ -13,6 +13,7 @@ import (
 	"github.com/TuSKan/astrogo/ephemeris/core"
 	"github.com/TuSKan/astrogo/ephemeris/jpl"
 	"github.com/TuSKan/astrogo/internal/metrology"
+	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/time"
 )
 
@@ -311,7 +312,8 @@ const firstLeapSecondYear = 1972
 func TestNoTimekeepingStepAtTheLeapSecondBoundary(t *testing.T) {
 	p, err := jpl.NewProvider(context.Background(), core.Planets, "de440")
 	if err != nil {
-		t.Skipf("the JPL provider could not be built: %v", err)
+		testutil.SkipOnUpstreamFailure(t, err)
+		t.Fatalf("jpl.NewProvider: %v", err)
 	}
 
 	defer func() { _ = p.Close() }()

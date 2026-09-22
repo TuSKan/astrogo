@@ -167,7 +167,8 @@ func TestAgainstGAMBONSTable2(t *testing.T) {
 		end := min(start+dustChunk, len(dirs))
 
 		if _, err := dust.Fetch(ctx, dustMap, dirs[start:end]...); err != nil {
-			t.Skipf("IRSA stopped answering after %d of %d sightlines: %v", dustMap.Len(), len(dirs), err)
+			testutil.SkipOnUpstreamFailure(t, err)
+			t.Fatalf("dust.Fetch stopped after %d of %d sightlines: %v", dustMap.Len(), len(dirs), err)
 		}
 	}
 
@@ -175,7 +176,8 @@ func TestAgainstGAMBONSTable2(t *testing.T) {
 
 	skyMap, err := starlight.Open(ctx)
 	if err != nil {
-		t.Skipf("could not fetch the published star map: %v", err)
+		testutil.SkipOnUpstreamFailure(t, err)
+		t.Fatalf("starlight.Open: %v", err)
 	}
 
 	stars, err := skyMap.Band("V")
@@ -201,7 +203,8 @@ func TestAgainstGAMBONSTable2(t *testing.T) {
 		StepNM:       0.1,
 	}, grid, 87_000)
 	if err != nil {
-		t.Skipf("SkyCalc did not answer: %v", err)
+		testutil.SkipOnUpstreamFailure(t, err)
+		t.Fatalf("airglow.NewAirglow: %v", err)
 	}
 
 	model, err := skybrightness.NewModel("gambons-table2",

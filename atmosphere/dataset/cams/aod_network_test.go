@@ -59,7 +59,8 @@ func aodAt(tb testing.TB, lonDeg, latDeg float64) float64 {
 
 	v, err := cams.AOD550(ctx, siteAt(tb, lonDeg, latDeg), aodEpoch)
 	if err != nil {
-		tb.Skipf("CAMS did not answer: %v", err)
+		testutil.SkipOnUpstreamFailure(tb, err)
+		tb.Fatalf("cams.AOD550: %v", err)
 	}
 
 	return v

@@ -35,9 +35,12 @@ const settledMargin = 18 * 30 * 24 * time.Hour
 // This is checked rather than left to the span comments because the spans are
 // written as date strings, where "2027" looks no different from "2025".
 func TestCorpusEpochsAreSettled(t *testing.T) {
+	// Fatal: the corpus is a file in this repository, not a service. If it
+	// cannot be loaded it is missing or malformed, which is news, and the line
+	// below already treats an empty one that way.
 	c, err := loadCorpus()
 	if err != nil {
-		t.Skipf("corpus unavailable: %v", err)
+		t.Fatalf("loadCorpus: %v", err)
 	}
 
 	if len(c.Entries) == 0 {
