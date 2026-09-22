@@ -91,7 +91,7 @@ func TestReadParsesEveryColumn(t *testing.T) {
 		got  float64
 		want float64
 	}{
-		{"semi-major axis (AU)", eros.SemiMajorAxis, 1.4582437},
+		{"semi-major axis (AU)", eros.SemiMajorAxis.AU(), 1.4582437},
 		{"eccentricity", eros.Eccentricity, 0.2228780},
 		{"inclination (deg)", eros.Inclination.Degrees(), 10.82855},
 		{"ascending node (deg)", eros.AscendingNode.Degrees(), 304.26797},
@@ -450,8 +450,9 @@ func TestParsedElementsPropagate(t *testing.T) {
 	// built straight from the semi-major axis it was given.
 	r := pos.Norm()
 
-	perihelion := eros.SemiMajorAxis * (1 - eros.Eccentricity)
-	aphelion := eros.SemiMajorAxis * (1 + eros.Eccentricity)
+	a := eros.SemiMajorAxis.AU()
+	perihelion := a * (1 - eros.Eccentricity)
+	aphelion := a * (1 + eros.Eccentricity)
 
 	if r < perihelion-1e-6 || r > aphelion+1e-6 {
 		t.Errorf("heliocentric distance %.6f AU is outside [%.6f, %.6f] AU, which its own "+

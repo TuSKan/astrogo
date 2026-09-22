@@ -255,7 +255,7 @@ func TestNewAsteroid_KeplerBackedProvider(t *testing.T) {
 	// Illustrative main-belt-asteroid-like elements (roughly Ceres'
 	// real values) — precision doesn't matter here, only that the
 	// plumbing produces a real, non-degenerate result.
-	el, err := eph.NewElements(epoch, 2.77, 0.076,
+	el, err := eph.NewElements(epoch, unit.AU(2.77), 0.076,
 		angle.Deg(10.6), angle.Deg(80.3), angle.Deg(73.6), angle.Deg(0))
 	if err != nil {
 		t.Fatalf("NewElements: %v", err)
@@ -289,8 +289,9 @@ func TestNewAsteroid_KeplerBackedProvider(t *testing.T) {
 	// closer than (perihelion - 1.5 AU of Earth's own orbit) nor
 	// farther than (aphelion + 1.5 AU) — loose, just catches a
 	// degenerate zero-vector or wildly wrong result.
-	minPlausible := el.SemiMajorAxis()*(1-el.Eccentricity()) - 1.5
-	maxPlausible := el.SemiMajorAxis()*(1+el.Eccentricity()) + 1.5
+	semiMajorAU := el.SemiMajorAxis().AU()
+	minPlausible := semiMajorAU*(1-el.Eccentricity()) - 1.5
+	maxPlausible := semiMajorAU*(1+el.Eccentricity()) + 1.5
 
 	if vec.Norm() < minPlausible || vec.Norm() > maxPlausible {
 		t.Errorf("GeocentricVec norm = %v AU, outside plausible band [%v, %v]", vec.Norm(), minPlausible, maxPlausible)

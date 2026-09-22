@@ -12,6 +12,7 @@ import (
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 func TestSBDBResolver(t *testing.T) {
@@ -176,7 +177,7 @@ func TestSBDBResolver_OrbitalElements(t *testing.T) {
 		t.Fatal("HasElements = false, want true: fixture has complete orbit.elements + epoch")
 	}
 
-	testutil.AssertNear(t, "SemiMajorAxis", tar.SemiMajorAxis, 2.77, 1e-9)
+	testutil.AssertNear(t, "SemiMajorAxis", tar.SemiMajorAxis.AU(), 2.77, 1e-9)
 	testutil.AssertNear(t, "Eccentricity", tar.Eccentricity, 0.0797, 1e-9)
 	testutil.AssertNear(t, "Inclination", tar.Inclination.Degrees(), 10.6, 1e-9)
 	testutil.AssertNear(t, "AscendingNode", tar.AscendingNode.Degrees(), 80.2, 1e-9)
@@ -281,8 +282,9 @@ func TestSBDBResolver_PhysicalDiameterAlbedo(t *testing.T) {
 		t.Fatalf("Failed to resolve Eros")
 	}
 
-	if !tar.HasDiameter || tar.Diameter != 16.84 {
-		t.Errorf("Diameter = %v (HasDiameter=%v), want 16.84 (HasDiameter=true)", tar.Diameter, tar.HasDiameter)
+	if !tar.HasDiameter || tar.Diameter != unit.Km(16.84) {
+		t.Errorf("Diameter = %v (HasDiameter=%v), want 16.84 km (HasDiameter=true)",
+			tar.Diameter, tar.HasDiameter)
 	}
 
 	if !tar.HasAlbedo || tar.Albedo != 0.25 {
@@ -498,8 +500,8 @@ func TestSearchBrightMock_OrbitalElements(t *testing.T) {
 		t.Fatal("expected Ceres to have HasElements=true — every element was present")
 	}
 
-	if math.Abs(ceres.SemiMajorAxis-2.77) > 1e-9 {
-		t.Errorf("SemiMajorAxis = %v, want 2.77", ceres.SemiMajorAxis)
+	if math.Abs(ceres.SemiMajorAxis.AU()-2.77) > 1e-9 {
+		t.Errorf("SemiMajorAxis = %v, want 2.77 AU", ceres.SemiMajorAxis)
 	}
 
 	if math.Abs(ceres.Eccentricity-0.0797) > 1e-9 {

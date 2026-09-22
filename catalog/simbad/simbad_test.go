@@ -12,6 +12,7 @@ import (
 	"github.com/TuSKan/astrogo/catalog/resolve"
 
 	"github.com/TuSKan/astrogo/remote"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 func TestParseCSV(t *testing.T) {
@@ -207,8 +208,8 @@ func TestParseCSV_PopulatesVMag(t *testing.T) {
 	// The fixture's rvz_radvel column (-5.5) was already being parsed here
 	// but never asserted on -- confirm HasRadialVelocity is set alongside
 	// the value, not just the value itself.
-	if !tgt.HasRadialVelocity || tgt.RadialVelocity != -5.5 {
-		t.Errorf("RadialVelocity = %v (HasRadialVelocity=%v), want -5.5 (HasRadialVelocity=true)",
+	if !tgt.HasRadialVelocity || tgt.RadialVelocity != unit.KmPerSec(-5.5) {
+		t.Errorf("RadialVelocity = %v (HasRadialVelocity=%v), want -5.5 km/s (HasRadialVelocity=true)",
 			tgt.RadialVelocity, tgt.HasRadialVelocity)
 	}
 }

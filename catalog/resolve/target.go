@@ -8,6 +8,7 @@ import (
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // Kind represents the type of an astronomical object.
@@ -128,10 +129,10 @@ type Target struct {
 	M2 float64
 	// K2 is the phase coefficient of the target.
 	K2 float64
-	// Diameter is the target's measured physical diameter, in kilometres
-	// (SBDB's "diameter" phys_par entry) — real occultation/thermal/radar
-	// measurement, not derived from H. Set only when HasDiameter is true.
-	Diameter float64
+	// Diameter is the target's measured physical diameter (SBDB's "diameter"
+	// phys_par entry) — a real occultation/thermal/radar measurement, not
+	// derived from H. Set only when HasDiameter is true.
+	Diameter unit.Length
 	// HasDiameter is true if the target has a measured Diameter.
 	HasDiameter bool
 	// Albedo is the target's geometric albedo (SBDB's "albedo" phys_par
@@ -141,13 +142,12 @@ type Target struct {
 	// HasAlbedo is true if the target has a measured Albedo.
 	HasAlbedo bool
 	// RadialVelocity is the radial velocity of the target.
-	RadialVelocity float64
+	RadialVelocity unit.Velocity
 	// G1 is the phase coefficient of the target.
 	G1 float64
 	// SemiMajorAxis is the osculating semi-major axis of the target's
-	// heliocentric orbit, in astronomical units. Set only when HasElements
-	// is true.
-	SemiMajorAxis float64
+	// heliocentric orbit. Set only when HasElements is true.
+	SemiMajorAxis unit.Length
 	// Eccentricity is the osculating eccentricity of the target's orbit.
 	// Set only when HasElements is true.
 	Eccentricity float64

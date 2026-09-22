@@ -49,6 +49,7 @@ import (
 	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // Open fetches an MPCORB-format file from [remote.MPCORB] and streams its
@@ -239,7 +240,7 @@ func parseRow(row string) (resolve.Target, error) {
 		set   func(float64)
 		isDeg bool
 	}{
-		{"semi-major axis", row[colAStart:colAEnd], func(v float64) { t.SemiMajorAxis = v }, false},
+		{"semi-major axis", row[colAStart:colAEnd], func(v float64) { t.SemiMajorAxis = unit.AU(v) }, false},
 		{"eccentricity", row[colEccStart:colEccEnd], func(v float64) { t.Eccentricity = v }, false},
 		{"inclination", row[colInclStart:colInclEnd], func(v float64) { t.Inclination = angle.Deg(v) }, true},
 		{"ascending node", row[colNodeStart:colNodeEnd], func(v float64) { t.AscendingNode = angle.Deg(v) }, true},

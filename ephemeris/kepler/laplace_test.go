@@ -8,6 +8,7 @@ import (
 	"github.com/TuSKan/astrogo/ephemeris/core"
 	"github.com/TuSKan/astrogo/ephemeris/kepler"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 	"github.com/TuSKan/astrogo/vector"
 )
 
@@ -48,7 +49,7 @@ func jovianBare(t *testing.T, i int) kepler.Elements {
 		t.Fatal("no central body for Jupiter")
 	}
 
-	el, err := kepler.NewElements(time.J2000(), kmToAU(s.aKM), s.e,
+	el, err := kepler.NewElements(time.J2000(), unit.AU(kmToAU(s.aKM)), s.e,
 		angle.Deg(s.incl), angle.Deg(s.node), angle.Deg(s.argp), angle.Deg(s.meanAnom))
 	if err != nil {
 		t.Fatalf("%s: NewElements: %v", s.name, err)
@@ -68,7 +69,7 @@ func jovianElements(t *testing.T, i int) kepler.Elements {
 		t.Fatal("no central body for Jupiter")
 	}
 
-	el, err := kepler.NewElements(time.J2000(), kmToAU(s.aKM), s.e,
+	el, err := kepler.NewElements(time.J2000(), unit.AU(kmToAU(s.aKM)), s.e,
 		angle.Deg(s.incl), angle.Deg(s.node), angle.Deg(s.argp), angle.Deg(s.meanAnom))
 	if err != nil {
 		t.Fatalf("%s: NewElements: %v", s.name, err)
@@ -143,7 +144,7 @@ func TestReadingLaplaceElementsAsEclipticIsBadlyWrong(t *testing.T) {
 
 	jupiter, _ := kepler.CentralBodyFor(core.Jupiter)
 
-	base, err := kepler.NewElements(time.J2000(), kmToAU(s.aKM), s.e,
+	base, err := kepler.NewElements(time.J2000(), unit.AU(kmToAU(s.aKM)), s.e,
 		angle.Deg(s.incl), angle.Deg(s.node), angle.Deg(s.argp), angle.Deg(s.meanAnom))
 	if err != nil {
 		t.Fatalf("NewElements: %v", err)

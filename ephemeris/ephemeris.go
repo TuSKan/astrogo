@@ -14,6 +14,7 @@ import (
 	"github.com/TuSKan/astrogo/ephemeris/satellite"
 	"github.com/TuSKan/astrogo/internal/gofaext"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 	"github.com/TuSKan/astrogo/vector"
 )
 
@@ -200,7 +201,7 @@ func WithKeplerBase(p Provider) KeplerOption {
 // first use inside NewFromElements/NewMovingBodyProvider) when the
 // elements are invalid — e.g. e >= 1, which two-body elliptical
 // propagation cannot represent.
-func NewElements(epoch time.Time, semiMajorAxis, eccentricity float64,
+func NewElements(epoch time.Time, semiMajorAxis unit.Length, eccentricity float64,
 	inclination, ascendingNode, argPeriapsis, meanAnomaly angle.Angle,
 ) (Elements, error) {
 	el, err := kepler.NewElements(epoch, semiMajorAxis, eccentricity, inclination, ascendingNode, argPeriapsis, meanAnomaly)
@@ -237,7 +238,7 @@ func NewMovingBodyProvider(opts ...KeplerOption) *kepler.Provider {
 // Kepler-propagated bodies sharing one provider/base, use
 // NewMovingBodyProvider directly and register each body on it.
 //
-//	el, err := eph.NewElements(t, 2.77, 0.076, incl, node, argp, ma)
+//	el, err := eph.NewElements(t, unit.AU(2.77), 0.076, incl, node, argp, ma)
 //	p, err := eph.NewFromElements(eph.ID(2000001), el) // 1 Ceres
 func NewFromElements(id ID, el Elements, opts ...KeplerOption) (Provider, error) {
 	p := NewMovingBodyProvider(opts...)

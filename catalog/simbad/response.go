@@ -14,6 +14,7 @@ import (
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // csvBody prepares a CSV response for parsing, refusing one that is a web page.
@@ -167,7 +168,8 @@ func ParseCSV(r io.Reader) ([]resolve.Target, error) {
 
 			if rvStr, ok := colIdx["rvz_radvel"]; ok && row[rvStr] != "" {
 				if v, err := strconv.ParseFloat(row[rvStr], 64); err == nil {
-					t.RadialVelocity = v
+					// SIMBAD's rvz_radvel is km/s.
+					t.RadialVelocity = unit.KmPerSec(v)
 					t.HasRadialVelocity = true
 				}
 			}
@@ -304,7 +306,8 @@ func ParseBrightCSV(r io.Reader) ([]resolve.Target, error) {
 
 			if rvStr, ok := colIdx["rvz_radvel"]; ok && row[rvStr] != "" {
 				if v, err := strconv.ParseFloat(row[rvStr], 64); err == nil {
-					t.RadialVelocity = v
+					// SIMBAD's rvz_radvel is km/s.
+					t.RadialVelocity = unit.KmPerSec(v)
 					t.HasRadialVelocity = true
 				}
 			}
