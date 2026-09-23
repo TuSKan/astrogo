@@ -59,14 +59,8 @@ func fetchIMCCE(t *testing.T, name string) (H, G float64) {
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		// A transport failure, so both predicates are needed: Unreachable knows
-		// a refused dial and a DNS failure, SkipOnUpstreamFailure a timeout or
-		// a connection dropped mid-transfer. Neither covers the other, and
-		// anything they both decline is a request this test built wrong.
-		if testutil.Unreachable(err) {
-			t.Skipf("IMCCE is unreachable: %v", err)
-		}
-
+		// One call: SkipOnUpstreamFailure consults Unreachable too, so a
+		// refused dial and a DNS failure are covered here as well.
 		testutil.SkipOnUpstreamFailure(t, err)
 		t.Fatalf("IMCCE request for %s: %v", name, err)
 	}

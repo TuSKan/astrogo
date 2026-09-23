@@ -65,7 +65,23 @@ func TestUpstreamFailureClassification(t *testing.T) {
 		// wrong — the URL moved, or the service grew an auth requirement.
 		{"401 unauthorized", &httpStatusError{401}, false},
 		{"parse failure", errStaticParse, false},
-		{"connection refused", &net.DNSError{}, false},
+
+		// The network never carried the request. Delegated to Unreachable
+		// rather than restated here, and these cases are the reason a caller
+		// no longer needs to consult both predicates — see #371.
+		//
+		// The DNS case used to be pinned to false, under the label "connection
+		// refused", which it is not. That expectation was the gap: a name that
+		// does not resolve is no more astrogo's doing than a 503.
+		{"dns failure", &net.DNSError{IsNotFound: true}, true},
+		{"refused dial", &net.OpError{Op: "dial", Err: syscall.ECONNREFUSED}, true},
+		{"host unreachable", &net.OpError{Op: "dial", Err: syscall.EHOSTUNREACH}, true},
+
+		// A caller that gave up on its own budget still says nothing about the
+		// network, and Unreachable declines it — but the deadline arm above
+		// claims it first, deliberately, because a service too slow to answer
+		// within the endpoint's timeout is the service's problem.
+		{"cancelled by the caller", context.Canceled, false},
 	}
 
 	for _, c := range cases {
@@ -98,6 +114,42 @@ func TestSkipOnUpstreamFailureKeepsA404(t *testing.T) {
 
 	if fake.skipped {
 		t.Fatal("a 404 must not skip: astrogo built a request the service rejected")
+	}
+}
+
+// TestSkipOnUpstreamFailureAloneCoversAnUnreachableHost is the point of #371:
+// one call, not two.
+//
+// Before this, a refused dial reached SkipOnUpstreamFailure and was declined,
+// so a call site that wanted the whole question answered had to consult
+// Unreachable first. Four did. The rest of the repository mostly did not, and
+// reached for a skip on any error instead.
+func TestSkipOnUpstreamFailureAloneCoversAnUnreachableHost(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		err  error
+	}{
+		{"a refused dial", &net.OpError{Op: "dial", Err: syscall.ECONNREFUSED}},
+		{"a name that does not resolve", &net.DNSError{IsNotFound: true}},
+	} {
+		fake := &fakeTB{TB: t}
+		SkipOnUpstreamFailure(fake, tc.err)
+
+		if !fake.skipped {
+			t.Errorf("%s must skip through SkipOnUpstreamFailure alone; a caller "+
+				"should not have to ask Unreachable as well", tc.name)
+		}
+	}
+}
+
+// TestSkipOnUpstreamFailureKeepsAParseFailure guards the other direction: the
+// widening must not have turned this into a predicate that skips on anything.
+func TestSkipOnUpstreamFailureKeepsAParseFailure(t *testing.T) {
+	fake := &fakeTB{TB: t}
+	SkipOnUpstreamFailure(fake, errStaticParse)
+
+	if fake.skipped {
+		t.Fatal("a decode failure must not skip: it is astrogo reading a response wrong")
 	}
 }
 
