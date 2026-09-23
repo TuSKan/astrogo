@@ -408,26 +408,6 @@ func Rxp(r [3][3]float64, p [3]float64) [3]float64 {
 	return rp
 }
 
-// Fk425 converts B1950.0 FK4 star data to J2000.0 FK5, with the full
-// six-element transformation: the E-terms of aberration are removed and FK4's
-// fictitious proper motion — the drift of its non-inertial equinox — is
-// subtracted. Proper motions are radians per Julian year, parallax in arcsec,
-// radial velocity in km/s.
-func Fk425(r1950, d1950, dr1950, dd1950, p1950, v1950 float64) (r2000, d2000, dr2000, dd2000, p2000, v2000 float64) {
-	gofa.Fk425(r1950, d1950, dr1950, dd1950, p1950, v1950,
-		&r2000, &d2000, &dr2000, &dd2000, &p2000, &v2000)
-
-	return r2000, d2000, dr2000, dd2000, p2000, v2000
-}
-
-// Fk524 is the inverse of [Fk425]: J2000.0 FK5 to B1950.0 FK4.
-func Fk524(r2000, d2000, dr2000, dd2000, p2000, v2000 float64) (r1950, d1950, dr1950, dd1950, p1950, v1950 float64) {
-	gofa.Fk524(r2000, d2000, dr2000, dd2000, p2000, v2000,
-		&r1950, &d1950, &dr1950, &dd1950, &p1950, &v1950)
-
-	return r1950, d1950, dr1950, dd1950, p1950, v1950
-}
-
 // Fk45z converts a B1950.0 FK4 position with *no* proper motion to J2000.0
 // FK5, given the Besselian epoch the FK4 position was determined at.
 //

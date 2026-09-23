@@ -440,7 +440,10 @@ func TestProperMotionSurvivesWithoutAParallax(t *testing.T) {
 func TestAtRestWithoutParallaxStaysAtRest(t *testing.T) {
 	t.Parallel()
 
-	for _, parallax := range []float64{0, 1e-7, 1e-4, 1e-3, 2e-2} {
+	// The grid now spans #339's whole table, including the rows that used to
+	// be skipped: 1e-9 arcsec is 1 Gpc, where a star at rest came back with
+	// 38.9 km/s.
+	for _, parallax := range []float64{0, 1e-9, 1e-7, 1e-5, 1e-4, 1e-3, 2e-2} {
 		start := coord.NewFK4WithProperMotion(
 			angle.Deg(123.4), angle.Deg(0),
 			angle.Zero(), angle.Zero(),
@@ -459,25 +462,25 @@ func TestAtRestWithoutParallaxStaysAtRest(t *testing.T) {
 				parallax, gotRA, gotDec)
 		}
 
-		// Radial velocity closes too, but only down to a parallax a real
-		// catalogue could contain — and the exception is a different defect,
-		// not a remnant of this one.
+		// Radial velocity closes at every row now, including the ones this
+		// test used to skip. It recovered a velocity as rd/(px·VF), so the
+		// frame artifact FK4 gives a star at rest was divided by the parallax
+		// and grew without bound — 3.9e-5 km/s at 1e-3, 0.39 at 1e-7, 39 at
+		// 1e-9, exactly proportional to 1/px.
 		//
-		// Below about 1e-5 arcsec the residual is iauFk524's own: it recovers
-		// a radial velocity as rd/(px·VF), so the frame artifact FK4 gives a
-		// star at rest is divided by the parallax and grows without bound.
-		// Measured on this case, it is exactly proportional to 1/px —
-		// 3.9e-5 km/s at 1e-3, 3.9e-4 at 1e-4, 0.39 at 1e-7, 39 at 1e-9 —
-		// which is a property of the FK4 routines rather than of the pv path
-		// #331 was about, and is why the proper motion above is clean at every
-		// row while this is not. Tracked separately.
+		// #339 fixed it where it belongs, in gofaext: the FK4 geometry never
+		// needed the distance (iauFk524 builds its pv-vector with a radius of
+		// 1.0), so a parallax that describes no distance now takes a route
+		// that does not divide by one.
 		//
-		// 1e-5 arcsec is 100 kpc. Nothing with an FK4 position is out there.
-		if parallax != 0 && parallax < 1e-4 {
-			continue
-		}
-
-		if rv := back.RV().KmPerSec(); math.Abs(rv) > 1e-3 {
+		// The bound is #339's own. Where the parallax describes no distance
+		// the answer is exactly zero and gofaext's
+		// TestFK4RoundTripClosesAtEveryParallax asserts that; where it
+		// describes a real one SOFA answers and carries a residual, because a
+		// frame artifact at a known distance really is a small space velocity.
+		// At 1e-5 arcsec — 100 kpc, further than anything with an FK4 position
+		// — that residual is 3.9 mm/s, and it falls as 1/px from there.
+		if rv := back.RV().KmPerSec(); math.Abs(rv) > 4e-3 {
 			t.Errorf("parallax %g: a star at rest came back at %+.6f km/s, want 0", parallax, rv)
 		}
 	}
