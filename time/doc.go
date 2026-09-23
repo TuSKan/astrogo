@@ -167,7 +167,7 @@
 //   - [Time.Calendar]'s day fraction is of the day's own length, so it stays in
 //     [0, 1) through the leap second.
 //
-// A second UTC never labelled is still reported rather than built: 23:59:60 on
+// A second UTC never labeled is still reported rather than built: 23:59:60 on
 // a day that gained no leap second, 23:59:61 anywhere, and 23:59:59 on the day
 // of a negative leap second. [Date] has no error to return, so it does what the
 // standard library does — rolls the second into the following minute — and

@@ -810,8 +810,8 @@ func (t Time) Add(d unit.Duration) Time {
 // is built as the instant it is: 2016-12-31 23:59:60 is one SI second after
 // 23:59:59 and one before the following midnight. See utcday.go.
 //
-// A second UTC never labelled — 60 on a day that gained no leap second, 61 or
-// more, or 23:59:59 on the day of a negative leap second — is normalised into
+// A second UTC never labeled — 60 on a day that gained no leap second, 61 or
+// more, or 23:59:59 on the day of a negative leap second — is normalized into
 // the following minute as the standard library does, and reported through
 // [logging], since this constructor has no error to return. See
 // leapsecond_alias.go.

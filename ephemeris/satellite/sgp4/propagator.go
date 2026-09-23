@@ -12,7 +12,7 @@ import (
 // # It has no effect on a near-Earth orbit
 //
 // The two modes differ in exactly two places: how sidereal time at epoch is
-// computed, and how the node is normalised inside dpper's Lyddane branch. Both
+// computed, and how the node is normalized inside dpper's Lyddane branch. Both
 // are deep space. Sidereal time reaches the model only through dscom, dsinit
 // and dspace, and the near-Earth path never reads it — so for a period under
 // 225 minutes the two modes are bit-identical, and this option is inert.

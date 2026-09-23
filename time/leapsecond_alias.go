@@ -10,7 +10,7 @@ import (
 	"github.com/TuSKan/astrogo/logging"
 )
 
-// Seconds that were never labelled, and what Date does when asked for one.
+// Seconds that were never labeled, and what Date does when asked for one.
 //
 // A real leap second is an instant of its own: [Date] builds 2016-12-31
 // 23:59:60 on the day's 86401st second, where it carries the ΔAT of 36 that
@@ -28,7 +28,7 @@ import (
 var warnSecondOutOfRangeOnce sync.Once
 
 // warnSecondOutOfRange reports, once per process, that a calendar instant
-// named a second UTC never labelled, and was normalised into the next minute.
+// named a second UTC never labeled, and was normalized into the next minute.
 //
 // Once per process rather than per call, matching [warnEOPUnavailable]: a
 // caller iterating a corpus of bad timestamps would otherwise get one line per
@@ -47,7 +47,7 @@ func warnSecondOutOfRange(year int, month time.Month, day, hour, minute, second 
 // classifying on the components as given would report the real 2016-12-31 leap
 // second as a second that never existed. The second is deliberately not passed
 // through the conversion — it is the value under discussion, and handing it to
-// time.Date is exactly what normalises it away.
+// time.Date is exactly what normalizes it away.
 //
 // Deep-historical years are returned unchanged, because [Date] ignores loc for
 // them too.
@@ -69,7 +69,7 @@ func logSecondOutOfRange(y, m, d, hour, minute, second int) {
 	// Warn, not Info, and so still emitted by the default logger. Date has no
 	// error return, and this is the only notice a caller gets that the instant
 	// they asked for is not the instant they received.
-	logging.Warn("second out of range, instant normalised into the following minute",
+	logging.Warn("second out of range, instant normalized into the following minute",
 		"utc", isoSecond(y, m, d, hour, minute, second),
 		"reason", "no leap second was inserted at the end of this UTC day",
 		"remedy", "pass a second in [0,59]; check the source that produced this timestamp")
@@ -110,7 +110,7 @@ func nextDay(y, m, d int) (int, int, int, float64) {
 
 // isoSecond formats a calendar instant for the warning's utc attribute. The
 // second is printed verbatim, 60 and above included: which value was rejected
-// is the whole point of the message, so this must not normalise it the way the
+// is the whole point of the message, so this must not normalize it the way the
 // constructor being reported on just did.
 func isoSecond(y, m, d, hour, minute, second int) string {
 	return fmt.Sprintf("%04d-%02d-%02dT%02d:%02d:%02dZ", y, m, d, hour, minute, second)

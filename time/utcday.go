@@ -330,14 +330,14 @@ func utcFromUT1(jd1, jd2 float64) (float64, float64) {
 // ends in a positive leap second, within the second the day gained.
 //
 // Anything else reports false, and [Date] falls back to what it always did —
-// normalising, and saying so. That covers a second of 60 on a day with no leap
+// normalizing, and saying so. That covers a second of 60 on a day with no leap
 // second, a second of 61, and every second of 60 on the day of a negative leap
 // second, when the minute is shorter rather than longer.
 //
 // The day is decided in UTC, because a leap second is inserted at the end of a
 // UTC day: in UTC+1 the same instant is 00:59:60 on the following date.
 // [utcComponents] converts without passing the second through, since handing
-// 60 to the standard library is exactly what normalises it away.
+// 60 to the standard library is exactly what normalizes it away.
 func dateInLeapSecond(year int, month Month, day, hour, minute, second, nanosecond int, loc *Location) (Time, bool) {
 	y, m, d, hh, mm := utcComponents(year, month, day, hour, minute, loc)
 	if hh != 23 || mm != 59 || !leapSecondEndsDay(y, int(m), d) {

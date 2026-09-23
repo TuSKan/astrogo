@@ -90,7 +90,7 @@ func TestDateReportsASecondThatNeverExisted(t *testing.T) {
 	Date(2016, 6, 30, 23, 59, 60, 0, stdtime.UTC)
 
 	if !strings.Contains(buf.String(), "second out of range") {
-		t.Errorf("Date normalised a second that never existed without reporting it; logger saw:\n%q",
+		t.Errorf("Date normalized a second that never existed without reporting it; logger saw:\n%q",
 			buf.String())
 	}
 
@@ -131,7 +131,7 @@ func TestSecondOutOfRangeIsAWarningNotProgress(t *testing.T) {
 	}
 
 	for _, want := range []string{
-		`msg="second out of range, instant normalised into the following minute"`,
+		`msg="second out of range, instant normalized into the following minute"`,
 		"utc=2016-06-30T23:59:60Z",
 		"reason=",
 		"remedy=",
@@ -244,6 +244,6 @@ func TestAliasWarningReportsTheUTCDate(t *testing.T) {
 	}
 
 	if !leapSecondEndsDay(y, int(m), d) {
-		t.Error("the 2016-12-31 leap second was not recognised through a non-UTC zone")
+		t.Error("the 2016-12-31 leap second was not recognized through a non-UTC zone")
 	}
 }
