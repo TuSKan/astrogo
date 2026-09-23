@@ -308,7 +308,7 @@ func TestNewAsteroid_KeplerBackedProvider(t *testing.T) {
 }
 
 func TestNewElements_RejectsHyperbolicEccentricity(t *testing.T) {
-	_, err := eph.NewElements(time.FromJD(2451545.0, time.UTC), 2.77, 1.2, // hyperbolic — unsupported by ephemeris/kepler
+	_, err := eph.NewElements(time.FromJD(2451545.0, time.UTC), 2.77, 1.2, // hyperbolic — a semi-major axis and mean anomaly describe an ellipse only
 		angle.Zero(), angle.Zero(), angle.Zero(), angle.Zero())
 	if err == nil {
 		t.Fatal("NewElements: expected error for hyperbolic eccentricity, got nil")

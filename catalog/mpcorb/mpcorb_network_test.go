@@ -109,7 +109,8 @@ func TestOpenParsesTheWholeSubsetFile(t *testing.T) {
 		// MPCORB is built on a and n, so it can only express a closed orbit.
 		// Measured across Distant.txt, NEA.txt and Unusual.txt on 2026-09-08:
 		// 92,865 rows, not one with e >= 1. That is what makes this package's
-		// output safe to hand to kepler, whose propagator is elliptical only.
+		// output safe to hand to kepler.NewElements, whose semi-major-axis
+		// form is elliptical only.
 		if tgt.Eccentricity < 0 || tgt.Eccentricity >= 1 {
 			t.Errorf("%s (%s): eccentricity %v is not a closed orbit", tgt.ID, tgt.Name, tgt.Eccentricity)
 		}

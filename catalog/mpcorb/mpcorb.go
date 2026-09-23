@@ -13,10 +13,10 @@
 // Comets. The MPC publishes them in CometEls.txt, in a different format built
 // around perihelion distance and time rather than semi-major axis and mean
 // anomaly, and most of them are near-parabolic: e is at or above 1 for the
-// long-period comets that make up the bulk of the file. astrogo's propagator is
-// elliptical only ([github.com/TuSKan/astrogo/ephemeris/kepler.ErrUnsupportedOrbit]),
-// so a CometEls reader would parse a file it cannot propagate. The propagator
-// comes first; see #128.
+// long-period comets that make up the bulk of the file. The propagator takes
+// that form now, for any e, through
+// [github.com/TuSKan/astrogo/ephemeris/kepler.FromPerihelion]; what remains is
+// a reader for the file.
 //
 // # Sizes
 //

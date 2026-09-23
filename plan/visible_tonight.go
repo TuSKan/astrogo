@@ -138,8 +138,9 @@ func WithPlanetaryMoons() VisibleTonightOption {
 // elements' own epoch, ~0.56″ at 30 days out — see CHANGELOG for the
 // live 433 Eros validation). A candidate with no published elements, or
 // whose orbit is hyperbolic/parabolic (every KindInterstellar object,
-// and near-parabolic comets — two-body propagation cannot represent
-// either), still takes the kernel path regardless of this option.
+// and near-parabolic comets — the semi-major axis and mean anomaly a
+// catalog target carries cannot describe either), still takes the kernel
+// path regardless of this option.
 //
 // Use this when real, perturbed, kernel-backed positions matter more
 // than the network/consent cost: astrometry, occultation prediction,
