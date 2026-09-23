@@ -259,7 +259,7 @@ func bitpixForType(dt arrow.DataType) (bitpix int, bzero float64, err error) {
 //	uint64 -> BITPIX 64, BZERO 9223372036854775808
 //
 // These are the values FITS 4.0 §5.2.5 names and the ones every reader
-// recognises, which is what makes the convention interoperable rather than a
+// recognizes, which is what makes the convention interoperable rather than a
 // private encoding.
 func unsignedBZero(bitpix int) float64 {
 	return math.Pow(2, float64(bitpix-1))

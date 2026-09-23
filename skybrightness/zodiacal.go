@@ -293,7 +293,7 @@ func bracketZodiacalLatitude(lat float64) (int, float64) {
 }
 
 // ZodiacalColorCorrection returns Leinert et al. (1998) Eq. 22's factor
-// f_co: the ratio of the zodiacal light's spectrum to the Sun's, normalised
+// f_co: the ratio of the zodiacal light's spectrum to the Sun's, normalized
 // to 1 at 500 nm.
 //
 //	elongation <= 30 deg:  1 + 1.2*log10(lambda/500)  for lambda >= 500 nm

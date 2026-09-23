@@ -13,7 +13,7 @@
 // # Which filters
 //
 // SVO identifies a filter by a string like "Generic/Bessell.V". Bessell (1990)
-// is the standard realisation of the Johnson-Cousins UBVRI system, so
+// is the standard realization of the Johnson-Cousins UBVRI system, so
 // "Generic/Bessell.U" through "Generic/Bessell.I" are the five bands
 // Masana et al. (2024) Table 1 tabulates. The service carries several thousand
 // others; nothing here is specific to Bessell, and the identifier is passed

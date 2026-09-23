@@ -41,8 +41,8 @@ var (
 	// cross-section pairs.
 	ErrFormat = errors.New("crosssection: file has no usable data rows")
 
-	// ErrUnit is returned for an unrecognised wavelength unit.
-	ErrUnit = errors.New("crosssection: unrecognised wavelength unit")
+	// ErrUnit is returned for an unrecognized wavelength unit.
+	ErrUnit = errors.New("crosssection: unrecognized wavelength unit")
 )
 
 // WavelengthUnit names what the first column of a file holds.

@@ -164,7 +164,7 @@ func TestProfileRejectsBadArguments(t *testing.T) {
 // # Why this is the test that matters
 //
 // Kocifaj (2007) Eq. 18 carries an explicit 1/4*pi and this package's phase
-// functions carry their own normalisation, so transcribing the equation
+// functions carry their own normalization, so transcribing the equation
 // literally divides the whole model by 4*pi. That error is a constant factor:
 // every radiance stays positive, every angular shape stays right, and nothing
 // downstream looks wrong. Integrating over the sphere is what distinguishes

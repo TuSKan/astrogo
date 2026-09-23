@@ -99,7 +99,7 @@ func (p *Provider) ResolveObjects(ctx context.Context, req resolve.ObjectRequest
 // Distinct from [Provider.Resolve], and deliberately: several answers are
 // this method's purpose, where for Resolve they are a failure. Anchored at
 // the start rather than wrapped in wildcards, and ordered brightest-first,
-// so the rows are ones a person would recognise and are the same rows on
+// so the rows are ones a person would recognize and are the same rows on
 // every call — the query this replaces had no ORDER BY, and two identical
 // searches for "M42" returned different objects.
 func (p *Provider) Search(ctx context.Context, query string) ([]resolve.Target, error) {

@@ -130,7 +130,7 @@ func TestApparentStateReportsWhichFetchFailed(t *testing.T) {
 // Light deflection needs three directions, and each of them comes from a
 // subtraction that can cancel: a target at the geocenter has no direction from
 // the observer, a target at the Sun's own place has none from the Sun, and a
-// Sun at the geocenter has none to the observer. Normalising any of those
+// Sun at the geocenter has none to the observer. Normalizing any of those
 // yields NaN, and NaN propagates silently all the way to an altitude and an
 // azimuth that are simply absent from a plot.
 //
@@ -236,7 +236,7 @@ func (p *movingSunProvider) Close() error { return nil }
 //
 // deflectBySun finds the Sun-to-source direction by subtracting the Sun's
 // geocentric position from the target's. For the Sun those are the same body,
-// so there is no direction to find, and the formula would be normalising
+// so there is no direction to find, and the formula would be normalizing
 // whatever is left of two nearly identical vectors.
 //
 // # What this asserts, and what it does not
@@ -282,7 +282,7 @@ func TestApparentStateDoesNotDeflectTheSun(t *testing.T) {
 	t.Errorf("the Sun's apparent position is %+v, which is none of the %d positions the "+
 		"provider returned (first %+v, last %+v).\n"+
 		"  Nothing may deflect the Sun by the Sun: the Sun-to-source direction there is the "+
-		"residue of the light-time iteration, not a direction, and normalising it bends the "+
+		"residue of the light-time iteration, not a direction, and normalizing it bends the "+
 		"Sun by milliarcseconds towards nowhere in particular.",
 		st.Pos, len(p.returned), p.returned[0], p.returned[len(p.returned)-1])
 }

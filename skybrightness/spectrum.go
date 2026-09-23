@@ -144,14 +144,14 @@ func DefaultOpticalGrid() unit.SpectralGrid {
 //
 // # What it does not affect
 //
-// The components renormalise a shape so its average across the passband is
+// The components renormalize a shape so its average across the passband is
 // one. So the temperature sets the spectrum's color — how the band-integrated
 // value is distributed across wavelength, and therefore how extinction, which
 // is steepest in the blue, redistributes it — and not the band value itself,
 // which the star map already fixes.
 //
 // Returned in W m^-2 sr^-1 nm^-1 for a blackbody of unit emissivity, though
-// only the shape survives renormalisation.
+// only the shape survives renormalization.
 func BlackbodyShape(grid unit.SpectralGrid, t float64) (SpectralRadiance, error) {
 	if err := grid.Validate(); err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrNoGrid, err)

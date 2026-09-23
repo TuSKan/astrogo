@@ -110,7 +110,7 @@ func RayleighOpticalDepth(lambda unit.WavelengthNM, pressureHPa float64) (unit.O
 	return unit.OpticalDepth(tau), nil
 }
 
-// RayleighPhaseFunction returns the normalised molecular scattering phase
+// RayleighPhaseFunction returns the normalized molecular scattering phase
 // function at scattering angle theta, in sr^-1.
 //
 // Winkler (2022) Eq. 9, after Bucholtz (1995):
@@ -123,7 +123,7 @@ func RayleighOpticalDepth(lambda unit.WavelengthNM, pressureHPa float64) (unit.O
 // dipole form (1 + cos^2)*3/(16*pi).
 //
 // The function integrates to exactly 1 over the sphere, which
-// TestRayleighPhaseFunctionNormalisation verifies.
+// TestRayleighPhaseFunctionNormalization verifies.
 func RayleighPhaseFunction(theta float64, depolarisation float64) float64 {
 	rho := depolarisation
 	cosT := math.Cos(theta)
@@ -133,7 +133,7 @@ func RayleighPhaseFunction(theta float64, depolarisation float64) float64 {
 	return prefactor * ((1+3*rho)/(1-rho) + cosT*cosT)
 }
 
-// HenyeyGreensteinPhaseFunction returns the normalised aerosol scattering
+// HenyeyGreensteinPhaseFunction returns the normalized aerosol scattering
 // phase function at scattering angle theta, in sr^-1.
 //
 // Winkler (2022) Eq. 10, after Henyey & Greenstein (1941):

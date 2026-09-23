@@ -185,7 +185,7 @@ func TestFK4RoundTripClosesAtEveryParallax(t *testing.T) {
 // TestFk52hDoesNotInventARadialVelocityInTheBand is the second half of #339,
 // and the reason maxStellarSpeed exists.
 //
-// #331 taught the FK5 <-> Hipparcos dispatch to recognise the two things
+// #331 taught the FK5 <-> Hipparcos dispatch to recognize the two things
 // iauStarpv says it had to override. Between them and a usable parallax there
 // is a band where it overrides nothing, reports success, and still describes a
 // star crossing the sky at a significant fraction of light speed — because the

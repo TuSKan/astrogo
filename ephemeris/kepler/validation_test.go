@@ -40,7 +40,7 @@ func requireHorizons(t *testing.T) {
 }
 
 // horizonsStatusError is an HTTP status carried out of horizonsGet as an error, so
-// that [testutil.SkipOnUpstreamFailure] can recognise Horizons answering 503
+// that [testutil.SkipOnUpstreamFailure] can recognize Horizons answering 503
 // or 429.
 //
 // This fetch uses net/http directly rather than remote.Client, so nothing
@@ -55,7 +55,7 @@ func (s horizonsStatusError) Error() string { return fmt.Sprintf("horizons: http
 
 func (s horizonsStatusError) HTTPStatus() int { return int(s) }
 
-// TestHorizonsStatusIsRecognisedAsAnOutage checks that the type above actually
+// TestHorizonsStatusIsRecognizedAsAnOutage checks that the type above actually
 // reaches the classifier.
 //
 // It is matched structurally, through an interface testutil declares inline and
@@ -65,7 +65,7 @@ func (s horizonsStatusError) HTTPStatus() int { return int(s) }
 //
 // 404 is in the table for the other half of the contract: a status that means
 // astrogo asked for the wrong thing must stay fatal.
-func TestHorizonsStatusIsRecognisedAsAnOutage(t *testing.T) {
+func TestHorizonsStatusIsRecognizedAsAnOutage(t *testing.T) {
 	for _, tc := range []struct {
 		name     string
 		status   int

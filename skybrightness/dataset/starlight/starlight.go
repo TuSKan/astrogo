@@ -265,7 +265,7 @@ func Load(r io.Reader, frame Frame) (*Map, error) {
 	return assemble(pixels, flat, names, nbands, frame)
 }
 
-// bandHeader recognises a "# bands: ..." comment.
+// bandHeader recognizes a "# bands: ..." comment.
 func bandHeader(comment string) ([]string, bool) {
 	trimmed := strings.TrimSpace(strings.TrimPrefix(comment, "#"))
 

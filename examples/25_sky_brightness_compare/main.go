@@ -174,7 +174,7 @@ darker of the three.
 
 That is correct physics and a trap. Read as advice about where to put a
 telescope it says the opposite of the truth. Getting the number a city dweller
-would recognise needs the Observatory preset over a real ground-emitter
+would recognize needs the Observatory preset over a real ground-emitter
 inventory, and that inventory is the one input satellite radiance alone cannot
 supply: the same VIIRS pixel is produced by many different real installations,
 differing in spectrum and in how much light they throw sideways rather than up.

@@ -243,7 +243,7 @@ const (
 // 1.1 arcsec per century, and it was measured rather than assumed. Against
 // Astropy's V_OFFSET_LSRK — which comes from the same Gordon apex through a
 // full FK4-with-equinox implementation, and is therefore an independent
-// realisation of the same definition:
+// realization of the same definition:
 //
 //	astrogo  [ 0.290050549357874, -17.317263640487756, 10.001412434484337]
 //	astropy  [ 0.289997068390346, -17.317264789717928, 10.001411995469470]
@@ -255,7 +255,7 @@ const (
 // the model difference and nothing else. 5.4 cm/s is twenty times below the
 // best radial-velocity precision anyone achieves and some two thousand times
 // below what spectral-line work quotes, on a convention whose own definition is
-// uncertain by far more. TestLSRKMatchesAstropysRealisation pins it.
+// uncertain by far more. TestLSRKMatchesAstropysRealization pins it.
 //
 // If [coord.FK4] ever learns a real equinox and Newcomb precession (#295's
 // option A), this becomes exact and the test tightens.

@@ -87,7 +87,7 @@ func TestLeapSecondRecordIsWellFormed(t *testing.T) {
 		// Every leap second so far has been positive, and an earlier version
 		// of this test asserted exactly +1 on that basis. That was wrong, and
 		// wrong in the direction that matters: the ITU-R has permitted a
-		// *negative* leap second since 1972 — realised by skipping 23:59:59
+		// *negative* leap second since 1972 — realized by skipping 23:59:59
 		// and advancing from 23:59:58 straight to 00:00:00 — and Levine,
 		// Tavella & Milton (2023) state plainly that it is "no longer simply
 		// an academic possibility", projecting one by about 2030 if the

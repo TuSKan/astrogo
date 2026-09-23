@@ -262,13 +262,13 @@ func BenchmarkLSRCorrection(b *testing.B) {
 	}
 }
 
-// TestLSRKMatchesAstropysRealisation is the check that makes the derived
+// TestLSRKMatchesAstropysRealization is the check that makes the derived
 // kinematic apex trustworthy, and the record of what it costs.
 //
 // Gordon (1975) publishes LSRK as an apex referred to the B1900 equinox.
 // astrogo derives the ICRS vector from that statement; Astropy derives it from
 // the same statement through a full FK4-with-equinox implementation and checks
-// the result in as a literal. Two independent realisations of one definition,
+// the result in as a literal. Two independent realizations of one definition,
 // so agreement is evidence and disagreement is a bug in one of them.
 //
 // They do not agree exactly, and the residual is explained rather than
@@ -276,7 +276,7 @@ func BenchmarkLSRCorrection(b *testing.B) {
 // so it precesses B1900 to B1950 with the IAU 1976 model. The two differ by
 // about 1.1 arcsec per century in the precession constant, and half a century
 // of that is what the test measures.
-func TestLSRKMatchesAstropysRealisation(t *testing.T) {
+func TestLSRKMatchesAstropysRealization(t *testing.T) {
 	t.Parallel()
 
 	// astropy.coordinates.builtin_frames.galactic_transforms, V_OFFSET_LSRK.

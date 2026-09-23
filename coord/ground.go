@@ -52,7 +52,7 @@ func GroundDistance(a, b *Geodetic) (unit.Length, error) {
 }
 
 // InitialBearing returns the initial great-circle bearing from a to b,
-// measured clockwise from true north and normalised to [0, 360).
+// measured clockwise from true north and normalized to [0, 360).
 //
 // It is the *initial* bearing: along a great circle the bearing changes
 // continuously, so this is the direction to set off in, not a constant

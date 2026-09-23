@@ -118,7 +118,7 @@ type UpwardEmission struct {
 }
 
 // Weight returns the relative emission at elevation above the source's
-// horizon, normalised so that a Lambertian source with no horizontal
+// horizon, normalized so that a Lambertian source with no horizontal
 // component has unit weight at the zenith.
 func (u UpwardEmission) Weight(elevation angle.Angle) float64 {
 	sin := elevation.Sin()
@@ -180,11 +180,11 @@ type GarstangEmission struct {
 
 // Weight implements [EmissionShape].
 //
-// Normalised by the value at the zenith, so it is a shape rather than an
+// Normalized by the value at the zenith, so it is a shape rather than an
 // absolute output and composes with the emitter's own radiance the same way
 // [UpwardEmission] does. At the zenith z0 is zero, the direct term vanishes
 // and the value is 2*Q*(1-q); a configuration where that is not positive has
-// no zenith emission to normalise against and returns zero.
+// no zenith emission to normalize against and returns zero.
 //
 // # The horizon is emission, not the absence of it
 //

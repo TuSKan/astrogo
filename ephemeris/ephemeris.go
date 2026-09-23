@@ -538,7 +538,7 @@ func ApparentState(p Provider, target ID, obsTime time.Time) (State, error) {
 //
 // SOFA's iauLd, which needs three directions and one distance:
 //
-//	p    observer to source        - the geocentric vector, normalised
+//	p    observer to source        - the geocentric vector, normalized
 //	q    Sun to source             - that vector less the Sun's own geocentric
 //	                                 position, both at the retarded epoch where
 //	                                 the light was

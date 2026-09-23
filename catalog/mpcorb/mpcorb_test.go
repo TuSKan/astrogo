@@ -282,7 +282,7 @@ func TestParseEpochNamesTheOffendingCharacter(t *testing.T) {
 // which the subset files do not have.
 //
 // Skipping a fixed number of lines, or scanning for the rule of dashes, both
-// encode a fact about today's header. A row is recognised by being a row —
+// encode a fact about today's header. A row is recognized by being a row —
 // wide enough to reach the readable designation, with an eccentricity where
 // the eccentricity goes — so a header that grows, shrinks or loses its rule
 // changes nothing.
@@ -324,7 +324,7 @@ func TestReadYieldsABadRowAndKeepsGoing(t *testing.T) {
 	t.Parallel()
 
 	// Corrupt Hidalgo's inclination, leaving its width and every other field
-	// intact so the row is still recognised as a row.
+	// intact so the row is still recognized as a row.
 	broken := strings.Replace(fixture, "   42.52433  0.6620703", "   4x.52433  0.6620703", 1)
 	if broken == fixture {
 		t.Fatal("the fixture no longer contains the substring this test corrupts")

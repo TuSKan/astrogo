@@ -190,7 +190,7 @@ func TestScatteredInGrowsTowardTheHorizon(t *testing.T) {
 //
 // A uniform star map with a flat spectral shape has a known extra-atmospheric
 // radiance — the map's own value, at every wavelength, because the shape is
-// normalised to average one across the band. Running it through the component,
+// normalized to average one across the band. Running it through the component,
 // which attenuates it, and then through AboveAtmosphere, which undoes that,
 // must return the number it started as.
 func TestAboveAtmosphereRecoversTheExtraAtmosphericField(t *testing.T) {

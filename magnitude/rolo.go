@@ -43,7 +43,7 @@ const (
 	ROLOSolidAngleSR = 6.4177e-5
 
 	// ROLOStandardDistance is the Moon-observer distance the model
-	// normalises to: 384400 km.
+	// normalizes to: 384400 km.
 	ROLOStandardDistance unit.Length = 384_400_000
 
 	// ROLOMinPhaseDeg and ROLOMaxPhaseDeg bound the absolute phase angle

@@ -228,7 +228,7 @@ func FK5ToFK4(c FK5, bepoch float64) FK4 {
 // FK4ToICRS converts an FK4 (B1950.0) position to ICRS, via FK5.
 //
 // The route is FK4 → FK5 (J2000.0) → Hipparcos, which is what defines the
-// ICRS realisation; astropy takes the same one. Both legs are the exported
+// ICRS realization; astropy takes the same one. Both legs are the exported
 // [FK4ToFK5] and [FK5ToICRS], so the intermediate J2000 position a caller may
 // actually want is reachable rather than buried here.
 //

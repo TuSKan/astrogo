@@ -106,7 +106,7 @@ func assembleSky(t *testing.T, when time.GoTime) (*skybrightness.Model, *skybrig
 	// this is the quiet end, so the share integrated starlight takes here is a
 	// floor rather than a typical value.
 	//
-	// The value was measured in Johnson V and is normalised here against the
+	// The value was measured in Johnson V and is normalized here against the
 	// synthetic band the rest of this file uses. The two overlap closely enough
 	// for a composition test on a smooth solar-like shape, but it is the
 	// mismatch StarMap's own documentation warns about, and a production caller

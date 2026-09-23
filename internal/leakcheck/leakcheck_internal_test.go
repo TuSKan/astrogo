@@ -69,7 +69,7 @@ func TestLeakCountReadsTheRuntimesOwnTotal(t *testing.T) {
 		{"one", "goroutineleak profile: total 1\n1 @ 0x1 0x2\n#\t0x1\tpkg.fn+0x18\tfile.go:14\n", 1},
 		{"several", "goroutineleak profile: total 12\n", 12},
 		{"empty input", "", 0},
-		{"a header this code does not recognise", "something else entirely\n", 0},
+		{"a header this code does not recognize", "something else entirely\n", 0},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()

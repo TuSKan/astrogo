@@ -46,14 +46,14 @@ func raisedCosine(name string, lo, hi float64, det magnitude.Detector) magnitude
 // to be computed on is sampled.
 //
 // This is the failure this package is built to avoid, and the one the
-// repository's own guidance singles out: normalising a spectral shape by the
+// repository's own guidance singles out: normalizing a spectral shape by the
 // sum of its samples rather than by its integral ties the answer to the step.
 // The result stays positive and plausible and changes every time a caller
 // picks a different grid, so nothing downstream can detect it. The step
 // cancels between the numerator and the denominator only if both are
 // integrals, which is what this asserts.
 //
-// The steps below span a factor of sixteen. A sum-normalised implementation
+// The steps below span a factor of sixteen. A sum-normalized implementation
 // would be wrong by that factor; the tolerance is five parts in a hundred
 // thousand.
 func TestMeanFluxDensityIsIndependentOfGridSpacing(t *testing.T) {

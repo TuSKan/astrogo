@@ -18,7 +18,7 @@ import (
 // The real hemispheres are 64 MB each and live behind a Dataverse download, so
 // nothing offline can exercise Open against them. What can be exercised is
 // every reason Open refuses a file — and those are the failure modes that
-// actually happen: a deposit reorganised, an identifier repointed at the
+// actually happen: a deposit reorganized, an identifier repointed at the
 // reddening map, a header keyword dropped.
 //
 // The fixtures below are 2x2 SFD-shaped images built here rather than checked
@@ -180,7 +180,7 @@ func TestSFDOpenReadsBothHemispheres(t *testing.T) {
 }
 
 // TestSFDOpenRefusesTwoOfTheSameHemisphere: the identifiers are Dataverse file
-// numbers, not names, so a deposit reorganised under them is not visibly
+// numbers, not names, so a deposit reorganized under them is not visibly
 // wrong. LAM_NSGP is what says which hemisphere a file actually is, and two
 // norths would otherwise leave half the sky answered from the wrong map.
 func TestSFDOpenRefusesTwoOfTheSameHemisphere(t *testing.T) {

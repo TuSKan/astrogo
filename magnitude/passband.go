@@ -94,7 +94,7 @@ func (d Detector) String() string {
 // turn a spectrum into a magnitude: which detector convention the curve
 // assumes, and which magnitude systems it has zero points for.
 //
-// The response is dimensionless and need not be normalised — every
+// The response is dimensionless and need not be normalized — every
 // projection divides by the curve's own integral, so an arbitrary scale
 // cancels.
 type Passband struct {
@@ -211,8 +211,8 @@ func (p Passband) Weights(grid unit.SpectralGrid) (weights []float64, coverage f
 //
 // This is the response-weighted mean the magnitude systems are defined
 // against: the numerator integrates the spectrum against the band weights,
-// the denominator normalises by the band, so an unnormalised response
-// curve gives the same answer as a normalised one.
+// the denominator normalizes by the band, so an unnormalized response
+// curve gives the same answer as a normalized one.
 //
 // minCoverage rejects a grid that covers less than that fraction of the
 // band; pass 0 to accept any coverage.
@@ -244,11 +244,11 @@ func MeanFluxDensity(spectrum []float64, grid unit.SpectralGrid, p Passband, min
 
 	denominator, err := grid.Integrate(weights)
 	if err != nil {
-		return 0, fmt.Errorf("magnitude: passband %q normalisation: %w", p.Name, err)
+		return 0, fmt.Errorf("magnitude: passband %q normalization: %w", p.Name, err)
 	}
 
 	if denominator == 0 {
-		return 0, fmt.Errorf("%w: %q normalisation integral is zero", ErrPassbandResponse, p.Name)
+		return 0, fmt.Errorf("%w: %q normalization integral is zero", ErrPassbandResponse, p.Name)
 	}
 
 	return numerator / denominator, nil

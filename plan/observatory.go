@@ -182,8 +182,8 @@ func lookupKnownSite(name string) (*Site, bool) {
 		// The site's own display name, before its aliases.
 		//
 		// It used to be checked only via the map key, which works for every
-		// site whose name happens to normalise to that key and fails for the
-		// one that does not: "Cerro Pachón" normalises to "cerro_pachón"
+		// site whose name happens to normalize to that key and fails for the
+		// one that does not: "Cerro Pachón" normalizes to "cerro_pachón"
 		// while its key is "cerro_pachon", so the name astrogo prints for
 		// that site was a name astrogo could not resolve. Found by
 		// KnownSiteNames, which made the round trip testable.
@@ -603,7 +603,7 @@ func (s *Site) LocalSiderealTime(t time.Time) (angle.Angle, error) {
 	}
 
 	lst := gast.Radians() + s.location.Lon().Radians()
-	// Normalise to [0, 2π)
+	// Normalize to [0, 2π)
 	lst = math.Mod(lst, 2*math.Pi)
 	if lst < 0 {
 		lst += 2 * math.Pi

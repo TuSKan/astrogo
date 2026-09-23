@@ -29,7 +29,7 @@ func TestVanRhijnAgainstRoachAndMeinel(t *testing.T) {
 }
 
 // At the zenith the layer is seen face on and the function is exactly 1 —
-// the normalisation the whole relation is defined against.
+// the normalization the whole relation is defined against.
 func TestVanRhijnZenith(t *testing.T) {
 	t.Parallel()
 

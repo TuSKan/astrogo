@@ -194,11 +194,11 @@ func (b observerPrecisionBody) command() string { return strconv.Itoa(b.naifID) 
 // response header states ("Center pole/equ : ITRF93"); astrogo performs it
 // through the IAU 2006/2000A CIO chain on IERS finals2000A. Switching polar
 // motion off on the SOFA side takes Paranal to 0.012" and Mauna Kea to 0.142"
-// but leaves Greenwich at 0.452", so it is a realisation difference and not a
+// but leaves Greenwich at 0.452", so it is a realization difference and not a
 // single dropped term.
 //
 // So the residual measured here is the gap between two Earth-orientation
-// realisations, not an astrogo defect. That is also why the contract below
+// realizations, not an astrogo defect. That is also why the contract below
 // stays where it is: it bounds a disagreement between reference frames, which
 // is what it always said it did (#256).
 //

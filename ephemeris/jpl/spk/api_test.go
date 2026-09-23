@@ -95,7 +95,7 @@ func TestMapHorizonsStatus(t *testing.T) {
 	// internal/testutil.SkipOnUpstreamFailure decides "this is the remote end
 	// failing, skip rather than fail CI" by looking for an error carrying
 	// HTTPStatus() int. When these sentinels replaced the HTTP error instead
-	// of wrapping it, a Horizons 503 could not be recognised as downtime and
+	// of wrapping it, a Horizons 503 could not be recognized as downtime and
 	// failed tests written to tolerate it (#244).
 	for _, status := range []int{
 		http.StatusBadRequest,

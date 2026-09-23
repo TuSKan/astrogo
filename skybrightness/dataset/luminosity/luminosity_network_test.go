@@ -53,7 +53,7 @@ func TestCurvesPeakWhereVisionDoes(t *testing.T) {
 			}
 		}
 
-		// Both curves are normalised to unity at their peak.
+		// Both curves are normalized to unity at their peak.
 		if best < 0.99 || best > 1.01 {
 			t.Errorf("%v curve peaks at %g, want 1", v, best)
 		}

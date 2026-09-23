@@ -9,5 +9,5 @@ does not advance on Windows — so two writers of one lock key picked the same
 staging path, and the loser's rename found its source already gone.
 `TestStagingAndPartialWritesAcrossBuckets` failed on every run because of it (since renamed).
 The write is now serialised within the process the way `Save` already was, and
-the `NotFound` that a losing writer raises across processes is recognised as
+the `NotFound` that a losing writer raises across processes is recognized as
 contention rather than returned as an error (#241).

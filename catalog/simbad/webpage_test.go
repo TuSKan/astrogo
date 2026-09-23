@@ -102,7 +102,7 @@ func TestAMalformedResponseIsNotReportedAsDowntime(t *testing.T) {
 		name string
 		body string
 	}{
-		{"headers the provider does not recognise", "alpha,beta,gamma\n1,2,3\n"},
+		{"headers the provider does not recognize", "alpha,beta,gamma\n1,2,3\n"},
 		{"a truncated row", "oid,main_id,ra,dec,otype,id\n1,M  31\n"},
 		{"not tabular at all", "{\"error\": \"nope\"}\n"},
 		{"empty", ""},

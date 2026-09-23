@@ -203,7 +203,7 @@ func (a Angle) DMSString(precision int) string {
 	// FormatFloat, which renders it "-0.0" while the leading-zero branch
 	// above has already written a '0', producing "00h04m0-0.0s". Deg(1) did
 	// exactly that in CI on macOS while passing on every amd64 machine.
-	// math.Max also normalises a negative zero, which is the other way the
+	// math.Max also normalizes a negative zero, which is the other way the
 	// sign reaches the seconds field.
 	s := math.Max(0, (rem-float64(m))*60)
 
@@ -289,7 +289,7 @@ func (a Angle) HMSString(precision int) string {
 	// FormatFloat, which renders it "-0.0" while the leading-zero branch
 	// above has already written a '0', producing "00h04m0-0.0s". Deg(1) did
 	// exactly that in CI on macOS while passing on every amd64 machine.
-	// math.Max also normalises a negative zero, which is the other way the
+	// math.Max also normalizes a negative zero, which is the other way the
 	// sign reaches the seconds field.
 	s := math.Max(0, (rem-float64(m))*60)
 

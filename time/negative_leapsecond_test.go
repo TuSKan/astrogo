@@ -10,7 +10,7 @@ import (
 
 // A negative leap second has never happened, and that is the reason to test it.
 //
-// The ITU-R has permitted one since 1972 — realised by skipping 23:59:59, so the
+// The ITU-R has permitted one since 1972 — realized by skipping 23:59:59, so the
 // day advances from 23:59:58 straight to 00:00:00 — and none has occurred in
 // fifty-odd years of leap seconds, every one of which has been positive. Levine,
 // Tavella & Milton (2023) say recent Earth-rotation data make one "no longer

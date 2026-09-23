@@ -378,7 +378,7 @@ func TestUnparseableBaseURLIsRefused(t *testing.T) {
 // TestAuthTokenTravelsInAHeader covers the option and the reason for its shape.
 //
 // The scheme is a parameter because services disagree silently: Gaia@AIP
-// accepts "Token" and ignores "Bearer", and an unrecognised scheme is not
+// accepts "Token" and ignores "Bearer", and an unrecognized scheme is not
 // rejected — the request simply proceeds anonymously, so getting it wrong looks
 // like unexplained rate limiting rather than an auth failure.
 //

@@ -28,7 +28,7 @@ var (
 //	k(h) = (tau_0 / H) * exp(-h / H)
 //
 // where tau_0 is the whole vertical column and H the scale height. The
-// normalisation is what makes the two arguments mean what they say: the
+// normalization is what makes the two arguments mean what they say: the
 // integral of k from the ground to infinity is exactly tau_0, so a caller
 // who knows the column and the scale height has fully specified the profile
 // and cannot accidentally describe an atmosphere with more or less
@@ -102,7 +102,7 @@ func checkProfile(altitude unit.Length, column unit.OpticalDepth, scaleHeight un
 //	beta(theta) = k_sca,M * p_M(theta) + k_sca,A * p_A(theta)
 //
 // This is the local counterpart of [CombinedPhaseFunction]. That one returns
-// a normalised phase function, weighted by each mechanism's share of the
+// a normalized phase function, weighted by each mechanism's share of the
 // column; this one keeps the dimensional volume scattering coefficients and
 // so answers a different question — not "in what direction does this
 // atmosphere scatter" but "how much light does this cubic meter of it put
@@ -116,7 +116,7 @@ func checkProfile(altitude unit.Length, column unit.OpticalDepth, scaleHeight un
 // # The factor of 4*pi that is not here
 //
 // Eq. 18 reads (1/4*pi)[k_sca,M * P_M + k_sca,A * P_A], and this has no such
-// factor. The two agree because the normalisations differ: Kocifaj's P
+// factor. The two agree because the normalizations differ: Kocifaj's P
 // satisfies the condition he states after his Eq. 3, that P integrates to
 // 4*pi over the sphere, while [RayleighPhaseFunction] and
 // [HenyeyGreensteinPhaseFunction] integrate to 1 and carry the 1/4*pi

@@ -234,7 +234,7 @@ func TestSmallBodyEros(t *testing.T) {
 		// missed: the planetary base kernel comes from NAIF's static file
 		// server rather than Horizons, and a CI run timed out dialling it after
 		// thirty seconds — "dial tcp 137.79.133.14:443: i/o timeout" — which
-		// the Horizons predicate has no reason to recognise. The build went red
+		// the Horizons predicate has no reason to recognize. The build went red
 		// for an outage in Pasadena.
 		//
 		// Anything else is a real refusal from a service that answered, and

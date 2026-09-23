@@ -119,7 +119,7 @@ func (k *keyedSemaphore) acquire(ctx context.Context, key string) (release func(
 // this code described as "on S3 a genuinely atomic conditional PUT, on fileblob
 // a Stat-then-Rename that is best-effort and can admit a second holder". The
 // gap was real and tracked as #241, and it forced a losing writer to be
-// recognised by three different error codes — FailedPrecondition, the intended
+// recognized by three different error codes — FailedPrecondition, the intended
 // signal; Unknown, from a Windows "Access is denied" when the winner held the
 // destination open; and NotFound, from the loser's own staging file being
 // renamed away because both had picked the same name from a clock that does not
@@ -478,7 +478,7 @@ func discardStaging(ctx context.Context, fsys fs.FS, writeKey, pKey string) {
 }
 
 // StagingSuffixes are the name suffixes this package appends to a cache key for
-// its own bookkeeping. Exported so remote can recognise and skip them when it
+// its own bookkeeping. Exported so remote can recognize and skip them when it
 // walks a cache directory; nothing else should need it.
 var StagingSuffixes = []string{".lock", ".part", ".resume", SourceETagSuffix}
 

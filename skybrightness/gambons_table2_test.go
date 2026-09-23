@@ -29,7 +29,7 @@ import (
 //
 // This is a better target than the web tool's all-sky export, for three
 // reasons. It is a composition, so it is dimensionless and immune to zero
-// points, to passband normalisation and to the airglow level — the very things
+// points, to passband normalization and to the airglow level — the very things
 // that dominated the all-sky comparison. It comes from the paper's full
 // scattering model rather than the web version's simplified one, whose authors
 // state it runs bright near the horizon and dark at the zenith. And every

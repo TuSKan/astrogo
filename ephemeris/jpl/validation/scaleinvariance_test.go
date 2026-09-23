@@ -90,7 +90,7 @@ func TestJPLStateIsScaleInvariant(t *testing.T) {
 				if d := got.Pos.Sub(base.Pos).Norm(); d > jplScaleTolerance {
 					t.Errorf("position moved %.6g AU (%.4g km) when the same instant "+
 						"was labeled %s.\n  The provider is reading the caller's scale "+
-						"as its own — normalise at the entry point rather than reading "+
+						"as its own — normalize at the entry point rather than reading "+
 						"JDParts raw.", d, d/metersInAU/1e3, s.label)
 				}
 			}

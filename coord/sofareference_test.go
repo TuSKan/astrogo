@@ -56,7 +56,7 @@ import (
 // to 0.142 but left Greenwich at 0.452, so it is not one term either.
 //
 // The conclusion is that the residual is a difference between two Earth
-// orientation realisations, not an astrogo defect — and the reason that
+// orientation realizations, not an astrogo defect — and the reason that
 // conclusion is safe is the 0.0000 measured here. Which is exactly why it is
 // worth a permanent, offline test rather than a paragraph.
 //

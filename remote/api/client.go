@@ -62,7 +62,7 @@ func WithUserAgent(ua string) Option {
 // of the given scheme.
 //
 // The scheme is a parameter because services disagree and the disagreement is
-// silent. Gaia@AIP accepts "Token" and ignores "Bearer" — an unrecognised
+// silent. Gaia@AIP accepts "Token" and ignores "Bearer" — an unrecognized
 // scheme is not rejected, the request simply proceeds anonymously, so the
 // symptom of getting it wrong is not an authentication error but a query that
 // mysteriously still hits the anonymous limits.

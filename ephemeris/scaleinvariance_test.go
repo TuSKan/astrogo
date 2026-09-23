@@ -29,7 +29,7 @@ const scaleTolerance = 1.0 * metersInAU
 // # Why this test exists
 //
 // time.Time is scale-aware by design. A provider that reads its Julian Date
-// parts without normalising does not get a slightly different answer — it
+// parts without normalizing does not get a slightly different answer — it
 // silently reinterprets the caller's instant as a different one.
 //
 // Three providers had three different contracts for the same input type:
@@ -131,7 +131,7 @@ func TestProviderStateIsScaleInvariant(t *testing.T) {
 					if d := got.Pos.Sub(base.Pos).Norm(); d > scaleTolerance {
 						t.Errorf("position moved %.6g AU (%.4g km) when the same instant "+
 							"was labeled %s.\n  The provider is reading the caller's "+
-							"scale as its own — normalise at the entry point "+
+							"scale as its own — normalize at the entry point "+
 							"(t.UTC()/t.TDB()) rather than reading JDParts raw.",
 							d, d/metersInAU/1e3, s.label)
 					}

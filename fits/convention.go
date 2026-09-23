@@ -66,7 +66,7 @@ func isLongKeyword(kw string) bool {
 //
 // The keyword is the tokens between "HIERARCH " and the first "=" outside a
 // quoted string, with runs of whitespace collapsed to one space — which is how
-// ESO writes them and how astropy normalises them, so that "ESO  DET" and
+// ESO writes them and how astropy normalizes them, so that "ESO  DET" and
 // "ESO DET" are the same keyword rather than two.
 //
 // ok is false for a card that is not HIERARCH, or is HIERARCH with no "=",

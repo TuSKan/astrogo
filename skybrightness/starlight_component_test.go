@@ -76,7 +76,7 @@ func starlightScene(t *testing.T) *skybrightness.Scene {
 
 // solarShape is a stand-in spectral shape for the summed light of stars of
 // every type: a 5500 K Planck curve in relative units. Its absolute scale is
-// arbitrary, which is the property the normalisation has to remove.
+// arbitrary, which is the property the normalization has to remove.
 func solarShape(grid unit.SpectralGrid) skybrightness.SpectralRadiance {
 	shape := skybrightness.NewSpectralRadiance(grid)
 	for i := range shape {
@@ -122,7 +122,7 @@ func starlightAt(
 // exactly that number over the same band.
 //
 // That is what makes the scaling a definition rather than an approximation. It
-// is checked with the atmosphere switched off, so only the normalisation is
+// is checked with the atmosphere switched off, so only the normalization is
 // under test.
 func TestIntegratedStarlightReproducesTheMapValue(t *testing.T) {
 	t.Parallel()
@@ -160,7 +160,7 @@ func TestIntegratedStarlightReproducesTheMapValue(t *testing.T) {
 
 // Refining the spectral grid must not change how much starlight there is.
 //
-// This is the regression test for a normalisation that divided by the sum of
+// This is the regression test for a normalization that divided by the sum of
 // the shape's samples rather than by its passband average. That made the total
 // come out right only for whatever sampling the shape happened to have, and
 // halved the starlight whenever the grid was refined. The failure is silent —

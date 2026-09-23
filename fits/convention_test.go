@@ -45,7 +45,7 @@ func TestReadsHIERARCHFromESOStyleBytes(t *testing.T) {
 			comment: "[nm] Grating wavelength",
 		},
 		{
-			// Extra spacing between tokens is normalised, so a header that
+			// Extra spacing between tokens is normalized, so a header that
 			// aligns its keywords does not produce a different one.
 			card:    "HIERARCH ESO  DET   EXPTIME = 1200 / seconds",
 			keyword: "ESO DET EXPTIME",

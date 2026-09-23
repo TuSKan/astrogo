@@ -79,8 +79,8 @@ func TestPassbandValidate(t *testing.T) {
 }
 
 // The band-averaged value of a flat spectrum is that same flat value,
-// whatever the response shape or normalisation — the defining property of
-// a weighted mean, and the first thing a wrong normalisation breaks.
+// whatever the response shape or normalization — the defining property of
+// a weighted mean, and the first thing a wrong normalization breaks.
 func TestMeanFluxDensityFlatSpectrumIsIdentity(t *testing.T) {
 	t.Parallel()
 
@@ -105,7 +105,7 @@ func TestMeanFluxDensityFlatSpectrumIsIdentity(t *testing.T) {
 	}
 }
 
-// An unnormalised curve must give the same answer as a normalised one,
+// An unnormalized curve must give the same answer as a normalized one,
 // since every projection divides by the band's own integral.
 func TestMeanFluxDensityIgnoresResponseScale(t *testing.T) {
 	t.Parallel()
@@ -150,6 +150,23 @@ func TestMeanFluxDensityRejectsPartialCoverage(t *testing.T) {
 	_, err := magnitude.MeanFluxDensity(spectrum, g, band, 0.99)
 	if !errors.Is(err, magnitude.ErrPassbandCoverage) {
 		t.Errorf("MeanFluxDensity with half coverage = %v, want ErrPassbandCoverage", err)
+	}
+}
+
+// A caller who waives the coverage check with 0 still cannot get a mean from
+// a grid that misses the band entirely: the band's weights are all zero, and
+// a mean over no response is refused rather than returned as 0/0.
+func TestMeanFluxDensityRefusesABandTheGridMisses(t *testing.T) {
+	t.Parallel()
+
+	g := mustGrid(t, 800, 51) // 800..850, nowhere near the band
+	band := topHat("test", 500, 600, magnitude.PhotonCounting)
+
+	spectrum := make([]float64, g.Len())
+
+	_, err := magnitude.MeanFluxDensity(spectrum, g, band, 0)
+	if !errors.Is(err, magnitude.ErrPassbandResponse) {
+		t.Errorf("MeanFluxDensity over a grid that misses the band = %v, want ErrPassbandResponse", err)
 	}
 }
 

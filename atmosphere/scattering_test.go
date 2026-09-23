@@ -88,7 +88,7 @@ func TestRayleighOpticalDepthRejectsBadInput(t *testing.T) {
 	}
 }
 
-// A normalised phase function integrates to exactly 1 over the sphere.
+// A normalized phase function integrates to exactly 1 over the sphere.
 // This is the single most valuable check on any scattering kernel: it
 // catches a wrong prefactor, a missing 4*pi, and a mis-transcribed
 // depolarisation term at once.
@@ -109,7 +109,7 @@ func integrateOverSphere(t *testing.T, p func(theta float64) float64) float64 {
 	return sum * (2 / float64(n)) * 2 * math.Pi
 }
 
-func TestRayleighPhaseFunctionNormalisation(t *testing.T) {
+func TestRayleighPhaseFunctionNormalization(t *testing.T) {
 	t.Parallel()
 
 	for _, rho := range []float64{0, atmosphere.RayleighDepolarisation, 0.03} {
@@ -181,7 +181,7 @@ func TestRayleighPhaseFunctionSymmetry(t *testing.T) {
 	}
 }
 
-func TestHenyeyGreensteinNormalisation(t *testing.T) {
+func TestHenyeyGreensteinNormalization(t *testing.T) {
 	t.Parallel()
 
 	for _, g := range []float64{-0.5, 0, 0.3, 0.5, 0.85} {
@@ -242,7 +242,7 @@ func TestHenyeyGreensteinRejectsSingularG(t *testing.T) {
 	}
 }
 
-// The combined phase function must remain normalised for any mixture, and
+// The combined phase function must remain normalized for any mixture, and
 // must reduce to each pure component at the limits — the property that
 // makes Winkler Eq. 12 a weighting rather than an approximation.
 func TestCombinedPhaseFunction(t *testing.T) {
@@ -306,7 +306,7 @@ func TestCombinedPhaseFunctionRejectsNoScattering(t *testing.T) {
 
 // Transmission and optical depth are inverses, and a zenith observation
 // through a standard atmosphere must transmit roughly 90 per cent at
-// 550 nm — a number an observer would recognise.
+// 550 nm — a number an observer would recognize.
 func TestTransmission(t *testing.T) {
 	t.Parallel()
 

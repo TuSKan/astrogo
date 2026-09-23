@@ -80,7 +80,7 @@ const (
 //
 //	L_lambda(lambda) = L_DNB * S(lambda) / INT S(lambda) R(lambda) d lambda
 //
-// The shape's absolute scale is irrelevant — it cancels — so a normalised
+// The shape's absolute scale is irrelevant — it cancels — so a normalized
 // curve, a blackbody, or a manufacturer's SPD all work.
 type SourceSpectrum struct {
 	// WavelengthNM is the common wavelength grid, ascending.

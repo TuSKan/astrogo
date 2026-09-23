@@ -20,8 +20,8 @@ import (
 //
 //   - A **frame bias**: the FK5 axes are tilted from the ICRS axes by a fixed
 //     rotation of order 20 mas, measured rather than defined, since FK5 was
-//     realised from observations of stars and ICRS from VLBI of quasars.
-//   - A **spin**: FK5's realisation rotates slowly against the extragalactic
+//     realized from observations of stars and ICRS from VLBI of quasars.
+//   - A **spin**: FK5's realization rotates slowly against the extragalactic
 //     frame, so the bias between them depends on the epoch of the position.
 //     That is why [FK5ToICRS] takes an epoch and not only a direction.
 //
@@ -137,7 +137,7 @@ func (c FK5) hasRecordedMotion() bool { return c.hasProperMotion && !c.fictitiou
 
 // FK5ToICRS converts an FK5 position to ICRS.
 //
-// ICRS is realised here by the Hipparcos frame, which is what defines it and
+// ICRS is realized here by the Hipparcos frame, which is what defines it and
 // what [FK4ToICRS] already routes through; astropy takes the same one.
 //
 // A position with no recorded proper motion goes through SOFA's position-only

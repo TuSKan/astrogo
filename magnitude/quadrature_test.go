@@ -20,9 +20,9 @@ func auditSpectrum(nm float64) float64 {
 // This exists because the distinction is easy to get wrong, and was. A
 // grid-independence check over a rectangular band shows the answer moving by a
 // quarter of a per cent between a 4 nm step and a 0.25 nm one, which looks
-// exactly like the failure that check is for — a mean normalised by the sample
+// exactly like the failure that check is for — a mean normalized by the sample
 // count rather than by the integral, tied to the grid. It is not. The give-away
-// is the direction of travel: a sum-normalised mean would scale with the step,
+// is the direction of travel: a sum-normalized mean would scale with the step,
 // by the full factor of sixteen across that range, while this converges, and
 // converges on the analytic value.
 //
@@ -69,7 +69,7 @@ func TestBandMeanConvergesOnTheAnalyticValue(t *testing.T) {
 		err2 := math.Abs(got-want) / want
 
 		// Every step must be closer to the analytic value than the last, which
-		// is what a sum-normalised mean would not do.
+		// is what a sum-normalized mean would not do.
 		if i > 0 {
 			ratio := previous / err2
 
