@@ -134,9 +134,9 @@ func WithPlanetaryMoons() VisibleTonightOption {
 // The default is Kepler because it is free — no network round trip, no
 // remote.EnableDownloads(..., remote.JPLHorizonsSPK) consent, no file
 // handle — and, for a single night's visibility-window search, accurate
-// well beyond what that search itself resolves (~0.04″ near the
-// elements' own epoch, ~0.56″ at 30 days out — see CHANGELOG for the
-// live 433 Eros validation). An open orbit — every KindInterstellar
+// well beyond what that search itself resolves (under a milliarcsecond at
+// the elements' own epoch and ~0.58″ at 30 days out, for 433 Eros against
+// Horizons). An open orbit — every KindInterstellar
 // object, and the near-parabolic comets with e >= 1 — is propagated from
 // the perihelion form SBDB publishes beside the semi-major axis, since it
 // has no usable semi-major axis. A candidate with no published elements

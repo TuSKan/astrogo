@@ -316,10 +316,16 @@ func angularSeparationArcsec(a, b vector.Vec3) float64 {
 // Two-body propagation ignores planetary perturbations by design (see
 // the kepler package doc comment), so some real divergence from the
 // perturbed ephemeris is expected and grows with |dt|. A live run of
-// this exact comparison measured that divergence at ~0.04" near dt=0,
-// growing to ~0.56" at dt=+/-30d — toleranceArcsec below keeps margin
-// above that measured max rather than claiming perturbation-level
-// accuracy this package doesn't attempt.
+// this exact comparison measured it at 0.000" at dt=0, growing to
+// ~0.58" at dt=+/-30d — toleranceArcsec below keeps margin above that
+// measured max rather than claiming perturbation-level accuracy this
+// package doesn't attempt.
+//
+// dt=0 is held far tighter, because there is no physics in it: osculating
+// elements reproduce the ephemeris exactly at their own epoch, so anything
+// left there is a convention. It read 0.04" until #391 — the elements were
+// rotated into the equator by the IAU 2006 obliquity, not the IAU 1976 one
+// JPL refers them to — and was taken for perturbation.
 func TestElements_StateAt_AgainstHorizons_433Eros(t *testing.T) {
 	requireHorizons(t)
 
@@ -337,11 +343,17 @@ func TestElements_StateAt_AgainstHorizons_433Eros(t *testing.T) {
 
 	// 2 arcsec, chosen from real measured data, not picked in advance: a
 	// live run of this exact comparison found the two-body/perturbed
-	// divergence grows roughly symmetrically from ~0.04" at dt=0 to a
-	// max of ~0.56" at dt=+/-30d (see the package's two-body-only
+	// divergence grows roughly symmetrically from 0.000" at dt=0 to a
+	// max of ~0.58" at dt=+/-30d (see the package's two-body-only
 	// accuracy caveat above) — this bound keeps real margin above that
 	// measured max rather than chasing it exactly.
-	const toleranceArcsec = 2.0
+	//
+	// At dt=0 there is nothing to allow for; the elements' printed digits
+	// are good to well under a milliarcsecond there.
+	const (
+		toleranceArcsec     = 2.0
+		atEpochToleranceArc = 0.005
+	)
 
 	var maxSepArcsec float64
 
@@ -373,6 +385,11 @@ func TestElements_StateAt_AgainstHorizons_433Eros(t *testing.T) {
 
 		if sepArcsec > maxSepArcsec {
 			maxSepArcsec = sepArcsec
+		}
+
+		if dtDays == 0 && sepArcsec > atEpochToleranceArc {
+			t.Errorf("dt=0: %.4f\" from Horizons at the elements' own epoch, where two-body motion "+
+				"is exact by construction — a frame or obliquity convention is wrong (#391)", sepArcsec)
 		}
 
 		if sepArcsec > toleranceArcsec {
