@@ -167,8 +167,39 @@ func h2fk5Angular(rh, dh, drh, ddh, pxh, rvh float64) (r5, d5, dr5, dd5, px5, rv
 	return r5, d5, dr5, dd5, pxh, rvh
 }
 
+// maxStellarSpeed bounds what a catalogue star can plausibly be doing, as a
+// fraction of the speed of light.
+//
+// # Why SOFA's own limit is not enough
+//
+// iauStarpv's VMAX = 0.5c is a statement about arithmetic: past it the
+// relativistic iteration stops meaning anything, so the velocity is zeroed and
+// the status says so. Between a usable parallax and that ceiling there is a
+// band where SOFA reports complete success and the answer is still not about a
+// star. Measured at a parallax of 1e-7 arcsec — SOFA's own PXMIN, so not
+// clamped — a star at rest in FK4 comes through iauFk52h with a radial
+// velocity of -9046 km/s and a status of zero. The implied speed there is
+// 0.43c.
+//
+// # Why this one is a judgement, and the only one in this package
+//
+// Nothing SOFA publishes separates "mathematically valid" from "not a star";
+// its limits are about where its own arithmetic fails. So this is astrogo's
+// number, and it is chosen from astronomy rather than from arithmetic: the
+// Galaxy's escape velocity at the Sun is about 550 km/s, and the fastest
+// objects a star catalogue contains are hypervelocity ejections from the
+// Galactic centre at order 10^3 km/s. 0.01c is 3000 km/s — comfortably above
+// anything real and fifty times below the point where SOFA gives up.
+//
+// It is deliberately loose. The purpose is to catch a distance that is absurd
+// by orders of magnitude, not to adjudicate marginal cases: a star whose
+// implied speed is a few hundred km/s keeps SOFA's answer, whatever this
+// package thinks of it.
+const maxStellarSpeed = 0.01
+
 // starpvIsExact reports whether iauStarpv can build a pv-vector for this star
-// without overriding anything.
+// without overriding anything, and whether the star it places in space is
+// moving at a speed a star could be moving at.
 //
 // It runs iauStarpv purely for the status its callers throw away, and the pv
 // it produces is discarded — the successful path below calls iauFk52h or
@@ -176,10 +207,20 @@ func h2fk5Angular(rh, dh, drh, ddh, pxh, rvh float64) (r5, d5, dr5, dd5, px5, rv
 // operations on a catalogue conversion, and it buys the property that the
 // number returned in the ordinary case is SOFA's own, produced by SOFA's own
 // code path, rather than something reassembled here from parts.
+//
+// The pv is not entirely discarded any more: its velocity is what the
+// [maxStellarSpeed] test is applied to, which is the one question SOFA's
+// status does not answer.
 func starpvIsExact(ra, dec, dr, dd, px, rv float64) bool {
 	var pv [2][3]float64
 
-	return gofa.Starpv(ra, dec, dr, dd, px, rv, &pv) == 0
+	if gofa.Starpv(ra, dec, dr, dd, px, rv, &pv) != 0 {
+		return false
+	}
+
+	// gofa.Pm is the modulus of a p-vector; DC is the speed of light in the
+	// au/day the pv-vector is expressed in.
+	return gofa.Pm(pv[1])/gofa.DC <= maxStellarSpeed
 }
 
 // starToAngular decomposes a catalogue position and proper motion into a unit

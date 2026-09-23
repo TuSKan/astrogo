@@ -350,6 +350,14 @@ func TestStarpvIsExactSeesWhatSOFAThrowsAway(t *testing.T) {
 		{"below PXMIN: the distance is overridden", 1e-9, pm, false},
 		{"at PXMIN with motion: the speed exceeds VMAX", 1e-7, pm, false},
 		{"at PXMIN at rest: nothing to clamp", 1e-7, 0, true},
+
+		// #339's band: above PXMIN, under VMAX, and iauStarpv reports complete
+		// success — for a star that would be crossing the sky at 0.43c. None
+		// of the conditions #331 named fires here, which is why the speed test
+		// had to be added beside them. 2.4 mas/yr is what FK4's own fictitious
+		// motion amounts to, so this is not a contrived rate.
+		{"above PXMIN, status clean, star at 0.43c", 1e-7, 2.4 / milliarcsecPerYear, false},
+		{"the same motion at a real distance", 1e-2, 2.4 / milliarcsecPerYear, true},
 	} {
 		if got := starpvIsExact(ra, dec, tc.pm, tc.pm, tc.px, 0); got != tc.exact {
 			t.Errorf("%s (px=%g, pm=%g rad/yr): starpvIsExact = %v, want %v",
