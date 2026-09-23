@@ -26,7 +26,7 @@ lambda(nm)   sigma(cm2)
 550   4.8e-21
 `
 
-	cs, err := crosssection.Parse(strings.NewReader(file), "O3", crosssection.Nanometre)
+	cs, err := crosssection.Parse(strings.NewReader(file), "O3", crosssection.Nanometer)
 	if err != nil {
 		t.Fatalf("Parse: %v", err)
 	}
@@ -95,7 +95,7 @@ func TestParseAngstrom(t *testing.T) {
 func TestParseClampsNegativeSigma(t *testing.T) {
 	t.Parallel()
 
-	cs, err := crosssection.Parse(strings.NewReader("400 -1e-25\n500 2e-23\n"), "O3", crosssection.Nanometre)
+	cs, err := crosssection.Parse(strings.NewReader("400 -1e-25\n500 2e-23\n"), "O3", crosssection.Nanometer)
 	if err != nil {
 		t.Fatalf("Parse: %v", err)
 	}
@@ -110,7 +110,7 @@ func TestParseClampsNegativeSigma(t *testing.T) {
 func TestParseDropsDuplicates(t *testing.T) {
 	t.Parallel()
 
-	cs, err := crosssection.Parse(strings.NewReader("400 1e-23\n400 1.1e-23\n500 2e-23\n"), "O3", crosssection.Nanometre)
+	cs, err := crosssection.Parse(strings.NewReader("400 1e-23\n400 1.1e-23\n500 2e-23\n"), "O3", crosssection.Nanometer)
 	if err != nil {
 		t.Fatalf("Parse: %v", err)
 	}
@@ -125,7 +125,7 @@ func TestParseDropsDuplicates(t *testing.T) {
 func TestParsedCrossSectionComputesOpticalDepth(t *testing.T) {
 	t.Parallel()
 
-	cs, err := crosssection.Parse(strings.NewReader("400 1e-21\n500 2e-21\n600 3e-21\n"), "O3", crosssection.Nanometre)
+	cs, err := crosssection.Parse(strings.NewReader("400 1e-21\n500 2e-21\n600 3e-21\n"), "O3", crosssection.Nanometer)
 	if err != nil {
 		t.Fatalf("Parse: %v", err)
 	}
@@ -162,7 +162,7 @@ func TestParseRejectsBadInput(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			if _, err := crosssection.Parse(strings.NewReader(tc.file), "O3", crosssection.Nanometre); !errors.Is(err, crosssection.ErrFormat) {
+			if _, err := crosssection.Parse(strings.NewReader(tc.file), "O3", crosssection.Nanometer); !errors.Is(err, crosssection.ErrFormat) {
 				t.Errorf("err = %v, want ErrFormat", err)
 			}
 		})

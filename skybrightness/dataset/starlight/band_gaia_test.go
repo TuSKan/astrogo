@@ -124,13 +124,13 @@ func TestGaiaJohnsonCousinsReproducesTheVBand(t *testing.T) {
 	}
 
 	want := []float64{-0.02704, 0.01424, -0.2156, 0.01426}
-	if len(got.ColourTerm) != len(want) {
-		t.Fatalf("%d colour coefficients, want %d", len(got.ColourTerm), len(want))
+	if len(got.ColorTerm) != len(want) {
+		t.Fatalf("%d colour coefficients, want %d", len(got.ColorTerm), len(want))
 	}
 
 	for i := range want {
-		if got.ColourTerm[i] != want[i] {
-			t.Errorf("colour coefficient %d is %v, want %v", i, got.ColourTerm[i], want[i])
+		if got.ColorTerm[i] != want[i] {
+			t.Errorf("colour coefficient %d is %v, want %v", i, got.ColorTerm[i], want[i])
 		}
 	}
 

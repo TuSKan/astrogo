@@ -299,7 +299,7 @@ func TestColourRecoveryUsesTheSamePolynomial(t *testing.T) {
 	band := GaiaJohnsonV()
 
 	// At bp_rp = 0 the polynomial collapses to its constant term.
-	if got, want := band.colourFactor(0), math.Pow(10, 0.4*band.ColourTerm[0]); math.Abs(got-want) > 1e-15 {
+	if got, want := band.colourFactor(0), math.Pow(10, 0.4*band.ColorTerm[0]); math.Abs(got-want) > 1e-15 {
 		t.Errorf("colourFactor(0) = %v, want %v", got, want)
 	}
 

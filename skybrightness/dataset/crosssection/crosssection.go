@@ -56,7 +56,7 @@ type WavelengthUnit string
 
 // The wavelength units the atlas uses.
 const (
-	Nanometre  WavelengthUnit = "nm"
+	Nanometer  WavelengthUnit = "nm"
 	Angstrom   WavelengthUnit = "A"
 	Wavenumber WavelengthUnit = "cm-1"
 )
@@ -64,7 +64,7 @@ const (
 // toNM converts one value in the given unit to nanometres.
 func (u WavelengthUnit) toNM(v float64) (float64, error) {
 	switch u {
-	case Nanometre:
+	case Nanometer:
 		return v, nil
 	case Angstrom:
 		return v / 10, nil
