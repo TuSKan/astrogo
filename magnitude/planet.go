@@ -214,16 +214,17 @@ func saturnMag(sunToPlanet, observerToPlanet [3]float64, r, delta, phAng float64
 	sunSubLat := subLatitude(saturnPole, sunToPlanet)
 	earthSubLat := subLatitude(saturnPole, observerToPlanet)
 
-	// Geometric mean sub-latitude: sqrt(β_sun · β_earth) when same sign, else 0.
+	// Ring inclination: the geometric mean sqrt(β_sun · β_earth) when the Sun
+	// and the observer are on the same side of the ring plane, else 0. It is
+	// never negative. The rings brighten Saturn by how far they are open, and
+	// the south face brightens it exactly as the north face does — a signed
+	// value dimmed the planet by up to 1.9 mag whenever the south face was
+	// lit (#375).
 	product := sunSubLat * earthSubLat
 
 	var subLatGeoc float64
 	if product >= 0 {
-		subLatGeoc = math.Sqrt(math.Abs(product))
-		// Preserve sign.
-		if sunSubLat < 0 {
-			subLatGeoc = -subLatGeoc
-		}
+		subLatGeoc = math.Sqrt(product)
 	}
 
 	const (
@@ -231,9 +232,7 @@ func saturnMag(sunToPlanet, observerToPlanet [3]float64, r, delta, phAng float64
 		geocentricInclinationLimit = 27.0
 	)
 
-	absSubLatGeoc := math.Abs(subLatGeoc)
-
-	if phAng <= geocentricPhaseLimit && absSubLatGeoc <= geocentricInclinationLimit {
+	if phAng <= geocentricPhaseLimit && subLatGeoc <= geocentricInclinationLimit {
 		// Eq. 10: globe + rings, geocentric circumstances.
 		sinBeta := math.Sin(subLatGeoc * math.Pi / 180)
 
