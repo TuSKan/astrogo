@@ -86,6 +86,10 @@ func TestPlanetMagnitudesAgreeWithHorizons(t *testing.T) {
 
 		// Pluto with Charon, from the Explanatory Supplement's V(1,0) = -1.01;
 		// Horizons uses -1.00, so these sit 0.010-0.012 mag bright (#407).
+		// Both implement the same historical law, so this is a consistency
+		// check on astrogo's geometry and arithmetic, not on the law, which
+		// can be tenths of a magnitude from Pluto's real brightness (see
+		// plutoMag).
 		{eph.Pluto, 2020, 1, 1, 0.3608, 14.384},
 		{eph.Pluto, 2024, 7, 1, 0.6269, 14.412},
 		{eph.Pluto, 2026, 12, 20, 0.9357, 14.608},

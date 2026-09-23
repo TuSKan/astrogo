@@ -308,17 +308,33 @@ func neptuneMag(r, delta, phAng float64, t time.Time) float64 {
 }
 
 // ── Pluto — Explanatory Supplement (1992), Table 7.48.1 ────────────────────
-// Mallama & Hilton (2018) do not cover Pluto, and neither does Skyfield. The
-// Explanatory Supplement to the Astronomical Almanac gives V(1,0) = −1.01 for
-// Pluto and Charon together, which is what any telescope short of resolving
-// them sees (Harris 1961), and a linear phase coefficient of 0.041 mag per
-// degree (Binzel & Mulholland 1984). Pluto's phase angle never exceeds about
-// 1.9° from Earth.
+// A historical approximation, and presented as one:
 //
-// JPL Horizons' APmag, which also includes Charon, uses −1.00 and the same
-// coefficient: 0.01 mag fainter than this, against a rotational variation the
-// Supplement puts at 0.1–0.3 mag. Until #407 PlanetApparent listed Pluto as
-// supported and returned ErrUnsupportedBody for it.
+//	V = −1.01 + 5 log10(r·Δ) + 0.041 α
+//
+// for Pluto and Charon unresolved, in Johnson V, with α the phase angle at the
+// target in degrees. Mallama & Hilton (2018) do not calibrate Pluto, and
+// neither does Skyfield. V(1,0) = −1.01 is the Explanatory Supplement's, for
+// the pair together (Harris 1961), so Charon is already in it and must not be
+// added again. The phase coefficient is Binzel & Mulholland's (1984), 0.041 ±
+// 0.003 mag per degree, measured between α = 0.615° and 1.659°; Pluto never
+// exceeds about 1.9° from Earth, and the linear law is not established nearer
+// opposition than those data go.
+//
+// What it leaves out is larger than anything the coefficients could be
+// refined by. Its normalization is fixed: it has no rotational light curve
+// (the Supplement quotes 0.11 mag peak to peak in 1954 and 0.29 in 1981), no
+// change with viewing aspect or epoch, and no mutual events. Resolved Hubble
+// photometry modeled by Buie et al. (2010) puts the pair 0.27 mag fainter than
+// this at one of its geometries, so discrepancies of tenths of a magnitude are
+// possible. It is fit for a visibility estimate — which is how VisibleTonight
+// uses it — and not for predicting a measurement.
+//
+// JPL Horizons' APmag, which also includes Charon, uses the same historical
+// law with V(1,0) = −1.00, and astrogo agrees with it to 0.01 mag. That is a
+// consistency check between two implementations of one formula, not a
+// validation of either. Until #407 PlanetApparent listed Pluto as supported
+// and returned ErrUnsupportedBody for it.
 
 func plutoMag(r, delta, phAng float64) float64 {
 	return -1.01 + 5*math.Log10(r*delta) + 0.041*phAng
