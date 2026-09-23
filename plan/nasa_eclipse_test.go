@@ -20,6 +20,7 @@ package plan_test
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -49,8 +50,64 @@ type nasaEclipseRef struct {
 
 // ── NASA Eclipse Catalog Parser ──────────────────────────────────────────────
 
+// catalogNumber matches the five-digit catalog number that opens every row of
+// NASA's eclipse catalog pages.
+var catalogNumber = regexp.MustCompile(`^\d{5}$`)
+
+// errCatalogField is a field of a recognized catalog row that does not parse.
+var errCatalogField = errors.New("malformed catalog field")
+
+// catalogFields are the date, time and ΔT columns every catalog row carries,
+// in the same place on the lunar and solar pages.
+type catalogFields struct {
+	year, month, day, hour, minute, sec int
+	deltaT                              float64
+}
+
+// parseCatalogFields reads parts[1:6] of a recognized catalog row.
+func parseCatalogFields(parts []string) (catalogFields, error) {
+	var f catalogFields
+
+	year, err := strconv.Atoi(parts[1])
+	if err != nil {
+		return f, fmt.Errorf("%w: year %q", errCatalogField, parts[1])
+	}
+
+	month, ok := monthMap[parts[2]]
+	if !ok {
+		return f, fmt.Errorf("%w: month %q", errCatalogField, parts[2])
+	}
+
+	day, err := strconv.Atoi(parts[3])
+	if err != nil {
+		return f, fmt.Errorf("%w: day %q", errCatalogField, parts[3])
+	}
+
+	hms := strings.Split(parts[4], ":")
+	if len(hms) != 3 {
+		return f, fmt.Errorf("%w: time %q", errCatalogField, parts[4])
+	}
+
+	var clock [3]int
+
+	for i, v := range hms {
+		if clock[i], err = strconv.Atoi(v); err != nil {
+			return f, fmt.Errorf("%w: time %q", errCatalogField, parts[4])
+		}
+	}
+
+	deltaT, err := strconv.ParseFloat(parts[5], 64)
+	if err != nil {
+		return f, fmt.Errorf("%w: ΔT %q", errCatalogField, parts[5])
+	}
+
+	return catalogFields{year, month, day, clock[0], clock[1], clock[2], deltaT}, nil
+}
+
 // parseNASALunarEclipses parses a NASA lunar eclipse catalog page.
-func parseNASALunarEclipses(html string) []nasaEclipseRef {
+func parseNASALunarEclipses(t *testing.T, html string) []nasaEclipseRef {
+	t.Helper()
+
 	var eclipses []nasaEclipseRef
 
 	// Strip HTML tags
@@ -71,49 +128,24 @@ func parseNASALunarEclipses(html string) []nasaEclipseRef {
 			continue
 		}
 
-		// Catalog number must be 5 digits
-		catNum := parts[0]
-		if len(catNum) != 5 {
+		// A catalog row starts with its five-digit catalog number; every other
+		// line on the page is prose, headers or rules. Past this point the line
+		// is a row, and a field in it that does not parse is a malformed row,
+		// reported rather than dropped: a quietly shorter reference set still
+		// compares, and passes, on whatever rows are left.
+		if !catalogNumber.MatchString(parts[0]) {
 			continue
 		}
 
-		if _, err := strconv.Atoi(catNum); err != nil {
-			continue
-		}
-
-		// Parse year
-		year, err := strconv.Atoi(parts[1])
+		fields, err := parseCatalogFields(parts)
 		if err != nil {
+			t.Errorf("NASA catalog row %q: %v", trimmed, err)
+
 			continue
 		}
 
-		// Parse month
-		month, ok := monthMap[parts[2]]
-		if !ok {
-			continue
-		}
-
-		// Parse day
-		day, err := strconv.Atoi(parts[3])
-		if err != nil {
-			continue
-		}
-
-		// Parse time (HH:MM:SS)
-		timeParts := strings.Split(parts[4], ":")
-		if len(timeParts) != 3 {
-			continue
-		}
-
-		hour, _ := strconv.Atoi(timeParts[0])
-		minute, _ := strconv.Atoi(timeParts[1])
-		sec, _ := strconv.Atoi(timeParts[2])
-
-		// Parse ΔT
-		dt, err := strconv.ParseFloat(parts[5], 64)
-		if err != nil {
-			continue
-		}
+		year, month, day := fields.year, fields.month, fields.day
+		hour, minute, sec, dt := fields.hour, fields.minute, fields.sec, fields.deltaT
 
 		// Parse Luna Num (skip)
 		// Parse Saros Num
@@ -157,7 +189,9 @@ func parseNASALunarEclipses(html string) []nasaEclipseRef {
 }
 
 // parseNASASolarEclipses parses a NASA solar eclipse catalog page.
-func parseNASASolarEclipses(html string) []nasaEclipseRef {
+func parseNASASolarEclipses(t *testing.T, html string) []nasaEclipseRef {
+	t.Helper()
+
 	var eclipses []nasaEclipseRef
 
 	clean := regexp.MustCompile(`<[^>]+>`).ReplaceAllString(html, "")
@@ -174,44 +208,24 @@ func parseNASASolarEclipses(html string) []nasaEclipseRef {
 			continue
 		}
 
-		// Catalog number must be 5 digits
-		catNum := parts[0]
-		if len(catNum) != 5 {
+		// A catalog row starts with its five-digit catalog number; every other
+		// line on the page is prose, headers or rules. Past this point the line
+		// is a row, and a field in it that does not parse is a malformed row,
+		// reported rather than dropped: a quietly shorter reference set still
+		// compares, and passes, on whatever rows are left.
+		if !catalogNumber.MatchString(parts[0]) {
 			continue
 		}
 
-		if _, err := strconv.Atoi(catNum); err != nil {
-			continue
-		}
-
-		year, err := strconv.Atoi(parts[1])
+		fields, err := parseCatalogFields(parts)
 		if err != nil {
+			t.Errorf("NASA catalog row %q: %v", trimmed, err)
+
 			continue
 		}
 
-		month, ok := monthMap[parts[2]]
-		if !ok {
-			continue
-		}
-
-		day, err := strconv.Atoi(parts[3])
-		if err != nil {
-			continue
-		}
-
-		timeParts := strings.Split(parts[4], ":")
-		if len(timeParts) != 3 {
-			continue
-		}
-
-		hour, _ := strconv.Atoi(timeParts[0])
-		minute, _ := strconv.Atoi(timeParts[1])
-		sec, _ := strconv.Atoi(timeParts[2])
-
-		dt, err := strconv.ParseFloat(parts[5], 64)
-		if err != nil {
-			continue
-		}
+		year, month, day := fields.year, fields.month, fields.day
+		hour, minute, sec, dt := fields.hour, fields.minute, fields.sec, fields.deltaT
 
 		// Eclipse type for solar: T, A, H, P
 		eclType := ""
@@ -377,7 +391,7 @@ func TestNASA_LunarEclipses_Historical(t *testing.T) {
 			nasaBudgetOK(t, 45*time.Second)
 
 			html := fetchNASAPage(t, c.url)
-			refs := parseNASALunarEclipses(html)
+			refs := parseNASALunarEclipses(t, html)
 			t.Logf("Parsed %d lunar eclipses from NASA %04d-%04d", len(refs), c.start, c.end)
 
 			if len(refs) == 0 {
@@ -398,9 +412,11 @@ func TestNASA_LunarEclipses_Historical(t *testing.T) {
 				searchStart := refTime.Add(unit.Days(-30))
 				searchEnd := refTime.Add(unit.Days(30))
 
+				// DE441 covers every date on these pages, so an error from the
+				// search is astrogo's, and a miss rather than a skip.
 				eclipses, err := plan.LunarEclipses(searchStart, searchEnd, prov)
 				if err != nil {
-					t.Logf("  SKIP %04d-%02d-%02d: LunarEclipses error: %v",
+					t.Errorf("  FAIL %04d-%02d-%02d: LunarEclipses: %v",
 						ref.Year, ref.Month, ref.Day, err)
 
 					continue
@@ -509,7 +525,7 @@ func TestNASA_SolarEclipses_Historical(t *testing.T) {
 			nasaBudgetOK(t, 45*time.Second)
 
 			html := fetchNASAPage(t, c.url)
-			refs := parseNASASolarEclipses(html)
+			refs := parseNASASolarEclipses(t, html)
 			t.Logf("Parsed %d solar eclipses from NASA %04d-%04d", len(refs), c.start, c.end)
 
 			if len(refs) == 0 {
@@ -529,9 +545,11 @@ func TestNASA_SolarEclipses_Historical(t *testing.T) {
 				searchStart := refTime.Add(unit.Days(-30))
 				searchEnd := refTime.Add(unit.Days(30))
 
+				// DE441 covers every date on these pages, so an error from the
+				// search is astrogo's, and a miss rather than a skip.
 				eclipses, err := plan.SolarEclipses(searchStart, searchEnd, prov)
 				if err != nil {
-					t.Logf("  SKIP %04d-%02d-%02d: SolarEclipses error: %v",
+					t.Errorf("  FAIL %04d-%02d-%02d: SolarEclipses: %v",
 						ref.Year, ref.Month, ref.Day, err)
 
 					continue
@@ -632,7 +650,7 @@ func TestNASA_DeltaT_CrossValidation(t *testing.T) {
 			nasaBudgetOK(t, 45*time.Second)
 
 			html := fetchNASAPage(t, c.url)
-			refs := parseNASALunarEclipses(html)
+			refs := parseNASALunarEclipses(t, html)
 
 			if len(refs) == 0 {
 				t.Fatalf("No eclipses parsed")

@@ -103,8 +103,12 @@ func TestSceneResultsDoNotDependOnEvaluationOrder(t *testing.T) {
 
 	for name := range build() {
 		// Cold: a component that has never seen another scene.
+		// Every one of these components answers in both scenes; an error is a
+		// component that stopped answering, not one to leave out of the check.
 		coldThin, errCold := evaluate(t, build()[name], thin, grid, dir)
 		if errCold != nil {
+			t.Errorf("%s, cold: %v", name, errCold)
+
 			continue
 		}
 
@@ -112,11 +116,15 @@ func TestSceneResultsDoNotDependOnEvaluationOrder(t *testing.T) {
 		warm := build()[name]
 
 		if _, err := evaluate(t, warm, thick, grid, dir); err != nil {
+			t.Errorf("%s, thick scene: %v", name, err)
+
 			continue
 		}
 
 		warmThin, err := evaluate(t, warm, thin, grid, dir)
 		if err != nil {
+			t.Errorf("%s, thin scene after the thick one: %v", name, err)
+
 			continue
 		}
 

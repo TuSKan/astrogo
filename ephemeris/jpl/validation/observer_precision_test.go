@@ -3,6 +3,7 @@
 package jpl_test
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"strconv"
@@ -363,24 +364,22 @@ func TestObserverPrecisionMatrix(t *testing.T) {
 				loc.Lon().Degrees(), loc.Lat().Degrees(), loc.Height().Meters(),
 				startTime, stopTime, stepSize)
 			if err != nil {
-				// Not this test's own bug: live-confirmed this session
-				// (curl, isolated from astrogo entirely) that JPL
-				// Horizons' own server returns a bare HTTP 500
-				// ("unexpected error: please notify the webmaster") for
-				// the Sun/Mercury/Moon specifically under this exact
-				// topocentric OBSERVER query shape (CENTER='coord@399'),
-				// reproducibly, even with a single minimal QUANTITIES=1
-				// request — while Mars/Jupiter/Saturn succeed with
-				// identical parameters otherwise. This is a real,
-				// external Horizons limitation for those three targets'
-				// topocentric-observer ephemeris, not a reachability
-				// flake (the endpoint responds) and not wrong data from
-				// astrogo's own request construction — so it's logged
-				// and skipped for this (body, site) pair rather than
-				// failing the whole matrix, matching this package's
-				// broader "never fail on external service behavior
-				// outside astrogo's control" convention.
-				t.Logf("fetch %s @ %s: %v (known Horizons limitation for this target, not astrogo)", body.name, ns.name, err)
+				// An outage for one (body, site) pair costs that pair, not the
+				// matrix: Horizons' error page, a 5xx, a timeout. Anything
+				// else is astrogo's request or parser, and fails.
+				//
+				// This used to continue on every error, on the strength of a
+				// comment saying Horizons returned HTTP 500 for the Sun,
+				// Mercury and the Moon under this query shape. Re-tested on
+				// 2026-09-23 with the exact parameters, all three answer; a
+				// 500 that comes back is an outage like any other.
+				if reason, ok := testutil.UpstreamFailure(err); ok || errors.Is(err, errHorizonsUnavailable) {
+					t.Logf("fetch %s @ %s: Horizons did not answer (%s): %v", body.name, ns.name, reason, err)
+
+					continue
+				}
+
+				t.Errorf("fetch %s @ %s: %v", body.name, ns.name, err)
 
 				continue
 			}

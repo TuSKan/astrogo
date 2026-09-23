@@ -4,6 +4,7 @@ package satellite
 
 import (
 	"bufio"
+	"errors"
 	"math"
 	"os"
 	"strconv"
@@ -52,9 +53,9 @@ func TestTheWrapperDoesNotCorruptTheModel(t *testing.T) {
 	used := make(map[string]int)
 
 	var (
-		compared int
-		worst    float64
-		worstAt  string
+		compared, checksumRefusals int
+		worst                      float64
+		worstAt                    string
 	)
 
 	for _, blk := range blocks {
@@ -72,15 +73,23 @@ func TestTheWrapperDoesNotCorruptTheModel(t *testing.T) {
 			// The three cases with unmaintained check digits are refused here
 			// and not by sgp4, which is the point of the split: this layer
 			// reads network feeds, so it enforces the check digit.
-			continue
+			if errors.Is(err, sgp4.ErrChecksum) {
+				checksumRefusals++
+
+				continue
+			}
+
+			t.Fatalf("satellite %s: NewFromTLE: %v", blk.satnum, err)
 		}
 
 		for _, row := range blk.rows {
 			// The reference's own argument, converted the way a caller would.
+			// No state in the reference errors — measured over every row —
+			// so an error here is the wrapper's, not the model's.
 			pos, _, perr := sat.propagateECI(sat.epoch.Add(unit.Days(row[0] / 1440.0)))
 			if perr != nil {
-				// An advisory error still carries a state and a hard one is the
-				// model's business, not the wrapper's.
+				t.Errorf("satellite %s at tsince %g: %v", blk.satnum, row[0], perr)
+
 				continue
 			}
 
@@ -103,6 +112,10 @@ func TestTheWrapperDoesNotCorruptTheModel(t *testing.T) {
 
 	if compared == 0 {
 		t.Fatal("no states were compared; the fixtures are not being read")
+	}
+
+	if checksumRefusals != 3 {
+		t.Errorf("%d element sets refused for their check digits, want the fixture's 3", checksumRefusals)
 	}
 
 	t.Logf("%d states through Satellite.propagateECI, worst %.4g km (satellite %s)",
@@ -138,7 +151,11 @@ func TestTheEpochFractionSurvivesTheWrapper(t *testing.T) {
 
 		sat, err := NewFromTLE(blk.satnum, ss[0][0][:sgp4.LineLength], ss[0][1][:sgp4.LineLength])
 		if err != nil {
-			continue
+			if errors.Is(err, sgp4.ErrChecksum) {
+				continue
+			}
+
+			t.Fatalf("satellite %s: NewFromTLE: %v", blk.satnum, err)
 		}
 
 		if frac := math.Abs(math.Mod(sat.epoch.JD()*86400.0, 1.0)); frac < 1e-6 || frac > 1-1e-6 {
@@ -147,6 +164,8 @@ func TestTheEpochFractionSurvivesTheWrapper(t *testing.T) {
 
 		pos, _, err := sat.propagateECI(sat.epoch)
 		if err != nil {
+			t.Errorf("satellite %s at its own epoch: %v", blk.satnum, err)
+
 			continue
 		}
 

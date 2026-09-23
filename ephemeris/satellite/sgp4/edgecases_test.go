@@ -179,14 +179,16 @@ func TestKeplerNonConvergenceIsNotReachableFromAnElementSet(t *testing.T) {
 		el.Eccentricity = 0.9999999
 		el.MeanMotion = n
 
+		// Refusing the shape would leave nothing tried, and the negative result
+		// above would then rest on nothing. New accepts all five today.
 		p, err := sgp4.New(el)
 		if err != nil {
-			continue
+			t.Fatalf("mean motion %g at e = %g: New: %v", n, el.Eccentricity, err)
 		}
 
 		for ts := -50000.0; ts <= 50000.0; ts += 250 {
 			if _, _, err := p.At(ts); errors.Is(err, sgp4.ErrKeplerNotConverged) {
-				t.Logf("mean motion %g reached ErrKeplerNotConverged at tsince %g — the "+
+				t.Errorf("mean motion %g reached ErrKeplerNotConverged at tsince %g — the "+
 					"sentinel's doc comment says no input has been found that does, and "+
 					"should be updated to name this one", n, ts)
 
