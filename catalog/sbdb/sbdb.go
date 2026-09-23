@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -150,6 +151,8 @@ func (p *Provider) ResolveObject(ctx context.Context, req resolve.ObjectRequest)
 			eccentricity                           float64
 			semiMajorAxis, incl, node, argp, ma    float64
 			hasA, hasIncl, hasNode, hasArgp, hasMA bool
+			q, tp                                  float64
+			hasQ, hasTP                            bool
 		)
 
 		for _, el := range payload.Orbit.Elements {
@@ -183,11 +186,22 @@ func (p *Provider) ResolveObject(ctx context.Context, req resolve.ObjectRequest)
 					ma = v
 					hasMA = true
 				}
+			case "q":
+				if v, err := parseFloat(el.Value); err == nil {
+					q = v
+					hasQ = true
+				}
+			case "tp":
+				if v, err := parseFloat(el.Value); err == nil {
+					tp = v
+					hasTP = true
+				}
 			}
 		}
 
 		epochJD, epochErr := parseFloat(payload.Orbit.Epoch)
-		hasElements := hasA && hasIncl && hasNode && hasArgp && hasMA && epochErr == nil
+		hasAsteroidForm, hasCometForm := hasA && hasMA, hasQ && hasTP
+		hasElements := hasIncl && hasNode && hasArgp && epochErr == nil && (hasAsteroidForm || hasCometForm)
 
 		t := resolve.Target{
 			ID:          payload.Object.SpkID,
@@ -201,12 +215,11 @@ func (p *Provider) ResolveObject(ctx context.Context, req resolve.ObjectRequest)
 
 		if hasElements {
 			t.Epoch = time.FromJD(epochJD, time.TDB)
-			t.SemiMajorAxis = unit.AU(semiMajorAxis)
 			t.Eccentricity = eccentricity
 			t.Inclination = angle.Deg(incl)
 			t.AscendingNode = angle.Deg(node)
 			t.ArgPeriapsis = angle.Deg(argp)
-			t.MeanAnomaly = angle.Deg(ma)
+			setElementForms(&t, hasAsteroidForm, semiMajorAxis, ma, hasCometForm, q, tp)
 		}
 
 		// Parse physical parameters for magnitude computation.
@@ -439,8 +452,9 @@ func (p *Provider) SearchBright(ctx context.Context, req resolve.BrightRequest) 
 // plan.FromCatalog can build a network-free Kepler-propagated body with
 // no Stage-2 kernel fetch at all. "e" (eccentricity) is folded in here
 // rather than requested separately — it was already fetched alone for
-// classifyKind, now decoded once alongside the rest.
-const elementFields = ",e,a,i,om,w,ma,epoch"
+// classifyKind, now decoded once alongside the rest. "q" and "tp" are the
+// comet form of the same orbit, which is the only form an open orbit has.
+const elementFields = ",e,a,i,om,w,ma,q,tp,epoch"
 
 // queryBright issues one sb-kind-scoped bulk query against
 // remote.JPLSBDBQuery, filtering by magField < maxVal, sorted magField
@@ -463,6 +477,11 @@ func (p *Provider) queryBright(ctx context.Context, sbKind, magField string, max
 	params.Set("fields", fields)
 	params.Set("sort", magField)
 	params.Set("limit", strconv.Itoa(limit))
+	// The bulk query rounds to four significant figures without it, as the
+	// identify endpoint rounds to three: C/1937 C1's e comes back as 1.0002
+	// for 1.000162271, and its perihelion time to a hundredth of a day. See
+	// ResolveObject's own full-prec comment for what rounding costs.
+	params.Set("full-prec", "true")
 
 	var resp sbdbQueryResponse
 	if err := p.client.GetJSON(ctx, remote.JPLSBDBQuery, "", params, &resp); err != nil {
@@ -504,6 +523,8 @@ func (p *Provider) queryBright(ctx context.Context, sbKind, magField string, max
 		var (
 			semiMajorAxis, incl, node, argp, ma    float64
 			hasA, hasIncl, hasNode, hasArgp, hasMA bool
+			q, tp                                  float64
+			hasQ, hasTP                            bool
 			epochJD                                float64
 			hasEpoch                               bool
 		)
@@ -538,13 +559,26 @@ func (p *Provider) queryBright(ctx context.Context, sbKind, magField string, max
 			}
 		}
 
+		if idx, ok := col["q"]; ok {
+			if v, err := parseFloat(cellString(row[idx])); err == nil {
+				q, hasQ = v, true
+			}
+		}
+
+		if idx, ok := col["tp"]; ok {
+			if v, err := parseFloat(cellString(row[idx])); err == nil {
+				tp, hasTP = v, true
+			}
+		}
+
 		if idx, ok := col["epoch"]; ok {
 			if v, err := parseFloat(cellString(row[idx])); err == nil {
 				epochJD, hasEpoch = v, true
 			}
 		}
 
-		hasElements := hasA && hasIncl && hasNode && hasArgp && hasMA && hasEpoch
+		hasAsteroidForm, hasCometForm := hasA && hasMA, hasQ && hasTP
+		hasElements := hasIncl && hasNode && hasArgp && hasEpoch && (hasAsteroidForm || hasCometForm)
 
 		t := resolve.Target{
 			ID:          spkID,
@@ -557,12 +591,11 @@ func (p *Provider) queryBright(ctx context.Context, sbKind, magField string, max
 
 		if hasElements {
 			t.Epoch = time.FromJD(epochJD, time.TDB)
-			t.SemiMajorAxis = unit.AU(semiMajorAxis)
 			t.Eccentricity = eccentricity
 			t.Inclination = angle.Deg(incl)
 			t.AscendingNode = angle.Deg(node)
 			t.ArgPeriapsis = angle.Deg(argp)
-			t.MeanAnomaly = angle.Deg(ma)
+			setElementForms(&t, hasAsteroidForm, semiMajorAxis, ma, hasCometForm, q, tp)
 		}
 
 		if magField == "H" {
@@ -589,19 +622,37 @@ func (p *Provider) queryBright(ctx context.Context, sbKind, magField string, max
 	return targets, nil
 }
 
-// parseFloat extracts a float64 from a string, ignoring trailing units/notes.
-func parseFloat(s string) (float64, error) {
-	s = strings.TrimSpace(s)
-	// SBDB sometimes returns values like "3.53" or "3.53 (assumed)"
-	// Take only the numeric prefix.
-	for i, c := range s {
-		if c != '-' && c != '+' && c != '.' && (c < '0' || c > '9') {
-			s = s[:i]
-			break
-		}
+// setElementForms sets whichever of the two element forms SBDB published:
+// the asteroid form (a, M at the epoch) and the comet form (q, tp, which SBDB
+// labels TDB). SBDB publishes both for nearly everything; a parabola has no
+// semi-major axis and so no mean anomaly, and is left with the comet form
+// alone.
+func setElementForms(t *resolve.Target, hasAsteroidForm bool, a, ma float64, hasCometForm bool, q, tp float64) {
+	if hasAsteroidForm {
+		t.SemiMajorAxis = unit.AU(a)
+		t.MeanAnomaly = angle.Deg(ma)
 	}
 
-	v, err := strconv.ParseFloat(strings.TrimSpace(s), 64)
+	if hasCometForm {
+		t.PerihelionDistance = unit.AU(q)
+		t.PerihelionTime = time.FromJD(tp, time.TDB)
+	}
+}
+
+// leadingNumber matches the numeric prefix of an SBDB value, exponent
+// included.
+var leadingNumber = regexp.MustCompile(`^[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?`)
+
+// parseFloat extracts a float64 from a string, ignoring trailing units/notes.
+//
+// SBDB sometimes returns values like "3.53 (assumed)", so only the numeric
+// prefix is read — and that prefix includes an exponent. SBDB writes small
+// values in E-notation: C/1937 C1's mean anomaly is "-2.593805408851336E-5",
+// and a prefix that stopped at the E read it as −2.59°.
+func parseFloat(s string) (float64, error) {
+	s = leadingNumber.FindString(strings.TrimSpace(s))
+
+	v, err := strconv.ParseFloat(s, 64)
 	if err != nil {
 		return 0, fmt.Errorf("sbdb: parse float: %w", err)
 	}

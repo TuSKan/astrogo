@@ -335,3 +335,57 @@ func TestSBDBElementsAreFullPrecision(t *testing.T) {
 			detailed, len(elements))
 	}
 }
+
+// TestSearchBrightElementsAreFullPrecision is TestSBDBElementsAreFullPrecision
+// for the bulk query, which rounds to four significant figures on its own and
+// needed the same parameter. Rounded, C/1937 C1's e = 1.000162271 comes back
+// as 1.0002 and its perihelion time to a hundredth of a day.
+//
+// The same digit test, over every element of every target with elements, and
+// over both forms, since an open orbit is propagated from the comet form.
+func TestSearchBrightElementsAreFullPrecision(t *testing.T) {
+	requireSBDB(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	targets, err := resolve.Drain(New().SearchBright(ctx, resolve.BrightRequest{MaxVMag: 2, Limit: 10}), 20)
+	if err != nil {
+		testutil.SkipOnUpstreamFailure(t, err)
+		t.Fatalf("SearchBright: %v", err)
+	}
+
+	var detailed, total int
+
+	for _, tgt := range targets {
+		if !tgt.HasElements {
+			continue
+		}
+
+		for _, v := range []float64{
+			tgt.Eccentricity, tgt.Inclination.Degrees(), tgt.AscendingNode.Degrees(),
+			tgt.ArgPeriapsis.Degrees(), tgt.PerihelionDistance.AU(),
+		} {
+			if v == 0 {
+				continue
+			}
+
+			total++
+
+			if math.Abs(v-roundToSignificant(v, 4)) > 1e-9*math.Abs(v) {
+				detailed++
+			}
+		}
+	}
+
+	if total < 20 {
+		t.Fatalf("only %d element values came back to check; want the bright list's elements", total)
+	}
+
+	// As in the identify test, not every value: a genuinely round one is
+	// possible. Rounded to four figures, none carries detail at all.
+	if detailed < total*3/4 {
+		t.Errorf("only %d of %d element values carry detail beyond four significant figures; "+
+			"the bulk query is rounding, so full-prec is missing or ignored", detailed, total)
+	}
+}

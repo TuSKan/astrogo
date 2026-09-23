@@ -120,7 +120,7 @@ const (
 	// choice is not the same for everyone: MPCORB.DAT is every numbered
 	// and multi-opposition object at 317 MB (94 MB as MPCORB.DAT.gz),
 	// while NEA.txt, Distant.txt, PHA.txt and Unusual.txt are
-	// single-digit-megabyte cuts of it.
+	// single-digit-megabyte cuts of it, and CometEls.txt holds the comets.
 	MPCORB EndpointID = "mpc.orb"
 
 	// VIIRSAnnual is lightpollutionmap.info's unauthenticated mirror of
@@ -643,7 +643,7 @@ func defaultEndpoints() map[EndpointID]Endpoint {
 			Subsystem: "mpcorb",
 			Description: "IAU Minor Planet Center orbital elements in MPCORB export format " +
 				"(MPCORB.DAT 317 MB, 94 MB gzipped; NEA.txt, Distant.txt, PHA.txt, " +
-				"Unusual.txt 0.5-8.6 MB each)",
+				"Unusual.txt 0.5-8.6 MB each), and comets in CometEls.txt (0.16 MB)",
 			// Two orders of magnitude between the whole catalogue and the
 			// subsets, and the caller picks. A single figure here would either
 			// refuse a 0.5 MB fetch under a small grant or wave a 317 MB one

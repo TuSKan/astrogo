@@ -8,6 +8,7 @@ import (
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/ephemeris/core"
+	"github.com/TuSKan/astrogo/ephemeris/kepler"
 	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 	"github.com/TuSKan/astrogo/vector"
@@ -67,11 +68,11 @@ func TestNewElementsRejectsWhatTwoBodyCannotRepresent(t *testing.T) {
 		{"a main-belt orbit", 2.77, 0.076, true},
 		{"a very eccentric but still closed orbit", 17.8, 0.967, true},
 
-		// e >= 1 is not a tight orbit, it is a different conic. Elliptical
-		// two-body propagation cannot represent it at all, so this must
-		// fail at construction rather than at first use — which is the
-		// difference between an error naming the elements and one arriving
-		// from inside a propagation loop.
+		// e >= 1 is not a tight orbit, it is a different conic. A semi-major
+		// axis and mean anomaly cannot describe it — ElementsFromPerihelion
+		// takes it — so this must fail at construction rather than at first
+		// use, which is the difference between an error naming the elements
+		// and one arriving from inside a propagation loop.
 		{"parabolic", 2.0, 1.0, false},
 		{"hyperbolic", 2.0, 1.5, false},
 	}
@@ -89,6 +90,53 @@ func TestNewElementsRejectsWhatTwoBodyCannotRepresent(t *testing.T) {
 				t.Fatalf("NewElements(a=%v, e=%v) succeeded; e >= 1 is not an ellipse", c.a, c.e)
 			}
 		})
+	}
+}
+
+// TestElementsFromPerihelionTakesEveryConic checks the facade over
+// kepler.FromPerihelion: it accepts an ellipse, a parabola and a hyperbola,
+// the result drops into NewFromElements like any other element set, and a
+// rejection still names kepler's sentinel through the wrapping.
+func TestElementsFromPerihelionTakesEveryConic(t *testing.T) {
+	// 2I/Borisov's perihelion, 2019-12-08.
+	tp := time.FromJDParts(2458826.0528, 0, time.TDB)
+
+	for _, e := range []float64{0.5, 1, 3.356476} {
+		el, err := ElementsFromPerihelion(tp, unit.AU(2.006521), e,
+			angle.Deg(44.0526), angle.Deg(308.1477), angle.Deg(209.1237))
+		if err != nil {
+			t.Fatalf("e = %v: ElementsFromPerihelion: %v", e, err)
+		}
+
+		const id = core.ID(1003639)
+
+		p, err := NewFromElements(id, el)
+		if err != nil {
+			t.Fatalf("e = %v: NewFromElements: %v", e, err)
+		}
+
+		st, err := p.State(id, tp.Add(unit.Days(30)))
+		_ = p.Close()
+
+		if err != nil {
+			t.Fatalf("e = %v: State: %v", e, err)
+		}
+
+		// A month after a perihelion 2 AU from the Sun, the body is between
+		// 1 and 4 AU from the Earth, whatever the conic.
+		if r := st.Pos.Norm(); r < 1 || r > 4 {
+			t.Errorf("e = %v: |r| = %v AU a month after perihelion", e, r)
+		}
+	}
+
+	_, err := ElementsFromPerihelion(tp, unit.AU(2), -0.5, angle.Zero(), angle.Zero(), angle.Zero())
+	if !errors.Is(err, kepler.ErrUnsupportedOrbit) {
+		t.Errorf("e = -0.5: err = %v, want kepler.ErrUnsupportedOrbit", err)
+	}
+
+	_, err = ElementsFromPerihelion(tp, 0, 1, angle.Zero(), angle.Zero(), angle.Zero())
+	if !errors.Is(err, kepler.ErrInvalidElements) {
+		t.Errorf("q = 0: err = %v, want kepler.ErrInvalidElements", err)
 	}
 }
 

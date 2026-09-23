@@ -8,15 +8,17 @@
 // five hundred asteroids", and SBDB returns its elements rounded to three
 // significant figures besides.
 //
-// # What this package does not do
+// # Comets
 //
-// Comets. The MPC publishes them in CometEls.txt, in a different format built
-// around perihelion distance and time rather than semi-major axis and mean
-// anomaly, and most of them are near-parabolic: e is at or above 1 for the
-// long-period comets that make up the bulk of the file. astrogo's propagator is
-// elliptical only ([github.com/TuSKan/astrogo/ephemeris/kepler.ErrUnsupportedOrbit]),
-// so a CometEls reader would parse a file it cannot propagate. The propagator
-// comes first; see #128.
+// The MPC publishes comets in CometEls.txt, in a different format built around
+// perihelion distance and time rather than semi-major axis and mean anomaly,
+// and [Read] reads that too: each row is recognized by its shape, so the same
+// call reads either file, or a file that mixes the two. A comet row fills the
+// comet form of [resolve.Target]'s elements — PerihelionDistance and
+// PerihelionTime — and leaves the asteroid form at zero, since the file does
+// not publish it and an open orbit has none. That matters: e is at or above 1
+// for 118 of the 959 comets in the file (2026-09-23), and those propagate
+// only through [github.com/TuSKan/astrogo/ephemeris.ElementsFromPerihelion].
 //
 // # Sizes
 //
@@ -30,6 +32,7 @@
 //	Unusual.txt    unusual orbits                 8.6 MB
 //	Distant.txt    Centaurs and trans-Neptunians  1.7 MB
 //	PHA.txt        potentially hazardous          0.5 MB
+//	CometEls.txt   every comet                   0.16 MB
 //
 // [Open] streams whichever one is named, so a caller filtering for five hundred
 // objects never holds a million.
@@ -52,11 +55,12 @@ import (
 	"github.com/TuSKan/astrogo/unit"
 )
 
-// Open fetches an MPCORB-format file from [remote.MPCORB] and streams its
-// rows.
+// Open fetches one of the MPC's orbit files from [remote.MPCORB] and streams
+// its rows.
 //
 // name is the file under the MPC's MPCORB directory — "MPCORB.DAT",
-// "NEA.txt", "Distant.txt", "PHA.txt", "Unusual.txt". It is
+// "NEA.txt", "Distant.txt", "PHA.txt", "Unusual.txt", or "CometEls.txt" for
+// the comets. It is
 // [remote.Downloadable], so the caller must have granted
 // [remote.EnableDownloads] for [remote.MPCORB]; because the sizes span two
 // orders of magnitude the endpoint declares [remote.SizeVaries], which means
@@ -91,9 +95,11 @@ func Open(ctx context.Context, name string) (iter.Seq2[resolve.Target, error], e
 	}, nil
 }
 
-// Read streams the rows of an MPCORB-format file, for a caller holding one
+// Read streams the rows of an MPC orbit file, for a caller holding one
 // already — a local copy, an archived snapshot, a file from a source other
-// than the MPC's own directory.
+// than the MPC's own directory. Rows in MPCORB format and in the comet format
+// of CometEls.txt are both read, each recognized by its shape; see the
+// package doc.
 //
 // gzip is detected from the stream's first two bytes rather than from a name,
 // so MPCORB.DAT.gz works without being told and a file misnamed either way
@@ -143,11 +149,20 @@ func Read(r io.Reader) iter.Seq2[resolve.Target, error] {
 
 			row := strings.TrimRight(sc.Text(), "\r\n")
 
-			if !isElementRow(row) {
+			var (
+				t   resolve.Target
+				err error
+			)
+
+			switch {
+			case isElementRow(row):
+				t, err = parseRow(row)
+			case isCometRow(row):
+				t, err = parseCometRow(row)
+			default:
 				continue
 			}
 
-			t, err := parseRow(row)
 			if err != nil {
 				if !yield(resolve.Target{}, fmt.Errorf("line %d: %w", line, err)) {
 					return

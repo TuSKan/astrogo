@@ -163,21 +163,35 @@ type Target struct {
 	// MeanAnomaly is the osculating mean anomaly of the target's orbit at
 	// Epoch. Set only when HasElements is true — and when it is, Epoch
 	// carries the elements' own epoch of osculation (the JPL/MPC
-	// convention, TDB), not a stellar catalog reference epoch like
-	// J2000. These six fields share their names with
-	// [github.com/TuSKan/astrogo/ephemeris.Elements]'s own fields
-	// one-for-one, so a caller can build one directly from a Target:
-	//
-	//	el := eph.Elements{
-	//		Epoch: t.Epoch, SemiMajorAxis: t.SemiMajorAxis, Eccentricity: t.Eccentricity,
-	//		Inclination: t.Inclination, AscendingNode: t.AscendingNode,
-	//		ArgPeriapsis: t.ArgPeriapsis, MeanAnomaly: t.MeanAnomaly,
-	//	}
+	// convention), not a stellar catalog reference epoch like J2000.
 	MeanAnomaly angle.Angle
+	// PerihelionDistance is the osculating perihelion distance of the
+	// target's orbit, the comet form of the same orbit SemiMajorAxis and
+	// MeanAnomaly describe. Set only when HasElements is true.
+	PerihelionDistance unit.Length
+	// PerihelionTime is the time of perihelion passage of the osculating
+	// orbit, TT or TDB as the source publishes it. Set only when HasElements
+	// is true.
+	PerihelionTime time.Time
 	// HasElements is true if the target has real published osculating
-	// orbital elements (SemiMajorAxis, Eccentricity, Inclination,
-	// AscendingNode, ArgPeriapsis, MeanAnomaly, and an elements-epoch
-	// Epoch) — currently populated only by catalog/sbdb.
+	// orbital elements: Eccentricity, Inclination, AscendingNode,
+	// ArgPeriapsis and an elements-epoch Epoch, and at least one of the two
+	// forms elements are published in.
+	//
+	// SemiMajorAxis and MeanAnomaly are the asteroid form, and describe an
+	// ellipse: a hyperbola's semi-major axis is negative by convention and a
+	// parabola has none, so both are zero for a parabola.
+	// PerihelionDistance and PerihelionTime are the comet form, and describe
+	// any conic. A form the source did not publish is left at zero — the
+	// MPC's comet file publishes only the comet form, MPCORB only the
+	// asteroid one, and SBDB both.
+	//
+	// [github.com/TuSKan/astrogo/ephemeris.NewElements] takes the asteroid
+	// form and [github.com/TuSKan/astrogo/ephemeris.ElementsFromPerihelion]
+	// the comet form, so an orbit with e >= 1 needs the second:
+	//
+	//	el, err := eph.ElementsFromPerihelion(t.PerihelionTime, t.PerihelionDistance,
+	//		t.Eccentricity, t.Inclination, t.AscendingNode, t.ArgPeriapsis)
 	HasElements bool
 	// HasM1 is true if the target has M1.
 	HasM1 bool
