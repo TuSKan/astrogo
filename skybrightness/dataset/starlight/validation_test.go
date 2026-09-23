@@ -37,7 +37,7 @@ import (
 //     everywhere except a few points on the Galactic plane.
 //
 // An earlier revision asserted equality within a magnitude and passed while the
-// colour transformation was inverted, because the resulting excess brightness
+// color transformation was inverted, because the resulting excess brightness
 // happened to cancel what the map was missing. Bounding it on one side, against
 // a total the map is a known subset of, is what makes the assertion mean
 // something.
@@ -115,7 +115,7 @@ func TestGaiaMapMatchesThePublishedSurfaceBrightness(t *testing.T) {
 	}
 }
 
-// runOf finds a run of n consecutive pixels whose centres all satisfy want,
+// runOf finds a run of n consecutive pixels whose centers all satisfy want,
 // so a targeted query can sample one part of the sky without aggregating the
 // whole of it.
 func runOf(t *testing.T, grid coord.HEALPix, n int, want func(b angle.Angle) bool) (first int64) {

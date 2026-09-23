@@ -92,7 +92,7 @@ func johnsonVTophat() magnitude.Passband {
 // blackbody is right and the component makes the caller choose rather than
 // guessing. A 5500 K Planck function is the conventional stand-in and is what
 // the rest of this package's tests use. The component renormalizes it so its
-// passband average is one, so the choice affects the spectrum's colour, not the
+// passband average is one, so the choice affects the spectrum's color, not the
 // V-band value the map already fixes.
 func solarLikeShape(grid unit.SpectralGrid) skybrightness.SpectralRadiance {
 	// [skybrightness.BlackbodyShape] rather than Planck's law written out

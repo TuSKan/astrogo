@@ -38,7 +38,7 @@ func finalsLine(mjd, x, y, dut1, lod string) string {
 }
 
 // A row with an MJD and no orientation is the bulletin running out, not an
-// epoch at which the pole is centred and UT1 equals UTC.
+// epoch at which the pole is centered and UT1 equals UTC.
 //
 // finals2000A is padded to full width for its whole length, so those rows are
 // not short and a length check does not reach them. Parsing them with the

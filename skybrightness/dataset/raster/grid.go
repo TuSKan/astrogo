@@ -41,7 +41,7 @@ var (
 //	lat = D + col*E + row*F
 //
 // For a north-up raster B is the +x pixel size, F the negative +y pixel size,
-// and C = E = 0. Pixel centres sit at integer coordinates offset by +0.5, per
+// and C = E = 0. Pixel centers sit at integer coordinates offset by +0.5, per
 // GDAL's convention.
 type GeoTransform struct {
 	A, B, C, D, E, F float64
@@ -113,7 +113,7 @@ func (g *Grid) SampleBilinear(lonDeg, latDeg float64) (float64, error) {
 	return bilinear(g.GT, g.Width, g.Height, lonDeg, latDeg, g.At)
 }
 
-// LonLat returns the georeferenced centre of a pixel.
+// LonLat returns the georeferenced center of a pixel.
 func (g *Grid) LonLat(col, row int) (lonDeg, latDeg float64) {
 	c, r := float64(col)+0.5, float64(row)+0.5
 

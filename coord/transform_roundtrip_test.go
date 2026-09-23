@@ -98,14 +98,14 @@ func TestICRSEclipticRoundTrip(t *testing.T) {
 func TestGalacticAnchors(t *testing.T) {
 	t.Parallel()
 
-	// The galactic centre and the north galactic pole, ICRS J2000.
+	// The galactic center and the north galactic pole, ICRS J2000.
 	for _, c := range []struct {
 		name         string
 		ra, dec      float64
 		wantL, wantB float64
 		toleranceDeg float64
 	}{
-		{"galactic centre", 266.405, -28.936, 0, 0, 0.01},
+		{"galactic center", 266.405, -28.936, 0, 0, 0.01},
 		{"north galactic pole", 192.859, 27.128, 0, 90, 0.01},
 	} {
 		gal := coord.ICRSToGalactic(coord.NewICRS(angle.Deg(c.ra), angle.Deg(c.dec)))

@@ -36,8 +36,8 @@ type BrightStar struct {
 	//
 	// # Where the other bands come from, and why none of them is a fit
 	//
-	// Unlike the Gaia path there is no colour polynomial here. Every band is
-	// arithmetic on published colour indices:
+	// Unlike the Gaia path there is no color polynomial here. Every band is
+	// arithmetic on published color indices:
 	//
 	//	B = V + (B-V)          Hipparcos I/239/hip_main
 	//	I = V - (V-I)          Hipparcos I/239/hip_main
@@ -46,13 +46,13 @@ type BrightStar struct {
 	// The R identity is the one worth stating: V-R = (V-I) - (R-I), so R
 	// follows exactly from two catalogued indices with nothing interpolated.
 	// Hipparcos publishes no R and no V-R, and the alternative — a
-	// colour-colour relation predicting V-R from B-V — would be a fit, which
+	// color-color relation predicting V-R from B-V — would be a fit, which
 	// is what this package refuses everywhere else. A star that the Bright
 	// Star Catalogue does not cover therefore has no R entry at all rather
 	// than an estimated one.
 	Mag map[string]float64
 
-	// vMinusI is the Hipparcos colour, kept only long enough to turn the
+	// vMinusI is the Hipparcos color, kept only long enough to turn the
 	// Bright Star Catalogue's R-I into an R magnitude. Unexported because it
 	// is a step in building Mag rather than part of what a star is.
 	vMinusI    float64
@@ -131,7 +131,7 @@ func AddBrightStars(m *Map, name string, band magnitude.Passband, stars []Bright
 		if !ok {
 			// Not every catalogue covers every band, and a star with no
 			// magnitude in this one contributes nothing to it. Silently, and
-			// deliberately: the alternative is to invent a colour, and the
+			// deliberately: the alternative is to invent a color, and the
 			// count is reported below so the gap is visible rather than
 			// assumed away.
 			continue

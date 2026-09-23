@@ -86,7 +86,7 @@ const (
 	roloP4 = 16.75  // cosine period, deg
 )
 
-// roloBand holds one row of Kieffer & Stone (2005) Table 4: the band centre
+// roloBand holds one row of Kieffer & Stone (2005) Table 4: the band center
 // and its ten wavelength-dependent coefficients.
 type roloBand struct {
 	Lambda unit.WavelengthNM
@@ -138,7 +138,7 @@ var roloBands = [32]roloBand{
 	{2383.6, [4]float64{-1.08403, -1.31032, 0.20323, -0.15863}, [3]float64{0.05955, -0.00940, 0.00083}, [3]float64{0.36134, -0.28408, 0.01010}},
 }
 
-// ROLOBands returns the 32 band centres of the ROLO model, in nanometers and
+// ROLOBands returns the 32 band centers of the ROLO model, in nanometers and
 // ascending order.
 //
 // The model is defined only at these wavelengths. It is a fit to broadband

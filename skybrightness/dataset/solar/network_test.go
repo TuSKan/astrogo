@@ -58,7 +58,7 @@ func TestNewScatteredMoonlightFromCALSPEC(t *testing.T) {
 //
 // This is the check that the resampling landed on the right wavelengths. A
 // band silently sampled at zero would make the Moon dark in exactly one
-// colour, which no total-brightness test would notice.
+// color, which no total-brightness test would notice.
 func TestSolarSpectrumCoversTheROLOBands(t *testing.T) {
 	reachable(t)
 

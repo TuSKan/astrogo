@@ -11,14 +11,14 @@ import (
 	"github.com/TuSKan/astrogo/vector"
 )
 
-// galacticCentre is the ICRS direction the frame is built around: Galactic
-// l = 0, b = 0, which is where the IAU convention puts the Galactic centre.
-func galacticCentre() coord.ICRS {
+// galacticCenter is the ICRS direction the frame is built around: Galactic
+// l = 0, b = 0, which is where the IAU convention puts the Galactic center.
+func galacticCenter() coord.ICRS {
 	return coord.GalacticToICRS(coord.NewGalactic(0, 0))
 }
 
 // TestSunSitsWhereTheFrameParametersPutIt is the frame's own definition read
-// back: the Sun is R₀ from the centre and z☉ above the midplane, and those two
+// back: the Sun is R₀ from the center and z☉ above the midplane, and those two
 // facts together fix its X.
 //
 // The X is the part worth asserting. −R₀ is the answer everyone writes down
@@ -40,7 +40,7 @@ func TestSunSitsWhereTheFrameParametersPutIt(t *testing.T) {
 	testutil.AssertNear(t, "Sun Z", sun.Z().Pc(), z0, 1e-9)
 
 	// The two derived radii differ, and by the amount the frame says.
-	testutil.AssertNear(t, "Sun distance from the centre", sun.Distance().Pc(), r0, 1e-9)
+	testutil.AssertNear(t, "Sun distance from the center", sun.Distance().Pc(), r0, 1e-9)
 	testutil.AssertNear(t, "Sun cylindrical radius", sun.Radius().Pc(), -wantX, 1e-9)
 
 	if gap := r0 - sun.Radius().Pc(); gap < 0.02 || gap > 0.04 {
@@ -48,24 +48,24 @@ func TestSunSitsWhereTheFrameParametersPutIt(t *testing.T) {
 	}
 }
 
-// TestGalacticCentreIsTheOrigin checks the one position the frame exists to
+// TestGalacticCenterIsTheOrigin checks the one position the frame exists to
 // name. A target in the direction of Galactic (0, 0) at exactly R₀ is the
-// centre, so it must land on (0, 0, 0) — after both the translation and the
+// center, so it must land on (0, 0, 0) — after both the translation and the
 // tilt, which is what makes this more than a subtraction.
-func TestGalacticCentreIsTheOrigin(t *testing.T) {
+func TestGalacticCenterIsTheOrigin(t *testing.T) {
 	t.Parallel()
 
 	f := coord.DefaultGalactocentricFrame()
-	gc := f.FromICRS(galacticCentre(), f.SunDistance())
+	gc := f.FromICRS(galacticCenter(), f.SunDistance())
 
 	// A part in 10¹² of R₀, which is floating-point noise on an 8178 pc
 	// cancellation rather than a tolerance on the physics.
 	const tol = 1e-8
 
-	testutil.AssertNear(t, "centre X", gc.X().Pc(), 0, tol)
-	testutil.AssertNear(t, "centre Y", gc.Y().Pc(), 0, tol)
-	testutil.AssertNear(t, "centre Z", gc.Z().Pc(), 0, tol)
-	testutil.AssertNear(t, "centre distance", gc.Distance().Pc(), 0, tol)
+	testutil.AssertNear(t, "center X", gc.X().Pc(), 0, tol)
+	testutil.AssertNear(t, "center Y", gc.Y().Pc(), 0, tol)
+	testutil.AssertNear(t, "center Z", gc.Z().Pc(), 0, tol)
+	testutil.AssertNear(t, "center distance", gc.Distance().Pc(), 0, tol)
 }
 
 // TestAxesPointWhereTheDocumentationSays pins the handedness and the axis
@@ -79,7 +79,7 @@ func TestGalacticCentreIsTheOrigin(t *testing.T) {
 // # Why the off-axis tolerance is 2.6 pc and not zero
 //
 // The frame is tilted by asin(z☉/R₀) = 0.1457°, so a displacement along a
-// Galactic axis is not along a Galactocentric one: 1000 pc toward the centre
+// Galactic axis is not along a Galactocentric one: 1000 pc toward the center
 // also moves −2.543 pc in Z, and 1000 pc toward the pole moves +2.543 pc in X.
 // That is d·sin(tilt), it is the frame working, and a test that demanded zero
 // there would be asserting the tilt away.
@@ -106,10 +106,10 @@ func TestAxesPointWhereTheDocumentationSays(t *testing.T) {
 		exactInY   bool
 	}{
 		{
-			name: "toward the centre raises X",
+			name: "toward the center raises X",
 			l:    0, b: 0,
 			wx: d, wy: 0, wz: 0,
-			why:      "+X points from the Sun toward the Galactic centre",
+			why:      "+X points from the Sun toward the Galactic center",
 			exactInY: true,
 		},
 		{
@@ -126,10 +126,10 @@ func TestAxesPointWhereTheDocumentationSays(t *testing.T) {
 			exactInY: true,
 		},
 		{
-			name: "the anticentre lowers X",
+			name: "the anticenter lowers X",
 			l:    180, b: 0,
 			wx: -d, wy: 0, wz: 0,
-			why:      "the anticentre is the other way along X",
+			why:      "the anticenter is the other way along X",
 			exactInY: true,
 		},
 	} {
@@ -164,7 +164,7 @@ func TestAxesPointWhereTheDocumentationSays(t *testing.T) {
 //
 // It covers the poles and the RA wrap, and distances from inside the solar
 // neighbourhood to well past the far edge of the disc — including targets on
-// the far side of the centre, where X changes sign and the direction back to
+// the far side of the center, where X changes sign and the direction back to
 // the Sun is nearly antiparallel to the one out.
 //
 // # The distance tolerance is absolute, and has to be
@@ -189,7 +189,7 @@ func TestRoundTripThroughTheFrame(t *testing.T) {
 		1,      // a nearby star
 		100,    // the solar neighbourhood
 		1000,   // a kiloparsec
-		8178,   // the centre's distance, so the far-side cases straddle it
+		8178,   // the center's distance, so the far-side cases straddle it
 		20000,  // past the far edge of the disc
 		100000, // the halo
 	}
@@ -228,7 +228,7 @@ func TestRoundTripThroughTheFrame(t *testing.T) {
 // can actually settle: the orientation, and the Sun's place in it.
 //
 // The orientation is the interesting half. astrogo never writes the
-// Galactic-centre direction or the roll angle down — both fall out of
+// Galactic-center direction or the roll angle down — both fall out of
 // [coord.ICRSToGalactic] — while astropy states them as frame parameters. That
 // they agree is a check of astrogo's construction against an independent one,
 // not a restatement of a shared constant.
@@ -250,7 +250,7 @@ func TestAstropysDefaultFrameIsReproducible(t *testing.T) {
 		astropyZSunPc     = 20.8
 	)
 
-	gc := galacticCentre()
+	gc := galacticCenter()
 
 	sep := coord.Separation(gc, coord.NewICRS(
 		angle.Deg(astropyGalcenRA), angle.Deg(astropyGalcenDec),
@@ -260,7 +260,7 @@ func TestAstropysDefaultFrameIsReproducible(t *testing.T) {
 	}
 
 	// astropy's roll0 rotates its intermediate frame's Z onto the north
-	// Galactic pole. Measured from the Galactic centre, that is the pole's
+	// Galactic pole. Measured from the Galactic center, that is the pole's
 	// position angle taken the other way round the circle.
 	ngp := coord.GalacticToICRS(coord.NewGalactic(0, angle.Deg(90)))
 
@@ -291,9 +291,9 @@ func TestTheSunsHeightIsNotCosmetic(t *testing.T) {
 	withHeight := coord.DefaultGalactocentricFrame()
 	flat := coord.NewGalactocentricFrame(withHeight.SunDistance(), 0, withHeight.SunVelocity())
 
-	// A target in the Galactic plane on the far side of the centre, twice as
-	// far away as the centre is.
-	target := galacticCentre()
+	// A target in the Galactic plane on the far side of the center, twice as
+	// far away as the center is.
+	target := galacticCenter()
 	d := 2 * withHeight.SunDistance()
 
 	tilted, untilted := withHeight.FromICRS(target, d), flat.FromICRS(target, d)
@@ -325,9 +325,9 @@ func TestDegenerateFramesDoNotProduceNaN(t *testing.T) {
 		name             string
 		distance, height float64
 	}{
-		{"no distance to the centre", 0, 20.8},
+		{"no distance to the center", 0, 20.8},
 		{"no distance and no height", 0, 0},
-		{"the Sun further from the plane than from the centre", 100, 500},
+		{"the Sun further from the plane than from the center", 100, 500},
 		{"a negative height", 8178, -20.8},
 	} {
 		got := coord.NewGalactocentricFrame(unit.Pc(tc.distance), unit.Pc(tc.height), vector.Zero()).
@@ -373,9 +373,9 @@ func TestParallaxDistanceIsTheReciprocal(t *testing.T) {
 func TestParallaxDistanceFeedsTheFrame(t *testing.T) {
 	t.Parallel()
 
-	// A star toward the Galactic centre at 1 mas, so a kiloparsec away — an
-	// eighth of the way to the centre, and the arithmetic is checkable by eye.
-	star := galacticCentre()
+	// A star toward the Galactic center at 1 mas, so a kiloparsec away — an
+	// eighth of the way to the center, and the arithmetic is checkable by eye.
+	star := galacticCenter()
 	f := coord.DefaultGalactocentricFrame()
 
 	got := f.FromICRS(star, coord.ParallaxDistance(angle.Arcsec(0.001)))

@@ -132,7 +132,7 @@ func DefaultOpticalGrid() unit.SpectralGrid {
 // [PresetInputs.StarShape] and [NewIntegratedStarlight] both require a spectral
 // shape from the caller, and deliberately: integrated starlight is the summed
 // light of stars of every type, no single blackbody is right for it, and a
-// package that picked one silently would be choosing the answer's colour on the
+// package that picked one silently would be choosing the answer's color on the
 // caller's behalf. But every caller needs *some* shape, and until this existed
 // each one had to write Planck's law out again — which is how two callers end
 // up with two different constants.
@@ -145,7 +145,7 @@ func DefaultOpticalGrid() unit.SpectralGrid {
 // # What it does not affect
 //
 // The components renormalize a shape so its average across the passband is
-// one. So the temperature sets the spectrum's colour — how the band-integrated
+// one. So the temperature sets the spectrum's color — how the band-integrated
 // value is distributed across wavelength, and therefore how extinction, which
 // is steepest in the blue, redistributes it — and not the band value itself,
 // which the star map already fixes.

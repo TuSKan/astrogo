@@ -9,7 +9,7 @@ import (
 )
 
 // The heliocentric frame — HCRS — has the ICRS axes with its origin moved from
-// the solar system barycentre to the centre of the Sun.
+// the solar system barycenter to the center of the Sun.
 //
 // # It is a translation, not a rotation
 //
@@ -22,12 +22,12 @@ import (
 //
 // # How far the origin moves
 //
-// Further than most people expect. The barycentre is the mass-weighted centre
+// Further than most people expect. The barycenter is the mass-weighted center
 // of the whole solar system, and Jupiter alone is a thousandth of the Sun's
-// mass at five astronomical units — so the Sun swings around the barycentre by
+// mass at five astronomical units — so the Sun swings around the barycenter by
 // up to about 0.009 AU, nearly two solar radii. Sampled quarterly across a
 // Jupiter period it runs from 0.0006 AU to 0.0092 AU — 0.14 to 1.98 solar
-// radii: sometimes the barycentre is deep inside the Sun, and sometimes the
+// radii: sometimes the barycenter is deep inside the Sun, and sometimes the
 // Sun is entirely outside the point it orbits.
 //
 // For a star the difference is small but not always ignorable: that offset
@@ -45,7 +45,7 @@ import (
 // taken.
 
 // SunBarycentric returns the Sun's position relative to the solar system
-// barycentre at t, in AU, on ICRS axes.
+// barycenter at t, in AU, on ICRS axes.
 //
 // There is no SOFA routine for this directly. Epv00 returns Earth's
 // heliocentric and barycentric position, and the Sun's barycentric position is
@@ -69,7 +69,7 @@ func SunBarycentric(t time.Time) (vector.Vec3, error) {
 }
 
 // BarycentricToHeliocentric moves a position vector's origin from the solar
-// system barycentre to the centre of the Sun, at epoch t. Both are in AU on
+// system barycenter to the center of the Sun, at epoch t. Both are in AU on
 // ICRS axes.
 //
 // Named rather than left to the caller because the subtraction has a direction

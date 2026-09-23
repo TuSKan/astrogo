@@ -76,19 +76,19 @@ var kmPerAU = constants.IAU.AstronomicalUnit.Value / 1e3
 // segment every other caller in the binary resolves to — silently, and with
 // no way for a later reader to see it happened.
 //
-// # The mapping mixes body centres and system barycentres
+// # The mapping mixes body centers and system barycenters
 //
-// 199, 299 and 399 are body centres; 4, 5, 6, 7 and 8 are system
-// barycentres. That is not an inconsistency to fix but what a planetary
+// 199, 299 and 399 are body centers; 4, 5, 6, 7 and 8 are system
+// barycenters. That is not an inconsistency to fix but what a planetary
 // kernel contains — the giant planets' satellite systems live in separate
-// kernels, so de440 and de441 can only offer the barycentre, while Mercury
-// and Venus have no moons and so *are* their own barycentres.
+// kernels, so de440 and de441 can only offer the barycenter, while Mercury
+// and Venus have no moons and so *are* their own barycenters.
 //
 // It does mean two kinds of point share one identifier space. Measured
-// against Horizons' body-centre commands over 2026, the gap is 0.0497 arcsec
+// against Horizons' body-center commands over 2026, the gap is 0.0497 arcsec
 // at Uranus, 0.0324 at Jupiter, 0.0288 at Saturn, 0.0093 at Neptune and zero
 // at Mars. Small, systematic, and easy to mistake for an astrogo error when
-// comparing against a reference that defaults to the body centre — see
+// comparing against a reference that defaults to the body center — see
 // [github.com/TuSKan/astrogo/ephemeris/core.ID] (#253).
 //
 // core.Pluto is deliberately absent: there is no NAIF mapping for it here,

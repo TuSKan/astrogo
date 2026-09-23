@@ -15,7 +15,7 @@ const lightSpeedAUPerDay = 173.144632674
 
 // orbitingProvider models what a real ephemeris provider does and the existing
 // mock deliberately does not: it holds two bodies on their own orbits about
-// the barycentre and returns the geocentric state as the difference of the
+// the barycenter and returns the geocentric state as the difference of the
 // two, both evaluated at the requested epoch.
 //
 // That difference is the whole point. mockLinearProvider returns a geocentric

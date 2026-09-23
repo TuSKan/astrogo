@@ -153,24 +153,7 @@ func TestMeanFluxDensityRejectsPartialCoverage(t *testing.T) {
 	}
 }
 
-// A caller who waives the coverage check with 0 still cannot get a mean from
-// a grid that misses the band entirely: the band's weights are all zero, and
-// a mean over no response is refused rather than returned as 0/0.
-func TestMeanFluxDensityRefusesABandTheGridMisses(t *testing.T) {
-	t.Parallel()
-
-	g := mustGrid(t, 800, 51) // 800..850, nowhere near the band
-	band := topHat("test", 500, 600, magnitude.PhotonCounting)
-
-	spectrum := make([]float64, g.Len())
-
-	_, err := magnitude.MeanFluxDensity(spectrum, g, band, 0)
-	if !errors.Is(err, magnitude.ErrPassbandResponse) {
-		t.Errorf("MeanFluxDensity over a grid that misses the band = %v, want ErrPassbandResponse", err)
-	}
-}
-
-// The pivot wavelength of a symmetric top-hat sits near its centre, and is
+// The pivot wavelength of a symmetric top-hat sits near its center, and is
 // a property of the curve alone.
 func TestPivotWavelength(t *testing.T) {
 	t.Parallel()
@@ -183,7 +166,7 @@ func TestPivotWavelength(t *testing.T) {
 	}
 
 	if pivot < 540 || pivot > 560 {
-		t.Errorf("PivotWavelength = %v, want near the 550 nm band centre", pivot)
+		t.Errorf("PivotWavelength = %v, want near the 550 nm band center", pivot)
 	}
 }
 

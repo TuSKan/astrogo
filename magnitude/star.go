@@ -60,8 +60,8 @@ func ExtinctionAtAltitude(k0, altitudeM float64) float64 {
 //	G − V = −0.02704 + 0.01424·(BP−RP) − 0.2156·(BP−RP)² + 0.01426·(BP−RP)³
 //
 // so V = G − (G−V). The table is tabulated as G minus the target band, and
-// reading it the other way round costs 2(G−V) — about 0.3 mag at solar colour,
-// 0.5 mag at the colour most catalogue stars have and over 3 mag for an M
+// reading it the other way round costs 2(G−V) — about 0.3 mag at solar color,
+// 0.5 mag at the color most catalogue stars have and over 3 mag for an M
 // dwarf — always in the direction that makes the star too bright.
 //
 // Three independent checks fix the direction. The Sun has G = −26.90 against
@@ -70,7 +70,7 @@ func ExtinctionAtAltitude(k0, altitudeM float64) float64 {
 // star is brighter in G than in V and G − V is negative. And measured against
 // 4,000 stars carrying both Gaia and Tycho-2 photometry, V = G − (G−V)
 // reproduces the Tycho-derived Johnson V with a median residual of −0.002 mag,
-// holding to within ±0.03 mag in every colour bin across the fitted range;
+// holding to within ±0.03 mag in every color bin across the fitted range;
 // the opposite sign misses by −0.48 mag.
 //
 // Valid for −0.5 < BP−RP < 5.0 mag. Outside that the cubic extrapolates and is
@@ -78,7 +78,7 @@ func ExtinctionAtAltitude(k0, altitudeM float64) float64 {
 //
 // Parameters:
 //   - G: Gaia DR3 G-band magnitude
-//   - bpMinusRp: Gaia BP − RP colour index
+//   - bpMinusRp: Gaia BP − RP color index
 func GaiaGToJohnsonV(G, bpMinusRp float64) float64 {
 	c := bpMinusRp
 	gMinusV := -0.02704 + 0.01424*c - 0.2156*c*c + 0.01426*c*c*c
@@ -116,7 +116,7 @@ func GaiaGToJohnsonV(G, bpMinusRp float64) float64 {
 //
 // Parameters:
 //   - G: Gaia DR3 G-band magnitude
-//   - bpMinusRp: Gaia BP − RP colour index
+//   - bpMinusRp: Gaia BP − RP color index
 func GaiaGToJohnsonB(G, bpMinusRp float64) float64 {
 	c := bpMinusRp
 	gMinusB := 0.01448 - 0.6874*c - 0.3604*c*c + 0.06718*c*c*c - 0.006061*c*c*c*c
@@ -138,7 +138,7 @@ func GaiaGToJohnsonB(G, bpMinusRp float64) float64 {
 // G − R = 0.2125, which with G − V = −0.1525 from [GaiaGToJohnsonV] puts the
 // solar V − R at 0.365 against a published 0.35 to 0.36. The sign is the one
 // physical check that matters — G spans 330 to 1050 nm and R sits redward of
-// its centre, so a star is fainter in G than in R and G − R is positive for
+// its center, so a star is fainter in G than in R and G − R is positive for
 // anything cooler than a hot blue star.
 //
 // # Validity
@@ -148,7 +148,7 @@ func GaiaGToJohnsonB(G, bpMinusRp float64) float64 {
 //
 // Parameters:
 //   - G: Gaia DR3 G-band magnitude
-//   - bpMinusRp: Gaia BP − RP colour index
+//   - bpMinusRp: Gaia BP − RP color index
 func GaiaGToJohnsonR(G, bpMinusRp float64) float64 {
 	c := bpMinusRp
 	gMinusR := -0.02275 + 0.3961*c - 0.1243*c*c - 0.01396*c*c*c + 0.003775*c*c*c*c
@@ -185,7 +185,7 @@ func GaiaGToJohnsonR(G, bpMinusRp float64) float64 {
 //
 // Parameters:
 //   - G: Gaia DR3 G-band magnitude
-//   - bpMinusRp: Gaia BP − RP colour index
+//   - bpMinusRp: Gaia BP − RP color index
 func GaiaGToCousinsI(G, bpMinusRp float64) float64 {
 	c := bpMinusRp
 	gMinusI := 0.01753 + 0.76*c - 0.0991*c*c

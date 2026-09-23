@@ -444,6 +444,14 @@ func FromGo(t time.Time) Time {
 	days := math.Floor(unixSec / 86400.0)
 	frac := (unixSec-days*86400.0)/86400.0 + unixNsec/86400.0
 
+	// On a UTC day ending in a leap second the fraction is of that day's own
+	// length — see utcday.go. A Unix timestamp has no label for the leap
+	// second itself, so this never produces one; it only places the day's
+	// other 86400 seconds where the representation expects them.
+	if leap := currentUTCSteps().leapAtEnd(int(days) + unixEpochMJD); leap != 0 {
+		frac *= daySeconds / (daySeconds + leap)
+	}
+
 	result := FromJDParts(2440587.5+days, frac, UTC)
 	result.loc = loc
 
@@ -528,9 +536,16 @@ func (t Time) String() string {
 func (t Time) ToGo() time.Time {
 	utc := t.UTC()
 
+	// A standard-library time is a count of uniform seconds, so a leap-second
+	// day's fraction is stretched back to 86400 first — see utcday.go. The
+	// leap second itself has no such count and comes out as the following
+	// midnight, which is also what the standard library's own time.Date makes
+	// of a second of 60.
+	jd1, jd2 := utcToLabel(utc.jd1, utc.jd2)
+
 	// JD 2440587.5 is 1970-01-01 00:00:00 UTC
-	days1 := utc.jd1 - 2440587.5
-	days2 := utc.jd2
+	days1 := jd1 - 2440587.5
+	days2 := jd2
 
 	totalSec := days1*86400.0 + days2*86400.0
 
@@ -698,11 +713,25 @@ func (t Time) AddDate(years, months, days int) Time {
 	// Keep original day-of-month from the source date.
 	_, _, origDay, _, _ := gofaext.JdToDate(t.jd1, t.jd2)
 
-	// Convert hours from fractional day
-	totalSec := frac * 86400.0
-	hour := int(totalSec / 3600)
+	// Convert hours from fractional day. A UTC fraction is of the day's own
+	// length, which is 86401 seconds on a leap-second day — see utcday.go.
+	secondsPerDay := 86400.0
+
+	if t.scale == UTC {
+		mjd, _ := utcDayOf(t.jd1, t.jd2)
+		secondsPerDay += currentUTCSteps().leapAtEnd(mjd)
+	}
+
+	totalSec := frac * secondsPerDay
+
+	// Capped at 23:59 so that an epoch inside a leap second keeps its second
+	// of 60 rather than becoming an hour of 24, which Dtf2d rejects outright.
+	// Carried onto a month with no leap second, 23:59:60 is past the end of
+	// the day and lands on the following midnight, as a second of 60 does
+	// anywhere else.
+	hour := min(int(totalSec/3600), 23)
 	totalSec -= float64(hour) * 3600
-	minute := int(totalSec / 60)
+	minute := min(int(totalSec/60), 59)
 	second := totalSec - float64(minute)*60
 
 	// Use day 1 of the target month to get a base JD, then add
@@ -733,19 +762,38 @@ func (t Time) AddDate(years, months, days int) Time {
 //
 // The asymmetry is deliberate rather than an oversight, and it is bounded:
 //
-//   - Add stays label arithmetic because [Time.Add] must be reversible.
-//     t.Add(d).Add(-d) returns exactly t, which TestAddIsReversible pins.
-//     Physical addition cannot be, because UTC has no label for the leap
-//     second itself (see the 23:59:60 issue) — an instant added *into* a leap
-//     second has nowhere to land and aliases to its neighbour, so the trip
-//     back arrives one second away.
+//   - Add stays label arithmetic because that is what it has always meant, and
+//     changing the meaning of an existing method under its callers is a
+//     decision of its own. t.Add(d).Add(-d) returns exactly t, which
+//     TestAddIsReversible pins, for every instant that has a label in the
+//     uniform count — everything but the leap second itself, which is where an
+//     Add starting inside one lands on the following midnight, as it always
+//     did.
 //   - Sub is physical because it returns a [unit.Duration], which is a count
 //     of SI seconds by type.
 //
-// Both cannot hold at once while UTC is not a total representation of the
-// instants it labels. To advance a UTC epoch by physical time, do the
-// arithmetic in a uniform scale: t.TAI().Add(d).UTC().
+// Now that UTC represents its leap seconds (see utcday.go) the reason this
+// could not be otherwise has gone, and physical addition would be reversible
+// too; whether Add should become it is a separate question. To advance a UTC
+// epoch by physical time today, do the arithmetic in a uniform scale:
+// t.TAI().Add(d).UTC().
 func (t Time) Add(d unit.Duration) Time {
+	if t.scale == UTC {
+		// Label arithmetic is arithmetic on labels, and on a leap-second day
+		// the Julian Date's fraction is of 86401 seconds rather than 86400 —
+		// so a whole day added to noon on 2016-12-30 would otherwise land at
+		// 12:00:00.5 on the 31st. Re-expressing with an 86400-second day,
+		// adding, and converting back keeps every label exactly where it
+		// always went. See utcday.go.
+		jd1, jd2 := utcToLabel(t.jd1, t.jd2)
+		jd1, jd2 = utcFromLabel(jd1, jd2+d.Days())
+
+		result := FromJDParts(jd1, jd2, UTC)
+		result.loc = t.loc
+
+		return result
+	}
+
 	result := FromJDParts(t.jd1, t.jd2+d.Days(), t.scale)
 	result.loc = t.loc
 
@@ -758,17 +806,23 @@ func (t Time) Add(d unit.Duration) Time {
 // Year 0 = 1 BC, year -1 = 2 BC, etc.
 // The timezone location is preserved for display purposes.
 //
-// A second of 60 — the label UTC gives an inserted leap second — cannot be
-// represented and is normalised onto the following midnight, one second later
-// than the instant asked for. 23:59:59 on the day of a negative leap second is
-// the mirror problem: a second UTC never labelled, which this returns anyway.
-// Both are reported through [logging] rather than returned, since this
-// constructor has no error to return; see leapsecond_alias.go for why the type
-// can hold neither.
+// A second of 60 on a day that ends in a leap second is that leap second, and
+// is built as the instant it is: 2016-12-31 23:59:60 is one SI second after
+// 23:59:59 and one before the following midnight. See utcday.go.
+//
+// A second UTC never labeled — 60 on a day that gained no leap second, 61 or
+// more, or 23:59:59 on the day of a negative leap second — is normalized into
+// the following minute as the standard library does, and reported through
+// [logging], since this constructor has no error to return. See
+// leapsecond_alias.go.
 func Date(year int, month time.Month, day, hour, minute, second, nanosecond int, loc *time.Location) Time {
 	switch {
 	case second >= 60:
-		warnLeapSecondAliased(year, month, day, hour, minute, second, loc)
+		if leap, ok := dateInLeapSecond(year, month, day, hour, minute, second, nanosecond, loc); ok {
+			return leap
+		}
+
+		warnSecondOutOfRange(year, month, day, hour, minute, second, loc)
 
 	// Only the last second of a UTC day can be one a negative leap second
 	// removed. Which second that is depends on the caller's zone, so the hour
@@ -1138,21 +1192,11 @@ func (t Time) UTC() Time {
 
 	switch t.scale { //nolint:exhaustive // UTC is identity; only TAI/TT/TDB/UT1 convert
 	case TAI:
-		// UTC = TAI − ΔAT.
-		// Use TAI JD as initial UTC guess for the leap-second lookup,
-		// then iterate once to handle the leap-second boundary.
-		y, m, d, fd, _ := gofaext.JdToDate(t.jd1, t.jd2)
-		dat := deltaAT(y, m, d, fd)
-		utcJD2 := t.jd2 - dat/86400.0
-		// Re-check: ΔAT may differ at the true UTC epoch (leap-second edge).
-		y2, m2, d2, fd2, _ := gofaext.JdToDate(t.jd1, utcJD2)
+		// UTC = TAI − ΔAT, landing on a leap second's own label when the
+		// instant is inside one — see utcday.go.
+		jd1, jd2 := taiToUTC(t.jd1, t.jd2)
 
-		dat2 := deltaAT(y2, m2, d2, fd2)
-		if dat2 != dat {
-			utcJD2 = t.jd2 - dat2/86400.0
-		}
-
-		return fromPartsPreserveLoc(t, t.jd1, utcJD2, UTC)
+		return fromPartsPreserveLoc(t, jd1, jd2, UTC)
 	case TT:
 		// Pre-1972 the forward conversion uses the Delta-T polynomial rather
 		// than Delta-AT — see [Time.TT] — and this direction has to gate on
@@ -1196,9 +1240,11 @@ func (t Time) UTC() Time {
 		tt := fromPartsPreserveLoc(t, t.jd1, t.jd2-tdbMinusTT(t.jd1, t.jd2)/86400.0, TT)
 		return tt.UTC()
 	case UT1:
-		// UTC = UT1 − DUT1. Since |DUT1| < 0.9s, UT1 ≈ UTC for lookup.
-		dut1 := dut1OrFallback(t.jd1, t.jd2)
-		return fromPartsPreserveLoc(t, t.jd1, t.jd2-dut1/86400.0, UTC)
+		// UTC = UT1 − DUT1. Since |DUT1| < 0.9s, UT1 ≈ UTC for lookup; near a
+		// leap second the inverse is iterated — see utcFromUT1.
+		jd1, jd2 := utcFromUT1(t.jd1, t.jd2)
+
+		return fromPartsPreserveLoc(t, jd1, jd2, UTC)
 	case GPST, BDT:
 		// GNSS → TAI → UTC. The first step is a constant and the second is
 		// the leap-second table, which is where the seconds a GNSS user is
@@ -1221,11 +1267,20 @@ func (t Time) TAI() Time {
 
 	switch t.scale { //nolint:exhaustive // only UTC/TT/TDB convert to TAI
 	case UTC:
-		// TAI = UTC + ΔAT
+		// TAI = UTC + ΔAT, reading the UTC fraction as a fraction of that
+		// day's own length — see utcday.go.
+		//
+		// The ordinary day is handled inline, exactly as it always was, and
+		// only a day of the month that can end in a leap second pays for the
+		// call: measured, routing every conversion through utcToTAI cost
+		// BenchmarkUTCToTAI 14%, where the precedent in leapsecond.go is
+		// that 22% was too much.
 		y, m, d, fd, _ := gofaext.JdToDate(t.jd1, t.jd2)
-		dat := deltaAT(y, m, d, fd)
+		if stepDays()&(1<<uint(d)) != 0 {
+			return t.fromUTCOnStepDay(0, TAI)
+		}
 
-		return fromPartsPreserveLoc(t, t.jd1, t.jd2+dat/86400.0, TAI)
+		return fromPartsPreserveLoc(t, t.jd1, t.jd2+deltaAT(y, m, d, fd)/86400.0, TAI)
 	case TT:
 		// TAI = TT − 32.184s
 		return fromPartsPreserveLoc(t, t.jd1, t.jd2-32.184/86400.0, TAI)
@@ -1302,17 +1357,26 @@ func (t Time) TT() Time {
 		// per SOFA's Dat back to 1960, and zero only before 1960) rather
 		// than integer leap seconds, so ΔAT is not a usable basis for TT
 		// here regardless of what Dat returns. Gate purely on the epoch.
-		y, m, d, fd, _ := gofaext.JdToDate(t.jd1, t.jd2)
-
-		if y < 1972 {
+		//
+		// Gated on the Julian Date of 1972-01-01 0h rather than on a calendar
+		// year, which needs a JdToDate this branch then does again inside
+		// utcToTAI — measured, that duplicate made UTC->TT half as slow again.
+		if t.jd1+t.jd2 < jd1972 {
 			// Historical date: use ΔT polynomial (TT = UT + ΔT)
 			dt := DeltaT(t.DecimalYear())
 			return fromPartsPreserveLoc(t, t.jd1, t.jd2+dt/86400.0, TT)
 		}
-		// Modern date: TT = UTC + ΔAT + 32.184s
-		dat := deltaAT(y, m, d, fd)
+		// Modern date: TT = UTC + ΔAT + 32.184s, the first step through
+		// utcday.go so that a leap-second day is read at its own length. This
+		// branch used to add ΔAT itself, a second copy of the arithmetic in
+		// [Time.TAI] that would have gone on assuming 86400 seconds.
+		// Inline on an ordinary day for the same reason as [Time.TAI].
+		y, m, d, fd, _ := gofaext.JdToDate(t.jd1, t.jd2)
+		if stepDays()&(1<<uint(d)) != 0 {
+			return t.fromUTCOnStepDay(32.184, TT)
+		}
 
-		return fromPartsPreserveLoc(t, t.jd1, t.jd2+(dat+32.184)/86400.0, TT)
+		return fromPartsPreserveLoc(t, t.jd1, t.jd2+(deltaAT(y, m, d, fd)+32.184)/86400.0, TT)
 	case TAI:
 		// TT = TAI + 32.184s
 		return fromPartsPreserveLoc(t, t.jd1, t.jd2+32.184/86400.0, TT)
@@ -1472,7 +1536,30 @@ func (t Time) UT1() (Time, error) {
 			mjdFromJDParts(utc.jd1, utc.jd2), err)
 	}
 
-	return fromPartsPreserveLoc(t, utc.jd1, utc.jd2+dut1/86400.0, UT1), nil
+	return utc.UT1Using(dut1), nil
+}
+
+// UT1Using returns t on the UT1 scale using dut1 as UT1 − UTC in seconds,
+// rather than looking it up.
+//
+// For a caller that already holds Earth Orientation Parameters — coord.Context
+// fetches them once per epoch and reuses them for polar motion as well — and
+// must not pay for, or disagree with, a second lookup. [Time.UT1] is this with
+// the lookup done for it.
+//
+// # Why the addition is not the caller's to do
+//
+// UT1 = UTC + DUT1 is true of the labels, and a UTC Julian Date is a label
+// only on an ordinary day. On one ending in a leap second its fraction is of
+// 86401 seconds (SOFA's convention; see utcday.go), so adding DUT1 to it
+// directly misplaces UT1 by up to a second — 15 arcsec of Earth rotation. This
+// forms the sum in TAI on those days, as iauUtcut1 does; the only place that
+// knows which days they are is this package.
+func (t Time) UT1Using(dut1 float64) Time {
+	utc := t.UTC()
+	jd1, jd2 := ut1FromUTC(utc.jd1, utc.jd2, dut1)
+
+	return fromPartsPreserveLoc(t, jd1, jd2, UT1)
 }
 
 // normalize ensures that |jd2| < 1.0, and both components are properly balanced.

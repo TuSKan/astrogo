@@ -167,7 +167,8 @@ measured distribution, follow the Evidence link to the generated table.
 | Solar Eclipse (historical) | ✅ validated | `plan/nasa_eclipse_test.go` | [NASA 5MC Solar](https://eclipse.gsfc.nasa.gov/SEcat5/SEcatalog.html) | ≤ 1.4 min | 1383/1383 eclipses detected across 6 centuries (1–2000 CE), mean Δ=0.8 min |
 | ΔT (TT−UT1) | ✅ validated | `time/deltat_test.go` | [NASA ΔT Polynomial](https://eclipse.gsfc.nasa.gov/LEcat5/deltatpoly.html) | ≤ 0.9 s | Espenak & Meeus 2006 + n-dot correction, cross-validated against 1187 NASA catalog entries, mean error 0.3 s |
 | Planetary magnitude — Saturn | ✅ validated | `magnitude/saturn_rings_test.go` | JPL Horizons APmag | 0.02 mag | Mallama & Hilton (2018) Eq. 10 at 7 dates 2002–2026, both ring faces lit, measured under 0.001 mag. Until #375 a signed ring inclination put the south face up to 1.9 mag too faint, and the range check below passed it |
-| Planetary magnitude — other planets | ⚠️ range check only | `magnitude/magnitude_test.go` | Mallama & Hilton (2018) | — | Mercury, Venus, Mars, Jupiter, Uranus and Neptune are checked against a wide magnitude range on one date (Mercury's is −2.5 to 7.0), and Neptune's secular brightening relatively. No value is pinned to a reference |
+| Planetary magnitude — Mercury, Venus, Jupiter, Uranus, Neptune | ✅ validated | `magnitude/planets_horizons_test.go` | JPL Horizons APmag | 0.02 mag | Mallama & Hilton (2018) at 4–6 dates each, 2020–2026, spanning each planet's phase range: Mercury to 177°, Venus on both sides of its 163.7° boundary. Measured 0.007 mag worst |
+| Planetary magnitude — Mars | ⚠️ phase curve only | `magnitude/planets_horizons_test.go` | JPL Horizons APmag | 0.1 mag | Mallama & Hilton's rotation and orbital-longitude corrections are omitted, as in Skyfield, and Horizons applies them: 0.076 mag worst at 6 dates, changing sign between dates (#389) |
 | Asteroid magnitude (HG) | ✅ validated | `magnitude/magnitude_test.go` | Bowell (1989) / Muinonen (2010) | 0.01 mag | H,G + H,G₁,G₂ + H,G₁₂* phase functions, spline knot validation at α=30°,60°,90° |
 | Asteroid magnitude (sHG1G2) | ✅ validated | `magnitude/fink_test.go` | [FINK/ZTF phunk pipeline](https://api.ztf.fink-portal.org) | 0.025 mag | Carry et al. (2024) 7-parameter spin-geometry model, validated against 186 r-band observations of 8467 Benoitcarry: mean Δ=0.011, RMS=0.013, 100% within 0.025 mag |
 | Comet magnitude | ✅ validated | `magnitude/magnitude_test.go` | IAU standard | 0.1 mag | M₁/k₁ total + M₂/k₂ nuclear models |
@@ -195,17 +196,17 @@ measured distribution, follow the Evidence link to the generated table.
 The following areas are not yet considered scientifically complete:
 
 - Advanced observation scheduling optimization
-- **The giant planets are system barycentres, not planets, and the table above compares
+- **The giant planets are system barycenters, not planets, and the table above compares
   them that way.** `core.Jupiter` resolves to NAIF 5, `core.Saturn` to 6, `core.Uranus` to
-  7 and `core.Neptune` to 8 — the system barycentres — because that is what a planetary
+  7 and `core.Neptune` to 8 — the system barycenters — because that is what a planetary
   kernel contains; the satellite systems live in separate kernels. Mercury, Venus and Earth
-  resolve to body centres (199, 299, 399), so one map mixes both conventions with nothing
-  saying so. Measured against Horizons' body-centre commands: **Uranus 0.0497″, Jupiter
+  resolve to body centers (199, 299, 399), so one map mixes both conventions with nothing
+  saying so. Measured against Horizons' body-center commands: **Uranus 0.0497″, Jupiter
   0.0324″, Saturn 0.0288″, Neptune 0.0093″** at the median, against 0.0000″ for Mars, the
   Sun and Venus. Far inside every tolerance on this page, and far outside what a user
   comparing Jupiter against Horizons' default `599` would expect — it reads as an astrogo
   error and is not one. See #253.
-- **Radial-velocity correction is now cross-checked against Astropy** (175 cases, 0.7 mm/s), which closes the gap this list previously recorded. What remains open is narrower: astrogo is a classical projection and does not implement the Wright & Eastman (2014) terms — gravitational redshift, light-travel time to the barycentre, and the effect of the target's own proper motion and parallax on the projection geometry. Measured, those amount to 4.66 m/s against Astropy's relativistic value, so sub-1-m/s precision-RV work needs the full treatment and this does not provide it.
+- **Radial-velocity correction is now cross-checked against Astropy** (175 cases, 0.7 mm/s), which closes the gap this list previously recorded. What remains open is narrower: astrogo is a classical projection and does not implement the Wright & Eastman (2014) terms — gravitational redshift, light-travel time to the barycenter, and the effect of the target's own proper motion and parallax on the projection geometry. Measured, those amount to 4.66 m/s against Astropy's relativistic value, so sub-1-m/s precision-RV work needs the full treatment and this does not provide it.
 - **Artificial skyglow in clear air** is tested on the model's physical claims rather than against a measured sky. An absolute check needs a per-emitter inventory — flux, spectrum and upward emission function — and satellite radiance alone can determine only the first: the same VIIRS pixel is produced by many real installations differing in spectrum and in how much light they throw sideways rather than up.
 - **Cloud reaches only the artificial term.** A cloud deck in the scene's atmosphere changes artificial skyglow and nothing else; moonlight, integrated starlight, diffuse galactic light, zodiacal light and airglow are all evaluated as though the sky were clear. Three separate models are missing behind that one sentence, not one.
 - **Every figure on this page assumes the host clock is UTC.** Around a leap second it

@@ -366,14 +366,14 @@ func TestFourBandQueryIsOnePass(t *testing.T) {
 	bands := make([]starlight.GaiaBand, 0, 4)
 
 	for _, name := range []string{"B", "V", "R", "I"} {
-		colour, err := starlight.JohnsonCousinsColorTerm(name)
+		color, err := starlight.JohnsonCousinsColorTerm(name)
 		if err != nil {
 			t.Fatalf("%s: %v", name, err)
 		}
 
 		bands = append(bands, starlight.GaiaBand{
 			Name:           name,
-			ColorTerm:      colour,
+			ColorTerm:      color,
 			FluxToRadiance: 1e-21,
 		})
 	}
@@ -423,7 +423,7 @@ func TestFourBandQueryIsOnePass(t *testing.T) {
 
 	// Every band has to carry light, and the reddest has to carry the most:
 	// the sky's integrated starlight is dominated by cool stars, so a pixel is
-	// brighter in I than in B. A band wired to the wrong colour polynomial or
+	// brighter in I than in B. A band wired to the wrong color polynomial or
 	// the wrong zero point shows here rather than after a 787-chunk build.
 	radiance := map[string]float64{}
 

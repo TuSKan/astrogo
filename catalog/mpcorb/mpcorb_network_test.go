@@ -10,6 +10,7 @@ import (
 
 	"github.com/TuSKan/astrogo/catalog/mpcorb"
 	"github.com/TuSKan/astrogo/catalog/resolve"
+	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/ephemeris/kepler"
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/remote"
@@ -109,7 +110,8 @@ func TestOpenParsesTheWholeSubsetFile(t *testing.T) {
 		// MPCORB is built on a and n, so it can only express a closed orbit.
 		// Measured across Distant.txt, NEA.txt and Unusual.txt on 2026-09-08:
 		// 92,865 rows, not one with e >= 1. That is what makes this package's
-		// output safe to hand to kepler, whose propagator is elliptical only.
+		// output safe to hand to kepler.NewElements, whose semi-major-axis
+		// form is elliptical only.
 		if tgt.Eccentricity < 0 || tgt.Eccentricity >= 1 {
 			t.Errorf("%s (%s): eccentricity %v is not a closed orbit", tgt.ID, tgt.Name, tgt.Eccentricity)
 		}
@@ -249,4 +251,58 @@ func tempBucket(t *testing.T) string {
 	t.Helper()
 
 	return filepath.ToSlash(t.TempDir())
+}
+
+// TestOpenParsesTheCometFile reads the MPC's whole CometEls.txt and holds it
+// to what the file itself guarantees, and to the claim the reader exists for:
+// every row, closed orbit or open, goes straight into
+// eph.ElementsFromPerihelion and puts the comet at its own perihelion
+// distance at its own perihelion time.
+func TestOpenParsesTheCometFile(t *testing.T) {
+	list := liveFile(t, "CometEls.txt")
+
+	// 959 rows on 2026-09-23, 118 of them with e >= 1. Floors, since the
+	// file only grows and a misread would miss by far more than that.
+	const (
+		floor     = 900
+		openFloor = 100
+	)
+
+	if len(list) < floor {
+		t.Fatalf("parsed %d comets, want at least %d", len(list), floor)
+	}
+
+	var open int
+
+	for _, c := range list {
+		if !c.HasElements || !c.HasM1 {
+			t.Fatalf("%s: HasElements = %v, HasM1 = %v; every row carries both", c.Name, c.HasElements, c.HasM1)
+		}
+
+		if c.Eccentricity >= 1 {
+			open++
+		}
+
+		el, err := eph.ElementsFromPerihelion(c.PerihelionTime, c.PerihelionDistance, c.Eccentricity,
+			c.Inclination, c.AscendingNode, c.ArgPeriapsis)
+		if err != nil {
+			t.Fatalf("%s: ElementsFromPerihelion: %v", c.Name, err)
+		}
+
+		pos, _, err := el.StateAt(c.PerihelionTime)
+		if err != nil {
+			t.Fatalf("%s: StateAt its perihelion: %v", c.Name, err)
+		}
+
+		if d := math.Abs(pos.Norm() - c.PerihelionDistance.AU()); d > 1e-9 {
+			t.Fatalf("%s: %.9f AU from the Sun at perihelion, want q = %.9f", c.Name, pos.Norm(), c.PerihelionDistance.AU())
+		}
+	}
+
+	if open < openFloor {
+		t.Errorf("%d comets with e >= 1, want at least %d; the eccentricity column may be misread", open, openFloor)
+	}
+
+	t.Logf("%d comets, %d on open orbits, every one at its own perihelion distance at its own perihelion time",
+		len(list), open)
 }

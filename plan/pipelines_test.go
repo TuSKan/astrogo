@@ -26,7 +26,7 @@ const (
 // [TestConstraintAndDetailsAgreeOnAltitude] covers the Sun, Moon and two
 // planets. A satellite is the extreme case and the one a star-shaped test is
 // least like: the ISS orbits at about 400 km, so an observer's offset from the
-// geocentre is a large fraction of its whole distance, where for the Moon it is
+// geocenter is a large fraction of its whole distance, where for the Moon it is
 // 1/60th and for Mars nothing. If the topocentric dispatch were ever removed
 // again, this is the case that would show it most violently.
 func TestSatelliteAltitudePipelinesAgree(t *testing.T) {

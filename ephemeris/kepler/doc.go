@@ -13,16 +13,26 @@
 //
 // # Scope and accuracy
 //
-// This package implements pure elliptical (0 <= e < 1) two-body motion
-// only. Hyperbolic/parabolic orbits ([ErrUnsupportedOrbit]) and an
-// MPC-style constructor from perihelion distance and time of perihelion
-// passage (rather than semi-major axis and mean anomaly) are deliberate,
-// documented follow-ups, not built here.
+// This package implements two-body motion on every conic. Elements come in
+// the two forms they are published in: [NewElements] takes a semi-major axis
+// and mean anomaly, the asteroid form, and is elliptical only;
+// [FromPerihelion] takes a perihelion distance and time, the form the Minor
+// Planet Center publishes comets in, and accepts any e >= 0. That matters
+// because the comets people observe are near-parabolic: 118 of the 959 in
+// the MPC's comet file had e >= 1 when #374 counted them, among them
+// C/2023 A3, C/2022 E3 and C/2021 A1.
+//
+// A set built by FromPerihelion is propagated by universal variables from its
+// perihelion state, one path for the ellipse, the parabola and the hyperbola
+// that never divides by 1−e and so stays well conditioned as e crosses 1.
 //
 // Because planetary perturbations are not modeled, a propagated
-// position's accuracy drifts away from [Elements.Epoch]: typically
-// arcseconds within days, arcminutes within months, for a main-belt
-// asteroid's osculating elements. For higher-accuracy positions over
+// position's accuracy drifts away from the epoch the elements osculate at:
+// typically arcseconds within days, arcminutes within months, for a
+// main-belt asteroid's osculating elements. That is [Elements.Epoch] for a
+// set built by NewElements. For one built by FromPerihelion, Epoch is the
+// perihelion time, and the osculation epoch is whichever one the elements
+// were published with. For higher-accuracy positions over
 // longer spans, use a real SPK-kernel-backed provider instead — see
 // [github.com/TuSKan/astrogo/ephemeris.NewProvider] with
 // [github.com/TuSKan/astrogo/ephemeris.SmallBody].

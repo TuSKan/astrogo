@@ -23,7 +23,8 @@ import (
 //   - HasH (asteroid photometry) with provider → *Asteroid
 //   - HasElements (published orbital elements) and no provider → *Comet/*Asteroid via a
 //     Kepler-propagated provider built from those elements (see eph.NewFromElements) —
-//     preferred over eph.Default() here, which has no data for an arbitrary small body
+//     preferred over eph.Default() here, which has no data for an arbitrary small body.
+//     An open orbit (e >= 1) is built from its perihelion form (eph.ElementsFromPerihelion)
 //   - Star kind → *Star
 //   - Everything else → *DeepSkyObject
 func FromCatalog(c catalog.Target, p eph.Provider) (Observable, error) {
@@ -91,14 +92,12 @@ func FromCatalog(c catalog.Target, p eph.Provider) (Observable, error) {
 	// a provider, and that path above is untouched and still takes
 	// precedence.
 	//
-	// Failure here (invalid/hyperbolic elements, rejected by
-	// eph.NewElements with ErrUnsupportedOrbit, or no H/M1 photometry to
-	// pick a body type) falls straight through to the fixed-target path
-	// below, exactly like the NewPlanetaryMoon branch above does, since
-	// FromCatalog has no error return.
+	// Failure here (invalid elements, or no H/M1 photometry to pick a body
+	// type) falls straight through to the fixed-target path below, exactly
+	// like the NewPlanetaryMoon branch above does, since FromCatalog has no
+	// error return.
 	if c.HasElements && needsSmallBodyEphemeris(c.Kind) {
-		if el, err := eph.NewElements(c.Epoch, c.SemiMajorAxis, c.Eccentricity,
-			c.Inclination, c.AscendingNode, c.ArgPeriapsis, c.MeanAnomaly); err == nil {
+		if el, err := elementsFromTarget(c); err == nil {
 			keplerID := id
 			if keplerID == 0 {
 				keplerID = keplerSyntheticID
@@ -172,6 +171,33 @@ func FromCatalog(c catalog.Target, p eph.Provider) (Observable, error) {
 	}
 
 	return NewDeepSkyObject(c.Name, c.Coord.RA(), c.Coord.Dec(), opts...), nil
+}
+
+// elementsFromTarget builds c's orbit in whichever form describes it. A
+// closed orbit published with a semi-major axis goes through eph.NewElements,
+// as it always has. Anything else — an orbit with e >= 1, which has no
+// usable semi-major axis, or one published only in perihelion form, as the
+// MPC's comet file publishes every comet — goes through
+// eph.ElementsFromPerihelion.
+func elementsFromTarget(c catalog.Target) (eph.Elements, error) {
+	var (
+		el  eph.Elements
+		err error
+	)
+
+	if c.Eccentricity < 1 && c.SemiMajorAxis > 0 {
+		el, err = eph.NewElements(c.Epoch, c.SemiMajorAxis, c.Eccentricity,
+			c.Inclination, c.AscendingNode, c.ArgPeriapsis, c.MeanAnomaly)
+	} else {
+		el, err = eph.ElementsFromPerihelion(c.PerihelionTime, c.PerihelionDistance, c.Eccentricity,
+			c.Inclination, c.AscendingNode, c.ArgPeriapsis)
+	}
+
+	if err != nil {
+		return eph.Elements{}, fmt.Errorf("plan: elements of %q: %w", c.Name, err)
+	}
+
+	return el, nil
 }
 
 // newCometFromTarget builds a *Comet from c's M1/K1 (and optional M2/K2)

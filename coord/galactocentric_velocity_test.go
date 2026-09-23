@@ -17,7 +17,7 @@ import (
 // Astropy's Galactocentric frame defaults to galcen_v_sun = (12.9, 245.6, 7.78)
 // km/s, citing Drimmel & Poggio (2018), and astrogo derives its rotational
 // component instead — from Reid & Brunthaler's Sgr A* proper motion times the
-// distance to the centre.
+// distance to the center.
 //
 // Those are not two routes to a shared constant. They are the same arithmetic:
 // evaluated at astropy's own R₀ of 8122 pc, the derivation gives 245.6049,
@@ -66,7 +66,7 @@ func TestTheRotationalComponentScalesWithTheDistance(t *testing.T) {
 
 	// And the peculiar components do not move, because they are the Sun's own
 	// wander with respect to the LSR and have nothing to do with how far away
-	// the centre is.
+	// the center is.
 	testutil.AssertExact(t, "radial component is unchanged", twice.X, base.X)
 	testutil.AssertExact(t, "vertical component is unchanged", twice.Z, base.Z)
 
@@ -82,7 +82,7 @@ func TestTheRotationalComponentScalesWithTheDistance(t *testing.T) {
 //
 // A star with no motion of its own relative to the Sun is nonetheless orbiting
 // the Galaxy, at exactly the Sun's velocity. If the frame did not add the
-// Sun's motion, such a star would come out stationary at the centre of the
+// Sun's motion, such a star would come out stationary at the center of the
 // Galaxy, which is the error this is guarding.
 func TestAStarAtRestWithRespectToTheSunMovesWithIt(t *testing.T) {
 	t.Parallel()

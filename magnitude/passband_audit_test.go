@@ -26,11 +26,11 @@ func raisedCosine(name string, lo, hi float64, det magnitude.Detector) magnitude
 		response []float64
 	)
 
-	centre, half := (lo+hi)/2, (hi-lo)/2
+	center, half := (lo+hi)/2, (hi-lo)/2
 
 	for nm := lo; nm <= hi+1e-9; nm += step {
 		lambdas = append(lambdas, unit.WavelengthNM(nm))
-		response = append(response, 0.5*(1+math.Cos(math.Pi*(nm-centre)/half)))
+		response = append(response, 0.5*(1+math.Cos(math.Pi*(nm-center)/half)))
 	}
 
 	return magnitude.Passband{
@@ -122,7 +122,7 @@ func TestMeanFluxDensityIsIndependentOfGridSpacing(t *testing.T) {
 func TestABAndSTAgreeAtTheirDefinedCrossover(t *testing.T) {
 	t.Parallel()
 
-	// Narrow, so the pivot sits essentially at the centre of the band.
+	// Narrow, so the pivot sits essentially at the center of the band.
 	band := topHat("crossover", 547.0, 548.2, magnitude.EnergyIntegrating)
 
 	pivot, err := band.PivotWavelength()

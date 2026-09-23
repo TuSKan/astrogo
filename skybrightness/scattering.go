@@ -53,7 +53,7 @@ type SkyRadiance func(ctx context.Context, dst SpectralRadiance, dir coord.AltAz
 // incoming field is built from a HEALPix star map and a dust map, both
 // piecewise constant. That, and not this constant, is what limits the
 // integral; closing it needs the field averaged over each quadrature cell
-// rather than sampled at its centre. Recorded in docs/skybrightness.md.
+// rather than sampled at its center. Recorded in docs/skybrightness.md.
 const DefaultScatteringRings = 12
 
 // ScatteredIn evaluates Masana et al. (2024) Eq. 11: the radiance scattered

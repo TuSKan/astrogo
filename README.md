@@ -419,7 +419,7 @@ be able to break an API until 1.0 says otherwise.
 | `vector` | 3D geometry primitives |
 | `time` | Astronomical time scales (JD-based: UTC/TAI/TT/TDB/UT1, the GNSS system times GPST/BDT, and the coordinate times TCG/TCB), Earth Orientation Parameters (DUT1, polar motion), epoch arithmetic (MJD, GAST, Julian epoch year, day-of-year) |
 | `atmosphere` | Refraction models, airmass, dispersion |
-| `coord` | Coordinate frames (ICRS, AltAz, Galactic, Ecliptic, FK4/B1950, FK5/J2000, CIRS and TETE apparent places, ITRS, HCRS, Supergalactic, Galactocentric, and `SkyOffset` centred on a target), topocentric reduction, Local Standard of Rest radial velocities |
+| `coord` | Coordinate frames (ICRS, AltAz, Galactic, Ecliptic, FK4/B1950, FK5/J2000, CIRS and TETE apparent places, ITRS, HCRS, Supergalactic, Galactocentric, and `SkyOffset` centered on a target), topocentric reduction, Local Standard of Rest radial velocities |
 | `ephemeris` | Solar system ephemerides (SOFA + JPL SPK) |
 | `ephemeris/satellite` | SGP4 propagation, TEME→GCRS, look angles, ground track |
 | `ephemeris/satellite/sgp4` | The SGP4/SDP4 model itself — element sets, TLE parsing, TEME states |

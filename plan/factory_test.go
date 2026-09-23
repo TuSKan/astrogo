@@ -2,6 +2,7 @@ package plan_test
 
 import (
 	"errors"
+	"math"
 	"testing"
 
 	"github.com/TuSKan/astrogo/angle"
@@ -142,10 +143,12 @@ func TestFromCatalog_ElementsToComet(t *testing.T) {
 }
 
 // TestFromCatalog_ElementsHyperbolicFallsThrough confirms a target whose
-// published eccentricity is >= 1 (which ephemeris/kepler's two-body
-// propagator cannot represent — eph.NewElements rejects it with
-// ErrUnsupportedOrbit) falls straight through to the fixed-target path
-// rather than panicking or silently building a broken Observable.
+// published eccentricity is >= 1 and which carries no comet form — no
+// perihelion distance and time, so neither eph.NewElements nor
+// eph.ElementsFromPerihelion can build it — falls straight through to the
+// fixed-target path rather than panicking or silently building a broken
+// Observable. With the comet form it propagates; see
+// TestFromCatalog_OpenOrbitPropagatesFromPerihelion.
 //
 // The fixture carries a coordinate, which a real interstellar object
 // resolved from SBDB does. It did not before FromCatalog could fail, and the
@@ -163,6 +166,86 @@ func TestFromCatalog_ElementsHyperbolicFallsThrough(t *testing.T) {
 
 	if _, ok := obj.(*plan.DeepSkyObject); !ok {
 		t.Fatalf("FromCatalog: got %T, want the fixed-target fallback *plan.DeepSkyObject", obj)
+	}
+}
+
+// perihelionDistanceAt returns obs's heliocentric distance at t, through the
+// provider FromCatalog built for it.
+func perihelionDistanceAt(t *testing.T, obs *plan.Comet, at time.Time) float64 {
+	t.Helper()
+
+	body, err := obs.Provider().State(obs.EphID(), at)
+	if err != nil {
+		t.Fatalf("State(%v): %v", obs.EphID(), err)
+	}
+
+	sun, err := obs.Provider().State(eph.Sun, at)
+	if err != nil {
+		t.Fatalf("State(Sun): %v", err)
+	}
+
+	return body.Pos.Sub(sun.Pos).Norm()
+}
+
+// TestFromCatalog_OpenOrbitPropagatesFromPerihelion builds C/2023 A3 as SBDB
+// published it on 2026-09-23 (full-prec=true). Its e = 1.000095, so its
+// semi-major axis is negative and eph.NewElements refuses it; FromCatalog
+// used to drop it to the fixed-target path. It now builds the orbit from the
+// comet form, and the comet it returns is at its own perihelion distance at
+// its own perihelion time.
+func TestFromCatalog_OpenOrbitPropagatesFromPerihelion(t *testing.T) {
+	c := catalog.Target{
+		Name: "C/2023 A3 (Tsuchinshan-ATLAS)", ID: "1004083", SPKID: "1004083",
+		Kind: resolve.KindComet, HasElements: true,
+		Epoch:              time.FromJDParts(2460448.5, 0, time.TDB),
+		Eccentricity:       1.000095368540586,
+		SemiMajorAxis:      unit.AU(-4104.394095058612),
+		MeanAnomaly:        angle.Deg(-0.0004975480989684438),
+		PerihelionDistance: unit.AU(0.3914300748355564),
+		PerihelionTime:     time.FromJDParts(2460581.240845175775, 0, time.TDB),
+		Inclination:        angle.Deg(139.112109080566),
+		AscendingNode:      angle.Deg(21.55947897244586),
+		ArgPeriapsis:       angle.Deg(308.4917649633916),
+		M1:                 8.9, K1: 5.5, HasM1: true,
+	}
+
+	comet, ok := mustFromCatalog(t, c, nil).(*plan.Comet)
+	if !ok {
+		t.Fatal("FromCatalog did not build a *plan.Comet for an open orbit with a comet form")
+	}
+
+	if r := perihelionDistanceAt(t, comet, c.PerihelionTime); math.Abs(r-c.PerihelionDistance.AU()) > 1e-12 {
+		t.Errorf("%.12f AU from the Sun at perihelion, want q = %.12f", r, c.PerihelionDistance.AU())
+	}
+}
+
+// TestFromCatalog_CometFileRowPropagates builds Hale-Bopp as the MPC's
+// CometEls.txt published it on 2026-09-23: a closed orbit, but in comet form
+// only, so its semi-major axis is zero and only the perihelion form can
+// build it.
+func TestFromCatalog_CometFileRowPropagates(t *testing.T) {
+	tp := time.FromJDParts(2450536.5, 0.0319, time.TT)
+
+	c := catalog.Target{
+		Name: "C/1995 O1 (Hale-Bopp)", ID: "CJ95O010", Designation: "C/1995 O1",
+		Kind: resolve.KindComet, Catalog: "mpcorb", HasElements: true,
+		Epoch:              time.FromJDParts(2461305.5, 0, time.TT),
+		Eccentricity:       0.994897,
+		PerihelionDistance: unit.AU(0.925246),
+		PerihelionTime:     tp,
+		Inclination:        angle.Deg(89.7360),
+		AscendingNode:      angle.Deg(281.8047),
+		ArgPeriapsis:       angle.Deg(130.7250),
+		M1:                 -2.0, K1: 10.0, HasM1: true,
+	}
+
+	comet, ok := mustFromCatalog(t, c, nil).(*plan.Comet)
+	if !ok {
+		t.Fatal("FromCatalog did not build a *plan.Comet from a comet-form-only element set")
+	}
+
+	if r := perihelionDistanceAt(t, comet, tp); math.Abs(r-0.925246) > 1e-12 {
+		t.Errorf("%.12f AU from the Sun at perihelion, want q = 0.925246", r)
 	}
 }
 
@@ -420,7 +503,7 @@ func TestFromCatalogKeepsADeepSkyRadialVelocity(t *testing.T) {
 
 // TestFromCatalogDistinguishesNoRadialVelocityFromZero keeps the same
 // distinction HasRadialVelocity exists for. A galaxy at rest relative to the
-// barycentre would read 0 km/s, and that is a measurement; a galaxy with no
+// barycenter would read 0 km/s, and that is a measurement; a galaxy with no
 // published RV also reads 0, and that is not.
 func TestFromCatalogDistinguishesNoRadialVelocityFromZero(t *testing.T) {
 	t.Parallel()

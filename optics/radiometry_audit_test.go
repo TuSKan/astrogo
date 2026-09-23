@@ -14,7 +14,7 @@ import (
 // TestPhotonRateAgainstClosedForm already reproduces the quadrature exactly,
 // but it cannot catch this particular mistake: it uses a flat spectrum on a
 // symmetric grid, and the photon conversion 1/E = lambda/hc is linear in
-// lambda, so its mean across that grid equals its value at the centre.
+// lambda, so its mean across that grid equals its value at the center.
 // Converting once outside the integral, at a mean or pivot wavelength, gives
 // the same answer there — and a different, wrong one for every spectrum that
 // is not flat.
@@ -45,7 +45,7 @@ func TestPhotonRateWeightsByWavelengthNotEnergy(t *testing.T) {
 	}
 
 	// Two narrow blocks of identical width and identical spectral radiance,
-	// so identical energy, one centred at 440 nm and one at 760 nm.
+	// so identical energy, one centered at 440 nm and one at 760 nm.
 	blue := make([]float64, grid.Len())
 	red := make([]float64, grid.Len())
 

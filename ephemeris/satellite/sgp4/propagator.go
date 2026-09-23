@@ -12,7 +12,7 @@ import (
 // # It has no effect on a near-Earth orbit
 //
 // The two modes differ in exactly two places: how sidereal time at epoch is
-// computed, and how the node is normalised inside dpper's Lyddane branch. Both
+// computed, and how the node is normalized inside dpper's Lyddane branch. Both
 // are deep space. Sidereal time reaches the model only through dscom, dsinit
 // and dspace, and the near-Earth path never reads it — so for a period under
 // 225 minutes the two modes are bit-identical, and this option is inert.
@@ -150,8 +150,8 @@ func New(el Elements, opts ...Option) (*Propagator, error) {
 	// two-part Julian Date so the fraction survives: a single float64 JD near
 	// 2.46e6 resolves to about 60 microseconds, and the whole point of taking a
 	// float time argument is not to throw that away at the other end.
-	jd1, jd2 := el.Epoch.UTC().JDParts()
-	epoch1950 := (jd1 - jd1950) + jd2
+	sec, nsec := utcLabel(el.Epoch)
+	epoch1950 := (float64(sec)+float64(nsec)/1e9)/secondsPerDay + (unixEpochJD - jd1950)
 
 	p.initl(epoch1950)
 	p.initNearEarth()
@@ -195,14 +195,36 @@ func (p *Propagator) At(tsince float64) (pos, vel vector.Vec3, err error) {
 // which for a low Earth orbit is 530 km. [time.Time] is scale-aware precisely
 // so this cannot be left to the caller.
 func (p *Propagator) AtTime(t time.Time) (pos, vel vector.Vec3, err error) {
-	// Two-part throughout, so a query far from epoch does not lose the
-	// fraction to a subtraction of two large numbers.
-	jd1, jd2 := t.UTC().JDParts()
-	e1, e2 := p.el.Epoch.UTC().JDParts()
+	// Whole seconds and nanoseconds, subtracted as integers, so a query far
+	// from epoch loses nothing to a subtraction of two large numbers.
+	ts, tn := utcLabel(t)
+	es, en := utcLabel(p.el.Epoch)
 
-	tsince := ((jd1 - e1) + (jd2 - e2)) * 1440.0
+	tsince := (float64(ts-es) + float64(tn-en)/1e9) / 60
 
 	return p.At(tsince)
+}
+
+// utcLabel returns t's UTC label as whole seconds and nanoseconds since the
+// Unix epoch, counting every day as 86400 seconds.
+//
+// # Why not the Julian Date
+//
+// SGP4 counts time the way its reference implementation does: Vallado's jday
+// turns a calendar date into a Julian Date with every day 1440 minutes long,
+// and tsince is the difference of two of those. A UTC Julian Date from
+// [time.Time.JDParts] stopped being that on the 27 days that end in a leap
+// second, when astrogo adopted SOFA's convention and let their fraction run
+// over 86401 seconds (#144). Subtracting those across such a day was off by up
+// to a second — 7.5 km of low-Earth-orbit track — at an epoch or a query that
+// happened to fall on one.
+//
+// The standard library's count is the uniform UTC label, and [time.Time.ToGo]
+// is the conversion to it.
+func utcLabel(t time.Time) (sec int64, nsec int) {
+	g := t.UTC().ToGo()
+
+	return g.Unix(), g.Nanosecond()
 }
 
 // Elements returns the element set this propagator was built from.

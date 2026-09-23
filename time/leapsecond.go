@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"sync"
 	"sync/atomic"
 
 	"github.com/TuSKan/astrogo/internal/gofaext"
@@ -38,6 +39,15 @@ var (
 type leapTable struct {
 	entries []LeapSecond
 	source  string
+
+	// steps indexes this table's leap seconds for utcday.go, built on first
+	// use so that registering a table costs nothing until UTC is converted.
+	steps func() *utcSteps
+
+	// days is the day-of-month mask [stepDays] returns for this table: gofa's
+	// days plus the day before every entry, set here so it is published in the
+	// same atomic store as the entries it describes.
+	days uint32
 }
 
 // leapRegistry holds the process-wide override, or nil for gofa's table.
@@ -94,10 +104,20 @@ func RegisterLeapSeconds(table []LeapSecond, source string) error {
 		return err
 	}
 
-	leapRegistry.Store(&leapTable{
+	lt := &leapTable{
 		entries: append([]LeapSecond(nil), table...),
 		source:  source,
-	})
+		days:    builtinStepDays,
+	}
+
+	for _, e := range lt.entries {
+		_, _, d := dayBefore(e.Year, e.Month, e.Day)
+		lt.days |= 1 << uint(d)
+	}
+
+	lt.steps = sync.OnceValue(func() *utcSteps { return buildUTCSteps(lt.entries) })
+
+	leapRegistry.Store(lt)
 
 	return nil
 }
@@ -129,11 +149,22 @@ func LeapSecondSource() string {
 // last step, because registration refuses a table that disagrees there, so
 // this can only differ for epochs gofa does not know about.
 func deltaAT(y, m, d int, fd float64) float64 {
-	var table []LeapSecond
-	if t := leapRegistry.Load(); t != nil {
-		table = t.entries
+	// gofa's own table, answered here rather than through deltaATIn: this runs
+	// on every UTC conversion, and forwarding the common case through a call
+	// that cannot be inlined cost BenchmarkUTCToTAI about 3 ns, measured.
+	t := leapRegistry.Load()
+	if t == nil || len(t.entries) == 0 {
+		dat, _ := gofaext.Dat(y, m, d, fd)
+
+		return dat
 	}
 
+	return deltaATIn(t.entries, y, m, d, fd)
+}
+
+// deltaATIn is [deltaAT] against a given table rather than the one in force,
+// so an index of that table's leap seconds can be built before it is installed.
+func deltaATIn(table []LeapSecond, y, m, d int, fd float64) float64 {
 	if len(table) == 0 {
 		dat, _ := gofaext.Dat(y, m, d, fd)
 

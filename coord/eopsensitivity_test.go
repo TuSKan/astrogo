@@ -403,7 +403,7 @@ func TestObserverVectorRespondsToPolarMotion(t *testing.T) {
 	withPole := obsVecWith(xpArcsec, ypArcsec)
 	withoutPole := obsVecWith(0, 0)
 
-	// The angle between the two observer positions, seen from the geocentre.
+	// The angle between the two observer positions, seen from the geocenter.
 	// A pole displaced by d moves a surface point by at most d, so the
 	// separation is bounded by the displacement and must not be zero.
 	cosSep := withPole.Unit().Dot(withoutPole.Unit())

@@ -20,7 +20,7 @@ import (
 // successive refinements of the same vector is the mistake this comment exists
 // to prevent.
 //
-//   - Geocentric is the input, unchanged: the place as seen from the centre of
+//   - Geocentric is the input, unchanged: the place as seen from the center of
 //     the Earth.
 //   - Topocentric is Geocentric less the observer's own geocentric position,
 //     which is diurnal parallax — about a degree for the Moon and under two

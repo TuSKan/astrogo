@@ -551,9 +551,9 @@ func (z *ZodiacalLight) Provenance() Provenance {
 		Equations: "Leinert Table 17 and Eq. 22, with the heliocentric and seasonal " +
 			"factors of Masana et al. Eq. 18",
 		ValidityDomain: "Beyond about 15 degrees solar elongation, which is where the " +
-			"table begins; 220 nm to 2.5 microns for the colour correction",
+			"table begins; 220 nm to 2.5 microns for the color correction",
 		KnownApproximations: []string{
-			"The colour correction is interpolated linearly in elongation between " +
+			"The color correction is interpolated linearly in elongation between " +
 				"the 30 and 90 degree relations Leinert et al. give.",
 			"Small-scale structure such as cometary trails is not represented; the " +
 				"table is explicit that it cannot be.",
@@ -999,7 +999,7 @@ func (s *IntegratedStarlight) Provenance() Provenance {
 			"The band value is spread across wavelengths by a caller-supplied " +
 				"spectral shape, since integrated starlight has no single one.",
 			"Whatever the supplied map omits — bright stars, faint completion, " +
-				"colour imputation — is omitted here too.",
+				"color imputation — is omitted here too.",
 		},
 		ExpectedAccuracy: "Dominated by the map's own provenance.",
 	}

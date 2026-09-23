@@ -81,7 +81,7 @@ type GaiaBand struct {
 	// Nil means the Gaia G band itself. The transformation is applied per
 	// star inside the aggregate, which matters: transforming a summed flux
 	// is not the same as summing transformed fluxes when the transformation
-	// depends on colour.
+	// depends on color.
 	ColorTerm []float64
 
 	// FluxToRadiance converts one unit of the archive's flux — e-/s, as
@@ -111,12 +111,12 @@ func (b GaiaBand) validate() error {
 	return nil
 }
 
-// colourPolynomial renders the G-to-band magnitude offset as an ADQL
-// expression in bp_rp, and evaluates it in Go for a given colour.
+// colorPolynomial renders the G-to-band magnitude offset as an ADQL
+// expression in bp_rp, and evaluates it in Go for a given color.
 //
-// One definition serves both, because the correction for colourless sources
+// One definition serves both, because the correction for colorless sources
 // has to use exactly the polynomial the query used. Two copies would drift.
-func (b GaiaBand) colourPolynomial() string {
+func (b GaiaBand) colorPolynomial() string {
 	var poly strings.Builder
 
 	for i, c := range b.ColorTerm {
@@ -134,26 +134,26 @@ func (b GaiaBand) colourPolynomial() string {
 	return poly.String()
 }
 
-// colourValidLo and colourValidHi bound the interval Riello et al. (2021)
+// colorValidLo and colorValidHi bound the interval Riello et al. (2021)
 // fitted the transformation over.
 const (
-	colourValidLo = -0.5
-	colourValidHi = 5.0
+	colorValidLo = -0.5
+	colorValidHi = 5.0
 )
 
-// colourFactor evaluates 10^(0.4*(G-band)) for one colour — the same factor
+// colorFactor evaluates 10^(0.4*(G-band)) for one color — the same factor
 // the query applies per star, for use on the sources the query had to drop.
 //
-// The colour is clamped to the fitted interval first. This matters here and not
+// The color is clamped to the fitted interval first. This matters here and not
 // in the query because the value passed in is a pixel's flux-weighted mean
-// colour, and weighting by flux lets one dominant star carry the mean well past
+// color, and weighting by flux lets one dominant star carry the mean well past
 // any individual population: measured over the order-9 sky the mean reaches
 // BP-RP = 7.41, where a cubic fitted to 5.0 is no longer describing anything.
 // Clamping refuses to extrapolate rather than inventing a value for it, and
 // costs 0.0003 per cent of the whole-sky map across the 194 pixels that reach
 // outside the interval.
-func (b GaiaBand) colourFactor(bpRP float64) float64 {
-	bpRP = math.Min(colourValidHi, math.Max(colourValidLo, bpRP))
+func (b GaiaBand) colorFactor(bpRP float64) float64 {
+	bpRP = math.Min(colorValidHi, math.Max(colorValidLo, bpRP))
 
 	var offset, term float64 = 0, 1
 
@@ -167,48 +167,48 @@ func (b GaiaBand) colourFactor(bpRP float64) float64 {
 
 // expression renders the band's per-star flux as ADQL.
 //
-// Sources without a BP-RP colour make the polynomial null, so SQL drops them
+// Sources without a BP-RP color make the polynomial null, so SQL drops them
 // from the sum. That is not a rounding error: across the whole order-8 build
-// 14.95 per cent of sources lack a colour, rising above 50 per cent in the
+// 14.95 per cent of sources lack a color, rising above 50 per cent in the
 // densest pixels of the Galactic plane, so the loss is both large and
 // direction-dependent — the worst combination, because a deficit that varies
 // across the sky cannot be absorbed into an overall calibration.
 //
 // They are recovered rather than excluded. The query returns two further
-// sums — the total G flux and the G flux of coloured sources alone — whose
-// difference is the flux the polynomial dropped, plus the mean colour of the
+// sums — the total G flux and the G flux of colored sources alone — whose
+// difference is the flux the polynomial dropped, plus the mean color of the
 // pixel. [GaiaBuild.accumulate] then assigns that flux the pixel's own mean
-// colour, which is what Masana et al. (2021) do. The counts still come back
+// color, which is what Masana et al. (2021) do. The counts still come back
 // per pixel so a caller can see how much of a pixel rests on the assumption.
 func (b GaiaBand) expression() string {
 	if len(b.ColorTerm) == 0 {
 		return "SUM(phot_g_mean_flux)"
 	}
 
-	return fmt.Sprintf("SUM(phot_g_mean_flux*POWER(10,0.4*(%s)))", b.colourPolynomial())
+	return fmt.Sprintf("SUM(phot_g_mean_flux*POWER(10,0.4*(%s)))", b.colorPolynomial())
 }
 
-// colourRecoveryColumns renders the extra aggregates that make the colourless
+// colorRecoveryColumns renders the extra aggregates that make the colorless
 // sources recoverable.
 //
 // The trick is NULL propagation rather than CASE or FILTER, both of which one
 // archive or the other rejects: adding 0*bp_rp to a flux makes the whole term
-// null exactly when the colour is missing, so the sum covers coloured sources
+// null exactly when the color is missing, so the sum covers colored sources
 // alone. Subtracting it from the unconditional sum leaves the dropped flux.
 // Plain arithmetic like this parses everywhere, which CASE and FILTER do not —
 // ESA rejects CASE, and Gaia@AIP rejects FILTER.
-func (b GaiaBand) colourRecoveryColumns() string {
+func (b GaiaBand) colorRecoveryColumns() string {
 	if len(b.ColorTerm) == 0 {
 		return ""
 	}
 
-	// The mean colour is weighted by flux, not by count.
+	// The mean color is weighted by flux, not by count.
 	//
 	// AVG(bp_rp) is dominated by the numerous faint red stars, while the flux
 	// being recovered is dominated by bright ones, which are systematically
 	// bluer. Measured on the worst pixel in the sky, the count-weighted mean is
 	// 1.452 against a flux-weighted 0.924, and using the former over-corrects
-	// by 19 per cent. Since what is being scaled is flux, the colour has to
+	// by 19 per cent. Since what is being scaled is flux, the color has to
 	// represent the light rather than the population.
 	name := columnName(b.Name)
 
@@ -274,7 +274,7 @@ func (g GaiaBuild) ADQL(firstPixel, lastPixel int64) (string, error) {
 
 	for _, b := range g.Bands {
 		fmt.Fprintf(&columns, ", %s AS %s%s", b.expression(), columnName(b.Name),
-			b.colourRecoveryColumns())
+			b.colorRecoveryColumns())
 	}
 
 	// Two things here are dictated by what the archive's ADQL parser accepts,
@@ -282,7 +282,7 @@ func (g GaiaBuild) ADQL(firstPixel, lastPixel int64) (string, error) {
 	//
 	//   - GROUP BY takes the select-list alias, not the expression. Repeating
 	//     source_id/N there is a parse error, not merely redundant.
-	//   - COUNT(bp_rp) counts the non-null colours, so COUNT(*) minus it gives
+	//   - COUNT(bp_rp) counts the non-null colors, so COUNT(*) minus it gives
 	//     the sources a transformed band drops. A CASE expression would say
 	//     that more directly and is rejected, as is COALESCE.
 	return fmt.Sprintf(
@@ -369,12 +369,12 @@ func columnName(name string) string {
 // # What this reproduces, and what it does not
 //
 // It sums the flux of every Gaia source into its HEALPix pixel, applying the
-// caller's colour transformation per star. That is the core of the GAMBONS
+// caller's color transformation per star. That is the core of the GAMBONS
 // method and the part that needs the catalogue.
 //
 // It does not add the bright stars Gaia omits, which Masana et al. take from
 // Hipparcos and which carry disproportionate weight; it drops sources with no
-// BP-RP colour from transformed bands rather than imputing one, where Masana
+// BP-RP color from transformed bands rather than imputing one, where Masana
 // et al. use the local mean; and it does not add the faint-star completion
 // below G = 20 that Masana et al. draw from the Besancon model, worth under
 // 3 per cent away from the galactic plane. A map built here is therefore a floor, not a replacement,
@@ -774,7 +774,7 @@ func (g GaiaBuild) accumulate(
 				continue // a pixel with no usable sources contributes nothing
 			}
 
-			flux += g.recoverColourless(b, rows)
+			flux += g.recoverColorless(b, rows)
 
 			bands[b.Name][pixel] = flux * b.FluxToRadiance / solidAngle
 		}
@@ -787,21 +787,21 @@ func (g GaiaBuild) accumulate(
 	return nil
 }
 
-// recoverColourless returns the flux the colour polynomial dropped, scaled as
-// though those sources carried the pixel's mean colour.
+// recoverColorless returns the flux the color polynomial dropped, scaled as
+// though those sources carried the pixel's mean color.
 //
 // Sources without BP-RP are 15 per cent of the sky and over half of the
 // densest pixels, so dropping them underestimates the Galactic plane
-// specifically. Masana et al. (2021) assign such stars the local mean colour;
+// specifically. Masana et al. (2021) assign such stars the local mean color;
 // this does the same, per HEALPix pixel, which is as local as the aggregate
 // allows.
 //
 // It returns zero — leaving the uncorrected sum — when the response predates
-// these columns, when nothing was dropped, or when a pixel has no coloured
+// these columns, when nothing was dropped, or when a pixel has no colored
 // source at all to average. That last case cannot be corrected by any local
 // mean, and inventing a global one would be exactly the fabrication this
 // package refuses elsewhere.
-func (g GaiaBuild) recoverColourless(b GaiaBand, rows resultRows) float64 {
+func (g GaiaBuild) recoverColorless(b GaiaBand, rows resultRows) float64 {
 	if len(b.ColorTerm) == 0 {
 		return 0
 	}
@@ -809,25 +809,25 @@ func (g GaiaBuild) recoverColourless(b GaiaBand, rows resultRows) float64 {
 	col := strings.ToLower(columnName(b.Name))
 
 	// A result predating these columns carries no correction, and a pixel with
-	// no coloured source has no mean to apply. Both leave the sum uncorrected.
+	// no colored source has no mean to apply. Both leave the sum uncorrected.
 	if !rows.Has(col+"_all") || !rows.Has(col+"_col") || !rows.Has(col+"_mc") {
 		return 0
 	}
 
 	all, haveAll := rows.Number(col + "_all")
-	coloured, haveColoured := rows.Number(col + "_col")
+	colored, haveColored := rows.Number(col + "_col")
 	mean, haveMean := rows.Number(col + "_mc")
 
-	if !haveAll || !haveColoured || !haveMean {
+	if !haveAll || !haveColored || !haveMean {
 		return 0
 	}
 
-	dropped := all - coloured
+	dropped := all - colored
 	if dropped <= 0 {
 		return 0
 	}
 
-	return dropped * b.colourFactor(mean)
+	return dropped * b.colorFactor(mean)
 }
 
 // GaiaJohnsonV is the Johnson V band on the zero point this package carries as
@@ -936,7 +936,7 @@ func VegaZeroFlux(band magnitude.Passband) (float64, error) {
 // it is calibrated on.
 //
 // One constructor rather than a GaiaJohnsonB/V/R/I apiece: the band differs
-// only in its colour polynomial and its zero point, and the first comes from
+// only in its color polynomial and its zero point, and the first comes from
 // [JohnsonCousinsColorTerm] while the second comes from the passband the
 // caller already has. A caller resolves that passband from
 // [github.com/TuSKan/astrogo/skybrightness/dataset/passband], so the curve,
@@ -946,7 +946,7 @@ func VegaZeroFlux(band magnitude.Passband) (float64, error) {
 // name selects the published relation and labels the band in the map; it is
 // one of "B", "V", "R", "I".
 func GaiaJohnsonCousins(name string, band magnitude.Passband) (GaiaBand, error) {
-	colour, err := JohnsonCousinsColorTerm(name)
+	color, err := JohnsonCousinsColorTerm(name)
 	if err != nil {
 		return GaiaBand{}, err
 	}
@@ -961,7 +961,7 @@ func GaiaJohnsonCousins(name string, band magnitude.Passband) (GaiaBand, error) 
 	// target band's zero point is applied.
 	return GaiaBand{
 		Name:           name,
-		ColorTerm:      colour,
+		ColorTerm:      color,
 		FluxToRadiance: zero / math.Pow(10, GaiaGZeroPoint/2.5),
 	}, nil
 }
@@ -986,7 +986,7 @@ func isAsync(id remote.EndpointID) bool {
 // which are applied here, so the same result serves any calibration.
 //
 // r is the result the service returns for the query [GaiaBuild.ADQL]
-// generates: one row per pixel, with the per-band flux and colour-recovery
+// generates: one row per pixel, with the per-band flux and color-recovery
 // columns. Parquet and CSV are both accepted and told apart by the file's own
 // magic, so a caller does not have to remember which format a job asked for.
 func BuildFromResult(ctx context.Context, r io.Reader, build GaiaBuild) (*Map, []int64, error) {

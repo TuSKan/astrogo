@@ -524,7 +524,7 @@ func TestGaiaGToJohnsonV(t *testing.T) {
 		t.Errorf("the Sun comes out at V = %.3f, want %.3f within 0.05", got, solarV)
 	}
 
-	// A star is brighter in G than in V for any ordinary colour, because G spans
+	// A star is brighter in G than in V for any ordinary color, because G spans
 	// 330-1050 nm against V's 500-600 nm and so collects more light. V must
 	// therefore be the fainter, larger number, and increasingly so as the star
 	// reddens. Reading the table backwards inverts exactly this.
@@ -537,14 +537,14 @@ func TestGaiaGToJohnsonV(t *testing.T) {
 		}
 
 		if v <= prev {
-			t.Errorf("V = %.3f at BP-RP = %.1f did not increase over %.3f; V-G must grow with colour", v, c, prev)
+			t.Errorf("V = %.3f at BP-RP = %.1f did not increase over %.3f; V-G must grow with color", v, c, prev)
 		}
 
 		prev = v
 	}
 
 	// The conversion is a pure magnitude offset, so it must commute with a
-	// change of brightness at fixed colour.
+	// change of brightness at fixed color.
 	a := magnitude.GaiaGToJohnsonV(10.0, 1.0)
 	b := magnitude.GaiaGToJohnsonV(15.0, 1.0)
 
@@ -586,14 +586,14 @@ func TestGaiaGToJohnsonB(t *testing.T) {
 		}
 
 		if b <= prev {
-			t.Errorf("B = %.3f at BP-RP = %.2f did not increase over %.3f; B-G must grow with colour", b, c, prev)
+			t.Errorf("B = %.3f at BP-RP = %.2f did not increase over %.3f; B-G must grow with color", b, c, prev)
 		}
 
 		prev = b
 	}
 
 	// The two transformations are independent fits, so making them agree on a
-	// colour index exercises both at once. The Sun's B-V is 0.653; a sign error
+	// color index exercises both at once. The Sun's B-V is 0.653; a sign error
 	// or a wrong polynomial in either one breaks this while leaving each
 	// function's own value superficially plausible.
 	bv := magnitude.GaiaGToJohnsonB(solarG, solarBPRP) - magnitude.GaiaGToJohnsonV(solarG, solarBPRP)

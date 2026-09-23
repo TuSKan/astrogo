@@ -179,8 +179,9 @@ type Satellite = satellite.Satellite
 // two-body Keplerian propagation via NewFromElements — a lighter-weight,
 // network-free alternative to a real SPK-kernel-backed Provider. See
 // ephemeris/kepler's package doc for the full algorithm, reference
-// frame, and accuracy/scope limitations (elliptical two-body only; no
-// planetary perturbations, so accuracy drifts away from Elements.Epoch).
+// frame, and accuracy/scope limitations (two-body only, with no planetary
+// perturbations, so accuracy drifts away from the epoch the elements
+// osculate at).
 type Elements = kepler.Elements
 
 // KeplerOption configures a NewFromElements provider.
@@ -199,14 +200,31 @@ func WithKeplerBase(p Provider) KeplerOption {
 // osculating orbital elements, referred to the J2000 ecliptic frame.
 // Returns an error immediately (rather than deferring the failure to
 // first use inside NewFromElements/NewMovingBodyProvider) when the
-// elements are invalid — e.g. e >= 1, which two-body elliptical
-// propagation cannot represent.
+// elements are invalid — e.g. e >= 1, which a semi-major axis and mean
+// anomaly cannot describe; [ElementsFromPerihelion] takes those.
 func NewElements(epoch time.Time, semiMajorAxis unit.Length, eccentricity float64,
 	inclination, ascendingNode, argPeriapsis, meanAnomaly angle.Angle,
 ) (Elements, error) {
 	el, err := kepler.NewElements(epoch, semiMajorAxis, eccentricity, inclination, ascendingNode, argPeriapsis, meanAnomaly)
 	if err != nil {
 		return Elements{}, fmt.Errorf("eph: new elements: %w", err)
+	}
+
+	return el, nil
+}
+
+// ElementsFromPerihelion constructs a validated set of heliocentric
+// osculating elements from a perihelion time, perihelion distance and
+// eccentricity — the form the Minor Planet Center publishes comets in — for
+// any e >= 0: ellipse, parabola or hyperbola. The angles are referred to the
+// J2000 ecliptic frame. See [kepler.FromPerihelion].
+func ElementsFromPerihelion(perihelionTime time.Time, perihelionDistance unit.Length, eccentricity float64,
+	inclination, ascendingNode, argPeriapsis angle.Angle,
+) (Elements, error) {
+	el, err := kepler.FromPerihelion(perihelionTime, perihelionDistance, eccentricity,
+		inclination, ascendingNode, argPeriapsis)
+	if err != nil {
+		return Elements{}, fmt.Errorf("eph: elements from perihelion: %w", err)
 	}
 
 	return el, nil

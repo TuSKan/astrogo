@@ -7,7 +7,7 @@ import (
 	"github.com/TuSKan/astrogo/angle"
 )
 
-// The R identity is exact arithmetic on two catalogued colour indices.
+// The R identity is exact arithmetic on two catalogued color indices.
 //
 // V-R = (V-I) - (R-I), so R = V - (V-I) + (R-I). Alpha Centauri A, from
 // Hipparcos V and V-I and the Bright Star Catalogue's R-I for HR 5459.
@@ -102,7 +102,7 @@ func TestMagnitudeToleranceSitsBetweenThePopulations(t *testing.T) {
 	for _, delta := range []float64{0.60, 0.62, 0.61} {
 		if delta <= BrightStarMagnitudeTolerance {
 			t.Errorf("a combined-light multiple at delta V %.2f is admitted by a tolerance "+
-				"of %.2f; its colour belongs to one component, not to the pair",
+				"of %.2f; its color belongs to one component, not to the pair",
 				delta, BrightStarMagnitudeTolerance)
 		}
 	}

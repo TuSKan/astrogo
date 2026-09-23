@@ -157,9 +157,9 @@ func (b observerPrecisionBody) command() string { return strconv.Itoa(b.naifID) 
 // tracks yp*tan(latitude) to within 0.006" across four of six epochs, which
 // is the local meridian moving with the pole. Greenwich apparent sidereal
 // time is a global quantity and does not carry it; Horizons' *local* value
-// does. The other two mismatches were the giant planets being barycentres
-// rather than planets (#253) and USNO tabulating Venus and Mars at the centre
-// of the illuminated disc rather than the geometric centre.
+// does. The other two mismatches were the giant planets being barycenters
+// rather than planets (#253) and USNO tabulating Venus and Mars at the center
+// of the illuminated disc rather than the geometric center.
 //
 // The +0.662" turned out not to be astrogo's at all. Against Horizons at
 // full precision, astrogo's geocentric apparent place agrees to +0.049" in
