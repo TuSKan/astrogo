@@ -21,6 +21,12 @@
 # job that reports all of it on every pull request tells the author nothing
 # about their own change. The base is what isolates it.
 #
+# The base has to be the commit the checked-out tree was actually built on. CI
+# checks out the pull request's merge ref, so that is the merge ref's first
+# parent — not the event's base.sha, which is the base branch as it was when
+# the pull request was opened and goes stale as soon as anything else merges
+# (#394).
+#
 # Usage: api-diff.sh <base-sha> <pr-number>
 
 set -euo pipefail
