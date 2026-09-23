@@ -192,9 +192,15 @@ jobs:
       - name: Install apidiff
         run: go install golang.org/x/exp/cmd/apidiff@v0.0.0-20250718183923-645b1fa84792
 
+      # The base is HEAD^1, not github.event.pull_request.base.sha. The checkout
+      # is the pull request's merge ref, whose first parent is the base branch
+      # as it is now; base.sha is the base branch as it was when the pull
+      # request was opened. Once main moves they differ, and diffing the merge
+      # ref against the older one blames the pull request for every break
+      # merged in between — #392 was told to declare #383's renames (#394).
       - name: Compare the exported API against the base
         shell: bash
-        run: bash ./.github/scripts/api-diff.sh "${{ github.event.pull_request.base.sha }}" "${{ github.event.pull_request.number }}"
+        run: bash ./.github/scripts/api-diff.sh "$(git rev-parse HEAD^1)" "${{ github.event.pull_request.number }}"
 
   race-detection:
     name: Race Detection
