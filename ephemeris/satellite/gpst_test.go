@@ -47,12 +47,12 @@ func TestGPSTimestampProducesTheSameStateAsItsUTC(t *testing.T) {
 		t.Fatalf("State(gps): %v", err)
 	}
 
-	// Same instant, so the same state. The tolerance is a metre in AU, which
+	// Same instant, so the same state. The tolerance is a meter in AU, which
 	// is far below the sub-second interpolation residual and far above float
 	// noise.
-	const metreInAU = 1.0 / 1.495978707e11
+	const meterInAU = 1.0 / 1.495978707e11
 
-	if d := fromGPS.Pos.Sub(fromUTC.Pos).Norm(); d > metreInAU {
+	if d := fromGPS.Pos.Sub(fromUTC.Pos).Norm(); d > meterInAU {
 		t.Errorf("the same instant on two scales gave states %.3f km apart",
 			d*1.495978707e8)
 	}

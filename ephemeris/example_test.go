@@ -53,7 +53,7 @@ func ExampleApparentState() {
 	moved := apparent.Pos.Sub(geometric).Norm()
 
 	// 2.31 AU is 1154 s of light time, and Mars and Earth move at up to ~55
-	// km/s relative to one another, so tens of thousands of kilometres is the
+	// km/s relative to one another, so tens of thousands of kilometers is the
 	// size to expect here rather than a rounding artefact.
 	fmt.Printf("geometric to apparent is %.0f km\n", moved*1.495978707e8)
 

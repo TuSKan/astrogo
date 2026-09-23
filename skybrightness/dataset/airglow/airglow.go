@@ -474,7 +474,7 @@ func fetchSkytable(ctx context.Context, req skycalcRequest) ([]byte, error) {
 // second time for the observer's own site.
 //
 // SkyCalc reports photons s^-1 m^-2 um^-1 arcsec^-2. Spectral radiance is that
-// divided by a thousand for micrometres to nanometres, divided by the solid
+// divided by a thousand for micrometers to nanometers, divided by the solid
 // angle of a square arcsecond, and multiplied by the energy of one photon at
 // its own wavelength. Skipping the last step leaves a photon count that looks
 // like a radiance.
@@ -614,7 +614,7 @@ func NewAirglow(
 	layerHeight unit.Length,
 ) (*skybrightness.Airglow, error) {
 	if spec.MinNM == 0 && spec.MaxNM == 0 && grid.Len() > 0 {
-		// Ask for exactly the grid being evaluated, plus a nanometre either
+		// Ask for exactly the grid being evaluated, plus a nanometer either
 		// side so the endpoints interpolate rather than fall off.
 		spec.MinNM = float64(grid.At(0)) - 1
 		spec.MaxNM = float64(grid.At(grid.Len()-1)) + 1
@@ -804,8 +804,8 @@ func columns(f *fits.File) (lambda, lines, continuum, transmittance []float64, e
 			return nil, nil, nil, nil, fmt.Errorf("%w: the table is empty", ErrService)
 		}
 
-		// SkyCalc's LAM is in nanometres when the request was, but the header
-		// is what says so; a table in micrometres would be off by a thousand
+		// SkyCalc's LAM is in nanometers when the request was, but the header
+		// is what says so; a table in micrometers would be off by a thousand
 		// and still look plausible.
 		if lambda[len(lambda)-1] < 30 {
 			for i := range lambda {

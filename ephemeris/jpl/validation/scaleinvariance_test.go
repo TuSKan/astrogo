@@ -13,13 +13,13 @@ import (
 	"github.com/TuSKan/astrogo/time"
 )
 
-// metresInAU converts the tolerance below into the AU that State reports in.
-const metresInAU = 1.0 / 149597870700.0
+// metersInAU converts the tolerance below into the AU that State reports in.
+const metersInAU = 1.0 / 149597870700.0
 
-// jplScaleTolerance is one metre, for the reasons given on the offline half of
+// jplScaleTolerance is one meter, for the reasons given on the offline half of
 // this test in ephemeris/scaleinvariance_test.go: the expected difference is
 // zero, and the tolerance absorbs only the float cost of a scale round-trip.
-const jplScaleTolerance = 1.0 * metresInAU
+const jplScaleTolerance = 1.0 * metersInAU
 
 // TestJPLStateIsScaleInvariant is the kernel-backed half of the contract that
 // ephemeris.TestProviderStateIsScaleInvariant asserts for SOFA and SGP4.
@@ -83,7 +83,7 @@ func TestJPLStateIsScaleInvariant(t *testing.T) {
 					t.Errorf("position moved %.6g AU (%.4g km) when the same instant "+
 						"was labelled %s.\n  The provider is reading the caller's scale "+
 						"as its own — normalise at the entry point rather than reading "+
-						"JDParts raw.", d, d/metresInAU/1e3, s.label)
+						"JDParts raw.", d, d/metersInAU/1e3, s.label)
 				}
 			}
 		})

@@ -271,7 +271,7 @@ func Inputs(ctx context.Context, spec Spec) (skybrightness.PresetInputs, error) 
 		return zero, fmt.Errorf("dataset: dust map: %w", err)
 	}
 
-	// The spectrum is fetched over the grid's own range, with a nanometre of
+	// The spectrum is fetched over the grid's own range, with a nanometer of
 	// slack at each end so the resampling interpolates rather than
 	// extrapolating at the edges.
 	glow, err := airglow.Fetch(ctx, airglow.Spec{

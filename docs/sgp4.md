@@ -100,7 +100,7 @@ That is as clean a confirmation as this kind of finding gets.
 The rewrite stops being a preference and becomes the obvious move, for a reason
 that is not "the repo is stale":
 
-- **astrogo has been shipping kilometre-scale errors** on decaying LEO objects
+- **astrogo has been shipping kilometer-scale errors** on decaying LEO objects
   and low-perigee deep-space orbits — exactly the objects a re-entry watcher or
   a debris-conjunction screen cares about. `Satellite.Verified` was built to warn
   callers off that regime; after this it should have nothing to warn about.

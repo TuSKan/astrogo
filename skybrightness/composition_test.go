@@ -238,7 +238,7 @@ func TestSurfaceAtAltitudeFollowsTheStandardProfile(t *testing.T) {
 	}
 
 	// Roughly three-quarters of sea level at 2.6 km, which is the sanity
-	// check that catches a metres-for-feet or a sign slip.
+	// check that catches a meters-for-feet or a sign slip.
 	if r := float64(highP) / float64(seaP); r < 0.65 || r > 0.85 {
 		t.Errorf("pressure ratio is %.3f; the standard atmosphere gives about 0.73 at 2.6 km", r)
 	}

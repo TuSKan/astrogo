@@ -59,7 +59,7 @@ func TestOzonePlausibility(t *testing.T) {
 	}{
 		{
 			// cm^2 read as m^2, or the reverse: a factor of 1e4 either way.
-			"cross section in square metres", chappuisFile(realPeak * 1e-4),
+			"cross section in square meters", chappuisFile(realPeak * 1e-4),
 		},
 		{
 			"cross section scaled up by a unit error", chappuisFile(realPeak * 1e4),

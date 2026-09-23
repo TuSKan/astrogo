@@ -446,7 +446,7 @@ func TestParsedElementsPropagate(t *testing.T) {
 	// a(1-e) <= r <= a(1+e) for any point on the ellipse. Eros: 1.133 AU to
 	// 1.783 AU. A column map off by one field puts r outside this.
 	//
-	// StateAt returns astronomical units, not metres — its perifocal vector is
+	// StateAt returns astronomical units, not meters — its perifocal vector is
 	// built straight from the semi-major axis it was given.
 	r := pos.Norm()
 

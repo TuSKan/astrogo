@@ -38,7 +38,7 @@ const OzoneTemperatureK = 223
 //
 // Ozone is the absorber this package can represent honestly. Its Chappuis
 // band is a broad continuum across the visible, which a tabulated cross
-// section on a nanometre grid reproduces exactly. O2 and H2O absorb in narrow
+// section on a nanometer grid reproduces exactly. O2 and H2O absorb in narrow
 // lines instead, and a band-averaged cross section is systematically wrong for
 // them — see [atmosphere.CrossSection] and docs/skybrightness.md section 16.
 func Ozone(ctx context.Context) (atmosphere.CrossSection, error) {
@@ -64,7 +64,7 @@ func Ozone(ctx context.Context) (atmosphere.CrossSection, error) {
 	}
 	defer func() { _ = r.Close() }()
 
-	// The atlas publishes this file as two columns, wavelength in nanometres
+	// The atlas publishes this file as two columns, wavelength in nanometers
 	// and cross section in cm^2 per molecule, with no header. The unit is
 	// passed rather than sniffed because the atlas also serves wavenumber and
 	// angstrom files that a sniffer would confuse for one another.
@@ -157,7 +157,7 @@ var ErrNoSource = errors.New("crosssection: no source for this species")
 //
 // Only ozone is available, and the refusal for the others is deliberate rather
 // than pending. O2 (688 and 762 nm) and H2O (720, 820 and 940 nm) absorb in
-// dense narrow lines. Averaging their cross section onto a nanometre grid and
+// dense narrow lines. Averaging their cross section onto a nanometer grid and
 // applying Beer-Lambert overestimates absorption systematically, because
 // exp(-tau) is convex: the mean of the transmission is not the transmission of
 // the mean. The error is invisible — every number stays positive and

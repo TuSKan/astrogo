@@ -26,7 +26,7 @@ import (
 //
 // What is *not* shared is the wiring, and that is the whole subject. Between a
 // caller's inputs and Apco13's arguments sit a time-scale conversion, a
-// two-part Julian date, longitude and latitude in radians, height in metres,
+// two-part Julian date, longitude and latitude in radians, height in meters,
 // polar motion in radians, and a pressure that has to become zero when a
 // custom refraction model is present. Between Atioq's outputs and an AltAz sit
 // a zenith-distance-to-altitude subtraction and an azimuth wrap. Every one of

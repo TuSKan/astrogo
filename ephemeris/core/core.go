@@ -156,7 +156,7 @@ func (s State) Require(frame Frame, center Center) error {
 	return nil
 }
 
-// kmPerAU is the number of kilometres in one Astronomical Unit.
+// kmPerAU is the number of kilometers in one Astronomical Unit.
 //
 // var, not const: constants.IAU.AstronomicalUnit is a struct, and Go does not
 // permit selecting a struct field inside a constant expression.
@@ -165,7 +165,7 @@ var kmPerAU = constants.IAU.AstronomicalUnit.Value / 1e3
 // Distance returns the geocentric distance in AU.
 func (s State) Distance() float64 { return s.Pos.Norm() }
 
-// DistanceKm returns the geocentric distance in kilometres.
+// DistanceKm returns the geocentric distance in kilometers.
 func (s State) DistanceKm() float64 { return s.Pos.Norm() * kmPerAU }
 
 // Speed returns the velocity magnitude in AU/day.
@@ -228,7 +228,7 @@ const (
 //	Jupiter   0.0324 arcsec
 //	Saturn    0.0288 arcsec
 //	Neptune   0.0093 arcsec
-//	Mars      0.0000 arcsec   (Phobos and Deimos displace it by centimetres)
+//	Mars      0.0000 arcsec   (Phobos and Deimos displace it by centimeters)
 //
 // That is far inside every tolerance astrogo publishes, and far outside what
 // someone checking Jupiter against Horizons' default `599` would expect: it
@@ -251,7 +251,7 @@ const (
 	// from the Earth-Moon barycentre, which is 4,671 km away.
 	Earth
 	// Mars is the identifier for the Mars system barycentre, NAIF 4. Phobos
-	// and Deimos displace it from the planet by centimetres, so the
+	// and Deimos displace it from the planet by centimeters, so the
 	// distinction is unobservable here.
 	Mars
 	// Jupiter is the identifier for the Jupiter system barycentre, NAIF 5 —

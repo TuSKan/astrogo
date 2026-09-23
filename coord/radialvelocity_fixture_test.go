@@ -314,7 +314,7 @@ func reportFullTreatment(t *testing.T, full []float64) {
 	// The classical projection sat 4.65 m/s from Astropy and said so. With
 	// the observer's frame shift implemented the two models are the same
 	// model, so what is left is arithmetic rather than physics: a tenth of a
-	// metre per second is loose enough for the terms astrogo still omits —
+	// meter per second is loose enough for the terms astrogo still omits —
 	// light-travel time to the barycentre, and the target's own proper
 	// motion over that crossing, neither of which a bare ICRS direction can
 	// supply — and forty times tighter than the gap it replaces.

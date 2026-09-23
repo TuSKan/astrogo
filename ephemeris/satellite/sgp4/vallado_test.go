@@ -25,12 +25,12 @@ import (
 // valladoMaxKM is the contract: 0.1 mm.
 //
 // Not a statement about where satellites are — SGP4's own model error is
-// kilometres within days of epoch. A statement about whether this is the same
+// kilometers within days of epoch. A statement about whether this is the same
 // arithmetic as the reference.
 //
 // # Where the number comes from
 //
-// tcppver.out prints positions to eight decimal places of a kilometre, so 1e-8
+// tcppver.out prints positions to eight decimal places of a kilometer, so 1e-8
 // km is the file's own resolution and nothing can agree better than that. Most
 // of the suite sits there: 30 of the 31 comparable cases agree to 3e-8 km or
 // better, which is ~1e-12 relative and is float64 accumulation over a few
@@ -44,7 +44,7 @@ import (
 // are near perigee at epoch, where a highly eccentric orbit's position is most
 // sensitive to the eccentric anomaly: the amplification is of order (1+e)/(1-e),
 // which is 73 at e = 0.973. A one-ulp difference in the last bits of axnl and
-// aynl arrives as micrometres of position there and nanometres at apogee.
+// aynl arrives as micrometers of position there and nanometers at apogee.
 //
 // So the contract is set at 1e-4 km — 24x the measured maximum, which leaves
 // room for fused multiply-add to move the last bits differently on ARM64, and

@@ -23,7 +23,7 @@ func mustGrid(t *testing.T, start, step unit.WavelengthNM) unit.SpectralGrid {
 }
 
 // The Dobson Unit is defined as 0.01 mm of the pure gas at STP. Its
-// accepted value is 2.687e16 molecules per square centimetre; deriving it
+// accepted value is 2.687e16 molecules per square centimeter; deriving it
 // from the SI-exact Boltzmann constant must reproduce that, which is what
 // makes it a derivation rather than a hardcoded number.
 func TestDobsonUnitDerivation(t *testing.T) {
@@ -106,7 +106,7 @@ func TestCrossSectionZeroOutsideTable(t *testing.T) {
 }
 
 // An ozone column in Dobson Units must agree with the same column
-// expressed in molecules per square centimetre.
+// expressed in molecules per square centimeter.
 func TestOzoneOpticalDepthMatchesExplicitColumn(t *testing.T) {
 	t.Parallel()
 

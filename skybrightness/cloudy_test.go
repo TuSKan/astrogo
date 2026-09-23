@@ -116,7 +116,7 @@ func TestCloudBrightensTheSkyOverASource(t *testing.T) {
 // over a city it is. But it also carries cos^4(z0_H), the angle at which the
 // city sees the patch of cloud being looked at, and for a source off to one
 // side raising the deck improves that angle faster than the inverse square
-// costs: a low cloud overhead is seen edge-on from a city two kilometres away
+// costs: a low cloud overhead is seen edge-on from a city two kilometers away
 // and lit weakly, while a higher one is closer to face-on.
 //
 // Measured here, with the observer at the zenith: a source 500 m away makes

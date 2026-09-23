@@ -273,7 +273,7 @@ func TestParseAcceptsEitherColumnCase(t *testing.T) {
 // disturbed it. This drives the identical worked example through the parser.
 //
 // SkyCalc reports photons s^-1 m^-2 um^-1 arcsec^-2. The radiance is that
-// divided by a thousand for micrometres to nanometres, divided by the solid
+// divided by a thousand for micrometers to nanometers, divided by the solid
 // angle of a square arcsecond, and multiplied by the energy of one photon at
 // its own wavelength.
 func TestParseConversionMatchesTheWorkedExample(t *testing.T) {

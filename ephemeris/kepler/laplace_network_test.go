@@ -20,7 +20,7 @@ import (
 const horizonsHost = "ssd.jpl.nasa.gov:443"
 
 // jovicentric fetches a satellite's position relative to Jupiter from
-// Horizons, in kilometres, ICRF.
+// Horizons, in kilometers, ICRF.
 func jovicentric(t *testing.T, naif int, startTDB, stopTDB, step string) map[float64]vector.Vec3 {
 	t.Helper()
 
@@ -103,7 +103,7 @@ func jovicentric(t *testing.T, naif int, startTDB, stopTDB, step string) map[flo
 // Because "incomplete" is not a number. The package doc says two-body motion
 // diverges for these satellites under Jupiter's J₂ and their own resonance,
 // and a reader deciding whether to use this needs to know whether that means
-// kilometres or radii. It is measured here rather than described.
+// kilometers or radii. It is measured here rather than described.
 //
 // The contract is deliberately loose and is not an accuracy claim: it is a
 // bound that catches the frame being wrong, which is a different and much

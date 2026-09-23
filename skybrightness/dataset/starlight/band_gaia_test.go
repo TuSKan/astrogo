@@ -14,7 +14,7 @@ import (
 // publishes for Generic/Bessell.V.
 //
 // A tophat rather than the real curve, so this file needs no network. Its pivot
-// lands about three nanometres off the real one, which is why the comparison
+// lands about three nanometers off the real one, which is why the comparison
 // below allows two per cent rather than asserting equality.
 func bessellVLike() magnitude.Passband {
 	return magnitude.Passband{

@@ -97,7 +97,7 @@ func Open(ctx context.Context) (*Spectrum, error) {
 }
 
 // Parse reads a CALSPEC-style FITS binary table, converting its angstrom
-// wavelengths and erg s^-1 cm^-2 angstrom^-1 fluxes to nanometres and
+// wavelengths and erg s^-1 cm^-2 angstrom^-1 fluxes to nanometers and
 // W m^-2 nm^-1.
 //
 // It is separate from [Open] so the conversion can be exercised without a

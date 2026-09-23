@@ -283,8 +283,8 @@ func expectedDiurnalArcsec(latRad, heightM float64) float64 {
 
 	// Radius of curvature in the prime vertical.
 	n := equatorialRadiusM / math.Sqrt(1-e2*sinLat*sinLat)
-	rhoMetres := (n + heightM) * cosLat
+	rhoMeters := (n + heightM) * cosLat
 
-	return angle.Rad(earthRotationRadPerSec * rhoMetres /
+	return angle.Rad(earthRotationRadPerSec * rhoMeters /
 		constants.SI2019.SpeedOfLight.Value).Arcseconds()
 }
