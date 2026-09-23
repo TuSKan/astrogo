@@ -10,6 +10,7 @@ import (
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/ephemeris/core"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/vector"
 )
 
 // TestSolarSystemCandidatesIncludePlutoByItsMagnitude: Pluto, at V ≈ 14.5 in
@@ -135,5 +136,73 @@ func TestMoonCandidatesReportAMoonTheyCannotEvaluate(t *testing.T) {
 		if !strings.Contains(err.Error(), m.name) {
 			t.Errorf("%s is not named in %v", m.name, err)
 		}
+	}
+}
+
+// twoPointProvider puts the Sun at one fixed point and every other body at
+// another, which is all a moon's H-G magnitude needs: a distance from the Sun,
+// a distance from the observer and the phase angle between them.
+type twoPointProvider struct{}
+
+func (twoPointProvider) State(id eph.ID, _ time.Time) (core.State, error) {
+	if id == eph.Sun {
+		return core.State{Pos: vector.Vec3{X: 1}}, nil
+	}
+
+	return core.State{Pos: vector.Vec3{Y: 5}}, nil
+}
+
+func (twoPointProvider) Close() error { return nil }
+
+// TestMoonCandidatesKeepAMoonBrighterThanTheLimit is the other side of
+// TestMoonCandidatesReportAMoonTheyCannotEvaluate: a moon whose magnitude is
+// computed is kept under the limit and not over it, with nothing recorded as
+// skipped either way; and a name moonSpecs does not know is recorded rather
+// than passed over.
+func TestMoonCandidatesKeepAMoonBrighterThanTheLimit(t *testing.T) {
+	var marsMoons []moonSpec
+
+	for _, m := range moonSpecs {
+		if m.parent == eph.Mars {
+			marsMoons = append(marsMoons, m)
+		}
+	}
+
+	at := time.Date(2026, 9, 23, 0, 0, 0, 0, time.LocationUTC)
+
+	for _, c := range []struct {
+		magLimit float64
+		want     int
+	}{
+		{30, len(marsMoons)},
+		{-10, 0},
+	} {
+		var dropped skips
+
+		got := moonCandidates(twoPointProvider{}, marsMoons, at, c.magLimit, &dropped)
+		if err := dropped.err(); err != nil {
+			t.Fatalf("magLimit %v: %v", c.magLimit, err)
+		}
+
+		if len(got) != c.want {
+			t.Errorf("magLimit %v: %d candidates, want %d", c.magLimit, len(got), c.want)
+		}
+
+		for _, cand := range got {
+			if cand.target.Kind != resolve.KindPlanetaryMoon {
+				t.Errorf("%s: kind %v, want KindPlanetaryMoon", cand.target.Name, cand.target.Kind)
+			}
+		}
+	}
+
+	var dropped skips
+
+	unknown := []moonSpec{{name: "Nonesuch", parent: eph.Mars}}
+	if got := moonCandidates(twoPointProvider{}, unknown, at, 30, &dropped); len(got) != 0 {
+		t.Errorf("%d candidates for a moon moonSpecs does not know, want 0", len(got))
+	}
+
+	if err := dropped.err(); !errors.Is(err, ErrUnknownPlanetaryMoon) {
+		t.Errorf("dropped.err() = %v, want it to record ErrUnknownPlanetaryMoon", err)
 	}
 }
