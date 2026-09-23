@@ -1044,7 +1044,7 @@ func ExtractWCS(h *Header) (*WCS, error) {
 
 // parseSIPPoly reads a SIP polynomial from a FITS header.
 // prefix is one of "A", "B", "AP", "BP".
-// Returns nil if the ORDER keyword is not found.
+// Returns an empty polynomial if the ORDER keyword is not found.
 //
 // An absent coefficient is zero, by the SIP convention. A present one that
 // does not parse is an error: until #409 it was taken for absent, so the term
@@ -1053,7 +1053,7 @@ func ExtractWCS(h *Header) (*WCS, error) {
 func parseSIPPoly(h *Header, prefix string) (map[[2]int]float64, error) {
 	order, err := h.GetInt(prefix + "_ORDER")
 	if errors.Is(err, ErrKeyNotFound) {
-		return nil, nil
+		return map[[2]int]float64{}, nil
 	}
 
 	if err != nil {
@@ -1181,7 +1181,7 @@ func tpvEval(coeffs map[int]float64, x, y float64) float64 {
 
 // parseTPVCoeffs reads TPV polynomial coefficients from a FITS header.
 // axis is 1 or 2 (for PV1_j or PV2_j keywords).
-// Returns nil if no PV keywords are found.
+// Returns an empty map if no PV keywords are found.
 func parseTPVCoeffs(h *Header, axis int) (map[int]float64, error) {
 	coeffs := make(map[int]float64)
 
@@ -1194,10 +1194,6 @@ func parseTPVCoeffs(h *Header, axis int) (map[int]float64, error) {
 		if present {
 			coeffs[j] = v
 		}
-	}
-
-	if len(coeffs) == 0 {
-		return nil, nil
 	}
 
 	return coeffs, nil
