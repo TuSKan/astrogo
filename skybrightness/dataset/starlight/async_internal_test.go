@@ -1,7 +1,10 @@
 package starlight
 
 import (
+	"context"
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
@@ -121,5 +124,31 @@ func TestIsAsyncNamesOnlyTheAsyncEndpoint(t *testing.T) {
 		if isAsync(id) {
 			t.Errorf("%s is treated as asynchronous", id)
 		}
+	}
+}
+
+// awaitPhase refuses a phase UWS does not define rather than polling it until
+// the cap. A service that answered "WEIRD" would otherwise hold a caller for
+// the whole asyncPhaseCap and then report only that the job was slow.
+func TestAwaitPhaseRefusesAnUnknownPhase(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !strings.HasSuffix(r.URL.Path, "/job-1/phase") {
+			http.NotFound(w, r)
+
+			return
+		}
+
+		_, _ = w.Write([]byte("weird\n"))
+	}))
+	t.Cleanup(server.Close)
+	t.Cleanup(remote.Reset)
+
+	if err := remote.SetURL(remote.GaiaTAP, server.URL); err != nil {
+		t.Fatal(err)
+	}
+
+	err := awaitPhase(context.Background(), remote.Default(), remote.GaiaTAP, "job-1")
+	if !errors.Is(err, ErrAsyncJob) || !strings.Contains(err.Error(), `unrecognized phase "WEIRD"`) {
+		t.Fatalf("awaitPhase = %v, want ErrAsyncJob naming the phase", err)
 	}
 }
