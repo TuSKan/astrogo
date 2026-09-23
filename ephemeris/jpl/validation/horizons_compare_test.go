@@ -121,7 +121,7 @@ func horizonsStateReference() metrology.Reference {
 // below the fault threshold by seven, which is what makes it a usable
 // discriminator rather than a number pinned to a measurement. A one-second
 // time-scale error — which this repository had until recently in its
-// leap-second parsing — moves the Moon about a kilometre and cannot hide
+// leap-second parsing — moves the Moon about a kilometer and cannot hide
 // under it.
 //
 // Most of the Moon's measured residual is therefore the kernel difference and

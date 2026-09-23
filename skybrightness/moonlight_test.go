@@ -45,7 +45,7 @@ func solarSpectrumFixture(tb testing.TB) []float64 {
 
 	for i, nm := range bands {
 		// Planck gives W m^-2 sr^-1 m^-1; the solid angle turns radiance
-		// into irradiance and 1e-9 converts per metre to per nanometre.
+		// into irradiance and 1e-9 converts per meter to per nanometer.
 		out[i] = planck(float64(nm)*1e-9) * omega * 1e-9
 	}
 

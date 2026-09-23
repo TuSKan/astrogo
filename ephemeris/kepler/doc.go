@@ -86,7 +86,7 @@
 // package applies.
 //
 // So what is here is the correct machinery, the correct constants and the
-// correct frame — not a satellite ephemeris. Kilometre accuracy needs a
+// correct frame — not a satellite ephemeris. Kilometer accuracy needs a
 // kernel-backed provider ([github.com/TuSKan/astrogo/ephemeris.NewProvider]
 // with [github.com/TuSKan/astrogo/ephemeris.Moons]); this is for a finder
 // chart, not an occultation prediction.

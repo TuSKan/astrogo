@@ -57,7 +57,7 @@ var (
 	ErrWrongSmallBody = errors.New("jpl: horizons returned a different small body")
 )
 
-// kmPerAU is the number of kilometres in one Astronomical Unit.
+// kmPerAU is the number of kilometers in one Astronomical Unit.
 //
 // Unexported. It was KMPerAU, which let a caller outside this module pin a
 // copy of the value that would not move if constants ever did — the precise

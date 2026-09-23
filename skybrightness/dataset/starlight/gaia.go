@@ -91,7 +91,7 @@ type GaiaBand struct {
 	// neither of which this package can supply — for Gaia G on the Vega
 	// scale that is 3.63e-11 * 10^(-25.6874/2.5).
 	//
-	// Per nanometre, not integrated over the band: a zero point converts a
+	// Per nanometer, not integrated over the band: a zero point converts a
 	// flux into a mean flux density, and [skybrightness.NewIntegratedStarlight]
 	// consumes it as one. Mixing the two conventions changes the answer by
 	// the band width and is not otherwise visible.
@@ -922,11 +922,11 @@ func VegaZeroFlux(band magnitude.Passband) (float64, error) {
 
 	const (
 		jansky      = 1e-26 // W m^-2 Hz^-1
-		metrePerNM  = 1e-9
+		meterPerNM  = 1e-9
 		perMToPerNM = 1e-9
 	)
 
-	lambdaM := float64(pivot) * metrePerNM
+	lambdaM := float64(pivot) * meterPerNM
 
 	return band.VegaZeroPointJy * jansky *
 		constants.SI2019.SpeedOfLight.Value / (lambdaM * lambdaM) * perMToPerNM, nil

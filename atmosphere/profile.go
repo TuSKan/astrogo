@@ -105,7 +105,7 @@ func checkProfile(altitude unit.Length, column unit.OpticalDepth, scaleHeight un
 // a normalised phase function, weighted by each mechanism's share of the
 // column; this one keeps the dimensional volume scattering coefficients and
 // so answers a different question — not "in what direction does this
-// atmosphere scatter" but "how much light does this cubic metre of it put
+// atmosphere scatter" but "how much light does this cubic meter of it put
 // into this solid angle". A height integral needs the second.
 //
 // Kocifaj (2007) Eq. 18 is exactly this quantity, written there as

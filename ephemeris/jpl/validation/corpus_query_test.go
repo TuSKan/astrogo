@@ -15,7 +15,7 @@ import (
 // When TestGenerateCorpus reports entries "changed", the natural conclusion is
 // that Horizons changed its answer. But an entry is keyed on class, body, site
 // *name* and epoch — not on the site's coordinates — so moving a site by a
-// metre, or getting its height wrong by a factor, reports as 300 changed values
+// meter, or getting its height wrong by a factor, reports as 300 changed values
 // rather than as a changed query. The two look identical in the summary and
 // mean opposite things.
 //

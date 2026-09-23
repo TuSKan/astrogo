@@ -165,7 +165,7 @@ func AllSkyRadiance(
 // extinction as e^{-h/H_R}.
 //
 // Distances and scale heights must share units; the paper works in
-// kilometres.
+// kilometers.
 func OpticalParameterT(
 	aerosolOpticalDepth unit.OpticalDepth, aerosolScaleHeight unit.Length,
 	molecularOpticalDepth unit.OpticalDepth, molecularScaleHeight unit.Length,

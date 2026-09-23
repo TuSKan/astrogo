@@ -47,7 +47,7 @@ var (
 
 // WavelengthUnit names what the first column of a file holds.
 //
-// The atlas is not uniform about this: some files are in nanometres, others
+// The atlas is not uniform about this: some files are in nanometers, others
 // in angstrom, others in wavenumbers. Nothing in the file body says which,
 // so it is a parameter rather than something to sniff — guessing wrong
 // shifts every absorption feature by a factor of ten and still produces a
@@ -61,7 +61,7 @@ const (
 	Wavenumber WavelengthUnit = "cm-1"
 )
 
-// toNM converts one value in the given unit to nanometres.
+// toNM converts one value in the given unit to nanometers.
 func (u WavelengthUnit) toNM(v float64) (float64, error) {
 	switch u {
 	case Nanometre:

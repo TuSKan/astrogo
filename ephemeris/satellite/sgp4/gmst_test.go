@@ -18,7 +18,7 @@ import (
 // literal is otherwise invisible — and it explains the measured behaviour of
 // [ModeAFSPC]: the two modes agree exactly at 1970 and drift apart only as each
 // accumulates from there, which is why a 2024 epoch shows them 1.6e-10 km apart
-// rather than kilometres.
+// rather than kilometers.
 func TestAFSPCOriginIsTheSameSiderealTime(t *testing.T) {
 	t.Parallel()
 

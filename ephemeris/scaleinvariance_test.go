@@ -9,19 +9,19 @@ import (
 	"github.com/TuSKan/astrogo/time"
 )
 
-// metresInAU converts the tolerance below into the AU that State reports in.
-const metresInAU = 1.0 / 149597870700.0
+// metersInAU converts the tolerance below into the AU that State reports in.
+const metersInAU = 1.0 / 149597870700.0
 
-// scaleTolerance is one metre.
+// scaleTolerance is one meter.
 //
 // Not a physical accuracy budget — the correct answer here is the *same*
 // answer, and the only permitted difference is the floating-point cost of
 // converting a Julian Date between scales and back. Measured, that cost is
-// 7e-8 m at worst across these providers, so one metre leaves seven orders of
+// 7e-8 m at worst across these providers, so one meter leaves seven orders of
 // headroom for a platform whose FMA rounding differs while staying five orders
 // below the smallest defect this test exists to catch (40 arcsec of lunar
 // motion is ~74 km; the SGP4 defect was 530 km).
-const scaleTolerance = 1.0 * metresInAU
+const scaleTolerance = 1.0 * metersInAU
 
 // TestProviderStateIsScaleInvariant asserts that a provider returns the same
 // state for one physical instant however the caller labels its scale.
@@ -133,7 +133,7 @@ func TestProviderStateIsScaleInvariant(t *testing.T) {
 							"was labelled %s.\n  The provider is reading the caller's "+
 							"scale as its own — normalise at the entry point "+
 							"(t.UTC()/t.TDB()) rather than reading JDParts raw.",
-							d, d/metresInAU/1e3, s.label)
+							d, d/metersInAU/1e3, s.label)
 					}
 
 					if d := got.Vel.Sub(base.Vel).Norm(); d > scaleTolerance {

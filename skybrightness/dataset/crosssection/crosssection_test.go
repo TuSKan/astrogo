@@ -72,7 +72,7 @@ func TestParseWavenumbersAreReordered(t *testing.T) {
 	}
 }
 
-// Angstrom is a factor of ten from nanometres, and getting it wrong shifts
+// Angstrom is a factor of ten from nanometers, and getting it wrong shifts
 // every absorption feature by that factor while still producing a
 // plausible-looking curve. That is why the unit is a parameter and not
 // sniffed from the file.

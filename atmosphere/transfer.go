@@ -108,7 +108,7 @@ const (
 )
 
 // MolecularScaleHeight returns the pressure scale height of the molecular
-// atmosphere at temperature t, in metres.
+// atmosphere at temperature t, in meters.
 //
 // This is the hydrostatic relation for an isothermal ideal gas,
 //
@@ -122,7 +122,7 @@ const (
 //
 // The isothermal assumption is the approximation here: the real troposphere
 // has a lapse rate, so this overstates the scale height of the lowest few
-// kilometres slightly. For the horizontal-path optical depths it feeds, that
+// kilometers slightly. For the horizontal-path optical depths it feeds, that
 // is well inside the uncertainty on the aerosol term beside it.
 func MolecularScaleHeight(t unit.TemperatureK) (unit.Length, error) {
 	if !positiveFinite(float64(t)) {
@@ -195,7 +195,7 @@ func MultipleScatteringFactor(rayleigh unit.OpticalDepth) (float64, error) {
 // Airglow layer geometry.
 const (
 	// VanRhijnEarthRadiusKM is the Earth radius Leinert et al. (1998) Eq. 13
-	// uses, in kilometres.
+	// uses, in kilometers.
 	VanRhijnEarthRadiusKM = 6378.0
 
 	// AirglowLayerHeight is the height of the emitting layer adopted by

@@ -45,7 +45,7 @@ import (
 // transforms on its own — which is exactly what #331's fix exploits, and why
 // those conversions are exact for a star with no parallax at all.
 //
-// A space velocity in km/s is not a rotation. It asks how many kilometres a
+// A space velocity in km/s is not a rotation. It asks how many kilometers a
 // star covers in a second, and an angular rate answers that only once a
 // distance says how far away the star is: the same 150 mas/yr is 7 km/s at
 // 10 pc and 700 km/s at 1 kpc. There is no cancellation to exploit, so a

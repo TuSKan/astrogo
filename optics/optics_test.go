@@ -179,7 +179,7 @@ func TestTelescope_PixelScaleAndSensorFOV(t *testing.T) {
 	//
 	// Not the classical 206265·µm/mm form this used to assert. That constant
 	// is a rounded radian-to-arcsecond conversion — 206264.806… — and it was
-	// in the formula only to reconcile microns against millimetres. With two
+	// in the formula only to reconcile microns against millimeters. With two
 	// unit.Length values neither factor is needed, and the answer moves by
 	// 9.4e-7 of itself: 0.7755557″ here against the 0.7755564″ the rounded
 	// constant gave.
