@@ -373,7 +373,7 @@ func TestZodiacalLightAccumulates(t *testing.T) {
 	}
 }
 
-// The elongation the colour correction uses follows from the geometry:
+// The elongation the color correction uses follows from the geometry:
 // cos(eps) = cos(dlon)*cos(beta).
 func TestZodiacalElongation(t *testing.T) {
 	t.Parallel()

@@ -42,7 +42,7 @@ const (
 	// Twice the Gaia radius rather than six times, because the two matches
 	// answer different questions. That one decides whether Gaia saw a star at
 	// all, where a false positive silently drops it from the map; this one
-	// only attaches a colour index, and the catalogue holds about 9,100 stars
+	// only attaches a color index, and the catalogue holds about 9,100 stars
 	// over the whole sky, so a window this size almost never contains two.
 	//
 	// It was thirty arcseconds, on the reasoning that the slack would absorb
@@ -120,7 +120,7 @@ func FetchBrightStars(ctx context.Context, faintestV float64, radius angle.Angle
 //
 // I/239/hip_main, not I/311/hip2. The latter is van Leeuwen (2007), an
 // astrometric reduction carrying Hpmag, B-V and V-I but no Johnson V — and
-// Johnson V is the whole point, since it is used directly with no colour
+// Johnson V is the whole point, since it is used directly with no color
 // transformation, which is what makes these stars immune to the transformation
 // error this package carried for so long.
 func fetchHipparcos(ctx context.Context, faintestV float64) ([]BrightStar, []float64, []float64, error) {
@@ -132,7 +132,7 @@ func fetchHipparcos(ctx context.Context, faintestV float64) ([]BrightStar, []flo
 	defer func() { _ = client.Close() }()
 
 	// B-V and V-I come back with the photometry, which is what makes a
-	// multi-band map possible without a colour fit: B = V + (B-V) and
+	// multi-band map possible without a color fit: B = V + (B-V) and
 	// I = V - (V-I), both exact.
 	// No HD: the VizieR view of this table does not carry one, which the
 	// service reports as an unresolved identifier and which is why the Bright
@@ -187,7 +187,7 @@ func parseHipparcos(r io.Reader) ([]BrightStar, []float64, []float64, error) {
 			Mag:  map[string]float64{"V": v},
 		}
 
-		// B and I follow from the catalogue's own colour indices. A star
+		// B and I follow from the catalogue's own color indices. A star
 		// missing one simply has no magnitude in that band; nothing is
 		// interpolated to fill it.
 		if bv, ok := numField(index, row, "b-v"); ok {
@@ -395,7 +395,7 @@ func sexagesimal(s string, isHours bool) (angle.Angle, bool) {
 //	V-R = (V-I) - (R-I)
 //	R   = V - (V-I) + (R-I)
 //
-// Nothing is fitted. The alternative would be a colour-colour relation
+// Nothing is fitted. The alternative would be a color-color relation
 // predicting V-R from B-V, which is a regression over somebody's sample, and
 // putting an estimate into a map that is otherwise measurements — for the
 // brightest stars in the sky, where an error is least forgivable — is what
@@ -426,12 +426,12 @@ func sexagesimal(s string, isHours bool) (angle.Angle, bool) {
 //     separately, so the candidate carrying R-I is fainter by 0.60, 0.62 and
 //     0.61 magnitudes. That is not measurement scatter, it is the difference
 //     between a pair and one of its stars, and attaching one component's
-//     colour to the pair's magnitude would be inventing a number rather than
+//     color to the pair's magnitude would be inventing a number rather than
 //     reading one.
 //
 // A star with no match keeps no R entry, and [AddBrightStars] then contributes
 // it to every other band and not to R - so the R map is short by exactly those
-// stars rather than carrying colours that belong to something else.
+// stars rather than carrying colors that belong to something else.
 func AddCousinsR(ctx context.Context, stars []BrightStar) (matched int, err error) {
 	var wanted int
 
@@ -522,7 +522,7 @@ func AddCousinsR(ctx context.Context, stars []BrightStar) (matched int, err erro
 		// so the nearer of the two was B by two hundredths of an arcsecond.
 		// A coin flip, and it landed on the wrong star: R-I of 0.30 rather
 		// than 0.22, which is the fourth brightest star in the sky given the
-		// colour of its companion.
+		// color of its companion.
 		//
 		// V separates them without ambiguity, -0.01 against 1.33, and it is a
 		// property of the star rather than of how well two catalogues agree

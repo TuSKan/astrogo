@@ -47,7 +47,7 @@ func TestGaiaADQLDivisor(t *testing.T) {
 	}
 }
 
-// A band with no colour term is the Gaia G band itself and needs no
+// A band with no color term is the Gaia G band itself and needs no
 // transformation — the one case that works without the caller supplying a
 // published fit.
 func TestGaiaADQLPlainBand(t *testing.T) {
@@ -59,19 +59,19 @@ func TestGaiaADQLPlainBand(t *testing.T) {
 	}
 
 	if !strings.Contains(adql, "SUM(phot_g_mean_flux) AS b_G") {
-		t.Errorf("a band with no colour term must sum G flux directly:\n%s", adql)
+		t.Errorf("a band with no color term must sum G flux directly:\n%s", adql)
 	}
 
 	if strings.Contains(adql, "POWER") {
-		t.Errorf("a band with no colour term must not apply a transformation:\n%s", adql)
+		t.Errorf("a band with no color term must not apply a transformation:\n%s", adql)
 	}
 }
 
-// The colour transformation is applied per star inside the aggregate, not to
+// The color transformation is applied per star inside the aggregate, not to
 // the summed flux afterwards. That distinction is the reason the polynomial is
 // rendered into the query at all: transforming a sum is not the same as
-// summing transformations when the transformation depends on colour.
-func TestGaiaADQLAppliesColourPerStar(t *testing.T) {
+// summing transformations when the transformation depends on color.
+func TestGaiaADQLAppliesColorPerStar(t *testing.T) {
 	t.Parallel()
 
 	band := starlight.GaiaBand{
@@ -98,7 +98,7 @@ func TestGaiaADQLAppliesColourPerStar(t *testing.T) {
 	}
 
 	// The archive rejects COALESCE alongside CASE, so a transformed band
-	// cannot substitute a default colour inside the aggregate. Sources
+	// cannot substitute a default color inside the aggregate. Sources
 	// without BP-RP make the polynomial null and SQL drops them, which is
 	// why their count is reported separately.
 	if strings.Contains(adql, "COALESCE") {
@@ -107,11 +107,11 @@ func TestGaiaADQLAppliesColourPerStar(t *testing.T) {
 
 	// And the count of those sources must be recoverable, so a caller can see
 	// how much of a pixel rests on the fallback. COUNT(bp_rp) counts the
-	// non-null colours; the archive's ADQL parser rejects a CASE expression
+	// non-null colors; the archive's ADQL parser rejects a CASE expression
 	// with an HTTP 400, which is why it is written this way rather than more
 	// directly.
 	if !strings.Contains(adql, "COUNT(bp_rp) AS ncolour") {
-		t.Errorf("the colour count must be reported: %s", adql)
+		t.Errorf("the color count must be reported: %s", adql)
 	}
 
 	if strings.Contains(adql, "CASE") {
@@ -122,7 +122,7 @@ func TestGaiaADQLAppliesColourPerStar(t *testing.T) {
 // The sign convention: a positive G - m_band means the band magnitude is
 // brighter than G, so it carries more flux. A star redder than the reference
 // must therefore gain flux in a red band.
-func TestGaiaColourTermSign(t *testing.T) {
+func TestGaiaColorTermSign(t *testing.T) {
 	t.Parallel()
 
 	adql, err := starlight.GaiaBuild{Bands: []starlight.GaiaBand{{

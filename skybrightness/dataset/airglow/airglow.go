@@ -133,7 +133,7 @@ type Spec struct {
 	// bands and the [OI] lines. This is a flat scaling of whatever came back,
 	// which is what a caller reaches for when they have an SQM or an all-sky
 	// camera saying tonight is brighter than the reference and no reason to
-	// believe the colour changed.
+	// believe the color changed.
 	//
 	// It is the same parameter GAMBONS exposes as its airglow percentage,
 	// where 100 is the reference spectrum unscaled, so a caller reproducing

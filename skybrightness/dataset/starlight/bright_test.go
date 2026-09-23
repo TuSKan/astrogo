@@ -15,7 +15,7 @@ import (
 // The Gaia path and the Hipparcos path must agree on the same star exactly,
 // not approximately.
 //
-// One converts a Gaia flux through a colour term and two zero points; the other
+// One converts a Gaia flux through a color term and two zero points; the other
 // reads Johnson V straight from a catalogue. They meet in the same map, so any
 // disagreement is a seam nothing downstream could see — the map would be wrong
 // by the difference wherever the two overlap, with every value still positive
@@ -38,7 +38,7 @@ func TestBothPathsAgreeOnTheSameStar(t *testing.T) {
 
 	band := GaiaJohnsonV()
 
-	// A Vega-coloured star: BP-RP = 0 collapses the colour polynomial to its
+	// A Vega-colored star: BP-RP = 0 collapses the color polynomial to its
 	// constant term c, so G = V + c and the flux producing that G follows from
 	// the zero point.
 	c := band.ColorTerm[0]
@@ -250,9 +250,9 @@ func vBandForTest() magnitude.Passband {
 
 // A star contributes to every band it has a magnitude in, and to no other.
 //
-// The bands come from published colour indices rather than a fit, so a star the
+// The bands come from published color indices rather than a fit, so a star the
 // Bright Star Catalogue does not cover has no R at all. Skipping it there is
-// the intended behavior and the alternative — inventing a colour so every band
+// the intended behavior and the alternative — inventing a color so every band
 // is populated — is what this package refuses.
 func TestAddBrightStarsCoversOnlyTheBandsAStarHas(t *testing.T) {
 	t.Parallel()
@@ -329,7 +329,7 @@ func TestBrightStarWithoutMagStillHasV(t *testing.T) {
 // V-R = (V-I) - (R-I), so R = V - (V-I) + (R-I). This pins it, because the
 // tempting alternative — reading R-I as V-R and using it directly — is a
 // plausible-looking mistake that would leave every R magnitude wrong by the
-// difference between two colour indices.
+// difference between two color indices.
 func TestCousinsRIdentity(t *testing.T) {
 	t.Parallel()
 

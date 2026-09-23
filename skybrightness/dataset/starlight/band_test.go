@@ -103,7 +103,7 @@ func TestGaiaJohnsonV(t *testing.T) {
 		t.Errorf("Name = %q, want V", band.Name)
 	}
 
-	// The colour term is the Gaia DR3 documentation Table 5.9 as printed: the table
+	// The color term is the Gaia DR3 documentation Table 5.9 as printed: the table
 	// is tabulated as G minus the target band, which is exactly what the
 	// query's +0.4 exponent needs, since the factor is 10^(0.4*(G-V)).
 	want := []float64{-0.02704, 0.01424, -0.2156, 0.01426}
@@ -117,7 +117,7 @@ func TestGaiaJohnsonV(t *testing.T) {
 		}
 	}
 
-	// A G=0, Vega-coloured source: BP-RP = 0 makes the polynomial its constant
+	// A G=0, Vega-colored source: BP-RP = 0 makes the polynomial its constant
 	// term, and the flux is 10^(25.6874/2.5) e-/s by the definition of the
 	// zero point. What comes out must be Johnson V's own Vega zero point,
 	// 3.63e-11 W m^-2 nm^-1, shifted by that constant.
@@ -125,7 +125,7 @@ func TestGaiaJohnsonV(t *testing.T) {
 	got := flux * band.FluxToRadiance * math.Pow(10, 0.4*band.ColorTerm[0])
 
 	if wantFlux := 3.63e-11 * math.Pow(10, -0.4*0.02704); math.Abs(got-wantFlux)/wantFlux > 1e-12 {
-		t.Errorf("a Vega-coloured G=0 source gives %.6e, want %.6e", got, wantFlux)
+		t.Errorf("a Vega-colored G=0 source gives %.6e, want %.6e", got, wantFlux)
 	}
 
 	// The band must be usable as it stands — this is the whole point of it
@@ -135,17 +135,17 @@ func TestGaiaJohnsonV(t *testing.T) {
 	}
 }
 
-// The colour factor must shrink as a star reddens, and must never exceed one.
+// The color factor must shrink as a star reddens, and must never exceed one.
 //
 // This is the invariant the sign of the Riello polynomial rests on. The factor
 // is F_V/F_G, and Gaia's G band spans 330-1050 nm against Johnson V's 500-600
 // nm, so a star always carries more flux in G than in V and the ratio is below
-// one for every ordinary colour. Entering the table with the sign inverted
+// one for every ordinary color. Entering the table with the sign inverted
 // leaves the map plausible and positive everywhere while making it 1.6 times
-// too bright at the sky's median colour and seventeen times at BP-RP = 3 -
+// too bright at the sky's median color and seventeen times at BP-RP = 3 -
 // worst along the Galactic plane, where the ensemble is reddest and the map is
 // brightest. Nothing else in this package's tests would notice.
-func TestGaiaJohnsonVColourFactorDirection(t *testing.T) {
+func TestGaiaJohnsonVColorFactorDirection(t *testing.T) {
 	t.Parallel()
 
 	band := starlight.GaiaJohnsonV()
@@ -178,10 +178,10 @@ func TestGaiaJohnsonVColourFactorDirection(t *testing.T) {
 		prev = f
 	}
 
-	// A solar-colour star, against the value implied by the Sun's own
+	// A solar-color star, against the value implied by the Sun's own
 	// magnitudes: G - V = -26.895 - (-26.76) = -0.135, so F_V/F_G = 10^(0.4 *
 	// -0.135) = 0.883.
 	if got := factor(0.82); math.Abs(got-0.883) > 0.02 {
-		t.Errorf("a solar-colour star gives F_V/F_G = %.4f, want 0.883 within 0.02", got)
+		t.Errorf("a solar-color star gives F_V/F_G = %.4f, want 0.883 within 0.02", got)
 	}
 }

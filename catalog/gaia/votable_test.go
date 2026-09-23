@@ -118,7 +118,7 @@ func TestConeSearchReadsVOTable(t *testing.T) {
 
 	// G = 12.5 at BP−RP = 0.8 through the Table 5.9 polynomial.
 	if !got.HasVMag {
-		t.Fatal("no V magnitude derived from G and the colour")
+		t.Fatal("no V magnitude derived from G and the color")
 	}
 
 	gMinusV := -0.02704 + 0.01424*0.8 - 0.2156*0.8*0.8 + 0.01426*0.8*0.8*0.8

@@ -35,7 +35,7 @@ var ErrNoPublishedMap = errors.New("starlight: the published map does not match 
 // B, V and I hold all 74. R holds 66: four have no R-I in the Bright Star
 // Catalogue, one is fainter than its completeness limit, and three are
 // multiples where Hipparcos reports combined light while that catalogue reports
-// components, so no colour on offer belongs to the same object. Those eight are
+// components, so no color on offer belongs to the same object. Those eight are
 // absent from R rather than carrying an invented value.
 //
 // The name records the composition, for the same reason the order and bands are
@@ -111,7 +111,7 @@ func Open(ctx context.Context) (*Map, error) {
 //
 // A hosted artifact that cannot say how it was made is an unattributable
 // number. Every input that changes the values is named: the catalogue release,
-// the grid, the magnitude cut, the colour transformation and both zero points
+// the grid, the magnitude cut, the color transformation and both zero points
 // the band conversion rests on. Someone holding only the file must be able to
 // tell whether it answers their question.
 func (g GaiaBuild) Header() string {
@@ -132,7 +132,7 @@ func (g GaiaBuild) Header() string {
 	fmt.Fprintf(&b, "# composition: every source Gaia observes; Gaia sees nothing brighter than G = 5\n")
 	fmt.Fprintf(&b, "# quantity: passband-averaged spectral radiance, W m^-2 sr^-1 nm^-1\n")
 
-	// Per band, because each column rests on its own colour transformation and
+	// Per band, because each column rests on its own color transformation and
 	// its own zero point. A header naming only the first would describe one
 	// column and mislabel the rest, which is worse than saying nothing.
 	for _, band := range g.Bands {

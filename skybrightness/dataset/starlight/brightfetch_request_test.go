@@ -56,8 +56,8 @@ func TestFetchHipparcosPostsTheQueryAndParsesTheAnswer(t *testing.T) {
 		t.Errorf("query = %q, want the Hipparcos main table", gotQuery)
 	}
 
-	// B-V and V-I are what make a multi-band map possible without a colour
-	// fit, so their absence from the query would be a silent loss of colour.
+	// B-V and V-I are what make a multi-band map possible without a color
+	// fit, so their absence from the query would be a silent loss of color.
 	for _, col := range []string{"B-V", "V-I"} {
 		if !strings.Contains(gotQuery, col) {
 			t.Errorf("query = %q, want it to select %s", gotQuery, col)
@@ -130,7 +130,7 @@ func TestAddCousinsRQueriesTheBrightStarCatalogue(t *testing.T) {
 	}
 
 	if !strings.Contains(gotQuery, "R-I") {
-		t.Errorf("query = %q, want it to select R-I — the colour this whole "+
+		t.Errorf("query = %q, want it to select R-I — the color this whole "+
 			"function exists to fetch", gotQuery)
 	}
 
