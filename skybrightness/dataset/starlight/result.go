@@ -35,7 +35,7 @@ import (
 // A column absent from the result is reported as absent rather than as zero.
 // The difference matters for the color-recovery columns, which older results
 // do not carry: a missing column means "no correction available" and a zero
-// would mean "nothing was dropped", and those call for opposite behaviour.
+// would mean "nothing was dropped", and those call for opposite behavior.
 type resultRows interface {
 	// Next advances to the next row, reporting whether there is one.
 	Next() bool
@@ -297,7 +297,7 @@ func openResult(ctx context.Context, r io.Reader) (resultRows, error) {
 // endpoint — this package's own default, set by [GaiaBuild.withDefaults] —
 // answers VOTable for FORMAT=csv, RESPONSEFORMAT=csv and text/csv alike,
 // checked against the live service. TAP services must serve VOTable and are
-// only encouraged to serve anything else, so this is conformant behaviour
+// only encouraged to serve anything else, so this is conformant behavior
 // rather than a fault, and a client that assumes its requested format is the
 // format it receives is the thing at fault.
 //

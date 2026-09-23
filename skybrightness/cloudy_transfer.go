@@ -18,7 +18,7 @@ type skyglowOptics struct {
 	// Column optical depths at each wavelength, molecular and aerosol.
 	molecular, aerosol []unit.OpticalDepth
 
-	// Scale heights of the two profiles, in metres.
+	// Scale heights of the two profiles, in meters.
 	molecularScaleM, aerosolScaleM float64
 
 	// aerosolAlbedo is the aerosol single-scattering albedo, which converts
@@ -277,7 +277,7 @@ func (c *CloudySkyglow) addAirTerm(
 	// scattering point as exp(-M(z0_h) * tau(0,h)): as h falls the vertical
 	// depth tau(0,h) goes to zero faster than the source's airmass grows, so
 	// the factor climbs to one at the ground. For a city 60 km away it falls
-	// by about 650 between 100 m and 1 km — a feature a few hundred metres
+	// by about 650 between 100 m and 1 km — a feature a few hundred meters
 	// wide sitting at the bottom of a range that may run to 100 km.
 	//
 	// Sampling that evenly does not work. Sixty-four uniform nodes over the
@@ -317,13 +317,13 @@ func (c *CloudySkyglow) addAirTerm(
 
 // dyadicFloorM is where subdivision starts when a range begins at the ground.
 //
-// Ten centimetres, and the value was measured rather than chosen. The
+// Ten centimeters, and the value was measured rather than chosen. The
 // integrand is finite at the ground rather than singular — the 1/h^2 is
-// cancelled by cos^2(z0_h), which falls like h/L — so the omitted sliver
+// canceled by cos^2(z0_h), which falls like h/L — so the omitted sliver
 // contributes about f(0) times the floor, and shrinking the floor converges.
 // Measured against a city 60 km away it converges cleanly: a 10 m floor is
 // 6.1 per cent low, 1 m is 0.63, 10 cm is 0.06 and 1 cm is 0.006. Ten
-// centimetres is where that stops mattering against every other error here,
+// centimeters is where that stops mattering against every other error here,
 // and each further decade costs another octave of subdivision.
 //
 // The converged value agrees to 0.26 per cent with sixteen thousand uniform

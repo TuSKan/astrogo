@@ -40,7 +40,7 @@ type Attempt struct {
 // nothing left for a caller to improve by hand.
 //
 // A policy is installed per [Client], with [WithRetryPolicy]. Varying retry
-// behaviour by endpoint means constructing a client per endpoint, which is what
+// behavior by endpoint means constructing a client per endpoint, which is what
 // a provider does anyway.
 type RetryPolicy func(Attempt) bool
 

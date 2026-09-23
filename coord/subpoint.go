@@ -76,7 +76,7 @@ func SubPoint(geocentric vector.Vec3, t time.Time) (*Geodetic, error) {
 // as seen from outside the sphere (matching increasing longitude at the
 // equator). Purely spherical: it treats center's latitude as a direction on
 // a sphere, ignoring WGS84 flattening. The resulting ellipsoidal position
-// error is at most a few hundred metres — negligible at any scale this
+// error is at most a few hundred meters — negligible at any scale this
 // shape would actually be rendered or reasoned about at.
 //
 // Returns ErrTooFewPoints if n < 3, or an error if center is nil.

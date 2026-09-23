@@ -109,13 +109,13 @@ func TestMPCObservatoriesParsesTheWholeRegister(t *testing.T) {
 		//	       4     90   -361 m .. +3,852 m
 		//	       3     38   -9,254 m .. +9,614 m
 		//
-		// 95% of the register lands inside a kilometre of sea level and six of
+		// 95% of the register lands inside a kilometer of sea level and six of
 		// the summit of Everest; the outliers are all in the two coarse
 		// buckets, and every one of them is inside its own quantisation. That
 		// is the check: not "is this height plausible" — which cannot be true
 		// for a 3-decimal row — but "is it plausible given what this row
 		// claims to know". A column read one field over produces hundreds of
-		// kilometres and fails at any precision.
+		// kilometers and fails at any precision.
 		const (
 			deepest = -1000.0
 			highest = 6000.0

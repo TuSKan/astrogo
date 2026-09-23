@@ -71,7 +71,7 @@ var koushanIGL = []eblPoint{
 //
 // # Isotropy
 //
-// The extragalactic background has no direction dependence worth modelling at
+// The extragalactic background has no direction dependence worth modeling at
 // this level: its anisotropy is a cosmological signal orders of magnitude below
 // the mean, and nothing else in this package would be sensitive to it. Only the
 // airmass varies with direction, so the component is a constant spectrum with

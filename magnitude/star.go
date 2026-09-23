@@ -45,9 +45,9 @@ func StarApparent(catMag, airmass float64, extinctionCoeff ...float64) float64 {
 //
 // Parameters:
 //   - k0: sea-level extinction coefficient (e.g. ExtinctionV)
-//   - altitudeM: observer altitude in metres
+//   - altitudeM: observer altitude in meters
 func ExtinctionAtAltitude(k0, altitudeM float64) float64 {
-	const scaleHeight = 8500.0 // metres
+	const scaleHeight = 8500.0 // meters
 	return k0 * math.Exp(-altitudeM/scaleHeight)
 }
 

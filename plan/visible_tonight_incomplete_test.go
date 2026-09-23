@@ -42,7 +42,7 @@ func (f *failingBrightSource) SearchBright(_ context.Context, _ resolve.BrightRe
 // #177 family, and the reason the skip logging alone was not enough.
 //
 // VisibleTonight is documented to skip what it cannot evaluate rather than fail
-// the night — that behaviour is right and does not change here. What changed is
+// the night — that behavior is right and does not change here. What changed is
 // that the skip stopped being invisible: it used to leave only a Warn line,
 // which a program cannot branch on, so a night's list came back short with the
 // same nil error as a night that was genuinely quiet.

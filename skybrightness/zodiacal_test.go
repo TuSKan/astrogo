@@ -43,7 +43,7 @@ func toMagPerArcsec(radiance float64) float64 {
 // That is independently reasonable rather than circular — a dark site's total
 // V sky brightness is around 22.0, and zodiacal light is roughly a quarter of
 // it at high ecliptic latitude, which puts this component near 23.5. Landing
-// there exercises the table's unit prefix, the per-micron to per-nanometre
+// there exercises the table's unit prefix, the per-micron to per-nanometer
 // conversion and the pole value all at once; a factor of ten anywhere shows
 // up as 2.5 magnitudes.
 func TestZodiacalPoleMatchesKnownBrightness(t *testing.T) {

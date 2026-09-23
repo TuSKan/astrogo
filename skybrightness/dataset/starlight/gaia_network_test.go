@@ -39,7 +39,7 @@ func TestGaiaQueryIsAcceptedByTheArchive(t *testing.T) {
 		Chunk: 4,
 		Bands: []starlight.GaiaBand{{
 			Name:           "V",
-			ColourTerm:     []float64{0.02, 0.007, 0.17},
+			ColorTerm:      []float64{0.02, 0.007, 0.17},
 			FluxToRadiance: 1e-21,
 		}},
 	}
@@ -366,14 +366,14 @@ func TestFourBandQueryIsOnePass(t *testing.T) {
 	bands := make([]starlight.GaiaBand, 0, 4)
 
 	for _, name := range []string{"B", "V", "R", "I"} {
-		colour, err := starlight.JohnsonCousinsColorTerm(name)
+		color, err := starlight.JohnsonCousinsColorTerm(name)
 		if err != nil {
 			t.Fatalf("%s: %v", name, err)
 		}
 
 		bands = append(bands, starlight.GaiaBand{
 			Name:           name,
-			ColourTerm:     colour,
+			ColorTerm:      color,
 			FluxToRadiance: 1e-21,
 		})
 	}

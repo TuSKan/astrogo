@@ -33,7 +33,7 @@ import (
 //
 // # What this is not
 //
-// Not a geodetic conversion. ITRS is Cartesian metres from the geocentre;
+// Not a geodetic conversion. ITRS is Cartesian meters from the geocentre;
 // latitude, longitude and height above the ellipsoid come from
 // [FromECEF], and the direction-to-ground-point question is [SubPoint].
 //

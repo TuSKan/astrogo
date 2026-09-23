@@ -37,7 +37,7 @@ func Seps(ra1, dec1, ra2, dec2 float64) float64 {
 //
 // All angular inputs and outputs are in radians.
 // Pressure phpa in hPa, temperature tc in °C, humidity rh in [0,1],
-// wavelength wl in micrometres.
+// wavelength wl in micrometers.
 //
 // Returns: azimuth aob, zenith distance zob, hour angle hob,
 // declination dob, right ascension rob, equation of origins eo, and
@@ -449,7 +449,7 @@ func Hfk5z(rh, dh, date1, date2 float64) (r5, d5, dr5, dd5 float64) {
 }
 
 // Pvtob returns the observer's position and velocity with respect to the
-// celestial intermediate reference system, in metres and metres per second.
+// celestial intermediate reference system, in meters and meters per second.
 //
 // It is the routine iauApio uses to derive the diurnal aberration magnitude.
 // iauApco13 sets that magnitude to zero instead, because on its path the
@@ -457,7 +457,7 @@ func Hfk5z(rh, dh, date1, date2 float64) (r5, d5, dr5, dd5 float64) {
 // it — so a caller reducing a position vector by rotation alone, with no
 // Atciq step, has to obtain it here.
 //
-// Arguments are geodetic longitude, latitude (radians) and height (metres),
+// Arguments are geodetic longitude, latitude (radians) and height (meters),
 // polar motion xp, yp (radians), the TIO locator sp (radians) and the Earth
 // rotation angle theta (radians).
 func Pvtob(elong, phi, hm, xp, yp, sp, theta float64) [2][3]float64 {

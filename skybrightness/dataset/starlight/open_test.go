@@ -149,7 +149,7 @@ func TestPublishedHeaderCarriesProvenance(t *testing.T) {
 		"HEALPix order 8",            // which grid
 		"ICRS",                       // which frame
 		"Gaia sees nothing brighter", // the limit the instrument itself imposes
-		"W m^-2 sr^-1 nm^-1",         // which quantity, per nanometre
+		"W m^-2 sr^-1 nm^-1",         // which quantity, per nanometer
 		"Table 5.9",                  // the color transformation's source, by table
 		"G - V polynomial in BP-RP",  // and which direction it is tabulated in
 		"25.6874",                    // the Gaia G zero point

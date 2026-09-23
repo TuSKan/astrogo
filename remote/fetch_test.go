@@ -159,7 +159,7 @@ func TestGetFileMutableHeadProbeChanged(t *testing.T) {
 	// asserting something fileblob's own metadata cannot express.
 	//
 	// A differing length makes the change visible whichever branch of
-	// unchanged is taken, so what is under test is the refresh behaviour
+	// unchanged is taken, so what is under test is the refresh behavior
 	// rather than the host's timer resolution. The same-length case is not
 	// merely untested here but untestable through this backend; against the
 	// real Mutable endpoints the ETag is server-supplied and content-based,

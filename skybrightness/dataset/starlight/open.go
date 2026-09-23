@@ -136,7 +136,7 @@ func (g GaiaBuild) Header() string {
 	// its own zero point. A header naming only the first would describe one
 	// column and mislabel the rest, which is worse than saying nothing.
 	for _, band := range g.Bands {
-		if len(band.ColourTerm) == 0 {
+		if len(band.ColorTerm) == 0 {
 			continue
 		}
 
@@ -153,7 +153,7 @@ func (g GaiaBuild) Header() string {
 			band.Name, band.FluxToRadiance)
 	}
 
-	if len(g.Bands) > 0 && len(g.Bands[0].ColourTerm) > 0 {
+	if len(g.Bands) > 0 && len(g.Bands[0].ColorTerm) > 0 {
 		fmt.Fprintf(&b, "# colourless sources: recovered, not dropped - their G flux is scaled by "+
 			"the polynomial at the pixel's flux-weighted mean BP-RP, clamped to [-0.5, 5.0]\n")
 	}

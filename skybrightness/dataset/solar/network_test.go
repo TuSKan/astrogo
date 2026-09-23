@@ -120,7 +120,7 @@ func TestSolarRespectsDownloadConsent(t *testing.T) {
 	if _, err := solar.NewScatteredMoonlight(ctx); err != nil &&
 		!errors.Is(err, remote.ErrDownloadDenied) {
 		// A cached copy from an earlier run makes this succeed, which is
-		// correct behaviour rather than a failure — consent gates the network
+		// correct behavior rather than a failure — consent gates the network
 		// step, not the cache.
 		t.Logf("consent path returned %v", err)
 	}

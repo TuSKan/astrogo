@@ -29,7 +29,7 @@ type Provider struct {
 // DefaultEndpoint is the archive a provider talks to when the caller names
 // none.
 //
-// Gaia@AIP rather than ESA's own archive, on measured behaviour rather than
+// Gaia@AIP rather than ESA's own archive, on measured behavior rather than
 // preference. Both serve the same DR3 tables - the data release is fixed, so
 // there is no question of one being more current - and on the same schema
 // query AIP answers in about three seconds against ESA's ten. ESA has also

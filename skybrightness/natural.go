@@ -595,7 +595,7 @@ type Airglow struct {
 //
 // layerHeight defaults to [github.com/TuSKan/astrogo/atmosphere.AirglowLayerHeight]
 // when zero. Set measured when the spectrum comes from an observation of the
-// night being modelled rather than from a reference, which changes the quality
+// night being modeled rather than from a reference, which changes the quality
 // flag the component reports.
 func NewAirglow(
 	zenith SpectralRadiance, grid unit.SpectralGrid, layerHeight unit.Length, measured bool,

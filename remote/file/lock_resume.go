@@ -163,7 +163,7 @@ func AcquireLock(ctx context.Context, fsys fs.FS, cacheKey string) (release func
 
 	for {
 		// Checked here as well as in the backend, because this loop is where a
-		// cancelled caller must stop and the backend is not obliged to be the
+		// canceled caller must stop and the backend is not obliged to be the
 		// one that notices. Every backend in this package does — see
 		// [localFS.WithContext] — but a lock handed to a caller who has gone is
 		// bad enough to be worth one comparison per attempt.
@@ -185,7 +185,7 @@ func AcquireLock(ctx context.Context, fsys fs.FS, cacheKey string) (release func
 			}
 
 			// release runs from the caller's defer, possibly after ctx was
-			// cancelled, and must still delete the lock — otherwise it leaks
+			// canceled, and must still delete the lock — otherwise it leaks
 			// until staleLockAge lets someone steal it.
 			//
 			// The in-process slot is handed back after the object is gone, not

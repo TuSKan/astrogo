@@ -10,7 +10,7 @@
 //
 // A large composite is read through a window rather than loaded whole: the
 // VIIRS annual products run to gigabytes, and a caller usually wants a few
-// hundred kilometres around one site.
+// hundred kilometers around one site.
 package raster
 
 import (

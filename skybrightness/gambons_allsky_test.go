@@ -61,7 +61,7 @@ const (
 	gambonsLowSkyWithAirglow = 21.15
 	gambonsLowSkyNoAirglow   = 22.35
 
-	// Microwatts per square metre on an upward-facing horizontal surface.
+	// Microwatts per square meter on an upward-facing horizontal surface.
 	gambonsIrradianceWithAirglow = 1.457
 	gambonsIrradianceNoAirglow   = 0.678
 )

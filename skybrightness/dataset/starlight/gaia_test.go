@@ -76,7 +76,7 @@ func TestGaiaADQLAppliesColorPerStar(t *testing.T) {
 
 	band := starlight.GaiaBand{
 		Name:           "V",
-		ColourTerm:     []float64{0.02, 0.007, 0.17},
+		ColorTerm:      []float64{0.02, 0.007, 0.17},
 		FluxToRadiance: 1e-18,
 	}
 
@@ -126,7 +126,7 @@ func TestGaiaColorTermSign(t *testing.T) {
 	t.Parallel()
 
 	adql, err := starlight.GaiaBuild{Bands: []starlight.GaiaBand{{
-		Name: "red", ColourTerm: []float64{0.5}, FluxToRadiance: 1,
+		Name: "red", ColorTerm: []float64{0.5}, FluxToRadiance: 1,
 	}},
 	}.ADQL(0, 9)
 	if err != nil {

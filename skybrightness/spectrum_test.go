@@ -23,7 +23,7 @@ func TestBlackbodyShapePeaksAtWien(t *testing.T) {
 		t.Fatalf("NewSpectralGrid: %v", err)
 	}
 
-	const wienNMK = 2.897771955e-3 * 1e9 // metre kelvin, in nanometre kelvin
+	const wienNMK = 2.897771955e-3 * 1e9 // meter kelvin, in nanometer kelvin
 
 	for _, temperature := range []float64{3000, 4500, 5500, 7000, 10000} {
 		shape, err := skybrightness.BlackbodyShape(grid, temperature)
@@ -41,7 +41,7 @@ func TestBlackbodyShapePeaksAtWien(t *testing.T) {
 
 		want := wienNMK / temperature
 
-		// One nanometre of grid resolution, plus a little for the peak being
+		// One nanometer of grid resolution, plus a little for the peak being
 		// flat near its top.
 		if math.Abs(at-want) > 2 {
 			t.Errorf("%g K peaks at %g nm, want %g from Wien displacement",

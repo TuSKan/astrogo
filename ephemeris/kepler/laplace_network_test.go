@@ -20,7 +20,7 @@ import (
 const horizonsHost = "ssd.jpl.nasa.gov:443"
 
 // jovicentric fetches a satellite's position relative to Jupiter from
-// Horizons, in kilometres, ICRF.
+// Horizons, in kilometers, ICRF.
 func jovicentric(t *testing.T, naif int, startTDB, stopTDB, step string) map[float64]vector.Vec3 {
 	t.Helper()
 
@@ -103,7 +103,7 @@ func jovicentric(t *testing.T, naif int, startTDB, stopTDB, step string) map[flo
 // Because "incomplete" is not a number. The package doc says two-body motion
 // diverges for these satellites under Jupiter's J₂ and their own resonance,
 // and a reader deciding whether to use this needs to know whether that means
-// kilometres or radii. It is measured here rather than described.
+// kilometers or radii. It is measured here rather than described.
 //
 // The contract is deliberately loose and is not an accuracy claim: it is a
 // bound that catches the frame being wrong, which is a different and much
@@ -124,7 +124,7 @@ func TestGalileanAgainstHorizons(t *testing.T) {
 		metrology.MustContract(10_000, "km",
 			"not an accuracy claim, and deliberately sits between two known errors. Two-body "+
 				"motion is wrong here by construction — Jupiter's J2 and the Laplace resonance "+
-				"are unmodelled — and that drift measures 5,905 km at worst over the ten days "+
+				"are unmodeled — and that drift measures 5,905 km at worst over the ten days "+
 				"sampled. Reading the same elements against the ecliptic instead of the Laplace "+
 				"plane displaces Io by 16,500 km. A bound above the first and below the second "+
 				"fails when the frame is wrong and passes while the physics is merely absent, "+

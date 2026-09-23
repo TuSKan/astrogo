@@ -69,7 +69,7 @@ const (
 	maritimeTropicalAngstrom = 0.04
 )
 
-// Aerosol scale heights, in metres, from OPAC's Table 5 "Height profiles of
+// Aerosol scale heights, in meters, from OPAC's Table 5 "Height profiles of
 // all aerosol types".
 //
 // # What Z is
@@ -78,7 +78,7 @@ const (
 //
 //	N(h) = N(0) * exp(-h/Z)
 //
-// with h the altitude above ground and Z "the scale height in kilometres,
+// with h the altitude above ground and Z "the scale height in kilometers,
 // which describes the slope of the profile". That is the same profile
 // [Builder.AerosolScaleHeight] carries: extinction is proportional to number
 // density for a fixed size distribution, so the two share a scale height and

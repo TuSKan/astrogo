@@ -26,7 +26,7 @@ import (
 //
 // What is *not* shared is the wiring, and that is the whole subject. Between a
 // caller's inputs and Apco13's arguments sit a time-scale conversion, a
-// two-part Julian date, longitude and latitude in radians, height in metres,
+// two-part Julian date, longitude and latitude in radians, height in meters,
 // polar motion in radians, and a pressure that has to become zero when a
 // custom refraction model is present. Between Atioq's outputs and an AltAz sit
 // a zenith-distance-to-altitude subtraction and an azimuth wrap. Every one of
@@ -100,7 +100,7 @@ func TestTopocentricPathIsSOFAsAtco13(t *testing.T) {
 	// Real observatories plus the geometric extremes: the equator, where the
 	// polar-motion meridian term vanishes; a high latitude, where hour angle
 	// projects into azimuth most steeply; and a site at the antimeridian,
-	// where a longitude sign error stops cancelling.
+	// where a longitude sign error stops canceling.
 	sites := []namedSite{
 		{"Greenwich", 0, 51.4778, 46},
 		{"Paranal", -70.4042, -24.6272, 2635},

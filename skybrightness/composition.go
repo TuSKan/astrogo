@@ -24,7 +24,7 @@ import (
 //
 // Everything else about the atmosphere stays the caller's: surface
 // conditions, aerosol, clouds, terrain. Those describe the night being
-// modelled and nothing here can know them.
+// modeled and nothing here can know them.
 //
 //	air, err := preset.Transfer(atmosphere.RuralAerosol(2635, atmosphere.CleanMountainAOD550))
 //	atm, err := air.Build()
