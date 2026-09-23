@@ -211,7 +211,7 @@ func TestParseEpochDecodesThePackedDate(t *testing.T) {
 		// Compared as a Julian Date against the same calendar date built
 		// through time's own constructor, rather than by reading fields back:
 		// the epoch is on the TT scale and a field-by-field comparison would
-		// pass for a value labelled with the wrong scale.
+		// pass for a value labeled with the wrong scale.
 		want := time.Date(tc.y, tc.m, tc.d, 0, 0, 0, 0, time.LocationUTC).JD()
 
 		if got.JD() != want {

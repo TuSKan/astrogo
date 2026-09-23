@@ -59,7 +59,7 @@ func fakeSources(t *testing.T) remote.FS {
 // loadNow builds a provider and drives its catalog load to completion.
 //
 // New performs no I/O — the fetch happens on the first query that needs the
-// catalog — so a test about fetch/cache behaviour has to ask a question to
+// catalog — so a test about fetch/cache behavior has to ask a question to
 // provoke one.
 func loadNow(t *testing.T) {
 	t.Helper()

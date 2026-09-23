@@ -234,7 +234,7 @@ func (m *Model) Estimate(ctx context.Context, q Query) (*Estimate, error) {
 		est.Quality.Add(flags)
 
 		// Validate per component, not just on the total: a negative term
-		// cancelled by a positive one would otherwise pass unnoticed, and
+		// canceled by a positive one would otherwise pass unnoticed, and
 		// the point of the check is to name which component is wrong.
 		if err := buf.Validate(); err != nil {
 			return nil, fmt.Errorf("%w: %q: %w", ErrComponentFailed, c.ID(), err)

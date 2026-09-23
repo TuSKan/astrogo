@@ -91,7 +91,7 @@ func TestDiscardIfCorruptKeepsAKernelItMerelyCouldNotRead(t *testing.T) {
 //
 // A checksum that computed cleanly and did not match is a statement about the
 // bytes, and the cached copy is worthless. Deleting it is what makes the next
-// run heal itself, which is the behaviour CacheDownload's comment has always
+// run heal itself, which is the behavior CacheDownload's comment has always
 // claimed.
 func TestDiscardIfCorruptDeletesAKernelThatIsWrong(t *testing.T) {
 	t.Parallel()

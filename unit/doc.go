@@ -30,7 +30,7 @@
 // provenance serialization) compare Compatible and even Equals in dimension
 // despite being physically distinct quantities. This is deliberate, not an
 // oversight: unit.Dimension's runtime model cannot and does not protect a
-// caller from cancelling a radiance into an irradiance.
+// caller from canceling a radiance into an irradiance.
 //
 // Real radiometric type safety instead comes from the zero-cost quantity
 // TYPES declared in quantity_types.go — [Radiance], [Irradiance],

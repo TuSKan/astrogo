@@ -331,7 +331,7 @@ func deltaMinutes(usnoMin, astroMin float64) float64 {
 //
 // So a network failure skips, and everything else still falls back: a kernel
 // that is absent for any reason the network is not -- consent withheld, a bad
-// local cache -- leaves the old behaviour untouched.
+// local cache -- leaves the old behavior untouched.
 func newEph(t *testing.T) eph.Provider {
 	t.Helper()
 

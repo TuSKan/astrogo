@@ -14,8 +14,8 @@ import (
 // A GNSS receiver hands out GPS system time, which is 18 seconds ahead of UTC
 // today. Before time.GPST existed a caller had no way to say so, and the only
 // expressible option — call it UTC — put the satellite 18 seconds along its
-// track. This asserts both halves: labelling it correctly gives the right
-// state, and labelling it UTC gives a measurably wrong one.
+// track. This asserts both halves: labeling it correctly gives the right
+// state, and labeling it UTC gives a measurably wrong one.
 //
 // It lives here rather than in time/ because the arithmetic is only half the
 // point. State converts to UTC internally, so this also proves the conversion
@@ -87,11 +87,11 @@ func TestGPSTimestampProducesTheSameStateAsItsUTC(t *testing.T) {
 	// this an assertion instead of a transcription.
 	arc := gap * speed
 	if offKm > arc || offKm < 0.97*arc {
-		t.Errorf("mislabelling GPS time as UTC moved the ISS %.1f km; expected just under "+
+		t.Errorf("mislabeling GPS time as UTC moved the ISS %.1f km; expected just under "+
 			"the %.1f km arc it covers in %.0f s at %.3f km/s", offKm, arc, gap, speed)
 	}
 
-	t.Logf("correctly labelled: %.6f km apart; mislabelled as UTC: %.1f km "+
+	t.Logf("correctly labeled: %.6f km apart; mislabeled as UTC: %.1f km "+
 		"(%.0f s at %.3f km/s)", fromGPS.Pos.Sub(fromUTC.Pos).Norm()*kmPerAU, offKm, gap, speed)
 
 	// And the interval arithmetic that a scheduler would do on it: the two

@@ -148,7 +148,7 @@ func (p *Provider) Search(ctx context.Context, query string) ([]resolve.Target, 
 // A failure is deliberately not cached: the next query retries. The cost of
 // that is a second attempt against an endpoint that is still down; the cost of
 // caching it is a provider that answers "not found" for ever because of one
-// cancelled context at start-up.
+// canceled context at start-up.
 func (p *Provider) load(ctx context.Context) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()

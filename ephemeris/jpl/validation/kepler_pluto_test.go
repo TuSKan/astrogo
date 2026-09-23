@@ -83,7 +83,7 @@ func plutoContract() metrology.Contract {
 			"over 1800-2050, while omitting the ecliptic-to-equatorial rotation displaces Pluto "+
 			"by at least 3.54 AU. A bound 5.1x above the first and 5.1x below the second fails "+
 			"when the frame or the elements are wrong and passes while the perturbations are "+
-			"merely unmodelled, which is the only distinction this suite can honestly make. "+
+			"merely unmodeled, which is the only distinction this suite can honestly make. "+
 			"JPL no longer publishes an accuracy figure for Pluto — it was removed from the "+
 			"Standish document these elements come from",
 		"both anchors measured: this suite for the approximation error, "+

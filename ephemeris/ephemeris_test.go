@@ -311,7 +311,7 @@ func TestOptionsRecordWhatTheySay(t *testing.T) {
 	}
 
 	// Chaining is documented on WithKernel, so appending rather than
-	// overwriting is the behaviour under test.
+	// overwriting is the behavior under test.
 	if len(cfg.ExtraKernels) != 2 ||
 		cfg.ExtraKernels[0] != "de441_part-2" || cfg.ExtraKernels[1] != "de441_part-3" {
 		t.Errorf("WithKernel recorded %v, want both kernels in order", cfg.ExtraKernels)

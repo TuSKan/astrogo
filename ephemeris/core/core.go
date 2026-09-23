@@ -47,7 +47,7 @@ type Frame uint8
 const (
 	// FrameUnspecified is the zero value, and asserts nothing.
 	//
-	// Deliberately not ICRS: a State that nobody labelled must not claim a
+	// Deliberately not ICRS: a State that nobody labeled must not claim a
 	// frame it was never checked against. A caller that needs certainty asks
 	// with [State.Require] and gets an error rather than a guess.
 	FrameUnspecified Frame = iota
@@ -141,7 +141,7 @@ type State struct {
 // caller needs, and returns an error naming the mismatch when it is not.
 //
 // An unspecified frame or centre passes: this is a check against a wrong
-// label, not a demand that every producer be labelled. Tightening it to
+// label, not a demand that every producer be labeled. Tightening it to
 // reject unspecified would turn "we do not know" into a failure at every call
 // site that has not been updated, which is a migration and not a safeguard.
 func (s State) Require(frame Frame, center Center) error {

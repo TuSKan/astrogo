@@ -35,7 +35,7 @@ const (
 // A ring rather than a point because the paper models a town of finite
 // extent, and because a point source directly beneath the observer is the one
 // geometry Eq. 27 cannot express: the 1/h^2 in the scattering integral is
-// cancelled by cos^2(z0_h) only while the source is somewhere else, and at
+// canceled by cos^2(z0_h) only while the source is somewhere else, and at
 // zero horizontal separation that cancellation fails. Eight emitters is
 // enough for the ring to behave as an extended source rather than as a point
 // at the zenith.
@@ -196,7 +196,7 @@ func TestZilinaAmplificationAcrossDistance(t *testing.T) {
 	last := ratios[len(ratios)-1]
 	if last >= 1 {
 		t.Errorf("at %.1f km the cloud still gives x%.3f; screening never appears, which "+
-			"is the half of the behaviour a cloud multiplier cannot produce",
+			"is the half of the behavior a cloud multiplier cannot produce",
 			distances[len(distances)-1], last)
 	}
 

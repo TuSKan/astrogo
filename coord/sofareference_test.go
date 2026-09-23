@@ -100,7 +100,7 @@ func TestTopocentricPathIsSOFAsAtco13(t *testing.T) {
 	// Real observatories plus the geometric extremes: the equator, where the
 	// polar-motion meridian term vanishes; a high latitude, where hour angle
 	// projects into azimuth most steeply; and a site at the antimeridian,
-	// where a longitude sign error stops cancelling.
+	// where a longitude sign error stops canceling.
 	sites := []namedSite{
 		{"Greenwich", 0, 51.4778, 46},
 		{"Paranal", -70.4042, -24.6272, 2635},

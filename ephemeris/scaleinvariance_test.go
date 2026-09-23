@@ -45,7 +45,7 @@ const scaleTolerance = 1.0 * metersInAU
 // Neither defect was a wrong formula. Both were a missing conversion at the
 // boundary, and nothing in the suite asked the question that finds them: each
 // provider was validated against its own external reference, and no test
-// compared a provider against itself under a relabelled input.
+// compared a provider against itself under a relabeled input.
 //
 // # Why the tolerance is not an accuracy budget
 //
@@ -125,12 +125,12 @@ func TestProviderStateIsScaleInvariant(t *testing.T) {
 				for _, s := range scales {
 					got, err := p.prov.State(id, s.at(utc))
 					if err != nil {
-						t.Fatalf("State with a %s-labelled instant: %v", s.label, err)
+						t.Fatalf("State with a %s-labeled instant: %v", s.label, err)
 					}
 
 					if d := got.Pos.Sub(base.Pos).Norm(); d > scaleTolerance {
 						t.Errorf("position moved %.6g AU (%.4g km) when the same instant "+
-							"was labelled %s.\n  The provider is reading the caller's "+
+							"was labeled %s.\n  The provider is reading the caller's "+
 							"scale as its own — normalise at the entry point "+
 							"(t.UTC()/t.TDB()) rather than reading JDParts raw.",
 							d, d/metersInAU/1e3, s.label)
@@ -138,7 +138,7 @@ func TestProviderStateIsScaleInvariant(t *testing.T) {
 
 					if d := got.Vel.Sub(base.Vel).Norm(); d > scaleTolerance {
 						t.Errorf("velocity moved %.6g AU/day when the same instant was "+
-							"labelled %s", d, s.label)
+							"labeled %s", d, s.label)
 					}
 				}
 			})

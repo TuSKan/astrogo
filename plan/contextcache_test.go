@@ -67,7 +67,7 @@ func TestContextCacheStaysInsideItsStatedBound(t *testing.T) {
 
 		// coord.ICRS carries the pair here purely as a direction on a
 		// sphere: Separation is the angle between two unit vectors and does
-		// not care which frame labelled them.
+		// not care which frame labeled them.
 		sep := coord.Separation(
 			coord.NewICRS(cached.Az(), cached.Alt()),
 			coord.NewICRS(exact.Az(), exact.Alt()),

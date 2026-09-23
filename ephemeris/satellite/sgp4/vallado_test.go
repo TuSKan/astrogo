@@ -81,7 +81,7 @@ const valladoP99KM = 1e-5
 // another satellite.
 //
 // This implementation refuses 33334 at tsince 0 with ErrPerturbedEccentricity,
-// which is the correct behaviour and is asserted by
+// which is the correct behavior and is asserted by
 // TestValladosErrorCasesReachTheModel.
 var artefactRows = map[string]bool{"33334": true}
 
@@ -615,7 +615,7 @@ func TestResonantOrbitIsOrderIndependent(t *testing.T) {
 	}
 }
 
-// TestAtIsAllocationFree pins the performance claim as a behaviour rather than
+// TestAtIsAllocationFree pins the performance claim as a behavior rather than
 // a benchmark number, so it runs in ordinary CI and blocks a merge.
 func TestAtIsAllocationFree(t *testing.T) {
 	el, err := sgp4.ParseTLE(issLine1, issLine2)

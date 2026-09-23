@@ -60,7 +60,7 @@ const AODVariable = "aod550"
 //
 // Because this is a night-time model. A passive optical instrument infers
 // aerosol optical depth from reflected sunlight, so satellite retrievals
-// exist only in daylight and can never describe the hour being modelled.
+// exist only in daylight and can never describe the hour being modeled.
 // CAMS is an assimilating forecast model: it has a value at every hour,
 // including the middle of the night, which is the whole reason it is the
 // source here.

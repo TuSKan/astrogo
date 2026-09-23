@@ -68,7 +68,7 @@
 // doing so made the fit worse in both directions and no explanation for that
 // was established.
 //
-// What remains unmodelled is the periodic perturbation. The Galilean moons are locked
+// What remains unmodeled is the periodic perturbation. The Galilean moons are locked
 // in the Laplace resonance and Jupiter's J₂ drives apsidal precession, so an
 // unperturbed ellipse drifts — measured against Horizons over ten days from
 // the elements' own epoch, by **up to 5,900 km** across the four Galilean

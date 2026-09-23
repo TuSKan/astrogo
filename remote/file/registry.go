@@ -20,7 +20,7 @@ var (
 	// exists to be imported for its side effect and exports nothing at all.
 	ErrNoScheme = errors.New("remote/file: no backend registered for this URL scheme")
 
-	// ErrNoContext indicates a filesystem that cannot be cancelled being used
+	// ErrNoContext indicates a filesystem that cannot be canceled being used
 	// where cancellation is required. See [ContextFS].
 	ErrNoContext = errors.New("remote/file: backend does not support cancellation")
 

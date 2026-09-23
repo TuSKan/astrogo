@@ -25,7 +25,7 @@ const sampleFinals2000A = `73 1 2 41684.00 I  0.120733 0.009786  0.136966 0.0159
 // remains here is the logic this package actually owns, and it no longer
 // needs a storage backend to run.
 //
-// Behaviour that belongs to remote — ETag body-skip, consent default-deny,
+// Behavior that belongs to remote — ETag body-skip, consent default-deny,
 // corrupt-download rejection — is tested in remote's own eop_test.go
 // against astrogo/time's public API.
 type fakeLoader struct {
@@ -296,7 +296,7 @@ func TestFetchContextCancellation(t *testing.T) {
 	cancel()
 
 	if err := fetch(ctx, l); err == nil {
-		t.Fatal("fetch with a cancelled context returned nil")
+		t.Fatal("fetch with a canceled context returned nil")
 	}
 }
 

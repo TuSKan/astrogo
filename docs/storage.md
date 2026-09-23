@@ -149,7 +149,7 @@ library cancellable without forking it.
 
 **A backend that does not implement `ContextFS` is refused for any
 `Downloadable` endpoint**, and that is a check rather than a convention. A
-multi-gigabyte fetch that cannot be cancelled is not something to discover at
+multi-gigabyte fetch that cannot be canceled is not something to discover at
 runtime.
 
 ### 2.4 Paths
@@ -257,7 +257,7 @@ predecessor merges.
 | :-- | :--- | :--- | :-- |
 | **1** | This document. | Is the plan right? | landed |
 | **2** | `remote/file`: the `File` type, the three interfaces, the scheme registry, and the `file://` backend on `os.Root`. Alongside gocloud, not replacing it. | #315's two-process reproduction fails before and passes after. `fstest.TestFS` passes against the backend. |
-| **3** | `http`/`https` and `mem://`. | Range behaviour matches today's; `BenchmarkReadAtStrategies` re-run and recorded, not assumed. | landed |
+| **3** | `http`/`https` and `mem://`. | Range behavior matches today's; `BenchmarkReadAtStrategies` re-run and recorded, not assumed. | landed |
 | **4** | Switch `remote` over, delete the gocloud path, drop `gocloud.dev` from `go.mod`, and reshape the public API per §6. | The §1 table re-measured. Every consuming package's tests unchanged except where §6 renames a call. | landed |
 | **5** | `s3`, `gcs`, `azblob`, `sftp`. | **Dropped — see §10.** | not done |
 
@@ -276,7 +276,7 @@ suite and is the main reason to expect this to take longer than it looks.
 
 **`s3iofs` is a small dependency with an uncancellable core.** §2.3's adapter
 handles it, but it is worth being clear that astrogo would be relying on a
-library whose published behaviour needs working around. The alternative — an
+library whose published behavior needs working around. The alternative — an
 astrogo S3 filesystem over the AWS SDK directly — is maybe 200 lines and
 removes the workaround. That is a decision for PR 5, and the plan does not
 pre-commit to it.

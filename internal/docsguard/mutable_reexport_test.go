@@ -51,7 +51,7 @@ var allowedTimeVars = map[string]string{
 // `var Sleep = time.Sleep`, `var Now = time.Now` and so on, and the six layout
 // strings were a `var` block where the standard library has untyped constants.
 // Any package anywhere in the import graph could assign to any of them and
-// change the behaviour of every epoch calculation in the process — a
+// change the behavior of every epoch calculation in the process — a
 // supply-chain footgun with no upside, since a plain function is identical at
 // every call site and a const is identical to a string literal.
 //

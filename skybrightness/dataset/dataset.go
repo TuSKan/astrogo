@@ -165,7 +165,7 @@ type Spec struct {
 
 	// SolarFluxSFU is the 10.7 cm solar radio flux that sets airglow's
 	// overall level, in solar flux units. Zero means SkyCalc's own default
-	// of 130. A caller modelling a specific night should use that night's
+	// of 130. A caller modeling a specific night should use that night's
 	// value, from the Canadian Space Weather Forecast Centre.
 	SolarFluxSFU float64
 
@@ -177,7 +177,7 @@ type Spec struct {
 	AirglowScale float64
 
 	// AirglowMeasured records that the airglow spectrum describes the night
-	// being modelled rather than a reference, which changes the quality flag
+	// being modeled rather than a reference, which changes the quality flag
 	// the component reports. False for anything this package fetches, since
 	// SkyCalc is a model.
 	AirglowMeasured bool

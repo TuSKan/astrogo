@@ -57,7 +57,7 @@ func farVector(c coord.ICRS) vector.Vec3 {
 // tan(z) diverges at the horizon, not at the 91° the guard allowed, so just
 // below it the cubic term flipped sign to about +61 rad and the dR > 0 test
 // passed it through: an altitude of **+7028°** at a geometric −0.076°. Between
-// roughly 0° and 2° the cubic cancelled the linear term instead, dR went
+// roughly 0° and 2° the cubic canceled the linear term instead, dR went
 // non-positive, and refraction was dropped entirely — 0.000° where the stellar
 // path applied 0.16°. And the model was the uncorrected series, missing the
 // Newton-Raphson step Atioq applies even where it converges.
@@ -183,7 +183,7 @@ func TestRefractionIsPhysicallyBounded(t *testing.T) {
 	// Measured, that kink extends to 3.097° and is worth about 3 arcsec. It is
 	// a property of Atioq's model, not a defect in reproducing it, so the band
 	// is excluded rather than asserted away — an earlier version of this test
-	// used the nominal 2.87° clamp and failed on the model's own behaviour.
+	// used the nominal 2.87° clamp and failed on the model's own behavior.
 	// 4° clears it with margin.
 	const monotonicAbove = 4.0
 

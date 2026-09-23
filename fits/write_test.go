@@ -259,7 +259,7 @@ func TestWriteHeaderOnlyPrimaryHDU(t *testing.T) {
 
 	// A header-only HDU comes back through the HDU interface rather than as
 	// an *ImageHDU: there are no pixels to decode into one, which is the
-	// reader's existing behaviour and is what NAXIS 0 means.
+	// reader's existing behavior and is what NAXIS 0 means.
 	hdu := got.HDUs[0]
 
 	if hdu.Type() != fits.HDUTypeImage {

@@ -30,7 +30,7 @@ var (
 	// [Radian] is — dim.Dimension has no tag distinguishing a solid angle from
 	// a bare dimensionless ratio (see the package doc). Adding Steradian
 	// gives real documentation and serialization value but NO type-level
-	// protection against a radiance silently cancelling into an
+	// protection against a radiance silently canceling into an
 	// irradiance; that protection lives in skybrightness's own named
 	// scalar types, not here. Do not rely on Compatible/ConversionFactor
 	// to catch a Steradian-vs-One mix-up — it can't.

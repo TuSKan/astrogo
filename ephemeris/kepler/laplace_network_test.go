@@ -124,7 +124,7 @@ func TestGalileanAgainstHorizons(t *testing.T) {
 		metrology.MustContract(10_000, "km",
 			"not an accuracy claim, and deliberately sits between two known errors. Two-body "+
 				"motion is wrong here by construction — Jupiter's J2 and the Laplace resonance "+
-				"are unmodelled — and that drift measures 5,905 km at worst over the ten days "+
+				"are unmodeled — and that drift measures 5,905 km at worst over the ten days "+
 				"sampled. Reading the same elements against the ecliptic instead of the Laplace "+
 				"plane displaces Io by 16,500 km. A bound above the first and below the second "+
 				"fails when the frame is wrong and passes while the physics is merely absent, "+

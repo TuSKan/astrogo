@@ -774,7 +774,7 @@ type TwilightEvent struct {
 // 34' is a fixed convention, not a SOFA computation -- USNO and the Astronomical
 // Almanac define rise and set the same way, so that two implementations agree on
 // an instant that is otherwise sensitive to the air on the night. SOFA's
-// rigorous refraction is used where refraction is being modelled rather than
+// rigorous refraction is used where refraction is being modeled rather than
 // conventionally defined: coord.Context's apparent-place transform, and
 // atmosphere's refraction models.
 
