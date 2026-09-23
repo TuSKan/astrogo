@@ -17,9 +17,9 @@ var (
 	// Hertz is Hz = s⁻¹ (frequency).
 	Hertz = Unit{Dimension: dim.Time.PowInt(-1), ScaleFactor: 1, Name: "hertz", Symbol: "Hz"}
 
-	// Nanometre is nm = 1e-9 m — the wavelength unit spectral radiance is
+	// Nanometer is nm = 1e-9 m — the wavelength unit spectral radiance is
 	// expressed per.
-	Nanometre = Unit{Dimension: dim.Length, ScaleFactor: 1e-9, Name: "nanometre", Symbol: "nm"}
+	Nanometer = Unit{Dimension: dim.Length, ScaleFactor: 1e-9, Name: "nanometer", Symbol: "nm"}
 
 	// Candela is cd (luminous intensity) — the base for Luminance below.
 	Candela = Unit{Dimension: dim.Luminosity, ScaleFactor: 1, Name: "candela", Symbol: "cd"}
@@ -60,10 +60,10 @@ var (
 	// SpectralRadianceUnit is W·m⁻²·sr⁻¹·nm⁻¹ — the primary quantity of
 	// the skybrightness spectral engine, L_λ(λ, altitude, azimuth, site,
 	// epoch).
-	SpectralRadianceUnit = RadianceUnit.Div(Nanometre)
+	SpectralRadianceUnit = RadianceUnit.Div(Nanometer)
 
 	// SpectralIrradianceUnit is W·m⁻²·nm⁻¹.
-	SpectralIrradianceUnit = IrradianceUnit.Div(Nanometre)
+	SpectralIrradianceUnit = IrradianceUnit.Div(Nanometer)
 
 	// LuminanceUnit is cd·m⁻².
 	LuminanceUnit = Candela.Div(Meter.PowInt(2))

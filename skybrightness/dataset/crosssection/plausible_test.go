@@ -89,7 +89,7 @@ func TestOzonePlausibility(t *testing.T) {
 // parseAndCheck runs the same two steps Ozone's validator does, so the test
 // exercises the guard as it is actually wired rather than in isolation.
 func parseAndCheck(file string) error {
-	xs, err := Parse(strings.NewReader(file), "O3", Nanometre)
+	xs, err := Parse(strings.NewReader(file), "O3", Nanometer)
 	if err != nil {
 		return err
 	}

@@ -67,7 +67,7 @@ type SourceRef struct {
 	Acquired  TimeRange // the observation period the data represents
 	Retrieved time.GoTime
 	Checksum  string // "sha256:..."
-	Licence   string
+	License   string
 	Endpoint  string // remote.EndpointID as a string; empty for user-supplied data
 	Fidelity  Fidelity
 }

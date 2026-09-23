@@ -41,7 +41,7 @@ func TestBothPathsAgreeOnTheSameStar(t *testing.T) {
 	// A Vega-coloured star: BP-RP = 0 collapses the colour polynomial to its
 	// constant term c, so G = V + c and the flux producing that G follows from
 	// the zero point.
-	c := band.ColourTerm[0]
+	c := band.ColorTerm[0]
 
 	for _, v := range []float64{-1.44, 0.03, 4.0, 11.5} {
 		g := v + c

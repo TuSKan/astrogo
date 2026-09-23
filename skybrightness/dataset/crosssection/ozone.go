@@ -47,7 +47,7 @@ func Ozone(ctx context.Context) (atmosphere.CrossSection, error) {
 	// cache rather than after — the same shape iers uses for the EOP bulletin.
 	fsys, key, err := remote.GetFile(ctx, remote.MPIMainzCrossSections, remote.OzoneSerdyuchenko223K,
 		remote.WithValidate(func(r io.Reader) error {
-			xs, err := Parse(r, "O3", Nanometre)
+			xs, err := Parse(r, "O3", Nanometer)
 			if err != nil {
 				return err
 			}
@@ -68,7 +68,7 @@ func Ozone(ctx context.Context) (atmosphere.CrossSection, error) {
 	// and cross section in cm^2 per molecule, with no header. The unit is
 	// passed rather than sniffed because the atlas also serves wavenumber and
 	// angstrom files that a sniffer would confuse for one another.
-	xs, err := Parse(r, "O3", Nanometre)
+	xs, err := Parse(r, "O3", Nanometer)
 	if err != nil {
 		return atmosphere.CrossSection{}, err
 	}
