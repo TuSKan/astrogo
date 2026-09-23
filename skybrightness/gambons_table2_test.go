@@ -341,7 +341,7 @@ func table2Epochs(
 
 			sun, err := eph.Position(provider, eph.Sun, time.FromGo(when))
 			if err != nil {
-				continue
+				t.Fatalf("Sun at %v: %v", when, err)
 			}
 
 			if cc.GeocentricToObserved(sun).Alt().Degrees() < -18 {

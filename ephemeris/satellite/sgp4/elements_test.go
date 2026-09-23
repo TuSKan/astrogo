@@ -110,8 +110,12 @@ func TestParsedElementsAreAlreadyValid(t *testing.T) {
 	t.Parallel()
 
 	for _, s := range loadValladoTLEs(t) {
+		// Every set in Vallado's file parses; one that stops parsing is a
+		// regression here, not a set to leave out of the check.
 		el, err := sgp4.ParseTLE(s.line1, s.line2)
 		if err != nil {
+			t.Errorf("satellite %s: ParseTLE: %v", s.satnum, err)
+
 			continue
 		}
 

@@ -52,8 +52,12 @@ func TestAirmassDomain(t *testing.T) {
 		previous := math.Inf(1)
 
 		for _, alt := range []float64{0, 0.001, 0.1, 1, 5, 15, 30, 45, 60, 80, 89, 89.999, 90} {
+			// Every altitude here is at or above the horizon, which both
+			// functions accept; an error is a defect, not a refusal.
 			got, err := fn.f(angle.Deg(alt))
 			if err != nil {
+				t.Errorf("%s(%.3f): %v", fn.name, alt, err)
+
 				continue
 			}
 
@@ -77,15 +81,15 @@ func TestAirmassDomain(t *testing.T) {
 		}
 
 		// At the zenith the airmass is one, by definition.
-		if got, err := fn.f(angle.Deg(90)); err == nil && math.Abs(got-1) > fn.zenithTolerance {
-			t.Errorf("%s at the zenith = %.9f, want 1 within %g", fn.name, got, fn.zenithTolerance)
+		if got, err := fn.f(angle.Deg(90)); err != nil || math.Abs(got-1) > fn.zenithTolerance {
+			t.Errorf("%s at the zenith = %.9f (err %v), want 1 within %g", fn.name, got, err, fn.zenithTolerance)
 		}
 
 		// On the horizon it is large but finite. A plane-parallel secant would
 		// diverge here; a real atmosphere gives a few tens.
 		got, err := fn.f(0)
-		if err == nil && (got < 10 || got > 100) {
-			t.Errorf("%s on the horizon = %.3f, want a few tens", fn.name, got)
+		if err != nil || got < 10 || got > 100 {
+			t.Errorf("%s on the horizon = %.3f (err %v), want a few tens", fn.name, got, err)
 		}
 	}
 }
@@ -250,8 +254,12 @@ func TestVanRhijnDomain(t *testing.T) {
 	previous := 0.0
 
 	for _, z := range []float64{0, 10, 30, 50, 70, 85, 89, 89.99} {
+		// Below 90 degrees an observer inside the shell always reaches it;
+		// only a line of sight past the limb is refused.
 		got, err := atmosphere.VanRhijn(angle.Deg(z), layer)
 		if err != nil {
+			t.Errorf("VanRhijn(%.2f): %v", z, err)
+
 			continue
 		}
 

@@ -53,14 +53,17 @@ func TestContextCacheStaysInsideItsStatedBound(t *testing.T) {
 	for i := range 6 * 60 * 2 { // six hours at 30 s
 		at := start.Add(unit.Seconds(float64(i) * 30))
 
+		// LookAngle answers below the horizon too — a negative altitude, not
+		// an error — and no sample in these six hours errors, so one that
+		// does is a defect, not a sample to leave out.
 		cached, err := LookAngle(sat, 0, ctxAt(at))
 		if err != nil {
-			continue // below the horizon geometry the provider rejects; not this test's subject
+			t.Fatalf("%v: LookAngle through the cache: %v", at, err)
 		}
 
 		exact, err := LookAngle(sat, 0, coord.NewContext(at, site, defaultAtm))
 		if err != nil {
-			continue
+			t.Fatalf("%v: LookAngle through a fresh context: %v", at, err)
 		}
 
 		n++

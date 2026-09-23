@@ -343,27 +343,32 @@ func TestElements_StateAt_AgainstHorizons_433Eros(t *testing.T) {
 	// measured max rather than chasing it exactly.
 	const toleranceArcsec = 2.0
 
-	var maxSepArcsec float64
+	var (
+		maxSepArcsec      float64
+		compared, outages int
+	)
 
 	for _, dtDays := range []float64{-30, -20, -10, -5, 0, 5, 10, 20, 30} {
 		at := epoch.Add(unit.Days(dtDays))
 
 		wantPos, _, err := fetchHelioVector(designation, at)
 		if err != nil {
-			// A transient Horizons hiccup (rate limiting, an HTML error
-			// page instead of ephemeris data) for one of the 9 points is
-			// not this test's own bug — live-reproduced this session: a
-			// run that failed on 4 consecutive mid-range points fully
-			// succeeded on an immediate retry with no code change,
-			// confirming intermittent upstream flakiness rather than a
-			// permanent per-epoch failure. Logged and skipped for this
-			// dt rather than failing the whole comparison, matching this
-			// package's "never fail on external service behavior outside
-			// astrogo's control" convention for network-tagged tests.
-			t.Logf("dt=%+.0fd: fetch: %v (transient Horizons issue, not astrogo)", dtDays, err)
+			// A Horizons hiccup for one of the nine points costs that
+			// point: it has been seen to fail four in a row and answer on
+			// an immediate retry. Only an identified outage is skipped;
+			// anything else is this test's request or parser, and fails.
+			if reason, ok := testutil.UpstreamFailure(err); ok {
+				t.Logf("dt=%+.0fd: Horizons did not answer (%s): %v", dtDays, reason, err)
 
-			continue
+				outages++
+
+				continue
+			}
+
+			t.Fatalf("dt=%+.0fd: fetch: %v", dtDays, err)
 		}
+
+		compared++
 
 		gotPos, _, err := el.StateAt(at)
 		testutil.AssertNoError(t, err)
@@ -380,5 +385,12 @@ func TestElements_StateAt_AgainstHorizons_433Eros(t *testing.T) {
 		}
 	}
 
-	t.Logf("max angular separation over +/-30 days: %.3f arcsec", maxSepArcsec)
+	// Nine outages is a comparison that did not happen, which is a skip and
+	// not a pass.
+	if compared == 0 {
+		t.Skipf("Horizons did not answer for any of the %d epochs", outages)
+	}
+
+	t.Logf("max angular separation over +/-30 days: %.3f arcsec (%d of %d epochs compared)",
+		maxSepArcsec, compared, compared+outages)
 }

@@ -164,6 +164,123 @@ func TestSkipsOnAnErrorAreClassified(t *testing.T) {
 	t.Logf("%d test files checked, %d unclassified skips", len(files), offenders)
 }
 
+// failsOrIdentifies matches a statement that either fails the test or asks what
+// an error is: t.Error, t.Errorf, t.Fatal, t.Fatalf, t.Fail or t.FailNow on
+// any receiver, or one of the classifiers.
+var failsOrIdentifies = regexp.MustCompile(
+	`\b\w+\.(?:Error|Errorf|Fatal|Fatalf|Fail|FailNow)\(|` +
+		`SkipOnUpstreamFailure|UpstreamFailure\(|Unreachable\(|errors\.Is\(|errors\.As\(`)
+
+// TestLoopsDoNotPassOverAnUnidentifiedError is TestSkipsOnAnErrorAreClassified
+// for the same defect written as a loop: a `continue` on any error.
+//
+// A test that iterates over cases, points or rows and continues past whatever
+// error one of them returns cannot fail on that error, and if every iteration
+// errors it cannot fail at all — the loop body, where every assertion lives,
+// never runs. #393 found 49 of them. Some skipped astrogo's own computation:
+// plan.MoonPhases, LunarEclipses and SolarEclipses errors were logged as
+// "SKIP" against 44,524 AstroPixels phases and three thousand NASA eclipses,
+// with nothing counting how many were compared. An atmosphere audit whose
+// zenith and horizon checks were also written `err == nil && ...` passed an
+// airmass function that errored on every input. Most of the rest turned out,
+// when measured, to be continuing past errors that never occur — which is
+// what a regression would have looked like.
+//
+// The rule is structural, as the skip rule is: a `continue` whose immediately
+// enclosing block opens on a bare `if err != nil` must be preceded, within
+// that block, by a call that fails the test or asks what the error is. So
+//
+//	if err != nil {
+//		t.Errorf("case %s: %v", name, err)
+//		continue                          // fails first, then moves on
+//	}
+//
+//	if errors.Is(err, fits.ErrWCSBehindPlane) {
+//		continue                          // enclosed by the identifying branch
+//	}
+//
+// both pass, and `if err != nil { continue }` does not. Nor does collecting the
+// error for later: say which error the loop expects where it meets it.
+//
+// There is no exemption list, for the reason the skip rule has none.
+func TestLoopsDoNotPassOverAnUnidentifiedError(t *testing.T) {
+	files := readTestFiles(t, filepath.Join("..", "..", ""))
+
+	var offenders int
+
+	for path, lines := range files {
+		for _, i := range unidentifiedContinues(lines) {
+			offenders++
+
+			t.Errorf("%s:%d: continues past an error it has not identified.\n"+
+				"  inside: %s\n"+
+				"  A loop that moves on from any error cannot fail on it, and if every\n"+
+				"  iteration errors it cannot fail at all. Fail on it — t.Errorf, then\n"+
+				"  continue — or continue only inside a branch that named it: errors.Is\n"+
+				"  for an expected refusal, testutil.UpstreamFailure for an outage.",
+				path, i+1, strings.TrimSpace(lines[enclosingOpener(lines, i)]))
+		}
+	}
+
+	if len(files) == 0 {
+		t.Fatal("no test files examined; the walk root may be wrong")
+	}
+
+	t.Logf("%d test files checked, %d unidentified continues", len(files), offenders)
+}
+
+// unidentifiedContinues returns the indexes of the `continue` statements in
+// lines whose enclosing block opens on a bare error check and neither fails nor
+// identifies the error before continuing.
+func unidentifiedContinues(lines []string) []int {
+	var out []int
+
+	for i, line := range lines {
+		if strings.TrimSpace(line) != "continue" {
+			continue
+		}
+
+		j := enclosingOpener(lines, i)
+		if j < 0 || !errGuard.MatchString(lines[j]) {
+			continue
+		}
+
+		if failsOrIdentifies.MatchString(strings.Join(lines[j:i], "\n")) {
+			continue
+		}
+
+		out = append(out, i)
+	}
+
+	return out
+}
+
+// TestUnidentifiedContinuesAreFound pins the detector on the shapes it has to
+// tell apart, so the repository-wide scan passing means the rule held and not
+// that the detector stopped seeing anything.
+func TestUnidentifiedContinuesAreFound(t *testing.T) {
+	cases := []struct {
+		name string
+		src  string
+		want int
+	}{
+		{"bare guard", "\tfor _, c := range cs {\n\t\tif err != nil {\n\t\t\tcontinue\n\t\t}\n\t}", 1},
+		{"guard with a log only", "\tfor _, c := range cs {\n\t\tif err != nil {\n\t\t\tt.Logf(\"%v\", err)\n\n\t\t\tcontinue\n\t\t}\n\t}", 1},
+		{"init-statement guard", "\tfor _, c := range cs {\n\t\tif _, err := f(c); err != nil {\n\t\t\tcontinue\n\t\t}\n\t}", 1},
+		{"collected for later", "\tfor _, c := range cs {\n\t\tif err != nil {\n\t\t\terrs = append(errs, err)\n\n\t\t\tcontinue\n\t\t}\n\t}", 1},
+		{"fails first", "\tfor _, c := range cs {\n\t\tif err != nil {\n\t\t\tt.Errorf(\"%v\", err)\n\n\t\t\tcontinue\n\t\t}\n\t}", 0},
+		{"identified", "\tfor _, c := range cs {\n\t\tif errors.Is(err, errX) {\n\t\t\tcontinue\n\t\t}\n\t}", 0},
+		{"identified inside the guard", "\tfor _, c := range cs {\n\t\tif err != nil {\n\t\t\tif reason, ok := testutil.UpstreamFailure(err); ok {\n\t\t\t\tt.Log(reason)\n\n\t\t\t\tcontinue\n\t\t\t}\n\n\t\t\tt.Fatal(err)\n\t\t}\n\t}", 0},
+		{"not an error guard", "\tfor _, c := range cs {\n\t\tif c == nil {\n\t\t\tcontinue\n\t\t}\n\t}", 0},
+	}
+
+	for _, tc := range cases {
+		if got := len(unidentifiedContinues(strings.Split(tc.src, "\n"))); got != tc.want {
+			t.Errorf("%s: found %d unidentified continues, want %d", tc.name, got, tc.want)
+		}
+	}
+}
+
 // readTestFiles returns every _test.go file under root, split into lines and
 // keyed by repository-relative, forward-slashed path.
 func readTestFiles(t *testing.T, root string) map[string][]string {
@@ -171,9 +288,14 @@ func readTestFiles(t *testing.T, root string) map[string][]string {
 
 	out := map[string][]string{}
 
+	// A file the walk cannot read is an error, not a file to leave out: a guard
+	// that silently skips what it cannot open passes on exactly the files it
+	// never checked.
 	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
-			return nil //nolint:nilerr // an unreadable path is skipped, not fatal
+			t.Errorf("walk %s: %v", path, err)
+
+			return nil
 		}
 
 		if info.IsDir() {
@@ -190,12 +312,16 @@ func readTestFiles(t *testing.T, root string) map[string][]string {
 
 		rel, rerr := filepath.Rel(root, path)
 		if rerr != nil {
-			return nil //nolint:nilerr // an unrelatable path is skipped, not fatal
+			t.Errorf("relativize %s: %v", path, rerr)
+
+			return nil
 		}
 
 		src, rerr := os.ReadFile(path)
 		if rerr != nil {
-			return nil //nolint:nilerr // a file we cannot read is skipped, not fatal
+			t.Errorf("read %s: %v", path, rerr)
+
+			return nil
 		}
 
 		out[filepath.ToSlash(rel)] = strings.Split(string(src), "\n")

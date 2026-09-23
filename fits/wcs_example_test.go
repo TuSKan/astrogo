@@ -206,24 +206,27 @@ func TestProjectionRoundTrip_Grid(t *testing.T) {
 				step = 1
 			}
 
-			var tested, skipped int
+			var tested int
 
 			for dx := -tc.fieldPix; dx <= tc.fieldPix; dx += step {
 				for dy := -tc.fieldPix; dy <= tc.fieldPix; dy += step {
 					px := crpix[0] + dx
 					py := crpix[1] + dy
 
+					// Every field here lies inside its projection's valid
+					// region, and all 81 points of every case round-trip
+					// today, so neither call has an error to expect.
 					world, err := w.PixelToWorld([]float64{px, py})
 					if err != nil {
-						skipped++
+						t.Errorf("PixelToWorld(%.1f, %.1f): %v", px, py, err)
+
 						continue
 					}
 
 					pxBack, err := w.WorldToPixel(world)
 					if err != nil {
-						// WorldToPixel Newton-Raphson may not converge for
-						// some projections at larger offsets. Skip gracefully.
-						skipped++
+						t.Errorf("WorldToPixel of (%.1f, %.1f): %v", px, py, err)
+
 						continue
 					}
 
@@ -245,7 +248,7 @@ func TestProjectionRoundTrip_Grid(t *testing.T) {
 				t.Error("no points were testable — check field size vs projection limits")
 			}
 
-			t.Logf("tested %d points, skipped %d", tested, skipped)
+			t.Logf("tested %d points", tested)
 		})
 	}
 }

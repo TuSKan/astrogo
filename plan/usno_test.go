@@ -585,11 +585,17 @@ func TestUSNO_CelNav(t *testing.T) {
 
 			pos, err := sunTarget.Position(tm)
 			if err != nil {
-				t.Logf("Sun position error: %v", err)
+				t.Errorf("Sun position at %v: %v", tm, err)
+
 				continue
 			}
 
-			aa, _ := ctx.ICRSToAltAz(pos)
+			aa, err := ctx.ICRSToAltAz(pos)
+			if err != nil {
+				t.Errorf("Sun to alt/az at %v: %v", tm, err)
+
+				continue
+			}
 
 			deltaAlt := math.Abs(aa.Alt().Degrees() - entry.AlmanacData.Hc)
 
@@ -1827,11 +1833,17 @@ func TestUSNO_CelNav_EdgeCases(t *testing.T) {
 
 					pos, err := sunTarget.Position(tm)
 					if err != nil {
-						t.Logf("Sun position error: %v", err)
+						t.Errorf("Sun position at %v: %v", tm, err)
+
 						continue
 					}
 
-					aa, _ := ctx.ICRSToAltAz(pos)
+					aa, err := ctx.ICRSToAltAz(pos)
+					if err != nil {
+						t.Errorf("Sun to alt/az at %v: %v", tm, err)
+
+						continue
+					}
 
 					deltaAlt := math.Abs(aa.Alt().Degrees() - entry.AlmanacData.Hc)
 
@@ -1863,11 +1875,17 @@ func TestUSNO_CelNav_EdgeCases(t *testing.T) {
 
 					pos, err := moonTarget.Position(tm)
 					if err != nil {
-						t.Logf("Moon position error: %v", err)
+						t.Errorf("Moon position at %v: %v", tm, err)
+
 						continue
 					}
 
-					aa, _ := ctx.ICRSToAltAz(pos)
+					aa, err := ctx.ICRSToAltAz(pos)
+					if err != nil {
+						t.Errorf("Moon to alt/az at %v: %v", tm, err)
+
+						continue
+					}
 
 					deltaAlt := math.Abs(aa.Alt().Degrees() - entry.AlmanacData.Hc)
 					t.Logf("Moon Alt: USNO=%.4f° astrogo=%.4f° Δ=%.4f°", entry.AlmanacData.Hc, aa.Alt().Degrees(), deltaAlt)

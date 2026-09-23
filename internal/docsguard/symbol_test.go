@@ -104,7 +104,7 @@ func TestCitedSymbolsExist(t *testing.T) {
 	for _, path := range docs {
 		rel, rerr := filepath.Rel(root, path)
 		if rerr != nil {
-			continue
+			t.Fatalf("relativize %s: %v", path, rerr)
 		}
 
 		slash := filepath.ToSlash(rel)
@@ -114,7 +114,7 @@ func TestCitedSymbolsExist(t *testing.T) {
 
 		raw, rerr := os.ReadFile(path)
 		if rerr != nil {
-			continue
+			t.Fatalf("read %s: %v", slash, rerr)
 		}
 
 		for n, line := range strings.Split(string(raw), "\n") {
