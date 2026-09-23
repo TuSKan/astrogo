@@ -23,7 +23,7 @@ import "math"
 // below that need nothing but math (Transmission<->OpticalDepth) are
 // methods here.
 type (
-	// WavelengthNM is a vacuum wavelength in nanometres, unless a
+	// WavelengthNM is a vacuum wavelength in nanometers, unless a
 	// dataset's own documentation states it is in air.
 	WavelengthNM float64
 
@@ -94,13 +94,13 @@ type (
 	CloudOpticalDepth float64
 
 	// EffectiveRadiusUM is a cloud droplet/ice-crystal effective radius,
-	// in micrometres.
+	// in micrometers.
 	EffectiveRadiusUM float64
 
 	// OzoneColumnDU is a total-column ozone amount, in Dobson units.
 	OzoneColumnDU float64
 
-	// PrecipitableWaterMM is precipitable water vapour, in millimetres.
+	// PrecipitableWaterMM is precipitable water vapour, in millimeters.
 	PrecipitableWaterMM float64
 
 	// PressureHPa is atmospheric pressure, in hectopascals.

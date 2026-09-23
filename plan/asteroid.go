@@ -50,7 +50,7 @@ func WithHG(absH, slopeG float64) AsteroidOption {
 // PhysicalRadius prefers this over the H+albedo estimate WithAlbedo
 // enables, when both are set.
 //
-// SBDB publishes it in kilometres, so a value taken from there is
+// SBDB publishes it in kilometers, so a value taken from there is
 // [unit.Km](d).
 func WithDiameter(d unit.Length) AsteroidOption {
 	return func(a *Asteroid) { a.diameter = d; a.hasDiameter = true }

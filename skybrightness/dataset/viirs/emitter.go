@@ -79,9 +79,9 @@ type Region struct {
 	// Site is the observer, at the center of the sampling.
 	Site *coord.Geodetic
 
-	// InnerM and OuterM bound the annulus sampled, in metres. Sources much
-	// closer than a kilometre break the horizon-source geometry the
-	// skyglow component assumes; sources far beyond a hundred kilometres
+	// InnerM and OuterM bound the annulus sampled, in meters. Sources much
+	// closer than a kilometer break the horizon-source geometry the
+	// skyglow component assumes; sources far beyond a hundred kilometers
 	// contribute little through the transmission term.
 	InnerM, OuterM float64
 

@@ -120,7 +120,7 @@ func TestMagnitudeToleranceSitsBetweenThePopulations(t *testing.T) {
 func TestCatalogueRadiusFitsThePropagationResidual(t *testing.T) {
 	t.Parallel()
 
-	arcsec := BrightStarCatalogueRadius.Degrees() * 3600
+	arcsec := BrightStarCatalogRadius.Degrees() * 3600
 
 	// Alpha Centauri, the worst case in this set, lands 6.4 arcseconds out
 	// after propagation. A radius under that loses it entirely.

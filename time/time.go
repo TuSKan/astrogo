@@ -1289,7 +1289,7 @@ func (t Time) TAI() Time {
 // compute the ET its own SPK segments are indexed by (see lsk.UTCToET). The
 // two tables agree — TestLeapSecondSourcesAgree pins that — but they are
 // separate sources, and whether time should consume the kernel instead is an
-// open question rather than the current behaviour.
+// open question rather than the current behavior.
 func (t Time) TT() Time {
 	if t.scale == TT {
 		return t

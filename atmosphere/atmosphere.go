@@ -324,7 +324,7 @@ func (b *Builder) Surface(pressureHPa, tempK float64) *Builder {
 
 // Refraction sets the remaining fields of the Atmosphere's embedded
 // Refraction — the model, relative humidity [0,1], and wavelength in
-// micrometres — for a caller who wants explicit refraction-model control
+// micrometers — for a caller who wants explicit refraction-model control
 // alongside the sky-brightness Atmosphere. Pressure/temperature stay owned
 // by Surface; this only touches the fields Surface doesn't set.
 func (b *Builder) Refraction(model RefractionModel, humidityFrac, wavelengthUM float64) *Builder {
@@ -428,7 +428,7 @@ func (b *Builder) SurfaceAtAltitude(height unit.Length) *Builder {
 	return b.Surface(isa.Pressure, isa.Temperature+273.15)
 }
 
-// PrecipitableWater sets precipitable water vapour, in millimetres.
+// PrecipitableWater sets precipitable water vapour, in millimeters.
 func (b *Builder) PrecipitableWater(mm float64) *Builder {
 	b.s.pwv = unit.PrecipitableWaterMM(mm)
 	return b
@@ -444,7 +444,7 @@ func (b *Builder) PrecipitableWater(mm float64) *Builder {
 // scale height H of an exponential profile, exp(-h/H). A meteorologist's
 // boundary-layer height is the depth of the mixing layer, which over land at
 // night is typically 100 to 500 m, while an aerosol scale height is
-// kilometres: OPAC's Table 5 gives 8 km for continental and urban aerosol,
+// kilometers: OPAC's Table 5 gives 8 km for continental and urban aerosol,
 // 2 km for desert dust and 1 km for sea salt, and the preset constructors
 // carry those already. Setting this by hand is for reproducing a published
 // run that used its own — Kocifaj (2007) takes beta = 0.65 km^-1, so 1538 m.

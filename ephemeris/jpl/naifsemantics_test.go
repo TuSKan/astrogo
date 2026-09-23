@@ -22,7 +22,7 @@ import (
 // someone comparing Jupiter against Horizons' default `599` expects — it reads
 // as an astrogo error and is not one (#253).
 //
-// This is a documentation guard as much as a behavioural one. The doc comments
+// This is a documentation guard as much as a behavioral one. The doc comments
 // on core.ID and NAIFFor state these numbers; if the mapping moves, they
 // become wrong silently, and a wrong statement about which point a coordinate
 // refers to is worse than no statement.

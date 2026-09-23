@@ -148,7 +148,7 @@ func runOf(t *testing.T, grid coord.HEALPix, n int, want func(b angle.Angle) boo
 
 // The Milky Way has to be where the Milky Way is.
 //
-// Gaia indexes HEALPix in ICRS, and the map says so. Labelling it galactic
+// Gaia indexes HEALPix in ICRS, and the map says so. Labeling it galactic
 // instead would rotate the plane across the sky — and because the map still
 // covers every direction and every value stays positive, nothing else here
 // would notice. The plane-to-cap contrast is what does: a frame swap does not

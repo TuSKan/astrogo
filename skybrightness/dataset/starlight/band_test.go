@@ -107,13 +107,13 @@ func TestGaiaJohnsonV(t *testing.T) {
 	// is tabulated as G minus the target band, which is exactly what the
 	// query's +0.4 exponent needs, since the factor is 10^(0.4*(G-V)).
 	want := []float64{-0.02704, 0.01424, -0.2156, 0.01426}
-	if len(band.ColourTerm) != len(want) {
-		t.Fatalf("ColourTerm has %d terms, want %d", len(band.ColourTerm), len(want))
+	if len(band.ColorTerm) != len(want) {
+		t.Fatalf("ColorTerm has %d terms, want %d", len(band.ColorTerm), len(want))
 	}
 
 	for i, c := range want {
-		if band.ColourTerm[i] != c {
-			t.Errorf("ColourTerm[%d] = %v, want %v", i, band.ColourTerm[i], c)
+		if band.ColorTerm[i] != c {
+			t.Errorf("ColorTerm[%d] = %v, want %v", i, band.ColorTerm[i], c)
 		}
 	}
 
@@ -122,7 +122,7 @@ func TestGaiaJohnsonV(t *testing.T) {
 	// zero point. What comes out must be Johnson V's own Vega zero point,
 	// 3.63e-11 W m^-2 nm^-1, shifted by that constant.
 	flux := math.Pow(10, 25.6874/2.5)
-	got := flux * band.FluxToRadiance * math.Pow(10, 0.4*band.ColourTerm[0])
+	got := flux * band.FluxToRadiance * math.Pow(10, 0.4*band.ColorTerm[0])
 
 	if wantFlux := 3.63e-11 * math.Pow(10, -0.4*0.02704); math.Abs(got-wantFlux)/wantFlux > 1e-12 {
 		t.Errorf("a Vega-coloured G=0 source gives %.6e, want %.6e", got, wantFlux)
@@ -154,7 +154,7 @@ func TestGaiaJohnsonVColourFactorDirection(t *testing.T) {
 	factor := func(c float64) float64 {
 		var offset, term float64 = 0, 1
 
-		for _, k := range band.ColourTerm {
+		for _, k := range band.ColorTerm {
 			offset += k * term
 			term *= c
 		}

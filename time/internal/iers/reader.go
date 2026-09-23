@@ -32,6 +32,50 @@ type Table struct {
 	records []Record
 }
 
+// leapJumpThreshold is how far UT1−UTC may change between consecutive daily
+// records before the change is read as a leap second rather than as rotation.
+//
+// Earth's rotation moves UT1−UTC by a few milliseconds a day — the length-of-day
+// excess, currently under 2 ms — so two adjacent records never differ by
+// anything near half a second unless UTC itself stepped between them. A leap
+// second steps it by exactly one. Half a second sits two orders of magnitude
+// above the one and a factor of two below the other.
+const leapJumpThreshold = 0.5
+
+// dut1Across returns r1's UT1−UTC as it would read had no leap second been
+// inserted since r0: that is, with any whole-second step between them removed.
+//
+// # Why interpolation needs it
+//
+// UT1 is continuous — it is Earth's rotation angle — while UTC stops for a
+// leap second, so UT1−UTC jumps by exactly one second at each. The records are
+// daily at 0h UTC and a leap second is inserted at the end of a UTC day, so the
+// jump always falls between two records and never inside one: interpolating the
+// raw values interpolates across a discontinuity.
+//
+// Measured on the IERS series before this existed, 2016-12-31 at 12:00 UTC
+// read +0.0918 s against a true −0.4083 s, and at 23:59 read +0.5906 s against
+// −0.4088 s: a ramp from one side of the step to the other, reaching a full
+// second — 15 arcsec of Earth rotation — just before midnight, on every
+// leap-second day in the record. See #377.
+//
+// With the step removed the interpolant follows UT1−UTC as it was before the
+// leap, which is what it was, right up to the leap second itself. [Table.EOP]
+// returns r1 unadjusted when queried exactly at r1, the one instant already on
+// the far side.
+//
+// The step is found in the data rather than read from a ΔAT table because this
+// package sits below the one that owns ΔAT, and the data says it unambiguously:
+// see [leapJumpThreshold].
+func dut1Across(r0, r1 Record) float64 {
+	step := r1.DUT1 - r0.DUT1
+	if math.Abs(step) < leapJumpThreshold {
+		return r1.DUT1
+	}
+
+	return r1.DUT1 - math.Round(step)
+}
+
 var _ Model = (*Table)(nil)
 
 // ParseFinals2000A parses IERS finals2000A.all format.
@@ -160,6 +204,14 @@ func (t *Table) EOP(mjd float64) (EOP, error) {
 	r0 := t.records[i-1]
 	r1 := t.records[i]
 
+	// A query landing exactly on a record gets that record. Not merely a
+	// shortcut: the leap-second handling below adjusts r1 to be continuous
+	// with r0, which is right for every instant before r1 and wrong for r1
+	// itself, which is already on the far side of the step.
+	if mjd == r1.MJD {
+		return EOP{DUT1: r1.DUT1, XP: r1.XP, YP: r1.YP, LOD: r1.LOD}, nil
+	}
+
 	f := (mjd - r0.MJD) / (r1.MJD - r0.MJD)
 	if f < 0 {
 		f = 0
@@ -170,7 +222,7 @@ func (t *Table) EOP(mjd float64) (EOP, error) {
 	}
 
 	return EOP{
-		DUT1: r0.DUT1 + f*(r1.DUT1-r0.DUT1),
+		DUT1: r0.DUT1 + f*(dut1Across(r0, r1)-r0.DUT1),
 		XP:   r0.XP + f*(r1.XP-r0.XP),
 		YP:   r0.YP + f*(r1.YP-r0.YP),
 		LOD:  r0.LOD + f*(r1.LOD-r0.LOD),

@@ -64,6 +64,8 @@ func TestAstrometricAgreesWithHorizonsGeocentric(t *testing.T) {
 	// for 2026.
 	provider, err := jpl.NewProvider(context.Background(), core.Planets, "de441_part-2")
 	if err != nil {
+		// See the same fetch in apparent_geocentric_test.go.
+		testutil.SkipOnUpstreamFailure(t, err)
 		t.Fatalf("de441_part-2 provider: %v", err)
 	}
 
@@ -142,7 +144,7 @@ func TestAstrometricAgreesWithHorizonsGeocentric(t *testing.T) {
 		rows, err := fetchGeocentricSeries(body.command, body.name, "1",
 			"2026-01-01", "2026-12-27", "30d")
 		if err != nil {
-			testutil.SkipOnUpstreamFailure(t, err)
+			skipIfHorizonsDown(t, err)
 			t.Fatalf("%s: fetching the geocentric astrometric series: %v", body.name, err)
 		}
 
@@ -331,6 +333,13 @@ func fetchGeocentricSeries(command, bodyName, quantity, startStr, stopStr, stepS
 	}
 
 	defer func() { _ = resp.Body.Close() }()
+
+	// Before the body is read: a non-200 is an error page, and reporting it
+	// as missing ephemeris data is what made a Horizons outage look like a
+	// defect. See horizonsStatusError.
+	if resp.StatusCode != http.StatusOK {
+		return nil, horizonsStatusError(resp.StatusCode)
+	}
 
 	bodyBytes, _ := io.ReadAll(resp.Body)
 	responseStr := string(bodyBytes)

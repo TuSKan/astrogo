@@ -16,14 +16,14 @@ import (
 )
 
 // auMeters is the astronomical unit, for turning a satellite's semi-major
-// axis in kilometres into the astronomical units the elements take.
+// axis in kilometers into the astronomical units the elements take.
 var auMeters = constants.IAU.AstronomicalUnit.Value
 
-// kmToAU converts a distance in kilometres.
+// kmToAU converts a distance in kilometers.
 //
 // A satellite's semi-major axis in AU is a very small number — Io's is
 // 2.8e-06 — which is a fine thing for a float64 to hold and an awkward thing
-// to type, so the tests below convert from the kilometres the literature
+// to type, so the tests below convert from the kilometers the literature
 // publishes.
 func kmToAU(km float64) float64 { return km * 1e3 / auMeters }
 
@@ -190,7 +190,7 @@ func TestPeriodFollowsKeplersThirdLaw(t *testing.T) {
 
 	if rel := math.Abs(gotJup-joviPublished) / joviPublished; rel < 0.003 || rel > 0.005 {
 		t.Errorf("two-body differs from Io's published period by %.3f%%, expected about 0.4%% — "+
-			"if this shrank, something started modelling the perturbations", 100*rel)
+			"if this shrank, something started modeling the perturbations", 100*rel)
 	}
 }
 
@@ -362,7 +362,7 @@ func TestUnregisteredBodyStillReachesTheBase(t *testing.T) {
 	}
 }
 
-// TestPeriodOverridesTheDerivedMeanMotion is the behavioural half of
+// TestPeriodOverridesTheDerivedMeanMotion is the behavioral half of
 // [kepler.Elements.WithPeriod]: the supplied period has to be the one the
 // mean anomaly actually advances at, not merely a field that round-trips.
 //

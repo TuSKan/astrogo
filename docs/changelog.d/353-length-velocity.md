@@ -2,8 +2,8 @@
 type: Added
 pr: 353
 ---
-`unit.Length` and `unit.Velocity` are named `float64` types carrying metres and
-metres per second, with constructors and accessors for every unit astrogo
+`unit.Length` and `unit.Velocity` are named `float64` types carrying meters and
+meters per second, with constructors and accessors for every unit astrogo
 speaks — `unit.AU`, `Km`, `Pc`, `Meters`, `KmPerSec`, `AUPerDay` and the
 readers that match. They are the pattern `angle.Angle` already uses, extended
 to the two dimensions the API was passing as bare `float64`. Measured, a named

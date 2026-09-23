@@ -46,7 +46,7 @@ func WithParallax(p angle.Angle) StarOption {
 //
 // Catalogues publish this in km/s, so the value a caller has in hand is
 // almost always [unit.KmPerSec](v). Writing a bare number here would mean
-// metres per second, which is what nothing publishes.
+// meters per second, which is what nothing publishes.
 func WithRadialVelocity(rv unit.Velocity) StarOption {
 	return func(s *Star) { s.radialVelocity = rv; s.hasRV = true }
 }

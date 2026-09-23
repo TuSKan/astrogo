@@ -8,7 +8,7 @@ import (
 // recorder is a [metrology.TB] that remembers what was done to it instead of
 // failing a real test.
 //
-// It exists because the interesting behaviour of this package is what it does
+// It exists because the interesting behavior of this package is what it does
 // on failure: which contract violations it reports, how it describes them,
 // that a non-finite sample is an error rather than a silent drop, and that a
 // suite which could not run is skipped rather than passed. None of that can

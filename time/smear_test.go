@@ -93,7 +93,7 @@ func TestLeapSmearWindowIgnoresPre1972Drift(t *testing.T) {
 }
 
 // TestLeapSmearWindowAcceptsAnyScale: the window is a property of the instant,
-// not of how it is labelled. A caller holding TAI or TT must get the same
+// not of how it is labeled. A caller holding TAI or TT must get the same
 // answer as one holding the same instant in UTC, or the helper would report on
 // whichever scale the caller happened to convert to.
 func TestLeapSmearWindowAcceptsAnyScale(t *testing.T) {

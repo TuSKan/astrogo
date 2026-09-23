@@ -119,7 +119,7 @@ func System(dst []float64, grid unit.SpectralGrid, elements ...Throughput) error
 // and a Sensor can build the matching Instrument with NewInstrument.
 type Instrument struct {
 	// CollectingAreaM2 is the effective light-collecting area in square
-	// metres, already net of central obstruction.
+	// meters, already net of central obstruction.
 	CollectingAreaM2 float64
 
 	// PixelSolidAngleSR is the solid angle one pixel subtends on the sky,
@@ -203,7 +203,7 @@ func (i Instrument) Validate() error {
 }
 
 // PhotonRate returns the photon rate an instrument records from a sky of
-// the given spectral radiance, in photons per second per square metre per
+// the given spectral radiance, in photons per second per square meter per
 // steradian — i.e. before the collecting area and pixel solid angle are
 // applied.
 //

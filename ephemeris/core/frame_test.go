@@ -49,7 +49,7 @@ func TestCenterString(t *testing.T) {
 func TestRequire(t *testing.T) {
 	icrs := State{Frame: FrameICRS, Center: CenterGeocenter}
 	gcrs := State{Frame: FrameGCRS, Center: CenterGeocenter}
-	unlabelled := State{}
+	unlabeled := State{}
 
 	cases := []struct {
 		name    string
@@ -62,7 +62,7 @@ func TestRequire(t *testing.T) {
 
 		// The distinction the type exists to make: GCRS and ICRS differ by
 		// frame bias, about 23 mas, and every provider used to hand back an
-		// unlabelled State that was mathematically valid either way.
+		// unlabeled State that was mathematically valid either way.
 		{"wrong frame", gcrs, FrameICRS, CenterGeocenter, ErrWrongFrame},
 		{"wrong center", icrs, FrameICRS, CenterBarycenter, ErrWrongCenter},
 
@@ -70,7 +70,7 @@ func TestRequire(t *testing.T) {
 		// provider that has not been taught to label its output says so
 		// rather than claiming ICRS geocentric, and a caller that does not
 		// care must not be forced to.
-		{"unlabelled state passes", unlabelled, FrameICRS, CenterGeocenter, nil},
+		{"unlabeled state passes", unlabeled, FrameICRS, CenterGeocenter, nil},
 		{"caller requires nothing", gcrs, FrameUnspecified, CenterUnspecified, nil},
 		{"caller requires frame only", gcrs, FrameGCRS, CenterUnspecified, nil},
 	}

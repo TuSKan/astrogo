@@ -94,7 +94,7 @@ func WriteFile(ctx context.Context, fsys fs.FS, name string, r io.Reader) error 
 //
 // A writer that can be aborted is, which releases its handles and leaves the
 // destination untouched. One that cannot is simply not closed — the gocloud-era
-// behaviour, and the reason [AbortWriter] exists: skipping Close is the only
+// behavior, and the reason [AbortWriter] exists: skipping Close is the only
 // way to avoid committing a truncated object, and it leaks whatever the writer
 // was holding.
 func abort(w io.WriteCloser) {

@@ -329,7 +329,7 @@ func TestAFSPCModeIsADifferentAnswer(t *testing.T) {
 			t.Errorf("%s: the two modes are identical, so WithMode is not reaching the "+
 				"deep-space code — it should, through the sidereal time at epoch", tc.name)
 		case maxDiff > 100:
-			t.Errorf("%s: the two modes differ by %g km. A convention difference is metres "+
+			t.Errorf("%s: the two modes differ by %g km. A convention difference is meters "+
 				"to a few km; this is a bug", tc.name, maxDiff)
 		default:
 			t.Logf("%s: the two modes differ by up to %.4g km", tc.name, maxDiff)
@@ -449,7 +449,7 @@ func TestAtTimeAgreesWithAt(t *testing.T) {
 
 		// Not exact equality: AtTime forms tsince by differencing two-part
 		// Julian dates, which is a different route to the same number, and the
-		// last bits of that route move with the platform. A millimetre is two
+		// last bits of that route move with the platform. A millimeter is two
 		// orders below the package's own contract and four below anything a
 		// caller could notice, so it bounds "the same computation" without
 		// asserting bit-identity across architectures.
@@ -458,7 +458,7 @@ func TestAtTimeAgreesWithAt(t *testing.T) {
 		}
 	}
 
-	// The scale conversion. The same instant labelled TT is 69.184 s later than
+	// The scale conversion. The same instant labeled TT is 69.184 s later than
 	// the UTC label, and AtTime must resolve that rather than take the label.
 	utc := el.Epoch.Add(unit.Days(1))
 

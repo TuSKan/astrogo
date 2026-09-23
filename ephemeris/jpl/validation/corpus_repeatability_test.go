@@ -6,8 +6,6 @@ import (
 	"math"
 	"strconv"
 	"testing"
-
-	"github.com/TuSKan/astrogo/internal/testutil"
 )
 
 // repeatBody and repeatSite name one query the corpus diff reports as moved.
@@ -72,14 +70,14 @@ func TestHorizonsAnswersTheSameQueryTheSameWay(t *testing.T) {
 	first, err := fetchObserverSeries(strconv.Itoa(repeatBody), repeatName,
 		repeatLonDeg, repeatLatDeg, repeatHeight, repeatStart, repeatStop, repeatStep)
 	if err != nil {
-		testutil.SkipOnUpstreamFailure(t, err)
+		skipIfHorizonsDown(t, err)
 		t.Fatalf("first observer series for %s: %v", repeatName, err)
 	}
 
 	second, err := fetchObserverSeries(strconv.Itoa(repeatBody), repeatName,
 		repeatLonDeg, repeatLatDeg, repeatHeight, repeatStart, repeatStop, repeatStep)
 	if err != nil {
-		testutil.SkipOnUpstreamFailure(t, err)
+		skipIfHorizonsDown(t, err)
 		t.Fatalf("second observer series for %s: %v", repeatName, err)
 	}
 

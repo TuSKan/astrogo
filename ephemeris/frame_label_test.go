@@ -62,23 +62,23 @@ func TestRequireCatchesAFrameMismatch(t *testing.T) {
 	}
 }
 
-// An unlabelled state passes rather than failing.
+// An unlabeled state passes rather than failing.
 //
 // The zero value asserts nothing, and Require checks against a *wrong* label
 // rather than demanding every producer carry one. Making unspecified an error
 // would turn "we do not know" into a failure at every call site not yet
 // updated, which is a migration rather than a safeguard — and would punish
 // third-party providers implementing the interface for astrogo's own change.
-func TestRequireAcceptsAnUnlabelledState(t *testing.T) {
+func TestRequireAcceptsAnUnlabeledState(t *testing.T) {
 	t.Parallel()
 
-	var unlabelled eph.State
+	var unlabeled eph.State
 
-	if err := unlabelled.Require(eph.FrameICRS, eph.CenterBarycenter); err != nil {
-		t.Errorf("an unlabelled state was refused: %v", err)
+	if err := unlabeled.Require(eph.FrameICRS, eph.CenterBarycenter); err != nil {
+		t.Errorf("an unlabeled state was refused: %v", err)
 	}
 
-	// And a labelled state is not constrained by a caller who does not care.
+	// And a labeled state is not constrained by a caller who does not care.
 	gcrs := eph.State{Frame: eph.FrameGCRS, Center: eph.CenterGeocenter}
 	if err := gcrs.Require(eph.FrameUnspecified, eph.CenterUnspecified); err != nil {
 		t.Errorf("a caller with no requirement got an error: %v", err)

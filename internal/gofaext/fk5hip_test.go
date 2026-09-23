@@ -57,35 +57,35 @@ func TestTheDistanceFreePathAgreesWithSOFAWhereSOFACanAnswer(t *testing.T) {
 		rv               float64 // km/s
 		tolMasPerYear    float64
 		tolArcsecOnSky   float64
-		tolKilometrePerS float64
+		tolKilometerPerS float64
 	}{
 		{
 			name: "a nearby star with a large proper motion",
 			ra:   123.4, dec: -35.6,
 			pmRA: 3000, pmDec: -1500, // Barnard's-star scale
 			parallax: 0.5, rv: -110,
-			tolMasPerYear: 2e-3, tolArcsecOnSky: 1e-9, tolKilometrePerS: 5e-6,
+			tolMasPerYear: 2e-3, tolArcsecOnSky: 1e-9, tolKilometerPerS: 5e-6,
 		},
 		{
 			name: "a distant star with a modest proper motion",
 			ra:   270, dec: 65,
 			pmRA: 15, pmDec: -8,
 			parallax: 1e-3, rv: 20,
-			tolMasPerYear: 3e-4, tolArcsecOnSky: 1e-9, tolKilometrePerS: 5e-3,
+			tolMasPerYear: 3e-4, tolArcsecOnSky: 1e-9, tolKilometerPerS: 5e-3,
 		},
 		{
 			name: "no radial velocity, so no light-time term at all",
 			ra:   10, dec: 0,
 			pmRA: 500, pmDec: 500,
 			parallax: 0.1, rv: 0,
-			tolMasPerYear: 1e-7, tolArcsecOnSky: 1e-9, tolKilometrePerS: 1e-6,
+			tolMasPerYear: 1e-7, tolArcsecOnSky: 1e-9, tolKilometerPerS: 1e-6,
 		},
 		{
 			name: "at rest, where the two must agree to rounding",
 			ra:   200, dec: -80,
 			pmRA: 0, pmDec: 0,
 			parallax: 0.02, rv: 0,
-			tolMasPerYear: 1e-9, tolArcsecOnSky: 1e-9, tolKilometrePerS: 1e-6,
+			tolMasPerYear: 1e-9, tolArcsecOnSky: 1e-9, tolKilometerPerS: 1e-6,
 		},
 	} {
 		ra := tc.ra * math.Pi / 180
@@ -145,9 +145,9 @@ func TestTheDistanceFreePathAgreesWithSOFAWhereSOFACanAnswer(t *testing.T) {
 					tc.name, dir.name, dPmRA, dPmDec, tc.tolMasPerYear)
 			}
 
-			if d := math.Abs(srv - arv); d > tc.tolKilometrePerS {
+			if d := math.Abs(srv - arv); d > tc.tolKilometerPerS {
 				t.Errorf("%s/%s: radial velocity differs by %.3g km/s, tolerance %.3g",
-					tc.name, dir.name, d, tc.tolKilometrePerS)
+					tc.name, dir.name, d, tc.tolKilometerPerS)
 			}
 		}
 	}

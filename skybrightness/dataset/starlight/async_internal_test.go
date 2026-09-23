@@ -96,7 +96,7 @@ func TestJobIDOfRejectsRubbish(t *testing.T) {
 // The long queue is requested, and that is not cosmetic.
 //
 // A whole-sky aggregation runs about fourteen minutes. On the service's
-// default queue it is cancelled with "canceling statement due to statement
+// default queue it is canceled with "canceling statement due to statement
 // timeout", which reads like a service fault and is a missing parameter; the
 // "2h" queue sets the session statement timeout to 7200000 ms. This pins the
 // value so that dropping it fails here rather than a quarter of an hour into a

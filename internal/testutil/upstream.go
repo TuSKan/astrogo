@@ -66,13 +66,23 @@ func SkipOnUpstreamFailure(tb testing.TB, err error) {
 		return
 	}
 
-	if reason, ok := upstreamFailure(err); ok {
+	if reason, ok := UpstreamFailure(err); ok {
 		tb.Skipf("upstream service failure, not verified: %s (%v)", reason, err)
 	}
 }
 
-// upstreamFailure reports whether err is the remote end failing, and why.
-func upstreamFailure(err error) (string, bool) {
+// UpstreamFailure reports whether err is somebody else's fault rather than
+// astrogo's, and why: the classification [SkipOnUpstreamFailure] acts on,
+// available to a caller that must do something other than skip.
+//
+// Exported for the suites that record a result before they stop.
+// metrology.NotVerified writes NOT VERIFIED into the accuracy report and then
+// skips, and four suites called it on any error at all — so a regression that
+// broke jpl.NewProvider outright was reported as an outage and could never
+// fail. With the question separated from the action they record NOT VERIFIED
+// for an outage and fail for everything else, which is the same line this
+// package draws everywhere else.
+func UpstreamFailure(err error) (string, bool) {
 	// Matched through an interface, not remote/api's concrete type: testutil is
 	// imported by nearly every test in the repository, and importing remote
 	// here would both create a cycle with remote's own tests and pull the

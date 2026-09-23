@@ -100,7 +100,7 @@ That is as clean a confirmation as this kind of finding gets.
 The rewrite stops being a preference and becomes the obvious move, for a reason
 that is not "the repo is stale":
 
-- **astrogo has been shipping kilometre-scale errors** on decaying LEO objects
+- **astrogo has been shipping kilometer-scale errors** on decaying LEO objects
   and low-perigee deep-space orbits — exactly the objects a re-entry watcher or
   a debris-conjunction screen cares about. `Satellite.Verified` was built to warn
   callers off that regime; after this it should have nothing to warn about.
@@ -428,7 +428,7 @@ The rewrite deletes as much as it adds:
 | `Satellite.Verified` | reassessed once A2 is measured; kept only if something still needs flagging |
 
 `satellite.ValidateTLE` is public, so it stays as a documented forwarder to
-`ParseTLE` + `VerifyTLEChecksums` rather than being removed. Its behaviour does
+`ParseTLE` + `VerifyTLEChecksums` rather than being removed. Its behavior does
 not change.
 
 ### 6.9 Not in this work
@@ -505,7 +505,7 @@ branches from `main` once its predecessor merges, so CI actually runs.
 | **3** | `initialize.go` + `nearearth.go`. Near-Earth SGP4 only; deep-space element sets return a "not yet implemented" error. | The ~13 near-Earth cases of the suite meet A1. |
 | **4** | `deepspace.go`. | All 33 cases meet A1. A2 measured and reported. |
 | **5** | Differential test vs the incumbent, fuzz targets, property tests, benchmarks. | A5, A6, A7. |
-| **6** | Switch `ephemeris/satellite` to `sgp4`; the deletions in §6.8; drop `go-satellite` from `go.mod`; update `docs/VALIDATION.md`, `README.md` and `CHANGELOG`. | A3, A4. No behaviour change outside the seven cases. |
+| **6** | Switch `ephemeris/satellite` to `sgp4`; the deletions in §6.8; drop `go-satellite` from `go.mod`; update `docs/VALIDATION.md`, `README.md` and `CHANGELOG`. | A3, A4. No behavior change outside the seven cases. |
 
 PR 3's split is not cosmetic. The near-Earth path is where the drag branch of
 §1.2 lives, so it is where the headline claim is either confirmed or refuted —
@@ -533,4 +533,4 @@ rather than accommodated by loosening it.
 
 **Scope.** This replaces a propagator. It does not touch TEME→GCRS, ground
 tracks, look angles, passes or magnitudes, and PR 6 is explicitly a
-no-behaviour-change PR outside §6.8 and the seven cases.
+no-behavior-change PR outside §6.8 and the seven cases.

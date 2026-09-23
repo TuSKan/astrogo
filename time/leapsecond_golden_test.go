@@ -33,7 +33,7 @@ type leapStep struct {
 // possibly including the first negative one — and then stop for good.
 //
 // That makes it the one place where a golden table is genuinely ground truth
-// rather than a snapshot of current behaviour, and where pinning it is
+// rather than a snapshot of current behavior, and where pinning it is
 // stronger than any cross-check between implementations.
 //
 // # Why a cross-check would not be enough

@@ -254,7 +254,7 @@ func TestArtificialSkyglowRespondsToShielding(t *testing.T) {
 	}
 }
 
-// The escape elevation is the component's own modelling choice, so raising
+// The escape elevation is the component's own modeling choice, so raising
 // it must visibly change the answer — otherwise the option is decorative and
 // the doc comment describing it is wrong.
 func TestArtificialSkyglowEscapeElevation(t *testing.T) {
@@ -558,7 +558,7 @@ func TestArtificialSkyglowPhaseWeighting(t *testing.T) {
 // factor to an emitter rather than to a result.
 //
 // It matters because published VIIRS corrections are stated that way. Aubé et
-// al. (2020) correct their modelled radiance by F_T*F_o for atmospheric
+// al. (2020) correct their modeled radiance by F_T*F_o for atmospheric
 // extinction and obstacle blocking of the DNB signal, applied to the model's
 // output with a single obstacle set for the whole domain — which they name as
 // the likely source of their 10 per cent residual. Applying such a factor per

@@ -56,7 +56,7 @@ import (
 // the curated entry names the observatory.
 //
 // So: right for reducing an observation and right for pointing a telescope,
-// wrong for anything that needs the metre, and not to be trusted at all below
+// wrong for anything that needs the meter, and not to be trusted at all below
 // five decimals without checking ResolutionM. A site you own should be entered
 // with your own surveyed coordinates through [NewSite].
 type MPCObservatory struct {
@@ -77,7 +77,7 @@ type MPCObservatory struct {
 	// package inventing a policy the MPC did not write down.
 	Location *coord.Geodetic
 
-	// ResolutionM is how finely this row was published, in metres: half a
+	// ResolutionM is how finely this row was published, in meters: half a
 	// unit in the last decimal of its parallax constants, scaled by Earth's
 	// equatorial radius. Zero for a row with no constants.
 	//
@@ -359,7 +359,7 @@ func parseMPCRow(row string) (MPCObservatory, error) {
 }
 
 // mpcResolution converts how many decimals a row's parallax constants carry
-// into metres on the ground: half a unit in the last place, scaled by the
+// into meters on the ground: half a unit in the last place, scaled by the
 // equatorial radius. The coarser of the two constants decides, since a
 // position is no better than its worse component.
 func mpcResolution(cosText, sinText string) float64 {

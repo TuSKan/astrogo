@@ -304,7 +304,7 @@ func TestFullSkyAllDirections(t *testing.T) {
 
 // The sky brightens toward the horizon. Airglow's van Rhijn enhancement, the
 // artificial term's own geometry and the longer scattering path all push the
-// same way, so this is the aggregate behaviour of the assembled engine rather
+// same way, so this is the aggregate behavior of the assembled engine rather
 // than any one component's.
 func TestFullSkyBrightensTowardTheHorizon(t *testing.T) {
 	t.Parallel()

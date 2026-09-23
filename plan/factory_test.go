@@ -276,13 +276,13 @@ func TestFromCatalog_AsteroidDiameterAndAlbedo(t *testing.T) {
 			t.Fatalf("FromCatalog: got %T, want *plan.Asteroid", obj)
 		}
 
-		metres, ok := ast.PhysicalRadius()
+		meters, ok := ast.PhysicalRadius()
 		if !ok {
 			t.Fatal("PhysicalRadius: ok = false, want true (albedo present, estimate should apply)")
 		}
 
-		if metres <= 0 {
-			t.Errorf("PhysicalRadius() = %v, want a positive H+albedo estimate", metres)
+		if meters <= 0 {
+			t.Errorf("PhysicalRadius() = %v, want a positive H+albedo estimate", meters)
 		}
 	})
 }
