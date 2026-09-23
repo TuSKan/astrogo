@@ -180,7 +180,7 @@ var errPerihelionDate = errors.New("perihelion date out of range")
 
 // cometPerihelionTime reads the perihelion date — year, month and a day with
 // four decimals, in TT. The midnight's Julian Date is formed through the UTC
-// calendar and labelled TT, as ParseEpoch does, and the day's fraction is
+// calendar and labeled TT, as ParseEpoch does, and the day's fraction is
 // carried as a second part so it keeps its precision.
 func cometPerihelionTime(row string) (time.Time, error) {
 	year, err := strconv.Atoi(row[cometTYearStart:cometTYearEnd])

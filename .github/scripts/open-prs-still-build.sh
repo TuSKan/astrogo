@@ -25,7 +25,7 @@
 # Build and vet, not the full test suite: this runs once per push to main and
 # multiplies by the number of open PRs, and a semantic conflict of this kind is
 # a compile error essentially every time. The PR's own checks remain the place
-# where behaviour is tested.
+# where behavior is tested.
 #
 # A PR from a fork is skipped — its head is not a ref in this repository, and
 # a fork PR cannot be trial-merged without fetching untrusted code into a job
