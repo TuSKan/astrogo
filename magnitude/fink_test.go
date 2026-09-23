@@ -26,6 +26,7 @@ import (
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/catalog/fink"
+	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/magnitude"
 )
 
@@ -75,7 +76,17 @@ func finkSSOQuery(t *testing.T, numberOrDesig string, withResiduals, withEphem b
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		t.Skipf("FINK SSO query failed (network issue?): %v", err)
+		// A transport failure, so both predicates are needed: Unreachable knows
+		// a refused dial and a DNS failure, SkipOnUpstreamFailure a timeout or
+		// a connection dropped mid-transfer. Neither covers the other, and
+		// anything they both decline is a request this test built wrong — which
+		// the old message guessed at out loud, with "(network issue?)".
+		if testutil.Unreachable(err) {
+			t.Skipf("FINK is unreachable: %v", err)
+		}
+
+		testutil.SkipOnUpstreamFailure(t, err)
+		t.Fatalf("FINK SSO request: %v", err)
 	}
 
 	t.Cleanup(func() {
@@ -167,7 +178,8 @@ func TestFINK_EndToEndSHG1G2(t *testing.T) {
 
 	tgt, err := prov.Resolve(context.Background(), "8467")
 	if err != nil {
-		t.Skipf("FINK provider: Resolve(8467) failed — SSOFT download or parsing error")
+		testutil.SkipOnUpstreamFailure(t, err)
+		t.Fatalf("Resolve(8467): %v", err)
 	}
 
 	// Resolve has a fast path — a single-object JSON lookup — that never
@@ -401,7 +413,8 @@ func TestFINK_SpinCorrectionPhysics(t *testing.T) {
 
 	tgt, err := prov.Resolve(context.Background(), "8467")
 	if err != nil {
-		t.Skipf("FINK provider: Resolve(8467) failed")
+		testutil.SkipOnUpstreamFailure(t, err)
+		t.Fatalf("Resolve(8467): %v", err)
 	}
 
 	if !tgt.HasSpin || !tgt.HasOblateness {

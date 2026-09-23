@@ -233,7 +233,8 @@ func TestSourceIDTilingAgreesAcrossOrders(t *testing.T) {
 
 		_, counts, err := starlight.RunChunk(ctx, build, first, last)
 		if err != nil {
-			t.Skipf("archive did not answer the order-%d chunk: %v", order, err)
+			testutil.SkipOnUpstreamFailure(t, err)
+			t.Fatalf("RunChunk for the order-%d chunk: %v", order, err)
 		}
 
 		var sum int64
@@ -284,7 +285,8 @@ func TestFetchBrightStarsFindsTheSaturatedStars(t *testing.T) {
 	stars, err := starlight.FetchBrightStars(ctx,
 		starlight.BrightStarLimitV, starlight.BrightStarMatchRadius)
 	if err != nil {
-		t.Skipf("an archive did not answer: %v", err)
+		testutil.SkipOnUpstreamFailure(t, err)
+		t.Fatalf("FetchBrightStars: %v", err)
 	}
 
 	t.Logf("%d Hipparcos stars have no Gaia counterpart", len(stars))

@@ -133,7 +133,8 @@ func TestEq11AgainstTheTable2Ratio(t *testing.T) {
 
 	skyMap, err := starlight.Open(ctx)
 	if err != nil {
-		t.Skipf("could not fetch the published star map: %v", err)
+		testutil.SkipOnUpstreamFailure(t, err)
+		t.Fatalf("starlight.Open: %v", err)
 	}
 
 	stars, err := skyMap.Band("V")

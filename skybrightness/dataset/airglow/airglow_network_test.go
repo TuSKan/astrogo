@@ -45,7 +45,8 @@ func TestFetchReturnsAPlausibleAirglowSpectrum(t *testing.T) {
 
 	s, err := airglow.Fetch(ctx, spec)
 	if err != nil {
-		t.Skipf("SkyCalc did not answer: %v", err)
+		testutil.SkipOnUpstreamFailure(t, err)
+		t.Fatalf("airglow.Fetch: %v", err)
 	}
 
 	if len(s.LambdaNM) == 0 {

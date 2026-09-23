@@ -180,7 +180,8 @@ func TestSmallBodySPKAgainstHorizons(t *testing.T) {
 			refs, err := fetchVectorSeries(body.designation, body.name,
 				"2024-01-01 00:00 TDB", "2024-02-10 00:00", fmt.Sprintf("%dd", stepJD))
 			if err != nil {
-				t.Skipf("Horizons vectors for %s: %v", body.name, err)
+				testutil.SkipOnUpstreamFailure(t, err)
+				t.Fatalf("Horizons vectors for %s: %v", body.name, err)
 			}
 
 			if len(refs) == 0 {

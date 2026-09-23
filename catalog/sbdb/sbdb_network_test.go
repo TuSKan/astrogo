@@ -294,7 +294,8 @@ func TestSBDBElementsAreFullPrecision(t *testing.T) {
 
 	tar, err := prov.Resolve(ctx, "433")
 	if err != nil {
-		t.Skip("SBDB did not resolve 433 Eros")
+		testutil.SkipOnUpstreamFailure(t, err)
+		t.Fatalf("Resolve(\"433\"): %v", err)
 	}
 
 	if !tar.HasElements {

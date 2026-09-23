@@ -148,7 +148,8 @@ func TestAgainstGAMBONS(t *testing.T) {
 	// The published integrated-starlight map.
 	skyMap, err := starlight.Open(ctx)
 	if err != nil {
-		t.Skipf("could not fetch the published star map: %v", err)
+		testutil.SkipOnUpstreamFailure(t, err)
+		t.Fatalf("starlight.Open: %v", err)
 	}
 
 	stars, err := skyMap.Band("V")
@@ -165,7 +166,8 @@ func TestAgainstGAMBONS(t *testing.T) {
 	// sightline the cap average will use, not just the zenith.
 	dustMap, err := dust.Fetch(ctx, nil, capDustDirections(t, scene, gambonsCapDeg, gambonsCapSamples)...)
 	if err != nil {
-		t.Skipf("IRSA did not answer: %v", err)
+		testutil.SkipOnUpstreamFailure(t, err)
+		t.Fatalf("dust.Fetch: %v", err)
 	}
 
 	dgl, err := skybrightness.NewDiffuseGalacticLight(dustMap, stars, band)
@@ -182,7 +184,8 @@ func TestAgainstGAMBONS(t *testing.T) {
 		StepNM:       0.1,
 	}, grid, 87_000)
 	if err != nil {
-		t.Skipf("SkyCalc did not answer: %v", err)
+		testutil.SkipOnUpstreamFailure(t, err)
+		t.Fatalf("airglow.NewAirglow: %v", err)
 	}
 
 	zodiacal := skybrightness.NewZodiacalLight()

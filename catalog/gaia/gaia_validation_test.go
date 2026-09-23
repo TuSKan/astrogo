@@ -175,7 +175,8 @@ func requireArchive(t *testing.T, id remote.EndpointID) {
 
 	u, err := url.Parse(raw)
 	if err != nil {
-		t.Skipf("%s has an unusable URL: %v", id, err)
+		testutil.SkipOnUpstreamFailure(t, err)
+		t.Fatalf("%s resolves to %q, which does not parse: %v", id, raw, err)
 	}
 
 	port := u.Port()

@@ -313,12 +313,29 @@ func fetchNASAPage(t *testing.T, url string) string {
 
 	resp, err := client.Do(req)
 	if err != nil {
-		t.Skipf("NASA endpoint unreachable, skipping: %v", err)
+		// A transport failure, so both predicates are needed: Unreachable knows
+		// a refused dial and a DNS failure, SkipOnUpstreamFailure a timeout or
+		// a connection dropped mid-transfer. Neither covers the other, and
+		// anything they both decline is a request this test built wrong.
+		if testutil.Unreachable(err) {
+			t.Skipf("the NASA endpoint is unreachable: %v", err)
+		}
+
+		testutil.SkipOnUpstreamFailure(t, err)
+		t.Fatalf("NASA request for %s: %v", url, err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
-		t.Skipf("NASA returned status %d for %s", resp.StatusCode, url)
+		// 5xx and 429 are the service having a bad day. Every other status —
+		// a 404 above all — means this test asked for the wrong page, which is
+		// the defect it exists to catch and used to skip past.
+		if resp.StatusCode >= http.StatusInternalServerError ||
+			resp.StatusCode == http.StatusTooManyRequests {
+			t.Skipf("NASA answered %d for %s", resp.StatusCode, url)
+		}
+
+		t.Fatalf("NASA answered %d for %s", resp.StatusCode, url)
 	}
 
 	body, err := io.ReadAll(resp.Body)

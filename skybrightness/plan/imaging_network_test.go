@@ -9,6 +9,7 @@ import (
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
+	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/optics"
 	"github.com/TuSKan/astrogo/plan"
 	"github.com/TuSKan/astrogo/remote"
@@ -44,7 +45,8 @@ func TestImagingDepthAgainstARealSky(t *testing.T) {
 
 	sky, err := dataset.Open(context.Background(), dataset.Spec{Preset: skybrightness.GAMBONSWeb})
 	if err != nil {
-		t.Skipf("no sky available: %v", err)
+		testutil.SkipOnUpstreamFailure(t, err)
+		t.Fatalf("dataset.Open: %v", err)
 	}
 
 	// A 200 mm f/5 with 1.5-arcsecond pixels and ordinary CMOS noise. The
@@ -132,7 +134,8 @@ func TestImagingSatisfiesThePlanningConstraint(t *testing.T) {
 
 	sky, err := dataset.Open(context.Background(), dataset.Spec{Preset: skybrightness.GAMBONSWeb})
 	if err != nil {
-		t.Skipf("no sky available: %v", err)
+		testutil.SkipOnUpstreamFailure(t, err)
+		t.Fatalf("dataset.Open: %v", err)
 	}
 
 	scope, err := optics.NewTelescope(unit.Millimeters(200), unit.Millimeters(1000))

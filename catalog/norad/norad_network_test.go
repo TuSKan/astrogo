@@ -214,7 +214,8 @@ func TestResolveISSIsTheStation(t *testing.T) {
 	// more call. "25544" used to find nothing at all.
 	byNumber, err := p.Resolve(t.Context(), "25544")
 	if err != nil {
-		t.Skip("CelesTrak did not answer the catalog-number query")
+		testutil.SkipOnUpstreamFailure(t, err)
+		t.Fatalf("Resolve(\"25544\"): %v", err)
 	}
 
 	if byNumber.ID != "25544" {

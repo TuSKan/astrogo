@@ -210,7 +210,8 @@ func runAllSky(t *testing.T) allSkyRun {
 
 	skyMap, err := starlight.Open(ctx)
 	if err != nil {
-		t.Skipf("could not fetch the published star map: %v", err)
+		testutil.SkipOnUpstreamFailure(t, err)
+		t.Fatalf("starlight.Open: %v", err)
 	}
 
 	stars, err := skyMap.Band("V")
@@ -266,10 +267,16 @@ func runAllSky(t *testing.T) allSkyRun {
 		end := min(start+dustChunk, len(dirs))
 
 		if _, err := dust.Fetch(ctx, dustMap, dirs[start:end]...); err != nil {
-			// Stop asking. A service that has begun refusing is not helped by
-			// being asked the remaining several hundred times, and a partial
-			// sky would silently bias every band it did not finish.
-			t.Skipf("IRSA stopped answering after %d of %d sightlines in %v: %v",
+			// Stop asking either way. A service that has begun refusing is not
+			// helped by being asked the remaining several hundred times, and a
+			// partial sky would silently bias every band it did not finish.
+			//
+			// Which of the two it is decides whether this counts as evidence.
+			// IRSA rate-limiting a long run is its business; a malformed
+			// request or a moved endpoint is ours, and used to skip here
+			// exactly like an outage.
+			testutil.SkipOnUpstreamFailure(t, err)
+			t.Fatalf("dust.Fetch stopped after %d of %d sightlines in %v: %v",
 				dustMap.Len(), len(dirs), time.Since(fetchStart).Round(time.Second), err)
 		}
 
@@ -935,7 +942,8 @@ func gambonsAirglow(ctx context.Context, t *testing.T, grid unit.SpectralGrid) s
 		StepNM:       0.1,
 	})
 	if err != nil {
-		t.Skipf("SkyCalc did not answer: %v", err)
+		testutil.SkipOnUpstreamFailure(t, err)
+		t.Fatalf("airglow.Fetch: %v", err)
 	}
 
 	out := skybrightness.NewSpectralRadiance(grid)
