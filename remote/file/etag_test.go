@@ -19,7 +19,7 @@ import (
 // current, and whether a partial one can be resumed onto.
 //
 // It replaced gocloud's per-object metadata map, which io/fs has no equivalent
-// of, so none of it is inherited behaviour — all of it is new and all of it is
+// of, so none of it is inherited behavior — all of it is new and all of it is
 // load-bearing.
 
 // stubInfo is an fs.FileInfo with whatever Sys and ModTime a case needs.
@@ -331,7 +331,7 @@ func TestMemFSHonoursItsContext(t *testing.T) {
 	}
 
 	if _, err := fs.ReadFile(dead, "k.bsp"); err == nil {
-		t.Error("a cancelled context still read from mem://")
+		t.Error("a canceled context still read from mem://")
 	}
 }
 

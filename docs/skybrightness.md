@@ -113,7 +113,7 @@ instrument projection downstream would then be wrong.
 
 Radiance is linear and additive; magnitude is logarithmic and is not. Components sum in
 radiance space and the conversion happens once, at the end. Summing magnitudes is a
-correctness bug, and `TestComponentsSumLinearly` asserts the linear behaviour directly.
+correctness bug, and `TestComponentsSumLinearly` asserts the linear behavior directly.
 
 ### The spectral grid
 
@@ -130,7 +130,7 @@ site beyond 700 nm. 1 nm resolves airglow line structure well enough for broadba
 projection while keeping a full-sky evaluation tractable.
 
 Integration is trapezoidal. The integrands are products of measured response curves and
-modelled spectra, both carrying sampling error far larger than the quadrature difference,
+modeled spectra, both carrying sampling error far larger than the quadrature difference,
 and Simpson would additionally require an odd sample count callers have no reason to
 guarantee.
 
@@ -242,7 +242,7 @@ data, validity domain and uncertainty: starlight, diffuse Galactic light, extrag
 background, zodiacal light, airglow continuum, airglow lines, moonlight, twilight,
 artificial.
 
-Radiance is validated **per component**, not only on the total: a negative term cancelled
+Radiance is validated **per component**, not only on the total: a negative term canceled
 by a positive one would otherwise pass unnoticed, and the point of the check is to name
 which component is wrong.
 
@@ -309,7 +309,7 @@ vertical aerosol and molecular optical thickness; `H_a`, `H_R` the corresponding
 heights; `D` source–observer separation; `ϖ_a` aerosol single-scattering albedo; `g_a`
 aerosol asymmetry parameter.
 
-**Behaviour worth checking.** At the horizon Eq. 2 reduces to `L_S·P(g,Θ)·(1−g)²/(1+g)`,
+**Behavior worth checking.** At the horizon Eq. 2 reduces to `L_S·P(g,Θ)·(1−g)²/(1+g)`,
 which is a cheap analytic check — and, as the next section explains, a badly insufficient
 one on its own. As `τ_a → 0`, `g → 0.33`, excluding isotropic scattering even in a clean
 atmosphere, consistent with `c₀`'s constant term.
@@ -487,7 +487,7 @@ base 2 km (0.3, 1.0 and 4.0 km in sensitivity), cloud fractions 0 to 0.9, bands 
 | Outside the city | screening — radiance *reduced* |
 
 The sign reversal between "over the city" and "outside the city" is the qualitative
-behaviour a universal cloud multiplier cannot reproduce, and is the acceptance criterion
+behavior a universal cloud multiplier cannot reproduce, and is the acceptance criterion
 for this component: amplification and screening must both emerge from geometry alone.
 
 **Measured, both emerge.** `TestZilinaAmplificationAcrossDistance` runs the paper's own
@@ -926,7 +926,7 @@ is already in the map.
 
 **Why the old map appeared to validate, and why comparing to a single number never could.**
 The inverted map read 23.44 at high latitude against a quoted ~23.5 and looked like a match.
-It was a coincidence: the excess brightness at the bluest part of the sky cancelled what the
+It was a coincidence: the excess brightness at the bluest part of the sky canceled what the
 map was missing. But the deeper problem is that the comparison sets two different
 quantities against each other. This map is **integrated starlight alone**; quoted all-sky background figures
 include diffuse galactic light — 20 to 30 per cent of the Milky Way's integrated light, per
@@ -1142,7 +1142,7 @@ columns.
 
 **Known limitations.**
 
-- The scattered term of Eq. 8 is not modelled. It returns to the line of sight some of
+- The scattered term of Eq. 8 is not modeled. It returns to the line of sight some of
   what extinction removed, so attenuation alone **overstates** the dimming toward the
   horizon. Masana et al. put the difference between their full and simplified scattering
   at under 0.1 mag arcsec⁻², and every result below 30° altitude carries
@@ -1199,7 +1199,7 @@ The numeric API is decoupled from storage and assumes nothing about a local POSI
 filesystem — `remote` addresses everything as a bucket plus key.
 
 **No hidden network dependency.** `Model.Estimate` is deterministic for a given scene and
-dataset version and performs no acquisition. This is enforced behaviourally:
+dataset version and performs no acquisition. This is enforced behaviorally:
 `TestEstimateWorksOffline` runs an evaluation under `remote.SetOffline(true)` and requires
 byte-identical output. A structural direct-import check complements it
 (`TestCoreDoesNotImportIOPackages`); a *transitive* ban would be wrong rather than
@@ -1426,7 +1426,7 @@ European site, a remote dark site, a high-aerosol site, a humid site, a high-alt
 site, both hemispheres. The model is not tuned to one observatory and then claimed global.
 
 **Phase 0 proves none of this.** It proves unit correctness, integration correctness,
-linear additivity, determinism, projection consistency and allocation behaviour. It ships
+linear additivity, determinism, projection consistency and allocation behavior. It ships
 no physics, so it makes no accuracy claim whatsoever.
 
 ---
@@ -1590,7 +1590,7 @@ source in hand.
 `skybrightness/dataset/airglow` calls ESO's SkyCalc — the same source GAMBONS uses — and
 returns a zenith spectrum the component applies van Rhijn to. Fetching rather than shipping a
 table follows the rule that no package embeds data, and it lets a caller ask for the solar
-flux of the night being modelled instead of a climatological average.
+flux of the night being modeled instead of a climatological average.
 
 Three things about that service had to be found by using it rather than by reading about it.
 Its protocol is three calls, not one: a POST that runs the model and returns a temporary

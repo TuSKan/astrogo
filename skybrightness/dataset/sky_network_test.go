@@ -18,7 +18,7 @@ import (
 //
 // # Why this needs a test at all
 //
-// Because it is a designed behaviour rather than an incidental error string.
+// Because it is a designed behavior rather than an incidental error string.
 // Consent deliberately stays outside this package — a convenience that
 // granted its own would fetch 145 MB because somebody typed a preset name —
 // and the price of that decision is that a first-time caller hits a refusal.

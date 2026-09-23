@@ -28,7 +28,7 @@ var kernel = func() []byte {
 	return b
 }()
 
-// objectServer serves one object with whatever range behaviour a test asks for.
+// objectServer serves one object with whatever range behavior a test asks for.
 type objectServer struct {
 	allowHEAD     bool
 	sendLength    bool
@@ -288,7 +288,7 @@ func TestHTTPIsReadOnly(t *testing.T) {
 
 	if _, ok := fsys.(file.ContextFS); !ok {
 		t.Error("the HTTP backend does not implement ContextFS, so a download over it " +
-			"could not be cancelled")
+			"could not be canceled")
 	}
 }
 
@@ -307,17 +307,17 @@ func TestHTTPHonoursItsContext(t *testing.T) {
 		t.Fatalf("a bound filesystem cannot read: %v", err)
 	}
 
-	// And a cancelled context stops it.
+	// And a canceled context stops it.
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 
-	cancelled, err := file.RequireContext(ctx, fsys)
+	canceled, err := file.RequireContext(ctx, fsys)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if _, err := fs.Stat(cancelled, "de440s.bsp"); err == nil {
-		t.Error("a cancelled context still fetched; ContextFS is not reaching the request")
+	if _, err := fs.Stat(canceled, "de440s.bsp"); err == nil {
+		t.Error("a canceled context still fetched; ContextFS is not reaching the request")
 	}
 }
 

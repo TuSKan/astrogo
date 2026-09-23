@@ -166,7 +166,7 @@ func TestCacheRoundTripsSparsely(t *testing.T) {
 //
 // The order-8 build is 787 queries against a shared service. When one was
 // throttled at chunk 360, the run discarded 360 chunks of completed work and
-// the only way forward was to ask for all of it again, which is the behaviour
+// the only way forward was to ask for all of it again, which is the behavior
 // that earns a throttle. Checkpointing means a stumble costs a minute and a
 // resume asks only for what is missing.
 func TestCacheRoundTripsCounts(t *testing.T) {

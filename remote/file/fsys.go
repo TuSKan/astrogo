@@ -113,7 +113,7 @@ type (
 		Abort() error
 	}
 
-	// ContextFS is a filesystem whose operations can be cancelled.
+	// ContextFS is a filesystem whose operations can be canceled.
 	//
 	// # The gap this closes, and why it is not optional in practice
 	//
@@ -135,7 +135,7 @@ type (
 	//
 	// A backend serving a Downloadable endpoint must implement this — see
 	// [RequireContext] — because a multi-gigabyte fetch that cannot be
-	// cancelled is not a thing to discover at run time.
+	// canceled is not a thing to discover at run time.
 	ContextFS interface {
 		fs.FS
 		WithContext(ctx context.Context) fs.FS

@@ -190,7 +190,7 @@ func TestPeriodFollowsKeplersThirdLaw(t *testing.T) {
 
 	if rel := math.Abs(gotJup-joviPublished) / joviPublished; rel < 0.003 || rel > 0.005 {
 		t.Errorf("two-body differs from Io's published period by %.3f%%, expected about 0.4%% — "+
-			"if this shrank, something started modelling the perturbations", 100*rel)
+			"if this shrank, something started modeling the perturbations", 100*rel)
 	}
 }
 
@@ -362,7 +362,7 @@ func TestUnregisteredBodyStillReachesTheBase(t *testing.T) {
 	}
 }
 
-// TestPeriodOverridesTheDerivedMeanMotion is the behavioural half of
+// TestPeriodOverridesTheDerivedMeanMotion is the behavioral half of
 // [kepler.Elements.WithPeriod]: the supplied period has to be the one the
 // mean anomaly actually advances at, not merely a field that round-trips.
 //

@@ -110,7 +110,7 @@ func TestCloudBrightensTheSkyOverASource(t *testing.T) {
 // The cloud term scales with reflectance, and with height in a way that
 // depends on where the source is.
 //
-// # The height behaviour is not simply 1/H^2
+// # The height behavior is not simply 1/H^2
 //
 // The term carries 1/H^2, so a lower deck ought to be brighter, and directly
 // over a city it is. But it also carries cos^4(z0_H), the angle at which the
@@ -529,7 +529,7 @@ func TestCloudScreensAwayFromTheCityAndAmplifiesOverIt(t *testing.T) {
 
 			if !c.amplifies && ratio >= 1 {
 				t.Errorf("far from the city the cloud gives %.3f of the clear sky; it must "+
-					"screen, which is the half of the behaviour a cloud multiplier cannot "+
+					"screen, which is the half of the behavior a cloud multiplier cannot "+
 					"produce", ratio)
 			}
 		})

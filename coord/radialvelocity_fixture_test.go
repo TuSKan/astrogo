@@ -176,7 +176,7 @@ func TestRVCorrectionAgainstAstropy(t *testing.T) {
 		"1 m/s, below astrogo's own stated accuracy for this classical projection and far "+
 			"above float64 noise; two classical implementations sharing an ephemeris should "+
 			"differ only in the projection, and a disagreement above this is a sign convention, "+
-			"a site position or a time scale rather than a modelling difference",
+			"a site position or a time scale rather than a modeling difference",
 		"coord/radialvelocity.go's accuracy note; Wright & Eastman (2014) for the terms neither side models")
 
 	// The two suites report identical residual distributions, and that is

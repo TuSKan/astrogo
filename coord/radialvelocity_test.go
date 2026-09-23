@@ -418,7 +418,7 @@ func TestBarycentricRadialVelocity_ExceedsTheAdditiveFormByTheDocumentedAmount(t
 
 	// The claim the doc comments make: at 46.6 km/s the dropped term equals
 	// the 4.66 m/s of relativistic physics this package omits, so beyond it
-	// the composition error dominates the modelling error.
+	// the composition error dominates the modeling error.
 	const crossover = 46.6
 
 	dropped := math.Abs(crossover*corr/c) * 1e3

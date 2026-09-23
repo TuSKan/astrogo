@@ -241,7 +241,7 @@ type PresetInputs struct {
 	AirglowZenith SpectralRadiance
 
 	// AirglowMeasured records that the spectrum came from an observation of
-	// the night being modelled rather than from a reference, which changes
+	// the night being modeled rather than from a reference, which changes
 	// the quality flag the component reports.
 	AirglowMeasured bool
 

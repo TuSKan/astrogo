@@ -232,7 +232,7 @@ type candidate struct {
 // reasons joined together, tagged by provider name.
 //
 // The distinction is the point. This used to return ErrNotFound for a
-// cancelled context, an exceeded deadline, offline mode and a CDS outage
+// canceled context, an exceeded deadline, offline mode and a CDS outage
 // alike, because the provider interface had nowhere to put a failure. A
 // pipeline resolving ten thousand names during an outage got ten thousand
 // confident "no such object" answers and no indication anything was wrong.
@@ -257,7 +257,7 @@ func (r *Resolver) Resolve(ctx context.Context, query string) (Target, error) {
 		return Target{}, ErrNotFound
 	}
 
-	// Checked before any provider is consulted so a cancelled caller gets
+	// Checked before any provider is consulted so a canceled caller gets
 	// context.Canceled rather than whatever the first provider makes of it.
 	if err := ctx.Err(); err != nil {
 		return Target{}, fmt.Errorf("catalog: %w", err)

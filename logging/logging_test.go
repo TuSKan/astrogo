@@ -101,7 +101,7 @@ func TestSetNilRestoresTheDefault(t *testing.T) {
 }
 
 // TestSilenceIsAvailable pins that a caller who wants nothing at all can have
-// it — the behaviour #108 asked for as the default, still reachable in one
+// it — the behavior #108 asked for as the default, still reachable in one
 // call.
 func TestSilenceIsAvailable(t *testing.T) {
 	defer logging.Set(nil)

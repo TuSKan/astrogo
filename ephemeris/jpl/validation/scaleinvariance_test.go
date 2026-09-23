@@ -47,7 +47,7 @@ func TestJPLStateIsScaleInvariant(t *testing.T) {
 
 	// Fixed, and deliberately clear of a leap-second boundary: the point here
 	// is the provider's handling of the caller's label, not the leap-second
-	// table's behaviour at a discontinuity.
+	// table's behavior at a discontinuity.
 	utc := time.Date(2026, time.April, 20, 3, 0, 0, 0, time.LocationUTC)
 
 	bodies := map[string]eph.ID{
@@ -76,12 +76,12 @@ func TestJPLStateIsScaleInvariant(t *testing.T) {
 			for _, s := range scales {
 				got, err := p.State(id, s.at(utc))
 				if err != nil {
-					t.Fatalf("State with a %s-labelled instant: %v", s.label, err)
+					t.Fatalf("State with a %s-labeled instant: %v", s.label, err)
 				}
 
 				if d := got.Pos.Sub(base.Pos).Norm(); d > jplScaleTolerance {
 					t.Errorf("position moved %.6g AU (%.4g km) when the same instant "+
-						"was labelled %s.\n  The provider is reading the caller's scale "+
+						"was labeled %s.\n  The provider is reading the caller's scale "+
 						"as its own — normalise at the entry point rather than reading "+
 						"JDParts raw.", d, d/metresInAU/1e3, s.label)
 				}

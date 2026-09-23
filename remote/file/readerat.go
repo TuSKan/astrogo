@@ -118,7 +118,7 @@ var (
 // at this moment and is not meant to outlive a rewrite of that name.
 //
 // A filesystem implementing [ContextFS] is bound to ctx first, so a read that
-// blocks on somebody else's network can be cancelled. One that does not — the
+// blocks on somebody else's network can be canceled. One that does not — the
 // local backend, which has nothing to cancel — is used as it is.
 func Open(ctx context.Context, fsys fs.FS, name string, opts ...ReaderAtOption) (File, error) {
 	cfg := readerAtConfig{chunkSize: defaultChunkSize, cachedChunks: defaultCachedChunks}

@@ -209,7 +209,7 @@ func TestScatteredMoonlightFullMoonSkyBrightness(t *testing.T) {
 
 // Away from the Moon the sky is darker. The Rayleigh phase function is
 // forward- and back-peaked and the path geometry changes too, so this is the
-// combined directional behaviour rather than a single term.
+// combined directional behavior rather than a single term.
 func TestScatteredMoonlightDarkensAwayFromTheMoon(t *testing.T) {
 	t.Parallel()
 

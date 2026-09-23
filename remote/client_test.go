@@ -87,7 +87,7 @@ func TestADedicatedClientDoesNotDisturbTheDefault(t *testing.T) {
 // TestPackageFunctionsOperateOnDefault pins the http.DefaultClient analogue.
 //
 // It is what makes the change compatible: every existing caller keeps writing
-// remote.SetOffline and keeps getting the same behaviour, because that call and
+// remote.SetOffline and keeps getting the same behavior, because that call and
 // Default().SetOffline are the same state rather than two that agree by
 // convention.
 func TestPackageFunctionsOperateOnDefault(t *testing.T) {

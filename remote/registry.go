@@ -265,7 +265,7 @@ type Policy func(ep Endpoint, size int64) error
 func SetPolicy(p Policy) { Default().SetPolicy(p) }
 
 // SetPolicy installs a custom download-consent policy on this client. Pass nil
-// to restore the default per-endpoint consent behaviour.
+// to restore the default per-endpoint consent behavior.
 func (c *Client) SetPolicy(p Policy) {
 	c.mu.Lock()
 	defer c.mu.Unlock()

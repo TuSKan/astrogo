@@ -252,7 +252,7 @@ func vBandForTest() magnitude.Passband {
 //
 // The bands come from published colour indices rather than a fit, so a star the
 // Bright Star Catalogue does not cover has no R at all. Skipping it there is
-// the intended behaviour and the alternative — inventing a colour so every band
+// the intended behavior and the alternative — inventing a colour so every band
 // is populated — is what this package refuses.
 func TestAddBrightStarsCoversOnlyTheBandsAStarHas(t *testing.T) {
 	t.Parallel()

@@ -61,7 +61,7 @@ const keplerSmallBodySpanDays = 30
 // the orbit at one instant, and the kernel is what JPL offers for positions.
 // So this takes the construction the Galilean and Pluto suites use: a bound
 // between two measured errors, chosen so it fails for a structural fault and
-// passes while the perturbations are merely unmodelled.
+// passes while the perturbations are merely unmodeled.
 //
 //   - Below it, the divergence this package openly does not model: 1.777e-5 AU
 //     (2,658 km) at worst over the six bodies and the window sampled here. The
@@ -89,14 +89,14 @@ const keplerSmallBodySpanDays = 30
 // from 690,000 km to 21 km, a factor of about 1,800, and it is guarded now by
 // TestSBDBElementsAreFullPrecision.
 //
-// The contract below is written against the fixed behaviour. Had this suite
+// The contract below is written against the fixed behavior. Had this suite
 // been written to accept what was measured first, it would have recorded a
 // 0.0123 AU bound and called a parsing bug the two-body approximation.
 func keplerSmallBodyContract() metrology.Contract {
 	return metrology.MustContract(keplerSmallBodyBoundAU, "AU",
 		"not an accuracy claim. Two-body propagation of osculating elements is wrong here by "+
 			"construction: the elements are exact only at their epoch of osculation and the "+
-			"planetary perturbations that move them are unmodelled, which costs 1.777e-5 AU "+
+			"planetary perturbations that move them are unmodeled, which costs 1.777e-5 AU "+
 			"(2,658 km) at worst over the 30 days either side sampled. Reading the same elements "+
 			"one frame out instead — the realistic structural mistake, since they are published "+
 			"against the ecliptic and returned in equatorial ICRS — displaces these bodies by at "+

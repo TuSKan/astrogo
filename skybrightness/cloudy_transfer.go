@@ -319,7 +319,7 @@ func (c *CloudySkyglow) addAirTerm(
 //
 // Ten centimetres, and the value was measured rather than chosen. The
 // integrand is finite at the ground rather than singular — the 1/h^2 is
-// cancelled by cos^2(z0_h), which falls like h/L — so the omitted sliver
+// canceled by cos^2(z0_h), which falls like h/L — so the omitted sliver
 // contributes about f(0) times the floor, and shrinking the floor converges.
 // Measured against a city 60 km away it converges cleanly: a 10 m floor is
 // 6.1 per cent low, 1 m is 0.63, 10 cm is 0.06 and 1 cm is 0.006. Ten

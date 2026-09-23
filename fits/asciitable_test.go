@@ -59,7 +59,7 @@ func appendInt(dst []byte, v int) []byte {
 	return append(dst, digits[i:]...)
 }
 
-// TestReadASCIITableDecodesItsColumns is the behaviour that was missing: the
+// TestReadASCIITableDecodesItsColumns is the behavior that was missing: the
 // reader used to consume the payload and return a header, so every ASCII table
 // in every archive arrived empty.
 func TestReadASCIITableDecodesItsColumns(t *testing.T) {

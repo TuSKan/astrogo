@@ -73,7 +73,7 @@ func AirglowRadiance(
 	flags := ClimatologicalAirglow
 
 	// Leinert et al. note that extinction and scattering along the longer
-	// path change the behaviour materially beyond about 40 degrees from the
+	// path change the behavior materially beyond about 40 degrees from the
 	// zenith, and this applies the geometry alone.
 	if zenithAngle.Degrees() > 40 {
 		flags |= ExtrapolatedModel

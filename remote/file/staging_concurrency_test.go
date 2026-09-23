@@ -93,15 +93,15 @@ func TestStagingAndPartialWritesAcrossFilesystems(t *testing.T) {
 	}
 }
 
-// TestAcquireLockReportsACancelledContext covers the path where the lock
+// TestAcquireLockReportsACanceledContext covers the path where the lock
 // object cannot be created for a reason that is not contention.
 //
 // The three codes a losing writer produces — FailedPrecondition, Unknown and
 // NotFound — are all retried, which is what makes the lock work under
-// contention and what makes this path easy to leave untested. A cancelled
+// contention and what makes this path easy to leave untested. A canceled
 // context is the case that must *not* be retried: the caller has gone, and
 // spinning until the deadline would be the one outcome worse than failing.
-func TestAcquireLockReportsACancelledContext(t *testing.T) {
+func TestAcquireLockReportsACanceledContext(t *testing.T) {
 	t.Parallel()
 
 	fsys, err := file.OpenFS("file:///" + filepath.ToSlash(t.TempDir()) + "?create_dir=true")
@@ -112,18 +112,18 @@ func TestAcquireLockReportsACancelledContext(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 
-	release, err := file.AcquireLock(ctx, fsys, "cancelled.bsp")
+	release, err := file.AcquireLock(ctx, fsys, "canceled.bsp")
 	if release != nil {
 		release()
 	}
 
 	if err == nil {
-		t.Fatal("a cancelled context produced a lock; the caller is gone and " +
+		t.Fatal("a canceled context produced a lock; the caller is gone and " +
 			"nothing should be holding one on its behalf")
 	}
 
 	if !errors.Is(err, context.Canceled) {
-		t.Errorf("AcquireLock with a cancelled context returned %v, want it to "+
+		t.Errorf("AcquireLock with a canceled context returned %v, want it to "+
 			"wrap context.Canceled rather than be retried as contention", err)
 	}
 

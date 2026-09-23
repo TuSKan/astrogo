@@ -458,7 +458,7 @@ func TestAtTimeAgreesWithAt(t *testing.T) {
 		}
 	}
 
-	// The scale conversion. The same instant labelled TT is 69.184 s later than
+	// The scale conversion. The same instant labeled TT is 69.184 s later than
 	// the UTC label, and AtTime must resolve that rather than take the label.
 	utc := el.Epoch.Add(unit.Days(1))
 

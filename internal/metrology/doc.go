@@ -36,7 +36,7 @@
 //
 // [Stats] reports percentiles because a maximum over a few dozen samples is
 // the least stable statistic available: it is determined by a single point
-// and moves whenever that point moves. p50 and p95 describe the behaviour,
+// and moves whenever that point moves. p50 and p95 describe the behavior,
 // the maximum bounds it, and [Stats.Worst] names the sample that produced it
 // so the report says *where* rather than only *how much*.
 //

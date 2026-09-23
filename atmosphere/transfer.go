@@ -222,7 +222,7 @@ const (
 // treated as a constant floor.
 //
 // This is the geometry only. Extinction and scattering along the longer path
-// work against it, and Leinert et al. note they change the behaviour
+// work against it, and Leinert et al. note they change the behavior
 // materially beyond about 40 degrees from the zenith; applying this factor
 // alone overstates the horizon brightness.
 //

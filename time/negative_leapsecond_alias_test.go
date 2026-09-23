@@ -130,7 +130,7 @@ func TestPositiveAndNegativeClassifiersDoNotOverlap(t *testing.T) {
 
 // TestSecondRemovedWarningIsAWarningNotProgress mirrors the positive case:
 // Date has no error return, so this is the only notice a caller gets that the
-// instant they built is one UTC never labelled.
+// instant they built is one UTC never labeled.
 func TestSecondRemovedWarningIsAWarningNotProgress(t *testing.T) {
 	// Not parallel: it swaps the process-wide logger and the leap-second table.
 	defer logging.Set(nil)

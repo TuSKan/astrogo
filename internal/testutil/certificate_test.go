@@ -77,7 +77,7 @@ type certFixture struct {
 // A live handshake rather than hand-built error values. What is under test is
 // which error the standard library actually produces and how deeply it wraps
 // it, and a synthetic x509 error would assert this package's belief about that
-// instead of the behaviour. Two things a synthetic error would have got wrong
+// instead of the behavior. Two things a synthetic error would have got wrong
 // here: VerifyHostname returns HostnameError by value, not by pointer, and the
 // verifier ordering described above is not what reading crypto/x509 alone
 // suggests, because two of the three CI platforms do not use it.
@@ -281,7 +281,7 @@ func TestCertificateFailureIgnoresEverythingElse(t *testing.T) {
 	}{
 		{"nil", nil},
 		{"a plain error", errSomethingWentWrong},
-		{"a cancelled context", context.Canceled},
+		{"a canceled context", context.Canceled},
 		{"a deadline", context.DeadlineExceeded},
 		{"a DNS failure", &net.DNSError{Err: "no such host", IsNotFound: true}},
 		{"a refused dial", &net.OpError{Op: "dial", Err: errConnectionRefused}},

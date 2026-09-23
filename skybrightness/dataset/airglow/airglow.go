@@ -88,7 +88,7 @@ type Spec struct {
 	//
 	// SkyCalc's own default is 130. GAMBONS ships its reference spectrum at
 	// 100. Current values come from the Canadian Space Weather Forecast
-	// Centre; a caller modelling a specific night should use that night's.
+	// Centre; a caller modeling a specific night should use that night's.
 	// Zero means SkyCalc's default.
 	SolarFluxSFU float64
 
@@ -116,7 +116,7 @@ type Spec struct {
 	// callers leave at zero.
 	//
 	// That matters for reproducing somebody else's run as much as for
-	// modelling a real night: two calculations quoting "SkyCalc at
+	// modeling a real night: two calculations quoting "SkyCalc at
 	// msolflux 100" can differ by tens of per cent without either being
 	// wrong, and neither would say so.
 	Season      int
@@ -457,7 +457,7 @@ func fetchSkytable(ctx context.Context, req skycalcRequest) ([]byte, error) {
 //
 // # Which columns, and why not FLUX
 //
-// The table carries a FLUX column that is the whole modelled sky. This reads
+// The table carries a FLUX column that is the whole modeled sky. This reads
 // FLUX_AEL and FLUX_ARC instead — the airglow emission lines and the airglow
 // residual continuum — and adds them. Using FLUX would fold in whatever else
 // the service included and hand the caller a sky to subtract from rather than

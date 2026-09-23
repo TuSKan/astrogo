@@ -81,7 +81,7 @@ func TestUpstreamFailureClassification(t *testing.T) {
 		// network, and Unreachable declines it — but the deadline arm above
 		// claims it first, deliberately, because a service too slow to answer
 		// within the endpoint's timeout is the service's problem.
-		{"cancelled by the caller", context.Canceled, false},
+		{"canceled by the caller", context.Canceled, false},
 	}
 
 	for _, c := range cases {

@@ -406,7 +406,7 @@ func BuildFromGaia(ctx context.Context, build GaiaBuild) (*Map, []int64, error) 
 	// run that dies partway keeps what it had. Before this, a throttle at
 	// chunk 360 of 787 discarded 360 chunks of somebody else's service time
 	// as well as fourteen minutes of ours, and the only recovery was to ask
-	// for all of it again — which is precisely the behaviour that gets a
+	// for all of it again — which is precisely the behavior that gets a
 	// client throttled in the first place.
 	band := build.Bands[0].Name
 	values := bands[band]
@@ -601,7 +601,7 @@ func aggregationClient(id remote.EndpointID) *remote.Client {
 // context is done. That is the failure a long build actually hits, so it is
 // retried here with a fresh deadline and a backoff.
 //
-// A cancelled parent context is not a transient failure and stops immediately.
+// A canceled parent context is not a transient failure and stops immediately.
 //
 // Retries are not reported through Progress. Overloading a (done, total)
 // callback with a sentinel would make every existing caller's arithmetic
