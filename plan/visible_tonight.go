@@ -168,8 +168,10 @@ type visibleCandidate struct {
 // naked-eye planets, Mercury through Neptune, plus Pluto — Uranus/Neptune/
 // Pluto are included on the same footing as everything else (never
 // hardcoded out): at typical magLimit values they're excluded by their own
-// faintness (~5.7/7.8/~14-16), not by a special case here. Pluto's Kind is
-// reported as resolve.KindDwarfPlanet, not resolve.KindPlanet — see
+// faintness (~5.7/7.8/~14-16), not by a special case here. (Until #407
+// Pluto was excluded by an error instead, at every limit: its magnitude was
+// not implemented and the error was dropped.) Pluto's Kind is reported as
+// resolve.KindDwarfPlanet, not resolve.KindPlanet — see
 // gatherSolarSystemCandidates.
 var planetConstructors = []func(eph.Provider) *Planet{
 	NewMercury, NewVenus, NewMars, NewJupiter, NewSaturn, NewUranus, NewNeptune, NewPluto,
@@ -301,7 +303,7 @@ func VisibleTonight(
 	var dropped skips
 
 	candidates := gatherCandidates(ctx, gatherBrightTargets(ctx, brightSources, magLimit, &dropped), start, end, cfg, &dropped)
-	candidates = append(candidates, gatherSolarSystemCandidates(planetProvider, mid, magLimit)...)
+	candidates = append(candidates, gatherSolarSystemCandidates(planetProvider, mid, magLimit, &dropped)...)
 
 	if cfg.includeMoons {
 		moonCandidates, moonProviders := gatherPlanetaryMoons(ctx, mid, magLimit, &dropped)
@@ -582,11 +584,20 @@ func candidateFromTarget(ctx context.Context, tgt resolve.Target, start, end tim
 // over one night, unlike their position). Each gets a synthetic
 // resolve.Target (no catalog backs these, so there's nothing to carry
 // through except identity/kind).
-func gatherSolarSystemCandidates(provider eph.Provider, at time.Time, magLimit float64) []visibleCandidate {
+//
+// A body whose magnitude cannot be computed is recorded in dropped, not left
+// out as though it were too faint. Until #407 it was left out: Pluto, whose
+// magnitude was not implemented, was missing at every limit, and a provider
+// failure for any planet looked exactly like that planet being too faint.
+func gatherSolarSystemCandidates(provider eph.Provider, at time.Time, magLimit float64, dropped *skips) []visibleCandidate {
 	var out []visibleCandidate
 
 	moon := NewMoon(provider)
-	if m, err := moon.ApparentMagnitude(at); err == nil && m < magLimit {
+
+	m, err := moon.ApparentMagnitude(at)
+	dropped.add("moon", moon.Name(), err)
+
+	if err == nil && m < magLimit {
 		out = append(out, visibleCandidate{
 			obj:    moon,
 			target: resolve.Target{Name: moon.Name(), Kind: resolve.KindMoon, Catalog: "ephemeris"},
@@ -602,6 +613,8 @@ func gatherSolarSystemCandidates(provider eph.Provider, at time.Time, magLimit f
 		}
 
 		m, err := p.ApparentMagnitude(at)
+		dropped.add("planet", p.Name(), err)
+
 		if err == nil && m < magLimit {
 			out = append(out, visibleCandidate{
 				obj:    p,

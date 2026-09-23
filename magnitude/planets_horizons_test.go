@@ -83,6 +83,14 @@ func TestPlanetMagnitudesAgreeWithHorizons(t *testing.T) {
 		{eph.Neptune, 2020, 1, 1, 1.724, 7.789},
 		{eph.Neptune, 2022, 6, 15, 1.946, 7.776},
 		{eph.Neptune, 2026, 9, 23, 0.120, 7.679},
+
+		// Pluto with Charon, from the Explanatory Supplement's V(1,0) = -1.01;
+		// Horizons uses -1.00, so these sit 0.010-0.012 mag bright (#407).
+		{eph.Pluto, 2020, 1, 1, 0.3608, 14.384},
+		{eph.Pluto, 2024, 7, 1, 0.6269, 14.412},
+		{eph.Pluto, 2026, 12, 20, 0.9357, 14.608},
+		{eph.Pluto, 2026, 9, 23, 1.3494, 14.536},
+		{eph.Pluto, 2022, 4, 1, 1.5852, 14.460},
 	}
 
 	for _, tc := range cases {

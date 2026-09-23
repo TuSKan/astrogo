@@ -70,6 +70,8 @@ func PlanetApparent(p eph.Provider, target eph.ID, t time.Time) (float64, error)
 		return uranusMag(sunToPlanet, observerToPlanet, r, delta, phAng), nil
 	case eph.Neptune:
 		return neptuneMag(r, delta, phAng, t), nil
+	case eph.Pluto:
+		return plutoMag(r, delta, phAng), nil
 	default:
 		return 0, ErrUnsupportedBody
 	}
@@ -303,4 +305,21 @@ func neptuneMag(r, delta, phAng float64, t time.Time) float64 {
 	}
 
 	return apMag
+}
+
+// ── Pluto — Explanatory Supplement (1992), Table 7.48.1 ────────────────────
+// Mallama & Hilton (2018) do not cover Pluto, and neither does Skyfield. The
+// Explanatory Supplement to the Astronomical Almanac gives V(1,0) = −1.01 for
+// Pluto and Charon together, which is what any telescope short of resolving
+// them sees (Harris 1961), and a linear phase coefficient of 0.041 mag per
+// degree (Binzel & Mulholland 1984). Pluto's phase angle never exceeds about
+// 1.9° from Earth.
+//
+// JPL Horizons' APmag, which also includes Charon, uses −1.00 and the same
+// coefficient: 0.01 mag fainter than this, against a rotational variation the
+// Supplement puts at 0.1–0.3 mag. Until #407 PlanetApparent listed Pluto as
+// supported and returned ErrUnsupportedBody for it.
+
+func plutoMag(r, delta, phAng float64) float64 {
+	return -1.01 + 5*math.Log10(r*delta) + 0.041*phAng
 }
