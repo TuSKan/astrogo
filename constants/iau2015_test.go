@@ -21,9 +21,35 @@ func TestIAU2015_AstronomicalUnit(t *testing.T) {
 	}
 }
 
+// TestIAU2015_MeanEarthRadius derives the value rather than restating it, from
+// the WGS 84 ellipsoid's own defining a and 1/f: both of its usual mean radii,
+// the sphere of equal volume (a²b)^(1/3) and the mean of the semi-axes
+// (2a+b)/3, are 6,371 km to the kilometer, and neither is 6,371,000 m to the
+// meter. It is not in IAU 2015 B3, which defines no mean radius, and it is not
+// exact (#403).
 func TestIAU2015_MeanEarthRadius(t *testing.T) {
 	c := constants.IAU2015.MeanEarthRadius
 	testutil.AssertExact(t, "MeanEarthRadius", c.Value, 6_371_000.0)
+
+	a := constants.WGS84.SemiMajorAxis.Value
+	b := a * (1 - 1/constants.WGS84.InverseFlattening.Value)
+
+	for name, r := range map[string]float64{
+		"sphere of equal volume": math.Cbrt(a * a * b),
+		"mean of the semi-axes":  (2*a + b) / 3,
+	} {
+		if km := math.Round(r/1000) * 1000; km != c.Value {
+			t.Errorf("MeanEarthRadius = %v, want the WGS 84 %s, %.2f m, to the kilometer", c.Value, name, r)
+		}
+	}
+
+	if c.Exact {
+		t.Errorf("MeanEarthRadius.Exact = true; it is a derived value rounded to the kilometer")
+	}
+
+	if strings.Contains(c.Reference, "B3") && !strings.Contains(c.Reference, "WGS 84") {
+		t.Errorf("MeanEarthRadius.Reference %q cites B3, which defines no mean Earth radius", c.Reference)
+	}
 
 	if c.Value < 6.35e6 || c.Value > 6.40e6 {
 		t.Errorf("MeanEarthRadius = %v, outside plausible band [6.35e6, 6.40e6]", c.Value)
@@ -43,7 +69,8 @@ func TestIAU2015_BodyRadii_Values(t *testing.T) {
 		c    constants.Constant
 		want float64
 	}{
-		{"Sun", s.SunEquatorialRadius, 696_000_000.0},
+		// B3's nominal solar radius, 6.957 × 10⁸ m; 696,000 km until #403.
+		{"Sun", s.SunEquatorialRadius, 695_700_000.0},
 		{"Moon", s.MoonEquatorialRadius, 1_737_400.0},
 		{"Mercury", s.MercuryEquatorialRadius, 2_440_530.0},
 		{"Venus", s.VenusEquatorialRadius, 6_051_800.0},
@@ -182,7 +209,7 @@ func TestIAU2015_ObliquityJ2000(t *testing.T) {
 func TestIAU2015_ExactnessSplit(t *testing.T) {
 	s := constants.IAU2015
 
-	exact := []constants.Constant{s.AstronomicalUnit, s.MeanEarthRadius, s.SunEquatorialRadius, s.JupiterEquatorialRadius}
+	exact := []constants.Constant{s.AstronomicalUnit, s.SunEquatorialRadius, s.JupiterEquatorialRadius}
 	for _, c := range exact {
 		if !c.Exact {
 			t.Errorf("%s: Exact = false, want true", c.Symbol)

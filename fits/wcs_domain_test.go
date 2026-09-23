@@ -1,6 +1,7 @@
 package fits
 
 import (
+	"errors"
 	"math"
 	"testing"
 )
@@ -86,8 +87,17 @@ func TestProjectNeverReturnsNaN(t *testing.T) {
 				for raStep := range 25 {
 					ra := (float64(raStep) / 24) * 2 * math.Pi
 
+					// A TAN point behind the tangent plane and the AIT
+					// antipode have no projection, and project says so;
+					// nothing else on the sphere is refused.
 					x, y, err := project(proj, ra, dec, 0, delta0)
+					if errors.Is(err, ErrWCSBehindPlane) || errors.Is(err, ErrWCSAntipodal) {
+						continue
+					}
+
 					if err != nil {
+						t.Errorf("%s at ra=%.4f dec=%+.4f from delta0=%+.4f: %v", proj, ra, dec, delta0, err)
+
 						continue
 					}
 
@@ -123,6 +133,9 @@ func TestProjectAndDeprojectRoundTrip(t *testing.T) {
 
 					x, y, err := project(proj, ra, dec, alpha0, delta0)
 					if err != nil {
+						t.Errorf("%s: (%.4f, %+.4f), a few degrees from the reference point: %v",
+							proj, ra, dec, err)
+
 						continue
 					}
 

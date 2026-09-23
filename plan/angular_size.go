@@ -21,8 +21,8 @@ import (
 // values, not a table keyed by ephemeris/core's eph.ID.
 //
 // Earth's entry is the WGS 84 semi-major axis, not an IAU2015 member —
-// it is exact to the WGS84 standard and consistent with IAU 2015 B3's
-// own Earth value.
+// it is exact to the WGS 84 standard. IAU 2015 B3's nominal equatorial
+// radius is 37 m shorter.
 var bodyEquatorialRadius = map[eph.ID]unit.Length{
 	eph.Sun:     unit.Meters(constants.IAU.SunEquatorialRadius.Value),
 	eph.Moon:    unit.Meters(constants.IAU.MoonEquatorialRadius.Value),

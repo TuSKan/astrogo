@@ -11,9 +11,9 @@ import (
 // Solar System bodies' published equatorial radii. "IAU2015" names the
 // set's currently-active vintage, not a claim every member individually
 // dates to 2015 — AstronomicalUnit is IAU 2012 Resolution B2;
-// MeanEarthRadius/SunEquatorialRadius/JupiterEquatorialRadius are IAU 2015
-// Resolution B3, Table 1 (and Exact, since B3 defines its nominal
-// conversion constants as exact by convention); the other eight body
+// SunEquatorialRadius/JupiterEquatorialRadius are IAU 2015 Resolution B3,
+// Table 1 (and Exact, since B3 defines its nominal conversion constants as
+// exact by convention); the other eight body
 // radii are IAU WGCCRE 2015 (Archinal et al. 2018, Celestial Mechanics
 // and Dynamical Astronomy 130:22, Table 4) and are measured, not exact.
 // Their Uncertainty values are the real published 1σ figures — verified
@@ -25,9 +25,16 @@ import (
 // every other member here, since its shape remains the least precisely
 // determined of the bodies in this table.
 //
+// MeanEarthRadius is not from B3, which defines no mean Earth radius — only
+// a nominal equatorial radius, 6,378,100 m, and a nominal polar radius,
+// 6,356,800 m. It is 6,371 km, the WGS 84 ellipsoid's mean radius to the
+// kilometer: the radius of the sphere of equal volume, (a²b)^(1/3), is
+// 6,371,000.79 m, and the mean of the semi-axes, (2a+b)/3, 6,371,008.77 m.
+// Not Exact. Until #403 it cited B3 and claimed to be exact.
+//
 // There is deliberately no EarthEquatorialRadius member — Earth's
-// equatorial radius is WGS84.SemiMajorAxis, exact to the WGS84 standard
-// and consistent with B3's own Earth value.
+// equatorial radius is WGS84.SemiMajorAxis, 6,378,137 m, exact to the WGS 84
+// standard. B3's nominal value is 37 m shorter and is not carried.
 //
 // Two further members, SunGravitationalParameter and ObliquityJ2000, are
 // single fixed values rather than the body-radius family above — see the
@@ -81,14 +88,23 @@ var IAU2015 = IAUSet{
 		Reference: "IAU 2012 Resolution B2", Exact: true,
 	},
 	MeanEarthRadius: Constant{
-		Name: "nominal mean Earth radius", Symbol: "R_E",
+		Name: "mean Earth radius", Symbol: "R_E",
 		Value: 6_371_000.0, Unit: unit.Meter,
-		Reference: "IAU 2015 Resolution B3, Table 1", Exact: true,
+		Reference: "WGS 84 ellipsoid mean radius to the kilometer: R3 = (a²b)^(1/3) = 6,371,000.79 m, R1 = (2a+b)/3 = 6,371,008.77 m",
 	},
+	// SunEquatorialRadius is B3's nominal solar radius, 695,700 km: the
+	// photospheric radius of Haberreiter et al. (2008), 695,658 ± 140 km, to
+	// the figures its uncertainty supports. It is a photospheric radius, not
+	// an equatorial one; the name is the set's. JPL Horizons uses the same
+	// value for the Sun's angular diameter.
+	//
+	// Until #403 this was 696,000 km, which is not B3's value but Auwers's
+	// (1891) 959.63″ semi-diameter at 1 AU — the figure eclipse and almanac
+	// work still uses, and which such code should carry under its own name.
 	SunEquatorialRadius: Constant{
-		Name: "nominal solar equatorial radius", Symbol: "R_Sun",
-		Value: 696_000_000.0, Unit: unit.Meter,
-		Reference: "IAU 2015 Resolution B3, Table 1", Exact: true,
+		Name: "nominal solar radius", Symbol: "R_Sun",
+		Value: 695_700_000.0, Unit: unit.Meter,
+		Reference: "IAU 2015 Resolution B3 (arXiv:1510.07674), nominal solar radius", Exact: true,
 	},
 	MoonEquatorialRadius: Constant{
 		Name: "Moon equatorial radius", Symbol: "R_Moon",

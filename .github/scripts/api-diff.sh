@@ -10,7 +10,7 @@
 #
 # So the rule is one-directional and deliberately so. An undeclared break fails.
 # A declared one passes, whatever apidiff thinks — a fragment claiming a break
-# that apidiff cannot see is usually a behavioural break rather than a
+# that apidiff cannot see is usually a behavioral break rather than a
 # signature one, and this script has no business calling that a mistake.
 #
 # # Why against the pull request's base rather than the last tag
@@ -90,7 +90,7 @@ run "$work/incompatible.txt" apidiff -m -incompatible "$work/base.api" "$module"
 #
 # The list comes from `go list` at the base commit rather than from a path
 # pattern: a package is a command because its clause says `package main`, and
-# guessing that from a directory name is how the next reorganisation slips
+# guessing that from a directory name is how the next reorganization slips
 # through. Filtering the base's set is also the conservative direction — a
 # package that is a command only at the head is still checked.
 ( cd "$work/base" && go list -f '{{if eq .Name "main"}}{{.ImportPath}}{{end}}' ./... ) \

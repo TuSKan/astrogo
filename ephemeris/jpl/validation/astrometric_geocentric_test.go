@@ -363,23 +363,28 @@ func fetchGeocentricSeries(command, bodyName, quantity, startStr, stopStr, stepS
 		// Read from the end, like parseObserverRow and for the same reason:
 		// Horizons emits a varying number of empty presence-flag columns
 		// after the date, and a fixed index would silently read one of them.
+		//
+		// Every line between $$SOE and $$EOE is a data row, so one that does
+		// not parse is a format this reader no longer understands, and is
+		// reported rather than dropped: a silently shorter series still
+		// compares, and passes, on whatever rows are left.
 		if len(cols) < 4 {
-			continue
+			return nil, fmt.Errorf("%w: %d in %q", errUnexpectedColumns, len(cols), line)
 		}
 
 		jd, err := strconv.ParseFloat(strings.TrimSpace(cols[0]), 64)
 		if err != nil {
-			continue
+			return nil, fmt.Errorf("horizons: row %q: JD: %w", line, err)
 		}
 
 		ra, err := strconv.ParseFloat(strings.TrimSpace(cols[len(cols)-3]), 64)
 		if err != nil {
-			continue
+			return nil, fmt.Errorf("horizons: row %q: RA: %w", line, err)
 		}
 
 		dec, err := strconv.ParseFloat(strings.TrimSpace(cols[len(cols)-2]), 64)
 		if err != nil {
-			continue
+			return nil, fmt.Errorf("horizons: row %q: Dec: %w", line, err)
 		}
 
 		rows = append(rows, astrometricRow{jdUT: jd, raDeg: ra, decDeg: dec})

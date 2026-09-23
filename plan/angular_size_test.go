@@ -28,8 +28,8 @@ func (p *fixedVecProvider) Close() error { return nil }
 // TestAngularDiameter_KnownValues cross-checks AngularDiameter against
 // independently well-known reference angular sizes (not re-derived from
 // this package's own radius table, to avoid a tautological test): the
-// Sun's angular diameter at 1 AU (~1919.3″, the textbook/almanac figure),
-// the Moon's at its mean distance (~31.1′), and Jupiter's near a typical
+// Sun's as JPL Horizons gives it, the Moon's at its mean distance
+// (~31.1′), and Jupiter's near a typical
 // opposition-adjacent distance (~47″). Each reference figure is quoted to
 // only 3-4 significant figures, so tolerances are set accordingly (looser
 // for the Moon, whose ~31.1′ figure implies ±0.05′ ≈ ±3″ of its own
@@ -55,7 +55,14 @@ func TestAngularDiameter_KnownValues(t *testing.T) {
 		wantArcsec  float64
 		toleranceAS float64
 	}{
-		{"Sun at 1 AU", eph.Sun, 1.0, 1919.3, 0.5},
+		// Horizons' Ang-diam, 2026-Jan-03 00:00 UT, CENTER='500@399',
+		// EXTRA_PREC: 1951.038″ at delta 0.98330377810852 AU, which is
+		// 2·asin(695,700 km/delta) — IAU 2015 B3's solar radius. Until
+		// #403 this case asked for the textbook 1919.3″ at 1 AU, the
+		// figure Horizons prints in its header beside the radius it does
+		// not use, and the 696,000 km radius behind it was 0.85″ large
+		// against Horizons at every distance.
+		{"Sun, Horizons 2026-01-03", eph.Sun, 0.98330377810852, 1951.038, 0.002},
 		{"Moon at mean distance", eph.Moon, 384_400_000.0 / 1.495978707e11, 31.1 * 60, 5.0},
 		{"Jupiter at 4.2 AU", eph.Jupiter, 4.2, 47.0, 0.5},
 	}

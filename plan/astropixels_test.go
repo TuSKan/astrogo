@@ -274,9 +274,11 @@ func TestAstroPixels_MoonPhases(t *testing.T) {
 				searchStart := refTime.Add(unit.Days(-2))
 				searchEnd := refTime.Add(unit.Days(2))
 
+				// DE441 covers every date on these pages, so an error from the
+				// search is astrogo's, and a miss rather than a skip.
 				phases, err := plan.MoonPhases(searchStart, searchEnd, prov)
 				if err != nil {
-					t.Logf("  SKIP %04d-%02d-%02d %02d:%02d %s: MoonPhases error: %v",
+					t.Errorf("  FAIL %04d-%02d-%02d %02d:%02d %s: MoonPhases: %v",
 						ref.Year, ref.Month, ref.Day, ref.Hour, ref.Min, ref.Phase, err)
 
 					continue

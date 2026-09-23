@@ -10,7 +10,8 @@ import (
 
 // PlanetApparent computes the V-band apparent magnitude of a Solar System body
 // using the Mallama & Hilton (2018) model, matching the Skyfield reference
-// implementation.
+// implementation except for Mars, where it also applies the model's rotation
+// and seasonal corrections, which Skyfield omits and JPL Horizons applies.
 //
 // Supported bodies: Sun, Moon, Mercury, Venus, Mars, Jupiter, Saturn (with rings),
 // Uranus, Neptune, Pluto.
@@ -61,7 +62,9 @@ func PlanetApparent(p eph.Provider, target eph.ID, t time.Time) (float64, error)
 	case eph.Venus:
 		return venusMag(r, delta, phAng), nil
 	case eph.Mars:
-		return marsMag(r, delta, phAng), nil
+		centralMeridian, ls := marsAngles(sunToPlanet, observerToPlanet, delta, t)
+
+		return marsMag(r, delta, phAng, centralMeridian, ls), nil
 	case eph.Jupiter:
 		return jupiterMag(r, delta, phAng), nil
 	case eph.Saturn:
@@ -142,31 +145,6 @@ func venusMag(r, delta, phAng float64) float64 {
 	}
 
 	return -4.384 + distMod + phAngFactor
-}
-
-// ── Mars — Mallama & Hilton 2018, Table 5 ───────────────────────────────────
-// Two regimes at α = 50° boundary with different V(1,0), matching Skyfield.
-
-func marsMag(r, delta, phAng float64) float64 {
-	rMag := 2.5 * math.Log10(r*r)
-	deltaMag := 2.5 * math.Log10(delta*delta)
-	distMod := rMag + deltaMag
-
-	const geocentricLimit = 50.0
-
-	var (
-		phAngFactor float64
-		v10         float64
-	)
-	if phAng <= geocentricLimit {
-		v10 = -1.601
-		phAngFactor = 2.267e-02*phAng - 1.302e-04*phAng*phAng
-	} else {
-		v10 = -0.367
-		phAngFactor = -0.02573*phAng + 0.0003445*phAng*phAng
-	}
-
-	return v10 + distMod + phAngFactor
 }
 
 // ── Jupiter — Mallama & Hilton 2018, Table 6 ────────────────────────────────
