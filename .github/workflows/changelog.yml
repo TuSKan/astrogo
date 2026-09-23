@@ -6,7 +6,7 @@ name: Changelog
 # `synchronize` — the default `pull_request` types are opened, synchronize and
 # reopened, so `labeled` fires nothing. Re-running the job does not help either:
 # GitHub replays the original event payload, so `github.event.pull_request.labels`
-# is still whatever it was when the run was created. Measured on #336 — labelled
+# is still whatever it was when the run was created. Measured on #336 — labeled
 # `no-changelog`, job re-run, still red with the same error.
 #
 # The only ways through were to push a commit to a pull request whose whole
@@ -42,7 +42,7 @@ jobs:
   # the existence check has to live here, where the number is.
   #
   # Label a pull request `no-changelog` when it genuinely warrants no entry —
-  # pure test coverage for shipped behaviour, or a change to CI that no user
+  # pure test coverage for shipped behavior, or a change to CI that no user
   # can observe. The label is deliberate and reviewable; silence was not.
   #
   # The job name is unchanged from when this lived in ci.yml, so the required
@@ -62,7 +62,7 @@ jobs:
           PR_LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
         run: |
           if [[ ",${PR_LABELS}," == *",no-changelog,"* ]]; then
-            echo "Labelled no-changelog — skipping."
+            echo "Labeled no-changelog — skipping."
             exit 0
           fi
 
