@@ -171,6 +171,9 @@ func TestJPLStateAgainstHorizons(t *testing.T) {
 
 	p, err := jpl.NewProvider(context.Background(), core.Planets, "de440")
 	if err != nil {
+		// The kernel comes from NAIF on first use, so its outage is not a
+		// verdict on the comparison. Anything else is astrogo's.
+		testutil.SkipOnUpstreamFailure(t, err)
 		t.Fatalf("failed to create provider: %v", err)
 	}
 

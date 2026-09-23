@@ -48,6 +48,58 @@ type StateVector struct {
 // skip on it; a real Horizons answer with bad numbers still fails.
 var errHorizonsUnavailable = errors.New("JPL Horizons served a non-API response")
 
+// horizonsStatusError is a non-200 answer from Horizons, carried out of the
+// fetchers below as an error that [testutil.SkipOnUpstreamFailure] can read.
+//
+// These fetchers use net/http directly rather than remote.Client, so nothing
+// upstream of them produces a *remote.HTTPError. Before this they did not look
+// at the status at all: Horizons under load answers 503 with its HTML error
+// page, which errHorizonsUnavailable caught in four of the five fetchers and
+// errNoEphemerisData misreported in the fifth — the one TestGenerateCorpus
+// uses. Neither sentinel carries a status, so every caller that asked
+// SkipOnUpstreamFailure got "not upstream" and failed on JPL's maintenance
+// window. The same shape of bug #366 fixed in ephemeris/kepler.
+//
+// testutil matches the status through an interface rather than a concrete type,
+// so a local type is all this needs, and a 404 — astrogo asking for something
+// that is not there — stays fatal.
+type horizonsStatusError int
+
+func (s horizonsStatusError) Error() string { return fmt.Sprintf("horizons: http %d", int(s)) }
+
+func (s horizonsStatusError) HTTPStatus() int { return int(s) }
+
+// Is makes a status that means Horizons is not serving match
+// errHorizonsUnavailable, the sentinel callers written before statuses were
+// checked already treat as downtime.
+//
+// Checking the status first must not change what those callers see, and
+// without this it did. Horizons sends its HTML error page with a 503, which
+// used to reach them as errHorizonsUnavailable through the body check; with the
+// status checked first it arrived as this type instead, and loadCases — which
+// records NOT VERIFIED on the sentinel — fell through to t.Fatalf. Found by the
+// tagged sweep, on the branch that introduced it.
+//
+// The set is testutil.SkipOnUpstreamFailure's: 5xx, 429, 408 and 403. Any other
+// status is astrogo asking for something that is not there, which is the defect
+// these tests exist to catch, and it no longer matches — a tightening, since
+// before the status was read a 404 served as HTML matched the body check too.
+func (s horizonsStatusError) Is(target error) bool {
+	if target != errHorizonsUnavailable {
+		return false
+	}
+
+	switch code := int(s); {
+	case code >= http.StatusInternalServerError,
+		code == http.StatusTooManyRequests,
+		code == http.StatusRequestTimeout,
+		code == http.StatusForbidden:
+		return true
+	default:
+		return false
+	}
+}
+
 // horizonsUnavailable reports whether body is JPL's web error page rather
 // than the API's text output.
 func horizonsUnavailable(body string) bool {
@@ -109,6 +161,13 @@ func fetchVector(command, bodyName string, startStr, stopStr string) (*StateVect
 		return nil, fmt.Errorf("querying Horizons: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
+
+	// Before the body is read: a non-200 is an error page, and reporting it
+	// as missing ephemeris data is what made a Horizons outage look like a
+	// defect. See horizonsStatusError.
+	if resp.StatusCode != http.StatusOK {
+		return nil, horizonsStatusError(resp.StatusCode)
+	}
 
 	bodyBytes, _ := io.ReadAll(resp.Body)
 	responseStr := string(bodyBytes)
@@ -223,6 +282,13 @@ func fetchVectorSeries(command, bodyName, startStr, stopStr, stepStr string) ([]
 		return nil, fmt.Errorf("querying Horizons: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
+
+	// Before the body is read: a non-200 is an error page, and reporting it
+	// as missing ephemeris data is what made a Horizons outage look like a
+	// defect. See horizonsStatusError.
+	if resp.StatusCode != http.StatusOK {
+		return nil, horizonsStatusError(resp.StatusCode)
+	}
 
 	bodyBytes, _ := io.ReadAll(resp.Body)
 	responseStr := string(bodyBytes)
@@ -339,6 +405,13 @@ func fetchObserverTable(command, bodyName string, lon, lat, height float64, star
 		return nil, fmt.Errorf("querying Horizons: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
+
+	// Before the body is read: a non-200 is an error page, and reporting it
+	// as missing ephemeris data is what made a Horizons outage look like a
+	// defect. See horizonsStatusError.
+	if resp.StatusCode != http.StatusOK {
+		return nil, horizonsStatusError(resp.StatusCode)
+	}
 
 	bodyBytes, _ := io.ReadAll(resp.Body)
 	responseStr := string(bodyBytes)
@@ -517,8 +590,22 @@ func fetchObserverSeries(command, bodyName string, lon, lat, height float64, sta
 	}
 	defer func() { _ = resp.Body.Close() }()
 
+	// Before the body is read: a non-200 is an error page, and reporting it
+	// as missing ephemeris data is what made a Horizons outage look like a
+	// defect. See horizonsStatusError.
+	if resp.StatusCode != http.StatusOK {
+		return nil, horizonsStatusError(resp.StatusCode)
+	}
+
 	bodyBytes, _ := io.ReadAll(resp.Body)
 	responseStr := string(bodyBytes)
+
+	// The only fetcher here that did not check for this, and the one the
+	// corpus generator uses: an error page reported as errNoEphemerisData
+	// looked like Horizons answering with nothing rather than not answering.
+	if horizonsUnavailable(responseStr) {
+		return nil, errHorizonsUnavailable
+	}
 
 	soeIdx := strings.Index(responseStr, "$$SOE")
 
