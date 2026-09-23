@@ -194,21 +194,39 @@ func gatherPlanetaryMoons(ctx context.Context, at time.Time, magLimit float64, d
 
 		opened = append(opened, p)
 
-		for _, m := range byKernel[kernels[i]] {
-			moon, err := NewPlanetaryMoon(m.name, p)
-			if err != nil {
-				continue // m.name always resolves against moonSpecs — defense in depth only
-			}
-
-			mag, err := moon.ApparentMagnitude(at)
-			if err == nil && mag < magLimit {
-				candidates = append(candidates, visibleCandidate{
-					obj:    moon,
-					target: resolve.Target{Name: m.name, Kind: resolve.KindPlanetaryMoon, Catalog: "ephemeris"},
-				})
-			}
-		}
+		candidates = append(candidates, moonCandidates(p, byKernel[kernels[i]], at, magLimit, dropped)...)
 	}
 
 	return candidates, opened
+}
+
+// moonCandidates evaluates the moons one kernel's provider covers: each one
+// brighter than magLimit at the instant at is a candidate, and each one whose
+// magnitude cannot be computed is recorded in dropped rather than left out as
+// though it were too faint (#407).
+func moonCandidates(p eph.Provider, specs []moonSpec, at time.Time, magLimit float64, dropped *skips) []visibleCandidate {
+	var out []visibleCandidate
+
+	for _, m := range specs {
+		moon, err := NewPlanetaryMoon(m.name, p)
+		if err != nil {
+			// m.name always resolves against moonSpecs, so this is defense
+			// in depth — but a skip all the same, and recorded.
+			dropped.add("planetary moon", m.name, err)
+
+			continue
+		}
+
+		mag, err := moon.ApparentMagnitude(at)
+		dropped.add("planetary moon", m.name, err)
+
+		if err == nil && mag < magLimit {
+			out = append(out, visibleCandidate{
+				obj:    moon,
+				target: resolve.Target{Name: m.name, Kind: resolve.KindPlanetaryMoon, Catalog: "ephemeris"},
+			})
+		}
+	}
+
+	return out
 }

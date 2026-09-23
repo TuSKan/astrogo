@@ -102,3 +102,38 @@ func TestSolarSystemCandidatesReportABodyTheyCannotEvaluate(t *testing.T) {
 		}
 	}
 }
+
+// TestMoonCandidatesReportAMoonTheyCannotEvaluate is the planetary moons' half
+// of the same rule: a kernel's provider that cannot answer costs its moons and
+// names them, rather than leaving them out as though they were too faint.
+func TestMoonCandidatesReportAMoonTheyCannotEvaluate(t *testing.T) {
+	var marsMoons []moonSpec
+
+	for _, m := range moonSpecs {
+		if m.parent == eph.Mars {
+			marsMoons = append(marsMoons, m)
+		}
+	}
+
+	if len(marsMoons) == 0 {
+		t.Fatal("precondition: no Mars moons in moonSpecs")
+	}
+
+	var dropped skips
+
+	at := time.Date(2026, 9, 23, 0, 0, 0, 0, time.LocationUTC)
+	if got := moonCandidates(failingProvider{}, marsMoons, at, 30, &dropped); len(got) != 0 {
+		t.Errorf("%d candidates from a provider that answers nothing, want 0", len(got))
+	}
+
+	err := dropped.err()
+	if !errors.Is(err, ErrIncomplete) || !errors.Is(err, errFailingProvider) {
+		t.Fatalf("dropped.err() = %v, want ErrIncomplete wrapping the provider's error", err)
+	}
+
+	for _, m := range marsMoons {
+		if !strings.Contains(err.Error(), m.name) {
+			t.Errorf("%s is not named in %v", m.name, err)
+		}
+	}
+}
