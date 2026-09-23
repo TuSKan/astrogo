@@ -36,6 +36,7 @@ func TestCurvesPeakWhereVisionDoes(t *testing.T) {
 
 		band, err := luminosity.Open(context.Background(), v)
 		if err != nil {
+			testutil.SkipOnUpstreamFailure(t, err)
 			t.Fatalf("Open %v: %v", v, err)
 		}
 

@@ -55,6 +55,10 @@ func TestSmallBodyDesignationFailuresAreLoud(t *testing.T) {
 				jpl.WithTimeInterval(start.Add(unit.Days(-5)), start.Add(unit.Days(5))))
 
 			if !errors.Is(err, tc.want) {
+				// Inside the branch, not before it: this test wants an error,
+				// and the one it wants must never be mistaken for an outage.
+				// Only an error that is not the expected one gets classified.
+				testutil.SkipOnUpstreamFailure(t, err)
 				t.Fatalf("NewProvider(%q) error = %v, want %v (%s)", tc.des, err, tc.want, tc.why)
 			}
 		})
@@ -79,6 +83,7 @@ func TestSmallBodyDesignationsThatResolve(t *testing.T) {
 			p, err := jpl.NewProvider(context.Background(), core.SmallBody, tc.des,
 				jpl.WithTimeInterval(start.Add(unit.Days(-5)), start.Add(unit.Days(5))))
 			if err != nil {
+				testutil.SkipOnUpstreamFailure(t, err)
 				t.Fatalf("NewProvider(%q): %v", tc.des, err)
 			}
 

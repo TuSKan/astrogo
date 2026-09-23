@@ -39,6 +39,58 @@ func requireHorizons(t *testing.T) {
 	testutil.RequireReachable(t, "ssd.jpl.nasa.gov:443")
 }
 
+// horizonsStatusError is an HTTP status carried out of horizonsGet as an error, so
+// that [testutil.SkipOnUpstreamFailure] can recognise Horizons answering 503
+// or 429.
+//
+// This fetch uses net/http directly rather than remote.Client, so nothing
+// upstream of it produces a *remote.HTTPError. Without this, an overloaded
+// Horizons returns an HTML error page, the parser reports errNoDataBlock, and
+// the suite fails for someone else's maintenance window. testutil matches the
+// status through an interface rather than a concrete type — exactly so that a
+// caller in this position can supply its own.
+type horizonsStatusError int
+
+func (s horizonsStatusError) Error() string { return fmt.Sprintf("horizons: http %d", int(s)) }
+
+func (s horizonsStatusError) HTTPStatus() int { return int(s) }
+
+// TestHorizonsStatusIsRecognisedAsAnOutage checks that the type above actually
+// reaches the classifier.
+//
+// It is matched structurally, through an interface testutil declares inline and
+// nothing here names, so there is no compile-time link between the two. Spell
+// the method HttpStatus and this file still builds, still passes, and silently
+// never skips again — which is the failure it was written to prevent.
+//
+// 404 is in the table for the other half of the contract: a status that means
+// astrogo asked for the wrong thing must stay fatal.
+func TestHorizonsStatusIsRecognisedAsAnOutage(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		status   int
+		wantSkip bool
+	}{
+		{"overloaded", http.StatusServiceUnavailable, true},
+		{"rate limited", http.StatusTooManyRequests, true},
+		{"not found", http.StatusNotFound, false},
+	} {
+		var skipped bool
+
+		t.Run(tc.name, func(t *testing.T) {
+			// Read in a defer because Skipf ends the subtest through
+			// runtime.Goexit, so nothing after the call below would run.
+			defer func() { skipped = t.Skipped() }()
+
+			testutil.SkipOnUpstreamFailure(t, horizonsStatusError(tc.status))
+		})
+
+		if skipped != tc.wantSkip {
+			t.Errorf("http %d: skipped = %v, want %v", tc.status, skipped, tc.wantSkip)
+		}
+	}
+}
+
 // horizonsGet issues a GET against the Horizons API and returns the
 // $$SOE/$$EOE-delimited data block.
 func horizonsGet(params url.Values) (string, error) {
@@ -50,6 +102,13 @@ func horizonsGet(params url.Values) (string, error) {
 		return "", fmt.Errorf("horizons request: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
+
+	// Before reading the body: a non-200 body is an error page, and reporting
+	// it as a parse failure is what made a Horizons outage look like a defect
+	// here.
+	if resp.StatusCode != http.StatusOK {
+		return "", horizonsStatusError(resp.StatusCode)
+	}
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -267,6 +326,7 @@ func TestElements_StateAt_AgainstHorizons_433Eros(t *testing.T) {
 	const designation = "433"
 
 	epochJD, el, err := fetchHelioElements(designation, time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC))
+	testutil.SkipOnUpstreamFailure(t, err)
 	testutil.AssertNoError(t, err)
 
 	if a := el.SemiMajorAxis().AU(); a < 1.0 || a > 2.0 {
