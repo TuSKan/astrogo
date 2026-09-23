@@ -316,10 +316,16 @@ func angularSeparationArcsec(a, b vector.Vec3) float64 {
 // Two-body propagation ignores planetary perturbations by design (see
 // the kepler package doc comment), so some real divergence from the
 // perturbed ephemeris is expected and grows with |dt|. A live run of
-// this exact comparison measured that divergence at ~0.04" near dt=0,
-// growing to ~0.56" at dt=+/-30d — toleranceArcsec below keeps margin
-// above that measured max rather than claiming perturbation-level
-// accuracy this package doesn't attempt.
+// this exact comparison measured it at 0.000" at dt=0, growing to
+// ~0.58" at dt=+/-30d — toleranceArcsec below keeps margin above that
+// measured max rather than claiming perturbation-level accuracy this
+// package doesn't attempt.
+//
+// dt=0 is held far tighter, because there is no physics in it: osculating
+// elements reproduce the ephemeris exactly at their own epoch, so anything
+// left there is a convention. It read 0.04" until #391 — the elements were
+// rotated into the equator by the IAU 2006 obliquity, not the IAU 1976 one
+// JPL refers them to — and was taken for perturbation.
 func TestElements_StateAt_AgainstHorizons_433Eros(t *testing.T) {
 	requireHorizons(t)
 
@@ -337,33 +343,44 @@ func TestElements_StateAt_AgainstHorizons_433Eros(t *testing.T) {
 
 	// 2 arcsec, chosen from real measured data, not picked in advance: a
 	// live run of this exact comparison found the two-body/perturbed
-	// divergence grows roughly symmetrically from ~0.04" at dt=0 to a
-	// max of ~0.56" at dt=+/-30d (see the package's two-body-only
+	// divergence grows roughly symmetrically from 0.000" at dt=0 to a
+	// max of ~0.58" at dt=+/-30d (see the package's two-body-only
 	// accuracy caveat above) — this bound keeps real margin above that
 	// measured max rather than chasing it exactly.
-	const toleranceArcsec = 2.0
+	//
+	// At dt=0 there is nothing to allow for; the elements' printed digits
+	// are good to well under a milliarcsecond there.
+	const (
+		toleranceArcsec     = 2.0
+		atEpochToleranceArc = 0.005
+	)
 
-	var maxSepArcsec float64
+	var (
+		maxSepArcsec      float64
+		compared, outages int
+	)
 
 	for _, dtDays := range []float64{-30, -20, -10, -5, 0, 5, 10, 20, 30} {
 		at := epoch.Add(unit.Days(dtDays))
 
 		wantPos, _, err := fetchHelioVector(designation, at)
 		if err != nil {
-			// A transient Horizons hiccup (rate limiting, an HTML error
-			// page instead of ephemeris data) for one of the 9 points is
-			// not this test's own bug — live-reproduced this session: a
-			// run that failed on 4 consecutive mid-range points fully
-			// succeeded on an immediate retry with no code change,
-			// confirming intermittent upstream flakiness rather than a
-			// permanent per-epoch failure. Logged and skipped for this
-			// dt rather than failing the whole comparison, matching this
-			// package's "never fail on external service behavior outside
-			// astrogo's control" convention for network-tagged tests.
-			t.Logf("dt=%+.0fd: fetch: %v (transient Horizons issue, not astrogo)", dtDays, err)
+			// A Horizons hiccup for one of the nine points costs that
+			// point: it has been seen to fail four in a row and answer on
+			// an immediate retry. Only an identified outage is skipped;
+			// anything else is this test's request or parser, and fails.
+			if reason, ok := testutil.UpstreamFailure(err); ok {
+				t.Logf("dt=%+.0fd: Horizons did not answer (%s): %v", dtDays, reason, err)
 
-			continue
+				outages++
+
+				continue
+			}
+
+			t.Fatalf("dt=%+.0fd: fetch: %v", dtDays, err)
 		}
+
+		compared++
 
 		gotPos, _, err := el.StateAt(at)
 		testutil.AssertNoError(t, err)
@@ -375,10 +392,22 @@ func TestElements_StateAt_AgainstHorizons_433Eros(t *testing.T) {
 			maxSepArcsec = sepArcsec
 		}
 
+		if dtDays == 0 && sepArcsec > atEpochToleranceArc {
+			t.Errorf("dt=0: %.4f\" from Horizons at the elements' own epoch, where two-body motion "+
+				"is exact by construction — a frame or obliquity convention is wrong (#391)", sepArcsec)
+		}
+
 		if sepArcsec > toleranceArcsec {
 			t.Errorf("dt=%+.0fd: angular separation %.3f\" exceeds %.1f\" tolerance", dtDays, sepArcsec, toleranceArcsec)
 		}
 	}
 
-	t.Logf("max angular separation over +/-30 days: %.3f arcsec", maxSepArcsec)
+	// Nine outages is a comparison that did not happen, which is a skip and
+	// not a pass.
+	if compared == 0 {
+		t.Skipf("Horizons did not answer for any of the %d epochs", outages)
+	}
+
+	t.Logf("max angular separation over +/-30 days: %.3f arcsec (%d of %d epochs compared)",
+		maxSepArcsec, compared, compared+outages)
 }

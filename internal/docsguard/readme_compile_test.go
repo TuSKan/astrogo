@@ -147,7 +147,7 @@ func TestREADMECodeBlocksCompile(t *testing.T) {
 		fragments++
 
 		file := filepath.Join(fragDir, "frag"+itoa(i)+".go")
-		if err := os.WriteFile(file, []byte(wrapFragment(idx, root, i, body)), 0o600); err != nil {
+		if err := os.WriteFile(file, []byte(wrapFragment(t, idx, root, i, body)), 0o600); err != nil {
 			t.Fatalf("write block %d: %v", i+1, err)
 		}
 	}
@@ -176,7 +176,9 @@ func TestREADMECodeBlocksCompile(t *testing.T) {
 }
 
 // wrapFragment turns a statement sequence into a compilable function.
-func wrapFragment(idx *symbolIndex, root string, i int, body string) string {
+func wrapFragment(t *testing.T, idx *symbolIndex, root string, i int, body string) string {
+	t.Helper()
+
 	// A fragment that carries its own import line is showing the import, not
 	// using it; the reconstruction below covers what it actually references.
 	var stmts []string
@@ -211,7 +213,9 @@ func wrapFragment(idx *symbolIndex, root string, i int, body string) string {
 		case len(idx.dirsByName[pkg]) == 1:
 			rel, err := filepath.Rel(root, idx.dirsByName[pkg][0])
 			if err != nil {
-				continue
+				// Dropping the import would surface as "undefined" in the
+				// compiled fragment, naming the wrong cause.
+				t.Fatalf("relativize %s: %v", idx.dirsByName[pkg][0], err)
 			}
 
 			imports = append(imports, `	`+pkg+` "github.com/TuSKan/astrogo/`+

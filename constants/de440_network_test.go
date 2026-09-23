@@ -172,8 +172,12 @@ func parseGM(t *testing.T, src string) map[int]float64 {
 			continue
 		}
 
+		// The pattern captured digits, so this fails only on a body number
+		// too long for an int — a line the pattern should not have matched.
 		body, err := strconv.Atoi(m[1])
 		if err != nil {
+			t.Errorf("%q: body number: %v", sc.Text(), err)
+
 			continue
 		}
 

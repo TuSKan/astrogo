@@ -181,9 +181,14 @@ func TestComponentsStayFiniteAndPositive(t *testing.T) {
 			for _, az := range azimuths {
 				dir := coord.NewAltAz(angle.Deg(alt), angle.Deg(az))
 
+				// Every component answers everywhere above the horizon —
+				// measured over these directions — so an error here is a
+				// component that stopped answering, not a refusal to allow.
+				// A component that errored everywhere used to pass this audit.
 				dst, err := evaluate(t, c, scene, grid, dir)
 				if err != nil {
-					// An error is an acceptable answer; a wrong number is not.
+					t.Errorf("%s at alt %.3f az %.3f: %v", name, alt, az, err)
+
 					continue
 				}
 
@@ -220,6 +225,8 @@ func TestComponentsAccumulateRatherThanOverwrite(t *testing.T) {
 	for name, c := range auditComponents(t, grid) {
 		clean := skybrightness.NewSpectralRadiance(grid)
 		if _, err := c.AddRadiance(context.Background(), clean, grid, dir, scene); err != nil {
+			t.Errorf("%s: %v", name, err)
+
 			continue
 		}
 
@@ -229,6 +236,8 @@ func TestComponentsAccumulateRatherThanOverwrite(t *testing.T) {
 		}
 
 		if _, err := c.AddRadiance(context.Background(), seeded, grid, dir, scene); err != nil {
+			t.Errorf("%s failed on a seeded buffer having succeeded on a clean one: %v", name, err)
+
 			continue
 		}
 
@@ -257,6 +266,8 @@ func TestComponentsAreRepeatable(t *testing.T) {
 	for name, c := range auditComponents(t, grid) {
 		first, err := evaluate(t, c, scene, grid, dir)
 		if err != nil {
+			t.Errorf("%s: %v", name, err)
+
 			continue
 		}
 

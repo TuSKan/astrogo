@@ -42,10 +42,16 @@
 // Elements are referred to the J2000 mean ecliptic and equinox, matching
 // the convention MPC- and JPL-published orbital elements use.
 // [Elements.StateAt] returns state in the ICRS-aligned mean equatorial
-// frame, via a fixed rotation by the J2000 mean obliquity
-// ([github.com/TuSKan/astrogo/constants.IAU2015.ObliquityJ2000]) —
+// frame, via a fixed rotation by the obliquity that defines that ecliptic —
 // deliberately not an epoch-of-date obliquity, which would introduce a
 // drift unrelated to the orbit's own real motion.
+//
+// That obliquity is IAU 1976's 84381.448″, which is what JPL's elements are
+// referred to (Horizons heads its element tables "IAU76/J2000"), and not the
+// IAU 2006 value in
+// [github.com/TuSKan/astrogo/constants.IAU2015.ObliquityJ2000], 0.042″
+// smaller. Rotating by that one tilted every position this package produced
+// from JPL's elements about the equinox: 33 km for C/2023 A3 at 2.5 AU.
 //
 // # Central body
 //

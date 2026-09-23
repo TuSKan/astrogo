@@ -22,11 +22,11 @@ import (
 // value), and for Mercury and Venus to cross the regime boundaries in their
 // phase curves: Mercury to 177°, Venus on both sides of 163.7°.
 //
-// Mars is held to a looser bound, on purpose. Mallama & Hilton (2018) correct
-// Mars for its rotation and its orbital longitude; astrogo omits both
-// corrections, as Skyfield does, and Horizons applies them. The difference
-// changes sign from date to date and reaches 0.076 mag on these dates. The
-// bound says what the omission costs, and tightens when the corrections exist.
+// Mars includes Mallama & Hilton's corrections for its rotation and its
+// orbital longitude, which Skyfield omits. Without them Mars was up to 0.076
+// mag from Horizons on these dates, and held to 0.1 (#389). Its dates reach
+// back to 2003 for the two its authors test with, the brightest a close
+// opposition makes it.
 func TestPlanetMagnitudesAgreeWithHorizons(t *testing.T) {
 	p := defaultProvider()
 
@@ -36,12 +36,8 @@ func TestPlanetMagnitudesAgreeWithHorizons(t *testing.T) {
 		}
 	})
 
-	const (
-		// Every planet here but Mars agrees to 0.007 mag or better.
-		tol = 0.02
-		// Mars without the rotation and orbital-longitude corrections.
-		tolMars = 0.1
-	)
+	// Every planet here agrees to 0.007 mag or better.
+	const tol = 0.02
 
 	cases := []struct {
 		planet   eph.ID
@@ -62,11 +58,16 @@ func TestPlanetMagnitudesAgreeWithHorizons(t *testing.T) {
 		{eph.Venus, 2025, 3, 23, 168.316, -4.220},
 		{eph.Venus, 2023, 8, 13, 169.292, -4.120},
 
+		{eph.Mars, 2003, 8, 28, 4.8948, -2.862},
 		{eph.Mars, 2025, 11, 20, 8.842, 1.421},
+		{eph.Mars, 2004, 7, 19, 11.5877, 1.788},
 		{eph.Mars, 2023, 8, 13, 18.420, 1.768},
+		{eph.Mars, 2024, 3, 10, 20.6988, 1.222},
 		{eph.Mars, 2020, 1, 1, 24.259, 1.548},
 		{eph.Mars, 2023, 1, 20, 28.923, -0.683},
+		{eph.Mars, 2025, 3, 23, 34.6780, 0.231},
 		{eph.Mars, 2026, 9, 23, 35.294, 1.086},
+		{eph.Mars, 2021, 3, 15, 36.2079, 1.037},
 		{eph.Mars, 2022, 6, 15, 43.126, 0.577},
 
 		{eph.Jupiter, 2020, 1, 1, 0.625, -1.838},
@@ -94,14 +95,9 @@ func TestPlanetMagnitudesAgreeWithHorizons(t *testing.T) {
 			continue
 		}
 
-		limit := tol
-		if tc.planet == eph.Mars {
-			limit = tolMars
-		}
-
-		if diff := got - tc.horizons; math.Abs(diff) > limit {
+		if diff := got - tc.horizons; math.Abs(diff) > tol {
 			t.Errorf("%v on %04d-%02d-%02d (phase %.1f°): V = %+.3f, Horizons gives %+.3f (off by %+.3f, limit %.2f)",
-				tc.planet, tc.y, tc.m, tc.d, tc.sto, got, tc.horizons, diff, limit)
+				tc.planet, tc.y, tc.m, tc.d, tc.sto, got, tc.horizons, diff, tol)
 		}
 	}
 }
