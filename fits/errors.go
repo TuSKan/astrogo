@@ -72,4 +72,8 @@ var (
 	ErrWCSMissingNAXIS = errors.New("fits/wcs: header missing mandatory NAXIS keyword")
 	// ErrWCSZeroDim indicates a mathematically zero-dimensional WCS plane.
 	ErrWCSZeroDim = errors.New("fits/wcs: header defines mathematically 0-dimensional plane")
+	// ErrWCSMalformedKeyword indicates a WCS keyword that is present but whose
+	// value does not parse. An absent keyword takes its default; a present
+	// one that cannot be read is never silently given it.
+	ErrWCSMalformedKeyword = errors.New("fits/wcs: malformed WCS keyword")
 )

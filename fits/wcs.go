@@ -1,6 +1,7 @@
 package fits
 
 import (
+	"errors"
 	"fmt"
 	"maps"
 	"math"
@@ -862,8 +863,12 @@ func deproject(proj string, x, y, alpha0, delta0 float64) (ra, dec float64, err 
 // coordinate metrics arrays natively mapping the resulting abstractions into [WCS].
 func ExtractWCS(h *Header) (*WCS, error) {
 	naxis, err := h.GetInt("NAXIS")
-	if err != nil {
+	if errors.Is(err, ErrKeyNotFound) {
 		return nil, ErrWCSMissingNAXIS
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", ErrWCSMalformedKeyword, err)
 	}
 
 	if naxis <= 0 {
@@ -890,20 +895,19 @@ func ExtractWCS(h *Header) (*WCS, error) {
 		u, _ := h.GetString(fmt.Sprintf("CUNIT%d", i))
 		cunit[idx] = strings.TrimSpace(u)
 
-		if v, err := h.GetFloat(fmt.Sprintf("CRVAL%d", i)); err == nil {
-			crval[idx] = v
+		var err error
+
+		if crval[idx], _, err = optionalFloat(h, fmt.Sprintf("CRVAL%d", i), 0); err != nil {
+			return nil, err
 		}
 
-		if p, err := h.GetFloat(fmt.Sprintf("CRPIX%d", i)); err == nil {
-			crpix[idx] = p
+		if crpix[idx], _, err = optionalFloat(h, fmt.Sprintf("CRPIX%d", i), 0); err != nil {
+			return nil, err
 		}
 
-		d, err := h.GetFloat(fmt.Sprintf("CDELT%d", i))
-		if err != nil {
-			d = 1.0
+		if cdelt[idx], _, err = optionalFloat(h, fmt.Sprintf("CDELT%d", i), 1); err != nil {
+			return nil, err
 		}
-
-		cdelt[idx] = d
 
 		pc[idx] = make([]float64, naxis)
 	}
@@ -916,8 +920,12 @@ func ExtractWCS(h *Header) (*WCS, error) {
 	for i := 1; i <= naxis; i++ {
 		cd[i-1] = make([]float64, naxis)
 		for j := 1; j <= naxis; j++ {
-			val, err := h.GetFloat(fmt.Sprintf("CD%d_%d", i, j))
-			if err == nil {
+			val, present, err := optionalFloat(h, fmt.Sprintf("CD%d_%d", i, j), 0)
+			if err != nil {
+				return nil, err
+			}
+
+			if present {
 				hasCDMatrix = true
 				cd[i-1][j-1] = val
 			}
@@ -953,12 +961,17 @@ func ExtractWCS(h *Header) (*WCS, error) {
 		// Fall back to PCi_j + CDELT convention.
 		for i := 1; i <= naxis; i++ {
 			for j := 1; j <= naxis; j++ {
-				val, err := h.GetFloat(fmt.Sprintf("PC%d_%d", i, j))
-				if err == nil {
-					pc[i-1][j-1] = val
-				} else if i == j {
-					pc[i-1][j-1] = 1.0
+				def := 0.0
+				if i == j {
+					def = 1
 				}
+
+				val, _, err := optionalFloat(h, fmt.Sprintf("PC%d_%d", i, j), def)
+				if err != nil {
+					return nil, err
+				}
+
+				pc[i-1][j-1] = val
 			}
 		}
 	}
@@ -984,18 +997,20 @@ func ExtractWCS(h *Header) (*WCS, error) {
 	}
 
 	// Extract SIP distortion coefficients if present.
-	sipA := parseSIPPoly(h, "A")
+	var sip [4]map[[2]int]float64
 
-	sipB := parseSIPPoly(h, "B")
-	if len(sipA) > 0 || len(sipB) > 0 {
-		w.SetSIP(sipA, sipB)
+	for i, prefix := range []string{"A", "B", "AP", "BP"} {
+		if sip[i], err = parseSIPPoly(h, prefix); err != nil {
+			return nil, err
+		}
 	}
 
-	sipAP := parseSIPPoly(h, "AP")
+	if len(sip[0]) > 0 || len(sip[1]) > 0 {
+		w.SetSIP(sip[0], sip[1])
+	}
 
-	sipBP := parseSIPPoly(h, "BP")
-	if len(sipAP) > 0 || len(sipBP) > 0 {
-		w.SetSIPInverse(sipAP, sipBP)
+	if len(sip[2]) > 0 || len(sip[3]) > 0 {
+		w.SetSIPInverse(sip[2], sip[3])
 	}
 
 	// Extract TPV distortion coefficients if CTYPE contains "-TPV" suffix.
@@ -1009,9 +1024,16 @@ func ExtractWCS(h *Header) (*WCS, error) {
 	}
 
 	if hasTPV {
-		pv1 := parseTPVCoeffs(h, 1)
+		pv1, err := parseTPVCoeffs(h, 1)
+		if err != nil {
+			return nil, err
+		}
 
-		pv2 := parseTPVCoeffs(h, 2)
+		pv2, err := parseTPVCoeffs(h, 2)
+		if err != nil {
+			return nil, err
+		}
+
 		if len(pv1) > 0 || len(pv2) > 0 {
 			w.SetTPV(pv1, pv2)
 		}
@@ -1022,25 +1044,59 @@ func ExtractWCS(h *Header) (*WCS, error) {
 
 // parseSIPPoly reads a SIP polynomial from a FITS header.
 // prefix is one of "A", "B", "AP", "BP".
-// Returns nil if the ORDER keyword is not found.
-func parseSIPPoly(h *Header, prefix string) map[[2]int]float64 {
+// Returns an empty polynomial if the ORDER keyword is not found.
+//
+// An absent coefficient is zero, by the SIP convention. A present one that
+// does not parse is an error: until #409 it was taken for absent, so the term
+// vanished from the distortion without a word, and a malformed ORDER took the
+// whole polynomial with it.
+func parseSIPPoly(h *Header, prefix string) (map[[2]int]float64, error) {
 	order, err := h.GetInt(prefix + "_ORDER")
-	if err != nil || order < 0 {
-		return nil
+	if errors.Is(err, ErrKeyNotFound) {
+		return map[[2]int]float64{}, nil
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", ErrWCSMalformedKeyword, err)
+	}
+
+	if order < 0 {
+		return nil, fmt.Errorf("%w: %s_ORDER = %d", ErrWCSMalformedKeyword, prefix, order)
 	}
 
 	coeffs := make(map[[2]int]float64)
 
 	for p := 0; p <= order; p++ {
 		for q := 0; q <= order-p; q++ {
-			key := fmt.Sprintf("%s_%d_%d", prefix, p, q)
-			if v, err := h.GetFloat(key); err == nil && v != 0 {
+			v, _, err := optionalFloat(h, fmt.Sprintf("%s_%d_%d", prefix, p, q), 0)
+			if err != nil {
+				return nil, err
+			}
+
+			if v != 0 {
 				coeffs[[2]int{p, q}] = v
 			}
 		}
 	}
 
-	return coeffs
+	return coeffs, nil
+}
+
+// optionalFloat reads a numeric WCS keyword that may be absent. Absent, it
+// is def; present and readable, its value and true; present and unreadable,
+// an error wrapping ErrWCSMalformedKeyword — never def, because a keyword the
+// header does state is not one it leaves out.
+func optionalFloat(h *Header, key string, def float64) (float64, bool, error) {
+	v, err := h.GetFloat(key)
+	if errors.Is(err, ErrKeyNotFound) {
+		return def, false, nil
+	}
+
+	if err != nil {
+		return 0, false, fmt.Errorf("%w: %w", ErrWCSMalformedKeyword, err)
+	}
+
+	return v, true, nil
 }
 
 // tpvEval evaluates a TPV distortion polynomial at intermediate coordinates (x, y).
@@ -1125,20 +1181,20 @@ func tpvEval(coeffs map[int]float64, x, y float64) float64 {
 
 // parseTPVCoeffs reads TPV polynomial coefficients from a FITS header.
 // axis is 1 or 2 (for PV1_j or PV2_j keywords).
-// Returns nil if no PV keywords are found.
-func parseTPVCoeffs(h *Header, axis int) map[int]float64 {
+// Returns an empty map if no PV keywords are found.
+func parseTPVCoeffs(h *Header, axis int) (map[int]float64, error) {
 	coeffs := make(map[int]float64)
 
 	for j := range 40 {
-		key := fmt.Sprintf("PV%d_%d", axis, j)
-		if v, err := h.GetFloat(key); err == nil {
+		v, present, err := optionalFloat(h, fmt.Sprintf("PV%d_%d", axis, j), 0)
+		if err != nil {
+			return nil, err
+		}
+
+		if present {
 			coeffs[j] = v
 		}
 	}
 
-	if len(coeffs) == 0 {
-		return nil
-	}
-
-	return coeffs
+	return coeffs, nil
 }

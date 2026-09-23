@@ -2,6 +2,7 @@ package fits
 
 import (
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -66,15 +67,24 @@ func ReadImage(h *Header, r io.Reader) (*ImageHDU, error) {
 		totalPixels = 0
 	}
 
-	// Parse BSCALE / BZERO / BLANK from header.
+	// Parse BSCALE / BZERO / BLANK from header. Absent, each takes its
+	// default; present and unreadable, it is an error rather than the default
+	// (#409). The difference is not academic: 16-bit unsigned data carries
+	// BZERO = 32768, which Fortran-derived writers put as 3.2768D+04, and
+	// until GetFloat read the D exponent that value was taken for absent and
+	// every pixel came back 32768 low.
 	bscale := 1.0
 	if v, err := h.GetFloat("BSCALE"); err == nil {
 		bscale = v
+	} else if !errors.Is(err, ErrKeyNotFound) {
+		return nil, fmt.Errorf("invalid BSCALE: %w", err)
 	}
 
 	bzero := 0.0
 	if v, err := h.GetFloat("BZERO"); err == nil {
 		bzero = v
+	} else if !errors.Is(err, ErrKeyNotFound) {
+		return nil, fmt.Errorf("invalid BZERO: %w", err)
 	}
 
 	var (
@@ -85,6 +95,8 @@ func ReadImage(h *Header, r io.Reader) (*ImageHDU, error) {
 	if v, err := h.GetInt("BLANK"); err == nil {
 		blank = int64(v)
 		hasBlank = true
+	} else if !errors.Is(err, ErrKeyNotFound) {
+		return nil, fmt.Errorf("invalid BLANK: %w", err)
 	}
 
 	hdu := &ImageHDU{

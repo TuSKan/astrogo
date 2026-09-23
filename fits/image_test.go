@@ -167,3 +167,37 @@ func TestReadImage_Blank(t *testing.T) {
 		t.Errorf("expected NaN for BLANK pixel, got %f", physical)
 	}
 }
+
+// TestReadImageScalingKeywords: BSCALE and BZERO written with the FITS D
+// exponent are read, and a scaling keyword that is present but unreadable is
+// an error rather than its default (#409). 16-bit unsigned data carries
+// BZERO = 32768, and Fortran-derived writers put it as 3.2768D+04: taken for
+// absent, as it was, every pixel came back 32768 low.
+func TestReadImageScalingKeywords(t *testing.T) {
+	image := func(extra ...Card) *Header {
+		h := NewHeader()
+		h.Append(Card{Keyword: "BITPIX", Value: "16"})
+		h.Append(Card{Keyword: "NAXIS", Value: "1"})
+		h.Append(Card{Keyword: "NAXIS1", Value: "1"})
+
+		for _, c := range extra {
+			h.Append(c)
+		}
+
+		return h
+	}
+
+	img, err := ReadImage(image(
+		Card{Keyword: "BSCALE", Value: "1.0D0"},
+		Card{Keyword: "BZERO", Value: "3.2768D+04"},
+	), bytes.NewReader(make([]byte, 2880)))
+	testutil.AssertNoError(t, err)
+	testutil.AssertEqual(t, "BScale", img.BScale, 1.0)
+	testutil.AssertEqual(t, "BZero", img.BZero, 32768.0)
+
+	for _, key := range []string{"BSCALE", "BZERO", "BLANK"} {
+		if _, err := ReadImage(image(Card{Keyword: key, Value: "'n/a'"}), bytes.NewReader(make([]byte, 2880))); err == nil {
+			t.Errorf("%s = 'n/a': no error; a present, unreadable scaling keyword must not take its default", key)
+		}
+	}
+}
