@@ -197,11 +197,14 @@ func TestElements_StateAt_KnownGeometry_Inclination90(t *testing.T) {
 	pos, _, err := el.StateAt(quarterPeriod)
 	testutil.AssertNoError(t, err)
 
-	eps := constants.IAU.ObliquityJ2000.Value
+	// The J2000 ecliptic of published elements is IAU 1976's (#391). At 1e-9
+	// this tells it from IAU 2006's 84381.406″, which moves y by 4e-7 here;
+	// the 1e-6 this used to allow could not.
+	eps := 84381.448 * math.Pi / 648000
 
-	testutil.AssertNear(t, "x", pos.X, 0, 1e-6)
-	testutil.AssertNear(t, "y", pos.Y, -a*math.Sin(eps), 1e-6)
-	testutil.AssertNear(t, "z", pos.Z, a*math.Cos(eps), 1e-6)
+	testutil.AssertNear(t, "x", pos.X, 0, 1e-9)
+	testutil.AssertNear(t, "y", pos.Y, -a*math.Sin(eps), 1e-9)
+	testutil.AssertNear(t, "z", pos.Z, a*math.Cos(eps), 1e-9)
 }
 
 func TestElements_StateAt_OnePeriodClosure(t *testing.T) {

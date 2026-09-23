@@ -75,13 +75,13 @@ func inPlane(peri, pos, h vector.Vec3) (r, nu float64) {
 // parabolic; an ellipse; and a comet 1e-4 above e = 1, 133 days from
 // perihelion, which is where the closed-form Stumpff functions lose digits.
 //
-// Two conventions differ, and both are set to Horizons' here so that what is
-// left is the propagation. Horizons converts with GM☉ = 1.3271244004127939e20
+// The comparison is made in ICRF, where Horizons states it, with one
+// convention set to Horizons': it converts with GM☉ = 1.3271244004127939e20
 // m³/s², DE440's value, where kepler uses the IAU 2015 nominal one; the
-// Keplerian GM is printed with the elements. And Horizons refers the elements
-// to the J2000 ecliptic of the IAU 1976 obliquity, 84381.448″, where kepler
-// rotates by IAU 2006's 84381.406″, a 0.042″ tilt that is #391. The comparison
-// is made in each side's own ecliptic, so that difference cancels.
+// Keplerian GM is printed with the elements. The ecliptic is already the same:
+// both refer the elements to the J2000 ecliptic of the IAU 1976 obliquity.
+// Before #391 kepler rotated by IAU 2006's instead, and this comparison had to
+// be made in each side's own ecliptic to get under 2e-7 AU.
 //
 // Values are from Horizons ELEMENTS queries of 2026-09-23 (CENTER='@10',
 // OBJ_DATA='YES'); the solution dates are those Horizons reported.
@@ -94,9 +94,6 @@ func TestFromPerihelionReproducesHorizonsOwnConversion(t *testing.T) {
 		tolPos = 1e-11 // AU
 		tolVel = 1e-13 // AU/day
 	)
-
-	eps2006 := constants.IAU.ObliquityJ2000.Value
-	eps1976 := 84381.448 * math.Pi / 648000
 
 	cases := []struct {
 		el       cometElements
@@ -144,8 +141,8 @@ func TestFromPerihelionReproducesHorizonsOwnConversion(t *testing.T) {
 			pos, vel, err := el.StateAt(time.FromJDParts(tc.epoch, 0, time.TDB))
 			testutil.AssertNoError(t, err)
 
-			dr := pos.RotateX(-eps2006).Sub(tc.pos.RotateX(-eps1976)).Norm()
-			dv := vel.RotateX(-eps2006).Sub(tc.vel.RotateX(-eps1976)).Norm()
+			dr := pos.Sub(tc.pos).Norm()
+			dv := vel.Sub(tc.vel).Norm()
 
 			if dr > tolPos || dv > tolVel {
 				t.Errorf("|Δr| = %.3g AU, |Δv| = %.3g AU/day from Horizons' conversion; want below %g and %g",

@@ -20,6 +20,7 @@ package plan_test
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -49,115 +50,113 @@ type nasaEclipseRef struct {
 
 // ── NASA Eclipse Catalog Parser ──────────────────────────────────────────────
 
-// parseNASALunarEclipses parses a NASA lunar eclipse catalog page.
-func parseNASALunarEclipses(html string) []nasaEclipseRef {
-	var eclipses []nasaEclipseRef
+// catalogNumber matches the five-digit catalog number that opens every row of
+// NASA's eclipse catalog pages.
+var catalogNumber = regexp.MustCompile(`^\d{5}$`)
 
-	// Strip HTML tags
-	clean := regexp.MustCompile(`<[^>]+>`).ReplaceAllString(html, "")
-	lines := strings.SplitSeq(clean, "\n")
+// errCatalogField is a field of a recognized catalog row that does not parse.
+var errCatalogField = errors.New("malformed catalog field")
 
-	for line := range lines {
-		// Look for lines with catalog numbers (5 digits at start)
-		trimmed := strings.TrimSpace(line)
-		if len(trimmed) < 40 {
-			continue
-		}
+// catalogFields are the date, time and ΔT columns every catalog row carries,
+// in the same place on the lunar and solar pages.
+type catalogFields struct {
+	year, month, day, hour, minute, sec int
+	deltaT                              float64
+}
 
-		// Try to match the pattern
-		// Format: "04824  0001 Jun 24  12:08:47  10519 -24719   78   P   ..."
-		parts := strings.Fields(trimmed)
-		if len(parts) < 9 {
-			continue
-		}
+// parseCatalogFields reads parts[1:6] of a recognized catalog row.
+func parseCatalogFields(parts []string) (catalogFields, error) {
+	var f catalogFields
 
-		// Catalog number must be 5 digits
-		catNum := parts[0]
-		if len(catNum) != 5 {
-			continue
-		}
-
-		if _, err := strconv.Atoi(catNum); err != nil {
-			continue
-		}
-
-		// Parse year
-		year, err := strconv.Atoi(parts[1])
-		if err != nil {
-			continue
-		}
-
-		// Parse month
-		month, ok := monthMap[parts[2]]
-		if !ok {
-			continue
-		}
-
-		// Parse day
-		day, err := strconv.Atoi(parts[3])
-		if err != nil {
-			continue
-		}
-
-		// Parse time (HH:MM:SS)
-		timeParts := strings.Split(parts[4], ":")
-		if len(timeParts) != 3 {
-			continue
-		}
-
-		hour, _ := strconv.Atoi(timeParts[0])
-		minute, _ := strconv.Atoi(timeParts[1])
-		sec, _ := strconv.Atoi(timeParts[2])
-
-		// Parse ΔT
-		dt, err := strconv.ParseFloat(parts[5], 64)
-		if err != nil {
-			continue
-		}
-
-		// Parse Luna Num (skip)
-		// Parse Saros Num
-		// Parse eclipse type — find "T+", "T-", "T", "P", "N" etc.
-		eclType := ""
-
-		for i := 7; i < len(parts) && i < 10; i++ {
-			p := parts[i]
-			if p == "T+" || p == "T-" || p == "T" ||
-				p == "P" || p == "N" ||
-				p == "Pb" || p == "Nb" || p == "Tb" {
-				eclType = string(p[0])
-				break
-			}
-		}
-
-		if eclType == "" {
-			continue
-		}
-
-		// NASA catalog uses Julian calendar before 1582-10-15, times are in TD ≈ TDB
-		isJulianCal := year < 1582 || (year == 1582 && month < 10) || (year == 1582 && month == 10 && day < 15)
-
-		var jdTD float64
-		if isJulianCal {
-			jdTD = time.DateJulianCal(year, month, day, hour, minute, sec).JD()
-		} else {
-			jdTD = time.Date(year, time.Month(month), day, hour, minute, sec, 0, time.LocationUTC).JD()
-		}
-
-		eclipses = append(eclipses, nasaEclipseRef{
-			Year: year, Month: month, Day: day,
-			Hour: hour, Min: minute, Sec: sec,
-			DeltaT:      dt,
-			EclipseType: eclType,
-			JDtd:        jdTD,
-		})
+	year, err := strconv.Atoi(parts[1])
+	if err != nil {
+		return f, fmt.Errorf("%w: year %q", errCatalogField, parts[1])
 	}
 
-	return eclipses
+	month, ok := monthMap[parts[2]]
+	if !ok {
+		return f, fmt.Errorf("%w: month %q", errCatalogField, parts[2])
+	}
+
+	day, err := strconv.Atoi(parts[3])
+	if err != nil {
+		return f, fmt.Errorf("%w: day %q", errCatalogField, parts[3])
+	}
+
+	hms := strings.Split(parts[4], ":")
+	if len(hms) != 3 {
+		return f, fmt.Errorf("%w: time %q", errCatalogField, parts[4])
+	}
+
+	var clock [3]int
+
+	for i, v := range hms {
+		if clock[i], err = strconv.Atoi(v); err != nil {
+			return f, fmt.Errorf("%w: time %q", errCatalogField, parts[4])
+		}
+	}
+
+	deltaT, err := strconv.ParseFloat(parts[5], 64)
+	if err != nil {
+		return f, fmt.Errorf("%w: ΔT %q", errCatalogField, parts[5])
+	}
+
+	return catalogFields{year, month, day, clock[0], clock[1], clock[2], deltaT}, nil
+}
+
+// lunarType and solarType are the eclipse-type column (the ninth field of a
+// row) as each catalog's key defines it: the type letter, then at most one
+// qualifier. Lunar (LEcat5/LEcatkey.html): N penumbral, P partial, T total;
+// m middle of its saros, + and - central total north and south of the shadow
+// axis, * total penumbral, b and e first and last of its saros. Solar
+// (SEcat5/SEcatkey.html): P partial, A annular, T total, H hybrid; m middle of
+// its saros, n and s central with no northern or southern limit, + and -
+// non-central with none, 2 and 3 hybrid beginning total or annular, b and e
+// first and last of its saros.
+//
+// The pages print the lunar key's * as x: all 19 Nx rows on the six lunar
+// pages these tests read have a penumbral magnitude of 1 or more, which is what
+// a total penumbral eclipse is.
+//
+// Until #398 each parser kept only the codes it listed, and dropped any other
+// row without a word: 28 lunar and 50 solar rows, the marginal penumbrals and
+// the non-central and hybrid eclipses a detector is likeliest to miss.
+var (
+	lunarType = regexp.MustCompile(`^([NPT])[m+*bex-]?$`)
+	solarType = regexp.MustCompile(`^([PATH])[mns+23be-]?$`)
+)
+
+// eclipseType returns the type letter of a catalog row's type field, or an
+// error wrapping errCatalogField when the key does not define the field.
+func eclipseType(key *regexp.Regexp, field string) (string, error) {
+	m := key.FindStringSubmatch(field)
+	if m == nil {
+		return "", fmt.Errorf("%w: eclipse type %q", errCatalogField, field)
+	}
+
+	return m[1], nil
+}
+
+// parseNASALunarEclipses parses a NASA lunar eclipse catalog page.
+func parseNASALunarEclipses(t *testing.T, html string) []nasaEclipseRef {
+	t.Helper()
+
+	return parseNASACatalog(t, html, lunarType)
 }
 
 // parseNASASolarEclipses parses a NASA solar eclipse catalog page.
-func parseNASASolarEclipses(html string) []nasaEclipseRef {
+func parseNASASolarEclipses(t *testing.T, html string) []nasaEclipseRef {
+	t.Helper()
+
+	return parseNASACatalog(t, html, solarType)
+}
+
+// parseNASACatalog parses a NASA eclipse catalog page, lunar or solar. The two
+// lay out every column this reads identically and differ only in the eclipse
+// types their keys define; key selects which.
+func parseNASACatalog(t *testing.T, html string, key *regexp.Regexp) []nasaEclipseRef {
+	t.Helper()
+
 	var eclipses []nasaEclipseRef
 
 	clean := regexp.MustCompile(`<[^>]+>`).ReplaceAllString(html, "")
@@ -165,73 +164,40 @@ func parseNASASolarEclipses(html string) []nasaEclipseRef {
 
 	for line := range lines {
 		trimmed := strings.TrimSpace(line)
-		if len(trimmed) < 40 {
-			continue
-		}
 
+		// A catalog row starts with its five-digit catalog number; every other
+		// line on the page is prose, headers or rules. Past this point the line
+		// is a row, and a field in it that does not parse is a malformed row,
+		// reported rather than dropped: a quietly shorter reference set still
+		// compares, and passes, on whatever rows are left.
+		//
+		// Format: "04824  0001 Jun 24  12:08:47  10519 -24719   78   P   ..."
 		parts := strings.Fields(trimmed)
+		if len(parts) == 0 || !catalogNumber.MatchString(parts[0]) {
+			continue
+		}
+
 		if len(parts) < 9 {
+			t.Errorf("NASA catalog row %q: %v: %d fields, the key defines 9 before the type-specific ones",
+				trimmed, errCatalogField, len(parts))
+
 			continue
 		}
 
-		// Catalog number must be 5 digits
-		catNum := parts[0]
-		if len(catNum) != 5 {
-			continue
-		}
-
-		if _, err := strconv.Atoi(catNum); err != nil {
-			continue
-		}
-
-		year, err := strconv.Atoi(parts[1])
+		fields, err := parseCatalogFields(parts)
 		if err != nil {
+			t.Errorf("NASA catalog row %q: %v", trimmed, err)
+
 			continue
 		}
 
-		month, ok := monthMap[parts[2]]
-		if !ok {
-			continue
-		}
+		year, month, day := fields.year, fields.month, fields.day
+		hour, minute, sec, dt := fields.hour, fields.minute, fields.sec, fields.deltaT
 
-		day, err := strconv.Atoi(parts[3])
+		eclType, err := eclipseType(key, parts[8])
 		if err != nil {
-			continue
-		}
+			t.Errorf("NASA catalog row %q: %v", trimmed, err)
 
-		timeParts := strings.Split(parts[4], ":")
-		if len(timeParts) != 3 {
-			continue
-		}
-
-		hour, _ := strconv.Atoi(timeParts[0])
-		minute, _ := strconv.Atoi(timeParts[1])
-		sec, _ := strconv.Atoi(timeParts[2])
-
-		dt, err := strconv.ParseFloat(parts[5], 64)
-		if err != nil {
-			continue
-		}
-
-		// Eclipse type for solar: T, A, H, P
-		eclType := ""
-
-		for i := 6; i < len(parts) && i < 12; i++ {
-			p := strings.TrimSpace(parts[i])
-			if len(p) >= 1 && (p[0] == 'T' || p[0] == 'A' || p[0] == 'H' || p[0] == 'P') {
-				// Verify it's actually an eclipse type marker, not some other field
-				if len(p) <= 3 && (p == "T" || p == "A" || p == "H" || p == "P" ||
-					p == "Ts" || p == "As" || p == "Hs" || p == "Ps" ||
-					p == "Tm" || p == "Am" || p == "Hm" || p == "Pm" ||
-					p == "T1" || p == "A1" || p == "H1" || p == "P1" ||
-					p == "Te" || p == "Ae" || p == "He" || p == "Pe") {
-					eclType = string(p[0])
-					break
-				}
-			}
-		}
-
-		if eclType == "" {
 			continue
 		}
 
@@ -377,7 +343,7 @@ func TestNASA_LunarEclipses_Historical(t *testing.T) {
 			nasaBudgetOK(t, 45*time.Second)
 
 			html := fetchNASAPage(t, c.url)
-			refs := parseNASALunarEclipses(html)
+			refs := parseNASALunarEclipses(t, html)
 			t.Logf("Parsed %d lunar eclipses from NASA %04d-%04d", len(refs), c.start, c.end)
 
 			if len(refs) == 0 {
@@ -398,9 +364,11 @@ func TestNASA_LunarEclipses_Historical(t *testing.T) {
 				searchStart := refTime.Add(unit.Days(-30))
 				searchEnd := refTime.Add(unit.Days(30))
 
+				// DE441 covers every date on these pages, so an error from the
+				// search is astrogo's, and a miss rather than a skip.
 				eclipses, err := plan.LunarEclipses(searchStart, searchEnd, prov)
 				if err != nil {
-					t.Logf("  SKIP %04d-%02d-%02d: LunarEclipses error: %v",
+					t.Errorf("  FAIL %04d-%02d-%02d: LunarEclipses: %v",
 						ref.Year, ref.Month, ref.Day, err)
 
 					continue
@@ -440,12 +408,17 @@ func TestNASA_LunarEclipses_Historical(t *testing.T) {
 							ref.Year, ref.Month, ref.Day, ref.Hour, ref.Min, ref.EclipseType, bestDelta)
 					}
 				} else {
-					// Only fail for umbral eclipses (T, P) — penumbral (N) may be below our detection threshold
+					// A missed umbral eclipse (T, P) fails. A missed penumbral one
+					// is logged, because astrogo decides an eclipse by a fixed
+					// 1.58° ecliptic-latitude limit rather than the shadow's real
+					// size that month, and misses marginal penumbrals that fall
+					// outside it — 1958-04-04, magnitude 0.0135, while shallower
+					// ones inside it are found (#401).
 					if ref.EclipseType != "N" {
 						t.Errorf("  MISS LE %04d-%02d-%02d %02d:%02d type=%s: not detected by astrogo",
 							ref.Year, ref.Month, ref.Day, ref.Hour, ref.Min, ref.EclipseType)
 					} else {
-						t.Logf("  SKIP LE %04d-%02d-%02d type=N (penumbral): below detection threshold",
+						t.Logf("  SKIP LE %04d-%02d-%02d type=N (penumbral): outside astrogo's fixed latitude limit (#401)",
 							ref.Year, ref.Month, ref.Day)
 					}
 				}
@@ -509,7 +482,7 @@ func TestNASA_SolarEclipses_Historical(t *testing.T) {
 			nasaBudgetOK(t, 45*time.Second)
 
 			html := fetchNASAPage(t, c.url)
-			refs := parseNASASolarEclipses(html)
+			refs := parseNASASolarEclipses(t, html)
 			t.Logf("Parsed %d solar eclipses from NASA %04d-%04d", len(refs), c.start, c.end)
 
 			if len(refs) == 0 {
@@ -529,9 +502,11 @@ func TestNASA_SolarEclipses_Historical(t *testing.T) {
 				searchStart := refTime.Add(unit.Days(-30))
 				searchEnd := refTime.Add(unit.Days(30))
 
+				// DE441 covers every date on these pages, so an error from the
+				// search is astrogo's, and a miss rather than a skip.
 				eclipses, err := plan.SolarEclipses(searchStart, searchEnd, prov)
 				if err != nil {
-					t.Logf("  SKIP %04d-%02d-%02d: SolarEclipses error: %v",
+					t.Errorf("  FAIL %04d-%02d-%02d: SolarEclipses: %v",
 						ref.Year, ref.Month, ref.Day, err)
 
 					continue
@@ -570,11 +545,13 @@ func TestNASA_SolarEclipses_Historical(t *testing.T) {
 							ref.Year, ref.Month, ref.Day, ref.Hour, ref.Min, ref.EclipseType, bestDelta)
 					}
 				} else {
+					// As for lunar: a missed partial is logged, not failed, for
+					// the same fixed latitude limit (#401). None is missed today.
 					if ref.EclipseType != "P" {
 						t.Errorf("  MISS SE %04d-%02d-%02d %02d:%02d type=%s: not detected by astrogo",
 							ref.Year, ref.Month, ref.Day, ref.Hour, ref.Min, ref.EclipseType)
 					} else {
-						t.Logf("  SKIP SE %04d-%02d-%02d type=P (partial): may be below threshold",
+						t.Logf("  SKIP SE %04d-%02d-%02d type=P (partial): outside astrogo's fixed latitude limit (#401)",
 							ref.Year, ref.Month, ref.Day)
 					}
 				}
@@ -605,7 +582,17 @@ func TestNASA_SolarEclipses_Historical(t *testing.T) {
 // TestNASA_DeltaT_CrossValidation verifies that astrogo's time.DeltaT polynomial
 // matches NASA's tabulated ΔT values from the Five Millennium Eclipse Catalog.
 // Both sources use the Espenak & Meeus (2006) model, so they should agree closely.
+//
+// Until #398 it asserted nothing: a difference over 10 s was logged as a
+// warning, and the test passed whatever time.DeltaT returned. The bound now
+// comes from the two things that separate the sides when the model agrees.
+// The catalog prints ΔT in whole seconds, 1 s at most. And this test evaluates
+// ΔT at mid-month rather than on the eclipse's date, up to half a month early
+// or late, which is 0.4 s in the first century, where ΔT falls fastest, near
+// 10 s a year. Measured over 1213 rows: 0.9 s at worst.
 func TestNASA_DeltaT_CrossValidation(t *testing.T) {
+	const deltaTTolerance = 1.5 // seconds
+
 	requireNASA(t)
 
 	nasaBudgetOK(t, 2*time.Minute)
@@ -632,7 +619,7 @@ func TestNASA_DeltaT_CrossValidation(t *testing.T) {
 			nasaBudgetOK(t, 45*time.Second)
 
 			html := fetchNASAPage(t, c.url)
-			refs := parseNASALunarEclipses(html)
+			refs := parseNASALunarEclipses(t, html)
 
 			if len(refs) == 0 {
 				t.Fatalf("No eclipses parsed")
@@ -643,11 +630,10 @@ func TestNASA_DeltaT_CrossValidation(t *testing.T) {
 				count                    int
 			)
 
+			// Every row counts. A ΔT of 0 is a value — the catalog prints it
+			// for eclipses around 1902, when ΔT crossed zero — and a field
+			// that does not parse was already reported by the parser.
 			for _, ref := range refs {
-				if ref.DeltaT == 0 {
-					continue
-				}
-
 				decYear := float64(ref.Year) + (float64(ref.Month)-0.5)/12.0
 				computed := time.DeltaT(decYear)
 				delta := math.Abs(computed - ref.DeltaT)
@@ -665,10 +651,9 @@ func TestNASA_DeltaT_CrossValidation(t *testing.T) {
 					maxDelta = delta
 				}
 
-				// NASA truncates ΔT to integer seconds; allow generous tolerance
-				if delta > 10 {
-					t.Logf("  WARN %04d-%02d-%02d: computed ΔT=%.1f, NASA ΔT=%.0f, Δ=%.1f s",
-						ref.Year, ref.Month, ref.Day, computed, ref.DeltaT, delta)
+				if delta > deltaTTolerance {
+					t.Errorf("%04d-%02d-%02d: computed ΔT=%.1f s, NASA ΔT=%.0f s, Δ=%.1f s (limit %.1f s)",
+						ref.Year, ref.Month, ref.Day, computed, ref.DeltaT, delta, deltaTTolerance)
 				}
 			}
 

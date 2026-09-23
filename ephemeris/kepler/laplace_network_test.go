@@ -71,14 +71,16 @@ func jovicentric(t *testing.T, naif int, startTDB, stopTDB, step string) map[flo
 			continue
 		}
 
+		// Every line between $$SOE and $$EOE is a data row; one that does not
+		// parse is a changed format, not a row to drop.
 		cols := strings.Split(line, ",")
 		if len(cols) < 5 {
-			continue
+			t.Fatalf("vector row has %d columns, want at least 5: %q", len(cols), line)
 		}
 
 		jd, err := strconv.ParseFloat(strings.TrimSpace(cols[0]), 64)
 		if err != nil {
-			continue
+			t.Fatalf("parse JD in %q: %v", line, err)
 		}
 
 		var v [3]float64

@@ -79,7 +79,7 @@ func TestCitedTestsExist(t *testing.T) {
 	for _, path := range goFiles {
 		src, err := os.ReadFile(path)
 		if err != nil {
-			continue
+			t.Fatalf("read %s: %v", path, err)
 		}
 
 		for _, m := range testDecl.FindAllStringSubmatch(string(src), -1) {
@@ -112,7 +112,7 @@ func TestCitedTestsExist(t *testing.T) {
 	for _, path := range append(goFiles, docFiles...) {
 		rel, err := filepath.Rel(root, path)
 		if err != nil {
-			continue
+			t.Fatalf("relativize %s: %v", path, err)
 		}
 
 		slash := filepath.ToSlash(rel)
@@ -122,7 +122,7 @@ func TestCitedTestsExist(t *testing.T) {
 
 		src, err := os.ReadFile(path)
 		if err != nil {
-			continue
+			t.Fatalf("read %s: %v", slash, err)
 		}
 
 		isGo := strings.HasSuffix(slash, ".go")

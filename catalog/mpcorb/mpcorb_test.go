@@ -336,10 +336,14 @@ func TestReadYieldsABadRowAndKeepsGoing(t *testing.T) {
 	)
 
 	for tgt, err := range mpcorb.Read(strings.NewReader(broken)) {
-		if err != nil {
+		if errors.Is(err, mpcorb.ErrMalformedRow) {
 			errs = append(errs, err)
 
 			continue
+		}
+
+		if err != nil {
+			t.Fatalf("Read: %v", err)
 		}
 
 		good = append(good, tgt)

@@ -186,10 +186,14 @@ func TestReadYieldsABadCometRowAndKeepsGoing(t *testing.T) {
 		)
 
 		for tgt, err := range mpcorb.Read(strings.NewReader(row + "\n" + cometRows[1] + "\n")) {
-			if err != nil {
+			if errors.Is(err, mpcorb.ErrMalformedRow) {
 				errs = append(errs, err)
 
 				continue
+			}
+
+			if err != nil {
+				t.Fatalf("Read: %v", err)
 			}
 
 			read++
