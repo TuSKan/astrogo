@@ -136,11 +136,11 @@ func WithPlanetaryMoons() VisibleTonightOption {
 // handle — and, for a single night's visibility-window search, accurate
 // well beyond what that search itself resolves (~0.04″ near the
 // elements' own epoch, ~0.56″ at 30 days out — see CHANGELOG for the
-// live 433 Eros validation). A candidate with no published elements, or
-// whose orbit is hyperbolic/parabolic (every KindInterstellar object,
-// and near-parabolic comets — the semi-major axis and mean anomaly a
-// catalog target carries cannot describe either), still takes the kernel
-// path regardless of this option.
+// live 433 Eros validation). An open orbit — every KindInterstellar
+// object, and the near-parabolic comets with e >= 1 — is propagated from
+// the perihelion form SBDB publishes beside the semi-major axis, since it
+// has no usable semi-major axis. A candidate with no published elements
+// still takes the kernel path regardless of this option.
 //
 // Use this when real, perturbed, kernel-backed positions matter more
 // than the network/consent cost: astrometry, occultation prediction,
@@ -552,9 +552,8 @@ func candidateFromTarget(ctx context.Context, tgt resolve.Target, start, end tim
 	// Kepler first: try FromCatalog's own elements-based construction
 	// (no provider passed) before ever reaching for a kernel — see
 	// WithSmallBodyKernels' doc comment for the full rationale. Falls
-	// through to the kernel path below when elements weren't published,
-	// are hyperbolic/parabolic, or the caller forced kernels via
-	// WithSmallBodyKernels.
+	// through to the kernel path below when elements weren't published or
+	// don't build, or the caller forced kernels via WithSmallBodyKernels.
 	if !cfg.forceSmallBodyKernels && tgt.HasElements {
 		if obj, err := FromCatalog(tgt, nil); err == nil && !isFixedTarget(obj) {
 			return obj, nil, nil

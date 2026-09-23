@@ -833,6 +833,8 @@ var scalarFieldRules = []fieldRule{
 			dst.AscendingNode = src.AscendingNode
 			dst.ArgPeriapsis = src.ArgPeriapsis
 			dst.MeanAnomaly = src.MeanAnomaly
+			dst.PerihelionDistance = src.PerihelionDistance
+			dst.PerihelionTime = src.PerihelionTime
 			setProvenance(dst, "OrbitalElements", provider)
 			setProvenance(dst, "Epoch", provider) // overwrites whatever the generic Epoch rule above set — this one is authoritative for an elements-bearing Target
 		},

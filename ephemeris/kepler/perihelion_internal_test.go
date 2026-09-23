@@ -1,10 +1,13 @@
 package kepler
 
 import (
+	"errors"
 	"math"
 	"testing"
 
+	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/constants"
+	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -57,6 +60,44 @@ func TestSolveUniversalConvergesAcrossTheConics(t *testing.T) {
 						e, q, dt, chi, residual)
 				}
 			}
+		}
+	}
+}
+
+// TestStateAtRefusesAnInstantThatIsNotANumber checks both paths fail rather
+// than hand back a position of NaNs. An instant that is not a number makes
+// every anomaly one too; Kepler's equation cannot be solved for it, in either
+// form, and StateAt says so.
+func TestStateAtRefusesAnInstantThatIsNotANumber(t *testing.T) {
+	epoch := time.FromJDParts(2460000.5, 0, time.TT)
+
+	classical, err := NewElements(epoch, unit.AU(2.5), 0.2, angle.Deg(10), angle.Deg(20), angle.Deg(30), angle.Deg(40))
+	if err != nil {
+		t.Fatalf("NewElements: %v", err)
+	}
+
+	hyperbola, err := FromPerihelion(epoch, unit.AU(0.5), 1.3, angle.Deg(10), angle.Deg(20), angle.Deg(30))
+	if err != nil {
+		t.Fatalf("FromPerihelion: %v", err)
+	}
+
+	for name, el := range map[string]Elements{"NewElements": classical, "FromPerihelion": hyperbola} {
+		pos, vel, err := el.StateAt(time.FromJD(math.NaN(), time.TT))
+		if !errors.Is(err, ErrKeplerNoConverge) {
+			t.Errorf("%s: StateAt(NaN) = %v, %v, %v; want ErrKeplerNoConverge", name, pos, vel, err)
+		}
+	}
+}
+
+// TestValidateRefusesABadPerihelionDistance checks the perihelion form's own
+// validation, which FromPerihelion pre-empts for its arguments but Validate
+// exists to repeat for a value built any other way.
+func TestValidateRefusesABadPerihelionDistance(t *testing.T) {
+	for _, q := range []float64{-1, math.NaN(), math.Inf(1)} {
+		el := Elements{perihelion: unit.AU(q), eccentricity: 1}
+
+		if err := el.Validate(); !errors.Is(err, ErrInvalidElements) {
+			t.Errorf("q = %v: Validate = %v, want ErrInvalidElements", q, err)
 		}
 	}
 }

@@ -257,6 +257,9 @@ func TestResolver_MergePreservesOrbitalElements(t *testing.T) {
 			AscendingNode: angle.Deg(80.2),
 			ArgPeriapsis:  angle.Deg(73.3),
 			MeanAnomaly:   angle.Deg(274),
+
+			PerihelionDistance: unit.AU(2.55),
+			PerihelionTime:     time.FromJDParts(2461599.841, 0, time.TDB),
 		},
 	}}
 	p2 := &mockProvider{name: "simbad", targets: map[string]Target{
@@ -289,6 +292,10 @@ func TestResolver_MergePreservesOrbitalElements(t *testing.T) {
 	testutil.AssertNear(t, "merged AscendingNode", got.AscendingNode.Degrees(), 80.2, 1e-9)
 	testutil.AssertNear(t, "merged ArgPeriapsis", got.ArgPeriapsis.Degrees(), 73.3, 1e-9)
 	testutil.AssertNear(t, "merged MeanAnomaly", got.MeanAnomaly.Degrees(), 274, 1e-9)
+
+	// The comet form travels with the rest: an open orbit has no other.
+	testutil.AssertNear(t, "merged PerihelionDistance", got.PerihelionDistance.AU(), 2.55, 1e-9)
+	testutil.AssertNear(t, "merged PerihelionTime", got.PerihelionTime.JD(), 2461599.841, 1e-9)
 
 	if !got.Epoch.Equal(elementsEpoch) {
 		t.Errorf("expected merged Epoch to be the elements' own epoch %v, got %v", elementsEpoch, got.Epoch)
