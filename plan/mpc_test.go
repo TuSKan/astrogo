@@ -359,7 +359,7 @@ func TestLookupMPCSiteLeavesTheTimeZoneUnset(t *testing.T) {
 }
 
 // TestMPCObservatoryResolutionTracksThePublishedDecimals covers the field that
-// exists so a caller can tell a 3-metre row from a 3-kilometre one.
+// exists so a caller can tell a 3-meter row from a 3-kilometer one.
 //
 // The register mixes both — 1,322 rows at six decimals and 38 at three — and
 // nothing in a recovered latitude and height says which you are holding. A

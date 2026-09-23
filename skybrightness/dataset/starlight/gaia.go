@@ -67,13 +67,13 @@ const (
 // definitions. Shipping a set here would mean either copying one without
 // being able to state which filter revision it belongs to, or inventing it.
 //
-// The Gaia G band itself needs no transformation, so a zero-value ColourTerm
+// The Gaia G band itself needs no transformation, so a zero-value ColorTerm
 // is the one case that works out of the box.
 type GaiaBand struct {
 	// Name labels the band in the resulting map.
 	Name string
 
-	// ColourTerm gives G minus the band magnitude as a polynomial in
+	// ColorTerm gives G minus the band magnitude as a polynomial in
 	// (BP-RP), lowest order first:
 	//
 	//	G - m_band = c[0] + c[1]*x + c[2]*x^2 + ...
@@ -82,7 +82,7 @@ type GaiaBand struct {
 	// star inside the aggregate, which matters: transforming a summed flux
 	// is not the same as summing transformed fluxes when the transformation
 	// depends on colour.
-	ColourTerm []float64
+	ColorTerm []float64
 
 	// FluxToRadiance converts one unit of the archive's flux — e-/s, as
 	// phot_g_mean_flux reports — into the passband-averaged spectral
@@ -91,7 +91,7 @@ type GaiaBand struct {
 	// neither of which this package can supply — for Gaia G on the Vega
 	// scale that is 3.63e-11 * 10^(-25.6874/2.5).
 	//
-	// Per nanometre, not integrated over the band: a zero point converts a
+	// Per nanometer, not integrated over the band: a zero point converts a
 	// flux into a mean flux density, and [skybrightness.NewIntegratedStarlight]
 	// consumes it as one. Mixing the two conventions changes the answer by
 	// the band width and is not otherwise visible.
@@ -119,7 +119,7 @@ func (b GaiaBand) validate() error {
 func (b GaiaBand) colourPolynomial() string {
 	var poly strings.Builder
 
-	for i, c := range b.ColourTerm {
+	for i, c := range b.ColorTerm {
 		if i > 0 {
 			poly.WriteString("+")
 		}
@@ -157,7 +157,7 @@ func (b GaiaBand) colourFactor(bpRP float64) float64 {
 
 	var offset, term float64 = 0, 1
 
-	for _, c := range b.ColourTerm {
+	for _, c := range b.ColorTerm {
 		offset += c * term
 		term *= bpRP
 	}
@@ -181,7 +181,7 @@ func (b GaiaBand) colourFactor(bpRP float64) float64 {
 // colour, which is what Masana et al. (2021) do. The counts still come back
 // per pixel so a caller can see how much of a pixel rests on the assumption.
 func (b GaiaBand) expression() string {
-	if len(b.ColourTerm) == 0 {
+	if len(b.ColorTerm) == 0 {
 		return "SUM(phot_g_mean_flux)"
 	}
 
@@ -198,7 +198,7 @@ func (b GaiaBand) expression() string {
 // Plain arithmetic like this parses everywhere, which CASE and FILTER do not —
 // ESA rejects CASE, and Gaia@AIP rejects FILTER.
 func (b GaiaBand) colourRecoveryColumns() string {
-	if len(b.ColourTerm) == 0 {
+	if len(b.ColorTerm) == 0 {
 		return ""
 	}
 
@@ -406,7 +406,7 @@ func BuildFromGaia(ctx context.Context, build GaiaBuild) (*Map, []int64, error) 
 	// run that dies partway keeps what it had. Before this, a throttle at
 	// chunk 360 of 787 discarded 360 chunks of somebody else's service time
 	// as well as fourteen minutes of ours, and the only recovery was to ask
-	// for all of it again — which is precisely the behaviour that gets a
+	// for all of it again — which is precisely the behavior that gets a
 	// client throttled in the first place.
 	band := build.Bands[0].Name
 	values := bands[band]
@@ -601,7 +601,7 @@ func aggregationClient(id remote.EndpointID) *remote.Client {
 // context is done. That is the failure a long build actually hits, so it is
 // retried here with a fresh deadline and a backoff.
 //
-// A cancelled parent context is not a transient failure and stops immediately.
+// A canceled parent context is not a transient failure and stops immediately.
 //
 // Retries are not reported through Progress. Overloading a (done, total)
 // callback with a sentinel would make every existing caller's arithmetic
@@ -802,7 +802,7 @@ func (g GaiaBuild) accumulate(
 // mean, and inventing a global one would be exactly the fabrication this
 // package refuses elsewhere.
 func (g GaiaBuild) recoverColourless(b GaiaBand, rows resultRows) float64 {
-	if len(b.ColourTerm) == 0 {
+	if len(b.ColorTerm) == 0 {
 		return 0
 	}
 
@@ -841,7 +841,7 @@ func (g GaiaBuild) recoverColourless(b GaiaBand, rows resultRows) float64 {
 func GaiaJohnsonV() GaiaBand {
 	return GaiaBand{
 		Name:           "V",
-		ColourTerm:     []float64{-0.02704, 0.01424, -0.2156, 0.01426},
+		ColorTerm:      []float64{-0.02704, 0.01424, -0.2156, 0.01426},
 		FluxToRadiance: johnsonVZeroFlux / math.Pow(10, GaiaGZeroPoint/2.5),
 	}
 }
@@ -922,11 +922,11 @@ func VegaZeroFlux(band magnitude.Passband) (float64, error) {
 
 	const (
 		jansky      = 1e-26 // W m^-2 Hz^-1
-		metrePerNM  = 1e-9
+		meterPerNM  = 1e-9
 		perMToPerNM = 1e-9
 	)
 
-	lambdaM := float64(pivot) * metrePerNM
+	lambdaM := float64(pivot) * meterPerNM
 
 	return band.VegaZeroPointJy * jansky *
 		constants.SI2019.SpeedOfLight.Value / (lambdaM * lambdaM) * perMToPerNM, nil
@@ -961,7 +961,7 @@ func GaiaJohnsonCousins(name string, band magnitude.Passband) (GaiaBand, error) 
 	// target band's zero point is applied.
 	return GaiaBand{
 		Name:           name,
-		ColourTerm:     colour,
+		ColorTerm:      colour,
 		FluxToRadiance: zero / math.Pow(10, GaiaGZeroPoint/2.5),
 	}, nil
 }

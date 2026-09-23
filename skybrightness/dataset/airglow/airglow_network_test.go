@@ -21,8 +21,8 @@ import (
 // exchange from a wrong one.
 //
 // It also checks the unit conversion, which is where the real risk is. SkyCalc
-// reports photons per micrometre per square arcsecond; spectral radiance is
-// per nanometre per steradian and carries the energy of a photon. Getting that
+// reports photons per micrometer per square arcsecond; spectral radiance is
+// per nanometer per steradian and carries the energy of a photon. Getting that
 // wrong is a factor of a thousand or of 4.25e10, and both leave a spectrum that
 // is positive, smooth and completely wrong. Only an absolute check catches it.
 func TestFetchReturnsAPlausibleAirglowSpectrum(t *testing.T) {

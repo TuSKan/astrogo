@@ -59,7 +59,7 @@ func TestSceneResultsDoNotDependOnEvaluationOrder(t *testing.T) {
 
 	// One observer, shared. coord.NewGeodetic returns a pointer and the frame
 	// cache compares observers by identity, so two separately-constructed sites
-	// never hit the cache however identical they are. A caller modelling one
+	// never hit the cache however identical they are. A caller modeling one
 	// site under changing weather reuses the site, which is when the cache is
 	// live and a key that omits the atmosphere matters.
 	loc, err := coord.NewGeodetic(angle.Deg(-70.4), angle.Deg(-24.6), 2635)

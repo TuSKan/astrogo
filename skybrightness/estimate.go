@@ -22,7 +22,7 @@ const MinPassbandCoverage = 0.99
 //
 // Every projection below — a magnitude in any band, a luminance, a photon
 // rate, a detector background rate — comes from the same stored spectrum.
-// They are views of one physical state, never independently modelled
+// They are views of one physical state, never independently modeled
 // numbers, which is what keeps them mutually consistent.
 type Estimate struct {
 	// Quality records how the prediction was constrained.

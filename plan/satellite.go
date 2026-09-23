@@ -171,7 +171,7 @@ func (s *Satellite) StaticMagnitude() (float64, bool) {
 	return s.stdMag, s.hasStdMag
 }
 
-// kmPerAU is the number of kilometres in one Astronomical Unit.
+// kmPerAU is the number of kilometers in one Astronomical Unit.
 //
 // var, not const: constants.IAU.AstronomicalUnit is a struct, and Go does not
 // permit selecting a struct field inside a constant expression.
@@ -256,7 +256,7 @@ func SatellitePasses(prov eph.Provider, name string, start, end time.Time,
 	// 94.8 µs for the SGP4 propagation and 24 ns for the transform itself, so
 	// 61% of every 30-second sample went on rebuilding state that barely
 	// changes. The reuse window's ≲0.1″ is three to four orders of magnitude
-	// inside SGP4's own kilometre-scale along-track error, which at a few
+	// inside SGP4's own kilometer-scale along-track error, which at a few
 	// hundred km of range is minutes of arc — see newContextCache and #166.
 	//
 	// Body id 0 is not a placeholder: satellite.Satellite carries one TLE and

@@ -101,7 +101,7 @@ func TestThePositionOnlyRouteStillHonoursItsEpoch(t *testing.T) {
 // instead of merely tidier.
 //
 // If any part of the six-element path consumed the epoch, two calls differing
-// only in it would differ in some element, and labelling both B1950 would then
+// only in it would differ in some element, and labeling both B1950 would then
 // be a second wrong label rather than a correction of the first.
 func TestTheSixElementRouteIgnoresTheEpochEntirely(t *testing.T) {
 	t.Parallel()
@@ -152,7 +152,7 @@ func TestPropagateEpochIsWhatTheEpochArgumentCannotDo(t *testing.T) {
 
 	// Both are B1950 positions, and they differ because the star moved.
 	if propagated.Epoch() != coord.B1950 || atEquinox.Epoch() != coord.B1950 {
-		t.Fatalf("both should be labelled B1950, got %g and %g",
+		t.Fatalf("both should be labeled B1950, got %g and %g",
 			propagated.Epoch(), atEquinox.Epoch())
 	}
 
@@ -173,7 +173,7 @@ func TestPropagateEpochIsWhatTheEpochArgumentCannotDo(t *testing.T) {
 	}
 }
 
-// TestTheRoundTripStillClosesAfterTheRelabelling guards the thing a label
+// TestTheRoundTripStillClosesAfterTheRelabeling guards the thing a label
 // change could plausibly break.
 //
 // FK4ToFK5's position-only route reads FK4.Epoch and passes it to SOFA. Nothing
@@ -184,7 +184,7 @@ func TestPropagateEpochIsWhatTheEpochArgumentCannotDo(t *testing.T) {
 // Both routes are checked at every epoch. The position-only one used to close
 // only at B1950 — see TestTheRoundTripClosesAtEveryEpoch, which is #341 and
 // has the numbers.
-func TestTheRoundTripStillClosesAfterTheRelabelling(t *testing.T) {
+func TestTheRoundTripStillClosesAfterTheRelabeling(t *testing.T) {
 	t.Parallel()
 
 	for _, tc := range []struct {

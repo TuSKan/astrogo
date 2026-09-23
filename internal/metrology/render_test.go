@@ -61,11 +61,11 @@ func TestRenderMarkdownDisclosesSharedAncestry(t *testing.T) {
 	got := metrology.RenderMarkdown(renderResults())
 
 	if !strings.Contains(got, "shares SOFA — consistency check") {
-		t.Errorf("a SOFA-derived reference is not labelled as a consistency check:\n%s", got)
+		t.Errorf("a SOFA-derived reference is not labeled as a consistency check:\n%s", got)
 	}
 
 	if !strings.Contains(got, "independent") {
-		t.Errorf("a reference with no shared ancestry is not labelled independent:\n%s", got)
+		t.Errorf("a reference with no shared ancestry is not labeled independent:\n%s", got)
 	}
 }
 

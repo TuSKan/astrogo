@@ -110,7 +110,7 @@ func TestAngularSeparationKeepsSmallAnglesPrecise(t *testing.T) {
 // RelativeError must not quietly become an absolute error at zero.
 //
 // Substituting |got| when want is zero is the common shortcut, and it changes
-// the quantity mid-dataset: a column labelled "relative error" then holds
+// the quantity mid-dataset: a column labeled "relative error" then holds
 // relative errors for most rows and absolute ones for the rest, in whatever
 // units the underlying value happened to have. NaN is the honest answer, and
 // Stats counts it rather than averaging it.

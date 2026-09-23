@@ -48,21 +48,21 @@ var (
 //
 // Ozone is what this machinery is for. Its Chappuis band is a broad
 // continuum across the visible, which a tabulated cross section on a
-// nanometre grid represents exactly. Serdyuchenko et al. (2014) is the
+// nanometer grid represents exactly. Serdyuchenko et al. (2014) is the
 // chosen source and 223 K the chosen temperature — the nearest measured
 // point to the effective temperature of stratospheric ozone.
 //
 // O2 and H2O are a different problem and are not merely unsupplied. They
 // absorb in narrow lines — O2 at 688 and 762 nm, water vapour at 720, 820
 // and 940 nm — and Beer-Lambert with a cross section band-averaged onto a
-// nanometre grid is systematically wrong for them, always overestimating
+// nanometer grid is systematically wrong for them, always overestimating
 // absorption, because exp(-tau) is convex and averaging the cross section
 // first is not the same as averaging the transmission. They need a band
 // model or correlated-k treatment, which is a capability this package does
 // not have rather than a dataset it lacks.
 
 // dobsonUnitMoleculesPerCM2 is the column density of one Dobson Unit, in
-// molecules per square centimetre.
+// molecules per square centimeter.
 //
 // A Dobson Unit is defined as a 0.01 mm thick layer of the pure gas at
 // standard temperature and pressure, so this is derived from the SI-exact
@@ -71,8 +71,8 @@ var (
 //	n0 = P0 / (k_B * T0)                 (number density at STP)
 //	1 DU = 1e-5 m * n0                   (0.01 mm of that gas)
 //
-// which gives 2.687e20 molecules per square metre, or 2.687e16 per square
-// centimetre.
+// which gives 2.687e20 molecules per square meter, or 2.687e16 per square
+// centimeter.
 var dobsonUnitMoleculesPerCM2 = func() float64 {
 	const (
 		stpPressurePa  = 101325.0 // IUPAC standard pressure
@@ -87,11 +87,11 @@ var dobsonUnitMoleculesPerCM2 = func() float64 {
 }()
 
 // DobsonUnitMoleculesPerCM2 reports the column density of one Dobson Unit,
-// in molecules per square centimetre.
+// in molecules per square centimeter.
 func DobsonUnitMoleculesPerCM2() float64 { return dobsonUnitMoleculesPerCM2 }
 
 // CrossSection is a tabulated absorption cross section for one molecular
-// species, in square centimetres per molecule — the unit spectroscopic
+// species, in square centimeters per molecule — the unit spectroscopic
 // databases publish.
 //
 // It is a concrete type rather than an interface: there is exactly one way
@@ -140,7 +140,7 @@ func (c CrossSection) Validate() error {
 }
 
 // OpticalDepth writes the vertical absorption optical depth onto grid,
-// given a column amount in molecules per square centimetre:
+// given a column amount in molecules per square centimeter:
 //
 //	tau(lambda) = sigma(lambda) * N
 //

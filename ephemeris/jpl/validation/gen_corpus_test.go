@@ -4,6 +4,7 @@ package jpl_test
 
 import (
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"math"
@@ -14,6 +15,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/time"
 )
 
@@ -127,20 +129,24 @@ func TestGenerateCorpus(t *testing.T) {
 			// reused across every site below.
 			vectors, err := fetchVectorSeries(target.command(), target.name, span.start, span.stop, span.step)
 			if err != nil {
-				t.Logf("vectors for %s over %s: %v — this span is omitted for this body",
-					target.name, span.class, err)
-
-				continue
+				// Not omitted any more, which is what it used to be. A span left
+				// out of the fetch is a span missing from the diff, and the diff
+				// then reported "removed" entries and failed with "the corpus
+				// would change" — so a rate-limited Horizons read as upstream
+				// drift. A partial fetch cannot be compared with a whole corpus,
+				// so it either skips, when Horizons is the one failing, or fails
+				// outright when it is not.
+				skipIfHorizonsDown(t, err)
+				t.Fatalf("vectors for %s over %s: %v", target.name, span.class, err)
 			}
 
 			for _, site := range sites {
 				points, err := fetchObserverSeries(target.command(), target.name,
 					site.Lon, site.Lat, site.Height, span.start, span.stop, span.step)
 				if err != nil {
-					t.Logf("observer table for %s @ %s over %s: %v — omitted",
+					skipIfHorizonsDown(t, err)
+					t.Fatalf("observer table for %s @ %s over %s: %v",
 						target.name, site.Name, span.class, err)
-
-					continue
 				}
 
 				n := min(len(points), len(vectors))
@@ -464,4 +470,22 @@ func gitCommit(t *testing.T) string {
 	}
 
 	return strings.TrimSpace(string(out))
+}
+
+// skipIfHorizonsDown skips t when err is Horizons failing rather than astrogo:
+// a status SkipOnUpstreamFailure reads as the service's, a dropped connection,
+// or the HTML page JPL serves in place of an API answer under load.
+//
+// The last is the one testutil cannot see. errHorizonsUnavailable carries no
+// status, because the page is identified by its body — which is also the only
+// case left once every fetcher checks the status first, since Horizons
+// normally sends that page with a 503.
+func skipIfHorizonsDown(t *testing.T, err error) {
+	t.Helper()
+
+	if errors.Is(err, errHorizonsUnavailable) {
+		t.Skipf("JPL Horizons served its error page rather than an API answer: %v", err)
+	}
+
+	testutil.SkipOnUpstreamFailure(t, err)
 }

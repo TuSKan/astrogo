@@ -164,7 +164,7 @@ func TestOneSlowProviderDoesNotCancelTheOthers(t *testing.T) {
 }
 
 // errProviderDown stands in for a transport failure — an outage, a rate limit,
-// a cancelled context — as opposed to a provider answering "no such object".
+// a canceled context — as opposed to a provider answering "no such object".
 var errProviderDown = errors.New("provider is down")
 
 // slowProvider answers after a fixed delay, resolving anything.

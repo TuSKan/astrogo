@@ -90,7 +90,7 @@ func TestScaleConversionsActuallyShiftTheInstant(t *testing.T) {
 
 	// And the labels have to agree with the arithmetic.
 	if utc.Scale() != time.UTC || tai.Scale() != time.TAI || tt.Scale() != time.TT {
-		t.Errorf("scales mislabelled: %v %v %v", utc.Scale(), tai.Scale(), tt.Scale())
+		t.Errorf("scales mislabeled: %v %v %v", utc.Scale(), tai.Scale(), tt.Scale())
 	}
 }
 

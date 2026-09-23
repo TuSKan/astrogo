@@ -15,7 +15,7 @@ import (
 	"github.com/TuSKan/astrogo/vector"
 )
 
-// kmPerAU is the number of kilometres in one Astronomical Unit.
+// kmPerAU is the number of kilometers in one Astronomical Unit.
 //
 // var, not const: constants.IAU.AstronomicalUnit is a struct, and Go does
 // not permit selecting a struct field inside a constant expression.
@@ -120,7 +120,7 @@ func NewFromTLE(name, line1, line2 string) (*Satellite, error) {
 //
 // Exposed because this type is an ephemeris provider — it answers in GCRS
 // astronomical units, which is the wrong shape for a caller who wants raw TEME
-// kilometres, the element set as parsed, or the model's own branch predicates.
+// kilometers, the element set as parsed, or the model's own branch predicates.
 // Those callers should not have to reach for a second parse of the same text.
 func (s *Satellite) Propagator() *sgp4.Propagator { return s.prop }
 
@@ -281,7 +281,7 @@ func (s *Satellite) subSatellitePoint(t time.Time) (*coord.Geodetic, error) {
 	ecefY := -eciPos.X*sinG + eciPos.Y*cosG
 	ecefZ := eciPos.Z
 
-	// Convert ECEF (km) to geodetic via coord.FromECEF (expects metres).
+	// Convert ECEF (km) to geodetic via coord.FromECEF (expects meters).
 	ecefVec := vector.V3(ecefX*1e3, ecefY*1e3, ecefZ*1e3)
 
 	geo, err := coord.FromECEF(ecefVec, coord.WGS84())

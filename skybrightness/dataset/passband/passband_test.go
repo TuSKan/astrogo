@@ -100,7 +100,7 @@ func TestParseReadsTheProfile(t *testing.T) {
 		t.Errorf("name is %q, want the service's filter identifier", band.Name)
 	}
 
-	// Angstrom in, nanometres out. A profile read as nanometres would put V at
+	// Angstrom in, nanometers out. A profile read as nanometers would put V at
 	// 5300 nm, which is thermal infrared rather than green.
 	if len(band.WavelengthNM) != len(goodRows()) {
 		t.Fatalf("%d samples, want %d", len(band.WavelengthNM), len(goodRows()))

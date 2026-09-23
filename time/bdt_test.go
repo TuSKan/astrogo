@@ -82,7 +82,7 @@ func TestBDTNamesTheSameInstantAsItsUTC(t *testing.T) {
 	utc := epoch()
 
 	if got := utc.BDT().Sub(utc); got != 0 {
-		t.Errorf("BDT(t).Sub(t) = %v, want 0 — the same instant, differently labelled", got)
+		t.Errorf("BDT(t).Sub(t) = %v, want 0 — the same instant, differently labeled", got)
 	}
 
 	// And the other direction, which is the one a receiver forces: a caller
@@ -100,12 +100,12 @@ func TestBDTNamesTheSameInstantAsItsUTC(t *testing.T) {
 	}
 }
 
-// TestBDTMislabelledAsUTCIsFourSecondsWrong measures the defect the scale
+// TestBDTMislabeledAsUTCIsFourSecondsWrong measures the defect the scale
 // exists to prevent, in the units a satellite user cares about.
 //
 // Four seconds is the offset most easily read as a rounding difference, and at
 // the ISS's 7.66 km/s it is 30 km of ground track.
-func TestBDTMislabelledAsUTCIsFourSecondsWrong(t *testing.T) {
+func TestBDTMislabeledAsUTCIsFourSecondsWrong(t *testing.T) {
 	t.Parallel()
 
 	utc := epoch()
@@ -116,9 +116,9 @@ func TestBDTMislabelledAsUTCIsFourSecondsWrong(t *testing.T) {
 	// shape that number usually arrives in — which costs about 40 microseconds
 	// of resolution and is why the tolerance is a millisecond rather than
 	// exact.
-	mislabelled := time.FromJD(receiver.JD(), time.UTC)
+	mislabeled := time.FromJD(receiver.JD(), time.UTC)
 
-	got := mislabelled.Sub(utc).Seconds()
+	got := mislabeled.Sub(utc).Seconds()
 	if math.Abs(got-4) > 1e-3 {
 		t.Errorf("a BDT timestamp passed as UTC lands %.6f s away, want 4", got)
 	}

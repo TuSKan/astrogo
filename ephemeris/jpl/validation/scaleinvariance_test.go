@@ -10,16 +10,17 @@ import (
 	"github.com/TuSKan/astrogo/ephemeris/core"
 	"github.com/TuSKan/astrogo/ephemeris/jpl"
 	"github.com/TuSKan/astrogo/internal/metrology"
+	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/time"
 )
 
-// metresInAU converts the tolerance below into the AU that State reports in.
-const metresInAU = 1.0 / 149597870700.0
+// metersInAU converts the tolerance below into the AU that State reports in.
+const metersInAU = 1.0 / 149597870700.0
 
-// jplScaleTolerance is one metre, for the reasons given on the offline half of
+// jplScaleTolerance is one meter, for the reasons given on the offline half of
 // this test in ephemeris/scaleinvariance_test.go: the expected difference is
 // zero, and the tolerance absorbs only the float cost of a scale round-trip.
-const jplScaleTolerance = 1.0 * metresInAU
+const jplScaleTolerance = 1.0 * metersInAU
 
 // TestJPLStateIsScaleInvariant is the kernel-backed half of the contract that
 // ephemeris.TestProviderStateIsScaleInvariant asserts for SOFA and SGP4.
@@ -40,14 +41,21 @@ func TestJPLStateIsScaleInvariant(t *testing.T) {
 
 	p, err := jpl.NewProvider(context.Background(), core.Planets, "de440")
 	if err != nil {
-		metrology.NotVerified(t, "the JPL provider could not be built: "+err.Error(), suite)
+		// NOT VERIFIED only for an outage. This used to record it for any error
+		// at all, so a regression that broke jpl.NewProvider outright was
+		// reported as NAIF being down and the suite could never fail.
+		if reason, ok := testutil.UpstreamFailure(err); ok {
+			metrology.NotVerified(t, "the DE440 kernel could not be fetched ("+reason+"): "+err.Error(), suite)
+		}
+
+		t.Fatalf("jpl.NewProvider: %v", err)
 	}
 
 	defer func() { _ = p.Close() }()
 
 	// Fixed, and deliberately clear of a leap-second boundary: the point here
 	// is the provider's handling of the caller's label, not the leap-second
-	// table's behaviour at a discontinuity.
+	// table's behavior at a discontinuity.
 	utc := time.Date(2026, time.April, 20, 3, 0, 0, 0, time.LocationUTC)
 
 	bodies := map[string]eph.ID{
@@ -76,14 +84,14 @@ func TestJPLStateIsScaleInvariant(t *testing.T) {
 			for _, s := range scales {
 				got, err := p.State(id, s.at(utc))
 				if err != nil {
-					t.Fatalf("State with a %s-labelled instant: %v", s.label, err)
+					t.Fatalf("State with a %s-labeled instant: %v", s.label, err)
 				}
 
 				if d := got.Pos.Sub(base.Pos).Norm(); d > jplScaleTolerance {
 					t.Errorf("position moved %.6g AU (%.4g km) when the same instant "+
-						"was labelled %s.\n  The provider is reading the caller's scale "+
+						"was labeled %s.\n  The provider is reading the caller's scale "+
 						"as its own — normalise at the entry point rather than reading "+
-						"JDParts raw.", d, d/metresInAU/1e3, s.label)
+						"JDParts raw.", d, d/metersInAU/1e3, s.label)
 				}
 			}
 		})

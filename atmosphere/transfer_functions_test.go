@@ -129,7 +129,7 @@ func TestExtendedSourceOpticalDepthCarriesTwoColumns(t *testing.T) {
 		t.Errorf("at sea level the depth is %g, want %g", float64(sea), want)
 	}
 
-	// Two kilometres up, each column keeps its own fraction.
+	// Two kilometers up, each column keeps its own fraction.
 	const h = 2000
 
 	up, err := atmosphere.ExtendedSourceOpticalDepth(rayleigh, aerosol, airmass, airmass, h, kappa)

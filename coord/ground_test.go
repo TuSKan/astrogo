@@ -32,7 +32,7 @@ func TestGroundDistanceOneDegreeLatitude(t *testing.T) {
 		t.Fatalf("GroundDistance: %v", err)
 	}
 
-	const want = 111195.0 // metres, pi/180 * mean radius
+	const want = 111195.0 // meters, pi/180 * mean radius
 
 	if rel := math.Abs(d.Meters()-want) / want; rel > 1e-3 {
 		t.Errorf("one degree of latitude = %.1f m, want ~%.0f m", d.Meters(), want)
@@ -78,8 +78,8 @@ func TestGroundDistanceAcrossDateLine(t *testing.T) {
 }
 
 // Short distances are where the spherical law of cosines loses precision
-// and haversine does not. A metre-scale separation must come out as a
-// metre-scale number rather than as noise.
+// and haversine does not. A meter-scale separation must come out as a
+// meter-scale number rather than as noise.
 func TestGroundDistanceShortBaseline(t *testing.T) {
 	t.Parallel()
 

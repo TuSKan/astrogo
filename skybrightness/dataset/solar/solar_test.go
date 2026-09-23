@@ -9,7 +9,7 @@ import (
 	"github.com/TuSKan/astrogo/unit"
 )
 
-// A hand-built spectrum, so the interpolation and range behaviour can be
+// A hand-built spectrum, so the interpolation and range behavior can be
 // checked without a network fetch or a FITS fixture.
 func fixture() *solar.Spectrum {
 	return &solar.Spectrum{

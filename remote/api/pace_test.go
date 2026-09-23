@@ -74,7 +74,7 @@ func TestMinIntervalPacesAndSerialises(t *testing.T) {
 	}
 }
 
-// An unpaced client keeps its old behaviour and pays nothing.
+// An unpaced client keeps its old behavior and pays nothing.
 func TestWithoutMinIntervalThereIsNoDelay(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = w.Write([]byte("ok"))
@@ -125,6 +125,6 @@ func TestPacingRespectsContext(t *testing.T) {
 	defer cancel()
 
 	if _, err := client.Get(ctx, base, "", nil); err == nil {
-		t.Error("a cancelled wait must not proceed to the request")
+		t.Error("a canceled wait must not proceed to the request")
 	}
 }

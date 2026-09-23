@@ -279,7 +279,7 @@ func (l *localFS) Stat(name string) (fs.FileInfo, error) {
 // ReadDir implements [fs.ReadDirFS], and ReadFile below implements
 // [fs.ReadFileFS].
 //
-// Both exist because os.dirFS implements them and behaviour follows the
+// Both exist because os.dirFS implements them and behavior follows the
 // interface set. Without ReadDir, fs.ReadDir falls back to Open plus
 // File.ReadDir — a different route to the same listing, and measured, one that
 // disagrees with Stat about a directory's ModTime often enough to fail
@@ -332,7 +332,7 @@ func freshEntries(dir string, entries []fs.DirEntry) []fs.DirEntry {
 // real stat therefore disagrees with itself, which is exactly what
 // fstest.TestFS checks. os.DirFS has the same defect — measured at 15 failures
 // in 40, not the 0 in 40 the issue originally recorded — so this is the standard
-// library's behaviour on Windows rather than anything astrogo does.
+// library's behavior on Windows rather than anything astrogo does.
 //
 // Reading the metadata on demand costs one Lstat per entry whose Info is
 // actually asked for, and makes the answer both self-consistent and more

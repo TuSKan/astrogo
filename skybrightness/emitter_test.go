@@ -21,7 +21,7 @@ const (
 //
 // Because the guard here was `sin <= 0`, and [ArtificialSkyglow] evaluates
 // the emission function at exactly zero elevation by default — a ground
-// source beyond a few kilometres sits at the observer's horizon, which is
+// source beyond a few kilometers sits at the observer's horizon, which is
 // that component's own documented reasoning. The two combined produced
 // exactly zero radiance for every source, at every distance, in every
 // direction. Not an error and not a small number: an artificial-skyglow term

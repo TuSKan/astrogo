@@ -41,7 +41,7 @@ func TestBothPathsAgreeOnTheSameStar(t *testing.T) {
 	// A Vega-coloured star: BP-RP = 0 collapses the colour polynomial to its
 	// constant term c, so G = V + c and the flux producing that G follows from
 	// the zero point.
-	c := band.ColourTerm[0]
+	c := band.ColorTerm[0]
 
 	for _, v := range []float64{-1.44, 0.03, 4.0, 11.5} {
 		g := v + c
@@ -252,7 +252,7 @@ func vBandForTest() magnitude.Passband {
 //
 // The bands come from published colour indices rather than a fit, so a star the
 // Bright Star Catalogue does not cover has no R at all. Skipping it there is
-// the intended behaviour and the alternative — inventing a colour so every band
+// the intended behavior and the alternative — inventing a colour so every band
 // is populated — is what this package refuses.
 func TestAddBrightStarsCoversOnlyTheBandsAStarHas(t *testing.T) {
 	t.Parallel()

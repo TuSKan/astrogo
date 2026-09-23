@@ -31,7 +31,7 @@ func TestTheAlgebraComposesTheDeclaredDimensions(t *testing.T) {
 		{"energy is force times length", dim.Force.Mul(dim.Length), dim.Energy},
 		{"power is energy over time", dim.Energy.Div(dim.Time), dim.Power},
 
-		// W/(m²·Hz), which reduces to kg·s⁻² once the metres and the hertz
+		// W/(m²·Hz), which reduces to kg·s⁻² once the meters and the hertz
 		// cancel — the one derived value whose name does not read as its
 		// definition, and so the one most worth deriving here.
 		{
