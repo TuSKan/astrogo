@@ -9,11 +9,22 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"syscall"
 	"testing"
 	"testing/fstest"
 
 	"github.com/TuSKan/astrogo/remote/file"
 )
+
+// errPrivilegeNotHeld is Windows' ERROR_PRIVILEGE_NOT_HELD, which is what
+// os.Symlink returns for an account outside developer mode.
+//
+// Written as a number because there is no portable name for it: golang.org/x/sys
+// has one and is not a dependency here. Worth the number rather than a broader
+// predicate, because the broader one does not work — measured, errors.Is against
+// fs.ErrPermission is false for this errno, so a test written the obvious way
+// would have skipped on every symlink failure while appearing to check for one.
+const errPrivilegeNotHeld = syscall.Errno(1314)
 
 // localURL builds a file:// URL for dir, the way remote's own resolver does.
 func localURL(t *testing.T, dir string) string {
@@ -447,7 +458,18 @@ func TestLocalFSConfinesToItsRoot(t *testing.T) {
 	// skip rather than a pass.
 	link := filepath.Join(dir, "escape")
 	if err := os.Symlink(outside, link); err != nil {
-		t.Skipf("cannot create a symlink here: %v", err)
+		// Only the one failure that means this account may not make symlinks.
+		// Measured on Windows: os.Symlink returns ERROR_PRIVILEGE_NOT_HELD, and
+		// errors.Is against fs.ErrPermission is FALSE for it, so the obvious
+		// predicate would never have fired. fs.ErrPermission is kept beside it
+		// for the platforms where that is the answer. Anything else — a missing
+		// target, a name already taken, a full disk — is this test's own setup
+		// being wrong, which is worth seeing.
+		if errors.Is(err, errPrivilegeNotHeld) || errors.Is(err, fs.ErrPermission) {
+			t.Skipf("this account cannot create a symlink: %v", err)
+		}
+
+		t.Fatalf("os.Symlink: %v", err)
 	}
 
 	if _, err := fsys.Open("escape/secret.txt"); err == nil {
@@ -482,7 +504,13 @@ func TestLstatAndReadLinkSeeTheLinkItself(t *testing.T) {
 	// Windows without developer mode — so a failure to set it up is a skip
 	// rather than a pass.
 	if err := os.Symlink(filepath.Join(dir, target), filepath.Join(dir, link)); err != nil {
-		t.Skipf("cannot create a symlink here: %v", err)
+		// The same two conditions, and the same reasoning, as the symlink set
+		// up in TestLocalFSConfinesToItsRoot above.
+		if errors.Is(err, errPrivilegeNotHeld) || errors.Is(err, fs.ErrPermission) {
+			t.Skipf("this account cannot create a symlink: %v", err)
+		}
+
+		t.Fatalf("os.Symlink: %v", err)
 	}
 
 	fsys, err := file.OpenFS(localURL(t, dir))

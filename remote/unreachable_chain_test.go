@@ -48,7 +48,11 @@ func TestAnUnreachableSourceStaysRecognisableThroughGetFile(t *testing.T) {
 
 	l, err := lc.Listen(t.Context(), "tcp", "127.0.0.1:0")
 	if err != nil {
-		t.Skipf("cannot reserve a local port: %v", err)
+		// Fatal, and the line releasing this listener below already was: a
+		// machine that cannot bind a loopback port cannot run this test at all,
+		// and the two halves of the same operation should not disagree about
+		// whether failing at it is news.
+		t.Fatalf("reserve a local port: %v", err)
 	}
 
 	addr := l.Addr().String()
