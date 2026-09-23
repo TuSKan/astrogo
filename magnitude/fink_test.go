@@ -76,15 +76,8 @@ func finkSSOQuery(t *testing.T, numberOrDesig string, withResiduals, withEphem b
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		// A transport failure, so both predicates are needed: Unreachable knows
-		// a refused dial and a DNS failure, SkipOnUpstreamFailure a timeout or
-		// a connection dropped mid-transfer. Neither covers the other, and
-		// anything they both decline is a request this test built wrong — which
-		// the old message guessed at out loud, with "(network issue?)".
-		if testutil.Unreachable(err) {
-			t.Skipf("FINK is unreachable: %v", err)
-		}
-
+		// One call: SkipOnUpstreamFailure consults Unreachable too, so a
+		// refused dial and a DNS failure are covered here as well.
 		testutil.SkipOnUpstreamFailure(t, err)
 		t.Fatalf("FINK SSO request: %v", err)
 	}

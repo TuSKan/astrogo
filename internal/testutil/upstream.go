@@ -10,8 +10,9 @@ import (
 	"testing"
 )
 
-// SkipOnUpstreamFailure skips tb when err is the remote service failing rather
-// than astrogo misbehaving.
+// SkipOnUpstreamFailure skips tb when err is somebody else's fault rather than
+// astrogo misbehaving — the service failing, or the network never carrying the
+// request at all.
 //
 // [RequireReachable] answers whether a socket opens, which is not the same
 // question as whether the service works. A host answering "500 Internal Server
@@ -24,6 +25,20 @@ import (
 // upstream's problem. Every other 4xx is not: a 400 or a 404 means astrogo
 // built a request the service rejected, which is exactly the defect these
 // tests exist to catch, and it stays a failure.
+//
+// # Why this is the only one a caller needs
+//
+// [Unreachable] answers the other half — a DNS failure, a refused or unroutable
+// dial — and is still exported, because it is a useful predicate on its own and
+// some tests read it directly. But it is consulted here, so nothing has to ask
+// twice.
+//
+// It used to. Four tests spelled out both checks before reaching their t.Fatal,
+// and that friction is part of why a dozen others reached for
+// t.Skipf("did not answer") on any error instead — a helper that answers half a
+// question invites a call site to stop asking. The duplication had also become
+// literal: teaching the classifiers about bad certificates meant teaching both,
+// separately, because neither consulted the other.
 //
 // # Why 403 is on the upstream's side and 401 is not
 //
@@ -112,6 +127,20 @@ func upstreamFailure(err error) (string, bool) {
 		return "broken pipe", true
 	case errors.Is(err, io.ErrUnexpectedEOF):
 		return "truncated response", true
+	}
+
+	// Last: a request the network never carried at all — a DNS failure, a
+	// refused dial, an unroutable host. Not a verdict on astrogo any more than
+	// a 503 is, and [Unreachable] already owns the question, so it is asked
+	// here rather than left to every call site.
+	//
+	// Safe to put last rather than first. Every arm above decides a case
+	// Unreachable declines or never sees: a status it cannot read, a bare
+	// context.DeadlineExceeded it deliberately returns false for, and the
+	// mid-transfer drops, which happen after a connection was carried. So
+	// nothing above changes meaning by having this below it.
+	if Unreachable(err) {
+		return "the network did not carry the request", true
 	}
 
 	return "", false
