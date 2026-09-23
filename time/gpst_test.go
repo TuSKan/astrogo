@@ -61,7 +61,7 @@ func TestGPSTOffsetFromTAIIsExactlyNineteenSeconds(t *testing.T) {
 	}
 }
 
-// TestGPSTIsEighteenSecondsAheadOfUTCToday is the figure a GNSS user recognises,
+// TestGPSTIsEighteenSecondsAheadOfUTCToday is the figure a GNSS user recognizes,
 // and the one that makes the scale worth having.
 //
 // Unlike the TAI offset it is not constant: it is ΔAT − 19, so it stepped to 18
@@ -189,7 +189,13 @@ func TestGPSTLabelsAdvanceInSISecondsAcrossALeapSecond(t *testing.T) {
 	// The contrast. Same two instants, UTC labels, and the gap is 7200 --
 	// which is why subtracting UTC labels directly is a bug and subtracting
 	// GPST labels is not.
-	if utcLabels := labelSeconds(utcAfter, utcBefore); math.Abs(utcLabels-7200) > 1e-6 {
+	//
+	// Counted as labels, through the standard library's uniform seconds, not
+	// by subtracting UTC Julian Dates. On a leap-second day a UTC Julian
+	// Date's fraction is of 86401 seconds — SOFA's convention, #144 — so the
+	// raw difference across one is 7200.958 s, which is neither the labels
+	// nor the elapsed time, and is why SOFA says not to take it.
+	if utcLabels := utcAfter.ToGo().Sub(utcBefore.ToGo()).Seconds(); math.Abs(utcLabels-7200) > 1e-6 {
 		t.Errorf("UTC labels advanced %.6f s, want 7200 -- the leap second is missing from the label", utcLabels)
 	}
 }

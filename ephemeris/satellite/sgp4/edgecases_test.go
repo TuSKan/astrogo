@@ -260,7 +260,7 @@ func TestInclinationSingularityIsGuarded(t *testing.T) {
 //
 // The two modes differ in exactly two places, and both are deep space: sidereal
 // time at epoch, which reaches the model only through dscom/dsinit/dspace, and
-// the node normalisation inside dpper's Lyddane branch. So the assertion is not
+// the node normalization inside dpper's Lyddane branch. So the assertion is not
 // simply "they differ" — below the 225-minute threshold they must be
 // bit-identical, and above it they must differ by the small amount a convention
 // produces rather than the large amount a bug produces.
@@ -447,9 +447,9 @@ func TestAtTimeAgreesWithAt(t *testing.T) {
 			t.Fatalf("AtTime(%s): %v", at, gerr)
 		}
 
-		// Not exact equality: AtTime forms tsince by differencing two-part
-		// Julian dates, which is a different route to the same number, and the
-		// last bits of that route move with the platform. A millimeter is two
+		// Not exact equality: AtTime forms tsince from the UTC labels'
+		// whole seconds and nanoseconds, which is a different route to the
+		// same number, and the last bits of that route move with the platform. A millimeter is two
 		// orders below the package's own contract and four below anything a
 		// caller could notice, so it bounds "the same computation" without
 		// asserting bit-identity across architectures.
@@ -530,5 +530,41 @@ func TestAccessorsDescribeTheOrbit(t *testing.T) {
 
 	if !g.SimplifiedDrag() {
 		t.Error("SDP4 always takes the simplified drag branch, whatever the perigee")
+	}
+}
+
+// TestAtTimeCountsLabelsOnALeapSecondDay pins SGP4's clock on the 27 days that
+// end in a leap second.
+//
+// SGP4 counts UTC the way its reference implementation's jday does, every day
+// 1440 minutes, so noon is 720 minutes after the midnight before it on any day
+// at all. A UTC Julian Date's fraction on such a day is of 86401 seconds,
+// following SOFA (#144), so subtracting two of them — which AtTime used to do —
+// puts noon at 719.99167 minutes: half a second short, 3.8 km of low-Earth-
+// orbit track.
+func TestAtTimeCountsLabelsOnALeapSecondDay(t *testing.T) {
+	t.Parallel()
+
+	el := leo()
+	el.Epoch = time.Date(2016, time.December, 31, 0, 0, 0, 0, time.LocationUTC)
+
+	p, err := sgp4.New(el)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	want, _, err := p.At(720)
+	if err != nil {
+		t.Fatalf("At(720): %v", err)
+	}
+
+	got, _, err := p.AtTime(time.Date(2016, time.December, 31, 12, 0, 0, 0, time.LocationUTC))
+	if err != nil {
+		t.Fatalf("AtTime(noon): %v", err)
+	}
+
+	if d := want.Sub(got).Norm(); d > 1e-6 {
+		t.Errorf("noon on the leap-second day is %g km from At(720); SGP4 counts that as "+
+			"exactly 720 minutes", d)
 	}
 }

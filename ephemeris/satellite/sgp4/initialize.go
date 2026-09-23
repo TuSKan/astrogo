@@ -48,6 +48,13 @@ const (
 	// jd1950 is the Julian Date of 0 January 1950, 0h — the origin SGP4
 	// carries its epoch from.
 	jd1950 = 2433281.5
+
+	// unixEpochJD is the Julian Date of 1970-01-01 0h, where a Unix count of
+	// seconds starts; see utcLabel.
+	unixEpochJD = 2440587.5
+
+	// secondsPerDay is a UTC day as SGP4 counts one, leap seconds or not.
+	secondsPerDay = 86400.0
 )
 
 // initl reproduces the reference's initl: the auxiliary epoch quantities, the
