@@ -41,6 +41,10 @@ func TestBareNumberDoesNotReturnADifferentBody(t *testing.T) {
 	}
 
 	if !errors.Is(err, jpl.ErrWrongSmallBody) {
+		// Inside the branch, not before it: the refusal this test is about
+		// must never be read as an outage. Only an error that is not the
+		// expected one is classified, and Horizons under load is one.
+		skipIfHorizonsCouldNotAnswer(t, err)
 		t.Fatalf(`NewProvider(..., "1") = %v, want ErrWrongSmallBody`, err)
 	}
 
@@ -100,6 +104,9 @@ func TestHorizonsRefusalIsReported(t *testing.T) {
 	}
 
 	if !errors.Is(err, spk.ErrHorizonsRefused) {
+		// See TestBareNumberDoesNotReturnADifferentBody for why this is inside
+		// the branch.
+		skipIfHorizonsCouldNotAnswer(t, err)
 		t.Fatalf("NewProvider for 101955; = %v, want ErrHorizonsRefused", err)
 	}
 
@@ -110,4 +117,23 @@ func TestHorizonsRefusalIsReported(t *testing.T) {
 	}
 
 	t.Logf("reported: %v", err)
+}
+
+// skipIfHorizonsCouldNotAnswer skips t when err is Horizons failing to serve
+// the kernel rather than refusing the request: a status or a dropped
+// connection, which testutil classifies, or a fault Horizons reports in the
+// body of a 200, which spk does.
+//
+// Found by the tagged sweep. These tests expect a specific refusal, so the
+// per-call-site audit for an unguarded fetch — which looked for a t.Fatal
+// straight after `if err != nil` — did not see them, and a 503 from Horizons
+// reached the "want ErrWrongSmallBody" failure instead.
+func skipIfHorizonsCouldNotAnswer(t *testing.T, err error) {
+	t.Helper()
+
+	if spk.TransientHorizonsFault(err) {
+		t.Skipf("Horizons could not serve the kernel: %v", err)
+	}
+
+	testutil.SkipOnUpstreamFailure(t, err)
 }
