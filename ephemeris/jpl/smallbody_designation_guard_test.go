@@ -60,6 +60,14 @@ func TestSemicolonDesignationLoadsTheRequestedBody(t *testing.T) {
 			p, err := jpl.NewProvider(context.Background(), core.SmallBody, designation,
 				jpl.WithTimeInterval(start, stop))
 			if err != nil {
+				// Horizons generates the kernel on request, and fails in two
+				// ways that are its own: an HTTP status, and a fault reported
+				// in the body of a 200. Each has its own classifier.
+				if spk.TransientHorizonsFault(err) {
+					t.Skipf("%q: Horizons could not serve the SPK: %v", designation, err)
+				}
+
+				testutil.SkipOnUpstreamFailure(t, err)
 				t.Fatalf("%q: %v", designation, err)
 			}
 
