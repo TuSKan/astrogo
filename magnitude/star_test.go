@@ -7,15 +7,15 @@ import (
 	"github.com/TuSKan/astrogo/magnitude"
 )
 
-// The four Johnson-Cousins relations reproduce the Sun's colours.
+// The four Johnson-Cousins relations reproduce the Sun's colors.
 //
 // The Sun is the one star whose Gaia and Johnson-Cousins photometry are both
 // known independently and precisely, so it is the anchor that fixes both the
 // direction of every relation and the shape of each polynomial at once. Getting
 // the tabulation backwards leaves each transformation smooth and plausible and
-// every colour wrong by twice the offset, which is exactly the error that
+// every color wrong by twice the offset, which is exactly the error that
 // shipped in GaiaGToJohnsonV and GaiaGToJohnsonB before.
-func TestGaiaToJohnsonCousinsReproducesSolarColours(t *testing.T) {
+func TestGaiaToJohnsonCousinsReproducesSolarColors(t *testing.T) {
 	t.Parallel()
 
 	// Gaia DR3: the Sun at G = -26.90, BP - RP = 0.82.
@@ -29,7 +29,7 @@ func TestGaiaToJohnsonCousinsReproducesSolarColours(t *testing.T) {
 	r := magnitude.GaiaGToJohnsonR(solarG, solarBPRP)
 	i := magnitude.GaiaGToCousinsI(solarG, solarBPRP)
 
-	// Published solar colours, with tolerances that admit the spread between
+	// Published solar colors, with tolerances that admit the spread between
 	// determinations but not a sign error or a wrong polynomial degree.
 	for _, c := range []struct {
 		name      string
@@ -90,7 +90,7 @@ func TestGaiaGToCousinsIIsQuadratic(t *testing.T) {
 	}
 }
 
-// The four bands stay correctly ordered across normal stellar colours.
+// The four bands stay correctly ordered across normal stellar colors.
 //
 // For any star cooler than about A0 the magnitudes must fall B > V > R > I:
 // a cool star emits more at longer wavelengths, so it is faintest in the
@@ -108,10 +108,10 @@ func TestGaiaGToCousinsIIsQuadratic(t *testing.T) {
 // what the fits claim.
 //
 // An earlier version of this test asserted that each G - band relation is
-// monotonic in colour. It is not, and that was my assumption rather than
+// monotonic in color. It is not, and that was my assumption rather than
 // anything the reference supports: measured, G - V turns over at BP - RP of
 // about -0.36, G - R at 1.5 and G - I at 4.0. These are empirical fits over
-// wide colour ranges and nothing requires them to be monotonic to their edges.
+// wide color ranges and nothing requires them to be monotonic to their edges.
 // The bounds were not tuned until the assertion passed; the assertion was
 // replaced with one the references do support.
 func TestGaiaTransformationsKeepTheBandsOrdered(t *testing.T) {
@@ -162,7 +162,7 @@ func TestGaiaTransformationsStayBoundedOverTheirRange(t *testing.T) {
 			g     = 12.0
 			steps = 40
 
-			// No optical colour index of a real star reaches six magnitudes;
+			// No optical color index of a real star reaches six magnitudes;
 			// a relation that produces one has lost its shape.
 			bound = 6.0
 		)
@@ -171,7 +171,7 @@ func TestGaiaTransformationsStayBoundedOverTheirRange(t *testing.T) {
 			col := c.lo + (c.hi-c.lo)*float64(step)/steps
 
 			if offset := g - c.f(g, col); math.Abs(offset) > bound {
-				t.Errorf("%s: G-%s = %.3f at BP-RP = %.3f, beyond anything a stellar colour "+
+				t.Errorf("%s: G-%s = %.3f at BP-RP = %.3f, beyond anything a stellar color "+
 					"index reaches", c.name, c.name, offset, col)
 
 				break

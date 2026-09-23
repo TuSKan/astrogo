@@ -16,7 +16,7 @@ var ErrZodiacalGeometry = errors.New("skybrightness: zodiacal geometry outside t
 // Zodiacal light — sunlight scattered by interplanetary dust.
 //
 //   - Model: Leinert et al. (1998) Table 17 for the spatial distribution at
-//     500 nm and Eq. 22 for the colour correction, with the heliocentric and
+//     500 nm and Eq. 22 for the color correction, with the heliocentric and
 //     seasonal factors applied as Masana et al. (2021) Eq. 18 does.
 //   - Primary reference: Leinert, Ch. et al. (1998), A&AS 127, 1, "The 1997
 //     reference of diffuse night sky brightness".
@@ -53,9 +53,9 @@ const (
 	zodiacalSeasonalAmplitude = 0.1
 	zodiacalSeasonalLatitude  = 60.0
 
-	// The span over which Leinert et al. give the colour correction.
-	zodiacalColourMinNM = 220.0
-	zodiacalColourMaxNM = 2500.0
+	// The span over which Leinert et al. give the color correction.
+	zodiacalColorMinNM = 220.0
+	zodiacalColorMaxNM = 2500.0
 )
 
 // zodiacalLongitudes are the differential ecliptic longitudes — the viewing
@@ -314,7 +314,7 @@ func bracketZodiacalLatitude(lat float64) (int, float64) {
 // extrapolated, since the relation is a straight line in log wavelength and
 // would eventually cross zero.
 func ZodiacalColorCorrection(lambda unit.WavelengthNM, elongation angle.Angle) float64 {
-	nm := math.Min(math.Max(float64(lambda), zodiacalColourMinNM), zodiacalColourMaxNM)
+	nm := math.Min(math.Max(float64(lambda), zodiacalColorMinNM), zodiacalColorMaxNM)
 	ratio := math.Log10(nm / ZodiacalReferenceNM)
 
 	// Slopes at 30 and at 90 degrees, redward and blueward of 500 nm.
@@ -380,7 +380,7 @@ func ZodiacalRadiance(dst SpectralRadiance, grid unit.SpectralGrid, geom Zodiaca
 	for i := range dst {
 		lambda := grid.At(i)
 
-		if lambda < zodiacalColourMinNM || lambda > zodiacalColourMaxNM {
+		if lambda < zodiacalColorMinNM || lambda > zodiacalColorMaxNM {
 			flags |= ExtrapolatedModel
 		}
 
@@ -398,7 +398,7 @@ func ZodiacalRadiance(dst SpectralRadiance, grid unit.SpectralGrid, geom Zodiaca
 }
 
 // ZodiacalElongation is the angular distance from the Sun implied by a
-// geometry, which is what the colour correction varies with:
+// geometry, which is what the color correction varies with:
 //
 //	cos(eps) = cos(dlon) * cos(beta)
 func ZodiacalElongation(geom ZodiacalGeometry) angle.Angle {

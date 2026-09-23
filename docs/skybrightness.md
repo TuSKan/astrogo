@@ -525,13 +525,13 @@ observer, cloud over the source city, cloud between city and observer, overcast.
 ### 11.2b Zodiacal light and diffuse galactic light
 
 **Zodiacal light** — Leinert et al. (1998) Table 17 for the 500 nm spatial distribution,
-Eq. 22 for the colour correction, with the heliocentric `R^-2.3` and the high-latitude
+Eq. 22 for the color correction, with the heliocentric `R^-2.3` and the high-latitude
 seasonal factor applied as Masana et al. (2021) Eq. 18 does.
 
 | Piece | Go function | Validation test |
 | :--- | :--- | :--- |
 | Table 17 map | `ZodiacalBrightnessAt` | `TestZodiacalPoleMatchesKnownBrightness`, `…TableCorners` |
-| Eq. 22 colour | `ZodiacalColorCorrection` | `TestZodiacalColorCorrectionSign` |
+| Eq. 22 color | `ZodiacalColorCorrection` | `TestZodiacalColorCorrectionSign` |
 | Full component | `ZodiacalLight` | `…HeliocentricScaling`, `…SeasonalTerm` |
 
 **The external anchor:** the ecliptic pole comes out at **23.26 mag/arcsec² in V**. A dark
@@ -827,7 +827,7 @@ way this goes, because the expensive part is the index scan over 1.8 billion row
 the arithmetic on each one; splitting the output would mean scanning four times to produce
 what one scan already holds. On the reading side a band is a column, so a caller wanting V
 alone pays seventeen megabytes instead of six — a one-off cost, cached afterwards, against
-a component that needs more than one band the moment a colour matters. `Map.Band` selects
+a component that needs more than one band the moment a color matters. `Map.Band` selects
 one.
 
 There is no U. Gaia's bluest band starts near 330 nm and the photometric documentation
@@ -846,14 +846,14 @@ the difference in their zero points alone; the residual after the fix is that di
 
 **Why the band is a constructor.** Converting Gaia G flux to Johnson V spectral flux
 density needs three published numbers from three sources: G's VEGAMAG zero point
-(25.6874), the G to V colour transformation, and Johnson V's own Vega zero point
-(3.63e-11 W m⁻² nm⁻¹). Using G's zero point with V's flux density and no colour term is
+(25.6874), the G to V color transformation, and Johnson V's own Vega zero point
+(3.63e-11 W m⁻² nm⁻¹). Using G's zero point with V's flux density and no color term is
 the obvious mistake and produces a map that is neither a G map nor a V map, wrong by the
-colour of whatever mix of spectral types each pixel holds — plausible everywhere, worst
+color of whatever mix of spectral types each pixel holds — plausible everywhere, worst
 along the Galactic plane where the ensemble is reddest. One constructor removes the
 opportunity.
 
-**The direction of that colour transformation was wrong, and it made the map 1.6 times too
+**The direction of that color transformation was wrong, and it made the map 1.6 times too
 bright.** The Gaia DR3 photometric documentation, Section 5.5.1, Table 5.9, is tabulated as
 *G minus the target band*. This
 package read it as V − G and negated it, so the query applied 10^(0.4(V−G)) where
@@ -862,12 +862,12 @@ package read it as V − G and negated it, so the query applied 10^(0.4(V−G)) 
 
 The error is invisible to every internal check. It leaves the map positive, smooth and
 monotonic plane-to-cap; it survived a ±1 mag absolute comparison because it is only 0.53
-mag at solar colour; and the one test that covered the sign asserted the inversion as its premise
+mag at solar color; and the one test that covered the sign asserted the inversion as its premise
 (`TestGaiaJohnsonVBrightensRedStars`, since deleted — `TestGaiaGToJohnsonV` now
 covers the same ground with the sign the right way round) — *"a red star is fainter in G than in V"*, which is
 backwards. Gaia's G spans 330–1050 nm against Johnson V's ~500–600 nm, so a star is always
 brighter in G, G − V is negative, and a red star must **lose** flux in V. Because the error
-scales with colour it is worst exactly where the map is brightest: 1.6× at BP−RP = 1.1,
+scales with color it is worst exactly where the map is brightest: 1.6× at BP−RP = 1.1,
 17× at BP−RP = 3.
 
 Three independent checks fix the direction, none of them internal:
@@ -877,7 +877,7 @@ Three independent checks fix the direction, none of them internal:
 | the Sun: G = −26.895, V = −26.76, so G − V = −0.14 | polynomial at BP−RP = 0.82 gives **−0.15** |
 | 4,000 stars with both Gaia and Tycho-2 photometry, V = G − P(c) | median residual **−0.002 mag** |
 | the same 4,000 stars, V = G + P(c) — what the code did | median residual **−0.479 mag** |
-| binned by colour across −0.5 < BP−RP < 5.0 | correct form holds to **±0.03 mag** in every bin |
+| binned by color across −0.5 < BP−RP < 5.0 | correct form holds to **±0.03 mag** in every bin |
 
 Measured on the sky: over 3,000 order-9 pixels at galactic latitude 71°, the inverted map
 reads 23.59 mag arcsec⁻², the corrected one 24.11, and the raw untransformed G sum 23.88.
@@ -902,7 +902,7 @@ sources, one whole-sky query of thirteen minutes:
 Against the inverted build the whole-sky mean moves 21.88 → 22.84, so the previous map
 carried **2.4 times too much flux**. Measured at order 9 before the move, the per-pixel
 ratio had a median of 0.595 and a first percentile of 0.079: no pixel got brighter, and the
-plane moved about twice as far as the cap, which is the colour-dependent signature the error
+plane moved about twice as far as the cap, which is the color-dependent signature the error
 had to have.
 
 **The bright stars Gaia cannot see: 74 of them, worth 6.4 per cent.** Hipparcos positions
@@ -954,8 +954,8 @@ per cent of directions agree within 0.1 mag. A caller asking how bright the sky 
 an answer swinging by half a magnitude depending on which side of a 6.9 arcmin boundary a
 star fell.
 
-And the one principled argument for building fine — that a more local mean colour improves
-the colourless-source correction — does not survive measurement. Correcting at order 9 and
+And the one principled argument for building fine — that a more local mean color improves
+the colorless-source correction — does not survive measurement. Correcting at order 9 and
 degrading to order 8 differs from correcting at order 8 directly by a median of **0.0000
 mag**, a 99th percentile of 0.0023, and 0.06 per cent of pixels past 0.01 mag.
 
@@ -969,7 +969,7 @@ validating it means validating those three things:
 | link | check | result |
 | :--- | :--- | ---: |
 | Gaia G VEGAMAG zero point | `G + 2.5·log₁₀(flux)` over 177,426 DR3 sources | **25.687367**, scatter 3×10⁻⁷ |
-| G → V transformation | 4,000 stars with Gaia and Tycho-2 photometry | **−0.002 mag**, ±0.03 per colour bin |
+| G → V transformation | 4,000 stars with Gaia and Tycho-2 photometry | **−0.002 mag**, ±0.03 per color bin |
 | HEALPix tiling by `source_id` | map summed back up against the catalogue | **exact** on counts |
 | flux conservation | same | 2.4×10⁻¹¹ relative |
 | Johnson V Vega zero point | not independently checked here | 3.63×10⁻¹¹ W m⁻² nm⁻¹, adopted |
@@ -984,11 +984,11 @@ back up and comparing against the catalogue queried without a `GROUP BY`:
 | sources | 1,811,709,771 | 1,811,709,771 |
 | with BP−RP | 1,540,770,489 | 1,540,770,489 |
 | total G flux | 1.00213307311044e13 | 1.00213307311068e13 |
-| coloured G flux | 9.94290378118816e12 | 9.94290378119190e12 |
+| colored G flux | 9.94290378118816e12 | 9.94290378119190e12 |
 
 The counts agree exactly, and the source total is Gaia DR3's own published size, so every
 source in the catalogue landed in exactly one pixel — none dropped at a boundary, none
-counted twice. No pixel is empty and no pixel lacks a coloured source. The flux differs at
+counted twice. No pixel is empty and no pixel lacks a colored source. The flux differs at
 2.4×10⁻¹¹, which is what summing 1.8 billion doubles in two different orders costs: √N·ε is
 about 10⁻¹¹. That is arithmetic noise, not a missing source.
 
@@ -1000,9 +1000,9 @@ independent measurement of integrated starlight is still absent, and it stays ab
 a reference is obtained whose composition is stated precisely enough to compare against —
 which a single quoted number is not.
 
-**Sources without a colour — a systematic error, not a rounding one.** The colour
+**Sources without a color — a systematic error, not a rounding one.** The color
 transformation is applied per star inside the aggregate, because transforming a sum is not
-the same as summing transformations when the transformation depends on colour. A source
+the same as summing transformations when the transformation depends on color. A source
 with no BP−RP makes the polynomial null and SQL drops it, and the archive rejects both
 `CASE` and `COALESCE`, so no default can be substituted in the query.
 
@@ -1024,40 +1024,40 @@ predominantly faint, so the flux shortfall is smaller than the count shortfall �
 not one per cent and it is not uniform, which is the part that matters: a direction-
 dependent deficit cannot be absorbed into an overall calibration.
 
-**Fixed by assigning the local mean colour**, which is what Masana et al. do. The query
-returns two further sums and a mean: the unconditional G flux, the G flux of coloured
+**Fixed by assigning the local mean color**, which is what Masana et al. do. The query
+returns two further sums and a mean: the unconditional G flux, the G flux of colored
 sources alone, and the pixel's mean BP−RP. Their difference is the flux the polynomial
-dropped, and it is scaled by the same polynomial evaluated at that mean colour.
+dropped, and it is scaled by the same polynomial evaluated at that mean color.
 
 The mechanism is NULL propagation, not `CASE` or `FILTER`. Adding `0*bp_rp` to a flux makes
-the term null exactly when the colour is missing, so the sum covers coloured sources alone.
+the term null exactly when the color is missing, so the sum covers colored sources alone.
 That is plain arithmetic and parses everywhere; `CASE` is rejected by ESA and `FILTER` by
 Gaia@AIP, so either would have tied the build to one archive.
 
 Measured on the densest pixel in the sky (hpx 467974, 74,126 sources): **57.2 per cent of
-its sources carry no colour, and they account for 7.2 per cent of its flux.** The count
-deficit is far larger than the flux deficit because colourless sources are predominantly
+its sources carry no color, and they account for 7.2 per cent of its flux.** The count
+deficit is far larger than the flux deficit because colorless sources are predominantly
 faint — which is why the earlier one-per-cent claim survived as long as it did. Seven per
 cent is 0.075 mag on the brightest part of the map: real, worth correcting, and not the
 catastrophe the source count alone suggests.
 
-**Where the mean-colour assumption is weakest, measured.** Degrading the corrected order-9
+**Where the mean-color assumption is weakest, measured.** Degrading the corrected order-9
 build to order 8 and comparing against the uncorrected chunked map gives a median
 difference of +0.12 per cent, +5.2 per cent at the 99th percentile, and 1,571 pixels (0.2
 per cent) differing by more than 10 per cent. The distribution is the correction's own
 signature: negligible across the empty sky, several per cent where sources crowd.
 
 The tail is more interesting than the median. Pixel 138978 has 229 sources of which 225
-carry a colour — 1.7 per cent dropped by count — yet those four colourless sources hold
+carry a color — 1.7 per cent dropped by count — yet those four colorless sources hold
 four times the flux of the other 225 combined, and the correction raises the pixel by 596
 per cent.
 
-That contradicts something stated earlier in this section. Colourless sources are
+That contradicts something stated earlier in this section. Colorless sources are
 predominantly faint **by count**, which is why the deficit went unnoticed for so long, but
 **BP/RP photometry also fails at the bright end through saturation**. So a pixel can lose
 most of its flux to a handful of bright sources while losing almost none of its count, and
-the correction then assigns the mean colour of many faint stars to a few bright ones whose
-colour it does not know.
+the correction then assigns the mean color of many faint stars to a few bright ones whose
+color it does not know.
 
 Correcting is still clearly better than dropping — those four sources are 80 per cent of
 that pixel's light, and the alternative is discarding them — but the assumption is least
@@ -1065,8 +1065,8 @@ reliable exactly where the flux concentrates. Pixels whose recovered flux domina
 measured flux should be treated as uncertain, and the per-pixel counts that ship with the
 map are what make that visible.
 
-**The fix: weight the mean colour by flux, not by count.** `AVG(bp_rp)` answers "what
-colour is a typical star here", but the quantity being scaled is flux, and flux is not
+**The fix: weight the mean color by flux, not by count.** `AVG(bp_rp)` answers "what
+color is a typical star here", but the quantity being scaled is flux, and flux is not
 distributed like stars. The numerous faint red sources dominate the average while the
 bright, bluer ones dominate the light. Replacing it with
 
@@ -1076,38 +1076,38 @@ asks the question the correction actually needs. On pixel 138978 the count-weigh
 BP−RP = 1.452 while the flux-weighted mean is 0.924 — the light really is much bluer than
 the population — and the correction factor falls from 1.469 to 1.188, so the count-weighted
 form was over-correcting that pixel by 19 per cent. The NULL-propagation trick carries over
-unchanged: with no coloured source in the pixel the denominator is a `SUM` over an all-NULL
+unchanged: with no colored source in the pixel the denominator is a `SUM` over an all-NULL
 set, which is NULL rather than zero, so the expression degrades to no correction instead of
 failing the query.
 
-**Where the residual error lives, measured by magnitude.** Binning colourless sources by G
+**Where the residual error lives, measured by magnitude.** Binning colorless sources by G
 and summing their flux, over a block of 45,474 order-9 pixels and a second block elsewhere:
 
 | | first block | second block |
 | :--- | ---: | ---: |
 | sources | 2,816,168 | 292,300 |
-| colourless, by count | 1.38 % | 1.17 % |
-| colourless, by flux | 0.19 % | 0.15 % |
+| colorless, by count | 1.38 % | 1.17 % |
+| colorless, by flux | 0.19 % | 0.15 % |
 | **dropped flux from G < 13** | **54.9 %** | **46.1 %** |
-| carried by | 161 sources (0.41 % of colourless) | 15 (0.44 %) |
+| carried by | 161 sources (0.41 % of colorless) | 15 (0.44 %) |
 
-About four in a thousand colourless sources carry roughly half the dropped flux, and one
+About four in a thousand colorless sources carry roughly half the dropped flux, and one
 G = 7 star carries 18 per cent of it in the first block. Neither block samples the crowded
-plane — both come out near 1.3 per cent colourless against 14.95 per cent all-sky — so these
+plane — both come out near 1.3 per cent colorless against 14.95 per cent all-sky — so these
 fractions describe the quiet sky, where the deficit is a few bright stars rather than many
-faint ones. That is what bounds the mean-colour assumption: no weighting scheme recovers the
-colour of one specific saturated star from its neighbours.
+faint ones. That is what bounds the mean-color assumption: no weighting scheme recovers the
+color of one specific saturated star from its neighbours.
 
 **Those stars can be resolved exactly rather than assumed.** `gaiadr3.tycho2tdsc_merge`
 carries `bt_mag`/`vt_mag` and is reachable from `gaia_source` through
 `tycho2tdsc_merge_best_neighbour`; both are present on Gaia@AIP. Tycho-2 photometry converts
 to Johnson V by the published ESA (1997, Vol. 1, §1.3, Eq. 1.3.20) transformation
-V = V_T − 0.090 (B_T − V_T) — a catalogue measurement, not an inferred colour. Of the 161
-bright colourless sources in the first block, 22 have such a counterpart and those 22 hold
-58.8 per cent of the bright colourless flux, so about 32 per cent of all the dropped flux in
+V = V_T − 0.090 (B_T − V_T) — a catalogue measurement, not an inferred color. Of the 161
+bright colorless sources in the first block, 22 have such a counterpart and those 22 hold
+58.8 per cent of the bright colorless flux, so about 32 per cent of all the dropped flux in
 that block can be replaced by a measured magnitude.
 
-A pixel with no coloured source at all cannot be corrected by any local mean, and no global
+A pixel with no colored source at all cannot be corrected by any local mean, and no global
 mean is substituted — that would be the fabrication this package refuses elsewhere. The
 per-pixel `ncolour` count still ships so a caller can see how much of a pixel rests on the
 assumption.
@@ -1147,7 +1147,7 @@ columns.
   horizon. Masana et al. put the difference between their full and simplified scattering
   at under 0.1 mag arcsec⁻², and every result below 30° altitude carries
   `ExtrapolatedModel`.
-- The colour transformation is fitted for −0.5 < BP−RP < 5.0 and extrapolates outside it.
+- The color transformation is fitted for −0.5 < BP−RP < 5.0 and extrapolates outside it.
 - A direction the map does not cover returns nothing and flags it, rather than reading as
   a dark sightline.
 
@@ -1158,7 +1158,7 @@ columns.
 | Masana Eq. 8, direct term | `IntegratedStarlight.AddRadiance` | `TestIntegratedStarlightDimsTowardTheHorizon`, `TestIntegratedStarlightReddens` |
 | Shape normalisation | `NewIntegratedStarlight` | `TestIntegratedStarlightReproducesTheMapValue`, `TestIntegratedStarlightIsIndependentOfGridResolution` |
 | `source_id / 2^(59−2k)` | `GaiaBuild.ADQL` | `TestGaiaADQLDivisor`, `TestGaiaQueryIsAcceptedByTheArchive` |
-| Gaia DR3 doc Table 5.9, as printed | `GaiaJohnsonV` | `TestGaiaJohnsonV`, `TestGaiaJohnsonVColourFactorDirection` |
+| Gaia DR3 doc Table 5.9, as printed | `GaiaJohnsonV` | `TestGaiaJohnsonV`, `TestGaiaJohnsonVColorFactorDirection` |
 
 **Still outstanding for this section.** The extragalactic background light is not
 implemented and is not folded into anything else; it is a separate component with its own
@@ -1227,7 +1227,7 @@ R, in W m⁻² sr⁻¹:
 | V | 21.93 | 2.22e-07 | 2.20e-07 | 4.42e-07 |
 | R | 21.18 | 5.10e-07 | 2.24e-07 | 7.34e-07 |
 
-The rows add up — `R_bg + R_a = R` exactly in all three — and the colour is its own check
+The rows add up — `R_bg + R_a = R` exactly in all three — and the color is its own check
 that they have been read correctly: artificial light in B is six times weaker than in V,
 which is what a sodium-dominated inventory produces, and the Canaries legislate for it.
 Tables 1 and 2 of the same paper carry ASTMON camera measurements at OT and ORM, and its
@@ -1529,7 +1529,7 @@ own literature and its own dataset:
 | Airglow, where the fetch lives | SkyCalc is a *service*, and evaluation performs no I/O. The spectrum is therefore resolved under `skybrightness/dataset/` and handed in through the `Scene`, the same way `dataset/solar` supplies the CALSPEC spectrum the Moon needs. A per-scene SkyCalc call during `Estimate` would break the property `TestEstimateWorksOffline` exists to hold. |
 | Airglow, the SkyCalc interface | **Checked against ESO's CLI documentation.** Parameters: `msolflux` is the monthly averaged 10.7 cm solar radio flux in sfu, default 130.0 — which is the F10.7 the scene will carry, under the service's own name. `incl_airglow` toggles the upper-atmosphere term. `wmin`/`wmax` accept 300 to 30000 nm and `wdelta` defaults to 0.1 nm, so the 330-1000 nm grid sits inside the range at finer sampling than it needs. The response is a **binary FITS table returning `FLUX_AEL` (upper-atmosphere emission lines) and `FLUX_ARC` (airglow residual continuum) as separate columns** — the continuum-and-line separation this design called for arrives from the service rather than having to be constructed. Worth noting that a binary FITS response is only readable here because `fits.Read` was taught to decode BINTABLE extensions earlier in this work; before that it returned headers and skipped every payload, so a SkyCalc response would have parsed to nothing at all. |
 | Airglow, what is still unknown | Two things the CLI documentation does not state and which must be settled before wiring: **the HTTP endpoint the CLI posts to**, which is not on that page and has to come from the client's source rather than be guessed, and **the terms of use** — no rate limit, acknowledgement or citation requirement is stated there. Given that this project has already been throttled once today by a shared research service for asking too often without identifying itself, the second is not a formality. |
-| Hipparcos bright stars, why not Gaia Sky | The ZAH/ARI Gaia Sky repository mirrors van Leeuwen (2007) — the right reduction, 8 MB, versioned and checksummed — and needs no TAP service, so this will be asked again. Its binary format **is** fully specified (LOD-catalogs documentation): a `-1` token, version, star count, then per star three doubles of cartesian position, velocity and proper motion, four floats named `appmag, absmag, color, size`, HIP number, Gaia source id and a UTF-16 name, big-endian. Reading that specification is what rules it out. **`color` is not a colour index** — it is *"8 bits per channel in RGBA … encoded into a single float using the libgdx Color class"*, so B−V is gone and no band transformation is possible. **`size` is *"a derived quantity, for rendering"*.** The photometric **band of the magnitudes is never stated**, and a zero point is band-specific, so the conversion to radiance cannot be performed at all. Worst of all, `gaiasky-catgen` applies astrophysical corrections when generating: extinction `Ag = min(3.2, 150/|sin b| × 5.9e-4)` and reddening `E_BP−RP`, negative parallaxes replaced by a default 0.04 mas, and filtering by parallax relative error. Integrated starlight needs the light that actually arrives above the atmosphere — **observed** magnitudes, extinction included — so a de-reddened magnitude overestimates it, worst along the Galactic plane where extinction is largest and the map is brightest. The generator is open (`codeberg.org/gaiasky/gaiasky-catgen`), so the band could be established from its source, but the corrections disqualify the product regardless. VizieR I/311/hip2 is used instead: van Leeuwen (2007), documented columns, stated units, no corrections applied. |
+| Hipparcos bright stars, why not Gaia Sky | The ZAH/ARI Gaia Sky repository mirrors van Leeuwen (2007) — the right reduction, 8 MB, versioned and checksummed — and needs no TAP service, so this will be asked again. Its binary format **is** fully specified (LOD-catalogs documentation): a `-1` token, version, star count, then per star three doubles of cartesian position, velocity and proper motion, four floats named `appmag, absmag, color, size`, HIP number, Gaia source id and a UTF-16 name, big-endian. Reading that specification is what rules it out. **`color` is not a color index** — it is *"8 bits per channel in RGBA … encoded into a single float using the libgdx Color class"*, so B−V is gone and no band transformation is possible. **`size` is *"a derived quantity, for rendering"*.** The photometric **band of the magnitudes is never stated**, and a zero point is band-specific, so the conversion to radiance cannot be performed at all. Worst of all, `gaiasky-catgen` applies astrophysical corrections when generating: extinction `Ag = min(3.2, 150/|sin b| × 5.9e-4)` and reddening `E_BP−RP`, negative parallaxes replaced by a default 0.04 mas, and filtering by parallax relative error. Integrated starlight needs the light that actually arrives above the atmosphere — **observed** magnitudes, extinction included — so a de-reddened magnitude overestimates it, worst along the Galactic plane where extinction is largest and the map is brightest. The generator is open (`codeberg.org/gaiasky/gaiasky-catgen`), so the band could be established from its source, but the corrections disqualify the product regardless. VizieR I/311/hip2 is used instead: van Leeuwen (2007), documented columns, stated units, no corrections applied. |
 | Airglow, the SkyCalc protocol | **Read from the client's source, version 1.4.** Host `https://etimecalret-002.eso.org`; `POST /observing/etc/api/skycalc` with the parameters as a JSON body, which returns `{status, tmpdir}` rather than data. The spectrum is then fetched from `/observing/etc/tmp/{tmpdir}/skytable.fits`, and finally `GET /observing/etc/api/rmtmp?d={tmpdir}` releases it. The almanac is a second endpoint, `/observing/etc/api/skycalc_almanac`. |
 | Airglow, the obligation nobody documents | **The third call is not optional.** Each request makes ESO allocate a temporary directory on their server, and it is the client that deletes it. A client which fetches its FITS and stops leaves that directory behind on every call. Nothing on the help page says so — it is visible only in the client's source — and it matters more here than for a person running the tool by hand, because a library calls it once per user rather than once per afternoon. Whatever wraps this must delete the directory even when the fetch fails. |
 | Airglow, a unit trap | The client notes its own break: output wavelengths are nanometres in version 1.4 and were **micrometres** in 1.3. A reader that assumes either silently is out by a thousand, which is the class of error this module treats as unacceptable elsewhere. The unit has to be asserted, not inherited. |
@@ -1576,7 +1576,7 @@ Nothing is optimised yet; that is Phase 8. The point is numbers before opinions.
 | A published AOD climatology asset | Nothing — deferred, not blocked | **Decided against for now (2026-08-26).** `atmosphere.CleanMountainAOD550` and its siblings are judged sufficient as the offline path, and `cams.AOD550` already serves anyone who wants the real hour. The design, if it is ever wanted: a **monthly median** of CAMS `aod550` on its own 0.4-degree grid, published as a release asset the way `starmap-v2` is, so the zero-setup path stops being a stated guess. Monthly because the seasonal cycle is the dominant signal — the Indo-Gangetic 1.07 measured here is a *January* number and the Saharan maximum moves thousands of kilometres by July, which is what broke this module's first grid-orientation test. Median rather than mean because AOD is skewed and a few dust events drag a mean above any typical night; 10th and 90th percentiles alongside it would let a caller carry a spread instead of a number pretending to certainty. Roughly 58 MB raw for twelve months and three percentiles, and smooth enough to compress toward `starmap-v2`'s order. Two things to settle first: the exact wording of the Copernicus licence on redistributing a derived product, which is the whole basis for publishing one instead of sharing credentials, and whether a three-day sampling across the four available years (~700 MB fetched) is enough for the median or whether it wants every day (~2.1 GB). |
 | **Cloud reaches only the artificial term** | A physically consistent cloudy sky, and any preset for one | **Not a data gap — a capability gap.** `scene.Atmosphere.Clouds()` is read in exactly one place in this module, `CloudySkyglow.deck`, so a deck in the atmosphere changes artificial skyglow and nothing else: moonlight, integrated starlight, diffuse galactic light, zodiacal light and airglow are all evaluated as though the sky were clear. Three different problems sit behind that one sentence. **Extraterrestrial light under cloud** — starlight, zodiacal, extragalactic, and the Moon's direct beam — needs the deck as an attenuator, and the line-of-sight opacity already exists as `cloudDeck.opacity`; what makes it more than plumbing is that a broken deck is binary per realisation while that function is the ensemble mean, so a fractional cover would return a sky nobody standing under it ever sees. **Moonlight under cloud** is a different model rather than a factor: the Moon sits *above* the deck and lights it from above, making the cloud base a bright extended source, which is the mirror image of the ground-source geometry Kocifaj (2007) solves and is not reachable from it by changing the limits of integration. **Airglow** is a third case again, since its emitting layer at 87 km is above any deck, so what a cloud does to it is block it rather than scatter it. Until those exist, note what is and is not constructible today: no preset registers `CloudySkyglow`, and it shares the `Artificial` `ComponentID` with `ArtificialSkyglow` so `NewModel` refuses to hold both — a cloudy model must be assembled by hand, swapping the artificial term rather than adding to a preset. Such a model runs, and its artificial term is right, but a total from it is internally inconsistent and should not be quoted. |
 | ~~A detection model for limiting magnitude~~ | **Resolved for imaging.** `optics.Instrument.SNR` and `LimitingSignal` are the CCD equation of Merline & Howell (1995) and its closed-form inverse; `plan.SkyDepth` is the one-method interface `plan` declares for itself, `plan.LimitingMagnitudeConstraint` scores against it, and `skybrightness/plan.Imaging` bridges the two. `plan` imports no sky-brightness package at all. The conversion needs no zero point of its own: one estimate yields both a surface brightness and a detector background through the same instrument and the same spectrum, which is a calibration. |
-| **Visual limiting magnitude** | A naked-eye or eyepiece depth, and with it `examples/21_meteor_shower_forecast` | **The reference is in hand and this is still not a small job.** Crumey (2014), *MNRAS* **442**, 2600 (doi:10.1093/mnras/stu992, arXiv:1405.4209) is open access, and it is the right model: it replaces Hecht (1947) — the formula Schaefer (1990) uses — extends beyond point sources to targets of any size, and computes the scotopic correction for a source whose colour differs from the background. An earlier revision of this row said the paper had not been obtained; that was wrong, and the distinction matters because it moves this from blocked to merely unstarted. Two things actually stand in the way. **A scotopic luminosity function**, which this module does not have: `unit.LuminanceCdM2` is a type with no producer, `magnitude` carries no V(λ) or V′(λ), and the CIE tables would have to arrive as a fetched dataset under `remote` like every other, with an endpoint, consent and a cache. Without it there is no way to turn a spectral radiance into the adaptation luminance the model takes. **And coefficient verification**: the model is piecewise with a scotopic/photopic split and several fitted constants, and this project has already had three transcription errors of exactly that kind — Kawara's decade, the Gaia table number, and a quadratic read as a cubic — each caught only by an independent physical cross-check rather than by re-reading. Transcribing it needs the same treatment, which is its own piece of work rather than a rider on someone else's. The candidate to avoid remains the one V1 used: Schaefer's SQM→NELM conversion consumes a single V-band scalar, so routing a spectrum through it discards the spectrum in the first step. |
+| **Visual limiting magnitude** | A naked-eye or eyepiece depth, and with it `examples/21_meteor_shower_forecast` | **The reference is in hand and this is still not a small job.** Crumey (2014), *MNRAS* **442**, 2600 (doi:10.1093/mnras/stu992, arXiv:1405.4209) is open access, and it is the right model: it replaces Hecht (1947) — the formula Schaefer (1990) uses — extends beyond point sources to targets of any size, and computes the scotopic correction for a source whose color differs from the background. An earlier revision of this row said the paper had not been obtained; that was wrong, and the distinction matters because it moves this from blocked to merely unstarted. Two things actually stand in the way. **A scotopic luminosity function**, which this module does not have: `unit.LuminanceCdM2` is a type with no producer, `magnitude` carries no V(λ) or V′(λ), and the CIE tables would have to arrive as a fetched dataset under `remote` like every other, with an endpoint, consent and a cache. Without it there is no way to turn a spectral radiance into the adaptation luminance the model takes. **And coefficient verification**: the model is piecewise with a scotopic/photopic split and several fitted constants, and this project has already had three transcription errors of exactly that kind — Kawara's decade, the Gaia table number, and a quadratic read as a cubic — each caught only by an independent physical cross-check rather than by re-reading. Transcribing it needs the same treatment, which is its own piece of work rather than a rider on someone else's. The candidate to avoid remains the one V1 used: Schaefer's SQM→NELM conversion consumes a single V-band scalar, so routing a spectrum through it discards the spectrum in the first step. |
 | **Aerosol optical properties at a humidity other than 80%** | Reproducing a GAMBONS run exactly, and any site whose humidity is known | **The data exists and the distribution channel does not.** OPAC's optical properties are hygroscopic: the water-soluble component swells with humidity, so single-scattering albedo, asymmetry and the Ångström exponent all move with it. The eight `atmosphere` presets are pinned at 80% RH because that is the only humidity Hess, Koepke & Schult (1998) tabulate — their Table 3 is titled "at a relative humidity of 80%". The package's own site says the software carries "up to 8 relative humidities", but distributes it through an anonymous FTP server described in 1998 and an invitation to email the authors. GAMBONS exposes RH as a dropdown and its reference export uses **70%**, so that comparison is not like for like in the aerosol term even when the type matches. What would unblock it: the OPAC data files themselves. What must not happen instead: interpolating between the one humidity that is published and a guess, which would put invented coefficients behind eight named presets. |
 | Jones et al. (2013) confirmation | Phase 3 framing | Confirm the A&A open-access text. |
 | Illumina-v2 product format | Phase 6 | A sample precomputed product and its dimension conventions. |
@@ -1850,15 +1850,15 @@ summing to 4.94×10⁶ e⁻/s, which is G = 8.95 integrated over the pixel's 1.5
 **That is all it confirms, and an earlier revision of this paragraph claimed more.** It
 converted that sum straight through Johnson V's zero point to 23.5 mag/arcsec² and called
 the result "a textbook integrated-starlight surface brightness" — but the sum carries no
-colour transformation, so treating it as a V surface brightness is exactly the G-zero-point-
+color transformation, so treating it as a V surface brightness is exactly the G-zero-point-
 with-V-flux-density mistake §11.4 warns against, and the agreement was coincidence. The
 published map, built with the transformation applied per star, puts pixel 100000 at **23.76
 mag/arcsec²**. A number that happens to land near a remembered one is not a check.
 
-The colour-dependent per-star transformation also evaluates inline, so the band conversion
+The color-dependent per-star transformation also evaluates inline, so the band conversion
 happens inside the aggregate rather than after it — which matters, because transforming a
 summed flux is not the same as summing transformed fluxes when the transformation depends
-on colour:
+on color:
 
 	SUM(phot_g_mean_flux * POWER(10, -0.4*(a + b*bp_rp + c*bp_rp*bp_rp)))
 
@@ -1872,7 +1872,7 @@ photometry — DR3 only *added* astrophysical parameters, variability and spectr
 | :--- | :--- |
 | Photometric transformations | The coefficients above were a placeholder for the capability test and the sign convention in it was wrong. Real ones must come from GAMBONS' recomputed EDR3 transformations or the Gaia documentation, verified. |
 | Bright stars | Gaia omits the brightest; Hipparcos supplies them, and they carry disproportionate weight. |
-| Missing colours | Over 300 million faint sources have no BP−RP. GAMBONS assigns the local mean colour. |
+| Missing colors | Over 300 million faint sources have no BP−RP. GAMBONS assigns the local mean color. |
 | Faint-star completion | Below G = 20, via the Besançon model. Under 3% except on the galactic plane. |
 | Independent validation | GAMBONS shipped a DR2 bug that underestimated ISL for months. A from-scratch pipeline needs checking against their web export (§13). |
 
@@ -1880,7 +1880,7 @@ This is still a data-preparation job producing a map, not a runtime operation �
 architecture is unchanged, since `dataset/starlight` already consumes such a map. What it
 changes is that the map can now be produced without waiting on anyone.
 
-**The airglow disagreement is a colour error, not a normalisation — measured across five
+**The airglow disagreement is a color error, not a normalisation — measured across five
 bands.**
 
 The V-band comparison put airglow 8.8 percentage points below Table 2 and could say nothing
@@ -1909,7 +1909,7 @@ differs. The two call for entirely different work, which is exactly what the sin
 comparison could not say.
 
 The shape of it is the lead: B agrees to 10 per cent while U, V, R and I do not, and the
-disagreement is not monotonic in wavelength, so it is not a smooth colour term. That points
+disagreement is not monotonic in wavelength, so it is not a smooth color term. That points
 at line systems rather than at a continuum slope — the [OI] 557.7 nm line sits inside V, the
 Herzberg O₂ bands dominate U and the OH Meinel bands dominate I, while B is comparatively
 line-poor. The next thing to establish is which SkyCalc request GAMBONS actually made:

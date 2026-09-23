@@ -37,7 +37,7 @@ import (
 //     everywhere except a few points on the Galactic plane.
 //
 // An earlier revision asserted equality within a magnitude and passed while the
-// colour transformation was inverted, because the resulting excess brightness
+// color transformation was inverted, because the resulting excess brightness
 // happened to cancel what the map was missing. Bounding it on one side, against
 // a total the map is a known subset of, is what makes the assertion mean
 // something.

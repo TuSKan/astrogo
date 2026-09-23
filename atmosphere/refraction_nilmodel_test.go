@@ -154,7 +154,7 @@ func TestRefractionSOFAAgreesWithTheClassicTangentRule(t *testing.T) {
 //
 // gofa's Refco integrates the refractive index of moist air at the wavelength
 // given, so blue light refracts measurably more than red. That difference is
-// atmospheric dispersion — the reason a low star shows a colour-fringed
+// atmospheric dispersion — the reason a low star shows a color-fringed
 // image, and the quantity coord.Disperse exists to report.
 func TestRefractionSOFADispersesByWavelength(t *testing.T) {
 	base := atmosphere.Refraction{Pressure: 1013.25, Temperature: 15.0, Humidity: 0.5}

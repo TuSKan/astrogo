@@ -81,7 +81,7 @@ func TestVegaZeroFluxNeedsAZeroPoint(t *testing.T) {
 // relation, so a four-band map is what this catalogue can produce. Returning
 // an error rather than an approximation is the whole point: a fabricated U
 // would be indistinguishable from a real one in the output.
-func TestJohnsonCousinsColourTermHasNoU(t *testing.T) {
+func TestJohnsonCousinsColorTermHasNoU(t *testing.T) {
 	t.Parallel()
 
 	for _, name := range []string{"B", "V", "R", "I"} {
@@ -108,7 +108,7 @@ func TestJohnsonCousinsColourTermHasNoU(t *testing.T) {
 // The general constructor reproduces the V band the package already had.
 //
 // GaiaJohnsonCousins("V", ...) replaced a dedicated GaiaJohnsonV, and the
-// replacement is only safe if it produces the same band: the same colour
+// replacement is only safe if it produces the same band: the same color
 // polynomial and a flux-to-radiance factor within the tophat's own error of
 // the one built from the literal zero point.
 func TestGaiaJohnsonCousinsReproducesTheVBand(t *testing.T) {

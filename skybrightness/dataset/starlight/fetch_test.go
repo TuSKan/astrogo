@@ -243,14 +243,14 @@ func TestChunkIsCachedSkipsCompletedRanges(t *testing.T) {
 	}
 }
 
-// Colourless sources must be recovered, not dropped.
+// Colorless sources must be recovered, not dropped.
 //
 // Across the whole order-8 build 14.95 per cent of sources carry no BP-RP, and
 // in the densest pixels of the Galactic plane it passes 50 per cent. Dropping
 // them underestimates the plane specifically — the brightest part of the map —
 // and a deficit that varies with direction cannot be calibrated away the way a
 // uniform one could.
-func TestColourRecoveryColumnsAreRequested(t *testing.T) {
+func TestColorRecoveryColumnsAreRequested(t *testing.T) {
 	t.Parallel()
 
 	adql, err := fetchSpec().ADQL(0, 9)
@@ -258,8 +258,8 @@ func TestColourRecoveryColumnsAreRequested(t *testing.T) {
 		t.Fatalf("ADQL: %v", err)
 	}
 
-	// The unconditional sum, the colour-propagating sum whose difference gives
-	// the dropped flux, and the pixel's mean colour to assign it.
+	// The unconditional sum, the color-propagating sum whose difference gives
+	// the dropped flux, and the pixel's mean color to assign it.
 	for _, want := range []string{
 		"SUM(phot_g_mean_flux) AS b_V_all",
 		"SUM(phot_g_mean_flux+0*bp_rp) AS b_V_col",
@@ -277,7 +277,7 @@ func TestColourRecoveryColumnsAreRequested(t *testing.T) {
 		}
 	}
 
-	// A band with no colour term has nothing to recover.
+	// A band with no color term has nothing to recover.
 	plain := GaiaBuild{Order: 8, Bands: []GaiaBand{{Name: "G", FluxToRadiance: 1e-18}}}
 
 	adql, err = plain.ADQL(0, 9)
@@ -291,21 +291,21 @@ func TestColourRecoveryColumnsAreRequested(t *testing.T) {
 }
 
 // The recovered flux must be scaled by the same polynomial the query applied,
-// evaluated at the pixel's mean colour. A different factor here than in the
+// evaluated at the pixel's mean color. A different factor here than in the
 // query is a seam that no downstream check could see.
-func TestColourRecoveryUsesTheSamePolynomial(t *testing.T) {
+func TestColorRecoveryUsesTheSamePolynomial(t *testing.T) {
 	t.Parallel()
 
 	band := GaiaJohnsonV()
 
 	// At bp_rp = 0 the polynomial collapses to its constant term.
-	if got, want := band.colourFactor(0), math.Pow(10, 0.4*band.ColourTerm[0]); math.Abs(got-want) > 1e-15 {
-		t.Errorf("colourFactor(0) = %v, want %v", got, want)
+	if got, want := band.colorFactor(0), math.Pow(10, 0.4*band.ColourTerm[0]); math.Abs(got-want) > 1e-15 {
+		t.Errorf("colorFactor(0) = %v, want %v", got, want)
 	}
 
 	// And the rendered ADQL must contain every coefficient the Go evaluation
 	// uses, in the same order.
-	poly := band.colourPolynomial()
+	poly := band.colorPolynomial()
 	for _, c := range []string{"-0.02704", "0.01424*bp_rp", "-0.2156*bp_rp*bp_rp"} {
 		if !strings.Contains(poly, c) {
 			t.Errorf("polynomial %q omits %q", poly, c)
@@ -314,8 +314,8 @@ func TestColourRecoveryUsesTheSamePolynomial(t *testing.T) {
 }
 
 // The recovery reads the response, so it must survive responses that lack the
-// columns, carry nothing to recover, or have no colour to average.
-func TestColourRecoveryDegradesSafely(t *testing.T) {
+// columns, carry nothing to recover, or have no color to average.
+func TestColorRecoveryDegradesSafely(t *testing.T) {
 	t.Parallel()
 
 	band := GaiaJohnsonV()
@@ -329,8 +329,8 @@ func TestColourRecoveryDegradesSafely(t *testing.T) {
 	}{
 		{"no recovery columns", "hpx", "0", 0},
 		{"nothing dropped", "b_v_all,b_v_col,b_v_mc", "100,100,0", 0},
-		{"no coloured source to average", "b_v_all,b_v_col,b_v_mc", "100,0,", 0},
-		{"recovers the difference", "b_v_all,b_v_col,b_v_mc", "100,60,0", 40 * band.colourFactor(0)},
+		{"no colored source to average", "b_v_all,b_v_col,b_v_mc", "100,0,", 0},
+		{"recovers the difference", "b_v_all,b_v_col,b_v_mc", "100,60,0", 40 * band.colorFactor(0)},
 	}
 
 	// One header line and one data line, which is the smallest thing
@@ -347,42 +347,42 @@ func TestColourRecoveryDegradesSafely(t *testing.T) {
 			t.Fatalf("%s: no row", tc.name)
 		}
 
-		got := spec.recoverColourless(band, rows)
+		got := spec.recoverColorless(band, rows)
 		if math.Abs(got-tc.want) > 1e-12 {
 			t.Errorf("%s: got %v, want %v", tc.name, got, tc.want)
 		}
 	}
 }
 
-// A mean colour outside the fitted interval must not be extrapolated.
+// A mean color outside the fitted interval must not be extrapolated.
 //
-// Flux-weighting the mean colour is what makes this reachable: one dominant
-// star can carry a pixel's mean past any colour a real star has, and over the
+// Flux-weighting the mean color is what makes this reachable: one dominant
+// star can carry a pixel's mean past any color a real star has, and over the
 // order-9 sky it reaches BP-RP = 7.41. A cubic fitted to 5.0 evaluated at 7.41
-// is not a transformation, it is an artefact, so the colour is clamped and the
+// is not a transformation, it is an artefact, so the color is clamped and the
 // factor stops changing beyond the interval.
-func TestColourFactorRefusesToExtrapolate(t *testing.T) {
+func TestColorFactorRefusesToExtrapolate(t *testing.T) {
 	t.Parallel()
 
 	band := GaiaJohnsonV()
 
-	if got, want := band.colourFactor(9.0), band.colourFactor(colourValidHi); got != want {
-		t.Errorf("BP-RP = 9 gives %v, want the value at the %v bound, %v", got, colourValidHi, want)
+	if got, want := band.colorFactor(9.0), band.colorFactor(colorValidHi); got != want {
+		t.Errorf("BP-RP = 9 gives %v, want the value at the %v bound, %v", got, colorValidHi, want)
 	}
 
-	if got, want := band.colourFactor(-4.0), band.colourFactor(colourValidLo); got != want {
-		t.Errorf("BP-RP = -4 gives %v, want the value at the %v bound, %v", got, colourValidLo, want)
+	if got, want := band.colorFactor(-4.0), band.colorFactor(colorValidLo); got != want {
+		t.Errorf("BP-RP = -4 gives %v, want the value at the %v bound, %v", got, colorValidLo, want)
 	}
 
 	// Inside the interval nothing is clamped, so the factor still varies.
-	if band.colourFactor(1.0) == band.colourFactor(2.0) {
+	if band.colorFactor(1.0) == band.colorFactor(2.0) {
 		t.Error("the factor stopped varying inside the fitted interval")
 	}
 
 	// And the clamped extremes stay physical: a factor is a flux ratio and the
 	// unbounded cubic is what produced ratios of a hundred.
 	for _, c := range []float64{-4, -0.5, 0, 2.5, 5, 9} {
-		if f := band.colourFactor(c); f <= 0 || f > 1.05 {
+		if f := band.colorFactor(c); f <= 0 || f > 1.05 {
 			t.Errorf("BP-RP = %v gives F_V/F_G = %v, outside anything a band ratio can be", c, f)
 		}
 	}

@@ -159,12 +159,12 @@ func NewImaging(spec Spec) (*Imaging, error) {
 //
 // # The assumption this makes, stated plainly
 //
-// That the source has the same colour as the sky. The electrons-to-magnitude
+// That the source has the same color as the sky. The electrons-to-magnitude
 // step depends on spectral shape, and the calibration above is anchored on
 // the sky's shape. For a red source under a moonlit sky, or a blue one under
-// sodium skyglow, the answer is off by the colour term between them. Getting
+// sodium skyglow, the answer is off by the color term between them. Getting
 // that right needs the source's own spectrum, which a target list does not
-// carry; what this returns is the depth reached for a sky-coloured source,
+// carry; what this returns is the depth reached for a sky-colored source,
 // which is the same convention a sky-limited exposure-time calculator uses.
 //
 // # Put the filter in the throughput, or the band label is a half-truth
@@ -178,7 +178,7 @@ func NewImaging(spec Spec) (*Imaging, error) {
 // An instrument declaring no throughput at all is treated as perfectly
 // transmitting at every wavelength, so its electrons come from the entire
 // grid while its magnitudes are quoted in the model's band. The result stays
-// internally consistent — a sky-coloured source really would produce that
+// internally consistent — a sky-colored source really would produce that
 // rate — but it is not a filter magnitude, and it does not respond to airmass
 // the way one would: extinction is wavelength-dependent, so a broadband rate
 // and a V-band brightness diverge as a target sinks. Measured at Paranal, a

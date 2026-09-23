@@ -209,7 +209,7 @@ func IntegratedHemisphere(points []SkyPoint, grid unit.SpectralGrid) (SpectralRa
 // This is a radiometric quantity. Photopic illuminance in lux is a
 // different projection of the same spectrum, obtained by weighting with
 // the CIE V(lambda) response through [magnitude], and the two must not be
-// confused: the ratio between them depends on the sky's colour.
+// confused: the ratio between them depends on the sky's color.
 func HorizontalIlluminance(points []SkyPoint, grid unit.SpectralGrid) (unit.Irradiance, error) {
 	spectrum, err := IntegratedHemisphere(points, grid)
 	if err != nil {

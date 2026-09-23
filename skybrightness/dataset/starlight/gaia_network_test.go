@@ -423,7 +423,7 @@ func TestFourBandQueryIsOnePass(t *testing.T) {
 
 	// Every band has to carry light, and the reddest has to carry the most:
 	// the sky's integrated starlight is dominated by cool stars, so a pixel is
-	// brighter in I than in B. A band wired to the wrong colour polynomial or
+	// brighter in I than in B. A band wired to the wrong color polynomial or
 	// the wrong zero point shows here rather than after a 787-chunk build.
 	radiance := map[string]float64{}
 

@@ -33,7 +33,7 @@ import (
 // in.
 //
 // A column absent from the result is reported as absent rather than as zero.
-// The difference matters for the colour-recovery columns, which older results
+// The difference matters for the color-recovery columns, which older results
 // do not carry: a missing column means "no correction available" and a zero
 // would mean "nothing was dropped", and those call for opposite behaviour.
 type resultRows interface {
@@ -212,7 +212,7 @@ func (p *parquetRows) Next() bool {
 // Number reads a column as a float, whatever width the service chose for it.
 //
 // The archive types these columns as it sees fit — a count as INT64, a summed
-// flux as DOUBLE, a mean colour as FLOAT — and every one of them is a number
+// flux as DOUBLE, a mean color as FLOAT — and every one of them is a number
 // this package divides or multiplies. Converting at the edge keeps that choice
 // out of the accumulation, where it would be a per-column special case.
 func (p *parquetRows) Has(column string) bool {

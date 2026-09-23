@@ -79,7 +79,7 @@ const DefaultMapBand = "V"
 //
 // Integrated starlight is the summed light of stars of every spectral type,
 // and no single blackbody is right for it. This is a solar-like stand-in that
-// puts the ensemble's colour in the right region, and it is a stated
+// puts the ensemble's color in the right region, and it is a stated
 // approximation rather than a measurement: a caller working in the blue, or
 // comparing against a specific published spectrum, should set
 // [Spec.StarTemperatureK] or build the shape themselves.

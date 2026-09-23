@@ -200,8 +200,8 @@ func TestAgainstGAMBONSTable2AcrossBands(t *testing.T) {
 	//
 	// A ratio that is off by the same factor in every band is a normalisation:
 	// one of the two components is scaled wrong and the airglow spectrum's
-	// shape is right. A ratio that drifts from U to I is a colour error — the
-	// airglow spectrum has the wrong shape, or the zodiacal colour correction
+	// shape is right. A ratio that drifts from U to I is a color error — the
+	// airglow spectrum has the wrong shape, or the zodiacal color correction
 	// does. The two call for entirely different work, and a single band cannot
 	// tell them apart.
 	lo, hi := math.Inf(1), math.Inf(-1)
@@ -224,12 +224,12 @@ func TestAgainstGAMBONSTable2AcrossBands(t *testing.T) {
 	switch {
 	case spread < 1.3:
 		t.Logf("the disagreement is flat across the spectrum, so it is a normalisation " +
-			"rather than a colour error: the airglow spectrum's SHAPE agrees with GAMBONS " +
+			"rather than a color error: the airglow spectrum's SHAPE agrees with GAMBONS " +
 			"and its LEVEL does not")
 	default:
-		t.Logf("the disagreement varies by %.2fx across the spectrum, so it is a colour "+
+		t.Logf("the disagreement varies by %.2fx across the spectrum, so it is a color "+
 			"error and not only a normalisation: the airglow spectrum's shape differs from "+
-			"GAMBONS', or the zodiacal colour correction does", spread)
+			"GAMBONS', or the zodiacal color correction does", spread)
 	}
 
 	// Bounds, not a transcription. These are wide because this is the first

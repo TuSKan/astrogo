@@ -327,7 +327,7 @@ func targetFromRow(row []string, col map[string]int) (resolve.Target, bool) {
 		t.Parallax = angle.Arcsec(v / 1000.0)
 	}
 
-	// Johnson V from Gaia G and the BP−RP colour.
+	// Johnson V from Gaia G and the BP−RP color.
 	gMag, okG := number("phot_g_mean_mag")
 	if !okG {
 		return t, true
@@ -344,7 +344,7 @@ func targetFromRow(row []string, col map[string]int) (resolve.Target, bool) {
 		return t, true
 	}
 
-	// No colour — G stands in for V, within about 0.3 mag for most stars.
+	// No color — G stands in for V, within about 0.3 mag for most stars.
 	t.VMag = gMag
 	t.HasVMag = true
 
