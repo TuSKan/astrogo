@@ -18,6 +18,7 @@ package cams
 
 import (
 	"context"
+	"errors"
 	"io/fs"
 	"math"
 	"testing"
@@ -54,7 +55,16 @@ func lnspFixture(t *testing.T) (remote.FS, string) {
 	fsys := credentialsBucket(t)
 
 	if _, err := fs.Stat(fsys, key); err != nil {
-		t.Skipf("real CAMS file not present at %s/%s -- skipping ground-truth test", credentialsDir, key)
+		// Absent is the expected case: the file is licensed and staged by hand,
+		// so it is missing on every machine but one. Any other Stat failure —
+		// a permission, an unreadable mount — is a broken fixture directory
+		// rather than an absent file, and saying "not present" about it would
+		// be wrong as well as quiet.
+		if errors.Is(err, fs.ErrNotExist) {
+			t.Skipf("real CAMS file not present at %s/%s -- skipping ground-truth test", credentialsDir, key)
+		}
+
+		t.Fatalf("Stat(%q) in the credentials bucket: %v", key, err)
 	}
 
 	return fsys, key
@@ -68,7 +78,16 @@ func aermr01Fixture(t *testing.T) (remote.FS, string) {
 	fsys := credentialsBucket(t)
 
 	if _, err := fs.Stat(fsys, key); err != nil {
-		t.Skipf("real CAMS file not present at %s/%s -- skipping ground-truth test", credentialsDir, key)
+		// Absent is the expected case: the file is licensed and staged by hand,
+		// so it is missing on every machine but one. Any other Stat failure —
+		// a permission, an unreadable mount — is a broken fixture directory
+		// rather than an absent file, and saying "not present" about it would
+		// be wrong as well as quiet.
+		if errors.Is(err, fs.ErrNotExist) {
+			t.Skipf("real CAMS file not present at %s/%s -- skipping ground-truth test", credentialsDir, key)
+		}
+
+		t.Fatalf("Stat(%q) in the credentials bucket: %v", key, err)
 	}
 
 	return fsys, key

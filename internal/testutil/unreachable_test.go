@@ -95,7 +95,13 @@ func TestUnreachableAgainstARealSocket(t *testing.T) {
 
 		l, err := lc.Listen(t.Context(), "tcp", "127.0.0.1:0")
 		if err != nil {
-			t.Skipf("cannot listen: %v", err)
+			// Fatal. A loopback listener on port 0 is the least a machine can
+			// offer, and this is the only test that exercises Unreachable
+			// against a socket the operating system actually refused rather
+			// than an error this repository built. Skipping it would retire
+			// that coverage silently, on exactly the machines where something
+			// is unusual enough to be worth knowing about.
+			t.Fatalf("listen on 127.0.0.1:0: %v", err)
 		}
 
 		addr := l.Addr().String()

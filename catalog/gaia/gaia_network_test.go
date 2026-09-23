@@ -4,6 +4,7 @@ package gaia
 
 import (
 	"context"
+	"errors"
 	"net"
 	"net/url"
 	"testing"
@@ -28,12 +29,20 @@ func requireGaia(t *testing.T) {
 
 	raw, err := remote.URL(DefaultEndpoint)
 	if err != nil {
-		t.Skipf("%s is not resolvable: %v", DefaultEndpoint, err)
+		// Offline mode and a disabled endpoint are choices the caller made, so
+		// there is nothing here to verify and nothing wrong. Anything else —
+		// an id missing from the registry above all — is this repository's own
+		// mistake, and skipping past it would hide a broken endpoint table
+		// behind a message about the archive.
+		if errors.Is(err, remote.ErrOffline) || errors.Is(err, remote.ErrEndpointDisabled) {
+			t.Skipf("%s is not resolvable: %v", DefaultEndpoint, err)
+		}
+
+		t.Fatalf("resolving %s: %v", DefaultEndpoint, err)
 	}
 
 	u, err := url.Parse(raw)
 	if err != nil {
-		testutil.SkipOnUpstreamFailure(t, err)
 		t.Fatalf("%s resolves to %q, which does not parse: %v", DefaultEndpoint, raw, err)
 	}
 

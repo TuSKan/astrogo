@@ -16,46 +16,6 @@ var skipCall = regexp.MustCompile(`^\s*\w+\.Skipf?\(`)
 // does not count.
 var errGuard = regexp.MustCompile(`^\s*if (?:[\w, ]+ :?= [^;]+; )?(\w*[eE]rr) != nil \{\s*$`)
 
-// allowedSkip is a skip on a bare error that is genuinely about the machine the
-// test is running on rather than about anything astrogo did.
-type allowedSkip struct {
-	file    string // repository-relative, forward slashes
-	message string // a distinctive substring of the skip message
-	why     string // not read by the test; here because the exemption has to argue itself
-}
-
-// The whole allowlist. Each entry is an environment precondition: something the
-// test needs that has nothing to do with the code under test and that no
-// classifier could sensibly be taught.
-//
-// Matched on the message rather than on a line number, so the exemption is tied
-// to the thing being exempted and survives the file moving around it.
-var allowedSkips = []allowedSkip{{
-	file:    "atmosphere/dataset/cams/ground_truth_test.go",
-	message: "real CAMS file not present",
-	why:     "a licensed file staged by hand; absent on every machine but one",
-}, {
-	file:    "catalog/gaia/gaia_network_test.go",
-	message: "is not resolvable",
-	why:     "remote.URL refuses a disabled endpoint or an offline process, both deliberate",
-}, {
-	file:    "catalog/gaia/gaia_validation_test.go",
-	message: "is not resolvable",
-	why:     "as above",
-}, {
-	file:    "internal/testutil/unreachable_test.go",
-	message: "cannot listen",
-	why:     "the test needs to open a listener; a sandbox that forbids it is not a defect here",
-}, {
-	file:    "remote/unreachable_chain_test.go",
-	message: "cannot reserve a local port",
-	why:     "as above",
-}, {
-	file:    "remote/file/localfs_test.go",
-	message: "cannot create a symlink here",
-	why:     "Windows needs a privilege for symlinks that an ordinary account does not have",
-}}
-
 // TestSkipsOnAnErrorAreClassified is the rule that a test may not skip on an
 // error it has not identified.
 //
@@ -82,10 +42,23 @@ var allowedSkips = []allowedSkip{{
 // right. A shallow check that cannot be argued with is worth more here than a
 // clever one that gets waived.
 //
-// # What is exempt
+// # There is no exemption list
 //
-// An environment precondition — see allowedSkips, where each entry says what it
-// is and why no classifier applies. Those are about the machine, not the code.
+// There was one, briefly, holding eight environment preconditions: a licensed
+// file staged by hand, an endpoint switched off, a listener, a port, a Windows
+// symlink privilege. Every one of them turned out to have a specific condition
+// it meant and was skipping on any error from the same call, which is this
+// defect one level down — so they were classified instead and the list went
+// away.
+//
+// One of them is the argument for not having a list. The symlink skips were
+// exempt because "Windows needs a privilege" is obviously an environment
+// matter. It is, and the obvious predicate for it does not work:
+// ERROR_PRIVILEGE_NOT_HELD does not satisfy errors.Is(err, fs.ErrPermission),
+// which the exemption would have gone on hiding.
+//
+// An environment precondition is still a fine reason to skip. It just has to
+// say which one, like everything else.
 func TestSkipsOnAnErrorAreClassified(t *testing.T) {
 	root := filepath.Join("..", "..")
 
@@ -152,7 +125,7 @@ func TestSkipsOnAnErrorAreClassified(t *testing.T) {
 				continue
 			}
 
-			if allowed(slash, line) || mentionsAny(lines[j:i], classifiers) {
+			if mentionsAny(lines[j:i], classifiers) {
 				continue
 			}
 
@@ -164,7 +137,8 @@ func TestSkipsOnAnErrorAreClassified(t *testing.T) {
 				"  testutil.SkipOnUpstreamFailure(t, err) for a service having a bad day,\n"+
 				"  testutil.Unreachable(err) for a request the network never carried, and\n"+
 				"  t.Fatal for everything else — which is the part astrogo can fix.\n"+
-				"  An environment precondition goes in allowedSkips with its reason.",
+				"  An environment precondition is a fine reason to skip; name the\n"+
+				"  condition it means, rather than skipping on any error from the call.",
 				slash, i+1, strings.TrimSpace(line))
 		}
 
@@ -179,18 +153,6 @@ func TestSkipsOnAnErrorAreClassified(t *testing.T) {
 	}
 
 	t.Logf("%d test files checked, %d unclassified skips", checked, offenders)
-}
-
-// allowed reports whether this skip is one of the documented environment
-// preconditions.
-func allowed(file, line string) bool {
-	for _, a := range allowedSkips {
-		if a.file == file && strings.Contains(line, a.message) {
-			return true
-		}
-	}
-
-	return false
 }
 
 // mentionsAny reports whether any of the needles appears in the block.
