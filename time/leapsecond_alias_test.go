@@ -3,6 +3,7 @@ package time
 import (
 	"bytes"
 	"log/slog"
+	"math"
 	"strings"
 	"sync"
 	"testing"
@@ -11,42 +12,70 @@ import (
 	"github.com/TuSKan/astrogo/logging"
 )
 
-// TestLeapSecondIsStillAliased pins the defect the warning exists to announce.
+// TestLeapSecondIsItsOwnInstant is #144, and replaces the test that pinned
+// the defect.
 //
-// This is deliberately an assertion that the wrong thing still happens. #144
-// weighs three options; this change takes the cheap two (report it, document
-// it) and leaves the expensive one — letting the UTC day run to 86401 seconds
-// the way iauDtf2d does — undecided. Should someone take it, this test fails,
-// and its failure is the signal to delete the warning rather than to restore
-// the aliasing.
-func TestLeapSecondIsStillAliased(t *testing.T) {
+// That test asserted 23:59:60 still landed on the following midnight, and said
+// that if it ever failed because the leap second had become representable, the
+// warning and the test should be deleted rather than the aliasing restored.
+// It did, and they were.
+//
+// 23:59:60 is now 86400/86401 of the way through 2016-12-31 — iauDtf2d's
+// convention — which puts it strictly between 23:59:59 and the next midnight,
+// one second from each.
+func TestLeapSecondIsItsOwnInstant(t *testing.T) {
+	before := Date(2016, 12, 31, 23, 59, 59, 0, stdtime.UTC)
 	leap := Date(2016, 12, 31, 23, 59, 60, 0, stdtime.UTC)
 	next := Date(2017, 1, 1, 0, 0, 0, 0, stdtime.UTC)
 
 	leap1, leap2 := leap.JDParts()
 	next1, next2 := next.JDParts()
 
-	if leap1 != next1 || leap2 != next2 {
-		t.Fatalf("23:59:60 no longer aliases the following midnight: (%.1f, %.15f) vs (%.1f, %.15f)\n"+
-			"  If that is because the leap second is now representable, #144 is fixed:\n"+
-			"  delete the warning in leapsecond_alias.go along with this test.",
-			leap1, leap2, next1, next2)
+	if leap1 == next1 && leap2 == next2 {
+		t.Fatal("23:59:60 still aliases the following midnight")
+	}
+
+	// The value iauDtf2d gives: 0h on 2016-12-31 is JD 2457753.5, and the
+	// fraction is of an 86401-second day.
+	want := 2457753.5 + 86400.0/86401.0
+	if got := leap.JD(); math.Abs(got-want)*86400 > 1e-6 {
+		t.Errorf("JD(2016-12-31 23:59:60) = %.12f, want %.12f", got, want)
+	}
+
+	if !before.Before(leap) || !leap.Before(next) {
+		t.Error("23:59:60 is not between 23:59:59 and the following midnight")
+	}
+
+	// One SI second either side, measured physically.
+	for _, c := range []struct {
+		name string
+		a, b Time
+	}{
+		{"23:59:59 to 23:59:60", before, leap},
+		{"23:59:60 to 00:00:00", leap, next},
+	} {
+		if got := c.b.Sub(c.a).Seconds(); math.Abs(got-1) > 1e-6 {
+			t.Errorf("%s spans %.9f s, want 1", c.name, got)
+		}
 	}
 }
 
-// TestDateReportsTheAliasing is the wiring: everything else here exercises
-// logLeapSecondAliased directly, so without this a Date that never called it
-// would still pass the whole file.
+// TestDateReportsASecondThatNeverExisted is the wiring for the warning that
+// remains: a second of 60 on a day that gained no leap second names an instant
+// UTC never had, and Date, with no error to return, says so.
+//
+// The real leap second must stay quiet now that it is represented — a warning
+// on a correct answer is noise a caller learns to filter, and then misses the
+// one that matters.
 //
 // The sync.Once is reset rather than worked around, because the property under
-// test is "the first Date to alias a leap second reports it" and any test
-// running earlier would otherwise have spent it. Not parallel, for that reason
-// and because it swaps the process-wide logger.
-func TestDateReportsTheAliasing(t *testing.T) {
+// test is "the first Date to name such a second reports it". Not parallel, for
+// that reason and because it swaps the process-wide logger.
+func TestDateReportsASecondThatNeverExisted(t *testing.T) {
 	defer logging.Set(nil)
 
-	warnLeapSecondAliasedOnce = sync.Once{}
-	defer func() { warnLeapSecondAliasedOnce = sync.Once{} }()
+	warnSecondOutOfRangeOnce = sync.Once{}
+	defer func() { warnSecondOutOfRangeOnce = sync.Once{} }()
 
 	var buf bytes.Buffer
 
@@ -54,15 +83,20 @@ func TestDateReportsTheAliasing(t *testing.T) {
 
 	Date(2016, 12, 31, 23, 59, 60, 0, stdtime.UTC)
 
-	if !strings.Contains(buf.String(), "leap second not representable") {
-		t.Errorf("Date aliased a leap second without reporting it; logger saw:\n%q", buf.String())
+	if buf.String() != "" {
+		t.Errorf("Date warned about a real leap second, which it now represents:\n%q", buf.String())
 	}
 
-	// An ordinary second must stay quiet, or the warning becomes noise a
-	// caller learns to filter out.
+	Date(2016, 6, 30, 23, 59, 60, 0, stdtime.UTC)
+
+	if !strings.Contains(buf.String(), "second out of range") {
+		t.Errorf("Date normalised a second that never existed without reporting it; logger saw:\n%q",
+			buf.String())
+	}
+
 	buf.Reset()
 
-	warnLeapSecondAliasedOnce = sync.Once{}
+	warnSecondOutOfRangeOnce = sync.Once{}
 
 	Date(2016, 12, 31, 23, 59, 59, 0, stdtime.UTC)
 
@@ -71,44 +105,35 @@ func TestDateReportsTheAliasing(t *testing.T) {
 	}
 }
 
-// TestLeapSecondAliasWarningIsAWarningNotProgress: Date has no error return,
-// so this message is the only notice a caller gets that the instant they built
-// is one second away from the instant they asked for. Demoted to Info it would
-// vanish under the default logger and the loss would be silent again — which
-// #144 names as the worst property of the current behaviour.
-func TestLeapSecondAliasWarningIsAWarningNotProgress(t *testing.T) {
+// TestSecondOutOfRangeIsAWarningNotProgress: Date has no error return, so this
+// message is the only notice a caller gets that the instant they built is not
+// the one they asked for. Demoted to Info it would vanish under the default
+// logger and the loss would be silent.
+func TestSecondOutOfRangeIsAWarningNotProgress(t *testing.T) {
 	// Not parallel: it swaps the process-wide logger.
 	defer logging.Set(nil)
 
 	var buf bytes.Buffer
 
-	// Info-and-above, so a demotion to Info is caught by the level assertion
-	// below rather than by an empty buffer.
 	logging.Set(slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{
 		Level: slog.LevelInfo,
 	})))
 
-	// Called directly rather than through warnLeapSecondAliased, whose
-	// sync.Once would be spent by whichever test ran first.
-	logLeapSecondAliased(2016, 12, 31, 23, 59, 60)
+	// Called directly rather than through warnSecondOutOfRange, whose sync.Once
+	// would be spent by whichever test ran first.
+	logSecondOutOfRange(2016, 6, 30, 23, 59, 60)
 
 	out := buf.String()
 
-	if out == "" {
-		t.Fatal("the leap-second warning wrote nothing to the installed logger")
-	}
-
 	if !strings.Contains(out, "level=WARN") {
-		t.Errorf("the leap-second message is not at WARN:\n%s\n"+
-			"  The default logger drops everything below WARN, so demoting this "+
-			"would make the aliasing silent again.", out)
+		t.Errorf("the message is not at WARN:\n%s\n"+
+			"  The default logger drops everything below WARN.", out)
 	}
 
 	for _, want := range []string{
-		`msg="leap second not representable, instant moved to the following midnight"`,
-		"utc=2016-12-31T23:59:60Z",
-		"delta_at_applied=37",
-		"delta_at_correct=36",
+		`msg="second out of range, instant normalised into the following minute"`,
+		"utc=2016-06-30T23:59:60Z",
+		"reason=",
 		"remedy=",
 	} {
 		if !strings.Contains(out, want) {
@@ -117,30 +142,40 @@ func TestLeapSecondAliasWarningIsAWarningNotProgress(t *testing.T) {
 	}
 }
 
-// TestSecondSixtyOnAnOrdinaryDayIsNotCalledALeapSecond: 2016-06-30 has no leap
-// second at its end, so 23:59:60 there is not an instant this type cannot hold
-// — it is an instant that never happened. Reporting the two the same way would
-// tell a caller their timestamp is a known limitation of the library when in
-// fact their data is wrong.
-func TestSecondSixtyOnAnOrdinaryDayIsNotCalledALeapSecond(t *testing.T) {
-	defer logging.Set(nil)
+// TestDateBuildsTheLeapSecondThroughAnyZone: a leap second is inserted at the
+// end of a UTC day, so in UTC+13 the 2016 one is 2017-01-01 12:59:60 local. The
+// day is decided in UTC, and the instant built must be the same one.
+func TestDateBuildsTheLeapSecondThroughAnyZone(t *testing.T) {
+	t.Parallel()
 
-	var buf bytes.Buffer
+	east := stdtime.FixedZone("UTC+13", 13*3600)
 
-	logging.Set(slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{
-		Level: slog.LevelInfo,
-	})))
+	local := Date(2017, stdtime.January, 1, 12, 59, 60, 500_000_000, east)
+	utc := Date(2016, stdtime.December, 31, 23, 59, 60, 500_000_000, stdtime.UTC)
 
-	logLeapSecondAliased(2016, 6, 30, 23, 59, 60)
+	if !local.Equal(utc) {
+		t.Errorf("12:59:60.5 in UTC+13 = JD %.12f, 23:59:60.5 UTC = JD %.12f; the same instant",
+			local.JD(), utc.JD())
+	}
+}
 
-	out := buf.String()
+// TestSecondSixtyOneIsNotALeapSecond: the leap day's last minute has 61
+// seconds, numbered 0 through 60. A 61st second is not a longer leap second but
+// an instant that never existed, and gets the warning's treatment rather than a
+// representation.
+func TestSecondSixtyOneIsNotALeapSecond(t *testing.T) {
+	t.Parallel()
 
-	if !strings.Contains(out, "second out of range") {
-		t.Errorf("23:59:60 on a day with no leap second was reported as a leap second:\n%s", out)
+	if _, ok := dateInLeapSecond(2016, stdtime.December, 31, 23, 59, 61, 0, stdtime.UTC); ok {
+		t.Error("23:59:61 was accepted as a leap second")
 	}
 
-	if strings.Contains(out, "delta_at_applied") {
-		t.Errorf("a non-existent second was given a ΔAT comparison, which implies it is real:\n%s", out)
+	if _, ok := dateInLeapSecond(2016, stdtime.December, 31, 23, 59, 60, 999_999_999, stdtime.UTC); !ok {
+		t.Error("23:59:60.999999999 was refused, but it is inside the inserted second")
+	}
+
+	if _, ok := dateInLeapSecond(2016, stdtime.June, 30, 23, 59, 60, 0, stdtime.UTC); ok {
+		t.Error("23:59:60 on 2016-06-30, which gained no leap second, was accepted")
 	}
 }
 

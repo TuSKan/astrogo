@@ -91,7 +91,10 @@ func NewContext(t time.Time, site *Geodetic, atm atmosphere.Refraction) *Context
 	// AtTime can later recompute mat from a fresh Earth Rotation Angle
 	// alone without rebuilding the slow precession-nutation/polar-motion
 	// factors. Bit-identical to a direct C2t06a call.
-	ut1, ut2 := jd1, jd2+eop.DUT1/86400.0
+	// UT1 through time rather than by adding DUT1 to the UTC Julian Date: on
+	// a day that ends in a leap second that date's fraction is of 86401
+	// seconds, and the sum would misplace Earth's rotation by up to a second.
+	ut1, ut2 := t.UT1Using(eop.DUT1).JDParts()
 	tt1, tt2 := t.TT().JDParts()
 	rc2i := gofaext.C2i06a(tt1, tt2)
 	sp := gofaext.Sp00(tt1, tt2)
@@ -197,8 +200,9 @@ func icrsFromTIRS(mat [3][3]float64, tirs vector.Vec3) vector.Vec3 {
 // periodically rather than calling AtTime indefinitely far from ctx.Time().
 func (ctx *Context) AtTime(t time.Time) *Context {
 	t = t.UTC()
-	jd1, jd2 := t.JDParts()
-	ut1, ut2 := jd1, jd2+ctx.eop.DUT1/86400.0
+	// The cached DUT1, applied by time so that a leap-second day is handled;
+	// see the same step in NewContext.
+	ut1, ut2 := t.UT1Using(ctx.eop.DUT1).JDParts()
 	era := gofaext.Era00(ut1, ut2)
 
 	c := ctx.Clone()

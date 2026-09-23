@@ -14,11 +14,28 @@ import (
 // is about 40 µs, so a whole-second value comes back a picosecond or so off.
 // The quantity under test is a leap second, and 1 µs is eleven orders of
 // magnitude below it.
+//
+// # Why the UTC side is read through the standard library
+//
+// ΔAT is TAI's label minus UTC's, and a UTC Julian Date stopped being a
+// uniform label when leap seconds became representable (#144): on a day that
+// ends in one, its fraction is of 86401 seconds, so subtracting it from TAI's
+// at noon on 2016-12-31 gave 36.4999942 s — half a second times 86400/86401
+// too much. That is SOFA's convention and SOFA's own warning, and this helper
+// was relying on the old one. The standard library's count of seconds is the
+// uniform UTC label, so the UTC side comes from there, split into whole days
+// and seconds of the day so that nothing near 2.46e6 is subtracted.
 func taiMinusUTCSeconds(when time.Time) float64 {
-	u1, u2 := when.UTC().JDParts()
+	const unixEpochJD = 2440587.5
+
+	g := when.UTC().ToGo()
+	unix := float64(g.Unix())
+	days := math.Floor(unix / 86400)
+	secOfDay := (unix - days*86400) + float64(g.Nanosecond())/1e9
+
 	a1, a2 := when.TAI().JDParts()
 
-	return ((a1 - u1) + (a2 - u2)) * 86400.0
+	return ((a1-unixEpochJD-days)+a2)*86400.0 - secOfDay
 }
 
 // TestRegisterLeapSecondsRejectsAnEmptyTable pins that a Reader carrying no

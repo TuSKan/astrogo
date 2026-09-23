@@ -139,42 +139,48 @@
 // shrinking: the most recent leap second was 2016-12-31, none is currently
 // scheduled, and the 2022 CGPM resolution abandons them by 2035.
 //
-// # The second you cannot express
+// # 23:59:60
 //
-// [Date] is the escape from a smeared clock, and it has a boundary of its own.
-// A [Time] holds a two-part Julian Date whose day is 86400 seconds long, so
-// there is no room in it for the second UTC labels 23:59:60. Asked for one,
-// [Date] normalises it onto the following midnight:
+// [Time] represents a leap second. [Date] builds 2016-12-31 23:59:60 as an
+// instant of its own, one SI second after 23:59:59 and one before the
+// following midnight, and it converts with the ΔAT that IERS and gofa both
+// give the inserted second — the old value, 36, not the 37 that starts at
+// midnight.
 //
-//	Date(2016, 12, 31, 23, 59, 60, 0, UTC) == Date(2017, 1, 1, 0, 0, 0, 0, UTC)
+// It does so by SOFA's convention. The fraction in a UTC Julian Date is a
+// fraction of *that day's* length, which is 86401 seconds on a day ending in a
+// leap second, so 23:59:60 sits at 86400/86401 of the day — iauDtf2d exactly,
+// and what astropy does through ERFA. On every ordinary day the two readings
+// coincide and nothing changed. utcday.go has the details, and #144 the
+// argument; before it, 23:59:60 landed on the following midnight and was
+// converted a full second wrong.
 //
-// The inserted second is one second wide in reality and zero seconds wide in
-// this type. That is not only a labelling problem, because ΔAT differs across
-// the boundary — IERS and gofa both give the inserted second the *old* value,
-// 36 rather than 37 — so an aliased instant is converted with the wrong offset
-// and lands a full second away.
+// Three consequences worth knowing:
 //
-// Twenty-seven such seconds exist in all of history, and none since 2016. What
-// makes them worth a paragraph is not their number but that the loss used to
-// be silent: a plausible epoch, one second wrong, with nothing reported.
-// [Date] now emits a [logging] warning for any second of 60 or more, saying
-// whether the day in question carried a real leap second or whether the
-// timestamp names an instant that never existed at all.
+//   - Do not subtract two UTC Julian Dates across a leap-second day. Their
+//     fractions are of days of different lengths, so the difference is neither
+//     the labels nor the elapsed time. [Time.Sub] measures elapsed time, and
+//     does it correctly; SOFA's documentation gives the same warning.
+//   - The standard library's time.Time cannot hold 23:59:60. [Time.ToGo] gives
+//     what time.Date itself makes of one — the following midnight — and every
+//     other instant converts exactly.
+//   - [Time.Calendar]'s day fraction is of the day's own length, so it stays in
+//     [0, 1) through the leap second.
 //
-// The mirror case has never happened and is now expected to. A negative leap
+// A second UTC never labelled is still reported rather than built: 23:59:60 on
+// a day that gained no leap second, 23:59:61 anywhere, and 23:59:59 on the day
+// of a negative leap second. [Date] has no error to return, so it does what the
+// standard library does — rolls the second into the following minute — and
+// emits a [logging] warning, because a timestamp one second wrong looks exactly
+// like one that is right.
+//
+// That last case has never happened and is now expected to. A negative leap
 // second removes the last second of a day — 23:59:58 is followed directly by
-// 00:00:00 — and [Time] can no more say a civil second is absent than it can
-// say one is present. The ITU-R has permitted one since 1972 and none has been
-// announced; Levine, Tavella & Milton (2023) project one by about 2030 and
-// warn that because they "have never happened ... it is almost a certainty
-// that there will be widespread errors in realizing the event". [Date] reports
-// a 23:59:59 that a registered ΔAT record says was removed, on the same terms
-// as the positive case. Nothing in the published record triggers it today,
-// which is exactly why it is written now rather than then.
-//
-// If you have data with real 23:59:60 timestamps in it, hold those instants in
-// TAI, which has no leap seconds to label and no ambiguity across the step.
-// SOFA's own answer is different — iauDtf2d lets the UTC day run to 86401
-// seconds — and adopting it here would touch every conversion in this package.
-// That has not been done; see https://github.com/TuSKan/astrogo/issues/144.
+// 00:00:00. The ITU-R has permitted one since 1972 and none has been announced;
+// Levine, Tavella & Milton (2023) project one by about 2030 and warn that
+// because they "have never happened ... it is almost a certainty that there
+// will be widespread errors in realizing the event". The representation above
+// handles it on the same terms, the day running to 86399 seconds, and a caller
+// who registers the announcement through [RegisterLeapSeconds] gets it before
+// gofa's table does.
 package time

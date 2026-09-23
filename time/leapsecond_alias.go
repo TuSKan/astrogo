@@ -10,42 +10,33 @@ import (
 	"github.com/TuSKan/astrogo/logging"
 )
 
-// A leap second is one second wide in reality and zero seconds wide in this
-// type. UTC labels the inserted second 23:59:60, and [Time] holds a two-part
-// Julian Date whose day is 86400 seconds long, so that label has nowhere to
-// land: [Date] normalises it onto the following midnight, where it is
-// indistinguishable from an instant one second later.
+// Seconds that were never labelled, and what Date does when asked for one.
 //
-// The consequence is measurable rather than theoretical. IERS and gofa agree
-// that the inserted second carries the *old* ΔAT:
+// A real leap second is an instant of its own: [Date] builds 2016-12-31
+// 23:59:60 on the day's 86401st second, where it carries the ΔAT of 36 that
+// IERS and gofa both give it — see utcday.go, and #144 for the argument. It
+// used to land on the following midnight, one second late and with the new ΔAT
+// of 37, and this file used to exist to say so.
 //
-//	2016-12-31 23:59:59 -> 36
-//	2016-12-31 23:59:60 -> 36     the leap second itself
-//	2017-01-01 00:00:00 -> 37     the step instant
-//
-// An aliased instant therefore gets 37 where the authority says 36 — a full
-// second of error, in the one place a time library is expected to be exact.
-//
-// SOFA does have a representation for this: iauDtf2d lets the UTC day run to
-// 86401 seconds, so 23:59:60 gets a two-part JD of its own. Adopting it is not
-// a local change — every conversion in this package divides by 86400 — so this
-// file does the next thing, which is to make the loss audible. See #144 for
-// the full argument and the options that were weighed.
+// What is left here is the second that was never real. A second of 60 on a day
+// that gained no leap second, a second of 61 or more anywhere, and 23:59:59 on
+// the day of a negative leap second name instants UTC never had. [Date] has no
+// error to return, so it does what the standard library's time.Date does —
+// rolls the second into the following minute — and reports it, because a
+// timestamp one second wrong looks exactly like one that is right.
 
-var warnLeapSecondAliasedOnce sync.Once
+var warnSecondOutOfRangeOnce sync.Once
 
-// warnLeapSecondAliased reports, once per process, that a calendar instant
-// with second ≥ 60 was normalised away.
+// warnSecondOutOfRange reports, once per process, that a calendar instant
+// named a second UTC never labelled, and was normalised into the next minute.
 //
 // Once per process rather than per call, matching [warnEOPUnavailable]: a
-// caller iterating a corpus that crosses a leap second would otherwise get one
-// line per row, and the attributes on the first line already name the instant
-// and the size of the error. The condition is a property of the type, not of
-// the particular timestamp, so the second report would add nothing.
-func warnLeapSecondAliased(year int, month time.Month, day, hour, minute, second int, loc *time.Location) {
-	warnLeapSecondAliasedOnce.Do(func() {
+// caller iterating a corpus of bad timestamps would otherwise get one line per
+// row, and the first line already names the instant.
+func warnSecondOutOfRange(year int, month time.Month, day, hour, minute, second int, loc *time.Location) {
+	warnSecondOutOfRangeOnce.Do(func() {
 		y, m, d, hh, mm := utcComponents(year, month, day, hour, minute, loc)
-		logLeapSecondAliased(y, int(m), d, hh, mm, second)
+		logSecondOutOfRange(y, int(m), d, hh, mm, second)
 	})
 }
 
@@ -70,33 +61,14 @@ func utcComponents(year int, month time.Month, day, hour, minute int, loc *time.
 	return u.Year(), u.Month(), u.Day(), u.Hour(), u.Minute()
 }
 
-// logLeapSecondAliased writes the warning, separately from the [sync.Once]
+// logSecondOutOfRange writes the warning, separately from the [sync.Once]
 // that rations it — split out for the same reason as [logEOPUnavailable], so a
 // test can assert on the message and its level without depending on which test
 // happened to spend the Once first.
-func logLeapSecondAliased(y, m, d, hour, minute, second int) {
+func logSecondOutOfRange(y, m, d, hour, minute, second int) {
 	// Warn, not Info, and so still emitted by the default logger. Date has no
 	// error return, and this is the only notice a caller gets that the instant
 	// they asked for is not the instant they received.
-	if second == 60 && leapSecondEndsDay(y, m, d) {
-		logging.Warn("leap second not representable, instant moved to the following midnight",
-			"utc", isoSecond(y, m, d, hour, minute, second),
-			"error", "1 s",
-			"delta_at_applied", deltaAT(nextDay(y, m, d)),
-			// The inserted second carries the ΔAT in force throughout the day
-			// it ends, which is what a mid-day lookup returns. Asked at the
-			// day's own boundary the answer depends on which side gofa rounds
-			// to, and the boundary is the thing under discussion.
-			"delta_at_correct", deltaAT(y, m, d, 0.5),
-			"remedy", "hold instants inside a leap second in TAI; UTC cannot label them")
-
-		return
-	}
-
-	// Second 60 on a day with no leap second, or second > 60 anywhere, is not
-	// a representation limit — it is an instant that never existed. Go's
-	// time.Date rolls it into the next minute, which is documented but silent,
-	// and a wrong-by-a-second epoch looks exactly like a right one.
 	logging.Warn("second out of range, instant normalised into the following minute",
 		"utc", isoSecond(y, m, d, hour, minute, second),
 		"reason", "no leap second was inserted at the end of this UTC day",

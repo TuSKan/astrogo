@@ -327,10 +327,13 @@ func (r *Reader) leapSecondsAt(jdTDB float64) float64 {
 }
 
 // j2000JD is the Julian Date of the J2000.0 epoch, and secondsPerDay the
-// length of a Julian day.
+// length of a Julian day. j2000Unix is J2000.0 as a Unix count of seconds —
+// 2000-01-01 12:00:00 UTC — which is where UTCToET's count of UTC labels
+// starts.
 const (
 	j2000JD       = 2451545.0
 	secondsPerDay = 86400.0
+	j2000Unix     = 946728000
 )
 
 // UTCToET converts a time directly to ephemeris seconds past J2000 — the
@@ -415,9 +418,16 @@ func UTCToET(t time.Time, l *Reader) float64 {
 		return ((td1 - j2000JD) + td2) * secondsPerDay
 	}
 
-	// Seconds of UTC past J2000, with the epoch removed from the day number
-	// before the fraction is added back.
-	secUTC := ((d1 - j2000JD) + d2) * secondsPerDay
+	// Seconds of UTC past J2000, counted as labels with every day 86400
+	// seconds — the count ΔAT is added to. Read from the standard library's
+	// uniform count rather than from the Julian Date, whose fraction on a day
+	// ending in a leap second is of 86401 seconds (#144). The leap second
+	// itself shares a label with the following midnight here, which is why
+	// the lookup below stays on the Julian Date: that one is still on the
+	// leap day through 23:59:60, and so still returns the old ΔAT, which is
+	// the one the inserted second carries.
+	g := utc.ToGo()
+	secUTC := float64(g.Unix()-j2000Unix) + float64(g.Nanosecond())/1e9
 
 	// The leap-second lookup only needs to land in the right interval, so the
 	// summed Julian Date is precise enough for it.
