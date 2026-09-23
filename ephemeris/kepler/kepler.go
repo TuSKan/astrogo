@@ -535,14 +535,31 @@ func rotatePerifocalToEcliptic(v vector.Vec3, incl, node, argp angle.Angle) vect
 
 // rotateEclipticToEquatorialJ2000 transforms a J2000 mean ecliptic vector
 // into the ICRS-aligned mean equatorial frame by rotating about the
-// shared vernal-equinox (X) axis by the FIXED J2000 mean obliquity
-// (constants.IAU.ObliquityJ2000) — deliberately not gofaext.Obl06(t)'s
-// epoch-of-date obliquity. Elements are referred to the J2000 ecliptic
+// shared vernal-equinox (X) axis by the FIXED obliquity that defines the
+// J2000 ecliptic of published elements (elementsEclipticObliquity) —
+// deliberately not gofaext.Obl06(t)'s epoch-of-date obliquity. Elements are referred to the J2000 ecliptic
 // by definition, so mixing in an epoch-of-date obliquity here would
 // introduce a spurious drift unrelated to the orbit's own real motion.
 func rotateEclipticToEquatorialJ2000(v vector.Vec3) vector.Vec3 {
-	return v.RotateX(constants.IAU.ObliquityJ2000.Value)
+	return v.RotateX(elementsEclipticObliquity)
 }
+
+// elementsEclipticObliquity is the obliquity that defines the J2000 ecliptic
+// published osculating elements are referred to: 84381.448″, the IAU 1976
+// value. Every Horizons ELEMENTS table is headed "IAU76/J2000 helio. ecliptic
+// osc. elements", and SBDB's elements are the same solution.
+//
+// It is not constants.IAU.ObliquityJ2000, the IAU 2006 value of 84381.406″,
+// which is right for a mean obliquity in a precession model and wrong here:
+// the 0.042″ between them is a rotation about the equinox, and rotating JPL's
+// elements by the IAU 2006 value tilted every position this package produced
+// from them — 33 km for C/2023 A3 at 2.5 AU, and the 0.04″ at dt = 0 that the
+// 433 Eros validation had put down to perturbations (#391).
+//
+// Standish's approximate planetary elements, of which PlutoElements is a row,
+// convert with 23.43928° (84381.408″). Rotating them by this value instead
+// moves Pluto by 0.040″, against the 0.14 AU its own two-body fit is off by.
+const elementsEclipticObliquity = 84381.448 * math.Pi / 648000
 
 // StateAt returns el's heliocentric position (AU) and velocity (AU/day)
 // at time t, in the ICRS-aligned mean equatorial frame, via two-body
