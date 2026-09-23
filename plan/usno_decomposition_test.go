@@ -88,7 +88,7 @@ import (
 // an error three thousand times larger. [gofaext.Atci13] returns eo for
 // exactly this, and the classical apparent right ascension is ri - eo.
 //
-// The centre. USNO's GHA and declination are geocentric; the navigator
+// The center. USNO's GHA and declination are geocentric; the navigator
 // applies parallax separately, which is why the response carries it as its
 // own correction. astrogo's [coord.Context] is built for a site, so
 // AstrometricToCIRS through it is *topocentric* — up to 8.8 arcseconds
@@ -309,8 +309,8 @@ func usnoNavigationalBody(name string) (eph.ID, bool) {
 		// of what this test taught.
 		//
 		// USNO's celnav tabulates them the way the Nautical Almanac does: at
-		// the centre of the *illuminated disc*, because that is what a
-		// navigator sights. Horizons and astrogo give the geometric centre.
+		// the center of the *illuminated disc*, because that is what a
+		// navigator sights. Horizons and astrogo give the geometric center.
 		// Comparing the two is a category error, not a measurement.
 		//
 		// It is large. Venus on 2026-09-23 at 0.393 AU: astrogo differs from
@@ -322,7 +322,7 @@ func usnoNavigationalBody(name string) (eph.ID, bool) {
 		//
 		// Not parallax: USNO returns identical GHA and declination for
 		// Greenwich, Sydney and the origin, so its values are geocentric.
-		// The magnitude fits a crescent's centre of light — Venus's
+		// The magnitude fits a crescent's center of light — Venus's
 		// semidiameter at that distance is 21.4", and the offset measures
 		// 14.4" on the sky.
 		//

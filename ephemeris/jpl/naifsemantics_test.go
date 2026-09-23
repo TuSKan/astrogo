@@ -7,16 +7,16 @@ import (
 	"github.com/TuSKan/astrogo/ephemeris/jpl"
 )
 
-// TestNAIFMappingIsTheDocumentedMixOfCentresAndBarycentres pins which kind of
+// TestNAIFMappingIsTheDocumentedMixOfCentersAndBarycenters pins which kind of
 // point each body identifier means.
 //
 // The mapping holds two kinds of point at once: 199, 299 and 399 are body
-// centres, while 4, 5, 6, 7 and 8 are system barycentres. That is not a
-// mistake — a planetary kernel contains only barycentres for the giant
+// centers, while 4, 5, 6, 7 and 8 are system barycenters. That is not a
+// mistake — a planetary kernel contains only barycenters for the giant
 // planets, because their satellite systems live in separate kernels — but it
 // is invisible from the identifier, and it is worth tens of milliarcseconds.
 //
-// Measured against Horizons' body-centre commands over 2026: 0.0497 arcsec at
+// Measured against Horizons' body-center commands over 2026: 0.0497 arcsec at
 // Uranus, 0.0324 at Jupiter, 0.0288 at Saturn, 0.0093 at Neptune, and zero at
 // Mars. Far inside every tolerance astrogo publishes, and far outside what
 // someone comparing Jupiter against Horizons' default `599` expects — it reads
@@ -26,13 +26,13 @@ import (
 // on core.ID and NAIFFor state these numbers; if the mapping moves, they
 // become wrong silently, and a wrong statement about which point a coordinate
 // refers to is worse than no statement.
-func TestNAIFMappingIsTheDocumentedMixOfCentresAndBarycentres(t *testing.T) {
+func TestNAIFMappingIsTheDocumentedMixOfCentersAndBarycenters(t *testing.T) {
 	t.Parallel()
 
 	for _, tc := range []struct {
 		body       core.ID
 		naif       int
-		barycentre bool
+		barycenter bool
 	}{
 		{core.Sun, 10, false},
 		{core.Moon, 301, false},
@@ -59,16 +59,16 @@ func TestNAIFMappingIsTheDocumentedMixOfCentresAndBarycentres(t *testing.T) {
 					"NAIFFor name this number and would now be wrong", tc.body, got, tc.naif)
 			}
 
-			// NAIF's own convention: a bare 1-9 is a system barycentre, and
-			// the body centre is that number times 100 plus the same digit.
+			// NAIF's own convention: a bare 1-9 is a system barycenter, and
+			// the body center is that number times 100 plus the same digit.
 			// So the kind of point is readable from the identifier itself,
 			// which is what makes this checkable rather than a matter of
 			// remembering.
-			if isBarycentre := got < 10; isBarycentre != tc.barycentre {
-				kind := map[bool]string{true: "a system barycentre", false: "a body centre"}
+			if isBarycenter := got < 10; isBarycenter != tc.barycenter {
+				kind := map[bool]string{true: "a system barycenter", false: "a body center"}
 
 				t.Errorf("NAIFFor(%s) = %d, which is %s; the documentation says %s",
-					tc.body, got, kind[isBarycentre], kind[tc.barycentre])
+					tc.body, got, kind[isBarycenter], kind[tc.barycenter])
 			}
 		})
 	}

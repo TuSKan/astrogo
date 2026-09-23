@@ -35,7 +35,7 @@ func TestProvidersLabelTheirFrame(t *testing.T) {
 	}
 
 	if st.Center != eph.CenterGeocenter {
-		t.Errorf("the analytical provider labels its origin %s, want geocentre", st.Center)
+		t.Errorf("the analytical provider labels its origin %s, want geocenter", st.Center)
 	}
 }
 

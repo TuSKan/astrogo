@@ -138,7 +138,7 @@ func GaiaGToJohnsonB(G, bpMinusRp float64) float64 {
 // G − R = 0.2125, which with G − V = −0.1525 from [GaiaGToJohnsonV] puts the
 // solar V − R at 0.365 against a published 0.35 to 0.36. The sign is the one
 // physical check that matters — G spans 330 to 1050 nm and R sits redward of
-// its centre, so a star is fainter in G than in R and G − R is positive for
+// its center, so a star is fainter in G than in R and G − R is positive for
 // anything cooler than a hot blue star.
 //
 // # Validity

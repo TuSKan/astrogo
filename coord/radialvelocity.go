@@ -194,7 +194,7 @@ func (ctx *Context) HeliocentricRVCorrection(target ICRS) (unit.Velocity, error)
 // the site's rotation is the dominant term, not a correction to it.
 //
 // The line of sight is topocentric, from the observer rather than from the
-// geocentre. For the Moon those differ by up to a degree.
+// geocenter. For the Moon those differ by up to a degree.
 func (ctx *Context) TopocentricRadialVelocity(posAU, velAUPerDay vector.Vec3) unit.Velocity {
 	auKM := constants.IAU.AstronomicalUnit.Value / 1000.0
 	dayS := constants.Derived.JulianDaySeconds.Value
@@ -247,7 +247,7 @@ func (ctx *Context) TopocentricRadialVelocity(posAU, velAUPerDay vector.Vec3) un
 // absolute velocity, and for agreeing with anyone else's absolute velocity.
 //
 // The terms omitted from even this are the ones that depend on the target
-// rather than the observer: the light-travel time to the barycentre, and the
+// rather than the observer: the light-travel time to the barycenter, and the
 // target's own proper motion and parallax changing the line of sight over the
 // crossing. Those need the target's distance and epoch, which a bare ICRS
 // direction does not carry.
@@ -269,7 +269,7 @@ func (ctx *Context) ObserverFrameShift() (float64, error) {
 	auMeters := constants.IAU.AstronomicalUnit.Value
 
 	// Heliocentric distance of the observer: Earth's, plus the observer's own
-	// offset from the geocentre. The offset is four parts in 100,000 of the
+	// offset from the geocenter. The offset is four parts in 100,000 of the
 	// distance and changes the solar term by a tenth of a millimetre per
 	// second, but it costs one addition.
 	helio := vector.V3(pvh[0][0], pvh[0][1], pvh[0][2]).Add(ctx.ObsVec()).Norm() * auMeters

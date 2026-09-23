@@ -32,7 +32,7 @@ func testHemisphere(nsgp float64) *hemisphere {
 	return h
 }
 
-// The pole lands at the centre and the galactic equator at the map's edge.
+// The pole lands at the center and the galactic equator at the map's edge.
 //
 // Those are the two ends of the radial coordinate, and between them they pin
 // the scale. Getting sqrt(1 - sin b) wrong — using the zenith angle, say —
@@ -48,7 +48,7 @@ func TestSFDProjectionRadialScale(t *testing.T) {
 		bDeg  float64
 		wantR float64
 	}{
-		{"the north galactic pole is the centre", 90, 0},
+		{"the north galactic pole is the center", 90, 0},
 		{"the galactic equator is at the full scale", 0, 2048},
 		{"30 degrees is sqrt(1/2) of the way out", 30, 2048 * math.Sqrt2 / 2},
 		{"60 degrees", 60, 2048 * math.Sqrt(1-math.Sqrt(3)/2)},
@@ -74,7 +74,7 @@ func TestSFDProjectionRadialScale(t *testing.T) {
 //
 // This matters beyond tidiness. The one improvement docs/skybrightness.md
 // records for the scattering integral is averaging the incoming field over a
-// quadrature cell instead of sampling its centre, and that is only a mean over
+// quadrature cell instead of sampling its center, and that is only a mean over
 // sky if the pixels carry equal solid angle.
 func TestSFDProjectionIsEqualArea(t *testing.T) {
 	t.Parallel()

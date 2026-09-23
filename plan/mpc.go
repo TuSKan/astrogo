@@ -71,9 +71,9 @@ type MPCObservatory struct {
 	// why this is a nil position rather than a missing row.
 	//
 	// Three further rows — 244, 248 and 500 — publish constants that are
-	// exactly zero, which is the geocentre and recovers to 6,378 km below
+	// exactly zero, which is the geocenter and recovers to 6,378 km below
 	// the ellipsoid. That is what the file says and it is reported as given:
-	// deciding that the centre of the Earth is not a place would be this
+	// deciding that the center of the Earth is not a place would be this
 	// package inventing a policy the MPC did not write down.
 	Location *coord.Geodetic
 
@@ -179,7 +179,7 @@ func MPCObservatories(ctx context.Context) ([]MPCObservatory, error) {
 //   - The code names a site with a position: a *Site.
 //   - The code is not in the list: [ErrUnknownSite].
 //   - The code is in the list but has no ground position — a space telescope,
-//     the geocentre, a roving observer: [ErrSiteNotOnEarth]. Reporting that as
+//     the geocenter, a roving observer: [ErrSiteNotOnEarth]. Reporting that as
 //     "unknown" would tell a caller their code was wrong when it is valid and
 //     the answer is that no such site exists.
 //

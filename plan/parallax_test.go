@@ -26,11 +26,11 @@ type detailer interface {
 // Every constraint, score and visibility check called ICRSToAltAz on a
 // geocentric position. That function treats its argument as a direction at
 // infinity — correct for a catalog star, wrong for anything nearby — so the
-// observer's offset from the geocentre was discarded. Only the events solver
+// observer's offset from the geocenter was discarded. Only the events solver
 // and the details builder subtracted it.
 //
 // The Moon is about 60 Earth radii away, so an observer on the surface sees it
-// up to 0.95° from where the geocentre does. Measured before the fix, at one
+// up to 0.95° from where the geocenter does. Measured before the fix, at one
 // site across a day:
 //
 //	Moon 00h  IsObservable=-31.3985  GetDetails=-32.3458  delta=+0.9474

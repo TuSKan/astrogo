@@ -188,7 +188,7 @@ func h2fk5Angular(rh, dh, drh, ddh, pxh, rvh float64) (r5, d5, dr5, dd5, px5, rv
 // number, and it is chosen from astronomy rather than from arithmetic: the
 // Galaxy's escape velocity at the Sun is about 550 km/s, and the fastest
 // objects a star catalogue contains are hypervelocity ejections from the
-// Galactic centre at order 10^3 km/s. 0.01c is 3000 km/s — comfortably above
+// Galactic center at order 10^3 km/s. 0.01c is 3000 km/s — comfortably above
 // anything real and fifty times below the point where SOFA gives up.
 //
 // It is deliberately loose. The purpose is to catch a distance that is absurd

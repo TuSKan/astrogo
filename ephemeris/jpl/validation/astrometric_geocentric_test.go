@@ -38,7 +38,7 @@ import (
 // which link it came from.
 //
 // A geocentric astrometric comparison removes most of the chain by
-// construction. CENTER='500@399' is the geocentre, so there is no site vector
+// construction. CENTER='500@399' is the geocenter, so there is no site vector
 // and no Earth rotation; quantity 1 is light-time corrected but carries no
 // aberration and no deflection. What is left depends on the ephemeris, the
 // light-time solution, and the frame — and on no Earth Orientation Parameter
@@ -74,17 +74,17 @@ func TestAstrometricAgreesWithHorizonsGeocentric(t *testing.T) {
 	// is tens of minutes rather than seconds.
 	//
 	// Jupiter and Saturn are asked for as '5' and '6' — the system
-	// barycentres — not '599' and '699', the body centres. That is what a DE
+	// barycenters — not '599' and '699', the body centers. That is what a DE
 	// planetary kernel contains for the giant planets: their satellite
 	// systems live in separate kernels, so a planetary-kernel provider
-	// necessarily returns the barycentre.
+	// necessarily returns the barycenter.
 	//
-	// It is not a detail. Asking Horizons for the body centres instead gives
+	// It is not a detail. Asking Horizons for the body centers instead gives
 	// Uranus p50 0.0497", Jupiter 0.0324", Saturn 0.0288" and Neptune
 	// 0.0093", while Sun, Venus and Mars sit at exactly zero — the offset
-	// between a giant planet and the barycentre it shares with its moons,
+	// between a giant planet and the barycenter it shares with its moons,
 	// about 100 km at Jupiter and 200 km at Saturn. Comparing against the
-	// wrong centre reads as an astrogo error and is not one (#253).
+	// wrong center reads as an astrogo error and is not one (#253).
 	bodies := []struct {
 		command string
 		name    string
@@ -280,7 +280,7 @@ type astrometricRow struct {
 }
 
 // fetchGeocentricSeries pulls astrometric positions from a Horizons OBSERVER
-// table centred on the geocentre.
+// table centered on the geocenter.
 //
 // CENTER='500@399' rather than 'coord@399': no site, so no site vector and no
 // Earth rotation enter the comparison.

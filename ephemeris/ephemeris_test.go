@@ -349,7 +349,7 @@ func TestPositionAndVelocityAgreeWithState(t *testing.T) {
 
 // TestHelpersPropagateTheProviderError keeps the three helpers from turning a
 // failure into a zero value, which for a position is indistinguishable from
-// the geocentre.
+// the geocenter.
 func TestHelpersPropagateTheProviderError(t *testing.T) {
 	p := &stubProvider{id: core.Sun}
 

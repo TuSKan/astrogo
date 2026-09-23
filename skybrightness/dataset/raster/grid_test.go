@@ -80,7 +80,7 @@ func TestGridNoData(t *testing.T) {
 		t.Errorf("all-sentinel grid = %v, want ErrNoData", err)
 	}
 
-	// One valid corner: sampling at its centre returns it exactly, with the
+	// One valid corner: sampling at its center returns it exactly, with the
 	// missing neighbours dropped rather than treated as zero.
 	partial := northUpGrid(2, 2, []float64{10, nan, nan, nan}, 0, 0)
 
@@ -108,19 +108,19 @@ func TestGridAt(t *testing.T) {
 	}
 }
 
-// Pixel centres sit half a pixel in from the corner the transform names.
+// Pixel centers sit half a pixel in from the corner the transform names.
 func TestGridLonLat(t *testing.T) {
 	t.Parallel()
 
 	g := northUpGrid(2, 2, []float64{1, 2, 3, 4}, 10, 50)
 
 	lon, lat := g.LonLat(0, 0)
-	testutil.AssertNear(t, "centre lon", lon, 10.5, 1e-12)
-	testutil.AssertNear(t, "centre lat", lat, 49.5, 1e-12)
+	testutil.AssertNear(t, "center lon", lon, 10.5, 1e-12)
+	testutil.AssertNear(t, "center lat", lat, 49.5, 1e-12)
 
 	lon, lat = g.LonLat(1, 1)
-	testutil.AssertNear(t, "next centre lon", lon, 11.5, 1e-12)
-	testutil.AssertNear(t, "next centre lat", lat, 48.5, 1e-12)
+	testutil.AssertNear(t, "next center lon", lon, 11.5, 1e-12)
+	testutil.AssertNear(t, "next center lat", lat, 48.5, 1e-12)
 }
 
 // Bilinear interpolation must reproduce the corner values exactly and give the
@@ -130,7 +130,7 @@ func TestGridBilinear(t *testing.T) {
 
 	g := northUpGrid(2, 2, []float64{0, 10, 20, 30}, 0, 0)
 
-	// Pixel centres.
+	// Pixel centers.
 	for _, tc := range []struct {
 		lon, lat, want float64
 	}{
@@ -144,7 +144,7 @@ func TestGridBilinear(t *testing.T) {
 			t.Fatalf("SampleBilinear(%v, %v): %v", tc.lon, tc.lat, err)
 		}
 
-		testutil.AssertNear(t, "pixel centre", got, tc.want, 1e-9)
+		testutil.AssertNear(t, "pixel center", got, tc.want, 1e-9)
 	}
 
 	// Halfway between the two top pixels.

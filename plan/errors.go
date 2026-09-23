@@ -108,7 +108,7 @@ var (
 
 	// ErrSiteNotOnEarth indicates NewMPCSite was given a real MPC
 	// observatory code that has no position on the ground — a space
-	// telescope, the geocentre, or a roving-observer placeholder. Distinct
+	// telescope, the geocenter, or a roving-observer placeholder. Distinct
 	// from ErrUnknownSite on purpose: the code is valid and the caller's
 	// spelling is not the problem.
 	ErrSiteNotOnEarth = errors.New("plan: MPC code has no position on Earth")

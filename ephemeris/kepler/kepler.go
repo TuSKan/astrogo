@@ -77,9 +77,9 @@ type CentralBody struct {
 	GM float64
 }
 
-// sunCentre is the default central body: the Sun, with the IAU nominal mass
+// sunCenter is the default central body: the Sun, with the IAU nominal mass
 // parameter the heliocentric path has always used.
-var sunCentre = CentralBody{ID: core.Sun, GM: constants.IAU.SunGravitationalParameter.Value}
+var sunCenter = CentralBody{ID: core.Sun, GM: constants.IAU.SunGravitationalParameter.Value}
 
 // LaplacePlane is the reference plane a satellite's published mean elements
 // are referred to, named by the direction of its pole.
@@ -256,7 +256,7 @@ func NewElements(epoch time.Time, semiMajorAxis unit.Length, eccentricity float6
 // the Sun.
 func (el Elements) CentralBody() CentralBody {
 	if el.central.GM == 0 {
-		return sunCentre
+		return sunCenter
 	}
 
 	return el.central

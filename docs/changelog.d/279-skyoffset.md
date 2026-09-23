@@ -2,7 +2,7 @@
 type: Added
 pr: 279
 ---
-`coord.SkyOffset` is a frame centred on a target, so positions near it can be
+`coord.SkyOffset` is a frame centered on a target, so positions near it can be
 given as offsets — dither and mosaic patterns, offset guide stars, slit
 layouts, finder charts. It is a rotation of the sphere rather than a projection
 onto a plane, which is the difference between it and subtracting coordinates: a

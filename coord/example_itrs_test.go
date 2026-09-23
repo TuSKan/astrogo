@@ -23,14 +23,14 @@ func ExampleContext_ICRSToITRS() {
 		atmosphere.Refraction{},
 	)
 
-	// Where the station is, in metres from the geocentre.
+	// Where the station is, in metres from the geocenter.
 	ecef := site.ToECEF(coord.WGS84())
 
 	// The same point seen from the celestial frame, and back again.
 	icrs := ctx.ITRSToICRS(ecef)
 	back := ctx.ICRSToITRS(icrs)
 
-	fmt.Printf("distance from the geocentre: %.3f km\n", ecef.Norm()/1000)
+	fmt.Printf("distance from the geocenter: %.3f km\n", ecef.Norm()/1000)
 	fmt.Printf("unchanged by the round trip: %.3f km\n", back.Norm()/1000)
 	// Printed as a threshold rather than a value: the residual is float
 	// rounding on a 6377 km vector, so its last digits are not the same on
@@ -38,7 +38,7 @@ func ExampleContext_ICRSToITRS() {
 	fmt.Printf("round trip moved under a micrometre: %v\n", back.Sub(ecef).Norm() < 1e-6)
 
 	// Output:
-	// distance from the geocentre: 6377.084 km
+	// distance from the geocenter: 6377.084 km
 	// unchanged by the round trip: 6377.084 km
 	// round trip moved under a micrometre: true
 }

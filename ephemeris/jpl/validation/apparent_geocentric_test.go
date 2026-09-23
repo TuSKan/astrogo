@@ -84,7 +84,7 @@ func TestApparentAgreesWithHorizonsGeocentric(t *testing.T) {
 
 	defer func() { _ = provider.Close() }()
 
-	// The same bodies and the same barycentre-versus-body-centre care as the
+	// The same bodies and the same barycenter-versus-body-center care as the
 	// astrometric comparison: '5' and '6', not '599' and '699' (#253). The Sun
 	// is left out — it is the deflecting body, so the term under test does not
 	// apply to it.

@@ -173,7 +173,7 @@ func rows(n, v int) string {
 	return b.String()
 }
 
-// A lookup by direction must land in the pixel whose centre it is, which ties
+// A lookup by direction must land in the pixel whose center it is, which ties
 // the map's indexing to coord.HEALPix's.
 func TestRadianceAtFollowsTheGrid(t *testing.T) {
 	t.Parallel()
@@ -195,7 +195,7 @@ func TestRadianceAtFollowsTheGrid(t *testing.T) {
 		}
 
 		if got != float64(pixel) {
-			t.Errorf("centre of pixel %d returned %v, want %v", pixel, got, float64(pixel))
+			t.Errorf("center of pixel %d returned %v, want %v", pixel, got, float64(pixel))
 		}
 	}
 }

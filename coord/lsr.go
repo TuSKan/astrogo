@@ -11,14 +11,14 @@ import (
 )
 
 // The Local Standard of Rest is the rest frame of the material at the Sun's
-// distance from the Galactic centre, and it is what a Galactic radial velocity
+// distance from the Galactic center, and it is what a Galactic radial velocity
 // is quoted against.
 //
 // # Why a barycentric radial velocity is not enough
 //
 // [Context.BarycentricRadialVelocity] removes the observer's own motion — the
 // site's rotation and Earth's orbit — and leaves a velocity measured against
-// the solar system barycentre. That is the right frame for a stellar orbit and
+// the solar system barycenter. That is the right frame for a stellar orbit and
 // the wrong one for anything Galactic, because the Sun itself is moving at
 // about 18 km/s with respect to its neighbours. Two clouds with the same
 // Galactic velocity, observed six months apart in opposite parts of the sky,
@@ -94,7 +94,7 @@ func (k LSRKind) String() string {
 
 // solarMotion returns the Sun's velocity with respect to the given Local
 // Standard of Rest, in km/s, as right-handed Galactic Cartesian components:
-// U toward the Galactic centre, V toward Galactic rotation, W toward the north
+// U toward the Galactic center, V toward Galactic rotation, W toward the north
 // Galactic pole.
 //
 // Both dynamical conventions are the published values, entered as their
@@ -183,7 +183,7 @@ func solarMotionICRS(kind LSRKind) vector.Vec3 {
 //
 // # Sign
 //
-// This is the solar motion dotted with the unit vector FROM the barycentre
+// This is the solar motion dotted with the unit vector FROM the barycenter
 // TOWARD target, so it is positive for a target near the solar apex. A star
 // there is being approached by the Sun, its measured barycentric velocity
 // therefore reads too low, and this correction brings it back up.

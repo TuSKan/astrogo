@@ -90,7 +90,7 @@ func TestMPCObservatoriesParsesTheWholeRegister(t *testing.T) {
 		// to the same bound as a 6-decimal one either fails on correct data
 		// or waves through a genuine column misread.
 		//
-		// The three geocentre rows (244, 248, 500) publish constants that are
+		// The three geocenter rows (244, 248, 500) publish constants that are
 		// exactly zero and land 6,378 km down. That is the origin, faithfully
 		// reported, and it is excluded by name rather than by widening the
 		// bound until it happens to fit.
@@ -100,7 +100,7 @@ func TestMPCObservatoriesParsesTheWholeRegister(t *testing.T) {
 		}
 
 		// The band is where places on Earth are, widened by this row's own
-		// published resolution. Measured over the 2,689 positioned non-geocentre
+		// published resolution. Measured over the 2,689 positioned non-geocenter
 		// rows on 2026-09-08, grouped by how many decimals their constants carry:
 		//
 		//	decimals      n   recovered height
@@ -134,13 +134,13 @@ func TestMPCObservatoriesParsesTheWholeRegister(t *testing.T) {
 
 	t.Logf("%d observatories: %d positioned, %d without a ground position", len(list), positioned, blank)
 
-	// The positionless rows are the space telescopes, the geocentre and the
+	// The positionless rows are the space telescopes, the geocenter and the
 	// roving-observer placeholders — 30 of them on 2026-09-08. A parser that
 	// started reading blanks as zeros would drive this to nought, and one
 	// reading real constants as blanks would drive it up.
 	if blank == 0 || blank > 100 {
 		t.Errorf("%d rows without a ground position; expected a few dozen "+
-			"(space telescopes, the geocentre, roving observers)", blank)
+			"(space telescopes, the geocenter, roving observers)", blank)
 	}
 }
 
@@ -273,7 +273,7 @@ func TestMPCObservatoriesNeedsDownloadConsent(t *testing.T) {
 //
 // The southern floor is two because that is what the register holds. The
 // first draft of this test said five, counted by a script that had not
-// excluded the three geocentre rows sitting at -90 by construction. The test
+// excluded the three geocenter rows sitting at -90 by construction. The test
 // found it, which is the argument for asserting the number at all.
 func TestMPCObservatoriesCoverTheLatitudesKnownSitesDoesNot(t *testing.T) {
 	list := requireMPCList(t)
@@ -291,7 +291,7 @@ func TestMPCObservatoriesCoverTheLatitudesKnownSitesDoesNot(t *testing.T) {
 			continue
 		}
 
-		// The three geocentre rows sit at the pole by construction and would
+		// The three geocenter rows sit at the pole by construction and would
 		// otherwise be counted as the most extreme site in both hemispheres.
 		switch obs.Code {
 		case "244", "248", "500":

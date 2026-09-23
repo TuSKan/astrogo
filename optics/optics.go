@@ -220,7 +220,7 @@ type Sensor struct {
 	Width unit.Length
 	// Height is the sensor's physical height.
 	Height unit.Length
-	// PixelPitch is the centre-to-centre pixel spacing. Datasheets quote it
+	// PixelPitch is the center-to-center pixel spacing. Datasheets quote it
 	// in micrometres, so it is usually [unit.Millimeters](microns / 1000).
 	PixelPitch unit.Length
 }

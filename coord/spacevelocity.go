@@ -7,7 +7,7 @@ import (
 )
 
 // SpaceVelocity returns the target's velocity with respect to the solar system
-// barycentre, in km/s, as Cartesian components on the ICRS axes.
+// barycenter, in km/s, as Cartesian components on the ICRS axes.
 //
 // The bool reports whether the velocity could be computed at all. It is false
 // for a target whose kinematics were never recorded, and false for one whose

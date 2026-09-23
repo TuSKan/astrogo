@@ -248,7 +248,7 @@ func TestInclinationSingularityIsGuarded(t *testing.T) {
 
 			// A finite answer is not enough: it also has to be an orbit.
 			if r := pos.Norm(); r < 6000 || r > 1e7 {
-				t.Errorf("%s at tsince %g is %g km from the centre of the Earth",
+				t.Errorf("%s at tsince %g is %g km from the center of the Earth",
 					tc.name, ts, r)
 			}
 		}

@@ -60,7 +60,7 @@ func TestNewHEALPixRejectsBadNside(t *testing.T) {
 	}
 }
 
-// The strongest self-consistency check available: every pixel's centre must
+// The strongest self-consistency check available: every pixel's center must
 // map back to that same pixel. It exercises the forward and inverse
 // transforms, the face assignment, and the Morton interleaving against each
 // other across all twelve faces and both polar caps.
@@ -77,7 +77,7 @@ func TestHEALPixRoundTrip(t *testing.T) {
 			}
 
 			if got := h.PixelOf(lon, lat); got != pixel {
-				t.Fatalf("nside %d: pixel %d has centre (%.6f, %.6f) which maps to pixel %d",
+				t.Fatalf("nside %d: pixel %d has center (%.6f, %.6f) which maps to pixel %d",
 					nside, pixel, lon.Degrees(), lat.Degrees(), got)
 			}
 		}

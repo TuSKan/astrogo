@@ -57,7 +57,7 @@ func (p *scriptedProvider) Close() error { return nil }
 // this repository has been bitten by before: a failure that is
 // indistinguishable from a legitimate answer. Every one of them returns
 // State{} on the way out, and State{} is a real value — a body at the
-// geocentre, at rest. A caller that ignored the error would get a plausible
+// geocenter, at rest. A caller that ignored the error would get a plausible
 // zero rather than a crash, which is why the assertion here is on all three of
 // the error being returned, the error still carrying its cause, and the state
 // being untouched.
@@ -100,7 +100,7 @@ func TestApparentStateReportsWhichFetchFailed(t *testing.T) {
 			if err == nil {
 				t.Fatalf("provider failed for %s and ApparentState returned no error, "+
 					"state %+v.\n"+
-					"  A silent State{} here is a body at the geocentre at rest, which is a "+
+					"  A silent State{} here is a body at the geocenter at rest, which is a "+
 					"legitimate-looking answer rather than a reported failure.", tc.name, st)
 			}
 
@@ -128,9 +128,9 @@ func TestApparentStateReportsWhichFetchFailed(t *testing.T) {
 // keeps three impossible geometries from becoming NaN.
 //
 // Light deflection needs three directions, and each of them comes from a
-// subtraction that can cancel: a target at the geocentre has no direction from
+// subtraction that can cancel: a target at the geocenter has no direction from
 // the observer, a target at the Sun's own place has none from the Sun, and a
-// Sun at the geocentre has none to the observer. Normalising any of those
+// Sun at the geocenter has none to the observer. Normalising any of those
 // yields NaN, and NaN propagates silently all the way to an altitude and an
 // azimuth that are simply absent from a plot.
 //
@@ -148,7 +148,7 @@ func TestApparentStateSurvivesDegenerateDeflectionGeometry(t *testing.T) {
 		pos, sun vector.Vec3
 	}{
 		{
-			"target at the geocentre",
+			"target at the geocenter",
 			vector.Zero(),
 			vector.V3(-0.9, 0.4, 0.0),
 		},
@@ -158,7 +158,7 @@ func TestApparentStateSurvivesDegenerateDeflectionGeometry(t *testing.T) {
 			vector.V3(-0.9, 0.4, 0.0),
 		},
 		{
-			"Sun at the geocentre",
+			"Sun at the geocenter",
 			vector.V3(0.5, 0.3, 0.1),
 			vector.Zero(),
 		},

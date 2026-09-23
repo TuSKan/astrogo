@@ -194,17 +194,17 @@ measured distribution, follow the Evidence link to the generated table.
 The following areas are not yet considered scientifically complete:
 
 - Advanced observation scheduling optimization
-- **The giant planets are system barycentres, not planets, and the table above compares
+- **The giant planets are system barycenters, not planets, and the table above compares
   them that way.** `core.Jupiter` resolves to NAIF 5, `core.Saturn` to 6, `core.Uranus` to
-  7 and `core.Neptune` to 8 — the system barycentres — because that is what a planetary
+  7 and `core.Neptune` to 8 — the system barycenters — because that is what a planetary
   kernel contains; the satellite systems live in separate kernels. Mercury, Venus and Earth
-  resolve to body centres (199, 299, 399), so one map mixes both conventions with nothing
-  saying so. Measured against Horizons' body-centre commands: **Uranus 0.0497″, Jupiter
+  resolve to body centers (199, 299, 399), so one map mixes both conventions with nothing
+  saying so. Measured against Horizons' body-center commands: **Uranus 0.0497″, Jupiter
   0.0324″, Saturn 0.0288″, Neptune 0.0093″** at the median, against 0.0000″ for Mars, the
   Sun and Venus. Far inside every tolerance on this page, and far outside what a user
   comparing Jupiter against Horizons' default `599` would expect — it reads as an astrogo
   error and is not one. See #253.
-- **Radial-velocity correction is now cross-checked against Astropy** (175 cases, 0.7 mm/s), which closes the gap this list previously recorded. What remains open is narrower: astrogo is a classical projection and does not implement the Wright & Eastman (2014) terms — gravitational redshift, light-travel time to the barycentre, and the effect of the target's own proper motion and parallax on the projection geometry. Measured, those amount to 4.66 m/s against Astropy's relativistic value, so sub-1-m/s precision-RV work needs the full treatment and this does not provide it.
+- **Radial-velocity correction is now cross-checked against Astropy** (175 cases, 0.7 mm/s), which closes the gap this list previously recorded. What remains open is narrower: astrogo is a classical projection and does not implement the Wright & Eastman (2014) terms — gravitational redshift, light-travel time to the barycenter, and the effect of the target's own proper motion and parallax on the projection geometry. Measured, those amount to 4.66 m/s against Astropy's relativistic value, so sub-1-m/s precision-RV work needs the full treatment and this does not provide it.
 - **Artificial skyglow in clear air** is tested on the model's physical claims rather than against a measured sky. An absolute check needs a per-emitter inventory — flux, spectrum and upward emission function — and satellite radiance alone can determine only the first: the same VIIRS pixel is produced by many real installations differing in spectrum and in how much light they throw sideways rather than up.
 - **Cloud reaches only the artificial term.** A cloud deck in the scene's atmosphere changes artificial skyglow and nothing else; moonlight, integrated starlight, diffuse galactic light, zodiacal light and airglow are all evaluated as though the sky were clear. Three separate models are missing behind that one sentence, not one.
 - **Every figure on this page assumes the host clock is UTC.** Around a leap second it

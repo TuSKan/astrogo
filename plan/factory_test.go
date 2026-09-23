@@ -420,7 +420,7 @@ func TestFromCatalogKeepsADeepSkyRadialVelocity(t *testing.T) {
 
 // TestFromCatalogDistinguishesNoRadialVelocityFromZero keeps the same
 // distinction HasRadialVelocity exists for. A galaxy at rest relative to the
-// barycentre would read 0 km/s, and that is a measurement; a galaxy with no
+// barycenter would read 0 km/s, and that is a measurement; a galaxy with no
 // published RV also reads 0, and that is not.
 func TestFromCatalogDistinguishesNoRadialVelocityFromZero(t *testing.T) {
 	t.Parallel()

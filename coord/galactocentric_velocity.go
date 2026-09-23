@@ -11,7 +11,7 @@ import (
 //
 // # What is actually measured
 //
-// Three numbers are needed: the Sun's motion toward the Galactic centre, along
+// Three numbers are needed: the Sun's motion toward the Galactic center, along
 // Galactic rotation, and toward the north Galactic pole. They do not come from
 // one source, because they are not one kind of measurement.
 //
@@ -26,7 +26,7 @@ import (
 // taken from a peculiar-velocity paper, because it is dominated by the
 // circular speed rather than by the Sun's wander. It is measured directly, and
 // very precisely, by the apparent proper motion of Sgr A*: the black hole is
-// effectively at rest at the Galactic centre, so what is seen is the reflex of
+// effectively at rest at the Galactic center, so what is seen is the reflex of
 // the Sun's own orbit. Reid & Brunthaler (2004), ApJ 616, 872, measure
 //
 //	6.379 ± 0.024 mas/yr, "almost entirely in the plane of the Galaxy"
@@ -74,7 +74,7 @@ const (
 // It is the reflex of the Sun's orbit, not a motion of the black hole. The same
 // paper finds the residual perpendicular to the plane to be −0.4 ± 0.9 km/s,
 // which is consistent with zero and is the evidence that Sgr A* is at rest at
-// the centre rather than merely near it.
+// the center rather than merely near it.
 const sgrAProperMotionMasPerYear = 6.379
 
 // auPerYearInKmPerSec is one astronomical unit per Julian year expressed in
@@ -108,9 +108,9 @@ var auPerYearInKmPerSec = kmPerAU / julianYearSeconds
 const julianYearSeconds = 365.25 * 86400
 
 // SolarVelocityFromSgrA returns the Sun's velocity in the Galactocentric frame,
-// in km/s, for a Galactic-centre distance of sunDistance.
+// in km/s, for a Galactic-center distance of sunDistance.
 //
-// The components are (toward the centre, along rotation, toward the north
+// The components are (toward the center, along rotation, toward the north
 // Galactic pole), on the axes of the Galactic frame — [GalactocentricFrame]
 // applies its own tilt to them, the same tilt it applies to positions.
 //
@@ -151,7 +151,7 @@ type galacticAxes struct {
 // Galactic pole, +y completing a right-handed set and so pointing toward
 // l = 90°.
 func computeGalacticBasis() galacticAxes {
-	centre := GalacticToICRS(NewGalactic(0, 0)).ToUnitVector()
+	center := GalacticToICRS(NewGalactic(0, 0)).ToUnitVector()
 	z := GalacticToICRS(NewGalactic(0, angle.Deg(90))).ToUnitVector()
 
 	// Gram-Schmidt against the pole rather than trusting the two directions to
@@ -159,7 +159,7 @@ func computeGalacticBasis() galacticAxes {
 	// through two trigonometric conversions, so the residual is small but not
 	// zero — and an inexact basis would quietly stop preserving the length of
 	// every velocity it rotates.
-	y := z.Cross(centre).Unit()
+	y := z.Cross(center).Unit()
 	x := y.Cross(z).Unit()
 
 	return galacticAxes{x: x, y: y, z: z}

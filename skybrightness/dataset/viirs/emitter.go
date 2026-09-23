@@ -76,7 +76,7 @@ import (
 // are average radiances in nW cm^-2 sr^-1, which is what SourceSpectrum
 // converts from.
 type Region struct {
-	// Site is the observer, at the centre of the sampling.
+	// Site is the observer, at the center of the sampling.
 	Site *coord.Geodetic
 
 	// InnerM and OuterM bound the annulus sampled, in metres. Sources much

@@ -39,7 +39,7 @@ var skyOffsetOrigins = []struct {
 }
 
 // TestSkyOffsetPlacesTheOriginAtZero is the defining property: the frame is
-// centred on its origin, so the origin has no offset from itself.
+// centered on its origin, so the origin has no offset from itself.
 func TestSkyOffsetPlacesTheOriginAtZero(t *testing.T) {
 	t.Parallel()
 

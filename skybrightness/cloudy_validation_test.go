@@ -29,7 +29,7 @@ const (
 	zilinaFarObserverKM = 18.5
 )
 
-// zilinaCity spreads a town's light over a ring at the urban radius, centred
+// zilinaCity spreads a town's light over a ring at the urban radius, centered
 // at a given distance and bearing from the observer.
 //
 // A ring rather than a point because the paper models a town of finite
@@ -39,7 +39,7 @@ const (
 // zero horizontal separation that cancellation fails. Eight emitters is
 // enough for the ring to behave as an extended source rather than as a point
 // at the zenith.
-func zilinaCity(tb testing.TB, centreKM float64) []skybrightness.GroundEmitter {
+func zilinaCity(tb testing.TB, centerKM float64) []skybrightness.GroundEmitter {
 	tb.Helper()
 
 	const emitters = 8
@@ -48,18 +48,18 @@ func zilinaCity(tb testing.TB, centreKM float64) []skybrightness.GroundEmitter {
 
 	for i := range emitters {
 		// Half-integer steps so that no emitter lands on the axis through the
-		// observer: at a town centre one urban radius away that would put one
+		// observer: at a town center one urban radius away that would put one
 		// of them at zero horizontal separation, which is the single geometry
 		// the scattering integral cannot express.
 		phi := 2 * math.Pi * (float64(i) + 0.5) / emitters
 
-		// The emitter's offset from the town centre, in a frame whose x axis
-		// points from the observer to that centre.
+		// The emitter's offset from the town center, in a frame whose x axis
+		// points from the observer to that center.
 		dx := zilinaUrbanRadiusKM * math.Cos(phi)
 		dy := zilinaUrbanRadiusKM * math.Sin(phi)
 
-		distance := math.Hypot(centreKM+dx, dy)
-		bearing := math.Atan2(dy, centreKM+dx) * 180 / math.Pi
+		distance := math.Hypot(centerKM+dx, dy)
+		bearing := math.Atan2(dy, centerKM+dx) * 180 / math.Pi
 
 		// The town's total output split evenly over the ring.
 		out = append(out, cloudyCity(tb, bearing, distance))
@@ -166,7 +166,7 @@ func TestZilinaAmplificationAcrossDistance(t *testing.T) {
 		ratio := zenithRadiance(t, comp, zilinaScene(t, zilinaMaxCover), grid) / clearSky
 		ratios = append(ratios, ratio)
 
-		t.Logf("town centre %6.1f km: zenith radiance x%7.3f at CF = %.1f", km, ratio, zilinaMaxCover)
+		t.Logf("town center %6.1f km: zenith radiance x%7.3f at CF = %.1f", km, ratio, zilinaMaxCover)
 	}
 
 	// Over the town: amplification, and of the order the paper reports rather

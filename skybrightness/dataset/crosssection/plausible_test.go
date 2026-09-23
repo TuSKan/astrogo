@@ -15,7 +15,7 @@ func chappuisFile(peak float64) string {
 	var b strings.Builder
 
 	for nm := 400; nm <= 700; nm += 10 {
-		// A crude bump centred on 603 nm — the shape does not matter here,
+		// A crude bump centered on 603 nm — the shape does not matter here,
 		// only the magnitude at the top of it.
 		x := (float64(nm) - 603) / 80
 		sigma := peak * math.Exp(-x*x)

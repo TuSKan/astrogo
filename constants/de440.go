@@ -19,7 +19,7 @@ package constants
 // Every planet appears twice, and the difference is not a rounding detail.
 // A *System* parameter is the planet plus its satellites, which is what a
 // planetary ephemeris integrates and therefore what governs the motion of the
-// system's barycentre about the Sun. The plain parameter is the planet's own
+// system's barycenter about the Sun. The plain parameter is the planet's own
 // mass, which is what governs a satellite's motion about it.
 //
 // The two differ by the mass of the satellites. Measured against the kernel:
@@ -39,7 +39,7 @@ package constants
 // version of this comment asserted the opposite; the period measurement
 // corrected it.
 //
-// The Sun and the Earth-Moon barycentre have no plain counterpart here: the
+// The Sun and the Earth-Moon barycenter have no plain counterpart here: the
 // Sun has no satellites in this sense, and Earth's own parameter is
 // [EarthGravitationalParameter], listed beside the Moon's for the same reason.
 type EphemerisSet struct {
@@ -134,7 +134,7 @@ var DE440 = EphemerisSet{
 		Reference: deSource,
 	},
 	EarthMoonGravitationalParameter: Constant{
-		Name: "Earth-Moon barycentre mass parameter", Symbol: "GM_3",
+		Name: "Earth-Moon barycenter mass parameter", Symbol: "GM_3",
 		Value: 4.0350323562548019e14, Unit: cubicMeterPerSecondSquared,
 		Reference: deSource,
 	},

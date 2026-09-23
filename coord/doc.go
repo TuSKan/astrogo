@@ -25,7 +25,7 @@
 //
 // [CIRS] in that chain is the **CIRS** place — right ascension measured
 // from the Celestial Intermediate Origin, which is what the IAU 2000/2006
-// resolutions put at the centre of the transformation. It is not the apparent
+// resolutions put at the center of the transformation. It is not the apparent
 // right ascension an almanac prints, which is measured from the true equinox;
 // the two are apart by the equation of the origins, about 20 arcminutes in
 // 2026 and growing by 46 arcseconds a year. [TETE] is the equinox-based place
@@ -60,14 +60,14 @@
 // # Extragalactic structure
 //
 // [Supergalactic] puts the flattened sheet of nearby bright galaxies — the
-// Local Supercluster, with the Virgo cluster near its centre — on the equator,
+// Local Supercluster, with the Virgo cluster near its center — on the equator,
 // the way Galactic coordinates put the Milky Way's disc on theirs. It is a
 // fixed rotation with no epoch, since the plane is defined by where galaxies
 // are rather than by where the Earth is pointing.
 //
 // # Galactic structure
 //
-// [GalactocentricFrame] moves the origin from the observer to the centre of
+// [GalactocentricFrame] moves the origin from the observer to the center of
 // the Galaxy, giving the Cartesian [Galactocentric] position in parsecs that
 // Galactic structure is actually written in — a rotation curve as a function
 // of cylindrical radius, a disc profile as a spread in height.
@@ -79,7 +79,7 @@
 // in. [ParallaxDistance] is the usual way to obtain it.
 //
 // It is also the one frame with measured parameters rather than a frozen
-// convention: the Sun's distance from the centre and its height above the
+// convention: the Sun's distance from the center and its height above the
 // midplane are numbers that move as they are re-measured, so they are
 // arguments to [NewGalactocentricFrame] and the values astrogo cites are in
 // [DefaultGalactocentricFrame]. The axes are not parameters — they are the
@@ -89,7 +89,7 @@
 // # Moving the origin to the Sun
 //
 // [BarycentricToHeliocentric] and [HeliocentricToBarycentric] translate a
-// position vector between the solar system barycentre and the centre of the
+// position vector between the solar system barycenter and the center of the
 // Sun — the HCRS frame, which keeps the ICRS axes and moves only the origin.
 // Because it is a translation rather than a rotation, it needs a position
 // rather than a direction, and how much it matters depends entirely on
@@ -98,7 +98,7 @@
 //
 // # Offsets from a target
 //
-// [SkyOffset] is a frame centred on a chosen position, so nearby objects are
+// [SkyOffset] is a frame centered on a chosen position, so nearby objects are
 // described by how far they are from it rather than by absolute coordinates —
 // dither and mosaic patterns, offset guide stars, slit layouts, finder charts.
 // It is a rotation of the sphere rather than a projection onto a plane, which
@@ -109,7 +109,7 @@
 // # The Local Standard of Rest
 //
 // [Context.BarycentricRadialVelocity] removes the observer's own motion and
-// leaves a velocity measured against the solar system barycentre, which is the
+// leaves a velocity measured against the solar system barycenter, which is the
 // wrong frame for anything Galactic: the Sun is itself moving at about 18 km/s
 // through its neighbourhood. [LSRCorrection] removes that too, and takes an
 // [LSRKind] because the published conventions disagree by 2.1 km/s and a v_LSR

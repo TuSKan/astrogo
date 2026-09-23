@@ -90,7 +90,7 @@ func main() {
 	fmt.Println("  observer and Earth's own, together about 4.65 m/s. Measured against")
 	fmt.Println("  Astropy over 175 cases, the two agree to 0.5 mm/s.")
 	fmt.Println()
-	fmt.Println("  Still omitted: light-travel time to the barycentre, and the target's")
+	fmt.Println("  Still omitted: light-travel time to the barycenter, and the target's")
 	fmt.Println("  own proper motion over that crossing. Both need the target's distance")
 	fmt.Println("  and epoch, which a bare ICRS direction does not carry.")
 	fmt.Println("═══════════════════════════════════════════════════════════════════")

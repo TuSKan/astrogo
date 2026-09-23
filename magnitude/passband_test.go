@@ -153,7 +153,7 @@ func TestMeanFluxDensityRejectsPartialCoverage(t *testing.T) {
 	}
 }
 
-// The pivot wavelength of a symmetric top-hat sits near its centre, and is
+// The pivot wavelength of a symmetric top-hat sits near its center, and is
 // a property of the curve alone.
 func TestPivotWavelength(t *testing.T) {
 	t.Parallel()
@@ -166,7 +166,7 @@ func TestPivotWavelength(t *testing.T) {
 	}
 
 	if pivot < 540 || pivot > 560 {
-		t.Errorf("PivotWavelength = %v, want near the 550 nm band centre", pivot)
+		t.Errorf("PivotWavelength = %v, want near the 550 nm band center", pivot)
 	}
 }
 

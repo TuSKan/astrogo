@@ -14,7 +14,7 @@ func ExampleSkyOffset() {
 	target := coord.NewICRS(angle.Deg(83.8221), angle.Deg(-5.3911)) // M42
 	f := coord.NewSkyOffset(target, 0)
 
-	// 20 arcseconds, centre plus the four corners.
+	// 20 arcseconds, center plus the four corners.
 	const d = 20.0 / 3600
 
 	for _, p := range []struct{ lon, lat float64 }{

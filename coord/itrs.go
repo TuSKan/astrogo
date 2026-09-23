@@ -6,7 +6,7 @@ import (
 
 // ITRS is the International Terrestrial Reference System: axes fixed in the
 // rotating Earth, with z through the pole, x through the Greenwich meridian,
-// and origin at the geocentre. It is the frame a station's coordinates are
+// and origin at the geocenter. It is the frame a station's coordinates are
 // published in, the frame a GNSS receiver reports, and the frame a satellite's
 // ground track is computed in.
 //
@@ -33,7 +33,7 @@ import (
 //
 // # What this is not
 //
-// Not a geodetic conversion. ITRS is Cartesian metres from the geocentre;
+// Not a geodetic conversion. ITRS is Cartesian metres from the geocenter;
 // latitude, longitude and height above the ellipsoid come from
 // [FromECEF], and the direction-to-ground-point question is [SubPoint].
 //
@@ -45,7 +45,7 @@ import (
 // ICRSToITRS rotates a geocentric vector from the celestial frame into the
 // Earth-fixed one at the Context's epoch.
 //
-// The vector is geocentric — a position measured from the centre of the Earth,
+// The vector is geocentric — a position measured from the center of the Earth,
 // or a direction, in whatever units the caller is working in. Length and units
 // pass through unchanged, since this is a rotation.
 //
