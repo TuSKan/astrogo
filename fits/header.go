@@ -85,13 +85,24 @@ func (h *Header) GetInt(keyword string) (int, error) {
 }
 
 // GetFloat returns the value of a keyword as a float64.
+//
+// The exponent letter may be D as well as E, as the FITS standard allows
+// (NOST §5.2.4, FITS 4.0 §4.2.4) and Fortran-derived writers use for double
+// precision: 1.5D-05. Until #409 that was refused, which the WCS reader then
+// took for an absent keyword.
 func (h *Header) GetFloat(keyword string) (float64, error) {
 	card, err := h.Get(keyword)
 	if err != nil {
 		return 0.0, err
 	}
 
-	val := strings.TrimSpace(card.Value)
+	val := strings.Map(func(r rune) rune {
+		if r == 'D' || r == 'd' {
+			return 'E'
+		}
+
+		return r
+	}, strings.TrimSpace(card.Value))
 
 	v, err := strconv.ParseFloat(val, 64)
 	if err != nil {
