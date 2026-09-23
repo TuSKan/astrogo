@@ -9,8 +9,10 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"testing"
 
 	"github.com/TuSKan/astrogo/constants"
+	"github.com/TuSKan/astrogo/plan"
 )
 
 // This file is built under either tag and neither alone.
@@ -191,6 +193,46 @@ type corpusManifest struct {
 	Sampling string `json:"sampling"`
 
 	NotPinned []string `json:"not_pinned"`
+}
+
+// corpusSites is the observer table every entry references by name.
+//
+// It lives here rather than beside the generator because both halves need it:
+// the network-tagged generator to build the query, and the validation-tagged
+// TestCorpusQueryIsUnchangedSinceItWasGenerated to check that query has not
+// moved. Behind one build tag it would be invisible to the other, and two
+// copies of a site table is exactly the drift this file exists to prevent.
+func corpusSites(t *testing.T) []corpusSite {
+	t.Helper()
+
+	out := make([]corpusSite, 0, 5)
+
+	for _, name := range []string{"Greenwich", "Paranal", "Mauna Kea"} {
+		site, err := plan.NewKnownSite(name)
+		if err != nil {
+			t.Fatalf("known site %q: %v", name, err)
+		}
+
+		loc := site.Location()
+		out = append(out, corpusSite{
+			Name:       site.Name(),
+			Lon:        loc.Lon().Degrees(),
+			Lat:        loc.Lat().Degrees(),
+			Height:     loc.Height().Meters(),
+			Provenance: "plan.KnownSites; published coordinates cross-checked against the IAU MPC observatory code list",
+		})
+	}
+
+	return append(out,
+		corpusSite{
+			Name: "Polar (synthetic, 78N)", Lon: 0, Lat: 78, Height: 0,
+			Provenance: "synthetic; hour-angle-to-azimuth projection is most extreme near the pole, and plan.KnownSites has nothing above 52 degrees",
+		},
+		corpusSite{
+			Name: "Equator (synthetic, 0N 0E)", Lon: 0, Lat: 0, Height: 0,
+			Provenance: "synthetic; targets transit near the zenith, where azimuth is ill-conditioned",
+		},
+	)
 }
 
 // corpus is the whole document.
