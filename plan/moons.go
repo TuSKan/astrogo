@@ -171,7 +171,7 @@ func gatherPlanetaryMoons(ctx context.Context, at time.Time, magLimit float64, d
 	// dropped, though: it goes to the caller's collector, so a night
 	// missing all eight Saturnian moons says why. It cannot travel as
 	// parallel.Map's error, which is errgroup's -- first one wins, rest
-	// cancelled -- exactly the wrong shape for a per-item skip.
+	// canceled -- exactly the wrong shape for a per-item skip.
 	providers, _ := parallel.Map(kernels, 0, func(_ int, kernel string) (eph.Provider, error) {
 		p, err := eph.NewProvider(ctx, eph.Moons, kernel)
 		if err != nil {

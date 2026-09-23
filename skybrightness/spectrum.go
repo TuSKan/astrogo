@@ -166,9 +166,9 @@ func BlackbodyShape(grid unit.SpectralGrid, t float64) (SpectralRadiance, error)
 	//	B(lambda, T) = 2hc^2 / lambda^5 / (exp(hc / (lambda k T)) - 1)
 	//
 	// with the constants taken from the module's own set rather than written
-	// out, and the result per nanometre rather than per metre.
+	// out, and the result per nanometer rather than per meter.
 	const (
-		metrePerNM  = 1e-9
+		meterPerNM  = 1e-9
 		perMToPerNM = 1e-9
 	)
 
@@ -181,7 +181,7 @@ func BlackbodyShape(grid unit.SpectralGrid, t float64) (SpectralRadiance, error)
 	out := NewSpectralRadiance(grid)
 
 	for i := range out {
-		lambda := float64(grid.At(i)) * metrePerNM
+		lambda := float64(grid.At(i)) * meterPerNM
 
 		exponent := h * c / (lambda * kB * t)
 		if exponent > 700 {

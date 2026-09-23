@@ -52,7 +52,7 @@ const (
 	// megajanskyPerSrToSI converts I_nu in MJy sr^-1 to W m^-2 Hz^-1 sr^-1.
 	megajanskyPerSrToSI = 1e-20
 
-	// speedOfLightNMPerS is c in nanometres per second, for the
+	// speedOfLightNMPerS is c in nanometers per second, for the
 	// per-frequency to per-wavelength conversion I_lambda = I_nu * c/lambda^2.
 	speedOfLightNMPerS = 2.99792458e17
 )

@@ -12,6 +12,7 @@ import (
 	"github.com/TuSKan/astrogo/ephemeris/core"
 	"github.com/TuSKan/astrogo/ephemeris/jpl"
 	"github.com/TuSKan/astrogo/internal/metrology"
+	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/time"
 )
 
@@ -149,7 +150,14 @@ func runSOFATest(t *testing.T, bid eph.ID) {
 
 	p, err := jpl.NewProvider(context.Background(), core.Planets, "de440")
 	if err != nil {
-		metrology.NotVerified(t, "the JPL provider could not be built: "+err.Error(), suite)
+		// NOT VERIFIED only for an outage. This used to record it for any error
+		// at all, so a regression that broke jpl.NewProvider outright was
+		// reported as NAIF being down and the suite could never fail.
+		if reason, ok := testutil.UpstreamFailure(err); ok {
+			metrology.NotVerified(t, "the DE440 kernel could not be fetched ("+reason+"): "+err.Error(), suite)
+		}
+
+		t.Fatalf("jpl.NewProvider: %v", err)
 	}
 
 	defer func() { _ = p.Close() }()

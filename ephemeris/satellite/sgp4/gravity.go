@@ -19,7 +19,7 @@ const (
 	//
 	// Measured on Vallado's reference suite, the whole 473-state set, switching
 	// astrogo's propagation from WGS-84 to WGS-72 moved the median position
-	// error from 34.6 m to under a tenth of a millimetre. That is the size of
+	// error from 34.6 m to under a tenth of a millimeter. That is the size of
 	// the mismatch, and it is why this is not configuration.
 	WGS72 Gravity = iota
 

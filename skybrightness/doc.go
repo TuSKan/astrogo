@@ -95,7 +95,7 @@
 //
 // Evaluation performs no I/O and no network access: every dataset is resolved
 // by the provider layer under skybrightness/dataset and handed in through the
-// scene, which is enforced behaviourally by a test that evaluates identically
+// scene, which is enforced behaviorally by a test that evaluates identically
 // under remote.SetOffline and structurally by an import check. A model is
 // read-only once built and may be evaluated from several goroutines; the
 // spectral buffers a caller passes in are the caller's to keep separate.

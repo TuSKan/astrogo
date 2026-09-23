@@ -20,8 +20,8 @@
 //   - The output frame is TEME (true equator, mean equinox), which is SGP4's
 //     own frame and not one anybody else uses. Converting it to GCRS is the
 //     caller's job — [github.com/TuSKan/astrogo/ephemeris/satellite] does it.
-//   - The accuracy is kilometres, and it degrades with time from epoch. SGP4
-//     agrees with the reference implementation to millimetres, which is a
+//   - The accuracy is kilometers, and it degrades with time from epoch. SGP4
+//     agrees with the reference implementation to millimeters, which is a
 //     statement about this code, not about where the satellite is.
 //
 // # Provenance

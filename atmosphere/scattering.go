@@ -77,7 +77,7 @@ const (
 
 	// rayleighCoefficient and rayleighExponent are Winkler (2022) Eq. 13's
 	// constants for the Rayleigh optical depth as a function of wavelength
-	// in nanometres, attributed there to Dutton et al. (1994).
+	// in nanometers, attributed there to Dutton et al. (1994).
 	rayleighCoefficient = 1.229e10
 	rayleighExponent    = -4.05
 )
@@ -89,7 +89,7 @@ const (
 //
 //	tau_R = (P / P0) * 1.229e10 * lambda^-4.05
 //
-// with P0 = 1013.5 hPa and lambda in nanometres. The pressure ratio scales
+// with P0 = 1013.5 hPa and lambda in nanometers. The pressure ratio scales
 // the molecular column with the mass of air actually above the site, which
 // is why a high observatory has a thinner Rayleigh atmosphere.
 //

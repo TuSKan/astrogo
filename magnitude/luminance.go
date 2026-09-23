@@ -8,14 +8,14 @@ import (
 )
 
 // Luminance projects a spectral radiance through a luminous efficiency
-// function, in candela per square metre.
+// function, in candela per square meter.
 //
 //	L_v = K * INT L_e(lambda) * V(lambda) dlambda
 //
 // with L_e the spectral radiance in W m^-2 sr^-1 nm^-1, V the dimensionless
 // efficiency function, and K its luminous efficacy in lumens per watt — 683
 // for photopic vision, about 1700 for scotopic. The result is lm m^-2 sr^-1,
-// which is a candela per square metre.
+// which is a candela per square meter.
 //
 // # Why this is an integral and not a mean
 //

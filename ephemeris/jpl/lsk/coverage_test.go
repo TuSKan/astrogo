@@ -73,7 +73,7 @@ func TestKernelHasNothingWeIgnore(t *testing.T) {
 	fsys, prefix, err := remote.CacheDir(ctx, remote.NAIFLSK)
 	testutil.AssertNoError(t, err)
 
-	// ── Direction 1: nothing in the data block is unmodelled ────────────────
+	// ── Direction 1: nothing in the data block is unmodeled ────────────────
 	raw, err := fsys.Open(prefix + "lsk/naif0012.tls")
 	if err != nil {
 		t.Fatalf("open cached LSK: %v", err)
@@ -164,6 +164,6 @@ func TestKernelHasNothingWeIgnore(t *testing.T) {
 		t.Error("DELTA_AT parsed as empty")
 	}
 
-	t.Logf("%d assignments in the data block, all modelled; %d DELTA_AT entries",
+	t.Logf("%d assignments in the data block, all modeled; %d DELTA_AT entries",
 		seen, len(r.DeltaAt))
 }

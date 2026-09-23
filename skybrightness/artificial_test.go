@@ -306,7 +306,7 @@ func TestKocifaj2022Eq2BrightensTowardTheHorizon(t *testing.T) {
 // and it is worth knowing the model inverts its directional structure there
 // rather than discovering it in a sky map.
 //
-// This documents behaviour rather than asserting the model is right about it.
+// This documents behavior rather than asserting the model is right about it.
 func TestKocifaj2022Eq2NearHorizonTurnover(t *testing.T) {
 	t.Parallel()
 
@@ -417,7 +417,7 @@ func TestKocifaj2022Eq2FallsWithDistance(t *testing.T) {
 
 	if far <= near {
 		t.Error("the unattenuated kernel no longer grows with t; the contract note in " +
-			"AllSkyRadiance's doc comment describes behaviour the code no longer has")
+			"AllSkyRadiance's doc comment describes behavior the code no longer has")
 	}
 }
 

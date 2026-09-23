@@ -106,7 +106,7 @@ var motionGrid = []struct {
 		// are not independent: 270 mas/yr at a parallax of 0.0005 arcsec is a
 		// transverse velocity of about 2,560 km/s, which no star has, and which
 		// pushes Starpv's relativistic solution far enough that the round trip
-		// carries a few centimetres per second of radial velocity. 0.005 arcsec
+		// carries a few centimeters per second of radial velocity. 0.005 arcsec
 		// puts it at roughly 256 km/s — a fast halo star, and a real one.
 		name:     "large motion at distance",
 		pmRA:     angle.Arcsec(0.150),

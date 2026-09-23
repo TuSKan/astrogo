@@ -216,7 +216,7 @@ func icrsFromCIRS(rc2i [3][3]float64, ra, dec float64) vector.Vec3 {
 // No aberration.
 //
 // Written out here rather than kept behind a flag in the production code,
-// because a behaviour a caller can switch back on is a behaviour that has to
+// because a behavior a caller can switch back on is a behavior that has to
 // be supported. Its only purpose is to be the thing the fix is measured
 // against.
 func rotateOnly(t *testing.T, ctx *coord.Context, v vector.Vec3) coord.AltAz {
@@ -283,8 +283,8 @@ func expectedDiurnalArcsec(latRad, heightM float64) float64 {
 
 	// Radius of curvature in the prime vertical.
 	n := equatorialRadiusM / math.Sqrt(1-e2*sinLat*sinLat)
-	rhoMetres := (n + heightM) * cosLat
+	rhoMeters := (n + heightM) * cosLat
 
-	return angle.Rad(earthRotationRadPerSec * rhoMetres /
+	return angle.Rad(earthRotationRadPerSec * rhoMeters /
 		constants.SI2019.SpeedOfLight.Value).Arcseconds()
 }

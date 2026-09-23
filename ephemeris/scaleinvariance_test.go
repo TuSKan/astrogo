@@ -9,19 +9,19 @@ import (
 	"github.com/TuSKan/astrogo/time"
 )
 
-// metresInAU converts the tolerance below into the AU that State reports in.
-const metresInAU = 1.0 / 149597870700.0
+// metersInAU converts the tolerance below into the AU that State reports in.
+const metersInAU = 1.0 / 149597870700.0
 
-// scaleTolerance is one metre.
+// scaleTolerance is one meter.
 //
 // Not a physical accuracy budget — the correct answer here is the *same*
 // answer, and the only permitted difference is the floating-point cost of
 // converting a Julian Date between scales and back. Measured, that cost is
-// 7e-8 m at worst across these providers, so one metre leaves seven orders of
+// 7e-8 m at worst across these providers, so one meter leaves seven orders of
 // headroom for a platform whose FMA rounding differs while staying five orders
 // below the smallest defect this test exists to catch (40 arcsec of lunar
 // motion is ~74 km; the SGP4 defect was 530 km).
-const scaleTolerance = 1.0 * metresInAU
+const scaleTolerance = 1.0 * metersInAU
 
 // TestProviderStateIsScaleInvariant asserts that a provider returns the same
 // state for one physical instant however the caller labels its scale.
@@ -45,7 +45,7 @@ const scaleTolerance = 1.0 * metresInAU
 // Neither defect was a wrong formula. Both were a missing conversion at the
 // boundary, and nothing in the suite asked the question that finds them: each
 // provider was validated against its own external reference, and no test
-// compared a provider against itself under a relabelled input.
+// compared a provider against itself under a relabeled input.
 //
 // # Why the tolerance is not an accuracy budget
 //
@@ -125,20 +125,20 @@ func TestProviderStateIsScaleInvariant(t *testing.T) {
 				for _, s := range scales {
 					got, err := p.prov.State(id, s.at(utc))
 					if err != nil {
-						t.Fatalf("State with a %s-labelled instant: %v", s.label, err)
+						t.Fatalf("State with a %s-labeled instant: %v", s.label, err)
 					}
 
 					if d := got.Pos.Sub(base.Pos).Norm(); d > scaleTolerance {
 						t.Errorf("position moved %.6g AU (%.4g km) when the same instant "+
-							"was labelled %s.\n  The provider is reading the caller's "+
+							"was labeled %s.\n  The provider is reading the caller's "+
 							"scale as its own — normalize at the entry point "+
 							"(t.UTC()/t.TDB()) rather than reading JDParts raw.",
-							d, d/metresInAU/1e3, s.label)
+							d, d/metersInAU/1e3, s.label)
 					}
 
 					if d := got.Vel.Sub(base.Vel).Norm(); d > scaleTolerance {
 						t.Errorf("velocity moved %.6g AU/day when the same instant was "+
-							"labelled %s", d, s.label)
+							"labeled %s", d, s.label)
 					}
 				}
 			})

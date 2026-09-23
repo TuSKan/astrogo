@@ -72,7 +72,7 @@ func runAsync(ctx context.Context, client *remote.Client, id remote.EndpointID, 
 	// they set: the default one gives a query well under a minute, and the "2h"
 	// queue issues SET SESSION statement_timeout TO 7200000 before running it.
 	// A GROUP BY over the whole Gaia catalogue takes about fourteen minutes,
-	// so on the default queue it is cancelled mid-flight with "canceling
+	// so on the default queue it is canceled mid-flight with "canceling
 	// statement due to statement timeout" — which reads like a service problem
 	// and is a missing parameter.
 	//

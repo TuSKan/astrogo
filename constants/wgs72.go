@@ -31,7 +31,7 @@ import "github.com/TuSKan/astrogo/unit"
 // in the sense that matters here — adopted by convention, not measured.
 //
 // That is also why J2 belongs in this package rather than with the propagator
-// that consumes it. It is not a modelling choice somebody made; it is part of
+// that consumes it. It is not a modeling choice somebody made; it is part of
 // what "WGS 72" means.
 //
 // # What is deliberately not here

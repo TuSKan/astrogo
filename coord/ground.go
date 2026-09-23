@@ -14,7 +14,7 @@ import (
 var ErrNilGeodetic = errors.New("coord: geodetic location must not be nil")
 
 // meanEarthRadiusM is the IUGG mean radius R_1 = (2a + b)/3 for WGS84, in
-// metres. It is the radius that minimises the error of a spherical
+// meters. It is the radius that minimises the error of a spherical
 // approximation to the ellipsoid over all latitudes.
 const meanEarthRadiusM = 6371008.8
 

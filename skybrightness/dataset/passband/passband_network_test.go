@@ -13,12 +13,12 @@ import (
 
 // The five Johnson-Cousins bands as Table 1 of Masana, Bará, Carrasco & Ribas
 // (2024), arXiv:2408.17371, characterises them: effective wavelength and
-// effective width, in nanometres.
+// effective width, in nanometers.
 //
 // This is what makes the comparison worth running. GAMBONS states which bands
 // its published radiances are on but not which tabulation of them, and SVO
 // carries several realizations of "Johnson-Cousins" that differ by a few
-// nanometres. Checking the fetched curves against the paper's own numbers is
+// nanometers. Checking the fetched curves against the paper's own numbers is
 // what establishes that Generic/Bessell is the family the paper means, rather
 // than assuming it because Bessell (1990) is the usual answer.
 var table1 = []struct {
@@ -40,7 +40,7 @@ var table1 = []struct {
 // are 90 nm apart at the blue end, so two per cent cannot confuse one for
 // another. The width is looser because "effective width" has several
 // definitions — SVO alone publishes WidthEff and FWHM, which differ by four
-// nanometres for V — and the paper does not say which it used.
+// nanometers for V — and the paper does not say which it used.
 //
 // # Why Generic/Bessell, measured rather than assumed
 //

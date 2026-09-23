@@ -31,7 +31,7 @@ var forbidden = map[string]string{
 // legitimately reach remote for Earth-orientation data and JPL kernels,
 // both consent-gated. What the core must not do is resolve data itself.
 // That evaluation genuinely performs no network access is asserted
-// behaviourally by TestEstimateWorksOffline, which is the real guarantee.
+// behaviorally by TestEstimateWorksOffline, which is the real guarantee.
 func TestCoreDoesNotImportIOPackages(t *testing.T) {
 	t.Parallel()
 

@@ -61,7 +61,7 @@ func TestGPSTOffsetFromTAIIsExactlyNineteenSeconds(t *testing.T) {
 	}
 }
 
-// TestGPSTIsEighteenSecondsAheadOfUTCToday is the figure a GNSS user recognizes,
+// TestGPSTIsEighteenSecondsAheadOfUTCToday is the figure a GNSS user recognises,
 // and the one that makes the scale worth having.
 //
 // Unlike the TAI offset it is not constant: it is ΔAT − 19, so it stepped to 18
@@ -117,7 +117,7 @@ func TestGPSTRoundTripsThroughEveryScale(t *testing.T) {
 // one that actually protects a satellite user.
 //
 // A GPS timestamp and the UTC timestamp of the same physical moment must be
-// equal as instants, however differently they are labelled. If they are not,
+// equal as instants, however differently they are labeled. If they are not,
 // everything downstream — a look angle, a pass prediction — is computed for the
 // wrong moment.
 func TestGPSTNamesTheSameInstantAsItsUTC(t *testing.T) {
@@ -138,7 +138,7 @@ func TestGPSTNamesTheSameInstantAsItsUTC(t *testing.T) {
 	// a different moment, by the 18 s that would otherwise go unnoticed.
 	misread := time.FromJD(gps.JD(), time.UTC)
 	if d := misread.Sub(utc).Seconds(); math.Abs(d-18.0) > 1e-3 {
-		t.Errorf("mislabelling GPS time as UTC shifts the instant by %.3f s, want 18", d)
+		t.Errorf("mislabeling GPS time as UTC shifts the instant by %.3f s, want 18", d)
 	}
 }
 
@@ -195,7 +195,7 @@ func TestGPSTLabelsAdvanceInSISecondsAcrossALeapSecond(t *testing.T) {
 }
 
 // TestGPSTStringIsItsName keeps the scale printable, which matters because a
-// mislabelled instant is most often noticed by reading one.
+// mislabeled instant is most often noticed by reading one.
 func TestGPSTStringIsItsName(t *testing.T) {
 	t.Parallel()
 

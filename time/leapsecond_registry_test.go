@@ -301,7 +301,7 @@ func TestResetLeapSecondsRestoresTheBuiltinTable(t *testing.T) {
 }
 
 // TestEpochsBeforeARegisteredTableBeginsFallBackToTheBuiltinOne pins the
-// behaviour a truncated table gets.
+// behavior a truncated table gets.
 //
 // A source need not start at 1972 — a Bulletin C extract might carry only
 // recent entries. Below its first entry it has no opinion, and the built-in

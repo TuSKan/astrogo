@@ -209,6 +209,6 @@ func TestAliasWarningReportsTheUTCDate(t *testing.T) {
 	}
 
 	if !leapSecondEndsDay(y, int(m), d) {
-		t.Error("the 2016-12-31 leap second was not recognized through a non-UTC zone")
+		t.Error("the 2016-12-31 leap second was not recognised through a non-UTC zone")
 	}
 }

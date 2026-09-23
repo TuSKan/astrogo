@@ -207,7 +207,7 @@ func (p Passband) Weights(grid unit.SpectralGrid) (weights []float64, coverage f
 }
 
 // MeanFluxDensity returns the passband-averaged spectral radiance of a
-// spectrum sampled on grid, in the spectrum's own per-nanometre unit.
+// spectrum sampled on grid, in the spectrum's own per-nanometer unit.
 //
 // This is the response-weighted mean the magnitude systems are defined
 // against: the numerator integrates the spectrum against the band weights,
@@ -396,7 +396,7 @@ func SurfaceBrightness(
 	}
 }
 
-// perWavelengthToPerFrequency converts a flux density per nanometre into
+// perWavelengthToPerFrequency converts a flux density per nanometer into
 // one per hertz at the given wavelength, using f_nu = f_lambda * lambda^2/c.
 func perWavelengthToPerFrequency(perNM float64, lambda unit.WavelengthNM) float64 {
 	lambdaM := float64(lambda) * 1e-9

@@ -84,7 +84,7 @@ func TestValidateTLERejectsASingleAlteredDigit(t *testing.T) {
 	}
 }
 
-// TestValidateTLEAcceptsTrailingWhitespace records a behaviour change, because
+// TestValidateTLEAcceptsTrailingWhitespace records a behavior change, because
 // a test used to assert the opposite.
 //
 // ValidateTLE refused a line with a trailing space, and that was a side effect

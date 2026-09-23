@@ -77,7 +77,7 @@ func Unreachable(err error) bool {
 	// downtime with the skip guard sitting right there and not firing.
 	//
 	// None of the three checks in this block can be produced by a context error
-	// on its own — a cancelled context is not a *net.DNSError, is not a dial
+	// on its own — a canceled context is not a *net.DNSError, is not a dial
 	// OpError, and is not ECONNREFUSED — so hoisting them past the exclusion
 	// costs that exclusion nothing. What must stay below it is the generic
 	// net.Error timeout check, for the reason given there.

@@ -188,7 +188,7 @@ func FK4ToFK5(c FK4) FK5 {
 // honest answer — a star at rest in FK5 is not at rest in FK4.
 //
 // As in [ICRSToFK4], bepoch applies to the position-only route only: a position
-// with recorded kinematics comes back at B1950.0 and labelled [B1950], because
+// with recorded kinematics comes back at B1950.0 and labeled [B1950], because
 // SOFA's six-element Fk524 takes no epoch. That doc comment has the reasoning
 // and names [PropagateEpoch] as the operation to use instead.
 func FK5ToFK4(c FK5, bepoch float64) FK4 {
@@ -287,7 +287,7 @@ func FK4ToICRS(c FK4) ICRS {
 // branches would disagree about the same star for reasons no caller could see.
 //
 // Before #330 the argument was stored without being used, so ICRSToFK4(star,
-// 1975) returned B1950 numbers labelled 1975. The numbers were right and the
+// 1975) returned B1950 numbers labeled 1975. The numbers were right and the
 // label was wrong, which is the worse of the two failures: a wrong label
 // propagates into [FK4ToFK5]'s position-only route and into anything reading
 // [FK4.Epoch].
@@ -331,7 +331,7 @@ func ICRSToFK4(c ICRS, bepoch float64) FK4 {
 		rv:       unit.KmPerSec(rv1950),
 		// B1950 rather than bepoch, and deliberately: see the note on the
 		// six-element route in this function's doc comment. Fk524 answers at
-		// the catalogue equinox and takes no epoch, so labelling its output
+		// the catalogue equinox and takes no epoch, so labeling its output
 		// with the caller's would be a false claim about the numbers beside it.
 		bepoch:          B1950,
 		hasProperMotion: true,

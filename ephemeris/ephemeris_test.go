@@ -115,7 +115,7 @@ func TestNewFromElementsAnswersTheRegisteredBody(t *testing.T) {
 
 	// Ceres is a main-belt body: geocentric distance has to be of that
 	// order. A bound this loose still catches a propagation that returns
-	// the origin, the Sun, or metres instead of AU.
+	// the origin, the Sun, or meters instead of AU.
 	if r := st.Pos.Norm(); r < 1.0 || r > 4.0 {
 		t.Errorf("|r| = %v AU for a main-belt body at J2000", r)
 	}
@@ -311,7 +311,7 @@ func TestOptionsRecordWhatTheySay(t *testing.T) {
 	}
 
 	// Chaining is documented on WithKernel, so appending rather than
-	// overwriting is the behaviour under test.
+	// overwriting is the behavior under test.
 	if len(cfg.ExtraKernels) != 2 ||
 		cfg.ExtraKernels[0] != "de441_part-2" || cfg.ExtraKernels[1] != "de441_part-3" {
 		t.Errorf("WithKernel recorded %v, want both kernels in order", cfg.ExtraKernels)

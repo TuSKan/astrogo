@@ -186,7 +186,7 @@ func (r *Reader) hasDeltaET() bool {
 // the line was one.
 //
 // SPICE writes exponents in Fortran style — "1.657D-3" — which Go's parser
-// does not accept, so D is normalized to E before parsing. Getting this wrong
+// does not accept, so D is normalised to E before parsing. Getting this wrong
 // would leave the constant at zero and silently disable the periodic term,
 // which is why hasDeltaET checks for exactly that.
 func (r *Reader) parseDeltaETConstant(line string) bool {

@@ -20,7 +20,7 @@ import (
 	"github.com/TuSKan/astrogo/unit"
 )
 
-// The whole chain, against a real modelled sky.
+// The whole chain, against a real modeled sky.
 //
 // # What only this test can say
 //
@@ -105,7 +105,7 @@ func TestImagingDepthAgainstARealSky(t *testing.T) {
 	// independent source for.
 	if zenith < 15 || zenith > 26 {
 		t.Errorf("the zenith limit is %.2f, outside anything a 200 mm telescope reaches in "+
-			"five minutes — that is a unit error rather than a modelling difference", zenith)
+			"five minutes — that is a unit error rather than a modeling difference", zenith)
 	}
 
 	// Shallower down low, but by less than the V-band sky brightens: with no

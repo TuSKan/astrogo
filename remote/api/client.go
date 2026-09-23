@@ -397,7 +397,7 @@ func (e *HTTPError) Error() string {
 func (e *HTTPError) HTTPStatus() int { return e.StatusCode }
 
 // decodeOptions holds the two places where encoding/json/v2's defaults are
-// deliberately turned back to v1's behaviour, and by omission the one place
+// deliberately turned back to v1's behavior, and by omission the one place
 // they are not.
 //
 // # What v2 is here for

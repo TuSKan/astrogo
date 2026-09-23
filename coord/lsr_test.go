@@ -170,7 +170,7 @@ func TestLSRCorrectionNeverExceedsTheSolarMotion(t *testing.T) {
 	}
 }
 
-// TestLSRKindsDisagreeByTwoKilometresPerSecond is why the convention is named
+// TestLSRKindsDisagreeByTwoKilometersPerSecond is why the convention is named
 // at the call site instead of being chosen here.
 //
 // The two solar motions differ by (11.1, 12.24, 7.25) − (9, 12, 7) =
@@ -178,7 +178,7 @@ func TestLSRCorrectionNeverExceedsTheSolarMotion(t *testing.T) {
 // two conventions can ever disagree for one target, and it is far above the
 // precision of any radial velocity worth correcting — so quoting a v_LSR
 // without saying which LSR is quoting a number with a 2 km/s ambiguity in it.
-func TestLSRKindsDisagreeByTwoKilometresPerSecond(t *testing.T) {
+func TestLSRKindsDisagreeByTwoKilometersPerSecond(t *testing.T) {
 	t.Parallel()
 
 	want := math.Sqrt(2.1*2.1 + 0.24*0.24 + 0.25*0.25)

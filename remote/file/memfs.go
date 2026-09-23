@@ -372,7 +372,7 @@ func (d *memDir) Close() error { return nil }
 
 // ReadDir implements [fs.ReadDirFile].
 //
-// The two exhaustion behaviours differ and fstest checks both: with n > 0 an
+// The two exhaustion behaviors differ and fstest checks both: with n > 0 an
 // exhausted directory reports io.EOF, and with n <= 0 it reports an empty slice
 // and a nil error.
 func (d *memDir) ReadDir(n int) ([]fs.DirEntry, error) {

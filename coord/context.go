@@ -139,7 +139,7 @@ func (ctx *Context) Clone() *Context {
 	return &c
 }
 
-// kmPerAU is the number of kilometres in one Astronomical Unit.
+// kmPerAU is the number of kilometers in one Astronomical Unit.
 //
 // var, not const: constants.IAU.AstronomicalUnit is a struct, and Go does not
 // permit selecting a struct field inside a constant expression.
@@ -522,7 +522,7 @@ func (ctx *Context) BarycentricVelocity() vector.Vec3 {
 //	f = 1 - diurab*E
 //	E' = f*(E + diurab),  N' = f*N,  U' = f*U
 //
-// The result is not renormalized, again as Atioq leaves it — the magnitude
+// The result is not renormalised, again as Atioq leaves it — the magnitude
 // differs from one by about 1.5e-6, and the callers here take an atan2.
 func (ctx *Context) aberrateDiurnal(e, n, u, norm float64) (float64, float64, float64) {
 	if norm == 0 {

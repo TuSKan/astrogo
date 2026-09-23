@@ -33,7 +33,7 @@ type TargetDetails struct {
 	// It is a rendering choice, not the unit Distance is in. It used to be
 	// both — Distance was a bare float64 and this string was the only record
 	// of what its number meant, so a caller reading Distance without reading
-	// this alongside it got parsecs, au or kilometres depending on the target
+	// this alongside it got parsecs, au or kilometers depending on the target
 	// and no way to tell. Distance now carries its own unit and this only
 	// decides which one to print.
 	DistanceUnit string

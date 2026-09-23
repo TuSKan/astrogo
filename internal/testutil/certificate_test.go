@@ -16,6 +16,14 @@ import (
 	"testing"
 )
 
+// The two non-certificate errors the negative case below is built from, as
+// sentinels because the repository's convention is that an error is a value
+// with a name rather than a string built where it is needed.
+var (
+	errSomethingWentWrong = errors.New("something went wrong")
+	errConnectionRefused  = errors.New("connection refused")
+)
+
 // The three dates the fixtures below are built from, as offsets in years from
 // the standard library's zero time.Time — year 1.
 //
@@ -35,14 +43,6 @@ import (
 //
 // The valid-until year is 2200. Nothing here survives that, but it is the sort
 // of thing that should be written down rather than discovered.
-// The two non-certificate errors the negative case below is built from, as
-// sentinels because the repository's convention is that an error is a value
-// with a name rather than a string built where it is needed.
-var (
-	errSomethingWentWrong = errors.New("something went wrong")
-	errConnectionRefused  = errors.New("connection refused")
-)
-
 var (
 	certValidFrom  = x509.Certificate{}.NotBefore.AddDate(1999, 0, 0) // 2000-01-01
 	certExpiredAt  = x509.Certificate{}.NotBefore.AddDate(2019, 0, 0) // 2020-01-01
@@ -77,7 +77,7 @@ type certFixture struct {
 // A live handshake rather than hand-built error values. What is under test is
 // which error the standard library actually produces and how deeply it wraps
 // it, and a synthetic x509 error would assert this package's belief about that
-// instead of the behaviour. Two things a synthetic error would have got wrong
+// instead of the behavior. Two things a synthetic error would have got wrong
 // here: VerifyHostname returns HostnameError by value, not by pointer, and the
 // verifier ordering described above is not what reading crypto/x509 alone
 // suggests, because two of the three CI platforms do not use it.
@@ -190,8 +190,8 @@ func TestAnExpiredCertificateIsTheServicesProblem(t *testing.T) {
 			"and nothing about astrogo's request can be corrected to satisfy it", err)
 	}
 
-	if _, up := upstreamFailure(err); !up {
-		t.Errorf("upstreamFailure = false, want a skip citing %q — this is the "+
+	if _, up := UpstreamFailure(err); !up {
+		t.Errorf("UpstreamFailure = false, want a skip citing %q — this is the "+
 			"classifier TestNewSiteEarthAddress_Live actually reaches, through "+
 			"SkipOnUpstreamFailure", reason)
 	}
@@ -263,8 +263,8 @@ func TestACertificateForAnotherNameStaysFatal(t *testing.T) {
 			"the wrong host is a defect to see, not an outage to skip")
 	}
 
-	if _, ok := upstreamFailure(err); ok {
-		t.Error("upstreamFailure = true for a name mismatch; the test that would have " +
+	if _, ok := UpstreamFailure(err); ok {
+		t.Error("UpstreamFailure = true for a name mismatch; the test that would have " +
 			"reported the wrong endpoint now skips instead")
 	}
 }
@@ -281,7 +281,7 @@ func TestCertificateFailureIgnoresEverythingElse(t *testing.T) {
 	}{
 		{"nil", nil},
 		{"a plain error", errSomethingWentWrong},
-		{"a cancelled context", context.Canceled},
+		{"a canceled context", context.Canceled},
 		{"a deadline", context.DeadlineExceeded},
 		{"a DNS failure", &net.DNSError{Err: "no such host", IsNotFound: true}},
 		{"a refused dial", &net.OpError{Op: "dial", Err: errConnectionRefused}},

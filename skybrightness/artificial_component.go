@@ -43,7 +43,7 @@ var ErrNoEmitters = errors.New("skybrightness: artificial skyglow needs at least
 //     (2019) Eq. 3 adopts and which gives 35.7 at the horizon rather than
 //     Pickering's 38. The paper's own stated limit is that Eq. 2 reduces to
 //     L_S·P·(1−g)²/(1+g) when looking at the horizon, and that holds exactly
-//     when M(z) reaches M_S. A ground source beyond a few kilometres sits at
+//     when M(z) reaches M_S. A ground source beyond a few kilometers sits at
 //     the observer's horizon, so this is what makes the model self-consistent
 //     with its own limit.
 //
@@ -265,7 +265,7 @@ func (a *ArtificialSkyglow) Provenance() Provenance {
 		ValidityDomain: "Clear sky. The asymmetry parameterisation was solved at 450 and " +
 			"550 nm and represents a band roughly 20-30 nm wide, so this component is " +
 			"less spectrally resolved than the grid it writes onto. Ground sources " +
-			"beyond a few kilometres, where the horizon-source geometry holds.",
+			"beyond a few kilometers, where the horizon-source geometry holds.",
 		KnownApproximations: []string{
 			"M_S is taken as the horizon airmass in Gushchin's formula, and the " +
 				"emission function is evaluated at zero elevation; the paper " +

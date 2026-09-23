@@ -74,7 +74,7 @@ func (p *Provider) Resolve(ctx context.Context, query string) (resolve.Target, e
 //
 // It used to swallow errors here: the iterator's error was written to the
 // global log package and the drained slice came back empty, which every caller
-// then read as "not found". A CDS outage, a cancelled context and a genuinely
+// then read as "not found". A CDS outage, a canceled context and a genuinely
 // absent object were indistinguishable, and the only trace was a line on
 // whatever writer log.SetOutput last pointed at.
 //

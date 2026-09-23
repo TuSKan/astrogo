@@ -81,7 +81,7 @@ type Spec struct {
 	SNR float64
 }
 
-// Imaging reports how faint an imaging system can see through a modelled sky.
+// Imaging reports how faint an imaging system can see through a modeled sky.
 //
 // It satisfies [plan.SkyDepth], so it drops straight into
 // [plan.LimitingMagnitudeConstraint].

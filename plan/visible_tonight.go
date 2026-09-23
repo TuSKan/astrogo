@@ -231,7 +231,7 @@ var planetConstructors = []func(eph.Provider) *Planet{
 //		return err
 //	}
 //
-// A caller who wants the old behaviour ignores an [ErrIncomplete] error; one
+// A caller who wants the old behavior ignores an [ErrIncomplete] error; one
 // who needs certainty treats it as fatal. Both are now possible, which is the
 // point — a Warn log line, which is all this used to emit, is not something a
 // program can branch on. Every other error return is fatal and comes with no

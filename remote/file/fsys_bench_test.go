@@ -169,7 +169,7 @@ func BenchmarkLocalReadAt(b *testing.B) {
 //
 // The request count is reported per operation. That number, not the time, is
 // the one that decides whether the chunk cache survives — 2000 requests for
-// 2000 reads is the behaviour the cache exists to prevent, and a local server
+// 2000 reads is the behavior the cache exists to prevent, and a local server
 // makes it look far cheaper than it is over a network.
 func BenchmarkHTTPReadAt(b *testing.B) {
 	data := benchObject(benchSizeMB)

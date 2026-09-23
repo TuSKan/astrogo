@@ -35,7 +35,7 @@ const (
 
 	// zodiacalTableUnit converts the table's 1e-8 W m^-2 sr^-1 um^-1 into
 	// W m^-2 sr^-1 nm^-1: 1e-8 for the prefix, then per-micron to
-	// per-nanometre.
+	// per-nanometer.
 	zodiacalTableUnit = 1e-8 / 1000
 
 	// zodiacalHeliocentricExponent is the power of heliocentric distance the

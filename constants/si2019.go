@@ -3,7 +3,7 @@ package constants
 // SIExactSet holds fundamental constants that became exact by definition
 // with the 2019 SI redefinition (the 26th CGPM's 2018 Resolution 1, in
 // force since 20 May 2019): the speed of light, the Planck constant, and
-// the Boltzmann constant now fix the metre, kilogram, and kelvin (via the
+// the Boltzmann constant now fix the meter, kilogram, and kelvin (via the
 // second and other exact defining constants) rather than being measured
 // against them. None of these three has a CODATA vintage the way G, the
 // electron/proton mass, and the fine-structure constant do — see CODATA2022.
