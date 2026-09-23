@@ -14,7 +14,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/TuSKan/astrogo/plan"
 	"github.com/TuSKan/astrogo/time"
 )
 
@@ -39,39 +38,6 @@ var updateCorpus = flag.Bool("update-corpus", false,
 // and Paranal at 25 south, so nothing in it exercises the geometry where
 // hour-angle-to-azimuth projection blows up or where a body passes through
 // the zenith.
-func corpusSites(t *testing.T) []corpusSite {
-	t.Helper()
-
-	out := make([]corpusSite, 0, 5)
-
-	for _, name := range []string{"Greenwich", "Paranal", "Mauna Kea"} {
-		site, err := plan.NewKnownSite(name)
-		if err != nil {
-			t.Fatalf("known site %q: %v", name, err)
-		}
-
-		loc := site.Location()
-		out = append(out, corpusSite{
-			Name:       site.Name(),
-			Lon:        loc.Lon().Degrees(),
-			Lat:        loc.Lat().Degrees(),
-			Height:     loc.Height().Meters(),
-			Provenance: "plan.KnownSites; published coordinates cross-checked against the IAU MPC observatory code list",
-		})
-	}
-
-	return append(out,
-		corpusSite{
-			Name: "Polar (synthetic, 78N)", Lon: 0, Lat: 78, Height: 0,
-			Provenance: "synthetic; hour-angle-to-azimuth projection is most extreme near the pole, and plan.KnownSites has nothing above 52 degrees",
-		},
-		corpusSite{
-			Name: "Equator (synthetic, 0N 0E)", Lon: 0, Lat: 0, Height: 0,
-			Provenance: "synthetic; targets transit near the zenith, where azimuth is ill-conditioned",
-		},
-	)
-}
-
 // corpusTargets are the bodies Horizons answers topocentric OBSERVER queries
 // for under CENTER='coord@399'.
 //
@@ -309,12 +275,31 @@ func diffCorpus(old, fresh *corpus) string {
 		worstWhere              string
 	)
 
+	// Per field, how many values moved and by how much at most.
+	type fieldStat struct {
+		count int
+		max   float64
+	}
+
+	byField := map[string]fieldStat{}
+
 	for key, e := range freshByKey {
 		prev, ok := oldByKey[key]
 		if !ok {
 			added = append(added, key)
 
 			continue
+		}
+
+		for _, d := range fieldDeltas(prev, e) {
+			st := byField[d.name]
+			st.count++
+
+			if d.delta > st.max {
+				st.max = d.delta
+			}
+
+			byField[d.name] = st
 		}
 
 		delta, field := largestFieldDelta(prev, e)
@@ -347,6 +332,26 @@ func diffCorpus(old, fresh *corpus) string {
 		fmt.Fprintf(&b, "  largest numeric change: %.6g at %s\n", worst, worstWhere)
 	}
 
+	// Grouped by field, which is what says whether the diff has a shape. A
+	// column that moves only at its own last printed digit is Horizons'
+	// emission tipping; one that moves anywhere else is a different animal and
+	// should not be accepted on the strength of the max alone.
+	if len(byField) > 0 {
+		names := make([]string, 0, len(byField))
+		for name := range byField {
+			names = append(names, name)
+		}
+
+		slices.Sort(names)
+
+		fmt.Fprintf(&b, "  by field:\n")
+
+		for _, name := range names {
+			st := byField[name]
+			fmt.Fprintf(&b, "    %-16s %4d values, largest %.3g\n", name, st.count, st.max)
+		}
+	}
+
 	for _, group := range []struct {
 		label string
 		keys  []string
@@ -369,17 +374,22 @@ func diffCorpus(old, fresh *corpus) string {
 	return b.String()
 }
 
-// largestFieldDelta returns the biggest absolute difference between two
-// entries and the field it is in.
-func largestFieldDelta(a, b corpusEntry) (float64, string) {
-	var (
-		worst float64
-		field string
-	)
+// fieldDeltas returns every field that differs between two entries, with by
+// how much.
+//
+// All of them rather than the largest, because the largest alone cannot tell a
+// reviewer what kind of change they are looking at. "94 entries changed, the
+// largest by 1e-06" is compatible with a rounding shift and with a body moving,
+// and the two call for opposite responses. Grouped by field it is obvious at a
+// glance: angles moving only at their last printed digit while range moves only
+// at its own is a reference whose emission tipped, and anything that lands
+// somewhere else is not.
+func fieldDeltas(a, b corpusEntry) []fieldDelta {
+	var out []fieldDelta
 
 	consider := func(name string, x, y float64) {
-		if d := math.Abs(x - y); d > worst {
-			worst, field = d, name
+		if d := math.Abs(x - y); d > 0 {
+			out = append(out, fieldDelta{name: name, delta: d})
 		}
 	}
 
@@ -394,6 +404,29 @@ func largestFieldDelta(a, b corpusEntry) (float64, string) {
 	for i := range 3 {
 		consider(fmt.Sprintf("geo_vector[%d]", i), a.GeoVector[i], b.GeoVector[i])
 		consider(fmt.Sprintf("geo_velocity[%d]", i), a.GeoVelocity[i], b.GeoVelocity[i])
+	}
+
+	return out
+}
+
+// fieldDelta is one field that moved, and by how much.
+type fieldDelta struct {
+	name  string
+	delta float64
+}
+
+// largestFieldDelta returns the biggest absolute difference between two
+// entries and the field it is in.
+func largestFieldDelta(a, b corpusEntry) (float64, string) {
+	var (
+		worst float64
+		field string
+	)
+
+	for _, d := range fieldDeltas(a, b) {
+		if d.delta > worst {
+			worst, field = d.delta, d.name
+		}
 	}
 
 	return worst, field
