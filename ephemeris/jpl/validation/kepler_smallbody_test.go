@@ -158,7 +158,11 @@ func TestKeplerSmallBodyAgainstSPK(t *testing.T) {
 					t.Skipf("Horizons could not serve an SPK for %s: %v (external, not astrogo)", body.name, err)
 				}
 
-				t.Skipf("provider for %s: %v", body.name, err)
+				// Anything the classifiers above and here decline is astrogo's.
+				// This was a skip on whatever was left, which is every error
+				// the provider can return that is not a Horizons fault.
+				testutil.SkipOnUpstreamFailure(t, err)
+				t.Fatalf("provider for %s: %v", body.name, err)
 			}
 
 			defer func() { _ = p.Close() }()
