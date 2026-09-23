@@ -37,7 +37,7 @@ func Example() {
 		fmt.Println("name matches several objects")
 
 	case err != nil:
-		// NOT an answer. Unreachable service, malformed response, cancelled
+		// NOT an answer. Unreachable service, malformed response, canceled
 		// context. This is the branch that must not be folded into the first.
 		fmt.Println("could not ask:", err)
 

@@ -21,7 +21,7 @@ const sampleFinals2000A = `73 1 2 41684.00 I  0.120733 0.009786  0.136966 0.0159
 73 1 3 41685.00 I  0.118980 0.011039  0.135656 0.013616  I 0.8056163 0.0002710  3.5563 0.1916  P    -0.751    0.199    -0.701    0.300   .141000   .134000   .8044000   -18.636    -3.571  `
 
 // These tests moved here from time/internal/iers when the EOP dependency
-// was inverted. They were always testing this package's behaviour —
+// was inverted. They were always testing this package's behavior —
 // consent, ETag revalidation, cache layout — through a package that had
 // no business knowing about any of it. They now sit next to the code they
 // exercise, and iers keeps only the tests about its own logic.

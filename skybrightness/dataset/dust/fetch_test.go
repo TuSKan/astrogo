@@ -148,7 +148,7 @@ func TestFetchQueriesACellOnce(t *testing.T) {
 
 // TestFetchKeepsWhatItLearnedWhenCutOff: being cut off part way through a long
 // list should cost the remaining sightlines, not the ones already paid for.
-// Without this the next run re-asks for everything, which is the behaviour the
+// Without this the next run re-asks for everything, which is the behavior the
 // cache was added to stop.
 func TestFetchKeepsWhatItLearnedWhenCutOff(t *testing.T) {
 	calls := fakeIRSA(t, func(n int) (float64, int) {

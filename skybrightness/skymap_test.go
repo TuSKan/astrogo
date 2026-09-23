@@ -84,7 +84,7 @@ func TestSkyMapRejectsZeroRings(t *testing.T) {
 }
 
 // A uniform sky of radiance L gives a horizontal irradiance of pi*L per
-// nanometre — the standard Lambertian result. It is the one closed form
+// nanometer — the standard Lambertian result. It is the one closed form
 // available for the hemispheric integral, so it pins the cos(alt)
 // weighting and the solid-angle bookkeeping together.
 func TestIntegratedHemisphereUniformSky(t *testing.T) {

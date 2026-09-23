@@ -90,7 +90,7 @@ func TestRefractionVanishesAtTheZenith(t *testing.T) {
 		// exact is true for the models that return a literal zero. SOFA does
 		// not: iauAtioq clamps cos(altitude) away from zero at celMin = 1e-6,
 		// so the series evaluates to 5.7e-5 arcsec rather than nothing. That
-		// is SOFA's own behaviour, reproduced on purpose, and 57 microarcsec
+		// is SOFA's own behavior, reproduced on purpose, and 57 microarcsec
 		// is eleven orders below anything this library claims.
 		exact bool
 	}{

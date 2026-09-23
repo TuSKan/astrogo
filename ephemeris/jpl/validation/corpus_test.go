@@ -31,9 +31,9 @@ import (
 // zeroes still parses.
 
 // kmPerAU converts the AU-valued state differences these suites measure into
-// the kilometres that the reference routines' own accuracy figures are quoted
+// the kilometers that the reference routines' own accuracy figures are quoted
 // in. The idiom is the one the constants package's doc demonstrates; Value is
-// in metres.
+// in meters.
 //
 // Here rather than in main_test.go because the validation- and network-tagged
 // suites both need it and cannot see each other's files, and main_test.go has

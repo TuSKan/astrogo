@@ -26,7 +26,7 @@ import (
 
 // wrapperMaxKM is deliberately loose. It is not an accuracy claim — sgp4's own
 // suite makes that one — it is a bound on transport: the number coming out of
-// Satellite.propagateECI must be the number sgp4 put in, and a metre sits far
+// Satellite.propagateECI must be the number sgp4 put in, and a meter sits far
 // below anything a unit slip, a frame confusion or a dropped epoch fraction
 // could hide inside.
 const wrapperMaxKM = 1e-3

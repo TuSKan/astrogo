@@ -20,7 +20,7 @@ type mockProvider struct {
 
 	// failWith, when set, is returned by both Resolve and Search instead of
 	// consulting targets — the stand-in for a provider that cannot answer
-	// (an outage, a cancelled context, a rate limit) as opposed to one that
+	// (an outage, a canceled context, a rate limit) as opposed to one that
 	// answers "no such object". Keeping those separable is the whole point of
 	// the error-returning Provider interface.
 	failWith error

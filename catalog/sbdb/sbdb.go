@@ -253,7 +253,7 @@ func (p *Provider) ResolveObject(ctx context.Context, req resolve.ObjectRequest)
 				}
 			case "diameter":
 				if v, err := parseFloat(pp.Value); err == nil {
-					// SBDB publishes phys_par diameters in kilometres.
+					// SBDB publishes phys_par diameters in kilometers.
 					t.Diameter = unit.Km(v)
 					t.HasDiameter = true
 				}

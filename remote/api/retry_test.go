@@ -41,7 +41,7 @@ func countingServer(t *testing.T, status, failures int) (*httptest.Server, *atom
 // own predicates wired directly into the client.
 //
 // Naming it, exporting it and giving it a signature a caller can implement is
-// the whole point of the change; this is the table that says the behaviour did
+// the whole point of the change; this is the table that says the behavior did
 // not move while the shape did.
 func TestDefaultRetryPolicyDecides(t *testing.T) {
 	t.Parallel()
@@ -110,7 +110,7 @@ func TestClientDoesNotRetryAStatusThePolicyRejects(t *testing.T) {
 // TestWithRetryPolicyReplacesTheDefault is the extension point itself.
 //
 // The policy here retries a 409, which the default does not, and refuses a 503,
-// which the default does — so passing it changes the behaviour in both
+// which the default does — so passing it changes the behavior in both
 // directions and neither result could come from the default still being in
 // force.
 func TestWithRetryPolicyReplacesTheDefault(t *testing.T) {

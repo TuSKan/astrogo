@@ -78,7 +78,7 @@
 // doing so made the fit worse in both directions and no explanation for that
 // was established.
 //
-// What remains unmodelled is the periodic perturbation. The Galilean moons are locked
+// What remains unmodeled is the periodic perturbation. The Galilean moons are locked
 // in the Laplace resonance and Jupiter's J₂ drives apsidal precession, so an
 // unperturbed ellipse drifts — measured against Horizons over ten days from
 // the elements' own epoch, by **up to 5,900 km** across the four Galilean
@@ -96,7 +96,7 @@
 // package applies.
 //
 // So what is here is the correct machinery, the correct constants and the
-// correct frame — not a satellite ephemeris. Kilometre accuracy needs a
+// correct frame — not a satellite ephemeris. Kilometer accuracy needs a
 // kernel-backed provider ([github.com/TuSKan/astrogo/ephemeris.NewProvider]
 // with [github.com/TuSKan/astrogo/ephemeris.Moons]); this is for a finder
 // chart, not an occultation prediction.

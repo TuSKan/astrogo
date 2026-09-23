@@ -116,11 +116,11 @@ func (g SpectralGrid) Wavelengths() []WavelengthNM {
 }
 
 // Integrate returns the trapezoidal integral of values over the grid, in
-// the values' own unit multiplied by nanometres. It returns ErrGridMismatch
+// the values' own unit multiplied by nanometers. It returns ErrGridMismatch
 // if len(values) != g.N.
 //
 // Trapezoidal rather than Simpson: the integrands here are products of
-// measured response curves and modelled spectra, both of which carry
+// measured response curves and modeled spectra, both of which carry
 // sampling error far larger than the quadrature difference, and Simpson
 // would additionally require an odd sample count that grid users have no
 // reason to guarantee.

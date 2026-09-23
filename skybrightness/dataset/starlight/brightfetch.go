@@ -36,7 +36,7 @@ const (
 	// alternative is an exported variable somebody could reassign.
 	BrightStarMatchRadius = angle.Angle(5 * math.Pi / 180 / 3600)
 
-	// BrightStarCatalogueRadius is the tolerance for matching a bright star to
+	// BrightStarCatalogRadius is the tolerance for matching a bright star to
 	// the Bright Star Catalogue, ten arcseconds.
 	//
 	// Twice the Gaia radius rather than six times, because the two matches
@@ -56,7 +56,7 @@ const (
 	// binary, and picking the nearer would have been luck rather than
 	// correctness. The positions are propagated now, and the radius is what a
 	// position match needs rather than what an unpropagated one needs.
-	BrightStarCatalogueRadius = angle.Angle(10 * math.Pi / 180 / 3600)
+	BrightStarCatalogRadius = angle.Angle(10 * math.Pi / 180 / 3600)
 
 	// BrightStarMagnitudeTolerance is how far a candidate's V may sit from the
 	// star's before it is taken to be a different object.
@@ -532,7 +532,7 @@ func AddCousinsR(ctx context.Context, stars []BrightStar) (matched int, err erro
 
 		for j, c := range catalogue {
 			d := coord.Separation(here, coord.NewICRS(c.ra, c.dec))
-			if d > BrightStarCatalogueRadius {
+			if d > BrightStarCatalogRadius {
 				continue
 			}
 

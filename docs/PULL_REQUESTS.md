@@ -19,12 +19,12 @@ Never commit on `main`. Branch names follow the change:
 
 | prefix | for |
 | :--- | :--- |
-| `fix/` | a defect in shipped behaviour |
+| `fix/` | a defect in shipped behavior |
 | `feat/` | new capability |
 | `test/` | coverage or a new validation suite |
 | `docs/` | documentation and its guards |
 | `chore/` | releases, tooling, CI |
-| `refactor/` | structure, no behaviour change |
+| `refactor/` | structure, no behavior change |
 
 On a branch you created, commit and push freely. **Opening a pull request needs
 an explicit instruction, and merging always does.**
@@ -111,7 +111,7 @@ which pull request is running — and its absence was not hypothetical: #80 and
 #81 both merged without a fragment while this very section asked for one, and
 would have been missing from the release they belong to.
 
-If a change genuinely warrants no entry — pure test coverage for behaviour
+If a change genuinely warrants no entry — pure test coverage for behavior
 already shipped, or a CI change no user can observe — label the pull request
 `no-changelog`. The label is deliberate and shows up in review; silence did
 not.
@@ -134,7 +134,7 @@ somebody wrote it down, and a break with no entry meant nothing at all.
 
 The rule is one-directional on purpose: an undeclared break fails, a declared
 one passes whatever `apidiff` sees. A fragment claiming a break the tool cannot
-see is usually a behavioural break rather than a signature one, and CI has no
+see is usually a behavioral break rather than a signature one, and CI has no
 business calling that a mistake.
 
 The failure message lists the changed symbols, which is the migration note

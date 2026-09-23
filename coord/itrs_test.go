@@ -85,7 +85,7 @@ func TestITRSRoundTripsAndKeepsItsLength(t *testing.T) {
 	for _, v := range []vector.Vec3{
 		{X: 1, Y: 0, Z: 0},
 		{X: 0.3, Y: -0.6, Z: 0.74},
-		{X: 6378137, Y: 0, Z: 0},       // an equatorial Earth radius, in metres
+		{X: 6378137, Y: 0, Z: 0},       // an equatorial Earth radius, in meters
 		{X: -1e-9, Y: 2e-9, Z: 3.5e-9}, // and something tiny
 		{X: 1.5e11, Y: -2e11, Z: 1e10}, // and something the size of an orbit
 	} {
@@ -170,7 +170,7 @@ func TestTheObserverRotatesOntoItsOwnSite(t *testing.T) {
 	ctx := itrsContext(t)
 	site := ctx.Site()
 
-	// ObsVec is in AU; the ellipsoid works in metres.
+	// ObsVec is in AU; the ellipsoid works in meters.
 	au := constants.IAU.AstronomicalUnit.Value
 
 	ecef := ctx.ICRSToITRS(ctx.ObsVec()).MulScalar(au)

@@ -79,6 +79,10 @@ func TestApparentAgreesWithHorizonsGeocentric(t *testing.T) {
 
 	provider, err := jpl.NewProvider(context.Background(), core.Planets, "de441_part-2")
 	if err != nil {
+		// The kernel comes from NAIF on first use. A NAIF outage is not a
+		// verdict on the comparison below, and this was the only unguarded
+		// fetch left in the test after the Horizons ones were classified.
+		testutil.SkipOnUpstreamFailure(t, err)
 		t.Fatalf("de441_part-2 provider: %v", err)
 	}
 
@@ -129,7 +133,7 @@ func TestApparentAgreesWithHorizonsGeocentric(t *testing.T) {
 		rows, err := fetchGeocentricSeries(body.command, body.name, "2",
 			"2026-01-01", "2026-12-25", "15d")
 		if err != nil {
-			testutil.SkipOnUpstreamFailure(t, err)
+			skipIfHorizonsDown(t, err)
 			t.Fatalf("%s: fetching the geocentric apparent series: %v", body.name, err)
 		}
 

@@ -555,7 +555,7 @@ func RankObservables(
 	// does not apply here: the `s > 0` filter above already drops a
 	// non-finite score, since every comparison against a NaN is false. This
 	// is the same rewrite for consistency and for the 1.7x it measures, not
-	// for a behaviour change.
+	// for a behavior change.
 	//
 	// That filter is worth a second look on its own account — it discards an
 	// unscoreable target silently, indistinguishably from one that scored

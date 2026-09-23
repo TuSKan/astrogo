@@ -135,7 +135,7 @@ func TestSpectrumAt(t *testing.T) {
 
 // The photon-to-energy conversion, checked against a hand-worked value.
 //
-// SkyCalc reports ph/s/m2/micron/arcsec2. A radiance is per nanometre, per
+// SkyCalc reports ph/s/m2/micron/arcsec2. A radiance is per nanometer, per
 // steradian, and in watts. Getting any one of those wrong leaves a spectrum
 // that is positive and smooth and out by a factor of 1000, 4.25e10 or 3.6e-19.
 func TestPhotonConversionMatchesAHandWorkedValue(t *testing.T) {

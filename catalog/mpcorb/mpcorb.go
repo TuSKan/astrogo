@@ -338,7 +338,7 @@ func ParseEpoch(packed string) (time.Time, error) {
 	// The Julian Date of a calendar midnight is the same number whichever
 	// scale labels it; what differs is which instant that number names. So
 	// the date is turned into a JD through the UTC constructor and then
-	// labelled TT, which is the scale MPCORB's epochs are actually given in.
+	// labeled TT, which is the scale MPCORB's epochs are actually given in.
 	// Reading it back as UTC instead would be wrong by ΔT — 69 s today, and
 	// a minute is not nothing when the elements are osculating.
 	midnight := time.Date(century+yy, time.Month(month), day, 0, 0, 0, 0, time.LocationUTC)

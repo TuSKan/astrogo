@@ -28,7 +28,7 @@ import (
 // package's entire purpose under a blank import is the registration, so the
 // init is the contract rather than a hidden side effect. CLAUDE.md's rule
 // forbids the latter, and an exported Register() the caller had to remember to
-// invoke would make a blank import do nothing — which is the one behaviour a
+// invoke would make a blank import do nothing — which is the one behavior a
 // reader of `import _` will not expect.
 //
 //nolint:gochecknoinits // the registration is this package's documented purpose under a blank import

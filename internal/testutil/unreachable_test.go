@@ -193,7 +193,7 @@ func TestANetworkFailureWinsOverAnAccompanyingDeadline(t *testing.T) {
 			want: true,
 		},
 		{
-			name: "connection refused under a cancelled context",
+			name: "connection refused under a canceled context",
 			err:  fmt.Errorf("get: %w: %w", context.Canceled, syscall.ECONNREFUSED),
 			want: true,
 		},

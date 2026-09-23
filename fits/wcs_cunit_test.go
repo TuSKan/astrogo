@@ -37,7 +37,7 @@ func wcsHeader(t *testing.T, cards ...string) *fits.Header {
 // read CUNIT at all. The number was correct and its unit was unreachable
 // through the API, which is a worse combination than either alone: a caller
 // gets a plausible float and has to go back to the header card to learn
-// whether it is metres or Angstrom.
+// whether it is meters or Angstrom.
 //
 // This does not decide the typed-API question. It makes the input that
 // question needs visible, which is a precondition for answering it either way.

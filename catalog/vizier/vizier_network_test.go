@@ -14,7 +14,7 @@ import (
 	"github.com/TuSKan/astrogo/time"
 )
 
-// skipOnServerUnavailable skips (never fails) the calling test after
+// failOrSkipOnOutage settles the calling test after
 // coneSearchWithRetry has already exhausted every retry — reached only
 // when every attempt (each against a freshly built Provider/*http.Client)
 // still failed. Live-isolated this session, all the way down through raw
@@ -27,15 +27,29 @@ import (
 // produces more than one distinct external-failure shape, not just a
 // clean 5xx. Since coneSearchWithRetry's exhaustion already means several
 // independent connection attempts all failed, any error reaching this
-// point is treated as the same "external downtime" class this project's
-// network-test policy exempts from failing CI — this is a
-// //go:build network, opt-in-only test file, never run in CI, so a human
-// running it locally still sees every attempt's real error via t.Logf
-// and can investigate a suspiciously-consistent failure by hand.
-func skipOnServerUnavailable(t *testing.T, err error) {
+// point used to be treated as the same "external downtime" class this
+// project's network-test policy exempts from failing CI, on the grounds that
+// a human running it locally still sees every attempt's real error via
+// t.Logf and can investigate a suspiciously-consistent failure by hand.
+//
+// # Why it no longer skips on everything
+//
+// Because the bogus 400 is also what a genuinely broken query returns.
+// "Incorrect ADQL query: N unresolved identifiers" is VizieR's answer to a
+// column or table name it does not know — which is the regression this file
+// exists to catch, and which fails identically on every backend. The retries
+// above absorb a flaky node; skipping on whatever survives three fresh
+// connections turned the one case they cannot absorb into a permanent pass.
+//
+// So the 503s are classified and skip, and anything that fails three times on
+// three connections fails the test. That is the outcome the paragraph above
+// asks for — a human looking at a suspiciously consistent failure — and a skip
+// is the one outcome nobody ever looks at.
+func failOrSkipOnOutage(t *testing.T, err error) {
 	t.Helper()
 
-	t.Skipf("VizieR TAP service unavailable after retries, skipping live test: %v", err)
+	testutil.SkipOnUpstreamFailure(t, err)
+	t.Fatalf("VizieR TAP failed on every fresh-connection attempt: %v", err)
 }
 
 // requireVizier skips the test when the VizieR TAP endpoint is unreachable —
@@ -65,7 +79,7 @@ func requireVizier(t *testing.T) {
 // backend answers, so this retry doesn't mask a real regression; it only
 // absorbs the proven backend-routing flakiness. Only the final attempt's
 // error, if every attempt failed, is handed to
-// skipOnServerUnavailable/t.Fatalf.
+// failOrSkipOnOutage.
 func coneSearchWithRetry(ctx context.Context, t *testing.T, req resolve.ConeRequest) int {
 	t.Helper()
 
@@ -103,7 +117,7 @@ func coneSearchWithRetry(ctx context.Context, t *testing.T, req resolve.ConeRequ
 		t.Logf("attempt %d/%d failed: %v", attempt+1, attempts, lastErr)
 	}
 
-	skipOnServerUnavailable(t, lastErr)
+	failOrSkipOnOutage(t, lastErr)
 
 	return count
 }

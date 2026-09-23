@@ -103,7 +103,7 @@ func TestAcquireLockAdmitsOneHolderAtATime(t *testing.T) {
 func TestAcquireLockReleasesTheInProcessSlotOnFailure(t *testing.T) {
 	fsys, _ := openLocalFS(t)
 
-	const cacheKey = "cancelled-acquire-test.bin"
+	const cacheKey = "canceled-acquire-test.bin"
 
 	// The lock object is written directly, standing in for a holder in
 	// another process. That is what reaches the path under test: this

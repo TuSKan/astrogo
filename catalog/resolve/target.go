@@ -230,13 +230,13 @@ func (t Target) ICRS(_ time.Time) (coord.ICRS, error) {
 // They used to be Resolve(ctx, query) (Target, bool) and
 // Search(ctx, query) []Target, which gave a failure nowhere to go. Every
 // outcome collapsed into "false": an object that genuinely does not exist, a
-// CDS outage, a cancelled context, a deadline, a 429 after retries, a TLS
+// CDS outage, a canceled context, a deadline, a 429 after retries, a TLS
 // failure, and a provider that does not implement name resolution at all.
 // Measured against the old API, all three of these returned "target not
 // found":
 //
 //	offline mode      -> target not found
-//	cancelled context -> target not found
+//	canceled context -> target not found
 //	deadline exceeded -> target not found
 //
 // so errors.Is(err, context.Canceled) could never be true through this

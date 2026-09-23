@@ -277,7 +277,7 @@ func sipEval(coeffs map[[2]int]float64, u, v float64) float64 {
 //
 // Because [WCS.PixelToWorld] returns a bare float per axis, and for a
 // non-celestial axis nothing else in this package says what that number is.
-// A spectral axis may be metres, Hertz or Angstrom; a time axis seconds or
+// A spectral axis may be meters, Hertz or Angstrom; a time axis seconds or
 // days. The value astrogo returns is correct in the header's unit, and until
 // now the header's unit was not reachable through the API at all — a caller
 // had to parse the card themselves to interpret a number this package handed
@@ -332,7 +332,7 @@ func (w *WCS) SetCUnit(cunit []string) error {
 //     be in degrees, so it is the header's unit and not a choice made here.
 //   - Every other axis comes back in the unit its own CUNITi declares, because
 //     the value is CRVAL plus a linear offset and astrogo does not convert it.
-//     A spectral axis is metres, Hertz or Angstrom as the header says; a time
+//     A spectral axis is meters, Hertz or Angstrom as the header says; a time
 //     axis seconds or days. [WCS.CUnit] is how a caller finds out which.
 //   - When no celestial pair is present, every axis is the linear case above.
 //

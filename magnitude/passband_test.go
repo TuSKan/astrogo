@@ -370,7 +370,7 @@ func TestSurfaceBrightnessZeroSkyIsInfinitelyFaint(t *testing.T) {
 // systematic, and entirely silent.
 //
 // The reference values are the Spanish Virtual Observatory's own
-// WavelengthPivot for the five Bessell bands, in nanometres. All five are
+// WavelengthPivot for the five Bessell bands, in nanometers. All five are
 // energy counters, and honouring that reproduces every one of them; the photon
 // form misses by 0.33 to 0.89 per cent.
 func TestPivotWavelengthFollowsTheDetector(t *testing.T) {
@@ -423,7 +423,7 @@ func TestPivotWavelengthFollowsTheDetector(t *testing.T) {
 	}
 
 	// And the difference is the size the definitions imply, not a rounding
-	// artefact: a hundred-nanometre-wide band separates them by about half a
+	// artefact: a hundred-nanometer-wide band separates them by about half a
 	// per cent.
 	if rel := (float64(photon) - float64(energy)) / float64(energy); rel < 0.001 || rel > 0.02 {
 		t.Errorf("the two conventions differ by %.3f per cent, which is not the scale the "+
