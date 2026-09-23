@@ -1084,7 +1084,7 @@ func GreatestElongations(start, end time.Time, target, sun Observable) ([]Event,
 }
 
 // FullMoonOppositions returns the full moons (Sun-Moon Oppositions) in the given interval.
-// For eclipse detection, use LunarEclipses() which filters by ecliptic latitude.
+// For eclipses, use LunarEclipses, which decides each Full Moon by Earth's shadow.
 func FullMoonOppositions(start, end time.Time, provider eph.Provider) ([]Event, error) {
 	sun := NewSun(provider)
 	moon := NewMoon(provider)

@@ -232,19 +232,22 @@ Implemented in `plan.Apsides()`.
 
 | Date | Type (NASA) | Detected | β (ecliptic lat) | γ (centrality) |
 |---|---|---|---|---|
-| 2026-03-03 | Total | ✅ | −0.362° | 0.229 |
-| 2026-08-28 | Partial | ✅ | +0.468° | 0.296 |
+| 2026-03-03 | Total | ✅ | −0.358° | 0.240 |
+| 2026-08-28 | Partial | ✅ | +0.462° | 0.317 |
 
 ### Solar Eclipses
 
 | Date | Type (NASA) | Detected | β (ecliptic lat) | γ (centrality) |
 |---|---|---|---|---|
-| 2026-02-17 | Annular | ✅ | −0.928° | 0.587 |
-| 2026-08-12 | Total | ✅ | +0.896° | 0.567 |
+| 2026-02-17 | Annular | ✅ | −0.919° | 0.626 |
+| 2026-08-12 | Total | ✅ | +0.888° | 0.585 |
 
-Algorithm: Filter Full Moons (lunar) and New Moons (solar) by Moon's ecliptic
-latitude within the Danjon penumbral limit (≈1.58°). Lower γ = more central eclipse.
-Implemented in `plan.LunarEclipses()` and `plan.SolarEclipses()`.
+Algorithm: at each Full Moon (lunar) or New Moon (solar), find greatest eclipse
+and ask whether the Moon enters Earth's penumbra, or the Moon's penumbra reaches
+Earth, with the shadows sized that month as NASA's Five Millennium Canons size them
+(#401). γ is the closest approach to the shadow axis as a fraction of the grazing
+distance: 0 central, 1 at the limit. β is the Moon's ecliptic latitude at greatest
+eclipse. Implemented in `plan.LunarEclipses()` and `plan.SolarEclipses()`.
 
 ---
 

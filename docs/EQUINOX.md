@@ -99,18 +99,19 @@ for seasonal temperatures, but it measurably affects season durations.
 
 ## Eclipses of 2026
 
-2026 features four eclipses — two total lunar and two solar:
+2026 features four eclipses — two lunar and two solar:
 
 | Type | Date (BRT) | |β| | γ | Visible from São Paulo? |
 |------|-----------|------|-------|--------------------------|
-| 🌕 Solar (Total/Annular) | Feb 17 09:12 | 0.919° | 0.581 | ❌ No — path crosses Antarctica/S. Atlantic |
-| 🌑 Lunar (Total) | Mar 03 08:34 | 0.358° | 0.227 | ✅ Yes — visible at moonset (partial) |
-| 🌕 Solar (Total/Annular) | Aug 12 14:46 | 0.887° | 0.562 | ❌ No — path crosses Europe/N. Africa |
-| 🌑 Lunar (Total) | Aug 28 01:13 | 0.463° | 0.293 | ✅ Yes — fully visible overnight |
+| 🌕 Solar (Total/Annular) | Feb 17 09:11 | 0.919° | 0.626 | ❌ No — path crosses Antarctica/S. Atlantic |
+| 🌑 Lunar (Total) | Mar 03 08:33 | 0.358° | 0.240 | ✅ Yes — visible at moonset (partial) |
+| 🌕 Solar (Total/Annular) | Aug 12 14:45 | 0.888° | 0.585 | ❌ No — path crosses Europe/N. Africa |
+| 🌑 Lunar (Partial) | Aug 28 01:12 | 0.462° | 0.317 | ✅ Yes — fully visible overnight |
 
-Both lunar eclipses have very low |β| (ecliptic latitude), indicating deep, central
-passages through Earth's shadow. The γ values (0.23 and 0.29) confirm these are
-near-central total eclipses with long totality durations.
+Both lunar eclipses have low |β| (ecliptic latitude), and their γ values (0.24 and
+0.32, the Moon's closest approach to the shadow axis as a fraction of the grazing
+distance) put both deep in Earth's shadow. March 3 is total; August 28 is a deep
+partial, umbral magnitude 0.93 in NASA's canon.
 
 > **Note:** Eclipse times are the moment of **greatest eclipse** (geocentric). Solar eclipse
 > visibility depends on the narrow shadow path; lunar eclipses are visible from the
@@ -149,7 +150,10 @@ can differ by up to 1° in declination.
 - **Ecliptic longitude:** computed via SOFA's IAU 2006 precession + IAU 2000A nutation
   (`Eqec06`), with the 20.496" aberration constant subtracted for the Sun's apparent position
 - **Root finding:** Chandrupatla's method with guaranteed convergence and sub-second precision
-- **Eclipse detection:** ecliptic latitude filtering at syzygy (Danjon limit ≈1.58° penumbral)
+- **Eclipse detection:** at each syzygy, greatest eclipse against that month's shadow,
+  sized as NASA's Five Millennium Canons size it (Danjon's rule for Earth's shadow, the
+  WGS 84 spheroid for the Moon's), which agrees with the canons on every eclipse in six
+  centuries (#401)
 - **Topocentric correction:** observer ICRS vector subtracted from geocentric body vector
   (`ctx.ObsVec()`)
 
