@@ -223,6 +223,62 @@ func parseNASACatalog(t *testing.T, html string, key *regexp.Regexp) []nasaEclip
 	return eclipses
 }
 
+// greatestEclipseTolMinutes bounds how far astrogo's greatest eclipse may fall
+// from the canon's, which prints it to the second. Measured over all 2885
+// eclipses on these pages: 0.16 minutes on average, 0.55 at worst. Drawing the
+// shadow axis from the geometric Sun instead of the apparent one moves it by
+// 0.8 minutes on average, which is what this is set to catch (#401). It used
+// to be logged, and only past an hour.
+const greatestEclipseTolMinutes = 1.0
+
+// checkNoEclipseOutsideCatalog is the comparison's other direction: every
+// eclipse astrogo reports over a catalog page's span is one the page lists.
+//
+// Until #401 only the catalog's side was asked — is each listed eclipse
+// found? — and astrogo, deciding by a fixed 1.58° latitude limit, reported 76
+// lunar and 97 solar eclipses over these six centuries that do not happen.
+// Nothing looked. The window is the page's first to last eclipse, a day
+// either side, so no eclipse belonging to a neighboring page can fall in it.
+func checkNoEclipseOutsideCatalog(t *testing.T, kind string,
+	find func(start, end time.Time, prov eph.Provider) ([]plan.EclipseEvent, error),
+	refs []nasaEclipseRef, prov eph.Provider,
+) {
+	t.Helper()
+
+	start := time.FromJD(refs[0].JDtd-1, time.TDB)
+	end := time.FromJD(refs[len(refs)-1].JDtd+1, time.TDB)
+
+	events, err := find(start, end, prov)
+	if err != nil {
+		t.Errorf("  FAIL %s over the page: %v", kind, err)
+
+		return
+	}
+
+	var extra int
+
+	for _, e := range events {
+		listed := false
+
+		for _, ref := range refs {
+			if math.Abs(e.Time.JD()-ref.JDtd) < 2 {
+				listed = true
+
+				break
+			}
+		}
+
+		if !listed {
+			extra++
+
+			t.Errorf("  EXTRA %s JD %.4f (TDB): astrogo reports an eclipse the catalog does not list (Gamma %.4f, |β| %.3f°)",
+				kind, e.Time.JD(), e.Gamma, math.Abs(e.EclipticLatitude.Degrees()))
+		}
+	}
+
+	t.Logf("%s: %d eclipses reported over the page, %d not in the catalog", kind, len(events), extra)
+}
+
 // ── Fetch Helper ─────────────────────────────────────────────────────────────
 
 // requireNASA skips the calling test when eclipse.gsfc.nasa.gov is
@@ -403,26 +459,21 @@ func TestNASA_LunarEclipses_Historical(t *testing.T) {
 						maxDelta = bestDelta
 					}
 
-					if bestDelta > 60 {
-						t.Logf("  WARN LE %04d-%02d-%02d %02d:%02d type=%s  Δ=%.0f min",
-							ref.Year, ref.Month, ref.Day, ref.Hour, ref.Min, ref.EclipseType, bestDelta)
+					if bestDelta > greatestEclipseTolMinutes {
+						t.Errorf("  LATE LE %04d-%02d-%02d %02d:%02d type=%s: greatest eclipse %.2f min from the catalog's, limit %.1f",
+							ref.Year, ref.Month, ref.Day, ref.Hour, ref.Min, ref.EclipseType, bestDelta, greatestEclipseTolMinutes)
 					}
 				} else {
-					// A missed umbral eclipse (T, P) fails. A missed penumbral one
-					// is logged, because astrogo decides an eclipse by a fixed
-					// 1.58° ecliptic-latitude limit rather than the shadow's real
-					// size that month, and misses marginal penumbrals that fall
-					// outside it — 1958-04-04, magnitude 0.0135, while shallower
-					// ones inside it are found (#401).
-					if ref.EclipseType != "N" {
-						t.Errorf("  MISS LE %04d-%02d-%02d %02d:%02d type=%s: not detected by astrogo",
-							ref.Year, ref.Month, ref.Day, ref.Hour, ref.Min, ref.EclipseType)
-					} else {
-						t.Logf("  SKIP LE %04d-%02d-%02d type=N (penumbral): outside astrogo's fixed latitude limit (#401)",
-							ref.Year, ref.Month, ref.Day)
-					}
+					// Every miss fails, penumbral ones included. They used to be
+					// logged, because astrogo decided an eclipse by a fixed 1.58°
+					// latitude limit and missed marginal penumbrals outside it;
+					// it now sizes the shadow as the canon does (#401).
+					t.Errorf("  MISS LE %04d-%02d-%02d %02d:%02d type=%s: not detected by astrogo",
+						ref.Year, ref.Month, ref.Day, ref.Hour, ref.Min, ref.EclipseType)
 				}
 			}
+
+			checkNoEclipseOutsideCatalog(t, "LE", plan.LunarEclipses, refs, prov)
 
 			if detected > 0 {
 				t.Logf("Century %04d-%04d: %d/%d eclipses detected, mean Δ=%.1f minute, max Δ=%.1f min",
@@ -540,22 +591,18 @@ func TestNASA_SolarEclipses_Historical(t *testing.T) {
 						maxDelta = bestDelta
 					}
 
-					if bestDelta > 60 {
-						t.Logf("  WARN SE %04d-%02d-%02d %02d:%02d type=%s  Δ=%.0f min",
-							ref.Year, ref.Month, ref.Day, ref.Hour, ref.Min, ref.EclipseType, bestDelta)
+					if bestDelta > greatestEclipseTolMinutes {
+						t.Errorf("  LATE SE %04d-%02d-%02d %02d:%02d type=%s: greatest eclipse %.2f min from the catalog's, limit %.1f",
+							ref.Year, ref.Month, ref.Day, ref.Hour, ref.Min, ref.EclipseType, bestDelta, greatestEclipseTolMinutes)
 					}
 				} else {
-					// As for lunar: a missed partial is logged, not failed, for
-					// the same fixed latitude limit (#401). None is missed today.
-					if ref.EclipseType != "P" {
-						t.Errorf("  MISS SE %04d-%02d-%02d %02d:%02d type=%s: not detected by astrogo",
-							ref.Year, ref.Month, ref.Day, ref.Hour, ref.Min, ref.EclipseType)
-					} else {
-						t.Logf("  SKIP SE %04d-%02d-%02d type=P (partial): outside astrogo's fixed latitude limit (#401)",
-							ref.Year, ref.Month, ref.Day)
-					}
+					// Every miss fails, partial ones included (#401).
+					t.Errorf("  MISS SE %04d-%02d-%02d %02d:%02d type=%s: not detected by astrogo",
+						ref.Year, ref.Month, ref.Day, ref.Hour, ref.Min, ref.EclipseType)
 				}
 			}
+
+			checkNoEclipseOutsideCatalog(t, "SE", plan.SolarEclipses, refs, prov)
 
 			if detected > 0 {
 				t.Logf("Century %04d-%04d: %d/%d eclipses detected, mean Δ=%.1f minute, max Δ=%.1f min",
