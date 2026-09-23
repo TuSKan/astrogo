@@ -62,7 +62,7 @@ func skyConstraintFixture(t *testing.T, vmag float64) (*Star, *Site, *coord.Cont
 // By default the constraint never rejects: it reports a margin and leaves the
 // decision to a score.
 //
-// This is the behaviour that distinguishes sky brightness from an altitude
+// This is the behavior that distinguishes sky brightness from an altitude
 // limit. Half a magnitude of moonlight makes a target harder, not impossible,
 // and a constraint that failed it outright would drop targets a real observer
 // would happily take.

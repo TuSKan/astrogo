@@ -130,7 +130,7 @@ func matrixEpochs() []matrixEpoch {
 //     microsecond, two orders above the representation limit and far below
 //     anything a model asymmetry could produce.
 //
-//   - **Modelled.** UT1 is UTC plus a tabulated DUT1, and before 1972 UTC ran
+//   - **Modeled.** UT1 is UTC plus a tabulated DUT1, and before 1972 UTC ran
 //     at a rubber rate whose Delta-AT is not an integer and not invertible.
 //     Neither round trip can be exact, and pretending otherwise would mean
 //     tightening a bound until a physical limitation looked like a bug. The
@@ -160,7 +160,7 @@ func TestScaleRoundTripMatrix(t *testing.T) {
 				"rather than rounding",
 			"IEEE 754 double spacing at the magnitude of jd2; see Time.normalize"))
 
-	modelled := metrology.NewSuite("time.scale.roundtrip.modelled", ref,
+	modeled := metrology.NewSuite("time.scale.roundtrip.modelled", ref,
 		metrology.MustContract(5.0, "s",
 			"a round trip through a scale defined by tabulated data can lose up to the magnitude "+
 				"of the offset itself: |DUT1| is kept below 0.9 s by leap-second insertion, and "+
@@ -200,7 +200,7 @@ func TestScaleRoundTripMatrix(t *testing.T) {
 				// UT1 always consults tabulated DUT1; before 1972 so does
 				// any pair that crosses between civil and atomic time.
 				if from.name == "UT1" || to.name == "UT1" || (e.preUTC && from.name != to.name) {
-					modelled.Add(sample)
+					modeled.Add(sample)
 				} else {
 					arithmetic.Add(sample)
 				}
@@ -209,7 +209,7 @@ func TestScaleRoundTripMatrix(t *testing.T) {
 	}
 
 	arithmetic.Report(t)
-	modelled.Report(t)
+	modeled.Report(t)
 }
 
 // TestToGoIsOneInstantWhateverTheScale pins the defect directly.

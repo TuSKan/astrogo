@@ -239,7 +239,7 @@ func TestOpenFSCachesOneFilesystemPerURL(t *testing.T) {
 }
 
 // uncancellable is an fs.FS that does not implement ContextFS, standing in for
-// a backend that cannot be cancelled.
+// a backend that cannot be canceled.
 type uncancellable struct{ fs.FS }
 
 // cancellable is the opposite: a filesystem that carries a context and refuses
@@ -286,7 +286,7 @@ func TestWithContextBindsWhatItCanAndLeavesTheRest(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	t.Run("a backend that cannot be cancelled is returned unchanged", func(t *testing.T) {
+	t.Run("a backend that cannot be canceled is returned unchanged", func(t *testing.T) {
 		t.Parallel()
 
 		plain := uncancellable{FS: fsys}
@@ -301,7 +301,7 @@ func TestWithContextBindsWhatItCanAndLeavesTheRest(t *testing.T) {
 		}
 	})
 
-	t.Run("a cancelled context reaches the operation", func(t *testing.T) {
+	t.Run("a canceled context reaches the operation", func(t *testing.T) {
 		t.Parallel()
 
 		src := cancellable{FS: fsys}
@@ -324,7 +324,7 @@ func TestWithContextBindsWhatItCanAndLeavesTheRest(t *testing.T) {
 		}
 
 		if _, err := fs.ReadFile(dead, "k.bsp"); !errors.Is(err, context.Canceled) {
-			t.Errorf("reading through a cancelled context gave %v, want context.Canceled — "+
+			t.Errorf("reading through a canceled context gave %v, want context.Canceled — "+
 				"WithContext is not handing the context to the filesystem", err)
 		}
 

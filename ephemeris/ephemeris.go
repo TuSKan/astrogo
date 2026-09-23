@@ -41,7 +41,7 @@ type (
 	Body = core.Body
 )
 
-// Reference frames and origins a [State] can be labelled with. The
+// Reference frames and origins a [State] can be labeled with. The
 // unspecified values are the zero values and assert nothing — see
 // [core.State].
 const (
@@ -365,7 +365,7 @@ func NewProvider(ctx context.Context, source Source, kernel string, opts ...Opti
 // explicitly. Since kepler's own default base learned to answer Pluto from
 // the same [kepler.PlutoElements], that registration is now belt and braces
 // rather than the only thing closing the gap — it keeps Default's contract
-// visible at the call site instead of resting on a lower layer's behaviour.
+// visible at the call site instead of resting on a lower layer's behavior.
 func Default() Provider {
 	p := kepler.New(kepler.WithBase(&sofaProvider{}))
 	if err := p.Register(Pluto, kepler.PlutoElements); err != nil {

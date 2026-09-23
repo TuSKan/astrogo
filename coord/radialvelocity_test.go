@@ -306,7 +306,7 @@ func TestObservedRadialVelocity_RoundTripsWithBarycentricRVCorrection(t *testing
 // three-term form the implementation uses — means a sign slip or a dropped
 // term in either expression fails the test.
 //
-// The tolerance is 1e-9 km/s, a micrometre per second, and it is set by the
+// The tolerance is 1e-9 km/s, a micrometer per second, and it is set by the
 // *reference* expression rather than by the code under test. Both velocities
 // are of order 1e-4 c, so the bracket (1+a)(1+b)-1 subtracts two numbers that
 // agree to fifteen digits and c multiplies what survives back up: the product
@@ -418,7 +418,7 @@ func TestBarycentricRadialVelocity_ExceedsTheAdditiveFormByTheDocumentedAmount(t
 
 	// The claim the doc comments make: at 46.6 km/s the dropped term equals
 	// the 4.66 m/s of relativistic physics this package omits, so beyond it
-	// the composition error dominates the modelling error.
+	// the composition error dominates the modeling error.
 	const crossover = 46.6
 
 	dropped := math.Abs(crossover*corr/c) * 1e3

@@ -68,7 +68,7 @@ var lightSpeedKmPerSec = constants.SI2019.SpeedOfLight.Value / 1000.0
 // relativistic term this package documents itself as omitting, combined —
 // once the target's own velocity passes 46.6 km/s, and 30 m/s for a halo
 // star at 300 km/s. For the Sun-like targets most catalogs hold it is
-// well under a metre per second, which is why it can sit unnoticed.
+// well under a meter per second, which is why it can sit unnoticed.
 //
 // It sat unnoticed here. [Context.BarycentricRVCorrection]'s own doc
 // comment gave the additive form as the way to use it, and the 175-case
@@ -202,7 +202,7 @@ func (ctx *Context) TopocentricRadialVelocity(posAU, velAUPerDay vector.Vec3) un
 	// Observer's geocentric position, and the velocity that position has by
 	// virtue of Earth turning under it. The rotation axis is the celestial
 	// pole; polar motion is tens of milliarcseconds and cannot matter to a
-	// half-kilometre-per-second term.
+	// half-kilometer-per-second term.
 	obsKM := ctx.ObsVec().MulScalar(auKM)
 	omega := vector.V3(0, 0, constants.WGS84.AngularVelocity.Value)
 	siteVel := omega.Cross(obsKM)
@@ -270,7 +270,7 @@ func (ctx *Context) ObserverFrameShift() (float64, error) {
 
 	// Heliocentric distance of the observer: Earth's, plus the observer's own
 	// offset from the geocentre. The offset is four parts in 100,000 of the
-	// distance and changes the solar term by a tenth of a millimetre per
+	// distance and changes the solar term by a tenth of a millimeter per
 	// second, but it costs one addition.
 	helio := vector.V3(pvh[0][0], pvh[0][1], pvh[0][2]).Add(ctx.ObsVec()).Norm() * auMeters
 

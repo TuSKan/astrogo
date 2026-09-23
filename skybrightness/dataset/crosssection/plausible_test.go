@@ -59,7 +59,7 @@ func TestOzonePlausibility(t *testing.T) {
 	}{
 		{
 			// cm^2 read as m^2, or the reverse: a factor of 1e4 either way.
-			"cross section in square metres", chappuisFile(realPeak * 1e-4),
+			"cross section in square meters", chappuisFile(realPeak * 1e-4),
 		},
 		{
 			"cross section scaled up by a unit error", chappuisFile(realPeak * 1e4),
@@ -89,7 +89,7 @@ func TestOzonePlausibility(t *testing.T) {
 // parseAndCheck runs the same two steps Ozone's validator does, so the test
 // exercises the guard as it is actually wired rather than in isolation.
 func parseAndCheck(file string) error {
-	xs, err := Parse(strings.NewReader(file), "O3", Nanometre)
+	xs, err := Parse(strings.NewReader(file), "O3", Nanometer)
 	if err != nil {
 		return err
 	}

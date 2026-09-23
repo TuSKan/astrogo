@@ -211,7 +211,7 @@ func TestParseEpochDecodesThePackedDate(t *testing.T) {
 		// Compared as a Julian Date against the same calendar date built
 		// through time's own constructor, rather than by reading fields back:
 		// the epoch is on the TT scale and a field-by-field comparison would
-		// pass for a value labelled with the wrong scale.
+		// pass for a value labeled with the wrong scale.
 		want := time.Date(tc.y, tc.m, tc.d, 0, 0, 0, 0, time.LocationUTC).JD()
 
 		if got.JD() != want {
@@ -446,7 +446,7 @@ func TestParsedElementsPropagate(t *testing.T) {
 	// a(1-e) <= r <= a(1+e) for any point on the ellipse. Eros: 1.133 AU to
 	// 1.783 AU. A column map off by one field puts r outside this.
 	//
-	// StateAt returns astronomical units, not metres — its perifocal vector is
+	// StateAt returns astronomical units, not meters — its perifocal vector is
 	// built straight from the semi-major axis it was given.
 	r := pos.Norm()
 

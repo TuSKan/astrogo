@@ -56,7 +56,7 @@ func TestProvenanceOfAnIndependentReference(t *testing.T) {
 	got := independent.Provenance()
 
 	if strings.Contains(got, "consistency check") {
-		t.Errorf("an independent reference was labelled a consistency check: %q", got)
+		t.Errorf("an independent reference was labeled a consistency check: %q", got)
 	}
 
 	// The dataset is the field that keeps the claim checkable years later:

@@ -24,7 +24,7 @@ func m31() map[string]Target {
 // exists to remove.
 //
 // Under the previous (Target, bool) interface a provider had nowhere to put a
-// failure, so an outage, a cancelled context and a genuinely absent object all
+// failure, so an outage, a canceled context and a genuinely absent object all
 // arrived as ErrNotFound. A scheduler asking "does NGC 5139 exist?" during a
 // CDS outage got a confident no.
 func TestResolveDoesNotReportAFailureAsNotFound(t *testing.T) {
@@ -64,8 +64,8 @@ func TestResolveReportsNotFoundOnlyWhenEveryProviderAnswered(t *testing.T) {
 	}
 }
 
-// TestResolveChecksTheContextBeforeConsultingProviders pins that a cancelled
-// caller learns it was cancelled, rather than receiving whatever the first
+// TestResolveChecksTheContextBeforeConsultingProviders pins that a canceled
+// caller learns it was canceled, rather than receiving whatever the first
 // provider makes of a dead context.
 func TestResolveChecksTheContextBeforeConsultingProviders(t *testing.T) {
 	t.Parallel()

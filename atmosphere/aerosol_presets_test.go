@@ -195,7 +195,7 @@ func TestAerosolPresetsCarryTheirOPACScaleHeight(t *testing.T) {
 		})
 	}
 
-	// Table 5's own values, in kilometres, so a transcription slip shows here
+	// Table 5's own values, in kilometers, so a transcription slip shows here
 	// rather than as a subtly wrong sky.
 	for _, c := range []struct {
 		name   string

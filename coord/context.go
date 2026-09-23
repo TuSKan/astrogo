@@ -142,7 +142,7 @@ func (ctx *Context) Clone() *Context {
 	return &c
 }
 
-// kmPerAU is the number of kilometres in one Astronomical Unit.
+// kmPerAU is the number of kilometers in one Astronomical Unit.
 //
 // var, not const: constants.IAU.AstronomicalUnit is a struct, and Go does not
 // permit selecting a struct field inside a constant expression.

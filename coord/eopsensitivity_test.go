@@ -367,7 +367,7 @@ func wrapArcsec(d float64) float64 {
 //
 // What that mutation represents is an observer placed on an untilted Earth —
 // wrong by the pole's own displacement, about 0.68 arcseconds of latitude and
-// longitude, or roughly 20 metres of position. It never shows in a star's
+// longitude, or roughly 20 meters of position. It never shows in a star's
 // direction and does show in diurnal parallax, so it is worth around 0.01
 // arcseconds for the Moon and nothing at all for anything further away. Small,
 // and silent, which is the combination worth a test.

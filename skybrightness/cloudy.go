@@ -14,7 +14,7 @@ import (
 var (
 	// ErrCloudLayers is returned when a scene carries more than one cloud
 	// deck, which neither published model solves.
-	ErrCloudLayers = errors.New("skybrightness: only one cloud layer is modelled")
+	ErrCloudLayers = errors.New("skybrightness: only one cloud layer is modeled")
 
 	// ErrCloudFraction is returned for a cover outside [0,1].
 	ErrCloudFraction = errors.New("skybrightness: cloud fraction must be in [0,1]")

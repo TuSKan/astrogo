@@ -800,7 +800,7 @@ func EvalChebyshev(coeffs []float64, tau, radius float64, calcDeriv bool) (p, v 
 //     is what makes the next run heal itself. Every one of these wraps
 //     [ErrCorruptSPK].
 //   - The bytes could not be read — "Access is denied" because another
-//     process holds the handle, a short read, a cancelled context, a full
+//     process holds the handle, a short read, a canceled context, a full
 //     disk. The file is very likely fine and the condition is transient.
 //
 // These used to be the same branch, so the second deleted the file. That is

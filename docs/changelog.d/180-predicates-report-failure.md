@@ -16,7 +16,7 @@ it.** It still skips a candidate it cannot evaluate rather than failing the
 night, but now returns its results alongside an error wrapping the new
 `plan.ErrIncomplete`, naming every catalogue source, target, small body, moon
 kernel and candidate that was dropped and why. A caller who ignores that error
-gets the previous behaviour; one who checks it can finally tell a quiet sky
+gets the previous behavior; one who checks it can finally tell a quiet sky
 from an unreachable JPL (#177).
 
 **`satellite.ValidateTLE` now checks that every numeric field is numeric, which

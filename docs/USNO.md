@@ -62,7 +62,7 @@ Supplement convention:
 > **Note:** The USNO `rstt/oneday` API ignores the `height` parameter for
 > rise/set times (verified empirically: `height=0` and `height=786` return
 > identical results for São Paulo). All comparisons below use `height=0`.
-> Altitude-dependent behaviour is validated separately in the
+> Altitude-dependent behavior is validated separately in the
 > [High Altitude](#high-altitude--mount-everest-8849m) section.
 
 ### São Paulo (S23°36', W46°39', height=0)

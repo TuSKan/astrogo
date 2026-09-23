@@ -64,7 +64,7 @@ func TestFailedLoadIsRetried(t *testing.T) {
 
 // TestLoadHappensOnce: the catalog is 7 MB and is kept for the life of the
 // provider. Going offline after a successful load and asking again is the
-// behavioural way to say so — a provider that re-fetched per query would fail
+// behavioral way to say so — a provider that re-fetched per query would fail
 // the second call.
 func TestLoadHappensOnce(t *testing.T) {
 	t.Cleanup(remote.Capture().Restore)
@@ -99,7 +99,7 @@ func TestLoadHonoursContext(t *testing.T) {
 	cancel()
 
 	if _, err := New().Resolve(ctx, "M42"); !errors.Is(err, context.Canceled) {
-		t.Errorf("Resolve with a cancelled context: err = %v, want context.Canceled", err)
+		t.Errorf("Resolve with a canceled context: err = %v, want context.Canceled", err)
 	}
 }
 

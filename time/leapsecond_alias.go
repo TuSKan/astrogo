@@ -175,7 +175,7 @@ func logSecondRemoved(y, m, d, hour, minute int) {
 		"reason", "this UTC day ended at 23:59:58; the next instant was the following midnight",
 		"delta_at_before", deltaAT(y, m, d, 0.5),
 		"delta_at_after", deltaAT(nextDay(y, m, d)),
-		"remedy", "check the source of this timestamp; UTC never labelled this second")
+		"remedy", "check the source of this timestamp; UTC never labeled this second")
 }
 
 // negativeLeapSecondEndsDay reports whether the last second of the UTC day

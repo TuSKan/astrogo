@@ -9,7 +9,7 @@ import (
 	"github.com/TuSKan/astrogo/unit"
 )
 
-// One watt per square metre per steradian of pure 555 nm light is 683 cd/m2.
+// One watt per square meter per steradian of pure 555 nm light is 683 cd/m2.
 //
 // # Why this is the anchoring case
 //

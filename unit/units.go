@@ -88,9 +88,9 @@ func (u Unit) String() string {
 var (
 	// Meter is the SI base unit of length.
 	Meter = Unit{Dimension: dim.Length, ScaleFactor: 1.0, Name: "meter", Symbol: "m"}
-	// Kilometer is 1000 metres.
+	// Kilometer is 1000 meters.
 	Kilometer = Unit{Dimension: dim.Length, ScaleFactor: 1000.0, Name: "kilometer", Symbol: "km"}
-	// Millimeter is 0.001 metres.
+	// Millimeter is 0.001 meters.
 	Millimeter = Unit{Dimension: dim.Length, ScaleFactor: 1e-3, Name: "millimeter", Symbol: "mm"}
 
 	// AstronomicalUnit is 1 AU = 1.495978707e11 m (IAU 2012 nominal).

@@ -33,7 +33,7 @@ type answer[R any] struct {
 // # Why not internal/parallel.Map
 //
 // Map is an errgroup: the first error wins and the remaining work is
-// cancelled. That is the opposite of what a resolver needs. A provider being
+// canceled. That is the opposite of what a resolver needs. A provider being
 // unreachable must not cancel the ones that would have answered, and its
 // failure has to survive to be reported alongside the successes rather than
 // replacing them.

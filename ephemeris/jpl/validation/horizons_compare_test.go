@@ -121,7 +121,7 @@ func horizonsStateReference() metrology.Reference {
 // below the fault threshold by seven, which is what makes it a usable
 // discriminator rather than a number pinned to a measurement. A one-second
 // time-scale error — which this repository had until recently in its
-// leap-second parsing — moves the Moon about a kilometre and cannot hide
+// leap-second parsing — moves the Moon about a kilometer and cannot hide
 // under it.
 //
 // Most of the Moon's measured residual is therefore the kernel difference and
@@ -171,6 +171,9 @@ func TestJPLStateAgainstHorizons(t *testing.T) {
 
 	p, err := jpl.NewProvider(context.Background(), core.Planets, "de440")
 	if err != nil {
+		// The kernel comes from NAIF on first use, so its outage is not a
+		// verdict on the comparison. Anything else is astrogo's.
+		testutil.SkipOnUpstreamFailure(t, err)
 		t.Fatalf("failed to create provider: %v", err)
 	}
 

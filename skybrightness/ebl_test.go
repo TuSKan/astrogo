@@ -41,7 +41,7 @@ func eblScene(t *testing.T) *Scene {
 // These are the numbers the component is, and a typo in one of them is not
 // visible in any downstream result — the extragalactic background is about one
 // per cent of the sky, so a wrong digit changes a total by nothing measurable
-// while making the component wrong. Every other test here checks behaviour;
+// while making the component wrong. Every other test here checks behavior;
 // this one checks transcription, against Koushan et al. (2021) Table 3 with
 // pivot wavelengths from Table 1.
 func TestKoushanTableIsTranscribedCorrectly(t *testing.T) {

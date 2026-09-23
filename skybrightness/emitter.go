@@ -161,7 +161,7 @@ func (u UpwardEmission) Weight(elevation angle.Angle) float64 {
 // exactly the angles whose light travels furthest — which is what makes the
 // split between Q and q matter more for a distant observer than the total
 // output does. Shielding a city changes q, and that changes the sky hundreds
-// of kilometres away.
+// of kilometers away.
 //
 // This is the emission function the World Atlas, the SkyGlow Simulator and
 // most of the light-pollution literature are built on, so it is the shape to
@@ -198,7 +198,7 @@ type GarstangEmission struct {
 // It is worth stating because the boundary is load-bearing rather than
 // cosmetic. [ArtificialSkyglow] evaluates the emission function at zero
 // elevation by default, on the grounds that a ground source beyond a few
-// kilometres sits at the observer's horizon, so a guard rejecting the horizon
+// kilometers sits at the observer's horizon, so a guard rejecting the horizon
 // would make that whole component silently produce nothing at all rather than
 // fail. Only elevations strictly below the horizon return zero.
 func (g GarstangEmission) Weight(elevation angle.Angle) float64 {

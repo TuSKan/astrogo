@@ -312,7 +312,7 @@ func TestEnsureLoadedRejectsWhatIsNotTheTable(t *testing.T) {
 	}
 }
 
-// TestFailedLoadIsNotRetried pins behaviour rather than endorsing it.
+// TestFailedLoadIsNotRetried pins behavior rather than endorsing it.
 //
 // A failed load is recorded and replayed for the life of the provider, so a
 // transient outage or a consent gate granted a moment later disables this
