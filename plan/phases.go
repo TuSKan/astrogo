@@ -532,82 +532,24 @@ func moonEclipticLatitude(t time.Time, prov eph.Provider) (angle.Angle, error) {
 	return ecl.Lat(), nil
 }
 
-// moonAntiSunSeparation returns the angular separation (degrees) between
-// the Moon and the anti-solar point (Earth's shadow center).
-// The "time of greatest lunar eclipse" is the minimum of this function.
-func moonAntiSunSeparation(t time.Time, prov eph.Provider) (float64, error) {
-	sunPos, err := eph.Position(prov, eph.Sun, t)
-	if err != nil {
-		return 0, fmt.Errorf("eclipse: sun position: %w", err)
-	}
-
-	moonPos, err := eph.Position(prov, eph.Moon, t)
-	if err != nil {
-		return 0, fmt.Errorf("eclipse: moon position: %w", err)
-	}
-
-	sunICRS, err := eph.ToICRS(sunPos)
-	if err != nil {
-		return 0, fmt.Errorf("eclipse: sun ICRS: %w", err)
-	}
-
-	moonICRS, err := eph.ToICRS(moonPos)
-	if err != nil {
-		return 0, fmt.Errorf("eclipse: moon ICRS: %w", err)
-	}
-
-	// Anti-solar point: flip the Sun's unit vector
-	antiSun := coord.NewICRS(
-		sunICRS.RA()+angle.Deg(180),
-		-sunICRS.Dec(),
-	)
-	sep := coord.Separation(moonICRS, antiSun)
-
-	return sep.Degrees(), nil
-}
-
-// moonSunSeparation returns the angular separation (degrees) between
-// the Moon and the Sun as seen from Earth.
-// The "time of greatest solar eclipse" is the minimum of this function.
-func moonSunSeparation(t time.Time, prov eph.Provider) (float64, error) {
-	sunPos, err := eph.Position(prov, eph.Sun, t)
-	if err != nil {
-		return 0, fmt.Errorf("eclipse: sun position: %w", err)
-	}
-
-	moonPos, err := eph.Position(prov, eph.Moon, t)
-	if err != nil {
-		return 0, fmt.Errorf("eclipse: moon position: %w", err)
-	}
-
-	sunICRS, err := eph.ToICRS(sunPos)
-	if err != nil {
-		return 0, fmt.Errorf("eclipse: sun ICRS: %w", err)
-	}
-
-	moonICRS, err := eph.ToICRS(moonPos)
-	if err != nil {
-		return 0, fmt.Errorf("eclipse: moon ICRS: %w", err)
-	}
-
-	return coord.Separation(moonICRS, sunICRS).Degrees(), nil
-}
-
-// LunarEclipses finds potential lunar eclipses in [start, end] by identifying
-// Full Moons where the Moon's ecliptic latitude is within the Danjon limit
-// (≈1.58° for penumbral, ≈1.05° for partial, ≈0.55° for total).
+// LunarEclipses returns the lunar eclipses in [start, end]: every Full Moon at
+// which the Moon enters Earth's penumbra, penumbral eclipses included.
 //
-// The eclipse time is refined to the moment of minimum Moon–anti-Sun angular
-// separation (time of greatest eclipse). The Gamma field indicates how central
-// the eclipse is (0 = perfectly central, 1 = at the limit).
+// Earth's shadow is sized as NASA's Five Millennium Canon of Lunar Eclipses
+// sizes it, by Danjon's rule, from that month's distances to the Moon and the
+// Sun, so an eclipse here is an eclipse there; against six centuries of the
+// canon the two agree on every one. Time is greatest eclipse, when the Moon's
+// center passes closest to the shadow axis. Gamma is that closest distance as
+// a fraction of the distance at which the Moon would just graze the penumbra:
+// 0 central, 1 grazing. EclipticLatitude is the Moon's, at greatest eclipse.
 //
-//nolint:dupl // shares structure with SolarEclipses but differs in phase filter and separation function.
+// Until #401 an eclipse was any Full Moon within a fixed 1.58° of ecliptic
+// latitude, which is not a property of the shadow: it reported eclipses that
+// do not happen and missed some that do.
 func LunarEclipses(start, end time.Time, prov eph.Provider) ([]EclipseEvent, error) {
 	if prov == nil {
 		prov = eph.Default()
 	}
-
-	const penumbralLimit = 1.58 // degrees
 
 	phases, err := MoonPhases(start, end, prov)
 	if err != nil {
@@ -625,57 +567,68 @@ func LunarEclipses(start, end time.Time, prov eph.Provider) ([]EclipseEvent, err
 
 		lat, err := moonEclipticLatitude(phase.Time, prov)
 		if err != nil {
+			return nil, fmt.Errorf("lunar eclipses: %w", err)
+		}
+
+		if math.Abs(lat.Degrees()) > eclipseLatitudeScreen {
 			continue
 		}
 
-		absLat := math.Abs(lat.Degrees())
-		if absLat <= penumbralLimit {
-			// Refine: minimize Moon–anti-Sun angular separation in a ±30 min
-			// window around the syzygy. This finds the "time of greatest eclipse".
-			tMin := phase.Time.Add(unit.Minutes(-30))
-			tMax := phase.Time.Add(unit.Minutes(30))
-
-			eclTime, _, err := solver.FindExtremum(func(t time.Time) (float64, error) {
-				return moonAntiSunSeparation(t, prov)
-			}, tMin, tMax, false)
+		eclTime, _, err := solver.FindExtremum(func(t time.Time) (float64, error) {
+			g, err := newEclipseGeometry(t, prov)
 			if err != nil {
-				eclTime = phase.Time
+				return 0, err
 			}
 
-			refinedLat, err := moonEclipticLatitude(eclTime, prov)
-			if err != nil {
-				// Fall back to the already-validated latitude at the syzygy
-				// rather than silently reporting a zero-valued refinement.
-				refinedLat = lat
-			}
-
-			eclipses = append(eclipses, EclipseEvent{
-				Type:             EclipseLunar,
-				Time:             eclTime,
-				EclipticLatitude: refinedLat,
-				Gamma:            math.Abs(refinedLat.Degrees()) / penumbralLimit,
-			})
+			return g.lunarAxisDistance(), nil
+		}, phase.Time.Add(unit.Minutes(-eclipseSearchHalfWidth)), phase.Time.Add(unit.Minutes(eclipseSearchHalfWidth)), false)
+		if err != nil {
+			return nil, fmt.Errorf("lunar eclipses: greatest eclipse near %v: %w", phase.Time, err)
 		}
+
+		g, err := newEclipseGeometry(eclTime, prov)
+		if err != nil {
+			return nil, fmt.Errorf("lunar eclipses: %w", err)
+		}
+
+		magnitude, gamma := g.lunarPenumbralMagnitude()
+		if magnitude <= 0 {
+			continue
+		}
+
+		eclLat, err := moonEclipticLatitude(eclTime, prov)
+		if err != nil {
+			return nil, fmt.Errorf("lunar eclipses: %w", err)
+		}
+
+		eclipses = append(eclipses, EclipseEvent{
+			Type:             EclipseLunar,
+			Time:             eclTime,
+			EclipticLatitude: eclLat,
+			Gamma:            gamma,
+		})
 	}
 
 	return eclipses, nil
 }
 
-// SolarEclipses finds potential solar eclipses in [start, end] by identifying
-// New Moons where the Moon's ecliptic latitude is within the solar eclipse limit
-// (≈1.58° for partial, ≈0.99° for total/annular).
+// SolarEclipses returns the solar eclipses in [start, end]: every New Moon at
+// which the Moon's penumbra falls on the Earth, partial eclipses included.
 //
-// The eclipse time is refined to the moment of minimum Moon–Sun angular
-// separation (time of greatest eclipse). The Gamma field indicates how central
-// the eclipse is (0 = perfectly central, 1 = at the limit).
+// The penumbra is sized, and the Earth shaped, as NASA's Five Millennium Canon
+// of Solar Eclipses has them, so an eclipse here is an eclipse there; against
+// six centuries of the canon the two agree on every one. Time is greatest
+// eclipse, when the shadow's axis passes closest to Earth's center. Gamma is
+// that closest distance as a fraction of the distance at which the penumbra
+// would just graze Earth's limb: 0 central, 1 grazing. EclipticLatitude is the
+// Moon's, at greatest eclipse.
 //
-//nolint:dupl // shares structure with LunarEclipses but differs in phase filter and separation function.
+// Until #401 an eclipse was any New Moon within a fixed 1.58° of ecliptic
+// latitude, which reported eclipses that do not happen.
 func SolarEclipses(start, end time.Time, prov eph.Provider) ([]EclipseEvent, error) {
 	if prov == nil {
 		prov = eph.Default()
 	}
-
-	const partialLimit = 1.58 // degrees
 
 	phases, err := MoonPhases(start, end, prov)
 	if err != nil {
@@ -693,37 +646,46 @@ func SolarEclipses(start, end time.Time, prov eph.Provider) ([]EclipseEvent, err
 
 		lat, err := moonEclipticLatitude(phase.Time, prov)
 		if err != nil {
+			return nil, fmt.Errorf("solar eclipses: %w", err)
+		}
+
+		if math.Abs(lat.Degrees()) > eclipseLatitudeScreen {
 			continue
 		}
 
-		absLat := math.Abs(lat.Degrees())
-		if absLat <= partialLimit {
-			// Refine: minimize Moon–Sun angular separation in a ±30 min
-			// window around the syzygy. This finds the "time of greatest eclipse".
-			tMin := phase.Time.Add(unit.Minutes(-30))
-			tMax := phase.Time.Add(unit.Minutes(30))
-
-			eclTime, _, err := solver.FindExtremum(func(t time.Time) (float64, error) {
-				return moonSunSeparation(t, prov)
-			}, tMin, tMax, false)
+		eclTime, _, err := solver.FindExtremum(func(t time.Time) (float64, error) {
+			g, err := newEclipseGeometry(t, prov)
 			if err != nil {
-				eclTime = phase.Time
+				return 0, err
 			}
 
-			refinedLat, err := moonEclipticLatitude(eclTime, prov)
-			if err != nil {
-				// Fall back to the already-validated latitude at the syzygy
-				// rather than silently reporting a zero-valued refinement.
-				refinedLat = lat
-			}
-
-			eclipses = append(eclipses, EclipseEvent{
-				Type:             EclipseSolar,
-				Time:             eclTime,
-				EclipticLatitude: refinedLat,
-				Gamma:            math.Abs(refinedLat.Degrees()) / partialLimit,
-			})
+			return g.solarAxisDistance(), nil
+		}, phase.Time.Add(unit.Minutes(-eclipseSearchHalfWidth)), phase.Time.Add(unit.Minutes(eclipseSearchHalfWidth)), false)
+		if err != nil {
+			return nil, fmt.Errorf("solar eclipses: greatest eclipse near %v: %w", phase.Time, err)
 		}
+
+		g, err := newEclipseGeometry(eclTime, prov)
+		if err != nil {
+			return nil, fmt.Errorf("solar eclipses: %w", err)
+		}
+
+		margin, gamma := g.solarPenumbraMargin(eclTime)
+		if margin <= 0 {
+			continue
+		}
+
+		eclLat, err := moonEclipticLatitude(eclTime, prov)
+		if err != nil {
+			return nil, fmt.Errorf("solar eclipses: %w", err)
+		}
+
+		eclipses = append(eclipses, EclipseEvent{
+			Type:             EclipseSolar,
+			Time:             eclTime,
+			EclipticLatitude: eclLat,
+			Gamma:            gamma,
+		})
 	}
 
 	return eclipses, nil
