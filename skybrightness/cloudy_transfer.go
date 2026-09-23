@@ -105,7 +105,7 @@ type stepKernel struct {
 	// shape a column depth is multiplied by to give a local extinction.
 	extinctionShapeM, extinctionShapeA float64
 
-	// The two phase functions at this scattering angle, already normalised
+	// The two phase functions at this scattering angle, already normalized
 	// per steradian.
 	rayleighPhase, aerosolPhase float64
 }

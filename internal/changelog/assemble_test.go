@@ -249,6 +249,6 @@ func TestAssembleKeepsAnUnknownSection(t *testing.T) {
 	}
 
 	if !strings.Contains(got, "**Something odd.**") {
-		t.Error("an unrecognised section was dropped")
+		t.Error("an unrecognized section was dropped")
 	}
 }

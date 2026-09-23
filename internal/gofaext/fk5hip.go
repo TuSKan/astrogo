@@ -73,7 +73,7 @@ import (
 // status its own wrappers throw away — that it cannot.
 
 // Fk52h converts J2000.0 FK5 star data to the Hipparcos frame, which is the
-// ICRS as realised by the Hipparcos catalogue.
+// ICRS as realized by the Hipparcos catalogue.
 //
 // Unlike iauFk52h it does not require a usable parallax: see the commentary at
 // the top of this file for what happens when SOFA's pv route cannot be taken,

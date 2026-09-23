@@ -260,7 +260,7 @@ func TestInclinationSingularityIsGuarded(t *testing.T) {
 //
 // The two modes differ in exactly two places, and both are deep space: sidereal
 // time at epoch, which reaches the model only through dscom/dsinit/dspace, and
-// the node normalisation inside dpper's Lyddane branch. So the assertion is not
+// the node normalization inside dpper's Lyddane branch. So the assertion is not
 // simply "they differ" — below the 225-minute threshold they must be
 // bit-identical, and above it they must differ by the small amount a convention
 // produces rather than the large amount a bug produces.

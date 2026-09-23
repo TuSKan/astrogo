@@ -73,10 +73,10 @@ func TestSourceSpectrumScaling(t *testing.T) {
 }
 
 // The conversion is linear in the pixel radiance, and independent of the
-// spectrum's absolute scale — a normalised curve and one ten times larger
+// spectrum's absolute scale — a normalized curve and one ten times larger
 // must give the same answer, because the shape cancels against the response
 // integral.
-func TestSourceSpectrumScaleIsShapeNormalised(t *testing.T) {
+func TestSourceSpectrumScaleIsShapeNormalized(t *testing.T) {
 	t.Parallel()
 
 	site := paranal(t)

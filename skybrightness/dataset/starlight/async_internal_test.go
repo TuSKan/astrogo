@@ -114,7 +114,7 @@ func TestIsAsyncNamesOnlyTheAsyncEndpoint(t *testing.T) {
 	t.Parallel()
 
 	if !isAsync(remote.GaiaAIPAsync) {
-		t.Error("the asynchronous endpoint is not recognised as one")
+		t.Error("the asynchronous endpoint is not recognized as one")
 	}
 
 	for _, id := range []remote.EndpointID{remote.GaiaTAP, remote.GaiaAIP, remote.VizieR} {

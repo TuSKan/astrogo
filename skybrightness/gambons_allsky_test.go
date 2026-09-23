@@ -732,7 +732,7 @@ func TestGAMBONSAllSkyWithAirglowMatched(t *testing.T) {
 	scale := (theirTop / theirOffTop) / (ourTop / ourOffTop)
 
 	t.Log("")
-	t.Logf("airglow normalised to GAMBONS in the %.0f-%.0f band: scale %.3f (%.3f mag)",
+	t.Logf("airglow normalized to GAMBONS in the %.0f-%.0f band: scale %.3f (%.3f mag)",
 		gambonsAltitudeBands[topBand].loAlt, gambonsAltitudeBands[topBand].hiAlt,
 		scale, -2.5*math.Log10(scale))
 	t.Logf("  %-12s %9s %9s %10s", "band", "astrogo", "GAMBONS", "diff")
@@ -825,7 +825,7 @@ func TestGAMBONSAllSkyWithAirglowMatched(t *testing.T) {
 
 		// Ours is in physical units and theirs in the arbitrary units of that
 		// power law, so only the ratio between the two bands is meaningful;
-		// it is normalised below against the highest band.
+		// it is normalized below against the highest band.
 		airglowRatioMag[bi] = -2.5 * math.Log10(ourFlux/theirFlux)
 
 		t.Logf("     %3.0f-%3.0f deg %13.4g %13.4g %11s %11.3f",
@@ -859,13 +859,13 @@ func TestGAMBONSAllSkyWithAirglowMatched(t *testing.T) {
 	}
 
 	t.Log("")
-	t.Log("     Separately from the slope, the normalisation differs. Near the")
+	t.Log("     Separately from the slope, the normalization differs. Near the")
 	t.Log("     zenith, where the geometry is reliable and extinction is a tenth")
 	t.Log("     of a magnitude, our airglow is a factor of about 1.6 fainter than")
 	t.Log("     GAMBONS'. Both drive it from an ESO SkyCalc spectrum, so that is a")
 	t.Log("     parameter difference rather than physics: their reference file is")
 	t.Log("     ESO_SkyCalc_100_10.dat and this test asks SkyCalc for 100 sfu,")
-	t.Log("     which need not be the same normalisation.")
+	t.Log("     which need not be the same normalization.")
 
 	t.Log("")
 	t.Log("  2. no light is scattered back into the beam.")

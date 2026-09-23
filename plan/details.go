@@ -134,7 +134,7 @@ func (d TargetDetails) String() string {
 // distanceInItsUnit renders Distance in whatever [TargetDetails.DistanceUnit]
 // names, so the printed number and the printed unit cannot disagree.
 //
-// An unrecognised DistanceUnit falls back to meters rather than guessing,
+// An unrecognized DistanceUnit falls back to meters rather than guessing,
 // which is the one answer that is never silently wrong by a factor: it is what
 // [unit.Length] stores, so the number is the value itself.
 func (d TargetDetails) distanceInItsUnit() float64 {

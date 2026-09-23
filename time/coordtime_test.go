@@ -22,7 +22,7 @@ import (
 const sofaEpoch = 2453750.5
 
 // dayTolerance is a day fraction that bounds a nanosecond, which is finer than
-// any of these scales is realised to and far finer than the millisecond-to-
+// any of these scales is realized to and far finer than the millisecond-to-
 // second offsets under test.
 const dayTolerance = 1e-12
 

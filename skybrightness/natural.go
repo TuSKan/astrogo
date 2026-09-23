@@ -835,13 +835,13 @@ const starlightBandCoverage = 0.99
 // A starlight map holds one number per direction, so spreading it across
 // wavelengths needs an assumed spectrum: integrated starlight is the summed
 // light of stars of every type, and no single blackbody is right. shape gives
-// the relative spectral radiance per grid point, normalised however the
+// the relative spectral radiance per grid point, normalized however the
 // caller likes — only its shape matters.
 //
 // band is the passband the map's values are averaged over, and it is what
 // makes the rescaling exact. The shape is divided by its own passband
 // average, so the component adds a spectrum whose average over that same band
-// reproduces the map's number by construction. Normalising by the sum of the
+// reproduces the map's number by construction. Normalizing by the sum of the
 // samples instead would tie the answer to how finely the grid is sampled,
 // halving the starlight whenever the grid is refined.
 func NewIntegratedStarlight(

@@ -84,7 +84,7 @@ func TestEarthRotationRateAgreesWithWGS72(t *testing.T) {
 //
 // Mean motion in radians per minute is not a quantity anyone reads by eye, so
 // the bounds are also stated as orbital periods, which is what makes them
-// recognisable: the synchronous band is 20.0 to 30.0 hours and the half-day
+// recognizable: the synchronous band is 20.0 to 30.0 hours and the half-day
 // band 11.333 to 12.678 hours. A transposed digit in either would pass every other
 // test in this package and silently move a geostationary satellite out of the
 // resonance it lives in.

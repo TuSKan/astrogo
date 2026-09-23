@@ -61,7 +61,7 @@ func builtinRecord(t *testing.T) []LeapSecond {
 // project for about 2030.
 //
 // Whether one is ever announced for that date is beside the point. What is
-// exercised is that an announced one would be recognised.
+// exercised is that an announced one would be recognized.
 func withNegativeLeapSecondAt2030(t *testing.T) {
 	t.Helper()
 
@@ -232,7 +232,7 @@ func TestRemovedSecondWarningReportsTheUTCDate(t *testing.T) {
 	out := buf.String()
 
 	if !strings.Contains(out, "second removed by a negative leap second") {
-		t.Fatalf("a removed second written in UTC+13 was not recognised; logger saw:\n%q", out)
+		t.Fatalf("a removed second written in UTC+13 was not recognized; logger saw:\n%q", out)
 	}
 
 	if !strings.Contains(out, "utc=2029-12-31T23:59:59Z") {

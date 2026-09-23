@@ -18,9 +18,9 @@ import (
 // the number, not by any rule a caller can be expected to follow. Nobody
 // types those. A user types "M31", "M 31" or "m31".
 //
-// SIMBAD's ADQL cannot normalise: REPLACE, LOWER, ILIKE and ivo_nocasematch
+// SIMBAD's ADQL cannot normalize: REPLACE, LOWER, ILIKE and ivo_nocasematch
 // are all rejected by its parser, verified against the live service. So the
-// normalisation has to happen here, by generating the handful of spellings
+// normalization has to happen here, by generating the handful of spellings
 // the padding can produce and matching all of them exactly.
 //
 // Four spaces is past every field width SIMBAD uses for the catalogues in
@@ -128,7 +128,7 @@ func BuildResolveQuery(req resolve.ObjectRequest) string {
 //
 // Still a LIKE, because that is what a search is — but anchored at the start
 // rather than wrapped in wildcards on both sides, and ordered, so that the
-// rows returned are the ones a person would recognise and are the same rows
+// rows returned are the ones a person would recognize and are the same rows
 // on every run. The unordered TOP N it replaces was not reproducible: two
 // identical calls for "M42" returned different objects.
 //

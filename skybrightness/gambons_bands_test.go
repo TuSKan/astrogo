@@ -32,7 +32,7 @@ import (
 // times, which is a data-preparation job and not something a test does.
 //
 // Zodiacal light and airglow need neither. Their ratio is dimensionless, it is
-// immune to the zero point and to the absolute airglow normalisation that
+// immune to the zero point and to the absolute airglow normalization that
 // dominated every earlier comparison, and it is available in all five bands
 // from the paper's own table. What it tests is the thing the V comparison
 // found worst: the airglow spectrum, whose shape across the optical range is
@@ -198,7 +198,7 @@ func TestAgainstGAMBONSTable2AcrossBands(t *testing.T) {
 	// The shape of the disagreement across the spectrum, which is what five
 	// bands buy over one.
 	//
-	// A ratio that is off by the same factor in every band is a normalisation:
+	// A ratio that is off by the same factor in every band is a normalization:
 	// one of the two components is scaled wrong and the airglow spectrum's
 	// shape is right. A ratio that drifts from U to I is a colour error — the
 	// airglow spectrum has the wrong shape, or the zodiacal colour correction
@@ -223,12 +223,12 @@ func TestAgainstGAMBONSTable2AcrossBands(t *testing.T) {
 
 	switch {
 	case spread < 1.3:
-		t.Logf("the disagreement is flat across the spectrum, so it is a normalisation " +
+		t.Logf("the disagreement is flat across the spectrum, so it is a normalization " +
 			"rather than a colour error: the airglow spectrum's SHAPE agrees with GAMBONS " +
 			"and its LEVEL does not")
 	default:
 		t.Logf("the disagreement varies by %.2fx across the spectrum, so it is a colour "+
-			"error and not only a normalisation: the airglow spectrum's shape differs from "+
+			"error and not only a normalization: the airglow spectrum's shape differs from "+
 			"GAMBONS', or the zodiacal colour correction does", spread)
 	}
 

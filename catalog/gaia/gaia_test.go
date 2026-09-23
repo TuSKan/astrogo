@@ -207,7 +207,7 @@ func TestParseVOTableReportsAWebPageAsDowntime(t *testing.T) {
 func TestParseVOTableDoesNotBlameTheServiceForABadDocument(t *testing.T) {
 	t.Parallel()
 
-	// Well-formed XML, recognisably a VOTable, and truncated mid-table.
+	// Well-formed XML, recognizably a VOTable, and truncated mid-table.
 	const broken = `<?xml version="1.0"?><VOTABLE><RESOURCE><TABLE><DATA><TABLEDATA><TR><TD>1`
 
 	_, err := parseVOTable(strings.NewReader(broken))

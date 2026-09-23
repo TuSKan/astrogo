@@ -315,7 +315,7 @@ func TestAerosolTauAtFollowsTheAngstromLaw(t *testing.T) {
 	}
 }
 
-// The cloud enums name every value, and an unrecognised one says so.
+// The cloud enums name every value, and an unrecognized one says so.
 func TestCloudEnumsName(t *testing.T) {
 	t.Parallel()
 

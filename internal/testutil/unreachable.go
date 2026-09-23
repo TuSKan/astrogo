@@ -26,7 +26,7 @@ import (
 //	137.79.133.14:443: i/o timeout
 //
 // The test's own doc comment said it "must not turn JPL's downtime into a red
-// build" and it did exactly that, because its guard recognised only the two
+// build" and it did exactly that, because its guard recognized only the two
 // ways Horizons answers 200 and still fails. An unreachable host was not one of
 // them.
 //

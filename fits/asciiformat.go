@@ -97,7 +97,7 @@ func (f asciiForm) parseCell(text string) (value float64, str string, blank bool
 
 	// FITS permits a D exponent where Go expects E, since Fortran wrote
 	// double-precision literals that way.
-	normalised := strings.Map(func(r rune) rune {
+	normalized := strings.Map(func(r rune) rune {
 		if r == 'D' || r == 'd' {
 			return 'E'
 		}
@@ -105,7 +105,7 @@ func (f asciiForm) parseCell(text string) (value float64, str string, blank bool
 		return r
 	}, trimmed)
 
-	v, err := strconv.ParseFloat(normalised, 64)
+	v, err := strconv.ParseFloat(normalized, 64)
 	if err != nil {
 		return 0, "", false, fmt.Errorf("%w: %q is not a number", ErrBadTForm, trimmed)
 	}

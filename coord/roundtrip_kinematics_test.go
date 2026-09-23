@@ -149,7 +149,7 @@ func kinematicGrid() []kinematicStar {
 	return out
 }
 
-// elements is the six-element state, normalised so the three frames can be
+// elements is the six-element state, normalized so the three frames can be
 // compared without caring which type they came from.
 type elements struct {
 	ra, dec     angle.Angle

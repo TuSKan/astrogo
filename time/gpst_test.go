@@ -61,7 +61,7 @@ func TestGPSTOffsetFromTAIIsExactlyNineteenSeconds(t *testing.T) {
 	}
 }
 
-// TestGPSTIsEighteenSecondsAheadOfUTCToday is the figure a GNSS user recognises,
+// TestGPSTIsEighteenSecondsAheadOfUTCToday is the figure a GNSS user recognizes,
 // and the one that makes the scale worth having.
 //
 // Unlike the TAI offset it is not constant: it is ΔAT − 19, so it stepped to 18

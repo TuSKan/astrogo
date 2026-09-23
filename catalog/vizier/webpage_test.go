@@ -73,7 +73,7 @@ func TestAChangedSchemaIsStillAChangedSchema(t *testing.T) {
 
 	_, err := parseCSV(strings.NewReader(renamed), tableSchemas[defaultTable])
 	if err == nil {
-		t.Fatal("a response with unrecognised columns parsed without error")
+		t.Fatal("a response with unrecognized columns parsed without error")
 	}
 
 	if !errors.Is(err, ErrUnexpectedSchema) {

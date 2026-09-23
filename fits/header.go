@@ -103,7 +103,7 @@ func (h *Header) GetFloat(keyword string) (float64, error) {
 
 // ParseCard extracts the value and comment string from a raw 80-byte FITS card.
 //
-// Three card shapes are recognised, which is every shape a header actually
+// Three card shapes are recognized, which is every shape a header actually
 // contains:
 //
 //   - A value card: keyword in columns 1-8, "= " in 9-10, then the value and
@@ -123,7 +123,7 @@ func ParseCard(raw []byte) Card {
 	}
 
 	// A HIERARCH keyword is longer than the eight-column field, so it has to
-	// be recognised before the columns are trusted.
+	// be recognized before the columns are trusted.
 	if kw, rest, ok := parseHierarch(s); ok {
 		value, comment := splitValueComment(rest)
 

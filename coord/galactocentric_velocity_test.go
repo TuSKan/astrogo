@@ -394,7 +394,7 @@ func TestToICRSDeclinesAVelocityItCannotSplit(t *testing.T) {
 		// Not exactly zero: the Sun's position is reconstructed through a
 		// rotation and a translation, so it lands within a femtoparsec of the
 		// origin rather than on it. What matters is that nothing blows up and
-		// the distance is recognisably nothing.
+		// the distance is recognizably nothing.
 		if distance.Pc() > 1e-9 {
 			t.Errorf("the Sun's own position came back at distance %g pc, want essentially 0",
 				distance.Pc())

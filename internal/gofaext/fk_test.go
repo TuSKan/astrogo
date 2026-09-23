@@ -87,7 +87,7 @@ func TestFk54z(t *testing.T) {
 	near(t, "dd1950", dd, 0.2108109051316431056e-7, 1e-18)
 }
 
-// TestFk52h checks FK5 J2000 to the Hipparcos frame — the ICRS realisation
+// TestFk52h checks FK5 J2000 to the Hipparcos frame — the ICRS realization
 // the FK4 conversions route through.
 func TestFk52h(t *testing.T) {
 	t.Parallel()

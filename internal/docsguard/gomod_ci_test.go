@@ -118,7 +118,7 @@ func TestWorkflowGoVersionTracksTheModuleDirective(t *testing.T) {
 	if found != wantPins {
 		t.Errorf("found %d Go version pins across %v, want %d.\n"+
 			"  Either a workflow step was added or removed — update this count — or the "+
-			"pins are no longer written in a form workflowGoVersion recognises, in which "+
+			"pins are no longer written in a form workflowGoVersion recognizes, in which "+
 			"case this test has been passing without checking anything.", found, workflows, wantPins)
 	}
 }

@@ -10,7 +10,7 @@ import (
 
 // The frame is where Galactic structure is written down: a target's distance
 // from us and its distance from the centre of the Galaxy are different
-// questions, and only the second one organises anything.
+// questions, and only the second one organizes anything.
 func ExampleGalactocentricFrame_FromICRS() {
 	f := coord.DefaultGalactocentricFrame()
 

@@ -102,11 +102,11 @@ const ClearSkyTopM = 100_000
 //
 // It derives the line-of-sight opacity from a stochastic 3D cloud field —
 // randomised cuboids filled with cloud elements — and reads it off a ray cast
-// through one realisation. The text does not specify that generator closely
+// through one realization. The text does not specify that generator closely
 // enough to reproduce, so [cloudDeck.opacity] takes the other route to the
 // same quantity, Beer-Lambert through a deck of stated optical depth. The
-// consequence is real and worth stating: a ray through a realised field is
-// binary per realisation, and this is the ensemble mean, so a broken sky
+// consequence is real and worth stating: a ray through a realized field is
+// binary per realization, and this is the ensemble mean, so a broken sky
 // comes out as what its patchiness averages to rather than as patchiness.
 //
 // And its printed Eq. 3 carries no cloud-fraction weight, which cannot be
@@ -289,7 +289,7 @@ type cloudDeck struct {
 //
 // The paper does not print a formula for it. It derives the quantity from a
 // stochastic 3D cloud field — randomised cuboids filled with cloud elements —
-// and reads the opacity off a ray cast through that realisation. That
+// and reads the opacity off a ray cast through that realization. That
 // generator is not specified closely enough in the text to reproduce, so this
 // takes the other route to the same quantity: Beer-Lambert through the deck
 // along the slant path,
@@ -297,8 +297,8 @@ type cloudDeck struct {
 //	o(z) = 1 - exp(-tau_c * M(z))
 //
 // which is what "opacity along the line of sight" means for a deck of stated
-// optical depth. The difference is that a ray through a realised field is
-// binary per realisation and this is the ensemble mean, so this cannot
+// optical depth. The difference is that a ray through a realized field is
+// binary per realization and this is the ensemble mean, so this cannot
 // produce the patchiness of a broken sky in one direction — it produces what
 // that patchiness averages to. That is recorded as a known approximation
 // rather than presented as their model.

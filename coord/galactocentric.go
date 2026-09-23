@@ -118,7 +118,7 @@ const (
 //
 // The *orientation* is not a parameter. The axes are those of the IAU Galactic
 // frame that [ICRSToGalactic] already implements — the Hipparcos ICRS
-// realisation of the 1958 system, via SOFA's Icrs2g. Letting a caller supply a
+// realization of the 1958 system, via SOFA's Icrs2g. Letting a caller supply a
 // different Galactic-centre direction would mean this file carried a second,
 // independent definition of which way the Galaxy points, and the two could
 // disagree. One definition, used twice, cannot.
@@ -388,7 +388,7 @@ func (c Galactocentric) Vector() vector.Vec3 { return c.v }
 // For anything in or near the disc this is the wrong quantity to reach for and
 // [Galactocentric.Radius] is the right one; they differ by less than a part in
 // 10⁴ at the Sun, and by a great deal for a halo star. The distinction matters
-// because the Galaxy is flat: its dynamics are organised by cylindrical radius
+// because the Galaxy is flat: its dynamics are organized by cylindrical radius
 // and height separately, not by spherical radius.
 func (c Galactocentric) Distance() unit.Length { return unit.Meters(c.v.Norm()) }
 

@@ -56,11 +56,11 @@ func ExampleRefraction_RefractFromTrue() {
 	// 90° -> lifted  0.00 arcmin
 }
 
-// Airmass is how much atmosphere a sightline crosses, normalised to 1 at the
+// Airmass is how much atmosphere a sightline crosses, normalized to 1 at the
 // zenith. It is the quantity extinction is proportional to, so it is what turns
 // an altitude into a magnitude penalty.
 //
-// Two values are worth recognising: 1 at the zenith, and ~2 at 30°, since
+// Two values are worth recognizing: 1 at the zenith, and ~2 at 30°, since
 // sin(30°) is a half and a sightline there crosses twice the vertical column.
 func ExampleAirmass() {
 	for _, alt := range []float64{90, 30, 10} {

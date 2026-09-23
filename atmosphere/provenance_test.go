@@ -6,7 +6,7 @@ import (
 	"github.com/TuSKan/astrogo/atmosphere"
 )
 
-// Every fidelity level names itself, and an unrecognised one says so rather
+// Every fidelity level names itself, and an unrecognized one says so rather
 // than passing for a real level.
 //
 // # Why a stringer is worth a test
@@ -47,7 +47,7 @@ func TestFidelityNamesEveryLevel(t *testing.T) {
 
 	for _, unknown := range []atmosphere.Fidelity{4, 17, 255} {
 		if got := unknown.String(); got != "Fidelity(unknown)" {
-			t.Errorf("Fidelity(%d).String() = %q, want %q — an unrecognised level must not "+
+			t.Errorf("Fidelity(%d).String() = %q, want %q — an unrecognized level must not "+
 				"borrow a real level's name", unknown, got, "Fidelity(unknown)")
 		}
 	}

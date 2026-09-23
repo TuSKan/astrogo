@@ -11,4 +11,4 @@ equinox** (Gordon 1975) — so astrogo derives the ICRS vector from that
 statement rather than copying a converted one. The B1900→B1950 step uses IAU
 1976 precession where Newcomb's is correct, which is measured rather than
 assumed: 0.55″ of direction and 5.4 cm/s against Astropy's independent
-realisation of the same definition. Closes [#295].
+realization of the same definition. Closes [#295].

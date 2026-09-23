@@ -330,7 +330,7 @@ func TestHMSString(t *testing.T) {
 		{"0h p0", "00h00m00s", 0, 0},
 		{"6h p0", "06h00m00s", 6, 0},
 		{"23h59m p1", "23h59m00.0s", 23 + 59.0/60, 1},
-		// Values > 24h are normalised
+		// Values > 24h are normalized
 		{"25h=1h p0", "01h00m00s", 25, 0},
 		// Fractional seconds
 		{"2h30m15.5s p1", "02h30m15.5s", 2 + 30.0/60 + 15.5/3600, 1},

@@ -177,7 +177,7 @@ func awaitPhase(ctx context.Context, client *remote.Client, id remote.EndpointID
 			// Still going.
 
 		default:
-			return fmt.Errorf("%w %s: unrecognised phase %q", ErrAsyncJob, jobID, phase)
+			return fmt.Errorf("%w %s: unrecognized phase %q", ErrAsyncJob, jobID, phase)
 		}
 
 		if time.Now().After(deadline) {

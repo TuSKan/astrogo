@@ -161,9 +161,9 @@ func TestRecordedETagRoundTrips(t *testing.T) {
 	}
 }
 
-// TestIsStagingNameRecognisesBookkeeping covers the predicate remote uses to
+// TestIsStagingNameRecognizesBookkeeping covers the predicate remote uses to
 // tell its own scaffolding from a cached object when it walks a cache.
-func TestIsStagingNameRecognisesBookkeeping(t *testing.T) {
+func TestIsStagingNameRecognizesBookkeeping(t *testing.T) {
 	t.Parallel()
 
 	for _, name := range []string{

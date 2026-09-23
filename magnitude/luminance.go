@@ -20,7 +20,7 @@ import (
 // # Why this is an integral and not a mean
 //
 // Because a luminance is a total, where a flux density is an average. Every
-// other projection in this package divides by the band's own normalisation to
+// other projection in this package divides by the band's own normalization to
 // answer "how bright per unit wavelength"; this one must not, because the eye
 // sums what it receives across the whole band. Dividing here would produce a
 // number that is smooth, positive, in plausible units and wrong by the width

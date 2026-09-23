@@ -79,8 +79,8 @@ func TestPassbandValidate(t *testing.T) {
 }
 
 // The band-averaged value of a flat spectrum is that same flat value,
-// whatever the response shape or normalisation — the defining property of
-// a weighted mean, and the first thing a wrong normalisation breaks.
+// whatever the response shape or normalization — the defining property of
+// a weighted mean, and the first thing a wrong normalization breaks.
 func TestMeanFluxDensityFlatSpectrumIsIdentity(t *testing.T) {
 	t.Parallel()
 
@@ -105,7 +105,7 @@ func TestMeanFluxDensityFlatSpectrumIsIdentity(t *testing.T) {
 	}
 }
 
-// An unnormalised curve must give the same answer as a normalised one,
+// An unnormalized curve must give the same answer as a normalized one,
 // since every projection divides by the band's own integral.
 func TestMeanFluxDensityIgnoresResponseScale(t *testing.T) {
 	t.Parallel()

@@ -180,7 +180,7 @@ func TestTransmissionIsBounded(t *testing.T) {
 // A phase function must be positive everywhere and integrate to one over the
 // sphere, which is what makes it a redistribution of light rather than a source
 // or a sink of it.
-func TestPhaseFunctionsAreNormalised(t *testing.T) {
+func TestPhaseFunctionsAreNormalized(t *testing.T) {
 	t.Parallel()
 
 	// Integrate p(theta) over the sphere: 2*pi*Integral p(theta) sin(theta) dtheta.

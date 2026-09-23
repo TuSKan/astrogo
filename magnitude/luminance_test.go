@@ -63,7 +63,7 @@ func TestLuminanceAnchorsOnTheLumenDefinition(t *testing.T) {
 // larger number.
 //
 // This is the property that separates it from every other projection in this
-// package, all of which divide by the band's normalisation and would return
+// package, all of which divide by the band's normalization and would return
 // the same value for both curves here. Getting it wrong produces a number in
 // the right units, of plausible size, wrong by the width of whatever curve
 // was passed in.

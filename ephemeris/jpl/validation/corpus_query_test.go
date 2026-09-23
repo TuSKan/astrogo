@@ -24,7 +24,7 @@ import (
 // `loc.Height()` became a `loc.Height().Meters()`; a wrong unit there is
 // exactly the silent, plausible, whole-corpus shift this catches. It would move
 // the real sites and leave the two synthetic ones at height zero untouched,
-// which is a pattern worth being able to recognise.
+// which is a pattern worth being able to recognize.
 //
 // So the manifest's record of what was asked is compared against what the code
 // would ask today. If they differ, the diff is astrogo's and no amount of

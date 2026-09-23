@@ -17,7 +17,7 @@ import (
 //
 // This is what makes the comparison worth running. GAMBONS states which bands
 // its published radiances are on but not which tabulation of them, and SVO
-// carries several realisations of "Johnson-Cousins" that differ by a few
+// carries several realizations of "Johnson-Cousins" that differ by a few
 // nanometres. Checking the fetched curves against the paper's own numbers is
 // what establishes that Generic/Bessell is the family the paper means, rather
 // than assuming it because Bessell (1990) is the usual answer.

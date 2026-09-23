@@ -574,7 +574,7 @@ func TestGaiaGToJohnsonB(t *testing.T) {
 	// Johnson B is narrow and blue where Gaia G is broad, so a star redder than
 	// the reference carries less flux in B and B is the fainter, larger number —
 	// by more as the star reddens. The condition is on stars redder than Vega,
-	// not on all of them: these are Vega-normalised magnitudes, so at BP-RP = 0
+	// not on all of them: these are Vega-normalized magnitudes, so at BP-RP = 0
 	// every band agrees by construction and the relation's 0.014 mag offset there
 	// is fit scatter rather than a physical claim.
 	prev := math.Inf(-1)

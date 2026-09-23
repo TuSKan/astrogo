@@ -17,7 +17,7 @@ import (
 	"github.com/TuSKan/astrogo/unit"
 )
 
-// solarSpectrumFixture is a 5772 K blackbody normalised to the solar
+// solarSpectrumFixture is a 5772 K blackbody normalized to the solar
 // constant, sampled at the ROLO bands.
 //
 // It is a test fixture, not a solar reference: the package ships no solar

@@ -41,11 +41,11 @@ var knownAssignments = map[string]bool{
 // whole time, unparsed, while a doc comment asserted a leap-second kernel could
 // not carry them.
 //
-// A parser that silently drops what it does not recognise cannot tell you what
+// A parser that silently drops what it does not recognize cannot tell you what
 // it dropped. This makes the kernel prove its own coverage instead, in both
 // directions:
 //
-//   - Nothing in the file is ignored. An unrecognised assignment fails here
+//   - Nothing in the file is ignored. An unrecognized assignment fails here
 //     rather than being skipped, so a future kernel revision that adds a
 //     keyword is a test failure and not a silent omission.
 //   - Nothing we claim to read is missing. A constant left at zero means the

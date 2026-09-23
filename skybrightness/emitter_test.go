@@ -65,8 +65,8 @@ func TestGarstangEmissionAtTheHorizonIsItsLargestLobe(t *testing.T) {
 	}
 }
 
-// The shape is normalised at the zenith, which is what makes it a shape.
-func TestGarstangEmissionIsNormalisedAtTheZenith(t *testing.T) {
+// The shape is normalized at the zenith, which is what makes it a shape.
+func TestGarstangEmissionIsNormalizedAtTheZenith(t *testing.T) {
 	t.Parallel()
 
 	shape := skybrightness.GarstangEmission{
@@ -76,7 +76,7 @@ func TestGarstangEmissionIsNormalisedAtTheZenith(t *testing.T) {
 
 	if got := shape.Weight(angle.Deg(90)); math.Abs(got-1) > 1e-12 {
 		t.Errorf("the weight at the zenith is %.15f, want exactly 1 — the value there is "+
-			"the normaliser, so anything else means the two disagree", got)
+			"the normalizer, so anything else means the two disagree", got)
 	}
 }
 

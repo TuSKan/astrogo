@@ -69,7 +69,7 @@ func BucketKeys(tb testing.TB, bucket fs.FS, prefix string) []string {
 
 	// Keys are reported relative to prefix, and a prefix that named a
 	// subdirectory has already been trimmed above; path.Clean here would
-	// change nothing, so the only normalisation left is the separator, which
+	// change nothing, so the only normalization left is the separator, which
 	// fs paths already use.
 	for i, k := range keys {
 		keys[i] = path.Clean(k)

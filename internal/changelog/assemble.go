@@ -133,7 +133,7 @@ func mergeSections(bodies ...string) string {
 	return b.String()
 }
 
-// sortSections puts known sections in [SectionOrder], then any unrecognised
+// sortSections puts known sections in [SectionOrder], then any unrecognized
 // ones in the order they were found — a heading this package does not know
 // about is still somebody's entry, and dropping it would be worse than
 // filing it last.

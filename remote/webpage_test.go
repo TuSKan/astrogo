@@ -71,16 +71,16 @@ func TestLooksLikeHTMLReadsOnlyThePrefix(t *testing.T) {
 		t.Error("a large VOTable was classified as a web page")
 	}
 
-	// And an HTML page is recognised from its opening bytes alone, so a caller
+	// And an HTML page is recognized from its opening bytes alone, so a caller
 	// peeking a few hundred bytes gets the same answer as one passing it all.
 	page := "<!DOCTYPE html>\n" + strings.Repeat("<p>maintenance</p>", 100000)
 
 	if !remote.LooksLikeHTML([]byte(page)[:64]) {
-		t.Error("an HTML page was not recognised from its first 64 bytes")
+		t.Error("an HTML page was not recognized from its first 64 bytes")
 	}
 
 	if !remote.LooksLikeHTML([]byte(page)) {
-		t.Error("an HTML page was not recognised when passed whole")
+		t.Error("an HTML page was not recognized when passed whole")
 	}
 }
 

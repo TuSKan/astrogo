@@ -8,7 +8,7 @@ import (
 	"github.com/TuSKan/astrogo/internal/testutil"
 )
 
-// TestAnUnreachableSourceStaysRecognisableThroughGetFile is the reproduction
+// TestAnUnreachableSourceStaysRecognizableThroughGetFile is the reproduction
 // #348 asked for, and it exists because a guard that was in place did not fire.
 //
 // # What happened
@@ -39,7 +39,7 @@ import (
 // travels the identical path — dial fails, net/http wraps it, remote/file wraps
 // that, remote wraps that. If a wrap along the way breaks the chain it breaks
 // it for both.
-func TestAnUnreachableSourceStaysRecognisableThroughGetFile(t *testing.T) {
+func TestAnUnreachableSourceStaysRecognizableThroughGetFile(t *testing.T) {
 	cleanRemoteState(t)
 
 	// A port nothing is listening on: bind one, learn its number, release it.

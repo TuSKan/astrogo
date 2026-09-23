@@ -327,7 +327,7 @@ func (w *WCS) SetCUnit(cunit []string) error {
 // ascension in degrees from a wavelength in Angstrom (#178).
 //
 //   - Celestial axes — the pair CTYPE names as longitude and latitude — come
-//     back in DEGREES, right ascension normalised to [0, 360). Degrees rather
+//     back in DEGREES, right ascension normalized to [0, 360). Degrees rather
 //     than radians because WCS Paper II requires celestial CRVAL and CDELT to
 //     be in degrees, so it is the header's unit and not a choice made here.
 //   - Every other axis comes back in the unit its own CUNITi declares, because
