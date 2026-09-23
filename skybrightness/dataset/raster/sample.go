@@ -22,8 +22,8 @@ func bilinear(gt GeoTransform, width, height int, lonDeg, latDeg float64, at pix
 		return 0, fmt.Errorf("%w: degenerate geotransform", ErrInvalidGrid)
 	}
 
-	// GDAL pixel coordinates place the pixel centre at integer+0.5; shift so that
-	// integer indices land on pixel centres for interpolation.
+	// GDAL pixel coordinates place the pixel center at integer+0.5; shift so that
+	// integer indices land on pixel centers for interpolation.
 	colF -= 0.5
 	rowF -= 0.5
 

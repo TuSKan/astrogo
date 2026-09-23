@@ -115,7 +115,7 @@ func TestGaiaMapMatchesThePublishedSurfaceBrightness(t *testing.T) {
 	}
 }
 
-// runOf finds a run of n consecutive pixels whose centres all satisfy want,
+// runOf finds a run of n consecutive pixels whose centers all satisfy want,
 // so a targeted query can sample one part of the sky without aggregating the
 // whole of it.
 func runOf(t *testing.T, grid coord.HEALPix, n int, want func(b angle.Angle) bool) (first int64) {

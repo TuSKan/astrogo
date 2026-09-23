@@ -3,7 +3,7 @@ type: Added
 pr: 343
 ---
 `coord.SpaceVelocity` returns a target's velocity with respect to the solar
-system barycentre in km/s, as Cartesian components on the ICRS axes, and
+system barycenter in km/s, as Cartesian components on the ICRS axes, and
 `coord.SpaceSpeed` its magnitude. Proper motion is an angular rate and radial
 velocity is a linear one, so neither can be compared with the other; this is the
 combination that Galactic UVW velocities, cluster membership tests and orbit

@@ -63,17 +63,17 @@ const (
 // johnsonVFromTable1 is a tophat over Johnson-Cousins V as Table 1 of the same
 // paper characterises it: effective wavelength 552.4 nm, width 90.9 nm.
 //
-// Still a tophat rather than the real curve, but centred and sized on their
+// Still a tophat rather than the real curve, but centered and sized on their
 // own numbers rather than on a round 500 to 600, which matters more here than
 // usual because the comparison is between bands whose airglow content differs
 // sharply across exactly this range — the OI line at 558 nm sits inside it.
 func johnsonVFromTable1() magnitude.Passband {
 	const (
-		centre = 552.4
+		center = 552.4
 		width  = 90.9
 	)
 
-	lo, hi := centre-width/2, centre+width/2
+	lo, hi := center-width/2, center+width/2
 
 	return magnitude.Passband{
 		Name: "Johnson-Cousins V (tophat on Masana et al. 2024 Table 1)",

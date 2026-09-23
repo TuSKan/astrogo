@@ -32,7 +32,7 @@ import (
 // # What it is for
 //
 // Dither and mosaic patterns, offset guide stars, slit and detector layouts,
-// finder charts, and any "put the target at the centre and tell me where
+// finder charts, and any "put the target at the center and tell me where
 // everything else falls" question. The frame is a value: build one per target
 // and apply it to as many positions as needed.
 //
@@ -48,7 +48,7 @@ type SkyOffset struct {
 	rotation angle.Angle
 }
 
-// NewSkyOffset returns the offset frame centred on origin, with the frame's
+// NewSkyOffset returns the offset frame centered on origin, with the frame's
 // +lat axis pointing at the given position angle (north through east).
 //
 // Pass a zero rotation for a north-up, east-left frame.
@@ -56,7 +56,7 @@ func NewSkyOffset(origin ICRS, rotation angle.Angle) SkyOffset {
 	return SkyOffset{origin: origin, rotation: rotation}
 }
 
-// Origin returns the position the frame is centred on.
+// Origin returns the position the frame is centered on.
 func (f SkyOffset) Origin() ICRS { return f.origin }
 
 // Rotation returns the position angle the frame's +lat axis points at.

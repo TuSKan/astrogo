@@ -68,7 +68,7 @@ func TestRadianceAtClosesAtTheRAWrap(t *testing.T) {
 //
 // The first version of this test asserted that every azimuth at declination 90
 // returns the same value, on the reasoning that the pole is one direction. That
-// is true of the sky and false of the pixelation: HEALPix has no pixel centred
+// is true of the sky and false of the pixelation: HEALPix has no pixel centered
 // on a pole, four meet there, and which one a lookup lands in depends on the
 // longitude it was given. The values differ by however much the sky differs
 // across 13.7 arcminutes at order 8, which is resolution rather than error.

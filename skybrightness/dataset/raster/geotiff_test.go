@@ -428,12 +428,12 @@ func rampPixels(width, height int, base float32) []float32 {
 	return px
 }
 
-// centerLonLat returns the lon/lat of the centre of pixel (col,row) for a synth.
+// centerLonLat returns the lon/lat of the center of pixel (col,row) for a synth.
 func (s synthTIFF) centerLonLat(col, row int) (lon, lat float64) {
 	return s.originLon + (float64(col)+0.5)*s.pxSize, s.originLat - (float64(row)+0.5)*s.pxSize
 }
 
-// readPixelCenters asserts every pixel reads back at its centre for the given
+// readPixelCenters asserts every pixel reads back at its center for the given
 // synth configuration, exercising the strip/tile indexing and decoding.
 func readPixelCenters(t *testing.T, s synthTIFF) {
 	t.Helper()

@@ -20,13 +20,13 @@ import (
 // does so only if the integral, the efficacy and the units all line up. Any
 // one of them wrong moves this number.
 //
-// The curve here is a narrow triangle centred on 555 nm rather than the real
+// The curve here is a narrow triangle centered on 555 nm rather than the real
 // CIE tabulation, so the test needs no network. Its integral is its width
 // over two, which is what makes the expected value hand-computable.
 func TestLuminanceAnchorsOnTheLumenDefinition(t *testing.T) {
 	t.Parallel()
 
-	// 1 nm steps across a 10 nm window centred on 555.
+	// 1 nm steps across a 10 nm window centered on 555.
 	grid, err := unit.NewSpectralGrid(550, 1, 11)
 	if err != nil {
 		t.Fatalf("NewSpectralGrid: %v", err)

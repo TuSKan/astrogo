@@ -14,7 +14,7 @@ import (
 //
 // The galaxies within about 100 Mpc are not spread evenly. They are
 // concentrated into a sheet — the Local Supercluster, with the Virgo cluster
-// near its centre — and de Vaucouleurs defined this system to put that sheet
+// near its center — and de Vaucouleurs defined this system to put that sheet
 // on the equator, the way Galactic coordinates put the Milky Way's disc on
 // theirs. Plotted in supergalactic latitude, a structure that looks like
 // scatter on the sky becomes a band.

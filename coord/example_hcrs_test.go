@@ -26,7 +26,7 @@ func ExampleBarycentricToHeliocentric() {
 		return
 	}
 
-	fmt.Printf("the Sun is %.6f AU from the barycentre\n", sun.Norm())
+	fmt.Printf("the Sun is %.6f AU from the barycenter\n", sun.Norm())
 
 	// A body about where Mars is, and a star about a parsec away, both given
 	// barycentrically.
@@ -53,7 +53,7 @@ func ExampleBarycentricToHeliocentric() {
 	}
 
 	// Output:
-	// the Sun is 0.009057 AU from the barycentre
+	// the Sun is 0.009057 AU from the barycenter
 	// a body at 1.7 AU     direction moves  881.1538 arcsec
 	// a star at 1 parsec   direction moves    0.0080 arcsec
 }

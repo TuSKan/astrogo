@@ -112,7 +112,7 @@ func (h HEALPix) PixelOf(lon, lat angle.Angle) int64 {
 	return face*h.nside*h.nside + interleave(ix, iy)
 }
 
-// Center returns the longitude and latitude of a pixel's centre.
+// Center returns the longitude and latitude of a pixel's center.
 func (h HEALPix) Center(pixel int64) (lon, lat angle.Angle, err error) {
 	if pixel < 0 || pixel >= h.NumPixels() {
 		return 0, 0, fmt.Errorf("%w: %d not in [0, %d)", ErrHEALPixPixel, pixel, h.NumPixels())

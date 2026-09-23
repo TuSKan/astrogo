@@ -9,7 +9,7 @@ import (
 	"github.com/TuSKan/astrogo/vector"
 )
 
-// apparentVec returns where a solar-system body is *seen* from the geocentre
+// apparentVec returns where a solar-system body is *seen* from the geocenter
 // at t — the apparent place, with light time and annual aberration both in it.
 //
 // # Why this exists rather than eph.Position

@@ -66,7 +66,7 @@ func TestTheSuperclusterPlaneIsNearlyPerpendicularToTheGalacticOne(t *testing.T)
 // TestVirgoLiesOnTheSuperclusterPlane is the test that would fail if the
 // rotation were self-consistent and pointed at nothing.
 //
-// The Virgo cluster is the centre of the Local Supercluster. That is the
+// The Virgo cluster is the center of the Local Supercluster. That is the
 // structure this coordinate system exists to flatten, so Virgo has to come out
 // on the equator — and it is the one claim here that no amount of internal
 // consistency can produce. A rotation about the wrong pole would still send
@@ -90,7 +90,7 @@ func TestVirgoLiesOnTheSuperclusterPlane(t *testing.T) {
 
 		// The cluster has real depth and width on the sky, so this is a band
 		// rather than a line. Five degrees is loose enough to hold the whole
-		// cluster and far tighter than the 42° a Galactic-centre direction
+		// cluster and far tighter than the 42° a Galactic-center direction
 		// lands at, which is the scale a wrong rotation would produce.
 		if sgb := math.Abs(sg.SGB().Degrees()); sgb > 5 {
 			t.Errorf("%s has supergalactic latitude %+.4f, %.4f degrees off the plane — "+
@@ -121,7 +121,7 @@ func TestSupergalacticRoundTrips(t *testing.T) {
 		{"the south celestial pole", 0, -89.9},
 		{"just above the RA wrap", 0.01, 0},
 		{"just below it", 359.99, 0},
-		{"the galactic centre", 266.405, -28.936},
+		{"the galactic center", 266.405, -28.936},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()

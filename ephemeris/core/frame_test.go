@@ -58,13 +58,13 @@ func TestRequire(t *testing.T) {
 		center  Center
 		wantErr error
 	}{
-		{"matching frame and centre", icrs, FrameICRS, CenterGeocenter, nil},
+		{"matching frame and center", icrs, FrameICRS, CenterGeocenter, nil},
 
 		// The distinction the type exists to make: GCRS and ICRS differ by
 		// frame bias, about 23 mas, and every provider used to hand back an
 		// unlabeled State that was mathematically valid either way.
 		{"wrong frame", gcrs, FrameICRS, CenterGeocenter, ErrWrongFrame},
-		{"wrong centre", icrs, FrameICRS, CenterBarycenter, ErrWrongCenter},
+		{"wrong center", icrs, FrameICRS, CenterBarycenter, ErrWrongCenter},
 
 		// An unspecified label asserts nothing, in either direction. A
 		// provider that has not been taught to label its output says so

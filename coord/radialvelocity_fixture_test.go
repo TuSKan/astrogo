@@ -137,7 +137,7 @@ func loadRVFixture(t *testing.T) rvFixture {
 //
 // astrogo documents about 1 m/s accuracy and says plainly it is a classical
 // projection: no gravitational redshift, no light-travel time to the
-// barycentre, no proper-motion or parallax effect on the projection geometry —
+// barycenter, no proper-motion or parallax effect on the projection geometry —
 // the Wright & Eastman (2014) terms. Astropy's own documentation puts its
 // barycentric correction at roughly 3 m/s against a full precision-RV code.
 // Two classical implementations agreeing should therefore sit near the
@@ -315,7 +315,7 @@ func reportFullTreatment(t *testing.T, full []float64) {
 	// the observer's frame shift implemented the two models are the same
 	// model, so what is left is arithmetic rather than physics: a tenth of a
 	// meter per second is loose enough for the terms astrogo still omits —
-	// light-travel time to the barycentre, and the target's own proper
+	// light-travel time to the barycenter, and the target's own proper
 	// motion over that crossing, neither of which a bare ICRS direction can
 	// supply — and forty times tighter than the gap it replaces.
 	const toleranceKmS = 1e-4

@@ -100,7 +100,7 @@ func (m *Model) SkyMap(ctx context.Context, q Query, rings int) ([]SkyPoint, err
 
 	// Every direction the map will hold, laid out before any is evaluated.
 	//
-	// Ring centres sit at half-steps so no sample lands exactly on the
+	// Ring centers sit at half-steps so no sample lands exactly on the
 	// horizon, where airmass diverges and most models leave their stated
 	// validity domain.
 	step := 90.0 / float64(rings)

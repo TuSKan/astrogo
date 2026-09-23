@@ -17,17 +17,17 @@ import (
 // that it is comparable to the size of the Sun.
 const solarRadiiPerAU = 215.032
 
-// TestTheSunOrbitsTheBarycentreByAboutASolarRadius is the physical check, and
+// TestTheSunOrbitsTheBarycenterByAboutASolarRadius is the physical check, and
 // it is the one that would catch the whole quantity being wrong rather than
 // slightly off.
 //
-// The barycentre is the mass-weighted centre of the solar system, and Jupiter
+// The barycenter is the mass-weighted center of the solar system, and Jupiter
 // alone is a thousandth of the Sun's mass at five AU — so the Sun's excursion
 // is of order the solar radius, not of order the Earth's orbit and not of order
 // zero. Sampling a Jupiter period has to show both: a distance that is
 // sometimes under half a solar radius and sometimes near two, because the giant
 // planets move in and out of alignment.
-func TestTheSunOrbitsTheBarycentreByAboutASolarRadius(t *testing.T) {
+func TestTheSunOrbitsTheBarycenterByAboutASolarRadius(t *testing.T) {
 	t.Parallel()
 
 	var minR, maxR = math.Inf(1), 0.0
@@ -53,18 +53,18 @@ func TestTheSunOrbitsTheBarycentreByAboutASolarRadius(t *testing.T) {
 	// Nothing here is a fitted tolerance: these are the bounds the two-body
 	// arithmetic gives for the Sun and the giant planets.
 	if maxR > 0.01 {
-		t.Errorf("the Sun reached %.6f AU from the barycentre, more than the ~0.009 AU "+
+		t.Errorf("the Sun reached %.6f AU from the barycenter, more than the ~0.009 AU "+
 			"all the giant planets aligned can produce", maxR)
 	}
 
 	if maxR < 0.006 {
-		t.Errorf("the Sun never got further than %.6f AU from the barycentre; Jupiter "+
+		t.Errorf("the Sun never got further than %.6f AU from the barycenter; Jupiter "+
 			"alone puts it past 0.005 AU, so this is too small to be the real quantity",
 			maxR)
 	}
 
 	if minR > 0.003 {
-		t.Errorf("the Sun never came closer than %.6f AU to the barycentre over a full "+
+		t.Errorf("the Sun never came closer than %.6f AU to the barycenter over a full "+
 			"Jupiter period, which it should — the giant planets do fall out of "+
 			"alignment", minR)
 	}

@@ -110,7 +110,7 @@ func ParseFinals2000A(r io.Reader) (*Table, error) {
 
 		// Polar motion and UT1-UTC are what make a row an orientation. A row
 		// that has an MJD and none of them is the bulletin running out, not an
-		// epoch at which the pole is centred and UT1 equals UTC.
+		// epoch at which the pole is centered and UT1 equals UTC.
 		//
 		// finals2000A is padded to full width for its whole length, so those
 		// rows are not short and the length check above does not reach them.

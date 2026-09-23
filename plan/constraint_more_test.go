@@ -89,14 +89,14 @@ func TestSunSepPassesTheSunItself(t *testing.T) {
 // TestGalacticLatitude is checked against the two directions the Galactic
 // frame is defined by, so the expected values are the definition rather than
 // a computation of it: the North Galactic Pole is b = +90 and the Galactic
-// centre b = 0.
+// center b = 0.
 func TestGalacticLatitude(t *testing.T) {
 	site := moreSite(t)
 	when := time.FromJD(2451545.0, time.UTC)
 
-	// IAU 1958 Galactic frame, on ICRS: the pole and the centre.
+	// IAU 1958 Galactic frame, on ICRS: the pole and the center.
 	pole := NewStar("north galactic pole", angle.Deg(192.85948), angle.Deg(27.12825))
-	centre := NewStar("galactic centre", angle.Deg(266.40510), angle.Deg(-28.93617))
+	center := NewStar("galactic center", angle.Deg(266.40510), angle.Deg(-28.93617))
 
 	c := GalacticLatitude{Threshold: angle.Deg(20)}
 
@@ -111,15 +111,15 @@ func TestGalacticLatitude(t *testing.T) {
 		t.Errorf("|b| at the pole = %.4f, want 90", res.Value)
 	}
 
-	res, err = c.Check(centre, when, site)
+	res, err = c.Check(center, when, site)
 	testutil.AssertNoError(t, err)
 
 	if res.Pass {
-		t.Errorf("the galactic centre passed a |b| >= 20° constraint: %v", res)
+		t.Errorf("the galactic center passed a |b| >= 20° constraint: %v", res)
 	}
 
 	if math.Abs(res.Value) > 0.01 {
-		t.Errorf("|b| at the centre = %.4f, want 0", res.Value)
+		t.Errorf("|b| at the center = %.4f, want 0", res.Value)
 	}
 }
 

@@ -20,7 +20,7 @@ import (
 //   - 005, 309, 474 — no separator at all between fields. "005   2.231000.659891"
 //     is longitude 2.23100, ρcosφ′ 0.659891; whitespace-splitting reads it as one
 //     number and drops the row while looking like it worked.
-//   - 250, 500 — no parallax constants: Hubble, and the geocentre.
+//   - 250, 500 — no parallax constants: Hubble, and the geocenter.
 //   - Z99 — a lettered code, and the last row of the file.
 //   - 807 — negative ρsinφ′, southern hemisphere.
 //
@@ -179,7 +179,7 @@ func TestParseMPCObsCodesKeepsPositionlessCodes(t *testing.T) {
 		t.Errorf("250 name = %q, want Hubble Space Telescope", hubble.Name)
 	}
 
-	// The geocentre publishes constants — all zero — so it is a *positioned*
+	// The geocenter publishes constants — all zero — so it is a *positioned*
 	// row, not a positionless one. It is here to pin that the two cases are
 	// told apart by what the file says rather than by whether the position
 	// looks sensible.

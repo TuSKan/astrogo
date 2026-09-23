@@ -499,7 +499,7 @@ func clamp(v, lo, hi float64) float64 {
 // A fixed target's radial velocity is a measurement somebody made and wrote
 // in a catalog: it is a property of the object, constant on any timescale an
 // observer cares about, and the only work here is referring it from the
-// barycentre to the observer. That is [MeasuredRadialVelocity], carried by
+// barycenter to the observer. That is [MeasuredRadialVelocity], carried by
 // *Star and *DeepSkyObject.
 //
 // A solar-system body has no such number, and could not have one. Its radial

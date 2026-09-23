@@ -293,10 +293,10 @@ func (c MoonIllum) CheckCtx(obj Observable, _ time.Time, _ *Site, ctx *coord.Con
 // # Why the two paths are not interchangeable
 //
 // [coord.Context.ICRSToAltAz] treats its argument as a direction — a catalog
-// star, infinitely far away — so the observer's offset from the geocentre
+// star, infinitely far away — so the observer's offset from the geocenter
 // cannot matter. That is right for a star and wrong for anything nearby: the
 // Moon is 60 Earth radii away, and an observer on the surface sees it up to
-// about **0.95°** from where the geocentre does.
+// about **0.95°** from where the geocenter does.
 //
 // Every constraint, score and visibility check in this package used to call
 // ICRSToAltAz on a geocentric position, so the scheduler reasoned about the

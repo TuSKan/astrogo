@@ -217,7 +217,7 @@ func TestPositionAndGeocentricVecAgree(t *testing.T) {
 // should not be there at all.
 //
 // Light time to a satellite is real but is a different correction — 1.3 ms to
-// low Earth orbit, from the observer rather than from the geocentre — and it
+// low Earth orbit, from the observer rather than from the geocenter — and it
 // is not what ApparentState computes.
 func TestSatellitePositionsAreNotRetarded(t *testing.T) {
 	t.Parallel()
@@ -369,7 +369,7 @@ func TestEveryEphemerisBackedTargetIsApparent(t *testing.T) {
 	}
 }
 
-// zeroProvider reports a body at the geocentre, which is not a direction.
+// zeroProvider reports a body at the geocenter, which is not a direction.
 //
 // It is the one input eph.ToICRS refuses: a zero vector has no right ascension
 // and no declination, and returning RA 0 Dec 0 for it would put a target in
@@ -441,17 +441,17 @@ func TestApparentFailuresNameTheTargetThatFailed(t *testing.T) {
 	}
 }
 
-// TestApparentDirectionRefusesTheGeocentre covers apparentICRS's second
+// TestApparentDirectionRefusesTheGeocenter covers apparentICRS's second
 // failure, which is not a provider failure at all.
 //
-// A body reported at the geocentre has a state and no direction. eph.ToICRS
+// A body reported at the geocenter has a state and no direction. eph.ToICRS
 // refuses it rather than answering RA 0 Dec 0 — a real point in Pisces that a
 // target would rise, transit and set from — and this keeps that refusal from
 // being flattened into a success on the way through.
-func TestApparentDirectionRefusesTheGeocentre(t *testing.T) {
+func TestApparentDirectionRefusesTheGeocenter(t *testing.T) {
 	t.Parallel()
 
-	body := NewPlanet("AtTheCentre", eph.Mars, zeroProvider{})
+	body := NewPlanet("AtTheCenter", eph.Mars, zeroProvider{})
 	when := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
 
 	// The vector itself is fine: zero is a state, just not a direction.
@@ -464,14 +464,14 @@ func TestApparentDirectionRefusesTheGeocentre(t *testing.T) {
 
 	_, err = body.Position(when)
 	if err == nil {
-		t.Fatal("Position answered a direction for a body at the geocentre")
+		t.Fatal("Position answered a direction for a body at the geocenter")
 	}
 
 	if !errors.Is(err, eph.ErrZeroVector) {
 		t.Errorf("err = %v, want eph.ErrZeroVector", err)
 	}
 
-	if !strings.Contains(err.Error(), "AtTheCentre") {
+	if !strings.Contains(err.Error(), "AtTheCenter") {
 		t.Errorf("err = %v, want the target's name in it", err)
 	}
 }

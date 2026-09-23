@@ -24,7 +24,7 @@ import (
 // as an apparent one is a pointing error three times the Moon's diameter.
 //
 // Both are correct answers to different questions. CIRS is what the IAU 2000/2006
-// resolutions put at the centre of the transformation chain, and it is what
+// resolutions put at the center of the transformation chain, and it is what
 // [Context.CIRSToObserved] consumes. The equinox-based place is what a
 // printed almanac, a FITS header written by older software, and most telescope
 // control systems mean by "apparent".

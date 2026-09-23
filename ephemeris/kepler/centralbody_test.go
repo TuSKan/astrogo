@@ -156,7 +156,7 @@ func TestPeriodFollowsKeplersThirdLaw(t *testing.T) {
 
 	gotJup := periodDays(t, circular(t, jupiter, radiusKM), wantJup)
 	if rel := math.Abs(gotJup-wantJup) / wantJup; rel > 1e-6 {
-		t.Errorf("Jupiter-centred period = %.6f d, third law says %.6f d (relative %.2g)",
+		t.Errorf("Jupiter-centered period = %.6f d, third law says %.6f d (relative %.2g)",
 			gotJup, wantJup, rel)
 	}
 
@@ -194,10 +194,10 @@ func TestPeriodFollowsKeplersThirdLaw(t *testing.T) {
 	}
 }
 
-// TestSunCentredIsUnchangedByTheRefactor pins the heliocentric result against
+// TestSunCenteredIsUnchangedByTheRefactor pins the heliocentric result against
 // the third law too, so the shared propagation path is not quietly altered
 // for the case that already worked.
-func TestSunCentredIsUnchangedByTheRefactor(t *testing.T) {
+func TestSunCenteredIsUnchangedByTheRefactor(t *testing.T) {
 	// One astronomical unit about the Sun is a year, by construction.
 	el, err := kepler.NewElements(time.J2000(), unit.AU(1.0), 0,
 		angle.Deg(0), angle.Deg(0), angle.Deg(0), angle.Deg(0))

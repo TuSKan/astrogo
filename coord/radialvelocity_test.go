@@ -441,7 +441,7 @@ func TestTopocentricRadialVelocityIsTheLineOfSightComponent(t *testing.T) {
 	ctx := coord.NewContext(
 		time.Date(2026, time.March, 15, 0, 0, 0, 0, time.LocationUTC), site, noRefraction)
 
-	// Far enough that the observer's offset from the geocentre does not turn
+	// Far enough that the observer's offset from the geocenter does not turn
 	// the line of sight appreciably, so the geometry is the pure projection.
 	const farAU = 100.0
 
@@ -490,7 +490,7 @@ func TestTopocentricRadialVelocityIsTheLineOfSightComponent(t *testing.T) {
 
 // TestTopocentricRadialVelocityCarriesTheDiurnalTerm pins the part that is
 // easy to leave out and impossible to notice: a body at rest relative to the
-// geocentre still has a radial velocity, because the observer is moving.
+// geocenter still has a radial velocity, because the observer is moving.
 //
 // It is 0.465 km/s at the equator and nothing at the pole, and for the Moon
 // it is the dominant term rather than a correction — the Moon's own
@@ -498,7 +498,7 @@ func TestTopocentricRadialVelocityIsTheLineOfSightComponent(t *testing.T) {
 func TestTopocentricRadialVelocityCarriesTheDiurnalTerm(t *testing.T) {
 	at := time.Date(2026, time.March, 15, 6, 0, 0, 0, time.LocationUTC)
 
-	// A body at rest relative to the geocentre. Whatever radial velocity it
+	// A body at rest relative to the geocenter. Whatever radial velocity it
 	// shows is the observer's own.
 	atRest := vector.Zero()
 	pos := vector.V3(100, 0, 0)

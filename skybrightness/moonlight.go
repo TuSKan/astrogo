@@ -376,7 +376,7 @@ func (m *ScatteredMoonlight) computeGeometry(scene *Scene) (*moonGeometry, error
 	// The second is topocentric. An Earth radius is 1.7 per cent of the
 	// Moon's distance and irradiance goes as its inverse square, so using the
 	// geocentric distance costs up to 3.3 per cent — an observer with the Moon
-	// overhead is that much closer to it than the Earth's centre is. The
+	// overhead is that much closer to it than the Earth's center is. The
 	// correction is one subtraction because coord.Context already computes the
 	// observer's geocentric position in ICRS to do its own parallax work.
 	//

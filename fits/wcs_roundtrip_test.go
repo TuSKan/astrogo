@@ -40,7 +40,7 @@ func tanWCS(t *testing.T) *WCS {
 // somewhere real.
 //
 // The reference pixel itself round-trips perfectly, which is why an
-// eyeball check at the centre of an image would not show this.
+// eyeball check at the center of an image would not show this.
 func TestPixelWorldRoundTrip(t *testing.T) {
 	t.Parallel()
 
@@ -79,13 +79,13 @@ func TestPixelToWorldFollowsTheHeaderOrientation(t *testing.T) {
 
 	wcs := tanWCS(t)
 
-	centre, err := wcs.PixelToWorld([]float64{100, 200})
+	center, err := wcs.PixelToWorld([]float64{100, 200})
 	if err != nil {
-		t.Fatalf("PixelToWorld centre: %v", err)
+		t.Fatalf("PixelToWorld center: %v", err)
 	}
 
-	if math.Abs(centre[0]-10) > 1e-9 || math.Abs(centre[1]-20) > 1e-9 {
-		t.Fatalf("the reference pixel gave %v, want the reference value (10, 20)", centre)
+	if math.Abs(center[0]-10) > 1e-9 || math.Abs(center[1]-20) > 1e-9 {
+		t.Fatalf("the reference pixel gave %v, want the reference value (10, 20)", center)
 	}
 
 	east, err := wcs.PixelToWorld([]float64{110, 200})
@@ -99,12 +99,12 @@ func TestPixelToWorldFollowsTheHeaderOrientation(t *testing.T) {
 	}
 
 	// CDELT1 < 0: ten columns to the right is one degree of RA to the left.
-	if got := east[0] - centre[0]; got > 0 {
+	if got := east[0] - center[0]; got > 0 {
 		t.Errorf("with CDELT1 negative, +10 columns moved RA by %+.4f degrees; it must decrease", got)
 	}
 
 	// CDELT2 > 0: ten rows up is one degree further north.
-	if got := north[1] - centre[1]; got < 0 {
+	if got := north[1] - center[1]; got < 0 {
 		t.Errorf("with CDELT2 positive, +10 rows moved declination by %+.4f degrees; it must increase", got)
 	}
 }

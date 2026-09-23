@@ -537,7 +537,7 @@ func NewCrescentParams(t time.Time, loc *coord.Geodetic, prov eph.Provider) (Cre
 	//
 	// The comment said "topocentric" and the code was not: ICRSToAltAz treats
 	// its argument as a direction at infinity, so the observer's offset from
-	// the geocentre was discarded. For the Moon that is up to 0.95° — and this
+	// the geocenter was discarded. For the Moon that is up to 0.95° — and this
 	// is a crescent-visibility calculation, where the whole question is the
 	// Moon's altitude a few degrees above the horizon shortly after sunset. An
 	// error comparable to the quantity being measured.

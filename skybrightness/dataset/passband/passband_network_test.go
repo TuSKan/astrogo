@@ -23,7 +23,7 @@ import (
 // than assuming it because Bessell (1990) is the usual answer.
 var table1 = []struct {
 	filter   string
-	centreNM float64
+	centerNM float64
 	widthNM  float64
 }{
 	{"Generic/Bessell.U", 361.6, 60.5},
@@ -36,7 +36,7 @@ var table1 = []struct {
 // Tolerances on the comparison against Table 1, separate because the two
 // statistics carry different weight.
 //
-// The centre is what identifies a band: neighbouring Johnson-Cousins filters
+// The center is what identifies a band: neighbouring Johnson-Cousins filters
 // are 90 nm apart at the blue end, so two per cent cannot confuse one for
 // another. The width is looser because "effective width" has several
 // definitions — SVO alone publishes WidthEff and FWHM, which differ by four
@@ -61,7 +61,7 @@ var table1 = []struct {
 // eight per cent rather than something tighter: U and R sit at six and seven,
 // which is a difference of tabulation and not of band.
 const (
-	centreTolFrac = 0.02
+	centerTolFrac = 0.02
 	widthTolFrac  = 0.08
 )
 
@@ -84,17 +84,17 @@ func TestFetchesTheJohnsonCousinsBands(t *testing.T) {
 			continue
 		}
 
-		centre, width := shape(band)
+		center, width := shape(band)
 
-		t.Logf("%-20s centre %6.1f nm (Table 1: %6.1f), width %6.1f nm (Table 1: %6.1f), "+
+		t.Logf("%-20s center %6.1f nm (Table 1: %6.1f), width %6.1f nm (Table 1: %6.1f), "+
 			"detector %v, zero point %8.2f Jy",
-			band.Name, centre, want.centreNM, width, want.widthNM, band.Detector,
+			band.Name, center, want.centerNM, width, want.widthNM, band.Detector,
 			band.VegaZeroPointJy)
 
-		if rel := math.Abs(centre-want.centreNM) / want.centreNM; rel > centreTolFrac {
-			t.Errorf("%s: centre is %.1f nm against Table 1's %.1f, off by %.1f per cent — "+
+		if rel := math.Abs(center-want.centerNM) / want.centerNM; rel > centerTolFrac {
+			t.Errorf("%s: center is %.1f nm against Table 1's %.1f, off by %.1f per cent — "+
 				"this is not the band the paper tabulates",
-				want.filter, centre, want.centreNM, 100*rel)
+				want.filter, center, want.centerNM, 100*rel)
 		}
 
 		if rel := math.Abs(width-want.widthNM) / want.widthNM; rel > widthTolFrac {
@@ -168,7 +168,7 @@ func TestFetchRefusesAnUnknownFilter(t *testing.T) {
 //
 // The width is the standard one, the integral of the response over its peak,
 // which for a tophat is exactly its span.
-func shape(p magnitude.Passband) (centreNM, widthNM float64) {
+func shape(p magnitude.Passband) (centerNM, widthNM float64) {
 	var num, den, peak float64
 
 	for i := range p.WavelengthNM {

@@ -11,9 +11,9 @@ import (
 )
 
 // Galactocentric is a position in a right-handed Cartesian frame whose origin
-// is the centre of the Galaxy.
+// is the center of the Galaxy.
 //
-//	+X points from the Sun toward the Galactic centre
+//	+X points from the Sun toward the Galactic center
 //	+Y points in the direction of Galactic rotation (roughly Galactic l = 90°)
 //	+Z points toward the north Galactic pole
 //
@@ -26,9 +26,9 @@ import (
 //
 // Every other frame in this package is a direction with an optional distance,
 // because that is what an observation is. This one is not, because the
-// questions asked of it are not angular: "how far from the centre", "how far
+// questions asked of it are not angular: "how far from the center", "how far
 // above the plane", "is this in the bar". Expressing those as a longitude and a
-// latitude around the Galactic centre would be a faithful translation of an
+// latitude around the Galactic center would be a faithful translation of an
 // unhelpful shape.
 //
 // It also means the frame needs a real distance to be entered at all. A
@@ -76,7 +76,7 @@ type Galactocentric struct {
 // than against a blend nobody published.
 const (
 	// sunGalacticDistancePc is R₀, the distance from the Sun to the Galactic
-	// centre: 8178 ± 13 (stat) ± 22 (sys) pc, from GRAVITY Collaboration
+	// center: 8178 ± 13 (stat) ± 22 (sys) pc, from GRAVITY Collaboration
 	// (Abuter et al.) 2019, A&A 625, L10 — a geometric measurement from the
 	// orbit of the star S2 around Sgr A*, with the orbit's angular size and
 	// the star's radial velocity together fixing the scale.
@@ -108,7 +108,7 @@ const (
 )
 
 // GalactocentricFrame is the frame [Galactocentric] positions are expressed in:
-// where the Galactic centre is, and where the Sun sits relative to it.
+// where the Galactic center is, and where the Sun sits relative to it.
 //
 // # What is a parameter here and what is not
 //
@@ -119,14 +119,14 @@ const (
 // The *orientation* is not a parameter. The axes are those of the IAU Galactic
 // frame that [ICRSToGalactic] already implements — the Hipparcos ICRS
 // realisation of the 1958 system, via SOFA's Icrs2g. Letting a caller supply a
-// different Galactic-centre direction would mean this file carried a second,
+// different Galactic-center direction would mean this file carried a second,
 // independent definition of which way the Galaxy points, and the two could
 // disagree. One definition, used twice, cannot.
 //
 // That choice is worth stating precisely, because it is where astrogo's frame
 // and astropy's are defined differently even though they agree:
 //
-//   - astropy parameterises the Galactic-centre direction (galcen_coord) and a
+//   - astropy parameterises the Galactic-center direction (galcen_coord) and a
 //     roll angle, and its defaults are ICRS α = 266.4051°, δ = −28.936175° with
 //     a roll of 58.5986320306°.
 //   - astrogo takes the direction from [GalacticToICRS] of l = 0, b = 0, which
@@ -150,7 +150,7 @@ type GalactocentricFrame struct {
 	sunVelocity vector.Vec3 // The Sun's velocity in this frame, km/s.
 }
 
-// NewGalactocentricFrame returns the frame in which the Galactic centre lies
+// NewGalactocentricFrame returns the frame in which the Galactic center lies
 // sunDistance from the Sun and the Sun lies sunHeight above the Galactic
 // midplane.
 //
@@ -159,7 +159,7 @@ type GalactocentricFrame struct {
 // [DefaultGalactocentricFrame], which carries the values this package cites.
 //
 // Nothing is validated. A sunDistance of zero leaves the frame untilted and
-// centred on the Sun, and a sunHeight larger than sunDistance is clamped to a
+// centered on the Sun, and a sunHeight larger than sunDistance is clamped to a
 // quarter turn; both are nonsense that a caller can construct, and neither
 // produces a NaN that would propagate silently into a catalogue.
 func NewGalactocentricFrame(sunDistance, sunHeight unit.Length, sunVelocity vector.Vec3) GalactocentricFrame {
@@ -185,7 +185,7 @@ func DefaultGalactocentricFrame() GalactocentricFrame {
 // Galactic axes the caller supplied it on — see [SolarVelocityFromSgrA].
 func (f GalactocentricFrame) SunVelocity() vector.Vec3 { return f.sunVelocity }
 
-// SunDistance returns R₀, the Sun-to-Galactic-centre distance.
+// SunDistance returns R₀, the Sun-to-Galactic-center distance.
 func (f GalactocentricFrame) SunDistance() unit.Length { return f.sunDistance }
 
 // SunHeight returns z☉, the Sun's height above the Galactic midplane.
@@ -194,8 +194,8 @@ func (f GalactocentricFrame) SunHeight() unit.Length { return f.sunHeight }
 // SunPosition returns where the Sun sits in this frame.
 //
 // It is (−√(R₀² − z☉²), 0, z☉), not (−R₀, 0, z☉). R₀ is the distance between
-// the Sun and the centre, so once the Sun is lifted z☉ above the midplane its
-// in-plane separation from the centre has to shrink for the total to stay R₀.
+// the Sun and the center, so once the Sun is lifted z☉ above the midplane its
+// in-plane separation from the center has to shrink for the total to stay R₀.
 // The difference is 0.03 pc at the default parameters — far too small to matter
 // and far too easy to get backwards, which is why it is computed rather than
 // assumed.
@@ -232,8 +232,8 @@ func (f GalactocentricFrame) FromICRS(c ICRS, distance unit.Length) Galactocentr
 	// scaled out to the distance given.
 	v := ICRSToGalactic(c).ToUnitVector().MulScalar(distance.Meters())
 
-	// Move the origin to the Galactic centre, which lies R₀ away along +X, and
-	// then tilt so the midplane passes through the centre with the Sun above
+	// Move the origin to the Galactic center, which lies R₀ away along +X, and
+	// then tilt so the midplane passes through the center with the Sun above
 	// it rather than in it.
 	out := Galactocentric{v: vector.V3(v.X-f.sunDistance.Meters(), v.Y, v.Z).RotateY(f.tilt())}
 
@@ -319,8 +319,8 @@ func icrsFromBarycentricVelocity(dir ICRS, distance unit.Length, velocity vector
 // tilt returns the angle the frame is rotated about the Y axis to lift the Sun
 // z☉ above the midplane, in radians.
 //
-// The Galactic centre is at Galactic (l, b) = (0, 0) by definition, so the
-// Sun–centre line lies in the Galactic b = 0 plane and the midplane cannot. The
+// The Galactic center is at Galactic (l, b) = (0, 0) by definition, so the
+// Sun–center line lies in the Galactic b = 0 plane and the midplane cannot. The
 // tilt is the angle between them: asin(z☉/R₀), about 0.146° by default.
 //
 // Zero distance gives zero rather than a NaN from 0/0, and a ratio past ±1 is
@@ -365,7 +365,7 @@ func NewGalactocentricWithVelocity(x, y, z unit.Length, velocity vector.Vec3) Ga
 // conversion can manage without a distance while this cannot.
 func (c Galactocentric) Velocity() (vector.Vec3, bool) { return c.vel, c.hasVelocity }
 
-// X returns the component toward the Galactic centre. The Sun is at negative X.
+// X returns the component toward the Galactic center. The Sun is at negative X.
 func (c Galactocentric) X() unit.Length { return unit.Meters(c.v.X) }
 
 // Y returns the component along Galactic rotation.
@@ -382,7 +382,7 @@ func (c Galactocentric) Z() unit.Length { return unit.Meters(c.v.Z) }
 // [Galactocentric.Z] to get it as a [unit.Length] and choose the unit there.
 func (c Galactocentric) Vector() vector.Vec3 { return c.v }
 
-// Distance returns the straight-line distance from the Galactic centre — the
+// Distance returns the straight-line distance from the Galactic center — the
 // length of the full three-dimensional vector.
 //
 // For anything in or near the disc this is the wrong quantity to reach for and

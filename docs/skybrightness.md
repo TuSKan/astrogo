@@ -493,9 +493,9 @@ for this component: amplification and screening must both emerge from geometry a
 **Measured, both emerge.** `TestZilinaAmplificationAcrossDistance` runs the paper's own
 configuration — AOD 0.1, Ångström 1.3, single-scattering albedo 0.90, asymmetry 0.65, cloud
 base 2 km, CF 0.9, the 500-600 nm band, a town of 3 km radius as eight emitters on a ring —
-and sweeps the observer out from the centre:
+and sweeps the observer out from the center:
 
-| town centre | 0 | 6 | 10.5 | 18.5 | 30 | 45 | 60 | 120 km |
+| town center | 0 | 6 | 10.5 | 18.5 | 30 | 45 | 60 | 120 km |
 | :--- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | cloudy / clear at the zenith | 122.5 | 73.1 | 20.3 | 5.44 | 1.92 | 0.98 | 0.74 | 0.64 |
 
@@ -589,7 +589,7 @@ ln A_k = Σ(i=0..3) a_ik·g^i + Σ(j=1..3) b_jk·Φ^(2j−1)
 - Lunar solid angle `Ω_M = 6.4177×10⁻⁵ sr`. Phase-angle validity 1.55°–97°. Fit residual
   0.0096 in ln(reflectance), residual σ 0.015.
 - Uncertainty budget (Table 6), for §10: atmospheric correction 0.743 % statistics-based /
-  0.7 % practical; radiance calibration 0.216 % / 3.1 %; lunar disk centring 0.075 % /
+  0.7 % practical; radiance calibration 0.216 % / 3.1 %; lunar disk centering 0.075 % /
   0.4 %; sum-to-irradiance 0.00432 % / 0.2 %; bias 0.0368 %; dark current 0.0846 %;
   flat-fielding 2.23×10⁻⁴ %.
 
