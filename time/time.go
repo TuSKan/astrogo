@@ -543,29 +543,20 @@ func (t Time) ToGo() time.Time {
 	// of a second of 60.
 	jd1, jd2 := utcToLabel(utc.jd1, utc.jd2)
 
-	// JD 2440587.5 is 1970-01-01 00:00:00 UTC
-	days1 := jd1 - 2440587.5
-	days2 := jd2
+	// Whole days and the fractions of both parts are kept apart until the
+	// fractions are in seconds. Summed first, as they were until #420, the
+	// parts made one float64 count of seconds since 1970, some 1.8e9 in 2026,
+	// whose 238 ns spacing lost up to 119 ns. Whole days are exact as
+	// integers; the fractions, with the half day that puts JD 2440587.5 at
+	// 1970-01-01 00:00:00, sum to under 2.5 days, which in seconds a float64
+	// resolves to 29 ps.
+	w1, w2 := math.Floor(jd1), math.Floor(jd2)
+	days := int64(w1) + int64(w2) - 2440588
+	secs := ((jd1 - w1) + (jd2 - w2) + 0.5) * 86400
+	whole := math.Floor(secs)
 
-	totalSec := days1*86400.0 + days2*86400.0
-
-	// Split into integer seconds and fractional nanoseconds to avoid
-	// int64 overflow when converting very large negative totalSec to
-	// nanoseconds (e.g., year 33 AD → totalSec ≈ -6.1e10, which would
-	// overflow int64 if multiplied by 1e9).
-	sec := int64(math.Floor(totalSec))
-	frac := totalSec - float64(sec)
-
-	nsec := int64(math.Round(frac * 1e9))
-	if nsec >= 1e9 {
-		sec++
-		nsec -= 1e9
-	} else if nsec < 0 {
-		sec--
-		nsec += 1e9
-	}
-
-	gt := time.Unix(sec, nsec).UTC()
+	// time.Unix normalizes a nanosecond count that rounds up to 1e9.
+	gt := time.Unix(days*86400+int64(whole), int64(math.Round((secs-whole)*1e9))).UTC()
 
 	// The display location rides on t rather than on the converted copy,
 	// though UTC() preserves it either way.
