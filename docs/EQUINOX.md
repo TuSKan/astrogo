@@ -103,9 +103,9 @@ for seasonal temperatures, but it measurably affects season durations.
 
 | Type | Date (BRT) | |β| | γ | Visible from São Paulo? |
 |------|-----------|------|-------|--------------------------|
-| 🌕 Solar (Total/Annular) | Feb 17 09:11 | 0.919° | 0.626 | ❌ No — path crosses Antarctica/S. Atlantic |
+| 🌕 Solar (Annular) | Feb 17 09:11 | 0.919° | 0.626 | ❌ No — path crosses Antarctica/S. Atlantic |
 | 🌑 Lunar (Total) | Mar 03 08:33 | 0.358° | 0.240 | ✅ Yes — visible at moonset (partial) |
-| 🌕 Solar (Total/Annular) | Aug 12 14:45 | 0.888° | 0.585 | ❌ No — path crosses Europe/N. Africa |
+| 🌕 Solar (Total) | Aug 12 14:45 | 0.888° | 0.585 | ❌ No — path crosses Europe/N. Africa |
 | 🌑 Lunar (Partial) | Aug 28 01:12 | 0.462° | 0.317 | ✅ Yes — fully visible overnight |
 
 Both lunar eclipses have low |β| (ecliptic latitude), and their γ values (0.24 and

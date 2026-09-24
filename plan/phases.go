@@ -507,12 +507,78 @@ func (e EclipseType) String() string {
 	}
 }
 
-// EclipseEvent records an eclipse with its time and ecliptic latitude.
+// EclipseKind is what kind of eclipse an EclipseEvent is, as NASA's Five
+// Millennium Canons classify them: penumbral, partial or total for the Moon;
+// partial, annular, total or hybrid for the Sun. The zero value is no kind.
+type EclipseKind int
+
+const (
+	// EclipsePenumbral is a lunar eclipse in which the Moon enters only
+	// Earth's penumbra.
+	EclipsePenumbral EclipseKind = iota + 1
+	// EclipsePartial is a lunar eclipse in which part of the Moon enters the
+	// umbra, or a solar eclipse that is total or annular nowhere on Earth.
+	EclipsePartial
+	// EclipseTotal is a lunar eclipse with the whole Moon in the umbra, or a
+	// solar eclipse whose umbra reaches the Earth.
+	EclipseTotal
+	// EclipseAnnular is a solar eclipse whose antumbra reaches the Earth: the
+	// Moon, too small to cover the Sun, leaves a ring.
+	EclipseAnnular
+	// EclipseHybrid is a solar eclipse that is total along part of its path
+	// and annular along the rest.
+	EclipseHybrid
+)
+
+func (k EclipseKind) String() string {
+	switch k {
+	case EclipsePenumbral:
+		return "Penumbral"
+	case EclipsePartial:
+		return "Partial"
+	case EclipseTotal:
+		return "Total"
+	case EclipseAnnular:
+		return "Annular"
+	case EclipseHybrid:
+		return "Hybrid"
+	default:
+		return "Unknown"
+	}
+}
+
+// EclipseEvent records an eclipse: when it is greatest, what kind it is, and
+// how deep.
 type EclipseEvent struct {
 	Time             time.Time
 	Type             EclipseType
 	EclipticLatitude angle.Angle
 	Gamma            float64
+
+	// Kind is the eclipse's kind, decided as the canon decides it: for the
+	// Moon by the umbral magnitude, for the Sun by whether the umbra or the
+	// antumbra reaches the Earth, and where. Until #405 there was none, and
+	// callers guessed it from EclipticLatitude, which cannot know it.
+	Kind EclipseKind
+
+	// Magnitude is the canon's eclipse magnitude at greatest eclipse.
+	//
+	// For the Moon it is the umbral magnitude: the fraction of the Moon's
+	// diameter inside Earth's umbra, negative for a penumbral eclipse by the
+	// fraction the Moon stays outside it.
+	//
+	// For the Sun it is taken at the point of greatest eclipse. For a central
+	// eclipse — total, annular or hybrid, the shadow axis meeting the Earth —
+	// it is the ratio of the Moon's apparent diameter to the Sun's there: over
+	// 1 for total, under 1 for annular. Otherwise it is the fraction of the
+	// Sun's diameter covered at the point of the limb nearest the axis, which
+	// is also what the canon gives for the rare total or annular eclipse
+	// whose axis misses the Earth.
+	Magnitude float64
+
+	// PenumbralMagnitude is, for the Moon, the fraction of its diameter inside
+	// Earth's penumbra; it is above 1 in every total eclipse. Zero for the Sun.
+	PenumbralMagnitude float64
 }
 
 // moonEclipticLatitude returns the Moon's ecliptic latitude at time t.
@@ -591,8 +657,8 @@ func LunarEclipses(start, end time.Time, prov eph.Provider) ([]EclipseEvent, err
 			return nil, fmt.Errorf("lunar eclipses: %w", err)
 		}
 
-		magnitude, gamma := g.lunarPenumbralMagnitude()
-		if magnitude <= 0 {
+		penumbral, umbral, gamma := g.lunarMagnitudes()
+		if penumbral <= 0 {
 			continue
 		}
 
@@ -602,10 +668,13 @@ func LunarEclipses(start, end time.Time, prov eph.Provider) ([]EclipseEvent, err
 		}
 
 		eclipses = append(eclipses, EclipseEvent{
-			Type:             EclipseLunar,
-			Time:             eclTime,
-			EclipticLatitude: eclLat,
-			Gamma:            gamma,
+			Type:               EclipseLunar,
+			Time:               eclTime,
+			EclipticLatitude:   eclLat,
+			Gamma:              gamma,
+			Kind:               lunarKind(umbral),
+			Magnitude:          umbral,
+			PenumbralMagnitude: penumbral,
 		})
 	}
 
@@ -670,9 +739,16 @@ func SolarEclipses(start, end time.Time, prov eph.Provider) ([]EclipseEvent, err
 			return nil, fmt.Errorf("solar eclipses: %w", err)
 		}
 
-		margin, gamma := g.solarPenumbraMargin(eclTime)
+		shadow := g.solarShadow(eclTime)
+
+		margin, gamma := shadow.margin()
 		if margin <= 0 {
 			continue
+		}
+
+		kind, magnitude, err := solarEclipseKind(prov, eclTime, shadow)
+		if err != nil {
+			return nil, fmt.Errorf("solar eclipses: %w", err)
 		}
 
 		eclLat, err := moonEclipticLatitude(eclTime, prov)
@@ -685,6 +761,8 @@ func SolarEclipses(start, end time.Time, prov eph.Provider) ([]EclipseEvent, err
 			Time:             eclTime,
 			EclipticLatitude: eclLat,
 			Gamma:            gamma,
+			Kind:             kind,
+			Magnitude:        magnitude,
 		})
 	}
 
