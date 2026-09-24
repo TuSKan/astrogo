@@ -5,6 +5,7 @@ import (
 	"slices"
 
 	"github.com/TuSKan/astrogo/angle"
+	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
@@ -105,13 +106,20 @@ func DayEvents(day time.Time, loc *time.Location, target Observable, site *Site)
 // site, is above site.RiseSetThreshold() — the single-instant check
 // Episode needs to tell whether [from, to] starts already inside an
 // up-episode.
+//
+// The altitude is geometric, in a zero-pressure atmosphere, because that is
+// what the threshold is and what the solver behind Episode measures against
+// it (solveVisibility's geomAtm). With the site's refraction the probe read
+// the Moon 0.18° higher than the solver did at every moonrise, so just before
+// a rise or just after a set it said "up" where the solver said "down", and
+// Episode returned the episode that had already ended (#422).
 func isAboveHorizon(target Observable, site *Site, t time.Time) (bool, error) {
 	pos, err := target.Position(t)
 	if err != nil {
 		return false, fmt.Errorf("plan: position: %w", err)
 	}
 
-	altaz, err := observedAltAz(target, t, coord.NewContext(t, site.Location(), site.Refraction()), pos)
+	altaz, err := observedAltAz(target, t, coord.NewContext(t, site.Location(), atmosphere.Refraction{Pressure: 0}), pos)
 	if err != nil {
 		return false, fmt.Errorf("plan: ICRS to AltAz: %w", err)
 	}
