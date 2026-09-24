@@ -14,9 +14,9 @@ import (
 // episode for a window starting then is the next one, from the rise at
 // 04:12:15 to the set at 19:46:53 on the 14th — Skyfield 1.54's instants for
 // the geometric centre crossing 0° (DE421), which these come within half a
-// second of. Episode's probe measured a
-// refracted altitude against the geometric threshold, called the Moon up, and
-// returned the episode that had ended 11 s before.
+// second of. Episode's probe measured a refracted altitude against the
+// geometric threshold, called the Moon up, and returned the episode that had
+// ended 11 s before.
 func TestEpisodeJustAfterASetIsTheNextOne(t *testing.T) {
 	site, err := NewSiteEarthLocation("Barcelona", 41.39, 2.17, 0)
 	if err != nil {
