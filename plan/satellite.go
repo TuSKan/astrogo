@@ -246,6 +246,10 @@ type PassEvent struct {
 func SatellitePasses(prov eph.Provider, name string, start, end time.Time,
 	observer *coord.Geodetic, minElevation angle.Angle,
 ) ([]SatellitePass, error) {
+	if err := checkInterval(start, end); err != nil {
+		return nil, err
+	}
+
 	step := unit.Seconds(30) // 30s steps for LEO
 	refineTol := unit.Seconds(1)
 

@@ -246,6 +246,10 @@ func (s EventSolver) Find(spec EventSpec, start, end time.Time) ([]Event, error)
 		return nil, err
 	}
 
+	if err := checkInterval(start, end); err != nil {
+		return nil, err
+	}
+
 	var (
 		events []Event
 		err    error

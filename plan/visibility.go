@@ -194,6 +194,10 @@ func VisibleIntervals(
 //  1. Coarse 10-min grid scan to bracket the maximum.
 //  2. Brent's minimization (via Solver) within the bracket for sub-second precision.
 func TransitEstimate(obj coord.Object, site *Site, start, end time.Time) (time.Time, angle.Angle, error) {
+	if err := checkInterval(start, end); err != nil {
+		return time.Time{}, angle.Deg(0), err
+	}
+
 	coarseStep := unit.Minutes(10)
 
 	// Stage 1: coarse scan to locate the bracket [tLeft, tRight] around the peak.
@@ -295,6 +299,10 @@ func Find(
 	start, end time.Time,
 	step time.Duration,
 ) ([]Interval, error) {
+	if err := checkInterval(start, end); err != nil {
+		return nil, err
+	}
+
 	if step <= 0 {
 		step = 5 * time.Minute
 	}
