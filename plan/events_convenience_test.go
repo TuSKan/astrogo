@@ -1,6 +1,7 @@
 package plan
 
 import (
+	"math"
 	"testing"
 
 	"github.com/TuSKan/astrogo/angle"
@@ -143,20 +144,32 @@ func TestFullMoonOppositions_MatchesMoonPhases(t *testing.T) {
 		t.Fatalf("MoonPhases: %v", err)
 	}
 
-	wantFullMoons := 0
+	var fullMoons []MoonPhaseEvent
 
 	for _, p := range phases {
 		if p.Phase == PhaseFullMoon {
-			wantFullMoons++
+			fullMoons = append(fullMoons, p)
 		}
 	}
 
-	// FullMoonOppositions (Sun-Moon geometric opposition) and MoonPhases'
-	// PhaseFullMoon (elongation = 180°) are the same physical event, found
-	// via two different solver paths — they should agree on count.
-	if len(events) != wantFullMoons {
-		t.Errorf("FullMoonOppositions found %d events, MoonPhases found %d PhaseFullMoon events; want equal",
-			len(events), wantFullMoons)
+	// FullMoonOppositions (the Moon–Sun opposition in ecliptic longitude) and
+	// MoonPhases' PhaseFullMoon (elongation = 180°) are the same physical
+	// event, found via two different solver paths — they should agree on the
+	// count and on the time. This compared counts only until #413, which let
+	// FullMoonOppositions' right-ascension solution sit up to 3.25 hours off.
+	//
+	// The minute allows for MoonPhases' geometric positions, which run about
+	// 40 s behind the apparent ones FullMoonOppositions uses (#430).
+	if len(events) != len(fullMoons) {
+		t.Fatalf("FullMoonOppositions found %d events, MoonPhases found %d PhaseFullMoon events; want equal",
+			len(events), len(fullMoons))
+	}
+
+	for i := range events {
+		if off := events[i].Time.Sub(fullMoons[i].Time).Minutes(); math.Abs(off) > 1 {
+			t.Errorf("Full Moon %d: FullMoonOppositions %v, MoonPhases %v (%+.1f minutes)",
+				i, events[i].Time, fullMoons[i].Time, off)
+		}
 	}
 }
 

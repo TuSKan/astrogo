@@ -65,7 +65,12 @@ const (
 	EventConjunctionEcliptic
 	// EventAppulse represents the moment of minimum angular separation between two targets.
 	EventAppulse
-	// EventOpposition represents two targets having apparent longitudes or right ascensions 180 degrees apart.
+	// EventOpposition represents two targets whose geocentric ecliptic
+	// longitudes differ by 180°: the definition of the Astronomical Almanac,
+	// Meeus (Astronomical Algorithms, ch. 36) and JPL Horizons. Until #413 it
+	// was solved on right ascension, which a body with ecliptic latitude
+	// reaches at a different time — up to 51 hours later for Mars over
+	// 2000–2040, and 3 hours for the Full Moon.
 	EventOpposition
 	// EventGreatestElongationEast represents the maximum angular separation of an inner planet east of the Sun.
 	EventGreatestElongationEast
@@ -494,17 +499,13 @@ func (s EventSolver) solveGeometry(spec EventSpec, start, end time.Time) ([]Even
 		}
 
 		switch spec.Kind { //nolint:exhaustive // only geometry kinds relevant
-		case EventConjunction, EventOpposition:
-			// Difference in Right Ascension
-			diff := pos1.RA().Degrees() - pos2.RA().Degrees()
-			// Normalize to [-180, 180]
-			for diff > 180 {
-				diff -= 360
-			}
-
-			for diff <= -180 {
-				diff += 360
-			}
+		case EventConjunction:
+			// Difference in right ascension.
+			return wrap180(pos1.RA().Degrees() - pos2.RA().Degrees()), nil
+		case EventConjunctionEcliptic, EventOpposition:
+			// Difference in ecliptic longitude, and for an opposition its
+			// distance from 180°.
+			diff := wrap180(coord.ICRSToEcliptic(pos1, t).Lon().Degrees() - coord.ICRSToEcliptic(pos2, t).Lon().Degrees())
 
 			if spec.Kind == EventOpposition {
 				if diff > 0 {
@@ -512,21 +513,6 @@ func (s EventSolver) solveGeometry(spec EventSpec, start, end time.Time) ([]Even
 				} else {
 					diff += 180
 				}
-			}
-
-			return diff, nil
-		case EventConjunctionEcliptic:
-			// Difference in Ecliptic Longitude
-			ecl1 := coord.ICRSToEcliptic(pos1, t)
-			ecl2 := coord.ICRSToEcliptic(pos2, t)
-
-			diff := ecl1.Lon().Degrees() - ecl2.Lon().Degrees()
-			for diff > 180 {
-				diff -= 360
-			}
-
-			for diff <= -180 {
-				diff += 360
 			}
 
 			return diff, nil
@@ -1033,7 +1019,10 @@ func Appulses(start, end time.Time, target, other Observable) ([]Event, error) {
 	return solver.Find(spec, start, end)
 }
 
-// Oppositions returns all opposition events between target and other in the given interval.
+// Oppositions returns all opposition events between target and other in the
+// given interval: the instants their geocentric ecliptic longitudes differ by
+// 180° (see EventOpposition). With DE440s the oppositions of Mars in 2003 and
+// 2027 and of Saturn in 2026 fall within a minute of JPL Horizons'.
 func Oppositions(start, end time.Time, target, other Observable) ([]Event, error) {
 	solver := NewEventSolver(unit.Hours(6), unit.Seconds(1))
 	spec := EventSpec{
@@ -1087,7 +1076,9 @@ func GreatestElongations(start, end time.Time, target, sun Observable) ([]Event,
 	return allEvents, nil
 }
 
-// FullMoonOppositions returns the full moons (Sun-Moon Oppositions) in the given interval.
+// FullMoonOppositions returns the full moons (Sun-Moon Oppositions) in the given interval:
+// the Moon's apparent ecliptic longitude 180° from the Sun's. With DE440s the
+// Full Moon of 2026-09-26 falls within a second of Skyfield's.
 // For eclipses, use LunarEclipses, which decides each Full Moon by Earth's shadow.
 func FullMoonOppositions(start, end time.Time, provider eph.Provider) ([]Event, error) {
 	sun := NewSun(provider)
@@ -1356,4 +1347,17 @@ func altitudesAt(spec EventSpec, t time.Time, geomAtm atmosphere.Refraction) (ge
 	}
 
 	return geom, refr, true
+}
+
+// wrap180 is an angle in degrees brought into (−180°, 180°].
+func wrap180(deg float64) float64 {
+	for deg > 180 {
+		deg -= 360
+	}
+
+	for deg <= -180 {
+		deg += 360
+	}
+
+	return deg
 }
