@@ -7,6 +7,7 @@ import (
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
+	"github.com/TuSKan/astrogo/internal/gofaext"
 	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
@@ -216,36 +217,37 @@ type SeasonEvent struct {
 	Season Season
 }
 
-// sunEclipticLongitude returns the Sun's apparent ecliptic longitude at time t.
+// sunEclipticLongitude returns the Sun's apparent ecliptic longitude at time t,
+// referred to the true equinox of date: the longitude the equinoxes and
+// solstices are defined on.
 //
-// SOFA's Eqec06 applies full IAU 2006 precession and IAU 2000A nutation,
-// returning ecliptic coordinates of the TRUE equinox of date. For the
-// Sun's apparent position, we subtract the aberration constant κ ≈ 20.496"
-// (annual aberration displaces the Sun westward). Light-time and aberration
-// largely cancel for the Sun, but the net effect shifts the apparent longitude
-// by −κ in ecliptic coordinates.
+// Apparent means the Sun as seen, light time and aberration included, which
+// eph.ApparentState applies exactly; this used to subtract the constant of
+// aberration, 20.496″, from the geometric Sun, which is off by up to 0.35″
+// as the Earth's distance from the Sun changes.
+//
+// True equinox means nutation in longitude, Δψ, is added: SOFA's Eqec06,
+// behind coord.ICRSToEcliptic, gives the mean equinox and ecliptic of date,
+// precession only. Until #414 the comment here said otherwise and Δψ, up to
+// ±17.2″ over the 18.6-year nutation cycle, was missing: the seasons were up
+// to 8.5 minutes off, as the USNO's show from 1972 to 2100.
 func sunEclipticLongitude(t time.Time, prov eph.Provider) (float64, error) {
-	sunPos, err := eph.Position(prov, eph.Sun, t)
+	sun, err := eph.ApparentState(prov, eph.Sun, t)
 	if err != nil {
 		return 0, fmt.Errorf("seasons: sun position: %w", err)
 	}
 
-	sunICRS, err := eph.ToICRS(sunPos)
+	sunICRS, err := eph.ToICRS(sun.Pos)
 	if err != nil {
 		return 0, fmt.Errorf("seasons: sun ICRS: %w", err)
 	}
 
 	tdb := t.TDB()
+	lon := coord.ICRSToEcliptic(sunICRS, tdb).Lon().Degrees()
 
-	// Eqec06: ICRS → ecliptic of TRUE equinox of date (precession + nutation)
-	ecl := coord.ICRSToEcliptic(sunICRS, tdb)
-	lon := ecl.Lon().Degrees()
-
-	// Subtract aberration constant: apparent Sun longitude is ~20.5" west
-	// of geometric due to Earth's orbital motion.
-	const aberration = 20.496 / 3600.0 // degrees
-
-	lon -= aberration
+	tt1, tt2 := t.TT().JDParts()
+	dpsi, _ := gofaext.Nut06a(tt1, tt2)
+	lon += dpsi * 180 / math.Pi
 
 	// Normalize to [0, 360)
 	for lon < 0 {
