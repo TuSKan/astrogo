@@ -132,6 +132,19 @@ func (c *Client) GetFile(ctx context.Context, id EndpointID, name string, opts .
 		return cacheFS, cacheKey, nil
 	}
 
+	// Nothing current is cached, so this call can only end in a download, and
+	// a caller who may not download has nothing to wait for. Checked before
+	// the lock, because the lock can be held by another process for as long
+	// as its download takes, or by a crashed one until the lock goes stale
+	// after half an hour: the lazy EOP load, which takes it on every process's
+	// first lookup, sat out the whole of that holding its own mutex, with
+	// every lookup in the process queued behind it, only to be refused
+	// consent at the end (#424). fetchInto checks again, on the size the
+	// source reports.
+	if err := c.CheckDownload(id, name, ep.ApproxSize); err != nil {
+		return nil, "", err
+	}
+
 	// The lock spans the "still missing? then download" decision, not just
 	// the transfer: without it two callers both observe the miss and both
 	// write. go test runs each package as its own process and several

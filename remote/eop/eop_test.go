@@ -283,3 +283,28 @@ func TestCachedDegradesWhenTheCacheCannotBeOpened(t *testing.T) {
 		t.Errorf("Cached with an unopenable cache = %v, want ErrNoEOPData", err)
 	}
 }
+
+// TestEOPFetchWithoutConsentIgnoresAForeignLock is #424's case at the loader:
+// another process holds the lock on the EOP cache entry, and this one never
+// granted consent. The fetch must be refused at once rather than wait for the
+// lock, which it used to do for up to half an hour, holding the EOP mutex.
+func TestEOPFetchWithoutConsentIgnoresAForeignLock(t *testing.T) {
+	scratchCache(t)
+	fakeIERSSource(t, sampleFinals2000A)
+
+	fsys, prefix, err := remote.CacheDir(context.Background(), remote.IERSFinals2000A)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := remote.WriteFile(context.Background(), fsys, prefix+eopCacheName+".lock", strings.NewReader("")); err != nil {
+		t.Fatalf("plant lock: %v", err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	if _, err := (eopLoader{}).Fetch(ctx); !errors.Is(err, remote.ErrDownloadDenied) {
+		t.Fatalf("Fetch with a foreign lock and no consent: %v, want ErrDownloadDenied at once", err)
+	}
+}
