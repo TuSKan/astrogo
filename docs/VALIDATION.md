@@ -157,6 +157,7 @@ measured distribution, follow the Evidence link to the generated table.
 | Moon Rise/Set/Transit | ✅ validated | `plan/usno_test.go` | USNO API | ≤ 0.6 min | 3 locations × 3 dates, topocentric parallax via GeocentricToObserved |
 | Altitude correction (8849m) | ✅ validated | `plan/usno_test.go` | internal consistency | ±1 min | Horizon dip 2.76° produces ~13 min shift at Everest |
 | Moon Phases | ✅ validated | `plan/usno_test.go` | USNO API | ≤ 1 min | 12 consecutive phases (Jan–Mar 2026) |
+| Moon illumination and phase angle | ✅ validated | `plan/moon_illumination_test.go` | Skyfield 1.54 `almanac.phase_angle` and `fraction_illuminated` (DE421) | 0.003°, 0.00003 | #416's three instants within **0.0015° and 0.00001** on the analytical ephemeris, the phase angle measured at the astrometric Moon. Until #416 the elongation was returned as the phase angle and the fraction was (1 − cos ψ)/2, up to 0.0014 off; a quarter Moon is 50.13% lit, and lunar-phase events now carry that as their `Value` rather than an exact 0.5 |
 | Moon Phases (historical) | ✅ validated | `plan/astropixels_test.go` | [AstroPixels](https://astropixels.com/ephemeris/phasescat/phasescat.html) | ≤ 6.0 min | 44,524 phases across 9 centuries (1–2100 CE), mean Δ=1.87 min |
 | Earth's Seasons | ✅ validated | `plan/usno_test.go` | USNO API | 2–4 min | 4 events (2026), aberration-corrected ecliptic longitude |
 | Celestial Navigation (AltAz) | ✅ validated | `plan/usno_test.go` | USNO API | 0.002° | Sub-arcsecond stellar altitude accuracy |
