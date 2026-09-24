@@ -175,25 +175,10 @@ func eclipticLongitude(v [3]float64) float64 {
 // less than the tables resolve: the corrections change by at most 0.009 mag
 // per degree of longitude.
 func marsWestLongitude(dir [3]float64, d float64) float64 {
-	const deg = math.Pi / 180
-
 	cent := d / 36525
-	ra := (317.68143 - 0.1061*cent) * deg
-	dec := (52.88650 - 0.0609*cent) * deg
-	w := 176.630 + 350.89198226*d
+	east := subPointEastLongitude(dir, 317.68143-0.1061*cent, 52.88650-0.0609*cent, 176.630+350.89198226*d)
 
-	// The node of Mars's equator on the ICRF equator, and the direction 90°
-	// east of it along Mars's equator: the pole crossed with the node.
-	sinRA, cosRA := math.Sincos(ra)
-	sinDec, cosDec := math.Sincos(dec)
-	node := [3]float64{-sinRA, cosRA, 0}
-	east := [3]float64{-sinDec * cosRA, -sinDec * sinRA, cosDec}
-
-	// W is measured east from the node to the prime meridian, so a direction at
-	// angle theta east of the node lies at east longitude theta − W.
-	theta := math.Atan2(dot(dir, east), dot(dir, node)) / deg
-
-	return angle.Deg(w - theta).Wrap360().Degrees()
+	return angle.Deg(-east).Wrap360().Degrees()
 }
 
 // lightAUPerDay is the speed of light in astronomical units per day.

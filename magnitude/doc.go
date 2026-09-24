@@ -4,7 +4,10 @@
 // The planet magnitude models follow Mallama & Hilton (2018), "Computing Apparent
 // Planetary Magnitudes for The Astronomical Almanac", Astronomy & Computing 25,
 // pp. 10–24. These are the algorithms adopted by the U.S. Naval Observatory and
-// HMNAO for The Astronomical Almanac since the 2020 edition.
+// HMNAO for The Astronomical Almanac since the 2020 edition. They do not cover
+// Pluto: PlanetApparent gives it the Explanatory Supplement's historical law,
+// and PlutoCharonApparent the light curves Buie et al. (2010) fitted to Hubble
+// photometry of Pluto and Charon resolved.
 //
 // Asteroid magnitudes support three IAU phase-curve models:
 //   - H,G (Bowell et al. 1989) — legacy, used by MPC with G=0.15
