@@ -17,6 +17,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"math"
 
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
@@ -188,37 +189,13 @@ func main() {
 	}
 
 	for _, e := range lunarEcl {
-		classification := "Penumbral"
-
-		absLat := e.EclipticLatitude.Degrees()
-		if absLat < 0 {
-			absLat = -absLat
-		}
-
-		if absLat < 0.55 {
-			classification = "Total"
-		} else if absLat < 1.05 {
-			classification = "Partial"
-		}
-
-		fmt.Printf("  🌑 Lunar Eclipse (%s)  %s  |β|=%.3f°  γ=%.3f\n",
-			classification, e.Time.In(brtz).Format("Jan 02 15:04 MST"), absLat, e.Gamma)
+		fmt.Printf("  🌑 Lunar Eclipse (%s)  %s  |β|=%.3f°  γ=%.3f  magnitude %.3f\n",
+			e.Kind, e.Time.In(brtz).Format("Jan 02 15:04 MST"), math.Abs(e.EclipticLatitude.Degrees()), e.Gamma, e.Magnitude)
 	}
 
 	for _, e := range solarEcl {
-		classification := "Partial"
-
-		absLat := e.EclipticLatitude.Degrees()
-		if absLat < 0 {
-			absLat = -absLat
-		}
-
-		if absLat < 0.99 {
-			classification = "Total/Annular"
-		}
-
-		fmt.Printf("  🌕 Solar Eclipse (%s)  %s  |β|=%.3f°  γ=%.3f\n",
-			classification, e.Time.In(brtz).Format("Jan 02 15:04 MST"), absLat, e.Gamma)
+		fmt.Printf("  🌕 Solar Eclipse (%s)  %s  |β|=%.3f°  γ=%.3f  magnitude %.3f\n",
+			e.Kind, e.Time.In(brtz).Format("Jan 02 15:04 MST"), math.Abs(e.EclipticLatitude.Degrees()), e.Gamma, e.Magnitude)
 	}
 
 	// ── Part 6: Topocentric Moon (diurnal parallax) ──────────────────────────

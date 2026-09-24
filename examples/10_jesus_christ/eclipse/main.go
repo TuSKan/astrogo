@@ -14,7 +14,6 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"math"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
@@ -99,19 +98,10 @@ func main() {
 	}
 
 	for _, e := range eclipses {
-		absLat := math.Abs(e.EclipticLatitude.Degrees())
-
-		eclType := "Penumbral"
-		if absLat < 0.55 {
-			eclType = "Total"
-		} else if absLat < 1.05 {
-			eclType = "Partial"
-		}
-
 		fmt.Printf("\n  ── Lunar Eclipse ──\n")
 		fmt.Printf("  Date:                %s\n", e.Time.FormatJulian("2006-01-02"))
 		fmt.Printf("  Maximum (UTC):       %s\n", e.Time.FormatJulian("15:04:05"))
-		fmt.Printf("  Type (estimated):    %s\n", eclType)
+		fmt.Printf("  Type:                %s (umbral magnitude %.3f)\n", e.Kind, e.Magnitude)
 		fmt.Printf("  Ecliptic latitude:   %.3f°\n", e.EclipticLatitude.Degrees())
 		fmt.Printf("  Gamma (centrality):  %.3f (0=central, 1=penumbral edge)\n", e.Gamma)
 	}
@@ -161,19 +151,10 @@ func main() {
 	}
 
 	fmt.Printf("  Found %d lunar eclipses:\n\n", len(allEclipses))
-	fmt.Printf("  %-22s  %-10s  %-8s  %s\n", "Date", "Type Est.", "Gamma", "Passover?")
+	fmt.Printf("  %-22s  %-10s  %-8s  %s\n", "Date", "Type", "Gamma", "Passover?")
 	fmt.Println("  " + repeat('─', 65))
 
 	for _, e := range allEclipses {
-		absLat := math.Abs(e.EclipticLatitude.Degrees())
-
-		eclType := "Penumbral"
-		if absLat < 0.55 {
-			eclType = "Total"
-		} else if absLat < 1.05 {
-			eclType = "Partial"
-		}
-
 		// Check if this eclipse is near a March/April full moon (Passover)
 		goTime := e.Time.ToGo()
 
@@ -184,7 +165,7 @@ func main() {
 
 		fmt.Printf("  %-22s  %-10s  %6.3f   %s\n",
 			e.Time.FormatJulian("2006-01-02 15:04 MST"),
-			eclType,
+			e.Kind,
 			e.Gamma,
 			passover)
 	}

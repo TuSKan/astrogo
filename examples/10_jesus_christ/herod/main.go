@@ -78,14 +78,6 @@ func main() {
 	for _, e := range eclipses {
 		absLat := math.Abs(e.EclipticLatitude.Degrees())
 
-		// Classify eclipse type from ecliptic latitude
-		eclType := "Penumbral"
-		if absLat < 0.55 {
-			eclType = "Total"
-		} else if absLat < 1.05 {
-			eclType = "Partial"
-		}
-
 		// Year in historical notation
 		year, _, _, _ := e.Time.JulianCalendar()
 
@@ -154,7 +146,7 @@ func main() {
 		}
 
 		marker := ""
-		if isNight && moonUp && (eclType == "Total" || eclType == "Partial") {
+		if isNight && moonUp && (e.Kind == plan.EclipseTotal || e.Kind == plan.EclipsePartial) {
 			marker = "◀ CANDIDATE"
 		}
 
@@ -162,7 +154,7 @@ func main() {
 			e.Time.FormatJulian("2006-01-02 15:04 MST"),
 			absLat,
 			e.Gamma,
-			eclType,
+			e.Kind,
 			yearStr,
 			visibility,
 			marker)

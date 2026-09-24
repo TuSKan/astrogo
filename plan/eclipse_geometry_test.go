@@ -58,7 +58,7 @@ func TestEclipseGeometryReproducesNASA2026(t *testing.T) {
 			t.Fatalf("%s: %v", c.name, err)
 		}
 
-		got, _ := g.lunarPenumbralMagnitude()
+		got, _, _ := g.lunarMagnitudes()
 		if math.Abs(got-c.magnitude) > tolMagnitude {
 			t.Errorf("%s: penumbral magnitude %.4f, NASA gives %.4f", c.name, got, c.magnitude)
 		}
@@ -296,4 +296,72 @@ func (p *failingAfterProvider) State(id eph.ID, t time.Time) (core.State, error)
 	}
 
 	return st, nil
+}
+
+// TestEclipseKindsAndMagnitudesMatchNASA classifies eclipses of every kind
+// the canons use — penumbral, partial and total lunar; partial, annular,
+// total and hybrid solar, and a total and an annular whose axis misses the
+// Earth — and compares kind and magnitude with NASA's Five Millennium Canon
+// rows for them (LEcat5/LE2001-2100.html, SEcat5/SE2001-2100.html).
+//
+// On eph.Default, the analytical ephemeris: magnitudes within 0.0014 here.
+// Against DE441 over six centuries of the canon every kind agrees and every
+// magnitude is within 0.0004 (see plan/nasa_eclipse_test.go).
+func TestEclipseKindsAndMagnitudesMatchNASA(t *testing.T) {
+	const tolMagnitude = 0.003
+
+	prov := eph.Default()
+
+	for _, c := range []struct {
+		name      string
+		find      func(start, end time.Time, prov eph.Provider) ([]EclipseEvent, error)
+		td        time.Time
+		kind      EclipseKind
+		magnitude float64
+		penumbral float64
+	}{
+		{"2024-03-25 penumbral", LunarEclipses, time.Date(2024, 3, 25, 7, 13, 59, 0, time.LocationUTC), EclipsePenumbral, -0.1325, 0.9557},
+		{"2024-09-18 partial", LunarEclipses, time.Date(2024, 9, 18, 2, 45, 25, 0, time.LocationUTC), EclipsePartial, 0.0848, 1.0372},
+		{"2025-03-14 total", LunarEclipses, time.Date(2025, 3, 14, 6, 59, 56, 0, time.LocationUTC), EclipseTotal, 1.1784, 2.2595},
+		{"2026-08-28 partial", LunarEclipses, time.Date(2026, 8, 28, 4, 14, 4, 0, time.LocationUTC), EclipsePartial, 0.9299, 1.9645},
+		{"2023-04-20 hybrid", SolarEclipses, time.Date(2023, 4, 20, 4, 17, 56, 0, time.LocationUTC), EclipseHybrid, 1.0132, 0},
+		{"2023-10-14 annular", SolarEclipses, time.Date(2023, 10, 14, 18, 0, 41, 0, time.LocationUTC), EclipseAnnular, 0.9520, 0},
+		{"2026-08-12 total", SolarEclipses, time.Date(2026, 8, 12, 17, 47, 6, 0, time.LocationUTC), EclipseTotal, 1.0386, 0},
+		{"2025-03-29 partial", SolarEclipses, time.Date(2025, 3, 29, 10, 48, 36, 0, time.LocationUTC), EclipsePartial, 0.9376, 0},
+		{"2043-04-09 non-central total", SolarEclipses, time.Date(2043, 4, 9, 18, 57, 49, 0, time.LocationUTC), EclipseTotal, 1.0095, 0},
+		{"2043-10-03 non-central annular", SolarEclipses, time.Date(2043, 10, 3, 3, 1, 49, 0, time.LocationUTC), EclipseAnnular, 0.9497, 0},
+	} {
+		td := time.FromJD(c.td.JD(), time.TDB)
+
+		events, err := c.find(td.Add(unit.Days(-3)), td.Add(unit.Days(3)), prov)
+		if err != nil || len(events) != 1 {
+			t.Errorf("%s: %d eclipses within three days, err %v; want 1", c.name, len(events), err)
+
+			continue
+		}
+
+		e := events[0]
+		if e.Kind != c.kind {
+			t.Errorf("%s: kind %v, the canon says %v", c.name, e.Kind, c.kind)
+		}
+
+		if math.Abs(e.Magnitude-c.magnitude) > tolMagnitude {
+			t.Errorf("%s: magnitude %.4f, the canon gives %.4f", c.name, e.Magnitude, c.magnitude)
+		}
+
+		if math.Abs(e.PenumbralMagnitude-c.penumbral) > tolMagnitude {
+			t.Errorf("%s: penumbral magnitude %.4f, the canon gives %.4f", c.name, e.PenumbralMagnitude, c.penumbral)
+		}
+	}
+}
+
+func TestEclipseKindString(t *testing.T) {
+	for k, want := range map[EclipseKind]string{
+		0: "Unknown", EclipsePenumbral: "Penumbral", EclipsePartial: "Partial",
+		EclipseTotal: "Total", EclipseAnnular: "Annular", EclipseHybrid: "Hybrid", 99: "Unknown",
+	} {
+		if got := k.String(); got != want {
+			t.Errorf("EclipseKind(%d).String() = %q, want %q", int(k), got, want)
+		}
+	}
 }
