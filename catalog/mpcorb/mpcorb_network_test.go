@@ -209,8 +209,11 @@ func TestEveryParsedObjectPropagates(t *testing.T) {
 func TestOpenRefusesWithoutDownloadConsent(t *testing.T) {
 	testutil.RequireReachable(t, "www.minorplanetcenter.net:443")
 
-	t.Cleanup(remote.Reset)
-	remote.Reset()
+	// Captured rather than Reset: Reset leaves the data directory alone, so
+	// the temporary one below would stay configured after it is deleted, and
+	// the next test here would fail to create its cache lock inside it (#443).
+	t.Cleanup(remote.Capture(remote.MPCORB).Restore)
+	remote.DisableDownloads(remote.MPCORB)
 
 	remote.SetDataDir("file:///" + tempBucket(t) + "?create_dir=true")
 
