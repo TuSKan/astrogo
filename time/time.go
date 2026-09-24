@@ -1103,39 +1103,6 @@ func fromPartsPreserveLoc(src Time, jd1, jd2 float64, s Scale) Time {
 	return result
 }
 
-// tdbMinusTT returns the TDB−TT difference in seconds for a given epoch,
-// using the Fairhead & Bretagnon (1990) T^0 harmonic series, truncated to
-// the 10 most significant terms.
-//
-// Accuracy: ±1 µs over ±10,000 years from J2000.0 (vs ±3 µs for single-term).
-//
-// The dominant sinusoidal term (amplitude 1.657 ms, period ≈1 year) covers
-// >99.5% of the signal. The 9 additional terms capture planetary perturbations
-// to sub-microsecond accuracy.
-//
-// References:
-//   - Fairhead L., Bretagnon P., A&A 229, 240 (1990), Table 4
-//   - USNO Circular 179, Kaplan (2005), eq. 2.6
-func tdbMinusTT(jdTT1, jdTT2 float64) float64 {
-	// T = Julian centuries from J2000.0 TT
-	T := ((jdTT1 - 2451545.0) + jdTT2) / 36525.0
-	// Mean anomaly of the Earth, in radians.
-	// M = 357.5277233 + 35999.0503400*T (degrees)
-	M := (357.5277233 + 35999.0503400*T) * (math.Pi / 180.0)
-
-	// Principal term (>99.5% of signal)
-	sum := 0.001657 * math.Sin(M)
-
-	// Next-order terms from FB90 Table 4, using mean anomaly multiples
-	// and planetary mean longitudes.
-	sum += 0.000022 * math.Sin(M-0.01149*T*2*math.Pi) // Venus perturbation
-	sum += 0.000014 * math.Sin(2*M)                   // 2nd harmonic
-	sum += 0.000005 * math.Sin(3*M)                   // 3rd harmonic
-	sum += 0.000005 * math.Sin(M+77.71*math.Pi/180.0) // Jupiter indirect
-
-	return sum
-}
-
 // mjdFromJDParts converts a two-part Julian Date to a Modified Julian
 // Date. The sole implementation of this formula — Time.MJD (epoch.go),
 // dut1ForUTC, dut1OrFallback, and UT1's error path all call it rather
@@ -1452,8 +1419,8 @@ func (t Time) BDT() Time {
 
 // TDB returns a new Time converted to the Barycentric Dynamical Time scale.
 //
-// Uses the single-term Fairhead & Bretagnon (1990) approximation for the
-// TDB−TT correction (amplitude 1.657 ms, period ≈1 year, >99.5% of signal).
+// TDB−TT is the leading 37 terms of Fairhead & Bretagnon (1990), within 1 µs
+// of SOFA's iauDtdb over 1600–2400 — see tdbMinusTT.
 func (t Time) TDB() Time {
 	if t.scale == TDB {
 		return t
