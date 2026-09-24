@@ -7,6 +7,13 @@ import (
 	"github.com/TuSKan/astrogo/internal/testutil"
 )
 
+// TestAe2hd is SOFA's own test vector (t_sofa_c.c, t_ae2hd).
+func TestAe2hd(t *testing.T) {
+	ha, dec := gofaext.Ae2hd(5.5, 1.1, 0.7)
+	testutil.AssertNear(t, "ha", ha, 0.5933291115507309663, 1e-14)
+	testutil.AssertNear(t, "dec", dec, 0.9613934761647817620, 1e-14)
+}
+
 func TestGofaExtWrappers(t *testing.T) {
 	// Dtf2d
 	d1, d2, st := gofaext.Dtf2d("UTC", 2000, 1, 1, 12, 0, 0.0)

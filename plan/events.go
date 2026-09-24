@@ -9,7 +9,7 @@ import (
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
-
+	"github.com/TuSKan/astrogo/internal/gofaext"
 	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
@@ -304,20 +304,12 @@ func (s EventSolver) solveVisibility(spec EventSpec, start, end time.Time) ([]Ev
 	// series would introduce in the root-finder.
 	geomAtm := atmosphere.Refraction{Pressure: 0} // zero pressure → no refraction
 
-	// evalCtx backs evalVal (rise/set/twilight, geometric no-refraction
-	// atmosphere); evalHACtx backs the transit search's evalHA closure
-	// (defined further below, inside the event loop, since it's only
-	// needed once a transit candidate is found) — both declared here so a
-	// single cache persists across every sample and bisection iteration,
-	// and across multiple transit candidates, within this solveVisibility call.
-	//
-	// Two caches rather than one because they evaluate under different
-	// atmospheres, and a Context carries the one it was built with — see
-	// newContextCache.
+	// evalCtx backs observe, declared here so a single cache persists across
+	// every sample and bisection iteration within this solveVisibility call.
 	evalCtx := newContextCache(spec.Observer.Location(), geomAtm)
-	evalHACtx := newContextCache(spec.Observer.Location(), spec.Observer.Refraction())
 
-	evalVal := func(t time.Time) (float64, error) {
+	// observe is the target's geometric observed position.
+	observe := func(t time.Time) (coord.AltAz, error) {
 		ctx := evalCtx(t)
 
 		// For solar system bodies, use the vector-based topocentric pipeline
@@ -325,52 +317,93 @@ func (s EventSolver) solveVisibility(spec EventSpec, start, end time.Time) ([]Ev
 		if mb, ok := spec.Target.(MovingBody); ok {
 			vec, err := mb.GeocentricVec(t)
 			if err != nil {
-				return 0, fmt.Errorf("events: geocentric vec: %w", err)
+				return coord.AltAz{}, fmt.Errorf("events: geocentric vec: %w", err)
 			}
 
-			aa := ctx.GeocentricToObserved(vec)
-
-			return aa.Alt().Degrees() - spec.Threshold.Degrees(), nil
+			return ctx.GeocentricToObserved(vec), nil
 		}
 
 		// For deep-space / stellar targets, use the astrometric pipeline.
 		pos, err := spec.Target.Position(t)
 		if err != nil {
-			return 0, fmt.Errorf("events: target position: %w", err)
+			return coord.AltAz{}, fmt.Errorf("events: target position: %w", err)
 		}
 
 		aa, err := observedAltAz(spec.Target, t, ctx, pos)
 		if err != nil {
-			return 0, fmt.Errorf("events: ICRS to AltAz: %w", err)
+			return coord.AltAz{}, fmt.Errorf("events: ICRS to AltAz: %w", err)
 		}
 
-		return aa.Alt().Degrees() - spec.Threshold.Degrees(), nil
+		return aa, nil
 	}
+
+	altitude := func(aa coord.AltAz) float64 { return aa.Alt().Degrees() - spec.Threshold.Degrees() }
+
+	// hourAngle is the hour angle of an observed position in degrees,
+	// [-180, 180]. Its upward zero crossing is the upper meridian transit, and
+	// it crosses zero sharply there, giving sub-second convergence even for a
+	// near-zenith transit, where the altitude is flat. It is zero exactly
+	// where the azimuth is 0° or 180°, whatever the latitude, so neither
+	// refraction, which moves a body along its vertical, nor diurnal
+	// parallax, which moves it in the plane of the site's meridian when it is
+	// on the meridian, moves the instant it crosses.
+	lat := spec.Observer.Location().Lat().Radians()
+	hourAngle := func(aa coord.AltAz) float64 {
+		ha, _ := gofaext.Ae2hd(aa.Az().Radians(), aa.Alt().Radians(), lat)
+
+		return ha * 180 / math.Pi
+	}
+
+	evalVal := func(t time.Time) (float64, error) {
+		aa, err := observe(t)
+
+		return altitude(aa), err
+	}
+
+	evalHA := func(t time.Time) (float64, error) {
+		aa, err := observe(t)
+
+		return hourAngle(aa), err
+	}
+
+	wantTransit := spec.Kind == EventTransit || spec.Kind == EventAnyVisibility
 
 	n := int(end.Sub(start)/s.Step) + 2
 	times := make([]time.Time, 0, n)
 	alts := make([]float64, 0, n)
 
-	for t := start; !t.After(end); t = t.Add(s.Step) {
-		times = append(times, t)
+	var has []float64
+	if wantTransit {
+		has = make([]float64, 0, n)
+	}
 
-		h, err := evalVal(t)
+	// One observation per sample serves the rise/set and the transit search.
+	sample := func(t time.Time) error {
+		aa, err := observe(t)
 		if err != nil {
-			return nil, err
+			return err
 		}
 
-		alts = append(alts, h)
+		times = append(times, t)
+		alts = append(alts, altitude(aa))
+
+		if wantTransit {
+			has = append(has, hourAngle(aa))
+		}
+
+		return nil
+	}
+
+	for t := start; !t.After(end); t = t.Add(s.Step) {
+		if err := sample(t); err != nil {
+			return nil, err
+		}
 	}
 
 	if last := times[len(times)-1]; last.Before(end) {
-		times = append(times, end)
-
-		h, err := evalVal(end)
-		if err != nil {
+		if err := sample(end); err != nil {
 			return nil, err
 		}
-
-		alts = append(alts, h)
 	}
 
 	for i := range len(times) - 1 {
@@ -395,72 +428,34 @@ func (s EventSolver) solveVisibility(spec EventSpec, start, end time.Time) ([]Ev
 				// baked into the threshold, per the USNO convention — so the
 				// geometric one is what Value is measured against, while
 				// Altitude reports what an observer would actually see.
-				geom, refr, ok := altitudesAt(spec, resTime, geomAtm)
-				if !ok {
-					continue // Can't populate display fields reliably; skip this event
+				// Without display fields the event is skipped, but not the
+				// rest of the step, which may hold a transit too.
+				if geom, refr, ok := altitudesAt(spec, resTime, geomAtm); ok {
+					events = append(events, Event{
+						Kind:              kind,
+						Time:              resTime,
+						Altitude:          refr.Alt(),
+						GeometricAltitude: geom.Alt(),
+						Azimuth:           geom.Az(),
+						Value:             geom.Alt().Degrees() - spec.Threshold.Degrees(),
+					})
 				}
-
-				events = append(events, Event{
-					Kind:              kind,
-					Time:              resTime,
-					Altitude:          refr.Alt(),
-					GeometricAltitude: geom.Alt(),
-					Azimuth:           geom.Az(),
-					Value:             geom.Alt().Degrees() - spec.Threshold.Degrees(),
-				})
 			}
 		}
 
-		// Local Maximum (Transit) — refine via hour angle = 0
-		if i > 0 {
-			h0 := alts[i-1]
-			if h1 > h0 && h1 >= h2 && (spec.Kind == EventTransit || spec.Kind == EventAnyVisibility) {
-				// Use hour angle root-finding instead of altitude maximization.
-				// HA crosses zero sharply at transit, giving robust sub-second convergence
-				// even for near-zenith transits where altitude is flat.
-				evalHA := func(t time.Time) (float64, error) {
-					pos, err := spec.Target.Position(t)
-					if err != nil {
-						return 0, fmt.Errorf("events: target position: %w", err)
-					}
-
-					ctx := evalHACtx(t)
-
-					ha, err := ctx.ICRSToHourAngle(pos)
-					if err != nil {
-						return 0, fmt.Errorf("events: hour angle: %w", err)
-					}
-
-					return ha.Degrees(), nil
-				}
-
-				// Compute HA at bracket endpoints to find the sub-bracket containing HA=0
-				haLeft, errLeft := evalHA(times[i-1])
-				haMid, errMid := evalHA(times[i])
-				haRight, errRight := evalHA(times[i+1])
-
-				if errLeft != nil || errMid != nil || errRight != nil {
-					// Can't reliably bracket a sign-crossing without all
-					// three evaluations — a silently-zeroed HA here could
-					// fabricate or mask a transit. Skip this window.
-					continue
-				}
-
-				var bracketA, bracketB time.Time
-
-				switch {
-				case haLeft*haMid <= 0:
-					bracketA, bracketB = times[i-1], times[i]
-				case haMid*haRight <= 0:
-					bracketA, bracketB = times[i], times[i+1]
-				default:
-					// HA doesn't cross zero — no transit in this bracket
-					continue
-				}
-
-				resTime, _, err := s.refineRoot(evalHA, bracketA, bracketB, 0)
+		// Transit: the hour angle rising through zero within this step. Not
+		// the altitude maximum, which leaves the meridian when the declination
+		// changes fast against the diurnal swing — the Moon at high latitude,
+		// the Sun near the pole — and which needs a sample on each side, so a
+		// transit in the window's first step went unreported (#417). The
+		// wrap from +180° to −180° is the lower culmination, excluded by the
+		// size of the jump.
+		if wantTransit {
+			ha1, ha2 := has[i], has[i+1]
+			if ha1 <= 0 && ha2 > 0 && ha2-ha1 < 180 {
+				resTime, _, err := s.refineRoot(evalHA, t1, t2, ha1)
 				if err != nil {
-					continue // Skip if solver fails
+					return nil, err
 				}
 
 				geom, refr, ok := altitudesAt(spec, resTime, geomAtm)
