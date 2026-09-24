@@ -119,8 +119,16 @@ func MoonPhases(start, end time.Time, prov eph.Provider) ([]MoonPhaseEvent, erro
 		return nil, err
 	}
 
-	prevT := start
-	for t := start.Add(step); !t.After(end); t = t.Add(step) {
+	// The last step ends at end itself, however short it is. Until #419 the
+	// samples stopped at the last whole step, so a phase between it and end
+	// was lost — and with it any eclipse at that syzygy, since LunarEclipses
+	// and SolarEclipses start here.
+	for prevT := start; prevT.Before(end); {
+		t := prevT.Add(step)
+		if t.After(end) {
+			t = end
+		}
+
 		curElong, err := moonElongation(t, prov)
 		if err != nil {
 			return nil, err
@@ -132,9 +140,12 @@ func MoonPhases(start, end time.Time, prov eph.Provider) ([]MoonPhaseEvent, erro
 			if CrossesTarget(prevElong, curElong, target, 360) {
 				eval := phaseEvaluator(target, prov)
 
+				// The samples bracket the crossing, so a refinement that fails
+				// is an ephemeris failure, returned rather than skipped: a
+				// skipped phase is a missing phase with a nil error.
 				refined, _, err := solver.FindRoot(eval, prevT, t)
 				if err != nil {
-					continue
+					return nil, fmt.Errorf("moon phases: %v near %v: %w", phase, t, err)
 				}
 
 				events = append(events, MoonPhaseEvent{Phase: phase, Time: refined})
