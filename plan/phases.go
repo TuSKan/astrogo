@@ -102,6 +102,10 @@ func moonElongation(t time.Time, prov eph.Provider) (float64, error) {
 // and uses Brent's method (via Solver) to refine the instant when the elongation
 // crosses 0°, 90°, 180°, or 270°.
 func MoonPhases(start, end time.Time, prov eph.Provider) ([]MoonPhaseEvent, error) {
+	if err := checkInterval(start, end); err != nil {
+		return nil, err
+	}
+
 	if prov == nil {
 		prov = eph.Default()
 	}

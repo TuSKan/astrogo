@@ -1,6 +1,11 @@
 package plan
 
-import "errors"
+import (
+	"errors"
+	"fmt"
+
+	"github.com/TuSKan/astrogo/time"
+)
 
 // Sentinel errors for observation planning.
 var (
@@ -15,6 +20,10 @@ var (
 	ErrNoObserverLocation = errors.New("visibility events require an observer geodetic location")
 	// ErrNoSecondaryTarget indicates a geometry event requires a secondary target.
 	ErrNoSecondaryTarget = errors.New("geometry requires a secondary target")
+	// ErrReversedInterval is returned for a search interval whose end is before
+	// its start. Until #418 such a call panicked, inside a sampler that sized
+	// its buffer from the interval's length.
+	ErrReversedInterval = errors.New("plan: interval ends before it starts")
 	// ErrFamilyNotImpl indicates an event solver for the given family is not implemented.
 	ErrFamilyNotImpl = errors.New("event solver for family is not implemented")
 	// ErrUnsupportedGeom indicates an unsupported geometry kind.
@@ -122,3 +131,13 @@ var (
 	// carried a longitude or parallax constant that is not a number.
 	ErrMalformedMPCRow = errors.New("plan: malformed MPC observatory row")
 )
+
+// checkInterval refuses a search interval that ends before it starts. An empty
+// one, start equal to end, is valid: it has nothing in it.
+func checkInterval(start, end time.Time) error {
+	if end.Before(start) {
+		return fmt.Errorf("%w: [%v, %v]", ErrReversedInterval, start, end)
+	}
+
+	return nil
+}
