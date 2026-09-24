@@ -46,6 +46,11 @@ type nasaEclipseRef struct {
 	DeltaT           float64 // ΔT in seconds (from NASA catalog)
 	EclipseType      string  // "T", "P", "N" (lunar) or "T", "A", "H", "P" (solar)
 	JDtd             float64 // Julian Day in TD
+
+	// Magnitude is the canon's eclipse magnitude: the umbral magnitude for a
+	// lunar eclipse, the eclipse magnitude at greatest eclipse for a solar
+	// one. PenumbralMagnitude is the lunar penumbral magnitude.
+	Magnitude, PenumbralMagnitude float64
 }
 
 // ── NASA Eclipse Catalog Parser ──────────────────────────────────────────────
@@ -201,6 +206,13 @@ func parseNASACatalog(t *testing.T, html string, key *regexp.Regexp) []nasaEclip
 			continue
 		}
 
+		magnitude, penumbral, err := catalogMagnitudes(key, parts)
+		if err != nil {
+			t.Errorf("NASA catalog row %q: %v", trimmed, err)
+
+			continue
+		}
+
 		// NASA catalog uses Julian calendar before 1582-10-15, times are in TD ≈ TDB
 		isJulianCal := year < 1582 || (year == 1582 && month < 10) || (year == 1582 && month == 10 && day < 15)
 
@@ -214,13 +226,76 @@ func parseNASACatalog(t *testing.T, html string, key *regexp.Regexp) []nasaEclip
 		eclipses = append(eclipses, nasaEclipseRef{
 			Year: year, Month: month, Day: day,
 			Hour: hour, Min: minute, Sec: sec,
-			DeltaT:      dt,
-			EclipseType: eclType,
-			JDtd:        jdTD,
+			DeltaT:             dt,
+			EclipseType:        eclType,
+			JDtd:               jdTD,
+			Magnitude:          magnitude,
+			PenumbralMagnitude: penumbral,
 		})
 	}
 
 	return eclipses
+}
+
+// catalogMagnitudes reads a row's magnitude columns: on the lunar pages the
+// penumbral and umbral magnitudes (fields 12 and 13), on the solar pages the
+// eclipse magnitude (field 12).
+func catalogMagnitudes(key *regexp.Regexp, parts []string) (magnitude, penumbral float64, err error) {
+	if len(parts) < 13 {
+		return 0, 0, fmt.Errorf("%w: %d fields, too few for the magnitudes", errCatalogField, len(parts))
+	}
+
+	first, err := strconv.ParseFloat(parts[11], 64)
+	if err != nil {
+		return 0, 0, fmt.Errorf("%w: magnitude %q", errCatalogField, parts[11])
+	}
+
+	if key != lunarType {
+		return first, 0, nil
+	}
+
+	umbral, err := strconv.ParseFloat(parts[12], 64)
+	if err != nil {
+		return 0, 0, fmt.Errorf("%w: umbral magnitude %q", errCatalogField, parts[12])
+	}
+
+	return umbral, first, nil
+}
+
+// catalogKinds maps the canon's type letters to astrogo's kinds.
+var catalogKinds = map[string]plan.EclipseKind{
+	"N": plan.EclipsePenumbral,
+	"P": plan.EclipsePartial,
+	"T": plan.EclipseTotal,
+	"A": plan.EclipseAnnular,
+	"H": plan.EclipseHybrid,
+}
+
+// catalogMagnitudeTol bounds astrogo's eclipse magnitudes against the canon's,
+// which prints four decimals. Measured against DE441 over the six centuries
+// this file reads and 2001–2100 besides: 0.0004 at worst for the lunar
+// penumbral and umbral magnitudes, 0.00026 for the solar. Every kind agrees,
+// the 77 hybrids on these pages included.
+const catalogMagnitudeTol = 0.002
+
+// checkKindAndMagnitude compares an eclipse astrogo found with the catalog
+// row it matched (#405).
+func checkKindAndMagnitude(t *testing.T, kind string, ref nasaEclipseRef, e plan.EclipseEvent) {
+	t.Helper()
+
+	date := fmt.Sprintf("%s %04d-%02d-%02d", kind, ref.Year, ref.Month, ref.Day)
+
+	if want := catalogKinds[ref.EclipseType]; e.Kind != want {
+		t.Errorf("  KIND %s: %v, the catalog says %v", date, e.Kind, want)
+	}
+
+	if d := e.Magnitude - ref.Magnitude; math.Abs(d) > catalogMagnitudeTol {
+		t.Errorf("  MAG %s: magnitude %.4f, the catalog gives %.4f (%+.4f)", date, e.Magnitude, ref.Magnitude, d)
+	}
+
+	if d := e.PenumbralMagnitude - ref.PenumbralMagnitude; math.Abs(d) > catalogMagnitudeTol {
+		t.Errorf("  MAG %s: penumbral magnitude %.4f, the catalog gives %.4f (%+.4f)", date, e.PenumbralMagnitude, ref.PenumbralMagnitude, d)
+	}
 }
 
 // greatestEclipseTolMinutes bounds how far astrogo's greatest eclipse may fall
@@ -441,6 +516,8 @@ func TestNASA_LunarEclipses_Historical(t *testing.T) {
 						found = true
 						bestDelta = delta
 
+						checkKindAndMagnitude(t, "LE", ref, ecl)
+
 						break
 					}
 				}
@@ -572,6 +649,8 @@ func TestNASA_SolarEclipses_Historical(t *testing.T) {
 					if delta < 2*24*60 {
 						found = true
 						bestDelta = delta
+
+						checkKindAndMagnitude(t, "SE", ref, ecl)
 
 						break
 					}

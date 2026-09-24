@@ -205,6 +205,10 @@ func searchEvent(target Observable, site *Site, from time.Time, k EventKind, for
 // See DayEvents for the different question ("what happened on this
 // calendar day") this is deliberately not answering.
 func Episode(from, to time.Time, target Observable, site *Site) (rise, set *Event, err error) {
+	if err := checkInterval(from, to); err != nil {
+		return nil, nil, err
+	}
+
 	// A fixed target whose culminations put it clear of the horizon either way
 	// has no rise to find, and searching 366 days to discover that costs about
 	// 2.9 s. See culminationSkipsSearch.
