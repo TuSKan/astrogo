@@ -348,49 +348,51 @@ func seasonEvaluator(target float64, prov eph.Provider) Evaluator {
 
 // ── Moon Illumination ────────────────────────────────────────────────────────
 
-// MoonIllumination returns the fraction of the Moon's disk illuminated [0, 1]
-// and the phase angle in degrees at time t.
+// MoonIllumination returns the fraction of the Moon's disk illuminated, in
+// [0, 1], and the Moon's phase angle at time t, both as seen from the
+// geocenter.
+//
+// The phase angle i is the Sun–Moon–Earth angle: 0° at full, near 180° at new.
+// It is not the elongation ψ, the Sun–Earth–Moon angle, which this returned in
+// its place until #416. The triangle's third angle, at the Sun, reaches 0.15°,
+// so i falls short of 180° − ψ by up to that much. The fraction is
+// k = (1 + cos i)/2 (Meeus, Astronomical Algorithms, 2nd ed., eq. 48.1), which
+// at first quarter is 0.5013, not 0.5.
+//
+// The Moon is the astrometric Moon, where the Earth sees it with light time
+// applied, and the phase angle is measured there. Against Skyfield's
+// almanac.phase_angle and fraction_illuminated (DE421) it agrees to 0.002° and
+// 0.00002; the geometric Moon is 0.003° off.
 func MoonIllumination(t time.Time, prov eph.Provider) (fraction float64, phaseAngle angle.Angle, err error) {
 	if prov == nil {
 		prov = eph.Default()
 	}
 
-	sunPos, err := eph.Position(prov, eph.Sun, t)
+	sun, err := eph.Position(prov, eph.Sun, t)
 	if err != nil {
 		return 0, 0, fmt.Errorf("illumination: sun position: %w", err)
 	}
 
-	moonPos, err := eph.Position(prov, eph.Moon, t)
+	moon, err := eph.AstrometricState(prov, eph.Moon, t)
 	if err != nil {
 		return 0, 0, fmt.Errorf("illumination: moon position: %w", err)
 	}
 
-	sunICRS, err := eph.ToICRS(sunPos)
-	if err != nil {
-		return 0, 0, fmt.Errorf("illumination: sun ICRS: %w", err)
-	}
+	// The angle at the Moon, as it was 1.3 s ago, between the Earth now and the
+	// Sun. The Sun moves some 7 km about the barycenter in the 8.5 minutes its
+	// light takes to reach the Moon, so its position now serves for then.
+	i := angleBetweenVectors(sun.Sub(moon.Pos), moon.Pos.MulScalar(-1))
 
-	moonICRS, err := eph.ToICRS(moonPos)
-	if err != nil {
-		return 0, 0, fmt.Errorf("illumination: moon ICRS: %w", err)
-	}
-
-	// Phase angle = angular separation between Sun and Moon as seen from Earth
-	sep := coord.Separation(moonICRS, sunICRS)
-
-	// Illumination fraction = (1 - cos(phase_angle)) / 2
-	frac := (1.0 - math.Cos(sep.Radians())) / 2.0
-
-	return frac, sep, nil
+	return (1 + math.Cos(i)) / 2, angle.Rad(i), nil
 }
 
 // MoonElongation returns the Moon's ecliptic elongation from the Sun at
 // time t: the Moon's ecliptic longitude minus the Sun's, normalized to
 // [0°, 360°). 0° at new moon, 90° at first quarter, 180° at full moon, 270°
 // at last quarter — monotonically increasing across a full lunation, unlike
-// [MoonIllumination]'s phaseAngle (the Sun–Moon–observer separation, which
-// is symmetric about full and so takes the same value on both the waxing
-// and waning side of a lunation). Use this — or [MoonPhaseFraction] — for
+// [MoonIllumination]'s phaseAngle (the Sun–Moon–Earth angle, which is
+// symmetric about full and so takes the same value on both the waxing and
+// waning side of a lunation). Use this — or [MoonPhaseFraction] — for
 // "is tonight's Moon waxing or waning", which phaseAngle alone can't answer.
 func MoonElongation(t time.Time, prov eph.Provider) (angle.Angle, error) {
 	if prov == nil {

@@ -656,7 +656,9 @@ type Event struct {
 
 	// Value is the quantity the solver drove to zero: the geometric altitude
 	// less the threshold for rise, set and twilight; the refracted altitude
-	// for a transit; a separation in degrees for geometry events.
+	// for a transit; a separation in degrees for geometry events. A lunar
+	// phase is the exception: its Value is the Moon's illuminated fraction
+	// then, from [MoonIllumination].
 	Value float64
 
 	Observable bool
@@ -1219,8 +1221,10 @@ func (s EventSolver) solveIllumination(spec EventSpec, start, end time.Time) ([]
 					continue
 				}
 
-				e, _ := moonElongation(resTime, prov)
-				illumination := (1.0 - math.Cos(e*math.Pi/180.0)) / 2.0
+				illumination, _, err := MoonIllumination(resTime, prov)
+				if err != nil {
+					return nil, err
+				}
 
 				events = append(events, Event{
 					Kind:  pt.kind,
