@@ -12,3 +12,14 @@ var (
 	MarsSubLongitudes            = marsSubLongitudes
 	EclipticLongitude            = eclipticLongitude
 )
+
+// The Pluto–Charon model's internals, for the same reason: the paper
+// tabulates its photometry at each visit's phase angle and longitude, not at
+// a date, so the model is tested there.
+var (
+	PlutoCharonMagnitudesAt = plutoCharonMagnitudes
+	PlutoCharonGeometry     = plutoCharonGeometry
+	AddMagnitudes           = addMagnitudes
+	PlutoPhaseCurve         = plutoPhaseCurve.at
+	CharonPhaseCurve        = charonPhaseCurve.at
+)

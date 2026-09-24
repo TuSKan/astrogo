@@ -306,7 +306,10 @@ func neptuneMag(r, delta, phAng float64, t time.Time) float64 {
 // photometry modeled by Buie et al. (2010) puts the pair 0.27 mag fainter than
 // this at one of its geometries, so discrepancies of tenths of a magnitude are
 // possible. It is fit for a visibility estimate — which is how VisibleTonight
-// uses it — and not for predicting a measurement.
+// uses it — and not for predicting a measurement. PlutoCharonApparent is that
+// Buie et al. model — rotation, nonlinear phase curves, the two bodies
+// separately — calibrated in 2002–2003 and documented with how far it has
+// since drifted from this law.
 //
 // JPL Horizons' APmag, which also includes Charon, uses the same historical
 // law with V(1,0) = −1.00, and astrogo agrees with it to 0.01 mag. That is a
