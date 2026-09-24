@@ -6,6 +6,7 @@ import (
 	"slices"
 
 	"github.com/TuSKan/astrogo/angle"
+	"github.com/TuSKan/astrogo/constants"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/time"
@@ -24,9 +25,13 @@ const meanSolarLongitudeDegPerDay = 360.0 / 365.25
 // working-list parameterization: the radiant position is anchored to a
 // peak SOLAR LONGITUDE, not a calendar date — solar longitude is exact
 // and year-independent (a calendar date drifts by up to a day year to
-// year), and this codebase already has the primitive needed to compute
-// it precisely (the unexported sunEclipticLongitude, used by Seasons'
-// equinox/solstice solver).
+// year).
+//
+// IMO gives every solar longitude "for the equinox 2000.0", so that is
+// what they are compared with (sunLongitudeJ2000). Until #415 they were
+// compared with the Sun's longitude of date, 0.37° further on in 2026 by
+// general precession, and every window and peak came about 9 hours early,
+// drifting 20 minutes further each year.
 type MeteorShower struct {
 	// Name is the shower's common name (e.g. "Perseids").
 	Name string
@@ -243,11 +248,11 @@ func wrap360Deg(d float64) float64 {
 	return d
 }
 
-// IsActive reports whether m is active at time t, based on the Sun's real
-// computed ecliptic longitude of date (via the same solver Seasons uses),
+// IsActive reports whether m is active at time t, from the Sun's longitude
+// referred to the equinox J2000.0, as IMO tabulates its activity windows —
 // not a calendar-date range.
 func (m MeteorShower) IsActive(t time.Time, prov eph.Provider) (bool, error) {
-	lambda, err := sunEclipticLongitude(t, prov)
+	lambda, err := sunLongitudeJ2000(t, prov)
 	if err != nil {
 		return false, fmt.Errorf("meteor: active: %w", err)
 	}
@@ -255,12 +260,13 @@ func (m MeteorShower) IsActive(t time.Time, prov eph.Provider) (bool, error) {
 	return solarLongitudeInRange(lambda, m.ActiveStartSolarLon, m.ActiveEndSolarLon), nil
 }
 
-// RadiantAt returns m's radiant position at time t: the Sun's real
-// ecliptic longitude of date is compared against m.PeakSolarLongitude,
-// converted to an elapsed-day count via meanSolarLongitudeDegPerDay, and
-// applied as linear RA/Dec drift from the peak position.
+// RadiantAt returns m's radiant position at time t: the Sun's longitude,
+// referred to the equinox J2000.0 as IMO's are, is compared against
+// m.PeakSolarLongitude, converted to an elapsed-day count via
+// meanSolarLongitudeDegPerDay, and applied as linear RA/Dec drift from the
+// peak position.
 func (m MeteorShower) RadiantAt(t time.Time, prov eph.Provider) (ra, dec angle.Angle, err error) {
-	lambda, err := sunEclipticLongitude(t, prov)
+	lambda, err := sunLongitudeJ2000(t, prov)
 	if err != nil {
 		return angle.Zero(), angle.Zero(), fmt.Errorf("meteor: radiant: %w", err)
 	}
@@ -324,4 +330,30 @@ func (m MeteorShower) ObservedRate(t time.Time, site *Site, prov eph.Provider, l
 	}
 
 	return m.ZHR * aa.Alt().Sin() * math.Pow(m.PopulationIndex, limitingMag-6.5), nil
+}
+
+// sunLongitudeJ2000 is the Sun's geocentric ecliptic longitude referred to the
+// mean equinox and ecliptic of J2000.0, in degrees [0, 360): the solar
+// longitude meteor-shower catalogs tabulate (IMO: "All λ⊙ are given for the
+// equinox 2000.0").
+//
+// The geometric Sun, rotated from ICRS about x by the J2000 obliquity: no
+// precession, nutation or aberration. The frame bias between ICRS and the
+// J2000 equator, 0.02″, is far below anything a shower's timing resolves.
+// Against Skyfield's ecliptic_J2000_frame (DE421) it agrees to a thousandth
+// of a degree, about a minute of time.
+func sunLongitudeJ2000(t time.Time, prov eph.Provider) (float64, error) {
+	sun, err := eph.Position(prov, eph.Sun, t)
+	if err != nil {
+		return 0, fmt.Errorf("meteor: sun position: %w", err)
+	}
+
+	sinEps, cosEps := math.Sincos(constants.IAU.ObliquityJ2000.Value)
+
+	lon := math.Atan2(sun.Y*cosEps+sun.Z*sinEps, sun.X) * 180 / math.Pi
+	if lon < 0 {
+		lon += 360
+	}
+
+	return lon, nil
 }
