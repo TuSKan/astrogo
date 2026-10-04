@@ -604,12 +604,26 @@ func (t Time) Calendar() (year, month, day int, dayFrac float64) {
 // Historical and biblical references (Josephus, Passover dates, etc.)
 // use the Julian calendar exclusively.
 func (t Time) JulianCalendar() (year, month, day int, dayFrac float64) {
-	jd := t.jd1 + t.jd2
+	return julianCalendar(t.jd1, t.jd2)
+}
+
+// julianCalendar is [Time.JulianCalendar] for a two-part Julian Date.
+//
+// The parts are not summed first. jd1+jd2 is one float64 near 1.7e6 for an
+// ancient date, spaced 2.3e-10 days — 20 µs — apart, which put a whole second
+// on the wrong side of the minute often enough to matter (#439). Whole days
+// are taken from each part as integers and only the fractions are added,
+// where a float64 resolves picoseconds.
+func julianCalendar(jd1, jd2 float64) (year, month, day int, dayFrac float64) {
+	w1, w2 := math.Floor(jd1), math.Floor(jd2)
+
+	// Fractional day from midnight, which is noon plus a half: under 2.5.
+	f := (jd1 - w1) + (jd2 - w2) + 0.5
+	wf := math.Floor(f)
+	f -= wf
 
 	// Integer JD at noon
-	z := int(math.Floor(jd + 0.5))
-	// Fractional day from noon
-	f := (jd + 0.5) - float64(z)
+	z := int(w1) + int(w2) + int(wf)
 
 	// Julian calendar: no Gregorian correction (b=0)
 	c := z + 32082
@@ -627,14 +641,13 @@ func (t Time) JulianCalendar() (year, month, day int, dayFrac float64) {
 // FormatJulian returns a string representation of the time in the given
 // layout using the Julian calendar. This should be used for all dates
 // before October 15, 1582 (e.g., biblical and ancient historical dates).
+//
+// The time is rounded to the nearest second, not truncated: an instant held a
+// few microseconds short of 12:30:00 prints as 12:30:00, and one a few short
+// of midnight as the next day's 00:00:00 (#439).
 func (t Time) FormatJulian(format string) string {
-	y, m, d, frac := t.JulianCalendar()
-
-	secondOfDay := frac * 86400.0
-	hour := int(secondOfDay / 3600)
-	secondOfDay -= float64(hour) * 3600
-	minute := int(secondOfDay / 60)
-	second := int(secondOfDay - float64(minute)*60)
+	y, m, d, frac := julianCalendar(t.jd1, t.jd2+halfSecondDays)
+	hour, minute, second := clockOf(frac)
 
 	yearStr := fmt.Sprintf("%04d", y)
 	if y < 0 {
@@ -855,9 +868,10 @@ func DateJulianCal(year, month, day, hour, minute, second int) Time {
 	y := year + 4800 - a
 	m := month + 12*a - 3
 	jdn := day + (153*m+2)/5 + 365*y + y/4 - 32083
-	jd := float64(jdn) - 0.5 + float64(hour)/24.0 + float64(minute)/1440.0 + float64(second)/86400.0
 
-	return FromJD(jd, UTC)
+	// The day number and the time of day as the two parts: summed into one
+	// float64 they lost up to 10 µs (#439).
+	return FromJDParts(float64(jdn)-0.5, float64(hour*3600+minute*60+second)/86400.0, UTC)
 }
 
 // DecimalYear returns the decimal year representation of the time.
@@ -916,20 +930,19 @@ func (t Time) In(loc *time.Location) Time {
 // to the standard library. For dates outside that range (e.g., negative years),
 // it formats manually using the SOFA-derived calendar components.
 func (t Time) Format(format string) string {
-	y, m, d, frac, _ := gofaext.JdToDate(t.jd1, t.jd2)
+	y, _, _, _, _ := gofaext.JdToDate(t.jd1, t.jd2)
 	// If year is within Go's time.Time range, delegate to standard formatting
 	if y >= 0 && y <= 9999 {
 		return t.ToGo().Format(format)
 	}
+
+	// Rounded to the nearest second, as FormatJulian is.
+	y, m, d, frac, _ := gofaext.JdToDate(t.jd1, t.jd2+halfSecondDays)
+	hour, minute, second := clockOf(frac)
 	// Manual formatting for out-of-range dates.
 	// Uses strings.NewReplacer for single-pass replacement to avoid
 	// infinite loops when replaced values contain other format tokens
 	// (e.g., year "-0018" contains "01" which would match month token).
-	totalSec := frac * 86400.0
-	hour := int(totalSec / 3600)
-	totalSec -= float64(hour) * 3600
-	minute := int(totalSec / 60)
-	second := int(totalSec - float64(minute)*60)
 
 	r := strings.NewReplacer(
 		"2006", fmt.Sprintf("%+05d", y),
@@ -1590,4 +1603,18 @@ func (t Time) subDays(other Time) float64 {
 	}
 
 	return (t.jd1 - other.jd1) + (t.jd2 - other.jd2)
+}
+
+// halfSecondDays is half a second in days: added to an instant before it is
+// split into a date and a clock, it makes the clock's truncation a rounding,
+// and lets the date carry when that rounds up to midnight.
+const halfSecondDays = 0.5 / 86400
+
+// clockOf splits a fraction of a day into hours, minutes and whole seconds,
+// truncating. A fraction a rounding error short of 1 would give 86400 s, so
+// the second is capped at the day's last.
+func clockOf(frac float64) (hour, minute, second int) {
+	s := min(int(frac*86400), 86399)
+
+	return s / 3600, s / 60 % 60, s % 60
 }
