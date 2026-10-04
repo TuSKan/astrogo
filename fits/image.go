@@ -151,20 +151,15 @@ func ReadImage(h *Header, r io.Reader) (*ImageHDU, error) {
 		return nil, err
 	}
 
-	// Allocate Arrow Buffer
-	mem := memory.NewGoAllocator()
-	buf := memory.NewResizableBuffer(mem)
-	buf.Resize(int(totalPayloadBytes))
-
 	// FITS mandates big-endian byte order for all data.
 	// Arrow tensors expect native byte order. Read the raw stream, then
 	// convert big-endian → native for multi-byte pixel types.
-	rawBytes := buf.Bytes()
-
-	_, err = io.ReadFull(r, rawBytes)
+	rawBytes, err := readDeclared(r, totalPayloadBytes)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read image payload: %w", err)
 	}
+
+	buf := memory.NewBufferBytes(rawBytes)
 
 	swapBigEndianToNative(rawBytes, int(pixelBytes))
 
