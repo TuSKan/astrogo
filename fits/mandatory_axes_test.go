@@ -95,6 +95,66 @@ func TestImageNeedsItsAxes(t *testing.T) {
 	}
 }
 
+// TestTruncatedUndecodedDataIsAnError: stepping over a table's undecoded data
+// is a read like any other, and a file that ends inside it, or inside the
+// padding after it, is an error rather than a table read short.
+func TestTruncatedUndecodedDataIsAnError(t *testing.T) {
+	t.Parallel()
+
+	// No fields, so nothing is decoded; 36 rows of 80 bytes, so one block.
+	header := func(xtension, naxis2 string) []byte {
+		return pad([]byte(card("XTENSION", xtension) + card("BITPIX", "8") + card("NAXIS", "2") +
+			card("NAXIS1", "80") + card("NAXIS2", naxis2) + card("PCOUNT", "0") + card("GCOUNT", "1") +
+			card("TFIELDS", "0") + "END"))
+	}
+
+	for _, c := range []struct {
+		name, want string
+		hdu        []byte
+	}{
+		{"BINTABLE ending in its rows", "skip bintable data",
+			append(header("'BINTABLE'", "36"), make([]byte, 100)...)},
+		{"TABLE ending in its rows", "skip asciitable rows",
+			append(header("'TABLE   '", "36"), make([]byte, 100)...)},
+		{"TABLE ending in its padding", "extension padding",
+			append(header("'TABLE   '", "1"), make([]byte, 80)...)},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+
+			raw := append(emptyPrimary(), c.hdu...)
+
+			if _, err := fits.Read(bytes.NewReader(raw)); err == nil || !strings.Contains(err.Error(), c.want) {
+				t.Errorf("Read: err %v, want one mentioning %q", err, c.want)
+			}
+		})
+	}
+}
+
+// TestReadRefusesASkippedHDUsStructure: an HDU that Read neither decodes nor
+// understands is stepped over by the size its structural keywords give, so
+// those keywords must be usable even though nothing else of it is read. They
+// used to size a malformed one as zero, and the next header was read from its
+// data (#460).
+func TestReadRefusesASkippedHDUsStructure(t *testing.T) {
+	t.Parallel()
+
+	for _, c := range []struct {
+		name, want string
+		raw        []byte
+	}{
+		{"primary with a malformed BITPIX", "BITPIX",
+			hduBytes(nil, card("SIMPLE", "T"), card("BITPIX", "'eight'"), card("NAXIS", "0"))},
+		{"unknown extension with a malformed NAXIS1", "NAXIS1", append(emptyPrimary(),
+			hduBytes(nil, card("XTENSION", "'FOREIGN '"), card("BITPIX", "8"), card("NAXIS", "1"),
+				card("NAXIS1", "'x'"), card("PCOUNT", "0"), card("GCOUNT", "1"))...)},
+	} {
+		if _, err := fits.Read(bytes.NewReader(c.raw)); err == nil || !strings.Contains(err.Error(), c.want) {
+			t.Errorf("%s: err %v, want one naming %s", c.name, err, c.want)
+		}
+	}
+}
+
 // emptyImageExtension is an IMAGE extension with no data, named name.
 func emptyImageExtension(name string) []byte {
 	return hduBytes(nil, card("XTENSION", "'IMAGE   '"), card("BITPIX", "8"), card("NAXIS", "0"),

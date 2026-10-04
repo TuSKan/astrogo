@@ -50,6 +50,44 @@ func TestASCIITableNeedsItsAxes(t *testing.T) {
 	}
 }
 
+// TestTableSizeMustFit: a table's size is NAXIS1 × NAXIS2, and a BINTABLE's
+// heap follows it. Each sum and product is checked as an image's is, rather
+// than wrapped, before anything is sized from it.
+func TestTableSizeMustFit(t *testing.T) {
+	t.Parallel()
+
+	table := func(xtension, naxis1, naxis2, pcount string) *Header {
+		return headerOf("XTENSION", xtension, "BITPIX", "8", "NAXIS", "2", "NAXIS1", naxis1,
+			"NAXIS2", naxis2, "PCOUNT", pcount, "GCOUNT", "1", "TFIELDS", "0")
+	}
+
+	ascii := func(h *Header) error {
+		_, err := ReadASCIITable(h, bytes.NewReader(nil))
+
+		return err
+	}
+
+	binary := func(h *Header) error {
+		_, err := ReadBintable(h, bytes.NewReader(nil))
+
+		return err
+	}
+
+	for _, c := range []struct {
+		name   string
+		read   func(*Header) error
+		header *Header
+	}{
+		{"TABLE rows × width", ascii, table("'TABLE   '", "4294967296", "4294967296", "0")},
+		{"BINTABLE rows × width", binary, table("'BINTABLE'", "4294967296", "4294967296", "0")},
+		{"BINTABLE table + heap", binary, table("'BINTABLE'", "1", "9223372036854775807", "1")},
+	} {
+		if err := c.read(c.header); !errors.Is(err, errDataSize) {
+			t.Errorf("%s overflowing: err %v, want errDataSize", c.name, err)
+		}
+	}
+}
+
 // TestPayloadSizeNeedsItsStructure: the size of an HDU that is skipped rather
 // than decoded comes from BITPIX, NAXIS and NAXISn, which are mandatory, and
 // GCOUNT and PCOUNT, which default only when absent. A malformed one used to
