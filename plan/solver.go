@@ -91,151 +91,17 @@ func sameSign(a, b float64) bool {
 // points would produce a well-conditioned step. If not, bisection is used.
 // The bracket is guaranteed to shrink on every iteration.
 func (s Solver) FindRoot(eval Evaluator, t1, t2 time.Time) (time.Time, float64, error) {
-	// Work in seconds offset from origin. This used to be a workaround for
-	// time.Duration's int64 nanoseconds; unit.Duration is float64 seconds, so
-	// the offset is now just the algorithm's own variable.
-	origin := t1
-	tolSec := s.Tolerance.Seconds()
-
-	timeAt := func(sec float64) time.Time {
-		return origin.Add(unit.Seconds(sec))
-	}
-
-	xa := 0.0
-	xb := t2.Sub(t1).Seconds()
-
-	fa, err := eval(timeAt(xa))
+	fa, err := eval(t1)
 	if err != nil {
 		return time.Time{}, 0, fmt.Errorf("solver: eval at a: %w", err)
 	}
 
-	if !finite(fa) {
-		return time.Time{}, 0, fmt.Errorf("solver: eval at a: %w", ErrNonFiniteEvaluation)
-	}
-
-	fb, err := eval(timeAt(xb))
+	fb, err := eval(t1.Add(t2.Sub(t1)))
 	if err != nil {
 		return time.Time{}, 0, fmt.Errorf("solver: eval at b: %w", err)
 	}
 
-	if !finite(fb) {
-		return time.Time{}, 0, fmt.Errorf("solver: eval at b: %w", ErrNonFiniteEvaluation)
-	}
-
-	// Verify bracketing condition
-	if sameSign(fa, fb) {
-		return time.Time{}, 0, fmt.Errorf(
-			"%w: f(a)=%g, f(b)=%g", ErrBracketingViolated, fa, fb)
-	}
-
-	// Third point: initialize to a (will be replaced after first iteration)
-	xc, fc := xa, fa
-
-	// Ensure |fb| ≤ |fa| — b is always the best estimate (closest to zero)
-	if math.Abs(fa) < math.Abs(fb) {
-		xa, xb = xb, xa
-		fa, fb = fb, fa
-	}
-
-	converged := false
-
-	for i := range s.MaxIter {
-		// Convergence: bracket width or exact root
-		if math.Abs(xb-xa) <= tolSec || fb == 0 {
-			converged = true
-
-			break
-		}
-
-		// ── Step selection ──────────────────────────────────────────────
-		// Default: bisection (t = 0.5 means midpoint of [a, b])
-		t := 0.5
-
-		// Try IQI if the three function values are distinct (avoids division by zero)
-		if fc != fa && fc != fb {
-			// ξ measures how far a is from b relative to c:
-			//   ξ = (a − b) / (c − b) ∈ (0, 1) when c is "behind" a
-			// φ measures how the function values are distributed:
-			//   φ = (fa − fb) / (fc − fb) ∈ (0, 1) for well-conditioned IQI
-			xi := (xa - xb) / (xc - xb)
-			phi := (fa - fb) / (fc - fb)
-
-			// Chandrupatla's geometric test:
-			// IQI is well-conditioned when the interpolation point falls inside
-			// the bracket. This is guaranteed when both:
-			//   φ² < ξ     (curvature from the a-side is appropriate)
-			//   (1−φ)² < 1−ξ  (curvature from the b-side is appropriate)
-			phi2 := phi * phi
-			if phi2 < xi && (1-phi)*(1-phi) < 1-xi {
-				// Inverse quadratic interpolation through (xa,fa), (xb,fb), (xc,fc).
-				// Expressed as the Lagrange basis parameter t where x_new = xa + t*(xb-xa):
-				//   t = L₁(0) + (c−a)/(b−a) · L₂(0)
-				// where L₁, L₂ are the Lagrange basis polynomials evaluated at f=0.
-				t = fa*fc/((fb-fa)*(fb-fc)) +
-					(xc-xa)/(xb-xa)*fa*fb/((fc-fa)*(fc-fb))
-
-				// Clamp to prevent stepping too close to bracket boundaries.
-				// xb == xa (bracket already converged to zero width) would
-				// otherwise divide by zero here, producing an Inf/NaN tlim
-				// that propagates into xt below — bail to plain bisection
-				// (t stays 0.5) instead. In practice the outer loop's own
-				// convergence check (math.Abs(xb-xa) <= tolSec) already
-				// breaks before this is reached for any tolSec > 0, but
-				// guard it directly rather than relying on that.
-				if width := math.Abs(xb - xa); width > 0 {
-					tlim := 0.5 * tolSec / width
-					if tlim < 1e-12 {
-						tlim = 1e-12
-					}
-
-					t = math.Max(tlim, math.Min(1-tlim, t))
-				} else {
-					t = 0.5
-				}
-			}
-		}
-
-		// ── Evaluate at new trial point ────────────────────────────────
-		xt := xa + t*(xb-xa)
-		if !finite(xt) {
-			return time.Time{}, 0, fmt.Errorf("solver: non-finite trial point at iter %d: %w", i, ErrNonFiniteEvaluation)
-		}
-
-		ft, err := eval(timeAt(xt))
-		if err != nil {
-			return time.Time{}, 0, fmt.Errorf("solver: eval at iter %d: %w", i, err)
-		}
-
-		if !finite(ft) {
-			return time.Time{}, 0, fmt.Errorf("solver: eval at iter %d: %w", i, ErrNonFiniteEvaluation)
-		}
-
-		// ── Update bracket and third point ─────────────────────────────
-		if sameSign(ft, fa) {
-			// xt is on the same side as a → a is replaced, old a becomes c
-			xc, fc = xa, fa
-			xa, fa = xt, ft
-		} else {
-			// xt is on the same side as b → b is replaced, old b becomes c
-			xc, fc = xb, fb
-			xb, fb = xt, ft
-		}
-
-		// Maintain invariant: |fb| ≤ |fa| — b is always the best estimate
-		if math.Abs(fa) < math.Abs(fb) {
-			xa, xb = xb, xa
-			fa, fb = fb, fa
-		}
-	}
-
-	// The estimate is returned either way; only the error distinguishes them.
-	if !converged {
-		return timeAt(xb), fb, fmt.Errorf("%w: %d iterations, bracket %v, tolerance %v",
-			ErrNoConvergence, s.MaxIter,
-			unit.Seconds(math.Abs(xb-xa)), s.Tolerance)
-	}
-
-	return timeAt(xb), fb, nil
+	return s.findRootFrom(eval, t1, t2, fa, fb)
 }
 
 // FindExtremum finds the time t in [a, b] where eval(t) reaches a local
@@ -402,6 +268,157 @@ func (s Solver) FindExtremum(eval Evaluator, t1, t3 time.Time, isMax bool) (time
 	}
 
 	return x, finalVal, nil
+}
+
+// findRootFrom is [Solver.FindRoot] for a caller that already holds eval's
+// values at both ends of the bracket, fa at t1 and fb at t2, and so does not
+// evaluate them again.
+//
+// That is not only a saving. A sweep that found a sign change between two
+// samples has already decided there is a root between them, and a second
+// evaluation of the same instant need not agree with the first: the event
+// solvers evaluate through a context cache whose base depends on what was
+// evaluated before, and its answers differ by a few times 1e-7°. A sample that
+// close to the threshold could change sign on re-evaluation, and the whole
+// search then failed with ErrBracketingViolated where the sweep had found an
+// ordinary crossing (#425). Starting from the samples, the bracket is the one
+// the sweep saw.
+func (s Solver) findRootFrom(eval Evaluator, t1, t2 time.Time, fa, fb float64) (time.Time, float64, error) {
+	// Work in seconds offset from origin. This used to be a workaround for
+	// time.Duration's int64 nanoseconds; unit.Duration is float64 seconds, so
+	// the offset is now just the algorithm's own variable.
+	origin := t1
+	tolSec := s.Tolerance.Seconds()
+
+	timeAt := func(sec float64) time.Time {
+		return origin.Add(unit.Seconds(sec))
+	}
+
+	xa := 0.0
+	xb := t2.Sub(t1).Seconds()
+
+	if !finite(fa) {
+		return time.Time{}, 0, fmt.Errorf("solver: eval at a: %w", ErrNonFiniteEvaluation)
+	}
+
+	if !finite(fb) {
+		return time.Time{}, 0, fmt.Errorf("solver: eval at b: %w", ErrNonFiniteEvaluation)
+	}
+
+	// Verify bracketing condition
+	if sameSign(fa, fb) {
+		return time.Time{}, 0, fmt.Errorf(
+			"%w: f(a)=%g, f(b)=%g", ErrBracketingViolated, fa, fb)
+	}
+
+	// Third point: initialize to a (will be replaced after first iteration)
+	xc, fc := xa, fa
+
+	// Ensure |fb| ≤ |fa| — b is always the best estimate (closest to zero)
+	if math.Abs(fa) < math.Abs(fb) {
+		xa, xb = xb, xa
+		fa, fb = fb, fa
+	}
+
+	converged := false
+
+	for i := range s.MaxIter {
+		// Convergence: bracket width or exact root
+		if math.Abs(xb-xa) <= tolSec || fb == 0 {
+			converged = true
+
+			break
+		}
+
+		// ── Step selection ──────────────────────────────────────────────
+		// Default: bisection (t = 0.5 means midpoint of [a, b])
+		t := 0.5
+
+		// Try IQI if the three function values are distinct (avoids division by zero)
+		if fc != fa && fc != fb {
+			// ξ measures how far a is from b relative to c:
+			//   ξ = (a − b) / (c − b) ∈ (0, 1) when c is "behind" a
+			// φ measures how the function values are distributed:
+			//   φ = (fa − fb) / (fc − fb) ∈ (0, 1) for well-conditioned IQI
+			xi := (xa - xb) / (xc - xb)
+			phi := (fa - fb) / (fc - fb)
+
+			// Chandrupatla's geometric test:
+			// IQI is well-conditioned when the interpolation point falls inside
+			// the bracket. This is guaranteed when both:
+			//   φ² < ξ     (curvature from the a-side is appropriate)
+			//   (1−φ)² < 1−ξ  (curvature from the b-side is appropriate)
+			phi2 := phi * phi
+			if phi2 < xi && (1-phi)*(1-phi) < 1-xi {
+				// Inverse quadratic interpolation through (xa,fa), (xb,fb), (xc,fc).
+				// Expressed as the Lagrange basis parameter t where x_new = xa + t*(xb-xa):
+				//   t = L₁(0) + (c−a)/(b−a) · L₂(0)
+				// where L₁, L₂ are the Lagrange basis polynomials evaluated at f=0.
+				t = fa*fc/((fb-fa)*(fb-fc)) +
+					(xc-xa)/(xb-xa)*fa*fb/((fc-fa)*(fc-fb))
+
+				// Clamp to prevent stepping too close to bracket boundaries.
+				// xb == xa (bracket already converged to zero width) would
+				// otherwise divide by zero here, producing an Inf/NaN tlim
+				// that propagates into xt below — bail to plain bisection
+				// (t stays 0.5) instead. In practice the outer loop's own
+				// convergence check (math.Abs(xb-xa) <= tolSec) already
+				// breaks before this is reached for any tolSec > 0, but
+				// guard it directly rather than relying on that.
+				if width := math.Abs(xb - xa); width > 0 {
+					tlim := 0.5 * tolSec / width
+					if tlim < 1e-12 {
+						tlim = 1e-12
+					}
+
+					t = math.Max(tlim, math.Min(1-tlim, t))
+				} else {
+					t = 0.5
+				}
+			}
+		}
+
+		// ── Evaluate at new trial point ────────────────────────────────
+		xt := xa + t*(xb-xa)
+		if !finite(xt) {
+			return time.Time{}, 0, fmt.Errorf("solver: non-finite trial point at iter %d: %w", i, ErrNonFiniteEvaluation)
+		}
+
+		ft, err := eval(timeAt(xt))
+		if err != nil {
+			return time.Time{}, 0, fmt.Errorf("solver: eval at iter %d: %w", i, err)
+		}
+
+		if !finite(ft) {
+			return time.Time{}, 0, fmt.Errorf("solver: eval at iter %d: %w", i, ErrNonFiniteEvaluation)
+		}
+
+		// ── Update bracket and third point ─────────────────────────────
+		if sameSign(ft, fa) {
+			// xt is on the same side as a → a is replaced, old a becomes c
+			xc, fc = xa, fa
+			xa, fa = xt, ft
+		} else {
+			// xt is on the same side as b → b is replaced, old b becomes c
+			xc, fc = xb, fb
+			xb, fb = xt, ft
+		}
+
+		// Maintain invariant: |fb| ≤ |fa| — b is always the best estimate
+		if math.Abs(fa) < math.Abs(fb) {
+			xa, xb = xb, xa
+			fa, fb = fb, fa
+		}
+	}
+
+	// The estimate is returned either way; only the error distinguishes them.
+	if !converged {
+		return timeAt(xb), fb, fmt.Errorf("%w: %d iterations, bracket %v, tolerance %v",
+			ErrNoConvergence, s.MaxIter,
+			unit.Seconds(math.Abs(xb-xa)), s.Tolerance)
+	}
+
+	return timeAt(xb), fb, nil
 }
 
 // CrossesTarget checks whether a cyclic quantity moved through a target angle

@@ -335,7 +335,7 @@ func SatellitePasses(prov eph.Provider, name string, start, end time.Time,
 
 		// Rise crossing: elevation goes above minimum.
 		if v1 <= 0 && v2 > 0 {
-			riseTime, _, err := solver.refineRoot(evalEl, times[i], times[i+1], v1)
+			riseTime, _, err := solver.refineRoot(evalEl, times[i], times[i+1], v1, v2)
 			if err != nil {
 				continue
 			}
@@ -348,7 +348,7 @@ func SatellitePasses(prov eph.Provider, name string, start, end time.Time,
 
 		// Set crossing: elevation drops below minimum.
 		if v1 > 0 && v2 <= 0 && currentPass != nil {
-			setTime, _, err := solver.refineRoot(evalEl, times[i], times[i+1], v1)
+			setTime, _, err := solver.refineRoot(evalEl, times[i], times[i+1], v1, v2)
 			if err != nil {
 				currentPass = nil
 				continue
