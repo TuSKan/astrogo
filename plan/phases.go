@@ -57,25 +57,27 @@ type MoonPhaseEvent struct {
 // moonElongation returns the ecliptic longitude difference (Moon − Sun)
 // normalized to [0, 360). This is the standard definition of lunar elongation
 // used for phase computation.
+//
+// Both longitudes are apparent — light time and aberration applied — as the
+// phases USNO, Horizons, Skyfield and the Astronomical Almanac publish are.
+// Until #430 they were geometric, and the Sun's 20.5″ of annual aberration,
+// at the Moon's 0.5″ a second against it, put every phase about 40 s late
+// and up to 0.71 min from FullMoonOppositions, which was already apparent.
+// Nutation and the precession of the ecliptic move both longitudes alike and
+// cancel in the difference.
+//
+// Both come from firstOrderApparentICRS, the apparent place from one State
+// call, since the elongation is evaluated at every sample and refinement step
+// of every phase and eclipse search.
 func moonElongation(t time.Time, prov eph.Provider) (float64, error) {
-	sunPos, err := eph.Position(prov, eph.Sun, t)
+	sunICRS, err := firstOrderApparentICRS(prov, eph.Sun, t)
 	if err != nil {
 		return 0, fmt.Errorf("phases: sun position: %w", err)
 	}
 
-	moonPos, err := eph.Position(prov, eph.Moon, t)
+	moonICRS, err := firstOrderApparentICRS(prov, eph.Moon, t)
 	if err != nil {
 		return 0, fmt.Errorf("phases: moon position: %w", err)
-	}
-
-	sunICRS, err := eph.ToICRS(sunPos)
-	if err != nil {
-		return 0, fmt.Errorf("phases: sun ICRS: %w", err)
-	}
-
-	moonICRS, err := eph.ToICRS(moonPos)
-	if err != nil {
-		return 0, fmt.Errorf("phases: moon ICRS: %w", err)
 	}
 
 	// Convert to ecliptic coordinates for elongation (TDB for SOFA)
@@ -308,9 +310,12 @@ func Seasons(year int, prov eph.Provider) ([]SeasonEvent, error) {
 			if CrossesIncreasing(prevLon, curLon, target, 360) {
 				eval := seasonEvaluator(target, prov)
 
+				// The samples bracket the crossing, so a refinement that fails
+				// is an ephemeris failure, returned rather than skipped: a
+				// skipped season is a missing equinox with a nil error (#453).
 				refined, _, err := solver.FindRoot(eval, prevT, t)
 				if err != nil {
-					continue
+					return nil, fmt.Errorf("seasons: %v near %v: %w", season, t, err)
 				}
 
 				events = append(events, SeasonEvent{Season: season, Time: refined})

@@ -430,18 +430,19 @@ func (s EventSolver) solveVisibility(spec EventSpec, start, end time.Time) ([]Ev
 		// baked into the threshold, per the USNO convention — so the
 		// geometric one is what Value is measured against, while
 		// Altitude reports what an observer would actually see.
-		// Without display fields the event is skipped, but not the
-		// rest of the step, which may hold a transit too.
-		if geom, refr, ok := altitudesAt(spec, resTime, geomAtm); ok {
-			events = append(events, Event{
-				Kind:              kind,
-				Time:              resTime,
-				Altitude:          refr.Alt(),
-				GeometricAltitude: geom.Alt(),
-				Azimuth:           geom.Az(),
-				Value:             geom.Alt().Degrees() - spec.Threshold.Degrees(),
-			})
+		geom, refr, err := altitudesAt(spec, resTime, geomAtm)
+		if err != nil {
+			return err
 		}
+
+		events = append(events, Event{
+			Kind:              kind,
+			Time:              resTime,
+			Altitude:          refr.Alt(),
+			GeometricAltitude: geom.Alt(),
+			Azimuth:           geom.Az(),
+			Value:             geom.Alt().Degrees() - spec.Threshold.Degrees(),
+		})
 
 		return nil
 	}
@@ -472,9 +473,9 @@ func (s EventSolver) solveVisibility(spec EventSpec, start, end time.Time) ([]Ev
 					return nil, err
 				}
 
-				geom, refr, ok := altitudesAt(spec, resTime, geomAtm)
-				if !ok {
-					continue // Can't populate display fields reliably; skip this event
+				geom, refr, err := altitudesAt(spec, resTime, geomAtm)
+				if err != nil {
+					return nil, err
 				}
 
 				events = append(events, Event{
@@ -659,9 +660,18 @@ func (s EventSolver) solveGeometry(spec EventSpec, start, end time.Time) ([]Even
 					return nil, err
 				}
 
-				// Validate if it is East or West based on RA difference.
-				pos1, _ := spec.Target.Position(resTime)
-				pos2, _ := spec.Other.Position(resTime)
+				// Validate if it is East or West based on RA difference. A
+				// position that fails here used to be read as the zero one,
+				// and the side decided from it (#437).
+				pos1, err := spec.Target.Position(resTime)
+				if err != nil {
+					return nil, fmt.Errorf("events: target position: %w", err)
+				}
+
+				pos2, err := spec.Other.Position(resTime)
+				if err != nil {
+					return nil, fmt.Errorf("events: other position: %w", err)
+				}
 
 				raDiff := pos1.RA().Degrees() - pos2.RA().Degrees()
 				for raDiff > 180 {
@@ -1098,8 +1108,19 @@ func Appulses(start, end time.Time, target, other Observable) ([]Event, error) {
 // given interval: the instants their geocentric ecliptic longitudes differ by
 // 180° (see EventOpposition). With DE440s the oppositions of Mars in 2003 and
 // 2027 and of Saturn in 2026 fall within a minute of JPL Horizons'.
+//
+// It samples once a day. The Sun gains at least 0.95° a day on every planet,
+// and at most 1.42° on Mars, the fastest, so the longitude difference passes
+// 180° once a synodic period and a day holds one crossing at most; the Moon's
+// 12° a day is as safe. An opposition is never mistaken for the wrap at
+// conjunction, which jumps by 358° or more against a day's 1.42°. The 6-hour
+// step this used found the same instants, to 0.3 s, at nearly four times the
+// cost — each sample is an apparent place, light time and aberration, for
+// both bodies (#432). A body whose longitude can turn about within a day, an
+// asteroid passing close to the Earth, is the one case to search with a
+// shorter step of its own.
 func Oppositions(start, end time.Time, target, other Observable) ([]Event, error) {
-	solver := NewEventSolver(unit.Hours(6), unit.Seconds(1))
+	solver := NewEventSolver(unit.Days(1), unit.Seconds(1))
 	spec := EventSpec{
 		Family: EventFamilyRelativeGeometry,
 		Kind:   EventOpposition,
@@ -1294,9 +1315,12 @@ func (s EventSolver) solveIllumination(spec EventSpec, start, end time.Time) ([]
 					continue
 				}
 
+				// The samples bracket the crossing, so a refinement that fails
+				// is an ephemeris failure, returned rather than skipped: a
+				// skipped phase is a missing phase with a nil error (#437).
 				resTime, _, err := s.refineRoot(evalDist, times[i], times[i+1], d1, d2)
 				if err != nil {
-					continue
+					return nil, fmt.Errorf("events: %v near %v: %w", pt.kind, times[i], err)
 				}
 
 				illumination, _, err := MoonIllumination(resTime, prov)
@@ -1385,45 +1409,45 @@ func NextFullMoon(start time.Time, provider eph.Provider) (*Event, error) {
 // outside the solver loop — so the Apco13 solve is paid a few times, not per
 // bisection step.
 //
-// ok is false when the target cannot be evaluated at t, which the callers
-// treat as "skip this event" rather than failing the whole solve.
-func altitudesAt(spec EventSpec, t time.Time, geomAtm atmosphere.Refraction) (geom, refr coord.AltAz, ok bool) {
-	at := func(atm atmosphere.Refraction) (coord.AltAz, bool) {
+// An error evaluating the target is returned, and fails the solve. It used to
+// be an ok of false that the callers took as "skip this event", so an
+// ephemeris failure at a refined instant left a rise, set or transit missing
+// with a nil error, indistinguishable from a quiet sky (#437).
+func altitudesAt(spec EventSpec, t time.Time, geomAtm atmosphere.Refraction) (geom, refr coord.AltAz, err error) {
+	at := func(atm atmosphere.Refraction) (coord.AltAz, error) {
 		ctx := coord.NewContext(t, spec.Observer.Location(), atm)
 
 		if mb, isMoving := spec.Target.(MovingBody); isMoving {
 			vec, err := mb.GeocentricVec(t)
 			if err != nil {
-				return coord.AltAz{}, false
+				return coord.AltAz{}, fmt.Errorf("events: geocentric vec: %w", err)
 			}
 
-			return ctx.GeocentricToObserved(vec), true
+			return ctx.GeocentricToObserved(vec), nil
 		}
 
 		pos, err := spec.Target.Position(t)
 		if err != nil {
-			return coord.AltAz{}, false
+			return coord.AltAz{}, fmt.Errorf("events: target position: %w", err)
 		}
 
 		aa, err := observedAltAz(spec.Target, t, ctx, pos)
 		if err != nil {
-			return coord.AltAz{}, false
+			return coord.AltAz{}, fmt.Errorf("events: ICRS to AltAz: %w", err)
 		}
 
-		return aa, true
+		return aa, nil
 	}
 
-	geom, ok = at(geomAtm)
-	if !ok {
-		return coord.AltAz{}, coord.AltAz{}, false
+	if geom, err = at(geomAtm); err != nil {
+		return coord.AltAz{}, coord.AltAz{}, err
 	}
 
-	refr, ok = at(spec.Observer.Refraction())
-	if !ok {
-		return coord.AltAz{}, coord.AltAz{}, false
+	if refr, err = at(spec.Observer.Refraction()); err != nil {
+		return coord.AltAz{}, coord.AltAz{}, err
 	}
 
-	return geom, refr, true
+	return geom, refr, nil
 }
 
 // wrap180 is an angle in degrees brought into (−180°, 180°].

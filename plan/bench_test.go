@@ -54,6 +54,19 @@ func BenchmarkVisibleIntervals_1MinStep(b *testing.B) {
 
 // ── Event Solver ────────────────────────────────────────────────────────────
 
+// BenchmarkOppositions is a year of Mars against the Sun on the analytical
+// ephemeris: the daily sweep (#432), each sample two apparent places.
+func BenchmarkOppositions(b *testing.B) {
+	prov := eph.Default()
+	mars, sun := NewMars(prov), NewSun(prov)
+	start := time.Date(2026, 6, 1, 0, 0, 0, 0, time.LocationUTC)
+	end := start.Add(unit.Days(365))
+
+	for b.Loop() {
+		_, _ = Oppositions(start, end, mars, sun)
+	}
+}
+
 func BenchmarkEventSolver_Visibility(b *testing.B) {
 	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(45), 0)
 	site, _ := NewSite("Test", loc)

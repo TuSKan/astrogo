@@ -701,14 +701,18 @@ func TestUSNO_MoonPhases(t *testing.T) {
 			// Events within 2 days are the same phase
 			delta := math.Abs(ap.Time.Sub(usnoTime).Minutes())
 			if delta < 2*24*60 {
-				t.Logf("%-14s  USNO=%s  astrogo=%s  Δ=%.0f min",
+				t.Logf("%-14s  USNO=%s  astrogo=%s  Δ=%.2f min",
 					usnoP.Phase,
 					usnoTime.Format("2006-01-02 15:04"),
-					ap.Time.Format("2006-01-02 15:04"),
+					ap.Time.Format("2006-01-02 15:04:05"),
 					delta)
 
-				if delta > 30 {
-					t.Errorf("%s: Δ=%.0f min exceeds 30 min tolerance", usnoP.Phase, delta)
+				// USNO gives the minute, so half a minute is its rounding and
+				// the rest is the model's. This was 30 minutes, against the
+				// minute docs/VALIDATION.md claims; with geometric longitudes
+				// (#430) every phase also ran about 40 s late.
+				if delta > 1 {
+					t.Errorf("%s: Δ=%.2f min exceeds the 1 min tolerance", usnoP.Phase, delta)
 				}
 
 				found = true

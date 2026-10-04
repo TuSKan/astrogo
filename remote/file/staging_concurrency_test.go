@@ -63,7 +63,7 @@ func TestStagingAndPartialWritesAcrossFilesystems(t *testing.T) {
 					return
 				}
 
-				release, err := file.AcquireLock(t.Context(), filesystems[i], key)
+				release, err := file.AcquireLock(t.Context(), filesystems[i], key, 0)
 				if err != nil {
 					errs[i] = err
 
@@ -112,7 +112,7 @@ func TestAcquireLockReportsACanceledContext(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 
-	release, err := file.AcquireLock(ctx, fsys, "canceled.bsp")
+	release, err := file.AcquireLock(ctx, fsys, "canceled.bsp", 0)
 	if release != nil {
 		release()
 	}
