@@ -1098,8 +1098,19 @@ func Appulses(start, end time.Time, target, other Observable) ([]Event, error) {
 // given interval: the instants their geocentric ecliptic longitudes differ by
 // 180° (see EventOpposition). With DE440s the oppositions of Mars in 2003 and
 // 2027 and of Saturn in 2026 fall within a minute of JPL Horizons'.
+//
+// It samples once a day. The Sun gains at least 0.95° a day on every planet,
+// and at most 1.42° on Mars, the fastest, so the longitude difference passes
+// 180° once a synodic period and a day holds one crossing at most; the Moon's
+// 12° a day is as safe. An opposition is never mistaken for the wrap at
+// conjunction, which jumps by 358° or more against a day's 1.42°. The 6-hour
+// step this used found the same instants, to 0.3 s, at nearly four times the
+// cost — each sample is an apparent place, light time and aberration, for
+// both bodies (#432). A body whose longitude can turn about within a day, an
+// asteroid passing close to the Earth, is the one case to search with a
+// shorter step of its own.
 func Oppositions(start, end time.Time, target, other Observable) ([]Event, error) {
-	solver := NewEventSolver(unit.Hours(6), unit.Seconds(1))
+	solver := NewEventSolver(unit.Days(1), unit.Seconds(1))
 	spec := EventSpec{
 		Family: EventFamilyRelativeGeometry,
 		Kind:   EventOpposition,
