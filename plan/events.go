@@ -283,9 +283,11 @@ func (s EventSolver) Find(spec EventSpec, start, end time.Time) ([]Event, error)
 	return events, nil
 }
 
-// refineRoot delegates to the unified Solver.FindRoot.
-func (s EventSolver) refineRoot(eval evaluator, t1, t2 time.Time, _ float64) (time.Time, float64, error) {
-	return s.Solver.FindRoot(Evaluator(eval), t1, t2)
+// refineRoot refines the crossing a sweep found between t1 and t2, from the
+// values f1 and f2 it sampled there — see [Solver.findRootFrom] for why they
+// are not evaluated again.
+func (s EventSolver) refineRoot(eval evaluator, t1, t2 time.Time, f1, f2 float64) (time.Time, float64, error) {
+	return s.Solver.findRootFrom(Evaluator(eval), t1, t2, f1, f2)
 }
 
 // refineExtremum delegates to the unified Solver.FindExtremum.
@@ -418,7 +420,7 @@ func (s EventSolver) solveVisibility(spec EventSpec, start, end time.Time) ([]Ev
 			}
 
 			if spec.Kind == kind || spec.Kind == EventAnyVisibility {
-				resTime, _, err := s.refineRoot(evalVal, t1, t2, h1)
+				resTime, _, err := s.refineRoot(evalVal, t1, t2, h1, h2)
 				if err != nil {
 					return nil, err
 				}
@@ -453,7 +455,7 @@ func (s EventSolver) solveVisibility(spec EventSpec, start, end time.Time) ([]Ev
 		if wantTransit {
 			ha1, ha2 := has[i], has[i+1]
 			if ha1 <= 0 && ha2 > 0 && ha2-ha1 < 180 {
-				resTime, _, err := s.refineRoot(evalHA, t1, t2, ha1)
+				resTime, _, err := s.refineRoot(evalHA, t1, t2, ha1, ha2)
 				if err != nil {
 					return nil, err
 				}
@@ -558,7 +560,7 @@ func (s EventSolver) solveGeometry(spec EventSpec, start, end time.Time) ([]Even
 			if (v1 <= 0 && v2 > 0) || (v1 > 0 && v2 <= 0) {
 				// Handle 180/-180 wrap-around false crossings if they jump significantly > 180
 				if math.Abs(v1-v2) < 180 {
-					resTime, val, err := s.refineRoot(evalVal, t1, t2, v1)
+					resTime, val, err := s.refineRoot(evalVal, t1, t2, v1, v2)
 					if err != nil {
 						return nil, err
 					}
@@ -1216,7 +1218,7 @@ func (s EventSolver) solveIllumination(spec EventSpec, start, end time.Time) ([]
 					continue
 				}
 
-				resTime, _, err := s.refineRoot(evalDist, times[i], times[i+1], d1)
+				resTime, _, err := s.refineRoot(evalDist, times[i], times[i+1], d1, d2)
 				if err != nil {
 					continue
 				}
