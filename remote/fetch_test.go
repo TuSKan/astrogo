@@ -9,7 +9,9 @@ import (
 	"log"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -601,5 +603,46 @@ func TestGetFileWithoutConsentDoesNotWaitForAForeignLock(t *testing.T) {
 
 	if _, _, err := GetFile(ctx, NAIFSPK, "planets/de442.bsp"); !errors.Is(err, ErrDownloadDenied) {
 		t.Fatalf("GetFile with a foreign lock and no consent: %v, want ErrDownloadDenied at once", err)
+	}
+}
+
+// TestGetFileStealsALockOlderThanTwiceItsTimeout: every holder of a cache
+// entry's lock downloads under the same timeout, so a lock older than twice it
+// was left by a crashed process. GetFile used to honor any lock for 30 minutes
+// whatever the download, and the lazy EOP load, with consent, waited that out
+// for a 3.8 MB bulletin with a 30 s timeout, holding its mutex (#445). Here a
+// minute-old lock on an entry fetched with a 10 s timeout is stolen at once.
+func TestGetFileStealsALockOlderThanTwiceItsTimeout(t *testing.T) {
+	t.Cleanup(func() {
+		SetDataDir("")
+		Reset()
+	})
+
+	dir := t.TempDir()
+	SetDataDir(testutil.FileURL(t, dir))
+
+	writeFakeSource(t, NAIFSPK, "planets/de442.bsp", "kernel-bytes")
+	EnableDownloads(0, NAIFSPK)
+
+	cacheFS, prefix, err := CacheDir(context.Background(), NAIFSPK)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	lockKey := prefix + "planets/de442.bsp.lock"
+	if err := WriteFile(context.Background(), cacheFS, lockKey, strings.NewReader("")); err != nil {
+		t.Fatalf("plant lock: %v", err)
+	}
+
+	crashed := time.NowUTC().ToGo().Add(-time.Minute)
+	if err := os.Chtimes(filepath.Join(dir, filepath.FromSlash(lockKey)), crashed, crashed); err != nil {
+		t.Fatalf("backdate lock: %v", err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if _, _, err := GetFile(ctx, NAIFSPK, "planets/de442.bsp", WithDownloadTimeout(10*time.Second)); err != nil {
+		t.Fatalf("GetFile with a crashed holder's lock: %v, want the lock stolen and the file fetched", err)
 	}
 }

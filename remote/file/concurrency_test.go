@@ -72,7 +72,7 @@ func TestConcurrentWritersOfOneKeyAllSucceed(t *testing.T) {
 
 	for i := range concurrency {
 		wg.Go(func() {
-			release, err := file.AcquireLock(t.Context(), fsys, key)
+			release, err := file.AcquireLock(t.Context(), fsys, key, 0)
 			if err != nil {
 				mu.Lock()
 
