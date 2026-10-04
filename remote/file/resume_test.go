@@ -94,7 +94,7 @@ func TestResumePointIsZeroWithoutAUsablePartial(t *testing.T) {
 	t.Run("no partial at all", func(t *testing.T) {
 		t.Parallel()
 
-		if got := file.ResumePoint(t.Context(), newFS(t), key, `"etag"`); got != 0 {
+		if got, _ := file.ResumePoint(t.Context(), newFS(t), key, `"etag"`); got != 0 {
 			t.Errorf("ResumePoint with nothing staged = %d, want 0", got)
 		}
 	})
@@ -105,7 +105,7 @@ func TestResumePointIsZeroWithoutAUsablePartial(t *testing.T) {
 		fsys := newFS(t)
 		seedPartial(t, fsys, file.PartialKey(key), "half", "")
 
-		if got := file.ResumePoint(t.Context(), fsys, key, `"etag"`); got != 0 {
+		if got, _ := file.ResumePoint(t.Context(), fsys, key, `"etag"`); got != 0 {
 			t.Errorf("ResumePoint on a partial with no recorded ETag = %d, want 0 — "+
 				"nothing says which source it came from", got)
 		}
@@ -117,7 +117,7 @@ func TestResumePointIsZeroWithoutAUsablePartial(t *testing.T) {
 		fsys := newFS(t)
 		seedPartial(t, fsys, file.PartialKey(key), "half", `"old"`)
 
-		if got := file.ResumePoint(t.Context(), fsys, key, `"new"`); got != 0 {
+		if got, _ := file.ResumePoint(t.Context(), fsys, key, `"new"`); got != 0 {
 			t.Errorf("ResumePoint across an ETag change = %d, want 0 — resuming here "+
 				"would splice two different downloads together", got)
 		}
@@ -145,7 +145,12 @@ func TestResumePointReportsAMatchingPartialsSize(t *testing.T) {
 	fsys := newFS(t)
 	seedPartial(t, fsys, file.PartialKey(key), body, etag)
 
-	if got, want := file.ResumePoint(t.Context(), fsys, key, etag), int64(len(body)); got != want {
+	got, err := file.ResumePoint(t.Context(), fsys, key, etag)
+	if err != nil {
+		t.Fatalf("ResumePoint: %v", err)
+	}
+
+	if want := int64(len(body)); got != want {
 		t.Errorf("ResumePoint = %d, want %d", got, want)
 	}
 }
@@ -203,7 +208,11 @@ func TestStageAndPromoteResumesFromAnOffset(t *testing.T) {
 	fsys := newFS(t)
 	seedPartial(t, fsys, file.PartialKey(key), staged, etag)
 
-	offset := file.ResumePoint(t.Context(), fsys, key, etag)
+	offset, err := file.ResumePoint(t.Context(), fsys, key, etag)
+	if err != nil {
+		t.Fatalf("ResumePoint: %v", err)
+	}
+
 	if offset != int64(len(staged)) {
 		t.Fatalf("ResumePoint = %d, want %d", offset, len(staged))
 	}
@@ -241,5 +250,39 @@ func TestStageAndPromoteCachesNothingWhenValidationFails(t *testing.T) {
 
 	if present(t, fsys, key) {
 		t.Error("content that failed validation was published to the cache key")
+	}
+}
+
+// TestResumePointKeepsAPartialWhoseETagCannotBeRead: a sidecar that exists
+// but cannot be read is not a missing one. ResumePoint used to read it as no
+// ETag and discard the partial, so a sharing violation on Windows, which a
+// virus scanner holding the fresh sidecar open causes for a few milliseconds,
+// threw away a multi-gigabyte download's progress (#452). Now the error comes
+// back and the partial stays for the next attempt. A directory where the
+// sidecar would be is unreadable as a file on every system, without a race.
+func TestResumePointKeepsAPartialWhoseETagCannotBeRead(t *testing.T) {
+	t.Parallel()
+
+	const key = "jpl/de440s.bsp"
+
+	fsys := newFS(t)
+	seedPartial(t, fsys, file.PartialKey(key), "half a kernel", "")
+
+	sidecar := file.PartialKey(key) + file.SourceETagSuffix
+	if err := file.WriteFile(t.Context(), fsys, sidecar+"/inside", strings.NewReader("")); err != nil {
+		t.Fatalf("make the sidecar a directory: %v", err)
+	}
+
+	offset, err := file.ResumePoint(t.Context(), fsys, key, `"etag"`)
+	if err == nil {
+		t.Errorf("ResumePoint over an unreadable sidecar: offset %d, no error", offset)
+	}
+
+	if !present(t, fsys, file.PartialKey(key)) {
+		t.Error("the partial was discarded over a sidecar that could not be read")
+	}
+
+	if got := file.RecordedETag(t.Context(), fsys, file.PartialKey(key)); got != "" {
+		t.Errorf("RecordedETag over an unreadable sidecar = %q, want \"\" (cannot tell)", got)
 	}
 }

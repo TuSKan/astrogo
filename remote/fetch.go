@@ -326,7 +326,10 @@ func (c *Client) fetchInto(ctx context.Context, id EndpointID, ep Endpoint, srcF
 		return err
 	}
 
-	offset := file.ResumePoint(ctx, cacheFS, cacheKey, sourceETag)
+	offset, err := file.ResumePoint(ctx, cacheFS, cacheKey, sourceETag)
+	if err != nil {
+		return fmt.Errorf("%w: %s: %w", ErrDownloadFailed, name, err)
+	}
 
 	logging.InfoContext(ctx, "downloading", "cache_key", cacheKey, "endpoint", id, "bytes", info.Size())
 
