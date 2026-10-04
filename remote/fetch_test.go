@@ -17,6 +17,7 @@ import (
 
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/remote/file"
+	"github.com/TuSKan/astrogo/time"
 )
 
 var errValidateTest = errors.New("not a valid LSK kernel")
@@ -569,5 +570,36 @@ func TestAFailedFetchWithNothingCachedStillFails(t *testing.T) {
 
 	if _, _, err := GetFile(context.Background(), NAIFSPK, "planets/absent.bsp"); err == nil {
 		t.Fatal("a failed download with nothing in the cache reported success")
+	}
+}
+
+// TestGetFileWithoutConsentDoesNotWaitForAForeignLock: a cache miss that may
+// not download has nothing to wait for, so another process's lock on the
+// entry must not hold it up. Consent used to be checked after the lock, and
+// a lock left by a crashed process held every caller until it went stale half
+// an hour later — the lazy EOP load among them, with its mutex held and every
+// Earth-orientation lookup in the process queued behind it (#424). With the
+// old order this waits out its context and fails with a deadline rather than
+// ErrDownloadDenied.
+func TestGetFileWithoutConsentDoesNotWaitForAForeignLock(t *testing.T) {
+	cleanRemoteState(t)
+
+	writeFakeSource(t, NAIFSPK, "planets/de442.bsp", "kernel-bytes")
+
+	cacheFS, prefix, err := CacheDir(context.Background(), NAIFSPK)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Another process's lock, fresh, so it is not taken for stale.
+	if err := WriteFile(context.Background(), cacheFS, prefix+"planets/de442.bsp.lock", strings.NewReader("")); err != nil {
+		t.Fatalf("plant lock: %v", err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	if _, _, err := GetFile(ctx, NAIFSPK, "planets/de442.bsp"); !errors.Is(err, ErrDownloadDenied) {
+		t.Fatalf("GetFile with a foreign lock and no consent: %v, want ErrDownloadDenied at once", err)
 	}
 }
