@@ -34,7 +34,7 @@ func TestAcquireLockSerializesAndReleases(t *testing.T) {
 
 	const cacheKey = "lockfile-test.bin"
 
-	release1, err := AcquireLock(context.Background(), fsys, cacheKey)
+	release1, err := AcquireLock(context.Background(), fsys, cacheKey, 0)
 	if err != nil {
 		t.Fatalf("first AcquireLock: %v", err)
 	}
@@ -42,7 +42,7 @@ func TestAcquireLockSerializesAndReleases(t *testing.T) {
 	acquired := make(chan struct{})
 
 	go func() {
-		release2, err := AcquireLock(context.Background(), fsys, cacheKey)
+		release2, err := AcquireLock(context.Background(), fsys, cacheKey, 0)
 		if err != nil {
 			t.Errorf("second AcquireLock: %v", err)
 
@@ -86,10 +86,62 @@ func TestAcquireLockStealsAbandonedLock(t *testing.T) {
 		t.Fatalf("backdate lock file: %v", err)
 	}
 
-	release, err := AcquireLock(context.Background(), fsys, cacheKey)
+	release, err := AcquireLock(context.Background(), fsys, cacheKey, 0)
 	if err != nil {
 		t.Fatalf("AcquireLock over a stale lock: %v", err)
 	}
 
 	release()
+}
+
+// TestAcquireLockHonorsTheCallersStaleAge: a caller that knows how long a live
+// holder can take says so, and a lock older than that is stolen, where it used
+// to be honored for 30 minutes whatever the download (#445). Zero keeps the 30
+// minutes, and so does anything longer: the caller may shorten the wait for a
+// crashed holder, not lengthen it.
+func TestAcquireLockHonorsTheCallersStaleAge(t *testing.T) {
+	for _, c := range []struct {
+		name       string
+		age        time.Duration
+		staleAfter time.Duration
+		stolen     bool
+	}{
+		{"a 2-minute-old lock, stale after a minute", 2 * time.Minute, time.Minute, true},
+		{"a 2-minute-old lock, the default", 2 * time.Minute, 0, false},
+		{"a 31-minute-old lock, stale after 2 hours", 31 * time.Minute, 2 * time.Hour, true},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			fsys, dir := openLocalFS(t)
+
+			const cacheKey = "kernel.bin"
+
+			if err := WriteFile(t.Context(), fsys, cacheKey+".lock", strings.NewReader("locked")); err != nil {
+				t.Fatalf("seed lock file: %v", err)
+			}
+
+			at := time.Now().Add(-c.age)
+			if err := os.Chtimes(filepath.Join(dir, cacheKey+".lock"), at, at); err != nil {
+				t.Fatalf("backdate lock file: %v", err)
+			}
+
+			ctx, cancel := context.WithTimeout(t.Context(), 2*time.Second)
+			defer cancel()
+
+			release, err := AcquireLock(ctx, fsys, cacheKey, c.staleAfter)
+			if c.stolen {
+				if err != nil {
+					t.Fatalf("AcquireLock: %v, want the lock stolen", err)
+				}
+
+				release()
+
+				return
+			}
+
+			if err == nil {
+				release()
+				t.Fatal("AcquireLock stole a lock younger than its stale age")
+			}
+		})
+	}
 }

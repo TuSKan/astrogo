@@ -43,10 +43,10 @@ var _ MovingBody = errMovingBody{}
 // TestAltitudesAtReportsFailureRatherThanAGuess covers the path an event takes
 // when a target cannot be evaluated at the refined time.
 //
-// altitudesAt returns ok=false and both callers skip the event. That matters
-// more than it looks: the alternative to skipping is appending an Event whose
-// altitude fields are the zero value, which would read as a target sitting
-// exactly on the horizon rather than as missing data.
+// altitudesAt returns the error, and its callers return it in turn. That
+// matters more than it looks: appending an Event whose altitude fields are the
+// zero value would read as a target sitting exactly on the horizon, and
+// skipping the event, as the callers did until #437, as a quiet sky.
 //
 // Both target shapes are covered because they reach the failure by different
 // routes — a MovingBody through GeocentricVec, everything else through
@@ -79,14 +79,14 @@ func TestAltitudesAtReportsFailureRatherThanAGuess(t *testing.T) {
 
 			spec := EventSpec{Target: tc.target, Observer: site}
 
-			geom, refr, ok := altitudesAt(spec, when, geomAtm)
-			if ok {
-				t.Fatalf("ok was true for a target that cannot be evaluated; "+
+			geom, refr, err := altitudesAt(spec, when, geomAtm)
+			if err == nil {
+				t.Fatalf("no error for a target that cannot be evaluated; "+
 					"got geom %v and refr %v", geom.Alt(), refr.Alt())
 			}
 
 			// Both altitudes must be the zero value, so a caller that ignores
-			// ok cannot mistake a stale reading for a fresh one.
+			// the error cannot mistake a stale reading for a fresh one.
 			if geom != (coord.AltAz{}) || refr != (coord.AltAz{}) {
 				t.Errorf("failure returned non-zero altitudes geom=%v refr=%v", geom, refr)
 			}
@@ -119,9 +119,9 @@ func TestAltitudesAtSeparatesTheTwoAtmospheres(t *testing.T) {
 
 	spec := EventSpec{Target: star, Observer: site}
 
-	geom, refr, ok := altitudesAt(spec, when, atmosphere.Refraction{Pressure: 0})
-	if !ok {
-		t.Fatal("altitudesAt failed on an ordinary star")
+	geom, refr, err := altitudesAt(spec, when, atmosphere.Refraction{Pressure: 0})
+	if err != nil {
+		t.Fatalf("altitudesAt failed on an ordinary star: %v", err)
 	}
 
 	if refr.Alt() <= geom.Alt() {

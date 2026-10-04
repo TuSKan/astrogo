@@ -33,8 +33,8 @@ import (
 const SourceETagSuffix = ".etag"
 
 // staleLockAge bounds how long a lock is honored before a new acquirer
-// treats it as abandoned by a crashed holder. Generous relative to any
-// single download in this registry.
+// treats it as abandoned by a crashed holder: the most a caller of
+// [AcquireLock] may ask for, and what it gets when it does not say.
 const staleLockAge = 30 * time.Minute
 
 // AcquireLock's polling interval starts low so a short download is noticed
@@ -109,6 +109,12 @@ func (k *keyedSemaphore) acquire(ctx context.Context, key string) (release func(
 // or ctx is done. Call the returned release exactly once — defer it
 // immediately, including on the caller's own error paths.
 //
+// A lock older than staleAfter is taken to be a crashed holder's and stolen.
+// Zero, or anything past 30 minutes, means 30 minutes. A caller who knows how
+// long a live holder can take — remote.GetFile, from the download timeout every
+// holder of that entry runs under — passes that, so a small file's lock left
+// by a crash is not waited out for half an hour (#445).
+//
 // Exclusion is in two layers. Within this process it is [inProcess], which
 // makes waiting cancellable. Across processes it is [CreateExclFS], which
 // astrogo's local backend implements with O_CREATE|O_EXCL inside an [os.Root].
@@ -133,9 +139,14 @@ func (k *keyedSemaphore) acquire(ctx context.Context, key string) (release func(
 // The layering still matters for a reason beyond belt-and-braces: `go test
 // ./...` runs each package as its own process and several of them want the same
 // JPL kernel, so the cross-process case is the common one.
-func AcquireLock(ctx context.Context, fsys fs.FS, cacheKey string) (release func(), err error) {
+func AcquireLock(ctx context.Context, fsys fs.FS, cacheKey string, staleAfter time.Duration) (release func(), err error) {
 	lockKey := cacheKey + ".lock"
 	delay := lockRetryDelayInitial
+
+	stale := staleLockAge
+	if staleAfter > 0 && staleAfter < stale {
+		stale = staleAfter
+	}
 
 	bound := WithContext(ctx, fsys)
 
@@ -206,7 +217,7 @@ func AcquireLock(ctx context.Context, fsys fs.FS, cacheKey string) (release func
 		}
 
 		if info, serr := fs.Stat(bound, lockKey); serr == nil &&
-			time.Since(info.ModTime()) > staleLockAge {
+			time.Since(info.ModTime()) > stale {
 			// Abandoned by a crashed holder; steal it next loop.
 			_ = Remove(ctx, fsys, lockKey)
 		}

@@ -51,7 +51,7 @@ func TestAcquireLockAdmitsOneHolderAtATime(t *testing.T) {
 
 		for range contenders {
 			wg.Go(func() {
-				release, err := AcquireLock(ctx, fsys, cacheKey)
+				release, err := AcquireLock(ctx, fsys, cacheKey, 0)
 				if err != nil {
 					t.Errorf("AcquireLock: %v", err)
 
@@ -121,7 +121,7 @@ func TestAcquireLockReleasesTheInProcessSlotOnFailure(t *testing.T) {
 	blocked, cancel := context.WithTimeout(context.Background(), 150*time.Millisecond)
 	defer cancel()
 
-	if _, err := AcquireLock(blocked, fsys, cacheKey); err == nil {
+	if _, err := AcquireLock(blocked, fsys, cacheKey, 0); err == nil {
 		t.Fatal("AcquireLock succeeded while another holder's lock object was present")
 	}
 
@@ -136,7 +136,7 @@ func TestAcquireLockReleasesTheInProcessSlotOnFailure(t *testing.T) {
 	go func() {
 		defer close(done)
 
-		r, err := AcquireLock(context.Background(), fsys, cacheKey)
+		r, err := AcquireLock(context.Background(), fsys, cacheKey, 0)
 		if err != nil {
 			t.Errorf("third AcquireLock: %v", err)
 
@@ -162,7 +162,7 @@ func TestAcquireLockReleasesTheInProcessSlotOnFailure(t *testing.T) {
 func TestAcquireLockDoesNotSerialiseDifferentKeys(t *testing.T) {
 	fsys, _ := openLocalFS(t)
 
-	first, err := AcquireLock(context.Background(), fsys, "kernel-a.bin")
+	first, err := AcquireLock(context.Background(), fsys, "kernel-a.bin", 0)
 	if err != nil {
 		t.Fatalf("AcquireLock a: %v", err)
 	}
@@ -172,7 +172,7 @@ func TestAcquireLockDoesNotSerialiseDifferentKeys(t *testing.T) {
 	done := make(chan error, 1)
 
 	go func() {
-		release, err := AcquireLock(context.Background(), fsys, "kernel-b.bin")
+		release, err := AcquireLock(context.Background(), fsys, "kernel-b.bin", 0)
 		if err == nil {
 			release()
 		}
