@@ -77,8 +77,8 @@ func ReadASCIITable(h *Header, r io.Reader) (*ASCIITableHDU, error) {
 		return nil, err
 	}
 
-	payload := make([]byte, size)
-	if _, err := io.ReadFull(r, payload); err != nil {
+	payload, err := readDeclared(r, size)
+	if err != nil {
 		return nil, fmt.Errorf("fits: failed reading asciitable payload: %w", err)
 	}
 

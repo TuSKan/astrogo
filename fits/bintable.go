@@ -334,8 +334,8 @@ func ReadBintable(h *Header, r io.Reader) (*BintableHDU, error) {
 			ErrBadTForm, offset, rowSize)
 	}
 
-	payload := make([]byte, tableBytes)
-	if _, err := io.ReadFull(r, payload); err != nil {
+	payload, err := readDeclared(r, tableBytes)
+	if err != nil {
 		return nil, fmt.Errorf("failed reading bintable payload: %w", err)
 	}
 
