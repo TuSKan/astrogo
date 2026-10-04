@@ -307,6 +307,14 @@ func Ae2hd(az, el, phi float64) (ha, dec float64) {
 	return ha, dec
 }
 
+// Dtdb returns TDB−TT in seconds: Fairhead & Bretagnon (1990) in full, plus
+// the topocentric term for a site at ut (UT1 day fraction), east longitude
+// elong (radians), distance u from the Earth's spin axis and v north of the
+// equatorial plane (km). Zero u and v give the geocentric value.
+func Dtdb(date1, date2, ut, elong, u, v float64) float64 {
+	return gofa.Dtdb(date1, date2, ut, elong, u, v)
+}
+
 // Nut06a returns the IAU 2006/2000A nutation components:
 //   - dpsi: nutation in longitude (radians)
 //   - deps: nutation in obliquity (radians)

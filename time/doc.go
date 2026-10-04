@@ -31,7 +31,7 @@
 //   - TAI ↔ GPST: Complete (GPST = TAI − 19 s, exact by definition)
 //   - TAI ↔ BDT:  Complete (BDT = TAI − 33 s, exact by definition)
 //   - TAI ↔ TT:  Complete (TT = TAI + 32.184s, exact by definition)
-//   - TT  ↔ TDB: Complete (Fairhead & Bretagnon 1990 single-term, amplitude 1.657 ms)
+//   - TT  ↔ TDB: Complete (Fairhead & Bretagnon 1990, leading 37 terms, within 1 µs of SOFA iauDtdb over 1600–2400)
 //   - UTC ↔ UT1: Complete when IERS EOP data is loaded; returns error when unavailable.
 //
 // [UT1] is the only conversion that can fail because it depends on observed

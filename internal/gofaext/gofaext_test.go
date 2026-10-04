@@ -14,6 +14,12 @@ func TestAe2hd(t *testing.T) {
 	testutil.AssertNear(t, "dec", dec, 0.9613934761647817620, 1e-14)
 }
 
+// TestDtdb is SOFA's own test vector (t_sofa_c.c, t_dtdb).
+func TestDtdb(t *testing.T) {
+	got := gofaext.Dtdb(2448939.5, 0.123, 0.76543, 5.0123, 5525.242, 3190.0)
+	testutil.AssertNear(t, "Dtdb", got, -0.1280368005936998991e-2, 1e-15)
+}
+
 func TestGofaExtWrappers(t *testing.T) {
 	// Dtf2d
 	d1, d2, st := gofaext.Dtf2d("UTC", 2000, 1, 1, 12, 0, 0.0)
