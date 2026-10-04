@@ -231,22 +231,43 @@ func PartialKey(cacheKey string) string { return cacheKey + ".part" }
 // ETag. It returns 0 — discarding any unusable leftover on the way — when
 // there is no partial, the partial is empty, it recorded no ETag, or the
 // source has changed since it was written.
-func ResumePoint(ctx context.Context, fsys fs.FS, cacheKey, sourceETag string) int64 {
+//
+// A partial whose ETag sidecar exists but cannot be read is neither resumed
+// nor discarded: the error is returned, and the caller must not start over,
+// since a fresh download is written over the partial. Until #452 an unreadable
+// sidecar read as no ETag, so a transient sharing violation on Windows threw
+// away whatever a multi-gigabyte download had fetched so far.
+func ResumePoint(ctx context.Context, fsys fs.FS, cacheKey, sourceETag string) (int64, error) {
 	bound := WithContext(ctx, fsys)
 	pKey := PartialKey(cacheKey)
 
 	info, err := fs.Stat(bound, pKey)
-	if err != nil || info.Size() <= 0 {
-		return 0
+	if errors.Is(err, fs.ErrNotExist) {
+		return 0, nil
 	}
 
-	if recorded := readETag(bound, pKey); recorded == "" || recorded != sourceETag {
+	// A partial that is there but cannot be looked at is left alone, like one
+	// whose sidecar cannot be read.
+	if err != nil {
+		return 0, fmt.Errorf("remote: stat partial %s: %w", pKey, err)
+	}
+
+	if info.Size() <= 0 {
+		return 0, nil
+	}
+
+	recorded, err := readETag(bound, pKey)
+	if err != nil {
+		return 0, err
+	}
+
+	if recorded == "" || recorded != sourceETag {
 		discardStaging(ctx, fsys, pKey, pKey)
 
-		return 0
+		return 0, nil
 	}
 
-	return info.Size()
+	return info.Size(), nil
 }
 
 // RecordedETag returns the source ETag recorded beside key when it was
@@ -254,8 +275,14 @@ func ResumePoint(ctx context.Context, fsys fs.FS, cacheKey, sourceETag string) i
 //
 // remote's cache-freshness check needs it, which is why this is exported where
 // the rest of the sidecar handling is not.
+//
+// A sidecar that cannot be read also gives "", which is "cannot tell" to the
+// freshness check: it re-downloads rather than trusting a cache it cannot
+// verify.
 func RecordedETag(ctx context.Context, fsys fs.FS, key string) string {
-	return readETag(WithContext(ctx, fsys), key)
+	tag, _ := readETag(WithContext(ctx, fsys), key)
+
+	return tag
 }
 
 // ETag returns a validator for an object: a token that changes when the object
@@ -297,14 +324,38 @@ func ETag(info fs.FileInfo) string {
 }
 
 // readETag returns the ETag recorded beside a staged object, or "".
-func readETag(fsys fs.FS, key string) string {
-	b, err := fs.ReadFile(fsys, key+SourceETagSuffix)
-	if err != nil {
-		return ""
+func readETag(fsys fs.FS, key string) (string, error) {
+	var err error
+
+	// A sidecar written a moment ago can be held open by a virus scanner or
+	// an indexer on Windows, which fails the open with a sharing violation for
+	// a few milliseconds. Missing is final; anything else is tried again.
+	for attempt := range etagReadAttempts {
+		if attempt > 0 {
+			time.Sleep(etagReadRetryDelay)
+		}
+
+		var b []byte
+
+		b, err = fs.ReadFile(fsys, key+SourceETagSuffix)
+		if err == nil {
+			return strings.TrimSpace(string(b)), nil
+		}
+
+		if errors.Is(err, fs.ErrNotExist) {
+			return "", nil
+		}
 	}
 
-	return strings.TrimSpace(string(b))
+	return "", fmt.Errorf("remote: read ETag of %s: %w", key, err)
 }
+
+// etagReadAttempts and etagReadRetryDelay bound how long readETag waits out a
+// sidecar it cannot open: three tries over 50 ms.
+const (
+	etagReadAttempts   = 3
+	etagReadRetryDelay = 25 * time.Millisecond
+)
 
 // WriteETag records sourceETag beside key, where [RecordedETag] reads it back.
 // An empty ETag writes nothing, which reads back as "cannot tell".
