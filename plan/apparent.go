@@ -3,6 +3,7 @@ package plan
 import (
 	"fmt"
 
+	"github.com/TuSKan/astrogo/constants"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/time"
@@ -68,6 +69,41 @@ func apparentICRS(p eph.Provider, id eph.ID, t time.Time) (coord.ICRS, error) {
 	}
 
 	icrs, err := eph.ToICRS(vec)
+	if err != nil {
+		return coord.ICRS{}, fmt.Errorf("plan: apparent direction: %w", err)
+	}
+
+	return icrs, nil
+}
+
+// lightAUPerDay is the speed of light in AU per day, the unit of a State's
+// velocity.
+var lightAUPerDay = constants.SI2019.SpeedOfLight.Value *
+	constants.Derived.JulianDaySeconds.Value / constants.IAU.AstronomicalUnit.Value
+
+// firstOrderApparentICRS is apparentICRS from a single State call, for a
+// caller that evaluates many instants: the geocentric position less the
+// geocentric velocity times the light time, which is the retarded geocentric
+// vector ApparentState iterates towards, taken to first order. The second
+// order is the body's geocentric acceleration over the light time — for the
+// Sun, the Earth's 6 mm/s² over 8.3 minutes, 750 m — and the two agree to
+// 0.04 mas for the Sun and 0.01 mas for the Moon
+// (TestFirstOrderApparentPlaceAgrees).
+//
+// It exists for speed. ApparentState converges in four State calls, and for
+// the Sun on the analytical ephemeris each is an Epv00, 34 µs: the lunar
+// elongation built on it cost 2.8 times the geometric one, and a year of
+// MoonPhases 3.3 times, which put plan's race-detector run past CI's ten
+// minutes (#430).
+func firstOrderApparentICRS(p eph.Provider, id eph.ID, t time.Time) (coord.ICRS, error) {
+	st, err := p.State(id, t)
+	if err != nil {
+		return coord.ICRS{}, fmt.Errorf("plan: state: %w", err)
+	}
+
+	tau := st.Pos.Norm() / lightAUPerDay
+
+	icrs, err := eph.ToICRS(st.Pos.Sub(st.Vel.MulScalar(tau)))
 	if err != nil {
 		return coord.ICRS{}, fmt.Errorf("plan: apparent direction: %w", err)
 	}

@@ -65,13 +65,17 @@ type MoonPhaseEvent struct {
 // and up to 0.71 min from FullMoonOppositions, which was already apparent.
 // Nutation and the precession of the ecliptic move both longitudes alike and
 // cancel in the difference.
+//
+// Both come from firstOrderApparentICRS, the apparent place from one State
+// call, since the elongation is evaluated at every sample and refinement step
+// of every phase and eclipse search.
 func moonElongation(t time.Time, prov eph.Provider) (float64, error) {
-	sunICRS, err := apparentICRS(prov, eph.Sun, t)
+	sunICRS, err := firstOrderApparentICRS(prov, eph.Sun, t)
 	if err != nil {
 		return 0, fmt.Errorf("phases: sun position: %w", err)
 	}
 
-	moonICRS, err := apparentICRS(prov, eph.Moon, t)
+	moonICRS, err := firstOrderApparentICRS(prov, eph.Moon, t)
 	if err != nil {
 		return 0, fmt.Errorf("phases: moon position: %w", err)
 	}
