@@ -284,15 +284,18 @@ func SatellitePasses(prov eph.Provider, name string, start, end time.Time,
 	}
 
 	// passEvent builds a PassEvent from a LookAngle call.
-	passEvent := func(t time.Time) PassEvent {
-		altaz, _ := lookAt(t)
+	passEvent := func(t time.Time) (PassEvent, error) {
+		altaz, err := lookAt(t)
+		if err != nil {
+			return PassEvent{}, err
+		}
 
 		return PassEvent{
 			Time:      t,
 			Azimuth:   altaz.Az(),
 			Elevation: altaz.Alt(),
 			Range:     altaz.Dist(),
-		}
+		}, nil
 	}
 
 	// Sample elevation over the window.
@@ -330,6 +333,10 @@ func SatellitePasses(prov eph.Provider, name string, start, end time.Time,
 		currentPass *SatellitePass
 	)
 
+	// The samples bracket each crossing, so every failure from here on is the
+	// propagation failing, and is returned: a pass dropped, or reported
+	// without its culmination, is indistinguishable from a sky without one
+	// (#454).
 	for i := range len(times) - 1 {
 		v1, v2 := vals[i], vals[i+1]
 
@@ -337,30 +344,33 @@ func SatellitePasses(prov eph.Provider, name string, start, end time.Time,
 		if v1 <= 0 && v2 > 0 {
 			riseTime, _, err := solver.refineRoot(evalEl, times[i], times[i+1], v1, v2)
 			if err != nil {
-				continue
+				return nil, fmt.Errorf("satellite passes: rise near %v: %w", times[i], err)
 			}
 
-			currentPass = &SatellitePass{
-				Name: name,
-				Rise: passEvent(riseTime),
+			rise, err := passEvent(riseTime)
+			if err != nil {
+				return nil, fmt.Errorf("satellite passes: rise: %w", err)
 			}
+
+			currentPass = &SatellitePass{Name: name, Rise: rise}
 		}
 
 		// Set crossing: elevation drops below minimum.
 		if v1 > 0 && v2 <= 0 && currentPass != nil {
 			setTime, _, err := solver.refineRoot(evalEl, times[i], times[i+1], v1, v2)
 			if err != nil {
-				currentPass = nil
-				continue
+				return nil, fmt.Errorf("satellite passes: set near %v: %w", times[i], err)
 			}
 
-			currentPass.Set = passEvent(setTime)
+			if currentPass.Set, err = passEvent(setTime); err != nil {
+				return nil, fmt.Errorf("satellite passes: set: %w", err)
+			}
+
 			currentPass.Duration, _ = time.ToGoDuration(setTime.Sub(currentPass.Rise.Time))
 
 			// Find culmination (max elevation) between rise and set.
-			culm, err := findCulmination(prov, observer, currentPass.Rise.Time, setTime)
-			if err == nil {
-				currentPass.Culmination = culm
+			if currentPass.Culmination, err = findCulmination(prov, observer, currentPass.Rise.Time, setTime); err != nil {
+				return nil, fmt.Errorf("satellite passes: culmination: %w", err)
 			}
 
 			passes = append(passes, *currentPass)
@@ -385,7 +395,7 @@ func findCulmination(prov eph.Provider, observer *coord.Geodetic,
 
 		altaz, err := LookAngle(prov, 0, ctx)
 		if err != nil {
-			continue
+			return PassEvent{}, err
 		}
 
 		if altaz.Alt().Degrees() > bestEl {
@@ -410,7 +420,7 @@ func findCulmination(prov eph.Provider, observer *coord.Geodetic,
 
 		altaz, err := LookAngle(prov, 0, ctx)
 		if err != nil {
-			continue
+			return PassEvent{}, err
 		}
 
 		if altaz.Alt().Degrees() > bestEl {
