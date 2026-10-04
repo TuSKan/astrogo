@@ -12,7 +12,7 @@ for 2024–2033 using JPL DE442 ephemerides and sub-second Chandrupatla root ref
 Every number is derived from the gravitational physics encoded in NASA's planetary
 ephemerides — no lookup tables, no analytical approximations, no curve fits.
 
-> **Observer:** São Paulo, Brazil (23°33'02"S, 46°37'60"W, 760m).
+> **Observer:** Quinta Calixto, Brazil (22°31'43"S, 46°28'23"W, 835 m).
 > All times are **BRT** (UTC−3). Equinoxes, solstices, apsides, and eclipses are
 > geocentric events — they occur at the same instant worldwide, displayed here in local time.
 
@@ -42,19 +42,21 @@ for _, e := range events {
 
 | Year | Vernal Equinox | Summer Solstice | Autumnal Equinox | Winter Solstice |
 |------|----------------|-----------------|------------------|-----------------|
-| 2024 | Mar 20 00:04:37 | Jun 20 17:49:39 | Sep 22 09:42:45 | Dec 21 06:20:17 |
-| 2025 | Mar 20 06:01:44 | Jun 20 23:43:14 | Sep 22 15:20:47 | Dec 21 12:04:57 |
-| 2026 | Mar 20 11:48:26 | Jun 21 05:27:55 | Sep 22 21:08:55 | Dec 21 17:53:57 |
-| 2027 | Mar 20 17:29:19 | Jun 21 11:16:12 | Sep 23 03:07:05 | Dec 21 23:47:30 |
-| 2028 | Mar 19 23:23:15 | Jun 20 17:08:34 | Sep 22 08:51:48 | Dec 21 05:26:06 |
-| 2029 | Mar 20 05:08:43 | Jun 20 22:55:32 | Sep 22 14:45:31 | Dec 21 11:20:45 |
-| 2030 | Mar 20 10:58:56 | Jun 21 04:38:35 | Sep 22 20:33:37 | Dec 21 17:15:37 |
-| 2031 | Mar 20 16:47:15 | Jun 21 10:23:26 | Sep 23 02:20:50 | Dec 21 23:00:24 |
-| 2032 | Mar 19 22:26:43 | Jun 20 16:13:16 | Sep 22 08:14:38 | Dec 21 04:59:04 |
-| 2033 | Mar 20 04:25:24 | Jun 20 22:03:30 | Sep 22 13:53:16 | Dec 21 10:46:49 |
+| 2024 | Mar 20 00:06:24 | Jun 20 17:50:59 | Sep 22 09:43:39 | Dec 21 06:20:34 |
+| 2025 | Mar 20 06:01:28 | Jun 20 23:42:15 | Sep 22 15:19:20 | Dec 21 12:03:05 |
+| 2026 | Mar 20 11:45:57 | Jun 21 05:24:30 | Sep 22 21:05:13 | Dec 21 17:50:14 |
+| 2027 | Mar 20 17:24:41 | Jun 21 11:10:50 | Sep 23 03:01:43 | Dec 21 23:42:09 |
+| 2028 | Mar 19 23:17:08 | Jun 20 17:02:00 | Sep 22 08:45:18 | Dec 21 05:19:39 |
+| 2029 | Mar 20 05:01:58 | Jun 20 22:48:17 | Sep 22 14:38:30 | Dec 21 11:14:06 |
+| 2030 | Mar 20 10:52:05 | Jun 21 04:31:18 | Sep 22 20:26:53 | Dec 21 17:09:37 |
+| 2031 | Mar 20 16:40:58 | Jun 21 10:17:08 | Sep 23 02:15:18 | Dec 21 22:55:33 |
+| 2032 | Mar 19 22:21:53 | Jun 20 16:08:46 | Sep 22 08:10:53 | Dec 21 04:55:56 |
+| 2033 | Mar 20 04:22:43 | Jun 20 22:01:08 | Sep 22 13:51:40 | Dec 21 10:46:00 |
 
-These times match the U.S. Naval Observatory's published values to within **1 minute**
-(validated by 41 integration tests in `plan/usno_test.go`).
+These times match the U.S. Naval Observatory's published values to within **1 minute**,
+which is USNO's own rounding (`TestUSNO_Seasons` in `plan/usno_test.go`, 20 events across
+2020–2035), and Skyfield's to under a second. Until #414 nutation in longitude was left
+out, and this table ran up to 7 minutes late: its 2027 vernal equinox read 17:29:19.
 
 ---
 
@@ -101,7 +103,7 @@ for seasonal temperatures, but it measurably affects season durations.
 
 2026 features four eclipses — two lunar and two solar:
 
-| Type | Date (BRT) | |β| | γ | Visible from São Paulo? |
+| Type | Date (BRT) | |β| | γ | Visible from Quinta Calixto? |
 |------|-----------|------|-------|--------------------------|
 | 🌕 Solar (Annular) | Feb 17 09:11 | 0.919° | 0.626 | ❌ No — path crosses Antarctica/S. Atlantic |
 | 🌑 Lunar (Total) | Mar 03 08:33 | 0.358° | 0.240 | ✅ Yes — visible at moonset (partial) |
@@ -124,20 +126,20 @@ partial, umbral magnitude 0.93 in NASA's canon.
 The v0.1.3 release added topocentric corrections for all moving bodies. The Moon
 benefits most — its diurnal parallax is ~1° (the Moon is only ~60 Earth radii away).
 
-**Observer:** São Paulo, Brazil (23°33'02"S, 46°37'60"W, 760m elevation)
+**Observer:** Quinta Calixto, Brazil (22°31'43"S, 46°28'23"W, 835 m elevation)
 
-At the moment of the 2026 Vernal Equinox (Mar 20 11:48:26 BRT):
+At the moment of the 2026 Vernal Equinox (Mar 20 11:45:57 BRT):
 
 | Property | Value |
 |----------|-------|
-| RA | 01h 10m 41.2s |
-| Dec | +11° 39' 49" |
-| Altitude | +47° 21' 51" |
+| RA | 01h 10m 38.1s |
+| Dec | +11° 38' 14" |
+| Altitude | +47° 56' 54" |
 | Distance | 0.0024 AU |
 | Elongation | 21.4° |
 | Illumination | 3.3% |
-| Moonrise | 07:30:47 BRT |
-| Moonset | 19:19:12 BRT |
+| Moonrise | 07:36 BRT |
+| Moonset | 19:12 BRT |
 
 The RA/Dec are **topocentric** — corrected for the observer's position on Earth's
 surface. This is critical for the Moon: the geocentric and topocentric positions
@@ -147,8 +149,10 @@ can differ by up to 1° in declination.
 
 ## Implementation Notes
 
-- **Ecliptic longitude:** computed via SOFA's IAU 2006 precession + IAU 2000A nutation
-  (`Eqec06`), with the 20.496" aberration constant subtracted for the Sun's apparent position
+- **Ecliptic longitude:** the Sun's apparent place from the ephemeris (light time and
+  aberration), referred to the mean ecliptic and equinox of date by SOFA's `Eqec06` (IAU 2006
+  precession), plus the IAU 2000A nutation in longitude from `Nut06a` for the true equinox —
+  which `Eqec06` does not apply (#414)
 - **Root finding:** Chandrupatla's method with guaranteed convergence and sub-second precision
 - **Eclipse detection:** at each syzygy, greatest eclipse against that month's shadow,
   sized as NASA's Five Millennium Canons size it (Danjon's rule for Earth's shadow, the

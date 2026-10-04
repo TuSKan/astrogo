@@ -53,11 +53,11 @@ func TestMeteorShowersTableIntegrity(t *testing.T) {
 	}
 }
 
-// findSolarLongitudeInstant scans year for the instant the Sun's real
-// ecliptic longitude of date crosses target, refining via the same
-// solver Seasons uses (seasonEvaluator + DefaultSolver.FindRoot) — used
-// below to test RadiantAt/IsActive against a real, precisely-found
-// instant rather than a hardcoded calendar date.
+// findSolarLongitudeInstant scans year for the instant the Sun's longitude,
+// referred to the equinox J2000.0 as the shower table's are, crosses target,
+// refining with DefaultSolver.FindRoot — used below to test
+// RadiantAt/IsActive against a real, precisely-found instant rather than a
+// hardcoded calendar date.
 func findSolarLongitudeInstant(t *testing.T, target float64, prov eph.Provider, year int) time.Time {
 	t.Helper()
 
@@ -66,19 +66,23 @@ func findSolarLongitudeInstant(t *testing.T, target float64, prov eph.Provider, 
 
 	step := unit.Hours(24)
 
-	eval := seasonEvaluator(target, prov)
+	eval := func(tm time.Time) (float64, error) {
+		lon, err := sunLongitudeJ2000(tm, prov)
 
-	prevLon, err := sunEclipticLongitude(start, prov)
+		return math.Remainder(lon-target, 360), err
+	}
+
+	prevLon, err := sunLongitudeJ2000(start, prov)
 	if err != nil {
-		t.Fatalf("sunEclipticLongitude: %v", err)
+		t.Fatalf("sunLongitudeJ2000: %v", err)
 	}
 
 	prevT := start
 
 	for tm := start.Add(step); !tm.After(end); tm = tm.Add(step) {
-		curLon, err := sunEclipticLongitude(tm, prov)
+		curLon, err := sunLongitudeJ2000(tm, prov)
 		if err != nil {
-			t.Fatalf("sunEclipticLongitude: %v", err)
+			t.Fatalf("sunLongitudeJ2000: %v", err)
 		}
 
 		if CrossesIncreasing(prevLon, curLon, target, 360) {

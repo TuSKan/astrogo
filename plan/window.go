@@ -7,12 +7,20 @@ import (
 )
 
 // Window represents a contiguous time interval.
+//
+// A window whose End is before its Start holds no instant, and every function
+// here treats it as empty: it overlaps nothing, Union drops it, and so
+// Intersect, Subtract and TotalDuration, which all normalize through Union,
+// act as if it were not there. Until #421 it was subtracted from as if whole,
+// counted as negative time, and returned by Union beside a window it
+// overlapped. Only Duration still reports it, as a negative length.
 type Window struct {
 	Start time.Time
 	End   time.Time
 }
 
-// Duration returns the length of the window as a standard time.Duration.
+// Duration returns the length of the window as a standard time.Duration:
+// End − Start, negative for an inverted window.
 //
 // An observing window is hours, and a caller prints it or compares it against
 // an exposure time, so it stays the type the standard library formats. The
@@ -28,9 +36,10 @@ func (w Window) Duration() time.Duration {
 // with zero shared duration. This inclusive convention is what lets Union's
 // merge step reuse Overlaps directly: two windows that merely touch
 // coalesce into one contiguous window instead of being reported as
-// separated by an infinitesimal, physically meaningless gap.
+// separated by an infinitesimal, physically meaningless gap. An inverted
+// window overlaps nothing.
 func (w Window) Overlaps(o Window) bool {
-	return !w.End.Before(o.Start) && !o.End.Before(w.Start)
+	return !w.inverted() && !o.inverted() && !w.End.Before(o.Start) && !o.End.Before(w.Start)
 }
 
 // Intersect returns the sub-window w and o have in common, and whether they
@@ -56,18 +65,22 @@ func (w Window) Intersect(o Window) (Window, bool) {
 	return Window{Start: start, End: end}, true
 }
 
+// inverted reports whether w ends before it starts, which makes it empty.
+func (w Window) inverted() bool { return w.End.Before(w.Start) }
+
 // Union merges ws into a normalized set: sorted by Start, with every pair
-// of overlapping or touching windows (see Overlaps) collapsed into one. The
-// result is pairwise disjoint and sorted ascending — the form Intersect,
-// Subtract, and TotalDuration all reduce their own inputs to first, so a
-// caller never has to pre-sort or pre-merge a window set by hand before
-// passing it to any of them.
+// of overlapping or touching windows (see Overlaps) collapsed into one, and
+// inverted windows, which are empty, left out. The result is pairwise
+// disjoint and sorted ascending — the form Intersect, Subtract, and
+// TotalDuration all reduce their own inputs to first, so a caller never has
+// to pre-sort or pre-merge a window set by hand before passing it to any of
+// them.
 func Union(ws []Window) []Window {
-	if len(ws) == 0 {
+	sorted := slices.DeleteFunc(slices.Clone(ws), Window.inverted)
+	if len(sorted) == 0 {
 		return nil
 	}
 
-	sorted := slices.Clone(ws)
 	slices.SortFunc(sorted, func(a, b Window) int {
 		switch {
 		case a.Start.Before(b.Start):

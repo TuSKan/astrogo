@@ -162,3 +162,92 @@ func consentGrantingPackages(t *testing.T, root string) []string {
 
 	return dirs
 }
+
+// TestSetDataDirIsNotResetAway catches the other half of the trap above in
+// every package, not only those whose TestMain grants consent: a test that
+// points the data directory at its own temporary bucket and cleans up with
+// remote.Reset leaves it pointed there, since Reset does not touch the data
+// directory. The bucket is deleted with the test, and the next test to cache
+// anything fails to create its lock inside it. catalog/mpcorb, which grants
+// consent inside its tests rather than in TestMain, did exactly this, and
+// broke TestOpenParsesTheCometFile on every run (#443).
+//
+// A test function that calls both is reported, unless it also puts the
+// default back with remote.SetDataDir(""), as time's EOP tests do. remote's
+// own tests are exempt, being the package under test, and so is this package,
+// which names both in its messages.
+func TestSetDataDirIsNotResetAway(t *testing.T) {
+	t.Parallel()
+
+	root := filepath.Join("..", "..")
+
+	var scanned, offenders int
+
+	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return nil //nolint:nilerr // an unreadable path is skipped, not fatal
+		}
+
+		rel, _ := filepath.Rel(root, path)
+		rel = filepath.ToSlash(rel)
+
+		if info.IsDir() {
+			if name := info.Name(); name == ".git" || name == "node_modules" || rel == "remote" || rel == "internal/docsguard" {
+				return filepath.SkipDir
+			}
+
+			return nil
+		}
+
+		if !strings.HasSuffix(path, "_test.go") {
+			return nil
+		}
+
+		data, rerr := os.ReadFile(path)
+		if rerr != nil {
+			return nil //nolint:nilerr // an unreadable file is skipped, not fatal
+		}
+
+		scanned++
+
+		// One chunk per top-level function, and only code lines in it: a
+		// comment explaining why Reset is wrong is prose this guard keeps.
+		for fn := range strings.SplitSeq(string(data), "\nfunc ") {
+			var sets, resets, restores bool
+
+			for line := range strings.SplitSeq(fn, "\n") {
+				trimmed := strings.TrimSpace(line)
+				if strings.HasPrefix(trimmed, "//") {
+					continue
+				}
+
+				sets = sets || strings.Contains(trimmed, "remote.SetDataDir(")
+				resets = resets || strings.Contains(trimmed, "remote.Reset")
+				restores = restores || strings.Contains(trimmed, `remote.SetDataDir("")`)
+			}
+
+			if sets && resets && !restores {
+				offenders++
+
+				name, _, _ := strings.Cut(fn, "(")
+
+				t.Errorf("%s: func %s sets remote's data directory and cleans up with remote.Reset.\n"+
+					"  Reset leaves the data directory alone, so it stays pointed at this "+
+					"test's temporary bucket after the bucket is deleted. Use "+
+					"remote.Capture(ids...).Restore, which restores the data directory too. "+
+					"See #443.", rel, name)
+			}
+		}
+
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("walk: %v", err)
+	}
+
+	if scanned < 100 {
+		t.Fatalf("only %d test files scanned; the walk is not reaching the module", scanned)
+	}
+
+	t.Logf("%d test files scanned, %d offending functions", scanned, offenders)
+}

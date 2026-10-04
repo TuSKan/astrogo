@@ -2,13 +2,11 @@ package plan
 
 import (
 	"errors"
-	"fmt"
 	"math"
 	"testing"
 
 	"github.com/TuSKan/astrogo/constants"
 	eph "github.com/TuSKan/astrogo/ephemeris"
-	"github.com/TuSKan/astrogo/ephemeris/core"
 	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 	"github.com/TuSKan/astrogo/vector"
@@ -228,13 +226,15 @@ func TestEclipsesAreDecidedByTheShadow(t *testing.T) {
 	}
 }
 
-// TestEclipseSearchReturnsEveryProviderFailure fails the provider on each of
-// its calls in turn, from the first one after the phase search to the last one
-// the eclipse search makes, and requires the failure back every time.
+// TestEclipseSearchReturnsEveryProviderFailure fails the provider once, on
+// each of its calls in turn — the phase search's and the eclipse search's —
+// and requires the failure back every time.
 //
 // Before #401 a failure mid-search was not returned: a latitude that could not
 // be computed skipped the syzygy, and a search that failed fell back to the
 // syzygy's own time. Either way an eclipse could go missing with a nil error.
+// A provider that failed on every call after one would hide a swallowed
+// failure behind the next call's (#419), so each fails once.
 func TestEclipseSearchReturnsEveryProviderFailure(t *testing.T) {
 	// Each window holds one eclipse, the first of 2026 of each kind.
 	cases := []struct {
@@ -247,55 +247,22 @@ func TestEclipseSearchReturnsEveryProviderFailure(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		counting := &failingAfterProvider{Provider: eph.Default(), limit: math.MaxInt}
-
-		if _, err := MoonPhases(c.start, c.end, counting); err != nil {
-			t.Fatalf("%s: MoonPhases: %v", c.name, err)
-		}
-
-		phaseCalls := counting.calls
-		counting.calls = 0
+		counting := &failingOnceProvider{Provider: eph.Default(), on: -1}
 
 		events, err := c.find(c.start, c.end, counting)
 		if err != nil || len(events) != 1 {
 			t.Fatalf("%s: %d eclipses, err %v; want the one eclipse in the window", c.name, len(events), err)
 		}
 
-		total := counting.calls
+		for call := range counting.calls {
+			prov := &failingOnceProvider{Provider: eph.Default(), on: call}
 
-		for limit := phaseCalls; limit < total; limit++ {
-			prov := &failingAfterProvider{Provider: eph.Default(), limit: limit}
-
-			if _, err := c.find(c.start, c.end, prov); !errors.Is(err, errFailingAfter) {
-				t.Errorf("%s: provider failing after %d of %d calls: err %v, want errFailingAfter",
-					c.name, limit, total, err)
+			if _, err := c.find(c.start, c.end, prov); !errors.Is(err, errFailingOnce) {
+				t.Errorf("%s: provider failing on call %d of %d: err %v, want errFailingOnce",
+					c.name, call, counting.calls, err)
 			}
 		}
 	}
-}
-
-var errFailingAfter = errors.New("failingAfterProvider: out of calls")
-
-// failingAfterProvider answers its first limit State calls and fails every
-// one after.
-type failingAfterProvider struct {
-	eph.Provider
-
-	calls, limit int
-}
-
-func (p *failingAfterProvider) State(id eph.ID, t time.Time) (core.State, error) {
-	p.calls++
-	if p.calls > p.limit {
-		return core.State{}, errFailingAfter
-	}
-
-	st, err := p.Provider.State(id, t)
-	if err != nil {
-		return core.State{}, fmt.Errorf("failingAfterProvider: %w", err)
-	}
-
-	return st, nil
 }
 
 // TestEclipseKindsAndMagnitudesMatchNASA classifies eclipses of every kind

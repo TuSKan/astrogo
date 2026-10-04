@@ -299,6 +299,14 @@ func Atcoq(rc, dc, pr, pd, px, rv float64, astrom *ASTROM) (aob, zob, hob, dob, 
 	return Atioq(ri, di, astrom)
 }
 
+// Ae2hd converts horizon coordinates, azimuth az (from north through east)
+// and elevation el, to hour angle and declination for a site at latitude phi,
+// all in radians. ha is in [-pi, pi], negative east of the meridian.
+func Ae2hd(az, el, phi float64) (ha, dec float64) {
+	gofa.Ae2hd(az, el, phi, &ha, &dec)
+	return ha, dec
+}
+
 // Dtdb returns TDB−TT in seconds: Fairhead & Bretagnon (1990) in full, plus
 // the topocentric term for a site at ut (UT1 day fraction), east longitude
 // elong (radians), distance u from the Earth's spin axis and v north of the

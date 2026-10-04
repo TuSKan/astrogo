@@ -7,6 +7,7 @@ import (
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
+	"github.com/TuSKan/astrogo/internal/gofaext"
 	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
@@ -123,8 +124,16 @@ func MoonPhases(start, end time.Time, prov eph.Provider) ([]MoonPhaseEvent, erro
 		return nil, err
 	}
 
-	prevT := start
-	for t := start.Add(step); !t.After(end); t = t.Add(step) {
+	// The last step ends at end itself, however short it is. Until #419 the
+	// samples stopped at the last whole step, so a phase between it and end
+	// was lost — and with it any eclipse at that syzygy, since LunarEclipses
+	// and SolarEclipses start here.
+	for prevT := start; prevT.Before(end); {
+		t := prevT.Add(step)
+		if t.After(end) {
+			t = end
+		}
+
 		curElong, err := moonElongation(t, prov)
 		if err != nil {
 			return nil, err
@@ -136,9 +145,12 @@ func MoonPhases(start, end time.Time, prov eph.Provider) ([]MoonPhaseEvent, erro
 			if CrossesTarget(prevElong, curElong, target, 360) {
 				eval := phaseEvaluator(target, prov)
 
+				// The samples bracket the crossing, so a refinement that fails
+				// is an ephemeris failure, returned rather than skipped: a
+				// skipped phase is a missing phase with a nil error.
 				refined, _, err := solver.FindRoot(eval, prevT, t)
 				if err != nil {
-					continue
+					return nil, fmt.Errorf("moon phases: %v near %v: %w", phase, t, err)
 				}
 
 				events = append(events, MoonPhaseEvent{Phase: phase, Time: refined})
@@ -216,36 +228,37 @@ type SeasonEvent struct {
 	Season Season
 }
 
-// sunEclipticLongitude returns the Sun's apparent ecliptic longitude at time t.
+// sunEclipticLongitude returns the Sun's apparent ecliptic longitude at time t,
+// referred to the true equinox of date: the longitude the equinoxes and
+// solstices are defined on.
 //
-// SOFA's Eqec06 applies full IAU 2006 precession and IAU 2000A nutation,
-// returning ecliptic coordinates of the TRUE equinox of date. For the
-// Sun's apparent position, we subtract the aberration constant κ ≈ 20.496"
-// (annual aberration displaces the Sun westward). Light-time and aberration
-// largely cancel for the Sun, but the net effect shifts the apparent longitude
-// by −κ in ecliptic coordinates.
+// Apparent means the Sun as seen, light time and aberration included, which
+// eph.ApparentState applies exactly; this used to subtract the constant of
+// aberration, 20.496″, from the geometric Sun, which is off by up to 0.35″
+// as the Earth's distance from the Sun changes.
+//
+// True equinox means nutation in longitude, Δψ, is added: SOFA's Eqec06,
+// behind coord.ICRSToEcliptic, gives the mean equinox and ecliptic of date,
+// precession only. Until #414 the comment here said otherwise and Δψ, up to
+// ±17.2″ over the 18.6-year nutation cycle, was missing: the seasons were up
+// to 8.5 minutes off, as the USNO's show from 1972 to 2100.
 func sunEclipticLongitude(t time.Time, prov eph.Provider) (float64, error) {
-	sunPos, err := eph.Position(prov, eph.Sun, t)
+	sun, err := eph.ApparentState(prov, eph.Sun, t)
 	if err != nil {
 		return 0, fmt.Errorf("seasons: sun position: %w", err)
 	}
 
-	sunICRS, err := eph.ToICRS(sunPos)
+	sunICRS, err := eph.ToICRS(sun.Pos)
 	if err != nil {
 		return 0, fmt.Errorf("seasons: sun ICRS: %w", err)
 	}
 
 	tdb := t.TDB()
+	lon := coord.ICRSToEcliptic(sunICRS, tdb).Lon().Degrees()
 
-	// Eqec06: ICRS → ecliptic of TRUE equinox of date (precession + nutation)
-	ecl := coord.ICRSToEcliptic(sunICRS, tdb)
-	lon := ecl.Lon().Degrees()
-
-	// Subtract aberration constant: apparent Sun longitude is ~20.5" west
-	// of geometric due to Earth's orbital motion.
-	const aberration = 20.496 / 3600.0 // degrees
-
-	lon -= aberration
+	tt1, tt2 := t.TT().JDParts()
+	dpsi, _ := gofaext.Nut06a(tt1, tt2)
+	lon += dpsi * 180 / math.Pi
 
 	// Normalize to [0, 360)
 	for lon < 0 {
@@ -335,49 +348,51 @@ func seasonEvaluator(target float64, prov eph.Provider) Evaluator {
 
 // ── Moon Illumination ────────────────────────────────────────────────────────
 
-// MoonIllumination returns the fraction of the Moon's disk illuminated [0, 1]
-// and the phase angle in degrees at time t.
+// MoonIllumination returns the fraction of the Moon's disk illuminated, in
+// [0, 1], and the Moon's phase angle at time t, both as seen from the
+// geocenter.
+//
+// The phase angle i is the Sun–Moon–Earth angle: 0° at full, near 180° at new.
+// It is not the elongation ψ, the Sun–Earth–Moon angle, which this returned in
+// its place until #416. The triangle's third angle, at the Sun, reaches 0.15°,
+// so i falls short of 180° − ψ by up to that much. The fraction is
+// k = (1 + cos i)/2 (Meeus, Astronomical Algorithms, 2nd ed., eq. 48.1), which
+// at first quarter is 0.5013, not 0.5.
+//
+// The Moon is the astrometric Moon, where the Earth sees it with light time
+// applied, and the phase angle is measured there. Against Skyfield's
+// almanac.phase_angle and fraction_illuminated (DE421) it agrees to 0.002° and
+// 0.00002; the geometric Moon is 0.003° off.
 func MoonIllumination(t time.Time, prov eph.Provider) (fraction float64, phaseAngle angle.Angle, err error) {
 	if prov == nil {
 		prov = eph.Default()
 	}
 
-	sunPos, err := eph.Position(prov, eph.Sun, t)
+	sun, err := eph.Position(prov, eph.Sun, t)
 	if err != nil {
 		return 0, 0, fmt.Errorf("illumination: sun position: %w", err)
 	}
 
-	moonPos, err := eph.Position(prov, eph.Moon, t)
+	moon, err := eph.AstrometricState(prov, eph.Moon, t)
 	if err != nil {
 		return 0, 0, fmt.Errorf("illumination: moon position: %w", err)
 	}
 
-	sunICRS, err := eph.ToICRS(sunPos)
-	if err != nil {
-		return 0, 0, fmt.Errorf("illumination: sun ICRS: %w", err)
-	}
+	// The angle at the Moon, as it was 1.3 s ago, between the Earth now and the
+	// Sun. The Sun moves some 7 km about the barycenter in the 8.5 minutes its
+	// light takes to reach the Moon, so its position now serves for then.
+	i := angleBetweenVectors(sun.Sub(moon.Pos), moon.Pos.MulScalar(-1))
 
-	moonICRS, err := eph.ToICRS(moonPos)
-	if err != nil {
-		return 0, 0, fmt.Errorf("illumination: moon ICRS: %w", err)
-	}
-
-	// Phase angle = angular separation between Sun and Moon as seen from Earth
-	sep := coord.Separation(moonICRS, sunICRS)
-
-	// Illumination fraction = (1 - cos(phase_angle)) / 2
-	frac := (1.0 - math.Cos(sep.Radians())) / 2.0
-
-	return frac, sep, nil
+	return (1 + math.Cos(i)) / 2, angle.Rad(i), nil
 }
 
 // MoonElongation returns the Moon's ecliptic elongation from the Sun at
 // time t: the Moon's ecliptic longitude minus the Sun's, normalized to
 // [0°, 360°). 0° at new moon, 90° at first quarter, 180° at full moon, 270°
 // at last quarter — monotonically increasing across a full lunation, unlike
-// [MoonIllumination]'s phaseAngle (the Sun–Moon–observer separation, which
-// is symmetric about full and so takes the same value on both the waxing
-// and waning side of a lunation). Use this — or [MoonPhaseFraction] — for
+// [MoonIllumination]'s phaseAngle (the Sun–Moon–Earth angle, which is
+// symmetric about full and so takes the same value on both the waxing and
+// waning side of a lunation). Use this — or [MoonPhaseFraction] — for
 // "is tonight's Moon waxing or waning", which phaseAngle alone can't answer.
 func MoonElongation(t time.Time, prov eph.Provider) (angle.Angle, error) {
 	if prov == nil {

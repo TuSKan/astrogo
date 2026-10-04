@@ -725,69 +725,81 @@ func TestUSNO_MoonPhases(t *testing.T) {
 
 // ── Test: Earth's Seasons ────────────────────────────────────────────────────
 
+// TestUSNO_Seasons compares the equinoxes and solstices with USNO's for years
+// spread over the 18.6-year nutation cycle, to a minute: USNO rounds to the
+// minute, so its own rounding is half of that.
+//
+// It used to check 2026 alone, to 30 minutes, and VALIDATION.md read "2–4
+// min". Nutation in longitude was missing (#414), and 2026 is a year in which
+// it is small: over 1972–2100 the seasons were up to 8.5 minutes off, and 5
+// minutes in 2027. Several years, and a bound the model has to earn, are what
+// would have shown it.
 func TestUSNO_Seasons(t *testing.T) {
 	requireUSNO(t)
 
-	url := "https://aa.usno.navy.mil/api/seasons?year=2026"
-	body := usnoGet(t, url)
-
-	var resp usnoSeasonsResponse
-	if err := json.Unmarshal(body, &resp); err != nil {
-		t.Fatalf("Failed to parse Seasons response: %v", err)
-	}
+	const tolMinutes = 1.0
 
 	eph := newEph(t)
 
-	// Compute astrogo seasons for 2026
-	astroSeasons, err := plan.Seasons(2026, eph)
-	if err != nil {
-		t.Fatalf("Seasons failed: %v", err)
-	}
+	for _, year := range []int{2020, 2024, 2027, 2031, 2035} {
+		body := usnoGet(t, fmt.Sprintf("https://aa.usno.navy.mil/api/seasons?year=%d", year))
 
-	// Map USNO names to our types
-	seasonMap := map[string]plan.Season{
-		"Equinox":  plan.SeasonVernalEquinox,  // March → Vernal, Sept → Autumnal
-		"Solstice": plan.SeasonSummerSolstice, // June → Summer, Dec → Winter
-	}
-
-	for _, usSeason := range resp.Data {
-		_, ok := seasonMap[usSeason.Phenom]
-		if !ok {
-			// Perihelion/Aphelion — not season events, skip
-			continue
+		var resp usnoSeasonsResponse
+		if err := json.Unmarshal(body, &resp); err != nil {
+			t.Fatalf("%d: failed to parse Seasons response: %v", year, err)
 		}
 
-		h, m, ok := parseUSNOTime(usSeason.Time)
-		if !ok {
-			continue
+		astroSeasons, err := plan.Seasons(year, eph)
+		if err != nil {
+			t.Fatalf("%d: Seasons failed: %v", year, err)
 		}
 
-		usnoTime := time.Date(usSeason.Year, time.Month(usSeason.Month), usSeason.Day, h, m, 0, 0, time.LocationUTC)
+		compared := 0
 
-		// Find matching astrogo season by date proximity
-		found := false
+		for _, usSeason := range resp.Data {
+			if usSeason.Phenom != "Equinox" && usSeason.Phenom != "Solstice" {
+				// Perihelion/Aphelion — not season events.
+				continue
+			}
 
-		for _, as := range astroSeasons {
-			delta := math.Abs(as.Time.Sub(usnoTime).Minutes())
-			if delta < 7*24*60 { // Within 7 days
-				t.Logf("%-20s  USNO=%s  astrogo=%s  Δ=%.0f min",
+			h, m, ok := parseUSNOTime(usSeason.Time)
+			if !ok {
+				t.Errorf("%d: unparseable USNO time %q", year, usSeason.Time)
+
+				continue
+			}
+
+			usnoTime := time.Date(usSeason.Year, time.Month(usSeason.Month), usSeason.Day, h, m, 0, 0, time.LocationUTC)
+
+			found := false
+
+			for _, as := range astroSeasons {
+				delta := as.Time.Sub(usnoTime).Minutes()
+				if math.Abs(delta) >= 7*24*60 {
+					continue
+				}
+
+				t.Logf("%-20s  USNO=%s  astrogo=%s  Δ=%+.2f min",
 					usSeason.Phenom+" ("+as.Season.String()+")",
-					usnoTime.Format("2006-01-02 15:04"),
-					as.Time.Format("2006-01-02 15:04"),
-					delta)
+					usnoTime.Format("2006-01-02 15:04"), as.Time.Format("2006-01-02 15:04:05"), delta)
 
-				if delta > 30 {
-					t.Errorf("%s: Δ=%.0f min exceeds 30 min tolerance", as.Season, delta)
+				if math.Abs(delta) > tolMinutes {
+					t.Errorf("%s %d: Δ=%+.2f min exceeds %.0f min", as.Season, year, delta, tolMinutes)
 				}
 
 				found = true
+				compared++
 
 				break
 			}
+
+			if !found {
+				t.Errorf("%s at %s: no matching astrogo season found", usSeason.Phenom, usnoTime.Format("2006-01-02"))
+			}
 		}
 
-		if !found {
-			t.Errorf("%s at %s: no matching astrogo season found", usSeason.Phenom, usnoTime.Format("2006-01-02"))
+		if compared != 4 {
+			t.Errorf("%d: compared %d seasons, want 4", year, compared)
 		}
 	}
 }

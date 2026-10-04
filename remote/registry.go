@@ -138,7 +138,12 @@ func (c *Client) Offline() bool {
 // after. Prefer Capture/Restore or WithScope for scoped setup.
 func Reset() { Default().Reset() }
 
-// Reset restores this client to the state [NewClient] returns.
+// Reset restores this client's registry to the state [NewClient] returns:
+// every endpoint at its built-in URL, downloads disabled, online, no custom
+// policy. Like the package-level [Reset], it leaves the data directory and the
+// API options alone. It used to promise all of NewClient's state, and a test
+// that took it at its word left the next one caching under a deleted
+// directory (#443); [Client.Capture] restores the data directory too.
 func (c *Client) Reset() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
