@@ -5,7 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/klauspost/pgzip"
@@ -137,7 +139,11 @@ func Read(r io.Reader) (*File, error) {
 		f.HDUs = append(f.HDUs, &basicHDU{header: header, hType: HDUTypeImage})
 
 		// Calculate data payload and skip it
-		size := payloadSize(header)
+		size, err := payloadSize(header)
+		if err != nil {
+			return nil, err
+		}
+
 		if size > 0 {
 			if canSeek {
 				_, err = seeker.Seek(size, io.SeekCurrent)
@@ -160,43 +166,106 @@ func Read(r io.Reader) (*File, error) {
 	return f, nil
 }
 
-func payloadSize(h *Header) int64 {
-	bitpix, _ := h.GetInt("BITPIX")
-	naxis, _ := h.GetInt("NAXIS")
+// payloadSize is the size of an HDU's data, padded to whole blocks, from the
+// structural keywords: BITPIX, NAXIS and NAXISn mandatory, GCOUNT and PCOUNT
+// defaulting only when absent (FITS 4.0 §4.4.1).
+func payloadSize(h *Header) (int64, error) {
+	bitpix, err := requiredInt(h, "BITPIX")
+	if err != nil {
+		return 0, err
+	}
+
+	_, elements, err := dataAxes(h)
+	if err != nil {
+		return 0, err
+	}
 
 	if bitpix < 0 {
 		bitpix = -bitpix
 	}
 
-	var total int64 = 1
-
-	for i := 1; i <= naxis; i++ {
-		dim, _ := h.GetInt(fmt.Sprintf("NAXIS%d", i))
-		total *= int64(dim)
-	}
-
-	if naxis == 0 {
-		total = 0
-	}
-
-	gcount, err := h.GetInt("GCOUNT")
+	gcount, err := optionalCount(h, "GCOUNT", 1)
 	if err != nil {
-		gcount = 1
+		return 0, err
 	}
 
-	pcount, err := h.GetInt("PCOUNT")
+	pcount, err := optionalCount(h, "PCOUNT", 0)
 	if err != nil {
-		pcount = 0
+		return 0, err
 	}
 
-	bytes := (int64(bitpix) / 8) * int64(gcount) * (int64(pcount) + total)
+	if elements > math.MaxInt64-int64(pcount) {
+		return 0, fmt.Errorf("%w: PCOUNT %d + %d elements overflows", errDataSize, pcount, elements)
+	}
+
+	bytes, err := mulSize(int64(bitpix)/8*int64(gcount), int64(pcount)+elements)
+	if err != nil {
+		return 0, err
+	}
 
 	remainder := bytes % int64(BlockSize)
 	if remainder != 0 {
+		if bytes > math.MaxInt64-int64(BlockSize) {
+			return 0, fmt.Errorf("%w: %d bytes cannot be padded to a block", errDataSize, bytes)
+		}
+
 		bytes += int64(BlockSize) - remainder
 	}
 
-	return bytes
+	return bytes, nil
+}
+
+// maxNAXIS is the most axes an HDU may have: "a non-negative integer no
+// greater than 999" (FITS 4.0 §4.4.1.1).
+const maxNAXIS = 999
+
+// dataAxes reads NAXIS and NAXIS1 … NAXISn, returning the lengths in header
+// order and the number of elements they describe: their product, or zero when
+// NAXIS is zero.
+//
+// The product is checked. Unchecked, two axes of 2^32 wrapped to zero, and an
+// image declaring them read as empty with no error; a product wrapping negative
+// sized a buffer, and panicked (#460).
+func dataAxes(h *Header) (axes []int, elements int64, err error) {
+	naxis, err := requiredAxis(h, "NAXIS")
+	if err != nil {
+		return nil, 0, err
+	}
+
+	if naxis > maxNAXIS {
+		return nil, 0, fmt.Errorf("%w: NAXIS = %d exceeds %d", errDataSize, naxis, maxNAXIS)
+	}
+
+	if naxis == 0 {
+		return nil, 0, nil
+	}
+
+	axes = make([]int, naxis)
+	elements = 1
+
+	for i := range axes {
+		axes[i], err = requiredAxis(h, "NAXIS"+strconv.Itoa(i+1))
+		if err != nil {
+			return nil, 0, err
+		}
+
+		elements, err = mulSize(elements, int64(axes[i]))
+		if err != nil {
+			return nil, 0, err
+		}
+	}
+
+	return axes, elements, nil
+}
+
+// mulSize multiplies two non-negative sizes, refusing a product an int64
+// cannot hold rather than wrapping.
+func mulSize(a, b int64) (int64, error) {
+	if b != 0 && a > math.MaxInt64/b {
+		return 0, fmt.Errorf("%w: %d × %d overflows", errDataSize, a, b)
+	}
+
+	return a * b, nil
 }
 
 // Two failsafes bound [ReadHeader] against a file with no END card, or with an

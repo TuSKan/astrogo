@@ -126,6 +126,34 @@ func FuzzRead(f *testing.F) {
 		fuzzCard("NAXIS2  =                 9999") +
 		fuzzCard("END")))
 
+	// An image whose axis product wraps negative, which sized its pixel
+	// buffer and panicked (#460).
+	f.Add(block(fuzzCard("SIMPLE  =                    T") +
+		fuzzCard("BITPIX  =                    8") +
+		fuzzCard("NAXIS   =                    2") +
+		fuzzCard("NAXIS1  =           4294967296") +
+		fuzzCard("NAXIS2  =           3221225472") +
+		fuzzCard("END")))
+
+	// A table claiming a negative row count, which sized its payload buffer
+	// and panicked (#460).
+	f.Add(append(
+		block(fuzzCard("SIMPLE  =                    T")+
+			fuzzCard("BITPIX  =                    8")+
+			fuzzCard("NAXIS   =                    0")+
+			fuzzCard("END")),
+		block(fuzzCard("XTENSION= 'BINTABLE'")+
+			fuzzCard("BITPIX  =                    8")+
+			fuzzCard("NAXIS   =                    2")+
+			fuzzCard("NAXIS1  =                    4")+
+			fuzzCard("NAXIS2  =                   -1")+
+			fuzzCard("PCOUNT  =                    0")+
+			fuzzCard("GCOUNT  =                    1")+
+			fuzzCard("TFIELDS =                    1")+
+			fuzzCard("TFORM1  = 'J       '")+
+			fuzzCard("END"))...,
+	))
+
 	f.Add([]byte{})
 
 	f.Fuzz(func(_ *testing.T, data []byte) {

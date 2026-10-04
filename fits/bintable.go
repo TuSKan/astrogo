@@ -249,8 +249,34 @@ func ReadBintable(h *Header, r io.Reader) (*BintableHDU, error) {
 		return nil, fmt.Errorf("missing TFIELDS: %w", err)
 	}
 
-	rows, _ := h.GetInt("NAXIS2")
-	rowSize, _ := h.GetInt("NAXIS1")
+	rows, err := requiredAxis(h, "NAXIS2")
+	if err != nil {
+		return nil, err
+	}
+
+	rowSize, err := requiredAxis(h, "NAXIS1")
+	if err != nil {
+		return nil, err
+	}
+
+	tableBytes, err := mulSize(int64(rowSize), int64(rows))
+	if err != nil {
+		return nil, err
+	}
+
+	// A heap-allocated PCOUNT area follows the table proper, and the whole
+	// extension is padded out to a block boundary. A malformed PCOUNT used to
+	// read as zero, leaving the heap to be read as the next header (#460).
+	pcount, err := optionalCount(h, "PCOUNT", 0)
+	if err != nil {
+		return nil, err
+	}
+
+	if tableBytes > math.MaxInt64-int64(pcount) {
+		return nil, fmt.Errorf("%w: %d table bytes + PCOUNT %d overflows", errDataSize, tableBytes, pcount)
+	}
+
+	consumed := tableBytes + int64(pcount)
 
 	hdu := &BintableHDU{
 		header: h, hType: HDUTypeBinary,
@@ -260,7 +286,14 @@ func ReadBintable(h *Header, r io.Reader) (*BintableHDU, error) {
 	}
 
 	if rows == 0 || tfields == 0 {
-		return hdu, nil
+		// Nothing to decode, but the rows, heap and padding are there to step
+		// over all the same: returning without them left the next header to
+		// be read from this one's data.
+		if _, err := io.CopyN(io.Discard, r, consumed); err != nil {
+			return nil, fmt.Errorf("fits: skip bintable data: %w", err)
+		}
+
+		return hdu, discardPadding(r, consumed)
 	}
 
 	fields := make([]arrow.Field, tfields)
@@ -301,7 +334,7 @@ func ReadBintable(h *Header, r io.Reader) (*BintableHDU, error) {
 			ErrBadTForm, offset, rowSize)
 	}
 
-	payload := make([]byte, int64(rowSize)*int64(rows))
+	payload := make([]byte, tableBytes)
 	if _, err := io.ReadFull(r, payload); err != nil {
 		return nil, fmt.Errorf("failed reading bintable payload: %w", err)
 	}
@@ -319,26 +352,11 @@ func ReadBintable(h *Header, r io.Reader) (*BintableHDU, error) {
 
 	hdu.Batch = bldr.NewRecordBatch()
 
-	// A heap-allocated PCOUNT area follows the table proper, and the whole
-	// extension is padded out to a block boundary.
-	pcount, err := h.GetInt("PCOUNT")
-	if err != nil {
-		pcount = 0
-	}
-
-	consumed := int64(rowSize)*int64(rows) + int64(pcount)
-
 	if _, err := io.CopyN(io.Discard, r, int64(pcount)); err != nil {
 		return nil, fmt.Errorf("failed reading bintable heap: %w", err)
 	}
 
-	if pad := consumed % int64(BlockSize); pad != 0 {
-		if _, err := io.CopyN(io.Discard, r, int64(BlockSize)-pad); err != nil {
-			return nil, fmt.Errorf("failed reading bintable padding: %w", err)
-		}
-	}
-
-	return hdu, nil
+	return hdu, discardPadding(r, consumed)
 }
 
 // GetStringColumn extracts a FITS binary table column and safely converts it to a standard Go string slice.
