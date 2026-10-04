@@ -408,40 +408,52 @@ func (s EventSolver) solveVisibility(spec EventSpec, start, end time.Time) ([]Ev
 		}
 	}
 
+	// crossing refines the rise or set between t1 and t2, where the threshold
+	// is crossed once, from h1 to h2, and records it if spec asks for it.
+	crossing := func(t1, t2 time.Time, h1, h2 float64) error {
+		kind := EventRise
+		if h1 > 0 {
+			kind = EventSet
+		}
+
+		if spec.Kind != kind && spec.Kind != EventAnyVisibility {
+			return nil
+		}
+
+		resTime, _, err := s.refineRoot(evalVal, t1, t2, h1, h2)
+		if err != nil {
+			return err
+		}
+
+		// Both altitudes, so the two fields mean what they are named.
+		// The solver works geometrically here — refraction is already
+		// baked into the threshold, per the USNO convention — so the
+		// geometric one is what Value is measured against, while
+		// Altitude reports what an observer would actually see.
+		// Without display fields the event is skipped, but not the
+		// rest of the step, which may hold a transit too.
+		if geom, refr, ok := altitudesAt(spec, resTime, geomAtm); ok {
+			events = append(events, Event{
+				Kind:              kind,
+				Time:              resTime,
+				Altitude:          refr.Alt(),
+				GeometricAltitude: geom.Alt(),
+				Azimuth:           geom.Az(),
+				Value:             geom.Alt().Degrees() - spec.Threshold.Degrees(),
+			})
+		}
+
+		return nil
+	}
+
 	for i := range len(times) - 1 {
 		t1, t2 := times[i], times[i+1]
 		h1, h2 := alts[i], alts[i+1]
 
 		// Crossings (Rise/Set)
 		if (h1 <= 0 && h2 > 0) || (h1 > 0 && h2 <= 0) {
-			kind := EventRise
-			if h1 > 0 {
-				kind = EventSet
-			}
-
-			if spec.Kind == kind || spec.Kind == EventAnyVisibility {
-				resTime, _, err := s.refineRoot(evalVal, t1, t2, h1, h2)
-				if err != nil {
-					return nil, err
-				}
-
-				// Both altitudes, so the two fields mean what they are named.
-				// The solver works geometrically here — refraction is already
-				// baked into the threshold, per the USNO convention — so the
-				// geometric one is what Value is measured against, while
-				// Altitude reports what an observer would actually see.
-				// Without display fields the event is skipped, but not the
-				// rest of the step, which may hold a transit too.
-				if geom, refr, ok := altitudesAt(spec, resTime, geomAtm); ok {
-					events = append(events, Event{
-						Kind:              kind,
-						Time:              resTime,
-						Altitude:          refr.Alt(),
-						GeometricAltitude: geom.Alt(),
-						Azimuth:           geom.Az(),
-						Value:             geom.Alt().Degrees() - spec.Threshold.Degrees(),
-					})
-				}
+			if err := crossing(t1, t2, h1, h2); err != nil {
+				return nil, err
 			}
 		}
 
@@ -477,7 +489,71 @@ func (s EventSolver) solveVisibility(spec EventSpec, start, end time.Time) ([]Ev
 		}
 	}
 
+	if spec.Kind == EventRise || spec.Kind == EventSet || spec.Kind == EventAnyVisibility {
+		if err := s.hiddenCrossings(evalVal, times, alts, crossing); err != nil {
+			return nil, err
+		}
+	}
+
 	return events, nil
+}
+
+// hiddenCrossings finds the rise and set, or set and rise, that both fall
+// between samples, which the sign test between neighbors cannot see.
+//
+// When a body's daily extreme only just passes the threshold, it can cross
+// and cross back within one step, and no sample lands on the far side: the
+// Sun at Mawson in midwinter, 14 minutes up and a hundredth of a degree above
+// the horizon; astronomical night at Paris in June, 10 minutes long; the Moon
+// at high latitude. Every helper samples at 15 minutes, and they returned
+// nothing (#426). A finer step only shrinks the gap.
+//
+// So wherever a sample is the highest of its neighbors and they are all below
+// the threshold, or the lowest and all above it, the extremum between them is
+// refined; if it lies past the threshold, there is one crossing on each side
+// of it. A sample at either end of the sweep counts against its one neighbor,
+// since the extremum may lie in the first or last step. An extremum that does
+// not pass the threshold costs one refinement and adds nothing — once a day
+// for a body that never rises or never sets, and not at all on an ordinary day,
+// whose extremes are far past it.
+func (s EventSolver) hiddenCrossings(evalVal evaluator, times []time.Time, alts []float64,
+	crossing func(t1, t2 time.Time, h1, h2 float64) error,
+) error {
+	for i := range alts {
+		lo, hi := max(i-1, 0), min(i+1, len(alts)-1)
+		if lo == hi {
+			continue
+		}
+
+		// Strict on the left so a plateau of equal samples is one extremum.
+		peak := (i == lo || alts[i] > alts[lo]) && alts[i] >= alts[hi]
+		trough := (i == lo || alts[i] < alts[lo]) && alts[i] <= alts[hi]
+		below := alts[lo] <= 0 && alts[i] <= 0 && alts[hi] <= 0
+		above := alts[lo] > 0 && alts[i] > 0 && alts[hi] > 0
+
+		if (!peak || !below) && (!trough || !above) {
+			continue
+		}
+
+		tm, hm, err := s.refineExtremum(evalVal, times[lo], times[hi], peak)
+		if err != nil {
+			return err
+		}
+
+		// Past the threshold the way the samples were not: a crossing into it
+		// and one back out.
+		if (hm > 0) != (alts[lo] > 0) {
+			if err := crossing(times[lo], tm, alts[lo], hm); err != nil {
+				return err
+			}
+
+			if err := crossing(tm, times[hi], hm, alts[hi]); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
 }
 
 func (s EventSolver) solveGeometry(spec EventSpec, start, end time.Time) ([]Event, error) {
