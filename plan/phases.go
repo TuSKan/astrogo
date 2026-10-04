@@ -308,9 +308,12 @@ func Seasons(year int, prov eph.Provider) ([]SeasonEvent, error) {
 			if CrossesIncreasing(prevLon, curLon, target, 360) {
 				eval := seasonEvaluator(target, prov)
 
+				// The samples bracket the crossing, so a refinement that fails
+				// is an ephemeris failure, returned rather than skipped: a
+				// skipped season is a missing equinox with a nil error (#453).
 				refined, _, err := solver.FindRoot(eval, prevT, t)
 				if err != nil {
-					continue
+					return nil, fmt.Errorf("seasons: %v near %v: %w", season, t, err)
 				}
 
 				events = append(events, SeasonEvent{Season: season, Time: refined})
