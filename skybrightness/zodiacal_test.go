@@ -237,6 +237,26 @@ func TestZodiacalColorCorrectionSign(t *testing.T) {
 	}
 }
 
+// One direction, written any of the ways an angle can be, is one elongation
+// and gets one color correction. Folding it as a latitude gave 340 degrees
+// the 90-degree slope while -20, the same direction, got the 30-degree one
+// (#467).
+func TestZodiacalColorCorrectionFoldsElongation(t *testing.T) {
+	t.Parallel()
+
+	for _, e := range []float64{0, 20, 45, 60, 89, 100, 135, 180} {
+		for _, lambda := range []unit.WavelengthNM{400, 700} {
+			want := skybrightness.ZodiacalColorCorrection(lambda, angle.Deg(e))
+
+			for _, same := range []float64{-e, 360 - e, e + 360, e - 360} {
+				if got := skybrightness.ZodiacalColorCorrection(lambda, angle.Deg(same)); math.Abs(got-want) > 1e-12 {
+					t.Errorf("%v nm at %v deg: %.9f, want %.9f as at %v deg", lambda, same, got, want, e)
+				}
+			}
+		}
+	}
+}
+
 // The heliocentric factor is a -2.3 power, so perihelion is measurably
 // brighter than aphelion — about 8 per cent over Earth's orbit.
 func TestZodiacalHeliocentricScaling(t *testing.T) {

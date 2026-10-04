@@ -323,10 +323,12 @@ func ZodiacalColorCorrection(lambda unit.WavelengthNM, elongation angle.Angle) f
 		near, far = 0.8, 0.6
 	}
 
-	deg := foldEclipticLatitude(elongation)
-	if elongation.Degrees() > 90 {
-		deg = math.Abs(math.Mod(elongation.Degrees(), 360))
-	}
+	// An elongation folds onto [0, 180] as a differential longitude does: the
+	// dust cloud is symmetric about the Sun-Earth line. It was folded as a
+	// latitude, onto [0, 90], and the fold then skipped for anything written
+	// above 90 degrees, so 340 took the 90-degree slope while -20, the same
+	// direction, took the 30-degree one, and -100 was read as 80 (#467).
+	deg := foldDifferentialLongitude(elongation)
 
 	var slope float64
 
