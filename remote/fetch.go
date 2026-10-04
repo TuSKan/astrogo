@@ -150,7 +150,13 @@ func (c *Client) GetFile(ctx context.Context, id EndpointID, name string, opts .
 	// write. go test runs each package as its own process and several
 	// share one JPL kernel, so this is a cross-process race that no
 	// in-process mutex can fix.
-	release, err := file.AcquireLock(ctx, cacheFS, cacheKey)
+	// Every holder of this lock downloads under the same timeout, so one older
+	// than twice it is not downloading: it crashed, and its lock is stolen
+	// rather than waited out — for the IERS bulletin's 30 s, after a minute
+	// instead of half an hour, the lazy EOP load's mutex held the while (#445).
+	timeout := cmp.Or(cfg.timeout, ep.DownloadTimeout, DefaultDownloadTimeout)
+
+	release, err := file.AcquireLock(ctx, cacheFS, cacheKey, 2*timeout)
 	if err != nil {
 		//nolint:wrapcheck // pure delegation to remote/file, internal to this package; its errors are already prefixed
 		return nil, "", err
@@ -162,8 +168,6 @@ func (c *Client) GetFile(ctx context.Context, id EndpointID, name string, opts .
 	if fresh, freshErr := freshInCache(ctx, ep, srcFS, cacheFS, name, cacheKey); freshErr == nil && fresh {
 		return cacheFS, cacheKey, nil
 	}
-
-	timeout := cmp.Or(cfg.timeout, ep.DownloadTimeout, DefaultDownloadTimeout)
 
 	if err := c.fetchInto(ctx, id, ep, srcFS, cacheFS, name, cacheKey, timeout, cfg); err != nil {
 		// A failed fetch is not the same as a missing file, and the difference
