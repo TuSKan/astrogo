@@ -66,6 +66,11 @@ type TransitionContext struct {
 }
 
 // TransitionModel evaluates the overhead of moving between two observations.
+//
+// An error fails the schedule being built: every strategy returns it, naming
+// the two blocks, rather than skipping the candidate. Return one only when
+// the overhead cannot be known; a transition that is merely expensive is a
+// long duration.
 type TransitionModel interface {
 	Overhead(ctx TransitionContext) (time.Duration, error)
 }
@@ -221,6 +226,23 @@ func (s *Scheduler) BuildSchedule(window Window, blocks []*Block) (*Schedule, er
 
 const defaultStep = 1 * time.Minute
 
+// overheadError names the transition whose overhead could not be computed.
+//
+// Every strategy used to skip such a candidate, so a block whose target could
+// not be positioned for the slew never placed and nothing said why; and the
+// greedy pass refined its estimate with the error discarded, placing the block
+// with no setup time at all. A failed overhead is the same failure as a
+// constraint that cannot be evaluated for that target, which already fails the
+// schedule, so it does too (#454).
+func overheadError(from, to *Block, err error) error {
+	fromID := "the start"
+	if from != nil {
+		fromID = from.ID
+	}
+
+	return fmt.Errorf("transition from %s to %s: %w", fromID, to.ID, err)
+}
+
 // checkConstraintsIntervalCtx verifies that all constraints pass continuously
 // over a time range, and returns the coord.Context closest to the interval
 // midpoint. Callers that need to score the same block immediately after
@@ -375,12 +397,16 @@ func (s *GreedyStrategy) Schedule(planner *Planner, window Window, blocks []*Blo
 
 			overhead, err := transition.Overhead(ctx)
 			if err != nil {
-				continue
+				return nil, fmt.Errorf("plan: greedy: %w", overheadError(lastBlock, b, err))
 			}
 
 			// Refine Transition Overhead with better approximation of destination time
 			ctx.ToTime = currentTime.Add(time.FromGoDuration(overhead))
-			overhead, _ = transition.Overhead(ctx)
+
+			overhead, err = transition.Overhead(ctx)
+			if err != nil {
+				return nil, fmt.Errorf("plan: greedy: %w", overheadError(lastBlock, b, err))
+			}
 
 			startTime := currentTime.Add(time.FromGoDuration(overhead))
 			endTime := startTime.Add(time.FromGoDuration(b.Duration))

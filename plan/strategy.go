@@ -164,7 +164,7 @@ func (s *SwapOptimizedStrategy) swapPass(
 
 			oh, err := transition.Overhead(ctx)
 			if err != nil {
-				continue
+				return false, fmt.Errorf("plan: swap: %w", overheadError(bj.Block, bi.Block, err))
 			}
 
 			overhead = oh
@@ -289,7 +289,7 @@ func (s *SwapOptimizedStrategy) insertPass(
 
 				oh, err := transition.Overhead(ctx)
 				if err != nil {
-					continue
+					return false, fmt.Errorf("plan: insert: %w", overheadError(gap.prevBlock, ub.Block, err))
 				}
 
 				overhead = oh
