@@ -450,7 +450,14 @@ func (w *WCS) WorldToPixel(world []float64) ([]float64, error) {
 
 	if w.nAxis >= 2 && proj != "" {
 		// Analytical initial guess via forward spherical projection.
-		la, lo := w.lonAxis, w.latAxis
+		//
+		// lo is the longitude axis and la the latitude axis, as in the Newton
+		// loop below. They were declared the other way round, so this guess
+		// projected the transposed point (right ascension read as declination)
+		// about the transposed reference. The loop usually recovered from that
+		// start; within about a degree of a celestial pole it did not, and a
+		// polar field could not map most of its own sky back to pixels (#469).
+		lo, la := w.lonAxis, w.latAxis
 		raRad := world[lo] * deg2rad
 		decRad := world[la] * deg2rad
 		alpha0 := w.crval[lo] * deg2rad
@@ -492,8 +499,10 @@ func (w *WCS) WorldToPixel(world []float64) ([]float64, error) {
 			pix[lo] = w.crpix[lo] + dp[0]
 			pix[la] = w.crpix[la] + dp[1]
 
-			// Higher axes: linear inverse.
-			for i := range w.nAxis {
+			// Higher axes: linear inverse. Ranged over world, which the
+			// length check above makes w.nAxis long, so the index is visibly
+			// in bounds for it.
+			for i := range world {
 				if i != lo && i != la {
 					pix[i] = w.crpix[i] + (world[i]-w.crval[i])/w.cdelt[i]
 				}
@@ -528,7 +537,12 @@ func (w *WCS) WorldToPixel(world []float64) ([]float64, error) {
 			dx += 360
 		}
 
-		if math.Abs(dx) < tol && math.Abs(dy) < tol {
+		// Converged when the residual is small on the sky. A difference in
+		// right ascension spans cos(dec) of that angle there, and none at a
+		// pole, where right ascension is undefined: tested raw, a pixel at
+		// the pole never converged, because its right ascension is whatever
+		// the projection's arithmetic happens to give (#469).
+		if math.Abs(dx*math.Cos(world[la]*deg2rad)) < tol && math.Abs(dy) < tol {
 			return pix, nil
 		}
 
@@ -726,7 +740,7 @@ func project(proj string, ra, dec, alpha0, delta0 float64) (x, y float64, err er
 		//   sin(θ) = sin(dec)·cos(δ₀) − cos(dec)·sin(δ₀)·cos(Δα)
 		//   φ = π + atan2(−cos(dec)·sin(Δα),
 		//                  −sin(dec)·sin(δ₀) − cos(dec)·cos(δ₀)·cos(Δα))
-		nativeTheta := math.Asin(sinDec*cosD0 - cosDec*sinD0*cosDRA)
+		nativeTheta := asinUnit(sinDec*cosD0 - cosDec*sinD0*cosDRA)
 		nativePhi := math.Pi + math.Atan2(-cosDec*sinDRA,
 			-sinDec*sinD0-cosDec*cosD0*cosDRA)
 		// Normalize to [-π, π] to prevent wrapping in the Hammer formula.
@@ -786,8 +800,7 @@ func deproject(proj string, x, y, alpha0, delta0 float64) (ra, dec float64, err 
 		theta := math.Atan(1.0 / r)
 		sinT, cosT := math.Sincos(theta)
 		// cos(φ) = −y/r, sin(φ) = x/r
-		dec = math.Asin(sinT*sinD0 + (y/r)*cosT*cosD0)
-		ra = alpha0 + math.Atan2(x*cosT, r*sinT*cosD0-y*cosT*sinD0)
+		ra, dec = zenithalToCelestial(x, y, r, sinT, cosT, sinD0, cosD0, alpha0)
 
 	case "SIN":
 		// Orthographic (slant-projection variant with xi=0, eta=0)
@@ -799,8 +812,12 @@ func deproject(proj string, x, y, alpha0, delta0 float64) (ra, dec float64, err 
 		}
 
 		sinT := math.Sqrt(1 - r2)
-		dec = math.Asin(sinT*sinD0 + y*cosD0)
-		ra = alpha0 + math.Atan2(x, sinT*cosD0-y*sinD0)
+		// x and sinT·cosD0 − y·sinD0 are cos(dec) times the sine and cosine
+		// of the right ascension offset; see zenithalToCelestial for why the
+		// declination comes from atan2 rather than asin.
+		n, d := x, sinT*cosD0-y*sinD0
+		dec = math.Atan2(sinT*sinD0+y*cosD0, math.Hypot(n, d))
+		ra = alpha0 + math.Atan2(n, d)
 
 	case "ARC":
 		// Zenithal equidistant: R(θ) = π/2 − θ
@@ -811,8 +828,7 @@ func deproject(proj string, x, y, alpha0, delta0 float64) (ra, dec float64, err 
 
 		theta := math.Pi/2 - r
 		sinT, cosT := math.Sincos(theta)
-		dec = math.Asin(sinT*sinD0 + (y/r)*cosT*cosD0)
-		ra = alpha0 + math.Atan2(x*cosT, r*sinT*cosD0-y*cosT*sinD0)
+		ra, dec = zenithalToCelestial(x, y, r, sinT, cosT, sinD0, cosD0, alpha0)
 
 	case "STG":
 		// Stereographic: R(θ) = 2·tan((π/2−θ)/2)
@@ -823,8 +839,7 @@ func deproject(proj string, x, y, alpha0, delta0 float64) (ra, dec float64, err 
 
 		theta := math.Pi/2 - 2*math.Atan(r/2)
 		sinT, cosT := math.Sincos(theta)
-		dec = math.Asin(sinT*sinD0 + (y/r)*cosT*cosD0)
-		ra = alpha0 + math.Atan2(x*cosT, r*sinT*cosD0-y*cosT*sinD0)
+		ra, dec = zenithalToCelestial(x, y, r, sinT, cosT, sinD0, cosD0, alpha0)
 
 	case "AIT":
 		// Hammer-Aitoff (full-sky equal-area, pseudo-cylindrical, theta_0 = 0).
@@ -836,7 +851,7 @@ func deproject(proj string, x, y, alpha0, delta0 float64) (ra, dec float64, err 
 		}
 
 		z := math.Sqrt(z2)
-		nativeTheta := math.Asin(y * z)
+		nativeTheta := asinUnit(y * z)
 		nativePhi := 2 * math.Atan2(x*z, 2*(2*z2-1))
 
 		// Step 2: Native → celestial rotation.
@@ -846,15 +861,43 @@ func deproject(proj string, x, y, alpha0, delta0 float64) (ra, dec float64, err 
 		//                    −sin(θ)·sin(δ₀) + cos(θ)·cos(δ₀)·cos(φ))
 		sinNT, cosNT := math.Sincos(nativeTheta)
 		sinNP, cosNP := math.Sincos(nativePhi)
-		dec = math.Asin(sinNT*cosD0 + cosNT*sinD0*cosNP)
-		ra = alpha0 + math.Atan2(cosNT*sinNP,
-			-sinNT*sinD0+cosNT*cosD0*cosNP)
+		// The rotation's other two components are cos(dec) times the sine
+		// and cosine of the right ascension offset; see zenithalToCelestial.
+		n, d := cosNT*sinNP, -sinNT*sinD0+cosNT*cosD0*cosNP
+		dec = math.Atan2(sinNT*cosD0+cosNT*sinD0*cosNP, math.Hypot(n, d))
+		ra = alpha0 + math.Atan2(n, d)
 
 	default:
 		return 0, 0, fmt.Errorf("%w: %q", ErrWCSUnsupported, proj)
 	}
 
 	return ra, dec, nil
+}
+
+// zenithalToCelestial turns a zenithal projection's native latitude, given as
+// sinT and cosT, at standard coordinates (x, y) with r = hypot(x, y) > 0,
+// into celestial (ra, dec) about the reference point (alpha0, delta0).
+//
+// n and d are r·cos(dec) times the sine and cosine of the right ascension
+// offset, and r·sinT·sinD0 + y·cosT·cosD0 is r·sin(dec), so the declination
+// is the atan2 of the two. It was the asin of the sine alone, which is
+// ill-conditioned at ±1: within a few milliarcseconds of a celestial pole a
+// one-ulp error in the sine became a 3 mas error in the declination, or
+// pushed the sine past 1 and made it NaN. About one pixel in ten aimed at a
+// pole came back NaN through TAN, ARC and STG (#469).
+func zenithalToCelestial(x, y, r, sinT, cosT, sinD0, cosD0, alpha0 float64) (ra, dec float64) {
+	n := x * cosT
+	d := r*sinT*cosD0 - y*cosT*sinD0
+
+	return alpha0 + math.Atan2(n, d), math.Atan2(r*sinT*sinD0+y*cosT*cosD0, math.Hypot(n, d))
+}
+
+// asinUnit is math.Asin with its argument clamped to [-1, 1]. It is left for
+// Hammer-Aitoff's native latitude, in each direction, which is a sine built
+// from a rotation: within [-1, 1] in exact arithmetic and up to an ulp beyond
+// it in floating point, where math.Asin returns NaN.
+func asinUnit(v float64) float64 {
+	return math.Asin(math.Max(-1, math.Min(1, v)))
 }
 
 // ── FITS Header Extraction ───────────────────────────────────────────────────

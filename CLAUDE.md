@@ -38,13 +38,14 @@ Tests are partitioned by build tag — the default `go test ./...` runs only fas
 
 Every parser that eats bytes from someone else's server or a user's disk is fuzzed. The property under test is "never panics or hangs on attacker-influenceable input," not correctness (that's covered by ordinary tests elsewhere). Seed corpora are `f.Add(...)` literals only — no checked-in binary fixtures — so they run as ordinary tests under `go test ./...` and are part of every CI run for free. Extended fuzzing beyond the seed corpus is a manual, periodic step, not a CI gate — run it when touching a parser.
 
-Six packages carry targets:
+Seven packages carry targets, and `TestEveryFuzzTargetIsDocumented` holds this table to the code in both directions:
 
 | package | targets | what the bytes are |
 | --- | --- | --- |
 | `ephemeris/jpl/spk` | `FuzzNewReaderReadSummaries`, `FuzzEvaluateSegment`, `FuzzReadDoubles` | downloaded SPK kernels |
 | `fits` | `FuzzParseCard`, `FuzzReadHeader`, `FuzzRead` | **arbitrary user files** — the only place astrogo opens one |
 | `ephemeris/satellite` | `FuzzValidateTLE`, `FuzzNewFromTLE` | CelesTrak or user-supplied element sets |
+| `ephemeris/satellite/sgp4` | `FuzzParseTLE`, `FuzzVerifyTLEChecksums` | the same element sets, at the SGP4 backend's own parser and checksum |
 | `catalog/norad` | `FuzzGPToTLE` | CelesTrak JSON, through `ToTLE` into SGP4 |
 | `internal/votable` | `FuzzRead` | SIMBAD / VizieR / Gaia / MAST TAP responses |
 | `time/internal/iers` | `FuzzParseFinals2000A` | the IERS bulletin |

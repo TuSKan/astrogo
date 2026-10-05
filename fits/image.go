@@ -38,33 +38,21 @@ type ImageHDU struct {
 
 // ReadImage reads an N-dimensional FITS image payload mapped directly into an Arrow Tensor representation.
 func ReadImage(h *Header, r io.Reader) (*ImageHDU, error) {
-	bitpix, err := h.GetInt("BITPIX")
+	bitpix, err := requiredInt(h, "BITPIX")
 	if err != nil {
-		return nil, fmt.Errorf("missing or invalid BITPIX: %w", err)
+		return nil, err
 	}
 
-	naxis, err := h.GetInt("NAXIS")
+	fitsAxes, totalPixels, err := dataAxes(h)
 	if err != nil {
-		return nil, fmt.Errorf("missing or invalid NAXIS: %w", err)
+		return nil, err
 	}
 
-	axes := make([]int64, naxis)
-
-	var totalPixels int64 = 1
-
-	for i := 1; i <= naxis; i++ {
-		dim, err := h.GetInt(fmt.Sprintf("NAXIS%d", i))
-		if err != nil {
-			return nil, fmt.Errorf("missing NAXIS%d: %w", i, err)
-		}
-		// FITS axis order is Fortran-contiguous (fastest varying index first).
-		// We'll retain the extents for Tensor metadata.
-		axes[naxis-i] = int64(dim) // C-contiguous flip for Arrow standard
-		totalPixels *= int64(dim)
-	}
-
-	if naxis == 0 {
-		totalPixels = 0
+	// FITS axis order is Fortran-contiguous (fastest varying index first).
+	// We'll retain the extents for Tensor metadata.
+	axes := make([]int64, len(fitsAxes))
+	for i, dim := range fitsAxes {
+		axes[len(fitsAxes)-1-i] = int64(dim) // C-contiguous flip for Arrow standard
 	}
 
 	// Parse BSCALE / BZERO / BLANK from header. Absent, each takes its
@@ -158,22 +146,20 @@ func ReadImage(h *Header, r io.Reader) (*ImageHDU, error) {
 		return nil, fmt.Errorf("%w: %d", ErrInvalidBitpix, bitpix)
 	}
 
-	totalPayloadBytes := totalPixels * pixelBytes
-
-	// Allocate Arrow Buffer
-	mem := memory.NewGoAllocator()
-	buf := memory.NewResizableBuffer(mem)
-	buf.Resize(int(totalPayloadBytes))
+	totalPayloadBytes, err := mulSize(totalPixels, pixelBytes)
+	if err != nil {
+		return nil, err
+	}
 
 	// FITS mandates big-endian byte order for all data.
 	// Arrow tensors expect native byte order. Read the raw stream, then
 	// convert big-endian → native for multi-byte pixel types.
-	rawBytes := buf.Bytes()
-
-	_, err = io.ReadFull(r, rawBytes)
+	rawBytes, err := readDeclared(r, totalPayloadBytes)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read image payload: %w", err)
 	}
+
+	buf := memory.NewBufferBytes(rawBytes)
 
 	swapBigEndianToNative(rawBytes, int(pixelBytes))
 

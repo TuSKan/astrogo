@@ -40,8 +40,20 @@ func ReadASCIITable(h *Header, r io.Reader) (*ASCIITableHDU, error) {
 		return nil, fmt.Errorf("missing TFIELDS: %w", err)
 	}
 
-	rows, _ := h.GetInt("NAXIS2")
-	rowSize, _ := h.GetInt("NAXIS1")
+	rows, err := requiredAxis(h, "NAXIS2")
+	if err != nil {
+		return nil, err
+	}
+
+	rowSize, err := requiredAxis(h, "NAXIS1")
+	if err != nil {
+		return nil, err
+	}
+
+	size, err := mulSize(int64(rowSize), int64(rows))
+	if err != nil {
+		return nil, err
+	}
 
 	hdu := &ASCIITableHDU{
 		header: h, hType: HDUTypeASCII,
@@ -51,7 +63,13 @@ func ReadASCIITable(h *Header, r io.Reader) (*ASCIITableHDU, error) {
 	}
 
 	if rows == 0 || tfields == 0 {
-		return hdu, discardPadding(r, int64(rowSize)*int64(rows))
+		// Nothing to decode, but the rows are there to step over all the
+		// same: padding alone left the next header to be read from them.
+		if _, err := io.CopyN(io.Discard, r, size); err != nil {
+			return nil, fmt.Errorf("fits: skip asciitable rows: %w", err)
+		}
+
+		return hdu, discardPadding(r, size)
 	}
 
 	forms, starts, fields, err := asciiColumns(h, tfields, rowSize)
@@ -59,8 +77,8 @@ func ReadASCIITable(h *Header, r io.Reader) (*ASCIITableHDU, error) {
 		return nil, err
 	}
 
-	payload := make([]byte, int64(rowSize)*int64(rows))
-	if _, err := io.ReadFull(r, payload); err != nil {
+	payload, err := readDeclared(r, size)
+	if err != nil {
 		return nil, fmt.Errorf("fits: failed reading asciitable payload: %w", err)
 	}
 
@@ -86,7 +104,7 @@ func ReadASCIITable(h *Header, r io.Reader) (*ASCIITableHDU, error) {
 
 	hdu.Batch = bldr.NewRecordBatch()
 
-	return hdu, discardPadding(r, int64(rowSize)*int64(rows))
+	return hdu, discardPadding(r, size)
 }
 
 // asciiColumns reads the per-column keywords: where each field starts, how it
@@ -175,7 +193,7 @@ func appendASCIICell(bldr array.Builder, form asciiForm, text string) error {
 func discardPadding(r io.Reader, consumed int64) error {
 	if pad := consumed % int64(BlockSize); pad != 0 {
 		if _, err := io.CopyN(io.Discard, r, int64(BlockSize)-pad); err != nil {
-			return fmt.Errorf("fits: failed reading asciitable padding: %w", err)
+			return fmt.Errorf("fits: failed reading extension padding: %w", err)
 		}
 	}
 

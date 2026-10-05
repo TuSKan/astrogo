@@ -5,7 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/klauspost/pgzip"
@@ -137,7 +139,11 @@ func Read(r io.Reader) (*File, error) {
 		f.HDUs = append(f.HDUs, &basicHDU{header: header, hType: HDUTypeImage})
 
 		// Calculate data payload and skip it
-		size := payloadSize(header)
+		size, err := payloadSize(header)
+		if err != nil {
+			return nil, err
+		}
+
 		if size > 0 {
 			if canSeek {
 				_, err = seeker.Seek(size, io.SeekCurrent)
@@ -160,43 +166,192 @@ func Read(r io.Reader) (*File, error) {
 	return f, nil
 }
 
-func payloadSize(h *Header) int64 {
-	bitpix, _ := h.GetInt("BITPIX")
-	naxis, _ := h.GetInt("NAXIS")
+// payloadSize is the size of an HDU's data, padded to whole blocks, from the
+// structural keywords: BITPIX, NAXIS and NAXISn mandatory, GCOUNT and PCOUNT
+// defaulting only when absent (FITS 4.0 §4.4.1).
+func payloadSize(h *Header) (int64, error) {
+	bitpix, err := requiredInt(h, "BITPIX")
+	if err != nil {
+		return 0, err
+	}
+
+	_, elements, err := dataAxes(h)
+	if err != nil {
+		return 0, err
+	}
 
 	if bitpix < 0 {
 		bitpix = -bitpix
 	}
 
-	var total int64 = 1
-
-	for i := 1; i <= naxis; i++ {
-		dim, _ := h.GetInt(fmt.Sprintf("NAXIS%d", i))
-		total *= int64(dim)
-	}
-
-	if naxis == 0 {
-		total = 0
-	}
-
-	gcount, err := h.GetInt("GCOUNT")
+	gcount, err := optionalCount(h, "GCOUNT", 1)
 	if err != nil {
-		gcount = 1
+		return 0, err
 	}
 
-	pcount, err := h.GetInt("PCOUNT")
+	pcount, err := optionalCount(h, "PCOUNT", 0)
 	if err != nil {
-		pcount = 0
+		return 0, err
 	}
 
-	bytes := (int64(bitpix) / 8) * int64(gcount) * (int64(pcount) + total)
+	if elements > math.MaxInt64-int64(pcount) {
+		return 0, fmt.Errorf("%w: PCOUNT %d + %d elements overflows", errDataSize, pcount, elements)
+	}
+
+	bytes, err := mulSize(int64(bitpix)/8*int64(gcount), int64(pcount)+elements)
+	if err != nil {
+		return 0, err
+	}
 
 	remainder := bytes % int64(BlockSize)
 	if remainder != 0 {
+		if bytes > math.MaxInt64-int64(BlockSize) {
+			return 0, fmt.Errorf("%w: %d bytes cannot be padded to a block", errDataSize, bytes)
+		}
+
 		bytes += int64(BlockSize) - remainder
 	}
 
-	return bytes
+	return bytes, nil
+}
+
+// maxNAXIS is the most axes an HDU may have: "a non-negative integer no
+// greater than 999" (FITS 4.0 §4.4.1.1).
+const maxNAXIS = 999
+
+// dataAxes reads NAXIS and NAXIS1 … NAXISn, returning the lengths in header
+// order and the number of elements they describe: their product, or zero when
+// NAXIS is zero.
+//
+// The product is checked. Unchecked, two axes of 2^32 wrapped to zero, and an
+// image declaring them read as empty with no error; a product wrapping negative
+// sized a buffer, and panicked (#460).
+func dataAxes(h *Header) (axes []int, elements int64, err error) {
+	naxis, err := requiredAxis(h, "NAXIS")
+	if err != nil {
+		return nil, 0, err
+	}
+
+	if naxis > maxNAXIS {
+		return nil, 0, fmt.Errorf("%w: NAXIS = %d exceeds %d", errDataSize, naxis, maxNAXIS)
+	}
+
+	if naxis == 0 {
+		return nil, 0, nil
+	}
+
+	axes = make([]int, naxis)
+	elements = 1
+
+	for i := range axes {
+		axes[i], err = requiredAxis(h, "NAXIS"+strconv.Itoa(i+1))
+		if err != nil {
+			return nil, 0, err
+		}
+
+		elements, err = mulSize(elements, int64(axes[i]))
+		if err != nil {
+			return nil, 0, err
+		}
+	}
+
+	return axes, elements, nil
+}
+
+// growChunk is the first allocation readDeclared makes for a source that
+// cannot say how much it holds. It doubles from there as data arrives.
+const growChunk = 1 << 20
+
+// readDeclared reads the n bytes of data a header declares.
+//
+// A header is not evidence that its data exists. Allocating n up front let a
+// file holding nothing but a header take whatever it claimed: FuzzRead's 2880
+// byte seed declaring a 9999 × 9999 float32 image allocated 400 MB before
+// reaching EOF, on every test run (#461). So memory follows the data rather
+// than the claim. When the source can show the data is there, it is read
+// into one exact allocation; otherwise the buffer grows as bytes arrive, and
+// a claim the source cannot back costs at most twice what it actually sent.
+func readDeclared(r io.Reader, n int64) ([]byte, error) {
+	remaining, ok, err := remainingBytes(r)
+	if err != nil {
+		return nil, err
+	}
+
+	if ok && remaining >= n {
+		buf := make([]byte, n)
+		if _, err := io.ReadFull(r, buf); err != nil {
+			return nil, err //nolint:wrapcheck // the caller wraps with what it was reading
+		}
+
+		return buf, nil
+	}
+
+	// Short by the source's own account, or unable to say. Neither is taken
+	// as the answer: reading is.
+	buf := make([]byte, 0, min(n, growChunk))
+
+	for int64(len(buf)) < n {
+		if len(buf) == cap(buf) {
+			grown := make([]byte, len(buf), min(n, 2*int64(cap(buf))))
+			copy(grown, buf)
+			buf = grown
+		}
+
+		m, err := r.Read(buf[len(buf):cap(buf)])
+		buf = buf[:len(buf)+m]
+
+		switch {
+		case int64(len(buf)) == n:
+			return buf, nil
+		case errors.Is(err, io.EOF):
+			return nil, fmt.Errorf("%w: %d of %d declared bytes", io.ErrUnexpectedEOF, len(buf), n)
+		case err != nil:
+			return nil, err //nolint:wrapcheck // the caller wraps with what it was reading
+		}
+	}
+
+	return buf, nil
+}
+
+// remainingBytes reports how many bytes r holds past its current position,
+// when r can say: it is an io.Seeker, or a BlockReader over one, which reads
+// through without buffering. ok is false when it cannot. The position is left
+// where it was; failing to restore it is the one error.
+func remainingBytes(r io.Reader) (remaining int64, ok bool, err error) {
+	if br, isBlock := r.(*BlockReader); isBlock {
+		r = br.r
+	}
+
+	s, isSeeker := r.(io.Seeker)
+	if !isSeeker {
+		return 0, false, nil
+	}
+
+	cur, err := s.Seek(0, io.SeekCurrent)
+	if err != nil {
+		return 0, false, nil //nolint:nilerr // a seeker that cannot report its position is one that cannot say
+	}
+
+	end, err := s.Seek(0, io.SeekEnd)
+	if err != nil {
+		return 0, false, nil //nolint:nilerr // likewise, and the position has not moved
+	}
+
+	if _, err := s.Seek(cur, io.SeekStart); err != nil {
+		return 0, false, fmt.Errorf("fits: restore read position: %w", err)
+	}
+
+	return end - cur, true, nil
+}
+
+// mulSize multiplies two non-negative sizes, refusing a product an int64
+// cannot hold rather than wrapping.
+func mulSize(a, b int64) (int64, error) {
+	if b != 0 && a > math.MaxInt64/b {
+		return 0, fmt.Errorf("%w: %d × %d overflows", errDataSize, a, b)
+	}
+
+	return a * b, nil
 }
 
 // Two failsafes bound [ReadHeader] against a file with no END card, or with an

@@ -84,6 +84,61 @@ func (h *Header) GetInt(keyword string) (int, error) {
 	return v, nil
 }
 
+// requiredInt reads a keyword the standard makes mandatory: missing and
+// unparsable are both errors, named, and never a zero to carry on with.
+//
+// The structural keywords used to be read with their error discarded, so a
+// BINTABLE whose NAXIS2 was missing or malformed read as a table of no rows
+// with no error, its data neither decoded nor consumed (#460).
+func requiredInt(h *Header, keyword string) (int, error) {
+	v, err := h.GetInt(keyword)
+	if err != nil {
+		return 0, fmt.Errorf("fits: mandatory keyword %s: %w", keyword, err)
+	}
+
+	return v, nil
+}
+
+// requiredAxis is requiredInt for an axis length, which cannot be negative. A
+// negative NAXISn used to size a payload buffer, and panicked (#460).
+func requiredAxis(h *Header, keyword string) (int, error) {
+	v, err := requiredInt(h, keyword)
+	if err != nil {
+		return 0, err
+	}
+
+	if v < 0 {
+		return 0, fmt.Errorf("%w: %s = %d is negative", errDataSize, keyword, v)
+	}
+
+	return v, nil
+}
+
+// optionalCount reads a count the standard lets a header omit, GCOUNT or
+// PCOUNT: absent gives def, but present and unparsable is an error, never def
+// (#411), and so is negative.
+func optionalCount(h *Header, keyword string, def int) (int, error) {
+	v, err := h.GetInt(keyword)
+	if errors.Is(err, ErrKeyNotFound) {
+		return def, nil
+	}
+
+	if err != nil {
+		return 0, err
+	}
+
+	if v < 0 {
+		return 0, fmt.Errorf("%w: %s = %d is negative", errDataSize, keyword, v)
+	}
+
+	return v, nil
+}
+
+// errDataSize is a data size the structural keywords cannot describe: a
+// negative length or count, more axes than the standard allows, or a size too
+// large for an int64.
+var errDataSize = errors.New("fits: unusable data size")
+
 // GetFloat returns the value of a keyword as a float64.
 //
 // The exponent letter may be D as well as E, as the FITS standard allows
