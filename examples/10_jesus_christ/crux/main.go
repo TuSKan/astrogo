@@ -4,8 +4,8 @@
 // Methodology:
 //  1. Compute the vernal equinox for each year
 //  2. Find new moons near the equinox
-//  3. Compute topocentric crescent parameters at Jerusalem sunset
-//  4. Evaluate all 20 modern visibility criteria
+//  3. Find Jerusalem's sunset and moonset on the evenings after each one
+//  4. Evaluate all 20 modern visibility criteria, each in its own convention
 //  5. Count to Nisan 14 and check if it's a Friday
 //
 // Requires DE441 for epoch coverage.
@@ -59,6 +59,11 @@ func main() {
 	jerusalem, err := coord.NewGeodetic(angle.Deg(35.2137), angle.Deg(31.7683), 754)
 	if err != nil {
 		log.Fatalf("jerusalem: %v", err)
+	}
+
+	site, err := plan.NewSite("Jerusalem", jerusalem)
+	if err != nil {
+		log.Fatalf("site: %v", err)
 	}
 
 	fmt.Println("══════════════════════════════════════════════════════════════")
@@ -115,16 +120,22 @@ func main() {
 
 		// For each new moon, check crescent visibility and compute Nisan 14
 		for _, nm := range newMoons {
-			// 3. Estimate crescent visibility
-			// Jerusalem sunset ≈ 18:00 local solar time
-			// Jerusalem is at longitude 35.21°E → UTC offset ≈ +2h21m
-			// So sunset ≈ 15:39 UTC (approximate, varies by season)
+			// 3. Evaluate crescent visibility at each evening's sunset.
+			// Jerusalem is at longitude 35.21°E, so local noon is 09:39 UT;
+			// CrescentVisibility takes the first sunset after it.
 			conjYear, conjMonth, conjDay, _ := nm.Time.Calendar()
 			// Check this and next 2 days for first visible crescent
 			for dayOff := range 3 {
-				sunsetUTC := time.Date(
+				noon := time.Date(
 					conjYear, time.Month(conjMonth), conjDay+dayOff,
-					15, 39, 0, 0, time.LocationUTC)
+					9, 39, 0, 0, time.LocationUTC)
+
+				result, err := plan.CrescentVisibility(noon, site, prov)
+				if err != nil {
+					continue
+				}
+
+				sunsetUTC := result.Sunset
 
 				// Skip if sunset is before conjunction
 				if sunsetUTC.Before(nm.Time) {
@@ -135,14 +146,6 @@ func main() {
 
 				// Moon must be at least 15 hours old for any plausible visibility
 				if ageHours >= 15.0 && ageHours < 72.0 {
-					// Compute topocentric crescent parameters at this sunset
-					params, err := plan.NewCrescentParams(sunsetUTC, jerusalem, prov)
-					if err != nil {
-						continue
-					}
-
-					result := params.EvaluateAll()
-
 					// Check if at least the Danjon elongation criterion is met
 					if !result.Danjon {
 						continue

@@ -34,11 +34,12 @@
 //   - Moon phases, seasons, eclipses — [MoonPhases], [MoonIllumination],
 //     [Seasons], [Apsides], [LunarEclipses], [SolarEclipses], [NextNewMoon],
 //     [NextFullMoon]
-//   - Lunar crescent visibility — [NewCrescentParams]/[CrescentParams], whose
-//     methods (Yallop, Odeh, Qureshi, Fotheringham, Danjon, MABIMS1995,
-//     MABIMS2021, and more) implement the 20 published criteria;
-//     [CrescentParams.EvaluateAll] runs all of them at once into a
-//     [CrescentResult]
+//   - Lunar crescent visibility — [CrescentVisibility] evaluates an evening,
+//     each criterion in the convention it was defined in, into a
+//     [CrescentResult]; [CrescentParams]' methods (Yallop, Odeh, Qureshi,
+//     Fotheringham, Danjon, MABIMS1995, MABIMS2021, and more) implement the 20
+//     published criteria, and [CrescentParams.EvaluateAll] runs all of them
+//     against one set of parameters
 //   - Scheduling — [Scheduler]/[NewScheduler], [Strategy]
 //     ([GreedyStrategy]/[PriorityStrategy]/[SwapOptimizedStrategy]),
 //     [TransitionModel], [Block]/[Schedule]
