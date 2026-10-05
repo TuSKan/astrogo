@@ -2,11 +2,7 @@ package plan
 
 import (
 	"fmt"
-	"math"
 
-	"github.com/TuSKan/astrogo/atmosphere"
-	"github.com/TuSKan/astrogo/coord"
-	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/time"
 )
 
@@ -153,7 +149,6 @@ func (p *CrescentParams) KraussAthenian() bool {
 // old.
 //
 // It read ArcL ≥ 3° AND MAlt ≥ 2° and dropped the age alternative (#496).
-// With Age left zero it still does.
 //
 // MAlt is the Moon's topocentric altitude and ArcL its geocentric elongation,
 // both at sunset, as CrescentVisibility's Params carry them.
@@ -528,112 +523,4 @@ Category 5: Lag Time
 		r.Yallop.String(), r.Odeh.String(), r.Qureshi.String(),
 		yn(r.CaldwellNakedEye), yn(r.CaldwellOptical), yn(r.Gautschy),
 	)
-}
-
-// ── Ephemeris Integration ───────────────────────────────────────────────────
-
-// NewCrescentParams computes topocentric lunar crescent parameters at the
-// given time and observer location using the provided ephemeris.
-//
-// The returned parameters are suitable for direct evaluation with all
-// 20 crescent visibility criteria. The time should normally be shortly
-// after local sunset on the evening of potential first sighting.
-//
-// The crescent width W is approximated using the mean lunar semi-diameter
-// (15.5 arc-minutes) and the geocentric phase angle. The lag time LT is
-// estimated from the Moon's altitude and the diurnal rotation rate.
-// For higher fidelity, compute moonset time directly and pass a manually
-// constructed CrescentParams.
-//
-// Example:
-//
-//	p, err := plan.NewCrescentParams(sunsetTime, jerusalem, prov)
-//	if err != nil { ... }
-//	result := p.EvaluateAll()
-//	fmt.Println(result.String())
-//
-// Deprecated: Use CrescentVisibility. NewCrescentParams gives every criterion
-// one set of parameters, which Yallop's and Odeh's were not defined in, with a
-// constant semi-diameter and a lag estimated from the Moon's altitude (#496).
-func NewCrescentParams(t time.Time, loc *coord.Geodetic, prov eph.Provider) (CrescentParams, error) { //nolint:funcorder // constructor after criteria methods for readability
-	if prov == nil {
-		prov = eph.Default()
-	}
-
-	// Get geocentric ICRS positions for Sun and Moon
-	sunPos, err := eph.Position(prov, eph.Sun, t)
-	if err != nil {
-		return CrescentParams{}, fmt.Errorf("crescent: sun position: %w", err)
-	}
-
-	moonPos, err := eph.Position(prov, eph.Moon, t)
-	if err != nil {
-		return CrescentParams{}, fmt.Errorf("crescent: moon position: %w", err)
-	}
-
-	sunICRS, err := eph.ToICRS(sunPos)
-	if err != nil {
-		return CrescentParams{}, fmt.Errorf("crescent: sun ICRS: %w", err)
-	}
-
-	moonICRS, err := eph.ToICRS(moonPos)
-	if err != nil {
-		return CrescentParams{}, fmt.Errorf("crescent: moon ICRS: %w", err)
-	}
-
-	// Topocentric AltAz for both bodies.
-	//
-	// The comment said "topocentric" and the code was not: ICRSToAltAz treats
-	// its argument as a direction at infinity, so the observer's offset from
-	// the geocenter was discarded. For the Moon that is up to 0.95° — and this
-	// is a crescent-visibility calculation, where the whole question is the
-	// Moon's altitude a few degrees above the horizon shortly after sunset. An
-	// error comparable to the quantity being measured.
-	//
-	// The vectors are already geocentric, so GeocentricToObserved subtracts
-	// the observer directly; no ICRS round trip is involved.
-	ctx := coord.NewContext(t, loc, atmosphere.Refraction{})
-
-	sunAltAz := ctx.GeocentricToObserved(sunPos)
-	moonAltAz := ctx.GeocentricToObserved(moonPos)
-
-	sunAlt := sunAltAz.Alt().Degrees()
-	moonAlt := moonAltAz.Alt().Degrees()
-	sunAz := sunAltAz.Az().Degrees()
-	moonAz := moonAltAz.Az().Degrees()
-
-	// ArcV: altitude difference (Moon − Sun)
-	arcV := moonAlt - sunAlt
-
-	// DAZ: absolute azimuth difference
-	daz := math.Abs(moonAz - sunAz)
-	if daz > 180 {
-		daz = 360 - daz
-	}
-
-	// ArcL: geocentric angular separation (elongation)
-	arcL := coord.Separation(moonICRS, sunICRS).Degrees()
-
-	// W: topocentric crescent width (arc minutes)
-	// W ≈ SD × (1 − cos(elongation)), where SD ≈ 15.5' (mean lunar semi-diameter)
-	const moonSD = 15.5 // arc minutes
-
-	w := moonSD * (1.0 - math.Cos(arcL*math.Pi/180.0))
-
-	// LT: lag time estimate (minutes)
-	// Approximate from Moon altitude and diurnal rotation rate (~15°/hr).
-	// For production use, compute actual moonset time.
-	lt := 0.0
-	if moonAlt > 0 {
-		lt = moonAlt / (15.0 / 60.0) // minutes
-	}
-
-	return CrescentParams{
-		ArcV: arcV,
-		ArcL: arcL,
-		DAZ:  daz,
-		MAlt: moonAlt,
-		W:    w,
-		LT:   lt,
-	}, nil
 }

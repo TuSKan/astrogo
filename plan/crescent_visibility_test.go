@@ -221,6 +221,29 @@ func TestCrescentVisibilityPolarEvenings(t *testing.T) {
 	}
 }
 
+// CrescentVisibility looks the Sun and Moon up through eph.Position directly,
+// not through NewSun and NewMoon, so it needs its own nil-provider default.
+func TestCrescentVisibilityNilProviderIsTheDefault(t *testing.T) {
+	t.Parallel()
+
+	site, evening := portOfSpainEvening(t)
+
+	withNil, err := CrescentVisibility(evening, site, nil)
+	if err != nil {
+		t.Fatalf("CrescentVisibility(nil): %v", err)
+	}
+
+	withDefault, err := CrescentVisibility(evening, site, eph.Default())
+	if err != nil {
+		t.Fatalf("CrescentVisibility(eph.Default()): %v", err)
+	}
+
+	if withNil.Yallop != withDefault.Yallop || !withNil.Sunset.Equal(withDefault.Sunset) {
+		t.Errorf("nil provider gave Yallop %v at sunset %v, eph.Default() %v at %v",
+			withNil.Yallop, withNil.Sunset, withDefault.Yallop, withDefault.Sunset)
+	}
+}
+
 func TestMABIMS1995AcceptsAnEightHourOldMoon(t *testing.T) {
 	t.Parallel()
 
@@ -233,7 +256,6 @@ func TestMABIMS1995AcceptsAnEightHourOldMoon(t *testing.T) {
 		{"age", CrescentParams{MAlt: 2.5, ArcL: 2.5, Age: 8}, true},
 		{"neither", CrescentParams{MAlt: 2.5, ArcL: 2.5, Age: 7.9}, false},
 		{"too low", CrescentParams{MAlt: 1.9, ArcL: 10, Age: 30}, false},
-		{"age left zero", CrescentParams{MAlt: 2.5, ArcL: 2.5}, false},
 	} {
 		if got := c.p.MABIMS1995(); got != c.want {
 			t.Errorf("%s: MABIMS1995(%+v) = %v, want %v", c.name, c.p, got, c.want)

@@ -33,10 +33,10 @@ import (
 //   - MABIMS 1995 ("2-3-8"): the altitude at least 2°, and the elongation at
 //     least 3° or the Moon at least 8 hours old, at sunset.
 //
-// The other criteria read what NewCrescentParams gave them: topocentric,
-// airless altitudes and azimuths, and the geocentric elongation, at sunset —
-// which happens to be MABIMS's convention. Their own conventions are not yet
-// verified against their sources. CrescentResult.Params is that set.
+// The other criteria read topocentric, airless altitudes and azimuths and the
+// geocentric elongation, at sunset — MABIMS's convention. Their own
+// conventions are not yet verified against their sources (#503).
+// CrescentResult.Params is that set.
 //
 // One evaluation builds one coord.Context, at sunset, and derives the best
 // time's from it with AtTime: an hour of AtTime costs ≲0.1″, against these
@@ -367,10 +367,8 @@ func (g crescentGeometry) topocentric(lagMinutes, age float64) CrescentParams {
 // the geocentric elongation, with W from it.
 //
 // That is MABIMS's convention, whose altitude is topocentric and elongation
-// geocentric. It is also what NewCrescentParams gave every criterion, so the
-// criteria whose conventions are not yet verified read what they always did,
-// but for W, which takes the Moon's semi-diameter at the time rather than a
-// constant 15.5′.
+// geocentric, and the one the criteria whose conventions are not yet verified
+// read (#503). W takes the Moon's semi-diameter at the time.
 func (g crescentGeometry) sunset(lagMinutes, age float64) CrescentParams {
 	p := g.topocentric(lagMinutes, age)
 	p.ArcL = g.arclGeo
