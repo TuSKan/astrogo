@@ -1,9 +1,9 @@
 // Example: Evaluate lunar crescent visibility from computed ephemeris.
 //
 // This finds the next New Moon, then evaluates crescent visibility on the
-// following evening from Quinta Calixto using real Sun/Moon positions
-// computed via NewCrescentParams. All 20 modern criteria (1910–2021) are
-// evaluated.
+// following evening from Quinta Calixto with CrescentVisibility, which finds
+// the sunset and moonset and evaluates all 20 modern criteria (1910–2021),
+// each in the convention it was defined in.
 //
 // Reference:
 //
@@ -18,7 +18,6 @@ import (
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/plan"
 	"github.com/TuSKan/astrogo/time"
-	"github.com/TuSKan/astrogo/unit"
 )
 
 func main() {
@@ -45,33 +44,22 @@ func main() {
 
 	fmt.Printf("  Next New Moon: %s\n\n", newMoon.Time)
 
-	// ── Find sunset on the evening after the New Moon ───────────────────
+	// ── Evaluate the first evening after the New Moon ───────────────────
 	// The crescent is typically first visible on the evening following
-	// the astronomical New Moon (conjunction).
-	evening := newMoon.Time
-	nextDay := evening.Add(unit.Days(1))
-
-	_, sunset, err := plan.SunriseSunset(evening, nextDay, site, prov)
-	if err != nil {
-		log.Fatalf("SunriseSunset: %v", err)
-	}
-
-	fmt.Printf("  Sunset (Quinta Calixto): %s\n\n", sunset.Time)
-
-	// ── Compute crescent parameters ~20 min after sunset ────────────────
-	// Best-practice observation window: 15–30 min after sunset, when the
-	// sky is dark enough to see a thin crescent but the Moon is still
+	// the astronomical New Moon (conjunction). CrescentVisibility takes the
+	// first sunset after the instant it is given, the moonset after it, and
+	// Yallop's best time between them, 4/9 of the lag after sunset, when
+	// the sky is dark enough to see a thin crescent but the Moon is still
 	// above the horizon.
-	obsTime := sunset.Time.Add(unit.Minutes(20))
-	fmt.Printf("  Observation time:   %s (sunset + 20 min)\n\n", obsTime)
-
-	params, err := plan.NewCrescentParams(obsTime, site.Location(), prov)
+	result, err := plan.CrescentVisibility(newMoon.Time, site, prov)
 	if err != nil {
-		log.Fatalf("NewCrescentParams: %v", err)
+		log.Fatalf("CrescentVisibility: %v", err)
 	}
 
-	// ── Evaluate all 20 criteria ────────────────────────────────────────
-	result := params.EvaluateAll()
+	fmt.Printf("  Sunset (Quinta Calixto): %s\n", result.Sunset)
+	fmt.Printf("  Moonset:                 %s\n", result.Moonset)
+	fmt.Printf("  Best time:               %s\n\n", result.BestTime)
+
 	fmt.Println(result.String())
 	fmt.Println()
 

@@ -14,8 +14,15 @@ import (
 //
 // This file implements 20 modern lunar crescent visibility criteria published
 // between 1910 and 2021. Each criterion is a pure function of pre-computed
-// topocentric parameters, returning either a boolean (visible/invisible) or
-// a multi-zone classification.
+// parameters, returning either a boolean (visible/invisible) or a multi-zone
+// classification.
+//
+// The criteria were not defined in one convention: Yallop's arc of vision is
+// geocentric and Odeh's topocentric, both at a best time after sunset, and
+// MABIMS pairs a topocentric altitude with a geocentric elongation at sunset.
+// A method reads its CrescentParams as given. CrescentVisibility computes
+// each criterion's parameters in its own convention; crescent_visibility.go
+// lists them, with their sources.
 //
 // Reference:
 //   Al-Jumaili M.H.A., Kamal M.S., Hussain S.A., Hanif N.H.H.M.,
@@ -23,12 +30,13 @@ import (
 //   Malaysian Journal of Science, Vol. 41(3), pp. 46–59, 2022.
 //   https://mjs.um.edu.my/index.php/MJS/article/view/44110/18309
 
-// CrescentParams holds the pre-computed topocentric parameters needed
-// to evaluate lunar crescent visibility criteria.
+// CrescentParams holds the pre-computed parameters needed to evaluate lunar
+// crescent visibility criteria.
 //
-// These values are typically derived from the Sun and Moon's topocentric
-// positions at a specific observer location and time (usually shortly
-// after sunset on the evening of potential first sighting).
+// These values are derived from the Sun and Moon's positions at an observer's
+// location and a time shortly after sunset on the evening of potential first
+// sighting. Which positions, and which time, depends on the criterion:
+// CrescentVisibility fills one set per convention.
 type CrescentParams struct {
 	// ArcV is the Arc of Vision: the angular difference in altitude
 	// between the Sun (below horizon) and the Moon (above horizon),
@@ -53,6 +61,11 @@ type CrescentParams struct {
 	// LT is the Lag Time: the interval between sunset and moonset,
 	// measured in minutes.
 	LT float64
+
+	// Age is the Moon's age, the time since the last new moon, in hours.
+	// MABIMS 1995 accepts an 8-hour-old Moon in place of its elongation
+	// limit; left zero, that alternative never applies.
+	Age float64
 }
 
 // ── Multi-Zone Classification ────────────────────────────────────────────────
@@ -135,13 +148,20 @@ func (p *CrescentParams) KraussAthenian() bool {
 // ── Category 2: Arc of Light & Moon Altitude (Calendrical) ───────────────────
 
 // MABIMS1995 evaluates the original MABIMS (1995) criterion used by
-// Brunei, Indonesia, Malaysia, and Singapore for Islamic calendar determination.
-// The crescent is visible if ArcL ≥ 3° AND MAlt ≥ 2°.
+// Brunei, Indonesia, Malaysia, and Singapore for Islamic calendar determination,
+// the "2-3-8" criterion: MAlt ≥ 2°, AND ArcL ≥ 3° OR the Moon at least 8 hours
+// old.
+//
+// It read ArcL ≥ 3° AND MAlt ≥ 2° and dropped the age alternative (#496).
+// With Age left zero it still does.
+//
+// MAlt is the Moon's topocentric altitude and ArcL its geocentric elongation,
+// both at sunset, as CrescentVisibility's Params carry them.
 //
 // This is the most permissive calendrical criterion and has been
 // superseded by MABIMS2021 for official use.
 func (p *CrescentParams) MABIMS1995() bool {
-	return p.ArcL >= 3.0 && p.MAlt >= 2.0
+	return p.MAlt >= 2.0 && (p.ArcL >= 3.0 || p.Age >= 8.0)
 }
 
 // Istanbul2016 evaluates the Istanbul (2016) criterion adopted by the
@@ -156,6 +176,9 @@ func (p *CrescentParams) Istanbul2016() bool {
 
 // MABIMS2021 evaluates the revised MABIMS (2021) criterion.
 // The crescent is visible if ArcL ≥ 6.4° AND MAlt ≥ 3°.
+//
+// MAlt is the Moon's topocentric altitude and ArcL its geocentric elongation,
+// both at sunset, as CrescentVisibility's Params carry them.
 //
 // This updated criterion replaced MABIMS1995 after extensive review
 // of observational data from Southeast Asian countries.
@@ -241,6 +264,9 @@ func (p *CrescentParams) AlrefayNakedEye() bool {
 //
 // This is one of the most widely used criteria in modern lunar calendar
 // determination and has been adopted by many national observatories.
+//
+// Yallop defined ArcV as geocentric and airless, and W as his W′ from the
+// geocentric elongation, at his best time: CrescentVisibility's Geocentric.
 func (p *CrescentParams) Yallop() CrescentZone {
 	w := p.W
 	q := (p.ArcV - 11.8371 + 6.3226*w - 0.7319*w*w + 0.1018*w*w*w) / 10.0
@@ -278,6 +304,9 @@ func (p *CrescentParams) Yallop() CrescentZone {
 //
 // Odeh's criterion was developed using a large database of over 700
 // observations and is considered one of the most reliable modern criteria.
+//
+// Odeh's ArcV and W are topocentric and airless, at Yallop's best time:
+// CrescentVisibility's Topocentric.
 func (p *CrescentParams) Odeh() CrescentZone {
 	w := p.W
 	v := p.ArcV - (-0.1018*w*w*w + 0.7319*w*w - 6.3226*w + 7.1651)
@@ -363,13 +392,28 @@ func (p *CrescentParams) Gautschy() bool {
 
 // ── Aggregate Evaluation ─────────────────────────────────────────────────────
 
-// CrescentResult holds the evaluation of all 20 visibility criteria
-// against a single set of crescent parameters.
+// CrescentResult holds the evaluation of all 20 visibility criteria.
+//
+// From EvaluateAll, every criterion read one set of parameters. From
+// CrescentVisibility, Yallop read Geocentric, Odeh read Topocentric, and the
+// rest read Params.
 type CrescentResult struct {
-	Qureshi          CrescentZone
-	Odeh             CrescentZone
-	Yallop           CrescentZone
-	Params           CrescentParams
+	Qureshi CrescentZone
+	Odeh    CrescentZone
+	Yallop  CrescentZone
+
+	// Params are the parameters every criterion but Yallop's and Odeh's
+	// read. From CrescentVisibility they are taken at sunset: topocentric,
+	// airless altitudes and azimuths, and the geocentric elongation.
+	Params CrescentParams
+
+	// Set by CrescentVisibility, and zero from EvaluateAll: the evening's
+	// sunset and moonset, the best time Yallop and Odeh are evaluated at,
+	// and the best-time parameters in each one's convention — Geocentric
+	// for Yallop, Topocentric for Odeh.
+	Sunset, Moonset, BestTime time.Time
+	Geocentric, Topocentric   CrescentParams
+
 	KraussAthenian   bool
 	Ilyas1984        bool
 	MABIMS1995       bool
@@ -507,6 +551,10 @@ Category 5: Lag Time
 //	if err != nil { ... }
 //	result := p.EvaluateAll()
 //	fmt.Println(result.String())
+//
+// Deprecated: Use CrescentVisibility. NewCrescentParams gives every criterion
+// one set of parameters, which Yallop's and Odeh's were not defined in, with a
+// constant semi-diameter and a lag estimated from the Moon's altitude (#496).
 func NewCrescentParams(t time.Time, loc *coord.Geodetic, prov eph.Provider) (CrescentParams, error) { //nolint:funcorder // constructor after criteria methods for readability
 	if prov == nil {
 		prov = eph.Default()
