@@ -63,6 +63,24 @@ type TransitionContext struct {
 	FromTime  time.Time // Time when the previous observation ended
 	ToTime    time.Time // Time when the next observation begins (approximate, often FromTime)
 	Site      *Site
+
+	// ContextAt, when set, supplies the coord.Context for an instant at Site.
+	// The built-in strategies set it to the Context cache they evaluate
+	// constraints through, so a model turning targets into alt/az pays an
+	// AtTime rather than a full SOFA rebuild (~93 µs) and sees the same Earth
+	// as the constraints. Nil means build a coord.NewContext per instant, so a
+	// TransitionContext built without it behaves as before (#485).
+	ContextAt func(time.Time) *coord.Context
+}
+
+// contextAt is the Context for t at the transition's site: ContextAt's when
+// set, otherwise a full one.
+func (ctx TransitionContext) contextAt(t time.Time) *coord.Context {
+	if ctx.ContextAt != nil {
+		return ctx.ContextAt(t)
+	}
+
+	return coord.NewContext(t, ctx.Site.Location(), ctx.Site.Refraction())
 }
 
 // TransitionModel evaluates the overhead of moving between two observations.
@@ -119,35 +137,23 @@ func (m *BasicTransitionModel) Overhead(ctx TransitionContext) (time.Duration, e
 			return 0, fmt.Errorf("schedule: to position: %w", err)
 		}
 
-		var altAzFrom, altAzTo coord.AltAz
+		// Same epoch is the common case (ToTime is documented as
+		// "approximate, often FromTime"), and then one Context serves both.
+		fromCtx := ctx.contextAt(ctx.FromTime)
 
-		if ctx.FromTime.Equal(ctx.ToTime) {
-			// Same epoch (the common case — ToTime is documented as
-			// "approximate, often FromTime"): share one Context instead of
-			// building two identical ~91µs SOFA transforms for one instant.
-			epochCtx := coord.NewContext(ctx.FromTime, ctx.Site.Location(), ctx.Site.Refraction())
+		toCtx := fromCtx
+		if !ctx.FromTime.Equal(ctx.ToTime) {
+			toCtx = ctx.contextAt(ctx.ToTime)
+		}
 
-			altAzFrom, err = observedAltAz(ctx.FromBlock.Target, ctx.FromTime, epochCtx, posFrom)
-			if err != nil {
-				return 0, fmt.Errorf("schedule: from AltAz: %w", err)
-			}
+		altAzFrom, err := observedAltAz(ctx.FromBlock.Target, ctx.FromTime, fromCtx, posFrom)
+		if err != nil {
+			return 0, fmt.Errorf("schedule: from AltAz: %w", err)
+		}
 
-			altAzTo, err = observedAltAz(ctx.ToBlock.Target, ctx.ToTime, epochCtx, posTo)
-			if err != nil {
-				return 0, fmt.Errorf("schedule: to AltAz: %w", err)
-			}
-		} else {
-			altAzFrom, err = observedAltAz(ctx.FromBlock.Target, ctx.FromTime,
-				coord.NewContext(ctx.FromTime, ctx.Site.Location(), ctx.Site.Refraction()), posFrom)
-			if err != nil {
-				return 0, fmt.Errorf("schedule: from AltAz: %w", err)
-			}
-
-			altAzTo, err = observedAltAz(ctx.ToBlock.Target, ctx.ToTime,
-				coord.NewContext(ctx.ToTime, ctx.Site.Location(), ctx.Site.Refraction()), posTo)
-			if err != nil {
-				return 0, fmt.Errorf("schedule: to AltAz: %w", err)
-			}
+		altAzTo, err := observedAltAz(ctx.ToBlock.Target, ctx.ToTime, toCtx, posTo)
+		if err != nil {
+			return 0, fmt.Errorf("schedule: to AltAz: %w", err)
 		}
 
 		// Calculate separation on Alt and Az independently.
@@ -398,6 +404,7 @@ func (s *GreedyStrategy) schedule(
 				FromTime:  currentTime,
 				ToTime:    currentTime, // Initial approximation
 				Site:      planner.Site,
+				ContextAt: ctxAt,
 			}
 
 			overhead, err := transition.Overhead(ctx)

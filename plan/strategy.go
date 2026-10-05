@@ -173,6 +173,7 @@ func (s *SwapOptimizedStrategy) swapPass(
 				FromTime:  newJEnd,
 				ToTime:    newJEnd,
 				Site:      planner.Site,
+				ContextAt: ctxAt,
 			}
 
 			oh, err := transition.Overhead(ctx)
@@ -299,6 +300,7 @@ func (s *SwapOptimizedStrategy) insertPass(
 					FromTime:  gap.window.Start,
 					ToTime:    gap.window.Start,
 					Site:      planner.Site,
+					ContextAt: ctxAt,
 				}
 
 				oh, err := transition.Overhead(ctx)
