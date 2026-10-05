@@ -369,14 +369,18 @@ func getMoonPosition(t time.Time) (coord.ICRS, error) {
 //
 // Returns math.Inf(1) if the target is still above threshold at all probe
 // points (circumpolar or very long visibility window).
-func estimateHoursUntilSet(obj Observable, t time.Time, site *Site, currentAlt float64) float64 {
+//
+// Each probe's Context is derived from ctx, the scoring instant's, with
+// AtTime. They were five full Contexts per score; AtTime's error at the
+// furthest probe, eight hours out, is ≲0.8″, against an interpolation whose
+// own error is degrees (#481).
+func estimateHoursUntilSet(obj Observable, t time.Time, ctx *coord.Context, currentAlt float64) float64 {
 	// If already below horizon, urgency is maximum.
 	if currentAlt <= 0 {
 		return 0
 	}
 
 	// Probe at +30m, +1h, +2h, +4h, +8h — 5 evaluations total.
-	// Each probe requires a fresh Context (different epoch than the caller's ctx).
 	probeOffsets := [5]time.Duration{
 		30 * time.Minute,
 		1 * time.Hour,
@@ -393,9 +397,7 @@ func estimateHoursUntilSet(obj Observable, t time.Time, site *Site, currentAlt f
 			continue
 		}
 
-		fctx := coord.NewContext(ft, site.Location(), site.Refraction())
-
-		aa, err := observedAltAz(obj, ft, fctx, pos)
+		aa, err := observedAltAz(obj, ft, ctx.AtTime(ft), pos)
 		if err != nil {
 			continue
 		}
@@ -459,7 +461,12 @@ type Scorer struct {
 // implements the Prioritized interface. A target failing any constraint scores
 // zero.
 func (s Scorer) Score(obj Observable, t time.Time) (float64, error) {
-	eval, err := isObservableCtx(obj, t, s.Site, s.Context, s.Constraints...)
+	ctx := s.Context
+	if ctx == nil {
+		ctx = coord.NewContext(t, s.Site.Location(), s.Site.Refraction())
+	}
+
+	eval, err := isObservableCtx(obj, t, s.Site, ctx, s.Constraints...)
 	if err != nil {
 		return 0, err
 	}
@@ -483,7 +490,7 @@ func (s Scorer) Score(obj Observable, t time.Time) (float64, error) {
 	var urgMerit float64
 
 	if wUrg > 0 {
-		hoursLeft := estimateHoursUntilSet(obj, t, s.Site, altDeg)
+		hoursLeft := estimateHoursUntilSet(obj, t, ctx, altDeg)
 		urgMerit = math.Min(1.0/(math.Max(hoursLeft, 0.5)), 1.0)
 	}
 

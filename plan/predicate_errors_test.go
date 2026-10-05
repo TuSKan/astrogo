@@ -65,7 +65,8 @@ func predicateSite(t *testing.T) *Site {
 //
 // # What was wrong
 //
-// checkConstraintsIntervalCtx read `if err != nil || !res.Pass` and returned a
+// checkConstraintsInterval (then checkConstraintsIntervalCtx) read
+// `if err != nil || !res.Pass` and returned a
 // bare false. So a constraint that could not be evaluated was indistinguishable
 // from one the target genuinely failed: the block was dropped, and the caller
 // received a schedule that looked complete.
@@ -250,11 +251,11 @@ func TestSwapAndInsertPassesReportAConstraintFailure(t *testing.T) {
 		Unscheduled: []UnscheduledBlock{{Block: b1}},
 	}
 
-	if _, err := strategy.swapPass(sched, planner, transition, time.Minute, newTabuList(2), 0); !errors.Is(err, errConstraintUnavailable) {
+	if _, err := strategy.swapPass(sched, planner, transition, time.Minute, plannerContexts(planner), newTabuList(2), 0); !errors.Is(err, errConstraintUnavailable) {
 		t.Errorf("swapPass returned %v, want it to wrap the constraint's error", err)
 	}
 
-	if _, err := strategy.insertPass(sched, planner, window, transition, time.Minute); !errors.Is(err, errConstraintUnavailable) {
+	if _, err := strategy.insertPass(sched, planner, window, transition, time.Minute, plannerContexts(planner)); !errors.Is(err, errConstraintUnavailable) {
 		t.Errorf("insertPass returned %v, want it to wrap the constraint's error", err)
 	}
 }
@@ -353,7 +354,7 @@ func (c endOnlyFailingConstraint) Check(_ Observable, t time.Time, _ *Site) (Res
 // TestConstraintFailureAtTheExactEndIsReported covers the interval check's
 // last step.
 //
-// checkConstraintsIntervalCtx samples from start to end and then, if the two
+// checkConstraintsInterval samples from start to end and then, if the two
 // differ, checks the exact end instant separately — because a step that does
 // not divide the interval leaves the endpoint unsampled, and a block whose
 // last moment violates a constraint is not schedulable.
@@ -370,9 +371,9 @@ func TestConstraintFailureAtTheExactEndIsReported(t *testing.T) {
 	// A step that does not divide the interval, so the loop never lands on end.
 	end := start.Add(unit.Minutes(25))
 
-	_, ok, err := checkConstraintsIntervalCtx(
+	ok, err := checkConstraintsInterval(
 		NewStar("A", angle.Zero(), angle.Zero()),
-		start, end, 10*time.Minute, site,
+		start, end, 10*time.Minute, site, newContextCache(site.Location(), site.Refraction()),
 		endOnlyFailingConstraint{at: end},
 	)
 

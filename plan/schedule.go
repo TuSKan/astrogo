@@ -181,9 +181,10 @@ func (m *BasicTransitionModel) Overhead(ctx TransitionContext) (time.Duration, e
 // linear programming, simulated annealing, genetic algorithms) should implement
 // this interface directly.
 //
-// Performance note: each constraint evaluation creates a new coord.Context
-// (~91 µs). For programs processing >1000 targets, consider pre-caching
-// Context objects and passing them through a custom Strategy implementation.
+// Performance note: the built-in strategies evaluate constraints through one
+// coord.Context per hour of window, deriving each step's with
+// coord.Context.AtTime rather than building a new one (~91 µs). A custom
+// Strategy evaluating many instants can do the same with AtTime.
 type Strategy interface {
 	// Schedule produces a Schedule from the provided Blocks within the given Window.
 	// The implementation should use Planner for constraint evaluation and TransitionModel
@@ -243,15 +244,19 @@ func overheadError(from, to *Block, err error) error {
 	return fmt.Errorf("transition from %s to %s: %w", fromID, to.ID, err)
 }
 
-// checkConstraintsIntervalCtx verifies that all constraints pass continuously
-// over a time range, and returns the coord.Context closest to the interval
-// midpoint. Callers that need to score the same block immediately after
-// constraint checking can reuse this Context instead of creating a redundant
-// one (~91 µs saved per call).
+// checkConstraintsInterval verifies that all constraints pass continuously
+// over a time range.
 //
-// Performance: creates a single coord.Context per time step and shares it
-// across all constraints that implement ConstraintCtx, avoiding redundant
-// SOFA matrix computations.
+// The Context at each step comes from ctxAt, which a strategy builds once per
+// Schedule with newContextCache, and is shared across the constraints that
+// implement ConstraintCtx. It was a full coord.NewContext per step, per
+// candidate placement: 99.5% of a greedy schedule's time (#481).
+//
+// It used to return the Context of the step closest to the interval's
+// midpoint, for scoreBlockPlacement to score the block at the midpoint with.
+// That Context was turned to the step's Earth rotation, not the midpoint's,
+// and they differ whenever the block is not an even number of steps long; the
+// score now takes ctxAt(mid) itself, which the cache makes cheap.
 //
 // # A constraint that fails to evaluate is an error, not a "no"
 //
@@ -266,17 +271,16 @@ func overheadError(from, to *Block, err error) error {
 // #102, where a swallowed error turned a CDS outage into "target not found".
 // The error now propagates: a caller who cannot evaluate their constraints
 // should hear about it rather than receive a quietly shorter plan.
-func checkConstraintsIntervalCtx(target Observable, start, end time.Time, step time.Duration, site *Site, constraints ...Constraint) (*coord.Context, bool, error) {
-	mid := start.Add(end.Sub(start) / 2)
-
-	var midCtx *coord.Context
-
+func checkConstraintsInterval(
+	target Observable,
+	start, end time.Time,
+	step time.Duration,
+	site *Site,
+	ctxAt func(time.Time) *coord.Context,
+	constraints ...Constraint,
+) (bool, error) {
 	check := func(t time.Time) (bool, error) {
-		ctx := coord.NewContext(t, site.Location(), site.Refraction())
-		// Capture the context closest to the midpoint for reuse by scoring.
-		if midCtx == nil || t.Sub(mid).Abs() <= midCtx.Time().Sub(mid).Abs() {
-			midCtx = ctx
-		}
+		ctx := ctxAt(t)
 
 		for _, c := range constraints {
 			var (
@@ -305,12 +309,8 @@ func checkConstraintsIntervalCtx(target Observable, start, end time.Time, step t
 	t := start
 	for t.Before(end) || t.Equal(end) {
 		ok, err := check(t)
-		if err != nil {
-			return nil, false, err
-		}
-
-		if !ok {
-			return nil, false, nil
+		if err != nil || !ok {
+			return false, err
 		}
 
 		t = t.Add(time.FromGoDuration(step))
@@ -318,17 +318,10 @@ func checkConstraintsIntervalCtx(target Observable, start, end time.Time, step t
 
 	// Always check the exact end time as well.
 	if !start.Equal(end) {
-		ok, err := check(end)
-		if err != nil {
-			return nil, false, err
-		}
-
-		if !ok {
-			return nil, false, nil
-		}
+		return check(end)
 	}
 
-	return midCtx, true, nil
+	return true, nil
 }
 
 // GreedyStrategy traverses time forward and schedules the first block in the list
@@ -340,6 +333,18 @@ type GreedyStrategy struct {
 
 // Schedule implements Strategy for GreedyStrategy.
 func (s *GreedyStrategy) Schedule(planner *Planner, window Window, blocks []*Block, transition TransitionModel) (*Schedule, error) {
+	return s.schedule(planner, window, blocks, transition, newContextCache(planner.Site.Location(), planner.Site.Refraction()))
+}
+
+// schedule is Schedule with the Context for each instant supplied by ctxAt,
+// which lets a test run the same pass on a full Context per instant.
+func (s *GreedyStrategy) schedule(
+	planner *Planner,
+	window Window,
+	blocks []*Block,
+	transition TransitionModel,
+	ctxAt func(time.Time) *coord.Context,
+) (*Schedule, error) {
 	step := s.Step
 	if step <= 0 {
 		step = defaultStep
@@ -420,13 +425,13 @@ func (s *GreedyStrategy) Schedule(planner *Planner, window Window, blocks []*Blo
 			allConstraints = append(allConstraints, b.Constraints...)
 
 			// Check observability over the full duration
-			midCtx, ok, err := checkConstraintsIntervalCtx(b.Target, startTime, endTime, step, planner.Site, allConstraints...)
+			ok, err := checkConstraintsInterval(b.Target, startTime, endTime, step, planner.Site, ctxAt, allConstraints...)
 			if err != nil {
 				return nil, fmt.Errorf("plan: greedy: block %s: %w", b.ID, err)
 			}
 
 			if ok {
-				score := scoreBlockPlacement(b, startTime, endTime, planner, midCtx)
+				score := scoreBlockPlacement(b, startTime, endTime, planner, ctxAt)
 				sched.Blocks = append(sched.Blocks, ScheduledBlock{
 					Block:     b,
 					Window:    Window{Start: startTime, End: endTime},
