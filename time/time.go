@@ -1193,8 +1193,12 @@ func (t Time) UTC() Time {
 		// microsecond, and the forward direction in [Time.TT] evaluates at
 		// the same UT year, so the two now agree by construction rather
 		// than by luck.
-		yTT, _, _, _, _ := gofaext.JdToDate(t.jd1, t.jd2)
-		if yTT < 1972 {
+		//
+		// The gate is the TT of 1960-01-01 0h UTC, where [Time.TT] switches
+		// from ΔT to ΔAT (#479). The two readings differ there by a fraction
+		// of a second, so a TT inside that sliver has no UTC on the ΔAT side
+		// and is read through ΔT, the side it is nearer.
+		if t.jd1+t.jd2 < jd1960+(deltaAT(1960, 1, 1, 0)+32.184)/daySeconds {
 			dt := DeltaT(t.DecimalYear())
 			approx := fromPartsPreserveLoc(t, t.jd1, t.jd2-dt/86400.0, UTC)
 			dt = DeltaT(approx.DecimalYear())
@@ -1323,16 +1327,23 @@ func (t Time) TT() Time {
 
 	switch t.scale { //nolint:exhaustive // only UTC/TAI/TDB convert to TT
 	case UTC:
-		// Leap seconds were only introduced 1972-01-01; before that, TAI-UTC
-		// followed pre-1972 rational drift-rate corrections (still nonzero
-		// per SOFA's Dat back to 1960, and zero only before 1960) rather
-		// than integer leap seconds, so ΔAT is not a usable basis for TT
-		// here regardless of what Dat returns. Gate purely on the epoch.
+		// UTC began in 1960, defined against TAI: from then TT = UTC + ΔAT +
+		// 32.184 s, with SOFA's ΔAT, which drifts through the 1960s and jumps
+		// by fractions of a second on the days utcday.go stretches. Before
+		// 1960 there is no UTC, and a UTC label is read as UT through ΔT.
 		//
-		// Gated on the Julian Date of 1972-01-01 0h rather than on a calendar
-		// year, which needs a JdToDate this branch then does again inside
-		// utcToTAI — measured, that duplicate made UTC->TT half as slow again.
-		if t.jd1+t.jd2 < jd1972 {
+		// The gate was 1972, reading 1960–1971 as UT too. That put TT 0.1 s
+		// from SOFA's on those dates, and from this package's own TAI: TT()
+		// and TAI().TT() disagreed for the same instant (#479).
+		//
+		// Gated on a Julian Date rather than on a calendar year, which needs a
+		// JdToDate this branch then does again inside utcToTAI — measured,
+		// that duplicate made UTC->TT half as slow again.
+		//
+		// TT steps at 1960-01-01 0h by the difference of the two readings,
+		// ΔAT + 32.184 s against ΔT(1960): two conventions meeting, as SOFA's
+		// own TAI−UTC does there.
+		if t.jd1+t.jd2 < jd1960 {
 			// Historical date: use ΔT polynomial (TT = UT + ΔT)
 			dt := DeltaT(t.DecimalYear())
 			return fromPartsPreserveLoc(t, t.jd1, t.jd2+dt/86400.0, TT)

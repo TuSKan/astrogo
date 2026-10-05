@@ -4,6 +4,8 @@ import (
 	"math"
 	"testing"
 
+	"github.com/hebl/gofa"
+
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/time"
@@ -624,27 +626,33 @@ func TestTT_FromAllScales(t *testing.T) {
 	testutil.AssertNear(t, "UT1→TT", ttFromUT1.JD(), expectedTT.JD(), 1e-12)
 }
 
-// TestTT_Pre1972UsesDeltaTNotLeapSeconds is a regression test: 1960-1971 dates
-// were previously misclassified as "modern" (leap-second era) because SOFA's
-// Dat returns nonzero rational drift-rate values from 1960 onward, not 0 until
-// 1972 as the old gate assumed, so this window silently used ΔAT+32.184s (the
-// drift-rate table) instead of the intended ΔT polynomial. Note: across this
-// whole window the two formulas happen to agree to within ~0.01-0.13s (both
-// track the same era's Earth-rotation/atomic-time divergence), so the
-// practical numerical impact is small — this test exists to confirm the
-// *formula* matches the code's documented design intent, not to demonstrate a
-// large numerical discrepancy.
-func TestTT_Pre1972UsesDeltaTNotLeapSeconds(t *testing.T) {
+// TestTT_UTCIsUTBefore1960AndSOFAsFrom1960 states where TT stops reading UTC
+// as UT. Before 1960 there is no UTC, and the ΔT polynomial is the bridge. From
+// 1960 UTC is defined against TAI, and TT = UTC + ΔAT + 32.184 s with SOFA's
+// drifting ΔAT (#479).
+//
+// This test used to pin the opposite: ΔT throughout 1960–1971, gated on 1972.
+// That gate was written against code that read "SOFA's Dat is zero" as "before
+// 1972", which Dat only answers before 1960, and it chose ΔT for the 1960s as
+// the documented design. #479 chose SOFA's convention there instead. Across
+// the era the two readings differ by 0.01–0.13 s; 0.09 s at this date.
+func TestTT_UTCIsUTBefore1960AndSOFAsFrom1960(t *testing.T) {
+	early := time.FromGo(time.GoDate(1955, 6, 15, 0, 0, 0, 0, time.LocationUTC))
+	earlyOffset := (early.TT().JD() - early.JD()) * 86400.0
+	testutil.AssertNear(t, "TT-UTC offset before 1960 (ΔT)", earlyOffset, time.DeltaT(early.DecimalYear()), 1e-4)
+
 	utc := time.FromGo(time.GoDate(1965, 6, 15, 0, 0, 0, 0, time.LocationUTC))
-	tt := utc.TT()
+	offsetSeconds := (utc.TT().JD() - utc.JD()) * 86400.0
 
-	offsetSeconds := (tt.JD() - utc.JD()) * 86400.0
-	expectedDT := time.DeltaT(utc.DecimalYear())
+	// SOFA's own TAI−UTC for that instant, asked of gofa rather than restated.
+	// 1e-4 s absorbs float64 noise from JD() collapsing the two-part
+	// representation.
+	var dat float64
+	if status := gofa.Dat(1965, 6, 15, 0, &dat); status != 0 {
+		t.Fatalf("gofa.Dat status %d", status)
+	}
 
-	// 1e-4s tolerance absorbs float64 noise from JD() collapsing the
-	// two-part representation, while still being tighter than the ~0.09s
-	// gap between ΔT and the old (buggy) drift-table value at this date.
-	testutil.AssertNear(t, "TT-UTC offset (ΔT-based)", offsetSeconds, expectedDT, 1e-4)
+	testutil.AssertNear(t, "TT-UTC offset in 1965 (SOFA's ΔAT)", offsetSeconds, dat+32.184, 1e-4)
 
 	// The true 1972-01-01 boundary itself must still use the leap-second path.
 	boundary := time.FromGo(time.GoDate(1972, 1, 1, 0, 0, 0, 0, time.LocationUTC))

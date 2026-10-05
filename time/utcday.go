@@ -77,10 +77,12 @@ type utcSteps struct {
 }
 
 // builtinStepDays are the days of the month on which gofa's record ends a day
-// with a step: 30 June and 31 December, since every entry it has takes effect
-// on 1 January or 1 July — which is also the only place buildUTCSteps looks
-// for them, so this is true by construction rather than by observation.
-const builtinStepDays uint32 = 1<<30 | 1<<31
+// with a step. Its leap seconds take effect on 1 January or 1 July, so end 30
+// June and 31 December; its 1960s jumps (see addRubberSteps) take effect on
+// the 1st of other months too, and the days before those that occur are the
+// 28th (1965-02-28), the 30th and the 31st. TestStepDaysCoverTheIndex holds
+// this to the index rather than to this comment.
+const builtinStepDays uint32 = 1<<28 | 1<<30 | 1<<31
 
 // stepDays returns the day-of-month mask for the leap-second table in force: a
 // bit set for every day of the month that ends a day with a step, in any year.
@@ -161,7 +163,61 @@ func buildUTCSteps(entries []LeapSecond) *utcSteps {
 		consider(e.Year, e.Month, e.Day)
 	}
 
+	addRubberSteps(s, entries)
+
 	return s
+}
+
+// addRubberSteps indexes the 1960s days that end in a fractional step of
+// TAI−UTC, which [Time] reads as SOFA does since #479.
+//
+// From 1960 to 1971 UTC was steered by rate offsets — "rubber seconds" — and
+// by occasional jumps of 0.05 to 0.1 s. iauDtf2d stretches a day that ends in
+// such a jump, and iauUtctai and iauUtcut1 read its fraction that way, exactly
+// as for a leap second. The jump is SOFA's dleap: what TAI−UTC does across the
+// midnight beyond the day's own drift, dleap = dat24 − (dat0 + dlod), with
+// dlod = 2(dat12 − dat0). Every jump takes effect on the 1st of a month.
+//
+// 1959-12-31 is not one, though SOFA's table makes it look like one: TAI−UTC
+// is undefined before 1960 and SOFA reads it as zero, so the first day of the
+// table is a 1.42 s "jump" that UTC never made. astrogo reads UTC before 1960
+// as UT through ΔT, so that day is not a UTC day at all here.
+func addRubberSteps(s *utcSteps, entries []LeapSecond) {
+	for y := 1960; y <= 1971; y++ {
+		for m := 1; m <= 12; m++ {
+			if y == 1960 && m == 1 {
+				continue
+			}
+
+			py, pm, pd := dayBefore(y, m, 1)
+
+			dat0 := deltaATIn(entries, py, pm, pd, 0)
+			dlod := 2 * (deltaATIn(entries, py, pm, pd, 0.5) - dat0)
+
+			dleap := deltaATIn(entries, y, m, 1, 0) - (dat0 + dlod)
+			if math.Abs(dleap) < 1e-9 {
+				continue
+			}
+
+			mjd := mjdOf(py, pm, pd)
+			s.leap[mjd] = dleap
+			s.first = min(s.first, mjd)
+			s.last = max(s.last, mjd)
+		}
+	}
+
+	// The last of them, 1971-12-31, is the jump to the leap-second era's first
+	// whole count, 10 s. The loop stops at 1971-12-01, so it is taken here.
+	py, pm, pd := dayBefore(1972, 1, 1)
+
+	dat0 := deltaATIn(entries, py, pm, pd, 0)
+	dlod := 2 * (deltaATIn(entries, py, pm, pd, 0.5) - dat0)
+
+	if dleap := deltaATIn(entries, 1972, 1, 1, 0) - (dat0 + dlod); math.Abs(dleap) >= 1e-9 {
+		mjd := mjdOf(py, pm, pd)
+		s.leap[mjd] = dleap
+		s.first = min(s.first, mjd)
+	}
 }
 
 // mjdOf returns the MJD of 0h on a Gregorian calendar date.
@@ -191,6 +247,25 @@ func utcDayOf(jd1, jd2 float64) (mjd int, frac float64) {
 	return int(day), (jd1 - mjdZero - day) + jd2
 }
 
+// stepDayOf is the MJD of the UTC day a label belongs to, as gofaext.JdToDate
+// names it, for the conversions that read a label's date from JdToDate and its
+// step from the index.
+//
+// utcDayOf floors the sum of the parts, and a label within an ulp below
+// midnight sums to the integer: it names the next day, with a fraction a hair
+// below zero, where JdToDate names the earlier day with a fraction a hair below
+// one. Reading the date from one and the step from the other cost a whole leap
+// second at 23:59:60.99999997 (#499). utcDayOf itself is right for what label
+// arithmetic asks of it, where a uniform label on midnight means midnight.
+func stepDayOf(jd1, jd2 float64) int {
+	mjd, frac := utcDayOf(jd1, jd2)
+	if frac < 0 {
+		mjd--
+	}
+
+	return mjd
+}
+
 // utcToTAI converts a UTC two-part Julian Date to TAI. iauUtctai, against
 // [deltaAT].
 //
@@ -207,9 +282,17 @@ func utcToTAI(jd1, jd2 float64) (float64, float64) {
 	// the part that costs: measured, fetching it on every call added 6.5 ns,
 	// 16%, to BenchmarkUTCToTAI.
 	if stepDays()&(1<<uint(d)) != 0 {
-		mjd, _ := utcDayOf(jd1, jd2)
-		if leap := currentUTCSteps().leapAtEnd(mjd); leap != 0 {
-			return jd1, jd2 + (fd*leap+deltaAT(y, m, d, 0))/daySeconds
+		if leap := currentUTCSteps().leapAtEnd(stepDayOf(jd1, jd2)); leap != 0 {
+			// iauUtctai: the fraction is of the stretched day, so it is
+			// rescaled to SI seconds, si, and then by the day's own drift in
+			// TAI−UTC, dlod, before ΔAT at 0h is added. dlod is the 1960s rate
+			// offset and exactly zero from 1972, where this reduces to the
+			// leap-second arithmetic it always was, bit for bit.
+			dat0 := deltaAT(y, m, d, 0)
+			dlod := 2 * (deltaAT(y, m, d, 0.5) - dat0)
+			si := fd * (daySeconds + leap) / daySeconds
+
+			return jd1, jd2 + (fd*leap+si*dlod+dat0)/daySeconds
 		}
 	}
 
@@ -287,9 +370,13 @@ func utcFromLabel(jd1, jd2 float64) (float64, float64) {
 // On an ordinary day that is the addition [Time.UT1] always did. On a
 // leap-second day the UTC fraction is of an 86401-second day, so the sum is
 // formed in TAI instead, with ΔAT as it stood at 0h: UT1 = TAI + (DUT1 − ΔAT).
+//
+// Every UTC day from 1960 to 1971 goes the TAI way too, as it does in
+// iauUtcut1: TAI−UTC drifted through those days, and SOFA holds UT1−TAI at its
+// 0h value across each, which puts UT1 up to the day's drift (~1.3 ms) from
+// UTC + DUT1 by evening. astrogo follows SOFA there since #479.
 func ut1FromUTC(jd1, jd2, dut1 float64) (float64, float64) {
-	mjd, _ := utcDayOf(jd1, jd2)
-	if currentUTCSteps().leapAtEnd(mjd) == 0 {
+	if currentUTCSteps().leapAtEnd(stepDayOf(jd1, jd2)) == 0 && !inRubberEra(jd1, jd2) {
 		return jd1, jd2 + dut1/daySeconds
 	}
 
@@ -312,7 +399,7 @@ func utcFromUT1(jd1, jd2 float64) (float64, float64) {
 	steps := currentUTCSteps()
 
 	mjd, _ := utcDayOf(u1, u2)
-	if steps.leapAtEnd(mjd) == 0 && steps.leapAtEnd(mjd-1) == 0 {
+	if steps.leapAtEnd(mjd) == 0 && steps.leapAtEnd(mjd-1) == 0 && !inRubberEra(u1, u2) {
 		return u1, u2
 	}
 
@@ -338,30 +425,53 @@ func utcFromUT1(jd1, jd2 float64) (float64, float64) {
 // UTC day: in UTC+1 the same instant is 00:59:60 on the following date.
 // [utcComponents] converts without passing the second through, since handing
 // 60 to the standard library is exactly what normalizes it away.
+//
+// The same holds for a 1960s day that ends in a positive fractional jump
+// (#479): its last minute runs to 60 + the jump, as iauDtf2d allows, so
+// 23:59:60.04 is a real instant on a day that gained 0.05 s.
 func dateInLeapSecond(year int, month Month, day, hour, minute, second, nanosecond int, loc *Location) (Time, bool) {
 	y, m, d, hh, mm := utcComponents(year, month, day, hour, minute, loc)
-	if hh != 23 || mm != 59 || !leapSecondEndsDay(y, int(m), d) {
+	if hh != 23 || mm != 59 {
+		return Time{}, false
+	}
+
+	leap := currentUTCSteps().leapAtEnd(mjdOf(y, int(m), d))
+	if leap <= 0 {
 		return Time{}, false
 	}
 
 	sec := float64(second) + float64(nanosecond)/1e9
-	if sec >= 61 {
+	if sec >= 60+leap {
 		return Time{}, false
 	}
 
 	// 23:59 is 86340 seconds into the day, and the fraction is of the day's
-	// own 86401 — iauDtf2d exactly.
+	// own length, 86400 + the step — iauDtf2d exactly.
 	jd1, jd2, _ := gofaext.Dtf2d("UTC", y, int(m), d, 0, 0, 0)
 
-	result := FromJDParts(jd1, jd2+(86340+sec)/(daySeconds+1), UTC)
+	result := FromJDParts(jd1, jd2+(86340+sec)/(daySeconds+leap), UTC)
 	result.loc = loc
 
 	return result, true
 }
 
 // jd1972 is the Julian Date of 1972-01-01 00:00 UTC, where the leap-second era
-// begins and [Time.TT] stops using the ΔT polynomial for UTC.
+// begins.
 const jd1972 = 2441317.5
+
+// jd1960 is the Julian Date of 1960-01-01 00:00 UTC, where UTC begins and
+// [Time.TT] stops using the ΔT polynomial for UTC (#479). Before it, a UTC
+// label is read as UT; from it, through SOFA's TAI−UTC.
+const jd1960 = 2436934.5
+
+// inRubberEra reports whether a UTC two-part Julian Date falls from 1960 to
+// 1971, when TAI−UTC drifted ("rubber seconds") rather than stepping by whole
+// seconds.
+func inRubberEra(jd1, jd2 float64) bool {
+	jd := jd1 + jd2
+
+	return jd >= jd1960 && jd < jd1972
+}
 
 // fromUTCOnStepDay converts a UTC epoch on a day of the month that can end in a
 // leap second, adding offset seconds on top of TAI — 0 for TAI, 32.184 for TT.
