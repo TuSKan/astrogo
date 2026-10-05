@@ -11,7 +11,6 @@ import (
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/internal/gofaext"
 	"github.com/TuSKan/astrogo/time"
-	"github.com/TuSKan/astrogo/unit"
 )
 
 // timescaleSite is the site the time-scale tests share.
@@ -77,13 +76,15 @@ func TestContextRotatesStarsByItsOwnUT1(t *testing.T) {
 // TestContextAstrometryUnchangedFrom1972 holds the unification to changing
 // nothing where the two derivations already agreed: from 1972 on, a Context's
 // astrometry and equation of the origins are what SOFA's Apco13 builds from
-// the UTC date itself, bit for bit.
+// the UTC date itself, to the last bits of a float64.
 //
-// On a leap-second day the numbers that depend on Earth rotation are allowed
-// their last bits: astrogo and SOFA form UT1 on an 86401-second day by
-// different arithmetic that rounds differently, and the observer's position
-// and velocity follow the rotation angle. Measured, the angle moves by
-// 2.1e-14 rad on 2016-12-31, which is 3e-10 s of UT1.
+// Not bit for bit, though amd64 gets that on every ordinary day. astrogo and
+// SOFA form TT and UT1 by different sums, and those round differently in the
+// last bit where arm64 fuses a multiply and an add (macOS CI failed this on an
+// ordinary day in 1987), and everywhere on a leap-second day, whose 86401
+// seconds the two divide by different arithmetic. Measured on amd64, the
+// rotation angle moves by 2.1e-14 rad on 2016-12-31, which is 3e-10 s of UT1;
+// the bound is 1e-13, five times that and nowhere near anything physical.
 func TestContextAstrometryUnchangedFrom1972(t *testing.T) {
 	t.Parallel()
 
@@ -116,36 +117,15 @@ func TestContextAstrometryUnchangedFrom1972(t *testing.T) {
 			atm.Pressure, atm.Temperature, atm.Humidity, atm.Wavelength,
 			&want, &wantEO)
 
-		if ctx.eo != wantEO {
-			t.Fatalf("%v: the equation of the origins is not Apco13's", epoch)
+		if d := math.Abs(ctx.eo - wantEO); d > 1e-13 {
+			t.Fatalf("%v: the equation of the origins differs from Apco13's by %.3g rad", epoch, d)
 		}
 
-		if leapSecondDay(epoch) {
-			if d := maxDiff(reflect.ValueOf(ctx.astrom), reflect.ValueOf(want)); d > 1e-13 {
-				t.Fatalf("%v, a leap-second day: the astrometry differs from Apco13's by %.3g", epoch, d)
-			}
-
-			continue
-		}
-
-		if ctx.astrom != want {
-			t.Fatalf("%v: from 1972 on a Context's astrometry must be Apco13's from the UTC date, bit for bit", epoch)
+		if d := maxDiff(reflect.ValueOf(ctx.astrom), reflect.ValueOf(want)); d > 1e-13 {
+			t.Fatalf("%v: from 1972 on a Context's astrometry must be Apco13's from the UTC date; it differs by %.3g",
+				epoch, d)
 		}
 	}
-}
-
-// leapSecondDay reports whether t's UTC day ends in a leap second, by SOFA's
-// table: TAI−UTC a whole second larger at the next day's 0h.
-func leapSecondDay(t time.Time) bool {
-	y, m, d, _, _ := gofaext.JdToDate(t.UTC().JDParts())
-	ny, nm, nd, _, _ := gofaext.JdToDate(time.Date(y, time.Month(m), d, 12, 0, 0, 0, time.LocationUTC).Add(unit.Days(1)).JDParts())
-
-	var today, tomorrow float64
-
-	gofa.Dat(y, m, d, 0, &today)
-	gofa.Dat(ny, nm, nd, 0, &tomorrow)
-
-	return tomorrow-today == 1
 }
 
 // maxDiff is the largest difference between corresponding numbers of two
