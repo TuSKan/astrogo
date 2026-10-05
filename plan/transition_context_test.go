@@ -1,7 +1,9 @@
 package plan
 
 import (
+	"errors"
 	"math"
+	"strings"
 	"testing"
 
 	"github.com/TuSKan/astrogo/angle"
@@ -9,6 +11,54 @@ import (
 	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
+
+// TransitionContext was comparable before it carried a Context source, so a
+// caller may compare two with ==. The source is a pointer so that it stays
+// comparable; a func field would not, and this would not compile.
+func TestTransitionContextStaysComparable(t *testing.T) {
+	t.Parallel()
+
+	plain := TransitionContext{}
+	cached := TransitionContext{contexts: &contextSource{}}
+
+	if plain == cached {
+		t.Error("a TransitionContext with a Context source compares equal to one without")
+	}
+}
+
+// A target Overhead can place but cannot turn into alt/az fails the slew from
+// either end, rather than slewing from a zero position.
+func TestOverheadReportsAnEndItCannotObserve(t *testing.T) {
+	t.Parallel()
+
+	loc, err := coord.NewGeodetic(angle.Deg(-70.4), angle.Deg(-24.6), 2635)
+	if err != nil {
+		t.Fatalf("NewGeodetic: %v", err)
+	}
+
+	site, err := NewSite("s", loc)
+	if err != nil {
+		t.Fatalf("NewSite: %v", err)
+	}
+
+	star := &Block{ID: "star", Target: NewStar("a", angle.Hour(5.5), angle.Deg(-5))}
+	moving := &Block{ID: "moving", Target: errMovingBody{}}
+	model := &BasicTransitionModel{SlewRate: 2}
+	start := time.Date(2026, time.March, 20, 1, 0, 0, 0, time.LocationUTC)
+
+	for _, c := range []struct {
+		name     string
+		from, to *Block
+	}{
+		{"from AltAz", moving, star},
+		{"to AltAz", star, moving},
+	} {
+		_, err := model.Overhead(TransitionContext{FromBlock: c.from, ToBlock: c.to, FromTime: start, ToTime: start, Site: site})
+		if !errors.Is(err, errMovingBodyFails) || !strings.Contains(err.Error(), c.name) {
+			t.Errorf("%s: Overhead returned %v, want the %s failure", c.name, err, c.name)
+		}
+	}
+}
 
 // TestOverheadThroughTheContextCache is #485: a TransitionContext carrying the
 // strategy's Context cache gives the slew the full-Context answer, at AtTime's
@@ -42,11 +92,11 @@ func TestOverheadThroughTheContextCache(t *testing.T) {
 		}
 
 		asked := 0
-		tc.ContextAt = func(at time.Time) *coord.Context {
+		tc.contexts = &contextSource{at: func(at time.Time) *coord.Context {
 			asked++
 
 			return cache(at)
-		}
+		}}
 
 		cached, err := model.Overhead(tc)
 		if err != nil {

@@ -136,6 +136,7 @@ func (s *SwapOptimizedStrategy) swapPass(
 ) (bool, error) {
 	improved := false
 	n := len(sched.Blocks)
+	contexts := &contextSource{at: ctxAt}
 
 	// Pre-compute merged constraints per block to avoid re-allocating on every candidate.
 	mergedC := make(map[string][]Constraint, n)
@@ -173,7 +174,7 @@ func (s *SwapOptimizedStrategy) swapPass(
 				FromTime:  newJEnd,
 				ToTime:    newJEnd,
 				Site:      planner.Site,
-				ContextAt: ctxAt,
+				contexts:  contexts,
 			}
 
 			oh, err := transition.Overhead(ctx)
@@ -263,6 +264,7 @@ func (s *SwapOptimizedStrategy) insertPass(
 
 	improved := false
 	remaining := make([]UnscheduledBlock, 0, len(sched.Unscheduled))
+	contexts := &contextSource{at: ctxAt}
 
 	// Sort unscheduled by priority (highest first) for best gap allocation.
 	sortedUnsched := make([]UnscheduledBlock, len(sched.Unscheduled))
@@ -300,7 +302,7 @@ func (s *SwapOptimizedStrategy) insertPass(
 					FromTime:  gap.window.Start,
 					ToTime:    gap.window.Start,
 					Site:      planner.Site,
-					ContextAt: ctxAt,
+					contexts:  contexts,
 				}
 
 				oh, err := transition.Overhead(ctx)

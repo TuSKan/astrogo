@@ -64,20 +64,28 @@ type TransitionContext struct {
 	ToTime    time.Time // Time when the next observation begins (approximate, often FromTime)
 	Site      *Site
 
-	// ContextAt, when set, supplies the coord.Context for an instant at Site.
-	// The built-in strategies set it to the Context cache they evaluate
-	// constraints through, so a model turning targets into alt/az pays an
-	// AtTime rather than a full SOFA rebuild (~93 µs) and sees the same Earth
-	// as the constraints. Nil means build a coord.NewContext per instant, so a
-	// TransitionContext built without it behaves as before (#485).
-	ContextAt func(time.Time) *coord.Context
+	// contexts is the Context cache of the strategy that built this
+	// TransitionContext, nil outside the built-in ones. A pointer rather
+	// than the func itself, so that TransitionContext stays comparable.
+	contexts *contextSource
 }
 
-// contextAt is the Context for t at the transition's site: ContextAt's when
-// set, otherwise a full one.
-func (ctx TransitionContext) contextAt(t time.Time) *coord.Context {
-	if ctx.ContextAt != nil {
-		return ctx.ContextAt(t)
+// contextSource is a strategy's Context cache, as a TransitionContext carries
+// it.
+type contextSource struct {
+	at func(time.Time) *coord.Context
+}
+
+// ContextAt is the coord.Context for an instant at Site.
+//
+// Inside the built-in strategies it comes from the cache they evaluate
+// constraints through, so a model turning targets into alt/az pays an AtTime
+// rather than a full SOFA rebuild (~93 µs), and sees the same Earth as the
+// constraints did. A TransitionContext built anywhere else gets a new
+// coord.NewContext per call, as Overhead always built (#485).
+func (ctx TransitionContext) ContextAt(t time.Time) *coord.Context {
+	if ctx.contexts != nil {
+		return ctx.contexts.at(t)
 	}
 
 	return coord.NewContext(t, ctx.Site.Location(), ctx.Site.Refraction())
@@ -139,11 +147,11 @@ func (m *BasicTransitionModel) Overhead(ctx TransitionContext) (time.Duration, e
 
 		// Same epoch is the common case (ToTime is documented as
 		// "approximate, often FromTime"), and then one Context serves both.
-		fromCtx := ctx.contextAt(ctx.FromTime)
+		fromCtx := ctx.ContextAt(ctx.FromTime)
 
 		toCtx := fromCtx
 		if !ctx.FromTime.Equal(ctx.ToTime) {
-			toCtx = ctx.contextAt(ctx.ToTime)
+			toCtx = ctx.ContextAt(ctx.ToTime)
 		}
 
 		altAzFrom, err := observedAltAz(ctx.FromBlock.Target, ctx.FromTime, fromCtx, posFrom)
@@ -356,6 +364,8 @@ func (s *GreedyStrategy) schedule(
 		step = defaultStep
 	}
 
+	contexts := &contextSource{at: ctxAt}
+
 	sched := &Schedule{
 		Site:   planner.Site,
 		Window: window,
@@ -404,7 +414,7 @@ func (s *GreedyStrategy) schedule(
 				FromTime:  currentTime,
 				ToTime:    currentTime, // Initial approximation
 				Site:      planner.Site,
-				ContextAt: ctxAt,
+				contexts:  contexts,
 			}
 
 			overhead, err := transition.Overhead(ctx)
