@@ -13,6 +13,7 @@ import (
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
+	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/skybrightness/dataset/starlight"
 	"github.com/TuSKan/astrogo/time"
 )
@@ -273,6 +274,43 @@ func TestSourceIDTilingAgreesAcrossOrders(t *testing.T) {
 // mode being guarded against is taking the 18,693 Hipparcos stars absent from
 // gaiadr3.hipparcos2_best_neighbour as the missing set, which double-counts
 // nearly all of them.
+// brightStarServicesControl is a request each of FetchBrightStars's two
+// services cannot reject when working. A degraded VizieR answered every query
+// with "400 1 unresolved identifiers" (#492), which reads as a malformed query
+// of ours; a working one answers this.
+//
+// The error does not say which service rejected the query, so the control asks
+// both, and a rejection by either skips. That would hide a malformed query to
+// one service while the other is degraded, which is the price of not parsing
+// error text for a service name.
+func brightStarServicesControl(t *testing.T) func() error {
+	t.Helper()
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	t.Cleanup(cancel)
+
+	controls := make([]func() error, 0, 2)
+
+	for _, svc := range []struct {
+		id   remote.EndpointID
+		from string
+	}{
+		{remote.VizieR, `"I/239/hip_main"`},
+		{remote.GaiaTAP, "gaiadr3.gaia_source"},
+	} {
+		syncURL, err := remote.URL(svc.id)
+		if err != nil {
+			t.Fatalf("%s endpoint: %v", svc.id, err)
+		}
+
+		controls = append(controls, testutil.TAPControl(ctx, syncURL, svc.from))
+	}
+
+	return func() error {
+		return errors.Join(controls[0](), controls[1]())
+	}
+}
+
 func TestFetchBrightStarsFindsTheSaturatedStars(t *testing.T) {
 	t.Parallel()
 
@@ -285,7 +323,7 @@ func TestFetchBrightStarsFindsTheSaturatedStars(t *testing.T) {
 	stars, err := starlight.FetchBrightStars(ctx,
 		starlight.BrightStarLimitV, starlight.BrightStarMatchRadius)
 	if err != nil {
-		testutil.SkipOnUpstreamFailure(t, err)
+		testutil.SkipOnDegradedService(t, err, brightStarServicesControl(t))
 		t.Fatalf("FetchBrightStars: %v", err)
 	}
 
