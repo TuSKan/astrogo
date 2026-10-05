@@ -70,6 +70,11 @@ type RankedObject struct {
 // RankObservable ranks objects by their maximum altitude within the given
 // time window. Only objects that satisfy constraints at least once in the
 // window are included. Objects are evaluated concurrently.
+//
+// The maximum comes from [TransitEstimate], whose coarse scan steps ten
+// minutes. That finds a star's or a planet's culmination, but can step over a
+// satellite pass, which lasts a few minutes; rank satellites by
+// [SatellitePasses] instead.
 func (p *Planner) RankObservable(objects []Observable, start, end time.Time) ([]RankedObject, error) {
 	type scored struct {
 		obj   Observable
@@ -78,20 +83,12 @@ func (p *Planner) RankObservable(objects []Observable, start, end time.Time) ([]
 	}
 
 	results, err := parallel.Map(objects, 0, func(_ int, obj Observable) (scored, error) {
-		// TransitEstimate only needs coord.Object's ICRS(t) — prefer a
-		// native implementation if obj happens to have one, otherwise
-		// wrap it via observableObject, which forwards to Observable's own
-		// Position(t). No concrete Observable in this package (Star,
-		// Planet, Asteroid, Satellite, ...) implements coord.Object
-		// directly, so this wrap is what makes RankObservable actually
-		// work for any of them, not just a hypothetical caller-supplied
-		// type that happens to implement both interfaces.
-		skyObj, ok := obj.(coord.Object)
-		if !ok {
-			skyObj = observableObject{obj}
-		}
-
-		transitTime, peakAlt, err := TransitEstimate(skyObj, p.Site, start, end)
+		// TransitEstimate only needs coord.Object's ICRS(t). No concrete
+		// Observable in this package (Star, Planet, Asteroid, Satellite, ...)
+		// implements coord.Object directly, so asObject wraps it, keeping
+		// MovingBody: the peak altitude is the score, and for the Moon or a
+		// satellite it is only right from the observer's position (#483).
+		transitTime, peakAlt, err := TransitEstimate(asObject(obj), p.Site, start, end)
 		if err != nil {
 			return scored{}, err
 		}

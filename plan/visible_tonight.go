@@ -630,9 +630,34 @@ func gatherSolarSystemCandidates(provider eph.Provider, at time.Time, magLimit f
 // TransitEstimate requires — Observable.Position(t) and coord.Object.ICRS(t)
 // are the identical operation under different names, so this is a pure
 // rename, not a behavior change.
+//
+// Use asObject rather than this directly. Embedding the Observable interface
+// gives the wrapper Observable's methods and no others, so a wrapped Moon or
+// satellite stops being a MovingBody and is read as a star at infinity: the
+// ISS ranked at 64° while below the horizon (#483).
 type observableObject struct{ Observable }
 
 func (o observableObject) ICRS(t time.Time) (coord.ICRS, error) { return o.Position(t) }
+
+// movingBodyObject is observableObject for a MovingBody, keeping GeocentricVec
+// so observedAltAz still takes the topocentric path.
+type movingBodyObject struct{ MovingBody }
+
+func (o movingBodyObject) ICRS(t time.Time) (coord.ICRS, error) { return o.Position(t) }
+
+// asObject returns obj as a coord.Object: itself if it already is one, and
+// otherwise a wrapper that keeps MovingBody when obj has it.
+func asObject(obj Observable) coord.Object {
+	if o, ok := obj.(coord.Object); ok {
+		return o
+	}
+
+	if mb, ok := obj.(MovingBody); ok {
+		return movingBodyObject{mb}
+	}
+
+	return observableObject{obj}
+}
 
 // evaluateCandidate runs the shared downstream pipeline every category goes
 // through identically: horizon windows, rise/transit/set, the real best-
@@ -728,7 +753,7 @@ func evaluateCandidate(ctx context.Context, c visibleCandidate, start, end time.
 	// falls outside [start, end].
 	w := windows[0]
 
-	peakTime, _, err := TransitEstimate(observableObject{obj}, site, w.Start, w.End)
+	peakTime, _, err := TransitEstimate(asObject(obj), site, w.Start, w.End)
 	if err != nil {
 		return skipped("transit estimate", err)
 	}
