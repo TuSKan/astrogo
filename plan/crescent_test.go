@@ -325,4 +325,18 @@ func TestCrescentResultStringNamesEveryCriterion(t *testing.T) {
 			t.Errorf("String() omits %q:\n%s", want, s)
 		}
 	}
+
+	// One verdict visible, the rest not, each on its own line.
+	s = CrescentResult{Danjon: CrescentVerdict{Visible: true}}.String()
+
+	for line := range strings.Lines(s) {
+		visible := strings.Contains(line, " visible ") && !strings.Contains(line, "not visible")
+
+		switch {
+		case strings.Contains(line, "Danjon") && !visible:
+			t.Errorf("the visible Danjon verdict reads %q", line)
+		case !strings.Contains(line, "Danjon") && visible:
+			t.Errorf("a verdict that is not visible reads %q", line)
+		}
+	}
 }

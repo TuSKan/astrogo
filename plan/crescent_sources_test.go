@@ -1,6 +1,7 @@
 package plan
 
 import (
+	"errors"
 	"math"
 	"testing"
 
@@ -168,6 +169,99 @@ func TestGeometricSunsetIsTheSunOnTheHorizon(t *testing.T) {
 
 	if early := r.Sunset.Sub(r.GeometricSunset).Minutes(); early < 2 || early > 6 {
 		t.Errorf("geometric sunset %.2f min before sunset, want a few minutes", early)
+	}
+}
+
+// Where the Sun sinks too slowly for Newton's method from sunset, the event
+// solver finds geometric sunset instead: at Longyearbyen on 2025-04-17, two
+// days before the midnight Sun, it comes an hour before the almanac's, the
+// Sun's center 0.83° above the horizon at sunset falling 0.0001° a second.
+// At midday under the midnight Sun nothing set the day before, and that is
+// reported.
+func TestGeometricSunsetWhereTheSunSetsSlowly(t *testing.T) {
+	t.Parallel()
+
+	site := crescentSite(t, 78.22, 15.65)
+	prov := eph.Default()
+
+	e, found, err := firstEvent(SunEvents, time.Date(2025, 4, 17, 10, 0, 0, 0, time.LocationUTC), 1, site, prov, isSet)
+	if err != nil || !found {
+		t.Fatalf("sunset: found %v, err %v", found, err)
+	}
+
+	ctx := coord.NewContext(e.Time, site.Location(), atmosphere.Refraction{})
+
+	geometric, err := geometricSunset(ctx, e.Time, site, prov)
+	if err != nil {
+		t.Fatalf("geometricSunset: %v", err)
+	}
+
+	g, err := crescentGeometryAt(ctx.AtTime(geometric), prov)
+	if err != nil {
+		t.Fatalf("crescentGeometryAt: %v", err)
+	}
+
+	if alt, early := g.sunGeo.Alt().Degrees(), e.Time.Sub(geometric).Minutes(); math.Abs(alt) > 0.01 || early < 50 || early > 70 {
+		t.Errorf("geometric sunset %.1f min before sunset, the Sun's center at %.4f°", early, alt)
+	}
+
+	noon := time.Date(2025, 6, 21, 11, 0, 0, 0, time.LocationUTC)
+	if _, err := geometricSunset(coord.NewContext(noon, site.Location(), atmosphere.Refraction{}), noon, site, prov); !errors.Is(err, errNoSunset) {
+		t.Errorf("under the midnight Sun: err = %v, want errNoSunset", err)
+	}
+}
+
+// A failed lookup of the Sun in the search for geometric sunset is
+// reported: either of Newton's two, and one in the solver's fallback.
+func TestGeometricSunsetReportsAFailedLookup(t *testing.T) {
+	t.Parallel()
+
+	prov := eph.Default()
+
+	for _, c := range []struct {
+		name string
+		site *Site
+		day  time.Time
+		// fails picks the failing lookups, given the sunset.
+		fails func(sunset, at time.Time) bool
+	}{
+		{"at sunset", crescentSite(t, 10.65, -61.52), time.Date(2025, 3, 29, 16, 0, 0, 0, time.LocationUTC),
+			func(sunset, at time.Time) bool { return at.Equal(sunset) }},
+		{"half a minute on", crescentSite(t, 10.65, -61.52), time.Date(2025, 3, 29, 16, 0, 0, 0, time.LocationUTC),
+			func(sunset, at time.Time) bool { return at.Equal(sunset.Add(unit.Seconds(30))) }},
+		{"in the fallback", crescentSite(t, 78.22, 15.65), time.Date(2025, 4, 17, 10, 0, 0, 0, time.LocationUTC),
+			func(sunset, at time.Time) bool { return at.Before(sunset.Add(unit.Minutes(-70))) }},
+	} {
+		e, found, err := firstEvent(SunEvents, c.day, 1, c.site, prov, isSet)
+		if err != nil || !found {
+			t.Fatalf("%s: sunset: found %v, err %v", c.name, found, err)
+		}
+
+		failing := failingWhenProvider{Provider: prov, fails: func(id eph.ID, at time.Time) bool {
+			return id == eph.Sun && c.fails(e.Time, at)
+		}}
+
+		ctx := coord.NewContext(e.Time, c.site.Location(), atmosphere.Refraction{})
+		if _, err := geometricSunset(ctx, e.Time, c.site, failing); !errors.Is(err, errFailingWhen) {
+			t.Errorf("%s: err = %v, want the lookup's error", c.name, err)
+		}
+	}
+
+	// Through CrescentVisibility: the sunset search never looks half a minute
+	// past the sunset it finds, Newton's method does.
+	site, evening := portOfSpainEvening(t)
+
+	r, err := CrescentVisibility(evening, site, prov)
+	if err != nil {
+		t.Fatalf("CrescentVisibility: %v", err)
+	}
+
+	failing := failingWhenProvider{Provider: prov, fails: func(id eph.ID, at time.Time) bool {
+		return id == eph.Sun && at.Equal(r.Sunset.Add(unit.Seconds(30)))
+	}}
+
+	if _, err := CrescentVisibility(evening, site, failing); !errors.Is(err, errFailingWhen) {
+		t.Errorf("CrescentVisibility: err = %v, want the lookup's error", err)
 	}
 }
 
