@@ -368,6 +368,18 @@ func Ee06a(date1, date2 float64) float64 {
 	return gofa.Ee06a(date1, date2)
 }
 
+// Ee06aFromBPN is [Ee06a] for a caller that already holds the
+// bias-precession-nutation matrix rnpb at the same TT, from [Pnm06a].
+//
+// SOFA's Ee06a is Anpm(Gst06a(0, 0, tt) − Gmst06(0, 0, tt)), and Gst06a is
+// Gst06 applied to Pnm06a's matrix, so given that matrix this is Ee06a's own
+// arithmetic, bit for bit, without evaluating the precession-nutation series
+// a second time. ephemeris/satellite computed both for every state and so
+// evaluated the series twice per call (#476).
+func Ee06aFromBPN(date1, date2 float64, rnpb [3][3]float64) float64 {
+	return gofa.Anpm(gofa.Gst06(0, 0, date1, date2, rnpb) - gofa.Gmst06(0, 0, date1, date2))
+}
+
 // Pmsafe applies stellar space motion (proper motion, parallax, radial
 // velocity) to propagate a catalog position from one epoch to another,
 // guarding against the near-zero-parallax case that would otherwise make
