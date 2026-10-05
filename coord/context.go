@@ -59,14 +59,25 @@ type Context struct {
 	eo float64
 }
 
-// NewContext prepares the astrometry parameters for a specific observer time and site.
-// The input time is defensively converted to UTC internally, since SOFA's Apco13
-// expects UTC. Callers may pass any time scale; the conversion is a no-op for UTC.
+// NewContext prepares the astrometry parameters for a specific observer time
+// and site. Callers may pass any time scale.
+//
+// # One time scale per Context
+//
+// Everything a Context holds is built from one TT, t.TT(), and one UT1,
+// t.UT1Using with the epoch's DUT1: the astrometry the stellar path reads, the
+// celestial-to-intermediate matrix the vector path and AtTime read, and the
+// Earth rotation both apply.
+//
+// It used to hand SOFA's Apco13 the UTC date and let it derive its own TT and
+// UT1 from SOFA's TAI−UTC table, while deriving astrogo's for everything else.
+// From 1972 on the two agree. Before, they did not: astrogo's ΔT against
+// SOFA's TAI−UTC put the TTs up to 34 s apart, and on the eleven days SOFA
+// stretches for a step in TAI−UTC (1959-12-31, ten in the 1960s, 1971-12-31)
+// the UT1s differed by up to 0.82 s, so a star and the Moon in one Context
+// were rotated by different Earths, 11.8″ apart (#474).
 func NewContext(t time.Time, site *Geodetic, atm atmosphere.Refraction) *Context {
-	// SOFA Apco13 requires UTC two-part JD. Enforce UTC regardless of input scale
-	// to prevent silent corruption of the ASTROM cache.
 	t = t.UTC()
-	jd1, jd2 := t.JDParts()
 	eop := t.EOP()
 
 	p := atm.Pressure
@@ -74,42 +85,32 @@ func NewContext(t time.Time, site *Geodetic, atm atmosphere.Refraction) *Context
 		p = 0.0 // Custom model overrides internal SOFA refraction
 	}
 
-	// Apco13's second return is the equation of the origins, the angle
-	// between the true equinox and the CIO. It is what separates the CIRS
-	// place this Context computes from the equinox-based apparent place an
-	// almanac quotes, and discarding it used to leave that conversion
-	// unreachable. See [Context.CIRSToTETE].
-	astrom, eo := gofaext.Apco13(
-		jd1, jd2, eop.DUT1,
-		site.Lon().Radians(), site.Lat().Radians(), site.Height().Meters(),
-		eop.XP, eop.YP,
-		p, atm.Temperature, atm.Humidity, atm.Wavelength,
-	)
-
-	// Precompute the C2t06a matrix and observer ICRS vector once, via its
-	// decomposed factors (rc2i, rpom) rather than the monolithic call, so
-	// AtTime can later recompute mat from a fresh Earth Rotation Angle
-	// alone without rebuilding the slow precession-nutation/polar-motion
-	// factors. Bit-identical to a direct C2t06a call.
 	// UT1 through time rather than by adding DUT1 to the UTC Julian Date: on
 	// a day that ends in a leap second that date's fraction is of 86401
 	// seconds, and the sum would misplace Earth's rotation by up to a second.
 	ut1, ut2 := t.UT1Using(eop.DUT1).JDParts()
 	tt1, tt2 := t.TT().JDParts()
 
-	// Apco13 has already built the celestial-to-intermediate matrix, as
-	// astrom.Bpn, from the same precession-nutation series C2i06a evaluates:
-	// building it again here cost a third of every NewContext, for the same
-	// matrix (#473). Apco13 built it at its own TT, though, derived from UTC
-	// through the leap-second table, so it is reused only where that TT is
-	// t.TT() to within 1e-14 day, which from 1972 on it always is. Before
-	// 1972 t.TT() follows ΔT, the two differ by up to 34 s, and the matrix is
-	// built at t.TT() as it always has been.
-	rc2i := astrom.Bpn
-	if a1, a2 := gofaext.UTCToTT(jd1, jd2); math.Abs((a1-tt1)+(a2-tt2)) > 1e-14 {
-		rc2i = gofaext.C2i06a(tt1, tt2)
-	}
+	// ApcoAt is SOFA's Apco13 given this Context's TT and UT1 rather than
+	// deriving its own. Its second return is the equation of the origins, the
+	// angle between the true equinox and the CIO. It is what separates the
+	// CIRS place this Context computes from the equinox-based apparent place
+	// an almanac quotes, and discarding it used to leave that conversion
+	// unreachable. See [Context.CIRSToTETE].
+	astrom, eo := gofaext.ApcoAt(
+		tt1, tt2, ut1, ut2,
+		site.Lon().Radians(), site.Lat().Radians(), site.Height().Meters(),
+		eop.XP, eop.YP,
+		p, atm.Temperature, atm.Humidity, atm.Wavelength,
+	)
 
+	// The celestial-to-intermediate matrix, which ApcoAt has already built as
+	// astrom.Bpn from the precession-nutation series: evaluating it again with
+	// C2i06a cost a third of every NewContext (#473). Held apart from Earth
+	// rotation and polar motion, so AtTime can recompute mat from a fresh
+	// Earth Rotation Angle alone. C2tcio(rc2i, era, rpom) is bit-identical to
+	// a direct C2t06a call at the same TT and UT1.
+	rc2i := astrom.Bpn
 	sp := gofaext.Sp00(tt1, tt2)
 	rpom := gofaext.Pom00(eop.XP, eop.YP, sp)
 	era0 := gofaext.Era00(ut1, ut2)
@@ -463,28 +464,26 @@ func (ctx *Context) ICRSToHourAngle(c ICRS) (angle.Angle, error) {
 }
 
 // AltAzToICRS converts local observed AltAz back into geometric ICRS.
-// NOTE: Atoc13 is used because the reverse pipeline requires the observation type ('A').
-// The EOP data cached at Context construction is reused to avoid a redundant IERS lookup.
+//
+// It inverts with the astrometry this Context already holds, through SOFA's
+// quick inverse (Atoiq, then Aticq), which is what Atoc13 does after building
+// that astrometry itself. It used to call Atoc13, so every inversion evaluated
+// the precession-nutation series again on a Context built to cache it, and did
+// so at SOFA's own TT and UT1 rather than this Context's: on the days #474
+// names, the inverse of ICRSToAltAz was not ICRSToAltAz's inverse.
 func (ctx *Context) AltAzToICRS(c AltAz) (ICRS, error) {
-	jd1, jd2 := ctx.t.JDParts()
-
-	p := ctx.atm.Pressure
 	geomAlt := c.Alt()
 
+	// The astrometry already carries this Context's refraction constants,
+	// built with zero pressure when a custom model is in charge; that model's
+	// refraction is taken out here instead.
 	if ctx.atm.Model != nil {
-		p = 0.0
 		R := ctx.atm.Model.RefractFromApparent(c.Alt(), ctx.atm)
 		geomAlt = angle.Rad(c.Alt().Radians() - R.Radians())
 	}
 
-	ra, dec := gofaext.Atoc13(
-		"A",
-		c.Az().Radians(), math.Pi/2-geomAlt.Radians(),
-		jd1, jd2, ctx.eop.DUT1,
-		ctx.site.Lon().Radians(), ctx.site.Lat().Radians(), ctx.site.Height().Meters(),
-		ctx.eop.XP, ctx.eop.YP,
-		p, ctx.atm.Temperature, ctx.atm.Humidity, ctx.atm.Wavelength,
-	)
+	ri, di := gofaext.Atoiq("A", c.Az().Radians(), math.Pi/2-geomAlt.Radians(), &ctx.astrom)
+	ra, dec := gofaext.Aticq(ri, di, &ctx.astrom)
 
 	return NewICRS(angle.Rad(ra).Wrap360(), angle.Rad(dec)), nil
 }

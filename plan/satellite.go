@@ -369,7 +369,7 @@ func SatellitePasses(prov eph.Provider, name string, start, end time.Time,
 			currentPass.Duration, _ = time.ToGoDuration(setTime.Sub(currentPass.Rise.Time))
 
 			// Find culmination (max elevation) between rise and set.
-			if currentPass.Culmination, err = findCulmination(prov, observer, currentPass.Rise.Time, setTime); err != nil {
+			if currentPass.Culmination, err = findCulmination(prov, observer, ctxAt, currentPass.Rise.Time, setTime); err != nil {
 				return nil, fmt.Errorf("satellite passes: culmination: %w", err)
 			}
 
@@ -383,17 +383,22 @@ func SatellitePasses(prov eph.Provider, name string, start, end time.Time,
 
 // findCulmination finds the point of maximum elevation during a pass
 // by sampling at 5-second intervals and refining the peak.
+//
+// Samples are looked up through ctxAt, the Context cache the pass scan
+// itself uses, rather than a full coord.NewContext at each one: it built
+// about 130 per pass, each a full evaluation of the precession-nutation
+// series, where the cache derives them from one with Context.AtTime (#476).
+// The culmination it reports is computed from a full Context at the chosen
+// instant, as rise and set are, so the cache decides only which sample wins.
 func findCulmination(prov eph.Provider, observer *coord.Geodetic,
-	start, end time.Time,
+	ctxAt func(time.Time) *coord.Context, start, end time.Time,
 ) (PassEvent, error) {
 	step := unit.Seconds(5)
 	bestTime := start
 	bestEl := -90.0
 
 	for t := start; !t.After(end); t = t.Add(step) {
-		ctx := coord.NewContext(t, observer, defaultAtm)
-
-		altaz, err := LookAngle(prov, 0, ctx)
+		altaz, err := LookAngle(prov, 0, ctxAt(t))
 		if err != nil {
 			return PassEvent{}, err
 		}
@@ -416,9 +421,7 @@ func findCulmination(prov eph.Provider, observer *coord.Geodetic,
 	}
 
 	for t := refineStart; !t.After(refineEnd); t = t.Add(unit.Seconds(1)) {
-		ctx := coord.NewContext(t, observer, defaultAtm)
-
-		altaz, err := LookAngle(prov, 0, ctx)
+		altaz, err := LookAngle(prov, 0, ctxAt(t))
 		if err != nil {
 			return PassEvent{}, err
 		}
