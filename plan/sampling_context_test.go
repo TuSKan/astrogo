@@ -148,11 +148,17 @@ func TestObservableWindowsThroughTheContextCache(t *testing.T) {
 // TestTransitEstimateThroughTheContextCache is the same for TransitEstimate,
 // once per day of each window.
 //
-// The transit time is held to maxBoundaryShift like a window boundary
-// (measured, at most 1 ms). The altitude is read through a full Context at
-// the refined instant on both sides, and the maximum is flat, so the two agree
-// to nanoarcseconds; 1 mas is a bound on anything physical rather than on
-// rounding.
+// The altitude is what a culmination is, and it is held tightly: it is read
+// through a full Context at the refined instant on both sides and the maximum
+// is flat, so the two agree to nanoarcseconds, and 1 mas bounds anything
+// physical rather than rounding.
+//
+// The instant is held only to the 1 s the solver refines to, unlike a window
+// boundary. A crossing is steep, so its time is well conditioned; a maximum is
+// flat, so its time is not, and where Brent's search stops inside its
+// tolerance is decided by the last bits. amd64 put both sides within 1 ms;
+// macOS arm64, where a multiply and an add can fuse, put the Moon's 30 ms
+// apart with the altitude still agreeing.
 func TestTransitEstimateThroughTheContextCache(t *testing.T) {
 	t.Parallel()
 
@@ -168,7 +174,7 @@ func TestTransitEstimateThroughTheContextCache(t *testing.T) {
 				t.Fatalf("%s: reference: %v", c.name, err)
 			}
 
-			if dt := math.Abs(gotT.Sub(wantT).Seconds()); dt > maxBoundaryShift {
+			if dt := math.Abs(gotT.Sub(wantT).Seconds()); dt > DefaultSolver().Tolerance.Seconds() {
 				t.Errorf("%s %v: transit at %v, %.3f s from the full-Context %v", c.name, day, gotT, dt, wantT)
 			}
 
