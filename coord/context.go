@@ -8,6 +8,7 @@ import (
 	"github.com/TuSKan/astrogo/constants"
 	"github.com/TuSKan/astrogo/internal/gofaext"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 	"github.com/TuSKan/astrogo/vector"
 )
 
@@ -329,6 +330,11 @@ func (ctx *Context) AstrometricToObserved(c Astrometric) AltAz {
 // constants per call rather than reusing the cache. The two are pinned against
 // each other by TestNilModelMatchesExplicitSOFAModel, which measures agreement
 // to 0.012 arcsec above 3 degrees and 0.7 milliarcsecond above 5 degrees.
+//
+// The result carries the topocentric distance, |v − observer|, with v read in
+// AU as the observer vector is. It used to carry none: Dist() was zero, while
+// ICRSToAltAz passes its input's distance through, and a satellite's
+// TargetDetails read that zero as its range (#495).
 func (ctx *Context) GeocentricToObserved(v vector.Vec3) AltAz {
 	// Topocentric vector in ICRS frame.
 	topoVec := v.Sub(ctx.obsVec)
@@ -363,7 +369,10 @@ func (ctx *Context) GeocentricToObserved(v vector.Vec3) AltAz {
 		alt = refractLikeAtioq(E, N, U, 1, ctx.astrom.Refa, ctx.astrom.Refb)
 	}
 
-	return NewAltAz(alt, angle.Rad(azimuth))
+	aa := NewAltAz(alt, angle.Rad(azimuth))
+	aa.SetDist(unit.AU(topoVec.Norm()))
+
+	return aa
 }
 
 // Refraction clamps, copied from SOFA's iauAtioq rather than chosen here.
