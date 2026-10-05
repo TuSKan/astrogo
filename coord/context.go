@@ -200,23 +200,33 @@ func icrsFromTIRS(mat [3][3]float64, tirs vector.Vec3) vector.Vec3 {
 // AtTime derives a new Context at instant t from this one, cheaply updating
 // only Earth-rotation-dependent state (the ASTROM Earth Rotation Angle, the
 // celestial-to-terrestrial matrix, and the observer vector) while reusing
-// this Context's precession-nutation, Earth ephemeris, polar motion, cached
-// EOP, and site/atmosphere state. Cost is O(1) (a handful of trig calls and
-// matrix multiplies) versus NewContext's ~91 µs full SOFA rebuild.
+// this Context's precession-nutation, Earth ephemeris, polar motion, and
+// site/atmosphere state. Cost is O(1) (a handful of trig calls, matrix
+// multiplies and one EOP lookup) versus NewContext's ~91 µs full SOFA rebuild.
 //
 // Accuracy: holding precession-nutation and aberration fixed costs ≲0.1″ per
 // hour of |t − ctx.Time()| — dominated by nutation's ~13.66-day term
 // (≈0.025″/h) and the annual-aberration direction's drift (≈0.015″/h);
-// precession (≈0.006″/h) and reusing this Context's DUT1/polar-motion
-// (<0.001″/h combined) are smaller still. At the horizon's steepest crossing
-// rate, 0.1″ of positional error is under 0.01 s of rise/set-time bias.
-// Callers sweeping longer spans should rebuild a fresh NewContext
-// periodically rather than calling AtTime indefinitely far from ctx.Time().
+// precession (≈0.006″/h) and reusing this Context's polar motion
+// (<0.001″/h) are smaller still. At the horizon's steepest crossing rate,
+// 0.1″ of positional error is under 0.01 s of rise/set-time bias. Callers
+// sweeping longer spans should rebuild a fresh NewContext periodically rather
+// than calling AtTime indefinitely far from ctx.Time().
+//
+// # DUT1 is t's own, not reused
+//
+// Reusing the base's DUT1 cost under a millisecond of UT1 per hour on an
+// ordinary day, which is why it used to be reused. Across a leap second it
+// costs a whole second: DUT1 = UT1 − UTC jumps by exactly one second there,
+// because UTC steps back and UT1 does not, so a base built before the leap put
+// every instant after it a second early in Earth rotation — 13″ for a star at
+// −30°, against the 0.1″ above (#489). Looking DUT1 up at t, as NewContext
+// does, costs one interpolation.
 func (ctx *Context) AtTime(t time.Time) *Context {
 	t = t.UTC()
-	// The cached DUT1, applied by time so that a leap-second day is handled;
-	// see the same step in NewContext.
-	ut1, ut2 := t.UT1Using(ctx.eop.DUT1).JDParts()
+	// t's own DUT1, applied by time so that a leap-second day is handled; see
+	// the same step in NewContext.
+	ut1, ut2 := t.UT1Using(t.EOP().DUT1).JDParts()
 	era := gofaext.Era00(ut1, ut2)
 
 	c := ctx.Clone()
