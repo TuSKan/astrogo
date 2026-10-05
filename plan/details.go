@@ -234,10 +234,11 @@ func fillMovingBody(d *TargetDetails, mb MovingBody, t time.Time, ctx *coord.Con
 	d.Distance = unit.AU(topoDist)
 	d.DistanceUnit = "a.u."
 
-	// A satellite's distance comes from the Reducer pipeline rather than the
-	// geocentric subtraction above, and is conventionally read in km.
+	// A satellite's distance is the same topocentric one, conventionally read
+	// in km. This used to replace it with altaz.Dist(), on the claim that it
+	// came from "the Reducer pipeline"; GeocentricToObserved set no distance,
+	// so every satellite's details read 0 km (#495).
 	if _, isSat := mb.(*Satellite); isSat {
-		d.Distance = altaz.Dist()
 		d.DistanceUnit = "km"
 
 		return
