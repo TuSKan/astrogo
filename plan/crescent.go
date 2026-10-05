@@ -2,65 +2,77 @@ package plan
 
 import (
 	"fmt"
+	"math"
+	"strings"
 
 	"github.com/TuSKan/astrogo/time"
 )
 
 // ── Lunar Crescent Visibility Criteria ───────────────────────────────────────
 //
-// This file implements 20 modern lunar crescent visibility criteria published
-// between 1910 and 2021. Each criterion is a pure function of pre-computed
-// parameters, returning either a boolean (visible/invisible) or a multi-zone
-// classification.
+// Eighteen published criteria for the first visibility of the young lunar
+// crescent, 1910–2021, each a pure function of CrescentParams returning a
+// verdict or a zone.
 //
-// The criteria were not defined in one convention: Yallop's arc of vision is
-// geocentric and Odeh's topocentric, both at a best time after sunset, and
-// MABIMS pairs a topocentric altitude with a geocentric elongation at sunset.
-// A method reads its CrescentParams as given. CrescentVisibility computes
-// each criterion's parameters in its own convention; crescent_visibility.go
-// lists them, with their sources.
+// The criteria were not defined in one convention. Each author computed his
+// quantities in his own way and at his own instant, and a criterion fed
+// another's moves its answer: Yallop's q read a topocentric arc of vision
+// 0.1 low, a whole zone near a boundary (#496). So a method reads its
+// CrescentParams as given, its doc names the convention and the instant the
+// author used, and CrescentVisibility computes each criterion's parameters in
+// that convention. Every formula, coefficient and table here is taken from
+// the criterion's own publication, cited on its method (#503):
 //
-// Reference:
-//   Al-Jumaili M.H.A., Kamal M.S., Hussain S.A., Hanif N.H.H.M.,
-//   "A Review on Modern Lunar Crescent Visibility Criterion",
-//   Malaysian Journal of Science, Vol. 41(3), pp. 46–59, 2022.
-//   https://mjs.um.edu.my/index.php/MJS/article/view/44110/18309
+//	criterion          quantities                                   instant
+//	Fotheringham 1910  geocentric Moon altitude, DAZ                geometric sunset
+//	Maunder 1911       geocentric Moon altitude, DAZ                geometric sunset
+//	Ilyas 1988         Moon altitude, DAZ                           geometric sunset
+//	Krauss 2012        geocentric Moon altitude, DAZ                geometric sunset
+//	Ilyas 1983         geocentric elongation                        geometric sunset
+//	Danjon 1932        topocentric elongation                       sunset
+//	Fatoohi 1998       topocentric elongation                       sunset
+//	MABIMS 1995, 2021  topocentric altitude, geocentric elongation  sunset
+//	Istanbul 2016      altitude and elongation, as MABIMS           sunset
+//	Alrefay 2018       topocentric ARCV, W from a 16′ semi-diameter sunset
+//	Caldwell 2001      apparent lower-limb altitude, DAZ            sunset
+//	Bruin 1977         geocentric ARCV, W from a 15′ semi-diameter  Yallop's best time
+//	Yallop 1997        geocentric ARCV, topocentric width W′        Yallop's best time
+//	Odeh 2004          topocentric ARCV and W                       Yallop's best time
+//	Qureshi 2010       geocentric ARCV, topocentric width W′        Qureshi's best time
+//
+// Geometric sunset is when the Sun's center is on the geometric horizon, its
+// altitude 0°, a few minutes before the sunset of an almanac, which is the
+// upper limb on the refracted horizon. All angles are airless unless named
+// apparent.
 
-// CrescentParams holds the pre-computed parameters needed to evaluate lunar
-// crescent visibility criteria.
+// CrescentParams holds the quantities a crescent visibility criterion reads.
 //
-// These values are derived from the Sun and Moon's positions at an observer's
-// location and a time shortly after sunset on the evening of potential first
-// sighting. Which positions, and which time, depends on the criterion:
-// CrescentVisibility fills one set per convention.
+// Which positions they are taken from, and at which instant, depends on the
+// criterion: each method's doc says, and CrescentVisibility fills one set per
+// criterion, which CrescentVerdict and CrescentZone carry back.
 type CrescentParams struct {
-	// ArcV is the Arc of Vision: the angular difference in altitude
-	// between the Sun (below horizon) and the Moon (above horizon),
-	// measured in degrees. Also called ARCV in some literature.
+	// ArcV is the arc of vision, ARCV: the Moon's altitude minus the Sun's,
+	// in degrees.
 	ArcV float64
 
-	// ArcL is the Arc of Light or Elongation: the angular separation
-	// between the Sun and Moon centers, measured in degrees.
+	// ArcL is the arc of light, ARCL: the elongation of the Moon from the
+	// Sun, center to center, in degrees.
 	ArcL float64
 
-	// DAZ is the Difference in Azimuth between the Sun and Moon,
-	// measured in degrees.
+	// DAZ is the difference in azimuth between the Sun and the Moon, in
+	// degrees, unsigned.
 	DAZ float64
 
-	// MAlt is the Moon's altitude above the horizon, measured in degrees.
+	// MAlt is the Moon's altitude, in degrees.
 	MAlt float64
 
-	// W is the topocentric crescent width, measured in arc minutes.
-	// This depends on the Moon's semi-diameter and phase angle.
+	// W is the width of the crescent, in arcminutes.
 	W float64
 
-	// LT is the Lag Time: the interval between sunset and moonset,
-	// measured in minutes.
+	// LT is the lag: moonset minus sunset, in minutes.
 	LT float64
 
 	// Age is the Moon's age, the time since the last new moon, in hours.
-	// MABIMS 1995 accepts an 8-hour-old Moon in place of its elongation
-	// limit; left zero, that alternative never applies.
 	Age float64
 }
 
@@ -76,8 +88,11 @@ type CrescentZone struct {
 	// (e.g. "Easily visible", "May need optical aid").
 	Label string
 
-	// Value is the computed discriminant parameter (q, V, or S).
+	// Value is the computed discriminant parameter (q, V, or s).
 	Value float64
+
+	// Params are the quantities the zone was computed from.
+	Params CrescentParams
 }
 
 // String returns a formatted representation: "Code: Label (value=X.XXXX)".
@@ -85,162 +100,211 @@ func (z CrescentZone) String() string {
 	return fmt.Sprintf("%s: %s (value=%.4f)", z.Code, z.Label, z.Value)
 }
 
-// ── Category 1: Altitude & Azimuth Criteria (ArcV vs DAZ) ───────────────────
+// CrescentVerdict is a visible-or-not criterion's answer, with the quantities
+// it read.
+type CrescentVerdict struct {
+	// Params are the quantities the criterion read, in its own convention.
+	Params CrescentParams
 
-// Fotheringham evaluates the Fotheringham (1910) criterion.
-// The crescent is visible if ArcV ≥ 12.0 − 0.008·DAZ.
+	// Visible is the criterion's verdict.
+	Visible bool
+}
+
+// ── Azimuth–altitude criteria: the Moon's altitude at sunset against DAZ ────
 //
-// This is the earliest modern empirical criterion, based on ancient
-// Babylonian observations compiled by Fotheringham.
+// The oldest family: the Moon's altitude when the Sun's center is on the
+// horizon, against the difference in azimuth. With the Sun at altitude 0 the
+// Moon's altitude is also the arc of vision (Krauss 2012).
+
+// Fotheringham evaluates Fotheringham's (1910) criterion: the Moon must stand
+// at least 12.0° − 0.008°·DAZ² above the horizon.
+//
+// Fotheringham, J. K. (1910), MNRAS 70, 527, p. 531, "Minimum Altitude =
+// 12°·0 − 0°·008 Z²", fitted to Julius Schmidt's and Mommsen's observations
+// at Athens. The altitude is the Moon's "true altitude at sunset", computed
+// without the lunar parallax (p. 528): geocentric and airless, at geometric
+// sunset. Reads MAlt and DAZ.
+//
+// He calls the formula a rough approximation of the table on his p. 530,
+// which runs only to DAZ 23°.
 func (p *CrescentParams) Fotheringham() bool {
-	return p.ArcV >= 12.0-0.008*p.DAZ
+	return p.MAlt >= 12.0-0.008*p.DAZ*p.DAZ
 }
 
-// Maunder evaluates the Maunder (1911) criterion.
-// The crescent is visible if ArcV ≥ 11.0 − 0.005·DAZ − 0.01·DAZ².
+// Maunder evaluates Maunder's (1911) criterion: the Moon must stand at least
+// 11° − DAZ/20 − DAZ²/100 above the horizon.
 //
-// Maunder refined Fotheringham's work using a quadratic fit to the
-// visibility boundary in the (DAZ, ArcV) plane.
+// Maunder, E. W. (1911), JBAA 21, 355, revised Fotheringham's line on the
+// same observations. His table (p. 359: 11.0, 10.5, 9.5, 8.0, 6.0° at DAZ 0,
+// 5, …, 20°) is fitted exactly by this quadratic (Yallop 1997, NAO TN 69,
+// Table 1 and eq. 3.1; Krauss 2012). The quantities are Fotheringham's: the
+// Moon's geocentric altitude at geometric sunset. Reads MAlt and DAZ.
 func (p *CrescentParams) Maunder() bool {
-	return p.ArcV >= 11.0-0.005*p.DAZ-0.01*p.DAZ*p.DAZ
+	d := math.Abs(p.DAZ)
+
+	return p.MAlt >= 11.0-d/20-d*d/100
 }
 
-// Ilyas1988 evaluates the Ilyas (1988) criterion.
-// The crescent is visible if ArcV ≥ f(DAZ), where f is a cubic polynomial.
+// ilyas1988Form is the curve of Ilyas (1988), A&A 206, 133, Fig. 5 (Form B):
+// the Moon's altitude at sunset against DAZ, every 2.5° from 0° to 60°.
 //
-// Ilyas extended the visibility boundary with additional data from tropical
-// latitudes, producing a more permissive curve than Maunder.
+// Ilyas published it only as a figure. These values were traced from the
+// scan of Fig. 5, 45 pixels to the degree, and are good to about 0.1°; his
+// text puts the curve's DAZ 0 end at the 10.4° lowest elongation, 0.1 above
+// the trace.
+var ilyas1988Form = []float64{
+	10.29, 10.12, 9.90, 9.60, 9.21, 8.68, 7.95, 7.22, 6.42, 5.73, 5.18, 4.77, 4.51,
+	4.34, 4.25, 4.22, 4.23, 4.19, 4.17, 4.15, 4.13, 4.11, 4.09, 4.10, 4.12,
+}
+
+// Ilyas1988 evaluates Ilyas's (1988) criterion: the Moon's altitude at sunset
+// must reach his curve of altitude against DAZ, which levels off at about 4°
+// beyond DAZ 35° — the limiting altitude separation of his title.
+//
+// It extends Fotheringham's and Maunder's criterion to large DAZ, evaluated
+// at sunset with the Sun's altitude 0 (his Appendix), and is read in their
+// convention: the Moon's geocentric altitude at geometric sunset. Ilyas does
+// not restate it. Reads MAlt and DAZ. Beyond DAZ 60°, the end of his curve,
+// its last value holds.
 func (p *CrescentParams) Ilyas1988() bool {
-	d := p.DAZ
-	limit := -0.0027356815*d - 0.0136648716*d*d + 0.0002119205*d*d*d + 10.2832719598
-
-	return p.ArcV >= limit
+	return p.MAlt >= interpolateUniform(ilyas1988Form, 2.5, math.Abs(p.DAZ))
 }
 
-// Fatoohi evaluates the Fatoohi et al. (1998) upper-limit criterion.
-// The crescent is visible if ArcV ≥ f(DAZ), where f is a cubic polynomial.
-//
-// This upper-limit curve was derived from Babylonian and Islamic historical
-// records. Observations above this curve are certainly visible.
-func (p *CrescentParams) Fatoohi() bool {
-	d := p.DAZ
-	limit := 10.7638 + 0.0356*d - 0.0164*d*d + 0.0004*d*d*d
+// krauss2012Athens and krauss2012AthensDAZ are the Athenian column of Krauss
+// (2012), Table 13: the crescent altitude h* at the middle of the zone where
+// a sighting becomes likely, against DAZ, for March to September.
+var (
+	krauss2012AthensDAZ = []float64{0, 5, 10, 15, 20, 22}
+	krauss2012Athens    = []float64{10.6, 10.5, 9.95, 9.0, 7.6, 7.0}
+)
 
-	return p.ArcV >= limit
-}
-
-// KraussAthenian evaluates the Krauss (2012) Athenian criterion.
-// The crescent is visible if ArcV ≥ f(DAZ), where f is a cubic polynomial.
+// KraussAthenian evaluates Krauss's (2012) Athenian criterion for the warm
+// season: the crescent is visible if the Moon's altitude reaches h*.
 //
-// Krauss derived this curve from ancient Athenian calendar data to model
-// historical lunar month beginnings.
+// Krauss, R. (2012), PalArch's J. Archaeol. Egypt/Egyptol. 9(5), Table 13,
+// from J. Schmidt's and others' observations at Athens. h* is the middle of
+// an uncertainty zone ±1.8° wide at DAZ 0: near its lower edge Krauss puts
+// the chance of a sighting as slight, at h* as medium, near its upper edge as
+// sizeable; this reads h* as the line. The column is for March to September,
+// and Krauss leaves the change of season to the user.
+//
+// The altitude is the Moon's geocentric altitude when the Sun's geocentric
+// altitude is 0°, as Krauss defines it after Fotheringham. Reads MAlt and DAZ.
+// Beyond DAZ 22°, the end of the table, its last value holds.
 func (p *CrescentParams) KraussAthenian() bool {
-	d := p.DAZ
-	limit := 0.0291254840*d - 0.0098347831*d*d + 0.0000475196*d*d*d + 10.5981838905
-
-	return p.ArcV >= limit
+	return p.MAlt >= interpolateTable(krauss2012AthensDAZ, krauss2012Athens, math.Abs(p.DAZ))
 }
 
-// ── Category 2: Arc of Light & Moon Altitude (Calendrical) ───────────────────
+// ── Elongation limits ───────────────────────────────────────────────────────
 
-// MABIMS1995 evaluates the original MABIMS (1995) criterion used by
-// Brunei, Indonesia, Malaysia, and Singapore for Islamic calendar determination,
-// the "2-3-8" criterion: MAlt ≥ 2°, AND ArcL ≥ 3° OR the Moon at least 8 hours
-// old.
+// Danjon evaluates the Danjon limit: no crescent is visible within 7° of the
+// Sun.
 //
-// It read ArcL ≥ 3° AND MAlt ≥ 2° and dropped the age alternative (#496).
-//
-// MAlt is the Moon's topocentric altitude and ArcL its geocentric elongation,
-// both at sunset, as CrescentVisibility's Params carry them.
-//
-// This is the most permissive calendrical criterion and has been
-// superseded by MABIMS2021 for official use.
-func (p *CrescentParams) MABIMS1995() bool {
-	return p.MAlt >= 2.0 && (p.ArcL >= 3.0 || p.Age >= 8.0)
-}
-
-// Istanbul2016 evaluates the Istanbul (2016) criterion adopted by the
-// Organisation of Islamic Cooperation (OIC).
-// The crescent is visible if ArcL ≥ 8° AND MAlt ≥ 5°.
-//
-// This is the most conservative calendrical criterion, requiring
-// both substantial elongation and significant moon altitude.
-func (p *CrescentParams) Istanbul2016() bool {
-	return p.ArcL >= 8.0 && p.MAlt >= 5.0
-}
-
-// MABIMS2021 evaluates the revised MABIMS (2021) criterion.
-// The crescent is visible if ArcL ≥ 6.4° AND MAlt ≥ 3°.
-//
-// MAlt is the Moon's topocentric altitude and ArcL its geocentric elongation,
-// both at sunset, as CrescentVisibility's Params carry them.
-//
-// This updated criterion replaced MABIMS1995 after extensive review
-// of observational data from Southeast Asian countries.
-func (p *CrescentParams) MABIMS2021() bool {
-	return p.ArcL >= 6.4 && p.MAlt >= 3.0
-}
-
-// ── Category 3: Singular Elongation Limits ───────────────────────────────────
-
-// Danjon evaluates the Danjon (1936) limit.
-// The crescent is visible if ArcL ≥ 7°.
-//
-// The Danjon limit is the minimum angular separation below which no
-// crescent visibility is possible due to the intense glare of the Sun.
-// This serves as the absolute physical lower bound for all criteria.
+// Danjon (1932, L'Astronomie 46, 57; 1936) extrapolated the shortening of the
+// crescent to zero length at an elongation of 7°, the elongation "taking
+// account of lunar parallax" — topocentric (Danjon 1932, p. 60, as translated
+// by Fatoohi, Stephenson & Al-Dargazelli 1998, Observatory 118, 65). Schaefer
+// (1991, QJRAS 32, 265) confirms the 7°. Read at sunset. Reads ArcL.
 func (p *CrescentParams) Danjon() bool {
 	return p.ArcL >= 7.0
 }
 
-// Schaefer evaluates the Schaefer (1991) elongation limit.
-// The crescent is visible if ArcL ≥ 7.5°.
+// Fatoohi1998 evaluates the limit of Fatoohi, Stephenson & Al-Dargazelli
+// (1998, Observatory 118, 65): no crescent is visible within 7.5° of the Sun.
 //
-// Schaefer refined the Danjon limit using modern photometric models
-// of atmospheric scattering and human visual threshold.
-func (p *CrescentParams) Schaefer() bool {
+// The smallest elongation among 503 ancient and modern sightings was 7.5°,
+// computed at sunset "allowing for parallax" (their Table I) — topocentric.
+// Reads ArcL.
+func (p *CrescentParams) Fatoohi1998() bool {
 	return p.ArcL >= 7.5
 }
 
-// Ilyas1984 evaluates the Ilyas (1984) naked-eye elongation limit.
-// The crescent is visible if ArcL ≥ 10.5°.
+// Ilyas1983 evaluates the limit of Ilyas (1983, JRASC 77, 214): no crescent
+// is visible within 10.5° of the Sun.
 //
-// Ilyas proposed this as the practical minimum elongation for reliable
-// naked-eye sighting under average observing conditions.
-func (p *CrescentParams) Ilyas1984() bool {
+// The lowest elongation of the composite Maunder–Bruin criterion at local
+// sunset, read in their geocentric convention at geometric sunset. Ilyas
+// offers it as a general guide only. Reads ArcL.
+func (p *CrescentParams) Ilyas1983() bool {
 	return p.ArcL >= 10.5
 }
 
-// ── Category 4: Arc of Vision & Lunar Width (ArcV vs W) ─────────────────────
+// ── Calendrical criteria: altitude and elongation at sunset ─────────────────
 
-// Bruin evaluates the Bruin (1977) criterion.
-// The crescent is visible if ArcV ≥ f(W), where f is a cubic polynomial
-// in the crescent width W (arc minutes).
+// MABIMS1995 evaluates the original MABIMS (1995) criterion used by Brunei,
+// Indonesia, Malaysia, and Singapore for the Islamic calendar, the "2-3-8"
+// criterion: MAlt ≥ 2°, AND ArcL ≥ 3° OR the Moon at least 8 hours old.
 //
-// Bruin was the first to incorporate the crescent width into the
-// visibility criterion, recognizing that wider crescents are easier
-// to detect against twilight sky brightness.
+// MAlt is the Moon's topocentric altitude and ArcL its geocentric elongation,
+// both at sunset. Superseded by MABIMS2021.
+func (p *CrescentParams) MABIMS1995() bool {
+	return p.MAlt >= 2.0 && (p.ArcL >= 3.0 || p.Age >= 8.0)
+}
+
+// MABIMS2021 evaluates the revised MABIMS (2021) criterion: ArcL ≥ 6.4° AND
+// MAlt ≥ 3°.
+//
+// MAlt is the Moon's topocentric altitude and ArcL its geocentric elongation,
+// both at sunset.
+func (p *CrescentParams) MABIMS2021() bool {
+	return p.ArcL >= 6.4 && p.MAlt >= 3.0
+}
+
+// Istanbul2016 evaluates the rule of the Istanbul congress of 2016 on a
+// unified Hijri calendar: ArcL ≥ 8° AND MAlt ≥ 5° at sunset.
+//
+// The congress applies it anywhere on Earth before 24h UT, not at one site.
+// The 8° and 5° are the Turkish Calendar Commission's of 1978 (Ilyas 1983,
+// Fig. 2b). Neither source states whether the altitude and elongation are
+// geocentric or topocentric, so they are read as MABIMS reads them:
+// topocentric altitude, geocentric elongation.
+func (p *CrescentParams) Istanbul2016() bool {
+	return p.ArcL >= 8.0 && p.MAlt >= 5.0
+}
+
+// ── Arc of vision against the crescent's width ──────────────────────────────
+
+// Bruin evaluates Bruin's (1977) criterion: ARCV ≥ 12.4023 − 9.4878W +
+// 3.9512W² − 0.5632W³.
+//
+// Bruin, F. (1977), Vistas Astron. 21, 331, gave his criterion as curves
+// (Fig. 9, p. 339); this cubic is Yallop's least-squares fit to them (1997,
+// NAO TN 69, Table 3 and eq. 3.3), which do not extend beyond W = 3′. ARCV is
+// geocentric, h + s; W = 15′(1 − cos ARCL), with Bruin's constant 15′
+// semi-diameter and the geocentric ARCL (Yallop eq. 3.4). Bruin's optimum is
+// the minimum of each curve, which Yallop's best time Ts + (4/9)·Lag
+// reproduces (eq. 4.1). Reads ArcV and W.
 func (p *CrescentParams) Bruin() bool {
 	w := p.W
-	limit := 11.5621745317 - 7.944238328*w + 3.2608487770*w*w - 0.4559413249*w*w*w
 
-	return p.ArcV >= limit
+	return p.ArcV >= 12.4023-9.4878*w+3.9512*w*w-0.5632*w*w*w
 }
 
-// AlrefayNakedEye evaluates the Al-Refay et al. (2018) naked-eye criterion.
-// The crescent is visible if ArcV > f(W), where f is a cubic polynomial
-// in the crescent width W (arc minutes).
+// AlrefayNakedEye evaluates the naked-eye criterion of Alrefay et al. (2018):
+// ARCV > 9.34 − 4.51W + 3.3W² − 1.01W³.
 //
-// Note: this criterion uses strict inequality (>), unlike most others
-// that use ≥.
+// Alrefay, T. et al. (2018), Observatory 138, 267, eq. 8, fitted to 545
+// observations from Saudi Arabia, 1988–2015. W = SD(1 − cos ARCL) with SD
+// held at 16′ (their eq. 7). They do not name the convention, but their
+// Table I is topocentric: its arcs of vision at sunset match topocentric
+// ones to 0.15° and miss geocentric ones by most of a degree
+// (TestAlrefayTableIIsTopocentricAtSunset). Read at sunset. Reads ArcV and W.
 func (p *CrescentParams) AlrefayNakedEye() bool {
 	w := p.W
-	limit := 9.34 - 4.51*w + 3.3*w*w - 1.01*w*w*w
 
-	return p.ArcV > limit
+	return p.ArcV > 9.34-4.51*w+3.3*w*w-1.01*w*w*w
 }
 
-// Yallop evaluates the Yallop (1998) multi-zone criterion.
+// AlrefayOpticalAid evaluates the aided-eye criterion of Alrefay et al.
+// (2018), eq. 9: ARCV > 7.83 − 4.35W + 3.22W² − 1.02W³, in the convention of
+// AlrefayNakedEye.
+func (p *CrescentParams) AlrefayOpticalAid() bool {
+	w := p.W
+
+	return p.ArcV > 7.83-4.35*w+3.22*w*w-1.02*w*w*w
+}
+
+// Yallop evaluates the Yallop (1997) multi-zone criterion.
 // It calculates the q parameter from ArcV and W, then classifies the
 // observation into one of six visibility zones (A through F).
 //
@@ -257,28 +321,25 @@ func (p *CrescentParams) AlrefayNakedEye() bool {
 //	E: Not visible with telescope   (−0.232 ≥ q > −0.293)
 //	F: Not visible, below Danjon    (−0.293 ≥ q)
 //
-// This is one of the most widely used criteria in modern lunar calendar
-// determination and has been adopted by many national observatories.
-//
 // Yallop defined ArcV as geocentric and airless, and W as his W′ from the
-// geocentric elongation, at his best time: CrescentVisibility's Geocentric.
+// geocentric elongation, at his best time (NAO TN 69, 1997).
 func (p *CrescentParams) Yallop() CrescentZone {
 	w := p.W
 	q := (p.ArcV - 11.8371 + 6.3226*w - 0.7319*w*w + 0.1018*w*w*w) / 10.0
 
 	switch {
 	case q > 0.216:
-		return CrescentZone{Code: "A", Label: "Easily visible", Value: q}
+		return CrescentZone{Code: "A", Label: "Easily visible", Value: q, Params: *p}
 	case q > -0.014:
-		return CrescentZone{Code: "B", Label: "Visible under perfect conditions", Value: q}
+		return CrescentZone{Code: "B", Label: "Visible under perfect conditions", Value: q, Params: *p}
 	case q > -0.160:
-		return CrescentZone{Code: "C", Label: "May need optical aid", Value: q}
+		return CrescentZone{Code: "C", Label: "May need optical aid", Value: q, Params: *p}
 	case q > -0.232:
-		return CrescentZone{Code: "D", Label: "Will need optical aid", Value: q}
+		return CrescentZone{Code: "D", Label: "Will need optical aid", Value: q, Params: *p}
 	case q > -0.293:
-		return CrescentZone{Code: "E", Label: "Not visible with telescope", Value: q}
+		return CrescentZone{Code: "E", Label: "Not visible with telescope", Value: q, Params: *p}
 	default:
-		return CrescentZone{Code: "F", Label: "Not visible, below Danjon limit", Value: q}
+		return CrescentZone{Code: "F", Label: "Not visible, below Danjon limit", Value: q, Params: *p}
 	}
 }
 
@@ -297,230 +358,216 @@ func (p *CrescentParams) Yallop() CrescentZone {
 //	Optical Aid Only           (2.0 > V ≥ −0.96)
 //	Not Visible                (V < −0.96)
 //
-// Odeh's criterion was developed using a large database of over 700
-// observations and is considered one of the most reliable modern criteria.
-//
-// Odeh's ArcV and W are topocentric and airless, at Yallop's best time:
-// CrescentVisibility's Topocentric.
+// Odeh's ArcV and W are topocentric and airless, at Yallop's best time
+// (Exp. Astron. 18, 39, 2004).
 func (p *CrescentParams) Odeh() CrescentZone {
 	w := p.W
 	v := p.ArcV - (-0.1018*w*w*w + 0.7319*w*w - 6.3226*w + 7.1651)
 
 	switch {
 	case v >= 5.65:
-		return CrescentZone{Code: "Naked Eye", Label: "Visible to naked eye", Value: v}
+		return CrescentZone{Code: "Naked Eye", Label: "Visible to naked eye", Value: v, Params: *p}
 	case v >= 2.0:
-		return CrescentZone{Code: "Optical/Naked", Label: "Optical aid, may be seen by naked eye", Value: v}
+		return CrescentZone{Code: "Optical/Naked", Label: "Optical aid, may be seen by naked eye", Value: v, Params: *p}
 	case v >= -0.96:
-		return CrescentZone{Code: "Optical Only", Label: "Visible only with optical aid", Value: v}
+		return CrescentZone{Code: "Optical Only", Label: "Visible only with optical aid", Value: v, Params: *p}
 	default:
-		return CrescentZone{Code: "Not Visible", Label: "Not visible", Value: v}
+		return CrescentZone{Code: "Not Visible", Label: "Not visible", Value: v, Params: *p}
 	}
 }
 
-// Qureshi evaluates the Qureshi (2010) multi-zone criterion.
-// It calculates the S parameter from ArcV and W, then classifies the
-// observation into one of five visibility zones.
+// Qureshi evaluates the Qureshi (2010) multi-zone criterion:
 //
-// The S parameter is:
+//	s = (ArcV − (10.43418 − 5.422643·W + 2.222075·W² − 0.351964·W³)) / 10
 //
-//	S = (ArcV − 0.351964·W³ + 2.222075·W² − 5.422643·W + 10.43418) / 10
+// Qureshi, M. S. (2010), Sindh Univ. Res. J. (Sci. Ser.) 42(1), 1, eq. 4 and
+// Table 6, with W in arcminutes. His eq. 5 as printed drops the parentheses
+// around the cubic, and read literally adds it to ArcV, putting every
+// crescent in zone A; his own Table 5 follows eq. 4 (obs. 220: ARCV 6.03°,
+// W 23.3″, s = −0.26). That table uses Yallop's quantities, geocentric ArcV
+// and topocentric W′, which Qureshi evaluates at his own best time,
+// Ts + (4.3/9.3)·Lag (eq. 6).
 //
 // Zones:
 //
-//	Easily visible                 (S > 0.15)
-//	Visible under perfect cond.    (0.15 ≥ S > 0.05)
-//	May require optical aid        (0.05 ≥ S > −0.06)
-//	Require optical aid            (−0.06 ≥ S > −0.16)
-//	Not visible with optical aid   (S ≤ −0.16)
+//	A: Easily visible                (s > 0.15)
+//	B: Visible under perfect cond.   (0.15 ≥ s > 0.05)
+//	C: May require optical aid       (0.05 ≥ s > −0.06)
+//	D: Require optical aid           (−0.06 ≥ s > −0.16)
+//	E: Not visible with optical aid  (s ≤ −0.16)
 func (p *CrescentParams) Qureshi() CrescentZone {
 	w := p.W
-	s := (p.ArcV - 0.351964*w*w*w + 2.222075*w*w - 5.422643*w + 10.43418) / 10.0
+	s := (p.ArcV - (10.43418 - 5.422643*w + 2.222075*w*w - 0.351964*w*w*w)) / 10.0
 
 	switch {
 	case s > 0.15:
-		return CrescentZone{Code: "A", Label: "Easily visible", Value: s}
+		return CrescentZone{Code: "A", Label: "Easily visible", Value: s, Params: *p}
 	case s > 0.05:
-		return CrescentZone{Code: "B", Label: "Visible under perfect conditions", Value: s}
+		return CrescentZone{Code: "B", Label: "Visible under perfect conditions", Value: s, Params: *p}
 	case s > -0.06:
-		return CrescentZone{Code: "C", Label: "May require optical aid", Value: s}
+		return CrescentZone{Code: "C", Label: "May require optical aid", Value: s, Params: *p}
 	case s > -0.16:
-		return CrescentZone{Code: "D", Label: "Require optical aid", Value: s}
+		return CrescentZone{Code: "D", Label: "Require optical aid", Value: s, Params: *p}
 	default:
-		return CrescentZone{Code: "E", Label: "Not visible with optical aid", Value: s}
+		return CrescentZone{Code: "E", Label: "Not visible with optical aid", Value: s, Params: *p}
 	}
 }
 
-// ── Category 5: Lag Time Criteria ────────────────────────────────────────────
+// ── The SAAO criterion: apparent altitude against DAZ ───────────────────────
 
-// CaldwellNakedEye evaluates the Caldwell & Laney (2011) naked-eye criterion.
-// The crescent is visible to the naked eye if LT > −0.9709·ArcL + 44.65.
+// caldwell2001NakedEye is the upper line of Caldwell & Laney (2001), Table 1
+// (Fig. 1): the apparent altitude of the Moon's lower limb at sunset below
+// which a naked-eye sighting is improbable, every 0.5° of DAZ from 0° to 21°.
+// Their lower line, below which even an aided sighting is impossible, is
+// this one less 1.90° throughout.
+var caldwell2001NakedEye = []float64{
+	8.19, 8.18, 8.16, 8.14, 8.10, 8.06, 8.02, 7.96, 7.91, 7.84, 7.77, 7.70, 7.62, 7.53, 7.44,
+	7.35, 7.26, 7.16, 7.05, 6.95, 6.84, 6.73, 6.61, 6.50, 6.38, 6.26, 6.15, 6.03, 5.91, 5.79,
+	5.67, 5.55, 5.43, 5.31, 5.19, 5.08, 4.96, 4.85, 4.74, 4.64, 4.53, 4.43, 4.33,
+}
+
+// caldwell2001Aided is the lower line of the same table.
+var caldwell2001Aided = []float64{
+	6.29, 6.28, 6.26, 6.24, 6.20, 6.16, 6.12, 6.06, 6.01, 5.94, 5.87, 5.80, 5.72, 5.63, 5.54,
+	5.45, 5.36, 5.26, 5.15, 5.05, 4.94, 4.83, 4.71, 4.60, 4.48, 4.36, 4.25, 4.13, 4.01, 3.89,
+	3.77, 3.65, 3.53, 3.41, 3.29, 3.18, 3.06, 2.95, 2.84, 2.74, 2.63, 2.53, 2.43,
+}
+
+// CaldwellNakedEye evaluates the SAAO criterion of Caldwell & Laney (2001)
+// for the naked eye: the Moon's lower limb must reach their upper line.
 //
-// Lag time is the interval (in minutes) between sunset and moonset.
-// Larger lag times give more time for the sky to darken while the
-// Moon is still above the horizon.
+// Caldwell, J. A. R. & Laney, C. D. (2001), African Skies 5, 15, Table 1:
+// the apparent altitude of the Moon's lower limb, topocentric and refracted,
+// at sunset, against DAZ at sunset. MAlt is that apparent lower-limb
+// altitude. Their lines are drawn to the edge of reliable sightings and are
+// meant to be optimistic. Beyond DAZ 21°, the end of the table, its last
+// value holds. Reads MAlt and DAZ.
 func (p *CrescentParams) CaldwellNakedEye() bool {
-	return p.LT > -0.9709*p.ArcL+44.65
+	return p.MAlt >= interpolateUniform(caldwell2001NakedEye, 0.5, math.Abs(p.DAZ))
 }
 
-// CaldwellOptical evaluates the Caldwell & Laney (2011) optical-aided criterion.
-// The crescent is visible with optical aid if LT > −1.9230·ArcL + 43.13.
-//
-// The optical-aided boundary permits smaller lag times than the
-// naked-eye criterion at the same elongation.
+// CaldwellOptical evaluates the SAAO criterion of Caldwell & Laney (2001)
+// with optical aid: the Moon's lower limb must reach their lower line, in
+// the convention of CaldwellNakedEye.
 func (p *CrescentParams) CaldwellOptical() bool {
-	return p.LT > -1.9230*p.ArcL+43.13
+	return p.MAlt >= interpolateUniform(caldwell2001Aided, 0.5, math.Abs(p.DAZ))
 }
 
-// Gautschy evaluates the Gautschy (2014) criterion.
-// The crescent is visible if LT ≥ f(DAZ), where f is a cubic polynomial
-// in the difference of azimuth.
-//
-// Gautschy derived this curve from ancient Babylonian calendar records
-// to model historical first-visibility practices.
-func (p *CrescentParams) Gautschy() bool {
-	d := p.DAZ
-	limit := 0.3342328913*d - 0.0715608980*d*d + 0.0009924422*d*d*d + 33.8890455442
+// ── Tables ──────────────────────────────────────────────────────────────────
 
-	return p.LT >= limit
-}
-
-// ── Aggregate Evaluation ─────────────────────────────────────────────────────
-
-// CrescentResult holds the evaluation of all 20 visibility criteria.
-//
-// From EvaluateAll, every criterion read one set of parameters. From
-// CrescentVisibility, Yallop read Geocentric, Odeh read Topocentric, and the
-// rest read Params.
-type CrescentResult struct {
-	Qureshi CrescentZone
-	Odeh    CrescentZone
-	Yallop  CrescentZone
-
-	// Params are the parameters every criterion but Yallop's and Odeh's
-	// read. From CrescentVisibility they are taken at sunset: topocentric,
-	// airless altitudes and azimuths, and the geocentric elongation.
-	Params CrescentParams
-
-	// Set by CrescentVisibility, and zero from EvaluateAll: the evening's
-	// sunset and moonset, the best time Yallop and Odeh are evaluated at,
-	// and the best-time parameters in each one's convention — Geocentric
-	// for Yallop, Topocentric for Odeh.
-	Sunset, Moonset, BestTime time.Time
-	Geocentric, Topocentric   CrescentParams
-
-	KraussAthenian   bool
-	Ilyas1984        bool
-	MABIMS1995       bool
-	Istanbul2016     bool
-	MABIMS2021       bool
-	Danjon           bool
-	Schaefer         bool
-	Fatoohi          bool
-	Bruin            bool
-	AlrefayNakedEye  bool
-	Ilyas1988        bool
-	Maunder          bool
-	Fotheringham     bool
-	CaldwellNakedEye bool
-	CaldwellOptical  bool
-	Gautschy         bool
-}
-
-// EvaluateAll runs all 20 lunar crescent visibility criteria against the
-// given parameters and returns the complete set of results.
-//
-// This is a convenience function that avoids calling each criterion
-// individually. All criteria are evaluated regardless of input validity;
-// the caller is responsible for ensuring the parameters are physically
-// meaningful (e.g., positive crescent width, non-negative lag time).
-func (p *CrescentParams) EvaluateAll() CrescentResult {
-	return CrescentResult{
-		Params: *p,
-
-		// Category 1
-		Fotheringham:   p.Fotheringham(),
-		Maunder:        p.Maunder(),
-		Ilyas1988:      p.Ilyas1988(),
-		Fatoohi:        p.Fatoohi(),
-		KraussAthenian: p.KraussAthenian(),
-
-		// Category 2
-		MABIMS1995:   p.MABIMS1995(),
-		Istanbul2016: p.Istanbul2016(),
-		MABIMS2021:   p.MABIMS2021(),
-
-		// Category 3
-		Danjon:    p.Danjon(),
-		Schaefer:  p.Schaefer(),
-		Ilyas1984: p.Ilyas1984(),
-
-		// Category 4
-		Bruin:           p.Bruin(),
-		AlrefayNakedEye: p.AlrefayNakedEye(),
-		Yallop:          p.Yallop(),
-		Odeh:            p.Odeh(),
-		Qureshi:         p.Qureshi(),
-
-		// Category 5
-		CaldwellNakedEye: p.CaldwellNakedEye(),
-		CaldwellOptical:  p.CaldwellOptical(),
-		Gautschy:         p.Gautschy(),
+// interpolateUniform interpolates linearly in ys, tabulated every step from
+// 0, holding the last value beyond the table.
+func interpolateUniform(ys []float64, step, x float64) float64 {
+	if x <= 0 {
+		return ys[0]
 	}
+
+	f := x / step
+
+	i := int(f)
+	if i >= len(ys)-1 {
+		return ys[len(ys)-1]
+	}
+
+	return ys[i] + (f-float64(i))*(ys[i+1]-ys[i])
 }
 
-// String returns a formatted multi-line summary of all criteria evaluations.
+// interpolateTable interpolates linearly in ys against the ascending xs,
+// holding the end values beyond the table.
+func interpolateTable(xs, ys []float64, x float64) float64 {
+	if x <= xs[0] {
+		return ys[0]
+	}
+
+	for i := 1; i < len(xs); i++ {
+		if x <= xs[i] {
+			return ys[i-1] + (x-xs[i-1])/(xs[i]-xs[i-1])*(ys[i]-ys[i-1])
+		}
+	}
+
+	return ys[len(ys)-1]
+}
+
+// ── The evening's result ────────────────────────────────────────────────────
+
+// CrescentResult is CrescentVisibility's evaluation of one evening: its
+// instants, and every criterion's answer with the quantities it read.
+type CrescentResult struct {
+	// Sunset and Moonset are the evening's sunset and the moonset its lag
+	// runs to; GeometricSunset is when the Sun's center reached altitude 0,
+	// the "sunset" of the azimuth–altitude criteria.
+	Sunset, Moonset, GeometricSunset time.Time
+
+	// BestTime is Yallop's best time, Ts + (4/9)·Lag, at which Bruin, Yallop
+	// and Odeh are read; QureshiBestTime is Qureshi's, Ts + (4.3/9.3)·Lag.
+	BestTime, QureshiBestTime time.Time
+
+	Yallop  CrescentZone
+	Odeh    CrescentZone
+	Qureshi CrescentZone
+
+	Fotheringham   CrescentVerdict
+	Maunder        CrescentVerdict
+	Ilyas1988      CrescentVerdict
+	KraussAthenian CrescentVerdict
+
+	Danjon      CrescentVerdict
+	Fatoohi1998 CrescentVerdict
+	Ilyas1983   CrescentVerdict
+
+	MABIMS1995   CrescentVerdict
+	MABIMS2021   CrescentVerdict
+	Istanbul2016 CrescentVerdict
+
+	Bruin             CrescentVerdict
+	AlrefayNakedEye   CrescentVerdict
+	AlrefayOpticalAid CrescentVerdict
+
+	CaldwellNakedEye CrescentVerdict
+	CaldwellOptical  CrescentVerdict
+}
+
+// String returns a multi-line summary: the evening's instants, then every
+// criterion's answer with the quantities it read.
 func (r CrescentResult) String() string {
-	yn := func(b bool) string {
-		if b {
-			return "Visible"
+	var b strings.Builder
+
+	fmt.Fprintf(&b, "Lunar crescent visibility\n")
+	fmt.Fprintf(&b, "  sunset %v, moonset %v, best time %v\n", r.Sunset, r.Moonset, r.BestTime)
+
+	verdict := func(name string, v CrescentVerdict) {
+		yn := "not visible"
+		if v.Visible {
+			yn = "visible"
 		}
 
-		return "Not visible"
+		fmt.Fprintf(&b, "  %-22s %-12s ARCV %6.2f° ARCL %6.2f° DAZ %6.2f° alt %6.2f° W %5.2f′\n",
+			name, yn, v.Params.ArcV, v.Params.ArcL, v.Params.DAZ, v.Params.MAlt, v.Params.W)
 	}
 
-	return fmt.Sprintf(`Lunar Crescent Visibility Evaluation
-═══════════════════════════════════════════════════════════════
-Input Parameters:
-  ArcV = %.4f°    ArcL = %.4f°    DAZ = %.4f°
-  MAlt = %.4f°    W = %.4f'       LT = %.2f min
+	zone := func(name string, z CrescentZone) {
+		fmt.Fprintf(&b, "  %-22s %-12s ARCV %6.2f° W %5.2f′  %s\n",
+			name, z.Code, z.Params.ArcV, z.Params.W, z.String())
+	}
 
-Category 1: Altitude & Azimuth (ArcV vs DAZ)
-  Fotheringham (1910):    %s
-  Maunder (1911):         %s
-  Ilyas (1988):           %s
-  Fatoohi (1998):         %s
-  Krauss Athenian (2012): %s
+	verdict("Fotheringham (1910)", r.Fotheringham)
+	verdict("Maunder (1911)", r.Maunder)
+	verdict("Ilyas (1988)", r.Ilyas1988)
+	verdict("Krauss Athens (2012)", r.KraussAthenian)
+	verdict("Danjon (1932)", r.Danjon)
+	verdict("Fatoohi (1998)", r.Fatoohi1998)
+	verdict("Ilyas (1983)", r.Ilyas1983)
+	verdict("MABIMS (1995)", r.MABIMS1995)
+	verdict("MABIMS (2021)", r.MABIMS2021)
+	verdict("Istanbul (2016)", r.Istanbul2016)
+	verdict("Bruin (1977)", r.Bruin)
+	verdict("Alrefay naked (2018)", r.AlrefayNakedEye)
+	verdict("Alrefay aided (2018)", r.AlrefayOpticalAid)
+	verdict("SAAO naked (2001)", r.CaldwellNakedEye)
+	verdict("SAAO aided (2001)", r.CaldwellOptical)
+	zone("Yallop (1997)", r.Yallop)
+	zone("Odeh (2004)", r.Odeh)
+	zone("Qureshi (2010)", r.Qureshi)
 
-Category 2: Calendrical (ArcL + MAlt)
-  MABIMS (1995):          %s
-  Istanbul (2016):        %s
-  MABIMS (2021):          %s
-
-Category 3: Elongation Limits
-  Danjon (1936):          %s
-  Schaefer (1991):        %s
-  Ilyas (1984):           %s
-
-Category 4: ArcV vs Crescent Width
-  Bruin (1977):           %s
-  Al-Refay (2018):        %s
-  Yallop (1998):          %s
-  Odeh (2004):            %s
-  Qureshi (2010):         %s
-
-Category 5: Lag Time
-  Caldwell Naked Eye:     %s
-  Caldwell Optical:       %s
-  Gautschy (2014):        %s`,
-		r.Params.ArcV, r.Params.ArcL, r.Params.DAZ,
-		r.Params.MAlt, r.Params.W, r.Params.LT,
-		yn(r.Fotheringham), yn(r.Maunder), yn(r.Ilyas1988),
-		yn(r.Fatoohi), yn(r.KraussAthenian),
-		yn(r.MABIMS1995), yn(r.Istanbul2016), yn(r.MABIMS2021),
-		yn(r.Danjon), yn(r.Schaefer), yn(r.Ilyas1984),
-		yn(r.Bruin), yn(r.AlrefayNakedEye),
-		r.Yallop.String(), r.Odeh.String(), r.Qureshi.String(),
-		yn(r.CaldwellNakedEye), yn(r.CaldwellOptical), yn(r.Gautschy),
-	)
+	return strings.TrimSuffix(b.String(), "\n")
 }

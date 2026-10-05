@@ -6,6 +6,7 @@ import (
 	"math"
 	"slices"
 
+	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/constants"
 	"github.com/TuSKan/astrogo/coord"
@@ -18,30 +19,20 @@ import (
 // ── Evaluating an evening, each criterion in its own convention ─────────────
 //
 // The criteria are not stated in one convention, so no one set of parameters
-// can feed all of them (#496). Each was fitted to quantities its author defined:
+// can feed all of them (#496, #503). crescent.go's header tables each one's
+// quantities and instant; this file computes them. Yallop's are the model for
+// the rest (1997, NAO Technical Note 69): ARCV the geocentric, airless
+// difference in altitude of the centers of Sun and Moon; ARCL geocentric; the
+// crescent width W′ = SD′(1 − cos ARCL) with SD = 0.27245π and SD′ =
+// SD(1 + sin h sin π), π the Moon's horizontal parallax and h its geocentric
+// altitude (his eqs. 3.8–3.10); at the best time Tb = Ts + (4/9)·Lag (eq. 4.1).
 //
-//   - Yallop (1997, NAO Technical Note 69): ARCV is the geocentric, airless
-//     difference in altitude of the centers of Sun and Moon; ARCL is
-//     geocentric; the crescent width is W′ = SD′(1 − cos ARCL) with
-//     SD = 0.27245π and SD′ = SD(1 + sin h sin π), π the Moon's horizontal
-//     parallax and h its geocentric altitude (his eqs. 3.8–3.10); all at the
-//     best time Tb = Ts + (4/9)·Lag (his eq. 4.1).
-//   - Odeh (2004, Exp. Astron. 18, 39): ARCV, ARCL and W topocentric and
-//     airless, W = SD′(1 − cos ARCL), at the same best time.
-//   - MABIMS 2021: the Moon's topocentric altitude at least 3° and the
-//     geocentric elongation at least 6.4°, at sunset.
-//   - MABIMS 1995 ("2-3-8"): the altitude at least 2°, and the elongation at
-//     least 3° or the Moon at least 8 hours old, at sunset.
-//
-// The other criteria read topocentric, airless altitudes and azimuths and the
-// geocentric elongation, at sunset — MABIMS's convention. Their own
-// conventions are not yet verified against their sources (#503).
-// CrescentResult.Params is that set.
-//
-// One evaluation builds one coord.Context, at sunset, and derives the best
-// time's from it with AtTime: an hour of AtTime costs ≲0.1″, against these
-// criteria's tenths of a degree. The Sun and Moon are each looked up once per
-// instant, and every criterion reads the same two lookups.
+// An evening is evaluated at four instants: geometric sunset, the almanac's
+// sunset, Yallop's best time and Qureshi's. One coord.Context is built, at
+// sunset, and the others derived from it with AtTime: an hour of AtTime costs
+// ≲0.1″, against these criteria's tenths of a degree. The Sun and Moon are
+// each looked up once per instant, and every criterion at that instant reads
+// the same two lookups.
 //
 // What an evaluation costs is the three searches before it: sunset, moonset
 // and the new moon. Each searches only as far as it must — the rise and set
@@ -87,11 +78,8 @@ const (
 // earlier that day, local noon for instance. The lag runs to the first moonset
 // after it, or back to the last one before it if the Moon had already set.
 //
-// The result's Params are the quantities at sunset, which MABIMS and the
-// criteria without a verified convention read: topocentric, airless altitudes
-// and azimuths, and the geocentric elongation. Geocentric and Topocentric are
-// the best-time quantities Yallop and Odeh read. A nil provider means
-// eph.Default().
+// Each criterion's answer carries the quantities it read, in its own
+// convention. A nil provider means eph.Default().
 //
 // It fails when the Sun does not set within a day of evening, or the Moon
 // neither sets within a day after sunset nor set within a day before it.
@@ -111,6 +99,13 @@ func CrescentVisibility(evening time.Time, site *Site, prov eph.Provider) (Cresc
 
 	sunset := sunEvent.Time
 
+	ctx := coord.NewContext(sunset, site.Location(), atmosphere.Refraction{})
+
+	geometric, err := geometricSunset(ctx, sunset, site, prov)
+	if err != nil {
+		return CrescentResult{}, err
+	}
+
 	moonset, err := moonsetFor(sunset, site, prov)
 	if err != nil {
 		return CrescentResult{}, err
@@ -118,12 +113,13 @@ func CrescentVisibility(evening time.Time, site *Site, prov eph.Provider) (Cresc
 
 	lag := moonset.Sub(sunset)
 
-	// Yallop's best time. A Moon that set before the Sun has no best time
-	// after sunset, and is evaluated at sunset, where every criterion that
-	// reads altitude already says no.
-	best := sunset
+	// The best times. A Moon that set before the Sun has no best time after
+	// sunset, and is evaluated at sunset, where every criterion that reads
+	// altitude already says no.
+	best, qureshiBest := sunset, sunset
 	if lag > 0 {
 		best = sunset.Add(lag * 4 / 9)
+		qureshiBest = sunset.Add(lag * 43 / 93)
 	}
 
 	age, err := moonAgeHours(sunset, prov)
@@ -131,33 +127,163 @@ func CrescentVisibility(evening time.Time, site *Site, prov eph.Provider) (Cresc
 		return CrescentResult{}, err
 	}
 
-	ctx := coord.NewContext(sunset, site.Location(), atmosphere.Refraction{})
+	var gGeometric, gSunset, gBest, gQureshi crescentGeometry
 
-	atSunset, err := crescentGeometryAt(ctx, prov)
-	if err != nil {
-		return CrescentResult{}, err
-	}
-
-	atBest, err := crescentGeometryAt(ctx.AtTime(best), prov)
-	if err != nil {
-		return CrescentResult{}, err
+	for _, at := range []struct {
+		g *crescentGeometry
+		t time.Time
+	}{{&gGeometric, geometric}, {&gSunset, sunset}, {&gBest, best}, {&gQureshi, qureshiBest}} {
+		if *at.g, err = crescentGeometryAt(ctx.AtTime(at.t), prov); err != nil {
+			return CrescentResult{}, err
+		}
 	}
 
 	lagMinutes := lag.Minutes()
-	ageAtBest := age + best.Sub(sunset).Hours()
+	ageAt := func(t time.Time) float64 { return age + t.Sub(sunset).Hours() }
 
-	params := atSunset.sunset(lagMinutes, age)
-	geocentric := atBest.geocentric(lagMinutes, ageAtBest)
-	topocentric := atBest.topocentric(lagMinutes, ageAtBest)
+	atGeometric := gGeometric.geocentric(lagMinutes, ageAt(geometric))
+	topocentric := gSunset.topocentric(lagMinutes, age)
+	yallop := gBest.geocentric(lagMinutes, ageAt(best))
 
-	r := params.EvaluateAll()
-	r.Sunset, r.Moonset, r.BestTime = sunset, moonset, best
-	r.Geocentric, r.Topocentric = geocentric, topocentric
+	r := CrescentResult{
+		Sunset: sunset, Moonset: moonset, GeometricSunset: geometric,
+		BestTime: best, QureshiBestTime: qureshiBest,
+	}
 
-	r.Yallop = geocentric.Yallop()
-	r.Odeh = topocentric.Odeh()
+	verdict := func(p CrescentParams, criterion func(*CrescentParams) bool) CrescentVerdict {
+		return CrescentVerdict{Visible: criterion(&p), Params: p}
+	}
+
+	r.Fotheringham = verdict(atGeometric, (*CrescentParams).Fotheringham)
+	r.Maunder = verdict(atGeometric, (*CrescentParams).Maunder)
+	r.Ilyas1988 = verdict(atGeometric, (*CrescentParams).Ilyas1988)
+	r.KraussAthenian = verdict(atGeometric, (*CrescentParams).KraussAthenian)
+	r.Ilyas1983 = verdict(atGeometric, (*CrescentParams).Ilyas1983)
+
+	r.Danjon = verdict(topocentric, (*CrescentParams).Danjon)
+	r.Fatoohi1998 = verdict(topocentric, (*CrescentParams).Fatoohi1998)
+
+	mabims := gSunset.sunset(lagMinutes, age)
+	r.MABIMS1995 = verdict(mabims, (*CrescentParams).MABIMS1995)
+	r.MABIMS2021 = verdict(mabims, (*CrescentParams).MABIMS2021)
+	r.Istanbul2016 = verdict(mabims, (*CrescentParams).Istanbul2016)
+
+	alrefay := topocentric
+	alrefay.W = crescentWidth(16, alrefay.ArcL)
+	r.AlrefayNakedEye = verdict(alrefay, (*CrescentParams).AlrefayNakedEye)
+	r.AlrefayOpticalAid = verdict(alrefay, (*CrescentParams).AlrefayOpticalAid)
+
+	saao := topocentric
+	saao.MAlt = apparentLowerLimb(gSunset, site.Refraction())
+	r.CaldwellNakedEye = verdict(saao, (*CrescentParams).CaldwellNakedEye)
+	r.CaldwellOptical = verdict(saao, (*CrescentParams).CaldwellOptical)
+
+	bruin := yallop
+	bruin.W = crescentWidth(15, bruin.ArcL)
+	r.Bruin = verdict(bruin, (*CrescentParams).Bruin)
+
+	odeh := gBest.topocentric(lagMinutes, ageAt(best))
+	qureshi := gQureshi.geocentric(lagMinutes, ageAt(qureshiBest))
+
+	r.Yallop = yallop.Yallop()
+	r.Odeh = odeh.Odeh()
+	r.Qureshi = qureshi.Qureshi()
 
 	return r, nil
+}
+
+// geometricSunset is the instant before sunset when the Sun's center was on
+// the geometric horizon, its geocentric altitude 0 — the "sunset" of
+// Fotheringham, Maunder, Ilyas and Krauss, a few minutes before the almanac's.
+//
+// Newton's method from sunset converges in three or four steps, each two
+// lookups of the Sun through ctx. Where the Sun sinks too slowly for it, near
+// the pole, the event solver searches the day before sunset instead; it reads
+// the Sun's topocentric altitude, off the geocentric by the solar parallax,
+// 8.8″.
+func geometricSunset(ctx *coord.Context, sunset time.Time, site *Site, prov eph.Provider) (time.Time, error) {
+	alt := func(t time.Time) (float64, error) {
+		sun, err := eph.Position(prov, eph.Sun, t)
+		if err != nil {
+			return 0, fmt.Errorf("crescent: sun position: %w", err)
+		}
+
+		c := ctx.AtTime(t)
+
+		return c.GeocentricToObserved(sun.Add(c.ObsVec())).Alt().Degrees(), nil
+	}
+
+	t := sunset
+
+	for range 8 {
+		h, err := alt(t)
+		if err != nil {
+			return time.Time{}, err
+		}
+
+		later, err := alt(t.Add(unit.Seconds(30)))
+		if err != nil {
+			return time.Time{}, err
+		}
+
+		rate := (later - h) / 30 // degrees a second
+		if rate > -1e-4 {
+			break
+		}
+
+		step := -h / rate
+		t = t.Add(unit.Seconds(step))
+
+		if t.Sub(sunset).Hours() < -1 || t.After(sunset) {
+			break
+		}
+
+		if math.Abs(step) < 0.05 {
+			return t, nil
+		}
+	}
+
+	solver := NewEventSolver(unit.Minutes(15), unit.Seconds(1))
+	spec := EventSpec{Family: EventFamilyVisibility, Kind: EventSet, Target: NewSun(prov), Observer: site}
+
+	sets := func(start, end time.Time, _ *Site, _ eph.Provider) ([]Event, error) {
+		return solver.Find(spec, start, end)
+	}
+
+	e, found, err := lastEvent(sets, sunset, 1, site, prov, isSet)
+	if err != nil {
+		return time.Time{}, err
+	}
+
+	if !found {
+		return time.Time{}, errNoSunset
+	}
+
+	return e.Time, nil
+}
+
+// apparentLowerLimb is the apparent altitude of the Moon's lower limb, in
+// degrees: its airless topocentric altitude, less the topocentric
+// semi-diameter SD′, raised by refraction at the site's pressure and
+// temperature.
+//
+// The refraction is Saemundsson's (1986), which holds to the horizon. The
+// default model, SOFA's A·tan z + B·tan³ z, holds refraction at about 10′
+// below 3° of altitude, where these crescents are, against 29′ on the
+// horizon, and would put every lower limb near the horizon a third of a
+// degree low.
+func apparentLowerLimb(g crescentGeometry, site atmosphere.Refraction) float64 {
+	site.Model = atmosphere.RefractionRigorous{}
+
+	limb := angle.Deg(g.moonTopo.Alt().Degrees() - g.topocentricSemiDiameterArcmin()/60)
+
+	return limb.Degrees() + site.RefractFromTrue(limb).Degrees()
+}
+
+// crescentWidth is SD(1 − cos ARCL), in arcminutes, for a constant
+// semi-diameter sd in arcminutes, as Bruin (15′) and Alrefay (16′) take it.
+func crescentWidth(sd, arclDeg float64) float64 {
+	return sd * (1 - math.Cos(arclDeg*math.Pi/180))
 }
 
 // eventsFunc finds a body's events in a window, as SunEvents and MoonEvents do.
@@ -367,8 +493,8 @@ func (g crescentGeometry) topocentric(lagMinutes, age float64) CrescentParams {
 // the geocentric elongation, with W from it.
 //
 // That is MABIMS's convention, whose altitude is topocentric and elongation
-// geocentric, and the one the criteria whose conventions are not yet verified
-// read (#503). W takes the Moon's semi-diameter at the time.
+// geocentric, and Istanbul 2016's as this package reads it. W takes the
+// Moon's semi-diameter at the time.
 func (g crescentGeometry) sunset(lagMinutes, age float64) CrescentParams {
 	p := g.topocentric(lagMinutes, age)
 	p.ArcL = g.arclGeo

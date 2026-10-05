@@ -2,7 +2,7 @@
 //
 // This finds the next New Moon, then evaluates crescent visibility on the
 // following evening from Quinta Calixto with CrescentVisibility, which finds
-// the sunset and moonset and evaluates all 20 modern criteria (1910–2021),
+// the sunset and moonset and evaluates 18 published criteria (1910–2021),
 // each in the convention it was defined in.
 //
 // Reference:
