@@ -104,8 +104,7 @@ func NewContext(t time.Time, site *Geodetic, atm atmosphere.Refraction) *Context
 	// through the leap-second table, so it is reused only where that TT is
 	// t.TT() to within 1e-14 day, which from 1972 on it always is. Before
 	// 1972 t.TT() follows ΔT, the two differ by up to 34 s, and the matrix is
-	// built at t.TT() as it always has been. TestNewContextEvaluatesTheSeriesOnce
-	// holds this to one evaluation.
+	// built at t.TT() as it always has been.
 	rc2i := astrom.Bpn
 	if a1, a2 := gofaext.UTCToTT(jd1, jd2); math.Abs((a1-tt1)+(a2-tt2)) > 1e-14 {
 		rc2i = gofaext.C2i06a(tt1, tt2)
