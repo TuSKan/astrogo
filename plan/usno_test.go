@@ -335,12 +335,15 @@ func deltaMinutes(usnoMin, astroMin float64) float64 {
 func newEph(t *testing.T) eph.Provider {
 	t.Helper()
 
-	p, err := eph.NewProvider(context.Background(), eph.Planets, "de442")
+	p, err := eph.NewProvider(kernelContext(t), eph.Planets, "de442")
 	if err != nil {
-		if testutil.Unreachable(err) {
-			t.Skipf("NAIF is unreachable, so DE442 could not be fetched: %v "+
+		// UpstreamFailure rather than Unreachable: it also counts a fetch that
+		// ran out of kernelContext's budget, which is NAIF too slow to finish
+		// and as external as NAIF being down.
+		if reason, ok := testutil.UpstreamFailure(err); ok {
+			t.Skipf("NAIF did not deliver DE442 (%s): %v "+
 				"(external, not astrogo -- and the analytic fallback is not accurate "+
-				"enough to compare against USNO)", err)
+				"enough to compare against USNO)", reason, err)
 		}
 
 		t.Logf("DE442 unavailable (%v), falling back to default", err)
@@ -561,7 +564,7 @@ func TestUSNO_CelNav(t *testing.T) {
 	// Validate Sun position
 	var prov eph.Provider
 
-	jplProv, err := eph.NewProvider(context.Background(), eph.Planets, "de442")
+	jplProv, err := eph.NewProvider(kernelContext(t), eph.Planets, "de442")
 	if err != nil {
 		t.Logf("failed to load jpl de442: %v", err)
 

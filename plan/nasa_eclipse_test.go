@@ -445,7 +445,7 @@ func TestNASA_LunarEclipses_Historical(t *testing.T) {
 
 	nasaBudgetOK(t, 6*time.Minute)
 
-	prov, err := eph.NewProvider(context.Background(), eph.Planets, "de441_part-1", eph.WithKernel("de441_part-2"))
+	prov, err := eph.NewProvider(kernelContext(t), eph.Planets, "de441_part-1", eph.WithKernel("de441_part-2"))
 	requireKernel(t, "DE441 provider", err)
 
 	defer func() { _ = prov.Close() }()
@@ -582,7 +582,7 @@ func TestNASA_SolarEclipses_Historical(t *testing.T) {
 
 	nasaBudgetOK(t, 6*time.Minute)
 
-	prov, err := eph.NewProvider(context.Background(), eph.Planets, "de441_part-1", eph.WithKernel("de441_part-2"))
+	prov, err := eph.NewProvider(kernelContext(t), eph.Planets, "de441_part-1", eph.WithKernel("de441_part-2"))
 	requireKernel(t, "DE441 provider", err)
 
 	defer func() { _ = prov.Close() }()
