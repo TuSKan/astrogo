@@ -465,8 +465,9 @@ following steps:
 
 1. Compute the **vernal equinox** using `plan.Seasons()`
 2. Find **new moons** within ±45 days using `plan.MoonPhases()`
-3. Estimate **crescent visibility** at Jerusalem sunset (~15:39 UTC, based on longitude
-   35.21°E) — the moon must be at least 20 hours old for likely naked-eye sighting
+3. Evaluate **crescent visibility** with `plan.CrescentVisibility()`, which finds Jerusalem's
+   sunset and moonset on each evening — the first evening, 15 to 72 hours after the new
+   moon, on which the crescent clears the Danjon limit begins the month
 4. Count forward **13 days** to Nisan 14
 5. Check the **day of the week**
 

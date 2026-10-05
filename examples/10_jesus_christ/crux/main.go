@@ -5,7 +5,7 @@
 //  1. Compute the vernal equinox for each year
 //  2. Find new moons near the equinox
 //  3. Find Jerusalem's sunset and moonset on the evenings after each one
-//  4. Evaluate all 20 modern visibility criteria, each in its own convention
+//  4. Evaluate 18 published visibility criteria, each in its own convention
 //  5. Count to Nisan 14 and check if it's a Friday
 //
 // Requires DE441 for epoch coverage.
@@ -147,7 +147,7 @@ func main() {
 				// Moon must be at least 15 hours old for any plausible visibility
 				if ageHours >= 15.0 && ageHours < 72.0 {
 					// Check if at least the Danjon elongation criterion is met
-					if !result.Danjon {
+					if !result.Danjon.Visible {
 						continue
 					}
 
@@ -175,7 +175,7 @@ func main() {
 						})
 					}
 
-					fmt.Printf("  %4d  %-20s  %-20s  %5.1f   %-16s  %-9s  %s  [%d/20 criteria]\n",
+					fmt.Printf("  %4d  %-20s  %-20s  %5.1f   %-16s  %-9s  %s  [%d/%d criteria]\n",
 						year,
 						equinox.FormatJulian("Jan 02 15:04 MST"),
 						nm.Time.FormatJulian("Jan 02 15:04 MST"),
@@ -183,7 +183,8 @@ func main() {
 						nisan14.FormatJulian("Jan 02 2006"),
 						weekday,
 						marker,
-						nVisible)
+						nVisible,
+						criteriaCount)
 
 					break // Take the first visible sunset
 				}
@@ -201,8 +202,8 @@ func main() {
 
 		for _, f := range fridays {
 			nVisible := countVisible(f.crescent)
-			fmt.Printf("    • AD %d — %s (Julian) — crescent age %.1f hours — %d/20 criteria met\n",
-				f.year, f.nisan14, f.ageHours, nVisible)
+			fmt.Printf("    • AD %d — %s (Julian) — crescent age %.1f hours — %d/%d criteria met\n",
+				f.year, f.nisan14, f.ageHours, nVisible, criteriaCount)
 		}
 
 		// Show detailed crescent evaluation for each Friday candidate
@@ -222,19 +223,22 @@ func main() {
 	fmt.Println()
 }
 
-// countVisible counts how many of the 20 criteria report visibility.
+// criteriaCount is how many criteria countVisible counts.
+const criteriaCount = 18
+
+// countVisible counts how many of the criteria report visibility.
 func countVisible(r plan.CrescentResult) int {
 	n := 0
 
-	bools := []bool{
-		r.Fotheringham, r.Maunder, r.Ilyas1988, r.Fatoohi, r.KraussAthenian,
-		r.MABIMS1995, r.Istanbul2016, r.MABIMS2021,
-		r.Danjon, r.Schaefer, r.Ilyas1984,
-		r.Bruin, r.AlrefayNakedEye,
-		r.CaldwellNakedEye, r.CaldwellOptical, r.Gautschy,
+	verdicts := []plan.CrescentVerdict{
+		r.Fotheringham, r.Maunder, r.Ilyas1988, r.KraussAthenian,
+		r.Danjon, r.Fatoohi1998, r.Ilyas1983,
+		r.MABIMS1995, r.MABIMS2021, r.Istanbul2016,
+		r.Bruin, r.AlrefayNakedEye, r.AlrefayOpticalAid,
+		r.CaldwellNakedEye, r.CaldwellOptical,
 	}
-	for _, b := range bools {
-		if b {
+	for _, v := range verdicts {
+		if v.Visible {
 			n++
 		}
 	}
@@ -250,7 +254,7 @@ func countVisible(r plan.CrescentResult) int {
 	if r.Qureshi.Code == "A" || r.Qureshi.Code == "B" {
 		n++
 	}
-	// Alrefay is already counted above as AlrefayNakedEye
+
 	return n
 }
 

@@ -149,7 +149,7 @@ breaks an example fails CI.
 | [`09_geometry_events`](examples/09_geometry_events/) | Moon phases, eclipses, conjunctions, apsides, seasons | ✓ |
 | [`11_skyfield_verify`](examples/11_skyfield_verify/) | Cross-check the ephemeris against Skyfield | |
 | [`12_satellite_tracking`](examples/12_satellite_tracking/) | ISS passes from live NORAD elements — AOS, max elevation, LOS | |
-| [`13_crescent_visibility`](examples/13_crescent_visibility/) | Will the new crescent be seen, by which of 20 criteria? | ✓ |
+| [`13_crescent_visibility`](examples/13_crescent_visibility/) | Will the new crescent be seen, by which of 18 criteria? | ✓ |
 | [`14_target_scoring`](examples/14_target_scoring/) | Composite scoring with configurable constraint weights | ✓ |
 | [`15_target_details`](examples/15_target_details/) | Everything the engine knows about one target at one instant | ✓ |
 | [`18_sky_brightness`](examples/18_sky_brightness/) | How dark is the sky here tonight? | |
@@ -178,7 +178,7 @@ tables you can check against published references.
 | **FITS & WCS** | Image/BinTable/ASCII HDUs, gzip streams, mmap, TAN projection, Arrow export |
 | **Sky Brightness** | Spectral all-sky radiance `L_λ(λ, direction, observer, time, atmosphere)` in W·m⁻²·sr⁻¹·nm⁻¹, kept spectral until projection — integrated starlight, diffuse galactic light, extragalactic background, zodiacal light (Leinert 1998), airglow, scattered moonlight (Kieffer & Stone 2005 ROLO + Winkler 2022), and artificial skyglow in clear air or under cloud (Kocifaj) — natural sky validated to **0.05 mag** against GAMBONS, a near-full Moon to 18.9 mag/arcsec² in V |
 | **Planning** | Sub-second Chandrupatla/Brent boundary refinement, constraint-based scoring, `Greedy`/`Priority`/`SwapOptimized` scheduling strategies |
-| **Events** | Rise/Set/Transit, Moon Phases, Seasons, Apsides, Eclipses, Conjunctions, Elongations, Satellite Passes, 20 historical lunar-crescent criteria |
+| **Events** | Rise/Set/Transit, Moon Phases, Seasons, Apsides, Eclipses, Conjunctions, Elongations, Satellite Passes, 18 published lunar-crescent criteria |
 | **Reference Data** | Built-in registry of 10 well-known observatory sites (`plan.KnownSites`), the 9 IMO Class I annual meteor showers with ZHR rate prediction (`plan.MeteorShowers`), 21 major planetary moons (`plan.PlanetaryMoon`), all 88 IAU constellations (`constellation.List`) |
 | **Optics** | Pure equipment-optics arithmetic (`optics`) — magnification, true/apparent FOV, exit pupil, Dawes limit, pixel scale for a `Telescope`/`Eyepiece`/`Sensor` combination |
 
@@ -307,9 +307,9 @@ Every component traces to primary literature: artificial skyglow follows Kocifaj
 - **Convenience**: `SunriseSunset`, `CivilDawnDusk`, `VisibilityEvents`, `Conjunctions`, `ConjunctionsEcliptic`, `Appulses`, `Oppositions`, `GreatestElongations`
 
 ### Lunar Crescent Visibility
-- **20 Historical Criteria (1910–2021)** — Fotheringham, Danjon, Yallop, Odeh, Caldwell, MABIMS, and more
-- Evaluates topocentric parameters (Altitude/Azimuth, Elongation, ArcV/Width, Lag Time)
-- `EvaluateAll` for batch assessment across all 20 models simultaneously
+- **18 Published Criteria (1910–2021)** — Fotheringham, Danjon, Yallop, Odeh, Caldwell, MABIMS, and more
+- `CrescentVisibility` evaluates an evening from its real sunset and moonset, each criterion in the convention its author defined: geocentric or topocentric, airless or apparent, at sunset or at a best time
+- Every formula, coefficient and table is taken from the criterion's own publication and checked against numbers it published
 
 ### Optical Tools (`optics`)
 - Pure equipment-optics arithmetic — no astrometry, no ephemeris, no network access

@@ -36,10 +36,9 @@
 //     [NextFullMoon]
 //   - Lunar crescent visibility — [CrescentVisibility] evaluates an evening,
 //     each criterion in the convention it was defined in, into a
-//     [CrescentResult]; [CrescentParams]' methods (Yallop, Odeh, Qureshi,
-//     Fotheringham, Danjon, MABIMS1995, MABIMS2021, and more) implement the 20
-//     published criteria, and [CrescentParams.EvaluateAll] runs all of them
-//     against one set of parameters
+//     [CrescentResult] carrying every answer with the quantities it read;
+//     [CrescentParams]' methods (Yallop, Odeh, Qureshi, Fotheringham, Danjon,
+//     MABIMS2021, and more) implement the 18 published criteria
 //   - Scheduling — [Scheduler]/[NewScheduler], [Strategy]
 //     ([GreedyStrategy]/[PriorityStrategy]/[SwapOptimizedStrategy]),
 //     [TransitionModel], [Block]/[Schedule]

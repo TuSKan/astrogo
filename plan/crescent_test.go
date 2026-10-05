@@ -2,285 +2,246 @@ package plan
 
 import (
 	"math"
+	"strings"
 	"testing"
 )
 
-// ── Category 1: Altitude & Azimuth ──────────────────────────────────────────
+// threshold is the value of the quantity set by at where visible turns from
+// false to true, found by bisection between lo, invisible, and hi, visible.
+func threshold(t *testing.T, lo, hi float64, visible func(x float64) bool) float64 {
+	t.Helper()
 
-func TestFotheringham(t *testing.T) {
-	tests := []struct {
-		name string
-		p    CrescentParams
-		want bool
-	}{
-		{"clear visible", CrescentParams{ArcV: 15, DAZ: 10}, true},
-		{"boundary exact", CrescentParams{ArcV: 11.92, DAZ: 10}, true},
-		{"just below", CrescentParams{ArcV: 11.919, DAZ: 10}, false},
-		{"zero DAZ visible", CrescentParams{ArcV: 12.0, DAZ: 0}, true},
-		{"zero DAZ invisible", CrescentParams{ArcV: 11.99, DAZ: 0}, false},
-		// limit at DAZ=20: 12.0 - 0.008*20 = 11.84
-		{"large DAZ visible", CrescentParams{ArcV: 11.84, DAZ: 20}, true},
-		{"large DAZ fail", CrescentParams{ArcV: 11.83, DAZ: 20}, false},
+	if visible(lo) || !visible(hi) {
+		t.Fatalf("no threshold in [%g, %g]: visible(lo) = %v, visible(hi) = %v", lo, hi, visible(lo), visible(hi))
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := tt.p.Fotheringham(); got != tt.want {
-				limit := 12.0 - 0.008*tt.p.DAZ
-				t.Errorf("Fotheringham() = %v, want %v (ArcV=%.4f, limit=%.4f)", got, tt.want, tt.p.ArcV, limit)
-			}
+
+	for range 60 {
+		mid := (lo + hi) / 2
+		if visible(mid) {
+			hi = mid
+		} else {
+			lo = mid
+		}
+	}
+
+	return hi
+}
+
+// lineTest checks that a criterion's line passes through each (x, y) point
+// within tol, x the value set by setX and y the threshold of the value set by
+// setY.
+func lineTest(t *testing.T, name string, xs, ys []float64, tol float64,
+	criterion func(*CrescentParams) bool, setX, setY func(*CrescentParams, float64),
+) {
+	t.Helper()
+
+	for i, x := range xs {
+		got := threshold(t, -5, 40, func(y float64) bool {
+			var p CrescentParams
+
+			setX(&p, x)
+			setY(&p, y)
+
+			return criterion(&p)
 		})
+
+		if math.Abs(got-ys[i]) > tol {
+			t.Errorf("%s at %g: line at %.3f, the source has %.3f (tolerance %g)", name, x, got, ys[i], tol)
+		}
 	}
 }
 
-func TestMaunder(t *testing.T) {
-	tests := []struct {
-		name string
-		p    CrescentParams
-		want bool
-	}{
-		{"clear visible", CrescentParams{ArcV: 15, DAZ: 5}, true},
-		{"zero DAZ at limit", CrescentParams{ArcV: 11.0, DAZ: 0}, true},
-		{"zero DAZ below", CrescentParams{ArcV: 10.99, DAZ: 0}, false},
-		// limit at DAZ=5: 11.0 - 0.005*5 - 0.01*25 = 10.725
-		{"moderate DAZ visible", CrescentParams{ArcV: 10.73, DAZ: 5}, true},
-		{"moderate DAZ invisible", CrescentParams{ArcV: 10.72, DAZ: 5}, false},
-		{"invisible", CrescentParams{ArcV: 5, DAZ: 10}, false},
+func setDAZ(p *CrescentParams, v float64)  { p.DAZ = v }
+func setMAlt(p *CrescentParams, v float64) { p.MAlt = v }
+func setArcV(p *CrescentParams, v float64) { p.ArcV = v }
+func setW(p *CrescentParams, v float64)    { p.W = v }
+
+// Fotheringham (1910), p. 531: "Minimum Altitude = 12°·0 − 0°·008 Z²". The
+// linear 12.0 − 0.008·DAZ this package had asked 11.84° at DAZ 20° where
+// Fotheringham asks 8.8° (#503).
+func TestFotheringhamIsHisFormula(t *testing.T) {
+	t.Parallel()
+
+	daz := []float64{0, 5, 10, 15, 20, 23}
+	want := make([]float64, len(daz))
+
+	for i, z := range daz {
+		want[i] = 12.0 - 0.008*z*z
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := tt.p.Maunder(); got != tt.want {
-				t.Errorf("Maunder() = %v, want %v", got, tt.want)
-			}
-		})
+
+	lineTest(t, "Fotheringham", daz, want, 1e-9, (*CrescentParams).Fotheringham, setDAZ, setMAlt)
+}
+
+// Maunder (1911), p. 359, as Yallop (1997) Table 1 reproduces it. The
+// −0.005·DAZ this package had put the line 0.9° high at DAZ 20° (#503).
+func TestMaunderReproducesHisTable(t *testing.T) {
+	t.Parallel()
+
+	lineTest(t, "Maunder",
+		[]float64{0, 5, 10, 15, 20},
+		[]float64{11.0, 10.5, 9.5, 8.0, 6.0},
+		1e-9, (*CrescentParams).Maunder, setDAZ, setMAlt)
+}
+
+// Ilyas (1988), Fig. 5: the curve levels off at about 4° beyond DAZ 35°. The
+// cubic this package had fell to 1.9° at DAZ 40° and climbed back to 6.7° at
+// 60° (#503).
+func TestIlyas1988FollowsHisCurve(t *testing.T) {
+	t.Parallel()
+
+	lineTest(t, "Ilyas 1988",
+		[]float64{0, 10, 20, 30, 40, 60, 75},
+		[]float64{10.29, 9.21, 6.42, 4.51, 4.23, 4.12, 4.12},
+		1e-9, (*CrescentParams).Ilyas1988, setDAZ, setMAlt)
+}
+
+// Krauss (2012), Table 13, the Athenian column.
+func TestKraussAthenianReproducesTable13(t *testing.T) {
+	t.Parallel()
+
+	lineTest(t, "Krauss",
+		[]float64{0, 5, 10, 15, 20, 22, 30},
+		[]float64{10.6, 10.5, 9.95, 9.0, 7.6, 7.0, 7.0},
+		1e-9, (*CrescentParams).KraussAthenian, setDAZ, setMAlt)
+}
+
+// Yallop (1997), Table 3: Bruin's curves, which Yallop's least-squares cubic
+// (eq. 3.3) fits to 0.18°, its largest residual at W = 0.5′; the W = 0.3′
+// point is Yallop's own extrapolation.
+func TestBruinFitsHisCurves(t *testing.T) {
+	t.Parallel()
+
+	lineTest(t, "Bruin",
+		[]float64{0.3, 0.5, 0.7, 1, 2, 3},
+		[]float64{10.0, 8.4, 7.5, 6.4, 4.7, 4.3},
+		0.18, (*CrescentParams).Bruin, setW, setArcV)
+}
+
+// Alrefay et al. (2018), eqs. 8 and 9.
+func TestAlrefayIsTheirEquations(t *testing.T) {
+	t.Parallel()
+
+	w := []float64{0.2, 0.5, 1.0, 1.5}
+	naked, aided := make([]float64, len(w)), make([]float64, len(w))
+
+	for i, x := range w {
+		naked[i] = 9.34 - 4.51*x + 3.3*x*x - 1.01*x*x*x
+		aided[i] = 7.83 - 4.35*x + 3.22*x*x - 1.02*x*x*x
+	}
+
+	lineTest(t, "Alrefay naked eye", w, naked, 1e-9, (*CrescentParams).AlrefayNakedEye, setW, setArcV)
+	lineTest(t, "Alrefay optical aid", w, aided, 1e-9, (*CrescentParams).AlrefayOpticalAid, setW, setArcV)
+}
+
+// Caldwell & Laney (2001), Table 1, both lines, and halfway between two
+// entries.
+func TestCaldwellReproducesTable1(t *testing.T) {
+	t.Parallel()
+
+	lineTest(t, "SAAO naked eye",
+		[]float64{0, 5, 10, 10.25, 15, 21, 30},
+		[]float64{8.19, 7.77, 6.84, 6.785, 5.67, 4.33, 4.33},
+		1e-9, (*CrescentParams).CaldwellNakedEye, setDAZ, setMAlt)
+	lineTest(t, "SAAO optical",
+		[]float64{0, 5, 10, 15, 21},
+		[]float64{6.29, 5.87, 4.94, 3.77, 2.43},
+		1e-9, (*CrescentParams).CaldwellOptical, setDAZ, setMAlt)
+}
+
+// Qureshi (2010), Table 5: three observations, from their ARCV and width to
+// his s-value and Yallop's q. Eq. 5 as printed, which this package followed,
+// put all three in zone A (#503).
+func TestQureshiReproducesHisTable5(t *testing.T) {
+	t.Parallel()
+
+	for _, o := range []struct {
+		no       int
+		arcv     float64 // degrees
+		widthSec float64 // arcseconds
+		q, s     float64
+		zone     string
+	}{
+		{220, 6.03, 23.3, -0.35, -0.26, "E"},
+		{257, 7.61, 8.73, -0.33, -0.21, "E"},
+		{79, 10.7, 24.7, 0.135, 0.215, "A"},
+	} {
+		p := CrescentParams{ArcV: o.arcv, W: o.widthSec / 60}
+
+		z := p.Qureshi()
+		if math.Abs(z.Value-o.s) > 0.006 || z.Code != o.zone {
+			t.Errorf("obs. %d: s = %.4f, zone %s; Qureshi's Table 5 has %.3f, zone %s", o.no, z.Value, z.Code, o.s, o.zone)
+		}
+
+		if q := p.Yallop().Value; math.Abs(q-o.q) > 0.006 {
+			t.Errorf("obs. %d: q = %.4f; Qureshi's Table 5 has %.3f", o.no, q, o.q)
+		}
 	}
 }
 
-func TestIlyas1988(t *testing.T) {
-	tests := []struct {
-		name string
-		p    CrescentParams
-		want bool
+func TestElongationLimits(t *testing.T) {
+	t.Parallel()
+
+	setArcL := func(p *CrescentParams, v float64) { p.ArcL = v }
+	none := func(*CrescentParams, float64) {}
+
+	for _, c := range []struct {
+		name      string
+		criterion func(*CrescentParams) bool
+		limit     float64
 	}{
-		{"zero DAZ at limit", CrescentParams{ArcV: 10.2832719598, DAZ: 0}, true},
-		{"zero DAZ below", CrescentParams{ArcV: 10.28, DAZ: 0}, false},
-		{"high ArcV", CrescentParams{ArcV: 15, DAZ: 10}, true},
-		{"low ArcV", CrescentParams{ArcV: 5, DAZ: 5}, false},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := tt.p.Ilyas1988(); got != tt.want {
-				t.Errorf("Ilyas1988() = %v, want %v", got, tt.want)
-			}
-		})
+		{"Danjon", (*CrescentParams).Danjon, 7.0},
+		{"Fatoohi 1998", (*CrescentParams).Fatoohi1998, 7.5},
+		{"Ilyas 1983", (*CrescentParams).Ilyas1983, 10.5},
+	} {
+		lineTest(t, c.name, []float64{0}, []float64{c.limit}, 1e-9, c.criterion, none, setArcL)
 	}
 }
 
-func TestFatoohi(t *testing.T) {
-	tests := []struct {
-		name string
-		p    CrescentParams
-		want bool
+func TestCalendricalCriteria(t *testing.T) {
+	t.Parallel()
+
+	for _, c := range []struct {
+		name      string
+		criterion func(*CrescentParams) bool
+		p         CrescentParams
+		want      bool
 	}{
-		{"zero DAZ at limit", CrescentParams{ArcV: 10.7638, DAZ: 0}, true},
-		{"zero DAZ below", CrescentParams{ArcV: 10.76, DAZ: 0}, false},
-		{"high ArcV", CrescentParams{ArcV: 15, DAZ: 5}, true},
-		{"low ArcV", CrescentParams{ArcV: 5, DAZ: 5}, false},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := tt.p.Fatoohi(); got != tt.want {
-				t.Errorf("Fatoohi() = %v, want %v", got, tt.want)
-			}
-		})
+		{"MABIMS 2021", (*CrescentParams).MABIMS2021, CrescentParams{MAlt: 3, ArcL: 6.4}, true},
+		{"MABIMS 2021 low", (*CrescentParams).MABIMS2021, CrescentParams{MAlt: 2.9, ArcL: 10}, false},
+		{"MABIMS 2021 close", (*CrescentParams).MABIMS2021, CrescentParams{MAlt: 10, ArcL: 6.3}, false},
+		{"MABIMS 1995 elongation", (*CrescentParams).MABIMS1995, CrescentParams{MAlt: 2.5, ArcL: 3.5, Age: 6}, true},
+		{"MABIMS 1995 age", (*CrescentParams).MABIMS1995, CrescentParams{MAlt: 2.5, ArcL: 2.5, Age: 8}, true},
+		{"MABIMS 1995 neither", (*CrescentParams).MABIMS1995, CrescentParams{MAlt: 2.5, ArcL: 2.5, Age: 7.9}, false},
+		{"MABIMS 1995 too low", (*CrescentParams).MABIMS1995, CrescentParams{MAlt: 1.9, ArcL: 10, Age: 30}, false},
+		{"Istanbul 2016", (*CrescentParams).Istanbul2016, CrescentParams{MAlt: 5, ArcL: 8}, true},
+		{"Istanbul 2016 low", (*CrescentParams).Istanbul2016, CrescentParams{MAlt: 4.9, ArcL: 12}, false},
+	} {
+		p := c.p
+		if got := c.criterion(&p); got != c.want {
+			t.Errorf("%s(%+v) = %v, want %v", c.name, c.p, got, c.want)
+		}
 	}
 }
 
-func TestKraussAthenian(t *testing.T) {
-	tests := []struct {
-		name string
-		p    CrescentParams
-		want bool
-	}{
-		{"zero DAZ at limit", CrescentParams{ArcV: 10.5981838905, DAZ: 0}, true},
-		{"zero DAZ below", CrescentParams{ArcV: 10.59, DAZ: 0}, false},
-		{"high ArcV", CrescentParams{ArcV: 15, DAZ: 10}, true},
-		{"low ArcV", CrescentParams{ArcV: 5, DAZ: 10}, false},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := tt.p.KraussAthenian(); got != tt.want {
-				t.Errorf("KraussAthenian() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
+func TestInterpolationHoldsTheEnds(t *testing.T) {
+	t.Parallel()
 
-// ── Category 2: Calendrical ─────────────────────────────────────────────────
+	ys := []float64{3, 2, 1}
 
-func TestMABIMS1995(t *testing.T) {
-	tests := []struct {
-		name string
-		p    CrescentParams
-		want bool
-	}{
-		{"both met", CrescentParams{ArcL: 5, MAlt: 3}, true},
-		{"exact boundary", CrescentParams{ArcL: 3.0, MAlt: 2.0}, true},
-		{"ArcL too low", CrescentParams{ArcL: 2.9, MAlt: 3}, false},
-		{"MAlt too low", CrescentParams{ArcL: 5, MAlt: 1.9}, false},
-		{"both too low", CrescentParams{ArcL: 2.0, MAlt: 1.0}, false},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := tt.p.MABIMS1995(); got != tt.want {
-				t.Errorf("MABIMS1995() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
+	for _, c := range []struct{ x, want float64 }{{-1, 3}, {0, 3}, {0.5, 2.5}, {2, 1}, {9, 1}} {
+		if got := interpolateUniform(ys, 1, c.x); got != c.want {
+			t.Errorf("interpolateUniform(%g) = %g, want %g", c.x, got, c.want)
+		}
 
-func TestIstanbul2016(t *testing.T) {
-	tests := []struct {
-		name string
-		p    CrescentParams
-		want bool
-	}{
-		{"both met", CrescentParams{ArcL: 10, MAlt: 6}, true},
-		{"exact boundary", CrescentParams{ArcL: 8.0, MAlt: 5.0}, true},
-		{"ArcL too low", CrescentParams{ArcL: 7.9, MAlt: 6}, false},
-		{"MAlt too low", CrescentParams{ArcL: 10, MAlt: 4.9}, false},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := tt.p.Istanbul2016(); got != tt.want {
-				t.Errorf("Istanbul2016() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestMABIMS2021(t *testing.T) {
-	tests := []struct {
-		name string
-		p    CrescentParams
-		want bool
-	}{
-		{"both met", CrescentParams{ArcL: 8, MAlt: 4}, true},
-		{"exact boundary", CrescentParams{ArcL: 6.4, MAlt: 3.0}, true},
-		{"ArcL too low", CrescentParams{ArcL: 6.3, MAlt: 4}, false},
-		{"MAlt too low", CrescentParams{ArcL: 8, MAlt: 2.9}, false},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := tt.p.MABIMS2021(); got != tt.want {
-				t.Errorf("MABIMS2021() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-// ── Category 3: Elongation Limits ───────────────────────────────────────────
-
-func TestDanjon(t *testing.T) {
-	tests := []struct {
-		name string
-		p    CrescentParams
-		want bool
-	}{
-		{"above", CrescentParams{ArcL: 10}, true},
-		{"exact", CrescentParams{ArcL: 7.0}, true},
-		{"below", CrescentParams{ArcL: 6.9}, false},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := tt.p.Danjon(); got != tt.want {
-				t.Errorf("Danjon() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestSchaefer(t *testing.T) {
-	tests := []struct {
-		name string
-		p    CrescentParams
-		want bool
-	}{
-		{"above", CrescentParams{ArcL: 10}, true},
-		{"exact", CrescentParams{ArcL: 7.5}, true},
-		{"below", CrescentParams{ArcL: 7.4}, false},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := tt.p.Schaefer(); got != tt.want {
-				t.Errorf("Schaefer() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestIlyas1984(t *testing.T) {
-	tests := []struct {
-		name string
-		p    CrescentParams
-		want bool
-	}{
-		{"above", CrescentParams{ArcL: 12}, true},
-		{"exact", CrescentParams{ArcL: 10.5}, true},
-		{"below", CrescentParams{ArcL: 10.4}, false},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := tt.p.Ilyas1984(); got != tt.want {
-				t.Errorf("Ilyas1984() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-// ── Category 4: ArcV vs Width ───────────────────────────────────────────────
-
-func TestBruin(t *testing.T) {
-	tests := []struct {
-		name string
-		p    CrescentParams
-		want bool
-	}{
-		{"zero width at limit", CrescentParams{ArcV: 11.5621745317, W: 0}, true},
-		{"zero width below", CrescentParams{ArcV: 11.56, W: 0}, false},
-		{"wide crescent visible", CrescentParams{ArcV: 8, W: 1.0}, true},
-		{"narrow crescent invisible", CrescentParams{ArcV: 5, W: 0.2}, false},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := tt.p.Bruin(); got != tt.want {
-				t.Errorf("Bruin() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestAlrefayNakedEye(t *testing.T) {
-	// Note: strict inequality (>), not >=
-	tests := []struct {
-		name string
-		p    CrescentParams
-		want bool
-	}{
-		{"well above", CrescentParams{ArcV: 15, W: 0.5}, true},
-		{"at limit exactly", CrescentParams{ArcV: 9.34, W: 0}, false}, // strict >
-		{"just above", CrescentParams{ArcV: 9.35, W: 0}, true},
-		{"well below", CrescentParams{ArcV: 5, W: 0.5}, false},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := tt.p.AlrefayNakedEye(); got != tt.want {
-				t.Errorf("AlrefayNakedEye() = %v, want %v", got, tt.want)
-			}
-		})
+		if got := interpolateTable([]float64{0, 1, 2}, ys, c.x); got != c.want {
+			t.Errorf("interpolateTable(%g) = %g, want %g", c.x, got, c.want)
+		}
 	}
 }
 
 func TestYallop(t *testing.T) {
+	t.Parallel()
+
 	// At W=0: q = (ArcV - 11.8371) / 10
 	// Zone A: q > +0.216  → ArcV > 13.9971
 	// Zone B: +0.216 >= q > -0.014  → 13.9971 >= ArcV > 11.6971
@@ -301,51 +262,20 @@ func TestYallop(t *testing.T) {
 		{"zone F below Danjon", "F", CrescentParams{ArcV: 2, W: 0}},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := tt.p.Yallop()
-			if got.Code != tt.wantCode {
-				t.Errorf("Yallop() code = %q, want %q (q=%.6f)", got.Code, tt.wantCode, got.Value)
-			}
-		})
-	}
-}
+		got := tt.p.Yallop()
+		if got.Code != tt.wantCode {
+			t.Errorf("%s: Yallop() code = %q, want %q (q=%.6f)", tt.name, got.Code, tt.wantCode, got.Value)
+		}
 
-func TestYallopBoundaries(t *testing.T) {
-	// Boundary semantics from spec:
-	//   A: q > +0.216
-	//   B: +0.216 >= q > -0.014
-	// So q = 0.216 exactly → zone B (since A requires strictly >)
-	w := 0.0
-	// q = (ArcV - 11.8371) / 10
-	// q = 0.216 → ArcV = 11.8371 + 2.16 = 13.9971
-	p := CrescentParams{ArcV: 13.9971, W: w}
-	got := p.Yallop()
-	// Due to floating-point, 13.9971 gives q ≈ 0.216000...
-	// The switch checks q > 0.216, so at exactly 0.216 it should be B.
-	// However, floating point: (13.9971 - 11.8371)/10 may not be exactly 0.216.
-	// Accept either A or B at the boundary; verify the q value is correct.
-	if got.Code != "A" && got.Code != "B" {
-		t.Errorf("q≈0.216 should be A or B, got %q (q=%.15f)", got.Code, got.Value)
-	}
-
-	// Clearly above → must be A
-	p.ArcV = 14.1
-
-	got = p.Yallop()
-	if got.Code != "A" {
-		t.Errorf("q clearly above 0.216 should be zone A, got %q (q=%.6f)", got.Code, got.Value)
-	}
-
-	// Clearly below → must be B
-	p.ArcV = 13.5
-
-	got = p.Yallop()
-	if got.Code != "B" {
-		t.Errorf("q clearly below 0.216 should be zone B, got %q (q=%.6f)", got.Code, got.Value)
+		if got.Params != tt.p {
+			t.Errorf("%s: zone carries %+v, want the parameters it read, %+v", tt.name, got.Params, tt.p)
+		}
 	}
 }
 
 func TestOdeh(t *testing.T) {
+	t.Parallel()
+
 	// At W=0: V = ArcV - 7.1651
 	// Naked Eye:      V >= 5.65  → ArcV >= 12.8151
 	// Optical/Naked:  5.65 > V >= 2.0  → 12.8151 > ArcV >= 9.1651
@@ -358,267 +288,21 @@ func TestOdeh(t *testing.T) {
 	}{
 		{"naked eye", "Naked Eye", CrescentParams{ArcV: 15, W: 0}},
 		{"optical/naked", "Optical/Naked", CrescentParams{ArcV: 10, W: 0}},
+		{"just below naked eye", "Optical/Naked", CrescentParams{ArcV: 12.81, W: 0}},
 		{"optical only", "Optical Only", CrescentParams{ArcV: 7, W: 0}},
 		{"not visible", "Not Visible", CrescentParams{ArcV: 2, W: 0}},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := tt.p.Odeh()
-			if got.Code != tt.wantCode {
-				t.Errorf("Odeh() code = %q, want %q (V=%.6f)", got.Code, tt.wantCode, got.Value)
-			}
-		})
-	}
-}
-
-func TestOdehBoundaries(t *testing.T) {
-	// V = ArcV - 7.1651 (at W=0)
-	// V >= 5.65 → Naked Eye
-	// Clearly above: ArcV = 13.0 → V = 5.8349
-	p := CrescentParams{ArcV: 13.0, W: 0}
-
-	got := p.Odeh()
-	if got.Code != "Naked Eye" {
-		t.Errorf("V=5.83 should be Naked Eye, got %q (V=%.6f)", got.Code, got.Value)
-	}
-
-	// V just below 5.65 → Optical/Naked (ArcV = 12.81 → V = 5.6449)
-	p.ArcV = 12.81
-
-	got = p.Odeh()
-	if got.Code != "Optical/Naked" {
-		t.Errorf("V=5.6449 should be Optical/Naked, got %q (V=%.6f)", got.Code, got.Value)
-	}
-}
-
-func TestQureshi(t *testing.T) {
-	// At W=0: S = (ArcV + 10.43418) / 10
-	// Zone A: S > 0.15   → ArcV > -10.43418 + 1.5 = -8.93418 (always for positive ArcV)
-	// So we need non-zero W to get lower zones.
-	// At W=1: poly = 0.351964 - 2.222075 + 5.422643 - 10.43418 = -6.882448
-	//   S = (ArcV + 6.882448) / 10
-	//   Zone A: S > 0.15  → ArcV > -5.382448
-	//   Zone B: 0.15 >= S > 0.05  → -5.382448 >= ArcV > -6.382448
-	// At W=0, all positive ArcV → zone A. We need W large enough.
-	// At W=3: poly = 0.351964*27 - 2.222075*9 + 5.422643*3 - 10.43418
-	//       = 9.503028 - 19.998675 + 16.267929 - 10.43418 = -4.661898
-	//   S = (ArcV + 4.661898) / 10
-	//   Zone A: S > 0.15  → ArcV > -3.161898
-	// Hard to get low zones with standard values. Use direct computation.
-	// Pick W=0 and compute ArcV for each zone:
-	//   S = (ArcV + 10.43418) / 10
-	//   A: S > 0.15  → ArcV > -8.93418   (any positive ArcV)
-	//   B: 0.15 >= S > 0.05 → -8.93418 >= ArcV > -9.93418
-	// Negative ArcV needed for lower zones, which is unphysical.
-	// Use large W=5 to shift the polynomial.
-	// poly(5) = 0.351964*125 - 2.222075*25 + 5.422643*5 - 10.43418
-	//         = 43.9955 - 55.551875 + 27.113215 - 10.43418 = 5.122660
-	// S = (ArcV - 5.122660) / 10
-	// A: S > 0.15  → ArcV > 6.62266
-	// B: 0.15 >= S > 0.05 → 6.62266 >= ArcV > 5.62266
-	// C: 0.05 >= S > -0.06 → 5.62266 >= ArcV > 4.52266
-	// D: -0.06 >= S > -0.16 → 4.52266 >= ArcV > 3.52266
-	// E: S <= -0.16 → ArcV <= 3.52266
-	tests := []struct {
-		name     string
-		wantCode string
-		p        CrescentParams
-	}{
-		{"easily visible", "A", CrescentParams{ArcV: 8.0, W: 5.0}},
-		{"perfect conditions", "B", CrescentParams{ArcV: 6.0, W: 5.0}},
-		{"may require optical", "C", CrescentParams{ArcV: 5.0, W: 5.0}},
-		{"require optical", "D", CrescentParams{ArcV: 4.0, W: 5.0}},
-		{"not visible", "E", CrescentParams{ArcV: 3.0, W: 5.0}},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := tt.p.Qureshi()
-			if got.Code != tt.wantCode {
-				t.Errorf("Qureshi() code = %q, want %q (S=%.6f)", got.Code, tt.wantCode, got.Value)
-			}
-		})
-	}
-}
-
-// ── Category 5: Lag Time ────────────────────────────────────────────────────
-
-func TestCaldwellNakedEye(t *testing.T) {
-	tests := []struct {
-		name string
-		p    CrescentParams
-		want bool
-	}{
-		{"high lag time", CrescentParams{LT: 50, ArcL: 10}, true},
-		{"below limit", CrescentParams{LT: 34.940, ArcL: 10}, false}, // -0.9709*10+44.65 = 34.941
-		{"above limit", CrescentParams{LT: 34.942, ArcL: 10}, true},  // strict >
-		{"low lag time", CrescentParams{LT: 20, ArcL: 10}, false},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := tt.p.CaldwellNakedEye(); got != tt.want {
-				limit := -0.9709*tt.p.ArcL + 44.65
-				t.Errorf("CaldwellNakedEye() = %v, want %v (LT=%.4f, limit=%.4f)", got, tt.want, tt.p.LT, limit)
-			}
-		})
-	}
-}
-
-func TestCaldwellOptical(t *testing.T) {
-	tests := []struct {
-		name string
-		p    CrescentParams
-		want bool
-	}{
-		{"high lag time", CrescentParams{LT: 40, ArcL: 10}, true},
-		{"low lag time", CrescentParams{LT: 15, ArcL: 10}, false},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := tt.p.CaldwellOptical(); got != tt.want {
-				t.Errorf("CaldwellOptical() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestGautschy(t *testing.T) {
-	tests := []struct {
-		name string
-		p    CrescentParams
-		want bool
-	}{
-		{"zero DAZ at limit", CrescentParams{LT: 33.8890455442, DAZ: 0}, true},
-		{"zero DAZ below", CrescentParams{LT: 33.88, DAZ: 0}, false},
-		{"high lag time", CrescentParams{LT: 50, DAZ: 5}, true},
-		{"low lag time", CrescentParams{LT: 20, DAZ: 5}, false},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := tt.p.Gautschy(); got != tt.want {
-				t.Errorf("Gautschy() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-// ── EvaluateAll ─────────────────────────────────────────────────────────────
-
-func TestEvaluateAll(t *testing.T) {
-	// Use a set of params that gives a mix of visible/invisible across criteria.
-	p := CrescentParams{
-		ArcV: 10.5,
-		ArcL: 12.0,
-		DAZ:  8.0,
-		MAlt: 5.5,
-		W:    0.5,
-		LT:   35.0,
-	}
-	r := p.EvaluateAll()
-
-	// Verify params are stored
-	if r.Params != p {
-		t.Error("EvaluateAll did not store params correctly")
-	}
-
-	// Verify individual criteria match direct calls
-	if r.Fotheringham != p.Fotheringham() {
-		t.Error("Fotheringham mismatch")
-	}
-
-	if r.Maunder != p.Maunder() {
-		t.Error("Maunder mismatch")
-	}
-
-	if r.Ilyas1988 != p.Ilyas1988() {
-		t.Error("Ilyas1988 mismatch")
-	}
-
-	if r.Fatoohi != p.Fatoohi() {
-		t.Error("Fatoohi mismatch")
-	}
-
-	if r.KraussAthenian != p.KraussAthenian() {
-		t.Error("KraussAthenian mismatch")
-	}
-
-	if r.MABIMS1995 != p.MABIMS1995() {
-		t.Error("MABIMS1995 mismatch")
-	}
-
-	if r.Istanbul2016 != p.Istanbul2016() {
-		t.Error("Istanbul2016 mismatch")
-	}
-
-	if r.MABIMS2021 != p.MABIMS2021() {
-		t.Error("MABIMS2021 mismatch")
-	}
-
-	if r.Danjon != p.Danjon() {
-		t.Error("Danjon mismatch")
-	}
-
-	if r.Schaefer != p.Schaefer() {
-		t.Error("Schaefer mismatch")
-	}
-
-	if r.Ilyas1984 != p.Ilyas1984() {
-		t.Error("Ilyas1984 mismatch")
-	}
-
-	if r.Bruin != p.Bruin() {
-		t.Error("Bruin mismatch")
-	}
-
-	if r.AlrefayNakedEye != p.AlrefayNakedEye() {
-		t.Error("AlrefayNakedEye mismatch")
-	}
-
-	if r.CaldwellNakedEye != p.CaldwellNakedEye() {
-		t.Error("CaldwellNakedEye mismatch")
-	}
-
-	if r.CaldwellOptical != p.CaldwellOptical() {
-		t.Error("CaldwellOptical mismatch")
-	}
-
-	if r.Gautschy != p.Gautschy() {
-		t.Error("Gautschy mismatch")
-	}
-
-	// Multi-zone value checks
-	yDirect := p.Yallop()
-	if math.Abs(r.Yallop.Value-yDirect.Value) > 1e-10 || r.Yallop.Code != yDirect.Code {
-		t.Errorf("Yallop mismatch: got %v, want %v", r.Yallop, yDirect)
-	}
-
-	oDirect := p.Odeh()
-	if math.Abs(r.Odeh.Value-oDirect.Value) > 1e-10 || r.Odeh.Code != oDirect.Code {
-		t.Errorf("Odeh mismatch: got %v, want %v", r.Odeh, oDirect)
-	}
-
-	qDirect := p.Qureshi()
-	if math.Abs(r.Qureshi.Value-qDirect.Value) > 1e-10 || r.Qureshi.Code != qDirect.Code {
-		t.Errorf("Qureshi mismatch: got %v, want %v", r.Qureshi, qDirect)
-	}
-}
-
-func TestEvaluateAllString(t *testing.T) {
-	p := CrescentParams{ArcV: 10.5, ArcL: 12.0, DAZ: 8.0, MAlt: 5.5, W: 0.5, LT: 35.0}
-	r := p.EvaluateAll()
-
-	s := r.String()
-	if len(s) == 0 {
-		t.Error("String() returned empty")
-	}
-	// Smoke test: should contain key labels
-	for _, want := range []string{"Fotheringham", "Maunder", "Yallop", "Odeh", "Qureshi", "Danjon", "MABIMS"} {
-		if !containsStr(s, want) {
-			t.Errorf("String() missing %q", want)
+		got := tt.p.Odeh()
+		if got.Code != tt.wantCode {
+			t.Errorf("%s: Odeh() code = %q, want %q (V=%.6f)", tt.name, got.Code, tt.wantCode, got.Value)
 		}
 	}
 }
 
 func TestCrescentZoneString(t *testing.T) {
+	t.Parallel()
+
 	z := CrescentZone{Code: "A", Label: "Easily visible", Value: 0.3456}
 
 	s := z.String()
@@ -627,17 +311,18 @@ func TestCrescentZoneString(t *testing.T) {
 	}
 }
 
-// containsStr checks if s contains substr.
-func containsStr(s, substr string) bool {
-	return len(s) >= len(substr) && searchStr(s, substr)
-}
+func TestCrescentResultStringNamesEveryCriterion(t *testing.T) {
+	t.Parallel()
 
-func searchStr(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
+	s := CrescentResult{}.String()
+
+	for _, want := range []string{
+		"Fotheringham", "Maunder", "Ilyas (1988)", "Krauss", "Danjon", "Fatoohi", "Ilyas (1983)",
+		"MABIMS (1995)", "MABIMS (2021)", "Istanbul", "Bruin", "Alrefay naked", "Alrefay aided",
+		"SAAO naked", "SAAO aided", "Yallop", "Odeh", "Qureshi",
+	} {
+		if !strings.Contains(s, want) {
+			t.Errorf("String() omits %q:\n%s", want, s)
 		}
 	}
-
-	return false
 }

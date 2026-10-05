@@ -55,22 +55,24 @@ func TestCrescentVisibilityReadsTheMABIMSElongationGeocentric(t *testing.T) {
 		t.Fatalf("crescentGeometryAt: %v", err)
 	}
 
+	p := r.MABIMS2021.Params
+
 	// The fixture must still straddle the limit for the test to mean anything.
-	if r.Params.MAlt < 3.4 || g.arclGeo < 6.8 || g.arclTopo > 6.0 {
+	if p.MAlt < 3.4 || g.arclGeo < 6.8 || g.arclTopo > 6.0 {
 		t.Fatalf("fixture moved: altitude %.3f°, geocentric elongation %.3f°, topocentric %.3f°",
-			r.Params.MAlt, g.arclGeo, g.arclTopo)
+			p.MAlt, g.arclGeo, g.arclTopo)
 	}
 
-	if math.Abs(r.Params.ArcL-g.arclGeo) > 1e-9 {
-		t.Errorf("Params.ArcL = %.6f°, want the geocentric elongation %.6f°, not the topocentric %.6f°",
-			r.Params.ArcL, g.arclGeo, g.arclTopo)
+	if math.Abs(p.ArcL-g.arclGeo) > 1e-9 {
+		t.Errorf("MABIMS read ArcL = %.6f°, want the geocentric elongation %.6f°, not the topocentric %.6f°",
+			p.ArcL, g.arclGeo, g.arclTopo)
 	}
 
-	if !r.MABIMS2021 {
+	if !r.MABIMS2021.Visible {
 		t.Errorf("MABIMS2021 = false at a geocentric elongation of %.3f°", g.arclGeo)
 	}
 
-	if !r.MABIMS1995 {
+	if !r.MABIMS1995.Visible {
 		t.Error("MABIMS1995 = false where MABIMS 2021, the stricter criterion, holds")
 	}
 }
@@ -86,13 +88,7 @@ func TestCrescentVisibilityYallopAndOdehReadTheirOwnConventions(t *testing.T) {
 		t.Fatalf("CrescentVisibility: %v", err)
 	}
 
-	if r.Yallop != r.Geocentric.Yallop() {
-		t.Errorf("Yallop = %v, the geocentric best-time parameters give %v", r.Yallop, r.Geocentric.Yallop())
-	}
-
-	if r.Odeh != r.Topocentric.Odeh() {
-		t.Errorf("Odeh = %v, the topocentric best-time parameters give %v", r.Odeh, r.Topocentric.Odeh())
-	}
+	geocentric, topocentric, atSunset := r.Yallop.Params, r.Odeh.Params, r.MABIMS2021.Params
 
 	if !r.Moonset.After(r.Sunset) {
 		t.Fatalf("moonset %v not after sunset %v", r.Moonset, r.Sunset)
@@ -104,12 +100,18 @@ func TestCrescentVisibilityYallopAndOdehReadTheirOwnConventions(t *testing.T) {
 		t.Errorf("best time %.3f s after sunset, want 4/9 of the lag, %.3f s", got, wantBest)
 	}
 
-	if got, want := r.Geocentric.Age-r.Params.Age, r.BestTime.Sub(r.Sunset).Hours(); math.Abs(got-want) > 1e-9 {
+	if got, want := geocentric.Age-atSunset.Age, r.BestTime.Sub(r.Sunset).Hours(); math.Abs(got-want) > 1e-9 {
 		t.Errorf("best-time age is %.6f h past the sunset age, want %.6f h", got, want)
 	}
 
-	if r.Params.LT != r.Geocentric.LT || r.Params.LT != r.Moonset.Sub(r.Sunset).Minutes() {
-		t.Errorf("lag %.3f / %.3f min, want the sunset-to-moonset %.3f min", r.Params.LT, r.Geocentric.LT, r.Moonset.Sub(r.Sunset).Minutes())
+	if atSunset.LT != geocentric.LT || atSunset.LT != r.Moonset.Sub(r.Sunset).Minutes() {
+		t.Errorf("lag %.3f / %.3f min, want the sunset-to-moonset %.3f min", atSunset.LT, geocentric.LT, r.Moonset.Sub(r.Sunset).Minutes())
+	}
+
+	// Qureshi's eq. 6, Tb = Ts + (4.3/9.3)·Lag.
+	wantQureshi := r.Moonset.Sub(r.Sunset).Seconds() * 4.3 / 9.3
+	if got := r.QureshiBestTime.Sub(r.Sunset).Seconds(); math.Abs(got-wantQureshi) > 1e-3 {
+		t.Errorf("Qureshi's best time %.3f s after sunset, want 4.3/9.3 of the lag, %.3f s", got, wantQureshi)
 	}
 
 	// The two best-time sets differ by the Moon's parallax in altitude,
@@ -123,9 +125,9 @@ func TestCrescentVisibilityYallopAndOdehReadTheirOwnConventions(t *testing.T) {
 	}
 
 	sinPi := math.Sin(g.parallax * math.Pi / 180)
-	want := math.Asin(sinPi*math.Cos(r.Geocentric.MAlt*math.Pi/180)) * 180 / math.Pi
+	want := math.Asin(sinPi*math.Cos(geocentric.MAlt*math.Pi/180)) * 180 / math.Pi
 
-	if got := r.Geocentric.MAlt - r.Topocentric.MAlt; math.Abs(got-want) > 0.005 {
+	if got := geocentric.MAlt - topocentric.MAlt; math.Abs(got-want) > 0.005 {
 		t.Errorf("geocentric − topocentric altitude = %.4f°, the parallax gives %.4f°", got, want)
 	}
 }
@@ -186,16 +188,16 @@ func TestCrescentVisibilityMoonSetBeforeTheSun(t *testing.T) {
 		t.Fatalf("CrescentVisibility: %v", err)
 	}
 
-	if !r.Moonset.Before(r.Sunset) || r.Params.LT >= 0 {
-		t.Fatalf("moonset %v, sunset %v, lag %.1f min: want the Moon set first", r.Moonset, r.Sunset, r.Params.LT)
+	if lag := r.MABIMS2021.Params.LT; !r.Moonset.Before(r.Sunset) || lag >= 0 {
+		t.Fatalf("moonset %v, sunset %v, lag %.1f min: want the Moon set first", r.Moonset, r.Sunset, lag)
 	}
 
-	if !r.BestTime.Equal(r.Sunset) {
-		t.Errorf("best time %v, want sunset %v when the Moon set first", r.BestTime, r.Sunset)
+	if !r.BestTime.Equal(r.Sunset) || !r.QureshiBestTime.Equal(r.Sunset) {
+		t.Errorf("best times %v and %v, want sunset %v when the Moon set first", r.BestTime, r.QureshiBestTime, r.Sunset)
 	}
 
-	if r.Yallop.Code != "F" || r.MABIMS2021 || r.MABIMS1995 {
-		t.Errorf("a Moon below the horizon at sunset: Yallop %s, MABIMS 2021 %v, 1995 %v", r.Yallop.Code, r.MABIMS2021, r.MABIMS1995)
+	if r.Yallop.Code != "F" || r.MABIMS2021.Visible || r.MABIMS1995.Visible {
+		t.Errorf("a Moon below the horizon at sunset: Yallop %s, MABIMS 2021 %v, 1995 %v", r.Yallop.Code, r.MABIMS2021.Visible, r.MABIMS1995.Visible)
 	}
 }
 
@@ -241,25 +243,6 @@ func TestCrescentVisibilityNilProviderIsTheDefault(t *testing.T) {
 	if withNil.Yallop != withDefault.Yallop || !withNil.Sunset.Equal(withDefault.Sunset) {
 		t.Errorf("nil provider gave Yallop %v at sunset %v, eph.Default() %v at %v",
 			withNil.Yallop, withNil.Sunset, withDefault.Yallop, withDefault.Sunset)
-	}
-}
-
-func TestMABIMS1995AcceptsAnEightHourOldMoon(t *testing.T) {
-	t.Parallel()
-
-	for _, c := range []struct {
-		name string
-		p    CrescentParams
-		want bool
-	}{
-		{"elongation", CrescentParams{MAlt: 2.5, ArcL: 3.5, Age: 6}, true},
-		{"age", CrescentParams{MAlt: 2.5, ArcL: 2.5, Age: 8}, true},
-		{"neither", CrescentParams{MAlt: 2.5, ArcL: 2.5, Age: 7.9}, false},
-		{"too low", CrescentParams{MAlt: 1.9, ArcL: 10, Age: 30}, false},
-	} {
-		if got := c.p.MABIMS1995(); got != c.want {
-			t.Errorf("%s: MABIMS1995(%+v) = %v, want %v", c.name, c.p, got, c.want)
-		}
 	}
 }
 

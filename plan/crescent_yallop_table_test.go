@@ -68,7 +68,7 @@ func TestCrescentVisibilityReproducesYallopTable4(t *testing.T) {
 			t.Fatalf("No %d: %v", o.no, err)
 		}
 
-		g := r.Geocentric
+		g := r.Yallop.Params
 
 		// The table gives angles to 0.1°, so 0.05° of each bound is its
 		// rounding; the rest is Yallop's ephemeris and his best time, which
