@@ -281,6 +281,24 @@ func Apco13(utc1, utc2, dut1, elong, phi, hm, xp, yp, phpa, tc, rh, wl float64) 
 	return astrom, eo
 }
 
+// UTCToTT returns the TT two-part Julian date that Apco13 derives internally
+// from a UTC two-part Julian date: UTC to TAI by the leap-second table, then
+// TAI to TT.
+//
+// It differs from astrogo's own time.Time.TT before 1972, where that follows
+// ΔT and this follows SOFA's table, by up to 34 s at 1900. From 1972 on the
+// two agree, which is what lets coord.NewContext reuse the matrix Apco13 has
+// already built instead of evaluating the precession-nutation series again
+// (#473).
+func UTCToTT(utc1, utc2 float64) (tt1, tt2 float64) {
+	var tai1, tai2 float64
+
+	gofa.Utctai(utc1, utc2, &tai1, &tai2)
+	gofa.Taitt(tai1, tai2, &tt1, &tt2)
+
+	return tt1, tt2
+}
+
 // Atciq provides quick ICRS to CIRS transformation given precomputed ASTROM parameters.
 func Atciq(rc, dc, pr, pd, px, rv float64, astrom *ASTROM) (ri, di float64) {
 	gofa.Atciq(rc, dc, pr, pd, px, rv, astrom, &ri, &di)
