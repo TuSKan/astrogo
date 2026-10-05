@@ -65,11 +65,14 @@ func scheduleFixture(t *testing.T) (*Planner, Window, []*Block, TransitionModel)
 // strategies, which evaluate through one Context cache per Schedule since
 // #481, to the schedules they build on a full Context at every instant.
 //
-// The placements are a sequence of discrete decisions at whole steps, so they
-// must agree exactly: a decision changes only if a constraint sits within the
-// cache's ≲0.1″ of its threshold at some step, and none does here. Scores
-// differ by that 0.1″ of altitude, about 1e-5 at these priorities; the bound
-// is 1e-3.
+// Which block goes where is a sequence of discrete decisions at whole steps,
+// so the order must agree exactly: a decision changes only if a constraint
+// sits within the cache's ≲0.1″ of its threshold at some step, and none does
+// here. The instants agree to a bound rather than exactly, because since #485
+// the slew between blocks goes through the cache too, and 0.1″ at the 2°/s
+// used here is ~14 µs of slew, carried forward block to block; the bound is
+// 0.01 s. Scores differ by that 0.1″ of altitude, about 1e-5 at these
+// priorities; the bound is 1e-3.
 func TestScheduleThroughTheContextCache(t *testing.T) {
 	t.Parallel()
 
@@ -104,7 +107,9 @@ func TestScheduleThroughTheContextCache(t *testing.T) {
 		for i := range got.Blocks {
 			g, w := got.Blocks[i], want.Blocks[i]
 
-			if g.Block.ID != w.Block.ID || !g.Window.Start.Equal(w.Window.Start) || !g.Window.End.Equal(w.Window.End) {
+			if g.Block.ID != w.Block.ID ||
+				math.Abs(g.Window.Start.Sub(w.Window.Start).Seconds()) > 0.01 ||
+				math.Abs(g.Window.End.Sub(w.Window.End).Seconds()) > 0.01 {
 				t.Errorf("%s: block %d is %s at %v, a full Context per instant places %s at %v",
 					run.name, i, g.Block.ID, g.Window.Start, w.Block.ID, w.Window.Start)
 			}
