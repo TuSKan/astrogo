@@ -313,8 +313,15 @@ func temeToGCRS(pos, vel vector.Vec3, t time.Time) (gcrsPos, gcrsVel vector.Vec3
 	tt := t.TT()
 	tta, ttb := tt.JDParts()
 
+	// BPN: bias-precession-nutation matrix (GCRS → true equatorial of date).
+	// Its transpose maps back: true equatorial of date → GCRS.
+	bpn := gofaext.Pnm06a(tta, ttb)
+
 	// Equation of the equinoxes: rotates TEME (mean equinox) → true equinox.
-	ee := gofaext.Ee06a(tta, ttb)
+	// Derived from bpn rather than by Ee06a, which evaluates the same
+	// precession-nutation series again for the same TT: two evaluations per
+	// state where one gives the identical answer (#476).
+	ee := gofaext.Ee06aFromBPN(tta, ttb, bpn)
 	cosEE := math.Cos(ee)
 	sinEE := math.Sin(ee)
 
@@ -329,10 +336,6 @@ func temeToGCRS(pos, vel vector.Vec3, t time.Time) (gcrsPos, gcrsVel vector.Vec3
 		sinEE*vel.X+cosEE*vel.Y,
 		vel.Z,
 	)
-
-	// BPN: bias-precession-nutation matrix (GCRS → true equatorial of date).
-	// Transpose maps back: true equatorial of date → GCRS.
-	bpn := gofaext.Pnm06a(tta, ttb)
 
 	// r_GCRS = BPN^T · r_true
 	gcrsPos = vector.V3(

@@ -97,24 +97,20 @@ func Atio13(
 	return aob, zob, hob, dob, rob
 }
 
-// Atoc13 performs the observed → ICRS transformation for a given coordinate type
-// ("A" for Az/ZD, "H" for HA/Dec, "R" for RA/Dec).
-func Atoc13(
-	typ string,
-	ob1, ob2 float64,
-	utc1, utc2, dut1 float64,
-	elong, phi, hm float64,
-	xp, yp float64,
-	phpa, tc, rh, wl float64,
-) (rc, dc float64) {
-	gofa.Atoc13(
-		typ, ob1, ob2,
-		utc1, utc2, dut1,
-		elong, phi, hm,
-		xp, yp,
-		phpa, tc, rh, wl,
-		&rc, &dc,
-	)
+// Atoiq is the quick observed → CIRS transformation, for a coordinate type
+// ("A" for Az/ZD, "H" for HA/Dec, "R" for RA/Dec), from precomputed ASTROM
+// parameters. With [Aticq] after it, it is SOFA's Atoc13 without the Apco13
+// that Atoc13 runs first.
+func Atoiq(typ string, ob1, ob2 float64, astrom *ASTROM) (ri, di float64) {
+	gofa.Atoiq(typ, ob1, ob2, astrom, &ri, &di)
+
+	return ri, di
+}
+
+// Aticq is the quick CIRS → ICRS transformation from precomputed ASTROM
+// parameters.
+func Aticq(ri, di float64, astrom *ASTROM) (rc, dc float64) {
+	gofa.Aticq(ri, di, astrom, &rc, &dc)
 
 	return rc, dc
 }
@@ -270,33 +266,38 @@ func Refco(phpa, tc, rh, wl float64) (refa, refb float64) {
 // astrometry parameters.
 type ASTROM = gofa.ASTROM
 
-// Apco13 prepares the ASTROM parameters for ICRS <-> observed transformations.
-func Apco13(utc1, utc2, dut1, elong, phi, hm, xp, yp, phpa, tc, rh, wl float64) (ASTROM, float64) {
-	var (
-		astrom ASTROM
-		eo     float64
-	)
-	gofa.Apco13(utc1, utc2, dut1, elong, phi, hm, xp, yp, phpa, tc, rh, wl, &astrom, &eo)
-
-	return astrom, eo
-}
-
-// UTCToTT returns the TT two-part Julian date that Apco13 derives internally
-// from a UTC two-part Julian date: UTC to TAI by the leap-second table, then
-// TAI to TT.
+// ApcoAt prepares the ASTROM parameters for ICRS <-> observed transformations,
+// and returns the equation of the origins, at the TT (tt1, tt2) and UT1
+// (ut11, ut12) the caller gives.
 //
-// It differs from astrogo's own time.Time.TT before 1972, where that follows
-// ΔT and this follows SOFA's table, by up to 34 s at 1900. From 1972 on the
-// two agree, which is what lets coord.NewContext reuse the matrix Apco13 has
-// already built instead of evaluating the precession-nutation series again
-// (#473).
-func UTCToTT(utc1, utc2 float64) (tt1, tt2 float64) {
-	var tai1, tai2 float64
+// It is SOFA's Apco13 step for step (Epv00, Pnm06a, Bpn2xy, S06, Era00, Sp00,
+// Refco, Apco, Eors) without the two conversions Apco13 makes first, UTC to TT
+// and UTC to UT1 through SOFA's TAI−UTC table. Those disagree with astrogo's
+// own time scales before 1972, by up to 34 s of TT and, on the days SOFA
+// stretches for a step in TAI−UTC, up to 0.82 s of UT1; a caller holding
+// astrogo's TT and UT1 passes them here so one Context runs on one time scale
+// (#474). Given the TT and UT1 Apco13 would derive, the result is Apco13's,
+// bit for bit.
+func ApcoAt(tt1, tt2, ut11, ut12, elong, phi, hm, xp, yp, phpa, tc, rh, wl float64) (ASTROM, float64) {
+	var (
+		ehpv, ebpv [2][3]float64
+		r          [3][3]float64
+		x, y       float64
+		refa, refb float64
+		astrom     ASTROM
+	)
 
-	gofa.Utctai(utc1, utc2, &tai1, &tai2)
-	gofa.Taitt(tai1, tai2, &tt1, &tt2)
+	gofa.Epv00(tt1, tt2, &ehpv, &ebpv)
+	gofa.Pnm06a(tt1, tt2, &r)
+	gofa.Bpn2xy(r, &x, &y)
+	s := gofa.S06(tt1, tt2, x, y)
+	theta := gofa.Era00(ut11, ut12)
+	sp := gofa.Sp00(tt1, tt2)
 
-	return tt1, tt2
+	gofa.Refco(phpa, tc, rh, wl, &refa, &refb)
+	gofa.Apco(tt1, tt2, ebpv, ehpv[0], x, y, s, theta, elong, phi, hm, xp, yp, sp, refa, refb, &astrom)
+
+	return astrom, gofa.Eors(r, s)
 }
 
 // Atciq provides quick ICRS to CIRS transformation given precomputed ASTROM parameters.
@@ -366,6 +367,18 @@ func Pnm06a(date1, date2 float64) [3][3]float64 {
 // Used to rotate from the mean equinox (TEME) to the true equinox of date.
 func Ee06a(date1, date2 float64) float64 {
 	return gofa.Ee06a(date1, date2)
+}
+
+// Ee06aFromBPN is [Ee06a] for a caller that already holds the
+// bias-precession-nutation matrix rnpb at the same TT, from [Pnm06a].
+//
+// SOFA's Ee06a is Anpm(Gst06a(0, 0, tt) − Gmst06(0, 0, tt)), and Gst06a is
+// Gst06 applied to Pnm06a's matrix, so given that matrix this is Ee06a's own
+// arithmetic, bit for bit, without evaluating the precession-nutation series
+// a second time. ephemeris/satellite computed both for every state and so
+// evaluated the series twice per call (#476).
+func Ee06aFromBPN(date1, date2 float64, rnpb [3][3]float64) float64 {
+	return gofa.Anpm(gofa.Gst06(0, 0, date1, date2, rnpb) - gofa.Gmst06(0, 0, date1, date2))
 }
 
 // Pmsafe applies stellar space motion (proper motion, parallax, radial
