@@ -11,6 +11,7 @@ import (
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/coord"
+	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/time"
 )
 
@@ -45,11 +46,32 @@ import (
 // three connections fails the test. That is the outcome the paragraph above
 // asks for — a human looking at a suspiciously consistent failure — and a skip
 // is the one outcome nobody ever looks at.
-func failOrSkipOnOutage(t *testing.T, err error) {
+func failOrSkipOnOutage(ctx context.Context, t *testing.T, err error) {
 	t.Helper()
 
-	testutil.SkipOnUpstreamFailure(t, err)
+	testutil.SkipOnDegradedService(t, err, vizierControl(ctx, t))
 	t.Fatalf("VizieR TAP failed on every fresh-connection attempt: %v", err)
+}
+
+// vizierControl is a request a working VizieR cannot reject. A degraded VizieR
+// answers every query with "400 1 unresolved identifiers", which reads as a
+// malformed query of ours; it fails this one too, and a renamed column of ours
+// does not (#492).
+//
+// Its own deadline rather than the caller's: by the time a control is wanted,
+// the retries have spent most of that one.
+func vizierControl(ctx context.Context, t *testing.T) func() error {
+	t.Helper()
+
+	syncURL, err := remote.URL(remote.VizieR)
+	if err != nil {
+		t.Fatalf("VizieR endpoint: %v", err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 30*time.Second)
+	t.Cleanup(cancel)
+
+	return testutil.TAPControl(ctx, syncURL, `"I/239/hip_main"`)
 }
 
 // requireVizier skips the test when the VizieR TAP endpoint is unreachable —
@@ -117,7 +139,7 @@ func coneSearchWithRetry(ctx context.Context, t *testing.T, req resolve.ConeRequ
 		t.Logf("attempt %d/%d failed: %v", attempt+1, attempts, lastErr)
 	}
 
-	failOrSkipOnOutage(t, lastErr)
+	failOrSkipOnOutage(ctx, t, lastErr)
 
 	return count
 }
