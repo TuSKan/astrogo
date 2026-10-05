@@ -584,6 +584,19 @@ func ObservableWindows(
 	site *Site,
 	constraints ...Constraint,
 ) ([]Window, error) {
+	return observableWindows(obj, start, end, step, site, newContextCache(site.Location(), site.Refraction()), constraints...)
+}
+
+// observableWindows is ObservableWindows with the Context for each instant
+// supplied by ctxAt, for the reason visibleIntervals gives.
+func observableWindows(
+	obj Observable,
+	start, end time.Time,
+	step unit.Duration,
+	site *Site,
+	ctxAt func(time.Time) *coord.Context,
+	constraints ...Constraint,
+) ([]Window, error) {
 	if step <= 0 {
 		return nil, fmt.Errorf("%w: %v", ErrStepNotPositive, step)
 	}
@@ -599,7 +612,7 @@ func ObservableWindows(
 	// boundary, and the caller got a rise or set time that was quietly wrong
 	// rather than absent.
 	checkObs := func(t time.Time) (bool, error) {
-		eval, err := IsObservable(obj, t, site, constraints...)
+		eval, err := isObservableCtx(obj, t, site, ctxAt(t), constraints...)
 		if err != nil {
 			return false, fmt.Errorf("plan: observability at %s: %w",
 				t.Format(time.RFC3339), err)
@@ -622,7 +635,7 @@ func ObservableWindows(
 
 	t := start
 	for t.Before(end) || t.Equal(end) {
-		eval, err := IsObservable(obj, t, site, constraints...)
+		eval, err := isObservableCtx(obj, t, site, ctxAt(t), constraints...)
 		if err != nil {
 			return nil, err
 		}

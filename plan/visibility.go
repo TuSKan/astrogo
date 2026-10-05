@@ -43,7 +43,7 @@ func IsVisible(obj coord.Object, t time.Time, site *Site, minAlt angle.Angle) (b
 // Falls back to the grid point b if refinement fails.
 func refineVisibility(
 	obj coord.Object,
-	site *Site,
+	ctxAt func(time.Time) *coord.Context,
 	a, b time.Time,
 	threshold angle.Angle,
 ) time.Time {
@@ -53,9 +53,7 @@ func refineVisibility(
 			return 0, fmt.Errorf("visibility: ICRS: %w", err)
 		}
 
-		ctx := coord.NewContext(t, site.Location(), site.Refraction())
-
-		aa, err := observedAltAz(obj, t, ctx, pos)
+		aa, err := observedAltAz(obj, t, ctxAt(t), pos)
 		if err != nil {
 			return 0, fmt.Errorf("visibility: AltAz: %w", err)
 		}
@@ -119,6 +117,23 @@ func VisibleIntervals(
 	step time.Duration,
 	minAlt angle.Angle,
 ) ([]Interval, error) {
+	return visibleIntervals(obj, newContextCache(site.Location(), site.Refraction()), start, end, step, minAlt)
+}
+
+// visibleIntervals is VisibleIntervals with the Context for each instant
+// supplied by ctxAt.
+//
+// That used to be a full coord.NewContext per sample and per refinement
+// iteration, which was 98% of the function's time; VisibleIntervals passes a
+// newContextCache, whose bound is ctxRefresh's (#480). The parameter is what
+// lets a test run this same algorithm on full Contexts as its reference.
+func visibleIntervals(
+	obj coord.Object,
+	ctxAt func(time.Time) *coord.Context,
+	start, end time.Time,
+	step time.Duration,
+	minAlt angle.Angle,
+) ([]Interval, error) {
 	if step <= 0 {
 		step = 5 * time.Minute
 	}
@@ -144,9 +159,7 @@ func VisibleIntervals(
 			return nil, fmt.Errorf("visibility: ICRS: %w", err)
 		}
 
-		ctx := coord.NewContext(t, site.Location(), site.Refraction())
-
-		aa, err := observedAltAz(obj, t, ctx, pos)
+		aa, err := observedAltAz(obj, t, ctxAt(t), pos)
 		if err != nil {
 			return nil, fmt.Errorf("visibility: AltAz: %w", err)
 		}
@@ -156,7 +169,7 @@ func VisibleIntervals(
 		if visible && !inWindow {
 			// Transition: invisible → visible. Refine the exact crossing.
 			if hasPrev {
-				winStart = refineVisibility(obj, site, prevT, t, minAlt)
+				winStart = refineVisibility(obj, ctxAt, prevT, t, minAlt)
 			} else {
 				winStart = t
 			}
@@ -164,7 +177,7 @@ func VisibleIntervals(
 			inWindow = true
 		} else if !visible && inWindow {
 			// Transition: visible → invisible. Refine the exact crossing.
-			winEnd := refineVisibility(obj, site, prevT, t, minAlt)
+			winEnd := refineVisibility(obj, ctxAt, prevT, t, minAlt)
 			intervals = append(intervals, Interval{
 				Object: obj,
 				Window: Window{Start: winStart, End: winEnd},
@@ -194,6 +207,19 @@ func VisibleIntervals(
 //  1. Coarse 10-min grid scan to bracket the maximum.
 //  2. Brent's minimization (via Solver) within the bracket for sub-second precision.
 func TransitEstimate(obj coord.Object, site *Site, start, end time.Time) (time.Time, angle.Angle, error) {
+	return transitEstimate(obj, site, newContextCache(site.Location(), site.Refraction()), start, end)
+}
+
+// transitEstimate is TransitEstimate with the Context for each scan sample and
+// solver iteration supplied by ctxAt, for the reason visibleIntervals gives.
+// The altitude it returns is still read through a full Context at the refined
+// instant, so the reported culmination carries no AtTime approximation.
+func transitEstimate(
+	obj coord.Object,
+	site *Site,
+	ctxAt func(time.Time) *coord.Context,
+	start, end time.Time,
+) (time.Time, angle.Angle, error) {
 	if err := checkInterval(start, end); err != nil {
 		return time.Time{}, angle.Deg(0), err
 	}
@@ -214,9 +240,7 @@ func TransitEstimate(obj coord.Object, site *Site, start, end time.Time) (time.T
 			return time.Time{}, angle.Deg(0), err
 		}
 
-		ctx := coord.NewContext(t, site.Location(), site.Refraction())
-
-		aa, err := observedAltAz(obj, t, ctx, pos)
+		aa, err := observedAltAz(obj, t, ctxAt(t), pos)
 		if err != nil {
 			return time.Time{}, angle.Deg(0), err
 		}
@@ -246,9 +270,7 @@ func TransitEstimate(obj coord.Object, site *Site, start, end time.Time) (time.T
 			return 0, fmt.Errorf("visibility: transit ICRS: %w", err)
 		}
 
-		ctx := coord.NewContext(t, site.Location(), site.Refraction())
-
-		aa, err := observedAltAz(obj, t, ctx, pos)
+		aa, err := observedAltAz(obj, t, ctxAt(t), pos)
 		if err != nil {
 			return 0, fmt.Errorf("visibility: transit AltAz: %w", err)
 		}
@@ -299,6 +321,24 @@ func Find(
 	start, end time.Time,
 	step time.Duration,
 ) ([]Interval, error) {
+	return find(obj, site, newContextCache(site.Location(), site.Refraction()), constraints, start, end, step)
+}
+
+// find is Find with the Context for each instant supplied by ctxAt, for the
+// reason visibleIntervals gives.
+//
+// It also shares that Context across the constraints, through ConstraintCtx,
+// as IsObservable and the scheduler do. Find called Check, and every built-in
+// Check builds its own full Context, so a sample cost one Apco13 per
+// constraint rather than one.
+func find(
+	obj coord.Object,
+	site *Site,
+	ctxAt func(time.Time) *coord.Context,
+	constraints []Constraint,
+	start, end time.Time,
+	step time.Duration,
+) ([]Interval, error) {
 	if err := checkInterval(start, end); err != nil {
 		return nil, err
 	}
@@ -318,8 +358,19 @@ func Find(
 
 	// Constraint check function for bisection refinement.
 	checkObs := func(t time.Time) (bool, error) {
+		ctx := ctxAt(t)
+
 		for _, c := range constraints {
-			res, err := c.Check(obs, t, site)
+			var (
+				res Result
+				err error
+			)
+			if cc, ok := c.(ConstraintCtx); ok {
+				res, err = cc.CheckCtx(obs, t, site, ctx)
+			} else {
+				res, err = c.Check(obs, t, site)
+			}
+
 			if err != nil {
 				return false, fmt.Errorf("plan: constraint at %s: %w",
 					t.Format(time.RFC3339), err)
