@@ -96,7 +96,21 @@ func NewContext(t time.Time, site *Geodetic, atm atmosphere.Refraction) *Context
 	// seconds, and the sum would misplace Earth's rotation by up to a second.
 	ut1, ut2 := t.UT1Using(eop.DUT1).JDParts()
 	tt1, tt2 := t.TT().JDParts()
-	rc2i := gofaext.C2i06a(tt1, tt2)
+
+	// Apco13 has already built the celestial-to-intermediate matrix, as
+	// astrom.Bpn, from the same precession-nutation series C2i06a evaluates:
+	// building it again here cost a third of every NewContext, for the same
+	// matrix (#473). Apco13 built it at its own TT, though, derived from UTC
+	// through the leap-second table, so it is reused only where that TT is
+	// t.TT() to within 1e-14 day, which from 1972 on it always is. Before
+	// 1972 t.TT() follows ΔT, the two differ by up to 34 s, and the matrix is
+	// built at t.TT() as it always has been. TestNewContextEvaluatesTheSeriesOnce
+	// holds this to one evaluation.
+	rc2i := astrom.Bpn
+	if a1, a2 := gofaext.UTCToTT(jd1, jd2); math.Abs((a1-tt1)+(a2-tt2)) > 1e-14 {
+		rc2i = gofaext.C2i06a(tt1, tt2)
+	}
+
 	sp := gofaext.Sp00(tt1, tt2)
 	rpom := gofaext.Pom00(eop.XP, eop.YP, sp)
 	era0 := gofaext.Era00(ut1, ut2)

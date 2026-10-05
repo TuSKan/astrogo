@@ -50,6 +50,8 @@ func Atco13(
 	xp, yp float64,
 	phpa, tc, rh, wl float64,
 ) (aob, zob, hob, dob, rob, eo float64, status int) {
+	series()
+
 	status = gofa.Atco13(
 		raRad, decRad,
 		pmra, pmdec, parallax, rv,
@@ -69,7 +71,10 @@ func Atci13(
 	pr, pd, px, rv float64,
 	date1, date2 float64,
 ) (ri, di, eo float64) {
+	series()
+
 	gofa.Atci13(rc, dc, pr, pd, px, rv, date1, date2, &ri, &di, &eo)
+
 	return ri, di, eo
 }
 
@@ -107,6 +112,8 @@ func Atoc13(
 	xp, yp float64,
 	phpa, tc, rh, wl float64,
 ) (rc, dc float64) {
+	series()
+
 	gofa.Atoc13(
 		typ, ob1, ob2,
 		utc1, utc2, dut1,
@@ -153,6 +160,8 @@ func Eqec06(date1, date2, ra, dec float64) (elon, elat float64) {
 
 // Atic13 converts CIRS to ICRS coordinates.
 func Atic13(ri, di, date1, date2 float64) (rc, dc float64) {
+	series()
+
 	var eo float64
 	gofa.Atic13(ri, di, date1, date2, &rc, &dc, &eo)
 
@@ -192,12 +201,16 @@ func Dat(iy, im, id int, fd float64) (d float64, status int) {
 // Gst06a returns the Greenwich Apparent Sidereal Time (GAST) for the given
 // UT1 and TT Julian dates. Result is in radians, [0, 2π).
 func Gst06a(uta, utb, tta, ttb float64) float64 {
+	series()
+
 	return gofa.Gst06a(uta, utb, tta, ttb)
 }
 
 // C2t06a returns the Earth rotation matrix mapping ICRS to the Terrestrial
 // Intermediate Reference System (TIRS). The transpose of this matrix maps TIRS backwards into ICRS natively.
 func C2t06a(tta, ttb, uta, utb, xp, yp float64) [3][3]float64 {
+	series()
+
 	var rc2t [3][3]float64
 	gofa.C2t06a(tta, ttb, uta, utb, xp, yp, &rc2t)
 
@@ -224,6 +237,8 @@ func Aper(theta float64, astrom *ASTROM) {
 // of C2t06a, safe to cache across a short time window and reuse with a
 // freshly computed Era00/Pom00 via C2tcio.
 func C2i06a(tta, ttb float64) [3][3]float64 {
+	series()
+
 	var rc2i [3][3]float64
 	gofa.C2i06a(tta, ttb, &rc2i)
 
@@ -272,6 +287,8 @@ type ASTROM = gofa.ASTROM
 
 // Apco13 prepares the ASTROM parameters for ICRS <-> observed transformations.
 func Apco13(utc1, utc2, dut1, elong, phi, hm, xp, yp, phpa, tc, rh, wl float64) (ASTROM, float64) {
+	series()
+
 	var (
 		astrom ASTROM
 		eo     float64
@@ -319,7 +336,10 @@ func Dtdb(date1, date2, ut, elong, u, v float64) float64 {
 //   - dpsi: nutation in longitude (radians)
 //   - deps: nutation in obliquity (radians)
 func Nut06a(date1, date2 float64) (dpsi, deps float64) {
+	series()
+
 	gofa.Nut06a(date1, date2, &dpsi, &deps)
+
 	return dpsi, deps
 }
 
@@ -333,6 +353,8 @@ func Obl06(date1, date2 float64) float64 {
 // with respect to the true equatorial triad of date.
 // The transpose maps from the true equatorial frame back to GCRS.
 func Pnm06a(date1, date2 float64) [3][3]float64 {
+	series()
+
 	var rbpn [3][3]float64
 	gofa.Pnm06a(date1, date2, &rbpn)
 
@@ -347,6 +369,8 @@ func Pnm06a(date1, date2 float64) [3][3]float64 {
 //
 // Used to rotate from the mean equinox (TEME) to the true equinox of date.
 func Ee06a(date1, date2 float64) float64 {
+	series()
+
 	return gofa.Ee06a(date1, date2)
 }
 
