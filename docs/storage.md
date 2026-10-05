@@ -188,7 +188,9 @@ Beyond the dependency:
 
 - **The scheme registry shrinks to a map of `func(*url.URL) (fs.FS, error)`.**
   No `URLMux`, no `BucketSchemes`, no `ValidBucketScheme`.
-- **`?prefix=` becomes `fs.Sub`**, which is in the standard library.
+- **`?prefix=` becomes `fs.Sub`**, which is in the standard library, for
+  reading. On its own it hid the write and cancel interfaces, so nothing could
+  be downloaded through it (#487). The wrapper now forwards those.
 - **The memory bucket becomes `fstest.MapFS`.** Tests that build a fake bucket
   today are three lines.
 - **`Copy`, `Exists`, `ReadAll`, `WriteAll` stop being methods** and become
