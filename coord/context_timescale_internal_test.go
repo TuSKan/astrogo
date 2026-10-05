@@ -73,10 +73,14 @@ func TestContextRotatesStarsByItsOwnUT1(t *testing.T) {
 	}
 }
 
-// TestContextAstrometryUnchangedFrom1972 holds the unification to changing
-// nothing where the two derivations already agreed: from 1972 on, a Context's
-// astrometry and equation of the origins are what SOFA's Apco13 builds from
-// the UTC date itself, to the last bits of a float64.
+// TestContextAstrometryIsSOFAsFrom1960 holds a Context to SOFA's Apco13 built
+// from the UTC date itself, to the last bits of a float64: astrometry and
+// equation of the origins, from 1960.
+//
+// It started at 1972, where #474's unification left astrogo's and SOFA's TT
+// and UT1 agreeing; before it astrogo read UTC as UT through ΔT. #479 made
+// astrogo read 1960–1971 UTC as SOFA does, so the agreement now runs from the
+// start of UTC, through the days SOFA stretches for a fractional jump.
 //
 // Not bit for bit, though amd64 gets that on every ordinary day. astrogo and
 // SOFA form TT and UT1 by different sums, and those round differently in the
@@ -85,7 +89,7 @@ func TestContextRotatesStarsByItsOwnUT1(t *testing.T) {
 // seconds the two divide by different arithmetic. Measured on amd64, the
 // rotation angle moves by 2.1e-14 rad on 2016-12-31, which is 3e-10 s of UT1;
 // the bound is 1e-13, five times that and nowhere near anything physical.
-func TestContextAstrometryUnchangedFrom1972(t *testing.T) {
+func TestContextAstrometryIsSOFAsFrom1960(t *testing.T) {
 	t.Parallel()
 
 	loc, atm := timescaleSite(t)
@@ -96,8 +100,13 @@ func TestContextAstrometryUnchangedFrom1972(t *testing.T) {
 		time.Date(2016, time.December, 31, 12, 0, 0, 0, time.LocationUTC),
 	}
 
-	// 1972 to 2100 in steps of 23.7 days.
-	for jd := 2441317.5; jd < 2488069.5; jd += 23.7 {
+	// SOFA's fractional-jump days, all but 1959-12-31, which is the edge of
+	// SOFA's table rather than a jump UTC made (see time's
+	// TestUTCBefore1960IsNotStretched).
+	epochs = append(epochs, sofaStepDays[1:]...)
+
+	// 1960 to 2100 in steps of 23.7 days.
+	for jd := 2436934.5; jd < 2488069.5; jd += 23.7 {
 		epochs = append(epochs, time.FromJD(jd, time.UTC))
 	}
 
