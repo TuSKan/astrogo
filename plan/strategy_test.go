@@ -227,7 +227,7 @@ func TestScoreBlockPlacement(t *testing.T) {
 	}
 
 	start := time.ZeroTime()
-	score := scoreBlockPlacement(b, start, start.Add(unit.Minutes(20)), planner, nil)
+	score := scoreBlockPlacement(b, start, start.Add(unit.Minutes(20)), planner, plannerContexts(planner))
 	t.Logf("Score for mock block: %.2f", score)
 
 	// Score should be non-negative

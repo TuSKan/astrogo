@@ -110,7 +110,7 @@ func TestSwapAndInsertPassesReportAnOverheadFailure(t *testing.T) {
 	// B1 follows it, which is the transition that fails.
 	swap := &Schedule{Window: window, Blocks: []ScheduledBlock{placed(b1, 0), placed(b2, 10*time.Minute)}}
 
-	_, err := strategy.swapPass(swap, planner, &failingTransition{}, time.Minute, newTabuList(2), 0)
+	_, err := strategy.swapPass(swap, planner, &failingTransition{}, time.Minute, plannerContexts(planner), newTabuList(2), 0)
 	if !errors.Is(err, errOverheadUnknown) || !strings.Contains(err.Error(), "transition from B2 to B1") {
 		t.Errorf("swapPass returned %v, want it to wrap the overhead's error and name the transition", err)
 	}
@@ -123,7 +123,7 @@ func TestSwapAndInsertPassesReportAnOverheadFailure(t *testing.T) {
 		Unscheduled: []UnscheduledBlock{{Block: b2}},
 	}
 
-	_, err = strategy.insertPass(insert, planner, window, &failingTransition{}, time.Minute)
+	_, err = strategy.insertPass(insert, planner, window, &failingTransition{}, time.Minute, plannerContexts(planner))
 	if !errors.Is(err, errOverheadUnknown) || !strings.Contains(err.Error(), "transition from the start to B2") {
 		t.Errorf("insertPass returned %v, want it to wrap the overhead's error and name the transition", err)
 	}
