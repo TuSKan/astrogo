@@ -120,10 +120,12 @@ func Schemes() []string {
 // Handled here rather than in each backend, so every scheme gets them and no
 // backend has to remember:
 //
-//   - ?prefix=sub/dir/ scopes the filesystem to that subtree, via fs.Sub.
+//   - ?prefix=sub/dir/ scopes the filesystem to that subtree, reading through
+//     fs.Sub and keeping the backend's writes and cancellation.
 //   - ?key=exact/object.dat serves one object under whatever name the caller
 //     asks for. It is the supported way to point an endpoint at a single file,
-//     since a bare single-object URL leaves no room for a name.
+//     since a bare single-object URL leaves no room for a name. It is
+//     read-only, and keeps cancellation so a download can go through it.
 func OpenFS(rawURL string) (fs.FS, error) {
 	registryMu.RLock()
 
@@ -175,7 +177,8 @@ func OpenFS(rawURL string) (fs.FS, error) {
 	return fsys, nil
 }
 
-// applyQueryWrappers implements ?prefix= and ?key=.
+// applyQueryWrappers implements ?prefix= and ?key=, each keeping the
+// capabilities of the filesystem it wraps; see wrappers.go.
 func applyQueryWrappers(u *url.URL, fsys fs.FS) (fs.FS, error) {
 	q := u.Query()
 
@@ -183,37 +186,30 @@ func applyQueryWrappers(u *url.URL, fsys fs.FS) (fs.FS, error) {
 		// fs.Sub wants a valid path: no leading or trailing slash, no dot
 		// elements. Trimming the trailing slash is the one accommodation,
 		// because writing a prefix with one is the natural thing to do.
-		sub, err := fs.Sub(fsys, trimSlashes(prefix))
+		scoped, err := scopePrefix(fsys, trimSlashes(prefix))
 		if err != nil {
-			return nil, fmt.Errorf("remote/file: prefix %q: %w", prefix, err)
+			return nil, err
 		}
 
-		fsys = sub
+		if had, has := capabilities(fsys), capabilities(scoped); has != had {
+			return nil, fmt.Errorf("%w: ?prefix= over %T keeps %v of %v", errCapabilitiesLost, fsys, has, had)
+		}
+
+		fsys = scoped
 	}
 
 	if key := q.Get("key"); key != "" {
-		fsys = singleObject{under: fsys, key: trimSlashes(key)}
+		single := newSingleObject(fsys, trimSlashes(key))
+
+		// Writes are dropped on purpose (see singleObject); cancellation is not.
+		if had, has := capabilities(fsys)&capContext, capabilities(single); has != had {
+			return nil, fmt.Errorf("%w: ?key= over %T keeps %v of %v", errCapabilitiesLost, fsys, has, had)
+		}
+
+		fsys = single
 	}
 
 	return fsys, nil
-}
-
-// singleObject serves one underlying object under any name the caller asks for.
-//
-// The alternative — pointing a bucket URL at one object directly — cannot work,
-// because the caller still supplies a name and there is nothing for it to mean.
-type singleObject struct {
-	under fs.FS
-	key   string
-}
-
-func (s singleObject) Open(string) (fs.File, error) {
-	f, err := s.under.Open(s.key)
-	if err != nil {
-		return nil, fmt.Errorf("remote/file: single object %s: %w", s.key, err)
-	}
-
-	return f, nil
 }
 
 func trimSlashes(s string) string {
