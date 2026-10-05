@@ -51,6 +51,8 @@ func TestEpisodeJustAfterASetIsTheNextOne(t *testing.T) {
 // must return the episode that rise begins. Before #422 it returned the
 // previous one for every moonrise at Barcelona, and for Sirius every time.
 func TestEpisodeJustBeforeARiseIsThatRise(t *testing.T) {
+	t.Parallel()
+
 	prov := eph.Default()
 
 	site, err := NewSiteEarthLocation("Barcelona", 41.39, 2.17, 0)

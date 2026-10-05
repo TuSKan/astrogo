@@ -54,6 +54,8 @@ func TestARefinementStartsFromTheSampledBracket(t *testing.T) {
 // here rather than written down so the test does not depend on the
 // ephemeris to the tenth decimal.
 func TestTwilightNearASampleOnTheThreshold(t *testing.T) {
+	t.Parallel()
+
 	prov := eph.Default()
 	sample := time.Date(2026, 6, 11, 22, 15, 0, 0, time.LocationUTC)
 	start := time.Date(2026, 6, 11, 20, 0, 0, 0, time.LocationUTC)

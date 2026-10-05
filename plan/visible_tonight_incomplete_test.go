@@ -51,6 +51,8 @@ func (f *failingBrightSource) SearchBright(_ context.Context, _ resolve.BrightRe
 // bug: Sirius must still be in the results (skipping stayed a skip, not a
 // failure), AND the error must wrap ErrIncomplete (the shortfall is reported).
 func TestVisibleTonightReportsAnIncompleteResult(t *testing.T) {
+	t.Parallel()
+
 	sources := []resolve.BrightObjectSearcher{&failingBrightSource{good: sirius}}
 
 	results, err := plan.VisibleTonight(context.Background(), quintaCalixtoSite(t), testNight, 2, sources, ephemeris.Default())
@@ -80,6 +82,8 @@ func TestVisibleTonightReportsAnIncompleteResult(t *testing.T) {
 // that would catch a future gatherer recording a skip for an ordinary
 // non-result — a target that is simply below the magnitude limit, say.
 func TestVisibleTonightReturnsNilErrorWhenComplete(t *testing.T) {
+	t.Parallel()
+
 	faint := sirius
 	faint.ID, faint.Name, faint.VMag = "faint", "Faint Star", 6.0
 

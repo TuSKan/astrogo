@@ -126,6 +126,8 @@ func TestTransitInTheWindowsFirstStep(t *testing.T) {
 // only ever find more, found fewer — at 69°N a 15-minute step found both lunar
 // transits of July 20–22, 2026, and a 1-minute step found none (#417).
 func TestTransitsDoNotDependOnTheStep(t *testing.T) {
+	t.Parallel()
+
 	prov := eph.Default()
 
 	site, err := NewSiteEarthLocation("69N", 69, 0, 0)
@@ -163,6 +165,8 @@ func TestTransitsDoNotDependOnTheStep(t *testing.T) {
 // 2026's (#417). Over the first quarter of 2026 it must report all of them,
 // one per lunar day, 24h 50m apart on average.
 func TestEveryLunarMeridianPassageIsATransit(t *testing.T) {
+	t.Parallel()
+
 	prov := eph.Default()
 
 	site, err := NewSiteEarthLocation("85N", 85, 0, 0)

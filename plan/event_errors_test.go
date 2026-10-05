@@ -24,6 +24,8 @@ import (
 // than from some call on, is what exposes it: a provider that kept failing
 // would be reported by the next sample anyway (see #419's test).
 func TestEventSearchesReturnEveryProviderFailure(t *testing.T) {
+	t.Parallel()
+
 	site, err := NewSiteEarthLocation("Barcelona", 41.39, 2.17, 0)
 	if err != nil {
 		t.Fatal(err)
