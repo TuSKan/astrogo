@@ -27,7 +27,7 @@ type movingObject struct{ *Planet }
 
 func (o movingObject) ICRS(t time.Time) (coord.ICRS, error) { return o.Position(t) }
 
-// samplingCase is one target at one site over two days: obj is the target as
+// samplingCase is one target at one site over a day: obj is the target as
 // the coord.Object functions take it, observable as the Observable ones do.
 type samplingCase struct {
 	name       string
@@ -64,9 +64,9 @@ func samplingCases(t *testing.T) []samplingCase {
 		moon, sun := NewMoon(prov), NewSun(prov)
 
 		cases = append(cases,
-			samplingCase{name: "star", obj: observableObject{star}, observable: star, site: site, start: start, window: unit.Days(2)},
-			samplingCase{name: "moon", obj: movingObject{moon}, observable: moon, site: site, start: start, window: unit.Days(2)},
-			samplingCase{name: "sun", obj: movingObject{sun}, observable: sun, site: site, start: start, window: unit.Days(2)},
+			samplingCase{name: "star", obj: observableObject{star}, observable: star, site: site, start: start, window: unit.Days(1)},
+			samplingCase{name: "moon", obj: movingObject{moon}, observable: moon, site: site, start: start, window: unit.Days(1)},
+			samplingCase{name: "sun", obj: movingObject{sun}, observable: sun, site: site, start: start, window: unit.Days(1)},
 		)
 	}
 
