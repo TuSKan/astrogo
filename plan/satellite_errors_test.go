@@ -17,6 +17,8 @@ import (
 // filled a pass event with zeros when its look angle did, each with a nil
 // error (#454).
 func TestSatellitePassesReturnEveryPropagationFailure(t *testing.T) {
+	t.Parallel()
+
 	sat, site := testISS(t)
 	minEl := angle.Deg(10)
 

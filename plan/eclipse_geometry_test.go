@@ -236,6 +236,8 @@ func TestEclipsesAreDecidedByTheShadow(t *testing.T) {
 // A provider that failed on every call after one would hide a swallowed
 // failure behind the next call's (#419), so each fails once.
 func TestEclipseSearchReturnsEveryProviderFailure(t *testing.T) {
+	t.Parallel()
+
 	// Each window holds one eclipse, the first of 2026 of each kind.
 	cases := []struct {
 		name       string

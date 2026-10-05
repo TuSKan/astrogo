@@ -17,6 +17,8 @@ import (
 // under default `go test ./...`.
 
 func TestConjunctions_MarsJupiter(t *testing.T) {
+	t.Parallel()
+
 	prov := eph.Default()
 	mars := NewMars(prov)
 	jupiter := NewJupiter(prov)
@@ -37,6 +39,8 @@ func TestConjunctions_MarsJupiter(t *testing.T) {
 }
 
 func TestConjunctionsEcliptic_MarsJupiter(t *testing.T) {
+	t.Parallel()
+
 	prov := eph.Default()
 	mars := NewMars(prov)
 	jupiter := NewJupiter(prov)
@@ -57,6 +61,8 @@ func TestConjunctionsEcliptic_MarsJupiter(t *testing.T) {
 }
 
 func TestAppulses_MarsJupiter(t *testing.T) {
+	t.Parallel()
+
 	prov := eph.Default()
 	mars := NewMars(prov)
 	jupiter := NewJupiter(prov)
@@ -79,6 +85,8 @@ func TestAppulses_MarsJupiter(t *testing.T) {
 }
 
 func TestOppositions_MarsSun(t *testing.T) {
+	t.Parallel()
+
 	prov := eph.Default()
 	mars := NewMars(prov)
 	sun := NewSun(prov)
@@ -97,6 +105,8 @@ func TestOppositions_MarsSun(t *testing.T) {
 }
 
 func TestGreatestElongations_Venus(t *testing.T) {
+	t.Parallel()
+
 	prov := eph.Default()
 	venus := NewVenus(prov)
 	sun := NewSun(prov)

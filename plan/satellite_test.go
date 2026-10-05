@@ -149,6 +149,8 @@ func TestLookAngle_ISS(t *testing.T) {
 }
 
 func TestSatellitePasses_ISS(t *testing.T) {
+	t.Parallel()
+
 	prov := newISSProvider(t)
 
 	loc, err := coord.NewGeodetic(angle.Deg(-46.473002), angle.Deg(-22.528478), 835.05)

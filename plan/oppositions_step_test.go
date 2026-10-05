@@ -14,6 +14,8 @@ import (
 // in 2026, and the first three Full Moons of 2026 as oppositions of the Moon
 // to the Sun, each to a second.
 func TestOppositionsAtADailyStep(t *testing.T) {
+	t.Parallel()
+
 	prov := eph.Default()
 	sun := NewSun(prov)
 

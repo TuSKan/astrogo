@@ -98,6 +98,8 @@ func findByName(results []plan.VisibleObject, name string) (plan.VisibleObject, 
 }
 
 func TestVisibleTonight_FiltersAndReturnsVisibleStar(t *testing.T) {
+	t.Parallel()
+
 	faint := resolve.Target{
 		ID: "faint", Name: "Faint Star", Kind: resolve.KindStar,
 		Coord: sirius.Coord, HasCoord: true, VMag: 6.0, HasVMag: true, Catalog: "SIMBAD",
@@ -149,6 +151,8 @@ func TestVisibleTonight_FiltersAndReturnsVisibleStar(t *testing.T) {
 // independently computed maxima of the same altitude curve and must
 // therefore describe (very nearly) the same instant.
 func TestVisibleTonight_PeakConsistentWithTransit(t *testing.T) {
+	t.Parallel()
+
 	sources := []resolve.BrightObjectSearcher{&mockBrightSource{targets: []resolve.Target{vega}}}
 
 	results, err := plan.VisibleTonight(context.Background(), quintaCalixtoSite(t), testNight, 2, sources, ephemeris.Default())
@@ -191,6 +195,8 @@ func TestVisibleTonight_PeakConsistentWithTransit(t *testing.T) {
 // error surfaced. testNight (noon UTC) never exercised this path, since
 // noon always falls between a morning's dawn and that evening's dusk.
 func TestVisibleTonight_MidnightNightOrdersDawnAfterDusk(t *testing.T) {
+	t.Parallel()
+
 	// Local midnight at Quinta Calixto (UTC-3) on 2026-08-01 is 2026-08-01T03:00:00Z.
 	midnightNight := time.Date(2026, time.August, 1, 3, 0, 0, 0, time.LocationUTC)
 
@@ -207,6 +213,8 @@ func TestVisibleTonight_MidnightNightOrdersDawnAfterDusk(t *testing.T) {
 }
 
 func TestVisibleTonight_ExcludesObjectNeverAboveHorizon(t *testing.T) {
+	t.Parallel()
+
 	sources := []resolve.BrightObjectSearcher{&mockBrightSource{targets: []resolve.Target{polaris}}}
 
 	results, err := plan.VisibleTonight(context.Background(), quintaCalixtoSite(t), testNight, 5, sources, ephemeris.Default())
@@ -300,6 +308,8 @@ func TestVisibleTonight_SortedByApparentMag(t *testing.T) {
 // this test exploits to stay robust without hardcoding a specific
 // real-world altitude/airmass value.
 func TestVisibleTonight_ExtinctionCanPushBorderlineStarOverMagLimit(t *testing.T) {
+	t.Parallel()
+
 	const magLimit = 2.0
 
 	borderline := resolve.Target{
@@ -330,6 +340,8 @@ func TestVisibleTonight_ExtinctionCanPushBorderlineStarOverMagLimit(t *testing.T
 // case flaky depending on exactly how much airmass the evaluation instant
 // happens to have.
 func TestVisibleTonight_WithMinAltitude(t *testing.T) {
+	t.Parallel()
+
 	sources := func() []resolve.BrightObjectSearcher {
 		return []resolve.BrightObjectSearcher{&mockBrightSource{targets: []resolve.Target{sirius}}}
 	}

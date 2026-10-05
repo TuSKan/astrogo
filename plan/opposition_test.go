@@ -19,6 +19,8 @@ import (
 // hours late. On the analytical ephemeris they are within 8.1 minutes; with
 // DE440s, within 0.9.
 func TestOppositionsAreInEclipticLongitude(t *testing.T) {
+	t.Parallel()
+
 	const tolMinutes = 15
 
 	prov := eph.Default()

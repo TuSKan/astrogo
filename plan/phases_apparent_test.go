@@ -16,6 +16,8 @@ import (
 // Moon of 2026-09-26 must come within 10 s of Skyfield 1.54's 16:49:02 UTC
 // (DE421) on the analytical ephemeris; it is 4 s, where it was 33 s late.
 func TestMoonPhasesAreApparent(t *testing.T) {
+	t.Parallel()
+
 	prov := eph.Default()
 	start := time.Date(2026, 1, 1, 0, 0, 0, 0, time.LocationUTC)
 	end := time.Date(2027, 1, 1, 0, 0, 0, 0, time.LocationUTC)

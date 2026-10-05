@@ -39,6 +39,8 @@ func testISS(t *testing.T) (*satellite.Satellite, *coord.Geodetic) {
 // hour of drift; if a change to AtTime or to ctxRefresh made the reuse worse,
 // this is the test that has to be argued with.
 func TestContextCacheStaysInsideItsStatedBound(t *testing.T) {
+	t.Parallel()
+
 	sat, site := testISS(t)
 
 	start := time.Date(2026, time.April, 20, 0, 0, 0, 0, time.LocationUTC)

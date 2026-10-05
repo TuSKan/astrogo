@@ -104,6 +104,8 @@ func TestCrossingPairsBetweenSamples(t *testing.T) {
 // horizon at midday, and astronomical night at Paris ends and returns. Before
 // #426 the 15-minute sweep dropped the pairs that fit between two samples.
 func TestTheStepDoesNotDecideWhichCrossingsExist(t *testing.T) {
+	t.Parallel()
+
 	prov := eph.Default()
 
 	for _, c := range []struct {
