@@ -18,16 +18,18 @@ import (
 func TestGaiaToJohnsonCousinsReproducesSolarColors(t *testing.T) {
 	t.Parallel()
 
+	in := inRange(t)
+
 	// Gaia DR3: the Sun at G = -26.90, BP - RP = 0.82.
 	const (
 		solarG    = -26.90
 		solarBPRP = 0.82
 	)
 
-	b := magnitude.GaiaGToJohnsonB(solarG, solarBPRP)
-	v := magnitude.GaiaGToJohnsonV(solarG, solarBPRP)
-	r := magnitude.GaiaGToJohnsonR(solarG, solarBPRP)
-	i := magnitude.GaiaGToCousinsI(solarG, solarBPRP)
+	b := in(magnitude.GaiaGToJohnsonB(solarG, solarBPRP))
+	v := in(magnitude.GaiaGToJohnsonV(solarG, solarBPRP))
+	r := in(magnitude.GaiaGToJohnsonR(solarG, solarBPRP))
+	i := in(magnitude.GaiaGToCousinsI(solarG, solarBPRP))
 
 	// Published solar colors, with tolerances that admit the spread between
 	// determinations but not a sign error or a wrong polynomial degree.
@@ -67,12 +69,14 @@ func TestGaiaToJohnsonCousinsReproducesSolarColors(t *testing.T) {
 func TestGaiaGToCousinsIIsQuadratic(t *testing.T) {
 	t.Parallel()
 
+	in := inRange(t)
+
 	const (
 		solarG    = -26.90
 		solarBPRP = 0.82
 	)
 
-	got := solarG - magnitude.GaiaGToCousinsI(solarG, solarBPRP)
+	got := solarG - in(magnitude.GaiaGToCousinsI(solarG, solarBPRP))
 
 	// The quadratic, written out.
 	want := 0.01753 + 0.76*solarBPRP - 0.0991*solarBPRP*solarBPRP
@@ -117,6 +121,8 @@ func TestGaiaGToCousinsIIsQuadratic(t *testing.T) {
 func TestGaiaTransformationsKeepTheBandsOrdered(t *testing.T) {
 	t.Parallel()
 
+	in := inRange(t)
+
 	const (
 		g     = 12.0
 		loCol = 0.5
@@ -127,10 +133,10 @@ func TestGaiaTransformationsKeepTheBandsOrdered(t *testing.T) {
 	for step := range steps + 1 {
 		col := loCol + (hiCol-loCol)*float64(step)/steps
 
-		b := magnitude.GaiaGToJohnsonB(g, col)
-		v := magnitude.GaiaGToJohnsonV(g, col)
-		r := magnitude.GaiaGToJohnsonR(g, col)
-		i := magnitude.GaiaGToCousinsI(g, col)
+		b := in(magnitude.GaiaGToJohnsonB(g, col))
+		v := in(magnitude.GaiaGToJohnsonV(g, col))
+		r := in(magnitude.GaiaGToJohnsonR(g, col))
+		i := in(magnitude.GaiaGToCousinsI(g, col))
 
 		if !(b > v && v > r && r > i) {
 			t.Fatalf("at BP-RP = %.3f the bands are B %.4f, V %.4f, R %.4f, I %.4f; a star "+
@@ -139,18 +145,25 @@ func TestGaiaTransformationsKeepTheBandsOrdered(t *testing.T) {
 	}
 }
 
-// No relation blows up inside the range it is fitted on.
+// No relation blows up inside the range it is fitted on, and each reports
+// that range.
 //
 // A mistyped coefficient usually shows as a polynomial that is fine near the
 // anchor and enormous at the edge, which is how the wrong G-to-B cubic behaved
 // before it was replaced: within half a magnitude at BP - RP near zero and two
 // magnitudes adrift by three.
+//
+// The ok result is the other half. The relations used to return their
+// extrapolation for any color and document "nothing is clamped here", and
+// catalog/gaia reported it as V for an L dwarf or a carbon star past BP - RP =
+// 5 (#530). Each must now say whether the color is inside the interval Riello
+// et al. (2021) fitted it over, which is the table below.
 func TestGaiaTransformationsStayBoundedOverTheirRange(t *testing.T) {
 	t.Parallel()
 
 	for _, c := range []struct {
 		name   string
-		f      func(g, c float64) float64
+		f      func(g, c float64) (float64, bool)
 		lo, hi float64
 	}{
 		{"B", magnitude.GaiaGToJohnsonB, -0.5, 4.0},
@@ -165,17 +178,51 @@ func TestGaiaTransformationsStayBoundedOverTheirRange(t *testing.T) {
 			// No optical color index of a real star reaches six magnitudes;
 			// a relation that produces one has lost its shape.
 			bound = 6.0
+
+			// How far inside an edge counts as inside.
+			margin = 1e-9
 		)
 
 		for step := range steps + 1 {
 			col := c.lo + (c.hi-c.lo)*float64(step)/steps
+			col = math.Min(c.hi-margin, math.Max(c.lo+margin, col))
 
-			if offset := g - c.f(g, col); math.Abs(offset) > bound {
+			mag, ok := c.f(g, col)
+			if !ok {
+				t.Errorf("%s: BP-RP = %.9f is inside the fitted %.1f to %.1f and was reported outside it",
+					c.name, col, c.lo, c.hi)
+			}
+
+			if offset := g - mag; math.Abs(offset) > bound {
 				t.Errorf("%s: G-%s = %.3f at BP-RP = %.3f, beyond anything a stellar color "+
 					"index reaches", c.name, c.name, offset, col)
 
 				break
 			}
 		}
+
+		for _, col := range []float64{c.lo - margin, c.hi + margin, c.lo - 1, c.hi + 2} {
+			if _, ok := c.f(g, col); ok {
+				t.Errorf("%s: BP-RP = %.9f is outside the fitted %.1f to %.1f and was reported inside it",
+					c.name, col, c.lo, c.hi)
+			}
+		}
+	}
+}
+
+// inRange returns a function that unwraps a Gaia transformation the calling
+// test expects to be inside its fitted color range, failing the test if the
+// relation reports otherwise.
+func inRange(t *testing.T) func(mag float64, ok bool) float64 {
+	t.Helper()
+
+	return func(mag float64, ok bool) float64 {
+		t.Helper()
+
+		if !ok {
+			t.Errorf("a color inside the fitted range was reported outside it")
+		}
+
+		return mag
 	}
 }
