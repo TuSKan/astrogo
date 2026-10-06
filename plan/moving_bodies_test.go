@@ -319,7 +319,7 @@ func TestComet_ApparentMagnitudeAndDetails(t *testing.T) {
 	const cometID eph.ID = 1000001
 
 	prov := newOppositionProvider(cometID)
-	c := NewComet("Test Comet", cometID, prov, 6.0, 10.0, WithNuclearMagnitude(11.0, 5.0))
+	c := NewComet("Test Comet", cometID, prov, 6.0, 10.0, WithNuclearMagnitude(11.0, 5.0, 0.03))
 
 	tm := time.FromJD(2451545.0, time.UTC)
 

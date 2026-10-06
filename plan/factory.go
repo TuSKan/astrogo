@@ -200,7 +200,7 @@ func elementsFromTarget(c catalog.Target) (eph.Elements, error) {
 	return el, nil
 }
 
-// newCometFromTarget builds a *Comet from c's M1/K1 (and optional M2/K2)
+// newCometFromTarget builds a *Comet from c's M1/K1 (and optional M2/K2/PC)
 // photometry, shared identically by both the kernel-backed and
 // Kepler-backed FromCatalog paths so they can't drift apart.
 func newCometFromTarget(c catalog.Target, id eph.ID, p eph.Provider) *Comet {
@@ -208,6 +208,7 @@ func newCometFromTarget(c catalog.Target, id eph.ID, p eph.Provider) *Comet {
 	if c.M2 != 0 {
 		comet.M2 = c.M2
 		comet.K2 = c.K2
+		comet.PC = c.PC
 	}
 
 	return comet

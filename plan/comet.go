@@ -19,15 +19,20 @@ type Comet struct {
 	K1       float64
 	M2       float64
 	K2       float64
-	id       eph.ID
+	// PC is the nuclear phase coefficient, magnitudes per degree; see
+	// magnitude.CometNuclearApparent.
+	PC float64
+	id eph.ID
 }
 
 // CometOption configures optional Comet fields.
 type CometOption func(*Comet)
 
-// WithNuclearMagnitude sets the nuclear magnitude parameters.
-func WithNuclearMagnitude(m2, k2 float64) CometOption {
-	return func(c *Comet) { c.M2 = m2; c.K2 = k2 }
+// WithNuclearMagnitude sets the nuclear magnitude parameters: SBDB's M2, K2
+// and PC, the phase coefficient in magnitudes per degree (zero where SBDB
+// publishes none).
+func WithNuclearMagnitude(m2, k2, pc float64) CometOption {
+	return func(c *Comet) { c.M2, c.K2, c.PC = m2, k2, pc }
 }
 
 // NewComet creates a comet target with optional parameters.

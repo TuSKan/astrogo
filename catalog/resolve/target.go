@@ -121,14 +121,20 @@ type Target struct {
 	G float64
 	// SpinRA is the spin right ascension of the target.
 	SpinRA float64
-	// M1 is the total magnitude of the target.
+	// M1 is a comet's absolute total magnitude (SBDB's M1).
 	M1 float64
-	// K1 is the phase coefficient of the target.
+	// K1 is the total magnitude's slope in log r (SBDB's K1), not a phase
+	// coefficient: the total magnitude has none.
 	K1 float64
-	// M2 is the nuclear magnitude of the target.
+	// M2 is a comet's absolute nuclear magnitude (SBDB's M2).
 	M2 float64
-	// K2 is the phase coefficient of the target.
+	// K2 is the nuclear magnitude's slope in log r (SBDB's K2). It was
+	// documented as the phase coefficient, which is PC.
 	K2 float64
+	// PC is the nuclear magnitude's phase coefficient, in magnitudes per
+	// degree of phase angle (SBDB's PC), or zero where SBDB publishes none.
+	// See magnitude.CometNuclearApparent.
+	PC float64
 	// Diameter is the target's measured physical diameter (SBDB's "diameter"
 	// phys_par entry) — a real occultation/thermal/radar measurement, not
 	// derived from H. Set only when HasDiameter is true.

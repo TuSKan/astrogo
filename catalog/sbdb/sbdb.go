@@ -251,6 +251,13 @@ func (p *Provider) ResolveObject(ctx context.Context, req resolve.ObjectRequest)
 				if v, err := parseFloat(pp.Value); err == nil {
 					t.K2 = v
 				}
+			case "PC":
+				// The nuclear magnitude's phase coefficient. Until #548 it
+				// was dropped, so no nuclear magnitude could carry its phase
+				// term.
+				if v, err := parseFloat(pp.Value); err == nil {
+					t.PC = v
+				}
 			case "diameter":
 				if v, err := parseFloat(pp.Value); err == nil {
 					// SBDB publishes phys_par diameters in kilometers.

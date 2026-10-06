@@ -396,7 +396,7 @@ func TestCometApparent_HeliocentricScaling(t *testing.T) {
 }
 
 func TestCometNuclearApparent(t *testing.T) {
-	m := magnitude.CometNuclearApparent(15, 5, 1.0, 1.0)
+	m := magnitude.CometNuclearApparent(15, 5, 0.035, 1.0, 1.0, angle.Zero())
 	assertNear(t, "nuclear r=Δ=1", m, 15.0, 0.001)
 }
 
