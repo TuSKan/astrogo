@@ -2,15 +2,16 @@
 //
 // # Architecture
 //
-// The top-level [NewProvider] factory creates an [Ephemeris] for a given
+// The top-level [NewProvider] factory creates a [Provider] for a given
 // [Source] and kernel identifier, routing internally to specialised
 // implementations:
 //
 //   - [Planets], [SmallBody], [Asteroids], [Comets] — JPL SPK/LSK kernels
 //   - [Satellites] — NORAD TLE/GP element sets with SGP4 propagation
 //
-// This mirrors the catalog package's unified [catalog.Resolver] pattern:
-// users rarely need to import subpackages directly.
+// This mirrors the catalog package's unified
+// [github.com/TuSKan/astrogo/catalog.Resolver] pattern: users rarely need to
+// import subpackages directly.
 //
 // # The kernel sources need one blank import
 //

@@ -76,7 +76,7 @@ func Atci13(
 // Atio13 performs the CIRS → observed transformation, applying refraction,
 // diurnal aberration and Earth rotation.
 //
-// Observed → ICRS is [Atoc13], not this: an earlier version of this comment
+// Observed → ICRS is [gofa.Atoc13], not this: an earlier version of this comment
 // claimed both directions in consecutive sentences.
 func Atio13(
 	ri, di float64, // CIRS RA, Dec (radians)
@@ -191,8 +191,9 @@ func Gst06a(uta, utb, tta, ttb float64) float64 {
 	return gofa.Gst06a(uta, utb, tta, ttb)
 }
 
-// C2t06a returns the Earth rotation matrix mapping ICRS to the Terrestrial
-// Intermediate Reference System (TIRS). The transpose of this matrix maps TIRS backwards into ICRS natively.
+// C2t06a returns the IAU 2006/2000A celestial-to-terrestrial matrix, mapping
+// GCRS to ITRS: frame bias, precession and nutation, Earth rotation, and the
+// polar motion xp, yp. Its transpose maps ITRS back to GCRS.
 func C2t06a(tta, ttb, uta, utb, xp, yp float64) [3][3]float64 {
 	var rc2t [3][3]float64
 	gofa.C2t06a(tta, ttb, uta, utb, xp, yp, &rc2t)
@@ -606,7 +607,7 @@ func Starpv(ra, dec, pmr, pmd, px, rv float64) (pv [2][3]float64, status int) {
 // meaningless rather than merely imprecise, so a caller must check.
 //
 // Note the order, which is the opposite of the intuitive one and is asserted by
-// [TestPvstarReportsTheInputsItCannotUse] for that reason.
+// TestPvstarReportsTheInputsItCannotUse for that reason.
 func Pvstar(pv [2][3]float64) (ra, dec, pmr, pmd, px, rv float64, status int) {
 	status = gofa.Pvstar(pv, &ra, &dec, &pmr, &pmd, &px, &rv)
 

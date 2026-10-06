@@ -185,9 +185,9 @@ func NewImaging(spec Spec) (*Imaging, error) {
 // filterless setup lost only 0.09 magnitudes of depth between the zenith and
 // ten degrees where the V-band sky brightened by 0.69.
 //
-// So declare the filter. [Band] reports which one the magnitudes are on, and
-// the answer is fully meaningful only when the instrument passes that band
-// and little else.
+// So declare the filter. [Imaging.Band] reports which one the magnitudes are
+// on, and the answer is fully meaningful only when the instrument passes that
+// band and little else.
 func (i *Imaging) LimitingMagnitudeAt(t time.Time, alt, az angle.Angle) (float64, error) {
 	scene, err := i.spec.Sky.Scene(i.spec.Site, t.GoTime(), i.spec.Air)
 	if err != nil {

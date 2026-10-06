@@ -20,17 +20,17 @@ const unreleasedHeading = "## [Unreleased]"
 // "## [0.16.0] — 2026-08-29".
 var versionHeading = regexp.MustCompile(`(?m)^## \[([0-9]+\.[0-9]+\.[0-9]+)\]`)
 
-// unreleasedLink matches the link reference [Unreleased] resolves through,
-// whose target names the most recent tag.
+// unreleasedLink matches the link reference the Unreleased heading resolves
+// through, whose target names the most recent tag.
 var unreleasedLink = regexp.MustCompile(`(?m)^\[Unreleased\]: (\S+/compare/v)([0-9]+\.[0-9]+\.[0-9]+)(\.\.\.HEAD)$`)
 
 // Assemble inserts a new release section built from entries, leaving
-// [Unreleased] empty and extending the link-reference chain.
+// the Unreleased section empty and extending the link-reference chain.
 //
 // Released sections are never rewritten — this changelog is forward-only —
 // so everything below the new section is copied verbatim.
 //
-// Anything already written by hand under [Unreleased] is folded into the
+// Anything already written by hand under Unreleased is folded into the
 // release alongside the fragments, merged by heading. Appending the two
 // bodies instead would produce a second "### Fixed" under one release,
 // which is the same silently-wrong output that motivated docs/changelog.d in the
@@ -67,9 +67,9 @@ func Assemble(src, version, date string, entries []Entry) (string, error) {
 	return strings.Replace(out, link[0], newLinks, 1), nil
 }
 
-// splitUnreleased returns everything before the [Unreleased] heading, the
+// splitUnreleased returns everything before the Unreleased heading, the
 // body between it and the next "## " heading, and everything from that
-// heading on. With no [Unreleased] heading the whole input is the head,
+// heading on. With no Unreleased heading the whole input is the head,
 // a case Assemble refuses before reaching here.
 func splitUnreleased(src string) (head, body, tail string) {
 	head, rest, found := strings.Cut(src, unreleasedHeading)

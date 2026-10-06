@@ -130,7 +130,7 @@ type Spec struct {
 	// Because they answer different questions. The solar flux is an input to
 	// SkyCalc's model and changes the spectrum's shape as well as its level:
 	// airglow's response to solar activity is not uniform across the OH
-	// bands and the [OI] lines. This is a flat scaling of whatever came back,
+	// bands and the [O I] lines. This is a flat scaling of whatever came back,
 	// which is what a caller reaches for when they have an SQM or an all-sky
 	// camera saying tonight is brighter than the reference and no reason to
 	// believe the color changed.
@@ -141,7 +141,8 @@ type Spec struct {
 	//
 	// A scaled spectrum is still climatology and still says so: scaling a
 	// reference to match one measured number does not make the reference a
-	// measurement, and [Spec.AirglowMeasured] in the parent dataset package
+	// measurement, and
+	// [github.com/TuSKan/astrogo/skybrightness/dataset.Spec.AirglowMeasured]
 	// is what claims otherwise.
 	Scale float64
 }

@@ -415,7 +415,7 @@ func (b *Builder) Ozone(du float64) *Builder {
 // depth, so a sea-level default at a 2,600 m site overstates molecular
 // scattering by about a quarter.
 //
-// It is a default, not a measurement, and [Surface] still overrides it. A site
+// It is a default, not a measurement, and [Builder.Surface] still overrides it. A site
 // with a real barometer should use one — ISA is a standard profile, not the
 // weather, and a passing front moves surface pressure by a couple of per cent.
 func (b *Builder) SurfaceAtAltitude(height unit.Length) *Builder {

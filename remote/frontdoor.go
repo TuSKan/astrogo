@@ -294,8 +294,9 @@ func DefaultRetryPolicy(a Attempt) bool { return api.DefaultRetryPolicy(a) }
 // falls back to.
 const DefaultAPITimeout = api.DefaultTimeout
 
-// The options an [APIClient] takes. Each forwards to the same option below,
-// so the whole configuration surface is reachable without the subpackage.
+// The options [Client.SetAPIOptions] takes. Each forwards to the same option
+// below, so the whole configuration surface is reachable without the
+// subpackage.
 
 // WithTimeout overrides the endpoint's registered per-request timeout.
 func WithTimeout(d time.Duration) APIOption { return api.WithTimeout(d) }
