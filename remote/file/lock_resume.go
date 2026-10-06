@@ -539,17 +539,18 @@ func discardStaging(ctx context.Context, fsys fs.FS, writeKey, pKey string) {
 	}
 }
 
-// StagingSuffixes are the name suffixes this package appends to a cache key for
-// its own bookkeeping. Exported so remote can recognize and skip them when it
-// walks a cache directory; nothing else should need it.
-var StagingSuffixes = []string{".lock", ".part", ".resume", SourceETagSuffix}
+// stagingSuffixes are the name suffixes this package appends to a cache key for
+// its own bookkeeping. remote recognizes and skips them when it walks a cache
+// directory through IsStagingName, so the list itself stays unexported: an
+// exported slice is one any importer could edit in place (#542).
+var stagingSuffixes = []string{".lock", ".part", ".resume", SourceETagSuffix}
 
 // IsStagingName reports whether name is one of this package's bookkeeping
 // objects rather than a cached object in its own right.
 func IsStagingName(name string) bool {
 	base := path.Base(name)
 
-	for _, suffix := range StagingSuffixes {
+	for _, suffix := range stagingSuffixes {
 		if strings.HasSuffix(base, suffix) {
 			return true
 		}

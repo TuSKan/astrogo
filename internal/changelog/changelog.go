@@ -34,10 +34,10 @@ var (
 	ErrEmptyBody     = errors.New("changelog: fragment has no body")
 )
 
-// SectionOrder is the order sections appear in a release, following Keep a
+// sectionOrder is the order sections appear in a release, following Keep a
 // Changelog with this project's "Changed — BREAKING" variant kept alongside
 // plain Changed.
-var SectionOrder = []string{
+var sectionOrder = []string{
 	"Added",
 	"Changed — BREAKING",
 	"Changed",
@@ -49,7 +49,9 @@ var SectionOrder = []string{
 
 // Entry is one changelog fragment.
 type Entry struct {
-	// Type is the section it belongs in, one of [SectionOrder].
+	// Type is the section it belongs in: one of the Keep a Changelog
+	// section names, with this project's "Changed — BREAKING" beside plain
+	// "Changed". docs/changelog.d/README.md lists them.
 	Type string
 
 	// PR is the pull request number, used to order entries within a
@@ -123,7 +125,7 @@ func ParseEntry(name, src string) (Entry, error) {
 	}
 
 	if !validType(e.Type) {
-		return e, fmt.Errorf("%w %q in %s (want one of %s)", ErrUnknownType, e.Type, name, strings.Join(SectionOrder, ", "))
+		return e, fmt.Errorf("%w %q in %s (want one of %s)", ErrUnknownType, e.Type, name, strings.Join(sectionOrder, ", "))
 	}
 
 	e.Body = strings.TrimSpace(body.String())
@@ -134,7 +136,7 @@ func ParseEntry(name, src string) (Entry, error) {
 	return e, nil
 }
 
-func validType(t string) bool { return slices.Contains(SectionOrder, t) }
+func validType(t string) bool { return slices.Contains(sectionOrder, t) }
 
 // LoadEntries parses every .md fragment in dir, skipping README.md.
 //
@@ -205,7 +207,7 @@ func (e Entry) cite() string {
 }
 
 // Render turns entries into a CHANGELOG section body, headings in
-// [SectionOrder] and entries within a heading ordered by PR number.
+// [sectionOrder] and entries within a heading ordered by PR number.
 //
 // Returns the empty string for no entries, so a caller can tell "nothing to
 // release" from "a release with no notes".
@@ -214,14 +216,14 @@ func Render(entries []Entry) string {
 		return ""
 	}
 
-	bySection := make(map[string][]Entry, len(SectionOrder))
+	bySection := make(map[string][]Entry, len(sectionOrder))
 	for _, e := range entries {
 		bySection[e.Type] = append(bySection[e.Type], e)
 	}
 
 	var b strings.Builder
 
-	for _, section := range SectionOrder {
+	for _, section := range sectionOrder {
 		in := bySection[section]
 		if len(in) == 0 {
 			continue

@@ -88,7 +88,7 @@ func splitUnreleased(src string) (head, body, tail string) {
 // mergeSections combines two rendered bodies, keeping one heading each and
 // preserving the canonical section order.
 func mergeSections(bodies ...string) string {
-	buckets := make(map[string][]string, len(SectionOrder))
+	buckets := make(map[string][]string, len(sectionOrder))
 
 	var order []string
 
@@ -133,7 +133,7 @@ func mergeSections(bodies ...string) string {
 	return b.String()
 }
 
-// sortSections puts known sections in [SectionOrder], then any unrecognized
+// sortSections puts known sections in [sectionOrder], then any unrecognized
 // ones in the order they were found — a heading this package does not know
 // about is still somebody's entry, and dropping it would be worse than
 // filing it last.
@@ -141,7 +141,7 @@ func sortSections(found []string) []string {
 	out := make([]string, 0, len(found))
 	seen := make(map[string]bool, len(found))
 
-	for _, section := range SectionOrder {
+	for _, section := range sectionOrder {
 		for _, f := range found {
 			if f == section && !seen[f] {
 				out = append(out, f)
