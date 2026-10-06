@@ -32,20 +32,11 @@ const (
 
 	// ConventionMolczan uses the Molczan convention:
 	// standard magnitude at 1000 km range, 90° phase (50% illumination),
-	// representing mean brightness. Intrinsically ~1.4 mag fainter than
-	// McCants for the same satellite (see molczanOffset).
+	// representing mean brightness. Numerically ~1.4 mag fainter than the
+	// McCants value for the same satellite; SatelliteApparent's predictions
+	// from it come out ~0.7 mag fainter, the mean-vs-brightest half of that.
 	ConventionMolczan
 )
-
-// molczanOffset is the total magnitude difference between the Molczan
-// (mcnames) and McCants (quicksat) standard-magnitude conventions, ~1.4 mag,
-// per https://www.mmccants.org/tles/intrmagdef.html. It is the sum of two
-// independent ~0.7 mag effects:
-//   - illumination/phase convention (Molczan 50% vs McCants full phase):
-//     2.5·log₁₀(2) ≈ 0.75 mag
-//   - mean vs. maximum ("brightest likely") brightness: ≈0.7 mag, a
-//     definitional (non-geometric) difference
-const molczanOffset = 1.45 // 2.5·log₁₀(2) + 0.7
 
 // satelliteReferenceRange is the range a standard magnitude is quoted at:
 // 1000 km, for both the McCants and Molczan conventions. The distance modulus
@@ -53,17 +44,32 @@ const molczanOffset = 1.45 // 2.5·log₁₀(2) + 0.7
 // definition rather than an observation.
 const satelliteReferenceRange unit.Length = 1_000_000
 
-// SatelliteApparent computes the apparent visual magnitude of an artificial satellite.
+// SatelliteApparent computes the apparent visual magnitude of an artificial
+// satellite from a standard magnitude, at the convention's own reference
+// geometry:
 //
-//	m_obs = m_std − 15.75 + 2.5·log₁₀(range²) − 2.5·log₁₀(Ψ(α))
+//	m = m_std + 5·log₁₀(range / 1000 km) − 2.5·log₁₀(Ψ(α) / Ψ(α_ref))
 //
-// equivalent to:
+// with α_ref the convention's reference phase angle: 0° (full phase) for
+// McCants/Quicksat, 90° for Molczan, as https://www.mmccants.org/tles/intrmagdef.html
+// defines them. A standard magnitude therefore reproduces itself at 1000 km
+// and its own reference phase.
 //
-//	m_obs = m_std + 5·log₁₀(range_km / 1000) − 2.5·log₁₀(Ψ(α))
+// The conventions are not converted into one another. Of the ~1.4 mag between
+// them, the phase-definition half is what α_ref accounts for; the other half
+// is that McCants quotes the "brightest likely" orientation and Molczan an
+// "average" one, and that page asks a program to keep it: a Molczan-based
+// prediction should come out about 0.7 mag fainter than a McCants-based one
+// for the same object, which this does.
+//
+// Until #560 the phase was measured from 90° whatever the convention — so a
+// McCants magnitude came out 0.75 mag (sphere) or 1.24 mag (cylinder) too
+// bright at its own reference geometry — and a Molczan magnitude was shifted
+// by the whole 1.45 mag as well.
 //
 // Parameters:
 //   - stdMag: standard magnitude from catalog (McCants or Molczan convention)
-//   - conv: which convention stdMag uses (affects phase reference interpretation)
+//   - conv: which convention stdMag uses, which fixes the reference phase
 //   - observerRange: observer–satellite range
 //   - alpha: phase angle (Sun–satellite–observer)
 //   - shape: phase function model (sphere or cylinder)
@@ -73,14 +79,6 @@ func SatelliteApparent(
 ) float64 {
 	if observerRange <= 0 {
 		return stdMag
-	}
-
-	// Normalize Molczan standard magnitudes to the McCants reference frame.
-	// A Molczan value is ~1.4 mag fainter than the McCants value for the same
-	// object (see molczanOffset), so subtract the offset to convert.
-	m := stdMag
-	if conv == ConventionMolczan {
-		m -= molczanOffset
 	}
 
 	// Distance modulus relative to the 1000 km reference. A ratio of two
@@ -93,13 +91,16 @@ func SatelliteApparent(
 		psi = 1e-30
 	}
 
-	phaseMag := -2.5 * math.Log10(psi)
+	// The reference phase is the convention's: full phase for McCants, 90°
+	// for Molczan.
+	refAlpha := 0.0
+	if conv == ConventionMolczan {
+		refAlpha = math.Pi / 2
+	}
 
-	// The phase correction is relative to the reference geometry (α=90°).
-	refPsi := satPhaseFunction(math.Pi/2, shape) // Ψ at 90°
-	refMag := -2.5 * math.Log10(refPsi)
+	refPsi := satPhaseFunction(refAlpha, shape)
 
-	return m + distMod + phaseMag - refMag
+	return stdMag + distMod - 2.5*math.Log10(psi/refPsi)
 }
 
 // satPhaseFunction evaluates the phase function for the given shape model.
