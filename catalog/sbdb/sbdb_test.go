@@ -292,6 +292,63 @@ func TestSBDBResolver_PhysicalDiameterAlbedo(t *testing.T) {
 	}
 }
 
+// TestSBDBResolver_CometNuclearPhaseCoefficient decodes a comet's magnitude
+// parameters, the phase coefficient PC among them. The phys_par block is
+// 13P/Olbers's as the live SBDB API returned it on 2026-10-06, including
+// K2's "5." — a trailing point, no digits after it.
+//
+// Until #548 PC was dropped, so a nuclear magnitude could never carry its
+// phase term however it was computed.
+func TestSBDBResolver_CometNuclearPhaseCoefficient(t *testing.T) {
+	jsonData := `{
+		"object": {
+			"spkid": "1000213",
+			"fullname": "13P/Olbers",
+			"des": "13P",
+			"kind": "cp"
+		},
+		"phys_par": [
+			{"name": "M1", "value": "6.7", "title": "comet total magnitude"},
+			{"name": "K1", "value": "18.5", "title": "comet total magnitude slope"},
+			{"name": "M2", "value": "11.3", "title": "comet nuclear magnitude"},
+			{"name": "K2", "value": "5.", "title": "comet nuclear magnitude slope"},
+			{"name": "PC", "value": "0.03", "title": "comet nuclear phase coefficient"}
+		]
+	}`
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+
+		if _, err := fmt.Fprint(w, jsonData); err != nil {
+			t.Errorf("failed to write response: %v", err)
+		}
+	}))
+	defer server.Close()
+
+	t.Cleanup(remote.Reset)
+
+	if err := remote.SetURL(remote.JPLSBDB, server.URL); err != nil {
+		t.Fatal(err)
+	}
+
+	tar, err := New().Resolve(context.Background(), "13P")
+	if err != nil {
+		t.Fatalf("Resolve 13P: %v", err)
+	}
+
+	for _, f := range []struct {
+		name      string
+		got, want float64
+	}{
+		{"M1", tar.M1, 6.7}, {"K1", tar.K1, 18.5},
+		{"M2", tar.M2, 11.3}, {"K2", tar.K2, 5}, {"PC", tar.PC, 0.03},
+	} {
+		if f.got != f.want {
+			t.Errorf("%s = %v, want %v", f.name, f.got, f.want)
+		}
+	}
+}
+
 func TestClassifyKind(t *testing.T) {
 	tests := []struct {
 		name         string

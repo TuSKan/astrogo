@@ -798,7 +798,7 @@ var scalarFieldRules = []fieldRule{
 		},
 	},
 	{
-		// SBDB-only physical-parameter cluster (H/G/M1/K1/M2/K2/G1/G2/
+		// SBDB-only physical-parameter cluster (H/G/M1/K1/M2/K2/PC/G1/G2/
 		// Diameter/Albedo) — no other provider populates any of these
 		// today.
 		precedence: []string{"sbdb"},
@@ -810,6 +810,7 @@ var scalarFieldRules = []fieldRule{
 			dst.K1 = src.K1
 			dst.M2 = src.M2
 			dst.K2 = src.K2
+			dst.PC = src.PC
 			dst.G1, dst.G2, dst.HasG1G2 = src.G1, src.G2, src.HasG1G2
 			dst.Diameter, dst.HasDiameter = src.Diameter, src.HasDiameter
 			dst.Albedo, dst.HasAlbedo = src.Albedo, src.HasAlbedo
