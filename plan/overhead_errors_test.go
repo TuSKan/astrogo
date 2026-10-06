@@ -106,25 +106,48 @@ func TestSwapAndInsertPassesReportAnOverheadFailure(t *testing.T) {
 		}
 	}
 
-	// Two adjacent blocks, so the swap is considered: B2 moves first and
-	// B1 follows it, which is the transition that fails.
-	swap := &Schedule{Window: window, Blocks: []ScheduledBlock{placed(b1, 0), placed(b2, 10*time.Minute)}}
+	// Two adjacent blocks, so the swap is considered. It asks for two
+	// transitions, in order: into B2 from the start of the window, where B2
+	// moves to, and from B2 to B1, which follows it. Each failure must be
+	// reported as its own.
+	for _, tc := range []struct {
+		failAt int
+		names  string
+	}{
+		{1, "transition from the start to B2"},
+		{2, "transition from B2 to B1"},
+	} {
+		swap := &Schedule{Window: window, Blocks: []ScheduledBlock{placed(b1, 0), placed(b2, 10*time.Minute)}}
 
-	_, err := strategy.swapPass(swap, planner, &failingTransition{}, time.Minute, plannerContexts(planner), newTabuList(2), 0)
-	if !errors.Is(err, errOverheadUnknown) || !strings.Contains(err.Error(), "transition from B2 to B1") {
-		t.Errorf("swapPass returned %v, want it to wrap the overhead's error and name the transition", err)
+		_, err := strategy.swapPass(swap, planner, &failingTransition{failAt: tc.failAt}, time.Minute,
+			plannerContexts(planner), newTabuList(2), 0)
+		if !errors.Is(err, errOverheadUnknown) || !strings.Contains(err.Error(), tc.names) {
+			t.Errorf("swapPass, call %d failing: %v, want it to wrap the overhead's error and name the %s",
+				tc.failAt, err, tc.names)
+		}
 	}
 
 	// One placed block and one waiting for a gap. The first gap tried is the
-	// one before B1, so the transition is from the start of the window.
-	insert := &Schedule{
-		Window:      window,
-		Blocks:      []ScheduledBlock{placed(b1, time.Hour)},
-		Unscheduled: []UnscheduledBlock{{Block: b2}},
-	}
+	// one before B1: into B2 from the start of the window, then from B2 to
+	// B1, which the gap ends at.
+	for _, tc := range []struct {
+		failAt int
+		names  string
+	}{
+		{1, "transition from the start to B2"},
+		{2, "transition from B2 to B1"},
+	} {
+		insert := &Schedule{
+			Window:      window,
+			Blocks:      []ScheduledBlock{placed(b1, time.Hour)},
+			Unscheduled: []UnscheduledBlock{{Block: b2}},
+		}
 
-	_, err = strategy.insertPass(insert, planner, window, &failingTransition{}, time.Minute, plannerContexts(planner))
-	if !errors.Is(err, errOverheadUnknown) || !strings.Contains(err.Error(), "transition from the start to B2") {
-		t.Errorf("insertPass returned %v, want it to wrap the overhead's error and name the transition", err)
+		_, err := strategy.insertPass(insert, planner, window, &failingTransition{failAt: tc.failAt}, time.Minute,
+			plannerContexts(planner))
+		if !errors.Is(err, errOverheadUnknown) || !strings.Contains(err.Error(), tc.names) {
+			t.Errorf("insertPass, call %d failing: %v, want it to wrap the overhead's error and name the %s",
+				tc.failAt, err, tc.names)
+		}
 	}
 }
