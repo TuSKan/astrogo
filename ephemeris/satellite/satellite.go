@@ -167,12 +167,32 @@ func (s *Satellite) OrbitalPeriod() float64 {
 	return 1440.0 / s.MeanMotion // minutes
 }
 
-// Altitude returns the precise altitude above the WGS84 ellipsoid at time t.
-// This uses the sub-satellite geodetic computation for WGS84-precise values.
+// Altitude returns the height above the WGS84 ellipsoid at time t.
+//
+// # Why the position is not turned Earth-fixed first
+//
+// Height above an ellipsoid of revolution depends on a point only through its
+// distance from the axis and its height along it, and a rotation about that
+// axis changes neither. TEME and the Earth-fixed frame share the axis — up to
+// polar motion, a third of an arcsecond, which moves a LEO height by
+// centimeters — so the TEME position gives the same height as any
+// Earth-fixed one.
+//
+// It used to be rotated first, by GAST. That bought nothing for the height,
+// cost a UT1 lookup (and with it a possible EOP load) and a full IAU
+// 2006/2000A nutation series per call, and was the wrong rotation besides:
+// TEME is on the mean equinox, so its Earth-fixed counterpart is GMST away,
+// not GAST (#512).
 func (s *Satellite) Altitude(t time.Time) (unit.Length, error) {
-	geo, err := s.subSatellitePoint(t)
+	pos, _, err := s.propagateECI(t)
 	if err != nil {
 		return 0, err
+	}
+
+	// coord.FromECEF expects meters; SGP4 answers in kilometers.
+	geo, err := coord.FromECEF(vector.V3(pos.X*1e3, pos.Y*1e3, pos.Z*1e3), coord.WGS84())
+	if err != nil {
+		return 0, fmt.Errorf("satellite: height above the ellipsoid: %w", err)
 	}
 
 	return geo.Height(), nil
@@ -247,49 +267,6 @@ func (s *Satellite) propagateECI(t time.Time) (pos, vel vector.Vec3, err error) 
 	}
 
 	return pos, vel, nil
-}
-
-// subSatellitePoint returns the geodetic coordinates (lat, lon, altitude)
-// of the sub-satellite point at time t.
-func (s *Satellite) subSatellitePoint(t time.Time) (*coord.Geodetic, error) {
-	eciPos, _, err := s.propagateECI(t)
-	if err != nil {
-		return nil, err
-	}
-
-	// Compute GAST for ECI → ECEF conversion. Falls back to UTC-derived
-	// GAST rather than failing if IERS EOP data is unavailable, matching
-	// this function's existing no-error-return contract.
-	//
-	// That fallback costs up to 0.9 s of Earth rotation — the bound the
-	// leap-second system enforces on UT1-UTC — which is about 13.5 arcsec
-	// of longitude, or 420 m of sub-satellite position at the equator. The
-	// comment here previously said "a few hundred ms", which understated it
-	// threefold. It is a ground-track error, not an orbit error: the ECI
-	// state is unaffected.
-	//
-	// CGPM Resolution 4 (2022) ends leap seconds by 2035 and with them that
-	// bound, so this degradation is unbounded thereafter. Discarding the
-	// error is deliberate here and stays deliberate, but it is worth knowing
-	// what is being discarded.
-	gast, _ := t.GAST()
-
-	// Rotate ECI → ECEF.
-	cosG := math.Cos(gast.Radians())
-	sinG := math.Sin(gast.Radians())
-	ecefX := eciPos.X*cosG + eciPos.Y*sinG
-	ecefY := -eciPos.X*sinG + eciPos.Y*cosG
-	ecefZ := eciPos.Z
-
-	// Convert ECEF (km) to geodetic via coord.FromECEF (expects meters).
-	ecefVec := vector.V3(ecefX*1e3, ecefY*1e3, ecefZ*1e3)
-
-	geo, err := coord.FromECEF(ecefVec, coord.WGS84())
-	if err != nil {
-		return nil, fmt.Errorf("satellite: ecef→geodetic: %w", err)
-	}
-
-	return geo, nil
 }
 
 // temeToGCRS converts TEME position/velocity (km, km/s) to GCRS using
