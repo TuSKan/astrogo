@@ -14,6 +14,7 @@ import (
 	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/internal/votable"
+	"github.com/TuSKan/astrogo/magnitude"
 	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/time"
 )
@@ -334,11 +335,17 @@ func targetFromRow(row []string, col map[string]int) (resolve.Target, bool) {
 	}
 
 	if bpRp, okC := number("bp_rp"); okC {
-		// Gaia DR3 documentation Table 5.9 is tabulated as G minus the target
-		// band, so this is G − V and V is G less it. See
-		// [magnitude.GaiaGToJohnsonV] for the evidence on the direction.
-		gMinusV := -0.02704 + 0.01424*bpRp - 0.2156*bpRp*bpRp + 0.01426*bpRp*bpRp*bpRp
-		t.VMag = gMag - gMinusV
+		// Outside the colors Riello et al. (2021) fitted the relation over,
+		// the cubic extrapolates — several magnitudes adrift by BP−RP = 7 —
+		// and an L dwarf or a carbon star is reported with no V rather than
+		// with an invented one. This used to inline its own copy of the
+		// cubic and apply it at any color (#530).
+		v, ok := magnitude.GaiaGToJohnsonV(gMag, bpRp)
+		if !ok {
+			return t, true
+		}
+
+		t.VMag = v
 		t.HasVMag = true
 
 		return t, true

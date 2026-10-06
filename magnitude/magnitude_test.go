@@ -510,6 +510,8 @@ func TestExtinctionAtAltitude(t *testing.T) {
 // magnitude too bright and red stars far more, and the whole integrated
 // starlight map was built through it.
 func TestGaiaGToJohnsonV(t *testing.T) {
+	in := inRange(t)
+
 	// The Sun: G = -26.895 (Casagrande & VandenBerg 2018) against the long
 	// established Johnson V = -26.76, at a solar BP-RP of 0.82. Nothing in this
 	// repository chose any of those three numbers, which is what makes them a
@@ -520,7 +522,7 @@ func TestGaiaGToJohnsonV(t *testing.T) {
 		solarV    = -26.76
 	)
 
-	if got := magnitude.GaiaGToJohnsonV(solarG, solarBPRP); math.Abs(got-solarV) > 0.05 {
+	if got := in(magnitude.GaiaGToJohnsonV(solarG, solarBPRP)); math.Abs(got-solarV) > 0.05 {
 		t.Errorf("the Sun comes out at V = %.3f, want %.3f within 0.05", got, solarV)
 	}
 
@@ -531,7 +533,7 @@ func TestGaiaGToJohnsonV(t *testing.T) {
 	prev := math.Inf(-1)
 
 	for _, c := range []float64{0.0, 0.5, 1.0, 2.0, 3.0, 4.0} {
-		v := magnitude.GaiaGToJohnsonV(10.0, c)
+		v := in(magnitude.GaiaGToJohnsonV(10.0, c))
 		if c > 0 && v <= 10.0 {
 			t.Errorf("BP-RP = %.1f gives V = %.3f for G = 10; a red star cannot be brighter in V", c, v)
 		}
@@ -545,8 +547,8 @@ func TestGaiaGToJohnsonV(t *testing.T) {
 
 	// The conversion is a pure magnitude offset, so it must commute with a
 	// change of brightness at fixed color.
-	a := magnitude.GaiaGToJohnsonV(10.0, 1.0)
-	b := magnitude.GaiaGToJohnsonV(15.0, 1.0)
+	a := in(magnitude.GaiaGToJohnsonV(10.0, 1.0))
+	b := in(magnitude.GaiaGToJohnsonV(15.0, 1.0))
 
 	if math.Abs((b-a)-5.0) > 1e-12 {
 		t.Errorf("five magnitudes of G became %.6f of V", b-a)
@@ -561,13 +563,15 @@ func TestGaiaGToJohnsonV(t *testing.T) {
 // published relation is a quartic. They missed by -0.46 mag at BP-RP = 0 and
 // -2.0 mag by BP-RP = 3, in both orientations, and no test covered them.
 func TestGaiaGToJohnsonB(t *testing.T) {
+	in := inRange(t)
+
 	const (
 		solarG    = -26.895
 		solarBPRP = 0.82
 		solarB    = -26.107 // V = -26.76 with (B-V) = 0.653, Ramirez et al. (2012)
 	)
 
-	if got := magnitude.GaiaGToJohnsonB(solarG, solarBPRP); math.Abs(got-solarB) > 0.1 {
+	if got := in(magnitude.GaiaGToJohnsonB(solarG, solarBPRP)); math.Abs(got-solarB) > 0.1 {
 		t.Errorf("the Sun comes out at B = %.3f, want %.3f within 0.1", got, solarB)
 	}
 
@@ -580,7 +584,7 @@ func TestGaiaGToJohnsonB(t *testing.T) {
 	prev := math.Inf(-1)
 
 	for _, c := range []float64{0.0, 0.25, 0.5, 1.0, 1.5, 1.75} {
-		b := magnitude.GaiaGToJohnsonB(10.0, c)
+		b := in(magnitude.GaiaGToJohnsonB(10.0, c))
 		if c > 0 && b <= 10.0 {
 			t.Errorf("BP-RP = %.2f gives B = %.3f for G = 10; a star cannot be brighter in B than in G", c, b)
 		}
@@ -596,7 +600,7 @@ func TestGaiaGToJohnsonB(t *testing.T) {
 	// color index exercises both at once. The Sun's B-V is 0.653; a sign error
 	// or a wrong polynomial in either one breaks this while leaving each
 	// function's own value superficially plausible.
-	bv := magnitude.GaiaGToJohnsonB(solarG, solarBPRP) - magnitude.GaiaGToJohnsonV(solarG, solarBPRP)
+	bv := in(magnitude.GaiaGToJohnsonB(solarG, solarBPRP)) - in(magnitude.GaiaGToJohnsonV(solarG, solarBPRP))
 	if math.Abs(bv-0.653) > 0.1 {
 		t.Errorf("the Sun's B-V comes out %.3f, want 0.653 within 0.1", bv)
 	}
