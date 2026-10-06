@@ -17,7 +17,7 @@ go test -tags integration -run TestUSNO -v -timeout 300s ./plan/
 
 | USNO Service | Test | Status | Accuracy |
 |---|---|---|---|
-| Complete Sun and Moon Data for One Day | `TestUSNO_SunMoonOneDay` | ✅ PASS | Sun ≤0.5 min, Moon ≤0.6 min |
+| Complete Sun and Moon Data for One Day | `TestUSNO_SunMoonOneDay` | ✅ PASS | Sun ≤0.5 min (civil twilight included), Moon ≤0.6 min |
 | Celestial Navigation | `TestUSNO_CelNav` | ✅ PASS | 0.002° (sub-arcsecond) |
 | Moon Phases | `TestUSNO_MoonPhases` | ✅ PASS | **≤1 minute** |
 | Earth's Seasons | `TestUSNO_Seasons` | ✅ PASS | **2–4 minutes** |
@@ -45,6 +45,7 @@ go test -tags integration -run TestUSNO -v -timeout 300s ./plan/
 |---|---|---|---|
 | **Sun Transit** | 0.2 min | 0.5 min | 1 min |
 | **Sun Rise/Set** | 0.2 min | 0.5 min | 2 min |
+| **Sun Civil Twilight** | 0.3 min | 0.5 min | 1 min |
 | **Moon Transit** | 0.2 min | 0.5 min | 1 min |
 | **Moon Rise/Set** | 0.3 min | 0.6 min | 3 min |
 
@@ -113,6 +114,9 @@ Supplement convention:
 
 | Date | Event | USNO | astrogo | Δ |
 |---|---|---|---|---|
+| 2026-04-06 | Sun Rise | 06:25 | 06:24:47 | 0.2 min |
+| 2026-04-06 | Sun Transit | 13:03 | 13:02:53 | 0.1 min |
+| 2026-04-06 | Sun Set | 19:42 | 19:42:03 | **0.0 min** |
 | 2026-04-06 | Moon Rise | 00:15 | 00:14:25 | 0.6 min |
 | 2026-04-06 | Moon Transit | 03:57 | 03:56:39 | 0.3 min |
 | 2026-04-06 | Moon Set | 07:32 | 07:32:34 | 0.6 min |
@@ -128,6 +132,27 @@ Supplement convention:
 | 2026-12-21 | Moon Set | 05:07 | 05:06:58 | **0.0 min** |
 | 2026-12-21 | Moon Rise | 13:09 | 13:09:01 | **0.0 min** |
 | 2026-12-21 | Moon Transit | 21:43 | 21:43:14 | 0.2 min |
+
+### Civil twilight (Sun's center at −6°)
+
+The same responses carry USNO's Begin and End Civil Twilight. They were
+discarded until #532. `plan.CivilDawnDusk` is now held to them at 1 min, which
+is USNO's minute rounding plus half a minute of margin. Twilight is a
+geometric threshold, with no refraction or horizon dip, so it does not need
+rise and set's 2 min. As a canary, a −5.5° threshold misses all 18 events by
+1.8–5.3 min.
+
+| Site | Date | Begin (USNO / astrogo / Δ) | End (USNO / astrogo / Δ) |
+|---|---|---|---|
+| São Paulo | 2026-04-06 | 05:54 / 05:54:08 / 0.1 min | 18:23 / 18:23:25 / 0.4 min |
+| São Paulo | 2026-06-21 | 06:23 / 06:23:20 / 0.3 min | 17:54 / 17:53:34 / 0.4 min |
+| São Paulo | 2026-12-21 | 04:51 / 04:51:28 / 0.5 min | 19:18 / 19:18:00 / 0.0 min |
+| Washington DC | 2026-04-06 | 06:18 / 06:17:55 / 0.1 min | 20:04 / 20:03:43 / 0.3 min |
+| Washington DC | 2026-06-21 | 05:11 / 05:10:58 / 0.0 min | 21:09 / 21:09:02 / 0.0 min |
+| Washington DC | 2026-12-21 | 06:53 / 06:53:09 / 0.1 min | 17:19 / 17:19:28 / 0.5 min |
+| London | 2026-04-06 | 05:50 / 05:50:28 / 0.5 min | 20:17 / 20:16:32 / 0.5 min |
+| London | 2026-06-21 | 03:55 / 03:55:19 / 0.3 min | 22:09 / 22:09:19 / 0.3 min |
+| London | 2026-12-21 | 07:23 / 07:23:24 / 0.4 min | 16:34 / 16:33:44 / 0.3 min |
 
 ---
 
