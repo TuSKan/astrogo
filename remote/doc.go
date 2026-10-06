@@ -73,15 +73,15 @@
 //
 // Everything astrogo caches lives under one location, set by [SetDataDir]
 // or the ASTROGO_CACHE_DIR environment variable, defaulting to
-// os.UserCacheDir()/astrogo. It is a bucket URL, not a filesystem path:
+// os.UserCacheDir()/astrogo. It is a filesystem URL, not an OS path:
 //
 //	remote.SetDataDir("file:///data/astrogo?create_dir=true")
 //	remote.SetDataDir("mem://scratch")       // for a test, or a cache that never lands
 //
-// Nothing in astrogo assumes the cache is local disk. [CacheDir] returns a
-// bucket and a key prefix; [GetFile] returns a bucket and a key. There is
-// no API anywhere that takes an OS path, and no local-only fast path — a
-// deployment whose cache is object storage behaves identically.
+// Nothing in astrogo assumes the cache is local disk. [CacheDir] returns an
+// [FS] and a key prefix; [GetFile] returns an [FS] and a key. There is no API
+// anywhere that takes an OS path, and no local-only fast path — a cache on
+// any scheme with a registered backend behaves identically.
 //
 // # Fetching
 //

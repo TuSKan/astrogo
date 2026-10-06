@@ -38,13 +38,12 @@ type EOPData = iers.Data
 // EOPLoader supplies raw EOP data to the lazy load that a
 // [Time.EOP]/[Time.UTC]/[Time.UT1] query triggers.
 //
-// It exists so this package needs no knowledge of caches, HTTP, download
-// consent or blob storage, and links none of it: importing astrogo/time
-// to compute a Julian date used to cost about 17 MB of binary in
-// cloud-storage and gRPC machinery that the arithmetic never touches.
-// Importing astrogo/remote registers a loader automatically, which is
-// what any program granting download consent already does, so nothing
-// changes for a caller that wants downloads.
+// It exists so this package needs no knowledge of caches, HTTP or download
+// consent, and links none of it: importing astrogo/time to compute a Julian
+// date used to cost about 17 MB of binary in cloud-storage and gRPC machinery
+// that the arithmetic never touches. Blank-importing
+// [github.com/TuSKan/astrogo/remote/eop] registers the loader that fetches
+// through remote; importing remote alone does not (#294).
 //
 // [FileEOPLoader] serves the pre-seeded, no-dependencies case.
 type EOPLoader = iers.Loader
@@ -69,7 +68,8 @@ var (
 )
 
 // RegisterEOPLoader sets the process-wide [EOPLoader]. Passing nil
-// unregisters. Importing astrogo/remote calls this for you.
+// unregisters. Blank-importing [github.com/TuSKan/astrogo/remote/eop] calls
+// this for you.
 func RegisterEOPLoader(l EOPLoader) { iers.RegisterLoader(l) }
 
 // ParseFinals2000A parses a finals2000A-format IERS bulletin into a Table.
@@ -150,6 +150,10 @@ func logEOPUnavailable(mjd float64) {
 	// sentences of prose: that is what slog is for, it keeps the line greppable
 	// when a caller ships JSON, and the default text handler still prints every
 	// attribute.
+	// The remedy leads with the import because nothing else works without it:
+	// since #294 no loader is registered until remote/eop is imported, and
+	// EnableDownloads alone then consents to a fetch nothing will make.
+	//
 	// The 0.9 s is not a property of this code. It is the bound leap seconds
 	// keep |UT1-UTC| inside, and CGPM Resolution 4 (2022) commits to abandoning
 	// leap seconds by 2035 -- after which UT1-UTC grows without bound and this
@@ -161,7 +165,8 @@ func logEOPUnavailable(mjd float64) {
 		"mjd", mjd,
 		"topocentric_error", "~1 arcsec",
 		"ut1_error", "~0.9 s until leap seconds end in 2035, unbounded after",
-		"remedy", "remote.EnableDownloads(0, remote.IERSFinals2000A) or pre-seed finals2000A.data")
+		"remedy", `import _ "github.com/TuSKan/astrogo/remote/eop", then `+
+			"remote.EnableDownloads(0, remote.IERSFinals2000A) or pre-seed finals2000A.data")
 }
 
 // lookupEOP is the single place that attempts an automatic lazy load

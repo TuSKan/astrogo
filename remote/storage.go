@@ -13,32 +13,34 @@ import (
 const appName = "astrogo"
 
 // DataDirEnv overrides the default data location when SetDataDir has not
-// been called. Its value is a bucket URL, not an OS path — see DataDirURL.
+// been called. Its value is a filesystem URL, not an OS path — see DataDirURL.
 const DataDirEnv = "ASTROGO_CACHE_DIR"
 
-// SetDataDir sets the base location for all data astrogo stores, as any
-// URL remote/file can open: "file:///home/u/.cache/astrogo?create_dir=true",
-// "s3://my-cache-bucket", "sftp://host/path". Nothing astrogo caches is
-// assumed to live on local disk.
-func SetDataDir(bucketURL string) { Default().SetDataDir(bucketURL) }
+// SetDataDir sets the base location for all data astrogo stores, as a
+// filesystem URL [OpenFS] can open and write to:
+// "file:///home/u/.cache/astrogo?create_dir=true", or "mem://scratch" for a
+// cache that never lands. Nothing astrogo caches is assumed to live on local
+// disk, so a backend for a further scheme would serve here unchanged; [Schemes]
+// lists the ones registered.
+func SetDataDir(fsURL string) { Default().SetDataDir(fsURL) }
 
 // SetDataDir sets the base location for everything this client stores. See the
 // package-level [SetDataDir].
-func (c *Client) SetDataDir(bucketURL string) {
+func (c *Client) SetDataDir(fsURL string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	c.dataDirURL = bucketURL
+	c.dataDirURL = fsURL
 }
 
-// DataDirURL returns the bucket URL astrogo stores all its data under,
+// DataDirURL returns the filesystem URL astrogo stores all its data under,
 // resolved in order: an explicit SetDataDir call, then DataDirEnv, then
 // the OS user cache directory — ~/.cache/astrogo on Linux,
 // %LocalAppData%\astrogo on Windows, ~/Library/Caches/astrogo on macOS.
 // Re-resolved per call, so a changed environment takes effect immediately.
 func DataDirURL() string { return Default().DataDirURL() }
 
-// DataDirURL returns the bucket URL this client stores its data under,
+// DataDirURL returns the filesystem URL this client stores its data under,
 // resolved in order: an explicit SetDataDir call on this client, then
 // DataDirEnv, then the OS user cache directory. Re-resolved per call, so a
 // changed environment takes effect immediately.
@@ -66,20 +68,18 @@ func (c *Client) DataDirURL() string {
 // URL supplied by the caller. It is deliberately unexported — a general
 // path-to-URL helper would invite call sites that assume local disk.
 //
-// The result carries create_dir=true because fileblob's URL opener
-// defaults CreateDir to false, so a first run would otherwise fail to open
-// a cache directory that does not exist yet. It is built through url.URL
-// rather than concatenation: a '#' in the path would silently truncate it
-// and swallow the query, and a stray '%' would make it unparseable.
+// The result carries create_dir=true because the file:// opener creates its
+// directory only when asked — a read-only source must not have one made — so
+// a first run would otherwise fail to open a cache directory that does not
+// exist yet. It is built through url.URL rather than concatenation: a '#' in
+// the path would silently truncate it and swallow the query, and a stray '%'
+// would make it unparseable.
 //
-// A caller who needs staging inside the bucket — to avoid a cross-volume
-// rename of a multi-gigabyte kernel, which os.TempDir on a different volume
-// turns into a second full copy — can add no_tmp_dir=1 to their own cache URL.
-// astrogo does not add it, because on Windows it makes concurrent writers of
-// one name collide inside the bucket instead of in os.TempDir, and there they
-// cannot fall back: measured, CI failed every test in ephemeris/jpl for three
-// minutes on a staging name the frozen clock would not let it retry past
-// (#241).
+// Writes stage inside the cache directory and are renamed into place, under
+// names unique by process id and counter, so a multi-gigabyte kernel never
+// crosses a volume and concurrent writers of one key cannot collide (#315).
+// The no_tmp_dir=1 parameter this comment used to weigh was gocloud's
+// fileblob's, and the file:// backend ignores it.
 func defaultDataDirURL() string {
 	base, err := os.UserCacheDir()
 	if err != nil {

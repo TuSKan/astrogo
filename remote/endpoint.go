@@ -295,18 +295,18 @@ type Endpoint struct {
 	// ID is the registry key.
 	ID EndpointID
 	// URL is what the endpoint is addressed by. For KindFile it is the
-	// exact string handed to blob.OpenBucket, and it must be a
-	// directory-style prefix — the bucket root the caller's name argument
-	// resolves within, never one exact resource. For KindAPI it is the
-	// base request URL.
+	// exact string handed to [OpenFS], and it must be a directory-style
+	// prefix — the filesystem root the caller's name argument resolves
+	// within, never one exact resource. For KindAPI it is the base request
+	// URL.
 	//
 	// Override with SetURL to reach a mirror, a proxy, or a different
-	// bucket entirely. Because the string is passed through untouched,
-	// everything blob.OpenBucket understands works here, on every scheme:
-	// scheme-specific connection details the driver parses, plus gocloud's
-	// own portable wrappers —
+	// filesystem entirely. Because the string is passed through untouched,
+	// everything [OpenFS] understands works here: scheme-specific connection
+	// details the backend parses, plus two portable wrappers that apply on
+	// every scheme —
 	//
-	//	?prefix=mirror/openngc/   scope the bucket to a subdirectory
+	//	?prefix=mirror/openngc/   scope the filesystem to a subdirectory
 	//	?key=archive/dump.dat     serve one exact object under any name
 	//
 	// The "key" form is how to point an endpoint at a single file, since a
@@ -400,12 +400,14 @@ const DefaultDownloadTimeout = 10 * time.Minute
 const horizonsURL = "https://ssd.jpl.nasa.gov/api/horizons.api"
 
 // copernicusEODATAURL addresses the Copernicus eodata bucket. Everything
-// past "?" is s3blob URL-opener configuration (url.Values-encoded, parsed
-// by gocloud.dev/blob/s3blob and gocloud.dev/aws): the service is not AWS,
-// so it needs its real HTTPS host, an immutable hostname, path-style
-// addressing, and a placeholder region the SDK will not reject. Expressing
-// it here rather than in Go keeps remote free of S3-specific code and lets
-// SetURL retarget it. See TestCopernicusURLCarriesS3ConnectionParams.
+// past "?" is the connection configuration an s3:// backend parses
+// (url.Values-encoded; these are the parameters gocloud.dev's s3blob took):
+// the service is not AWS, so it needs its real HTTPS host, an immutable
+// hostname, path-style addressing, and a placeholder region the SDK will not
+// reject. Expressing it here rather than in Go keeps remote free of
+// S3-specific code and lets SetURL retarget it. No s3:// backend is
+// registered today, so the endpoint does not resolve; docs/storage.md §10
+// records why. See TestCopernicusURLCarriesS3ConnectionParams.
 const copernicusEODATAURL = "s3://eodata?endpoint=https%3A%2F%2Feodata.dataspace.copernicus.eu" +
 	"&hostname_immutable=true&region=default&use_path_style=true"
 
