@@ -11,9 +11,10 @@ import (
 //
 // Because the mistake this prevents is not a dimensional one. Nobody passes a
 // duration where a distance goes; what astrogo's API got wrong was units
-// *within* a dimension — [coord.ICRS]'s distance held astronomical units on an
-// ephemeris path and kilometers on a satellite one, with nothing in the
-// signature saying which, and a caller could not tell them apart.
+// *within* a dimension — [github.com/TuSKan/astrogo/coord.ICRS]'s distance
+// held astronomical units on an ephemeris path and kilometers on a satellite
+// one, with nothing in the signature saying which, and a caller could not tell
+// them apart.
 //
 // A Quantity would catch that and more, and costs more than it needs to: it is
 // 56 bytes against 8, and measured over a 1000-element batch it is 14.3x slower
@@ -25,8 +26,9 @@ import (
 // Neither allocates. The Quantity cost is width, not the heap, and both satisfy
 // the allocs-per-op contracts in coord, time and atmosphere.
 //
-// This is the pattern [angle.Angle] already uses, in the same hot paths, under
-// the same contracts. Length and [Velocity] finish what that started.
+// This is the pattern [github.com/TuSKan/astrogo/angle.Angle] already uses, in
+// the same hot paths, under the same contracts. Length and [Velocity] finish
+// what that started.
 //
 // # Why meters
 //

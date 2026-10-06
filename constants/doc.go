@@ -67,7 +67,7 @@
 // terms, and IERS Earth orientation parameters stay in the packages that
 // implement the model they belong to (see time, coord, ephemeris).
 //
-// [IAU2015.SunGravitationalParameter] and [IAU2015.ObliquityJ2000] are a
+// [IAUSet.SunGravitationalParameter] and [IAUSet.ObliquityJ2000] are a
 // narrow, deliberate exception to "planetary mass parameters stay
 // elsewhere": both are single fixed values published by name in the same
 // IAU resolutions already represented in this set (B3's Table 1 for the

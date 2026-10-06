@@ -3,7 +3,7 @@
 //
 // CHANGELOG.md was the only file five of eight pull requests conflicted on
 // in a single batch of parallel work — never the code, always the changelog,
-// because every branch appends to the same [Unreleased] section.
+// because every branch appends to the same Unreleased section.
 //
 // Resolving such a conflict textually is not harmless. Merge markers carry
 // no information about which heading a bullet belongs under, so an entry

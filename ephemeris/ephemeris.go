@@ -57,7 +57,7 @@ const (
 	CenterHeliocenter = core.CenterHeliocenter
 )
 
-// Errors reported by [State.Require].
+// Errors reported by [core.State.Require].
 var (
 	ErrWrongFrame  = core.ErrWrongFrame
 	ErrWrongCenter = core.ErrWrongCenter

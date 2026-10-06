@@ -5,8 +5,10 @@ import (
 	"math"
 	"testing"
 
+	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
+	"github.com/TuSKan/astrogo/internal/gofaext"
 	"github.com/TuSKan/astrogo/time"
 )
 
@@ -49,23 +51,35 @@ func TestSubsolarPoint_SolsticeLatitude(t *testing.T) {
 }
 
 // TestSubsolarPoint_LongitudeMatchesLocalSiderealTime cross-checks
-// SubsolarPoint's longitude against plan.Site.LocalSiderealTime — an
-// entirely separate code path (GAST + site longitude). At the point where
-// the Sun is exactly at the zenith, the Sun's hour angle is 0 by
-// definition, which means Local Sidereal Time there must equal the Sun's
-// own right ascension. This is an exact algebraic identity (both sides
-// reduce to the same GAST-based formula), so the tolerance here is purely
-// float precision, not a physical approximation.
+// SubsolarPoint's longitude against plan.Site.LocalSiderealTime. At the
+// point where the Sun is exactly at the zenith its hour angle is 0, so the
+// local apparent sidereal time there equals the Sun's apparent right
+// ascension.
+//
+// Referred to the true equator and equinox of date, which is what sidereal
+// time is measured from. This test used to compare against the right
+// ascension of the GCRS vector, and called the two sides "an exact algebraic
+// identity" because SubsolarPoint rotated that vector by GAST alone: the
+// identity held, and both sides were off by the precession and nutation since
+// J2000.
+//
+// The two sides now take different routes through SOFA. SubsolarPoint is the
+// CIO-based C2t06a; this side is the equinox-based Pnm06a for the right
+// ascension and Gst06a for sidereal time. They are the same rotation stated
+// two ways, and agree to float precision; polar motion, the one term only one
+// side carries, is zero here because no EOP are loaded.
 func TestSubsolarPoint_LongitudeMatchesLocalSiderealTime(t *testing.T) {
 	prov := eph.Default()
 	tm := time.FromJD(2461000.25, time.UTC) // arbitrary date, no special significance
 
-	sunVec, err := eph.Position(prov, eph.Sun, tm)
+	sun, err := apparentVec(prov, eph.Sun, tm)
 	if err != nil {
-		t.Fatalf("eph.Position: %v", err)
+		t.Fatalf("apparentVec: %v", err)
 	}
 
-	wantRA := math.Atan2(sunVec.Y, sunVec.X)
+	tt1, tt2 := tm.TT().JDParts()
+	ofDate := gofaext.Rxp(gofaext.Pnm06a(tt1, tt2), [3]float64{sun.X, sun.Y, sun.Z})
+	wantRA := math.Atan2(ofDate[1], ofDate[0])
 
 	geo, err := SubsolarPoint(prov, tm)
 	if err != nil {
@@ -82,17 +96,114 @@ func TestSubsolarPoint_LongitudeMatchesLocalSiderealTime(t *testing.T) {
 		t.Fatalf("LocalSiderealTime: %v", err)
 	}
 
-	diff := lst.Radians() - wantRA
-	for diff > math.Pi {
-		diff -= 2 * math.Pi
-	}
-
-	for diff < -math.Pi {
-		diff += 2 * math.Pi
-	}
+	diff := math.Remainder(lst.Radians()-wantRA, 2*math.Pi)
+	t.Logf("LAST at the subsolar point minus the Sun's apparent RA of date: %.3g rad (%.3g arcsec)",
+		diff, diff*180/math.Pi*3600)
 
 	if math.Abs(diff) > 1e-9 {
-		t.Errorf("LST at subsolar point = %v rad, Sun RA = %v rad, diff = %v rad (want ~0)", lst.Radians(), wantRA, diff)
+		t.Errorf("LST at subsolar point = %v rad, Sun's apparent RA of date = %v rad, diff = %v rad (want ~0)",
+			lst.Radians(), wantRA, diff)
+	}
+}
+
+// TestSubsolarPoint_EquinoxLatitude holds the subsolar latitude to zero at
+// both equinoxes of 2026, which Seasons finds independently of anything here.
+//
+// An equinox is the instant the Sun's apparent ecliptic longitude of date is
+// 0° or 180°, so its apparent declination is its ecliptic latitude times
+// cos ε, and the Sun's ecliptic latitude stays within about an arcsecond.
+// That is the whole tolerance: the solver's one-second convergence moves the
+// declination by 0.02 arcsec.
+//
+// This is where the old rotation showed. A solstice is not: there the Sun's
+// right ascension is 90° or 270°, where precession does not move declination,
+// which is how TestSubsolarPoint_SolsticeLatitude passed throughout.
+func TestSubsolarPoint_EquinoxLatitude(t *testing.T) {
+	prov := eph.Default()
+
+	events, err := Seasons(2026, prov)
+	if err != nil {
+		t.Fatalf("Seasons: %v", err)
+	}
+
+	var n int
+
+	for _, e := range events {
+		if e.Season != SeasonVernalEquinox && e.Season != SeasonAutumnalEquinox {
+			continue
+		}
+
+		n++
+
+		geo, err := SubsolarPoint(prov, e.Time)
+		if err != nil {
+			t.Fatalf("SubsolarPoint: %v", err)
+		}
+
+		lat := geo.Lat().Degrees() * 3600
+		t.Logf("%v at %v: subsolar latitude %.3f arcsec", e.Season, e.Time, lat)
+
+		if math.Abs(lat) > 1.5 {
+			t.Errorf("%v at %v: subsolar latitude = %.3f arcsec, want within 1.5 of 0", e.Season, e.Time, lat)
+		}
+	}
+
+	if n != 2 {
+		t.Fatalf("Seasons(2026) gave %d equinoxes, want 2", n)
+	}
+}
+
+// TestSubsolarAndSublunarPointsAreOverhead observes the Sun and the Moon from
+// the points SubsolarPoint and SublunarPoint return, through the path every
+// other moving-body altitude in this package takes: the apparent place into
+// [coord.Context.GeocentricToObserved], with refraction off.
+//
+// The two tolerances are the two things a direction-only sub-point cannot
+// remove. For the Sun it is diurnal aberration, 0.32 arcsec at the equator;
+// measured worst 0.319. For the Moon it is parallax: an observer at the
+// geodetic sub-point stands up to 21 km off the geocentric line, since
+// geodetic and geocentric latitude differ by up to 11.5′, and from the Moon
+// that is up to 12 arcsec at perigee; measured worst 9.1. With the old
+// rotation both were off by the precession since J2000, 1355 arcsec for the
+// Sun in 2026.
+func TestSubsolarAndSublunarPointsAreOverhead(t *testing.T) {
+	prov := eph.Default()
+
+	for _, body := range []struct {
+		name      string
+		id        eph.ID
+		point     func(eph.Provider, time.Time) (*coord.Geodetic, error)
+		tolArcsec float64
+	}{
+		{"Sun", eph.Sun, SubsolarPoint, 1},
+		{"Moon", eph.Moon, SublunarPoint, 15},
+	} {
+		var worst float64
+
+		for _, jd := range []float64{2451545.0, 2455197.5, 2461318.0, 2469807.5} {
+			tm := time.FromJD(jd, time.UTC)
+
+			geo, err := body.point(prov, tm)
+			if err != nil {
+				t.Fatalf("%s at JD %.1f: %v", body.name, jd, err)
+			}
+
+			vec, err := apparentVec(prov, body.id, tm)
+			if err != nil {
+				t.Fatalf("%s at JD %.1f: apparentVec: %v", body.name, jd, err)
+			}
+
+			ctx := coord.NewContext(tm, geo, atmosphere.Refraction{Pressure: 0})
+			zd := 90*3600 - ctx.GeocentricToObserved(vec).Alt().Degrees()*3600
+			worst = max(worst, zd)
+
+			if zd > body.tolArcsec {
+				t.Errorf("%s at JD %.1f: %.3f arcsec from the zenith at its own sub-point, want under %g",
+					body.name, jd, zd, body.tolArcsec)
+			}
+		}
+
+		t.Logf("%s: worst zenith distance at its sub-point %.3f arcsec", body.name, worst)
 	}
 }
 
@@ -132,22 +243,16 @@ func TestTerminator_PointsAtCorrectSeparationFromSubsolarPoint(t *testing.T) {
 
 // TestTerminator_EquinoxGeometricPassesNearPoles confirms the geometric
 // terminator at the equinox instant (found via Seasons, not a hardcoded
-// date) passes close to both poles — the subsolar point sits close to the
-// equator at that instant, so its 90°-radius small circle should closely
-// approach lat=±90°.
+// date) passes through both poles — the subsolar point sits on the equator
+// at that instant, so its 90°-radius small circle reaches lat=±90°, less the
+// subsolar latitude TestSubsolarPoint_EquinoxLatitude bounds by 1.5 arcsec.
 //
-// The tolerance here (1.5°, not the sub-arcsecond precision coord's own
-// synthetic-exactly-equatorial-center test uses) is set by a real,
-// already-documented frame convention gap, not sloppy math: Seasons finds
-// the instant the Sun's TRUE-OF-DATE ecliptic longitude crosses 0°, while
-// SubsolarPoint/eph.Position report the Sun's direction in the fixed
-// ICRS/J2000 equatorial frame (no precession-nutation applied) — the same
-// convention difference behind the ~1142″ RA gap this codebase's own
-// Horizons-comparison tests document elsewhere (session history: "CIRS-
-// vs-True-Equinox frame convention difference"). Left as a real,
-// documented limitation rather than "corrected" here — fixing it would
-// mean picking a side of a genuine of-date-vs-fixed-frame design question
-// that spans more than this one feature.
+// The bound used to be 1.5°, explained as a frame convention gap: Seasons
+// finds the Sun's true-of-date longitude crossing 0°, while SubsolarPoint
+// placed the Sun by its fixed-frame direction with no precession-nutation
+// applied. That was not a convention to choose between but the defect in
+// coord.SubPoint, which rotated a GCRS vector by GAST alone: the terminator
+// stopped 0.146° short of the pole in 2026, and now stops 0.3 arcsec short.
 func TestTerminator_EquinoxGeometricPassesNearPoles(t *testing.T) {
 	prov := eph.Default()
 
@@ -181,8 +286,11 @@ func TestTerminator_EquinoxGeometricPassesNearPoles(t *testing.T) {
 		}
 	}
 
-	if maxAbsLat < 88.5 {
-		t.Errorf("max |lat| among equinox terminator points = %v°, want >= 88.5° (close to 90°)", maxAbsLat)
+	const wantArcsec = 1.5
+
+	if short := (90 - maxAbsLat) * 3600; short > wantArcsec {
+		t.Errorf("max |lat| among equinox terminator points = %v°, %.3f arcsec short of the pole, want under %g",
+			maxAbsLat, short, wantArcsec)
 	}
 }
 

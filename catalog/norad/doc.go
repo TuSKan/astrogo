@@ -28,6 +28,6 @@
 // # Architecture
 //
 // The package implements [resolve.Provider] for integration with the unified
-// catalog [Resolver], and provides a lower-level [Provider.Fetch] method for
+// [github.com/TuSKan/astrogo/catalog.Resolver], and provides a lower-level [Provider.Fetch] method for
 // direct access to parsed GP element sets.
 package norad

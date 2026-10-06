@@ -1,5 +1,6 @@
-// Package dim holds the physical dimensions a [unit.Unit] is expressed in, and
-// the algebra for composing them.
+// Package dim holds the physical dimensions a
+// [github.com/TuSKan/astrogo/unit.Unit] is expressed in, and the algebra for
+// composing them.
 //
 // # Why a package of its own
 //
@@ -7,9 +8,10 @@
 // namespaces. These values are used compositionally — constants/units.go builds
 // a gravitational parameter as Volume divided by Mass divided by Time squared —
 // and inside unit they collided with the quantity types callers actually pass:
-// a Dimension named Length shadows [unit.Length], which is the one a signature
-// wants. Prefixing them read as DimVolume.Div(DimMass).Div(DimTime.PowInt(2)),
-// and DimDimensionless stuttered.
+// a Dimension named Length shadows [github.com/TuSKan/astrogo/unit.Length],
+// which is the one a signature wants. Prefixing them read as
+// DimVolume.Div(DimMass).Div(DimTime.PowInt(2)), and DimDimensionless
+// stuttered.
 //
 // Dimensions are also the more primitive of the two ideas: a unit is a scale on
 // a dimension, so unit imports this and not the other way round.

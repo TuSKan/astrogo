@@ -111,11 +111,11 @@ const DefaultStarTemperatureK = 5800
 // whole network of them, and the observer that does matter is the one
 // [Sky.Scene] takes.
 //
-// The airglow spectrum is the exception, and it is why this is [Observatory]
-// rather than a location. SkyCalc models Paranal at three altitudes rather
-// than an arbitrary site, so the place-dependence here cannot be resolved
-// from coordinates — it can only be chosen, and a caller far from those
-// altitudes needs to know they are choosing.
+// The airglow spectrum is the exception, and it is why this is
+// [Spec.Observatory] rather than a location. SkyCalc models Paranal at three
+// altitudes rather than an arbitrary site, so the place-dependence here
+// cannot be resolved from coordinates — it can only be chosen, and a caller
+// far from those altitudes needs to know they are choosing.
 //
 // A site field would have obscured exactly that. It would look like the
 // answer to the one question this cannot answer, while every computation

@@ -105,7 +105,7 @@ func (k LSRKind) String() string {
 //     Copenhagen kinematics.
 //   - Delhaye (1965), in *Galactic Structure* (Blaauw & Schmidt, eds.),
 //     §2.1, whose (9, 12, 7) is the classical value and whose own stated
-//     apex — Galactic l = 53°, b = 25° — [TestLSRApexMatchesTheLiterature]
+//     apex — Galactic l = 53°, b = 25° — TestLSRApexMatchesTheLiterature
 //     checks these components against.
 //
 // The second element of each is the one to look at: V is the asymmetric drift,

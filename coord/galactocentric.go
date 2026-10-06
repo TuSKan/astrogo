@@ -53,7 +53,7 @@ type Galactocentric struct {
 	// accessors and [NewGalactocentric] are exact inverses: a Vec3 cannot be
 	// typed, so the unit has to be fixed here, and any other choice would put
 	// a multiply-then-divide by the parsec between a component read out and
-	// the same component entered back in. [TestAccessorsAreExactlyInvertedByTheConstructor]
+	// the same component entered back in. TestAccessorsAreExactlyInvertedByTheConstructor
 	// is that property.
 	v vector.Vec3
 
@@ -91,7 +91,7 @@ const (
 	// differ by 56 pc — 0.7%, and about two of the later measurement's
 	// combined uncertainties. Anyone reproducing an astropy number should pass
 	// 8122 to [NewGalactocentricFrame] rather than expect it here;
-	// [TestAstropysDefaultFrameIsReproducible] is that comparison.
+	// TestAstropysDefaultFrameIsReproducible is that comparison.
 	sunGalacticDistancePc = 8178.0
 
 	// sunMidplaneHeightPc is z☉, the Sun's height above the Galactic midplane:
@@ -200,9 +200,10 @@ func (f GalactocentricFrame) SunHeight() unit.Length { return f.sunHeight }
 // and far too easy to get backwards, which is why it is computed rather than
 // assumed.
 // It also carries the Sun's velocity, which is the frame parameter itself
-// tilted onto the frame's axes. That cannot come from [FromICRS], because the
-// Sun has no parallax and no proper motion of its own to measure — its motion
-// in this frame is the thing the frame is told, not a thing derived.
+// tilted onto the frame's axes. That cannot come from
+// [GalactocentricFrame.FromICRS], because the Sun has no parallax and no
+// proper motion of its own to measure — its motion in this frame is the thing
+// the frame is told, not a thing derived.
 func (f GalactocentricFrame) SunPosition() Galactocentric {
 	out := f.FromICRS(ICRS{}, 0)
 

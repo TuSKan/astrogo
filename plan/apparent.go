@@ -96,17 +96,29 @@ var lightAUPerDay = constants.SI2019.SpeedOfLight.Value *
 // MoonPhases 3.3 times, which put plan's race-detector run past CI's ten
 // minutes (#430).
 func firstOrderApparentICRS(p eph.Provider, id eph.ID, t time.Time) (coord.ICRS, error) {
-	st, err := p.State(id, t)
+	vec, err := firstOrderApparentVec(p, id, t)
 	if err != nil {
-		return coord.ICRS{}, fmt.Errorf("plan: state: %w", err)
+		return coord.ICRS{}, err
 	}
 
-	tau := st.Pos.Norm() / lightAUPerDay
-
-	icrs, err := eph.ToICRS(st.Pos.Sub(st.Vel.MulScalar(tau)))
+	icrs, err := eph.ToICRS(vec)
 	if err != nil {
 		return coord.ICRS{}, fmt.Errorf("plan: apparent direction: %w", err)
 	}
 
 	return icrs, nil
+}
+
+// firstOrderApparentVec is the retarded geocentric vector
+// firstOrderApparentICRS takes the direction of, for a caller that wants the
+// vector: apparentVec to the same first order, from one State call.
+func firstOrderApparentVec(p eph.Provider, id eph.ID, t time.Time) (vector.Vec3, error) {
+	st, err := p.State(id, t)
+	if err != nil {
+		return vector.Vec3{}, fmt.Errorf("plan: state: %w", err)
+	}
+
+	tau := st.Pos.Norm() / lightAUPerDay
+
+	return st.Pos.Sub(st.Vel.MulScalar(tau)), nil
 }

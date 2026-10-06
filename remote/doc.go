@@ -15,9 +15,12 @@
 //     JPL SBDB and Horizons.
 //
 // Neither is importable from outside remote/, and that is a test rather
-// than a convention. Everything they do is here: [Bucket], [OpenBucket],
-// [Save], [NewReaderAt], [IsNotFound], [APIClient] and [NewAPIClient]. A
-// caller reaching a subpackage directly would be going around the gate
+// than a convention. Everything they do is here: [FS], [File], [OpenFS],
+// [Open], [WriteFile], [RemoveFile] and [Schemes] for files, and the
+// [Client.Get], [Client.GetJSON], [Client.PostForm] and [Client.PostJSON]
+// request methods, with [HTTPError] and [RetryPolicy], for services. A
+// missing object is errors.Is(err, fs.ErrNotExist), as anywhere else in Go.
+// A caller reaching a subpackage directly would be going around the gate
 // below, which is not a shortcut — it is a program that ignores
 // [SetOffline] at one call site and reports nothing.
 //
