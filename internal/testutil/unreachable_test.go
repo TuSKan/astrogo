@@ -1,12 +1,15 @@
 package testutil_test
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"syscall"
 	"testing"
 
@@ -41,6 +44,22 @@ func TestUnreachableSeparatesTheNetworkFromTheService(t *testing.T) {
 			err:  fmt.Errorf("fetch: %w", &net.DNSError{Err: "no such host", Name: "nope.invalid"}),
 			want: true,
 		},
+		{
+			name: "a connection closed before any response, as NAIF did (#505)",
+			err: fmt.Errorf("remote/file: HEAD %s: %w", naifKernel,
+				&url.Error{Op: "Head", URL: naifKernel, Err: io.EOF}),
+			want: true,
+		},
+		{
+			name: "a status line cut short",
+			err:  &url.Error{Op: "Get", URL: naifKernel, Err: io.ErrUnexpectedEOF},
+			want: true,
+		},
+		{
+			name: "a body cut short by a server that answered",
+			err:  fmt.Errorf("read kernel: %w", io.ErrUnexpectedEOF),
+			want: false,
+		},
 		{"connection refused", fmt.Errorf("get: %w", syscall.ECONNREFUSED), true},
 		{"connection reset", fmt.Errorf("read: %w", syscall.ECONNRESET), true},
 		{"host unreachable", fmt.Errorf("dial: %w", syscall.EHOSTUNREACH), true},
@@ -70,6 +89,9 @@ func TestUnreachableSeparatesTheNetworkFromTheService(t *testing.T) {
 
 // errServed stands for a status a server actually returned.
 var errServed = errors.New("unexpected HTTP status")
+
+// naifKernel is the URL NAIF closed the connection on in #505.
+const naifKernel = "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/planets/de440s.bsp"
 
 // timeoutError is a net.Error that reports a timeout, which is how the standard
 // library signals a transport deadline.
@@ -126,6 +148,74 @@ func TestUnreachableAgainstARealSocket(t *testing.T) {
 		}
 	})
 
+	t.Run("a connection closed before any response is unreachable", func(t *testing.T) {
+		t.Parallel()
+
+		// The request is read in full before the close, so the close is an
+		// orderly one; closing on unread bytes would reset the connection
+		// instead, which is the other case.
+		addr := rawServer(t, func(net.Conn, *bufio.Reader) {})
+
+		resp, err := get(t, addr)
+		if err == nil {
+			_ = resp.Body.Close()
+
+			t.Fatal("a server that answered nothing produced a response")
+		}
+
+		if !testutil.Unreachable(err) {
+			t.Errorf("Unreachable(%v) = false for a connection closed before any response", err)
+		}
+	})
+
+	t.Run("a connection the server reset is unreachable", func(t *testing.T) {
+		t.Parallel()
+
+		// A zero linger makes the close a reset rather than an orderly
+		// close: Linux and macOS report ECONNRESET, Windows WSAECONNRESET,
+		// which only the platform's own number matches.
+		addr := rawServer(t, func(conn net.Conn, _ *bufio.Reader) {
+			if tcp, ok := conn.(*net.TCPConn); ok {
+				_ = tcp.SetLinger(0)
+			}
+		})
+
+		resp, err := get(t, addr)
+		if err == nil {
+			_ = resp.Body.Close()
+
+			t.Fatal("a server that reset the connection produced a response")
+		}
+
+		if !testutil.Unreachable(err) {
+			t.Errorf("Unreachable(%v) = false for a reset connection", err)
+		}
+	})
+
+	t.Run("a body cut short by a server that answered is not unreachable", func(t *testing.T) {
+		t.Parallel()
+
+		addr := rawServer(t, func(conn net.Conn, _ *bufio.Reader) {
+			_, _ = io.WriteString(conn, "HTTP/1.1 200 OK\r\nContent-Length: 100\r\n\r\nten bytes!")
+		})
+
+		resp, err := get(t, addr)
+		if err != nil {
+			t.Fatalf("the request itself failed: %v", err)
+		}
+
+		defer func() { _ = resp.Body.Close() }()
+
+		_, err = io.ReadAll(resp.Body)
+		if !errors.Is(err, io.ErrUnexpectedEOF) {
+			t.Fatalf("reading a short body: err = %v, want io.ErrUnexpectedEOF", err)
+		}
+
+		if testutil.Unreachable(fmt.Errorf("read kernel: %w", err)) {
+			t.Error("a body cut short by a server that answered reported as unreachable")
+		}
+	})
+
 	t.Run("a served 500 is not unreachable", func(t *testing.T) {
 		t.Parallel()
 
@@ -152,6 +242,57 @@ func TestUnreachableAgainstARealSocket(t *testing.T) {
 			t.Error("a served response reported as unreachable")
 		}
 	})
+}
+
+// rawServer serves every connection on a loopback port by reading the
+// request's head, handing the connection to respond and closing it, and
+// returns the address.
+func rawServer(t *testing.T, respond func(net.Conn, *bufio.Reader)) string {
+	t.Helper()
+
+	var lc net.ListenConfig
+
+	l, err := lc.Listen(t.Context(), "tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("listen on 127.0.0.1:0: %v", err)
+	}
+
+	t.Cleanup(func() { _ = l.Close() })
+
+	go func() {
+		for {
+			conn, err := l.Accept()
+			if err != nil {
+				return
+			}
+
+			r := bufio.NewReader(conn)
+
+			for {
+				line, err := r.ReadString('\n')
+				if err != nil || line == "\r\n" {
+					break
+				}
+			}
+
+			respond(conn, r)
+			_ = conn.Close()
+		}
+	}()
+
+	return l.Addr().String()
+}
+
+// get requests the root of addr.
+func get(t *testing.T, addr string) (*http.Response, error) {
+	t.Helper()
+
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, "http://"+addr+"/", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return http.DefaultClient.Do(req) //nolint:wrapcheck // the test reads the transport's own error
 }
 
 // TestANetworkFailureWinsOverAnAccompanyingDeadline is #348.
