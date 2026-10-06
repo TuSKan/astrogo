@@ -11,10 +11,9 @@ import (
 // ErrNoLoader is returned when EOP data is needed but no Loader has been
 // registered.
 //
-// Importing astrogo/remote registers one automatically, which is what any
-// program granting download consent already does. A program that imports
-// neither gets this, and degrades to zero EOP exactly as an unconsented
-// one does.
+// Blank-importing astrogo/remote/eop registers one. A program that neither
+// imports it nor registers its own gets this, and degrades to zero EOP
+// exactly as an unconsented one does.
 var ErrNoLoader = errors.New("iers: no EOP loader registered")
 
 // ErrNoEOPData is returned by a Loader that found nothing to return —
@@ -75,8 +74,9 @@ func GetLoader() Loader {
 // using nothing but the standard library.
 //
 // It serves the deployment that pre-seeds EOP data on disk and wants no
-// cloud-storage dependency: astrogo/remote's loader offers the same cache
-// read, but linking remote for it costs the whole blob-storage tree.
+// network dependency: astrogo/remote/eop's loader offers the same cache read,
+// but linking it costs net/http, crypto/tls and resty — measured with go1.27
+// on windows/amd64, a Julian-date program goes from 3.0 MB to 6.3 MB.
 // Fetch always reports [ErrNoEOPData] — a fixed path is not a download.
 type FileLoader string
 

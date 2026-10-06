@@ -320,8 +320,8 @@ func NewProvider(ctx context.Context, source Source, kernel string, opts ...Opti
 	case Planets, SmallBody, Asteroids, Comets, Moons:
 		// Through the registered backend rather than by importing one. This
 		// package knows SOFA and a source vocabulary; the kernel half reaches
-		// remote and gocloud.dev/blob, and a build that never asks for a kernel
-		// should not link it. See ephemeris/core/kernel.go and #112.
+		// remote and its network stack, and a build that never asks for a
+		// kernel should not link it. See ephemeris/core/kernel.go and #112.
 		p, err := core.KernelProvider(ctx, core.KernelRequest{
 			Source:       source,
 			Kernel:       kernel,

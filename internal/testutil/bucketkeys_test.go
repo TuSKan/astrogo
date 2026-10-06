@@ -38,23 +38,27 @@ func TestBucketKeysReturnsKeysRelativeToThePrefix(t *testing.T) {
 	}
 }
 
-// A fileblob bucket writes a ".attrs" sidecar beside every object. It is
-// per-object metadata, not a cached artifact, so a test counting what a cache
-// holds must not see it — which is the whole reason this helper exists rather
-// than callers listing the bucket themselves.
-func TestBucketKeysHidesDriverSidecars(t *testing.T) {
+// Every file under the prefix is a key, the cache's own sidecars included.
+//
+// This used to hide ".attrs" files, the per-object metadata gocloud's fileblob
+// wrote beside every object. No backend writes them now, and the sidecars
+// remote does write — an .etag recording the source's ETag, a .part while a
+// download is in flight, a .lock while one holds the key — are part of what a
+// cache contains, which is what the callers of this helper assert on.
+func TestBucketKeysListsSidecars(t *testing.T) {
 	t.Parallel()
 
 	fsys := fstest.MapFS{
-		"jpl/de440s.bsp":       {Data: []byte("kernel")},
-		"jpl/de440s.bsp.attrs": {Data: []byte(`{"metadata":{}}`)},
+		"jpl/de440s.bsp":      {Data: []byte("kernel")},
+		"jpl/de440s.bsp.etag": {Data: []byte(`"abc"`)},
+		"jpl/de441.bsp.part":  {Data: []byte("half a kernel")},
 	}
 
 	got := testutil.BucketKeys(t, fsys, "jpl/")
 
-	want := []string{"de440s.bsp"}
+	want := []string{"de440s.bsp", "de440s.bsp.etag", "de441.bsp.part"}
 	if !slices.Equal(got, want) {
-		t.Errorf("BucketKeys = %v, want %v — the driver's .attrs sidecar is not a cached object", got, want)
+		t.Errorf("BucketKeys = %v, want %v — a sidecar is part of what the cache contains", got, want)
 	}
 }
 

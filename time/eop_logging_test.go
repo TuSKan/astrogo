@@ -57,6 +57,10 @@ func TestEOPWarningIsAWarningNotProgress(t *testing.T) {
 		"mjd=58849",
 		"topocentric_error=",
 		"remedy=",
+		// The remedy has to name the import: without remote/eop no loader is
+		// registered, and EnableDownloads alone consents to a fetch nothing
+		// will make.
+		"github.com/TuSKan/astrogo/remote/eop",
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("the message does not carry %q:\n%s", want, out)

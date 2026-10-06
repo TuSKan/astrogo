@@ -614,9 +614,9 @@ follows the same rule: blank-import `remote/eop`, put `finals2000A.data` at key
 needed.
 
 If a mirror serves a file under some other layout, point the endpoint at it rather than
-renaming anything. `remote.SetURL` accepts everything `gocloud.dev/blob` understands,
-including `?prefix=` to scope into a subdirectory and `?key=` to serve one exact object
-under whatever name astrogo asks for:
+renaming anything. `remote.SetURL` accepts any filesystem URL `remote.OpenFS` understands,
+including its two portable wrappers: `?prefix=` to scope into a subdirectory and `?key=`
+to serve one exact object under whatever name astrogo asks for:
 
 ```go
 remote.SetURL(remote.IERSFinals2000A, "https://mirror.example/archive?key=2026-08/eop-dump.dat")
@@ -654,30 +654,32 @@ It is a package of its own rather than part of `remote` for a plain reason: the
 loader needs `remote.GetFile`, so it has to sit one import *below* `remote`,
 which cannot then import it back. Naming it is what turns EOP on.
 
-A program that imports `astrogo/time` without it links no storage backend at
-all — measured, a binary computing a Julian date is **2.5 MB rather than
-19.4 MB** — and degrades to zero EOP with a one-time warning, which costs about
-an arcsecond of topocentric position. To read a pre-seeded file without any
+A program that imports `astrogo/time` without it links no network stack at
+all — measured with go1.27 on windows/amd64, a binary computing a Julian date is
+**3.0 MB rather than 6.3 MB** — and degrades to zero EOP with a one-time warning,
+which costs about an arcsecond of topocentric position. To read a pre-seeded file without any
 `remote` dependency at all, register
 `time.FileEOPLoader("/path/to/finals2000A.data")` instead.
 
 `ephemeris` works the same way, and it buys more than a Julian date. The
 kernel-backed sources (`Planets`, `SmallBody`, `Asteroids`, `Comets`, `Moons`)
-read SPK files, so they reach `remote` and through it `gocloud.dev/blob`; the
-SOFA path does not. The kernel half therefore registers itself:
+read SPK files, so they reach `remote` and through it `net/http`, `crypto/tls` and
+`resty`; the SOFA path does not. The kernel half therefore registers itself:
 
 ```go
 import _ "github.com/TuSKan/astrogo/ephemeris/jpl"
 ```
 
-Measured, a program asking `eph.Default()` where Mars is went from **13.9 MB and
-424 packages to 4.7 MB and 224**, with gRPC, OpenTelemetry, protobuf and
-`gocloud.dev` at zero — 64 packages of gRPC were arriving for an error-code
-enum. Without the import those five sources return an error naming it;
-`Satellites` and everything on SOFA are unaffected.
+Measured with go1.27 on windows/amd64, a program asking `eph.Default()` where Mars
+is comes to **4.7 MB and 107 packages without the import, and 12.4 MB and 236 with
+it**. (When #112 introduced the registration the storage layer was `gocloud.dev`, and
+the import cost 13.9 MB and 424 packages, 64 of them gRPC.) Without the import those
+five sources return an error naming it; `Satellites` and everything on SOFA are
+unaffected.
+
 OpenNGC works the same way — like every other catalog provider, it fetches over the
 network via
-`remote.EnableDownloads(remote.OpenNGC, ...)` (see "Enabling a download" above).
+`remote.EnableDownloads(0, remote.OpenNGC)` (see "Enabling a download" above).
 
 ---
 
