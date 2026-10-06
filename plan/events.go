@@ -59,7 +59,8 @@ const (
 
 	// -- FamilyRelativeGeometry --
 
-	// EventConjunction represents two targets having the same right ascension (ΔRA = 0).
+	// EventConjunction represents two targets having the same geocentric
+	// apparent right ascension of date (ΔRA = 0 on the true equator of date).
 	EventConjunction
 	// EventConjunctionEcliptic represents two targets having the same ecliptic longitude (Δλ = 0).
 	EventConjunctionEcliptic
@@ -574,8 +575,7 @@ func (s EventSolver) solveGeometry(spec EventSpec, start, end time.Time) ([]Even
 
 		switch spec.Kind { //nolint:exhaustive // only geometry kinds relevant
 		case EventConjunction:
-			// Difference in right ascension.
-			return wrap180(pos1.RA().Degrees() - pos2.RA().Degrees()), nil
+			return raOfDateDifference(pos1, pos2, t), nil
 		case EventConjunctionEcliptic, EventOpposition:
 			// Difference in ecliptic longitude, and for an opposition its
 			// distance from 180°.
@@ -1061,7 +1061,11 @@ func getTwilightPair(start, end time.Time, site *Site, prov eph.Provider, kind T
 
 // ── Geometry Helpers ──────────────────────────────────────────────────────────
 
-// Conjunctions returns all conjunction events (same RA, ΔRA = 0) between target and other.
+// Conjunctions returns all conjunction events in right ascension between
+// target and other: the instants their geocentric apparent right ascensions
+// of date are equal, the definition the almanacs use. Against Skyfield on
+// DE440s these fall within a second; until #545 they were solved on the
+// J2000 equator and came out up to 2.5 min off.
 func Conjunctions(start, end time.Time, target, other Observable) ([]Event, error) {
 	solver := NewEventSolver(unit.Hours(6), unit.Seconds(1))
 	spec := EventSpec{
@@ -1449,6 +1453,35 @@ func altitudesAt(spec EventSpec, t time.Time, geomAtm atmosphere.Refraction) (ge
 }
 
 // wrap180 is an angle in degrees brought into (−180°, 180°].
+// raOfDateDifference returns pos1's right ascension minus pos2's, in degrees
+// wrapped to (−180°, 180°], both measured on the true equator of date — the
+// right ascension an almanac means by a conjunction in right ascension.
+//
+// pos1 and pos2 are apparent places on ICRS axes, so their own RA is measured
+// along the J2000 equator. Precession and nutation move RA by an amount that
+// depends on declination, so two bodies at different declinations reach the
+// same J2000 RA at a different instant from the same RA of date: measured
+// against Skyfield, 21 s apart for Venus and Jupiter in 2023 and 2.5 min for
+// the Jupiter–Saturn conjunction of 2020 (#545).
+//
+// The rotation is to CIRS. Its RA differs from equinox-based apparent RA by
+// the equation of the origins, one angle for every body at a given instant,
+// so the difference — and the instant it crosses zero — is the same.
+func raOfDateDifference(pos1, pos2 coord.ICRS, t time.Time) float64 {
+	tt1, tt2 := t.TT().JDParts()
+	rc2i := gofaext.C2i06a(tt1, tt2)
+
+	ra := func(p coord.ICRS) float64 {
+		v := p.ToUnitVector()
+		x := rc2i[0][0]*v.X + rc2i[0][1]*v.Y + rc2i[0][2]*v.Z
+		y := rc2i[1][0]*v.X + rc2i[1][1]*v.Y + rc2i[1][2]*v.Z
+
+		return math.Atan2(y, x) * 180 / math.Pi
+	}
+
+	return wrap180(ra(pos1) - ra(pos2))
+}
+
 func wrap180(deg float64) float64 {
 	for deg > 180 {
 		deg -= 360
