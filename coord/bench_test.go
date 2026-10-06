@@ -205,3 +205,16 @@ func BenchmarkReduceBatch_10k(b *testing.B) {
 		}
 	})
 }
+
+// BenchmarkFromECEF converts a geostationary-height point, the altitude at
+// which the method matters most (#526).
+func BenchmarkFromECEF(b *testing.B) {
+	wgs84 := coord.WGS84()
+	v := vector.V3(30_000e3, 25_000e3, 9_000e3)
+
+	for b.Loop() {
+		if _, err := coord.FromECEF(v, wgs84); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
