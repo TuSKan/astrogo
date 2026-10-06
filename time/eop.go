@@ -46,14 +46,19 @@ type EOPData = iers.Data
 // what any program granting download consent already does, so nothing
 // changes for a caller that wants downloads.
 //
-// [FileEOPLoader] serves the pre-seeded, no-dependencies case.
+// [FSEOPLoader] serves the pre-seeded, no-dependencies case.
 type EOPLoader = iers.Loader
 
-// FileEOPLoader is an [EOPLoader] that reads one finals2000A file from a
-// fixed path using nothing but the standard library — for a deployment
-// that pre-seeds EOP data and wants no cloud-storage dependency. It
-// downloads nothing.
-type FileEOPLoader = iers.FileLoader
+// FSEOPLoader is an [EOPLoader] that reads one finals2000A object from a
+// filesystem using nothing but the standard library — for a deployment that
+// pre-seeds EOP data and wants no network dependency. It downloads nothing.
+//
+//	time.RegisterEOPLoader(time.FSEOPLoader{FS: os.DirFS(dir), Name: "finals2000A.data"})
+//
+// The filesystem is the caller's: os.DirFS for a directory on disk, or a
+// remote.FS, which is an fs.FS. A missing object is [ErrNoEOPData], an
+// ordinary state; any other read failure is returned as itself.
+type FSEOPLoader = iers.FSLoader
 
 // Sentinel errors for the EOP loader path.
 var (

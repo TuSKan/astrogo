@@ -658,8 +658,11 @@ A program that imports `astrogo/time` without it links no storage backend at
 all — measured, a binary computing a Julian date is **2.5 MB rather than
 19.4 MB** — and degrades to zero EOP with a one-time warning, which costs about
 an arcsecond of topocentric position. To read a pre-seeded file without any
-`remote` dependency at all, register
-`time.FileEOPLoader("/path/to/finals2000A.data")` instead.
+`remote` dependency at all, register a filesystem loader instead:
+
+```go
+time.RegisterEOPLoader(time.FSEOPLoader{FS: os.DirFS("/data/eop"), Name: "finals2000A.data"})
+```
 
 `ephemeris` works the same way, and it buys more than a Julian date. The
 kernel-backed sources (`Planets`, `SmallBody`, `Asteroids`, `Comets`, `Moons`)
