@@ -202,9 +202,9 @@ func (RefractionApproximate) RefractFromApparent(obsAlt angle.Angle, env Refract
 //
 // Unlike the Saemundsson and Bennett formulas beside it, the constants are not
 // a fixed empirical fit rescaled by a pressure ratio: gofa's Refco integrates
-// the refractive index of moist air for the specific conditions given, so the
-// wavelength dependence is real dispersion rather than the linear 0.005/µm
-// approximation [RefractionRigorous] applies.
+// the refractive index of moist air for the specific conditions given.
+// [RefractionRigorous] borrows its wavelength law — the same refractivity
+// formula, as a ratio — so the two disperse alike.
 type RefractionSOFA struct{}
 
 // Refraction clamps, copied from SOFA's iauAtioq rather than chosen here.
@@ -259,6 +259,38 @@ func (RefractionSOFA) RefractFromApparent(obsAlt angle.Angle, env Refraction) an
 	return angle.Rad(refa*tz + refb*tz*tz*tz)
 }
 
+// dispersionFactor is the refractivity of air at wavelength wl, in
+// micrometers, relative to its value at 0.55 µm, which is where the Bennett
+// and Saemundsson formulas below are taken to hold. A wavelength of zero or
+// less means unspecified and gives 1.
+//
+// The refractivity is the IAG (1999) optical formula for dry air, in the form
+// SOFA's iauRefco uses it (Rueger 2002): proportional to
+// 77.53484e-6 + (4.39108e-7 + 3.666e-9/λ²)/λ². Water vapor adds a term that
+// does not depend on wavelength and is under a percent of the dry one, so it
+// is left out of the ratio. Between 0.40 and 0.70 µm the factor changes by
+// 2.5%, which is atmospheric dispersion: 2.4 arcsec at 30 degrees altitude,
+// as SOFA's own model gives.
+//
+// It replaced an unsourced 1 + 0.005·(0.55 − λ), which changed refraction by
+// 0.15% over the same span and made this model's dispersion 16 times too
+// small (#527).
+func dispersionFactor(wl float64) float64 {
+	if wl <= 0 {
+		return 1
+	}
+
+	return dryAirRefractivity(wl) / dryAirRefractivity(0.55)
+}
+
+// dryAirRefractivity is the wavelength-dependent part of iauRefco's optical
+// refractivity, wl in micrometers. Only its ratio is used.
+func dryAirRefractivity(wl float64) float64 {
+	wlsq := wl * wl
+
+	return 77.53484e-6 + (4.39108e-7+3.666e-9/wlsq)/wlsq
+}
+
 // RefractionRigorous explicitly represents the analytical integration model derived from physical meteorological parameters.
 type RefractionRigorous struct{}
 
@@ -286,12 +318,7 @@ func (RefractionRigorous) RefractFromTrue(trueAlt angle.Angle, env Refraction) a
 
 	correction := (env.Pressure / 1010.0) * (283.0 / (273.15 + env.Temperature))
 
-	wlFactor := 1.0
-	if env.Wavelength > 0 {
-		wlFactor = 1.0 + 0.005*(0.55-env.Wavelength)
-	}
-
-	return angle.Deg((r0 * correction * wlFactor) / 60.0)
+	return angle.Deg((r0 * correction * dispersionFactor(env.Wavelength)) / 60.0)
 }
 
 // RefractFromApparent derives atmospheric refraction analytically based on the observed visual altitude.
@@ -318,12 +345,7 @@ func (RefractionRigorous) RefractFromApparent(obsAlt angle.Angle, env Refraction
 
 	correction := (env.Pressure / 1010.0) * (283.0 / (273.15 + env.Temperature))
 
-	wlFactor := 1.0
-	if env.Wavelength > 0 {
-		wlFactor = 1.0 + 0.005*(0.55-env.Wavelength)
-	}
-
-	return angle.Deg((r0 * correction * wlFactor) / 60.0)
+	return angle.Deg((r0 * correction * dispersionFactor(env.Wavelength)) / 60.0)
 }
 
 // StandardRefraction returns a typical sea-level refraction environment
