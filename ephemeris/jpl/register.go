@@ -16,9 +16,9 @@ import (
 // That is the whole reason a blank import means anything here. Without it,
 // eph.NewProvider(ctx, eph.Planets, ...) reports [core.ErrNoKernelBackend] and
 // names this import; with it, the root package costs what a kernel-backed
-// build actually needs — this package reaches remote, which reaches
-// gocloud.dev/blob, and that is about 12 MB of client a pure-SOFA call has no
-// use for. See ephemeris/core/kernel.go and #112.
+// build actually needs — this package reaches remote, which reaches net/http,
+// crypto/tls and resty, about 7.7 MB a pure-SOFA call has no use for. See
+// ephemeris/core/kernel.go and #112.
 //
 // A caller who imports this package for its own API — jpl.NewProvider,
 // jpl.Provider — gets the registration too, and wants it: the two are the same

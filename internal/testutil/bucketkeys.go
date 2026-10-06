@@ -10,17 +10,13 @@ import (
 
 // BucketKeys lists the object keys under prefix, relative to it, so a test
 // can assert on what a cache actually contains without reading a
-// directory. Driver bookkeeping is filtered out: fileblob writes a
-// ".attrs" sidecar per object, which is per-object metadata rather than a
-// cached artifact.
+// directory. Every file is a key, sidecars included: remote's own .etag,
+// .lock and .part files are part of what a cache contains.
 //
-// The parameter is fs.FS rather than a bucket type, which is what lets this
-// helper exist at all: remote/file's own tests use it, so naming that package
-// here would be an import cycle, and naming gocloud.dev/blob would put the
-// storage driver in a package that has no business knowing which one astrogo
-// uses. A *remote.Bucket satisfies it directly — the type implements fs.FS and
-// fs.SubFS — so no call site changes and nothing is asserted about the backend
-// beyond what the standard library already describes.
+// The parameter is fs.FS, which is what lets this helper exist at all:
+// remote/file's own tests use it, so naming that package here would be an
+// import cycle. A remote.FS is an fs.FS, so nothing is asserted about the
+// backend beyond what the standard library already describes.
 func BucketKeys(tb testing.TB, bucket fs.FS, prefix string) []string {
 	tb.Helper()
 
@@ -51,7 +47,7 @@ func BucketKeys(tb testing.TB, bucket fs.FS, prefix string) []string {
 			return err
 		}
 
-		if d.IsDir() || strings.HasSuffix(p, ".attrs") {
+		if d.IsDir() {
 			return nil
 		}
 

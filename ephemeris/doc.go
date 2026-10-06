@@ -16,20 +16,21 @@
 // # The kernel sources need one blank import
 //
 // [Planets], [SmallBody], [Asteroids], [Comets] and [Moons] read SPK kernels,
-// which means files, a cache and a network — and that reaches
-// gocloud.dev/blob, whose transitive weight is about 12 MB of object-storage
-// client. A build that only asks SOFA where Mars is has no use for any of it,
-// and used to link all of it because one branch of [NewProvider] mentioned the
-// type.
+// which means files, a cache and a network: remote, and through it net/http,
+// crypto/tls and resty. A build that only asks SOFA where Mars is has no use
+// for any of it, and used to link all of it because one branch of
+// [NewProvider] mentioned the type.
 //
 // So the kernel half registers itself instead:
 //
 //	import _ "github.com/TuSKan/astrogo/ephemeris/jpl"
 //
-// Measured, a program calling eph.Default().State(eph.Mars, t) went from 13.9
-// MB and 424 packages to 4.7 MB and 224, with gRPC, OpenTelemetry, protobuf and
-// gocloud.dev at zero. Adding the import restores every byte of it, to the
-// build that wants it. The same pattern remote/eop uses; see #112.
+// Measured with go1.27 on windows/amd64, a program calling
+// eph.Default().State(eph.Mars, t) is 4.7 MB and 107 packages without the
+// import and 12.4 MB and 236 with it, 69 of them crypto. The import adds those
+// bytes only to the build that wants them. The same pattern remote/eop uses;
+// see #112, whose figures (13.9 MB and 424 packages) were measured when the
+// storage layer was gocloud.dev.
 //
 // Without the import, those five sources report an error naming it.
 // [Satellites], [Default] and everything built on SOFA are unaffected.

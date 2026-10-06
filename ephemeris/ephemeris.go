@@ -320,8 +320,8 @@ func NewProvider(ctx context.Context, source Source, kernel string, opts ...Opti
 	case Planets, SmallBody, Asteroids, Comets, Moons:
 		// Through the registered backend rather than by importing one. This
 		// package knows SOFA and a source vocabulary; the kernel half reaches
-		// remote and gocloud.dev/blob, and a build that never asks for a kernel
-		// should not link it. See ephemeris/core/kernel.go and #112.
+		// remote and its network stack, and a build that never asks for a
+		// kernel should not link it. See ephemeris/core/kernel.go and #112.
 		p, err := core.KernelProvider(ctx, core.KernelRequest{
 			Source:       source,
 			Kernel:       kernel,
@@ -415,20 +415,6 @@ func Velocity(p Provider, id ID, t time.Time) (vector.Vec3, error) {
 	}
 
 	return st.Vel, nil
-}
-
-const earthMeanRadiusKm = 6371.0
-
-// Altitude returns the approximate altitude above the Earth's mean surface
-// in kilometers. For satellites this gives orbital altitude (~400 km for ISS);
-// for planets it gives geocentric distance minus Earth radius.
-func Altitude(p Provider, id ID, t time.Time) (float64, error) {
-	st, err := p.State(id, t)
-	if err != nil {
-		return 0, fmt.Errorf("ephemeris: altitude: %w", err)
-	}
-
-	return st.DistanceKm() - earthMeanRadiusKm, nil
 }
 
 // lightAUPerDay is the speed of light in astronomical units per day, the

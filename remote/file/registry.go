@@ -16,8 +16,10 @@ import (
 var (
 	// ErrNoScheme indicates a URL whose scheme no backend has registered.
 	//
-	// Almost always a missing blank import: s3:// needs remote/file/s3, which
-	// exists to be imported for its side effect and exports nothing at all.
+	// file://, http://, https:// and mem:// are always registered. Any other
+	// scheme needs a backend subpackage, blank-imported for its side effect
+	// and exporting nothing; none ships today, so s3://, gs://, azblob:// and
+	// sftp:// all end here. See docs/storage.md for why.
 	ErrNoScheme = errors.New("remote/file: no backend registered for this URL scheme")
 
 	// ErrNoContext indicates a filesystem that cannot be canceled being used

@@ -13,13 +13,14 @@ import (
 //
 // # Why a registration rather than an import
 //
-// Asking where Mars is costs 14 MB and 424 packages, of which 12 MB and 131
-// are an object-storage client the answer never touches: ephemeris imports
-// ephemeris/jpl, which imports remote, which imports gocloud.dev/blob, which
-// pulls 64 packages of gRPC for an error-code enum and 34 of OpenTelemetry
-// because it instruments unconditionally. A pure-SOFA call — no kernel, no
-// network, no file — paid for all of it because one branch of one factory
-// mentioned the type.
+// If ephemeris imported ephemeris/jpl, asking where Mars is would cost a
+// network stack the answer never touches: jpl imports remote, which imports
+// net/http, crypto/tls and resty. Measured with go1.27 on windows/amd64 that
+// is 12.4 MB and 236 packages against 4.7 MB and 107 for the pure-SOFA build.
+// When #112 introduced the registration the storage layer was gocloud.dev, and
+// the gap was 14 MB and 424 packages, gRPC and OpenTelemetry among them. A
+// pure-SOFA call — no kernel, no network, no file — paid for all of it because
+// one branch of one factory mentioned the type.
 //
 // The same pattern remote/eop uses: a subpackage that is nothing but a
 // registration, blank-imported by a build that needs the capability. See #112.
