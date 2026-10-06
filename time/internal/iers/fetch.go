@@ -3,6 +3,7 @@ package iers
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -14,6 +15,7 @@ var (
 	fetchMu       sync.Mutex
 	lastAttempt   time.Time         // wall-clock of last fetch attempt (success or failure)
 	lastCacheRead time.Time         // wall-clock of last Loader.Cached read
+	errLastCache  error             // why the last cached copy was unusable, if not merely absent
 	errLastFetch  error             // non-nil if the most recent attempt failed
 	retryCooldown = 5 * time.Minute // minimum interval between fetch attempts
 )
@@ -94,27 +96,50 @@ func EnsureLoaded(mjd float64) error {
 	// by hand, so this bounds that rather than removing it.
 	if lastCacheRead.IsZero() || time.Since(lastCacheRead) >= retryCooldown {
 		lastCacheRead = time.Now()
+		errLastCache = nil
 
-		if data, err := l.Cached(ctx); err == nil {
+		data, err := l.Cached(ctx)
+
+		switch {
+		case err == nil:
 			if lastAttempt.IsZero() {
 				lastAttempt = data.ModTime
 			}
 
-			if _, perr := parseAndRegister(data.Raw, SourceCache); perr == nil && covered(mjd) {
+			_, perr := parseAndRegister(data.Raw, SourceCache)
+			if perr == nil && covered(mjd) {
 				return nil
 			}
+
+			if perr != nil {
+				errLastCache = fmt.Errorf("iers: parse cached EOP data: %w", perr)
+			}
+
+		// Nothing cached is an ordinary state. A cached copy that could not be
+		// read is not, and must not come back looking like one: it is the
+		// difference between "pre-seed the bulletin" and "the bulletin you
+		// pre-seeded is unreadable", and only the second is the operator's
+		// to fix.
+		case !errors.Is(err, ErrNoEOPData):
+			errLastCache = fmt.Errorf("iers: read cached EOP data: %w", err)
 		}
 	}
 
 	// Throttle retries so transient errors don't cause a request storm.
 	if !lastAttempt.IsZero() && time.Since(lastAttempt) < retryCooldown {
-		return errLastFetch // may be nil (successful) or the prior error
+		return errors.Join(errLastCache, errLastFetch) // nil if neither failed
 	}
 
 	lastAttempt = time.Now()
-	errLastFetch = fetch(ctx, l)
 
-	return errLastFetch
+	errLastFetch = fetch(ctx, l)
+	if errLastFetch == nil {
+		// The network supplied the data, so a cached copy that could not be
+		// used no longer matters.
+		errLastCache = nil
+	}
+
+	return errors.Join(errLastCache, errLastFetch)
 }
 
 // forgetCacheRead lets the next EnsureLoaded read the cached bulletin
