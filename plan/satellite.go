@@ -160,10 +160,46 @@ func (s *Satellite) ApparentMagnitudeCtx(t time.Time, ctx *coord.Context) (float
 		return 0, errDegenerateGeometry
 	}
 
+	// An eclipsed satellite reflects nothing and has no visual magnitude.
+	// Until #562 it was given one anyway: the ISS on a midnight pass,
+	// entirely inside Earth's shadow, came out at −3.9.
+	if satelliteEclipsed(satSt.Pos, sunSt.Pos) {
+		return 0, fmt.Errorf("%w: %s at %v", ErrSatelliteEclipsed, s.name, t)
+	}
+
 	cosAlpha := math.Max(-1, math.Min(1, dot/(norm1*norm2)))
 	alpha := angle.Rad(math.Acos(cosAlpha))
 
 	return mag.SatelliteApparent(s.stdMag, s.convention, observerRange, alpha, s.phaseModel), nil
+}
+
+// satelliteEclipsed reports whether a satellite at satPos is in Earth's
+// shadow: whether Earth's sphere lies on the line from the satellite toward
+// the Sun's center at sunPos, both geocentric and in AU.
+//
+// It is Skyfield's is_sunlit definition — the Sun's center, a spherical Earth
+// of the WGS 84 equatorial radius, no penumbra and no atmosphere — chosen so
+// the two can be compared directly; the Sun's 16′ disk and refraction in the
+// atmosphere shift the real shadow edge by seconds, not minutes.
+func satelliteEclipsed(satPos, sunPos vector.Vec3) bool {
+	radius := earthEquatorialRadiusKm / auKm
+
+	if satPos.Norm() <= radius {
+		return true
+	}
+
+	// Along toSun from the satellite, where the line comes closest to Earth's
+	// center. Behind the satellite, the line only moves away from the sphere.
+	toSun := sunPos.Sub(satPos)
+	along := -satPos.Dot(toSun) / toSun.Dot(toSun)
+
+	if along <= 0 {
+		return false
+	}
+
+	closest := satPos.Add(toSun.MulScalar(along))
+
+	return closest.Norm() < radius
 }
 
 // StaticMagnitude returns the catalog standard magnitude if set.
