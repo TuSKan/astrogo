@@ -567,7 +567,7 @@ func (t Time) ToGo() time.Time {
 	return gt
 }
 
-// GoTime is an alias for [ToGo].
+// GoTime is an alias for [Time.ToGo].
 func (t Time) GoTime() time.Time { return t.ToGo() }
 
 // Year returns the Gregorian calendar year of t.
@@ -1499,10 +1499,12 @@ func (t Time) TCB() Time {
 // UT1 returns a new Time converted to the Universal Time (UT1) scale.
 //
 // This conversion requires IERS Earth Orientation Parameters for DUT1,
-// which are loaded automatically and lazily on first need: a pre-seeded
-// on-disk cache file, then (if [remote.EnableDownloads] was called for
-// [remote.IERSFinals2000A]) a network fetch. Returns an error if none of
-// that yields data for the given epoch — unlike [Time.EOP] and
+// which are loaded automatically and lazily on first need once
+// [github.com/TuSKan/astrogo/remote/eop] is imported: a pre-seeded on-disk
+// cache file, then (if [github.com/TuSKan/astrogo/remote.EnableDownloads]
+// was called for [github.com/TuSKan/astrogo/remote.IERSFinals2000A]) a
+// network fetch. Returns an error if none of that yields data for the given
+// epoch — unlike [Time.EOP] and
 // [Time.UTC]'s UT1 branch, this method propagates the failure rather than
 // silently degrading to DUT1=0.
 func (t Time) UT1() (Time, error) {

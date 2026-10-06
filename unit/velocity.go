@@ -36,10 +36,11 @@ var (
 //
 // # This is a speed along one axis, not a vector
 //
-// A named scalar cannot type a [vector.Vec3], so a three-component space
-// velocity stays a Vec3 with its unit documented. What this types is every
-// place a single number crosses an API boundary — a radial velocity, a speed,
-// a correction to add to one — which is where the confusion actually was.
+// A named scalar cannot type a [github.com/TuSKan/astrogo/vector.Vec3], so a
+// three-component space velocity stays a Vec3 with its unit documented. What
+// this types is every place a single number crosses an API boundary — a radial
+// velocity, a speed, a correction to add to one — which is where the confusion
+// actually was.
 //
 // # What this does not catch
 //

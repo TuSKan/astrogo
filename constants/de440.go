@@ -41,7 +41,8 @@ package constants
 //
 // The Sun and the Earth-Moon barycenter have no plain counterpart here: the
 // Sun has no satellites in this sense, and Earth's own parameter is
-// [EarthGravitationalParameter], listed beside the Moon's for the same reason.
+// [EphemerisSet.EarthGravitationalParameter], listed beside the Moon's for the
+// same reason.
 type EphemerisSet struct {
 	// Vintage names the ephemeris these values are taken from.
 	Vintage string

@@ -301,9 +301,10 @@ const smallBodySpan = 1000000
 // SmallBodyID returns the identifier for the numbered small body n — 433 for
 // Eros, 3200 for Phaethon — placed clear of the named bodies.
 //
-// This is the form [Provider.SupportedBodies] reports. A bare core.ID(433)
-// still resolves, so existing callers keep working, but it cannot be
-// enumerated without ambiguity and is not what a new caller should write.
+// This is the form [github.com/TuSKan/astrogo/ephemeris/jpl.Provider.SupportedBodies]
+// reports. A bare core.ID(433) still resolves, so existing callers keep
+// working, but it cannot be enumerated without ambiguity and is not what a
+// new caller should write.
 //
 // Returns 0 for an n outside NAIF's small-body block, which is not a valid
 // body identifier and will fail to resolve rather than aliasing another body.

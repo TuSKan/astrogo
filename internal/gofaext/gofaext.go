@@ -76,7 +76,7 @@ func Atci13(
 // Atio13 performs the CIRS → observed transformation, applying refraction,
 // diurnal aberration and Earth rotation.
 //
-// Observed → ICRS is [Atoc13], not this: an earlier version of this comment
+// Observed → ICRS is [gofa.Atoc13], not this: an earlier version of this comment
 // claimed both directions in consecutive sentences.
 func Atio13(
 	ri, di float64, // CIRS RA, Dec (radians)
@@ -606,7 +606,7 @@ func Starpv(ra, dec, pmr, pmd, px, rv float64) (pv [2][3]float64, status int) {
 // meaningless rather than merely imprecise, so a caller must check.
 //
 // Note the order, which is the opposite of the intuitive one and is asserted by
-// [TestPvstarReportsTheInputsItCannotUse] for that reason.
+// TestPvstarReportsTheInputsItCannotUse for that reason.
 func Pvstar(pv [2][3]float64) (ra, dec, pmr, pmd, px, rv float64, status int) {
 	status = gofa.Pvstar(pv, &ra, &dec, &pmr, &pmd, &px, &rv)
 
