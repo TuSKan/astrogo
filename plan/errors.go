@@ -52,12 +52,6 @@ var (
 	// which MeasuredRadialVelocity reports as a value with ok true.
 	ErrNoRadialVelocity = errors.New("target has no radial velocity")
 
-	// ErrNotCoordObject indicates the object does not implement coord.Object.
-	//
-	// Deprecated: RankObservable no longer returns this — every Observable
-	// is now usable regardless of whether it happens to also implement
-	// coord.Object directly (see observableObject in visible_tonight.go).
-	ErrNotCoordObject = errors.New("object does not implement coord.Object required for ranking")
 	// ErrStepNotPositive indicates a non-positive time step.
 	ErrStepNotPositive = errors.New("step must be positive")
 	// ErrStepTooLarge indicates a step that risks missing short visibility windows.
@@ -89,7 +83,7 @@ var (
 
 	// ErrUnknownSite indicates NewKnownSite found no entry matching the
 	// requested name (checked against every known site's name and
-	// aliases, case- and space-insensitive — see KnownSites).
+	// aliases, case- and space-insensitive — see KnownSiteNames).
 	ErrUnknownSite = errors.New("plan: unknown site name")
 
 	// ErrNoPhysicalRadius indicates AngularDiameter was asked for a body
@@ -103,7 +97,7 @@ var (
 
 	// ErrUnknownMeteorShower indicates NewMeteorShower found no entry
 	// matching the requested name (checked against every shower's Name and
-	// Code, case- and space-insensitive — see MeteorShowers).
+	// Code, case- and space-insensitive — see MeteorShowerNames).
 	ErrUnknownMeteorShower = errors.New("plan: unknown meteor shower name")
 
 	// ErrUnknownPlanetaryMoon indicates NewPlanetaryMoon found no entry

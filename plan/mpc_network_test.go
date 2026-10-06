@@ -165,9 +165,9 @@ func TestNewMPCSiteResolvesRealCodes(t *testing.T) {
 				t.Fatalf("NewMPCSite(%q): %v", tc.code, err)
 			}
 
-			want, ok := KnownSites[tc.known]
+			want, ok := knownSites[tc.known]
 			if !ok {
-				t.Skipf("KnownSites has no %q to compare against", tc.known)
+				t.Skipf("knownSites has no %q to compare against", tc.known)
 			}
 
 			testutil.AssertNear(t, "latitude",
