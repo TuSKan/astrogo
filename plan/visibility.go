@@ -232,24 +232,39 @@ func transitEstimate(
 		alt float64
 	}
 
-	samples := make([]sample, 0, int(end.Sub(start)/coarseStep)+1)
+	samples := make([]sample, 0, int(end.Sub(start)/coarseStep)+2)
 
-	for t := start; !t.After(end); t = t.Add(coarseStep) {
+	sampleAt := func(t time.Time) error {
 		pos, err := obj.ICRS(t)
 		if err != nil {
-			return time.Time{}, angle.Deg(0), err
+			return fmt.Errorf("visibility: transit ICRS: %w", err)
 		}
 
 		aa, err := observedAltAz(obj, t, ctxAt(t), pos)
 		if err != nil {
-			return time.Time{}, angle.Deg(0), err
+			return err
 		}
 
 		samples = append(samples, sample{t, aa.Alt().Degrees()})
+
+		return nil
 	}
 
-	if len(samples) == 0 {
-		return time.Time{}, angle.Deg(0), nil
+	for t := start; !t.After(end); t = t.Add(coarseStep) {
+		if err := sampleAt(t); err != nil {
+			return time.Time{}, angle.Deg(0), err
+		}
+	}
+
+	// The window's end, whenever the steps did not land on it. Until #540 a
+	// window that was not a whole number of steps never evaluated it, so a
+	// target still rising at the end — the common case for a window that
+	// closes at dawn — was reported at the last step before, up to 10 min
+	// early and 2.3° low. A window shorter than one step sampled only start.
+	if samples[len(samples)-1].t.Before(end) {
+		if err := sampleAt(end); err != nil {
+			return time.Time{}, angle.Deg(0), err
+		}
 	}
 
 	// Find index of maximum.
@@ -285,19 +300,52 @@ func transitEstimate(
 		return time.Time{}, angle.Deg(0), err
 	}
 
-	pos, err := obj.ICRS(resTime)
+	fullAlt := func(t time.Time) (angle.Angle, error) {
+		pos, err := obj.ICRS(t)
+		if err != nil {
+			return angle.Deg(0), err
+		}
+
+		aa, err := observedAltAz(obj, t, coord.NewContext(t, site.Location(), site.Refraction()), pos)
+		if err != nil {
+			return angle.Deg(0), err
+		}
+
+		return aa.Alt(), nil
+	}
+
+	resAlt, err := fullAlt(resTime)
 	if err != nil {
 		return time.Time{}, angle.Deg(0), err
 	}
 
-	resCtx := coord.NewContext(resTime, site.Location(), site.Refraction())
-
-	aa, err := observedAltAz(obj, resTime, resCtx, pos)
-	if err != nil {
-		return time.Time{}, angle.Deg(0), err
+	// Brent's method never evaluates the ends of its bracket, so when the
+	// highest sample is an edge of the window — a target rising through
+	// the whole window, or setting through it — the maximum is that edge
+	// and Brent only approaches it to within its tolerance. The edge is
+	// read through the same full Context as the refined instant, so the
+	// two altitudes compare like for like.
+	var edges []time.Time
+	if maxIdx == 0 {
+		edges = append(edges, start)
 	}
 
-	return resTime, aa.Alt(), nil
+	if maxIdx == len(samples)-1 {
+		edges = append(edges, end)
+	}
+
+	for _, edge := range edges {
+		edgeAlt, err := fullAlt(edge)
+		if err != nil {
+			return time.Time{}, angle.Deg(0), err
+		}
+
+		if edgeAlt > resAlt {
+			resTime, resAlt = edge, edgeAlt
+		}
+	}
+
+	return resTime, resAlt, nil
 }
 
 // MaxAltitudeInWindow returns the maximum altitude reached by an object
