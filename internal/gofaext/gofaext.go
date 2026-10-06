@@ -191,8 +191,9 @@ func Gst06a(uta, utb, tta, ttb float64) float64 {
 	return gofa.Gst06a(uta, utb, tta, ttb)
 }
 
-// C2t06a returns the Earth rotation matrix mapping ICRS to the Terrestrial
-// Intermediate Reference System (TIRS). The transpose of this matrix maps TIRS backwards into ICRS natively.
+// C2t06a returns the IAU 2006/2000A celestial-to-terrestrial matrix, mapping
+// GCRS to ITRS: frame bias, precession and nutation, Earth rotation, and the
+// polar motion xp, yp. Its transpose maps ITRS back to GCRS.
 func C2t06a(tta, ttb, uta, utb, xp, yp float64) [3][3]float64 {
 	var rc2t [3][3]float64
 	gofa.C2t06a(tta, ttb, uta, utb, xp, yp, &rc2t)

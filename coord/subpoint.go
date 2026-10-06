@@ -5,67 +5,79 @@ import (
 	"math"
 
 	"github.com/TuSKan/astrogo/angle"
+	"github.com/TuSKan/astrogo/internal/gofaext"
 	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/vector"
 )
 
 // SubPoint returns the geodetic point on Earth's reference ellipsoid where
 // a distant body in direction geocentric (a geocentric position vector in
-// any GCRS-aligned inertial frame — ICRS-equatorial, as produced by
-// eph.Position/MovingBody.GeocentricVec throughout this codebase) would be
-// observed exactly at the zenith, at time t. Only geocentric's direction
-// matters, not its length/units — it need not be a unit vector.
+// GCRS, as produced by eph.Position/MovingBody.GeocentricVec throughout this
+// codebase) would be observed exactly at the zenith, at time t. Only
+// geocentric's direction matters, not its length/units — it need not be a
+// unit vector.
 //
-// This is a DIFFERENT computation from ephemeris/satellite's unexported
-// subSatellitePoint (which rotates ECI→ECEF via GAST and then runs a full
-// ellipsoidal ECEF→geodetic fit via FromECEF): that definition — where the
-// straight line from the body through the geocenter pierces the ellipsoid
-// — is correct for a NEARBY body like an orbiting satellite, whose own
-// radial distance from the geocenter is part of the geometry.
+// The direction is used as given: for the point where a body is *seen*
+// overhead, pass its apparent place, with light time and aberration in it.
+// plan.SubsolarPoint and plan.SublunarPoint do.
 //
-// For an effectively-infinite-distance body (the Sun, Moon, or any
-// planet — this function takes only a direction, so it makes no
-// distinction), "at the zenith" instead means the ellipsoid's local normal
-// is parallel to the body's direction. By definition, geodetic latitude
-// IS the angle between the equatorial plane and the ellipsoid's normal at
-// a point — so the sub-point's geodetic latitude equals the body's
-// declination in the Earth-fixed (ECEF) frame directly, with no further
-// ellipsoidal correction, and its longitude is the ECEF frame's
-// right-ascension-like angle. This differs from the GEOCENTRIC sub-point
-// (the same declination reinterpreted as geocentric latitude) by up to
-// ~11.5′ at mid-latitudes — the well-known geodetic-vs-geocentric latitude
-// discrepancy under WGS84 flattening.
+// "At the zenith" means the ellipsoid's local normal is parallel to the
+// body's direction. By definition, geodetic latitude IS the angle between
+// the equatorial plane and the ellipsoid's normal at a point — so the
+// sub-point's geodetic latitude equals the body's declination in the
+// Earth-fixed frame directly, with no further ellipsoidal correction, and its
+// longitude is the Earth-fixed frame's right-ascension-like angle. This
+// differs from the GEOCENTRIC sub-point (the same declination reinterpreted
+// as geocentric latitude) by up to ~11.5′ at mid-latitudes — the well-known
+// geodetic-vs-geocentric latitude discrepancy under WGS84 flattening.
 //
-// Do not refactor this function onto subSatellitePoint's ECEF-fit pattern,
-// or vice versa — they solve genuinely different geometric problems for
-// bodies at genuinely different distance regimes.
+// # The rotation into the Earth-fixed frame
+//
+// GCRS to ITRS is the full IAU 2006/2000A celestial-to-terrestrial matrix,
+// SOFA's C2t06a: frame bias, precession and nutation, then Earth rotation,
+// then polar motion, at t's own UT1 and polar motion — the matrix
+// [Context] uses. It used to be Earth rotation alone, by GAST, which is the
+// right rotation only for a vector already referred to the true equator and
+// equinox of date. A GCRS vector is not, so the sub-point was displaced by
+// precession and nutation since J2000. For the Sun, measured as the zenith
+// distance at the point returned: 15 arcsec at J2000 itself, from nutation,
+// 0.38° — 42 km — in October 2026, and growing at the general precession's
+// 50 arcsec a year.
+//
+// # Not for a nearby body
+//
+// Only the direction is used, so this is the sub-point of a body at
+// effectively infinite distance: the Sun, the Moon, a planet. For a
+// satellite, whose distance is part of the geometry, the point overhead is
+// where the ellipsoid normal passes through the body — [FromECEF] of its
+// Earth-fixed position. The two differ in latitude by up to the 11.5′ above
+// scaled by R/(R+h): about 10.8′ for the ISS at 420 km.
+//
+// Returns [ErrZeroVector] for a zero vector, and an error when UT1 cannot be
+// had for t, as [time.Time.UT1] reports it.
 func SubPoint(geocentric vector.Vec3, t time.Time) (*Geodetic, error) {
 	if geocentric.Norm() == 0 {
 		return nil, fmt.Errorf("coord: subpoint: %w", ErrZeroVector)
 	}
 
-	gast, err := t.GAST()
+	ut1, err := t.UT1()
 	if err != nil {
-		return nil, fmt.Errorf("coord: subpoint: gast: %w", err)
+		return nil, fmt.Errorf("coord: subpoint: %w", err)
 	}
 
-	cosG := gast.Cos()
-	sinG := gast.Sin()
+	eop := t.EOP()
+	tt1, tt2 := t.TT().JDParts()
+	u1, u2 := ut1.JDParts()
 
-	// Rotate the GCRS-aligned direction into the Earth-fixed (ECEF) frame
-	// — the same rotation subSatellitePoint uses — but, per the doc
-	// comment above, what happens to the result next is deliberately
-	// different: no ellipsoidal ECEF→geodetic fit, just direct
-	// declination/right-ascension extraction via FromUnitVector below
-	// (which is scale-invariant, so ecef need not be normalized).
-	ecef := vector.V3(
-		geocentric.X*cosG+geocentric.Y*sinG,
-		-geocentric.X*sinG+geocentric.Y*cosG,
-		geocentric.Z,
-	)
+	rc2t := gofaext.C2t06a(tt1, tt2, u1, u2, eop.XP, eop.YP)
+	itrs := gofaext.Rxp(rc2t, [3]float64{geocentric.X, geocentric.Y, geocentric.Z})
 
+	// No ellipsoidal ECEF→geodetic fit, per the doc comment above: the
+	// direction's declination and right ascension in ITRS are the geodetic
+	// latitude and longitude. FromUnitVector is scale-invariant, so itrs need
+	// not be normalized.
 	g := &Geodetic{}
-	g.FromUnitVector(ecef)
+	g.FromUnitVector(vector.V3(itrs[0], itrs[1], itrs[2]))
 
 	return g, nil
 }
