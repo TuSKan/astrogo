@@ -150,8 +150,28 @@ func (s *SwapOptimizedStrategy) swapPass(
 		bi := sched.Blocks[i]
 		bj := sched.Blocks[i+1]
 
-		// Try placing bj at bi's start time.
+		// bj moves into bi's place, after whatever preceded bi, so the
+		// setup it needs is the transition from that block, not the one bi
+		// needed. Until #547 it took bi's start and bi's SetupTime as they
+		// were, and could begin before the slew to it had finished.
+		var prev *Block
+
+		prevEnd := sched.Window.Start
+		if i > 0 {
+			prev = sched.Blocks[i-1].Block
+			prevEnd = sched.Blocks[i-1].Window.End
+		}
+
+		setupJ, err := transitionOverhead(transition, prev, bj.Block, prevEnd, bi.Window.Start, planner.Site, contexts)
+		if err != nil {
+			return false, fmt.Errorf("plan: swap: %w", err)
+		}
+
 		newJStart := bi.Window.Start
+		if earliest := prevEnd.Add(time.FromGoDuration(setupJ)); earliest.After(newJStart) {
+			newJStart = earliest
+		}
+
 		newJEnd := newJStart.Add(time.FromGoDuration(bj.Block.Duration))
 
 		// Validate bj's constraints at the new time.
@@ -164,37 +184,36 @@ func (s *SwapOptimizedStrategy) swapPass(
 			continue
 		}
 
-		// Compute transition overhead from bj to bi.
-		overhead := time.Duration(0)
-
-		if transition != nil {
-			ctx := TransitionContext{
-				FromBlock: bj.Block,
-				ToBlock:   bi.Block,
-				FromTime:  newJEnd,
-				ToTime:    newJEnd,
-				Site:      planner.Site,
-				contexts:  contexts,
-			}
-
-			oh, err := transition.Overhead(ctx)
-			if err != nil {
-				return false, fmt.Errorf("plan: swap: %w", overheadError(bj.Block, bi.Block, err))
-			}
-
-			overhead = oh
+		overhead, err := transitionOverhead(transition, bj.Block, bi.Block, newJEnd, newJEnd, planner.Site, contexts)
+		if err != nil {
+			return false, fmt.Errorf("plan: swap: %w", err)
 		}
 
 		newIStart := newJEnd.Add(time.FromGoDuration(overhead))
 		newIEnd := newIStart.Add(time.FromGoDuration(bi.Block.Duration))
 
-		// Check collision with the next block after the pair.
-		if i+2 < n && newIEnd.After(sched.Blocks[i+2].Window.Start) {
-			continue
-		}
 		// Check window boundary.
 		if newIEnd.After(sched.Window.End) {
 			continue
+		}
+
+		// The block after the pair now follows bi rather than bj, and must
+		// still have time for that slew. Ending before it starts is not
+		// enough: until #547 that was the whole check, and the block was left
+		// starting before the telescope could reach it.
+		var setupNext time.Duration
+
+		if i+2 < n {
+			next := sched.Blocks[i+2]
+
+			setupNext, err = transitionOverhead(transition, bi.Block, next.Block, newIEnd, next.Window.Start, planner.Site, contexts)
+			if err != nil {
+				return false, fmt.Errorf("plan: swap: %w", err)
+			}
+
+			if newIEnd.Add(time.FromGoDuration(setupNext)).After(next.Window.Start) {
+				continue
+			}
 		}
 
 		// Validate bi's constraints at the new time.
@@ -225,7 +244,7 @@ func (s *SwapOptimizedStrategy) swapPass(
 				Block:     bj.Block,
 				Window:    Window{Start: newJStart, End: newJEnd},
 				Score:     newJScore,
-				SetupTime: bi.SetupTime,
+				SetupTime: setupJ,
 			}
 			sched.Blocks[i+1] = ScheduledBlock{
 				Block:     bi.Block,
@@ -233,6 +252,11 @@ func (s *SwapOptimizedStrategy) swapPass(
 				Score:     newIScore,
 				SetupTime: overhead,
 			}
+
+			if i+2 < n {
+				sched.Blocks[i+2].SetupTime = setupNext
+			}
+
 			improved = true
 
 			// Record the reverse swap as tabu.
@@ -292,25 +316,10 @@ func (s *SwapOptimizedStrategy) insertPass(
 				continue
 			}
 
-			// Compute transition overhead from the preceding block.
-			overhead := time.Duration(0)
-
-			if transition != nil {
-				ctx := TransitionContext{
-					FromBlock: gap.prevBlock,
-					ToBlock:   ub.Block,
-					FromTime:  gap.window.Start,
-					ToTime:    gap.window.Start,
-					Site:      planner.Site,
-					contexts:  contexts,
-				}
-
-				oh, err := transition.Overhead(ctx)
-				if err != nil {
-					return false, fmt.Errorf("plan: insert: %w", overheadError(gap.prevBlock, ub.Block, err))
-				}
-
-				overhead = oh
+			overhead, err := transitionOverhead(transition, gap.prevBlock, ub.Block,
+				gap.window.Start, gap.window.Start, planner.Site, contexts)
+			if err != nil {
+				return false, fmt.Errorf("plan: insert: %w", err)
 			}
 
 			startTime := gap.window.Start.Add(time.FromGoDuration(overhead))
@@ -320,12 +329,35 @@ func (s *SwapOptimizedStrategy) insertPass(
 				continue
 			}
 
+			// The block after the gap now follows the inserted one, so the
+			// slew to it has to fit too. Until #547 the insertion only had to
+			// end by the time that block started, which left it starting
+			// before the telescope could reach it.
+			var setupNext time.Duration
+
+			if gap.next >= 0 {
+				next := sched.Blocks[gap.next]
+
+				setupNext, err = transitionOverhead(transition, ub.Block, next.Block, endTime, next.Window.Start, planner.Site, contexts)
+				if err != nil {
+					return false, fmt.Errorf("plan: insert: %w", err)
+				}
+
+				if endTime.Add(time.FromGoDuration(setupNext)).After(next.Window.Start) {
+					continue
+				}
+			}
+
 			ok, err := checkConstraintsInterval(ub.Block.Target, startTime, endTime, step, planner.Site, ctxAt, mergedC[ub.Block.ID]...)
 			if err != nil {
 				return false, fmt.Errorf("plan: insert: block %s: %w", ub.Block.ID, err)
 			}
 
 			if ok {
+				if gap.next >= 0 {
+					sched.Blocks[gap.next].SetupTime = setupNext
+				}
+
 				score := scoreBlockPlacement(ub.Block, startTime, endTime, planner, ctxAt)
 				sched.Blocks = append(sched.Blocks, ScheduledBlock{
 					Block:     ub.Block,
@@ -402,13 +434,45 @@ func scoreBlockPlacement(block *Block, start, end time.Time, planner *Planner, c
 type gapInfo struct {
 	window    Window
 	prevBlock *Block // nil if this is the gap before the first block
+	// next is the index in the scheduled blocks of the block the gap ends
+	// at, or -1 for the gap after the last block.
+	next int
+}
+
+// transitionOverhead is the model's overhead from one block to the next: zero
+// with no model, and an error naming the transition when the model has no
+// answer.
+func transitionOverhead(
+	transition TransitionModel,
+	from, to *Block,
+	fromTime, toTime time.Time,
+	site *Site,
+	contexts *contextSource,
+) (time.Duration, error) {
+	if transition == nil {
+		return 0, nil
+	}
+
+	oh, err := transition.Overhead(TransitionContext{
+		FromBlock: from,
+		ToBlock:   to,
+		FromTime:  fromTime,
+		ToTime:    toTime,
+		Site:      site,
+		contexts:  contexts,
+	})
+	if err != nil {
+		return 0, overheadError(from, to, err)
+	}
+
+	return oh, nil
 }
 
 // scheduleGaps computes the gaps between scheduled blocks within a window.
 // The returned gaps are ordered chronologically.
 func scheduleGaps(blocks []ScheduledBlock, window Window) []gapInfo {
 	if len(blocks) == 0 {
-		return []gapInfo{{window: window, prevBlock: nil}}
+		return []gapInfo{{window: window, prevBlock: nil, next: -1}}
 	}
 
 	gaps := make([]gapInfo, 0, len(blocks)+1)
@@ -418,6 +482,7 @@ func scheduleGaps(blocks []ScheduledBlock, window Window) []gapInfo {
 		gaps = append(gaps, gapInfo{
 			window:    Window{Start: window.Start, End: blocks[0].Window.Start},
 			prevBlock: nil,
+			next:      0,
 		})
 	}
 
@@ -430,6 +495,7 @@ func scheduleGaps(blocks []ScheduledBlock, window Window) []gapInfo {
 			gaps = append(gaps, gapInfo{
 				window:    Window{Start: gapStart, End: gapEnd},
 				prevBlock: blocks[i].Block,
+				next:      i + 1,
 			})
 		}
 	}
@@ -440,6 +506,7 @@ func scheduleGaps(blocks []ScheduledBlock, window Window) []gapInfo {
 		gaps = append(gaps, gapInfo{
 			window:    Window{Start: lastEnd, End: window.End},
 			prevBlock: blocks[len(blocks)-1].Block,
+			next:      -1,
 		})
 	}
 
