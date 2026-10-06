@@ -12,6 +12,7 @@ import (
 	"github.com/TuSKan/astrogo/catalog"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
+	"github.com/TuSKan/astrogo/ephemeris/satellite"
 	"github.com/TuSKan/astrogo/plan"
 	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
@@ -21,7 +22,7 @@ import (
 //
 //  1. Resolve satellite from catalog (NORAD → CelestTrak)
 //  2. SGP4 orbit propagation via Provider.State() — same as JPL planets
-//  3. Provider-agnostic altitude
+//  3. Height above the WGS84 ellipsoid
 //  4. Topocentric look angle via coord.Context (same API for ISS (Zarya) and Mars)
 //  5. Pass prediction
 //
@@ -81,16 +82,23 @@ func main() {
 	fmt.Printf("  Distance: %.1f km\n", state.DistanceKm())
 
 	// ═══════════════════════════════════════════════════════════════════════
-	// 3. Provider-Agnostic Altitude
+	// 3. Height Above the WGS84 Ellipsoid
 	// ═══════════════════════════════════════════════════════════════════════
 	header("Orbital Altitude")
 
-	alt, err := eph.Altitude(prov, 0, epoch)
+	// A Satellites provider is a *satellite.Satellite, which knows the
+	// ellipsoid; a generic Provider only knows a geocentric distance.
+	sat, ok := prov.(*satellite.Satellite)
+	if !ok {
+		log.Fatalf("a Satellites provider should be a *satellite.Satellite, got %T", prov)
+	}
+
+	alt, err := sat.Altitude(epoch)
 	if err != nil {
 		log.Fatalf("Altitude failed: %v", err)
 	}
 
-	fmt.Printf("  Altitude: %.1f km above Earth surface\n", alt)
+	fmt.Printf("  Altitude: %.1f km above the WGS84 ellipsoid\n", alt.Km())
 
 	// ═══════════════════════════════════════════════════════════════════════
 	// 4. Look Angle via coord.Context (same API for ISS (Zarya) and Mars)
