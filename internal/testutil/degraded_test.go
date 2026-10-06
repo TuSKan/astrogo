@@ -73,21 +73,23 @@ func TestTAPControlAsksForOneRowAndReadsBothKindsOfFailure(t *testing.T) {
 	}
 
 	ok := respond(http.StatusOK, "HIP,Vmag\n1,9.1\n")
-	if err := TAPControl(context.Background(), ok.URL, `"I/239/hip_main"`)(); err != nil {
+	if err := TAPControl(context.Background(), ok.URL, `"I/239/hip_main"`, "HIP")(); err != nil {
 		t.Fatalf("a 200 with a row failed the control: %v", err)
 	}
 
-	if gotMethod != http.MethodPost || gotQuery != `SELECT TOP 1 * FROM "I/239/hip_main"` {
-		t.Errorf("sent %s %q, want POST SELECT TOP 1 * FROM \"I/239/hip_main\"", gotMethod, gotQuery)
+	// A named column, not *: the degradation the control exists to detect is
+	// a failure to resolve names, and * gives it none to fail on (#520).
+	if gotMethod != http.MethodPost || gotQuery != `SELECT TOP 1 HIP FROM "I/239/hip_main"` {
+		t.Errorf("sent %s %q, want POST SELECT TOP 1 HIP FROM \"I/239/hip_main\"", gotMethod, gotQuery)
 	}
 
 	rejected := respond(http.StatusBadRequest, "<VOTABLE><INFO name=\"QUERY_STATUS\" value=\"ERROR\">Incorrect ADQL query: 1 unresolved identifiers!</INFO>")
-	if err := TAPControl(context.Background(), rejected.URL, `"I/239/hip_main"`)(); err == nil || !strings.Contains(err.Error(), "HTTP 400") {
+	if err := TAPControl(context.Background(), rejected.URL, `"I/239/hip_main"`, "HIP")(); err == nil || !strings.Contains(err.Error(), "HTTP 400") {
 		t.Errorf("a 400 passed the control or was not named: %v", err)
 	}
 
 	errorIn200 := respond(http.StatusOK, "<VOTABLE><INFO name=\"QUERY_STATUS\" value=\"ERROR\">no such table</INFO></VOTABLE>")
-	if err := TAPControl(context.Background(), errorIn200.URL, "gaiadr3.gaia_source")(); err == nil {
+	if err := TAPControl(context.Background(), errorIn200.URL, "gaiadr3.gaia_source", "source_id")(); err == nil {
 		t.Error("a 200 VOTable reporting a query error passed the control")
 	}
 }
