@@ -30,12 +30,19 @@ func (k TwilightKind) zenithAngle() angle.Angle {
 // SubsolarPoint returns the geodetic point on Earth where the Sun is
 // exactly at the zenith at time t — see coord.SubPoint for the underlying
 // geometry and how it differs from a nearby-body sub-point.
+//
+// The Sun's direction is its apparent place, with light time and annual
+// aberration in it, the same one every other altitude in this package is
+// computed from. The geometric place is 20 arcsec away, about 600 m here.
+// It is taken to first order, from one State call rather than the four
+// apparentVec iterates, which agrees to 0.04 mas for the Sun and 0.01 mas
+// for the Moon (TestFirstOrderApparentPlaceAgrees).
 func SubsolarPoint(p eph.Provider, t time.Time) (*coord.Geodetic, error) {
 	if p == nil {
 		p = eph.Default()
 	}
 
-	vec, err := eph.Position(p, eph.Sun, t)
+	vec, err := firstOrderApparentVec(p, eph.Sun, t)
 	if err != nil {
 		return nil, fmt.Errorf("plan: subsolar point: %w", err)
 	}
@@ -52,14 +59,14 @@ func SubsolarPoint(p eph.Provider, t time.Time) (*coord.Geodetic, error) {
 // exactly at the zenith at time t — see coord.SubPoint for the underlying
 // geometry and how it differs from a nearby-body sub-point. Note this uses
 // the same distance-independent direction-only definition as
-// SubsolarPoint; it is not the (much closer) "sub-satellite" style
-// computation ephemeris/satellite uses for orbiting bodies.
+// SubsolarPoint, from the Moon's apparent place; it is not the
+// "sub-satellite" point, where the ellipsoid normal passes through the body.
 func SublunarPoint(p eph.Provider, t time.Time) (*coord.Geodetic, error) {
 	if p == nil {
 		p = eph.Default()
 	}
 
-	vec, err := eph.Position(p, eph.Moon, t)
+	vec, err := firstOrderApparentVec(p, eph.Moon, t)
 	if err != nil {
 		return nil, fmt.Errorf("plan: sublunar point: %w", err)
 	}
