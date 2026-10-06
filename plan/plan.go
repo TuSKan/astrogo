@@ -389,6 +389,9 @@ func estimateHoursUntilSet(obj Observable, t time.Time, ctx *coord.Context, curr
 		8 * time.Hour,
 	}
 
+	// The last instant known to be above the horizon, starting from now.
+	prevHours, prevAlt := 0.0, currentAlt
+
 	for _, offset := range probeOffsets {
 		ft := t.Add(time.FromGoDuration(offset))
 
@@ -402,12 +405,19 @@ func estimateHoursUntilSet(obj Observable, t time.Time, ctx *coord.Context, curr
 			continue
 		}
 
-		if aa.Alt().Degrees() <= 0 {
-			// Target sets between previous probe and this one.
-			// Linear interpolation for a rough estimate.
+		alt := aa.Alt().Degrees()
+		if alt <= 0 {
+			// The target sets between the last probe it was up at and this
+			// one, so interpolate across that interval. Until #554 this
+			// interpolated from now instead, ignoring every probe the target
+			// was still up at: one that had just risen came out about to set,
+			// 1.6 h against a true 7.1 h.
 			hours := offset.Hours()
-			return hours * (currentAlt / (currentAlt - aa.Alt().Degrees()))
+
+			return prevHours + (hours-prevHours)*prevAlt/(prevAlt-alt)
 		}
+
+		prevHours, prevAlt = offset.Hours(), alt
 	}
 
 	// Still up at +8h — not urgent at all.
