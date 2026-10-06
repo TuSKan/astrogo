@@ -3,7 +3,9 @@ package testutil
 import (
 	"context"
 	"errors"
+	"io"
 	"net"
+	"net/url"
 	"syscall"
 )
 
@@ -32,13 +34,15 @@ import (
 //
 // # What counts, and what deliberately does not
 //
-// Counted: a timeout at any layer, a DNS failure, and the connection being
-// refused or the host or network being unreachable. Each of these means the
-// request never reached a service that could have an opinion.
+// Counted: a timeout at any layer, a DNS failure, the connection being
+// refused or the host or network being unreachable, and a server that
+// accepted the connection and closed it before any response. Each of these
+// means the request never reached a service that could have an opinion.
 //
-// Not counted: any status a server actually returned, including 500. A service
-// that answers is a service under test, and astrogo's own rule is that a
-// wrong answer from a reachable endpoint stays fatal. Nor a bare
+// Not counted: any status a server actually returned, including 500, or a
+// response body it cut short. A service that answers is a service under
+// test, and astrogo's own rule is that a wrong answer from a reachable
+// endpoint stays fatal. Nor a bare
 // context.Canceled, which means the caller gave up and says nothing about the
 // network.
 //
@@ -104,14 +108,30 @@ func Unreachable(err error) bool {
 		return true
 	}
 
-	// The errno cases, for a failure that arrives without an OpError around it.
-	for _, syscallErr := range []error{
+	// A server that accepted the connection and closed it before answering.
+	// net/http reports that from Client.Do as a *url.Error wrapping io.EOF, or
+	// io.ErrUnexpectedEOF if part of a status line arrived first: no response
+	// existed, so no service had an opinion. NAIF did this during an outage,
+	// and a kernel test failed on it while its neighbors skipped the refused
+	// connections that followed (#505).
+	//
+	// The *url.Error is the point. A body cut short by a server that did
+	// answer reads as io.ErrUnexpectedEOF from Body.Read, outside any
+	// url.Error, and stays a failure. Nor can a context error produce this.
+	if u, ok := errors.AsType[*url.Error](err); ok &&
+		(errors.Is(u.Err, io.EOF) || errors.Is(u.Err, io.ErrUnexpectedEOF)) {
+		return true
+	}
+
+	// The errno cases, for a failure that arrives without a dial OpError
+	// around it, and the platform's own numbers where they differ.
+	for _, syscallErr := range append([]error{
 		syscall.ECONNREFUSED,
 		syscall.ECONNRESET,
 		syscall.EHOSTUNREACH,
 		syscall.ENETUNREACH,
 		syscall.ETIMEDOUT,
-	} {
+	}, platformErrnos...) {
 		if errors.Is(err, syscallErr) {
 			return true
 		}
