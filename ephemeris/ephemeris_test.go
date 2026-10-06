@@ -9,6 +9,7 @@ import (
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/ephemeris/core"
 	"github.com/TuSKan/astrogo/ephemeris/kepler"
+	"github.com/TuSKan/astrogo/ephemeris/satellite"
 	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 	"github.com/TuSKan/astrogo/vector"
@@ -308,19 +309,29 @@ func TestNewProviderBuildsASatelliteOffline(t *testing.T) {
 
 	when := time.FromJD(2461281.5, time.UTC)
 
-	// core.ID(0), not the NAIF catalogue number: a satellite provider tracks
-	// exactly one object and refuses any other id, so that a Sun lookup
-	// cannot be silently answered with the satellite's own state.
-	alt, err := Altitude(p, core.ID(0), when)
+	// A *satellite.Satellite, which is what gives a caller the height above
+	// the ellipsoid: examples/12_satellite_tracking asserts this type.
+	sat, ok := p.(*satellite.Satellite)
+	if !ok {
+		t.Fatalf("NewProvider(Satellites) returned %T, want *satellite.Satellite", p)
+	}
+
+	// State with core.ID(0), not the NAIF catalogue number: a satellite
+	// provider tracks exactly one object and refuses any other id, so that a
+	// Sun lookup cannot be silently answered with the satellite's own state.
+	if _, err := p.State(core.ID(0), when); err != nil {
+		t.Fatalf("State: %v", err)
+	}
+
+	alt, err := sat.Altitude(when)
 	if err != nil {
 		t.Fatalf("Altitude: %v", err)
 	}
 
 	// The ISS orbits between roughly 370 and 460 km. A bound that wide still
-	// catches an altitude computed without subtracting the Earth's radius,
-	// or one left in AU.
-	if alt < 300 || alt > 600 {
-		t.Errorf("ISS altitude = %.1f km, want roughly 400", alt)
+	// catches a height left in AU or measured from the geocenter.
+	if km := alt.Km(); km < 300 || km > 600 {
+		t.Errorf("ISS altitude = %.1f km, want roughly 400", km)
 	}
 }
 
@@ -395,7 +406,7 @@ func TestPositionAndVelocityAgreeWithState(t *testing.T) {
 	}
 }
 
-// TestHelpersPropagateTheProviderError keeps the three helpers from turning a
+// TestHelpersPropagateTheProviderError keeps the two helpers from turning a
 // failure into a zero value, which for a position is indistinguishable from
 // the geocenter.
 func TestHelpersPropagateTheProviderError(t *testing.T) {
@@ -409,10 +420,6 @@ func TestHelpersPropagateTheProviderError(t *testing.T) {
 
 	if _, err := Velocity(p, absent, time.J2000()); err == nil {
 		t.Error("Velocity returned nil error for an unsupported body")
-	}
-
-	if _, err := Altitude(p, absent, time.J2000()); err == nil {
-		t.Error("Altitude returned nil error for an unsupported body")
 	}
 }
 
