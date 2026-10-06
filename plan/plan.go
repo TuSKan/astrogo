@@ -640,8 +640,7 @@ func observableWindows(
 	hasPrev := false
 	prevOK := false
 
-	t := start
-	for t.Before(end) || t.Equal(end) {
+	for t, more := start, !start.After(end); more; t, more = nextSample(t, end, step) {
 		eval, err := isObservableCtx(obj, t, site, ctxAt(t), constraints...)
 		if err != nil {
 			return nil, err
@@ -674,7 +673,6 @@ func observableWindows(
 		prevT = t
 		prevOK = eval.Observable
 		hasPrev = true
-		t = t.Add(step)
 	}
 
 	// Close the final window if the target was observable at the end of the range.

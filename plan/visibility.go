@@ -120,6 +120,27 @@ func VisibleIntervals(
 	return visibleIntervals(obj, newContextCache(site.Location(), site.Refraction()), start, end, step, minAlt)
 }
 
+// nextSample returns the sample after t on a scan ending at end, in steps of
+// step, with the last step cut short so the scan's final sample is end
+// itself; more is false once end has been sampled.
+//
+// The window finders used to step while t <= end, which never evaluates end
+// unless the steps happen to land on it. A target setting after the last
+// sample was then reported up until end, and one rising after it was missed
+// altogether (#550).
+func nextSample(t, end time.Time, step unit.Duration) (next time.Time, more bool) {
+	if !t.Before(end) {
+		return t, false
+	}
+
+	next = t.Add(step)
+	if next.After(end) {
+		next = end
+	}
+
+	return next, true
+}
+
 // visibleIntervals is VisibleIntervals with the Context for each instant
 // supplied by ctxAt.
 //
@@ -152,8 +173,7 @@ func visibleIntervals(
 
 	hasPrev := false
 
-	t := start
-	for t.Before(end) || t.Equal(end) {
+	for t, more := start, !start.After(end); more; t, more = nextSample(t, end, time.FromGoDuration(step)) {
 		pos, err := obj.ICRS(t)
 		if err != nil {
 			return nil, fmt.Errorf("visibility: ICRS: %w", err)
@@ -187,7 +207,6 @@ func visibleIntervals(
 
 		prevT = t
 		hasPrev = true
-		t = t.Add(time.FromGoDuration(step))
 	}
 
 	if inWindow {
@@ -395,8 +414,7 @@ func find(
 	hasPrev := false
 	prevOK := false
 
-	t := start
-	for t.Before(end) || t.Equal(end) {
+	for t, more := start, !start.After(end); more; t, more = nextSample(t, end, time.FromGoDuration(step)) {
 		allOK, err := checkObs(t)
 		if err != nil {
 			return nil, err
@@ -429,7 +447,6 @@ func find(
 		prevT = t
 		prevOK = allOK
 		hasPrev = true
-		t = t.Add(time.FromGoDuration(step))
 	}
 
 	if inWindow {
