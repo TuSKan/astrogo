@@ -126,10 +126,117 @@ func TestTransitEstimate(t *testing.T) {
 	if alt.Degrees() < -90 {
 		t.Error("Invalid transit altitude")
 	}
+}
 
-	maxAlt, err := MaxAltitudeInWindow(obj, site, start, end)
+// TestTransitEstimateFindsThePeakAtTheWindowEdge holds TransitEstimate and
+// MaxAltitudeInWindow to a scan of the window every 30 s plus both ends,
+// through a full Context at each instant.
+//
+// The property is one-sided: the reported peak lies in the window and is
+// never lower than any altitude the target actually reaches there. That holds
+// whatever the scan's spacing, so a coarse scan cannot make it fail
+// spuriously; it can only make it weaker, and the cases are chosen so the
+// defect is not subtle.
+//
+// It replaces a check that MaxAltitudeInWindow equals TransitEstimate's
+// altitude, which could not fail: one is the other. Its window was half a day,
+// a whole number of the 10-minute coarse steps, so the window's end was
+// sampled by luck. These windows are not. Until #540 the scan stopped at the
+// last whole step, so a target still rising at the end was reported at that
+// step instead, and a window shorter than one step sampled only its start:
+// measured for this star, 0.87° low over 129 min and 1.45° low over 9. A
+// setting target's peak at the window's start came back 1.4 s late and 9″
+// low, because Brent's method never evaluates the ends of its bracket.
+func TestTransitEstimateFindsThePeakAtTheWindowEdge(t *testing.T) {
+	t.Parallel()
+
+	loc, err := coord.NewGeodetic(angle.Zero(), angle.Zero(), 0)
 	testutil.AssertNoError(t, err)
-	testutil.AssertNear(t, "MaxAltitude == Transit", maxAlt.Degrees(), alt.Degrees(), 1e-6)
+
+	site, err := NewSite("equator", loc)
+	testutil.AssertNoError(t, err)
+
+	// Declination −30°, so it culminates at 60°. A star at 0° would pass
+	// within a few hundredths of a degree of this site's zenith, where
+	// altitude peaks in a near-cusp rather than a parabola and the solver's
+	// one-second time tolerance alone is worth tens of milliarcseconds.
+	obj := mockObject{pos: coord.NewICRS(angle.Deg(100), angle.Deg(-30))}
+
+	altAt := func(tm time.Time) float64 {
+		aa, err := observedAltAz(obj, tm, coord.NewContext(tm, site.Location(), site.Refraction()), obj.pos)
+		if err != nil {
+			t.Fatalf("altitude at %v: %v", tm, err)
+		}
+
+		return aa.Alt().Degrees()
+	}
+
+	day := time.FromJD(2461000.5, time.UTC)
+
+	transit, _, err := TransitEstimate(obj, site, day, day.Add(unit.Days(1)))
+	testutil.AssertNoError(t, err)
+
+	cases := []struct {
+		name       string
+		from       unit.Duration // window start, relative to transit
+		length     unit.Duration
+		peakAtEdge string // "start", "end", or "" for an interior culmination
+	}{
+		{"rising, 125 min", unit.Minutes(-180), unit.Minutes(125), "end"},
+		{"rising, 129 min", unit.Minutes(-180), unit.Minutes(129), "end"},
+		{"rising, shorter than a step", unit.Minutes(-120), unit.Minutes(9), "end"},
+		{"setting, 129 min", unit.Minutes(60), unit.Minutes(129), "start"},
+		{"culminating, 125 min", unit.Minutes(-61), unit.Minutes(125), ""},
+	}
+
+	for _, c := range cases {
+		start := transit.Add(c.from)
+		end := start.Add(c.length)
+
+		bestT, bestAlt := end, altAt(end)
+		for tm := start; tm.Before(end); tm = tm.Add(unit.Seconds(30)) {
+			if a := altAt(tm); a > bestAlt {
+				bestT, bestAlt = tm, a
+			}
+		}
+
+		gotT, gotAlt, err := TransitEstimate(obj, site, start, end)
+		testutil.AssertNoError(t, err)
+
+		if gotT.Before(start) || gotT.After(end) {
+			t.Errorf("%s: peak at %+.4f min, outside the %.0f min window",
+				c.name, gotT.Sub(start).Minutes(), c.length.Minutes())
+		}
+
+		// 1e-6 deg is the slack for the refinement itself: the solver stops
+		// within a second of an interior peak, which at this star's
+		// culmination costs about 3e-7 deg, so a scan instant that happens to
+		// land nearer the peak can sit that much above the answer.
+		if gotAlt.Degrees() < bestAlt-1e-6 {
+			t.Errorf("%s: peak %.6f deg at %+.2f min, but the target reaches %.6f deg at %+.2f min (%.4f deg higher)",
+				c.name, gotAlt.Degrees(), gotT.Sub(start).Minutes(), bestAlt, bestT.Sub(start).Minutes(),
+				bestAlt-gotAlt.Degrees())
+		}
+
+		switch c.peakAtEdge {
+		case "start":
+			if !gotT.Equal(start) {
+				t.Errorf("%s: peak at %+.4f min, want the window's start", c.name, gotT.Sub(start).Minutes())
+			}
+		case "end":
+			if !gotT.Equal(end) {
+				t.Errorf("%s: peak at %+.4f min, want the window's end", c.name, gotT.Sub(start).Minutes())
+			}
+		}
+
+		maxAlt, err := MaxAltitudeInWindow(obj, site, start, end)
+		testutil.AssertNoError(t, err)
+
+		if maxAlt.Degrees() < bestAlt-1e-6 {
+			t.Errorf("%s: MaxAltitudeInWindow %.6f deg, but the target reaches %.6f deg",
+				c.name, maxAlt.Degrees(), bestAlt)
+		}
+	}
 }
 
 func TestFind(t *testing.T) {
