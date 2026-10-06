@@ -181,7 +181,6 @@ func TestRefractionSOFADispersesByWavelength(t *testing.T) {
 		t.Errorf("dispersion 0.40-0.70 um at %.0f deg = %.3f arcsec, want roughly "+
 			"1-5 arcsec", alt, spread)
 	}
-
 }
 
 // TestRefractionRigorousDispersesLikeSOFA holds the empirical model's
