@@ -216,11 +216,11 @@ func TestTwilightEvents(t *testing.T) {
 
 			for _, e := range events {
 				if e.Dawn != nil {
-					testutil.AssertNear(t, "dawn altitude", e.Dawn.GeometricAltitude.Degrees(), TwilightThresholds[kind], 0.02)
+					testutil.AssertNear(t, "dawn altitude", e.Dawn.GeometricAltitude.Degrees(), twilightThresholds[kind], 0.02)
 				}
 
 				if e.Dusk != nil {
-					testutil.AssertNear(t, "dusk altitude", e.Dusk.GeometricAltitude.Degrees(), TwilightThresholds[kind], 0.02)
+					testutil.AssertNear(t, "dusk altitude", e.Dusk.GeometricAltitude.Degrees(), twilightThresholds[kind], 0.02)
 				}
 			}
 		})
@@ -257,8 +257,8 @@ func TestTwilightEventsGroupsDuskWithFollowingDawn(t *testing.T) {
 				t.Errorf("paired event: Dusk (%v) should be before Dawn (%v)", e.Dusk.Time, e.Dawn.Time)
 			}
 
-			testutil.AssertNear(t, "dusk altitude", e.Dusk.GeometricAltitude.Degrees(), TwilightThresholds[AstronomicalTwilight], 0.02)
-			testutil.AssertNear(t, "dawn altitude", e.Dawn.GeometricAltitude.Degrees(), TwilightThresholds[AstronomicalTwilight], 0.02)
+			testutil.AssertNear(t, "dusk altitude", e.Dusk.GeometricAltitude.Degrees(), twilightThresholds[AstronomicalTwilight], 0.02)
+			testutil.AssertNear(t, "dawn altitude", e.Dawn.GeometricAltitude.Degrees(), twilightThresholds[AstronomicalTwilight], 0.02)
 		}
 	}
 

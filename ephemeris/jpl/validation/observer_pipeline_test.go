@@ -22,7 +22,7 @@ func TestPhase1ObserverPipelineAgainstHorizons(t *testing.T) {
 	requireHorizons(t)
 
 	// The Earth Observer setup — real Greenwich (Royal Observatory), matching
-	// plan.KnownSites' entry. NewGeodetic is (lon, lat, height); this used
+	// plan.NewKnownSite's entry. NewGeodetic is (lon, lat, height); this used
 	// to be swapped (lon=51.477°, lat=0°, an equatorial point off Somalia,
 	// not Greenwich) — see docs/VALIDATION.md's precision-floor section for
 	// why that swap likely explains the historical Az/El deviation

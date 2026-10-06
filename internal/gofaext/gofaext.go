@@ -594,6 +594,20 @@ func Starpv(ra, dec, pmr, pmd, px, rv float64) (pv [2][3]float64, status int) {
 	return pv, status
 }
 
+// Gc2gde converts a geocentric Cartesian position, in meters, to geodetic
+// east longitude and latitude (radians) and height above the ellipsoid
+// (meters), for the ellipsoid of equatorial radius a (meters) and flattening
+// f: SOFA's iauGc2gde, which is Fukushima's (2006) method and holds to a
+// fraction of a micrometer from the ground out past the Moon.
+//
+// The status is SOFA's own: 0 for success, -1 for a flattening outside
+// [0, 1), -2 for a non-positive radius.
+func Gc2gde(a, f float64, xyz [3]float64) (elong, phi, height float64, status int) {
+	status = gofa.Gc2gde(a, f, xyz, &elong, &phi, &height)
+
+	return elong, phi, height, status
+}
+
 // Pvstar is the inverse of [Starpv]: a barycentric position/velocity pv-vector,
 // in au and au per day, back to star catalogue data.
 //

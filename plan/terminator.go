@@ -9,7 +9,7 @@ import (
 	"github.com/TuSKan/astrogo/time"
 )
 
-// zenithAngle returns k's TwilightThresholds altitude (plan/events.go),
+// zenithAngle returns k's twilightThresholds altitude (plan/events.go),
 // reinterpreted as an angular distance from the zenith rather than an
 // altitude above the horizon (zenith angle = 90° − altitude). Terminator
 // uses this as the small circle's angular radius around the subsolar
@@ -19,7 +19,7 @@ import (
 // "geometric vs. apparent terminator" distinction. Unknown kinds fall back
 // to the geometric 90° horizon.
 func (k TwilightKind) zenithAngle() angle.Angle {
-	threshold, ok := TwilightThresholds[k]
+	threshold, ok := twilightThresholds[k]
 	if !ok {
 		return angle.Deg(90)
 	}

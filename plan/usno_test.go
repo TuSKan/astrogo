@@ -303,6 +303,38 @@ func deltaMinutes(usnoMin, astroMin float64) float64 {
 	return d
 }
 
+// checkUSNOCivilTwilight holds one civil twilight event to the USNO time
+// for it. USNO's phenomenon is the Sun's center at 6° below the horizon, the
+// same definition plan.CivilTwilight uses, so the two answer one question.
+//
+// A USNO twilight with no astrogo event is an error, not a log line: the
+// site, day and threshold are the same, so a missing event means astrogo
+// lost a crossing that happened.
+func checkUSNOCivilTwilight(t *testing.T, phen string, h, m int, ev *plan.Event, tz *time.Location) {
+	t.Helper()
+
+	if ev == nil {
+		t.Errorf("Sun %s: USNO reports %02d:%02d, astrogo found no event", phen, h, m)
+
+		return
+	}
+
+	delta := deltaMinutes(minutesFromMidnight(h, m), eventMinutesIn(ev.Time, tz))
+	t.Logf("Sun %-20s  USNO=%02d:%02d  astrogo=%s  Δ=%.1f min",
+		phen, h, m, ev.Time.In(tz).Format("15:04:05"), delta)
+
+	// USNO rounds to the nearest minute, so 0.5 min is rounding alone, and
+	// that is the most measured over the nine site-days here. Rise and set
+	// get 2 min for refraction and horizon dip; twilight is a geometric
+	// −6° with neither, so 1 min is rounding plus half a minute of margin.
+	// Measured, a −5.5° threshold moves these eighteen events by 1.8 to
+	// 5.3 min, so half a degree of error cannot pass.
+	const tol = 1.0
+	if delta > tol {
+		t.Errorf("Sun %s: Δ=%.1f min exceeds %.0f min tolerance", phen, delta, tol)
+	}
+}
+
 // newEph builds the DE442 provider these USNO comparisons need, or says why it
 // could not.
 //
@@ -422,6 +454,15 @@ func TestUSNO_SunMoonOneDay(t *testing.T) {
 					t.Fatalf("SunEvents failed: %v", err)
 				}
 
+				// Civil twilight comes back in the same USNO response. Until
+				// #532 it was skipped as "handled separately" and nothing else
+				// compared it, so astrogo's twilight times had no external
+				// reference at all.
+				civilDawn, civilDusk, err := plan.CivilDawnDusk(start, end, site, prov)
+				if err != nil {
+					t.Fatalf("CivilDawnDusk failed: %v", err)
+				}
+
 				for _, sp := range resp.Properties.Data.SunData {
 					h, m, ok := parseUSNOTime(sp.Time)
 					if !ok {
@@ -439,8 +480,16 @@ func TestUSNO_SunMoonOneDay(t *testing.T) {
 						matchKind = plan.EventSet
 					case "Upper Transit":
 						matchKind = plan.EventTransit
+					case "Begin Civil Twilight":
+						checkUSNOCivilTwilight(t, sp.Phen, h, m, civilDawn, tz)
+
+						continue
+					case "End Civil Twilight":
+						checkUSNOCivilTwilight(t, sp.Phen, h, m, civilDusk, tz)
+
+						continue
 					default:
-						continue // Civil twilight handled separately
+						continue
 					}
 
 					found := false

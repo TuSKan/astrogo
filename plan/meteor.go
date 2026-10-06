@@ -74,12 +74,12 @@ type MeteorShower struct {
 
 // MeteorShowerNames returns the names of every built-in shower, sorted.
 //
-// See [KnownSiteNames] for why enumeration goes through a function rather
-// than an exported map. Use [NewMeteorShower] to resolve a name.
+// The table behind it is unexported, for the reason [KnownSiteNames] gives.
+// Use [NewMeteorShower] to resolve a name.
 func MeteorShowerNames() []string {
-	out := make([]string, 0, len(MeteorShowers))
+	out := make([]string, 0, len(meteorShowers))
 
-	for _, s := range MeteorShowers {
+	for _, s := range meteorShowers {
 		out = append(out, s.Name)
 	}
 
@@ -88,7 +88,7 @@ func MeteorShowerNames() []string {
 	return out
 }
 
-// MeteorShowers is a modest, defensible starter list, not the full IMO
+// meteorShowers is a modest, defensible starter list, not the full IMO
 // working list — the 9 IMO "Class I" (strongest annual) showers, keyed by
 // a lowercase/underscore slug. See NewMeteorShower for name/code-based
 // lookup. Peak
@@ -116,11 +116,7 @@ func MeteorShowerNames() []string {
 // constellation.Centroid for Ursa Minor) — the source data available
 // wasn't sufficient to derive a reliable rate, and near the peak date the
 // resulting position error from omitting it is small in absolute terms.
-//
-// Deprecated: use [MeteorShowerNames] to enumerate and [NewMeteorShower] to
-// resolve. An exported map is process-wide mutable state; see
-// [KnownSiteNames].
-var MeteorShowers = map[string]MeteorShower{
+var meteorShowers = map[string]MeteorShower{
 	"quadrantids": {
 		Name: "Quadrantids", Code: "QUA", ParentBody: "2003 EH1",
 		RadiantRA: angle.Deg(230), RadiantDec: angle.Deg(49),
@@ -186,18 +182,17 @@ var MeteorShowers = map[string]MeteorShower{
 	},
 }
 
-// NewMeteorShower looks up name against MeteorShowers' map key (the
-// normalized form of its Name) or any entry's Code, case- and
-// space-insensitive, and returns it, or ErrUnknownMeteorShower if no entry
-// matches.
+// NewMeteorShower looks up name against each built-in shower's Name or Code
+// ([MeteorShowerNames] lists them), case- and space-insensitive, and returns
+// it, or ErrUnknownMeteorShower if no entry matches.
 func NewMeteorShower(name string) (MeteorShower, error) {
 	want := normalizeSiteName(name)
 
-	if m, ok := MeteorShowers[want]; ok {
+	if m, ok := meteorShowers[want]; ok {
 		return m, nil
 	}
 
-	for _, m := range MeteorShowers {
+	for _, m := range meteorShowers {
 		if normalizeSiteName(m.Code) == want {
 			return m, nil
 		}

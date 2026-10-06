@@ -179,7 +179,7 @@ tables you can check against published references.
 | **Sky Brightness** | Spectral all-sky radiance `L_λ(λ, direction, observer, time, atmosphere)` in W·m⁻²·sr⁻¹·nm⁻¹, kept spectral until projection — integrated starlight, diffuse galactic light, extragalactic background, zodiacal light (Leinert 1998), airglow, scattered moonlight (Kieffer & Stone 2005 ROLO + Winkler 2022), and artificial skyglow in clear air or under cloud (Kocifaj) — natural sky validated to **0.05 mag** against GAMBONS, a near-full Moon to 18.9 mag/arcsec² in V |
 | **Planning** | Sub-second Chandrupatla/Brent boundary refinement, constraint-based scoring, `Greedy`/`Priority`/`SwapOptimized` scheduling strategies |
 | **Events** | Rise/Set/Transit, Moon Phases, Seasons, Apsides, Eclipses, Conjunctions, Elongations, Satellite Passes, 18 published lunar-crescent criteria |
-| **Reference Data** | Built-in registry of 10 well-known observatory sites (`plan.KnownSites`), the 9 IMO Class I annual meteor showers with ZHR rate prediction (`plan.MeteorShowers`), 21 major planetary moons (`plan.PlanetaryMoon`), all 88 IAU constellations (`constellation.List`) |
+| **Reference Data** | Built-in registry of 10 well-known observatory sites (`plan.NewKnownSite`), the 9 IMO Class I annual meteor showers with ZHR rate prediction (`plan.NewMeteorShower`), 21 major planetary moons (`plan.PlanetaryMoon`), all 88 IAU constellations (`constellation.List`) |
 | **Optics** | Pure equipment-optics arithmetic (`optics`) — magnification, true/apparent FOV, exit pupil, Dawes limit, pixel scale for a `Telescope`/`Eyepiece`/`Sensor` combination |
 
 <details>
@@ -222,7 +222,7 @@ tables you can check against published references.
 - Epsilon-tolerant site equality (1e-12 rad)
 - Defensive catalog pointer copying
 - **Stateful `Context`** caching for batch transforms (73× speedup for 100-star batches)
-- `plan.KnownSites`/`NewKnownSite` — built-in registry of 10 well-known observatory sites (Mauna Kea, Paranal, La Palma, Cerro Tololo, Kitt Peak, La Silla, Siding Spring, Palomar, Cerro Pachón, Greenwich), each a fully-built `*Site` carrying its own IAU Minor Planet Center observatory code and aliases (`Site.MPCCode()`/`Aliases()`); matched by name or alias, case/space-insensitive
+- `plan.KnownSiteNames`/`NewKnownSite` — built-in registry of 10 well-known observatory sites (Mauna Kea, Paranal, La Palma, Cerro Tololo, Kitt Peak, La Silla, Siding Spring, Palomar, Cerro Pachón, Greenwich), each a fully-built `*Site` carrying its own IAU Minor Planet Center observatory code and aliases (`Site.MPCCode()`/`Aliases()`); matched by name or alias, case/space-insensitive
 
 ### Ephemerides
 - Sun and Moon positions
@@ -268,7 +268,7 @@ tables you can check against published references.
 ### Visibility & Planning
 - `plan.VisibleTonight` — "what's visible in the sky tonight brighter than magnitude X", across stars, deep-sky objects, planets, the Moon, asteroids, and comets in one call, each annotated with its constellation and extinction-adjusted apparent magnitude; `plan.WithPlanetaryMoons()` opts into the 21 major moons of Mars/Jupiter/Saturn/Uranus/Neptune/Pluto too (off by default — their SPK kernels run ~64 MB–1.1 GB each)
 - `plan.PlanetaryMoon`/`NewPlanetaryMoon` — dedicated type for natural satellites of planets other than Earth (Io, Titan, Triton, Charon, ...), embedding the same H-G reflectance model `Asteroid` uses; `Parent()` returns the NAIF ID of the planet it orbits
-- `plan.MeteorShower`/`MeteorShowers`/`NewMeteorShower` — the 9 IMO "Class I" annual showers (Quadrantids through Ursids); `RadiantAt`/`IsActive` key off the Sun's real ecliptic longitude, referred to the equinox J2000.0 as IMO tabulates it (year-independent, not calendar date), and `ObservedRate` predicts meteors/hour for a real site/time/sky-brightness condition via IMO's own ZHR formula
+- `plan.MeteorShower`/`MeteorShowerNames`/`NewMeteorShower` — the 9 IMO "Class I" annual showers (Quadrantids through Ursids); `RadiantAt`/`IsActive` key off the Sun's real ecliptic longitude, referred to the equinox J2000.0 as IMO tabulates it (year-independent, not calendar date), and `ObservedRate` predicts meteors/hour for a real site/time/sky-brightness condition via IMO's own ZHR formula
 - `plan.AngularDiameter`/`BodyEquatorialRadius` — apparent angular diameter for the Sun, Moon, and planets, auto-populating `TargetDetails.AngularSize`
 - `plan.TargetDetails.RadialVelocity` — auto-populated for any target implementing `MeasuredRadialVelocity` (currently `*Star`, via `WithRadialVelocity`): the topocentric RV an observer would measure right now, alongside the catalog barycentric value, via `coord.Context.ObservedRadialVelocity`
 - `plan.SubsolarPoint`/`SublunarPoint`/`Terminator` — day/night terminator and twilight-circle computation (`TwilightKind`: geometric, apparent, civil, nautical, astronomical)

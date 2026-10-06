@@ -109,3 +109,56 @@ func TestExtractWCS_CDMatrix_WithRotation(t *testing.T) {
 	testutil.AssertNear(t, "RA at CRPIX", res[0], 180.0, 1e-10)
 	testutil.AssertNear(t, "DEC at CRPIX", res[1], 45.0, 1e-10)
 }
+
+// TestCDMatrixDecomposesBackToItself holds the CD-to-CDELT/PC split to the
+// one property the transform depends on: CDELTi·PCi_j reproduces CDi_j, since
+// PixelToWorld applies the pair as CDELT scaling row i (Greisen & Calabretta
+// 2002, §2.1.2).
+//
+// The split used to go by columns, which reproduces CDi_j·CDELTi/CDELTj
+// instead. That is CD itself only when every CDELT has the same value, so the
+// matrices here are the ones that are not: an ordinary sky image turned 30
+// degrees (CD1_1 < 0, CD2_2 > 0), a skewed one with unequal scales, and a
+// quarter turn with a zero diagonal (#524).
+func TestCDMatrixDecomposesBackToItself(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		name string
+		cd   [2][2]float64
+	}{
+		{"rotated 30 degrees, sky parity", [2][2]float64{{-0.8660254037844387e-4, 0.5e-4}, {0.5e-4, 0.8660254037844387e-4}}},
+		{"skewed, unequal scales", [2][2]float64{{-1.0e-3, 2.0e-4}, {1.5e-4, 1.1e-3}}},
+		{"quarter turn, zero diagonal", [2][2]float64{{0, 1.0e-4}, {1.0e-4, 0}}},
+		{"diagonal, sky parity", [2][2]float64{{-2.8e-4, 0}, {0, 2.8e-4}}},
+	} {
+		h := NewHeader()
+		h.Append(Card{Keyword: "NAXIS", Value: "2"})
+		h.Append(Card{Keyword: "CTYPE1", Value: "RA---TAN"})
+		h.Append(Card{Keyword: "CTYPE2", Value: "DEC--TAN"})
+		h.Append(Card{Keyword: "CRVAL1", Value: "150"})
+		h.Append(Card{Keyword: "CRVAL2", Value: "2"})
+		h.Append(Card{Keyword: "CRPIX1", Value: "100"})
+		h.Append(Card{Keyword: "CRPIX2", Value: "200"})
+
+		for i := range 2 {
+			for j := range 2 {
+				h.Append(Card{Keyword: fmt.Sprintf("CD%d_%d", i+1, j+1), Value: fmt.Sprintf("%.17g", tc.cd[i][j])})
+			}
+		}
+
+		wcs, err := ExtractWCS(h)
+		testutil.AssertNoError(t, err)
+
+		cdelt, pc := wcs.CDELT(), wcs.PC()
+
+		for i := range 2 {
+			for j := range 2 {
+				if got := cdelt[i] * pc[i][j]; math.Abs(got-tc.cd[i][j]) > 1e-15*math.Abs(cdelt[i]) {
+					t.Errorf("%s: CDELT%d·PC%d_%d = %.17g, want CD%d_%d = %.17g",
+						tc.name, i+1, i+1, j+1, got, i+1, j+1, tc.cd[i][j])
+				}
+			}
+		}
+	}
+}

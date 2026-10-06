@@ -27,20 +27,19 @@ func TestBodyMapping(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		got, ok := jpl.BodyIDToNAIF[tt.id]
+		got, ok := jpl.NAIFFor(tt.id)
 		if !ok {
-			t.Errorf("BodyIDToNAIF[%v] not found", tt.id)
+			t.Errorf("NAIFFor(%v) not found", tt.id)
 			continue
 		}
 
 		if got != tt.want {
-			t.Errorf("BodyIDToNAIF[%v] = %v, want %v", tt.id, got, tt.want)
+			t.Errorf("NAIFFor(%v) = %v, want %v", tt.id, got, tt.want)
 		}
 	}
 
-	_, ok := jpl.BodyIDToNAIF[core.ID(255)]
-	if ok {
-		t.Error("Expected error for unknown body ID")
+	if _, ok := jpl.NAIFFor(core.ID(255)); ok {
+		t.Error("NAIFFor reports an unknown body ID as mapped")
 	}
 }
 

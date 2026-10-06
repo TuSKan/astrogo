@@ -73,17 +73,20 @@ func ExtinctionAtAltitude(k0, altitudeM float64) float64 {
 // holding to within ±0.03 mag in every color bin across the fitted range;
 // the opposite sign misses by −0.48 mag.
 //
-// Valid for −0.5 < BP−RP < 5.0 mag. Outside that the cubic extrapolates and is
-// not clamped here — at BP−RP = 7 it is already several magnitudes adrift.
+// Fitted for −0.5 < BP−RP < 5.0. Outside that the cubic extrapolates — at
+// BP−RP = 7 it is already several magnitudes adrift — so ok is false there and
+// v is the extrapolation, not a magnitude. It used to return the extrapolation
+// alone, documented as "not clamped here", and catalog/gaia reported it as V
+// for any color (#530).
 //
 // Parameters:
 //   - G: Gaia DR3 G-band magnitude
 //   - bpMinusRp: Gaia BP − RP color index
-func GaiaGToJohnsonV(G, bpMinusRp float64) float64 {
+func GaiaGToJohnsonV(G, bpMinusRp float64) (v float64, ok bool) {
 	c := bpMinusRp
 	gMinusV := -0.02704 + 0.01424*c - 0.2156*c*c + 0.01426*c*c*c
 
-	return G - gMinusV
+	return G - gMinusV, c > -0.5 && c < 5.0
 }
 
 // GaiaGToJohnsonB converts a Gaia DR3 G-band magnitude to an approximate
@@ -108,20 +111,21 @@ func GaiaGToJohnsonV(G, bpMinusRp float64) float64 {
 //
 // # Validity
 //
-// Fitted for −0.5 < BP−RP < 4.0, and Table 5.10 restricts it further: **beyond
-// BP−RP = 1.75 it holds only for M giants.** The same Tycho check shows why —
-// the residual is −0.01 below 1.75, −0.08 by 2.5 and +0.69 beyond it. Nothing
-// is clamped here, so a caller working with red stars has to respect that bound
-// itself.
+// Fitted for −0.5 < BP−RP < 4.0, and ok is false outside that, where b is the
+// quartic's extrapolation rather than a magnitude. Table 5.10 restricts it
+// further: **beyond BP−RP = 1.75 it holds only for M giants.** The same Tycho
+// check shows why — the residual is −0.01 below 1.75, −0.08 by 2.5 and +0.69
+// beyond it. A star's luminosity class is not in its color, so ok cannot
+// report that bound and a caller working with red dwarfs has to respect it.
 //
 // Parameters:
 //   - G: Gaia DR3 G-band magnitude
 //   - bpMinusRp: Gaia BP − RP color index
-func GaiaGToJohnsonB(G, bpMinusRp float64) float64 {
+func GaiaGToJohnsonB(G, bpMinusRp float64) (b float64, ok bool) {
 	c := bpMinusRp
 	gMinusB := 0.01448 - 0.6874*c - 0.3604*c*c + 0.06718*c*c*c - 0.006061*c*c*c*c
 
-	return G - gMinusB
+	return G - gMinusB, c > -0.5 && c < 4.0
 }
 
 // GaiaGToJohnsonR converts a Gaia DR3 G-band magnitude to an approximate
@@ -143,17 +147,19 @@ func GaiaGToJohnsonB(G, bpMinusRp float64) float64 {
 //
 // # Validity
 //
-// Fitted for 0.0 < BP−RP < 4.0, and Table 5.10 restricts it further: beyond
-// BP−RP = 2.0 it holds only for M giants. Nothing is clamped here.
+// Fitted for 0.0 < BP−RP < 4.0, and ok is false outside that, where r is the
+// quartic's extrapolation rather than a magnitude. Table 5.10 restricts it
+// further: beyond BP−RP = 2.0 it holds only for M giants, which ok cannot
+// report.
 //
 // Parameters:
 //   - G: Gaia DR3 G-band magnitude
 //   - bpMinusRp: Gaia BP − RP color index
-func GaiaGToJohnsonR(G, bpMinusRp float64) float64 {
+func GaiaGToJohnsonR(G, bpMinusRp float64) (r float64, ok bool) {
 	c := bpMinusRp
 	gMinusR := -0.02275 + 0.3961*c - 0.1243*c*c - 0.01396*c*c*c + 0.003775*c*c*c*c
 
-	return G - gMinusR
+	return G - gMinusR, c > 0.0 && c < 4.0
 }
 
 // GaiaGToCousinsI converts a Gaia DR3 G-band magnitude to an approximate
@@ -180,15 +186,16 @@ func GaiaGToJohnsonR(G, bpMinusRp float64) float64 {
 // # Validity
 //
 // Fitted for −0.5 < BP−RP < 4.5, with no M-giant restriction, which makes it
-// the least encumbered of the four Johnson-Cousins relations. Nothing is
-// clamped here.
+// the least encumbered of the four Johnson-Cousins relations. ok is false
+// outside that, where i is the quadratic's extrapolation rather than a
+// magnitude.
 //
 // Parameters:
 //   - G: Gaia DR3 G-band magnitude
 //   - bpMinusRp: Gaia BP − RP color index
-func GaiaGToCousinsI(G, bpMinusRp float64) float64 {
+func GaiaGToCousinsI(G, bpMinusRp float64) (i float64, ok bool) {
 	c := bpMinusRp
 	gMinusI := 0.01753 + 0.76*c - 0.0991*c*c
 
-	return G - gMinusI
+	return G - gMinusI, c > -0.5 && c < 4.5
 }

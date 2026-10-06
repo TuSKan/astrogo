@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -217,5 +218,48 @@ func TestParseVOTableDoesNotBlameTheServiceForABadDocument(t *testing.T) {
 
 	if errors.Is(err, remote.ErrNotServingData) {
 		t.Errorf("a malformed VOTable was reported as the service not serving data: %v", err)
+	}
+}
+
+// TestVMagOnlyWhereTheColorRelationHolds: V comes from Riello et al.'s (2021)
+// G − V relation inside the colors it was fitted over, from nothing outside
+// them, and from G alone when there is no color at all.
+//
+// It used to apply its own copy of the cubic at any color and mark the result
+// as a real magnitude, so an L dwarf at BP−RP = 6 came back with a V the
+// relation does not support (#530). A known extreme color is evidence that G
+// is a poor stand-in for V; an absent one is not, so the two cases differ on
+// purpose.
+func TestVMagOnlyWhereTheColorRelationHolds(t *testing.T) {
+	t.Parallel()
+
+	col := map[string]int{"source_id": 0, "ra": 1, "dec": 2, "phot_g_mean_mag": 3, "bp_rp": 4}
+
+	for _, tc := range []struct {
+		name    string
+		bpRp    string
+		wantHas bool
+		wantV   float64
+	}{
+		{"solar color", "0.82", true, 12.15247},
+		{"just inside the red edge", "4.99", true, 0},
+		{"an L dwarf past the fitted range", "6.0", false, 0},
+		{"bluer than anything fitted", "-0.8", false, 0},
+		{"no color", "", true, 12.0},
+	} {
+		target, ok := targetFromRow([]string{"1", "10.0", "20.0", "12.0", tc.bpRp}, col)
+		if !ok {
+			t.Fatalf("%s: row rejected", tc.name)
+		}
+
+		if target.HasVMag != tc.wantHas {
+			t.Errorf("%s: HasVMag = %v, want %v (V = %.3f)", tc.name, target.HasVMag, tc.wantHas, target.VMag)
+
+			continue
+		}
+
+		if tc.wantV != 0 && math.Abs(target.VMag-tc.wantV) > 1e-3 {
+			t.Errorf("%s: V = %.5f, want %.5f", tc.name, target.VMag, tc.wantV)
+		}
 	}
 }
