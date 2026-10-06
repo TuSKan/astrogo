@@ -181,18 +181,50 @@ func TestRefractionSOFADispersesByWavelength(t *testing.T) {
 		t.Errorf("dispersion 0.40-0.70 um at %.0f deg = %.3f arcsec, want roughly "+
 			"1-5 arcsec", alt, spread)
 	}
+}
 
-	// The empirical model's wavelength handling is a linear fudge, so it must
-	// not be mistaken for this. Pinned so that a later "simplification" that
-	// routes the default through RefractionRigorous is caught.
-	er, eb := base, base
-	er.Model, eb.Model = atmosphere.RefractionRigorous{}, atmosphere.RefractionRigorous{}
-	eb.Wavelength, er.Wavelength = 0.40, 0.70
+// TestRefractionRigorousDispersesLikeSOFA holds the empirical model's
+// wavelength law to SOFA's.
+//
+// The two models differ in total refraction: the Bennett and Saemundsson fits
+// sit 3 to 5 percent above SOFA's A·tan z + B·tan³ z at sea-level standard
+// conditions, which is the empirical calibration and not this test's subject.
+// What must agree is how refraction scales with wavelength, so this compares
+// dispersion as a fraction of each model's own refraction. Measured, they
+// agree to 0.1 percent from 80 down to 5 degrees.
+//
+// It used to scale by an unsourced 1 + 0.005·(0.55 − λ), and a test here
+// pinned that as the smaller of the two: 0.155 arcsec of dispersion between
+// 0.40 and 0.70 µm at 30 degrees, against SOFA's 2.467 (#527). A caller of
+// coord.Reducer.Disperse with atmosphere.StandardRefraction, which carries
+// this model, was told dispersion was 16 times smaller than it is.
+//
+// Below 5 degrees SOFA's tan z expansion is itself the weaker model, and
+// the comparison stops meaning anything.
+func TestRefractionRigorousDispersesLikeSOFA(t *testing.T) {
+	base := atmosphere.Refraction{Pressure: 1013.25, Temperature: 15.0, Humidity: 0.5}
 
-	if empirical := (eb.RefractFromTrue(angle.Deg(alt)) -
-		er.RefractFromTrue(angle.Deg(alt))).Arcseconds(); empirical >= spread {
-		t.Errorf("RefractionRigorous reported %.3f arcsec of dispersion against "+
-			"SOFA's %.3f; the linear 0.005/um approximation should be the smaller",
-			empirical, spread)
+	for _, alt := range []float64{80, 60, 45, 30, 20, 15, 10, 5} {
+		sofa := fractionalDispersion(base, angle.Deg(alt))
+
+		rig := base
+		rig.Model = atmosphere.RefractionRigorous{}
+
+		empirical := fractionalDispersion(rig, angle.Deg(alt))
+
+		if rel := empirical/sofa - 1; math.Abs(rel) > 0.01 {
+			t.Errorf("at %.0f degrees: RefractionRigorous disperses %.5f of its refraction between "+
+				"0.40 and 0.70 µm and SOFA %.5f, %.1f%% apart; want within 1%%",
+				alt, empirical, sofa, 100*rel)
+		}
 	}
+}
+
+// fractionalDispersion is the refraction difference between 0.40 and 0.70 µm
+// as a fraction of the refraction at 0.55 µm, under env's model.
+func fractionalDispersion(env atmosphere.Refraction, alt angle.Angle) float64 {
+	blue, red, mid := env, env, env
+	blue.Wavelength, red.Wavelength, mid.Wavelength = 0.40, 0.70, 0.55
+
+	return (blue.RefractFromTrue(alt) - red.RefractFromTrue(alt)).Radians() / mid.RefractFromTrue(alt).Radians()
 }
