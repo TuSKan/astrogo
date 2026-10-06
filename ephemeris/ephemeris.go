@@ -35,10 +35,6 @@ type (
 	ID = core.ID
 	// Source is an ephemeris source.
 	Source = core.Source
-	// Kind is an ephemeris kind.
-	Kind = core.Kind
-	// Body is an ephemeris body.
-	Body = core.Body
 )
 
 // Reference frames and origins a [State] can be labeled with. The
@@ -91,23 +87,6 @@ const (
 )
 
 const (
-	// KindStar is the kind for stars.
-	KindStar = core.KindStar
-	// KindPlanet is the kind for planets.
-	KindPlanet = core.KindPlanet
-	// KindMoon is the kind for moons.
-	KindMoon = core.KindMoon
-	// KindMinorBody is the kind for minor bodies.
-	KindMinorBody = core.KindMinorBody
-	// KindComet is the kind for comets.
-	KindComet = core.KindComet
-	// KindBarycenter is the kind for barycenters.
-	KindBarycenter = core.KindBarycenter
-	// KindSatellite is the kind for satellites.
-	KindSatellite = core.KindSatellite
-)
-
-const (
 	// Planets is the source for planets.
 	Planets = core.Planets
 	// SmallBody is the source for small bodies.
@@ -124,31 +103,6 @@ const (
 	// Titan, Triton) — distinct from Satellites above, which is artificial
 	// (TLE/SGP4-based) satellites.
 	Moons = core.Moons
-)
-
-var (
-	// SunBody is the body for the Sun.
-	SunBody = core.SunBody
-	// MoonBody is the body for the Moon.
-	MoonBody = core.MoonBody
-	// MercuryBody is the body for Mercury.
-	MercuryBody = core.MercuryBody
-	// VenusBody is the body for Venus.
-	VenusBody = core.VenusBody
-	// EarthBody is the body for Earth.
-	EarthBody = core.EarthBody
-	// MarsBody is the body for Mars.
-	MarsBody = core.MarsBody
-	// JupiterBody is the body for Jupiter.
-	JupiterBody = core.JupiterBody
-	// SaturnBody is the body for Saturn.
-	SaturnBody = core.SaturnBody
-	// UranusBody is the body for Uranus.
-	UranusBody = core.UranusBody
-	// NeptuneBody is the body for Neptune.
-	NeptuneBody = core.NeptuneBody
-	// Bodies is the array of all bodies.
-	Bodies = core.Bodies
 )
 
 // ── Sentinel errors ──────────────────────────────────────────────────────────
