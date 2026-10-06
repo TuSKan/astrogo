@@ -976,28 +976,37 @@ func ExtractWCS(h *Header) (*WCS, error) {
 	}
 
 	if hasCDMatrix {
-		// Decompose CD matrix: CDi_j = CDELTi * PCi_j
-		// Extract CDELT as column norms and PC as the normalized rotation.
+		// Decompose CDi_j = CDELTi · PCi_j (Greisen & Calabretta 2002, A&A
+		// 395, 1061, §2.1.2). CDELTi scales row i — intermediate world axis i
+		// — which is how PixelToWorld applies it, so the split is by row:
+		// CDELTi is the row's norm, signed by its diagonal element, and PCi_j
+		// is the row divided by it. Their product is CDi_j again whatever the
+		// sign chosen, which is the only property the transform needs.
+		//
+		// It used to split by columns and divide column-wise, which makes
+		// CDELTi·PCi_j come out as CDi_j·CDELTi/CDELTj. On an ordinary sky
+		// image, CD1_1 < 0 and CD2_2 > 0, that ratio is -1 and every rotated
+		// header was read rotated the other way: 0.09 degrees out at 900
+		// pixels for a 30-degree turn (#524).
 		for i := range naxis {
-			var colNorm float64
+			var rowNorm float64
 			for j := range naxis {
-				colNorm += cd[j][i] * cd[j][i]
+				rowNorm += cd[i][j] * cd[i][j]
 			}
 
-			colNorm = math.Sqrt(colNorm)
-			if colNorm == 0 {
-				colNorm = 1.0 // Avoid division by zero for degenerate axes
+			rowNorm = math.Sqrt(rowNorm)
+			if rowNorm == 0 {
+				rowNorm = 1.0 // a degenerate axis: PC stays zero, nothing to scale
 			}
 
-			// Preserve sign from the diagonal element
 			if cd[i][i] < 0 {
-				cdelt[i] = -colNorm
+				cdelt[i] = -rowNorm
 			} else {
-				cdelt[i] = colNorm
+				cdelt[i] = rowNorm
 			}
 
 			for j := range naxis {
-				pc[j][i] = cd[j][i] / cdelt[i]
+				pc[i][j] = cd[i][j] / cdelt[i]
 			}
 		}
 	} else {
