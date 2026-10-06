@@ -1,0 +1,8 @@
+[project]
+name = "astrogo-wcs-fixture"
+version = "1.0.0"
+description = "Generates the Astropy/WCSLIB reference table for astrogo's FITS WCS"
+requires-python = ">=3.11"
+dependencies = [
+    "astropy>=7.0",
+]
