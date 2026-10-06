@@ -1053,10 +1053,12 @@ func ToGoDuration(d unit.Duration) (Duration, bool) {
 
 // FromGoDuration converts a standard-library duration to an astrogo one.
 //
-// Exact in every case: an int64 nanosecond count is at most 19 digits and
-// float64 seconds carries 15 significant ones, so a duration long enough to
-// lose a nanosecond here is already longer than any wall-clock interval the
-// standard library is used for.
+// Exact to the nanosecond up to 2^22 s, about 48.5 days. A [unit.Duration] is
+// float64 seconds, whose spacing grows with the value: past 2^22 s it exceeds
+// half a nanosecond, and the count rounds — by up to 4 ns at a year, measured.
+// This used to claim exactness in every case, on the reasoning that float64
+// carries 15 significant digits; it does, but a nanosecond count of a year
+// needs 17.
 func FromGoDuration(d Duration) unit.Duration {
 	return unit.Seconds(d.Seconds())
 }
