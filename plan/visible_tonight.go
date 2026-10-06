@@ -37,7 +37,9 @@ type VisibleObject struct {
 	// ApparentMag is extinction-adjusted (via atmosphere.Airmass +
 	// magnitude.StarApparent's generic linear-extinction model — the
 	// physics doesn't care whether the photons came from a star, planet,
-	// asteroid, or comet), evaluated at PeakTime.
+	// asteroid, or comet), evaluated at PeakTime. A peak below 0° — above an
+	// elevated site's dipped horizon but not the astronomical one — takes
+	// the horizon's airmass, so its extinction there is a lower bound.
 	ApparentMag float64
 	// RiseTime/TransitTime/SetTime are the real geometric event instants
 	// within [start, end] — each is zero (time.Time{}) if that event
@@ -788,7 +790,19 @@ func evaluateCandidate(ctx context.Context, c visibleCandidate, start, end time.
 		return VisibleObject{}, false, nil // evaluated: no published magnitude
 	}
 
-	airmass, err := atmosphere.Airmass(aa.Alt())
+	// The windows are found against the site's dipped horizon, which for an
+	// elevated site lies below 0°, so a window's peak can too: a target that
+	// clears the horizon a mountain observer sees without clearing the
+	// astronomical one. Airmass is not defined below 0°, and it refusing used
+	// to fail the whole call (#551). The horizon's airmass is used instead,
+	// which is a lower bound on the extinction there, and the magnitude limit
+	// decides as for any other target.
+	peakAlt := aa.Alt()
+	if peakAlt.Degrees() < 0 {
+		peakAlt = angle.Zero()
+	}
+
+	airmass, err := atmosphere.Airmass(peakAlt)
 	if err != nil {
 		return skipped("airmass", err)
 	}

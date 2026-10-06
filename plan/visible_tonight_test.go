@@ -2,12 +2,15 @@ package plan_test
 
 import (
 	"context"
+	"math"
 	"testing"
 
 	"github.com/TuSKan/astrogo/angle"
+	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/ephemeris"
+	"github.com/TuSKan/astrogo/magnitude"
 	"github.com/TuSKan/astrogo/plan"
 	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
@@ -209,6 +212,50 @@ func TestVisibleTonight_MidnightNightOrdersDawnAfterDusk(t *testing.T) {
 
 	if _, ok := findByName(results, "Sirius"); !ok {
 		t.Fatalf("expected Sirius visible when night is local midnight, got %+v", results)
+	}
+}
+
+// TestVisibleTonight_PeakBelowTheAstronomicalHorizon is #551. Quinta Calixto
+// sits at 835 m, so its windows are found against a horizon dipped to
+// −0.848°, and a star at Dec +68.37° culminates there at about −0.9°
+// geometric — inside a window, but below 0° apparent. Airmass is undefined
+// below 0°, and its refusal used to fail the whole call ("result is
+// incomplete") along with the six objects that were fine.
+func TestVisibleTonight_PeakBelowTheAstronomicalHorizon(t *testing.T) {
+	t.Parallel()
+
+	grazer := resolve.Target{
+		ID: "grazer", Name: "Grazer", Kind: resolve.KindStar,
+		Coord:    coord.NewICRS(angle.Deg(311), angle.Deg(68.37)),
+		HasCoord: true, VMag: -1.0, HasVMag: true, Catalog: "test",
+	}
+
+	site := quintaCalixtoSite(t)
+	night := time.Date(2026, time.August, 1, 3, 0, 0, 0, time.LocationUTC)
+	sources := []resolve.BrightObjectSearcher{&mockBrightSource{targets: []resolve.Target{grazer}}}
+
+	results, err := plan.VisibleTonight(context.Background(), site, night, 8, sources, ephemeris.Default())
+	if err != nil {
+		t.Fatalf("VisibleTonight: %v", err)
+	}
+
+	got, ok := findByName(results, "Grazer")
+	if !ok {
+		t.Fatalf("Grazer clears the site's dipped horizon and is bright enough at the horizon's airmass, but was not listed")
+	}
+
+	if alt := got.PeakAltitude.Degrees(); alt >= 0 || alt < site.RiseSetThreshold().Degrees() {
+		t.Fatalf("peak altitude %.3f°, want it between the dipped horizon (%.3f°) and 0°, which is the case under test",
+			alt, site.RiseSetThreshold().Degrees())
+	}
+
+	horizon, err := atmosphere.Airmass(angle.Zero())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if want := magnitude.StarApparent(grazer.VMag, horizon); math.Abs(got.ApparentMag-want) > 1e-9 {
+		t.Errorf("ApparentMag %.4f, want %.4f: the catalog magnitude extinguished at the horizon's airmass", got.ApparentMag, want)
 	}
 }
 
