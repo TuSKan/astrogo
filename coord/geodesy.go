@@ -6,6 +6,7 @@ import (
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/constants"
+	"github.com/TuSKan/astrogo/internal/gofaext"
 	"github.com/TuSKan/astrogo/unit"
 	"github.com/TuSKan/astrogo/vector"
 )
@@ -178,8 +179,20 @@ func (g Geodetic) ToECEF(e Ellipsoid) vector.Vec3 {
 	return vector.V3(x, y, z)
 }
 
-// FromECEF converts an ECEF Cartesian vector to Geodetic coordinates using
-// the given ellipsoid. It uses the Bowring (1976) algorithm.
+// FromECEF converts an ECEF Cartesian vector, in meters, to geodetic
+// coordinates on the given ellipsoid, by SOFA's iauGc2gde: Fukushima's (2006)
+// method, which holds to a fraction of a micrometer from the ground out past
+// the Moon.
+//
+// It used Bowring's (1976) single step, which is exact enough on the ground
+// and degrades with altitude. Measured round trip, worst height error over
+// latitude: 1.5 mm at the ISS, 25 cm at GPS orbit, 31 cm at geostationary
+// orbit and 42 cm at the Moon's distance, against 2.2e-8 m at geostationary
+// orbit here (#526). It mattered once satellite.Altitude came to run here.
+//
+// A point on the polar axis gets longitude 0. Returns [ErrNotFinite] for a
+// non-finite component and [ErrInvalidEllipsoid] for an ellipsoid SOFA
+// refuses.
 func FromECEF(v vector.Vec3, e Ellipsoid) (*Geodetic, error) {
 	x, y, z := v.X, v.Y, v.Z
 	if math.IsNaN(x) || math.IsInf(x, 0) ||
@@ -188,37 +201,11 @@ func FromECEF(v vector.Vec3, e Ellipsoid) (*Geodetic, error) {
 		return nil, fmt.Errorf("ECEF: %w", ErrNotFinite)
 	}
 
-	a := e.A.Meters()
-	f := e.F
-	e2 := 2*f - f*f
-	b := a * (1 - f)
-	ep2 := (a*a - b*b) / (b * b)
-
-	p := math.Hypot(x, y)
-	if p == 0 {
-		if z == 0 {
-			return NewGeodetic(angle.Rad(0), angle.Rad(0), unit.Meters(-a))
-		}
-
-		lat := math.Pi / 2
-		if z < 0 {
-			lat = -math.Pi / 2
-		}
-
-		return NewGeodetic(angle.Rad(0), angle.Rad(lat), unit.Meters(math.Abs(z)-b))
+	lon, lat, h, status := gofaext.Gc2gde(e.A.Meters(), e.F, [3]float64{x, y, z})
+	if status != 0 {
+		return nil, fmt.Errorf("ECEF: %w: a = %g m, f = %g (SOFA status %d)",
+			ErrInvalidEllipsoid, e.A.Meters(), e.F, status)
 	}
-
-	theta := math.Atan2(z*a, p*b)
-
-	sinTheta := math.Sin(theta)
-	cosTheta := math.Cos(theta)
-
-	lon := math.Atan2(y, x)
-	lat := math.Atan2(z+ep2*b*sinTheta*sinTheta*sinTheta, p-e2*a*cosTheta*cosTheta*cosTheta)
-
-	sinLat := math.Sin(lat)
-	n := a / math.Sqrt(1-e2*sinLat*sinLat)
-	h := p/math.Cos(lat) - n
 
 	return NewGeodetic(angle.Rad(lon).WrapPi(), angle.Rad(lat), unit.Meters(h))
 }

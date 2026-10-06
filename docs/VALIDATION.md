@@ -129,7 +129,7 @@ measured distribution, follow the Evidence link to the generated table.
 | Angle normalization | ✅ validated | `angle/angle_test.go` | analytical | exact / 1e-15 | boundary wrapping tested |
 | Angle formatting/parsing | ✅ validated | `angle/angle_test.go` | round-trip tests | string + tolerance | sexagesimal (HMS/DMS) formatting |
 | Vector spherical/cartesian | ✅ validated | `vector/vector_test.go` | analytical | 1e-12 | pole cases tested |
-| Geodetic ↔ ECEF | ✅ validated | `coord/geodesy_test.go` | WGS84 formulas | 1e-6 m / angular | pole/equator/general tested |
+| Geodetic ↔ ECEF | ✅ validated | `coord/geodesy_test.go` | round trip through the closed-form forward conversion | 1e-6 m / 1e-10 rad | ECEF → geodetic is SOFA's `iauGc2gde` (Fukushima 2006). Held from −10 km to the Moon's distance at every latitude: worst **1.8e-7 m** of height and **2.6e-11 rad** of latitude. The one-step Bowring (1976) method it replaced lost 1.5 mm at the ISS and 31 cm at geostationary orbit (#526); the round trip was then tested only within a kilometer of the surface, where Bowring is exact. Polar axis and invalid ellipsoids covered. |
 | ICRS ↔ Galactic | ✅ validated | `coord/transform_roundtrip_test.go` | `gofa` | 1e-12 | poles, GC, round-trip verified |
 | ICRS ↔ Ecliptic | ✅ validated | `coord/transform_roundtrip_test.go` | `gofa` (IAU 2006) | 2e-5 deg | poles, Aries, round-trip verified |
 | ICRS ↔ AltAz | ✅ validated | `coord.topocentric.separation`, `coord.topocentric.crosstrack`, `coord.topocentric.elevation` | `gofa` + invariants | 1e-7 deg | edge cases + round-trip verified |

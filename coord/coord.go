@@ -25,6 +25,9 @@ var (
 	ErrTooFewPoints = errors.New("coord: at least 3 points are required")
 	// ErrNilCenter indicates SmallCircle was given a nil center.
 	ErrNilCenter = errors.New("coord: center must not be nil")
+	// ErrInvalidEllipsoid indicates an Ellipsoid no conversion can use: a
+	// semi-major axis that is not positive, or a flattening outside [0, 1).
+	ErrInvalidEllipsoid = errors.New("coord: invalid ellipsoid")
 	// ErrSofaEpv00Failed indicates gofaext.Epv00 returned a failure
 	// status — see HeliocentricRVCorrection, the one place in this
 	// package that calls it outside of Context construction.
