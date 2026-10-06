@@ -175,10 +175,16 @@ func TestSetTimeProbesThroughAtTime(t *testing.T) {
 
 	planner, window, blocks, _ := scheduleFixture(t)
 
+	// The same probes and the same interpolation as estimateHoursUntilSet,
+	// differing only in where each probe's Context comes from. Until #554 it
+	// restated the old interpolation, from now to the first probe below the
+	// horizon, and so held that defect in place as well as testing AtTime.
 	reference := func(obj Observable, t0 time.Time, currentAlt float64) float64 {
 		if currentAlt <= 0 {
 			return 0
 		}
+
+		prevHours, prevAlt := 0.0, currentAlt
 
 		for _, offset := range [5]time.Duration{30 * time.Minute, time.Hour, 2 * time.Hour, 4 * time.Hour, 8 * time.Hour} {
 			ft := t0.Add(time.FromGoDuration(offset))
@@ -193,9 +199,12 @@ func TestSetTimeProbesThroughAtTime(t *testing.T) {
 				t.Fatalf("reference probe: observedAltAz: %v", err)
 			}
 
-			if aa.Alt().Degrees() <= 0 {
-				return offset.Hours() * (currentAlt / (currentAlt - aa.Alt().Degrees()))
+			alt := aa.Alt().Degrees()
+			if alt <= 0 {
+				return prevHours + (offset.Hours()-prevHours)*prevAlt/(prevAlt-alt)
 			}
+
+			prevHours, prevAlt = offset.Hours(), alt
 		}
 
 		return math.Inf(1)

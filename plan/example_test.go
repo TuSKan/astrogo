@@ -81,5 +81,5 @@ func ExampleRankObservables() {
 	}
 	// Output:
 	// 1. NearZenith (Score:  67.5)
-	// 2. Lower      (Score:  45.4)
+	// 2. Lower      (Score:  45.0)
 }
