@@ -71,7 +71,7 @@ func vizierControl(ctx context.Context, t *testing.T) func() error {
 	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 30*time.Second)
 	t.Cleanup(cancel)
 
-	return testutil.TAPControl(ctx, syncURL, `"I/239/hip_main"`)
+	return testutil.TAPControl(ctx, syncURL, `"I/239/hip_main"`, "HIP")
 }
 
 // requireVizier skips the test when the VizieR TAP endpoint is unreachable —

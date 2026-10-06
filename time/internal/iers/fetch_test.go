@@ -99,6 +99,7 @@ func clearCooldown() {
 
 	lastAttempt = time.Time{}
 	lastCacheRead = time.Time{}
+	errLastCache = nil
 	errLastFetch = nil
 }
 
@@ -147,6 +148,75 @@ func TestEnsureLoadedPropagatesFetchError(t *testing.T) {
 	err := EnsureLoaded(41684)
 	if !errors.Is(err, errUpstream) {
 		t.Fatalf("EnsureLoaded = %v, want it to wrap %v", err, errUpstream)
+	}
+}
+
+// errDenied stands in for a cached bulletin that is there and cannot be read.
+var errDenied = errors.New("permission denied")
+
+// TestEnsureLoadedReportsWhyTheCacheWasUnusable is #509's half in this
+// package: a cached copy that could not be read or parsed is reported beside
+// the fetch's failure. Both used to be dropped, so an operator whose
+// pre-seeded bulletin was unreadable got the same result as one who had never
+// seeded it.
+func TestEnsureLoadedReportsWhyTheCacheWasUnusable(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		loader *fakeLoader
+		want   string
+	}{
+		{
+			name:   "unreadable",
+			loader: &fakeLoader{cachedErr: errDenied, fetchErr: ErrNoEOPData},
+			want:   "read cached EOP data",
+		},
+		{
+			// The parser skips lines it cannot read, so garbage parses to an
+			// empty table rather than failing. What does fail is the scanner,
+			// on a line past bufio's 64 KiB token limit.
+			name: "unparseable",
+			loader: &fakeLoader{
+				cached:   Data{Raw: []byte(strings.Repeat("x", 70000))},
+				fetchErr: ErrNoEOPData,
+			},
+			want: "parse cached EOP data",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			installLoader(t, tc.loader)
+
+			err := EnsureLoaded(41684)
+			if err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("EnsureLoaded = %v, want it to say %q", err, tc.want)
+			}
+
+			// The fetch's own reason is still there beside it.
+			if !errors.Is(err, ErrNoEOPData) {
+				t.Errorf("EnsureLoaded = %v, which lost the fetch's ErrNoEOPData", err)
+			}
+		})
+	}
+}
+
+// TestEnsureLoadedDoesNotReportAnAbsentCache is the other side: nothing
+// cached is an ordinary state, not a cache failure, and must not be reported
+// as one.
+func TestEnsureLoadedDoesNotReportAnAbsentCache(t *testing.T) {
+	installLoader(t, noCache(Data{}, ErrNoEOPData))
+
+	err := EnsureLoaded(41684)
+	if err != nil && strings.Contains(err.Error(), "cached EOP data") {
+		t.Errorf("EnsureLoaded = %v, reporting an absent cache as a failure", err)
+	}
+}
+
+// TestEnsureLoadedForgetsTheCacheOnceTheFetchSucceeds: an unreadable cache
+// does not matter once the network supplied the data, so it is not reported.
+func TestEnsureLoadedForgetsTheCacheOnceTheFetchSucceeds(t *testing.T) {
+	installLoader(t, &fakeLoader{cachedErr: errDenied, fetched: Data{Raw: []byte(sampleFinals2000A)}})
+
+	if err := EnsureLoaded(41684); err != nil {
+		t.Fatalf("EnsureLoaded = %v, want nil after a successful fetch", err)
 	}
 }
 

@@ -657,9 +657,12 @@ which cannot then import it back. Naming it is what turns EOP on.
 A program that imports `astrogo/time` without it links no network stack at
 all — measured with go1.27 on windows/amd64, a binary computing a Julian date is
 **3.0 MB rather than 6.3 MB** — and degrades to zero EOP with a one-time warning,
-which costs about an arcsecond of topocentric position. To read a pre-seeded file without any
-`remote` dependency at all, register
-`time.FileEOPLoader("/path/to/finals2000A.data")` instead.
+which costs about an arcsecond of topocentric position. To read a pre-seeded file
+without any `remote` dependency at all, register a filesystem loader instead:
+
+```go
+time.RegisterEOPLoader(time.FSEOPLoader{FS: os.DirFS("/data/eop"), Name: "finals2000A.data"})
+```
 
 `ephemeris` works the same way, and it buys more than a Julian date. The
 kernel-backed sources (`Planets`, `SmallBody`, `Asteroids`, `Comets`, `Moons`)

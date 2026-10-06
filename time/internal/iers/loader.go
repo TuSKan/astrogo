@@ -3,7 +3,8 @@ package iers
 import (
 	"context"
 	"errors"
-	"os"
+	"fmt"
+	"io/fs"
 	"sync"
 	"time"
 )
@@ -70,31 +71,59 @@ func GetLoader() Loader {
 	return loader
 }
 
-// FileLoader is a [Loader] reading one finals2000A file from a fixed path,
+// FSLoader is a [Loader] reading one finals2000A object from a filesystem,
 // using nothing but the standard library.
 //
-// It serves the deployment that pre-seeds EOP data on disk and wants no
-// network dependency: astrogo/remote/eop's loader offers the same cache read,
-// but linking it costs net/http, crypto/tls and resty — measured with go1.27
-// on windows/amd64, a Julian-date program goes from 3.0 MB to 6.3 MB.
-// Fetch always reports [ErrNoEOPData] — a fixed path is not a download.
-type FileLoader string
+// It serves the deployment that pre-seeds EOP data and wants no network
+// dependency: astrogo/remote/eop's loader offers the same cache read, but
+// linking it costs net/http, crypto/tls and resty — measured with go1.27 on
+// windows/amd64, a Julian-date program goes from 3.0 MB to 6.3 MB. The
+// filesystem is the caller's, which is what keeps an OS path out of
+// astrogo's API: a directory on disk is os.DirFS(dir), written at the
+// caller's own call site, and a remote.FS works unchanged. Fetch always
+// reports [ErrNoEOPData] — reading what is already there is not a download.
+//
+// It used to take an OS path, as a string, and read it with os.ReadFile
+// (#509).
+type FSLoader struct {
+	// FS holds the bulletin.
+	FS fs.FS
+	// Name is the bulletin's name within FS, "/"-separated, e.g.
+	// "finals2000A.data".
+	Name string
+}
 
-// Cached reads the file. A missing file is [ErrNoEOPData], not an error
-// worth propagating: "nothing pre-seeded here" is an ordinary state.
-func (f FileLoader) Cached(_ context.Context) (Data, error) {
-	raw, err := os.ReadFile(string(f))
-	if err != nil {
+// errNoFS is a zero-value FSLoader: a misconfiguration, not an absence.
+var errNoFS = errors.New("iers: FSLoader has no filesystem")
+
+// Cached reads the object.
+//
+// A missing object is [ErrNoEOPData]: "nothing pre-seeded here" is an
+// ordinary state. Any other failure — a permission error, an unreadable
+// mount — is returned as itself. It used to be folded into ErrNoEOPData too,
+// which made a deployment whose pre-seeded file could not be read look
+// exactly like one that had never seeded it.
+func (f FSLoader) Cached(_ context.Context) (Data, error) {
+	if f.FS == nil {
+		return Data{}, errNoFS
+	}
+
+	raw, err := fs.ReadFile(f.FS, f.Name)
+	if errors.Is(err, fs.ErrNotExist) {
 		return Data{}, ErrNoEOPData
 	}
 
+	if err != nil {
+		return Data{}, fmt.Errorf("iers: read %s: %w", f.Name, err)
+	}
+
 	var mod time.Time
-	if info, serr := os.Stat(string(f)); serr == nil {
+	if info, serr := fs.Stat(f.FS, f.Name); serr == nil {
 		mod = info.ModTime()
 	}
 
 	return Data{Raw: raw, ModTime: mod}, nil
 }
 
-// Fetch always reports [ErrNoEOPData]: a FileLoader downloads nothing.
-func (f FileLoader) Fetch(context.Context) (Data, error) { return Data{}, ErrNoEOPData }
+// Fetch always reports [ErrNoEOPData]: an FSLoader downloads nothing.
+func (FSLoader) Fetch(context.Context) (Data, error) { return Data{}, ErrNoEOPData }
