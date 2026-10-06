@@ -379,20 +379,20 @@ func TestLocalSiderealTime(t *testing.T) {
 	testutil.AssertNear(t, "LST at Greenwich J2000", lst.Degrees(), expectedDeg, 0.5)
 }
 
-// TestKnownSitesTableIntegrity guards KnownSites' fixed data table against
+// TestKnownSitesTableIntegrity guards knownSites' fixed data table against
 // copy-paste mistakes: no duplicate names/aliases/MPC codes and every
 // coordinate in a physically valid range.
 func TestKnownSitesTableIntegrity(t *testing.T) {
 	seenName := make(map[string]string)
 	seenCode := make(map[string]string)
 
-	if len(KnownSites) == 0 {
+	if len(knownSites) == 0 {
 		t.Fatal("expected a non-empty starter list of known sites")
 	}
 
-	for _, s := range KnownSites {
+	for _, s := range knownSites {
 		if s.Name() == "" {
-			t.Errorf("a KnownSites entry has an empty Name")
+			t.Errorf("a knownSites entry has an empty Name")
 		}
 
 		norm := strings.ToLower(strings.ReplaceAll(s.Name(), " ", ""))

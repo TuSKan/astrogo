@@ -8,10 +8,10 @@ import (
 	"github.com/TuSKan/astrogo/ephemeris/jpl"
 )
 
-// BodyIDToNAIF is an exported map, so any package could reassign an entry and
-// change which SPK segment every other caller in the binary resolves to —
-// silently, with nothing for a later reader to see. The accessors exist so
-// reading it does not require reaching into that state.
+// The NAIF table was an exported map, so any package could reassign an entry
+// and change which SPK segment every other caller in the binary resolved to —
+// silently, with nothing for a later reader to see. It is unexported now
+// (#533), and these accessors are the only way to read it.
 func TestNAIFAccessors(t *testing.T) {
 	t.Parallel()
 

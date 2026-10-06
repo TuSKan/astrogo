@@ -48,16 +48,16 @@ type HorizonProfile func(azimuth angle.Angle) angle.Angle
 // site list, sorted, for a caller that wants to offer a choice rather than
 // look one up.
 //
-// It exists so that enumerating the sites does not require reaching into an
-// exported map. Handing callers the map itself makes the list process-wide
-// mutable state: one package deleting or replacing an entry changes what
-// every other caller in the binary sees, which is a reproducibility and
-// test-isolation problem rather than a race one. Use [NewKnownSite] to
-// resolve a name — it accepts aliases and is case- and space-insensitive.
+// The registry behind it is unexported. Handing callers the map itself would
+// make the list process-wide mutable state: one package deleting or
+// replacing an entry would change what every other caller in the binary
+// sees, which is a reproducibility and test-isolation problem rather than a
+// race one. Use [NewKnownSite] to resolve a name — it accepts aliases and is
+// case- and space-insensitive.
 func KnownSiteNames() []string {
-	out := make([]string, 0, len(KnownSites))
+	out := make([]string, 0, len(knownSites))
 
-	for _, s := range KnownSites {
+	for _, s := range knownSites {
 		out = append(out, s.name)
 	}
 
@@ -66,7 +66,7 @@ func KnownSiteNames() []string {
 	return out
 }
 
-// KnownSites maps a modest, defensible starter list of well-known observing
+// knownSites maps a modest, defensible starter list of well-known observing
 // sites (not an exhaustive observatory database) to fully-built *Site
 // values, keyed by a lowercase/underscore slug. Coordinates and elevations
 // are the published geodetic values from each site's own Wikipedia
@@ -75,12 +75,9 @@ func KnownSiteNames() []string {
 // where a code is set. A caller needing survey-grade precision for their
 // own site should always supply their own measured coordinates via
 // NewSite — this table is a convenience for "somewhere near Mauna Kea,"
-// not a substitute for that. See NewKnownSite for name/alias-based lookup.
-//
-// Deprecated: use [KnownSiteNames] to enumerate and [NewKnownSite] to resolve.
-// An exported map is process-wide mutable state, and a caller that deletes or
-// replaces an entry changes what every other caller in the binary sees.
-var KnownSites = map[string]*Site{
+// not a substitute for that. Callers reach it through KnownSiteNames and
+// NewKnownSite.
+var knownSites = map[string]*Site{
 	"greenwich": {
 		name:     "Greenwich",
 		location: coord.MustGeodetic(angle.Zero(), angle.Deg(51.4772), 45),
@@ -169,16 +166,16 @@ func normalizeSiteName(s string) string {
 	return strings.ToLower(strings.ReplaceAll(strings.TrimSpace(s), " ", "_"))
 }
 
-// lookupKnownSite finds a KnownSites entry by its map key (the normalized
+// lookupKnownSite finds a knownSites entry by its map key (the normalized
 // form of its Name) or any Alias, case- and space-insensitive.
 func lookupKnownSite(name string) (*Site, bool) {
 	want := normalizeSiteName(name)
 
-	if s, ok := KnownSites[want]; ok {
+	if s, ok := knownSites[want]; ok {
 		return s, true
 	}
 
-	for _, s := range KnownSites {
+	for _, s := range knownSites {
 		// The site's own display name, before its aliases.
 		//
 		// It used to be checked only via the map key, which works for every
@@ -201,8 +198,9 @@ func lookupKnownSite(name string) (*Site, bool) {
 	return nil, false
 }
 
-// NewKnownSite looks up name (matched against every KnownSites entry's
-// Name and Aliases, case- and space-insensitive) and returns its *Site, or
+// NewKnownSite looks up name (matched against every built-in site's Name
+// and Aliases, case- and space-insensitive; [KnownSiteNames] lists them) and
+// returns its *Site, or
 // ErrUnknownSite if no entry matches. The registry's shared *Site is
 // returned directly — a caller wanting a variant (a different horizon,
 // time zone, ...) should chain the returned Site's own WithHorizon/
@@ -450,15 +448,6 @@ func (s *Site) Latitude() angle.Angle { return s.location.Lat() }
 
 // Height returns the site's height above the reference ellipsoid.
 func (s *Site) Height() unit.Length { return s.location.Height() }
-
-// HeightMeters returns the site's height above the reference ellipsoid in
-// meters.
-//
-// Deprecated: use [Site.Height], which carries its own unit. Kept because the
-// name is correct about what it returns and a caller who wants the number in
-// meters loses nothing; it is the signature that no longer matches the rest of
-// this package.
-func (s *Site) HeightMeters() float64 { return s.location.Height().Meters() }
 
 // Refraction returns a refraction profile adjusted for the site's elevation
 // using the ICAO International Standard Atmosphere barometric formula.

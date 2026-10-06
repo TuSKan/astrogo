@@ -316,7 +316,8 @@ func TestRankObservables(t *testing.T) {
 // TestPlannerRankObservable is a regression test for Planner.RankObservable
 // (the peak-altitude-within-a-window method, distinct from the
 // package-level RankObservables function TestRankObservables already
-// covers): before the fix it returned ErrNotCoordObject for every real
+// covers): before the fix it returned ErrNotCoordObject (a sentinel that
+// no longer exists, removed in #533 once nothing returned it) for every real
 // Observable in this package -- none of Star/Planet/Asteroid/... implement
 // coord.Object directly, only Observable.Position -- so this method was
 // unreachable dead code with zero production callers. A plain *Star must
@@ -338,10 +339,6 @@ func TestPlannerRankObservable(t *testing.T) {
 
 	ranked, err := p.RankObservable(objs, start, end)
 	if err != nil {
-		if errors.Is(err, ErrNotCoordObject) {
-			t.Fatal("RankObservable should never return ErrNotCoordObject for a plain Observable")
-		}
-
 		t.Fatalf("RankObservable: %v", err)
 	}
 

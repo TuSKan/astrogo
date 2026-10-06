@@ -108,7 +108,7 @@ func TestParseMPCObsCodesReadsFieldsWithNoSeparator(t *testing.T) {
 // four to six decimals, and one unit in the last place of a five-decimal
 // constant is 64 m on the ground. Where the two sources disagree by more than
 // that — La Palma's 12″ — they are describing different points, the MPC coding
-// one telescope and KnownSites naming the observatory.
+// one telescope and knownSites naming the observatory.
 func TestParseMPCObsCodesRecoversKnownPositions(t *testing.T) {
 	t.Parallel()
 
@@ -134,9 +134,9 @@ func TestParseMPCObsCodesRecoversKnownPositions(t *testing.T) {
 				t.Fatalf("%s has no recovered position", tc.code)
 			}
 
-			want, ok := KnownSites[tc.known]
+			want, ok := knownSites[tc.known]
 			if !ok {
-				t.Fatalf("KnownSites has no %q; this test's reference is gone", tc.known)
+				t.Fatalf("knownSites has no %q; this test's reference is gone", tc.known)
 			}
 
 			got := obs.Location
@@ -149,7 +149,7 @@ func TestParseMPCObsCodesRecoversKnownPositions(t *testing.T) {
 			dLon := math.Mod(got.Lon().Degrees()-ref.Lon().Degrees()+540, 360) - 180
 
 			if math.Abs(dLon) > tc.lonTolD {
-				t.Errorf("longitude %.5f vs %.5f (KnownSites), differ by %.5f deg > %.5f",
+				t.Errorf("longitude %.5f vs %.5f (knownSites), differ by %.5f deg > %.5f",
 					got.Lon().Degrees(), ref.Lon().Degrees(), dLon, tc.lonTolD)
 			}
 

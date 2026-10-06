@@ -12,8 +12,8 @@ Also retyped: `WithRadialVelocity`, `WithDSORadialVelocity`, `WithDiameter`,
 `RadialVelocity`, `BodyEquatorialRadius`, `TargetDetails.Distance`,
 `ApsisEvent.Distance`, `PassEvent.Range` and `MeteorShower.VelocityKmS` — the
 last renamed to `Velocity`, since the unit is no longer part of the name.
-`Site.Height` is new and returns a `unit.Length`; `Site.HeightMeters` is
-deprecated in its favour.
+`Site.Height` is new and returns a `unit.Length`. It replaces
+`Site.HeightMeters`, which #533 removed.
 
 `TargetDetails` is the one worth reading about. Its `Distance float64` meant
 parsecs for a star, au for a planet and kilometers for a satellite, and the

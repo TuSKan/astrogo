@@ -37,7 +37,7 @@ sites, across three sampling classes.
 - **adversarial** — the same epochs at a synthetic 78°N site, where
   hour-angle-to-azimuth projection is most extreme, and at the equator, where
   targets transit near the zenith and azimuth is ill-conditioned.
-  `plan.KnownSites` cannot supply either: its extremes are Greenwich at 51
+  `plan.NewKnownSite`'s registry cannot supply either: its extremes are Greenwich at 51
   north and Paranal at 25 south.
 
 Each entry carries Horizons' geocentric state and its topocentric answer for

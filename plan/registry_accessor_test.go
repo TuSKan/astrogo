@@ -7,14 +7,11 @@ import (
 	"github.com/TuSKan/astrogo/plan"
 )
 
-// The registries are exported maps, which makes them process-wide mutable
-// state: one package deleting or replacing an entry changes what every other
-// caller in the binary sees. That is a reproducibility and test-isolation
-// problem rather than a race one, and it is why enumeration now goes through
-// a function.
-//
-// The maps stay, deprecated, because this repository's own rule gives a
-// deprecated symbol two minor releases before removal.
+// The registries were exported maps, which made them process-wide mutable
+// state: one package deleting or replacing an entry changed what every other
+// caller in the binary saw. That is a reproducibility and test-isolation
+// problem rather than a race one, and it is why enumeration goes through a
+// function and the maps are unexported (#533).
 func TestKnownSiteNamesEnumeratesEveryEntry(t *testing.T) {
 	t.Parallel()
 

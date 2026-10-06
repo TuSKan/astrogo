@@ -219,14 +219,14 @@ func corpusSites(t *testing.T) []corpusSite {
 			Lon:        loc.Lon().Degrees(),
 			Lat:        loc.Lat().Degrees(),
 			Height:     loc.Height().Meters(),
-			Provenance: "plan.KnownSites; published coordinates cross-checked against the IAU MPC observatory code list",
+			Provenance: "plan.NewKnownSite; published coordinates cross-checked against the IAU MPC observatory code list",
 		})
 	}
 
 	return append(out,
 		corpusSite{
 			Name: "Polar (synthetic, 78N)", Lon: 0, Lat: 78, Height: 0,
-			Provenance: "synthetic; hour-angle-to-azimuth projection is most extreme near the pole, and plan.KnownSites has nothing above 52 degrees",
+			Provenance: "synthetic; hour-angle-to-azimuth projection is most extreme near the pole, and plan.NewKnownSite has nothing above 52 degrees",
 		},
 		corpusSite{
 			Name: "Equator (synthetic, 0N 0E)", Lon: 0, Lat: 0, Height: 0,

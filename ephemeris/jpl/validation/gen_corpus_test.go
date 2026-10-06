@@ -33,9 +33,9 @@ var updateCorpus = flag.Bool("update-corpus", false,
 
 // corpusSites is the observer list, named and with its provenance.
 //
-// The first three come from plan.KnownSites, whose coordinates are published
+// The first three come from plan.NewKnownSite, whose coordinates are published
 // values cross-checked against the IAU Minor Planet Center's observatory
-// codes. The last two are synthetic, and they are here because KnownSites is
+// codes. The last two are synthetic, and they are here because that registry is
 // entirely mid-latitude and tropical: its extremes are Greenwich at 51 north
 // and Paranal at 25 south, so nothing in it exercises the geometry where
 // hour-angle-to-azimuth projection blows up or where a body passes through

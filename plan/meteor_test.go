@@ -12,18 +12,18 @@ import (
 	"github.com/TuSKan/astrogo/unit"
 )
 
-// TestMeteorShowersTableIntegrity guards the fixed MeteorShowers data
+// TestMeteorShowersTableIntegrity guards the fixed meteorShowers data
 // table against copy-paste mistakes, in the same style as
 // TestPlanetaryMoonsTableIntegrity/TestKnownSitesTableIntegrity.
 func TestMeteorShowersTableIntegrity(t *testing.T) {
 	seenName := make(map[string]bool)
 	seenCode := make(map[string]bool)
 
-	if len(MeteorShowers) == 0 {
+	if len(meteorShowers) == 0 {
 		t.Fatal("expected a non-empty starter list of meteor showers")
 	}
 
-	for _, m := range MeteorShowers {
+	for _, m := range meteorShowers {
 		if seenName[m.Name] {
 			t.Errorf("duplicate Name %q", m.Name)
 		}
@@ -110,7 +110,7 @@ func findSolarLongitudeInstant(t *testing.T, target float64, prov eph.Provider, 
 func TestMeteorShower_RadiantAt_AtPeak(t *testing.T) {
 	prov := eph.Default()
 
-	for _, m := range MeteorShowers {
+	for _, m := range meteorShowers {
 		t.Run(m.Name, func(t *testing.T) {
 			peakTime := findSolarLongitudeInstant(t, m.PeakSolarLongitude, prov, 2026)
 

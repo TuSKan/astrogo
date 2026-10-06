@@ -40,7 +40,7 @@ func TestSunLongitudeJ2000MatchesSkyfield(t *testing.T) {
 // 16 and the peak came at 16:52 on August 12, about nine hours early.
 func TestPerseidsFollowIMOsJ2000Longitudes(t *testing.T) {
 	prov := eph.Default()
-	per := MeteorShowers["perseids"]
+	per := meteorShowers["perseids"]
 
 	for _, c := range []struct {
 		at   time.Time

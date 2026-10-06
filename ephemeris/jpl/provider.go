@@ -71,10 +71,10 @@ var kmPerAU = constants.IAU.AstronomicalUnit.Value / 1e3
 // NAIFFor returns the NAIF integer identifier for a body, and whether the
 // body is one this package has a mapping for.
 //
-// It exists so that reading the mapping does not require reaching into an
-// exported map. A caller that assigns to BodyIDToNAIF changes which SPK
-// segment every other caller in the binary resolves to — silently, and with
-// no way for a later reader to see it happened.
+// The table behind it is unexported. If callers could assign to it, one
+// reassignment would change which SPK segment every other caller in the
+// binary resolves to — silently, and with no way for a later reader to see
+// it happened.
 //
 // # The mapping mixes body centers and system barycenters
 //
@@ -94,7 +94,7 @@ var kmPerAU = constants.IAU.AstronomicalUnit.Value / 1e3
 // core.Pluto is deliberately absent: there is no NAIF mapping for it here,
 // so this reports false and a kernel-backed provider cannot serve it.
 func NAIFFor(id core.ID) (int, bool) {
-	naif, ok := BodyIDToNAIF[id]
+	naif, ok := bodyIDToNAIF[id]
 
 	return naif, ok
 }
@@ -102,9 +102,9 @@ func NAIFFor(id core.ID) (int, bool) {
 // NAIFBodies returns every body this package can map to a NAIF identifier,
 // sorted, for a caller enumerating what a kernel might contain.
 func NAIFBodies() []core.ID {
-	out := make([]core.ID, 0, len(BodyIDToNAIF))
+	out := make([]core.ID, 0, len(bodyIDToNAIF))
 
-	for id := range BodyIDToNAIF {
+	for id := range bodyIDToNAIF {
 		out = append(out, id)
 	}
 
@@ -113,12 +113,8 @@ func NAIFBodies() []core.ID {
 	return out
 }
 
-// BodyIDToNAIF maps core.ID to NAIF integer IDs.
-//
-// Deprecated: use [NAIFFor] to look up and [NAIFBodies] to enumerate. An
-// exported map is process-wide mutable state, and one package reassigning an
-// entry changes which segment every other caller resolves to.
-var BodyIDToNAIF = map[core.ID]int{
+// bodyIDToNAIF maps core.ID to NAIF integer IDs; see [NAIFFor].
+var bodyIDToNAIF = map[core.ID]int{
 	core.Sun: 10, core.Moon: 301, core.Mercury: 199, core.Venus: 299,
 	core.Earth: 399, core.Mars: 4, core.Jupiter: 5, core.Saturn: 6,
 	core.Uranus: 7, core.Neptune: 8,
@@ -555,7 +551,7 @@ func (p *Provider) SupportedBodies() []core.ID {
 		bid := core.ID(targetID)
 
 		// Check if it's a known body
-		for b, naif := range BodyIDToNAIF {
+		for b, naif := range bodyIDToNAIF {
 			if int32(naif) == targetID {
 				bid = b
 				break

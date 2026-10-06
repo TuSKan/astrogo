@@ -18,7 +18,7 @@ import (
 	// plan is an orchestration-layer package; ephemeris/jpl/validation sits
 	// below it in CLAUDE.md's architecture diagram. This import is
 	// test-only (this file ships no production code) and used purely for
-	// plan.KnownSites/NewSite's convenience — no production file under
+	// plan.NewKnownSite/NewSite's convenience — no production file under
 	// ephemeris/ imports plan, so the layering rule ("lower layers never
 	// import higher ones") is about production imports, not test fixtures,
 	// and isn't actually violated here.
@@ -242,7 +242,7 @@ func TestObserverPrecisionMatrix(t *testing.T) {
 		t.Fatalf("Mauna Kea: %v", err)
 	}
 
-	// No KnownSites entry exists at high latitude — hour-angle-to-azimuth
+	// No known site exists at high latitude — hour-angle-to-azimuth
 	// projection is most extreme there, making it a useful probe for the
 	// crossTrack hypothesis independent of the three real observatories.
 	polarLoc, err := coord.NewGeodetic(angle.Zero(), angle.Deg(78.0), 0)
