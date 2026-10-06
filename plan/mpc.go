@@ -114,7 +114,7 @@ var mpcCache struct {
 //
 // The list — about 200 KB — is fetched on the first call that needs it, using
 // that caller's context, and kept for the life of the process. It is a
-// [remote.Downloadable] endpoint, so a caller must have granted
+// [remote.Endpoint.Downloadable] endpoint, so a caller must have granted
 // [remote.EnableDownloads] for [remote.MPCObsCodes] first; without it the error
 // is [remote.ErrDownloadDenied] and says which call grants it.
 //

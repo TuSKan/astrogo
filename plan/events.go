@@ -721,8 +721,9 @@ type Event struct {
 	Kind EventKind
 
 	// Altitude is the refracted altitude — what an observer would see — at
-	// every event kind. It agrees with [IsObservable] and [GetDetails] for the
-	// same instant, so altitudes may be compared across event kinds.
+	// every event kind. It agrees with [IsObservable] and
+	// [Observable.GetDetails] for the same instant, so altitudes may be
+	// compared across event kinds.
 	//
 	// It was geometric at rise and set and refracted at transit until #156,
 	// with nothing in the type saying so, which made a rise altitude and a

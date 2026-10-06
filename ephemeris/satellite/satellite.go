@@ -131,8 +131,9 @@ func (s *Satellite) Propagator() *sgp4.Propagator { return s.prop }
 // id returns [ErrUnexpectedID] rather than silently answering for the wrong
 // body.
 //
-// The conversion pipeline: TEME (km) → GCRS (AU) via the IAU 2006
-// Earth rotation matrix (C2T06A).
+// The conversion pipeline: TEME (km) → true equator and equinox of date by
+// the equation of the equinoxes → GCRS (AU) by the transpose of the IAU
+// 2006/2000A bias-precession-nutation matrix (Pnm06a).
 func (s *Satellite) State(id core.ID, t time.Time) (core.State, error) {
 	if id != 0 {
 		return core.State{}, fmt.Errorf("%w: %d", ErrUnexpectedID, id)

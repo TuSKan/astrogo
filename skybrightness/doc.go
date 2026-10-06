@@ -35,8 +35,9 @@
 // and magnitude systems live in [magnitude]. Instrument throughput and
 // detector rates live in [optics]. Spectral quantity types and the shared
 // wavelength axis live in [unit]. Geometry, ephemerides and time scales
-// come from [coord], [ephemeris] and [time]. A capability that belongs to
-// one of those packages is added there, not duplicated here.
+// come from [coord], [github.com/TuSKan/astrogo/ephemeris] and [time]. A
+// capability that belongs to one of those packages is added there, not
+// duplicated here.
 //
 // # Getting a number
 //

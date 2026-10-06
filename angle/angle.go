@@ -58,13 +58,13 @@ func (a Angle) Degrees() float64 { return float64(a) * rad2deg }
 // Arcminutes returns the angle in arcminutes.
 func (a Angle) Arcminutes() float64 { return float64(a) * rad2arcmin }
 
-// Arcmin is an alias for [Arcminutes].
+// Arcmin is an alias for [Angle.Arcminutes].
 func (a Angle) Arcmin() float64 { return a.Arcminutes() }
 
 // Arcseconds returns the angle in arcseconds.
 func (a Angle) Arcseconds() float64 { return float64(a) * rad2arcsec }
 
-// Arcsec is an alias for [Arcseconds].
+// Arcsec is an alias for [Angle.Arcseconds].
 func (a Angle) Arcsec() float64 { return a.Arcseconds() }
 
 // Hours returns the angle in hours (1 hour = 15 degrees).
@@ -137,11 +137,11 @@ func (a Angle) WrapPi() Angle {
 }
 
 // Wrap360 returns an equivalent angle in [0°, 360°).
-// It is an alias for [Wrap2Pi] with degree-friendly naming.
+// It is an alias for [Angle.Wrap2Pi] with degree-friendly naming.
 func (a Angle) Wrap360() Angle { return a.Wrap2Pi() }
 
 // Wrap180 returns an equivalent angle in (-180°, 180°].
-// It is an alias for [WrapPi] with degree-friendly naming.
+// It is an alias for [Angle.WrapPi] with degree-friendly naming.
 func (a Angle) Wrap180() Angle { return a.WrapPi() }
 
 // ── Arithmetic ────────────────────────────────────────────────────────────────

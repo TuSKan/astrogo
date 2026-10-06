@@ -284,8 +284,9 @@ var (
 	// their "I do not do name resolution" was indistinguishable from "that
 	// object does not exist". A Resolver could therefore report a real object
 	// as absent because the only provider asked was one that never answers
-	// names. [Provider.Capabilities] describes the same fact ahead of time;
-	// this reports it at the call.
+	// names. The Capabilities method of [ObjectResolver], [ConeSearcher] and
+	// [BrightObjectSearcher] describes the same fact ahead of time; this
+	// reports it at the call.
 	ErrUnsupported = errors.New("operation not supported by this provider")
 )
 

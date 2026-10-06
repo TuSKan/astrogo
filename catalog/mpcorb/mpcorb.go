@@ -61,7 +61,7 @@ import (
 // name is the file under the MPC's MPCORB directory — "MPCORB.DAT",
 // "NEA.txt", "Distant.txt", "PHA.txt", "Unusual.txt", or "CometEls.txt" for
 // the comets. It is
-// [remote.Downloadable], so the caller must have granted
+// [remote.Endpoint.Downloadable], so the caller must have granted
 // [remote.EnableDownloads] for [remote.MPCORB]; because the sizes span two
 // orders of magnitude the endpoint declares [remote.SizeVaries], which means
 // the grant's own byte budget is what decides.

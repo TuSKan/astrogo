@@ -3,7 +3,7 @@
 //
 // # Design
 //
-// A [Quantity] is a pair of a numerical value and a [units.Unit].
+// A [Quantity] is a pair of a numerical value and a [Unit].
 //
 // This package is for general-purpose scientific calculations where explicit
 // unit handling and dimension-safety are required.

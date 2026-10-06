@@ -34,7 +34,7 @@ import (
 //     in FK4 has a real proper motion in FK5, and one with a measured FK4
 //     proper motion needs that fictitious component subtracted.
 //
-// The third is why [FK4.ToICRS] refuses to guess. See [NewFK4] and
+// The third is why [FK4ToICRS] refuses to guess. See [NewFK4] and
 // [NewFK4WithProperMotion].
 type FK4 struct {
 	ra, dec         angle.Angle

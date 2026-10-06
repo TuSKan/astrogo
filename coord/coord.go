@@ -199,9 +199,10 @@ func (c ICRS) Dec() angle.Angle { return c.dec }
 //
 // Zero is still ambiguous, and deliberately so — it means "not set" and it
 // means "at the observer", and the type cannot tell them apart. Anything that
-// must know carries its own flag, the way [ICRS.ProperMotion] does; anything
-// that must not guess takes the distance as its own parameter, the way
-// [GalactocentricFrame.FromICRS] does.
+// must know carries its own flag, the way kinematics do: [NewICRSWithKinematics]
+// records them even when they are zero. Anything that must not guess takes
+// the distance as its own parameter, the way [GalactocentricFrame.FromICRS]
+// does.
 func (c ICRS) Dist() unit.Length { return c.dist }
 
 // PmRA returns the proper motion in right ascension — μα* = dRA/dt · cos(dec),
