@@ -58,20 +58,33 @@ func SkipOnDegradedService(tb testing.TB, err error, control func() error) {
 }
 
 // TAPControl returns a control for [SkipOnDegradedService] against a TAP
-// service: a synchronous query for one row of from, verbatim as the FROM
-// clause (a delimited VizieR table name keeps its quotes).
+// service: a synchronous query for column from one row of from, both verbatim
+// (a delimited VizieR table name keeps its quotes). column must be one the
+// table has carried for as long as anyone has queried it — HIP in
+// I/239/hip_main, source_id in gaiadr3.gaia_source — so the control cannot be
+// wrong.
+//
+// # Why it names a column
+//
+// It used to send SELECT TOP 1 *, which names none. VizieR's degraded answer
+// is "unresolved identifiers": a failure to resolve the names in a query. A
+// query with no names gave it nothing to fail on, and on 2026-10-06 the
+// control passed while the bright-star query was refused as unresolved — a
+// query that returned rows minutes later — so the test failed instead of
+// skipping (#520). Naming a column is what makes the control exercise the
+// failure it is there to detect.
 //
 // It is a plain net/http request rather than one through astrogo's remote
 // client, on purpose. A control sharing the request-building path would fail
 // alongside the request under test when that path is what broke, and the
 // helper would then skip the very defect the test exists to catch.
-func TAPControl(ctx context.Context, syncURL, from string) func() error {
+func TAPControl(ctx context.Context, syncURL, from, column string) func() error {
 	return func() error {
 		form := url.Values{
 			"REQUEST": {"doQuery"},
 			"LANG":    {"ADQL"},
 			"FORMAT":  {"csv"},
-			"QUERY":   {"SELECT TOP 1 * FROM " + from},
+			"QUERY":   {"SELECT TOP 1 " + column + " FROM " + from},
 		}
 
 		req, err := http.NewRequestWithContext(ctx, http.MethodPost, syncURL, strings.NewReader(form.Encode()))

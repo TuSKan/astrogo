@@ -292,18 +292,19 @@ func brightStarServicesControl(t *testing.T) func() error {
 	controls := make([]func() error, 0, 2)
 
 	for _, svc := range []struct {
-		id   remote.EndpointID
-		from string
+		id     remote.EndpointID
+		from   string
+		column string
 	}{
-		{remote.VizieR, `"I/239/hip_main"`},
-		{remote.GaiaTAP, "gaiadr3.gaia_source"},
+		{remote.VizieR, `"I/239/hip_main"`, "HIP"},
+		{remote.GaiaTAP, "gaiadr3.gaia_source", "source_id"},
 	} {
 		syncURL, err := remote.URL(svc.id)
 		if err != nil {
 			t.Fatalf("%s endpoint: %v", svc.id, err)
 		}
 
-		controls = append(controls, testutil.TAPControl(ctx, syncURL, svc.from))
+		controls = append(controls, testutil.TAPControl(ctx, syncURL, svc.from, svc.column))
 	}
 
 	return func() error {
