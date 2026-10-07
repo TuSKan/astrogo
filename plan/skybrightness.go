@@ -1,6 +1,7 @@
 package plan
 
 import (
+	"errors"
 	"fmt"
 	"math"
 
@@ -73,6 +74,9 @@ type LimitingMagnitudeConstraint struct {
 	// [StaticMagnitude]. A target with neither imposes no requirement and
 	// always passes, which is deliberate: a constraint that rejected
 	// everything it could not measure would silently empty a target list.
+	// A satellite in Earth's shadow is the opposite case, measured and
+	// dark: it needs an infinitely deep sky, so a hard cutoff rejects it
+	// and its score is zero.
 	Required func(obj Observable) (float64, bool)
 
 	// Ramp is the soft-ramp half-width in magnitudes. Zero means 0.5.
@@ -119,6 +123,10 @@ func (c LimitingMagnitudeConstraint) CheckCtx(
 
 	if margin >= 0 {
 		return Result{Pass: true, Value: margin}, nil
+	}
+
+	if math.IsInf(required, 1) {
+		return Result{Pass: false, Value: margin, Reason: "the target sends no light to detect"}, nil
 	}
 
 	return Result{
@@ -212,8 +220,15 @@ func (c LimitingMagnitudeConstraint) requiredFor(obj Observable, ctx *coord.Cont
 	// The time-varying magnitude first, since a planet's brightness is not a
 	// catalog constant and using one would be wrong by magnitudes.
 	if mc, ok := obj.(MagnitudeComputer); ok {
-		if m, err := mc.ApparentMagnitudeCtx(ctx.Time(), ctx); err == nil {
+		m, err := mc.ApparentMagnitudeCtx(ctx.Time(), ctx)
+		if err == nil {
 			return m
+		}
+
+		// A satellite in Earth's shadow is not a target without photometry:
+		// it sends no light at all, and no sky is deep enough to see it.
+		if errors.Is(err, ErrSatelliteEclipsed) {
+			return math.Inf(1)
 		}
 	}
 

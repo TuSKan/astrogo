@@ -95,6 +95,11 @@ var (
 	// otherwise divide by zero.
 	ErrZeroDistance = errors.New("plan: distance is zero or negative")
 
+	// ErrSatelliteEclipsed indicates Satellite.ApparentMagnitudeCtx was
+	// asked for the magnitude of a satellite in Earth's shadow, which
+	// reflects no sunlight and so has none.
+	ErrSatelliteEclipsed = errors.New("plan: satellite is in Earth's shadow")
+
 	// ErrUnknownMeteorShower indicates NewMeteorShower found no entry
 	// matching the requested name (checked against every shower's Name and
 	// Code, case- and space-insensitive — see MeteorShowerNames).
