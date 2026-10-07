@@ -406,9 +406,9 @@ func TestCometNuclearApparent(t *testing.T) {
 
 func TestSatelliteApparent_RangeScaling(t *testing.T) {
 	stdMag := 2.0
-	alpha := angle.Deg(90)
+	alpha := angle.Deg(0)
 
-	// At reference range (1000 km) and reference phase (90°): should equal stdMag.
+	// At the McCants reference geometry, 1000 km and full phase: stdMag.
 	m1000 := magnitude.SatelliteApparent(stdMag, magnitude.ConventionMcCants, unit.Km(1000), alpha, magnitude.PhaseSphere)
 	assertNear(t, "sat 1000 km", m1000, stdMag, 0.01)
 
@@ -447,24 +447,58 @@ func TestSatelliteApparent_CylinderVsSphere(t *testing.T) {
 	t.Logf("Sphere=%.3f, Cylinder=%.3f", mSphere, mCyl)
 }
 
-func TestSatelliteApparent_MolczanConvention(t *testing.T) {
-	stdMag := 3.0
-	observerRange := unit.Km(1000)
-	alpha := angle.Deg(90)
+// TestSatelliteStandardMagnitudeReproducesItself is #560's definitional
+// check: a standard magnitude is the brightness at the convention's own
+// reference geometry, so at 1000 km and the convention's reference phase —
+// full phase for McCants, 90° for Molczan, per
+// https://www.mmccants.org/tles/intrmagdef.html — SatelliteApparent must
+// return it unchanged, whatever the shape model.
+//
+// It replaces a test that held a McCants magnitude to 90°, which is the
+// Molczan reference: under it a McCants satellite came out 0.75 mag (sphere)
+// or 1.24 mag (cylinder) too bright, and a Molczan one 1.45 mag.
+func TestSatelliteStandardMagnitudeReproducesItself(t *testing.T) {
+	t.Parallel()
 
-	mMcCants := magnitude.SatelliteApparent(stdMag, magnitude.ConventionMcCants, observerRange, alpha, magnitude.PhaseSphere)
-	mMolczan := magnitude.SatelliteApparent(stdMag, magnitude.ConventionMolczan, observerRange, alpha, magnitude.PhaseSphere)
+	for _, shape := range []magnitude.SatPhaseModel{magnitude.PhaseSphere, magnitude.PhaseCylinder} {
+		for _, c := range []struct {
+			name  string
+			conv  magnitude.StdMagConvention
+			alpha angle.Angle
+		}{
+			{"McCants at full phase", magnitude.ConventionMcCants, angle.Zero()},
+			{"Molczan at 90°", magnitude.ConventionMolczan, angle.Deg(90)},
+		} {
+			got := magnitude.SatelliteApparent(3.0, c.conv, unit.Km(1000), c.alpha, shape)
+			assertNear(t, c.name, got, 3.0, 1e-12)
+		}
+	}
+}
 
-	// The Molczan and McCants standard-magnitude conventions differ by ~1.4 mag
-	// in total (mmccants.org/tles/intrmagdef.html): ~0.75 mag from the
-	// illumination/phase convention (50% vs full phase) plus ~0.7 mag from the
-	// mean vs. maximum brightness definition. For the same stdMag input, the
-	// Molczan result is therefore brighter (lower mag) by that full offset.
-	expectedOffset := 1.45 // 2.5·log₁₀(2) + 0.7, matches molczanOffset
-	actualOffset := mMcCants - mMolczan
+// TestSatelliteMolczanPredictsFainterForTheSameObject is the other half of
+// the page's prescription: the same satellite carries a Molczan magnitude
+// about 1.4 mag fainter than its McCants one, half of that from the phase
+// definition and half from "average" against "brightest likely" orientation,
+// and "a program should always generate a prediction that is about 0.7
+// magnitudes fainter using Ted's intrinsic magnitude". With the sphere model
+// the phase half is 2.5·log₁₀2 ≈ 0.75, so the predictions differ by
+// 1.4 − 0.75 ≈ 0.65 mag at every geometry.
+func TestSatelliteMolczanPredictsFainterForTheSameObject(t *testing.T) {
+	t.Parallel()
 
-	assertNear(t, "Molczan offset", actualOffset, expectedOffset, 0.001)
-	t.Logf("McCants=%.3f, Molczan=%.3f, Δ=%.4f (expected %.4f)", mMcCants, mMolczan, actualOffset, expectedOffset)
+	const mcCants, molczan = 1.0, 2.4
+
+	for _, rangeKm := range []float64{400, 1000, 2500} {
+		for _, deg := range []float64{10, 60, 90, 140} {
+			r, a := unit.Km(rangeKm), angle.Deg(deg)
+
+			q := magnitude.SatelliteApparent(mcCants, magnitude.ConventionMcCants, r, a, magnitude.PhaseSphere)
+			m := magnitude.SatelliteApparent(molczan, magnitude.ConventionMolczan, r, a, magnitude.PhaseSphere)
+
+			want := 1.4 - 2.5*math.Log10(2)
+			assertNear(t, "Molczan − McCants prediction", m-q, want, 1e-12)
+		}
+	}
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
