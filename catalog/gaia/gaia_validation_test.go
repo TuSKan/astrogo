@@ -81,11 +81,11 @@ func TestArchivesAgree(t *testing.T) {
 			// A front end that accepts the connection and then stops
 			// answering is downtime, not wrong data. ESA's did this
 			// routinely, which is most of why it is no longer the default.
-			var netErr net.Error
-			if errors.Is(iterErr, context.DeadlineExceeded) ||
-				(errors.As(iterErr, &netErr) && netErr.Timeout()) {
-				t.Skipf("%s accepted the connection but did not answer: %v", id, iterErr)
-			}
+			// So is one that answers with its own timeout: ESA's has also
+			// replied to every query with a 408 and "Job timeout/aborted"
+			// (#595). The shared classifier knows both, and every other
+			// outage this repository has met.
+			testutil.SkipOnUpstreamFailure(t, iterErr)
 
 			// And an archive that answers with its own error page is the same
 			// condition wearing different clothes: a 200 carrying HTML, which
