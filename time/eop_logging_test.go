@@ -35,7 +35,7 @@ func TestEOPWarningIsAWarningNotProgress(t *testing.T) {
 
 	// Called directly rather than through warnEOPUnavailable, whose sync.Once
 	// would be spent by whichever test ran first.
-	logEOPUnavailable(58849.0)
+	logEOPUnavailable(58849.0, errNothingLoaded)
 
 	out := buf.String()
 
@@ -55,6 +55,8 @@ func TestEOPWarningIsAWarningNotProgress(t *testing.T) {
 	for _, want := range []string{
 		`msg="EOP unavailable, using zero DUT1 and polar motion"`,
 		"mjd=58849",
+		// Which step failed, so a caller can tell the remedies apart (#518).
+		`cause="time: no EOP bulletin loaded"`,
 		"topocentric_error=",
 		"remedy=",
 		// The remedy has to name the import: without remote/eop no loader is

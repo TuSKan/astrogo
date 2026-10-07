@@ -1,6 +1,7 @@
 package time
 
 import (
+	"errors"
 	"io"
 	"sync"
 
@@ -131,11 +132,11 @@ func SetRetryCooldown(d Duration) { iers.SetRetryCooldown(d) }
 var warnEOPUnavailableOnce sync.Once
 
 // warnEOPUnavailable logs, once per process, that no real EOP data could
-// be found for mjd — shared by Time.EOP() and the UT1<->UTC conversion's
-// silent-degrade path (Time.UT1() itself still propagates the error
-// instead of calling this).
-func warnEOPUnavailable(mjd float64) {
-	warnEOPUnavailableOnce.Do(func() { logEOPUnavailable(mjd) })
+// be found for mjd, and why: cause is the lookup's or the lazy load's error.
+// Shared by every path that degrades to zero EOP: Time.EOP, the UT1<->UTC
+// conversion, and Time.UT1 when nothing was loaded.
+func warnEOPUnavailable(mjd float64, cause error) {
+	warnEOPUnavailableOnce.Do(func() { logEOPUnavailable(mjd, cause) })
 }
 
 // logEOPUnavailable writes the warning, separately from the [sync.Once] that
@@ -145,7 +146,7 @@ func warnEOPUnavailable(mjd float64) {
 // fires exactly once per process, and whichever test happened to run first
 // would spend it — so a test asserting the warning reaches an installed logger
 // would pass or fail on test ordering rather than on the code.
-func logEOPUnavailable(mjd float64) {
+func logEOPUnavailable(mjd float64, cause error) {
 	// Warn, not Info, and so still emitted by the default logger: this is the
 	// only notice a caller gets that the numbers changed. Time.EOP has no
 	// error return, and the UT1<->UTC degrade path has already decided not to
@@ -166,12 +167,23 @@ func logEOPUnavailable(mjd float64) {
 	// 1-minute tolerance would mean an adjustment roughly once a century, so
 	// the degradation this warning describes gets slowly and permanently worse
 	// from 2035 rather than staying at 0.9 s. See #147.
+	//
+	// The cause says which step failed: no loader registered, no cached
+	// bulletin and no consent to fetch one, or a bulletin that does not reach
+	// this epoch. It is what lets a caller tell the remedy apart from the rest.
+	causeText := "unknown"
+	if cause != nil {
+		causeText = cause.Error()
+	}
+
 	logging.Warn("EOP unavailable, using zero DUT1 and polar motion",
 		"mjd", mjd,
+		"cause", causeText,
 		"topocentric_error", "~1 arcsec",
 		"ut1_error", "~0.9 s until leap seconds end in 2035, unbounded after",
 		"remedy", `import _ "github.com/TuSKan/astrogo/remote/eop", then `+
-			"remote.EnableDownloads(0, remote.IERSFinals2000A) or pre-seed finals2000A.data")
+			"remote.EnableDownloads(0, remote.IERSFinals2000A) or pre-seed finals2000A.data, "+
+			"or RegisterModel(ZeroModel{}) to choose zero EOP deliberately")
 }
 
 // lookupEOP is the single place that attempts an automatic lazy load
@@ -179,15 +191,42 @@ func logEOPUnavailable(mjd float64) {
 // already covers mjd, then (if not) a pre-seeded on-disk cache file, then
 // (if download consent was granted) a network fetch — see
 // iers.EnsureLoaded. It never logs; callers decide whether to
-// warn-and-degrade (Time.EOP, the UT1<->UTC conversion) or propagate the
-// error (Time.UT1).
+// warn-and-degrade or propagate.
+//
+// It reports two failures separately, because they are not the same:
+//
+//   - err: the registered model could not answer for mjd, which only a
+//     loaded bulletin that does not reach the epoch does. Time.UT1
+//     propagates this one.
+//   - defaulted: the answer is the untouched zero default, because nothing
+//     was loaded and nothing was chosen; it carries the lazy load's error.
+//     The zero model answers every epoch without error, so before #518 this
+//     case looked like success and no caller warned. A caller that registers
+//     ZeroModel deliberately is not defaulted: its source is "explicit".
 //
 //nolint:wrapcheck // pure delegation to the unexported time/internal/iers, not a true external dependency
-func lookupEOP(mjd float64) (EOP, error) {
-	_ = iers.EnsureLoaded(mjd) // best-effort; the lookup below is authoritative
+func lookupEOP(mjd float64) (eop EOP, defaulted, err error) {
+	loadErr := iers.EnsureLoaded(mjd)
 
-	return iers.GetModel().EOP(mjd)
+	eop, err = iers.GetModel().EOP(mjd)
+	if err != nil {
+		return eop, nil, err
+	}
+
+	if iers.EOPSource() == iers.SourceZero {
+		if loadErr == nil {
+			loadErr = errNothingLoaded
+		}
+
+		return eop, loadErr, nil
+	}
+
+	return eop, nil, nil
 }
+
+// errNothingLoaded is the cause given when the zero default answered and the
+// lazy load reported no error of its own.
+var errNothingLoaded = errors.New("time: no EOP bulletin loaded")
 
 // EOP returns Earth Orientation Parameters for t's epoch, first attempting
 // an automatic lazy load if the registered model doesn't cover it (see
@@ -196,12 +235,21 @@ func lookupEOP(mjd float64) (EOP, error) {
 // same fallback contract UT1<->UTC conversion uses internally. Never
 // returns an error, for callers (like coord.NewContext) that can't
 // themselves propagate a lookup failure.
+//
+// "Doesn't help" includes nothing having been loaded at all, the case of a
+// program that never imported remote/eop: until #518 that one answered zeros
+// without the warning. RegisterModel(ZeroModel{}) chooses zero EOP
+// deliberately and stays silent.
 func (t Time) EOP() EOP {
 	mjd := t.MJD()
 
-	eop, err := lookupEOP(mjd)
-	if err != nil {
-		warnEOPUnavailable(mjd)
+	eop, defaulted, err := lookupEOP(mjd)
+
+	switch {
+	case err != nil:
+		warnEOPUnavailable(mjd, err)
+	case defaulted != nil:
+		warnEOPUnavailable(mjd, defaulted)
 	}
 
 	return eop
