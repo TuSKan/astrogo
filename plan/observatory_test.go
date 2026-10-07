@@ -588,9 +588,10 @@ func TestSiteHorizonDipIsTheApparentDip(t *testing.T) {
 			t.Errorf("geometric dip at %.0f m = %.4f°, want %.3f°", c.height, geometric, c.geometric)
 		}
 
-		if got := site.RiseSetThreshold().Degrees(); got != -site.HorizonDip().Degrees() {
-			t.Errorf("RiseSetThreshold at %.0f m = %.4f°, want the dip alone, %.4f°",
-				c.height, got, -site.HorizonDip().Degrees())
+		// The almanac horizon a star rises on: 34′ of refraction plus the
+		// dip (#568).
+		if got, want := site.RiseSetThreshold().Degrees(), -0.5667-site.HorizonDip().Degrees(); math.Abs(got-want) > 1e-12 {
+			t.Errorf("RiseSetThreshold at %.0f m = %.4f°, want 34′ plus the dip, %.4f°", c.height, got, want)
 		}
 	}
 }

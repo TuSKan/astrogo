@@ -10,20 +10,21 @@ import (
 )
 
 // TestEpisodeJustAfterASetIsTheNextOne is #422's case: at Barcelona the Moon
-// set at 18:59:49 UTC on 2026-07-13 and is 0.027° down at 19:00, so the
-// episode for a window starting then is the next one, from the rise at
-// 04:12:15 to the set at 19:46:53 on the 14th — Skyfield 1.54's instants for
-// the geometric centre crossing 0° (DE421), which these come within half a
-// second of. Episode's probe measured a refracted altitude against the
-// geometric threshold, called the Moon up, and returned the episode that had
-// ended 11 s before.
+// sets at 19:03:41 UTC on 2026-07-13, so the episode for a window starting
+// at 19:04 is the next one, from the rise at 04:08:23 to the set at 19:50:30
+// on the 14th. Those are Skyfield 1.55's instants (DE440s) for the Moon's
+// apparent centre crossing the almanac horizon a generic target rises on,
+// −0.5667° (#568); before #568 the threshold was 0° and the instants
+// 18:59:49, 04:12:15 and 19:46:53. Episode's probe once measured a refracted
+// altitude against the geometric threshold, called the Moon up, and returned
+// the episode that had ended seconds before.
 func TestEpisodeJustAfterASetIsTheNextOne(t *testing.T) {
 	site, err := NewSiteEarthLocation("Barcelona", 41.39, 2.17, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	from := time.Date(2026, 7, 13, 19, 0, 0, 0, time.LocationUTC)
+	from := time.Date(2026, 7, 13, 19, 4, 0, 0, time.LocationUTC)
 
 	rise, set, err := Episode(from, from.Add(unit.Hours(10)), NewMoon(eph.Default()), site)
 	if err != nil {
@@ -38,8 +39,8 @@ func TestEpisodeJustAfterASetIsTheNextOne(t *testing.T) {
 		what      string
 		got, want time.Time
 	}{
-		{"rise", rise.Time, time.Date(2026, 7, 14, 4, 12, 15, 0, time.LocationUTC)},
-		{"set", set.Time, time.Date(2026, 7, 14, 19, 46, 53, 0, time.LocationUTC)},
+		{"rise", rise.Time, time.Date(2026, 7, 14, 4, 8, 23, 453e6, time.LocationUTC)},
+		{"set", set.Time, time.Date(2026, 7, 14, 19, 50, 30, 236e6, time.LocationUTC)},
 	} {
 		if d := c.got.Sub(c.want).Abs(); d > unit.Seconds(2) {
 			t.Errorf("%s %v, Skyfield gives %v (off by %v)", c.what, c.got, c.want, d)

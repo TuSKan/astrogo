@@ -845,8 +845,8 @@ type TwilightEvent struct {
 // SunRiseSetThreshold and MoonRiseSetThreshold are each the conventional sum
 // of a standard refraction of 34', the body's semi-diameter, and the horizon
 // dip for the site's elevation, 1.76'√h, which includes terrestrial
-// refraction. RiseSetThreshold, for any other target, is the dip alone. The
-// 34' is a fixed convention, not a SOFA computation -- USNO and the Astronomical
+// refraction. RiseSetThreshold, for any other target, is the same without a
+// semi-diameter. The 34' is a fixed convention, not a SOFA computation -- USNO and the Astronomical
 // Almanac define rise and set the same way, so that two implementations agree on
 // an instant that is otherwise sensitive to the air on the night. SOFA's
 // rigorous refraction is used where refraction is being modeled rather than
@@ -1197,8 +1197,8 @@ func FullMoonOppositions(start, end time.Time, provider eph.Provider) ([]Event, 
 }
 
 // VisibilityEvents returns all rise, transit, and set events for a target at the given site.
-// The rise/set threshold is the site's dipped horizon alone, from its elevation; no
-// atmospheric refraction is added. See [Site.RiseSetThreshold].
+// The rise/set threshold is the almanac horizon for a point source: 34' of standard
+// refraction plus the dip from the site's elevation. See [Site.RiseSetThreshold].
 func VisibilityEvents(start, end time.Time, target Observable, site *Site) ([]Event, error) {
 	solver := NewEventSolver(unit.Minutes(15), unit.Seconds(1))
 	spec := EventSpec{

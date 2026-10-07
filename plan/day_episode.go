@@ -37,12 +37,12 @@ const initialSearchStepDays = 2.0
 const maxEpisodeSearchSteps = 10
 
 // dayEventsThreshold and dayEventsSpec are shared by DayEvents and Episode:
-// both answer "when does this arbitrary Observable cross the site's true,
-// elevation-corrected horizon" — the same convention plan.RiseSetThreshold
-// documents and the generic-target rise/set solver at events.go already
-// uses. Neither adds atmospheric refraction the way SunEvents/MoonEvents
-// do for their specific bodies; a caller wanting that runs its own solver
-// with site.SunRiseSetThreshold()/MoonRiseSetThreshold() instead.
+// both answer "when does this arbitrary Observable rise and set", on the
+// almanac horizon plan.RiseSetThreshold documents, the one VisibilityEvents
+// uses: 34′ of refraction plus the site's dip. Neither adds a semi-diameter
+// the way SunEvents/MoonEvents do for their specific bodies; a caller
+// wanting that runs its own solver with site.SunRiseSetThreshold() or
+// MoonRiseSetThreshold() instead.
 func visibilityEvents(target Observable, site *Site, start, end time.Time) ([]Event, error) {
 	return NewEventSolver(unit.Minutes(15), unit.Seconds(1)).Find(EventSpec{
 		Family:    EventFamilyVisibility,
@@ -256,10 +256,13 @@ func Episode(from, to time.Time, target Observable, site *Site) (rise, set *Even
 // them and skips its search.
 //
 // One degree, chosen to clear every effect the closed form does not model. It
-// is pure spherical geometry from declination and latitude: no atmospheric
-// refraction (~34' at the horizon), no parallax, no proper motion over the
-// window. A target within that margin of the threshold is one where those
-// terms could decide the answer, so it goes to the search as before.
+// is pure spherical geometry from the catalog declination and the latitude,
+// against the same threshold the search uses, refraction included. What it
+// leaves out is the gap between that declination and the apparent one the
+// search sees: precession since J2000, nutation, aberration, proper motion
+// over the window, a few tenths of a degree at most. A target within the
+// margin of the threshold is one where those could decide the answer, so it
+// goes to the search as before.
 //
 // The margin is what makes this an optimisation rather than a second, cruder
 // implementation of the same question. A target one degree clear is not a

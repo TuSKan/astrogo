@@ -470,16 +470,31 @@ func (s *Site) HorizonDip() angle.Angle {
 	return atmosphere.HorizonDip(s.location.Height())
 }
 
+// standardRefraction is the conventional refraction at the horizon, 34′,
+// that USNO and the Astronomical Almanac fold into every rise and set
+// threshold, in degrees. It is a fixed convention, not the refraction of the
+// air on the night: two almanacs agree on a rise only because both use it.
+const standardRefraction = 0.5667
+
 // RiseSetThreshold returns the rise/set altitude threshold for a point
-// source (star) at this site: the horizon dip from the site's elevation,
-// and nothing else. Unlike [Site.SunRiseSetThreshold] it adds no
-// atmospheric refraction, and the rise/set solver compares it with the
-// geometric altitude, so a point source rises when its geometric center
-// reaches the dipped horizon.
+// source (star) at this site:
 //
-// At sea level: 0°. At 786m: −0.82° (the depressed horizon).
+//	alt = −(standard refraction + horizon dip)
+//
+// the rule [Site.SunRiseSetThreshold] follows, without a semi-diameter. The
+// rise/set solver compares it with the geometric altitude, so a point source
+// rises when its center is 34′ plus the dip below the geometric horizon:
+// when, by convention, refraction lifts it onto the visible one. USNO's
+// rise/set definitions and Skyfield's find_risings put a star's horizon at
+// the same −34′.
+//
+// At sea level: −0.5667°. At 786 m: −1.389°.
+//
+// Until #568 it was the dip alone, with no refraction, so a star rose 2.4
+// to 7 minutes after the almanacs' rise at the latitudes tested there, and
+// set as much before theirs.
 func (s *Site) RiseSetThreshold() angle.Angle {
-	return angle.Deg(-s.HorizonDip().Degrees())
+	return angle.Deg(-standardRefraction - s.HorizonDip().Degrees())
 }
 
 // SunRiseSetThreshold returns the sunrise/sunset altitude threshold.
@@ -497,8 +512,6 @@ func (s *Site) RiseSetThreshold() angle.Angle {
 func (s *Site) SunRiseSetThreshold() angle.Angle {
 	const sunSemiDiameter = 0.2667 // degrees, ~16 arcmin
 
-	const standardRefraction = 0.5667 // degrees, ~34 arcmin
-
 	return angle.Deg(-sunSemiDiameter - standardRefraction - s.HorizonDip().Degrees())
 }
 
@@ -512,8 +525,6 @@ func (s *Site) SunRiseSetThreshold() angle.Angle {
 // by the topocentric correction in GeocentricToObserved).
 func (s *Site) MoonRiseSetThreshold() angle.Angle {
 	const moonSemiDiameter = 0.2583 // degrees, ~15.5 arcmin (mean)
-
-	const standardRefraction = 0.5667 // degrees, ~34 arcmin
 
 	return angle.Deg(-moonSemiDiameter - standardRefraction - s.HorizonDip().Degrees())
 }

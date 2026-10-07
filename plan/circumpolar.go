@@ -6,39 +6,21 @@ import (
 	"github.com/TuSKan/astrogo/angle"
 )
 
-// standardRefractionCircumpolar is the same ~34' standard atmospheric
-// refraction at the horizon Site.SunRiseSetThreshold/MoonRiseSetThreshold
-// already use — kept as its own named constant here (rather than reusing
-// theirs) since neither of those methods exposes the bare number.
-const standardRefractionCircumpolar = 0.5667 // degrees
-
 // circumpolarConfig holds IsCircumpolar/IsNeverUp's options.
 type circumpolarConfig struct {
 	threshold    angle.Angle
 	hasThreshold bool
-	refraction   bool
 }
 
 // CircumpolarOption customizes IsCircumpolar/IsNeverUp.
 type CircumpolarOption func(*circumpolarConfig)
 
-// WithRefraction includes standard atmospheric refraction at the horizon
-// (~34', the same constant Site.SunRiseSetThreshold/MoonRiseSetThreshold
-// use) in the altitude threshold. Off by default, matching
-// Site.RiseSetThreshold's own documented convention for a generic point
-// source — real horizon refraction slightly widens the circumpolar zone
-// and narrows the never-rises one, so which way this defaults changes the
-// answer right at the boundary. Ignored if WithHorizonAltitude is also given.
-func WithRefraction() CircumpolarOption {
-	return func(c *circumpolarConfig) { c.refraction = true }
-}
-
 // WithHorizonAltitude overrides the horizon reference with a caller-supplied
-// minimum altitude instead of the site's true, elevation-corrected horizon
-// — e.g. a fixed local obstruction ("never clears my treeline"). Takes
-// precedence over WithRefraction, since a caller-chosen minimum altitude
-// already IS their effective horizon. (Not named WithMinAltitude: that name
-// is already VisibleTonight's, for an unrelated per-run filter threshold.)
+// minimum geometric altitude instead of the site's rise/set threshold: a
+// fixed local obstruction ("never clears my treeline"), or 0° for the
+// geometric horizon with no refraction. (Not named WithMinAltitude: that
+// name is already VisibleTonight's, for an unrelated per-run filter
+// threshold.)
 func WithHorizonAltitude(minAlt angle.Angle) CircumpolarOption {
 	return func(c *circumpolarConfig) { c.threshold, c.hasThreshold = minAlt, true }
 }
@@ -52,9 +34,15 @@ func WithHorizonAltitude(minAlt angle.Angle) CircumpolarOption {
 // result there means either "circumpolar" or "never rises", and telling
 // those apart needs a second altitude check of its own).
 //
-// The horizon reference defaults to site.RiseSetThreshold() (geometric,
-// elevation-corrected, no atmospheric refraction); see WithRefraction and
-// WithHorizonAltitude to change that.
+// The horizon reference defaults to site.RiseSetThreshold(), the almanac
+// horizon a star rises and sets on: 34′ of refraction plus the site's dip,
+// below the geometric horizon. The altitudes it is compared with are
+// geometric. WithHorizonAltitude replaces it.
+//
+// Until #568 the default left the refraction out and WithRefraction put it
+// back. The refraction is now the default, as it is for VisibilityEvents,
+// and the option is gone: the two disagreed about the same star at the
+// boundary unless a caller knew to ask.
 func IsCircumpolar(dec angle.Angle, site *Site, opts ...CircumpolarOption) bool {
 	minAlt, _ := circumpolarExtremes(dec, site)
 
@@ -103,10 +91,5 @@ func circumpolarThreshold(site *Site, opts []CircumpolarOption) angle.Angle {
 		return cfg.threshold
 	}
 
-	threshold := site.RiseSetThreshold()
-	if cfg.refraction {
-		threshold -= angle.Deg(standardRefractionCircumpolar)
-	}
-
-	return threshold
+	return site.RiseSetThreshold()
 }

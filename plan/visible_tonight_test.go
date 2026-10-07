@@ -244,9 +244,9 @@ func TestVisibleTonight_PeakBelowTheAstronomicalHorizon(t *testing.T) {
 		t.Fatalf("Grazer clears the site's dipped horizon and is bright enough at the horizon's airmass, but was not listed")
 	}
 
-	if alt := got.PeakAltitude.Degrees(); alt >= 0 || alt < site.RiseSetThreshold().Degrees() {
+	if alt := got.PeakAltitude.Degrees(); alt >= 0 || alt < -site.HorizonDip().Degrees() {
 		t.Fatalf("peak altitude %.3f°, want it between the dipped horizon (%.3f°) and 0°, which is the case under test",
-			alt, site.RiseSetThreshold().Degrees())
+			alt, -site.HorizonDip().Degrees())
 	}
 
 	horizon, err := atmosphere.Airmass(angle.Zero())
@@ -379,7 +379,7 @@ func TestVisibleTonight_ExtinctionCanPushBorderlineStarOverMagLimit(t *testing.T
 // TestVisibleTonight_WithMinAltitude demonstrates the option actually
 // changes behavior, not just accepted and ignored: a tight minimum
 // altitude excludes Sirius's low-altitude portion of its arc, while the
-// default (site.RiseSetThreshold(), near 0°) includes it. magLimit=2
+// default (the visible horizon, −dip, near 0°) includes it. magLimit=2
 // (rather than something closer to Sirius's own -1.46) leaves headroom for
 // atmospheric extinction, which evaluateCandidate now checks against the
 // final extinction-adjusted magnitude, not the raw catalog one — a magLimit

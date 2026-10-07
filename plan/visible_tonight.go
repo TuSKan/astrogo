@@ -100,9 +100,11 @@ type visibleTonightConfig struct {
 type VisibleTonightOption func(*visibleTonightConfig)
 
 // WithMinAltitude overrides the minimum altitude an object must clear to
-// count as "visible" tonight. Default: site.RiseSetThreshold() (geometric
-// horizon plus standard refraction/dip — the same bar VisibilityEvents
-// itself uses for rise/set).
+// count as "visible" tonight. The altitude is the observed one, refraction
+// included, so the default is the visible horizon, minus the site's dip.
+// That is the bar VisibilityEvents uses for rise and set, seen from the
+// other side: its threshold, site.RiseSetThreshold(), is the same horizon
+// on the geometric altitude, 34′ of refraction lower.
 func WithMinAltitude(alt angle.Angle) VisibleTonightOption {
 	return func(c *visibleTonightConfig) { c.minAltitude = alt }
 }
@@ -259,7 +261,7 @@ func VisibleTonight(
 	}
 
 	cfg := visibleTonightConfig{
-		minAltitude: site.RiseSetThreshold(),
+		minAltitude: angle.Deg(-site.HorizonDip().Degrees()),
 		step:        unit.Minutes(10),
 	}
 
