@@ -8,6 +8,7 @@ import (
 	"math"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -41,10 +42,29 @@ type ssoftRow struct {
 	number      int64
 	h1          float64
 	fit, status int32
+
+	// designation, when set, is written in place of number: an identifier
+	// that is not a number.
+	designation string
+}
+
+// numberText is the row's sso_number as FINK writes it, a string.
+func (r ssoftRow) numberText() string {
+	if r.designation != "" {
+		return r.designation
+	}
+
+	return strconv.FormatInt(r.number, 10)
 }
 
 // ssoftParquet renders rows as a parquet file with the SSOFT column names
-// readParquet looks for.
+// readParquet looks for, and with the types FINK gives them.
+//
+// The types are read from the real table, not chosen here: SSOFT 2025.04
+// (SHG1G2) stores sso_number as a string and fit, status and n_obs as doubles.
+// This fixture used to write sso_number as int64, which the reader handled and
+// FINK never sends, so every test passed while every asteroid in the real
+// table was read as number 0 (#596).
 //
 // Written through the same Arrow parquet stack the reader uses, so a schema the
 // writer accepts is one the reader can open — the alternative, a hand-rolled
@@ -56,7 +76,7 @@ func ssoftParquet(t *testing.T, rows []ssoftRow) []byte {
 
 	schema := arrow.NewSchema([]arrow.Field{
 		{Name: "sso_name", Type: arrow.BinaryTypes.String},
-		{Name: "sso_number", Type: arrow.PrimitiveTypes.Int64},
+		{Name: "sso_number", Type: arrow.BinaryTypes.String},
 		{Name: "H_1", Type: arrow.PrimitiveTypes.Float64},
 		{Name: "H_2", Type: arrow.PrimitiveTypes.Float64},
 		{Name: "err_H_1", Type: arrow.PrimitiveTypes.Float64},
@@ -70,9 +90,9 @@ func ssoftParquet(t *testing.T, rows []ssoftRow) []byte {
 		{Name: "delta0", Type: arrow.PrimitiveTypes.Float64},
 		{Name: "a_b", Type: arrow.PrimitiveTypes.Float64},
 		{Name: "a_c", Type: arrow.PrimitiveTypes.Float64},
-		{Name: "fit", Type: arrow.PrimitiveTypes.Int32},
-		{Name: "status", Type: arrow.PrimitiveTypes.Int32},
-		{Name: "n_obs", Type: arrow.PrimitiveTypes.Int32},
+		{Name: "fit", Type: arrow.PrimitiveTypes.Float64},
+		{Name: "status", Type: arrow.PrimitiveTypes.Float64},
+		{Name: "n_obs", Type: arrow.PrimitiveTypes.Float64},
 		{Name: "rms", Type: arrow.PrimitiveTypes.Float64},
 	}, nil)
 
@@ -90,24 +110,6 @@ func ssoftParquet(t *testing.T, rows []ssoftRow) []byte {
 		return fb
 	}
 
-	i64 := func(i int) *array.Int64Builder {
-		fb, ok := b.Field(i).(*array.Int64Builder)
-		if !ok {
-			t.Fatalf("field %d is %T, not an int64 builder", i, b.Field(i))
-		}
-
-		return fb
-	}
-
-	i32 := func(i int) *array.Int32Builder {
-		fb, ok := b.Field(i).(*array.Int32Builder)
-		if !ok {
-			t.Fatalf("field %d is %T, not an int32 builder", i, b.Field(i))
-		}
-
-		return fb
-	}
-
 	f64 := func(i int) *array.Float64Builder {
 		fb, ok := b.Field(i).(*array.Float64Builder)
 		if !ok {
@@ -119,7 +121,7 @@ func ssoftParquet(t *testing.T, rows []ssoftRow) []byte {
 
 	for _, r := range rows {
 		str(0).Append(r.name)
-		i64(1).Append(r.number)
+		str(1).Append(r.numberText())
 		f64(2).Append(r.h1)
 		f64(3).Append(r.h1 - 0.5) // H_2
 		f64(4).Append(0.1)        // err_H_1
@@ -133,9 +135,9 @@ func ssoftParquet(t *testing.T, rows []ssoftRow) []byte {
 		f64(12).Append(-30.0)     // delta0
 		f64(13).Append(1.1)       // a_b
 		f64(14).Append(1.2)       // a_c
-		i32(15).Append(r.fit)
-		i32(16).Append(r.status)
-		i32(17).Append(500) // n_obs
+		f64(15).Append(float64(r.fit))
+		f64(16).Append(float64(r.status))
+		f64(17).Append(500) // n_obs
 		f64(18).Append(0.05)
 	}
 
@@ -233,6 +235,41 @@ func TestEnsureLoadedIndexesUsableRows(t *testing.T) {
 	// name key, which would answer every nameless query with it.
 	if rec := p.lookupCached("333"); rec == nil {
 		t.Error("a usable row with no name was not indexed by number")
+	}
+}
+
+// A row whose sso_number is not a number is indexed by name and kept out of
+// the number index. Before #596 every row the reader could not read a number
+// from was filed under 0, one overwriting the next, and given "0" as its ID.
+func TestBulkTableKeepsUnnumberedRowsOutOfTheNumberIndex(t *testing.T) {
+	body := ssoftParquet(t, []ssoftRow{
+		{name: "Benoitcarry", number: 8467, h1: 15.0, status: 1},
+		{name: "2001 RZ74", designation: "2001 RZ74", h1: 15.9, status: 2},
+	})
+
+	serveSSOFT(t, http.StatusOK, body)
+
+	p := New()
+	if err := p.ensureLoaded(context.Background()); err != nil {
+		t.Fatalf("ensureLoaded: %v", err)
+	}
+
+	if got := p.Count(); got != 2 {
+		t.Errorf("Count() = %d, want 2: both rows are usable", got)
+	}
+
+	if rec := p.lookupCached("0"); rec != nil {
+		t.Errorf("lookupCached(0) = %+v; no asteroid is number 0", rec)
+	}
+
+	rec := p.lookupCached("2001 RZ74")
+	if rec == nil {
+		t.Fatal("the unnumbered row was not indexed by name")
+	}
+
+	if tgt := p.recordToTarget(rec); tgt.ID != "2001 RZ74" || tgt.Designation != "" {
+		t.Errorf("the unnumbered row became ID %q, Designation %q; want its name and no designation",
+			tgt.ID, tgt.Designation)
 	}
 }
 
@@ -385,6 +422,13 @@ func TestResolveFallsBackToTheBulkTable(t *testing.T) {
 
 	if tgt.Name != "Benoitcarry" {
 		t.Errorf("Resolve(8467).Name = %q, want Benoitcarry", tgt.Name)
+	}
+
+	// The number is the target's identity, and it comes from the table's
+	// sso_number column, a string. Read as 0, it gave every asteroid the same
+	// ID (#596).
+	if tgt.ID != "8467" || tgt.Designation != "8467" {
+		t.Errorf("Resolve(8467) has ID %q and Designation %q, want 8467 for both", tgt.ID, tgt.Designation)
 	}
 
 	// H_2, not H_1: recordToTarget prefers r-band over g-band because r is

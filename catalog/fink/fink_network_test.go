@@ -96,3 +96,38 @@ func TestFINKProvider_SingleObjectJSON(t *testing.T) {
 		t.Errorf("Name/number lookup mismatch: H=%f vs %f", tgt2.H, tgt.H)
 	}
 }
+
+// The real bulk table, read the way Resolve falls back to it.
+//
+// Nothing tested this against FINK's own file until #596, and the fixture
+// that stood in for it had chosen its own column types: FINK stores sso_number
+// as a string, which the reader read as 0 for every one of SSOFT 2025.04's
+// 151,924 rows, so the number index held a single entry. The version is
+// pinned, so the count is fixed; 148,922 rows pass the fit and status filter.
+func TestFINKBulkTableIndexesEveryAsteroid(t *testing.T) {
+	requireFink(t)
+
+	p := New()
+
+	err := p.ensureLoaded(context.Background())
+	testutil.SkipOnUpstreamFailure(t, err)
+
+	if err != nil {
+		t.Fatalf("ensureLoaded: %v", err)
+	}
+
+	if got := p.Count(); got < 100000 {
+		t.Errorf("Count() = %d; SSOFT %s indexes some 150,000 asteroids", got, p.version)
+	}
+
+	rec := p.lookupCached("8467")
+	if rec == nil || rec.Name != "Benoitcarry" {
+		t.Fatalf("lookupCached(8467) = %+v, want Benoitcarry", rec)
+	}
+
+	if byName := p.lookupCached("Benoitcarry"); byName == nil || byName.Number != 8467 {
+		t.Errorf("lookupCached(Benoitcarry) = %+v, want number 8467", byName)
+	}
+
+	t.Logf("SSOFT %s: %d asteroids indexed", p.version, p.Count())
+}

@@ -173,10 +173,19 @@ func BuildSearchQuery(req resolve.ObjectRequest) string {
 // table.column reference in ORDER BY ("Incorrect ADQL query: Encountered
 // '.'"), confirmed directly against the real service — every other clause
 // here works fine qualified, this is specifically an ORDER BY restriction.
+//
+// With no req.Limit it asks for every object, which SearchBright's contract
+// promises, up to one row past brightRowCap so that SearchBright can tell a
+// complete list from a cut one. It used to take TOP 100 instead, so every
+// caller that set no limit, plan.VisibleTonight among them, saw SIMBAD's 100
+// brightest objects, down to V 2.46, whatever bound it asked for (#603).
+//
+// Objects with no position are left out: a bright-object listing exists to be
+// placed on the sky, and below V 8 SIMBAD holds 29 entries without one.
 func BuildBrightQuery(req resolve.BrightRequest) string {
 	limit := req.Limit
 	if limit <= 0 {
-		limit = 100
+		limit = brightRowCap + 1
 	}
 
 	return fmt.Sprintf(`SELECT TOP %d
@@ -192,9 +201,15 @@ func BuildBrightQuery(req resolve.BrightRequest) string {
 		allfluxes.V AS vmag
 	FROM basic
 	JOIN allfluxes ON basic.oid = allfluxes.oidref
-	WHERE allfluxes.V < %f
+	WHERE allfluxes.V < %f AND basic.ra IS NOT NULL AND basic.dec IS NOT NULL
 	ORDER BY vmag ASC`, limit, req.MaxVMag)
 }
+
+// brightRowCap is the most objects SearchBright returns for a request that
+// names no limit. It is SIMBAD's own default output limit, as its TAP
+// capabilities declare it (50,000 rows by default, 2,000,000 at most), and it
+// lies past V 8, where SIMBAD holds 45,457 objects.
+const brightRowCap = 50000
 
 // TAPRequest builds the form values for a POST TAP query.
 func TAPRequest(adql string) url.Values {

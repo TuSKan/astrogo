@@ -88,7 +88,7 @@ func TestResolveMock(t *testing.T) {
 
 	p := New()
 
-	redirect(t, remote.SIMBAD, server.URL)
+	redirect(t, server.URL)
 
 	tgt, err := p.Resolve(context.Background(), "m31")
 	if err != nil {
@@ -110,7 +110,7 @@ func TestRetryTimeout(t *testing.T) {
 	}))
 	defer server.Close()
 
-	redirect(t, remote.SIMBAD, server.URL)
+	redirect(t, server.URL)
 
 	p := New()
 
@@ -388,7 +388,7 @@ func TestSearchBrightMock(t *testing.T) {
 
 	p := New()
 
-	redirect(t, remote.SIMBAD, server.URL)
+	redirect(t, server.URL)
 
 	var got []resolve.Target
 
@@ -432,14 +432,14 @@ func TestProviderInterface(t *testing.T) {
 // test. It replaces the old http.RoundTripper injection: remote/api's
 // Client is opaque by design, and every request resolves its URL through
 // remote.URL(id) anyway, so the registry is the natural seam.
-func redirect(t *testing.T, id remote.EndpointID, url string) {
+func redirect(t *testing.T, url string) {
 	t.Helper()
 
-	scope := remote.Capture(id)
+	scope := remote.Capture(remote.SIMBAD)
 	t.Cleanup(scope.Restore)
 
-	if err := remote.SetURL(id, url); err != nil {
-		t.Fatalf("SetURL(%s): %v", id, err)
+	if err := remote.SetURL(remote.SIMBAD, url); err != nil {
+		t.Fatalf("SetURL(%s): %v", remote.SIMBAD, err)
 	}
 }
 
