@@ -228,3 +228,67 @@ func TestRefractionIsPhysicallyBounded(t *testing.T) {
 
 	t.Logf("%d samples bounded; monotonic above %.1f°", len(samples), monotonicAbove)
 }
+
+// TestAltAzToICRSInvertsRefractionNearTheHorizon: going to the observed place
+// and back returns the catalog place, from 3° below the horizon to 15° above,
+// for the default model and for an explicit one. Below 10° the inverse takes
+// refraction out through the hand-over to Bennett-NA (#588), and below 5° it
+// is the exact inverse of the forward direction; between, the round trip is
+// as good as SOFA's own two directions, whose disagreement the forward one
+// carries through the hand-over; above 10° it is SOFA's Atioq and Atoiq.
+//
+// Measured with the default model: 8e-8 arcsec below 5°, 0.025 through the
+// hand-over and 0.015 from 10° to 15°. RefractionBennett inverts its own
+// formula, so with it the round trip is exact at every altitude.
+func TestAltAzToICRSInvertsRefractionNearTheHorizon(t *testing.T) {
+	t.Parallel()
+
+	withAtm, _ := refractionScene(t)
+
+	bennett := withAtm.Refraction()
+	bennett.Model = atmosphere.RefractionBennett{}
+
+	explicit := coord.NewContext(withAtm.Time(), withAtm.Site(), bennett)
+
+	var checked int
+
+	for _, c := range []struct {
+		name string
+		ctx  *coord.Context
+	}{{"default", withAtm}, {"RefractionBennett", explicit}} {
+		for raDeg := 0.0; raDeg < 360.0; raDeg += 0.05 {
+			icrs := coord.NewICRS(angle.Deg(raDeg), angle.Deg(-20))
+
+			aa, err := c.ctx.ICRSToAltAz(icrs)
+			if err != nil {
+				t.Fatalf("ICRSToAltAz: %v", err)
+			}
+
+			alt := aa.Alt().Degrees()
+			if alt < -3 || alt > 15 {
+				continue
+			}
+
+			back, err := c.ctx.AltAzToICRS(aa)
+			if err != nil {
+				t.Fatalf("AltAzToICRS: %v", err)
+			}
+
+			checked++
+
+			tolerance := 0.05 // arcseconds: SOFA's own directions, through the hand-over
+			if alt < 5 || c.ctx == explicit {
+				tolerance = 1e-5
+			}
+
+			if d := coord.Separation(icrs, back).Arcseconds(); d > tolerance {
+				t.Errorf("%s, observed %.3f°: back %.4f arcsec from the catalog place, beyond %g",
+					c.name, alt, d, tolerance)
+			}
+		}
+	}
+
+	if checked < 100 {
+		t.Fatalf("only %d places between -3° and 15°; the sweep is not exercising the horizon", checked)
+	}
+}

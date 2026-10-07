@@ -125,3 +125,46 @@ func TestBennettTurnover(t *testing.T) {
 		t.Errorf("turnover at %.5f°, want -1.61445°", bennettTurnover)
 	}
 }
+
+// TestBennettEdges: no air refracts nothing; a line of sight below the foot
+// of the taper is not refracted, either way; the zenith is not refracted; an
+// unstated wavelength is the formula's own; and the forward direction inverts
+// the reverse one exactly.
+func TestBennettEdges(t *testing.T) {
+	if got := Bennett(0, 0, testT, testWL); got != 0 {
+		t.Errorf("Bennett with no pressure: %g, want 0", got)
+	}
+
+	if got := BennettFromTrue(0, 0, testT, testWL); got != 0 {
+		t.Errorf("BennettFromTrue with no pressure: %g, want 0", got)
+	}
+
+	foot := bennettZero(testP, testT, testWL)
+
+	for _, alt := range []float64{foot - 1e-6, -10 * deg, -90 * deg} {
+		if got := Bennett(alt, testP, testT, testWL); got != 0 {
+			t.Errorf("Bennett at %.4f°, below the taper's foot at %.4f°: %g, want 0", alt/deg, foot/deg, got)
+		}
+
+		if got := BennettFromTrue(alt, testP, testT, testWL); got != 0 {
+			t.Errorf("BennettFromTrue at %.4f°: %g, want 0", alt/deg, got)
+		}
+	}
+
+	if got := Bennett(90*deg, testP, testT, testWL); got != 0 {
+		t.Errorf("Bennett at the zenith: %g, want 0", got)
+	}
+
+	if got := dispersion(0); got != 1 {
+		t.Errorf("dispersion with no wavelength: %g, want 1", got)
+	}
+
+	for h := -4.0; h <= 89.0; h += 0.5 {
+		alt := h * deg
+
+		r := BennettFromTrue(alt, testP, testT, testWL)
+		if back := Bennett(alt+r, testP, testT, testWL); math.Abs(back-r)/deg*3600 > 1e-6 {
+			t.Errorf("true %g°: %.9f″ forward, %.9f″ back", h, r/deg*3600, back/deg*3600)
+		}
+	}
+}

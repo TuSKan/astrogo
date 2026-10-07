@@ -126,6 +126,10 @@ func TestRefraction_ZeroPressure(t *testing.T) {
 			if ref := model.RefractFromTrue(angle.Deg(alt), env); ref != 0 {
 				t.Errorf("%T at %g°: zero pressure should produce zero refraction, got %v", model, alt, ref)
 			}
+
+			if ref := model.RefractFromApparent(angle.Deg(alt), env); ref != 0 {
+				t.Errorf("%T at apparent %g°: zero pressure should produce zero refraction, got %v", model, alt, ref)
+			}
 		}
 	}
 }
