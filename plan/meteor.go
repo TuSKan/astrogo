@@ -368,11 +368,7 @@ func (m MeteorShower) ZHRAt(t time.Time, prov eph.Provider) (float64, error) {
 		return 0, fmt.Errorf("meteor: ZHR: %w", err)
 	}
 
-	if !solarLongitudeInRange(lambda, m.ActiveStartSolarLon, m.ActiveEndSolarLon) {
-		return 0, nil
-	}
-
-	return m.ZHR * m.Activity.at(solarLongitudeDelta(lambda, m.PeakSolarLongitude)), nil
+	return m.zhrAtSolarLongitude(lambda), nil
 }
 
 // ObservedRate returns the predicted number of m's meteors a single
@@ -424,6 +420,16 @@ func (m MeteorShower) ObservedRate(t time.Time, site *Site, prov eph.Provider, l
 	}
 
 	return zhr * aa.Alt().Sin() * math.Pow(m.PopulationIndex, limitingMag-6.5), nil
+}
+
+// zhrAtSolarLongitude is [MeteorShower.ZHRAt] at the Sun's J2000 longitude
+// lambda, in degrees.
+func (m MeteorShower) zhrAtSolarLongitude(lambda float64) float64 {
+	if !solarLongitudeInRange(lambda, m.ActiveStartSolarLon, m.ActiveEndSolarLon) {
+		return 0
+	}
+
+	return m.ZHR * m.Activity.at(solarLongitudeDelta(lambda, m.PeakSolarLongitude))
 }
 
 // sunLongitudeJ2000 is the Sun's geocentric ecliptic longitude referred to the
