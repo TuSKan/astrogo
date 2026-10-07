@@ -117,7 +117,9 @@ const (
 //
 // # What these are, and what they are not
 //
-// They are starting points, not measurements, and they are not from OPAC.
+// They are starting points, not tonight's air, and they are not from OPAC.
+// One of them is a site's measured median, sourced below; the other two are
+// representative values with no measurement behind them.
 // OPAC (Hess, Koepke & Schult 1998) supplies the aerosol *optical properties*
 // the constructors below carry — single-scattering albedo, asymmetry
 // parameter, Angstrom exponent — which are properties of an aerosol type and
@@ -133,13 +135,22 @@ const (
 // Copernicus analysis for a site and an hour — or take it from an AERONET
 // station.
 //
-// The ranges in each comment are the spread a regime plausibly covers; the
-// constant is a representative value within it.
+// The ranges in the comments of the unmeasured two are the spread a regime
+// plausibly covers; the constant is a representative value within it.
 const (
 	// CleanMountainAOD550 is a high, dry, remote site — the cleanest air
-	// routinely observed. Roughly 0.02 to 0.05. Paranal and Mauna Kea sit
-	// here, and so does a polar site.
-	CleanMountainAOD550 = 0.03
+	// routinely observed — and, unlike its two siblings, it is measured: the
+	// median at Cerro Paranal, 2,640 m, over more than 40 nights in six
+	// months of standard-star spectrophotometry. Patat et al. (2011, A&A 527,
+	// A91) fit the aerosol there as 0.013 λ^-1.38 mag per airmass with λ in
+	// µm, which at 550 nm is an optical depth of 0.0273.
+	//
+	// It is not the cleanest such site. Buton et al. (2013, A&A 549, A8) give
+	// Mauna Kea's summit a median of 0.0084 (λ/1 µm)^-1.26 mag per airmass:
+	// 0.016 at 550 nm. Both medians hide a night-to-night spread;
+	// Patat et al. put a semi-interquartile range of 0.009 mag per airmass on
+	// theirs at 400 nm, against a median of 0.045.
+	CleanMountainAOD550 = 0.027
 
 	// ContinentalAOD550 is ordinary inland background air away from cities.
 	// Roughly 0.05 to 0.15, and the value most temperate rural sites spend

@@ -215,6 +215,7 @@ tables you can check against published references.
 - `RefractionBennett` — Bennett's formula as refitted to the Nautical Almanac's tables, with pressure, temperature and wavelength; the almanac's table to 0.12′
 - `RefractionSOFA` — the default above
 - Pickering (2002) airmass — stable down to 0° altitude (overcomes Kasten & Young limitations)
+- **Extinction from a site's own air**: `Atmosphere.Extinction` adds Rayleigh scattering from the surface pressure, ozone from its column, and aerosol from its optical depth. On each paper's own air it reproduces Paranal's measured extinction curve within 0.01 mag/airmass (Patat et al. 2011), and Mauna Kea's decomposition term by term (Buton et al. 2013)
 - Chromatic atmospheric dispersion via `Reducer.Disperse()`
 
 ### Observer Modeling

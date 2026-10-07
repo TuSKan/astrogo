@@ -1,6 +1,7 @@
 package atmosphere
 
 import (
+	"errors"
 	"math"
 	"testing"
 
@@ -96,5 +97,28 @@ func TestAtmosphere_ErrAtmosphereBuilder(t *testing.T) {
 	_, err := NewBuilder().Surface(-1, -1).Build()
 	if err == nil {
 		t.Fatal("expected an error for negative pressure/temperature")
+	}
+}
+
+// Ozone refuses a column that would make ozone emit rather than absorb, and
+// one that is not a number at all; Extinction would otherwise brighten a star
+// with it. No ozone is a column like any other.
+func TestBuilder_OzoneRefusesAnImpossibleColumn(t *testing.T) {
+	for _, du := range []float64{-1, math.NaN(), math.Inf(1), math.Inf(-1)} {
+		_, err := NewBuilder().Ozone(du).Build()
+		if !errors.Is(err, ErrAtmosphereBuilder) || !errors.Is(err, errOzoneColumn) {
+			t.Errorf("Ozone(%v).Build() = %v, want ErrAtmosphereBuilder joining errOzoneColumn", du, err)
+		}
+	}
+
+	for _, du := range []float64{0, 258} {
+		air, err := NewBuilder().Ozone(du).Build()
+		if err != nil {
+			t.Fatalf("Ozone(%g).Build(): %v", du, err)
+		}
+
+		if got := air.Ozone(); got != unit.OzoneColumnDU(du) {
+			t.Errorf("Ozone(%g) built an Atmosphere holding %v DU", du, got)
+		}
 	}
 }
