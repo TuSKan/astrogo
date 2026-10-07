@@ -50,12 +50,6 @@ var ErrMissingColumn = errors.New("simbad: missing expected column")
 // the substring query this replaced returned an arbitrary one.
 var ErrEmptyQuery = errors.New("simbad: empty query")
 
-// ErrBrightTruncated is yielded by SearchBright, after the objects it has,
-// when a request with no limit reaches brightRowCap: SIMBAD has more objects
-// brighter than the bound than one query returns, and the list is not all of
-// them.
-var ErrBrightTruncated = errors.New("simbad: more objects brighter than the bound than one query returns")
-
 // ParseCSV parses SIMBAD's TAP output in CSV format into resolve.Targets.
 // The expected order from BuildResolveQuery is:
 // oid, main_id, ra, dec, otype, id (matched alias)

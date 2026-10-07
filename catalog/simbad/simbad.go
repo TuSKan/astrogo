@@ -130,7 +130,7 @@ func (p *Provider) Search(ctx context.Context, query string) ([]resolve.Target, 
 // With req.Limit set it returns at most that many. Without one it returns
 // every object, up to 50,000, SIMBAD's own default output limit; a bound
 // faint enough to pass that (about V 8.1) gets the 50,000 brightest followed
-// by an error wrapping [ErrBrightTruncated], never a short list that looks
+// by an error wrapping [resolve.ErrTruncated], never a short list that looks
 // complete. Only a complete list is cached.
 func (p *Provider) SearchBright(ctx context.Context, req resolve.BrightRequest) resolve.SeqIterator[resolve.Target] {
 	cacheKey := fmt.Sprintf("bright:%f:%d", req.MaxVMag, req.Limit)
@@ -184,7 +184,7 @@ func (p *Provider) SearchBright(ctx context.Context, req resolve.BrightRequest) 
 
 		if truncated {
 			yield(resolve.Target{}, fmt.Errorf("%w: SIMBAD has more than %d objects brighter than V %g",
-				ErrBrightTruncated, brightRowCap, req.MaxVMag))
+				resolve.ErrTruncated, brightRowCap, req.MaxVMag))
 		}
 	}
 }

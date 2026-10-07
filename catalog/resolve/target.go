@@ -294,6 +294,12 @@ var (
 	// [BrightObjectSearcher] describes the same fact ahead of time; this
 	// reports it at the call.
 	ErrUnsupported = errors.New("operation not supported by this provider")
+	// ErrTruncated is yielded, after the results a provider has, when it
+	// returns fewer than were asked for because it reached a ceiling of its
+	// own: a list that is not all of them, said so rather than passed off as
+	// complete. A [BrightObjectSearcher] promises every object brighter than
+	// the bound, and this is how one that cannot deliver all of them says so.
+	ErrTruncated = errors.New("result cut short at the provider's limit")
 )
 
 // Normalize converts a query to a canonical form for matching.

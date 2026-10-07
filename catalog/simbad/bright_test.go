@@ -128,8 +128,8 @@ func TestSearchBrightReportsACutList(t *testing.T) {
 		t.Errorf("got %d targets, want the %d brightest", len(targets), brightRowCap)
 	}
 
-	if len(errs) != 1 || !errors.Is(errs[0], ErrBrightTruncated) {
-		t.Fatalf("errors = %v, want one wrapping ErrBrightTruncated", errs)
+	if len(errs) != 1 || !errors.Is(errs[0], resolve.ErrTruncated) {
+		t.Fatalf("errors = %v, want one wrapping resolve.ErrTruncated", errs)
 	}
 
 	if _, errs := drainBright(p, resolve.BrightRequest{MaxVMag: 9}); len(errs) != 1 || hits.Load() != 2 {
