@@ -1117,27 +1117,33 @@ func mjdFromJDParts(jd1, jd2 float64) float64 {
 	return (jd1 - 2400000.5) + jd2
 }
 
-// dut1ForUTC retrieves DUT1 for the given UTC two-part JD.
-// Returns (dut1, nil) on success, or (0, err) if IERS data is unavailable.
-func dut1ForUTC(jd1, jd2 float64) (float64, error) {
-	eop, err := lookupEOP(mjdFromJDParts(jd1, jd2))
+// dut1ForUTC retrieves DUT1 for the given UTC two-part JD, with
+// [lookupEOP]'s two failures: err when a loaded model does not cover the
+// epoch, defaulted when nothing was loaded and the zero default answered.
+func dut1ForUTC(jd1, jd2 float64) (dut1 float64, defaulted, err error) {
+	eop, defaulted, err := lookupEOP(mjdFromJDParts(jd1, jd2))
 	if err != nil {
-		return 0, fmt.Errorf("time: EOP lookup: %w", err)
+		return 0, nil, fmt.Errorf("time: EOP lookup: %w", err)
 	}
 
-	return eop.DUT1, nil
+	return eop.DUT1, defaulted, nil
 }
 
 // dut1OrFallback retrieves DUT1 with a fallback to 0.0 on error.
-// Logs a one-time warning (shared with Time.EOP()) when falling back.
+// Logs a one-time warning (shared with Time.EOP()) when falling back, or
+// when the zero default answered because nothing was loaded (#518).
 func dut1OrFallback(jd1, jd2 float64) float64 {
 	mjd := mjdFromJDParts(jd1, jd2)
 
-	dut1, err := dut1ForUTC(jd1, jd2)
-	if err != nil {
-		warnEOPUnavailable(mjd)
+	dut1, defaulted, err := dut1ForUTC(jd1, jd2)
+
+	switch {
+	case err != nil:
+		warnEOPUnavailable(mjd, err)
 
 		return 0
+	case defaulted != nil:
+		warnEOPUnavailable(mjd, defaulted)
 	}
 
 	return dut1
@@ -1505,10 +1511,16 @@ func (t Time) TCB() Time {
 // [github.com/TuSKan/astrogo/remote/eop] is imported: a pre-seeded on-disk
 // cache file, then (if [github.com/TuSKan/astrogo/remote.EnableDownloads]
 // was called for [github.com/TuSKan/astrogo/remote.IERSFinals2000A]) a
-// network fetch. Returns an error if none of that yields data for the given
-// epoch — unlike [Time.EOP] and
-// [Time.UTC]'s UT1 branch, this method propagates the failure rather than
-// silently degrading to DUT1=0.
+// network fetch.
+//
+// Returns an error when a loaded bulletin does not reach the epoch: unlike
+// [Time.EOP] and [Time.UTC]'s UT1 branch, this method propagates that
+// failure rather than degrading to DUT1=0. When nothing was loaded at all,
+// as in a program that never imported remote/eop, it degrades like them,
+// to DUT1=0 with the one-time EOP warning, and returns no error; so does a
+// caller that registered ZeroModel deliberately, without the warning. This
+// doc promised an error in that case too until #518, which no code ever
+// returned.
 func (t Time) UT1() (Time, error) {
 	if t.scale == UT1 {
 		return t, nil
@@ -1516,10 +1528,14 @@ func (t Time) UT1() (Time, error) {
 
 	utc := t.UTC() // deterministic route to UTC
 
-	dut1, err := dut1ForUTC(utc.jd1, utc.jd2)
+	dut1, defaulted, err := dut1ForUTC(utc.jd1, utc.jd2)
 	if err != nil {
 		return Time{}, fmt.Errorf("astrogo/time: UT1 conversion failed (MJD %.1f): %w",
 			mjdFromJDParts(utc.jd1, utc.jd2), err)
+	}
+
+	if defaulted != nil {
+		warnEOPUnavailable(mjdFromJDParts(utc.jd1, utc.jd2), defaulted)
 	}
 
 	return utc.UT1Using(dut1), nil
