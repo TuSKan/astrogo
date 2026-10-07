@@ -317,7 +317,7 @@ func VisibleTonight(
 	if air == nil {
 		var err error
 		if air, err = defaultNightAir(site); err != nil {
-			return nil, fmt.Errorf("plan: visible tonight: default air: %w", err)
+			return nil, err
 		}
 	}
 
@@ -887,9 +887,14 @@ func evaluateCandidate(ctx context.Context, c visibleCandidate, start, end time.
 // defaultNightAir is the air VisibleTonight assumes when the caller names
 // none; see WithAtmosphere.
 func defaultNightAir(site *Site) (*atmosphere.Atmosphere, error) {
-	return atmosphere.ContinentalCleanAerosol(site.Height(), atmosphere.CleanMountainAOD550).
+	air, err := atmosphere.ContinentalCleanAerosol(site.Height(), atmosphere.CleanMountainAOD550).
 		Ozone(defaultOzoneDU).
 		Build()
+	if err != nil {
+		return nil, fmt.Errorf("plan: visible tonight: default air: %w", err)
+	}
+
+	return air, nil
 }
 
 // rawMagnitude returns obj's magnitude before atmospheric extinction —
