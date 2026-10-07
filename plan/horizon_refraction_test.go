@@ -199,6 +199,11 @@ func TestHorizonRefractionIsPartOfTheSite(t *testing.T) {
 		t.Error("sites whose horizon air names different models are equal")
 	}
 
+	warm, _ := NewSite("s", loc, WithHorizonRefraction(atmosphere.Refraction{Pressure: 1030, Temperature: 25}))
+	if cold.Equal(warm) {
+		t.Error("sites whose horizon air differs in temperature are equal")
+	}
+
 	withHorizon, err := cold.WithHorizon(angle.Deg(5))
 	if err != nil {
 		t.Fatalf("WithHorizon: %v", err)
