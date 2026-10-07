@@ -138,17 +138,25 @@ func TestEpisodeStillSearchesNearTheHorizonBoundary(t *testing.T) {
 
 	base := time.Date(2026, time.March, 20, 0, 0, 0, 0, time.LocationUTC)
 
-	// At latitude 50N the never-rises boundary is dec = -(90-50) = -40, and the
-	// circumpolar boundary is dec = +40. Declinations within the margin of
+	// At latitude 50N a star culminates at dec + 40 above and dec − 40 below
+	// the horizon, so against the rise/set threshold h (34′ of refraction
+	// below it, #568) the never-rises boundary is dec = h − 40 and the
+	// circumpolar boundary dec = 40 + h. Declinations within the margin of
 	// either must not be answered from geometry alone.
-	for _, decDeg := range []float64{-40.5, -40.0, -39.5, 39.5, 40.0, 40.5} {
-		star := NewStar("edge", angle.Deg(0), angle.Deg(decDeg))
+	h := site.RiseSetThreshold().Degrees()
 
-		if culminationSkipsSearch(star, site, base) {
-			t.Errorf("dec %+.1f is within %g deg of a boundary at latitude 50, but "+
-				"the closed form answered without searching. Refraction alone is "+
-				"~34 arcmin here, so geometry cannot settle it.",
-				decDeg, episodeClosedFormMargin)
+	for _, boundary := range []float64{h - 40, 40 + h} {
+		for _, offset := range []float64{-0.5, 0, 0.5} {
+			decDeg := boundary + offset
+			star := NewStar("edge", angle.Deg(0), angle.Deg(decDeg))
+
+			if culminationSkipsSearch(star, site, base) {
+				t.Errorf("dec %+.2f is within %g deg of a boundary at latitude 50, but "+
+					"the closed form answered without searching. The apparent "+
+					"declination differs from the catalog one by up to a few tenths "+
+					"of a degree, so geometry cannot settle it.",
+					decDeg, episodeClosedFormMargin)
+			}
 		}
 	}
 }

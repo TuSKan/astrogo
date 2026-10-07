@@ -135,47 +135,42 @@ func TestIsCircumpolarNeitherForOrdinaryObject(t *testing.T) {
 	}
 }
 
-// TestIsCircumpolarWithRefraction verifies WithRefraction's actual physical
-// direction: refraction bends light so an object appears higher than its
-// true geometric position, so a real horizon threshold sits BELOW the
-// geometric one (exactly why SunRiseSetThreshold/MoonRiseSetThreshold
-// subtract the refraction constant, making their threshold more negative)
-// — this WIDENS the circumpolar zone (an object that geometrically dips
-// slightly below the horizon can still count as "up"), it does not narrow
-// it. The issue itself states this same direction explicitly.
-func TestIsCircumpolarWithRefraction(t *testing.T) {
+// TestIsCircumpolarUsesTheAlmanacHorizon: refraction lifts an object, so
+// the horizon a star rises and sets on sits 34′ below the geometric one, and
+// the circumpolar zone is wider than the geometry alone gives (#568). At 60°N
+// a declination of 29.6° dips just under the geometric horizon at lower
+// culmination: circumpolar on the almanac horizon, the default, and not on
+// the geometric one.
+func TestIsCircumpolarUsesTheAlmanacHorizon(t *testing.T) {
 	t.Parallel()
 
-	// lat=60, dec=29.6: minAlt without refraction is just under 0° (not
-	// circumpolar); the ~34' refraction correction is enough to push it
-	// just over.
 	site := circumpolarTestSite(t, 60)
 	dec := angle.Deg(29.6)
 
-	withoutRefraction := plan.IsCircumpolar(dec, site)
-	withRefraction := plan.IsCircumpolar(dec, site, plan.WithRefraction())
-
-	if withoutRefraction {
-		t.Fatalf("test fixture assumption broken: dec=%v should not be circumpolar without refraction", dec)
+	if plan.IsCircumpolar(dec, site, plan.WithHorizonAltitude(angle.Zero())) {
+		t.Fatalf("test fixture assumption broken: dec=%v should dip below the geometric horizon", dec)
 	}
 
-	if !withRefraction {
-		t.Error("WithRefraction should widen the circumpolar zone enough to flip this borderline case")
+	if !plan.IsCircumpolar(dec, site) {
+		t.Error("dec 29.6° at 60°N stays above the almanac horizon and should be circumpolar by default")
 	}
 
-	// The reverse direction (refraction turning a circumpolar case
-	// non-circumpolar) must never happen.
-	if plan.IsCircumpolar(angle.Deg(89.26), circumpolarTestSite(t, 70)) &&
-		!plan.IsCircumpolar(angle.Deg(89.26), circumpolarTestSite(t, 70), plan.WithRefraction()) {
-		t.Error("WithRefraction turned a circumpolar case non-circumpolar — refraction should only ever widen the zone")
+	// And it narrows the never-up zone: dec −30.4° culminates at −0.4°,
+	// under the geometric horizon but above the almanac one.
+	south := angle.Deg(-30.4)
+
+	if !plan.IsNeverUp(south, site, plan.WithHorizonAltitude(angle.Zero())) {
+		t.Fatalf("test fixture assumption broken: dec=%v should stay under the geometric horizon", south)
+	}
+
+	if plan.IsNeverUp(south, site) {
+		t.Error("dec −30.4° at 60°N clears the almanac horizon and should not be never-up by default")
 	}
 }
 
 // TestIsCircumpolarWithHorizonAltitude verifies a caller-supplied minimum
-// altitude overrides the site's own horizon entirely, in both directions:
-// a normally-circumpolar object stops being circumpolar against a high
-// enough obstruction, and a fixed permissive threshold can't be defeated by
-// requesting refraction on top of it (WithHorizonAltitude wins).
+// altitude overrides the site's own horizon entirely: a normally-circumpolar
+// object stops being circumpolar against a high enough obstruction.
 func TestIsCircumpolarWithHorizonAltitude(t *testing.T) {
 	t.Parallel()
 
@@ -190,14 +185,6 @@ func TestIsCircumpolarWithHorizonAltitude(t *testing.T) {
 	// 69.26° — an obstruction higher than that defeats its circumpolarity.
 	if plan.IsCircumpolar(polaris, site, plan.WithHorizonAltitude(angle.Deg(75))) {
 		t.Error("a 75° horizon obstruction should defeat Polaris's circumpolarity from 70°N (min altitude there is 69.26°)")
-	}
-
-	// WithHorizonAltitude takes precedence over WithRefraction.
-	got1 := plan.IsCircumpolar(polaris, site, plan.WithHorizonAltitude(angle.Deg(-1)))
-	got2 := plan.IsCircumpolar(polaris, site, plan.WithHorizonAltitude(angle.Deg(-1)), plan.WithRefraction())
-
-	if got1 != got2 {
-		t.Error("WithHorizonAltitude should make WithRefraction a no-op")
 	}
 }
 
