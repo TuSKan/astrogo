@@ -14,10 +14,11 @@ import (
 )
 
 // meanSolarLongitudeDegPerDay is the Sun's mean apparent motion along the
-// ecliptic, 360°/365.25 days — used only to translate an IMO calendar-date
-// activity window into an approximate solar-longitude window (see
-// meteorShowers' doc comment); RadiantAt itself always uses the Sun's real
-// computed ecliptic longitude, never this mean rate.
+// ecliptic, 360°/365.25 days. RadiantAt uses it to turn the Sun's real
+// longitude offset from the peak into the day count the radiant's daily
+// drift is multiplied by. The activity windows do not use it: in July and
+// August the Sun moves 0.957°/day, so a day count converted at the mean rate
+// put the Perseids' start most of a day before IMO's date (#573).
 const meanSolarLongitudeDegPerDay = 360.0 / 365.25
 
 // MeteorShower describes one annual meteor shower's radiant motion and
@@ -89,96 +90,94 @@ func MeteorShowerNames() []string {
 }
 
 // meteorShowers is a modest, defensible starter list, not the full IMO
-// working list — the 9 IMO "Class I" (strongest annual) showers, keyed by
-// a lowercase/underscore slug. See NewMeteorShower for name/code-based
-// lookup. Peak
-// radiant position (RA/Dec at PeakSolarLongitude), ZHR, population index,
-// and velocity are IMO's own published Table 5 values (2015/2020-era IMO
-// Meteor Shower Calendar, imo.net); daily drift near each peak is derived
-// from IMO's Table 6 (radiant position at bracketing dates around each
-// peak, differenced here rather than copied as a pre-computed rate, since
-// the source table publishes positions, not rates); each ActiveStartSolarLon/
-// ActiveEndSolarLon is approximated from IMO's published calendar-date
-// activity window via meanSolarLongitudeDegPerDay, since the source
-// doesn't publish the window's solar-longitude bounds directly — an
-// approximation, not independently sourced, documented here rather than
-// silently treated as exact.
+// working list: the 9 IMO "Class I" (strongest annual) showers, keyed by a
+// lowercase/underscore slug. See NewMeteorShower for name/code-based lookup.
 //
-// Leonids' ZHR is set to its typical annual (non-outburst) rate, not the
-// "100+" IMO's own table lists — that figure reflects the shower's famous
-// ~33-year storm potential (tied to 55P/Tempel-Tuttle's orbital period),
-// which this simple model has no mechanism to predict; using it as a
-// blanket annual ZHR would badly overstate every ordinary year.
+// Every value is from the IMO Meteor Shower Calendar 2027
+// (https://www.imo.net/ShCal27s.pdf), "correct according to the best
+// information available in June 2026" (#573):
 //
-// Ursids' daily drift is left at zero: the radiant sits at Dec +76°, close
-// enough to the north celestial pole that "degrees of RA per day" becomes
-// an unstable, near-degenerate quantity (the same phenomenon documented on
-// constellation.Centroid for Ursa Minor) — the source data available
-// wasn't sufficient to derive a reliable rate, and near the peak date the
-// resulting position error from omitting it is small in absolute terms.
+//   - Peak solar longitude, radiant at the peak, V∞, r and ZHR are Table 5's,
+//     with its decimals. Where Table 5 gives a ZHR as a floor ("80+", "110+",
+//     "15+") the floor is used: the Quadrantids "can vary ≈ 60 − 200", and the
+//     Leonids' storms, tied to 55P/Tempel-Tuttle's 33-year period, are
+//     nothing this model can predict.
+//   - The daily drift is the difference of the two Table 6 radiant positions
+//     that bracket the maximum, divided by the days between them. Table 6
+//     publishes positions to the whole degree five days apart, so a drift is
+//     good to about 0.2°/day.
+//   - The activity window is Table 5's dates turned into the Sun's J2000
+//     longitude, geometric, on ecliptic_J2000_frame (Skyfield 1.55, DE440s):
+//     0h UT on the first date of activity to 24h UT on the last, in 2027, the
+//     year the calendar is for.
+//
+// The Ursids' radiant, at +76°, is close enough to the pole that a drift in
+// right ascension is near-degenerate; Table 6 gives 217° on both dates that
+// bracket the maximum, so its RA drift is zero and its declination drift is
+// Table 6's.
 var meteorShowers = map[string]MeteorShower{
 	"quadrantids": {
 		Name: "Quadrantids", Code: "QUA", ParentBody: "2003 EH1",
 		RadiantRA: angle.Deg(230), RadiantDec: angle.Deg(49),
 		DriftRAPerDay: angle.Deg(0.6), DriftDecPerDay: angle.Deg(-0.2),
-		PeakSolarLongitude: 283, ActiveStartSolarLon: 283 - 2*meanSolarLongitudeDegPerDay, ActiveEndSolarLon: 283 + 2*meanSolarLongitudeDegPerDay,
-		ZHR: 120, PopulationIndex: 2.1, Velocity: unit.KmPerSec(41),
+		PeakSolarLongitude: 283.15, ActiveStartSolarLon: 275.87, ActiveEndSolarLon: 292.18,
+		ZHR: 80, PopulationIndex: 2.1, Velocity: unit.KmPerSec(41),
 	},
 	"lyrids": {
 		Name: "Lyrids", Code: "LYR", ParentBody: "C/1861 G1 (Thatcher)",
 		RadiantRA: angle.Deg(271), RadiantDec: angle.Deg(34),
 		DriftRAPerDay: angle.Deg(1.0), DriftDecPerDay: angle.Deg(0.0),
-		PeakSolarLongitude: 32, ActiveStartSolarLon: 32 - 6*meanSolarLongitudeDegPerDay, ActiveEndSolarLon: 32 + 3*meanSolarLongitudeDegPerDay,
+		PeakSolarLongitude: 32.32, ActiveStartSolarLon: 23.46, ActiveEndSolarLon: 40.04,
 		ZHR: 18, PopulationIndex: 2.1, Velocity: unit.KmPerSec(49),
 	},
 	"eta_aquariids": {
 		Name: "Eta Aquariids", Code: "ETA", ParentBody: "1P/Halley",
 		RadiantRA: angle.Deg(338), RadiantDec: angle.Deg(-1),
 		DriftRAPerDay: angle.Deg(0.8), DriftDecPerDay: angle.Deg(0.4),
-		PeakSolarLongitude: 45, ActiveStartSolarLon: 45 - 17*meanSolarLongitudeDegPerDay, ActiveEndSolarLon: 45 + 22*meanSolarLongitudeDegPerDay,
-		ZHR: 60, PopulationIndex: 2.4, Velocity: unit.KmPerSec(66),
+		PeakSolarLongitude: 45.5, ActiveStartSolarLon: 28.35, ActiveEndSolarLon: 67.05,
+		ZHR: 50, PopulationIndex: 2.4, Velocity: unit.KmPerSec(66),
 	},
 	"southern_delta_aquariids": {
 		Name: "Southern Delta Aquariids", Code: "SDA", ParentBody: "96P/Machholz (disputed)",
-		RadiantRA: angle.Deg(339), RadiantDec: angle.Deg(-16),
-		DriftRAPerDay: angle.Deg(1.0), DriftDecPerDay: angle.Deg(0.4),
-		PeakSolarLongitude: 125, ActiveStartSolarLon: 125 - 16*meanSolarLongitudeDegPerDay, ActiveEndSolarLon: 125 + 22*meanSolarLongitudeDegPerDay,
-		ZHR: 20, PopulationIndex: 3.2, Velocity: unit.KmPerSec(41),
+		RadiantRA: angle.Deg(340), RadiantDec: angle.Deg(-16),
+		DriftRAPerDay: angle.Deg(0.83), DriftDecPerDay: angle.Deg(0.33),
+		PeakSolarLongitude: 128, ActiveStartSolarLon: 109.08, ActiveEndSolarLon: 150.25,
+		ZHR: 25, PopulationIndex: 2.5, Velocity: unit.KmPerSec(41),
 	},
 	"perseids": {
 		Name: "Perseids", Code: "PER", ParentBody: "109P/Swift-Tuttle",
-		RadiantRA: angle.Deg(46), RadiantDec: angle.Deg(58),
-		DriftRAPerDay: angle.Deg(1.3), DriftDecPerDay: angle.Deg(0.15),
-		PeakSolarLongitude: 140, ActiveStartSolarLon: 140 - 26*meanSolarLongitudeDegPerDay, ActiveEndSolarLon: 140 + 12*meanSolarLongitudeDegPerDay,
-		ZHR: 100, PopulationIndex: 2.6, Velocity: unit.KmPerSec(59),
+		RadiantRA: angle.Deg(48), RadiantDec: angle.Deg(58),
+		DriftRAPerDay: angle.Deg(1.2), DriftDecPerDay: angle.Deg(0.2),
+		PeakSolarLongitude: 140.0, ActiveStartSolarLon: 113.85, ActiveEndSolarLon: 151.21,
+		ZHR: 110, PopulationIndex: 2.2, Velocity: unit.KmPerSec(59),
 	},
 	"orionids": {
 		Name: "Orionids", Code: "ORI", ParentBody: "1P/Halley",
 		RadiantRA: angle.Deg(95), RadiantDec: angle.Deg(16),
-		DriftRAPerDay: angle.Deg(0.65), DriftDecPerDay: angle.Deg(0.05),
-		PeakSolarLongitude: 208, ActiveStartSolarLon: 208 - 19*meanSolarLongitudeDegPerDay, ActiveEndSolarLon: 208 + 17*meanSolarLongitudeDegPerDay,
-		ZHR: 23, PopulationIndex: 2.5, Velocity: unit.KmPerSec(66),
+		DriftRAPerDay: angle.Deg(0.8), DriftDecPerDay: angle.Deg(0.0),
+		PeakSolarLongitude: 208, ActiveStartSolarLon: 188.20, ActiveEndSolarLon: 224.96,
+		ZHR: 20, PopulationIndex: 2.5, Velocity: unit.KmPerSec(66),
 	},
 	"leonids": {
 		Name: "Leonids", Code: "LEO", ParentBody: "55P/Tempel-Tuttle",
-		RadiantRA: angle.Deg(153), RadiantDec: angle.Deg(22),
+		RadiantRA: angle.Deg(152), RadiantDec: angle.Deg(22),
 		DriftRAPerDay: angle.Deg(0.6), DriftDecPerDay: angle.Deg(-0.4),
-		PeakSolarLongitude: 235, ActiveStartSolarLon: 235 - 5*meanSolarLongitudeDegPerDay, ActiveEndSolarLon: 235 + 2*meanSolarLongitudeDegPerDay,
+		PeakSolarLongitude: 235.27, ActiveStartSolarLon: 222.96, ActiveEndSolarLon: 248.16,
 		ZHR: 15, PopulationIndex: 2.5, Velocity: unit.KmPerSec(71),
 	},
 	"geminids": {
 		Name: "Geminids", Code: "GEM", ParentBody: "3200 Phaethon",
 		RadiantRA: angle.Deg(112), RadiantDec: angle.Deg(33),
-		DriftRAPerDay: angle.Deg(1.0), DriftDecPerDay: angle.Deg(-0.1),
-		PeakSolarLongitude: 262, ActiveStartSolarLon: 262 - 7*meanSolarLongitudeDegPerDay, ActiveEndSolarLon: 262 + 3*meanSolarLongitudeDegPerDay,
-		ZHR: 120, PopulationIndex: 2.6, Velocity: unit.KmPerSec(35),
+		DriftRAPerDay: angle.Deg(1.0), DriftDecPerDay: angle.Deg(0.0),
+		PeakSolarLongitude: 262.2, ActiveStartSolarLon: 251.20, ActiveEndSolarLon: 268.48,
+		ZHR: 150, PopulationIndex: 2.6, Velocity: unit.KmPerSec(35),
 	},
 	"ursids": {
 		Name: "Ursids", Code: "URS", ParentBody: "8P/Tuttle",
 		RadiantRA: angle.Deg(217), RadiantDec: angle.Deg(76),
-		DriftRAPerDay: angle.Zero(), DriftDecPerDay: angle.Zero(),
-		PeakSolarLongitude: 270, ActiveStartSolarLon: 270 - 5*meanSolarLongitudeDegPerDay, ActiveEndSolarLon: 270 + 4*meanSolarLongitudeDegPerDay,
-		ZHR: 10, PopulationIndex: 3.0, Velocity: unit.KmPerSec(33),
+		DriftRAPerDay: angle.Zero(), DriftDecPerDay: angle.Deg(-0.4),
+		PeakSolarLongitude: 270.7, ActiveStartSolarLon: 264.41, ActiveEndSolarLon: 274.59,
+		ZHR: 10, PopulationIndex: 2.8, Velocity: unit.KmPerSec(33),
 	},
 }
 
