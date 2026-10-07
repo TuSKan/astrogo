@@ -1269,7 +1269,8 @@ func TestUSNO_PolarSun(t *testing.T) {
 }
 
 // ── Test: High Altitude — Mount Everest ──────────────────────────────────────
-// At 8849m altitude, the geometric horizon dip is ~2.76°, which significantly
+// At 8849m altitude, the horizon dip is ~2.76° (1.76′√h, with terrestrial
+// refraction; the geometric dip would be 3.02°), which significantly
 // shifts sunrise/sunset times (the Sun appears to rise earlier and set later).
 //
 // IMPORTANT: The USNO rstt/oneday API ignores the height parameter for rise/set

@@ -462,15 +462,20 @@ func (s *Site) Refraction() atmosphere.Refraction {
 	return atmosphere.AtAltitude(s.location.Height())
 }
 
-// HorizonDip returns the geometric dip angle of the visible horizon at this
-// site's elevation. At sea level the dip is zero; at 786 m it is ≈ 0.90°.
+// HorizonDip returns the dip of the visible horizon at this site's elevation:
+// 1.76′·√h with h in meters, the apparent dip, which includes terrestrial
+// refraction (see [atmosphere.HorizonDip]). At sea level it is zero; at 786 m
+// it is 0.82°, where the geometric dip, with no refraction, would be 0.90°.
 func (s *Site) HorizonDip() angle.Angle {
 	return atmosphere.HorizonDip(s.location.Height())
 }
 
-// RiseSetThreshold returns the standard rise/set altitude threshold for a
-// point source (star) at this site, including the geometric horizon dip
-// from the site's elevation.
+// RiseSetThreshold returns the rise/set altitude threshold for a point
+// source (star) at this site: the horizon dip from the site's elevation,
+// and nothing else. Unlike [Site.SunRiseSetThreshold] it adds no
+// atmospheric refraction, and the rise/set solver compares it with the
+// geometric altitude, so a point source rises when its geometric center
+// reaches the dipped horizon.
 //
 // At sea level: 0°. At 786m: −0.82° (the depressed horizon).
 func (s *Site) RiseSetThreshold() angle.Angle {
