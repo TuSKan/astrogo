@@ -64,6 +64,11 @@ type MeteorShower struct {
 	// would see under ideal conditions (radiant at zenith, limiting
 	// magnitude 6.5). See ObservedRate for the real-conditions formula.
 	ZHR float64
+	// Activity is how the ZHR falls away from its maximum; see
+	// [ActivityProfile]. The zero value is flat, the ZHR staying at its
+	// maximum through the whole activity window, which is all that can be
+	// said of a shower whose profile is not known.
+	Activity ActivityProfile
 	// PopulationIndex (r) describes how the shower's meteor count changes
 	// per magnitude of limiting-magnitude depth — always > 1; most
 	// showers fall in the 2.0-3.2 range (lower = relatively more bright
@@ -71,6 +76,46 @@ type MeteorShower struct {
 	PopulationIndex float64
 	// Velocity is the shower's geocentric entry velocity, informational.
 	Velocity unit.Velocity
+}
+
+// ActivityProfile is a shower's activity around its maximum, as a fraction
+// of the activity at the maximum, in the form Jenniskens (1994, A&A 287,
+// 990) fits to the annual streams: the ZHR falls off as
+//
+//	10^(−B·|λ☉ − λ☉max|)
+//
+// with the slope B per degree of solar longitude (his Eq. 8). A stream that
+// one such curve does not describe is the sum of two, a narrow main peak and
+// a broad background (his Table 3c). The rising branch, before the maximum,
+// has a slope B⁺ of its own, and the falling branch B⁻.
+//
+// PeakShare is in [0, 1] and every slope is non-negative. The zero value is
+// flat: no peak, and a background that does not fall off.
+type ActivityProfile struct {
+	// PeakShare is the main peak's share of the activity at the maximum,
+	// ZHRᵖ / (ZHRᵖ + ZHRᵇ); the background has the rest. It is 1 for a
+	// stream one curve describes.
+	PeakShare float64
+
+	// PeakRise and PeakFall are the main peak's slopes B⁺ and B⁻, per
+	// degree of solar longitude.
+	PeakRise, PeakFall float64
+
+	// BackgroundRise and BackgroundFall are the background's.
+	BackgroundRise, BackgroundFall float64
+}
+
+// at returns the activity delta degrees of solar longitude from the
+// maximum, negative before it, as a fraction of the activity at the maximum.
+func (p ActivityProfile) at(delta float64) float64 {
+	peak, background := p.PeakFall, p.BackgroundFall
+	if delta < 0 {
+		peak, background = p.PeakRise, p.BackgroundRise
+	}
+
+	d := math.Abs(delta)
+
+	return p.PeakShare*math.Pow(10, -peak*d) + (1-p.PeakShare)*math.Pow(10, -background*d)
 }
 
 // MeteorShowerNames returns the names of every built-in shower, sorted.
@@ -111,6 +156,15 @@ func MeteorShowerNames() []string {
 //     0h UT on the first date of activity to 24h UT on the last, in 2027, the
 //     year the calendar is for.
 //
+// Each activity profile is Jenniskens (1994, A&A 287, 990)'s, centered on
+// IMO's maximum (his are for the equinox 1950.0). Where his Table 3c fits a
+// main peak and a background, that is used: the Quadrantids, Perseids,
+// Geminids and Ursids, whose long backgrounds one curve cannot follow. The
+// rest are his Table 3b's single curves, the Leonids among them because
+// Table 3c gives their falling background only as a bound, "> 0.15". The
+// Ursids' Table 3b fit is parenthesized there as uncertain; Table 3c's is
+// not. The ZHR at the maximum stays IMO's: only the shape is his.
+//
 // The Ursids' radiant, at +76°, is close enough to the pole that a drift in
 // right ascension is near-degenerate; Table 6 gives 217° on both dates that
 // bracket the maximum, so its RA drift is zero and its declination drift is
@@ -122,6 +176,7 @@ var meteorShowers = map[string]MeteorShower{
 		DriftRAPerDay: angle.Deg(0.6), DriftDecPerDay: angle.Deg(-0.2),
 		PeakSolarLongitude: 283.15, ActiveStartSolarLon: 275.87, ActiveEndSolarLon: 292.18,
 		ZHR: 80, PopulationIndex: 2.1, Velocity: unit.KmPerSec(41),
+		Activity: ActivityProfile{PeakShare: 110.0 / (110 + 20), PeakRise: 2.5, PeakFall: 2.5, BackgroundRise: 0.37, BackgroundFall: 0.45},
 	},
 	"lyrids": {
 		Name: "Lyrids", Code: "LYR", ParentBody: "C/1861 G1 (Thatcher)",
@@ -129,6 +184,7 @@ var meteorShowers = map[string]MeteorShower{
 		DriftRAPerDay: angle.Deg(1.0), DriftDecPerDay: angle.Deg(0.0),
 		PeakSolarLongitude: 32.32, ActiveStartSolarLon: 23.46, ActiveEndSolarLon: 40.04,
 		ZHR: 18, PopulationIndex: 2.1, Velocity: unit.KmPerSec(49),
+		Activity: ActivityProfile{PeakShare: 1, PeakRise: 0.22, PeakFall: 0.22},
 	},
 	"eta_aquariids": {
 		Name: "Eta Aquariids", Code: "ETA", ParentBody: "1P/Halley",
@@ -136,6 +192,7 @@ var meteorShowers = map[string]MeteorShower{
 		DriftRAPerDay: angle.Deg(0.8), DriftDecPerDay: angle.Deg(0.4),
 		PeakSolarLongitude: 45.5, ActiveStartSolarLon: 28.35, ActiveEndSolarLon: 67.05,
 		ZHR: 50, PopulationIndex: 2.4, Velocity: unit.KmPerSec(66),
+		Activity: ActivityProfile{PeakShare: 1, PeakRise: 0.080, PeakFall: 0.080},
 	},
 	"southern_delta_aquariids": {
 		Name: "Southern Delta Aquariids", Code: "SDA", ParentBody: "96P/Machholz (disputed)",
@@ -143,6 +200,7 @@ var meteorShowers = map[string]MeteorShower{
 		DriftRAPerDay: angle.Deg(0.83), DriftDecPerDay: angle.Deg(0.33),
 		PeakSolarLongitude: 128, ActiveStartSolarLon: 109.08, ActiveEndSolarLon: 150.25,
 		ZHR: 25, PopulationIndex: 2.5, Velocity: unit.KmPerSec(41),
+		Activity: ActivityProfile{PeakShare: 1, PeakRise: 0.091, PeakFall: 0.091},
 	},
 	"perseids": {
 		Name: "Perseids", Code: "PER", ParentBody: "109P/Swift-Tuttle",
@@ -150,6 +208,7 @@ var meteorShowers = map[string]MeteorShower{
 		DriftRAPerDay: angle.Deg(1.2), DriftDecPerDay: angle.Deg(0.2),
 		PeakSolarLongitude: 140.0, ActiveStartSolarLon: 113.85, ActiveEndSolarLon: 151.21,
 		ZHR: 110, PopulationIndex: 2.2, Velocity: unit.KmPerSec(59),
+		Activity: ActivityProfile{PeakShare: 70.0 / (70 + 23), PeakRise: 0.35, PeakFall: 0.35, BackgroundRise: 0.050, BackgroundFall: 0.092},
 	},
 	"orionids": {
 		Name: "Orionids", Code: "ORI", ParentBody: "1P/Halley",
@@ -157,6 +216,7 @@ var meteorShowers = map[string]MeteorShower{
 		DriftRAPerDay: angle.Deg(0.8), DriftDecPerDay: angle.Deg(0.0),
 		PeakSolarLongitude: 208, ActiveStartSolarLon: 188.20, ActiveEndSolarLon: 224.96,
 		ZHR: 20, PopulationIndex: 2.5, Velocity: unit.KmPerSec(66),
+		Activity: ActivityProfile{PeakShare: 1, PeakRise: 0.12, PeakFall: 0.12},
 	},
 	"leonids": {
 		Name: "Leonids", Code: "LEO", ParentBody: "55P/Tempel-Tuttle",
@@ -164,6 +224,7 @@ var meteorShowers = map[string]MeteorShower{
 		DriftRAPerDay: angle.Deg(0.6), DriftDecPerDay: angle.Deg(-0.4),
 		PeakSolarLongitude: 235.27, ActiveStartSolarLon: 222.96, ActiveEndSolarLon: 248.16,
 		ZHR: 15, PopulationIndex: 2.5, Velocity: unit.KmPerSec(71),
+		Activity: ActivityProfile{PeakShare: 1, PeakRise: 0.39, PeakFall: 0.39},
 	},
 	"geminids": {
 		Name: "Geminids", Code: "GEM", ParentBody: "3200 Phaethon",
@@ -171,6 +232,7 @@ var meteorShowers = map[string]MeteorShower{
 		DriftRAPerDay: angle.Deg(1.0), DriftDecPerDay: angle.Deg(0.0),
 		PeakSolarLongitude: 262.2, ActiveStartSolarLon: 251.20, ActiveEndSolarLon: 268.48,
 		ZHR: 150, PopulationIndex: 2.6, Velocity: unit.KmPerSec(35),
+		Activity: ActivityProfile{PeakShare: 74.0 / (74 + 18), PeakRise: 0.59, PeakFall: 0.81, BackgroundRise: 0.09, BackgroundFall: 0.31},
 	},
 	"ursids": {
 		Name: "Ursids", Code: "URS", ParentBody: "8P/Tuttle",
@@ -178,6 +240,7 @@ var meteorShowers = map[string]MeteorShower{
 		DriftRAPerDay: angle.Zero(), DriftDecPerDay: angle.Deg(-0.4),
 		PeakSolarLongitude: 270.7, ActiveStartSolarLon: 264.41, ActiveEndSolarLon: 274.59,
 		ZHR: 10, PopulationIndex: 2.8, Velocity: unit.KmPerSec(33),
+		Activity: ActivityProfile{PeakShare: 10.0 / (10 + 2.0), PeakRise: 0.9, PeakFall: 0.9, BackgroundRise: 0.08, BackgroundFall: 0.2},
 	},
 }
 
@@ -221,7 +284,15 @@ func solarLongitudeDelta(cur, peak float64) float64 {
 // solarLongitudeInRange reports whether lambda falls within [start, end]
 // (degrees, each wrapped to [0,360)), handling the case where the range
 // itself wraps past 360°→0°.
+//
+// A range a full turn or more wide contains every longitude. Wrapping its
+// ends first made [0, 360] the single point 0, so a shower declared active
+// all year was active at one instant of it (#572).
 func solarLongitudeInRange(lambda, start, end float64) bool {
+	if end-start >= 360 {
+		return true
+	}
+
 	lambda = wrap360Deg(lambda)
 	start = wrap360Deg(start)
 	end = wrap360Deg(end)
@@ -285,24 +356,53 @@ func (m MeteorShower) Radiant(t time.Time, prov eph.Provider) (*Star, error) {
 	return NewStar(m.Name+" radiant", ra, dec), nil
 }
 
+// ZHRAt returns m's zenithal hourly rate at time t: m.ZHR, the rate at the
+// maximum, times m.Activity at the Sun's J2000 longitude, and zero outside
+// [m.ActiveStartSolarLon, m.ActiveEndSolarLon].
+//
+// Until #572 nothing used the date: ObservedRate gave the maximum rate on
+// every night of the year, 97 Perseids an hour on 1 March from 45°N.
+func (m MeteorShower) ZHRAt(t time.Time, prov eph.Provider) (float64, error) {
+	lambda, err := sunLongitudeJ2000(t, prov)
+	if err != nil {
+		return 0, fmt.Errorf("meteor: ZHR: %w", err)
+	}
+
+	if !solarLongitudeInRange(lambda, m.ActiveStartSolarLon, m.ActiveEndSolarLon) {
+		return 0, nil
+	}
+
+	return m.ZHR * m.Activity.at(solarLongitudeDelta(lambda, m.PeakSolarLongitude)), nil
+}
+
 // ObservedRate returns the predicted number of m's meteors a single
 // observer at site would see per hour at time t, given the naked-eye
 // limiting magnitude limitingMag actually reached under the sky
 // conditions of the moment. This is IMO's own standard formula, inverted
 // to predict rather than measure:
 //
-//	observedRate = ZHR · sin(h_R) · r^(LM − 6.5)
+//	observedRate = ZHR(t) · sin(h_R) · r^(LM − 6.5)
 //
-// where h_R is the radiant's altitude — under the defining standard
-// conditions (h_R=90°, LM=6.5) this reduces to exactly ZHR. Returns 0
-// (not an error) when the radiant is below the horizon, and likewise for
-// a limiting magnitude of -Inf (a sky too bright to see anything).
+// where ZHR(t) is [MeteorShower.ZHRAt] and h_R is the radiant's altitude.
+// Under the defining standard conditions (h_R=90°, LM=6.5) it reduces to
+// exactly ZHR(t). Returns 0 (not an error) outside the activity window,
+// when the radiant is below the horizon, and for a limiting magnitude of
+// -Inf (a sky too bright to see anything).
 //
 // The limiting magnitude is a caller-supplied input rather than something
 // computed here: it depends on moonlight, zodiacal light and light
 // pollution through a sky-brightness model, which is a separate concern
 // from meteor rate arithmetic.
 func (m MeteorShower) ObservedRate(t time.Time, site *Site, prov eph.Provider, limitingMag float64) (float64, error) {
+	zhr, err := m.ZHRAt(t, prov)
+	if err != nil {
+		return 0, fmt.Errorf("meteor: observed rate: %w", err)
+	}
+
+	if zhr == 0 {
+		return 0, nil
+	}
+
 	ra, dec, err := m.RadiantAt(t, prov)
 	if err != nil {
 		return 0, fmt.Errorf("meteor: observed rate: %w", err)
@@ -323,7 +423,7 @@ func (m MeteorShower) ObservedRate(t time.Time, site *Site, prov eph.Provider, l
 		return 0, nil
 	}
 
-	return m.ZHR * aa.Alt().Sin() * math.Pow(m.PopulationIndex, limitingMag-6.5), nil
+	return zhr * aa.Alt().Sin() * math.Pow(m.PopulationIndex, limitingMag-6.5), nil
 }
 
 // sunLongitudeJ2000 is the Sun's geocentric ecliptic longitude referred to the
