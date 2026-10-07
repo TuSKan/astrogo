@@ -123,23 +123,40 @@ func toTargets(records []targetRecord) []resolve.Target {
 	return targets
 }
 
-// mapKind maps an OpenNGC object-type code to astrogo's resolve.Kind.
+// mapKind maps an OpenNGC object type to astrogo's resolve.Kind, or to
+// resolve.KindOther for a type that is not an object to observe, which the
+// parser then skips.
+//
+// The codes are OpenNGC's own, the 21 its NGC_guide.txt defines at the commit
+// remote.OpenNGC pins, and every one of them has a case here. The switch used
+// to list codes from other catalogues ("Gx", "*Assoc", "Nb") that OpenNGC never
+// uses, and miss two it does: "*Ass", an association of stars, and "EmN", an
+// emission nebula. Their 72 rows, M24 and Brocchi's Cluster among them, fell
+// through to KindOther and were dropped (#599).
+//
+// "*Ass" is a star cluster rather than an open one, since OpenNGC's README
+// groups it with OCl, GCl and Cl+N and its members include star clouds (M24)
+// and asterisms (Brocchi's Cluster) as well as the Magellanic Clouds' OB
+// associations.
 func mapKind(t string) resolve.Kind {
 	switch t {
-	case "G", "Gx", "Gxy", "G_Ctr", "GClstr":
-		return resolve.KindGalaxy
-	case "Nb", "HII", "PN", "SNR", "RfN", "Neb", "DrkN":
-		return resolve.KindNebula
-	case "OCl", "Cl", "Cl+N", "Assoc", "NAssoc", "OCl+N":
+	case "*", "**":
+		return resolve.KindStar
+	case "*Ass":
+		return resolve.KindStarCluster
+	case "OCl", "Cl+N":
 		return resolve.KindOpenCluster
 	case "GCl":
 		return resolve.KindGlobularCluster
-	case "*", "**", "*Assoc", "Star":
-		return resolve.KindStar
-	case "Ast":
-		return resolve.KindAsterism
-	case "GGroup", "GPair", "GTrpl":
+	case "G", "GPair", "GTrpl", "GGroup":
 		return resolve.KindGalaxy
+	case "PN", "HII", "DrkN", "EmN", "Neb", "RfN", "SNR":
+		return resolve.KindNebula
+	case "Nova", "NonEx", "Dup", "Other":
+		// A nova's catalogued position is a star that has faded; a
+		// nonexistent object and a duplicate have nothing of their own to
+		// observe; "Other" is defined only by its notes.
+		return resolve.KindOther
 	default:
 		return resolve.KindOther
 	}
