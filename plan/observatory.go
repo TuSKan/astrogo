@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 	"net/url"
+	"reflect"
 	"slices"
 	"strconv"
 	"strings"
@@ -27,6 +28,10 @@ type Site struct {
 	aliases        []string
 	horizon        angle.Angle
 	horizonProfile HorizonProfile
+
+	// horizonAir is the air the rise and set horizon refracts through, or
+	// nil for the almanacs' fixed 34′; see WithHorizonRefraction.
+	horizonAir *atmosphere.Refraction
 }
 
 // HorizonProfile computes the local horizon elevation limit at a given
@@ -233,6 +238,28 @@ func WithHorizonProfile(p HorizonProfile) SiteOption {
 	return func(s *Site) { s.horizonProfile = p }
 }
 
+// WithHorizonRefraction sets the air whose refraction lifts a body onto the
+// rise and set horizon, in place of the almanacs' fixed 34′: the pressure,
+// temperature and wavelength of the air along the horizon, and its model, nil
+// for the default, which is Bennett-NA there. A zero pressure is no
+// refraction, and the horizon is then the dip alone.
+//
+// It is the air the line of sight grazes, which is not always the site's.
+// From a summit over the sea it is the air near the water, which refracts
+// about as the almanacs assume, not the summit's thin air, which refracts
+// much less; over a land horizon near the site's own height it is the site's
+// air, [Site.Refraction] or measured values.
+//
+// The refraction is taken at 0° of apparent altitude and added to the dip,
+// as the almanacs add their 34′ (see [Site.RiseSetThreshold]). At 10 °C and
+// 1010 hPa it is 33.8′. Observed horizon refraction varies from night to
+// night by more than any of this corrects: against timed sunrises and
+// sunsets no model predicts a rise or set better than about 2 minutes
+// (Wilson 2018), and none here claims to.
+func WithHorizonRefraction(air atmosphere.Refraction) SiteOption {
+	return func(s *Site) { s.horizonAir = &air }
+}
+
 // WithTimeZone sets the site's local time zone. Defaults to UTC if omitted
 // (see Site.TimeZone).
 func WithTimeZone(tz *time.Location) SiteOption {
@@ -256,8 +283,8 @@ func WithSiteAliases(aliases ...string) SiteOption {
 // NewSite creates a new observing site with validation.
 // name: A human-readable name for the site.
 // loc: The geodetic location (longitude, latitude, height).
-// opts: optional parameters — see WithHorizon, WithTimeZone, WithMPCCode,
-// and WithSiteAliases.
+// opts: optional parameters — see WithHorizon, WithHorizonProfile,
+// WithHorizonRefraction, WithTimeZone, WithMPCCode, and WithSiteAliases.
 func NewSite(name string, loc *coord.Geodetic, opts ...SiteOption) (*Site, error) {
 	if loc == nil {
 		return nil, ErrNilLocation
@@ -490,11 +517,14 @@ const standardRefraction = 0.5667
 //
 // At sea level: −0.5667°. At 786 m: −1.389°.
 //
+// With [WithHorizonRefraction] the 34′ is instead the refraction of the air
+// the site names, here and in the Sun's and Moon's thresholds.
+//
 // Until #568 it was the dip alone, with no refraction, so a star rose 2.4
 // to 7 minutes after the almanacs' rise at the latitudes tested there, and
 // set as much before theirs.
 func (s *Site) RiseSetThreshold() angle.Angle {
-	return angle.Deg(-standardRefraction - s.HorizonDip().Degrees())
+	return angle.Deg(-s.horizonRefraction() - s.HorizonDip().Degrees())
 }
 
 // SunRiseSetThreshold returns the sunrise/sunset altitude threshold.
@@ -508,11 +538,12 @@ func (s *Site) RiseSetThreshold() angle.Angle {
 //   - Standard atmospheric refraction at horizon: 34' (0.5667°)
 //   - Horizon dip from elevation: 1.76'√h
 //
-// Total at sea level: −(16' + 34') = −50' = −0.8333°.
+// Total at sea level: −(16' + 34') = −50' = −0.8333°. With
+// [WithHorizonRefraction] the 34' is that air's refraction.
 func (s *Site) SunRiseSetThreshold() angle.Angle {
 	const sunSemiDiameter = 0.2667 // degrees, ~16 arcmin
 
-	return angle.Deg(-sunSemiDiameter - standardRefraction - s.HorizonDip().Degrees())
+	return angle.Deg(-sunSemiDiameter - s.horizonRefraction() - s.HorizonDip().Degrees())
 }
 
 // MoonRiseSetThreshold returns the rise/set altitude threshold for the Moon.
@@ -526,7 +557,7 @@ func (s *Site) SunRiseSetThreshold() angle.Angle {
 func (s *Site) MoonRiseSetThreshold() angle.Angle {
 	const moonSemiDiameter = 0.2583 // degrees, ~15.5 arcmin (mean)
 
-	return angle.Deg(-moonSemiDiameter - standardRefraction - s.HorizonDip().Degrees())
+	return angle.Deg(-moonSemiDiameter - s.horizonRefraction() - s.HorizonDip().Degrees())
 }
 
 // String returns a compact representation of the site, appending the MPC
@@ -573,12 +604,37 @@ func (s *Site) Equal(other *Site) bool {
 		math.Abs(s.location.Lat().Radians()-other.location.Lat().Radians()) < eps &&
 		math.Abs(s.location.Height().Meters()-other.location.Height().Meters()) < eps &&
 		math.Abs(s.horizon.Radians()-other.horizon.Radians()) < eps &&
+		sameHorizonAir(s.horizonAir, other.horizonAir) &&
 		tzEqual
+}
+
+// sameHorizonAir reports whether two sites refract their horizons alike. The
+// model is compared by type, as skybrightness compares refraction settings:
+// every model astrogo ships is a stateless empty struct, and comparing the
+// interface directly would panic for a caller's own non-comparable one.
+func sameHorizonAir(a, b *atmosphere.Refraction) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+
+	if a.Pressure != b.Pressure || a.Temperature != b.Temperature ||
+		a.Humidity != b.Humidity || a.Wavelength != b.Wavelength {
+		return false
+	}
+
+	return reflect.TypeOf(a.Model) == reflect.TypeOf(b.Model)
 }
 
 // WithHorizon returns a copy of s with the given horizon limit.
 func (s *Site) WithHorizon(h angle.Angle) (*Site, error) {
-	return NewSite(s.name, s.location, WithHorizon(h), WithTimeZone(s.timeZone), WithMPCCode(s.mpcCode), WithSiteAliases(s.aliases...), WithHorizonProfile(s.horizonProfile))
+	site, err := NewSite(s.name, s.location, WithHorizon(h), WithTimeZone(s.timeZone), WithMPCCode(s.mpcCode), WithSiteAliases(s.aliases...), WithHorizonProfile(s.horizonProfile))
+	if err != nil {
+		return nil, err
+	}
+
+	site.horizonAir = s.horizonAir
+
+	return site, nil
 }
 
 // WithTimeZone returns a copy of s with the given time zone.
@@ -591,6 +647,7 @@ func (s *Site) WithTimeZone(tz *time.Location) *Site {
 		timeZone:       tz,
 		mpcCode:        s.mpcCode,
 		aliases:        s.Aliases(),
+		horizonAir:     s.horizonAir,
 	}
 }
 
@@ -615,4 +672,15 @@ func (s *Site) LocalSiderealTime(t time.Time) (angle.Angle, error) {
 	}
 
 	return angle.Rad(lst), nil
+}
+
+// horizonRefraction is the refraction at the horizon the rise and set
+// thresholds use, in degrees: the almanacs' 34′, or with
+// WithHorizonRefraction, that air's refraction at 0° of apparent altitude.
+func (s *Site) horizonRefraction() float64 {
+	if s.horizonAir == nil {
+		return standardRefraction
+	}
+
+	return s.horizonAir.RefractFromApparent(angle.Zero()).Degrees()
 }
